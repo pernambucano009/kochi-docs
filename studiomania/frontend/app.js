@@ -430,7 +430,7 @@ function showStep(step) {
   if (!document.querySelector(`.view[data-view="${step}"]`)) step = "1";
   document.querySelectorAll(".view").forEach((v) => (v.hidden = v.dataset.view !== step));
   document.querySelectorAll(".step[data-step]").forEach((b) => b.classList.toggle("active", b.dataset.step === step));
-  if (step !== "1") player.pause();
+  document.querySelectorAll("video, audio").forEach((m) => m.pause());
   if (location.hash !== `#${step}`) history.replaceState(null, "", `#${step}`);
   viewHooks[step]?.();
 }

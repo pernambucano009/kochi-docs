@@ -42,6 +42,7 @@ def load_env_file(path: Path) -> None:
 load_env_file(ROOT / ".env")
 
 import atlas  # noqa: E402  (لازم بعد قراءة .env)
+import montage  # noqa: E402
 
 MAX_CLIP_SECONDS = 15.0
 MIN_CUT_GAP = 0.2  # أقل مسافة مسموحة بين نقطتين قطع
@@ -57,10 +58,11 @@ CLIPS_DIR = DATA_DIR / "clips"
 COACHES_DIR = DATA_DIR / "coaches"
 GENERATED_DIR = DATA_DIR / "generated"
 AUDIO_DIR = DATA_DIR / "audio"
+EXPORTS_DIR = DATA_DIR / "exports"  # فولدر الفيديوهات الجاهزة للنشر
 DB_PATH = DATA_DIR / "studiomania.db"
 FRONTEND_DIR = ROOT / "frontend"
 
-for d in (RAW_DIR, CLIPS_DIR, COACHES_DIR, GENERATED_DIR, AUDIO_DIR):
+for d in (RAW_DIR, CLIPS_DIR, COACHES_DIR, GENERATED_DIR, AUDIO_DIR, EXPORTS_DIR):
     d.mkdir(parents=True, exist_ok=True)
 
 
@@ -132,6 +134,25 @@ def init_db() -> None:
                 name TEXT NOT NULL,
                 filename TEXT NOT NULL,
                 duration REAL NOT NULL,
+                created_at TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS projects (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                data TEXT NOT NULL,
+                render_status TEXT NOT NULL DEFAULT 'idle',
+                render_error TEXT,
+                export_id TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS exports (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                filename TEXT NOT NULL,
+                duration REAL NOT NULL,
+                source TEXT NOT NULL,
+                project_id TEXT,
                 created_at TEXT NOT NULL
             );
             CREATE TABLE IF NOT EXISTS coaches (
@@ -888,11 +909,261 @@ def delete_audio(audio_id: str):
     return {"ok": True}
 
 
+# ---------------------------------------------------------------- المونتاج (الخطوة 6)
+
+_probe_cache: dict[str, montage.MediaInfo] = {}
+
+
+def media_info(path: Path) -> montage.MediaInfo:
+    key = f"{path}:{path.stat().st_mtime}"
+    if key not in _probe_cache:
+        _probe_cache[key] = montage.probe(ffmpeg_exe(), path)
+    return _probe_cache[key]
+
+
+@app.get("/api/montage/sources")
+def montage_sources():
+    """الفيديوهات المولَّدة الجاهزة اللي ينفع تدخل المونتاج."""
+    with closing(db()) as conn:
+        rows = conn.execute(
+            "SELECT * FROM generations WHERE status = 'completed' AND output_filename IS NOT NULL ORDER BY created_at DESC"
+        ).fetchall()
+    out = []
+    for r in rows:
+        path = GENERATED_DIR / r["output_filename"]
+        if not path.exists():
+            continue
+        out.append(
+            {
+                "id": r["id"],
+                "label": r["clip_label"],
+                "coach_id": r["coach_id"],
+                "coach_name": r["coach_name"],
+                "url": f"/media/generated/{r['output_filename']}",
+                "duration": media_info(path).duration,
+            }
+        )
+    return out
+
+
+class ClipEdit(BaseModel):
+    gen_id: str
+    start: float = 0
+    end: float | None = None
+    zoom: float = 1.0
+    x: float = 0.0
+    y: float = 0.0
+    volume: float = 1.0
+
+
+class TrackEdit(BaseModel):
+    id: str
+    volume: float = 1.0
+    delay: float = 0.0
+    offset: float = 0.0
+    fade_out: bool = True
+
+
+class ProjectIn(BaseModel):
+    name: str
+    coach_id: str | None = None
+    clips: list[ClipEdit] = []
+    voice: TrackEdit | None = None
+    music: TrackEdit | None = None
+    outro: bool = True
+    outro_volume: float = 1.0
+
+
+def project_to_dict(r: sqlite3.Row) -> dict:
+    return {
+        "id": r["id"],
+        "name": r["name"],
+        "data": json.loads(r["data"]),
+        "render_status": r["render_status"],
+        "render_error": r["render_error"],
+        "export_id": r["export_id"],
+        "updated_at": r["updated_at"],
+    }
+
+
+def get_project(conn: sqlite3.Connection, project_id: str) -> sqlite3.Row:
+    row = conn.execute("SELECT * FROM projects WHERE id = ?", (project_id,)).fetchone()
+    if row is None:
+        raise HTTPException(404, "المشروع غير موجود")
+    return row
+
+
+@app.get("/api/projects")
+def list_projects():
+    with closing(db()) as conn:
+        return [project_to_dict(r) for r in conn.execute("SELECT * FROM projects ORDER BY updated_at DESC")]
+
+
+@app.post("/api/projects")
+def create_project(body: ProjectIn):
+    project_id = uuid.uuid4().hex[:12]
+    data = body.model_dump()
+    data["name"] = body.name.strip() or "مشروع جديد"
+    with closing(db()) as conn, conn:
+        conn.execute(
+            "INSERT INTO projects (id, name, data, render_status, created_at, updated_at) VALUES (?, ?, ?, 'idle', ?, ?)",
+            (project_id, data["name"], json.dumps(data), now(), now()),
+        )
+        return project_to_dict(get_project(conn, project_id))
+
+
+@app.put("/api/projects/{project_id}")
+def save_project(project_id: str, body: ProjectIn):
+    data = body.model_dump()
+    data["name"] = body.name.strip() or "مشروع جديد"
+    with closing(db()) as conn, conn:
+        get_project(conn, project_id)
+        conn.execute(
+            "UPDATE projects SET name = ?, data = ?, updated_at = ? WHERE id = ?",
+            (data["name"], json.dumps(data), now(), project_id),
+        )
+        return project_to_dict(get_project(conn, project_id))
+
+
+@app.delete("/api/projects/{project_id}")
+def delete_project(project_id: str):
+    with closing(db()) as conn, conn:
+        row = get_project(conn, project_id)
+        if row["render_status"] == "rendering":
+            raise HTTPException(400, "المشروع بيتصدّر دلوقتي، استنى لما يخلص")
+        conn.execute("DELETE FROM projects WHERE id = ?", (project_id,))
+    return {"ok": True}
+
+
+def clamp(v: float, lo: float, hi: float) -> float:
+    return max(lo, min(hi, v))
+
+
+def build_montage(conn: sqlite3.Connection, data: dict) -> tuple[list, montage.AudioTrack | None, montage.AudioTrack | None]:
+    """يحوّل بيانات المشروع لقطع ومسارات صوت جاهزة لـ FFmpeg، ويتأكد إن كل حاجة موجودة."""
+    ff = ffmpeg_exe()
+    segments = []
+    for i, c in enumerate(data["clips"], start=1):
+        g = conn.execute("SELECT output_filename FROM generations WHERE id = ?", (c["gen_id"],)).fetchone()
+        if g is None or not g["output_filename"] or not (GENERATED_DIR / g["output_filename"]).exists():
+            raise HTTPException(400, f"الفيديو رقم {i} اتمسح. شيله من المونتاج")
+        path = GENERATED_DIR / g["output_filename"]
+        info = media_info(path)
+        start = clamp(c["start"], 0, info.duration)
+        end = clamp(c["end"] if c["end"] is not None else info.duration, 0, info.duration)
+        if end - start < 0.3:
+            raise HTTPException(400, f"الفيديو رقم {i} مقصوص لدرجة إنه أقل من ثانية")
+        segments.append(
+            montage.Segment(
+                path, start, end,
+                zoom=clamp(c["zoom"], 1, 4), x=clamp(c["x"], -1, 1), y=clamp(c["y"], -1, 1),
+                volume=clamp(c["volume"], 0, 3), has_audio=info.has_audio,
+            )
+        )
+    if not segments:
+        raise HTTPException(400, "ضيف فيديو واحد على الأقل للمونتاج")
+
+    if data.get("outro") and data.get("coach_id"):
+        coach = conn.execute("SELECT outro_filename FROM coaches WHERE id = ?", (data["coach_id"],)).fetchone()
+        if coach and coach["outro_filename"]:
+            path = COACHES_DIR / coach["outro_filename"]
+            info = media_info(path)
+            segments.append(
+                montage.Segment(path, 0, info.duration, volume=clamp(data.get("outro_volume", 1), 0, 3), has_audio=info.has_audio)
+            )
+
+    def track(t: dict | None, kind: str) -> montage.AudioTrack | None:
+        if not t:
+            return None
+        row = conn.execute("SELECT filename FROM audio WHERE id = ? AND kind = ?", (t["id"], kind)).fetchone()
+        if row is None:
+            raise HTTPException(400, "ملف الصوت المختار اتمسح من المكتبة")
+        return montage.AudioTrack(
+            AUDIO_DIR / row["filename"], volume=clamp(t["volume"], 0, 3),
+            delay=max(0, t["delay"]), offset=max(0, t["offset"]), fade_out=t["fade_out"],
+        )
+
+    return segments, track(data.get("voice"), "voice"), track(data.get("music"), "music")
+
+
+def run_render(project_id: str, export_id: str, cmd: list[str], total: float, name: str) -> None:
+    filename = f"{export_id}.mp4"
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    with closing(db()) as conn, conn:
+        if result.returncode != 0:
+            (EXPORTS_DIR / filename).unlink(missing_ok=True)
+            conn.execute(
+                "UPDATE projects SET render_status = 'failed', render_error = ?, updated_at = ? WHERE id = ?",
+                (f"FFmpeg: {result.stderr.strip()[-400:]}", now(), project_id),
+            )
+            return
+        conn.execute(
+            "INSERT INTO exports (id, name, filename, duration, source, project_id, created_at) VALUES (?, ?, ?, ?, 'studio', ?, ?)",
+            (export_id, name, filename, total, project_id, now()),
+        )
+        conn.execute(
+            "UPDATE projects SET render_status = 'done', render_error = NULL, export_id = ?, updated_at = ? WHERE id = ?",
+            (export_id, now(), project_id),
+        )
+
+
+render_executor = ThreadPoolExecutor(max_workers=1)
+
+
+@app.post("/api/projects/{project_id}/render")
+def render_project(project_id: str):
+    with closing(db()) as conn, conn:
+        row = get_project(conn, project_id)
+        if row["render_status"] == "rendering":
+            raise HTTPException(400, "المشروع بيتصدّر بالفعل")
+        data = json.loads(row["data"])
+        segments, voice, music = build_montage(conn, data)
+        export_id = uuid.uuid4().hex[:12]
+        cmd, total = montage.build_command(ffmpeg_exe(), segments, EXPORTS_DIR / f"{export_id}.mp4", voice, music)
+        conn.execute(
+            "UPDATE projects SET render_status = 'rendering', render_error = NULL, updated_at = ? WHERE id = ?",
+            (now(), project_id),
+        )
+    render_executor.submit(run_render, project_id, export_id, cmd, total, row["name"])
+    return {"ok": True, "duration": total}
+
+
+def export_to_dict(r: sqlite3.Row) -> dict:
+    return {
+        "id": r["id"],
+        "name": r["name"],
+        "url": f"/media/exports/{r['filename']}",
+        "duration": r["duration"],
+        "source": r["source"],
+        "project_id": r["project_id"],
+        "created_at": r["created_at"],
+    }
+
+
+@app.get("/api/exports")
+def list_exports():
+    with closing(db()) as conn:
+        return [export_to_dict(r) for r in conn.execute("SELECT * FROM exports ORDER BY created_at DESC")]
+
+
+def reset_stuck_renders() -> None:
+    """التصدير بيضيع لو البرنامج اتقفل في النص، فنعلّمه كفاشل."""
+    with closing(db()) as conn, conn:
+        conn.execute(
+            "UPDATE projects SET render_status = 'failed', render_error = 'البرنامج اتقفل أثناء التصدير. صدّر تاني' "
+            "WHERE render_status = 'rendering'"
+        )
+
+
+reset_stuck_renders()
+
+
 app.mount("/media/raw", StaticFiles(directory=RAW_DIR), name="raw")
 app.mount("/media/clips", StaticFiles(directory=CLIPS_DIR), name="clips")
 app.mount("/media/coaches", StaticFiles(directory=COACHES_DIR), name="coaches")
 app.mount("/media/generated", StaticFiles(directory=GENERATED_DIR), name="generated")
 app.mount("/media/audio", StaticFiles(directory=AUDIO_DIR), name="audio")
+app.mount("/media/exports", StaticFiles(directory=EXPORTS_DIR), name="exports")
 
 
 @app.get("/")

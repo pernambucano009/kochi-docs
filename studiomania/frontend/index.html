@@ -23,7 +23,7 @@
     <button class="step" data-step="3"><span>3</span>التعليق الصوتي</button>
     <button class="step" data-step="4"><span>4</span>المدربين</button>
     <button class="step" data-step="5"><span>5</span>الموسيقى</button>
-    <button class="step" disabled><span>6</span>المونتاج</button>
+    <button class="step" data-step="6"><span>6</span>المونتاج</button>
     <button class="step" disabled><span>7</span>النشر</button>
   </nav>
 
@@ -168,11 +168,88 @@
   <!-- الخطوة 3 و 5: مكتبات الصوت (بيملاها audio.js) -->
   <main class="view" data-view="3" hidden><div class="audio-lib" data-kind="voice"></div></main>
   <main class="view" data-view="5" hidden><div class="audio-lib" data-kind="music"></div></main>
+
+  <!-- الخطوة 6: المونتاج -->
+  <main class="view" data-view="6" hidden>
+    <div class="panel project-bar">
+      <select id="projectSelect"></select>
+      <button class="btn sm" id="newProject">＋ مشروع جديد</button>
+      <input type="text" id="projectName" placeholder="اسم المشروع">
+      <span class="muted" id="saveState"></span>
+      <span class="spacer"></span>
+      <button class="btn sm danger" id="deleteProject">حذف المشروع</button>
+    </div>
+    <p class="empty panel" id="noProject" hidden>اعمل مشروع جديد عشان تبدأ المونتاج.</p>
+
+    <div class="montage" id="montage" hidden>
+      <section class="panel bin">
+        <div class="panel-head"><h2>الفيديوهات المولَّدة</h2></div>
+        <label class="check"><input type="checkbox" id="binCoachOnly" checked> فيديوهات المدرب المختار بس</label>
+        <div class="bin-grid" id="binGrid"></div>
+        <p class="empty" id="binEmpty" hidden>مفيش فيديوهات مولَّدة جاهزة. ولّد من <a href="#" data-goto="2">الخطوة 2</a>.</p>
+      </section>
+
+      <section class="panel timeline-panel">
+        <div class="panel-head"><h2>ترتيب الفيديو</h2><span class="muted" id="totalLabel"></span></div>
+        <ol class="tl" id="tlList"></ol>
+        <p class="empty" id="tlEmpty">دوس ＋ على فيديو من الشمال عشان يدخل هنا.</p>
+
+        <div class="clip-editor" id="clipEditor" hidden>
+          <div class="frame" id="previewFrame"><video id="previewVideo" muted playsinline loop></video></div>
+          <div class="sliders" dir="ltr">
+            <h3 dir="rtl" id="editorLabel"></h3>
+            <label dir="rtl">بداية القص <b id="startVal"></b><input type="range" dir="ltr" id="edStart" min="0" step="0.1"></label>
+            <label dir="rtl">نهاية القص <b id="endVal"></b><input type="range" dir="ltr" id="edEnd" min="0" step="0.1"></label>
+            <label dir="rtl">زووم <b id="zoomVal"></b><input type="range" dir="ltr" id="edZoom" min="100" max="300" step="5"></label>
+            <label dir="rtl">شمال ⟷ يمين <b id="xVal"></b><input type="range" dir="ltr" id="edX" min="-100" max="100" step="1"></label>
+            <label dir="rtl">فوق ⟷ تحت <b id="yVal"></b><input type="range" dir="ltr" id="edY" min="-100" max="100" step="1"></label>
+            <label dir="rtl">الصوت <b id="volVal"></b><input type="range" dir="ltr" id="edVol" min="0" max="200" step="5"></label>
+            <div class="row" dir="rtl">
+              <button class="btn sm" id="edPlay">▶︎ معاينة</button>
+              <button class="btn sm" id="edReset">↺ رجّع الإعدادات</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel side">
+        <div class="panel-head"><h2>المدرب والأوترو</h2></div>
+        <label class="field">المدرب <select id="mCoach"></select></label>
+        <label class="check"><input type="checkbox" id="mOutro"> ضيف الأوترو في الآخر <span class="muted" id="outroInfo"></span></label>
+        <label class="field slider-field">صوت الأوترو <b id="outroVolVal"></b><input type="range" id="mOutroVol" min="0" max="200" step="5" dir="ltr"></label>
+
+        <div class="panel-head gap-top"><h2>التعليق الصوتي</h2></div>
+        <label class="field"><select id="mVoice"></select></label>
+        <div id="voiceOpts">
+          <label class="field slider-field">الصوت <b id="voiceVolVal"></b><input type="range" id="mVoiceVol" min="0" max="200" step="5" dir="ltr"></label>
+          <label class="field">يبدأ بعد (ثانية) <input type="number" id="mVoiceDelay" min="0" step="0.5"></label>
+        </div>
+
+        <div class="panel-head gap-top"><h2>الموسيقى</h2></div>
+        <label class="field"><select id="mMusic"></select></label>
+        <div id="musicOpts">
+          <label class="field slider-field">الصوت <b id="musicVolVal"></b><input type="range" id="mMusicVol" min="0" max="200" step="5" dir="ltr"></label>
+          <label class="field">تبدأ من ثانية جوه الملف <input type="number" id="mMusicOffset" min="0" step="0.5"></label>
+          <label class="check"><input type="checkbox" id="mMusicFade"> تختفي بالتدريج في الآخر</label>
+          <p class="alert warn" id="musicWarn" hidden></p>
+        </div>
+
+        <button class="btn primary wide gap-top" id="renderBtn">🎬 صدّر الفيديو</button>
+        <p class="err" id="renderError" hidden></p>
+        <div id="renderResult" hidden>
+          <video id="resultVideo" controls playsinline></video>
+          <div class="row"><a class="btn sm" id="resultDownload" download>⬇ تحميل</a>
+          <span class="muted">اتحفظ في فولدر الفيديوهات الجاهزة</span></div>
+        </div>
+      </section>
+    </div>
+  </main>
 </div>
 <div class="toast" id="toast" hidden></div>
 <script src="/app.js"></script>
 <script src="/coaches.js"></script>
 <script src="/generate.js"></script>
 <script src="/audio.js"></script>
+<script src="/montage.js"></script>
 </body>
 </html>
