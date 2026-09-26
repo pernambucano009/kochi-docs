@@ -15,6 +15,9 @@
       <h1>StudioMania</h1>
       <p>من الفيديو الخام لحد النشر</p>
     </div>
+    <span class="spacer"></span>
+    <button class="btn sm" id="openSettings">⚙️ الإعدادات</button>
+    <button class="btn sm" id="logout">خروج</button>
   </header>
 
   <nav class="steps" id="steps">
@@ -287,6 +290,34 @@
       <p class="empty" id="postsEmpty">مفيش بوستات هنا.</p>
     </section>
   </main>
+
+  <!-- الإعدادات -->
+  <main class="view" data-view="settings" hidden>
+    <div class="gen-layout">
+      <section class="panel">
+        <div class="panel-head"><h2>مفاتيح الخدمات</h2></div>
+        <form id="keysForm">
+          <label class="field">مفتاح Atlas Cloud (للتوليد بـ Seedance)
+            <input type="password" id="atlasKey" autocomplete="off" placeholder="الصق المفتاح هنا"></label>
+          <p class="hint" id="atlasState"></p>
+          <label class="field">مفتاح Zernio (للنشر على السوشيال ميديا)
+            <input type="password" id="zernioKey" autocomplete="off" placeholder="الصق المفتاح هنا"></label>
+          <p class="hint" id="zernioState"></p>
+          <p class="hint">المفاتيح بتتحفظ على السيرفر بتاعك بس. لو سبت الخانة فاضية المفتاح القديم بيفضل زي ما هو.</p>
+          <button class="btn primary" type="submit">حفظ المفاتيح</button>
+        </form>
+      </section>
+      <section class="panel settings">
+        <div class="panel-head"><h2>تغيير الباسورد</h2></div>
+        <form id="pwForm">
+          <label class="field">الباسورد الحالي <input type="password" id="pwCurrent" autocomplete="current-password" required></label>
+          <label class="field">الباسورد الجديد <input type="password" id="pwNew" autocomplete="new-password" required></label>
+          <button class="btn primary" type="submit">غيّر الباسورد</button>
+        </form>
+        <p class="hint" id="pwEnvNote" hidden>الباسورد متحدد من إعدادات السيرفر (APP_PASSWORD)، فبيتغيّر من هناك.</p>
+      </section>
+    </div>
+  </main>
 </div>
 <div class="toast" id="toast" hidden></div>
 <script src="/app.js"></script>
@@ -295,5 +326,6 @@
 <script src="/audio.js"></script>
 <script src="/montage.js"></script>
 <script src="/publish.js"></script>
+<script src="/settings.js"></script>
 </body>
 </html>

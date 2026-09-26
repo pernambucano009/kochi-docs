@@ -23,6 +23,10 @@ function toast(msg, isError = false) {
 
 async function api(path, opts = {}) {
   const res = await fetch(path, opts);
+  if (res.status === 401 && !path.startsWith("/api/auth/")) {
+    location.href = "/login";
+    throw new Error("لازم تسجّل دخول");
+  }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.detail || `خطأ ${res.status}`);
   return data;
@@ -430,6 +434,7 @@ function showStep(step) {
   if (!document.querySelector(`.view[data-view="${step}"]`)) step = "1";
   document.querySelectorAll(".view").forEach((v) => (v.hidden = v.dataset.view !== step));
   document.querySelectorAll(".step[data-step]").forEach((b) => b.classList.toggle("active", b.dataset.step === step));
+  $("openSettings").classList.toggle("active", step === "settings");
   document.querySelectorAll("video, audio").forEach((m) => m.pause());
   if (location.hash !== `#${step}`) history.replaceState(null, "", `#${step}`);
   viewHooks[step]?.();

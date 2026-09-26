@@ -21,7 +21,8 @@ from pathlib import Path
 
 import httpx
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
-from fastapi.responses import FileResponse
+from fastapi import Request
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -45,6 +46,7 @@ load_env_file(ROOT / ".env")
 import atlas  # noqa: E402  (لازم بعد قراءة .env)
 import montage  # noqa: E402
 import publisher  # noqa: E402
+from auth import SESSION_COOKIE, SESSION_DAYS, Auth  # noqa: E402
 
 MAX_CLIP_SECONDS = 15.0
 MIN_CUT_GAP = 0.2  # أقل مسافة مسموحة بين نقطتين قطع
@@ -54,7 +56,7 @@ IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
 AUDIO_EXTENSIONS = {".mp3", ".wav", ".m4a", ".aac", ".ogg", ".opus", ".flac"}
 AUDIO_KINDS = {"voice", "music"}  # التعليق الصوتي (الخطوة 3) والموسيقى (الخطوة 5)
 
-DATA_DIR = ROOT / "data"
+DATA_DIR = Path(os.environ.get("STUDIOMANIA_DATA") or ROOT / "data")
 RAW_DIR = DATA_DIR / "raw"
 CLIPS_DIR = DATA_DIR / "clips"
 COACHES_DIR = DATA_DIR / "coaches"
@@ -253,7 +255,119 @@ def clips_count(conn: sqlite3.Connection, video_id: str) -> int:
 
 
 init_db()
+auth = Auth(DB_PATH, DATA_DIR)
 app = FastAPI(title="StudioMania")
+
+# الصفحات والملفات اللي بتفتح من غير دخول
+PUBLIC_PATHS = {"/login", "/login.html", "/style.css", "/health", "/api/auth/state", "/api/auth/login", "/api/auth/setup"}
+
+
+@app.middleware("http")
+async def require_login(request: Request, call_next):
+    path = request.url.path
+    if path in PUBLIC_PATHS or auth.valid_token(request.cookies.get(SESSION_COOKIE)):
+        return await call_next(request)
+    if path.startswith("/api/"):
+        return JSONResponse({"detail": "لازم تسجّل دخول"}, status_code=401)
+    return RedirectResponse("/login")
+
+
+@app.get("/health")
+def health():
+    return {"ok": True}
+
+
+@app.get("/login")
+def login_page():
+    return FileResponse(FRONTEND_DIR / "login.html")
+
+
+class PasswordIn(BaseModel):
+    password: str
+
+
+def session_response(request: Request) -> JSONResponse:
+    resp = JSONResponse({"ok": True})
+    secure = request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https"
+    resp.set_cookie(
+        SESSION_COOKIE, auth.make_token(), max_age=SESSION_DAYS * 86400,
+        httponly=True, samesite="lax", secure=secure,
+    )
+    return resp
+
+
+@app.get("/api/auth/state")
+def auth_state(request: Request):
+    return {
+        "needs_setup": auth.needs_setup(),
+        "logged_in": auth.valid_token(request.cookies.get(SESSION_COOKIE)),
+    }
+
+
+@app.post("/api/auth/setup")
+def auth_setup(body: PasswordIn, request: Request):
+    if not auth.needs_setup():
+        raise HTTPException(400, "الباسورد متعمل قبل كده")
+    if len(body.password) < 8:
+        raise HTTPException(400, "الباسورد لازم يكون 8 حروف أو أرقام على الأقل")
+    auth.set_password(body.password)
+    return session_response(request)
+
+
+@app.post("/api/auth/login")
+def auth_login(body: PasswordIn, request: Request):
+    if auth.needs_setup():
+        raise HTTPException(400, "لسه مفيش باسورد، اعمل واحد الأول")
+    if not auth.check_password(body.password):
+        time.sleep(1)  # يبطّأ أي حد بيجرّب باسوردات كتير
+        raise HTTPException(401, "الباسورد غلط")
+    return session_response(request)
+
+
+@app.post("/api/auth/logout")
+def auth_logout():
+    resp = JSONResponse({"ok": True})
+    resp.delete_cookie(SESSION_COOKIE)
+    return resp
+
+
+class ChangePasswordIn(BaseModel):
+    current: str
+    new: str
+
+
+@app.post("/api/auth/password")
+def change_password(body: ChangePasswordIn, request: Request):
+    if auth.env_password():
+        raise HTTPException(400, "الباسورد متحدد من إعدادات السيرفر (APP_PASSWORD)، غيّره من هناك")
+    if not auth.check_password(body.current):
+        raise HTTPException(400, "الباسورد الحالي غلط")
+    if len(body.new) < 8:
+        raise HTTPException(400, "الباسورد الجديد لازم يكون 8 حروف أو أرقام على الأقل")
+    auth.set_password(body.new)
+    return session_response(request)
+
+
+# ---------------------------------------------------------------- الإعدادات
+
+
+@app.get("/api/settings")
+def get_settings():
+    return {"keys": auth.keys_state(), "password_from_env": bool(auth.env_password())}
+
+
+class SettingsIn(BaseModel):
+    atlas: str | None = None  # None = متغيرش، "" = امسح
+    zernio: str | None = None
+
+
+@app.put("/api/settings")
+def save_settings(body: SettingsIn):
+    for name in ("atlas", "zernio"):
+        value = getattr(body, name)
+        if value is not None:
+            auth.save_key(name, value)
+    return get_settings()
 
 
 @app.get("/api/config")
