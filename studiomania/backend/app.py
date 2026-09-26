@@ -48,16 +48,19 @@ MIN_CUT_GAP = 0.2  # أقل مسافة مسموحة بين نقطتين قطع
 MIN_REFERENCE_SECONDS = 2.0  # Seedance مش بيقبل فيديو مرجعي أقصر من كده
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".m4v", ".webm", ".mkv"}
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
+AUDIO_EXTENSIONS = {".mp3", ".wav", ".m4a", ".aac", ".ogg", ".opus", ".flac"}
+AUDIO_KINDS = {"voice", "music"}  # التعليق الصوتي (الخطوة 3) والموسيقى (الخطوة 5)
 
 DATA_DIR = ROOT / "data"
 RAW_DIR = DATA_DIR / "raw"
 CLIPS_DIR = DATA_DIR / "clips"
 COACHES_DIR = DATA_DIR / "coaches"
 GENERATED_DIR = DATA_DIR / "generated"
+AUDIO_DIR = DATA_DIR / "audio"
 DB_PATH = DATA_DIR / "studiomania.db"
 FRONTEND_DIR = ROOT / "frontend"
 
-for d in (RAW_DIR, CLIPS_DIR, COACHES_DIR, GENERATED_DIR):
+for d in (RAW_DIR, CLIPS_DIR, COACHES_DIR, GENERATED_DIR, AUDIO_DIR):
     d.mkdir(parents=True, exist_ok=True)
 
 
@@ -121,6 +124,14 @@ def init_db() -> None:
                 name TEXT NOT NULL,
                 text TEXT NOT NULL,
                 is_default INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS audio (
+                id TEXT PRIMARY KEY,
+                kind TEXT NOT NULL,
+                name TEXT NOT NULL,
+                filename TEXT NOT NULL,
+                duration REAL NOT NULL,
                 created_at TEXT NOT NULL
             );
             CREATE TABLE IF NOT EXISTS coaches (
@@ -805,10 +816,83 @@ def resume_generations() -> None:
 resume_generations()
 
 
+# ---------------------------------------------------------------- مكتبات الصوت (التعليق الصوتي والموسيقى)
+
+
+def audio_to_dict(r: sqlite3.Row) -> dict:
+    return {
+        "id": r["id"],
+        "kind": r["kind"],
+        "name": r["name"],
+        "url": f"/media/audio/{r['filename']}",
+        "duration": r["duration"],
+        "created_at": r["created_at"],
+    }
+
+
+def check_kind(kind: str) -> str:
+    if kind not in AUDIO_KINDS:
+        raise HTTPException(400, "نوع مكتبة غير معروف")
+    return kind
+
+
+@app.get("/api/audio")
+def list_audio(kind: str):
+    check_kind(kind)
+    with closing(db()) as conn:
+        rows = conn.execute("SELECT * FROM audio WHERE kind = ? ORDER BY created_at DESC", (kind,)).fetchall()
+    return [audio_to_dict(r) for r in rows]
+
+
+@app.post("/api/audio")
+def upload_audio(kind: str = Form(...), file: UploadFile = File(...)):
+    check_kind(kind)
+    audio_id = uuid.uuid4().hex[:12]
+    filename = save_upload(file, AUDIO_EXTENSIONS, AUDIO_DIR, f"{kind}_{audio_id}")
+    try:
+        duration = probe_duration(AUDIO_DIR / filename)
+    except ValueError as exc:
+        (AUDIO_DIR / filename).unlink(missing_ok=True)
+        raise HTTPException(400, str(exc)) from exc
+    with closing(db()) as conn, conn:
+        conn.execute(
+            "INSERT INTO audio (id, kind, name, filename, duration, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (audio_id, kind, Path(file.filename).stem, filename, duration, now()),
+        )
+        return audio_to_dict(conn.execute("SELECT * FROM audio WHERE id = ?", (audio_id,)).fetchone())
+
+
+class RenameIn(BaseModel):
+    name: str
+
+
+@app.patch("/api/audio/{audio_id}")
+def rename_audio(audio_id: str, body: RenameIn):
+    name = body.name.strip()
+    if not name:
+        raise HTTPException(400, "الاسم فاضي")
+    with closing(db()) as conn, conn:
+        if conn.execute("UPDATE audio SET name = ? WHERE id = ?", (name, audio_id)).rowcount == 0:
+            raise HTTPException(404, "الملف غير موجود")
+        return audio_to_dict(conn.execute("SELECT * FROM audio WHERE id = ?", (audio_id,)).fetchone())
+
+
+@app.delete("/api/audio/{audio_id}")
+def delete_audio(audio_id: str):
+    with closing(db()) as conn, conn:
+        row = conn.execute("SELECT filename FROM audio WHERE id = ?", (audio_id,)).fetchone()
+        if row is None:
+            raise HTTPException(404, "الملف غير موجود")
+        conn.execute("DELETE FROM audio WHERE id = ?", (audio_id,))
+    (AUDIO_DIR / row["filename"]).unlink(missing_ok=True)
+    return {"ok": True}
+
+
 app.mount("/media/raw", StaticFiles(directory=RAW_DIR), name="raw")
 app.mount("/media/clips", StaticFiles(directory=CLIPS_DIR), name="clips")
 app.mount("/media/coaches", StaticFiles(directory=COACHES_DIR), name="coaches")
 app.mount("/media/generated", StaticFiles(directory=GENERATED_DIR), name="generated")
+app.mount("/media/audio", StaticFiles(directory=AUDIO_DIR), name="audio")
 
 
 @app.get("/")

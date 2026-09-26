@@ -20,9 +20,9 @@
   <nav class="steps" id="steps">
     <button class="step active" data-step="1"><span>1</span>تقطيع الفيديوهات</button>
     <button class="step" data-step="2"><span>2</span>توليد Seedance</button>
-    <button class="step" disabled><span>3</span>التعليق الصوتي</button>
+    <button class="step" data-step="3"><span>3</span>التعليق الصوتي</button>
     <button class="step" data-step="4"><span>4</span>المدربين</button>
-    <button class="step" disabled><span>5</span>الموسيقى</button>
+    <button class="step" data-step="5"><span>5</span>الموسيقى</button>
     <button class="step" disabled><span>6</span>المونتاج</button>
     <button class="step" disabled><span>7</span>النشر</button>
   </nav>
@@ -164,10 +164,15 @@
       </section>
     </div>
   </main>
+
+  <!-- الخطوة 3 و 5: مكتبات الصوت (بيملاها audio.js) -->
+  <main class="view" data-view="3" hidden><div class="audio-lib" data-kind="voice"></div></main>
+  <main class="view" data-view="5" hidden><div class="audio-lib" data-kind="music"></div></main>
 </div>
 <div class="toast" id="toast" hidden></div>
 <script src="/app.js"></script>
 <script src="/coaches.js"></script>
 <script src="/generate.js"></script>
+<script src="/audio.js"></script>
 </body>
 </html>
