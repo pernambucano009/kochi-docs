@@ -12,6 +12,7 @@ import shutil
 import sqlite3
 import subprocess
 import threading
+import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import closing
@@ -43,6 +44,7 @@ load_env_file(ROOT / ".env")
 
 import atlas  # noqa: E402  (لازم بعد قراءة .env)
 import montage  # noqa: E402
+import publisher  # noqa: E402
 
 MAX_CLIP_SECONDS = 15.0
 MIN_CUT_GAP = 0.2  # أقل مسافة مسموحة بين نقطتين قطع
@@ -154,6 +156,18 @@ def init_db() -> None:
                 source TEXT NOT NULL,
                 project_id TEXT,
                 created_at TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS posts (
+                id TEXT PRIMARY KEY,
+                export_id TEXT NOT NULL,
+                caption TEXT NOT NULL,
+                platforms TEXT NOT NULL,
+                scheduled_at TEXT NOT NULL,
+                status TEXT NOT NULL,
+                error TEXT,
+                published_at TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
             );
             CREATE TABLE IF NOT EXISTS coaches (
                 id TEXT PRIMARY KEY,
@@ -1156,6 +1170,220 @@ def reset_stuck_renders() -> None:
 
 
 reset_stuck_renders()
+
+
+# ---------------------------------------------------------------- فولدر الفيديوهات الجاهزة والنشر (الخطوة 7)
+
+
+@app.post("/api/exports/upload")
+def upload_export(file: UploadFile = File(...)):
+    """فيديو جاهز من برا البرنامج بيدخل نفس الفولدر."""
+    export_id = uuid.uuid4().hex[:12]
+    filename = save_upload(file, VIDEO_EXTENSIONS, EXPORTS_DIR, f"upload_{export_id}")
+    try:
+        duration = probe_duration(EXPORTS_DIR / filename)
+    except ValueError as exc:
+        (EXPORTS_DIR / filename).unlink(missing_ok=True)
+        raise HTTPException(400, str(exc)) from exc
+    with closing(db()) as conn, conn:
+        conn.execute(
+            "INSERT INTO exports (id, name, filename, duration, source, project_id, created_at) VALUES (?, ?, ?, ?, 'upload', NULL, ?)",
+            (export_id, Path(file.filename).stem, filename, duration, now()),
+        )
+        return export_to_dict(conn.execute("SELECT * FROM exports WHERE id = ?", (export_id,)).fetchone())
+
+
+@app.patch("/api/exports/{export_id}")
+def rename_export(export_id: str, body: RenameIn):
+    name = body.name.strip()
+    if not name:
+        raise HTTPException(400, "الاسم فاضي")
+    with closing(db()) as conn, conn:
+        if conn.execute("UPDATE exports SET name = ? WHERE id = ?", (name, export_id)).rowcount == 0:
+            raise HTTPException(404, "الفيديو غير موجود")
+        return export_to_dict(conn.execute("SELECT * FROM exports WHERE id = ?", (export_id,)).fetchone())
+
+
+@app.delete("/api/exports/{export_id}")
+def delete_export(export_id: str):
+    with closing(db()) as conn, conn:
+        row = conn.execute("SELECT filename FROM exports WHERE id = ?", (export_id,)).fetchone()
+        if row is None:
+            raise HTTPException(404, "الفيديو غير موجود")
+        pending = conn.execute(
+            "SELECT COUNT(*) FROM posts WHERE export_id = ? AND status IN ('scheduled', 'publishing')", (export_id,)
+        ).fetchone()[0]
+        if pending:
+            raise HTTPException(400, "الفيديو ده عليه بوستات متجدولة. الغيها الأول")
+        conn.execute("DELETE FROM exports WHERE id = ?", (export_id,))
+    (EXPORTS_DIR / row["filename"]).unlink(missing_ok=True)
+    return {"ok": True}
+
+
+def post_to_dict(r: sqlite3.Row) -> dict:
+    return {
+        "id": r["id"],
+        "export_id": r["export_id"],
+        "export_name": r["export_name"],
+        "export_url": f"/media/exports/{r['export_filename']}" if r["export_filename"] else None,
+        "caption": r["caption"],
+        "platforms": json.loads(r["platforms"]),
+        "scheduled_at": r["scheduled_at"],
+        "status": r["status"],
+        "error": r["error"],
+        "published_at": r["published_at"],
+    }
+
+
+POSTS_QUERY = (
+    "SELECT p.*, e.name AS export_name, e.filename AS export_filename "
+    "FROM posts p LEFT JOIN exports e ON e.id = p.export_id"
+)
+
+
+@app.get("/api/publisher")
+def publisher_status():
+    return {"service": publisher.service_name(), "platforms": publisher.PLATFORMS}
+
+
+@app.get("/api/posts")
+def list_posts():
+    with closing(db()) as conn:
+        return [post_to_dict(r) for r in conn.execute(POSTS_QUERY + " ORDER BY p.scheduled_at")]
+
+
+class PostIn(BaseModel):
+    export_id: str
+    caption: str = ""
+    platforms: list[str]
+    scheduled_at: datetime  # من المتصفح بتوقيت UTC
+
+
+def clean_post(conn: sqlite3.Connection, body: PostIn) -> tuple[str, str, str]:
+    if not conn.execute("SELECT 1 FROM exports WHERE id = ?", (body.export_id,)).fetchone():
+        raise HTTPException(400, "الفيديو مش موجود في الفولدر")
+    platforms = [p for p in dict.fromkeys(body.platforms) if p in publisher.PLATFORMS]
+    if not platforms:
+        raise HTTPException(400, "اختار منصة واحدة على الأقل")
+    when = body.scheduled_at
+    if when.tzinfo is None:
+        raise HTTPException(400, "الميعاد لازم يكون فيه المنطقة الزمنية")
+    return json.dumps(platforms), when.astimezone(timezone.utc).isoformat(timespec="seconds"), body.caption.strip()
+
+
+def publish_soon_if_due(when: str) -> None:
+    """لو الميعاد عدّى، منستناش لفّة المجدول الجاية."""
+    if when <= now():
+        threading.Thread(target=publish_due_posts, daemon=True).start()
+
+
+@app.post("/api/posts")
+def create_post(body: PostIn):
+    with closing(db()) as conn, conn:
+        platforms, when, caption = clean_post(conn, body)
+        post_id = uuid.uuid4().hex[:12]
+        conn.execute(
+            "INSERT INTO posts (id, export_id, caption, platforms, scheduled_at, status, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, 'scheduled', ?, ?)",
+            (post_id, body.export_id, caption, platforms, when, now(), now()),
+        )
+        result = post_to_dict(conn.execute(POSTS_QUERY + " WHERE p.id = ?", (post_id,)).fetchone())
+    publish_soon_if_due(when)
+    return result
+
+
+@app.put("/api/posts/{post_id}")
+def update_post(post_id: str, body: PostIn):
+    with closing(db()) as conn, conn:
+        row = conn.execute("SELECT status FROM posts WHERE id = ?", (post_id,)).fetchone()
+        if row is None:
+            raise HTTPException(404, "البوست غير موجود")
+        if row["status"] in ("publishing", "published"):
+            raise HTTPException(400, "البوست ده اتنشر أو بيتنشر دلوقتي")
+        platforms, when, caption = clean_post(conn, body)
+        conn.execute(
+            "UPDATE posts SET export_id = ?, caption = ?, platforms = ?, scheduled_at = ?, status = 'scheduled', "
+            "error = NULL, updated_at = ? WHERE id = ?",
+            (body.export_id, caption, platforms, when, now(), post_id),
+        )
+        result = post_to_dict(conn.execute(POSTS_QUERY + " WHERE p.id = ?", (post_id,)).fetchone())
+    publish_soon_if_due(when)
+    return result
+
+
+@app.delete("/api/posts/{post_id}")
+def delete_post(post_id: str):
+    with closing(db()) as conn, conn:
+        row = conn.execute("SELECT status FROM posts WHERE id = ?", (post_id,)).fetchone()
+        if row is None:
+            raise HTTPException(404, "البوست غير موجود")
+        if row["status"] == "publishing":
+            raise HTTPException(400, "البوست بيتنشر دلوقتي")
+        conn.execute("DELETE FROM posts WHERE id = ?", (post_id,))
+    return {"ok": True}
+
+
+@app.post("/api/posts/{post_id}/retry")
+def retry_post(post_id: str):
+    """يرجّع البوست الفاشل للجدول، ولو ميعاده عدّى بيتنشر في أول فرصة."""
+    with closing(db()) as conn, conn:
+        n = conn.execute(
+            "UPDATE posts SET status = 'scheduled', error = NULL, updated_at = ? WHERE id = ? AND status = 'failed'",
+            (now(), post_id),
+        ).rowcount
+    if not n:
+        raise HTTPException(400, "البوست ده مش فاشل")
+    threading.Thread(target=publish_due_posts, daemon=True).start()
+    return {"ok": True}
+
+
+_publish_lock = threading.Lock()
+
+
+def publish_due_posts() -> None:
+    if not _publish_lock.acquire(blocking=False):
+        return
+    try:
+        with closing(db()) as conn, conn:
+            due = conn.execute(
+                POSTS_QUERY + " WHERE p.status = 'scheduled' AND p.scheduled_at <= ? ORDER BY p.scheduled_at",
+                (now(),),
+            ).fetchall()
+            for r in due:
+                conn.execute("UPDATE posts SET status = 'publishing', updated_at = ? WHERE id = ?", (now(), r["id"]))
+        for r in due:
+            try:
+                if not r["export_filename"] or not (EXPORTS_DIR / r["export_filename"]).exists():
+                    raise publisher.PublishError("الفيديو اتمسح من الفولدر")
+                publisher.publish(EXPORTS_DIR / r["export_filename"], r["caption"], json.loads(r["platforms"]))
+                fields = ("published", None, now())
+            except Exception as exc:  # أي خطأ يتسجل على البوست ويفضل ظاهر
+                fields = ("failed", str(exc)[:500], None)
+            with closing(db()) as conn, conn:
+                conn.execute(
+                    "UPDATE posts SET status = ?, error = ?, published_at = ?, updated_at = ? WHERE id = ?",
+                    (*fields, now(), r["id"]),
+                )
+    finally:
+        _publish_lock.release()
+
+
+def scheduler_loop() -> None:
+    while True:
+        try:
+            publish_due_posts()
+        except Exception:  # المجدول لازم يفضل شغال مهما حصل
+            pass
+        time.sleep(20)
+
+
+with closing(db()) as _conn, _conn:
+    # لو البرنامج اتقفل وبوست بيتنشر، مش عارفين اتنشر ولا لأ، فنعلّمه عشان تتأكد بنفسك
+    _conn.execute(
+        "UPDATE posts SET status = 'failed', error = 'البرنامج اتقفل أثناء النشر. اتأكد من المنصة قبل ما تعيد المحاولة' "
+        "WHERE status = 'publishing'"
+    )
+threading.Thread(target=scheduler_loop, daemon=True).start()
 
 
 app.mount("/media/raw", StaticFiles(directory=RAW_DIR), name="raw")

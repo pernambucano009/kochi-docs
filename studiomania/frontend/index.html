@@ -24,7 +24,7 @@
     <button class="step" data-step="4"><span>4</span>المدربين</button>
     <button class="step" data-step="5"><span>5</span>الموسيقى</button>
     <button class="step" data-step="6"><span>6</span>المونتاج</button>
-    <button class="step" disabled><span>7</span>النشر</button>
+    <button class="step" data-step="7"><span>7</span>النشر</button>
   </nav>
 
   <main class="layout view" data-view="1">
@@ -244,6 +244,49 @@
       </section>
     </div>
   </main>
+
+  <!-- الخطوة 7: فولدر الفيديوهات الجاهزة والنشر -->
+  <main class="view" data-view="7" hidden>
+    <div class="alert warn" id="publisherAlert" hidden></div>
+    <div class="gen-layout">
+      <section class="panel">
+        <div class="panel-head"><h2>فولدر الفيديوهات الجاهزة <span class="muted" id="readyCount"></span></h2>
+          <label class="btn primary sm">＋ رفع فيديو من عندي
+            <input type="file" id="readyUpload" accept="video/*,.mkv" multiple hidden></label></div>
+        <div id="readyUploads"></div>
+        <div class="ready-grid" id="readyGrid"></div>
+        <p class="empty" id="readyEmpty">الفولدر فاضي. صدّر فيديو من <a href="#" data-goto="6">المونتاج</a> أو ارفع فيديو من عندك.</p>
+      </section>
+
+      <section class="panel settings">
+        <div class="panel-head"><h2 id="postFormTitle">جدولة بوست</h2></div>
+        <form id="postForm">
+          <div class="post-video" id="postVideo"><span class="muted">اختار فيديو من الفولدر (دوس 📅 جدول)</span></div>
+          <label class="field">الكابشن
+            <textarea id="postCaption" rows="4" placeholder="الكلام اللي هينزل مع الفيديو، والهاشتاجات"></textarea></label>
+          <div class="field">المنصات <div class="platforms" id="postPlatforms"></div></div>
+          <label class="field">الميعاد <input type="datetime-local" id="postWhen" required></label>
+          <div class="quick-times" id="quickTimes"></div>
+          <div class="row">
+            <button class="btn primary" type="submit" id="postSubmit">📅 جدول</button>
+            <button class="btn" type="button" id="postCancel" hidden>إلغاء التعديل</button>
+          </div>
+        </form>
+      </section>
+    </div>
+
+    <section class="panel gap-top">
+      <div class="panel-head"><h2>المواعيد</h2>
+        <select id="postFilter">
+          <option value="upcoming">الجاية</option>
+          <option value="all">الكل</option>
+          <option value="published">اتنشرت</option>
+          <option value="failed">فشلت</option>
+        </select></div>
+      <ul class="posts" id="postsList"></ul>
+      <p class="empty" id="postsEmpty">مفيش بوستات هنا.</p>
+    </section>
+  </main>
 </div>
 <div class="toast" id="toast" hidden></div>
 <script src="/app.js"></script>
@@ -251,5 +294,6 @@
 <script src="/generate.js"></script>
 <script src="/audio.js"></script>
 <script src="/montage.js"></script>
+<script src="/publish.js"></script>
 </body>
 </html>
