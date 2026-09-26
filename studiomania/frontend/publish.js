@@ -1,9 +1,10 @@
 // StudioMania — الخطوة 7: فولدر الفيديوهات الجاهزة والنشر المجدول
 
-const pub = { exports: [], posts: [], platforms: {}, service: null, videoId: null, editing: null, timer: null };
+const pub = { exports: [], posts: [], platforms: {}, accounts: {}, service: null, videoId: null, editing: null, timer: null };
 const PLATFORMS_KEY = "studiomania.platforms";
 const POST_STATUS = {
   scheduled: ["متجدول", "scheduled"],
+  sending: ["بيتبعت لـ Zernio...", "active"],
   publishing: ["بيتنشر...", "active"],
   published: ["اتنشر", "published"],
   failed: ["فشل", "failed"],
@@ -13,10 +14,21 @@ async function initPublish() {
   const info = await api("/api/publisher");
   pub.platforms = info.platforms;
   pub.service = info.service;
+  pub.accounts = info.accounts || {};
   const alert = $("publisherAlert");
-  alert.hidden = !!pub.service;
-  alert.textContent = "⚠️ لسه مفيش خدمة نشر مربوطة. تقدر تجدول البوستات عادي، بس مش هتتنشر فعلًا غير لما نربط خدمة (Ayrshare أو Late أو Postiz).";
-  if (!$("postPlatforms").children.length) renderPlatformBoxes();
+  alert.hidden = info.service === "mock";
+  alert.className = "alert " + (info.service === "zernio" && !info.accounts_error ? "info" : "warn");
+  if (!info.service) {
+    alert.innerHTML = `⚠️ لسه مفيش ربط بـ Zernio. تقدر تجدول البوستات عادي، وأول ما تضيف <code>ZERNIO_API_KEY</code> في ملف <code>.env</code> البرنامج هيبعتهم لوحده.`;
+  } else if (info.accounts_error) {
+    alert.textContent = `⚠️ ${info.accounts_error}`;
+  } else if (info.service === "zernio") {
+    const linked = Object.entries(pub.platforms).map(([k, label]) =>
+      pub.accounts[k] ? `<span class="pill published">✓ ${label}${pub.accounts[k].name ? ` (${escapeHtml(pub.accounts[k].name)})` : ""}</span>`
+        : `<span class="pill failed">✕ ${label}</span>`).join(" ");
+    alert.innerHTML = `الحسابات المربوطة في Zernio: ${linked} · <a href="${info.dashboard_url}" target="_blank">اربط حسابات</a>`;
+  }
+  renderPlatformBoxes();
   await Promise.all([pubLoadExports(), pubLoadPosts()]);
   if (!$("postWhen").value) setWhen(nextSlot());
 }
@@ -32,7 +44,7 @@ async function pubLoadExports() {
 function renderReady() {
   $("readyEmpty").hidden = pub.exports.length > 0;
   $("readyCount").textContent = pub.exports.length ? `(${pub.exports.length})` : "";
-  const scheduled = new Set(pub.posts.filter((p) => p.status === "scheduled").map((p) => p.export_id));
+  const scheduled = new Set(pub.posts.filter((p) => p.status === "scheduled" || p.status === "sending").map((p) => p.export_id));
   $("readyGrid").innerHTML = pub.exports
     .map(
       (e) => `<div class="ready ${e.id === pub.videoId ? "selected" : ""}" data-id="${e.id}">
@@ -107,8 +119,15 @@ $("readyUpload").addEventListener("change", async (e) => {
 function renderPlatformBoxes() {
   let saved = [];
   try { saved = JSON.parse(storageGet(PLATFORMS_KEY) || "[]"); } catch {}
+  const keep = checkedPlatforms();
+  if (keep.length) saved = keep;
+  const needLink = pub.service === "zernio";
   $("postPlatforms").innerHTML = Object.entries(pub.platforms)
-    .map(([k, label]) => `<label><input type="checkbox" value="${k}" ${saved.includes(k) ? "checked" : ""}> ${label}</label>`)
+    .map(([k, label]) => {
+      const off = needLink && !pub.accounts[k];
+      return `<label title="${off ? "الحساب ده مش مربوط في Zernio" : ""}" class="${off ? "off" : ""}">
+        <input type="checkbox" value="${k}" ${saved.includes(k) && !off ? "checked" : ""} ${off ? "disabled" : ""}> ${label}</label>`;
+    })
     .join("");
 }
 function checkedPlatforms() {
@@ -201,7 +220,7 @@ async function pubLoadPosts() {
   // نحدّث كل شوية عشان نشوف البوستات اللي اتنشرت
   // لو فيه بوست جه ميعاده أو بيتنشر، نحدّث أسرع
   const nowIso = new Date().toISOString();
-  const busy = pub.posts.some((p) => p.status === "publishing" || (p.status === "scheduled" && new Date(p.scheduled_at).toISOString() <= nowIso));
+  const busy = pub.posts.some((p) => p.status === "publishing" || p.status === "sending" || (p.status === "scheduled" && new Date(p.scheduled_at).toISOString() <= nowIso));
   if (!document.querySelector('.view[data-view="7"]').hidden) pub.timer = setTimeout(pubLoadPosts, busy ? 3000 : 15000);
 }
 
@@ -210,13 +229,14 @@ function renderPosts() {
   const list = pub.posts
     .filter((p) =>
       filter === "all" ? true
-        : filter === "upcoming" ? p.status === "scheduled" || p.status === "publishing"
+        : filter === "upcoming" ? ["scheduled", "sending", "publishing"].includes(p.status)
           : p.status === filter)
     .sort((a, b) => (filter === "upcoming" ? a.scheduled_at.localeCompare(b.scheduled_at) : b.scheduled_at.localeCompare(a.scheduled_at)));
   $("postsEmpty").hidden = list.length > 0;
   $("postsList").innerHTML = list
     .map((p) => {
-      const [label, cls] = POST_STATUS[p.status] || [p.status, ""];
+      let [label, cls] = POST_STATUS[p.status] || [p.status, ""];
+      if (p.status === "scheduled" && p.sent) label = "متجدول في Zernio ✓";
       const when = new Date(p.scheduled_at).toLocaleString("ar-EG", { weekday: "long", day: "numeric", month: "long", hour: "numeric", minute: "2-digit" });
       return `<li data-id="${p.id}">
         ${p.export_url ? `<video src="${p.export_url}#t=0.5" preload="metadata" muted></video>` : ""}
@@ -228,9 +248,9 @@ function renderPosts() {
         </div>
         <span class="pill ${cls}">${label}</span>
         <span class="acts">
-          ${p.status === "scheduled" || p.status === "failed" ? `<button class="btn sm" data-act="edit">✎ تعديل</button>` : ""}
+          ${p.status === "scheduled" || (p.status === "failed" && !p.sent) ? `<button class="btn sm" data-act="edit">✎ تعديل</button>` : ""}
           ${p.status === "failed" ? `<button class="btn sm" data-act="retry">↻ إعادة المحاولة</button>` : ""}
-          ${p.status !== "publishing" ? `<button class="btn sm danger" data-act="delete">${p.status === "scheduled" ? "إلغاء" : "حذف"}</button>` : ""}
+          ${p.status !== "publishing" && p.status !== "sending" ? `<button class="btn sm danger" data-act="delete">${p.status === "scheduled" ? "إلغاء" : "حذف"}</button>` : ""}
         </span>
       </li>`;
     })

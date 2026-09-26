@@ -166,6 +166,7 @@ def init_db() -> None:
                 status TEXT NOT NULL,
                 error TEXT,
                 published_at TEXT,
+                remote_id TEXT,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             );
@@ -1211,7 +1212,7 @@ def delete_export(export_id: str):
         if row is None:
             raise HTTPException(404, "الفيديو غير موجود")
         pending = conn.execute(
-            "SELECT COUNT(*) FROM posts WHERE export_id = ? AND status IN ('scheduled', 'publishing')", (export_id,)
+            "SELECT COUNT(*) FROM posts WHERE export_id = ? AND status IN ('scheduled', 'sending', 'publishing')", (export_id,)
         ).fetchone()[0]
         if pending:
             raise HTTPException(400, "الفيديو ده عليه بوستات متجدولة. الغيها الأول")
@@ -1232,18 +1233,32 @@ def post_to_dict(r: sqlite3.Row) -> dict:
         "status": r["status"],
         "error": r["error"],
         "published_at": r["published_at"],
+        "sent": bool(r["remote_id"]),
     }
 
 
 POSTS_QUERY = (
-    "SELECT p.*, e.name AS export_name, e.filename AS export_filename "
+    "SELECT p.*, e.name AS export_name, e.filename AS export_filename, e.source AS export_source "
     "FROM posts p LEFT JOIN exports e ON e.id = p.export_id"
 )
 
 
 @app.get("/api/publisher")
 def publisher_status():
-    return {"service": publisher.service_name(), "platforms": publisher.PLATFORMS}
+    service = publisher.service_name()
+    linked, error = {}, None
+    if service == "zernio":
+        try:
+            linked = publisher.accounts(refresh=True)
+        except (publisher.PublishError, httpx.HTTPError) as exc:
+            error = f"مقدرتش أوصل لـ Zernio: {exc}"
+    return {
+        "service": service,
+        "platforms": {k: v[1] for k, v in publisher.PLATFORMS.items()},
+        "accounts": linked,
+        "accounts_error": error,
+        "dashboard_url": publisher.DASHBOARD_URL,
+    }
 
 
 @app.get("/api/posts")
@@ -1271,9 +1286,44 @@ def clean_post(conn: sqlite3.Connection, body: PostIn) -> tuple[str, str, str]:
     return json.dumps(platforms), when.astimezone(timezone.utc).isoformat(timespec="seconds"), body.caption.strip()
 
 
-def publish_soon_if_due(when: str) -> None:
-    """لو الميعاد عدّى، منستناش لفّة المجدول الجاية."""
-    if when <= now():
+def set_post(post_id: str, **fields) -> None:
+    fields["updated_at"] = now()
+    cols = ", ".join(f"{k} = ?" for k in fields)
+    with closing(db()) as conn, conn:
+        conn.execute(f"UPDATE posts SET {cols} WHERE id = ?", (*fields.values(), post_id))
+
+
+def send_post(post_id: str, old_remote_id: str | None = None) -> None:
+    """يرفع الفيديو ويسلّم البوست لـ Zernio (في الخلفية)."""
+    try:
+        if old_remote_id:
+            publisher.cancel(old_remote_id)
+        with closing(db()) as conn:
+            r = conn.execute(POSTS_QUERY + " WHERE p.id = ?", (post_id,)).fetchone()
+        if r is None or r["status"] != "sending":
+            return
+        if not r["export_filename"] or not (EXPORTS_DIR / r["export_filename"]).exists():
+            raise publisher.PublishError("الفيديو اتمسح من الفولدر")
+        remote_id = publisher.schedule(
+            EXPORTS_DIR / r["export_filename"],
+            r["caption"],
+            json.loads(r["platforms"]),
+            r["scheduled_at"],
+            title=r["caption"].split("\n")[0].strip() or r["export_name"],
+            ai_made=r["export_source"] == "studio",
+            publish_now=r["scheduled_at"] <= now(),
+        )
+        set_post(post_id, status="scheduled", remote_id=remote_id, error=None)
+    except (publisher.PublishError, httpx.HTTPError) as exc:
+        set_post(post_id, status="failed", remote_id=None, error=f"مقدرتش أسلّم البوست لـ Zernio: {exc}"[:500])
+
+
+def after_save(post_id: str, when: str, old_remote_id: str | None) -> None:
+    service = publisher.service_name()
+    if service == "zernio":
+        set_post(post_id, status="sending", remote_id=None)
+        threading.Thread(target=send_post, args=(post_id, old_remote_id), daemon=True).start()
+    elif when <= now():
         threading.Thread(target=publish_due_posts, daemon=True).start()
 
 
@@ -1287,53 +1337,67 @@ def create_post(body: PostIn):
             "VALUES (?, ?, ?, ?, ?, 'scheduled', ?, ?)",
             (post_id, body.export_id, caption, platforms, when, now(), now()),
         )
-        result = post_to_dict(conn.execute(POSTS_QUERY + " WHERE p.id = ?", (post_id,)).fetchone())
-    publish_soon_if_due(when)
-    return result
+    after_save(post_id, when, None)
+    with closing(db()) as conn:
+        return post_to_dict(conn.execute(POSTS_QUERY + " WHERE p.id = ?", (post_id,)).fetchone())
 
 
 @app.put("/api/posts/{post_id}")
 def update_post(post_id: str, body: PostIn):
     with closing(db()) as conn, conn:
-        row = conn.execute("SELECT status FROM posts WHERE id = ?", (post_id,)).fetchone()
+        row = conn.execute("SELECT status, remote_id FROM posts WHERE id = ?", (post_id,)).fetchone()
         if row is None:
             raise HTTPException(404, "البوست غير موجود")
-        if row["status"] in ("publishing", "published"):
-            raise HTTPException(400, "البوست ده اتنشر أو بيتنشر دلوقتي")
+        if row["status"] in ("sending", "publishing", "published"):
+            raise HTTPException(400, "البوست ده اتنشر أو بيتبعت دلوقتي")
+        if row["status"] == "failed" and row["remote_id"]:
+            raise HTTPException(400, "البوست ده اتبعت لـ Zernio وفشل. استخدم إعادة المحاولة، أو احذفه واعمل واحد جديد")
         platforms, when, caption = clean_post(conn, body)
         conn.execute(
             "UPDATE posts SET export_id = ?, caption = ?, platforms = ?, scheduled_at = ?, status = 'scheduled', "
             "error = NULL, updated_at = ? WHERE id = ?",
             (body.export_id, caption, platforms, when, now(), post_id),
         )
-        result = post_to_dict(conn.execute(POSTS_QUERY + " WHERE p.id = ?", (post_id,)).fetchone())
-    publish_soon_if_due(when)
-    return result
+    after_save(post_id, when, row["remote_id"])
+    with closing(db()) as conn:
+        return post_to_dict(conn.execute(POSTS_QUERY + " WHERE p.id = ?", (post_id,)).fetchone())
 
 
 @app.delete("/api/posts/{post_id}")
 def delete_post(post_id: str):
+    with closing(db()) as conn:
+        row = conn.execute("SELECT status, remote_id FROM posts WHERE id = ?", (post_id,)).fetchone()
+    if row is None:
+        raise HTTPException(404, "البوست غير موجود")
+    if row["status"] in ("sending", "publishing"):
+        raise HTTPException(400, "البوست بيتبعت دلوقتي، استنى ثواني")
+    if row["remote_id"] and row["status"] == "scheduled":
+        # لازم نلغيه عند Zernio الأول، وإلا هيتنشر برضه
+        try:
+            publisher.cancel(row["remote_id"])
+        except (publisher.PublishError, httpx.HTTPError) as exc:
+            raise HTTPException(400, f"مقدرتش ألغيه عند Zernio: {exc}") from exc
     with closing(db()) as conn, conn:
-        row = conn.execute("SELECT status FROM posts WHERE id = ?", (post_id,)).fetchone()
-        if row is None:
-            raise HTTPException(404, "البوست غير موجود")
-        if row["status"] == "publishing":
-            raise HTTPException(400, "البوست بيتنشر دلوقتي")
         conn.execute("DELETE FROM posts WHERE id = ?", (post_id,))
     return {"ok": True}
 
 
 @app.post("/api/posts/{post_id}/retry")
 def retry_post(post_id: str):
-    """يرجّع البوست الفاشل للجدول، ولو ميعاده عدّى بيتنشر في أول فرصة."""
-    with closing(db()) as conn, conn:
-        n = conn.execute(
-            "UPDATE posts SET status = 'scheduled', error = NULL, updated_at = ? WHERE id = ? AND status = 'failed'",
-            (now(), post_id),
-        ).rowcount
-    if not n:
+    with closing(db()) as conn:
+        row = conn.execute("SELECT status, remote_id, scheduled_at FROM posts WHERE id = ?", (post_id,)).fetchone()
+    if row is None or row["status"] != "failed":
         raise HTTPException(400, "البوست ده مش فاشل")
-    threading.Thread(target=publish_due_posts, daemon=True).start()
+    if row["remote_id"]:
+        # Zernio بتعيد المنصات اللي فشلت بس، فمفيش نشر مكرر
+        try:
+            publisher.retry(row["remote_id"])
+        except (publisher.PublishError, httpx.HTTPError) as exc:
+            raise HTTPException(400, str(exc)) from exc
+        set_post(post_id, status="scheduled", error=None)
+    else:
+        set_post(post_id, status="scheduled", error=None)
+        after_save(post_id, row["scheduled_at"], None)
     return {"ok": True}
 
 
@@ -1344,25 +1408,43 @@ def publish_due_posts() -> None:
     if not _publish_lock.acquire(blocking=False):
         return
     try:
-        with closing(db()) as conn, conn:
-            due = conn.execute(
-                POSTS_QUERY + " WHERE p.status = 'scheduled' AND p.scheduled_at <= ? ORDER BY p.scheduled_at",
-                (now(),),
-            ).fetchall()
-            for r in due:
-                conn.execute("UPDATE posts SET status = 'publishing', updated_at = ? WHERE id = ?", (now(), r["id"]))
+        service = publisher.service_name()
+        with closing(db()) as conn:
+            if service == "zernio":
+                # بوستات اتجدولت قبل ما المفتاح يتضاف: نسلّمها دلوقتي
+                waiting = [r["id"] for r in conn.execute("SELECT id FROM posts WHERE status = 'scheduled' AND remote_id IS NULL")]
+                # بوستات ميعادها عدّى: نسأل Zernio اتنشرت ولا لأ
+                sent = conn.execute(
+                    "SELECT id, remote_id FROM posts WHERE status = 'scheduled' AND remote_id IS NOT NULL AND scheduled_at <= ?",
+                    (now(),),
+                ).fetchall()
+            else:
+                due = conn.execute(
+                    POSTS_QUERY + " WHERE p.status = 'scheduled' AND p.scheduled_at <= ? ORDER BY p.scheduled_at", (now(),)
+                ).fetchall()
+
+        if service == "zernio":
+            for post_id in waiting:
+                set_post(post_id, status="sending")
+                send_post(post_id)
+            for r in sent:
+                try:
+                    state, error = publisher.remote_status(r["remote_id"])
+                except (publisher.PublishError, httpx.HTTPError):
+                    continue  # نحاول تاني في اللفة الجاية
+                if state == "published":
+                    set_post(r["id"], status="published", published_at=now(), error=None)
+                elif state == "failed":
+                    set_post(r["id"], status="failed", error=error)
+            return
+
         for r in due:
-            try:
-                if not r["export_filename"] or not (EXPORTS_DIR / r["export_filename"]).exists():
-                    raise publisher.PublishError("الفيديو اتمسح من الفولدر")
-                publisher.publish(EXPORTS_DIR / r["export_filename"], r["caption"], json.loads(r["platforms"]))
-                fields = ("published", None, now())
-            except Exception as exc:  # أي خطأ يتسجل على البوست ويفضل ظاهر
-                fields = ("failed", str(exc)[:500], None)
-            with closing(db()) as conn, conn:
-                conn.execute(
-                    "UPDATE posts SET status = ?, error = ?, published_at = ?, updated_at = ? WHERE id = ?",
-                    (*fields, now(), r["id"]),
+            if service == "mock":
+                set_post(r["id"], status="published", published_at=now(), error=None)
+            else:
+                set_post(
+                    r["id"], status="failed",
+                    error="لسه مفيش خدمة نشر مربوطة، فالبوست متنشرش. ضيف ZERNIO_API_KEY في ملف .env ودوس إعادة المحاولة",
                 )
     finally:
         _publish_lock.release()
@@ -1378,10 +1460,12 @@ def scheduler_loop() -> None:
 
 
 with closing(db()) as _conn, _conn:
-    # لو البرنامج اتقفل وبوست بيتنشر، مش عارفين اتنشر ولا لأ، فنعلّمه عشان تتأكد بنفسك
+    if "remote_id" not in {c[1] for c in _conn.execute("PRAGMA table_info(posts)")}:
+        _conn.execute("ALTER TABLE posts ADD COLUMN remote_id TEXT")
+    # لو البرنامج اتقفل وهو بيسلّم بوست، مش عارفين وصل ولا لأ، فنعلّمه عشان تتأكد بنفسك
     _conn.execute(
-        "UPDATE posts SET status = 'failed', error = 'البرنامج اتقفل أثناء النشر. اتأكد من المنصة قبل ما تعيد المحاولة' "
-        "WHERE status = 'publishing'"
+        "UPDATE posts SET status = 'failed', error = 'البرنامج اتقفل وهو بيبعت البوست. اتأكد من Zernio قبل ما تعيد المحاولة' "
+        "WHERE status IN ('sending', 'publishing')"
     )
 threading.Thread(target=scheduler_loop, daemon=True).start()
 
