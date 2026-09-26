@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>StudioMania</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%228%22 fill=%22%23ff6b2c%22/%3E%3Ctext x=%2216%22 y=%2223%22 font-size=%2220%22 font-weight=%22800%22 text-anchor=%22middle%22 fill=%22white%22 font-family=%22Arial%22%3ES%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="logo">S</div>
+    <div class="title">
+      <h1>StudioMania</h1>
+      <p>من الفيديو الخام لحد النشر</p>
+    </div>
+  </header>
+
+  <nav class="steps" id="steps">
+    <button class="step active" data-step="1"><span>1</span>تقطيع الفيديوهات</button>
+    <button class="step" disabled><span>2</span>توليد Seedance</button>
+    <button class="step" disabled><span>3</span>التعليق الصوتي</button>
+    <button class="step" disabled><span>4</span>المدربين</button>
+    <button class="step" disabled><span>5</span>الموسيقى</button>
+    <button class="step" disabled><span>6</span>المونتاج</button>
+    <button class="step" disabled><span>7</span>النشر</button>
+  </nav>
+
+  <main class="layout">
+    <aside class="panel library">
+      <div class="panel-head">
+        <h2>الفيديوهات الخام</h2>
+        <label class="btn primary sm">
+          ＋ رفع فيديو
+          <input type="file" id="fileInput" accept="video/*,.mkv" multiple hidden>
+        </label>
+      </div>
+      <div class="dropzone" id="dropzone">اسحب الفيديوهات وحطها هنا</div>
+      <div id="uploads"></div>
+      <ul class="video-list" id="videoList"></ul>
+      <p class="empty" id="libraryEmpty">لسه مفيش فيديوهات. ارفع أول فيديو.</p>
+    </aside>
+
+    <section class="panel editor" id="editor" hidden>
+      <div class="panel-head">
+        <h2 id="editorTitle"></h2>
+        <button class="btn sm danger" id="deleteVideo">حذف الفيديو</button>
+      </div>
+
+      <div class="player">
+        <video id="player" playsinline preload="metadata"></video>
+      </div>
+
+      <div class="timeline" id="timeline">
+        <div class="segs" id="timelineSegs"></div>
+        <div class="playhead" id="playhead"></div>
+      </div>
+
+      <div class="controls">
+        <button class="btn sm" id="back1" title="رجوع ثانية (←)">⏪ 1ث</button>
+        <button class="btn sm" id="playPause" title="تشغيل / إيقاف (مسافة)">▶︎ تشغيل</button>
+        <button class="btn sm" id="fwd1" title="قدّام ثانية (→)">1ث ⏩</button>
+        <span class="time" id="timeLabel">0:00.0 / 0:00.0</span>
+        <span class="spacer"></span>
+        <button class="btn sm" id="undoCut" title="تراجع (Z)">↶ تراجع</button>
+        <button class="btn primary cut" id="cutHere" title="اقطع هنا (C)">✂️ اقطع هنا</button>
+      </div>
+      <p class="hint">اختصارات الكيبورد: <kbd>مسافة</kbd> تشغيل وإيقاف · <kbd>C</kbd> اقطع هنا · <kbd>Z</kbd> تراجع · <kbd>←</kbd> <kbd>→</kbd> ثانية لورا وقدام</p>
+
+      <div class="alert warn" id="tooLongAlert" hidden></div>
+
+      <table class="segments">
+        <thead>
+          <tr><th>#</th><th>من</th><th>إلى</th><th>المدة</th><th>الحالة</th><th></th></tr>
+        </thead>
+        <tbody id="segmentsBody"></tbody>
+      </table>
+
+      <div class="split-row">
+        <button class="btn primary" id="splitBtn">✂️ قطّع الفيديو</button>
+        <span class="muted" id="splitInfo"></span>
+      </div>
+
+      <div id="clipsSection" hidden>
+        <h3>القطع الجاهزة <span class="muted" id="clipsCount"></span></h3>
+        <div class="clips" id="clipsGrid"></div>
+      </div>
+    </section>
+
+    <section class="panel placeholder" id="placeholder">
+      <p>اختار فيديو من القائمة عشان تبدأ تقطّعه.</p>
+    </section>
+  </main>
+</div>
+<div class="toast" id="toast" hidden></div>
+<script src="/app.js"></script>
+</body>
+</html>
