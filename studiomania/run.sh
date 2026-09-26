@@ -3,4 +3,4 @@
 set -e
 cd "$(dirname "$0")"
 pip install -q -r backend/requirements.txt
-exec python3 -m uvicorn app:app --app-dir backend --host 0.0.0.0 --port "${PORT:-8000}"
+exec python3 -m uvicorn app:app --app-dir backend --host 127.0.0.1 --port "${PORT:-8000}"
