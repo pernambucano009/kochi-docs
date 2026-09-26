@@ -1,9 +1,7 @@
 // StudioMania — الخطوة 2: توليد فيديوهات بـ Seedance
 
-const DEFAULT_PROMPT =
-  "@image1 is the coach, a cartoon character. Recreate the exact exercise movement, body mechanics, tempo and camera framing from @video1, performed by the character from @image1. Keep the character's face, outfit and art style exactly as in @image1. Full body visible, clean gym background, smooth natural motion.";
-const PROMPT_KEY = "studiomania.prompt";
-const SETTINGS_KEY = "studiomania.genSettings";
+const PROMPT_KEY = "studiomania.promptId";
+const AUDIO_KEY = "studiomania.audio";
 const ACTIVE = new Set(["queued", "uploading", "submitted", "processing", "downloading"]);
 const STATUS_LABEL = {
   queued: "في الطابور",
@@ -15,7 +13,7 @@ const STATUS_LABEL = {
   failed: "فشل",
 };
 
-const gen = { atlas: null, coachId: null, clips: [], selected: new Set(), list: [], timer: null };
+const gen = { atlas: null, coachId: null, clips: [], selected: new Set(), list: [], timer: null, prompts: [], promptId: null, editing: null };
 
 function storageGet(key) {
   try { return localStorage.getItem(key); } catch { return null; }
@@ -27,23 +25,17 @@ function storageSet(key, value) {
 async function initGenerate() {
   if (!gen.atlas) {
     gen.atlas = await api("/api/atlas");
-    $("modelSelect").innerHTML = gen.atlas.models.map((m) => `<option value="${m.id}">${m.label}</option>`).join("");
-    $("resSelect").innerHTML = gen.atlas.resolutions.map((r) => `<option>${r}</option>`).join("");
-    $("ratioSelect").innerHTML = gen.atlas.ratios.map((r) => `<option>${r}</option>`).join("");
-    let saved = {};
-    try { saved = JSON.parse(storageGet(SETTINGS_KEY) || "{}"); } catch {}
-    $("modelSelect").value = saved.model || gen.atlas.default_model;
-    $("resSelect").value = saved.resolution || "720p";
-    $("ratioSelect").value = saved.ratio || "9:16";
-    $("audioCheck").checked = !!saved.generate_audio;
-    fillDurations(saved.duration);
-    $("promptInput").value = storageGet(PROMPT_KEY) || DEFAULT_PROMPT;
+    const a = gen.atlas;
+    $("fixedSettings").innerHTML = [a.model_label, a.resolution, a.ratio, "المدة على قد القطعة"]
+      .map((t) => `<span class="pill">${t}</span>`).join("");
+    $("audioCheck").checked = storageGet(AUDIO_KEY) === "1";
+    gen.promptId = storageGet(PROMPT_KEY);
   }
   const alert = $("atlasAlert");
   alert.hidden = gen.atlas.configured || gen.atlas.mock;
   alert.innerHTML = "⚠️ مفتاح Atlas مش متسجل. اعمل ملف <code>.env</code> في فولدر <code>studiomania</code> واكتب فيه <code>ATLASCLOUD_API_KEY=مفتاحك</code>، وبعدين شغّل البرنامج تاني.";
 
-  const [coaches, clips] = await Promise.all([api("/api/coaches"), api("/api/clips")]);
+  const [coaches, clips] = await Promise.all([api("/api/coaches"), api("/api/clips"), loadPrompts()]);
   renderCoachPicker(coaches);
   gen.clips = clips;
   const ids = new Set(clips.map((c) => c.id));
@@ -52,31 +44,96 @@ async function initGenerate() {
   await loadGenerations();
 }
 
-function fillDurations(selected) {
-  const max = gen.atlas.models.find((m) => m.id === $("modelSelect").value)?.max_duration || 15;
-  const current = selected ?? $("durationSelect").value;
-  let html = `<option value="">على قد القطعة</option>`;
-  for (let d = gen.atlas.min_duration; d <= max; d++) html += `<option value="${d}">${d} ثانية</option>`;
-  $("durationSelect").innerHTML = html;
-  $("durationSelect").value = current && Number(current) <= max ? String(current) : "";
+$("audioCheck").addEventListener("change", () => storageSet(AUDIO_KEY, $("audioCheck").checked ? "1" : "0"));
+
+// ---------- مكتبة البرومبتات ----------
+async function loadPrompts() {
+  gen.prompts = await api("/api/prompts");
+  if (!gen.prompts.some((p) => p.id === gen.promptId)) {
+    gen.promptId = (gen.prompts.find((p) => p.is_default) || gen.prompts[0])?.id || null;
+  }
+  renderPrompts();
 }
 
-function saveSettings() {
-  storageSet(SETTINGS_KEY, JSON.stringify({
-    model: $("modelSelect").value,
-    resolution: $("resSelect").value,
-    ratio: $("ratioSelect").value,
-    duration: $("durationSelect").value,
-    generate_audio: $("audioCheck").checked,
-  }));
+function renderPrompts() {
+  $("promptList").innerHTML = gen.prompts
+    .map(
+      (p) => `<div class="prompt-item ${p.id === gen.promptId ? "selected" : ""}" data-id="${p.id}">
+        <div class="top">
+          <span>${p.id === gen.promptId ? "🔘" : "⚪"}</span>
+          <span class="name">${escapeHtml(p.name)}</span>
+          ${p.is_default ? `<span class="pill">الافتراضي</span>` : ""}
+          <span class="acts">
+            <button class="btn sm" data-act="edit" title="تعديل">✎</button>
+            <button class="btn sm danger" data-act="delete" title="حذف">✕</button>
+          </span>
+        </div>
+        <div class="text">${escapeHtml(p.text)}</div>
+      </div>`
+    )
+    .join("");
+  updateGenerateBtn();
 }
-$("modelSelect").addEventListener("change", () => { fillDurations(); saveSettings(); });
-["resSelect", "ratioSelect", "durationSelect", "audioCheck"].forEach((id) => $(id).addEventListener("change", saveSettings));
-$("promptInput").addEventListener("input", () => storageSet(PROMPT_KEY, $("promptInput").value));
-$("resetPrompt").addEventListener("click", (e) => {
+
+function openPromptForm(p = null) {
+  gen.editing = p;
+  $("promptName").value = p?.name || "";
+  $("promptText").value = p?.text || "";
+  $("promptDefault").checked = !!p?.is_default;
+  $("promptForm").hidden = false;
+  $("promptName").focus();
+}
+function closePromptForm() {
+  gen.editing = null;
+  $("promptForm").hidden = true;
+}
+
+$("newPrompt").onclick = () => openPromptForm();
+$("promptCancel").onclick = closePromptForm;
+
+$("promptForm").addEventListener("submit", async (e) => {
   e.preventDefault();
-  $("promptInput").value = DEFAULT_PROMPT;
-  storageSet(PROMPT_KEY, DEFAULT_PROMPT);
+  const body = JSON.stringify({
+    name: $("promptName").value,
+    text: $("promptText").value,
+    is_default: $("promptDefault").checked,
+  });
+  try {
+    const saved = await api(gen.editing ? `/api/prompts/${gen.editing.id}` : "/api/prompts", {
+      method: gen.editing ? "PUT" : "POST",
+      headers: { "Content-Type": "application/json" },
+      body,
+    });
+    gen.promptId = saved.id;
+    storageSet(PROMPT_KEY, saved.id);
+    toast("✅ البرومبت اتحفظ واتختار");
+    closePromptForm();
+    await loadPrompts();
+  } catch (err) {
+    toast(err.message, true);
+  }
+});
+
+$("promptList").addEventListener("click", async (e) => {
+  const item = e.target.closest(".prompt-item");
+  if (!item) return;
+  const p = gen.prompts.find((x) => x.id === item.dataset.id);
+  const act = e.target.closest("button[data-act]")?.dataset.act;
+  if (act === "edit") return openPromptForm(p);
+  if (act === "delete") {
+    if (!confirm(`حذف البرومبت "${p.name}"؟`)) return;
+    try {
+      await api(`/api/prompts/${p.id}`, { method: "DELETE" });
+      if (gen.editing?.id === p.id) closePromptForm();
+      await loadPrompts();
+    } catch (err) {
+      toast(err.message, true);
+    }
+    return;
+  }
+  gen.promptId = p.id;
+  storageSet(PROMPT_KEY, p.id);
+  renderPrompts();
 });
 
 // ---------- المدرب ----------
@@ -156,7 +213,7 @@ function updateGenerateBtn() {
   const n = gen.selected.size;
   $("clipPickCount").textContent = n ? `${n} مختارة` : "";
   const btn = $("generateBtn");
-  btn.disabled = !n || !gen.coachId;
+  btn.disabled = !n || !gen.coachId || !gen.promptId;
   btn.textContent = n ? `✨ ولّد ${n} فيديو` : "✨ ولّد";
 }
 
@@ -164,18 +221,13 @@ $("generateBtn").onclick = async () => {
   const btn = $("generateBtn");
   btn.disabled = true;
   try {
-    const duration = $("durationSelect").value;
     const res = await api("/api/generations", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         clip_ids: [...gen.selected],
         coach_id: gen.coachId,
-        prompt: $("promptInput").value,
-        model: $("modelSelect").value,
-        resolution: $("resSelect").value,
-        ratio: $("ratioSelect").value,
-        duration: duration ? Number(duration) : null,
+        prompt_id: gen.promptId,
         generate_audio: $("audioCheck").checked,
       }),
     });

@@ -16,14 +16,12 @@ import httpx
 
 BASE_URL = os.environ.get("ATLASCLOUD_BASE_URL", "https://api.atlascloud.ai")
 
-MODELS = {
-    "bytedance/seedance-2.0/reference-to-video": {"label": "Seedance 2.0", "max_duration": 15},
-    "bytedance/seedance-2.0-fast/reference-to-video": {"label": "Seedance 2.0 Fast", "max_duration": 15},
-    "bytedance/seedance-2.5/reference-to-video": {"label": "Seedance 2.5", "max_duration": 30},
-}
-DEFAULT_MODEL = "bytedance/seedance-2.0/reference-to-video"
-RESOLUTIONS = ["480p", "720p", "1080p"]
-RATIOS = ["9:16", "16:9", "1:1"]
+# إعدادات ثابتة: Seedance 2.0 Mini (الأرخص)، دقة 480p، مقاس 9:16
+MODEL = "bytedance/seedance-2.0-mini/reference-to-video"
+MODEL_LABEL = "Seedance 2.0 Mini"
+RESOLUTION = "480p"
+RATIO = "9:16"
+MAX_DURATION = 15
 MIN_DURATION = 4
 
 TERMINAL_OK = {"completed", "succeeded"}

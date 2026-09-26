@@ -116,6 +116,13 @@ def init_db() -> None:
                 filename TEXT NOT NULL,
                 created_at TEXT NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS prompts (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                text TEXT NOT NULL,
+                is_default INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL
+            );
             CREATE TABLE IF NOT EXISTS coaches (
                 id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
@@ -571,7 +578,7 @@ def generation_to_dict(r: sqlite3.Row) -> dict:
         "coach_name": r["coach_name"],
         "coach_image_url": f"/media/coaches/{r['coach_image']}",
         "model": r["model"],
-        "model_label": atlas.MODELS.get(r["model"], {}).get("label", r["model"]),
+        "model_label": atlas.MODEL_LABEL if r["model"] == atlas.MODEL else r["model"].split("/")[1],
         "prompt": r["prompt"],
         "params": json.loads(r["params"]),
         "status": r["status"],
@@ -587,22 +594,115 @@ def atlas_status():
     return {
         "configured": bool(atlas.api_key()),
         "mock": atlas.mock_mode(),
-        "models": [{"id": k, **v} for k, v in atlas.MODELS.items()],
-        "default_model": atlas.DEFAULT_MODEL,
-        "resolutions": atlas.RESOLUTIONS,
-        "ratios": atlas.RATIOS,
+        "model_label": atlas.MODEL_LABEL,
+        "resolution": atlas.RESOLUTION,
+        "ratio": atlas.RATIO,
         "min_duration": atlas.MIN_DURATION,
+        "max_duration": atlas.MAX_DURATION,
     }
+
+
+# ---------------------------------------------------------------- مكتبة البرومبتات
+
+DEFAULT_PROMPT = (
+    "@image1 is the coach, a cartoon character. Recreate the exact exercise movement, body mechanics, "
+    "tempo and camera framing from @video1, performed by the character from @image1. Keep the character's "
+    "face, outfit and art style exactly as in @image1. Full body visible, clean gym background, smooth natural motion."
+)
+
+
+def seed_prompts() -> None:
+    with closing(db()) as conn, conn:
+        if conn.execute("SELECT COUNT(*) FROM prompts").fetchone()[0] == 0:
+            conn.execute(
+                "INSERT INTO prompts (id, name, text, is_default, created_at) VALUES (?, ?, ?, 1, ?)",
+                (uuid.uuid4().hex[:12], "نفس حركة التمرين", DEFAULT_PROMPT, now()),
+            )
+
+
+seed_prompts()
+
+
+def prompt_to_dict(r: sqlite3.Row) -> dict:
+    return {"id": r["id"], "name": r["name"], "text": r["text"], "is_default": bool(r["is_default"])}
+
+
+def get_prompt(conn: sqlite3.Connection, prompt_id: str) -> sqlite3.Row:
+    row = conn.execute("SELECT * FROM prompts WHERE id = ?", (prompt_id,)).fetchone()
+    if row is None:
+        raise HTTPException(404, "البرومبت غير موجود")
+    return row
+
+
+class PromptIn(BaseModel):
+    name: str
+    text: str
+    is_default: bool = False
+
+
+def clean_prompt(body: PromptIn) -> tuple[str, str]:
+    name, text = body.name.strip(), body.text.strip()
+    if not name or not text:
+        raise HTTPException(400, "اكتب اسم البرومبت ونصّه")
+    return name, text
+
+
+@app.get("/api/prompts")
+def list_prompts():
+    with closing(db()) as conn:
+        rows = conn.execute("SELECT * FROM prompts ORDER BY is_default DESC, created_at").fetchall()
+    return [prompt_to_dict(r) for r in rows]
+
+
+@app.post("/api/prompts")
+def create_prompt(body: PromptIn):
+    name, text = clean_prompt(body)
+    prompt_id = uuid.uuid4().hex[:12]
+    with closing(db()) as conn, conn:
+        if body.is_default:
+            conn.execute("UPDATE prompts SET is_default = 0")
+        conn.execute(
+            "INSERT INTO prompts (id, name, text, is_default, created_at) VALUES (?, ?, ?, ?, ?)",
+            (prompt_id, name, text, int(body.is_default), now()),
+        )
+        return prompt_to_dict(get_prompt(conn, prompt_id))
+
+
+@app.put("/api/prompts/{prompt_id}")
+def update_prompt(prompt_id: str, body: PromptIn):
+    name, text = clean_prompt(body)
+    with closing(db()) as conn, conn:
+        get_prompt(conn, prompt_id)
+        if body.is_default:
+            conn.execute("UPDATE prompts SET is_default = 0")
+        conn.execute(
+            "UPDATE prompts SET name = ?, text = ?, is_default = ? WHERE id = ?",
+            (name, text, int(body.is_default), prompt_id),
+        )
+        return prompt_to_dict(get_prompt(conn, prompt_id))
+
+
+@app.delete("/api/prompts/{prompt_id}")
+def delete_prompt(prompt_id: str):
+    with closing(db()) as conn, conn:
+        get_prompt(conn, prompt_id)
+        if conn.execute("SELECT COUNT(*) FROM prompts").fetchone()[0] <= 1:
+            raise HTTPException(400, "لازم يفضل برومبت واحد على الأقل")
+        conn.execute("DELETE FROM prompts WHERE id = ?", (prompt_id,))
+        if not conn.execute("SELECT 1 FROM prompts WHERE is_default = 1").fetchone():
+            conn.execute(
+                "UPDATE prompts SET is_default = 1 WHERE id = (SELECT id FROM prompts ORDER BY created_at LIMIT 1)"
+            )
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------- طلبات التوليد
 
 
 class GenerationIn(BaseModel):
     clip_ids: list[str]
     coach_id: str
-    prompt: str
-    model: str = atlas.DEFAULT_MODEL
-    resolution: str = "720p"
-    ratio: str = "9:16"
-    duration: int | None = None  # فاضي = على قد طول القطعة
+    prompt_id: str
     generate_audio: bool = False
 
 
@@ -610,18 +710,12 @@ class GenerationIn(BaseModel):
 def create_generations(body: GenerationIn):
     if not (atlas.api_key() or atlas.mock_mode()):
         raise HTTPException(400, "مفتاح Atlas مش متسجل. ضيف ATLASCLOUD_API_KEY في ملف .env وشغّل البرنامج تاني")
-    if body.model not in atlas.MODELS:
-        raise HTTPException(400, "موديل غير معروف")
-    if body.resolution not in atlas.RESOLUTIONS or body.ratio not in atlas.RATIOS:
-        raise HTTPException(400, "الدقة أو المقاس غير مدعوم")
-    if not body.prompt.strip():
-        raise HTTPException(400, "اكتب الوصف (prompt)")
     if not body.clip_ids:
         raise HTTPException(400, "اختار قطعة واحدة على الأقل")
-    max_duration = atlas.MODELS[body.model]["max_duration"]
 
     with closing(db()) as conn, conn:
         coach = get_coach(conn, body.coach_id)
+        prompt_text = get_prompt(conn, body.prompt_id)["text"]
         rows = conn.execute(
             f"SELECT c.*, v.name AS video_name FROM clips c JOIN videos v ON v.id = c.video_id "
             f"WHERE c.id IN ({','.join('?' * len(body.clip_ids))})",
@@ -635,14 +729,13 @@ def create_generations(body: GenerationIn):
 
         ids = []
         for r in rows:
-            clip_len = r["end"] - r["start"]
-            duration = body.duration or round(clip_len + 0.49)
-            duration = max(atlas.MIN_DURATION, min(max_duration, duration))
+            # المدة على قد طول القطعة، في حدود اللي Seedance بيقبله (4 لـ 15 ثانية)
+            duration = max(atlas.MIN_DURATION, min(atlas.MAX_DURATION, int(r["end"] - r["start"] + 0.5)))
             gen_id = uuid.uuid4().hex[:12]
             params = {
                 "duration": duration,
-                "resolution": body.resolution,
-                "ratio": body.ratio,
+                "resolution": atlas.RESOLUTION,
+                "ratio": atlas.RATIO,
                 "generate_audio": body.generate_audio,
             }
             conn.execute(
@@ -651,7 +744,7 @@ def create_generations(body: GenerationIn):
                 (
                     gen_id, r["id"], r["filename"], f"{r['video_name']} #{r['idx']}",
                     coach["id"], coach["name"], coach["image_filename"],
-                    body.model, body.prompt.strip(), json.dumps(params), now(), now(),
+                    atlas.MODEL, prompt_text, json.dumps(params), now(), now(),
                 ),
             )
             ids.append(gen_id)

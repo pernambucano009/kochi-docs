@@ -109,19 +109,23 @@
       </section>
 
       <section class="panel settings">
-        <div class="panel-head"><h2>3. الإعدادات</h2></div>
-        <label class="field">الوصف (prompt)
-          <textarea id="promptInput" rows="7"></textarea>
-        </label>
-        <p class="hint"><code>@image1</code> = صورة المدرب · <code>@video1</code> = القطعة. الكتابة بالإنجليزي بتدّي نتايج أدق. <a href="#" id="resetPrompt">رجّع الوصف الافتراضي</a></p>
-        <div class="grid2">
-          <label class="field">الموديل <select id="modelSelect"></select></label>
-          <label class="field">الدقة <select id="resSelect"></select></label>
-          <label class="field">المقاس <select id="ratioSelect"></select></label>
-          <label class="field">المدة
-            <select id="durationSelect"><option value="">على قد القطعة</option></select>
-          </label>
-        </div>
+        <div class="panel-head"><h2>3. اختار البرومبت</h2>
+          <button class="btn sm" id="newPrompt">＋ برومبت جديد</button></div>
+        <div class="prompt-list" id="promptList"></div>
+
+        <form class="prompt-form" id="promptForm" hidden>
+          <label class="field">الاسم <input type="text" id="promptName" placeholder="مثلًا: نفس حركة التمرين" required></label>
+          <label class="field">النص
+            <textarea id="promptText" rows="7" required></textarea></label>
+          <p class="hint"><code>@image1</code> = صورة المدرب · <code>@video1</code> = القطعة. الكتابة بالإنجليزي بتدّي نتايج أدق.</p>
+          <label class="check"><input type="checkbox" id="promptDefault"> يبقى البرومبت الافتراضي</label>
+          <div class="row">
+            <button class="btn primary sm" type="submit">حفظ</button>
+            <button class="btn sm" type="button" id="promptCancel">إلغاء</button>
+          </div>
+        </form>
+
+        <div class="fixed-settings" id="fixedSettings"></div>
         <label class="check"><input type="checkbox" id="audioCheck"> يولّد صوت مع الفيديو</label>
         <button class="btn primary wide" id="generateBtn">✨ ولّد</button>
       </section>

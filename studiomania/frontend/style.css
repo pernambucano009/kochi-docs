@@ -213,3 +213,21 @@ code { background: var(--surface-2); border-radius: 4px; padding: 0 4px; directi
 dialog.outro-dlg { border: 1px solid var(--line); background: var(--surface); color: var(--text); border-radius: 14px; padding: 12px; max-width: min(420px, 92vw); }
 dialog.outro-dlg video { width: 100%; max-height: 70vh; display: block; border-radius: 8px; background: #000; }
 dialog::backdrop { background: rgba(0,0,0,.6); }
+
+/* ---------- مكتبة البرومبتات ---------- */
+.prompt-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; max-height: 360px; overflow-y: auto; }
+.prompt-item {
+  border: 2px solid var(--line); border-radius: 10px; padding: 8px 10px; cursor: pointer; background: var(--surface-2);
+}
+.prompt-item.selected { border-color: var(--accent); }
+.prompt-item .top { display: flex; align-items: center; gap: 6px; font-weight: 700; font-size: 14px; }
+.prompt-item .top .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prompt-item .text {
+  font-size: 12px; color: var(--muted); direction: ltr; text-align: left; margin-top: 4px;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+}
+.prompt-item.selected .text { -webkit-line-clamp: unset; }
+.prompt-item .acts { display: flex; gap: 4px; }
+.prompt-form { border: 1px dashed var(--accent); border-radius: 10px; padding: 10px; margin-bottom: 12px; }
+.fixed-settings { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.fixed-settings .pill { font-size: 12px; padding: 3px 10px; color: var(--text); }
