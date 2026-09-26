@@ -1,0 +1,266 @@
+// StudioMania — الخطوة 2: توليد فيديوهات بـ Seedance
+
+const DEFAULT_PROMPT =
+  "@image1 is the coach, a cartoon character. Recreate the exact exercise movement, body mechanics, tempo and camera framing from @video1, performed by the character from @image1. Keep the character's face, outfit and art style exactly as in @image1. Full body visible, clean gym background, smooth natural motion.";
+const PROMPT_KEY = "studiomania.prompt";
+const SETTINGS_KEY = "studiomania.genSettings";
+const ACTIVE = new Set(["queued", "uploading", "submitted", "processing", "downloading"]);
+const STATUS_LABEL = {
+  queued: "في الطابور",
+  uploading: "بيرفع الملفات",
+  submitted: "اتبعت لـ Seedance",
+  processing: "Seedance بيولّد",
+  downloading: "بيحمّل الفيديو",
+  completed: "جاهز",
+  failed: "فشل",
+};
+
+const gen = { atlas: null, coachId: null, clips: [], selected: new Set(), list: [], timer: null };
+
+function storageGet(key) {
+  try { return localStorage.getItem(key); } catch { return null; }
+}
+function storageSet(key, value) {
+  try { localStorage.setItem(key, value); } catch {}
+}
+
+async function initGenerate() {
+  if (!gen.atlas) {
+    gen.atlas = await api("/api/atlas");
+    $("modelSelect").innerHTML = gen.atlas.models.map((m) => `<option value="${m.id}">${m.label}</option>`).join("");
+    $("resSelect").innerHTML = gen.atlas.resolutions.map((r) => `<option>${r}</option>`).join("");
+    $("ratioSelect").innerHTML = gen.atlas.ratios.map((r) => `<option>${r}</option>`).join("");
+    let saved = {};
+    try { saved = JSON.parse(storageGet(SETTINGS_KEY) || "{}"); } catch {}
+    $("modelSelect").value = saved.model || gen.atlas.default_model;
+    $("resSelect").value = saved.resolution || "720p";
+    $("ratioSelect").value = saved.ratio || "9:16";
+    $("audioCheck").checked = !!saved.generate_audio;
+    fillDurations(saved.duration);
+    $("promptInput").value = storageGet(PROMPT_KEY) || DEFAULT_PROMPT;
+  }
+  const alert = $("atlasAlert");
+  alert.hidden = gen.atlas.configured || gen.atlas.mock;
+  alert.innerHTML = "⚠️ مفتاح Atlas مش متسجل. اعمل ملف <code>.env</code> في فولدر <code>studiomania</code> واكتب فيه <code>ATLASCLOUD_API_KEY=مفتاحك</code>، وبعدين شغّل البرنامج تاني.";
+
+  const [coaches, clips] = await Promise.all([api("/api/coaches"), api("/api/clips")]);
+  renderCoachPicker(coaches);
+  gen.clips = clips;
+  const ids = new Set(clips.map((c) => c.id));
+  gen.selected = new Set([...gen.selected].filter((id) => ids.has(id)));
+  renderClipPicker();
+  await loadGenerations();
+}
+
+function fillDurations(selected) {
+  const max = gen.atlas.models.find((m) => m.id === $("modelSelect").value)?.max_duration || 15;
+  const current = selected ?? $("durationSelect").value;
+  let html = `<option value="">على قد القطعة</option>`;
+  for (let d = gen.atlas.min_duration; d <= max; d++) html += `<option value="${d}">${d} ثانية</option>`;
+  $("durationSelect").innerHTML = html;
+  $("durationSelect").value = current && Number(current) <= max ? String(current) : "";
+}
+
+function saveSettings() {
+  storageSet(SETTINGS_KEY, JSON.stringify({
+    model: $("modelSelect").value,
+    resolution: $("resSelect").value,
+    ratio: $("ratioSelect").value,
+    duration: $("durationSelect").value,
+    generate_audio: $("audioCheck").checked,
+  }));
+}
+$("modelSelect").addEventListener("change", () => { fillDurations(); saveSettings(); });
+["resSelect", "ratioSelect", "durationSelect", "audioCheck"].forEach((id) => $(id).addEventListener("change", saveSettings));
+$("promptInput").addEventListener("input", () => storageSet(PROMPT_KEY, $("promptInput").value));
+$("resetPrompt").addEventListener("click", (e) => {
+  e.preventDefault();
+  $("promptInput").value = DEFAULT_PROMPT;
+  storageSet(PROMPT_KEY, DEFAULT_PROMPT);
+});
+
+// ---------- المدرب ----------
+function renderCoachPicker(coaches) {
+  if (!coaches.some((c) => c.id === gen.coachId)) gen.coachId = coaches[0]?.id || null;
+  $("coachPickerEmpty").hidden = coaches.length > 0;
+  $("coachPicker").innerHTML = coaches
+    .map(
+      (c) => `<button class="coach-pick ${c.id === gen.coachId ? "selected" : ""}" data-id="${c.id}">
+        <img src="${c.image_url}" alt="">${escapeHtml(c.name)}</button>`
+    )
+    .join("");
+  updateGenerateBtn();
+}
+$("coachPicker").addEventListener("click", (e) => {
+  const b = e.target.closest(".coach-pick");
+  if (!b) return;
+  gen.coachId = b.dataset.id;
+  document.querySelectorAll(".coach-pick").forEach((x) => x.classList.toggle("selected", x === b));
+  updateGenerateBtn();
+});
+
+// ---------- القطع ----------
+const MIN_REF = 2;
+function renderClipPicker() {
+  $("clipPickerEmpty").hidden = gen.clips.length > 0;
+  const groups = new Map();
+  for (const c of gen.clips) {
+    if (!groups.has(c.video_id)) groups.set(c.video_id, { name: c.video_name, clips: [] });
+    groups.get(c.video_id).clips.push(c);
+  }
+  $("clipPicker").innerHTML = [...groups.entries()]
+    .map(([vid, g]) => {
+      const usable = g.clips.filter((c) => c.duration >= MIN_REF);
+      const all = usable.length > 0 && usable.every((c) => gen.selected.has(c.id));
+      return `<div class="clip-group">
+        <div class="clip-group-head"><span>${escapeHtml(g.name)}</span>
+          <button class="btn sm" data-all="${vid}">${all ? "إلغاء الكل" : "اختار الكل"}</button></div>
+        <div class="clip-picks">${g.clips
+          .map((c) => {
+            const short = c.duration < MIN_REF;
+            return `<div class="clip-pick ${gen.selected.has(c.id) ? "selected" : ""} ${short ? "too-short" : ""}"
+              data-id="${c.id}" title="${short ? `أقصر من ${MIN_REF} ثانية، Seedance مش هيقبلها` : ""}">
+              <video src="${c.url}#t=0.5" preload="metadata" muted playsinline></video>
+              <span class="tick">✓</span>
+              <span class="tag"><span>#${c.index}</span><span>${c.duration.toFixed(1)}ث</span></span>
+            </div>`;
+          })
+          .join("")}</div>
+      </div>`;
+    })
+    .join("");
+  updateGenerateBtn();
+}
+$("clipPicker").addEventListener("click", (e) => {
+  const allBtn = e.target.closest("[data-all]");
+  if (allBtn) {
+    const usable = gen.clips.filter((c) => c.video_id === allBtn.dataset.all && c.duration >= MIN_REF);
+    const all = usable.every((c) => gen.selected.has(c.id));
+    usable.forEach((c) => (all ? gen.selected.delete(c.id) : gen.selected.add(c.id)));
+    return renderClipPicker();
+  }
+  const pick = e.target.closest(".clip-pick");
+  if (!pick || pick.classList.contains("too-short")) return;
+  const id = pick.dataset.id;
+  gen.selected.has(id) ? gen.selected.delete(id) : gen.selected.add(id);
+  renderClipPicker();
+});
+// معاينة القطعة لما الماوس يقف عليها
+$("clipPicker").addEventListener("mouseover", (e) => e.target.closest(".clip-pick")?.querySelector("video")?.play().catch(() => {}));
+$("clipPicker").addEventListener("mouseout", (e) => {
+  const v = e.target.closest(".clip-pick")?.querySelector("video");
+  if (v && !e.relatedTarget?.closest?.(".clip-pick")) { v.pause(); v.currentTime = 0.5; }
+});
+
+function updateGenerateBtn() {
+  const n = gen.selected.size;
+  $("clipPickCount").textContent = n ? `${n} مختارة` : "";
+  const btn = $("generateBtn");
+  btn.disabled = !n || !gen.coachId;
+  btn.textContent = n ? `✨ ولّد ${n} فيديو` : "✨ ولّد";
+}
+
+$("generateBtn").onclick = async () => {
+  const btn = $("generateBtn");
+  btn.disabled = true;
+  try {
+    const duration = $("durationSelect").value;
+    const res = await api("/api/generations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        clip_ids: [...gen.selected],
+        coach_id: gen.coachId,
+        prompt: $("promptInput").value,
+        model: $("modelSelect").value,
+        resolution: $("resSelect").value,
+        ratio: $("ratioSelect").value,
+        duration: duration ? Number(duration) : null,
+        generate_audio: $("audioCheck").checked,
+      }),
+    });
+    toast(`🚀 اتبعت ${res.created} طلب`);
+    gen.selected.clear();
+    renderClipPicker();
+    await loadGenerations();
+  } catch (err) {
+    toast(err.message, true);
+  } finally {
+    updateGenerateBtn();
+  }
+};
+
+// ---------- النتايج ----------
+async function loadGenerations() {
+  gen.list = await api("/api/generations");
+  renderGenerations();
+  clearTimeout(gen.timer);
+  const viewOpen = !document.querySelector('.view[data-view="2"]').hidden;
+  if (viewOpen && gen.list.some((g) => ACTIVE.has(g.status))) gen.timer = setTimeout(loadGenerations, 3000);
+}
+
+function renderGenerations() {
+  const list = gen.list;
+  $("gensEmpty").hidden = list.length > 0;
+  const active = list.filter((g) => ACTIVE.has(g.status)).length;
+  const done = list.filter((g) => g.status === "completed").length;
+  $("genSummary").textContent = list.length ? `${done} جاهز${active ? ` · ${active} شغال` : ""}` : "";
+
+  // منعيدش رسم الفيديوهات اللي خلصت عشان متقفش لو شغالة
+  const grid = $("gensGrid");
+  const existing = new Map([...grid.children].map((el) => [el.dataset.id, el]));
+  const frag = document.createDocumentFragment();
+  for (const g of list) {
+    const key = `${g.status}|${g.error || ""}`;
+    let el = existing.get(g.id);
+    if (!el || el.dataset.key !== key) {
+      el = document.createElement("div");
+      el.className = "gen";
+      el.dataset.id = g.id;
+      el.dataset.key = key;
+      el.innerHTML = genCard(g);
+    }
+    frag.appendChild(el);
+  }
+  grid.replaceChildren(frag);
+}
+
+function genCard(g) {
+  const isActive = ACTIVE.has(g.status);
+  const media = g.output_url
+    ? `<video src="${g.output_url}" controls preload="metadata" playsinline></video>`
+    : `<div class="wait">${isActive ? `<div class="spin"></div><br>${STATUS_LABEL[g.status]}...` : "مفيش فيديو"}</div>`;
+  const pillCls = g.status === "completed" ? "completed" : g.status === "failed" ? "failed" : "active";
+  const p = g.params;
+  return `<div class="media">${media}</div>
+    <div class="body">
+      <div class="who"><img src="${g.coach_image_url}" alt="">${escapeHtml(g.coach_name)}</div>
+      <div>${escapeHtml(g.clip_label)} · ${g.model_label} · ${p.resolution} · ${p.duration}ث</div>
+      <span class="pill ${pillCls}">${STATUS_LABEL[g.status] || g.status}</span>
+      ${g.error ? `<div class="err">${escapeHtml(g.error)}</div>` : ""}
+      <div class="acts">
+        <a class="btn sm" href="${g.clip_url}" target="_blank">القطعة الأصلية</a>
+        ${g.output_url ? `<a class="btn sm" href="${g.output_url}" download>⬇ تحميل</a>` : ""}
+        ${g.status === "failed" ? `<button class="btn sm" data-act="retry">↻ إعادة المحاولة</button>` : ""}
+        ${isActive ? "" : `<button class="btn sm danger" data-act="delete">حذف</button>`}
+      </div>
+    </div>`;
+}
+
+$("gensGrid").addEventListener("click", async (e) => {
+  const btn = e.target.closest("button[data-act]");
+  if (!btn) return;
+  const id = btn.closest(".gen").dataset.id;
+  try {
+    if (btn.dataset.act === "retry") await api(`/api/generations/${id}/retry`, { method: "POST" });
+    if (btn.dataset.act === "delete") {
+      if (!confirm("حذف الفيديو ده؟")) return;
+      await api(`/api/generations/${id}`, { method: "DELETE" });
+    }
+    await loadGenerations();
+  } catch (err) {
+    toast(err.message, true);
+  }
+});
+
+viewHooks["2"] = initGenerate;

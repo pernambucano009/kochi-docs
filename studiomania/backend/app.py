@@ -1,35 +1,63 @@
 """StudioMania backend.
 
 الخطوة 1: مكتبة الفيديوهات الخام وتقطيعها لقطع (كل قطعة 15 ثانية أو أقل).
+الخطوة 2: توليد فيديوهات بـ Seedance عن طريق Atlas Cloud.
+الخطوة 4: مكتبة المدربين (الصورة والأوترو).
 """
 
 import json
+import os
 import re
 import shutil
 import sqlite3
 import subprocess
+import threading
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import closing
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+import httpx
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+ROOT = Path(__file__).resolve().parent.parent
+
+
+def load_env_file(path: Path) -> None:
+    """يقرا ملف .env (سطور KEY=VALUE) من غير ما يغيّر متغيرات متسجلة قبل كده."""
+    if not path.exists():
+        return
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+
+
+load_env_file(ROOT / ".env")
+
+import atlas  # noqa: E402  (لازم بعد قراءة .env)
+
 MAX_CLIP_SECONDS = 15.0
 MIN_CUT_GAP = 0.2  # أقل مسافة مسموحة بين نقطتين قطع
+MIN_REFERENCE_SECONDS = 2.0  # Seedance مش بيقبل فيديو مرجعي أقصر من كده
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".m4v", ".webm", ".mkv"}
+IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
 
-ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = ROOT / "data"
 RAW_DIR = DATA_DIR / "raw"
 CLIPS_DIR = DATA_DIR / "clips"
+COACHES_DIR = DATA_DIR / "coaches"
+GENERATED_DIR = DATA_DIR / "generated"
 DB_PATH = DATA_DIR / "studiomania.db"
 FRONTEND_DIR = ROOT / "frontend"
 
-for d in (RAW_DIR, CLIPS_DIR):
+for d in (RAW_DIR, CLIPS_DIR, COACHES_DIR, GENERATED_DIR):
     d.mkdir(parents=True, exist_ok=True)
 
 
@@ -87,6 +115,33 @@ def init_db() -> None:
                 end REAL NOT NULL,
                 filename TEXT NOT NULL,
                 created_at TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS coaches (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                image_filename TEXT NOT NULL,
+                outro_filename TEXT,
+                outro_duration REAL,
+                created_at TEXT NOT NULL
+            );
+            -- بنحفظ نسخة من بيانات القطعة والمدرب عشان السجل يفضل لو اتمسحوا
+            CREATE TABLE IF NOT EXISTS generations (
+                id TEXT PRIMARY KEY,
+                clip_id TEXT NOT NULL,
+                clip_filename TEXT NOT NULL,
+                clip_label TEXT NOT NULL,
+                coach_id TEXT NOT NULL,
+                coach_name TEXT NOT NULL,
+                coach_image TEXT NOT NULL,
+                model TEXT NOT NULL,
+                prompt TEXT NOT NULL,
+                params TEXT NOT NULL,
+                status TEXT NOT NULL,
+                prediction_id TEXT,
+                error TEXT,
+                output_filename TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
             );
             """
         )
@@ -308,8 +363,359 @@ def delete_clip(clip_id: str):
     return {"ok": True}
 
 
+# ---------------------------------------------------------------- المدربين
+
+
+def save_upload(upload: UploadFile, allowed: set[str], folder: Path, prefix: str) -> str:
+    ext = Path(upload.filename or "").suffix.lower()
+    if ext not in allowed:
+        raise HTTPException(400, f"نوع الملف غير مدعوم: {ext or 'بدون امتداد'}")
+    filename = f"{prefix}_{uuid.uuid4().hex[:8]}{ext}"
+    with (folder / filename).open("wb") as out:
+        shutil.copyfileobj(upload.file, out)
+    return filename
+
+
+def coach_to_dict(row: sqlite3.Row) -> dict:
+    return {
+        "id": row["id"],
+        "name": row["name"],
+        "image_url": f"/media/coaches/{row['image_filename']}",
+        "outro_url": f"/media/coaches/{row['outro_filename']}" if row["outro_filename"] else None,
+        "outro_duration": row["outro_duration"],
+        "created_at": row["created_at"],
+    }
+
+
+def get_coach(conn: sqlite3.Connection, coach_id: str) -> sqlite3.Row:
+    row = conn.execute("SELECT * FROM coaches WHERE id = ?", (coach_id,)).fetchone()
+    if row is None:
+        raise HTTPException(404, "المدرب غير موجود")
+    return row
+
+
+def save_outro(outro: UploadFile, coach_id: str) -> tuple[str, float]:
+    filename = save_upload(outro, VIDEO_EXTENSIONS, COACHES_DIR, f"{coach_id}_outro")
+    try:
+        return filename, probe_duration(COACHES_DIR / filename)
+    except ValueError as exc:
+        (COACHES_DIR / filename).unlink(missing_ok=True)
+        raise HTTPException(400, f"الأوترو: {exc}") from exc
+
+
+@app.get("/api/coaches")
+def list_coaches():
+    with closing(db()) as conn:
+        return [coach_to_dict(r) for r in conn.execute("SELECT * FROM coaches ORDER BY name")]
+
+
+@app.post("/api/coaches")
+def create_coach(
+    name: str = Form(...),
+    image: UploadFile = File(...),
+    outro: UploadFile | None = File(None),
+):
+    name = name.strip()
+    if not name:
+        raise HTTPException(400, "اكتب اسم المدرب")
+    coach_id = uuid.uuid4().hex[:12]
+    image_filename = save_upload(image, IMAGE_EXTENSIONS, COACHES_DIR, f"{coach_id}_image")
+    outro_filename, outro_duration = save_outro(outro, coach_id) if outro and outro.filename else (None, None)
+    with closing(db()) as conn, conn:
+        conn.execute(
+            "INSERT INTO coaches (id, name, image_filename, outro_filename, outro_duration, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (coach_id, name, image_filename, outro_filename, outro_duration, now()),
+        )
+        return coach_to_dict(get_coach(conn, coach_id))
+
+
+@app.patch("/api/coaches/{coach_id}")
+def update_coach(
+    coach_id: str,
+    name: str | None = Form(None),
+    image: UploadFile | None = File(None),
+    outro: UploadFile | None = File(None),
+    remove_outro: bool = Form(False),
+):
+    with closing(db()) as conn, conn:
+        row = get_coach(conn, coach_id)
+        old_files = []
+        if name is not None and name.strip():
+            conn.execute("UPDATE coaches SET name = ? WHERE id = ?", (name.strip(), coach_id))
+        if image and image.filename:
+            filename = save_upload(image, IMAGE_EXTENSIONS, COACHES_DIR, f"{coach_id}_image")
+            conn.execute("UPDATE coaches SET image_filename = ? WHERE id = ?", (filename, coach_id))
+            old_files.append(row["image_filename"])
+        if outro and outro.filename:
+            filename, duration = save_outro(outro, coach_id)
+            conn.execute(
+                "UPDATE coaches SET outro_filename = ?, outro_duration = ? WHERE id = ?",
+                (filename, duration, coach_id),
+            )
+            old_files.append(row["outro_filename"])
+        elif remove_outro:
+            conn.execute("UPDATE coaches SET outro_filename = NULL, outro_duration = NULL WHERE id = ?", (coach_id,))
+            old_files.append(row["outro_filename"])
+        result = coach_to_dict(get_coach(conn, coach_id))
+    # الصورة القديمة ممكن تكون مستخدمة في توليد لسه شغال، فبنسيبها لو كده
+    with closing(db()) as conn:
+        in_use = {r[0] for r in conn.execute("SELECT coach_image FROM generations")}
+    for f in old_files:
+        if f and f not in in_use:
+            (COACHES_DIR / f).unlink(missing_ok=True)
+    return result
+
+
+@app.delete("/api/coaches/{coach_id}")
+def delete_coach(coach_id: str):
+    with closing(db()) as conn, conn:
+        row = get_coach(conn, coach_id)
+        conn.execute("DELETE FROM coaches WHERE id = ?", (coach_id,))
+        in_use = {r[0] for r in conn.execute("SELECT coach_image FROM generations")}
+    if row["image_filename"] not in in_use:
+        (COACHES_DIR / row["image_filename"]).unlink(missing_ok=True)
+    if row["outro_filename"]:
+        (COACHES_DIR / row["outro_filename"]).unlink(missing_ok=True)
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------- التوليد بـ Seedance
+
+ACTIVE_STATUSES = ("queued", "uploading", "submitted", "processing", "downloading")
+executor = ThreadPoolExecutor(max_workers=3)
+_running: set[str] = set()
+_running_lock = threading.Lock()
+
+
+def set_generation(gen_id: str, **fields) -> None:
+    fields["updated_at"] = now()
+    cols = ", ".join(f"{k} = ?" for k in fields)
+    with closing(db()) as conn, conn:
+        conn.execute(f"UPDATE generations SET {cols} WHERE id = ?", (*fields.values(), gen_id))
+
+
+def run_generation(gen_id: str) -> None:
+    with _running_lock:
+        if gen_id in _running:
+            return
+        _running.add(gen_id)
+    try:
+        _run_generation(gen_id)
+    except httpx.HTTPError as exc:
+        set_generation(gen_id, status="failed", error=f"مقدرتش أوصل لـ Atlas (مشكلة إنترنت أو اتصال): {exc}"[:500])
+    except Exception as exc:  # أي خطأ يتسجل على الطلب نفسه بدل ما يضيع
+        set_generation(gen_id, status="failed", error=str(exc)[:500])
+    finally:
+        with _running_lock:
+            _running.discard(gen_id)
+
+
+def _run_generation(gen_id: str) -> None:
+    with closing(db()) as conn:
+        g = conn.execute("SELECT * FROM generations WHERE id = ?", (gen_id,)).fetchone()
+    if g is None:
+        return
+    clip_path = CLIPS_DIR / g["clip_filename"]
+    image_path = COACHES_DIR / g["coach_image"]
+    output = f"{gen_id}.mp4"
+
+    def on_status(status: str) -> None:
+        set_generation(gen_id, status="processing" if status not in ("completed", "succeeded") else "downloading")
+
+    if atlas.mock_mode():
+        if not clip_path.exists():
+            raise atlas.AtlasError("ملف القطعة اتمسح")
+        set_generation(gen_id, status="submitted", prediction_id=f"mock-{gen_id}")
+        atlas.mock_generate(clip_path, GENERATED_DIR / output, on_status)
+        set_generation(gen_id, status="completed", output_filename=output, error=None)
+        return
+
+    prediction_id = g["prediction_id"]
+    if not prediction_id:
+        # لسه متبعتش: نرفع الملفات ونبعت الطلب
+        if not clip_path.exists():
+            raise atlas.AtlasError("ملف القطعة اتمسح (غالبًا الفيديو اتقطّع تاني). اختار القطعة الجديدة وولّد من الأول")
+        if not image_path.exists():
+            raise atlas.AtlasError("صورة المدرب اتمسحت")
+        set_generation(gen_id, status="uploading", error=None)
+        clip_url = atlas.upload_media(clip_path)
+        image_url = atlas.upload_media(image_path)
+        params = json.loads(g["params"])
+        body = {
+            "model": g["model"],
+            "prompt": g["prompt"],
+            "reference_images": [image_url],
+            "reference_videos": [clip_url],
+            "duration": params["duration"],
+            "resolution": params["resolution"],
+            "ratio": params["ratio"],
+            "generate_audio": params["generate_audio"],
+            "watermark": False,
+        }
+        prediction_id = atlas.submit_video(body)
+        set_generation(gen_id, status="submitted", prediction_id=prediction_id)
+
+    video_url = atlas.wait_for(prediction_id, on_status)
+    set_generation(gen_id, status="downloading")
+    atlas.download(video_url, GENERATED_DIR / output)
+    set_generation(gen_id, status="completed", output_filename=output, error=None)
+
+
+def generation_to_dict(r: sqlite3.Row) -> dict:
+    return {
+        "id": r["id"],
+        "clip_id": r["clip_id"],
+        "clip_label": r["clip_label"],
+        "clip_url": f"/media/clips/{r['clip_filename']}",
+        "coach_id": r["coach_id"],
+        "coach_name": r["coach_name"],
+        "coach_image_url": f"/media/coaches/{r['coach_image']}",
+        "model": r["model"],
+        "model_label": atlas.MODELS.get(r["model"], {}).get("label", r["model"]),
+        "prompt": r["prompt"],
+        "params": json.loads(r["params"]),
+        "status": r["status"],
+        "error": r["error"],
+        "output_url": f"/media/generated/{r['output_filename']}" if r["output_filename"] else None,
+        "created_at": r["created_at"],
+        "updated_at": r["updated_at"],
+    }
+
+
+@app.get("/api/atlas")
+def atlas_status():
+    return {
+        "configured": bool(atlas.api_key()),
+        "mock": atlas.mock_mode(),
+        "models": [{"id": k, **v} for k, v in atlas.MODELS.items()],
+        "default_model": atlas.DEFAULT_MODEL,
+        "resolutions": atlas.RESOLUTIONS,
+        "ratios": atlas.RATIOS,
+        "min_duration": atlas.MIN_DURATION,
+    }
+
+
+class GenerationIn(BaseModel):
+    clip_ids: list[str]
+    coach_id: str
+    prompt: str
+    model: str = atlas.DEFAULT_MODEL
+    resolution: str = "720p"
+    ratio: str = "9:16"
+    duration: int | None = None  # فاضي = على قد طول القطعة
+    generate_audio: bool = False
+
+
+@app.post("/api/generations")
+def create_generations(body: GenerationIn):
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل. ضيف ATLASCLOUD_API_KEY في ملف .env وشغّل البرنامج تاني")
+    if body.model not in atlas.MODELS:
+        raise HTTPException(400, "موديل غير معروف")
+    if body.resolution not in atlas.RESOLUTIONS or body.ratio not in atlas.RATIOS:
+        raise HTTPException(400, "الدقة أو المقاس غير مدعوم")
+    if not body.prompt.strip():
+        raise HTTPException(400, "اكتب الوصف (prompt)")
+    if not body.clip_ids:
+        raise HTTPException(400, "اختار قطعة واحدة على الأقل")
+    max_duration = atlas.MODELS[body.model]["max_duration"]
+
+    with closing(db()) as conn, conn:
+        coach = get_coach(conn, body.coach_id)
+        rows = conn.execute(
+            f"SELECT c.*, v.name AS video_name FROM clips c JOIN videos v ON v.id = c.video_id "
+            f"WHERE c.id IN ({','.join('?' * len(body.clip_ids))})",
+            body.clip_ids,
+        ).fetchall()
+        if len(rows) != len(set(body.clip_ids)):
+            raise HTTPException(400, "فيه قطع مش موجودة. حدّث الصفحة")
+        short = [f"{r['video_name']} #{r['idx']}" for r in rows if r["end"] - r["start"] < MIN_REFERENCE_SECONDS]
+        if short:
+            raise HTTPException(400, f"قطع أقصر من {MIN_REFERENCE_SECONDS:g} ثانية ومينفعش تتبعت: {', '.join(short)}")
+
+        ids = []
+        for r in rows:
+            clip_len = r["end"] - r["start"]
+            duration = body.duration or round(clip_len + 0.49)
+            duration = max(atlas.MIN_DURATION, min(max_duration, duration))
+            gen_id = uuid.uuid4().hex[:12]
+            params = {
+                "duration": duration,
+                "resolution": body.resolution,
+                "ratio": body.ratio,
+                "generate_audio": body.generate_audio,
+            }
+            conn.execute(
+                "INSERT INTO generations (id, clip_id, clip_filename, clip_label, coach_id, coach_name, coach_image, "
+                "model, prompt, params, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', ?, ?)",
+                (
+                    gen_id, r["id"], r["filename"], f"{r['video_name']} #{r['idx']}",
+                    coach["id"], coach["name"], coach["image_filename"],
+                    body.model, body.prompt.strip(), json.dumps(params), now(), now(),
+                ),
+            )
+            ids.append(gen_id)
+    for gen_id in ids:
+        executor.submit(run_generation, gen_id)
+    return {"created": len(ids)}
+
+
+@app.get("/api/generations")
+def list_generations():
+    with closing(db()) as conn:
+        rows = conn.execute("SELECT * FROM generations ORDER BY created_at DESC, clip_label").fetchall()
+    return [generation_to_dict(r) for r in rows]
+
+
+@app.post("/api/generations/{gen_id}/retry")
+def retry_generation(gen_id: str):
+    with closing(db()) as conn:
+        row = conn.execute("SELECT status FROM generations WHERE id = ?", (gen_id,)).fetchone()
+    if row is None:
+        raise HTTPException(404, "الطلب غير موجود")
+    if row["status"] != "failed":
+        raise HTTPException(400, "الطلب ده مش فاشل")
+    # لو الطلب كان اتبعت لـ Atlas بنكمّل متابعته بدل ما ندفع تاني
+    set_generation(gen_id, status="queued", error=None)
+    executor.submit(run_generation, gen_id)
+    return {"ok": True}
+
+
+@app.delete("/api/generations/{gen_id}")
+def delete_generation(gen_id: str):
+    with closing(db()) as conn, conn:
+        row = conn.execute("SELECT output_filename, status FROM generations WHERE id = ?", (gen_id,)).fetchone()
+        if row is None:
+            raise HTTPException(404, "الطلب غير موجود")
+        if row["status"] in ACTIVE_STATUSES:
+            raise HTTPException(400, "الطلب لسه شغال، استنى لما يخلص")
+        conn.execute("DELETE FROM generations WHERE id = ?", (gen_id,))
+    if row["output_filename"]:
+        (GENERATED_DIR / row["output_filename"]).unlink(missing_ok=True)
+    return {"ok": True}
+
+
+def resume_generations() -> None:
+    """لو البرنامج اتقفل والطلبات شغالة، نكمّلها لما يفتح تاني."""
+    with closing(db()) as conn:
+        ids = [
+            r["id"]
+            for r in conn.execute(
+                f"SELECT id FROM generations WHERE status IN ({','.join('?' * len(ACTIVE_STATUSES))})",
+                ACTIVE_STATUSES,
+            )
+        ]
+    for gen_id in ids:
+        executor.submit(run_generation, gen_id)
+
+
+resume_generations()
+
+
 app.mount("/media/raw", StaticFiles(directory=RAW_DIR), name="raw")
 app.mount("/media/clips", StaticFiles(directory=CLIPS_DIR), name="clips")
+app.mount("/media/coaches", StaticFiles(directory=COACHES_DIR), name="coaches")
+app.mount("/media/generated", StaticFiles(directory=GENERATED_DIR), name="generated")
 
 
 @app.get("/")

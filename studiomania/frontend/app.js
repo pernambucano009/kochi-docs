@@ -133,6 +133,7 @@ const dz = $("dropzone");
   document.addEventListener(ev, (e) => { e.preventDefault(); if (ev === "drop" || e.target === dz) dz.classList.remove("over"); })
 );
 document.addEventListener("drop", (e) => {
+  if (!isStep1()) return;
   const files = [...(e.dataTransfer?.files || [])].filter((f) => f.type.startsWith("video/") || /\.(mkv|mov|m4v)$/i.test(f.name));
   if (files.length) uploadFiles(files);
 });
@@ -354,7 +355,7 @@ $("cutHere").onclick = cutHere;
 $("undoCut").onclick = undo;
 
 document.addEventListener("keydown", (e) => {
-  if (!state.current || e.target.matches("input, textarea")) return;
+  if (!state.current || !isStep1() || e.target.matches("input, textarea, select")) return;
   const k = e.key.toLowerCase();
   if (k === " ") { e.preventDefault(); togglePlay(); }
   else if (k === "c" || k === "ؤ") { e.preventDefault(); cutHere(); }
@@ -423,10 +424,31 @@ $("clipsGrid").addEventListener("click", async (e) => {
   await loadClips();
 });
 
+// ---------- التنقل بين الخطوات ----------
+const viewHooks = {}; // كل صفحة بتسجّل هنا اللي يحصل لما تفتح
+function showStep(step) {
+  if (!document.querySelector(`.view[data-view="${step}"]`)) step = "1";
+  document.querySelectorAll(".view").forEach((v) => (v.hidden = v.dataset.view !== step));
+  document.querySelectorAll(".step[data-step]").forEach((b) => b.classList.toggle("active", b.dataset.step === step));
+  if (step !== "1") player.pause();
+  if (location.hash !== `#${step}`) history.replaceState(null, "", `#${step}`);
+  viewHooks[step]?.();
+}
+$("steps").addEventListener("click", (e) => {
+  const b = e.target.closest(".step[data-step]");
+  if (b) showStep(b.dataset.step);
+});
+document.addEventListener("click", (e) => {
+  const a = e.target.closest("[data-goto]");
+  if (a) { e.preventDefault(); showStep(a.dataset.goto); }
+});
+const isStep1 = () => !document.querySelector('.view[data-view="1"]').hidden;
+
 // ---------- البداية ----------
 (async () => {
   const cfg = await api("/api/config");
   state.maxClip = cfg.max_clip_seconds;
   state.minGap = cfg.min_cut_gap;
   await loadVideos();
+  showStep(location.hash.slice(1) || "1");
 })();

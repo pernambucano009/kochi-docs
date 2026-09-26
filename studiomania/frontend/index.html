@@ -19,15 +19,15 @@
 
   <nav class="steps" id="steps">
     <button class="step active" data-step="1"><span>1</span>تقطيع الفيديوهات</button>
-    <button class="step" disabled><span>2</span>توليد Seedance</button>
+    <button class="step" data-step="2"><span>2</span>توليد Seedance</button>
     <button class="step" disabled><span>3</span>التعليق الصوتي</button>
-    <button class="step" disabled><span>4</span>المدربين</button>
+    <button class="step" data-step="4"><span>4</span>المدربين</button>
     <button class="step" disabled><span>5</span>الموسيقى</button>
     <button class="step" disabled><span>6</span>المونتاج</button>
     <button class="step" disabled><span>7</span>النشر</button>
   </nav>
 
-  <main class="layout">
+  <main class="layout view" data-view="1">
     <aside class="panel library">
       <div class="panel-head">
         <h2>الفيديوهات الخام</h2>
@@ -92,8 +92,78 @@
       <p>اختار فيديو من القائمة عشان تبدأ تقطّعه.</p>
     </section>
   </main>
+
+  <!-- الخطوة 2: التوليد -->
+  <main class="view" data-view="2" hidden>
+    <div class="alert warn" id="atlasAlert" hidden></div>
+    <div class="gen-layout">
+      <section class="panel">
+        <div class="panel-head"><h2>1. اختار المدرب</h2></div>
+        <div class="coach-picker" id="coachPicker"></div>
+        <p class="empty" id="coachPickerEmpty" hidden>مفيش مدربين لسه. ضيف مدرب من صفحة <a href="#" data-goto="4">المدربين</a>.</p>
+
+        <div class="panel-head gap-top"><h2>2. اختار القطع</h2>
+          <span class="muted" id="clipPickCount"></span></div>
+        <div id="clipPicker"></div>
+        <p class="empty" id="clipPickerEmpty" hidden>مفيش قطع جاهزة. قطّع فيديو الأول من <a href="#" data-goto="1">الخطوة 1</a>.</p>
+      </section>
+
+      <section class="panel settings">
+        <div class="panel-head"><h2>3. الإعدادات</h2></div>
+        <label class="field">الوصف (prompt)
+          <textarea id="promptInput" rows="7"></textarea>
+        </label>
+        <p class="hint"><code>@image1</code> = صورة المدرب · <code>@video1</code> = القطعة. الكتابة بالإنجليزي بتدّي نتايج أدق. <a href="#" id="resetPrompt">رجّع الوصف الافتراضي</a></p>
+        <div class="grid2">
+          <label class="field">الموديل <select id="modelSelect"></select></label>
+          <label class="field">الدقة <select id="resSelect"></select></label>
+          <label class="field">المقاس <select id="ratioSelect"></select></label>
+          <label class="field">المدة
+            <select id="durationSelect"><option value="">على قد القطعة</option></select>
+          </label>
+        </div>
+        <label class="check"><input type="checkbox" id="audioCheck"> يولّد صوت مع الفيديو</label>
+        <button class="btn primary wide" id="generateBtn">✨ ولّد</button>
+      </section>
+    </div>
+
+    <section class="panel gap-top">
+      <div class="panel-head"><h2>الفيديوهات المولَّدة</h2><span class="muted" id="genSummary"></span></div>
+      <div class="gens" id="gensGrid"></div>
+      <p class="empty" id="gensEmpty">لسه مفيش فيديوهات مولَّدة.</p>
+    </section>
+  </main>
+
+  <!-- الخطوة 4: المدربين -->
+  <main class="view" data-view="4" hidden>
+    <div class="gen-layout">
+      <section class="panel">
+        <div class="panel-head"><h2>المدربين</h2></div>
+        <div class="coaches" id="coachesGrid"></div>
+        <p class="empty" id="coachesEmpty">لسه مفيش مدربين.</p>
+      </section>
+      <section class="panel settings">
+        <div class="panel-head"><h2 id="coachFormTitle">إضافة مدرب</h2></div>
+        <form id="coachForm">
+          <label class="field">الاسم <input type="text" id="coachName" required></label>
+          <label class="field">الصورة (PNG أو JPG أو WebP)
+            <input type="file" id="coachImage" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp"></label>
+          <img id="coachImagePreview" class="coach-preview" hidden alt="">
+          <label class="field">الأوترو (فيديو، اختياري)
+            <input type="file" id="coachOutro" accept="video/*,.mkv"></label>
+          <label class="check" id="removeOutroWrap" hidden><input type="checkbox" id="removeOutro"> امسح الأوترو الحالي</label>
+          <div class="row">
+            <button class="btn primary" type="submit" id="coachSubmit">حفظ</button>
+            <button class="btn" type="button" id="coachCancel" hidden>إلغاء</button>
+          </div>
+        </form>
+      </section>
+    </div>
+  </main>
 </div>
 <div class="toast" id="toast" hidden></div>
 <script src="/app.js"></script>
+<script src="/coaches.js"></script>
+<script src="/generate.js"></script>
 </body>
 </html>
