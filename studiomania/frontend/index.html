@@ -40,7 +40,9 @@
           <input type="text" id="newFolderName" placeholder="اسم المشروع (هو اسم الفيديو النهائي)" required>
           <button class="btn primary sm" type="submit">＋ مشروع جديد</button>
         </form>
-        <input type="search" class="folder-search" id="folderSearch" placeholder="دوّر على مشروع...">
+        <label class="btn wide folder-up" id="folderDrop">📂 ارفع فولدرات (أو اسحبها هنا)
+          <input type="file" id="folderUpload" webkitdirectory directory multiple hidden></label>
+                <input type="search" class="folder-search" id="folderSearch" placeholder="دوّر على مشروع...">
         <ul class="folder-list" id="folderList"></ul>
         <p class="empty" id="foldersEmpty">لسه مفيش مشاريع. اكتب اسم واعمل أول مشروع.</p>
       </section>
@@ -446,6 +448,22 @@
   <div class="row gap-top">
     <button class="btn primary" id="bulkUpload" disabled>⬆ ارفع الكل</button>
     <span class="muted" id="bulkProgress"></span>
+  </div>
+</dialog>
+<dialog class="bulk-dlg" id="fupDialog">
+  <div class="panel-head"><h2>📂 رفع مشاريع من فولدرات</h2><button class="btn sm" id="fupClose">✕</button></div>
+  <p class="hint">كل فولدر = مشروع باسمه. جوّه: الفيديو الخام، والتعليق الصوتي، وصورة المدرب (وفيديو اسمه فيه <code>outro</code> أو <code>اوترو</code> يبقى أوترو المدرب). راجع وعدّل قبل الرفع.</p>
+  <div class="bulk-table-wrap">
+    <table class="bulk-table fup-table">
+      <thead><tr><th>اسم المشروع</th><th>🎬 الفيديو</th><th>🎙️ الصوت</th><th>🧑‍🏫 المدرب</th><th></th></tr></thead>
+      <tbody id="fupRows"></tbody>
+    </table>
+  </div>
+  <p class="empty" id="fupEmpty">مفيش فولدرات فيها ملفات.</p>
+  <div class="bar bulk-bar" id="fupBar" hidden><i></i></div>
+  <div class="row gap-top">
+    <button class="btn primary" id="fupUpload">⬆ ارفع المشاريع</button>
+    <span class="muted" id="fupProgress"></span>
   </div>
 </dialog>
 <div class="toast" id="toast" hidden></div>

@@ -256,3 +256,209 @@ $("goMontage").onclick = async () => {
 };
 
 viewHooks["0"] = loadFolders;
+
+// ---------- رفع فولدرات كاملة ----------
+const fup = { rows: [], busy: false };
+const RE_VIDEO = /\.(mp4|mov|m4v|webm|mkv)$/i;
+const RE_AUDIO = /\.(mp3|wav|m4a|aac|ogg|opus|flac)$/i;
+const RE_IMAGE = /\.(png|jpe?g|webp)$/i;
+const RE_OUTRO = /(outro|اوترو|أوترو|إوترو)/i;
+const IGNORE = /(^\.|thumbs\.db$|desktop\.ini$)/i;
+
+function mb(f) { return `${(f.size / 1048576).toFixed(1)}MB`; }
+
+// items: [{file, path}] والـ path بيبدأ باسم الفولدر اللي اتختار
+function groupIntoProjects(items) {
+  const groups = new Map();
+  for (const { file, path } of items) {
+    const parts = path.split("/").filter(Boolean);
+    if (IGNORE.test(parts[parts.length - 1])) continue;
+    // ملف جوه فولدر فرعي = مشروع الفولدر الفرعي، ملف في الفولدر الرئيسي = مشروع الفولدر الرئيسي
+    const name = parts.length >= 3 ? parts[1] : parts.length === 2 ? parts[0] : file.name.replace(/\.[^.]+$/, "");
+    if (!groups.has(name)) groups.set(name, []);
+    groups.get(name).push(file);
+  }
+  const rows = [];
+  for (const [name, files] of groups) {
+    const videos = files.filter((f) => RE_VIDEO.test(f.name));
+    const outros = videos.filter((f) => RE_OUTRO.test(f.name));
+    const raws = videos.filter((f) => !RE_OUTRO.test(f.name)).sort((a, b) => b.size - a.size);
+    const audios = files.filter((f) => RE_AUDIO.test(f.name)).sort((a, b) => b.size - a.size);
+    const images = files.filter((f) => RE_IMAGE.test(f.name));
+    if (!raws.length && !audios.length && !images.length) continue;
+    const notes = [];
+    if (raws.length > 1) notes.push(`فيه ${raws.length} فيديوهات، هاخد الأكبر`);
+    if (audios.length > 1) notes.push(`فيه ${audios.length} ملفات صوت، هاخد الأكبر`);
+    const image = images[0] || null;
+    const key = image ? matchKey(image.name) : "";
+    const existingCoach = key ? coachState.list.find((c) => matchKey(c.name) === key) || fol.coaches.find((c) => matchKey(c.name) === key) : null;
+    const existingFolder = fol.list.find((f) => f.name.trim() === name.trim());
+    rows.push({
+      name, video: raws[0] || null, voice: audios[0] || null, image, outro: outros[0] || null, notes,
+      // coach: "" = من غير مدرب، "new" = مدرب جديد من الصورة، أو id مدرب موجود
+      coach: existingCoach ? existingCoach.id : image ? "new" : "",
+      newCoachName: image ? (key ? niceName(image.name) : `مدرب ${name}`) : "",
+      existingFolderId: existingFolder?.id || null,
+      preview: image ? URL.createObjectURL(image) : null,
+      status: "",
+    });
+  }
+  return rows;
+}
+
+function renderFup() {
+  $("fupEmpty").hidden = fup.rows.length > 0;
+  const coaches = fol.coaches;
+  $("fupRows").innerHTML = fup.rows
+    .map((r, i) => {
+      const coachOpts = `<option value="">— من غير مدرب —</option>` +
+        (r.image ? `<option value="new" ${r.coach === "new" ? "selected" : ""}>＋ مدرب جديد من الصورة</option>` : "") +
+        coaches.map((c) => `<option value="${c.id}" ${r.coach === c.id ? "selected" : ""}>${escapeHtml(c.name)}</option>`).join("");
+      return `<tr data-i="${i}" class="${r.status === "done" ? "done" : ""}">
+        <td><input type="text" data-f="name" value="${escapeHtml(r.name)}">
+          ${r.existingFolderId ? `<div class="warn-text">مشروع بالاسم ده موجود، هيتحدّث</div>` : ""}
+          ${r.notes.map((n) => `<div class="muted">${escapeHtml(n)}</div>`).join("")}
+          ${r.status && r.status !== "done" ? `<div class="${r.status.startsWith("✕") ? "err" : "muted"}">${escapeHtml(r.status)}</div>` : ""}</td>
+        <td>${r.video ? `${escapeHtml(r.video.name)}<div class="muted">${mb(r.video)}</div>` : `<span class="warn-text">مفيش</span>`}</td>
+        <td>${r.voice ? `${escapeHtml(r.voice.name)}<div class="muted">${mb(r.voice)}</div>` : `<span class="muted">مفيش</span>`}</td>
+        <td class="fup-coach">${r.preview ? `<img src="${r.preview}" alt="">` : ""}
+          <select data-f="coach">${coachOpts}</select>
+          ${r.coach === "new" ? `<input type="text" data-f="newCoachName" value="${escapeHtml(r.newCoachName)}" placeholder="اسم المدرب">` : ""}
+          ${r.outro ? `<div class="muted">🎬 أوترو: ${escapeHtml(r.outro.name)}</div>` : ""}</td>
+        <td>${r.status === "done" ? "✅" : `<button class="btn sm danger" data-f="remove">✕</button>`}</td>
+      </tr>`;
+    })
+    .join("");
+  const pending = fup.rows.filter((r) => r.status !== "done");
+  $("fupUpload").disabled = fup.busy || !pending.length || pending.some((r) => !r.name.trim() || (r.coach === "new" && !r.newCoachName.trim()));
+  $("fupUpload").textContent = `⬆ ارفع ${pending.length} مشروع`;
+}
+
+async function openFolderUpload(items) {
+  if (!coachState.list.length) await loadCoaches().catch(() => {});
+  fol.coaches = await api("/api/coaches");
+  fup.rows = groupIntoProjects(items);
+  $("fupProgress").textContent = "";
+  $("fupBar").hidden = true;
+  renderFup();
+  $("fupDialog").showModal();
+}
+
+$("folderUpload").addEventListener("change", (e) => {
+  const items = [...e.target.files].map((file) => ({ file, path: file.webkitRelativePath || file.name }));
+  e.target.value = "";
+  if (items.length) openFolderUpload(items);
+});
+
+// سحب الفولدرات وحطها على الزرار
+async function readEntry(entry, path, out) {
+  if (entry.isFile) {
+    const file = await new Promise((res, rej) => entry.file(res, rej));
+    out.push({ file, path: `${path}${file.name}` });
+  } else if (entry.isDirectory) {
+    const reader = entry.createReader();
+    let batch;
+    do {
+      batch = await new Promise((res, rej) => reader.readEntries(res, rej));
+      for (const child of batch) await readEntry(child, `${path}${entry.name}/`, out);
+    } while (batch.length);
+  }
+}
+const drop = $("folderDrop");
+drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("over"); });
+drop.addEventListener("dragleave", () => drop.classList.remove("over"));
+drop.addEventListener("drop", async (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  drop.classList.remove("over");
+  const entries = [...e.dataTransfer.items].map((it) => it.webkitGetAsEntry?.()).filter(Boolean);
+  const items = [];
+  // لو اتسحبت فولدرات كتير مع بعض، كل واحد فيهم مشروع
+  const multi = entries.filter((en) => en.isDirectory).length > 1;
+  for (const en of entries) await readEntry(en, multi ? "_/" : "", items);
+  if (items.length) openFolderUpload(items);
+});
+
+$("fupRows").addEventListener("input", (e) => {
+  const r = fup.rows[Number(e.target.closest("tr").dataset.i)];
+  if (e.target.dataset.f === "name") { r.name = e.target.value; r.existingFolderId = fol.list.find((f) => f.name.trim() === r.name.trim())?.id || null; }
+  if (e.target.dataset.f === "newCoachName") r.newCoachName = e.target.value;
+  $("fupUpload").disabled = false;
+  const btnState = fup.rows.filter((x) => x.status !== "done").some((x) => !x.name.trim() || (x.coach === "new" && !x.newCoachName.trim()));
+  $("fupUpload").disabled = fup.busy || btnState;
+});
+$("fupRows").addEventListener("change", (e) => {
+  if (e.target.dataset.f !== "coach") return;
+  fup.rows[Number(e.target.closest("tr").dataset.i)].coach = e.target.value;
+  renderFup();
+});
+$("fupRows").addEventListener("click", (e) => {
+  if (e.target.closest("[data-f=remove]")) { fup.rows.splice(Number(e.target.closest("tr").dataset.i), 1); renderFup(); }
+});
+$("fupClose").onclick = () => { if (!fup.busy) $("fupDialog").close(); };
+
+$("fupUpload").onclick = async () => {
+  fup.busy = true;
+  renderFup();
+  const bar = $("fupBar");
+  const rows = fup.rows.filter((r) => r.status !== "done");
+  const newCoaches = new Map(); // نفس المدرب الجديد لو اتكرر في كذا فولدر يتعمل مرة واحدة
+  for (const [n, r] of rows.entries()) {
+    const label = `${n + 1} من ${rows.length}: ${r.name}`;
+    const step = (s) => { r.status = s; $("fupProgress").textContent = `⏳ ${label} · ${s}`; renderFup(); };
+    try {
+      step("بيعمل المشروع...");
+      let folder = r.existingFolderId
+        ? fol.list.find((f) => f.id === r.existingFolderId)
+        : await api("/api/folders", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: r.name.trim() }) });
+      if (r.video) {
+        step(`بيرفع الفيديو (${mb(r.video)})...`);
+        const form = new FormData();
+        form.append("file", r.video);
+        folder = await uploadWithProgress(`/api/folders/${folder.id}/video`, form, bar);
+      }
+      if (r.voice) {
+        step("بيرفع التعليق الصوتي...");
+        const form = new FormData();
+        form.append("file", r.voice);
+        folder = await uploadWithProgress(`/api/folders/${folder.id}/voice`, form, bar);
+      }
+      let coachId = r.coach && r.coach !== "new" ? r.coach : null;
+      if (r.coach === "new") {
+        const cname = r.newCoachName.trim();
+        coachId = newCoaches.get(cname) || fol.coaches.find((c) => c.name.trim() === cname)?.id || null;
+        if (!coachId) {
+          step("بيعمل المدرب...");
+          const form = new FormData();
+          form.append("name", cname);
+          form.append("image", r.image);
+          if (r.outro) form.append("outro", r.outro);
+          coachId = (await api("/api/coaches", { method: "POST", body: form })).id;
+          newCoaches.set(cname, coachId);
+        }
+      } else if (coachId && r.outro && !fol.coaches.find((c) => c.id === coachId)?.outro_url) {
+        // مدرب موجود مالوش أوترو: نضيفله الأوترو اللي في الفولدر
+        step("بيضيف الأوترو للمدرب...");
+        const form = new FormData();
+        form.append("outro", r.outro);
+        await api(`/api/coaches/${coachId}`, { method: "PATCH", body: form });
+      }
+      if (coachId) {
+        await api(`/api/folders/${folder.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ coach_id: coachId }) });
+      }
+      r.status = "done";
+    } catch (err) {
+      r.status = `✕ ${err.message}`;
+    }
+    renderFup();
+  }
+  fup.busy = false;
+  await loadFolders();
+  const failed = fup.rows.filter((r) => r.status !== "done").length;
+  $("fupProgress").textContent = failed ? `✅ ${rows.length - failed} تمام · ✕ ${failed} فشلوا، صلّح ودوس ارفع تاني` : "";
+  renderFup();
+  if (!failed) {
+    $("fupDialog").close();
+    toast(`✅ اترفع ${rows.length} مشروع`);
+  }
+};

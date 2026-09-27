@@ -434,3 +434,10 @@ dialog.bulk-dlg { width: min(900px, 96vw); max-height: 90vh; border: 1px solid v
 .el-bar { height: 6px; }
 .warn-text { color: var(--warn); font-size: 13px; }
 .element details summary { cursor: pointer; font-size: 13px; color: var(--muted); }
+.folder-up { margin-bottom: 8px; border-style: dashed; }
+.folder-up.over { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.fup-table td { font-size: 13px; word-break: break-word; }
+.fup-table tr.done { opacity: .55; }
+.fup-coach { min-width: 170px; }
+.fup-coach img { width: 40px; height: 40px; object-fit: cover; border-radius: 8px; margin-bottom: 4px; }
+.fup-coach input { margin-top: 4px; }
