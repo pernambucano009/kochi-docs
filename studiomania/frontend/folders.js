@@ -295,6 +295,12 @@ function groupIntoProjects(items) {
     const existingFolder = fol.list.find((f) => f.name.trim() === name.trim());
     rows.push({
       name, video: raws[0] || null, voice: audios[0] || null, image, outro: outros[0] || null, notes,
+      files: {
+        video: [...raws, ...outros],
+        voice: audios,
+        image: images,
+        outro: [...outros, ...raws],
+      },
       // coach: "" = من غير مدرب، "new" = مدرب جديد من الصورة، أو id مدرب موجود
       coach: existingCoach ? existingCoach.id : image ? "new" : "",
       newCoachName: image ? (key ? niceName(image.name) : `مدرب ${name}`) : "",
@@ -306,6 +312,19 @@ function groupIntoProjects(items) {
   return rows;
 }
 
+const SLOT_LABEL = { video: "الفيديو الخام", voice: "التعليق الصوتي", image: "صورة المدرب", outro: "الأوترو" };
+
+function slotSelect(r, slot) {
+  const files = r.files[slot];
+  const cur = r[slot];
+  if (!files.length) return `<span class="muted">مفيش في الفولدر</span>`;
+  const opts = `<option value="">— مفيش —</option>` + files
+    .map((f, i) => `<option value="${i}" ${cur === f ? "selected" : ""}>${escapeHtml(f.name)} (${mb(f)})</option>`)
+    .join("");
+  return `<div class="slot"><select data-slot="${slot}">${opts}</select>
+    ${cur ? `<button type="button" class="btn sm" data-preview="${slot}" title="شوف/اسمع">👁</button>` : ""}</div>`;
+}
+
 function renderFup() {
   $("fupEmpty").hidden = fup.rows.length > 0;
   const coaches = fol.coaches;
@@ -314,23 +333,26 @@ function renderFup() {
       const coachOpts = `<option value="">— من غير مدرب —</option>` +
         (r.image ? `<option value="new" ${r.coach === "new" ? "selected" : ""}>＋ مدرب جديد من الصورة</option>` : "") +
         coaches.map((c) => `<option value="${c.id}" ${r.coach === c.id ? "selected" : ""}>${escapeHtml(c.name)}</option>`).join("");
+      const same = r.video && r.video === r.outro ? `<div class="err">نفس الفيديو متختار خام وأوترو</div>` : "";
       return `<tr data-i="${i}" class="${r.status === "done" ? "done" : ""}">
         <td><input type="text" data-f="name" value="${escapeHtml(r.name)}">
           ${r.existingFolderId ? `<div class="warn-text">مشروع بالاسم ده موجود، هيتحدّث</div>` : ""}
-          ${r.notes.map((n) => `<div class="muted">${escapeHtml(n)}</div>`).join("")}
           ${r.status && r.status !== "done" ? `<div class="${r.status.startsWith("✕") ? "err" : "muted"}">${escapeHtml(r.status)}</div>` : ""}</td>
-        <td>${r.video ? `${escapeHtml(r.video.name)}<div class="muted">${mb(r.video)}</div>` : `<span class="warn-text">مفيش</span>`}</td>
-        <td>${r.voice ? `${escapeHtml(r.voice.name)}<div class="muted">${mb(r.voice)}</div>` : `<span class="muted">مفيش</span>`}</td>
-        <td class="fup-coach">${r.preview ? `<img src="${r.preview}" alt="">` : ""}
-          <select data-f="coach">${coachOpts}</select>
+        <td>${slotSelect(r, "video")}${same}</td>
+        <td>${slotSelect(r, "voice")}</td>
+        <td class="fup-coach">
+          ${r.preview ? `<img src="${r.preview}" alt="">` : ""}
+          <div class="slot-label">🖼️ الصورة</div>${slotSelect(r, "image")}
+          <div class="slot-label">🧑‍🏫 المدرب</div><select data-f="coach">${coachOpts}</select>
           ${r.coach === "new" ? `<input type="text" data-f="newCoachName" value="${escapeHtml(r.newCoachName)}" placeholder="اسم المدرب">` : ""}
-          ${r.outro ? `<div class="muted">🎬 أوترو: ${escapeHtml(r.outro.name)}</div>` : ""}</td>
-        <td>${r.status === "done" ? "✅" : `<button class="btn sm danger" data-f="remove">✕</button>`}</td>
+          <div class="slot-label">🎬 الأوترو</div>${slotSelect(r, "outro")}</td>
+        <td>${r.status === "done" ? "✅" : `<button class="btn sm danger" data-f="remove" title="متترفعش">✕</button>`}</td>
       </tr>`;
     })
     .join("");
   const pending = fup.rows.filter((r) => r.status !== "done");
-  $("fupUpload").disabled = fup.busy || !pending.length || pending.some((r) => !r.name.trim() || (r.coach === "new" && !r.newCoachName.trim()));
+  $("fupUpload").disabled = fup.busy || !pending.length || pending.some((r) =>
+    !r.name.trim() || (r.coach === "new" && (!r.newCoachName.trim() || !r.image)) || (r.video && r.video === r.outro));
   $("fupUpload").textContent = `⬆ ارفع ${pending.length} مشروع`;
 }
 
@@ -388,9 +410,48 @@ $("fupRows").addEventListener("input", (e) => {
   $("fupUpload").disabled = fup.busy || btnState;
 });
 $("fupRows").addEventListener("change", (e) => {
-  if (e.target.dataset.f !== "coach") return;
-  fup.rows[Number(e.target.closest("tr").dataset.i)].coach = e.target.value;
+  const r = fup.rows[Number(e.target.closest("tr").dataset.i)];
+  const slot = e.target.dataset.slot;
+  if (slot) {
+    const file = e.target.value === "" ? null : r.files[slot][Number(e.target.value)];
+    r[slot] = file;
+    // الفيديو ما ينفعش يبقى خام وأوترو في نفس الوقت
+    if (slot === "video" && file && r.outro === file) r.outro = null;
+    if (slot === "outro" && file && r.video === file) r.video = null;
+    if (slot === "image") {
+      if (r.preview) URL.revokeObjectURL(r.preview);
+      r.preview = file ? URL.createObjectURL(file) : null;
+      const key = file ? matchKey(file.name) : "";
+      const match = key ? fol.coaches.find((c) => matchKey(c.name) === key) : null;
+      if (match) r.coach = match.id;
+      else if (!file && r.coach === "new") r.coach = "";
+      else if (file && !r.coach) { r.coach = "new"; r.newCoachName = key ? niceName(file.name) : `مدرب ${r.name}`; }
+    }
+  }
+  if (e.target.dataset.f === "coach") r.coach = e.target.value;
   renderFup();
+});
+
+// معاينة الملف قبل ما تختاره
+$("fupRows").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-preview]");
+  if (!b) return;
+  const r = fup.rows[Number(b.closest("tr").dataset.i)];
+  const file = r[b.dataset.preview];
+  if (!file) return;
+  const url = URL.createObjectURL(file);
+  const dlg = document.createElement("dialog");
+  dlg.className = "outro-dlg";
+  const media = RE_IMAGE.test(file.name)
+    ? `<img src="${url}" alt="" style="max-width:100%;max-height:70vh;display:block;border-radius:8px">`
+    : RE_AUDIO.test(file.name) ? `<audio src="${url}" controls autoplay style="width:100%"></audio>`
+    : `<video src="${url}" controls autoplay playsinline></video>`;
+  dlg.innerHTML = `<div class="el-title">${SLOT_LABEL[b.dataset.preview]}: ${escapeHtml(file.name)}</div>${media}
+    <div class="row gap-top"><button class="btn sm">إغلاق</button></div>`;
+  dlg.querySelector("button").onclick = () => dlg.close();
+  dlg.addEventListener("close", () => { URL.revokeObjectURL(url); dlg.remove(); });
+  document.body.appendChild(dlg);
+  dlg.showModal();
 });
 $("fupRows").addEventListener("click", (e) => {
   if (e.target.closest("[data-f=remove]")) { fup.rows.splice(Number(e.target.closest("tr").dataset.i), 1); renderFup(); }
