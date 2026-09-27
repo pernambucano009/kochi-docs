@@ -11,6 +11,7 @@ import re
 import shutil
 import sqlite3
 import subprocess
+from xml.sax.saxutils import escape as xml_escape
 import threading
 import time
 import uuid
@@ -72,6 +73,18 @@ FONTS_DIR = ROOT / "fonts"
 
 for d in (RAW_DIR, CLIPS_DIR, COACHES_DIR, GENERATED_DIR, AUDIO_DIR, EXPORTS_DIR, BRAND_DIR, TMP_DIR):
     d.mkdir(parents=True, exist_ok=True)
+
+# الكابشن بيدوّر على الخطوط عن طريق fontconfig، والسيرفر (Railway) مفيهوش إعداداته خالص.
+# فبنعمل ملف إعدادات صغير يشاور على فولدر الخطوط بتاعنا، وكل أوامر FFmpeg بتستخدمه.
+FONTCONFIG_FILE = TMP_DIR / "fonts.conf"
+FONTCONFIG_FILE.write_text(
+    '<?xml version="1.0"?>\n<!DOCTYPE fontconfig SYSTEM "fonts.dtd">\n<fontconfig>\n'
+    f"  <dir>{xml_escape(str(FONTS_DIR))}</dir>\n"
+    f"  <cachedir>{xml_escape(str(TMP_DIR / 'fontcache'))}</cachedir>\n"
+    "</fontconfig>\n",
+    encoding="utf-8",
+)
+os.environ["FONTCONFIG_FILE"] = str(FONTCONFIG_FILE)
 
 
 def ffmpeg_exe() -> str:
@@ -1475,6 +1488,15 @@ def project_captions(conn: sqlite3.Connection, data: dict, total: float, export_
     return montage.Subtitles(ass, FONTS_DIR)
 
 
+def render_error(result: subprocess.CompletedProcess) -> str:
+    """رسالة الخطأ اللي بتظهر لما التصدير يفشل، من غير سطور التحذير اللي ملهاش لازمة."""
+    if result.returncode < 0:
+        return "التصدير وقف فجأة (غالبًا ذاكرة السيرفر خلصت). جرّب تاني، ولو اتكرر قلّل طول الفيديو أو عدد القطع."
+    noise = ("Fontconfig", "fonctconfig", "fontconfig", "memory font", "Loading font")
+    lines = [l for l in result.stderr.strip().splitlines() if l.strip() and not any(n in l for n in noise)]
+    return f"FFmpeg: {chr(10).join(lines)[-400:] or f'خطأ رقم {result.returncode}'}"
+
+
 def run_render(project_id: str, export_id: str, cmd: list[str], total: float, name: str) -> None:
     filename = f"{export_id}.mp4"
     result = subprocess.run(cmd, capture_output=True, text=True)
@@ -1484,7 +1506,7 @@ def run_render(project_id: str, export_id: str, cmd: list[str], total: float, na
             (EXPORTS_DIR / filename).unlink(missing_ok=True)
             conn.execute(
                 "UPDATE projects SET render_status = 'failed', render_error = ?, updated_at = ? WHERE id = ?",
-                (f"FFmpeg: {result.stderr.strip()[-400:]}", now(), project_id),
+                (render_error(result), now(), project_id),
             )
             return
         conn.execute(
