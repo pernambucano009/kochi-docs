@@ -1458,13 +1458,16 @@ def project_captions(conn: sqlite3.Connection, data: dict, total: float, export_
     tr = json.loads(row["transcript"]) if row and row["transcript"] else {}
     if tr.get("status") != "done" or not tr.get("words"):
         raise HTTPException(400, "لسه الكلام بتاع التعليق الصوتي متكتبش. دوس «اكتب الكلام» الأول أو اقفل الكابشن")
+    # الكلام اللي اتمسح من الكابشن في المشروع ده (بمعاد بدايته جوه ملف الصوت)
+    removed = {int(k) for k in cfg.get("removed") or []}
+    source = [w for w in tr["words"] if round(w["s"] * 100) not in removed]
     words = []
     for part in track_parts(voice):
         offset, delay = max(0.0, part.get("offset") or 0), max(0.0, part.get("delay") or 0)
         length = part.get("length") or float("inf")
         words += [
             {"w": w["w"], "s": w["s"] - offset + delay, "e": w["e"] - offset + delay}
-            for w in tr["words"] if w["e"] - offset > 0 and w["s"] - offset < length
+            for w in source if w["e"] - offset > 0 and w["s"] - offset < length
         ]
     words.sort(key=lambda w: w["s"])
     ass = TMP_DIR / f"{export_id}.ass"

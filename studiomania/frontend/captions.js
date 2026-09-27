@@ -49,6 +49,8 @@ function renderBrandPanels() {
   $("capColor").value = c.color; $("capHl").value = c.highlight; $("capBoxColor").value = c.box_color;
   $("capHlOn").checked = !!c.highlight_on; $("capBox").checked = !!c.box; $("capPop").checked = !!c.pop;
   renderTranscriptStatus();
+  $("capRestore").hidden = !c.removed?.length;
+  $("capRestore").textContent = `↺ رجّع الكابشن المحذوف (${c.removed?.length || 0} كلمة)`;
 
   $("logoOn").checked = !!l.enabled;
   $("logoThumb").hidden = $("logoRemove").hidden = !brand.logoUrl;
@@ -78,6 +80,7 @@ $("capTemplates").addEventListener("click", (e) => {
   scheduleTimeline();
   scheduleSave();
 });
+$("capRestore").onclick = brandInput(() => (capCfg().removed = []));
 $("capFont").addEventListener("change", brandInput(() => (capCfg().font = $("capFont").value)));
 $("capSize").addEventListener("input", brandInput(() => (capCfg().size = Number($("capSize").value))));
 $("capY").addEventListener("input", brandInput(() => (capCfg().y = Number($("capY").value))));

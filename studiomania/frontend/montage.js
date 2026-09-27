@@ -34,11 +34,13 @@ function setSelection(list) {
   mt.extra = list.slice(0, -1);
 }
 function selOfEl(el) {
+  if (el.classList.contains("tl-cap")) return { kind: "cap", i: Number(el.dataset.c) };
   if (el.dataset.track) return { kind: el.dataset.track, p: Number(el.dataset.p) };
   if (el.dataset.outro) return { kind: "outro" };
   return { kind: "clip", i: Number(el.dataset.i) };
 }
 function elOfSel(x) {
+  if (x.kind === "cap") return $("trkCaps").querySelector(`.tl-cap[data-c="${x.i}"]`);
   if (x.kind === "clip") return $("trkVideo").querySelector(`.tl-clip[data-i="${x.i}"]`);
   if (x.kind === "outro") return $("trkVideo").querySelector(".tl-clip[data-outro]");
   return document.querySelector(`.tl-audio[data-track="${x.kind}"][data-p="${x.p}"]`);
@@ -196,9 +198,11 @@ function fixSelection() {
   if (!mt.project) return;
   const d = mt.project.data;
   if (!s) { mt.extra = []; return; }
-  const valid = (s) => !((s.kind === "clip" && !d.clips[s.i]) || ((s.kind === "voice" || s.kind === "music") && !d[s.kind]?.parts?.[s.p]) ||
+  const nCaps = captionBlocks().length;
+  const valid = (s) => !((s.kind === "cap" && s.i >= nCaps) || (s.kind === "clip" && !d.clips[s.i]) || ((s.kind === "voice" || s.kind === "music") && !d[s.kind]?.parts?.[s.p]) ||
       (s.kind === "outro" && !currentOutro()));
   mt.extra = mt.extra.filter(valid);
+  if (!valid(s)) { mt.sel = null; return; }
   if ((s.kind === "clip" && !d.clips[s.i]) || ((s.kind === "voice" || s.kind === "music") && !d[s.kind]?.parts?.[s.p]) ||
       (s.kind === "outro" && !currentOutro())) mt.sel = null;
 }
@@ -474,7 +478,7 @@ function renderTimeline() {
   }
 
   $("trkCaps").innerHTML = captionBlocks()
-    .map((g) => `<div class="tl-cap" data-t="${g.t0}" style="left:${g.t0 * mt.pps}px;width:${Math.max(2, (g.t1 - g.t0) * mt.pps)}px">${escapeHtml(g.text)}</div>`)
+    .map((g, n) => `<div class="tl-cap ${isSel({ kind: "cap", i: n }) ? "selected" : ""}" data-c="${n}" data-t="${g.t0}" title="دوسة تختاره · Delete تمسحه" style="left:${g.t0 * mt.pps}px;width:${Math.max(2, (g.t1 - g.t0) * mt.pps)}px">${escapeHtml(g.text)}</div>`)
     .join("");
 
   const nSel = allSelected().length;
@@ -593,9 +597,11 @@ function captionBlocks() {
   const tr = d.voice && typeof brand !== "undefined" && brand.tr[d.voice.id];
   if (!d.captions?.enabled || !(tr?.status === "done" && tr.words.length)) return [];
   const blocks = [];
+  const removed = new Set(d.captions.removed || []);
+  const source = tr.words.filter((w) => !removed.has(Math.round(w.s * 100)));
   // كل قطعة من التعليق الصوتي ليها الكلام اللي جواها بس
   for (const x of trackParts("voice")) {
-    const words = tr.words.filter((w) => w.e > x.offset && w.s < x.offset + x.len);
+    const words = source.filter((w) => w.e > x.offset && w.s < x.offset + x.len);
     const groups = groupWords(words, d.captions.words || 3);
     const shift = x.t0 - x.offset;
     groups.forEach((g, k) => {
@@ -701,6 +707,10 @@ function deleteSelected() {
   if (!list.length) return;
   pushHistory();
   const d = mt.project.data;
+  // الكابشن: بنشيل الكلام ده من الكابشن في المشروع ده بس (التعليق الصوتي نفسه مبيتغيّرش)
+  const caps = captionBlocks();
+  const gone = list.filter((x) => x.kind === "cap").flatMap((x) => caps[x.i]?.g || []);
+  if (gone.length) d.captions.removed = [...new Set([...(d.captions.removed || []), ...gone.map((w) => Math.round(w.s * 100))])];
   // من الآخر للأول عشان الأرقام متتلخبطش
   const desc = (k) => list.filter((x) => x.kind === k).map((x) => x.i ?? x.p).sort((a, b) => b - a);
   for (const i of desc("clip")) d.clips.splice(i, 1);
@@ -765,8 +775,9 @@ $("tlCanvas").addEventListener("pointerdown", (e) => {
   if (mt.tool === "blade" && clipEl?.dataset.i != null) { splitAt(snap(t)); return; }
   if (mt.tool === "blade" && audEl) { splitAt(snap(t), { kind: audEl.dataset.track, p: Number(audEl.dataset.p) }); return; }
   // Ctrl (أو ⌘) + دوسة: تضيف القطعة للاختيار أو تشيلها منه
-  if ((clipEl || audEl) && (e.ctrlKey || e.metaKey)) {
-    const x = selOfEl(clipEl || audEl);
+  const capEl = e.target.closest(".tl-cap");
+  if ((clipEl || audEl || capEl) && (e.ctrlKey || e.metaKey)) {
+    const x = selOfEl(clipEl || audEl || capEl);
     setSelection(isSel(x) ? allSelected().filter((y) => selKey(y) !== selKey(x)) : [...allSelected(), x]);
     renderTimeline();
     renderInspector();
@@ -790,6 +801,16 @@ $("tlCanvas").addEventListener("pointerdown", (e) => {
 
   // سحب في مكان فاضي: مربع تحديد يختار كل القطع اللي جواه
   if (!clipEl && !audEl && !e.target.closest("#tlRuler, .tl-playhead, .tl-cap")) return marquee(e, t);
+
+  // دوسة على كابشن: تختاره وتروح لمعاده
+  if (capEl) {
+    mt.sel = selOfEl(capEl);
+    showTab("caps");
+    seek(Number(capEl.dataset.t));
+    renderTimeline();
+    renderInspector();
+    return;
+  }
 
   // المسطرة ورأس المؤشر: تحريك المؤشر بالسحب
   if (e.target.closest("#tlRuler, .tl-playhead") || (!clipEl && !audEl)) {
@@ -835,12 +856,12 @@ function marquee(e, t) {
       const x1 = Math.min(e.clientX, ev.clientX), x2 = Math.max(e.clientX, ev.clientX);
       const y1 = Math.min(e.clientY, ev.clientY), y2 = Math.max(e.clientY, ev.clientY);
       Object.assign(box.style, { left: `${x1 - cr.left}px`, top: `${y1 - cr.top}px`, width: `${x2 - x1}px`, height: `${y2 - y1}px` });
-      const hit = [...canvas.querySelectorAll(".tl-clip, .tl-audio")]
+      const hit = [...canvas.querySelectorAll(".tl-clip, .tl-audio, .tl-cap")]
         .filter((el) => { const r = el.getBoundingClientRect(); return r.right > x1 && r.left < x2 && r.bottom > y1 && r.top < y2; })
         .map(selOfEl);
       const keys = new Set(base.map(selKey));
       setSelection([...base, ...hit.filter((x) => !keys.has(selKey(x)))]);
-      canvas.querySelectorAll(".tl-clip, .tl-audio").forEach((el) => el.classList.toggle("selected", isSel(selOfEl(el))));
+      canvas.querySelectorAll(".tl-clip, .tl-audio, .tl-cap").forEach((el) => el.classList.toggle("selected", isSel(selOfEl(el))));
     },
     () => {
       if (box) { box.remove(); renderTimeline(); renderInspector(); return; }
@@ -1258,7 +1279,7 @@ document.addEventListener("keydown", (e) => {
   else if (ctrl && code === "KeyZ") e.shiftKey ? redoEdit() : undoEdit();
   else if (ctrl && code === "KeyY") redoEdit();
   else if (ctrl && code === "KeyA") {
-    setSelection([...document.querySelectorAll("#tlCanvas .tl-clip, #tlCanvas .tl-audio")].map(selOfEl));
+    setSelection([...document.querySelectorAll("#tlCanvas .tl-clip, #tlCanvas .tl-audio, #tlCanvas .tl-cap")].map(selOfEl));
     renderTimeline();
     renderInspector();
   }
