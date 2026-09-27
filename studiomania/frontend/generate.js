@@ -36,10 +36,21 @@ async function initGenerate() {
   alert.innerHTML = `⚠️ مفتاح Atlas مش متسجل. حطه من <a href="#" data-goto="settings">⚙️ الإعدادات</a>.`;
 
   const [coaches, clips] = await Promise.all([api("/api/coaches"), api("/api/clips"), loadPrompts()]);
-  renderCoachPicker(coaches);
   gen.clips = clips;
   const ids = new Set(clips.map((c) => c.id));
   gen.selected = new Set([...gen.selected].filter((id) => ids.has(id)));
+  if (gen.pending) {
+    // جاي من التقطيع أو من المشروع: نعلّم على قطع الفيديو ده ونختار المدرب بتاعه
+    const { videoId, coachId } = gen.pending;
+    gen.pending = null;
+    const mine = clips.filter((c) => c.video_id === videoId && c.duration >= MIN_REF);
+    gen.selected = new Set(mine.map((c) => c.id));
+    const coach = coachId || mine.find((c) => c.video_coach_id)?.video_coach_id;
+    if (coach && coaches.some((c) => c.id === coach)) gen.coachId = coach;
+    toast(`✅ اتعلّم على ${mine.length} قطعة${coach ? " واتختار المدرب" : ". اختار المدرب"}`);
+    setTimeout(() => document.querySelector(".clip-pick.selected")?.scrollIntoView({ block: "center", behavior: "smooth" }), 200);
+  }
+  renderCoachPicker(coaches);
   renderClipPicker();
   await loadGenerations();
 }
@@ -135,6 +146,12 @@ $("promptList").addEventListener("click", async (e) => {
   storageSet(PROMPT_KEY, p.id);
   renderPrompts();
 });
+
+// يفتح صفحة التوليد وقطع فيديو معيّن متعلّم عليها
+function openGenerateWith(videoId, coachId = null) {
+  gen.pending = { videoId, coachId };
+  showStep("2");
+}
 
 // ---------- المدرب ----------
 function renderCoachPicker(coaches) {

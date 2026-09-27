@@ -491,11 +491,14 @@ $("splitBtn").onclick = async () => {
   btn.textContent = "⏳ بيقطّع...";
   try {
     const res = await api(`/api/videos/${v.id}/split`, { method: "POST" });
-    toast(`✅ اتعمل ${res.clips_count} قطعة`);
+    toast(`✅ اتعمل ${res.clips_count} قطعة. دوس «✨ ابعت القطع لـ Seedance» تحت`);
     await loadVideos();
     const fresh = state.videos.find((x) => x.id === v.id);
     if (fresh && state.current?.id === v.id) state.current.clips_count = fresh.clips_count;
     await loadClips();
+    $("clipsSection").scrollIntoView({ behavior: "smooth", block: "start" });
+    $("toSeedance").classList.add("pulse");
+    setTimeout(() => $("toSeedance").classList.remove("pulse"), 4000);
   } catch (err) {
     toast(err.message, true);
   } finally {
@@ -503,6 +506,8 @@ $("splitBtn").onclick = async () => {
     renderEditor();
   }
 };
+
+$("toSeedance").onclick = () => openGenerateWith(state.current.id, state.current.coach?.id || null);
 
 async function loadClips() {
   const v = state.current;

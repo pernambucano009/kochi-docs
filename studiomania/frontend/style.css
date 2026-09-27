@@ -450,3 +450,7 @@ dialog.bulk-dlg { width: min(900px, 96vw); max-height: 90vh; border: 1px solid v
 .fup-table select { direction: ltr; text-align: right; }
 .fup-add { margin-bottom: 6px; }
 #fupAddDrop.over { border-color: var(--accent); }
+.clips-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: 22px 0 10px; }
+.clips-head h3 { margin: 0; }
+.btn.pulse { animation: pulse 1s ease-in-out 4; }
+@keyframes pulse { 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 35%, transparent); } }

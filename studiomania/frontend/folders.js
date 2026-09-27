@@ -213,21 +213,7 @@ $("goCut").onclick = async () => {
   await loadVideos();
   openVideo(id);
 };
-$("goGenerate").onclick = () => {
-  const vid = fol.current.video.id;
-  const coachId = fol.current.coach?.id;
-  showStep("2");
-  // نختار قطع الفيديو ده والمدرب بتاعه لوحدهم
-  const wait = setInterval(() => {
-    if (!gen.clips.length) return;
-    clearInterval(wait);
-    gen.selected = new Set(gen.clips.filter((c) => c.video_id === vid && c.duration >= 2).map((c) => c.id));
-    if (coachId) gen.coachId = coachId;
-    document.querySelectorAll(".coach-pick").forEach((x) => x.classList.toggle("selected", x.dataset.id === gen.coachId));
-    renderClipPicker();
-  }, 150);
-  setTimeout(() => clearInterval(wait), 5000);
-};
+$("goGenerate").onclick = () => openGenerateWith(fol.current.video.id, fol.current.coach?.id || null);
 $("goMontage").onclick = async () => {
   const f = fol.current;
   try {
