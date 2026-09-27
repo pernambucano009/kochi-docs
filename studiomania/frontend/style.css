@@ -376,3 +376,15 @@ dialog.tr-dlg { width: min(720px, 94vw); max-height: 86vh; border: 1px solid var
 .tr-row .t { font-size: 12px; color: var(--muted); direction: ltr; width: 92px; flex: none; font-variant-numeric: tabular-nums; }
 .tr-row input { flex: 1; background: var(--surface-2); border: 1px solid var(--line); color: var(--text); padding: 7px 10px; border-radius: 8px; font: inherit; font-size: 15px; }
 .coach-mini { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; }
+
+/* ---------- الرفع الجماعي للمدربين ---------- */
+dialog.bulk-dlg { width: min(900px, 96vw); max-height: 90vh; border: 1px solid var(--line); background: var(--surface); color: var(--text); border-radius: 14px; padding: 14px; }
+.bulk-pick { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.bulk-table-wrap { max-height: 50vh; overflow-y: auto; margin-top: 8px; }
+.bulk-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.bulk-table th { text-align: right; color: var(--muted); font-size: 12px; font-weight: 600; padding: 6px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--surface); }
+.bulk-table td { padding: 6px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.bulk-table img { width: 44px; height: 44px; object-fit: cover; border-radius: 8px; display: block; }
+.bulk-table input, .bulk-table select { width: 100%; background: var(--surface-2); border: 1px solid var(--line); color: var(--text); padding: 6px 8px; border-radius: 8px; font: inherit; font-size: 13px; }
+.bulk-table select { max-width: 240px; }
+.bulk-bar { margin-top: 10px; height: 6px; }

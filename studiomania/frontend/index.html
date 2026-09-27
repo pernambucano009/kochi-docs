@@ -158,7 +158,8 @@
   <main class="view" data-view="4" hidden>
     <div class="gen-layout">
       <section class="panel">
-        <div class="panel-head"><h2>المدربين</h2></div>
+        <div class="panel-head"><h2>المدربين <span class="muted" id="coachCount"></span></h2>
+          <button class="btn sm primary" id="bulkOpen">📦 رفع جماعي</button></div>
         <div class="coaches" id="coachesGrid"></div>
         <p class="empty" id="coachesEmpty">لسه مفيش مدربين.</p>
       </section>
@@ -384,6 +385,28 @@
   <audio id="trAudio" preload="none"></audio>
   <div class="tr-list" id="trList"></div>
   <div class="row gap-top"><button class="btn primary" id="trSave">💾 حفظ</button><button class="btn" id="trCancel">إلغاء</button></div>
+</dialog>
+<dialog class="bulk-dlg" id="bulkDialog">
+  <div class="panel-head"><h2>📦 رفع مدربين كتير مرة واحدة</h2><button class="btn sm" id="bulkClose">✕</button></div>
+  <div class="bulk-pick">
+    <label class="btn">🖼️ اختار الصور <input type="file" id="bulkImages" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp" multiple hidden></label>
+    <label class="btn">🎬 اختار الأوتروهات <input type="file" id="bulkOutros" accept="video/*,.mkv" multiple hidden></label>
+    <span class="muted" id="bulkCounts"></span>
+  </div>
+  <p class="hint">سمّي الملفات باسم المدرب، زي <code>ahmed.png</code> و <code>ahmed_outro.mp4</code>، والبرنامج بيطابقهم لوحده. واسم المدرب بيتاخد من اسم الصورة، وتقدر تعدّله هنا.</p>
+  <div class="alert warn" id="bulkWarn" hidden></div>
+  <div class="bulk-table-wrap">
+    <table class="bulk-table">
+      <thead><tr><th></th><th>اسم المدرب</th><th>الأوترو</th><th>هيحصل إيه</th><th></th></tr></thead>
+      <tbody id="bulkRows"></tbody>
+    </table>
+  </div>
+  <p class="empty" id="bulkEmpty">اختار الصور والأوتروهات عشان تظهر هنا.</p>
+  <div class="bar bulk-bar" id="bulkBar" hidden><i></i></div>
+  <div class="row gap-top">
+    <button class="btn primary" id="bulkUpload" disabled>⬆ ارفع الكل</button>
+    <span class="muted" id="bulkProgress"></span>
+  </div>
 </dialog>
 <div class="toast" id="toast" hidden></div>
 <script src="/app.js"></script>
