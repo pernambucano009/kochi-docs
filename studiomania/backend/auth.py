@@ -47,6 +47,12 @@ class Auth:
             else:
                 conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (key, value))
 
+    def get_setting(self, key: str) -> str | None:
+        return self._get(f"app:{key}")
+
+    def set_setting(self, key: str, value: str | None) -> None:
+        self._set(f"app:{key}", value)
+
     # ------------------------------------------------------------ الباسورد
 
     def env_password(self) -> str | None:

@@ -196,6 +196,7 @@ function layoutPreview() {
     width: `${dw}px`, height: `${dh}px`,
     left: `${-((dw - W) / 2) * (1 + c.x)}px`, top: `${-((dh - H) / 2) * (1 + c.y)}px`,
   });
+  if (typeof updatePreviewOverlays === "function") updatePreviewOverlays();
 }
 pv.addEventListener("loadedmetadata", () => {
   layoutPreview();
@@ -274,6 +275,7 @@ function renderSide() {
     $("musicWarn").textContent = `⚠️ الموسيقى (${fmtDuration(Math.max(0, available))}) أقصر من الفيديو (${fmtDuration(total)})، فآخر الفيديو هيبقى من غير موسيقى.`;
   }
   $("renderBtn").disabled = d.clips.length === 0 || mt.project.render_status === "rendering";
+  if (typeof renderBrandPanels === "function") renderBrandPanels();
 }
 
 function sideInput(apply) {

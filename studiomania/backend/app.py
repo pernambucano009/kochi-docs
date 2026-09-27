@@ -44,6 +44,7 @@ def load_env_file(path: Path) -> None:
 load_env_file(ROOT / ".env")
 
 import atlas  # noqa: E402  (لازم بعد قراءة .env)
+import captions  # noqa: E402
 import montage  # noqa: E402
 import publisher  # noqa: E402
 from auth import SESSION_COOKIE, SESSION_DAYS, Auth  # noqa: E402
@@ -63,10 +64,13 @@ COACHES_DIR = DATA_DIR / "coaches"
 GENERATED_DIR = DATA_DIR / "generated"
 AUDIO_DIR = DATA_DIR / "audio"
 EXPORTS_DIR = DATA_DIR / "exports"  # فولدر الفيديوهات الجاهزة للنشر
+BRAND_DIR = DATA_DIR / "brand"  # اللوجو
+TMP_DIR = DATA_DIR / "tmp"
 DB_PATH = DATA_DIR / "studiomania.db"
 FRONTEND_DIR = ROOT / "frontend"
+FONTS_DIR = ROOT / "fonts"
 
-for d in (RAW_DIR, CLIPS_DIR, COACHES_DIR, GENERATED_DIR, AUDIO_DIR, EXPORTS_DIR):
+for d in (RAW_DIR, CLIPS_DIR, COACHES_DIR, GENERATED_DIR, AUDIO_DIR, EXPORTS_DIR, BRAND_DIR, TMP_DIR):
     d.mkdir(parents=True, exist_ok=True)
 
 
@@ -267,6 +271,14 @@ init_db()
 with closing(db()) as _conn, _conn:
     if "voice_id" not in {c[1] for c in _conn.execute("PRAGMA table_info(videos)")}:
         _conn.execute("ALTER TABLE videos ADD COLUMN voice_id TEXT")
+    if "transcript" not in {c[1] for c in _conn.execute("PRAGMA table_info(audio)")}:
+        _conn.execute("ALTER TABLE audio ADD COLUMN transcript TEXT")
+    # لو البرنامج اتقفل وهو بيكتب الكلام، نعلّمه كفاشل عشان تعيد
+    for _r in _conn.execute("""SELECT id FROM audio WHERE transcript LIKE '%"status": "working"%'""").fetchall():
+        _conn.execute(
+            "UPDATE audio SET transcript = ? WHERE id = ?",
+            (json.dumps({"status": "failed", "error": "البرنامج اتقفل أثناء الكتابة. جرّب تاني", "words": []}), _r[0]),
+        )
 auth = Auth(DB_PATH, DATA_DIR)
 app = FastAPI(title="StudioMania")
 
@@ -1165,6 +1177,8 @@ class ProjectIn(BaseModel):
     music: TrackEdit | None = None
     outro: bool = True
     outro_volume: float = 1.0
+    captions: dict = {}  # {enabled, template, font, size, y, words, color, highlight, ...}
+    logo: dict = {}  # {enabled, size, x, y, opacity, hide_outro}
 
 
 def project_to_dict(r: sqlite3.Row) -> dict:
@@ -1232,10 +1246,11 @@ def clamp(v: float, lo: float, hi: float) -> float:
     return max(lo, min(hi, v))
 
 
-def build_montage(conn: sqlite3.Connection, data: dict) -> tuple[list, montage.AudioTrack | None, montage.AudioTrack | None]:
+def build_montage(conn: sqlite3.Connection, data: dict):
     """يحوّل بيانات المشروع لقطع ومسارات صوت جاهزة لـ FFmpeg، ويتأكد إن كل حاجة موجودة."""
     ff = ffmpeg_exe()
     segments = []
+    outro_len = 0.0
     for i, c in enumerate(data["clips"], start=1):
         g = conn.execute("SELECT output_filename FROM generations WHERE id = ?", (c["gen_id"],)).fetchone()
         if g is None or not g["output_filename"] or not (GENERATED_DIR / g["output_filename"]).exists():
@@ -1264,6 +1279,7 @@ def build_montage(conn: sqlite3.Connection, data: dict) -> tuple[list, montage.A
             segments.append(
                 montage.Segment(path, 0, info.duration, volume=clamp(data.get("outro_volume", 1), 0, 3), has_audio=info.has_audio)
             )
+            outro_len = info.duration
 
     def track(t: dict | None, kind: str) -> montage.AudioTrack | None:
         if not t:
@@ -1276,12 +1292,46 @@ def build_montage(conn: sqlite3.Connection, data: dict) -> tuple[list, montage.A
             delay=max(0, t["delay"]), offset=max(0, t["offset"]), fade_out=t["fade_out"],
         )
 
-    return segments, track(data.get("voice"), "voice"), track(data.get("music"), "music")
+    return segments, track(data.get("voice"), "voice"), track(data.get("music"), "music"), outro_len
+
+
+def project_logo(data: dict, total: float, outro_len: float) -> montage.Logo | None:
+    cfg = {**LOGO_DEFAULTS, **(data.get("logo") or {})}
+    path = logo_path()
+    if not cfg["enabled"] or not path:
+        return None
+    until = total - outro_len if cfg["hide_outro"] and outro_len > 0 else None
+    return montage.Logo(
+        path, size=clamp(float(cfg["size"]), 3, 60), x=clamp(float(cfg["x"]), 0, 100),
+        y=clamp(float(cfg["y"]), 0, 100), opacity=clamp(float(cfg["opacity"]), 0.1, 1), until=until,
+    )
+
+
+def project_captions(conn: sqlite3.Connection, data: dict, total: float, export_id: str) -> montage.Subtitles | None:
+    cfg = data.get("captions") or {}
+    if not cfg.get("enabled"):
+        return None
+    voice = data.get("voice")
+    if not voice:
+        raise HTTPException(400, "الكابشن بيتعمل من التعليق الصوتي. اختار تعليق صوتي أو اقفل الكابشن")
+    row = conn.execute("SELECT transcript FROM audio WHERE id = ?", (voice["id"],)).fetchone()
+    tr = json.loads(row["transcript"]) if row and row["transcript"] else {}
+    if tr.get("status") != "done" or not tr.get("words"):
+        raise HTTPException(400, "لسه الكلام بتاع التعليق الصوتي متكتبش. دوس «اكتب الكلام» الأول أو اقفل الكابشن")
+    offset, delay = max(0.0, voice.get("offset", 0)), max(0.0, voice.get("delay", 0))
+    words = [
+        {"w": w["w"], "s": w["s"] - offset + delay, "e": w["e"] - offset + delay}
+        for w in tr["words"] if w["e"] - offset > 0
+    ]
+    ass = TMP_DIR / f"{export_id}.ass"
+    ass.write_text(captions.build_ass(words, cfg, total), encoding="utf-8")
+    return montage.Subtitles(ass, FONTS_DIR)
 
 
 def run_render(project_id: str, export_id: str, cmd: list[str], total: float, name: str) -> None:
     filename = f"{export_id}.mp4"
     result = subprocess.run(cmd, capture_output=True, text=True)
+    (TMP_DIR / f"{export_id}.ass").unlink(missing_ok=True)
     with closing(db()) as conn, conn:
         if result.returncode != 0:
             (EXPORTS_DIR / filename).unlink(missing_ok=True)
@@ -1310,9 +1360,14 @@ def render_project(project_id: str):
         if row["render_status"] == "rendering":
             raise HTTPException(400, "المشروع بيتصدّر بالفعل")
         data = json.loads(row["data"])
-        segments, voice, music = build_montage(conn, data)
+        segments, voice, music, outro_len = build_montage(conn, data)
         export_id = uuid.uuid4().hex[:12]
-        cmd, total = montage.build_command(ffmpeg_exe(), segments, EXPORTS_DIR / f"{export_id}.mp4", voice, music)
+        total = sum(sg.duration for sg in segments)
+        subs = project_captions(conn, data, total, export_id)
+        cmd, total = montage.build_command(
+            ffmpeg_exe(), segments, EXPORTS_DIR / f"{export_id}.mp4", voice, music,
+            logo=project_logo(data, total, outro_len), subtitles=subs,
+        )
         conn.execute(
             "UPDATE projects SET render_status = 'rendering', render_error = NULL, updated_at = ? WHERE id = ?",
             (now(), project_id),
@@ -1648,12 +1703,130 @@ with closing(db()) as _conn, _conn:
 threading.Thread(target=scheduler_loop, daemon=True).start()
 
 
+# ---------------------------------------------------------------- الكابشن واللوجو
+
+LOGO_DEFAULTS = {"enabled": True, "size": 18, "x": 92, "y": 4, "opacity": 0.9, "hide_outro": True}
+
+
+def transcript_of(row: sqlite3.Row) -> dict:
+    return json.loads(row["transcript"]) if row["transcript"] else {"status": "none", "words": []}
+
+
+@app.get("/api/captions/options")
+def caption_options():
+    return {
+        "fonts": [{"family": f["family"], "label": f["label"], "url": f"/fonts/{f['file']}"} for f in captions.FONTS],
+        "templates": {k: v for k, v in captions.TEMPLATES.items()},
+        "default_template": captions.DEFAULT_TEMPLATE,
+        "logo_defaults": LOGO_DEFAULTS,
+    }
+
+
+@app.get("/api/audio/{audio_id}/transcript")
+def get_transcript(audio_id: str):
+    with closing(db()) as conn:
+        row = conn.execute("SELECT transcript FROM audio WHERE id = ?", (audio_id,)).fetchone()
+    if row is None:
+        raise HTTPException(404, "الملف غير موجود")
+    return transcript_of(row)
+
+
+def set_transcript(audio_id: str, data: dict) -> None:
+    with closing(db()) as conn, conn:
+        conn.execute("UPDATE audio SET transcript = ? WHERE id = ?", (json.dumps(data, ensure_ascii=False), audio_id))
+
+
+def run_transcribe(audio_id: str) -> None:
+    with closing(db()) as conn:
+        row = conn.execute("SELECT filename, duration FROM audio WHERE id = ?", (audio_id,)).fetchone()
+    if row is None:
+        return
+    try:
+        words = atlas.transcribe(AUDIO_DIR / row["filename"], row["duration"])
+        set_transcript(audio_id, {"status": "done", "words": words, "edited": False})
+    except httpx.HTTPError as exc:
+        set_transcript(audio_id, {"status": "failed", "error": f"مقدرتش أوصل لـ Atlas: {exc}"[:400], "words": []})
+    except Exception as exc:  # الخطأ يبان للمستخدم بدل ما يضيع
+        set_transcript(audio_id, {"status": "failed", "error": str(exc)[:400], "words": []})
+
+
+@app.post("/api/audio/{audio_id}/transcribe")
+def start_transcribe(audio_id: str):
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "محتاج مفتاح Atlas عشان يكتب الكلام. حطه من ⚙️ الإعدادات")
+    with closing(db()) as conn:
+        row = conn.execute("SELECT transcript FROM audio WHERE id = ?", (audio_id,)).fetchone()
+    if row is None:
+        raise HTTPException(404, "الملف غير موجود")
+    if transcript_of(row).get("status") == "working":
+        return {"ok": True}
+    set_transcript(audio_id, {"status": "working", "words": []})
+    threading.Thread(target=run_transcribe, args=(audio_id,), daemon=True).start()
+    return {"ok": True}
+
+
+class WordIn(BaseModel):
+    w: str
+    s: float
+    e: float
+
+
+class TranscriptIn(BaseModel):
+    words: list[WordIn]
+
+
+@app.put("/api/audio/{audio_id}/transcript")
+def save_transcript(audio_id: str, body: TranscriptIn):
+    words = sorted(
+        ({"w": w.w.strip(), "s": round(max(0.0, w.s), 3), "e": round(max(w.s, w.e), 3)} for w in body.words if w.w.strip()),
+        key=lambda w: w["s"],
+    )
+    with closing(db()) as conn:
+        if not conn.execute("SELECT 1 FROM audio WHERE id = ?", (audio_id,)).fetchone():
+            raise HTTPException(404, "الملف غير موجود")
+    set_transcript(audio_id, {"status": "done", "words": words, "edited": True})
+    return {"status": "done", "words": words, "edited": True}
+
+
+def logo_path() -> Path | None:
+    name = auth.get_setting("logo")
+    path = BRAND_DIR / name if name else None
+    return path if path and path.exists() else None
+
+
+@app.get("/api/logo")
+def get_logo():
+    path = logo_path()
+    return {"url": f"/media/brand/{path.name}" if path else None}
+
+
+@app.post("/api/logo")
+def upload_logo(file: UploadFile = File(...)):
+    old = logo_path()
+    filename = save_upload(file, IMAGE_EXTENSIONS, BRAND_DIR, "logo")
+    auth.set_setting("logo", filename)
+    if old:
+        old.unlink(missing_ok=True)
+    return get_logo()
+
+
+@app.delete("/api/logo")
+def delete_logo():
+    old = logo_path()
+    auth.set_setting("logo", None)
+    if old:
+        old.unlink(missing_ok=True)
+    return {"url": None}
+
+
 app.mount("/media/raw", StaticFiles(directory=RAW_DIR), name="raw")
 app.mount("/media/clips", StaticFiles(directory=CLIPS_DIR), name="clips")
 app.mount("/media/coaches", StaticFiles(directory=COACHES_DIR), name="coaches")
 app.mount("/media/generated", StaticFiles(directory=GENERATED_DIR), name="generated")
 app.mount("/media/audio", StaticFiles(directory=AUDIO_DIR), name="audio")
 app.mount("/media/exports", StaticFiles(directory=EXPORTS_DIR), name="exports")
+app.mount("/media/brand", StaticFiles(directory=BRAND_DIR), name="brand")
+app.mount("/fonts", StaticFiles(directory=FONTS_DIR), name="fonts")
 
 
 @app.get("/")

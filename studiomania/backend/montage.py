@@ -61,12 +61,30 @@ class AudioTrack:
     fade_out: bool = False
 
 
+@dataclass
+class Logo:
+    path: Path
+    size: float = 18.0  # عرض اللوجو كنسبة من عرض الفيديو
+    x: float = 92.0  # من 0 (شمال) لـ 100 (يمين)
+    y: float = 4.0  # من 0 (فوق) لـ 100 (تحت)
+    opacity: float = 0.9
+    until: float | None = None  # يختفي بعد الثانية دي (قبل الأوترو)
+
+
+@dataclass
+class Subtitles:
+    ass_path: Path
+    fonts_dir: Path
+
+
 def build_command(
     ffmpeg: str,
     segments: list[Segment],
     output: Path,
     voice: AudioTrack | None = None,
     music: AudioTrack | None = None,
+    logo: Logo | None = None,
+    subtitles: Subtitles | None = None,
 ) -> tuple[list[str], float]:
     """يبني أمر FFmpeg ويرجّعه مع الطول النهائي للفيديو."""
     if not segments:
@@ -100,7 +118,33 @@ def build_command(
             idx += 1
         concat_inputs.append(f"[v{n}][a{n}]")
 
-    filters.append(f"{''.join(concat_inputs)}concat=n={len(segments)}:v=1:a=1[vout][base]")
+    filters.append(f"{''.join(concat_inputs)}concat=n={len(segments)}:v=1:a=1[vcat][base]")
+    video_label = "[vcat]"
+
+    if logo:
+        args += ["-loop", "1", "-i", str(logo.path)]
+        lw = max(2, int(WIDTH * logo.size / 100) // 2 * 2)
+        filters.append(
+            f"[{idx}:v]scale={lw}:-2,format=rgba,colorchannelmixer=aa={max(0.0, min(1.0, logo.opacity)):.2f}[logo]"
+        )
+        enable = f":enable='lt(t,{logo.until:.3f})'" if logo.until else ""
+        filters.append(
+            f"{video_label}[logo]overlay=x='(W-w)*{logo.x / 100:.4f}':y='(H-h)*{logo.y / 100:.4f}'"
+            f":shortest=1{enable}[vlogo]"
+        )
+        video_label = "[vlogo]"
+        idx += 1
+
+    if subtitles:
+        from captions import filter_path
+
+        filters.append(
+            f"{video_label}subtitles=filename='{filter_path(subtitles.ass_path)}'"
+            f":fontsdir='{filter_path(subtitles.fonts_dir)}'[vsub]"
+        )
+        video_label = "[vsub]"
+
+    filters.append(f"{video_label}format=yuv420p[vout]")
     mix = ["[base]"]
 
     if voice:

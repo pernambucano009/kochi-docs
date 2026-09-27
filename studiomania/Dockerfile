@@ -8,6 +8,7 @@ RUN pip install --no-cache-dir -r backend/requirements.txt \
  && python -c "import imageio_ffmpeg; print(imageio_ffmpeg.get_ffmpeg_exe())"
 COPY backend backend
 COPY frontend frontend
+COPY fonts fonts
 
 # الفيديوهات وقاعدة البيانات هنا. لازم يتربط بـ volume عشان متضيعش مع كل تحديث
 # (بيتعمل من إعدادات الاستضافة نفسها)
