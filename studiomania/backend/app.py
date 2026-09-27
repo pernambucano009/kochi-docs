@@ -1376,8 +1376,8 @@ def build_montage(conn: sqlite3.Connection, data: dict):
         info = media_info(path)
         start = clamp(c["start"], 0, info.duration)
         end = clamp(c["end"] if c["end"] is not None else info.duration, 0, info.duration)
-        if end - start < 0.3:
-            raise HTTPException(400, f"الفيديو رقم {i} مقصوص لدرجة إنه أقل من ثانية")
+        if end - start < 1 / 30 - 0.001:
+            raise HTTPException(400, f"الفيديو رقم {i} مقصوص لدرجة إنه مفيهوش ولا فريم")
         segments.append(
             montage.Segment(
                 path, start, end,

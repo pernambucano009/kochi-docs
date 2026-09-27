@@ -2,7 +2,7 @@
 
 const FPS = 30;
 const PV_W = 252, PV_H = 448; // حجم كادر المعاينة (9:16)
-const MIN_CLIP = 0.3; // أقل طول لقطعة (السيرفر بيرفض أقل من كده)
+const MIN_CLIP = 1 / 30; // أقل طول لقطعة: فريم واحد
 const PPS_MIN = 8, PPS_MAX = 600; // حدود زووم التايم لاين (بكسل لكل ثانية)
 const PROJECT_KEY = "studiomania.projectId";
 const CLIP_DEFAULTS = { start: 0, end: null, zoom: 1, x: 0, y: 0, volume: 1 };
@@ -581,7 +581,7 @@ function splitAt(t) {
   const it = seq().items.find((x) => x.kind === "clip" && t > x.t0 && t < x.t1);
   if (!it) return toast("حط المؤشر على قطعة فيديو عشان تقسمها", true);
   const at = snap(it.in + (t - it.t0));
-  if (at - it.in < MIN_CLIP || clipOut(it.c) - at < MIN_CLIP) return toast("قريب أوي من طرف القطعة", true);
+  if (at - it.in < MIN_CLIP - 1e-6 || clipOut(it.c) - at < MIN_CLIP - 1e-6) return toast("مفيش ولا فريم بين المؤشر وطرف القطعة", true);
   pushHistory();
   const clips = mt.project.data.clips;
   clips.splice(it.i + 1, 0, { ...it.c, start: at });
@@ -697,23 +697,53 @@ function trimClip(e, i, side) {
   const s = clipSource(c);
   const start0 = c.start, out0 = clipOut(c);
   mt.sel = { kind: "clip", i };
+  renderTimeline();
+  renderInspector();
+  const it0 = seq().items[i];
+  const el = $("trkVideo").querySelector(`.tl-clip[data-i="${i}"]`);
+  el.classList.add("trimming");
+  const tip = document.createElement("div");
+  tip.className = "tl-tip";
+  tip.dir = "ltr";
+  $("tlCanvas").append(tip);
+  let moved = false;
   drag(
     e,
     (dx) => {
+      moved = true;
       const ds = snap(dx / mt.pps);
+      // وإنت بتسحب: الطرف اللي ماسكه بيمشي مع الماوس، والباقي بيتظبط لما تسيب
+      let left = it0.t0;
       if (side === "l") {
         c.start = clamp(snap(start0 + ds), 0, out0 - MIN_CLIP);
-        mt.t = seq().items[i].t0;
+        left = it0.t0 + (c.start - start0);
       } else {
         const out = clamp(snap(out0 + ds), c.start + MIN_CLIP, s.duration);
         c.end = out >= s.duration - 0.001 ? null : out;
-        mt.t = Math.max(seq().items[i].t0, seq().items[i].t1 - 1 / FPS);
       }
-      renderTimeline();
-      renderInspector();
+      const len = clipOut(c) - c.start;
+      el.style.left = `${left * mt.pps}px`;
+      el.style.width = `${len * mt.pps}px`;
+      el.querySelector(".strip")?.remove();
+      el.insertAdjacentHTML("afterbegin", stripHtml("gen", s.id, c.start, len * mt.pps));
+      const cv = el.querySelector("canvas.cw");
+      if (cv) drawWave(cv, s.url, c.start, len, c.volume > 0 ? "#9fe3a8" : "#6b7180", c.volume);
+      el.querySelector(".du").textContent = `${len.toFixed(1)}s`;
+      const diff = len - (out0 - start0);
+      tip.textContent = `${len.toFixed(2)}s (${diff >= 0 ? "+" : "−"}${Math.abs(diff).toFixed(2)})`;
+      const edgeX = (side === "l" ? left : left + len) * mt.pps;
+      tip.style.left = `${Math.max(tip.offsetWidth / 2 + 2, edgeX)}px`;
+      // المعاينة بتوريك الفريم اللي عند الطرف اللي بتسحبه
+      mt.t = side === "l" ? it0.t0 : Math.max(it0.t0, it0.t0 + len - 1 / FPS);
       syncPreview();
+      $("tlPlayhead").style.left = `${(side === "l" ? left : it0.t0 + len) * mt.pps}px`;
+      renderInspector();
     },
-    () => { renderSide(); scheduleSave(); }
+    () => {
+      tip.remove();
+      if (!moved) { mt.undo.pop(); renderHistoryButtons(); }
+      changed();
+    }
   );
 }
 
