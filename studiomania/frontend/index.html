@@ -292,6 +292,8 @@
               <label dir="rtl">شمال ⟷ يمين <b id="xVal"></b><input type="range" dir="ltr" id="edX" min="-100" max="100" step="1"></label>
               <label dir="rtl">فوق ⟷ تحت <b id="yVal"></b><input type="range" dir="ltr" id="edY" min="-100" max="100" step="1"></label>
               <label dir="rtl">الصوت <b id="volVal"></b><input type="range" dir="ltr" id="edVol" min="0" max="200" step="5"></label>
+              <div class="row" dir="rtl"><button class="btn sm" id="edMute"></button>
+                <span class="muted" id="noAudio" hidden>🔈 الفيديو ده مفيهوش صوت</span></div>
               <p class="hint" dir="rtl">💡 اسحب الصورة في المعاينة عشان تحرّكها، وعجلة الماوس عليها بتعمل زووم.</p>
               <div class="row wrap" dir="rtl">
                 <button class="btn sm" id="edSplit">✂ قسّم عند المؤشر</button>
@@ -404,7 +406,7 @@
         <div class="tl-body">
           <div class="tl-heads">
             <div class="h-ruler"></div>
-            <div class="h-video">🎞️ فيديو</div>
+            <div class="h-video">🎞️ فيديو <button class="ic mute-all" id="muteAll" hidden></button></div>
             <div class="h-voice">🎙️ تعليق</div>
             <div class="h-music">🎵 موسيقى</div>
             <div class="h-caps">✍️ كابشن</div>

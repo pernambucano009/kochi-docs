@@ -1219,6 +1219,7 @@ def montage_sources():
                 "coach_name": r["coach_name"],
                 "url": f"/media/generated/{r['output_filename']}",
                 "duration": media_info(path).duration,
+                "has_audio": media_info(path).has_audio,
             }
         )
     return out

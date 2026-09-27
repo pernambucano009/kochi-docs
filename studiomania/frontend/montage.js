@@ -381,12 +381,26 @@ function renderTimeline() {
           return `<div class="tl-clip ${it.kind} ${sel ? "selected" : ""} ${it.s || it.kind === "outro" ? "" : "missing"}"
               ${it.kind === "clip" ? `data-i="${it.i}"` : `data-outro="1"`} style="left:${it.t0 * mt.pps}px;width:${w}px">
             ${strip}
+            ${hasSound(it) ? `<canvas class="cw"></canvas>` : ""}
             <span class="nm" dir="auto">${label}</span><span class="du">${(it.t1 - it.t0).toFixed(1)}s</span>
+            ${soundBadge(it)}
             ${it.kind === "clip" ? `<b class="h l" data-h="l"></b><b class="h r" data-h="r"></b>` : ""}
           </div>`;
         })
         .join("")
     : `<div class="tl-drop-hint">اسحب فيديو هنا أو دوس ＋ على فيديو من المكتبة</div>`;
+  // موجة الصوت اللي جوه كل قطعة فيديو
+  $("trkVideo").querySelectorAll(".tl-clip").forEach((el) => {
+    const cv = el.querySelector("canvas.cw");
+    const it = el.dataset.outro ? items.find((x) => x.kind === "outro") : items[Number(el.dataset.i)];
+    if (cv && it) drawWave(cv, it.url, it.in, it.t1 - it.t0, it.volume > 0 ? "#9fe3a8" : "#6b7180");
+  });
+  const clips = d.clips.filter((c) => clipSource(c)?.has_audio);
+  const allMuted = clips.length > 0 && clips.every((c) => c.volume === 0);
+  $("muteAll").hidden = !clips.length;
+  $("muteAll").textContent = allMuted ? "🔇" : "🔊";
+  $("muteAll").title = allMuted ? "رجّع صوت كل الفيديوهات" : "اكتم صوت كل الفيديوهات";
+  $("muteAll").classList.toggle("off", allMuted);
 
   for (const [kind, info, color] of [["voice", voice, "#7fb2ff"], ["music", music, "#6fe0bd"]]) {
     const el = $(kind === "voice" ? "trkVoice" : "trkMusic");
@@ -408,6 +422,41 @@ function renderTimeline() {
   $("totalLabel").textContent = total ? `${d.clips.length} قطعة` : "";
   drawPlayhead();
 }
+
+// ---------- الصوت اللي جوه الفيديو ----------
+function hasSound(it) {
+  return it.kind === "outro" || !!it.s?.has_audio;
+}
+function soundBadge(it) {
+  if (!hasSound(it)) return "";
+  const v = Math.round(it.volume * 100);
+  const icon = v === 0 ? "🔇" : v < 60 ? "🔉" : "🔊";
+  return `<button class="snd ${v === 0 ? "off" : ""}" data-mute title="${v === 0 ? "الصوت مكتوم — دوس ترجّعه" : "الفيديو ده فيه صوت — دوس تكتمه"}">${icon}${v === 0 ? "" : ` ${v}%`}</button>`;
+}
+const lastVolume = new WeakMap();
+function toggleMute(target) {
+  // target: قطعة من المونتاج، أو "outro"
+  pushHistory();
+  const d = mt.project.data;
+  if (target === "outro") {
+    if (d.outro_volume > 0) { lastVolume.set(d, d.outro_volume); d.outro_volume = 0; }
+    else d.outro_volume = lastVolume.get(d) || 1;
+  } else if (target.volume > 0) { lastVolume.set(target, target.volume); target.volume = 0; }
+  else target.volume = lastVolume.get(target) || 1;
+  changed();
+}
+$("muteAll").onclick = () => {
+  const clips = mt.project.data.clips.filter((c) => clipSource(c)?.has_audio);
+  if (!clips.length) return;
+  pushHistory();
+  const mute = !clips.every((c) => c.volume === 0);
+  for (const c of clips) {
+    if (mute && c.volume > 0) { lastVolume.set(c, c.volume); c.volume = 0; }
+    else if (!mute) c.volume = lastVolume.get(c) || 1;
+  }
+  toast(mute ? "🔇 كتمت صوت كل الفيديوهات" : "🔊 رجّعت صوت الفيديوهات");
+  changed();
+};
 
 // الكابشن اللي هيظهر على الفيديو، بمواعيده على التايم لاين
 function captionBlocks() {
@@ -555,6 +604,11 @@ $("tlCanvas").addEventListener("pointerdown", (e) => {
   const audEl = e.target.closest(".tl-audio");
   const handle = e.target.closest("[data-h]")?.dataset.h;
   e.preventDefault();
+
+  if (clipEl && e.target.closest("[data-mute]")) {
+    toggleMute(clipEl.dataset.outro ? "outro" : mt.project.data.clips[Number(clipEl.dataset.i)]);
+    return;
+  }
 
   // المسطرة ورأس المؤشر: تحريك المؤشر بالسحب
   if (e.target.closest("#tlRuler, .tl-playhead") || (!clipEl && !audEl)) {
@@ -970,7 +1024,11 @@ function renderInspector() {
   $("zoomVal").textContent = `${Math.round(c.zoom * 100)}%`;
   $("xVal").textContent = c.x.toFixed(2);
   $("yVal").textContent = c.y.toFixed(2);
-  $("volVal").textContent = `${Math.round(c.volume * 100)}%`;
+  $("volVal").textContent = s.has_audio ? `${Math.round(c.volume * 100)}%` : "";
+  $("edVol").disabled = !s.has_audio;
+  $("edMute").hidden = !s.has_audio;
+  $("edMute").textContent = c.volume === 0 ? "🔊 رجّع الصوت" : "🔇 اكتم صوت الفيديو ده";
+  $("noAudio").hidden = !!s.has_audio;
 }
 
 function editorInput(key, apply) {
@@ -991,6 +1049,7 @@ $("edZoom").addEventListener("input", editorInput("zoom", (c) => (c.zoom = Numbe
 $("edX").addEventListener("input", editorInput("x", (c) => (c.x = Number($("edX").value) / 100)));
 $("edY").addEventListener("input", editorInput("y", (c) => (c.y = Number($("edY").value) / 100)));
 $("edVol").addEventListener("input", editorInput("vol", (c) => (c.volume = Number($("edVol").value) / 100)));
+$("edMute").onclick = () => { const c = selectedClip(); if (c) toggleMute(c); };
 $("edReset").onclick = editorInput(null, (c) => Object.assign(c, { zoom: 1, x: 0, y: 0, volume: 1 }));
 
 // ---------- المدرب والصوت ----------
