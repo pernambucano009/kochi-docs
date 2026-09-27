@@ -448,3 +448,5 @@ dialog.bulk-dlg { width: min(900px, 96vw); max-height: 90vh; border: 1px solid v
 .fup-table td:nth-child(2), .fup-table td:nth-child(3) { min-width: 200px; }
 .fup-table td:first-child { min-width: 140px; }
 .fup-table select { direction: ltr; text-align: right; }
+.fup-add { margin-bottom: 6px; }
+#fupAddDrop.over { border-color: var(--accent); }
