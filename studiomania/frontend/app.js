@@ -532,7 +532,7 @@ $("clipsGrid").addEventListener("click", async (e) => {
 // ---------- التنقل بين الخطوات ----------
 const viewHooks = {}; // كل صفحة بتسجّل هنا اللي يحصل لما تفتح
 function showStep(step) {
-  if (!document.querySelector(`.view[data-view="${step}"]`)) step = "1";
+  if (!document.querySelector(`.view[data-view="${step}"]`)) step = "0";
   document.querySelectorAll(".view").forEach((v) => (v.hidden = v.dataset.view !== step));
   document.querySelectorAll(".step[data-step]").forEach((b) => b.classList.toggle("active", b.dataset.step === step));
   $("openSettings").classList.toggle("active", step === "settings");
@@ -556,5 +556,5 @@ const isStep1 = () => !document.querySelector('.view[data-view="1"]').hidden;
   state.maxClip = cfg.max_clip_seconds;
   state.minGap = cfg.min_cut_gap;
   await loadVideos();
-  showStep(location.hash.slice(1) || "1");
+  showStep(location.hash.slice(1) || "0");
 })();

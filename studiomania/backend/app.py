@@ -282,6 +282,16 @@ init_db()
 with closing(db()) as _conn, _conn:
     if "voice_id" not in {c[1] for c in _conn.execute("PRAGMA table_info(videos)")}:
         _conn.execute("ALTER TABLE videos ADD COLUMN voice_id TEXT")
+    _conn.execute(
+        """CREATE TABLE IF NOT EXISTS folders (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            video_id TEXT,
+            voice_id TEXT,
+            coach_id TEXT,
+            created_at TEXT NOT NULL
+        )"""
+    )
     if "coach_id" not in {c[1] for c in _conn.execute("PRAGMA table_info(videos)")}:
         _conn.execute("ALTER TABLE videos ADD COLUMN coach_id TEXT")
     if "transcript" not in {c[1] for c in _conn.execute("PRAGMA table_info(audio)")}:
@@ -291,6 +301,15 @@ with closing(db()) as _conn, _conn:
         _conn.execute(
             "UPDATE audio SET transcript = ? WHERE id = ?",
             (json.dumps({"status": "failed", "error": "البرنامج اتقفل أثناء الكتابة. جرّب تاني", "words": []}), _r[0]),
+        )
+with closing(db()) as _conn, _conn:
+    # أي فيديو خام مالوش فولدر بيبقى ليه فولدر بنفس اسمه
+    for _v in _conn.execute(
+        "SELECT * FROM videos WHERE id NOT IN (SELECT video_id FROM folders WHERE video_id IS NOT NULL)"
+    ).fetchall():
+        _conn.execute(
+            "INSERT INTO folders (id, name, video_id, voice_id, coach_id, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (uuid.uuid4().hex[:12], _v["name"], _v["id"], _v["voice_id"], _v["coach_id"], _v["created_at"]),
         )
 auth = Auth(DB_PATH, DATA_DIR)
 app = FastAPI(title="StudioMania")
@@ -419,8 +438,7 @@ def list_videos():
         return [video_row_to_dict(r, clips_count(conn, r["id"])) for r in rows]
 
 
-@app.post("/api/videos")
-def upload_video(file: UploadFile = File(...)):
+def store_video(file: UploadFile) -> str:
     ext = Path(file.filename or "").suffix.lower()
     if ext not in VIDEO_EXTENSIONS:
         raise HTTPException(400, f"نوع الملف غير مدعوم: {ext or 'بدون امتداد'}")
@@ -439,7 +457,30 @@ def upload_video(file: UploadFile = File(...)):
             "INSERT INTO videos (id, name, filename, duration, created_at) VALUES (?, ?, ?, ?, ?)",
             (video_id, Path(file.filename).stem, filename, duration, now()),
         )
-        return video_row_to_dict(get_video(conn, video_id), 0)
+    return video_id
+
+
+def remove_video(conn: sqlite3.Connection, video_id: str) -> None:
+    row = conn.execute("SELECT filename FROM videos WHERE id = ?", (video_id,)).fetchone()
+    if row is None:
+        return
+    for clip in conn.execute("SELECT filename FROM clips WHERE video_id = ?", (video_id,)):
+        (CLIPS_DIR / clip["filename"]).unlink(missing_ok=True)
+    conn.execute("DELETE FROM videos WHERE id = ?", (video_id,))
+    conn.execute("UPDATE folders SET video_id = NULL WHERE video_id = ?", (video_id,))
+    (RAW_DIR / row["filename"]).unlink(missing_ok=True)
+
+
+@app.post("/api/videos")
+def upload_video(file: UploadFile = File(...)):
+    video_id = store_video(file)
+    with closing(db()) as conn, conn:
+        v = get_video(conn, video_id)
+        conn.execute(
+            "INSERT INTO folders (id, name, video_id, created_at) VALUES (?, ?, ?, ?)",
+            (uuid.uuid4().hex[:12], v["name"], video_id, now()),
+        )
+        return video_row_to_dict(v, 0)
 
 
 class CutsIn(BaseModel):
@@ -482,6 +523,7 @@ def link_voice(video_id: str, body: VoiceLinkIn):
         ).fetchone():
             raise HTTPException(400, "التسجيل الصوتي مش موجود في المكتبة")
         conn.execute("UPDATE videos SET voice_id = ? WHERE id = ?", (body.voice_id or None, video_id))
+        conn.execute("UPDATE folders SET voice_id = ? WHERE video_id = ?", (body.voice_id or None, video_id))
         return video_row_to_dict(get_video(conn, video_id), clips_count(conn, video_id))
 
 
@@ -497,6 +539,7 @@ def link_coach(video_id: str, body: CoachLinkIn):
         if body.coach_id:
             get_coach(conn, body.coach_id)
         conn.execute("UPDATE videos SET coach_id = ? WHERE id = ?", (body.coach_id or None, video_id))
+        conn.execute("UPDATE folders SET coach_id = ? WHERE video_id = ?", (body.coach_id or None, video_id))
         return video_row_to_dict(get_video(conn, video_id), clips_count(conn, video_id))
 
 
@@ -538,11 +581,8 @@ def montage_draft(video_id: str, coach_id: str | None = None):
 @app.delete("/api/videos/{video_id}")
 def delete_video(video_id: str):
     with closing(db()) as conn, conn:
-        row = get_video(conn, video_id)
-        for clip in conn.execute("SELECT filename FROM clips WHERE video_id = ?", (video_id,)):
-            (CLIPS_DIR / clip["filename"]).unlink(missing_ok=True)
-        conn.execute("DELETE FROM videos WHERE id = ?", (video_id,))
-        (RAW_DIR / row["filename"]).unlink(missing_ok=True)
+        get_video(conn, video_id)
+        remove_video(conn, video_id)
     return {"ok": True}
 
 
@@ -745,6 +785,7 @@ def delete_coach(coach_id: str):
         row = get_coach(conn, coach_id)
         conn.execute("DELETE FROM coaches WHERE id = ?", (coach_id,))
         conn.execute("UPDATE videos SET coach_id = NULL WHERE coach_id = ?", (coach_id,))
+        conn.execute("UPDATE folders SET coach_id = NULL WHERE coach_id = ?", (coach_id,))
         in_use = {r[0] for r in conn.execute("SELECT coach_image FROM generations")}
     if row["image_filename"] not in in_use:
         (COACHES_DIR / row["image_filename"]).unlink(missing_ok=True)
@@ -1141,6 +1182,7 @@ def delete_audio(audio_id: str):
             raise HTTPException(404, "الملف غير موجود")
         conn.execute("DELETE FROM audio WHERE id = ?", (audio_id,))
         conn.execute("UPDATE videos SET voice_id = NULL WHERE voice_id = ?", (audio_id,))
+        conn.execute("UPDATE folders SET voice_id = NULL WHERE voice_id = ?", (audio_id,))
     (AUDIO_DIR / row["filename"]).unlink(missing_ok=True)
     return {"ok": True}
 
@@ -1849,6 +1891,164 @@ def delete_logo():
     if old:
         old.unlink(missing_ok=True)
     return {"url": None}
+
+
+# ---------------------------------------------------------------- المشاريع (الفولدرات)
+
+
+def sync_folder(conn: sqlite3.Connection, folder_id: str) -> None:
+    """الفيديو الخام بياخد اسم الفولدر والصوت والمدرب بتوعه، ومشاريع المونتاج بتاخد الاسم."""
+    f = conn.execute("SELECT * FROM folders WHERE id = ?", (folder_id,)).fetchone()
+    if not f or not f["video_id"]:
+        return
+    conn.execute(
+        "UPDATE videos SET name = ?, voice_id = ?, coach_id = ? WHERE id = ?",
+        (f["name"], f["voice_id"], f["coach_id"], f["video_id"]),
+    )
+    for p in conn.execute("SELECT id, data FROM projects").fetchall():
+        data = json.loads(p["data"])
+        if data.get("video_id") == f["video_id"] and data.get("name") != f["name"]:
+            data["name"] = f["name"]
+            conn.execute("UPDATE projects SET name = ?, data = ? WHERE id = ?", (f["name"], json.dumps(data), p["id"]))
+
+
+def get_folder(conn: sqlite3.Connection, folder_id: str) -> sqlite3.Row:
+    row = conn.execute("SELECT * FROM folders WHERE id = ?", (folder_id,)).fetchone()
+    if row is None:
+        raise HTTPException(404, "المشروع غير موجود")
+    return row
+
+
+def folder_to_dict(conn: sqlite3.Connection, f: sqlite3.Row) -> dict:
+    video = None
+    if f["video_id"]:
+        v = conn.execute("SELECT * FROM videos WHERE id = ?", (f["video_id"],)).fetchone()
+        if v:
+            clip_ids = [r["id"] for r in conn.execute("SELECT id FROM clips WHERE video_id = ?", (v["id"],))]
+            done = 0
+            for cid in clip_ids:
+                if conn.execute(
+                    "SELECT 1 FROM generations WHERE clip_id = ? AND status = 'completed'", (cid,)
+                ).fetchone():
+                    done += 1
+            video = {
+                "id": v["id"], "url": f"/media/raw/{v['filename']}", "duration": v["duration"],
+                "file": v["filename"], "clips": len(clip_ids), "generated": done,
+            }
+    voice = None
+    if f["voice_id"]:
+        a = conn.execute("SELECT id, name, filename, duration FROM audio WHERE id = ?", (f["voice_id"],)).fetchone()
+        if a:
+            voice = {"id": a["id"], "name": a["name"], "url": f"/media/audio/{a['filename']}", "duration": a["duration"]}
+    coach = None
+    if f["coach_id"]:
+        c = conn.execute("SELECT * FROM coaches WHERE id = ?", (f["coach_id"],)).fetchone()
+        if c:
+            coach = coach_to_dict(c)
+    montage_project, exported = None, None
+    if f["video_id"]:
+        for p in conn.execute("SELECT id, data, export_id FROM projects ORDER BY updated_at DESC").fetchall():
+            if json.loads(p["data"]).get("video_id") == f["video_id"]:
+                montage_project = p["id"]
+                if p["export_id"]:
+                    e = conn.execute("SELECT filename FROM exports WHERE id = ?", (p["export_id"],)).fetchone()
+                    exported = f"/media/exports/{e['filename']}" if e else None
+                break
+    return {
+        "id": f["id"], "name": f["name"], "created_at": f["created_at"],
+        "video": video, "voice": voice, "coach": coach,
+        "montage_project": montage_project, "exported": exported,
+    }
+
+
+@app.get("/api/folders")
+def list_folders():
+    with closing(db()) as conn:
+        rows = conn.execute("SELECT * FROM folders ORDER BY created_at DESC").fetchall()
+        return [folder_to_dict(conn, r) for r in rows]
+
+
+class FolderIn(BaseModel):
+    name: str
+
+
+@app.post("/api/folders")
+def create_folder(body: FolderIn):
+    name = body.name.strip()
+    if not name:
+        raise HTTPException(400, "اكتب اسم المشروع")
+    folder_id = uuid.uuid4().hex[:12]
+    with closing(db()) as conn, conn:
+        conn.execute("INSERT INTO folders (id, name, created_at) VALUES (?, ?, ?)", (folder_id, name, now()))
+        return folder_to_dict(conn, get_folder(conn, folder_id))
+
+
+@app.patch("/api/folders/{folder_id}")
+def update_folder(folder_id: str, body: dict):
+    """بيغيّر اللي اتبعت بس: name أو voice_id أو coach_id (null = شيله)."""
+    with closing(db()) as conn, conn:
+        get_folder(conn, folder_id)
+        if "name" in body:
+            name = str(body["name"] or "").strip()
+            if not name:
+                raise HTTPException(400, "الاسم فاضي")
+            conn.execute("UPDATE folders SET name = ? WHERE id = ?", (name, folder_id))
+        if "voice_id" in body:
+            vid = body["voice_id"] or None
+            if vid and not conn.execute("SELECT 1 FROM audio WHERE id = ? AND kind = 'voice'", (vid,)).fetchone():
+                raise HTTPException(400, "التسجيل مش موجود في المكتبة")
+            conn.execute("UPDATE folders SET voice_id = ? WHERE id = ?", (vid, folder_id))
+        if "coach_id" in body:
+            cid = body["coach_id"] or None
+            if cid:
+                get_coach(conn, cid)
+            conn.execute("UPDATE folders SET coach_id = ? WHERE id = ?", (cid, folder_id))
+        sync_folder(conn, folder_id)
+        return folder_to_dict(conn, get_folder(conn, folder_id))
+
+
+@app.post("/api/folders/{folder_id}/video")
+def set_folder_video(folder_id: str, file: UploadFile = File(...)):
+    """يرفع الفيديو الخام للمشروع. لو فيه فيديو قديم، بيتمسح هو والتقطيع بتاعه."""
+    with closing(db()) as conn:
+        get_folder(conn, folder_id)
+    new_id = store_video(file)
+    with closing(db()) as conn, conn:
+        old = get_folder(conn, folder_id)["video_id"]
+        if old:
+            remove_video(conn, old)
+        conn.execute("UPDATE folders SET video_id = ? WHERE id = ?", (new_id, folder_id))
+        sync_folder(conn, folder_id)
+        return folder_to_dict(conn, get_folder(conn, folder_id))
+
+
+@app.post("/api/folders/{folder_id}/voice")
+def set_folder_voice(folder_id: str, file: UploadFile = File(...)):
+    """يرفع تسجيل جديد للمكتبة ويحطه في المشروع."""
+    with closing(db()) as conn:
+        get_folder(conn, folder_id)
+    audio = upload_audio(kind="voice", file=file)
+    return update_folder(folder_id, {"voice_id": audio["id"]})
+
+
+@app.delete("/api/folders/{folder_id}/video")
+def delete_folder_video(folder_id: str):
+    with closing(db()) as conn, conn:
+        f = get_folder(conn, folder_id)
+        if f["video_id"]:
+            remove_video(conn, f["video_id"])
+        return folder_to_dict(conn, get_folder(conn, folder_id))
+
+
+@app.delete("/api/folders/{folder_id}")
+def delete_folder(folder_id: str, delete_video: bool = True):
+    """يمسح المشروع والفيديو الخام بتاعه. التعليق الصوتي والمدرب بيفضلوا في مكتباتهم."""
+    with closing(db()) as conn, conn:
+        f = get_folder(conn, folder_id)
+        if delete_video and f["video_id"]:
+            remove_video(conn, f["video_id"])
+        conn.execute("DELETE FROM folders WHERE id = ?", (folder_id,))
+    return {"ok": True}
 
 
 app.mount("/media/raw", StaticFiles(directory=RAW_DIR), name="raw")

@@ -21,7 +21,8 @@
   </header>
 
   <nav class="steps" id="steps">
-    <button class="step active" data-step="1"><span>1</span>تقطيع الفيديوهات</button>
+    <button class="step" data-step="0"><span>📁</span>المشاريع</button>
+    <button class="step" data-step="1"><span>1</span>تقطيع الفيديوهات</button>
     <button class="step" data-step="2"><span>2</span>توليد Seedance</button>
     <button class="step" data-step="3"><span>3</span>التعليق الصوتي</button>
     <button class="step" data-step="4"><span>4</span>المدربين</button>
@@ -30,7 +31,42 @@
     <button class="step" data-step="7"><span>7</span>النشر</button>
   </nav>
 
-  <main class="layout view" data-view="1">
+  <!-- المشاريع (الفولدرات) -->
+  <main class="view" data-view="0" hidden>
+    <div class="folders-layout">
+      <section class="panel">
+        <div class="panel-head"><h2>المشاريع <span class="muted" id="folderCount"></span></h2></div>
+        <form class="new-folder" id="newFolderForm">
+          <input type="text" id="newFolderName" placeholder="اسم المشروع (هو اسم الفيديو النهائي)" required>
+          <button class="btn primary sm" type="submit">＋ مشروع جديد</button>
+        </form>
+        <input type="search" class="folder-search" id="folderSearch" placeholder="دوّر على مشروع...">
+        <ul class="folder-list" id="folderList"></ul>
+        <p class="empty" id="foldersEmpty">لسه مفيش مشاريع. اكتب اسم واعمل أول مشروع.</p>
+      </section>
+
+      <section class="panel folder-detail" id="folderDetail" hidden>
+        <div class="panel-head">
+          <input type="text" class="folder-name" id="folderName" title="اسم المشروع = اسم الفيديو اللي هيتصدّر">
+          <button class="btn sm danger" id="folderDelete">🗑️ حذف المشروع</button>
+        </div>
+        <div class="folder-progress" id="folderProgress"></div>
+        <div class="elements">
+          <div class="element" id="elVideo"></div>
+          <div class="element" id="elVoice"></div>
+          <div class="element" id="elCoach"></div>
+        </div>
+        <div class="row wrap gap-top">
+          <button class="btn" id="goCut">✂️ افتح في التقطيع</button>
+          <button class="btn" id="goGenerate">✨ ولّد بـ Seedance</button>
+          <button class="btn primary" id="goMontage">🎬 افتح في المونتاج</button>
+        </div>
+      </section>
+      <section class="panel placeholder" id="folderPlaceholder"><p>اختار مشروع أو اعمل واحد جديد.</p></section>
+    </div>
+  </main>
+
+  <main class="layout view" data-view="1" hidden>
     <aside class="panel library">
       <div class="panel-head">
         <h2>الفيديوهات الخام</h2>
@@ -414,6 +450,7 @@
 </dialog>
 <div class="toast" id="toast" hidden></div>
 <script src="/app.js"></script>
+<script src="/folders.js"></script>
 <script src="/coaches.js"></script>
 <script src="/generate.js"></script>
 <script src="/audio.js"></script>
