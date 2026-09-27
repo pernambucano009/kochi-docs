@@ -1276,6 +1276,13 @@ class ClipEdit(BaseModel):
     volume: float = 1.0
 
 
+class TrackPart(BaseModel):
+    delay: float = 0.0
+    offset: float = 0.0
+    length: float | None = None
+    volume: float = 1.0
+
+
 class TrackEdit(BaseModel):
     id: str
     volume: float = 1.0
@@ -1283,6 +1290,7 @@ class TrackEdit(BaseModel):
     offset: float = 0.0
     length: float | None = None  # قصّ آخر الملف (None = لحد آخره)
     fade_out: bool = True
+    parts: list[TrackPart] = []  # لو الصوت متقسّم: كل قطعة ومكانها
 
 
 class ProjectIn(BaseModel):
@@ -1363,6 +1371,13 @@ def clamp(v: float, lo: float, hi: float) -> float:
     return max(lo, min(hi, v))
 
 
+def track_parts(t: dict) -> list[dict]:
+    """قطع التعليق أو الموسيقى. المشاريع القديمة فيها قطعة واحدة بس."""
+    if t.get("parts"):
+        return t["parts"]
+    return [{"delay": t.get("delay", 0), "offset": t.get("offset", 0), "length": t.get("length"), "volume": t.get("volume", 1)}]
+
+
 def build_montage(conn: sqlite3.Connection, data: dict):
     """يحوّل بيانات المشروع لقطع ومسارات صوت جاهزة لـ FFmpeg، ويتأكد إن كل حاجة موجودة."""
     ff = ffmpeg_exe()
@@ -1398,17 +1413,24 @@ def build_montage(conn: sqlite3.Connection, data: dict):
             )
             outro_len = info.duration
 
-    def track(t: dict | None, kind: str) -> montage.AudioTrack | None:
+    def track(t: dict | None, kind: str) -> list[montage.AudioTrack]:
         if not t:
-            return None
+            return []
         row = conn.execute("SELECT filename FROM audio WHERE id = ? AND kind = ?", (t["id"], kind)).fetchone()
         if row is None:
             raise HTTPException(400, "ملف الصوت المختار اتمسح من المكتبة")
-        return montage.AudioTrack(
-            AUDIO_DIR / row["filename"], volume=clamp(t["volume"], 0, 3),
-            delay=max(0, t["delay"]), offset=max(0, t["offset"]),
-            length=t["length"] if t.get("length") and t["length"] > 0.1 else None, fade_out=t["fade_out"],
-        )
+        parts = track_parts(t)
+        # الاختفاء بالتدريج بيبقى في آخر قطعة بس
+        last = max(range(len(parts)), key=lambda n: parts[n]["delay"])
+        return [
+            montage.AudioTrack(
+                AUDIO_DIR / row["filename"], volume=clamp(p["volume"], 0, 3),
+                delay=max(0, p["delay"]), offset=max(0, p["offset"]),
+                length=p["length"] if p.get("length") and p["length"] > 0.01 else None,
+                fade_out=bool(t.get("fade_out")) and n == last,
+            )
+            for n, p in enumerate(parts)
+        ]
 
     return segments, track(data.get("voice"), "voice"), track(data.get("music"), "music"), outro_len
 
@@ -1436,12 +1458,15 @@ def project_captions(conn: sqlite3.Connection, data: dict, total: float, export_
     tr = json.loads(row["transcript"]) if row and row["transcript"] else {}
     if tr.get("status") != "done" or not tr.get("words"):
         raise HTTPException(400, "لسه الكلام بتاع التعليق الصوتي متكتبش. دوس «اكتب الكلام» الأول أو اقفل الكابشن")
-    offset, delay = max(0.0, voice.get("offset", 0)), max(0.0, voice.get("delay", 0))
-    length = voice.get("length") or float("inf")
-    words = [
-        {"w": w["w"], "s": w["s"] - offset + delay, "e": w["e"] - offset + delay}
-        for w in tr["words"] if w["e"] - offset > 0 and w["s"] - offset < length
-    ]
+    words = []
+    for part in track_parts(voice):
+        offset, delay = max(0.0, part.get("offset") or 0), max(0.0, part.get("delay") or 0)
+        length = part.get("length") or float("inf")
+        words += [
+            {"w": w["w"], "s": w["s"] - offset + delay, "e": w["e"] - offset + delay}
+            for w in tr["words"] if w["e"] - offset > 0 and w["s"] - offset < length
+        ]
+    words.sort(key=lambda w: w["s"])
     ass = TMP_DIR / f"{export_id}.ass"
     ass.write_text(captions.build_ass(words, cfg, total), encoding="utf-8")
     return montage.Subtitles(ass, FONTS_DIR)

@@ -87,6 +87,7 @@ function openProject(p) {
 }
 
 function renderAll() {
+  normalizeTracks(mt.project.data);
   fixSelection();
   renderBin();
   renderTimeline();
@@ -134,24 +135,39 @@ function totalLength() {
   return seq().total;
 }
 
-// مكان التعليق الصوتي أو الموسيقى على التايم لاين
-function trackInfo(kind) {
+// التعليق الصوتي والموسيقى ممكن يتقسّموا لكذا قطعة من نفس الملف (parts)
+function normalizeTracks(d) {
+  for (const kind of ["voice", "music"]) {
+    const t = d[kind];
+    if (t && !t.parts?.length) {
+      t.parts = [{ delay: t.delay || 0, offset: t.offset || 0, length: t.length ?? null, volume: t.volume ?? 1 }];
+    }
+  }
+}
+
+// كل قطعة صوت ومكانها على التايم لاين
+function trackParts(kind) {
   const t = mt.project?.data[kind];
-  if (!t) return null;
+  if (!t?.parts?.length) return [];
   const a = (kind === "voice" ? mt.voices : mt.music).find((x) => x.id === t.id);
-  if (!a) return null;
-  const offset = clamp(t.offset || 0, 0, Math.max(0, a.duration - 0.1));
-  const len = Math.max(0.1, Math.min(t.length || Infinity, a.duration - offset));
-  const t0 = Math.max(0, t.delay || 0);
-  return { t, a, dur: a.duration, offset, len, t0, t1: t0 + len, url: a.url };
+  if (!a) return [];
+  return t.parts.map((p, k) => {
+    const offset = clamp(p.offset || 0, 0, Math.max(0, a.duration - MIN_CLIP));
+    const len = Math.max(MIN_CLIP, Math.min(p.length || Infinity, a.duration - offset));
+    const t0 = Math.max(0, p.delay || 0);
+    return { kind, k, p, t, a, dur: a.duration, offset, len, t0, t1: t0 + len, url: a.url, volume: p.volume ?? 1 };
+  });
+}
+function trackEnd(kind) {
+  return Math.max(0, ...trackParts(kind).map((x) => x.t1));
 }
 
 function fixSelection() {
   const s = mt.sel;
   if (!s || !mt.project) return;
   const d = mt.project.data;
-  if ((s.kind === "clip" && !d.clips[s.i]) || (s.kind === "voice" && !d.voice) ||
-      (s.kind === "music" && !d.music) || (s.kind === "outro" && !currentOutro())) mt.sel = null;
+  if ((s.kind === "clip" && !d.clips[s.i]) || ((s.kind === "voice" || s.kind === "music") && !d[s.kind]?.parts?.[s.p]) ||
+      (s.kind === "outro" && !currentOutro())) mt.sel = null;
 }
 function selectedClip() {
   return mt.sel?.kind === "clip" ? mt.project.data.clips[mt.sel.i] : null;
@@ -364,8 +380,7 @@ function renderTimeline() {
   const d = mt.project.data;
   const { items, total } = seq();
   const view = $("tlScroll").clientWidth || 800;
-  const voice = trackInfo("voice"), music = trackInfo("music");
-  const end = Math.max(total, voice?.t1 || 0, music?.t1 || 0);
+  const end = Math.max(total, trackEnd("voice"), trackEnd("music"));
   const width = Math.max(view, (end + 4) * mt.pps);
   const canvas = $("tlCanvas");
   canvas.style.width = `${width}px`;
@@ -404,17 +419,25 @@ function renderTimeline() {
   $("muteAll").title = allMuted ? "رجّع صوت كل الفيديوهات" : "اكتم صوت كل الفيديوهات";
   $("muteAll").classList.toggle("off", allMuted);
 
-  for (const [kind, info, color] of [["voice", voice, "#7fb2ff"], ["music", music, "#6fe0bd"]]) {
+  for (const [kind, color] of [["voice", "#7fb2ff"], ["music", "#6fe0bd"]]) {
     const el = $(kind === "voice" ? "trkVoice" : "trkMusic");
-    if (!info) {
+    const parts = trackParts(kind);
+    if (!parts.length) {
       el.innerHTML = `<div class="tl-empty-track">${kind === "voice" ? "مفيش تعليق صوتي — اختاره من تاب 🔊 الصوت" : "مفيش موسيقى — اختارها من تاب 🔊 الصوت"}</div>`;
       continue;
     }
-    const sel = mt.sel?.kind === kind;
-    el.innerHTML = `<div class="tl-audio ${kind} ${sel ? "selected" : ""}" data-track="${kind}" style="left:${info.t0 * mt.pps}px;width:${info.len * mt.pps}px">
-        <canvas></canvas><span class="nm" dir="auto">${escapeHtml(info.a.name)}</span>${volLine(info.t.volume ?? 1)}
-        <b class="h l" data-h="l"></b><b class="h r" data-h="r"></b></div>`;
-    drawWave(el.querySelector("canvas"), info.url, info.offset, info.len, color, info.t.volume ?? 1);
+    el.innerHTML = parts
+      .map((x) => {
+        const sel = mt.sel?.kind === kind && mt.sel.p === x.k;
+        return `<div class="tl-audio ${kind} ${sel ? "selected" : ""}" data-track="${kind}" data-p="${x.k}" style="left:${x.t0 * mt.pps}px;width:${x.len * mt.pps}px">
+          <canvas></canvas><span class="nm" dir="auto">${escapeHtml(x.a.name)}</span>${volLine(x.volume)}
+          <b class="h l" data-h="l"></b><b class="h r" data-h="r"></b></div>`;
+      })
+      .join("");
+    el.querySelectorAll(".tl-audio").forEach((box, n) => {
+      const x = parts[n];
+      drawWave(box.querySelector("canvas"), x.url, x.offset, x.len, color, x.volume);
+    });
   }
 
   $("trkCaps").innerHTML = captionBlocks()
@@ -444,7 +467,10 @@ function volLine(vol) {
 }
 function volTarget(el) {
   const d = mt.project.data;
-  if (el.dataset.track) return { get: () => d[el.dataset.track].volume ?? 1, set: (v) => (d[el.dataset.track].volume = v) };
+  if (el.dataset.track) {
+    const part = d[el.dataset.track].parts[Number(el.dataset.p)];
+    return { get: () => part.volume ?? 1, set: (v) => (part.volume = v) };
+  }
   if (el.dataset.outro) return { get: () => d.outro_volume, set: (v) => (d.outro_volume = v) };
   const c = d.clips[Number(el.dataset.i)];
   return { get: () => c.volume, set: (v) => (c.volume = v) };
@@ -508,18 +534,22 @@ $("muteAll").onclick = () => {
 // الكابشن اللي هيظهر على الفيديو، بمواعيده على التايم لاين
 function captionBlocks() {
   const d = mt.project.data;
-  const voice = trackInfo("voice");
-  const tr = voice && typeof brand !== "undefined" && brand.tr[voice.t.id];
+  const tr = d.voice && typeof brand !== "undefined" && brand.tr[d.voice.id];
   if (!d.captions?.enabled || !(tr?.status === "done" && tr.words.length)) return [];
-  const words = tr.words.filter((w) => w.e > voice.offset && w.s < voice.offset + voice.len);
-  const groups = groupWords(words, d.captions.words || 3);
-  const shift = voice.t0 - voice.offset;
-  return groups.map((g, k) => {
-    const next = groups[k + 1];
-    const t0 = g[0].s + shift;
-    const t1 = Math.min(next ? next[0].s : Infinity, g[g.length - 1].e + 0.5) + shift;
-    return { t0, t1, g, shift, text: g.map((w) => w.w).join(" ") };
-  });
+  const blocks = [];
+  // كل قطعة من التعليق الصوتي ليها الكلام اللي جواها بس
+  for (const x of trackParts("voice")) {
+    const words = tr.words.filter((w) => w.e > x.offset && w.s < x.offset + x.len);
+    const groups = groupWords(words, d.captions.words || 3);
+    const shift = x.t0 - x.offset;
+    groups.forEach((g, k) => {
+      const next = groups[k + 1];
+      const t0 = Math.max(x.t0, g[0].s + shift);
+      const t1 = Math.min(x.t1, (next ? next[0].s : Infinity) + shift, g[g.length - 1].e + 0.5 + shift);
+      if (t1 > t0) blocks.push({ t0, t1, g, shift, text: g.map((w) => w.w).join(" ") });
+    });
+  }
+  return blocks.sort((a, b) => a.t0 - b.t0);
 }
 
 function drawPlayhead() {
@@ -544,7 +574,7 @@ function setZoom(pps, anchorX) {
 function fitZoom() {
   if (!mt.project) return;
   const sc = $("tlScroll");
-  const end = Math.max(totalLength(), trackInfo("voice")?.t1 || 0, trackInfo("music")?.t1 || 0, 5);
+  const end = Math.max(totalLength(), trackEnd("voice"), trackEnd("music"), 5);
   setZoom((sc.clientWidth - 30) / end, 0);
   sc.scrollLeft = 0;
 }
@@ -577,7 +607,26 @@ function setTool(tool) {
 }
 document.querySelectorAll(".tl-toolbar .tool").forEach((b) => (b.onclick = () => setTool(b.dataset.tool)));
 
-function splitAt(t) {
+function splitPart(x, t) {
+  const cut = snap(t - x.t0);
+  if (cut < MIN_CLIP - 1e-6 || x.len - cut < MIN_CLIP - 1e-6) return toast("مفيش ولا فريم بين المؤشر وطرف القطعة", true);
+  pushHistory();
+  const parts = x.t.parts;
+  const rest = x.p.length == null ? null : snap(x.len - cut);
+  parts[x.k].length = cut;
+  parts.splice(x.k + 1, 0, { delay: snap(x.t0 + cut), offset: snap(x.offset + cut), length: rest, volume: x.volume });
+  mt.sel = { kind: x.kind, p: x.k + 1 };
+  changed();
+}
+
+// target: قطعة صوت معيّنة (من أداة القطع)، وإلا بيقسم المختار أو الفيديو اللي عند المؤشر
+function splitAt(t, target) {
+  const s = target || mt.sel;
+  if (s?.kind === "voice" || s?.kind === "music") {
+    const x = trackParts(s.kind)[s.p];
+    if (x && t > x.t0 && t < x.t1) return splitPart(x, t);
+    return toast("حط المؤشر على قطعة الصوت المختارة عشان تقسمها", true);
+  }
   const it = seq().items.find((x) => x.kind === "clip" && t > x.t0 && t < x.t1);
   if (!it) return toast("حط المؤشر على قطعة فيديو عشان تقسمها", true);
   const at = snap(it.in + (t - it.t0));
@@ -597,8 +646,10 @@ function deleteSelected() {
   pushHistory();
   const d = mt.project.data;
   if (s.kind === "clip") d.clips.splice(s.i, 1);
-  else if (s.kind === "voice") d.voice = null;
-  else if (s.kind === "music") d.music = null;
+  else if (s.kind === "voice" || s.kind === "music") {
+    d[s.kind].parts.splice(s.p, 1);
+    if (!d[s.kind].parts.length) d[s.kind] = null;
+  }
   else if (s.kind === "outro") d.outro = false;
   mt.sel = null;
   changed();
@@ -652,8 +703,18 @@ $("tlCanvas").addEventListener("pointerdown", (e) => {
   const handle = e.target.closest("[data-h]")?.dataset.h;
   e.preventDefault();
 
+  // أداة القطع ليها الأولوية على أي حاجة جوه القطعة
+  if (mt.tool === "blade" && clipEl?.dataset.i != null) { splitAt(snap(t)); return; }
+  if (mt.tool === "blade" && audEl) { splitAt(snap(t), { kind: audEl.dataset.track, p: Number(audEl.dataset.p) }); return; }
   if ((clipEl || audEl) && e.target.closest("[data-vol]")) {
-    return dragVolume(e, clipEl || audEl);
+    // خط الصوت بيختار القطعة كمان
+    const box = clipEl || audEl;
+    mt.sel = audEl ? { kind: audEl.dataset.track, p: Number(audEl.dataset.p) }
+      : box.dataset.outro ? { kind: "outro" } : { kind: "clip", i: Number(box.dataset.i) };
+    document.querySelectorAll(".tl-clip.selected, .tl-audio.selected").forEach((x) => x.classList.remove("selected"));
+    box.classList.add("selected");
+    renderInspector();
+    return dragVolume(e, box);
   }
   if (clipEl && e.target.closest("[data-mute]")) {
     toggleMute(clipEl.dataset.outro ? "outro" : mt.project.data.clips[Number(clipEl.dataset.i)]);
@@ -684,9 +745,10 @@ $("tlCanvas").addEventListener("pointerdown", (e) => {
   }
 
   if (audEl) {
-    const kind = audEl.dataset.track;
-    selectItem({ kind });
-    return moveTrack(e, kind, handle);
+    const kind = audEl.dataset.track, k = Number(audEl.dataset.p);
+    if (mt.tool === "blade") { splitAt(snap(t), { kind, p: k }); return; }
+    selectItem({ kind, p: k });
+    return moveTrack(e, kind, k, handle);
   }
 });
 
@@ -787,35 +849,44 @@ function reorderClip(e, i) {
   );
 }
 
-function moveTrack(e, kind, side) {
+function moveTrack(e, kind, k, side) {
   pause();
-  const info = trackInfo(kind);
+  const info = trackParts(kind)[k];
   if (!info) return;
   pushHistory();
-  const t = info.t;
+  const p = info.p;
   const { offset: off0, t0: delay0, len: len0 } = info;
+  // أطراف القطع التانية عشان القطعة تلزق فيها
+  const edges = [0, mt.t, ...trackParts(kind).filter((x) => x.k !== k).flatMap((x) => [x.t0, x.t1])];
+  let moved = false;
   drag(
     e,
     (dx) => {
+      moved = true;
       let ds = snap(dx / mt.pps);
       if (!side) {
         let delay = Math.max(0, delay0 + ds);
-        // يلزق في أول الفيديو وفي المؤشر
-        if (delay * mt.pps < 8) delay = 0;
-        if (Math.abs(delay - mt.t) * mt.pps < 8) delay = mt.t;
-        t.delay = snap(delay);
+        for (const edge of edges) {
+          if (Math.abs(delay - edge) * mt.pps < 8) { delay = edge; break; }
+          if (Math.abs(delay + len0 - edge) * mt.pps < 8) { delay = edge - len0; break; }
+        }
+        p.delay = snap(Math.max(0, delay));
       } else if (side === "l") {
-        ds = clamp(ds, Math.max(-off0, -delay0), len0 - 0.3);
-        t.offset = snap(off0 + ds);
-        t.delay = snap(delay0 + ds);
-        t.length = snap(len0 - ds);
+        ds = clamp(ds, Math.max(-off0, -delay0), len0 - MIN_CLIP);
+        p.offset = snap(off0 + ds);
+        p.delay = snap(delay0 + ds);
+        p.length = snap(len0 - ds);
       } else {
-        const len = clamp(snap(len0 + ds), 0.3, info.dur - off0);
-        t.length = len >= info.dur - off0 - 0.01 ? null : len;
+        const len = clamp(snap(len0 + ds), MIN_CLIP, info.dur - off0);
+        p.length = len >= info.dur - off0 - 0.01 ? null : len;
       }
       renderTimeline();
     },
-    () => { renderSide(); scheduleSave(); }
+    () => {
+      if (!moved) { mt.undo.pop(); renderHistoryButtons(); return; }
+      renderSide();
+      scheduleSave();
+    }
   );
 }
 
@@ -831,7 +902,7 @@ $("tlCanvas").addEventListener("dblclick", (e) => {
 // خط أداة القطع
 $("tlCanvas").addEventListener("pointermove", (e) => {
   const hover = $("tlHover");
-  const onClip = e.target.closest(".tl-clip[data-i]");
+  const onClip = e.target.closest(".tl-clip[data-i], .tl-audio");
   hover.hidden = !(mt.tool === "blade" && onClip);
   if (!hover.hidden) hover.style.left = `${snap(canvasTime(e)) * mt.pps}px`;
 });
@@ -850,8 +921,15 @@ $("tlCanvas").addEventListener("drop", (e) => {
 
 // ---------- المعاينة والتشغيل ----------
 const pool = new Map(); // لكل فيديو عنصر جاهز عشان التنقل بين القطع يبقى سريع
-const voiceEl = new Audio(), musicEl = new Audio();
-voiceEl.preload = musicEl.preload = "auto";
+const audioEls = new Map(); // عنصر صوت لكل قطعة من التعليق أو الموسيقى
+function audioFor(key) {
+  let el = audioEls.get(key);
+  if (!el) { el = new Audio(); el.preload = "auto"; audioEls.set(key, el); }
+  return el;
+}
+function pauseAudio() {
+  for (const el of audioEls.values()) el.pause();
+}
 
 function videoFor(url) {
   let v = pool.get(url);
@@ -928,8 +1006,7 @@ function seek(t) {
     mt.clock = performance.now();
     mt.clockT = mt.t;
     mt.activeKey = null;
-    voiceEl.pause();
-    musicEl.pause();
+    pauseAudio();
   } else syncPreview();
   followPlayhead();
 }
@@ -957,8 +1034,7 @@ function pause() {
   mt.playing = false;
   cancelAnimationFrame(mt.raf);
   for (const v of pool.values()) { v.pause(); v.muted = true; }
-  voiceEl.pause();
-  musicEl.pause();
+  pauseAudio();
   $("tpPlay").textContent = "▶︎";
   mt.t = snap(mt.t);
   syncPreview();
@@ -968,7 +1044,7 @@ const togglePlayback = () => (mt.playing ? pause() : play());
 function syncAudio(el, info, t, total, fade) {
   if (!info || t < info.t0 || t >= info.t1) { if (!el.paused) el.pause(); return; }
   if (el.getAttribute("src") !== info.url) el.src = info.url;
-  let vol = clamp(info.t.volume ?? 1, 0, 1);
+  let vol = clamp(info.volume, 0, 1);
   const end = Math.min(total, info.t1);
   if (fade && info.t.fade_out && end - t < 1.5) vol *= clamp((end - t) / 1.5, 0, 1);
   el.volume = vol;
@@ -991,8 +1067,17 @@ function tick() {
     v.volume = clamp(it.volume, 0, 1);
     if (v.paused) v.play().catch(() => {});
   }
-  syncAudio(voiceEl, trackInfo("voice"), mt.t, total, false);
-  syncAudio(musicEl, trackInfo("music"), mt.t, total, true);
+  const live = new Set();
+  for (const kind of ["voice", "music"]) {
+    const parts = trackParts(kind);
+    const last = parts.reduce((m, x) => (!m || x.t0 > m.t0 ? x : m), null);
+    for (const x of parts) {
+      const key = `${kind}${x.k}`;
+      live.add(key);
+      syncAudio(audioFor(key), x, mt.t, total, kind === "music" && x === last);
+    }
+  }
+  for (const [key, el] of audioEls) if (!live.has(key) && !el.paused) el.pause();
   drawPlayhead();
   updatePreviewOverlays();
   followPlayhead();
@@ -1155,22 +1240,22 @@ function renderSide() {
   $("mVoice").value = d.voice?.id || "";
   $("voiceOpts").hidden = !d.voice;
   if (d.voice) {
-    $("mVoiceVol").value = Math.round(d.voice.volume * 100);
-    $("voiceVolVal").textContent = `${Math.round(d.voice.volume * 100)}%`;
-    $("mVoiceDelay").value = d.voice.delay;
+    const vv = d.voice.parts?.[0]?.volume ?? d.voice.volume ?? 1;
+    $("mVoiceVol").value = Math.round(vv * 100);
+    $("voiceVolVal").textContent = `${Math.round(vv * 100)}%`;
   }
 
   $("mMusic").value = d.music?.id || "";
   $("musicOpts").hidden = !d.music;
   if (d.music) {
-    $("mMusicVol").value = Math.round(d.music.volume * 100);
-    $("musicVolVal").textContent = `${Math.round(d.music.volume * 100)}%`;
-    $("mMusicOffset").value = d.music.offset;
+    const mv = d.music.parts?.[0]?.volume ?? d.music.volume ?? 1;
+    $("mMusicVol").value = Math.round(mv * 100);
+    $("musicVolVal").textContent = `${Math.round(mv * 100)}%`;
     $("mMusicFade").checked = d.music.fade_out;
-    const info = trackInfo("music");
+    const end = trackEnd("music");
     const total = totalLength();
-    $("musicWarn").hidden = !info || info.t1 >= total - 0.05;
-    if (info) $("musicWarn").textContent = `⚠️ الموسيقى بتخلص عند ${fmtDuration(info.t1)} والفيديو طوله ${fmtDuration(total)}، فآخر الفيديو هيبقى من غير موسيقى.`;
+    $("musicWarn").hidden = !end || end >= total - 0.05;
+    $("musicWarn").textContent = `⚠️ الموسيقى بتخلص عند ${fmtDuration(end)} والفيديو طوله ${fmtDuration(total)}، فآخر الفيديو هيبقى من غير موسيقى.`;
   }
   $("renderBtn").disabled = d.clips.length === 0 || mt.project.render_status === "rendering";
   if (typeof renderBrandPanels === "function") renderBrandPanels();
@@ -1183,18 +1268,24 @@ $("mCoach").addEventListener("change", sideInput(null, (d) => { d.coach_id = $("
 $("mOutro").addEventListener("change", sideInput(null, (d) => (d.outro = $("mOutro").checked)));
 $("mOutroVol").addEventListener("input", sideInput("outroVol", (d) => (d.outro_volume = $("mOutroVol").value / 100)));
 $("mVoice").addEventListener("change", sideInput(null, (d) => {
-  d.voice = $("mVoice").value ? { id: $("mVoice").value, volume: d.voice?.volume ?? 1, delay: d.voice?.delay ?? 0, offset: 0, length: null, fade_out: false } : null;
+  const vol = d.voice?.parts?.[0]?.volume ?? 1, delay = d.voice?.parts?.[0]?.delay ?? 0;
+  d.voice = $("mVoice").value
+    ? { id: $("mVoice").value, volume: vol, delay: 0, offset: 0, length: null, fade_out: false, parts: [{ delay, offset: 0, length: null, volume: vol }] }
+    : null;
 }));
-$("mVoiceVol").addEventListener("input", sideInput("voiceVol", (d) => (d.voice.volume = $("mVoiceVol").value / 100)));
-$("mVoiceDelay").addEventListener("change", sideInput(null, (d) => (d.voice.delay = Math.max(0, Number($("mVoiceDelay").value) || 0))));
+// سلايدر الصوت في التاب بيغيّر كل قطع التعليق مرة واحدة
+function setTrackVolume(t, v) {
+  t.volume = v;
+  for (const p of t.parts || []) p.volume = v;
+}
+$("mVoiceVol").addEventListener("input", sideInput("voiceVol", (d) => setTrackVolume(d.voice, $("mVoiceVol").value / 100)));
 $("mMusic").addEventListener("change", sideInput(null, (d) => {
-  d.music = $("mMusic").value ? { id: $("mMusic").value, volume: d.music?.volume ?? 0.3, delay: 0, offset: 0, length: null, fade_out: d.music?.fade_out ?? true } : null;
+  const vol = d.music?.parts?.[0]?.volume ?? 0.3;
+  d.music = $("mMusic").value
+    ? { id: $("mMusic").value, volume: vol, delay: 0, offset: 0, length: null, fade_out: d.music?.fade_out ?? true, parts: [{ delay: 0, offset: 0, length: null, volume: vol }] }
+    : null;
 }));
-$("mMusicVol").addEventListener("input", sideInput("musicVol", (d) => (d.music.volume = $("mMusicVol").value / 100)));
-$("mMusicOffset").addEventListener("change", sideInput(null, (d) => {
-  d.music.offset = Math.max(0, Number($("mMusicOffset").value) || 0);
-  d.music.length = null;
-}));
+$("mMusicVol").addEventListener("input", sideInput("musicVol", (d) => setTrackVolume(d.music, $("mMusicVol").value / 100)));
 $("mMusicFade").addEventListener("change", sideInput(null, (d) => (d.music.fade_out = $("mMusicFade").checked)));
 
 // ---------- الحفظ ----------

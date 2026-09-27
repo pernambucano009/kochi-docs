@@ -148,9 +148,12 @@ def build_command(
     filters.append(f"{video_label}format=yuv420p[vout]")
     mix = ["[base]"]
 
-    for label, track in (("voice", voice), ("music", music)):
-        if not track:
-            continue
+    # التعليق والموسيقى ممكن يبقوا متقسّمين لكذا قطعة من نفس الملف
+    def as_list(t):
+        return [x for x in t if x] if isinstance(t, list) else ([t] if t else [])
+
+    audio = [(f"voice{n}", t) for n, t in enumerate(as_list(voice))] + [(f"music{n}", t) for n, t in enumerate(as_list(music))]
+    for label, track in audio:
         args += ["-ss", f"{max(0.0, track.offset):.3f}"]
         if track.length:
             args += ["-t", f"{track.length:.3f}"]
