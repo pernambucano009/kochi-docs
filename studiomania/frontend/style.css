@@ -342,3 +342,9 @@ header.top .btn.active { border-color: var(--accent); }
 .login .err { margin-top: 10px; }
 #keysForm .field input, #pwForm .field input { background: var(--surface-2); border: 1px solid var(--line); color: var(--text); padding: 8px 10px; border-radius: 10px; font: inherit; direction: ltr; }
 .ok-text { color: var(--ok); }
+
+/* ---------- ربط الصوت بالفيديو ---------- */
+.voice-link { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 14px; background: var(--surface-2); border-radius: 10px; padding: 8px 10px; margin-bottom: 12px; }
+.voice-link select, .new-project select { background: var(--surface); border: 1px solid var(--line); color: var(--text); padding: 6px 8px; border-radius: 8px; font: inherit; font-size: 13px; max-width: 260px; }
+.new-project { display: inline-flex; gap: 4px; align-items: center; }
+.linked-video { font-size: 13px; background: var(--surface-2); border-radius: 8px; padding: 4px 10px; }

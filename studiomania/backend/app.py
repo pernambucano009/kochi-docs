@@ -240,7 +240,16 @@ def video_row_to_dict(row: sqlite3.Row, clips_count: int) -> dict:
         "segments": segments_for(row["duration"], cuts, skipped),
         "clips_count": clips_count,
         "created_at": row["created_at"],
+        "voice": linked_voice(row["voice_id"]),
     }
+
+
+def linked_voice(voice_id: str | None) -> dict | None:
+    if not voice_id:
+        return None
+    with closing(db()) as conn:
+        r = conn.execute("SELECT id, name, duration FROM audio WHERE id = ? AND kind = 'voice'", (voice_id,)).fetchone()
+    return {"id": r["id"], "name": r["name"], "duration": r["duration"]} if r else None
 
 
 def get_video(conn: sqlite3.Connection, video_id: str) -> sqlite3.Row:
@@ -255,6 +264,9 @@ def clips_count(conn: sqlite3.Connection, video_id: str) -> int:
 
 
 init_db()
+with closing(db()) as _conn, _conn:
+    if "voice_id" not in {c[1] for c in _conn.execute("PRAGMA table_info(videos)")}:
+        _conn.execute("ALTER TABLE videos ADD COLUMN voice_id TEXT")
 auth = Auth(DB_PATH, DATA_DIR)
 app = FastAPI(title="StudioMania")
 
@@ -429,6 +441,56 @@ def save_cuts(video_id: str, body: CutsIn):
             (json.dumps(cuts), json.dumps(skipped), video_id),
         )
         return video_row_to_dict(get_video(conn, video_id), clips_count(conn, video_id))
+
+
+class VoiceLinkIn(BaseModel):
+    voice_id: str | None = None
+
+
+@app.put("/api/videos/{video_id}/voice")
+def link_voice(video_id: str, body: VoiceLinkIn):
+    """يربط الفيديو الخام بتسجيل صوتي من المكتبة (أو يفك الربط لو فاضي)."""
+    with closing(db()) as conn, conn:
+        get_video(conn, video_id)
+        if body.voice_id and not conn.execute(
+            "SELECT 1 FROM audio WHERE id = ? AND kind = 'voice'", (body.voice_id,)
+        ).fetchone():
+            raise HTTPException(400, "التسجيل الصوتي مش موجود في المكتبة")
+        conn.execute("UPDATE videos SET voice_id = ? WHERE id = ?", (body.voice_id or None, video_id))
+        return video_row_to_dict(get_video(conn, video_id), clips_count(conn, video_id))
+
+
+@app.get("/api/videos/{video_id}/montage-draft")
+def montage_draft(video_id: str, coach_id: str | None = None):
+    """يجمّع آخر فيديو مولَّد لكل قطعة من الفيديو ده بالترتيب، ومعاه الصوت المربوط."""
+    with closing(db()) as conn:
+        video = get_video(conn, video_id)
+        clips = conn.execute("SELECT id, idx FROM clips WHERE video_id = ? ORDER BY idx", (video_id,)).fetchall()
+        chosen, missing = [], []
+        for c in clips:
+            query = "SELECT id, coach_id, output_filename FROM generations WHERE clip_id = ? AND status = 'completed'"
+            args: list = [c["id"]]
+            if coach_id:
+                query += " AND coach_id = ?"
+                args.append(coach_id)
+            gens = conn.execute(query + " ORDER BY created_at DESC", args).fetchall()
+            gen = next((g for g in gens if g["output_filename"] and (GENERATED_DIR / g["output_filename"]).exists()), None)
+            if gen:
+                chosen.append(gen)
+            else:
+                missing.append(c["idx"])
+    if not coach_id and chosen:
+        coach_id = chosen[-1]["coach_id"]
+    voice = linked_voice(video["voice_id"])
+    return {
+        "video_id": video_id,
+        "name": video["name"],
+        "coach_id": coach_id,
+        "gen_ids": [g["id"] for g in chosen],
+        "missing": missing,
+        "clips_total": len(clips),
+        "voice": voice,
+    }
 
 
 @app.delete("/api/videos/{video_id}")
@@ -1034,6 +1096,7 @@ def delete_audio(audio_id: str):
         if row is None:
             raise HTTPException(404, "الملف غير موجود")
         conn.execute("DELETE FROM audio WHERE id = ?", (audio_id,))
+        conn.execute("UPDATE videos SET voice_id = NULL WHERE voice_id = ?", (audio_id,))
     (AUDIO_DIR / row["filename"]).unlink(missing_ok=True)
     return {"ok": True}
 
@@ -1095,6 +1158,7 @@ class TrackEdit(BaseModel):
 
 class ProjectIn(BaseModel):
     name: str
+    video_id: str | None = None  # الفيديو الخام اللي المشروع معمول منه
     coach_id: str | None = None
     clips: list[ClipEdit] = []
     voice: TrackEdit | None = None

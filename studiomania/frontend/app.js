@@ -69,7 +69,7 @@ function renderLibrary() {
           : "";
       return `<li data-id="${v.id}" class="${state.current?.id === v.id ? "active" : ""}">
         <div class="name">${escapeHtml(v.name)}</div>
-        <div class="meta"><span>${fmt(v.duration)}</span><span>${v.cuts.length} نقطة قطع</span>${badge}</div>
+        <div class="meta"><span>${fmt(v.duration)}</span><span>${v.cuts.length} نقطة قطع</span>${v.voice ? `<span class="badge ok" title="${escapeHtml(v.voice.name)}">🎙️ صوت مربوط</span>` : ""}${badge}</div>
       </li>`;
     })
     .join("");
@@ -155,7 +155,68 @@ function openVideo(id) {
   renderLibrary();
   renderEditor();
   loadClips();
+  loadVoiceLink();
 }
+
+// ---------- ربط التسجيل الصوتي بالفيديو ----------
+async function loadVoiceLink() {
+  const v = state.current;
+  if (!v) return;
+  const voices = await api("/api/audio?kind=voice");
+  $("voiceSelect").innerHTML = `<option value="">— مفيش —</option>` +
+    voices.map((a) => `<option value="${a.id}">${escapeHtml(a.name)} (${fmtDuration(a.duration)})</option>`).join("");
+  $("voiceSelect").value = v.voice?.id || "";
+  renderVoiceInfo();
+}
+
+function renderVoiceInfo() {
+  const v = state.current;
+  const info = $("voiceInfo");
+  if (!v?.voice) {
+    info.textContent = "اربطه عشان المونتاج يلاقيه جاهز";
+    return;
+  }
+  const diff = Math.abs(v.voice.duration - v.duration);
+  info.textContent = `طول الصوت ${fmtDuration(v.voice.duration)} · طول الفيديو ${fmtDuration(v.duration)}` +
+    (diff > 2 ? " ⚠️ مختلفين" : " ✓");
+}
+
+async function linkVoice(voiceId) {
+  const v = state.current;
+  try {
+    const saved = await api(`/api/videos/${v.id}/voice`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ voice_id: voiceId || null }),
+    });
+    v.voice = saved.voice;
+    const i = state.videos.findIndex((x) => x.id === v.id);
+    if (i >= 0) state.videos[i] = saved;
+    renderLibrary();
+    renderVoiceInfo();
+    toast(voiceId ? "✅ التسجيل اتربط بالفيديو" : "اتفك الربط");
+  } catch (err) {
+    toast(err.message, true);
+  }
+}
+
+$("voiceSelect").addEventListener("change", () => linkVoice($("voiceSelect").value));
+$("voiceUpload").addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  e.target.value = "";
+  if (!file) return;
+  const form = new FormData();
+  form.append("kind", "voice");
+  form.append("file", file);
+  try {
+    toast(`⏳ بيرفع ${file.name}...`);
+    const a = await api("/api/audio", { method: "POST", body: form });
+    await linkVoice(a.id);
+    await loadVoiceLink();
+  } catch (err) {
+    toast(`فشل الرفع: ${err.message}`, true);
+  }
+});
 
 function currentSegments() {
   const v = state.current;

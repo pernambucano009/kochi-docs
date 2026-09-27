@@ -1,7 +1,7 @@
 // StudioMania — الخطوة 6: المونتاج
 
 const mt = {
-  projects: [], project: null, sources: [], coaches: [], voices: [], music: [],
+  projects: [], project: null, sources: [], coaches: [], voices: [], music: [], videos: [],
   selected: -1, saveTimer: null, pollTimer: null,
 };
 const PROJECT_KEY = "studiomania.projectId";
@@ -12,9 +12,9 @@ function blankProject(name) {
 }
 
 async function initMontage() {
-  [mt.projects, mt.sources, mt.coaches, mt.voices, mt.music] = await Promise.all([
+  [mt.projects, mt.sources, mt.coaches, mt.voices, mt.music, mt.videos] = await Promise.all([
     api("/api/projects"), api("/api/montage/sources"), api("/api/coaches"),
-    api("/api/audio?kind=voice"), api("/api/audio?kind=music"),
+    api("/api/audio?kind=voice"), api("/api/audio?kind=music"), api("/api/videos"),
   ]);
   fillSelects();
   const wanted = mt.project?.id || storageGet(PROJECT_KEY);
@@ -23,6 +23,10 @@ async function initMontage() {
 }
 
 function fillSelects() {
+  const keep = $("newFromVideo").value;
+  $("newFromVideo").innerHTML = `<option value="">مشروع فاضي</option>` +
+    mt.videos.map((v) => `<option value="${v.id}">من فيديو: ${escapeHtml(v.name)}${v.voice ? " 🎙️" : ""}</option>`).join("");
+  $("newFromVideo").value = mt.videos.some((v) => v.id === keep) ? keep : "";
   $("mCoach").innerHTML = `<option value="">— اختار —</option>` +
     mt.coaches.map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join("");
   $("mVoice").innerHTML = `<option value="">بدون تعليق صوتي</option>` +
@@ -51,6 +55,7 @@ function openProject(p) {
   const d = mt.project.data;
   // المشاريع القديمة ممكن يكون فيها فيديوهات اتمسحت
   $("projectName").value = d.name;
+  renderLinkedVideo();
   $("mCoach").value = d.coach_id || "";
   renderAll();
   renderRender();
@@ -327,11 +332,24 @@ $("projectSelect").addEventListener("change", async () => {
 });
 $("newProject").onclick = async () => {
   await saveProject();
-  const name = `فيديو ${mt.projects.length + 1}`;
+  const videoId = $("newFromVideo").value;
+  let data = blankProject(`فيديو ${mt.projects.length + 1}`);
+  if (videoId) {
+    const draft = await api(`/api/videos/${videoId}/montage-draft`);
+    data = {
+      ...data,
+      name: draft.name,
+      video_id: videoId,
+      coach_id: draft.coach_id,
+      clips: draft.gen_ids.map((gen_id) => ({ gen_id, ...CLIP_DEFAULTS })),
+      voice: draft.voice ? { id: draft.voice.id, volume: 1, delay: 0, offset: 0, fade_out: false } : null,
+    };
+    reportDraft(draft);
+  }
   const p = await api("/api/projects", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(blankProject(name)),
+    body: JSON.stringify(data),
   });
   mt.projects.unshift(p);
   openProject(p);
@@ -390,5 +408,48 @@ async function pollRender() {
   if (fresh.render_status === "rendering") mt.pollTimer = setTimeout(pollRender, 2000);
   else if (fresh.render_status === "done") toast("✅ الفيديو جاهز");
 }
+
+// ---------- الربط بالفيديو الخام ----------
+function reportDraft(draft) {
+  const got = draft.gen_ids.length;
+  if (!draft.clips_total) return toast("الفيديو ده لسه متقطّعش", true);
+  if (draft.missing.length) {
+    toast(`جبت ${got} من ${draft.clips_total} قطعة. القطع رقم ${draft.missing.join("، ")} لسه متولّدتش`, true);
+  } else {
+    toast(`✅ جبت ${got} قطعة بالترتيب${draft.voice ? " والتعليق الصوتي بتاعهم" : ""}`);
+  }
+}
+
+function renderLinkedVideo() {
+  const d = mt.project?.data;
+  const video = d?.video_id && mt.videos.find((v) => v.id === d.video_id);
+  $("linkedVideo").hidden = $("refreshFromVideo").hidden = !d?.video_id;
+  if (d?.video_id) {
+    $("linkedVideo").textContent = video
+      ? `🔗 من فيديو: ${video.name}${video.voice ? ` · 🎙️ ${video.voice.name}` : ""}`
+      : "🔗 الفيديو الخام اتمسح";
+  }
+}
+
+$("refreshFromVideo").onclick = async () => {
+  const d = mt.project.data;
+  try {
+    const draft = await api(`/api/videos/${d.video_id}/montage-draft${d.coach_id ? `?coach_id=${d.coach_id}` : ""}`);
+    mt.sources = await api("/api/montage/sources");
+    // التعديلات (قص وزووم...) بتفضل على الفيديوهات اللي كانت موجودة
+    const old = new Map(d.clips.map((c) => [c.gen_id, c]));
+    d.clips = draft.gen_ids.map((gen_id) => old.get(gen_id) || { gen_id, ...CLIP_DEFAULTS });
+    if (draft.voice && d.voice?.id !== draft.voice.id) {
+      d.voice = { id: draft.voice.id, volume: d.voice?.volume ?? 1, delay: d.voice?.delay ?? 0, offset: 0, fade_out: false };
+    }
+    if (!d.coach_id) d.coach_id = draft.coach_id;
+    $("mCoach").value = d.coach_id || "";
+    mt.selected = -1;
+    reportDraft(draft);
+    changed();
+  } catch (err) {
+    toast(err.message, true);
+  }
+};
 
 viewHooks["6"] = initMontage;

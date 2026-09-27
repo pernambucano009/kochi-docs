@@ -50,6 +50,13 @@
         <h2 id="editorTitle"></h2>
         <button class="btn sm danger" id="deleteVideo">حذف الفيديو</button>
       </div>
+      <div class="voice-link">
+        <span>🎙️ التعليق الصوتي بتاع الفيديو ده:</span>
+        <select id="voiceSelect"></select>
+        <label class="btn sm">⬆ رفع تسجيل جديد
+          <input type="file" id="voiceUpload" accept=".mp3,.wav,.m4a,.aac,.ogg,.opus,.flac,audio/*" hidden></label>
+        <span class="muted" id="voiceInfo"></span>
+      </div>
 
       <div class="player">
         <video id="player" playsinline preload="metadata"></video>
@@ -176,8 +183,13 @@
   <main class="view" data-view="6" hidden>
     <div class="panel project-bar">
       <select id="projectSelect"></select>
-      <button class="btn sm" id="newProject">＋ مشروع جديد</button>
+      <span class="new-project">
+        <select id="newFromVideo" title="تعمل المشروع من فيديو خام؟"></select>
+        <button class="btn sm" id="newProject">＋ مشروع جديد</button>
+      </span>
       <input type="text" id="projectName" placeholder="اسم المشروع">
+      <span class="linked-video" id="linkedVideo" hidden></span>
+      <button class="btn sm" id="refreshFromVideo" hidden title="يجيب آخر الفيديوهات المولَّدة للفيديو ده والصوت المربوط بيه">🔄 حدّث من الفيديو</button>
       <span class="muted" id="saveState"></span>
       <span class="spacer"></span>
       <button class="btn sm danger" id="deleteProject">حذف المشروع</button>
