@@ -59,7 +59,7 @@ function renderBrandPanels() {
   $("logoX").value = l.x; $("logoXVal").textContent = `${l.x}%`;
   $("logoY").value = l.y; $("logoYVal").textContent = `${l.y}%`;
   $("logoOp").value = Math.round(l.opacity * 100); $("logoOpVal").textContent = `${Math.round(l.opacity * 100)}%`;
-  $("logoHideOutro").checked = !!l.hide_outro;
+  $("logoOnOutro").checked = l.on_outro !== false;
   updatePreviewOverlays();
 }
 
@@ -94,7 +94,7 @@ $("logoSize").addEventListener("input", brandInput(() => (logoCfg().size = Numbe
 $("logoX").addEventListener("input", brandInput(() => (logoCfg().x = Number($("logoX").value))));
 $("logoY").addEventListener("input", brandInput(() => (logoCfg().y = Number($("logoY").value))));
 $("logoOp").addEventListener("input", brandInput(() => (logoCfg().opacity = Number($("logoOp").value) / 100)));
-$("logoHideOutro").addEventListener("change", brandInput(() => (logoCfg().hide_outro = $("logoHideOutro").checked)));
+$("logoOnOutro").addEventListener("change", brandInput(() => (logoCfg().on_outro = $("logoOnOutro").checked)));
 
 $("logoUpload").addEventListener("change", async (e) => {
   const file = e.target.files[0];
@@ -125,7 +125,7 @@ function updatePreviewOverlays() {
   const W = PV_W, H = PV_H;
   const l = logoCfg();
   const img = $("pvLogo");
-  img.hidden = !(l.enabled && brand.logoUrl) || (l.hide_outro && mt.activeItem?.kind === "outro");
+  img.hidden = !(l.enabled && brand.logoUrl) || (l.on_outro === false && mt.activeItem?.kind === "outro");
   if (!img.hidden) {
     if (img.getAttribute("src") !== brand.logoUrl) img.src = brand.logoUrl;
     const w = (W * l.size) / 100;

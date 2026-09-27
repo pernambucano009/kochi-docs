@@ -1295,7 +1295,7 @@ class ProjectIn(BaseModel):
     outro: bool = True
     outro_volume: float = 1.0
     captions: dict = {}  # {enabled, template, font, size, y, words, color, highlight, ...}
-    logo: dict = {}  # {enabled, size, x, y, opacity, hide_outro}
+    logo: dict = {}  # {enabled, size, x, y, opacity, on_outro}
 
 
 def project_to_dict(r: sqlite3.Row) -> dict:
@@ -1418,7 +1418,7 @@ def project_logo(data: dict, total: float, outro_len: float) -> montage.Logo | N
     path = logo_path()
     if not cfg["enabled"] or not path:
         return None
-    until = total - outro_len if cfg["hide_outro"] and outro_len > 0 else None
+    until = total - outro_len if not cfg["on_outro"] and outro_len > 0 else None
     return montage.Logo(
         path, size=clamp(float(cfg["size"]), 3, 60), x=clamp(float(cfg["x"]), 0, 100),
         y=clamp(float(cfg["y"]), 0, 100), opacity=clamp(float(cfg["opacity"]), 0.1, 1), until=until,
@@ -1824,7 +1824,7 @@ threading.Thread(target=scheduler_loop, daemon=True).start()
 
 # ---------------------------------------------------------------- الكابشن واللوجو
 
-LOGO_DEFAULTS = {"enabled": True, "size": 18, "x": 92, "y": 4, "opacity": 0.9, "hide_outro": True}
+LOGO_DEFAULTS = {"enabled": True, "size": 18, "x": 92, "y": 4, "opacity": 0.9, "on_outro": True}
 
 
 def transcript_of(row: sqlite3.Row) -> dict:
