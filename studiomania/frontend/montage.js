@@ -310,7 +310,7 @@ function waveInfo(url) {
   return null;
 }
 
-function drawWave(canvas, url, offset, len, color) {
+function drawWave(canvas, url, offset, len, color, gain = 1) {
   const info = waveInfo(url);
   const w = canvas.clientWidth, h = canvas.clientHeight;
   if (!info || !w || !h) return;
@@ -323,7 +323,8 @@ function drawWave(canvas, url, offset, len, color) {
     const a = offset + (x / cw) * len, b = offset + ((x + 1) / cw) * len;
     let m = 0;
     for (let i = Math.floor(a * info.rate), e = Math.max(i + 1, Math.ceil(b * info.rate)); i < e && i < info.peaks.length; i++) m = Math.max(m, info.peaks[i]);
-    const bh = Math.max(1, m * (h - 4));
+    // الموجة بتكبر وتصغر مع علو الصوت زي كاب كات
+    const bh = Math.max(1, Math.min(1, m * gain) * (h - 4));
     g.fillRect(x, (h - bh) / 2, 1, bh);
   }
 }
@@ -384,6 +385,7 @@ function renderTimeline() {
             ${hasSound(it) ? `<canvas class="cw"></canvas>` : ""}
             <span class="nm" dir="auto">${label}</span><span class="du">${(it.t1 - it.t0).toFixed(1)}s</span>
             ${soundBadge(it)}
+            ${hasSound(it) ? volLine(it.volume) : ""}
             ${it.kind === "clip" ? `<b class="h l" data-h="l"></b><b class="h r" data-h="r"></b>` : ""}
           </div>`;
         })
@@ -393,7 +395,7 @@ function renderTimeline() {
   $("trkVideo").querySelectorAll(".tl-clip").forEach((el) => {
     const cv = el.querySelector("canvas.cw");
     const it = el.dataset.outro ? items.find((x) => x.kind === "outro") : items[Number(el.dataset.i)];
-    if (cv && it) drawWave(cv, it.url, it.in, it.t1 - it.t0, it.volume > 0 ? "#9fe3a8" : "#6b7180");
+    if (cv && it) drawWave(cv, it.url, it.in, it.t1 - it.t0, it.volume > 0 ? "#9fe3a8" : "#6b7180", it.volume);
   });
   const clips = d.clips.filter((c) => clipSource(c)?.has_audio);
   const allMuted = clips.length > 0 && clips.every((c) => c.volume === 0);
@@ -410,9 +412,9 @@ function renderTimeline() {
     }
     const sel = mt.sel?.kind === kind;
     el.innerHTML = `<div class="tl-audio ${kind} ${sel ? "selected" : ""}" data-track="${kind}" style="left:${info.t0 * mt.pps}px;width:${info.len * mt.pps}px">
-        <canvas></canvas><span class="nm" dir="auto">${escapeHtml(info.a.name)}</span>
+        <canvas></canvas><span class="nm" dir="auto">${escapeHtml(info.a.name)}</span>${volLine(info.t.volume ?? 1)}
         <b class="h l" data-h="l"></b><b class="h r" data-h="r"></b></div>`;
-    drawWave(el.querySelector("canvas"), info.url, info.offset, info.len, color);
+    drawWave(el.querySelector("canvas"), info.url, info.offset, info.len, color, info.t.volume ?? 1);
   }
 
   $("trkCaps").innerHTML = captionBlocks()
@@ -433,6 +435,51 @@ function soundBadge(it) {
   const icon = v === 0 ? "🔇" : v < 60 ? "🔉" : "🔊";
   return `<button class="snd ${v === 0 ? "off" : ""}" data-mute title="${v === 0 ? "الصوت مكتوم — دوس ترجّعه" : "الفيديو ده فيه صوت — دوس تكتمه"}">${icon}${v === 0 ? "" : ` ${v}%`}</button>`;
 }
+// خط الصوت جوه القطعة: تسحبه لفوق يعلّي ولتحت يوطّي (من 0% لـ 200%)
+const VOL_MAX = 2;
+function volLine(vol) {
+  const pct = Math.round(vol * 100);
+  return `<i class="vline ${pct === 0 ? "zero" : ""} ${vol > 1.4 ? "hi" : ""}" data-vol style="bottom:${(clamp(vol, 0, VOL_MAX) / VOL_MAX) * 100}%"
+    title="اسحب لفوق أو لتحت عشان تعلّي أو توطّي الصوت · دبل كليك يرجّعه 100%"><em>${pct}%</em></i>`;
+}
+function volTarget(el) {
+  const d = mt.project.data;
+  if (el.dataset.track) return { get: () => d[el.dataset.track].volume ?? 1, set: (v) => (d[el.dataset.track].volume = v) };
+  if (el.dataset.outro) return { get: () => d.outro_volume, set: (v) => (d.outro_volume = v) };
+  const c = d.clips[Number(el.dataset.i)];
+  return { get: () => c.volume, set: (v) => (c.volume = v) };
+}
+function dragVolume(e, box) {
+  pause();
+  pushHistory();
+  const target = volTarget(box);
+  const line = box.querySelector(".vline");
+  const cv = box.querySelector("canvas");
+  const v0 = target.get();
+  // المساحة اللي الخط بيتحرك فيها هي ارتفاع القطعة
+  const h = Math.max(20, box.clientHeight - 6);
+  box.classList.add("vol-drag");
+  drag(
+    e,
+    (dx, dy) => {
+      let v = clamp(v0 - (dy / h) * VOL_MAX, 0, VOL_MAX);
+      v = Math.round(v * 20) / 20; // خطوات 5%
+      if (Math.abs(v - 1) < 0.04) v = 1; // يلزق على 100%
+      target.set(v);
+      line.style.bottom = `${(v / VOL_MAX) * 100}%`;
+      line.classList.toggle("zero", v === 0);
+      line.classList.toggle("hi", v > 1.4);
+      line.querySelector("em").textContent = `${Math.round(v * 100)}%`;
+    },
+    () => {
+      box.classList.remove("vol-drag");
+      // دوسة من غير سحب: منرسمش من جديد عشان الدبل كليك يشتغل
+      if (target.get() === v0) { mt.undo.pop(); renderHistoryButtons(); return; }
+      changed();
+    }
+  );
+}
+
 const lastVolume = new WeakMap();
 function toggleMute(target) {
   // target: قطعة من المونتاج، أو "outro"
@@ -605,6 +652,9 @@ $("tlCanvas").addEventListener("pointerdown", (e) => {
   const handle = e.target.closest("[data-h]")?.dataset.h;
   e.preventDefault();
 
+  if ((clipEl || audEl) && e.target.closest("[data-vol]")) {
+    return dragVolume(e, clipEl || audEl);
+  }
   if (clipEl && e.target.closest("[data-mute]")) {
     toggleMute(clipEl.dataset.outro ? "outro" : mt.project.data.clips[Number(clipEl.dataset.i)]);
     return;
@@ -738,6 +788,15 @@ function moveTrack(e, kind, side) {
     () => { renderSide(); scheduleSave(); }
   );
 }
+
+// دبل كليك على خط الصوت: يرجّعه 100%
+$("tlCanvas").addEventListener("dblclick", (e) => {
+  const box = e.target.closest("[data-vol]") && e.target.closest(".tl-clip, .tl-audio");
+  if (!box) return;
+  pushHistory();
+  volTarget(box).set(1);
+  changed();
+});
 
 // خط أداة القطع
 $("tlCanvas").addEventListener("pointermove", (e) => {

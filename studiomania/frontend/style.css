@@ -367,6 +367,14 @@ button.ic.play:hover { background: #e6e6e6; }
 .tl-heads .h-video { justify-content: space-between; }
 .mute-all { font-size: 13px; min-width: 26px !important; height: 24px !important; }
 .mute-all.off { background: #b3262b !important; color: #fff; }
+.vline { position: absolute; left: 0; right: 0; height: 9px; margin-bottom: -4px; z-index: 3; cursor: ns-resize; }
+.vline::before { content: ""; position: absolute; left: 0; right: 0; top: 4px; height: 1px; background: rgba(255,255,255,.75); box-shadow: 0 0 2px #000; }
+.vline:hover::before, .vol-drag .vline::before { height: 2px; top: 3px; background: #fff; }
+.vline.zero::before { background: #ff5a5a; }
+.vline em { display: none; position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); font-style: normal; font-size: 11px; font-weight: 700; color: #000; background: #fff; padding: 0 6px; border-radius: 4px; white-space: nowrap; pointer-events: none; }
+.vline:hover em, .vol-drag .vline em { display: block; }
+.vline.zero em { bottom: 2px; }
+.vline.hi em { bottom: auto; top: 6px; }
 .tl-keys { margin: 0; padding: 5px 10px; font-size: 11px; color: #7a8090; border-top: 1px solid #262a33; }
 .sliders { flex: 1; min-width: 220px; display: flex; flex-direction: column; gap: 6px; }
 .sliders h3 { margin: 0 0 4px; font-size: 14px; }
