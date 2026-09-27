@@ -194,12 +194,14 @@ $("clipPicker").addEventListener("click", (e) => {
     const usable = gen.clips.filter((c) => c.video_id === allBtn.dataset.all && c.duration >= MIN_REF);
     const all = usable.every((c) => gen.selected.has(c.id));
     usable.forEach((c) => (all ? gen.selected.delete(c.id) : gen.selected.add(c.id)));
+    if (!all) autoPickCoach(usable.map((c) => c.id));
     return renderClipPicker();
   }
   const pick = e.target.closest(".clip-pick");
   if (!pick || pick.classList.contains("too-short")) return;
   const id = pick.dataset.id;
   gen.selected.has(id) ? gen.selected.delete(id) : gen.selected.add(id);
+  autoPickCoach([id]);
   renderClipPicker();
 });
 // معاينة القطعة لما الماوس يقف عليها
@@ -209,12 +211,30 @@ $("clipPicker").addEventListener("mouseout", (e) => {
   if (v && !e.relatedTarget?.closest?.(".clip-pick")) { v.pause(); v.currentTime = 0.5; }
 });
 
+// لو الفيديو مربوط بمدرب، نختاره لوحده
+function autoPickCoach(clipIds) {
+  const clip = gen.clips.find((c) => clipIds.includes(c.id) && gen.selected.has(c.id) && c.video_coach_id);
+  if (!clip || clip.video_coach_id === gen.coachId) return;
+  const btn = document.querySelector(`.coach-pick[data-id="${clip.video_coach_id}"]`);
+  if (!btn) return;
+  gen.coachId = clip.video_coach_id;
+  document.querySelectorAll(".coach-pick").forEach((x) => x.classList.toggle("selected", x === btn));
+  toast(`🧑‍🏫 اتختار ${btn.textContent.trim()} لوحده (مربوط بالفيديو)`);
+}
+
+function coachMismatch() {
+  const chosen = gen.clips.filter((c) => gen.selected.has(c.id) && c.video_coach_id && c.video_coach_id !== gen.coachId);
+  return chosen.length;
+}
+
 function updateGenerateBtn() {
   const n = gen.selected.size;
   $("clipPickCount").textContent = n ? `${n} مختارة` : "";
   const btn = $("generateBtn");
   btn.disabled = !n || !gen.coachId || !gen.promptId;
   btn.textContent = n ? `✨ ولّد ${n} فيديو` : "✨ ولّد";
+  const mis = coachMismatch();
+  $("clipPickCount").textContent += mis ? ` · ⚠️ ${mis} قطعة مربوطة بمدرب تاني` : "";
 }
 
 $("generateBtn").onclick = async () => {

@@ -69,7 +69,7 @@ function renderLibrary() {
           : "";
       return `<li data-id="${v.id}" class="${state.current?.id === v.id ? "active" : ""}">
         <div class="name">${escapeHtml(v.name)}</div>
-        <div class="meta"><span>${fmt(v.duration)}</span><span>${v.cuts.length} نقطة قطع</span>${v.voice ? `<span class="badge ok" title="${escapeHtml(v.voice.name)}">🎙️ صوت مربوط</span>` : ""}${badge}</div>
+        <div class="meta"><span>${fmt(v.duration)}</span><span>${v.cuts.length} نقطة قطع</span>${v.voice ? `<span class="badge ok" title="${escapeHtml(v.voice.name)}">🎙️ صوت مربوط</span>` : ""}${v.coach ? `<span class="badge ok">🧑‍🏫 ${escapeHtml(v.coach.name)}</span>` : ""}${badge}</div>
       </li>`;
     })
     .join("");
@@ -156,7 +156,47 @@ function openVideo(id) {
   renderEditor();
   loadClips();
   loadVoiceLink();
+  loadCoachLink();
 }
+
+// ---------- ربط المدرب بالفيديو ----------
+async function loadCoachLink() {
+  const v = state.current;
+  if (!v) return;
+  const coaches = await api("/api/coaches");
+  $("coachLinkSelect").innerHTML = `<option value="">— مفيش —</option>` +
+    coaches.map((c) => `<option value="${c.id}">${escapeHtml(c.name)}${c.outro_url ? "" : " (من غير أوترو)"}</option>`).join("");
+  $("coachLinkSelect").value = v.coach?.id || "";
+  renderCoachLink();
+}
+
+function renderCoachLink() {
+  const c = state.current?.coach;
+  $("coachLinkImg").hidden = !c;
+  if (c) $("coachLinkImg").src = c.image_url;
+  $("coachLinkInfo").textContent = !c
+    ? "اربطه عشان صورته تتبعت لـ Seedance والأوترو بتاعه يتحط في الآخر لوحدهم"
+    : c.has_outro ? "✓ صورته للتوليد والأوترو بتاعه في الآخر" : "⚠️ المدرب ده مالوش أوترو، ضيفه من صفحة المدربين";
+}
+
+$("coachLinkSelect").addEventListener("change", async () => {
+  const v = state.current;
+  try {
+    const saved = await api(`/api/videos/${v.id}/coach`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ coach_id: $("coachLinkSelect").value || null }),
+    });
+    v.coach = saved.coach;
+    const i = state.videos.findIndex((x) => x.id === v.id);
+    if (i >= 0) state.videos[i] = saved;
+    renderLibrary();
+    renderCoachLink();
+    toast(saved.coach ? `✅ الفيديو اتربط بـ ${saved.coach.name}` : "اتفك الربط");
+  } catch (err) {
+    toast(err.message, true);
+  }
+});
 
 // ---------- ربط التسجيل الصوتي بالفيديو ----------
 async function loadVoiceLink() {

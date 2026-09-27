@@ -245,7 +245,18 @@ def video_row_to_dict(row: sqlite3.Row, clips_count: int) -> dict:
         "clips_count": clips_count,
         "created_at": row["created_at"],
         "voice": linked_voice(row["voice_id"]),
+        "coach": linked_coach(row["coach_id"]),
     }
+
+
+def linked_coach(coach_id: str | None) -> dict | None:
+    if not coach_id:
+        return None
+    with closing(db()) as conn:
+        r = conn.execute("SELECT id, name, image_filename, outro_filename FROM coaches WHERE id = ?", (coach_id,)).fetchone()
+    if not r:
+        return None
+    return {"id": r["id"], "name": r["name"], "image_url": f"/media/coaches/{r['image_filename']}", "has_outro": bool(r["outro_filename"])}
 
 
 def linked_voice(voice_id: str | None) -> dict | None:
@@ -271,6 +282,8 @@ init_db()
 with closing(db()) as _conn, _conn:
     if "voice_id" not in {c[1] for c in _conn.execute("PRAGMA table_info(videos)")}:
         _conn.execute("ALTER TABLE videos ADD COLUMN voice_id TEXT")
+    if "coach_id" not in {c[1] for c in _conn.execute("PRAGMA table_info(videos)")}:
+        _conn.execute("ALTER TABLE videos ADD COLUMN coach_id TEXT")
     if "transcript" not in {c[1] for c in _conn.execute("PRAGMA table_info(audio)")}:
         _conn.execute("ALTER TABLE audio ADD COLUMN transcript TEXT")
     # لو البرنامج اتقفل وهو بيكتب الكلام، نعلّمه كفاشل عشان تعيد
@@ -472,11 +485,28 @@ def link_voice(video_id: str, body: VoiceLinkIn):
         return video_row_to_dict(get_video(conn, video_id), clips_count(conn, video_id))
 
 
+class CoachLinkIn(BaseModel):
+    coach_id: str | None = None
+
+
+@app.put("/api/videos/{video_id}/coach")
+def link_coach(video_id: str, body: CoachLinkIn):
+    """يربط الفيديو الخام بمدرب: صورته للتوليد والأوترو بتاعه للمونتاج."""
+    with closing(db()) as conn, conn:
+        get_video(conn, video_id)
+        if body.coach_id:
+            get_coach(conn, body.coach_id)
+        conn.execute("UPDATE videos SET coach_id = ? WHERE id = ?", (body.coach_id or None, video_id))
+        return video_row_to_dict(get_video(conn, video_id), clips_count(conn, video_id))
+
+
 @app.get("/api/videos/{video_id}/montage-draft")
 def montage_draft(video_id: str, coach_id: str | None = None):
     """يجمّع آخر فيديو مولَّد لكل قطعة من الفيديو ده بالترتيب، ومعاه الصوت المربوط."""
     with closing(db()) as conn:
         video = get_video(conn, video_id)
+        # المدرب المربوط بالفيديو هو الأساس، إلا لو اتحدد غيره
+        coach_id = coach_id or video["coach_id"]
         clips = conn.execute("SELECT id, idx FROM clips WHERE video_id = ? ORDER BY idx", (video_id,)).fetchall()
         chosen, missing = [], []
         for c in clips:
@@ -573,7 +603,7 @@ def split_video(video_id: str):
 @app.get("/api/clips")
 def list_clips(video_id: str | None = None):
     query = (
-        "SELECT c.*, v.name AS video_name FROM clips c JOIN videos v ON v.id = c.video_id"
+        "SELECT c.*, v.name AS video_name, v.coach_id AS video_coach_id FROM clips c JOIN videos v ON v.id = c.video_id"
         + (" WHERE c.video_id = ?" if video_id else "")
         + " ORDER BY v.created_at DESC, c.idx"
     )
@@ -584,6 +614,7 @@ def list_clips(video_id: str | None = None):
             "id": r["id"],
             "video_id": r["video_id"],
             "video_name": r["video_name"],
+            "video_coach_id": r["video_coach_id"],
             "index": r["idx"],
             "start": r["start"],
             "end": r["end"],
@@ -713,6 +744,7 @@ def delete_coach(coach_id: str):
     with closing(db()) as conn, conn:
         row = get_coach(conn, coach_id)
         conn.execute("DELETE FROM coaches WHERE id = ?", (coach_id,))
+        conn.execute("UPDATE videos SET coach_id = NULL WHERE coach_id = ?", (coach_id,))
         in_use = {r[0] for r in conn.execute("SELECT coach_image FROM generations")}
     if row["image_filename"] not in in_use:
         (COACHES_DIR / row["image_filename"]).unlink(missing_ok=True)
