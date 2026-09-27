@@ -15,6 +15,35 @@ const mt = {
   pps: 60, tool: "select", undo: [], redo: [], histKey: null, histAt: 0,
 };
 
+// الاختيار: mt.sel هي القطعة الأساسية، وmt.extra القطع التانية اللي اتختارت بـ Ctrl أو بالتحديد
+let selPrimary = null;
+mt.extra = [];
+Object.defineProperty(mt, "sel", {
+  get: () => selPrimary,
+  set: (v) => { selPrimary = v; mt.extra = []; }, // اختيار عادي بيلغي الاختيار المتعدد
+});
+const selKey = (x) => (x ? `${x.kind}:${x.i ?? x.p ?? ""}` : "");
+function allSelected() {
+  const out = [], seen = new Set();
+  for (const x of [...mt.extra, mt.sel]) if (x && !seen.has(selKey(x))) { seen.add(selKey(x)); out.push(x); }
+  return out;
+}
+const isSel = (x) => allSelected().some((y) => selKey(y) === selKey(x));
+function setSelection(list) {
+  selPrimary = list[list.length - 1] || null;
+  mt.extra = list.slice(0, -1);
+}
+function selOfEl(el) {
+  if (el.dataset.track) return { kind: el.dataset.track, p: Number(el.dataset.p) };
+  if (el.dataset.outro) return { kind: "outro" };
+  return { kind: "clip", i: Number(el.dataset.i) };
+}
+function elOfSel(x) {
+  if (x.kind === "clip") return $("trkVideo").querySelector(`.tl-clip[data-i="${x.i}"]`);
+  if (x.kind === "outro") return $("trkVideo").querySelector(".tl-clip[data-outro]");
+  return document.querySelector(`.tl-audio[data-track="${x.kind}"][data-p="${x.p}"]`);
+}
+
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const snap = (t) => Math.round(t * FPS) / FPS;
 const isMontage = () => !document.querySelector('.view[data-view="6"]').hidden;
@@ -164,8 +193,12 @@ function trackEnd(kind) {
 
 function fixSelection() {
   const s = mt.sel;
-  if (!s || !mt.project) return;
+  if (!mt.project) return;
   const d = mt.project.data;
+  if (!s) { mt.extra = []; return; }
+  const valid = (s) => !((s.kind === "clip" && !d.clips[s.i]) || ((s.kind === "voice" || s.kind === "music") && !d[s.kind]?.parts?.[s.p]) ||
+      (s.kind === "outro" && !currentOutro()));
+  mt.extra = mt.extra.filter(valid);
   if ((s.kind === "clip" && !d.clips[s.i]) || ((s.kind === "voice" || s.kind === "music") && !d[s.kind]?.parts?.[s.p]) ||
       (s.kind === "outro" && !currentOutro())) mt.sel = null;
 }
@@ -391,7 +424,7 @@ function renderTimeline() {
     ? items
         .map((it) => {
           const w = (it.t1 - it.t0) * mt.pps;
-          const sel = (it.kind === "clip" && mt.sel?.kind === "clip" && mt.sel.i === it.i) || (it.kind === "outro" && mt.sel?.kind === "outro");
+          const sel = isSel(it.kind === "clip" ? { kind: "clip", i: it.i } : { kind: "outro" });
           const strip = it.kind === "clip" ? stripHtml("gen", it.s?.id, it.in, w) : stripHtml("outro", it.coach.id, 0, w);
           const label = it.kind === "clip" ? (it.s ? escapeHtml(it.s.label) : "⚠️ الفيديو اتمسح") : `🎬 أوترو ${escapeHtml(it.coach.name)}`;
           return `<div class="tl-clip ${it.kind} ${sel ? "selected" : ""} ${it.s || it.kind === "outro" ? "" : "missing"}"
@@ -428,7 +461,7 @@ function renderTimeline() {
     }
     el.innerHTML = parts
       .map((x) => {
-        const sel = mt.sel?.kind === kind && mt.sel.p === x.k;
+        const sel = isSel({ kind, p: x.k });
         return `<div class="tl-audio ${kind} ${sel ? "selected" : ""}" data-track="${kind}" data-p="${x.k}" style="left:${x.t0 * mt.pps}px;width:${x.len * mt.pps}px">
           <canvas></canvas><span class="nm" dir="auto">${escapeHtml(x.a.name)}</span>${volLine(x.volume)}
           <b class="h l" data-h="l"></b><b class="h r" data-h="r"></b></div>`;
@@ -444,7 +477,8 @@ function renderTimeline() {
     .map((g) => `<div class="tl-cap" data-t="${g.t0}" style="left:${g.t0 * mt.pps}px;width:${Math.max(2, (g.t1 - g.t0) * mt.pps)}px">${escapeHtml(g.text)}</div>`)
     .join("");
 
-  $("totalLabel").textContent = total ? `${d.clips.length} قطعة` : "";
+  const nSel = allSelected().length;
+  $("totalLabel").textContent = total ? `${d.clips.length} قطعة${nSel > 1 ? ` · ✔ ${nSel} مختارين` : ""}` : "";
   drawPlayhead();
 }
 
@@ -475,32 +509,54 @@ function volTarget(el) {
   const c = d.clips[Number(el.dataset.i)];
   return { get: () => c.volume, set: (v) => (c.volume = v) };
 }
+function volTargetOf(x) {
+  const d = mt.project.data;
+  if (x.kind === "voice" || x.kind === "music") {
+    const part = d[x.kind].parts[x.p];
+    return { get: () => part.volume ?? 1, set: (v) => (part.volume = v) };
+  }
+  if (x.kind === "outro") return { get: () => d.outro_volume, set: (v) => (d.outro_volume = v) };
+  const c = d.clips[x.i];
+  return { get: () => c.volume, set: (v) => (c.volume = v) };
+}
+function showVolLine(el, v) {
+  const line = el?.querySelector(".vline");
+  if (!line) return;
+  line.style.bottom = `${(v / VOL_MAX) * 100}%`;
+  line.classList.toggle("zero", v === 0);
+  line.classList.toggle("hi", v > 1.4);
+  line.querySelector("em").textContent = `${Math.round(v * 100)}%`;
+}
+
+// لو فيه كذا قطعة مختارة، الخط بيعلّي أو يوطّي صوتهم كلهم بنفس المقدار
 function dragVolume(e, box) {
   pause();
   pushHistory();
-  const target = volTarget(box);
-  const line = box.querySelector(".vline");
-  const cv = box.querySelector("canvas");
-  const v0 = target.get();
+  const me = selOfEl(box);
+  const group = isSel(me) ? allSelected().filter((x) => elOfSel(x)?.querySelector(".vline")) : [me];
+  const items = group.map((x) => ({ x, el: elOfSel(x), target: volTargetOf(x) })).map((o) => ({ ...o, v0: o.target.get() }));
+  const mine = items.find((o) => selKey(o.x) === selKey(me)) || items[0];
   // المساحة اللي الخط بيتحرك فيها هي ارتفاع القطعة
   const h = Math.max(20, box.clientHeight - 6);
-  box.classList.add("vol-drag");
+  items.forEach((o) => o.el?.classList.add("vol-drag"));
   drag(
     e,
     (dx, dy) => {
-      let v = clamp(v0 - (dy / h) * VOL_MAX, 0, VOL_MAX);
+      let v = clamp(mine.v0 - (dy / h) * VOL_MAX, 0, VOL_MAX);
       v = Math.round(v * 20) / 20; // خطوات 5%
-      if (Math.abs(v - 1) < 0.04) v = 1; // يلزق على 100%
-      target.set(v);
-      line.style.bottom = `${(v / VOL_MAX) * 100}%`;
-      line.classList.toggle("zero", v === 0);
-      line.classList.toggle("hi", v > 1.4);
-      line.querySelector("em").textContent = `${Math.round(v * 100)}%`;
+      if (items.length === 1 && Math.abs(v - 1) < 0.04) v = 1; // يلزق على 100%
+      const delta = v - mine.v0;
+      for (const o of items) {
+        const nv = Math.round(clamp(o.v0 + delta, 0, VOL_MAX) * 20) / 20;
+        o.target.set(nv);
+        showVolLine(o.el, nv);
+      }
+      if (items.length > 1) mine.el.querySelector(".vline em").textContent = `${Math.round(v * 100)}% (${delta >= 0 ? "+" : "−"}${Math.round(Math.abs(delta) * 100)}%)`;
     },
     () => {
-      box.classList.remove("vol-drag");
+      items.forEach((o) => o.el?.classList.remove("vol-drag"));
       // دوسة من غير سحب: منرسمش من جديد عشان الدبل كليك يشتغل
-      if (target.get() === v0) { mt.undo.pop(); renderHistoryButtons(); return; }
+      if (items.every((o) => o.target.get() === o.v0)) { mt.undo.pop(); renderHistoryButtons(); return; }
       changed();
     }
   );
@@ -641,16 +697,18 @@ function splitAt(t, target) {
 $("tlSplit").onclick = $("edSplit").onclick = () => splitAt(mt.t);
 
 function deleteSelected() {
-  const s = mt.sel;
-  if (!s) return;
+  const list = allSelected();
+  if (!list.length) return;
   pushHistory();
   const d = mt.project.data;
-  if (s.kind === "clip") d.clips.splice(s.i, 1);
-  else if (s.kind === "voice" || s.kind === "music") {
-    d[s.kind].parts.splice(s.p, 1);
-    if (!d[s.kind].parts.length) d[s.kind] = null;
+  // من الآخر للأول عشان الأرقام متتلخبطش
+  const desc = (k) => list.filter((x) => x.kind === k).map((x) => x.i ?? x.p).sort((a, b) => b - a);
+  for (const i of desc("clip")) d.clips.splice(i, 1);
+  for (const kind of ["voice", "music"]) {
+    for (const k of desc(kind)) d[kind].parts.splice(k, 1);
+    if (d[kind] && !d[kind].parts.length) d[kind] = null;
   }
-  else if (s.kind === "outro") d.outro = false;
+  if (list.some((x) => x.kind === "outro")) d.outro = false;
   mt.sel = null;
   changed();
 }
@@ -706,20 +764,32 @@ $("tlCanvas").addEventListener("pointerdown", (e) => {
   // أداة القطع ليها الأولوية على أي حاجة جوه القطعة
   if (mt.tool === "blade" && clipEl?.dataset.i != null) { splitAt(snap(t)); return; }
   if (mt.tool === "blade" && audEl) { splitAt(snap(t), { kind: audEl.dataset.track, p: Number(audEl.dataset.p) }); return; }
-  if ((clipEl || audEl) && e.target.closest("[data-vol]")) {
-    // خط الصوت بيختار القطعة كمان
-    const box = clipEl || audEl;
-    mt.sel = audEl ? { kind: audEl.dataset.track, p: Number(audEl.dataset.p) }
-      : box.dataset.outro ? { kind: "outro" } : { kind: "clip", i: Number(box.dataset.i) };
-    document.querySelectorAll(".tl-clip.selected, .tl-audio.selected").forEach((x) => x.classList.remove("selected"));
-    box.classList.add("selected");
+  // Ctrl (أو ⌘) + دوسة: تضيف القطعة للاختيار أو تشيلها منه
+  if ((clipEl || audEl) && (e.ctrlKey || e.metaKey)) {
+    const x = selOfEl(clipEl || audEl);
+    setSelection(isSel(x) ? allSelected().filter((y) => selKey(y) !== selKey(x)) : [...allSelected(), x]);
+    renderTimeline();
     renderInspector();
+    return;
+  }
+  if ((clipEl || audEl) && e.target.closest("[data-vol]")) {
+    // خط الصوت بيختار القطعة كمان (ولو هي من ضمن اختيار متعدد، بيفضل زي ما هو)
+    const box = clipEl || audEl;
+    if (!isSel(selOfEl(box))) {
+      mt.sel = selOfEl(box);
+      document.querySelectorAll(".tl-clip.selected, .tl-audio.selected").forEach((x) => x.classList.remove("selected"));
+      box.classList.add("selected");
+      renderInspector();
+    }
     return dragVolume(e, box);
   }
   if (clipEl && e.target.closest("[data-mute]")) {
     toggleMute(clipEl.dataset.outro ? "outro" : mt.project.data.clips[Number(clipEl.dataset.i)]);
     return;
   }
+
+  // سحب في مكان فاضي: مربع تحديد يختار كل القطع اللي جواه
+  if (!clipEl && !audEl && !e.target.closest("#tlRuler, .tl-playhead, .tl-cap")) return marquee(e, t);
 
   // المسطرة ورأس المؤشر: تحريك المؤشر بالسحب
   if (e.target.closest("#tlRuler, .tl-playhead") || (!clipEl && !audEl)) {
@@ -751,6 +821,37 @@ $("tlCanvas").addEventListener("pointerdown", (e) => {
     return moveTrack(e, kind, k, handle);
   }
 });
+
+function marquee(e, t) {
+  const canvas = $("tlCanvas");
+  const base = e.ctrlKey || e.metaKey ? allSelected() : [];
+  let box = null;
+  drag(
+    e,
+    (dx, dy, ev) => {
+      if (!box && Math.hypot(dx, dy) < 5) return;
+      if (!box) { box = document.createElement("div"); box.className = "tl-marquee"; canvas.append(box); }
+      const cr = canvas.getBoundingClientRect();
+      const x1 = Math.min(e.clientX, ev.clientX), x2 = Math.max(e.clientX, ev.clientX);
+      const y1 = Math.min(e.clientY, ev.clientY), y2 = Math.max(e.clientY, ev.clientY);
+      Object.assign(box.style, { left: `${x1 - cr.left}px`, top: `${y1 - cr.top}px`, width: `${x2 - x1}px`, height: `${y2 - y1}px` });
+      const hit = [...canvas.querySelectorAll(".tl-clip, .tl-audio")]
+        .filter((el) => { const r = el.getBoundingClientRect(); return r.right > x1 && r.left < x2 && r.bottom > y1 && r.top < y2; })
+        .map(selOfEl);
+      const keys = new Set(base.map(selKey));
+      setSelection([...base, ...hit.filter((x) => !keys.has(selKey(x)))]);
+      canvas.querySelectorAll(".tl-clip, .tl-audio").forEach((el) => el.classList.toggle("selected", isSel(selOfEl(el))));
+    },
+    () => {
+      if (box) { box.remove(); renderTimeline(); renderInspector(); return; }
+      // دوسة من غير سحب: تنقل المؤشر وتلغي الاختيار
+      mt.sel = null;
+      seek(t);
+      renderTimeline();
+      renderInspector();
+    }
+  );
+}
 
 function trimClip(e, i, side) {
   pause();
@@ -1156,11 +1257,17 @@ document.addEventListener("keydown", (e) => {
   else if (e.key === "End") { pause(); seek(totalLength()); }
   else if (ctrl && code === "KeyZ") e.shiftKey ? redoEdit() : undoEdit();
   else if (ctrl && code === "KeyY") redoEdit();
+  else if (ctrl && code === "KeyA") {
+    setSelection([...document.querySelectorAll("#tlCanvas .tl-clip, #tlCanvas .tl-audio")].map(selOfEl));
+    renderTimeline();
+    renderInspector();
+  }
   else if (ctrl && code === "KeyB") splitAt(mt.t);
   else if (ctrl) done = false;
   else if (code === "KeyS") splitAt(mt.t);
   else if (code === "KeyB" || code === "KeyC") setTool("blade");
-  else if (code === "KeyV" || code === "KeyA" || e.key === "Escape") setTool("select");
+  else if (e.key === "Escape") { setTool("select"); mt.sel = null; renderTimeline(); renderInspector(); }
+  else if (code === "KeyV" || code === "KeyA") setTool("select");
   else if (e.key === "Delete" || e.key === "Backspace") deleteSelected();
   else if (e.key === "+" || e.key === "=") setZoom(mt.pps * 1.5);
   else if (e.key === "-" || e.key === "_") setZoom(mt.pps / 1.5);
