@@ -4,6 +4,7 @@
 وبعدها أوترو المدرب، وفوقهم التعليق الصوتي والموسيقى.
 """
 
+import os
 import re
 import subprocess
 from dataclasses import dataclass
@@ -11,6 +12,9 @@ from pathlib import Path
 
 WIDTH, HEIGHT, FPS = 1080, 1920, 30
 MUSIC_FADE_SECONDS = 1.5
+# عدد الـ threads ثابت: FFmpeg لوحده بيفتح thread لكل core في السيرفر، وعلى Railway
+# ده ممكن يبقى عشرات، وكل واحد بيحجز فريمات في الذاكرة لحد ما الذاكرة تخلص
+THREADS = max(1, int(os.environ.get("RENDER_THREADS", "2")))
 
 
 @dataclass
@@ -78,48 +82,68 @@ class Subtitles:
     fonts_dir: Path
 
 
-def build_command(
+def segment_command(ffmpeg: str, seg: Segment, output: Path) -> list[str]:
+    """المرحلة الأولى: قطعة واحدة بس، مقصوصة ومتظبطة على 1080×1920 وصوتها موحّد."""
+    args = [ffmpeg, "-hide_banner", "-loglevel", "error", "-y", "-filter_complex_threads", "1",
+            "-threads", "1", "-ss", f"{seg.start:.3f}", "-t", f"{seg.duration:.3f}", "-i", str(seg.path)]
+    # بنقص الجزء اللي هيظهر من الفيديو الأصلي الأول وبعدين نكبّره، بدل ما نكبّر
+    # الفيديو كله (لحد 3 أضعاف 1080×1920) ونقص منه — نفس النتيجة بذاكرة أقل بكتير
+    z = max(1.0, seg.zoom)
+    filters = [
+        f"[0:v]crop=w='min(iw,ih*{WIDTH}/{HEIGHT})/{z:.4f}':h='min(ih,iw*{HEIGHT}/{WIDTH})/{z:.4f}'"
+        f":x='(iw-ow)/2*(1+({seg.x:.4f}))':y='(ih-oh)/2*(1+({seg.y:.4f}))',"
+        f"scale={WIDTH}:{HEIGHT},setsar=1,fps={FPS},format=yuv420p[v]"
+    ]
+    if seg.has_audio:
+        audio_in = "[0:a]"
+    else:
+        # فيديو من غير صوت: نحط سكوت بنفس الطول عشان التركيب يمشي
+        args += ["-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo"]
+        audio_in = "[1:a]"
+    filters.append(
+        f"{audio_in}aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,"
+        f"volume={seg.volume:.3f},apad,atrim=0:{seg.duration:.3f}[a]"
+    )
+    return args + [
+        "-filter_complex", ";".join(filters), "-map", "[v]", "-map", "[a]", "-t", f"{seg.duration:.3f}",
+        # جودة عالية وسرعة عالية، لأنه ملف مؤقت هيتضغط تاني في المرحلة التانية
+        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "12", "-threads", str(THREADS),
+        "-c:a", "pcm_s16le", str(output),
+    ]
+
+
+def build_commands(
     ffmpeg: str,
     segments: list[Segment],
     output: Path,
-    voice: AudioTrack | None = None,
-    music: AudioTrack | None = None,
+    work_dir: Path,
+    voice: AudioTrack | list[AudioTrack] | None = None,
+    music: AudioTrack | list[AudioTrack] | None = None,
     logo: Logo | None = None,
     subtitles: Subtitles | None = None,
-) -> tuple[list[str], float]:
-    """يبني أمر FFmpeg ويرجّعه مع الطول النهائي للفيديو."""
+) -> tuple[list[list[str]], float]:
+    """يبني أوامر FFmpeg بالترتيب ويرجّعها مع الطول النهائي للفيديو.
+
+    كل قطعة بتتجهّز لوحدها الأول، وبعدين أمر أخير بيلزقهم ويحط اللوجو والكابشن
+    والصوت. كده الذاكرة ثابتة مهما كان عدد القطع (لو كله في أمر واحد، كل قطعة
+    بتفتح فيديو في نفس الوقت والذاكرة بتخلص على السيرفر).
+    """
     if not segments:
         raise ValueError("مفيش فيديوهات في المونتاج")
     total = sum(s.duration for s in segments)
-    args = [ffmpeg, "-hide_banner", "-loglevel", "error", "-y"]
-    filters = []
-    concat_inputs = []
-    idx = 0
-
+    work_dir.mkdir(parents=True, exist_ok=True)
+    commands, parts = [], []
     for n, seg in enumerate(segments):
-        args += ["-ss", f"{seg.start:.3f}", "-t", f"{seg.duration:.3f}", "-i", str(seg.path)]
-        vin = idx
-        idx += 1
-        zw = int(WIDTH * seg.zoom) // 2 * 2
-        zh = int(HEIGHT * seg.zoom) // 2 * 2
-        filters.append(
-            f"[{vin}:v]scale={zw}:{zh}:force_original_aspect_ratio=increase,"
-            f"crop={WIDTH}:{HEIGHT}:x='(iw-ow)/2*(1+({seg.x:.4f}))':y='(ih-oh)/2*(1+({seg.y:.4f}))',"
-            f"setsar=1,fps={FPS},format=yuv420p[v{n}]"
-        )
-        if seg.has_audio:
-            filters.append(
-                f"[{vin}:a]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,"
-                f"volume={seg.volume:.3f}[a{n}]"
-            )
-        else:
-            # فيديو من غير صوت: نحط سكوت بنفس الطول عشان التركيب يمشي
-            args += ["-f", "lavfi", "-t", f"{seg.duration:.3f}", "-i", "anullsrc=r=48000:cl=stereo"]
-            filters.append(f"[{idx}:a]aformat=sample_fmts=fltp:channel_layouts=stereo[a{n}]")
-            idx += 1
-        concat_inputs.append(f"[v{n}][a{n}]")
+        part = work_dir / f"seg{n:03d}.mkv"
+        commands.append(segment_command(ffmpeg, seg, part))
+        parts.append(part)
+    concat_list = work_dir / "list.txt"
+    concat_list.write_text("".join(f"file '{p.as_posix()}'\n" for p in parts), encoding="utf-8")
 
-    filters.append(f"{''.join(concat_inputs)}concat=n={len(segments)}:v=1:a=1[vcat][base]")
+    args = [ffmpeg, "-hide_banner", "-loglevel", "error", "-y", "-filter_complex_threads", "1",
+            "-f", "concat", "-safe", "0", "-i", str(concat_list)]
+    filters = ["[0:v]null[vcat]", "[0:a]anull[base]"]
+    idx = 1
     video_label = "[vcat]"
 
     if logo:
@@ -183,8 +207,9 @@ def build_command(
         "-filter_complex", ";".join(filters),
         "-map", "[vout]", "-map", audio_label,
         "-t", f"{total:.3f}",
-        "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-threads", str(THREADS),
         "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart",
         str(output),
     ]
-    return args, total
+    commands.append(args)
+    return commands, total

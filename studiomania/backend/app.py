@@ -1497,9 +1497,14 @@ def render_error(result: subprocess.CompletedProcess) -> str:
     return f"FFmpeg: {chr(10).join(lines)[-400:] or f'خطأ رقم {result.returncode}'}"
 
 
-def run_render(project_id: str, export_id: str, cmd: list[str], total: float, name: str) -> None:
+def run_render(project_id: str, export_id: str, cmds: list[list[str]], total: float, name: str) -> None:
     filename = f"{export_id}.mp4"
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    # الأوامر بتشتغل ورا بعض: كل قطعة لوحدها وبعدين التجميع النهائي
+    for cmd in cmds:
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            break
+    shutil.rmtree(TMP_DIR / f"render-{export_id}", ignore_errors=True)
     (TMP_DIR / f"{export_id}.ass").unlink(missing_ok=True)
     with closing(db()) as conn, conn:
         if result.returncode != 0:
@@ -1533,8 +1538,8 @@ def render_project(project_id: str):
         export_id = uuid.uuid4().hex[:12]
         total = sum(sg.duration for sg in segments)
         subs = project_captions(conn, data, total, export_id)
-        cmd, total = montage.build_command(
-            ffmpeg_exe(), segments, EXPORTS_DIR / f"{export_id}.mp4", voice, music,
+        cmd, total = montage.build_commands(
+            ffmpeg_exe(), segments, EXPORTS_DIR / f"{export_id}.mp4", TMP_DIR / f"render-{export_id}", voice, music,
             logo=project_logo(data, total, outro_len), subtitles=subs,
         )
         conn.execute(
@@ -1565,6 +1570,8 @@ def list_exports():
 
 def reset_stuck_renders() -> None:
     """التصدير بيضيع لو البرنامج اتقفل في النص، فنعلّمه كفاشل."""
+    for leftover in TMP_DIR.glob("render-*"):
+        shutil.rmtree(leftover, ignore_errors=True)
     with closing(db()) as conn, conn:
         conn.execute(
             "UPDATE projects SET render_status = 'failed', render_error = 'البرنامج اتقفل أثناء التصدير. صدّر تاني' "
