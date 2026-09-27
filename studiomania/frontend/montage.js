@@ -576,7 +576,7 @@ $("tlCanvas").addEventListener("pointerdown", (e) => {
     const s = clipSource(c);
     if (handle && s) return trimClip(e, i, handle);
     selectItem({ kind: "clip", i }, true);
-    return reorderClip(e, i, clipEl);
+    return reorderClip(e, i);
   }
 
   if (audEl) {
@@ -613,19 +613,27 @@ function trimClip(e, i, side) {
   );
 }
 
-function reorderClip(e, i, el) {
-  let moving = false, target = i;
+function reorderClip(e, i) {
+  let moving = false, target = i, el = null;
   const marker = document.createElement("div");
   marker.className = "tl-insert";
+  const me = seq().items[i];
   drag(
     e,
-    (dx, dy, ev) => {
+    (dx) => {
       if (!moving && Math.abs(dx) < 5) return;
-      if (!moving) { moving = true; el.classList.add("dragging"); $("trkVideo").append(marker); }
-      el.style.transform = `translateX(${dx}px)`;
-      const t = canvasTime(ev);
+      if (!moving) {
+        moving = true;
+        // التايم لاين بيترسم من جديد لما بنختار القطعة، فناخد النسخة اللي على الشاشة دلوقتي
+        el = $("trkVideo").querySelector(`.tl-clip[data-i="${i}"]`);
+        el?.classList.add("dragging");
+        $("trkVideo").append(marker);
+      }
+      if (el) el.style.transform = `translateX(${dx}px)`;
+      // بتبدّل مع اللي جنبها أول ما طرفها يعدّي نص القطعة التانية
+      const edge0 = dx > 0 ? me.t1 + dx / mt.pps : me.t0 + dx / mt.pps;
       const others = seq().items.filter((x) => x.kind === "clip" && x.i !== i);
-      target = others.filter((x) => (x.t0 + x.t1) / 2 < t).length;
+      target = others.filter((x) => (x.t0 + x.t1) / 2 < edge0).length;
       const edge = target === 0 ? 0 : others[target - 1].t1 - (others[target - 1].i > i ? clipLength(mt.project.data.clips[i]) : 0);
       marker.style.left = `${edge * mt.pps}px`;
     },
@@ -711,6 +719,11 @@ function videoFor(url) {
     v.muted = true;
     v.src = url;
     v.addEventListener("loadedmetadata", () => mt.active === v && layoutActive());
+    v.addEventListener("loadeddata", () => {
+      if (mt.active !== v || mt.playing) return;
+      layoutActive();
+      v.currentTime = v.currentTime; // نطلب الفريم تاني عشان يترسم
+    });
     $("pvStage").append(v);
     pool.set(url, v);
   }
@@ -746,7 +759,9 @@ function showItem(it, t, playing) {
   mt.activeKey = it?.key ?? null;
   if (!v) return;
   const want = it.in + clamp(t - it.t0, 0, it.t1 - it.t0 - 0.5 / FPS);
-  if (!playing || changedItem || Math.abs(v.currentTime - want) > 0.3) {
+  // أول ما الفيديو يظهر لازم نطلب الفريم من جديد، وإلا ممكن يفضل أسود
+  if (changedItem) v.currentTime = want + 0.001;
+  else if (!playing || Math.abs(v.currentTime - want) > 0.3) {
     if (Math.abs(v.currentTime - want) > 0.0005) v.currentTime = want + 0.001;
   }
   layoutActive();
