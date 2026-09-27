@@ -312,7 +312,7 @@ function renderEditor() {
   if (tooLong.length) {
     alert.textContent = `⚠️ فيه ${tooLong.length} قطعة أطول من ${state.maxClip} ثانية (رقم ${tooLong.map((s) => s.index + 1).join("، ")}). زوّد نقط قطع فيها أو استبعدها قبل ما تقطّع.`;
   }
-  $("splitBtn").disabled = tooLong.length > 0 || active.length === 0;
+  $("splitBtn").disabled = $("splitSendBtn").disabled = tooLong.length > 0 || active.length === 0;
   $("splitInfo").textContent = active.length
     ? `هيطلع ${active.length} قطعة`
     : "كل القطع مستبعدة";
@@ -481,20 +481,25 @@ $("deleteVideo").onclick = async () => {
 };
 
 // ---------- التقطيع والقطع الجاهزة ----------
-$("splitBtn").onclick = async () => {
+async function splitCurrent(thenSend) {
   const v = state.current;
-  const btn = $("splitBtn");
+  const btn = thenSend ? $("splitSendBtn") : $("splitBtn");
+  const label = btn.textContent;
   clearTimeout(saveTimer);
   await save();
   if (v.clips_count && !confirm("الفيديو ده اتقطّع قبل كده. التقطيع الجديد هيمسح القطع القديمة. تكمّل؟")) return;
-  btn.disabled = true;
+  $("splitBtn").disabled = $("splitSendBtn").disabled = true;
   btn.textContent = "⏳ بيقطّع...";
   try {
     const res = await api(`/api/videos/${v.id}/split`, { method: "POST" });
-    toast(`✅ اتعمل ${res.clips_count} قطعة. دوس «✨ ابعت القطع لـ Seedance» تحت`);
     await loadVideos();
     const fresh = state.videos.find((x) => x.id === v.id);
     if (fresh && state.current?.id === v.id) state.current.clips_count = fresh.clips_count;
+    if (thenSend) {
+      openGenerateWith(v.id, v.coach?.id || null);
+      return;
+    }
+    toast(`✅ اتعمل ${res.clips_count} قطعة. دوس «✨ ابعت القطع لـ Seedance» تحت`);
     await loadClips();
     $("clipsSection").scrollIntoView({ behavior: "smooth", block: "start" });
     $("toSeedance").classList.add("pulse");
@@ -502,10 +507,12 @@ $("splitBtn").onclick = async () => {
   } catch (err) {
     toast(err.message, true);
   } finally {
-    btn.textContent = "✂️ قطّع الفيديو";
+    btn.textContent = label;
     renderEditor();
   }
-};
+}
+$("splitBtn").onclick = () => splitCurrent(false);
+$("splitSendBtn").onclick = () => splitCurrent(true);
 
 $("toSeedance").onclick = () => openGenerateWith(state.current.id, state.current.coach?.id || null);
 
