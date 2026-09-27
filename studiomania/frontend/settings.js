@@ -8,6 +8,9 @@ async function loadSettings() {
     $(`${name}State`).className = "hint " + (k.set ? "ok-text" : "");
     $(`${name}Key`).value = "";
   }
+  api("/api/system").then((x) => {
+    $("sysInfo").textContent = `🖥️ السيرفر: ${x.cpus ?? "?"} معالج · الذاكرة ${x.memory_limit_mb ? `${x.memory_limit_mb} ميجا (مستخدم ${x.memory_used_mb ?? "?"})` : "من غير حد معروف"}`;
+  }).catch(() => {});
   $("pwForm").hidden = s.password_from_env;
   $("pwEnvNote").hidden = !s.password_from_env;
 }

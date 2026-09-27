@@ -1492,7 +1492,7 @@ $("deleteProject").onclick = async () => {
 function renderRender() {
   const p = mt.project;
   const btn = $("renderBtn");
-  btn.textContent = p.render_status === "rendering" ? "⏳ بيصدّر..." : "🎬 صدّر الفيديو";
+  btn.textContent = p.render_status === "rendering" ? `⏳ ${p.render_progress || "بيصدّر..."}` : "🎬 صدّر الفيديو";
   $("renderError").hidden = p.render_status !== "failed";
   $("renderError").textContent = p.render_error || "";
   const done = p.render_status === "done" && p.export_id;
@@ -1523,13 +1523,21 @@ async function pollRender() {
   clearTimeout(mt.pollTimer);
   const id = mt.project?.id;
   if (!id) return;
-  const list = await api("/api/projects");
+  let list;
+  try {
+    list = await api("/api/projects");
+  } catch {
+    // السيرفر ممكن يكون بيعيد التشغيل: نفضل نحاول، منقفش
+    mt.pollTimer = setTimeout(pollRender, 4000);
+    return;
+  }
   const fresh = list.find((p) => p.id === id);
   if (!fresh || mt.project?.id !== id) return;
-  Object.assign(mt.project, { render_status: fresh.render_status, render_error: fresh.render_error, export_id: fresh.export_id });
+  Object.assign(mt.project, { render_status: fresh.render_status, render_error: fresh.render_error, render_progress: fresh.render_progress, export_id: fresh.export_id });
   renderRender();
   if (fresh.render_status === "rendering") mt.pollTimer = setTimeout(pollRender, 2000);
   else if (fresh.render_status === "done") toast("✅ الفيديو جاهز");
+  else if (fresh.render_status === "failed") toast("✕ التصدير فشل، شوف السبب تحت الزرار", true);
 }
 
 // ---------- الربط بالفيديو الخام ----------

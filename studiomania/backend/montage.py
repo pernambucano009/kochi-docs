@@ -82,7 +82,14 @@ class Subtitles:
     fonts_dir: Path
 
 
-def segment_command(ffmpeg: str, seg: Segment, output: Path) -> list[str]:
+def encoder_args(preset: str, crf: int, low_memory: bool) -> list[str]:
+    args = ["-c:v", "libx264", "-preset", preset, "-crf", str(crf), "-threads", "1" if low_memory else str(THREADS)]
+    if low_memory:
+        args += ["-x264-params", "rc-lookahead=5"]  # فريمات أقل في الذاكرة
+    return args
+
+
+def segment_command(ffmpeg: str, seg: Segment, output: Path, low_memory: bool = False) -> list[str]:
     """المرحلة الأولى: قطعة واحدة بس، مقصوصة ومتظبطة على 1080×1920 وصوتها موحّد."""
     args = [ffmpeg, "-hide_banner", "-loglevel", "error", "-y", "-filter_complex_threads", "1",
             "-threads", "1", "-ss", f"{seg.start:.3f}", "-t", f"{seg.duration:.3f}", "-i", str(seg.path)]
@@ -107,7 +114,7 @@ def segment_command(ffmpeg: str, seg: Segment, output: Path) -> list[str]:
     return args + [
         "-filter_complex", ";".join(filters), "-map", "[v]", "-map", "[a]", "-t", f"{seg.duration:.3f}",
         # جودة عالية وسرعة عالية، لأنه ملف مؤقت هيتضغط تاني في المرحلة التانية
-        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "12", "-threads", str(THREADS),
+        *encoder_args("ultrafast", 12, low_memory),
         "-c:a", "pcm_s16le", str(output),
     ]
 
@@ -121,6 +128,7 @@ def build_commands(
     music: AudioTrack | list[AudioTrack] | None = None,
     logo: Logo | None = None,
     subtitles: Subtitles | None = None,
+    low_memory: bool = False,
 ) -> tuple[list[list[str]], float]:
     """يبني أوامر FFmpeg بالترتيب ويرجّعها مع الطول النهائي للفيديو.
 
@@ -135,7 +143,7 @@ def build_commands(
     commands, parts = [], []
     for n, seg in enumerate(segments):
         part = work_dir / f"seg{n:03d}.mkv"
-        commands.append(segment_command(ffmpeg, seg, part))
+        commands.append(segment_command(ffmpeg, seg, part, low_memory))
         parts.append(part)
     concat_list = work_dir / "list.txt"
     concat_list.write_text("".join(f"file '{p.as_posix()}'\n" for p in parts), encoding="utf-8")
@@ -207,7 +215,7 @@ def build_commands(
         "-filter_complex", ";".join(filters),
         "-map", "[vout]", "-map", audio_label,
         "-t", f"{total:.3f}",
-        "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-threads", str(THREADS),
+        *encoder_args("veryfast", 20, low_memory),
         "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart",
         str(output),
     ]

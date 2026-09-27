@@ -1326,6 +1326,7 @@ def project_to_dict(r: sqlite3.Row) -> dict:
         "data": json.loads(r["data"]),
         "render_status": r["render_status"],
         "render_error": r["render_error"],
+        "render_progress": RENDER_ACTIVE.get(r["id"]),
         "export_id": r["export_id"],
         "updated_at": r["updated_at"],
     }
@@ -1340,7 +1341,14 @@ def get_project(conn: sqlite3.Connection, project_id: str) -> sqlite3.Row:
 
 @app.get("/api/projects")
 def list_projects():
-    with closing(db()) as conn:
+    with closing(db()) as conn, conn:
+        # لو مكتوب «بيصدّر» والتصدير مش شغال فعلًا، يبقى وقف في النص
+        for r in conn.execute("SELECT id FROM projects WHERE render_status = 'rendering'").fetchall():
+            if r["id"] not in RENDER_ACTIVE:
+                conn.execute(
+                    "UPDATE projects SET render_status = 'failed', render_error = ? WHERE id = ?",
+                    (f"التصدير وقف في النص{memory_note()}. صدّر تاني.", r["id"]),
+                )
         return [project_to_dict(r) for r in conn.execute("SELECT * FROM projects ORDER BY updated_at DESC")]
 
 
@@ -1488,40 +1496,118 @@ def project_captions(conn: sqlite3.Connection, data: dict, total: float, export_
     return montage.Subtitles(ass, FONTS_DIR)
 
 
+def memory_note() -> str:
+    limit = system_info()["memory_limit_mb"]
+    return f" — الذاكرة المتاحة للسيرفر {limit} ميجا" if limit else ""
+
+
 def render_error(result: subprocess.CompletedProcess) -> str:
     """رسالة الخطأ اللي بتظهر لما التصدير يفشل، من غير سطور التحذير اللي ملهاش لازمة."""
     if result.returncode < 0:
-        return "التصدير وقف فجأة (غالبًا ذاكرة السيرفر خلصت). جرّب تاني، ولو اتكرر قلّل طول الفيديو أو عدد القطع."
+        return f"التصدير وقف فجأة (غالبًا ذاكرة السيرفر خلصت){memory_note()}. جرّب تاني."
     noise = ("Fontconfig", "fonctconfig", "fontconfig", "memory font", "Loading font")
     lines = [l for l in result.stderr.strip().splitlines() if l.strip() and not any(n in l for n in noise)]
     return f"FFmpeg: {chr(10).join(lines)[-400:] or f'خطأ رقم {result.returncode}'}"
 
 
+# ---------- حالة السيرفر (عشان نعرف لو الذاكرة قليلة) ----------
+def _read_int(path: str) -> int | None:
+    try:
+        v = Path(path).read_text().strip()
+        return None if v == "max" else int(v)
+    except (OSError, ValueError):
+        return None
+
+
+def system_info() -> dict:
+    limit = _read_int("/sys/fs/cgroup/memory.max") or _read_int("/sys/fs/cgroup/memory/memory.limit_in_bytes")
+    used = _read_int("/sys/fs/cgroup/memory.current") or _read_int("/sys/fs/cgroup/memory/memory.usage_in_bytes")
+    if limit and limit > 1 << 50:  # رقم ضخم = مفيش حد
+        limit = None
+    return {
+        "memory_limit_mb": limit // 2**20 if limit else None,
+        "memory_used_mb": used // 2**20 if used else None,
+        "cpus": os.cpu_count(),
+    }
+
+
+@app.get("/api/system")
+def get_system():
+    return system_info()
+
+
+# التصديرات اللي شغالة فعلًا دلوقتي، ووصلت لفين
+RENDER_ACTIVE: dict[str, str] = {}
+SEGMENT_TIMEOUT = 15 * 60
+FINAL_TIMEOUT = 60 * 60
+
+
+def run_final(cmd: list[str], project_id: str, total: float) -> subprocess.CompletedProcess:
+    """المرحلة الأخيرة، وبنقرا منها النسبة اللي خلصت عشان تظهر في البرنامج."""
+    cmd = cmd[:1] + ["-progress", "pipe:1", "-nostats"] + cmd[1:]
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    err_lines: list[str] = []
+    reader = threading.Thread(target=lambda: err_lines.extend(proc.stderr), daemon=True)
+    reader.start()
+    started = time.time()
+    for line in proc.stdout:
+        if line.startswith("out_time_us=") and total > 0:
+            try:
+                done = int(line.split("=", 1)[1]) / 1e6
+            except ValueError:
+                continue
+            pct = 40 + min(59, int(done / total * 60))
+            RENDER_ACTIVE[project_id] = f"بيجمّع الفيديو النهائي… {pct}%"
+        if time.time() - started > FINAL_TIMEOUT:
+            proc.kill()
+    proc.wait()
+    reader.join(timeout=5)
+    return subprocess.CompletedProcess(cmd, proc.returncode, "", "".join(err_lines))
+
+
 def run_render(project_id: str, export_id: str, cmds: list[list[str]], total: float, name: str) -> None:
     filename = f"{export_id}.mp4"
-    # الأوامر بتشتغل ورا بعض: كل قطعة لوحدها وبعدين التجميع النهائي
-    for cmd in cmds:
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        if result.returncode != 0:
-            break
-    shutil.rmtree(TMP_DIR / f"render-{export_id}", ignore_errors=True)
-    (TMP_DIR / f"{export_id}.ass").unlink(missing_ok=True)
-    with closing(db()) as conn, conn:
-        if result.returncode != 0:
-            (EXPORTS_DIR / filename).unlink(missing_ok=True)
-            conn.execute(
-                "UPDATE projects SET render_status = 'failed', render_error = ?, updated_at = ? WHERE id = ?",
-                (render_error(result), now(), project_id),
-            )
-            return
-        conn.execute(
-            "INSERT INTO exports (id, name, filename, duration, source, project_id, created_at) VALUES (?, ?, ?, ?, 'studio', ?, ?)",
-            (export_id, name, filename, total, project_id, now()),
-        )
-        conn.execute(
-            "UPDATE projects SET render_status = 'done', render_error = NULL, export_id = ?, updated_at = ? WHERE id = ?",
-            (export_id, now(), project_id),
-        )
+    error = None
+    try:
+        # الأوامر بتشتغل ورا بعض: كل قطعة لوحدها وبعدين التجميع النهائي
+        segs = cmds[:-1]
+        for n, cmd in enumerate(segs, start=1):
+            RENDER_ACTIVE[project_id] = f"بيجهّز القطعة {n} من {len(segs)}… {int((n - 1) / len(segs) * 40)}%"
+            try:
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=SEGMENT_TIMEOUT)
+            except subprocess.TimeoutExpired:
+                error = f"تجهيز القطعة رقم {n} خد وقت أكتر من اللازم ووقف."
+                break
+            if result.returncode != 0:
+                error = render_error(result)
+                break
+        if not error:
+            RENDER_ACTIVE[project_id] = "بيجمّع الفيديو النهائي… 40%"
+            result = run_final(cmds[-1], project_id, total)
+            if result.returncode != 0:
+                error = render_error(result)
+    except Exception as exc:  # أي مشكلة غير متوقعة لازم تظهر، مش يفضل «بيصدّر» على طول
+        error = f"حصلت مشكلة أثناء التصدير: {exc}"
+    finally:
+        shutil.rmtree(TMP_DIR / f"render-{export_id}", ignore_errors=True)
+        (TMP_DIR / f"{export_id}.ass").unlink(missing_ok=True)
+        with closing(db()) as conn, conn:
+            if error:
+                (EXPORTS_DIR / filename).unlink(missing_ok=True)
+                conn.execute(
+                    "UPDATE projects SET render_status = 'failed', render_error = ?, updated_at = ? WHERE id = ?",
+                    (error, now(), project_id),
+                )
+            else:
+                conn.execute(
+                    "INSERT INTO exports (id, name, filename, duration, source, project_id, created_at) VALUES (?, ?, ?, ?, 'studio', ?, ?)",
+                    (export_id, name, filename, total, project_id, now()),
+                )
+                conn.execute(
+                    "UPDATE projects SET render_status = 'done', render_error = NULL, export_id = ?, updated_at = ? WHERE id = ?",
+                    (export_id, now(), project_id),
+                )
+        RENDER_ACTIVE.pop(project_id, None)
 
 
 render_executor = ThreadPoolExecutor(max_workers=1)
@@ -1541,7 +1627,9 @@ def render_project(project_id: str):
         cmd, total = montage.build_commands(
             ffmpeg_exe(), segments, EXPORTS_DIR / f"{export_id}.mp4", TMP_DIR / f"render-{export_id}", voice, music,
             logo=project_logo(data, total, outro_len), subtitles=subs,
+            low_memory=(system_info()["memory_limit_mb"] or 99999) < 1500,
         )
+        RENDER_ACTIVE[project_id] = "بيبدأ…"
         conn.execute(
             "UPDATE projects SET render_status = 'rendering', render_error = NULL, updated_at = ? WHERE id = ?",
             (now(), project_id),
@@ -1574,8 +1662,8 @@ def reset_stuck_renders() -> None:
         shutil.rmtree(leftover, ignore_errors=True)
     with closing(db()) as conn, conn:
         conn.execute(
-            "UPDATE projects SET render_status = 'failed', render_error = 'البرنامج اتقفل أثناء التصدير. صدّر تاني' "
-            "WHERE render_status = 'rendering'"
+            "UPDATE projects SET render_status = 'failed', render_error = ? WHERE render_status = 'rendering'",
+            (f"السيرفر اتقفل وبدأ من جديد أثناء التصدير (غالبًا الذاكرة خلصت{memory_note()}). صدّر تاني.",),
         )
 
 
