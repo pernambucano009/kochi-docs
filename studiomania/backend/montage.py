@@ -56,8 +56,9 @@ class Segment:
 class AudioTrack:
     path: Path
     volume: float = 1.0
-    delay: float = 0.0  # يبدأ بعد كام ثانية من أول الفيديو (للتعليق الصوتي)
-    offset: float = 0.0  # يبدأ من ثانية كام جوه الملف (للموسيقى)
+    delay: float = 0.0  # يبدأ بعد كام ثانية من أول الفيديو
+    offset: float = 0.0  # يبدأ من ثانية كام جوه الملف
+    length: float | None = None  # ياخد كام ثانية من الملف (None = لحد آخره)
     fade_out: bool = False
 
 
@@ -147,26 +148,26 @@ def build_command(
     filters.append(f"{video_label}format=yuv420p[vout]")
     mix = ["[base]"]
 
-    if voice:
-        args += ["-i", str(voice.path)]
-        delay_ms = int(max(0.0, voice.delay) * 1000)
-        filters.append(
-            f"[{idx}:a]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,"
-            f"volume={voice.volume:.3f},adelay={delay_ms}|{delay_ms}[voice]"
-        )
-        mix.append("[voice]")
-        idx += 1
-
-    if music:
-        args += ["-ss", f"{max(0.0, music.offset):.3f}", "-i", str(music.path)]
+    for label, track in (("voice", voice), ("music", music)):
+        if not track:
+            continue
+        args += ["-ss", f"{max(0.0, track.offset):.3f}"]
+        if track.length:
+            args += ["-t", f"{track.length:.3f}"]
+        args += ["-i", str(track.path)]
+        delay = max(0.0, track.delay)
+        delay_ms = int(delay * 1000)
         chain = (
             f"[{idx}:a]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,"
-            f"volume={music.volume:.3f},atrim=0:{total:.3f}"
+            f"volume={track.volume:.3f},adelay={delay_ms}|{delay_ms},atrim=0:{total:.3f}"
         )
-        if music.fade_out and total > MUSIC_FADE_SECONDS:
-            chain += f",afade=t=out:st={total - MUSIC_FADE_SECONDS:.3f}:d={MUSIC_FADE_SECONDS}"
-        filters.append(chain + "[music]")
-        mix.append("[music]")
+        if track.fade_out:
+            # يختفي بالتدريج في آخره، أو في آخر الفيديو لو هو أطول منه
+            end = min(total, delay + track.length) if track.length else total
+            if end - delay > MUSIC_FADE_SECONDS:
+                chain += f",afade=t=out:st={end - MUSIC_FADE_SECONDS:.3f}:d={MUSIC_FADE_SECONDS}"
+        filters.append(chain + f"[{label}]")
+        mix.append(f"[{label}]")
         idx += 1
 
     if len(mix) > 1:

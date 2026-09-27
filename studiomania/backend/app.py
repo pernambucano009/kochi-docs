@@ -1224,6 +1224,47 @@ def montage_sources():
     return out
 
 
+THUMB_FPS = 2  # كام صورة في الثانية في شريط الصور بتاع التايم لاين
+THUMB_HEIGHT = 128
+
+
+@app.get("/api/montage/filmstrip")
+def montage_filmstrip(kind: str, id: str):
+    """شريط صور صغيرة من الفيديو (صورتين في الثانية) عشان التايم لاين."""
+    with closing(db()) as conn:
+        if kind == "gen":
+            row = conn.execute("SELECT output_filename AS f FROM generations WHERE id = ?", (id,)).fetchone()
+            base = GENERATED_DIR
+        elif kind == "outro":
+            row = conn.execute("SELECT outro_filename AS f FROM coaches WHERE id = ?", (id,)).fetchone()
+            base = COACHES_DIR
+        else:
+            raise HTTPException(400, "نوع غلط")
+    if row is None or not row["f"] or not (base / row["f"]).exists():
+        raise HTTPException(404, "الفيديو غير موجود")
+    src = base / row["f"]
+    frames = max(1, int(media_info(src).duration * THUMB_FPS + 0.999))
+    out = TMP_DIR / "filmstrips" / f"{kind}-{id}-{int(src.stat().st_mtime)}.jpg"
+    if not out.exists():
+        out.parent.mkdir(parents=True, exist_ok=True)
+        part = out.with_suffix(".part.jpg")
+        result = subprocess.run(
+            [
+                ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src),
+                "-vf", f"fps={THUMB_FPS},scale=-2:{THUMB_HEIGHT},tile={frames}x1",
+                "-frames:v", "1", "-q:v", "5", str(part),
+            ],
+            capture_output=True, text=True,
+        )
+        if result.returncode != 0 or not part.exists():
+            raise HTTPException(500, "مش قادر أعمل صور التايم لاين")
+        part.replace(out)
+    return FileResponse(
+        out, media_type="image/jpeg",
+        headers={"Cache-Control": "max-age=86400", "X-Frames": str(frames), "X-Fps": str(THUMB_FPS)},
+    )
+
+
 class ClipEdit(BaseModel):
     gen_id: str
     start: float = 0
@@ -1239,6 +1280,7 @@ class TrackEdit(BaseModel):
     volume: float = 1.0
     delay: float = 0.0
     offset: float = 0.0
+    length: float | None = None  # قصّ آخر الملف (None = لحد آخره)
     fade_out: bool = True
 
 
@@ -1363,7 +1405,8 @@ def build_montage(conn: sqlite3.Connection, data: dict):
             raise HTTPException(400, "ملف الصوت المختار اتمسح من المكتبة")
         return montage.AudioTrack(
             AUDIO_DIR / row["filename"], volume=clamp(t["volume"], 0, 3),
-            delay=max(0, t["delay"]), offset=max(0, t["offset"]), fade_out=t["fade_out"],
+            delay=max(0, t["delay"]), offset=max(0, t["offset"]),
+            length=t["length"] if t.get("length") and t["length"] > 0.1 else None, fade_out=t["fade_out"],
         )
 
     return segments, track(data.get("voice"), "voice"), track(data.get("music"), "music"), outro_len
@@ -1393,9 +1436,10 @@ def project_captions(conn: sqlite3.Connection, data: dict, total: float, export_
     if tr.get("status") != "done" or not tr.get("words"):
         raise HTTPException(400, "لسه الكلام بتاع التعليق الصوتي متكتبش. دوس «اكتب الكلام» الأول أو اقفل الكابشن")
     offset, delay = max(0.0, voice.get("offset", 0)), max(0.0, voice.get("delay", 0))
+    length = voice.get("length") or float("inf")
     words = [
         {"w": w["w"], "s": w["s"] - offset + delay, "e": w["e"] - offset + delay}
-        for w in tr["words"] if w["e"] - offset > 0
+        for w in tr["words"] if w["e"] - offset > 0 and w["s"] - offset < length
     ]
     ass = TMP_DIR / f"{export_id}.ass"
     ass.write_text(captions.build_ass(words, cfg, total), encoding="utf-8")

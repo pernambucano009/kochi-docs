@@ -1,7 +1,7 @@
 // StudioMania — الكابشن واللوجو في المونتاج
 
 const brand = { options: null, logoUrl: null, tr: {}, trTimer: null, editing: null };
-const FRAME_SCALE = 216 / 1080; // كادر المعاينة بالنسبة لحجم الفيديو الحقيقي
+const FRAME_SCALE = PV_W / 1080; // كادر المعاينة بالنسبة لحجم الفيديو الحقيقي
 
 async function loadBrandOptions() {
   if (!brand.options) {
@@ -64,16 +64,18 @@ function renderBrandPanels() {
 }
 
 function brandInput(apply) {
-  return () => { apply(); renderBrandPanels(); scheduleSave(); };
+  return () => { pushHistory("brand"); apply(); renderBrandPanels(); scheduleTimeline(); scheduleSave(); };
 }
 $("capOn").addEventListener("change", brandInput(() => (capCfg().enabled = $("capOn").checked)));
 $("capTemplates").addEventListener("click", (e) => {
   const b = e.target.closest("button[data-t]");
   if (!b) return;
+  pushHistory();
   const c = capCfg();
   Object.assign(c, brand.options.templates[b.dataset.t], { template: b.dataset.t });
   delete c.label;
   renderBrandPanels();
+  scheduleTimeline();
   scheduleSave();
 });
 $("capFont").addEventListener("change", brandInput(() => (capCfg().font = $("capFont").value)));
@@ -120,10 +122,10 @@ $("logoRemove").onclick = async () => {
 // ---------- معاينة اللوجو والكابشن على الكادر ----------
 function updatePreviewOverlays() {
   if (!mt.project || !brand.options) return;
-  const W = 216, H = 384;
+  const W = PV_W, H = PV_H;
   const l = logoCfg();
   const img = $("pvLogo");
-  img.hidden = !(l.enabled && brand.logoUrl);
+  img.hidden = !(l.enabled && brand.logoUrl) || (l.hide_outro && mt.activeItem?.kind === "outro");
   if (!img.hidden) {
     if (img.getAttribute("src") !== brand.logoUrl) img.src = brand.logoUrl;
     const w = (W * l.size) / 100;
@@ -134,10 +136,10 @@ function updatePreviewOverlays() {
   }
   const c = capCfg();
   const cap = $("pvCap");
-  cap.hidden = !c.enabled;
+  const live = c.enabled && liveCaption(c);
+  cap.hidden = !live;
   if (cap.hidden) return;
-  const words = sampleWords(c.words);
-  const hlIndex = c.highlight_on && words.length > 1 ? 1 : -1;
+  const { words, hl: hlIndex } = live;
   const stroke = c.box ? "" : `-webkit-text-stroke:${Math.max(1, (c.size / 16) * FRAME_SCALE * 2)}px #000;paint-order:stroke fill;`;
   cap.style.cssText = `top:${(H * c.y) / 100}px;font-family:'${c.font}';font-size:${c.size * FRAME_SCALE}px;color:${c.color};`;
   cap.innerHTML = `<span style="${c.box ? `background:${c.box_color};` : ""}${stroke}">${words
@@ -145,6 +147,26 @@ function updatePreviewOverlays() {
     .join(" ")}</span>`;
 }
 $("pvLogo").addEventListener("load", updatePreviewOverlays);
+
+// الكابشن اللي بيظهر عند المؤشر، بنفس تقسيم الفيديو النهائي
+function liveCaption(c) {
+  const blocks = captionBlocks();
+  if (!blocks.length) {
+    const words = sampleWords(c.words);
+    return { words, hl: c.highlight_on && words.length > 1 ? 1 : -1 };
+  }
+  let b = blocks.find((x) => mt.t >= x.t0 && mt.t < x.t1);
+  // وإنت بتظبط شكل الكابشن نوريك أول جملة حتى لو المؤشر مش عليها
+  if (!b && !mt.playing && !$("capOpts").closest(".pane").hidden) b = blocks[0];
+  if (!b) return null;
+  const vt = mt.t - b.shift;
+  let hl = -1;
+  if (c.highlight_on) {
+    b.g.forEach((w, i) => { if (vt >= w.s) hl = i; });
+    hl = Math.max(0, hl);
+  }
+  return { words: b.g.map((w) => w.w), hl };
+}
 
 function sampleWords(n) {
   const voice = mt.project?.data.voice;
@@ -174,7 +196,7 @@ function renderTranscriptStatus() {
   if (!tr) {
     st.className = "cap-status";
     st.textContent = "…";
-    loadTranscript(voice.id).then(renderTranscriptStatus);
+    loadTranscript(voice.id).then(() => { renderTranscriptStatus(); scheduleTimeline(); updatePreviewOverlays(); });
     return;
   }
   if (tr.status === "working") {
@@ -185,6 +207,7 @@ function renderTranscriptStatus() {
       await loadTranscript(voice.id);
       renderTranscriptStatus();
       updatePreviewOverlays();
+      scheduleTimeline();
     }, 3000);
   } else if (tr.status === "done") {
     st.className = "cap-status ok";
@@ -286,6 +309,7 @@ $("trSave").onclick = async () => {
     closeTr();
     toast("✅ الكلام اتحفظ");
     renderBrandPanels();
+    scheduleTimeline();
   } catch (err) {
     toast(err.message, true);
   }

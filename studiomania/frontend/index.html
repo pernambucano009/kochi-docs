@@ -245,52 +245,81 @@
     </div>
     <p class="empty panel" id="noProject" hidden>اعمل مشروع جديد عشان تبدأ المونتاج.</p>
 
-    <div class="montage" id="montage" hidden>
-      <section class="panel bin">
-        <div class="panel-head"><h2>الفيديوهات المولَّدة</h2></div>
-        <label class="check"><input type="checkbox" id="binCoachOnly" checked> فيديوهات المدرب المختار بس</label>
-        <div class="bin-grid" id="binGrid"></div>
-        <p class="empty" id="binEmpty" hidden>مفيش فيديوهات مولَّدة جاهزة. ولّد من <a href="#" data-goto="2">الخطوة 2</a>.</p>
-      </section>
+    <div class="editor" id="montage" hidden>
+      <div class="ed-top">
+        <section class="panel ed-media">
+          <div class="panel-head"><h2>الفيديوهات المولَّدة</h2></div>
+          <label class="check"><input type="checkbox" id="binCoachOnly" checked> المدرب المختار بس</label>
+          <div class="bin-grid" id="binGrid"></div>
+          <p class="empty" id="binEmpty" hidden>مفيش فيديوهات مولَّدة جاهزة. ولّد من <a href="#" data-goto="2">الخطوة 2</a>.</p>
+          <p class="hint">دوس ＋ أو اسحب الفيديو للتايم لاين.</p>
+        </section>
 
-      <section class="panel timeline-panel">
-        <div class="panel-head"><h2>ترتيب الفيديو</h2><span class="muted" id="totalLabel"></span></div>
-        <ol class="tl" id="tlList"></ol>
-        <p class="empty" id="tlEmpty">دوس ＋ على فيديو من الشمال عشان يدخل هنا.</p>
+        <section class="ed-player">
+          <div class="frame" id="previewFrame">
+            <div class="pv-stage" id="pvStage"></div>
+            <img class="pv-logo" id="pvLogo" alt="" hidden><div class="pv-cap" id="pvCap" hidden></div>
+            <div class="pv-empty" id="pvEmpty">التايم لاين فاضي</div>
+          </div>
+          <div class="transport" dir="ltr">
+            <span class="tc" id="tcNow">00:00:00</span><span class="tc total">/ <span id="tcTotal">00:00:00</span></span>
+            <span class="spacer"></span>
+            <button class="ic" id="tpStart" title="للأول (Home)">⏮</button>
+            <button class="ic" id="tpPrev" title="فريم لورا (←)">◀︎|</button>
+            <button class="ic play" id="tpPlay" title="تشغيل / إيقاف (Space)">▶︎</button>
+            <button class="ic" id="tpNext" title="فريم لقدّام (→)">|▶︎</button>
+            <button class="ic" id="tpEnd" title="للآخر (End)">⏭</button>
+            <span class="spacer"></span>
+            <span class="tc muted" id="totalLabel"></span>
+          </div>
+        </section>
 
-        <div class="clip-editor" id="clipEditor" hidden>
-          <div class="frame" id="previewFrame"><video id="previewVideo" muted playsinline loop></video>
-            <img class="pv-logo" id="pvLogo" alt="" hidden><div class="pv-cap" id="pvCap" hidden></div></div>
-          <div class="sliders" dir="ltr">
-            <h3 dir="rtl" id="editorLabel"></h3>
-            <label dir="rtl">بداية القص <b id="startVal"></b><input type="range" dir="ltr" id="edStart" min="0" step="0.1"></label>
-            <label dir="rtl">نهاية القص <b id="endVal"></b><input type="range" dir="ltr" id="edEnd" min="0" step="0.1"></label>
-            <label dir="rtl">زووم <b id="zoomVal"></b><input type="range" dir="ltr" id="edZoom" min="100" max="300" step="5"></label>
-            <label dir="rtl">شمال ⟷ يمين <b id="xVal"></b><input type="range" dir="ltr" id="edX" min="-100" max="100" step="1"></label>
-            <label dir="rtl">فوق ⟷ تحت <b id="yVal"></b><input type="range" dir="ltr" id="edY" min="-100" max="100" step="1"></label>
-            <label dir="rtl">الصوت <b id="volVal"></b><input type="range" dir="ltr" id="edVol" min="0" max="200" step="5"></label>
-            <div class="row" dir="rtl">
-              <button class="btn sm" id="edPlay">▶︎ معاينة</button>
-              <button class="btn sm" id="edReset">↺ رجّع الإعدادات</button>
+        <section class="panel ed-inspector">
+          <div class="tabs" id="inspTabs">
+            <button data-tab="clip" class="active">🎞️ القطعة</button>
+            <button data-tab="audio">🔊 الصوت</button>
+            <button data-tab="caps">✍️ الكابشن</button>
+            <button data-tab="logo">🏷️ اللوجو</button>
+            <button data-tab="export">🎬 تصدير</button>
+          </div>
+
+          <div class="pane" data-pane="clip">
+            <p class="empty" id="clipNone">دوس على قطعة في التايم لاين عشان تعدّلها.</p>
+            <div class="sliders" id="clipProps" dir="ltr" hidden>
+              <h3 dir="rtl" id="editorLabel"></h3>
+              <p class="clip-times" dir="rtl" id="clipTimes"></p>
+              <label dir="rtl">زووم <b id="zoomVal"></b><input type="range" dir="ltr" id="edZoom" min="100" max="300" step="5"></label>
+              <label dir="rtl">شمال ⟷ يمين <b id="xVal"></b><input type="range" dir="ltr" id="edX" min="-100" max="100" step="1"></label>
+              <label dir="rtl">فوق ⟷ تحت <b id="yVal"></b><input type="range" dir="ltr" id="edY" min="-100" max="100" step="1"></label>
+              <label dir="rtl">الصوت <b id="volVal"></b><input type="range" dir="ltr" id="edVol" min="0" max="200" step="5"></label>
+              <p class="hint" dir="rtl">💡 اسحب الصورة في المعاينة عشان تحرّكها، وعجلة الماوس عليها بتعمل زووم.</p>
+              <div class="row wrap" dir="rtl">
+                <button class="btn sm" id="edSplit">✂ قسّم عند المؤشر</button>
+                <button class="btn sm" id="edDup">⧉ كرّر</button>
+                <button class="btn sm" id="edReset">↺ رجّع الإعدادات</button>
+                <button class="btn sm danger" id="edDelete">🗑 احذف</button>
+              </div>
+            </div>
+            <div id="outroProps" hidden>
+              <h3>🎬 الأوترو</h3>
+              <p class="hint">الأوترو بيتحط أوتوماتيك في آخر الفيديو من المدرب المختار. تقدر تشيله أو تغيّر صوته من تاب 🔊 الصوت.</p>
             </div>
           </div>
-        </div>
-      </section>
 
-      <section class="panel side">
-        <div class="panel-head"><h2>المدرب والأوترو</h2></div>
-        <label class="field">المدرب <select id="mCoach"></select></label>
+          <div class="pane" data-pane="audio" hidden>
+            <h3 class="pane-h">🧑‍🏫 المدرب والأوترو</h3>
+            <label class="field">المدرب <select id="mCoach"></select></label>
         <label class="check"><input type="checkbox" id="mOutro"> ضيف الأوترو في الآخر <span class="muted" id="outroInfo"></span></label>
         <label class="field slider-field">صوت الأوترو <b id="outroVolVal"></b><input type="range" id="mOutroVol" min="0" max="200" step="5" dir="ltr"></label>
 
-        <div class="panel-head gap-top"><h2>التعليق الصوتي</h2></div>
+        <h3 class="pane-h">🎙️ التعليق الصوتي</h3>
         <label class="field"><select id="mVoice"></select></label>
         <div id="voiceOpts">
           <label class="field slider-field">الصوت <b id="voiceVolVal"></b><input type="range" id="mVoiceVol" min="0" max="200" step="5" dir="ltr"></label>
           <label class="field">يبدأ بعد (ثانية) <input type="number" id="mVoiceDelay" min="0" step="0.5"></label>
         </div>
 
-        <div class="panel-head gap-top"><h2>الموسيقى</h2></div>
+        <h3 class="pane-h">🎵 الموسيقى</h3>
         <label class="field"><select id="mMusic"></select></label>
         <div id="musicOpts">
           <label class="field slider-field">الصوت <b id="musicVolVal"></b><input type="range" id="mMusicVol" min="0" max="200" step="5" dir="ltr"></label>
@@ -298,10 +327,11 @@
           <label class="check"><input type="checkbox" id="mMusicFade"> تختفي بالتدريج في الآخر</label>
           <p class="alert warn" id="musicWarn" hidden></p>
         </div>
+          </div>
 
-        <div class="panel-head gap-top"><h2>✍️ الكابشن</h2>
-          <label class="switch"><input type="checkbox" id="capOn"> مفعّل</label></div>
-        <div id="capOpts">
+          <div class="pane" data-pane="caps" hidden>
+            <label class="switch"><input type="checkbox" id="capOn"> الكابشن مفعّل</label>
+            <div id="capOpts">
           <div class="cap-status" id="capStatus"></div>
           <div class="row wrap">
             <button class="btn sm" id="capTranscribe">🎧 اكتب الكلام من التعليق الصوتي</button>
@@ -321,10 +351,11 @@
           <label class="check"><input type="checkbox" id="capBox"> خلفية (بوكس) ورا الكلام</label>
           <label class="check"><input type="checkbox" id="capPop"> حركة ظهور (بوب)</label>
         </div>
+          </div>
 
-        <div class="panel-head gap-top"><h2>🏷️ اللوجو</h2>
-          <label class="switch"><input type="checkbox" id="logoOn"> مفعّل</label></div>
-        <div class="logo-row">
+          <div class="pane" data-pane="logo" hidden>
+            <label class="switch"><input type="checkbox" id="logoOn"> اللوجو مفعّل</label>
+            <div class="logo-row">
           <img id="logoThumb" alt="" hidden>
           <label class="btn sm">⬆ <span id="logoUpLabel">ارفع اللوجو</span>
             <input type="file" id="logoUpload" accept=".png,.webp,.jpg,.jpeg,image/png,image/webp,image/jpeg" hidden></label>
@@ -338,15 +369,61 @@
           <label class="field slider-field">الشفافية <b id="logoOpVal"></b><input type="range" id="logoOp" min="10" max="100" step="5" dir="ltr"></label>
           <label class="check"><input type="checkbox" id="logoHideOutro"> يختفي وقت الأوترو</label>
         </div>
+          </div>
 
-        <button class="btn primary wide gap-top" id="renderBtn">🎬 صدّر الفيديو</button>
+          <div class="pane" data-pane="export" hidden>
+            <button class="btn primary wide gap-top" id="renderBtn">🎬 صدّر الفيديو</button>
         <p class="err" id="renderError" hidden></p>
         <div id="renderResult" hidden>
           <video id="resultVideo" controls playsinline></video>
           <div class="row"><a class="btn sm" id="resultDownload" download>⬇ تحميل</a>
           <span class="muted">اتحفظ في فولدر الفيديوهات الجاهزة</span></div>
         </div>
+          </div>
+        </section>
+      </div>
+
+      <section class="ed-timeline" dir="ltr">
+        <div class="tl-toolbar">
+          <button class="ic" id="tlUndo" title="رجوع (Ctrl+Z)">↶</button>
+          <button class="ic" id="tlRedo" title="إعادة (Ctrl+Y)">↷</button>
+          <span class="sep"></span>
+          <button class="ic tool active" data-tool="select" title="أداة الاختيار والسحب (V)">⮝ اختيار</button>
+          <button class="ic tool" data-tool="blade" title="أداة القطع: دوس على القطعة مكان ما عايز تقطع (B)">✂ أداة القطع</button>
+          <button class="ic" id="tlSplit" title="قسّم عند المؤشر (S)">⫿ قسّم</button>
+          <button class="ic" id="tlDelete" title="احذف المختار (Delete)">🗑</button>
+          <span class="sep"></span>
+          <button class="ic" id="tlPrevFrame" title="فريم لورا (←)">◀︎|</button>
+          <button class="ic" id="tlNextFrame" title="فريم لقدّام (→)">|▶︎</button>
+          <span class="spacer"></span>
+          <button class="ic" id="tlZoomOut" title="زووم أوت (Ctrl + عجلة الماوس)">－</button>
+          <input type="range" id="tlZoom" min="0" max="1000" step="1" title="زووم التايم لاين">
+          <button class="ic" id="tlZoomIn" title="زووم إن (Ctrl + عجلة الماوس)">＋</button>
+          <button class="ic" id="tlFit" title="اعرض كل التايم لاين">⤢</button>
+        </div>
+        <div class="tl-body">
+          <div class="tl-heads">
+            <div class="h-ruler"></div>
+            <div class="h-video">🎞️ فيديو</div>
+            <div class="h-voice">🎙️ تعليق</div>
+            <div class="h-music">🎵 موسيقى</div>
+            <div class="h-caps">✍️ كابشن</div>
+          </div>
+          <div class="tl-scroll" id="tlScroll">
+            <div class="tl-canvas" id="tlCanvas">
+              <div class="tl-ruler" id="tlRuler"></div>
+              <div class="tl-track t-video" id="trkVideo"></div>
+              <div class="tl-track t-voice" id="trkVoice"></div>
+              <div class="tl-track t-music" id="trkMusic"></div>
+              <div class="tl-track t-caps" id="trkCaps"></div>
+              <div class="tl-hover" id="tlHover" hidden></div>
+              <div class="tl-playhead" id="tlPlayhead"><span></span></div>
+            </div>
+          </div>
+        </div>
+        <p class="tl-keys" dir="rtl">Space تشغيل · ← → فريم فريم (Shift = ثانية) · S قسّم · B أداة القطع · V اختيار · Delete حذف · Ctrl+Z رجوع · Ctrl + عجلة الماوس زووم</p>
       </section>
+    </div>
     </div>
   </main>
 
