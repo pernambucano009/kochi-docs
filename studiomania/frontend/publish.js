@@ -19,7 +19,7 @@ async function initPublish() {
   alert.hidden = info.service === "mock";
   alert.className = "alert " + (info.service === "zernio" && !info.accounts_error ? "info" : "warn");
   if (!info.service) {
-    alert.innerHTML = `⚠️ لسه مفيش ربط بـ Zernio. تقدر تجدول البوستات عادي، وأول ما تضيف <code>ZERNIO_API_KEY</code> في ملف <code>.env</code> البرنامج هيبعتهم لوحده.`;
+    alert.innerHTML = `⚠️ لسه مفيش ربط بـ Zernio. تقدر تجدول البوستات عادي، وأول ما تحط مفتاح Zernio من <a href="#" data-goto="settings">⚙️ الإعدادات</a> البرنامج هيبعتهم لوحده.`;
   } else if (info.accounts_error) {
     alert.textContent = `⚠️ ${info.accounts_error}`;
   } else if (info.service === "zernio") {

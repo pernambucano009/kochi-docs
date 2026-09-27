@@ -50,7 +50,7 @@ def _unwrap(payload):
 def _headers() -> dict:
     key = api_key()
     if not key:
-        raise AtlasError("مفتاح Atlas مش متسجل. ضيف ATLASCLOUD_API_KEY في ملف .env")
+        raise AtlasError("مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات")
     return {"Authorization": f"Bearer {key}"}
 
 

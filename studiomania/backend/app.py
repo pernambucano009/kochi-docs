@@ -944,7 +944,7 @@ class GenerationIn(BaseModel):
 @app.post("/api/generations")
 def create_generations(body: GenerationIn):
     if not (atlas.api_key() or atlas.mock_mode()):
-        raise HTTPException(400, "مفتاح Atlas مش متسجل. ضيف ATLASCLOUD_API_KEY في ملف .env وشغّل البرنامج تاني")
+        raise HTTPException(400, "مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات")
     if not body.clip_ids:
         raise HTTPException(400, "اختار قطعة واحدة على الأقل")
 
@@ -1677,7 +1677,7 @@ def publish_due_posts() -> None:
             else:
                 set_post(
                     r["id"], status="failed",
-                    error="لسه مفيش خدمة نشر مربوطة، فالبوست متنشرش. ضيف ZERNIO_API_KEY في ملف .env ودوس إعادة المحاولة",
+                    error="لسه مفيش خدمة نشر مربوطة، فالبوست متنشرش. حط مفتاح Zernio من ⚙️ الإعدادات ودوس إعادة المحاولة",
                 )
     finally:
         _publish_lock.release()

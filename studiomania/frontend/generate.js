@@ -33,7 +33,7 @@ async function initGenerate() {
   }
   const alert = $("atlasAlert");
   alert.hidden = gen.atlas.configured || gen.atlas.mock;
-  alert.innerHTML = "⚠️ مفتاح Atlas مش متسجل. اعمل ملف <code>.env</code> في فولدر <code>studiomania</code> واكتب فيه <code>ATLASCLOUD_API_KEY=مفتاحك</code>، وبعدين شغّل البرنامج تاني.";
+  alert.innerHTML = `⚠️ مفتاح Atlas مش متسجل. حطه من <a href="#" data-goto="settings">⚙️ الإعدادات</a>.`;
 
   const [coaches, clips] = await Promise.all([api("/api/coaches"), api("/api/clips"), loadPrompts()]);
   renderCoachPicker(coaches);
