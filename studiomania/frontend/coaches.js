@@ -122,7 +122,7 @@ $("coachesGrid").addEventListener("click", async (e) => {
 viewHooks["4"] = loadCoaches;
 
 // ---------- الرفع الجماعي ----------
-const bulk = { images: [], outros: [], rows: [], busy: false };
+const bulk = { images: [], outros: [], rows: [], busy: false, ignored: new Set(), urls: {} };
 const NOISE = /(outro|intro|final|photo|image|img|pic|avatar|coach|اوترو|أوترو|إوترو|صوره|صورة|المدرب|مدرب|كوتش|v\d+)/g;
 
 // بيوحّد الاسم عشان "Ahmed_Outro.mp4" و "ahmed.png" و "أحمد" و "احمد" يتطابقوا
@@ -178,11 +178,12 @@ function renderBulk() {
   $("bulkCounts").textContent = `${images.length} صورة · ${outros.length} أوترو`;
   $("bulkEmpty").hidden = rows.length > 0;
   const assigned = new Set(rows.map((r) => r.outro).filter((x) => x !== null));
-  const unmatched = outros.map((f, i) => i).filter((i) => !assigned.has(i));
+  const unmatched = outros.map((f, i) => i).filter((i) => !assigned.has(i) && !bulk.ignored.has(i));
+  renderUnmatched(unmatched);
   const noOutro = rows.filter((r) => r.outro === null).length;
   const warn = [];
-  if (unmatched.length) warn.push(`⚠️ ${unmatched.length} أوترو ماتعرفش عليهم: ${unmatched.map((i) => outros[i].name).join("، ")}. اختارهم من القايمة جنب المدرب الصح.`);
   if (noOutro && outros.length) warn.push(`${noOutro} مدرب من غير أوترو.`);
+  if (bulk.ignored.size) warn.push(`${bulk.ignored.size} أوترو اتجاهل ومش هيترفع.`);
   $("bulkWarn").hidden = !warn.length;
   $("bulkWarn").innerHTML = warn.map(escapeHtml).join("<br>");
   const names = new Map();
@@ -206,12 +207,79 @@ function renderBulk() {
     })
     .join("");
   const bad = rows.some((r) => !r.name.trim() || names.get(r.name.trim()) > 1 || (!r.existingId && !r.image));
-  $("bulkUpload").disabled = !rows.length || bad || bulk.busy;
-  $("bulkUpload").textContent = `⬆ ارفع الكل (${rows.length})`;
+  $("bulkUpload").disabled = !rows.length || bad || bulk.busy || unmatched.length > 0;
+  $("bulkUpload").textContent = unmatched.length
+    ? `🔗 اربط ${unmatched.length} أوترو الأول`
+    : `⬆ ارفع الكل (${rows.length})`;
 }
 
+// ---------- شاشة ربط الأوتروهات اللي ماتعرفش عليها ----------
+function outroUrl(i) {
+  if (!bulk.urls[i]) bulk.urls[i] = URL.createObjectURL(bulk.outros[i]);
+  return bulk.urls[i];
+}
+
+function coachChoices() {
+  // المدربين اللي بيترفعوا دلوقتي + المدربين الموجودين قبل كده
+  const fromRows = bulk.rows.map((r, ri) => ({ key: `r${ri}`, name: r.name, img: r.preview, hasOutro: r.outro !== null }));
+  const inRows = new Set(bulk.rows.map((r) => r.existingId).filter(Boolean));
+  const existing = coachState.list
+    .filter((c) => !inRows.has(c.id))
+    .map((c) => ({ key: `c${c.id}`, name: c.name, img: c.image_url, hasOutro: !!c.outro_url, existing: true }));
+  return [...fromRows, ...existing];
+}
+
+function renderUnmatched(unmatched) {
+  $("bulkUnmatched").hidden = !unmatched.length;
+  if (!unmatched.length) {
+    $("unmatchedList").innerHTML = "";
+    return;
+  }
+  const choices = coachChoices();
+  $("unmatchedList").innerHTML = unmatched
+    .map((i) => `<div class="um-card" data-o="${i}">
+      <div class="um-video"><video src="${outroUrl(i)}" controls preload="metadata" playsinline></video>
+        <div class="um-name" title="${escapeHtml(bulk.outros[i].name)}">🎬 ${escapeHtml(bulk.outros[i].name)}</div>
+        <button class="btn sm" data-ignore="${i}">تجاهل الأوترو ده</button></div>
+      <div class="um-coaches">${choices
+        .map((c) => `<button class="um-coach" data-o="${i}" data-c="${c.key}" title="${escapeHtml(c.name)}">
+          ${c.img ? `<img src="${c.img}" alt="">` : `<span class="um-noimg">؟</span>`}
+          <span>${escapeHtml(c.name)}</span>
+          ${c.hasOutro ? `<small>عنده أوترو</small>` : ""}${c.existing ? `<small>موجود قبل كده</small>` : ""}
+        </button>`)
+        .join("") || `<p class="muted">مفيش مدربين. ارفع صورهم الأول.</p>`}</div>
+    </div>`)
+    .join("");
+}
+
+$("unmatchedList").addEventListener("click", (e) => {
+  const ign = e.target.closest("[data-ignore]");
+  if (ign) {
+    bulk.ignored.add(Number(ign.dataset.ignore));
+    return renderBulk();
+  }
+  const btn = e.target.closest(".um-coach");
+  if (!btn) return;
+  const o = Number(btn.dataset.o);
+  const key = btn.dataset.c;
+  let row;
+  if (key.startsWith("r")) {
+    row = bulk.rows[Number(key.slice(1))];
+  } else {
+    const c = coachState.list.find((x) => x.id === key.slice(1));
+    row = { key: matchKey(c.name), image: null, name: c.name, existingId: c.id, outro: null, preview: c.image_url };
+    bulk.rows.push(row);
+  }
+  if (row.outro !== null && row.outro !== o && !confirm(`${row.name} عنده أوترو متربط بالفعل (${bulk.outros[row.outro].name}). تبدّله بالأوترو ده؟`)) return;
+  bulk.rows.forEach((r) => { if (r.outro === o) r.outro = null; });
+  row.outro = o;
+  toast(`✅ ${bulk.outros[o].name} اتربط بـ ${row.name}`);
+  renderBulk();
+});
+
 $("bulkOpen").onclick = () => {
-  Object.assign(bulk, { images: [], outros: [], rows: [] });
+  Object.values(bulk.urls).forEach((u) => URL.revokeObjectURL(u));
+  Object.assign(bulk, { images: [], outros: [], rows: [], ignored: new Set(), urls: {} });
   $("bulkProgress").textContent = "";
   $("bulkBar").hidden = true;
   renderBulk();

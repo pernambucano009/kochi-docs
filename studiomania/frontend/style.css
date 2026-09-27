@@ -388,3 +388,17 @@ dialog.bulk-dlg { width: min(900px, 96vw); max-height: 90vh; border: 1px solid v
 .bulk-table input, .bulk-table select { width: 100%; background: var(--surface-2); border: 1px solid var(--line); color: var(--text); padding: 6px 8px; border-radius: 8px; font: inherit; font-size: 13px; }
 .bulk-table select { max-width: 240px; }
 .bulk-bar { margin-top: 10px; height: 6px; }
+.unmatched { border: 2px dashed var(--warn); border-radius: 12px; padding: 10px; margin: 10px 0; }
+.unmatched h3 { margin: 0 0 10px; font-size: 15px; }
+.um-card { display: flex; gap: 12px; align-items: flex-start; padding: 10px 0; border-top: 1px solid var(--line); }
+.um-card:first-child { border-top: none; padding-top: 0; }
+.um-video { width: 150px; flex: none; display: flex; flex-direction: column; gap: 6px; }
+.um-video video { width: 100%; aspect-ratio: 9 / 16; background: #000; border-radius: 8px; object-fit: contain; }
+.um-name { font-size: 12px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: ltr; text-align: right; }
+.um-coaches { flex: 1; display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; max-height: 330px; overflow-y: auto; }
+.um-coach { border: 2px solid var(--line); background: var(--surface-2); border-radius: 10px; padding: 5px; color: var(--text); display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 12px; font-weight: 600; }
+.um-coach:hover { border-color: var(--accent); }
+.um-coach img, .um-noimg { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 7px; background: var(--surface); display: flex; align-items: center; justify-content: center; font-size: 24px; }
+.um-coach span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.um-coach small { font-size: 10px; color: var(--muted); font-weight: 400; }
+@media (max-width: 600px) { .um-card { flex-direction: column; } .um-video { width: 120px; } }
