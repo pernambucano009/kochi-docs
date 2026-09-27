@@ -10,8 +10,8 @@ COPY backend backend
 COPY frontend frontend
 
 # الفيديوهات وقاعدة البيانات هنا. لازم يتربط بـ volume عشان متضيعش مع كل تحديث
+# (بيتعمل من إعدادات الاستضافة نفسها)
 ENV STUDIOMANIA_DATA=/data
-VOLUME ["/data"]
 
 EXPOSE 8000
 CMD ["sh", "-c", "exec uvicorn app:app --app-dir backend --host 0.0.0.0 --port ${PORT:-8000} --proxy-headers --forwarded-allow-ips='*'"]
