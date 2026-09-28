@@ -330,7 +330,7 @@ auth = Auth(DB_PATH, DATA_DIR)
 app = FastAPI(title="StudioMania")
 
 # الصفحات والملفات اللي بتفتح من غير دخول
-PUBLIC_PATHS = {"/login", "/login.html", "/style.css", "/health", "/api/auth/state", "/api/auth/login", "/api/auth/setup"}
+PUBLIC_PATHS = {"/login", "/login.html", "/style.css", "/i18n.js", "/i18n-en.js", "/health", "/api/auth/state", "/api/auth/login", "/api/auth/setup"}
 
 
 @app.middleware("http")

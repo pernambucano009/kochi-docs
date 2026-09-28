@@ -1500,13 +1500,19 @@ function renderRender() {
   $("renderResult").hidden = !done;
   if (done) {
     // اسم المشروع جوه الرابط، عشان الفيديو يتحفظ باسمه من أي مكان
-    const file = `${(p.data.name || "video").replace(/[\\/:*?"<>|]+/g, " ").trim() || "video"}.mp4`;
+    const file = exportFileName(p.data.name);
     const url = `/media/export/${p.export_id}/${encodeURIComponent(file)}`;
     if ($("resultVideo").getAttribute("src") !== url) $("resultVideo").src = url;
     $("resultDownload").href = `${url}?download=1`;
     $("resultDownload").setAttribute("download", file);
   }
   renderSide();
+}
+
+// اسم ملف الفيديو = اسم المشروع من غير الحروف اللي مينفعش تبقى في اسم ملف
+function exportFileName(name) {
+  const clean = (name || "").replace(/[\\/:*?"<>|]+/g, " ").trim();
+  return (clean || "video") + ".mp4";
 }
 
 $("renderBtn").onclick = async () => {

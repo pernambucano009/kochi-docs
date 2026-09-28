@@ -543,19 +543,16 @@ $("clipsGrid").addEventListener("click", async (e) => {
 
 // ---------- التنقل بين الخطوات ----------
 const viewHooks = {}; // كل صفحة بتسجّل هنا اللي يحصل لما تفتح
+// "home" = الرئيسية (المربعات). أي خطوة تانية بتفتح في الشاشة الكبيرة (shell.js)
 function showStep(step) {
-  if (!document.querySelector(`.view[data-view="${step}"]`)) step = "0";
-  document.querySelectorAll(".view").forEach((v) => (v.hidden = v.dataset.view !== step));
-  document.querySelectorAll(".step[data-step]").forEach((b) => b.classList.toggle("active", b.dataset.step === step));
-  $("openSettings").classList.toggle("active", step === "settings");
+  if (step !== "home" && !document.querySelector(`.view[data-view="${step}"]`)) step = "home";
   document.querySelectorAll("video, audio").forEach((m) => m.pause());
   if (location.hash !== `#${step}`) history.replaceState(null, "", `#${step}`);
+  if (step === "home") return closeStage();
+  document.querySelectorAll(".view").forEach((v) => (v.hidden = v.dataset.view !== step));
+  openStage(step);
   viewHooks[step]?.();
 }
-$("steps").addEventListener("click", (e) => {
-  const b = e.target.closest(".step[data-step]");
-  if (b) showStep(b.dataset.step);
-});
 document.addEventListener("click", (e) => {
   const a = e.target.closest("[data-goto]");
   if (a) { e.preventDefault(); showStep(a.dataset.goto); }
@@ -568,5 +565,5 @@ const isStep1 = () => !document.querySelector('.view[data-view="1"]').hidden;
   state.maxClip = cfg.max_clip_seconds;
   state.minGap = cfg.min_cut_gap;
   await loadVideos();
-  showStep(location.hash.slice(1) || "0");
+  showStep(location.hash.slice(1) || "home");
 })();
