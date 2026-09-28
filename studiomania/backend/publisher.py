@@ -176,6 +176,32 @@ def cancel(remote_id: str) -> None:
         _check(resp, "إلغاء البوست")
 
 
+def list_scheduled() -> list[dict]:
+    """البوستات المتجدولة عند Zernio: [{"id", "content", "scheduled_for", "platforms" (عندنا), "media_url"}]."""
+    with _client(30) as c:
+        data = _check(c.get(f"{BASE_URL}/posts", params={"status": "scheduled", "limit": 100}), "قراءة البوستات من Zernio")
+    items = data.get("posts", data.get("data", [])) if isinstance(data, dict) else data
+    reverse = {remote: ours for ours, (remote, _) in PLATFORMS.items()}
+    out = []
+    for post in items or []:
+        if not isinstance(post, dict) or str(post.get("status", "scheduled")).lower() != "scheduled":
+            continue
+        pid = post.get("_id") or post.get("id")
+        if not pid:
+            continue
+        media = next((m.get("url") for m in post.get("mediaItems") or [] if isinstance(m, dict) and m.get("url")), None)
+        plats = []
+        for pl in post.get("platforms") or []:
+            name = pl.get("platform") if isinstance(pl, dict) else pl
+            if reverse.get(str(name).lower()):
+                plats.append(reverse[str(name).lower()])
+        out.append({
+            "id": str(pid), "content": post.get("content") or "", "scheduled_for": post.get("scheduledFor"),
+            "platforms": list(dict.fromkeys(plats)), "media_url": media,
+        })
+    return out
+
+
 def retry(remote_id: str) -> None:
     with _client(30) as c:
         _check(c.post(f"{BASE_URL}/posts/{remote_id}/retry"), "إعادة المحاولة")

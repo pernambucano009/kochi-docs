@@ -749,3 +749,11 @@ dialog::backdrop { background: rgba(20, 20, 20, .28); backdrop-filter: blur(4px)
 ::-webkit-scrollbar-thumb { background: rgba(20, 20, 20, .15); border-radius: 10px; border: 2px solid transparent; background-clip: padding-box; }
 .posts li.failed { box-shadow: inset 3px 0 0 var(--danger); background: color-mix(in srgb, var(--danger) 6%, transparent); }
 [dir="rtl"] .posts li.failed { box-shadow: inset -3px 0 0 var(--danger); }
+.orphans { margin: 0 0 12px; padding: 12px; border-radius: 20px; background: color-mix(in srgb, var(--warn) 12%, transparent); border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent); }
+.orphans-title { margin: 0 0 8px; font-weight: 500; }
+.orphan { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-top: 1px solid var(--line); flex-wrap: wrap; }
+.orphan video { width: 46px; height: 82px; object-fit: cover; border-radius: 10px; background: #000; }
+.orphan .info { flex: 1; min-width: 180px; display: flex; flex-direction: column; font-size: 13px; }
+.orphan .when { font-weight: 500; }
+.orphan .cap { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.orphan .acts { display: flex; gap: 6px; }

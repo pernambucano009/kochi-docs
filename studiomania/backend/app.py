@@ -1884,7 +1884,8 @@ def post_to_dict(r: sqlite3.Row) -> dict:
         "id": r["id"],
         "export_id": r["export_id"],
         "export_name": r["export_name"],
-        "export_url": f"/media/exports/{r['export_filename']}" if r["export_filename"] else None,
+        "export_url": f"/media/exports/{r['export_filename']}" if r["export_filename"] else r["remote_media"],
+        "from_zernio": not r["export_filename"] and bool(r["remote_media"]),
         "caption": r["caption"],
         "platforms": json.loads(r["platforms"]),
         "scheduled_at": r["scheduled_at"],
@@ -1990,10 +1991,12 @@ def create_post(body: PostIn):
     with closing(db()) as conn, conn:
         platforms, when, caption = clean_post(conn, body)
         post_id = uuid.uuid4().hex[:12]
+        # لو Zernio مربوط بيتسجّل «بيتبعت» على طول، عشان المجدول ميبعتهوش هو كمان (نسختين عند Zernio)
+        status = "sending" if publisher.service_name() == "zernio" else "scheduled"
         conn.execute(
             "INSERT INTO posts (id, export_id, caption, platforms, scheduled_at, status, created_at, updated_at) "
-            "VALUES (?, ?, ?, ?, ?, 'scheduled', ?, ?)",
-            (post_id, body.export_id, caption, platforms, when, now(), now()),
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (post_id, body.export_id, caption, platforms, when, status, now(), now()),
         )
     after_save(post_id, when, None)
     with closing(db()) as conn:
@@ -2029,14 +2032,69 @@ def delete_post(post_id: str):
         raise HTTPException(404, "البوست غير موجود")
     if row["status"] in ("sending", "publishing"):
         raise HTTPException(400, "البوست بيتبعت دلوقتي، استنى ثواني")
-    if row["remote_id"] and row["status"] == "scheduled":
-        # لازم نلغيه عند Zernio الأول، وإلا هيتنشر برضه
+    if row["remote_id"] and row["status"] in ("scheduled", "failed"):
+        # لازم نلغيه عند Zernio الأول، وإلا هيتنشر برضه (حتى الفاشل ممكن يكون لسه متجدول على منصات تانية)
         try:
             publisher.cancel(row["remote_id"])
         except (publisher.PublishError, httpx.HTTPError) as exc:
-            raise HTTPException(400, f"مقدرتش ألغيه عند Zernio: {exc}") from exc
+            if row["status"] == "scheduled":
+                raise HTTPException(400, f"مقدرتش ألغيه عند Zernio: {exc}") from exc
     with closing(db()) as conn, conn:
         conn.execute("DELETE FROM posts WHERE id = ?", (post_id,))
+    return {"ok": True}
+
+
+# ---------- البوستات اللي عند Zernio ومش في القايمة هنا ----------
+def _remote_orphans() -> list[dict]:
+    if publisher.service_name() != "zernio":
+        return []
+    try:
+        remote = publisher.list_scheduled()
+    except (publisher.PublishError, httpx.HTTPError) as exc:
+        raise HTTPException(400, f"مقدرتش أوصل لـ Zernio: {exc}") from exc
+    with closing(db()) as conn:
+        known = {r["remote_id"] for r in conn.execute("SELECT remote_id FROM posts WHERE remote_id IS NOT NULL")}
+    return [p for p in remote if p["id"] not in known]
+
+
+@app.get("/api/posts/remote")
+def remote_orphans():
+    return _remote_orphans()
+
+
+class AdoptIn(BaseModel):
+    remote_id: str
+
+
+@app.post("/api/posts/adopt")
+def adopt_remote_post(body: AdoptIn):
+    """بوست متجدول عند Zernio ومش هنا: نضيفه للقايمة عشان تتابعه وتلغيه من هنا."""
+    post = next((p for p in _remote_orphans() if p["id"] == body.remote_id), None)
+    if post is None:
+        raise HTTPException(404, "البوست ده مش لاقيه عند Zernio، أو موجود في القايمة بالفعل")
+    try:
+        when = datetime.fromisoformat(str(post["scheduled_for"]).replace("Z", "+00:00")).astimezone(timezone.utc)
+    except ValueError:
+        when = datetime.now(timezone.utc)
+    post_id = uuid.uuid4().hex[:12]
+    with closing(db()) as conn, conn:
+        conn.execute(
+            "INSERT INTO posts (id, export_id, caption, platforms, scheduled_at, status, remote_id, remote_media, created_at, updated_at) "
+            "VALUES (?, '', ?, ?, ?, 'scheduled', ?, ?, ?, ?)",
+            (post_id, post["content"], json.dumps(post["platforms"]), when.isoformat(timespec="seconds"),
+             post["id"], post["media_url"], now(), now()),
+        )
+    return {"ok": True}
+
+
+@app.post("/api/posts/remote/{remote_id}/cancel")
+def cancel_remote_post(remote_id: str):
+    if not any(p["id"] == remote_id for p in _remote_orphans()):
+        raise HTTPException(404, "البوست ده مش لاقيه عند Zernio، أو موجود في القايمة بالفعل")
+    try:
+        publisher.cancel(remote_id)
+    except (publisher.PublishError, httpx.HTTPError) as exc:
+        raise HTTPException(400, f"مقدرتش ألغيه عند Zernio: {exc}") from exc
     return {"ok": True}
 
 
@@ -2054,7 +2112,7 @@ def retry_post(post_id: str):
             raise HTTPException(400, str(exc)) from exc
         set_post(post_id, status="scheduled", error=None)
     else:
-        set_post(post_id, status="scheduled", error=None)
+        set_post(post_id, status="sending" if publisher.service_name() == "zernio" else "scheduled", error=None)
         after_save(post_id, row["scheduled_at"], None)
     return {"ok": True}
 
@@ -2120,6 +2178,8 @@ def scheduler_loop() -> None:
 with closing(db()) as _conn, _conn:
     if "remote_id" not in {c[1] for c in _conn.execute("PRAGMA table_info(posts)")}:
         _conn.execute("ALTER TABLE posts ADD COLUMN remote_id TEXT")
+    if "remote_media" not in {c[1] for c in _conn.execute("PRAGMA table_info(posts)")}:
+        _conn.execute("ALTER TABLE posts ADD COLUMN remote_media TEXT")
     # لو البرنامج اتقفل وهو بيسلّم بوست، مش عارفين وصل ولا لأ، فنعلّمه عشان تتأكد بنفسك
     _conn.execute(
         "UPDATE posts SET status = 'failed', error = 'البرنامج اتقفل وهو بيبعت البوست. اتأكد من Zernio قبل ما تعيد المحاولة' "

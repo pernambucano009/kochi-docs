@@ -577,13 +577,15 @@
 
           <section class="panel gap-top">
             <div class="panel-head"><h2>المواعيد</h2>
+        <button class="btn sm" id="syncZernio" title="يشوف لو فيه بوستات متجدولة على Zernio ومش في القايمة هنا">🔄 قارن مع Zernio</button>
               <select id="postFilter">
                 <option value="upcoming">الجاية</option>
                 <option value="all">الكل</option>
                 <option value="published">اتنشرت</option>
                 <option value="failed">فشلت</option>
               </select></div>
-            <ul class="posts" id="postsList"></ul>
+            <div class="orphans" id="remoteOrphans" hidden></div>
+      <ul class="posts" id="postsList"></ul>
             <p class="empty" id="postsEmpty">مفيش بوستات هنا.</p>
           </section>
         </main>

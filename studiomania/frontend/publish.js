@@ -30,6 +30,7 @@ async function initPublish() {
   }
   renderPlatformBoxes();
   await Promise.all([pubLoadExports(), pubLoadPosts()]);
+  if (pub.service === "zernio") loadRemoteOrphans();
   if (!$("postWhen").value) setWhen(nextSlot());
 }
 
@@ -249,7 +250,7 @@ function renderPosts() {
         ${p.export_url ? `<video src="${p.export_url}#t=0.5" preload="metadata" muted></video>` : ""}
         <div class="info">
           <span class="when">${when}</span>
-          <span>${escapeHtml(p.export_name || "⚠️ الفيديو اتمسح")} · ${p.platforms.map((k) => pub.platforms[k] || k).join("، ")}</span>
+          <span>${escapeHtml(p.export_name || (p.from_zernio ? "🔗 من Zernio" : "⚠️ الفيديو اتمسح"))} · ${p.platforms.map((k) => pub.platforms[k] || k).join("، ")}</span>
           ${p.caption ? `<span class="cap" title="${escapeHtml(p.caption)}">${escapeHtml(p.caption)}</span>` : ""}
           ${p.error ? `<span class="err">${escapeHtml(p.error)}</span>` : ""}
         </div>
@@ -292,6 +293,7 @@ $("postsList").addEventListener("click", async (e) => {
       await api(`/api/posts/${p.id}`, { method: "DELETE" });
       if (pub.editing === p.id) resetPostForm();
       await pubLoadPosts();
+      if (pub.service === "zernio") loadRemoteOrphans();
     }
   } catch (err) {
     toast(err.message, true);
@@ -299,3 +301,45 @@ $("postsList").addEventListener("click", async (e) => {
 });
 
 viewHooks["7"] = initPublish;
+
+// ---------- بوستات متجدولة على Zernio ومش في القايمة هنا ----------
+async function loadRemoteOrphans(verbose = false) {
+  const box = $("remoteOrphans");
+  try {
+    const list = await api("/api/posts/remote");
+    box.hidden = !list.length;
+    if (verbose && !list.length) toast("✅ كل البوستات اللي على Zernio موجودة هنا");
+    const when = (iso) => (iso ? new Date(iso).toLocaleString(UI_LOCALE(), { weekday: "long", day: "numeric", month: "long", hour: "numeric", minute: "2-digit" }) : "");
+    box.innerHTML = list.length ? `<p class="orphans-title">⚠️ فيه ${list.length} بوست متجدول على Zernio ومش في القايمة هنا</p>` + list.map((o) => `
+      <div class="orphan" data-rid="${escapeHtml(o.id)}">
+        ${o.media_url ? `<video src="${escapeHtml(o.media_url)}#t=0.5" preload="metadata" muted></video>` : ""}
+        <div class="info"><span class="when">${when(o.scheduled_for)}</span>
+          <span>${o.platforms.map((k) => pub.platforms[k] || k).join("، ")}</span>
+          ${o.content ? `<span class="cap">${escapeHtml(o.content)}</span>` : ""}</div>
+        <span class="acts"><button class="btn sm" data-oact="adopt">＋ ضيفه للقايمة</button>
+          <button class="btn sm danger" data-oact="cancel">✕ الغيه من Zernio</button></span>
+      </div>`).join("") : "";
+  } catch (err) {
+    if (verbose) toast(err.message, true);
+  }
+}
+$("syncZernio").onclick = () => loadRemoteOrphans(true);
+$("remoteOrphans").addEventListener("click", async (e) => {
+  const btn = e.target.closest("button[data-oact]");
+  if (!btn) return;
+  const rid = btn.closest(".orphan").dataset.rid;
+  try {
+    if (btn.dataset.oact === "adopt") {
+      await api("/api/posts/adopt", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ remote_id: rid }) });
+      toast("✅ البوست اتضاف للقايمة");
+    } else {
+      if (!confirm("تلغي البوست ده من Zernio؟ مش هيتنشر.")) return;
+      await api(`/api/posts/remote/${encodeURIComponent(rid)}/cancel`, { method: "POST" });
+      toast("✅ اتلغى من Zernio");
+    }
+    await pubLoadPosts();
+    await loadRemoteOrphans();
+  } catch (err) {
+    toast(err.message, true);
+  }
+});

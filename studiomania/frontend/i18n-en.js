@@ -718,5 +718,18 @@ window.I18N_EN = {
   "حصلت مشكلة": "Something went wrong",
   "{0} قطعة": "{0} clips",
   "{0} جاهز": "{0} ready",
-  "✕ البوست ماتبعتش: {0}": "✕ The post wasn't sent: {0}"
+  "✕ البوست ماتبعتش: {0}": "✕ The post wasn't sent: {0}",
+  "🔄 قارن مع Zernio": "🔄 Compare with Zernio",
+  "يشوف لو فيه بوستات متجدولة على Zernio ومش في القايمة هنا": "Checks for posts scheduled on Zernio that aren't in the list here",
+  "🔗 من Zernio": "🔗 From Zernio",
+  "✅ كل البوستات اللي على Zernio موجودة هنا": "✅ Every post on Zernio is in the list here",
+  "⚠️ فيه {0} بوست متجدول على Zernio ومش في القايمة هنا": "⚠️ {0} posts are scheduled on Zernio but aren't in the list here",
+  "＋ ضيفه للقايمة": "＋ Add to the list",
+  "✕ الغيه من Zernio": "✕ Cancel on Zernio",
+  "✅ البوست اتضاف للقايمة": "✅ Post added to the list",
+  "تلغي البوست ده من Zernio؟ مش هيتنشر.": "Cancel this post on Zernio? It won't be published.",
+  "✅ اتلغى من Zernio": "✅ Cancelled on Zernio",
+  "قراءة البوستات من Zernio": "Reading posts from Zernio",
+  "البوست ده مش لاقيه عند Zernio، أو موجود في القايمة بالفعل": "Couldn't find this post on Zernio, or it's already in the list",
+  "تجهيز رفع الفيديو: رد غير متوقع (الحقول: {0})": "Preparing the video upload: unexpected response (fields: {0})"
 };
