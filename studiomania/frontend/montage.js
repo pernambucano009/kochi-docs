@@ -1499,10 +1499,12 @@ function renderRender() {
   const done = p.render_status === "done" && p.export_id;
   $("renderResult").hidden = !done;
   if (done) {
-    const url = `/media/exports/${p.export_id}.mp4`;
+    // اسم المشروع جوه الرابط، عشان الفيديو يتحفظ باسمه من أي مكان
+    const file = `${(p.data.name || "video").replace(/[\\/:*?"<>|]+/g, " ").trim() || "video"}.mp4`;
+    const url = `/media/export/${p.export_id}/${encodeURIComponent(file)}`;
     if ($("resultVideo").getAttribute("src") !== url) $("resultVideo").src = url;
-    $("resultDownload").href = url;
-    $("resultDownload").setAttribute("download", `${p.data.name}.mp4`);
+    $("resultDownload").href = `${url}?download=1`;
+    $("resultDownload").setAttribute("download", file);
   }
   renderSide();
 }

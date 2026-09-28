@@ -16,6 +16,7 @@ from xml.sax.saxutils import escape as xml_escape
 import threading
 import time
 import uuid
+from urllib.parse import quote
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import closing
 from datetime import datetime, timezone
@@ -1777,16 +1778,37 @@ def render_project(project_id: str):
     return {"ok": True, "duration": total}
 
 
+def export_file_name(name: str) -> str:
+    """اسم الملف اللي بيتحمّل: اسم المشروع، من غير الحروف اللي الأجهزة مبتقبلهاش في أسماء الملفات."""
+    clean = re.sub(r'[\\/:*?"<>|\x00-\x1f]+', " ", name).strip(" .") or "video"
+    return f"{clean[:120]}.mp4"
+
+
 def export_to_dict(r: sqlite3.Row) -> dict:
+    # الاسم جوه الرابط نفسه، عشان أي طريقة تحميل (حتى من قايمة مشغّل الفيديو) تحفظه باسم المشروع
+    url = f"/media/export/{r['id']}/{quote(export_file_name(r['name']))}"
     return {
         "id": r["id"],
         "name": r["name"],
-        "url": f"/media/exports/{r['filename']}",
+        "url": url,
+        "download_url": f"{url}?download=1",
         "duration": r["duration"],
         "source": r["source"],
         "project_id": r["project_id"],
         "created_at": r["created_at"],
     }
+
+
+@app.get("/media/export/{export_id}/{filename}")
+def export_file(export_id: str, filename: str, download: int = 0):
+    with closing(db()) as conn:
+        row = conn.execute("SELECT * FROM exports WHERE id = ?", (export_id,)).fetchone()
+    if row is None or not (EXPORTS_DIR / row["filename"]).exists():
+        raise HTTPException(404, "الفيديو غير موجود")
+    return FileResponse(
+        EXPORTS_DIR / row["filename"], media_type="video/mp4", filename=export_file_name(row["name"]),
+        content_disposition_type="attachment" if download else "inline",
+    )
 
 
 @app.get("/api/exports")

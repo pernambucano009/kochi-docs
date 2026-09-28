@@ -56,7 +56,7 @@ function renderReady() {
             ${scheduled.has(e.id) ? `<span class="pill scheduled">متجدول</span>` : ""}</div>
           <div class="acts">
             <button class="btn sm primary" data-act="pick">📅 جدول</button>
-            <a class="btn sm" href="${e.url}" download="${escapeHtml(e.name)}.mp4" title="تحميل">⬇</a>
+            <a class="btn sm" href="${e.download_url}" download="${escapeHtml(e.name)}.mp4" title="تحميل">⬇</a>
             <button class="btn sm" data-act="rename" title="تغيير الاسم">✎</button>
             <button class="btn sm danger" data-act="delete" title="حذف">✕</button>
           </div>
