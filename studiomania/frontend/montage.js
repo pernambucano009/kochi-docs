@@ -1493,6 +1493,7 @@ function renderRender() {
   const p = mt.project;
   const btn = $("renderBtn");
   btn.textContent = p.render_status === "rendering" ? `⏳ ${p.render_progress || "بيصدّر..."}` : "🎬 صدّر الفيديو";
+  $("renderCancel").hidden = p.render_status !== "rendering";
   $("renderError").hidden = p.render_status !== "failed";
   $("renderError").textContent = p.render_error || "";
   const done = p.render_status === "done" && p.export_id;
@@ -1519,6 +1520,16 @@ $("renderBtn").onclick = async () => {
     // الرسالة بتفضل ظاهرة تحت الزرار عشان تقدر تقراها
     $("renderError").textContent = err.message;
     $("renderError").hidden = false;
+  }
+};
+
+$("renderCancel").onclick = async () => {
+  if (!confirm("توقّف التصدير؟")) return;
+  try {
+    await api(`/api/projects/${mt.project.id}/render/cancel`, { method: "POST" });
+    toast("⏹ بيوقف التصدير…");
+  } catch (err) {
+    toast(err.message, true);
   }
 };
 

@@ -1604,7 +1604,7 @@ def clean_storage():
         raise HTTPException(400, "فيه تصدير شغال دلوقتي، استنى لما يخلص")
     before = folder_mb(TMP_DIR) + folder_mb(SYSTEM_TMP)
     for item in list(TMP_DIR.iterdir()) + list(SYSTEM_TMP.glob("render-*")):
-        if item.name in ("fonts.conf", "fontcache"):
+        if item.name in ("fonts.conf", "fontcache", "render.log"):
             continue
         if item.is_dir():
             shutil.rmtree(item, ignore_errors=True)
@@ -1615,57 +1615,97 @@ def clean_storage():
 
 # التصديرات اللي شغالة فعلًا دلوقتي، ووصلت لفين
 RENDER_ACTIVE: dict[str, str] = {}
-SEGMENT_TIMEOUT = 15 * 60
-FINAL_TIMEOUT = 60 * 60
 
 
-def run_final(cmd: list[str], project_id: str, total: float) -> subprocess.CompletedProcess:
-    """المرحلة الأخيرة، وبنقرا منها النسبة اللي خلصت عشان تظهر في البرنامج."""
-    cmd = cmd[:1] + ["-progress", "pipe:1", "-nostats"] + cmd[1:]
+RENDER_PROCS: dict[str, subprocess.Popen] = {}  # أمر FFmpeg الشغال دلوقتي لكل تصدير (عشان الإلغاء)
+RENDER_CANCELLED: set[str] = set()
+STALL_SECONDS = int(os.environ.get("RENDER_STALL_SECONDS", "180"))  # لو التصدير موقف مكانه المدة دي، بنوقفه بدل ما يفضل معلّق
+RENDER_LOG = TMP_DIR / "render.log"
+
+
+def log_render(text: str) -> None:
+    with RENDER_LOG.open("a", encoding="utf-8") as f:
+        f.write(f"[{datetime.now(timezone.utc).strftime('%H:%M:%S')}] {text}\n")
+
+
+def run_ffmpeg(cmd: list[str], project_id: str, length: float, pct: tuple[int, int], label: str) -> tuple[int, str]:
+    """يشغّل أمر FFmpeg ويتابع وصل لفين. لو وقف مكانه كتير أو اتلغى، بيتقفل."""
+    cmd = cmd[:1] + ["-progress", "pipe:1", "-nostats"] + [a if a != "error" else "warning" for a in cmd[1:]]
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    RENDER_PROCS[project_id] = proc
     err_lines: list[str] = []
+    state = {"last": time.time(), "done": -1.0, "stalled": False}
     reader = threading.Thread(target=lambda: err_lines.extend(proc.stderr), daemon=True)
     reader.start()
-    started = time.time()
+
+    def watchdog() -> None:
+        while proc.poll() is None:
+            if time.time() - state["last"] > STALL_SECONDS:
+                state["stalled"] = True
+                log_render(f"{label}: وقف مكانه {STALL_SECONDS} ثانية عند {state['done']:.1f}ث — ذاكرة: {system_info()}")
+                proc.kill()
+                return
+            time.sleep(2)
+
+    threading.Thread(target=watchdog, daemon=True).start()
     for line in proc.stdout:
-        if line.startswith("out_time_us=") and total > 0:
+        if line.startswith("out_time_us="):
             try:
                 done = int(line.split("=", 1)[1]) / 1e6
             except ValueError:
                 continue
-            pct = 40 + min(59, int(done / total * 60))
-            RENDER_ACTIVE[project_id] = f"بيجمّع الفيديو النهائي… {pct}%"
-        if time.time() - started > FINAL_TIMEOUT:
-            proc.kill()
+            if done > state["done"]:
+                state["done"], state["last"] = done, time.time()
+                frac = min(1.0, done / length) if length > 0 else 0
+                RENDER_ACTIVE[project_id] = f"{label}… {int(pct[0] + (pct[1] - pct[0]) * frac)}%"
+        elif line.startswith("progress=end"):
+            state["last"] = time.time()
     proc.wait()
     reader.join(timeout=5)
-    return subprocess.CompletedProcess(cmd, proc.returncode, "", "".join(err_lines))
+    RENDER_PROCS.pop(project_id, None)
+    stderr = "".join(err_lines)
+    log_render(f"{label}: خلص برقم {proc.returncode} عند {state['done']:.1f}ث من {length:.1f}ث")
+    if stderr.strip():
+        log_render("FFmpeg قال:\n" + stderr.strip()[-3000:])
+    if state["stalled"]:
+        return -999, stderr
+    return proc.returncode, stderr
 
 
 def run_render(project_id: str, export_id: str, cmds: list[list[str]], total: float, name: str, work_dir: Path) -> None:
     filename = f"{export_id}.mp4"
     error = None
+    RENDER_LOG.write_text("", encoding="utf-8")
+    log_render(f"تصدير {name} ({total:.1f}ث، {len(cmds) - 1} قطعة) — السيرفر: {system_info()} — مساحة فاضية: {free_mb(EXPORTS_DIR)} ميجا")
     try:
         # الأوامر بتشتغل ورا بعض: كل قطعة لوحدها وبعدين التجميع النهائي
         segs = cmds[:-1]
-        for n, cmd in enumerate(segs, start=1):
-            RENDER_ACTIVE[project_id] = f"بيجهّز القطعة {n} من {len(segs)}… {int((n - 1) / len(segs) * 40)}%"
-            try:
-                result = subprocess.run(cmd, capture_output=True, text=True, timeout=SEGMENT_TIMEOUT)
-            except subprocess.TimeoutExpired:
-                error = f"تجهيز القطعة رقم {n} خد وقت أكتر من اللازم ووقف."
+        steps = [(c, f"بيجهّز القطعة {n} من {len(segs)}", (int((n - 1) / len(segs) * 40), int(n / len(segs) * 40)))
+                 for n, c in enumerate(segs, start=1)]
+        steps.append((cmds[-1], "بيجمّع الفيديو النهائي", (40, 99)))
+        for cmd, label, pct in steps:
+            if project_id in RENDER_CANCELLED:
                 break
-            if result.returncode != 0:
-                error = render_error(result)
+            length = float(cmd[cmd.index("-t") + 1]) if "-t" in cmd and cmd is not cmds[-1] else total
+            code, stderr = run_ffmpeg(cmd, project_id, length, pct, label)
+            if project_id in RENDER_CANCELLED:
                 break
-        if not error:
-            RENDER_ACTIVE[project_id] = "بيجمّع الفيديو النهائي… 40%"
-            result = run_final(cmds[-1], project_id, total)
-            if result.returncode != 0:
-                error = render_error(result)
+            if code == -999:
+                wait = f"{STALL_SECONDS // 60} دقايق" if STALL_SECONDS >= 120 else f"{STALL_SECONDS} ثانية"
+                error = (f"التصدير وقف مكانه أكتر من {wait} في «{label}» فوقّفته{memory_note()}. "
+                         "جرّب تاني، ولو اتكرر ابعت «سجل آخر تصدير» من ⚙️ الإعدادات.")
+                break
+            if code != 0:
+                error = render_error(subprocess.CompletedProcess(cmd, code, "", stderr))
+                break
+        if project_id in RENDER_CANCELLED:
+            error = "إنت لغيت التصدير."
     except Exception as exc:  # أي مشكلة غير متوقعة لازم تظهر، مش يفضل «بيصدّر» على طول
         error = f"حصلت مشكلة أثناء التصدير: {exc}"
+        log_render(f"مشكلة: {exc!r}")
     finally:
+        RENDER_CANCELLED.discard(project_id)
+        log_render(f"النهاية: {error or 'تمام ✓'}")
         shutil.rmtree(work_dir, ignore_errors=True)
         (TMP_DIR / f"{export_id}.ass").unlink(missing_ok=True)
         with closing(db()) as conn, conn:
@@ -1685,6 +1725,23 @@ def run_render(project_id: str, export_id: str, cmds: list[list[str]], total: fl
                     (export_id, now(), project_id),
                 )
         RENDER_ACTIVE.pop(project_id, None)
+
+
+@app.post("/api/projects/{project_id}/render/cancel")
+def cancel_render(project_id: str):
+    if project_id not in RENDER_ACTIVE:
+        raise HTTPException(400, "مفيش تصدير شغال للمشروع ده")
+    RENDER_CANCELLED.add(project_id)
+    proc = RENDER_PROCS.get(project_id)
+    if proc and proc.poll() is None:
+        proc.kill()
+    return {"ok": True}
+
+
+@app.get("/api/render-log")
+def get_render_log():
+    text = RENDER_LOG.read_text(encoding="utf-8") if RENDER_LOG.exists() else ""
+    return JSONResponse({"log": text or "لسه مفيش تصدير اتعمل من ساعة ما السيرفر اشتغل."})
 
 
 render_executor = ThreadPoolExecutor(max_workers=1)

@@ -115,7 +115,7 @@ def segment_command(ffmpeg: str, seg: Segment, output: Path, low_memory: bool = 
         "-filter_complex", ";".join(filters), "-map", "[v]", "-map", "[a]", "-t", f"{seg.duration:.3f}",
         # ملف مؤقت هيتضغط تاني: جودة عالية بس بحجم معقول عشان مساحة السيرفر متخلصش
         *encoder_args("veryfast", 16, low_memory),
-        "-c:a", "flac", str(output),
+        "-c:a", "flac", "-sample_fmt", "s16", str(output),
     ]
 
 

@@ -87,3 +87,23 @@ $("cleanTmp").onclick = async () => {
     toast(err.message, true);
   }
 };
+
+// ---------- سجل آخر تصدير (عشان نعرف المشكلة فين) ----------
+$("showLog").onclick = async () => {
+  try {
+    const r = await api("/api/render-log");
+    $("renderLog").textContent = r.log;
+    $("renderLog").hidden = false;
+    $("copyLog").hidden = false;
+  } catch (err) {
+    toast(err.message, true);
+  }
+};
+$("copyLog").onclick = async () => {
+  try {
+    await navigator.clipboard.writeText($("renderLog").textContent);
+    toast("✅ اتنسخ، ابعته في الشات");
+  } catch {
+    toast("حدّد الكلام وانسخه بإيدك", true);
+  }
+};
