@@ -547,3 +547,10 @@ dialog.bulk-dlg { width: min(900px, 96vw); max-height: 90vh; border: 1px solid v
 .clips-head h3 { margin: 0; }
 .btn.pulse { animation: pulse 1s ease-in-out 4; }
 @keyframes pulse { 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 35%, transparent); } }
+
+/* ---------- المساحة ---------- */
+.storage .bar { height: 10px; background: var(--surface-2); border-radius: 6px; overflow: hidden; margin: 4px 0; }
+.storage .bar span { display: block; height: 100%; }
+.storage ul { list-style: none; padding: 0; margin: 6px 0 10px; font-size: 13px; }
+.storage li { display: flex; justify-content: space-between; padding: 3px 0; border-bottom: 1px solid var(--line); }
+.storage li b { direction: ltr; }

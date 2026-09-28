@@ -1516,6 +1516,9 @@ $("renderBtn").onclick = async () => {
     pollRender();
   } catch (err) {
     toast(err.message, true);
+    // الرسالة بتفضل ظاهرة تحت الزرار عشان تقدر تقراها
+    $("renderError").textContent = err.message;
+    $("renderError").hidden = false;
   }
 };
 

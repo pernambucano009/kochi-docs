@@ -11,6 +11,7 @@ async function loadSettings() {
   api("/api/system").then((x) => {
     $("sysInfo").textContent = `🖥️ السيرفر: ${x.cpus ?? "?"} معالج · الذاكرة ${x.memory_limit_mb ? `${x.memory_limit_mb} ميجا (مستخدم ${x.memory_used_mb ?? "?"})` : "من غير حد معروف"}`;
   }).catch(() => {});
+  loadStorage();
   $("pwForm").hidden = s.password_from_env;
   $("pwEnvNote").hidden = !s.password_from_env;
 }
@@ -55,3 +56,34 @@ $("logout").onclick = async () => {
 };
 
 viewHooks["settings"] = loadSettings;
+
+// ---------- المساحة ----------
+const STORAGE_LABELS = {
+  raw: "الفيديوهات الخام", clips: "القطع", generated: "فيديوهات Seedance", coaches: "المدربين",
+  audio: "الصوت والموسيقى", exports: "الفيديوهات الجاهزة", tmp: "ملفات مؤقتة",
+};
+async function loadStorage() {
+  try {
+    const st = await api("/api/storage");
+    const used = st.total_mb - st.free_mb;
+    const pct = Math.round((used / st.total_mb) * 100);
+    $("storageInfo").innerHTML = `
+      <div class="bar"><span style="width:${pct}%;background:${pct > 90 ? "var(--danger)" : "var(--accent)"}"></span></div>
+      <p class="${pct > 90 ? "err" : "hint"}">مستخدم ${fmtMb(used)} من ${fmtMb(st.total_mb)} · فاضي ${fmtMb(st.free_mb)}</p>
+      <ul>${Object.entries(st.folders).map(([k, v]) => `<li><span>${STORAGE_LABELS[k] || k}</span><b>${fmtMb(v)}</b></li>`).join("")}</ul>`;
+  } catch (err) {
+    $("storageInfo").textContent = err.message;
+  }
+}
+function fmtMb(mb) {
+  return mb >= 1024 ? `${(mb / 1024).toFixed(1)} جيجا` : `${Math.round(mb)} ميجا`;
+}
+$("cleanTmp").onclick = async () => {
+  try {
+    const r = await api("/api/storage/clean", { method: "POST" });
+    toast(`✅ اتمسح ${fmtMb(r.freed_mb)}`);
+    loadStorage();
+  } catch (err) {
+    toast(err.message, true);
+  }
+};

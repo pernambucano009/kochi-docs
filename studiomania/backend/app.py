@@ -11,6 +11,7 @@ import re
 import shutil
 import sqlite3
 import subprocess
+import tempfile
 from xml.sax.saxutils import escape as xml_escape
 import threading
 import time
@@ -1505,6 +1506,8 @@ def render_error(result: subprocess.CompletedProcess) -> str:
     """رسالة الخطأ اللي بتظهر لما التصدير يفشل، من غير سطور التحذير اللي ملهاش لازمة."""
     if result.returncode < 0:
         return f"التصدير وقف فجأة (غالبًا ذاكرة السيرفر خلصت){memory_note()}. جرّب تاني."
+    if "No space left on device" in result.stderr:
+        return space_message(None, free_mb(EXPORTS_DIR))
     noise = ("Fontconfig", "fonctconfig", "fontconfig", "memory font", "Loading font")
     lines = [l for l in result.stderr.strip().splitlines() if l.strip() and not any(n in l for n in noise)]
     return f"FFmpeg: {chr(10).join(lines)[-400:] or f'خطأ رقم {result.returncode}'}"
@@ -1536,6 +1539,80 @@ def get_system():
     return system_info()
 
 
+# ---------- المساحة ----------
+SYSTEM_TMP = Path(tempfile.gettempdir()) / "studiomania-render"
+
+
+def free_mb(path: Path) -> int:
+    path.mkdir(parents=True, exist_ok=True)
+    return shutil.disk_usage(path).free // 2**20
+
+
+def folder_mb(path: Path) -> float:
+    total = 0
+    for f in path.rglob("*"):
+        try:
+            if f.is_file():
+                total += f.stat().st_size
+        except OSError:
+            pass
+    return round(total / 2**20, 1)
+
+
+def render_work_dir(export_id: str, total: float) -> Path:
+    """الملفات المؤقتة للتصدير بتتحط في المكان اللي فيه مساحة أكتر، ولو مفيش مساحة كفاية بنقول بدري."""
+    need_tmp = int(total * 2.5) + 50  # تقريبًا: القطع المؤقتة
+    need_out = int(total * 1.2) + 20  # الفيديو النهائي
+    out_free = free_mb(EXPORTS_DIR)
+    if out_free < need_out:
+        raise HTTPException(400, space_message(need_out, out_free))
+    choices = sorted([(free_mb(TMP_DIR), TMP_DIR), (free_mb(SYSTEM_TMP), SYSTEM_TMP)], key=lambda c: c[0], reverse=True)
+    free, base = choices[0]
+    # لو الملفات المؤقتة والفيديو النهائي على نفس المساحة لازم يكفّوا الاتنين
+    same = base.stat().st_dev == EXPORTS_DIR.stat().st_dev
+    if free < need_tmp + (need_out if same else 0):
+        raise HTTPException(400, space_message(need_tmp + need_out, free))
+    return base / f"render-{export_id}"
+
+
+def space_message(need: int | None, free: int) -> str:
+    what = f"محتاج حوالي {need} ميجا والفاضي {free} ميجا بس" if need else f"الفاضي {free} ميجا بس"
+    return (
+        f"مساحة السيرفر مش كفاية للتصدير: {what}. "
+        "امسح فيديوهات جاهزة قديمة (الخطوة 7) أو فيديوهات خام خلصت منها، أو دوس «امسح الملفات المؤقتة» في ⚙️ الإعدادات، "
+        "أو كبّر مساحة الـ Volume من إعدادات Railway."
+    )
+
+
+@app.get("/api/storage")
+def get_storage():
+    usage = shutil.disk_usage(DATA_DIR)
+    folders = {
+        "raw": RAW_DIR, "clips": CLIPS_DIR, "generated": GENERATED_DIR, "coaches": COACHES_DIR,
+        "audio": AUDIO_DIR, "exports": EXPORTS_DIR, "tmp": TMP_DIR,
+    }
+    return {
+        "total_mb": usage.total // 2**20, "free_mb": usage.free // 2**20,
+        "folders": {k: folder_mb(v) for k, v in folders.items()},
+    }
+
+
+@app.post("/api/storage/clean")
+def clean_storage():
+    """بيمسح الملفات المؤقتة بس (صور التايم لاين وبقايا التصدير)، وهي بتتعمل تاني لوحدها لما تحتاجها."""
+    if RENDER_ACTIVE:
+        raise HTTPException(400, "فيه تصدير شغال دلوقتي، استنى لما يخلص")
+    before = folder_mb(TMP_DIR) + folder_mb(SYSTEM_TMP)
+    for item in list(TMP_DIR.iterdir()) + list(SYSTEM_TMP.glob("render-*")):
+        if item.name in ("fonts.conf", "fontcache"):
+            continue
+        if item.is_dir():
+            shutil.rmtree(item, ignore_errors=True)
+        else:
+            item.unlink(missing_ok=True)
+    return {"freed_mb": round(before - folder_mb(TMP_DIR) - folder_mb(SYSTEM_TMP), 1)}
+
+
 # التصديرات اللي شغالة فعلًا دلوقتي، ووصلت لفين
 RENDER_ACTIVE: dict[str, str] = {}
 SEGMENT_TIMEOUT = 15 * 60
@@ -1565,7 +1642,7 @@ def run_final(cmd: list[str], project_id: str, total: float) -> subprocess.Compl
     return subprocess.CompletedProcess(cmd, proc.returncode, "", "".join(err_lines))
 
 
-def run_render(project_id: str, export_id: str, cmds: list[list[str]], total: float, name: str) -> None:
+def run_render(project_id: str, export_id: str, cmds: list[list[str]], total: float, name: str, work_dir: Path) -> None:
     filename = f"{export_id}.mp4"
     error = None
     try:
@@ -1589,7 +1666,7 @@ def run_render(project_id: str, export_id: str, cmds: list[list[str]], total: fl
     except Exception as exc:  # أي مشكلة غير متوقعة لازم تظهر، مش يفضل «بيصدّر» على طول
         error = f"حصلت مشكلة أثناء التصدير: {exc}"
     finally:
-        shutil.rmtree(TMP_DIR / f"render-{export_id}", ignore_errors=True)
+        shutil.rmtree(work_dir, ignore_errors=True)
         (TMP_DIR / f"{export_id}.ass").unlink(missing_ok=True)
         with closing(db()) as conn, conn:
             if error:
@@ -1624,8 +1701,9 @@ def render_project(project_id: str):
         export_id = uuid.uuid4().hex[:12]
         total = sum(sg.duration for sg in segments)
         subs = project_captions(conn, data, total, export_id)
+        work_dir = render_work_dir(export_id, total)
         cmd, total = montage.build_commands(
-            ffmpeg_exe(), segments, EXPORTS_DIR / f"{export_id}.mp4", TMP_DIR / f"render-{export_id}", voice, music,
+            ffmpeg_exe(), segments, EXPORTS_DIR / f"{export_id}.mp4", work_dir, voice, music,
             logo=project_logo(data, total, outro_len), subtitles=subs,
             low_memory=(system_info()["memory_limit_mb"] or 99999) < 1500,
         )
@@ -1634,7 +1712,7 @@ def render_project(project_id: str):
             "UPDATE projects SET render_status = 'rendering', render_error = NULL, updated_at = ? WHERE id = ?",
             (now(), project_id),
         )
-    render_executor.submit(run_render, project_id, export_id, cmd, total, row["name"])
+    render_executor.submit(run_render, project_id, export_id, cmd, total, row["name"], work_dir)
     return {"ok": True, "duration": total}
 
 
@@ -1658,7 +1736,7 @@ def list_exports():
 
 def reset_stuck_renders() -> None:
     """التصدير بيضيع لو البرنامج اتقفل في النص، فنعلّمه كفاشل."""
-    for leftover in TMP_DIR.glob("render-*"):
+    for leftover in [*TMP_DIR.glob("render-*"), *SYSTEM_TMP.glob("render-*")]:
         shutil.rmtree(leftover, ignore_errors=True)
     with closing(db()) as conn, conn:
         conn.execute(

@@ -113,9 +113,9 @@ def segment_command(ffmpeg: str, seg: Segment, output: Path, low_memory: bool = 
     )
     return args + [
         "-filter_complex", ";".join(filters), "-map", "[v]", "-map", "[a]", "-t", f"{seg.duration:.3f}",
-        # جودة عالية وسرعة عالية، لأنه ملف مؤقت هيتضغط تاني في المرحلة التانية
-        *encoder_args("ultrafast", 12, low_memory),
-        "-c:a", "pcm_s16le", str(output),
+        # ملف مؤقت هيتضغط تاني: جودة عالية بس بحجم معقول عشان مساحة السيرفر متخلصش
+        *encoder_args("veryfast", 16, low_memory),
+        "-c:a", "flac", str(output),
     ]
 
 
