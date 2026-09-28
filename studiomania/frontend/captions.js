@@ -128,7 +128,7 @@ function updatePreviewOverlays() {
   const W = PV_W, H = PV_H;
   const l = logoCfg();
   const img = $("pvLogo");
-  img.hidden = !(l.enabled && brand.logoUrl) || (l.on_outro === false && mt.activeItem?.kind === "outro");
+  img.hidden = !(l.enabled && brand.logoUrl) || (l.on_outro === false && (mt.activeItem?.kind === "outro" || mt.activeItem?.s?.kind === "outro"));
   if (!img.hidden) {
     if (img.getAttribute("src") !== brand.logoUrl) img.src = brand.logoUrl;
     const w = (W * l.size) / 100;

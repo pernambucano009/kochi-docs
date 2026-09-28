@@ -757,3 +757,8 @@ dialog::backdrop { background: rgba(20, 20, 20, .28); backdrop-filter: blur(4px)
 .orphan .when { font-weight: 500; }
 .orphan .cap { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .orphan .acts { display: flex; gap: 6px; }
+.pl-links { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.pl-link { font-size: 12px; padding: 3px 10px; border-radius: 999px; background: color-mix(in srgb, var(--ok) 14%, transparent); color: var(--ok); text-decoration: none; }
+a.pl-link:hover { background: color-mix(in srgb, var(--ok) 24%, transparent); }
+.pl-link.nolink { background: var(--surface-2); color: var(--muted); }
+.pl-link.bad { background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--danger); }

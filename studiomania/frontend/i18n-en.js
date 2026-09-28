@@ -731,5 +731,9 @@ window.I18N_EN = {
   "✅ اتلغى من Zernio": "✅ Cancelled on Zernio",
   "قراءة البوستات من Zernio": "Reading posts from Zernio",
   "البوست ده مش لاقيه عند Zernio، أو موجود في القايمة بالفعل": "Couldn't find this post on Zernio, or it's already in the list",
-  "تجهيز رفع الفيديو: رد غير متوقع (الحقول: {0})": "Preparing the video upload: unexpected response (fields: {0})"
+  "تجهيز رفع الفيديو: رد غير متوقع (الحقول: {0})": "Preparing the video upload: unexpected response (fields: {0})",
+  "✅ اللي اتنشر": "✅ Published",
+  "🔄 حدّث": "🔄 Refresh",
+  "لسه مفيش بوستات اتنشرت.": "No posts published yet.",
+  "✅ اتحدّث": "✅ Refreshed"
 };

@@ -176,15 +176,17 @@ def cancel(remote_id: str) -> None:
         _check(resp, "إلغاء البوست")
 
 
-def list_scheduled() -> list[dict]:
-    """البوستات المتجدولة عند Zernio: [{"id", "content", "scheduled_for", "platforms" (عندنا), "media_url"}]."""
+def list_posts(status: str, limit: int = 100) -> list[dict]:
+    """بوستات Zernio بحالة معيّنة، بشكل موحّد:
+    [{"id", "status", "content", "scheduled_for", "published_at", "media_url",
+      "platforms": [{"key" (عندنا), "status", "url", "error", "published_at"}]}]"""
     with _client(30) as c:
-        data = _check(c.get(f"{BASE_URL}/posts", params={"status": "scheduled", "limit": 100}), "قراءة البوستات من Zernio")
+        data = _check(c.get(f"{BASE_URL}/posts", params={"status": status, "limit": limit}), "قراءة البوستات من Zernio")
     items = data.get("posts", data.get("data", [])) if isinstance(data, dict) else data
     reverse = {remote: ours for ours, (remote, _) in PLATFORMS.items()}
     out = []
     for post in items or []:
-        if not isinstance(post, dict) or str(post.get("status", "scheduled")).lower() != "scheduled":
+        if not isinstance(post, dict):
             continue
         pid = post.get("_id") or post.get("id")
         if not pid:
@@ -192,14 +194,32 @@ def list_scheduled() -> list[dict]:
         media = next((m.get("url") for m in post.get("mediaItems") or [] if isinstance(m, dict) and m.get("url")), None)
         plats = []
         for pl in post.get("platforms") or []:
-            name = pl.get("platform") if isinstance(pl, dict) else pl
-            if reverse.get(str(name).lower()):
-                plats.append(reverse[str(name).lower()])
+            name = str(pl.get("platform") if isinstance(pl, dict) else pl).lower()
+            if name not in reverse:
+                continue
+            info = pl if isinstance(pl, dict) else {}
+            plats.append({
+                "key": reverse[name],
+                "status": str(info.get("status") or post.get("status") or "").lower(),
+                "url": info.get("platformPostUrl") or info.get("postUrl") or info.get("url"),
+                "error": info.get("errorMessage") or info.get("error"),
+                "published_at": info.get("publishedAt"),
+            })
         out.append({
-            "id": str(pid), "content": post.get("content") or "", "scheduled_for": post.get("scheduledFor"),
-            "platforms": list(dict.fromkeys(plats)), "media_url": media,
+            "id": str(pid), "status": str(post.get("status") or status).lower(), "content": post.get("content") or "",
+            "scheduled_for": post.get("scheduledFor"), "published_at": post.get("publishedAt"),
+            "media_url": media, "platforms": plats,
         })
     return out
+
+
+def list_scheduled() -> list[dict]:
+    """البوستات المتجدولة عند Zernio (الشكل القديم اللي بتستخدمه مقارنة القايمة)."""
+    return [
+        {"id": p["id"], "content": p["content"], "scheduled_for": p["scheduled_for"],
+         "platforms": list(dict.fromkeys(x["key"] for x in p["platforms"])), "media_url": p["media_url"]}
+        for p in list_posts("scheduled") if p["status"] == "scheduled"
+    ]
 
 
 def retry(remote_id: str) -> None:

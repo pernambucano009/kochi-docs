@@ -31,6 +31,7 @@ async function initPublish() {
   renderPlatformBoxes();
   await Promise.all([pubLoadExports(), pubLoadPosts()]);
   if (pub.service === "zernio") loadRemoteOrphans();
+  loadPublished();
   if (!$("postWhen").value) setWhen(nextSlot());
 }
 
@@ -343,3 +344,33 @@ $("remoteOrphans").addEventListener("click", async (e) => {
     toast(err.message, true);
   }
 });
+
+// ---------- اللي اتنشر (من Zernio، بلينك البوست على كل منصة) ----------
+const PLATFORM_ICON = { tiktok: "♪", instagram: "◎", youtube: "▶", facebook: "f", x: "𝕏" };
+async function loadPublished(verbose = false) {
+  try {
+    const list = await api("/api/posts/published");
+    $("publishedEmpty").hidden = list.length > 0;
+    $("publishedCount").textContent = list.length ? `(${list.length})` : "";
+    $("publishedList").innerHTML = list.map((p) => {
+      const when = p.published_at ? new Date(p.published_at).toLocaleString(UI_LOCALE(), { weekday: "long", day: "numeric", month: "long", hour: "numeric", minute: "2-digit" }) : "";
+      const plats = p.platforms.map((x) => {
+        const name = pub.platforms[x.key] || x.key;
+        const ok = !x.status || x.status === "published";
+        if (x.url) return `<a class="pl-link ${ok ? "" : "bad"}" href="${escapeHtml(x.url)}" target="_blank" rel="noopener">${PLATFORM_ICON[x.key] || ""} ${escapeHtml(name)} ↗</a>`;
+        return `<span class="pl-link ${ok ? "nolink" : "bad"}" title="${escapeHtml(x.error || "")}">${PLATFORM_ICON[x.key] || ""} ${escapeHtml(name)}${ok ? "" : " ✕"}</span>`;
+      }).join("");
+      return `<li>
+        ${p.media_url ? `<video src="${escapeHtml(p.media_url)}#t=0.5" preload="metadata" muted></video>` : ""}
+        <div class="info"><span class="when">${when}</span>
+          ${p.name ? `<span>${escapeHtml(p.name)}</span>` : ""}
+          ${p.content ? `<span class="cap" title="${escapeHtml(p.content)}">${escapeHtml(p.content)}</span>` : ""}
+          <span class="pl-links">${plats}</span></div>
+      </li>`;
+    }).join("");
+    if (verbose) toast("✅ اتحدّث");
+  } catch (err) {
+    if (verbose) toast(err.message, true);
+  }
+}
+$("publishedRefresh").onclick = () => loadPublished(true);

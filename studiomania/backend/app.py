@@ -1214,6 +1214,21 @@ def media_info(path: Path) -> montage.MediaInfo:
     return _probe_cache[key]
 
 
+OUTRO_PREFIX = "outro:"  # قطعة في المونتاج من أوترو مدرب: gen_id = "outro:<coach id>"
+
+
+def clip_source(conn: sqlite3.Connection, gen_id: str) -> Path | None:
+    if gen_id.startswith(OUTRO_PREFIX):
+        row = conn.execute("SELECT outro_filename AS f FROM coaches WHERE id = ?", (gen_id[len(OUTRO_PREFIX):],)).fetchone()
+        base = COACHES_DIR
+    else:
+        row = conn.execute("SELECT output_filename AS f FROM generations WHERE id = ?", (gen_id,)).fetchone()
+        base = GENERATED_DIR
+    if row is None or not row["f"] or not (base / row["f"]).exists():
+        return None
+    return base / row["f"]
+
+
 @app.get("/api/montage/sources")
 def montage_sources():
     """الفيديوهات المولَّدة الجاهزة اللي ينفع تدخل المونتاج."""
@@ -1237,6 +1252,18 @@ def montage_sources():
                 "has_audio": media_info(path).has_audio,
             }
         )
+    # أوترو كل مدرب بيدخل المونتاج كقطعة عادية (تتقص وتتحرك وتتقسم)
+    with closing(db()) as conn:
+        for c in conn.execute("SELECT id, name, outro_filename FROM coaches WHERE outro_filename IS NOT NULL ORDER BY name"):
+            path = COACHES_DIR / c["outro_filename"]
+            if not path.exists():
+                continue
+            info = media_info(path)
+            out.append({
+                "id": f"{OUTRO_PREFIX}{c['id']}", "kind": "outro", "label": f"🎬 أوترو {c['name']}",
+                "coach_id": c["id"], "coach_name": c["name"], "url": f"/media/coaches/{c['outro_filename']}",
+                "duration": info.duration, "has_audio": info.has_audio,
+            })
     return out
 
 
@@ -1407,10 +1434,9 @@ def build_montage(conn: sqlite3.Connection, data: dict):
     segments = []
     outro_len = 0.0
     for i, c in enumerate(data["clips"], start=1):
-        g = conn.execute("SELECT output_filename FROM generations WHERE id = ?", (c["gen_id"],)).fetchone()
-        if g is None or not g["output_filename"] or not (GENERATED_DIR / g["output_filename"]).exists():
+        path = clip_source(conn, c["gen_id"])
+        if path is None:
             raise HTTPException(400, f"الفيديو رقم {i} اتمسح. شيله من المونتاج")
-        path = GENERATED_DIR / g["output_filename"]
         info = media_info(path)
         start = clamp(c["start"], 0, info.duration)
         end = clamp(c["end"] if c["end"] is not None else info.duration, 0, info.duration)
@@ -1425,6 +1451,11 @@ def build_montage(conn: sqlite3.Connection, data: dict):
         )
     if not segments:
         raise HTTPException(400, "ضيف فيديو واحد على الأقل للمونتاج")
+    # الأوترو اللي في آخر المونتاج (عشان اللوجو يختفي وقته لو اخترت كده)
+    for c, seg in zip(reversed(data["clips"]), reversed(segments)):
+        if not c["gen_id"].startswith(OUTRO_PREFIX):
+            break
+        outro_len += seg.duration
 
     if data.get("outro") and data.get("coach_id"):
         coach = conn.execute("SELECT outro_filename FROM coaches WHERE id = ?", (data["coach_id"],)).fetchone()
@@ -1893,6 +1924,7 @@ def post_to_dict(r: sqlite3.Row) -> dict:
         "error": r["error"],
         "published_at": r["published_at"],
         "sent": bool(r["remote_id"]),
+        "remote_id": r["remote_id"],
     }
 
 
@@ -2055,6 +2087,35 @@ def _remote_orphans() -> list[dict]:
     with closing(db()) as conn:
         known = {r["remote_id"] for r in conn.execute("SELECT remote_id FROM posts WHERE remote_id IS NOT NULL")}
     return [p for p in remote if p["id"] not in known]
+
+
+@app.get("/api/posts/published")
+def published_posts():
+    """اللي اتنشر: من Zernio (بلينك البوست على كل منصة)، ولو مفيش Zernio من القايمة هنا."""
+    with closing(db()) as conn:
+        local = [post_to_dict(r) for r in conn.execute(POSTS_QUERY + " WHERE p.status = 'published' ORDER BY p.published_at DESC")]
+    if publisher.service_name() != "zernio":
+        return [{"id": p["id"], "content": p["caption"], "published_at": p["published_at"] or p["scheduled_at"],
+                 "media_url": p["export_url"], "name": p["export_name"],
+                 "platforms": [{"key": k, "status": "published", "url": None, "error": None} for k in p["platforms"]]}
+                for p in local]
+    try:
+        remote = publisher.list_posts("published", 50)
+    except (publisher.PublishError, httpx.HTTPError) as exc:
+        raise HTTPException(400, f"مقدرتش أوصل لـ Zernio: {exc}") from exc
+    by_remote = {p.get("remote_id"): p for p in local}
+    with closing(db()) as conn:
+        names = {r["remote_id"]: r["export_name"] for r in conn.execute(POSTS_QUERY + " WHERE p.remote_id IS NOT NULL")}
+    out = []
+    for r in remote:
+        ours = by_remote.get(r["id"])
+        out.append({
+            "id": r["id"], "content": r["content"], "media_url": r["media_url"] or (ours or {}).get("export_url"),
+            "published_at": r["published_at"] or next((x["published_at"] for x in r["platforms"] if x.get("published_at")), None) or r["scheduled_for"],
+            "name": names.get(r["id"]), "platforms": r["platforms"],
+        })
+    out.sort(key=lambda x: x["published_at"] or "", reverse=True)
+    return out
 
 
 @app.get("/api/posts/remote")

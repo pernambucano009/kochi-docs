@@ -117,8 +117,30 @@ function openProject(p) {
   if (mt.project.render_status === "rendering") pollRender();
 }
 
+// ---------- الأوترو: قطعة فيديو عادية جوه التايم لاين ----------
+const OUTRO_PREFIX = "outro:";
+const isOutroClip = (c) => c.gen_id.startsWith(OUTRO_PREFIX);
+const outroIdFor = (coachId) => `${OUTRO_PREFIX}${coachId}`;
+function coachHasOutro(coachId) {
+  return !!coachId && mt.sources.some((s) => s.id === outroIdFor(coachId));
+}
+function addOutroClip(d) {
+  if (!coachHasOutro(d.coach_id) || d.clips.some(isOutroClip)) return false;
+  d.clips.push({ gen_id: outroIdFor(d.coach_id), ...CLIP_DEFAULTS, volume: d.outro_volume ?? 1 });
+  return true;
+}
+// المشاريع القديمة (والجديدة) فيها «ضيف الأوترو» كإعداد: بنحوّله لقطعة في آخر الفيديو مرة واحدة
+function migrateOutro(d) {
+  if (!d.outro) return false;
+  if (!d.coach_id) return false; // لسه مفيش مدرب، الأوترو هيتضاف أول ما يتختار
+  addOutroClip(d);
+  d.outro = false;
+  return true;
+}
+
 function renderAll() {
   normalizeTracks(mt.project.data);
+  if (migrateOutro(mt.project.data)) scheduleSave();
   fixSelection();
   renderBin();
   renderTimeline();
@@ -316,6 +338,11 @@ function stripInfo(kind, id) {
   return null;
 }
 
+function clipStrip(s, inSec, width) {
+  if (!s) return "";
+  return s.kind === "outro" ? stripHtml("outro", s.coach_id, inSec, width) : stripHtml("gen", s.id, inSec, width);
+}
+
 function stripHtml(kind, id, inSec, width) {
   const info = id && stripInfo(kind, id);
   if (!info) return "";
@@ -429,7 +456,7 @@ function renderTimeline() {
         .map((it) => {
           const w = (it.t1 - it.t0) * mt.pps;
           const sel = isSel(it.kind === "clip" ? { kind: "clip", i: it.i } : { kind: "outro" });
-          const strip = it.kind === "clip" ? stripHtml("gen", it.s?.id, it.in, w) : stripHtml("outro", it.coach.id, 0, w);
+          const strip = it.kind === "clip" ? clipStrip(it.s, it.in, w) : stripHtml("outro", it.coach.id, 0, w);
           const label = it.kind === "clip" ? (it.s ? escapeHtml(it.s.label) : "⚠️ الفيديو اتمسح") : `🎬 أوترو ${escapeHtml(it.coach.name)}`;
           return `<div class="tl-clip ${it.kind} ${sel ? "selected" : ""} ${it.s || it.kind === "outro" ? "" : "missing"}"
               ${it.kind === "clip" ? `data-i="${it.i}"` : `data-outro="1"`} style="left:${it.t0 * mt.pps}px;width:${w}px">
@@ -909,7 +936,7 @@ function trimClip(e, i, side) {
       el.style.left = `${left * mt.pps}px`;
       el.style.width = `${len * mt.pps}px`;
       el.querySelector(".strip")?.remove();
-      el.insertAdjacentHTML("afterbegin", stripHtml("gen", s.id, c.start, len * mt.pps));
+      el.insertAdjacentHTML("afterbegin", clipStrip(s, c.start, len * mt.pps));
       const cv = el.querySelector("canvas.cw");
       if (cv) drawWave(cv, s.url, c.start, len, c.volume > 0 ? "#9fe3a8" : "#6b7180", c.volume);
       el.querySelector(".du").textContent = `${len.toFixed(1)}s`;
@@ -1359,11 +1386,13 @@ function renderSide() {
   const d = mt.project.data;
   const coach = mt.coaches.find((c) => c.id === d.coach_id);
   $("mCoach").value = d.coach_id || "";
-  $("mOutro").checked = d.outro;
+  const outros = d.clips.filter(isOutroClip);
+  $("mOutro").checked = outros.length > 0;
   $("mOutro").disabled = !coach?.outro_url;
   $("outroInfo").textContent = !coach ? "" : coach.outro_url ? `(${fmtDuration(coach.outro_duration)})` : "(المدرب ده مالوش أوترو)";
-  $("mOutroVol").value = Math.round(d.outro_volume * 100);
-  $("outroVolVal").textContent = `${Math.round(d.outro_volume * 100)}%`;
+  const ov = outros[0]?.volume ?? d.outro_volume ?? 1;
+  $("mOutroVol").value = Math.round(ov * 100);
+  $("outroVolVal").textContent = `${Math.round(ov * 100)}%`;
 
   $("mVoice").value = d.voice?.id || "";
   $("voiceOpts").hidden = !d.voice;
@@ -1392,9 +1421,23 @@ function renderSide() {
 function sideInput(key, apply) {
   return () => { pushHistory(key); apply(mt.project.data); fixSelection(); renderSide(); renderTimeline(); syncPreview(); scheduleSave(); };
 }
-$("mCoach").addEventListener("change", sideInput(null, (d) => { d.coach_id = $("mCoach").value || null; renderBin(); }));
-$("mOutro").addEventListener("change", sideInput(null, (d) => (d.outro = $("mOutro").checked)));
-$("mOutroVol").addEventListener("input", sideInput("outroVol", (d) => (d.outro_volume = $("mOutroVol").value / 100)));
+$("mCoach").addEventListener("change", sideInput(null, (d) => {
+  d.coach_id = $("mCoach").value || null;
+  // الأوترو بيتبدّل بأوترو المدرب الجديد (أو بيتشال لو مالوش أوترو)
+  const had = d.clips.some(isOutroClip);
+  d.clips = d.clips.filter((c) => !isOutroClip(c));
+  if (had) addOutroClip(d);
+  renderBin();
+}));
+$("mOutro").addEventListener("change", sideInput(null, (d) => {
+  if ($("mOutro").checked) addOutroClip(d);
+  else d.clips = d.clips.filter((c) => !isOutroClip(c));
+  d.outro = false;
+}));
+$("mOutroVol").addEventListener("input", sideInput("outroVol", (d) => {
+  d.outro_volume = $("mOutroVol").value / 100;
+  d.clips.filter(isOutroClip).forEach((c) => (c.volume = d.outro_volume));
+}));
 $("mVoice").addEventListener("change", sideInput(null, (d) => {
   const vol = d.voice?.parts?.[0]?.volume ?? 1, delay = d.voice?.parts?.[0]?.delay ?? 0;
   d.voice = $("mVoice").value
@@ -1592,7 +1635,8 @@ $("refreshFromVideo").onclick = async () => {
     pushHistory();
     // التعديلات (قص وزووم...) بتفضل على الفيديوهات اللي كانت موجودة
     const old = new Map(d.clips.map((c) => [c.gen_id, c]));
-    d.clips = draft.gen_ids.map((gen_id) => old.get(gen_id) || { gen_id, ...CLIP_DEFAULTS });
+    const outros = d.clips.filter(isOutroClip);
+    d.clips = [...draft.gen_ids.map((gen_id) => old.get(gen_id) || { gen_id, ...CLIP_DEFAULTS }), ...outros];
     if (draft.voice && d.voice?.id !== draft.voice.id) {
       d.voice = { id: draft.voice.id, volume: d.voice?.volume ?? 1, delay: d.voice?.delay ?? 0, offset: 0, length: null, fade_out: false };
     }
