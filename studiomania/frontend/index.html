@@ -171,6 +171,7 @@
                 <div class="element" id="elVideo"></div>
                 <div class="element" id="elVoice"></div>
                 <div class="element" id="elCoach"></div>
+                <div class="element el-script" id="elScript"></div>
               </div>
               <div class="row wrap gap-top">
                 <button class="btn" id="goCut">✂️ افتح في التقطيع</button>
@@ -672,7 +673,7 @@
 </dialog>
 <dialog class="bulk-dlg" id="fupDialog">
   <div class="panel-head"><h2>📂 رفع مشاريع من فولدرات</h2><button class="btn sm" id="fupClose">✕</button></div>
-  <p class="hint">كل فولدر = مشروع باسمه. جوّه: الفيديو الخام، والتعليق الصوتي، وصورة المدرب. الأوترو بييجي من المدرب اللي تختاره. راجع وعدّل قبل الرفع.</p>
+  <p class="hint">كل فولدر = مشروع باسمه. جوّه: الفيديو الخام، والتعليق الصوتي، وصورة المدرب، وملف السكريبت (.txt). الأوترو بييجي من المدرب اللي تختاره. راجع وعدّل قبل الرفع.</p>
   <div class="row wrap fup-add">
     <label class="btn sm" id="fupAddDrop">＋ ضيف فولدرات كمان (أو اسحبها هنا)
       <input type="file" id="fupAdd" webkitdirectory directory multiple hidden></label>
@@ -680,7 +681,7 @@
   </div>
   <div class="bulk-table-wrap">
     <table class="bulk-table fup-table">
-      <thead><tr><th>اسم المشروع</th><th>🎬 الفيديو</th><th>🎙️ الصوت</th><th>🧑‍🏫 المدرب</th><th></th></tr></thead>
+      <thead><tr><th>اسم المشروع</th><th>🎬 الفيديو</th><th>🎙️ الصوت والسكريبت</th><th>🧑‍🏫 المدرب</th><th></th></tr></thead>
       <tbody id="fupRows"></tbody>
     </table>
   </div>

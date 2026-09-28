@@ -309,6 +309,9 @@ with closing(db()) as _conn, _conn:
     )
     if "coach_id" not in {c[1] for c in _conn.execute("PRAGMA table_info(videos)")}:
         _conn.execute("ALTER TABLE videos ADD COLUMN coach_id TEXT")
+    # سكريبت التعليق الصوتي (النص اللي الراوي بيقراه)
+    if "script" not in {c[1] for c in _conn.execute("PRAGMA table_info(folders)")}:
+        _conn.execute("ALTER TABLE folders ADD COLUMN script TEXT")
     if "transcript" not in {c[1] for c in _conn.execute("PRAGMA table_info(audio)")}:
         _conn.execute("ALTER TABLE audio ADD COLUMN transcript TEXT")
     # لو البرنامج اتقفل وهو بيكتب الكلام، نعلّمه كفاشل عشان تعيد
@@ -2428,7 +2431,7 @@ def folder_to_dict(conn: sqlite3.Connection, f: sqlite3.Row) -> dict:
                 break
     return {
         "id": f["id"], "name": f["name"], "created_at": f["created_at"],
-        "video": video, "voice": voice, "coach": coach,
+        "video": video, "voice": voice, "coach": coach, "script": f["script"] or "",
         "montage_project": montage_project, "exported": exported,
     }
 
@@ -2457,7 +2460,7 @@ def create_folder(body: FolderIn):
 
 @app.patch("/api/folders/{folder_id}")
 def update_folder(folder_id: str, body: dict):
-    """بيغيّر اللي اتبعت بس: name أو voice_id أو coach_id (null = شيله)."""
+    """بيغيّر اللي اتبعت بس: name أو voice_id أو coach_id أو script (null = شيله)."""
     with closing(db()) as conn, conn:
         get_folder(conn, folder_id)
         if "name" in body:
@@ -2475,6 +2478,11 @@ def update_folder(folder_id: str, body: dict):
             if cid:
                 get_coach(conn, cid)
             conn.execute("UPDATE folders SET coach_id = ? WHERE id = ?", (cid, folder_id))
+        if "script" in body:
+            script = str(body["script"] or "").replace("\r\n", "\n").strip()
+            if len(script) > 200_000:
+                raise HTTPException(400, "السكريبت طويل جدًا")
+            conn.execute("UPDATE folders SET script = ? WHERE id = ?", (script or None, folder_id))
         sync_folder(conn, folder_id)
         return folder_to_dict(conn, get_folder(conn, folder_id))
 

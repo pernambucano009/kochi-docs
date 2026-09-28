@@ -696,6 +696,11 @@ dialog.bulk-dlg { width: min(900px, 96vw); max-height: 90vh; border: 1px solid v
 .element video { width: 100%; max-height: 300px; background: #000; border-radius: 8px; }
 .element audio { width: 100%; }
 .element select { width: 100%; background: var(--surface); border: 1px solid var(--line); color: var(--text); padding: 7px 8px; border-radius: 8px; font: inherit; font-size: 13px; }
+.el-script { grid-column: 1 / -1; }
+.el-script textarea { width: 100%; min-height: 150px; resize: vertical; background: var(--surface); border: 1px solid var(--line); color: var(--text); padding: 10px 12px; border-radius: 10px; font: inherit; font-size: 15px; line-height: 1.8; }
+.el-script .script-meta { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; font-size: 12px; color: var(--muted); }
+.el-script .script-meta .dirty { color: var(--accent, #E5613E); font-weight: 600; }
+.fup-script { font-size: 12px; color: var(--muted); max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .el-empty { border: 2px dashed var(--line); border-radius: 10px; padding: 22px 8px; text-align: center; color: var(--muted); font-size: 13px; }
 .el-title { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .el-coach { width: 110px; height: 110px; object-fit: cover; border-radius: 12px; }

@@ -116,11 +116,145 @@ function renderFolderDetail() {
          <a href="#" class="btn sm" data-goto="4">＋ ضيف مدرب جديد</a>
        </div>`;
 
+  renderScript(f);
+
   $("goCut").disabled = !f.video;
   $("goGenerate").disabled = !f.video?.clips;
   $("goMontage").disabled = !f.video?.generated;
   $("goMontage").textContent = f.montage_project ? "🎬 افتح في المونتاج" : "🎬 اعمل المونتاج";
 }
+
+// ---------- السكريبت (نص التعليق الصوتي) ----------
+const RE_TEXT = /\.(txt|md|srt)$/i;
+const WORDS_PER_MIN = 140; // سرعة قراية الراوي تقريبًا
+
+// بيقرا ملف التكست بأي ترميز شائع (UTF-8 أو UTF-16 أو ويندوز العربي)
+async function readTextFile(file) {
+  const buf = new Uint8Array(await file.arrayBuffer());
+  let text;
+  if (buf[0] === 0xff && buf[1] === 0xfe) text = new TextDecoder("utf-16le").decode(buf);
+  else if (buf[0] === 0xfe && buf[1] === 0xff) text = new TextDecoder("utf-16be").decode(buf);
+  else {
+    try { text = new TextDecoder("utf-8", { fatal: true }).decode(buf); }
+    catch { text = new TextDecoder("windows-1256").decode(buf); }
+  }
+  text = text.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n");
+  // ملف ترجمة: نشيل الأرقام والتوقيتات ونسيب الكلام بس
+  if (/\.srt$/i.test(file.name)) {
+    text = text.split(/\n{2,}/).map((b) => b.split("\n")
+      .filter((l) => !/^\d+$/.test(l.trim()) && !/-->/.test(l)).join(" ").trim())
+      .filter(Boolean).join("\n");
+  }
+  return text.trim();
+}
+
+function scriptWords(text) { return (text.match(/\S+/g) || []).length; }
+
+function scriptMeta(f, text) {
+  const words = scriptWords(text);
+  if (!words) return "";
+  const secs = Math.round((words / WORDS_PER_MIN) * 60);
+  const parts = [`${words} كلمة`, `قراية تقريبًا ${fmtDuration(secs)}`];
+  if (f.voice) parts.push(`التسجيل الحالي ${fmtDuration(f.voice.duration)}`);
+  return parts.map((p) => `<span>${p}</span>`).join("·");
+}
+
+const scriptState = { folder: null, saved: "", dirty: false };
+
+function renderScript(f) {
+  const el = $("elScript");
+  // متمسحش اللي بتكتبه لو الصفحة اتحدّثت وانت لسه محفظتش
+  if (scriptState.folder === f.id && scriptState.dirty && el.querySelector("textarea")) return;
+  scriptState.folder = f.id;
+  scriptState.saved = f.script || "";
+  scriptState.dirty = false;
+  el.innerHTML = `<h3>📝 السكريبت</h3>
+    <div class="muted">النص اللي الراوي بيقراه. لو حبيت تغيّر صوت الراوي بعدين، ده النص اللي هيتسجّل بيه.</div>
+    <textarea id="scriptText" dir="auto" placeholder="اكتب أو الزق السكريبت هنا، أو ارفع ملف تكست (.txt)"></textarea>
+    <div class="script-meta" id="scriptMeta"></div>
+    <div class="row wrap">
+      <button class="btn sm primary" id="scriptSave" disabled>💾 احفظ السكريبت</button>
+      <label class="btn sm">📄 ارفع ملف تكست<input type="file" id="scriptFile" accept=".txt,.md,.srt,text/plain" hidden></label>
+      <button class="btn sm" id="scriptCopy" ${f.script ? "" : "disabled"}>📋 انسخ</button>
+      <button class="btn sm" id="scriptDownload" ${f.script ? "" : "disabled"}>⬇ نزّله ملف</button>
+    </div>`;
+  $("scriptText").value = scriptState.saved;
+  updateScriptMeta();
+}
+
+function updateScriptMeta() {
+  const f = fol.current;
+  const text = $("scriptText").value;
+  scriptState.dirty = text.trim() !== scriptState.saved.trim();
+  $("scriptSave").disabled = !scriptState.dirty;
+  $("scriptMeta").innerHTML = scriptMeta(f, text) + (scriptState.dirty ? `<span class="dirty">● متعدّل ومتحفظش</span>` : "");
+}
+
+async function saveScript() {
+  const text = $("scriptText").value.trim();
+  const id = scriptState.folder;
+  scriptState.dirty = false;
+  try {
+    const f = await api(`/api/folders/${id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ script: text }),
+    });
+    // لو فتحت مشروع تاني وهو بيحفظ، متغيّرش المشروع اللي قدامك
+    if (fol.current?.id === id) {
+      fol.current = f;
+      scriptState.saved = f.script || "";
+      updateScriptMeta();
+      $("scriptCopy").disabled = $("scriptDownload").disabled = !f.script;
+    }
+    const i = fol.list.findIndex((x) => x.id === id);
+    if (i >= 0) fol.list[i] = f;
+    toast(text ? "✅ السكريبت اتحفظ" : "السكريبت اتمسح");
+  } catch (err) {
+    if (scriptState.folder === id) scriptState.dirty = true;
+    toast(err.message, true);
+  }
+}
+
+$("elScript").addEventListener("input", (e) => { if (e.target.id === "scriptText") updateScriptMeta(); });
+// بيتحفظ لوحده لما تخرج من خانة الكتابة، عشان لو فتحت مشروع تاني ميضيعش
+$("elScript").addEventListener("focusout", (e) => { if (e.target.id === "scriptText" && scriptState.dirty) saveScript(); });
+$("elScript").addEventListener("keydown", (e) => {
+  if (e.target.id === "scriptText" && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+    e.preventDefault();
+    if (scriptState.dirty) saveScript();
+  }
+});
+$("elScript").addEventListener("change", async (e) => {
+  if (e.target.id !== "scriptFile") return;
+  e.stopPropagation(); // متتعاملش كأنه رفع فيديو أو صوت
+  const file = e.target.files[0];
+  e.target.value = "";
+  if (!file) return;
+  try {
+    const text = await readTextFile(file);
+    if (!text) return toast("الملف فاضي", true);
+    if (scriptState.saved && !confirm("ده هيبدّل السكريبت الحالي بالملف الجديد. تكمّل؟")) return;
+    $("scriptText").value = text;
+    await saveScript();
+  } catch (err) {
+    toast(err.message, true);
+  }
+});
+$("elScript").addEventListener("click", async (e) => {
+  const id = e.target.closest("button")?.id;
+  if (id === "scriptSave" && scriptState.dirty) saveScript();
+  if (id === "scriptCopy") {
+    try { await navigator.clipboard.writeText($("scriptText").value); toast("📋 اتنسخ"); }
+    catch { $("scriptText").select(); document.execCommand("copy"); toast("📋 اتنسخ"); }
+  }
+  if (id === "scriptDownload") {
+    const blob = new Blob(["\uFEFF" + $("scriptText").value], { type: "text/plain;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${fol.current.name} - script.txt`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+});
 
 async function patchFolder(changes, msg) {
   try {
@@ -251,7 +385,7 @@ const RE_IMAGE = /\.(png|jpe?g|webp)$/i;
 const RE_OUTRO = /(outro|اوترو|أوترو|إوترو)/i;
 const IGNORE = /(^\.|thumbs\.db$|desktop\.ini$)/i;
 
-function mb(f) { return `${(f.size / 1048576).toFixed(1)}MB`; }
+function mb(f) { return f.size < 1048576 ? `${Math.max(1, Math.round(f.size / 1024))}KB` : `${(f.size / 1048576).toFixed(1)}MB`; }
 
 // items: [{file, path}] والـ path بيبدأ باسم الفولدر اللي اتختار
 function groupIntoProjects(items) {
@@ -271,20 +405,26 @@ function groupIntoProjects(items) {
     const raws = videos.filter((f) => !RE_OUTRO.test(f.name)).sort((a, b) => b.size - a.size);
     const audios = files.filter((f) => RE_AUDIO.test(f.name)).sort((a, b) => b.size - a.size);
     const images = files.filter((f) => RE_IMAGE.test(f.name));
-    if (!raws.length && !audios.length && !images.length) continue;
+    // السكريبت: ملف التكست (الأكبر لو فيه كذا واحد، والـ txt قبل الترجمة)
+    const texts = files.filter((f) => RE_TEXT.test(f.name))
+      .sort((a, b) => (/\.srt$/i.test(a.name) - /\.srt$/i.test(b.name)) || b.size - a.size);
+    if (!raws.length && !audios.length && !images.length && !texts.length) continue;
     const notes = [];
     if (raws.length > 1) notes.push(`فيه ${raws.length} فيديوهات، هاخد الأكبر`);
     if (audios.length > 1) notes.push(`فيه ${audios.length} ملفات صوت، هاخد الأكبر`);
+    if (texts.length > 1) notes.push(`فيه ${texts.length} ملفات تكست، هاخد الأكبر`);
     const image = images[0] || null;
     const key = image ? matchKey(image.name) : "";
     const existingCoach = key ? coachState.list.find((c) => matchKey(c.name) === key) || fol.coaches.find((c) => matchKey(c.name) === key) : null;
     const existingFolder = fol.list.find((f) => f.name.trim() === name.trim());
     rows.push({
       name, video: raws[0] || null, voice: audios[0] || null, image, notes,
+      script: texts[0] || null, scriptText: "",
       files: {
         video: [...raws, ...outros],
         voice: audios,
         image: images,
+        script: texts,
       },
       // coach: "" = من غير مدرب، "new" = مدرب جديد من الصورة، أو id مدرب موجود
       coach: existingCoach ? existingCoach.id : image ? "new" : "",
@@ -297,7 +437,12 @@ function groupIntoProjects(items) {
   return rows;
 }
 
-const SLOT_LABEL = { video: "الفيديو الخام", voice: "التعليق الصوتي", image: "صورة المدرب" };
+const SLOT_LABEL = { video: "الفيديو الخام", voice: "التعليق الصوتي", image: "صورة المدرب", script: "السكريبت" };
+
+async function loadRowScript(r) {
+  try { r.scriptText = r.script ? await readTextFile(r.script) : ""; }
+  catch { r.scriptText = ""; }
+}
 
 function slotSelect(r, slot) {
   const files = r.files[slot];
@@ -329,7 +474,10 @@ function renderFup() {
           ${r.existingFolderId ? `<div class="warn-text">مشروع بالاسم ده موجود، هيتحدّث</div>` : ""}
           ${r.status && r.status !== "done" ? `<div class="${r.status.startsWith("✕") ? "err" : "muted"}">${escapeHtml(r.status)}</div>` : ""}</td>
         <td>${slotSelect(r, "video")}</td>
-        <td>${slotSelect(r, "voice")}</td>
+        <td>${slotSelect(r, "voice")}
+          <div class="slot-label">📝 السكريبت</div>${slotSelect(r, "script")}
+          ${r.scriptText ? `<div class="fup-script" dir="auto" title="${escapeHtml(r.scriptText.slice(0, 300))}">${escapeHtml(r.scriptText.slice(0, 80))}</div>
+            <div class="muted">${scriptWords(r.scriptText)} كلمة</div>` : ""}</td>
         <td class="fup-coach">
           ${r.preview ? `<img src="${r.preview}" alt="">` : ""}
           <div class="slot-label">🖼️ الصورة</div>${slotSelect(r, "image")}
@@ -352,6 +500,7 @@ async function openFolderUpload(items, append = false) {
   if (!coachState.list.length) await loadCoaches().catch(() => {});
   fol.coaches = await api("/api/coaches");
   const rows = groupIntoProjects(items);
+  await Promise.all(rows.map(loadRowScript));
   if (append) {
     // لو نفس الفولدر اتضاف تاني، الجديد بياخد مكانه
     const names = new Set(rows.map((r) => r.name));
@@ -422,12 +571,13 @@ $("fupRows").addEventListener("input", (e) => {
   const btnState = fup.rows.filter((x) => x.status !== "done").some((x) => !x.name.trim() || (x.coach === "new" && !x.newCoachName.trim()));
   $("fupUpload").disabled = fup.busy || btnState;
 });
-$("fupRows").addEventListener("change", (e) => {
+$("fupRows").addEventListener("change", async (e) => {
   const r = fup.rows[Number(e.target.closest("tr").dataset.i)];
   const slot = e.target.dataset.slot;
   if (slot) {
     const file = e.target.value === "" ? null : r.files[slot][Number(e.target.value)];
     r[slot] = file;
+    if (slot === "script") await loadRowScript(r);
     if (slot === "image") {
       if (r.preview) URL.revokeObjectURL(r.preview);
       r.preview = file ? URL.createObjectURL(file) : null;
@@ -451,8 +601,10 @@ $("fupRows").addEventListener("click", (e) => {
   if (!file) return;
   const url = URL.createObjectURL(file);
   const dlg = document.createElement("dialog");
-  dlg.className = "outro-dlg";
-  const media = RE_IMAGE.test(file.name)
+  dlg.className = b.dataset.preview === "script" ? "outro-dlg script-dlg" : "outro-dlg";
+  const media = b.dataset.preview === "script"
+    ? `<div dir="auto" style="white-space:pre-wrap;max-height:60vh;overflow:auto;line-height:1.8;padding:8px 2px">${escapeHtml(r.scriptText || "")}</div>`
+    : RE_IMAGE.test(file.name)
     ? `<img src="${url}" alt="" style="max-width:100%;max-height:70vh;display:block;border-radius:8px">`
     : RE_AUDIO.test(file.name) ? `<audio src="${url}" controls autoplay style="width:100%"></audio>`
     : `<video src="${url}" controls autoplay playsinline></video>`;
@@ -493,6 +645,10 @@ $("fupUpload").onclick = async () => {
         const form = new FormData();
         form.append("file", r.voice);
         folder = await uploadWithProgress(`/api/folders/${folder.id}/voice`, form, bar);
+      }
+      if (r.script && r.scriptText) {
+        step("بيحفظ السكريبت...");
+        await api(`/api/folders/${folder.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ script: r.scriptText }) });
       }
       let coachId = r.coach && r.coach !== "new" ? r.coach : null;
       if (r.coach === "new") {
