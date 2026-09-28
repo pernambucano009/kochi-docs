@@ -89,6 +89,26 @@ def accounts(refresh: bool = False) -> dict:
 # ---------------------------------------------------------------- رفع الفيديو وتسليم البوست
 
 
+def presign_urls(data) -> tuple[str | None, str | None]:
+    """لينك الرفع ولينك الفيديو بعد الرفع. Zernio بيسمّي التاني publicUrl (وقبل كده fileUrl)."""
+    if isinstance(data, dict) and isinstance(data.get("data"), dict):
+        data = data["data"]
+    if not isinstance(data, dict):
+        return None, None
+    upload_url = data.get("uploadUrl") or data.get("upload_url")
+    file_url = next(
+        (data[k] for k in ("publicUrl", "public_url", "fileUrl", "file_url", "mediaUrl", "url") if isinstance(data.get(k), str)),
+        None,
+    )
+    if not file_url:
+        # أي لينك تاني في الرد غير لينك الرفع
+        file_url = next(
+            (v for k, v in data.items() if isinstance(v, str) and v.startswith("http") and v != upload_url and k.lower().endswith("url")),
+            None,
+        )
+    return upload_url, file_url
+
+
 def upload_video(path: Path) -> str:
     content_type = mimetypes.guess_type(path.name)[0] or "video/mp4"
     with _client() as c:
@@ -96,9 +116,9 @@ def upload_video(path: Path) -> str:
             c.post(f"{BASE_URL}/media/presign", json={"filename": path.name, "contentType": content_type}),
             "تجهيز رفع الفيديو",
         )
-    upload_url, file_url = data.get("uploadUrl"), data.get("fileUrl") or data.get("url")
+    upload_url, file_url = presign_urls(data)
     if not upload_url or not file_url:
-        raise PublishError(f"تجهيز رفع الفيديو: رد غير متوقع: {str(data)[:200]}")
+        raise PublishError(f"تجهيز رفع الفيديو: رد غير متوقع (الحقول: {', '.join(map(str, data)) if isinstance(data, dict) else type(data).__name__})")
     with path.open("rb") as f, httpx.Client(timeout=900) as c:
         resp = c.put(upload_url, content=f, headers={"Content-Type": content_type})
     if resp.status_code >= 400:
