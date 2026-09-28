@@ -148,26 +148,75 @@ def build_commands(
     concat_list = work_dir / "list.txt"
     concat_list.write_text("".join(f"file '{p.as_posix()}'\n" for p in parts), encoding="utf-8")
 
-    args = [ffmpeg, "-hide_banner", "-loglevel", "error", "-y", "-filter_complex_threads", "1",
-            "-f", "concat", "-safe", "0", "-i", str(concat_list)]
-    filters = ["[0:v]null[vcat]", "[0:a]anull[base]"]
-    idx = 1
-    video_label = "[vcat]"
+    base_args = [ffmpeg, "-hide_banner", "-loglevel", "error", "-y", "-filter_complex_threads", "1"]
+    concat_in = ["-f", "concat", "-safe", "0", "-i", str(concat_list)]
+    mixed, video = work_dir / "mix.flac", work_dir / "video.mp4"
 
+    # (أ) الصوت لوحده: صوت الفيديوهات + قطع التعليق والموسيقى
+    # كل ملف صوت بيتفتح مرة واحدة بس، وبنقسمه جوه لقطعه — FFmpeg 7.0 ممكن يعلّق لما
+    # يبقى فيه مدخلات كتير ماشية بسرعات مختلفة في نفس الأمر
+    def as_list(t):
+        return [x for x in t if x] if isinstance(t, list) else ([t] if t else [])
+
+    tracks = [("voice", t) for t in as_list(voice)] + [("music", t) for t in as_list(music)]
+    args = base_args + ["-vn"] + concat_in
+    filters = ["[0:a]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo[base]"]
+    mix = ["[base]"]
+    files: dict[Path, list[AudioTrack]] = {}
+    for _, t in tracks:
+        files.setdefault(t.path, []).append(t)
+    for fi, (path, parts_of_file) in enumerate(files.items(), start=1):
+        args += ["-i", str(path)]
+        outs = [f"[f{fi}p{k}]" for k in range(len(parts_of_file))]
+        filters.append(
+            f"[{fi}:a]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,"
+            f"asplit={len(outs)}{''.join(outs)}" if len(outs) > 1 else
+            f"[{fi}:a]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo{outs[0]}"
+        )
+        for k, track in enumerate(parts_of_file):
+            offset = max(0.0, track.offset)
+            trim = f"atrim=start={offset:.3f}" + (f":duration={track.length:.3f}" if track.length else "")
+            delay = max(0.0, track.delay)
+            # بنأخّر القطعة بتغيير وقتها وaresample بيملا اللي قبلها سكوت.
+            # adelay بيتجاهل التأخير لو جه بعد قص الصوت (في FFmpeg 7.0)، فالقطع كانت بتبدأ من أول الفيديو
+            chain = (
+                f"{outs[k]}{trim},asetpts=PTS-STARTPTS+{delay:.3f}/TB,aresample=async=1:first_pts=0,"
+                f"volume={track.volume:.3f},apad,atrim=0:{total:.3f}"
+            )
+            if track.fade_out:
+                # يختفي بالتدريج في آخره، أو في آخر الفيديو لو هو أطول منه
+                end = min(total, delay + track.length) if track.length else total
+                if end - delay > MUSIC_FADE_SECONDS:
+                    chain += f",afade=t=out:st={end - MUSIC_FADE_SECONDS:.3f}:d={MUSIC_FADE_SECONDS}"
+            label = f"[a{fi}_{k}]"
+            filters.append(chain + label)
+            mix.append(label)
+    if len(mix) > 1:
+        filters.append(f"{''.join(mix)}amix=inputs={len(mix)}:duration=first:normalize=0[aout]")
+    else:
+        filters.append("[base]anull[aout]")
+    commands.append(args + [
+        "-filter_complex", ";".join(filters), "-map", "[aout]", "-t", f"{total:.3f}",
+        "-c:a", "flac", "-sample_fmt", "s16", str(mixed),
+    ])
+
+    # (ب) الصورة لوحدها: الفيديوهات + اللوجو + الكابشن
+    args = base_args + ["-an"] + concat_in
+    filters = ["[0:v]null[vcat]"]
+    video_label = "[vcat]"
     if logo:
-        args += ["-loop", "1", "-i", str(logo.path)]
+        # صورة واحدة بس (من غير -loop): الـ overlay بيكرّر آخر فريم لوحده لآخر الفيديو
+        args += ["-i", str(logo.path)]
         lw = max(2, int(WIDTH * logo.size / 100) // 2 * 2)
         filters.append(
-            f"[{idx}:v]scale={lw}:-2,format=rgba,colorchannelmixer=aa={max(0.0, min(1.0, logo.opacity)):.2f}[logo]"
+            f"[1:v]scale={lw}:-2,format=rgba,colorchannelmixer=aa={max(0.0, min(1.0, logo.opacity)):.2f}[logo]"
         )
         enable = f":enable='lt(t,{logo.until:.3f})'" if logo.until else ""
         filters.append(
             f"{video_label}[logo]overlay=x='(W-w)*{logo.x / 100:.4f}':y='(H-h)*{logo.y / 100:.4f}'"
-            f":shortest=1{enable}[vlogo]"
+            f":eof_action=repeat{enable}[vlogo]"
         )
         video_label = "[vlogo]"
-        idx += 1
-
     if subtitles:
         from captions import filter_path
 
@@ -176,48 +225,15 @@ def build_commands(
             f":fontsdir='{filter_path(subtitles.fonts_dir)}'[vsub]"
         )
         video_label = "[vsub]"
-
     filters.append(f"{video_label}format=yuv420p[vout]")
-    mix = ["[base]"]
+    commands.append(args + [
+        "-filter_complex", ";".join(filters), "-map", "[vout]", "-t", f"{total:.3f}",
+        *encoder_args("veryfast", 20, low_memory), str(video),
+    ])
 
-    # التعليق والموسيقى ممكن يبقوا متقسّمين لكذا قطعة من نفس الملف
-    def as_list(t):
-        return [x for x in t if x] if isinstance(t, list) else ([t] if t else [])
-
-    audio = [(f"voice{n}", t) for n, t in enumerate(as_list(voice))] + [(f"music{n}", t) for n, t in enumerate(as_list(music))]
-    for label, track in audio:
-        args += ["-ss", f"{max(0.0, track.offset):.3f}"]
-        if track.length:
-            args += ["-t", f"{track.length:.3f}"]
-        args += ["-i", str(track.path)]
-        delay = max(0.0, track.delay)
-        delay_ms = int(delay * 1000)
-        chain = (
-            f"[{idx}:a]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,"
-            f"volume={track.volume:.3f},adelay={delay_ms}|{delay_ms},atrim=0:{total:.3f}"
-        )
-        if track.fade_out:
-            # يختفي بالتدريج في آخره، أو في آخر الفيديو لو هو أطول منه
-            end = min(total, delay + track.length) if track.length else total
-            if end - delay > MUSIC_FADE_SECONDS:
-                chain += f",afade=t=out:st={end - MUSIC_FADE_SECONDS:.3f}:d={MUSIC_FADE_SECONDS}"
-        filters.append(chain + f"[{label}]")
-        mix.append(f"[{label}]")
-        idx += 1
-
-    if len(mix) > 1:
-        filters.append(f"{''.join(mix)}amix=inputs={len(mix)}:duration=first:normalize=0[aout]")
-        audio_label = "[aout]"
-    else:
-        audio_label = "[base]"
-
-    args += [
-        "-filter_complex", ";".join(filters),
-        "-map", "[vout]", "-map", audio_label,
-        "-t", f"{total:.3f}",
-        *encoder_args("veryfast", 20, low_memory),
-        "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart",
-        str(output),
-    ]
-    commands.append(args)
+    # (ج) نركّب الصوت على الصورة من غير ما نضغط الصورة تاني
+    commands.append(base_args + [
+        "-i", str(video), "-i", str(mixed), "-map", "0:v", "-map", "1:a", "-t", f"{total:.3f}",
+        "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", str(output),
+    ])
     return commands, total

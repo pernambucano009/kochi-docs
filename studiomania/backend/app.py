@@ -1676,17 +1676,21 @@ def run_render(project_id: str, export_id: str, cmds: list[list[str]], total: fl
     filename = f"{export_id}.mp4"
     error = None
     RENDER_LOG.write_text("", encoding="utf-8")
-    log_render(f"تصدير {name} ({total:.1f}ث، {len(cmds) - 1} قطعة) — السيرفر: {system_info()} — مساحة فاضية: {free_mb(EXPORTS_DIR)} ميجا")
+    log_render(f"تصدير {name} ({total:.1f}ث، {len(cmds) - 3} قطعة) — السيرفر: {system_info()} — مساحة فاضية: {free_mb(EXPORTS_DIR)} ميجا")
     try:
         # الأوامر بتشتغل ورا بعض: كل قطعة لوحدها وبعدين التجميع النهائي
-        segs = cmds[:-1]
+        segs = cmds[:-3]
         steps = [(c, f"بيجهّز القطعة {n} من {len(segs)}", (int((n - 1) / len(segs) * 40), int(n / len(segs) * 40)))
                  for n, c in enumerate(segs, start=1)]
-        steps.append((cmds[-1], "بيجمّع الفيديو النهائي", (40, 99)))
+        steps += [
+            (cmds[-3], "بيجهّز الصوت", (40, 48)),
+            (cmds[-2], "بيجمّع الفيديو النهائي", (48, 96)),
+            (cmds[-1], "بيحفظ الفيديو", (96, 99)),
+        ]
         for cmd, label, pct in steps:
             if project_id in RENDER_CANCELLED:
                 break
-            length = float(cmd[cmd.index("-t") + 1]) if "-t" in cmd and cmd is not cmds[-1] else total
+            length = float(cmd[cmd.index("-t") + 1]) if cmd in segs else total
             code, stderr = run_ffmpeg(cmd, project_id, length, pct, label)
             if project_id in RENDER_CANCELLED:
                 break
