@@ -203,7 +203,7 @@ $("postForm").addEventListener("submit", async (e) => {
       headers: { "Content-Type": "application/json" },
       body,
     });
-    toast(pub.editing ? "✅ البوست اتعدّل" : `✅ اتجدول ${when.toLocaleString("ar-EG", { weekday: "long", hour: "numeric", minute: "2-digit" })}`);
+    toast(pub.editing ? "✅ البوست اتعدّل" : `✅ اتجدول ${when.toLocaleString(UI_LOCALE(), { weekday: "long", hour: "numeric", minute: "2-digit" })}`);
     resetPostForm();
     await pubLoadPosts();
   } catch (err) {
@@ -213,7 +213,13 @@ $("postForm").addEventListener("submit", async (e) => {
 
 // ---------- المواعيد ----------
 async function pubLoadPosts() {
+  const before = new Map(pub.posts.map((p) => [p.id, p.status]));
   pub.posts = await api("/api/posts");
+  // بوست كان بيتبعت أو متجدول وفشل: نقول على طول والسبب إيه
+  for (const p of pub.posts) {
+    const was = before.get(p.id);
+    if (p.status === "failed" && was && was !== "failed") toast(`✕ البوست ماتبعتش: ${p.error || "فشل"}`, true);
+  }
   renderPosts();
   renderReady();
   clearTimeout(pub.timer);
@@ -229,7 +235,8 @@ function renderPosts() {
   const list = pub.posts
     .filter((p) =>
       filter === "all" ? true
-        : filter === "upcoming" ? ["scheduled", "sending", "publishing"].includes(p.status)
+        // البوست اللي فشل بيفضل ظاهر في «الجاية» بالسبب لحد ما تعيده أو تمسحه
+        : filter === "upcoming" ? ["scheduled", "sending", "publishing", "failed"].includes(p.status)
           : p.status === filter)
     .sort((a, b) => (filter === "upcoming" ? a.scheduled_at.localeCompare(b.scheduled_at) : b.scheduled_at.localeCompare(a.scheduled_at)));
   $("postsEmpty").hidden = list.length > 0;
@@ -237,8 +244,8 @@ function renderPosts() {
     .map((p) => {
       let [label, cls] = POST_STATUS[p.status] || [p.status, ""];
       if (p.status === "scheduled" && p.sent) label = "متجدول في Zernio ✓";
-      const when = new Date(p.scheduled_at).toLocaleString("ar-EG", { weekday: "long", day: "numeric", month: "long", hour: "numeric", minute: "2-digit" });
-      return `<li data-id="${p.id}">
+      const when = new Date(p.scheduled_at).toLocaleString(UI_LOCALE(), { weekday: "long", day: "numeric", month: "long", hour: "numeric", minute: "2-digit" });
+      return `<li data-id="${p.id}" class="${p.status === "failed" ? "failed" : ""}">
         ${p.export_url ? `<video src="${p.export_url}#t=0.5" preload="metadata" muted></video>` : ""}
         <div class="info">
           <span class="when">${when}</span>

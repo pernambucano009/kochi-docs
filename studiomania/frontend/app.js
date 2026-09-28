@@ -32,6 +32,9 @@ async function api(path, opts = {}) {
   return data;
 }
 
+// لغة التواريخ: أرقام عادية في العربي، وإنجليزي لو الواجهة إنجليزي
+const UI_LOCALE = () => (window.I18N?.lang === "en" ? "en-US" : "ar-EG-u-nu-latn");
+
 function escapeHtml(s) {
   return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }

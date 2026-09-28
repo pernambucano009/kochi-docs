@@ -747,3 +747,5 @@ dialog::backdrop { background: rgba(20, 20, 20, .28); backdrop-filter: blur(4px)
 .alert { border-radius: 18px; }
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-thumb { background: rgba(20, 20, 20, .15); border-radius: 10px; border: 2px solid transparent; background-clip: padding-box; }
+.posts li.failed { box-shadow: inset 3px 0 0 var(--danger); background: color-mix(in srgb, var(--danger) 6%, transparent); }
+[dir="rtl"] .posts li.failed { box-shadow: inset -3px 0 0 var(--danger); }

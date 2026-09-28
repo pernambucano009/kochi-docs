@@ -717,5 +717,6 @@ window.I18N_EN = {
   "الباسوردين مش زي بعض": "The passwords don't match",
   "حصلت مشكلة": "Something went wrong",
   "{0} قطعة": "{0} clips",
-  "{0} جاهز": "{0} ready"
+  "{0} جاهز": "{0} ready",
+  "✕ البوست ماتبعتش: {0}": "✕ The post wasn't sent: {0}"
 };
