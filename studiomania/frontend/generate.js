@@ -13,7 +13,10 @@ const STATUS_LABEL = {
   failed: "فشل",
 };
 
-const gen = { atlas: null, coachId: null, clips: [], selected: new Set(), list: [], timer: null, prompts: [], promptId: null, editing: null };
+const gen = {
+  atlas: null, clips: [], selected: new Set(), list: [], timer: null, prompts: [], promptId: null, editing: null,
+  coaches: new Map(), archive: new Map(), viewArchive: null, show: new Set(),
+};
 
 function storageGet(key) {
   try { return localStorage.getItem(key); } catch { return null; }
@@ -35,22 +38,22 @@ async function initGenerate() {
   alert.hidden = gen.atlas.configured || gen.atlas.mock;
   alert.innerHTML = `⚠️ مفتاح Atlas مش متسجل. حطه من <a href="#" data-goto="settings">⚙️ الإعدادات</a>.`;
 
-  const [coaches, clips] = await Promise.all([api("/api/coaches"), api("/api/clips"), loadPrompts()]);
+  const [coaches, clips] = await Promise.all([api("/api/coaches"), api("/api/clips"), loadPrompts(), loadArchive()]);
+  gen.coaches = new Map(coaches.map((c) => [c.id, c]));
   gen.clips = clips;
   const ids = new Set(clips.map((c) => c.id));
   gen.selected = new Set([...gen.selected].filter((id) => ids.has(id)));
   if (gen.pending) {
-    // جاي من التقطيع أو من المشروع: نعلّم على قطع الفيديو ده ونختار المدرب بتاعه
-    const { videoId, coachId } = gen.pending;
+    // جاي من التقطيع أو من المشروع: نعلّم على قطع الفيديو ده
+    const { videoId } = gen.pending;
     gen.pending = null;
+    gen.show.add(videoId); // يظهر حتى لو في الأرشيف
     const mine = clips.filter((c) => c.video_id === videoId && c.duration >= MIN_REF);
-    gen.selected = new Set(mine.map((c) => c.id));
-    const coach = coachId || mine.find((c) => c.video_coach_id)?.video_coach_id;
-    if (coach && coaches.some((c) => c.id === coach)) gen.coachId = coach;
-    toast(`✅ اتعلّم على ${mine.length} قطعة${coach ? " واتختار المدرب" : ". اختار المدرب"}`);
-    setTimeout(() => document.querySelector(".clip-pick.selected")?.scrollIntoView({ block: "center", behavior: "smooth" }), 200);
+    const coach = gen.coaches.get(mine[0]?.video_coach_id);
+    if (coach) mine.forEach((c) => gen.selected.add(c.id));
+    toast(coach ? `✅ اتعلّم على ${mine.length} قطعة · المدرب: ${coach.name}` : "⚠️ المشروع ده مفيهوش مدرب. اختاره من صفحة المشاريع", !coach);
+    setTimeout(() => document.querySelector(`.clip-group[data-vid="${videoId}"]`)?.scrollIntoView({ block: "center", behavior: "smooth" }), 200);
   }
-  renderCoachPicker(coaches);
   renderClipPicker();
   await loadGenerations();
 }
@@ -147,53 +150,110 @@ $("promptList").addEventListener("click", async (e) => {
   renderPrompts();
 });
 
-// يفتح صفحة التوليد وقطع فيديو معيّن متعلّم عليها
-function openGenerateWith(videoId, coachId = null) {
-  gen.pending = { videoId, coachId };
+// يفتح صفحة التوليد وقطع فيديو معيّن متعلّم عليها (المدرب بييجي من المشروع)
+function openGenerateWith(videoId) {
+  gen.pending = { videoId };
   showStep("2");
 }
 
-// ---------- المدرب ----------
-function renderCoachPicker(coaches) {
-  if (!coaches.some((c) => c.id === gen.coachId)) gen.coachId = coaches[0]?.id || null;
-  $("coachPickerEmpty").hidden = coaches.length > 0;
-  $("coachPicker").innerHTML = coaches
-    .map(
-      (c) => `<button class="coach-pick ${c.id === gen.coachId ? "selected" : ""}" data-id="${c.id}">
-        <img src="${c.image_url}" alt="">${escapeHtml(c.name)}</button>`
-    )
-    .join("");
-  updateGenerateBtn();
+// ---------- الأرشيف ----------
+async function loadArchive() {
+  const list = await api("/api/archive");
+  gen.archive = new Map(list.map((a) => [a.video_id, a]));
 }
-$("coachPicker").addEventListener("click", (e) => {
-  const b = e.target.closest(".coach-pick");
+const isArchived = (vid) => !!gen.archive.get(vid)?.archived;
+
+async function setArchived(vid, archived) {
+  try {
+    await api(`/api/videos/${vid}/archive`, {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ archived }),
+    });
+    await loadArchive();
+    gen.show.delete(vid);
+    if (archived) {
+      gen.clips.filter((c) => c.video_id === vid).forEach((c) => gen.selected.delete(c.id));
+      if (gen.viewArchive === vid) gen.viewArchive = null;
+    } else if (gen.viewArchive === vid) gen.viewArchive = null;
+    toast(archived ? "🗄️ اتنقل للأرشيف" : "↩ رجع للشغال");
+    renderClipPicker();
+    renderGenerations();
+  } catch (err) {
+    toast(err.message, true);
+  }
+}
+
+function renderArchive() {
+  const items = [...gen.archive.values()].filter((a) => a.archived);
+  const counts = new Map();
+  for (const g of gen.list) if (g.status === "completed") counts.set(g.video_id, (counts.get(g.video_id) || 0) + 1);
+  $("archiveEmpty").hidden = items.length > 0;
+  $("archiveCount").textContent = items.length ? `(${items.length})` : "";
+  $("archiveList").innerHTML = items
+    .map((a) => `<li data-vid="${a.video_id}" class="${gen.viewArchive === a.video_id ? "active" : ""}">
+      <div class="nm">${escapeHtml(a.name)}</div>
+      <div class="meta">${counts.get(a.video_id) ? `<span>🎞️ ${counts.get(a.video_id)} فيديو</span>` : ""}
+        ${a.exported_url ? `<a href="${a.exported_url}" target="_blank">✅ اتصدّر</a>` : `<span>اتأرشف بإيدك</span>`}</div>
+      <div class="acts">
+        <button class="btn sm" data-arch="view">${gen.viewArchive === a.video_id ? "✕ اقفل" : "👁 اعرض"}</button>
+        <button class="btn sm" data-arch="restore" title="رجّعه للشغال">↩ رجّعه</button>
+      </div>
+    </li>`)
+    .join("");
+}
+
+$("archiveList").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-arch]");
   if (!b) return;
-  gen.coachId = b.dataset.id;
-  document.querySelectorAll(".coach-pick").forEach((x) => x.classList.toggle("selected", x === b));
-  updateGenerateBtn();
+  const vid = b.closest("li").dataset.vid;
+  if (b.dataset.arch === "restore") return setArchived(vid, false);
+  gen.viewArchive = gen.viewArchive === vid ? null : vid;
+  renderGenerations();
+  if (gen.viewArchive) $("gensTitle").scrollIntoView({ behavior: "smooth", block: "start" });
+});
+$("archiveBanner").addEventListener("click", (e) => {
+  if (e.target.closest("[data-arch-close]")) { gen.viewArchive = null; renderGenerations(); }
+  if (e.target.closest("[data-arch-restore]")) setArchived(gen.viewArchive, false);
 });
 
 // ---------- القطع ----------
 const MIN_REF = 2;
+
+function coachChip(coachId) {
+  const c = gen.coaches.get(coachId);
+  return c
+    ? `<span class="coach-chip"><img src="${c.image_url}" alt="">${escapeHtml(c.name)}</span>`
+    : `<span class="coach-chip missing">⚠️ مفيش مدرب</span>`;
+}
+
 function renderClipPicker() {
-  $("clipPickerEmpty").hidden = gen.clips.length > 0;
   const groups = new Map();
   for (const c of gen.clips) {
-    if (!groups.has(c.video_id)) groups.set(c.video_id, { name: c.video_name, clips: [] });
+    if (isArchived(c.video_id) && !gen.show.has(c.video_id)) continue;
+    if (!groups.has(c.video_id)) groups.set(c.video_id, { name: c.video_name, coach: c.video_coach_id, clips: [] });
     groups.get(c.video_id).clips.push(c);
   }
+  $("clipPickerEmpty").hidden = groups.size > 0;
   $("clipPicker").innerHTML = [...groups.entries()]
     .map(([vid, g]) => {
+      const hasCoach = gen.coaches.has(g.coach);
       const usable = g.clips.filter((c) => c.duration >= MIN_REF);
       const all = usable.length > 0 && usable.every((c) => gen.selected.has(c.id));
-      return `<div class="clip-group">
-        <div class="clip-group-head"><span>${escapeHtml(g.name)}</span>
-          <button class="btn sm" data-all="${vid}">${all ? "إلغاء الكل" : "اختار الكل"}</button></div>
+      return `<div class="clip-group ${hasCoach ? "" : "no-coach"}" data-vid="${vid}">
+        <div class="clip-group-head">
+          <span class="ttl">${escapeHtml(g.name)}${isArchived(vid) ? ` <span class="pill">🗄️ من الأرشيف</span>` : ""}</span>
+          ${coachChip(g.coach)}
+          <span class="spacer"></span>
+          ${hasCoach
+            ? `<button class="btn sm" data-all="${vid}">${all ? "إلغاء الكل" : "اختار الكل"}</button>`
+            : `<button class="btn sm primary" data-pick-coach="${vid}">🧑‍🏫 اختار المدرب من المشروع</button>`}
+          <button class="btn sm" data-archive="${vid}" title="انقل المشروع ده للأرشيف">🗄️</button>
+        </div>
         <div class="clip-picks">${g.clips
           .map((c) => {
             const short = c.duration < MIN_REF;
-            return `<div class="clip-pick ${gen.selected.has(c.id) ? "selected" : ""} ${short ? "too-short" : ""}"
-              data-id="${c.id}" title="${short ? `أقصر من ${MIN_REF} ثانية، Seedance مش هيقبلها` : ""}">
+            const off = short || !hasCoach;
+            return `<div class="clip-pick ${gen.selected.has(c.id) ? "selected" : ""} ${off ? "too-short" : ""}"
+              data-id="${c.id}" title="${short ? `أقصر من ${MIN_REF} ثانية، Seedance مش هيقبلها` : !hasCoach ? "اختار مدرب للمشروع الأول" : ""}">
               <video src="${c.url}#t=0.5" preload="metadata" muted playsinline></video>
               <span class="tick">✓</span>
               <span class="tag"><span>#${c.index}</span><span>${c.duration.toFixed(1)}ث</span></span>
@@ -205,20 +265,30 @@ function renderClipPicker() {
     .join("");
   updateGenerateBtn();
 }
-$("clipPicker").addEventListener("click", (e) => {
+$("clipPicker").addEventListener("click", async (e) => {
+  const arch = e.target.closest("[data-archive]");
+  if (arch) return setArchived(arch.dataset.archive, true);
+  const pc = e.target.closest("[data-pick-coach]");
+  if (pc) {
+    setFlowByVideo(pc.dataset.pickCoach);
+    fol.current = null;
+    return showStep("0");
+  }
   const allBtn = e.target.closest("[data-all]");
   if (allBtn) {
     const usable = gen.clips.filter((c) => c.video_id === allBtn.dataset.all && c.duration >= MIN_REF);
     const all = usable.every((c) => gen.selected.has(c.id));
     usable.forEach((c) => (all ? gen.selected.delete(c.id) : gen.selected.add(c.id)));
-    if (!all) autoPickCoach(usable.map((c) => c.id));
     return renderClipPicker();
   }
   const pick = e.target.closest(".clip-pick");
-  if (!pick || pick.classList.contains("too-short")) return;
+  if (!pick) return;
+  if (pick.classList.contains("too-short")) {
+    if (pick.closest(".no-coach")) toast("المشروع ده مفيهوش مدرب. دوس «اختار المدرب من المشروع»", true);
+    return;
+  }
   const id = pick.dataset.id;
   gen.selected.has(id) ? gen.selected.delete(id) : gen.selected.add(id);
-  autoPickCoach([id]);
   renderClipPicker();
 });
 // معاينة القطعة لما الماوس يقف عليها
@@ -228,42 +298,35 @@ $("clipPicker").addEventListener("mouseout", (e) => {
   if (v && !e.relatedTarget?.closest?.(".clip-pick")) { v.pause(); v.currentTime = 0.5; }
 });
 
-// لو الفيديو مربوط بمدرب، نختاره لوحده
-function autoPickCoach(clipIds) {
-  const clip = gen.clips.find((c) => clipIds.includes(c.id) && gen.selected.has(c.id) && c.video_coach_id);
-  if (!clip || clip.video_coach_id === gen.coachId) return;
-  const btn = document.querySelector(`.coach-pick[data-id="${clip.video_coach_id}"]`);
-  if (!btn) return;
-  gen.coachId = clip.video_coach_id;
-  document.querySelectorAll(".coach-pick").forEach((x) => x.classList.toggle("selected", x === btn));
-  toast(`🧑‍🏫 اتختار ${btn.textContent.trim()} لوحده (مربوط بالفيديو)`);
-}
-
-function coachMismatch() {
-  const chosen = gen.clips.filter((c) => gen.selected.has(c.id) && c.video_coach_id && c.video_coach_id !== gen.coachId);
-  return chosen.length;
-}
-
 function updateGenerateBtn() {
   const n = gen.selected.size;
-  $("clipPickCount").textContent = n ? `${n} مختارة` : "";
+  const coaches = new Set(gen.clips.filter((c) => gen.selected.has(c.id)).map((c) => c.video_coach_id));
+  $("clipPickCount").textContent = n
+    ? `${n} مختارة` + (coaches.size > 1 ? ` · ${coaches.size} مدربين` : "")
+    : "";
   const btn = $("generateBtn");
-  btn.disabled = !n || !gen.coachId || !gen.promptId;
+  btn.disabled = !n || !gen.promptId;
   btn.textContent = n ? `✨ ولّد ${n} فيديو` : "✨ ولّد";
-  const mis = coachMismatch();
-  $("clipPickCount").textContent += mis ? ` · ⚠️ ${mis} قطعة مربوطة بمدرب تاني` : "";
 }
 
 $("generateBtn").onclick = async () => {
   const btn = $("generateBtn");
   btn.disabled = true;
   try {
+    // لو بتولّد تاني لمشروع في الأرشيف، يرجع للشغال عشان تشوف النتايج
+    const vids = new Set(gen.clips.filter((c) => gen.selected.has(c.id)).map((c) => c.video_id));
+    for (const vid of vids) {
+      if (!isArchived(vid)) continue;
+      await api(`/api/videos/${vid}/archive`, {
+        method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ archived: false }),
+      });
+    }
+    if ([...vids].some(isArchived)) await loadArchive();
     const res = await api("/api/generations", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         clip_ids: [...gen.selected],
-        coach_id: gen.coachId,
         prompt_id: gen.promptId,
         generate_audio: $("audioCheck").checked,
       }),
@@ -289,29 +352,63 @@ async function loadGenerations() {
 }
 
 function renderGenerations() {
-  const list = gen.list;
+  renderArchive();
+  const viewing = gen.viewArchive && gen.archive.get(gen.viewArchive);
+  if (!viewing) gen.viewArchive = null;
+  // الشغال: كل اللي مش في الأرشيف · الأرشيف: المشروع اللي فتحته بس
+  const list = gen.list.filter((g) => (viewing ? g.video_id === gen.viewArchive : !isArchived(g.video_id)));
+  $("gensTitle").textContent = viewing ? "🗄️ فيديوهات من الأرشيف" : "الفيديوهات المولَّدة";
+  $("archiveBanner").hidden = !viewing;
+  if (viewing) {
+    $("archiveBanner").innerHTML = `<span>بتتفرج على <b>${escapeHtml(viewing.name)}</b> من الأرشيف</span>
+      <button class="btn sm" data-arch-restore>↩ رجّعه للشغال</button>
+      <button class="btn sm primary" data-arch-close>رجوع للشغال عليه</button>`;
+  }
   $("gensEmpty").hidden = list.length > 0;
+  $("gensEmpty").textContent = viewing ? "مفيش فيديوهات مولَّدة للمشروع ده." : "لسه مفيش فيديوهات مولَّدة.";
   const active = list.filter((g) => ACTIVE.has(g.status)).length;
   const done = list.filter((g) => g.status === "completed").length;
   $("genSummary").textContent = list.length ? `${done} جاهز${active ? ` · ${active} شغال` : ""}` : "";
 
-  // منعيدش رسم الفيديوهات اللي خلصت عشان متقفش لو شغالة
-  const grid = $("gensGrid");
-  const existing = new Map([...grid.children].map((el) => [el.dataset.id, el]));
-  const frag = document.createDocumentFragment();
+  // متقسّمة على المشاريع
+  const groups = new Map();
   for (const g of list) {
-    const key = `${g.status}|${g.error || ""}`;
-    let el = existing.get(g.id);
-    if (!el || el.dataset.key !== key) {
-      el = document.createElement("div");
-      el.className = "gen";
-      el.dataset.id = g.id;
-      el.dataset.key = key;
-      el.innerHTML = genCard(g);
-    }
-    frag.appendChild(el);
+    const key = g.video_id || "";
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(g);
   }
-  grid.replaceChildren(frag);
+  // منعيدش رسم الفيديوهات اللي خلصت عشان متقفش لو شغالة
+  const host = $("gensGroups");
+  const existing = new Map([...host.querySelectorAll(".gen")].map((el) => [el.dataset.id, el]));
+  const frag = document.createDocumentFragment();
+  for (const [vid, gens] of groups) {
+    const a = gen.archive.get(vid);
+    const box = document.createElement("div");
+    box.className = "gen-group";
+    const ready = gens.filter((g) => g.status === "completed").length;
+    box.innerHTML = `<div class="gen-group-head">
+        <span class="ttl">${escapeHtml(a?.name || gens[0].clip_label.replace(/ #\d+$/, "") || "من غير مشروع")}</span>
+        <span class="muted">${ready} / ${gens.length} جاهز</span>
+        ${a?.exported_url ? `<a class="muted" href="${a.exported_url}" target="_blank">✅ اتصدّر</a>` : ""}
+        <span class="spacer"></span>
+        ${vid && !viewing ? `<button class="btn sm" data-archive="${vid}">🗄️ أرشفه</button>` : ""}
+      </div><div class="gens"></div>`;
+    const grid = box.querySelector(".gens");
+    for (const g of gens) {
+      const key = `${g.status}|${g.error || ""}`;
+      let el = existing.get(g.id);
+      if (!el || el.dataset.key !== key) {
+        el = document.createElement("div");
+        el.className = "gen";
+        el.dataset.id = g.id;
+        el.dataset.key = key;
+        el.innerHTML = genCard(g);
+      }
+      grid.appendChild(el);
+    }
+    frag.appendChild(box);
+  }
+  host.replaceChildren(frag);
 }
 
 function genCard(g) {
@@ -336,7 +433,9 @@ function genCard(g) {
     </div>`;
 }
 
-$("gensGrid").addEventListener("click", async (e) => {
+$("gensGroups").addEventListener("click", async (e) => {
+  const arch = e.target.closest("[data-archive]");
+  if (arch) return setArchived(arch.dataset.archive, true);
   const btn = e.target.closest("button[data-act]");
   if (!btn) return;
   const id = btn.closest(".gen").dataset.id;

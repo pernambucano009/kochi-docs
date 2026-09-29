@@ -23,6 +23,7 @@ class MediaInfo:
     width: int
     height: int
     has_audio: bool
+    fps: float = 30.0
 
 
 def probe(ffmpeg: str, path: Path) -> MediaInfo:
@@ -37,6 +38,7 @@ def probe(ffmpeg: str, path: Path) -> MediaInfo:
         width=int(size.group(1)) if size else 0,
         height=int(size.group(2)) if size else 0,
         has_audio=bool(re.search(r"Stream #\d+:\d+.*Audio:", err)),
+        fps=float(fps.group(1)) if (fps := re.search(r"Video:.*?(\d+(?:\.\d+)?) fps", err)) else 30.0,
     )
 
 

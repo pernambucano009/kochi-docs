@@ -157,6 +157,7 @@ function openVideo(id) {
   player.src = v.url;
   renderLibrary();
   renderEditor();
+  requestAnimationFrame(fitCutZoom);
   loadClips();
   loadVoiceLink();
   loadCoachLink();
@@ -272,16 +273,7 @@ function renderEditor() {
   const segs = currentSegments();
   const t = player.currentTime || 0;
 
-  // التايم لاين
-  $("timelineSegs").innerHTML = segs
-    .map((s) => {
-      const cls = s.skipped ? "skipped" : s.too_long ? "long" : "ok";
-      const cur = t >= s.start && t < s.end ? " current" : "";
-      const left = (s.start / v.duration) * 100;
-      const width = (s.duration / v.duration) * 100;
-      return `<div class="seg ${cls}${cur}" style="left:${left}%;width:${width}%" title="${fmt(s.start)} → ${fmt(s.end)}">${width > 4 ? s.index + 1 : ""}</div>`;
-    })
-    .join("");
+  renderCutTimeline();
 
   // الجدول
   $("segmentsBody").innerHTML = segs
@@ -323,14 +315,232 @@ function renderEditor() {
   updatePlayhead();
 }
 
+// ---------- تايم لاين التقطيع (شبه المونتاج) ----------
+const ct = { pps: 20, fps: 30, strip: null, stripFor: null, drag: null };
+const CT_MIN = 2, CT_MAX = 600;
+const ctClamp = (v, a, b) => Math.min(b, Math.max(a, v));
+
+// 00:00:00 = دقايق:ثواني:فريمات
+function fmtFrames(t) {
+  const f = Math.round(Math.max(0, t) * ct.fps);
+  const fps = Math.round(ct.fps);
+  const sec = Math.floor(f / fps);
+  const p = (n) => String(n).padStart(2, "0");
+  return `${p(Math.floor(sec / 60))}:${p(sec % 60)}:${p(f % fps)}`;
+}
+const snapFrame = (t) => Math.round(t * ct.fps) / ct.fps;
+
+// شريط الصور بتاع الفيديو الخام (بيتعمل مرة واحدة على السيرفر)
+function loadCutStrip(v) {
+  if (ct.stripFor === v.id) return;
+  ct.stripFor = v.id;
+  ct.strip = null;
+  ct.fps = 30;
+  fetch(`/api/montage/filmstrip?kind=raw&id=${v.id}`)
+    .then(async (r) => {
+      if (!r.ok || ct.stripFor !== v.id) return;
+      const frames = Number(r.headers.get("X-Frames")) || 1;
+      const fps = Number(r.headers.get("X-Fps")) || 1;
+      ct.fps = Number(r.headers.get("X-Video-Fps")) || 30;
+      const url = URL.createObjectURL(await r.blob());
+      const img = new Image();
+      img.onload = () => {
+        if (ct.stripFor !== v.id) return;
+        ct.strip = { url, frames, fps, aspect: img.width / frames / img.height };
+        renderCutTimeline();
+      };
+      img.src = url;
+    })
+    .catch(() => {});
+}
+
+function cutStripHtml(s0, width) {
+  const info = ct.strip;
+  if (!info) return "";
+  const h = 62;
+  const tw = Math.max(10, h * info.aspect);
+  const n = Math.min(600, Math.ceil(width / tw));
+  let html = "";
+  for (let k = 0; k < n; k++) {
+    const t = s0 + (k * tw + tw / 2) / ct.pps;
+    const fi = ctClamp(Math.floor(t * info.fps), 0, info.frames - 1);
+    html += `<i style="width:${tw}px;background-position:${-fi * tw}px 0;background-size:${info.frames * tw}px 100%"></i>`;
+  }
+  return `<div class="strip" style="--img:url(${info.url})">${html}</div>`;
+}
+
+function cutRuler(width) {
+  const steps = [1 / ct.fps, 2 / ct.fps, 5 / ct.fps, 10 / ct.fps, 0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300];
+  const major = steps.find((x) => x * ct.pps >= 70) || 300;
+  let minor = major < 1 ? major / 2 : major / 5;
+  if (minor * ct.pps < 6) minor = major;
+  let html = "";
+  for (let k = 0; k * major * ct.pps < width; k++) {
+    const t = k * major;
+    const f = Math.round(t * ct.fps) % Math.round(ct.fps);
+    html += `<span style="left:${t * ct.pps}px">${f ? `${f}f` : fmtFrames(t).slice(0, 5)}</span>`;
+  }
+  const r = $("ctRuler");
+  r.innerHTML = html;
+  r.style.setProperty("--minor", `${minor * ct.pps}px`);
+  r.style.setProperty("--major", `${major * ct.pps}px`);
+}
+
+function renderCutTimeline() {
+  const v = state.current;
+  if (!v) return;
+  loadCutStrip(v);
+  const sc = $("ctScroll");
+  const width = Math.max(sc.clientWidth, v.duration * ct.pps + 30);
+  $("timeline").style.width = `${width}px`;
+  cutRuler(width);
+  const t = player.currentTime || 0;
+  const segs = currentSegments();
+  $("timelineSegs").innerHTML = segs
+    .map((s) => {
+      const cls = s.skipped ? "skipped" : s.too_long ? "long" : "ok";
+      const cur = t >= s.start && t < s.end ? " current" : "";
+      const w = s.duration * ct.pps;
+      return `<div class="ct-seg ${cls}${cur}" data-i="${s.index}" style="left:${s.start * ct.pps}px;width:${w}px">
+        ${cutStripHtml(s.start, w)}
+        ${w > 26 ? `<span class="nm"><span>#${s.index + 1}</span>${w > 90 ? `<span> · ${s.duration.toFixed(1)}ث</span>` : ""}${s.skipped && w > 150 ? "<span> · مستبعدة</span>" : s.too_long && w > 150 ? `<span> · أطول من ${state.maxClip}ث</span>` : ""}</span>` : ""}
+      </div>`;
+    })
+    .join("") + v.cuts
+    .map((c, i) => `<div class="ct-cut" data-c="${i}" style="left:${c * ct.pps}px" title="${fmtFrames(c)} · اسحب تحرّكه · دبل كليك يمسحه"></div>`)
+    .join("");
+  $("ctZoom").value = Math.round((Math.log(ct.pps / CT_MIN) / Math.log(CT_MAX / CT_MIN)) * 1000);
+  updatePlayhead();
+}
+
 function updatePlayhead() {
   const v = state.current;
   if (!v) return;
   const t = player.currentTime || 0;
-  $("playhead").style.left = `${(t / v.duration) * 100}%`;
-  $("timeLabel").textContent = `${fmt(t)} / ${fmt(v.duration)}`;
-  $("playPause").textContent = player.paused ? "▶︎ تشغيل" : "⏸ إيقاف";
+  const x = t * ct.pps;
+  $("playhead").style.left = `${x}px`;
+  $("timeLabel").textContent = `${fmtFrames(t)} / ${fmtFrames(v.duration)}`;
+  $("playPause").textContent = player.paused ? "▶︎" : "⏸";
+  // المؤشر يفضل باين وهو شغال
+  const sc = $("ctScroll");
+  if (!player.paused && !ct.drag && (x < sc.scrollLeft || x > sc.scrollLeft + sc.clientWidth - 40)) sc.scrollLeft = x - 40;
 }
+
+function setCutZoom(pps, anchorX) {
+  const sc = $("ctScroll");
+  const ax = anchorX ?? ctClamp((player.currentTime || 0) * ct.pps - sc.scrollLeft, 0, sc.clientWidth);
+  const tAnchor = (sc.scrollLeft + ax) / ct.pps;
+  ct.pps = ctClamp(pps, CT_MIN, CT_MAX);
+  renderCutTimeline();
+  sc.scrollLeft = tAnchor * ct.pps - ax;
+}
+function fitCutZoom() {
+  const v = state.current;
+  if (!v) return;
+  const sc = $("ctScroll");
+  setCutZoom((sc.clientWidth - 30) / Math.max(v.duration, 1), 0);
+  sc.scrollLeft = 0;
+}
+$("ctZoom").addEventListener("input", () => setCutZoom(CT_MIN * (CT_MAX / CT_MIN) ** ($("ctZoom").value / 1000)));
+$("ctZoomIn").onclick = () => setCutZoom(ct.pps * 1.5);
+$("ctZoomOut").onclick = () => setCutZoom(ct.pps / 1.5);
+$("ctFit").onclick = fitCutZoom;
+$("ctScroll").addEventListener("wheel", (e) => {
+  const sc = $("ctScroll");
+  if (e.ctrlKey || e.metaKey || e.altKey) {
+    e.preventDefault();
+    setCutZoom(ct.pps * Math.exp(-e.deltaY * 0.002), e.clientX - sc.getBoundingClientRect().left);
+  } else if (Math.abs(e.deltaY) > Math.abs(e.deltaX) && sc.scrollWidth > sc.clientWidth) {
+    e.preventDefault();
+    sc.scrollLeft += e.deltaY;
+  }
+}, { passive: false });
+window.addEventListener("resize", () => state.current && isStep1() && renderCutTimeline());
+
+const timeAt = (e) => {
+  const r = $("timeline").getBoundingClientRect();
+  return ctClamp((e.clientX - r.left) / ct.pps, 0, state.current.duration);
+};
+
+function seekTo(t) {
+  stopAt = null;
+  player.currentTime = ctClamp(t, 0, state.current.duration);
+  updatePlayhead();
+}
+// فريم بالظبط: بنقف في نص الفريم عشان المتصفح يعرضه صح
+function stepFrames(n) {
+  if (!state.current) return;
+  player.pause();
+  const f = Math.round((player.currentTime || 0) * ct.fps) + n;
+  seekTo((f + 0.01) / ct.fps);
+}
+function stepSeconds(n) {
+  if (state.current) seekTo((player.currentTime || 0) + n);
+}
+
+// دوسة أو سحب على التايم لاين = تحريك المؤشر · سحب خط القطع = تحريكه
+$("timeline").addEventListener("pointerdown", (e) => {
+  const v = state.current;
+  if (!v || e.button !== 0) return;
+  const cutEl = e.target.closest(".ct-cut");
+  // دبل كليك: دوستين على نفس الخط ورا بعض بسرعة (pointer events مبتعدّش الدوسات)
+  const now = performance.now();
+  const dbl = cutEl && ct.lastCut?.c === cutEl.dataset.c && now - ct.lastCut.at < 400;
+  ct.lastCut = cutEl ? { c: cutEl.dataset.c, at: now } : null;
+  if (dbl) {
+    ct.lastCut = null;
+    // دبل كليك على خط القطع = امسحه
+    const c = v.cuts[Number(cutEl.dataset.c)];
+    commit(v.cuts.filter((x) => x !== c), v.skipped.filter((s) => Math.abs(s - c) > 0.006));
+    toast("اتمسحت نقطة القطع");
+    e.preventDefault();
+    return;
+  }
+  if (cutEl) {
+    const i = Number(cutEl.dataset.c);
+    const old = v.cuts[i];
+    ct.drag = { kind: "cut", i, old, before: { cuts: [...v.cuts], skipped: [...v.skipped] } };
+  } else {
+    ct.drag = { kind: "seek" };
+    player.pause();
+    seekTo(timeAt(e));
+  }
+  $("timeline").setPointerCapture(e.pointerId);
+  e.preventDefault();
+});
+$("timeline").addEventListener("pointermove", (e) => {
+  const v = state.current;
+  if (!v) return;
+  const hover = $("ctHover");
+  if (!ct.drag) {
+    hover.hidden = !e.target.closest(".ct-track");
+    hover.style.left = `${timeAt(e) * ct.pps}px`;
+    return;
+  }
+  hover.hidden = true;
+  if (ct.drag.kind === "seek") return seekTo(timeAt(e));
+  const { i } = ct.drag;
+  const lo = (i > 0 ? v.cuts[i - 1] : 0) + state.minGap;
+  const hi = (i < v.cuts.length - 1 ? v.cuts[i + 1] : v.duration) - state.minGap;
+  const t = ctClamp(snapFrame(timeAt(e)), lo, hi);
+  v.cuts[i] = Math.round(t * 1000) / 1000;
+  ct.drag.moved = true;
+  // القطعة المستبعدة تفضل مستبعدة بعد ما بدايتها تتحرك
+  seekTo(t);
+  renderCutTimeline();
+});
+$("timeline").addEventListener("pointerleave", () => ($("ctHover").hidden = true));
+$("timeline").addEventListener("pointerup", () => {
+  const d = ct.drag;
+  ct.drag = null;
+  if (d?.kind !== "cut" || !d.moved) return;
+  const v = state.current;
+  const moved = v.cuts[d.i];
+  const skipped = d.before.skipped.map((s) => (Math.abs(s - d.old) < 0.006 ? Math.round(moved * 100) / 100 : s));
+  v.cuts = d.before.cuts;
+  commit(v.cuts.map((c, k) => (k === d.i ? moved : c)), skipped);
+});
+
 
 let saveTimer;
 function commit(newCuts, newSkipped) {
@@ -368,7 +578,7 @@ async function save() {
 function cutHere() {
   const v = state.current;
   if (!v) return;
-  const t = Math.round(player.currentTime * 1000) / 1000;
+  const t = Math.round(snapFrame(player.currentTime) * 1000) / 1000;
   if (t < state.minGap || t > v.duration - state.minGap) {
     toast("مينفعش تقطع في أول أو آخر الفيديو بالظبط");
     return;
@@ -418,8 +628,8 @@ function renderEditorLight() {
   if (!v) return;
   const t = player.currentTime;
   const segs = currentSegments();
-  document.querySelectorAll("#timelineSegs .seg").forEach((el, i) => {
-    const s = segs[i];
+  document.querySelectorAll("#timelineSegs .ct-seg").forEach((el) => {
+    const s = segs[Number(el.dataset.i)];
     el.classList.toggle("current", !!s && t >= s.start && t < s.end);
   });
   updatePlayhead();
@@ -444,21 +654,16 @@ $("segmentsBody").addEventListener("click", (e) => {
   }
 });
 
-$("timeline").addEventListener("click", (e) => {
-  const rect = e.currentTarget.getBoundingClientRect();
-  const ratio = (e.clientX - rect.left) / rect.width;
-  stopAt = null;
-  player.currentTime = Math.max(0, Math.min(1, ratio)) * state.current.duration;
-});
-
 function togglePlay() {
   stopAt = null;
   player.paused ? player.play() : player.pause();
 }
 
 $("playPause").onclick = togglePlay;
-$("back1").onclick = () => (player.currentTime = Math.max(0, player.currentTime - 1));
-$("fwd1").onclick = () => (player.currentTime = Math.min(state.current.duration, player.currentTime + 1));
+$("back1").onclick = () => stepSeconds(-1);
+$("fwd1").onclick = () => stepSeconds(1);
+$("prevFrame").onclick = () => stepFrames(-1);
+$("nextFrame").onclick = () => stepFrames(1);
 $("cutHere").onclick = cutHere;
 $("undoCut").onclick = undo;
 
@@ -468,8 +673,10 @@ document.addEventListener("keydown", (e) => {
   if (k === " ") { e.preventDefault(); togglePlay(); }
   else if (k === "c" || k === "ؤ") { e.preventDefault(); cutHere(); }
   else if (k === "z" || k === "ئ") { e.preventDefault(); undo(); }
-  else if (k === "arrowleft") { e.preventDefault(); player.currentTime = Math.max(0, player.currentTime - 1); }
-  else if (k === "arrowright") { e.preventDefault(); player.currentTime = Math.min(state.current.duration, player.currentTime + 1); }
+  else if (k === "arrowleft") { e.preventDefault(); e.shiftKey ? stepSeconds(-1) : stepFrames(-1); }
+  else if (k === "arrowright") { e.preventDefault(); e.shiftKey ? stepSeconds(1) : stepFrames(1); }
+  else if (k === "," || k === "و") { e.preventDefault(); stepFrames(-1); }
+  else if (k === "." || k === "ز") { e.preventDefault(); stepFrames(1); }
 });
 
 $("deleteVideo").onclick = async () => {

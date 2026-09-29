@@ -97,7 +97,7 @@
       </article>
 
       <article class="tile t-ring" data-open="current">
-        <svg class="ring-svg" viewBox="0 0 120 120"><circle cx="60" cy="60" r="50" class="ring-bg"/><circle cx="60" cy="60" r="50" class="ring-fg" id="ringFg"/></svg>
+        <svg class="ring-svg" viewBox="0 0 120 120"><circle cx="60" cy="60" r="59" class="ring-disc"/><circle cx="60" cy="60" r="47" class="ring-bg"/><circle cx="60" cy="60" r="47" class="ring-fg" id="ringFg"/></svg>
         <div class="ring-text"><b id="ringPct">0%</b><span id="ringLabel">المشروع الحالي</span></div>
       </article>
 
@@ -221,21 +221,33 @@
               <video id="player" playsinline preload="metadata"></video>
             </div>
 
-            <div class="timeline" id="timeline">
-              <div class="segs" id="timelineSegs"></div>
-              <div class="playhead" id="playhead"></div>
-            </div>
-
-            <div class="controls">
-              <button class="btn sm" id="back1" title="رجوع ثانية (←)">⏪ 1ث</button>
-              <button class="btn sm" id="playPause" title="تشغيل / إيقاف (مسافة)">▶︎ تشغيل</button>
-              <button class="btn sm" id="fwd1" title="قدّام ثانية (→)">1ث ⏩</button>
-              <span class="time" id="timeLabel">0:00.0 / 0:00.0</span>
-              <span class="spacer"></span>
-              <button class="btn sm" id="undoCut" title="تراجع (Z)">↶ تراجع</button>
-              <button class="btn primary cut" id="cutHere" title="اقطع هنا (C)">✂️ اقطع هنا</button>
-            </div>
-            <p class="hint">اختصارات الكيبورد: <kbd>مسافة</kbd> تشغيل وإيقاف · <kbd>C</kbd> اقطع هنا · <kbd>Z</kbd> تراجع · <kbd>←</kbd> <kbd>→</kbd> ثانية لورا وقدام</p>
+            <section class="ed-timeline cut-tl" dir="ltr">
+              <div class="tl-toolbar">
+                <button class="ic" id="back1" title="ثانية لورا (Shift + ←)">⏪ 1ث</button>
+                <button class="ic" id="prevFrame" title="فريم لورا (←)">◀︎| فريم</button>
+                <button class="ic play" id="playPause" title="تشغيل / إيقاف (مسافة)">▶︎</button>
+                <button class="ic" id="nextFrame" title="فريم لقدّام (→)">فريم |▶︎</button>
+                <button class="ic" id="fwd1" title="ثانية لقدّام (Shift + →)">1ث ⏩</button>
+                <span class="tc" id="timeLabel">00:00:00 / 00:00:00</span>
+                <span class="sep"></span>
+                <button class="ic" id="undoCut" title="تراجع (Z)">↶ تراجع</button>
+                <button class="ic cut" id="cutHere" title="اقطع هنا (C)">✂️ اقطع هنا</button>
+                <span class="spacer"></span>
+                <button class="ic" id="ctZoomOut" title="زووم أوت (Ctrl + عجلة الماوس)">－</button>
+                <input type="range" id="ctZoom" min="0" max="1000" step="1" title="زووم التايم لاين">
+                <button class="ic" id="ctZoomIn" title="زووم إن (Ctrl + عجلة الماوس)">＋</button>
+                <button class="ic" id="ctFit" title="اعرض الفيديو كله">⤢</button>
+              </div>
+              <div class="tl-scroll" id="ctScroll">
+                <div class="tl-canvas" id="timeline">
+                  <div class="tl-ruler" id="ctRuler"></div>
+                  <div class="ct-track" id="timelineSegs"></div>
+                  <div class="tl-hover" id="ctHover" hidden></div>
+                  <div class="tl-playhead" id="playhead"><span></span></div>
+                </div>
+              </div>
+              <p class="tl-keys" dir="rtl">Space تشغيل · ← → فريم فريم · Shift + ← → ثانية · C اقطع هنا · Z تراجع · اسحب خط القطع عشان تحرّكه · دبل كليك على خط القطع يمسحه · Ctrl + عجلة الماوس زووم</p>
+            </section>
 
             <div class="alert warn" id="tooLongAlert" hidden></div>
 
@@ -271,18 +283,15 @@
           <div class="alert warn" id="atlasAlert" hidden></div>
           <div class="gen-layout">
             <section class="panel">
-              <div class="panel-head"><h2>1. اختار المدرب</h2></div>
-              <div class="coach-picker" id="coachPicker"></div>
-              <p class="empty" id="coachPickerEmpty" hidden>مفيش مدربين لسه. ضيف مدرب من صفحة <a href="#" data-goto="4">المدربين</a>.</p>
-
-              <div class="panel-head gap-top"><h2>2. اختار القطع</h2>
+              <div class="panel-head"><h2>1. اختار القطع</h2>
                 <span class="muted" id="clipPickCount"></span></div>
+              <p class="hint">المدرب بييجي من المشروع نفسه. لو عايز تغيّره، غيّره من صفحة المشاريع.</p>
               <div id="clipPicker"></div>
               <p class="empty" id="clipPickerEmpty" hidden>مفيش قطع جاهزة. قطّع فيديو الأول من <a href="#" data-goto="1">الخطوة 1</a>.</p>
             </section>
 
             <section class="panel settings">
-              <div class="panel-head"><h2>3. اختار البرومبت</h2>
+              <div class="panel-head"><h2>2. اختار البرومبت</h2>
                 <button class="btn sm" id="newPrompt">＋ برومبت جديد</button></div>
               <div class="prompt-list" id="promptList"></div>
 
@@ -304,11 +313,21 @@
             </section>
           </div>
 
-          <section class="panel gap-top">
-            <div class="panel-head"><h2>الفيديوهات المولَّدة</h2><span class="muted" id="genSummary"></span></div>
-            <div class="gens" id="gensGrid"></div>
-            <p class="empty" id="gensEmpty">لسه مفيش فيديوهات مولَّدة.</p>
-          </section>
+          <div class="gen-results gap-top">
+            <section class="panel">
+              <div class="panel-head"><h2 id="gensTitle">الفيديوهات المولَّدة</h2><span class="muted" id="genSummary"></span></div>
+              <div class="archive-banner" id="archiveBanner" hidden></div>
+              <div id="gensGroups"></div>
+              <p class="empty" id="gensEmpty">لسه مفيش فيديوهات مولَّدة.</p>
+            </section>
+
+            <aside class="panel archive-panel">
+              <div class="panel-head"><h2>🗄️ الأرشيف</h2><span class="muted" id="archiveCount"></span></div>
+              <p class="hint">المشاريع اللي خلصت واتصدّرت بتتنقل هنا لوحدها عشان متتلخبطش مع اللي شغال عليه.</p>
+              <ul class="archive-list" id="archiveList"></ul>
+              <p class="empty" id="archiveEmpty">الأرشيف فاضي.</p>
+            </aside>
+          </div>
         </main>
 
         <!-- الخطوة 4: المدربين -->

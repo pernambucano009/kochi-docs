@@ -309,6 +309,13 @@ with closing(db()) as _conn, _conn:
     )
     if "coach_id" not in {c[1] for c in _conn.execute("PRAGMA table_info(videos)")}:
         _conn.execute("ALTER TABLE videos ADD COLUMN coach_id TEXT")
+    # كل فيديو متولّد بيفتكر هو من أنهي فيديو خام (عشان الأرشيف)
+    if "video_id" not in {c[1] for c in _conn.execute("PRAGMA table_info(generations)")}:
+        _conn.execute("ALTER TABLE generations ADD COLUMN video_id TEXT")
+        _conn.execute("UPDATE generations SET video_id = (SELECT video_id FROM clips WHERE clips.id = generations.clip_id)")
+    # الأرشيف: NULL = لوحده (بعد التصدير)، 1 = اتأرشف بإيدك، 0 = رجّعته بإيدك
+    if "archived" not in {c[1] for c in _conn.execute("PRAGMA table_info(videos)")}:
+        _conn.execute("ALTER TABLE videos ADD COLUMN archived INTEGER")
     # سكريبت التعليق الصوتي (النص اللي الراوي بيقراه)
     if "script" not in {c[1] for c in _conn.execute("PRAGMA table_info(folders)")}:
         _conn.execute("ALTER TABLE folders ADD COLUMN script TEXT")
@@ -898,6 +905,7 @@ def generation_to_dict(r: sqlite3.Row) -> dict:
     return {
         "id": r["id"],
         "clip_id": r["clip_id"],
+        "video_id": r["video_id"],
         "clip_label": r["clip_label"],
         "clip_url": f"/media/clips/{r['clip_filename']}",
         "coach_id": r["coach_id"],
@@ -1027,7 +1035,7 @@ def delete_prompt(prompt_id: str):
 
 class GenerationIn(BaseModel):
     clip_ids: list[str]
-    coach_id: str
+    coach_id: str | None = None  # لو فاضي: كل قطعة بتاخد مدرب المشروع بتاعها
     prompt_id: str
     generate_audio: bool = False
 
@@ -1040,10 +1048,10 @@ def create_generations(body: GenerationIn):
         raise HTTPException(400, "اختار قطعة واحدة على الأقل")
 
     with closing(db()) as conn, conn:
-        coach = get_coach(conn, body.coach_id)
+        forced = get_coach(conn, body.coach_id) if body.coach_id else None
         prompt_text = get_prompt(conn, body.prompt_id)["text"]
         rows = conn.execute(
-            f"SELECT c.*, v.name AS video_name FROM clips c JOIN videos v ON v.id = c.video_id "
+            f"SELECT c.*, v.name AS video_name, v.coach_id AS video_coach_id FROM clips c JOIN videos v ON v.id = c.video_id "
             f"WHERE c.id IN ({','.join('?' * len(body.clip_ids))})",
             body.clip_ids,
         ).fetchall()
@@ -1053,8 +1061,16 @@ def create_generations(body: GenerationIn):
         if short:
             raise HTTPException(400, f"قطع أقصر من {MIN_REFERENCE_SECONDS:g} ثانية ومينفعش تتبعت: {', '.join(short)}")
 
+        if not forced:
+            missing = sorted({r["video_name"] for r in rows if not r["video_coach_id"]})
+            if missing:
+                raise HTTPException(400, f"مفيش مدرب للمشروع: {'، '.join(missing)}. اختاره من صفحة المشاريع")
+        coaches = {}
         ids = []
         for r in rows:
+            coach = forced or coaches.get(r["video_coach_id"])
+            if coach is None:
+                coach = coaches[r["video_coach_id"]] = get_coach(conn, r["video_coach_id"])
             # المدة على قد طول القطعة، في حدود اللي Seedance بيقبله (4 لـ 15 ثانية)
             duration = max(atlas.MIN_DURATION, min(atlas.MAX_DURATION, int(r["end"] - r["start"] + 0.5)))
             gen_id = uuid.uuid4().hex[:12]
@@ -1066,11 +1082,12 @@ def create_generations(body: GenerationIn):
             }
             conn.execute(
                 "INSERT INTO generations (id, clip_id, clip_filename, clip_label, coach_id, coach_name, coach_image, "
-                "model, prompt, params, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', ?, ?)",
+                "model, prompt, params, status, created_at, updated_at, video_id) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', ?, ?, ?)",
                 (
                     gen_id, r["id"], r["filename"], f"{r['video_name']} #{r['idx']}",
                     coach["id"], coach["name"], coach["image_filename"],
-                    atlas.MODEL, prompt_text, json.dumps(params), now(), now(),
+                    atlas.MODEL, prompt_text, json.dumps(params), now(), now(), r["video_id"],
                 ),
             )
             ids.append(gen_id)
@@ -1084,6 +1101,54 @@ def list_generations():
     with closing(db()) as conn:
         rows = conn.execute("SELECT * FROM generations ORDER BY created_at DESC, clip_label").fetchall()
     return [generation_to_dict(r) for r in rows]
+
+
+# ---------------------------------------------------------------- الأرشيف
+
+
+def exported_videos(conn: sqlite3.Connection) -> dict[str, str]:
+    """الفيديوهات الخام اللي اتعملها مونتاج واتصدّرت: video_id → رابط الفيديو النهائي."""
+    out: dict[str, str] = {}
+    for p in conn.execute(
+        "SELECT p.data, e.filename FROM projects p JOIN exports e ON e.id = p.export_id ORDER BY p.updated_at"
+    ).fetchall():
+        vid = json.loads(p["data"]).get("video_id")
+        if vid:
+            out[vid] = f"/media/exports/{p['filename']}"
+    return out
+
+
+@app.get("/api/archive")
+def archive_status():
+    """حالة كل فيديو: شغال عليه ولا في الأرشيف. اللي اتصدّر بيتأرشف لوحده إلا لو رجّعته."""
+    with closing(db()) as conn:
+        exported = exported_videos(conn)
+        rows = conn.execute("SELECT id, name, archived, created_at FROM videos ORDER BY created_at DESC").fetchall()
+    return [
+        {
+            "video_id": r["id"], "name": r["name"],
+            "archived": bool(r["archived"]) if r["archived"] is not None else r["id"] in exported,
+            "manual": r["archived"] is not None,
+            "exported_url": exported.get(r["id"]),
+        }
+        for r in rows
+    ]
+
+
+class ArchiveIn(BaseModel):
+    archived: bool | None = None  # null = يرجع للتلقائي
+
+
+@app.put("/api/videos/{video_id}/archive")
+def set_archive(video_id: str, body: ArchiveIn):
+    with closing(db()) as conn, conn:
+        if not conn.execute("SELECT 1 FROM videos WHERE id = ?", (video_id,)).fetchone():
+            raise HTTPException(404, "الفيديو غير موجود")
+        exported = video_id in exported_videos(conn)
+        # لو اللي اخترته هو نفس التلقائي، نسيبه تلقائي
+        value = None if body.archived is None or body.archived == exported else int(body.archived)
+        conn.execute("UPDATE videos SET archived = ? WHERE id = ?", (value, video_id))
+    return {"ok": True}
 
 
 @app.post("/api/generations/{gen_id}/retry")
@@ -1284,12 +1349,22 @@ def montage_filmstrip(kind: str, id: str):
         elif kind == "outro":
             row = conn.execute("SELECT outro_filename AS f FROM coaches WHERE id = ?", (id,)).fetchone()
             base = COACHES_DIR
+        elif kind == "raw":
+            row = conn.execute("SELECT filename AS f FROM videos WHERE id = ?", (id,)).fetchone()
+            base = RAW_DIR
         else:
             raise HTTPException(400, "نوع غلط")
     if row is None or not row["f"] or not (base / row["f"]).exists():
         raise HTTPException(404, "الفيديو غير موجود")
     src = base / row["f"]
-    frames = max(1, int(media_info(src).duration * THUMB_FPS + 0.999))
+    info = media_info(src)
+    # الفيديو الخام ممكن يبقى طويل: نقلل الصور عشان الصورة متعدّيش حدود الـ JPEG
+    thumb_fps, height = THUMB_FPS, THUMB_HEIGHT
+    if kind == "raw":
+        height = 80
+        width = max(1, round(height * (info.width or 9) / (info.height or 16)))
+        thumb_fps = min(THUMB_FPS, 60000 / (width * max(info.duration, 1)))
+    frames = max(1, int(info.duration * thumb_fps + 0.999))
     out = TMP_DIR / "filmstrips" / f"{kind}-{id}-{int(src.stat().st_mtime)}.jpg"
     if not out.exists():
         out.parent.mkdir(parents=True, exist_ok=True)
@@ -1297,7 +1372,7 @@ def montage_filmstrip(kind: str, id: str):
         result = subprocess.run(
             [
                 ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src),
-                "-vf", f"fps={THUMB_FPS},scale=-2:{THUMB_HEIGHT},tile={frames}x1",
+                "-vf", f"fps={thumb_fps:.5f},scale=-2:{height},tile={frames}x1",
                 "-frames:v", "1", "-q:v", "5", str(part),
             ],
             capture_output=True, text=True,
@@ -1307,7 +1382,10 @@ def montage_filmstrip(kind: str, id: str):
         part.replace(out)
     return FileResponse(
         out, media_type="image/jpeg",
-        headers={"Cache-Control": "max-age=86400", "X-Frames": str(frames), "X-Fps": str(THUMB_FPS)},
+        headers={
+            "Cache-Control": "max-age=86400", "X-Frames": str(frames), "X-Fps": f"{thumb_fps:.5f}",
+            "X-Video-Fps": f"{info.fps:g}",
+        },
     )
 
 

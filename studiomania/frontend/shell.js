@@ -231,7 +231,7 @@ async function loadHome() {
 
   // حلقة المشروع الحالي
   const pct = Math.round((st.done / 5) * 100);
-  const C = 2 * Math.PI * 50;
+  const C = 2 * Math.PI * 47;
   $("ringFg").style.strokeDasharray = `${(C * pct) / 100} ${C}`;
   $("ringPct").textContent = `${pct}%`;
   $("ringLabel").textContent = cur ? cur.name : "مفيش مشروع لسه";
