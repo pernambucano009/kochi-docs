@@ -5,6 +5,7 @@
 الخطوة 4: مكتبة المدربين (الصورة والأوترو).
 """
 
+import hashlib
 import json
 import os
 import re
@@ -25,7 +26,7 @@ from pathlib import Path
 import httpx
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi import Request
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -343,11 +344,45 @@ app = FastAPI(title="StudioMania")
 PUBLIC_PATHS = {"/login", "/login.html", "/style.css", "/i18n.js", "/i18n-en.js", "/health", "/api/auth/state", "/api/auth/login", "/api/auth/setup"}
 
 
+# ملفات الواجهة: كل تحديث ليه رقم نسخة جديد عشان المتصفح ميفضلش شغال بالقديم
+_asset_versions: dict[str, tuple[float, str]] = {}
+
+
+def asset_version(name: str) -> str:
+    path = FRONTEND_DIR / name
+    try:
+        mtime = path.stat().st_mtime
+    except OSError:
+        return "0"
+    cached = _asset_versions.get(name)
+    if not cached or cached[0] != mtime:
+        cached = (mtime, hashlib.sha1(path.read_bytes()).hexdigest()[:10])
+        _asset_versions[name] = cached
+    return cached[1]
+
+
+def html_page(name: str) -> Response:
+    """الصفحة بروابط الملفات فيها رقم النسخة، ومن غير كاش."""
+    html = (FRONTEND_DIR / name).read_text(encoding="utf-8")
+    html = re.sub(
+        r'((?:src|href)=")/([\w.-]+\.(?:js|css))"',
+        lambda m: f'{m.group(1)}/{m.group(2)}?v={asset_version(m.group(2))}"',
+        html,
+    )
+    return Response(html, media_type="text/html; charset=utf-8", headers={"Cache-Control": "no-cache"})
+
+
 @app.middleware("http")
 async def require_login(request: Request, call_next):
     path = request.url.path
     if path in PUBLIC_PATHS or auth.valid_token(request.cookies.get(SESSION_COOKIE)):
-        return await call_next(request)
+        response = await call_next(request)
+        # ملفات الواجهة: اللي برقم نسخة تتخزن، والباقي يتأكد كل مرة إنه آخر نسخة
+        if not path.startswith(("/api/", "/media/", "/fonts/")) and "cache-control" not in response.headers:
+            response.headers["Cache-Control"] = (
+                "public, max-age=31536000, immutable" if request.query_params.get("v") else "no-cache"
+            )
+        return response
     if path.startswith("/api/"):
         return JSONResponse({"detail": "لازم تسجّل دخول"}, status_code=401)
     return RedirectResponse("/login")
@@ -359,8 +394,9 @@ def health():
 
 
 @app.get("/login")
+@app.get("/login.html")
 def login_page():
-    return FileResponse(FRONTEND_DIR / "login.html")
+    return html_page("login.html")
 
 
 class PasswordIn(BaseModel):
@@ -2620,8 +2656,9 @@ app.mount("/fonts", StaticFiles(directory=FONTS_DIR), name="fonts")
 
 
 @app.get("/")
+@app.get("/index.html")
 def index():
-    return FileResponse(FRONTEND_DIR / "index.html")
+    return html_page("index.html")
 
 
 app.mount("/", StaticFiles(directory=FRONTEND_DIR), name="frontend")
