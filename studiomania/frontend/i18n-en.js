@@ -801,5 +801,16 @@ window.I18N_EN = {
   "🗄️ الأرشيف": "🗄️ Archive",
   "المشاريع اللي خلصت واتصدّرت بتتنقل هنا لوحدها عشان متتلخبطش مع اللي شغال عليه.": "Finished, exported projects move here automatically so they don't get mixed up with what you're working on.",
   "الأرشيف فاضي.": "The archive is empty.",
-  "مفيش مدرب للمشروع: {0}. اختاره من صفحة المشاريع": "No coach for project: {0}. Pick one on the Projects page"
+  "مفيش مدرب للمشروع: {0}. اختاره من صفحة المشاريع": "No coach for project: {0}. Pick one on the Projects page",
+  "امسح الأوترو ده": "Delete this outro",
+  "الأوترو ده في التايم لاين. شيله منه الأول": "This outro is on the timeline. Remove it from there first",
+  "مسح «{0}»؟": "Delete “{0}”?",
+  "اتمسح": "Deleted",
+  "أوترو {0}": "Outro {0}",
+  "✅ الأوترو اتضاف في آخر المونتاج. تقدر تحركه وتقصه زي أي قطعة": "✅ Outro added at the end of the montage. Move and trim it like any clip",
+  "ارفع فيديو أوترو تاني غير أوترو المدرب، ويتحط في آخر المونتاج": "Upload another outro video besides the coach's; it goes at the end of the montage",
+  "🎬 ＋ أوترو تاني": "🎬 ＋ Another outro",
+  "أوترو": "Outro",
+  "الأوترو غير موجود": "Outro not found",
+  "الأوترو ده مستخدم في: {0}. شيله من المونتاج الأول": "This outro is used in: {0}. Remove it from the montage first"
 };

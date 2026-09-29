@@ -317,6 +317,17 @@ with closing(db()) as _conn, _conn:
     # الأرشيف: NULL = لوحده (بعد التصدير)، 1 = اتأرشف بإيدك، 0 = رجّعته بإيدك
     if "archived" not in {c[1] for c in _conn.execute("PRAGMA table_info(videos)")}:
         _conn.execute("ALTER TABLE videos ADD COLUMN archived INTEGER")
+    # أوتروهات زيادة بتترفع من صفحة المونتاج (غير أوترو المدرب)
+    _conn.execute(
+        """CREATE TABLE IF NOT EXISTS outros (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            filename TEXT NOT NULL,
+            duration REAL NOT NULL,
+            coach_id TEXT,
+            created_at TEXT NOT NULL
+        )"""
+    )
     # سكريبت التعليق الصوتي (النص اللي الراوي بيقراه)
     if "script" not in {c[1] for c in _conn.execute("PRAGMA table_info(folders)")}:
         _conn.execute("ALTER TABLE folders ADD COLUMN script TEXT")
@@ -1319,11 +1330,16 @@ def media_info(path: Path) -> montage.MediaInfo:
 
 
 OUTRO_PREFIX = "outro:"  # قطعة في المونتاج من أوترو مدرب: gen_id = "outro:<coach id>"
+EXTRA_OUTRO_PREFIX = "xoutro:"  # أوترو زيادة اترفع من المونتاج: gen_id = "xoutro:<outro id>"
+ANY_OUTRO = (OUTRO_PREFIX, EXTRA_OUTRO_PREFIX)
 
 
 def clip_source(conn: sqlite3.Connection, gen_id: str) -> Path | None:
     if gen_id.startswith(OUTRO_PREFIX):
         row = conn.execute("SELECT outro_filename AS f FROM coaches WHERE id = ?", (gen_id[len(OUTRO_PREFIX):],)).fetchone()
+        base = COACHES_DIR
+    elif gen_id.startswith(EXTRA_OUTRO_PREFIX):
+        row = conn.execute("SELECT filename AS f FROM outros WHERE id = ?", (gen_id[len(EXTRA_OUTRO_PREFIX):],)).fetchone()
         base = COACHES_DIR
     else:
         row = conn.execute("SELECT output_filename AS f FROM generations WHERE id = ?", (gen_id,)).fetchone()
@@ -1368,7 +1384,55 @@ def montage_sources():
                 "coach_id": c["id"], "coach_name": c["name"], "url": f"/media/coaches/{c['outro_filename']}",
                 "duration": info.duration, "has_audio": info.has_audio,
             })
+        for o in conn.execute("SELECT * FROM outros ORDER BY created_at DESC"):
+            path = COACHES_DIR / o["filename"]
+            if not path.exists():
+                continue
+            info = media_info(path)
+            out.append({
+                "id": f"{EXTRA_OUTRO_PREFIX}{o['id']}", "kind": "outro", "extra": True, "label": f"🎬 {o['name']}",
+                "coach_id": o["coach_id"], "url": f"/media/coaches/{o['filename']}",
+                "duration": info.duration, "has_audio": info.has_audio,
+            })
     return out
+
+
+@app.post("/api/outros")
+def upload_outro(name: str = Form(""), coach_id: str = Form(""), file: UploadFile = File(...)):
+    """أوترو زيادة من صفحة المونتاج. بيظهر مع الفيديوهات ويتحط في التايم لاين زي أي قطعة."""
+    outro_id = uuid.uuid4().hex[:12]
+    filename = save_upload(file, VIDEO_EXTENSIONS, COACHES_DIR, f"{outro_id}_xoutro")
+    try:
+        duration = probe_duration(COACHES_DIR / filename)
+    except ValueError as exc:
+        (COACHES_DIR / filename).unlink(missing_ok=True)
+        raise HTTPException(400, f"الأوترو: {exc}") from exc
+    name = name.strip() or Path(file.filename or "").stem or "أوترو"
+    with closing(db()) as conn, conn:
+        if coach_id and not conn.execute("SELECT 1 FROM coaches WHERE id = ?", (coach_id,)).fetchone():
+            coach_id = ""
+        conn.execute(
+            "INSERT INTO outros (id, name, filename, duration, coach_id, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (outro_id, name, filename, duration, coach_id or None, now()),
+        )
+    return {"id": f"{EXTRA_OUTRO_PREFIX}{outro_id}", "name": name, "duration": duration}
+
+
+@app.delete("/api/outros/{outro_id}")
+def delete_outro(outro_id: str):
+    outro_id = outro_id.removeprefix(EXTRA_OUTRO_PREFIX)
+    gen_id = f"{EXTRA_OUTRO_PREFIX}{outro_id}"
+    with closing(db()) as conn, conn:
+        row = conn.execute("SELECT filename FROM outros WHERE id = ?", (outro_id,)).fetchone()
+        if row is None:
+            raise HTTPException(404, "الأوترو غير موجود")
+        used = [p["name"] for p in conn.execute("SELECT name, data FROM projects").fetchall()
+                if any(c.get("gen_id") == gen_id for c in json.loads(p["data"]).get("clips", []))]
+        if used:
+            raise HTTPException(400, f"الأوترو ده مستخدم في: {'، '.join(used)}. شيله من المونتاج الأول")
+        conn.execute("DELETE FROM outros WHERE id = ?", (outro_id,))
+    (COACHES_DIR / row["filename"]).unlink(missing_ok=True)
+    return {"ok": True}
 
 
 THUMB_FPS = 2  # كام صورة في الثانية في شريط الصور بتاع التايم لاين
@@ -1384,6 +1448,9 @@ def montage_filmstrip(kind: str, id: str):
             base = GENERATED_DIR
         elif kind == "outro":
             row = conn.execute("SELECT outro_filename AS f FROM coaches WHERE id = ?", (id,)).fetchone()
+            base = COACHES_DIR
+        elif kind == "xoutro":
+            row = conn.execute("SELECT filename AS f FROM outros WHERE id = ?", (id.removeprefix(EXTRA_OUTRO_PREFIX),)).fetchone()
             base = COACHES_DIR
         elif kind == "raw":
             row = conn.execute("SELECT filename AS f FROM videos WHERE id = ?", (id,)).fetchone()
@@ -1570,7 +1637,7 @@ def build_montage(conn: sqlite3.Connection, data: dict):
         raise HTTPException(400, "ضيف فيديو واحد على الأقل للمونتاج")
     # الأوترو اللي في آخر المونتاج (عشان اللوجو يختفي وقته لو اخترت كده)
     for c, seg in zip(reversed(data["clips"]), reversed(segments)):
-        if not c["gen_id"].startswith(OUTRO_PREFIX):
+        if not c["gen_id"].startswith(ANY_OUTRO):
             break
         outro_len += seg.duration
 

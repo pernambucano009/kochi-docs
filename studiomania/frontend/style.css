@@ -506,6 +506,8 @@ dialog::backdrop { background: rgba(0,0,0,.6); }
 .bin-item video { width: 100%; aspect-ratio: 9 / 16; object-fit: cover; display: block; pointer-events: none; }
 .bin-item .tag { position: absolute; bottom: 0; inset-inline: 0; background: rgba(0,0,0,.65); color: #fff; font-size: 11px; padding: 2px 5px; }
 .bin-item .add { position: absolute; top: 5px; right: 5px; width: 28px; height: 28px; border-radius: 50%; border: none; background: var(--accent); color: #fff; font-size: 18px; line-height: 1; }
+.bin-item .del { position: absolute; top: 5px; left: 5px; width: 24px; height: 24px; border-radius: 50%; border: none; background: rgba(0,0,0,.6); color: #fff; font-size: 12px; line-height: 1; }
+.bin-item .del:hover { background: var(--danger); }
 
 .ed-player { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
   background: #0b0c0f; border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 10px 8px; }

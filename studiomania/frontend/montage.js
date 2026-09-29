@@ -120,6 +120,8 @@ function openProject(p) {
 // ---------- الأوترو: قطعة فيديو عادية جوه التايم لاين ----------
 const OUTRO_PREFIX = "outro:";
 const isOutroClip = (c) => c.gen_id.startsWith(OUTRO_PREFIX);
+const EXTRA_OUTRO_PREFIX = "xoutro:"; // أوترو زيادة اترفع من المونتاج
+const isAnyOutro = (c) => isOutroClip(c) || c.gen_id.startsWith(EXTRA_OUTRO_PREFIX);
 const outroIdFor = (coachId) => `${OUTRO_PREFIX}${coachId}`;
 function coachHasOutro(coachId) {
   return !!coachId && mt.sources.some((s) => s.id === outroIdFor(coachId));
@@ -266,13 +268,14 @@ $("tlRedo").onclick = redoEdit;
 function renderBin() {
   const d = mt.project.data;
   const onlyCoach = $("binCoachOnly").checked && d.coach_id;
-  const list = mt.sources.filter((s) => !onlyCoach || s.coach_id === d.coach_id);
+  const list = mt.sources.filter((s) => !onlyCoach || s.coach_id === d.coach_id || (s.extra && !s.coach_id));
   $("binEmpty").hidden = list.length > 0;
   $("binGrid").innerHTML = list
     .map(
       (s) => `<div class="bin-item" data-id="${s.id}" draggable="true">
         <video src="${s.url}#t=0.5" preload="metadata" muted playsinline></video>
         <button class="add" title="ضيف عند المؤشر">＋</button>
+        ${s.extra ? `<button class="del" title="امسح الأوترو ده">✕</button>` : ""}
         <span class="tag">${escapeHtml(s.label)} · ${s.duration.toFixed(1)}ث</span>
       </div>`
     )
@@ -299,9 +302,44 @@ function insertClip(genId, index) {
   changed();
 }
 
-$("binGrid").addEventListener("click", (e) => {
+$("binGrid").addEventListener("click", async (e) => {
   const item = e.target.closest(".bin-item");
   if (item && e.target.closest(".add")) insertClip(item.dataset.id, insertIndexAt(mt.t));
+  if (item && e.target.closest(".del")) {
+    const src = mt.sources.find((s) => s.id === item.dataset.id);
+    if (mt.project.data.clips.some((c) => c.gen_id === src.id)) return toast("الأوترو ده في التايم لاين. شيله منه الأول", true);
+    if (!confirm(`مسح «${src.label}»؟`)) return;
+    try {
+      await api(`/api/outros/${encodeURIComponent(src.id)}`, { method: "DELETE" });
+      mt.sources = mt.sources.filter((s) => s.id !== src.id);
+      renderBin();
+      toast("اتمسح");
+    } catch (err) {
+      toast(err.message, true);
+    }
+  }
+});
+
+// أوترو تاني: بيترفع ويتحط في آخر المونتاج على طول
+$("outroUpload").addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  e.target.value = "";
+  if (!file || !mt.project) return;
+  const d = mt.project.data;
+  const form = new FormData();
+  form.append("file", file);
+  form.append("name", `أوترو ${file.name.replace(/\.[^.]+$/, "")}`);
+  if (d.coach_id) form.append("coach_id", d.coach_id);
+  try {
+    toast(`⏳ بيرفع ${file.name}...`);
+    const o = await api("/api/outros", { method: "POST", body: form });
+    mt.sources = await api("/api/montage/sources");
+    renderBin();
+    insertClip(o.id, d.clips.length);
+    toast("✅ الأوترو اتضاف في آخر المونتاج. تقدر تحركه وتقصه زي أي قطعة");
+  } catch (err) {
+    toast(err.message, true);
+  }
 });
 $("binGrid").addEventListener("dblclick", (e) => {
   const item = e.target.closest(".bin-item");
@@ -340,6 +378,7 @@ function stripInfo(kind, id) {
 
 function clipStrip(s, inSec, width) {
   if (!s) return "";
+  if (s.extra) return stripHtml("xoutro", s.id, inSec, width);
   return s.kind === "outro" ? stripHtml("outro", s.coach_id, inSec, width) : stripHtml("gen", s.id, inSec, width);
 }
 
@@ -1635,7 +1674,7 @@ $("refreshFromVideo").onclick = async () => {
     pushHistory();
     // التعديلات (قص وزووم...) بتفضل على الفيديوهات اللي كانت موجودة
     const old = new Map(d.clips.map((c) => [c.gen_id, c]));
-    const outros = d.clips.filter(isOutroClip);
+    const outros = d.clips.filter(isAnyOutro);
     d.clips = [...draft.gen_ids.map((gen_id) => old.get(gen_id) || { gen_id, ...CLIP_DEFAULTS }), ...outros];
     if (draft.voice && d.voice?.id !== draft.voice.id) {
       d.voice = { id: draft.voice.id, volume: d.voice?.volume ?? 1, delay: d.voice?.delay ?? 0, offset: 0, length: null, fade_out: false };
