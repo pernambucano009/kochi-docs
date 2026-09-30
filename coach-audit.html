@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#2FA79E">
+<title>فحص بروفايلات المدربين — كوتشي</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap">
+<style>
+  body{margin:0;background:#f7f5f0;font-family:Cairo,Tajawal,system-ui,sans-serif;color:#1f2937}
+  .intro{max-width:1200px;margin:0 auto;padding:20px 16px 0}
+  .intro h1{margin:0 0 6px;font-size:24px;font-weight:900}
+  .intro p{margin:0 0 12px;color:#6b7280}
+  .ways{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin-bottom:16px}
+  .way{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:16px}
+  .way h3{margin:0 0 6px;font-size:16px}
+  .way ol{margin:6px 0 0;padding-inline-start:20px;color:#374151;font-size:14px}
+  .bm{display:inline-block;margin-top:10px;background:#2FA79E;color:#fff;font-weight:700;border-radius:10px;padding:8px 14px;text-decoration:none;cursor:grab}
+  .bm[aria-disabled="true"]{opacity:.5;pointer-events:none}
+  #report{padding:0 16px 24px}
+</style>
+</head>
+<body>
+<div class="intro">
+  <h1>فحص جاهزية بروفايلات المدربين</h1>
+  <p>بيشيك على كل مدرب في www.kochi.fit: صورة البروفايل، الفيديو التعريفي، الشهادات المعتمدة، المواعيد المتاحة لمكالمة الزووم، وحالات الترانسفورميشن.</p>
+  <div class="ways">
+    <div class="way">
+      <h3>١) من هنا مباشرة</h3>
+      <p style="margin:0;color:#6b7280;font-size:14px">الفحص بيبدأ لوحده تحت. لو ظهرت رسالة CORS استخدم الطريقة التانية.</p>
+    </div>
+    <div class="way">
+      <h3>٢) زرار في المتصفح (بيشتغل دايمًا)</h3>
+      <ol>
+        <li>اسحب الزرار ده لشريط الـ Bookmarks فوق.</li>
+        <li>افتح <b>www.kochi.fit</b>.</li>
+        <li>اضغط الـ Bookmark — التقرير هيفتح فوق الموقع.</li>
+      </ol>
+      <a class="bm" id="bm" href="#" aria-disabled="true" onclick="return false">🩺 فحص مدربين كوتشي</a>
+    </div>
+  </div>
+</div>
+<div id="report" class="kca"></div>
+
+<script src="coach-audit.js"></script>
+<script>
+  KochiCoachAudit.start(document.getElementById('report'));
+
+  fetch('coach-audit.js').then(function (r) { return r.text(); }).then(function (code) {
+    var bm = document.getElementById('bm');
+    bm.href = 'javascript:' + encodeURIComponent('window.__KCA_AUTORUN__=1;' + code + ';void 0');
+    bm.removeAttribute('aria-disabled');
+    bm.removeAttribute('onclick');
+  }).catch(function () {});
+</script>
+</body>
+</html>
