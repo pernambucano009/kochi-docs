@@ -30,6 +30,7 @@
   <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M4 12h16M14 6l6 6-6 6"/></symbol>
   <symbol id="i-min" viewBox="0 0 24 24"><path d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5"/></symbol>
   <symbol id="i-max" viewBox="0 0 24 24"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></symbol>
+  <symbol id="i-slides" viewBox="0 0 24 24"><rect x="7" y="3.5" width="10" height="17" rx="2"/><path d="M4 6v12M20 6v12"/></symbol>
   <symbol id="i-box" viewBox="0 0 24 24"><path d="M4 7.5 12 4l8 3.5v9L12 20l-8-3.5z"/><path d="M4 7.5l8 3.5 8-3.5M12 11v9"/></symbol>
 </svg>
 <div class="bg-art" aria-hidden="true"><i class="blob b1"></i><i class="blob b2"></i><i class="blob b3"></i><i class="ring r1"></i><i class="ring r2"></i></div>
@@ -39,6 +40,8 @@
     <button class="rail-btn" data-goto="home" title="الرئيسية"><svg><use href="#i-home"/></svg><span>الرئيسية</span></button>
     <span class="rail-sep"></span>
     <p class="rail-label">المكتبات</p>
+    <button class="rail-btn" data-goto="8" title="صناعة الكاروسيل"><svg><use href="#i-slides"/></svg><span>الكاروسيل</span></button>
+    <span class="rail-sep"></span>
     <button class="rail-btn" data-goto="4" title="المدربين"><svg><use href="#i-users"/></svg><span>المدربين</span></button>
     <button class="rail-btn" data-goto="3" title="التعليق الصوتي"><svg><use href="#i-mic"/></svg><span>التعليق الصوتي</span></button>
     <button class="rail-btn" data-goto="5" title="الموسيقى"><svg><use href="#i-music"/></svg><span>الموسيقى</span></button>
@@ -113,6 +116,13 @@
         <h2>النشر على السوشيال</h2>
         <ul class="post-list" id="tilePosts"></ul>
         <p class="tile-sub" id="tilePubSub"></p>
+      </article>
+
+      <article class="tile t-carousel glass" data-open="8">
+        <header><span class="tile-num new">جديد</span><span class="tile-ic"><svg><use href="#i-slides"/></svg></span><button class="tile-exp" tabindex="-1"><svg><use href="#i-max"/></svg></button></header>
+        <h2>صناعة الكاروسيل</h2>
+        <div class="car-stack" id="tileCarStack"><i></i><i></i><i></i></div>
+        <p class="tile-sub" id="tileCarSub">فكرة ← نص سعودي ← تصميم ← سلايدات</p>
       </article>
 
       <article class="tile t-libs glass">
@@ -649,6 +659,87 @@
         </main>
 
         <!-- الإعدادات -->
+        <!-- صناعة الكاروسيل -->
+        <main class="view" data-view="8" hidden>
+          <div class="alert warn" id="carAlert" hidden></div>
+          <div class="car-layout">
+            <aside class="panel car-list-panel">
+              <div class="panel-head"><h2>الكاروسيلات</h2>
+                <button class="btn sm" id="carBrandOpen" title="الهوية البصرية والموديلات">🎨 الهوية</button></div>
+              <form class="row" id="carNewForm"><input type="text" id="carNewName" placeholder="موضوع الكاروسيل"><button class="btn primary sm" type="submit">＋ جديد</button></form>
+              <ul class="car-list" id="carList"></ul>
+              <p class="empty" id="carListEmpty">لسه مفيش كاروسيلات. اكتب موضوع ودوس جديد.</p>
+            </aside>
+
+            <section class="car-main" id="carMain" hidden>
+              <div class="car-head">
+                <input type="text" class="folder-name" id="carName" title="اسم الكاروسيل">
+                <nav class="car-steps" id="carSteps">
+                  <button data-s="idea"><i>1</i>الفكرة</button>
+                  <button data-s="plan"><i>2</i>النص</button>
+                  <button data-s="overview"><i>3</i>الشكل العام</button>
+                  <button data-s="slides"><i>4</i>السلايدات</button>
+                </nav>
+                <button class="btn sm danger" id="carDelete">🗑️</button>
+              </div>
+
+              <!-- 1. النقاش -->
+              <section class="panel car-sec" data-sec="idea">
+                <div class="panel-head"><h2>💬 اتناقش على الفكرة</h2><span class="muted" id="carModelName"></span></div>
+                <div class="car-chat" id="carChat" data-no-i18n></div>
+                <form class="car-input" id="carChatForm">
+                  <textarea id="carMsg" rows="2" placeholder="قوله الموضوع أو اسأله عن أفكار... (Enter يبعت، Shift+Enter سطر جديد)"></textarea>
+                  <button class="btn primary" type="submit" id="carSend">إرسال</button>
+                </form>
+                <div class="row wrap car-quick" id="carQuick">
+                  <button class="btn sm" data-q="اقترح عليا 5 أفكار كاروسيل عن الموضوع ده">💡 اقترح 5 أفكار</button>
+                  <button class="btn sm" data-q="اختار أقوى فكرة وقولي ليه، واقترح هوك أقوى لأول سلايد">🎯 أقوى فكرة</button>
+                </div>
+                <div class="car-plan-bar">
+                  <label>عدد السلايدات <select id="carCount"></select></label>
+                  <label>المقاس <select id="carRatio"><option value="9:16">9:16 تيك توك وستوري</option><option value="4:5">4:5 فيد إنستجرام</option></select></label>
+                  <label>المدرب <select id="carCoach"></select></label>
+                  <button class="btn primary" id="carPlanBtn">📋 اكتب الكاروسيل</button>
+                </div>
+              </section>
+
+              <!-- 2. النص -->
+              <section class="panel car-sec" data-sec="plan" hidden>
+                <div class="panel-head"><h2>📋 نص الكاروسيل</h2>
+                  <span class="row"><span class="muted" id="carPlanState"></span>
+                  <button class="btn sm" id="carPolish" title="الموديل يراجع الإملاء ويخلّي الكلام سعودي طبيعي">✨ نقّح اللهجة والإملاء</button></span></div>
+                <p class="hint">راجع كل كلمة هنا قبل الرسم: الكلام ده هو اللي هيتكتب على الصور بالحرف. تقدر تعدّل بإيدك.</p>
+                <div class="car-slides-edit" id="carPlan"></div>
+                <label class="field">الكابشن <textarea id="carCaption" rows="3"></textarea></label>
+                <label class="field">الهاشتاجات <input type="text" id="carTags" dir="auto"></label>
+                <div class="row"><button class="btn primary" id="carToOverview">🖼️ ارسم الشكل العام</button></div>
+              </section>
+
+              <!-- 3. الشكل العام -->
+              <section class="panel car-sec" data-sec="overview" hidden>
+                <div class="panel-head"><h2>🖼️ الشكل العام (الكاروسيل كله في صورة واحدة)</h2><span class="muted" id="carOvState"></span></div>
+                <p class="hint">كل السلايدات بتترسم مع بعض الأول عشان تطلع متسقة. راجع الشكل والعربي، ولو تمام وافق، ولو لأ ارسم تاني.</p>
+                <div class="car-overview" id="carOverview"></div>
+                <div class="row wrap">
+                  <button class="btn" id="carOvRedo">🔄 ارسم تاني</button>
+                  <button class="btn primary" id="carApprove">✅ الشكل تمام، كمّل للسلايدات</button>
+                </div>
+              </section>
+
+              <!-- 4. السلايدات -->
+              <section class="panel car-sec" data-sec="slides" hidden>
+                <div class="panel-head"><h2>📱 السلايدات بالمقاس النهائي</h2>
+                  <span class="row"><span class="muted" id="carSlidesState"></span>
+                  <a class="btn sm" id="carZip" download>⬇ نزّل الكل</a></span></div>
+                <p class="hint">كل سلايد بتترسم لوحدها بجودة عالية، ومعاها الشكل العام والسلايد اللي قبلها عشان تفضل متسقة. قارن الكلام تحت كل صورة، ولو فيه حرف غلط دوس «أعد».</p>
+                <div class="row"><button class="btn primary" id="carSlidesGo">🎨 ارسم السلايدات</button></div>
+                <div class="car-grid" id="carGrid"></div>
+              </section>
+            </section>
+            <section class="panel placeholder" id="carPlaceholder"><p>اختار كاروسيل أو اعمل واحد جديد.</p></section>
+          </div>
+        </main>
+
         <main class="view" data-view="settings" hidden>
           <div class="gen-layout">
             <section class="panel">
@@ -721,6 +812,33 @@
     <span class="muted" id="bulkProgress"></span>
   </div>
 </dialog>
+<dialog class="bulk-dlg" id="brandDialog">
+  <div class="panel-head"><h2>🎨 هوية كوتشي البصرية والموديلات</h2><button class="btn sm" id="brandClose">إغلاق</button></div>
+  <div class="brand-grid">
+    <div>
+      <label class="field">اسم البراند <input type="text" data-b="name"></label>
+      <label class="field">عن البراند <textarea rows="2" data-b="about"></textarea></label>
+      <label class="field">الجمهور <textarea rows="2" data-b="audience"></textarea></label>
+      <label class="field">الألوان (أكواد زي #E5613E واسم كل لون) <input type="text" data-b="colors" dir="ltr" placeholder="#E5613E orange (main), #111111 black, #FFFFFF white"></label>
+      <label class="field">الخط <input type="text" data-b="font"></label>
+      <label class="field">ستايل الرسم (بالإنجليزي أحسن) <textarea rows="3" data-b="style" dir="auto"></textarea></label>
+      <label class="field">مكان اللوجو <input type="text" data-b="logo_rule"></label>
+    </div>
+    <div>
+      <div class="field">اللوجو <div class="brand-logo" id="brandLogo"></div><span class="hint">نفس لوجو المونتاج. بيتغيّر من المونتاج ← البراند.</span></div>
+      <div class="field">صور الشخصيات والستايل (لحد 12)
+        <div class="brand-refs" id="brandRefs"></div>
+        <label class="btn sm">＋ ضيف صور<input type="file" id="brandRefUpload" accept="image/png,image/jpeg,image/webp" multiple hidden></label>
+        <span class="hint">صور شخصيات الـ 2D اللي بتستخدموها أو كاروسيل قديم عاجبك. بتتبعت مع كل رسمة كمرجع.</span></div>
+      <label class="field">موديل الكلام (من Atlas) <input type="text" id="brandTextModel" dir="ltr"></label>
+      <div class="row"><button class="btn sm" id="brandTest">🧪 جرّب الموديل</button><span class="muted" id="brandTestOut"></span></div>
+      <label class="field">موديل الصور <select id="brandImageModel"></select></label>
+      <label class="field">الجودة <select id="brandQuality"></select></label>
+      <p class="hint">الجودة الأعلى أوضح في الكلام العربي بس أغلى وأبطأ. الشكل العام بيترسم بنفس الجودة.</p>
+    </div>
+  </div>
+  <div class="row gap-top"><button class="btn primary" id="brandSave">💾 احفظ</button></div>
+</dialog>
 <dialog class="bulk-dlg" id="handlesDialog">
   <div class="panel-head"><h2>📥 حسابات المدربين من الملف</h2><button class="btn sm" id="handlesClose">إغلاق</button></div>
   <p class="hint">راجع: كل صف اتربط بالمدرب اللي اسمه شبهه. غيّر الربط لو غلط. الحسابات كلها بتتحفظ، وأي مدرب تضيفه بعدين بنفس الاسم بياخد حساباته لوحده.</p>
@@ -761,6 +879,7 @@
 <script src="/captions.js"></script>
 <script src="/publish.js"></script>
 <script src="/settings.js"></script>
+<script src="/carousel.js"></script>
 <script src="/shell.js"></script>
 </body>
 </html>

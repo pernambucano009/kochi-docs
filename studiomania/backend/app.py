@@ -53,6 +53,7 @@ import captions  # noqa: E402
 import montage  # noqa: E402
 import publisher  # noqa: E402
 import sheets  # noqa: E402
+import carousel as cz  # noqa: E402
 from auth import SESSION_COOKIE, SESSION_DAYS, Auth  # noqa: E402
 
 MAX_CLIP_SECONDS = 15.0
@@ -72,11 +73,13 @@ AUDIO_DIR = DATA_DIR / "audio"
 EXPORTS_DIR = DATA_DIR / "exports"  # فولدر الفيديوهات الجاهزة للنشر
 BRAND_DIR = DATA_DIR / "brand"  # اللوجو
 TMP_DIR = DATA_DIR / "tmp"
+CAROUSELS_DIR = DATA_DIR / "carousels"  # صور الكاروسيلات
+BRAND_REFS_DIR = DATA_DIR / "brand" / "refs"  # صور الشخصيات والستايل بتاع الهوية البصرية
 DB_PATH = DATA_DIR / "studiomania.db"
 FRONTEND_DIR = ROOT / "frontend"
 FONTS_DIR = ROOT / "fonts"
 
-for d in (RAW_DIR, CLIPS_DIR, COACHES_DIR, GENERATED_DIR, AUDIO_DIR, EXPORTS_DIR, BRAND_DIR, TMP_DIR):
+for d in (RAW_DIR, CLIPS_DIR, COACHES_DIR, GENERATED_DIR, AUDIO_DIR, EXPORTS_DIR, BRAND_DIR, TMP_DIR, CAROUSELS_DIR, BRAND_REFS_DIR):
     d.mkdir(parents=True, exist_ok=True)
 
 # الكابشن بيدوّر على الخطوط عن طريق fontconfig، والسيرفر (Railway) مفيهوش إعداداته خالص.
@@ -332,6 +335,29 @@ with closing(db()) as _conn, _conn:
             tiktok TEXT
         )"""
     )
+    # الكاروسيلات: كل واحد بالنقاش والخطة وحالة الصور
+    _conn.execute(
+        """CREATE TABLE IF NOT EXISTS carousels (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            data TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )"""
+    )
+    # لو البرنامج اتقفل وهو بيرسم كاروسيل، الرسم ده وقف
+    for _r in _conn.execute("SELECT id, data FROM carousels").fetchall():
+        _d = json.loads(_r["data"])
+        _changed = False
+        if _d["overview"].get("status") == "working":
+            _d["overview"].update(status="failed", error="البرنامج اتقفل وهو بيرسم. دوس ارسم تاني")
+            _changed = True
+        for _s in _d.get("slides", []):
+            if _s.get("status") in ("working", "queued"):
+                _s.update(status="idle", error=None)
+                _changed = True
+        if _changed:
+            _conn.execute("UPDATE carousels SET data = ? WHERE id = ?", (json.dumps(_d, ensure_ascii=False), _r["id"]))
     # أوتروهات زيادة بتترفع من صفحة المونتاج (غير أوترو المدرب)
     _conn.execute(
         """CREATE TABLE IF NOT EXISTS outros (
@@ -2963,8 +2989,528 @@ app.mount("/media/coaches", StaticFiles(directory=COACHES_DIR), name="coaches")
 app.mount("/media/generated", StaticFiles(directory=GENERATED_DIR), name="generated")
 app.mount("/media/audio", StaticFiles(directory=AUDIO_DIR), name="audio")
 app.mount("/media/exports", StaticFiles(directory=EXPORTS_DIR), name="exports")
+app.mount("/media/carousels", StaticFiles(directory=CAROUSELS_DIR), name="carousels")
 app.mount("/media/brand", StaticFiles(directory=BRAND_DIR), name="brand")
 app.mount("/fonts", StaticFiles(directory=FONTS_DIR), name="fonts")
+
+
+# ---------------------------------------------------------------- الكاروسيل
+
+CAROUSEL_LOCK = threading.Lock()
+CAROUSEL_JOBS: set[str] = set()  # كاروسيلات بترسم دلوقتي
+
+
+def carousel_settings() -> dict:
+    return {
+        "text_model": auth.get_setting("carousel_text_model") or atlas.DEFAULT_TEXT_MODEL,
+        "image_family": auth.get_setting("carousel_image_family") or "sunburst",
+        "quality": auth.get_setting("carousel_quality") or "high",
+    }
+
+
+def brand_settings() -> dict:
+    try:
+        saved = json.loads(auth.get_setting("brand") or "{}")
+    except ValueError:
+        saved = {}
+    return {**cz.DEFAULT_BRAND, **{k: v for k, v in saved.items() if k in cz.DEFAULT_BRAND}}
+
+
+def brand_refs() -> list[Path]:
+    return sorted(p for p in BRAND_REFS_DIR.iterdir() if p.suffix.lower() in IMAGE_EXTENSIONS)
+
+
+@app.get("/api/carousel/settings")
+def get_carousel_settings():
+    return {
+        **carousel_settings(),
+        "brand": brand_settings(),
+        "defaults": cz.DEFAULT_BRAND,
+        "refs": [{"name": p.name, "url": f"/media/brand/refs/{p.name}"} for p in brand_refs()],
+        "logo": get_logo()["url"],
+        "image_models": {k: v[2] for k, v in atlas.IMAGE_MODELS.items()},
+        "qualities": list(cz.QUALITIES),
+        "sizes": list(cz.SIZES),
+        "configured": bool(atlas.api_key()) or atlas.mock_mode(),
+    }
+
+
+class CarouselSettingsIn(BaseModel):
+    text_model: str | None = None
+    image_family: str | None = None
+    quality: str | None = None
+    brand: dict | None = None
+
+
+@app.put("/api/carousel/settings")
+def save_carousel_settings(body: CarouselSettingsIn):
+    if body.text_model is not None:
+        auth.set_setting("carousel_text_model", body.text_model.strip() or None)
+    if body.image_family is not None:
+        if body.image_family not in atlas.IMAGE_MODELS:
+            raise HTTPException(400, "موديل الصور غير معروف")
+        auth.set_setting("carousel_image_family", body.image_family)
+    if body.quality is not None:
+        if body.quality not in cz.QUALITIES:
+            raise HTTPException(400, "الجودة غير معروفة")
+        auth.set_setting("carousel_quality", body.quality)
+    if body.brand is not None:
+        clean = {k: str(v).strip()[:2000] for k, v in body.brand.items() if k in cz.DEFAULT_BRAND}
+        auth.set_setting("brand", json.dumps(clean, ensure_ascii=False))
+    return get_carousel_settings()
+
+
+@app.post("/api/carousel/test-model")
+def test_text_model():
+    """بيتأكد إن موديل الكلام شغال بمفتاح Atlas، وبيرجّع جملة تجريبية باللهجة السعودية."""
+    if atlas.mock_mode():
+        return {"ok": True, "reply": "هلا والله، أنا جاهز نشتغل على الكاروسيل 👌"}
+    try:
+        reply = atlas.chat(
+            [{"role": "user", "content": "قل جملة ترحيب قصيرة باللهجة السعودية لمتابعين حساب لياقة."}],
+            carousel_settings()["text_model"], max_tokens=120,
+        )
+    except (atlas.AtlasError, httpx.HTTPError) as exc:
+        raise HTTPException(400, str(exc)) from exc
+    return {"ok": True, "reply": reply}
+
+
+@app.post("/api/carousel/refs")
+def upload_brand_ref(file: UploadFile = File(...)):
+    if len(brand_refs()) >= 12:
+        raise HTTPException(400, "12 صورة بالكتير. امسح حاجة الأول")
+    save_upload(file, IMAGE_EXTENSIONS, BRAND_REFS_DIR, f"ref_{uuid.uuid4().hex[:8]}")
+    return get_carousel_settings()
+
+
+@app.delete("/api/carousel/refs/{name}")
+def delete_brand_ref(name: str):
+    path = BRAND_REFS_DIR / Path(name).name
+    path.unlink(missing_ok=True)
+    return get_carousel_settings()
+
+
+def new_carousel_data() -> dict:
+    return {
+        "chat": [], "plan": None,
+        "settings": {"slides": 6, "ratio": "9:16", "coach_id": None},
+        "overview": {"status": "idle", "file": None, "error": None, "approved": False},
+        "slides": [],
+    }
+
+
+def load_carousel(conn: sqlite3.Connection, cid: str) -> tuple[sqlite3.Row, dict]:
+    row = conn.execute("SELECT * FROM carousels WHERE id = ?", (cid,)).fetchone()
+    if row is None:
+        raise HTTPException(404, "الكاروسيل غير موجود")
+    return row, json.loads(row["data"])
+
+
+def save_carousel(conn: sqlite3.Connection, cid: str, data: dict, name: str | None = None) -> None:
+    if name is not None:
+        conn.execute("UPDATE carousels SET name = ?, data = ?, updated_at = ? WHERE id = ?",
+                     (name, json.dumps(data, ensure_ascii=False), now(), cid))
+    else:
+        conn.execute("UPDATE carousels SET data = ?, updated_at = ? WHERE id = ?",
+                     (json.dumps(data, ensure_ascii=False), now(), cid))
+
+
+def update_carousel(cid: str, fn) -> dict:
+    """تعديل آمن (السيرفر ممكن يكون بيرسم في نفس الوقت)."""
+    with CAROUSEL_LOCK, closing(db()) as conn, conn:
+        _, data = load_carousel(conn, cid)
+        fn(data)
+        save_carousel(conn, cid, data)
+        return data
+
+
+def media_file_url(cid: str, name: str | None) -> str | None:
+    if not name or not (CAROUSELS_DIR / cid / name).exists():
+        return None
+    return f"/media/carousels/{cid}/{name}?v={int((CAROUSELS_DIR / cid / name).stat().st_mtime)}"
+
+
+def carousel_to_dict(row: sqlite3.Row, data: dict | None = None) -> dict:
+    data = data or json.loads(row["data"])
+    cid = row["id"]
+    ov = dict(data["overview"], url=media_file_url(cid, data["overview"].get("file")))
+    slides = [dict(s, url=media_file_url(cid, s.get("file"))) for s in data.get("slides", [])]
+    return {
+        "id": cid, "name": row["name"], "created_at": row["created_at"], "updated_at": row["updated_at"],
+        "chat": data["chat"], "plan": data["plan"], "settings": data["settings"],
+        "overview": ov, "slides": slides, "busy": cid in CAROUSEL_JOBS,
+    }
+
+
+@app.get("/api/carousels")
+def list_carousels():
+    with closing(db()) as conn:
+        out = []
+        for r in conn.execute("SELECT * FROM carousels ORDER BY updated_at DESC"):
+            d = carousel_to_dict(r)
+            done = [s for s in d["slides"] if s["url"]]
+            out.append({"id": d["id"], "name": d["name"], "updated_at": d["updated_at"], "busy": d["busy"],
+                        "slides": len(d["plan"]["slides"]) if d["plan"] else 0, "done": len(done),
+                        "cover": done[0]["url"] if done else d["overview"]["url"]})
+        return out
+
+
+class CarouselIn(BaseModel):
+    name: str
+
+
+@app.post("/api/carousels")
+def create_carousel(body: CarouselIn):
+    name = body.name.strip() or "كاروسيل جديد"
+    cid = uuid.uuid4().hex[:12]
+    with closing(db()) as conn, conn:
+        conn.execute("INSERT INTO carousels (id, name, data, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+                     (cid, name, json.dumps(new_carousel_data()), now(), now()))
+        row, data = load_carousel(conn, cid)
+        return carousel_to_dict(row, data)
+
+
+@app.get("/api/carousels/{cid}")
+def get_carousel(cid: str):
+    with closing(db()) as conn:
+        row, data = load_carousel(conn, cid)
+        return carousel_to_dict(row, data)
+
+
+class CarouselPatch(BaseModel):
+    name: str | None = None
+    plan: dict | None = None
+    settings: dict | None = None
+
+
+@app.patch("/api/carousels/{cid}")
+def patch_carousel(cid: str, body: CarouselPatch):
+    with CAROUSEL_LOCK, closing(db()) as conn, conn:
+        row, data = load_carousel(conn, cid)
+        if body.settings is not None:
+            st = data["settings"]
+            if "slides" in body.settings:
+                st["slides"] = max(2, min(10, int(body.settings["slides"] or 6)))
+            if "ratio" in body.settings and body.settings["ratio"] in cz.SIZES:
+                st["ratio"] = body.settings["ratio"]
+            if "coach_id" in body.settings:
+                st["coach_id"] = body.settings["coach_id"] or None
+        if body.plan is not None:
+            if cid in CAROUSEL_JOBS:
+                raise HTTPException(400, "استنى لحد ما الرسم يخلص")
+            plan = cz.parse_plan(json.dumps(body.plan, ensure_ascii=False))
+            data["plan"] = plan
+            sync_slides(data)
+        name = body.name.strip() if body.name and body.name.strip() else None
+        save_carousel(conn, cid, data, name)
+        row, data = load_carousel(conn, cid)
+        return carousel_to_dict(row, data)
+
+
+def sync_slides(data: dict) -> None:
+    """عدد خانات الصور على قد عدد السلايدات في الخطة."""
+    n = len(data["plan"]["slides"]) if data["plan"] else 0
+    slides = data.get("slides", [])[:n]
+    slides += [{"status": "idle", "file": None, "error": None} for _ in range(n - len(slides))]
+    data["slides"] = slides
+
+
+@app.delete("/api/carousels/{cid}")
+def delete_carousel(cid: str):
+    if cid in CAROUSEL_JOBS:
+        raise HTTPException(400, "استنى لحد ما الرسم يخلص")
+    with closing(db()) as conn, conn:
+        conn.execute("DELETE FROM carousels WHERE id = ?", (cid,))
+    shutil.rmtree(CAROUSELS_DIR / Path(cid).name, ignore_errors=True)
+    return {"ok": True}
+
+
+def llm(messages: list[dict], json_mode: bool = False, temperature: float = 0.8) -> str:
+    try:
+        return atlas.chat(messages, carousel_settings()["text_model"], temperature=temperature,
+                          max_tokens=4000, json_mode=json_mode)
+    except (atlas.AtlasError, httpx.HTTPError) as exc:
+        raise HTTPException(400, f"موديل الكلام: {exc}") from exc
+
+
+class ChatIn(BaseModel):
+    message: str
+
+
+@app.post("/api/carousels/{cid}/chat")
+def carousel_chat(cid: str, body: ChatIn):
+    text = body.message.strip()
+    if not text:
+        raise HTTPException(400, "اكتب حاجة")
+    with closing(db()) as conn:
+        _, data = load_carousel(conn, cid)
+    history = [*data["chat"], {"role": "user", "content": text}]
+    if atlas.mock_mode():
+        reply = cz.mock_reply(history)
+    else:
+        reply = llm([{"role": "system", "content": cz.chat_system(brand_settings())}, *history[-30:]])
+    def add(d):
+        d["chat"] += [{"role": "user", "content": text}, {"role": "assistant", "content": reply}]
+    return carousel_to_dict_by_id(cid, update_carousel(cid, add))
+
+
+def carousel_to_dict_by_id(cid: str, data: dict) -> dict:
+    with closing(db()) as conn:
+        row, _ = load_carousel(conn, cid)
+    return carousel_to_dict(row, data)
+
+
+def coach_for(data: dict) -> sqlite3.Row | None:
+    coach_id = data["settings"].get("coach_id")
+    if not coach_id:
+        return None
+    with closing(db()) as conn:
+        return conn.execute("SELECT * FROM coaches WHERE id = ?", (coach_id,)).fetchone()
+
+
+@app.post("/api/carousels/{cid}/plan")
+def carousel_plan(cid: str):
+    """الموديل يكتب الكاروسيل النهائي (سلايد سلايد) من النقاش."""
+    with closing(db()) as conn:
+        _, data = load_carousel(conn, cid)
+    if not data["chat"]:
+        raise HTTPException(400, "اتكلم مع الموديل عن الفكرة الأول")
+    n = data["settings"]["slides"]
+    coach = coach_for(data)
+    if atlas.mock_mode():
+        text = cz.mock_plan(n)
+    else:
+        text = llm(cz.plan_messages(brand_settings(), data["chat"], n, coach["name"] if coach else None),
+                   json_mode=True, temperature=0.7)
+    try:
+        plan = cz.parse_plan(text, n)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    def put(d):
+        d["plan"] = plan
+        d["overview"] = {"status": "idle", "file": d["overview"].get("file"), "error": None, "approved": False}
+        sync_slides(d)
+    data = update_carousel(cid, put)
+    name = plan["title"] or None
+    if name:
+        with closing(db()) as conn, conn:
+            conn.execute("UPDATE carousels SET name = ? WHERE id = ?", (name, cid))
+    return carousel_to_dict_by_id(cid, data)
+
+
+@app.post("/api/carousels/{cid}/polish")
+def carousel_polish(cid: str):
+    """تنقيح: إملاء صح ولهجة سعودية، من غير ما يغيّر عدد السلايدات."""
+    with closing(db()) as conn:
+        _, data = load_carousel(conn, cid)
+    if not data["plan"]:
+        raise HTTPException(400, "اكتب الخطة الأول")
+    if atlas.mock_mode():
+        text = json.dumps(data["plan"], ensure_ascii=False)
+    else:
+        text = llm(cz.polish_messages(brand_settings(), data["plan"]), json_mode=True, temperature=0.3)
+    try:
+        plan = cz.parse_plan(text)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    old = data["plan"]["slides"]
+    if len(plan["slides"]) != len(old):
+        raise HTTPException(400, "التنقيح غيّر عدد السلايدات، فمتحفظش. جرّب تاني")
+    for new, prev in zip(plan["slides"], old):
+        new["visual"] = prev.get("visual") or new["visual"]  # الرسمة متتغيرش
+    def put(d):
+        d["plan"] = plan
+    return carousel_to_dict_by_id(cid, update_carousel(cid, put))
+
+
+# ---------- الرسم ----------
+def mock_image(dest: Path, size: str, label: str, hue: int) -> None:
+    w, h = size.split("x")
+    colors = ["#E5613E", "#2B6CB0", "#2F855A", "#B7791F", "#6B46C1", "#C53030", "#2C7A7B", "#97266D", "#4A5568", "#DD6B20"]
+    time.sleep(1.2)
+    subprocess.run(
+        [ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi",
+         "-i", f"color=c={colors[hue % len(colors)]}:s={w}x{h}", "-frames:v", "1", str(dest)],
+        check=True, capture_output=True,
+    )
+
+
+def reference_list(first: list[Path], coach: sqlite3.Row | None) -> tuple[list[Path], dict]:
+    """ترتيب الصور المرجعية وأرقامها عشان البرومبت يقول «الصورة رقم كذا»."""
+    files, refs = list(first), {}
+    logo = logo_path()
+    if logo:
+        files.append(logo)
+        refs["logo"] = len(files)
+    chars = []
+    for p in brand_refs()[: 16 - len(files) - (1 if coach else 0)]:
+        files.append(p)
+        chars.append(len(files))
+    if chars:
+        refs["characters"] = chars
+    if coach and len(files) < 16:
+        files.append(COACHES_DIR / coach["image_filename"])
+        refs["coach"] = len(files)
+        refs["coach_name"] = coach["name"]
+    return files, refs
+
+
+def draw(prompt: str, size: str, files: list[Path], dest: Path, mock_label: str, hue: int) -> None:
+    if atlas.mock_mode():
+        return mock_image(dest, size, mock_label, hue)
+    cfg = carousel_settings()
+    urls = [atlas.reference_url(p) for p in files if p.exists()]
+    url = atlas.generate_image(cfg["image_family"], prompt, size, cfg["quality"], urls or None)
+    part = dest.with_suffix(".part.png")
+    atlas.download(url, part)
+    part.replace(dest)
+
+
+def run_overview(cid: str) -> None:
+    try:
+        with closing(db()) as conn:
+            _, data = load_carousel(conn, cid)
+        plan, ratio = data["plan"], data["settings"]["ratio"]
+        files, refs = reference_list([], coach_for(data))
+        folder = CAROUSELS_DIR / cid
+        folder.mkdir(parents=True, exist_ok=True)
+        name = f"overview-{uuid.uuid4().hex[:6]}.png"
+        prompt = cz.overview_prompt(brand_settings(), plan, ratio, refs)
+        draw(prompt, cz.overview_size(len(plan["slides"]), ratio), files, folder / name, "overview", 0)
+        def done(d):
+            old = d["overview"].get("file")
+            if old and old != name:
+                (folder / old).unlink(missing_ok=True)
+            d["overview"] = {"status": "done", "file": name, "error": None, "approved": False}
+        update_carousel(cid, done)
+    except Exception as exc:  # noqa: BLE001  (أي خطأ يتسجّل على الكاروسيل بدل ما يضيع)
+        msg = str(exc)[:400]
+        update_carousel(cid, lambda d: d["overview"].update(status="failed", error=msg))
+    finally:
+        CAROUSEL_JOBS.discard(cid)
+
+
+def run_slides(cid: str, only: int | None) -> None:
+    """السلايدات بالترتيب، كل واحدة ومعاها الصورة الكاملة والسلايد اللي قبلها."""
+    try:
+        with closing(db()) as conn:
+            _, data = load_carousel(conn, cid)
+        plan, ratio = data["plan"], data["settings"]["ratio"]
+        folder = CAROUSELS_DIR / cid
+        overview = folder / data["overview"]["file"]
+        coach = coach_for(data)
+        size = "x".join(map(str, cz.SIZES[ratio]))
+        todo = [only] if only else [k for k in range(1, len(plan["slides"]) + 1) if data["slides"][k - 1]["status"] != "done"]
+        for k in todo:
+            with closing(db()) as conn:
+                _, data = load_carousel(conn, cid)
+            update_carousel(cid, lambda d, k=k: d["slides"][k - 1].update(status="working", error=None))
+            prev = data["slides"][k - 2] if k > 1 else None
+            first = [overview]
+            if prev and prev.get("file") and (folder / prev["file"]).exists():
+                first.append(folder / prev["file"])
+            files, refs = reference_list(first, coach)
+            if len(first) > 1:
+                refs["previous"] = 2
+            name = f"slide-{k:02d}-{uuid.uuid4().hex[:6]}.png"
+            try:
+                draw(cz.slide_prompt(brand_settings(), plan, k, ratio, refs), size, files, folder / name, f"slide {k}", k)
+            except Exception as exc:  # noqa: BLE001
+                msg = str(exc)[:400]
+                update_carousel(cid, lambda d, k=k: d["slides"][k - 1].update(status="failed", error=msg))
+                break  # اللي بعدها محتاجة دي كمرجع
+            def done(d, k=k, name=name):
+                old = d["slides"][k - 1].get("file")
+                if old and old != name:
+                    (folder / old).unlink(missing_ok=True)
+                d["slides"][k - 1] = {"status": "done", "file": name, "error": None}
+            update_carousel(cid, done)
+    finally:
+        CAROUSEL_JOBS.discard(cid)
+
+
+def start_job(cid: str, target, *args) -> None:
+    with CAROUSEL_LOCK:
+        if cid in CAROUSEL_JOBS:
+            raise HTTPException(400, "فيه رسم شغال للكاروسيل ده. استنى يخلص")
+        CAROUSEL_JOBS.add(cid)
+    threading.Thread(target=target, args=(cid, *args), daemon=True).start()
+
+
+def need_atlas() -> None:
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات")
+
+
+@app.post("/api/carousels/{cid}/overview")
+def carousel_overview(cid: str):
+    """الكاروسيل كله في صورة واحدة، عشان نشوف الشكل ونوافق قبل السلايدات."""
+    need_atlas()
+    with closing(db()) as conn:
+        _, data = load_carousel(conn, cid)
+    if not data["plan"]:
+        raise HTTPException(400, "اكتب الخطة الأول")
+    if cid in CAROUSEL_JOBS:
+        raise HTTPException(400, "فيه رسم شغال للكاروسيل ده. استنى يخلص")
+    update_carousel(cid, lambda d: d["overview"].update(status="working", error=None))
+    start_job(cid, run_overview)
+    return get_carousel(cid)
+
+
+@app.post("/api/carousels/{cid}/approve")
+def carousel_approve(cid: str):
+    with closing(db()) as conn:
+        _, data = load_carousel(conn, cid)
+    if data["overview"]["status"] != "done":
+        raise HTTPException(400, "ارسم الشكل العام الأول")
+    update_carousel(cid, lambda d: d["overview"].update(approved=True))
+    return get_carousel(cid)
+
+
+@app.post("/api/carousels/{cid}/slides")
+def carousel_slides(cid: str, only: int | None = None):
+    """يرسم السلايدات اللي لسه (أو سلايد واحدة لو only)."""
+    need_atlas()
+    with closing(db()) as conn:
+        _, data = load_carousel(conn, cid)
+    if not data["overview"].get("approved"):
+        raise HTTPException(400, "وافق على الشكل العام الأول")
+    n = len(data["plan"]["slides"])
+    if only is not None and not 1 <= only <= n:
+        raise HTTPException(400, "رقم السلايد غلط")
+    if cid in CAROUSEL_JOBS:
+        raise HTTPException(400, "فيه رسم شغال للكاروسيل ده. استنى يخلص")
+    def mark(d):
+        for k in ([only] if only else range(1, n + 1)):
+            if only or d["slides"][k - 1]["status"] != "done":
+                d["slides"][k - 1].update(status="queued", error=None)
+    update_carousel(cid, mark)
+    start_job(cid, run_slides, only)
+    return get_carousel(cid)
+
+
+@app.get("/api/carousels/{cid}/zip")
+def carousel_zip(cid: str):
+    import io
+    import zipfile
+
+    with closing(db()) as conn:
+        row, data = load_carousel(conn, cid)
+    files = [(k, CAROUSELS_DIR / cid / s["file"]) for k, s in enumerate(data["slides"], 1) if s.get("file")]
+    files = [(k, p) for k, p in files if p.exists()]
+    if not files:
+        raise HTTPException(400, "لسه مفيش سلايدات جاهزة")
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_STORED) as z:
+        for k, p in files:
+            z.write(p, f"{k:02d}.png")
+        plan = data["plan"] or {}
+        caption = "\n\n".join(filter(None, [plan.get("caption"), " ".join(plan.get("hashtags") or [])]))
+        if caption:
+            z.writestr("caption.txt", caption)
+    name = export_file_name(row["name"]).rsplit(".", 1)[0] + ".zip"
+    return Response(buf.getvalue(), media_type="application/zip",
+                    headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(name)}"})
 
 
 @app.get("/")

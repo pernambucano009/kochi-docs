@@ -152,7 +152,7 @@ def submit_audio(body: dict) -> str:
     return prediction_id
 
 
-def wait_prediction(prediction_id: str, max_seconds: int = 600, interval: float = 3) -> dict:
+def wait_prediction(prediction_id: str, max_seconds: int = 600, interval: float = 3, what: str = "تحويل الصوت") -> dict:
     deadline = time.monotonic() + max_seconds
     while time.monotonic() < deadline:
         try:
@@ -164,9 +164,9 @@ def wait_prediction(prediction_id: str, max_seconds: int = 600, interval: float 
         if status in TERMINAL_OK:
             return pred
         if status in TERMINAL_FAIL:
-            raise AtlasError(f"تحويل الصوت فشل: {str(pred.get('error') or status)[:300]}")
+            raise AtlasError(f"{what} فشل: {str(pred.get('error') or status)[:300]}")
         time.sleep(interval)
-    raise AtlasError("تحويل الصوت أخد وقت طويل. جرّب تاني")
+    raise AtlasError(f"{what} أخد وقت طويل. جرّب تاني")
 
 
 def _find_words(obj) -> list[dict] | None:
@@ -271,3 +271,69 @@ def transcribe(audio_path: Path, duration: float) -> list[dict]:
     if not text.strip():
         raise AtlasError("الخدمة مرجّعتش أي كلام. اتأكد إن التسجيل فيه صوت واضح")
     return words_from_text(text, 0, duration)
+
+
+# ---------------------------------------------------------------- الكلام (موديلات الشات)
+# Atlas بيدّي موديلات كلام بنفس شكل OpenAI: POST /v1/chat/completions بنفس المفتاح
+
+LLM_URL = os.environ.get("ATLASCLOUD_LLM_URL", f"{BASE_URL}/v1")
+DEFAULT_TEXT_MODEL = "deepseek-ai/DeepSeek-V3.1"
+
+
+def chat(messages: list[dict], model: str, temperature: float = 0.8, max_tokens: int = 4000, json_mode: bool = False) -> str:
+    body = {"model": model, "messages": messages, "temperature": temperature, "max_tokens": max_tokens, "stream": False}
+    if json_mode:
+        body["response_format"] = {"type": "json_object"}
+    with httpx.Client(timeout=180) as client:
+        resp = client.post(f"{LLM_URL}/chat/completions", headers=_headers(), json=body)
+        # بعض الموديلات مش بتقبل response_format، فنجرّب من غيره
+        if json_mode and resp.status_code in (400, 422):
+            body.pop("response_format")
+            resp = client.post(f"{LLM_URL}/chat/completions", headers=_headers(), json=body)
+    data = _check(resp, f"موديل الكلام ({model})")
+    try:
+        return str(data["choices"][0]["message"]["content"] or "").strip()
+    except (KeyError, IndexError, TypeError) as exc:
+        raise AtlasError(f"موديل الكلام رجّع رد غريب: {str(data)[:200]}") from exc
+
+
+# ---------------------------------------------------------------- الصور (GPT Image 2.5)
+
+IMAGE_MODELS = {
+    "sunburst": ("openai/gpt-image-2.5-sunburst/text-to-image", "openai/gpt-image-2.5-sunburst/edit", "GPT Image 2.5 Sunburst"),
+    "flare": ("openai/gpt-image-2.5-flare/text-to-image", "openai/gpt-image-2.5-flare/edit", "GPT Image 2.5 Flare"),
+}
+
+
+def generate_image(family: str, prompt: str, size: str, quality: str, images: list[str] | None = None) -> str:
+    """يرسم صورة ويرجّع لينكها. لو فيه صور مرجعية بيستخدم نسخة الـ edit (لحد 16 صورة)."""
+    t2i, edit, _ = IMAGE_MODELS.get(family) or IMAGE_MODELS["sunburst"]
+    body = {"model": edit if images else t2i, "prompt": prompt[:32000], "size": size, "quality": quality, "output_format": "png"}
+    if images:
+        body["images"] = images[:16]
+    with httpx.Client(timeout=90) as client:
+        resp = client.post(f"{BASE_URL}/api/v1/model/generateImage", headers=_headers(), json=body)
+    data = _check(resp, "طلب الصورة")
+    prediction_id = (data or {}).get("id") or (data or {}).get("prediction_id")
+    if not prediction_id:
+        raise AtlasError(f"طلب الصورة: الرد مفيهوش رقم طلب: {str(data)[:200]}")
+    pred = wait_prediction(prediction_id, max_seconds=900, interval=4, what="رسم الصورة")
+    outputs = pred.get("outputs") or []
+    url = next((o for o in outputs if isinstance(o, str) and o.startswith("http")), None)
+    if not url:
+        raise AtlasError("الصورة خلصت بس مرجعش لينك")
+    return url
+
+
+_uploads: dict[str, tuple[float, str]] = {}
+
+
+def reference_url(path: Path) -> str:
+    """بيرفع الصورة المرجعية لـ Atlas مرة واحدة ويفتكر اللينك (لمدة ساعة)."""
+    key = f"{path}:{path.stat().st_mtime}"
+    cached = _uploads.get(key)
+    if cached and time.monotonic() - cached[0] < 3000:
+        return cached[1]
+    url = upload_media(path)
+    _uploads[key] = (time.monotonic(), url)
+    return url

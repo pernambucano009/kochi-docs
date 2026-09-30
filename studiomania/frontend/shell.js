@@ -11,6 +11,7 @@ const STEP_INFO = {
   4: { num: "", title: "مكتبة المدربين" },
   3: { num: "", title: "مكتبة التعليق الصوتي" },
   5: { num: "", title: "مكتبة الموسيقى" },
+  8: { num: "", title: "صناعة الكاروسيل" },
   settings: { num: "", title: "الإعدادات" },
 };
 const NEXT_LABEL = {
@@ -263,6 +264,14 @@ async function loadHome() {
   // المونتاج
   const exported = projects.filter((p) => p.export_id).length;
   $("tileMontSub").textContent = `${projects.length} مشروع مونتاج · ${exported} اتصدّر`;
+  api("/api/carousels").then((list) => {
+    const done = list.filter((c) => c.slides && c.done === c.slides).length;
+    if (list.length) $("tileCarSub").textContent = `${list.length} كاروسيل · ${done} خلصان`;
+    const covers = list.filter((c) => c.cover).slice(0, 3);
+    document.querySelectorAll("#tileCarStack i").forEach((el, i) => {
+      el.style.background = covers[i] ? `center / cover url("${covers[i].cover}")` : "";
+    });
+  }).catch(() => {});
 
   // النشر
   const upcoming = posts.filter((p) => p.status === "scheduled").sort((a, b) => a.scheduled_at.localeCompare(b.scheduled_at));
