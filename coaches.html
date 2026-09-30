@@ -310,7 +310,7 @@ textarea[dir=ltr]{text-align:left}
       '</div>' +
       '<div class="meter"><i style="width:' + Math.round(pct * 100) + '%;background:' + color + '"></i></div>' +
       '<div class="checks">' + checks + '</div>' + alert + hours +
-      '<details><summary><span>✏️ ' + (isReady(r) ? 'رسالة شكر' : 'رسالة بالناقص') + ' — اعرض / عدّل</span>' +
+      '<details><summary><span>✏️ ' + (r.reversed.length ? 'رسالة بالتعديل المطلوب' : isReady(r) ? 'رسالة شكر' : 'رسالة بالناقص') + ' — اعرض / عدّل</span>' +
         '<span class="lang"><button data-lang="ar" class="' + (lang === 'ar' ? 'on' : '') + '">AR</button><button data-lang="en" class="' + (lang === 'en' ? 'on' : '') + '">EN</button></span></summary>' +
         '<textarea dir="' + (lang === 'en' ? 'ltr' : 'rtl') + '">' + esc(buildMessage(r, lang)) + '</textarea></details>' +
       '<div class="btnrow">' +
