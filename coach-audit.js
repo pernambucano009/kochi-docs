@@ -9,14 +9,16 @@
   var API = 'https://marketplace.kochi.fit/api/v1';
   var MEDIA = 'https://marketplace.kochi.fit';
   var SITE = 'https://www.kochi.fit';
-  var GENDERS = [undefined, 'male', 'female'];
+  // الـ API بيرجّع الرجالة بس لو مفيش فلتر، فلازم نطلب الاتنين
+  var GENDERS = ['ذكر', 'أنثى'];
+  var SLOT_DAYS = 7;
   var CONCURRENCY = 4;
 
   var CHECKS = [
     { key: 'photo', label: 'صورة البروفايل' },
     { key: 'video', label: 'فيديو تعريفي' },
     { key: 'certs', label: 'شهادات معتمدة' },
-    { key: 'hours', label: 'مواعيد متاحة' },
+    { key: 'hours', label: 'مواعيد زووم متاحة' },
     { key: 'transf', label: 'ترانسفورميشن' }
   ];
 
@@ -62,7 +64,7 @@
     var all = [];
     var errors = [];
     return Promise.all(GENDERS.map(function (g) {
-      return get('/trainers', g ? { gender: g } : null)
+      return get('/trainers', { gender: g })
         .then(function (b) { return asArray(b, ['trainers', 'items', 'results']); })
         .catch(function (e) { errors.push(e); return []; });
     })).then(function (lists) {
@@ -77,15 +79,42 @@
     });
   }
 
+  function dateKey(d) {
+    var pad = function (n) { return (n < 10 ? '0' : '') + n; };
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+  }
+
+  // نفس اللي صفحة الحجز بتعرضه للعميل الجديد (intro meeting)
+  function loadSlots(id) {
+    var days = [];
+    for (var i = 0; i < SLOT_DAYS; i++) {
+      var d = new Date();
+      d.setDate(d.getDate() + i);
+      days.push(dateKey(d));
+    }
+    return Promise.all(days.map(function (date) {
+      return get('/bookings/available-slots', { trainerId: id, date: date })
+        .then(function (b) { var v = unwrap(b); return (v && v.slots) || (Array.isArray(v) ? v : []); })
+        .catch(function () { return null; });
+    })).then(function (lists) {
+      if (lists.every(function (l) { return l === null; })) return null;
+      return {
+        days: lists.filter(function (l) { return l && l.length; }).length,
+        total: lists.reduce(function (n, l) { return n + (l ? l.length : 0); }, 0)
+      };
+    });
+  }
+
   function loadDetails(summary) {
     var id = trainerId(summary);
     var enc = encodeURIComponent(id);
     return Promise.all([
       get('/trainers/' + enc).then(function (b) { return pick(unwrap(b), ['trainer', 'profile']); }).catch(function () { return null; }),
       get('/trainers/' + enc + '/working-hours').then(unwrap).catch(function () { return null; }),
-      get('/trainers/' + enc + '/transformations').then(function (b) { return asArray(b, ['transformations']); }).catch(function () { return null; })
+      get('/trainers/' + enc + '/transformations').then(function (b) { return asArray(b, ['transformations']); }).catch(function () { return null; }),
+      loadSlots(id)
     ]).then(function (res) {
-      return { id: id, trainer: Object.assign({}, summary, res[0] || {}), hours: res[1], transformations: res[2] };
+      return { id: id, trainer: Object.assign({}, summary, res[0] || {}), hours: res[1], transformations: res[2], slots: res[3] };
     });
   }
 
@@ -120,15 +149,37 @@
     var photo = mediaUrl(t.profileImage || t.image || t.photo);
     var video = mediaUrl(t.introVideo || t.introVideoUrl);
     var certs = Array.isArray(t.certifications) ? t.certifications : [];
-    var certStatus = function (c) { return String(c.status || (c.verified ? 'approved' : 'pending')).toLowerCase(); };
+    // الـ API العام بيرجّع أسماء الشهادات اللي ظاهرة على البروفايل (نصوص)؛ لو رجعت objects بنعتمد على status
+    var certStatus = function (c) {
+      if (typeof c === 'string') return c.trim() ? 'approved' : 'empty';
+      return String(c.status || (c.verified === false ? 'pending' : 'approved')).toLowerCase();
+    };
     var approved = certs.filter(function (c) { return certStatus(c) === 'approved'; }).length;
     var pending = certs.filter(function (c) { return certStatus(c) === 'pending'; }).length;
     var days = workingDays(d.hours || t.workingHours);
+    var reversed = days.filter(function (x) {
+      var a = x.startTime || x.from || x.start, b = x.endTime || x.to || x.end;
+      return String(b) <= String(a);
+    });
+    var dayName = function (x) { var k = String(x.dayOfWeek || x.day || '').toLowerCase(); return DAY_AR[k] || k; };
+    var slots = d.slots;
+    var hoursOk = slots ? slots.total > 0 : (days.length > reversed.length);
+    var hoursNote = !days.length
+      ? 'مفيش أيام شغل محددة'
+      : (slots
+          ? (slots.total ? slots.total + ' ميعاد في ' + slots.days + ' أيام (الأسبوع الجاي)' : 'مفيش ولا ميعاد يتحجز الأسبوع الجاي')
+          : days.length + ' أيام شغل');
+    if (reversed.length) {
+      hoursNote += ' — ⚠️ وقت النهاية قبل البداية: ' + reversed.map(function (x) {
+        return dayName(x) + ' من ' + (x.startTime || x.from || x.start) + ' لـ ' + (x.endTime || x.to || x.end);
+      }).join('، ');
+    }
     var transf = d.transformations || (Array.isArray(t.transformations) ? t.transformations : []);
 
     var result = {
       id: d.id,
       name: (t.name || t.fullName || t.fullNameEn || t.username || '').trim() || '(بدون اسم)',
+      status: t.status === 'pending_verification' ? 'حسابه لسه قيد التوثيق' : '',
       email: t.email || '',
       phone: t.phone || '',
       url: SITE + '/trainers/' + encodeURIComponent(d.id),
@@ -139,18 +190,10 @@
         certs: {
           ok: approved > 0,
           note: approved > 0
-            ? approved + ' معتمدة' + (pending ? ' + ' + pending + ' قيد المراجعة' : '')
+            ? approved + ' شهادة' + (pending ? ' + ' + pending + ' قيد المراجعة' : '')
             : (pending ? pending + ' قيد المراجعة (مش معتمدة لسه)' : (certs.length ? certs.length + ' مرفوضة' : 'مفيش شهادات'))
         },
-        hours: {
-          ok: days.length > 0,
-          note: days.length
-            ? days.map(function (x) {
-                var k = String(x.dayOfWeek || x.day || '').toLowerCase();
-                return (DAY_AR[k] || k) + ' ' + (x.startTime || x.from || x.start) + '–' + (x.endTime || x.to || x.end);
-              }).join('، ')
-            : 'مفيش أيام شغل محددة'
-        },
+        hours: { ok: hoursOk, note: hoursNote, warn: reversed.length > 0 },
         transf: { ok: transf.length > 0, note: transf.length ? transf.length + ' حالة' : 'مفيش حالات' }
       }
     };
@@ -217,6 +260,7 @@
     '.kca-cell{display:inline-block;border-radius:8px;padding:2px 8px;font-size:12px;font-weight:700}',
     '.kca-cell.ok{background:var(--okbg);color:var(--ok)}',
     '.kca-cell.bad{background:var(--badbg);color:var(--bad)}',
+    '.kca-cell.warn{background:#fef3c7;color:#b45309}',
     '.kca-note{display:block;color:var(--muted);font-size:12px;margin-top:3px;max-width:220px}',
     '.kca-score{font-weight:900;white-space:nowrap}',
     '.kca-msg{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px}',
@@ -241,9 +285,9 @@
   }
 
   function toCsv(rows) {
-    var head = ['الاسم', 'الإيميل', 'الموبايل', 'الرابط', 'النتيجة'].concat(CHECKS.map(function (c) { return c.label; })).concat(['الناقص']);
+    var head = ['الاسم', 'الإيميل', 'الموبايل', 'حالة الحساب', 'الرابط', 'النتيجة'].concat(CHECKS.map(function (c) { return c.label; })).concat(['الناقص']);
     var lines = [head].concat(rows.map(function (r) {
-      return [r.name, r.email, r.phone, r.url, r.score + '/' + CHECKS.length]
+      return [r.name, r.email, r.phone, r.status || 'موثّق', r.url, r.score + '/' + CHECKS.length]
         .concat(CHECKS.map(function (c) { return (r.checks[c.key].ok ? '✅ ' : '❌ ') + r.checks[c.key].note; }))
         .concat([r.missing.join('، ') || 'جاهز']);
     }));
@@ -308,13 +352,15 @@
         return '<tr><td><div class="kca-who">' +
           (r.photoUrl ? '<img src="' + esc(r.photoUrl) + '" alt="" loading="lazy" onerror="this.style.visibility=\'hidden\'">' : '<span class="kca-ph"></span>') +
           '<div><a href="' + esc(r.url) + '" target="_blank" rel="noopener">' + esc(r.name) + '</a>' +
-          (r.email || r.phone ? '<span class="kca-note">' + esc([r.email, r.phone].filter(Boolean).join(' · ')) + '</span>' : '') +
+          (r.email || r.phone ? '<span class="kca-note">' + [r.email, r.phone].filter(Boolean).map(function (v) { return '<bdi dir="ltr">' + esc(v) + '</bdi>'; }).join(' · ') + '</span>' : '') +
+          (r.status ? '<span class="kca-note" style="color:#b45309">' + esc(r.status) + '</span>' : '') +
           '</div></div></td>' +
           '<td class="kca-score" style="color:' + color + '">' + r.score + '/' + CHECKS.length + '</td>' +
           CHECKS.map(function (c) {
             var ch = r.checks[c.key];
             var note = ch.link ? '<a href="' + esc(ch.link) + '" target="_blank" rel="noopener">' + esc(ch.note) + '</a>' : esc(ch.note);
-            return '<td><span class="kca-cell ' + (ch.ok ? 'ok' : 'bad') + '">' + (ch.ok ? '✓ تمام' : '✗ ناقص') + '</span><span class="kca-note">' + note + '</span></td>';
+            var label = ch.ok ? (ch.warn ? '⚠️ راجِع' : '✓ تمام') : '✗ ناقص';
+            return '<td><span class="kca-cell ' + (ch.ok ? (ch.warn ? 'warn' : 'ok') : 'bad') + '">' + label + '</span><span class="kca-note">' + note + '</span></td>';
           }).join('') + '</tr>';
       }).join('') : '<tr><td colspan="' + (CHECKS.length + 2) + '" style="text-align:center;color:var(--muted)">مفيش نتايج</td></tr>';
     }
