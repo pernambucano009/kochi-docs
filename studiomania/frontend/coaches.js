@@ -17,6 +17,7 @@ function renderCoaches() {
         <img src="${c.image_url}" alt="">
         <div class="body">
           <div class="name">${escapeHtml(c.name)}</div>
+          ${c.instagram || c.tiktok ? `<div class="handles" dir="ltr">${c.instagram ? `<a href="https://instagram.com/${c.instagram}" target="_blank">📸 @${escapeHtml(c.instagram)}</a>` : ""}${c.tiktok ? `<a href="https://tiktok.com/@${c.tiktok}" target="_blank">🎵 @${escapeHtml(c.tiktok)}</a>` : ""}</div>` : ""}
           <div class="outro">${
             c.outro_url
               ? `🎬 أوترو ${fmt(c.outro_duration)} <button class="btn sm" data-act="outro" data-id="${c.id}">▶︎ شوف</button>`
@@ -46,6 +47,8 @@ function editCoach(c) {
   coachState.editing = c;
   $("coachFormTitle").textContent = `تعديل: ${c.name}`;
   $("coachName").value = c.name;
+  $("coachInstagram").value = c.instagram ? `@${c.instagram}` : "";
+  $("coachTiktok").value = c.tiktok ? `@${c.tiktok}` : "";
   $("coachImagePreview").src = c.image_url;
   $("coachImagePreview").hidden = false;
   $("coachCancel").hidden = false;
@@ -75,6 +78,8 @@ $("coachForm").addEventListener("submit", async (e) => {
   if (image) form.append("image", image);
   if (outro) form.append("outro", outro);
   if (editing && $("removeOutro").checked) form.append("remove_outro", "true");
+  form.append("instagram", $("coachInstagram").value);
+  form.append("tiktok", $("coachTiktok").value);
 
   const btn = $("coachSubmit");
   btn.disabled = true;
@@ -238,7 +243,7 @@ function renderUnmatched(unmatched) {
   const choices = coachChoices();
   $("unmatchedList").innerHTML = unmatched
     .map((i) => `<div class="um-card" data-o="${i}">
-      <div class="um-video"><video src="${outroUrl(i)}" controls preload="metadata" playsinline></video>
+      <div class="um-video"><video src="${outroUrl(i)}" controls preload="none" playsinline></video>
         <div class="um-name" title="${escapeHtml(bulk.outros[i].name)}">🎬 ${escapeHtml(bulk.outros[i].name)}</div>
         <button class="btn sm" data-ignore="${i}">تجاهل الأوترو ده</button></div>
       <div class="um-coaches">${choices
@@ -361,5 +366,61 @@ $("bulkUpload").onclick = async () => {
   } else {
     $("bulkDialog").close();
     toast(`✅ اترفع ${ok} مدرب`);
+  }
+};
+
+// ---------- حسابات المدربين من ملف Excel ----------
+const handlesState = { rows: [], coaches: [] };
+
+$("handlesFile").addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  e.target.value = "";
+  if (!file) return;
+  const form = new FormData();
+  form.append("file", file);
+  try {
+    const res = await api("/api/coaches/handles/preview", { method: "POST", body: form });
+    handlesState.rows = res.rows;
+    handlesState.coaches = res.coaches;
+    renderHandles();
+    $("handlesDialog").showModal();
+  } catch (err) {
+    toast(err.message, true);
+  }
+});
+
+function renderHandles() {
+  const opts = (sel) => `<option value="">— مش في البرنامج —</option>` + handlesState.coaches
+    .map((c) => `<option value="${c.id}" ${c.id === sel ? "selected" : ""}>${escapeHtml(c.name)}</option>`).join("");
+  const bad = (v) => `<span class="warn-text" title="اسم الحساب مش مظبوط، ومش هيتحفظ">⚠️ ${escapeHtml(v)}</span>`;
+  $("handlesRows").innerHTML = handlesState.rows
+    .map((r, i) => `<tr data-i="${i}">
+      <td>${escapeHtml(r.name)}</td>
+      <td dir="ltr">${r.instagram ? `@${escapeHtml(r.instagram)}` : r.bad_instagram ? bad(r.bad_instagram) : "—"}</td>
+      <td dir="ltr">${r.tiktok ? `@${escapeHtml(r.tiktok)}` : r.bad_tiktok ? bad(r.bad_tiktok) : "—"}</td>
+      <td><select>${opts(r.coach_id)}</select></td>
+    </tr>`)
+    .join("");
+  const linked = handlesState.rows.filter((r) => r.coach_id).length;
+  $("handlesInfo").textContent = `${handlesState.rows.length} حساب · ${linked} مربوطين بمدربين`;
+}
+
+$("handlesRows").addEventListener("change", (e) => {
+  const r = handlesState.rows[Number(e.target.closest("tr").dataset.i)];
+  r.coach_id = e.target.value || null;
+  renderHandles();
+});
+$("handlesClose").onclick = () => $("handlesDialog").close();
+$("handlesApply").onclick = async () => {
+  try {
+    const res = await api("/api/coaches/handles/apply", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ rows: handlesState.rows }),
+    });
+    $("handlesDialog").close();
+    toast(`✅ اتحفظ · ${res.coaches_updated} مدرب اتحدّث`);
+    await loadCoaches();
+  } catch (err) {
+    toast(err.message, true);
   }
 };

@@ -335,7 +335,9 @@
           <div class="gen-layout">
             <section class="panel">
               <div class="panel-head"><h2>المدربين <span class="muted" id="coachCount"></span></h2>
-                <button class="btn sm primary" id="bulkOpen">📦 رفع جماعي</button></div>
+                <span class="row">
+                  <label class="btn sm" title="ملف Excel أو CSV فيه اسم المدرب وحساب إنستجرام وتيك توك">📥 استورد الحسابات من ملف<input type="file" id="handlesFile" accept=".xlsx,.csv" hidden></label>
+                  <button class="btn sm primary" id="bulkOpen">📦 رفع جماعي</button></span></div>
               <div class="coaches" id="coachesGrid"></div>
               <p class="empty" id="coachesEmpty">لسه مفيش مدربين.</p>
             </section>
@@ -349,6 +351,9 @@
                 <label class="field">الأوترو (فيديو، اختياري)
                   <input type="file" id="coachOutro" accept="video/*,.mkv"></label>
                 <label class="check" id="removeOutroWrap" hidden><input type="checkbox" id="removeOutro"> امسح الأوترو الحالي</label>
+                <label class="field">حساب إنستجرام <input type="text" id="coachInstagram" dir="ltr" placeholder="@username أو اللينك"></label>
+                <label class="field">حساب تيك توك <input type="text" id="coachTiktok" dir="ltr" placeholder="@username أو اللينك"></label>
+                <p class="hint">بيتعمله تاج لوحده لما تنشر فيديو من مشروعه على إنستجرام.</p>
                 <div class="row">
                   <button class="btn primary" type="submit" id="coachSubmit">حفظ</button>
                   <button class="btn" type="button" id="coachCancel" hidden>إلغاء</button>
@@ -585,11 +590,36 @@
                 <div class="post-video" id="postVideo"><span class="muted">اختار فيديو من الفولدر (دوس 📅 جدول)</span></div>
                 <label class="field">الكابشن
                   <textarea id="postCaption" rows="4" placeholder="الكلام اللي هينزل مع الفيديو، والهاشتاجات"></textarea></label>
+                <div class="loc-row"><button type="button" class="btn sm" id="addRiyadh" title="Zernio مش بيدعم تحديد مكان البوست، فبنكتبه في الكابشن">📍 ضيف «الرياض» للكابشن</button></div>
                 <div class="field">المنصات <div class="platforms" id="postPlatforms"></div></div>
+
+                <div class="post-extra" id="igOpts" hidden>
+                  <div class="extra-title">📸 إنستجرام</div>
+                  <label class="field">🏷️ تاج لحسابات <input type="text" id="igTags" dir="ltr" list="handlesList" placeholder="@coach_name, @another" autocomplete="off"></label>
+                  <datalist id="handlesList"></datalist>
+                  <p class="hint" id="igTagsHint">حساب المدرب بيتحط لوحده من مشروع الفيديو.</p>
+                  <label class="check"><input type="checkbox" id="igCollab"> 🤝 كولاب: البوست يظهر كمان في حسابات التاج (لحد 3، بعد ما يوافقوا على الدعوة)</label>
+                </div>
+
+                <div class="post-extra" id="coverOpts" hidden>
+                  <div class="extra-title">🖼️ الغلاف <span class="muted" id="coverFor"></span></div>
+                  <label class="check"><input type="checkbox" id="coverOn"> اختار الغلاف بنفسك (من غيره المنصة بتختار)</label>
+                  <div class="cover-pick" id="coverPick" hidden>
+                    <video id="coverVideo" muted playsinline preload="metadata"></video>
+                    <div class="cover-ctrl">
+                      <input type="range" id="coverRange" min="0" max="1000" step="1" dir="ltr">
+                      <div class="row"><button type="button" class="btn sm" id="coverPrev" title="فريم لورا">◀︎|</button>
+                        <span class="muted" id="coverTime">0:00.0</span>
+                        <button type="button" class="btn sm" id="coverNext" title="فريم لقدّام">|▶︎</button></div>
+                    </div>
+                  </div>
+                </div>
+
                 <label class="field">الميعاد <input type="datetime-local" id="postWhen" required></label>
                 <div class="quick-times" id="quickTimes"></div>
                 <div class="row">
                   <button class="btn primary" type="submit" id="postSubmit">📅 جدول</button>
+                  <button class="btn ink" type="button" id="postNow" title="ينزل على طول على المنصات اللي اخترتها">🚀 انشر الآن</button>
                   <button class="btn" type="button" id="postCancel" hidden>إلغاء التعديل</button>
                 </div>
               </form>
@@ -690,6 +720,15 @@
     <button class="btn primary" id="bulkUpload" disabled>⬆ ارفع الكل</button>
     <span class="muted" id="bulkProgress"></span>
   </div>
+</dialog>
+<dialog class="bulk-dlg" id="handlesDialog">
+  <div class="panel-head"><h2>📥 حسابات المدربين من الملف</h2><button class="btn sm" id="handlesClose">إغلاق</button></div>
+  <p class="hint">راجع: كل صف اتربط بالمدرب اللي اسمه شبهه. غيّر الربط لو غلط. الحسابات كلها بتتحفظ، وأي مدرب تضيفه بعدين بنفس الاسم بياخد حساباته لوحده.</p>
+  <div class="handles-wrap"><table class="segments handles-table">
+    <thead><tr><th>الاسم في الملف</th><th>إنستجرام</th><th>تيك توك</th><th>المدرب في البرنامج</th></tr></thead>
+    <tbody id="handlesRows"></tbody>
+  </table></div>
+  <div class="row gap-top"><button class="btn primary" id="handlesApply">💾 احفظ الحسابات</button><span class="muted" id="handlesInfo"></span></div>
 </dialog>
 <dialog class="bulk-dlg" id="fupDialog">
   <div class="panel-head"><h2>📂 رفع مشاريع من فولدرات</h2><button class="btn sm" id="fupClose">✕</button></div>

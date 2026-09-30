@@ -259,6 +259,9 @@ label.btn { cursor: pointer; }
 .stage-body { flex: 1; min-height: 0; overflow: auto; padding: 18px; }
 .stage-body > .view { max-width: 1500px; margin: 0 auto; }
 body.stage-open { overflow: hidden; }
+/* الشاشة الكبيرة مفتوحة: من غير بلور ومن غير رسم للرئيسية وراها (أخف بكتير على الجهاز) */
+body.stage-settled .stage-card { backdrop-filter: none; -webkit-backdrop-filter: none; background: #F6F5F3; }
+body.stage-settled .app, body.stage-settled .bg-art { visibility: hidden; }
 @media (max-width: 900px) { .flow span { display: none; } .stage { padding: 0; } .stage-card { border-radius: 0; } }
 
 /* ---------- الصناديق جوه الخطوات ---------- */
@@ -436,6 +439,20 @@ code { background: var(--surface-2); border-radius: 4px; padding: 0 4px; directi
 .coach img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; background: var(--surface); }
 .coach .body { padding: 8px 10px; }
 .coach .name { font-weight: 700; }
+.post-extra { border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; margin: 10px 0; display: flex; flex-direction: column; gap: 6px; background: rgba(255,255,255,.5); }
+.post-extra .extra-title { font-weight: 600; font-size: 14px; }
+.post-extra .hint { margin: 0; }
+.loc-row { margin: -4px 0 8px; }
+.cover-pick { display: flex; gap: 10px; align-items: center; }
+.cover-pick video { width: 96px; aspect-ratio: 9 / 16; object-fit: cover; background: #000; border-radius: 10px; flex: none; }
+.cover-ctrl { flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.cover-ctrl input[type=range] { width: 100%; accent-color: var(--accent); }
+.posts .tags { font-size: 12px; color: var(--muted); }
+.coach .handles { display: flex; flex-direction: column; gap: 2px; font-size: 12px; margin: 2px 0; }
+.coach .handles a { color: var(--muted); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.coach .handles a:hover { color: var(--accent); }
+.handles-wrap { max-height: 60vh; overflow: auto; }
+.handles-table select { max-width: 200px; }
 .coach .outro { font-size: 12px; color: var(--muted); display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .coach .acts { display: flex; gap: 6px; margin-top: 6px; }
 .coach-preview { width: 120px; aspect-ratio: 1; object-fit: cover; border-radius: 10px; margin-bottom: 10px; }

@@ -5,6 +5,7 @@
 الخطوة 4: مكتبة المدربين (الصورة والأوترو).
 """
 
+import gzip
 import hashlib
 import json
 import os
@@ -51,6 +52,7 @@ import atlas  # noqa: E402  (لازم بعد قراءة .env)
 import captions  # noqa: E402
 import montage  # noqa: E402
 import publisher  # noqa: E402
+import sheets  # noqa: E402
 from auth import SESSION_COOKIE, SESSION_DAYS, Auth  # noqa: E402
 
 MAX_CLIP_SECONDS = 15.0
@@ -317,6 +319,19 @@ with closing(db()) as _conn, _conn:
     # الأرشيف: NULL = لوحده (بعد التصدير)، 1 = اتأرشف بإيدك، 0 = رجّعته بإيدك
     if "archived" not in {c[1] for c in _conn.execute("PRAGMA table_info(videos)")}:
         _conn.execute("ALTER TABLE videos ADD COLUMN archived INTEGER")
+    # حسابات المدرب على السوشيال (للتاج في النشر)
+    for _col in ("instagram", "tiktok"):
+        if _col not in {c[1] for c in _conn.execute("PRAGMA table_info(coaches)")}:
+            _conn.execute(f"ALTER TABLE coaches ADD COLUMN {_col} TEXT")
+    # دليل الحسابات اللي اتستوردت من ملف (حتى لو المدرب لسه مش في البرنامج)
+    _conn.execute(
+        """CREATE TABLE IF NOT EXISTS social_handles (
+            key TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            instagram TEXT,
+            tiktok TEXT
+        )"""
+    )
     # أوتروهات زيادة بتترفع من صفحة المونتاج (غير أوترو المدرب)
     _conn.execute(
         """CREATE TABLE IF NOT EXISTS outros (
@@ -383,10 +398,38 @@ def html_page(name: str) -> Response:
     return Response(html, media_type="text/html; charset=utf-8", headers={"Cache-Control": "no-cache"})
 
 
+_gzip_cache: dict[str, tuple[float, bytes]] = {}
+
+
+def gzipped_asset(request: Request) -> Response | None:
+    """ملفات الـ JS والـ CSS مضغوطة (أصغر 4 مرات تقريبًا، فالصفحة بتفتح أسرع)."""
+    path = request.url.path
+    if not path.endswith((".js", ".css")) or "gzip" not in request.headers.get("accept-encoding", ""):
+        return None
+    file = (FRONTEND_DIR / path.lstrip("/")).resolve()
+    if file.parent != FRONTEND_DIR.resolve() or not file.is_file():
+        return None
+    mtime = file.stat().st_mtime
+    cached = _gzip_cache.get(path)
+    if not cached or cached[0] != mtime:
+        cached = (mtime, gzip.compress(file.read_bytes(), 6))
+        _gzip_cache[path] = cached
+    return Response(
+        cached[1],
+        media_type="text/css" if path.endswith(".css") else "text/javascript",
+        headers={
+            "Content-Encoding": "gzip", "Vary": "Accept-Encoding",
+            "Cache-Control": "public, max-age=31536000, immutable" if request.query_params.get("v") else "no-cache",
+        },
+    )
+
+
 @app.middleware("http")
 async def require_login(request: Request, call_next):
     path = request.url.path
     if path in PUBLIC_PATHS or auth.valid_token(request.cookies.get(SESSION_COOKIE)):
+        if (fast := gzipped_asset(request)) is not None:
+            return fast
         response = await call_next(request)
         # ملفات الواجهة: اللي برقم نسخة تتخزن، والباقي يتأكد كل مرة إنه آخر نسخة
         if not path.startswith(("/api/", "/media/", "/fonts/")) and "cache-control" not in response.headers:
@@ -768,6 +811,8 @@ def coach_to_dict(row: sqlite3.Row) -> dict:
         "image_url": f"/media/coaches/{row['image_filename']}",
         "outro_url": f"/media/coaches/{row['outro_filename']}" if row["outro_filename"] else None,
         "outro_duration": row["outro_duration"],
+        "instagram": row["instagram"],
+        "tiktok": row["tiktok"],
         "created_at": row["created_at"],
     }
 
@@ -794,15 +839,31 @@ def list_coaches():
         return [coach_to_dict(r) for r in conn.execute("SELECT * FROM coaches ORDER BY name")]
 
 
+def coach_handles(instagram: str | None, tiktok: str | None) -> dict[str, str | None]:
+    """الحسابات اللي اتكتبت (اللي مش مبعوت بيفضل زي ما هو)."""
+    out = {}
+    for col, value in (("instagram", instagram), ("tiktok", tiktok)):
+        if value is None:
+            continue
+        handle = sheets.clean_handle(value, col)
+        if value.strip() and not handle:
+            raise HTTPException(400, f"اسم حساب {'إنستجرام' if col == 'instagram' else 'تيك توك'} مش مظبوط: {value.strip()}")
+        out[col] = handle
+    return out
+
+
 @app.post("/api/coaches")
 def create_coach(
     name: str = Form(...),
     image: UploadFile = File(...),
     outro: UploadFile | None = File(None),
+    instagram: str | None = Form(None),
+    tiktok: str | None = Form(None),
 ):
     name = name.strip()
     if not name:
         raise HTTPException(400, "اكتب اسم المدرب")
+    handles = coach_handles(instagram, tiktok)
     coach_id = uuid.uuid4().hex[:12]
     image_filename = save_upload(image, IMAGE_EXTENSIONS, COACHES_DIR, f"{coach_id}_image")
     outro_filename, outro_duration = save_outro(outro, coach_id) if outro and outro.filename else (None, None)
@@ -811,6 +872,11 @@ def create_coach(
             "INSERT INTO coaches (id, name, image_filename, outro_filename, outro_duration, created_at) VALUES (?, ?, ?, ?, ?, ?)",
             (coach_id, name, image_filename, outro_filename, outro_duration, now()),
         )
+        # لو الاسم موجود في ملف الحسابات اللي اتستورد، حساباته بتتحط لوحدها
+        known = conn.execute("SELECT instagram, tiktok FROM social_handles WHERE key = ?", (sheets.norm_name(name),)).fetchone()
+        for col in ("instagram", "tiktok"):
+            value = handles.get(col) if col in handles else (known[col] if known else None)
+            conn.execute(f"UPDATE coaches SET {col} = ? WHERE id = ?", (value, coach_id))
         return coach_to_dict(get_coach(conn, coach_id))
 
 
@@ -821,10 +887,14 @@ def update_coach(
     image: UploadFile | None = File(None),
     outro: UploadFile | None = File(None),
     remove_outro: bool = Form(False),
+    instagram: str | None = Form(None),
+    tiktok: str | None = Form(None),
 ):
     with closing(db()) as conn, conn:
         row = get_coach(conn, coach_id)
         old_files = []
+        for col, handle in coach_handles(instagram, tiktok).items():
+            conn.execute(f"UPDATE coaches SET {col} = ? WHERE id = ?", (handle, coach_id))
         if name is not None and name.strip():
             conn.execute("UPDATE coaches SET name = ? WHERE id = ?", (name.strip(), coach_id))
         if image and image.filename:
@@ -849,6 +919,102 @@ def update_coach(
         if f and f not in in_use:
             (COACHES_DIR / f).unlink(missing_ok=True)
     return result
+
+
+# ---------- حسابات المدربين على السوشيال (استيراد من ملف) ----------
+def _find_col(header: list[str], *words: str) -> int | None:
+    for i, h in enumerate(header):
+        h = (h or "").strip().lower()
+        if any(w in h for w in words):
+            return i
+    return None
+
+
+@app.post("/api/coaches/handles/preview")
+async def preview_handles(file: UploadFile = File(...)):
+    """بيقرا ملف Excel أو CSV فيه أسماء المدربين وحساباتهم، ويطابق كل اسم بمدرب في البرنامج."""
+    data = await file.read()
+    try:
+        rows = sheets.read_table(file.filename or "", data)
+    except Exception as exc:  # noqa: BLE001  (ملف بايظ أو مش Excel)
+        raise HTTPException(400, f"مش قادر أقرا الملف: {exc}") from exc
+    if not rows:
+        raise HTTPException(400, "الملف فاضي")
+    header = rows[0]
+    name_col = _find_col(header, "الاسم", "اسم", "name")
+    ig_col = _find_col(header, "إنستقرام", "انستقرام", "إنستجرام", "انستجرام", "instagram", "insta")
+    tt_col = _find_col(header, "تيك توك", "تيكتوك", "tiktok")
+    if name_col is None or (ig_col is None and tt_col is None):
+        raise HTTPException(400, "لازم الملف يبقى فيه عمود للاسم وعمود لإنستجرام أو تيك توك")
+    with closing(db()) as conn:
+        coaches = [dict(r) for r in conn.execute("SELECT id, name FROM coaches")]
+    by_name = {sheets.norm_name(c["name"]): c for c in coaches}
+    out = []
+    for r in rows[1:]:
+        r = r + [""] * (len(header) - len(r))
+        name = (r[name_col] or "").strip()
+        if not name:
+            continue
+        raw_ig = r[ig_col].strip() if ig_col is not None else ""
+        raw_tt = r[tt_col].strip() if tt_col is not None else ""
+        ig, tt = sheets.clean_handle(raw_ig, "instagram"), sheets.clean_handle(raw_tt, "tiktok")
+        key = sheets.norm_name(name)
+        coach = by_name.get(key) or next(
+            (c for k, c in by_name.items() if k and len(k) > 3 and (k in key or key in k)), None
+        )
+        out.append({
+            "name": name, "instagram": ig, "tiktok": tt,
+            "bad_instagram": raw_ig if raw_ig and not ig else None,
+            "bad_tiktok": raw_tt if raw_tt and not tt else None,
+            "coach_id": coach["id"] if coach else None,
+        })
+    return {"rows": out, "coaches": coaches}
+
+
+class HandleRow(BaseModel):
+    name: str
+    instagram: str | None = None
+    tiktok: str | None = None
+    coach_id: str | None = None
+
+
+class HandlesIn(BaseModel):
+    rows: list[HandleRow]
+
+
+@app.post("/api/coaches/handles/apply")
+def apply_handles(body: HandlesIn):
+    updated = 0
+    with closing(db()) as conn, conn:
+        for r in body.rows:
+            ig, tt = sheets.clean_handle(r.instagram, "instagram"), sheets.clean_handle(r.tiktok, "tiktok")
+            if not (ig or tt):
+                continue
+            conn.execute(
+                "INSERT INTO social_handles (key, name, instagram, tiktok) VALUES (?, ?, ?, ?) "
+                "ON CONFLICT(key) DO UPDATE SET name = excluded.name, "
+                "instagram = COALESCE(excluded.instagram, instagram), tiktok = COALESCE(excluded.tiktok, tiktok)",
+                (sheets.norm_name(r.name), r.name.strip(), ig, tt),
+            )
+            if r.coach_id and conn.execute("SELECT 1 FROM coaches WHERE id = ?", (r.coach_id,)).fetchone():
+                conn.execute(
+                    "UPDATE coaches SET instagram = COALESCE(?, instagram), tiktok = COALESCE(?, tiktok) WHERE id = ?",
+                    (ig, tt, r.coach_id),
+                )
+                updated += 1
+    return {"saved": len(body.rows), "coaches_updated": updated}
+
+
+@app.get("/api/handles")
+def list_handles():
+    """كل الحسابات المعروفة (المدربين + اللي اتستوردت) عشان الاقتراحات في خانة التاج."""
+    with closing(db()) as conn:
+        out = [{"name": r["name"], "instagram": r["instagram"], "tiktok": r["tiktok"]}
+               for r in conn.execute("SELECT name, instagram, tiktok FROM coaches WHERE instagram IS NOT NULL OR tiktok IS NOT NULL")]
+        seen = {h["instagram"] for h in out}
+        out += [{"name": r["name"], "instagram": r["instagram"], "tiktok": r["tiktok"]}
+                for r in conn.execute("SELECT name, instagram, tiktok FROM social_handles ORDER BY name") if r["instagram"] not in seen]
+    return out
 
 
 @app.delete("/api/coaches/{coach_id}")
@@ -1433,6 +1599,40 @@ def delete_outro(outro_id: str):
         conn.execute("DELETE FROM outros WHERE id = ?", (outro_id,))
     (COACHES_DIR / row["filename"]).unlink(missing_ok=True)
     return {"ok": True}
+
+
+# صورة صغيرة من الفيديو بدل ما القوايم تحمّل الفيديوهات نفسها (أخف بكتير على الجهاز)
+THUMB_DIRS = {"raw": RAW_DIR, "clips": CLIPS_DIR, "generated": GENERATED_DIR, "exports": EXPORTS_DIR, "coaches": COACHES_DIR}
+
+
+@app.get("/api/thumb")
+def video_thumb(src: str):
+    parts = src.split("?")[0].split("#")[0].strip("/").split("/")
+    if len(parts) == 4 and parts[:2] == ["media", "export"]:
+        # رابط الفولدر الجاهز: /media/export/<id>/<اسم>
+        with closing(db()) as conn:
+            row = conn.execute("SELECT filename FROM exports WHERE id = ?", (parts[2],)).fetchone()
+        path = EXPORTS_DIR / row["filename"] if row else None
+    elif len(parts) == 3 and parts[0] == "media" and parts[1] in THUMB_DIRS and "/" not in parts[2] and ".." not in parts[2]:
+        path = THUMB_DIRS[parts[1]] / parts[2]
+    else:
+        raise HTTPException(400, "رابط غلط")
+    if path is None or not path.is_file():
+        raise HTTPException(404, "الفيديو غير موجود")
+    out = TMP_DIR / "thumbs" / f"{path.parent.name}-{path.stem}-{int(path.stat().st_mtime)}.jpg"
+    if not out.exists():
+        out.parent.mkdir(parents=True, exist_ok=True)
+        part = out.with_suffix(".part.jpg")
+        at = "0.5" if media_info(path).duration > 1 else "0"
+        result = subprocess.run(
+            [ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", at, "-i", str(path),
+             "-frames:v", "1", "-vf", "scale=-2:360", "-q:v", "6", str(part)],
+            capture_output=True, text=True,
+        )
+        if result.returncode != 0 or not part.exists():
+            raise HTTPException(500, "مش قادر أعمل صورة للفيديو")
+        part.replace(out)
+    return FileResponse(out, media_type="image/jpeg", headers={"Cache-Control": "max-age=604800"})
 
 
 THUMB_FPS = 2  # كام صورة في الثانية في شريط الصور بتاع التايم لاين
@@ -2029,7 +2229,20 @@ def export_file(export_id: str, filename: str, download: int = 0):
 @app.get("/api/exports")
 def list_exports():
     with closing(db()) as conn:
-        return [export_to_dict(r) for r in conn.execute("SELECT * FROM exports ORDER BY created_at DESC")]
+        # مدرب كل فيديو (من مشروع المونتاج) عشان التاج بتاعه يتحط لوحده في النشر
+        coach_of = {}
+        for p in conn.execute("SELECT id, data FROM projects").fetchall():
+            cid = json.loads(p["data"]).get("coach_id")
+            if cid:
+                coach_of[p["id"]] = cid
+        coaches = {r["id"]: {"id": r["id"], "name": r["name"], "instagram": r["instagram"], "tiktok": r["tiktok"]}
+                   for r in conn.execute("SELECT id, name, instagram, tiktok FROM coaches")}
+        out = []
+        for r in conn.execute("SELECT * FROM exports ORDER BY created_at DESC"):
+            e = export_to_dict(r)
+            e["coach"] = coaches.get(coach_of.get(r["project_id"]))
+            out.append(e)
+        return out
 
 
 def reset_stuck_renders() -> None:
@@ -2109,6 +2322,7 @@ def post_to_dict(r: sqlite3.Row) -> dict:
         "published_at": r["published_at"],
         "sent": bool(r["remote_id"]),
         "remote_id": r["remote_id"],
+        "options": json.loads(r["options"]) if r["options"] else {},
     }
 
 
@@ -2142,11 +2356,36 @@ def list_posts():
         return [post_to_dict(r) for r in conn.execute(POSTS_QUERY + " ORDER BY p.scheduled_at")]
 
 
+class PostOptions(BaseModel):
+    ig_tags: list[str] = []  # حسابات تتعمل تاج في إنستجرام
+    ig_collab: bool = False  # البوست يظهر كمان في حساب المدرب (كولاب) لو وافق
+    cover_ms: int | None = None  # الغلاف: فريم من الفيديو (بالملّي ثانية) لإنستجرام وتيك توك
+
+
 class PostIn(BaseModel):
     export_id: str
     caption: str = ""
     platforms: list[str]
     scheduled_at: datetime  # من المتصفح بتوقيت UTC
+    options: PostOptions = PostOptions()
+
+
+def clean_options(opts: PostOptions) -> str:
+    tags = []
+    for t in opts.ig_tags:
+        h = sheets.clean_handle(t, "instagram")
+        if t.strip() and not h:
+            raise HTTPException(400, f"اسم الحساب مش مظبوط: {t.strip()}")
+        if h and h not in tags:
+            tags.append(h)
+    if len(tags) > 20:
+        raise HTTPException(400, "إنستجرام بيقبل 20 تاج بالكتير")
+    if opts.ig_collab and not tags:
+        raise HTTPException(400, "الكولاب محتاج حساب واحد على الأقل في خانة التاج")
+    if opts.ig_collab and len(tags) > 3:
+        raise HTTPException(400, "الكولاب بيقبل 3 حسابات بالكتير")
+    cover = max(0, int(opts.cover_ms)) if opts.cover_ms is not None else None
+    return json.dumps({"ig_tags": tags, "ig_collab": opts.ig_collab, "cover_ms": cover})
 
 
 def clean_post(conn: sqlite3.Connection, body: PostIn) -> tuple[str, str, str]:
@@ -2187,6 +2426,7 @@ def send_post(post_id: str, old_remote_id: str | None = None) -> None:
             title=r["caption"].split("\n")[0].strip() or r["export_name"],
             ai_made=r["export_source"] == "studio",
             publish_now=r["scheduled_at"] <= now(),
+            options=json.loads(r["options"]) if r["options"] else {},
         )
         set_post(post_id, status="scheduled", remote_id=remote_id, error=None)
     except (publisher.PublishError, httpx.HTTPError) as exc:
@@ -2206,13 +2446,14 @@ def after_save(post_id: str, when: str, old_remote_id: str | None) -> None:
 def create_post(body: PostIn):
     with closing(db()) as conn, conn:
         platforms, when, caption = clean_post(conn, body)
+        options = clean_options(body.options)
         post_id = uuid.uuid4().hex[:12]
         # لو Zernio مربوط بيتسجّل «بيتبعت» على طول، عشان المجدول ميبعتهوش هو كمان (نسختين عند Zernio)
         status = "sending" if publisher.service_name() == "zernio" else "scheduled"
         conn.execute(
-            "INSERT INTO posts (id, export_id, caption, platforms, scheduled_at, status, created_at, updated_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (post_id, body.export_id, caption, platforms, when, status, now(), now()),
+            "INSERT INTO posts (id, export_id, caption, platforms, scheduled_at, status, options, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (post_id, body.export_id, caption, platforms, when, status, options, now(), now()),
         )
     after_save(post_id, when, None)
     with closing(db()) as conn:
@@ -2230,10 +2471,11 @@ def update_post(post_id: str, body: PostIn):
         if row["status"] == "failed" and row["remote_id"]:
             raise HTTPException(400, "البوست ده اتبعت لـ Zernio وفشل. استخدم إعادة المحاولة، أو احذفه واعمل واحد جديد")
         platforms, when, caption = clean_post(conn, body)
+        options = clean_options(body.options)
         conn.execute(
             "UPDATE posts SET export_id = ?, caption = ?, platforms = ?, scheduled_at = ?, status = 'scheduled', "
-            "error = NULL, updated_at = ? WHERE id = ?",
-            (body.export_id, caption, platforms, when, now(), post_id),
+            "options = ?, error = NULL, updated_at = ? WHERE id = ?",
+            (body.export_id, caption, platforms, when, options, now(), post_id),
         )
     after_save(post_id, when, row["remote_id"])
     with closing(db()) as conn:
@@ -2425,6 +2667,9 @@ with closing(db()) as _conn, _conn:
         _conn.execute("ALTER TABLE posts ADD COLUMN remote_id TEXT")
     if "remote_media" not in {c[1] for c in _conn.execute("PRAGMA table_info(posts)")}:
         _conn.execute("ALTER TABLE posts ADD COLUMN remote_media TEXT")
+    # إعدادات إضافية للبوست: تاج إنستجرام، كولاب، الغلاف
+    if "options" not in {c[1] for c in _conn.execute("PRAGMA table_info(posts)")}:
+        _conn.execute("ALTER TABLE posts ADD COLUMN options TEXT")
     # لو البرنامج اتقفل وهو بيسلّم بوست، مش عارفين وصل ولا لأ، فنعلّمه عشان تتأكد بنفسك
     _conn.execute(
         "UPDATE posts SET status = 'failed', error = 'البرنامج اتقفل وهو بيبعت البوست. اتأكد من Zernio قبل ما تعيد المحاولة' "

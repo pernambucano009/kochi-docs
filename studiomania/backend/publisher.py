@@ -126,13 +126,17 @@ def upload_video(path: Path) -> str:
     return file_url
 
 
-def schedule(video: Path, caption: str, platforms: list[str], when_utc: str, title: str, ai_made: bool, publish_now: bool) -> str:
+def schedule(
+    video: Path, caption: str, platforms: list[str], when_utc: str, title: str, ai_made: bool, publish_now: bool,
+    options: dict | None = None,
+) -> str:
     """يرفع الفيديو ويسلّم البوست لـ Zernio، ويرجّع رقم البوست عندهم."""
     linked = accounts(refresh=True)
     missing = [PLATFORMS[p][1] for p in platforms if p not in linked]
     if missing:
         raise PublishError(f"الحسابات دي مش مربوطة في Zernio: {'، '.join(missing)}. اربطها من {DASHBOARD_URL}")
 
+    opts = options or {}
     url = upload_video(video)
     entries = []
     for p in platforms:
@@ -147,6 +151,20 @@ def schedule(video: Path, caption: str, platforms: list[str], when_utc: str, tit
                 "expressConsentGiven": True,
                 "videoMadeWithAi": ai_made,
             }
+            if opts.get("cover_ms") is not None:
+                entry["platformSpecificData"]["videoCoverTimestampMs"] = opts["cover_ms"]
+        elif p == "instagram":
+            data = {}
+            tags = opts.get("ig_tags") or []
+            if tags:
+                # في الريلز إنستجرام بيتجاهل المكان (x و y) وبيحط التاج على الفيديو كله
+                data["userTags"] = [{"username": t, "x": 0.5, "y": 0.5} for t in tags]
+                if opts.get("ig_collab"):
+                    data["collaborators"] = tags[:3]
+            if opts.get("cover_ms") is not None:
+                data["thumbOffset"] = opts["cover_ms"]
+            if data:
+                entry["platformSpecificData"] = data
         elif p == "youtube":
             entry["platformSpecificData"] = {
                 "title": title[:100],

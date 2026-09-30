@@ -35,6 +35,13 @@ async function api(path, opts = {}) {
 // لغة التواريخ: أرقام عادية في العربي، وإنجليزي لو الواجهة إنجليزي
 const UI_LOCALE = () => (window.I18N?.lang === "en" ? "en-US" : "ar-EG-u-nu-latn");
 
+// القوايم بتعرض صورة صغيرة من السيرفر، والفيديو نفسه ميتحمّلش غير لما تشغّله (أخف بكتير)
+const thumbOf = (url) => (url && url.startsWith("/media/") ? `/api/thumb?src=${encodeURIComponent(url.split("#")[0])}` : "");
+function lightVideo(url, attrs = "") {
+  const poster = thumbOf(url);
+  return `<video src="${url}" preload="none"${poster ? ` poster="${poster}"` : ""} ${attrs}></video>`;
+}
+
 function escapeHtml(s) {
   return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
@@ -735,7 +742,7 @@ async function loadClips() {
   $("clipsGrid").innerHTML = clips
     .map(
       (c) => `<div class="clip">
-        <video src="${c.url}" controls preload="metadata" playsinline></video>
+        ${lightVideo(c.url, "controls playsinline")}
         <div class="info"><span>#${c.index} · ${c.duration.toFixed(1)} ث</span>
         <button class="btn sm danger" data-del="${c.id}" title="حذف القطعة">✕</button></div>
       </div>`

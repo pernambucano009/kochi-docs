@@ -72,14 +72,17 @@ function openStage(step) {
   if (!first) return;
   $("stage").hidden = false;
   document.body.classList.add("stage-open");
-  animateStage(tileFor(step), true);
+  // بعد ما يفتح: خلفية سادة ونخبّي الرئيسية اللي وراه، عشان المتصفح ميفضلش يرسم البلور مع كل حركة
+  animateStage(tileFor(step), true).then(() => {
+    if (shell.step !== null) document.body.classList.add("stage-settled");
+  });
 }
 
 function closeStage() {
   if ($("stage").hidden) { loadHome(); return; }
   const tile = tileFor(shell.step);
   shell.step = null;
-  document.body.classList.remove("stage-open");
+  document.body.classList.remove("stage-open", "stage-settled");
   animateStage(tile, false).then(() => {
     $("stage").hidden = true;
     document.querySelectorAll(".view").forEach((v) => (v.hidden = true));

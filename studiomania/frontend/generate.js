@@ -254,7 +254,7 @@ function renderClipPicker() {
             const off = short || !hasCoach;
             return `<div class="clip-pick ${gen.selected.has(c.id) ? "selected" : ""} ${off ? "too-short" : ""}"
               data-id="${c.id}" title="${short ? `أقصر من ${MIN_REF} ثانية، Seedance مش هيقبلها` : !hasCoach ? "اختار مدرب للمشروع الأول" : ""}">
-              <video src="${c.url}#t=0.5" preload="metadata" muted playsinline></video>
+              ${lightVideo(c.url, "muted playsinline")}
               <span class="tick">✓</span>
               <span class="tag"><span>#${c.index}</span><span>${c.duration.toFixed(1)}ث</span></span>
             </div>`;
@@ -414,7 +414,7 @@ function renderGenerations() {
 function genCard(g) {
   const isActive = ACTIVE.has(g.status);
   const media = g.output_url
-    ? `<video src="${g.output_url}" controls preload="metadata" playsinline></video>`
+    ? lightVideo(g.output_url, "controls playsinline")
     : `<div class="wait">${isActive ? `<div class="spin"></div><br>${STATUS_LABEL[g.status]}...` : "مفيش فيديو"}</div>`;
   const pillCls = g.status === "completed" ? "completed" : g.status === "failed" ? "failed" : "active";
   const p = g.params;

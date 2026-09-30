@@ -29,6 +29,7 @@ async function initPublish() {
     alert.innerHTML = `الحسابات المربوطة في Zernio: ${linked} · <a href="${info.dashboard_url}" target="_blank">اربط حسابات</a>`;
   }
   renderPlatformBoxes();
+  loadHandles();
   await Promise.all([pubLoadExports(), pubLoadPosts()]);
   if (pub.service === "zernio") loadRemoteOrphans();
   loadPublished();
@@ -50,7 +51,7 @@ function renderReady() {
   $("readyGrid").innerHTML = pub.exports
     .map(
       (e) => `<div class="ready ${e.id === pub.videoId ? "selected" : ""}" data-id="${e.id}">
-        <video src="${e.url}" controls preload="metadata" playsinline></video>
+        ${lightVideo(e.url, "controls playsinline")}
         <div class="body">
           <div class="name" title="${escapeHtml(e.name)}">${escapeHtml(e.name)}</div>
           <div class="meta"><span>${fmtDuration(e.duration)}</span>
@@ -142,6 +143,65 @@ function renderPostVideo() {
   $("postVideo").innerHTML = ex
     ? `🎬 ${escapeHtml(ex.name)} <span class="muted">(${fmtDuration(ex.duration)})</span>`
     : `<span class="muted">اختار فيديو من الفولدر (دوس 📅 جدول)</span>`;
+  // التاج: حساب مدرب المشروع بيتحط لوحده (إلا لو انت كتبت حاجة بإيدك)
+  const coachTag = ex?.coach?.instagram ? `@${ex.coach.instagram}` : "";
+  if (!pub.tagsTouched && !pub.editing) $("igTags").value = coachTag;
+  $("igTagsHint").textContent = ex?.coach
+    ? (ex.coach.instagram ? `المدرب: ${ex.coach.name} (@${ex.coach.instagram})` : `⚠️ المدرب ${ex.coach.name} مالوش حساب إنستجرام متسجل. ضيفه من صفحة المدربين`)
+    : "اكتب الحسابات اللي عايز تعملها تاج، وافصل بينهم بفاصلة.";
+  // الغلاف بيتختار من نفس الفيديو
+  const v = $("coverVideo");
+  if (ex && v.dataset.src !== ex.url) {
+    v.dataset.src = ex.url;
+    v.src = ex.url;
+    $("coverRange").max = Math.round(ex.duration * 1000);
+    if (!pub.editing) { $("coverOn").checked = false; setCover(0); }
+  }
+  renderPostExtras();
+}
+
+// ---------- إنستجرام: التاج والكولاب · والغلاف لإنستجرام وتيك توك ----------
+function renderPostExtras() {
+  const pl = checkedPlatforms();
+  const ig = pl.includes("instagram"), tt = pl.includes("tiktok");
+  $("igOpts").hidden = !ig;
+  $("coverOpts").hidden = !(ig || tt) || !pub.videoId;
+  $("coverFor").textContent = ig && tt ? "(إنستجرام وتيك توك)" : ig ? "(إنستجرام)" : "(تيك توك)";
+  $("coverPick").hidden = !$("coverOn").checked;
+}
+function setCover(ms) {
+  $("coverRange").value = ms;
+  const v = $("coverVideo");
+  if (v.src) v.currentTime = ms / 1000;
+  $("coverTime").textContent = fmt(ms / 1000);
+}
+$("postPlatforms").addEventListener("change", renderPostExtras);
+$("coverOn").addEventListener("change", () => { renderPostExtras(); if ($("coverOn").checked) setCover(Number($("coverRange").value)); });
+$("coverRange").addEventListener("input", () => setCover(Number($("coverRange").value)));
+$("coverPrev").onclick = () => setCover(Math.max(0, Number($("coverRange").value) - 33));
+$("coverNext").onclick = () => setCover(Math.min(Number($("coverRange").max), Number($("coverRange").value) + 33));
+$("igTags").addEventListener("input", () => (pub.tagsTouched = true));
+$("addRiyadh").onclick = () => {
+  const c = $("postCaption");
+  if (!c.value.includes("📍")) c.value = `${c.value.trimEnd()}${c.value.trim() ? "\n\n" : ""}📍 الرياض`;
+  c.focus();
+};
+
+async function loadHandles() {
+  try {
+    const list = await api("/api/handles");
+    $("handlesList").innerHTML = list.filter((h) => h.instagram)
+      .map((h) => `<option value="@${escapeHtml(h.instagram)}">${escapeHtml(h.name)}</option>`).join("");
+  } catch {}
+}
+
+function postOptions() {
+  const tags = $("igTags").value.split(/[,،\s]+/).map((t) => t.trim()).filter(Boolean);
+  return {
+    ig_tags: tags,
+    ig_collab: $("igCollab").checked,
+    cover_ms: $("coverOn").checked ? Number($("coverRange").value) : null,
+  };
 }
 
 // datetime-local بيشتغل بالتوقيت المحلي للجهاز
@@ -181,23 +241,35 @@ function resetPostForm() {
   $("postSubmit").textContent = "📅 جدول";
   $("postCancel").hidden = true;
   $("postCaption").value = "";
+  pub.tagsTouched = false;
+  $("igCollab").checked = false;
+  $("coverOn").checked = false;
   setWhen(nextSlot());
+  renderPostVideo();
 }
 $("postCancel").onclick = resetPostForm;
 
-$("postForm").addEventListener("submit", async (e) => {
+$("postForm").addEventListener("submit", (e) => {
   e.preventDefault();
+  submitPost(false);
+});
+$("postNow").onclick = () => submitPost(true);
+
+async function submitPost(now) {
   if (!pub.videoId) return toast("اختار فيديو من الفولدر الأول", true);
   const platforms = checkedPlatforms();
   if (!platforms.length) return toast("اختار منصة واحدة على الأقل", true);
-  const when = new Date($("postWhen").value);
+  const when = now ? new Date() : new Date($("postWhen").value);
   if (isNaN(when)) return toast("اختار الميعاد", true);
-  if (when < new Date() && !confirm("الميعاد ده عدّى، فالبوست هيتنشر على طول. تكمّل؟")) return;
+  const names = platforms.map((k) => pub.platforms[k] || k).join("، ");
+  if (now && !confirm(`البوست هينزل دلوقتي على: ${names}. تكمّل؟`)) return;
+  if (!now && when < new Date() && !confirm("الميعاد ده عدّى، فالبوست هيتنشر على طول. تكمّل؟")) return;
   const body = JSON.stringify({
     export_id: pub.videoId,
     caption: $("postCaption").value,
     platforms,
     scheduled_at: when.toISOString(),
+    options: postOptions(),
   });
   try {
     await api(pub.editing ? `/api/posts/${pub.editing}` : "/api/posts", {
@@ -205,13 +277,14 @@ $("postForm").addEventListener("submit", async (e) => {
       headers: { "Content-Type": "application/json" },
       body,
     });
-    toast(pub.editing ? "✅ البوست اتعدّل" : `✅ اتجدول ${when.toLocaleString(UI_LOCALE(), { weekday: "long", hour: "numeric", minute: "2-digit" })}`);
+    toast(now ? "🚀 البوست بيتبعت للنشر دلوقتي" : pub.editing ? "✅ البوست اتعدّل"
+      : `✅ اتجدول ${when.toLocaleString(UI_LOCALE(), { weekday: "long", hour: "numeric", minute: "2-digit" })}`);
     resetPostForm();
     await pubLoadPosts();
   } catch (err) {
     toast(err.message, true);
   }
-});
+}
 
 // ---------- المواعيد ----------
 async function pubLoadPosts() {
@@ -248,11 +321,12 @@ function renderPosts() {
       if (p.status === "scheduled" && p.sent) label = "متجدول في Zernio ✓";
       const when = new Date(p.scheduled_at).toLocaleString(UI_LOCALE(), { weekday: "long", day: "numeric", month: "long", hour: "numeric", minute: "2-digit" });
       return `<li data-id="${p.id}" class="${p.status === "failed" ? "failed" : ""}">
-        ${p.export_url ? `<video src="${p.export_url}#t=0.5" preload="metadata" muted></video>` : ""}
+        ${p.export_url ? lightVideo(p.export_url, "muted") : ""}
         <div class="info">
           <span class="when">${when}</span>
           <span>${escapeHtml(p.export_name || (p.from_zernio ? "🔗 من Zernio" : "⚠️ الفيديو اتمسح"))} · ${p.platforms.map((k) => pub.platforms[k] || k).join("، ")}</span>
           ${p.caption ? `<span class="cap" title="${escapeHtml(p.caption)}">${escapeHtml(p.caption)}</span>` : ""}
+          ${p.options?.ig_tags?.length ? `<span class="tags" dir="ltr">🏷️ ${p.options.ig_tags.map((t) => `@${escapeHtml(t)}`).join(" ")}${p.options.ig_collab ? " · 🤝" : ""}</span>` : ""}
           ${p.error ? `<span class="err">${escapeHtml(p.error)}</span>` : ""}
         </div>
         <span class="pill ${cls}">${label}</span>
@@ -281,8 +355,14 @@ $("postsList").addEventListener("click", async (e) => {
       $("postCaption").value = p.caption;
       $("postPlatforms").querySelectorAll("input").forEach((i) => (i.checked = p.platforms.includes(i.value)));
       setWhen(new Date(p.scheduled_at));
+      const o = p.options || {};
+      $("igTags").value = (o.ig_tags || []).map((t) => `@${t}`).join(", ");
+      pub.tagsTouched = true;
+      $("igCollab").checked = !!o.ig_collab;
+      $("coverOn").checked = o.cover_ms != null;
       renderReady();
       renderPostVideo();
+      if (o.cover_ms != null) setCover(o.cover_ms);
       $("postForm").scrollIntoView({ behavior: "smooth", block: "start" });
     }
     if (btn.dataset.act === "retry") {
@@ -313,7 +393,7 @@ async function loadRemoteOrphans(verbose = false) {
     const when = (iso) => (iso ? new Date(iso).toLocaleString(UI_LOCALE(), { weekday: "long", day: "numeric", month: "long", hour: "numeric", minute: "2-digit" }) : "");
     box.innerHTML = list.length ? `<p class="orphans-title">⚠️ فيه ${list.length} بوست متجدول على Zernio ومش في القايمة هنا</p>` + list.map((o) => `
       <div class="orphan" data-rid="${escapeHtml(o.id)}">
-        ${o.media_url ? `<video src="${escapeHtml(o.media_url)}#t=0.5" preload="metadata" muted></video>` : ""}
+        ${o.media_url ? lightVideo(escapeHtml(o.media_url), "muted") : ""}
         <div class="info"><span class="when">${when(o.scheduled_for)}</span>
           <span>${o.platforms.map((k) => pub.platforms[k] || k).join("، ")}</span>
           ${o.content ? `<span class="cap">${escapeHtml(o.content)}</span>` : ""}</div>
@@ -361,7 +441,7 @@ async function loadPublished(verbose = false) {
         return `<span class="pl-link ${ok ? "nolink" : "bad"}" title="${escapeHtml(x.error || "")}">${PLATFORM_ICON[x.key] || ""} ${escapeHtml(name)}${ok ? "" : " ✕"}</span>`;
       }).join("");
       return `<li>
-        ${p.media_url ? `<video src="${escapeHtml(p.media_url)}#t=0.5" preload="metadata" muted></video>` : ""}
+        ${p.media_url ? lightVideo(escapeHtml(p.media_url), "muted") : ""}
         <div class="info"><span class="when">${when}</span>
           ${p.name ? `<span>${escapeHtml(p.name)}</span>` : ""}
           ${p.content ? `<span class="cap" title="${escapeHtml(p.content)}">${escapeHtml(p.content)}</span>` : ""}

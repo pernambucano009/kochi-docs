@@ -273,7 +273,7 @@ function renderBin() {
   $("binGrid").innerHTML = list
     .map(
       (s) => `<div class="bin-item" data-id="${s.id}" draggable="true">
-        <video src="${s.url}#t=0.5" preload="metadata" muted playsinline></video>
+        ${lightVideo(s.url, "muted playsinline")}
         <button class="add" title="ضيف عند المؤشر">＋</button>
         ${s.extra ? `<button class="del" title="امسح الأوترو ده">✕</button>` : ""}
         <span class="tag">${escapeHtml(s.label)} · ${s.duration.toFixed(1)}ث</span>
