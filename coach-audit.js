@@ -179,16 +179,22 @@
     var days = workingDays(d.hours || t.workingHours);
     var slots = d.slots;
     var dayKeyOf = function (x) { return String(x.dayOfWeek || x.day || '').toLowerCase(); };
-    // يوم متسجل غلط = النهاية مش بعد البداية (ومنها 00:00 نص الليل، الموقع بيحسبها بداية اليوم)،
-    // وصفحة الحجز فعلًا مش بتعرض فيه مواعيد (لو قدرنا نتأكد)
-    var reversed = days.filter(function (x) {
-      var a = x.startTime || x.from || x.start, b = x.endTime || x.to || x.end;
-      if (String(b) > String(a)) return false;
+    // النهاية 00:00 = نص الليل (آخر اليوم) — المدرب ظابطها صح. بس الموقع بيحسبها بداية اليوم
+    // فبيقفل اليوم ده للعملاء؛ دي مشكلة في الموقع مش عند المدرب، فبتتسجل لوحدها.
+    var isMidnight = function (x) { return /^0?0:00/.test(String(x.endTime || x.to || x.end)); };
+    var noSlots = function (x) {
       var n = slots && slots.byWeekday ? slots.byWeekday[dayKeyOf(x)] : undefined;
       return n === undefined || n === 0;
+    };
+    // يوم متسجل غلط من المدرب = النهاية قبل البداية، وصفحة الحجز فعلًا مش بتعرض فيه مواعيد
+    var reversed = days.filter(function (x) {
+      var a = x.startTime || x.from || x.start, b = x.endTime || x.to || x.end;
+      return !isMidnight(x) && String(b) <= String(a) && noSlots(x);
     });
+    var midnightDays = days.filter(function (x) { return isMidnight(x) && slots && noSlots(x); });
     var dayName = function (x) { var k = dayKeyOf(x); return DAY_AR[k] || k; };
-    var hoursOk = slots ? slots.total > 0 : (days.length > reversed.length);
+    var validDays = days.length - reversed.length;
+    var hoursOk = slots ? (slots.total > 0 || midnightDays.length > 0) : validDays > 0;
     var hoursNote = !days.length
       ? 'مفيش أيام شغل محددة'
       : (slots
@@ -200,6 +206,13 @@
     });
     if (badDays.length) {
       hoursNote += ' — ⚠️ أيام متسجلة غلط ومفيهاش مواعيد: ' + badDays.map(function (x) { return describeBadDay(x, 'ar'); }).join('، ');
+    }
+    var siteIssues = midnightDays.map(function (x) {
+      return { day: dayName(x), dayKey: dayKeyOf(x), start: x.startTime || x.from || x.start, end: x.endTime || x.to || x.end };
+    });
+    if (siteIssues.length) {
+      hoursNote += ' — ℹ️ مشكلة في الموقع: ' + siteIssues.map(function (x) { return x.day + ' من ' + x.start + ' لنص الليل'; }).join('، ') +
+        ' مظبوطة صح بس الموقع مش بيعرضها للعملاء';
     }
     var transf = d.transformations || (Array.isArray(t.transformations) ? t.transformations : []);
 
@@ -213,6 +226,7 @@
       phoneDigits: String(t.phone || '').replace(/\D/g, ''),
       instagram: String(t.instagram || '').trim().replace(/^@/, '').replace(/^https?:\/\/(www\.)?instagram\.com\//, '').replace(/[/?].*$/, ''),
       reversed: badDays,
+      siteIssues: siteIssues,
       hasHours: days.length > 0,
       url: SITE + '/trainers/' + encodeURIComponent(d.id),
       photoUrl: photo,
