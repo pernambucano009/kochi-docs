@@ -198,16 +198,14 @@ textarea[dir=ltr]{text-align:left}
     var items = ITEMS[lang];
     var missing = CHECKS.filter(function (c) { return !r.checks[c.key].ok; }).map(function (c) { return c.key; });
     var fixHours = r.reversed.length > 0 && missing.indexOf('hours') < 0;
-    var badDays = r.reversed.map(function (x) {
-      return lang === 'ar' ? x.day + ' من ' + x.start + ' لـ ' + x.end : (x.dayKey.charAt(0).toUpperCase() + x.dayKey.slice(1)) + ' ' + x.start + '→' + x.end;
-    }).join(lang === 'ar' ? '، ' : ', ');
+    var badDays = r.reversed.map(function (x) { return KochiCoachAudit.describeBadDay(x, lang); }).join(lang === 'ar' ? '، ' : ', ');
 
     var lines = function (keys) {
       return keys.map(function (k) {
         if (k === 'hours' && r.reversed.length) {
           return lang === 'ar'
-            ? '🗓️ مواعيدك المتاحة: فيه أيام وقت النهاية فيها قبل البداية (' + badDays + ')، فالعملاء مش قادرين يحجزوا مكالمة الزووم'
-            : '🗓️ Your available times: some days end before they start (' + badDays + '), so clients can’t book the intro Zoom call';
+            ? '🗓️ مواعيدك المتاحة: فيه أيام متسجلة بشكل العملاء مش قادرين يحجزوا فيه مكالمة الزووم: ' + badDays
+            : '🗓️ Your available times: clients can’t book the intro Zoom call on some days: ' + badDays;
         }
         return items[k];
       }).join('\n');
@@ -217,7 +215,8 @@ textarea[dir=ltr]{text-align:left}
       if (!missing.length && !fixHours) {
         return 'Hi Coach ' + name + ' 🌹\n\nKOCHI team here 💪\n\nYour profile on the platform is 100% complete — thank you! 👏\nIt’s now fully ready to receive new clients 🚀\n\nAny help you need, we’re here 🙏\nKOCHI Team';
       }
-      return 'Hi Coach ' + name + ' 🌹\n\nKOCHI team here 💪\n\nYour profile on the platform needs a few things to be ready for new clients:\n\n' +
+      return 'Hi Coach ' + name + ' 🌹\n\nKOCHI team here 💪\n\n' +
+        (missing.length ? 'Your profile on the platform needs a few things to be ready for new clients:' : 'Your profile is almost perfect 👏 just one small fix so new clients can book with you:') + '\n\n' +
         lines(missing.concat(fixHours ? ['hours'] : [])) +
         '\n\nThe more complete your profile, the stronger you show up to clients 🚀\nYou can complete it here: ' + SIGNIN +
         '\n\nAny help you need, we’re here 🙏\nKOCHI Team';
@@ -225,7 +224,8 @@ textarea[dir=ltr]{text-align:left}
     if (!missing.length && !fixHours) {
       return 'أهلاً يا كوتش ' + name + ' 🌹\n\nمعاك فريق KOCHI 💪\n\nبروفايلك على المنصة مكتمل 100% — شكرًا ليك 👏\nوبقى جاهز يستقبل عملاء جداد 🚀\n\nأي مساعدة إحنا معاك 🙏\nفريق كوتشي';
     }
-    return 'أهلاً يا كوتش ' + name + ' 🌹\n\nمعاك فريق KOCHI 💪\n\nبروفايلك على المنصة ناقصه كام حاجة عشان يبقى جاهز يستقبل عملاء جداد:\n\n' +
+    return 'أهلاً يا كوتش ' + name + ' 🌹\n\nمعاك فريق KOCHI 💪\n\n' +
+      (missing.length ? 'بروفايلك على المنصة ناقصه كام حاجة عشان يبقى جاهز يستقبل عملاء جداد:' : 'بروفايلك تقريبًا كامل 👏 فاضل تعديل بسيط عشان العملاء الجداد يقدروا يحجزوا معاك:') + '\n\n' +
       lines(missing.concat(fixHours ? ['hours'] : [])) +
       '\n\nكل ما بروفايلك يكون مكتمل، كل ما ظهورك قدّام العملاء يكون أقوى 🚀\nتقدر تكمّله من هنا: ' + SIGNIN +
       '\n\nأي مساعدة إحنا معاك 🙏\nفريق كوتشي';
@@ -287,8 +287,8 @@ textarea[dir=ltr]{text-align:left}
     }).join('');
 
     var alert = r.reversed.length
-      ? '<div class="alert">⚠️ مواعيد متسجلة غلط (النهاية قبل البداية) فالعملاء مش شايفينها: ' +
-        esc(r.reversed.map(function (x) { return x.day + ' من ' + x.start + ' لـ ' + x.end; }).join('، ')) + '</div>'
+      ? '<div class="alert">⚠️ أيام متسجلة غلط والعملاء مش شايفين فيها مواعيد: ' +
+        esc(r.reversed.map(function (x) { return KochiCoachAudit.describeBadDay(x, 'ar'); }).join('، ')) + '</div>'
       : '';
 
     var hours = r.checks.hours.ok && !r.reversed.length ? '<div class="hours">🗓️ ' + esc(r.checks.hours.note) + '</div>' : '';

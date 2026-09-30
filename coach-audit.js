@@ -92,13 +92,21 @@
       d.setDate(d.getDate() + i);
       days.push(dateKey(d));
     }
+    var WEEK = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
     return Promise.all(days.map(function (date) {
       return get('/bookings/available-slots', { trainerId: id, date: date })
         .then(function (b) { var v = unwrap(b); return (v && v.slots) || (Array.isArray(v) ? v : []); })
         .catch(function () { return null; });
     })).then(function (lists) {
       if (lists.every(function (l) { return l === null; })) return null;
+      var byWeekday = {};
+      lists.forEach(function (l, i) {
+        if (l === null) return;
+        var p = days[i].split('-').map(Number);
+        byWeekday[WEEK[new Date(p[0], p[1] - 1, p[2]).getDay()]] = l.length;
+      });
       return {
+        byWeekday: byWeekday,
         days: lists.filter(function (l) { return l && l.length; }).length,
         total: lists.reduce(function (n, l) { return n + (l ? l.length : 0); }, 0)
       };
@@ -144,6 +152,18 @@
     wednesday: 'الأربعاء', thursday: 'الخميس', friday: 'الجمعة'
   };
 
+  function describeBadDay(x, lang) {
+    if (lang === 'en') {
+      var day = x.dayKey.charAt(0).toUpperCase() + x.dayKey.slice(1);
+      return x.midnight
+        ? day + ' ' + x.start + '→' + x.end + ' (00:00 counts as the start of the day — set it to 23:30)'
+        : day + ' ' + x.start + '→' + x.end + ' (ends before it starts)';
+    }
+    return x.midnight
+      ? x.day + ' من ' + x.start + ' لـ ' + x.end + ' (الـ 00:00 بتتحسب بداية اليوم — خلّيها 23:30)'
+      : x.day + ' من ' + x.start + ' لـ ' + x.end + ' (النهاية قبل البداية)';
+  }
+
   function evaluate(d) {
     var t = d.trainer;
     var photo = mediaUrl(t.profileImage || t.image || t.photo);
@@ -157,22 +177,29 @@
     var approved = certs.filter(function (c) { return certStatus(c) === 'approved'; }).length;
     var pending = certs.filter(function (c) { return certStatus(c) === 'pending'; }).length;
     var days = workingDays(d.hours || t.workingHours);
+    var slots = d.slots;
+    var dayKeyOf = function (x) { return String(x.dayOfWeek || x.day || '').toLowerCase(); };
+    // يوم متسجل غلط = النهاية مش بعد البداية (ومنها 00:00 نص الليل، الموقع بيحسبها بداية اليوم)،
+    // وصفحة الحجز فعلًا مش بتعرض فيه مواعيد (لو قدرنا نتأكد)
     var reversed = days.filter(function (x) {
       var a = x.startTime || x.from || x.start, b = x.endTime || x.to || x.end;
-      return String(b) <= String(a);
+      if (String(b) > String(a)) return false;
+      var n = slots && slots.byWeekday ? slots.byWeekday[dayKeyOf(x)] : undefined;
+      return n === undefined || n === 0;
     });
-    var dayName = function (x) { var k = String(x.dayOfWeek || x.day || '').toLowerCase(); return DAY_AR[k] || k; };
-    var slots = d.slots;
+    var dayName = function (x) { var k = dayKeyOf(x); return DAY_AR[k] || k; };
     var hoursOk = slots ? slots.total > 0 : (days.length > reversed.length);
     var hoursNote = !days.length
       ? 'مفيش أيام شغل محددة'
       : (slots
           ? (slots.total ? slots.total + ' ميعاد في ' + slots.days + ' أيام (الأسبوع الجاي)' : 'مفيش ولا ميعاد يتحجز الأسبوع الجاي')
           : days.length + ' أيام شغل');
-    if (reversed.length) {
-      hoursNote += ' — ⚠️ وقت النهاية قبل البداية: ' + reversed.map(function (x) {
-        return dayName(x) + ' من ' + (x.startTime || x.from || x.start) + ' لـ ' + (x.endTime || x.to || x.end);
-      }).join('، ');
+    var badDays = reversed.map(function (x) {
+      var end = x.endTime || x.to || x.end;
+      return { day: dayName(x), dayKey: dayKeyOf(x), start: x.startTime || x.from || x.start, end: end, midnight: /^0?0:00/.test(end) };
+    });
+    if (badDays.length) {
+      hoursNote += ' — ⚠️ أيام متسجلة غلط ومفيهاش مواعيد: ' + badDays.map(function (x) { return describeBadDay(x, 'ar'); }).join('، ');
     }
     var transf = d.transformations || (Array.isArray(t.transformations) ? t.transformations : []);
 
@@ -185,9 +212,7 @@
       phone: t.phone || '',
       phoneDigits: String(t.phone || '').replace(/\D/g, ''),
       instagram: String(t.instagram || '').trim().replace(/^@/, '').replace(/^https?:\/\/(www\.)?instagram\.com\//, '').replace(/[/?].*$/, ''),
-      reversed: reversed.map(function (x) {
-        return { day: dayName(x), dayKey: String(x.dayOfWeek || x.day || '').toLowerCase(), start: x.startTime || x.from || x.start, end: x.endTime || x.to || x.end };
-      }),
+      reversed: badDays,
       hasHours: days.length > 0,
       url: SITE + '/trainers/' + encodeURIComponent(d.id),
       photoUrl: photo,
@@ -421,7 +446,7 @@
     return start(host, { closable: true, host: host });
   }
 
-  var api = { audit: audit, start: start, openOverlay: openOverlay, toCsv: toCsv, CHECKS: CHECKS };
+  var api = { describeBadDay: describeBadDay, audit: audit, start: start, openOverlay: openOverlay, toCsv: toCsv, CHECKS: CHECKS };
   if (typeof window !== 'undefined') window.KochiCoachAudit = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (typeof window !== 'undefined' && window.__KCA_AUTORUN__) openOverlay();
