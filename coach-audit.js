@@ -179,9 +179,16 @@
     var result = {
       id: d.id,
       name: (t.name || t.fullName || t.fullNameEn || t.username || '').trim() || '(بدون اسم)',
+      nameEn: String(t.fullNameEn || '').trim(),
       status: t.status === 'pending_verification' ? 'حسابه لسه قيد التوثيق' : '',
       email: t.email || '',
       phone: t.phone || '',
+      phoneDigits: String(t.phone || '').replace(/\D/g, ''),
+      instagram: String(t.instagram || '').trim().replace(/^@/, '').replace(/^https?:\/\/(www\.)?instagram\.com\//, '').replace(/[/?].*$/, ''),
+      reversed: reversed.map(function (x) {
+        return { day: dayName(x), dayKey: String(x.dayOfWeek || x.day || '').toLowerCase(), start: x.startTime || x.from || x.start, end: x.endTime || x.to || x.end };
+      }),
+      hasHours: days.length > 0,
       url: SITE + '/trainers/' + encodeURIComponent(d.id),
       photoUrl: photo,
       checks: {

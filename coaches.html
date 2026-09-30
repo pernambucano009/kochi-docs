@@ -1,0 +1,462 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#46A79E">
+<title>KOCHI · لوحة متابعة المدربين</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap">
+<style>
+:root{--teal:#4FB3AA;--teal-d:#3E9A92;--navy:#1F2437;--mint:#EAF6F4;--bg:#FBFBF9;--card:#fff;--line:#E7E9EC;--muted:#6E7B7A;--ink:#2E3536;
+--wa:#25D366;--ig:#E1306C;--ok:#1B8A5A;--okbg:#E5F6EE;--bad:#C0392B;--badbg:#FDECEC;--warn:#B45309;--warnbg:#FEF3C7}
+*{box-sizing:border-box}
+body{margin:0;font-family:'Cairo',system-ui,sans-serif;background:var(--bg);color:var(--ink)}
+button,input,select,textarea{font:inherit}
+header{background:linear-gradient(135deg,#5FC1B8,#46A79E);color:#fff;padding:24px 16px 38px}
+.wrap{max-width:1180px;margin:0 auto}
+.hrow{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.logo{width:54px;height:54px;background:#fff;border-radius:16px;display:flex;align-items:center;justify-content:center;flex:none;color:#46A79E;font-weight:800;font-size:28px}
+h1{margin:0;font-size:22px;font-weight:800}
+.subh{margin:2px 0 0;font-size:13.5px;opacity:.92}
+.hbtns{margin-inline-start:auto;display:flex;gap:8px;flex-wrap:wrap}
+.hbtn{background:rgba(255,255,255,.18);color:#fff;border:1px solid rgba(255,255,255,.4);border-radius:10px;padding:7px 12px;font-weight:700;font-size:13px;cursor:pointer}
+.hbtn:hover{background:rgba(255,255,255,.28)}
+.stats{margin:-22px auto 0;padding:0 16px;display:grid;grid-template-columns:repeat(4,1fr);gap:12px;max-width:1180px}
+.stat{background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px 14px;box-shadow:0 6px 18px rgba(31,36,55,.05)}
+.stat .n{font-size:24px;font-weight:800;color:var(--teal-d)}
+.stat .l{font-size:12px;color:var(--muted)}
+.stat.dark{background:var(--navy)}.stat.dark .n{color:#6FD0C6}.stat.dark .l{color:#AEB6C6}
+.chips{max-width:1180px;margin:16px auto 0;padding:0 16px;display:flex;gap:8px;flex-wrap:wrap}
+.chip{background:#fff;border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:13px;font-weight:700;cursor:pointer;color:var(--ink)}
+.chip b{color:var(--bad)}
+.chip.on{background:var(--navy);color:#fff;border-color:var(--navy)}.chip.on b{color:#FFB4AB}
+.bar{max-width:1180px;margin:12px auto 0;padding:0 16px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.bar input,.bar select{border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:#fff;color:var(--ink);min-width:0}
+.bar input{flex:1 1 200px}
+.bar .count{color:var(--muted);font-size:13px;margin-inline-start:auto}
+.grid{max-width:1180px;margin:14px auto 0;padding:0 16px 40px;display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;box-shadow:0 4px 14px rgba(31,36,55,.05);display:flex;flex-direction:column;gap:10px;min-width:0}
+.card.ready{border-color:#BFE6D3}
+.chead{display:flex;gap:10px;align-items:center}
+.av{width:48px;height:48px;border-radius:50%;object-fit:cover;background:#EEF0F3;flex:none;border:2px solid #fff;box-shadow:0 0 0 1px var(--line)}
+.who{min-width:0;flex:1}
+.name{font-weight:800;font-size:15px;color:var(--ink);text-decoration:none}
+.name:hover{color:var(--teal-d)}
+.meta{font-size:12px;color:var(--muted);display:flex;flex-wrap:wrap;column-gap:10px}
+.meta bdi{direction:ltr}
+.tag{font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:999px;display:inline-block;margin-inline-start:4px;vertical-align:middle}
+.tag.pend{background:var(--warnbg);color:var(--warn)}
+.tag.dup{background:var(--badbg);color:var(--bad)}
+.score{flex:none;text-align:center}
+.score b{display:block;font-size:20px;font-weight:800;line-height:1}
+.score span{font-size:11px;color:var(--muted)}
+.meter{height:6px;border-radius:99px;background:#EEF0F3;overflow:hidden}
+.meter i{display:block;height:100%;border-radius:99px}
+.checks{display:flex;flex-wrap:wrap;gap:6px}
+.ck{font-size:12px;font-weight:700;padding:3px 9px;border-radius:8px;cursor:help}
+.ck.ok{background:var(--okbg);color:var(--ok)}
+.ck.bad{background:var(--badbg);color:var(--bad)}
+.ck.warn{background:var(--warnbg);color:var(--warn)}
+.alert{font-size:12px;background:var(--warnbg);color:var(--warn);border-radius:10px;padding:7px 10px;line-height:1.7}
+.hours{font-size:12px;color:var(--muted)}
+details{border:1px solid var(--line);border-radius:12px;background:#FAFBFA}
+summary{cursor:pointer;padding:8px 10px;font-size:13px;font-weight:700;color:var(--teal-d);list-style:none;display:flex;justify-content:space-between;align-items:center;gap:8px}
+summary::-webkit-details-marker{display:none}
+.lang{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.lang button{border:0;background:#fff;padding:2px 9px;font-size:11.5px;font-weight:700;cursor:pointer;color:var(--muted)}
+.lang button.on{background:var(--navy);color:#fff}
+textarea{width:100%;border:0;border-top:1px solid var(--line);background:#fff;padding:10px;min-height:190px;resize:vertical;font-size:13px;line-height:1.7;border-radius:0 0 12px 12px;color:var(--ink)}
+textarea[dir=ltr]{text-align:left}
+.btnrow{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.btn{border:0;border-radius:10px;padding:10px;font-size:13.5px;font-weight:700;cursor:pointer;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:6px;color:#fff}
+.btn.wa{background:var(--wa)}.btn.ig{background:var(--ig)}
+.btn[aria-disabled=true]{background:#D5D9DD;pointer-events:none}
+.links{display:flex;gap:12px;flex-wrap:wrap;font-size:12px}
+.links a{color:var(--teal-d);font-weight:700;text-decoration:none}
+.links a:hover{text-decoration:underline}
+.log{font-size:12px;color:var(--muted);display:flex;justify-content:space-between;gap:8px;align-items:center}
+.log.done{color:var(--ok);font-weight:700}
+.log button{background:none;border:0;color:var(--muted);font-size:11.5px;cursor:pointer;text-decoration:underline;padding:0}
+.msg{max-width:1180px;margin:18px auto;padding:0 16px}
+.msg>div{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px}
+.msg .err{background:var(--badbg);color:var(--bad);border-color:#F4C7C7}
+.progress{height:8px;background:var(--line);border-radius:99px;overflow:hidden;margin-top:10px}
+.progress i{display:block;height:100%;width:0;background:var(--teal);transition:width .2s}
+.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:10px 16px;border-radius:12px;font-size:13.5px;font-weight:700;opacity:0;transition:opacity .2s;pointer-events:none;z-index:9;max-width:calc(100% - 32px);text-align:center}
+.toast.show{opacity:1}
+.empty{grid-column:1/-1;text-align:center;color:var(--muted);padding:30px}
+@media (max-width:720px){.stats{grid-template-columns:repeat(2,1fr)}.grid{grid-template-columns:1fr}h1{font-size:19px}}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap hrow">
+    <div class="logo">K</div>
+    <div>
+      <h1>لوحة متابعة المدربين</h1>
+      <p class="subh" id="sub">بيانات حيّة من www.kochi.fit · مين جاهز ومين ناقص، وتواصل معاه على طول</p>
+    </div>
+    <div class="hbtns">
+      <button class="hbtn" id="csv" hidden>⬇️ Excel</button>
+      <button class="hbtn" id="refresh">🔄 تحديث</button>
+    </div>
+  </div>
+</header>
+
+<div id="loading" class="msg"><div><b>جاري فحص بروفايلات المدربين…</b>
+  <div id="ptext" style="color:var(--muted);font-size:13px;margin-top:4px">بجيب قايمة المدربين من الموقع</div>
+  <div class="progress"><i id="pbar"></i></div></div></div>
+
+<div id="app" hidden>
+  <div class="stats" id="stats"></div>
+  <div class="chips" id="chips"></div>
+  <div class="bar">
+    <input type="search" id="q" placeholder="دوّر باسم المدرب أو الرقم أو الإنستجرام…">
+    <select id="show">
+      <option value="all">كل المدربين</option>
+      <option value="incomplete">الناقصين بس</option>
+      <option value="ready">الجاهزين بس</option>
+      <option value="notcontacted">الناقصين اللي لسه متواصلتش معاهم</option>
+      <option value="contacted">اللي اتواصلت معاهم</option>
+    </select>
+    <span class="count" id="count"></span>
+  </div>
+  <div class="grid" id="grid"></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script src="coach-audit.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  // بيانات من «لوحة إرسال المدربين المؤسّسين» مش موجودة على الموقع: لغة الرسالة + إنستجرام ناقص
+  var CONTACT_OVERRIDES = {
+    '971563024613': { lang: 'en' },                                  // Julius Kamoga
+    '971561171483': { lang: 'en' },                                  // Eric Yeboah
+    '971508780943': { lang: 'en', instagram: 'anita_spisak_original' } // Anita Spisak
+  };
+  var SIGNIN = 'https://www.kochi.fit/signin';
+  var STORE = 'kochi-coach-contacts-v1';
+
+  var CHECKS = KochiCoachAudit.CHECKS;
+  var ITEMS = {
+    ar: {
+      photo: '📸 صورة بروفايل احترافية ليك',
+      video: '🎥 فيديو تعريفي قصير تعرّف فيه العملاء بنفسك',
+      certs: '🎓 شهادات الاعتماد بتاعتك',
+      hours: '🗓️ مواعيدك المتاحة لمكالمة الزووم مع العملاء الجداد',
+      transf: '📊 حالات ترانسفورميشن (قبل / بعد) لعملائك'
+    },
+    en: {
+      photo: '📸 A professional profile photo',
+      video: '🎥 A short intro video so clients can get to know you',
+      certs: '🎓 Your certifications',
+      hours: '🗓️ Your available times for the intro Zoom call with new clients',
+      transf: '📊 Client transformation cases (before / after)'
+    }
+  };
+
+  var rows = [];
+  var filter = { q: '', show: 'all', miss: null };
+  var langs = {};
+
+  // ---------- تخزين سجل التواصل (على نفس المتصفح) ----------
+  function loadLog() { try { return JSON.parse(localStorage.getItem(STORE)) || {}; } catch (e) { return {}; } }
+  function saveLog(log) { try { localStorage.setItem(STORE, JSON.stringify(log)); } catch (e) {} }
+  var log = loadLog();
+  langs = log.__langs || {};
+
+  function markContact(id, channel) {
+    var e = log[id] || { wa: 0, ig: 0 };
+    e[channel] = (e[channel] || 0) + 1;
+    e.last = Date.now();
+    e.lastChannel = channel;
+    log[id] = e;
+    saveLog(log);
+  }
+
+  function ago(ts) {
+    var m = Math.round((Date.now() - ts) / 60000);
+    if (m < 1) return 'دلوقتي';
+    if (m < 60) return 'من ' + m + ' دقيقة';
+    var h = Math.round(m / 60);
+    if (h < 24) return 'من ' + h + ' ساعة';
+    var d = Math.round(h / 24);
+    return d === 1 ? 'امبارح' : 'من ' + d + ' يوم';
+  }
+
+  // ---------- الرسالة ----------
+  function firstName(r, lang) {
+    var full = lang === 'en' && r.nameEn ? r.nameEn : r.name;
+    return full.replace(/["“”]/g, '').trim().split(/\s+/)[0] || full;
+  }
+
+  function buildMessage(r, lang) {
+    var name = firstName(r, lang);
+    var items = ITEMS[lang];
+    var missing = CHECKS.filter(function (c) { return !r.checks[c.key].ok; }).map(function (c) { return c.key; });
+    var fixHours = r.reversed.length > 0 && missing.indexOf('hours') < 0;
+    var badDays = r.reversed.map(function (x) {
+      return lang === 'ar' ? x.day + ' من ' + x.start + ' لـ ' + x.end : (x.dayKey.charAt(0).toUpperCase() + x.dayKey.slice(1)) + ' ' + x.start + '→' + x.end;
+    }).join(lang === 'ar' ? '، ' : ', ');
+
+    var lines = function (keys) {
+      return keys.map(function (k) {
+        if (k === 'hours' && r.reversed.length) {
+          return lang === 'ar'
+            ? '🗓️ مواعيدك المتاحة: فيه أيام وقت النهاية فيها قبل البداية (' + badDays + ')، فالعملاء مش قادرين يحجزوا مكالمة الزووم'
+            : '🗓️ Your available times: some days end before they start (' + badDays + '), so clients can’t book the intro Zoom call';
+        }
+        return items[k];
+      }).join('\n');
+    };
+
+    if (lang === 'en') {
+      if (!missing.length && !fixHours) {
+        return 'Hi Coach ' + name + ' 🌹\n\nKOCHI team here 💪\n\nYour profile on the platform is 100% complete — thank you! 👏\nIt’s now fully ready to receive new clients 🚀\n\nAny help you need, we’re here 🙏\nKOCHI Team';
+      }
+      return 'Hi Coach ' + name + ' 🌹\n\nKOCHI team here 💪\n\nYour profile on the platform needs a few things to be ready for new clients:\n\n' +
+        lines(missing.concat(fixHours ? ['hours'] : [])) +
+        '\n\nThe more complete your profile, the stronger you show up to clients 🚀\nYou can complete it here: ' + SIGNIN +
+        '\n\nAny help you need, we’re here 🙏\nKOCHI Team';
+    }
+    if (!missing.length && !fixHours) {
+      return 'أهلاً يا كوتش ' + name + ' 🌹\n\nمعاك فريق KOCHI 💪\n\nبروفايلك على المنصة مكتمل 100% — شكرًا ليك 👏\nوبقى جاهز يستقبل عملاء جداد 🚀\n\nأي مساعدة إحنا معاك 🙏\nفريق كوتشي';
+    }
+    return 'أهلاً يا كوتش ' + name + ' 🌹\n\nمعاك فريق KOCHI 💪\n\nبروفايلك على المنصة ناقصه كام حاجة عشان يبقى جاهز يستقبل عملاء جداد:\n\n' +
+      lines(missing.concat(fixHours ? ['hours'] : [])) +
+      '\n\nكل ما بروفايلك يكون مكتمل، كل ما ظهورك قدّام العملاء يكون أقوى 🚀\nتقدر تكمّله من هنا: ' + SIGNIN +
+      '\n\nأي مساعدة إحنا معاك 🙏\nفريق كوتشي';
+  }
+
+  // ---------- أدوات ----------
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  var toastTimer;
+  function toast(t) {
+    var el = document.getElementById('toast');
+    el.textContent = t;
+    el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { el.classList.remove('show'); }, 2600);
+  }
+  function copy(text) {
+    if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(text);
+    var ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); } finally { ta.remove(); }
+    return Promise.resolve();
+  }
+  function isReady(r) { return r.score === CHECKS.length; }
+  function langOf(r) { return langs[r.id] || r.lang; }
+
+  // ---------- العرض ----------
+  function renderStats() {
+    var ready = rows.filter(isReady).length;
+    var incomplete = rows.length - ready;
+    var contacted = rows.filter(function (r) { return !isReady(r) && log[r.id] && log[r.id].last; }).length;
+    document.getElementById('stats').innerHTML =
+      '<div class="stat"><div class="n">' + rows.length + '</div><div class="l">إجمالي المدربين</div></div>' +
+      '<div class="stat"><div class="n" style="color:var(--ok)">' + ready + '</div><div class="l">بروفايلات جاهزة 100%</div></div>' +
+      '<div class="stat"><div class="n" style="color:var(--bad)">' + incomplete + '</div><div class="l">ناقصهم حاجة</div></div>' +
+      '<div class="stat dark"><div class="n">' + contacted + ' / ' + incomplete + '</div><div class="l">اتواصلت مع الناقصين</div></div>';
+
+    document.getElementById('chips').innerHTML = CHECKS.map(function (c) {
+      var n = rows.filter(function (r) { return !r.checks[c.key].ok; }).length;
+      return '<button class="chip' + (filter.miss === c.key ? ' on' : '') + '" data-miss="' + c.key + '">ناقصهم ' + esc(c.label) + ' <b>' + n + '</b></button>';
+    }).join('');
+  }
+
+  function cardHtml(r) {
+    var lang = langOf(r);
+    var entry = log[r.id];
+    var pct = r.score / CHECKS.length;
+    var color = isReady(r) ? 'var(--ok)' : r.score >= 3 ? 'var(--warn)' : 'var(--bad)';
+    var waHref = r.phoneDigits ? 'https://wa.me/' + r.phoneDigits + '?text=' + encodeURIComponent(buildMessage(r, lang)) : null;
+
+    var checks = CHECKS.map(function (c) {
+      var ch = r.checks[c.key];
+      var cls = ch.ok ? (ch.warn ? 'warn' : 'ok') : 'bad';
+      return '<span class="ck ' + cls + '" title="' + esc(ch.note) + '">' + (ch.ok ? (ch.warn ? '⚠️ ' : '✓ ') : '✗ ') + esc(c.label) + '</span>';
+    }).join('');
+
+    var alert = r.reversed.length
+      ? '<div class="alert">⚠️ مواعيد متسجلة غلط (النهاية قبل البداية) فالعملاء مش شايفينها: ' +
+        esc(r.reversed.map(function (x) { return x.day + ' من ' + x.start + ' لـ ' + x.end; }).join('، ')) + '</div>'
+      : '';
+
+    var hours = r.checks.hours.ok && !r.reversed.length ? '<div class="hours">🗓️ ' + esc(r.checks.hours.note) + '</div>' : '';
+
+    var logLine = entry && entry.last
+      ? '<div class="log done"><span>✅ اتواصلت معاه ' + ago(entry.last) + ' عبر ' + (entry.lastChannel === 'wa' ? 'واتساب' : 'إنستجرام') +
+        ' · واتساب ' + (entry.wa || 0) + ' · إنستجرام ' + (entry.ig || 0) + '</span><button data-act="reset">تصفير</button></div>'
+      : '<div class="log"><span>لسه متواصلتش معاه من هنا</span></div>';
+
+    return '<article class="card' + (isReady(r) ? ' ready' : '') + '" data-id="' + esc(r.id) + '">' +
+      '<div class="chead">' +
+        (r.photoUrl ? '<img class="av" src="' + esc(r.photoUrl) + '" alt="" loading="lazy" onerror="this.removeAttribute(\'src\')">' : '<span class="av"></span>') +
+        '<div class="who"><a class="name" href="' + esc(r.url) + '" target="_blank" rel="noopener">' + esc(r.name) + '</a>' +
+          (r.status ? '<span class="tag pend">قيد التوثيق</span>' : '') +
+          (r.dupInstagram ? '<span class="tag dup" title="نفس حساب الإنستجرام متسجل لمدرب تاني: ' + esc(r.dupInstagram) + '">⚠️ إنستجرام مكرر</span>' : '') +
+          '<div class="meta"><span>' + (r.phoneDigits ? '📞 <bdi>+' + esc(r.phoneDigits) + '</bdi>' : 'مفيش رقم') + '</span>' +
+          (r.instagram ? '<span>📷 <bdi>@' + esc(r.instagram) + '</bdi></span>' : '') + '</div></div>' +
+        '<div class="score"><b style="color:' + color + '">' + r.score + '/' + CHECKS.length + '</b><span>جاهزية</span></div>' +
+      '</div>' +
+      '<div class="meter"><i style="width:' + Math.round(pct * 100) + '%;background:' + color + '"></i></div>' +
+      '<div class="checks">' + checks + '</div>' + alert + hours +
+      '<details><summary><span>✏️ ' + (isReady(r) ? 'رسالة شكر' : 'رسالة بالناقص') + ' — اعرض / عدّل</span>' +
+        '<span class="lang"><button data-lang="ar" class="' + (lang === 'ar' ? 'on' : '') + '">AR</button><button data-lang="en" class="' + (lang === 'en' ? 'on' : '') + '">EN</button></span></summary>' +
+        '<textarea dir="' + (lang === 'en' ? 'ltr' : 'rtl') + '">' + esc(buildMessage(r, lang)) + '</textarea></details>' +
+      '<div class="btnrow">' +
+        '<a class="btn wa" data-act="wa" target="_blank" rel="noopener" ' + (waHref ? 'href="' + esc(waHref) + '"' : 'aria-disabled="true"') + '>💬 واتساب</a>' +
+        '<a class="btn ig" data-act="ig" target="_blank" rel="noopener" ' + (r.instagram ? 'href="https://ig.me/m/' + esc(encodeURIComponent(r.instagram)) + '"' : 'aria-disabled="true"') + '>📷 رسالة إنستجرام</a>' +
+      '</div>' +
+      '<div class="links">' +
+        '<a href="' + esc(r.url) + '" target="_blank" rel="noopener">🔗 بروفايله على كوتشي</a>' +
+        (r.instagram ? '<a href="https://instagram.com/' + esc(encodeURIComponent(r.instagram)) + '" target="_blank" rel="noopener">📷 حسابه على إنستجرام</a>' : '') +
+      '</div>' + logLine +
+    '</article>';
+  }
+
+  function visible() {
+    var q = filter.q.trim().toLowerCase();
+    return rows.filter(function (r) {
+      if (q && (r.name + ' ' + r.phoneDigits + ' ' + r.instagram + ' ' + r.email).toLowerCase().indexOf(q.replace(/^[@+]/, '')) < 0) return false;
+      if (filter.miss && r.checks[filter.miss].ok) return false;
+      var contacted = !!(log[r.id] && log[r.id].last);
+      switch (filter.show) {
+        case 'ready': return isReady(r);
+        case 'incomplete': return !isReady(r);
+        case 'notcontacted': return !isReady(r) && !contacted;
+        case 'contacted': return contacted;
+      }
+      return true;
+    });
+  }
+
+  function renderGrid() {
+    var list = visible();
+    document.getElementById('grid').innerHTML = list.length ? list.map(cardHtml).join('') : '<div class="empty">مفيش مدربين بالفلتر ده</div>';
+    document.getElementById('count').textContent = list.length + ' من ' + rows.length + ' مدرب';
+  }
+
+  function renderAll() { renderStats(); renderGrid(); }
+
+  function refreshCard(id) {
+    var r = rows.find(function (x) { return x.id === id; });
+    var old = document.querySelector('.card[data-id="' + CSS.escape(id) + '"]');
+    if (!r || !old) return;
+    var open = old.querySelector('details').open;
+    var tmp = document.createElement('div');
+    tmp.innerHTML = cardHtml(r);
+    var card = tmp.firstChild;
+    card.querySelector('details').open = open;
+    old.replaceWith(card);
+  }
+
+  // ---------- الأحداث ----------
+  document.getElementById('grid').addEventListener('click', function (e) {
+    var card = e.target.closest('.card');
+    if (!card) return;
+    var id = card.getAttribute('data-id');
+    var r = rows.find(function (x) { return x.id === id; });
+    var text = card.querySelector('textarea').value;
+
+    var langBtn = e.target.closest('[data-lang]');
+    if (langBtn) {
+      e.preventDefault();
+      langs[id] = langBtn.getAttribute('data-lang');
+      log.__langs = langs; saveLog(log);
+      refreshCard(id);
+      return;
+    }
+    var act = e.target.closest('[data-act]');
+    if (!act) return;
+    var a = act.getAttribute('data-act');
+    if (a === 'wa') {
+      act.href = 'https://wa.me/' + r.phoneDigits + '?text=' + encodeURIComponent(text);
+      markContact(id, 'wa');
+      setTimeout(function () { refreshCard(id); renderStats(); }, 50);
+    } else if (a === 'ig') {
+      copy(text).then(function () { toast('✅ الرسالة اتنسخت — الصقها في الشات اللي هيفتح'); }, function () { toast('افتح الرسالة وانسخها يدويًا'); });
+      markContact(id, 'ig');
+      setTimeout(function () { refreshCard(id); renderStats(); }, 50);
+    } else if (a === 'reset') {
+      delete log[id]; saveLog(log);
+      refreshCard(id); renderStats();
+    }
+  });
+
+  document.getElementById('chips').addEventListener('click', function (e) {
+    var chip = e.target.closest('[data-miss]');
+    if (!chip) return;
+    var k = chip.getAttribute('data-miss');
+    filter.miss = filter.miss === k ? null : k;
+    renderAll();
+  });
+  document.getElementById('q').addEventListener('input', function (e) { filter.q = e.target.value; renderGrid(); });
+  document.getElementById('show').addEventListener('change', function (e) { filter.show = e.target.value; renderGrid(); });
+  document.getElementById('csv').addEventListener('click', function () {
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([KochiCoachAudit.toCsv(rows)], { type: 'text/csv;charset=utf-8' }));
+    a.download = 'kochi-coaches-' + new Date().toISOString().slice(0, 10) + '.csv';
+    document.body.appendChild(a); a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+  });
+  document.getElementById('refresh').addEventListener('click', load);
+
+  // ---------- التحميل ----------
+  function prepare(list) {
+    list.forEach(function (r) {
+      var o = CONTACT_OVERRIDES[r.phoneDigits] || {};
+      r.lang = o.lang || 'ar';
+      if (!r.instagram && o.instagram) r.instagram = o.instagram;
+    });
+    var byIg = {};
+    list.forEach(function (r) {
+      if (!r.instagram) return;
+      var k = r.instagram.toLowerCase();
+      (byIg[k] = byIg[k] || []).push(r);
+    });
+    Object.keys(byIg).forEach(function (k) {
+      if (byIg[k].length < 2) return;
+      byIg[k].forEach(function (r) {
+        r.dupInstagram = byIg[k].filter(function (x) { return x !== r; }).map(function (x) { return x.name; }).join('، ');
+      });
+    });
+    return list;
+  }
+
+  function load() {
+    document.getElementById('loading').hidden = false;
+    document.getElementById('app').hidden = true;
+    document.getElementById('csv').hidden = true;
+    var pbar = document.getElementById('pbar'), ptext = document.getElementById('ptext');
+    pbar.style.width = '0';
+    KochiCoachAudit.audit(function (done, total) {
+      ptext.textContent = total ? 'اتفحص ' + done + ' من ' + total + ' مدرب' : 'مفيش مدربين';
+      pbar.style.width = (total ? Math.round(done / total * 100) : 100) + '%';
+    }).then(function (list) {
+      rows = prepare(list);
+      document.getElementById('sub').textContent = 'بيانات حيّة من www.kochi.fit · آخر تحديث ' + new Date().toLocaleString('ar-EG', { dateStyle: 'medium', timeStyle: 'short' });
+      document.getElementById('loading').hidden = true;
+      document.getElementById('app').hidden = false;
+      document.getElementById('csv').hidden = false;
+      renderAll();
+    }).catch(function (err) {
+      ptext.innerHTML = '<b style="color:var(--bad)">مقدرتش أجيب بيانات المدربين:</b> ' + esc(err && err.message) +
+        '<br>اتأكد إن النت شغال واضغط 🔄 تحديث.';
+    });
+  }
+
+  load();
+})();
+</script>
+</body>
+</html>
