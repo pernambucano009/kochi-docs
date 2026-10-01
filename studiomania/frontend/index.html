@@ -873,18 +873,13 @@
   </div>
   <div class="row gap-top"><button class="btn primary" id="brandSave">💾 احفظ</button></div>
 </dialog>
-<dialog class="bulk-dlg" id="libDialog">
+<dialog class="bulk-dlg lib-dlg" id="libDialog">
   <div class="panel-head"><h2>📚 مكتبة الكاروسيل</h2><button class="btn sm" id="libClose">إغلاق</button></div>
-  <nav class="car-steps lib-tabs" id="libTabs"><button data-t="template" class="active">🧩 تيمبليتس</button><button data-t="coach">🏋️ المدربين</button><button data-t="character">🧑‍🎨 شخصيات 2D</button><button data-t="style">🎨 ستايلات الرسم</button></nav>
-  <div class="row lib-pack"><label class="btn sm" title="ملف zip جاهز فيه صور ومعلومات (manifest.json)">📦 استورد حزمة جاهزة<input type="file" id="libPack" accept=".zip,application/zip" hidden></label></div>
-  <p class="hint" id="libHint"></p>
-  <form class="lib-new" id="libNew">
-    <input type="text" id="libName" placeholder="الاسم">
-    <input type="text" id="libNotes" placeholder="ملاحظات (اختياري): الألوان، الخط، شخصية الكاركتر...">
-    <label class="btn sm primary" id="libUploadBtn">⬆ ارفع صور وضيف<input type="file" id="libFiles" accept="image/*" multiple hidden></label>
-  </form>
+  <nav class="car-steps lib-tabs" id="libTabs"><button data-t="template" class="active">🧩 تيمبليتس</button><button data-t="style">🎨 ستايلات الرسم</button><button data-t="character">🧑‍🎨 شخصيات 2D</button><button data-t="coach">🏋️ المدربين</button></nav>
+  <div class="row lib-tools"><p class="hint" id="libHint"></p>
+    <label class="btn sm" title="ملف zip جاهز فيه صور ومعلومات (manifest.json)">📦 استورد حزمة<input type="file" id="libPack" accept=".zip,application/zip" hidden></label></div>
   <p class="lib-status" id="libStatus" hidden></p>
-  <div class="lib-items" id="libItems"></div>
+  <div class="lib-grid" id="libItems"></div>
 </dialog>
 <dialog class="bulk-dlg" id="handlesDialog">
   <div class="panel-head"><h2>📥 حسابات المدربين من الملف</h2><button class="btn sm" id="handlesClose">إغلاق</button></div>

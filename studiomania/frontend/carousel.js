@@ -548,39 +548,80 @@ $("ctaList").addEventListener("click", (e) => {
 $("ctaAdd").onclick = () => renderCtaEditor([...ctasFromEditor(), { id: `c${Date.now().toString(36)}`, label: "", text: "" }]);
 $("ctaReset").onclick = () => renderCtaEditor(car.cfg.default_ctas);
 
-// ---------- المكتبة: تيمبليتس وشخصيات ----------
+// ---------- المكتبة: معرض صور تختار منه ----------
 async function openLibrary(tab = car.libTab) {
-  if (!$("libDialog").open) libStatus("");
+  if (!$("libDialog").open) { libStatus(""); car.libEdit = null; }
   car.libTab = tab;
   car.lib = await api("/api/carousel/library");
   renderLibrary();
   if (!$("libDialog").open) $("libDialog").showModal();
 }
+const LIB_HINTS = {
+  template: "دوس على التصميم اللي عاجبك يتختار للكاروسيل. البرنامج بياخد التقسيم والشكل ويلوّنه بألوان كوتشي ويحط كلامنا.",
+  style: "دوس على الستايل يتختار (ودوسة تانية تلغيه). البرنامج بياخد طريقة الرسم بس ويرسم شخصيات جديدة بألوان كوتشي.",
+  character: "دوس على الشخصيات اللي عايزها في الكاروسيل (لحد 4).",
+  coach: "دوس على المدرب يتختار لكاروسيل «معلومات من مدرب».",
+};
+const LIB_NEW = { template: "ضيف تصميم", style: "ضيف ستايل", character: "ضيف شخصية", coach: "ضيف مدرب" };
+// المختار في الكاروسيل المفتوح
+function libSelected(a) {
+  const st = car.cur?.settings;
+  if (!st) return false;
+  if (a.kind === "template") return st.kind === "template" && st.template_id === a.id;
+  if (a.kind === "coach") return st.kind === "coach" && st.coach_asset_id === a.id;
+  if (a.kind === "style") return st.kind !== "coach" && st.style_id === a.id;
+  return st.kind === "characters" && (st.character_ids || []).includes(a.id);
+}
+// الإعدادات اللي بتتغير لما تختار حاجة من المكتبة (وبتغيّر نوع الكاروسيل لو لازم)
+function libPickSettings(a) {
+  const st = car.cur.settings;
+  if (a.kind === "template") return { kind: "template", template_id: a.id };
+  if (a.kind === "coach") return { kind: "coach", coach_asset_id: a.id };
+  if (a.kind === "style") return { style_id: libSelected(a) ? null : a.id, ...(st.kind === "coach" ? { kind: "characters" } : {}) };
+  const ids = new Set(st.kind === "characters" ? st.character_ids || [] : []);
+  if (ids.has(a.id)) ids.delete(a.id);
+  else if (ids.size >= 4) return null;
+  else ids.add(a.id);
+  return { kind: "characters", character_ids: [...ids] };
+}
+function libCard(a) {
+  const img = a.images[0];
+  return `<div class="lib-card2 ${libSelected(a) ? "selected" : ""}" data-id="${a.id}" title="${escapeHtml(a.notes || a.name)}">
+    <div class="lc-img">${img ? `<img src="${img.url}" alt="" loading="lazy">` : ""}${a.images.length > 1 ? `<em>${a.images.length} صور</em>` : ""}</div>
+    <div class="lc-name">${escapeHtml(a.name)}${a.handle ? `<small dir="ltr">@${escapeHtml(a.handle)}</small>` : ""}</div>
+    <button class="lc-edit" data-edit title="شوف الصور وعدّل">✏️</button><i>✓</i></div>`;
+}
+function libDetail(a) {
+  return `<div class="lib-item lib-detail" data-id="${a.id}">
+    <div class="row wrap">
+      <button class="btn sm" data-back>→ رجوع للمعرض</button>
+      ${car.cur ? `<button class="btn sm ${libSelected(a) ? "" : "primary"}" data-pick>${libSelected(a) ? "✓ متختار (دوس تلغيه)" : "✓ اختاره للكاروسيل"}</button>` : ""}
+      <button class="btn sm danger" data-del-asset>🗑️ امسح من المكتبة</button>
+    </div>
+    <div class="lib-meta">
+      <label>الاسم<input type="text" data-f="name" value="${escapeHtml(a.name)}"></label>
+      <label>ملاحظات للرسم (اختياري)<textarea data-f="notes" rows="3" placeholder="الألوان، الخط، أي تفاصيل">${escapeHtml(a.notes)}</textarea></label>
+      ${a.kind === "coach" ? `<label>إنستجرام<input type="text" data-f="handle" dir="ltr" value="${a.handle ? `@${escapeHtml(a.handle)}` : ""}" placeholder="@instagram"></label>` : ""}
+    </div>
+    <div class="lib-big">${a.images.map((im) => `<div class="ref"><a href="${im.url}" target="_blank"><img src="${im.url}" alt=""></a><button class="del" data-img="${im.name}" title="امسح الصورة">✕</button></div>`).join("")}
+      <label class="lib-add" title="ضيف صور (لحد 12)">＋<input type="file" data-add accept="image/*" multiple hidden></label></div>
+  </div>`;
+}
 function renderLibrary() {
   const tab = car.libTab;
   document.querySelectorAll("#libTabs [data-t]").forEach((b) => b.classList.toggle("active", b.dataset.t === tab));
-  $("libHint").textContent = {
-    template: "ارفع صور تصميمات كاروسيل عاجباك (سلايد أو أكتر من نفس التصميم). البرنامج بياخد التقسيم والشكل ويلوّنه بألوان كوتشي ويحط كلامنا.",
-    coach: "شخصية كل مدرب المرسومة بستايل كوتشي (صورة أو أكتر)، باسمه وحسابه على إنستجرام. بتظهر في كاروسيل «معلومات من مدرب».",
-    character: "ارفع صور الشخصية من أكتر من زاوية وتعبير، وكل شخصية لوحدها باسمها. كل ما الصور أوضح الرسم هيطلع شبهها أكتر.",
-    style: "رسومات عاجبك ستايلها (الخطوط والأشكال والتظليل). البرنامج بياخد طريقة الرسم بس، ويرسم شخصيات جديدة بألوان كوتشي.",
-  }[tab];
-  $("libName").placeholder = { template: "اسم التيمبليت", coach: "اسم المدرب", character: "اسم الشخصية (مثلًا: كوتشي الشاب)", style: "اسم الستايل" }[tab];
+  const editing = car.lib.find((a) => a.id === car.libEdit);
+  $("libHint").textContent = editing ? "" : car.cur ? LIB_HINTS[tab] : "افتح كاروسيل عشان تختار منها. من هنا تقدر تضيف وتعدّل.";
+  $("libItems").classList.toggle("detail", !!editing);
+  if (editing) { $("libItems").innerHTML = libDetail(editing); return; }
   const items = car.lib.filter((a) => a.kind === tab);
-  $("libItems").innerHTML = items.map((a) => `<div class="lib-item" data-id="${a.id}">
-      <div class="lib-imgs">${a.images.map((im) => `<div class="ref"><img src="${im.url}" alt=""><button class="del" data-img="${im.name}" title="امسح الصورة">✕</button></div>`).join("")}
-        <label class="lib-add" title="ضيف صور (لحد 12)">＋<input type="file" data-add accept="image/*" multiple hidden></label></div>
-      <div class="lib-meta">
-        <input type="text" data-f="name" value="${escapeHtml(a.name)}">
-        <input type="text" data-f="notes" value="${escapeHtml(a.notes)}" placeholder="ملاحظات">
-        ${a.kind === "coach" ? `<input type="text" data-f="handle" dir="ltr" value="${a.handle ? `@${escapeHtml(a.handle)}` : ""}" placeholder="@instagram">` : ""}
-        <button class="btn sm danger" data-del-asset>🗑️ امسح</button>
-      </div>
-    </div>`).join("") || `<p class="empty">لسه فاضية.</p>`;
+  $("libItems").innerHTML = `<label class="lib-card2 lib-new-card" id="libUploadBtn">
+      <div class="lc-img">＋</div><div class="lc-name">${LIB_NEW[tab]}<small>ارفع صورة أو أكتر</small></div>
+      <input type="file" id="libFiles" accept="image/*" multiple hidden></label>` + items.map(libCard).join("");
 }
 $("libTabs").addEventListener("click", (e) => {
   const b = e.target.closest("[data-t]");
-  if (b) { car.libTab = b.dataset.t; renderLibrary(); }
+  if (b) { car.libTab = b.dataset.t; car.libEdit = null; renderLibrary(); }
 });
 $("libClose").onclick = () => $("libDialog").close();
 $("libDialog").addEventListener("close", () => car.cur && renderSetup());
@@ -594,26 +635,36 @@ function libStatus(msg, isError = false) {
 function uploadedMsg(res, count) {
   return res.skipped ? `✅ اتضاف ${count - res.skipped} صورة · ${res.skipped} اتسابوا (12 صورة بالكتير لكل واحد)` : `✅ اتضاف ${count} صورة`;
 }
-$("libFiles").addEventListener("change", async (e) => {
+async function libPick(a) {
+  const settings = libPickSettings(a);
+  if (!settings) return libStatus("✕ 4 شخصيات بالكتير", true);
+  const was = libSelected(a);
+  try {
+    await patchCarousel({ settings });
+    renderSetup();
+    renderLibrary();
+    libStatus(was ? `اتلغى «${a.name}»` : `✅ اخترت «${a.name}» للكاروسيل`);
+  } catch (err) { libStatus(`✕ ${err.message}`, true); }
+}
+// رفع جديد: من غير اسم (بياخد اسم تلقائي) وبعدها بيفتح التفاصيل لو حابب تغيّره
+$("libItems").addEventListener("change", async (e) => {
+  if (e.target.id !== "libFiles") return;
   const files = [...e.target.files];
   e.target.value = "";
   if (!files.length) return;
   const form = new FormData();
   form.append("kind", car.libTab);
-  form.append("name", $("libName").value);
-  form.append("notes", $("libNotes").value);
   files.forEach((f) => form.append("files", f));
   libStatus(`⏳ بيرفع ${files.length} صورة...`);
   $("libUploadBtn").classList.add("busy");
   try {
     const res = await api("/api/carousel/library", { method: "POST", body: form });
-    $("libName").value = $("libNotes").value = "";
+    car.libEdit = res.id;
     await openLibrary();
-    libStatus(`${uploadedMsg(res, files.length)} في «${res.name}». غيّر الاسم من الخانة لو حابب`);
+    libStatus(`${uploadedMsg(res, files.length)} في «${res.name}». تقدر تغيّر الاسم هنا أو ترجع للمعرض`);
   } catch (err) {
     libStatus(`✕ ${err.message}`, true);
-  } finally {
-    $("libUploadBtn").classList.remove("busy");
+    $("libUploadBtn")?.classList.remove("busy");
   }
 });
 async function patchAsset(id, form, count = 0) {
@@ -643,8 +694,17 @@ $("libItems").addEventListener("change", (e) => {
   patchAsset(item.dataset.id, form, count);
 });
 $("libItems").addEventListener("click", async (e) => {
+  const card = e.target.closest(".lib-card2[data-id]");
+  if (card) {
+    const a = car.lib.find((x) => x.id === card.dataset.id);
+    // ✏️ أو مفيش كاروسيل مفتوح: افتح التفاصيل، غير كده الدوسة بتختار
+    if (e.target.closest("[data-edit]") || !car.cur) { car.libEdit = a.id; libStatus(""); return renderLibrary(); }
+    return libPick(a);
+  }
   const item = e.target.closest(".lib-item");
   if (!item) return;
+  if (e.target.closest("[data-back]")) { car.libEdit = null; libStatus(""); return renderLibrary(); }
+  if (e.target.closest("[data-pick]")) return libPick(car.lib.find((x) => x.id === item.dataset.id));
   const img = e.target.closest("[data-img]");
   if (img) {
     const form = new FormData();
@@ -654,6 +714,7 @@ $("libItems").addEventListener("click", async (e) => {
   if (e.target.closest("[data-del-asset]")) {
     if (!confirm("مسح ده من المكتبة؟")) return;
     await api(`/api/carousel/library/${item.dataset.id}`, { method: "DELETE" });
+    car.libEdit = null;
     await openLibrary();
   }
 });

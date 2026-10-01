@@ -249,6 +249,8 @@ def kind_design_rules(ctx: dict) -> str:
         t = ctx.get("template") or {}
         return ("DESIGN: follow the template reference images for STRUCTURE: copy their layout grid, composition, "
                 "text hierarchy and positions, shapes and decorative motifs, spacing and logo position, on every slide. "
+                "If a reference is a mockup photo of slides on a phone or table, ignore the phone, perspective, shadows "
+                "and background: take only the flat slide designs and adapt them to the vertical slide size. "
                 "RECOLOR everything to the KOCHI brand palette below (do not keep the template's own colors unless the "
                 "template notes say so), and draw any illustration in the illustration style below. Only the text and small content "
                 "visuals change between slides."
