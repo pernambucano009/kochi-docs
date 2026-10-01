@@ -286,6 +286,21 @@ VISION_FALLBACKS = [
     "deepseek-ai/deepseek-v4-flash-vision-exp", "google/gemini-2.5-flash", "openai/gpt-4.1", "openai/gpt-4o",
 ]
 VISION_HINTS = ("vl", "vision", "gemini", "gpt-4o", "gpt-4.1", "gpt-5")
+# موديل اللقطات في المسلسل (GPT 5.6 Luna من OpenAI). لو الاسم مختلف في Atlas بندوّر عليه بكلمة luna
+DEFAULT_SERIES_MODEL = "openai/gpt-5.6-luna"
+
+
+def model_candidates(preferred: str, hints: tuple[str, ...], fallbacks: list[str]) -> list[str]:
+    """الموديل المختار الأول، وبعده اللي عند Atlas وفيه الكلمات دي، وبعدها الاحتياطي."""
+    available = list_models()
+    seen = {m.lower(): m for m in available}
+    found = [m for m in available if any(h in m.lower() for h in hints)]
+    out: list[str] = []
+    for m in [preferred, *found, *fallbacks]:
+        m = seen.get((m or "").lower(), m)
+        if m and m not in out:
+            out.append(m)
+    return out
 
 
 def list_models() -> list[str]:

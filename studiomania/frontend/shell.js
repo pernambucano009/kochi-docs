@@ -12,6 +12,7 @@ const STEP_INFO = {
   3: { num: "", title: "مكتبة التعليق الصوتي" },
   5: { num: "", title: "مكتبة الموسيقى" },
   8: { num: "", title: "صناعة الكاروسيل" },
+  9: { num: "", title: "المسلسلات" },
   settings: { num: "", title: "الإعدادات" },
 };
 const NEXT_LABEL = {

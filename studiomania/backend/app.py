@@ -8,6 +8,7 @@
 import gzip
 import hashlib
 import json
+import math
 import os
 import re
 import shutil
@@ -54,6 +55,7 @@ import montage  # noqa: E402
 import publisher  # noqa: E402
 import sheets  # noqa: E402
 import carousel as cz  # noqa: E402
+import series as sz  # noqa: E402
 from auth import SESSION_COOKIE, SESSION_DAYS, Auth  # noqa: E402
 
 MAX_CLIP_SECONDS = 15.0
@@ -74,13 +76,14 @@ EXPORTS_DIR = DATA_DIR / "exports"  # فولدر الفيديوهات الجاه
 BRAND_DIR = DATA_DIR / "brand"  # اللوجو
 TMP_DIR = DATA_DIR / "tmp"
 CAROUSELS_DIR = DATA_DIR / "carousels"  # صور الكاروسيلات
+SERIES_DIR = DATA_DIR / "series"  # المسلسلات: صور الشخصية، وصوت ولقطات كل حلقة
 BRAND_REFS_DIR = DATA_DIR / "brand" / "refs"  # (قديم) صور الشخصيات، اتنقلت لمكتبة الكاروسيل
 LIBRARY_DIR = DATA_DIR / "brand" / "library"  # مكتبة الكاروسيل: تيمبليتس وشخصيات
 DB_PATH = DATA_DIR / "studiomania.db"
 FRONTEND_DIR = ROOT / "frontend"
 FONTS_DIR = ROOT / "fonts"
 
-for d in (RAW_DIR, CLIPS_DIR, COACHES_DIR, GENERATED_DIR, AUDIO_DIR, EXPORTS_DIR, BRAND_DIR, TMP_DIR, CAROUSELS_DIR, BRAND_REFS_DIR, LIBRARY_DIR):
+for d in (RAW_DIR, CLIPS_DIR, COACHES_DIR, GENERATED_DIR, AUDIO_DIR, EXPORTS_DIR, BRAND_DIR, TMP_DIR, CAROUSELS_DIR, BRAND_REFS_DIR, LIBRARY_DIR, SERIES_DIR):
     d.mkdir(parents=True, exist_ok=True)
 
 # الكابشن بيدوّر على الخطوط عن طريق fontconfig، والسيرفر (Railway) مفيهوش إعداداته خالص.
@@ -334,6 +337,19 @@ with closing(db()) as _conn, _conn:
             name TEXT NOT NULL,
             instagram TEXT,
             tiktok TEXT
+        )"""
+    )
+    # المسلسلات وحلقاتها (الحلقة: السكريبت والصوت وتوقيت الجمل واللقطات ونسخها)
+    _conn.execute(
+        """CREATE TABLE IF NOT EXISTS series (
+            id TEXT PRIMARY KEY, name TEXT NOT NULL, data TEXT NOT NULL,
+            created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+        )"""
+    )
+    _conn.execute(
+        """CREATE TABLE IF NOT EXISTS episodes (
+            id TEXT PRIMARY KEY, series_id TEXT NOT NULL, number INTEGER NOT NULL, name TEXT NOT NULL,
+            data TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
         )"""
     )
     # الكاروسيلات: كل واحد بالنقاش والخطة وحالة الصور
@@ -1667,11 +1683,15 @@ def video_thumb(src: str):
         path = EXPORTS_DIR / row["filename"] if row else None
     elif len(parts) == 3 and parts[0] == "media" and parts[1] in THUMB_DIRS and "/" not in parts[2] and ".." not in parts[2]:
         path = THUMB_DIRS[parts[1]] / parts[2]
+    elif (len(parts) == 6 and parts[:3] == ["media", "series", "episodes"] and parts[4] == "takes"
+          and all(re.fullmatch(r"[\w.-]+", x) and ".." not in x for x in (parts[3], parts[5]))):
+        # نسخ لقطات المسلسل: /media/series/episodes/<الحلقة>/takes/<الملف>
+        path = SERIES_DIR / "episodes" / parts[3] / "takes" / parts[5]
     else:
         raise HTTPException(400, "رابط غلط")
     if path is None or not path.is_file():
         raise HTTPException(404, "الفيديو غير موجود")
-    out = TMP_DIR / "thumbs" / f"{path.parent.name}-{path.stem}-{int(path.stat().st_mtime)}.jpg"
+    out = TMP_DIR / "thumbs" / f"{path.parent.parent.name if path.parent.name == 'takes' else path.parent.name}-{path.stem}-{int(path.stat().st_mtime)}.jpg"
     if not out.exists():
         out.parent.mkdir(parents=True, exist_ok=True)
         part = out.with_suffix(".part.jpg")
@@ -3042,6 +3062,7 @@ app.mount("/media/generated", StaticFiles(directory=GENERATED_DIR), name="genera
 app.mount("/media/audio", StaticFiles(directory=AUDIO_DIR), name="audio")
 app.mount("/media/exports", StaticFiles(directory=EXPORTS_DIR), name="exports")
 app.mount("/media/carousels", StaticFiles(directory=CAROUSELS_DIR), name="carousels")
+app.mount("/media/series", StaticFiles(directory=SERIES_DIR), name="series")
 app.mount("/media/brand", StaticFiles(directory=BRAND_DIR), name="brand")
 app.mount("/fonts", StaticFiles(directory=FONTS_DIR), name="fonts")
 
@@ -4045,6 +4066,595 @@ def carousel_zip(cid: str):
     name = export_file_name(row["name"]).rsplit(".", 1)[0] + ".zip"
     return Response(buf.getvalue(), media_type="application/zip",
                     headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(name)}"})
+
+
+# ---------- المسلسلات: سكريبت ← صوت مترقّم ← لقطات ببرومبتات ← نسخ لكل لقطة ← تجميع الحلقة ----------
+SERIES_LOCK = threading.Lock()
+SERIES_JOBS: set[str] = set()  # حلقات بيتجمّع فيها الفيديو دلوقتي
+series_executor = ThreadPoolExecutor(max_workers=2)
+SERIES_W, SERIES_H = 1080, 1920
+
+
+def series_settings() -> dict:
+    return {
+        "text_model": auth.get_setting("series_text_model") or atlas.DEFAULT_SERIES_MODEL,
+        "video_model": auth.get_setting("series_video_model") or atlas.MODEL,
+    }
+
+
+def new_series_data() -> dict:
+    return {"bible": "", "character": "", "refs": []}
+
+
+def series_row(conn: sqlite3.Connection, sid: str) -> tuple[sqlite3.Row, dict]:
+    r = conn.execute("SELECT * FROM series WHERE id = ?", (sid,)).fetchone()
+    if r is None:
+        raise HTTPException(404, "المسلسل غير موجود")
+    return r, {**new_series_data(), **json.loads(r["data"])}
+
+
+def series_to_dict(r: sqlite3.Row, data: dict, episodes: list[dict]) -> dict:
+    sid = r["id"]
+    return {
+        "id": sid, "name": r["name"], "bible": data["bible"], "character": data["character"],
+        "refs": [{"file": f, "url": f"/media/series/{sid}/refs/{f}"} for f in data["refs"] if (SERIES_DIR / sid / "refs" / f).exists()],
+        "episodes": episodes,
+    }
+
+
+def new_episode_data() -> dict:
+    return {"script": "", "notes": "", "audio": None, "scenes": [], "lines": [], "timing": None,
+            "shots": [], "takes": {}, "render": {"status": "idle", "export_id": None, "error": None}}
+
+
+def episode_row(conn: sqlite3.Connection, eid: str) -> tuple[sqlite3.Row, dict]:
+    r = conn.execute("SELECT * FROM episodes WHERE id = ?", (eid,)).fetchone()
+    if r is None:
+        raise HTTPException(404, "الحلقة غير موجودة")
+    return r, {**new_episode_data(), **json.loads(r["data"])}
+
+
+def update_episode(eid: str, fn) -> dict:
+    """تعديل آمن (التوليد والتجميع شغالين في الخلفية على نفس الحلقة)."""
+    with SERIES_LOCK, closing(db()) as conn, conn:
+        _, data = episode_row(conn, eid)
+        fn(data)
+        conn.execute("UPDATE episodes SET data = ?, updated_at = ? WHERE id = ?", (json.dumps(data, ensure_ascii=False), now(), eid))
+        return data
+
+
+def ep_dir(eid: str) -> Path:
+    d = SERIES_DIR / "episodes" / Path(eid).name
+    (d / "takes").mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def take_to_dict(eid: str, t: dict) -> dict:
+    f = ep_dir(eid) / "takes" / t["file"] if t.get("file") else None
+    return {**t, "url": f"/media/series/episodes/{eid}/takes/{t['file']}" if f and f.exists() else None}
+
+
+def episode_to_dict(r: sqlite3.Row, data: dict) -> dict:
+    eid = r["id"]
+    audio = data["audio"]
+    takes = {k: take_to_dict(eid, t) for k, t in data["takes"].items()}
+    used = {tid for s in data["shots"] for tid in s.get("takes", [])}
+    return {
+        "id": eid, "series_id": r["series_id"], "number": r["number"], "name": r["name"],
+        "script": data["script"], "notes": data["notes"], "scenes": data["scenes"], "lines": data["lines"],
+        "timing": data["timing"],
+        "audio": {**audio, "url": f"/media/series/episodes/{eid}/{audio['file']}"} if audio else None,
+        "shots": [{**s, "duration": round(s["end"] - s["start"], 2), "takes": [takes[t] for t in s.get("takes", []) if t in takes]}
+                  for s in data["shots"]],
+        # نسخ من قوايم لقطات قديمة: محفوظة وتقدر تحطها على أي لقطة
+        "pool": [t for k, t in takes.items() if k not in used],
+        "render": data["render"], "busy": eid in SERIES_JOBS,
+        "export_url": None,
+    }
+
+
+def episode_response(eid: str) -> dict:
+    with closing(db()) as conn:
+        r, data = episode_row(conn, eid)
+        out = episode_to_dict(r, data)
+        if data["render"].get("export_id"):
+            e = conn.execute("SELECT filename FROM exports WHERE id = ?", (data["render"]["export_id"],)).fetchone()
+            out["export_url"] = f"/media/exports/{e['filename']}" if e else None
+    return out
+
+
+@app.get("/api/series")
+def list_series():
+    with closing(db()) as conn:
+        out = []
+        for r in conn.execute("SELECT * FROM series ORDER BY created_at"):
+            data = {**new_series_data(), **json.loads(r["data"])}
+            eps = [{"id": e["id"], "number": e["number"], "name": e["name"]}
+                   for e in conn.execute("SELECT id, number, name FROM episodes WHERE series_id = ? ORDER BY number", (r["id"],))]
+            out.append(series_to_dict(r, data, eps))
+        return {"series": out, "settings": series_settings(), "configured": bool(atlas.api_key()) or atlas.mock_mode()}
+
+
+class NameIn(BaseModel):
+    name: str
+
+
+@app.post("/api/series")
+def create_series(body: NameIn):
+    sid = uuid.uuid4().hex[:12]
+    with closing(db()) as conn, conn:
+        conn.execute("INSERT INTO series (id, name, data, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+                     (sid, body.name.strip() or "مسلسل جديد", json.dumps(new_series_data()), now(), now()))
+    return list_series()
+
+
+class SeriesPatch(BaseModel):
+    name: str | None = None
+    bible: str | None = None
+    character: str | None = None
+
+
+@app.patch("/api/series/{sid}")
+def patch_series(sid: str, body: SeriesPatch):
+    with closing(db()) as conn, conn:
+        r, data = series_row(conn, sid)
+        for k in ("bible", "character"):
+            if getattr(body, k) is not None:
+                data[k] = getattr(body, k)[:20000]
+        name = body.name.strip() if body.name and body.name.strip() else r["name"]
+        conn.execute("UPDATE series SET name = ?, data = ?, updated_at = ? WHERE id = ?", (name, json.dumps(data, ensure_ascii=False), now(), sid))
+    return list_series()
+
+
+@app.post("/api/series/{sid}/refs")
+def add_series_refs(sid: str, files: list[UploadFile] = File(...)):
+    """صور الشخصية: بتتبعت مع كل لقطة عشان شكله يفضل ثابت."""
+    folder = SERIES_DIR / Path(sid).name / "refs"
+    folder.mkdir(parents=True, exist_ok=True)
+    with closing(db()) as conn, conn:
+        _, data = series_row(conn, sid)
+        for f in files:
+            data["refs"].append(save_upload(f, IMAGE_EXTENSIONS, folder, "ref"))
+        conn.execute("UPDATE series SET data = ?, updated_at = ? WHERE id = ?", (json.dumps(data, ensure_ascii=False), now(), sid))
+    return list_series()
+
+
+@app.delete("/api/series/{sid}/refs")
+def delete_series_ref(sid: str, file: str):
+    with closing(db()) as conn, conn:
+        _, data = series_row(conn, sid)
+        data["refs"] = [f for f in data["refs"] if f != file]
+        conn.execute("UPDATE series SET data = ?, updated_at = ? WHERE id = ?", (json.dumps(data, ensure_ascii=False), now(), sid))
+    (SERIES_DIR / Path(sid).name / "refs" / Path(file).name).unlink(missing_ok=True)
+    return list_series()
+
+
+class EpisodeIn(BaseModel):
+    name: str
+    number: int | None = None
+
+
+@app.post("/api/series/{sid}/episodes")
+def create_episode(sid: str, body: EpisodeIn):
+    eid = uuid.uuid4().hex[:12]
+    with closing(db()) as conn, conn:
+        series_row(conn, sid)
+        n = body.number or (conn.execute("SELECT COALESCE(MAX(number), 0) FROM episodes WHERE series_id = ?", (sid,)).fetchone()[0] + 1)
+        conn.execute("INSERT INTO episodes (id, series_id, number, name, data, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                     (eid, sid, n, body.name.strip() or f"الحلقة {n}", json.dumps(new_episode_data()), now(), now()))
+    return episode_response(eid)
+
+
+@app.get("/api/episodes/{eid}")
+def get_episode(eid: str):
+    return episode_response(eid)
+
+
+@app.delete("/api/episodes/{eid}")
+def delete_episode(eid: str):
+    if eid in SERIES_JOBS:
+        raise HTTPException(400, "استنى لحد ما التجميع يخلص")
+    with closing(db()) as conn, conn:
+        conn.execute("DELETE FROM episodes WHERE id = ?", (eid,))
+    shutil.rmtree(SERIES_DIR / "episodes" / Path(eid).name, ignore_errors=True)
+    return {"ok": True}
+
+
+class EpisodePatch(BaseModel):
+    name: str | None = None
+    script: str | None = None
+    notes: str | None = None
+    lines: list[dict] | None = None  # تعديل توقيت الجمل بإيدك
+    shot: dict | None = None  # تعديل لقطة واحدة: {id, title, prompt, camera, ..., start, end}
+
+
+@app.patch("/api/episodes/{eid}")
+def patch_episode(eid: str, body: EpisodePatch):
+    def fn(d):
+        if body.script is not None:
+            d["script"] = body.script[:60000]
+            parsed = sz.parse_script(d["script"])
+            old = {ln["text"]: ln for ln in d["lines"]}
+            # الجمل اللي ما اتغيرتش بتحتفظ بتوقيتها
+            d["scenes"] = parsed["scenes"]
+            d["lines"] = [{**ln, "start": old.get(ln["text"], {}).get("start"), "end": old.get(ln["text"], {}).get("end")}
+                          for ln in parsed["lines"]]
+        if body.notes is not None:
+            d["notes"] = body.notes[:4000]
+        if body.lines is not None:
+            by_n = {int(x.get("n", 0)): x for x in body.lines}
+            for ln in d["lines"]:
+                x = by_n.get(ln["n"])
+                if x:
+                    ln["start"], ln["end"] = round(float(x["start"]), 2), round(float(x["end"]), 2)
+            d["timing"] = "manual"
+        if body.shot:
+            s = next((s for s in d["shots"] if s["id"] == body.shot.get("id")), None)
+            if s is None:
+                raise HTTPException(404, "اللقطة مش موجودة")
+            for k in ("title", "prompt", "camera", "shot", "location", "sfx", "transition"):
+                if k in body.shot:
+                    s[k] = str(body.shot[k] or "")[:3000]
+            if "offset" in body.shot:
+                s["offset"] = max(0.0, round(float(body.shot["offset"] or 0), 2))
+            if "end" in body.shot:
+                # تغيير نهاية لقطة بيحرّك بداية اللي بعدها (الحلقة تفضل متلاصقة على الصوت)
+                k = d["shots"].index(s)
+                nxt = d["shots"][k + 1] if k + 1 < len(d["shots"]) else None
+                hi = nxt["end"] - 0.3 if nxt else s["end"]
+                s["end"] = round(min(max(float(body.shot["end"]), s["start"] + 0.3), hi), 2)
+                if nxt:
+                    nxt["start"] = s["end"]
+    with closing(db()) as conn, conn:
+        if body.name and body.name.strip():
+            conn.execute("UPDATE episodes SET name = ? WHERE id = ?", (body.name.strip(), eid))
+    update_episode(eid, fn)
+    return episode_response(eid)
+
+
+@app.post("/api/episodes/{eid}/audio")
+def upload_episode_audio(eid: str, file: UploadFile = File(...)):
+    """الفويس أوفر: هو المرجع للتوقيت ومدة الحلقة."""
+    folder = ep_dir(eid)
+    name = save_upload(file, AUDIO_EXTENSIONS, folder, "voiceover")
+    try:
+        duration = probe_duration(folder / name)
+    except Exception as exc:  # noqa: BLE001
+        (folder / name).unlink(missing_ok=True)
+        raise HTTPException(400, f"مقدرتش أقرا الملف الصوتي: {exc}") from exc
+    def fn(d):
+        if d["audio"]:
+            (folder / d["audio"]["file"]).unlink(missing_ok=True)
+        d["audio"] = {"file": name, "duration": round(duration, 2), "name": file.filename}
+        d["timing"] = None
+        for ln in d["lines"]:
+            ln["start"] = ln["end"] = None
+    update_episode(eid, fn)
+    return episode_response(eid)
+
+
+def speech_segments(path: Path) -> list[tuple[float, float]]:
+    """أماكن الكلام في الصوت (بين السكتات)."""
+    out = subprocess.run([ffmpeg_exe(), "-hide_banner", "-i", str(path), "-af", "silencedetect=noise=-35dB:d=0.35", "-f", "null", "-"],
+                         capture_output=True, text=True, timeout=300).stderr
+    starts = [float(x) for x in re.findall(r"silence_start: ([\d.]+)", out)]
+    ends = [float(x) for x in re.findall(r"silence_end: ([\d.]+)", out)]
+    segs, t = [], 0.0
+    for a, b in zip(starts, ends):
+        if a - t > 0.12:
+            segs.append((t, a))
+        t = b
+    total = probe_duration(path)
+    if len(ends) == len(starts) and total - t > 0.12:
+        segs.append((t, total))
+    return [s for s in segs if s[1] - s[0] > 0.1]
+
+
+@app.post("/api/episodes/{eid}/timing")
+def episode_timing(eid: str, mode: str = "auto"):
+    """يرقّم كل جملة من السكريبت بوقتها في الصوت. auto: موديل الكلام (كل كلمة بوقتها)، ولو مش متاح: تقدير من السكتات."""
+    with closing(db()) as conn:
+        _, data = episode_row(conn, eid)
+    if not data["audio"]:
+        raise HTTPException(400, "ارفع الفويس أوفر الأول")
+    if not data["lines"]:
+        raise HTTPException(400, "حط السكريبت الأول (جمل الفويس أوفر بين « »)")
+    path = ep_dir(eid) / data["audio"]["file"]
+    source, timed = "estimate", None
+    if mode != "estimate" and atlas.api_key() and not atlas.mock_mode():
+        try:
+            words = atlas.transcribe(path, data["audio"]["duration"])
+            timed, source = sz.align(words, data["lines"]), "stt"
+        except (atlas.AtlasError, httpx.HTTPError) as exc:
+            if mode == "stt":
+                raise HTTPException(400, f"موديل الكلام: {exc}") from exc
+    if timed is None:
+        timed = sz.estimate(speech_segments(path), data["lines"])
+    def fn(d):
+        for ln, t in zip(d["lines"], timed):
+            ln["start"], ln["end"] = t["start"], t["end"]
+        d["timing"] = source
+    update_episode(eid, fn)
+    return episode_response(eid)
+
+
+def series_for_episode(conn: sqlite3.Connection, r: sqlite3.Row) -> tuple[sqlite3.Row, dict]:
+    return series_row(conn, r["series_id"])
+
+
+def series_chat(messages: list[dict]) -> str:
+    """GPT 5.6 Luna (أو اللي متختار في الإعدادات). لو الاسم مش موجود في Atlas بندوّر على أقرب موديل ونحفظه."""
+    preferred = series_settings()["text_model"]
+    errors = []
+    for model in atlas.model_candidates(preferred, ("luna",), [carousel_settings()["text_model"]])[:5]:
+        try:
+            reply = atlas.chat(messages, model, temperature=0.6, max_tokens=12000, json_mode=True)
+        except (atlas.AtlasError, httpx.HTTPError) as exc:
+            errors.append(f"{model}: {str(exc)[:120]}")
+            continue
+        if model != preferred:
+            auth.set_setting("series_text_model", model)
+        return reply
+    raise HTTPException(400, "موديل اللقطات مش شغال: " + " | ".join(errors[:3]))
+
+
+@app.post("/api/episodes/{eid}/shots")
+def episode_shots(eid: str):
+    """الموديل يقسّم الحلقة للقطات على توقيت الصوت، ويكتب برومبت لكل لقطة. النسخ القديمة بتفضل محفوظة."""
+    with closing(db()) as conn:
+        r, data = episode_row(conn, eid)
+        _, sdata = series_for_episode(conn, r)
+    if not data["audio"] or not data["lines"] or any(ln.get("start") is None for ln in data["lines"]):
+        raise HTTPException(400, "رقّم جمل الفويس أوفر على الصوت الأول")
+    total = data["audio"]["duration"]
+    if atlas.mock_mode():
+        shots = sz.mock_shots(data["lines"], total)
+    else:
+        if not atlas.api_key():
+            raise HTTPException(400, "مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات")
+        reply = series_chat(sz.shots_messages(sdata["bible"], sdata["character"], data["script"], data["lines"], total, data["notes"]))
+        try:
+            shots = sz.parse_shots(reply, total)
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+    for s in shots:
+        s.update(id=uuid.uuid4().hex[:10], takes=[], chosen=None, offset=0.0)
+    def fn(d):
+        d["shots"] = shots
+    update_episode(eid, fn)
+    return episode_response(eid)
+
+
+def find_shot(d: dict, shot_id: str) -> dict:
+    s = next((s for s in d["shots"] if s["id"] == shot_id), None)
+    if s is None:
+        raise HTTPException(404, "اللقطة مش موجودة")
+    return s
+
+
+@app.post("/api/episodes/{eid}/shots/{shot_id}/takes")
+def upload_take(eid: str, shot_id: str, file: UploadFile = File(...)):
+    """فيديو جاهز (اتعمل برة البرنامج) كنسخة للقطة."""
+    folder = ep_dir(eid) / "takes"
+    name = save_upload(file, VIDEO_EXTENSIONS, folder, "take")
+    try:
+        duration = probe_duration(folder / name)
+    except Exception as exc:  # noqa: BLE001
+        (folder / name).unlink(missing_ok=True)
+        raise HTTPException(400, f"مقدرتش أقرا الفيديو: {exc}") from exc
+    tid = uuid.uuid4().hex[:10]
+    def fn(d):
+        s = find_shot(d, shot_id)
+        d["takes"][tid] = {"id": tid, "file": name, "source": "upload", "status": "done", "error": None,
+                           "duration": round(duration, 2), "name": file.filename, "created_at": now()}
+        s["takes"].append(tid)
+        s["chosen"], s["offset"] = tid, 0.0
+    update_episode(eid, fn)
+    return episode_response(eid)
+
+
+class TakeIn(BaseModel):
+    take_id: str
+
+
+@app.post("/api/episodes/{eid}/shots/{shot_id}/pick")
+def pick_take(eid: str, shot_id: str, body: TakeIn):
+    """تختار نسخة للقطة (من نسخها، أو من النسخ المحفوظة من قوايم قديمة)."""
+    def fn(d):
+        s = find_shot(d, shot_id)
+        if body.take_id not in d["takes"]:
+            raise HTTPException(404, "النسخة مش موجودة")
+        if body.take_id not in s["takes"]:
+            for other in d["shots"]:
+                if body.take_id in other["takes"] and other is not s:
+                    other["takes"].remove(body.take_id)
+                    if other["chosen"] == body.take_id:
+                        other["chosen"] = other["takes"][-1] if other["takes"] else None
+            s["takes"].append(body.take_id)
+        s["chosen"], s["offset"] = body.take_id, 0.0
+    update_episode(eid, fn)
+    return episode_response(eid)
+
+
+@app.delete("/api/episodes/{eid}/takes/{take_id}")
+def delete_take(eid: str, take_id: str):
+    file = None
+    def fn(d):
+        nonlocal file
+        t = d["takes"].pop(take_id, None)
+        if t is None:
+            raise HTTPException(404, "النسخة مش موجودة")
+        if t["status"] in ("queued", "working"):
+            raise HTTPException(400, "النسخة دي لسه بتتولد")
+        file = t.get("file")
+        for s in d["shots"]:
+            if take_id in s["takes"]:
+                s["takes"].remove(take_id)
+                if s["chosen"] == take_id:
+                    s["chosen"] = s["takes"][-1] if s["takes"] else None
+    update_episode(eid, fn)
+    if file:
+        (ep_dir(eid) / "takes" / Path(file).name).unlink(missing_ok=True)
+    return episode_response(eid)
+
+
+def shot_prompt(s: dict, character: str) -> str:
+    parts = [s.get("prompt") or s.get("title") or ""]
+    if character.strip():
+        parts.append(f"Character (keep identical to the reference images): {character.strip()}")
+    parts.append("Vertical 9:16, cinematic, realistic, natural light. The man never talks to the camera. No on-screen text, no subtitles, no logos.")
+    return "\n".join(p for p in parts if p)
+
+
+def run_take(eid: str, tid: str) -> None:
+    """يولّد نسخة للقطة بـ Seedance، وصور الشخصية مراجع عشان شكله يفضل ثابت."""
+    def setp(**kw):
+        update_episode(eid, lambda d: d["takes"].get(tid, {}).update(**kw))
+    try:
+        with closing(db()) as conn:
+            r, data = episode_row(conn, eid)
+            _, sdata = series_for_episode(conn, r)
+        t = data["takes"][tid]
+        dest = ep_dir(eid) / "takes" / f"{tid}.mp4"
+        setp(status="working")
+        if atlas.mock_mode():
+            time.sleep(1.5)
+            subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i",
+                            f"color=c=0x{(hash(tid) & 0xFFFFFF):06x}:s=496x864:d={t['gen_duration']}:r=24",
+                            "-c:v", "libx264", "-pix_fmt", "yuv420p", str(dest)], check=True, capture_output=True, timeout=120)
+        else:
+            refs = [SERIES_DIR / r["series_id"] / "refs" / f for f in sdata["refs"]][:4]
+            body = {
+                "model": series_settings()["video_model"], "prompt": t["prompt"],
+                "reference_images": [atlas.upload_media(p) for p in refs if p.exists()],
+                "duration": t["gen_duration"], "resolution": atlas.RESOLUTION, "ratio": atlas.RATIO,
+                "generate_audio": False, "watermark": False,
+            }
+            pid = atlas.submit_video(body)
+            setp(prediction_id=pid)
+            url = atlas.wait_for(pid, lambda _s: None)
+            atlas.download(url, dest)
+        setp(status="done", file=dest.name, duration=round(probe_duration(dest), 2), error=None)
+    except Exception as exc:  # noqa: BLE001
+        setp(status="failed", error=str(exc)[:400])
+
+
+@app.post("/api/episodes/{eid}/shots/{shot_id}/generate")
+def generate_take(eid: str, shot_id: str):
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات")
+    tid = uuid.uuid4().hex[:10]
+    with closing(db()) as conn:
+        r, _ = episode_row(conn, eid)
+        _, sdata = series_for_episode(conn, r)
+    def fn(d):
+        s = find_shot(d, shot_id)
+        dur = s["end"] - s["start"]
+        # Seedance بيعمل من 4 لـ 15 ثانية: بنولّد أطول شوية من اللقطة ونقص منها
+        gen = int(min(atlas.MAX_DURATION, max(atlas.MIN_DURATION, math.ceil(dur + 0.5))))
+        d["takes"][tid] = {"id": tid, "file": None, "source": "seedance", "status": "queued", "error": None,
+                           "duration": None, "gen_duration": gen, "prompt": shot_prompt(s, sdata["character"]), "created_at": now()}
+        s["takes"].append(tid)
+        if not s["chosen"]:
+            s["chosen"] = tid
+    update_episode(eid, fn)
+    series_executor.submit(run_take, eid, tid)
+    return episode_response(eid)
+
+
+def run_render(eid: str) -> None:
+    """يجمّع الحلقة: كل لقطة من نسختها المختارة بمدتها بالظبط من الصوت، وفوقهم الفويس أوفر."""
+    work = TMP_DIR / f"ep_{eid}_{uuid.uuid4().hex[:6]}"
+    work.mkdir(parents=True, exist_ok=True)
+    try:
+        with closing(db()) as conn:
+            r, data = episode_row(conn, eid)
+            sr, _ = series_for_episode(conn, r)
+        parts = []
+        for k, s in enumerate(data["shots"]):
+            dur = round(s["end"] - s["start"], 3)
+            t = data["takes"].get(s.get("chosen") or "")
+            src = ep_dir(eid) / "takes" / t["file"] if t and t.get("file") and t["status"] == "done" else None
+            part = work / f"{k:03d}.mp4"
+            vf = (f"scale={SERIES_W}:{SERIES_H}:force_original_aspect_ratio=increase,crop={SERIES_W}:{SERIES_H},"
+                  f"fps=30,setsar=1,format=yuv420p,tpad=stop_mode=clone:stop_duration={dur:.3f}")
+            if src and src.exists():
+                cmd = [ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{s.get('offset') or 0:.3f}",
+                       "-i", str(src), "-t", f"{dur:.3f}", "-an", "-vf", vf]
+            else:  # لقطة لسه من غير فيديو: أسود بمدتها
+                cmd = [ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi",
+                       "-i", f"color=c=black:s={SERIES_W}x{SERIES_H}:r=30:d={dur:.3f}"]
+            cmd += ["-t", f"{dur:.3f}", "-c:v", "libx264", "-preset", "veryfast", "-crf", "19", "-pix_fmt", "yuv420p", str(part)]
+            subprocess.run(cmd, check=True, capture_output=True, timeout=600)
+            parts.append(part)
+        (work / "list.txt").write_text("".join(f"file '{p.name}'\n" for p in parts))
+        export_id = uuid.uuid4().hex[:12]
+        filename = f"{export_id}.mp4"
+        total = data["audio"]["duration"]
+        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-f", "concat", "-safe", "0",
+                        "-i", str(work / "list.txt"), "-i", str(ep_dir(eid) / data["audio"]["file"]),
+                        "-map", "0:v", "-map", "1:a", "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-t", f"{total:.3f}",
+                        "-movflags", "+faststart", str(EXPORTS_DIR / filename)], check=True, capture_output=True, timeout=900)
+        name = f"{sr['name']} — {r['name']}"
+        with closing(db()) as conn, conn:
+            conn.execute("INSERT INTO exports (id, name, filename, duration, source, project_id, created_at) VALUES (?, ?, ?, ?, ?, NULL, ?)",
+                         (export_id, name, filename, total, "series", now()))
+        update_episode(eid, lambda d: d.update(render={"status": "done", "export_id": export_id, "error": None}))
+    except Exception as exc:  # noqa: BLE001
+        msg = exc.stderr.decode(errors="ignore")[-300:] if isinstance(exc, subprocess.CalledProcessError) and exc.stderr else str(exc)
+        update_episode(eid, lambda d: d.update(render={"status": "failed", "export_id": None, "error": msg[:400]}))
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+        SERIES_JOBS.discard(eid)
+
+
+@app.post("/api/episodes/{eid}/render")
+def render_episode(eid: str):
+    with closing(db()) as conn:
+        _, data = episode_row(conn, eid)
+    if not data["shots"] or not data["audio"]:
+        raise HTTPException(400, "جهّز اللقطات الأول")
+    with SERIES_LOCK:
+        if eid in SERIES_JOBS:
+            raise HTTPException(400, "التجميع شغال")
+        SERIES_JOBS.add(eid)
+    update_episode(eid, lambda d: d.update(render={"status": "working", "export_id": None, "error": None}))
+    render_executor.submit(run_render, eid)
+    return episode_response(eid)
+
+
+def reset_stuck_series() -> None:
+    """بعد ما السيرفر يقوم: أي توليد أو تجميع كان شغال اتقطع."""
+    with closing(db()) as conn, conn:
+        for r in conn.execute("SELECT id, data FROM episodes").fetchall():
+            d = json.loads(r["data"])
+            changed = False
+            for t in (d.get("takes") or {}).values():
+                if t.get("status") in ("queued", "working"):
+                    t.update(status="failed", error="اتقطع لما السيرفر اتقفل. دوس ولّد تاني")
+                    changed = True
+            if (d.get("render") or {}).get("status") == "working":
+                d["render"] = {"status": "failed", "export_id": None, "error": "اتقطع لما السيرفر اتقفل. جمّع تاني"}
+                changed = True
+            if changed:
+                conn.execute("UPDATE episodes SET data = ? WHERE id = ?", (json.dumps(d, ensure_ascii=False), r["id"]))
+
+
+reset_stuck_series()
+
+
+class SeriesSettingsIn(BaseModel):
+    text_model: str | None = None
+    video_model: str | None = None
+
+
+@app.put("/api/series-settings")
+def save_series_settings(body: SeriesSettingsIn):
+    if body.text_model is not None:
+        auth.set_setting("series_text_model", body.text_model.strip() or None)
+    if body.video_model is not None:
+        auth.set_setting("series_video_model", body.video_model.strip() or None)
+    return series_settings()
 
 
 @app.get("/")

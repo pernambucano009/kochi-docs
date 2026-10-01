@@ -41,6 +41,7 @@
     <span class="rail-sep"></span>
     <p class="rail-label">المكتبات</p>
     <button class="rail-btn" data-goto="8" title="صناعة الكاروسيل"><svg><use href="#i-slides"/></svg><span>الكاروسيل</span></button>
+    <button class="rail-btn" data-goto="9" title="المسلسلات"><svg><use href="#i-film"/></svg><span>المسلسلات</span></button>
     <span class="rail-sep"></span>
     <button class="rail-btn" data-goto="4" title="المدربين"><svg><use href="#i-users"/></svg><span>المدربين</span></button>
     <button class="rail-btn" data-goto="3" title="التعليق الصوتي"><svg><use href="#i-mic"/></svg><span>التعليق الصوتي</span></button>
@@ -799,6 +800,71 @@
           </div>
         </main>
 
+        <main class="view" data-view="9" hidden>
+          <div class="alert warn" id="serAlert" hidden>⚠️ مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات.</div>
+          <div class="car-layout">
+            <aside class="panel ser-side">
+              <div class="panel-head"><h2>🎭 المسلسلات</h2></div>
+              <form class="row" id="serNewForm"><input type="text" id="serNewName" placeholder="اسم المسلسل"><button class="btn primary sm" type="submit">＋ جديد</button></form>
+              <ul class="ser-list" id="serList"></ul>
+            </aside>
+            <section class="car-main" id="serMain" hidden>
+              <div class="car-head">
+                <h2 class="ser-title" id="serTitle" data-no-i18n></h2>
+                <nav class="car-steps" id="serTabs">
+                  <button data-t="series"><i>1</i>المسلسل والشخصية</button>
+                  <button data-t="script"><i>2</i>السكريبت والصوت</button>
+                  <button data-t="shots"><i>3</i>اللقطات</button>
+                  <button data-t="render"><i>4</i>التجميع</button>
+                </nav>
+              </div>
+
+              <section class="panel ser-sec" data-sec="series">
+                <label class="field">اسم المسلسل (للبرنامج بس، مش بيتقال في الحلقات) <input type="text" id="serName" data-no-i18n></label>
+                <label class="field">دستور المسلسل (البرومبت الأساسي: الفكرة، الأسلوب، اللهجة، الممنوعات). بيتبعت للموديل مع كل حلقة
+                  <textarea id="serBible" rows="10" data-no-i18n></textarea></label>
+                <label class="field">وصف الشخصية (بيتكتب في برومبت كل لقطة عشان شكلها يفضل ثابت). يفضّل بالإنجليزي
+                  <textarea id="serCharacter" rows="4" dir="auto" data-no-i18n placeholder="Tall thin man, small hair bun on top, thick mustache, sharp features, serious calm look, loose elegant black clothes..."></textarea></label>
+                <div class="field">صور الشخصية (بتتبعت مع كل لقطة بتتولد)<div class="lib-imgs ser-refs" id="serRefs"></div></div>
+                <div class="row wrap ser-models">
+                  <label class="field">موديل اللقطات (من Atlas) <input type="text" id="serTextModel" dir="ltr"></label>
+                  <label class="field">موديل الفيديو <input type="text" id="serVideoModel" dir="ltr"></label>
+                </div>
+              </section>
+
+              <section class="panel ser-sec" data-sec="script" hidden>
+                <div class="panel-head"><h2>📝 السكريبت</h2><label class="btn sm">📄 من ملف .txt<input type="file" id="serScriptFile" accept=".txt,text/plain" hidden></label></div>
+                <p class="hint">كل مشهد يبدأ بسطر «المشهد 1 — ...»، وجمل الفويس أوفر بين « ». المدد المكتوبة في السكريبت بتتجاهل: الصوت هو المرجع.</p>
+                <textarea id="serScript" rows="12" data-no-i18n></textarea>
+                <label class="field">ملاحظات للمخرج (اختياري) <input type="text" id="serNotes" data-no-i18n placeholder="مثلًا: لقطات المشهد 5 أسرع، والإضاءة دافية"></label>
+                <div class="panel-head ser-audio-head"><h2>🎙️ الفويس أوفر</h2>
+                  <span class="row"><label class="btn sm">⬆ ارفع الصوت<input type="file" id="serAudioFile" accept="audio/*" hidden></label>
+                  <button class="btn sm primary" id="serTiming">⏱️ رقّم الجمل على الصوت</button></span></div>
+                <div class="row wrap"><span class="muted" id="serAudioInfo"></span><span class="muted" id="serTimingState"></span></div>
+                <audio id="serAudio" controls preload="metadata" hidden></audio>
+                <div class="ser-lines-wrap"><table class="segments ser-lines"><thead><tr><th>#</th><th>الجملة</th><th>تبدأ</th><th>تخلص</th><th>المدة</th></tr></thead>
+                  <tbody id="serLines"></tbody></table></div>
+              </section>
+
+              <section class="panel ser-sec" data-sec="shots" hidden>
+                <div class="panel-head"><h2>🎬 اللقطات</h2><button class="btn primary" id="serShotsGo">✨ جهّز اللقطات</button></div>
+                <p class="hint" id="serShotsHint"></p>
+                <p class="hint">كل لقطة مدتها جاية من وقت الكلام اللي عليها. ولّد نسخ أو ارفع فيديو جاهز، ودوس على النسخة اللي عاجباك. الماوس فوق النسخة بيشغّلها.</p>
+                <div class="ser-shots" id="serShots"></div>
+                <div class="ser-pool" id="serPool" hidden><h3>📦 نسخ محفوظة (من تقسيمات قديمة)</h3><div class="ser-pool-list" id="serPoolList"></div></div>
+              </section>
+
+              <section class="panel ser-sec" data-sec="render" hidden>
+                <div class="panel-head"><h2>🎞️ تجميع الحلقة</h2><span class="muted" id="serRenderState"></span></div>
+                <p class="hint" id="serRenderHint"></p>
+                <div class="row"><button class="btn primary" id="serRenderGo">🎞️ جمّع الحلقة</button></div>
+                <div class="ser-rendered" id="serRendered"></div>
+              </section>
+            </section>
+            <section class="panel placeholder" id="serEmpty"><p>اعمل مسلسل جديد من الجنب.</p></section>
+          </div>
+        </main>
+
         <main class="view" data-view="settings" hidden>
           <div class="gen-layout">
             <section class="panel">
@@ -948,6 +1014,7 @@
 <script src="/publish.js"></script>
 <script src="/settings.js"></script>
 <script src="/carousel.js"></script>
+<script src="/series.js"></script>
 <script src="/shell.js"></script>
 </body>
 </html>

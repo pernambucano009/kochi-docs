@@ -1,0 +1,275 @@
+"""المسلسلات: قراءة السكريبت، ترقيم جمل الفويس أوفر على الصوت، وتجهيز اللقطات وبرومبتاتها.
+
+القاعدة: الصوت هو المرجع للتوقيت. مدة الحلقة = مدة الفويس أوفر، ومدة كل لقطة من وقت الجمل اللي بتخدمها.
+"""
+
+import json
+import re
+
+# ---------------------------------------------------------------- السكريبت
+
+SCENE_RE = re.compile(r"^\s*(?:#+\s*)?المشهد\s*(\d+)\s*[—\-–:|]*\s*(.*)$")
+QUOTE_RE = re.compile(r"«([^»]+)»")
+
+
+def parse_script(text: str) -> dict:
+    """المشاهد وجمل الفويس أوفر (الكلام اللي بين « »). كل جملة معاها رقم المشهد بتاعها."""
+    scenes: list[dict] = []
+    lines: list[dict] = []
+    current = 0
+    for raw in (text or "").splitlines():
+        m = SCENE_RE.match(raw)
+        if m:
+            current = int(m.group(1))
+            scenes.append({"n": current, "title": m.group(2).strip()})
+            continue
+        for q in QUOTE_RE.findall(raw):
+            q = q.strip()
+            if q:
+                lines.append({"n": len(lines) + 1, "text": q, "scene": current})
+    if scenes:
+        # اللي قبل أول مشهد (زي عنوان الحلقة بين « ») مش من الفويس أوفر
+        lines = [{**ln, "n": k} for k, ln in enumerate((ln for ln in lines if ln["scene"]), 1)]
+    if not lines:
+        # سكريبت من غير « »: كل سطر مش فاضي جملة
+        for raw in (text or "").splitlines():
+            t = raw.strip()
+            if t and not SCENE_RE.match(t):
+                lines.append({"n": len(lines) + 1, "text": t, "scene": current})
+    return {"scenes": scenes, "lines": lines}
+
+
+# ---------------------------------------------------------------- مطابقة الكلمات على الجمل
+
+def norm(word: str) -> str:
+    w = re.sub(r"[ً-ْـ]", "", word or "")
+    w = re.sub("[إأآا]", "ا", w).replace("ة", "ه").replace("ى", "ي").replace("ؤ", "و").replace("ئ", "ي")
+    return re.sub(r"[^\w]", "", w.lower())
+
+
+def tokens(text: str) -> list[str]:
+    return [t for t in (norm(x) for x in re.split(r"\s+", text or "")) if t]
+
+
+def _sim(a: str, b: str) -> float:
+    if a == b:
+        return 1.0
+    if not a or not b:
+        return 0.0
+    # تشابه بسيط: نسبة الحروف المشتركة بالترتيب (موديل الكلام ساعات بيكتب الكلمة بشكل مختلف)
+    m, n = len(a), len(b)
+    prev = [0] * (n + 1)
+    for i in range(1, m + 1):
+        cur = [0] * (n + 1)
+        for j in range(1, n + 1):
+            cur[j] = prev[j - 1] + 1 if a[i - 1] == b[j - 1] else max(prev[j], cur[j - 1])
+        prev = cur
+    return 2 * prev[n] / (m + n)
+
+
+def align(words: list[dict], lines: list[dict]) -> list[dict]:
+    """كل جملة من السكريبت بوقت بدايتها ونهايتها من كلمات موديل الكلام (w, s, e).
+    بنطابق الكلمات بالترتيب (زي المقارنة بين نصين)، والجمل اللي ما اتلقطتش بتاخد وقت بين اللي قبلها واللي بعدها."""
+    script = [(li, t) for li, line in enumerate(lines) for t in tokens(line["text"])]
+    heard = [(norm(w.get("w", "")), float(w.get("s", 0)), float(w.get("e", 0))) for w in words]
+    heard = [h for h in heard if h[0]]
+    n, m = len(script), len(heard)
+    out = [{"start": None, "end": None} for _ in lines]
+    if n and m:
+        gap = -0.4
+        score = [[0.0] * (m + 1) for _ in range(n + 1)]
+        move = [[0] * (m + 1) for _ in range(n + 1)]
+        for i in range(1, n + 1):
+            score[i][0], move[i][0] = score[i - 1][0] + gap, 1
+        for j in range(1, m + 1):
+            score[0][j], move[0][j] = score[0][j - 1] + gap, 2
+        for i in range(1, n + 1):
+            for j in range(1, m + 1):
+                s = _sim(script[i - 1][1], heard[j - 1][0])
+                best, mv = score[i - 1][j - 1] + (s * 2 - 1), 0
+                if score[i - 1][j] + gap > best:
+                    best, mv = score[i - 1][j] + gap, 1
+                if score[i][j - 1] + gap > best:
+                    best, mv = score[i][j - 1] + gap, 2
+                score[i][j], move[i][j] = best, mv
+        i, j = n, m
+        while i > 0 and j > 0:
+            mv = move[i][j]
+            if mv == 0:
+                li = script[i - 1][0]
+                if _sim(script[i - 1][1], heard[j - 1][0]) >= 0.5:
+                    s, e = heard[j - 1][1], heard[j - 1][2]
+                    o = out[li]
+                    o["start"] = s if o["start"] is None else min(o["start"], s)
+                    o["end"] = e if o["end"] is None else max(o["end"], e)
+                i, j = i - 1, j - 1
+            elif mv == 1:
+                i -= 1
+            else:
+                j -= 1
+    return fill_gaps(out, words[-1]["e"] if words else 0)
+
+
+def fill_gaps(out: list[dict], total: float) -> list[dict]:
+    """الجمل اللي من غير وقت: بتتحط بين اللي قبلها واللي بعدها بالتساوي."""
+    k = 0
+    while k < len(out):
+        if out[k]["start"] is not None:
+            k += 1
+            continue
+        j = k
+        while j < len(out) and out[j]["start"] is None:
+            j += 1
+        a = out[k - 1]["end"] if k > 0 else 0.0
+        b = out[j]["start"] if j < len(out) else total
+        step = max(0.0, b - a) / (j - k)
+        for q in range(k, j):
+            out[q] = {"start": a + step * (q - k), "end": a + step * (q - k + 1)}
+        k = j
+    return [{"start": round(o["start"], 2), "end": round(max(o["end"], o["start"]), 2)} for o in out]
+
+
+def estimate(segments: list[tuple[float, float]], lines: list[dict]) -> list[dict]:
+    """من غير موديل الكلام: توقيت تقريبي من أماكن السكوت في الصوت وطول كل جملة."""
+    if not segments or not lines:
+        return [{"start": 0.0, "end": 0.0} for _ in lines]
+    weights = [len(re.sub(r"[^؀-ۿ\w]", "", line["text"])) + 2 for line in lines]
+    rate = sum(b - a for a, b in segments) / sum(weights)
+    expected = [w * rate for w in weights]
+    L, S = len(lines), len(segments)
+    inf = float("inf")
+    dp = [[inf] * (S + 1) for _ in range(L + 1)]
+    prv: list[list] = [[None] * (S + 1) for _ in range(L + 1)]
+    dp[0][0] = 0.0
+    for i in range(L + 1):
+        for j in range(S + 1):
+            if dp[i][j] == inf:
+                continue
+            for k in range(1, 6):
+                for m in range(1, 7):
+                    if (k > 1 and m > 1) or i + k > L or j + m > S:
+                        continue
+                    actual = segments[j + m - 1][1] - segments[j][0]
+                    exp = sum(expected[i:i + k]) + 0.6 * (m - 1)
+                    c = dp[i][j] + (actual - exp) ** 2 + 0.3 * (k - 1)
+                    if c < dp[i + k][j + m]:
+                        dp[i + k][j + m], prv[i + k][j + m] = c, (i, j, k, m)
+    if dp[L][S] == inf:
+        # جمل أكتر بكتير من المقاطع: نوزّع على الصوت كله بالطول
+        a, b = segments[0][0], segments[-1][1]
+        out, t = [], a
+        for e in expected:
+            d = (b - a) * e / sum(expected)
+            out.append({"start": round(t, 2), "end": round(t + d, 2)})
+            t += d
+        return out
+    res: list = [None] * L
+    i, j = L, S
+    while i > 0:
+        pi, pj, k, m = prv[i][j]
+        a, b = segments[pj][0], segments[pj + m - 1][1]
+        tot, t = sum(expected[pi:pi + k]), a
+        for q in range(k):
+            d = (b - a) * expected[pi + q] / tot
+            res[pi + q] = {"start": round(t, 2), "end": round(t + d, 2)}
+            t += d
+        i, j = pi, pj
+    return res
+
+
+# ---------------------------------------------------------------- اللقطات (الموديل)
+
+SHOTS_FORMAT = """{"shots": [
+  {"scene": 1, "start": 0.0, "end": 2.4, "lines": [1],
+   "title": "وصف قصير بالعربي للقطة",
+   "shot": "extreme close-up | close-up | medium | wide | over-the-shoulder | POV | insert ...",
+   "camera": "static | slow push-in | handheld follow | tracking | pan ...",
+   "location": "المكان",
+   "sfx": "المؤثرات الصوتية (من غير موسيقى إلا لو ضروري)",
+   "transition": "cut | match cut | hard cut to black ...",
+   "prompt": "English prompt for the video model: subject, action, setting, lighting, lens, camera move, mood. Vertical 9:16, cinematic, realistic."}
+]}"""
+
+
+def shots_messages(bible: str, character: str, script: str, lines: list[dict], total: float, notes: str = "") -> list[dict]:
+    timed = "\n".join(f'{ln["n"]}. [{ln["start"]:.2f}–{ln["end"]:.2f}] (مشهد {ln.get("scene") or "-"}) «{ln["text"]}»' for ln in lines)
+    system = (
+        "أنت مخرج ومونتير لمسلسل قصير على السوشيال ميديا. شغلتك تحوّل السكريبت لقائمة لقطات (Shot List) "
+        "جاهزة للتوليد بموديل فيديو، وكل لقطة متظبطة على توقيت الفويس أوفر.\n\n"
+        f"دستور المسلسل:\n{bible.strip()}\n\n"
+        f"الشخصية (لازم تتوصف بنفس الشكل في كل برومبت):\n{character.strip()}"
+    )
+    user = f"""السكريبت:
+{script.strip()}
+
+جمل الفويس أوفر بتوقيتها الحقيقي في الصوت (بالثواني). مدة الحلقة كلها {total:.2f} ثانية:
+{timed}
+
+قواعد مهمة جدًا:
+- الصوت هو المرجع: اللقطات بتغطي الحلقة كلها من 0 لحد {total:.2f} من غير فراغات ولا تداخل (end لكل لقطة = start اللي بعدها).
+- أي مدد مكتوبة في السكريبت نفسه تجاهلها. المدة بتيجي من وقت الجمل بس.
+- كل جملة ليها لقطة أو أكتر بتخدم معناها بالظبط. الجملة الطويلة ممكن تتقسم على أكتر من لقطة، والكلمات القصيرة ورا بعض ممكن تبقى لقطات سريعة.
+- حدود اللقطات يفضل تبقى عند بداية جملة أو في السكوت بين الجمل. الوقت اللي من غير كلام (زي آخر الحلقة) ليه لقطاته من السكريبت.
+- اللقطة الواحدة من 0.8 لـ 6 ثواني.
+- lines: أرقام الجمل اللي بتتقال وقت اللقطة.
+- prompt بالإنجليزي لموديل فيديو (Seedance): وصف الشخصية الكامل في كل برومبت (لو ظاهرة)، الفعل، المكان في السعودية، الإضاءة، العدسة، حركة الكاميرا، المزاج. فيديو طولي 9:16 واقعي سينمائي. الشخصية ما بتتكلمش قدام الكاميرا. من غير أي كلام مكتوب على الشاشة. لقطات الشاشات (جوال/لابتوب) توصف محتواها بوضوح.
+- اسم الشخصية ما يتذكرش أبدًا.
+{f"- ملاحظات المخرج: {notes.strip()}" if notes.strip() else ""}
+
+رجّع JSON بس بالشكل ده:
+{SHOTS_FORMAT}"""
+    return [{"role": "system", "content": system}, {"role": "user", "content": user}]
+
+
+def parse_shots(text: str, total: float) -> list[dict]:
+    """اللقطات من رد الموديل، متظبطة: مترتبة ومتلاصقة من 0 لآخر الحلقة."""
+    m = re.search(r"\{.*\}", text or "", re.S)
+    if not m:
+        raise ValueError("الموديل ما رجعش قائمة لقطات")
+    data = json.loads(m.group(0), strict=False)
+    raw = data.get("shots") if isinstance(data, dict) else None
+    if not isinstance(raw, list) or not raw:
+        raise ValueError("الموديل ما رجعش قائمة لقطات")
+    shots = []
+    for s in raw:
+        if not isinstance(s, dict):
+            continue
+        try:
+            start, end = float(s.get("start", 0)), float(s.get("end", 0))
+        except (TypeError, ValueError):
+            continue
+        shots.append({
+            "scene": int(s.get("scene") or 0) if str(s.get("scene") or "0").isdigit() else 0,
+            "start": start, "end": end,
+            "lines": [int(x) for x in s.get("lines") or [] if str(x).isdigit()],
+            **{k: str(s.get(k) or "").strip()[:2000] for k in ("title", "shot", "camera", "location", "sfx", "transition", "prompt")},
+        })
+    return snap(shots, total)
+
+
+def snap(shots: list[dict], total: float) -> list[dict]:
+    """ترتيب اللقطات وتلزيقها: الأولى من 0، وكل واحدة بتبدأ مكان ما اللي قبلها خلصت، والأخيرة لآخر الصوت."""
+    shots = sorted((s for s in shots if s["end"] > s["start"] or s["end"] == 0), key=lambda s: s["start"])
+    out = []
+    t = 0.0
+    for k, s in enumerate(shots):
+        end = min(total, s["end"]) if k < len(shots) - 1 else total
+        if end - t < 0.3:  # أقصر من اللازم: تدخل في اللي قبلها
+            continue
+        out.append({**s, "start": round(t, 2), "end": round(end, 2)})
+        t = end
+    if out and out[-1]["end"] < total:
+        out[-1]["end"] = round(total, 2)
+    for k, s in enumerate(out, 1):
+        s["n"] = k
+    return out
+
+
+def mock_shots(lines: list[dict], total: float) -> list[dict]:
+    shots = []
+    for ln in lines:
+        shots.append({"scene": ln.get("scene") or 0, "start": ln["start"], "end": ln["end"], "lines": [ln["n"]],
+                      "title": f"لقطة تجريبية للجملة {ln['n']}", "shot": "medium", "camera": "slow push-in",
+                      "location": "كافيه في الرياض", "sfx": "", "transition": "cut",
+                      "prompt": f"Mock prompt for line {ln['n']}: tall thin man with a small hair bun and a thick mustache, black loose clothes."})
+    return snap(shots, total)
