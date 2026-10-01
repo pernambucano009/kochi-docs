@@ -357,6 +357,9 @@ with closing(db()) as _conn, _conn:
             created_at TEXT NOT NULL
         )"""
     )
+    for _col in ("handle", "seed"):  # حساب إنستجرام (للمدربين) + مفتاح الحزمة اللي اتستورد منها
+        if _col not in {c[1] for c in _conn.execute("PRAGMA table_info(carousel_assets)")}:
+            _conn.execute(f"ALTER TABLE carousel_assets ADD COLUMN {_col} TEXT")
     # صور الشخصيات القديمة (من الهوية) بتبقى شخصية في المكتبة
     _old_refs = sorted(p for p in BRAND_REFS_DIR.iterdir() if p.is_file())
     if _old_refs:
@@ -3036,7 +3039,9 @@ def brand_settings() -> dict:
         saved = json.loads(auth.get_setting("brand") or "{}")
     except ValueError:
         saved = {}
-    return {**cz.DEFAULT_BRAND, **{k: v for k, v in saved.items() if k in cz.DEFAULT_BRAND}}
+    if saved.get("style") in cz.OLD_DEFAULT_STYLES:
+        saved.pop("style")  # الستايل القديم اتغيّر بالهوية الرسمية
+    return {**cz.DEFAULT_BRAND, **{k: v for k, v in saved.items() if k in cz.DEFAULT_BRAND and v}}
 
 
 def cta_list() -> list[dict]:
@@ -3115,7 +3120,7 @@ def test_text_model():
 
 
 # ---------- مكتبة الكاروسيل: تيمبليتس وشخصيات ----------
-ASSET_KINDS = {"template": "تيمبليت", "character": "شخصية"}
+ASSET_KINDS = {"template": "تيمبليت", "character": "شخصية", "coach": "مدرب"}
 ASSET_MAX_FILES = 12
 # صيغ تانية بتتحول PNG لوحدها (صور الآيفون وصور المواقع)
 CONVERT_EXTENSIONS = {".heic", ".heif", ".avif", ".gif", ".bmp", ".tif", ".tiff", ".jfif"}
@@ -3123,7 +3128,7 @@ CONVERT_EXTENSIONS = {".heic", ".heif", ".avif", ".gif", ".bmp", ".tif", ".tiff"
 
 def asset_to_dict(r: sqlite3.Row) -> dict:
     files = [f for f in json.loads(r["files"]) if (LIBRARY_DIR / r["id"] / f).exists()]
-    return {"id": r["id"], "kind": r["kind"], "name": r["name"], "notes": r["notes"],
+    return {"id": r["id"], "kind": r["kind"], "name": r["name"], "notes": r["notes"], "handle": r["handle"],
             "images": [{"name": f, "url": f"/media/brand/library/{r['id']}/{f}"} for f in files]}
 
 
@@ -3206,7 +3211,8 @@ def create_asset(kind: str = Form(...), name: str = Form(""), notes: str = Form(
 
 @app.patch("/api/carousel/library/{aid}")
 def update_asset(aid: str, name: str | None = Form(None), notes: str | None = Form(None),
-                 files: list[UploadFile] | None = File(None), remove: str | None = Form(None)):
+                 files: list[UploadFile] | None = File(None), remove: str | None = Form(None),
+                 handle: str | None = Form(None)):
     with closing(db()) as conn, conn:
         r = get_asset(conn, aid)
         current = json.loads(r["files"])
@@ -3224,8 +3230,69 @@ def update_asset(aid: str, name: str | None = Form(None), notes: str | None = Fo
             conn.execute("UPDATE carousel_assets SET name = ? WHERE id = ?", (name.strip()[:80], aid))
         if notes is not None:
             conn.execute("UPDATE carousel_assets SET notes = ? WHERE id = ?", (notes.strip()[:1500], aid))
+        if handle is not None:
+            h = sheets.clean_handle(handle, "instagram")
+            if handle.strip() and not h:
+                raise HTTPException(400, f"اسم حساب إنستجرام مش مظبوط: {handle.strip()}")
+            conn.execute("UPDATE carousel_assets SET handle = ? WHERE id = ?", (h, aid))
         conn.execute("UPDATE carousel_assets SET files = ? WHERE id = ?", (json.dumps(current), aid))
         return {**asset_to_dict(get_asset(conn, aid)), "skipped": skipped}
+
+
+@app.post("/api/carousel/library/import")
+async def import_library_pack(file: UploadFile = File(...)):
+    """حزمة جاهزة (zip فيه manifest.json + الصور): بتضيف أو بتحدّث كل اللي فيها مرة واحدة."""
+    import io
+    import zipfile
+
+    raw = await file.read()
+    if len(raw) > 300 * 1024 * 1024:
+        raise HTTPException(400, "الحزمة أكبر من 300 ميجا")
+    try:
+        z = zipfile.ZipFile(io.BytesIO(raw))
+        names = {Path(n).name: n for n in z.namelist() if not n.endswith("/")}
+        manifest = json.loads(z.read(names["manifest.json"]).decode("utf-8"))
+    except (zipfile.BadZipFile, KeyError, ValueError) as exc:
+        raise HTTPException(400, "ده مش ملف حزمة مكتبة (لازم zip فيه manifest.json)") from exc
+    added = updated = 0
+    with closing(db()) as conn, conn:
+        for item in manifest.get("items", []):
+            kind, key = item.get("kind"), str(item.get("key") or "")[:80]
+            if kind not in ASSET_KINDS or not key or not item.get("files"):
+                continue
+            row = conn.execute("SELECT id FROM carousel_assets WHERE seed = ?", (key,)).fetchone()
+            aid = row["id"] if row else uuid.uuid4().hex[:12]
+            folder = LIBRARY_DIR / aid
+            if row:
+                shutil.rmtree(folder, ignore_errors=True)
+            folder.mkdir(parents=True, exist_ok=True)
+            saved = []
+            for fname in item["files"][:ASSET_MAX_FILES]:
+                src = names.get(Path(fname).name)
+                ext = Path(fname).suffix.lower()
+                if not src or ext not in IMAGE_EXTENSIONS:
+                    continue
+                out = f"{uuid.uuid4().hex[:8]}{ext}"
+                (folder / out).write_bytes(z.read(src))
+                saved.append(out)
+            if not saved:
+                continue
+            handle = sheets.clean_handle(item.get("handle") or "", "instagram")
+            values = (str(item.get("name") or key)[:80], str(item.get("notes") or "")[:1500], handle, json.dumps(saved))
+            if row:
+                conn.execute("UPDATE carousel_assets SET name = ?, notes = ?, handle = ?, files = ?, kind = ? WHERE id = ?",
+                             (*values, kind, aid))
+                updated += 1
+            else:
+                conn.execute("INSERT INTO carousel_assets (id, kind, name, notes, handle, files, seed, created_at) "
+                             "VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (aid, kind, values[0], values[1], values[2], values[3], key, now()))
+                added += 1
+    # الهوية (الألوان والستايل) بعد ما الإضافة تتقفل، عشان الإعدادات قاعدة بيانات تانية
+    if isinstance(manifest.get("brand"), dict):
+        current = json.loads(auth.get_setting("brand") or "{}")
+        current.update({k: str(v) for k, v in manifest["brand"].items() if k in cz.DEFAULT_BRAND})
+        auth.set_setting("brand", json.dumps(current, ensure_ascii=False))
+    return {"added": added, "updated": updated}
 
 
 @app.delete("/api/carousel/library/{aid}")
@@ -3347,6 +3414,8 @@ def patch_carousel(cid: str, body: CarouselPatch):
                 st["kind"] = body.settings["kind"]
             if "template_id" in body.settings:
                 st["template_id"] = body.settings["template_id"] or None
+            if "coach_asset_id" in body.settings:
+                st["coach_asset_id"] = body.settings["coach_asset_id"] or None
             if "character_ids" in body.settings:
                 st["character_ids"] = [str(x) for x in (body.settings["character_ids"] or [])][:4]
             if "cta" in body.settings and isinstance(body.settings["cta"], dict):
@@ -3428,10 +3497,19 @@ def coach_for(data: dict) -> sqlite3.Row | None:
 def carousel_context(data: dict) -> tuple[dict, dict]:
     """نوع الكاروسيل وتفاصيله (للبرومبت) + الصور المرجعية بتاعته."""
     st = {"kind": "characters", "template_id": None, "character_ids": [], "cta": {"type": "auto"}, **data["settings"]}
-    coach = coach_for(data) if st["kind"] == "coach" else None
+    is_coach = st["kind"] == "coach"
+    coach = None
     ctx: dict = {"kind": st["kind"], "characters": []}
-    assets: dict = {"template": None, "characters": [], "coach": coach}
+    assets: dict = {"template": None, "characters": [], "coach": None, "coach_asset": None}
     with closing(db()) as conn:
+        if is_coach and st.get("coach_asset_id"):
+            r = conn.execute("SELECT * FROM carousel_assets WHERE id = ? AND kind = 'coach'", (st["coach_asset_id"],)).fetchone()
+            if r:
+                ctx["coach"] = {"name": r["name"], "instagram": r["handle"], "notes": r["notes"]}
+                assets["coach_asset"] = asset_to_dict(r)
+        elif is_coach:
+            coach = coach_for(data)  # الكاروسيلات القديمة: مدرب من مكتبة المدربين بتاعة التوليد
+            assets["coach"] = coach
         if st["kind"] == "template" and st.get("template_id"):
             r = conn.execute("SELECT * FROM carousel_assets WHERE id = ?", (st["template_id"],)).fetchone()
             if r:
@@ -3445,7 +3523,7 @@ def carousel_context(data: dict) -> tuple[dict, dict]:
                     assets["characters"].append(asset_to_dict(r))
     if coach:
         ctx["coach"] = {"name": coach["name"], "instagram": coach["instagram"]}
-    ctx["cta_text"] = cz.cta_text(st.get("cta"), cta_list(), coach["name"] if coach else None)
+    ctx["cta_text"] = cz.cta_text(st.get("cta"), cta_list(), (ctx.get("coach") or {}).get("name"))
     return ctx, assets
 
 
@@ -3456,7 +3534,7 @@ def check_kind_ready(data: dict) -> None:
         raise HTTPException(400, "اختار التيمبليت الأول")
     if kind == "characters" and not st.get("character_ids"):
         raise HTTPException(400, "اختار شخصية واحدة على الأقل من المكتبة")
-    if kind == "coach" and not st.get("coach_id"):
+    if kind == "coach" and not (st.get("coach_asset_id") or st.get("coach_id")):
         raise HTTPException(400, "اختار المدرب الأول")
 
 
@@ -3541,7 +3619,8 @@ def reference_list(first: list[Path], assets: dict) -> tuple[list[Path], dict]:
     if logo and (i := add(logo)):
         refs["logo"] = i
     coach = assets.get("coach")
-    room = 16 - len(files) - (1 if coach else 0)
+    coach_asset = assets.get("coach_asset")
+    room = 16 - len(files) - (1 if coach else 0) - (min(3, len(coach_asset["images"])) if coach_asset else 0)
     tpl = assets.get("template")
     if tpl:
         idx = [i for img in tpl["images"][:room] if (i := add(LIBRARY_DIR / tpl["id"] / img["name"]))]
@@ -3556,8 +3635,13 @@ def reference_list(first: list[Path], assets: dict) -> tuple[list[Path], dict]:
             if idx:
                 refs["characters"].append((ch["name"], idx))
     if coach and (i := add(COACHES_DIR / coach["image_filename"])):
-        refs["coach"] = i
+        refs["coach"] = [i]
         refs["coach_name"] = coach["name"]
+    if coach_asset:
+        idx = [i for img in coach_asset["images"][:3] if (i := add(LIBRARY_DIR / coach_asset["id"] / img["name"]))]
+        if idx:
+            refs["coach"] = idx
+            refs["coach_name"] = coach_asset["name"]
     return files, refs
 
 

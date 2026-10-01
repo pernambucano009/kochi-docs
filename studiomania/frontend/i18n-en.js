@@ -1046,5 +1046,21 @@ window.I18N_EN = {
   "⏳ بيرفع {0} صورة...": "⏳ Uploading {0} images...",
   "{0} في «{1}». غيّر الاسم من الخانة لو حابب": "{0} to “{1}”. Rename it in the field if you like",
   "«{0}» نوعها مش مدعوم. ارفع صور PNG أو JPG": "“{0}” isn't a supported type. Upload PNG or JPG images",
-  "مش قادر أفتح «{0}». احفظها PNG أو JPG وارفعها تاني": "Can't open “{0}”. Save it as PNG or JPG and upload again"
+  "مش قادر أفتح «{0}». احفظها PNG أو JPG وارفعها تاني": "Can't open “{0}”. Save it as PNG or JPG and upload again",
+  "مفيش مدربين في المكتبة لسه. ضيفهم من 📚 المكتبة ← المدربين، أو استورد حزمة المدربين.": "No coaches in the library yet. Add them from 📚 Library → Coaches, or import the coaches pack.",
+  "⚠️ المدرب ده مالوش حساب إنستجرام متسجل (ضيفه من المكتبة)": "⚠️ This coach has no Instagram account saved (add it in the library)",
+  "ارفع صور تصميمات كاروسيل عاجباك (سلايد أو أكتر من نفس التصميم). البرنامج بياخد التقسيم والشكل ويلوّنه بألوان كوتشي ويحط كلامنا.": "Upload carousel designs you like (one or more slides of the same design). The app takes the layout, recolors it with KOCHI colors and puts our text in.",
+  "شخصية كل مدرب المرسومة بستايل كوتشي (صورة أو أكتر)، باسمه وحسابه على إنستجرام. بتظهر في كاروسيل «معلومات من مدرب».": "Each coach's character drawn in KOCHI style (one or more images), with their name and Instagram. Used in “Coach tips” carousels.",
+  "⏳ بيستورد {0}...": "⏳ Importing {0}...",
+  "✅ اتضاف {0} · اتحدّث {1}": "✅ Added {0} · updated {1}",
+  "ملف zip جاهز فيه صور ومعلومات (manifest.json)": "A ready zip with images and info (manifest.json)",
+  "شخصية المدرب المرسومة واسمه": "The coach's drawn character and name",
+  "اختار المدرب": "Pick the coach",
+  "＋ ضيف مدرب": "＋ Add coach",
+  "🏋️ المدربين": "🏋️ Coaches",
+  "📦 استورد حزمة جاهزة": "📦 Import a ready pack",
+  "اسم حساب إنستجرام مش مظبوط: {0}": "Invalid Instagram account name: {0}",
+  "الحزمة أكبر من 300 ميجا": "The pack is larger than 300 MB",
+  "ده مش ملف حزمة مكتبة (لازم zip فيه manifest.json)": "This isn't a library pack (it must be a zip with manifest.json)",
+  "صورة المدرب الحقيقية واسمه": "The coach's real photo and name"
 };

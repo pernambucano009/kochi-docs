@@ -19,15 +19,24 @@ DEFAULT_BRAND = {
     "name": "KOCHI",
     "about": "كوتشي منصة تدريب رياضي وتغذية أونلاين بتوصّل المتدربين في السعودية والخليج بمدربين معتمدين.",
     "audience": "شباب وبنات في السعودية والخليج مهتمين باللياقة والتغذية والجسم الصحي",
-    "colors": "",
+    # من KOCHI Production Brief (الهوية الرسمية: KOCHI Sketchy Fitness)
+    "colors": "#57B8AF teal (main accent), #EEECDA cream (backgrounds), #1F2933 charcoal (text and lines)",
     "font": "خط عربي عريض وواضح (زي Tajawal أو Cairo)، العناوين Bold والكلام العادي Regular",
     "style": (
-        "2D flat vector illustration, clean geometric shapes, solid fills, no gradients or only very soft ones, "
-        "no 3D, no photorealism, consistent character design across slides, generous white space, "
-        "modern social-media carousel layout"
+        "KOCHI Sketchy Fitness: hand-drawn illustration, loose pencil-like line work with slight imperfections, "
+        "misty watercolor-wash fills, warm muted palette (teal, cream, charcoal), bold clean outlines, minimal cell "
+        "shading, no 3D, no photorealism, no gradient fills. Athletic but approachable, like a fitness sketchbook."
     ),
     "logo_rule": "اللوجو صغير في نفس الركن في كل السلايدات",
 }
+
+# الستايل القديم (قبل الهوية الرسمية): لو متسجل في الإعدادات نتجاهله
+OLD_DEFAULT_STYLES = {
+    "2D flat vector illustration, clean geometric shapes, solid fills, no gradients or only very soft ones, "
+    "no 3D, no photorealism, consistent character design across slides, generous white space, "
+    "modern social-media carousel layout",
+}
+EYES_RULE = "!!!!! TWO TINY SOLID BLACK FILLED CIRCLES AS EYES — NO EXCEPTIONS !!!!!"
 
 SIZES = {
     "9:16": (1440, 2560),  # تيك توك والستوري
@@ -55,8 +64,7 @@ DEFAULT_CTAS = [
 def brand_block(brand: dict, kind: str = "characters") -> str:
     b = {**DEFAULT_BRAND, **{k: v for k, v in (brand or {}).items() if v}}
     lines = [f"Brand: {b['name']}. {b['about']}", f"Audience: {b['audience']}"]
-    if kind == "characters":
-        lines.append(f"Illustration style: {b['style']}")
+    lines.append(f"Illustration style (for every character, icon and drawing): {b['style']}")
     lines.append(f"Typography: {b['font']}")
     if b.get("colors"):
         lines.append(f"Brand colors (use these as the palette, exact hex values): {b['colors']}")
@@ -124,7 +132,7 @@ def kind_writing_rules(ctx: dict) -> str:
         handle = f" (@{c['instagram']})" if c.get("instagram") else ""
         return (f"- الكاروسيل ده معلومات ونصايح من المدرب {c['name']}{handle}: الكلام على لسانه أو منسوب له، "
                 f"وأول سلايد يقدّمه (مثلًا: نصيحة من كوتش {c['name']}).\n"
-                "- حقل visual بالإنجليزي: مكان صورة المدرب الحقيقية في السلايد وتعبيره، وأي أيقونات بسيطة.")
+                "- حقل visual بالإنجليزي: شخصية المدرب المرسومة بتعمل إيه في السلايد (وضعية، تمرين، تعبير)، وأي أيقونات بسيطة.")
     if kind == "template":
         return "- حقل visual بالإنجليزي ويوصف المحتوى المرسوم بس (أيقونات وعناصر)، لأن التصميم نفسه ثابت من التيمبليت."
     names = "، ".join(ch["name"] for ch in ctx.get("characters") or []) or "شخصيات البراند"
@@ -230,21 +238,25 @@ def kind_design_rules(ctx: dict) -> str:
     kind = ctx.get("kind")
     if kind == "template":
         t = ctx.get("template") or {}
-        return ("DESIGN: follow the template reference images exactly. Copy their design system: layout grid, "
-                "background, shapes and decorations, color palette, typography style, sizes and text positions, "
-                "logo position. Keep the same look on every slide; only the text and the small content visuals change."
+        return ("DESIGN: follow the template reference images for STRUCTURE: copy their layout grid, composition, "
+                "text hierarchy and positions, shapes and decorative motifs, spacing and logo position, on every slide. "
+                "RECOLOR everything to the KOCHI brand palette below (do not keep the template's own colors unless the "
+                "template notes say so), and draw any illustration in the KOCHI style. Only the text and small content "
+                "visuals change between slides."
                 + (f" Template notes: {t['notes']}" if t.get("notes") else ""))
     if kind == "coach":
         c = ctx.get("coach") or {}
         handle = f' and the handle "@{c["instagram"]}"' if c.get("instagram") else ""
-        return (f"DESIGN: a clean, premium fitness-tips carousel featuring the real coach {c.get('name', '')}. "
-                "Use the coach photo reference as a real photographic cut-out of the same person (do not turn it into "
-                "an illustration, do not change the face, body or skin tone). Show the coach on the first and last "
-                f'slides at least, with the name "{c.get("name", "")}"{handle} written small near the photo.')
+        return (f"DESIGN: a fitness-tips carousel presented by the KOCHI coach character {c.get('name', '')}. "
+                "Reproduce the coach character from the reference image(s) exactly: same face, hair or head covering, "
+                "skin tone, body type and outfit, in the same hand-drawn KOCHI sketchy style. Show the coach on the "
+                f'first and last slides at least (posing or demonstrating the tip), with the name "{c.get("name", "")}"'
+                f"{handle} written small near the character. {EYES_RULE}"
+                + (f" Coach notes: {c['notes']}" if c.get("notes") else ""))
     names = ", ".join(ch["name"] for ch in ctx.get("characters") or [])
-    return ("DESIGN: 2D flat vector character carousel. Reuse the character reference images exactly: same faces, "
-            "proportions, hair, outfits and colors, drawn in the same flat style. Never redesign the characters."
-            + (f" Characters: {names}." if names else ""))
+    return ("DESIGN: KOCHI 2D character carousel. Reuse the character reference images exactly: same faces, "
+            "proportions, hair, outfits and colors, in the same hand-drawn KOCHI sketchy style. Never redesign "
+            f"the characters. {EYES_RULE}" + (f" Characters: {names}." if names else ""))
 
 
 def overview_prompt(brand: dict, plan: dict, ratio: str, refs: dict, ctx: dict) -> str:
@@ -264,6 +276,8 @@ def overview_prompt(brand: dict, plan: dict, ratio: str, refs: dict, ctx: dict) 
     lines.append("Slides:")
     for i, s in enumerate(plan["slides"], 1):
         lines.append(f"Slide {i}: {slide_text(s)}. Visual: {s.get('visual') or 'supporting visual'}")
+    if ctx.get("kind") in ("coach", "characters"):
+        lines.append(EYES_RULE)
     return "\n".join(lines)
 
 
@@ -282,6 +296,8 @@ def slide_prompt(brand: dict, plan: dict, k: int, ratio: str, refs: dict, ctx: d
     lines += reference_notes(refs)
     lines.append(f"Slide {k} text: {slide_text(s)}")
     lines.append(f"Visual: {s.get('visual') or 'supporting visual'}")
+    if ctx.get("kind") in ("coach", "characters"):
+        lines.append(EYES_RULE)
     return "\n".join(lines)
 
 
@@ -298,7 +314,8 @@ def reference_notes(refs: dict) -> list[str]:
     for name, idx in refs.get("characters") or []:
         notes.append(f"Reference images {_idx(idx)} show the character \"{name}\": reproduce this exact character.")
     if refs.get("coach"):
-        notes.append(f"Reference image {refs['coach']} is a real photo of the coach {refs.get('coach_name') or ''}.")
+        notes.append(f"Reference images {_idx(refs['coach'])} show the coach character {refs.get('coach_name') or ''}: "
+                     "reproduce this exact character.")
     return notes
 
 

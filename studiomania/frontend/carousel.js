@@ -185,8 +185,11 @@ function renderSetup() {
     || `<span class="muted">مفيش تيمبليتس لسه. ضيف من 📚 المكتبة صور تصميمات عاجباك.</span>`;
   $("carChars").innerHTML = chars.map((a) => assetThumb(a, picked.has(a.id))).join("")
     || `<span class="muted">مفيش شخصيات لسه. ضيف من 📚 المكتبة صور كل شخصية.</span>`;
-  const coach = car.coaches.find((c) => c.id === st.coach_id);
-  $("carCoachNote").textContent = coach ? (coach.instagram ? `@${coach.instagram} هيتكتب جنب صورته` : "⚠️ المدرب ده مالوش حساب إنستجرام متسجل") : "";
+  const libCoaches = car.lib.filter((a) => a.kind === "coach");
+  $("carCoaches").innerHTML = libCoaches.map((a) => assetThumb(a, a.id === st.coach_asset_id)).join("")
+    || `<span class="muted">مفيش مدربين في المكتبة لسه. ضيفهم من 📚 المكتبة ← المدربين، أو استورد حزمة المدربين.</span>`;
+  const coach = currentCoach();
+  $("carCoachNote").textContent = coach ? (coach.handle ? `@${coach.handle} هيتكتب جنب صورته` : "⚠️ المدرب ده مالوش حساب إنستجرام متسجل (ضيفه من المكتبة)") : "";
   // الـ CTA
   const cta = st.cta || { type: "auto" };
   $("carCta").innerHTML = `<option value="auto">🤖 خليه يختار الأنسب</option>` +
@@ -206,13 +209,22 @@ function renderSetup() {
   $("carCtaPreview").textContent = ctaPreview();
 }
 
+// المدرب المختار (من مكتبة الكاروسيل، أو من مدربين التوليد في الكاروسيلات القديمة)
+function currentCoach() {
+  const st = car.cur.settings;
+  const a = car.lib.find((x) => x.id === st.coach_asset_id && x.kind === "coach");
+  if (a) return { name: a.name, handle: a.handle };
+  const c = car.coaches.find((x) => x.id === st.coach_id);
+  return c ? { name: c.name, handle: c.instagram } : null;
+}
+
 function ctaPreview() {
   const type = $("carCta").value;
   if (type === "auto") return "الموديل هيختار الدعوة الأنسب للمحتوى.";
   if (type === "custom") return $("carCtaText").value ? `آخر سلايد: ${$("carCtaText").value}` : "";
   const tpl = car.cfg.ctas.find((c) => c.id === type);
   if (!tpl) return "";
-  const coach = car.coaches.find((c) => c.id === car.cur.settings.coach_id);
+  const coach = currentCoach();
   const text = tpl.text.replace("{keyword}", $("carCtaKeyword").value || "…").replace("{reward}", $("carCtaReward").value || "…")
     .replace("{coach}", (coach?.name || "…").replace(/^(الكوتش|كوتش|الكابتن|كابتن|coach|captain)\s+/i, ""));
   return `آخر سلايد: ${text}`;
@@ -228,6 +240,10 @@ $("carKinds").addEventListener("click", (e) => {
 $("carTemplates").addEventListener("click", (e) => {
   const b = e.target.closest(".car-asset");
   if (b) saveSetup({ template_id: b.dataset.id });
+});
+$("carCoaches").addEventListener("click", (e) => {
+  const b = e.target.closest(".car-asset");
+  if (b) saveSetup({ coach_asset_id: b.dataset.id });
 });
 $("carChars").addEventListener("click", (e) => {
   const b = e.target.closest(".car-asset");
@@ -270,7 +286,7 @@ $("carPlanBtn").onclick = () => {
   const c = car.cur;
   if (c.plan && !confirm("فيه نص مكتوب قبل كده. تكتبه من الأول من النقاش؟")) return;
   busyButton($("carPlanBtn"), "⏳ بيكتب...", async () => {
-    await patchCarousel({ settings: { slides: $("carCount").value, ratio: $("carRatio").value, coach_id: $("carCoach").value, cta: ctaFromForm() } });
+    await patchCarousel({ settings: { slides: $("carCount").value, ratio: $("carRatio").value, cta: ctaFromForm() } });
     car.cur = await api(`/api/carousels/${c.id}/plan`, { method: "POST" });
     car.sec = "plan";
     await loadCarList();
@@ -535,10 +551,12 @@ async function openLibrary(tab = car.libTab) {
 function renderLibrary() {
   const tab = car.libTab;
   document.querySelectorAll("#libTabs [data-t]").forEach((b) => b.classList.toggle("active", b.dataset.t === tab));
-  $("libHint").textContent = tab === "template"
-    ? "ارفع صور تصميمات كاروسيل عاجباك (سلايد أو أكتر من نفس التصميم). البرنامج هيقلّد التصميم ويحط كلامنا."
-    : "ارفع صور الشخصية من أكتر من زاوية وتعبير، وكل شخصية لوحدها باسمها. كل ما الصور أوضح الرسم هيطلع شبهها أكتر.";
-  $("libName").placeholder = tab === "template" ? "اسم التيمبليت" : "اسم الشخصية (مثلًا: كوتشي الشاب)";
+  $("libHint").textContent = {
+    template: "ارفع صور تصميمات كاروسيل عاجباك (سلايد أو أكتر من نفس التصميم). البرنامج بياخد التقسيم والشكل ويلوّنه بألوان كوتشي ويحط كلامنا.",
+    coach: "شخصية كل مدرب المرسومة بستايل كوتشي (صورة أو أكتر)، باسمه وحسابه على إنستجرام. بتظهر في كاروسيل «معلومات من مدرب».",
+    character: "ارفع صور الشخصية من أكتر من زاوية وتعبير، وكل شخصية لوحدها باسمها. كل ما الصور أوضح الرسم هيطلع شبهها أكتر.",
+  }[tab];
+  $("libName").placeholder = { template: "اسم التيمبليت", coach: "اسم المدرب", character: "اسم الشخصية (مثلًا: كوتشي الشاب)" }[tab];
   const items = car.lib.filter((a) => a.kind === tab);
   $("libItems").innerHTML = items.map((a) => `<div class="lib-item" data-id="${a.id}">
       <div class="lib-imgs">${a.images.map((im) => `<div class="ref"><img src="${im.url}" alt=""><button class="del" data-img="${im.name}" title="امسح الصورة">✕</button></div>`).join("")}
@@ -546,6 +564,7 @@ function renderLibrary() {
       <div class="lib-meta">
         <input type="text" data-f="name" value="${escapeHtml(a.name)}">
         <input type="text" data-f="notes" value="${escapeHtml(a.notes)}" placeholder="ملاحظات">
+        ${a.kind === "coach" ? `<input type="text" data-f="handle" dir="ltr" value="${a.handle ? `@${escapeHtml(a.handle)}` : ""}" placeholder="@instagram">` : ""}
         <button class="btn sm danger" data-del-asset>🗑️ امسح</button>
       </div>
     </div>`).join("") || `<p class="empty">لسه فاضية.</p>`;
@@ -630,3 +649,20 @@ $("libItems").addEventListener("click", async (e) => {
   }
 });
 $("carLibOpen").onclick = () => openLibrary();
+
+$("libPack").addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  e.target.value = "";
+  if (!file) return;
+  const form = new FormData();
+  form.append("file", file);
+  libStatus(`⏳ بيستورد ${file.name}...`);
+  try {
+    const r = await api("/api/carousel/library/import", { method: "POST", body: form });
+    car.cfg = await api("/api/carousel/settings");
+    await openLibrary();
+    libStatus(`✅ اتضاف ${r.added} · اتحدّث ${r.updated}`);
+  } catch (err) {
+    libStatus(`✕ ${err.message}`, true);
+  }
+});
