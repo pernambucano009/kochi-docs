@@ -276,6 +276,7 @@ function takeThumb(t, chosen) {
   return `<div class="take ${t.id === chosen ? "sel" : ""} ${t.status} ${t.approved ? "ok" : ""}" data-take="${t.id}" title="${t.source === "upload" ? escapeHtml(t.name || "فيديو مرفوع") : "Seedance"}${t.error ? ` — ${escapeHtml(t.error)}` : ""}">
     ${media}<em>${t.approved ? "✅" : t.source === "upload" ? "⬆" : "✨"} ${t.duration ? `${t.duration.toFixed(1)}ث` : ""}</em>
     ${busy ? "" : `<b data-del-take title="امسح النسخة">✕</b>`}
+    ${t.url ? `<i class="zoom" data-zoom title="كبّر">🔍</i>` : ""}
     ${t.status === "failed" && t.source === "seedance" ? `<button class="retry" data-retry-take title="حاول تاني (لو الطلب اتبعت بيكمّل من غير دفع تاني)">↻</button>` : ""}</div>`;
 }
 const FRAME_STATE = { queued: "⏳ مستنية", working: "🎨 بترسم...", failed: "✕ فشلت" };
@@ -340,6 +341,8 @@ function renderShotsTab() {
   $("serPool").hidden = !ep.pool.length;
   $("serPoolList").innerHTML = ep.pool.map((t) => `<div class="pool-item">${takeThumb(t, null)}
       <select data-attach="${t.id}"><option value="">حطها على لقطة…</option>${ep.shots.map((s) => `<option value="${s.id}">${s.n}. ${escapeHtml((s.title || "").slice(0, 30))}</option>`).join("")}</select></div>`).join("");
+  $("serGalleryGo").disabled = !n;
+  if ($("serGalDialog").open) renderGallery();
 }
 $("serShotsGo").onclick = () => {
   if (ser.ep.shots.length && !confirm("تقسيم جديد للحلقة؟ النسخ اللي اتولدت أو اترفعت هتفضل محفوظة تحت «نسخ محفوظة» وتقدر تحطها على أي لقطة.")) return;
@@ -404,6 +407,7 @@ $("serShots").addEventListener("click", async (e) => {
       ser.ep = await api(`/api/episodes/${ser.ep.id}/takes/${take.dataset.take}/retry`, { method: "POST" });
       return renderSeries();
     }
+    if (e.target.closest("[data-zoom]")) return openGallery(id, take.dataset.take);
     if (e.target.closest("[data-del-take]")) {
       if (!confirm("مسح النسخة دي نهائي؟")) return;
       ser.ep = await api(`/api/episodes/${ser.ep.id}/takes/${take.dataset.take}`, { method: "DELETE" });
@@ -501,6 +505,193 @@ $("serToEditor").onclick = () => busyButton($("serToEditor"), "⏳", async () =>
 $("serRenderGo").onclick = () => busyButton($("serRenderGo"), "⏳", async () => {
   ser.ep = await api(`/api/episodes/${ser.ep.id}/render`, { method: "POST" });
   renderSeries();
+});
+
+// ---------- معرض فيديوهات الحلقة: كل اللقطات قدامك، ودوس على أي واحدة تكبر وتعاينها ----------
+const gal = { filter: "all", shot: null, take: null, list: [] };
+const GAL_LABEL = { done: "✅ موافق عليه", review: "👀 مستني موافقتك", busy: "🎬 بيتولد...", todo: "لسه" };
+function galState(s) {
+  const chosen = s.takes.find((t) => t.id === s.chosen);
+  if (chosen?.status === "done") return chosen.approved ? "done" : "review";
+  if (s.takes.some((t) => t.status === "queued" || t.status === "working")) return "busy";
+  return "todo";
+}
+function galTake(s) {
+  return s.takes.find((t) => t.id === s.chosen) || s.takes.filter((t) => t.status === "queued" || t.status === "working").slice(-1)[0] || s.takes.slice(-1)[0];
+}
+function openGallery(shotId = null, takeId = null) {
+  gal.shot = shotId;
+  gal.take = takeId;
+  if (shotId && gal.filter !== "all" && !galShots().some((s) => s.id === shotId)) gal.filter = "all";
+  renderGallery();
+  if (!$("serGalDialog").open) $("serGalDialog").showModal();
+}
+function galShots() {
+  return ser.ep.shots.filter((s) => gal.filter === "all" || galState(s) === gal.filter);
+}
+function galStop() {
+  $("serGalAudio").pause();
+  const v = $("serGalStage").querySelector("video");
+  if (v) v.pause();
+}
+function renderGallery() {
+  const ep = ser.ep;
+  if (!ep) return;
+  const counts = { all: ep.shots.length, done: 0, review: 0, busy: 0, todo: 0 };
+  ep.shots.forEach((s) => counts[galState(s)]++);
+  $("serGalCount").textContent = `✅ ${counts.done} · 👀 ${counts.review} · 🎬 ${counts.busy} · لسه ${counts.todo} — من ${counts.all} لقطة`;
+  document.querySelectorAll("#serGalTabs [data-f]").forEach((b) => {
+    b.classList.toggle("active", b.dataset.f === gal.filter);
+    b.dataset.count = counts[b.dataset.f];
+  });
+  const shots = galShots();
+  gal.list = shots.map((s) => s.id);
+  const viewing = !!gal.shot && ep.shots.some((s) => s.id === gal.shot);
+  $("serGalAll").hidden = viewing;
+  $("serGalView").hidden = !viewing;
+  if (viewing) return renderGalView();
+  galStop();
+  $("serGalGrid").innerHTML = shots.map((s) => {
+    const st = galState(s);
+    const t = galTake(s);
+    const failed = st === "todo" && t?.status === "failed";
+    const media = t?.url && (st === "done" || st === "review")
+      ? lightVideo(t.url, "muted loop playsinline")
+      : `${s.frame_url ? `<img src="${s.frame_url}" alt="">` : ""}${st === "busy" ? `<div class="spin"></div>` : ""}`;
+    return `<button class="gal-tile ${st}" data-gal="${s.id}" title="${escapeHtml(s.title || "")}" data-no-i18n>${media}
+      <span class="n">${s.n}</span><span class="st">${failed ? "✕ فشل" : s.approved || st !== "todo" ? GAL_LABEL[st] : "اللقطة مش معتمدة"} · ${s.duration.toFixed(1)}ث</span></button>`;
+  }).join("") || `<p class="muted">مفيش لقطات هنا.</p>`;
+}
+function renderGalView() {
+  const ep = ser.ep;
+  const s = ep.shots.find((x) => x.id === gal.shot);
+  if (!s.takes.some((t) => t.id === gal.take)) gal.take = galTake(s)?.id || null;
+  const t = s.takes.find((x) => x.id === gal.take);
+  const k = gal.list.indexOf(s.id);
+  $("serGalTitle").textContent = `اللقطة ${s.n} · ${serFmt(s.start)} → ${serFmt(s.end)} · ${s.duration.toFixed(1)}ث${s.title ? ` · ${s.title}` : ""}`;
+  $("serGalPrev").disabled = k <= 0;
+  $("serGalNext").disabled = k < 0 || k >= gal.list.length - 1;
+  const lines = Object.fromEntries(ep.lines.map((l) => [l.n, l]));
+  $("serGalSaid").innerHTML = (s.lines || []).map((n) => lines[n]).filter(Boolean).map((l) => `«${escapeHtml(l.text)}»`).join(" ") || `<span class="muted">(من غير كلام)</span>`;
+  // المسرح: الفيديو الكبير (من غير ما نعيد تحميله لو هو هو)
+  const stage = $("serGalStage");
+  const cur = stage.querySelector("video");
+  if (t?.url) {
+    if (!cur || cur.dataset.url !== t.url) {
+      galStop();
+      stage.innerHTML = `<video src="${t.url}" data-url="${t.url}" controls playsinline autoplay></video>`;
+      galHookVideo(stage.querySelector("video"), s);
+    }
+  } else {
+    galStop();
+    const busy = t && (t.status === "queued" || t.status === "working");
+    stage.innerHTML = `${s.frame_url ? `<img src="${s.frame_url}" alt="">` : ""}<div style="position:absolute">${busy ? `<div class="spin"></div>${TAKE_STATE[t.status]}` : t?.status === "failed" ? "✕ الفيديو فشل" : "لسه مفيش فيديو"}</div>`;
+    stage.style.position = "relative";
+  }
+  $("serGalTakes").innerHTML = s.takes.length > 1 ? s.takes.map((x) => takeThumb(x, s.chosen).replace(`class="take `, `class="take ${x.id === gal.take ? "viewing " : ""}`)).join("") : "";
+  $("serGalErr").hidden = !(t?.status === "failed" && t.error);
+  $("serGalErr").textContent = t?.error ? `✕ ${t.error}` : "";
+  const acts = [];
+  if (t?.status === "done") {
+    if (t.id !== s.chosen) acts.push(`<button class="btn sm" data-gal-pick>👈 استخدم النسخة دي</button>`);
+    else acts.push(`<button class="btn ${t.approved ? "" : "primary"}" data-gal-ok>${t.approved ? "✅ موافق عليه (دوس تلغي)" : "✅ موافق على الفيديو"}</button>`);
+  }
+  if (t?.status === "failed" && t.source === "seedance") acts.push(`<button class="btn sm" data-gal-retry>↻ حاول تاني</button>`);
+  acts.push(s.approved
+    ? `<button class="btn sm" data-gal-gen>${t ? "🔄 ولّد واحد تاني" : "🎬 ولّد الفيديو"}</button>`
+    : `<button class="btn sm" data-gal-approve-shot>✅ اعتمد اللقطة الأول</button>`);
+  $("serGalActs").innerHTML = acts.join("");
+}
+// الفويس أوفر بتاع اللقطة يمشي مع الفيديو
+function galHookVideo(v, s) {
+  const a = $("serGalAudio");
+  if (ser.ep.audio && !a.src.endsWith(ser.ep.audio.url)) a.src = ser.ep.audio.url;
+  const voiceOn = () => $("serGalVoice").checked && !!ser.ep.audio;
+  const sync = () => {
+    const shot = ser.ep.shots.find((x) => x.id === s.id) || s;
+    a.currentTime = shot.start + Math.max(0, v.currentTime - (shot.offset || 0));
+  };
+  v.muted = voiceOn();
+  v.addEventListener("play", () => { v.muted = voiceOn(); if (voiceOn()) { sync(); a.play().catch(() => {}); } });
+  v.addEventListener("pause", () => a.pause());
+  v.addEventListener("ended", () => a.pause());
+  v.addEventListener("seeked", () => { if (voiceOn() && !v.paused) sync(); });
+  v.addEventListener("timeupdate", () => { if (!a.paused && a.currentTime >= s.end) a.pause(); });
+}
+$("serGalVoice").onchange = () => {
+  const v = $("serGalStage").querySelector("video");
+  if (!v) return;
+  v.muted = $("serGalVoice").checked && !!ser.ep.audio;
+  if (!v.muted) $("serGalAudio").pause();
+  else if (!v.paused) { v.pause(); v.play(); }
+};
+function galMove(step) {
+  const k = gal.list.indexOf(gal.shot);
+  const id = gal.list[k + step];
+  if (!id) return;
+  gal.shot = id;
+  gal.take = null;
+  renderGallery();
+}
+$("serGalleryGo").onclick = () => openGallery();
+$("serGalClose").onclick = () => $("serGalDialog").close();
+$("serGalDialog").addEventListener("close", () => { galStop(); $("serGalStage").innerHTML = ""; gal.shot = null; });
+$("serGalDialog").addEventListener("cancel", (e) => { if (gal.shot) { e.preventDefault(); gal.shot = null; renderGallery(); } });
+$("serGalBack").onclick = () => { gal.shot = null; renderGallery(); };
+$("serGalPrev").onclick = () => galMove(-1);
+$("serGalNext").onclick = () => galMove(1);
+document.addEventListener("keydown", (e) => {
+  if (!$("serGalDialog").open || !gal.shot || e.target.closest?.("input, textarea")) return;
+  if (e.key === "ArrowLeft") { e.preventDefault(); galMove(1); }
+  if (e.key === "ArrowRight") { e.preventDefault(); galMove(-1); }
+});
+$("serGalTabs").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-f]");
+  if (!b) return;
+  gal.filter = b.dataset.f;
+  renderGallery();
+});
+$("serGalGrid").addEventListener("click", (e) => {
+  const tile = e.target.closest("[data-gal]");
+  if (tile) openGallery(tile.dataset.gal);
+});
+$("serGalGrid").addEventListener("mouseover", (e) => { const v = e.target.closest(".gal-tile video"); if (v) { v.preload = "auto"; v.play().catch(() => {}); } });
+$("serGalGrid").addEventListener("mouseout", (e) => { const v = e.target.closest(".gal-tile video"); if (v) v.pause(); });
+$("serGalTakes").addEventListener("click", async (e) => {
+  const take = e.target.closest("[data-take]");
+  if (!take) return;
+  if (e.target.closest("[data-del-take]")) {
+    if (!confirm("مسح النسخة دي نهائي؟")) return;
+    try { ser.ep = await api(`/api/episodes/${ser.ep.id}/takes/${take.dataset.take}`, { method: "DELETE" }); renderSeries(); }
+    catch (err) { toast(err.message, true); }
+    return;
+  }
+  gal.take = take.dataset.take;
+  renderGalView();
+});
+$("serGalActs").addEventListener("click", async (e) => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  const eid = ser.ep.id;
+  const sid = gal.shot;
+  try {
+    b.disabled = true;
+    if (b.matches("[data-gal-ok]")) {
+      const t = ser.ep.shots.find((x) => x.id === sid).takes.find((x) => x.id === gal.take);
+      ser.ep = await api(`/api/episodes/${eid}/takes/${t.id}/approve?approved=${!t.approved}`, { method: "POST" });
+      if (!t.approved) toast(`✅ اللقطة ${ser.ep.shots.find((x) => x.id === sid).n} موافق عليها`);
+    } else if (b.matches("[data-gal-pick]")) {
+      ser.ep = await api(`/api/episodes/${eid}/shots/${sid}/pick`, { method: "POST", ...jsonBody({ take_id: gal.take }) });
+    } else if (b.matches("[data-gal-retry]")) {
+      ser.ep = await api(`/api/episodes/${eid}/takes/${gal.take}/retry`, { method: "POST" });
+    } else if (b.matches("[data-gal-gen]")) {
+      ser.ep = await api(`/api/episodes/${eid}/shots/${sid}/generate`, { method: "POST" });
+      gal.take = null;
+    } else if (b.matches("[data-gal-approve-shot]")) {
+      await patchEpisode({ shot: { id: sid, approved: true } });
+    }
+    renderSeries();
+  } catch (err) { toast(err.message, true); b.disabled = false; }
 });
 
 // متابعة: النسخ اللي بتتولد والتجميع

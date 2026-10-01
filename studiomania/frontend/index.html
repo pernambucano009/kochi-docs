@@ -873,6 +873,7 @@
                   <button class="btn" id="serFramesGo">🎨 ارسم الستوري بورد</button>
                   <button class="btn" id="serApproveAll">✅ اعتمد كل اللقطات</button>
                   <button class="btn primary" id="serGenApproved">🎬 ولّد المعتمدة</button>
+                  <button class="btn" id="serGalleryGo">🎞️ شوف كل الفيديوهات</button>
                   <span class="muted" id="serProgress"></span>
                 </div>
                 <div class="ser-shots" id="serShots"></div>
@@ -991,6 +992,33 @@
     </div>
   </div>
   <div class="row gap-top"><button class="btn primary" id="brandSave">💾 احفظ</button></div>
+</dialog>
+<dialog class="bulk-dlg ser-gal-dlg" id="serGalDialog">
+  <div class="panel-head"><h2>🎞️ فيديوهات الحلقة</h2><span class="muted" id="serGalCount"></span><button class="btn sm" id="serGalClose">إغلاق</button></div>
+  <div id="serGalAll">
+    <nav class="car-steps lib-tabs" id="serGalTabs"><button data-f="all" class="active">الكل</button><button data-f="review">مستنية موافقتك</button><button data-f="done">موافق عليها</button><button data-f="busy">بتتولد</button><button data-f="todo">لسه</button></nav>
+    <div class="ser-gal-grid" id="serGalGrid"></div>
+  </div>
+  <div class="ser-gal-view" id="serGalView" hidden>
+    <div class="row wrap ser-gal-nav">
+      <button class="btn sm" id="serGalBack">↩ كل الفيديوهات</button>
+      <b id="serGalTitle" data-no-i18n></b>
+      <span class="spacer"></span>
+      <button class="btn sm" id="serGalPrev">→ اللي قبلها</button>
+      <button class="btn sm" id="serGalNext">اللي بعدها ←</button>
+    </div>
+    <div class="ser-gal-body">
+      <div class="ser-gal-stage" id="serGalStage"></div>
+      <div class="ser-gal-side">
+        <div class="said" id="serGalSaid" data-no-i18n></div>
+        <label class="ser-gal-voice"><input type="checkbox" id="serGalVoice" checked> 🔊 شغّل معاه الفويس أوفر</label>
+        <div class="takes" id="serGalTakes"></div>
+        <div class="err" id="serGalErr" hidden></div>
+        <div class="acts" id="serGalActs"></div>
+      </div>
+    </div>
+    <audio id="serGalAudio" preload="auto" hidden></audio>
+  </div>
 </dialog>
 <dialog class="bulk-dlg ser-del-dlg" id="serDelDialog">
   <h2>🗑️ حذف اللقطة <span id="serDelNum"></span></h2>
