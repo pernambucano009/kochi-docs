@@ -927,3 +927,37 @@ a.pl-link:hover { background: color-mix(in srgb, var(--ok) 24%, transparent); }
 .brand-refs .ref { position: relative; }
 .brand-refs img { width: 72px; height: 72px; object-fit: cover; border-radius: 10px; display: block; }
 .brand-refs .del { position: absolute; top: 3px; right: 3px; width: 20px; height: 20px; border-radius: 50%; border: none; background: rgba(0,0,0,.65); color: #fff; font-size: 11px; }
+
+/* أنواع الكاروسيل والمكتبة والـ CTA */
+.car-setup { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 8px; }
+.car-setup-title { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+.car-setup-title select { font-weight: 400; }
+.car-setup .lib-link { font-weight: 400; font-size: 12px; color: var(--accent); }
+.car-kinds { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+@media (max-width: 700px) { .car-kinds { grid-template-columns: 1fr; } }
+.car-kinds button { border: 2px solid var(--line); background: var(--surface); border-radius: 14px; padding: 10px 12px; text-align: start; display: flex; flex-direction: column; gap: 2px; color: var(--text); font: inherit; }
+.car-kinds button small { color: var(--muted); font-size: 12px; }
+.car-kinds button.active { border-color: var(--accent); background: var(--accent-soft); }
+.car-pick { display: flex; flex-direction: column; gap: 6px; }
+.car-assets { display: flex; gap: 8px; flex-wrap: wrap; }
+.car-asset { position: relative; width: 92px; border: 2px solid var(--line); border-radius: 12px; background: var(--surface); padding: 0; overflow: hidden; display: flex; flex-direction: column; font: inherit; color: var(--text); }
+.car-asset img { width: 100%; aspect-ratio: 4 / 5; object-fit: cover; display: block; }
+.car-asset span { font-size: 11px; padding: 3px 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.car-asset i { position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; border-radius: 50%; background: var(--accent); color: #fff; font-style: normal; font-size: 12px; display: none; align-items: center; justify-content: center; }
+.car-asset.selected { border-color: var(--accent); }
+.car-asset.selected i { display: flex; }
+.car-cta { display: flex; gap: 8px; flex-wrap: wrap; }
+.car-cta select, .car-cta input { flex: 1; min-width: 180px; }
+.cta-list { display: flex; flex-direction: column; gap: 6px; margin: 6px 0; }
+.cta-row { display: grid; grid-template-columns: 140px 1fr auto; gap: 6px; }
+.lib-tabs { align-self: flex-start; margin-bottom: 6px; }
+.lib-new { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0 12px; }
+.lib-new input { flex: 1; min-width: 160px; }
+.lib-items { display: flex; flex-direction: column; gap: 10px; max-height: 55vh; overflow: auto; }
+.lib-item { display: flex; gap: 12px; background: var(--surface-2); border-radius: 12px; padding: 10px; flex-wrap: wrap; }
+.lib-imgs { display: flex; gap: 6px; flex-wrap: wrap; flex: 1; min-width: 220px; }
+.lib-imgs .ref { position: relative; }
+.lib-imgs img { width: 72px; height: 90px; object-fit: cover; border-radius: 8px; display: block; }
+.lib-imgs .del { position: absolute; top: 3px; right: 3px; width: 20px; height: 20px; border-radius: 50%; border: none; background: rgba(0,0,0,.65); color: #fff; font-size: 11px; }
+.lib-add { width: 72px; height: 90px; border: 2px dashed var(--line); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 22px; color: var(--muted); cursor: pointer; }
+.lib-meta { display: flex; flex-direction: column; gap: 6px; width: 240px; }

@@ -1,12 +1,12 @@
 // StudioMania — صناعة الكاروسيل: نقاش ← نص سعودي ← الشكل العام ← السلايدات واحدة واحدة
 
-const car = { list: [], cur: null, cfg: null, coaches: [], sec: null, timer: null, saveTimer: null, sending: false };
+const car = { list: [], cur: null, cfg: null, coaches: [], lib: [], sec: null, timer: null, saveTimer: null, sending: false, libTab: "template" };
 const CAR_KEY = "studiomania.carousel";
 const CAR_STATUS = { idle: "", queued: "⏳ مستنية دورها", working: "🎨 بترسم...", done: "", failed: "✕ فشلت" };
 
 async function initCarousel() {
   try {
-    [car.cfg, car.coaches] = await Promise.all([api("/api/carousel/settings"), api("/api/coaches")]);
+    [car.cfg, car.coaches, car.lib] = await Promise.all([api("/api/carousel/settings"), api("/api/coaches"), api("/api/carousel/library")]);
   } catch (err) {
     return toast(err.message, true);
   }
@@ -99,6 +99,7 @@ function renderCarousel() {
   $("carCount").value = c.settings.slides;
   $("carRatio").value = c.settings.ratio;
   $("carCoach").value = c.settings.coach_id || "";
+  renderSetup();
   renderChat();
   renderPlan();
   renderOverview();
@@ -159,9 +160,101 @@ async function patchCarousel(body) {
 }
 for (const [id, key] of [["carCount", "slides"], ["carRatio", "ratio"], ["carCoach", "coach_id"]]) {
   $(id).addEventListener("change", async () => {
-    try { await patchCarousel({ settings: { [key]: $(id).value } }); } catch (err) { toast(err.message, true); }
+    try { await patchCarousel({ settings: { [key]: $(id).value } }); renderSetup(); } catch (err) { toast(err.message, true); }
   });
 }
+
+// ---------- نوع الكاروسيل والـ CTA ----------
+function assetThumb(a, selected) {
+  const img = a.images[0];
+  return `<button type="button" class="car-asset ${selected ? "selected" : ""}" data-id="${a.id}" title="${escapeHtml(a.notes || a.name)}">
+    ${img ? `<img src="${img.url}" alt="">` : ""}<span>${escapeHtml(a.name)}</span><i>✓</i></button>`;
+}
+
+function renderSetup() {
+  const st = car.cur.settings;
+  const kind = st.kind || "characters";
+  document.querySelectorAll("#carKinds [data-kind]").forEach((b) => b.classList.toggle("active", b.dataset.kind === kind));
+  $("carPickTemplate").hidden = kind !== "template";
+  $("carPickChars").hidden = kind !== "characters";
+  $("carPickCoach").hidden = kind !== "coach";
+  const templates = car.lib.filter((a) => a.kind === "template");
+  const chars = car.lib.filter((a) => a.kind === "character");
+  const picked = new Set(st.character_ids || []);
+  $("carTemplates").innerHTML = templates.map((a) => assetThumb(a, a.id === st.template_id)).join("")
+    || `<span class="muted">مفيش تيمبليتس لسه. ضيف من 📚 المكتبة صور تصميمات عاجباك.</span>`;
+  $("carChars").innerHTML = chars.map((a) => assetThumb(a, picked.has(a.id))).join("")
+    || `<span class="muted">مفيش شخصيات لسه. ضيف من 📚 المكتبة صور كل شخصية.</span>`;
+  const coach = car.coaches.find((c) => c.id === st.coach_id);
+  $("carCoachNote").textContent = coach ? (coach.instagram ? `@${coach.instagram} هيتكتب جنب صورته` : "⚠️ المدرب ده مالوش حساب إنستجرام متسجل") : "";
+  // الـ CTA
+  const cta = st.cta || { type: "auto" };
+  $("carCta").innerHTML = `<option value="auto">🤖 خليه يختار الأنسب</option>` +
+    // دعوات فيها اسم المدرب بتظهر بس في كاروسيل المدرب
+    car.cfg.ctas.filter((c) => kind === "coach" || !c.text.includes("{coach}"))
+      .map((c) => `<option value="${c.id}">${escapeHtml(c.label)}</option>`).join("") +
+    `<option value="custom">✍️ اكتبها بنفسك</option>`;
+  $("carCta").value = [...$("carCta").options].some((o) => o.value === cta.type) ? cta.type : "auto";
+  const tpl = car.cfg.ctas.find((c) => c.id === $("carCta").value);
+  const needs = (k) => !!tpl?.text.includes(`{${k}}`);
+  $("carCtaKeyword").hidden = !needs("keyword");
+  $("carCtaReward").hidden = !needs("reward");
+  $("carCtaText").hidden = $("carCta").value !== "custom";
+  for (const [id, k] of [["carCtaKeyword", "keyword"], ["carCtaReward", "reward"], ["carCtaText", "text"]]) {
+    if (document.activeElement !== $(id)) $(id).value = cta[k] || "";
+  }
+  $("carCtaPreview").textContent = ctaPreview();
+}
+
+function ctaPreview() {
+  const type = $("carCta").value;
+  if (type === "auto") return "الموديل هيختار الدعوة الأنسب للمحتوى.";
+  if (type === "custom") return $("carCtaText").value ? `آخر سلايد: ${$("carCtaText").value}` : "";
+  const tpl = car.cfg.ctas.find((c) => c.id === type);
+  if (!tpl) return "";
+  const coach = car.coaches.find((c) => c.id === car.cur.settings.coach_id);
+  const text = tpl.text.replace("{keyword}", $("carCtaKeyword").value || "…").replace("{reward}", $("carCtaReward").value || "…")
+    .replace("{coach}", (coach?.name || "…").replace(/^(الكوتش|كوتش|الكابتن|كابتن|coach|captain)\s+/i, ""));
+  return `آخر سلايد: ${text}`;
+}
+
+async function saveSetup(settings) {
+  try { await patchCarousel({ settings }); renderSetup(); } catch (err) { toast(err.message, true); }
+}
+$("carKinds").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-kind]");
+  if (b) saveSetup({ kind: b.dataset.kind });
+});
+$("carTemplates").addEventListener("click", (e) => {
+  const b = e.target.closest(".car-asset");
+  if (b) saveSetup({ template_id: b.dataset.id });
+});
+$("carChars").addEventListener("click", (e) => {
+  const b = e.target.closest(".car-asset");
+  if (!b) return;
+  const ids = new Set(car.cur.settings.character_ids || []);
+  if (ids.has(b.dataset.id)) ids.delete(b.dataset.id);
+  else if (ids.size >= 4) return toast("4 شخصيات بالكتير", true);
+  else ids.add(b.dataset.id);
+  saveSetup({ character_ids: [...ids] });
+});
+function ctaFromForm() {
+  return { type: $("carCta").value, keyword: $("carCtaKeyword").value, reward: $("carCtaReward").value, text: $("carCtaText").value };
+}
+$("carCta").addEventListener("change", () => saveSetup({ cta: ctaFromForm() }));
+for (const id of ["carCtaKeyword", "carCtaReward", "carCtaText"]) {
+  $(id).addEventListener("input", () => {
+    $("carCtaPreview").textContent = ctaPreview();
+    clearTimeout(car.ctaTimer);
+    car.ctaTimer = setTimeout(() => saveSetup({ cta: ctaFromForm() }), 600);
+  });
+}
+document.querySelector(".car-setup").addEventListener("click", (e) => {
+  const a = e.target.closest("[data-lib]");
+  if (!a) return;
+  e.preventDefault();
+  openLibrary(a.dataset.lib);
+});
 $("carName").addEventListener("change", async () => {
   try { await patchCarousel({ name: $("carName").value }); await loadCarList(); } catch (err) { toast(err.message, true); }
 });
@@ -177,7 +270,7 @@ $("carPlanBtn").onclick = () => {
   const c = car.cur;
   if (c.plan && !confirm("فيه نص مكتوب قبل كده. تكتبه من الأول من النقاش؟")) return;
   busyButton($("carPlanBtn"), "⏳ بيكتب...", async () => {
-    await patchCarousel({ settings: { slides: $("carCount").value, ratio: $("carRatio").value, coach_id: $("carCoach").value } });
+    await patchCarousel({ settings: { slides: $("carCount").value, ratio: $("carRatio").value, coach_id: $("carCoach").value, cta: ctaFromForm() } });
     car.cur = await api(`/api/carousels/${c.id}/plan`, { method: "POST" });
     car.sec = "plan";
     await loadCarList();
@@ -385,8 +478,7 @@ function renderBrand() {
     el.placeholder ||= cfg.defaults[el.dataset.b] || "";
   });
   $("brandLogo").innerHTML = cfg.logo ? `<img src="${cfg.logo}" alt="">` : `<span class="muted">مفيش لوجو. ارفعه من المونتاج ← البراند</span>`;
-  $("brandRefs").innerHTML = cfg.refs.map((r) => `<div class="ref"><img src="${r.url}" alt=""><button class="del" data-ref="${r.name}" title="امسح">✕</button></div>`).join("")
-    || `<span class="muted">مفيش صور لسه</span>`;
+  renderCtaEditor(cfg.ctas);
   $("brandTextModel").value = cfg.text_model;
   $("brandImageModel").innerHTML = Object.entries(cfg.image_models).map(([k, v]) => `<option value="${k}" ${k === cfg.image_family ? "selected" : ""}>${v}</option>`).join("");
   $("brandQuality").innerHTML = cfg.qualities.map((q) => `<option ${q === cfg.quality ? "selected" : ""}>${q}</option>`).join("");
@@ -403,8 +495,9 @@ $("brandSave").onclick = () => busyButton($("brandSave"), "⏳", async () => {
   document.querySelectorAll("#brandDialog [data-b]").forEach((el) => (brand[el.dataset.b] = el.value));
   car.cfg = await api("/api/carousel/settings", {
     method: "PUT", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ brand, text_model: $("brandTextModel").value, image_family: $("brandImageModel").value, quality: $("brandQuality").value }),
+    body: JSON.stringify({ brand, ctas: ctasFromEditor(), text_model: $("brandTextModel").value, image_family: $("brandImageModel").value, quality: $("brandQuality").value }),
   });
+  if (car.cur) renderSetup();
   $("carModelName").textContent = car.cfg.text_model;
   $("brandDialog").close();
   toast("✅ اتحفظ");
@@ -414,19 +507,105 @@ $("brandTest").onclick = () => busyButton($("brandTest"), "⏳", async () => {
   const r = await api("/api/carousel/test-model", { method: "POST" });
   $("brandTestOut").textContent = `✓ ${r.reply}`;
 });
-$("brandRefUpload").addEventListener("change", async (e) => {
+function renderCtaEditor(list) {
+  $("ctaList").innerHTML = list.map((c) => `<div class="cta-row" data-id="${escapeHtml(c.id)}">
+    <input type="text" data-c="label" value="${escapeHtml(c.label)}" placeholder="الاسم">
+    <input type="text" data-c="text" value="${escapeHtml(c.text)}" placeholder="النص اللي في آخر سلايد">
+    <button type="button" class="btn sm danger" data-c-del title="امسح">✕</button></div>`).join("");
+}
+function ctasFromEditor() {
+  return [...$("ctaList").querySelectorAll(".cta-row")].map((r) => ({
+    id: r.dataset.id, label: r.querySelector('[data-c="label"]').value, text: r.querySelector('[data-c="text"]').value,
+  }));
+}
+$("ctaList").addEventListener("click", (e) => {
+  if (e.target.closest("[data-c-del]")) e.target.closest(".cta-row").remove();
+});
+$("ctaAdd").onclick = () => renderCtaEditor([...ctasFromEditor(), { id: `c${Date.now().toString(36)}`, label: "", text: "" }]);
+$("ctaReset").onclick = () => renderCtaEditor(car.cfg.default_ctas);
+
+// ---------- المكتبة: تيمبليتس وشخصيات ----------
+async function openLibrary(tab = car.libTab) {
+  car.libTab = tab;
+  car.lib = await api("/api/carousel/library");
+  renderLibrary();
+  if (!$("libDialog").open) $("libDialog").showModal();
+}
+function renderLibrary() {
+  const tab = car.libTab;
+  document.querySelectorAll("#libTabs [data-t]").forEach((b) => b.classList.toggle("active", b.dataset.t === tab));
+  $("libHint").textContent = tab === "template"
+    ? "ارفع صور تصميمات كاروسيل عاجباك (سلايد أو أكتر من نفس التصميم). البرنامج هيقلّد التصميم ويحط كلامنا."
+    : "ارفع صور الشخصية من أكتر من زاوية وتعبير، وكل شخصية لوحدها باسمها. كل ما الصور أوضح الرسم هيطلع شبهها أكتر.";
+  $("libName").placeholder = tab === "template" ? "اسم التيمبليت" : "اسم الشخصية (مثلًا: كوتشي الشاب)";
+  const items = car.lib.filter((a) => a.kind === tab);
+  $("libItems").innerHTML = items.map((a) => `<div class="lib-item" data-id="${a.id}">
+      <div class="lib-imgs">${a.images.map((im) => `<div class="ref"><img src="${im.url}" alt=""><button class="del" data-img="${im.name}" title="امسح الصورة">✕</button></div>`).join("")}
+        <label class="lib-add" title="ضيف صور">＋<input type="file" data-add accept="image/png,image/jpeg,image/webp" multiple hidden></label></div>
+      <div class="lib-meta">
+        <input type="text" data-f="name" value="${escapeHtml(a.name)}">
+        <input type="text" data-f="notes" value="${escapeHtml(a.notes)}" placeholder="ملاحظات">
+        <button class="btn sm danger" data-del-asset>🗑️ امسح</button>
+      </div>
+    </div>`).join("") || `<p class="empty">لسه فاضية.</p>`;
+}
+$("libTabs").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-t]");
+  if (b) { car.libTab = b.dataset.t; renderLibrary(); }
+});
+$("libClose").onclick = () => $("libDialog").close();
+$("libDialog").addEventListener("close", () => car.cur && renderSetup());
+$("libFiles").addEventListener("change", async (e) => {
   const files = [...e.target.files];
   e.target.value = "";
-  for (const f of files) {
-    const form = new FormData();
-    form.append("file", f);
-    try { car.cfg = await api("/api/carousel/refs", { method: "POST", body: form }); } catch (err) { toast(err.message, true); break; }
+  if (!files.length) return;
+  if (!$("libName").value.trim()) { toast("اكتب الاسم الأول", true); return $("libName").focus(); }
+  const form = new FormData();
+  form.append("kind", car.libTab);
+  form.append("name", $("libName").value);
+  form.append("notes", $("libNotes").value);
+  files.forEach((f) => form.append("files", f));
+  try {
+    await api("/api/carousel/library", { method: "POST", body: form });
+    $("libName").value = $("libNotes").value = "";
+    await openLibrary();
+    toast("✅ اتضاف للمكتبة");
+  } catch (err) {
+    toast(err.message, true);
   }
-  renderBrand();
 });
-$("brandRefs").addEventListener("click", async (e) => {
-  const b = e.target.closest("[data-ref]");
-  if (!b) return;
-  car.cfg = await api(`/api/carousel/refs/${encodeURIComponent(b.dataset.ref)}`, { method: "DELETE" });
-  renderBrand();
+async function patchAsset(id, form) {
+  try {
+    await api(`/api/carousel/library/${id}`, { method: "PATCH", body: form });
+    await openLibrary();
+  } catch (err) {
+    toast(err.message, true);
+  }
+}
+$("libItems").addEventListener("change", (e) => {
+  const item = e.target.closest(".lib-item");
+  if (!item) return;
+  const form = new FormData();
+  if (e.target.matches("[data-add]")) {
+    [...e.target.files].forEach((f) => form.append("files", f));
+  } else if (e.target.dataset.f) {
+    form.append(e.target.dataset.f, e.target.value);
+  } else return;
+  patchAsset(item.dataset.id, form);
 });
+$("libItems").addEventListener("click", async (e) => {
+  const item = e.target.closest(".lib-item");
+  if (!item) return;
+  const img = e.target.closest("[data-img]");
+  if (img) {
+    const form = new FormData();
+    form.append("remove", img.dataset.img);
+    return patchAsset(item.dataset.id, form);
+  }
+  if (e.target.closest("[data-del-asset]")) {
+    if (!confirm("مسح ده من المكتبة؟")) return;
+    await api(`/api/carousel/library/${item.dataset.id}`, { method: "DELETE" });
+    await openLibrary();
+  }
+});
+$("carLibOpen").onclick = () => openLibrary();

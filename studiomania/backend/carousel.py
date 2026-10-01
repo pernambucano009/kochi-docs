@@ -35,19 +35,53 @@ SIZES = {
 }
 QUALITIES = ("low", "medium", "high", "xhigh", "max")
 
+# أنواع الكاروسيل
+KINDS = {
+    "template": "تيمبليت (تصميم جاهز)",
+    "characters": "شخصيات 2D",
+    "coach": "معلومات من مدرب",
+}
 
-def brand_block(brand: dict) -> str:
+# الدعوة في آخر سلايد (CTA). بتتعدّل من الهوية، و«auto» الموديل بيختار
+DEFAULT_CTAS = [
+    {"id": "comment", "label": "💬 اكتب كلمة في الكومنت", "text": "اكتب «{keyword}» بالتعليقات و{reward}"},
+    {"id": "follow", "label": "➕ تابعنا", "text": "تابعنا، كل يوم معلومة جديدة"},
+    {"id": "platform", "label": "📱 منصة كوتشي", "text": "كوتشي أول منصة عربية تربطك بمدربك المعتمد"},
+    {"id": "save", "label": "🔖 احفظ وشارك", "text": "احفظ البوست وأرسله لربعك اللي يحتاجونه"},
+    {"id": "coach", "label": "🧑‍🏫 تابع المدرب", "text": "تابع الكوتش {coach} وابدأ رحلتك في كوتشي"},
+]
+
+
+def brand_block(brand: dict, kind: str = "characters") -> str:
     b = {**DEFAULT_BRAND, **{k: v for k, v in (brand or {}).items() if v}}
-    lines = [
-        f"Brand: {b['name']}. {b['about']}",
-        f"Audience: {b['audience']}",
-        f"Illustration style: {b['style']}",
-        f"Typography: {b['font']}",
-    ]
+    lines = [f"Brand: {b['name']}. {b['about']}", f"Audience: {b['audience']}"]
+    if kind == "characters":
+        lines.append(f"Illustration style: {b['style']}")
+    lines.append(f"Typography: {b['font']}")
     if b.get("colors"):
         lines.append(f"Brand colors (use these as the palette, exact hex values): {b['colors']}")
     lines.append(f"Logo: {b['logo_rule']}")
     return "\n".join(lines)
+
+
+def cta_text(cta: dict | None, ctas: list[dict], coach_name: str | None) -> str | None:
+    """نص الـ CTA بعد ما نحط الكلمة والجايزة واسم المدرب. None = الموديل يختار."""
+    if not cta or cta.get("type") in (None, "", "auto"):
+        return None
+    if cta.get("type") == "custom":
+        return (cta.get("text") or "").strip() or None
+    base = next((c for c in ctas if c["id"] == cta["type"]), None)
+    if not base:
+        return None
+    text = base["text"]
+    if "{coach}" in text and not coach_name:
+        return None  # دعوة المدرب من غير مدرب: الموديل يختار بداله
+    text = text.replace("{keyword}", (cta.get("keyword") or "جدول").strip())
+    text = text.replace("{reward}", (cta.get("reward") or "نرسلك التفاصيل").strip())
+    # «تابع الكوتش {coach}» من غير ما تتكرر كلمة كوتش لو هي في الاسم
+    coach = re.sub(r"^(الكوتش|كوتش|الكابتن|كابتن|coach|captain)\s+", "", (coach_name or "").strip(), flags=re.I)
+    text = text.replace("{coach}", coach)
+    return re.sub(r"\s+", " ", text).strip()
 
 
 # ---------------------------------------------------------------- الكلام
@@ -58,7 +92,7 @@ DIALECT_RULES = """قواعد الكتابة على السلايدات:
 - من غير تشكيل، ومن غير إيموجي جوه نص السلايد.
 - جمل قصيرة جدًا: العنوان من 2 لـ 6 كلمات، والكلام تحته 20 كلمة بالكتير.
 - معلومات صحيحة علميًا ومفيدة، ومن غير وعود مبالغ فيها.
-- أول سلايد هوك يوقّف السكرول، وآخر سلايد دعوة لكوتشي (مثلًا: ابدأ مع مدربك في كوتشي)."""
+- أول سلايد هوك يوقّف السكرول."""
 
 
 def chat_system(brand: dict) -> str:
@@ -78,27 +112,52 @@ PLAN_SCHEMA = """{
   "caption": "كابشن البوست باللهجة السعودية",
   "hashtags": ["#هاشتاق", "..."],
   "slides": [
-    {"headline": "عنوان السلايد", "body": "الكلام تحت العنوان (ممكن يبقى فاضي)", "visual": "وصف الرسمة بالإنجليزي: الشخصية بتعمل إيه، العناصر، التكوين"}
+    {"headline": "عنوان السلايد", "body": "الكلام تحت العنوان (ممكن يبقى فاضي)", "visual": "وصف الرسمة بالإنجليزي"}
   ]
 }"""
 
 
-def plan_messages(brand: dict, chat: list[dict], slides: int, coach_name: str | None) -> list[dict]:
-    coach = f"\nالكاروسيل ده بيظهر فيه المدرب {coach_name} كشخصية (نفس شكله في الصورة المرجعية)." if coach_name else ""
-    ask = f"""اكتب الكاروسيل النهائي من النقاش اللي فات، في {slides} سلايدات بالظبط.{coach}
+def kind_writing_rules(ctx: dict) -> str:
+    kind = ctx.get("kind")
+    if kind == "coach" and ctx.get("coach"):
+        c = ctx["coach"]
+        handle = f" (@{c['instagram']})" if c.get("instagram") else ""
+        return (f"- الكاروسيل ده معلومات ونصايح من المدرب {c['name']}{handle}: الكلام على لسانه أو منسوب له، "
+                f"وأول سلايد يقدّمه (مثلًا: نصيحة من كوتش {c['name']}).\n"
+                "- حقل visual بالإنجليزي: مكان صورة المدرب الحقيقية في السلايد وتعبيره، وأي أيقونات بسيطة.")
+    if kind == "template":
+        return "- حقل visual بالإنجليزي ويوصف المحتوى المرسوم بس (أيقونات وعناصر)، لأن التصميم نفسه ثابت من التيمبليت."
+    names = "، ".join(ch["name"] for ch in ctx.get("characters") or []) or "شخصيات البراند"
+    return f"- حقل visual بالإنجليزي ويوصف الشخصيات ({names}) بتعمل إيه في كل سلايد، بنفس الشكل في كل السلايدات."
+
+
+def cta_rule(ctx: dict) -> str:
+    text = ctx.get("cta_text")
+    if text:
+        return f"- آخر سلايد هو الدعوة (CTA) ونصها لازم يكون بالمعنى ده بالظبط، ولو فيه كلمة بين « » تفضل زي ما هي: {text}\n- الكابشن يكرر نفس الدعوة."
+    return ("- آخر سلايد دعوة (CTA): اختار الأنسب للمحتوى من دول: اكتب كلمة في الكومنت ونرسلك حاجة، "
+            "أو تابعنا عشان كل يوم معلومة جديدة، أو كوتشي أول منصة عربية تربطك بمدربك المعتمد، أو احفظ البوست وشاركه.")
+
+
+def plan_messages(brand: dict, chat: list[dict], slides: int, ctx: dict) -> list[dict]:
+    ask = f"""اكتب الكاروسيل النهائي من النقاش اللي فات، في {slides} سلايدات بالظبط.
 {DIALECT_RULES}
-- حقل visual بالإنجليزي ويوصف رسمة 2D flat vector بنفس الشخصيات في كل السلايدات.
+{kind_writing_rules(ctx)}
+{cta_rule(ctx)}
 رجّع JSON بس، من غير أي كلام قبله أو بعده، بالشكل ده:
 {PLAN_SCHEMA}"""
     return [{"role": "system", "content": chat_system(brand)}, *chat[-20:], {"role": "user", "content": ask}]
 
 
-def polish_messages(brand: dict, plan: dict) -> list[dict]:
+def polish_messages(brand: dict, plan: dict, ctx: dict | None = None) -> list[dict]:
+    keep = ""
+    if ctx and ctx.get("cta_text"):
+        keep = f"\n- سيب معنى الدعوة في آخر سلايد زي ما هو، وأي كلمة بين « » متتغيرش: {ctx['cta_text']}"
     ask = f"""راجع نص الكاروسيل ده ونقّحه:
 - حوّل أي كلمة مش سعودية للهجة السعودية البيضاء.
 - صحّح أي غلطة إملائية أو همزة أو تاء مربوطة.
 - قصّر أي جملة طويلة من غير ما المعنى يضيع.
-- متغيّرش عدد السلايدات ولا حقل visual.
+- متغيّرش عدد السلايدات ولا حقل visual.{keep}
 {DIALECT_RULES}
 رجّع نفس الـ JSON بالظبط بعد التنقيح، من غير أي كلام تاني:
 {json.dumps(plan, ensure_ascii=False, indent=1)}"""
@@ -167,7 +226,28 @@ def slide_text(s: dict) -> str:
     return " | ".join(parts) or "(no text on this slide)"
 
 
-def overview_prompt(brand: dict, plan: dict, ratio: str, refs: dict) -> str:
+def kind_design_rules(ctx: dict) -> str:
+    kind = ctx.get("kind")
+    if kind == "template":
+        t = ctx.get("template") or {}
+        return ("DESIGN: follow the template reference images exactly. Copy their design system: layout grid, "
+                "background, shapes and decorations, color palette, typography style, sizes and text positions, "
+                "logo position. Keep the same look on every slide; only the text and the small content visuals change."
+                + (f" Template notes: {t['notes']}" if t.get("notes") else ""))
+    if kind == "coach":
+        c = ctx.get("coach") or {}
+        handle = f' and the handle "@{c["instagram"]}"' if c.get("instagram") else ""
+        return (f"DESIGN: a clean, premium fitness-tips carousel featuring the real coach {c.get('name', '')}. "
+                "Use the coach photo reference as a real photographic cut-out of the same person (do not turn it into "
+                "an illustration, do not change the face, body or skin tone). Show the coach on the first and last "
+                f'slides at least, with the name "{c.get("name", "")}"{handle} written small near the photo.')
+    names = ", ".join(ch["name"] for ch in ctx.get("characters") or [])
+    return ("DESIGN: 2D flat vector character carousel. Reuse the character reference images exactly: same faces, "
+            "proportions, hair, outfits and colors, drawn in the same flat style. Never redesign the characters."
+            + (f" Characters: {names}." if names else ""))
+
+
+def overview_prompt(brand: dict, plan: dict, ratio: str, refs: dict, ctx: dict) -> str:
     n = len(plan["slides"])
     cols, rows = overview_grid(n)
     lines = [
@@ -176,17 +256,18 @@ def overview_prompt(brand: dict, plan: dict, ratio: str, refs: dict) -> str:
         "Slide 1 is the top-left panel and the order continues left to right, row by row. "
         "Every panel is a finished slide. All panels share one visual system: same background treatment, "
         "same color palette, same typography, same characters, same logo position.",
-        brand_block(brand),
+        kind_design_rules(ctx),
+        brand_block(brand, ctx.get("kind", "characters")),
         TEXT_RULES,
     ]
     lines += reference_notes(refs)
     lines.append("Slides:")
     for i, s in enumerate(plan["slides"], 1):
-        lines.append(f"Slide {i}: {slide_text(s)}. Visual: {s.get('visual') or 'supporting flat illustration'}")
+        lines.append(f"Slide {i}: {slide_text(s)}. Visual: {s.get('visual') or 'supporting visual'}")
     return "\n".join(lines)
 
 
-def slide_prompt(brand: dict, plan: dict, k: int, ratio: str, refs: dict) -> str:
+def slide_prompt(brand: dict, plan: dict, k: int, ratio: str, refs: dict, ctx: dict) -> str:
     n = len(plan["slides"])
     s = plan["slides"][k - 1]
     lines = [
@@ -197,25 +278,27 @@ def slide_prompt(brand: dict, plan: dict, k: int, ratio: str, refs: dict) -> str
     ]
     if refs.get("previous"):
         lines.append("Reference image 2 is the finished previous slide: match its exact style, colors, fonts and character design.")
-    lines += [brand_block(brand), TEXT_RULES]
+    lines += [kind_design_rules(ctx), brand_block(brand, ctx.get("kind", "characters")), TEXT_RULES]
     lines += reference_notes(refs)
     lines.append(f"Slide {k} text: {slide_text(s)}")
-    lines.append(f"Visual: {s.get('visual') or 'supporting flat illustration'}")
+    lines.append(f"Visual: {s.get('visual') or 'supporting visual'}")
     return "\n".join(lines)
+
+
+def _idx(items: list[int]) -> str:
+    return ", ".join(str(i) for i in items)
 
 
 def reference_notes(refs: dict) -> list[str]:
     notes = []
     if refs.get("logo"):
         notes.append(f"Reference image {refs['logo']} is the brand logo: place it small and unchanged, never redraw it.")
-    if refs.get("characters"):
-        idx = ", ".join(str(i) for i in refs["characters"])
-        notes.append(f"Reference images {idx} show the brand's 2D flat vector characters and style: reuse them exactly.")
+    if refs.get("template"):
+        notes.append(f"Reference images {_idx(refs['template'])} are the design TEMPLATE to copy.")
+    for name, idx in refs.get("characters") or []:
+        notes.append(f"Reference images {_idx(idx)} show the character \"{name}\": reproduce this exact character.")
     if refs.get("coach"):
-        notes.append(
-            f"Reference image {refs['coach']} is the coach {refs.get('coach_name') or ''}: draw them as a 2D flat vector "
-            "character that clearly resembles this person (same face shape, hairstyle or head covering, facial hair if any, skin tone and outfit colors)."
-        )
+        notes.append(f"Reference image {refs['coach']} is a real photo of the coach {refs.get('coach_name') or ''}.")
     return notes
 
 
@@ -232,7 +315,7 @@ def mock_reply(chat: list[dict]) -> str:
     )
 
 
-def mock_plan(slides: int) -> str:
+def mock_plan(slides: int, cta: str | None = None) -> str:
     items = [
         {"headline": "تمرّن كل يوم وما تشوف نتيجة؟", "body": "", "visual": "tired character looking at a mirror"},
         {"headline": "العضلة تكبر وانت ترتاح", "body": "التمرين يكسّر الألياف، والنوم يبنيها من جديد", "visual": "character sleeping, muscle icon glowing"},
@@ -244,4 +327,5 @@ def mock_plan(slides: int) -> str:
     while len(items) < slides:
         items.insert(-1, {"headline": f"نصيحة رقم {len(items)}", "body": "كلام تجريبي للسلايد", "visual": "flat icon"})
     return json.dumps({"title": "الراحة جزء من التمرين", "caption": "الراحة مو رفاهية 💪", "hashtags": ["#كوتشي", "#لياقة"],
-                       "slides": items[:slides]}, ensure_ascii=False)
+                       "slides": items[: slides - 1] + [{"headline": cta, "body": "", "visual": "call to action"} if cta else items[-1]]},
+                      ensure_ascii=False)

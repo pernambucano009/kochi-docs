@@ -665,7 +665,8 @@
           <div class="car-layout">
             <aside class="panel car-list-panel">
               <div class="panel-head"><h2>الكاروسيلات</h2>
-                <button class="btn sm" id="carBrandOpen" title="الهوية البصرية والموديلات">🎨 الهوية</button></div>
+                <span class="row"><button class="btn sm" id="carLibOpen" title="تيمبليتس وشخصيات">📚 المكتبة</button>
+                <button class="btn sm" id="carBrandOpen" title="الهوية البصرية والموديلات">🎨 الهوية</button></span></div>
               <form class="row" id="carNewForm"><input type="text" id="carNewName" placeholder="موضوع الكاروسيل"><button class="btn primary sm" type="submit">＋ جديد</button></form>
               <ul class="car-list" id="carList"></ul>
               <p class="empty" id="carListEmpty">لسه مفيش كاروسيلات. اكتب موضوع ودوس جديد.</p>
@@ -695,10 +696,37 @@
                   <button class="btn sm" data-q="اقترح عليا 5 أفكار كاروسيل عن الموضوع ده">💡 اقترح 5 أفكار</button>
                   <button class="btn sm" data-q="اختار أقوى فكرة وقولي ليه، واقترح هوك أقوى لأول سلايد">🎯 أقوى فكرة</button>
                 </div>
+                <div class="car-setup">
+                  <div class="car-setup-title">نوع الكاروسيل</div>
+                  <div class="car-kinds" id="carKinds">
+                    <button type="button" data-kind="template"><b>🧩 تيمبليت</b><small>نفس تصميم جاهز من المكتبة</small></button>
+                    <button type="button" data-kind="characters"><b>🧑‍🎨 شخصيات 2D</b><small>شخصيات كوتشي المرسومة</small></button>
+                    <button type="button" data-kind="coach"><b>🏋️ معلومات من مدرب</b><small>صورة المدرب الحقيقية واسمه</small></button>
+                  </div>
+                  <div class="car-pick" id="carPickTemplate" hidden>
+                    <div class="car-setup-title">اختار التيمبليت <a href="#" class="lib-link" data-lib="template">＋ ضيف تيمبليت</a></div>
+                    <div class="car-assets" id="carTemplates"></div>
+                  </div>
+                  <div class="car-pick" id="carPickChars" hidden>
+                    <div class="car-setup-title">اختار الشخصيات (لحد 4) <a href="#" class="lib-link" data-lib="character">＋ ضيف شخصية</a></div>
+                    <div class="car-assets" id="carChars"></div>
+                  </div>
+                  <div class="car-pick" id="carPickCoach" hidden>
+                    <label class="car-setup-title">المدرب <select id="carCoach"></select></label>
+                    <span class="hint" id="carCoachNote"></span>
+                  </div>
+                  <div class="car-setup-title">الدعوة في آخر سلايد (CTA)</div>
+                  <div class="car-cta">
+                    <select id="carCta"></select>
+                    <input type="text" id="carCtaKeyword" placeholder="الكلمة اللي يكتبوها (مثلًا: جدول)" hidden>
+                    <input type="text" id="carCtaReward" placeholder="هياخدوا إيه (مثلًا: نرسلك جدول التمرين)" hidden>
+                    <input type="text" id="carCtaText" placeholder="اكتب الدعوة بنفسك" hidden>
+                  </div>
+                  <div class="hint" id="carCtaPreview"></div>
+                </div>
                 <div class="car-plan-bar">
                   <label>عدد السلايدات <select id="carCount"></select></label>
                   <label>المقاس <select id="carRatio"><option value="9:16">9:16 تيك توك وستوري</option><option value="4:5">4:5 فيد إنستجرام</option></select></label>
-                  <label>المدرب <select id="carCoach"></select></label>
                   <button class="btn primary" id="carPlanBtn">📋 اكتب الكاروسيل</button>
                 </div>
               </section>
@@ -826,10 +854,10 @@
     </div>
     <div>
       <div class="field">اللوجو <div class="brand-logo" id="brandLogo"></div><span class="hint">نفس لوجو المونتاج. بيتغيّر من المونتاج ← البراند.</span></div>
-      <div class="field">صور الشخصيات والستايل (لحد 12)
-        <div class="brand-refs" id="brandRefs"></div>
-        <label class="btn sm">＋ ضيف صور<input type="file" id="brandRefUpload" accept="image/png,image/jpeg,image/webp" multiple hidden></label>
-        <span class="hint">صور شخصيات الـ 2D اللي بتستخدموها أو كاروسيل قديم عاجبك. بتتبعت مع كل رسمة كمرجع.</span></div>
+      <div class="field">أنواع الدعوة (CTA)
+        <div class="cta-list" id="ctaList"></div>
+        <div class="row"><button type="button" class="btn sm" id="ctaAdd">＋ دعوة جديدة</button><button type="button" class="btn sm" id="ctaReset">↺ رجّع الأصلي</button></div>
+        <span class="hint">في النص: {keyword} = الكلمة اللي يكتبوها، {reward} = هياخدوا إيه، {coach} = اسم المدرب.</span></div>
       <label class="field">موديل الكلام (من Atlas) <input type="text" id="brandTextModel" dir="ltr"></label>
       <div class="row"><button class="btn sm" id="brandTest">🧪 جرّب الموديل</button><span class="muted" id="brandTestOut"></span></div>
       <label class="field">موديل الصور <select id="brandImageModel"></select></label>
@@ -838,6 +866,17 @@
     </div>
   </div>
   <div class="row gap-top"><button class="btn primary" id="brandSave">💾 احفظ</button></div>
+</dialog>
+<dialog class="bulk-dlg" id="libDialog">
+  <div class="panel-head"><h2>📚 مكتبة الكاروسيل</h2><button class="btn sm" id="libClose">إغلاق</button></div>
+  <nav class="car-steps lib-tabs" id="libTabs"><button data-t="template" class="active">🧩 تيمبليتس</button><button data-t="character">🧑‍🎨 شخصيات 2D</button></nav>
+  <p class="hint" id="libHint"></p>
+  <form class="lib-new" id="libNew">
+    <input type="text" id="libName" placeholder="الاسم" required>
+    <input type="text" id="libNotes" placeholder="ملاحظات (اختياري): الألوان، الخط، شخصية الكاركتر...">
+    <label class="btn sm primary">⬆ ارفع صور وضيف<input type="file" id="libFiles" accept="image/png,image/jpeg,image/webp" multiple hidden></label>
+  </form>
+  <div class="lib-items" id="libItems"></div>
 </dialog>
 <dialog class="bulk-dlg" id="handlesDialog">
   <div class="panel-head"><h2>📥 حسابات المدربين من الملف</h2><button class="btn sm" id="handlesClose">إغلاق</button></div>
