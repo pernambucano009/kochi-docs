@@ -339,6 +339,55 @@ def reference_notes(refs: dict) -> list[str]:
     return notes
 
 
+# ---------------------------------------------------------------- قراءة صور المكتبة (موديل الرؤية)
+
+DESCRIBE_FOCUS = {
+    "template": "a social-media carousel TEMPLATE. Describe: layout grid and composition, text hierarchy and where "
+                "headline/body/numbers sit, typography (serif/sans/condensed/handwritten, weights, case, sizes), "
+                "the exact color palette as hex codes, shapes, icons and decorative motifs, background treatment, "
+                "how slides connect to each other, overall mood. If it is a mockup photo (phone, table, perspective), "
+                "describe only the flat slide designs.",
+    "style": "an ILLUSTRATION STYLE reference. Describe how things are drawn: line work, shapes, body proportions, "
+             "faces, shading and lighting, textures (grain, watercolor...), color approach, level of detail, mood. "
+             "Do not describe the specific people or scene.",
+    "character": "a CHARACTER reference. Describe the character so it can be redrawn identically: gender, age, "
+                 "body type, skin tone, hair or head covering, face details, outfit and colors, accessories, "
+                 "personality in the pose, drawing style.",
+    "coach": "a fitness COACH character. Describe them so they can be redrawn identically: gender, age, body type, "
+             "skin tone, hair/beard or head covering, face details, outfit and colors, accessories, drawing style.",
+}
+
+
+def describe_messages(kind: str, image_urls: list[str]) -> list[dict]:
+    """رسالة لموديل الرؤية: يكتب اسم عربي قصير وملاحظات تصميم بالإنجليزي (JSON)."""
+    content: list[dict] = [{"type": "text", "text": (
+        f"The images show {DESCRIBE_FOCUS.get(kind, DESCRIBE_FOCUS['template'])}\n"
+        "Reply with JSON only: {\"name\": \"a short catchy Arabic name of 2-4 words that describes the look "
+        "(Egyptian/Saudi everyday words, no quotes)\", \"notes\": \"compact English design notes, 60-110 words, "
+        "concrete and specific, written as instructions for an image model\"}"
+    )}]
+    content += [{"type": "image_url", "image_url": {"url": u}} for u in image_urls]
+    return [{"role": "user", "content": content}]
+
+
+def parse_description(text: str) -> dict:
+    m = re.search(r"\{.*\}", text or "", re.S)
+    if not m:
+        raise ValueError("الموديل ما رجعش وصف")
+    data = json.loads(m.group(0), strict=False)  # بعض الموديلات بتحط سطر جديد جوه النص
+    name = str(data.get("name") or "").strip().strip('"«»')[:60]
+    notes = re.sub(r"\s+", " ", str(data.get("notes") or "")).strip()[:1500]
+    if not notes:
+        raise ValueError("الموديل ما رجعش وصف")
+    return {"name": name, "notes": notes}
+
+
+def mock_description(kind: str) -> dict:
+    return {"name": {"template": "تصميم تجريبي جريء", "style": "ستايل تجريبي ناعم"}.get(kind, "شخصية تجريبية"),
+            "notes": "Mock description: bold sans headline top-start, big slide number, charcoal and cream panels, "
+                     "teal accent, thin arrow connecting slides."}
+
+
 # ---------------------------------------------------------------- وضع التجربة (من غير Atlas)
 
 def mock_reply(chat: list[dict]) -> str:

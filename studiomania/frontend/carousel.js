@@ -504,6 +504,7 @@ function renderBrand() {
   $("brandLogo").innerHTML = cfg.logo ? `<img src="${cfg.logo}" alt="">` : `<span class="muted">مفيش لوجو. ارفعه من المونتاج ← البراند</span>`;
   renderCtaEditor(cfg.ctas);
   $("brandTextModel").value = cfg.text_model;
+  $("brandVisionModel").value = cfg.vision_model;
   $("brandImageModel").innerHTML = Object.entries(cfg.image_models).map(([k, v]) => `<option value="${k}" ${k === cfg.image_family ? "selected" : ""}>${v}</option>`).join("");
   $("brandQuality").innerHTML = cfg.qualities.map((q) => `<option ${q === cfg.quality ? "selected" : ""}>${q}</option>`).join("");
 }
@@ -519,7 +520,7 @@ $("brandSave").onclick = () => busyButton($("brandSave"), "⏳", async () => {
   document.querySelectorAll("#brandDialog [data-b]").forEach((el) => (brand[el.dataset.b] = el.value));
   car.cfg = await api("/api/carousel/settings", {
     method: "PUT", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ brand, ctas: ctasFromEditor(), text_model: $("brandTextModel").value, image_family: $("brandImageModel").value, quality: $("brandQuality").value }),
+    body: JSON.stringify({ brand, ctas: ctasFromEditor(), text_model: $("brandTextModel").value, vision_model: $("brandVisionModel").value, image_family: $("brandImageModel").value, quality: $("brandQuality").value }),
   });
   if (car.cur) renderSetup();
   $("carModelName").textContent = car.cfg.text_model;
@@ -596,11 +597,12 @@ function libDetail(a) {
     <div class="row wrap">
       <button class="btn sm" data-back>→ رجوع للمعرض</button>
       ${car.cur ? `<button class="btn sm ${libSelected(a) ? "" : "primary"}" data-pick>${libSelected(a) ? "✓ متختار (دوس تلغيه)" : "✓ اختاره للكاروسيل"}</button>` : ""}
+      <button class="btn sm" data-describe title="البرنامج يبص على الصور ويكتب الخطوط والألوان والتفاصيل">✨ اقرا الصور واكتب الوصف</button>
       <button class="btn sm danger" data-del-asset>🗑️ امسح من المكتبة</button>
     </div>
     <div class="lib-meta">
       <label>الاسم<input type="text" data-f="name" value="${escapeHtml(a.name)}"></label>
-      <label>ملاحظات للرسم (اختياري)<textarea data-f="notes" rows="3" placeholder="الألوان، الخط، أي تفاصيل">${escapeHtml(a.notes)}</textarea></label>
+      <label>الوصف (البرنامج بيكتبه لوحده، وتقدر تعدّله)<textarea data-f="notes" rows="4" placeholder="الألوان، الخط، أي تفاصيل">${escapeHtml(a.notes)}</textarea></label>
       ${a.kind === "coach" ? `<label>إنستجرام<input type="text" data-f="handle" dir="ltr" value="${a.handle ? `@${escapeHtml(a.handle)}` : ""}" placeholder="@instagram"></label>` : ""}
     </div>
     <div class="lib-big">${a.images.map((im) => `<div class="ref"><a href="${im.url}" target="_blank"><img src="${im.url}" alt=""></a><button class="del" data-img="${im.name}" title="امسح الصورة">✕</button></div>`).join("")}
@@ -661,12 +663,25 @@ $("libItems").addEventListener("change", async (e) => {
     const res = await api("/api/carousel/library", { method: "POST", body: form });
     car.libEdit = res.id;
     await openLibrary();
-    libStatus(`${uploadedMsg(res, files.length)} في «${res.name}». تقدر تغيّر الاسم هنا أو ترجع للمعرض`);
+    // البرنامج يقرا الصور لوحده ويكتب الاسم والوصف
+    await describeAsset(res.id, uploadedMsg(res, files.length));
   } catch (err) {
     libStatus(`✕ ${err.message}`, true);
     $("libUploadBtn")?.classList.remove("busy");
   }
 });
+async function describeAsset(id, prefix = "") {
+  libStatus(`${prefix ? `${prefix} · ` : ""}🔍 البرنامج بيبص على الصور ويكتب الاسم والخطوط والألوان...`);
+  document.querySelector("[data-describe]")?.classList.add("busy");
+  try {
+    const a = await api(`/api/carousel/library/${id}/describe`, { method: "POST" });
+    await openLibrary();
+    libStatus(`✅ اتكتب الوصف لـ«${a.name}». راجعه وعدّل لو حابب`);
+  } catch (err) {
+    document.querySelector("[data-describe]")?.classList.remove("busy");
+    libStatus(`${prefix ? `${prefix} · ` : ""}✕ ${err.message}. اكتب الوصف بنفسك أو جرّب تاني`, true);
+  }
+}
 async function patchAsset(id, form, count = 0) {
   if (count) libStatus(`⏳ بيرفع ${count} صورة...`);
   try {
@@ -705,6 +720,7 @@ $("libItems").addEventListener("click", async (e) => {
   if (!item) return;
   if (e.target.closest("[data-back]")) { car.libEdit = null; libStatus(""); return renderLibrary(); }
   if (e.target.closest("[data-pick]")) return libPick(car.lib.find((x) => x.id === item.dataset.id));
+  if (e.target.closest("[data-describe]")) return describeAsset(item.dataset.id);
   const img = e.target.closest("[data-img]");
   if (img) {
     const form = new FormData();

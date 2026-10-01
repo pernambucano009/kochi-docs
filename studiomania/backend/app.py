@@ -3029,6 +3029,7 @@ CAROUSEL_JOBS: set[str] = set()  # كاروسيلات بترسم دلوقتي
 def carousel_settings() -> dict:
     return {
         "text_model": auth.get_setting("carousel_text_model") or atlas.DEFAULT_TEXT_MODEL,
+        "vision_model": auth.get_setting("carousel_vision_model") or atlas.DEFAULT_VISION_MODEL,
         "image_family": auth.get_setting("carousel_image_family") or "sunburst",
         "quality": auth.get_setting("carousel_quality") or "high",
     }
@@ -3071,6 +3072,7 @@ def get_carousel_settings():
 
 class CarouselSettingsIn(BaseModel):
     text_model: str | None = None
+    vision_model: str | None = None
     image_family: str | None = None
     quality: str | None = None
     brand: dict | None = None
@@ -3081,6 +3083,8 @@ class CarouselSettingsIn(BaseModel):
 def save_carousel_settings(body: CarouselSettingsIn):
     if body.text_model is not None:
         auth.set_setting("carousel_text_model", body.text_model.strip() or None)
+    if body.vision_model is not None:
+        auth.set_setting("carousel_vision_model", body.vision_model.strip() or None)
     if body.image_family is not None:
         if body.image_family not in atlas.IMAGE_MODELS:
             raise HTTPException(400, "موديل الصور غير معروف")
@@ -3293,6 +3297,33 @@ async def import_library_pack(file: UploadFile = File(...)):
         current.update({k: str(v) for k, v in manifest["brand"].items() if k in cz.DEFAULT_BRAND})
         auth.set_setting("brand", json.dumps(current, ensure_ascii=False))
     return {"added": added, "updated": updated}
+
+
+@app.post("/api/carousel/library/{aid}/describe")
+def describe_asset(aid: str):
+    """موديل الرؤية بيبص على الصور ويكتب الملاحظات (الخطوط والألوان والتقسيم)، واسم لو الاسم تلقائي."""
+    with closing(db()) as conn:
+        r = get_asset(conn, aid)
+        images = asset_to_dict(r)["images"][:4]
+    if atlas.mock_mode():
+        d = cz.mock_description(r["kind"])
+    else:
+        if not atlas.api_key():
+            raise HTTPException(400, "حط مفتاح Atlas الأول عشان البرنامج يقرا الصور")
+        try:
+            urls = [atlas.reference_url(LIBRARY_DIR / aid / im["name"]) for im in images]
+            reply = atlas.chat(cz.describe_messages(r["kind"], urls), carousel_settings()["vision_model"],
+                               temperature=0.3, max_tokens=800, json_mode=True)
+            d = cz.parse_description(reply)
+        except (atlas.AtlasError, httpx.HTTPError, ValueError) as exc:
+            raise HTTPException(400, f"ما قدرتش أقرا الصور: {exc}") from exc
+    with closing(db()) as conn, conn:
+        # الاسم بيتغيّر بس لو لسه تلقائي («تيمبليت 3»)، واسم المدرب ما بيتغيّرش
+        auto = re.fullmatch(rf"{re.escape(ASSET_KINDS.get(r['kind'], ''))} \d+", r["name"] or "")
+        if d["name"] and auto and r["kind"] != "coach":
+            conn.execute("UPDATE carousel_assets SET name = ? WHERE id = ?", (d["name"], aid))
+        conn.execute("UPDATE carousel_assets SET notes = ? WHERE id = ?", (d["notes"], aid))
+        return asset_to_dict(get_asset(conn, aid))
 
 
 @app.delete("/api/carousel/library/{aid}")

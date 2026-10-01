@@ -278,6 +278,8 @@ def transcribe(audio_path: Path, duration: float) -> list[dict]:
 
 LLM_URL = os.environ.get("ATLASCLOUD_LLM_URL", f"{BASE_URL}/v1")
 DEFAULT_TEXT_MODEL = "deepseek-ai/DeepSeek-V3.1"
+# موديل بيشوف الصور (بيقرا التيمبليت والستايل ويكتب وصفه)
+DEFAULT_VISION_MODEL = "Qwen/Qwen3-VL-235B-A22B-Instruct"
 
 
 def chat(messages: list[dict], model: str, temperature: float = 0.8, max_tokens: int = 4000, json_mode: bool = False) -> str:
