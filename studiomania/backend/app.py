@@ -4576,6 +4576,30 @@ def run_take(eid: str, tid: str) -> None:
         setp(status="failed", error=str(exc)[:400])
 
 
+@app.delete("/api/episodes/{eid}/shots/{shot_id}")
+def delete_shot(eid: str, shot_id: str, merge: str = "prev"):
+    """تشيل لقطة، ووقتها بيتضاف على اللي قبلها (prev) أو اللي بعدها (next) عشان الحلقة تفضل متلاصقة على الصوت.
+    نسخها (الفيديوهات) بتروح للنسخ المحفوظة."""
+    def fn(d):
+        shots = d["shots"]
+        s = find_shot(d, shot_id)
+        if len(shots) < 2:
+            raise HTTPException(400, "دي آخر لقطة في الحلقة")
+        k = shots.index(s)
+        if merge == "next" and k + 1 < len(shots) or k == 0:
+            other = shots[k + 1]
+            other["start"] = s["start"]
+        else:
+            other = shots[k - 1]
+            other["end"] = s["end"]
+        other["lines"] = sorted(set(other.get("lines") or []) | set(s.get("lines") or []))
+        shots.remove(s)
+        for n, x in enumerate(shots, 1):
+            x["n"] = n
+    update_episode(eid, fn)
+    return episode_response(eid)
+
+
 @app.post("/api/episodes/{eid}/takes/{take_id}/retry")
 def retry_take(eid: str, take_id: str):
     """نسخة فشلت: لو الطلب كان اتبعت لـ Seedance بنكمّل متابعته وتحميله (من غير دفع تاني)، غير كده بيتبعت من الأول."""

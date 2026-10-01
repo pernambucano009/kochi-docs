@@ -301,7 +301,8 @@ function renderShotsTab() {
     const ready = chosen?.approved;
     return `${head}<article class="shot ${s.approved ? "approved" : ""} ${ready ? "ready" : ""}" data-shot="${s.id}">
       <header><b>${s.n}</b><span class="t">${serFmt(s.start)} → ${serFmt(s.end)}</span><span class="dur">${s.duration.toFixed(1)}ث</span>
-        <button class="btn sm" data-play="${s.start}:${s.end}" title="اسمع الكلام اللي على اللقطة">▶</button></header>
+        <button class="btn sm" data-play="${s.start}:${s.end}" title="اسمع الكلام اللي على اللقطة">▶</button>
+        <button class="btn sm danger" data-del-shot title="احذف اللقطة">🗑️</button></header>
       <div class="said" data-no-i18n>${said}</div>
       <div class="frame">${frame}</div>
       ${frames}
@@ -375,6 +376,7 @@ $("serShots").addEventListener("click", async (e) => {
       ser.ep = await api(`/api/episodes/${ser.ep.id}/shots/${id}/generate`, { method: "POST" });
       return renderSeries();
     }
+    if (e.target.closest("[data-del-shot]")) return askDeleteShot(id);
     if (e.target.closest("[data-frame-go]")) {
       ser.ep = await api(`/api/episodes/${ser.ep.id}/frames?shot_id=${id}`, { method: "POST" });
       return renderSeries();
@@ -428,6 +430,33 @@ $("serPoolList").addEventListener("click", async (e) => {
   catch (err) { toast(err.message, true); }
 });
 
+// حذف لقطة: وقتها يتضاف على اللي قبلها أو اللي بعدها (الحلقة تفضل على طول الصوت)
+function askDeleteShot(id) {
+  const shots = ser.ep.shots;
+  const k = shots.findIndex((s) => s.id === id);
+  const s = shots[k];
+  const prev = shots[k - 1];
+  const next = shots[k + 1];
+  if (!prev && !next) return toast("دي آخر لقطة في الحلقة", true);
+  $("serDelNum").textContent = s.n;
+  $("serDelInfo").textContent = `مدتها ${s.duration.toFixed(1)} ثانية. الوقت ده يتضاف على أنهي لقطة؟ ${s.takes.length ? "الفيديوهات بتاعتها هتروح للنسخ المحفوظة." : ""}`;
+  $("serDelPrev").hidden = !prev;
+  $("serDelNext").hidden = !next;
+  if (prev) $("serDelPrev").textContent = `→ اللي قبلها (${prev.n}): ${prev.duration.toFixed(1)} ← ${(prev.duration + s.duration).toFixed(1)}ث`;
+  if (next) $("serDelNext").textContent = `← اللي بعدها (${next.n}): ${next.duration.toFixed(1)} ← ${(next.duration + s.duration).toFixed(1)}ث`;
+  const go = async (merge) => {
+    $("serDelDialog").close();
+    try {
+      ser.ep = await api(`/api/episodes/${ser.ep.id}/shots/${id}?merge=${merge}`, { method: "DELETE" });
+      renderSeries();
+      toast(`اتحذفت اللقطة ${s.n}`);
+    } catch (err) { toast(err.message, true); }
+  };
+  $("serDelPrev").onclick = () => go("prev");
+  $("serDelNext").onclick = () => go("next");
+  $("serDelCancel").onclick = () => $("serDelDialog").close();
+  $("serDelDialog").showModal();
+}
 $("serFramesGo").onclick = () => busyButton($("serFramesGo"), "⏳", async () => {
   ser.ep = await api(`/api/episodes/${ser.ep.id}/frames`, { method: "POST" });
   renderSeries();
