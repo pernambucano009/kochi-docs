@@ -275,7 +275,8 @@ function takeThumb(t, chosen) {
   const media = t.url ? lightVideo(t.url, 'muted loop playsinline') : `<div class="car-wait">${busy ? `<div class="spin"></div>` : ""}${TAKE_STATE[t.status] || ""}</div>`;
   return `<div class="take ${t.id === chosen ? "sel" : ""} ${t.status} ${t.approved ? "ok" : ""}" data-take="${t.id}" title="${t.source === "upload" ? escapeHtml(t.name || "فيديو مرفوع") : "Seedance"}${t.error ? ` — ${escapeHtml(t.error)}` : ""}">
     ${media}<em>${t.approved ? "✅" : t.source === "upload" ? "⬆" : "✨"} ${t.duration ? `${t.duration.toFixed(1)}ث` : ""}</em>
-    ${busy ? "" : `<b data-del-take title="امسح النسخة">✕</b>`}</div>`;
+    ${busy ? "" : `<b data-del-take title="امسح النسخة">✕</b>`}
+    ${t.status === "failed" && t.source === "seedance" ? `<button class="retry" data-retry-take title="حاول تاني (لو الطلب اتبعت بيكمّل من غير دفع تاني)">↻</button>` : ""}</div>`;
 }
 const FRAME_STATE = { queued: "⏳ مستنية", working: "🎨 بترسم...", failed: "✕ فشلت" };
 function renderShotsTab() {
@@ -396,6 +397,10 @@ $("serShots").addEventListener("click", async (e) => {
     }
     const take = e.target.closest("[data-take]");
     if (!take) return;
+    if (e.target.closest("[data-retry-take]")) {
+      ser.ep = await api(`/api/episodes/${ser.ep.id}/takes/${take.dataset.take}/retry`, { method: "POST" });
+      return renderSeries();
+    }
     if (e.target.closest("[data-del-take]")) {
       if (!confirm("مسح النسخة دي نهائي؟")) return;
       ser.ep = await api(`/api/episodes/${ser.ep.id}/takes/${take.dataset.take}`, { method: "DELETE" });

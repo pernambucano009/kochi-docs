@@ -4548,23 +4548,41 @@ def run_take(eid: str, tid: str) -> None:
                             f"color=c=0x{(hash(tid) & 0xFFFFFF):06x}:s=496x864:d={t['gen_duration']}:r=24",
                             "-c:v", "libx264", "-pix_fmt", "yuv420p", str(dest)], check=True, capture_output=True, timeout=120)
         else:
-            refs = [SERIES_DIR / r["series_id"] / "refs" / f for f in sdata["refs"]][:4]
-            if t.get("frame"):
-                # صورة الستوري بورد أول مرجع: نفس الكادر والتكوين
-                refs.insert(0, ep_dir(eid) / "frames" / t["frame"])
-            body = {
-                "model": series_settings()["video_model"], "prompt": t["prompt"],
-                "reference_images": [atlas.upload_media(p) for p in refs if p.exists()],
-                "duration": t["gen_duration"], "resolution": atlas.RESOLUTION, "ratio": atlas.RATIO,
-                "generate_audio": False, "watermark": False,
-            }
-            pid = atlas.submit_video(body)
+            # لو الطلب اتبعت قبل كده (إعادة محاولة) بنكمّل متابعته من غير ما ندفع تاني
+            pid = t.get("prediction_id")
+            if not pid:
+                refs = [SERIES_DIR / r["series_id"] / "refs" / f for f in sdata["refs"]][:4]
+                if t.get("frame"):
+                    # صورة الستوري بورد أول مرجع: نفس الكادر والتكوين
+                    refs.insert(0, ep_dir(eid) / "frames" / t["frame"])
+                body = {
+                    "model": series_settings()["video_model"], "prompt": t["prompt"],
+                    "reference_images": [atlas.upload_media(p) for p in refs if p.exists()],
+                    "duration": t["gen_duration"], "resolution": atlas.RESOLUTION, "ratio": atlas.RATIO,
+                    "generate_audio": False, "watermark": False,
+                }
+                pid = atlas.submit_video(body)
             setp(prediction_id=pid)
             url = atlas.wait_for(pid, lambda _s: None)
             atlas.download(url, dest)
         setp(status="done", file=dest.name, duration=round(probe_duration(dest), 2), error=None)
     except Exception as exc:  # noqa: BLE001
         setp(status="failed", error=str(exc)[:400])
+
+
+@app.post("/api/episodes/{eid}/takes/{take_id}/retry")
+def retry_take(eid: str, take_id: str):
+    """نسخة فشلت: لو الطلب كان اتبعت لـ Seedance بنكمّل متابعته وتحميله (من غير دفع تاني)، غير كده بيتبعت من الأول."""
+    def fn(d):
+        t = d["takes"].get(take_id)
+        if t is None:
+            raise HTTPException(404, "النسخة مش موجودة")
+        if t["status"] != "failed" or t.get("source") != "seedance":
+            raise HTTPException(400, "النسخة دي مش فاشلة")
+        t.update(status="queued", error=None)
+    update_episode(eid, fn)
+    series_executor.submit(run_take, eid, take_id)
+    return episode_response(eid)
 
 
 @app.post("/api/episodes/{eid}/shots/{shot_id}/generate")
