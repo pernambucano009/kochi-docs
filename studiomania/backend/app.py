@@ -4538,19 +4538,26 @@ def shot_prompt(s: dict, character: str) -> str:
 
 
 def seedance_ref(path: Path) -> Path:
-    """Seedance بيرفض الصور اللي ضلعها أقل من 300 أو أكتر من 6000 بكسل: نسخة متظبطة (JPG) قبل الرفع."""
+    """Seedance بيرفض الصور اللي ضلعها أقل من 300 أو أكتر من 6000 بكسل، أو نسبتها (العرض÷الطول) برة 0.4–2.5.
+    بنعمل نسخة متظبطة (JPG): هوامش للصور الطويلة أو العريضة أوي (من غير ما نقص منها)، وبعدين تكبير أو تصغير."""
     probe = subprocess.run([ffmpeg_exe(), "-hide_banner", "-i", str(path)], capture_output=True, text=True, timeout=30).stderr
     m = re.search(r"Video:.*?(\d{2,5})x(\d{2,5})", probe)
     w, h = (int(m.group(1)), int(m.group(2))) if m else (0, 0)
-    if w and h and 300 <= min(w, h) and max(w, h) <= 6000 and path.suffix.lower() in (".jpg", ".jpeg", ".png"):
+    ok_ratio = w and h and 0.45 <= w / h <= 2.2
+    if ok_ratio and 300 <= min(w, h) and max(w, h) <= 6000 and path.suffix.lower() in (".jpg", ".jpeg", ".png"):
         return path
-    out = TMP_DIR / "seedance_refs" / f"{path.parent.name}-{path.stem}-{int(path.stat().st_mtime)}.jpg"
+    out = TMP_DIR / "seedance_refs" / f"{path.parent.name}-{path.stem}-{int(path.stat().st_mtime)}-v2.jpg"
     if not out.exists():
         out.parent.mkdir(parents=True, exist_ok=True)
-        # أصغر ضلع 720 (أو أكبر لو الصورة أكبر)، وأكبر ضلع لحد 4096
-        vf = ("scale='if(lt(iw,ih),max(720,min(iw,4096)),-2)':'if(lt(iw,ih),-2,max(720,min(ih,4096)))',"
-              "scale='min(iw,4096)':'min(ih,4096)':force_original_aspect_ratio=decrease")
-        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(path), "-vf", vf,
+        steps = []
+        if w and h and w / h < 0.45:  # طويلة أوي: هوامش على الجنبين
+            steps.append("pad=ceil(ih*0.5/2)*2:ih:(ow-iw)/2:0:color=0x1a1a1a")
+        elif w and h and w / h > 2.2:  # عريضة أوي: هوامش فوق وتحت
+            steps.append("pad=iw:ceil(iw/2/2)*2:0:(oh-ih)/2:color=0x1a1a1a")
+        # أصغر ضلع 720 على الأقل، وأكبر ضلع 4096 بالكتير
+        steps.append("scale='if(lt(iw,ih),max(720,min(iw,4096)),-2)':'if(lt(iw,ih),-2,max(720,min(ih,4096)))'")
+        steps.append("scale='min(iw,4096)':'min(ih,4096)':force_original_aspect_ratio=decrease")
+        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(path), "-vf", ",".join(steps),
                         "-q:v", "2", str(out)], check=True, capture_output=True, timeout=60)
     return out
 
