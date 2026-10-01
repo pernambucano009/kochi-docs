@@ -110,6 +110,11 @@ def presign_urls(data) -> tuple[str | None, str | None]:
 
 
 def upload_video(path: Path) -> str:
+    return upload_file(path)
+
+
+def upload_file(path: Path) -> str:
+    """بيرفع ملف (فيديو أو صورة) لـ Zernio ويرجّع اللينك بتاعه."""
     content_type = mimetypes.guess_type(path.name)[0] or "video/mp4"
     with _client() as c:
         data = _check(
@@ -184,6 +189,40 @@ def schedule(
     remote_id = post.get("_id") or post.get("id")
     if not remote_id:
         raise PublishError(f"تسليم البوست: الرد مفيهوش رقم البوست: {str(data)[:200]}")
+    return remote_id
+
+
+def schedule_carousel(images: list[Path], caption: str, when_utc: str, publish_now: bool, options: dict | None = None) -> str:
+    """كاروسيل صور على إنستجرام (لحد 10 صور). إنستجرام مش بيقبل موسيقى على الكاروسيل من الـ API."""
+    linked = accounts(refresh=True)
+    if "instagram" not in linked:
+        raise PublishError(f"حساب إنستجرام مش مربوط في Zernio. اربطه من {DASHBOARD_URL}")
+    if not 2 <= len(images) <= 10:
+        raise PublishError("الكاروسيل لازم يكون من 2 لـ 10 صور")
+    opts = options or {}
+    urls = [upload_file(p) for p in images]
+    data = {}
+    tags = opts.get("ig_tags") or []
+    if tags:
+        # التاج على السلايد اللي اختاره (mediaIndex بيبدأ من صفر)، تحت في النص
+        index = min(max(int(opts.get("tag_slide") or 1), 1), len(urls)) - 1
+        data["userTags"] = [{"username": t, "x": 0.5, "y": 0.85, "mediaIndex": index} for t in tags]
+        if opts.get("ig_collab"):
+            data["collaborators"] = tags[:3]
+    entry = {"platform": "instagram", "accountId": linked["instagram"]["id"]}
+    if data:
+        entry["platformSpecificData"] = data
+    body = {"content": caption, "platforms": [entry], "mediaItems": [{"type": "image", "url": u} for u in urls]}
+    if publish_now:
+        body["publishNow"] = True
+    else:
+        body["scheduledFor"] = when_utc
+    with _client() as c:
+        data = _check(c.post(f"{BASE_URL}/posts", json=body), "تسليم الكاروسيل")
+    post = data.get("post", data) if isinstance(data, dict) else {}
+    remote_id = post.get("_id") or post.get("id")
+    if not remote_id:
+        raise PublishError(f"تسليم الكاروسيل: الرد مفيهوش رقم البوست: {str(data)[:200]}")
     return remote_id
 
 

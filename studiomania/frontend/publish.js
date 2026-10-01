@@ -321,7 +321,7 @@ function renderPosts() {
       if (p.status === "scheduled" && p.sent) label = "متجدول في Zernio ✓";
       const when = new Date(p.scheduled_at).toLocaleString(UI_LOCALE(), { weekday: "long", day: "numeric", month: "long", hour: "numeric", minute: "2-digit" });
       return `<li data-id="${p.id}" class="${p.status === "failed" ? "failed" : ""}">
-        ${p.export_url ? lightVideo(p.export_url, "muted") : ""}
+        ${p.image_url ? `<img class="post-thumb" src="${p.image_url}" alt="">` : p.export_url ? lightVideo(p.export_url, "muted") : ""}
         <div class="info">
           <span class="when">${when}</span>
           <span>${escapeHtml(p.export_name || (p.from_zernio ? "🔗 من Zernio" : "⚠️ الفيديو اتمسح"))} · ${p.platforms.map((k) => pub.platforms[k] || k).join("، ")}</span>
@@ -331,7 +331,7 @@ function renderPosts() {
         </div>
         <span class="pill ${cls}">${label}</span>
         <span class="acts">
-          ${p.status === "scheduled" || (p.status === "failed" && !p.sent) ? `<button class="btn sm" data-act="edit">✎ تعديل</button>` : ""}
+          ${!p.carousel_id && (p.status === "scheduled" || (p.status === "failed" && !p.sent)) ? `<button class="btn sm" data-act="edit">✎ تعديل</button>` : ""}
           ${p.status === "failed" ? `<button class="btn sm" data-act="retry">↻ إعادة المحاولة</button>` : ""}
           ${p.status !== "publishing" && p.status !== "sending" ? `<button class="btn sm danger" data-act="delete">${p.status === "scheduled" ? "إلغاء" : "حذف"}</button>` : ""}
         </span>

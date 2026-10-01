@@ -2360,6 +2360,16 @@ def delete_export(export_id: str):
 
 
 def post_to_dict(r: sqlite3.Row) -> dict:
+    if r["carousel_id"]:
+        # كاروسيل صور: الصورة الأولى بدل الفيديو
+        first = CAROUSELS_DIR / r["carousel_id"] / "post" / "01.jpg"
+        return {**_post_dict(r), "carousel_id": r["carousel_id"],
+                "export_name": f"🖼️ {r['carousel_name']}" if r["carousel_name"] else "⚠️ الكاروسيل اتمسح",
+                "export_url": None, "image_url": f"/media/carousels/{r['carousel_id']}/post/01.jpg" if first.exists() else None}
+    return _post_dict(r)
+
+
+def _post_dict(r: sqlite3.Row) -> dict:
     return {
         "id": r["id"],
         "export_id": r["export_id"],
@@ -2379,8 +2389,9 @@ def post_to_dict(r: sqlite3.Row) -> dict:
 
 
 POSTS_QUERY = (
-    "SELECT p.*, e.name AS export_name, e.filename AS export_filename, e.source AS export_source "
-    "FROM posts p LEFT JOIN exports e ON e.id = p.export_id"
+    "SELECT p.*, e.name AS export_name, e.filename AS export_filename, e.source AS export_source, "
+    "c.name AS carousel_name FROM posts p LEFT JOIN exports e ON e.id = p.export_id "
+    "LEFT JOIN carousels c ON c.id = p.carousel_id"
 )
 
 
@@ -2409,6 +2420,7 @@ def list_posts():
 
 
 class PostOptions(BaseModel):
+    tag_slide: int = 1  # في الكاروسيل: التاج على أنهي سلايد
     ig_tags: list[str] = []  # حسابات تتعمل تاج في إنستجرام
     ig_collab: bool = False  # البوست يظهر كمان في حساب المدرب (كولاب) لو وافق
     cover_ms: int | None = None  # الغلاف: فريم من الفيديو (بالملّي ثانية) لإنستجرام وتيك توك
@@ -2437,7 +2449,7 @@ def clean_options(opts: PostOptions) -> str:
     if opts.ig_collab and len(tags) > 3:
         raise HTTPException(400, "الكولاب بيقبل 3 حسابات بالكتير")
     cover = max(0, int(opts.cover_ms)) if opts.cover_ms is not None else None
-    return json.dumps({"ig_tags": tags, "ig_collab": opts.ig_collab, "cover_ms": cover})
+    return json.dumps({"ig_tags": tags, "ig_collab": opts.ig_collab, "cover_ms": cover, "tag_slide": max(1, int(opts.tag_slide or 1))})
 
 
 def clean_post(conn: sqlite3.Connection, body: PostIn) -> tuple[str, str, str]:
@@ -2468,6 +2480,15 @@ def send_post(post_id: str, old_remote_id: str | None = None) -> None:
             r = conn.execute(POSTS_QUERY + " WHERE p.id = ?", (post_id,)).fetchone()
         if r is None or r["status"] != "sending":
             return
+        if r["carousel_id"]:
+            with closing(db()) as conn:
+                _, cdata = load_carousel(conn, r["carousel_id"])
+            remote_id = publisher.schedule_carousel(
+                post_images(r["carousel_id"], cdata), r["caption"], r["scheduled_at"],
+                publish_now=r["scheduled_at"] <= now(), options=json.loads(r["options"]) if r["options"] else {},
+            )
+            set_post(post_id, status="scheduled", remote_id=remote_id, error=None)
+            return
         if not r["export_filename"] or not (EXPORTS_DIR / r["export_filename"]).exists():
             raise publisher.PublishError("الفيديو اتمسح من الفولدر")
         remote_id = publisher.schedule(
@@ -2481,8 +2502,9 @@ def send_post(post_id: str, old_remote_id: str | None = None) -> None:
             options=json.loads(r["options"]) if r["options"] else {},
         )
         set_post(post_id, status="scheduled", remote_id=remote_id, error=None)
-    except (publisher.PublishError, httpx.HTTPError) as exc:
-        set_post(post_id, status="failed", remote_id=None, error=f"مقدرتش أسلّم البوست لـ Zernio: {exc}"[:500])
+    except (publisher.PublishError, httpx.HTTPError, HTTPException, subprocess.SubprocessError) as exc:
+        detail = exc.detail if isinstance(exc, HTTPException) else exc
+        set_post(post_id, status="failed", remote_id=None, error=f"مقدرتش أسلّم البوست لـ Zernio: {detail}"[:500])
 
 
 def after_save(post_id: str, when: str, old_remote_id: str | None) -> None:
@@ -2515,9 +2537,11 @@ def create_post(body: PostIn):
 @app.put("/api/posts/{post_id}")
 def update_post(post_id: str, body: PostIn):
     with closing(db()) as conn, conn:
-        row = conn.execute("SELECT status, remote_id FROM posts WHERE id = ?", (post_id,)).fetchone()
+        row = conn.execute("SELECT status, remote_id, carousel_id FROM posts WHERE id = ?", (post_id,)).fetchone()
         if row is None:
             raise HTTPException(404, "البوست غير موجود")
+        if row["carousel_id"]:
+            raise HTTPException(400, "ده كاروسيل: الغيه من هنا وانشره تاني من صفحة الكاروسيل")
         if row["status"] in ("sending", "publishing", "published"):
             raise HTTPException(400, "البوست ده اتنشر أو بيتبعت دلوقتي")
         if row["status"] == "failed" and row["remote_id"]:
@@ -2719,6 +2743,8 @@ with closing(db()) as _conn, _conn:
         _conn.execute("ALTER TABLE posts ADD COLUMN remote_id TEXT")
     if "remote_media" not in {c[1] for c in _conn.execute("PRAGMA table_info(posts)")}:
         _conn.execute("ALTER TABLE posts ADD COLUMN remote_media TEXT")
+    if "carousel_id" not in {c[1] for c in _conn.execute("PRAGMA table_info(posts)")}:
+        _conn.execute("ALTER TABLE posts ADD COLUMN carousel_id TEXT")
     # إعدادات إضافية للبوست: تاج إنستجرام، كولاب، الغلاف
     if "options" not in {c[1] for c in _conn.execute("PRAGMA table_info(posts)")}:
         _conn.execute("ALTER TABLE posts ADD COLUMN options TEXT")
@@ -3351,7 +3377,7 @@ def delete_asset(aid: str):
 def new_carousel_data() -> dict:
     return {
         "chat": [], "plan": None,
-        "settings": {"slides": 6, "ratio": "9:16", "kind": "characters", "coach_id": None,
+        "settings": {"slides": 6, "ratio": "4:5", "mix": True, "coach_id": None, "style_id": None,
                      "template_id": None, "character_ids": [], "cta": {"type": "auto"}},
         "overview": {"status": "idle", "file": None, "error": None, "approved": False},
         "slides": [],
@@ -3362,7 +3388,25 @@ def load_carousel(conn: sqlite3.Connection, cid: str) -> tuple[sqlite3.Row, dict
     row = conn.execute("SELECT * FROM carousels WHERE id = ?", (cid,)).fetchone()
     if row is None:
         raise HTTPException(404, "الكاروسيل غير موجود")
-    return row, json.loads(row["data"])
+    data = json.loads(row["data"])
+    mix_settings(data["settings"])
+    return row, data
+
+
+def mix_settings(st: dict) -> None:
+    """الكاروسيلات القديمة كان ليها نوع واحد: نسيب بس الاختيارات اللي كانت شغالة فيه، والباقي يتشال."""
+    if st.get("mix"):
+        return
+    kind = st.get("kind", "characters")
+    if kind != "template":
+        st["template_id"] = None
+    if kind != "characters":
+        st["character_ids"] = []
+    if kind == "coach":
+        st["style_id"] = None
+    else:
+        st["coach_id"] = st["coach_asset_id"] = None
+    st["mix"] = True
 
 
 def save_carousel(conn: sqlite3.Connection, cid: str, data: dict, name: str | None = None) -> None:
@@ -3454,8 +3498,6 @@ def patch_carousel(cid: str, body: CarouselPatch):
                 st["ratio"] = body.settings["ratio"]
             if "coach_id" in body.settings:
                 st["coach_id"] = body.settings["coach_id"] or None
-            if "kind" in body.settings and body.settings["kind"] in cz.KINDS:
-                st["kind"] = body.settings["kind"]
             if "template_id" in body.settings:
                 st["template_id"] = body.settings["template_id"] or None
             if "coach_asset_id" in body.settings:
@@ -3532,62 +3574,42 @@ def carousel_to_dict_by_id(cid: str, data: dict) -> dict:
     return carousel_to_dict(row, data)
 
 
-def coach_for(data: dict) -> sqlite3.Row | None:
-    coach_id = data["settings"].get("coach_id")
-    if not coach_id:
-        return None
-    with closing(db()) as conn:
-        return conn.execute("SELECT * FROM coaches WHERE id = ?", (coach_id,)).fetchone()
-
-
 def carousel_context(data: dict) -> tuple[dict, dict]:
-    """نوع الكاروسيل وتفاصيله (للبرومبت) + الصور المرجعية بتاعته."""
-    st = {"kind": "characters", "template_id": None, "character_ids": [], "cta": {"type": "auto"}, **data["settings"]}
-    is_coach = st["kind"] == "coach"
-    coach = None
-    ctx: dict = {"kind": st["kind"], "characters": []}
+    """اختيارات الكاروسيل مع بعض (تيمبليت + ستايل + شخصيات + مدرب) للبرومبت، والصور المرجعية بتاعتها."""
+    st = {"template_id": None, "character_ids": [], "cta": {"type": "auto"}, **data["settings"]}
+    ctx: dict = {"characters": []}
     assets: dict = {"template": None, "characters": [], "coach": None, "coach_asset": None, "style": None}
     with closing(db()) as conn:
-        if is_coach and st.get("coach_asset_id"):
-            r = conn.execute("SELECT * FROM carousel_assets WHERE id = ? AND kind = 'coach'", (st["coach_asset_id"],)).fetchone()
-            if r:
-                ctx["coach"] = {"name": r["name"], "instagram": r["handle"], "notes": r["notes"]}
-                assets["coach_asset"] = asset_to_dict(r)
-        elif is_coach:
-            coach = coach_for(data)  # الكاروسيلات القديمة: مدرب من مكتبة المدربين بتاعة التوليد
+        def asset(aid: str | None, kind: str) -> sqlite3.Row | None:
+            if not aid:
+                return None
+            return conn.execute("SELECT * FROM carousel_assets WHERE id = ? AND kind = ?", (aid, kind)).fetchone()
+
+        if r := asset(st.get("template_id"), "template"):
+            ctx["template"] = {"name": r["name"], "notes": r["notes"]}
+            assets["template"] = asset_to_dict(r)
+        for aid in st.get("character_ids") or []:
+            if r := asset(aid, "character"):
+                ctx["characters"].append({"name": r["name"], "notes": r["notes"]})
+                assets["characters"].append(asset_to_dict(r))
+        if r := asset(st.get("style_id"), "style"):
+            ctx["style"] = {"name": r["name"], "notes": r["notes"]}
+            assets["style"] = asset_to_dict(r)
+        # المدرب من مكتبة المدربين نفسها (صفحة المدربين)، والقديم من مكتبة الكاروسيل لو لسه متسجل
+        coach = conn.execute("SELECT * FROM coaches WHERE id = ?", (st["coach_id"],)).fetchone() if st.get("coach_id") else None
+        if coach:
+            ctx["coach"] = {"name": coach["name"], "instagram": coach["instagram"]}
             assets["coach"] = coach
-        if st["kind"] == "template" and st.get("template_id"):
-            r = conn.execute("SELECT * FROM carousel_assets WHERE id = ?", (st["template_id"],)).fetchone()
-            if r:
-                ctx["template"] = {"name": r["name"], "notes": r["notes"]}
-                assets["template"] = asset_to_dict(r)
-        if st["kind"] == "characters":
-            for aid in st.get("character_ids") or []:
-                r = conn.execute("SELECT * FROM carousel_assets WHERE id = ?", (aid,)).fetchone()
-                if r:
-                    ctx["characters"].append({"name": r["name"], "notes": r["notes"]})
-                    assets["characters"].append(asset_to_dict(r))
-        # ستايل الرسم: للشخصيات والتيمبليت بس (المدرب بيترسم زي صورته)
-        if not is_coach and st.get("style_id"):
-            r = conn.execute("SELECT * FROM carousel_assets WHERE id = ? AND kind = 'style'", (st["style_id"],)).fetchone()
-            if r:
-                ctx["style"] = {"name": r["name"], "notes": r["notes"]}
-                assets["style"] = asset_to_dict(r)
-    if coach:
-        ctx["coach"] = {"name": coach["name"], "instagram": coach["instagram"]}
+        elif r := asset(st.get("coach_asset_id"), "coach"):
+            ctx["coach"] = {"name": r["name"], "instagram": r["handle"], "notes": r["notes"]}
+            assets["coach_asset"] = asset_to_dict(r)
     ctx["cta_text"] = cz.cta_text(st.get("cta"), cta_list(), (ctx.get("coach") or {}).get("name"))
     return ctx, assets
 
 
 def check_kind_ready(data: dict) -> None:
-    st = data["settings"]
-    kind = st.get("kind", "characters")
-    if kind == "template" and not st.get("template_id"):
-        raise HTTPException(400, "اختار التيمبليت الأول")
-    if kind == "characters" and not (st.get("character_ids") or st.get("style_id")):
-        raise HTTPException(400, "اختار شخصية أو ستايل رسم واحد على الأقل من المكتبة")
-    if kind == "coach" and not (st.get("coach_asset_id") or st.get("coach_id")):
-        raise HTTPException(400, "اختار المدرب الأول")
+    """كل الاختيارات اختيارية: من غير حاجة بيرسم بستايل كوتشي وشخصيات جديدة."""
+    return None
 
 
 @app.post("/api/carousels/{cid}/plan")
@@ -3658,7 +3680,8 @@ def mock_image(dest: Path, size: str, label: str, hue: int) -> None:
 
 
 def reference_list(first: list[Path], assets: dict) -> tuple[list[Path], dict]:
-    """ترتيب الصور المرجعية وأرقامها عشان البرومبت يقول «الصورة رقم كذا» (لحد 16 صورة)."""
+    """ترتيب الصور المرجعية وأرقامها عشان البرومبت يقول «الصورة رقم كذا» (لحد 16 صورة).
+    لما الاختيارات تتجمع كل واحد بياخد نصيب: المدرب الأول، وبعده الستايل والتيمبليت، والباقي للشخصيات."""
     files, refs = list(first), {}
 
     def add(path: Path) -> int | None:
@@ -3667,41 +3690,26 @@ def reference_list(first: list[Path], assets: dict) -> tuple[list[Path], dict]:
         files.append(path)
         return len(files)
 
+    def add_asset(a: dict, limit: int) -> list[int]:
+        return [i for img in a["images"][:max(0, limit)] if (i := add(LIBRARY_DIR / a["id"] / img["name"]))]
+
     logo = logo_path()
     if logo and (i := add(logo)):
         refs["logo"] = i
-    coach = assets.get("coach")
-    coach_asset = assets.get("coach_asset")
-    room = 16 - len(files) - (1 if coach else 0) - (min(3, len(coach_asset["images"])) if coach_asset else 0)
-    tpl = assets.get("template")
-    if tpl:
-        idx = [i for img in tpl["images"][:room] if (i := add(LIBRARY_DIR / tpl["id"] / img["name"]))]
-        if idx:
-            refs["template"] = idx
-    style = assets.get("style")
-    if style:
-        # الستايل ياخد لحد 6 صور، أو 3 لو فيه شخصيات معاه
-        n = min(len(style["images"]), room, 3 if assets.get("characters") else 6)
-        idx = [i for img in style["images"][:n] if (i := add(LIBRARY_DIR / style["id"] / img["name"]))]
-        if idx:
-            refs["style"] = idx
-            room -= len(idx)
-    chars = assets.get("characters") or []
-    if chars:
-        per = max(1, room // len(chars))
-        refs["characters"] = []
-        for ch in chars:
-            idx = [i for img in ch["images"][:per] if (i := add(LIBRARY_DIR / ch["id"] / img["name"]))]
-            if idx:
-                refs["characters"].append((ch["name"], idx))
+    tpl, style, chars = assets.get("template"), assets.get("style"), assets.get("characters") or []
+    coach, coach_asset = assets.get("coach"), assets.get("coach_asset")
     if coach and (i := add(COACHES_DIR / coach["image_filename"])):
-        refs["coach"] = [i]
-        refs["coach_name"] = coach["name"]
-    if coach_asset:
-        idx = [i for img in coach_asset["images"][:3] if (i := add(LIBRARY_DIR / coach_asset["id"] / img["name"]))]
-        if idx:
-            refs["coach"] = idx
-            refs["coach_name"] = coach_asset["name"]
+        refs["coach"], refs["coach_name"] = [i], coach["name"]
+    elif coach_asset and (idx := add_asset(coach_asset, 3)):
+        refs["coach"], refs["coach_name"] = idx, coach_asset["name"]
+    others = sum(1 for x in (tpl, style) if x) + (1 if chars else 0)
+    if style and (idx := add_asset(style, 6 if others == 1 else 3)):
+        refs["style"] = idx
+    if tpl and (idx := add_asset(tpl, 12 if others == 1 else 4)):
+        refs["template"] = idx
+    if chars:
+        per = max(1, (16 - len(files)) // len(chars))
+        refs["characters"] = [(ch["name"], idx) for ch in chars if (idx := add_asset(ch, per))]
     return files, refs
 
 
@@ -3841,6 +3849,113 @@ def carousel_slides(cid: str, only: int | None = None):
     return get_carousel(cid)
 
 
+def post_images(cid: str, data: dict) -> list[Path]:
+    """السلايدات بمقاس النشر (1080×1350 JPG)، بتتعمل مرة وبتتحدّث لو السلايد اتغيّر."""
+    w, h = cz.POST_SIZES.get(data["settings"].get("ratio"), cz.POST_SIZES["4:5"])
+    out_dir = CAROUSELS_DIR / cid / "post"
+    out_dir.mkdir(exist_ok=True)
+    out = []
+    for k, s in enumerate(data["slides"], 1):
+        src = CAROUSELS_DIR / cid / s["file"] if s.get("file") else None
+        if not src or not src.exists():
+            continue
+        dest = out_dir / f"{k:02d}.jpg"
+        if not dest.exists() or dest.stat().st_mtime < src.stat().st_mtime:
+            subprocess.run(
+                [ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src),
+                 "-vf", f"scale={w}:{h}:force_original_aspect_ratio=increase,crop={w}:{h}", "-q:v", "2", str(dest)],
+                check=True, capture_output=True, timeout=60,
+            )
+        out.append(dest)
+    return out
+
+
+def ready_slides(cid: str) -> tuple[sqlite3.Row, dict, list[Path]]:
+    with closing(db()) as conn:
+        row, data = load_carousel(conn, cid)
+    if not data["slides"] or any(s.get("status") != "done" or not s.get("file") for s in data["slides"]):
+        raise HTTPException(400, "خلّص رسم كل السلايدات الأول")
+    if cid in CAROUSEL_JOBS:
+        raise HTTPException(400, "استنى لحد ما الرسم يخلص")
+    return row, data, post_images(cid, data)
+
+
+class CarouselPostIn(BaseModel):
+    caption: str = ""
+    scheduled_at: datetime
+    options: PostOptions = PostOptions()
+
+
+@app.post("/api/carousels/{cid}/publish")
+def publish_carousel(cid: str, body: CarouselPostIn):
+    """كاروسيل صور على إنستجرام عن طريق Zernio (فوري أو مجدول)، مع تاج المدرب على سلايد."""
+    _, _, images = ready_slides(cid)
+    if not 2 <= len(images) <= 10:
+        raise HTTPException(400, "إنستجرام بيقبل كاروسيل من 2 لـ 10 صور")
+    when = body.scheduled_at
+    if when.tzinfo is None:
+        raise HTTPException(400, "الميعاد لازم يكون فيه المنطقة الزمنية")
+    when = when.astimezone(timezone.utc).isoformat(timespec="seconds")
+    options = clean_options(body.options)
+    post_id = uuid.uuid4().hex[:12]
+    status = "sending" if publisher.service_name() == "zernio" else "scheduled"
+    with closing(db()) as conn, conn:
+        conn.execute(
+            "INSERT INTO posts (id, export_id, carousel_id, caption, platforms, scheduled_at, status, options, created_at, updated_at) "
+            "VALUES (?, '', ?, ?, ?, ?, ?, ?, ?, ?)",
+            (post_id, cid, body.caption.strip(), json.dumps(["instagram"]), when, status, options, now(), now()),
+        )
+    after_save(post_id, when, None)
+    with closing(db()) as conn:
+        return post_to_dict(conn.execute(POSTS_QUERY + " WHERE p.id = ?", (post_id,)).fetchone())
+
+
+class ReelIn(BaseModel):
+    music_id: str | None = None
+    seconds: float = 3.0  # مدة كل سلايد
+
+
+@app.post("/api/carousels/{cid}/reel")
+def carousel_reel(cid: str, body: ReelIn):
+    """ريل من السلايدات + موسيقى من المكتبة (إنستجرام مش بيقبل موسيقى على الكاروسيل من الـ API).
+    السلايد 4:5 في نص فيديو 9:16 على خلفية كريمي، وبيتحفظ في الفيديوهات الجاهزة عشان يتنشر زي أي فيديو."""
+    row, data, images = ready_slides(cid)
+    sec = max(1.5, min(8.0, float(body.seconds or 3)))
+    total = sec * len(images)
+    music = None
+    if body.music_id:
+        with closing(db()) as conn:
+            music = conn.execute("SELECT * FROM audio WHERE id = ? AND kind = 'music'", (body.music_id,)).fetchone()
+        if music is None:
+            raise HTTPException(400, "الموسيقى مش موجودة في المكتبة")
+    cmd = [ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y"]
+    for img in images:
+        cmd += ["-loop", "1", "-t", f"{sec:.2f}", "-i", str(img)]
+    if music:
+        cmd += ["-stream_loop", "-1", "-i", str(AUDIO_DIR / music["filename"])]
+    else:
+        cmd += ["-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo"]
+    n = len(images)
+    vf = "".join(f"[{i}:v]scale=1080:1350,pad=1080:1920:0:285:color=0xEEECDA,setsar=1,fps=30,format=yuv420p[v{i}];" for i in range(n))
+    vf += "".join(f"[v{i}]" for i in range(n)) + f"concat=n={n}:v=1:a=0[v];"
+    vf += f"[{n}:a]atrim=0:{total:.2f},afade=t=out:st={max(0, total - 1.5):.2f}:d=1.5,asetpts=N/SR/TB[a]"
+    export_id = uuid.uuid4().hex[:12]
+    filename = f"{export_id}.mp4"
+    cmd += ["-filter_complex", vf, "-map", "[v]", "-map", "[a]", "-c:v", "libx264", "-preset", "veryfast",
+            "-crf", "20", "-c:a", "aac", "-b:a", "192k", "-t", f"{total:.2f}", "-movflags", "+faststart",
+            str(EXPORTS_DIR / filename)]
+    try:
+        subprocess.run(cmd, check=True, capture_output=True, timeout=600)
+    except subprocess.CalledProcessError as exc:
+        (EXPORTS_DIR / filename).unlink(missing_ok=True)
+        raise HTTPException(500, f"مقدرتش أعمل الريل: {exc.stderr.decode(errors='ignore')[-300:]}") from exc
+    name = f"ريل {row['name']}"
+    with closing(db()) as conn, conn:
+        conn.execute("INSERT INTO exports (id, name, filename, duration, source, project_id, created_at) VALUES (?, ?, ?, ?, ?, NULL, ?)",
+                     (export_id, name, filename, total, "carousel", now()))
+    return {"id": export_id, "name": name, "url": f"/media/exports/{filename}", "duration": total}
+
+
 @app.get("/api/carousels/{cid}/zip")
 def carousel_zip(cid: str):
     import io
@@ -3848,14 +3963,13 @@ def carousel_zip(cid: str):
 
     with closing(db()) as conn:
         row, data = load_carousel(conn, cid)
-    files = [(k, CAROUSELS_DIR / cid / s["file"]) for k, s in enumerate(data["slides"], 1) if s.get("file")]
-    files = [(k, p) for k, p in files if p.exists()]
+    files = post_images(cid, data)
     if not files:
         raise HTTPException(400, "لسه مفيش سلايدات جاهزة")
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_STORED) as z:
-        for k, p in files:
-            z.write(p, f"{k:02d}.png")
+        for p in files:
+            z.write(p, p.name)
         plan = data["plan"] or {}
         caption = "\n\n".join(filter(None, [plan.get("caption"), " ".join(plan.get("hashtags") or [])]))
         if caption:

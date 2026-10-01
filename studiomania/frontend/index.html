@@ -578,7 +578,6 @@
               <p class="tl-keys" dir="rtl">Space تشغيل · ← → فريم فريم (Shift = ثانية) · S قسّم · B أداة القطع · V اختيار · Delete حذف · Ctrl+Z رجوع · Ctrl + عجلة الماوس زووم · Ctrl + دوسة أو اسحب مربع = اختيار كذا قطعة · Ctrl+A الكل</p>
             </section>
           </div>
-          </div>
         </main>
 
         <!-- الخطوة 7: فولدر الفيديوهات الجاهزة والنشر -->
@@ -680,6 +679,7 @@
                   <button data-s="plan"><i>2</i>النص</button>
                   <button data-s="overview"><i>3</i>الشكل العام</button>
                   <button data-s="slides"><i>4</i>السلايدات</button>
+                  <button data-s="publish"><i>5</i>النشر</button>
                 </nav>
                 <button class="btn sm danger" id="carDelete">🗑️</button>
               </div>
@@ -697,28 +697,22 @@
                   <button class="btn sm" data-q="اختار أقوى فكرة وقولي ليه، واقترح هوك أقوى لأول سلايد">🎯 أقوى فكرة</button>
                 </div>
                 <div class="car-setup">
-                  <div class="car-setup-title">نوع الكاروسيل</div>
-                  <div class="car-kinds" id="carKinds">
-                    <button type="button" data-kind="template"><b>🧩 تيمبليت</b><small>نفس تصميم جاهز من المكتبة</small></button>
-                    <button type="button" data-kind="characters"><b>🧑‍🎨 شخصيات 2D</b><small>شخصيات كوتشي المرسومة</small></button>
-                    <button type="button" data-kind="coach"><b>🏋️ معلومات من مدرب</b><small>شخصية المدرب المرسومة واسمه</small></button>
-                  </div>
-                  <div class="car-pick" id="carPickTemplate" hidden>
-                    <div class="car-setup-title">اختار التيمبليت <a href="#" class="lib-link" data-lib="template">＋ ضيف تيمبليت</a></div>
+                  <p class="hint car-mix-hint">اختار اللي يعجبك من كل حاجة وجمّعهم مع بعض (تيمبليت + ستايل + شخصيات + مدرب). كلهم اختياري، ودوسة تانية على أي حاجة تلغيها. من غير اختيار البرنامج بيرسم بستايل كوتشي.</p>
+                  <div class="car-pick" id="carPickTemplate">
+                    <div class="car-setup-title">🧩 التصميم (تيمبليت) <a href="#" class="lib-link" data-lib="template">📚 المكتبة</a></div>
                     <div class="car-assets" id="carTemplates"></div>
                   </div>
-                  <div class="car-pick" id="carPickChars" hidden>
-                    <div class="car-setup-title">اختار الشخصيات (لحد 4) <a href="#" class="lib-link" data-lib="character">＋ ضيف شخصية</a></div>
-                    <div class="car-assets" id="carChars"></div>
-                  </div>
-                  <div class="car-pick" id="carPickStyle" hidden>
-                    <div class="car-setup-title">ستايل الرسم (اختياري) <a href="#" class="lib-link" data-lib="style">＋ ضيف ستايل</a></div>
+                  <div class="car-pick" id="carPickStyle">
+                    <div class="car-setup-title">🎨 ستايل الرسم <a href="#" class="lib-link" data-lib="style">📚 المكتبة</a></div>
                     <div class="car-assets" id="carStyles"></div>
                   </div>
-                  <div class="car-pick" id="carPickCoach" hidden>
-                    <div class="car-setup-title">اختار المدرب <a href="#" class="lib-link" data-lib="coach">＋ ضيف مدرب</a></div>
+                  <div class="car-pick" id="carPickChars">
+                    <div class="car-setup-title">🧑‍🎨 الشخصيات (لحد 4) <a href="#" class="lib-link" data-lib="character">📚 المكتبة</a></div>
+                    <div class="car-assets" id="carChars"></div>
+                  </div>
+                  <div class="car-pick" id="carPickCoach">
+                    <div class="car-setup-title">🏋️ المدرب (من مكتبة المدربين)</div>
                     <div class="car-assets" id="carCoaches"></div>
-                    <select id="carCoach" hidden></select>
                     <span class="hint" id="carCoachNote"></span>
                   </div>
                   <div class="car-setup-title">الدعوة في آخر سلايد (CTA)</div>
@@ -732,7 +726,7 @@
                 </div>
                 <div class="car-plan-bar">
                   <label>عدد السلايدات <select id="carCount"></select></label>
-                  <label>المقاس <select id="carRatio"><option value="9:16">9:16 تيك توك وستوري</option><option value="4:5">4:5 فيد إنستجرام</option></select></label>
+                  <label>المقاس <select id="carRatio"><option value="4:5">4:5 بوست إنستجرام (1080×1350)</option></select></label>
                   <button class="btn primary" id="carPlanBtn">📋 اكتب الكاروسيل</button>
                 </div>
               </section>
@@ -764,10 +758,39 @@
               <section class="panel car-sec" data-sec="slides" hidden>
                 <div class="panel-head"><h2>📱 السلايدات بالمقاس النهائي</h2>
                   <span class="row"><span class="muted" id="carSlidesState"></span>
-                  <a class="btn sm" id="carZip" download>⬇ نزّل الكل</a></span></div>
+                  <a class="btn sm" id="carZip" download>⬇ نزّل الكل (1080×1350)</a>
+                  <button class="btn sm primary" id="carToPublish" hidden>🚀 النشر</button></span></div>
                 <p class="hint">كل سلايد بتترسم لوحدها بجودة عالية، ومعاها الشكل العام والسلايد اللي قبلها عشان تفضل متسقة. قارن الكلام تحت كل صورة، ولو فيه حرف غلط دوس «أعد».</p>
                 <div class="row"><button class="btn primary" id="carSlidesGo">🎨 ارسم السلايدات</button></div>
                 <div class="car-grid" id="carGrid"></div>
+              </section>
+
+              <!-- 5. النشر -->
+              <section class="panel car-sec" data-sec="publish" hidden>
+                <div class="panel-head"><h2>🚀 النشر</h2><span class="muted" id="carPubState"></span></div>
+                <div class="car-pub-modes" id="carPubModes">
+                  <button type="button" data-mode="carousel" class="active"><b>📸 كاروسيل صور</b><small>على إنستجرام. إنستجرام مش بيسمح بموسيقى للكاروسيل من البرامج، الموسيقى بتتضاف من الأبلكيشن بس</small></button>
+                  <button type="button" data-mode="reel"><b>🎬 ريل بالسلايدات + موسيقى</b><small>فيديو من السلايدات بموسيقى من المكتبة، على إنستجرام وتيك توك</small></button>
+                </div>
+                <div class="car-pub-reel" id="carPubReel" hidden>
+                  <label>الموسيقى <select id="carPubMusic"></select></label>
+                  <label>كل سلايد <select id="carPubSec"><option value="2">2 ثانية</option><option value="2.5">2.5 ثانية</option><option value="3" selected>3 ثواني</option><option value="4">4 ثواني</option><option value="5">5 ثواني</option></select></label>
+                  <label class="check"><input type="checkbox" id="carPubIg" checked> إنستجرام</label>
+                  <label class="check"><input type="checkbox" id="carPubTt" checked> تيك توك</label>
+                </div>
+                <label class="field">الكابشن <textarea id="carPubCaption" rows="4" data-no-i18n></textarea></label>
+                <div class="car-pub-tags">
+                  <label class="field">تاج على إنستجرام (حساب المدرب وأي حد تاني، افصل بمسافة) <input type="text" id="carPubTags" dir="ltr" placeholder="@coach_name"></label>
+                  <label id="carPubSlideWrap">التاج على سلايد <select id="carPubSlide"></select></label>
+                  <label class="check"><input type="checkbox" id="carPubCollab"> 🤝 كولاب (يظهر في حساب المدرب كمان)</label>
+                </div>
+                <div class="row wrap car-pub-when">
+                  <label>الميعاد <input type="datetime-local" id="carPubWhen"></label>
+                  <button class="btn" id="carPubSchedule">📅 جدول</button>
+                  <button class="btn primary" id="carPubNow">🚀 انشر دلوقتي</button>
+                </div>
+                <p class="hint" id="carPubHint"></p>
+                <div class="car-pub-done" id="carPubDone"></div>
               </section>
             </section>
             <section class="panel placeholder" id="carPlaceholder"><p>اختار كاروسيل أو اعمل واحد جديد.</p></section>
@@ -876,7 +899,7 @@
 </dialog>
 <dialog class="bulk-dlg lib-dlg" id="libDialog">
   <div class="panel-head"><h2>📚 مكتبة الكاروسيل</h2><button class="btn sm" id="libClose">إغلاق</button></div>
-  <nav class="car-steps lib-tabs" id="libTabs"><button data-t="template" class="active">🧩 تيمبليتس</button><button data-t="style">🎨 ستايلات الرسم</button><button data-t="character">🧑‍🎨 شخصيات 2D</button><button data-t="coach">🏋️ المدربين</button></nav>
+  <nav class="car-steps lib-tabs" id="libTabs"><button data-t="template" class="active">🧩 تيمبليتس</button><button data-t="style">🎨 ستايلات الرسم</button><button data-t="character">🧑‍🎨 شخصيات 2D</button></nav>
   <div class="row lib-tools"><p class="hint" id="libHint"></p>
     <label class="btn sm" title="ملف zip جاهز فيه صور ومعلومات (manifest.json). تقدر تختار كذا ملف مرة واحدة">📦 استورد حزمة<input type="file" id="libPack" accept=".zip,application/zip" multiple hidden></label></div>
   <p class="lib-status" id="libStatus" hidden></p>

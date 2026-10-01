@@ -981,3 +981,19 @@ a.pl-link:hover { background: color-mix(in srgb, var(--ok) 24%, transparent); }
 .lib-status { margin: 0 0 10px; padding: 8px 12px; border-radius: 10px; background: var(--accent-soft); font-size: 13px; }
 .lib-status.err { background: #fde2e2; color: var(--danger); }
 [data-describe].busy, #libUploadBtn.busy { opacity: .6; pointer-events: none; }
+
+/* ---------- نشر الكاروسيل ---------- */
+.car-mix-hint { margin: 0 0 4px; }
+.car-pub-modes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 12px; }
+@media (max-width: 700px) { .car-pub-modes { grid-template-columns: 1fr; } }
+.car-pub-modes button { border: 2px solid var(--line); background: var(--surface); border-radius: 14px; padding: 10px 12px; text-align: start; display: flex; flex-direction: column; gap: 3px; color: var(--text); font: inherit; cursor: pointer; }
+.car-pub-modes button small { color: var(--muted); font-size: 12px; }
+.car-pub-modes button.active { border-color: var(--accent); background: var(--accent-soft); }
+.car-pub-reel, .car-pub-tags, .car-pub-when { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 10px; }
+.car-pub-reel label, .car-pub-when label, #carPubSlideWrap { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
+.car-pub-tags .field { flex: 1; min-width: 240px; margin: 0; }
+.car-pub-reel .check, .car-pub-tags .check { flex-direction: row; align-items: center; gap: 6px; }
+.car-pub-done video { max-height: 360px; border-radius: 12px; background: #000; display: block; margin-top: 8px; }
+.car-pub-done .ok { margin: 8px 0 0; padding: 8px 12px; border-radius: 10px; background: var(--accent-soft); }
+#carPubNow.busy, #carPubSchedule.busy { opacity: .6; pointer-events: none; }
+.post-thumb { width: 72px; aspect-ratio: 4 / 5; object-fit: cover; border-radius: 8px; flex: none; }

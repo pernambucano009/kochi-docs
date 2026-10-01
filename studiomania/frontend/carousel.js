@@ -14,8 +14,6 @@ async function initCarousel() {
   $("carAlert").innerHTML = `⚠️ مفتاح Atlas مش متسجل. حطه من <a href="#" data-goto="settings">⚙️ الإعدادات</a>.`;
   $("carModelName").textContent = car.cfg.text_model;
   $("carCount").innerHTML = [3, 4, 5, 6, 7, 8, 9, 10].map((n) => `<option value="${n}">${n}</option>`).join("");
-  $("carCoach").innerHTML = `<option value="">— من غير مدرب —</option>` +
-    car.coaches.map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join("");
   await loadCarList();
   const last = car.cur?.id || storageGet(CAR_KEY) || car.list[0]?.id;
   if (last && car.list.some((c) => c.id === last)) await openCarousel(last);
@@ -81,6 +79,7 @@ function autoSection(c) {
 function reachable(c, s) {
   if (s === "idea") return true;
   if (s === "plan" || s === "overview") return !!c.plan;
+  if (s === "publish") return c.slides.length > 0 && c.slides.every((x) => x.status === "done");
   return !!c.overview.approved;
 }
 
@@ -97,13 +96,15 @@ function renderCarousel() {
   });
   document.querySelectorAll(".car-sec").forEach((s) => (s.hidden = s.dataset.sec !== car.sec));
   $("carCount").value = c.settings.slides;
+  // الكاروسيلات القديمة اللي اتعملت 9:16 بيفضل مقاسها ظاهر
+  if (![...$("carRatio").options].some((o) => o.value === c.settings.ratio)) $("carRatio").add(new Option(`${c.settings.ratio} (قديم)`, c.settings.ratio));
   $("carRatio").value = c.settings.ratio;
-  $("carCoach").value = c.settings.coach_id || "";
   renderSetup();
   renderChat();
   renderPlan();
   renderOverview();
   renderSlides();
+  renderPublish();
   schedulePoll();
 }
 
@@ -158,7 +159,7 @@ $("carQuick").addEventListener("click", (e) => {
 async function patchCarousel(body) {
   car.cur = await api(`/api/carousels/${car.cur.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
 }
-for (const [id, key] of [["carCount", "slides"], ["carRatio", "ratio"], ["carCoach", "coach_id"]]) {
+for (const [id, key] of [["carCount", "slides"], ["carRatio", "ratio"]]) {
   $(id).addEventListener("change", async () => {
     try { await patchCarousel({ settings: { [key]: $(id).value } }); renderSetup(); } catch (err) { toast(err.message, true); }
   });
@@ -171,33 +172,26 @@ function assetThumb(a, selected) {
     ${img ? `<img src="${img.url}" alt="">` : ""}<span>${escapeHtml(a.name)}</span><i>✓</i></button>`;
 }
 
+function coachThumb(c, selected) {
+  return `<button type="button" class="car-asset ${selected ? "selected" : ""}" data-id="${c.id}" title="${escapeHtml(c.name)}${c.instagram ? ` @${escapeHtml(c.instagram)}` : ""}">
+    <img src="${c.image_url}" alt="" loading="lazy"><span>${escapeHtml(c.name)}</span><i>✓</i></button>`;
+}
 function renderSetup() {
   const st = car.cur.settings;
-  const kind = st.kind || "characters";
-  document.querySelectorAll("#carKinds [data-kind]").forEach((b) => b.classList.toggle("active", b.dataset.kind === kind));
-  $("carPickTemplate").hidden = kind !== "template";
-  $("carPickChars").hidden = kind !== "characters";
-  $("carPickCoach").hidden = kind !== "coach";
-  $("carPickStyle").hidden = kind === "coach";
-  $("carStyles").innerHTML = car.lib.filter((a) => a.kind === "style").map((a) => assetThumb(a, a.id === st.style_id)).join("")
-    || `<span class="muted">مفيش ستايلات لسه. ضيف من 📚 المكتبة صور رسومات عاجبك ستايلها.</span>`;
-  const templates = car.lib.filter((a) => a.kind === "template");
-  const chars = car.lib.filter((a) => a.kind === "character");
   const picked = new Set(st.character_ids || []);
-  $("carTemplates").innerHTML = templates.map((a) => assetThumb(a, a.id === st.template_id)).join("")
-    || `<span class="muted">مفيش تيمبليتس لسه. ضيف من 📚 المكتبة صور تصميمات عاجباك.</span>`;
-  $("carChars").innerHTML = chars.map((a) => assetThumb(a, picked.has(a.id))).join("")
-    || `<span class="muted">مفيش شخصيات لسه. ضيف من 📚 المكتبة صور كل شخصية.</span>`;
-  const libCoaches = car.lib.filter((a) => a.kind === "coach");
-  $("carCoaches").innerHTML = libCoaches.map((a) => assetThumb(a, a.id === st.coach_asset_id)).join("")
-    || `<span class="muted">مفيش مدربين في المكتبة لسه. ضيفهم من 📚 المكتبة ← المدربين، أو استورد حزمة المدربين.</span>`;
+  const empty = (what) => `<span class="muted">مفيش ${what} لسه. ضيف من 📚 المكتبة.</span>`;
+  $("carTemplates").innerHTML = car.lib.filter((a) => a.kind === "template").map((a) => assetThumb(a, a.id === st.template_id)).join("") || empty("تيمبليتس");
+  $("carStyles").innerHTML = car.lib.filter((a) => a.kind === "style").map((a) => assetThumb(a, a.id === st.style_id)).join("") || empty("ستايلات");
+  $("carChars").innerHTML = car.lib.filter((a) => a.kind === "character").map((a) => assetThumb(a, picked.has(a.id))).join("") || empty("شخصيات");
+  $("carCoaches").innerHTML = car.coaches.map((c) => coachThumb(c, c.id === st.coach_id)).join("")
+    || `<span class="muted">مفيش مدربين لسه. ضيفهم من صفحة المدربين.</span>`;
   const coach = currentCoach();
-  $("carCoachNote").textContent = coach ? (coach.handle ? `@${coach.handle} هيتكتب جنب صورته` : "⚠️ المدرب ده مالوش حساب إنستجرام متسجل (ضيفه من المكتبة)") : "";
+  $("carCoachNote").textContent = coach ? (coach.handle ? `@${coach.handle} هيتكتب جنب صورته ويتعمله تاج في النشر` : "⚠️ المدرب ده مالوش حساب إنستجرام متسجل (ضيفه من صفحة المدربين)") : "";
   // الـ CTA
   const cta = st.cta || { type: "auto" };
   $("carCta").innerHTML = `<option value="auto">🤖 خليه يختار الأنسب</option>` +
-    // دعوات فيها اسم المدرب بتظهر بس في كاروسيل المدرب
-    car.cfg.ctas.filter((c) => kind === "coach" || !c.text.includes("{coach}"))
+    // دعوات فيها اسم المدرب بتظهر بس لو فيه مدرب متختار
+    car.cfg.ctas.filter((c) => coach || !c.text.includes("{coach}"))
       .map((c) => `<option value="${c.id}">${escapeHtml(c.label)}</option>`).join("") +
     `<option value="custom">✍️ اكتبها بنفسك</option>`;
   $("carCta").value = [...$("carCta").options].some((o) => o.value === cta.type) ? cta.type : "auto";
@@ -215,10 +209,10 @@ function renderSetup() {
 // المدرب المختار (من مكتبة الكاروسيل، أو من مدربين التوليد في الكاروسيلات القديمة)
 function currentCoach() {
   const st = car.cur.settings;
-  const a = car.lib.find((x) => x.id === st.coach_asset_id && x.kind === "coach");
-  if (a) return { name: a.name, handle: a.handle };
   const c = car.coaches.find((x) => x.id === st.coach_id);
-  return c ? { name: c.name, handle: c.instagram } : null;
+  if (c) return { name: c.name, handle: c.instagram };
+  const a = car.lib.find((x) => x.id === st.coach_asset_id && x.kind === "coach");  // كاروسيلات قديمة
+  return a ? { name: a.name, handle: a.handle } : null;
 }
 
 function ctaPreview() {
@@ -236,22 +230,19 @@ function ctaPreview() {
 async function saveSetup(settings) {
   try { await patchCarousel({ settings }); renderSetup(); } catch (err) { toast(err.message, true); }
 }
-$("carKinds").addEventListener("click", (e) => {
-  const b = e.target.closest("[data-kind]");
-  if (b) saveSetup({ kind: b.dataset.kind });
-});
+// كل اختيار بيتلغي بدوسة تانية عليه
+const toggleId = (cur, id) => (cur === id ? null : id);
 $("carTemplates").addEventListener("click", (e) => {
   const b = e.target.closest(".car-asset");
-  if (b) saveSetup({ template_id: b.dataset.id });
+  if (b) saveSetup({ template_id: toggleId(car.cur.settings.template_id, b.dataset.id) });
+});
+$("carStyles").addEventListener("click", (e) => {
+  const b = e.target.closest(".car-asset");
+  if (b) saveSetup({ style_id: toggleId(car.cur.settings.style_id, b.dataset.id) });
 });
 $("carCoaches").addEventListener("click", (e) => {
   const b = e.target.closest(".car-asset");
-  if (b) saveSetup({ coach_asset_id: b.dataset.id });
-});
-// الستايل: دوسة تختاره، ودوسة تانية عليه تلغيه (يرجع لستايل كوتشي)
-$("carStyles").addEventListener("click", (e) => {
-  const b = e.target.closest(".car-asset");
-  if (b) saveSetup({ style_id: b.dataset.id === car.cur.settings.style_id ? null : b.dataset.id });
+  if (b) saveSetup({ coach_id: toggleId(car.cur.settings.coach_id, b.dataset.id), coach_asset_id: null });
 });
 $("carChars").addEventListener("click", (e) => {
   const b = e.target.closest(".car-asset");
@@ -427,6 +418,7 @@ function renderSlides() {
   $("carSlidesState").textContent = `${done} / ${c.slides.length} جاهزة`;
   $("carZip").href = `/api/carousels/${c.id}/zip`;
   $("carZip").hidden = !done;
+  $("carToPublish").hidden = !reachable(c, "publish");
   $("carSlidesGo").hidden = active || done === c.slides.length;
   $("carSlidesGo").textContent = done ? `🎨 كمّل الباقي (${c.slides.length - done})` : "🎨 ارسم السلايدات";
   const ratio = c.settings.ratio === "4:5" ? "4 / 5" : "9 / 16";
@@ -558,7 +550,7 @@ async function openLibrary(tab = car.libTab) {
   if (!$("libDialog").open) $("libDialog").showModal();
 }
 const LIB_HINTS = {
-  template: "دوس على التصميم اللي عاجبك يتختار للكاروسيل. البرنامج بياخد التقسيم والشكل ويلوّنه بألوان كوتشي ويحط كلامنا.",
+  template: "دوس على التصميم اللي عاجبك يتختار للكاروسيل (ودوسة تانية تلغيه). البرنامج بياخد التقسيم والشكل ويلوّنه بألوان كوتشي ويحط كلامنا.",
   style: "دوس على الستايل يتختار (ودوسة تانية تلغيه). البرنامج بياخد طريقة الرسم بس ويرسم شخصيات جديدة بألوان كوتشي.",
   character: "دوس على الشخصيات اللي عايزها في الكاروسيل (لحد 4).",
   coach: "دوس على المدرب يتختار لكاروسيل «معلومات من مدرب».",
@@ -568,22 +560,23 @@ const LIB_NEW = { template: "ضيف تصميم", style: "ضيف ستايل", cha
 function libSelected(a) {
   const st = car.cur?.settings;
   if (!st) return false;
-  if (a.kind === "template") return st.kind === "template" && st.template_id === a.id;
-  if (a.kind === "coach") return st.kind === "coach" && st.coach_asset_id === a.id;
-  if (a.kind === "style") return st.kind !== "coach" && st.style_id === a.id;
-  return st.kind === "characters" && (st.character_ids || []).includes(a.id);
+  if (a.kind === "template") return st.template_id === a.id;
+  if (a.kind === "style") return st.style_id === a.id;
+  if (a.kind === "coach") return st.coach_asset_id === a.id;
+  return (st.character_ids || []).includes(a.id);
 }
-// الإعدادات اللي بتتغير لما تختار حاجة من المكتبة (وبتغيّر نوع الكاروسيل لو لازم)
+// الإعدادات اللي بتتغير لما تختار حاجة من المكتبة (دوسة تانية بتلغيها)
 function libPickSettings(a) {
   const st = car.cur.settings;
-  if (a.kind === "template") return { kind: "template", template_id: a.id };
-  if (a.kind === "coach") return { kind: "coach", coach_asset_id: a.id };
-  if (a.kind === "style") return { style_id: libSelected(a) ? null : a.id, ...(st.kind === "coach" ? { kind: "characters" } : {}) };
-  const ids = new Set(st.kind === "characters" ? st.character_ids || [] : []);
+  const on = libSelected(a);
+  if (a.kind === "template") return { template_id: on ? null : a.id };
+  if (a.kind === "style") return { style_id: on ? null : a.id };
+  if (a.kind === "coach") return { coach_asset_id: on ? null : a.id, coach_id: null };
+  const ids = new Set(st.character_ids || []);
   if (ids.has(a.id)) ids.delete(a.id);
   else if (ids.size >= 4) return null;
   else ids.add(a.id);
-  return { kind: "characters", character_ids: [...ids] };
+  return { character_ids: [...ids] };
 }
 function libCard(a) {
   const img = a.images[0];
@@ -758,3 +751,92 @@ $("libPack").addEventListener("change", async (e) => {
   await openLibrary();
   libStatus(`✅ اتضاف ${added} · اتحدّث ${updated}`);
 });
+
+// ---------- النشر: كاروسيل صور على إنستجرام، أو ريل من السلايدات بموسيقى ----------
+car.pubMode = "carousel";
+function localInput(d) {
+  const z = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+  return z.toISOString().slice(0, 16);
+}
+async function renderPublish() {
+  const c = car.cur;
+  if (car.sec !== "publish") return;
+  document.querySelectorAll("#carPubModes [data-mode]").forEach((b) => b.classList.toggle("active", b.dataset.mode === car.pubMode));
+  const reel = car.pubMode === "reel";
+  $("carPubReel").hidden = !reel;
+  $("carPubSlideWrap").hidden = reel;
+  $("carPubHint").textContent = reel
+    ? "البرنامج هيعمل فيديو من السلايدات بالموسيقى، ويتحفظ كمان في الفيديوهات الجاهزة. التاج في الريل بيبقى على الفيديو كله."
+    : "الكاروسيل بيتنشر صور بمقاس 1080×1350 على إنستجرام. تيك توك مش بيقبل كاروسيل صور من هنا، استخدم الريل.";
+  // أول ما تفتح النشر للكاروسيل ده: الكابشن من النص، والتاج حساب المدرب
+  if (car.pubFor !== c.id) {
+    car.pubFor = c.id;
+    const plan = c.plan || {};
+    $("carPubCaption").value = [plan.caption, (plan.hashtags || []).join(" ")].filter(Boolean).join("\n\n");
+    const coach = currentCoach();
+    $("carPubTags").value = coach?.handle ? `@${coach.handle}` : "";
+    $("carPubCollab").checked = false;
+    $("carPubWhen").value = localInput(new Date(Date.now() + 3600e3));
+    $("carPubDone").innerHTML = "";
+    $("carPubSlide").innerHTML = c.slides.map((_, i) => `<option value="${i + 1}">${i + 1}</option>`).join("");
+  }
+  if (!car.music) {
+    try { car.music = await api("/api/audio?kind=music"); } catch { car.music = []; }
+  }
+  const keep = $("carPubMusic").value;
+  $("carPubMusic").innerHTML = `<option value="">— من غير موسيقى —</option>` +
+    car.music.map((m) => `<option value="${m.id}">${escapeHtml(m.name)}</option>`).join("");
+  if (keep) $("carPubMusic").value = keep;
+  else if (car.music.length) $("carPubMusic").value = car.music[0].id;
+}
+$("carPubModes").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-mode]");
+  if (b) { car.pubMode = b.dataset.mode; renderPublish(); }
+});
+function pubTags() {
+  return $("carPubTags").value.split(/[\s,،]+/).map((t) => t.replace(/^@/, "").trim()).filter(Boolean);
+}
+async function publishCarousel(now) {
+  const c = car.cur;
+  const when = now ? new Date() : new Date($("carPubWhen").value);
+  if (Number.isNaN(when.getTime())) return toast("اختار الميعاد", true);
+  if (!now && when < new Date()) return toast("الميعاد ده عدّى، اختار ميعاد جاي أو دوس انشر دلوقتي", true);
+  const options = { ig_tags: pubTags(), ig_collab: $("carPubCollab").checked, tag_slide: Number($("carPubSlide").value) || 1 };
+  const caption = $("carPubCaption").value;
+  const btns = [$("carPubNow"), $("carPubSchedule")];
+  btns.forEach((b) => b.classList.add("busy"));
+  try {
+    let post;
+    if (car.pubMode === "reel") {
+      const platforms = [["instagram", "carPubIg"], ["tiktok", "carPubTt"]].filter(([, id]) => $(id).checked).map(([p]) => p);
+      if (!platforms.length) return toast("اختار منصة واحدة على الأقل", true);
+      $("carPubState").textContent = "🎬 بيعمل الريل...";
+      const exp = await api(`/api/carousels/${c.id}/reel`, { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ music_id: $("carPubMusic").value || null, seconds: Number($("carPubSec").value) }) });
+      $("carPubState").textContent = "📤 بيبعته للنشر...";
+      post = await api("/api/posts", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ export_id: exp.id, caption, platforms, scheduled_at: when.toISOString(), options: { ig_tags: options.ig_tags, ig_collab: options.ig_collab } }) });
+      $("carPubDone").innerHTML = `<video src="${exp.url}" controls preload="metadata"></video>`;
+    } else {
+      $("carPubState").textContent = "📤 بيبعت الكاروسيل...";
+      post = await api(`/api/carousels/${c.id}/publish`, { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ caption, scheduled_at: when.toISOString(), options }) });
+      $("carPubDone").innerHTML = "";
+    }
+    $("carPubState").textContent = "";
+    $("carPubDone").insertAdjacentHTML("afterbegin", `<p class="ok">✅ ${now ? "اتبعت للنشر دلوقتي" : "اتجدول"}. تابع حالته من <a href="#" data-goto-pub>صفحة النشر</a>.</p>`);
+    toast(now ? "اتبعت للنشر" : "اتجدول");
+    return post;
+  } catch (err) {
+    $("carPubState").textContent = "";
+    toast(err.message, true);
+  } finally {
+    btns.forEach((b) => b.classList.remove("busy"));
+  }
+}
+$("carPubNow").onclick = () => publishCarousel(true);
+$("carPubSchedule").onclick = () => publishCarousel(false);
+$("carPubDone").addEventListener("click", (e) => {
+  if (e.target.closest("[data-goto-pub]")) { e.preventDefault(); showStep("7"); }
+});
+$("carToPublish").onclick = () => { car.sec = "publish"; renderCarousel(); };
