@@ -279,7 +279,39 @@ def transcribe(audio_path: Path, duration: float) -> list[dict]:
 LLM_URL = os.environ.get("ATLASCLOUD_LLM_URL", f"{BASE_URL}/v1")
 DEFAULT_TEXT_MODEL = "deepseek-ai/DeepSeek-V3.1"
 # موديل بيشوف الصور (بيقرا التيمبليت والستايل ويكتب وصفه)
-DEFAULT_VISION_MODEL = "Qwen/Qwen3-VL-235B-A22B-Instruct"
+DEFAULT_VISION_MODEL = "qwen/qwen3-vl-235b-a22b-instruct"
+# لو الموديل المختار مش موجود بنجرب دول بالترتيب (الأسماء بتختلف في Atlas)
+VISION_FALLBACKS = [
+    "qwen/qwen3-vl-235b-a22b-instruct", "Qwen/Qwen3-VL-235B-A22B-Instruct", "qwen/qwen3-vl-30b-a3b-instruct",
+    "deepseek-ai/deepseek-v4-flash-vision-exp", "google/gemini-2.5-flash", "openai/gpt-4.1", "openai/gpt-4o",
+]
+VISION_HINTS = ("vl", "vision", "gemini", "gpt-4o", "gpt-4.1", "gpt-5")
+
+
+def list_models() -> list[str]:
+    """أسماء موديلات الكلام اللي Atlas بيقدمها (لو الطلب فشل بترجع فاضية)."""
+    try:
+        with httpx.Client(timeout=30) as client:
+            resp = client.get(f"{LLM_URL}/models", headers=_headers())
+        data = resp.json()
+        items = data.get("data") if isinstance(data, dict) else data
+        return [str(m.get("id") if isinstance(m, dict) else m) for m in items or []]
+    except (httpx.HTTPError, ValueError, AttributeError, TypeError):
+        return []
+
+
+def vision_candidates(preferred: str) -> list[str]:
+    """الموديل المختار الأول، وبعده موديلات الرؤية اللي Atlas عنده، وبعدها الاحتياطي."""
+    available = list_models()
+    seen = {m.lower(): m for m in available}
+    found = [m for m in available if any(h in m.lower() for h in VISION_HINTS) and "embed" not in m.lower()]
+    found.sort(key=lambda m: (0 if "qwen3-vl" in m.lower() else 1, m))
+    out: list[str] = []
+    for m in [preferred, *found, *VISION_FALLBACKS]:
+        m = seen.get(m.lower(), m)  # نفس الاسم بالحروف اللي Atlas كاتبها بيها
+        if m and m not in out:
+            out.append(m)
+    return out
 
 
 def chat(messages: list[dict], model: str, temperature: float = 0.8, max_tokens: int = 4000, json_mode: bool = False) -> str:

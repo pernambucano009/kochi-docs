@@ -3312,11 +3312,24 @@ def describe_asset(aid: str):
             raise HTTPException(400, "حط مفتاح Atlas الأول عشان البرنامج يقرا الصور")
         try:
             urls = [atlas.reference_url(LIBRARY_DIR / aid / im["name"]) for im in images]
-            reply = atlas.chat(cz.describe_messages(r["kind"], urls), carousel_settings()["vision_model"],
-                               temperature=0.3, max_tokens=800, json_mode=True)
-            d = cz.parse_description(reply)
-        except (atlas.AtlasError, httpx.HTTPError, ValueError) as exc:
-            raise HTTPException(400, f"ما قدرتش أقرا الصور: {exc}") from exc
+        except (atlas.AtlasError, httpx.HTTPError) as exc:
+            raise HTTPException(400, f"ما قدرتش أرفع الصور لـ Atlas: {exc}") from exc
+        preferred = carousel_settings()["vision_model"]
+        d, errors = None, []
+        # لو الموديل مش موجود أو مش بيشوف صور نجرب اللي بعده، وأول واحد ينجح نحفظه
+        for model in atlas.vision_candidates(preferred)[:8]:
+            try:
+                reply = atlas.chat(cz.describe_messages(r["kind"], urls), model,
+                                   temperature=0.3, max_tokens=800, json_mode=True)
+                d = cz.parse_description(reply)
+            except (atlas.AtlasError, httpx.HTTPError, ValueError) as exc:
+                errors.append(f"{model}: {str(exc)[:120]}")
+                continue
+            if model != preferred:
+                auth.set_setting("carousel_vision_model", model)
+            break
+        if d is None:
+            raise HTTPException(400, "ما قدرتش أقرا الصور بأي موديل: " + " | ".join(errors[:3]))
     with closing(db()) as conn, conn:
         # الاسم بيتغيّر بس لو لسه تلقائي («تيمبليت 3»)، واسم المدرب ما بيتغيّرش
         auto = re.fullmatch(rf"{re.escape(ASSET_KINDS.get(r['kind'], ''))} \d+", r["name"] or "")
