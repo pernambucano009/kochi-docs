@@ -526,6 +526,7 @@ $("ctaReset").onclick = () => renderCtaEditor(car.cfg.default_ctas);
 
 // ---------- المكتبة: تيمبليتس وشخصيات ----------
 async function openLibrary(tab = car.libTab) {
+  if (!$("libDialog").open) libStatus("");
   car.libTab = tab;
   car.lib = await api("/api/carousel/library");
   renderLibrary();
@@ -541,7 +542,7 @@ function renderLibrary() {
   const items = car.lib.filter((a) => a.kind === tab);
   $("libItems").innerHTML = items.map((a) => `<div class="lib-item" data-id="${a.id}">
       <div class="lib-imgs">${a.images.map((im) => `<div class="ref"><img src="${im.url}" alt=""><button class="del" data-img="${im.name}" title="امسح الصورة">✕</button></div>`).join("")}
-        <label class="lib-add" title="ضيف صور">＋<input type="file" data-add accept="image/png,image/jpeg,image/webp" multiple hidden></label></div>
+        <label class="lib-add" title="ضيف صور (لحد 12)">＋<input type="file" data-add accept="image/*" multiple hidden></label></div>
       <div class="lib-meta">
         <input type="text" data-f="name" value="${escapeHtml(a.name)}">
         <input type="text" data-f="notes" value="${escapeHtml(a.notes)}" placeholder="ملاحظات">
@@ -555,43 +556,63 @@ $("libTabs").addEventListener("click", (e) => {
 });
 $("libClose").onclick = () => $("libDialog").close();
 $("libDialog").addEventListener("close", () => car.cur && renderSetup());
+// رسالة ثابتة جوه المكتبة (التوست بيختفي بسرعة ومش باين فوق الشباك)
+function libStatus(msg, isError = false) {
+  const el = $("libStatus");
+  el.hidden = !msg;
+  el.textContent = msg || "";
+  el.classList.toggle("err", isError);
+}
+function uploadedMsg(res, count) {
+  return res.skipped ? `✅ اتضاف ${count - res.skipped} صورة · ${res.skipped} اتسابوا (12 صورة بالكتير لكل واحد)` : `✅ اتضاف ${count} صورة`;
+}
 $("libFiles").addEventListener("change", async (e) => {
   const files = [...e.target.files];
   e.target.value = "";
   if (!files.length) return;
-  if (!$("libName").value.trim()) { toast("اكتب الاسم الأول", true); return $("libName").focus(); }
   const form = new FormData();
   form.append("kind", car.libTab);
   form.append("name", $("libName").value);
   form.append("notes", $("libNotes").value);
   files.forEach((f) => form.append("files", f));
+  libStatus(`⏳ بيرفع ${files.length} صورة...`);
+  $("libUploadBtn").classList.add("busy");
   try {
-    await api("/api/carousel/library", { method: "POST", body: form });
+    const res = await api("/api/carousel/library", { method: "POST", body: form });
     $("libName").value = $("libNotes").value = "";
     await openLibrary();
-    toast("✅ اتضاف للمكتبة");
+    libStatus(`${uploadedMsg(res, files.length)} في «${res.name}». غيّر الاسم من الخانة لو حابب`);
   } catch (err) {
-    toast(err.message, true);
+    libStatus(`✕ ${err.message}`, true);
+  } finally {
+    $("libUploadBtn").classList.remove("busy");
   }
 });
-async function patchAsset(id, form) {
+async function patchAsset(id, form, count = 0) {
+  if (count) libStatus(`⏳ بيرفع ${count} صورة...`);
   try {
-    await api(`/api/carousel/library/${id}`, { method: "PATCH", body: form });
+    const res = await api(`/api/carousel/library/${id}`, { method: "PATCH", body: form });
     await openLibrary();
+    libStatus(count ? uploadedMsg(res, count) : "✅ اتحفظ");
   } catch (err) {
-    toast(err.message, true);
+    libStatus(`✕ ${err.message}`, true);
   }
 }
 $("libItems").addEventListener("change", (e) => {
   const item = e.target.closest(".lib-item");
   if (!item) return;
   const form = new FormData();
+  let count = 0;
   if (e.target.matches("[data-add]")) {
-    [...e.target.files].forEach((f) => form.append("files", f));
+    const files = [...e.target.files];
+    e.target.value = "";
+    if (!files.length) return;
+    files.forEach((f) => form.append("files", f));
+    count = files.length;
   } else if (e.target.dataset.f) {
     form.append(e.target.dataset.f, e.target.value);
   } else return;
-  patchAsset(item.dataset.id, form);
+  patchAsset(item.dataset.id, form, count);
 });
 $("libItems").addEventListener("click", async (e) => {
   const item = e.target.closest(".lib-item");

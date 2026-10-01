@@ -3116,7 +3116,9 @@ def test_text_model():
 
 # ---------- مكتبة الكاروسيل: تيمبليتس وشخصيات ----------
 ASSET_KINDS = {"template": "تيمبليت", "character": "شخصية"}
-ASSET_MAX_FILES = 8
+ASSET_MAX_FILES = 12
+# صيغ تانية بتتحول PNG لوحدها (صور الآيفون وصور المواقع)
+CONVERT_EXTENSIONS = {".heic", ".heif", ".avif", ".gif", ".bmp", ".tif", ".tiff", ".jfif"}
 
 
 def asset_to_dict(r: sqlite3.Row) -> dict:
@@ -3138,33 +3140,68 @@ def carousel_library():
         return [asset_to_dict(r) for r in conn.execute("SELECT * FROM carousel_assets ORDER BY created_at")]
 
 
-def add_asset_files(aid: str, current: list[str], files: list[UploadFile]) -> list[str]:
+def add_asset_files(aid: str, current: list[str], files: list[UploadFile]) -> tuple[list[str], int]:
+    """بيحفظ الصور (ولو أكتر من الحد بياخد الأول بس). بيرجّع الملفات وعدد اللي اتسابت."""
     folder = LIBRARY_DIR / aid
     folder.mkdir(parents=True, exist_ok=True)
-    out = list(current)
-    for f in files:
-        if not f or not f.filename:
-            continue
-        if len(out) >= ASSET_MAX_FILES:
-            raise HTTPException(400, f"{ASSET_MAX_FILES} صور بالكتير لكل واحد")
-        out.append(save_upload(f, IMAGE_EXTENSIONS, folder, uuid.uuid4().hex[:8]))
-    return out
+    out, added, skipped = list(current), [], 0
+    try:
+        for f in files:
+            if not f or not f.filename:
+                continue
+            if len(out) >= ASSET_MAX_FILES:
+                skipped += 1
+                continue
+            ext = Path(f.filename).suffix.lower()
+            if ext in IMAGE_EXTENSIONS:
+                name = save_upload(f, IMAGE_EXTENSIONS, folder, uuid.uuid4().hex[:8])
+            elif ext in CONVERT_EXTENSIONS:
+                name = convert_image(f, folder)
+            else:
+                raise HTTPException(400, f"«{f.filename}» نوعها مش مدعوم. ارفع صور PNG أو JPG")
+            out.append(name)
+            added.append(name)
+    except Exception:
+        for name in added:  # متسيبش ملفات نص نص
+            (folder / name).unlink(missing_ok=True)
+        raise
+    return out, skipped
+
+
+def convert_image(f: UploadFile, folder: Path) -> str:
+    src = folder / f"in_{uuid.uuid4().hex[:8]}{Path(f.filename).suffix.lower()}"
+    name = f"{uuid.uuid4().hex[:8]}.png"
+    try:
+        with src.open("wb") as out:
+            shutil.copyfileobj(f.file, out)
+        result = subprocess.run(
+            [ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src), "-frames:v", "1", str(folder / name)],
+            capture_output=True, text=True,
+        )
+    finally:
+        src.unlink(missing_ok=True)
+    if result.returncode != 0 or not (folder / name).exists():
+        raise HTTPException(400, f"مش قادر أفتح «{f.filename}». احفظها PNG أو JPG وارفعها تاني")
+    return name
 
 
 @app.post("/api/carousel/library")
-def create_asset(kind: str = Form(...), name: str = Form(...), notes: str = Form(""), files: list[UploadFile] = File(...)):
+def create_asset(kind: str = Form(...), name: str = Form(""), notes: str = Form(""), files: list[UploadFile] = File(...)):
     if kind not in ASSET_KINDS:
         raise HTTPException(400, "النوع غلط")
-    if not name.strip():
-        raise HTTPException(400, "اكتب اسم")
     aid = uuid.uuid4().hex[:12]
-    saved = add_asset_files(aid, [], files)
+    saved, skipped = add_asset_files(aid, [], files)
     if not saved:
+        shutil.rmtree(LIBRARY_DIR / aid, ignore_errors=True)
         raise HTTPException(400, "ارفع صورة واحدة على الأقل")
     with closing(db()) as conn, conn:
+        if not name.strip():
+            # من غير اسم: «تيمبليت 3» مثلًا (تقدر تغيّره بعدين)
+            n = conn.execute("SELECT COUNT(*) FROM carousel_assets WHERE kind = ?", (kind,)).fetchone()[0] + 1
+            name = f"{ASSET_KINDS[kind]} {n}"
         conn.execute("INSERT INTO carousel_assets (id, kind, name, notes, files, created_at) VALUES (?, ?, ?, ?, ?, ?)",
                      (aid, kind, name.strip()[:80], notes.strip()[:1500], json.dumps(saved), now()))
-        return asset_to_dict(get_asset(conn, aid))
+        return {**asset_to_dict(get_asset(conn, aid)), "skipped": skipped}
 
 
 @app.patch("/api/carousel/library/{aid}")
@@ -3180,14 +3217,15 @@ def update_asset(aid: str, name: str | None = Form(None), notes: str | None = Fo
                     raise HTTPException(400, "لازم تفضل صورة واحدة على الأقل. امسحه كله لو مش عايزه")
                 current.remove(gone)
                 (LIBRARY_DIR / aid / gone).unlink(missing_ok=True)
+        skipped = 0
         if files:
-            current = add_asset_files(aid, current, files)
+            current, skipped = add_asset_files(aid, current, files)
         if name is not None and name.strip():
             conn.execute("UPDATE carousel_assets SET name = ? WHERE id = ?", (name.strip()[:80], aid))
         if notes is not None:
             conn.execute("UPDATE carousel_assets SET notes = ? WHERE id = ?", (notes.strip()[:1500], aid))
         conn.execute("UPDATE carousel_assets SET files = ? WHERE id = ?", (json.dumps(current), aid))
-        return asset_to_dict(get_asset(conn, aid))
+        return {**asset_to_dict(get_asset(conn, aid)), "skipped": skipped}
 
 
 @app.delete("/api/carousel/library/{aid}")

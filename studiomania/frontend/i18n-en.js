@@ -1039,5 +1039,12 @@ window.I18N_EN = {
   "📱 منصة كوتشي": "📱 KOCHI platform",
   "🔖 احفظ وشارك": "🔖 Save & share",
   "🧑‍🏫 تابع المدرب": "🧑‍🏫 Follow the coach",
-  "شخصيات كوتشي": "KOCHI characters"
+  "شخصيات كوتشي": "KOCHI characters",
+  "ضيف صور (لحد 12)": "Add images (up to 12)",
+  "✅ اتضاف {0} صورة · {1} اتسابوا (12 صورة بالكتير لكل واحد)": "✅ Added {0} images · {1} skipped (12 images max per item)",
+  "✅ اتضاف {0} صورة": "✅ Added {0} images",
+  "⏳ بيرفع {0} صورة...": "⏳ Uploading {0} images...",
+  "{0} في «{1}». غيّر الاسم من الخانة لو حابب": "{0} to “{1}”. Rename it in the field if you like",
+  "«{0}» نوعها مش مدعوم. ارفع صور PNG أو JPG": "“{0}” isn't a supported type. Upload PNG or JPG images",
+  "مش قادر أفتح «{0}». احفظها PNG أو JPG وارفعها تاني": "Can't open “{0}”. Save it as PNG or JPG and upload again"
 };

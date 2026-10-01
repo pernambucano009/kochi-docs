@@ -872,10 +872,11 @@
   <nav class="car-steps lib-tabs" id="libTabs"><button data-t="template" class="active">🧩 تيمبليتس</button><button data-t="character">🧑‍🎨 شخصيات 2D</button></nav>
   <p class="hint" id="libHint"></p>
   <form class="lib-new" id="libNew">
-    <input type="text" id="libName" placeholder="الاسم" required>
+    <input type="text" id="libName" placeholder="الاسم">
     <input type="text" id="libNotes" placeholder="ملاحظات (اختياري): الألوان، الخط، شخصية الكاركتر...">
-    <label class="btn sm primary">⬆ ارفع صور وضيف<input type="file" id="libFiles" accept="image/png,image/jpeg,image/webp" multiple hidden></label>
+    <label class="btn sm primary" id="libUploadBtn">⬆ ارفع صور وضيف<input type="file" id="libFiles" accept="image/*" multiple hidden></label>
   </form>
+  <p class="lib-status" id="libStatus" hidden></p>
   <div class="lib-items" id="libItems"></div>
 </dialog>
 <dialog class="bulk-dlg" id="handlesDialog">
