@@ -1013,6 +1013,8 @@ window.I18N_EN = {
   "مفيش ستايلات لسه. ضيف من 📚 المكتبة صور رسومات عاجبك ستايلها.": "No styles yet. Add drawings whose style you like from 📚 Library.",
   "رسومات عاجبك ستايلها (الخطوط والأشكال والتظليل). البرنامج بياخد طريقة الرسم بس، ويرسم شخصيات جديدة بألوان كوتشي.": "Drawings whose style you like (lines, shapes, shading). Only the drawing style is used: new characters are drawn in KOCHI colors.",
   "اسم الستايل": "Style name",
+  "⏳ بيستورد {0} ({1} من {2})...": "⏳ Importing {0} ({1} of {2})...",
+  "ملف zip جاهز فيه صور ومعلومات (manifest.json). تقدر تختار كذا ملف مرة واحدة": "A ready zip with images and info (manifest.json). You can pick several files at once",
   "دوس على التصميم اللي عاجبك يتختار للكاروسيل. البرنامج بياخد التقسيم والشكل ويلوّنه بألوان كوتشي ويحط كلامنا.": "Click a design to pick it for the carousel. Its layout is reused, recolored in KOCHI colors with our text.",
   "دوس على الستايل يتختار (ودوسة تانية تلغيه). البرنامج بياخد طريقة الرسم بس ويرسم شخصيات جديدة بألوان كوتشي.": "Click a style to pick it (click again to remove). Only the drawing style is used, with new characters in KOCHI colors.",
   "دوس على الشخصيات اللي عايزها في الكاروسيل (لحد 4).": "Click the characters you want in the carousel (up to 4).",

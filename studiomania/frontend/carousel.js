@@ -721,18 +721,24 @@ $("libItems").addEventListener("click", async (e) => {
 $("carLibOpen").onclick = () => openLibrary();
 
 $("libPack").addEventListener("change", async (e) => {
-  const file = e.target.files[0];
+  const files = [...e.target.files];
   e.target.value = "";
-  if (!file) return;
-  const form = new FormData();
-  form.append("file", file);
-  libStatus(`⏳ بيستورد ${file.name}...`);
-  try {
-    const r = await api("/api/carousel/library/import", { method: "POST", body: form });
-    car.cfg = await api("/api/carousel/settings");
-    await openLibrary();
-    libStatus(`✅ اتضاف ${r.added} · اتحدّث ${r.updated}`);
-  } catch (err) {
-    libStatus(`✕ ${err.message}`, true);
+  if (!files.length) return;
+  let added = 0, updated = 0;
+  for (const [i, file] of files.entries()) {
+    const form = new FormData();
+    form.append("file", file);
+    libStatus(`⏳ بيستورد ${file.name} (${i + 1} من ${files.length})...`);
+    try {
+      const r = await api("/api/carousel/library/import", { method: "POST", body: form });
+      added += r.added; updated += r.updated;
+    } catch (err) {
+      return libStatus(`✕ ${file.name}: ${err.message}`, true);
+    }
   }
+  car.cfg = await api("/api/carousel/settings");
+  // افتح التبويب اللي فيه حاجات عشان تبان على طول
+  if (!car.lib.some((a) => a.kind === car.libTab)) car.libTab = "template";
+  await openLibrary();
+  libStatus(`✅ اتضاف ${added} · اتحدّث ${updated}`);
 });
