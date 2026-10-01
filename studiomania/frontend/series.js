@@ -482,20 +482,35 @@ $("serGenApproved").onclick = () => busyButton($("serGenApproved"), "⏳", async
 function renderRenderTab() {
   const ep = ser.ep;
   const notOk = ep.shots.filter((s) => !s.takes.some((t) => t.id === s.chosen && t.approved)).map((s) => s.n);
-  $("serToEditor").disabled = !ep.shots.length || notOk.length > 0;
-  $("serToEditor").title = notOk.length ? `لقطات لسه من غير فيديو موافق عليه: ${notOk.join("، ")}` : "";
+  // الزرار دايمًا شغال: لو فيه لقطات ناقصة بيقولك هي إيه ويفتحهالك
+  $("serToEditor").disabled = !ep.shots.length;
+  $("serToEditor").classList.toggle("primary", !notOk.length);
+  $("serMissing").hidden = !notOk.length;
+  $("serMissing").innerHTML = notOk.length ? `<b>⚠️ لقطات لسه من غير فيديو موافق عليه:</b> ${ep.shots.filter((s) => notOk.includes(s.n)).map((s) => `<button class="chip" data-gal-open="${s.id}" title="افتحها">${s.n}</button>`).join("")}` : "";
   const missing = ep.shots.filter((s) => !s.takes.some((t) => t.id === s.chosen && t.status === "done")).length;
   const r = ep.render;
-  $("serRenderGo").disabled = !ep.shots.length || r.status === "working";
+  $("serRenderGo").disabled = !ep.shots.length;
   $("serRenderState").textContent = r.status === "working" ? "🎞️ بيجمّع الحلقة..." : r.status === "failed" ? `✕ ${r.error || ""}` : "";
   $("serRenderHint").textContent = !ep.shots.length ? "جهّز اللقطات الأول."
-    : notOk.length ? `🎬 لسه ${notOk.length} لقطة من غير فيديو موافق عليه (${notOk.join("، ")}). المعاينة السريعة بتحط مكانهم أسود أو النسخة المختارة.`
+    : notOk.length ? `🎬 لسه ${notOk.length} لقطة من غير فيديو موافق عليه. دوس على رقم أي لقطة تفتحها. المعاينة السريعة بتحط مكانهم أسود أو النسخة المختارة.`
     : missing ? `⚠️ ${missing} لقطة لسه من غير فيديو، هتطلع سودا بمدتها. تقدر تجمّع عشان تشوف الإيقاع.`
       : "كل اللقطات جاهزة. كل لقطة بتتقص على مدتها بالظبط من الصوت، والفويس أوفر فوقهم.";
   $("serRendered").innerHTML = ep.export_url ? `<video src="${ep.export_url}" controls preload="metadata"></video>
     <p class="hint">اتحفظت في الفيديوهات الجاهزة، وتقدر تنشرها من صفحة النشر.</p>` : "";
 }
-$("serToEditor").onclick = () => busyButton($("serToEditor"), "⏳", async () => {
+$("serMissing").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-gal-open]");
+  if (b) openGallery(b.dataset.galOpen);
+});
+$("serToEditor").onclick = () => {
+  const missing = ser.ep.shots.filter((s) => !s.takes.some((t) => t.id === s.chosen && t.approved));
+  if (missing.length) {
+    toast(`فيه ${missing.length} لقطة لسه من غير فيديو موافق عليه (${missing.map((s) => s.n).join("، ")}). وافق عليهم وبعدين افتح المحرر.`, true);
+    return openGallery(missing[0].id);
+  }
+  openInEditor();
+};
+const openInEditor = () => busyButton($("serToEditor"), "⏳", async () => {
   const r = await api(`/api/episodes/${ser.ep.id}/to-editor`, { method: "POST" });
   storageSet("studiomania.projectId", r.project_id);
   if (typeof mt !== "undefined") mt.project = null;

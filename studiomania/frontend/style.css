@@ -1114,3 +1114,7 @@ a.pl-link:hover { background: color-mix(in srgb, var(--ok) 24%, transparent); }
 .ser-gal-stage { position: relative; }
 .take.viewing { outline: 3px solid var(--accent); outline-offset: 1px; }
 #serGalTabs [data-count]::after { content: " (" attr(data-count) ")"; opacity: .7; }
+.ser-missing { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; background: #FFF5E6; color: #7a4a00; border-radius: 10px; padding: 8px 10px; margin: 6px 0; font-size: 14px; }
+.ser-missing b { font-weight: 500; }
+.ser-missing .chip { border: 1px solid #D69E2E; background: #fff; color: #7a4a00; border-radius: 999px; padding: 1px 10px; cursor: pointer; font: inherit; }
+.ser-missing .chip:hover { background: #D69E2E; color: #fff; }
