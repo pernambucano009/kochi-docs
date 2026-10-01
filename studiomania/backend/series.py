@@ -4,6 +4,7 @@
 """
 
 import json
+import math
 import re
 
 # ---------------------------------------------------------------- السكريبت
@@ -260,9 +261,18 @@ def snap(shots: list[dict], total: float) -> list[dict]:
         t = end
     if out and out[-1]["end"] < total:
         out[-1]["end"] = round(total, 2)
-    for k, s in enumerate(out, 1):
+    # لقطة أطول من 8 ثواني بتتقسم (Seedance بيعمل 15 ثانية بالكتير، واللقطات الطويلة بتملّ)
+    split = []
+    for s in out:
+        d = s["end"] - s["start"]
+        parts = max(1, math.ceil(d / 6)) if d > 8 else 1
+        for q in range(parts):
+            a, b = s["start"] + d * q / parts, s["start"] + d * (q + 1) / parts
+            split.append({**s, "start": round(a, 2), "end": round(b, 2),
+                          "title": s.get("title", "") + (f" ({q + 1}/{parts})" if parts > 1 else "")})
+    for k, s in enumerate(split, 1):
         s["n"] = k
-    return out
+    return split
 
 
 def mock_shots(lines: list[dict], total: float) -> list[dict]:
@@ -273,3 +283,64 @@ def mock_shots(lines: list[dict], total: float) -> list[dict]:
                       "location": "كافيه في الرياض", "sfx": "", "transition": "cut",
                       "prompt": f"Mock prompt for line {ln['n']}: tall thin man with a small hair bun and a thick mustache, black loose clothes."})
     return snap(shots, total)
+
+
+# ---------------------------------------------------------------- كتابة الحلقة (الموديل يكتب وانت توجّهه)
+
+SCRIPT_FORMAT = """الشكل المطلوب بالظبط (البرنامج بيقرا السكريبت بالشكل ده):
+الحلقة رقم N — «اسم الحلقة»
+المشهد 1 — اسم المشهد
+الصورة: وصف اللقطات والمكان والحركة (من غير مدد بالثواني)
+«جملة الفويس أوفر الأولى.»
+«جملة الفويس أوفر التانية.»
+المشهد 2 — ...
+- كل جملة فويس أوفر في سطر لوحدها بين « » وبس. أي كلام تاني (وصف، ملاحظات) من غير « ».
+- الوقفات اكتبها جوه الجملة بـ ... مش في سطر لوحده.
+- المشهد اللي من غير كلام يتكتب عادي من غير « »."""
+
+
+def writer_messages(bible: str, character: str, previous: list[dict], number: int, chat: list[dict]) -> list[dict]:
+    """رسايل كاتب الحلقات: الدستور + الحلقات اللي فاتت كاملة + النقاش على الحلقة دي."""
+    prev = "\n\n".join(f"=== الحلقة {p['number']}: {p['name']} ===\n{p['script'].strip()}" for p in previous if p.get("script", "").strip())
+    system = (
+        "أنت كاتب سيناريو ومخرج إبداعي لمسلسل قصير على السوشيال ميديا. بتكتب الحلقات واحدة ورا التانية، "
+        "وكل حلقة استكمال طبيعي للي قبلها: القصة بتتقدم، ومحدش بيعيد اللي اتقال، وكل حلقة بتسيب سؤال للي بعدها.\n\n"
+        f"دستور المسلسل:\n{bible.strip()}\n\n"
+        + (f"الشخصية:\n{character.strip()}\n\n" if character.strip() else "")
+        + (f"الحلقات اللي اتعملت لحد دلوقتي (بالترتيب):\n{prev}\n\n" if prev else "")
+        + f"{SCRIPT_FORMAT}\n\n"
+        "رد دايمًا بسكريبت الحلقة كامل بالشكل ده (حتى لو التعديل المطلوب صغير)، ومن غير أي كلام قبله أو بعده. "
+        "اسم الشخصية ما يتذكرش أبدًا."
+    )
+    first = f"اكتب الحلقة رقم {number} استكمالًا للي فات."
+    msgs = [{"role": "system", "content": system}]
+    if not chat or chat[0]["role"] != "user":
+        msgs.append({"role": "user", "content": first})
+    return msgs + chat[-30:]
+
+
+def clean_script(text: str) -> str:
+    """لو الموديل حط السكريبت جوه ``` بناخد اللي جوه بس."""
+    m = re.search(r"```(?:\w+)?\n(.*?)```", text or "", re.S)
+    return (m.group(1) if m else text or "").strip()
+
+
+def mock_script(number: int, chat: list[dict]) -> str:
+    note = f"\n(اتعدّل حسب: {chat[-1]['content'][:60]})" if chat and chat[-1]["role"] == "user" else ""
+    return (f"الحلقة رقم {number} — «تجربة»\nالمشهد 1 — البداية\nالصورة: هو جالس قدام اللابتوب بالليل.\n"
+            f"«أول سطر كتبته... ما اشتغل.»\n«والثاني بعد.»\nالمشهد 2 — القرار\nالصورة: يقفل اللابتوب ويطالع الشباك.\n"
+            f"«بس ما وقفت.»{note}")
+
+
+# ---------------------------------------------------------------- الستوري بورد (GPT Image)
+
+def frame_prompt(shot: dict, character: str) -> str:
+    """برومبت صورة الستوري بورد للقطة: نفس شكل الشخصية من الصور، وكادر طولي."""
+    return "\n".join(x for x in [
+        "Cinematic storyboard frame for a vertical 9:16 short-film shot. Photorealistic still, like a frame grab from the final film.",
+        f"Shot: {shot.get('shot') or ''}. Camera: {shot.get('camera') or ''}. Location: {shot.get('location') or ''}.",
+        f"Action: {shot.get('prompt') or shot.get('title') or ''}",
+        f"The man must look exactly like the person in the reference images: {character.strip()}" if character.strip()
+        else "The man must look exactly like the person in the reference images.",
+        "Saudi Arabia setting, natural realistic lighting, shallow depth of field. No text, no captions, no logos, no watermark, no frame borders.",
+    ] if x)

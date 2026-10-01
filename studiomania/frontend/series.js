@@ -49,7 +49,7 @@ function renderSeries() {
   document.querySelectorAll(".ser-sec").forEach((x) => (x.hidden = x.dataset.sec !== ser.tab));
   $("serTitle").textContent = hasEp ? `${s.name} · ${ser.ep.number}. ${ser.ep.name}` : s.name;
   renderSeriesTab(s);
-  if (hasEp) { renderScriptTab(); renderShotsTab(); renderRenderTab(); }
+  if (hasEp) { renderWriteTab(); renderScriptTab(); renderShotsTab(); renderRenderTab(); }
   schedulePollSeries();
 }
 
@@ -88,7 +88,7 @@ $("serNewForm").addEventListener("submit", async (e) => {
 async function openEpisode(eid) {
   try { ser.ep = await api(`/api/episodes/${eid}`); } catch (err) { return toast(err.message, true); }
   ser.sid = ser.ep.series_id;
-  if (ser.tab === "series") ser.tab = ser.ep.shots.length ? "shots" : "script";
+  if (ser.tab === "series") ser.tab = ser.ep.shots.length ? "shots" : ser.ep.audio ? "script" : "write";
   remember();
   renderSeries();
 }
@@ -149,7 +149,41 @@ for (const [id, key] of [["serTextModel", "text_model"], ["serVideoModel", "vide
   });
 }
 
-// ---------- 2. السكريبت والصوت: كل جملة بوقتها ----------
+// ---------- 2. كتابة الحلقة: الموديل يكتب وانت توجّهه ----------
+function renderWriteTab() {
+  const ep = ser.ep;
+  let v = 0;
+  $("serChat").innerHTML = ep.chat.map((m) => m.role === "user"
+    ? `<div class="msg user">${escapeHtml(m.content)}</div>`
+    : `<div class="msg assistant"><details><summary>📝 نسخة ${++v} من السكريبت</summary><pre>${escapeHtml(m.content)}</pre></details></div>`).join("")
+    || `<div class="muted">لسه مفيش. دوس «✍️ اكتب الحلقة» والبرنامج يكتبها استكمالًا للحلقات اللي فاتت، أو الزق سكريبت جاهز تحت.</div>`;
+  $("serChat").scrollTop = $("serChat").scrollHeight;
+  $("serWriteGo").textContent = ep.chat.length ? "✍️ عدّل" : "✍️ اكتب الحلقة";
+  $("serApproveScript").textContent = ep.script_approved ? "✅ معتمد (دوس تلغي)" : "✅ اعتمد السكريبت";
+  $("serApproveScript").classList.toggle("primary", !ep.script_approved);
+  $("serApproveScript").disabled = !ep.lines.length;
+  $("serWriteState").textContent = ep.script_approved ? "✅ السكريبت معتمد: سجّل الفويس أوفر وارفعه في «3 الفويس أوفر»" : ep.lines.length ? `${ep.lines.length} جملة فويس أوفر` : "";
+}
+$("serWriteForm").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const message = $("serWriteMsg").value.trim();
+  if (ser.ep.chat.length && !message) return $("serWriteMsg").focus();
+  busyButton($("serWriteGo"), "⏳ بيكتب...", async () => {
+    ser.ep = await api(`/api/episodes/${ser.ep.id}/write`, { method: "POST", ...jsonBody({ message }) });
+    $("serWriteMsg").value = "";
+    renderSeries();
+  });
+});
+$("serWriteMsg").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("serWriteForm").requestSubmit(); }
+});
+$("serApproveScript").onclick = () => busyButton($("serApproveScript"), "⏳", async () => {
+  ser.ep = await api(`/api/episodes/${ser.ep.id}/approve-script?approved=${!ser.ep.script_approved}`, { method: "POST" });
+  if (ser.ep.script_approved) { ser.tab = "script"; toast("اتعتمد. سجّل الفويس أوفر وارفعه هنا"); }
+  renderSeries();
+});
+
+// ---------- 3. الفويس أوفر: كل جملة بوقتها ----------
 const TIMING_LABEL = { stt: "✅ من موديل الكلام (كل كلمة بوقتها)", estimate: "≈ تقدير من السكتات في الصوت", manual: "✍️ متعدّل بإيدك" };
 function renderScriptTab() {
   const ep = ser.ep;
@@ -239,10 +273,11 @@ const TAKE_STATE = { queued: "⏳ مستنية", working: "🎬 بتتولد..."
 function takeThumb(t, chosen) {
   const busy = t.status === "queued" || t.status === "working";
   const media = t.url ? lightVideo(t.url, 'muted loop playsinline') : `<div class="car-wait">${busy ? `<div class="spin"></div>` : ""}${TAKE_STATE[t.status] || ""}</div>`;
-  return `<div class="take ${t.id === chosen ? "sel" : ""} ${t.status}" data-take="${t.id}" title="${t.source === "upload" ? escapeHtml(t.name || "فيديو مرفوع") : "Seedance"}${t.error ? ` — ${escapeHtml(t.error)}` : ""}">
-    ${media}<em>${t.source === "upload" ? "⬆" : "✨"} ${t.duration ? `${t.duration.toFixed(1)}ث` : ""}</em>
+  return `<div class="take ${t.id === chosen ? "sel" : ""} ${t.status} ${t.approved ? "ok" : ""}" data-take="${t.id}" title="${t.source === "upload" ? escapeHtml(t.name || "فيديو مرفوع") : "Seedance"}${t.error ? ` — ${escapeHtml(t.error)}` : ""}">
+    ${media}<em>${t.approved ? "✅" : t.source === "upload" ? "⬆" : "✨"} ${t.duration ? `${t.duration.toFixed(1)}ث` : ""}</em>
     ${busy ? "" : `<b data-del-take title="امسح النسخة">✕</b>`}</div>`;
 }
+const FRAME_STATE = { queued: "⏳ مستنية", working: "🎨 بترسم...", failed: "✕ فشلت" };
 function renderShotsTab() {
   const ep = ser.ep;
   const ready = ep.audio && ep.lines.length && ep.lines.every((l) => l.start != null);
@@ -257,22 +292,47 @@ function renderShotsTab() {
     const said = (s.lines || []).map((n) => lines[n]).filter(Boolean).map((l) => `«${escapeHtml(l.text)}»`).join(" ") || `<span class="muted">(من غير كلام)</span>`;
     const chosen = s.takes.find((t) => t.id === s.chosen);
     const short = chosen?.duration && chosen.duration - (s.offset || 0) < s.duration - 0.05;
-    return `${head}<article class="shot" data-shot="${s.id}">
+    const fbusy = s.frame_status === "queued" || s.frame_status === "working";
+    const frame = s.frame_url
+      ? `<a href="${s.frame_url}" target="_blank"><img src="${s.frame_url}" alt=""></a>${fbusy ? `<div class="car-wait over"><div class="spin"></div></div>` : ""}`
+      : `<div class="car-wait">${fbusy ? `<div class="spin"></div>` : ""}${FRAME_STATE[s.frame_status] || "لسه من غير ستوري بورد"}</div>`;
+    const frames = (s.frames || []).length > 1 ? `<div class="frame-vers">${s.frames.map((f, i) => `<img src="${f.url}" data-frame="${f.file}" class="${f.url === s.frame_url ? "sel" : ""}" title="نسخة ${i + 1}" alt="">`).join("")}</div>` : "";
+    const ready = chosen?.approved;
+    return `${head}<article class="shot ${s.approved ? "approved" : ""} ${ready ? "ready" : ""}" data-shot="${s.id}">
       <header><b>${s.n}</b><span class="t">${serFmt(s.start)} → ${serFmt(s.end)}</span><span class="dur">${s.duration.toFixed(1)}ث</span>
         <button class="btn sm" data-play="${s.start}:${s.end}" title="اسمع الكلام اللي على اللقطة">▶</button></header>
       <div class="said" data-no-i18n>${said}</div>
+      <div class="frame">${frame}</div>
+      ${frames}
+      ${s.frame_error ? `<div class="err">${escapeHtml(s.frame_error)}</div>` : ""}
       <input type="text" class="title" data-f="title" value="${escapeHtml(s.title || "")}" placeholder="وصف اللقطة" data-no-i18n>
       <div class="meta" data-no-i18n>${[s.shot, s.camera, s.location, s.sfx && `🔊 ${s.sfx}`, s.transition && `↪ ${s.transition}`].filter(Boolean).map(escapeHtml).join(" · ")}</div>
       <textarea data-f="prompt" rows="4" dir="ltr" placeholder="Prompt" data-no-i18n>${escapeHtml(s.prompt || "")}</textarea>
-      <div class="takes">${s.takes.map((t) => takeThumb(t, s.chosen)).join("")}</div>
       <div class="acts">
-        <button class="btn sm primary" data-gen>✨ ولّد نسخة</button>
+        <button class="btn sm" data-frame-go ${fbusy ? "disabled" : ""}>🎨 ${s.frame_url ? "ارسم تاني" : "ارسم الستوري بورد"}</button>
+        <button class="btn sm ${s.approved ? "" : "primary"}" data-approve>${s.approved ? "✅ معتمدة (دوس تلغي)" : "✅ اعتمد اللقطة"}</button>
+      </div>
+      <div class="takes">${s.takes.map((t) => takeThumb(t, s.chosen)).join("")}</div>
+      ${chosen && chosen.status === "done" ? `<div class="acts take-acts">
+        <button class="btn sm ${chosen.approved ? "" : "primary"}" data-take-ok="${chosen.id}">${chosen.approved ? "✅ موافق عليه" : "✅ موافق على الفيديو"}</button>
+        <button class="btn sm" data-gen ${s.approved ? "" : "disabled"}>🔄 واحد تاني</button></div>` : ""}
+      <div class="acts">
+        ${chosen ? "" : `<button class="btn sm primary" data-gen ${s.approved ? "" : "disabled"} title="${s.approved ? "" : "اعتمد اللقطة الأول"}">🎬 ولّد الفيديو</button>`}
         <label class="btn sm">⬆ ارفع فيديو<input type="file" data-up accept="video/*" hidden></label>
         ${chosen ? `<label class="off">يبدأ من <input type="number" step="0.1" min="0" data-f="offset" value="${s.offset || 0}">ث</label>` : ""}
         ${short ? `<span class="warn">⚠️ النسخة أقصر من اللقطة، آخر فريم هيتمد</span>` : ""}
       </div>
     </article>`;
   }).join("");
+  const n = ep.shots.length;
+  const framed = ep.shots.filter((s) => s.frame_url).length;
+  const approved = ep.shots.filter((s) => s.approved).length;
+  const okVideos = ep.shots.filter((s) => s.takes.some((t) => t.id === s.chosen && t.approved)).length;
+  $("serProgress").textContent = n ? `🎨 ${framed}/${n} ستوري بورد · ✅ ${approved}/${n} لقطة معتمدة · 🎬 ${okVideos}/${n} فيديو موافق عليه` : "";
+  $("serFramesGo").disabled = !n;
+  $("serApproveAll").disabled = !n;
+  $("serApproveAll").textContent = n && approved === n ? "↩ الغي اعتماد الكل" : "✅ اعتمد كل اللقطات";
+  $("serGenApproved").disabled = !approved;
   // نسخ محفوظة من قوايم قديمة
   $("serPool").hidden = !ep.pool.length;
   $("serPoolList").innerHTML = ep.pool.map((t) => `<div class="pool-item">${takeThumb(t, null)}
@@ -314,6 +374,26 @@ $("serShots").addEventListener("click", async (e) => {
       ser.ep = await api(`/api/episodes/${ser.ep.id}/shots/${id}/generate`, { method: "POST" });
       return renderSeries();
     }
+    if (e.target.closest("[data-frame-go]")) {
+      ser.ep = await api(`/api/episodes/${ser.ep.id}/frames?shot_id=${id}`, { method: "POST" });
+      return renderSeries();
+    }
+    const fr = e.target.closest("[data-frame]");
+    if (fr) {
+      ser.ep = await api(`/api/episodes/${ser.ep.id}/shots/${id}/frame`, { method: "POST", ...jsonBody({ file: fr.dataset.frame }) });
+      return renderSeries();
+    }
+    if (e.target.closest("[data-approve]")) {
+      const s = ser.ep.shots.find((x) => x.id === id);
+      await patchEpisode({ shot: { id, approved: !s.approved } });
+      return renderSeries();
+    }
+    const ok = e.target.closest("[data-take-ok]");
+    if (ok) {
+      const t = ser.ep.shots.find((x) => x.id === id).takes.find((x) => x.id === ok.dataset.takeOk);
+      ser.ep = await api(`/api/episodes/${ser.ep.id}/takes/${t.id}/approve?approved=${!t.approved}`, { method: "POST" });
+      return renderSeries();
+    }
     const take = e.target.closest("[data-take]");
     if (!take) return;
     if (e.target.closest("[data-del-take]")) {
@@ -343,19 +423,46 @@ $("serPoolList").addEventListener("click", async (e) => {
   catch (err) { toast(err.message, true); }
 });
 
-// ---------- 4. التجميع ----------
+$("serFramesGo").onclick = () => busyButton($("serFramesGo"), "⏳", async () => {
+  ser.ep = await api(`/api/episodes/${ser.ep.id}/frames`, { method: "POST" });
+  renderSeries();
+});
+$("serApproveAll").onclick = () => busyButton($("serApproveAll"), "⏳", async () => {
+  const all = ser.ep.shots.every((s) => s.approved);
+  ser.ep = await api(`/api/episodes/${ser.ep.id}/approve-shots?approved=${!all}`, { method: "POST" });
+  renderSeries();
+});
+$("serGenApproved").onclick = () => busyButton($("serGenApproved"), "⏳", async () => {
+  const todo = ser.ep.shots.filter((s) => s.approved && !s.takes.some((t) => t.status !== "failed")).length;
+  if (!confirm(`هيتولد فيديو لـ ${todo} لقطة معتمدة بـ Seedance. نكمّل؟`)) return;
+  ser.ep = await api(`/api/episodes/${ser.ep.id}/generate-approved`, { method: "POST" });
+  renderSeries();
+});
+
+// ---------- 5. المونتاج ----------
 function renderRenderTab() {
   const ep = ser.ep;
+  const notOk = ep.shots.filter((s) => !s.takes.some((t) => t.id === s.chosen && t.approved)).map((s) => s.n);
+  $("serToEditor").disabled = !ep.shots.length || notOk.length > 0;
+  $("serToEditor").title = notOk.length ? `لقطات لسه من غير فيديو موافق عليه: ${notOk.join("، ")}` : "";
   const missing = ep.shots.filter((s) => !s.takes.some((t) => t.id === s.chosen && t.status === "done")).length;
   const r = ep.render;
   $("serRenderGo").disabled = !ep.shots.length || r.status === "working";
   $("serRenderState").textContent = r.status === "working" ? "🎞️ بيجمّع الحلقة..." : r.status === "failed" ? `✕ ${r.error || ""}` : "";
   $("serRenderHint").textContent = !ep.shots.length ? "جهّز اللقطات الأول."
+    : notOk.length ? `🎬 لسه ${notOk.length} لقطة من غير فيديو موافق عليه (${notOk.join("، ")}). المعاينة السريعة بتحط مكانهم أسود أو النسخة المختارة.`
     : missing ? `⚠️ ${missing} لقطة لسه من غير فيديو، هتطلع سودا بمدتها. تقدر تجمّع عشان تشوف الإيقاع.`
       : "كل اللقطات جاهزة. كل لقطة بتتقص على مدتها بالظبط من الصوت، والفويس أوفر فوقهم.";
   $("serRendered").innerHTML = ep.export_url ? `<video src="${ep.export_url}" controls preload="metadata"></video>
     <p class="hint">اتحفظت في الفيديوهات الجاهزة، وتقدر تنشرها من صفحة النشر.</p>` : "";
 }
+$("serToEditor").onclick = () => busyButton($("serToEditor"), "⏳", async () => {
+  const r = await api(`/api/episodes/${ser.ep.id}/to-editor`, { method: "POST" });
+  storageSet("studiomania.projectId", r.project_id);
+  if (typeof mt !== "undefined") mt.project = null;
+  toast("اتفتحت الحلقة في محرر الفيديو");
+  showStep("6");
+});
 $("serRenderGo").onclick = () => busyButton($("serRenderGo"), "⏳", async () => {
   ser.ep = await api(`/api/episodes/${ser.ep.id}/render`, { method: "POST" });
   renderSeries();
@@ -366,7 +473,8 @@ function schedulePollSeries() {
   clearTimeout(ser.timer);
   const ep = ser.ep;
   if (!ep) return;
-  const busy = ep.render.status === "working" || ep.shots.some((s) => s.takes.some((t) => t.status === "queued" || t.status === "working"));
+  const busy = ep.render.status === "working" || ep.shots.some((s) => s.frame_status === "queued" || s.frame_status === "working"
+    || s.takes.some((t) => t.status === "queued" || t.status === "working"));
   if (!busy || document.querySelector('.view[data-view="9"]').hidden) return;
   ser.timer = setTimeout(async () => {
     try {

@@ -1380,7 +1380,7 @@ def create_generations(body: GenerationIn):
 @app.get("/api/generations")
 def list_generations():
     with closing(db()) as conn:
-        rows = conn.execute("SELECT * FROM generations ORDER BY created_at DESC, clip_label").fetchall()
+        rows = conn.execute("SELECT * FROM generations WHERE clip_id NOT LIKE 'series:%' ORDER BY created_at DESC, clip_label").fetchall()
     return [generation_to_dict(r) for r in rows]
 
 
@@ -4103,7 +4103,7 @@ def series_to_dict(r: sqlite3.Row, data: dict, episodes: list[dict]) -> dict:
 
 
 def new_episode_data() -> dict:
-    return {"script": "", "notes": "", "audio": None, "scenes": [], "lines": [], "timing": None,
+    return {"script": "", "notes": "", "chat": [], "script_approved": False, "audio": None, "scenes": [], "lines": [], "timing": None,
             "shots": [], "takes": {}, "render": {"status": "idle", "export_id": None, "error": None}}
 
 
@@ -4126,12 +4126,18 @@ def update_episode(eid: str, fn) -> dict:
 def ep_dir(eid: str) -> Path:
     d = SERIES_DIR / "episodes" / Path(eid).name
     (d / "takes").mkdir(parents=True, exist_ok=True)
+    (d / "frames").mkdir(parents=True, exist_ok=True)
     return d
 
 
 def take_to_dict(eid: str, t: dict) -> dict:
     f = ep_dir(eid) / "takes" / t["file"] if t.get("file") else None
     return {**t, "url": f"/media/series/episodes/{eid}/takes/{t['file']}" if f and f.exists() else None}
+
+
+def frame_url(eid: str, name: str | None) -> str | None:
+    p = ep_dir(eid) / "frames" / name if name else None
+    return f"/media/series/episodes/{eid}/frames/{name}?v={int(p.stat().st_mtime)}" if p and p.exists() else None
 
 
 def episode_to_dict(r: sqlite3.Row, data: dict) -> dict:
@@ -4142,13 +4148,16 @@ def episode_to_dict(r: sqlite3.Row, data: dict) -> dict:
     return {
         "id": eid, "series_id": r["series_id"], "number": r["number"], "name": r["name"],
         "script": data["script"], "notes": data["notes"], "scenes": data["scenes"], "lines": data["lines"],
+        "chat": data["chat"], "script_approved": data["script_approved"],
         "timing": data["timing"],
         "audio": {**audio, "url": f"/media/series/episodes/{eid}/{audio['file']}"} if audio else None,
-        "shots": [{**s, "duration": round(s["end"] - s["start"], 2), "takes": [takes[t] for t in s.get("takes", []) if t in takes]}
+        "shots": [{**s, "duration": round(s["end"] - s["start"], 2), "takes": [takes[t] for t in s.get("takes", []) if t in takes],
+                   "frames": [{"file": f, "url": frame_url(eid, f)} for f in s.get("frames", []) if frame_url(eid, f)],
+                   "frame_url": frame_url(eid, s.get("frame"))}
                   for s in data["shots"]],
         # نسخ من قوايم لقطات قديمة: محفوظة وتقدر تحطها على أي لقطة
         "pool": [t for k, t in takes.items() if k not in used],
-        "render": data["render"], "busy": eid in SERIES_JOBS,
+        "render": data["render"], "busy": eid in SERIES_JOBS, "project_id": data.get("project_id"),
         "export_url": None,
     }
 
@@ -4297,6 +4306,8 @@ def patch_episode(eid: str, body: EpisodePatch):
                     s[k] = str(body.shot[k] or "")[:3000]
             if "offset" in body.shot:
                 s["offset"] = max(0.0, round(float(body.shot["offset"] or 0), 2))
+            if "approved" in body.shot:
+                s["approved"] = bool(body.shot["approved"])
             if "end" in body.shot:
                 # تغيير نهاية لقطة بيحرّك بداية اللي بعدها (الحلقة تفضل متلاصقة على الصوت)
                 k = d["shots"].index(s)
@@ -4382,13 +4393,13 @@ def series_for_episode(conn: sqlite3.Connection, r: sqlite3.Row) -> tuple[sqlite
     return series_row(conn, r["series_id"])
 
 
-def series_chat(messages: list[dict]) -> str:
+def series_chat(messages: list[dict], json_mode: bool = True) -> str:
     """GPT 5.6 Luna (أو اللي متختار في الإعدادات). لو الاسم مش موجود في Atlas بندوّر على أقرب موديل ونحفظه."""
     preferred = series_settings()["text_model"]
     errors = []
     for model in atlas.model_candidates(preferred, ("luna",), [carousel_settings()["text_model"]])[:5]:
         try:
-            reply = atlas.chat(messages, model, temperature=0.6, max_tokens=12000, json_mode=True)
+            reply = atlas.chat(messages, model, temperature=0.6 if json_mode else 0.8, max_tokens=12000, json_mode=json_mode)
         except (atlas.AtlasError, httpx.HTTPError) as exc:
             errors.append(f"{model}: {str(exc)[:120]}")
             continue
@@ -4418,7 +4429,8 @@ def episode_shots(eid: str):
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
     for s in shots:
-        s.update(id=uuid.uuid4().hex[:10], takes=[], chosen=None, offset=0.0)
+        s.update(id=uuid.uuid4().hex[:10], takes=[], chosen=None, offset=0.0, approved=False,
+                 frames=[], frame=None, frame_status="idle", frame_error=None)
     def fn(d):
         d["shots"] = shots
     update_episode(eid, fn)
@@ -4445,7 +4457,8 @@ def upload_take(eid: str, shot_id: str, file: UploadFile = File(...)):
     tid = uuid.uuid4().hex[:10]
     def fn(d):
         s = find_shot(d, shot_id)
-        d["takes"][tid] = {"id": tid, "file": name, "source": "upload", "status": "done", "error": None,
+        # الفيديو اللي بترفعه بنفسك معتمد على طول
+        d["takes"][tid] = {"id": tid, "file": name, "source": "upload", "status": "done", "error": None, "approved": True,
                            "duration": round(duration, 2), "name": file.filename, "created_at": now()}
         s["takes"].append(tid)
         s["chosen"], s["offset"] = tid, 0.0
@@ -4500,6 +4513,8 @@ def delete_take(eid: str, take_id: str):
 
 def shot_prompt(s: dict, character: str) -> str:
     parts = [s.get("prompt") or s.get("title") or ""]
+    if s.get("frame"):
+        parts.append("The first reference image is the approved storyboard frame: keep its composition, framing, setting and lighting.")
     if character.strip():
         parts.append(f"Character (keep identical to the reference images): {character.strip()}")
     parts.append("Vertical 9:16, cinematic, realistic, natural light. The man never talks to the camera. No on-screen text, no subtitles, no logos.")
@@ -4524,6 +4539,9 @@ def run_take(eid: str, tid: str) -> None:
                             "-c:v", "libx264", "-pix_fmt", "yuv420p", str(dest)], check=True, capture_output=True, timeout=120)
         else:
             refs = [SERIES_DIR / r["series_id"] / "refs" / f for f in sdata["refs"]][:4]
+            if t.get("frame"):
+                # صورة الستوري بورد أول مرجع: نفس الكادر والتكوين
+                refs.insert(0, ep_dir(eid) / "frames" / t["frame"])
             body = {
                 "model": series_settings()["video_model"], "prompt": t["prompt"],
                 "reference_images": [atlas.upload_media(p) for p in refs if p.exists()],
@@ -4549,11 +4567,14 @@ def generate_take(eid: str, shot_id: str):
         _, sdata = series_for_episode(conn, r)
     def fn(d):
         s = find_shot(d, shot_id)
+        if not s.get("approved"):
+            raise HTTPException(400, f"اعتمد اللقطة {s['n']} الأول (راجع الستوري بورد والبرومبت)")
         dur = s["end"] - s["start"]
         # Seedance بيعمل من 4 لـ 15 ثانية: بنولّد أطول شوية من اللقطة ونقص منها
         gen = int(min(atlas.MAX_DURATION, max(atlas.MIN_DURATION, math.ceil(dur + 0.5))))
         d["takes"][tid] = {"id": tid, "file": None, "source": "seedance", "status": "queued", "error": None,
-                           "duration": None, "gen_duration": gen, "prompt": shot_prompt(s, sdata["character"]), "created_at": now()}
+                           "duration": None, "gen_duration": gen, "prompt": shot_prompt(s, sdata["character"]),
+                           "frame": s.get("frame"), "approved": False, "created_at": now()}
         s["takes"].append(tid)
         if not s["chosen"]:
             s["chosen"] = tid
@@ -4623,6 +4644,225 @@ def render_episode(eid: str):
     return episode_response(eid)
 
 
+
+class WriteIn(BaseModel):
+    message: str = ""
+
+
+@app.post("/api/episodes/{eid}/write")
+def write_episode(eid: str, body: WriteIn):
+    """الموديل يكتب سكريبت الحلقة استكمالًا للحلقات اللي فاتت. أي رسالة منك = توجيه، وهو بيرجّع السكريبت كامل متعدّل."""
+    with closing(db()) as conn:
+        r, data = episode_row(conn, eid)
+        _, sdata = series_for_episode(conn, r)
+        previous = []
+        for e in conn.execute("SELECT number, name, data FROM episodes WHERE series_id = ? AND number < ? ORDER BY number",
+                              (r["series_id"], r["number"])):
+            previous.append({"number": e["number"], "name": e["name"], "script": json.loads(e["data"]).get("script", "")})
+    chat = list(data["chat"])
+    if body.message.strip():
+        chat.append({"role": "user", "content": body.message.strip()[:4000]})
+    elif not chat:
+        chat.append({"role": "user", "content": f"اكتب الحلقة رقم {r['number']} استكمالًا للي فات."})
+    if atlas.mock_mode():
+        reply = sz.mock_script(r["number"], chat)
+    else:
+        if not atlas.api_key():
+            raise HTTPException(400, "مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات")
+        reply = series_chat(sz.writer_messages(sdata["bible"], sdata["character"], previous, r["number"], chat), json_mode=False)
+    script = sz.clean_script(reply)
+    if not sz.parse_script(script)["lines"]:
+        raise HTTPException(400, "الموديل رجّع رد مش سكريبت. جرّب تاني أو وضّح طلبك")
+    def fn(d):
+        d["chat"] = chat + [{"role": "assistant", "content": script}]
+        d["script"] = script
+        d["script_approved"] = False
+        parsed = sz.parse_script(script)
+        old = {ln["text"]: ln for ln in d["lines"]}
+        d["scenes"] = parsed["scenes"]
+        d["lines"] = [{**ln, "start": old.get(ln["text"], {}).get("start"), "end": old.get(ln["text"], {}).get("end")}
+                      for ln in parsed["lines"]]
+    update_episode(eid, fn)
+    return episode_response(eid)
+
+
+@app.post("/api/episodes/{eid}/approve-script")
+def approve_script(eid: str, approved: bool = True):
+    update_episode(eid, lambda d: d.update(script_approved=bool(approved)))
+    return episode_response(eid)
+
+
+FRAME_SIZE = "1152x2048"  # 9:16
+
+
+def run_frame(eid: str, shot_id: str) -> None:
+    """صورة الستوري بورد للقطة بـ GPT Image، وصور الشخصية مراجع."""
+    def setp(**kw):
+        update_episode(eid, lambda d: next((s for s in d["shots"] if s["id"] == shot_id), {}).update(**kw))
+    try:
+        with closing(db()) as conn:
+            r, data = episode_row(conn, eid)
+            _, sdata = series_for_episode(conn, r)
+        s = next((s for s in data["shots"] if s["id"] == shot_id), None)
+        if s is None:
+            return
+        setp(frame_status="working", frame_error=None)
+        name = f"frame-{s['n']:02d}-{uuid.uuid4().hex[:6]}.png"
+        dest = ep_dir(eid) / "frames" / name
+        if atlas.mock_mode():
+            mock_image(dest, "576x1024", f"shot {s['n']}", s["n"])
+        else:
+            refs = [SERIES_DIR / r["series_id"] / "refs" / f for f in sdata["refs"]][:6]
+            urls = [atlas.reference_url(p) for p in refs if p.exists()]
+            cfg = carousel_settings()
+            url = atlas.generate_image(cfg["image_family"], sz.frame_prompt(s, sdata["character"]), FRAME_SIZE,
+                                       auth.get_setting("series_frame_quality") or "medium", urls or None)
+            atlas.download(url, dest)
+        def done(d):
+            sh = next((x for x in d["shots"] if x["id"] == shot_id), None)
+            if sh is not None:
+                sh.setdefault("frames", []).append(name)
+                sh.update(frame=name, frame_status="done", frame_error=None)
+        update_episode(eid, done)
+    except Exception as exc:  # noqa: BLE001
+        setp(frame_status="failed", frame_error=str(exc)[:400])
+
+
+def queue_frames(eid: str, ids: list[str]) -> None:
+    def fn(d):
+        for s in d["shots"]:
+            if s["id"] in ids:
+                s.update(frame_status="queued", frame_error=None)
+    update_episode(eid, fn)
+    for i in ids:
+        series_executor.submit(run_frame, eid, i)
+
+
+@app.post("/api/episodes/{eid}/frames")
+def episode_frames(eid: str, shot_id: str | None = None):
+    """يرسم الستوري بورد: لقطة واحدة (نسخة جديدة)، أو كل اللقطات اللي لسه ملهاش صورة."""
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات")
+    with closing(db()) as conn:
+        _, data = episode_row(conn, eid)
+    busy = {"queued", "working"}
+    if shot_id:
+        s = find_shot(data, shot_id)
+        if s.get("frame_status") in busy:
+            raise HTTPException(400, "الصورة دي بتترسم")
+        ids = [shot_id]
+    else:
+        ids = [s["id"] for s in data["shots"] if not s.get("frame") and s.get("frame_status") not in busy]
+    if not ids:
+        raise HTTPException(400, "كل اللقطات ليها ستوري بورد")
+    queue_frames(eid, ids)
+    return episode_response(eid)
+
+
+class FramePick(BaseModel):
+    file: str
+
+
+@app.post("/api/episodes/{eid}/shots/{shot_id}/frame")
+def pick_frame(eid: str, shot_id: str, body: FramePick):
+    def fn(d):
+        s = find_shot(d, shot_id)
+        if body.file not in s.get("frames", []):
+            raise HTTPException(404, "الصورة مش موجودة")
+        s["frame"] = body.file
+    update_episode(eid, fn)
+    return episode_response(eid)
+
+
+@app.post("/api/episodes/{eid}/approve-shots")
+def approve_all_shots(eid: str, approved: bool = True):
+    def fn(d):
+        for s in d["shots"]:
+            s["approved"] = bool(approved)
+    update_episode(eid, fn)
+    return episode_response(eid)
+
+
+@app.post("/api/episodes/{eid}/generate-approved")
+def generate_approved(eid: str):
+    """يولّد فيديو لكل لقطة معتمدة لسه ملهاش نسخة (أو نسخها كلها فشلت)."""
+    with closing(db()) as conn:
+        _, data = episode_row(conn, eid)
+    ok = {"queued", "working", "done"}
+    todo = [s["id"] for s in data["shots"] if s.get("approved")
+            and not any(data["takes"].get(t, {}).get("status") in ok for t in s.get("takes", []))]
+    if not todo:
+        raise HTTPException(400, "مفيش لقطات معتمدة محتاجة توليد. اعتمد اللقطات الأول")
+    for sid in todo:
+        generate_take(eid, sid)
+    return episode_response(eid)
+
+
+@app.post("/api/episodes/{eid}/takes/{take_id}/approve")
+def approve_take(eid: str, take_id: str, approved: bool = True):
+    """توافق على الفيديو: يبقى هو المختار للقطة."""
+    def fn(d):
+        t = d["takes"].get(take_id)
+        if t is None:
+            raise HTTPException(404, "النسخة مش موجودة")
+        if t["status"] != "done":
+            raise HTTPException(400, "النسخة لسه ما خلصتش")
+        t["approved"] = bool(approved)
+        if approved:
+            for s in d["shots"]:
+                if take_id in s["takes"]:
+                    s["chosen"] = take_id
+    update_episode(eid, fn)
+    return episode_response(eid)
+
+
+@app.post("/api/episodes/{eid}/to-editor")
+def episode_to_editor(eid: str):
+    """يحط الحلقة في محرر الفيديو: كل لقطة بنسختها المعتمدة ومقصوصة على مدتها، والفويس أوفر تحتهم."""
+    with closing(db()) as conn:
+        r, data = episode_row(conn, eid)
+        sr, _ = series_for_episode(conn, r)
+    if not data["shots"] or not data["audio"]:
+        raise HTTPException(400, "جهّز اللقطات والصوت الأول")
+    def ok(s: dict) -> bool:
+        t = data["takes"].get(s.get("chosen") or "", {})
+        return t.get("status") == "done" and bool(t.get("file")) and bool(t.get("approved"))
+    missing = [s["n"] for s in data["shots"] if not ok(s)]
+    if missing:
+        raise HTTPException(400, f"اللقطات دي لسه من غير فيديو موافق عليه: {', '.join(map(str, missing))}")
+    label = f"{sr['name']} — {r['name']}"
+    clips = []
+    with closing(db()) as conn, conn:
+        for s in data["shots"]:
+            t = data["takes"][s["chosen"]]
+            gid = uuid.uuid4().hex[:12]
+            out = f"{gid}.mp4"
+            shutil.copyfile(ep_dir(eid) / "takes" / t["file"], GENERATED_DIR / out)
+            conn.execute(
+                "INSERT INTO generations (id, clip_id, clip_filename, clip_label, coach_id, coach_name, coach_image, model, prompt, "
+                "params, status, output_filename, created_at, updated_at) VALUES (?, ?, ?, ?, '', '', '', ?, ?, '{}', 'completed', ?, ?, ?)",
+                (gid, f"series:{eid}", t["file"], f"{label} · لقطة {s['n']}", t.get("source", ""), t.get("prompt") or "", out, now(), now()),
+            )
+            start = float(s.get("offset") or 0)
+            dur = s["end"] - s["start"]
+            clips.append({"gen_id": gid, "start": start, "end": min(start + dur, t.get("duration") or start + dur),
+                          "zoom": 1.0, "x": 0.0, "y": 0.0, "volume": 0.0})
+        # الفويس أوفر في مكتبة التعليق الصوتي عشان المحرر يقراه
+        vid = uuid.uuid4().hex[:12]
+        vfile = f"voice_{vid}{Path(data['audio']['file']).suffix}"
+        shutil.copyfile(ep_dir(eid) / data["audio"]["file"], AUDIO_DIR / vfile)
+        conn.execute("INSERT INTO audio (id, kind, name, filename, duration, created_at) VALUES (?, 'voice', ?, ?, ?, ?)",
+                     (vid, f"🎙️ {label}", vfile, data["audio"]["duration"], now()))
+        pid = uuid.uuid4().hex[:12]
+        pdata = {"name": label, "video_id": None, "coach_id": None, "clips": clips,
+                 "voice": {"id": vid, "volume": 1.0, "delay": 0.0, "offset": 0.0, "length": None, "fade_out": False, "parts": []},
+                 "music": None, "outro": False, "outro_volume": 1.0, "captions": {}, "logo": {}}
+        conn.execute("INSERT INTO projects (id, name, data, render_status, created_at, updated_at) VALUES (?, ?, ?, 'idle', ?, ?)",
+                     (pid, label, json.dumps(pdata, ensure_ascii=False), now(), now()))
+    update_episode(eid, lambda d: d.update(project_id=pid))
+    return {"project_id": pid}
+
+
 def reset_stuck_series() -> None:
     """بعد ما السيرفر يقوم: أي توليد أو تجميع كان شغال اتقطع."""
     with closing(db()) as conn, conn:
@@ -4632,6 +4872,10 @@ def reset_stuck_series() -> None:
             for t in (d.get("takes") or {}).values():
                 if t.get("status") in ("queued", "working"):
                     t.update(status="failed", error="اتقطع لما السيرفر اتقفل. دوس ولّد تاني")
+                    changed = True
+            for sh in d.get("shots") or []:
+                if sh.get("frame_status") in ("queued", "working"):
+                    sh.update(frame_status="failed", frame_error="اتقطع لما السيرفر اتقفل. ارسم تاني")
                     changed = True
             if (d.get("render") or {}).get("status") == "working":
                 d["render"] = {"status": "failed", "export_id": None, "error": "اتقطع لما السيرفر اتقفل. جمّع تاني"}

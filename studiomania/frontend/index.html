@@ -812,10 +812,11 @@
               <div class="car-head">
                 <h2 class="ser-title" id="serTitle" data-no-i18n></h2>
                 <nav class="car-steps" id="serTabs">
-                  <button data-t="series"><i>1</i>المسلسل والشخصية</button>
-                  <button data-t="script"><i>2</i>السكريبت والصوت</button>
-                  <button data-t="shots"><i>3</i>اللقطات</button>
-                  <button data-t="render"><i>4</i>التجميع</button>
+                  <button data-t="series"><i>1</i>المسلسل</button>
+                  <button data-t="write"><i>2</i>كتابة الحلقة</button>
+                  <button data-t="script"><i>3</i>الفويس أوفر</button>
+                  <button data-t="shots"><i>4</i>اللقطات والستوري بورد</button>
+                  <button data-t="render"><i>5</i>المونتاج</button>
                 </nav>
               </div>
 
@@ -833,12 +834,24 @@
                 </div>
               </section>
 
-              <section class="panel ser-sec" data-sec="script" hidden>
+              <section class="panel ser-sec" data-sec="write" hidden>
                 <label class="field">اسم الحلقة <input type="text" id="serEpRename" data-no-i18n></label>
-                <div class="panel-head"><h2>📝 السكريبت</h2><label class="btn sm">📄 من ملف .txt<input type="file" id="serScriptFile" accept=".txt,text/plain" hidden></label></div>
-                <p class="hint">كل مشهد يبدأ بسطر «المشهد 1 — ...»، وجمل الفويس أوفر بين « ». المدد المكتوبة في السكريبت بتتجاهل: الصوت هو المرجع.</p>
-                <textarea id="serScript" rows="12" data-no-i18n></textarea>
+                <div class="panel-head"><h2>✍️ كتابة الحلقة</h2><span class="muted" id="serWriteState"></span></div>
+                <p class="hint">البرنامج بيكتب الحلقة استكمالًا للحلقات اللي قبلها. لو في حاجة مش عاجباك اكتبله توجيهك وهو يعدّل السكريبت كله. وتقدر تعدّل بإيدك في السكريبت تحت.</p>
+                <div class="car-chat ser-chat" id="serChat" data-no-i18n></div>
+                <form class="car-input" id="serWriteForm">
+                  <textarea id="serWriteMsg" rows="2" placeholder="وجّه الكاتب: مثلًا «خلي المشهد التاني في المطار»، «النهاية أهدى»، «جمل أقصر»... (Enter يبعت)"></textarea>
+                  <button class="btn primary" type="submit" id="serWriteGo">✍️ اكتب الحلقة</button>
+                </form>
+                <div class="panel-head"><h2>📝 السكريبت</h2>
+                  <span class="row"><label class="btn sm">📄 من ملف .txt<input type="file" id="serScriptFile" accept=".txt,text/plain" hidden></label>
+                  <button class="btn sm primary" id="serApproveScript">✅ اعتمد السكريبت</button></span></div>
+                <p class="hint">كل مشهد يبدأ بسطر «المشهد 1 — ...»، وجمل الفويس أوفر بين « ». لما تعتمده سجّل الفويس أوفر وارفعه في الخطوة اللي بعدها.</p>
+                <textarea id="serScript" rows="14" data-no-i18n></textarea>
                 <label class="field">ملاحظات للمخرج (اختياري) <input type="text" id="serNotes" data-no-i18n placeholder="مثلًا: لقطات المشهد 5 أسرع، والإضاءة دافية"></label>
+              </section>
+
+              <section class="panel ser-sec" data-sec="script" hidden>
                 <div class="panel-head ser-audio-head"><h2>🎙️ الفويس أوفر</h2>
                   <span class="row"><label class="btn sm">⬆ ارفع الصوت<input type="file" id="serAudioFile" accept="audio/*" hidden></label>
                   <button class="btn sm primary" id="serTiming">⏱️ رقّم الجمل على الصوت</button></span></div>
@@ -849,17 +862,29 @@
               </section>
 
               <section class="panel ser-sec" data-sec="shots" hidden>
-                <div class="panel-head"><h2>🎬 اللقطات</h2><button class="btn primary" id="serShotsGo">✨ جهّز اللقطات</button></div>
+                <div class="panel-head"><h2>🎬 اللقطات والستوري بورد</h2><button class="btn" id="serShotsGo">✨ جهّز اللقطات</button></div>
                 <p class="hint" id="serShotsHint"></p>
-                <p class="hint">كل لقطة مدتها جاية من وقت الكلام اللي عليها. ولّد نسخ أو ارفع فيديو جاهز، ودوس على النسخة اللي عاجباك. الماوس فوق النسخة بيشغّلها.</p>
+                <ol class="ser-steps">
+                  <li>راجع كل لقطة: الستوري بورد والبرومبت ومدتها. عدّل أو ارسم الصورة تاني لو مش عاجباك.</li>
+                  <li>اعتمد اللقطات اللي تمام (✅)، وبعدين «ولّد المعتمدة». الفيديو مدته على قد الجملة.</li>
+                  <li>على كل فيديو: «✅ موافق» أو «🔄 واحد تاني». ولما كله يبقى موافق عليه روح للمونتاج.</li>
+                </ol>
+                <div class="row wrap ser-bulk">
+                  <button class="btn" id="serFramesGo">🎨 ارسم الستوري بورد</button>
+                  <button class="btn" id="serApproveAll">✅ اعتمد كل اللقطات</button>
+                  <button class="btn primary" id="serGenApproved">🎬 ولّد المعتمدة</button>
+                  <span class="muted" id="serProgress"></span>
+                </div>
                 <div class="ser-shots" id="serShots"></div>
                 <div class="ser-pool" id="serPool" hidden><h3>📦 نسخ محفوظة (من تقسيمات قديمة)</h3><div class="ser-pool-list" id="serPoolList"></div></div>
               </section>
 
               <section class="panel ser-sec" data-sec="render" hidden>
-                <div class="panel-head"><h2>🎞️ تجميع الحلقة</h2><span class="muted" id="serRenderState"></span></div>
+                <div class="panel-head"><h2>🎞️ المونتاج</h2><span class="muted" id="serRenderState"></span></div>
                 <p class="hint" id="serRenderHint"></p>
-                <div class="row"><button class="btn primary" id="serRenderGo">🎞️ جمّع الحلقة</button></div>
+                <div class="row wrap"><button class="btn primary" id="serToEditor">🎬 افتح في محرر الفيديو</button>
+                  <button class="btn" id="serRenderGo">👀 معاينة سريعة</button></div>
+                <p class="hint">المحرر بيفتح مشروع فيه كل لقطة بالفيديو الموافق عليه ومقصوصة على مدتها، والفويس أوفر تحتهم. تقدر تضيف موسيقى وكابشن ولوجو وتصدّر من هناك.</p>
                 <div class="ser-rendered" id="serRendered"></div>
               </section>
             </section>
