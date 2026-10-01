@@ -315,6 +315,7 @@ function renderShotsTab() {
         <button class="btn sm ${s.approved ? "" : "primary"}" data-approve>${s.approved ? "✅ معتمدة (دوس تلغي)" : "✅ اعتمد اللقطة"}</button>
       </div>
       <div class="takes">${s.takes.map((t) => takeThumb(t, s.chosen)).join("")}</div>
+      ${(() => { const bad = s.takes.filter((t) => t.status === "failed" && t.error).slice(-1)[0]; return bad ? `<div class="err">✕ الفيديو فشل: ${escapeHtml(bad.error)}</div>` : ""; })()}
       ${chosen && chosen.status === "done" ? `<div class="acts take-acts">
         <button class="btn sm ${chosen.approved ? "" : "primary"}" data-take-ok="${chosen.id}">${chosen.approved ? "✅ موافق عليه" : "✅ موافق على الفيديو"}</button>
         <button class="btn sm" data-gen ${s.approved ? "" : "disabled"}>🔄 واحد تاني</button></div>` : ""}

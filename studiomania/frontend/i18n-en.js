@@ -1013,6 +1013,7 @@ window.I18N_EN = {
   "مفيش ستايلات لسه. ضيف من 📚 المكتبة صور رسومات عاجبك ستايلها.": "No styles yet. Add drawings whose style you like from 📚 Library.",
   "رسومات عاجبك ستايلها (الخطوط والأشكال والتظليل). البرنامج بياخد طريقة الرسم بس، ويرسم شخصيات جديدة بألوان كوتشي.": "Drawings whose style you like (lines, shapes, shading). Only the drawing style is used: new characters are drawn in KOCHI colors.",
   "اسم الستايل": "Style name",
+  "✕ الفيديو فشل: {0}": "✕ Video failed: {0}",
   "احذف اللقطة": "Delete shot",
   "دي آخر لقطة في الحلقة": "This is the episode's only shot",
   "الفيديوهات بتاعتها هتروح للنسخ المحفوظة.": "Its videos will move to saved versions.",
