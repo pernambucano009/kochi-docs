@@ -4537,6 +4537,24 @@ def shot_prompt(s: dict, character: str) -> str:
     return "\n".join(p for p in parts if p)
 
 
+def seedance_ref(path: Path) -> Path:
+    """Seedance بيرفض الصور اللي ضلعها أقل من 300 أو أكتر من 6000 بكسل: نسخة متظبطة (JPG) قبل الرفع."""
+    probe = subprocess.run([ffmpeg_exe(), "-hide_banner", "-i", str(path)], capture_output=True, text=True, timeout=30).stderr
+    m = re.search(r"Video:.*?(\d{2,5})x(\d{2,5})", probe)
+    w, h = (int(m.group(1)), int(m.group(2))) if m else (0, 0)
+    if w and h and 300 <= min(w, h) and max(w, h) <= 6000 and path.suffix.lower() in (".jpg", ".jpeg", ".png"):
+        return path
+    out = TMP_DIR / "seedance_refs" / f"{path.parent.name}-{path.stem}-{int(path.stat().st_mtime)}.jpg"
+    if not out.exists():
+        out.parent.mkdir(parents=True, exist_ok=True)
+        # أصغر ضلع 720 (أو أكبر لو الصورة أكبر)، وأكبر ضلع لحد 4096
+        vf = ("scale='if(lt(iw,ih),max(720,min(iw,4096)),-2)':'if(lt(iw,ih),-2,max(720,min(ih,4096)))',"
+              "scale='min(iw,4096)':'min(ih,4096)':force_original_aspect_ratio=decrease")
+        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(path), "-vf", vf,
+                        "-q:v", "2", str(out)], check=True, capture_output=True, timeout=60)
+    return out
+
+
 def run_take(eid: str, tid: str) -> None:
     """يولّد نسخة للقطة بـ Seedance، وصور الشخصية مراجع عشان شكله يفضل ثابت."""
     def setp(**kw):
@@ -4563,7 +4581,7 @@ def run_take(eid: str, tid: str) -> None:
                     refs.insert(0, ep_dir(eid) / "frames" / t["frame"])
                 body = {
                     "model": series_settings()["video_model"], "prompt": t["prompt"],
-                    "reference_images": [atlas.upload_media(p) for p in refs if p.exists()],
+                    "reference_images": [atlas.upload_media(seedance_ref(p)) for p in refs if p.exists()],
                     "duration": t["gen_duration"], "resolution": atlas.RESOLUTION, "ratio": atlas.RATIO,
                     "generate_audio": False, "watermark": False,
                 }
