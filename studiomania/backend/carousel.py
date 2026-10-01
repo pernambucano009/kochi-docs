@@ -61,10 +61,19 @@ DEFAULT_CTAS = [
 ]
 
 
-def brand_block(brand: dict, kind: str = "characters") -> str:
+def style_text(style: dict | None) -> str | None:
+    """ستايل الرسم المختار من المكتبة: بيحل محل ستايل البراند في الرسم بس، والألوان تفضل ألوان البراند."""
+    if not style:
+        return None
+    return (f"the \"{style['name']}\" art style shown in the style reference images"
+            + (f": {style['notes'].strip().rstrip('.')}" if style.get("notes") else "")
+            + ". Keep its line work, shapes, proportions, shading and texture, but use ONLY the brand colors below.")
+
+
+def brand_block(brand: dict, kind: str = "characters", style: dict | None = None) -> str:
     b = {**DEFAULT_BRAND, **{k: v for k, v in (brand or {}).items() if v}}
     lines = [f"Brand: {b['name']}. {b['about']}", f"Audience: {b['audience']}"]
-    lines.append(f"Illustration style (for every character, icon and drawing): {b['style']}")
+    lines.append(f"Illustration style (for every character, icon and drawing): {style_text(style) or b['style']}")
     lines.append(f"Typography: {b['font']}")
     if b.get("colors"):
         lines.append(f"Brand colors (use these as the palette, exact hex values): {b['colors']}")
@@ -241,7 +250,7 @@ def kind_design_rules(ctx: dict) -> str:
         return ("DESIGN: follow the template reference images for STRUCTURE: copy their layout grid, composition, "
                 "text hierarchy and positions, shapes and decorative motifs, spacing and logo position, on every slide. "
                 "RECOLOR everything to the KOCHI brand palette below (do not keep the template's own colors unless the "
-                "template notes say so), and draw any illustration in the KOCHI style. Only the text and small content "
+                "template notes say so), and draw any illustration in the illustration style below. Only the text and small content "
                 "visuals change between slides."
                 + (f" Template notes: {t['notes']}" if t.get("notes") else ""))
     if kind == "coach":
@@ -254,8 +263,14 @@ def kind_design_rules(ctx: dict) -> str:
                 f"{handle} written small near the character. {EYES_RULE}"
                 + (f" Coach notes: {c['notes']}" if c.get("notes") else ""))
     names = ", ".join(ch["name"] for ch in ctx.get("characters") or [])
+    if not names:
+        # ستايل بس من غير شخصيات: شخصيات جديدة بالستايل ده وتفضل ثابتة في كل السلايدات
+        return ("DESIGN: KOCHI 2D character carousel. Invent ONE or TWO original Gulf characters (modest sportswear, "
+                "Saudi everyday look) drawn in the illustration style below, and keep them identical on every slide: "
+                f"same faces, proportions, hair, outfits and colors. {EYES_RULE}")
+    style = "the illustration style below" if ctx.get("style") else "the same hand-drawn KOCHI sketchy style"
     return ("DESIGN: KOCHI 2D character carousel. Reuse the character reference images exactly: same faces, "
-            "proportions, hair, outfits and colors, in the same hand-drawn KOCHI sketchy style. Never redesign "
+            f"proportions, hair, outfits and colors, in {style}. Never redesign "
             f"the characters. {EYES_RULE}" + (f" Characters: {names}." if names else ""))
 
 
@@ -269,7 +284,7 @@ def overview_prompt(brand: dict, plan: dict, ratio: str, refs: dict, ctx: dict) 
         "Every panel is a finished slide. All panels share one visual system: same background treatment, "
         "same color palette, same typography, same characters, same logo position.",
         kind_design_rules(ctx),
-        brand_block(brand, ctx.get("kind", "characters")),
+        brand_block(brand, ctx.get("kind", "characters"), ctx.get("style")),
         TEXT_RULES,
     ]
     lines += reference_notes(refs)
@@ -292,7 +307,7 @@ def slide_prompt(brand: dict, plan: dict, k: int, ratio: str, refs: dict, ctx: d
     ]
     if refs.get("previous"):
         lines.append("Reference image 2 is the finished previous slide: match its exact style, colors, fonts and character design.")
-    lines += [kind_design_rules(ctx), brand_block(brand, ctx.get("kind", "characters")), TEXT_RULES]
+    lines += [kind_design_rules(ctx), brand_block(brand, ctx.get("kind", "characters"), ctx.get("style")), TEXT_RULES]
     lines += reference_notes(refs)
     lines.append(f"Slide {k} text: {slide_text(s)}")
     lines.append(f"Visual: {s.get('visual') or 'supporting visual'}")
@@ -311,6 +326,9 @@ def reference_notes(refs: dict) -> list[str]:
         notes.append(f"Reference image {refs['logo']} is the brand logo: place it small and unchanged, never redraw it.")
     if refs.get("template"):
         notes.append(f"Reference images {_idx(refs['template'])} are the design TEMPLATE to copy.")
+    if refs.get("style"):
+        notes.append(f"Reference images {_idx(refs['style'])} are ART STYLE references only: copy how things are drawn "
+                     "(line work, shapes, proportions, shading, texture). Do NOT copy their people, scenes, text or colors.")
     for name, idx in refs.get("characters") or []:
         notes.append(f"Reference images {_idx(idx)} show the character \"{name}\": reproduce this exact character.")
     if refs.get("coach"):

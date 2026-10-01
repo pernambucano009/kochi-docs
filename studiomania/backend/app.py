@@ -3120,7 +3120,7 @@ def test_text_model():
 
 
 # ---------- مكتبة الكاروسيل: تيمبليتس وشخصيات ----------
-ASSET_KINDS = {"template": "تيمبليت", "character": "شخصية", "coach": "مدرب"}
+ASSET_KINDS = {"template": "تيمبليت", "character": "شخصية", "coach": "مدرب", "style": "ستايل رسم"}
 ASSET_MAX_FILES = 12
 # صيغ تانية بتتحول PNG لوحدها (صور الآيفون وصور المواقع)
 CONVERT_EXTENSIONS = {".heic", ".heif", ".avif", ".gif", ".bmp", ".tif", ".tiff", ".jfif"}
@@ -3418,6 +3418,8 @@ def patch_carousel(cid: str, body: CarouselPatch):
                 st["coach_asset_id"] = body.settings["coach_asset_id"] or None
             if "character_ids" in body.settings:
                 st["character_ids"] = [str(x) for x in (body.settings["character_ids"] or [])][:4]
+            if "style_id" in body.settings:
+                st["style_id"] = body.settings["style_id"] or None
             if "cta" in body.settings and isinstance(body.settings["cta"], dict):
                 c = body.settings["cta"]
                 st["cta"] = {k: str(c.get(k) or "")[:300] for k in ("type", "keyword", "reward", "text")}
@@ -3500,7 +3502,7 @@ def carousel_context(data: dict) -> tuple[dict, dict]:
     is_coach = st["kind"] == "coach"
     coach = None
     ctx: dict = {"kind": st["kind"], "characters": []}
-    assets: dict = {"template": None, "characters": [], "coach": None, "coach_asset": None}
+    assets: dict = {"template": None, "characters": [], "coach": None, "coach_asset": None, "style": None}
     with closing(db()) as conn:
         if is_coach and st.get("coach_asset_id"):
             r = conn.execute("SELECT * FROM carousel_assets WHERE id = ? AND kind = 'coach'", (st["coach_asset_id"],)).fetchone()
@@ -3521,6 +3523,12 @@ def carousel_context(data: dict) -> tuple[dict, dict]:
                 if r:
                     ctx["characters"].append({"name": r["name"], "notes": r["notes"]})
                     assets["characters"].append(asset_to_dict(r))
+        # ستايل الرسم: للشخصيات والتيمبليت بس (المدرب بيترسم زي صورته)
+        if not is_coach and st.get("style_id"):
+            r = conn.execute("SELECT * FROM carousel_assets WHERE id = ? AND kind = 'style'", (st["style_id"],)).fetchone()
+            if r:
+                ctx["style"] = {"name": r["name"], "notes": r["notes"]}
+                assets["style"] = asset_to_dict(r)
     if coach:
         ctx["coach"] = {"name": coach["name"], "instagram": coach["instagram"]}
     ctx["cta_text"] = cz.cta_text(st.get("cta"), cta_list(), (ctx.get("coach") or {}).get("name"))
@@ -3532,8 +3540,8 @@ def check_kind_ready(data: dict) -> None:
     kind = st.get("kind", "characters")
     if kind == "template" and not st.get("template_id"):
         raise HTTPException(400, "اختار التيمبليت الأول")
-    if kind == "characters" and not st.get("character_ids"):
-        raise HTTPException(400, "اختار شخصية واحدة على الأقل من المكتبة")
+    if kind == "characters" and not (st.get("character_ids") or st.get("style_id")):
+        raise HTTPException(400, "اختار شخصية أو ستايل رسم واحد على الأقل من المكتبة")
     if kind == "coach" and not (st.get("coach_asset_id") or st.get("coach_id")):
         raise HTTPException(400, "اختار المدرب الأول")
 
@@ -3626,6 +3634,14 @@ def reference_list(first: list[Path], assets: dict) -> tuple[list[Path], dict]:
         idx = [i for img in tpl["images"][:room] if (i := add(LIBRARY_DIR / tpl["id"] / img["name"]))]
         if idx:
             refs["template"] = idx
+    style = assets.get("style")
+    if style:
+        # الستايل ياخد لحد 6 صور، أو 3 لو فيه شخصيات معاه
+        n = min(len(style["images"]), room, 3 if assets.get("characters") else 6)
+        idx = [i for img in style["images"][:n] if (i := add(LIBRARY_DIR / style["id"] / img["name"]))]
+        if idx:
+            refs["style"] = idx
+            room -= len(idx)
     chars = assets.get("characters") or []
     if chars:
         per = max(1, room // len(chars))

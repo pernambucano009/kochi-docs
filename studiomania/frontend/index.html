@@ -711,6 +711,10 @@
                     <div class="car-setup-title">اختار الشخصيات (لحد 4) <a href="#" class="lib-link" data-lib="character">＋ ضيف شخصية</a></div>
                     <div class="car-assets" id="carChars"></div>
                   </div>
+                  <div class="car-pick" id="carPickStyle" hidden>
+                    <div class="car-setup-title">ستايل الرسم (اختياري) <a href="#" class="lib-link" data-lib="style">＋ ضيف ستايل</a></div>
+                    <div class="car-assets" id="carStyles"></div>
+                  </div>
                   <div class="car-pick" id="carPickCoach" hidden>
                     <div class="car-setup-title">اختار المدرب <a href="#" class="lib-link" data-lib="coach">＋ ضيف مدرب</a></div>
                     <div class="car-assets" id="carCoaches"></div>
@@ -871,7 +875,7 @@
 </dialog>
 <dialog class="bulk-dlg" id="libDialog">
   <div class="panel-head"><h2>📚 مكتبة الكاروسيل</h2><button class="btn sm" id="libClose">إغلاق</button></div>
-  <nav class="car-steps lib-tabs" id="libTabs"><button data-t="template" class="active">🧩 تيمبليتس</button><button data-t="coach">🏋️ المدربين</button><button data-t="character">🧑‍🎨 شخصيات 2D</button></nav>
+  <nav class="car-steps lib-tabs" id="libTabs"><button data-t="template" class="active">🧩 تيمبليتس</button><button data-t="coach">🏋️ المدربين</button><button data-t="character">🧑‍🎨 شخصيات 2D</button><button data-t="style">🎨 ستايلات الرسم</button></nav>
   <div class="row lib-pack"><label class="btn sm" title="ملف zip جاهز فيه صور ومعلومات (manifest.json)">📦 استورد حزمة جاهزة<input type="file" id="libPack" accept=".zip,application/zip" hidden></label></div>
   <p class="hint" id="libHint"></p>
   <form class="lib-new" id="libNew">

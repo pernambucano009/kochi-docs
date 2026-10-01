@@ -178,6 +178,9 @@ function renderSetup() {
   $("carPickTemplate").hidden = kind !== "template";
   $("carPickChars").hidden = kind !== "characters";
   $("carPickCoach").hidden = kind !== "coach";
+  $("carPickStyle").hidden = kind === "coach";
+  $("carStyles").innerHTML = car.lib.filter((a) => a.kind === "style").map((a) => assetThumb(a, a.id === st.style_id)).join("")
+    || `<span class="muted">مفيش ستايلات لسه. ضيف من 📚 المكتبة صور رسومات عاجبك ستايلها.</span>`;
   const templates = car.lib.filter((a) => a.kind === "template");
   const chars = car.lib.filter((a) => a.kind === "character");
   const picked = new Set(st.character_ids || []);
@@ -244,6 +247,11 @@ $("carTemplates").addEventListener("click", (e) => {
 $("carCoaches").addEventListener("click", (e) => {
   const b = e.target.closest(".car-asset");
   if (b) saveSetup({ coach_asset_id: b.dataset.id });
+});
+// الستايل: دوسة تختاره، ودوسة تانية عليه تلغيه (يرجع لستايل كوتشي)
+$("carStyles").addEventListener("click", (e) => {
+  const b = e.target.closest(".car-asset");
+  if (b) saveSetup({ style_id: b.dataset.id === car.cur.settings.style_id ? null : b.dataset.id });
 });
 $("carChars").addEventListener("click", (e) => {
   const b = e.target.closest(".car-asset");
@@ -555,8 +563,9 @@ function renderLibrary() {
     template: "ارفع صور تصميمات كاروسيل عاجباك (سلايد أو أكتر من نفس التصميم). البرنامج بياخد التقسيم والشكل ويلوّنه بألوان كوتشي ويحط كلامنا.",
     coach: "شخصية كل مدرب المرسومة بستايل كوتشي (صورة أو أكتر)، باسمه وحسابه على إنستجرام. بتظهر في كاروسيل «معلومات من مدرب».",
     character: "ارفع صور الشخصية من أكتر من زاوية وتعبير، وكل شخصية لوحدها باسمها. كل ما الصور أوضح الرسم هيطلع شبهها أكتر.",
+    style: "رسومات عاجبك ستايلها (الخطوط والأشكال والتظليل). البرنامج بياخد طريقة الرسم بس، ويرسم شخصيات جديدة بألوان كوتشي.",
   }[tab];
-  $("libName").placeholder = { template: "اسم التيمبليت", coach: "اسم المدرب", character: "اسم الشخصية (مثلًا: كوتشي الشاب)" }[tab];
+  $("libName").placeholder = { template: "اسم التيمبليت", coach: "اسم المدرب", character: "اسم الشخصية (مثلًا: كوتشي الشاب)", style: "اسم الستايل" }[tab];
   const items = car.lib.filter((a) => a.kind === tab);
   $("libItems").innerHTML = items.map((a) => `<div class="lib-item" data-id="${a.id}">
       <div class="lib-imgs">${a.images.map((im) => `<div class="ref"><img src="${im.url}" alt=""><button class="del" data-img="${im.name}" title="امسح الصورة">✕</button></div>`).join("")}
