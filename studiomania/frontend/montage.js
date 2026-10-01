@@ -1156,18 +1156,38 @@ function itemAt(items, t, total) {
   return items.find((x) => t < x.t1) || (t >= total ? items[items.length - 1] : null);
 }
 
+function revealVideo(v) {
+  for (const el of pool.values()) el.classList.toggle("on", el === v);
+}
+// القطع اللي جاية بتتحمّل وتقف على أول فريم فيها من بدري، عشان مايبقاش فيه أسود بين اللقطات
+function preloadNext(items, it) {
+  const k = items.indexOf(it);
+  for (const x of items.slice(k + 1, k + 3)) {
+    if (!x.url) continue;
+    const n = videoFor(x.url);
+    if (n === mt.active || n.seeking) continue;
+    if (Math.abs(n.currentTime - (x.in + 0.001)) > 0.05) n.currentTime = x.in + 0.001;
+  }
+}
+
 function showItem(it, t, playing) {
   const v = it?.url ? videoFor(it.url) : null;
+  const want = v ? it.in + clamp(t - it.t0, 0, it.t1 - it.t0 - 0.5 / FPS) : 0;
   if (v !== mt.active) {
     mt.active?.pause();
-    for (const el of pool.values()) el.classList.toggle("on", el === v);
+    // اللقطة اللي فاتت تفضل ظاهرة لحد ما الجديدة يبقى عندها فريم جاهز (بدل ما الشاشة تسود)
+    if (!v || (v.readyState >= 2 && !v.seeking && Math.abs(v.currentTime - want) < 0.1)) revealVideo(v);
+    else {
+      const ready = () => { if (mt.active === v) revealVideo(v); };
+      v.addEventListener("seeked", ready, { once: true });
+      v.addEventListener("loadeddata", ready, { once: true });
+    }
   }
   const changedItem = mt.activeKey !== it?.key || mt.active !== v;
   mt.active = v;
   mt.activeItem = it;
   mt.activeKey = it?.key ?? null;
   if (!v) return;
-  const want = it.in + clamp(t - it.t0, 0, it.t1 - it.t0 - 0.5 / FPS);
   // أول ما الفيديو يظهر لازم نطلب الفريم من جديد، وإلا ممكن يفضل أسود
   if (changedItem) v.currentTime = want + 0.001;
   else if (!playing || Math.abs(v.currentTime - want) > 0.3) {
@@ -1183,6 +1203,7 @@ function syncPreview() {
   const it = itemAt(items, mt.t, total);
   $("pvEmpty").hidden = !!it;
   showItem(it, mt.t, false);
+  if (it) preloadNext(items, it);
   drawPlayhead();
   updatePreviewOverlays();
 }
@@ -1249,6 +1270,7 @@ function tick() {
   if (mt.t >= total) { mt.t = total; return pause(); }
   const it = itemAt(items, mt.t, total);
   showItem(it, mt.t, true);
+  if (it && mt.activeKey !== mt.preloadedFor) { mt.preloadedFor = mt.activeKey; preloadNext(items, it); }
   const v = mt.active;
   if (v) {
     v.muted = false;
