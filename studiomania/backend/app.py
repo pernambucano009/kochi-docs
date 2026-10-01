@@ -3367,7 +3367,7 @@ def describe_asset(aid: str):
         for model in atlas.vision_candidates(preferred)[:8]:
             try:
                 reply = atlas.chat(cz.describe_messages(r["kind"], urls), model,
-                                   temperature=0.3, max_tokens=800, json_mode=True)
+                                   temperature=0.3, max_tokens=4000, json_mode=True)
                 d = cz.parse_description(reply)
             except (atlas.AtlasError, httpx.HTTPError, ValueError) as exc:
                 errors.append(f"{model}: {str(exc)[:120]}")
@@ -4149,6 +4149,7 @@ def episode_to_dict(r: sqlite3.Row, data: dict) -> dict:
         "id": eid, "series_id": r["series_id"], "number": r["number"], "name": r["name"],
         "script": data["script"], "notes": data["notes"], "scenes": data["scenes"], "lines": data["lines"],
         "chat": data["chat"], "script_approved": data["script_approved"],
+        "heard": " ".join(str(w.get("w", "")) for w in data.get("words") or []),
         "timing": data["timing"],
         "audio": {**audio, "url": f"/media/series/episodes/{eid}/{audio['file']}"} if audio else None,
         "shots": [{**s, "duration": round(s["end"] - s["start"], 2), "takes": [takes[t] for t in s.get("takes", []) if t in takes],
@@ -4371,19 +4372,28 @@ def episode_timing(eid: str, mode: str = "auto"):
     if not data["lines"]:
         raise HTTPException(400, "حط السكريبت الأول (جمل الفويس أوفر بين « »)")
     path = ep_dir(eid) / data["audio"]["file"]
-    source, timed = "estimate", None
+    source, timed, words, heard_lines = "estimate", None, None, None
     if mode != "estimate" and atlas.api_key() and not atlas.mock_mode():
         try:
             words = atlas.transcribe(path, data["audio"]["duration"])
-            timed, source = sz.align(words, data["lines"]), "stt"
+            timed, ratio = sz.align_with_ratio(words, data["lines"])
+            source = "stt"
+            # الصوت اتسجّل بكلام مختلف عن السكريبت: الصوت هو المرجع، فالجمل بتتاخد منه هو
+            if ratio < 0.6 or mode == "audio":
+                heard_lines, source = sz.sentences_from_words(words), "audio"
         except (atlas.AtlasError, httpx.HTTPError) as exc:
-            if mode == "stt":
+            if mode in ("stt", "audio"):
                 raise HTTPException(400, f"موديل الكلام: {exc}") from exc
-    if timed is None:
+    if timed is None and heard_lines is None:
         timed = sz.estimate(speech_segments(path), data["lines"])
     def fn(d):
-        for ln, t in zip(d["lines"], timed):
-            ln["start"], ln["end"] = t["start"], t["end"]
+        if words is not None:
+            d["words"] = words
+        if heard_lines is not None:
+            d["lines"] = heard_lines
+        else:
+            for ln, t in zip(d["lines"], timed):
+                ln["start"], ln["end"] = t["start"], t["end"]
         d["timing"] = source
     update_episode(eid, fn)
     return episode_response(eid)

@@ -69,9 +69,14 @@ def _sim(a: str, b: str) -> float:
 
 
 def align(words: list[dict], lines: list[dict]) -> list[dict]:
+    return align_with_ratio(words, lines)[0]
+
+
+def align_with_ratio(words: list[dict], lines: list[dict]) -> tuple[list[dict], float]:
     """كل جملة من السكريبت بوقت بدايتها ونهايتها من كلمات موديل الكلام (w, s, e).
     بنطابق الكلمات بالترتيب (زي المقارنة بين نصين)، والجمل اللي ما اتلقطتش بتاخد وقت بين اللي قبلها واللي بعدها."""
     script = [(li, t) for li, line in enumerate(lines) for t in tokens(line["text"])]
+    matched = 0
     heard = [(norm(w.get("w", "")), float(w.get("s", 0)), float(w.get("e", 0))) for w in words]
     heard = [h for h in heard if h[0]]
     n, m = len(script), len(heard)
@@ -99,6 +104,7 @@ def align(words: list[dict], lines: list[dict]) -> list[dict]:
             if mv == 0:
                 li = script[i - 1][0]
                 if _sim(script[i - 1][1], heard[j - 1][0]) >= 0.5:
+                    matched += 1
                     s, e = heard[j - 1][1], heard[j - 1][2]
                     o = out[li]
                     o["start"] = s if o["start"] is None else min(o["start"], s)
@@ -108,7 +114,25 @@ def align(words: list[dict], lines: list[dict]) -> list[dict]:
                 i -= 1
             else:
                 j -= 1
-    return fill_gaps(out, words[-1]["e"] if words else 0)
+    ratio = matched / max(1, min(n, m))
+    return fill_gaps(out, words[-1]["e"] if words else 0), ratio
+
+
+def sentences_from_words(words: list[dict]) -> list[dict]:
+    """جمل من كلام الصوت نفسه (لما الفويس أوفر اتسجّل بكلام غير السكريبت):
+    بنقطع عند . ؟ ! أو سكتة طويلة، وعند الفاصلة لو الجملة طولت."""
+    out, cur = [], []
+    for k, w in enumerate(words):
+        cur.append(w)
+        text = str(w.get("w", ""))
+        nxt = words[k + 1] if k + 1 < len(words) else None
+        pause = (float(nxt["s"]) - float(w["e"])) if nxt else 99
+        dur = float(w["e"]) - float(cur[0]["s"])
+        if re.search(r"[.؟?!]$", text) or pause >= 0.7 or (re.search(r"[،,]$", text) and dur >= 2.5) or nxt is None:
+            out.append({"n": len(out) + 1, "text": " ".join(str(x["w"]) for x in cur).strip(), "scene": 0,
+                        "start": round(float(cur[0]["s"]), 2), "end": round(float(cur[-1]["e"]), 2)})
+            cur = []
+    return out
 
 
 def fill_gaps(out: list[dict], total: float) -> list[dict]:
@@ -203,7 +227,7 @@ def shots_messages(bible: str, character: str, script: str, lines: list[dict], t
     user = f"""السكريبت:
 {script.strip()}
 
-جمل الفويس أوفر بتوقيتها الحقيقي في الصوت (بالثواني). مدة الحلقة كلها {total:.2f} ثانية:
+جمل الفويس أوفر زي ما اتقالت فعلًا في الصوت، بتوقيتها الحقيقي (بالثواني). ممكن الكلام يختلف عن السكريبت: الصوت هو المرجع، والسكريبت للمشاهد والصورة. أي جملة مش من كلام الشخصية (زي ملاحظة أداء اتقرت بالغلط) اعتبرها سكوت. مدة الحلقة كلها {total:.2f} ثانية:
 {timed}
 
 قواعد مهمة جدًا:

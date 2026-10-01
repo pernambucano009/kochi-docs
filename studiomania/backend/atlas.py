@@ -279,10 +279,10 @@ def transcribe(audio_path: Path, duration: float) -> list[dict]:
 LLM_URL = os.environ.get("ATLASCLOUD_LLM_URL", f"{BASE_URL}/v1")
 DEFAULT_TEXT_MODEL = "deepseek-ai/DeepSeek-V3.1"
 # موديل بيشوف الصور (بيقرا التيمبليت والستايل ويكتب وصفه)
-DEFAULT_VISION_MODEL = "qwen/qwen3-vl-235b-a22b-instruct"
+DEFAULT_VISION_MODEL = "google/gemini-2.5-flash"
 # لو الموديل المختار مش موجود بنجرب دول بالترتيب (الأسماء بتختلف في Atlas)
 VISION_FALLBACKS = [
-    "qwen/qwen3-vl-235b-a22b-instruct", "Qwen/Qwen3-VL-235B-A22B-Instruct", "qwen/qwen3-vl-30b-a3b-instruct",
+    "google/gemini-2.5-flash", "google/gemini-3-flash-preview", "qwen/qwen3-vl-235b-a22b-thinking",
     "deepseek-ai/deepseek-v4-flash-vision-exp", "google/gemini-2.5-flash", "openai/gpt-4.1", "openai/gpt-4o",
 ]
 VISION_HINTS = ("vl", "vision", "gemini", "gpt-4o", "gpt-4.1", "gpt-5")
