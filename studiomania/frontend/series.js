@@ -194,7 +194,7 @@ function renderScriptTab() {
   const player = $("serAudio");
   if (ep.audio && !player.src.endsWith(ep.audio.url)) player.src = ep.audio.url;
   player.hidden = !ep.audio;
-  $("serTiming").disabled = !ep.audio || !ep.lines.length;
+  $("serTiming").disabled = !ep.audio;
   $("serTimingState").textContent = ep.timing ? TIMING_LABEL[ep.timing] || "" : "";
   const scenes = Object.fromEntries(ep.scenes.map((s) => [s.n, s.title]));
   let last = null;
@@ -207,7 +207,7 @@ function renderScriptTab() {
       <td><input type="number" step="0.05" min="0" data-f="start" value="${ln.start ?? ""}"></td>
       <td><input type="number" step="0.05" min="0" data-f="end" value="${ln.end ?? ""}"></td>
       <td>${dur}ث ${ln.start != null ? `<button class="btn sm" data-play="${ln.start}:${ln.end}" title="اسمعها">▶</button>` : ""}</td></tr>`;
-  }).join("") || `<tr><td colspan="5" class="muted">حط السكريبت فوق: جمل الفويس أوفر بين « » وكل مشهد يبدأ بـ «المشهد 1».</td></tr>`;
+  }).join("") || `<tr><td colspan="5" class="muted">${ep.audio ? "دوس «⏱️ رقّم الجمل على الصوت»: البرنامج هيسمع الصوت ويقسّمه جمل بتوقيتها (حتى من غير سكريبت)." : "ارفع الفويس أوفر الأول."}</td></tr>`;
 }
 async function patchEpisode(body) {
   ser.ep = await api(`/api/episodes/${ser.ep.id}`, { method: "PATCH", ...jsonBody(body) });
@@ -238,7 +238,7 @@ $("serAudioFile").addEventListener("change", async (e) => {
   try {
     ser.ep = await api(`/api/episodes/${ser.ep.id}/audio`, { method: "POST", body: form });
     renderSeries();
-    if (ser.ep.lines.length) $("serTiming").click();
+    $("serTiming").click();
   } catch (err) { toast(err.message, true); renderSeries(); }
 });
 $("serTiming").onclick = () => busyButton($("serTiming"), "⏳ بيسمع الصوت...", async () => {

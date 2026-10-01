@@ -4369,11 +4369,17 @@ def episode_timing(eid: str, mode: str = "auto"):
         _, data = episode_row(conn, eid)
     if not data["audio"]:
         raise HTTPException(400, "ارفع الفويس أوفر الأول")
-    if not data["lines"]:
-        raise HTTPException(400, "حط السكريبت الأول (جمل الفويس أوفر بين « »)")
     path = ep_dir(eid) / data["audio"]["file"]
+    if not data["lines"]:
+        # من غير سكريبت: الجمل بتتاخد من الصوت نفسه (محتاج موديل الكلام)
+        if atlas.mock_mode():
+            mode = "audio"
+        elif not atlas.api_key():
+            raise HTTPException(400, "من غير سكريبت لازم موديل الكلام يسمع الصوت: حط مفتاح Atlas من ⚙️ الإعدادات، أو الزق السكريبت في «كتابة الحلقة»")
+        else:
+            mode = "audio"
     source, timed, words, heard_lines = "estimate", None, None, None
-    if mode != "estimate" and atlas.api_key() and not atlas.mock_mode():
+    if mode != "estimate" and (atlas.api_key() and not atlas.mock_mode() or (atlas.mock_mode() and not data["lines"])):
         try:
             words = atlas.transcribe(path, data["audio"]["duration"])
             timed, ratio = sz.align_with_ratio(words, data["lines"])

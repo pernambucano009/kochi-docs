@@ -1013,6 +1013,8 @@ window.I18N_EN = {
   "مفيش ستايلات لسه. ضيف من 📚 المكتبة صور رسومات عاجبك ستايلها.": "No styles yet. Add drawings whose style you like from 📚 Library.",
   "رسومات عاجبك ستايلها (الخطوط والأشكال والتظليل). البرنامج بياخد طريقة الرسم بس، ويرسم شخصيات جديدة بألوان كوتشي.": "Drawings whose style you like (lines, shapes, shading). Only the drawing style is used: new characters are drawn in KOCHI colors.",
   "اسم الستايل": "Style name",
+  "دوس «⏱️ رقّم الجمل على الصوت»: البرنامج هيسمع الصوت ويقسّمه جمل بتوقيتها (حتى من غير سكريبت).": "Press “⏱️ Time lines on the audio”: the audio is transcribed and split into timed lines (even without a script).",
+  "ارفع الفويس أوفر الأول.": "Upload the voice-over first.",
   "حاول تاني (لو الطلب اتبعت بيكمّل من غير دفع تاني)": "Retry (if already submitted, it resumes without paying again)",
   "📝 نسخة {0} من السكريبت": "📝 Script version {0}",
   "لسه مفيش. دوس «✍️ اكتب الحلقة» والبرنامج يكتبها استكمالًا للحلقات اللي فاتت، أو الزق سكريبت جاهز تحت.": "Nothing yet. Press “✍️ Write episode” and it will be written as a continuation of earlier episodes, or paste a ready script below.",
