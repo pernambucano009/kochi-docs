@@ -3390,7 +3390,26 @@ def load_carousel(conn: sqlite3.Connection, cid: str) -> tuple[sqlite3.Row, dict
         raise HTTPException(404, "الكاروسيل غير موجود")
     data = json.loads(row["data"])
     mix_settings(data["settings"])
+    init_versions(data)
     return row, data
+
+
+def init_versions(data: dict) -> None:
+    """كل صورة اترسمت بتتحفظ: data["versions"] = {"overview": [...], "1": [...], "2": [...]}.
+    الكاروسيلات القديمة: الصور الحالية بتبقى أول نسخة."""
+    if "versions" in data:
+        return
+    v: dict = {}
+    if data["overview"].get("file"):
+        v["overview"] = [{"file": data["overview"]["file"], "at": None}]
+    for k, sl in enumerate(data.get("slides", []), 1):
+        if sl.get("file"):
+            v[str(k)] = [{"file": sl["file"], "at": None}]
+    data["versions"] = v
+
+
+def add_version(d: dict, key: str, name: str) -> None:
+    d.setdefault("versions", {}).setdefault(key, []).append({"file": name, "at": now()})
 
 
 def mix_settings(st: dict) -> None:
@@ -3436,8 +3455,14 @@ def media_file_url(cid: str, name: str | None) -> str | None:
 def carousel_to_dict(row: sqlite3.Row, data: dict | None = None) -> dict:
     data = data or json.loads(row["data"])
     cid = row["id"]
-    ov = dict(data["overview"], url=media_file_url(cid, data["overview"].get("file")))
-    slides = [dict(s, url=media_file_url(cid, s.get("file"))) for s in data.get("slides", [])]
+    versions = data.get("versions", {})
+
+    def vlist(key: str) -> list[dict]:
+        return [{"file": v["file"], "url": u} for v in versions.get(key, []) if (u := media_file_url(cid, v["file"]))]
+
+    ov = dict(data["overview"], url=media_file_url(cid, data["overview"].get("file")), versions=vlist("overview"))
+    slides = [dict(s, url=media_file_url(cid, s.get("file")), versions=vlist(str(k)))
+              for k, s in enumerate(data.get("slides", []), 1)]
     return {
         "id": cid, "name": row["name"], "created_at": row["created_at"], "updated_at": row["updated_at"],
         "chat": data["chat"], "plan": data["plan"], "settings": data["settings"],
@@ -3737,9 +3762,8 @@ def run_overview(cid: str) -> None:
         prompt = cz.overview_prompt(brand_settings(), plan, ratio, refs, ctx)
         draw(prompt, cz.overview_size(len(plan["slides"]), ratio), files, folder / name, "overview", 0)
         def done(d):
-            old = d["overview"].get("file")
-            if old and old != name:
-                (folder / old).unlink(missing_ok=True)
+            # القديم بيفضل محفوظ في النسخ، وتقدر ترجعله
+            add_version(d, "overview", name)
             d["overview"] = {"status": "done", "file": name, "error": None, "approved": False}
         update_carousel(cid, done)
     except Exception as exc:  # noqa: BLE001  (أي خطأ يتسجّل على الكاروسيل بدل ما يضيع)
@@ -3749,7 +3773,7 @@ def run_overview(cid: str) -> None:
         CAROUSEL_JOBS.discard(cid)
 
 
-def run_slides(cid: str, only: int | None) -> None:
+def run_slides(cid: str, only: int | None, redo_all: bool = False) -> None:
     """السلايدات بالترتيب، كل واحدة ومعاها الصورة الكاملة والسلايد اللي قبلها."""
     try:
         with closing(db()) as conn:
@@ -3759,7 +3783,8 @@ def run_slides(cid: str, only: int | None) -> None:
         overview = folder / data["overview"]["file"]
         ctx, assets = carousel_context(data)
         size = "x".join(map(str, cz.SIZES[ratio]))
-        todo = [only] if only else [k for k in range(1, len(plan["slides"]) + 1) if data["slides"][k - 1]["status"] != "done"]
+        todo = [only] if only else [k for k in range(1, len(plan["slides"]) + 1)
+                                    if redo_all or data["slides"][k - 1]["status"] != "done"]
         for k in todo:
             with closing(db()) as conn:
                 _, data = load_carousel(conn, cid)
@@ -3779,9 +3804,7 @@ def run_slides(cid: str, only: int | None) -> None:
                 update_carousel(cid, lambda d, k=k: d["slides"][k - 1].update(status="failed", error=msg))
                 break  # اللي بعدها محتاجة دي كمرجع
             def done(d, k=k, name=name):
-                old = d["slides"][k - 1].get("file")
-                if old and old != name:
-                    (folder / old).unlink(missing_ok=True)
+                add_version(d, str(k), name)
                 d["slides"][k - 1] = {"status": "done", "file": name, "error": None}
             update_carousel(cid, done)
     finally:
@@ -3828,8 +3851,9 @@ def carousel_approve(cid: str):
 
 
 @app.post("/api/carousels/{cid}/slides")
-def carousel_slides(cid: str, only: int | None = None):
-    """يرسم السلايدات اللي لسه (أو سلايد واحدة لو only)."""
+def carousel_slides(cid: str, only: int | None = None, redo_all: bool = False):
+    """يرسم السلايدات اللي لسه (أو سلايد واحدة لو only، أو نسخة جديدة لكلهم لو redo_all).
+    النسخ القديمة بتفضل محفوظة."""
     need_atlas()
     with closing(db()) as conn:
         _, data = load_carousel(conn, cid)
@@ -3842,11 +3866,52 @@ def carousel_slides(cid: str, only: int | None = None):
         raise HTTPException(400, "فيه رسم شغال للكاروسيل ده. استنى يخلص")
     def mark(d):
         for k in ([only] if only else range(1, n + 1)):
-            if only or d["slides"][k - 1]["status"] != "done":
+            if only or redo_all or d["slides"][k - 1]["status"] != "done":
                 d["slides"][k - 1].update(status="queued", error=None)
     update_carousel(cid, mark)
-    start_job(cid, run_slides, only)
+    start_job(cid, run_slides, only, redo_all)
     return get_carousel(cid)
+
+
+class PickIn(BaseModel):
+    target: str  # "overview" أو رقم السلايد
+    file: str
+
+
+@app.post("/api/carousels/{cid}/pick")
+def carousel_pick(cid: str, body: PickIn):
+    """تختار نسخة قديمة لسلايد (أو للشكل العام) بدل اللي متختارة."""
+    if cid in CAROUSEL_JOBS:
+        raise HTTPException(400, "استنى لحد ما الرسم يخلص")
+    def pick(d):
+        if body.file not in [v["file"] for v in d.get("versions", {}).get(body.target, [])]:
+            raise HTTPException(404, "النسخة دي مش موجودة")
+        if body.target == "overview":
+            d["overview"].update(status="done", file=body.file, error=None)
+            return
+        k = int(body.target) if body.target.isdigit() else 0
+        if not 1 <= k <= len(d["slides"]):
+            raise HTTPException(400, "رقم السلايد غلط")
+        d["slides"][k - 1] = {"status": "done", "file": body.file, "error": None}
+    return carousel_to_dict_by_id(cid, update_carousel(cid, pick))
+
+
+@app.delete("/api/carousels/{cid}/versions")
+def carousel_delete_version(cid: str, target: str, file: str):
+    """مسح نسخة مش عايزها (المتختارة مش بتتمسح)."""
+    if cid in CAROUSEL_JOBS:
+        raise HTTPException(400, "استنى لحد ما الرسم يخلص")
+    def drop(d):
+        cur = d["overview"].get("file") if target == "overview" else (
+            d["slides"][int(target) - 1].get("file") if target.isdigit() and 1 <= int(target) <= len(d["slides"]) else None)
+        if file == cur:
+            raise HTTPException(400, "دي النسخة المتختارة. اختار غيرها الأول")
+        if file not in [v["file"] for v in d.get("versions", {}).get(target, [])]:
+            raise HTTPException(404, "النسخة دي مش موجودة")
+        d.get("versions", {})[target] = [v for v in d.get("versions", {}).get(target, []) if v["file"] != file]
+    data = update_carousel(cid, drop)
+    (CAROUSELS_DIR / cid / Path(file).name).unlink(missing_ok=True)
+    return carousel_to_dict_by_id(cid, data)
 
 
 def post_images(cid: str, data: dict) -> list[Path]:
@@ -3860,12 +3925,15 @@ def post_images(cid: str, data: dict) -> list[Path]:
         if not src or not src.exists():
             continue
         dest = out_dir / f"{k:02d}.jpg"
-        if not dest.exists() or dest.stat().st_mtime < src.stat().st_mtime:
+        # بنفتكر الصورة اتعملت من أنهي نسخة (لو اخترت نسخة أقدم لازم تتعمل تاني)
+        made_from = out_dir / f"{k:02d}.src"
+        if not dest.exists() or not made_from.exists() or made_from.read_text() != s["file"]:
             subprocess.run(
                 [ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src),
                  "-vf", f"scale={w}:{h}:force_original_aspect_ratio=increase,crop={w}:{h}", "-q:v", "2", str(dest)],
                 check=True, capture_output=True, timeout=60,
             )
+            made_from.write_text(s["file"])
         out.append(dest)
     return out
 

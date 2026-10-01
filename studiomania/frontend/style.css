@@ -997,3 +997,15 @@ a.pl-link:hover { background: color-mix(in srgb, var(--ok) 24%, transparent); }
 .car-pub-done .ok { margin: 8px 0 0; padding: 8px 12px; border-radius: 10px; background: var(--accent-soft); }
 #carPubNow.busy, #carPubSchedule.busy { opacity: .6; pointer-events: none; }
 .post-thumb { width: 72px; aspect-ratio: 4 / 5; object-fit: cover; border-radius: 8px; flex: none; }
+
+/* نسخ السلايدات والشكل العام */
+.car-versions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; }
+.car-versions > .muted { font-size: 12px; flex-basis: 100%; }
+.car-versions .ver { position: relative; width: 52px; border: 2px solid var(--line); border-radius: 8px; overflow: hidden; cursor: pointer; background: #fff; }
+.car-versions .ver img { width: 100%; aspect-ratio: 4 / 5; object-fit: cover; display: block; }
+.car-overview .car-versions .ver { width: 110px; }
+.car-overview .car-versions .ver img { aspect-ratio: auto; }
+.car-versions .ver em { position: absolute; bottom: 2px; left: 3px; font-style: normal; font-size: 10px; background: rgba(0,0,0,.6); color: #fff; padding: 0 4px; border-radius: 4px; }
+.car-versions .ver b { position: absolute; top: 2px; right: 2px; width: 16px; height: 16px; border-radius: 50%; background: rgba(0,0,0,.65); color: #fff; font-size: 9px; font-weight: 400; display: none; align-items: center; justify-content: center; }
+.car-versions .ver:hover b { display: flex; }
+.car-versions .ver.sel { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }

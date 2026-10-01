@@ -396,6 +396,7 @@ function renderOverview() {
   if (working && ov.url) $("carOverview").insertAdjacentHTML("afterbegin", `<div class="car-wait small"><div class="spin"></div>بيرسم نسخة جديدة...</div>`);
   $("carOvRedo").disabled = working || car.cur.busy;
   $("carOvRedo").textContent = ov.url || ov.error ? "🔄 ارسم تاني" : "🎨 ارسم";
+  $("carOverview").insertAdjacentHTML("beforeend", versionsRow("overview", ov.versions || [], ov.file, working || car.cur.busy));
   $("carApprove").disabled = working || ov.status !== "done";
   $("carApprove").textContent = ov.approved ? "📱 روح للسلايدات" : "✅ الشكل تمام، كمّل للسلايدات";
 }
@@ -409,6 +410,34 @@ $("carApprove").onclick = () => busyButton($("carApprove"), "⏳", async () => {
   renderCarousel();
 });
 
+// النسخ: كل اللي اترسم بيتحفظ، ودوسة على أي نسخة تختارها
+function versionsRow(target, list, current, locked) {
+  if (list.length < 2) return "";
+  return `<div class="car-versions" data-target="${target}">
+    <span class="muted">${list.length} نسخ:</span>
+    ${list.map((v, i) => `<div class="ver ${v.file === current ? "sel" : ""}" data-file="${v.file}" title="نسخة ${i + 1}">
+      <img src="${v.url}" alt="" loading="lazy"><em>${i + 1}</em>
+      ${v.file === current || locked ? "" : `<b data-del-ver title="امسح النسخة دي">✕</b>`}</div>`).join("")}
+  </div>`;
+}
+async function onVersionClick(e) {
+  const ver = e.target.closest(".car-versions .ver");
+  if (!ver) return;
+  const target = ver.closest(".car-versions").dataset.target;
+  const file = ver.dataset.file;
+  try {
+    if (e.target.closest("[data-del-ver]")) {
+      if (!confirm("مسح النسخة دي نهائي؟")) return;
+      car.cur = await api(`/api/carousels/${car.cur.id}/versions?target=${encodeURIComponent(target)}&file=${encodeURIComponent(file)}`, { method: "DELETE" });
+    } else {
+      car.cur = await api(`/api/carousels/${car.cur.id}/pick`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ target, file }) });
+    }
+    renderCarousel();
+  } catch (err) { toast(err.message, true); }
+}
+$("carOverview").addEventListener("click", onVersionClick);
+$("carGrid").addEventListener("click", onVersionClick);
+
 // ---------- السلايدات ----------
 function renderSlides() {
   const c = car.cur;
@@ -421,6 +450,7 @@ function renderSlides() {
   $("carToPublish").hidden = !reachable(c, "publish");
   $("carSlidesGo").hidden = active || done === c.slides.length;
   $("carSlidesGo").textContent = done ? `🎨 كمّل الباقي (${c.slides.length - done})` : "🎨 ارسم السلايدات";
+  $("carSlidesAll").hidden = active || c.busy || !done;
   const ratio = c.settings.ratio === "4:5" ? "4 / 5" : "9 / 16";
   $("carGrid").innerHTML = c.plan.slides
     .map((p, i) => {
@@ -434,6 +464,7 @@ function renderSlides() {
           <div class="n">${i + 1}</div>
           <div class="txt" data-no-i18n><b>${escapeHtml(p.headline)}</b>${p.body ? `<br>${escapeHtml(p.body)}` : ""}</div>
           ${s.error ? `<div class="err">${escapeHtml(s.error)}</div>` : ""}
+          ${versionsRow(String(i + 1), s.versions || [], s.file, active || c.busy)}
           <div class="acts">
             ${s.url ? `<a class="btn sm" href="${s.url}" download="${i + 1}.png">⬇</a>` : ""}
             <button class="btn sm" data-redo="${i + 1}" ${active || c.busy ? "disabled" : ""}>🔄 ${s.url ? "أعد" : "ارسم"}</button>
@@ -443,6 +474,11 @@ function renderSlides() {
     })
     .join("");
 }
+$("carSlidesAll").onclick = () => busyButton($("carSlidesAll"), "⏳", async () => {
+  if (!confirm("ترسم نسخة جديدة لكل السلايدات؟ النسخ القديمة هتفضل محفوظة وتقدر ترجعلها.")) return;
+  car.cur = await api(`/api/carousels/${car.cur.id}/slides?redo_all=true`, { method: "POST" });
+  renderCarousel();
+});
 $("carSlidesGo").onclick = () => busyButton($("carSlidesGo"), "⏳", async () => {
   car.cur = await api(`/api/carousels/${car.cur.id}/slides`, { method: "POST" });
   renderCarousel();
