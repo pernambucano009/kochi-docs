@@ -826,6 +826,7 @@
                 <label class="field">وصف الشخصية (بيتكتب في برومبت كل لقطة عشان شكلها يفضل ثابت). يفضّل بالإنجليزي
                   <textarea id="serCharacter" rows="4" dir="auto" data-no-i18n placeholder="Tall thin man, small hair bun on top, thick mustache, sharp features, serious calm look, loose elegant black clothes..."></textarea></label>
                 <div class="field">صور الشخصية (بتتبعت مع كل لقطة بتتولد)<div class="lib-imgs ser-refs" id="serRefs"></div></div>
+                <p class="hint">لما تخلّص هنا، دوس «2 السكريبت والصوت» فوق، أو اعمل حلقة من الجنب (＋ حلقة).</p>
                 <div class="row wrap ser-models">
                   <label class="field">موديل اللقطات (من Atlas) <input type="text" id="serTextModel" dir="ltr"></label>
                   <label class="field">موديل الفيديو <input type="text" id="serVideoModel" dir="ltr"></label>
@@ -833,6 +834,7 @@
               </section>
 
               <section class="panel ser-sec" data-sec="script" hidden>
+                <label class="field">اسم الحلقة <input type="text" id="serEpRename" data-no-i18n></label>
                 <div class="panel-head"><h2>📝 السكريبت</h2><label class="btn sm">📄 من ملف .txt<input type="file" id="serScriptFile" accept=".txt,text/plain" hidden></label></div>
                 <p class="hint">كل مشهد يبدأ بسطر «المشهد 1 — ...»، وجمل الفويس أوفر بين « ». المدد المكتوبة في السكريبت بتتجاهل: الصوت هو المرجع.</p>
                 <textarea id="serScript" rows="12" data-no-i18n></textarea>

@@ -1013,6 +1013,8 @@ window.I18N_EN = {
   "مفيش ستايلات لسه. ضيف من 📚 المكتبة صور رسومات عاجبك ستايلها.": "No styles yet. Add drawings whose style you like from 📚 Library.",
   "رسومات عاجبك ستايلها (الخطوط والأشكال والتظليل). البرنامج بياخد طريقة الرسم بس، ويرسم شخصيات جديدة بألوان كوتشي.": "Drawings whose style you like (lines, shapes, shading). Only the drawing style is used: new characters are drawn in KOCHI colors.",
   "اسم الستايل": "Style name",
+  "اتعملت الحلقة الأولى. غيّر اسمها من خانة «اسم الحلقة» لو حابب": "First episode created. Rename it in the “Episode name” box if you like.",
+  "لما تخلّص هنا، دوس «2 السكريبت والصوت» فوق، أو اعمل حلقة من الجنب (＋ حلقة).": "When you're done here, click “2 Script & audio” above, or create an episode from the side (＋ Episode).",
   "اسم الحلقة": "Episode name",
   "＋ حلقة": "＋ Episode",
   "لسه مفيش مسلسلات.": "No series yet.",

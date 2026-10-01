@@ -43,7 +43,6 @@ function renderSeries() {
   if (!s) return;
   const hasEp = !!ser.ep && ser.ep.series_id === s.id;
   document.querySelectorAll("#serTabs [data-t]").forEach((b) => {
-    b.disabled = b.dataset.t !== "series" && !hasEp;
     b.classList.toggle("active", b.dataset.t === ser.tab);
   });
   if (!hasEp && ser.tab !== "series") ser.tab = "series";
@@ -93,9 +92,24 @@ async function openEpisode(eid) {
   remember();
   renderSeries();
 }
-$("serTabs").addEventListener("click", (e) => {
+$("serTabs").addEventListener("click", async (e) => {
   const b = e.target.closest("[data-t]");
-  if (b && !b.disabled) { ser.tab = b.dataset.t; renderSeries(); }
+  if (!b) return;
+  const t = b.dataset.t;
+  if (t !== "series" && !(ser.ep && ser.ep.series_id === ser.sid)) {
+    // مفيش حلقة مفتوحة: نفتح آخر حلقة، ولو مفيش حلقات خالص نعمل الأولى
+    const eps = ser.cur()?.episodes || [];
+    ser.tab = t;
+    if (eps.length) return openEpisode(eps[eps.length - 1].id);
+    try {
+      ser.ep = await api(`/api/series/${ser.sid}/episodes`, { method: "POST", ...jsonBody({ name: "" }) });
+      await loadSeries();
+      remember();
+      toast("اتعملت الحلقة الأولى. غيّر اسمها من خانة «اسم الحلقة» لو حابب");
+    } catch (err) { return toast(err.message, true); }
+  }
+  ser.tab = t;
+  renderSeries();
 });
 
 // ---------- 1. المسلسل: الدستور والشخصية وصورها ----------
@@ -140,6 +154,7 @@ const TIMING_LABEL = { stt: "✅ من موديل الكلام (كل كلمة ب�
 function renderScriptTab() {
   const ep = ser.ep;
   if (document.activeElement !== $("serScript")) $("serScript").value = ep.script;
+  if (document.activeElement !== $("serEpRename")) $("serEpRename").value = ep.name;
   if (document.activeElement !== $("serNotes")) $("serNotes").value = ep.notes;
   $("serAudioInfo").textContent = ep.audio ? `${ep.audio.name || "الفويس أوفر"} · ${serFmt(ep.audio.duration)} (ده طول الحلقة)` : "لسه مفيش صوت";
   const player = $("serAudio");
@@ -165,6 +180,9 @@ async function patchEpisode(body) {
 }
 $("serScript").addEventListener("change", async () => {
   try { await patchEpisode({ script: $("serScript").value }); renderSeries(); toast(`اتحفظ · ${ser.ep.lines.length} جملة`); } catch (err) { toast(err.message, true); }
+});
+$("serEpRename").addEventListener("change", async () => {
+  try { await patchEpisode({ name: $("serEpRename").value }); await loadSeries(); renderSeries(); toast("اتحفظ"); } catch (err) { toast(err.message, true); }
 });
 $("serNotes").addEventListener("change", async () => {
   try { await patchEpisode({ notes: $("serNotes").value }); } catch (err) { toast(err.message, true); }
