@@ -218,7 +218,7 @@
               <span>🎙️ التعليق الصوتي بتاع الفيديو ده:</span>
               <select id="voiceSelect"></select>
               <label class="btn sm">⬆ رفع تسجيل جديد
-                <input type="file" id="voiceUpload" accept=".mp3,.wav,.m4a,.aac,.ogg,.opus,.flac,audio/*" hidden></label>
+                <input type="file" id="voiceUpload" accept="audio/*,video/*,.mp3,.wav,.m4a,.aac,.ogg,.opus,.flac,.amr,.caf,.aif,.aiff,.wma,.3gp,.webm,.mp4,.mov" hidden></label>
               <span class="muted" id="voiceInfo"></span>
             </div>
             <div class="voice-link">
@@ -468,7 +468,7 @@
 
               <h3 class="pane-h">🎙️ التعليق الصوتي</h3>
               <div class="sel-up"><label class="field"><select id="mVoice"></select></label>
-                <label class="btn sm" title="ارفع ملف تعليق صوتي من عندك، ويتحط في المونتاج على طول (وبيتحفظ في مكتبة الصوت)">⬆ ارفع<input type="file" data-audio-up="voice" accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg" hidden></label></div>
+                <label class="btn sm" title="ارفع ملف تعليق صوتي من عندك، ويتحط في المونتاج على طول (وبيتحفظ في مكتبة الصوت)">⬆ ارفع<input type="file" data-audio-up="voice" accept="audio/*,video/*,.mp3,.wav,.m4a,.aac,.ogg,.opus,.flac,.amr,.caf,.aif,.aiff,.wma,.3gp,.webm,.mp4,.mov" hidden></label></div>
               <div id="voiceOpts">
                 <label class="field slider-field">الصوت <b id="voiceVolVal"></b><input type="range" id="mVoiceVol" min="0" max="200" step="5" dir="ltr"></label>
                 <p class="hint">حرّكه وقصّه وقسّمه من التايم لاين تحت.</p>
@@ -476,7 +476,7 @@
 
               <h3 class="pane-h">🎵 الموسيقى</h3>
               <div class="sel-up"><label class="field"><select id="mMusic"></select></label>
-                <label class="btn sm" title="ارفع ملف موسيقى من عندك، ويتحط في المونتاج على طول (وبيتحفظ في مكتبة الصوت)">⬆ ارفع<input type="file" data-audio-up="music" accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg" hidden></label></div>
+                <label class="btn sm" title="ارفع ملف موسيقى من عندك، ويتحط في المونتاج على طول (وبيتحفظ في مكتبة الصوت)">⬆ ارفع<input type="file" data-audio-up="music" accept="audio/*,video/*,.mp3,.wav,.m4a,.aac,.ogg,.opus,.flac,.amr,.caf,.aif,.aiff,.wma,.3gp,.webm,.mp4,.mov" hidden></label></div>
               <div id="musicOpts">
                 <label class="field slider-field">الصوت <b id="musicVolVal"></b><input type="range" id="mMusicVol" min="0" max="200" step="5" dir="ltr"></label>
                 <p class="hint">حرّكها وقصّها وقسّمها من التايم لاين تحت.</p>
@@ -875,7 +875,7 @@
 
               <section class="panel ser-sec" data-sec="script" hidden>
                 <div class="panel-head ser-audio-head"><h2>🎙️ الفويس أوفر</h2>
-                  <span class="row"><label class="btn sm">⬆ ارفع الصوت<input type="file" id="serAudioFile" accept="audio/*" hidden></label>
+                  <span class="row"><label class="btn sm">⬆ ارفع الصوت<input type="file" id="serAudioFile" accept="audio/*,video/*,.mp3,.wav,.m4a,.aac,.ogg,.opus,.flac,.amr,.caf,.aif,.aiff,.wma,.3gp,.webm,.mp4,.mov" hidden></label>
                   <button class="btn sm" id="serCopyVoice" title="الكلام بس، كل جملة في سطر، جاهز تحطه في برنامج الصوت">📋 انسخ الكلام</button>
                   <button class="btn sm" id="serVoiceTxt" title="نفس الكلام في ملف .txt">⬇ .txt</button>
                   <button class="btn sm primary" id="serTiming">⏱️ رقّم الجمل على الصوت</button></span></div>

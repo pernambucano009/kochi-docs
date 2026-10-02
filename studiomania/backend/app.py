@@ -872,6 +872,28 @@ def save_upload(upload: UploadFile, allowed: set[str], folder: Path, prefix: str
     return filename
 
 
+def save_audio_upload(upload: UploadFile, folder: Path, prefix: str) -> str:
+    """أي ملف صوت (أو فيديو، بناخد صوته): المعروف بيتحفظ زي ما هو، والباقي (amr / caf / aiff / wma / 3gp / webm /
+    من غير امتداد...) بيتحول لـ m4a. لو FFmpeg ما عرفش يقراه كصوت بنقول كده بوضوح."""
+    ext = Path(upload.filename or "").suffix.lower()
+    if ext in AUDIO_EXTENSIONS:
+        return save_upload(upload, AUDIO_EXTENSIONS, folder, prefix)
+    safe_ext = ext if re.fullmatch(r"\.[a-z0-9]{1,6}", ext) else ""
+    raw = folder / f"{prefix}_{uuid.uuid4().hex[:8]}.upload{safe_ext}"
+    with raw.open("wb") as out:
+        shutil.copyfileobj(upload.file, out)
+    filename = f"{prefix}_{uuid.uuid4().hex[:8]}.m4a"
+    try:
+        r = subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(raw), "-vn", "-map", "0:a:0",
+                            "-c:a", "aac", "-b:a", "192k", str(folder / filename)], capture_output=True, text=True, timeout=600)
+        if r.returncode != 0 or not (folder / filename).exists() or (folder / filename).stat().st_size < 1000:
+            (folder / filename).unlink(missing_ok=True)
+            raise HTTPException(400, f"الملف ده ({ext or 'من غير امتداد'}) مفيهوش صوت أقدر أقراه. جرّب mp3 أو m4a أو wav")
+    finally:
+        raw.unlink(missing_ok=True)
+    return filename
+
+
 def coach_to_dict(row: sqlite3.Row) -> dict:
     return {
         "id": row["id"],
@@ -1509,7 +1531,7 @@ def list_audio(kind: str):
 def upload_audio(kind: str = Form(...), file: UploadFile = File(...)):
     check_kind(kind)
     audio_id = uuid.uuid4().hex[:12]
-    filename = save_upload(file, AUDIO_EXTENSIONS, AUDIO_DIR, f"{kind}_{audio_id}")
+    filename = save_audio_upload(file, AUDIO_DIR, f"{kind}_{audio_id}")
     try:
         duration = probe_duration(AUDIO_DIR / filename)
     except ValueError as exc:
@@ -4407,7 +4429,7 @@ def patch_episode(eid: str, body: EpisodePatch):
 def upload_episode_audio(eid: str, file: UploadFile = File(...)):
     """الفويس أوفر: هو المرجع للتوقيت ومدة الحلقة."""
     folder = ep_dir(eid)
-    name = save_upload(file, AUDIO_EXTENSIONS, folder, "voiceover")
+    name = save_audio_upload(file, folder, "voiceover")
     try:
         duration = probe_duration(folder / name)
     except Exception as exc:  # noqa: BLE001
