@@ -341,6 +341,39 @@ $("outroUpload").addEventListener("change", async (e) => {
     toast(err.message, true);
   }
 });
+// فيديو من عندك: بيبدّل القطعة المتحددة (بنفس مكانها ومدتها) أو بيتحط عند المؤشر
+$("clipUpload").addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  e.target.value = "";
+  if (!file || !mt.project) return;
+  const d = mt.project.data;
+  const c = selectedClip();
+  const replace = c && confirm("تبدّل فيديو القطعة المتحددة بالفيديو ده؟\n(لو لأ، هيتحط كقطعة جديدة عند المؤشر)");
+  const form = new FormData();
+  form.append("file", file);
+  if (d.coach_id) form.append("coach_id", d.coach_id);
+  if (replace) form.append("replace", c.gen_id);
+  try {
+    toast(`⏳ بيرفع ${file.name}...`);
+    const r = await api("/api/montage/upload", { method: "POST", body: form });
+    mt.sources = await api("/api/montage/sources");
+    renderBin();
+    if (replace) {
+      pushHistory();
+      const len = clipLength(c);
+      Object.assign(c, { gen_id: r.id, start: 0, end: Math.min(r.duration, len || r.duration) });
+      changed();
+      toast(r.duration + 0.05 < len
+        ? `✅ اتبدّل الفيديو. خلي بالك: الفيديو الجديد ${r.duration.toFixed(1)}ث والقطعة كانت ${len.toFixed(1)}ث`
+        : `✅ اتبدّل الفيديو${r.synced_shot ? " واتضاف كمان على اللقطة في تبويب المسلسل" : ""}`);
+    } else {
+      insertClip(r.id, insertIndexAt(mt.t));
+      toast("✅ الفيديو اتضاف عند المؤشر");
+    }
+  } catch (err) {
+    toast(err.message, true);
+  }
+});
 $("binGrid").addEventListener("dblclick", (e) => {
   const item = e.target.closest(".bin-item");
   if (item) insertClip(item.dataset.id, insertIndexAt(mt.t));

@@ -1583,6 +1583,54 @@ def clip_source(conn: sqlite3.Connection, gen_id: str) -> Path | None:
     return base / row["f"]
 
 
+@app.post("/api/montage/upload")
+def montage_upload(file: UploadFile = File(...), coach_id: str = Form(""), replace: str = Form("")):
+    """فيديو من عندك للمونتاج. لو بيبدّل قطعة جاية من لقطة في مسلسل، بيتضاف كمان نسخة على اللقطة دي (موافق عليها)."""
+    name = save_upload(file, VIDEO_EXTENSIONS, GENERATED_DIR, "upload")
+    path = GENERATED_DIR / name
+    try:
+        info = media_info(path)
+    except Exception as exc:  # noqa: BLE001
+        path.unlink(missing_ok=True)
+        raise HTTPException(400, f"مقدرتش أقرا الفيديو: {exc}") from exc
+    gid = uuid.uuid4().hex[:12]
+    label = f"⬆ {Path(file.filename or 'video').stem}"
+    link = {}
+    with closing(db()) as conn, conn:
+        if replace:
+            row = conn.execute("SELECT clip_label, params FROM generations WHERE id = ?", (replace,)).fetchone()
+            if row:
+                try:
+                    link = json.loads(row["params"] or "{}")
+                except ValueError:
+                    link = {}
+                label = f"{row['clip_label']} ⬆"
+        conn.execute(
+            "INSERT INTO generations (id, clip_id, clip_filename, clip_label, coach_id, coach_name, coach_image, model, prompt, "
+            "params, status, output_filename, created_at, updated_at) VALUES (?, ?, ?, ?, ?, '', '', 'upload', '', ?, 'completed', ?, ?, ?)",
+            (gid, f"series:{link['episode']}" if link.get("episode") else "upload", file.filename or name, label, coach_id,
+             json.dumps(link), name, now(), now()),
+        )
+    synced = None
+    if link.get("episode") and link.get("shot"):
+        eid, sid = link["episode"], link["shot"]
+        try:
+            tname = f"take_{uuid.uuid4().hex[:10]}{path.suffix}"
+            shutil.copyfile(path, ep_dir(eid) / "takes" / tname)
+            tid = uuid.uuid4().hex[:10]
+            def fn(d):
+                sh = find_shot(d, sid)
+                d["takes"][tid] = {"id": tid, "file": tname, "source": "upload", "status": "done", "error": None, "approved": True,
+                                   "duration": round(info.duration, 2), "name": file.filename, "created_at": now()}
+                sh["takes"].append(tid)
+                sh["chosen"], sh["offset"] = tid, 0.0
+            update_episode(eid, fn)
+            synced = sid
+        except HTTPException:
+            synced = None
+    return {"id": gid, "duration": info.duration, "synced_shot": synced}
+
+
 @app.get("/api/montage/sources")
 def montage_sources():
     """الفيديوهات المولَّدة الجاهزة اللي ينفع تدخل المونتاج."""
@@ -5377,8 +5425,9 @@ def episode_to_editor(eid: str):
                 shutil.copyfile(src, GENERATED_DIR / out)
             conn.execute(
                 "INSERT INTO generations (id, clip_id, clip_filename, clip_label, coach_id, coach_name, coach_image, model, prompt, "
-                "params, status, output_filename, created_at, updated_at) VALUES (?, ?, ?, ?, '', '', '', ?, ?, '{}', 'completed', ?, ?, ?)",
-                (gid, f"series:{eid}", t["file"], f"{label} · لقطة {s['n']}", t.get("source", ""), t.get("prompt") or "", out, now(), now()),
+                "params, status, output_filename, created_at, updated_at) VALUES (?, ?, ?, ?, '', '', '', ?, ?, ?, 'completed', ?, ?, ?)",
+                (gid, f"series:{eid}", t["file"], f"{label} · لقطة {s['n']}", t.get("source", ""), t.get("prompt") or "",
+                 json.dumps({"episode": eid, "shot": s["id"]}), out, now(), now()),
             )
             start = float(s.get("offset") or 0)
             dur = s["end"] - s["start"]

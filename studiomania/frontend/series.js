@@ -950,6 +950,7 @@ function renderGalView() {
   acts.push(s.approved
     ? `<button class="btn sm" data-gal-gen>${t ? "🔄 ولّد واحد تاني" : "🎬 ولّد الفيديو"}</button>`
     : `<button class="btn sm" data-gal-approve-shot>✅ اعتمد اللقطة الأول</button>`);
+  acts.push(`<label class="btn sm" title="فيديو من عندك للقطة دي (بيتعتمد على طول)">⬆ ارفع فيديو<input type="file" data-gal-up accept="video/*,.mkv,.mov" hidden></label>`);
   acts.push(s.prompt_status === "working"
     ? `<span class="muted">✍️ بيكتب برومبت جديد...</span>`
     : `<button class="btn sm" data-gal-reprompt title="وصف وبرومبت جديد على الكلام الجديد؛ الفيديو الجاي بيتولد عليه">✍️ برومبت جديد للكلام الجديد</button>`);
@@ -1022,6 +1023,22 @@ $("serGalTakes").addEventListener("click", async (e) => {
   }
   gal.take = take.dataset.take;
   renderGalView();
+});
+$("serGalActs").addEventListener("change", async (e) => {
+  const inp = e.target.closest("[data-gal-up]");
+  if (!inp) return;
+  const f = inp.files[0];
+  inp.value = "";
+  if (!f) return;
+  const form = new FormData();
+  form.append("file", f);
+  try {
+    toast(`⏳ بيرفع ${f.name}...`);
+    ser.ep = await api(`/api/episodes/${ser.ep.id}/shots/${gal.shot}/takes`, { method: "POST", body: form });
+    gal.take = null;
+    renderSeries();
+    toast("✅ الفيديو اترفع واتعتمد للقطة دي");
+  } catch (err) { toast(err.message, true); }
 });
 $("serGalActs").addEventListener("click", async (e) => {
   const b = e.target.closest("button");
