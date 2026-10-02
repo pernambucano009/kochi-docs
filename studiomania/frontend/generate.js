@@ -428,7 +428,7 @@ function genCard(g) {
         <a class="btn sm" href="${g.clip_url}" target="_blank">القطعة الأصلية</a>
         ${g.output_url ? `<a class="btn sm" href="${g.output_url}" download>⬇ تحميل</a>` : ""}
         ${g.status === "failed" ? `<button class="btn sm" data-act="retry">↻ إعادة المحاولة</button>` : ""}
-        ${isActive ? "" : `<button class="btn sm" data-act="again" title="فيديو جديد لنفس القطعة بنفس المدرب والبرومبت (القديم بيفضل لحد ما تمسحه)">🔄 ولّد تاني</button>`}
+        ${isActive ? "" : `<button class="btn sm" data-act="again" title="فيديو جديد لنفس القطعة بنفس المدرب والبرومبت، مكان القديم">🔄 ولّد تاني</button>`}
         ${isActive ? "" : `<button class="btn sm danger" data-act="delete">حذف</button>`}
       </div>
     </div>`;
@@ -443,7 +443,7 @@ $("gensGroups").addEventListener("click", async (e) => {
   try {
     if (btn.dataset.act === "retry") await api(`/api/generations/${id}/retry`, { method: "POST" });
     if (btn.dataset.act === "again") {
-      if (!confirm("تولّد فيديو جديد للقطعة دي؟ (ده توليد جديد بيتحسب عليك، والقديم بيفضل لحد ما تمسحه)")) return;
+      if (!confirm("تولّد فيديو جديد للقطعة دي مكان القديم؟\nالفيديو القديم هيتمسح، والجديد هيتولد في نفس مكانه (ده توليد جديد بيتحسب عليك).")) return;
       await api(`/api/generations/${id}/again`, { method: "POST" });
       toast("🔄 بيتولد فيديو جديد للقطعة دي");
     }

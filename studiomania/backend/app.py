@@ -1220,7 +1220,8 @@ def generation_to_dict(r: sqlite3.Row) -> dict:
         "params": json.loads(r["params"]),
         "status": r["status"],
         "error": r["error"],
-        "output_url": f"/media/generated/{r['output_filename']}" if r["output_filename"] else None,
+        # ?v= عشان لو الفيديو اتولد تاني بنفس الاسم المتصفح ما يعرضش القديم من الكاش
+        "output_url": f"/media/generated/{r['output_filename']}?v={re.sub(r'[^0-9]', '', r['updated_at'] or '')[-10:]}" if r["output_filename"] else None,
         "created_at": r["created_at"],
         "updated_at": r["updated_at"],
     }
@@ -1470,27 +1471,26 @@ def retry_generation(gen_id: str):
 
 @app.post("/api/generations/{gen_id}/again")
 def generate_again(gen_id: str):
-    """توليد جديد لنفس القطعة (نفس المدرب والبرومبت والإعدادات). الفيديو القديم بيفضل لحد ما تمسحه."""
+    """توليد جديد لنفس القطعة (نفس المدرب والبرومبت والإعدادات) في نفس مكان القديم: الفيديو القديم بيتمسح
+    والطلب نفسه بيتولد من الأول، فالترتيب ما بيتغيرش."""
     if not (atlas.api_key() or atlas.mock_mode()):
         raise HTTPException(400, "مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات")
-    new_id = uuid.uuid4().hex[:12]
-    with closing(db()) as conn, conn:
+    with closing(db()) as conn:
         r = conn.execute("SELECT * FROM generations WHERE id = ?", (gen_id,)).fetchone()
-        if r is None:
-            raise HTTPException(404, "الطلب غير موجود")
-        if r["clip_id"].startswith("series:") or r["clip_id"] == "upload":
-            raise HTTPException(400, "الفيديو ده مش من قطعة مشروع")
-        if not conn.execute("SELECT 1 FROM clips WHERE id = ?", (r["clip_id"],)).fetchone():
-            raise HTTPException(400, "القطعة الأصلية اتمسحت")
-        conn.execute(
-            "INSERT INTO generations (id, clip_id, clip_filename, clip_label, coach_id, coach_name, coach_image, "
-            "model, prompt, params, status, created_at, updated_at, video_id) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', ?, ?, ?)",
-            (new_id, r["clip_id"], r["clip_filename"], r["clip_label"], r["coach_id"], r["coach_name"], r["coach_image"],
-             r["model"], r["prompt"], r["params"], now(), now(), r["video_id"]),
-        )
-    executor.submit(run_generation, new_id)
-    return {"id": new_id}
+    if r is None:
+        raise HTTPException(404, "الطلب غير موجود")
+    if r["clip_id"].startswith("series:") or r["clip_id"] == "upload":
+        raise HTTPException(400, "الفيديو ده مش من قطعة مشروع")
+    if r["status"] not in ("completed", "failed"):
+        raise HTTPException(400, "الفيديو لسه بيتولد")
+    with _running_lock:
+        if gen_id in _running:
+            raise HTTPException(400, "الفيديو لسه بيتولد")
+    if r["output_filename"]:
+        (GENERATED_DIR / r["output_filename"]).unlink(missing_ok=True)
+    set_generation(gen_id, status="queued", prediction_id=None, output_filename=None, error=None)
+    executor.submit(run_generation, gen_id)
+    return {"id": gen_id}
 
 
 @app.delete("/api/generations/{gen_id}")
