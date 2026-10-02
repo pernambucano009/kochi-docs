@@ -60,12 +60,14 @@ ADAPT_FORMAT = """{
   "hook": "أول 3 ثواني",
   "scenes": [
     {"n": 1, "seconds": 3, "ref_scene": 1,
+     "motion_graphics": "الموشن جرافيك في المشهد بالتفصيل (بالعربي): كل عنصر متحرك (كارت، شاشة تطبيق، أيقونة، كلام متحرك، لوجو، أشكال) إزاي بيدخل ويتحرك ويخرج، بالتوقيت جوه المشهد (من ثانية كام لكام)، الاتجاه والسرعة والـ easing، والانتقال للمشهد اللي بعده. نفس بناء الموشن في المشهد الأصلي بمحتوى كوتشي",
+     "motion_prompt": "English description of the same motion-graphics animation for a video model: each animated element, how it enters, moves and exits, timing, easing, and the transition out",
      "visual": "اللي هيحصل في المشهد",
      "shot": "نوع اللقطة", "camera": "حركة الكاميرا والعدسة",
      "on_screen_text": "الكلام المكتوب على الشاشة",
      "voice": "الكلام اللي هيتقال (باللهجة السعودية)",
      "sfx": "المؤثرات الصوتية", "music": "الموسيقى في المشهد",
-     "prompt": "English prompt for a video model (Seedance) for this scene: subject, action, setting in Saudi Arabia, lighting, lens, camera move, mood, the chosen visual style. Vertical 9:16.",
+     "prompt": "English prompt for a video model (Seedance) for this scene: subject, action, setting in Saudi Arabia, lighting, lens, camera move, mood, the chosen visual style, AND the motion-graphics elements and how they animate. Vertical 9:16.",
      "components": [
        {"name": "اسم المكون في إعلان كوتشي", "kind": "character | prop | background | graphic | text | ui | icon | effect",
         "from": "اسم المكون اللي يقابله في المشهد الأصلي (أو فاضي لو جديد)",
@@ -138,6 +140,11 @@ def adapt_messages(brand: dict, analysis: dict, audio: dict, settings: dict, sty
         + "تحليل الإعلان المرجعي (وكل مشهد بمكوناته وعناصر الموشن جرافيك وحركتها):\n" + json.dumps(analysis, ensure_ascii=False)[:40000] + "\n\n"
         + ("تحليل الصوت:\n" + json.dumps(audio, ensure_ascii=False)[:6000] + "\n\n" if audio else "")
         + "المطلوب:\n" + "\n".join(f"- {a}" for a in asks if a) + "\n"
+        "- الإعلان الجديد بيتبني على الموشن جرافيك بتاع الأصلي مش على الفكرة بس: امشي مشهد بمشهد على الأصلي، "
+        "وخد من كل مشهد الموشن جرافيك بتاعه (العناصر المتحركة، طريقة دخولها وحركتها وخروجها، توقيتها، الإيقاع، الانتقالات) "
+        "واعمل نفس البناء الحركي بمحتوى كوتشي. القصة والكلام يتكتبوا عشان يخدموا الموشن ده.\n"
+        "- كل مشهد لازم يكون فيه motion_graphics مفصّل بالتوقيت وmotion_prompt بالإنجليزي، والبرومبت يوصف الموشن كمان. "
+        "لو المشهد الأصلي مفيهوش موشن جرافيك اكتب الحركة والانتقال بس.\n"
         "- مشاهد بنفس روح الإعلان الأصلي لكن بقصة كوتشي، وكل مشهد ببرومبت إنجليزي جاهز لموديل فيديو.\n"
         "- كل مشهد ref_scene = رقم المشهد الأصلي اللي مستوحى منه. وحوّل مكونات المشهد الأصلي (خصوصًا عناصر الموشن جرافيك) "
         "لنسخة كوتشي: نفس الوظيفة ونفس طريقة الحركة، بس بشكل كوتشي (شاشة التطبيق بدل شاشتهم، لوجو كوتشي بدل لوجوهم، "
@@ -272,7 +279,9 @@ def mock_audio() -> dict:
 def mock_adaptation(duration: int = 30) -> dict:
     return {"title": "كوتشي: إعلان تجريبي", "concept": "فكرة تجريبية", "why_it_fits": "تجربة", "kochi_angle": "التطبيق",
             "duration": duration, "format": "9:16", "hook": "سؤال سريع",
-            "scenes": [{"n": i + 1, "seconds": 5, "ref_scene": 1 + i % 2, "visual": f"مشهد {i + 1}", "shot": "medium", "camera": "static",
+            "scenes": [{"n": i + 1, "seconds": 5, "ref_scene": 1 + i % 2, "visual": f"مشهد {i + 1}",
+                        "motion_graphics": "كارت كوتشي بينط من تحت في أول ثانية ويكبر، وبعدين بيتزحلق لبرة شمال",
+                        "motion_prompt": "A KOCHI card pops up from the bottom in the first second, scales up, then slides out left.", "shot": "medium", "camera": "static",
                         "on_screen_text": "", "voice": "جملة تجريبية", "sfx": "", "music": "", "prompt": "Test scene. Vertical 9:16.",
                         "components": [{"name": "المتدرب", "kind": "character", "from": "الممثل", "description": "شاب سعودي",
                                         "image_prompt": "A young Saudi man, full body.", "animation": "ثابت"},
@@ -335,6 +344,7 @@ def frame_prompt(h: dict, shot: dict) -> str:
         f"SHOT {shot.get('n')}: {shot.get('visual', '')}",
         f"Framing / camera: {shot.get('shot', '')} {shot.get('camera', '')}".strip(),
         f"On-screen graphics or text in this shot: {shot['on_screen_text']}" if shot.get("on_screen_text") else "",
+        f"Motion graphics in this shot (show them mid-animation, at their key pose): {shot['motion_prompt']}" if shot.get("motion_prompt") else "",
         ("Elements that must appear in this frame (including motion-graphics elements, shown mid-animation): "
          + "; ".join(f"{c.get('name')}: {c.get('image_prompt') or c.get('description')}" for c in shot.get("components") or [] if c.get("use", True))
          ) if shot.get("components") else "",
@@ -363,7 +373,9 @@ def components_messages(h: dict, shot: dict, has_reference: bool) -> list[dict]:
         "إيموجي، تأثيرات). لو الإعلان الأصلي فيه موشن جرافيك في اللقطة دي، استخرج عناصره وطريقة حركتها وطبّقها على كوتشي.\n\n"
         f"راس الإعلان (ثابت لكل اللقطات):\n{header_text(h)}\n\n"
         f"اللقطة {shot.get('n')} ({shot.get('seconds', '')} ثانية): {shot.get('visual', '')}\n"
-        f"كلام على الشاشة: {shot.get('on_screen_text', '') or '—'}\nالصوت: {shot.get('voice', '') or '—'}\n\n"
+        f"كلام على الشاشة: {shot.get('on_screen_text', '') or '—'}\nالصوت: {shot.get('voice', '') or '—'}\n"
+        + (f"الموشن جرافيك المطلوب في اللقطة (التزم بيه): {shot.get('motion_notes')}\n" if shot.get("motion_notes") else "")
+        + "\n"
         + (f"مكونات المشهد الأصلي المقابل (حوّلها لنسخة كوتشي بنفس الوظيفة والحركة): "
            f"{json.dumps(shot.get('ref_components'), ensure_ascii=False)}\nالموشن جرافيك في الأصلي: {shot.get('ref_motion', '')}\n"
            if shot.get("ref_components") else "")
@@ -391,6 +403,7 @@ def video_prompt(h: dict, shot: dict, n_components: int) -> str:
         refs += f" Reference images 2-{n_components + 1} are the elements of the shot: use them exactly as they look."
     return "\n".join(x for x in [
         shot.get("assembly_prompt") or shot.get("prompt") or shot.get("visual", ""),
+        f"Motion graphics animation: {shot['motion_prompt']}" if shot.get("motion_prompt") and not shot.get("assembly_prompt") else "",
         refs,
         f"Visual style: {h['style']}" if h.get("style") else "",
         f"Characters: {h['characters']}" if h.get("characters") else "",

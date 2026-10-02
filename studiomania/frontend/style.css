@@ -1287,3 +1287,6 @@ a.pl-link:hover { background: color-mix(in srgb, var(--ok) 24%, transparent); }
   border-radius: 12px; background: #FFF7E6; color: #7A4B00; font-size: 14px; }
 .ad-stale .grow { flex: 1 1 220px; }
 #adTabs .ad-side-tab { opacity: .85; font-style: italic; }
+.ad-motion { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; padding: 8px 10px; border-radius: 10px;
+  background: color-mix(in srgb, var(--accent, #E8613C) 8%, transparent); }
+.ad-mg.orig { font-size: 13px; opacity: .85; }

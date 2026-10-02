@@ -149,6 +149,19 @@ function renderAdAudio() {
     <div class="ad-card wide" data-no-i18n><span>الصوت المحيط: ${adEsc(au.ambience)}</span><span>المكس: ${adEsc(au.mix)}</span><span><b>${adEsc(au.sound_design_notes)}</b></span></div>`;
 }
 
+// الموشن جرافيك في مشهد الاقتراح، وجنبه الموشن بتاع المشهد الأصلي اللي اتبنى عليه
+function adaptMotion(s) {
+  const orig = (adx.cur.analysis?.scenes || []).find((x) => String(x.n) === String(s.ref_scene));
+  return `<div class="ad-motion">
+    ${orig?.motion_graphics ? `<div class="ad-mg orig" data-no-i18n>↩ <b>الموشن في المشهد الأصلي ${adEsc(orig.n)}:</b> ${adEsc(orig.motion_graphics)}</div>` : ""}
+    ${adField("🎞️ الموشن جرافيك في المشهد (نسخة كوتشي)", s.motion_graphics, 'data-ask="motion_graphics"', 3)}
+    ${adField("Motion prompt", s.motion_prompt, 'data-ask="motion_prompt"', 2, true)}</div>`;
+}
+
+// اقتراح اتكتب قبل ما الموشن جرافيك يدخل فيه (طريقة قديمة) والتحليل فيه موشن
+const adaptNoMotion = (a) => !!a.adaptation?.scenes?.length && !a.adaptation.scenes.some((s) => s.motion_graphics)
+  && (a.analysis?.scenes || []).some((s) => s.motion_graphics);
+
 function renderAdAdapt() {
   const a = adx.cur;
   const busy = a.adapt_status === "working";
@@ -166,7 +179,7 @@ function renderAdAdapt() {
     <h3 class="pane-h">🎬 المشاهد</h3>
     <div class="ad-scenes">${(ad.scenes || []).map((s, i) => `<article class="ad-scene adapt" data-ascene="${i}">
       <div class="ad-scene-media"><b>${s.n ?? i + 1}</b><span class="t">${adEsc(s.seconds)}ث</span></div>
-      <div class="ad-scene-body">${Object.entries(ADAPT_SCENE_LABELS).map(([k, l]) => adField(l, s[k], `data-ask="${k}"`, 1)).join("")}
+      <div class="ad-scene-body">${adaptMotion(s)}${Object.entries(ADAPT_SCENE_LABELS).map(([k, l]) => adField(l, s[k], `data-ask="${k}"`, 1)).join("")}
         ${adField("Prompt (Seedance)", s.prompt, 'data-ask="prompt"', 3, true)}
         <button class="btn sm" type="button" data-copy-prompt="${i}">📋 انسخ البرومبت</button>
         ${s.ref_scene ? `<div class="muted">↩ مستوحى من المشهد ${adEsc(s.ref_scene)} في الإعلان الأصلي</div>` : ""}
@@ -413,7 +426,7 @@ $("adAdapt").addEventListener("click", async (e) => {
   if (e.target.closest("[data-copy-adapt]")) {
     const ad = adx.cur.adaptation;
     const parts = [ad.title, "", ...["concept", "why_it_fits", "kochi_angle", "hook", "format"].map((k) => `${ADAPT_LABELS[k]}: ${ad[k] || ""}`), "",
-      ...(ad.scenes || []).map((s, i) => [`— المشهد ${s.n ?? i + 1} (${s.seconds}ث)`, ...Object.entries(ADAPT_SCENE_LABELS).map(([k, l]) => `${l}: ${s[k] || ""}`), `Prompt: ${s.prompt || ""}`].join("\n")), "",
+      ...(ad.scenes || []).map((s, i) => [`— المشهد ${s.n ?? i + 1} (${s.seconds}ث)`, `الموشن جرافيك: ${s.motion_graphics || ""}`, ...Object.entries(ADAPT_SCENE_LABELS).map(([k, l]) => `${l}: ${s[k] || ""}`), `Prompt: ${s.prompt || ""}`].join("\n")), "",
       ...["voiceover_script", "music_direction", "sound_design", "cast", "locations", "production_notes", "cta", "caption"].map((k) => `${ADAPT_LABELS[k]}: ${ad[k] || ""}`)];
     adCopy(parts.join("\n"));
   }
@@ -548,7 +561,7 @@ function scheduleAdPoll() {
 
 // ---------- التنقل بين الخطوات: كل خطوة بتاخد آخر نسخة من اللي قبلها ----------
 // based_on = رقم نسخة الخطوة اللي قبلها وقت ما الخطوة دي اتعملت. لو أقل من الحالي يبقى الخطوة دي قديمة
-const adaptStale = (a) => !!a.adaptation && a.adaptation.based_on != null && a.adaptation.based_on < a.analysis_ver;
+const adaptStale = (a) => (!!a.adaptation && a.adaptation.based_on != null && a.adaptation.based_on < a.analysis_ver) || adaptNoMotion(a);
 const prodStale = (a) => !!a.prod && a.prod.based_on != null && a.prod.based_on < a.adapt_ver;
 
 function renderAdFlow() {
@@ -566,7 +579,8 @@ function renderAdFlow() {
   }
   const s1 = $("adAdaptStale");
   s1.hidden = !adaptStale(a) || adBusy;
-  s1.innerHTML = `<span class="grow">⚠️ الاقتراح ده مكتوب على نسخة أقدم من التحليل (التحليل أو المكونات اتغيروا بعده).</span>
+  s1.innerHTML = `<span class="grow">${adaptNoMotion(a) ? "⚠️ الاقتراح ده مكتوب بالطريقة القديمة على الفكرة بس، من غير الموشن جرافيك بتاع كل مشهد."
+    : "⚠️ الاقتراح ده مكتوب على نسخة أقدم من التحليل (التحليل أو المكونات اتغيروا بعده)."}</span>
     <button class="btn sm primary" data-flow="adapt" ${anBusy ? "disabled" : ""}>↻ اكتبه من جديد بالتحليل الجديد</button>`;
   const n2 = $("adNextAdapt");
   n2.hidden = !a.adaptation?.scenes?.length || adBusy;
@@ -663,11 +677,12 @@ function renderAdProd() {
       <div class="body">
         <header><b class="n">${s.n}</b><label class="muted">المدة <input type="number" min="1" max="15" step="0.5" value="${s.seconds}" data-pf="seconds" style="width:64px"> ث</label></header>
         <div class="ad-fields">${Object.entries(PSHOT_LABELS).map(([k, l]) => adField(l, s[k], `data-pf="${k}"`, 1)).join("")}</div>
+        <div class="ad-motion">${adField("🎞️ الموشن جرافيك في اللقطة", s.motion_notes, 'data-pf="motion_notes"', 2)}
+          ${adField("Motion prompt (بيدخل في الستوري بورد والفيديو)", s.motion_prompt, 'data-pf="motion_prompt"', 2, true)}</div>
         <h4 class="pane-h">🧩 المكونات ${s.comp_status === "working" ? `<span class="spin-inline"></span>` : ""}
           <button class="btn sm" data-p="comps" ${!s.frame_url || s.comp_status === "working" ? "disabled" : ""} title="الموديل يشوف الستوري بورد واللقطة الأصلية ويظبط المكونات عليهم">${s.components.length ? "↻ حدّث المكونات من الستوري بورد" : "🧩 استخرج المكونات"}</button>
           ${s.components.length ? `<button class="btn sm" data-p="compimgs">🖼️ صور المكونات</button><button class="btn sm" data-p="addcomp">＋ مكون</button>` : ""}</h4>
         ${s.comp_error ? `<div class="err">${adEsc(s.comp_error)}</div>` : ""}
-        ${s.motion_notes ? `<p class="hint" data-no-i18n>🎞️ ${adEsc(s.motion_notes)}</p>` : ""}
         <div class="ad-comps">${s.components.map((c) => `<div class="ad-comp ${c.use === false ? "off" : ""}" data-pc="${c.id}">
           <div class="img">${c.image_url ? `<img src="${c.image_url}" alt="">` : c.status === "working" ? `<div class="spin"></div>` : "🖼️"}</div>
           ${c.images.length > 1 ? `<div class="vers">${c.images.map((f) => `<img src="${f.url}" data-cimg="${f.file}" class="${f.url === c.image_url ? "sel" : ""}" alt="">`).join("")}</div>` : ""}

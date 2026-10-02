@@ -6320,7 +6320,9 @@ def prod_start(aid: str):
             "ref_scene": ref.get("n") if ref else None, "ref_frame": ref.get("frame") if ref else None,
             "frame": None, "frames": [], "frame_status": "idle", "frame_error": None,
             "components": comps, "comp_status": "done" if comps else "idle", "comp_error": None,
-            "motion_notes": (ref or {}).get("motion_graphics", ""), "assembly_prompt": "",
+            # الموشن جرافيك المكتوب في الاقتراح لكوتشي، ولو مش موجود (اقتراح قديم) بتاع المشهد الأصلي
+            "motion_notes": str(sc.get("motion_graphics") or (ref or {}).get("motion_graphics", "")),
+            "motion_prompt": str(sc.get("motion_prompt") or ""), "assembly_prompt": "",
             "approved": False, "takes": [], "chosen": None,
         })
     def fn(d):
@@ -6375,7 +6377,7 @@ class ProdShotIn(BaseModel):
 
 
 PSHOT_FIELDS = ("seconds", "visual", "shot", "camera", "on_screen_text", "voice", "sfx", "music", "prompt",
-                "assembly_prompt", "motion_notes", "approved")
+                "assembly_prompt", "motion_notes", "motion_prompt", "approved")
 
 
 @app.patch("/api/ads/{aid}/prod/shots/{sid}")
@@ -6519,7 +6521,7 @@ def run_ad_components(aid: str, sid: str) -> None:
                 if c["name"] in old:
                     c.update(image=old[c["name"]]["image"], images=old[c["name"]].get("images", []))
             x.update(components=comps, comp_status="done", comp_error=None,
-                     motion_notes=str(out.get("motion_notes") or ""), assembly_prompt=str(out.get("assembly_prompt") or x.get("assembly_prompt") or ""))
+                     motion_notes=x.get("motion_notes") or str(out.get("motion_notes") or ""), assembly_prompt=str(out.get("assembly_prompt") or x.get("assembly_prompt") or ""))
         update_ad(aid, done)
     except Exception as exc:  # noqa: BLE001
         set_pshot(aid, sid, comp_status="failed", comp_error=str(getattr(exc, "detail", None) or exc)[:400])
