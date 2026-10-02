@@ -63,6 +63,7 @@ function renderAds() {
     renderAdSettings();
     renderAdProd();
     renderAdFlow();
+    renderAdActivity();
   }
   scheduleAdPoll();
 }
@@ -87,7 +88,7 @@ function renderAdAnalysis() {
   const missing = sc.length && !sc.some((s) => (s.components || []).length);
   $("adSceneCompsGo").hidden = !a.analysis;
   $("adSceneCompsGo").disabled = a.scomp_status === "working";
-  $("adSceneCompsGo").textContent = a.scomp_status === "working" ? "⏳ بيفصّص المكونات..." : missing ? "🧩 فصّص مكونات المشاهد والموشن جرافيك" : "↻ فصّص المكونات تاني";
+  $("adSceneCompsGo").textContent = a.scomp_status === "working" ? "⏳ بيستخرج الموشن جرافيك..." : missing ? "🎞️ استخرج الموشن جرافيك والمكونات" : "↻ استخرج الموشن جرافيك والمكونات تاني";
   $("adSceneCompsGo").classList.toggle("primary", !!missing);
   $("adSceneCompsErr").hidden = !a.analysis?.components_error;
   $("adSceneCompsErr").textContent = a.analysis?.components_error ? `✕ ${a.analysis.components_error}` : "";
@@ -570,7 +571,11 @@ function renderAdFlow() {
   const adBusy = a.adapt_status === "working";
   const n1 = $("adNextAnalysis");
   n1.hidden = !a.analysis;
-  if (a.analysis) {
+  const sc = a.analysis?.scenes || [];
+  if (a.analysis && sc.length && !sc.some((s) => (s.components || []).length || s.motion_graphics) && a.scomp_status !== "working") {
+    n1.innerHTML = `<span class="muted">⚠️ لسه الموشن جرافيك ومكونات المشاهد ما اتستخرجوش، والاقتراح بيتبني عليهم.</span>
+      <button class="btn primary" data-scomps ${anBusy ? "disabled" : ""}>🎞️ استخرج الموشن جرافيك والمكونات</button>`;
+  } else if (a.analysis) {
     const fresh = a.adaptation && !adaptStale(a);
     n1.innerHTML = `<span class="muted">${adBusy ? "✍️ اقتراح كوتشي بيتكتب من التحليل ده..." : fresh ? "✅ اقتراح كوتشي متحدّث بآخر نسخة من التحليل والمكونات."
       : a.adaptation ? "⚠️ التحليل أو المكونات اتغيروا بعد ما الاقتراح اتكتب." : "الخطوة الجاية: اقتراح لكوتشي مبني على المشاهد والمكونات دي."}</span>
@@ -600,6 +605,32 @@ function renderAdFlow() {
     ${hist.length ? `<button class="btn sm" data-prod-restore="0" ${prodBusy(a) ? "disabled" : ""}>↶ رجّع التنفيذ السابق (${hist[0].shots} لقطة)</button>` : ""}`;
 }
 
+// شريط «بيعمل إيه دلوقتي»: كل الشغل اللي شغال في الخلفية للإعلان ده
+function renderAdActivity() {
+  const a = adx.cur, items = [];
+  const nums = (arr) => arr.map((s) => s.n).join("، ");
+  if (["queued", "working"].includes(a.status)) items.push(["analysis", `🔍 بيحلل الإعلان: ${a.step || "في الطابور"}`]);
+  if (a.scomp_status === "working") items.push(["analysis", "🎞️ بيستخرج الموشن جرافيك ومكونات كل مشهد"]);
+  if (a.adapt_status === "working") items.push(["adapt", "✍️ بيكتب اقتراح كوتشي"]);
+  if (a.audio_status === "working") items.push(["audio", "🎧 بيسمع الصوت ويفصّصه"]);
+  const shots = a.prod?.shots || [];
+  const drawing = shots.filter((s) => s.frame_status === "working"), waitDraw = shots.filter((s) => s.frame_status === "queued");
+  if (drawing.length) items.push(["prod", `🎨 بيرسم الستوري بورد: لقطة ${nums(drawing)}`]);
+  if (waitDraw.length) items.push(["prod", `⏳ مستني يرسم: لقطة ${nums(waitDraw)}`]);
+  const comps = shots.filter((s) => s.comp_status === "working");
+  if (comps.length) items.push(["prod", `🧩 بيستخرج مكونات: لقطة ${nums(comps)}`]);
+  const cimg = shots.filter((s) => s.components.some((c) => c.status === "working"));
+  if (cimg.length) items.push(["prod", `🖼️ بيولّد صور ${cimg.reduce((k, s) => k + s.components.filter((c) => c.status === "working").length, 0)} مكون (لقطة ${nums(cimg)})`]);
+  const gen = shots.filter((s) => s.takes.some((t) => t.status === "working")), waitGen = shots.filter((s) => s.takes.some((t) => t.status === "queued"));
+  if (gen.length) items.push(["prod", `🎬 بيولّد فيديو: لقطة ${nums(gen)}`]);
+  if (waitGen.length) items.push(["prod", `⏳ فيديو في الطابور: لقطة ${nums(waitGen)}`]);
+  const el = $("adActivity");
+  el.classList.toggle("busy", !!items.length);
+  el.innerHTML = items.length
+    ? `<div class="spin"></div><b>شغال دلوقتي:</b>${items.map(([t, x]) => `<button type="button" class="ad-act" data-act-tab="${t}">${x}</button>`).join("")}`
+    : `<span class="dot"></span><span class="muted">ساكت دلوقتي، مفيش حاجة شغالة. اختار الخطوة اللي عايزها.</span>`;
+}
+
 async function adFlow(btn, to) {
   const a = adx.cur;
   if (to === "adapt") {
@@ -622,6 +653,9 @@ async function adFlow(btn, to) {
 document.querySelector('.view[data-view="10"]').addEventListener("click", (e) => {
   const f = e.target.closest("[data-flow]");
   if (f) return adFlow(f, f.dataset.flow);
+  if (e.target.closest("[data-scomps]")) return $("adSceneCompsGo").click();
+  const go = e.target.closest("[data-act-tab]");
+  if (go) { adx.tab = go.dataset.actTab; return renderAds(); }
   const r = e.target.closest("[data-prod-restore]");
   if (r && confirm("ترجّع التنفيذ السابق؟ التنفيذ الحالي هيتحفظ مكانه.")) pDo(r, "⏳", () => pAPI(`/restore?i=${r.dataset.prodRestore}`, { method: "POST" }));
 });

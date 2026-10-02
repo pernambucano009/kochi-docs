@@ -1291,3 +1291,11 @@ a.pl-link:hover { background: color-mix(in srgb, var(--ok) 24%, transparent); }
   background: color-mix(in srgb, var(--accent, #E8613C) 8%, transparent); }
 .ad-mg.orig { font-size: 13px; opacity: .85; }
 .ad-comp .kind .up { color: var(--accent, #E8613C); font-weight: 600; }
+/* شريط «بيعمل إيه دلوقتي» في الإعلانات */
+.ad-activity { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0;
+  padding: 8px 12px; border-radius: 12px; background: var(--surface-2); font-size: 13px; }
+.ad-activity.busy { background: #EAF6F4; color: #1F4D48; box-shadow: 0 2px 10px rgba(0,0,0,.06); }
+.ad-activity .spin { width: 16px; height: 16px; }
+.ad-activity .dot { width: 9px; height: 9px; border-radius: 50%; background: #9AA5A0; }
+.ad-activity .ad-act { border: 0; border-radius: 999px; padding: 4px 10px; background: #fff; color: inherit; font: inherit; cursor: pointer; }
+.ad-activity .ad-act:hover { background: #D6EFEB; }
