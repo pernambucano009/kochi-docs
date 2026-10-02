@@ -563,10 +563,15 @@ function scheduleAdPoll() {
 // ---------- التنقل بين الخطوات: كل خطوة بتاخد آخر نسخة من اللي قبلها ----------
 // based_on = رقم نسخة الخطوة اللي قبلها وقت ما الخطوة دي اتعملت. لو أقل من الحالي يبقى الخطوة دي قديمة
 const adaptStale = (a) => (!!a.adaptation && a.adaptation.based_on != null && a.adaptation.based_on < a.analysis_ver) || adaptNoMotion(a);
-const prodStale = (a) => !!a.prod && a.prod.based_on != null && a.prod.based_on < a.adapt_ver;
+// التنفيذ قديم لو الاقتراح اتغير بعده، أو لو الاقتراح نفسه قديم (التحليل أو الموشن اتغيروا بعده)
+const prodStale = (a) => !!a.prod && ((a.prod.based_on != null && a.prod.based_on < a.adapt_ver) || adaptStale(a));
 
 function renderAdFlow() {
   const a = adx.cur;
+  if (adx.followProd === a.id && a.adapt_status !== "working") {
+    adx.followProd = null;
+    if (a.prod && !prodStale(a)) { adx.tab = "prod"; return renderAds(); }
+  }
   const anBusy = ["queued", "working"].includes(a.status) || a.scomp_status === "working";
   const adBusy = a.adapt_status === "working";
   const n1 = $("adNextAnalysis");
@@ -590,18 +595,21 @@ function renderAdFlow() {
   const n2 = $("adNextAdapt");
   n2.hidden = !a.adaptation?.scenes?.length || adBusy;
   if (!n2.hidden) {
-    const fresh = a.prod && !prodStale(a);
+    const fresh = a.prod && !prodStale(a), old = adaptStale(a);
     n2.innerHTML = `<span class="muted">${fresh ? "✅ التنفيذ ماشي على آخر نسخة من الاقتراح."
+      : old ? "⚠️ الاقتراح ده مبني على تحليل أقدم، فالموشن جرافيك الجديد مش فيه. هيتكتب من جديد بالموشن وبعدين يتاخد للتنفيذ."
       : a.prod ? "⚠️ الاقتراح اتغير بعد ما التنفيذ بدأ." : "الخطوة الجاية: التنفيذ (ستوري بورد ← مكونات ← فيديو لكل لقطة)."}</span>
-      <button class="btn primary" data-flow="prod" ${prodBusy(a) && !fresh ? "disabled" : ""}>${fresh ? "التالي: التنفيذ ←" : "التالي: خد الاقتراح ده للتنفيذ ←"}</button>`;
+      <button class="btn primary" data-flow="prod" ${prodBusy(a) && !fresh ? "disabled" : ""}>${fresh ? "التالي: التنفيذ ←"
+        : old ? "التالي: حدّث الاقتراح بالموشن وخده للتنفيذ ←" : "التالي: خد الاقتراح ده للتنفيذ ←"}</button>`;
   }
   const s2 = $("adProdStale"), hist = a.prod_history || [];
   const stale = prodStale(a);
   s2.hidden = !stale && !hist.length;
   s2.classList.toggle("ad-stale", stale);
   s2.classList.toggle("ad-next", !stale);
-  s2.innerHTML = `${stale ? `<span class="grow">⚠️ اقتراح كوتشي اتغير بعد ما التنفيذ ده بدأ، فاللقطات هنا ماشية على النسخة القديمة.</span>
-      <button class="btn sm primary" data-flow="prod" ${prodBusy(a) ? "disabled" : ""}>↻ خد الاقتراح الجديد للتنفيذ</button>` : `<span class="grow muted">📦 في تنفيذ قديم محفوظ.</span>`}
+  s2.innerHTML = `${stale ? `<span class="grow">${adaptStale(a) ? "⚠️ التحليل أو الموشن جرافيك اتغيروا بعد ما الاقتراح اتكتب، فاللقطات هنا ماشية على النسخة القديمة."
+      : "⚠️ اقتراح كوتشي اتغير بعد ما التنفيذ ده بدأ، فاللقطات هنا ماشية على النسخة القديمة."}</span>
+      <button class="btn sm primary" data-flow="prod" ${prodBusy(a) || a.adapt_status === "working" ? "disabled" : ""}>${adaptStale(a) ? "↻ حدّث الاقتراح بالموشن وخده للتنفيذ" : "↻ خد الاقتراح الجديد للتنفيذ"}</button>` : `<span class="grow muted">📦 في تنفيذ قديم محفوظ.</span>`}
     ${hist.length ? `<button class="btn sm" data-prod-restore="0" ${prodBusy(a) ? "disabled" : ""}>↶ رجّع التنفيذ السابق (${hist[0].shots} لقطة)</button>` : ""}`;
 }
 
@@ -611,7 +619,7 @@ function renderAdActivity() {
   const nums = (arr) => arr.map((s) => s.n).join("، ");
   if (["queued", "working"].includes(a.status)) items.push(["analysis", `🔍 بيحلل الإعلان: ${a.step || "في الطابور"}`]);
   if (a.scomp_status === "working") items.push(["analysis", "🎞️ بيستخرج الموشن جرافيك ومكونات كل مشهد"]);
-  if (a.adapt_status === "working") items.push(["adapt", "✍️ بيكتب اقتراح كوتشي"]);
+  if (a.adapt_status === "working") items.push(["adapt", a.chain_prod ? "✍️ بيكتب اقتراح كوتشي بالموشن، وبعده هيبدأ التنفيذ" : "✍️ بيكتب اقتراح كوتشي"]);
   if (a.audio_status === "working") items.push(["audio", "🎧 بيسمع الصوت ويفصّصه"]);
   const shots = a.prod?.shots || [];
   const drawing = shots.filter((s) => s.frame_status === "working"), waitDraw = shots.filter((s) => s.frame_status === "queued");
@@ -643,6 +651,16 @@ async function adFlow(btn, to) {
     });
   }
   if (a.prod && !prodStale(a)) { adx.tab = "prod"; return renderAds(); }
+  if (adaptStale(a)) {
+    // الموشن بيوصل للتنفيذ عن طريق الاقتراح: يتكتب من جديد من آخر تحليل، وبعدها التنفيذ بيبدأ منه لوحده
+    if (!confirm(a.prod ? "الاقتراح هيتكتب من جديد من آخر تحليل (بالموشن جرافيك اللي اتستخرج)، وبعدها التنفيذ هيبدأ منه لوحده. التنفيذ الحالي هيتحفظ وتقدر ترجعه. تكمل؟"
+      : "الاقتراح هيتكتب من جديد من آخر تحليل (بالموشن جرافيك اللي اتستخرج)، وبعدها التنفيذ هيبدأ منه لوحده. تكمل؟")) return;
+    return busyButton(btn, "⏳", async () => {
+      adx.cur = await api(`/api/ads/${a.id}/adapt`, { method: "POST", ...jsonBody({ message: "", then_prod: true }) });
+      adx.followProd = a.id;
+      renderAds();
+    });
+  }
   if (a.prod && !confirm("هيبدأ تنفيذ جديد من آخر نسخة من الاقتراح. التنفيذ الحالي (صوره وفيديوهاته) هيتحفظ وتقدر ترجعه بزرار «رجّع التنفيذ السابق». تكمل؟")) return;
   return busyButton(btn, "⏳", async () => {
     adx.cur = await pAPI("/start", { method: "POST" });
@@ -720,7 +738,8 @@ function renderAdProd() {
       <div class="body">
         <header><b class="n">${s.n}</b><label class="muted">المدة <input type="number" min="1" max="15" step="0.5" value="${s.seconds}" data-pf="seconds" style="width:64px"> ث</label></header>
         <div class="ad-fields">${Object.entries(PSHOT_LABELS).map(([k, l]) => adField(l, s[k], `data-pf="${k}"`, 1)).join("")}</div>
-        <div class="ad-motion">${adField("🎞️ الموشن جرافيك في اللقطة", s.motion_notes, 'data-pf="motion_notes"', 2)}
+        <div class="ad-motion">${s.ref_motion ? `<div class="ad-mg orig" data-no-i18n>↩ <b>الموشن في المشهد الأصلي ${adEsc(s.ref_scene)}:</b> ${adEsc(s.ref_motion)}</div>` : ""}
+          ${adField("🎞️ الموشن جرافيك في اللقطة", s.motion_notes, 'data-pf="motion_notes"', 2)}
           ${adField("Motion prompt (بيدخل في الستوري بورد والفيديو)", s.motion_prompt, 'data-pf="motion_prompt"', 2, true)}</div>
         <h4 class="pane-h">🧩 المكونات ${s.comp_status === "working" ? `<span class="spin-inline"></span>` : ""}
           <button class="btn sm" data-p="comps" ${!s.frame_url || s.comp_status === "working" ? "disabled" : ""} title="الموديل يشوف الستوري بورد واللقطة الأصلية ويظبط المكونات عليهم">${s.components.length ? "↻ حدّث المكونات من الستوري بورد" : "🧩 استخرج المكونات"}</button>

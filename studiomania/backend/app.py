@@ -5624,8 +5624,19 @@ def ad_to_dict(r: sqlite3.Row, d: dict) -> dict:
         "scomp_status": d.get("scomp_status", "idle"),
         "chat": d.get("chat") or [],
         "thumb": scenes[0]["frame_url"] if scenes and scenes[0].get("frame_url") else None,
-        "prod": prod_to_dict(aid, d.get("prod")),
+        "prod": with_ref_motion(prod_to_dict(aid, d.get("prod")), analysis),
+        "chain_prod": bool(d.get("chain_prod")),
     }
+
+
+def with_ref_motion(prod: dict | None, analysis: dict) -> dict | None:
+    """الموشن جرافيك بتاع المشهد الأصلي المقابل لكل لقطة (من آخر تحليل)، عشان يظهر جنب الموشن بتاع كوتشي."""
+    if not prod:
+        return prod
+    by_n = {s.get("n"): s for s in (analysis or {}).get("scenes") or []}
+    for s in prod["shots"]:
+        s["ref_motion"] = (by_n.get(s.get("ref_scene")) or {}).get("motion_graphics", "")
+    return prod
 
 
 def ad_response(aid: str) -> dict:
@@ -5855,6 +5866,7 @@ def reanalyze_ad(aid: str):
 
 class AdAdaptIn(BaseModel):
     message: str = ""
+    then_prod: bool = False  # بعد ما الاقتراح يتكتب، التنفيذ يبدأ منه على طول
 
 
 @app.post("/api/ads/{aid}/adapt")
@@ -5869,6 +5881,7 @@ def adapt_ad(aid: str, body: AdAdaptIn):
     msg = body.message.strip()[:3000]
     def fn(d):
         d["adapt_status"], d["adapt_error"] = "working", None
+        d["chain_prod"] = body.then_prod
         if msg:
             d.setdefault("chat", []).append({"role": "user", "content": msg})
         else:
@@ -6058,7 +6071,15 @@ def run_ad_adapt(aid: str) -> None:
         update_ad(aid, fn)
     except Exception as exc:  # noqa: BLE001
         msg = str(getattr(exc, "detail", None) or exc)[:500]
-        update_ad(aid, lambda d: d.update(adapt_status="failed", adapt_error=msg))
+        update_ad(aid, lambda d: d.update(adapt_status="failed", adapt_error=msg, chain_prod=False))
+        return
+    chain = []
+    update_ad(aid, lambda d: chain.append(d.pop("chain_prod", False)))
+    if chain and chain[0]:
+        try:
+            prod_start(aid)
+        except HTTPException as exc:
+            update_ad(aid, lambda d: d.update(adapt_error=f"الاقتراح اتكتب بس التنفيذ مبدأش: {exc.detail}"))
 
 
 # ---------- ستايلات الإعلانات: صور بتتحفظ وتتختار لأي إعلان
