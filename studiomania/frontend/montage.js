@@ -70,6 +70,11 @@ async function initMontage() {
   const wanted = mt.project?.id || storageGet(PROJECT_KEY);
   const p = mt.projects.find((x) => x.id === wanted) || mt.projects[0];
   openProject(p || null);
+  // جاي من صفحة التوليد: نجيب آخر الفيديوهات المولَّدة للمشروع
+  const handoff = mt.handoff;
+  mt.handoff = null;
+  if (handoff?.draft) reportDraft(handoff.draft);
+  else if (handoff?.refresh && mt.project?.data.video_id) await $("refreshFromVideo").onclick();
 }
 
 function fillSelects() {
@@ -1637,6 +1642,29 @@ $("newProject").onclick = async () => {
   openProject(p);
   $("projectName").select();
 };
+// من صفحة التوليد: يفتح مونتاج الفيديو ده بآخر الفيديوهات المولَّدة (أو يعمل له مشروع لو مفيش)
+async function openMontageForVideo(videoId) {
+  const projects = await api("/api/projects");
+  const mine = projects.filter((x) => x.data.video_id === videoId)
+    .sort((a, b) => (b.updated_at || "").localeCompare(a.updated_at || ""));
+  let p = mine[0];
+  if (p) {
+    mt.handoff = { refresh: true };
+  } else {
+    const draft = await api(`/api/videos/${videoId}/montage-draft`);
+    const data = {
+      ...blankProject(draft.name), name: draft.name, video_id: videoId, coach_id: draft.coach_id,
+      clips: draft.gen_ids.map((gen_id) => ({ gen_id, ...CLIP_DEFAULTS })),
+      voice: draft.voice ? { id: draft.voice.id, volume: 1, delay: 0, offset: 0, length: null, fade_out: false } : null,
+    };
+    p = await api("/api/projects", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
+    mt.handoff = { draft };
+  }
+  if (mt.project) await saveProject();
+  storageSet(PROJECT_KEY, p.id);
+  mt.project = null;
+  showStep("6");
+}
 $("deleteProject").onclick = async () => {
   if (!confirm(`حذف المشروع "${mt.project.data.name}"؟ (الفيديوهات اللي اتصدّرت منه هتفضل موجودة)`)) return;
   try {

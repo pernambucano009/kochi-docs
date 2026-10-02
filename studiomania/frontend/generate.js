@@ -391,6 +391,7 @@ function renderGenerations() {
         <span class="muted">${ready} / ${gens.length} جاهز</span>
         ${a?.exported_url ? `<a class="muted" href="${a.exported_url}" target="_blank">✅ اتصدّر</a>` : ""}
         <span class="spacer"></span>
+        ${vid && ready ? `<button class="btn sm primary" data-montage="${vid}" title="يفتح المونتاج بتاع الفيديو ده بآخر الفيديوهات المولَّدة بالترتيب، والتعليق الصوتي بتاعه">🎬 خده للمونتاج</button>` : ""}
         ${vid && !viewing ? `<button class="btn sm" data-archive="${vid}">🗄️ أرشفه</button>` : ""}
       </div><div class="gens"></div>`;
     const grid = box.querySelector(".gens");
@@ -437,6 +438,8 @@ function genCard(g) {
 $("gensGroups").addEventListener("click", async (e) => {
   const arch = e.target.closest("[data-archive]");
   if (arch) return setArchived(arch.dataset.archive, true);
+  const mont = e.target.closest("[data-montage]");
+  if (mont) return busyButton(mont, "⏳", () => openMontageForVideo(mont.dataset.montage));
   const btn = e.target.closest("button[data-act]");
   if (!btn) return;
   const id = btn.closest(".gen").dataset.id;
