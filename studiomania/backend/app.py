@@ -1215,7 +1215,7 @@ def generation_to_dict(r: sqlite3.Row) -> dict:
         "coach_name": r["coach_name"],
         "coach_image_url": f"/media/coaches/{r['coach_image']}",
         "model": r["model"],
-        "model_label": atlas.MODEL_LABEL if r["model"] == atlas.MODEL else r["model"].split("/")[1],
+        "model_label": atlas.MODEL_LABEL if r["model"] == atlas.MODEL else (r["model"] or "").split("/")[-1],
         "prompt": r["prompt"],
         "params": json.loads(r["params"]),
         "status": r["status"],
@@ -1402,7 +1402,7 @@ def create_generations(body: GenerationIn):
 @app.get("/api/generations")
 def list_generations():
     with closing(db()) as conn:
-        rows = conn.execute("SELECT * FROM generations WHERE clip_id NOT LIKE 'series:%' ORDER BY created_at DESC, clip_label").fetchall()
+        rows = conn.execute("SELECT * FROM generations WHERE clip_id NOT LIKE 'series:%' AND clip_id != 'upload' ORDER BY created_at DESC, clip_label").fetchall()
     return [generation_to_dict(r) for r in rows]
 
 
@@ -1466,6 +1466,31 @@ def retry_generation(gen_id: str):
     set_generation(gen_id, status="queued", error=None)
     executor.submit(run_generation, gen_id)
     return {"ok": True}
+
+
+@app.post("/api/generations/{gen_id}/again")
+def generate_again(gen_id: str):
+    """توليد جديد لنفس القطعة (نفس المدرب والبرومبت والإعدادات). الفيديو القديم بيفضل لحد ما تمسحه."""
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات")
+    new_id = uuid.uuid4().hex[:12]
+    with closing(db()) as conn, conn:
+        r = conn.execute("SELECT * FROM generations WHERE id = ?", (gen_id,)).fetchone()
+        if r is None:
+            raise HTTPException(404, "الطلب غير موجود")
+        if r["clip_id"].startswith("series:") or r["clip_id"] == "upload":
+            raise HTTPException(400, "الفيديو ده مش من قطعة مشروع")
+        if not conn.execute("SELECT 1 FROM clips WHERE id = ?", (r["clip_id"],)).fetchone():
+            raise HTTPException(400, "القطعة الأصلية اتمسحت")
+        conn.execute(
+            "INSERT INTO generations (id, clip_id, clip_filename, clip_label, coach_id, coach_name, coach_image, "
+            "model, prompt, params, status, created_at, updated_at, video_id) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', ?, ?, ?)",
+            (new_id, r["clip_id"], r["clip_filename"], r["clip_label"], r["coach_id"], r["coach_name"], r["coach_image"],
+             r["model"], r["prompt"], r["params"], now(), now(), r["video_id"]),
+        )
+    executor.submit(run_generation, new_id)
+    return {"id": new_id}
 
 
 @app.delete("/api/generations/{gen_id}")
