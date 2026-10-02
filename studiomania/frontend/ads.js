@@ -625,6 +625,8 @@ function renderAdActivity() {
   const drawing = shots.filter((s) => s.frame_status === "working"), waitDraw = shots.filter((s) => s.frame_status === "queued");
   if (drawing.length) items.push(["prod", `🎨 بيرسم الستوري بورد: لقطة ${nums(drawing)}`]);
   if (waitDraw.length) items.push(["prod", `⏳ مستني يرسم: لقطة ${nums(waitDraw)}`]);
+  const mo = shots.filter((s) => s.motion_status === "working");
+  if (mo.length) items.push(["prod", `🎞️ بيستحضر الموشن جرافيك من الإعلان الأصلي: لقطة ${nums(mo)}`]);
   const comps = shots.filter((s) => s.comp_status === "working");
   if (comps.length) items.push(["prod", `🧩 بيستخرج مكونات: لقطة ${nums(comps)}`]);
   const cimg = shots.filter((s) => s.components.some((c) => c.status === "working"));
@@ -681,7 +683,7 @@ document.querySelector('.view[data-view="10"]').addEventListener("click", (e) =>
 // ---------- 4. التنفيذ: راس الإعلان ← ستوري بورد ← مكونات ← لقطات ← المونتاج ----------
 const PBUSY = new Set(["queued", "working"]);
 function prodBusy(a) {
-  return !!a.prod?.shots.some((s) => PBUSY.has(s.frame_status) || s.comp_status === "working"
+  return !!a.prod?.shots.some((s) => PBUSY.has(s.frame_status) || s.comp_status === "working" || s.motion_status === "working"
     || s.components.some((c) => c.status === "working") || s.takes.some((t) => PBUSY.has(t.status)));
 }
 const HEADER_LABELS = { title: "اسم الإعلان", concept: "الكونسبت", style: "الستايل البصري (بالإنجليزي)", characters: "الشخصيات (نفس الشكل في كل لقطة)",
@@ -740,6 +742,8 @@ function renderAdProd() {
         <div class="ad-fields">${Object.entries(PSHOT_LABELS).map(([k, l]) => adField(l, s[k], `data-pf="${k}"`, 1)).join("")}</div>
         <div class="ad-motion">${s.ref_motion ? `<div class="ad-mg orig" data-no-i18n>↩ <b>الموشن في المشهد الأصلي ${adEsc(s.ref_scene)}:</b> ${adEsc(s.ref_motion)}</div>` : ""}
           ${adField("🎞️ الموشن جرافيك في اللقطة", s.motion_notes, 'data-pf="motion_notes"', 2)}
+          <div class="row wrap"><button class="btn sm" data-p="motion" ${s.motion_status === "working" ? "disabled" : ""}>${s.motion_status === "working" ? "⏳ بيستحضر الموشن..." : "🎞️ استحضر الموشن من المشهد الأصلي"}</button></div>
+          ${s.motion_error ? `<div class="err">${adEsc(s.motion_error)}</div>` : ""}
           ${adField("Motion prompt (بيدخل في الستوري بورد والفيديو)", s.motion_prompt, 'data-pf="motion_prompt"', 2, true)}</div>
         <h4 class="pane-h">🧩 المكونات ${s.comp_status === "working" ? `<span class="spin-inline"></span>` : ""}
           <button class="btn sm" data-p="comps" ${!s.frame_url || s.comp_status === "working" ? "disabled" : ""} title="الموديل يشوف الستوري بورد واللقطة الأصلية ويظبط المكونات عليهم">${s.components.length ? "↻ حدّث المكونات من الستوري بورد" : "🧩 استخرج المكونات"}</button>
@@ -748,7 +752,7 @@ function renderAdProd() {
         <div class="ad-comps">${s.components.map((c) => `<div class="ad-comp ${c.use === false ? "off" : ""}" data-pc="${c.id}">
           <div class="img">${c.image_url ? `<img src="${c.image_url}" alt="">` : c.status === "working" ? `<div class="spin"></div>` : "🖼️"}</div>
           ${c.images.length > 1 ? `<div class="vers">${c.images.map((f) => `<img src="${f.url}" data-cimg="${f.file}" class="${f.url === c.image_url ? "sel" : ""}" alt="">`).join("")}</div>` : ""}
-          <span class="kind">${KIND_LABEL[c.kind] || adEsc(c.kind)}${c.uploaded ? ` · <b class="up">⬆ من عندك</b>` : ""}</span>
+          <span class="kind">${KIND_LABEL[c.kind] || adEsc(c.kind)}${c.motion ? " · 🎞️" : ""}${c.uploaded ? ` · <b class="up">⬆ من عندك</b>` : ""}</span>
           <input type="text" value="${adEsc(c.name)}" data-cf="name" data-no-i18n>
           <textarea rows="3" dir="ltr" data-cf="image_prompt" placeholder="Image prompt" data-no-i18n>${adEsc(c.image_prompt)}</textarea>
           ${c.animation ? `<span class="muted" data-no-i18n>🎞️ ${adEsc(c.animation)}</span>` : ""}
@@ -787,6 +791,10 @@ $("adHeaderStyle").addEventListener("change", () => pAPI("/header", { method: "P
   .then((a) => { adx.cur = a; renderAds(); toast("🎨 الستايل اتغير في راس الإعلان. الصور والفيديوهات الجاية هتتعمل بيه"); }).catch((err) => toast(err.message, true)));
 $("adHeaderAspect").addEventListener("change", () => pAPI("/header", { method: "PATCH", ...jsonBody({ header: { aspect: $("adHeaderAspect").value } }) })
   .then((a) => { adx.cur = a; renderAds(); }).catch((err) => toast(err.message, true)));
+$("adPMotion").onclick = () => {
+  if (!confirm("يتفرج على كل مشهد في الإعلان الأصلي ويستحضر الموشن جرافيك بتاعه في اللقطة المقابلة (الموشن المكتوب + عناصر الموشن كمكونات). الموشن المكتوب دلوقتي هيتبدل، والمكونات الموجودة مش هتتلمس. تكمل؟")) return;
+  pDo($("adPMotion"), "⏳", () => pAPI("/motion", { method: "POST" }));
+};
 $("adPDelFrames").onclick = () => {
   const n = adx.cur.prod.shots.filter((s) => s.frames.length).length;
   if (!n) return toast("مفيش ستوري بورد تتمسح");
@@ -853,6 +861,7 @@ $("adPShots").addEventListener("click", async (e) => {
   try {
     if (b.dataset.pframe) adx.cur = await pAPI(`/shots/${sid}/frame`, { method: "POST", ...jsonBody({ file: b.dataset.pframe }) });
     else if (b.dataset.p === "frame") adx.cur = await pAPI(`/frames?shot_id=${sid}`, { method: "POST" });
+    else if (b.dataset.p === "motion") adx.cur = await pAPI(`/motion?shot_id=${sid}`, { method: "POST" });
     else if (b.dataset.p === "delframe") {
       const more = s.frames.length > 1;
       if (!confirm(more ? `تمسح الستوري بورد المعروضة للقطة ${s.n}؟ النسخة اللي قبلها هتظهر مكانها.` : `تمسح الستوري بورد بتاعة اللقطة ${s.n}؟`)) return;

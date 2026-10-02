@@ -6252,7 +6252,7 @@ def prod_dir(aid: str, sub: str) -> Path:
 
 def prod_busy(p: dict | None) -> bool:
     for s in (p or {}).get("shots") or []:
-        if "working" in (s.get("frame_status"), s.get("comp_status")):
+        if "working" in (s.get("frame_status"), s.get("comp_status"), s.get("motion_status")):
             return True
         if any(c.get("status") == "working" for c in s.get("components") or []):
             return True
@@ -6519,6 +6519,73 @@ def prod_pick_frame(aid: str, sid: str, body: FramePickIn):
             raise HTTPException(404, "النسخة مش موجودة")
         s["frame"] = body.file
     update_ad(aid, fn)
+    return ad_response(aid)
+
+
+def run_ad_motion(aid: str, sids: list[str]) -> None:
+    """يستحضر الموشن جرافيك من المشاهد الأصلية للقطات التنفيذ (بيتفرج على الفيديو الأصلي لو موجود)."""
+    try:
+        with closing(db()) as conn:
+            _, d = ad_row(conn, aid)
+        p = d["prod"]
+        orig = {x.get("n"): x for x in (d.get("analysis") or {}).get("scenes") or []}
+        items = [{"shot": s, "orig": orig.get(s.get("ref_scene"))} for s in p["shots"] if s["id"] in sids]
+        proxy = ad_dir(aid) / "proxy.mp4"
+        if atlas.mock_mode():
+            out = az.mock_motion(items)
+        elif proxy.exists():
+            out = ad_json(ad_media_chat(az.with_media(az.motion_messages(p["header"], items, True),
+                                                      data_url(proxy, "video/mp4"), "ad.mp4")), "الموشن جرافيك")
+        else:
+            out = ad_json(series_chat(az.motion_messages(p["header"], items, False)), "الموشن جرافيك")
+        got = {str(x.get("id")): x for x in out.get("shots") or [] if isinstance(x, dict)}
+        def fn(d):
+            for s in d["prod"]["shots"]:
+                if s["id"] not in sids:
+                    continue
+                x = got.get(s["id"])
+                if not x:
+                    s.update(motion_status="failed", motion_error="الموديل ما رجعش موشن للقطة دي. جرّب تاني")
+                    continue
+                s["motion_notes"] = str(x.get("motion_graphics") or s.get("motion_notes") or "")
+                s["motion_prompt"] = str(x.get("motion_prompt") or s.get("motion_prompt") or "")
+                names = {c["name"] for c in s.get("components") or []}
+                for c in x.get("components") or []:
+                    if not isinstance(c, dict) or not c.get("name") or str(c["name"]) in names:
+                        continue
+                    s.setdefault("components", []).append({
+                        "id": uuid.uuid4().hex[:8], "name": str(c["name"])[:60], "kind": str(c.get("kind") or "graphic")[:20],
+                        "from": str(c.get("from") or ""), "description": str(c.get("description") or ""),
+                        "image_prompt": str(c.get("image_prompt") or ""), "animation": str(c.get("animation") or ""),
+                        "image": None, "images": [], "status": "idle", "error": None, "use": True, "motion": True})
+                s.update(motion_status="done", motion_error=None)
+        update_ad(aid, fn)
+    except Exception as exc:  # noqa: BLE001
+        msg = str(getattr(exc, "detail", None) or exc)[:400]
+        def fail(d):
+            for s in (d.get("prod") or {}).get("shots") or []:
+                if s["id"] in sids and s.get("motion_status") == "working":
+                    s.update(motion_status="failed", motion_error=msg)
+        update_ad(aid, fail)
+
+
+@app.post("/api/ads/{aid}/prod/motion")
+def prod_motion(aid: str, shot_id: str | None = None):
+    """زرار «استحضر الموشن جرافيك»: لقطة واحدة أو كل اللقطات."""
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات")
+    ids: list[str] = []
+    def fn(d):
+        p = prod_of(d)
+        for s in p["shots"]:
+            if (shot_id and s["id"] != shot_id) or s.get("motion_status") == "working":
+                continue
+            s.update(motion_status="working", motion_error=None)
+            ids.append(s["id"])
+    update_ad(aid, fn)
+    if not ids:
+        raise HTTPException(400, "الموشن بيتستحضر بالفعل")
+    threading.Thread(target=run_ad_motion, args=(aid, ids), daemon=True).start()
     return ad_response(aid)
 
 
@@ -6950,6 +7017,8 @@ def reset_stuck_prod() -> None:
                     s.update(frame_status="failed", frame_error="اتقطع لما السيرفر اتقفل. ارسم تاني")
                 if s.get("comp_status") == "working":
                     s.update(comp_status="failed", comp_error="اتقطع لما السيرفر اتقفل. استخرج تاني")
+                if s.get("motion_status") == "working":
+                    s.update(motion_status="failed", motion_error="اتقطع لما السيرفر اتقفل. استحضر تاني")
                 for c in s.get("components") or []:
                     if c.get("status") == "working":
                         c.update(status="failed", error="اتقطع لما السيرفر اتقفل")

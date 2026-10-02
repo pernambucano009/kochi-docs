@@ -494,3 +494,56 @@ def mock_scene_components(scenes: list[dict]) -> dict:
                         "components": [{"name": "الممثل", "kind": "character", "description": "شاب", "animation": "ثابت"},
                                        {"name": "كارت سعر", "kind": "graphic", "description": "كارت أبيض", "animation": "بينط من تحت"}]}
                        for s in scenes]}
+
+
+# ================================================================ استحضار الموشن جرافيك للقطات التنفيذ
+
+MOTION_FORMAT = """{
+  "shots": [
+    {"id": "رقم اللقطة زي ما هو",
+     "motion_graphics": "الموشن جرافيك في لقطة كوتشي بالتفصيل (بالعربي): كل عنصر متحرك، دخوله وحركته وخروجه، التوقيت جوه اللقطة (من ثانية كام لكام)، الاتجاه والسرعة والـ easing، والانتقال للقطة اللي بعدها",
+     "motion_prompt": "English description of the same motion-graphics animation for image/video models",
+     "components": [
+       {"name": "اسم العنصر في نسخة كوتشي", "kind": "graphic | text | ui | icon | effect | logo",
+        "from": "العنصر اللي يقابله في الإعلان الأصلي",
+        "description": "شكله ودوره",
+        "image_prompt": "English prompt to create this element alone, isolated on a plain flat background, in the ad style",
+        "animation": "حركته بالتفصيل"}
+     ]}
+  ]
+}"""
+
+
+def motion_messages(h: dict, items: list[dict], with_video: bool) -> list[dict]:
+    """items: لكل لقطة من التنفيذ، اللقطة نفسها والمشهد الأصلي المقابل (بوقته ومكوناته)."""
+    rows = []
+    for it in items:
+        s, o = it["shot"], it.get("orig") or {}
+        rows.append(
+            f"### لقطة كوتشي id={s['id']} (رقم {s.get('n')}، {s.get('seconds', '')} ثانية)\n"
+            f"اللي بيحصل: {s.get('visual', '')}\nكلام على الشاشة: {s.get('on_screen_text', '') or '—'}\n"
+            f"الموشن المكتوب لها دلوقتي: {s.get('motion_notes', '') or '—'}\n"
+            f"المكونات الحالية: {', '.join(c.get('name', '') for c in s.get('components') or []) or '—'}\n"
+            + (f"المشهد الأصلي المقابل: رقم {o.get('n')} من {o.get('start', 0):.1f} لـ {o.get('end', 0):.1f} ثانية في الفيديو. "
+               f"{o.get('visual', '')}\nالموشن في الأصلي (من التحليل): {o.get('motion_graphics', '') or '—'}\n"
+               f"مكونات الأصلي: {json.dumps(o.get('components') or [], ensure_ascii=False)}\n" if o else "مفيش مشهد أصلي مقابل.\n"))
+    text = (
+        "أنت موشن ديزاينر لإعلانات كوتشي. "
+        + ("اتفرج على الإعلان الأصلي المرفق، وركّز في كل مشهد أصلي مذكور بوقته تحت. " if with_video else "")
+        + "المطلوب: تستحضر الموشن جرافيك بتاع كل مشهد أصلي وتطبّقه على لقطة كوتشي المقابلة: نفس العناصر المتحركة بوظيفتها، "
+        "نفس طريقة الدخول والحركة والخروج، نفس التوقيت والإيقاع والانتقالات، بس بمحتوى كوتشي "
+        "(شاشات تطبيق كوتشي، لوجو كوتشي، كلام كوتشي، ألوان البراند). لو المشهد الأصلي مفيهوش موشن جرافيك خالص، "
+        "اكتب الحركة والانتقال بس ورجّع components فاضية.\n"
+        "components = عناصر الموشن جرافيك بس (مش الشخصيات ولا الخلفيات)، ومتكررش عنصر موجود في المكونات الحالية بنفس الاسم.\n\n"
+        f"راس الإعلان:\n{header_text(h)}\n\n" + "\n".join(rows) + "\n"
+        f"رجّع JSON بس بالشكل ده (لقطة لكل id):\n{MOTION_FORMAT}"
+    )
+    return [{"role": "user", "content": text}]
+
+
+def mock_motion(items: list[dict]) -> dict:
+    return {"shots": [{"id": it["shot"]["id"], "motion_graphics": f"مستحضر من المشهد {(it.get('orig') or {}).get('n', '؟')}: كارت كوتشي بيطلع من الموبايل",
+                       "motion_prompt": "A KOCHI card slides out of the phone with a soft bounce.",
+                       "components": [{"name": "كارت كوتشي متحرك", "kind": "graphic", "from": "كارت سعر", "description": "كارت أبيض بلوجو كوتشي",
+                                       "image_prompt": "A white KOCHI card UI element.", "animation": "بيطلع من الموبايل ويتنطط"}]}
+                      for it in items]}
