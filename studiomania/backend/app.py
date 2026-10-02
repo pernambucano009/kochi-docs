@@ -6420,6 +6420,15 @@ def style_ref_urls(header: dict, limit: int) -> list[str]:
     return [atlas.reference_url(f) for f in files]
 
 
+AD_FRAME_REFS = 16  # أقصى عدد صور مرجعية لموديل الصور
+
+
+def ref_comps(shot: dict, limit: int) -> list[dict]:
+    """المكونات اللي ليها صورة وداخلة في اللقطة، بالترتيب اللي بيتبعت للموديل: اللي انت رافعها الأول."""
+    comps = [c for c in shot.get("components") or [] if c.get("use", True) and c.get("image")]
+    return sorted(comps, key=lambda c: not is_uploaded(c.get("image")))[:limit]
+
+
 def run_ad_frame(aid: str, sid: str) -> None:
     try:
         with closing(db()) as conn:
@@ -6435,8 +6444,14 @@ def run_ad_frame(aid: str, sid: str) -> None:
             w, hh = size.split("x")
             mock_image(dest, f"{int(w) // 2}x{int(hh) // 2}", f"shot {s['n']}", s["n"])
         else:
-            url = atlas.generate_image(carousel_settings()["image_family"], az.frame_prompt(h, s), size,
-                                       auth.get_setting("series_frame_quality") or "medium", style_ref_urls(h, 4) or None)
+            # صور المكونات نفسها (شاشات كوتشي، اللوجو، الشخصيات...) مراجع أساسية، وبعدها صور الستايل للشكل العام
+            comps = ref_comps(s, AD_FRAME_REFS - 2)
+            comp_dir = prod_dir(aid, "comps")
+            comps = [c for c in comps if (comp_dir / c["image"]).exists()]
+            styles = style_ref_urls(h, min(4, AD_FRAME_REFS - len(comps)))
+            refs = [atlas.reference_url(comp_dir / c["image"]) for c in comps] + styles
+            url = atlas.generate_image(carousel_settings()["image_family"], az.frame_prompt(h, s, comps, len(styles)), size,
+                                       auth.get_setting("series_frame_quality") or "medium", refs or None)
             atlas.download(url, dest)
         def done(d):
             x = find_pshot(d["prod"], sid)
@@ -6703,8 +6718,7 @@ def run_ad_take(aid: str, sid: str, tid: str) -> None:
             pid = t.get("prediction_id")
             if not pid:
                 frames, comps = prod_dir(aid, "frames"), prod_dir(aid, "comps")
-                refs = [frames / s["frame"]] + [comps / c["image"] for c in s.get("components") or []
-                                                 if c.get("use", True) and c.get("image")][:AD_MAX_REFS - 1]
+                refs = [frames / s["frame"]] + [comps / c["image"] for c in ref_comps(s, AD_MAX_REFS - 1)]
                 body = {
                     "model": series_settings()["video_model"], "prompt": t["prompt"],
                     "reference_images": [atlas.upload_media(seedance_ref(x)) for x in refs if x.exists()],
@@ -6727,11 +6741,10 @@ def queue_ad_take(aid: str, sid: str) -> None:
         s = find_pshot(p, sid)
         if not s.get("frame"):
             raise HTTPException(400, f"اللقطة {s['n']} ملهاش ستوري بورد")
-        n_comp = len([c for c in s.get("components") or [] if c.get("use", True) and c.get("image")][:AD_MAX_REFS - 1])
         s.setdefault("takes", []).append({
             "id": tid, "file": None, "status": "queued", "error": None, "approved": False, "duration": None,
             "gen_duration": int(min(atlas.MAX_DURATION, max(atlas.MIN_DURATION, math.ceil(float(s.get("seconds") or 4))))),
-            "prompt": az.video_prompt(p["header"], s, n_comp), "created_at": now()})
+            "prompt": az.video_prompt(p["header"], s, ref_comps(s, AD_MAX_REFS - 1)), "created_at": now()})
         if not s.get("chosen"):
             s["chosen"] = tid
     update_ad(aid, fn)

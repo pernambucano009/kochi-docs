@@ -337,7 +337,25 @@ def header_text(h: dict) -> str:
     return "\n".join(p for p in parts if p)
 
 
-def frame_prompt(h: dict, shot: dict) -> str:
+def frame_prompt(h: dict, shot: dict, ref_comps: list[dict] | None = None, n_style: int = 0) -> str:
+    """برومبت صورة الستوري بورد. ref_comps = المكونات اللي صورها رايحة للموديل بنفس الترتيب (أول الصور)،
+    وبعدها n_style صورة ستايل."""
+    ref_comps = ref_comps or []
+    with_img = {c.get("id") for c in ref_comps}
+    rest = [c for c in shot.get("components") or [] if c.get("use", True) and c.get("id") not in with_img]
+    refs_txt = ""
+    if ref_comps:
+        refs_txt = ("REFERENCE IMAGES — these are the REAL brand assets of this ad. Put each one into the frame EXACTLY as it is "
+                    "(same screen content and layout, same logo, same face and outfit, same colors and text). Do not redesign them, "
+                    "do not replace them, and do not invent any other app screens, logos or brand marks:\n"
+                    + "\n".join(f"- Image {i + 1} = {c.get('name')}: {c.get('description') or c.get('image_prompt') or ''}".rstrip(": ")
+                                 + (f" (motion: {c['animation']})" if c.get("animation") else "")
+                                 for i, c in enumerate(ref_comps)))
+        if n_style:
+            refs_txt += (f"\nImages {len(ref_comps) + 1}-{len(ref_comps) + n_style} are visual-style references only "
+                         "(look, lighting, palette). Do not copy their content.")
+    elif n_style:
+        refs_txt = "The reference images are visual-style references only (look, lighting, palette). Do not copy their content."
     return "\n".join(x for x in [
         f"Storyboard frame for a {h.get('aspect', '9:16')} commercial shot. Polished, like a real frame grab from the final ad.",
         header_text(h),
@@ -345,10 +363,11 @@ def frame_prompt(h: dict, shot: dict) -> str:
         f"Framing / camera: {shot.get('shot', '')} {shot.get('camera', '')}".strip(),
         f"On-screen graphics or text in this shot: {shot['on_screen_text']}" if shot.get("on_screen_text") else "",
         f"Motion graphics in this shot (show them mid-animation, at their key pose): {shot['motion_prompt']}" if shot.get("motion_prompt") else "",
-        ("Elements that must appear in this frame (including motion-graphics elements, shown mid-animation): "
-         + "; ".join(f"{c.get('name')}: {c.get('image_prompt') or c.get('description')}" for c in shot.get("components") or [] if c.get("use", True))
-         ) if shot.get("components") else "",
+        refs_txt,
+        ("Other elements to draw: " + "; ".join(f"{c.get('name')}: {c.get('image_prompt') or c.get('description')}" for c in rest)) if rest else "",
         f"Details: {shot.get('prompt', '')}" if shot.get("prompt") else "",
+        ("Any app screen or logo in the frame must be one of the reference images above."
+         if any(c.get("kind") in ("ui", "logo") for c in ref_comps) else ""),
     ] if x)
 
 
@@ -397,10 +416,15 @@ def component_prompt(h: dict, comp: dict) -> str:
     ] if x)
 
 
-def video_prompt(h: dict, shot: dict, n_components: int) -> str:
+def video_prompt(h: dict, shot: dict, ref_comps: list[dict] | int = 0) -> str:
+    comps = ref_comps if isinstance(ref_comps, list) else []
+    n = len(comps) if comps else int(ref_comps or 0)
     refs = "Reference image 1 is the storyboard frame: keep its composition."
-    if n_components:
-        refs += f" Reference images 2-{n_components + 1} are the elements of the shot: use them exactly as they look."
+    if comps:
+        refs += (" The next reference images are the real brand assets of the shot, use them exactly as they look "
+                 "(no other app screens or logos): " + "; ".join(f"image {i + 2} = {c.get('name')}" for i, c in enumerate(comps)) + ".")
+    elif n:
+        refs += f" Reference images 2-{n + 1} are the elements of the shot: use them exactly as they look."
     return "\n".join(x for x in [
         shot.get("assembly_prompt") or shot.get("prompt") or shot.get("visual", ""),
         f"Motion graphics animation: {shot['motion_prompt']}" if shot.get("motion_prompt") and not shot.get("assembly_prompt") else "",

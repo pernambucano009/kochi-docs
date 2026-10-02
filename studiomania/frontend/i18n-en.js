@@ -1013,6 +1013,7 @@ window.I18N_EN = {
   "مفيش ستايلات لسه. ضيف من 📚 المكتبة صور رسومات عاجبك ستايلها.": "No styles yet. Add drawings whose style you like from 📚 Library.",
   "رسومات عاجبك ستايلها (الخطوط والأشكال والتظليل). البرنامج بياخد طريقة الرسم بس، ويرسم شخصيات جديدة بألوان كوتشي.": "Drawings whose style you like (lines, shapes, shading). Only the drawing style is used: new characters are drawn in KOCHI colors.",
   "اسم الستايل": "Style name",
+  "🧩 الرسم بيستخدم صور {0} مكون زي ما هي": "🧩 Drawing uses {0} component images as they are",
   "⬆ من عندك": "⬆ Yours",
   "كل المكونات ليها صور ✅": "All components have images ✅",
   "هيولّد صور لـ {0} مكون ملهمش صورة. المكونات اللي ليها صورة ({1})، ومنها اللي انت رافعها، مش هتتلمس. تكمل؟": "This generates images for {0} components without one. Components that already have an image ({1}), including the ones you uploaded, won't be touched. Continue?",

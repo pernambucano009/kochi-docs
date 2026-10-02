@@ -679,6 +679,8 @@ function renderAdProd() {
           <button class="btn sm" data-p="frame" ${fbusy ? "disabled" : ""}>🎨 ${s.frame_url ? "ارسم تاني" : "ارسم"}</button>
           <button class="btn sm ${s.approved ? "" : "primary"}" data-p="approve">${s.approved ? "✅ معتمدة" : "✅ اعتمد"}</button>
         </div>
+        ${(() => { const n = s.components.filter((c) => c.use !== false && c.image_url).length;
+          return n ? `<p class="muted" style="font-size:12px;margin:4px 0 0">🧩 الرسم بيستخدم صور ${n} مكون زي ما هي</p>` : ""; })()}
       </div>
       <div class="body">
         <header><b class="n">${s.n}</b><label class="muted">المدة <input type="number" min="1" max="15" step="0.5" value="${s.seconds}" data-pf="seconds" style="width:64px"> ث</label></header>
