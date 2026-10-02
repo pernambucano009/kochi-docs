@@ -160,7 +160,7 @@ function renderAdSettings() {
   $("adStylePick").innerHTML = `<button type="button" class="ad-style-card ${!st.style_id ? "sel" : ""}" data-pick-style=""><span class="ph">∅</span><b>من غير ستايل</b></button>` +
     adx.styles.map((s) => `<button type="button" class="ad-style-card ${s.id === st.style_id ? "sel" : ""}" data-pick-style="${s.id}">
       ${s.images[0] ? `<img src="${s.images[0]}" alt="">` : `<span class="ph">🎨</span>`}<b data-no-i18n>${adEsc(s.name)}</b></button>`).join("");
-  $("adReanalyze").disabled = a.status === "working" || a.status === "queued";
+  $("adReanalyze").disabled = $("adReedit").disabled = a.status === "working" || a.status === "queued";
   $("adReadapt").disabled = a.adapt_status === "working" || !a.analysis;
 }
 
@@ -182,24 +182,154 @@ $("adList").addEventListener("click", (e) => {
   const li = e.target.closest("[data-ad]");
   if (li) openAd(li.dataset.ad).catch((err) => toast(err.message, true));
 });
-$("adFile").addEventListener("change", async (e) => {
+// الفيديو بيفتح في محرر صغير (قص وكروب) قبل ما يترفع
+$("adFile").addEventListener("change", (e) => {
   const f = e.target.files[0];
   e.target.value = "";
-  if (!f) return;
-  const form = new FormData();
-  form.append("file", f);
-  try {
-    toast(`⏳ بيرفع ${f.name}...`);
-    const a = await api("/api/ads", { method: "POST", body: form });
-    adx.list = await api("/api/ads");
-    adx.cur = a;
-    adx.tab = "analysis";
-    adx.view = "ad";
-    storageSet(AD_KEY, a.id);
-    renderAds();
-    toast("✅ اترفع. التحليل بدأ وبعده الاقتراح لكوتشي");
-  } catch (err) { toast(err.message, true); }
+  if (f) openAdEditor({ file: f });
 });
+async function uploadAd(file, edit) {
+  const form = new FormData();
+  form.append("file", file);
+  if (edit.start != null) form.append("trim_start", edit.start);
+  if (edit.end != null) form.append("trim_end", edit.end);
+  if (edit.crop) form.append("crop", edit.crop);
+  toast(`⏳ بيرفع ${file.name}...`);
+  const a = await api("/api/ads", { method: "POST", body: form });
+  adx.list = await api("/api/ads");
+  adx.cur = a;
+  adx.tab = "analysis";
+  adx.view = "ad";
+  storageSet(AD_KEY, a.id);
+  renderAds();
+  toast("✅ اترفع. التحليل بدأ وبعده الاقتراح لكوتشي");
+}
+
+// ---------- محرر القص والكروب ----------
+const aed = { file: null, aid: null, url: null, dur: 0, start: 0, end: 0, crop: null, ratio: "none", drag: null, stopAt: null };
+const aedFmt = (t) => `${Math.floor(t / 60)}:${(t % 60).toFixed(1).padStart(4, "0")}`;
+function openAdEditor({ file = null, ad = null }) {
+  aed.file = file;
+  aed.aid = ad?.id || null;
+  if (aed.url?.startsWith("blob:")) URL.revokeObjectURL(aed.url);
+  aed.url = file ? URL.createObjectURL(file) : ad.original_url;
+  const prev = ad?.source?.edit || {};
+  aed.start = prev.start || 0;
+  aed.endWanted = prev.end || null;
+  aed.crop = prev.crop ? { x: prev.crop[0], y: prev.crop[1], w: prev.crop[2], h: prev.crop[3] } : null;
+  aed.ratio = aed.crop ? "free" : "none";
+  const v = $("adEdVideo");
+  v.src = aed.url;
+  $("adEdGo").textContent = file ? "✅ تمام، ارفع وحلّل" : "✅ طبّق وحلّل من جديد";
+  $("adEdInfo").textContent = file ? file.name : ad.name;
+  $("adEditDialog").showModal();
+}
+$("adEdVideo").addEventListener("loadedmetadata", () => {
+  const v = $("adEdVideo");
+  aed.dur = v.duration || 0;
+  aed.end = Math.min(aed.endWanted || aed.dur, aed.dur);
+  aed.A = v.videoWidth / v.videoHeight;
+  v.currentTime = aed.start;
+  renderAdEditor();
+});
+$("adEdVideo").addEventListener("timeupdate", () => {
+  const v = $("adEdVideo");
+  if (aed.stopAt != null && v.currentTime >= aed.stopAt) { v.pause(); aed.stopAt = null; }
+  renderAdTimes();
+});
+function renderAdTimes() {
+  const t = $("adEdVideo").currentTime || 0;
+  $("adEdStartLbl").textContent = `⟦ ${aedFmt(aed.start)}`;
+  $("adEdEndLbl").textContent = `${aedFmt(aed.end)} ⟧`;
+  $("adEdNowLbl").textContent = `${aedFmt(t)} · ${aedFmt(Math.max(0, aed.end - aed.start))}`;
+  if (document.activeElement !== $("adEdSeek")) $("adEdSeek").value = aed.dur ? Math.round((t / aed.dur) * 1000) : 0;
+}
+function renderAdEditor() {
+  renderAdTimes();
+  document.querySelectorAll("#adEdRatios [data-r]").forEach((b) => b.classList.toggle("active", b.dataset.r === String(aed.ratio)));
+  const box = $("adEdCrop");
+  box.hidden = !aed.crop;
+  if (!aed.crop) return;
+  const W = $("adEdVideo").clientWidth, H = $("adEdVideo").clientHeight;
+  Object.assign(box.style, { left: `${aed.crop.x * W}px`, top: `${aed.crop.y * H}px`, width: `${aed.crop.w * W}px`, height: `${aed.crop.h * H}px` });
+}
+window.addEventListener("resize", () => { if ($("adEditDialog").open) renderAdEditor(); });
+$("adEdSeek").addEventListener("input", () => { $("adEdVideo").currentTime = (Number($("adEdSeek").value) / 1000) * aed.dur; });
+$("adEdSetStart").onclick = () => { aed.start = Math.min($("adEdVideo").currentTime, aed.end - 0.5); renderAdTimes(); };
+$("adEdSetEnd").onclick = () => { aed.end = Math.max($("adEdVideo").currentTime, aed.start + 0.5); renderAdTimes(); };
+$("adEdResetTrim").onclick = () => { aed.start = 0; aed.end = aed.dur; renderAdTimes(); };
+$("adEdPlay").onclick = () => {
+  const v = $("adEdVideo");
+  v.currentTime = aed.start;
+  aed.stopAt = aed.end;
+  v.play().catch(() => {});
+};
+// مقاس الكروب: نسبة العرض للطول بالبكسل؛ بنحسبها ككسور من الصورة
+function fitCrop(r) {
+  const A = aed.A || 1;
+  let w = 1, h = 1;
+  if (r < A) w = r / A; else h = A / r;
+  return { x: (1 - w) / 2, y: (1 - h) / 2, w, h };
+}
+$("adEdRatios").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-r]");
+  if (!b) return;
+  aed.ratio = b.dataset.r === "none" || b.dataset.r === "free" ? b.dataset.r : Number(b.dataset.r);
+  if (aed.ratio === "none") aed.crop = null;
+  else if (aed.ratio === "free") aed.crop = aed.crop || { x: 0.05, y: 0.05, w: 0.9, h: 0.9 };
+  else aed.crop = fitCrop(aed.ratio);
+  renderAdEditor();
+});
+$("adEdCrop").addEventListener("pointerdown", (e) => {
+  e.preventDefault();
+  const W = $("adEdVideo").clientWidth, H = $("adEdVideo").clientHeight;
+  aed.drag = { h: e.target.dataset.h || "move", sx: e.clientX, sy: e.clientY, c0: { ...aed.crop }, W, H };
+  $("adEdCrop").setPointerCapture(e.pointerId);
+});
+$("adEdCrop").addEventListener("pointermove", (e) => {
+  const d = aed.drag;
+  if (!d) return;
+  const dx = (e.clientX - d.sx) / d.W, dy = (e.clientY - d.sy) / d.H, c = d.c0;
+  const cl = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  if (d.h === "move") {
+    aed.crop = { ...c, x: cl(c.x + dx, 0, 1 - c.w), y: cl(c.y + dy, 0, 1 - c.h) };
+  } else {
+    // الركن المقابل ثابت
+    const left = d.h.includes("w"), top = d.h.includes("n");
+    const ax = left ? c.x + c.w : c.x, ay = top ? c.y + c.h : c.y;
+    let w = cl(left ? c.w - dx : c.w + dx, 0.05, left ? ax : 1 - ax);
+    let h = cl(top ? c.h - dy : c.h + dy, 0.05, top ? ay : 1 - ay);
+    if (typeof aed.ratio === "number") {
+      const k = (aed.A || 1) / aed.ratio; // h = w * A / r
+      h = w * k;
+      const maxH = top ? ay : 1 - ay;
+      if (h > maxH) { h = maxH; w = h / k; }
+    }
+    aed.crop = { x: left ? ax - w : ax, y: top ? ay - h : ay, w, h };
+  }
+  renderAdEditor();
+});
+$("adEdCrop").addEventListener("pointerup", () => (aed.drag = null));
+$("adEdCancel").onclick = () => $("adEditDialog").close();
+$("adEditDialog").addEventListener("close", () => { $("adEdVideo").pause(); });
+$("adEdGo").onclick = () => busyButton($("adEdGo"), "⏳ بيرفع ويقص...", async () => {
+  const full = aed.start < 0.05 && aed.end > aed.dur - 0.05;
+  const c = aed.crop;
+  const edit = {
+    start: full ? null : Number(aed.start.toFixed(3)),
+    end: full ? null : Number(aed.end.toFixed(3)),
+    crop: c ? [c.x, c.y, c.w, c.h].map((v) => v.toFixed(4)).join(",") : "",
+  };
+  if (aed.file) await uploadAd(aed.file, edit);
+  else {
+    if (!confirm("القص والكروب الجديد هيتطبق على الفيديو الأصلي، والتحليل والاقتراح هيتعملوا من الأول. تكمّل؟")) return;
+    adx.cur = await api(`/api/ads/${aed.aid}/edit`, { method: "POST", ...jsonBody(edit) });
+    adx.tab = "analysis";
+    renderAds();
+  }
+  $("adEditDialog").close();
+});
+
 $("adTabs").addEventListener("click", (e) => {
   const b = e.target.closest("[data-t]");
   if (!b) return;
@@ -310,6 +440,7 @@ function reanalyze() {
   });
 }
 $("adReanalyze").onclick = reanalyze;
+$("adReedit").onclick = () => openAdEditor({ ad: adx.cur });
 $("adDelete").onclick = async () => {
   if (!confirm(`تحذف «${adx.cur.name}» وتحليله؟`)) return;
   try {

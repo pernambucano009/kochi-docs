@@ -5607,6 +5607,7 @@ def ad_to_dict(r: sqlite3.Row, d: dict) -> dict:
     return {
         "id": aid, "name": r["name"], "created_at": r["created_at"],
         "source": d.get("source"), "source_url": f"{base}/{d['source']['file']}" if d.get("source") else None,
+        "original_url": f"{base}/{d['source'].get('original') or d['source']['file']}" if d.get("source") else None,
         "status": d.get("status", "idle"), "step": d.get("step"), "error": d.get("error"),
         "analysis": {**analysis, "scenes": scenes} if analysis else None,
         "audio": d.get("audio"), "audio_error": d.get("audio_error"), "audio_tech": d.get("audio_tech"),
@@ -5634,20 +5635,80 @@ def list_ads():
     return out
 
 
+def parse_ad_edit(start: float | None, end: float | None, crop: str) -> dict | None:
+    """القص والكروب من المحرر الصغير: الكروب كسور من الصورة (x,y,w,h بين 0 و1)."""
+    edit = {}
+    if start is not None and start > 0.01:
+        edit["start"] = round(float(start), 3)
+    if end is not None and end > 0:
+        edit["end"] = round(float(end), 3)
+    if crop:
+        try:
+            x, y, w, h = (max(0.0, min(1.0, float(v))) for v in crop.split(","))
+        except ValueError as exc:
+            raise HTTPException(400, "الكروب مش مظبوط") from exc
+        if w < 0.999 or h < 0.999:
+            if w < 0.05 or h < 0.05:
+                raise HTTPException(400, "الكروب صغير أوي")
+            edit["crop"] = [round(x, 4), round(y, 4), round(min(w, 1 - x), 4), round(min(h, 1 - y), 4)]
+    return edit or None
+
+
+def apply_ad_edit(original: Path, out: Path, edit: dict | None) -> None:
+    """يطلّع نسخة مقصوصة ومعمولها كروب من الفيديو الأصلي (بجودة عالية)."""
+    if not edit:
+        shutil.copyfile(original, out)
+        return
+    args = [ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y"]
+    if edit.get("start"):
+        args += ["-ss", f"{edit['start']:.3f}"]
+    if edit.get("end"):
+        args += ["-to", f"{edit['end']:.3f}"]
+    args += ["-i", str(original)]
+    if edit.get("start") and edit.get("end"):
+        # -to بعد -ss قبل الـ input بيتحسب من أول الملف، فبنحوّله لمدة
+        i = args.index("-to")
+        args[i], args[i + 1] = "-t", f"{edit['end'] - edit['start']:.3f}"
+    vf = []
+    if edit.get("crop"):
+        x, y, w, h = edit["crop"]
+        vf.append(f"crop=trunc(iw*{w}/2)*2:trunc(ih*{h}/2)*2:trunc(iw*{x}):trunc(ih*{y})")
+    if vf:
+        args += ["-vf", ",".join(vf)]
+    args += ["-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k",
+             "-movflags", "+faststart", str(out)]
+    r = subprocess.run(args, capture_output=True, text=True, timeout=900)
+    if r.returncode != 0 or not out.exists():
+        raise HTTPException(400, f"مقدرتش أقص الفيديو: {r.stderr[-300:]}")
+
+
+def ad_source_from(folder: Path, original: str, edit: dict | None, display_name: str | None) -> dict:
+    src_name = original if not edit else "source-edit.mp4"
+    if edit:
+        apply_ad_edit(folder / original, folder / src_name, edit)
+    try:
+        info = media_info(folder / src_name)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(400, f"مقدرتش أقرا الفيديو: {exc}") from exc
+    return {"file": src_name, "original": original, "edit": edit, "name": display_name, "duration": round(info.duration, 2),
+            "width": info.width, "height": info.height, "has_audio": info.has_audio}
+
+
 @app.post("/api/ads")
-def create_ad(file: UploadFile = File(...), name: str = Form("")):
-    """ترفع إعلان مرجعي والتحليل بيبدأ لوحده (الصورة والصوت، وبعدها اقتراح لكوتشي)."""
+def create_ad(file: UploadFile = File(...), name: str = Form(""), trim_start: float | None = Form(None),
+              trim_end: float | None = Form(None), crop: str = Form("")):
+    """ترفع إعلان مرجعي (ولو عايز تقصه أو تعمله كروب قبلها) والتحليل بيبدأ لوحده، وبعده اقتراح لكوتشي."""
     aid = uuid.uuid4().hex[:12]
     folder = ad_dir(aid)
-    fname = save_upload(file, VIDEO_EXTENSIONS, folder, "source")
+    fname = save_upload(file, VIDEO_EXTENSIONS, folder, "original")
     try:
-        info = media_info(folder / fname)
-    except Exception as exc:  # noqa: BLE001
+        source = ad_source_from(folder, fname, parse_ad_edit(trim_start, trim_end, crop), file.filename)
+    except HTTPException:
         shutil.rmtree(folder, ignore_errors=True)
-        raise HTTPException(400, f"مقدرتش أقرا الفيديو: {exc}") from exc
-    data = {"source": {"file": fname, "name": file.filename, "duration": round(info.duration, 2),
-                       "width": info.width, "height": info.height, "has_audio": info.has_audio},
-            "status": "queued", "settings": {"duration": min(60, max(10, round(info.duration))), "format": "9:16 ريلز وتيك توك",
+        raise
+    info = source
+    data = {"source": source,
+            "status": "queued", "settings": {"duration": min(60, max(10, round(info["duration"]))), "format": "9:16 ريلز وتيك توك",
                                              "language": "اللهجة السعودية"}}
     with closing(db()) as conn, conn:
         conn.execute("INSERT INTO ads (id, name, data, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
@@ -5699,6 +5760,29 @@ def delete_ad(aid: str):
         conn.execute("DELETE FROM ads WHERE id = ?", (aid,))
     shutil.rmtree(ADS_DIR / Path(aid).name, ignore_errors=True)
     return {"ok": True}
+
+
+class AdEditIn(BaseModel):
+    start: float | None = None
+    end: float | None = None
+    crop: str = ""
+
+
+@app.post("/api/ads/{aid}/edit")
+def edit_ad(aid: str, body: AdEditIn):
+    """قص وكروب جديد من الفيديو الأصلي، وبعدها التحليل والاقتراح بيتعملوا من الأول."""
+    with closing(db()) as conn:
+        _, d = ad_row(conn, aid)
+    if d.get("status") in ("queued", "working"):
+        raise HTTPException(400, "استنى لما التحليل اللي شغال يخلص")
+    folder = ad_dir(aid)
+    original = d["source"].get("original") or d["source"]["file"]
+    source = ad_source_from(folder, original, parse_ad_edit(body.start, body.end, body.crop), d["source"].get("name"))
+    for f in (folder / "frames").glob("*.jpg"):
+        f.unlink(missing_ok=True)
+    update_ad(aid, lambda d: d.update(source=source, status="queued", error=None, analysis=None, audio=None, audio_error=None))
+    threading.Thread(target=run_ad_analysis, args=(aid,), daemon=True).start()
+    return ad_response(aid)
 
 
 @app.post("/api/ads/{aid}/analyze")

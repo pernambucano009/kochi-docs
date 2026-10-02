@@ -992,6 +992,7 @@
                 <div class="row wrap">
                   <button class="btn primary" id="adReadapt">✍️ اكتب الاقتراح من جديد بالإعدادات دي</button>
                   <button class="btn" id="adReanalyze">🔍 حلّل الإعلان تاني</button>
+                  <button class="btn" id="adReedit">✂️ قص وكروب من جديد</button>
                   <button class="btn danger" id="adDelete">🗑️ احذف الإعلان</button>
                 </div>
                 <label class="field ad-model">موديل تحليل الفيديو والصوت (لكل الإعلانات) <input type="text" id="adVideoModel" dir="ltr"></label>
@@ -1112,6 +1113,40 @@
     </div>
   </div>
   <div class="row gap-top"><button class="btn primary" id="brandSave">💾 احفظ</button></div>
+</dialog>
+<dialog class="bulk-dlg ad-edit-dlg" id="adEditDialog">
+  <div class="panel-head"><h2>✂️ قص وكروب قبل التحليل</h2><span class="muted" id="adEdInfo" data-no-i18n></span></div>
+  <div class="ad-ed-body">
+    <div class="ad-ed-stage"><div class="ad-ed-wrap" id="adEdWrap">
+      <video id="adEdVideo" playsinline preload="auto"></video>
+      <div class="ad-ed-crop" id="adEdCrop" hidden><i data-h="nw"></i><i data-h="ne"></i><i data-h="sw"></i><i data-h="se"></i></div>
+    </div></div>
+    <div class="ad-ed-side">
+      <h3 class="pane-h">⏱️ القص</h3>
+      <div class="ad-ed-times" dir="ltr"><span id="adEdStartLbl"></span><span id="adEdNowLbl"></span><span id="adEdEndLbl"></span></div>
+      <input type="range" id="adEdSeek" min="0" max="1000" value="0" dir="ltr">
+      <div class="row wrap">
+        <button class="btn sm" type="button" id="adEdSetStart">⟦ البداية من هنا</button>
+        <button class="btn sm" type="button" id="adEdSetEnd">النهاية هنا ⟧</button>
+        <button class="btn sm" type="button" id="adEdPlay">▶ شغّل الجزء</button>
+        <button class="btn sm" type="button" id="adEdResetTrim">↺ الفيديو كله</button>
+      </div>
+      <h3 class="pane-h">🔲 الكروب</h3>
+      <div class="row wrap" id="adEdRatios">
+        <button class="btn sm" type="button" data-r="none">من غير كروب</button>
+        <button class="btn sm" type="button" data-r="free">حر</button>
+        <button class="btn sm" type="button" data-r="0.5625">9:16</button>
+        <button class="btn sm" type="button" data-r="0.8">4:5</button>
+        <button class="btn sm" type="button" data-r="1">1:1</button>
+        <button class="btn sm" type="button" data-r="1.7778">16:9</button>
+      </div>
+      <p class="hint">اسحب المربع عشان تحركه، ومن الأركان عشان تكبّره أو تصغّره. اللي برة المربع (شريط الموبايل والحواف) بيتشال.</p>
+      <div class="row wrap ad-ed-acts">
+        <button class="btn primary" type="button" id="adEdGo">✅ تمام، ارفع وحلّل</button>
+        <button class="btn" type="button" id="adEdCancel">إلغاء</button>
+      </div>
+    </div>
+  </div>
 </dialog>
 <dialog class="bulk-dlg ser-gal-dlg" id="serGalDialog">
   <div class="panel-head"><h2>🎞️ فيديوهات الحلقة</h2><span class="muted" id="serGalCount"></span><button class="btn sm" id="serGalClose">إغلاق</button></div>
