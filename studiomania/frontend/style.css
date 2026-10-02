@@ -1142,3 +1142,8 @@ a.pl-link:hover { background: color-mix(in srgb, var(--ok) 24%, transparent); }
 #serRwManual { margin-top: 6px; }
 .ser-ep-row { align-items: flex-end; gap: 8px; }
 .ser-ep-row .field { flex: 1; min-width: 200px; }
+/* زراير الجملة قدام خانة الكتابة على نفس السطر */
+.rw-edit { display: flex; gap: 6px; align-items: center; }
+.rw-edit textarea { flex: 1; min-width: 0; }
+.rw-edit .wc, .rw-edit .rw-tools { padding-top: 0; }
+.rw-line > b { align-self: flex-end; padding: 0 0 8px; }

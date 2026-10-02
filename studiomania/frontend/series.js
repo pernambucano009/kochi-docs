@@ -222,9 +222,9 @@ function rwRowHtml(r) {
     <div class="rw-body">${old
       ? `<div class="old">«${escapeHtml(old.text)}» <span class="muted">· ${(old.end - old.start).toFixed(1)}ث</span></div>`
       : `<div class="old new-tag">جملة جديدة: هيتعمل لها لقطة وفيديو بعد ما تسجّل</div>`}
-      <textarea rows="1" placeholder="اكتب الجملة...">${escapeHtml(r.text)}</textarea></div>
-    <span class="wc" title="${old ? "عدد الكلمات: الجديد / القديم" : "وقتها تقريبًا"}"></span>
-    <span class="rw-tools"><button class="btn sm" data-rw-add title="جملة جديدة بعد دي">➕</button><button class="btn sm" data-rw-del title="شيل الجملة">🗑️</button></span></div>`;
+      <div class="rw-edit"><textarea rows="1" placeholder="اكتب الجملة...">${escapeHtml(r.text)}</textarea>
+        <span class="wc" title="${old ? "عدد الكلمات: الجديد / القديم" : "وقتها تقريبًا"}"></span>
+        <span class="rw-tools"><button class="btn sm" data-rw-add title="جملة جديدة بعد دي">➕</button><button class="btn sm" data-rw-del title="شيل الجملة">🗑️</button></span></div></div></div>`;
 }
 function renderRewrite() {
   const ep = ser.ep;
