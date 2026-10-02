@@ -24,7 +24,7 @@ async function loadBrandOptions() {
 function capCfg() {
   const d = mt.project.data;
   if (!d.captions || !d.captions.template) {
-    d.captions = { enabled: false, template: brand.options.default_template, ...brand.options.templates[brand.options.default_template], ...(d.captions || {}) };
+    d.captions = { enabled: true, template: brand.options.default_template, ...brand.options.templates[brand.options.default_template], ...(d.captions || {}) };
   }
   return d.captions;
 }
@@ -224,6 +224,14 @@ function renderTranscriptStatus() {
     st.className = "cap-status";
     st.textContent = "لسه الكلام متكتبش.";
     $("capTranscribe").textContent = "🎧 اكتب الكلام من التعليق الصوتي";
+    // الكابشن شغال: الكلام بيتكتب من التعليق الصوتي لوحده (مرة واحدة لكل صوت)
+    brand.autoTr ||= new Set();
+    if (capCfg().enabled && !brand.autoTr.has(voice.id)) {
+      brand.autoTr.add(voice.id);
+      api(`/api/audio/${voice.id}/transcribe`, { method: "POST" })
+        .then(() => { brand.tr[voice.id] = { status: "working", words: [] }; renderTranscriptStatus(); })
+        .catch(() => {});
+    }
   }
 }
 

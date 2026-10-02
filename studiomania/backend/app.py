@@ -2873,7 +2873,7 @@ threading.Thread(target=scheduler_loop, daemon=True).start()
 
 # ---------------------------------------------------------------- الكابشن واللوجو
 
-LOGO_DEFAULTS = {"enabled": True, "size": 18, "x": 92, "y": 4, "opacity": 0.9, "on_outro": True}
+LOGO_DEFAULTS = {"enabled": True, "size": 37, "x": 0, "y": 4, "opacity": 0.9, "on_outro": True}
 
 
 def transcript_of(row: sqlite3.Row) -> dict:
@@ -5429,6 +5429,18 @@ def approve_take(eid: str, take_id: str, approved: bool = True):
     return episode_response(eid)
 
 
+DEFAULT_MUSIC_NAME = "beat"  # الموسيقى اللي بتتحط في أي مونتاج جديد لو موجودة في المكتبة
+
+
+def default_music(conn: sqlite3.Connection) -> dict | None:
+    row = conn.execute("SELECT id FROM audio WHERE kind = 'music' AND lower(name) LIKE ? ORDER BY lower(name) = ? DESC, created_at DESC",
+                       (f"%{DEFAULT_MUSIC_NAME}%", DEFAULT_MUSIC_NAME)).fetchone()
+    if not row:
+        return None
+    return {"id": row["id"], "volume": 0.3, "delay": 0.0, "offset": 0.0, "length": None, "fade_out": True,
+            "parts": [{"delay": 0.0, "offset": 0.0, "length": None, "volume": 0.3}]}
+
+
 def stretch_take(src: Path, out: Path, start: float, have: float, need: float) -> None:
     """الفيديو أقصر من وقت اللقطة (بعد صوت جديد): نبطّأه لحد 1.3x، والباقي آخر فريم واقف."""
     k = min(1.3, need / max(have, 0.1))
@@ -5489,7 +5501,7 @@ def episode_to_editor(eid: str):
         pid = uuid.uuid4().hex[:12]
         pdata = {"name": label, "video_id": None, "coach_id": None, "clips": clips,
                  "voice": {"id": vid, "volume": 1.0, "delay": 0.0, "offset": 0.0, "length": None, "fade_out": False, "parts": []},
-                 "music": None, "outro": False, "outro_volume": 1.0, "captions": {}, "logo": {}}
+                 "music": default_music(conn), "outro": False, "outro_volume": 1.0, "captions": {}, "logo": {}}
         conn.execute("INSERT INTO projects (id, name, data, render_status, created_at, updated_at) VALUES (?, ?, ?, 'idle', ?, ?)",
                      (pid, label, json.dumps(pdata, ensure_ascii=False), now(), now()))
     update_episode(eid, lambda d: d.update(project_id=pid))

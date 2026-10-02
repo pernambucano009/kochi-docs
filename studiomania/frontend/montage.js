@@ -57,8 +57,15 @@ function fmtTC(t) {
   return `${p(Math.floor(s / 60))}:${p(s % 60)}:${p(f % FPS)}`;
 }
 
+// الموسيقى الافتراضية لأي مشروع جديد: «beat» من مكتبة الموسيقى لو موجودة
+const DEFAULT_MUSIC = "beat";
+function defaultMusic() {
+  const list = mt.music || [];
+  const a = list.find((x) => x.name.trim().toLowerCase() === DEFAULT_MUSIC) || list.find((x) => x.name.toLowerCase().includes(DEFAULT_MUSIC));
+  return a ? { id: a.id, volume: 0.3, delay: 0, offset: 0, length: null, fade_out: true, parts: [{ delay: 0, offset: 0, length: null, volume: 0.3 }] } : null;
+}
 function blankProject(name) {
-  return { name, coach_id: null, clips: [], voice: null, music: null, outro: true, outro_volume: 1 };
+  return { name, coach_id: null, clips: [], voice: null, music: defaultMusic(), outro: true, outro_volume: 1 };
 }
 
 async function initMontage() {
@@ -1651,6 +1658,7 @@ async function openMontageForVideo(videoId) {
   if (p) {
     mt.handoff = { refresh: true };
   } else {
+    mt.music = await api("/api/audio?kind=music");
     const draft = await api(`/api/videos/${videoId}/montage-draft`);
     const data = {
       ...blankProject(draft.name), name: draft.name, video_id: videoId, coach_id: draft.coach_id,

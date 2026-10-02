@@ -37,11 +37,11 @@ TEMPLATES = {
         "color": "#111111", "highlight": "#FF6B2C", "highlight_on": True, "box": True, "box_color": "#FFD400", "pop": False,
     },
     "kochi": {
-        "label": "كوتشي (برتقاني)", "font": "SM Changa", "size": 104, "y": 70, "words": 2,
-        "color": "#FFFFFF", "highlight": "#FF6B2C", "highlight_on": True, "box": False, "box_color": "#000000", "pop": True,
+        "label": "كوتشي", "font": "SM Changa", "size": 104, "y": 70, "words": 2,
+        "color": "#FFFFFF", "highlight": "#80DFCC", "highlight_on": True, "box": False, "box_color": "#000000", "pop": True,
     },
 }
-DEFAULT_TEMPLATE = "tiktok"
+DEFAULT_TEMPLATE = "kochi"
 
 
 def style_for(settings: dict) -> dict:
