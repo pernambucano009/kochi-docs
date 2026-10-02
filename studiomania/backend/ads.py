@@ -71,6 +71,7 @@ ADAPT_FORMAT = """{
      "components": [
        {"name": "اسم المكون في إعلان كوتشي", "kind": "character | prop | background | graphic | text | ui | icon | effect",
         "from": "اسم المكون اللي يقابله في المشهد الأصلي (أو فاضي لو جديد)",
+        "asset": "لو المكون ده شاشة تطبيق أو لوجو أو صورة المنتج: اسم الأصل الحقيقي من عقل الإعلان بالظبط (وإلا فاضي)",
         "description": "شكله ودوره في المشهد",
         "image_prompt": "English prompt to create this element alone, isolated on a plain flat background, in the ad style",
         "animation": "حركته في المشهد (زي حركة المكون الأصلي لو ليه أصل)"}
@@ -118,7 +119,8 @@ def with_media(messages: list[dict], data_url: str, filename: str) -> list[dict]
     return messages[:-1] + [msg]
 
 
-def adapt_messages(brand: dict, analysis: dict, audio: dict, settings: dict, style: dict | None, chat: list[dict]) -> list[dict]:
+def adapt_messages(brand: dict, analysis: dict, audio: dict, settings: dict, style: dict | None, chat: list[dict],
+                   brain: dict | None = None) -> list[dict]:
     style_txt = ""
     if style:
         style_txt = (f"الستايل البصري المختار «{style.get('name', '')}»:\n{style.get('notes') or ''}\n"
@@ -132,10 +134,13 @@ def adapt_messages(brand: dict, analysis: dict, audio: dict, settings: dict, sty
         f"تعليمات إضافية: {s['notes']}" if s.get("notes") else "",
     ]
     system = (
-        "أنت كريتيف دايركتور لبراند كوتشي. شغلتك تاخد إعلان مرجعي متفصّص وتقترح إعلان لكوتشي مستوحى منه "
+        f"أنت كريتيف دايركتور لبراند {(brain or {}).get('name') or 'كوتشي'}. شغلتك تاخد إعلان مرجعي متفصّص وتقترح إعلان لكوتشي مستوحى منه "
         "(نفس الذكاء والبناء والإحساس، مش نسخة)، مناسب للسوق السعودي والخليجي.\n\n"
-        f"عن كوتشي: {brand.get('about', '')}\nالجمهور: {brand.get('audience', '')}\n"
-        f"ألوان البراند: {brand.get('colors', '')}\n\n"
+        + (f"عقل الإعلان (المنتج وهويته وأصوله الحقيقية، التزم بيه بالظبط):\n{brain_text(brain)}\n"
+           "أي شاشة تطبيق أو لوجو أو صورة منتج في الإعلان لازم تكون من الأصول دي (اكتب اسمها في asset)، "
+           "ومتخترعش شاشات أو لوجوهات تانية. الألوان والثيم من عقل الإعلان.\n\n" if brain else
+           f"عن كوتشي: {brand.get('about', '')}\nالجمهور: {brand.get('audience', '')}\n"
+           f"ألوان البراند: {brand.get('colors', '')}\n\n")
         + style_txt
         + "تحليل الإعلان المرجعي (وكل مشهد بمكوناته وعناصر الموشن جرافيك وحركتها):\n" + json.dumps(analysis, ensure_ascii=False)[:40000] + "\n\n"
         + ("تحليل الصوت:\n" + json.dumps(audio, ensure_ascii=False)[:6000] + "\n\n" if audio else "")
@@ -309,7 +314,7 @@ def aspect_of(text: str) -> str:
     return "9:16"
 
 
-def header_from(adaptation: dict, style: dict | None, brand: dict, settings: dict) -> dict:
+def header_from(adaptation: dict, style: dict | None, brand: dict, settings: dict, brain: dict | None = None) -> dict:
     """راس الإعلان: الثوابت اللي بتدخل في كل برومبت عشان الإعلان كله يطلع بنفس الشكل."""
     a = adaptation or {}
     return {
@@ -319,7 +324,9 @@ def header_from(adaptation: dict, style: dict | None, brand: dict, settings: dic
         "style_id": (settings or {}).get("style_id"),
         "characters": a.get("cast", ""),
         "locations": a.get("locations", ""),
-        "palette": brand.get("colors", ""),
+        "palette": (brain or {}).get("palette") or brand.get("colors", ""),
+        "brand": brain_header(brain),
+        "brain_id": (brain or {}).get("id"),
         "rules": "Vertical social ad, consistent characters, wardrobe and lighting in every shot. No watermarks, no random text.",
         "aspect": aspect_of((settings or {}).get("format") or a.get("format") or ""),
     }
@@ -328,6 +335,7 @@ def header_from(adaptation: dict, style: dict | None, brand: dict, settings: dic
 def header_text(h: dict) -> str:
     parts = [
         f"AD: {h.get('title', '')}. CONCEPT: {h.get('concept', '')}",
+        f"PRODUCT / BRAND IDENTITY (stay strictly on-brand): {h['brand']}" if h.get("brand") else "",
         f"VISUAL STYLE (must match exactly): {h['style']}" if h.get("style") else "",
         f"CHARACTERS (keep identical in every shot): {h['characters']}" if h.get("characters") else "",
         f"LOCATIONS: {h['locations']}" if h.get("locations") else "",
@@ -412,6 +420,7 @@ def component_prompt(h: dict, comp: dict) -> str:
         comp.get("image_prompt") or comp.get("description", ""),
         f"Visual style: {h['style']}" if h.get("style") else "",
         f"Brand palette: {h['palette']}" if h.get("palette") and comp.get("kind") in ("graphic", "text", "ui", "icon", "effect") else "",
+        f"Brand identity: {h['brand']}" if h.get("brand") and comp.get("kind") in ("graphic", "text", "ui", "icon", "effect", "logo") else "",
         "Single isolated element centered on a plain flat light background, nothing else in the image, no watermark.",
     ] if x)
 
@@ -547,3 +556,71 @@ def mock_motion(items: list[dict]) -> dict:
                        "components": [{"name": "كارت كوتشي متحرك", "kind": "graphic", "from": "كارت سعر", "description": "كارت أبيض بلوجو كوتشي",
                                        "image_prompt": "A white KOCHI card UI element.", "animation": "بيطلع من الموبايل ويتنطط"}]}
                       for it in items]}
+
+
+# ================================================================ عقل الإعلان: المنتج وأصوله (شاشات، لوجو، صور المنتج) والهوية
+
+BRAIN_TYPES = {"app": "تطبيق موبايل", "physical": "منتج ملموس", "service": "خدمة"}
+
+BRAIN_FORMAT = """{
+  "palette": "ألوان البراند بالـ hex واسم ودور كل لون، مثلًا: #57B8AF teal (main accent), #EEECDA cream (backgrounds)",
+  "theme": "الثيم العام (فاتح / غامق، الإحساس، الزوايا، الظلال، المسافات)",
+  "typography": "الخطوط وشكلها (عريض، مستدير، ...)",
+  "ui_style": "English, prompt-ready description of the product's UI / visual identity so any generated screen or graphic stays on-brand",
+  "logo_description": "English description of the logo (shape, colors, wordmark) so it can be recognised",
+  "assets": [{"file": "اسم الملف زي ما هو", "name": "اسم قصير بالعربي (مثلًا: شاشة الرئيسية، شاشة المدربين، اللوجو)", "description": "إيه اللي في الصورة بالتفصيل بالعربي"}]
+}"""
+
+
+def brain_messages(brain: dict, files: list[str]) -> str:
+    return (
+        "أنت مصمم هوية ومدير فني. قدامك أصول منتج (لوجو، شاشات تطبيق، صور منتج) بنفس ترتيب أسامي الملفات دي: "
+        f"{', '.join(files)}.\n"
+        f"المنتج: {brain.get('name', '')} — {BRAIN_TYPES.get(brain.get('type'), '')} في مجال {brain.get('domain', '') or '؟'}. "
+        f"{brain.get('about', '')}\n"
+        "استنبط الهوية البصرية بالظبط من الصور (الألوان الحقيقية بالـ hex، الثيم، الخطوط، شكل الواجهة)، "
+        "ووصّف كل صورة لوحدها عشان نعرف نختار الشاشة المناسبة لأي مشهد في إعلان.\n"
+        f"رجّع JSON بس بالشكل ده:\n{BRAIN_FORMAT}"
+    )
+
+
+def brain_text(brain: dict | None) -> str:
+    """ملخص عقل الإعلان اللي بيدخل في كتابة الاقتراح."""
+    if not brain:
+        return ""
+    lines = [f"المنتج: {brain.get('name', '')} ({BRAIN_TYPES.get(brain.get('type'), '')})" + (f" — المجال: {brain['domain']}" if brain.get("domain") else "")]
+    for k, label in (("about", "عنه"), ("audience", "الجمهور"), ("rules", "قواعد لازم تتراعى"), ("palette", "الألوان"),
+                     ("theme", "الثيم"), ("typography", "الخطوط"), ("ui_style", "شكل الواجهة")):
+        if brain.get(k):
+            lines.append(f"{label}: {brain[k]}")
+    for kind, label in (("screens", "شاشات التطبيق الحقيقية المتاحة"), ("logos", "اللوجوهات المتاحة"), ("products", "صور المنتج المتاحة")):
+        items = brain.get(kind) or []
+        if items:
+            lines.append(f"{label} (استخدم الاسم بالظبط في asset):\n" + "\n".join(f"- {a.get('name') or a['file']}: {a.get('description', '')}" for a in items[:60]))
+    return "\n".join(lines)
+
+
+def brain_header(brain: dict | None) -> str:
+    """سطر الهوية (بالإنجليزي في الغالب) اللي بيدخل في راس الإعلان وكل برومبت صورة وفيديو."""
+    if not brain:
+        return ""
+    parts = [f"{brain.get('name', '')} — {({'app': 'mobile app', 'physical': 'physical product', 'service': 'service'}).get(brain.get('type'), '')}"
+             + (f", {brain['domain']}" if brain.get("domain") else ""),
+             brain.get("ui_style", ""), f"Theme: {brain['theme']}" if brain.get("theme") else "",
+             f"Typography: {brain['typography']}" if brain.get("typography") else "",
+             f"Logo: {brain['logo_description']}" if brain.get("logo_description") else ""]
+    return ". ".join(p.strip().rstrip(".") for p in parts if p and p.strip()) + "."
+
+
+MATCH_FORMAT = """{"matches": [{"id": "id المكون", "file": "اسم ملف الصورة المناسبة أو فاضي لو مفيش مناسبة"}]}"""
+
+
+def match_messages(comps: list[dict], assets: list[dict]) -> list[dict]:
+    text = (
+        "عندك مكونات من لقطات إعلان، وعندك الأصول الحقيقية للمنتج (شاشات / لوجو / صور منتج). "
+        "اختار لكل مكون الصورة الحقيقية الأنسب ليه من الأصول.\n"
+        "المكونات:\n" + "\n".join(f"- id={c['id']} ({c.get('kind')}) {c.get('name')}: {c.get('description', '')} {c.get('asset', '')}" for c in comps)
+        + "\n\nالأصول:\n" + "\n".join(f"- file={a['file']} [{a['kind']}] {a.get('name', '')}: {a.get('description', '')}" for a in assets)
+        + f"\n\nرجّع JSON بس:\n{MATCH_FORMAT}"
+    )
+    return [{"role": "user", "content": text}]

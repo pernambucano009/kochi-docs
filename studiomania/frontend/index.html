@@ -931,6 +931,7 @@
               <p class="hint">ارفع إعلان عاجبك، والبرنامج يفصّصه ويقترح إعلان لكوتشي مستوحى منه.</p>
               <label class="btn primary ad-up">⬆ ارفع إعلان<input type="file" id="adFile" accept="video/*,.mp4,.mov,.webm,.mkv" hidden></label>
               <ul class="ad-list" id="adList"></ul>
+              <button class="btn ad-styles-go" id="adBrainGo">🧠 عقل الإعلان</button>
               <button class="btn ad-styles-go" id="adStylesGo">🎨 مكتبة الستايلات</button>
             </aside>
 
@@ -996,6 +997,7 @@
                   </details>
                   <div class="row wrap ser-bulk">
                     <button class="btn primary" id="adPMotion">🎞️ استحضر الموشن جرافيك</button>
+                    <button class="btn" id="adPBrain" title="يحط شاشات التطبيق واللوجو وصور المنتج الحقيقية من عقل الإعلان مكان المكونات">🧠 طبّق عقل الإعلان</button>
                     <button class="btn" id="adPFrames">🎨 ارسم الستوري بورد</button>
                     <button class="btn danger" id="adPDelFrames">🗑️ امسح كل الستوري بورد</button>
                     <button class="btn" id="adPComps">🧩 استخرج المكونات</button>
@@ -1015,6 +1017,9 @@
                 <div class="ad-style-pick" id="adStylePick"></div>
                 <div class="row wrap"><button class="btn sm" id="adSaveStyle">🎨 احفظ ستايل الإعلان ده في المكتبة</button>
                   <button class="btn sm" id="adStylesGo2">＋ ضيف ستايل من صور</button></div>
+                <h3 class="pane-h">🧠 عقل الإعلان</h3>
+                <div class="row wrap"><label class="field">المنتج اللي الإعلان عنه <select id="adSetBrain" data-set="brain_id"></select></label>
+                  <button class="btn sm" id="adBrainGo2">🧠 افتح عقل الإعلان</button></div>
                 <h3 class="pane-h">⚙️ إعدادات الإعلان</h3>
                 <div class="ad-set-grid">
                   <label class="field">المدة المطلوبة (ثانية) <input type="number" id="adSetDuration" min="5" max="180" data-set="duration"></label>
@@ -1049,6 +1054,52 @@
                   <label class="btn primary">⬆ ارفع صور الستايل<input type="file" id="adStyleFiles" accept="image/*" multiple hidden></label>
                 </form>
                 <div class="ad-style-grid" id="adStyleGrid"></div>
+              </div>
+            </section>
+            <section class="car-main" id="adBrain" hidden>
+              <div class="panel">
+                <div class="panel-head"><h2>🧠 عقل الإعلان</h2><button class="btn sm" id="adBrainBack">↩ رجوع للإعلان</button></div>
+                <p class="hint">هنا كل حاجة عن المنتج: نوعه ومجاله وشاشاته ولوجوهه. البرنامج بيستنبط منها الألوان والثيم، وأي ستوري بورد أو فيديو بيستخدم الشاشات واللوجو دول بالظبط بدل ما يخترع.</p>
+                <div class="row wrap">
+                  <label class="field">المنتج <select id="adBrainPick"></select></label>
+                  <button class="btn sm" id="adBrainNew">＋ منتج جديد</button>
+                  <button class="btn sm danger" id="adBrainDel">🗑️ احذف</button>
+                  <span class="muted" id="adBrainState"></span>
+                </div>
+                <div id="adBrainBody">
+                  <div class="ad-set-grid">
+                    <label class="field">الاسم <input type="text" data-bn="name"></label>
+                    <label class="field">نوع المنتج
+                      <select data-bf="type"><option value="app">📱 تطبيق موبايل</option><option value="physical">📦 منتج ملموس</option><option value="service">🤝 خدمة</option></select></label>
+                    <label class="field">المجال <input type="text" data-bf="domain" placeholder="مثلًا: لياقة وتغذية"></label>
+                  </div>
+                  <label class="field">عن المنتج <textarea rows="2" data-bf="about"></textarea></label>
+                  <label class="field">الجمهور <textarea rows="2" data-bf="audience"></textarea></label>
+                  <label class="field">قواعد لازم تتراعى في أي إعلان <textarea rows="2" data-bf="rules" placeholder="مثلًا: اللوجو دايمًا في الآخر، من غير وعود صحية مبالغ فيها"></textarea></label>
+
+                  <h3 class="pane-h">🏷️ اللوجو</h3>
+                  <div class="row wrap"><label class="btn sm primary">⬆ ارفع اللوجو<input type="file" accept="image/*" multiple data-bup="logos" hidden></label></div>
+                  <div class="ad-brain-grid" data-bgrid="logos"></div>
+
+                  <h3 class="pane-h" data-bsec="screens">📱 شاشات التطبيق</h3>
+                  <div class="row wrap" data-bsec="screens">
+                    <label class="btn sm primary">📁 ارفع فولدر الشاشات<input type="file" webkitdirectory directory multiple data-bup="screens" hidden></label>
+                    <label class="btn sm">⬆ ارفع صور شاشات<input type="file" accept="image/*" multiple data-bup="screens" hidden></label>
+                  </div>
+                  <div class="ad-brain-grid" data-bgrid="screens"></div>
+
+                  <h3 class="pane-h">📦 صور المنتج / الخدمة</h3>
+                  <div class="row wrap"><label class="btn sm">⬆ ارفع صور<input type="file" accept="image/*" multiple data-bup="products" hidden></label></div>
+                  <div class="ad-brain-grid" data-bgrid="products"></div>
+
+                  <h3 class="pane-h">🎨 الهوية المستنبطة <button class="btn sm" id="adBrainAnalyze">🔍 استنبط من الصور</button></h3>
+                  <p class="hint">بتتكتب لوحدها من اللوجو والشاشات، وتقدر تعدّلها (اللي بتعدّله بإيدك ميتغيرش لما تستنبط تاني).</p>
+                  <label class="field">الألوان <textarea rows="2" data-bf="palette" dir="ltr"></textarea></label>
+                  <label class="field">الثيم <textarea rows="2" data-bf="theme"></textarea></label>
+                  <label class="field">الخطوط <textarea rows="1" data-bf="typography"></textarea></label>
+                  <label class="field">شكل الواجهة (بالإنجليزي للبرومبتات) <textarea rows="3" data-bf="ui_style" dir="ltr"></textarea></label>
+                  <label class="field">وصف اللوجو <textarea rows="2" data-bf="logo_description" dir="ltr"></textarea></label>
+                </div>
               </div>
             </section>
             <section class="panel placeholder" id="adEmpty"><p>ارفع إعلان من الجنب عشان تبدأ.</p></section>

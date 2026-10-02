@@ -1,11 +1,11 @@
 // StudioMania — الإعلانات: إعلان مرجعي ← تفصيص (مشاهد، فكرة، تصوير، إخراج، أصوات، مؤثرات) ← اقتراح لكوتشي
 // ومكتبة ستايلات (صور) بتتحفظ وتتختار لأي إعلان
 
-const adx = { list: [], cur: null, styles: [], tab: "analysis", timer: null, view: "ad" };
+const adx = { list: [], cur: null, styles: [], brains: [], brainId: null, tab: "analysis", timer: null, view: "ad" };
 const AD_KEY = "studiomania.ad";
 
 async function initAds() {
-  [adx.list, adx.styles] = await Promise.all([api("/api/ads"), api("/api/ad-styles")]);
+  [adx.list, adx.styles, adx.brains] = await Promise.all([api("/api/ads"), api("/api/ad-styles"), api("/api/ad-brains")]);
   api("/api/ads-settings").then((s) => ($("adVideoModel").value = s.video_model)).catch(() => {});
   const want = adx.cur?.id || storageGet(AD_KEY);
   const id = adx.list.some((a) => a.id === want) ? want : adx.list[0]?.id;
@@ -49,9 +49,11 @@ function renderAds() {
     || `<li class="muted">لسه مفيش إعلانات.</li>`;
   const a = adx.cur;
   $("adStyles").hidden = adx.view !== "styles";
+  $("adBrain").hidden = adx.view !== "brain";
   $("adMain").hidden = adx.view !== "ad" || !a;
-  $("adEmpty").hidden = adx.view === "styles" || !!a;
+  $("adEmpty").hidden = adx.view !== "ad" || !!a;
   if (adx.view === "styles") renderStyleLib();
+  if (adx.view === "brain") renderBrain();
   if (a && adx.view === "ad") {
     if (document.activeElement !== $("adName")) $("adName").value = a.name;
     document.querySelectorAll("#adTabs [data-t]").forEach((b) => b.classList.toggle("active", b.dataset.t === adx.tab));
@@ -192,6 +194,10 @@ function renderAdAdapt() {
 
 function renderAdSettings() {
   const a = adx.cur, st = a.settings || {};
+  if (document.activeElement !== $("adSetBrain")) {
+    $("adSetBrain").innerHTML = `<option value="">تلقائي${adx.brains[0] ? ` (${adEsc(adx.brains[0].name)})` : ""}</option>`
+      + adx.brains.map((b) => `<option value="${b.id}">${adEsc(b.name)}</option>`).join("") + `<option value="none">من غير عقل إعلان</option>`;
+  }
   for (const el of document.querySelectorAll("[data-set]")) if (document.activeElement !== el) el.value = st[el.dataset.set] ?? "";
   $("adStylePick").innerHTML = `<button type="button" class="ad-style-card ${!st.style_id ? "sel" : ""}" data-pick-style=""><span class="ph">∅</span><b>من غير ستايل</b></button>` +
     adx.styles.map((s) => `<button type="button" class="ad-style-card ${s.id === st.style_id ? "sel" : ""}" data-pick-style="${s.id}">
@@ -543,11 +549,12 @@ $("adStyleGrid").addEventListener("click", async (e) => {
 function scheduleAdPoll() {
   clearTimeout(adx.timer);
   const a = adx.cur;
-  const busy = (a && (["queued", "working"].includes(a.status) || a.adapt_status === "working" || a.scomp_status === "working" || a.audio_status === "working" || prodBusy(a))) || adx.styles.some((s) => s.status === "working");
+  const busy = (a && (["queued", "working"].includes(a.status) || a.adapt_status === "working" || a.scomp_status === "working" || a.audio_status === "working" || prodBusy(a))) || adx.styles.some((s) => s.status === "working") || adx.brains.some((b) => b.status === "working");
   if (!busy || document.querySelector('.view[data-view="10"]').hidden) return;
   adx.timer = setTimeout(async () => {
     try {
       if (adx.styles.some((s) => s.status === "working")) adx.styles = await api("/api/ad-styles");
+      if (adx.brains.some((b) => b.status === "working")) adx.brains = await api("/api/ad-brains");
       if (adx.cur) {
         const fresh = await api(`/api/ads/${adx.cur.id}`);
         const changed = fresh.status !== adx.cur.status || fresh.adapt_status !== adx.cur.adapt_status;
@@ -687,7 +694,7 @@ function prodBusy(a) {
     || s.components.some((c) => c.status === "working") || s.takes.some((t) => PBUSY.has(t.status)));
 }
 const HEADER_LABELS = { title: "اسم الإعلان", concept: "الكونسبت", style: "الستايل البصري (بالإنجليزي)", characters: "الشخصيات (نفس الشكل في كل لقطة)",
-  locations: "الأماكن", palette: "ألوان البراند", rules: "قواعد ثابتة" };
+  locations: "الأماكن", palette: "ألوان البراند", brand: "🧠 هوية المنتج (من عقل الإعلان)", rules: "قواعد ثابتة" };
 const KIND_LABEL = { character: "🧍 شخصية", prop: "📦 أداة", background: "🏞️ خلفية", graphic: "✨ جرافيك", text: "🔤 كلام", ui: "📱 شاشة", icon: "⭐ أيقونة", effect: "💫 تأثير", logo: "🏷️ لوجو" };
 const PSHOT_LABELS = { visual: "اللي بيحصل", shot: "اللقطة", camera: "الكاميرا", on_screen_text: "كلام على الشاشة", voice: "الكلام", sfx: "المؤثرات" };
 const pAPI = (path, opts) => api(`/api/ads/${adx.cur.id}/prod${path}`, opts);
@@ -752,7 +759,7 @@ function renderAdProd() {
         <div class="ad-comps">${s.components.map((c) => `<div class="ad-comp ${c.use === false ? "off" : ""}" data-pc="${c.id}">
           <div class="img">${c.image_url ? `<img src="${c.image_url}" alt="">` : c.status === "working" ? `<div class="spin"></div>` : "🖼️"}</div>
           ${c.images.length > 1 ? `<div class="vers">${c.images.map((f) => `<img src="${f.url}" data-cimg="${f.file}" class="${f.url === c.image_url ? "sel" : ""}" alt="">`).join("")}</div>` : ""}
-          <span class="kind">${KIND_LABEL[c.kind] || adEsc(c.kind)}${c.motion ? " · 🎞️" : ""}${c.uploaded ? ` · <b class="up">⬆ من عندك</b>` : ""}</span>
+          <span class="kind">${KIND_LABEL[c.kind] || adEsc(c.kind)}${c.motion ? " · 🎞️" : ""}${c.brain_asset ? ` · <b class="up">🧠 من عقل الإعلان</b>` : c.uploaded ? ` · <b class="up">⬆ من عندك</b>` : ""}</span>
           <input type="text" value="${adEsc(c.name)}" data-cf="name" data-no-i18n>
           <textarea rows="3" dir="ltr" data-cf="image_prompt" placeholder="Image prompt" data-no-i18n>${adEsc(c.image_prompt)}</textarea>
           ${c.animation ? `<span class="muted" data-no-i18n>🎞️ ${adEsc(c.animation)}</span>` : ""}
@@ -791,6 +798,12 @@ $("adHeaderStyle").addEventListener("change", () => pAPI("/header", { method: "P
   .then((a) => { adx.cur = a; renderAds(); toast("🎨 الستايل اتغير في راس الإعلان. الصور والفيديوهات الجاية هتتعمل بيه"); }).catch((err) => toast(err.message, true)));
 $("adHeaderAspect").addEventListener("change", () => pAPI("/header", { method: "PATCH", ...jsonBody({ header: { aspect: $("adHeaderAspect").value } }) })
   .then((a) => { adx.cur = a; renderAds(); }).catch((err) => toast(err.message, true)));
+$("adPBrain").onclick = () => busyButton($("adPBrain"), "⏳", async () => {
+  const r = await pAPI("/apply-brain", { method: "POST" });
+  adx.cur = r;
+  renderAds();
+  toast(r.applied ? `🧠 اتحط ${r.applied} مكون من عقل الإعلان (شاشات / لوجو / منتج)` : "مفيش مكونات شاشات أو لوجو محتاجة صور من عقل الإعلان");
+});
 $("adPMotion").onclick = () => {
   if (!confirm("يتفرج على كل مشهد في الإعلان الأصلي ويستحضر الموشن جرافيك بتاعه في اللقطة المقابلة (الموشن المكتوب + عناصر الموشن كمكونات). الموشن المكتوب دلوقتي هيتبدل، والمكونات الموجودة مش هتتلمس. تكمل؟")) return;
   pDo($("adPMotion"), "⏳", () => pAPI("/motion", { method: "POST" }));
@@ -892,4 +905,90 @@ $("adPShots").addEventListener("click", async (e) => {
     }
     renderAds();
   } catch (err) { toast(err.message, true); }
+});
+
+
+// ---------- 🧠 عقل الإعلان: المنتج وأصوله الحقيقية (شاشات، لوجو، صور منتج) وهويته المستنبطة ----------
+const BRAIN_KIND_TITLE = { logos: "لوجو", screens: "شاشة", products: "صورة" };
+const curBrain = () => adx.brains.find((b) => b.id === adx.brainId) || adx.brains[0];
+function renderBrain() {
+  const b = curBrain();
+  adx.brainId = b?.id || null;
+  $("adBrainPick").innerHTML = adx.brains.map((x) => `<option value="${x.id}" ${x.id === adx.brainId ? "selected" : ""}>${adEsc(x.name)}</option>`).join("");
+  $("adBrainBody").hidden = !b;
+  $("adBrainDel").disabled = !b;
+  if (!b) return;
+  $("adBrainState").innerHTML = b.status === "working" ? `<span class="spin-inline"></span> 🔍 بيشوف الصور ويستنبط الهوية...`
+    : b.status === "failed" ? `✕ ${adEsc(b.error || "الاستنباط فشل")}` : "";
+  $("adBrainAnalyze").disabled = b.status === "working";
+  if (editingIn($("adBrainBody"))) return;
+  document.querySelectorAll("#adBrainBody [data-bf]").forEach((el) => (el.value = b[el.dataset.bf] || ""));
+  document.querySelector('#adBrainBody [data-bn="name"]').value = b.name;
+  document.querySelectorAll("#adBrainBody [data-bsec]").forEach((el) => (el.hidden = b.type !== "app"));
+  for (const kind of ["logos", "screens", "products"]) {
+    const grid = document.querySelector(`[data-bgrid="${kind}"]`);
+    grid.hidden = kind === "screens" && b.type !== "app";
+    grid.innerHTML = b[kind].map((x) => `<div class="ad-brain-item" data-bfile="${adEsc(x.file)}">
+        <img src="${x.url}" alt="" loading="lazy">
+        <input type="text" value="${adEsc(x.name)}" data-ba="name" data-no-i18n>
+        <textarea rows="3" data-ba="description" placeholder="${b.status === "working" ? "بيتوصف..." : "وصف"}" data-no-i18n>${adEsc(x.description)}</textarea>
+        <button class="btn sm danger" type="button" data-bdel title="احذف">✕</button></div>`).join("")
+      || `<p class="muted">لسه مفيش ${BRAIN_KIND_TITLE[kind]}.</p>`;
+  }
+}
+const bAPI = (path, opts) => api(`/api/ad-brains/${adx.brainId}${path}`, opts);
+async function brainSave(fn) {
+  try {
+    const b = await fn();
+    adx.brains = adx.brains.map((x) => (x.id === b.id ? b : x));
+    renderAds();
+  } catch (err) { toast(err.message, true); }
+}
+$("adBrainGo").onclick = $("adBrainGo2").onclick = async () => {
+  adx.view = "brain";
+  if (adx.cur?.settings?.brain_id && adx.cur.settings.brain_id !== "none") adx.brainId = adx.cur.settings.brain_id;
+  adx.brains = await api("/api/ad-brains");
+  renderAds();
+};
+$("adBrainBack").onclick = () => { adx.view = "ad"; renderAds(); };
+$("adBrainPick").onchange = () => { adx.brainId = $("adBrainPick").value; renderAds(); };
+$("adBrainNew").onclick = async () => {
+  const name = prompt("اسم المنتج؟");
+  if (!name?.trim()) return;
+  try {
+    const b = await api("/api/ad-brains", { method: "POST", ...jsonBody({ name, fields: {} }) });
+    adx.brains.push(b);
+    adx.brainId = b.id;
+    renderAds();
+  } catch (err) { toast(err.message, true); }
+};
+$("adBrainDel").onclick = async () => {
+  const b = curBrain();
+  if (!b || !confirm(`تحذف عقل «${b.name}» بكل شاشاته ولوجوهاته؟`)) return;
+  try { await api(`/api/ad-brains/${b.id}`, { method: "DELETE" }); adx.brains = await api("/api/ad-brains"); adx.brainId = null; renderAds(); }
+  catch (err) { toast(err.message, true); }
+};
+$("adBrainAnalyze").onclick = () => brainSave(() => bAPI("/analyze", { method: "POST" }));
+$("adBrainBody").addEventListener("change", async (e) => {
+  const el = e.target;
+  if (el.dataset.bf) return brainSave(() => bAPI("", { method: "PATCH", ...jsonBody({ fields: { [el.dataset.bf]: el.value } }) }));
+  if (el.dataset.bn) return brainSave(() => bAPI("", { method: "PATCH", ...jsonBody({ name: el.value, fields: {} }) }));
+  const item = el.closest("[data-bfile]");
+  if (item && el.dataset.ba) return brainSave(() => bAPI(`/assets/${encodeURIComponent(item.dataset.bfile)}`, { method: "PATCH", ...jsonBody({ [el.dataset.ba]: el.value }) }));
+  if (el.dataset.bup) {
+    const files = [...el.files].filter((f) => /\.(png|jpe?g|webp)$/i.test(f.name));
+    el.value = "";
+    if (!files.length) return toast("مفيش صور (PNG / JPG / WEBP) في اللي اخترته", true);
+    const form = new FormData();
+    form.append("kind", el.dataset.bup);
+    files.slice(0, 120).forEach((f) => form.append("files", f));
+    toast(`⏳ بيرفع ${files.length} صورة...`);
+    await brainSave(() => bAPI("/assets", { method: "POST", body: form }));
+    toast("✅ اترفعت، والبرنامج بيوصفهم ويستنبط الهوية");
+  }
+});
+$("adBrainBody").addEventListener("click", (e) => {
+  const item = e.target.closest("[data-bfile]");
+  if (!item || !e.target.closest("[data-bdel]") || !confirm("تحذف الصورة دي من عقل الإعلان؟")) return;
+  brainSave(() => bAPI(`/assets/${encodeURIComponent(item.dataset.bfile)}`, { method: "DELETE" }));
 });

@@ -1299,3 +1299,10 @@ a.pl-link:hover { background: color-mix(in srgb, var(--ok) 24%, transparent); }
 .ad-activity .dot { width: 9px; height: 9px; border-radius: 50%; background: #9AA5A0; }
 .ad-activity .ad-act { border: 0; border-radius: 999px; padding: 4px 10px; background: #fff; color: inherit; font: inherit; cursor: pointer; }
 .ad-activity .ad-act:hover { background: #D6EFEB; }
+/* عقل الإعلان */
+.ad-brain-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; margin: 8px 0 14px; }
+.ad-brain-item { display: flex; flex-direction: column; gap: 6px; background: var(--surface-2); border-radius: 12px; padding: 8px; position: relative; min-width: 0; }
+.ad-brain-item img { width: 100%; height: 200px; object-fit: contain; background: var(--surface); border-radius: 8px; }
+.ad-brain-item textarea, .ad-brain-item input { width: 100%; font-size: 12px; }
+.ad-brain-item [data-bdel] { position: absolute; top: 12px; inset-inline-start: 12px; }
+#adBrain .row { align-items: flex-end; }

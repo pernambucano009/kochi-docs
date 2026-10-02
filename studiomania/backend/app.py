@@ -349,6 +349,11 @@ with closing(db()) as _conn, _conn:
         )"""
     )
     _conn.execute(
+        """CREATE TABLE IF NOT EXISTS ad_brains (
+            id TEXT PRIMARY KEY, name TEXT NOT NULL, data TEXT NOT NULL, created_at TEXT NOT NULL
+        )"""
+    )
+    _conn.execute(
         """CREATE TABLE IF NOT EXISTS ad_styles (
             id TEXT PRIMARY KEY, name TEXT NOT NULL, data TEXT NOT NULL, created_at TEXT NOT NULL
         )"""
@@ -5556,7 +5561,7 @@ ADS_LOCK = threading.Lock()
 AD_MAX_SECONDS = 180  # أطول إعلان بنحلله (الموديل بيستقبل الفيديو كله مرة واحدة)
 DEFAULT_AD_VIDEO_MODEL = "google/gemini-2.5-pro"
 AD_VIDEO_FALLBACKS = ["google/gemini-2.5-pro", "google/gemini-2.5-flash", "google/gemini-3-flash-preview", "google/gemini-3.5-flash"]
-AD_SETTING_KEYS = ("style_id", "duration", "format", "language", "production", "notes")
+AD_SETTING_KEYS = ("style_id", "brain_id", "duration", "format", "language", "production", "notes")
 
 
 def ads_settings() -> dict:
@@ -6060,7 +6065,7 @@ def run_ad_adapt(aid: str) -> None:
             result = az.mock_adaptation(int(settings.get("duration") or 30))
         else:
             msgs = az.adapt_messages(brand_settings(), d.get("analysis") or {}, d.get("audio") or {}, settings,
-                                     ad_style(settings.get("style_id")), d.get("chat") or [])
+                                     ad_style(settings.get("style_id")), d.get("chat") or [], ad_brain(settings))
             result = ad_json(series_chat(msgs), "اقتراح كوتشي")
         def fn(d):
             d["adaptation"] = {**result, "based_on": d.get("analysis_ver", 0)}
@@ -6080,6 +6085,337 @@ def run_ad_adapt(aid: str) -> None:
             prod_start(aid)
         except HTTPException as exc:
             update_ad(aid, lambda d: d.update(adapt_error=f"الاقتراح اتكتب بس التنفيذ مبدأش: {exc.detail}"))
+
+
+# ---------- عقل الإعلان: المنتج (تطبيق / منتج ملموس / خدمة)، أصوله الحقيقية (شاشات، لوجو، صور منتج) وهويته
+
+BRAIN_KINDS = ("screens", "logos", "products")
+BRAIN_FIELDS = ("type", "domain", "about", "audience", "rules", "palette", "theme", "typography", "ui_style", "logo_description")
+BRAIN_LOCK = threading.Lock()
+
+
+def brain_dir(bid: str) -> Path:
+    d = ADS_DIR / "brains" / Path(bid).name
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def brain_row(bid: str) -> dict | None:
+    with closing(db()) as conn:
+        r = conn.execute("SELECT * FROM ad_brains WHERE id = ?", (bid,)).fetchone()
+    return {"id": r["id"], "name": r["name"], "created_at": r["created_at"], **json.loads(r["data"])} if r else None
+
+
+def update_brain(bid: str, fn) -> None:
+    with BRAIN_LOCK, closing(db()) as conn, conn:
+        r = conn.execute("SELECT * FROM ad_brains WHERE id = ?", (bid,)).fetchone()
+        if r is None:
+            raise HTTPException(404, "العقل ده مش موجود")
+        d = json.loads(r["data"])
+        name = fn(d)
+        conn.execute("UPDATE ad_brains SET data = ?" + (", name = ?" if name else "") + " WHERE id = ?",
+                     (json.dumps(d, ensure_ascii=False), *([name] if name else []), bid))
+
+
+def brain_to_dict(b: dict) -> dict:
+    base = f"/media/ads/brains/{b['id']}"
+    out = {k: b.get(k, "") for k in ("id", "name", "created_at", *BRAIN_FIELDS)}
+    out.update(status=b.get("status", "idle"), error=b.get("error"))
+    for kind in BRAIN_KINDS:
+        out[kind] = [{**a, "url": f"{base}/{a['file']}"} for a in b.get(kind) or []]
+    return out
+
+
+def seed_brain() -> None:
+    """أول مرة: عقل لكوتشي من هوية البراند واللوجو الموجودين."""
+    with closing(db()) as conn:
+        if conn.execute("SELECT 1 FROM ad_brains LIMIT 1").fetchone():
+            return
+    b = brand_settings()
+    bid = uuid.uuid4().hex[:12]
+    data = {"type": "app", "domain": "لياقة وتغذية وتدريب أونلاين", "about": b.get("about", ""), "audience": b.get("audience", ""),
+            "rules": "", "palette": b.get("colors", ""), "theme": "", "typography": b.get("font", ""), "ui_style": "",
+            "logo_description": "", "screens": [], "logos": [], "products": [], "status": "idle"}
+    logo = logo_path()
+    if logo and logo.exists():
+        f = f"logo-{uuid.uuid4().hex[:6]}{logo.suffix.lower()}"
+        shutil.copyfile(logo, brain_dir(bid) / f)
+        data["logos"].append({"file": f, "name": "لوجو " + (b.get("name") or ""), "description": ""})
+    with closing(db()) as conn, conn:
+        conn.execute("INSERT INTO ad_brains (id, name, data, created_at) VALUES (?, ?, ?, ?)",
+                     (bid, b.get("name") or "KOCHI", json.dumps(data, ensure_ascii=False), now()))
+
+
+def ad_brain(settings: dict | None) -> dict | None:
+    """عقل الإعلان المختار للإعلان ده (ولو مش مختار: أول عقل)."""
+    bid = (settings or {}).get("brain_id")
+    if bid == "none":
+        return None
+    b = brain_row(bid) if bid else None
+    if b is None:
+        with closing(db()) as conn:
+            r = conn.execute("SELECT id FROM ad_brains ORDER BY created_at LIMIT 1").fetchone()
+        b = brain_row(r["id"]) if r else None
+    return b
+
+
+@app.get("/api/ad-brains")
+def list_brains():
+    seed_brain()
+    with closing(db()) as conn:
+        ids = [r["id"] for r in conn.execute("SELECT id FROM ad_brains ORDER BY created_at")]
+    return [brain_to_dict(brain_row(i)) for i in ids]
+
+
+class BrainIn(BaseModel):
+    name: str | None = None
+    fields: dict = {}
+
+
+@app.post("/api/ad-brains")
+def create_brain(body: BrainIn):
+    bid = uuid.uuid4().hex[:12]
+    data = {"type": "app", **{k: str(body.fields.get(k) or "") for k in BRAIN_FIELDS if k != "type"},
+            "screens": [], "logos": [], "products": [], "status": "idle"}
+    if body.fields.get("type") in az.BRAIN_TYPES:
+        data["type"] = body.fields["type"]
+    with closing(db()) as conn, conn:
+        conn.execute("INSERT INTO ad_brains (id, name, data, created_at) VALUES (?, ?, ?, ?)",
+                     (bid, (body.name or "").strip()[:80] or "منتج جديد", json.dumps(data, ensure_ascii=False), now()))
+    return brain_to_dict(brain_row(bid))
+
+
+@app.patch("/api/ad-brains/{bid}")
+def patch_brain(bid: str, body: BrainIn):
+    def fn(d):
+        for k in BRAIN_FIELDS:
+            if k in body.fields:
+                v = str(body.fields[k] or "")
+                if k == "type" and v not in az.BRAIN_TYPES:
+                    continue
+                d[k] = v[:8000]
+                if k in ("palette", "theme", "typography", "ui_style", "logo_description") and k not in d.setdefault("edited", []):
+                    d["edited"].append(k)  # الاستنباط بعد كده ميغيّرش اللي كتبته بإيدك
+        return (body.name or "").strip()[:80] or None
+    update_brain(bid, fn)
+    return brain_to_dict(brain_row(bid))
+
+
+@app.delete("/api/ad-brains/{bid}")
+def delete_brain(bid: str):
+    with closing(db()) as conn, conn:
+        conn.execute("DELETE FROM ad_brains WHERE id = ?", (bid,))
+    shutil.rmtree(ADS_DIR / "brains" / Path(bid).name, ignore_errors=True)
+    return {"ok": True}
+
+
+@app.post("/api/ad-brains/{bid}/assets")
+def upload_brain_assets(bid: str, kind: str = Form("screens"), files: list[UploadFile] = File(...)):
+    """رفع شاشات التطبيق (فولدر كامل) أو اللوجو أو صور المنتج. بعدها البرنامج بيوصّفهم ويستنبط الهوية لوحده."""
+    if kind not in BRAIN_KINDS:
+        raise HTTPException(400, "نوع غير معروف")
+    if brain_row(bid) is None:
+        raise HTTPException(404, "العقل ده مش موجود")
+    folder = brain_dir(bid)
+    added = []
+    for f in files[:120]:
+        if Path(f.filename or "").suffix.lower() not in IMAGE_EXTENSIONS:
+            continue  # الفولدر ممكن يكون فيه ملفات تانية
+        name = save_upload(f, IMAGE_EXTENSIONS, folder, kind[:-1])
+        added.append({"file": name, "name": Path(f.filename or name).stem[:60], "description": ""})
+    if not added:
+        raise HTTPException(400, "مفيش صور في الملفات دي (PNG / JPG / WEBP)")
+    update_brain(bid, lambda d: d.setdefault(kind, []).extend(added) or d.update(status="working", error=None))
+    threading.Thread(target=run_brain_analyze, args=(bid,), daemon=True).start()
+    return brain_to_dict(brain_row(bid))
+
+
+class BrainAssetIn(BaseModel):
+    name: str | None = None
+    description: str | None = None
+
+
+def find_brain_asset(d: dict, file: str) -> tuple[str, dict]:
+    for kind in BRAIN_KINDS:
+        for a in d.get(kind) or []:
+            if a["file"] == file:
+                return kind, a
+    raise HTTPException(404, "الصورة دي مش موجودة")
+
+
+@app.patch("/api/ad-brains/{bid}/assets/{file}")
+def patch_brain_asset(bid: str, file: str, body: BrainAssetIn):
+    def fn(d):
+        _, a = find_brain_asset(d, file)
+        if body.name is not None:
+            a["name"], a["named"] = body.name.strip()[:80], True
+        if body.description is not None:
+            a["description"] = body.description.strip()[:2000]
+    update_brain(bid, fn)
+    return brain_to_dict(brain_row(bid))
+
+
+@app.delete("/api/ad-brains/{bid}/assets/{file}")
+def delete_brain_asset(bid: str, file: str):
+    def fn(d):
+        kind, a = find_brain_asset(d, file)
+        d[kind] = [x for x in d[kind] if x is not a]
+    update_brain(bid, fn)
+    (brain_dir(bid) / Path(file).name).unlink(missing_ok=True)
+    return brain_to_dict(brain_row(bid))
+
+
+@app.post("/api/ad-brains/{bid}/analyze")
+def analyze_brain(bid: str):
+    b = brain_row(bid)
+    if b is None:
+        raise HTTPException(404, "العقل ده مش موجود")
+    if not any(b.get(k) for k in BRAIN_KINDS):
+        raise HTTPException(400, "ارفع اللوجو أو شاشات التطبيق الأول")
+    update_brain(bid, lambda d: d.update(status="working", error=None))
+    threading.Thread(target=run_brain_analyze, args=(bid,), daemon=True).start()
+    return brain_to_dict(b)
+
+
+def model_image(path: Path, size: int = 768) -> Path:
+    """نسخة صغيرة من الصورة للموديل (أوفر في الحجم والتكلفة)."""
+    out = TMP_DIR / "brain_view" / f"{path.parent.name}-{path.stem}-{int(path.stat().st_mtime)}.jpg"
+    if not out.exists():
+        out.parent.mkdir(parents=True, exist_ok=True)
+        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(path),
+                        "-vf", f"scale='min({size},iw)':-2", "-q:v", "4", str(out)], capture_output=True, timeout=60)
+    return out if out.exists() else path
+
+
+def run_brain_analyze(bid: str) -> None:
+    """الموديل بيشوف اللوجو والشاشات وصور المنتج: يستنبط الألوان والثيم والخطوط وشكل الواجهة، ويوصّف كل صورة."""
+    try:
+        b = brain_row(bid)
+        folder = brain_dir(bid)
+        assets = [a for k in ("logos", "screens", "products") for a in b.get(k) or []][:24]
+        if atlas.mock_mode():
+            out = {"palette": "#57B8AF teal (accent), #EEECDA cream (background)", "theme": "فاتح وهادي", "typography": "خط عريض مستدير",
+                   "ui_style": "Clean light UI with teal accents and rounded cards.", "logo_description": "Teal KOCHI wordmark.",
+                   "assets": [{"file": a["file"], "name": a["name"], "description": f"وصف تجريبي لـ {a['name']}"} for a in assets]}
+        else:
+            parts = [{"type": "text", "text": az.brain_messages(b, [a["file"] for a in assets])}]
+            for a in assets:
+                parts.append({"type": "image_url", "image_url": {"url": data_url(model_image(folder / a["file"]), "image/jpeg")}})
+            out = ad_json(ad_media_chat([{"role": "user", "content": parts}], 12000), "عقل الإعلان")
+        got = {str(x.get("file")): x for x in out.get("assets") or [] if isinstance(x, dict)}
+        def fn(d):
+            for k in ("palette", "theme", "typography", "ui_style", "logo_description"):
+                if out.get(k) and k not in (d.get("edited") or []):
+                    d[k] = str(out[k])[:4000]
+            for kind in BRAIN_KINDS:
+                for a in d.get(kind) or []:
+                    x = got.get(a["file"])
+                    if not x:
+                        continue
+                    if not a.get("description"):
+                        a["description"] = str(x.get("description") or "")[:2000]
+                    # الاسم اللي جاي من اسم الملف بيتبدل باسم أوضح، إلا لو انت سميته بإيدك
+                    if x.get("name") and not a.get("named"):
+                        a["name"] = str(x["name"])[:80]
+            d.update(status="done", error=None)
+        update_brain(bid, fn)
+    except Exception as exc:  # noqa: BLE001
+        msg = str(getattr(exc, "detail", None) or exc)[:300]
+        try:
+            update_brain(bid, lambda d: d.update(status="failed", error=msg))
+        except HTTPException:
+            pass
+
+
+def brain_assets(brain: dict | None, kinds: tuple[str, ...]) -> list[dict]:
+    return [{**a, "kind": k} for k in kinds for a in (brain or {}).get(k) or []]
+
+
+def apply_brain(aid: str, sids: list[str] | None = None, use_model: bool = True) -> int:
+    """يحط الأصول الحقيقية من عقل الإعلان مكان مكونات اللقطات: الشاشات للـ ui، اللوجو للـ logo، وصورة المنتج للمنتج.
+    الصور اللي انت رافعها بنفسك متتلمسش. بيرجّع عدد المكونات اللي اتطبّق عليها."""
+    with closing(db()) as conn:
+        _, d = ad_row(conn, aid)
+    p = d.get("prod")
+    brain = ad_brain(d.get("settings"))
+    if not p or not brain:
+        return 0
+    want = {"ui": ("screens",), "logo": ("logos",), "prop": ("products",)}
+    todo = []
+    for s in p["shots"]:
+        if sids and s["id"] not in sids:
+            continue
+        for c in s.get("components") or []:
+            if c.get("use") is False or c.get("kind") not in want or (is_uploaded(c.get("image")) and not c.get("brain_asset")):
+                continue
+            pool = brain_assets(brain, want[c["kind"]])
+            if c["kind"] == "prop" and (brain.get("type") != "physical" or not c.get("asset")):
+                continue  # الأدوات العادية مش المنتج
+            if pool:
+                todo.append((s["id"], c, pool))
+    if not todo:
+        return 0
+    def by_name(c, pool):
+        key = str(c.get("asset") or "").strip()
+        for a in pool:
+            if key and (a.get("name") == key or a["file"] == key):
+                return a
+        text = f"{c.get('name', '')} {c.get('description', '')}"
+        hits = [a for a in pool if a.get("name") and a["name"] in text]
+        return hits[0] if len(hits) == 1 else None
+    picks: dict[str, str] = {}
+    unsure = []
+    for sid, c, pool in todo:
+        a = by_name(c, pool) or (pool[0] if len(pool) == 1 else None)
+        if a:
+            picks[c["id"]] = a["file"]
+        else:
+            unsure.append((sid, c, pool))
+    if unsure:
+        try:
+            if not use_model or atlas.mock_mode():
+                raise ValueError
+            out = ad_json(series_chat(az.match_messages([c for _, c, _ in unsure], brain_assets(brain, BRAIN_KINDS))), "اختيار الأصول")
+            files = {a["file"] for a in brain_assets(brain, BRAIN_KINDS)}
+            for m in out.get("matches") or []:
+                if isinstance(m, dict) and m.get("file") in files:
+                    picks[str(m.get("id"))] = m["file"]
+        except (ValueError, HTTPException, atlas.AtlasError):
+            pass
+        for _, c, pool in unsure:
+            picks.setdefault(c["id"], pool[0]["file"])
+    folder, comp_dir = brain_dir(brain["id"]), prod_dir(aid, "comps")
+    copies = {}
+    for cid, f in picks.items():
+        src = folder / f
+        if src.exists():
+            name = f"{cid}-up_brain-{Path(f).stem[:40]}{src.suffix.lower()}"
+            if not (comp_dir / name).exists():
+                shutil.copyfile(src, comp_dir / name)
+            copies[cid] = (name, f)
+    count = []
+    def fn(d):
+        for s in (d.get("prod") or {}).get("shots") or []:
+            for c in s.get("components") or []:
+                if c["id"] in copies and not (is_uploaded(c.get("image")) and not c.get("brain_asset")):
+                    name, f = copies[c["id"]]
+                    if c.get("image") != name:
+                        c.setdefault("images", []).append(name)
+                    c.update(image=name, brain_asset=f, status="done", error=None)
+                    count.append(1)
+    update_ad(aid, fn)
+    return len(count)
+
+
+@app.post("/api/ads/{aid}/prod/apply-brain")
+def prod_apply_brain(aid: str, shot_id: str | None = None):
+    with closing(db()) as conn:
+        _, d = ad_row(conn, aid)
+    prod_of(d)
+    if not ad_brain(d.get("settings")):
+        raise HTTPException(400, "مفيش عقل إعلان مختار. اعمله من «🧠 عقل الإعلان»")
+    n = apply_brain(aid, [shot_id] if shot_id else None)
+    return {**ad_response(aid), "applied": n}
 
 
 # ---------- ستايلات الإعلانات: صور بتتحفظ وتتختار لأي إعلان
@@ -6320,7 +6656,7 @@ def prod_start(aid: str):
     if prod_busy(d.get("prod")):
         raise HTTPException(400, "في توليد شغال في التنفيذ الحالي. استنى لما يخلص")
     settings = d.get("settings") or {}
-    header = az.header_from(a, ad_style(settings.get("style_id")), brand_settings(), settings)
+    header = az.header_from(a, ad_style(settings.get("style_id")), brand_settings(), settings, ad_brain(settings))
     scenes = a["scenes"]
     shots = []
     orig = {s.get("n"): s for s in (d.get("analysis") or {}).get("scenes") or []}
@@ -6331,7 +6667,7 @@ def prod_start(aid: str):
             ref = None
         ref = ref or ref_scene_for(d.get("analysis"), k, len(scenes))
         comps = [{"id": uuid.uuid4().hex[:8], "name": str(c.get("name") or "مكون")[:60], "kind": str(c.get("kind") or "prop")[:20],
-                  "from": str(c.get("from") or ""), "description": str(c.get("description") or ""),
+                  "from": str(c.get("from") or ""), "asset": str(c.get("asset") or ""), "description": str(c.get("description") or ""),
                   "image_prompt": str(c.get("image_prompt") or ""), "animation": str(c.get("animation") or ""),
                   "image": None, "images": [], "status": "idle", "error": None, "use": True}
                  for c in sc.get("components") or [] if isinstance(c, dict) and (c.get("image_prompt") or c.get("description"))][:10]
@@ -6354,7 +6690,16 @@ def prod_start(aid: str):
             d["prod_history"] = ([{**old, "archived_at": now()}] + (d.get("prod_history") or []))[:5]
         d["prod"] = {"header": header, "shots": shots, "based_on": d.get("adapt_ver", 0)}
     update_ad(aid, fn)
+    # شاشات التطبيق واللوجو وصور المنتج الحقيقية من عقل الإعلان بتتحط في المكونات لوحدها
+    threading.Thread(target=safe_apply_brain, args=(aid,), daemon=True).start()
     return ad_response(aid)
+
+
+def safe_apply_brain(aid: str, sids: list[str] | None = None) -> None:
+    try:
+        apply_brain(aid, sids)
+    except Exception:  # noqa: BLE001 — تطبيق العقل تحسين، مش لازم يوقف حاجة
+        pass
 
 
 @app.post("/api/ads/{aid}/prod/restore")
@@ -6380,7 +6725,7 @@ class ProdHeaderIn(BaseModel):
 
 @app.patch("/api/ads/{aid}/prod/header")
 def prod_header(aid: str, body: ProdHeaderIn):
-    keys = ("title", "concept", "style", "style_id", "characters", "locations", "palette", "rules", "aspect")
+    keys = ("title", "concept", "style", "style_id", "characters", "locations", "palette", "brand", "rules", "aspect")
     def fn(d):
         p = prod_of(d)
         h = {**p["header"], **{k: body.header[k] for k in keys if k in body.header}}
@@ -6452,6 +6797,8 @@ def ref_comps(shot: dict, limit: int) -> list[dict]:
 
 def run_ad_frame(aid: str, sid: str) -> None:
     try:
+        set_pshot(aid, sid, frame_status="working", frame_error=None)
+        safe_apply_brain(aid, [sid])  # قبل الرسم: الشاشات واللوجو الحقيقيين من عقل الإعلان
         with closing(db()) as conn:
             _, d = ad_row(conn, aid)
         p = d["prod"]
@@ -6560,6 +6907,7 @@ def run_ad_motion(aid: str, sids: list[str]) -> None:
                         "image": None, "images": [], "status": "idle", "error": None, "use": True, "motion": True})
                 s.update(motion_status="done", motion_error=None)
         update_ad(aid, fn)
+        safe_apply_brain(aid, sids)
     except Exception as exc:  # noqa: BLE001
         msg = str(getattr(exc, "detail", None) or exc)[:400]
         def fail(d):
@@ -6680,6 +7028,7 @@ def run_ad_components(aid: str, sid: str) -> None:
             x.update(components=comps, comp_status="done", comp_error=None,
                      motion_notes=x.get("motion_notes") or str(out.get("motion_notes") or ""), assembly_prompt=str(out.get("assembly_prompt") or x.get("assembly_prompt") or ""))
         update_ad(aid, done)
+        safe_apply_brain(aid, [sid])
     except Exception as exc:  # noqa: BLE001
         set_pshot(aid, sid, comp_status="failed", comp_error=str(getattr(exc, "detail", None) or exc)[:400])
 
@@ -6807,6 +7156,8 @@ def prod_comp_images(aid: str, shot_id: str | None = None, comp_id: str | None =
     """صور المكونات: مكون واحد (نسخة جديدة)، أو كل مكونات لقطة، أو كل المكونات اللي لسه ملهاش صورة."""
     if not (atlas.api_key() or atlas.mock_mode()):
         raise HTTPException(400, "مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات")
+    if not comp_id:
+        safe_apply_brain(aid, [shot_id] if shot_id else None)  # الشاشات واللوجو من عقل الإعلان بدل ما يتولدوا
     with closing(db()) as conn:
         _, d = ad_row(conn, aid)
     p = prod_of(d)
