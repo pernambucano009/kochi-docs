@@ -82,6 +82,14 @@ const adField = (label, value, attrs, rows = 2, ltr = false) => `<label class="a
 
 function renderAdAnalysis() {
   const a = adx.cur;
+  const sc = a.analysis?.scenes || [];
+  const missing = sc.length && !sc.some((s) => (s.components || []).length);
+  $("adSceneCompsGo").hidden = !a.analysis;
+  $("adSceneCompsGo").disabled = a.scomp_status === "working";
+  $("adSceneCompsGo").textContent = a.scomp_status === "working" ? "⏳ بيفصّص المكونات..." : missing ? "🧩 فصّص مكونات المشاهد والموشن جرافيك" : "↻ فصّص المكونات تاني";
+  $("adSceneCompsGo").classList.toggle("primary", !!missing);
+  $("adSceneCompsErr").hidden = !a.analysis?.components_error;
+  $("adSceneCompsErr").textContent = a.analysis?.components_error ? `✕ ${a.analysis.components_error}` : "";
   const v = $("adVideo");
   if (a.source_url && v.getAttribute("src") !== a.source_url) v.src = a.source_url;
   const an = a.analysis;
@@ -98,7 +106,10 @@ function renderAdAnalysis() {
     $("adScenes").innerHTML = (an.scenes || []).map((s) => `<article class="ad-scene" data-scene="${s.n}">
       <div class="ad-scene-media">${s.frame_url ? `<img src="${s.frame_url}" alt="" data-seek="${s.start}">` : ""}
         <b>${s.n}</b><span class="t">${adFmt(s.start)} → ${adFmt(s.end)}</span></div>
-      <div class="ad-scene-body">${Object.entries(SCENE_LABELS).filter(([k]) => s[k] != null).map(([k, l]) => adField(l, s[k], `data-sk="${k}"`, 1)).join("")}</div>
+      <div class="ad-scene-body">${Object.entries(SCENE_LABELS).filter(([k]) => s[k] != null).map(([k, l]) => adField(l, s[k], `data-sk="${k}"`, 1)).join("")}
+        ${s.motion_graphics ? `<div class="ad-mg" data-no-i18n>🎞️ <b>الموشن جرافيك:</b> ${adEsc(s.motion_graphics)}</div>` : ""}
+        ${(s.components || []).length ? `<div class="ad-scomps" data-no-i18n>${s.components.map((c) => `<span class="ad-scomp" title="${adEsc(c.description)}">
+          ${KIND_LABEL[c.kind] || "🧩"} <b>${adEsc(c.name)}</b>${c.animation ? `<small>${adEsc(c.animation)}</small>` : ""}</span>`).join("")}</div>` : ""}</div>
     </article>`).join("");
   }
 }
@@ -150,7 +161,10 @@ function renderAdAdapt() {
       <div class="ad-scene-media"><b>${s.n ?? i + 1}</b><span class="t">${adEsc(s.seconds)}ث</span></div>
       <div class="ad-scene-body">${Object.entries(ADAPT_SCENE_LABELS).map(([k, l]) => adField(l, s[k], `data-ask="${k}"`, 1)).join("")}
         ${adField("Prompt (Seedance)", s.prompt, 'data-ask="prompt"', 3, true)}
-        <button class="btn sm" type="button" data-copy-prompt="${i}">📋 انسخ البرومبت</button></div></article>`).join("")}</div>
+        <button class="btn sm" type="button" data-copy-prompt="${i}">📋 انسخ البرومبت</button>
+        ${s.ref_scene ? `<div class="muted">↩ مستوحى من المشهد ${adEsc(s.ref_scene)} في الإعلان الأصلي</div>` : ""}
+        ${(s.components || []).length ? `<div class="ad-scomps" data-no-i18n>${s.components.map((c) => `<span class="ad-scomp" title="${adEsc(c.description)}">
+          ${KIND_LABEL[c.kind] || "🧩"} <b>${adEsc(c.name)}</b>${c.from ? `<small>بدل: ${adEsc(c.from)}</small>` : ""}${c.animation ? `<small>${adEsc(c.animation)}</small>` : ""}</span>`).join("")}</div>` : ""}</div></article>`).join("")}</div>
     <div class="ad-fields">${["voiceover_script", "music_direction", "sound_design", "cast", "locations", "production_notes", "cta", "caption"]
       .map((k) => adField(ADAPT_LABELS[k], ad[k], `data-ad-key="${k}"`, k === "voiceover_script" || k === "production_notes" ? 4 : 2)).join("")}</div>`;
 }
@@ -365,6 +379,10 @@ document.querySelector('.view[data-view="10"]').addEventListener("click", (e) =>
   v.play().catch(() => {});
 });
 $("adStatus").addEventListener("click", (e) => { if (e.target.closest("[data-ad-retry]")) reanalyze(); });
+$("adSceneCompsGo").onclick = () => busyButton($("adSceneCompsGo"), "⏳", async () => {
+  adx.cur = await api(`/api/ads/${adx.cur.id}/scene-components`, { method: "POST" });
+  renderAds();
+});
 
 // الاقتراح: تعديل بإيدك أو برسالة
 function adaptCopy() {
@@ -500,7 +518,7 @@ $("adStyleGrid").addEventListener("click", async (e) => {
 function scheduleAdPoll() {
   clearTimeout(adx.timer);
   const a = adx.cur;
-  const busy = (a && (["queued", "working"].includes(a.status) || a.adapt_status === "working" || prodBusy(a))) || adx.styles.some((s) => s.status === "working");
+  const busy = (a && (["queued", "working"].includes(a.status) || a.adapt_status === "working" || a.scomp_status === "working" || prodBusy(a))) || adx.styles.some((s) => s.status === "working");
   if (!busy || document.querySelector('.view[data-view="10"]').hidden) return;
   adx.timer = setTimeout(async () => {
     try {
@@ -525,7 +543,7 @@ function prodBusy(a) {
 }
 const HEADER_LABELS = { title: "اسم الإعلان", concept: "الكونسبت", style: "الستايل البصري (بالإنجليزي)", characters: "الشخصيات (نفس الشكل في كل لقطة)",
   locations: "الأماكن", palette: "ألوان البراند", rules: "قواعد ثابتة" };
-const KIND_LABEL = { character: "🧍 شخصية", prop: "📦 أداة", background: "🏞️ خلفية", graphic: "✨ جرافيك", text: "🔤 كلام", ui: "📱 شاشة", icon: "⭐ أيقونة", effect: "💫 تأثير" };
+const KIND_LABEL = { character: "🧍 شخصية", prop: "📦 أداة", background: "🏞️ خلفية", graphic: "✨ جرافيك", text: "🔤 كلام", ui: "📱 شاشة", icon: "⭐ أيقونة", effect: "💫 تأثير", logo: "🏷️ لوجو" };
 const PSHOT_LABELS = { visual: "اللي بيحصل", shot: "اللقطة", camera: "الكاميرا", on_screen_text: "كلام على الشاشة", voice: "الكلام", sfx: "المؤثرات" };
 const pAPI = (path, opts) => api(`/api/ads/${adx.cur.id}/prod${path}`, opts);
 async function pDo(btn, label, fn) {
@@ -569,7 +587,7 @@ function renderAdProd() {
         <header><b class="n">${s.n}</b><label class="muted">المدة <input type="number" min="1" max="15" step="0.5" value="${s.seconds}" data-pf="seconds" style="width:64px"> ث</label></header>
         <div class="ad-fields">${Object.entries(PSHOT_LABELS).map(([k, l]) => adField(l, s[k], `data-pf="${k}"`, 1)).join("")}</div>
         <h4 class="pane-h">🧩 المكونات ${s.comp_status === "working" ? `<span class="spin-inline"></span>` : ""}
-          <button class="btn sm" data-p="comps" ${!s.frame_url || s.comp_status === "working" ? "disabled" : ""}>${s.components.length ? "↻ استخرج تاني" : "🧩 استخرج المكونات"}</button>
+          <button class="btn sm" data-p="comps" ${!s.frame_url || s.comp_status === "working" ? "disabled" : ""} title="الموديل يشوف الستوري بورد واللقطة الأصلية ويظبط المكونات عليهم">${s.components.length ? "↻ حدّث المكونات من الستوري بورد" : "🧩 استخرج المكونات"}</button>
           ${s.components.length ? `<button class="btn sm" data-p="compimgs">🖼️ صور المكونات</button><button class="btn sm" data-p="addcomp">＋ مكون</button>` : ""}</h4>
         ${s.comp_error ? `<div class="err">${adEsc(s.comp_error)}</div>` : ""}
         ${s.motion_notes ? `<p class="hint" data-no-i18n>🎞️ ${adEsc(s.motion_notes)}</p>` : ""}
@@ -671,7 +689,7 @@ $("adPShots").addEventListener("click", async (e) => {
     else if (b.dataset.p === "frame") adx.cur = await pAPI(`/frames?shot_id=${sid}`, { method: "POST" });
     else if (b.dataset.p === "approve") adx.cur = await pAPI(`/shots/${sid}`, { method: "PATCH", ...jsonBody({ fields: { approved: !s.approved } }) });
     else if (b.dataset.p === "comps") {
-      if (s.components.length && !confirm("تستخرج المكونات من جديد؟ المكونات اللي ليها صورة بنفس الاسم بتفضل بصورتها.")) return;
+      if (s.components.length && !confirm("تحدّث المكونات من الستوري بورد؟ المكونات اللي ليها صورة بنفس الاسم بتفضل بصورتها.")) return;
       adx.cur = await pAPI(`/components?shot_id=${sid}`, { method: "POST" });
     } else if (b.dataset.p === "compimgs") adx.cur = await pAPI(`/comp-images?shot_id=${sid}`, { method: "POST" });
     else if (b.dataset.p === "addcomp") adx.cur = await pAPI(`/shots/${sid}/components`, { method: "POST", ...jsonBody({ fields: {} }) });

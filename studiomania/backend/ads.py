@@ -59,13 +59,20 @@ ADAPT_FORMAT = """{
   "format": "9:16 ريلز / تيك توك ...",
   "hook": "أول 3 ثواني",
   "scenes": [
-    {"n": 1, "seconds": 3,
+    {"n": 1, "seconds": 3, "ref_scene": 1,
      "visual": "اللي هيحصل في المشهد",
      "shot": "نوع اللقطة", "camera": "حركة الكاميرا والعدسة",
      "on_screen_text": "الكلام المكتوب على الشاشة",
      "voice": "الكلام اللي هيتقال (باللهجة السعودية)",
      "sfx": "المؤثرات الصوتية", "music": "الموسيقى في المشهد",
-     "prompt": "English prompt for a video model (Seedance) for this scene: subject, action, setting in Saudi Arabia, lighting, lens, camera move, mood, the chosen visual style. Vertical 9:16."}
+     "prompt": "English prompt for a video model (Seedance) for this scene: subject, action, setting in Saudi Arabia, lighting, lens, camera move, mood, the chosen visual style. Vertical 9:16.",
+     "components": [
+       {"name": "اسم المكون في إعلان كوتشي", "kind": "character | prop | background | graphic | text | ui | icon | effect",
+        "from": "اسم المكون اللي يقابله في المشهد الأصلي (أو فاضي لو جديد)",
+        "description": "شكله ودوره في المشهد",
+        "image_prompt": "English prompt to create this element alone, isolated on a plain flat background, in the ad style",
+        "animation": "حركته في المشهد (زي حركة المكون الأصلي لو ليه أصل)"}
+     ]}
   ],
   "voiceover_script": "الفويس أوفر كامل",
   "music_direction": "الموسيقى المطلوبة (نوع، مود، BPM، أمثلة)",
@@ -128,10 +135,13 @@ def adapt_messages(brand: dict, analysis: dict, audio: dict, settings: dict, sty
         f"عن كوتشي: {brand.get('about', '')}\nالجمهور: {brand.get('audience', '')}\n"
         f"ألوان البراند: {brand.get('colors', '')}\n\n"
         + style_txt
-        + "تحليل الإعلان المرجعي:\n" + json.dumps(analysis, ensure_ascii=False)[:14000] + "\n\n"
+        + "تحليل الإعلان المرجعي (وكل مشهد بمكوناته وعناصر الموشن جرافيك وحركتها):\n" + json.dumps(analysis, ensure_ascii=False)[:40000] + "\n\n"
         + ("تحليل الصوت:\n" + json.dumps(audio, ensure_ascii=False)[:6000] + "\n\n" if audio else "")
         + "المطلوب:\n" + "\n".join(f"- {a}" for a in asks if a) + "\n"
         "- مشاهد بنفس روح الإعلان الأصلي لكن بقصة كوتشي، وكل مشهد ببرومبت إنجليزي جاهز لموديل فيديو.\n"
+        "- كل مشهد ref_scene = رقم المشهد الأصلي اللي مستوحى منه. وحوّل مكونات المشهد الأصلي (خصوصًا عناصر الموشن جرافيك) "
+        "لنسخة كوتشي: نفس الوظيفة ونفس طريقة الحركة، بس بشكل كوتشي (شاشة التطبيق بدل شاشتهم، لوجو كوتشي بدل لوجوهم، "
+        "شخصياتنا بدل ممثليهم). الشخصية اللي بتتكرر في أكتر من مشهد اكتب برومبتها بنفس الوصف بالظبط.\n"
         "- من غير كليشيهات إعلانات ومن غير وعود صحية مبالغ فيها.\n"
         f"رجّع JSON بس بالشكل ده:\n{ADAPT_FORMAT}"
     )
@@ -262,8 +272,12 @@ def mock_audio() -> dict:
 def mock_adaptation(duration: int = 30) -> dict:
     return {"title": "كوتشي: إعلان تجريبي", "concept": "فكرة تجريبية", "why_it_fits": "تجربة", "kochi_angle": "التطبيق",
             "duration": duration, "format": "9:16", "hook": "سؤال سريع",
-            "scenes": [{"n": i + 1, "seconds": 5, "visual": f"مشهد {i + 1}", "shot": "medium", "camera": "static",
-                        "on_screen_text": "", "voice": "جملة تجريبية", "sfx": "", "music": "", "prompt": "Test scene. Vertical 9:16."}
+            "scenes": [{"n": i + 1, "seconds": 5, "ref_scene": 1 + i % 2, "visual": f"مشهد {i + 1}", "shot": "medium", "camera": "static",
+                        "on_screen_text": "", "voice": "جملة تجريبية", "sfx": "", "music": "", "prompt": "Test scene. Vertical 9:16.",
+                        "components": [{"name": "المتدرب", "kind": "character", "from": "الممثل", "description": "شاب سعودي",
+                                        "image_prompt": "A young Saudi man, full body.", "animation": "ثابت"},
+                                       {"name": "كارت كوتشي", "kind": "ui", "from": "كارت سعر", "description": "كارت التطبيق",
+                                        "image_prompt": "A KOCHI app card UI.", "animation": "بينط من تحت"}]}
                        for i in range(3)],
             "voiceover_script": "فويس أوفر تجريبي", "music_direction": "beat", "sound_design": "whoosh",
             "cast": "مدرب", "locations": "جيم", "production_notes": "تجربة", "cta": "حمّل كوتشي", "caption": "كابشن"}
@@ -321,6 +335,9 @@ def frame_prompt(h: dict, shot: dict) -> str:
         f"SHOT {shot.get('n')}: {shot.get('visual', '')}",
         f"Framing / camera: {shot.get('shot', '')} {shot.get('camera', '')}".strip(),
         f"On-screen graphics or text in this shot: {shot['on_screen_text']}" if shot.get("on_screen_text") else "",
+        ("Elements that must appear in this frame (including motion-graphics elements, shown mid-animation): "
+         + "; ".join(f"{c.get('name')}: {c.get('image_prompt') or c.get('description')}" for c in shot.get("components") or [] if c.get("use", True))
+         ) if shot.get("components") else "",
         f"Details: {shot.get('prompt', '')}" if shot.get("prompt") else "",
     ] if x)
 
@@ -347,7 +364,13 @@ def components_messages(h: dict, shot: dict, has_reference: bool) -> list[dict]:
         f"راس الإعلان (ثابت لكل اللقطات):\n{header_text(h)}\n\n"
         f"اللقطة {shot.get('n')} ({shot.get('seconds', '')} ثانية): {shot.get('visual', '')}\n"
         f"كلام على الشاشة: {shot.get('on_screen_text', '') or '—'}\nالصوت: {shot.get('voice', '') or '—'}\n\n"
-        "الشخصيات اللي بتتكرر في الإعلان اكتب برومبتها بنفس الوصف بالظبط. أقصى حاجة 8 مكونات، الأهم الأول.\n"
+        + (f"مكونات المشهد الأصلي المقابل (حوّلها لنسخة كوتشي بنفس الوظيفة والحركة): "
+           f"{json.dumps(shot.get('ref_components'), ensure_ascii=False)}\nالموشن جرافيك في الأصلي: {shot.get('ref_motion', '')}\n"
+           if shot.get("ref_components") else "")
+        + (f"المكونات المقترحة للقطة دي (عدّلها على الستوري بورد وكمّل الناقص): "
+           f"{json.dumps([{k: c.get(k) for k in ('name', 'kind', 'description', 'animation')} for c in shot.get('components') or []], ensure_ascii=False)}\n"
+           if shot.get("components") else "")
+        + "الشخصيات اللي بتتكرر في الإعلان اكتب برومبتها بنفس الوصف بالظبط. أقصى حاجة 8 مكونات، الأهم الأول.\n"
         f"رجّع JSON بس بالشكل ده:\n{COMPONENTS_FORMAT}"
     )
     return [{"role": "user", "content": text}]
@@ -381,3 +404,56 @@ def mock_components() -> dict:
         {"name": "شاشة التطبيق", "kind": "ui", "description": "شاشة كوتشي", "image_prompt": "A phone screen showing a fitness app UI.", "animation": "بتكبر من النص"},
         {"name": "أيقونة نار", "kind": "icon", "description": "إيموجي حماس", "image_prompt": "A flat fire icon.", "animation": "بتنط فوق الموبايل"},
     ], "motion_notes": "حركة تجريبية", "assembly_prompt": "Test assembly prompt."}
+
+
+
+SCENE_COMPONENTS_FORMAT = """{
+  "scenes": [
+    {"n": 1,
+     "motion_graphics": "وصف الموشن جرافيك في المشهد ده (لو فيه): العناصر وإزاي بتتحرك وتتنقل",
+     "components": [
+       {"name": "اسم قصير", "kind": "character | prop | background | graphic | text | ui | icon | effect | logo",
+        "description": "شكله ودوره في المشهد",
+        "animation": "إزاي بيدخل ويتحرك ويخرج (التوقيت والاتجاه والسرعة والـ easing)"}
+     ]}
+  ]
+}"""
+
+
+def scene_components_messages(scenes: list[dict]) -> list[dict]:
+    rows = "\n".join(f'{s["n"]}. [{s.get("start", 0):.1f}–{s.get("end", 0):.1f}] {s.get("visual", "")}' for s in scenes)
+    text = (
+        "أنت موشن ديزاينر. اتفرج على الإعلان ده وفصّص كل مشهد لمكوناته اللي اتعمل منها: الشخصيات، الأدوات والمنتجات، "
+        "الخلفيات، وكل عناصر الموشن جرافيك (أيقونات، كروت كلام، شاشات، أشكال، أسهم، لوجوهات، تأثيرات، كلام متحرك). "
+        "لكل مكون اكتب شكله ودوره وطريقة حركته بالتفصيل (دخول، حركة، خروج، توقيت).\n"
+        f"المشاهد بأوقاتها:\n{rows}\n\n"
+        "نفس أرقام المشاهد. التحليل بالعربي المصري البسيط. أقصى حاجة 10 مكونات للمشهد، الأهم الأول.\n"
+        f"رجّع JSON بس بالشكل ده:\n{SCENE_COMPONENTS_FORMAT}"
+    )
+    return [{"role": "user", "content": text}]
+
+
+def merge_scene_components(scenes: list[dict], data: dict) -> int:
+    """يحط مكونات كل مشهد جوه المشهد نفسه. بيرجّع عدد المشاهد اللي اتفصّصت."""
+    by_n = {}
+    for x in (data or {}).get("scenes") or []:
+        if isinstance(x, dict) and str(x.get("n", "")).strip().isdigit():
+            by_n[int(str(x["n"]).strip())] = x
+    count = 0
+    for s in scenes:
+        x = by_n.get(int(s.get("n") or 0))
+        if not x:
+            continue
+        comps = [{k: str(c.get(k) or "") for k in ("name", "kind", "description", "animation")}
+                 for c in x.get("components") or [] if isinstance(c, dict) and c.get("name")][:10]
+        s["components"] = comps
+        s["motion_graphics"] = str(x.get("motion_graphics") or "")
+        count += 1
+    return count
+
+
+def mock_scene_components(scenes: list[dict]) -> dict:
+    return {"scenes": [{"n": s["n"], "motion_graphics": "كروت بتطلع من الموبايل",
+                        "components": [{"name": "الممثل", "kind": "character", "description": "شاب", "animation": "ثابت"},
+                                       {"name": "كارت سعر", "kind": "graphic", "description": "كارت أبيض", "animation": "بينط من تحت"}]}
+                       for s in scenes]}

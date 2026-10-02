@@ -5613,6 +5613,7 @@ def ad_to_dict(r: sqlite3.Row, d: dict) -> dict:
         "audio": d.get("audio"), "audio_error": d.get("audio_error"), "audio_tech": d.get("audio_tech"),
         "settings": d.get("settings") or {},
         "adaptation": d.get("adaptation"), "adapt_status": d.get("adapt_status", "idle"), "adapt_error": d.get("adapt_error"),
+        "scomp_status": d.get("scomp_status", "idle"),
         "chat": d.get("chat") or [],
         "thumb": scenes[0]["frame_url"] if scenes and scenes[0].get("frame_url") else None,
         "prod": prod_to_dict(aid, d.get("prod")),
@@ -5786,6 +5787,47 @@ def edit_ad(aid: str, body: AdEditIn):
     return ad_response(aid)
 
 
+def run_scene_components(aid: str) -> None:
+    try:
+        with closing(db()) as conn:
+            _, d = ad_row(conn, aid)
+        scenes = d["analysis"]["scenes"]
+        if atlas.mock_mode():
+            sc = az.mock_scene_components(scenes)
+        else:
+            proxy = ad_dir(aid) / "proxy.mp4"
+            if not proxy.exists():
+                raise HTTPException(400, "نسخة الفيديو الصغيرة مش موجودة. دوس «حلّل تاني»")
+            sc = ad_json(ad_media_chat(az.with_media(az.scene_components_messages(scenes), data_url(proxy, "video/mp4"), "ad.mp4")),
+                         "مكونات المشاهد")
+        def fn(d):
+            az.merge_scene_components(d["analysis"]["scenes"], sc)
+            d["analysis"]["components_error"] = None
+            d["scomp_status"] = "done"
+        update_ad(aid, fn)
+    except Exception as exc:  # noqa: BLE001
+        msg = str(getattr(exc, "detail", None) or exc)[:300]
+        def fail(d):
+            d["scomp_status"] = "failed"
+            if d.get("analysis"):
+                d["analysis"]["components_error"] = msg
+        update_ad(aid, fail)
+
+
+@app.post("/api/ads/{aid}/scene-components")
+def scene_components(aid: str):
+    """تفصيص مكونات مشاهد الإعلان الأصلي (للإعلانات اللي اتحللت قبل الخطوة دي، أو لو عايز تعيده)."""
+    with closing(db()) as conn:
+        _, d = ad_row(conn, aid)
+    if not d.get("analysis"):
+        raise HTTPException(400, "استنى لما التحليل يخلص")
+    if d.get("scomp_status") == "working":
+        raise HTTPException(400, "التفصيص شغال بالفعل")
+    update_ad(aid, lambda d: d.update(scomp_status="working"))
+    threading.Thread(target=run_scene_components, args=(aid,), daemon=True).start()
+    return ad_response(aid)
+
+
 @app.post("/api/ads/{aid}/analyze")
 def reanalyze_ad(aid: str):
     with closing(db()) as conn:
@@ -5925,6 +5967,15 @@ def run_ad_analysis(aid: str) -> None:
                            capture_output=True, timeout=60)
             if (folder / "frames" / fr).exists():
                 s["frame"] = fr
+        step("بيفصّص مكونات كل مشهد والموشن جرافيك")
+        try:
+            sc = az.mock_scene_components(analysis["scenes"]) if atlas.mock_mode() else ad_json(
+                ad_media_chat(az.with_media(az.scene_components_messages(analysis["scenes"]), data_url(proxy, "video/mp4"), "ad.mp4")),
+                "مكونات المشاهد")
+            az.merge_scene_components(analysis["scenes"], sc)
+            analysis["components_error"] = None
+        except (atlas.AtlasError, ValueError, HTTPException) as exc:
+            analysis["components_error"] = str(getattr(exc, "detail", None) or exc)[:300]
         if not analysis.get("title"):
             analysis["title"] = ""
         def done(d):
@@ -6191,15 +6242,26 @@ def prod_start(aid: str):
     header = az.header_from(a, ad_style(settings.get("style_id")), brand_settings(), settings)
     scenes = a["scenes"]
     shots = []
+    orig = {s.get("n"): s for s in (d.get("analysis") or {}).get("scenes") or []}
     for k, sc in enumerate(scenes):
-        ref = ref_scene_for(d.get("analysis"), k, len(scenes))
+        try:
+            ref = orig.get(int(sc.get("ref_scene")))
+        except (TypeError, ValueError):
+            ref = None
+        ref = ref or ref_scene_for(d.get("analysis"), k, len(scenes))
+        comps = [{"id": uuid.uuid4().hex[:8], "name": str(c.get("name") or "مكون")[:60], "kind": str(c.get("kind") or "prop")[:20],
+                  "from": str(c.get("from") or ""), "description": str(c.get("description") or ""),
+                  "image_prompt": str(c.get("image_prompt") or ""), "animation": str(c.get("animation") or ""),
+                  "image": None, "images": [], "status": "idle", "error": None, "use": True}
+                 for c in sc.get("components") or [] if isinstance(c, dict) and (c.get("image_prompt") or c.get("description"))][:10]
         shots.append({
             "id": uuid.uuid4().hex[:10], "n": k + 1,
             "seconds": float(sc.get("seconds") or 4) if str(sc.get("seconds") or "").replace(".", "", 1).isdigit() else 4.0,
             **{f: str(sc.get(f) or "") for f in ("visual", "shot", "camera", "on_screen_text", "voice", "sfx", "music", "prompt")},
             "ref_scene": ref.get("n") if ref else None, "ref_frame": ref.get("frame") if ref else None,
             "frame": None, "frames": [], "frame_status": "idle", "frame_error": None,
-            "components": [], "comp_status": "idle", "comp_error": None, "motion_notes": "", "assembly_prompt": "",
+            "components": comps, "comp_status": "done" if comps else "idle", "comp_error": None,
+            "motion_notes": (ref or {}).get("motion_graphics", ""), "assembly_prompt": "",
             "approved": False, "takes": [], "chosen": None,
         })
     update_ad(aid, lambda d: d.update(prod={"header": header, "shots": shots}))
@@ -6352,7 +6414,9 @@ def run_ad_components(aid: str, sid: str) -> None:
         else:
             ref = ad_dir(aid) / "frames" / s["ref_frame"] if s.get("ref_frame") else None
             ref = ref if ref and ref.exists() else None
-            msgs = az.components_messages(p["header"], s, bool(ref))
+            orig = next((x for x in (d.get("analysis") or {}).get("scenes") or [] if x.get("n") == s.get("ref_scene")), None)
+            msgs = az.components_messages(p["header"], {**s, "ref_components": (orig or {}).get("components") or [],
+                                                         "ref_motion": (orig or {}).get("motion_graphics", "")}, bool(ref))
             parts = [{"type": "text", "text": msgs[0]["content"]}]
             if s.get("frame"):
                 parts.append({"type": "image_url", "image_url": {"url": data_url(prod_dir(aid, "frames") / s["frame"], "image/png")}})

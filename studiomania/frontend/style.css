@@ -1273,3 +1273,8 @@ a.pl-link:hover { background: color-mix(in srgb, var(--ok) 24%, transparent); }
 .ad-take .wait { color: #fff; font-size: 12px; padding: 18px 6px; text-align: center; }
 .ad-take .acts { display: flex; gap: 2px; flex-wrap: wrap; padding: 4px; background: var(--surface); }
 .ad-take .acts .btn { padding: 2px 6px; font-size: 11px; }
+.ad-scenes-head { align-items: center; gap: 10px; margin-top: 10px; }
+.ad-mg { grid-column: 1 / -1; font-size: 13px; background: var(--surface); border-radius: 10px; padding: 6px 10px; }
+.ad-scomps { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.ad-scomp { background: var(--surface); border-radius: 10px; padding: 4px 8px; font-size: 12px; display: inline-flex; flex-direction: column; max-width: 240px; }
+.ad-scomp small { color: var(--muted); font-size: 11px; }
