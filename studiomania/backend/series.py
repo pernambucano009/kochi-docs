@@ -421,39 +421,50 @@ def word_count(text: str) -> int:
     return len([w for w in re.split(r"\s+", text or "") if re.search(r"\w", w)])
 
 
-def rewrite_messages(bible: str, character: str, lines: list[dict], shots: list[dict], chat: list[dict]) -> list[dict]:
-    """الفيديوهات خلاص اتصورت: الموديل بيكتب كلام جديد لكل جملة، على نفس الصورة ونفس الوقت تقريبًا."""
-    rows = []
-    for ln in lines:
-        dur = max(0.0, (ln.get("end") or 0) - (ln.get("start") or 0))
-        seen = [s.get("title") or "" for s in shots if ln["n"] in (s.get("lines") or [])]
-        rows.append(
-            f'{ln["n"]}. ({dur:.1f} ثانية، {word_count(ln["text"])} كلمة) «{ln["text"]}»'
+def rewrite_messages(bible: str, character: str, rows: list[dict], shots: list[dict], chat: list[dict]) -> list[dict]:
+    """الفيديوهات خلاص اتصورت: الموديل بيعدّل كلام الجمل على نفس الصورة ونفس الوقت تقريبًا،
+    وممكن يضيف جمل جديدة (n = null) لو المستخدم طلب، ودي بيتعمل لها لقطات جديدة بعد التسجيل."""
+    out = []
+    for r in rows:
+        if r.get("n") is None:
+            out.append(f'جديدة (n=null): «{r["text"]}»')
+            continue
+        seen = [x.get("title") or "" for x in shots if r["n"] in (x.get("lines") or [])]
+        out.append(
+            f'{r["n"]}. ({(r.get("dur") or 0):.1f} ثانية، {word_count(r.get("old") or r["text"])} كلمة) «{r["text"]}»'
             + (f' — على الشاشة: {" / ".join(x for x in seen if x)}' if any(seen) else "")
         )
     system = (
         "أنت كاتب سيناريو لمسلسل قصير على السوشيال ميديا. الحلقة دي اتصورت خلاص والفيديوهات جاهزة، "
-        "والمطلوب كلام فويس أوفر جديد يتسجّل على نفس الفيديوهات بالظبط.\n\n"
+        "والمستخدم بيعدّل كلام الفويس أوفر عشان يتسجّل من جديد على نفس الفيديوهات.\n\n"
         f"دستور المسلسل:\n{bible.strip()}\n\n"
         + (f"الشخصية:\n{character.strip()}\n\n" if character.strip() else "")
         + "جمل الفويس أوفر الحالية بالترتيب (رقم الجملة، مدتها في الصوت، وإيه اللي ظاهر على الشاشة وقتها):\n"
-        + "\n".join(rows)
+        + "\n".join(out)
         + "\n\nالقواعد:\n"
-        "- نفس عدد الجمل ونفس أرقامها: كل جملة جديدة مكان القديمة بالظبط، لأن الصورة اللي تحتها مش هتتغير.\n"
-        "- الجملة الجديدة لازم تتقال في نفس الوقت تقريبًا: قريبة من عدد كلمات القديمة (زيادة كلمتين بالكتير). الجمل القصيرة جدًا (أقل من ثانية) خليها كلمة أو كلمتين.\n"
-        "- الكلام يناسب اللي ظاهر على الشاشة، والقصة تفضل ماشية بنفس الترتيب.\n"
-        "- نفس لهجة المسلسل ونفس روح الشخصية، واسم الشخصية ما يتذكرش أبدًا.\n"
-        "- اسمع توجيه المستخدم وطبّقه على الحلقة كلها بشكل واضح، مش تغيير كلمة هنا وكلمة هناك: "
-        "المستخدم مش عاجبه الكلام القديم، فأغلب الجمل لازم تتغير فعلًا.\n"
+        "- الجمل اللي ليها رقم ليها فيديو جاهز: سيب رقمها زي ما هو، والجملة الجديدة مكانها لازم تناسب الصورة وتتقال في نفس الوقت تقريبًا "
+        "(قريبة من عدد الكلمات، زيادة كلمتين بالكتير). الجمل القصيرة جدًا (أقل من ثانية) خليها كلمة أو كلمتين.\n"
+        "- ما تشيلش جمل ليها رقم.\n"
+        "- لو المستخدم طلب يزوّد كلام (مشهد جديد، جملة زيادة، يطوّل حتة، يقسم مشهد): ضيف جمل جديدة بـ \"n\": null في مكانها بالترتيب. "
+        "الجمل الجديدة دي هيتعمل لها لقطات وفيديوهات جديدة، فمسموح تبقى بأي طول معقول. وما تضيفش جمل جديدة إلا لو اتطلب.\n"
+        "- غيّر اللي المستخدم طالبه بس: لو طلب تغيير في الأسلوب للحلقة كلها (مثلًا أظرف) طبّقه بوضوح على أغلب الجمل، "
+        "ولو طلب حاجة في حتة معينة سيب باقي الجمل زي ما هي بالحرف.\n"
+        "- القصة تفضل ماشية بنفس الترتيب، ونفس لهجة المسلسل وروح الشخصية، واسم الشخصية ما يتذكرش أبدًا.\n"
         "- لو طلب كوميديا: ضحك ذكي وجاف مش تهريج. استخدم المفارقة بين الكلام والصورة، والمبالغة، والسخرية من النفس، "
         "وتفاصيل سعودية يومية حقيقية، وإفيه واضح في آخر كل مشهد أو كل كام جملة. الشخصية جادة جدًا من برة، والضحك جاي من جدّيتها.\n\n"
-        'رد بـ JSON بس بالشكل ده: {"lines": [{"n": 1, "text": "..."}, ...]} وفيه كل الجمل.'
+        'رد بـ JSON بس بالشكل ده، وفيه كل الجمل بالترتيب: {"lines": [{"n": 1, "text": "..."}, {"n": null, "text": "جملة جديدة"}, ...]}'
     )
     return [{"role": "system", "content": system}] + chat[-20:]
 
 
-def parse_rewrite(text: str, lines: list[dict]) -> list[dict]:
-    """الجمل الجديدة بنفس أرقام القديمة؛ أي جملة الموديل نسيها بتفضل زي ما هي."""
+def _new_key() -> str:
+    import uuid
+    return "x" + uuid.uuid4().hex[:8]
+
+
+def parse_rewrite(text: str, rows: list[dict]) -> list[dict]:
+    """الجمل بالترتيب: اللي ليها رقم = جملة قديمة (ليها فيديو)، واللي من غير رقم = جديدة.
+    أي جملة قديمة الموديل نسيها بترجع مكانها زي ما كانت."""
     m = re.search(r"\{.*\}", text or "", re.S)
     if not m:
         raise ValueError("الموديل ما رجعش الجمل الجديدة")
@@ -461,28 +472,95 @@ def parse_rewrite(text: str, lines: list[dict]) -> list[dict]:
     raw = data.get("lines") if isinstance(data, dict) else None
     if not isinstance(raw, list) or not raw:
         raise ValueError("الموديل ما رجعش الجمل الجديدة")
-    new = {}
+    known = {r["n"]: r for r in rows if r.get("n") is not None}
+    out, seen = [], set()
     for x in raw:
-        if isinstance(x, dict) and str(x.get("n", "")).strip().isdigit() and str(x.get("text") or "").strip():
-            new[int(str(x["n"]).strip())] = str(x["text"]).strip().strip("«»\"").strip()[:500]
-    return [{"n": ln["n"], "text": new.get(ln["n"], ln["text"])} for ln in lines]
+        if not isinstance(x, dict):
+            continue
+        t = str(x.get("text") or "").strip().strip("«»\"").strip()[:500]
+        n = int(str(x.get("n")).strip()) if str(x.get("n", "")).strip().isdigit() else None
+        if n is not None and n in known and n not in seen:
+            seen.add(n)
+            out.append({"n": n, "k": f"n{n}", "text": t or known[n]["text"]})
+        elif n is None and t:
+            out.append({"n": None, "k": _new_key(), "text": t})
+    for n in sorted(set(known) - seen):
+        k = max((i for i, r in enumerate(out) if r["n"] is not None and r["n"] < n), default=-1)
+        out.insert(k + 1, {"n": n, "k": f"n{n}", "text": known[n]["text"]})
+    return out
 
 
-def mock_rewrite(lines: list[dict], chat: list[dict]) -> str:
-    return json.dumps({"lines": [{"n": ln["n"], "text": f"{ln['text']} 😂"} for ln in lines]}, ensure_ascii=False)
+def mock_rewrite(rows: list[dict], chat: list[dict]) -> str:
+    out = [{"n": r.get("n"), "text": f"{r['text']} 😂" if r.get("n") is not None else r["text"]} for r in rows]
+    if chat and "زود" in chat[-1]["content"]:
+        out.append({"n": None, "text": "وهنا جملة زيادة في الآخر."})
+    return json.dumps({"lines": out}, ensure_ascii=False)
 
 
-def warp_shots(shots: list[dict], old: dict, old_total: float, new_lines: list[dict], new_total: float) -> list[dict]:
+def carve_new_shots(shots: list[dict], lines: list[dict], added: list[int], total: float) -> list[str]:
+    """جمل جديدة اتضافت واتسجلت: كل واحدة ليها لقطة جديدة بتتقص من اللقطة اللي وقعت فيها (بعد ما اتمطت على الصوت الجديد).
+    اللقطات القديمة بفيديوهاتها بتفضل. بيرجّع أرقام اللقطات الجديدة."""
+    import uuid
+    by_n = {ln["n"]: ln for ln in lines}
+    new_ids = []
+    for n in sorted(added, key=lambda n: by_n.get(n, {}).get("start") or 0):
+        ln = by_n.get(n)
+        if not ln or ln.get("start") is None:
+            continue
+        a = ln["start"]
+        host = next((x for x in shots if x["start"] <= a < x["end"]), shots[-1] if shots else None)
+        if host is None:
+            continue
+        k = shots.index(host)
+        if a - host["start"] >= 0.4:
+            # اللقطة الجديدة بتاخد باقي اللقطة من أول الجملة الجديدة
+            start, end = a, host["end"]
+            if end - start < 0.3:
+                continue
+            host["end"] = round(start, 2)
+            pos = k + 1
+        else:
+            start, end = host["start"], min(ln["end"] + 0.15, host["end"] - 0.4)
+            if end - start < 0.3:
+                continue
+            host["start"] = round(end, 2)
+            pos = k
+        sid = uuid.uuid4().hex[:10]
+        shots.insert(pos, {"id": sid, "scene": host.get("scene") or 0, "start": round(start, 2), "end": round(end, 2),
+                           "lines": [n], "title": ln["text"][:80], "shot": "", "camera": "", "location": host.get("location") or "",
+                           "sfx": "", "transition": "cut", "prompt": "", "takes": [], "chosen": None, "offset": 0.0,
+                           "approved": False, "frames": [], "frame": None, "frame_status": "idle", "frame_error": None,
+                           "added": True, "needs_describe": True})
+        new_ids.append(sid)
+    # متلاصقة من 0 لآخر الصوت
+    for i, x in enumerate(shots):
+        if i:
+            x["start"] = shots[i - 1]["end"]
+        x["end"] = max(x["start"] + 0.1, x["end"])
+    if shots:
+        shots[-1]["end"] = round(max(shots[-1]["start"] + 0.1, total), 2)
+    for i, x in enumerate(shots, 1):
+        x["n"] = i
+    return new_ids
+
+
+def warp_shots(shots: list[dict], old: dict, old_total: float, new_lines: list[dict], new_total: float,
+               holes: list[tuple[float, float, float]] | None = None) -> list[dict]:
     """الصوت الجديد اتسجّل: كل لقطة تتحرك وتتمط أو تتقص على مكان جملها في الصوت الجديد.
     بنعمل خريطة من الوقت القديم للجديد من بداية ونهاية كل جملة موجودة في الاتنين، وبين النقط بالتناسب."""
-    pts = [(0.0, 0.0)]
-    for ln in sorted(new_lines, key=lambda x: x.get("start") or 0):
+    cand = []
+    for ln in new_lines:
         o = old.get(str(ln["n"]))
         if not o or ln.get("start") is None or ln.get("end") is None:
             continue
-        for a, b in ((o[0], ln["start"]), (o[1], ln["end"])):
-            if a > pts[-1][0] + 0.05 and b > pts[-1][1] + 0.05 and a < old_total and b < new_total:
-                pts.append((float(a), float(b)))
+        cand += [(float(o[0]), float(ln["start"])), (float(o[1]), float(ln["end"]))]
+    # جمل جديدة اتحطت بعد جملة قديمة: الوقت القديم ده بيقفز فوق مكانها في الصوت الجديد (فاضي للقطة الجديدة)
+    for t, a, b in holes or []:
+        cand += [(float(t), float(a)), (float(t) + 0.001, float(b))]
+    pts = [(0.0, 0.0)]
+    for a, b in sorted(cand):
+        if a > pts[-1][0] + 0.0005 and b > pts[-1][1] + 0.05 and a < old_total and b < new_total:
+            pts.append((a, b))
     pts.append((float(old_total), float(new_total)))
 
     def warp(t: float) -> float:

@@ -1135,3 +1135,8 @@ a.pl-link:hover { background: color-mix(in srgb, var(--ok) 24%, transparent); }
 .ser-add-dlg textarea { width: 100%; }
 .shot.flash { box-shadow: 0 0 0 3px var(--accent); transition: box-shadow .3s; }
 .shot header .added { font-size: 12px; }
+.rw-line.new textarea { border-color: var(--accent); }
+.rw-line .new-tag { color: var(--accent); }
+.rw-line .rw-tools { display: flex; gap: 2px; padding-top: 2px; }
+.rw-line .rw-tools .btn { padding: 2px 6px; }
+#serRwManual { margin-top: 6px; }

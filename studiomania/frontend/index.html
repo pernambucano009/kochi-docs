@@ -838,11 +838,12 @@
                 <label class="field">اسم الحلقة <input type="text" id="serEpRename" data-no-i18n></label>
                 <section class="ser-rewrite" id="serRewrite" hidden>
                   <div class="panel-head"><h2>🎭 كلام جديد على نفس الفيديوهات</h2><span class="muted" id="serRwState"></span></div>
-                  <p class="hint">مش عاجبك الكلام؟ الفيديوهات تفضل زي ما هي، والبرنامج يكتب جملة جديدة مكان كل جملة على قد وقتها. بعدها تسجّل الفويس أوفر الجديد وترفعه، واللقطات بتتظبط عليه لوحدها.</p>
+                  <p class="hint">عدّل الكلام من غير ما تخسر الفيديوهات: كل جملة قديمة بتفضل بلقطاتها، وتقدر تزوّد جمل أو مشاهد جديدة (➕) في أي مكان، أو تقول للبرنامج «زوّد مشهد بعد كذا». بعدها تسجّل الفويس أوفر الجديد وترفعه: اللقطات القديمة بتتظبط عليه، والجمل الجديدة بيتعمل لها لقطات.</p>
                   <form class="car-input" id="serRwForm">
                     <textarea id="serRwMsg" rows="2" placeholder="وجّهه: مثلًا «خليه مضحك أكتر»، «إفيه في آخر كل مشهد»، «أقصر»... (Enter يبعت)"></textarea>
                     <button class="btn primary" type="submit" id="serRwGo">🎭 اكتب كلام جديد</button>
                   </form>
+                  <button class="btn sm" id="serRwManual">✏️ عدّل بإيدي (وزوّد جمل أو مشاهد)</button>
                   <div class="ser-rw-lines" id="serRwLines" data-no-i18n></div>
                   <div class="row wrap" id="serRwActs" hidden>
                     <button class="btn primary" id="serRwApply">✅ اعتمد الكلام الجديد</button>

@@ -186,8 +186,32 @@ $("serApproveScript").onclick = () => busyButton($("serApproveScript"), "⏳", a
   renderSeries();
 });
 
-// كلام جديد على نفس الفيديوهات: جملة مكان جملة، على قد وقتها
+// كلام جديد على نفس الفيديوهات: الجمل القديمة بفيديوهاتها، وتقدر تزوّد جمل جديدة (بيتعمل لها لقطات بعد التسجيل)
 const wordsOf = (t) => (t || "").split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w)).length;
+function rwRows() {
+  return [...$("serRwLines").querySelectorAll(".rw-line")].map((el) => ({
+    n: el.dataset.n ? Number(el.dataset.n) : null, k: el.dataset.k, text: el.querySelector("textarea").value,
+  }));
+}
+function rwCount(el) {
+  const old = ser.ep.lines.find((l) => l.n === Number(el.dataset.n));
+  const b = wordsOf(el.querySelector("textarea").value);
+  const wc = el.querySelector(".wc");
+  if (!old) { wc.textContent = `≈ ${(b / 2.4).toFixed(1)}ث`; wc.classList.remove("long"); return; }
+  const a = wordsOf(old.text);
+  wc.textContent = `${b}/${a}${b > a + 1 ? " ⚠️ أطول" : ""}`;
+  wc.classList.toggle("long", b > a + 1);
+}
+function rwRowHtml(r) {
+  const old = r.n != null ? ser.ep.lines.find((l) => l.n === r.n) : null;
+  return `<div class="rw-line ${old ? "" : "new"}" data-k="${escapeHtml(r.k || "")}" data-n="${r.n ?? ""}"><b>${old ? r.n : "➕"}</b>
+    <div class="rw-body">${old
+      ? `<div class="old">«${escapeHtml(old.text)}» <span class="muted">· ${(old.end - old.start).toFixed(1)}ث</span></div>`
+      : `<div class="old new-tag">جملة جديدة: هيتعمل لها لقطة وفيديو بعد ما تسجّل</div>`}
+      <textarea rows="1" placeholder="اكتب الجملة...">${escapeHtml(r.text)}</textarea></div>
+    <span class="wc" title="${old ? "عدد الكلمات: الجديد / القديم" : "وقتها تقريبًا"}"></span>
+    <span class="rw-tools"><button class="btn sm" data-rw-add title="جملة جديدة بعد دي">➕</button><button class="btn sm" data-rw-del title="شيل الجملة">🗑️</button></span></div>`;
+}
 function renderRewrite() {
   const ep = ser.ep;
   const ready = ep.shots.length && ep.lines.length && ep.lines.every((l) => l.start != null);
@@ -197,20 +221,25 @@ function renderRewrite() {
   if (!ready) return;
   const rw = ep.rewrite.lines;
   $("serRwGo").textContent = rw.length ? "🎭 عدّل" : "🎭 اكتب كلام جديد";
+  $("serRwManual").hidden = !!rw.length;
   $("serRwActs").hidden = !rw.length;
-  $("serRwState").textContent = rw.length ? `${rw.filter((x) => x.text !== ep.lines.find((l) => l.n === x.n)?.text).length} جملة اتغيرت من ${ep.lines.length}` : "";
+  const changed = rw.filter((x) => x.n != null && x.text !== ep.lines.find((l) => l.n === x.n)?.text).length;
+  const added = rw.filter((x) => x.n == null).length;
+  const removed = ep.lines.length - rw.filter((x) => x.n != null).length;
+  $("serRwState").textContent = rw.length ? [`${changed} جملة اتغيرت`, added && `➕ ${added} جديدة`, removed && `🗑️ ${removed} اتشالت`].filter(Boolean).join(" · ") : "";
   if (!rw.length) { $("serRwLines").innerHTML = ""; return; }
   if ($("serRwLines").contains(document.activeElement)) return;
-  const newText = Object.fromEntries(rw.map((x) => [x.n, x.text]));
-  $("serRwLines").innerHTML = ep.lines.map((l) => {
-    const now = newText[l.n] ?? l.text;
-    const a = wordsOf(l.text), b = wordsOf(now);
-    return `<div class="rw-line"><b>${l.n}</b>
-      <div class="rw-body"><div class="old">«${escapeHtml(l.text)}» <span class="muted">· ${(l.end - l.start).toFixed(1)}ث</span></div>
-        <textarea rows="1" data-rw="${l.n}">${escapeHtml(now)}</textarea></div>
-      <span class="wc ${b > a + 1 ? "long" : ""}" title="عدد الكلمات: الجديد / القديم">${b}/${a}${b > a + 1 ? " ⚠️ أطول" : ""}</span></div>`;
-  }).join("");
+  $("serRwLines").innerHTML = rw.map(rwRowHtml).join("");
+  $("serRwLines").querySelectorAll(".rw-line").forEach(rwCount);
 }
+async function saveRw() {
+  try { ser.ep = await api(`/api/episodes/${ser.ep.id}/rewrite`, { method: "PUT", ...jsonBody({ lines: rwRows() }) }); renderSeries(); }
+  catch (err) { toast(err.message, true); }
+}
+$("serRwManual").onclick = () => busyButton($("serRwManual"), "⏳", async () => {
+  ser.ep = await api(`/api/episodes/${ser.ep.id}/rewrite`, { method: "PUT", ...jsonBody({ lines: ser.ep.lines.map((l) => ({ n: l.n, text: l.text })) }) });
+  renderSeries();
+});
 $("serRwForm").addEventListener("submit", (e) => {
   e.preventDefault();
   const message = $("serRwMsg").value.trim();
@@ -225,22 +254,29 @@ $("serRwMsg").addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("serRwForm").requestSubmit(); }
 });
 $("serRwLines").addEventListener("input", (e) => {
-  const ta = e.target.closest("[data-rw]");
-  if (!ta) return;
-  const l = ser.ep.lines.find((x) => x.n === Number(ta.dataset.rw));
-  const a = wordsOf(l.text), b = wordsOf(ta.value);
-  const wc = ta.closest(".rw-line").querySelector(".wc");
-  wc.textContent = `${b}/${a}${b > a + 1 ? " ⚠️ أطول" : ""}`;
-  wc.classList.toggle("long", b > a + 1);
+  const row = e.target.closest(".rw-line");
+  if (row && e.target.matches("textarea")) rwCount(row);
 });
-$("serRwLines").addEventListener("change", async (e) => {
-  if (!e.target.closest("[data-rw]")) return;
-  const lines = [...$("serRwLines").querySelectorAll("[data-rw]")].map((t) => ({ n: Number(t.dataset.rw), text: t.value }));
-  try { ser.ep = await api(`/api/episodes/${ser.ep.id}/rewrite`, { method: "PUT", ...jsonBody({ lines }) }); renderSeries(); }
-  catch (err) { toast(err.message, true); }
+$("serRwLines").addEventListener("change", (e) => {
+  if (e.target.matches("textarea")) saveRw();
+});
+$("serRwLines").addEventListener("click", (e) => {
+  const row = e.target.closest(".rw-line");
+  if (!row) return;
+  if (e.target.closest("[data-rw-add]")) {
+    row.insertAdjacentHTML("afterend", rwRowHtml({ n: null, k: `x${Math.random().toString(36).slice(2, 10)}`, text: "" }));
+    const fresh = row.nextElementSibling;
+    rwCount(fresh);
+    fresh.querySelector("textarea").focus();
+  } else if (e.target.closest("[data-rw-del]")) {
+    if (row.dataset.n && !confirm("تشيل الجملة دي؟ اللقطة بتاعتها بتفضل بفيديوها بس من غير كلام عليها (وتقدر تحذفها من تبويب اللقطات).")) return;
+    row.remove();
+    saveRw();
+  }
 });
 $("serRwApply").onclick = () => {
-  if (!confirm("الكلام الجديد هيبقى سكريبت الحلقة. بعدها تسجّل الفويس أوفر بيه وترفعه، واللقطات تتظبط عليه.\n(المونتاج والفيديو اللي صدّرته قبل كده بيفضلوا زي ما هما.)")) return;
+  const added = ser.ep.rewrite.lines.filter((x) => x.n == null && x.text.trim()).length;
+  if (!confirm(`الكلام الجديد هيبقى سكريبت الحلقة. بعدها تسجّل الفويس أوفر بيه وترفعه، واللقطات تتظبط عليه.${added ? `\nالجمل الجديدة (${added}) هيتعمل لها لقطات جديدة بعد ما ترقّم الجمل على الصوت.` : ""}\n(المونتاج والفيديو اللي صدّرته قبل كده بيفضلوا زي ما هما.)`)) return;
   busyButton($("serRwApply"), "⏳", async () => {
     ser.ep = await api(`/api/episodes/${ser.ep.id}/rewrite/apply`, { method: "POST" });
     ser.tab = "script";
@@ -363,6 +399,7 @@ function renderShotsTab() {
   if (rt) $("serRetimed").textContent = rt.short.length
     ? `🔁 اللقطات اتظبطت على الصوت الجديد. ${rt.short.length} لقطة الفيديو بتاعها بقى أقصر من وقتها (${rt.short.join("، ")}): في المونتاج هتتبطّأ شوية وآخر فريم يقف، أو دوس «🔄 واحد تاني» عليها يتولد على الوقت الجديد.`
     : "🔁 اللقطات اتظبطت على الصوت الجديد، وكل الفيديوهات مكفية وقتها.";
+  if (rt?.added?.length) $("serRetimed").textContent += ` ➕ اتعملت لقطات جديدة للجمل اللي ضفتها (${rt.added.join("، ")}): ارسم لها ستوري بورد واعتمدها وولّدها.`;
   $("serShots").innerHTML = ep.shots.map((s) => {
     const head = s.scene !== scene ? `<div class="ser-scene">المشهد ${s.scene}</div>` : "";
     scene = s.scene;

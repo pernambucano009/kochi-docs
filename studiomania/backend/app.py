@@ -4409,7 +4409,42 @@ def episode_timing(eid: str, mode: str = "auto"):
         d["timing"] = source
         retime_shots(d, matched=heard_lines is None)
     update_episode(eid, fn)
+    describe_new_shots(eid)
     return episode_response(eid)
+
+
+def describe_new_shots(eid: str) -> None:
+    """اللقطات اللي اتعملت لجمل جديدة: الموديل يكتب وصفها وبرومبتها على أسلوب اللي جنبها (كلهم مع بعض)."""
+    with closing(db()) as conn:
+        r, data = episode_row(conn, eid)
+        _, sdata = series_for_episode(conn, r)
+    shots = data["shots"]
+    todo = [k for k, x in enumerate(shots) if x.get("needs_describe")]
+    if not todo:
+        return
+    def one(k: int) -> tuple[str, dict | None]:
+        x = shots[k]
+        prev = next((shots[i] for i in range(k - 1, -1, -1) if not shots[i].get("needs_describe")), None)
+        nxt = next((shots[i] for i in range(k + 1, len(shots)) if not shots[i].get("needs_describe")), None)
+        said = [ln["text"] for ln in data["lines"] if ln["n"] in (x.get("lines") or [])]
+        if atlas.mock_mode():
+            return x["id"], sz.mock_one_shot(prev, said[0] if said else "")
+        if not atlas.api_key():
+            return x["id"], None
+        try:
+            return x["id"], sz.parse_one_shot(series_chat(sz.insert_shot_messages(
+                sdata["bible"], sdata["character"], prev, nxt, said, x["end"] - x["start"], "")))
+        except (HTTPException, ValueError):
+            return x["id"], None
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        results = dict(pool.map(one, todo))
+    def fn(d):
+        for x in d["shots"]:
+            if x["id"] in results:
+                if results[x["id"]]:
+                    x.update(results[x["id"]])
+                x.pop("needs_describe", None)
+    update_episode(eid, fn)
 
 
 def retime_shots(d: dict, matched: bool) -> None:
@@ -4419,16 +4454,32 @@ def retime_shots(d: dict, matched: bool) -> None:
     if not rt or not d["shots"] or not d["audio"]:
         return
     total = d["audio"]["duration"]
-    d["shots"] = sz.warp_shots(d["shots"], rt["old"] if matched else {}, rt["total"], d["lines"], total)
+    added = set(rt.get("added") or []) if matched else set()
+    holes, prev_end, group = [], 0.0, []
+    for ln in d["lines"] + [None]:
+        if ln is not None and ln["n"] in added:
+            if ln.get("start") is not None:
+                group.append(ln)
+            continue
+        if group:
+            holes.append((prev_end, min(x["start"] for x in group), max(x["end"] for x in group)))
+            group = []
+        if ln is not None and str(ln["n"]) in rt["old"]:
+            prev_end = rt["old"][str(ln["n"])][1]
+    d["shots"] = sz.warp_shots(d["shots"], rt["old"] if matched else {}, rt["total"], d["lines"], total, holes)
     if not matched:
         for sh in d["shots"]:
             sh["lines"] = sz.lines_in_shot(sh, d["lines"])
+    if added:
+        sz.carve_new_shots(d["shots"], d["lines"], sorted(added), total)
+    for ln in d["lines"]:
+        ln.pop("added", None)
     short = []
     for sh in d["shots"]:
         t = d["takes"].get(sh.get("chosen") or "")
         if t and t.get("duration") and t["duration"] - (sh.get("offset") or 0) < sh["end"] - sh["start"] - 0.05:
             short.append(sh["n"])
-    d["retimed"] = {"at": now(), "short": short}
+    d["retimed"] = {"at": now(), "short": short, "added": [sh["n"] for sh in d["shots"] if sh.get("needs_describe")]}
 
 
 def series_for_episode(conn: sqlite3.Connection, r: sqlite3.Row) -> tuple[sqlite3.Row, dict]:
@@ -4874,43 +4925,65 @@ class RewriteLinesIn(BaseModel):
     lines: list[dict]
 
 
+def rewrite_rows(d: dict) -> list[dict]:
+    """المسودة الحالية (أو جمل الحلقة لو لسه مفيش)، ومع كل جملة قديمة مدتها في الصوت."""
+    old = {ln["n"]: ln for ln in d["lines"]}
+    base = (d.get("rewrite") or {}).get("lines") or [{"n": ln["n"], "k": f"n{ln['n']}", "text": ln["text"]} for ln in d["lines"]]
+    rows = []
+    for r in base:
+        o = old.get(r.get("n")) if r.get("n") is not None else None
+        rows.append({**r, "old": o["text"] if o else None,
+                     "dur": round((o.get("end") or 0) - (o.get("start") or 0), 2) if o and o.get("start") is not None else None})
+    return rows
+
+
 @app.post("/api/episodes/{eid}/rewrite")
 def rewrite_episode(eid: str, body: WriteIn):
-    """كلام فويس أوفر جديد على نفس الفيديوهات: نفس الجمل ونفس أوقاتها تقريبًا، بتوجيهك (مثلًا: أظرف)."""
+    """تعديل كلام الحلقة على نفس الفيديوهات بتوجيهك (مثلًا: أظرف، أو زوّد مشهد). الجمل القديمة بأرقامها،
+    والجديدة بيتعمل لها لقطات بعد ما تسجّل الصوت."""
     with closing(db()) as conn:
         r, data = episode_row(conn, eid)
         _, sdata = series_for_episode(conn, r)
-    lines = data["lines"]
-    if not lines or any(ln.get("start") is None for ln in lines):
+    if not data["lines"] or any(ln.get("start") is None for ln in data["lines"]):
         raise HTTPException(400, "الحلقة لسه مفيهاش جمل متوقتة على الصوت")
+    rows = rewrite_rows(data)
     rw = data.get("rewrite") or {"chat": [], "lines": []}
     chat = list(rw["chat"])
     msg = body.message.strip()[:4000] or "اكتب كلام جديد للحلقة على نفس الفيديوهات."
     chat.append({"role": "user", "content": msg})
     if atlas.mock_mode():
-        reply = sz.mock_rewrite(lines, chat)
+        reply = sz.mock_rewrite(rows, chat)
     else:
         if not atlas.api_key():
             raise HTTPException(400, "مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات")
-        reply = series_chat(sz.rewrite_messages(sdata["bible"], sdata["character"], lines, data["shots"], chat))
+        reply = series_chat(sz.rewrite_messages(sdata["bible"], sdata["character"], rows, data["shots"], chat))
     try:
-        new = sz.parse_rewrite(reply, lines)
+        new = sz.parse_rewrite(reply, rows)
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
     def fn(d):
-        d["rewrite"] = {"chat": chat + [{"role": "assistant", "content": json.dumps({"lines": new}, ensure_ascii=False)}], "lines": new}
+        d["rewrite"] = {"chat": chat + [{"role": "assistant", "content": json.dumps(
+            {"lines": [{"n": x["n"], "text": x["text"]} for x in new]}, ensure_ascii=False)}], "lines": new}
     update_episode(eid, fn)
     return episode_response(eid)
 
 
 @app.put("/api/episodes/{eid}/rewrite")
 def save_rewrite(eid: str, body: RewriteLinesIn):
-    """تعديلك بإيدك على الجمل الجديدة."""
-    texts = {int(x["n"]): str(x.get("text") or "").strip()[:500] for x in body.lines if str(x.get("n", "")).isdigit()}
+    """المسودة زي ما هي عندك: تعديل بإيدك، جمل جديدة (من غير رقم)، أو جمل اتشالت."""
     def fn(d):
+        known = {ln["n"] for ln in d["lines"]}
+        out, seen = [], set()
+        for x in body.lines[:400]:
+            n = int(x["n"]) if str(x.get("n", "")).isdigit() else None
+            text = str(x.get("text") or "").strip()[:500]
+            if n is not None and (n not in known or n in seen):
+                continue
+            if n is not None:
+                seen.add(n)
+            out.append({"n": n, "k": f"n{n}" if n is not None else (str(x.get("k") or "") or sz._new_key())[:20], "text": text})
         rw = d.get("rewrite") or {"chat": [], "lines": []}
-        base = rw["lines"] or [{"n": ln["n"], "text": ln["text"]} for ln in d["lines"]]
-        rw["lines"] = [{"n": x["n"], "text": texts.get(x["n"]) or x["text"]} for x in base]
+        rw["lines"] = out
         d["rewrite"] = rw
     update_episode(eid, fn)
     return episode_response(eid)
@@ -4924,41 +4997,45 @@ def discard_rewrite(eid: str):
 
 @app.post("/api/episodes/{eid}/rewrite/apply")
 def apply_rewrite(eid: str):
-    """الكلام الجديد يبقى هو سكريبت الحلقة. الجمل محتفظة بأوقاتها القديمة لحد ما ترفع الصوت الجديد،
-    وساعتها اللقطات بتتظبط عليه لوحدها. القديم بيتحفظ في history."""
+    """المسودة تبقى هي سكريبت الحلقة. الجمل القديمة محتفظة بأوقاتها وبلقطاتها، والجديدة من غير وقت لحد ما ترفع
+    الصوت الجديد: ساعتها اللقطات القديمة بتتظبط عليه، والجمل الجديدة بيتعمل لها لقطات. القديم بيتحفظ في history."""
     def fn(d):
-        rw = d.get("rewrite") or {}
-        new = {x["n"]: x["text"] for x in rw.get("lines") or []}
-        if not new:
+        draft = [x for x in (d.get("rewrite") or {}).get("lines") or [] if x["text"].strip()]
+        if not draft:
             raise HTTPException(400, "اكتب الكلام الجديد الأول")
         d.setdefault("history", []).append({"at": now(), "script": d["script"], "lines": d["lines"], "scenes": d["scenes"],
                                             "audio": d["audio"], "timing": d["timing"]})
         d["history"] = d["history"][-10:]
-        script = d["script"]
-        for ln in d["lines"]:
-            if ln["n"] in new and f"«{ln['text']}»" in script:
-                script = script.replace(f"«{ln['text']}»", f"«{new[ln['n']]}»", 1)
-            elif ln["n"] in new:
-                script = None
-                break
-        d["lines"] = [{**ln, "text": new.get(ln["n"], ln["text"])} for ln in d["lines"]]
-        if script is None:
-            # الجمل كانت متاخدة من الصوت: نكتب السكريبت من الجمل نفسها
-            titles = {sc["n"]: sc["title"] for sc in d["scenes"]}
-            out, scene = [], None
-            for ln in d["lines"]:
-                if ln.get("scene") and ln["scene"] != scene:
-                    scene = ln["scene"]
-                    out.append(f"المشهد {scene} — {titles.get(scene, '')}".rstrip(" —"))
-                out.append(f"«{ln['text']}»")
-            script = "\n".join(out)
-        d["script"] = script
+        old = {ln["n"]: ln for ln in d["lines"]}
+        lines, remap, added, scene = [], {}, [], 0
+        for i, x in enumerate(draft, 1):
+            o = old.get(x["n"]) if x["n"] is not None else None
+            if o:
+                remap[o["n"]] = i
+                scene = o.get("scene") or 0
+                lines.append({**o, "n": i, "text": x["text"].strip()})
+            else:
+                added.append(i)
+                lines.append({"n": i, "text": x["text"].strip(), "scene": scene, "start": None, "end": None, "added": True})
+        timed = d["shots"] and d["audio"] and all(o.get("start") is not None for o in d["lines"])
+        retime = {"old": {str(remap[o["n"]]): [o["start"], o["end"]] for o in d["lines"] if o["n"] in remap},
+                  "total": d["audio"]["duration"], "added": added} if timed else None
+        for sh in d["shots"]:
+            sh["lines"] = [remap[n] for n in sh.get("lines") or [] if n in remap]
+        d["lines"] = lines
+        titles = {sc["n"]: sc["title"] for sc in d["scenes"]}
+        out, cur = [], None
+        for ln in lines:
+            if ln.get("scene") and ln["scene"] != cur:
+                cur = ln["scene"]
+                out.append(f"المشهد {cur} — {titles.get(cur, '')}".rstrip(" —"))
+            out.append(f"«{ln['text']}»")
+        d["script"] = "\n".join(out)
         d["script_approved"] = True
         d["voice_pending"] = True
         d["rewrite"] = {"chat": [], "lines": []}
         d["retimed"] = None
-        if d["shots"] and d["audio"] and all(ln.get("start") is not None for ln in d["lines"]):
-            d["retime"] = {"old": {str(ln["n"]): [ln["start"], ln["end"]] for ln in d["lines"]}, "total": d["audio"]["duration"]}
+        d["retime"] = retime
     update_episode(eid, fn)
     return episode_response(eid)
 
