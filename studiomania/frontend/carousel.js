@@ -811,7 +811,7 @@ async function renderPublish() {
     $("carPubCaption").value = [plan.caption, (plan.hashtags || []).join(" ")].filter(Boolean).join("\n\n");
     const coach = currentCoach();
     $("carPubTags").value = coach?.handle ? `@${coach.handle}` : "";
-    $("carPubCollab").checked = false;
+    $("carPubCollab").checked = !!coach?.handle; // الكاروسيل عن مدرب ليه حساب: كولاب تلقائي
     $("carPubWhen").value = localInput(new Date(Date.now() + 3600e3));
     $("carPubDone").innerHTML = "";
     $("carPubSlide").innerHTML = c.slides.map((_, i) => `<option value="${i + 1}">${i + 1}</option>`).join("");

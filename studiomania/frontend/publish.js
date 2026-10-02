@@ -145,7 +145,11 @@ function renderPostVideo() {
     : `<span class="muted">اختار فيديو من الفولدر (دوس 📅 جدول)</span>`;
   // التاج: حساب مدرب المشروع بيتحط لوحده (إلا لو انت كتبت حاجة بإيدك)
   const coachTag = ex?.coach?.instagram ? `@${ex.coach.instagram}` : "";
-  if (!pub.tagsTouched && !pub.editing) $("igTags").value = coachTag;
+  if (!pub.tagsTouched && !pub.editing) {
+    $("igTags").value = coachTag;
+    // الفيديو عن مدرب ليه حساب: كولاب معاه تلقائي (تقدر تشيله)
+    $("igCollab").checked = !!coachTag;
+  }
   $("igTagsHint").textContent = ex?.coach
     ? (ex.coach.instagram ? `المدرب: ${ex.coach.name} (@${ex.coach.instagram})` : `⚠️ المدرب ${ex.coach.name} مالوش حساب إنستجرام متسجل. ضيفه من صفحة المدربين`)
     : "اكتب الحسابات اللي عايز تعملها تاج، وافصل بينهم بفاصلة.";
