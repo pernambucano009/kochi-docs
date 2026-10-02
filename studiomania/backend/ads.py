@@ -267,3 +267,117 @@ def mock_adaptation(duration: int = 30) -> dict:
                        for i in range(3)],
             "voiceover_script": "فويس أوفر تجريبي", "music_direction": "beat", "sound_design": "whoosh",
             "cast": "مدرب", "locations": "جيم", "production_notes": "تجربة", "cta": "حمّل كوتشي", "caption": "كابشن"}
+
+
+# ================================================================ التنفيذ: راس الإعلان ← ستوري بورد ← مكونات ← لقطات
+
+ASPECTS = {  # المقاس ← (مقاس صورة الستوري بورد، نسبة Seedance)
+    "9:16": ("1152x2048", "9:16"),
+    "16:9": ("2048x1152", "16:9"),
+    "1:1": ("1536x1536", "1:1"),
+}
+
+
+def aspect_of(text: str) -> str:
+    t = (text or "").replace(" ", "")
+    for k in ("16:9", "1:1"):
+        if k in t:
+            return k
+    return "9:16"
+
+
+def header_from(adaptation: dict, style: dict | None, brand: dict, settings: dict) -> dict:
+    """راس الإعلان: الثوابت اللي بتدخل في كل برومبت عشان الإعلان كله يطلع بنفس الشكل."""
+    a = adaptation or {}
+    return {
+        "title": a.get("title", ""),
+        "concept": a.get("concept", ""),
+        "style": (style or {}).get("notes") or "",
+        "style_id": (settings or {}).get("style_id"),
+        "characters": a.get("cast", ""),
+        "locations": a.get("locations", ""),
+        "palette": brand.get("colors", ""),
+        "rules": "Vertical social ad, consistent characters, wardrobe and lighting in every shot. No watermarks, no random text.",
+        "aspect": aspect_of((settings or {}).get("format") or a.get("format") or ""),
+    }
+
+
+def header_text(h: dict) -> str:
+    parts = [
+        f"AD: {h.get('title', '')}. CONCEPT: {h.get('concept', '')}",
+        f"VISUAL STYLE (must match exactly): {h['style']}" if h.get("style") else "",
+        f"CHARACTERS (keep identical in every shot): {h['characters']}" if h.get("characters") else "",
+        f"LOCATIONS: {h['locations']}" if h.get("locations") else "",
+        f"BRAND PALETTE: {h['palette']}" if h.get("palette") else "",
+        f"RULES: {h['rules']}" if h.get("rules") else "",
+    ]
+    return "\n".join(p for p in parts if p)
+
+
+def frame_prompt(h: dict, shot: dict) -> str:
+    return "\n".join(x for x in [
+        f"Storyboard frame for a {h.get('aspect', '9:16')} commercial shot. Polished, like a real frame grab from the final ad.",
+        header_text(h),
+        f"SHOT {shot.get('n')}: {shot.get('visual', '')}",
+        f"Framing / camera: {shot.get('shot', '')} {shot.get('camera', '')}".strip(),
+        f"On-screen graphics or text in this shot: {shot['on_screen_text']}" if shot.get("on_screen_text") else "",
+        f"Details: {shot.get('prompt', '')}" if shot.get("prompt") else "",
+    ] if x)
+
+
+COMPONENTS_FORMAT = """{
+  "components": [
+    {"name": "اسم قصير بالعربي", "kind": "character | prop | background | graphic | text | ui | icon | effect",
+     "description": "وصف المكون ودوره في اللقطة (بالعربي)",
+     "image_prompt": "English prompt for an image model to create THIS element alone, isolated on a plain flat background, in the ad's visual style, high detail",
+     "animation": "إزاي المكون ده بيتحرك في اللقطة (دخول، حركة، خروج) بالعربي"}
+  ],
+  "motion_notes": "شرح الموشن جرافيك والحركة في اللقطة بالعربي",
+  "assembly_prompt": "English prompt for a reference-to-video model (Seedance) that builds this shot from the reference images: image 1 is the storyboard frame (composition), the next images are the components. Describe the action, the camera move, and how each graphic element animates, in the ad's style."
+}"""
+
+
+def components_messages(h: dict, shot: dict, has_reference: bool) -> list[dict]:
+    text = (
+        "أنت موشن ديزاينر ومخرج إعلانات. قدامك صورة الستوري بورد للقطة من إعلان كوتشي"
+        + (" وبعدها صورة من اللقطة المقابلة في الإعلان الأصلي اللي بنستلهم منه" if has_reference else "")
+        + ".\nفصّص اللقطة لمكوناتها عشان كل مكون يتعمل لوحده بموديل صور وبعدين نجمعهم في فيديو: "
+        "الشخصيات، الأدوات والمنتجات، الخلفية، وكل عناصر الموشن جرافيك (أيقونات، كروت كلام، شاشات تطبيق، أشكال، أسهم، "
+        "إيموجي، تأثيرات). لو الإعلان الأصلي فيه موشن جرافيك في اللقطة دي، استخرج عناصره وطريقة حركتها وطبّقها على كوتشي.\n\n"
+        f"راس الإعلان (ثابت لكل اللقطات):\n{header_text(h)}\n\n"
+        f"اللقطة {shot.get('n')} ({shot.get('seconds', '')} ثانية): {shot.get('visual', '')}\n"
+        f"كلام على الشاشة: {shot.get('on_screen_text', '') or '—'}\nالصوت: {shot.get('voice', '') or '—'}\n\n"
+        "الشخصيات اللي بتتكرر في الإعلان اكتب برومبتها بنفس الوصف بالظبط. أقصى حاجة 8 مكونات، الأهم الأول.\n"
+        f"رجّع JSON بس بالشكل ده:\n{COMPONENTS_FORMAT}"
+    )
+    return [{"role": "user", "content": text}]
+
+
+def component_prompt(h: dict, comp: dict) -> str:
+    return "\n".join(x for x in [
+        comp.get("image_prompt") or comp.get("description", ""),
+        f"Visual style: {h['style']}" if h.get("style") else "",
+        f"Brand palette: {h['palette']}" if h.get("palette") and comp.get("kind") in ("graphic", "text", "ui", "icon", "effect") else "",
+        "Single isolated element centered on a plain flat light background, nothing else in the image, no watermark.",
+    ] if x)
+
+
+def video_prompt(h: dict, shot: dict, n_components: int) -> str:
+    refs = "Reference image 1 is the storyboard frame: keep its composition."
+    if n_components:
+        refs += f" Reference images 2-{n_components + 1} are the elements of the shot: use them exactly as they look."
+    return "\n".join(x for x in [
+        shot.get("assembly_prompt") or shot.get("prompt") or shot.get("visual", ""),
+        refs,
+        f"Visual style: {h['style']}" if h.get("style") else "",
+        f"Characters: {h['characters']}" if h.get("characters") else "",
+        f"{h.get('aspect', '9:16')} commercial shot, smooth cinematic motion, no text artifacts, no watermark.",
+    ] if x)
+
+
+def mock_components() -> dict:
+    return {"components": [
+        {"name": "المدرب", "kind": "character", "description": "مدرب بيشاور على الموبايل", "image_prompt": "A fitness coach character, full body.", "animation": "بيدخل من اليمين"},
+        {"name": "شاشة التطبيق", "kind": "ui", "description": "شاشة كوتشي", "image_prompt": "A phone screen showing a fitness app UI.", "animation": "بتكبر من النص"},
+        {"name": "أيقونة نار", "kind": "icon", "description": "إيموجي حماس", "image_prompt": "A flat fire icon.", "animation": "بتنط فوق الموبايل"},
+    ], "motion_notes": "حركة تجريبية", "assembly_prompt": "Test assembly prompt."}

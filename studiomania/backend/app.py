@@ -1417,7 +1417,7 @@ def create_generations(body: GenerationIn):
 @app.get("/api/generations")
 def list_generations():
     with closing(db()) as conn:
-        rows = conn.execute("SELECT * FROM generations WHERE clip_id NOT LIKE 'series:%' AND clip_id != 'upload' ORDER BY created_at DESC, clip_label").fetchall()
+        rows = conn.execute("SELECT * FROM generations WHERE clip_id NOT LIKE 'series:%' AND clip_id NOT LIKE 'ad:%' AND clip_id != 'upload' ORDER BY created_at DESC, clip_label").fetchall()
     return [generation_to_dict(r) for r in rows]
 
 
@@ -5615,6 +5615,7 @@ def ad_to_dict(r: sqlite3.Row, d: dict) -> dict:
         "adaptation": d.get("adaptation"), "adapt_status": d.get("adapt_status", "idle"), "adapt_error": d.get("adapt_error"),
         "chat": d.get("chat") or [],
         "thumb": scenes[0]["frame_url"] if scenes and scenes[0].get("frame_url") else None,
+        "prod": prod_to_dict(aid, d.get("prod")),
     }
 
 
@@ -6117,6 +6118,603 @@ def reset_stuck_ads() -> None:
 
 
 reset_stuck_ads()
+
+
+# ---------- تنفيذ الإعلان: راس ← ستوري بورد ← مكونات ← لقطات Seedance ← المونتاج
+
+ad_executor = ThreadPoolExecutor(max_workers=3)
+AD_MAX_REFS = 5  # صورة الستوري بورد + لحد 4 مكونات
+
+
+def prod_dir(aid: str, sub: str) -> Path:
+    d = ad_dir(aid) / "prod" / sub
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def prod_of(d: dict) -> dict:
+    p = d.get("prod")
+    if not p:
+        raise HTTPException(400, "ابدأ التنفيذ الأول")
+    return p
+
+
+def find_pshot(p: dict, sid: str) -> dict:
+    s = next((x for x in p["shots"] if x["id"] == sid), None)
+    if s is None:
+        raise HTTPException(404, "اللقطة مش موجودة")
+    return s
+
+
+def find_comp(s: dict, cid: str) -> dict:
+    c = next((x for x in s.get("components") or [] if x["id"] == cid), None)
+    if c is None:
+        raise HTTPException(404, "المكون مش موجود")
+    return c
+
+
+def prod_to_dict(aid: str, p: dict | None) -> dict | None:
+    if not p:
+        return None
+    base = f"/media/ads/{aid}/prod"
+    shots = []
+    for s in p["shots"]:
+        shots.append({
+            **s,
+            "frame_url": f"{base}/frames/{s['frame']}" if s.get("frame") else None,
+            "frames": [{"file": f, "url": f"{base}/frames/{f}"} for f in s.get("frames") or []],
+            "components": [{**c, "image_url": f"{base}/comps/{c['image']}" if c.get("image") else None,
+                            "images": [{"file": f, "url": f"{base}/comps/{f}"} for f in c.get("images") or []]}
+                           for c in s.get("components") or []],
+            "takes": [{**t, "url": f"{base}/takes/{t['file']}" if t.get("file") else None} for t in s.get("takes") or []],
+        })
+    return {**p, "shots": shots}
+
+
+def ref_scene_for(analysis: dict, k: int, total: int) -> dict | None:
+    """اللقطة المقابلة في الإعلان الأصلي (بنفس الترتيب النسبي)."""
+    scenes = (analysis or {}).get("scenes") or []
+    if not scenes:
+        return None
+    return scenes[min(len(scenes) - 1, int(k * len(scenes) / max(1, total)))]
+
+
+@app.post("/api/ads/{aid}/prod/start")
+def prod_start(aid: str):
+    """يبدأ التنفيذ من اقتراح كوتشي: راس الإعلان (الستايل والكونسبت) ولقطة لكل مشهد."""
+    with closing(db()) as conn:
+        _, d = ad_row(conn, aid)
+    a = d.get("adaptation")
+    if not a or not a.get("scenes"):
+        raise HTTPException(400, "مفيش اقتراح لكوتشي لسه")
+    settings = d.get("settings") or {}
+    header = az.header_from(a, ad_style(settings.get("style_id")), brand_settings(), settings)
+    scenes = a["scenes"]
+    shots = []
+    for k, sc in enumerate(scenes):
+        ref = ref_scene_for(d.get("analysis"), k, len(scenes))
+        shots.append({
+            "id": uuid.uuid4().hex[:10], "n": k + 1,
+            "seconds": float(sc.get("seconds") or 4) if str(sc.get("seconds") or "").replace(".", "", 1).isdigit() else 4.0,
+            **{f: str(sc.get(f) or "") for f in ("visual", "shot", "camera", "on_screen_text", "voice", "sfx", "music", "prompt")},
+            "ref_scene": ref.get("n") if ref else None, "ref_frame": ref.get("frame") if ref else None,
+            "frame": None, "frames": [], "frame_status": "idle", "frame_error": None,
+            "components": [], "comp_status": "idle", "comp_error": None, "motion_notes": "", "assembly_prompt": "",
+            "approved": False, "takes": [], "chosen": None,
+        })
+    update_ad(aid, lambda d: d.update(prod={"header": header, "shots": shots}))
+    return ad_response(aid)
+
+
+class ProdHeaderIn(BaseModel):
+    header: dict
+
+
+@app.patch("/api/ads/{aid}/prod/header")
+def prod_header(aid: str, body: ProdHeaderIn):
+    keys = ("title", "concept", "style", "style_id", "characters", "locations", "palette", "rules", "aspect")
+    def fn(d):
+        p = prod_of(d)
+        h = {**p["header"], **{k: body.header[k] for k in keys if k in body.header}}
+        if "style_id" in body.header and body.header["style_id"] != p["header"].get("style_id"):
+            st = ad_style(body.header["style_id"])
+            h["style"] = (st or {}).get("notes", "")
+        if h.get("aspect") not in az.ASPECTS:
+            h["aspect"] = "9:16"
+        p["header"] = h
+    update_ad(aid, fn)
+    return ad_response(aid)
+
+
+class ProdShotIn(BaseModel):
+    fields: dict
+
+
+PSHOT_FIELDS = ("seconds", "visual", "shot", "camera", "on_screen_text", "voice", "sfx", "music", "prompt",
+                "assembly_prompt", "motion_notes", "approved")
+
+
+@app.patch("/api/ads/{aid}/prod/shots/{sid}")
+def prod_shot_patch(aid: str, sid: str, body: ProdShotIn):
+    def fn(d):
+        s = find_pshot(prod_of(d), sid)
+        for k in PSHOT_FIELDS:
+            if k in body.fields:
+                v = body.fields[k]
+                s[k] = bool(v) if k == "approved" else max(1.0, min(15.0, float(v or 4))) if k == "seconds" else str(v or "")
+    update_ad(aid, fn)
+    return ad_response(aid)
+
+
+@app.post("/api/ads/{aid}/prod/approve-all")
+def prod_approve_all(aid: str, approved: bool = True):
+    def fn(d):
+        for s in prod_of(d)["shots"]:
+            s["approved"] = bool(approved)
+    update_ad(aid, fn)
+    return ad_response(aid)
+
+
+def set_pshot(aid: str, sid: str, **kw) -> None:
+    def fn(d):
+        s = next((x for x in (d.get("prod") or {}).get("shots", []) if x["id"] == sid), None)
+        if s is not None:
+            s.update(**kw)
+    update_ad(aid, fn)
+
+
+def style_ref_urls(header: dict, limit: int) -> list[str]:
+    """صور الستايل المختار مراجع لموديل الصور عشان الشكل يفضل ثابت."""
+    sid = header.get("style_id")
+    if not sid:
+        return []
+    folder = ADS_DIR / "styles" / Path(sid).name
+    files = sorted(folder.glob("img-*"))[:limit]
+    return [atlas.reference_url(f) for f in files]
+
+
+def run_ad_frame(aid: str, sid: str) -> None:
+    try:
+        with closing(db()) as conn:
+            _, d = ad_row(conn, aid)
+        p = d["prod"]
+        s = find_pshot(p, sid)
+        set_pshot(aid, sid, frame_status="working", frame_error=None)
+        h = p["header"]
+        size = az.ASPECTS.get(h.get("aspect"), az.ASPECTS["9:16"])[0]
+        name = f"frame-{s['n']:02d}-{uuid.uuid4().hex[:6]}.png"
+        dest = prod_dir(aid, "frames") / name
+        if atlas.mock_mode():
+            w, hh = size.split("x")
+            mock_image(dest, f"{int(w) // 2}x{int(hh) // 2}", f"shot {s['n']}", s["n"])
+        else:
+            url = atlas.generate_image(carousel_settings()["image_family"], az.frame_prompt(h, s), size,
+                                       auth.get_setting("series_frame_quality") or "medium", style_ref_urls(h, 4) or None)
+            atlas.download(url, dest)
+        def done(d):
+            x = find_pshot(d["prod"], sid)
+            x.setdefault("frames", []).append(name)
+            x.update(frame=name, frame_status="done", frame_error=None)
+        update_ad(aid, done)
+    except Exception as exc:  # noqa: BLE001
+        set_pshot(aid, sid, frame_status="failed", frame_error=str(getattr(exc, "detail", None) or exc)[:400])
+
+
+@app.post("/api/ads/{aid}/prod/frames")
+def prod_frames(aid: str, shot_id: str | None = None):
+    """الستوري بورد: لقطة واحدة (نسخة جديدة) أو كل اللقطات اللي لسه ملهاش صورة."""
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات")
+    with closing(db()) as conn:
+        _, d = ad_row(conn, aid)
+    p = prod_of(d)
+    busy = {"queued", "working"}
+    ids = [shot_id] if shot_id else [s["id"] for s in p["shots"] if not s.get("frame") and s.get("frame_status") not in busy]
+    if shot_id and find_pshot(p, shot_id).get("frame_status") in busy:
+        raise HTTPException(400, "الصورة دي بتترسم")
+    if not ids:
+        raise HTTPException(400, "كل اللقطات ليها ستوري بورد")
+    def fn(d):
+        for s in d["prod"]["shots"]:
+            if s["id"] in ids:
+                s.update(frame_status="queued", frame_error=None)
+    update_ad(aid, fn)
+    for i in ids:
+        ad_executor.submit(run_ad_frame, aid, i)
+    return ad_response(aid)
+
+
+class FramePickIn(BaseModel):
+    file: str
+
+
+@app.post("/api/ads/{aid}/prod/shots/{sid}/frame")
+def prod_pick_frame(aid: str, sid: str, body: FramePickIn):
+    def fn(d):
+        s = find_pshot(prod_of(d), sid)
+        if body.file not in (s.get("frames") or []):
+            raise HTTPException(404, "النسخة مش موجودة")
+        s["frame"] = body.file
+    update_ad(aid, fn)
+    return ad_response(aid)
+
+
+def run_ad_components(aid: str, sid: str) -> None:
+    """يفصّص اللقطة لمكوناتها (من صورة الستوري بورد واللقطة المقابلة في الإعلان الأصلي)."""
+    try:
+        with closing(db()) as conn:
+            _, d = ad_row(conn, aid)
+        p = d["prod"]
+        s = find_pshot(p, sid)
+        set_pshot(aid, sid, comp_status="working", comp_error=None)
+        if atlas.mock_mode():
+            out = az.mock_components()
+        else:
+            ref = ad_dir(aid) / "frames" / s["ref_frame"] if s.get("ref_frame") else None
+            ref = ref if ref and ref.exists() else None
+            msgs = az.components_messages(p["header"], s, bool(ref))
+            parts = [{"type": "text", "text": msgs[0]["content"]}]
+            if s.get("frame"):
+                parts.append({"type": "image_url", "image_url": {"url": data_url(prod_dir(aid, "frames") / s["frame"], "image/png")}})
+            if ref:
+                parts.append({"type": "image_url", "image_url": {"url": data_url(ref, "image/jpeg")}})
+            out = ad_json(ad_media_chat([{"role": "user", "content": parts}], 8000), "مكونات اللقطة")
+        comps = []
+        for c in (out.get("components") or [])[:10]:
+            if isinstance(c, dict) and (c.get("image_prompt") or c.get("description")):
+                comps.append({"id": uuid.uuid4().hex[:8], "name": str(c.get("name") or "مكون")[:60],
+                              "kind": str(c.get("kind") or "prop")[:20], "description": str(c.get("description") or ""),
+                              "image_prompt": str(c.get("image_prompt") or ""), "animation": str(c.get("animation") or ""),
+                              "image": None, "images": [], "status": "idle", "error": None, "use": True})
+        def done(d):
+            x = find_pshot(d["prod"], sid)
+            old = {c["name"]: c for c in x.get("components") or [] if c.get("image")}
+            for c in comps:  # مكون ليه صورة قبل كده بنفس الاسم بيفضل بصورته
+                if c["name"] in old:
+                    c.update(image=old[c["name"]]["image"], images=old[c["name"]].get("images", []))
+            x.update(components=comps, comp_status="done", comp_error=None,
+                     motion_notes=str(out.get("motion_notes") or ""), assembly_prompt=str(out.get("assembly_prompt") or x.get("assembly_prompt") or ""))
+        update_ad(aid, done)
+    except Exception as exc:  # noqa: BLE001
+        set_pshot(aid, sid, comp_status="failed", comp_error=str(getattr(exc, "detail", None) or exc)[:400])
+
+
+@app.post("/api/ads/{aid}/prod/components")
+def prod_components(aid: str, shot_id: str | None = None):
+    """استخراج المكونات: لقطة واحدة أو كل اللقطات اللي ليها ستوري بورد ولسه ملهاش مكونات."""
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات")
+    with closing(db()) as conn:
+        _, d = ad_row(conn, aid)
+    p = prod_of(d)
+    if shot_id:
+        s = find_pshot(p, shot_id)
+        if not s.get("frame"):
+            raise HTTPException(400, "ارسم الستوري بورد للقطة دي الأول")
+        ids = [shot_id]
+    else:
+        ids = [s["id"] for s in p["shots"] if s.get("frame") and not s.get("components") and s.get("comp_status") != "working"]
+    if not ids:
+        raise HTTPException(400, "مفيش لقطات جاهزة (لازم الستوري بورد الأول)")
+    for i in ids:
+        set_pshot(aid, i, comp_status="working", comp_error=None)
+        ad_executor.submit(run_ad_components, aid, i)
+    return ad_response(aid)
+
+
+class CompIn(BaseModel):
+    fields: dict
+
+
+@app.patch("/api/ads/{aid}/prod/shots/{sid}/components/{cid}")
+def prod_comp_patch(aid: str, sid: str, cid: str, body: CompIn):
+    def fn(d):
+        c = find_comp(find_pshot(prod_of(d), sid), cid)
+        for k in ("name", "kind", "description", "image_prompt", "animation"):
+            if k in body.fields:
+                c[k] = str(body.fields[k] or "")
+        if "use" in body.fields:
+            c["use"] = bool(body.fields["use"])
+        if "image" in body.fields and body.fields["image"] in (c.get("images") or []):
+            c["image"] = body.fields["image"]
+    update_ad(aid, fn)
+    return ad_response(aid)
+
+
+@app.post("/api/ads/{aid}/prod/shots/{sid}/components")
+def prod_comp_add(aid: str, sid: str, body: CompIn):
+    """مكون جديد بإيدك."""
+    def fn(d):
+        s = find_pshot(prod_of(d), sid)
+        s.setdefault("components", []).append({
+            "id": uuid.uuid4().hex[:8], "name": str(body.fields.get("name") or "مكون جديد")[:60], "kind": "prop",
+            "description": "", "image_prompt": str(body.fields.get("image_prompt") or ""), "animation": "",
+            "image": None, "images": [], "status": "idle", "error": None, "use": True})
+    update_ad(aid, fn)
+    return ad_response(aid)
+
+
+@app.delete("/api/ads/{aid}/prod/shots/{sid}/components/{cid}")
+def prod_comp_delete(aid: str, sid: str, cid: str):
+    def fn(d):
+        s = find_pshot(prod_of(d), sid)
+        s["components"] = [c for c in s.get("components") or [] if c["id"] != cid]
+    update_ad(aid, fn)
+    return ad_response(aid)
+
+
+@app.post("/api/ads/{aid}/prod/shots/{sid}/components/{cid}/upload")
+def prod_comp_upload(aid: str, sid: str, cid: str, file: UploadFile = File(...)):
+    """صورة المكون من عندك بدل ما تتولد."""
+    name = save_upload(file, IMAGE_EXTENSIONS, prod_dir(aid, "comps"), f"{cid}-up")
+    def fn(d):
+        c = find_comp(find_pshot(prod_of(d), sid), cid)
+        c.setdefault("images", []).append(name)
+        c.update(image=name, status="done", error=None)
+    update_ad(aid, fn)
+    return ad_response(aid)
+
+
+def set_comp(aid: str, sid: str, cid: str, **kw) -> None:
+    def fn(d):
+        s = next((x for x in (d.get("prod") or {}).get("shots", []) if x["id"] == sid), None)
+        c = next((x for x in (s or {}).get("components") or [] if x["id"] == cid), None)
+        if c is not None:
+            c.update(**kw)
+    update_ad(aid, fn)
+
+
+def run_ad_comp_image(aid: str, sid: str, cid: str) -> None:
+    try:
+        with closing(db()) as conn:
+            _, d = ad_row(conn, aid)
+        p = d["prod"]
+        c = find_comp(find_pshot(p, sid), cid)
+        set_comp(aid, sid, cid, status="working", error=None)
+        name = f"{cid}-{uuid.uuid4().hex[:6]}.png"
+        dest = prod_dir(aid, "comps") / name
+        if atlas.mock_mode():
+            mock_image(dest, "512x512", c["name"][:12], len(c["name"]))
+        else:
+            url = atlas.generate_image(carousel_settings()["image_family"], az.component_prompt(p["header"], c), "1024x1024",
+                                       auth.get_setting("series_frame_quality") or "medium", style_ref_urls(p["header"], 3) or None)
+            atlas.download(url, dest)
+        def done(d):
+            x = find_comp(find_pshot(d["prod"], sid), cid)
+            x.setdefault("images", []).append(name)
+            x.update(image=name, status="done", error=None)
+        update_ad(aid, done)
+    except Exception as exc:  # noqa: BLE001
+        set_comp(aid, sid, cid, status="failed", error=str(getattr(exc, "detail", None) or exc)[:400])
+
+
+@app.post("/api/ads/{aid}/prod/comp-images")
+def prod_comp_images(aid: str, shot_id: str | None = None, comp_id: str | None = None):
+    """صور المكونات: مكون واحد (نسخة جديدة)، أو كل مكونات لقطة، أو كل المكونات اللي لسه ملهاش صورة."""
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات")
+    with closing(db()) as conn:
+        _, d = ad_row(conn, aid)
+    p = prod_of(d)
+    jobs = []
+    for s in p["shots"]:
+        if shot_id and s["id"] != shot_id:
+            continue
+        for c in s.get("components") or []:
+            if comp_id and c["id"] != comp_id:
+                continue
+            if c.get("status") == "working" or (not comp_id and (c.get("image") or not c.get("use", True))):
+                continue
+            jobs.append((s["id"], c["id"]))
+    if not jobs:
+        raise HTTPException(400, "مفيش مكونات محتاجة صور")
+    for s_id, c_id in jobs:
+        set_comp(aid, s_id, c_id, status="working", error=None)
+        ad_executor.submit(run_ad_comp_image, aid, s_id, c_id)
+    return ad_response(aid)
+
+
+def run_ad_take(aid: str, sid: str, tid: str) -> None:
+    def setp(**kw):
+        def fn(d):
+            s = next((x for x in (d.get("prod") or {}).get("shots", []) if x["id"] == sid), None)
+            t = next((x for x in (s or {}).get("takes") or [] if x["id"] == tid), None)
+            if t is not None:
+                t.update(**kw)
+        update_ad(aid, fn)
+    try:
+        with closing(db()) as conn:
+            _, d = ad_row(conn, aid)
+        p = d["prod"]
+        s = find_pshot(p, sid)
+        t = next(x for x in s["takes"] if x["id"] == tid)
+        dest = prod_dir(aid, "takes") / f"{tid}.mp4"
+        setp(status="working")
+        aspect = az.ASPECTS.get(p["header"].get("aspect"), az.ASPECTS["9:16"])[1]
+        if atlas.mock_mode():
+            time.sleep(1.5)
+            size = {"9:16": "496x864", "16:9": "864x496", "1:1": "640x640"}[aspect]
+            subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i",
+                            f"color=c=0x{(hash(tid) & 0xFFFFFF):06x}:s={size}:d={t['gen_duration']}:r=24",
+                            "-c:v", "libx264", "-pix_fmt", "yuv420p", str(dest)], check=True, capture_output=True, timeout=120)
+        else:
+            pid = t.get("prediction_id")
+            if not pid:
+                frames, comps = prod_dir(aid, "frames"), prod_dir(aid, "comps")
+                refs = [frames / s["frame"]] + [comps / c["image"] for c in s.get("components") or []
+                                                 if c.get("use", True) and c.get("image")][:AD_MAX_REFS - 1]
+                body = {
+                    "model": series_settings()["video_model"], "prompt": t["prompt"],
+                    "reference_images": [atlas.upload_media(seedance_ref(x)) for x in refs if x.exists()],
+                    "duration": t["gen_duration"], "resolution": atlas.RESOLUTION, "ratio": aspect,
+                    "generate_audio": False, "watermark": False,
+                }
+                pid = atlas.submit_video(body)
+                setp(prediction_id=pid)
+            url = atlas.wait_for(pid, lambda _s: None)
+            atlas.download(url, dest)
+        setp(status="done", file=dest.name, duration=round(probe_duration(dest), 2), error=None)
+    except Exception as exc:  # noqa: BLE001
+        setp(status="failed", error=str(getattr(exc, "detail", None) or exc)[:400])
+
+
+def queue_ad_take(aid: str, sid: str) -> None:
+    tid = uuid.uuid4().hex[:10]
+    def fn(d):
+        p = prod_of(d)
+        s = find_pshot(p, sid)
+        if not s.get("frame"):
+            raise HTTPException(400, f"اللقطة {s['n']} ملهاش ستوري بورد")
+        n_comp = len([c for c in s.get("components") or [] if c.get("use", True) and c.get("image")][:AD_MAX_REFS - 1])
+        s.setdefault("takes", []).append({
+            "id": tid, "file": None, "status": "queued", "error": None, "approved": False, "duration": None,
+            "gen_duration": int(min(atlas.MAX_DURATION, max(atlas.MIN_DURATION, math.ceil(float(s.get("seconds") or 4))))),
+            "prompt": az.video_prompt(p["header"], s, n_comp), "created_at": now()})
+        if not s.get("chosen"):
+            s["chosen"] = tid
+    update_ad(aid, fn)
+    ad_executor.submit(run_ad_take, aid, sid, tid)
+
+
+@app.post("/api/ads/{aid}/prod/shots/{sid}/generate")
+def prod_generate(aid: str, sid: str):
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات")
+    queue_ad_take(aid, sid)
+    return ad_response(aid)
+
+
+@app.post("/api/ads/{aid}/prod/generate-approved")
+def prod_generate_approved(aid: str):
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات")
+    with closing(db()) as conn:
+        _, d = ad_row(conn, aid)
+    todo = [s["id"] for s in prod_of(d)["shots"] if s.get("approved") and s.get("frame")
+            and not any(t["status"] != "failed" for t in s.get("takes") or [])]
+    if not todo:
+        raise HTTPException(400, "مفيش لقطات معتمدة ليها ستوري بورد ومن غير فيديو")
+    for sid in todo:
+        queue_ad_take(aid, sid)
+    return ad_response(aid)
+
+
+class TakeActIn(BaseModel):
+    take_id: str
+
+
+@app.post("/api/ads/{aid}/prod/shots/{sid}/take")
+def prod_take_act(aid: str, sid: str, body: TakeActIn, action: str = "pick"):
+    """pick: النسخة المختارة · approve / unapprove · delete · retry (بيكمّل الطلب من غير دفع تاني)."""
+    retry = False
+    def fn(d):
+        nonlocal retry
+        s = find_pshot(prod_of(d), sid)
+        t = next((x for x in s.get("takes") or [] if x["id"] == body.take_id), None)
+        if t is None:
+            raise HTTPException(404, "النسخة مش موجودة")
+        if action == "pick":
+            s["chosen"] = t["id"]
+        elif action in ("approve", "unapprove"):
+            if t["status"] != "done":
+                raise HTTPException(400, "النسخة لسه ما خلصتش")
+            t["approved"] = action == "approve"
+            if t["approved"]:
+                s["chosen"] = t["id"]
+        elif action == "delete":
+            s["takes"] = [x for x in s["takes"] if x["id"] != t["id"]]
+            if s.get("chosen") == t["id"]:
+                s["chosen"] = s["takes"][-1]["id"] if s["takes"] else None
+            if t.get("file"):
+                (prod_dir(aid, "takes") / t["file"]).unlink(missing_ok=True)
+        elif action == "retry":
+            if t["status"] != "failed":
+                raise HTTPException(400, "النسخة دي مش فاشلة")
+            t.update(status="queued", error=None)
+            retry = True
+    update_ad(aid, fn)
+    if retry:
+        ad_executor.submit(run_ad_take, aid, sid, body.take_id)
+    return ad_response(aid)
+
+
+@app.post("/api/ads/{aid}/prod/upload-take")
+def prod_upload_take(aid: str, shot_id: str, file: UploadFile = File(...)):
+    """فيديو من عندك للقطة (بيتعتمد على طول)."""
+    tid = uuid.uuid4().hex[:10]
+    name = save_upload(file, VIDEO_EXTENSIONS, prod_dir(aid, "takes"), f"{tid}-up")
+    dur = probe_duration(prod_dir(aid, "takes") / name)
+    def fn(d):
+        s = find_pshot(prod_of(d), shot_id)
+        s.setdefault("takes", []).append({"id": tid, "file": name, "status": "done", "error": None, "approved": True,
+                                          "duration": round(dur, 2), "upload": True, "created_at": now()})
+        s["chosen"] = tid
+    update_ad(aid, fn)
+    return ad_response(aid)
+
+
+@app.post("/api/ads/{aid}/prod/to-editor")
+def prod_to_editor(aid: str):
+    """يجمع اللقطات الموافق عليها بالترتيب في مشروع مونتاج (والموسيقى الافتراضية)."""
+    with closing(db()) as conn:
+        r, d = ad_row(conn, aid)
+    p = prod_of(d)
+    missing = []
+    picks = []
+    for s in p["shots"]:
+        t = next((x for x in s.get("takes") or [] if x["id"] == s.get("chosen")), None)
+        if not t or t["status"] != "done" or not t.get("approved"):
+            missing.append(s["n"])
+        else:
+            picks.append((s, t))
+    if missing:
+        raise HTTPException(400, f"اللقطات دي لسه من غير فيديو موافق عليه: {', '.join(map(str, missing))}")
+    label = p["header"].get("title") or r["name"]
+    clips = []
+    with closing(db()) as conn, conn:
+        for s, t in picks:
+            gid = uuid.uuid4().hex[:12]
+            out = f"{gid}.mp4"
+            shutil.copyfile(prod_dir(aid, "takes") / t["file"], GENERATED_DIR / out)
+            conn.execute(
+                "INSERT INTO generations (id, clip_id, clip_filename, clip_label, coach_id, coach_name, coach_image, model, prompt, "
+                "params, status, output_filename, created_at, updated_at) VALUES (?, ?, ?, ?, '', '', '', 'seedance', ?, '{}', 'completed', ?, ?, ?)",
+                (gid, f"ad:{aid}", t["file"], f"📣 {label} · لقطة {s['n']}", t.get("prompt") or "", out, now(), now()),
+            )
+            dur = float(s.get("seconds") or t.get("duration") or 4)
+            clips.append({"gen_id": gid, "start": 0.0, "end": min(dur, t.get("duration") or dur),
+                          "zoom": 1.0, "x": 0.0, "y": 0.0, "volume": 0.0})
+        pid = uuid.uuid4().hex[:12]
+        pdata = {"name": f"📣 {label}", "video_id": None, "coach_id": None, "clips": clips, "voice": None,
+                 "music": default_music(conn), "outro": False, "outro_volume": 1.0, "captions": {}, "logo": {}}
+        conn.execute("INSERT INTO projects (id, name, data, render_status, created_at, updated_at) VALUES (?, ?, ?, 'idle', ?, ?)",
+                     (pid, pdata["name"], json.dumps(pdata, ensure_ascii=False), now(), now()))
+    update_ad(aid, lambda d: d["prod"].update(project_id=pid))
+    return {"project_id": pid}
+
+
+def reset_stuck_prod() -> None:
+    with closing(db()) as conn, conn:
+        for r in conn.execute("SELECT id, data FROM ads").fetchall():
+            d = json.loads(r["data"])
+            p = d.get("prod")
+            if not p:
+                continue
+            for s in p["shots"]:
+                if s.get("frame_status") in ("queued", "working"):
+                    s.update(frame_status="failed", frame_error="اتقطع لما السيرفر اتقفل. ارسم تاني")
+                if s.get("comp_status") == "working":
+                    s.update(comp_status="failed", comp_error="اتقطع لما السيرفر اتقفل. استخرج تاني")
+                for c in s.get("components") or []:
+                    if c.get("status") == "working":
+                        c.update(status="failed", error="اتقطع لما السيرفر اتقفل")
+                for t in s.get("takes") or []:
+                    if t.get("status") in ("queued", "working"):
+                        t.update(status="failed", error="اتقطع لما السيرفر اتقفل. دوس ↻ (بيكمّل من غير دفع تاني)")
+            conn.execute("UPDATE ads SET data = ? WHERE id = ?", (json.dumps(d, ensure_ascii=False), r["id"]))
+
+
+reset_stuck_prod()
 
 
 class SeriesSettingsIn(BaseModel):

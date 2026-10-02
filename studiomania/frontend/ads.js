@@ -61,6 +61,7 @@ function renderAds() {
     renderAdAudio();
     renderAdAdapt();
     renderAdSettings();
+    renderAdProd();
   }
   scheduleAdPoll();
 }
@@ -499,7 +500,7 @@ $("adStyleGrid").addEventListener("click", async (e) => {
 function scheduleAdPoll() {
   clearTimeout(adx.timer);
   const a = adx.cur;
-  const busy = (a && (["queued", "working"].includes(a.status) || a.adapt_status === "working")) || adx.styles.some((s) => s.status === "working");
+  const busy = (a && (["queued", "working"].includes(a.status) || a.adapt_status === "working" || prodBusy(a))) || adx.styles.some((s) => s.status === "working");
   if (!busy || document.querySelector('.view[data-view="10"]').hidden) return;
   adx.timer = setTimeout(async () => {
     try {
@@ -514,3 +515,183 @@ function scheduleAdPoll() {
     } catch { scheduleAdPoll(); }
   }, 3000);
 }
+
+
+// ---------- 4. التنفيذ: راس الإعلان ← ستوري بورد ← مكونات ← لقطات ← المونتاج ----------
+const PBUSY = new Set(["queued", "working"]);
+function prodBusy(a) {
+  return !!a.prod?.shots.some((s) => PBUSY.has(s.frame_status) || s.comp_status === "working"
+    || s.components.some((c) => c.status === "working") || s.takes.some((t) => PBUSY.has(t.status)));
+}
+const HEADER_LABELS = { title: "اسم الإعلان", concept: "الكونسبت", style: "الستايل البصري (بالإنجليزي)", characters: "الشخصيات (نفس الشكل في كل لقطة)",
+  locations: "الأماكن", palette: "ألوان البراند", rules: "قواعد ثابتة" };
+const KIND_LABEL = { character: "🧍 شخصية", prop: "📦 أداة", background: "🏞️ خلفية", graphic: "✨ جرافيك", text: "🔤 كلام", ui: "📱 شاشة", icon: "⭐ أيقونة", effect: "💫 تأثير" };
+const PSHOT_LABELS = { visual: "اللي بيحصل", shot: "اللقطة", camera: "الكاميرا", on_screen_text: "كلام على الشاشة", voice: "الكلام", sfx: "المؤثرات" };
+const pAPI = (path, opts) => api(`/api/ads/${adx.cur.id}/prod${path}`, opts);
+async function pDo(btn, label, fn) {
+  return busyButton(btn, label, async () => { adx.cur = await fn(); renderAds(); });
+}
+
+function renderAdProd() {
+  const a = adx.cur, p = a.prod;
+  $("adProdStart").hidden = !!p;
+  $("adProdMain").hidden = !p;
+  $("adProdGo").disabled = !a.adaptation?.scenes?.length;
+  if (!p) return;
+  const h = p.header;
+  if (!$("adHeader").contains(document.activeElement)) {
+    $("adHeader").innerHTML = Object.entries(HEADER_LABELS).map(([k, l]) => adField(l, h[k], `data-h="${k}"`, k === "style" || k === "characters" ? 3 : 2, k === "style")).join("");
+  }
+  $("adHeaderStyle").innerHTML = `<option value="">من غير ستايل</option>` + adx.styles.map((s) => `<option value="${s.id}" ${s.id === h.style_id ? "selected" : ""}>${adEsc(s.name)}</option>`).join("");
+  $("adHeaderAspect").value = h.aspect || "9:16";
+  const shots = p.shots, n = shots.length;
+  const framed = shots.filter((s) => s.frame).length, comps = shots.filter((s) => s.components.length).length;
+  const okv = shots.filter((s) => s.takes.some((t) => t.id === s.chosen && t.approved)).length;
+  $("adPProgress").textContent = `🎨 ${framed}/${n} · 🧩 ${comps}/${n} · ✅ ${shots.filter((s) => s.approved).length}/${n} · 🎬 ${okv}/${n}`;
+  $("adPApproveAll").textContent = shots.every((s) => s.approved) ? "↩ الغي اعتماد الكل" : "✅ اعتمد كل اللقطات";
+  if ($("adPShots").contains(document.activeElement)) return;
+  $("adPShots").innerHTML = shots.map((s) => {
+    const fbusy = PBUSY.has(s.frame_status);
+    const ref = s.ref_frame ? `<div class="ref"><img src="/media/ads/${a.id}/frames/${s.ref_frame}" alt="">من الإعلان الأصلي (مشهد ${s.ref_scene})</div>` : "";
+    const chosen = s.takes.find((t) => t.id === s.chosen);
+    return `<article class="ad-pshot ${s.approved ? "approved" : ""}" data-ps="${s.id}">
+      <div>
+        <div class="frame">${s.frame_url ? `<img src="${s.frame_url}" alt="">` : ""}${fbusy ? `<div class="car-wait over"><div class="spin"></div></div>` : s.frame_url ? "" : "لسه من غير ستوري بورد"}</div>
+        ${s.frames.length > 1 ? `<div class="vers">${s.frames.map((f) => `<img src="${f.url}" data-pframe="${f.file}" class="${f.url === s.frame_url ? "sel" : ""}" alt="">`).join("")}</div>` : ""}
+        ${s.frame_error ? `<div class="err">${adEsc(s.frame_error)}</div>` : ""}
+        ${ref}
+        <div class="row wrap" style="margin-top:6px">
+          <button class="btn sm" data-p="frame" ${fbusy ? "disabled" : ""}>🎨 ${s.frame_url ? "ارسم تاني" : "ارسم"}</button>
+          <button class="btn sm ${s.approved ? "" : "primary"}" data-p="approve">${s.approved ? "✅ معتمدة" : "✅ اعتمد"}</button>
+        </div>
+      </div>
+      <div class="body">
+        <header><b class="n">${s.n}</b><label class="muted">المدة <input type="number" min="1" max="15" step="0.5" value="${s.seconds}" data-pf="seconds" style="width:64px"> ث</label></header>
+        <div class="ad-fields">${Object.entries(PSHOT_LABELS).map(([k, l]) => adField(l, s[k], `data-pf="${k}"`, 1)).join("")}</div>
+        <h4 class="pane-h">🧩 المكونات ${s.comp_status === "working" ? `<span class="spin-inline"></span>` : ""}
+          <button class="btn sm" data-p="comps" ${!s.frame_url || s.comp_status === "working" ? "disabled" : ""}>${s.components.length ? "↻ استخرج تاني" : "🧩 استخرج المكونات"}</button>
+          ${s.components.length ? `<button class="btn sm" data-p="compimgs">🖼️ صور المكونات</button><button class="btn sm" data-p="addcomp">＋ مكون</button>` : ""}</h4>
+        ${s.comp_error ? `<div class="err">${adEsc(s.comp_error)}</div>` : ""}
+        ${s.motion_notes ? `<p class="hint" data-no-i18n>🎞️ ${adEsc(s.motion_notes)}</p>` : ""}
+        <div class="ad-comps">${s.components.map((c) => `<div class="ad-comp ${c.use === false ? "off" : ""}" data-pc="${c.id}">
+          <div class="img">${c.image_url ? `<img src="${c.image_url}" alt="">` : c.status === "working" ? `<div class="spin"></div>` : "🖼️"}</div>
+          ${c.images.length > 1 ? `<div class="vers">${c.images.map((f) => `<img src="${f.url}" data-cimg="${f.file}" class="${f.url === c.image_url ? "sel" : ""}" alt="">`).join("")}</div>` : ""}
+          <span class="kind">${KIND_LABEL[c.kind] || adEsc(c.kind)}</span>
+          <input type="text" value="${adEsc(c.name)}" data-cf="name" data-no-i18n>
+          <textarea rows="3" dir="ltr" data-cf="image_prompt" placeholder="Image prompt" data-no-i18n>${adEsc(c.image_prompt)}</textarea>
+          ${c.animation ? `<span class="muted" data-no-i18n>🎞️ ${adEsc(c.animation)}</span>` : ""}
+          ${c.error ? `<div class="err">${adEsc(c.error)}</div>` : ""}
+          <div class="row wrap"><button class="btn sm" data-c="img" ${c.status === "working" ? "disabled" : ""}>🖼️ ${c.image_url ? "تاني" : "ولّد"}</button>
+            <label class="btn sm" title="صورة من عندك">⬆<input type="file" accept="image/*" data-c="up" hidden></label>
+            <label class="check" title="يدخل في الفيديو"><input type="checkbox" data-cf="use" ${c.use === false ? "" : "checked"}>يدخل</label>
+            <button class="btn sm danger" data-c="del">✕</button></div>
+        </div>`).join("")}</div>
+        ${adField("برومبت تجميع اللقطة (Seedance)", s.assembly_prompt || s.prompt, 'data-pf="assembly_prompt"', 3, true)}
+        <div class="ad-takes">${s.takes.map((t) => `<div class="ad-take ${t.id === s.chosen ? "sel" : ""} ${t.approved ? "ok" : ""}" data-pt="${t.id}">
+          ${t.url ? lightVideo(t.url, 'controls playsinline') : `<div class="wait">${PBUSY.has(t.status) ? `<div class="spin"></div>🎬 بيتولد` : `✕ ${adEsc(t.error || "فشل")}`}</div>`}
+          <div class="acts">${t.status === "done" ? `<button class="btn sm" data-t="${t.approved ? "unapprove" : "approve"}">${t.approved ? "✅" : "موافق"}</button>` : ""}
+            ${t.status === "failed" ? `<button class="btn sm" data-t="retry">↻</button>` : ""}
+            ${t.id !== s.chosen && t.status === "done" ? `<button class="btn sm" data-t="pick">اختار</button>` : ""}
+            ${PBUSY.has(t.status) ? "" : `<button class="btn sm danger" data-t="delete">✕</button>`}</div></div>`).join("")}</div>
+        <div class="row wrap">
+          <button class="btn sm ${chosen ? "" : "primary"}" data-p="gen" ${s.frame_url ? "" : "disabled"} title="${s.frame_url ? "" : "ارسم الستوري بورد الأول"}">🎬 ${chosen ? "ولّد واحد تاني" : "ولّد الفيديو"}</button>
+          <label class="btn sm">⬆ ارفع فيديو<input type="file" accept="video/*" data-p="uptake" hidden></label>
+        </div>
+      </div>
+    </article>`;
+  }).join("");
+}
+
+$("adProdGo").onclick = () => pDo($("adProdGo"), "⏳", () => pAPI("/start", { method: "POST" }));
+$("adProdRestart").onclick = () => {
+  if (!confirm("تبدأ التنفيذ من جديد من اقتراح كوتشي الحالي؟ اللقطات والصور والفيديوهات اللي هنا هتتشال من التنفيذ.")) return;
+  pDo($("adProdRestart"), "⏳", () => pAPI("/start", { method: "POST" }));
+};
+$("adHeader").addEventListener("change", (e) => {
+  const k = e.target.dataset.h;
+  if (k) pAPI("/header", { method: "PATCH", ...jsonBody({ header: { [k]: e.target.value } }) }).then((a) => (adx.cur = a)).catch((err) => toast(err.message, true));
+});
+$("adHeaderStyle").addEventListener("change", () => pAPI("/header", { method: "PATCH", ...jsonBody({ header: { style_id: $("adHeaderStyle").value || null } }) })
+  .then((a) => { adx.cur = a; renderAds(); toast("🎨 الستايل اتغير في راس الإعلان. الصور والفيديوهات الجاية هتتعمل بيه"); }).catch((err) => toast(err.message, true)));
+$("adHeaderAspect").addEventListener("change", () => pAPI("/header", { method: "PATCH", ...jsonBody({ header: { aspect: $("adHeaderAspect").value } }) })
+  .then((a) => { adx.cur = a; renderAds(); }).catch((err) => toast(err.message, true)));
+$("adPFrames").onclick = () => pDo($("adPFrames"), "⏳", () => pAPI("/frames", { method: "POST" }));
+$("adPComps").onclick = () => pDo($("adPComps"), "⏳", () => pAPI("/components", { method: "POST" }));
+$("adPCompImgs").onclick = () => pDo($("adPCompImgs"), "⏳", () => pAPI("/comp-images", { method: "POST" }));
+$("adPApproveAll").onclick = () => pDo($("adPApproveAll"), "⏳", () => pAPI(`/approve-all?approved=${!adx.cur.prod.shots.every((s) => s.approved)}`, { method: "POST" }));
+$("adPGenerate").onclick = () => {
+  const n = adx.cur.prod.shots.filter((s) => s.approved && s.frame_url && !s.takes.some((t) => t.status !== "failed")).length;
+  if (n && !confirm(`تولّد فيديو لـ ${n} لقطة بـ Seedance؟ (التوليد بيتحسب عليك)`)) return;
+  pDo($("adPGenerate"), "⏳", () => pAPI("/generate-approved", { method: "POST" }));
+};
+$("adPEditor").onclick = () => busyButton($("adPEditor"), "⏳", async () => {
+  const r = await pAPI("/to-editor", { method: "POST" });
+  storageSet("studiomania.projectId", r.project_id);
+  if (typeof mt !== "undefined") mt.project = null;
+  toast("🎞️ اتفتح الإعلان في المونتاج");
+  showStep("6");
+});
+
+$("adPShots").addEventListener("change", async (e) => {
+  const card = e.target.closest("[data-ps]");
+  if (!card) return;
+  const sid = card.dataset.ps;
+  try {
+    if (e.target.dataset.pf) {
+      adx.cur = await pAPI(`/shots/${sid}`, { method: "PATCH", ...jsonBody({ fields: { [e.target.dataset.pf]: e.target.value } }) });
+      return;
+    }
+    const comp = e.target.closest("[data-pc]");
+    if (comp && e.target.dataset.cf) {
+      const v = e.target.type === "checkbox" ? e.target.checked : e.target.value;
+      adx.cur = await pAPI(`/shots/${sid}/components/${comp.dataset.pc}`, { method: "PATCH", ...jsonBody({ fields: { [e.target.dataset.cf]: v } }) });
+      if (e.target.type === "checkbox") renderAds();
+      return;
+    }
+    const f = e.target.files?.[0];
+    if (!f) return;
+    e.target.value = "";
+    const form = new FormData();
+    form.append("file", f);
+    toast("⏳ بيرفع...");
+    if (comp && e.target.dataset.c === "up") adx.cur = await pAPI(`/shots/${sid}/components/${comp.dataset.pc}/upload`, { method: "POST", body: form });
+    else if (e.target.dataset.p === "uptake") adx.cur = await pAPI(`/upload-take?shot_id=${sid}`, { method: "POST", body: form });
+    renderAds();
+  } catch (err) { toast(err.message, true); }
+});
+$("adPShots").addEventListener("click", async (e) => {
+  const card = e.target.closest("[data-ps]");
+  if (!card) return;
+  const sid = card.dataset.ps;
+  const s = adx.cur.prod.shots.find((x) => x.id === sid);
+  const b = e.target.closest("button, img[data-pframe], img[data-cimg]");
+  if (!b) return;
+  try {
+    if (b.dataset.pframe) adx.cur = await pAPI(`/shots/${sid}/frame`, { method: "POST", ...jsonBody({ file: b.dataset.pframe }) });
+    else if (b.dataset.p === "frame") adx.cur = await pAPI(`/frames?shot_id=${sid}`, { method: "POST" });
+    else if (b.dataset.p === "approve") adx.cur = await pAPI(`/shots/${sid}`, { method: "PATCH", ...jsonBody({ fields: { approved: !s.approved } }) });
+    else if (b.dataset.p === "comps") {
+      if (s.components.length && !confirm("تستخرج المكونات من جديد؟ المكونات اللي ليها صورة بنفس الاسم بتفضل بصورتها.")) return;
+      adx.cur = await pAPI(`/components?shot_id=${sid}`, { method: "POST" });
+    } else if (b.dataset.p === "compimgs") adx.cur = await pAPI(`/comp-images?shot_id=${sid}`, { method: "POST" });
+    else if (b.dataset.p === "addcomp") adx.cur = await pAPI(`/shots/${sid}/components`, { method: "POST", ...jsonBody({ fields: {} }) });
+    else if (b.dataset.p === "gen") {
+      if (!confirm(`تولّد فيديو للقطة ${s.n} بـ Seedance؟ (التوليد بيتحسب عليك)`)) return;
+      adx.cur = await pAPI(`/shots/${sid}/generate`, { method: "POST" });
+    } else {
+      const comp = b.closest("[data-pc]");
+      if (comp && b.dataset.cimg) adx.cur = await pAPI(`/shots/${sid}/components/${comp.dataset.pc}`, { method: "PATCH", ...jsonBody({ fields: { image: b.dataset.cimg } }) });
+      else if (comp && b.dataset.c === "img") adx.cur = await pAPI(`/comp-images?shot_id=${sid}&comp_id=${comp.dataset.pc}`, { method: "POST" });
+      else if (comp && b.dataset.c === "del") {
+        if (!confirm("تشيل المكون ده؟")) return;
+        adx.cur = await pAPI(`/shots/${sid}/components/${comp.dataset.pc}`, { method: "DELETE" });
+      } else {
+        const take = b.closest("[data-pt]");
+        if (!take || !b.dataset.t) return;
+        if (b.dataset.t === "delete" && !confirm("تمسح النسخة دي؟")) return;
+        adx.cur = await pAPI(`/shots/${sid}/take?action=${b.dataset.t}`, { method: "POST", ...jsonBody({ take_id: take.dataset.pt }) });
+      }
+    }
+    renderAds();
+  } catch (err) { toast(err.message, true); }
+});

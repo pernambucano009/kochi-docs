@@ -941,6 +941,7 @@
                   <button data-t="analysis"><i>1</i>التحليل والمشاهد</button>
                   <button data-t="audio"><i>2</i>الصوت</button>
                   <button data-t="adapt"><i>3</i>اقتراح كوتشي</button>
+                  <button data-t="prod"><i>4</i>التنفيذ</button>
                   <button data-t="settings">⚙️ الإعدادات</button>
                 </nav>
               </div>
@@ -966,6 +967,34 @@
                   <button class="btn primary" type="submit" id="adAdaptGo">✍️ عدّل الاقتراح</button>
                 </form>
                 <div id="adAdapt"></div>
+              </section>
+
+              <section class="panel ad-sec" data-sec="prod" hidden>
+                <div id="adProdStart" class="ad-prod-start" hidden>
+                  <p>التنفيذ بيمشي بالترتيب: <b>راس الإعلان</b> (الستايل والكونسبت) ← <b>ستوري بورد</b> لكل لقطة ← <b>مكونات</b> كل لقطة (شخصيات، خلفيات، عناصر موشن جرافيك) وصورة لكل مكون ← <b>فيديو</b> كل لقطة بـ Seedance من الستوري بورد والمكونات ← <b>المونتاج</b>.</p>
+                  <button class="btn primary" id="adProdGo">🎬 ابدأ التنفيذ من اقتراح كوتشي</button>
+                </div>
+                <div id="adProdMain" hidden>
+                  <details class="ad-header" id="adHeaderBox" open>
+                    <summary>🧭 راس الإعلان (الثوابت اللي بتدخل في كل صورة وفيديو)</summary>
+                    <div class="ad-fields" id="adHeader"></div>
+                    <div class="row wrap ad-header-row">
+                      <label class="field">الستايل <select id="adHeaderStyle"></select></label>
+                      <label class="field">المقاس <select id="adHeaderAspect"><option value="9:16">9:16 طولي</option><option value="16:9">16:9 عرضي</option><option value="1:1">1:1 مربع</option></select></label>
+                      <button class="btn sm" id="adProdRestart">↺ ابدأ التنفيذ من جديد من الاقتراح</button>
+                    </div>
+                  </details>
+                  <div class="row wrap ser-bulk">
+                    <button class="btn" id="adPFrames">🎨 ارسم الستوري بورد</button>
+                    <button class="btn" id="adPComps">🧩 استخرج المكونات</button>
+                    <button class="btn" id="adPCompImgs">🖼️ ولّد صور المكونات</button>
+                    <button class="btn" id="adPApproveAll">✅ اعتمد كل اللقطات</button>
+                    <button class="btn primary" id="adPGenerate">🎬 ولّد المعتمدة</button>
+                    <button class="btn primary" id="adPEditor">🎞️ افتح في المونتاج</button>
+                    <span class="muted" id="adPProgress"></span>
+                  </div>
+                  <div class="ad-pshots" id="adPShots"></div>
+                </div>
               </section>
 
               <section class="panel ad-sec" data-sec="settings" hidden>
