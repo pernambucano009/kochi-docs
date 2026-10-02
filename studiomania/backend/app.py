@@ -4160,6 +4160,9 @@ def episode_to_dict(r: sqlite3.Row, data: dict) -> dict:
         "pool": [t for k, t in takes.items() if k not in used],
         "render": data["render"], "busy": eid in SERIES_JOBS, "project_id": data.get("project_id"),
         "export_url": None,
+        "rewrite": data.get("rewrite") or {"chat": [], "lines": []},
+        "voice_pending": bool(data.get("voice_pending")), "retime": bool(data.get("retime")),
+        "retimed": data.get("retimed"),
     }
 
 
@@ -4335,9 +4338,12 @@ def upload_episode_audio(eid: str, file: UploadFile = File(...)):
         (folder / name).unlink(missing_ok=True)
         raise HTTPException(400, f"مقدرتش أقرا الملف الصوتي: {exc}") from exc
     def fn(d):
+        if d["shots"] and d["audio"] and not d.get("retime") and d["lines"] and all(ln.get("start") is not None for ln in d["lines"]):
+            d["retime"] = {"old": {str(ln["n"]): [ln["start"], ln["end"]] for ln in d["lines"]}, "total": d["audio"]["duration"]}
         if d["audio"]:
             (folder / d["audio"]["file"]).unlink(missing_ok=True)
         d["audio"] = {"file": name, "duration": round(duration, 2), "name": file.filename}
+        d["voice_pending"] = False
         d["timing"] = None
         for ln in d["lines"]:
             ln["start"] = ln["end"] = None
@@ -4401,8 +4407,28 @@ def episode_timing(eid: str, mode: str = "auto"):
             for ln, t in zip(d["lines"], timed):
                 ln["start"], ln["end"] = t["start"], t["end"]
         d["timing"] = source
+        retime_shots(d, matched=heard_lines is None)
     update_episode(eid, fn)
     return episode_response(eid)
+
+
+def retime_shots(d: dict, matched: bool) -> None:
+    """بعد صوت جديد: كل لقطة تتحرك وتتمط على مكان جملها في الصوت الجديد، والفيديوهات زي ما هي.
+    matched: الجمل هي هي بنفس أرقامها (اتقرت من السكريبت)، غير كده بنمط الحلقة كلها بالتناسب."""
+    rt = d.pop("retime", None)
+    if not rt or not d["shots"] or not d["audio"]:
+        return
+    total = d["audio"]["duration"]
+    d["shots"] = sz.warp_shots(d["shots"], rt["old"] if matched else {}, rt["total"], d["lines"], total)
+    if not matched:
+        for sh in d["shots"]:
+            sh["lines"] = sz.lines_in_shot(sh, d["lines"])
+    short = []
+    for sh in d["shots"]:
+        t = d["takes"].get(sh.get("chosen") or "")
+        if t and t.get("duration") and t["duration"] - (sh.get("offset") or 0) < sh["end"] - sh["start"] - 0.05:
+            short.append(sh["n"])
+    d["retimed"] = {"at": now(), "short": short}
 
 
 def series_for_episode(conn: sqlite3.Connection, r: sqlite3.Row) -> tuple[sqlite3.Row, dict]:
@@ -4769,6 +4795,99 @@ def write_episode(eid: str, body: WriteIn):
     return episode_response(eid)
 
 
+class RewriteLinesIn(BaseModel):
+    lines: list[dict]
+
+
+@app.post("/api/episodes/{eid}/rewrite")
+def rewrite_episode(eid: str, body: WriteIn):
+    """كلام فويس أوفر جديد على نفس الفيديوهات: نفس الجمل ونفس أوقاتها تقريبًا، بتوجيهك (مثلًا: أظرف)."""
+    with closing(db()) as conn:
+        r, data = episode_row(conn, eid)
+        _, sdata = series_for_episode(conn, r)
+    lines = data["lines"]
+    if not lines or any(ln.get("start") is None for ln in lines):
+        raise HTTPException(400, "الحلقة لسه مفيهاش جمل متوقتة على الصوت")
+    rw = data.get("rewrite") or {"chat": [], "lines": []}
+    chat = list(rw["chat"])
+    msg = body.message.strip()[:4000] or "اكتب كلام جديد للحلقة على نفس الفيديوهات."
+    chat.append({"role": "user", "content": msg})
+    if atlas.mock_mode():
+        reply = sz.mock_rewrite(lines, chat)
+    else:
+        if not atlas.api_key():
+            raise HTTPException(400, "مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات")
+        reply = series_chat(sz.rewrite_messages(sdata["bible"], sdata["character"], lines, data["shots"], chat))
+    try:
+        new = sz.parse_rewrite(reply, lines)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    def fn(d):
+        d["rewrite"] = {"chat": chat + [{"role": "assistant", "content": json.dumps({"lines": new}, ensure_ascii=False)}], "lines": new}
+    update_episode(eid, fn)
+    return episode_response(eid)
+
+
+@app.put("/api/episodes/{eid}/rewrite")
+def save_rewrite(eid: str, body: RewriteLinesIn):
+    """تعديلك بإيدك على الجمل الجديدة."""
+    texts = {int(x["n"]): str(x.get("text") or "").strip()[:500] for x in body.lines if str(x.get("n", "")).isdigit()}
+    def fn(d):
+        rw = d.get("rewrite") or {"chat": [], "lines": []}
+        base = rw["lines"] or [{"n": ln["n"], "text": ln["text"]} for ln in d["lines"]]
+        rw["lines"] = [{"n": x["n"], "text": texts.get(x["n"]) or x["text"]} for x in base]
+        d["rewrite"] = rw
+    update_episode(eid, fn)
+    return episode_response(eid)
+
+
+@app.delete("/api/episodes/{eid}/rewrite")
+def discard_rewrite(eid: str):
+    update_episode(eid, lambda d: d.update(rewrite={"chat": [], "lines": []}))
+    return episode_response(eid)
+
+
+@app.post("/api/episodes/{eid}/rewrite/apply")
+def apply_rewrite(eid: str):
+    """الكلام الجديد يبقى هو سكريبت الحلقة. الجمل محتفظة بأوقاتها القديمة لحد ما ترفع الصوت الجديد،
+    وساعتها اللقطات بتتظبط عليه لوحدها. القديم بيتحفظ في history."""
+    def fn(d):
+        rw = d.get("rewrite") or {}
+        new = {x["n"]: x["text"] for x in rw.get("lines") or []}
+        if not new:
+            raise HTTPException(400, "اكتب الكلام الجديد الأول")
+        d.setdefault("history", []).append({"at": now(), "script": d["script"], "lines": d["lines"], "scenes": d["scenes"],
+                                            "audio": d["audio"], "timing": d["timing"]})
+        d["history"] = d["history"][-10:]
+        script = d["script"]
+        for ln in d["lines"]:
+            if ln["n"] in new and f"«{ln['text']}»" in script:
+                script = script.replace(f"«{ln['text']}»", f"«{new[ln['n']]}»", 1)
+            elif ln["n"] in new:
+                script = None
+                break
+        d["lines"] = [{**ln, "text": new.get(ln["n"], ln["text"])} for ln in d["lines"]]
+        if script is None:
+            # الجمل كانت متاخدة من الصوت: نكتب السكريبت من الجمل نفسها
+            titles = {sc["n"]: sc["title"] for sc in d["scenes"]}
+            out, scene = [], None
+            for ln in d["lines"]:
+                if ln.get("scene") and ln["scene"] != scene:
+                    scene = ln["scene"]
+                    out.append(f"المشهد {scene} — {titles.get(scene, '')}".rstrip(" —"))
+                out.append(f"«{ln['text']}»")
+            script = "\n".join(out)
+        d["script"] = script
+        d["script_approved"] = True
+        d["voice_pending"] = True
+        d["rewrite"] = {"chat": [], "lines": []}
+        d["retimed"] = None
+        if d["shots"] and d["audio"] and all(ln.get("start") is not None for ln in d["lines"]):
+            d["retime"] = {"old": {str(ln["n"]): [ln["start"], ln["end"]] for ln in d["lines"]}, "total": d["audio"]["duration"]}
+    update_episode(eid, fn)
+    return episode_response(eid)
+
+
 @app.post("/api/episodes/{eid}/approve-script")
 def approve_script(eid: str, approved: bool = True):
     update_episode(eid, lambda d: d.update(script_approved=bool(approved)))
@@ -4899,6 +5018,16 @@ def approve_take(eid: str, take_id: str, approved: bool = True):
     return episode_response(eid)
 
 
+def stretch_take(src: Path, out: Path, start: float, have: float, need: float) -> None:
+    """الفيديو أقصر من وقت اللقطة (بعد صوت جديد): نبطّأه لحد 1.3x، والباقي آخر فريم واقف."""
+    k = min(1.3, need / max(have, 0.1))
+    freeze = max(0.0, need - have * k)
+    vf = f"setpts={k:.4f}*(PTS-STARTPTS),fps=30" + (f",tpad=stop_mode=clone:stop_duration={freeze + 0.1:.3f}" if freeze > 0.01 else "")
+    subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{start:.3f}", "-i", str(src),
+                    "-vf", vf, "-an", "-t", f"{need:.3f}", "-c:v", "libx264", "-preset", "veryfast", "-crf", "17",
+                    "-pix_fmt", "yuv420p", str(out)], check=True, capture_output=True, timeout=300)
+
+
 @app.post("/api/episodes/{eid}/to-editor")
 def episode_to_editor(eid: str):
     """يحط الحلقة في محرر الفيديو: كل لقطة بنسختها المعتمدة ومقصوصة على مدتها، والفويس أوفر تحتهم."""
@@ -4920,7 +5049,16 @@ def episode_to_editor(eid: str):
             t = data["takes"][s["chosen"]]
             gid = uuid.uuid4().hex[:12]
             out = f"{gid}.mp4"
-            shutil.copyfile(ep_dir(eid) / "takes" / t["file"], GENERATED_DIR / out)
+            src = ep_dir(eid) / "takes" / t["file"]
+            dur = s["end"] - s["start"]
+            start = float(s.get("offset") or 0)
+            have = (t.get("duration") or 0) - start
+            if t.get("duration") and have < dur - 0.05:
+                stretch_take(src, GENERATED_DIR / out, start, have, dur)
+                t = {**t, "duration": dur}
+                s = {**s, "offset": 0.0}
+            else:
+                shutil.copyfile(src, GENERATED_DIR / out)
             conn.execute(
                 "INSERT INTO generations (id, clip_id, clip_filename, clip_label, coach_id, coach_name, coach_image, model, prompt, "
                 "params, status, output_filename, created_at, updated_at) VALUES (?, ?, ?, ?, '', '', '', ?, ?, '{}', 'completed', ?, ?, ?)",

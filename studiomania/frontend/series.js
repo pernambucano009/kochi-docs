@@ -162,12 +162,15 @@ function renderWriteTab() {
   $("serApproveScript").textContent = ep.script_approved ? "✅ معتمد (دوس تلغي)" : "✅ اعتمد السكريبت";
   $("serApproveScript").classList.toggle("primary", !ep.script_approved);
   $("serApproveScript").disabled = !ep.lines.length;
+  renderRewrite();
   $("serWriteState").textContent = ep.script_approved ? "✅ السكريبت معتمد: سجّل الفويس أوفر وارفعه في «3 الفويس أوفر»" : ep.lines.length ? `${ep.lines.length} جملة فويس أوفر` : "";
 }
 $("serWriteForm").addEventListener("submit", (e) => {
   e.preventDefault();
   const message = $("serWriteMsg").value.trim();
   if (ser.ep.chat.length && !message) return $("serWriteMsg").focus();
+  if (ser.ep.shots.some((s) => s.takes.length)
+    && !confirm("الحلقة دي ليها فيديوهات خلاص. الكاتب هنا بيكتب الحلقة من الأول، ولو غيّرت السكريبت اللقطات مش هتمشي معاه.\nلو عايز تغيّر الكلام بس وتسيب الفيديوهات، استخدم «🎭 كلام جديد على نفس الفيديوهات» فوق.\n\nتكمّل برضه؟")) return;
   busyButton($("serWriteGo"), "⏳ بيكتب...", async () => {
     ser.ep = await api(`/api/episodes/${ser.ep.id}/write`, { method: "POST", ...jsonBody({ message }) });
     $("serWriteMsg").value = "";
@@ -180,6 +183,73 @@ $("serWriteMsg").addEventListener("keydown", (e) => {
 $("serApproveScript").onclick = () => busyButton($("serApproveScript"), "⏳", async () => {
   ser.ep = await api(`/api/episodes/${ser.ep.id}/approve-script?approved=${!ser.ep.script_approved}`, { method: "POST" });
   if (ser.ep.script_approved) { ser.tab = "script"; toast("اتعتمد. سجّل الفويس أوفر وارفعه هنا"); }
+  renderSeries();
+});
+
+// كلام جديد على نفس الفيديوهات: جملة مكان جملة، على قد وقتها
+const wordsOf = (t) => (t || "").split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w)).length;
+function renderRewrite() {
+  const ep = ser.ep;
+  const ready = ep.shots.length && ep.lines.length && ep.lines.every((l) => l.start != null);
+  $("serRewrite").hidden = !ready;
+  $("serVoicePending1").hidden = !ep.voice_pending;
+  $("serVoicePending2").hidden = !ep.voice_pending;
+  if (!ready) return;
+  const rw = ep.rewrite.lines;
+  $("serRwGo").textContent = rw.length ? "🎭 عدّل" : "🎭 اكتب كلام جديد";
+  $("serRwActs").hidden = !rw.length;
+  $("serRwState").textContent = rw.length ? `${rw.filter((x) => x.text !== ep.lines.find((l) => l.n === x.n)?.text).length} جملة اتغيرت من ${ep.lines.length}` : "";
+  if (!rw.length) { $("serRwLines").innerHTML = ""; return; }
+  if ($("serRwLines").contains(document.activeElement)) return;
+  const newText = Object.fromEntries(rw.map((x) => [x.n, x.text]));
+  $("serRwLines").innerHTML = ep.lines.map((l) => {
+    const now = newText[l.n] ?? l.text;
+    const a = wordsOf(l.text), b = wordsOf(now);
+    return `<div class="rw-line"><b>${l.n}</b>
+      <div class="rw-body"><div class="old">«${escapeHtml(l.text)}» <span class="muted">· ${(l.end - l.start).toFixed(1)}ث</span></div>
+        <textarea rows="1" data-rw="${l.n}">${escapeHtml(now)}</textarea></div>
+      <span class="wc ${b > a + 1 ? "long" : ""}" title="عدد الكلمات: الجديد / القديم">${b}/${a}${b > a + 1 ? " ⚠️ أطول" : ""}</span></div>`;
+  }).join("");
+}
+$("serRwForm").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const message = $("serRwMsg").value.trim();
+  if (ser.ep.rewrite.lines.length && !message) return $("serRwMsg").focus();
+  busyButton($("serRwGo"), "⏳ بيكتب...", async () => {
+    ser.ep = await api(`/api/episodes/${ser.ep.id}/rewrite`, { method: "POST", ...jsonBody({ message: message || "خليه مضحك أكتر" }) });
+    $("serRwMsg").value = "";
+    renderSeries();
+  });
+});
+$("serRwMsg").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("serRwForm").requestSubmit(); }
+});
+$("serRwLines").addEventListener("input", (e) => {
+  const ta = e.target.closest("[data-rw]");
+  if (!ta) return;
+  const l = ser.ep.lines.find((x) => x.n === Number(ta.dataset.rw));
+  const a = wordsOf(l.text), b = wordsOf(ta.value);
+  const wc = ta.closest(".rw-line").querySelector(".wc");
+  wc.textContent = `${b}/${a}${b > a + 1 ? " ⚠️ أطول" : ""}`;
+  wc.classList.toggle("long", b > a + 1);
+});
+$("serRwLines").addEventListener("change", async (e) => {
+  if (!e.target.closest("[data-rw]")) return;
+  const lines = [...$("serRwLines").querySelectorAll("[data-rw]")].map((t) => ({ n: Number(t.dataset.rw), text: t.value }));
+  try { ser.ep = await api(`/api/episodes/${ser.ep.id}/rewrite`, { method: "PUT", ...jsonBody({ lines }) }); renderSeries(); }
+  catch (err) { toast(err.message, true); }
+});
+$("serRwApply").onclick = () => {
+  if (!confirm("الكلام الجديد هيبقى سكريبت الحلقة. بعدها تسجّل الفويس أوفر بيه وترفعه، واللقطات تتظبط عليه.\n(المونتاج والفيديو اللي صدّرته قبل كده بيفضلوا زي ما هما.)")) return;
+  busyButton($("serRwApply"), "⏳", async () => {
+    ser.ep = await api(`/api/episodes/${ser.ep.id}/rewrite/apply`, { method: "POST" });
+    ser.tab = "script";
+    toast("اتعتمد ✅ سجّل الفويس أوفر الجديد وارفعه هنا");
+    renderSeries();
+  });
+};
+$("serRwDiscard").onclick = () => busyButton($("serRwDiscard"), "⏳", async () => {
+  ser.ep = await api(`/api/episodes/${ser.ep.id}/rewrite`, { method: "DELETE" });
   renderSeries();
 });
 
@@ -288,6 +358,11 @@ function renderShotsTab() {
   $("serShotsHint").textContent = ready ? `الحلقة ${serFmt(ep.audio.duration)} · ${ep.shots.length} لقطة · الموديل: ${ser.settings.text_model}` : "رقّم جمل الفويس أوفر على الصوت الأول (تبويب السكريبت والصوت).";
   const lines = Object.fromEntries(ep.lines.map((l) => [l.n, l]));
   let scene = null;
+  const rt = ep.retimed;
+  $("serRetimed").hidden = !rt;
+  if (rt) $("serRetimed").textContent = rt.short.length
+    ? `🔁 اللقطات اتظبطت على الصوت الجديد. ${rt.short.length} لقطة الفيديو بتاعها بقى أقصر من وقتها (${rt.short.join("، ")}): في المونتاج هتتبطّأ شوية وآخر فريم يقف، أو دوس «🔄 واحد تاني» عليها يتولد على الوقت الجديد.`
+    : "🔁 اللقطات اتظبطت على الصوت الجديد، وكل الفيديوهات مكفية وقتها.";
   $("serShots").innerHTML = ep.shots.map((s) => {
     const head = s.scene !== scene ? `<div class="ser-scene">المشهد ${s.scene}</div>` : "";
     scene = s.scene;
@@ -324,7 +399,7 @@ function renderShotsTab() {
         ${chosen ? "" : `<button class="btn sm primary" data-gen ${s.approved ? "" : "disabled"} title="${s.approved ? "" : "اعتمد اللقطة الأول"}">🎬 ولّد الفيديو</button>`}
         <label class="btn sm">⬆ ارفع فيديو<input type="file" data-up accept="video/*" hidden></label>
         ${chosen ? `<label class="off">يبدأ من <input type="number" step="0.1" min="0" data-f="offset" value="${s.offset || 0}">ث</label>` : ""}
-        ${short ? `<span class="warn">⚠️ النسخة أقصر من اللقطة، آخر فريم هيتمد</span>` : ""}
+        ${short ? `<span class="warn">⚠️ النسخة أقصر من اللقطة: هتتبطّأ شوية وآخر فريم يقف</span>` : ""}
       </div>
     </article>`;
   }).join("");

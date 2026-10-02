@@ -356,6 +356,103 @@ def mock_script(number: int, chat: list[dict]) -> str:
             f"«بس ما وقفت.»{note}")
 
 
+
+# ---------------------------------------------------------------- كلام جديد على نفس الفيديوهات
+
+WORDS_PER_SECOND = 2.4  # سرعة فويس أوفر عادية بالعربي
+
+
+def word_count(text: str) -> int:
+    return len([w for w in re.split(r"\s+", text or "") if re.search(r"\w", w)])
+
+
+def rewrite_messages(bible: str, character: str, lines: list[dict], shots: list[dict], chat: list[dict]) -> list[dict]:
+    """الفيديوهات خلاص اتصورت: الموديل بيكتب كلام جديد لكل جملة، على نفس الصورة ونفس الوقت تقريبًا."""
+    rows = []
+    for ln in lines:
+        dur = max(0.0, (ln.get("end") or 0) - (ln.get("start") or 0))
+        seen = [s.get("title") or "" for s in shots if ln["n"] in (s.get("lines") or [])]
+        rows.append(
+            f'{ln["n"]}. ({dur:.1f} ثانية، {word_count(ln["text"])} كلمة) «{ln["text"]}»'
+            + (f' — على الشاشة: {" / ".join(x for x in seen if x)}' if any(seen) else "")
+        )
+    system = (
+        "أنت كاتب سيناريو لمسلسل قصير على السوشيال ميديا. الحلقة دي اتصورت خلاص والفيديوهات جاهزة، "
+        "والمطلوب كلام فويس أوفر جديد يتسجّل على نفس الفيديوهات بالظبط.\n\n"
+        f"دستور المسلسل:\n{bible.strip()}\n\n"
+        + (f"الشخصية:\n{character.strip()}\n\n" if character.strip() else "")
+        + "جمل الفويس أوفر الحالية بالترتيب (رقم الجملة، مدتها في الصوت، وإيه اللي ظاهر على الشاشة وقتها):\n"
+        + "\n".join(rows)
+        + "\n\nالقواعد:\n"
+        "- نفس عدد الجمل ونفس أرقامها: كل جملة جديدة مكان القديمة بالظبط، لأن الصورة اللي تحتها مش هتتغير.\n"
+        "- الجملة الجديدة لازم تتقال في نفس الوقت تقريبًا: قريبة من عدد كلمات القديمة (زيادة كلمتين بالكتير). الجمل القصيرة جدًا (أقل من ثانية) خليها كلمة أو كلمتين.\n"
+        "- الكلام يناسب اللي ظاهر على الشاشة، والقصة تفضل ماشية بنفس الترتيب.\n"
+        "- نفس لهجة المسلسل ونفس روح الشخصية، واسم الشخصية ما يتذكرش أبدًا.\n"
+        "- اسمع توجيه المستخدم وطبّقه على الحلقة كلها بشكل واضح، مش تغيير كلمة هنا وكلمة هناك: "
+        "المستخدم مش عاجبه الكلام القديم، فأغلب الجمل لازم تتغير فعلًا.\n"
+        "- لو طلب كوميديا: ضحك ذكي وجاف مش تهريج. استخدم المفارقة بين الكلام والصورة، والمبالغة، والسخرية من النفس، "
+        "وتفاصيل سعودية يومية حقيقية، وإفيه واضح في آخر كل مشهد أو كل كام جملة. الشخصية جادة جدًا من برة، والضحك جاي من جدّيتها.\n\n"
+        'رد بـ JSON بس بالشكل ده: {"lines": [{"n": 1, "text": "..."}, ...]} وفيه كل الجمل.'
+    )
+    return [{"role": "system", "content": system}] + chat[-20:]
+
+
+def parse_rewrite(text: str, lines: list[dict]) -> list[dict]:
+    """الجمل الجديدة بنفس أرقام القديمة؛ أي جملة الموديل نسيها بتفضل زي ما هي."""
+    m = re.search(r"\{.*\}", text or "", re.S)
+    if not m:
+        raise ValueError("الموديل ما رجعش الجمل الجديدة")
+    data = json.loads(m.group(0), strict=False)
+    raw = data.get("lines") if isinstance(data, dict) else None
+    if not isinstance(raw, list) or not raw:
+        raise ValueError("الموديل ما رجعش الجمل الجديدة")
+    new = {}
+    for x in raw:
+        if isinstance(x, dict) and str(x.get("n", "")).strip().isdigit() and str(x.get("text") or "").strip():
+            new[int(str(x["n"]).strip())] = str(x["text"]).strip().strip("«»\"").strip()[:500]
+    return [{"n": ln["n"], "text": new.get(ln["n"], ln["text"])} for ln in lines]
+
+
+def mock_rewrite(lines: list[dict], chat: list[dict]) -> str:
+    return json.dumps({"lines": [{"n": ln["n"], "text": f"{ln['text']} 😂"} for ln in lines]}, ensure_ascii=False)
+
+
+def warp_shots(shots: list[dict], old: dict, old_total: float, new_lines: list[dict], new_total: float) -> list[dict]:
+    """الصوت الجديد اتسجّل: كل لقطة تتحرك وتتمط أو تتقص على مكان جملها في الصوت الجديد.
+    بنعمل خريطة من الوقت القديم للجديد من بداية ونهاية كل جملة موجودة في الاتنين، وبين النقط بالتناسب."""
+    pts = [(0.0, 0.0)]
+    for ln in sorted(new_lines, key=lambda x: x.get("start") or 0):
+        o = old.get(str(ln["n"]))
+        if not o or ln.get("start") is None or ln.get("end") is None:
+            continue
+        for a, b in ((o[0], ln["start"]), (o[1], ln["end"])):
+            if a > pts[-1][0] + 0.05 and b > pts[-1][1] + 0.05 and a < old_total and b < new_total:
+                pts.append((float(a), float(b)))
+    pts.append((float(old_total), float(new_total)))
+
+    def warp(t: float) -> float:
+        for (a0, b0), (a1, b1) in zip(pts, pts[1:]):
+            if t <= a1:
+                return b0 + (b1 - b0) * (t - a0) / (a1 - a0) if a1 > a0 else b0
+        return new_total
+
+    out = []
+    for s in shots:
+        out.append({**s, "start": round(warp(s["start"]), 2), "end": round(warp(s["end"]), 2)})
+    # متلاصقة من 0 لآخر الصوت
+    for k, s in enumerate(out):
+        s["start"] = 0.0 if k == 0 else out[k - 1]["end"]
+        s["end"] = max(s["start"] + 0.1, s["end"])
+    if out:
+        out[-1]["end"] = round(max(out[-1]["start"] + 0.1, new_total), 2)
+    return out
+
+
+def lines_in_shot(shot: dict, lines: list[dict]) -> list[int]:
+    """الجمل اللي نصها واقع جوه اللقطة."""
+    return [ln["n"] for ln in lines if ln.get("start") is not None
+            and shot["start"] <= (ln["start"] + ln["end"]) / 2 < shot["end"]]
+
 # ---------------------------------------------------------------- الستوري بورد (GPT Image)
 
 def frame_prompt(shot: dict, character: str) -> str:
