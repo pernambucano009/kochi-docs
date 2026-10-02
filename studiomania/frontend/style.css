@@ -1159,3 +1159,6 @@ a.pl-link:hover { background: color-mix(in srgb, var(--ok) 24%, transparent); }
 .shot-ghost { border: 2px dashed var(--accent); border-radius: 14px; padding: 12px; display: flex; flex-direction: column; gap: 6px; justify-content: center; font-size: 14px; background: var(--surface); }
 .shot-ghost b { font-size: 20px; }
 .shot-ghost .muted { font-size: 12px; }
+.shot .prompt-busy { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--accent); }
+.shot .prompt-busy .spin { width: 14px; height: 14px; }
+.prompt-new { font-size: 12px; color: #2F855A; background: #F0FFF4; border-radius: 8px; padding: 4px 8px; }

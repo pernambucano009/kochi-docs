@@ -502,6 +502,9 @@ function renderShotsTab() {
       ${s.frame_error ? `<div class="err">${escapeHtml(s.frame_error)}</div>` : ""}
       <input type="text" class="title" data-f="title" value="${escapeHtml(s.title || "")}" placeholder="وصف اللقطة" data-no-i18n>
       <div class="meta" data-no-i18n>${[s.shot, s.camera, s.location, s.sfx && `🔊 ${s.sfx}`, s.transition && `↪ ${s.transition}`].filter(Boolean).map(escapeHtml).join(" · ")}</div>
+      ${s.prompt_status === "working" ? `<div class="prompt-busy"><div class="spin"></div> ✍️ بيكتب برومبت للكلام الجديد...</div>` : ""}
+      ${s.prompt_status === "failed" && s.prompt_error ? `<div class="err">✍️ ${escapeHtml(s.prompt_error)}</div>` : ""}
+      ${s.prompt_new ? `<div class="prompt-new">🆕 برومبت جديد على الكلام الجديد${s.takes.length ? " · الفيديوهات اللي تحت من البرومبت القديم: استخدم واحد منهم أو ولّد واحد جديد" : ""}</div>` : ""}
       <textarea data-f="prompt" rows="4" dir="ltr" placeholder="Prompt" data-no-i18n>${escapeHtml(s.prompt || "")}</textarea>
       <div class="acts">
         <button class="btn sm" data-redescribe title="الموديل يكتب وصف وبرومبت جديد للقطة على الكلام الجديد (الصور والفيديوهات القديمة بتفضل كنسخ)">✍️ برومبت للكلام الجديد</button>
@@ -535,6 +538,9 @@ function renderShotsTab() {
   $("serPoolList").innerHTML = ep.pool.map((t) => `<div class="pool-item">${takeThumb(t, null)}
       <select data-attach="${t.id}"><option value="">حطها على لقطة…</option>${ep.shots.map((s) => `<option value="${s.id}">${s.n}. ${escapeHtml((s.title || "").slice(0, 30))}</option>`).join("")}</select></div>`).join("");
   $("serGalleryGo").disabled = !n;
+  const writing = ep.shots.filter((s) => s.prompt_status === "working").length;
+  $("serRepromptAll").disabled = !n || !!writing;
+  $("serRepromptAll").textContent = writing ? `✍️ بيكتب برومبتات (${writing} لقطة)...` : "✍️ برومبتات للكلام الحالي";
   if ($("serGalDialog").open) renderGallery();
 }
 $("serShotsGo").onclick = () => {
@@ -783,6 +789,14 @@ $("serAddGo").onclick = () => busyButton($("serAddGo"), "⏳ بيكتب اللق
   if (card) { card.scrollIntoView({ behavior: "smooth", block: "center" }); card.classList.add("flash"); setTimeout(() => card.classList.remove("flash"), 2500); }
 });
 
+$("serRepromptAll").onclick = () => {
+  if (!confirm("الموديل يكتب وصف وبرومبت جديد لكل اللقطات على الكلام الحالي؟\nالستوري بورد والفيديوهات الموجودة بيفضلوا زي ما هما، والتوليد الجاي هيبقى على البرومبتات الجديدة.")) return;
+  busyButton($("serRepromptAll"), "⏳", async () => {
+    ser.ep = await api(`/api/episodes/${ser.ep.id}/reprompt`, { method: "POST" });
+    renderSeries();
+    toast("✍️ البرومبتات بتتكتب في الخلفية، وكل لقطة بتتحدث أول ما تخلص");
+  });
+};
 $("serFramesGo").onclick = () => busyButton($("serFramesGo"), "⏳", async () => {
   ser.ep = await api(`/api/episodes/${ser.ep.id}/frames`, { method: "POST" });
   renderSeries();
@@ -936,6 +950,10 @@ function renderGalView() {
   acts.push(s.approved
     ? `<button class="btn sm" data-gal-gen>${t ? "🔄 ولّد واحد تاني" : "🎬 ولّد الفيديو"}</button>`
     : `<button class="btn sm" data-gal-approve-shot>✅ اعتمد اللقطة الأول</button>`);
+  acts.push(s.prompt_status === "working"
+    ? `<span class="muted">✍️ بيكتب برومبت جديد...</span>`
+    : `<button class="btn sm" data-gal-reprompt title="وصف وبرومبت جديد على الكلام الجديد؛ الفيديو الجاي بيتولد عليه">✍️ برومبت جديد للكلام الجديد</button>`);
+  if (s.prompt_new) acts.push(`<div class="prompt-new">🆕 البرومبت اتحدث على الكلام الجديد${t ? "، والفيديو ده من البرومبت القديم" : ""}</div>`);
   $("serGalActs").innerHTML = acts.join("");
 }
 // الفويس أوفر بتاع اللقطة يمشي مع الفيديو
@@ -1023,6 +1041,10 @@ $("serGalActs").addEventListener("click", async (e) => {
     } else if (b.matches("[data-gal-gen]")) {
       ser.ep = await api(`/api/episodes/${eid}/shots/${sid}/generate`, { method: "POST" });
       gal.take = null;
+    } else if (b.matches("[data-gal-reprompt]")) {
+      b.textContent = "⏳ بيكتب...";
+      ser.ep = await api(`/api/episodes/${eid}/shots/${sid}/describe`, { method: "POST" });
+      toast("✍️ اتكتب برومبت جديد. دوس «🔄 ولّد واحد تاني» عشان يتولد عليه");
     } else if (b.matches("[data-gal-approve-shot]")) {
       await patchEpisode({ shot: { id: sid, approved: true } });
     }
@@ -1035,7 +1057,7 @@ function schedulePollSeries() {
   clearTimeout(ser.timer);
   const ep = ser.ep;
   if (!ep) return;
-  const busy = ep.render.status === "working" || ep.shots.some((s) => s.frame_status === "queued" || s.frame_status === "working"
+  const busy = ep.render.status === "working" || ep.shots.some((s) => s.frame_status === "queued" || s.frame_status === "working" || s.prompt_status === "working"
     || s.takes.some((t) => t.status === "queued" || t.status === "working"));
   if (!busy || document.querySelector('.view[data-view="9"]').hidden) return;
   ser.timer = setTimeout(async () => {

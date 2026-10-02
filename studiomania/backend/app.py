@@ -4072,6 +4072,8 @@ def carousel_zip(cid: str):
 SERIES_LOCK = threading.Lock()
 SERIES_JOBS: set[str] = set()  # حلقات بيتجمّع فيها الفيديو دلوقتي
 series_executor = ThreadPoolExecutor(max_workers=2)
+prompt_executor = ThreadPoolExecutor(max_workers=4)  # برومبتات جديدة بعد تغيير الكلام
+REPROMPT_BATCH = 8
 SERIES_W, SERIES_H = 1080, 1920
 
 
@@ -4789,6 +4791,65 @@ def reorder_shots(eid: str, body: ShotOrderIn):
     return episode_response(eid)
 
 
+def start_reprompt(eid: str, ids: list[str]) -> None:
+    """يعلّم اللقطات إنها بيتكتب لها برومبت جديد، ويبعتهم للموديل على دفعات في الخلفية."""
+    if not ids:
+        return
+    def mark(d):
+        for x in d["shots"]:
+            if x["id"] in ids:
+                x["prompt_status"], x["prompt_error"] = "working", None
+    update_episode(eid, mark)
+    for k in range(0, len(ids), REPROMPT_BATCH):
+        prompt_executor.submit(run_reprompt, eid, ids[k:k + REPROMPT_BATCH])
+
+
+def run_reprompt(eid: str, ids: list[str]) -> None:
+    try:
+        with closing(db()) as conn:
+            r, data = episode_row(conn, eid)
+            _, sdata = series_for_episode(conn, r)
+        shots = data["shots"]
+        text = {ln["n"]: ln["text"] for ln in data["lines"]}
+        items = []
+        for k, x in enumerate(shots):
+            if x["id"] in ids:
+                items.append({"id": x["id"], "n": x["n"], "seconds": x["end"] - x["start"],
+                              "said": [text[n] for n in x.get("lines") or [] if n in text], "shot": x,
+                              "prev": shots[k - 1] if k else None, "next": shots[k + 1] if k + 1 < len(shots) else None})
+        if atlas.mock_mode():
+            result = {it["id"]: sz.mock_one_shot(it["prev"], " ".join(it["said"])) for it in items}
+        else:
+            result = sz.parse_reprompt(series_chat(sz.reprompt_messages(sdata["bible"], sdata["character"], items)))
+        error = None
+    except Exception as exc:  # noqa: BLE001
+        result, error = {}, str(getattr(exc, "detail", exc))[:300]
+    def fn(d):
+        for x in d["shots"]:
+            if x["id"] not in ids:
+                continue
+            if x["id"] in result:
+                x.update(result[x["id"]])
+                x.update(prompt_status="done", prompt_error=None, prompt_new=True)
+            else:
+                x.update(prompt_status="failed", prompt_error=error or "الموديل ما رجعش برومبت للقطة دي")
+    update_episode(eid, fn)
+
+
+@app.post("/api/episodes/{eid}/reprompt")
+def reprompt_episode(eid: str, shot_id: str | None = None):
+    """برومبتات جديدة على الكلام الحالي: لقطة واحدة (shot_id) أو كل اللقطات. الستوري بورد والفيديوهات القديمة بيفضلوا."""
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات")
+    with closing(db()) as conn:
+        _, data = episode_row(conn, eid)
+    ids = [x["id"] for x in data["shots"] if (shot_id is None or x["id"] == shot_id) and x.get("prompt_status") != "working"]
+    if not ids:
+        raise HTTPException(400, "البرومبت بيتكتب بالفعل")
+    start_reprompt(eid, ids)
+    return episode_response(eid)
+
+
 @app.post("/api/episodes/{eid}/shots/{shot_id}/describe")
 def describe_shot(eid: str, shot_id: str):
     """وصف وبرومبت جديد للقطة على الكلام الجديد (من المسودة لو فيه)، بنفس أسلوب اللي جنبها.
@@ -4816,7 +4877,7 @@ def describe_shot(eid: str, shot_id: str):
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
     def fn(d):
-        find_shot(d, shot_id).update(fields)
+        find_shot(d, shot_id).update(**fields, prompt_new=True, prompt_status="done", prompt_error=None)
     update_episode(eid, fn)
     return episode_response(eid)
 
@@ -4897,6 +4958,7 @@ def generate_take(eid: str, shot_id: str):
                            "duration": None, "gen_duration": gen, "prompt": shot_prompt(s, sdata["character"]),
                            "frame": s.get("frame"), "approved": False, "created_at": now()}
         s["takes"].append(tid)
+        s.pop("prompt_new", None)
         if not s["chosen"]:
             s["chosen"] = tid
     update_episode(eid, fn)
@@ -5113,6 +5175,7 @@ def apply_rewrite(eid: str):
         retime = {"old": {str(remap[o["n"]]): [o["start"], o["end"]] for o in d["lines"] if o["n"] in remap},
                   "total": d["audio"]["duration"], "added": added} if timed else None
         for sh in d["shots"]:
+            sh["_old_lines"] = list(sh.get("lines") or [])
             sh["lines"] = [remap[n] for n in sh.get("lines") or [] if n in remap]
         d["lines"] = lines
         titles = {sc["n"]: sc["title"] for sc in d["scenes"]}
@@ -5125,10 +5188,19 @@ def apply_rewrite(eid: str):
         d["script"] = "\n".join(out)
         d["script_approved"] = True
         d["voice_pending"] = True
+        old_text = {o["n"]: o["text"] for o in old.values()}
+        new_by_old = {x["n"]: x["text"].strip() for x in draft if x["n"] is not None}
+        changed.extend(sh["id"] for sh in d["shots"]
+                       if any(new_by_old.get(o) != old_text[o] for o in sh.get("_old_lines") or []))
         d["rewrite"] = {"chat": [], "lines": []}
         d["retimed"] = None
         d["retime"] = retime
+        for sh in d["shots"]:
+            sh.pop("_old_lines", None)
+    changed: list[str] = []
     update_episode(eid, fn)
+    if changed and (atlas.api_key() or atlas.mock_mode()):
+        start_reprompt(eid, changed)
     return episode_response(eid)
 
 
@@ -5339,6 +5411,9 @@ def reset_stuck_series() -> None:
                     t.update(status="failed", error="اتقطع لما السيرفر اتقفل. دوس ولّد تاني")
                     changed = True
             for sh in d.get("shots") or []:
+                if sh.get("prompt_status") == "working":
+                    sh.update(prompt_status="failed", prompt_error="اتقطع لما السيرفر اتقفل. دوس ✍️ تاني")
+                    changed = True
                 if sh.get("frame_status") in ("queued", "working"):
                     sh.update(frame_status="failed", frame_error="اتقطع لما السيرفر اتقفل. ارسم تاني")
                     changed = True

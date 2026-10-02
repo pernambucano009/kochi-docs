@@ -394,6 +394,47 @@ def insert_shot_messages(bible: str, character: str, prev: dict | None, nxt: dic
     return [{"role": "system", "content": system}, {"role": "user", "content": user}]
 
 
+def reprompt_messages(bible: str, character: str, items: list[dict]) -> list[dict]:
+    """برومبتات جديدة لكذا لقطة مرة واحدة بعد ما الكلام اتغير. items: لكل لقطة رقمها ومدتها والكلام الجديد عليها
+    ووصفها القديم، واللقطة اللي قبلها واللي بعدها عشان الاتساق."""
+    blocks = []
+    for it in items:
+        blocks.append(
+            f'### id: {it["id"]} (لقطة {it["n"]}، {it["seconds"]:.1f} ثانية)\n'
+            f'الكلام الجديد وقتها: {" ".join("«" + x + "»" for x in it["said"]) if it["said"] else "(من غير كلام)"}\n'
+            f'اللقطة دي قبل كده:\n{shot_brief(it["shot"])}\n'
+            f'اللي قبلها: {(it["prev"] or {}).get("title") or "(مفيش)"} | اللي بعدها: {(it["next"] or {}).get("title") or "(مفيش)"}'
+        )
+    system = (
+        "أنت مخرج لمسلسل قصير على السوشيال ميديا. كلام الفويس أوفر اتغير، والمطلوب تحدّث وصف وبرومبت كل لقطة "
+        "عشان الصورة تخدم الكلام الجديد. خلي الاتساق مع باقي الحلقة: نفس الأماكن والإضاءة واللبس والمزاج. "
+        "لو اللقطة القديمة لسه مناسبة للكلام الجديد خليها قريبة منها وغيّر اللي محتاج بس.\n\n"
+        f"دستور المسلسل:\n{bible.strip()}\n\n"
+        f"الشخصية (لازم تتوصف بنفس الشكل في البرومبت لو ظاهرة):\n{character.strip()}"
+    )
+    user = (
+        "\n\n".join(blocks)
+        + "\n\nprompt بالإنجليزي لموديل فيديو (Seedance): الشخصية بوصفها الكامل لو ظاهرة، الفعل، المكان، الإضاءة، العدسة، حركة الكاميرا، المزاج. "
+        "فيديو طولي 9:16 واقعي سينمائي، الشخصية ما بتتكلمش قدام الكاميرا، ومن غير أي كلام مكتوب على الشاشة. اسم الشخصية ما يتذكرش أبدًا.\n\n"
+        'رجّع JSON بس بالشكل ده، لكل لقطة بنفس الـ id:\n{"shots": [' + ONE_SHOT_FORMAT.replace("{", '{"id": "...", ', 1) + "]}"
+    )
+    return [{"role": "system", "content": system}, {"role": "user", "content": user}]
+
+
+def parse_reprompt(text: str) -> dict[str, dict]:
+    m = re.search(r"\{.*\}", text or "", re.S)
+    if not m:
+        raise ValueError("الموديل ما رجعش البرومبتات")
+    data = json.loads(m.group(0), strict=False)
+    out = {}
+    for x in (data.get("shots") if isinstance(data, dict) else None) or []:
+        if isinstance(x, dict) and x.get("id") and str(x.get("prompt") or "").strip():
+            out[str(x["id"])] = {k: str(x.get(k) or "").strip()[:2000] for k in ("title", "shot", "camera", "location", "sfx", "transition", "prompt")}
+    if not out:
+        raise ValueError("الموديل ما رجعش البرومبتات")
+    return out
+
+
 def parse_one_shot(text: str) -> dict:
     m = re.search(r"\{.*\}", text or "", re.S)
     if not m:
