@@ -1147,3 +1147,9 @@ a.pl-link:hover { background: color-mix(in srgb, var(--ok) 24%, transparent); }
 .rw-edit textarea { flex: 1; min-width: 0; }
 .rw-edit .wc, .rw-edit .rw-tools { padding-top: 0; }
 .rw-line > b { align-self: flex-end; padding: 0 0 8px; }
+/* ترتيب اللقطات بالسحب */
+.shot header .drag { cursor: grab; font-size: 18px; color: var(--muted); padding: 0 2px; user-select: none; touch-action: none; }
+.shot header .mv { padding: 4px 7px; }
+.shot.dragging { opacity: .45; }
+.shot.drop-before { box-shadow: 4px 0 0 0 var(--accent); }
+.shot.drop-after { box-shadow: -4px 0 0 0 var(--accent); }

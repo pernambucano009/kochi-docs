@@ -456,8 +456,10 @@ function renderShotsTab() {
     const frames = (s.frames || []).length > 1 ? `<div class="frame-vers">${s.frames.map((f, i) => `<img src="${f.url}" data-frame="${f.file}" class="${f.url === s.frame_url ? "sel" : ""}" title="نسخة ${i + 1}" alt="">`).join("")}</div>` : "";
     const ready = chosen?.approved;
     return `${head}<article class="shot ${s.approved ? "approved" : ""} ${ready ? "ready" : ""}" data-shot="${s.id}">
-      <header><b>${s.n}</b>${s.added ? `<span class="added" title="لقطة ضفتها بإيدك">➕</span>` : ""}<span class="t">${serFmt(s.start)} → ${serFmt(s.end)}</span><span class="dur">${s.duration.toFixed(1)}ث</span>
+      <header><span class="drag" title="اسحب اللقطة لمكان تاني">⠿</span><b>${s.n}</b>${s.added ? `<span class="added" title="لقطة ضفتها بإيدك">➕</span>` : ""}<span class="t">${serFmt(s.start)} → ${serFmt(s.end)}</span><span class="dur">${s.duration.toFixed(1)}ث</span>
         <button class="btn sm" data-play="${s.start}:${s.end}" title="اسمع الكلام اللي على اللقطة">▶</button>
+        <button class="btn sm mv" data-move="-1" title="قدّمها لقطة (تيجي قبل اللي قبلها)" ${s.n === 1 ? "disabled" : ""}>→</button>
+        <button class="btn sm mv" data-move="1" title="أخّرها لقطة (تيجي بعد اللي بعدها)" ${s.n === ep.shots.length ? "disabled" : ""}>←</button>
         <button class="btn sm" data-add-after title="ضيف لقطة جديدة بعد دي">➕</button>
         <button class="btn sm danger" data-del-shot title="احذف اللقطة">🗑️</button></header>
       <div class="said" data-no-i18n>${said}</div>
@@ -538,6 +540,14 @@ $("serShots").addEventListener("click", async (e) => {
     }
     if (e.target.closest("[data-del-shot]")) return askDeleteShot(id);
     if (e.target.closest("[data-add-after]")) return askAddShot(id);
+    const mv = e.target.closest("[data-move]");
+    if (mv) {
+      const ids = ser.ep.shots.map((x) => x.id);
+      const k = ids.indexOf(id), j = k + Number(mv.dataset.move);
+      if (j < 0 || j >= ids.length) return;
+      [ids[k], ids[j]] = [ids[j], ids[k]];
+      return moveShots(ids, id);
+    }
     if (e.target.closest("[data-frame-go]")) {
       ser.ep = await api(`/api/episodes/${ser.ep.id}/frames?shot_id=${id}`, { method: "POST" });
       return renderSeries();
@@ -619,6 +629,65 @@ function askDeleteShot(id) {
   $("serDelCancel").onclick = () => $("serDelDialog").close();
   $("serDelDialog").showModal();
 }
+// ترتيب اللقطات: كل لقطة بتتنقل بستوري بوردها وفيديوهاتها ومدتها، والفويس أوفر ثابت
+async function moveShots(order, focusId) {
+  try {
+    ser.ep = await api(`/api/episodes/${ser.ep.id}/shots/order`, { method: "POST", ...jsonBody({ order }) });
+    renderSeries();
+    const s = ser.ep.shots.find((x) => x.id === focusId);
+    const card = document.querySelector(`[data-shot="${focusId}"]`);
+    if (card) { card.scrollIntoView({ behavior: "smooth", block: "nearest" }); card.classList.add("flash"); setTimeout(() => card.classList.remove("flash"), 1500); }
+    if (s) toast(`اللقطة بقت رقم ${s.n} (${serFmt(s.start)} → ${serFmt(s.end)})`);
+  } catch (err) { toast(err.message, true); }
+}
+// السحب: من علامة ⠿ في راس الكارت
+let dragId = null;
+$("serShots").addEventListener("pointerdown", (e) => {
+  const h = e.target.closest(".drag");
+  if (h) h.closest(".shot").draggable = true;
+});
+$("serShots").addEventListener("dragstart", (e) => {
+  const card = e.target.closest(".shot");
+  if (!card?.draggable) return e.preventDefault();
+  dragId = card.dataset.shot;
+  card.classList.add("dragging");
+  e.dataTransfer.effectAllowed = "move";
+  e.dataTransfer.setData("text/plain", dragId);
+});
+const dropSide = (card, e) => {
+  const r = card.getBoundingClientRect();
+  // الشبكة من اليمين للشمال: النص اليمين = قبلها
+  return e.clientX > r.left + r.width / 2 ? "before" : "after";
+};
+const clearDrop = () => document.querySelectorAll(".shot.drop-before, .shot.drop-after").forEach((c) => c.classList.remove("drop-before", "drop-after"));
+$("serShots").addEventListener("dragover", (e) => {
+  const card = e.target.closest(".shot");
+  if (!dragId || !card || card.dataset.shot === dragId) return;
+  e.preventDefault();
+  clearDrop();
+  card.classList.add(`drop-${dropSide(card, e)}`);
+});
+$("serShots").addEventListener("drop", (e) => {
+  const card = e.target.closest(".shot");
+  if (!dragId || !card) return;
+  e.preventDefault();
+  const side = dropSide(card, e);
+  const ids = ser.ep.shots.map((x) => x.id).filter((x) => x !== dragId);
+  const k = ids.indexOf(card.dataset.shot);
+  if (k < 0) return;
+  ids.splice(side === "before" ? k : k + 1, 0, dragId);
+  const moved = dragId;
+  dragId = null;
+  clearDrop();
+  if (ids.join() !== ser.ep.shots.map((x) => x.id).join()) moveShots(ids, moved);
+});
+$("serShots").addEventListener("dragend", (e) => {
+  const card = e.target.closest(".shot");
+  if (card) { card.draggable = false; card.classList.remove("dragging"); }
+  dragId = null;
+  clearDrop();
+});
+
 // لقطة جديدة بين لقطتين: وقتها بيتاخد من اللي جنبها، والحلقة تفضل على طول الصوت
 const ADD_MIN = 0.5;
 function addPlan(prev, next, secs, from) {

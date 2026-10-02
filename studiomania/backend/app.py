@@ -4761,6 +4761,34 @@ def insert_times(shots: list[dict], after: str, seconds: float, take_from: str) 
     return k, start, start + a + b, a + b
 
 
+class ShotOrderIn(BaseModel):
+    order: list[str]
+
+
+@app.post("/api/episodes/{eid}/shots/order")
+def reorder_shots(eid: str, body: ShotOrderIn):
+    """ترتيب جديد للقطات. كل لقطة بتتنقل بالستوري بورد والفيديوهات والبرومبت ومدتها، والفويس أوفر ثابت مكانه:
+    الأوقات بتتحسب من جديد ورا بعض، والجمل اللي على كل لقطة بتتحدث حسب وقتها الجديد."""
+    def fn(d):
+        by_id = {x["id"]: x for x in d["shots"]}
+        if sorted(body.order) != sorted(by_id):
+            raise HTTPException(400, "اللقطات اتغيرت. اعمل ريفريش وجرّب تاني")
+        shots, t = [], 0.0
+        for i, sid in enumerate(body.order, 1):
+            x = by_id[sid]
+            dur = x["end"] - x["start"]
+            x.update(n=i, start=round(t, 2), end=round(t + dur, 2))
+            t += dur
+            shots.append(x)
+        if shots and d["audio"]:
+            shots[-1]["end"] = round(max(shots[-1]["start"] + 0.1, d["audio"]["duration"]), 2)
+        for x in shots:
+            x["lines"] = sz.lines_in_shot(x, d["lines"])
+        d["shots"] = shots
+    update_episode(eid, fn)
+    return episode_response(eid)
+
+
 @app.post("/api/episodes/{eid}/shots/insert")
 def insert_shot(eid: str, body: InsertShotIn):
     """لقطة جديدة بين لقطتين. وقتها بيتاخد من اللي جنبها، والموديل بيكتب وصفها وبرومبتها على نفس أسلوبهم
