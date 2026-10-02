@@ -42,6 +42,7 @@
     <p class="rail-label">المكتبات</p>
     <button class="rail-btn" data-goto="8" title="صناعة الكاروسيل"><svg><use href="#i-slides"/></svg><span>الكاروسيل</span></button>
     <button class="rail-btn" data-goto="9" title="المسلسلات"><svg><use href="#i-film"/></svg><span>المسلسلات</span></button>
+    <button class="rail-btn" data-goto="10" title="الإعلانات"><svg><use href="#i-spark"/></svg><span>الإعلانات</span></button>
     <span class="rail-sep"></span>
     <button class="rail-btn" data-goto="4" title="المدربين"><svg><use href="#i-users"/></svg><span>المدربين</span></button>
     <button class="rail-btn" data-goto="3" title="التعليق الصوتي"><svg><use href="#i-mic"/></svg><span>التعليق الصوتي</span></button>
@@ -922,6 +923,96 @@
           </div>
         </main>
 
+        <main class="view" data-view="10" hidden>
+          <div class="alert warn" id="adAlert" hidden>⚠️ مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات.</div>
+          <div class="car-layout">
+            <aside class="panel ad-side">
+              <div class="panel-head"><h2>📣 الإعلانات</h2></div>
+              <p class="hint">ارفع إعلان عاجبك، والبرنامج يفصّصه ويقترح إعلان لكوتشي مستوحى منه.</p>
+              <label class="btn primary ad-up">⬆ ارفع إعلان<input type="file" id="adFile" accept="video/*,.mp4,.mov,.webm,.mkv" hidden></label>
+              <ul class="ad-list" id="adList"></ul>
+              <button class="btn ad-styles-go" id="adStylesGo">🎨 مكتبة الستايلات</button>
+            </aside>
+
+            <section class="car-main" id="adMain" hidden>
+              <div class="car-head">
+                <input class="ad-title" id="adName" data-no-i18n>
+                <nav class="car-steps" id="adTabs">
+                  <button data-t="analysis"><i>1</i>التحليل والمشاهد</button>
+                  <button data-t="audio"><i>2</i>الصوت</button>
+                  <button data-t="adapt"><i>3</i>اقتراح كوتشي</button>
+                  <button data-t="settings">⚙️ الإعدادات</button>
+                </nav>
+              </div>
+              <div class="ad-status" id="adStatus" hidden></div>
+
+              <section class="panel ad-sec" data-sec="analysis">
+                <div class="ad-top">
+                  <video id="adVideo" controls playsinline preload="metadata"></video>
+                  <div class="ad-fields" id="adSummary"></div>
+                </div>
+                <h3 class="pane-h">🎬 المشاهد</h3>
+                <div class="ad-scenes" id="adScenes"></div>
+              </section>
+
+              <section class="panel ad-sec" data-sec="audio" hidden>
+                <div id="adAudio"></div>
+              </section>
+
+              <section class="panel ad-sec" data-sec="adapt" hidden>
+                <div class="panel-head"><h2>🎯 اقتراح لكوتشي</h2><span class="muted" id="adAdaptState"></span></div>
+                <form class="car-input" id="adAdaptForm">
+                  <textarea id="adAdaptMsg" rows="2" placeholder="وجّهه: «خليه مضحك»، «بطولة مدرب ومتدربة»، «أقصر 15 ثانية»... (Enter يبعت)"></textarea>
+                  <button class="btn primary" type="submit" id="adAdaptGo">✍️ عدّل الاقتراح</button>
+                </form>
+                <div id="adAdapt"></div>
+              </section>
+
+              <section class="panel ad-sec" data-sec="settings" hidden>
+                <h3 class="pane-h">🎨 الستايل البصري للاقتراح</h3>
+                <p class="hint">اختار ستايل من المكتبة (صور بتحفظها وتستخدمها في أي إعلان). البرومبتات بتتكتب بيه.</p>
+                <div class="ad-style-pick" id="adStylePick"></div>
+                <div class="row wrap"><button class="btn sm" id="adSaveStyle">🎨 احفظ ستايل الإعلان ده في المكتبة</button>
+                  <button class="btn sm" id="adStylesGo2">＋ ضيف ستايل من صور</button></div>
+                <h3 class="pane-h">⚙️ إعدادات الإعلان</h3>
+                <div class="ad-set-grid">
+                  <label class="field">المدة المطلوبة (ثانية) <input type="number" id="adSetDuration" min="5" max="180" data-set="duration"></label>
+                  <label class="field">المقاس / المنصة <input type="text" id="adSetFormat" data-set="format"></label>
+                  <label class="field">اللغة واللهجة <input type="text" id="adSetLanguage" data-set="language"></label>
+                  <label class="field">طريقة التنفيذ
+                    <select id="adSetProduction" data-set="production">
+                      <option value="">البرنامج يختار</option>
+                      <option value="فيديو AI بالكامل (Seedance) من غير تصوير">فيديو AI بالكامل (Seedance)</option>
+                      <option value="تصوير حقيقي بالموبايل أو كاميرا">تصوير حقيقي</option>
+                      <option value="مزيج: تصوير حقيقي للمدرب ولقطات AI">مزيج: تصوير + AI</option>
+                      <option value="موشن جرافيك ورسوم">موشن جرافيك</option>
+                    </select></label>
+                </div>
+                <label class="field">تعليمات للاقتراح (بتتاخد في الاعتبار كل مرة) <textarea id="adSetNotes" rows="3" data-set="notes" placeholder="مثلًا: الإعلان عن مدربين التغذية، بطولة بنت، من غير موسيقى صاخبة"></textarea></label>
+                <div class="row wrap">
+                  <button class="btn primary" id="adReadapt">✍️ اكتب الاقتراح من جديد بالإعدادات دي</button>
+                  <button class="btn" id="adReanalyze">🔍 حلّل الإعلان تاني</button>
+                  <button class="btn danger" id="adDelete">🗑️ احذف الإعلان</button>
+                </div>
+                <label class="field ad-model">موديل تحليل الفيديو والصوت (لكل الإعلانات) <input type="text" id="adVideoModel" dir="ltr"></label>
+              </section>
+            </section>
+
+            <section class="car-main" id="adStyles" hidden>
+              <div class="panel">
+                <div class="panel-head"><h2>🎨 مكتبة الستايلات</h2><button class="btn sm" id="adStylesBack">↩ رجوع للإعلان</button></div>
+                <p class="hint">كل ستايل = صور بتوضح الشكل اللي عايزه (تصوير، ألوان، إضاءة). البرنامج بيشوف الصور ويكتب وصف الستايل لوحده، وتقدر تعدّله.</p>
+                <form class="row wrap" id="adStyleForm">
+                  <input type="text" id="adStyleName" placeholder="اسم الستايل (اختياري)">
+                  <label class="btn primary">⬆ ارفع صور الستايل<input type="file" id="adStyleFiles" accept="image/*" multiple hidden></label>
+                </form>
+                <div class="ad-style-grid" id="adStyleGrid"></div>
+              </div>
+            </section>
+            <section class="panel placeholder" id="adEmpty"><p>ارفع إعلان من الجنب عشان تبدأ.</p></section>
+          </div>
+        </main>
+
         <main class="view" data-view="settings" hidden>
           <div class="gen-layout">
             <section class="panel">
@@ -1124,6 +1215,7 @@
 <script src="/settings.js"></script>
 <script src="/carousel.js"></script>
 <script src="/series.js"></script>
+<script src="/ads.js"></script>
 <script src="/shell.js"></script>
 </body>
 </html>

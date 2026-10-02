@@ -56,6 +56,7 @@ import publisher  # noqa: E402
 import sheets  # noqa: E402
 import carousel as cz  # noqa: E402
 import series as sz  # noqa: E402
+import ads as az  # noqa: E402
 from auth import SESSION_COOKIE, SESSION_DAYS, Auth  # noqa: E402
 
 MAX_CLIP_SECONDS = 15.0
@@ -76,6 +77,7 @@ EXPORTS_DIR = DATA_DIR / "exports"  # فولدر الفيديوهات الجاه
 BRAND_DIR = DATA_DIR / "brand"  # اللوجو
 TMP_DIR = DATA_DIR / "tmp"
 CAROUSELS_DIR = DATA_DIR / "carousels"  # صور الكاروسيلات
+ADS_DIR = DATA_DIR / "ads"  # الإعلانات المرجعية وتحليلها، وصور الستايلات
 SERIES_DIR = DATA_DIR / "series"  # المسلسلات: صور الشخصية، وصوت ولقطات كل حلقة
 BRAND_REFS_DIR = DATA_DIR / "brand" / "refs"  # (قديم) صور الشخصيات، اتنقلت لمكتبة الكاروسيل
 LIBRARY_DIR = DATA_DIR / "brand" / "library"  # مكتبة الكاروسيل: تيمبليتس وشخصيات
@@ -83,7 +85,7 @@ DB_PATH = DATA_DIR / "studiomania.db"
 FRONTEND_DIR = ROOT / "frontend"
 FONTS_DIR = ROOT / "fonts"
 
-for d in (RAW_DIR, CLIPS_DIR, COACHES_DIR, GENERATED_DIR, AUDIO_DIR, EXPORTS_DIR, BRAND_DIR, TMP_DIR, CAROUSELS_DIR, BRAND_REFS_DIR, LIBRARY_DIR, SERIES_DIR):
+for d in (RAW_DIR, CLIPS_DIR, COACHES_DIR, GENERATED_DIR, AUDIO_DIR, EXPORTS_DIR, BRAND_DIR, TMP_DIR, CAROUSELS_DIR, BRAND_REFS_DIR, LIBRARY_DIR, SERIES_DIR, ADS_DIR):
     d.mkdir(parents=True, exist_ok=True)
 
 # الكابشن بيدوّر على الخطوط عن طريق fontconfig، والسيرفر (Railway) مفيهوش إعداداته خالص.
@@ -337,6 +339,18 @@ with closing(db()) as _conn, _conn:
             name TEXT NOT NULL,
             instagram TEXT,
             tiktok TEXT
+        )"""
+    )
+    # الإعلانات المرجعية (التحليل والاقتراح لكوتشي) وستايلات الإعلانات
+    _conn.execute(
+        """CREATE TABLE IF NOT EXISTS ads (
+            id TEXT PRIMARY KEY, name TEXT NOT NULL, data TEXT NOT NULL,
+            created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+        )"""
+    )
+    _conn.execute(
+        """CREATE TABLE IF NOT EXISTS ad_styles (
+            id TEXT PRIMARY KEY, name TEXT NOT NULL, data TEXT NOT NULL, created_at TEXT NOT NULL
         )"""
     )
     # المسلسلات وحلقاتها (الحلقة: السكريبت والصوت وتوقيت الجمل واللقطات ونسخها)
@@ -3158,6 +3172,7 @@ app.mount("/media/audio", StaticFiles(directory=AUDIO_DIR), name="audio")
 app.mount("/media/exports", StaticFiles(directory=EXPORTS_DIR), name="exports")
 app.mount("/media/carousels", StaticFiles(directory=CAROUSELS_DIR), name="carousels")
 app.mount("/media/series", StaticFiles(directory=SERIES_DIR), name="series")
+app.mount("/media/ads", StaticFiles(directory=ADS_DIR), name="ads")
 app.mount("/media/brand", StaticFiles(directory=BRAND_DIR), name="brand")
 app.mount("/fonts", StaticFiles(directory=FONTS_DIR), name="fonts")
 
@@ -5533,6 +5548,471 @@ def reset_stuck_series() -> None:
 
 
 reset_stuck_series()
+
+
+# ================================================================ الإعلانات: تفصيص إعلان مرجعي واقتراح لكوتشي
+
+ADS_LOCK = threading.Lock()
+AD_MAX_SECONDS = 180  # أطول إعلان بنحلله (الموديل بيستقبل الفيديو كله مرة واحدة)
+DEFAULT_AD_VIDEO_MODEL = "google/gemini-2.5-pro"
+AD_VIDEO_FALLBACKS = ["google/gemini-2.5-pro", "google/gemini-2.5-flash", "google/gemini-3-flash-preview", "google/gemini-3.5-flash"]
+AD_SETTING_KEYS = ("style_id", "duration", "format", "language", "production", "notes")
+
+
+def ads_settings() -> dict:
+    return {"video_model": auth.get_setting("ads_video_model") or DEFAULT_AD_VIDEO_MODEL}
+
+
+class AdsSettingsIn(BaseModel):
+    video_model: str | None = None
+
+
+@app.get("/api/ads-settings")
+def get_ads_settings():
+    return ads_settings()
+
+
+@app.put("/api/ads-settings")
+def put_ads_settings(body: AdsSettingsIn):
+    if body.video_model is not None:
+        auth.set_setting("ads_video_model", body.video_model.strip())
+    return ads_settings()
+
+
+def ad_dir(aid: str) -> Path:
+    d = ADS_DIR / Path(aid).name
+    (d / "frames").mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def ad_row(conn: sqlite3.Connection, aid: str) -> tuple[sqlite3.Row, dict]:
+    r = conn.execute("SELECT * FROM ads WHERE id = ?", (aid,)).fetchone()
+    if r is None:
+        raise HTTPException(404, "الإعلان غير موجود")
+    return r, json.loads(r["data"])
+
+
+def update_ad(aid: str, fn) -> None:
+    with ADS_LOCK, closing(db()) as conn, conn:
+        r, data = ad_row(conn, aid)
+        fn(data)
+        conn.execute("UPDATE ads SET data = ?, updated_at = ? WHERE id = ?", (json.dumps(data, ensure_ascii=False), now(), aid))
+
+
+def ad_to_dict(r: sqlite3.Row, d: dict) -> dict:
+    aid = r["id"]
+    base = f"/media/ads/{aid}"
+    analysis = d.get("analysis") or {}
+    scenes = [{**s, "frame_url": f"{base}/frames/{s['frame']}" if s.get("frame") else None} for s in analysis.get("scenes") or []]
+    return {
+        "id": aid, "name": r["name"], "created_at": r["created_at"],
+        "source": d.get("source"), "source_url": f"{base}/{d['source']['file']}" if d.get("source") else None,
+        "status": d.get("status", "idle"), "step": d.get("step"), "error": d.get("error"),
+        "analysis": {**analysis, "scenes": scenes} if analysis else None,
+        "audio": d.get("audio"), "audio_error": d.get("audio_error"), "audio_tech": d.get("audio_tech"),
+        "settings": d.get("settings") or {},
+        "adaptation": d.get("adaptation"), "adapt_status": d.get("adapt_status", "idle"), "adapt_error": d.get("adapt_error"),
+        "chat": d.get("chat") or [],
+        "thumb": scenes[0]["frame_url"] if scenes and scenes[0].get("frame_url") else None,
+    }
+
+
+def ad_response(aid: str) -> dict:
+    with closing(db()) as conn:
+        r, d = ad_row(conn, aid)
+    return ad_to_dict(r, d)
+
+
+@app.get("/api/ads")
+def list_ads():
+    with closing(db()) as conn:
+        rows = conn.execute("SELECT * FROM ads ORDER BY created_at DESC").fetchall()
+    out = []
+    for r in rows:
+        a = ad_to_dict(r, json.loads(r["data"]))
+        out.append({k: a[k] for k in ("id", "name", "created_at", "status", "step", "thumb", "adapt_status")})
+    return out
+
+
+@app.post("/api/ads")
+def create_ad(file: UploadFile = File(...), name: str = Form("")):
+    """ترفع إعلان مرجعي والتحليل بيبدأ لوحده (الصورة والصوت، وبعدها اقتراح لكوتشي)."""
+    aid = uuid.uuid4().hex[:12]
+    folder = ad_dir(aid)
+    fname = save_upload(file, VIDEO_EXTENSIONS, folder, "source")
+    try:
+        info = media_info(folder / fname)
+    except Exception as exc:  # noqa: BLE001
+        shutil.rmtree(folder, ignore_errors=True)
+        raise HTTPException(400, f"مقدرتش أقرا الفيديو: {exc}") from exc
+    data = {"source": {"file": fname, "name": file.filename, "duration": round(info.duration, 2),
+                       "width": info.width, "height": info.height, "has_audio": info.has_audio},
+            "status": "queued", "settings": {"duration": min(60, max(10, round(info.duration))), "format": "9:16 ريلز وتيك توك",
+                                             "language": "اللهجة السعودية"}}
+    with closing(db()) as conn, conn:
+        conn.execute("INSERT INTO ads (id, name, data, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+                     (aid, name.strip() or Path(file.filename or "إعلان").stem, json.dumps(data, ensure_ascii=False), now(), now()))
+    threading.Thread(target=run_ad_analysis, args=(aid,), daemon=True).start()
+    return ad_response(aid)
+
+
+@app.get("/api/ads/{aid}")
+def get_ad(aid: str):
+    return ad_response(aid)
+
+
+class AdPatchIn(BaseModel):
+    name: str | None = None
+    settings: dict | None = None
+    analysis: dict | None = None
+    audio: dict | None = None
+    adaptation: dict | None = None
+
+
+@app.patch("/api/ads/{aid}")
+def patch_ad(aid: str, body: AdPatchIn):
+    """مركز الإعدادات: تعديل الإعدادات أو أي حاجة في التحليل أو الاقتراح بإيدك."""
+    if body.name is not None and body.name.strip():
+        with closing(db()) as conn, conn:
+            conn.execute("UPDATE ads SET name = ? WHERE id = ?", (body.name.strip()[:120], aid))
+    def fn(d):
+        if body.settings is not None:
+            d["settings"] = {**(d.get("settings") or {}), **{k: body.settings[k] for k in AD_SETTING_KEYS if k in body.settings}}
+        if body.analysis is not None and d.get("analysis"):
+            # الفريمات بتفضل زي ما هي
+            frames = {s.get("n"): s.get("frame") for s in d["analysis"].get("scenes") or []}
+            scenes = [{k: v for k, v in s.items() if k != "frame_url"} for s in body.analysis.get("scenes") or d["analysis"].get("scenes") or []]
+            for s in scenes:
+                s["frame"] = frames.get(s.get("n"))
+            d["analysis"] = {**d["analysis"], **body.analysis, "scenes": scenes}
+        if body.audio is not None:
+            d["audio"] = body.audio
+        if body.adaptation is not None:
+            d["adaptation"] = body.adaptation
+    update_ad(aid, fn)
+    return ad_response(aid)
+
+
+@app.delete("/api/ads/{aid}")
+def delete_ad(aid: str):
+    with closing(db()) as conn, conn:
+        conn.execute("DELETE FROM ads WHERE id = ?", (aid,))
+    shutil.rmtree(ADS_DIR / Path(aid).name, ignore_errors=True)
+    return {"ok": True}
+
+
+@app.post("/api/ads/{aid}/analyze")
+def reanalyze_ad(aid: str):
+    with closing(db()) as conn:
+        _, d = ad_row(conn, aid)
+    if d.get("status") in ("queued", "working"):
+        raise HTTPException(400, "التحليل شغال بالفعل")
+    update_ad(aid, lambda d: d.update(status="queued", error=None))
+    threading.Thread(target=run_ad_analysis, args=(aid,), daemon=True).start()
+    return ad_response(aid)
+
+
+class AdAdaptIn(BaseModel):
+    message: str = ""
+
+
+@app.post("/api/ads/{aid}/adapt")
+def adapt_ad(aid: str, body: AdAdaptIn):
+    """اقتراح كوتشي من جديد (بالإعدادات والستايل الحاليين)، أو تعديله برسالة منك."""
+    with closing(db()) as conn:
+        _, d = ad_row(conn, aid)
+    if not d.get("analysis"):
+        raise HTTPException(400, "استنى لما التحليل يخلص")
+    if d.get("adapt_status") == "working":
+        raise HTTPException(400, "الاقتراح بيتكتب بالفعل")
+    msg = body.message.strip()[:3000]
+    def fn(d):
+        d["adapt_status"], d["adapt_error"] = "working", None
+        if msg:
+            d.setdefault("chat", []).append({"role": "user", "content": msg})
+        else:
+            d["chat"] = []
+    update_ad(aid, fn)
+    threading.Thread(target=run_ad_adapt, args=(aid,), daemon=True).start()
+    return ad_response(aid)
+
+
+def ad_media_chat(messages: list[dict], max_tokens: int = 16000) -> str:
+    """موديل بيفهم الفيديو والصوت (Gemini). بيجرب المختار، ولو مش متاح اللي بعده."""
+    if atlas.mock_mode():
+        return "{}"
+    errors = []
+    for model in atlas.model_candidates(ads_settings()["video_model"], ("gemini-2.5-pro", "gemini-2.5-flash"), AD_VIDEO_FALLBACKS)[:4]:
+        try:
+            with httpx.Client(timeout=600) as client:
+                resp = client.post(f"{atlas.LLM_URL}/chat/completions", headers=atlas._headers(),
+                                   json={"model": model, "messages": messages, "temperature": 0.3, "max_tokens": max_tokens})
+            data = atlas._check(resp, f"موديل الفيديو ({model})")
+            text = str(data["choices"][0]["message"]["content"] or "").strip()
+            if text:
+                return text
+            errors.append(f"{model}: رد فاضي")
+        except (atlas.AtlasError, httpx.HTTPError, KeyError, IndexError) as exc:
+            errors.append(f"{model}: {str(exc)[:150]}")
+    raise atlas.AtlasError("موديل الفيديو مش شغال: " + " | ".join(errors[:3]))
+
+
+def data_url(path: Path, mime: str) -> str:
+    import base64
+    return f"data:{mime};base64," + base64.b64encode(path.read_bytes()).decode()
+
+
+def ad_loudness(path: Path) -> dict:
+    """قياس الصوت محليًا (من غير موديل): الارتفاع (LUFS) وأعلى نقطة."""
+    out = subprocess.run([ffmpeg_exe(), "-hide_banner", "-i", str(path), "-af", "ebur128=peak=true", "-f", "null", "-"],
+                         capture_output=True, text=True, timeout=300).stderr
+    tail = out[out.rfind("Summary:"):] if "Summary:" in out else out
+    lufs = re.search(r"I:\s*(-?[\d.]+) LUFS", tail)
+    peak = re.search(r"Peak:\s*(-?[\d.]+) dBFS", tail)
+    lra = re.search(r"LRA:\s*(-?[\d.]+) LU", tail)
+    return {"lufs": float(lufs.group(1)) if lufs else None, "true_peak": float(peak.group(1)) if peak else None,
+            "range_lu": float(lra.group(1)) if lra else None}
+
+
+def run_ad_analysis(aid: str) -> None:
+    def step(label: str):
+        update_ad(aid, lambda d: d.update(status="working", step=label))
+    try:
+        with closing(db()) as conn:
+            _, d = ad_row(conn, aid)
+        folder = ad_dir(aid)
+        src = folder / d["source"]["file"]
+        dur = min(d["source"]["duration"], AD_MAX_SECONDS)
+        has_audio = d["source"].get("has_audio")
+        step("بيجهّز الفيديو")
+        proxy, audio = folder / "proxy.mp4", folder / "audio.mp3"
+        # نسخة صغيرة للموديل: الصورة والصوت كفاية للتحليل وحجمها صغير
+        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src), "-t", f"{dur:.2f}",
+                        "-vf", "scale='if(gt(iw,ih),min(640,iw),-2)':'if(gt(iw,ih),-2,min(640,ih))',fps=12",
+                        "-c:v", "libx264", "-preset", "veryfast", "-crf", "31", "-pix_fmt", "yuv420p",
+                        "-c:a", "aac", "-ac", "1", "-b:a", "64k", str(proxy)], check=True, capture_output=True, timeout=600)
+        tech = None
+        if has_audio:
+            subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src), "-t", f"{dur:.2f}",
+                            "-vn", "-ac", "1", "-b:a", "96k", str(audio)], check=True, capture_output=True, timeout=300)
+            tech = ad_loudness(src)
+        step("بيتفرج على الإعلان (الصورة والصوت)")
+        if atlas.mock_mode():
+            analysis = az.mock_analysis(dur)
+        else:
+            analysis = az.parse_json(ad_media_chat(az.with_media(az.video_messages(dur, d.get("settings", {}).get("notes", "")),
+                                                                 data_url(proxy, "video/mp4"), "ad.mp4")), "تحليل الإعلان")
+        analysis["scenes"] = az.clean_scenes(analysis.get("scenes"), dur)
+        audio_data, audio_err = None, None
+        if has_audio:
+            step("بيسمع الصوت بالتفصيل")
+            try:
+                audio_data = az.mock_audio() if atlas.mock_mode() else az.parse_json(
+                    ad_media_chat(az.with_media(az.audio_messages(dur), data_url(audio, "audio/mpeg"), "ad.mp3")), "تحليل الصوت")
+            except (atlas.AtlasError, ValueError) as exc:
+                audio_err = str(exc)[:400]
+        step("بيطلّع صورة من كل مشهد")
+        for s in analysis["scenes"]:
+            fr = f"scene-{s['n']:02d}.jpg"
+            t = (s["start"] + s["end"]) / 2
+            subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{t:.2f}", "-i", str(src),
+                            "-frames:v", "1", "-vf", "scale=-2:480", "-q:v", "4", str(folder / "frames" / fr)],
+                           capture_output=True, timeout=60)
+            if (folder / "frames" / fr).exists():
+                s["frame"] = fr
+        if not analysis.get("title"):
+            analysis["title"] = ""
+        def done(d):
+            d.update(analysis=analysis, audio=audio_data, audio_error=audio_err, audio_tech=tech,
+                     status="done", step=None, error=None, adapt_status="working", adapt_error=None, chat=[])
+        update_ad(aid, done)
+    except Exception as exc:  # noqa: BLE001
+        msg = str(getattr(exc, "detail", None) or exc)[:500]
+        if isinstance(exc, subprocess.CalledProcessError):
+            msg = f"FFmpeg: {(exc.stderr or b'').decode(errors='ignore')[-300:] if isinstance(exc.stderr, bytes) else exc.stderr}"
+        update_ad(aid, lambda d: d.update(status="failed", step=None, error=msg))
+        return
+    run_ad_adapt(aid)
+
+
+def ad_style(style_id: str | None) -> dict | None:
+    if not style_id:
+        return None
+    with closing(db()) as conn:
+        r = conn.execute("SELECT * FROM ad_styles WHERE id = ?", (style_id,)).fetchone()
+    return {"name": r["name"], **json.loads(r["data"])} if r else None
+
+
+def run_ad_adapt(aid: str) -> None:
+    try:
+        with closing(db()) as conn:
+            _, d = ad_row(conn, aid)
+        settings = d.get("settings") or {}
+        if atlas.mock_mode():
+            result = az.mock_adaptation(int(settings.get("duration") or 30))
+        else:
+            msgs = az.adapt_messages(brand_settings(), d.get("analysis") or {}, d.get("audio") or {}, settings,
+                                     ad_style(settings.get("style_id")), d.get("chat") or [])
+            result = az.parse_json(series_chat(msgs), "اقتراح كوتشي")
+        def fn(d):
+            d["adaptation"] = result
+            d["adapt_status"], d["adapt_error"] = "done", None
+            if d.get("chat"):
+                d["chat"].append({"role": "assistant", "content": json.dumps(result, ensure_ascii=False)[:6000]})
+        update_ad(aid, fn)
+    except Exception as exc:  # noqa: BLE001
+        msg = str(getattr(exc, "detail", None) or exc)[:500]
+        update_ad(aid, lambda d: d.update(adapt_status="failed", adapt_error=msg))
+
+
+# ---------- ستايلات الإعلانات: صور بتتحفظ وتتختار لأي إعلان
+
+def style_dir(sid: str) -> Path:
+    d = ADS_DIR / "styles" / Path(sid).name
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def style_to_dict(r: sqlite3.Row) -> dict:
+    d = json.loads(r["data"])
+    return {"id": r["id"], "name": r["name"], "notes": d.get("notes", ""), "status": d.get("status", "done"),
+            "error": d.get("error"), "from_ad": d.get("from_ad"), "created_at": r["created_at"],
+            "images": [f"/media/ads/styles/{r['id']}/{f}" for f in d.get("images") or []]}
+
+
+@app.get("/api/ad-styles")
+def list_ad_styles():
+    with closing(db()) as conn:
+        return [style_to_dict(r) for r in conn.execute("SELECT * FROM ad_styles ORDER BY created_at DESC")]
+
+
+def add_style(name: str, image_paths: list[Path], notes: str = "", from_ad: str | None = None) -> str:
+    sid = uuid.uuid4().hex[:12]
+    folder = style_dir(sid)
+    files = []
+    for i, p in enumerate(image_paths):
+        f = f"img-{i + 1:02d}{p.suffix.lower()}"
+        shutil.copyfile(p, folder / f)
+        files.append(f)
+    data = {"images": files, "notes": notes, "status": "working", "from_ad": from_ad}
+    with closing(db()) as conn, conn:
+        conn.execute("INSERT INTO ad_styles (id, name, data, created_at) VALUES (?, ?, ?, ?)",
+                     (sid, name.strip() or "ستايل جديد", json.dumps(data, ensure_ascii=False), now()))
+    threading.Thread(target=describe_style, args=(sid, not name.strip()), daemon=True).start()
+    return sid
+
+
+def describe_style(sid: str, rename: bool) -> None:
+    """الموديل بيشوف صور الستايل ويكتب وصفه (بالإنجليزي عشان البرومبتات)."""
+    with closing(db()) as conn:
+        r = conn.execute("SELECT * FROM ad_styles WHERE id = ?", (sid,)).fetchone()
+    if r is None:
+        return
+    d = json.loads(r["data"])
+    folder = style_dir(sid)
+    try:
+        if atlas.mock_mode():
+            out = {"name": "ستايل تجريبي", "notes": "Cinematic test style."}
+        else:
+            parts = [{"type": "text", "text": az.style_messages(", ".join(d["images"]))[0]["content"]}]
+            for f in d["images"][:6]:
+                mime = "image/png" if f.endswith(".png") else "image/webp" if f.endswith(".webp") else "image/jpeg"
+                parts.append({"type": "image_url", "image_url": {"url": data_url(folder / f, mime)}})
+            out = az.parse_json(ad_media_chat([{"role": "user", "content": parts}], 3000), "وصف الستايل")
+        notes = (d.get("notes") + "\n\n" if d.get("notes") else "") + str(out.get("notes") or "").strip()
+        d.update(notes=notes.strip(), status="done", error=None)
+        name = str(out.get("name") or "").strip()[:60] if rename else None
+    except Exception as exc:  # noqa: BLE001
+        d.update(status="failed", error=str(getattr(exc, "detail", None) or exc)[:300])
+        name = None
+    with closing(db()) as conn, conn:
+        conn.execute("UPDATE ad_styles SET data = ?" + (", name = ?" if name else "") + " WHERE id = ?",
+                     (json.dumps(d, ensure_ascii=False), *( [name] if name else []), sid))
+
+
+@app.post("/api/ad-styles")
+def create_ad_style(files: list[UploadFile] = File(...), name: str = Form(""), notes: str = Form("")):
+    tmp = Path(tempfile.mkdtemp(dir=TMP_DIR))
+    try:
+        paths = [tmp / save_upload(f, IMAGE_EXTENSIONS, tmp, f"s{i}") for i, f in enumerate(files[:12])]
+        if not paths:
+            raise HTTPException(400, "ارفع صورة واحدة على الأقل")
+        sid = add_style(name, paths, notes.strip())
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    with closing(db()) as conn:
+        return style_to_dict(conn.execute("SELECT * FROM ad_styles WHERE id = ?", (sid,)).fetchone())
+
+
+class StylePatchIn(BaseModel):
+    name: str | None = None
+    notes: str | None = None
+
+
+@app.patch("/api/ad-styles/{sid}")
+def patch_ad_style(sid: str, body: StylePatchIn):
+    with closing(db()) as conn, conn:
+        r = conn.execute("SELECT * FROM ad_styles WHERE id = ?", (sid,)).fetchone()
+        if r is None:
+            raise HTTPException(404, "الستايل غير موجود")
+        d = json.loads(r["data"])
+        if body.notes is not None:
+            d["notes"] = body.notes.strip()[:4000]
+        conn.execute("UPDATE ad_styles SET data = ?, name = ? WHERE id = ?",
+                     (json.dumps(d, ensure_ascii=False), (body.name or r["name"]).strip()[:60] or r["name"], sid))
+        return style_to_dict(conn.execute("SELECT * FROM ad_styles WHERE id = ?", (sid,)).fetchone())
+
+
+@app.delete("/api/ad-styles/{sid}")
+def delete_ad_style(sid: str):
+    with closing(db()) as conn, conn:
+        conn.execute("DELETE FROM ad_styles WHERE id = ?", (sid,))
+    shutil.rmtree(ADS_DIR / "styles" / Path(sid).name, ignore_errors=True)
+    return {"ok": True}
+
+
+class SaveStyleIn(BaseModel):
+    name: str = ""
+
+
+@app.post("/api/ads/{aid}/save-style")
+def save_ad_style(aid: str, body: SaveStyleIn):
+    """ستايل الإعلان نفسه (صور من مشاهده + وصف التصوير والألوان) بيتحفظ في المكتبة عشان تستخدمه بعدين."""
+    with closing(db()) as conn:
+        r, d = ad_row(conn, aid)
+    a = d.get("analysis") or {}
+    folder = ad_dir(aid)
+    frames = [folder / "frames" / s["frame"] for s in a.get("scenes") or [] if s.get("frame") and (folder / "frames" / s["frame"]).exists()]
+    if not frames:
+        raise HTTPException(400, "مفيش صور من الإعلان لسه. استنى لما التحليل يخلص")
+    step = max(1, len(frames) // 6)
+    notes = "\n".join(x for x in [a.get("cinematography"), a.get("colors"), a.get("editing")] if x)
+    sid = add_style(body.name.strip() or f"ستايل {r['name']}", frames[::step][:6], notes, from_ad=aid)
+    with closing(db()) as conn:
+        return style_to_dict(conn.execute("SELECT * FROM ad_styles WHERE id = ?", (sid,)).fetchone())
+
+
+def reset_stuck_ads() -> None:
+    with closing(db()) as conn, conn:
+        for r in conn.execute("SELECT id, data FROM ads").fetchall():
+            d = json.loads(r["data"])
+            changed = False
+            if d.get("status") in ("queued", "working"):
+                d.update(status="failed", step=None, error="اتقطع لما السيرفر اتقفل. دوس «حلّل تاني»")
+                changed = True
+            if d.get("adapt_status") == "working":
+                d.update(adapt_status="failed", adapt_error="اتقطع لما السيرفر اتقفل. دوس «اكتب الاقتراح تاني»")
+                changed = True
+            if changed:
+                conn.execute("UPDATE ads SET data = ? WHERE id = ?", (json.dumps(d, ensure_ascii=False), r["id"]))
+        for r in conn.execute("SELECT id, data FROM ad_styles").fetchall():
+            d = json.loads(r["data"])
+            if d.get("status") == "working":
+                d.update(status="failed", error="اتقطع لما السيرفر اتقفل")
+                conn.execute("UPDATE ad_styles SET data = ? WHERE id = ?", (json.dumps(d, ensure_ascii=False), r["id"]))
+
+
+reset_stuck_ads()
 
 
 class SeriesSettingsIn(BaseModel):

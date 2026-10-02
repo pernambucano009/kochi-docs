@@ -13,6 +13,7 @@ const STEP_INFO = {
   5: { num: "", title: "مكتبة الموسيقى" },
   8: { num: "", title: "صناعة الكاروسيل" },
   9: { num: "", title: "المسلسلات" },
+  10: { num: "", title: "الإعلانات" },
   settings: { num: "", title: "الإعدادات" },
 };
 const NEXT_LABEL = {
