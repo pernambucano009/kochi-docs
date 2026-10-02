@@ -139,17 +139,63 @@ def adapt_messages(brand: dict, analysis: dict, audio: dict, settings: dict, sty
     return [{"role": "system", "content": system}, first] + chat[-12:]
 
 
+def _extract(text: str) -> str:
+    t = re.sub(r"^```(?:json)?\s*|\s*```\s*$", "", (text or "").strip(), flags=re.S)
+    i = t.find("{")
+    if i < 0:
+        return ""
+    j = t.rfind("}")
+    return t[i:j + 1] if j > i else t[i:]  # من غير قفلة = الرد اتقطع
+
+
+def _cleanup(raw: str) -> str:
+    """أشهر غلطات الموديلات في JSON."""
+    s = re.sub(r"//[^\n\"]*\n", "\n", raw)                                  # تعليقات
+    s = re.sub(r",\s*([}\]])", r"\1", s)                                  # فاصلة زيادة قبل القفلة
+    s = re.sub(r'(:\s*)(\d+):(\d{2}(?:\.\d+)?)(?=\s*[,}\]])',             # وقت مكتوب 1:20 بدل 80
+               lambda m: f"{m.group(1)}{int(m.group(2)) * 60 + float(m.group(3)):.2f}", s)
+    s = re.sub(r":\s*(NaN|undefined|None)\b", ": null", s)
+    s = s.replace("“", '"').replace("”", '"')
+    return s
+
+
+def _finite(v):
+    """NaN و Infinity مش JSON صحيح للمتصفح: بيبقوا null."""
+    if isinstance(v, float) and (v != v or v in (float("inf"), float("-inf"))):
+        return None
+    if isinstance(v, dict):
+        return {k: _finite(x) for k, x in v.items()}
+    if isinstance(v, list):
+        return [_finite(x) for x in v]
+    return v
+
+
 def parse_json(text: str, what: str) -> dict:
-    m = re.search(r"\{.*\}", text or "", re.S)
-    if not m:
+    """JSON من رد الموديل، ولو فيه غلطات بنحاول نصلّحها قبل ما نقول إنه مش مفهوم."""
+    data = _parse_json(text, what)
+    return _finite(data)
+
+
+def _parse_json(text: str, what: str) -> dict:
+    raw = _extract(text)
+    if not raw:
         raise ValueError(f"الموديل ما رجعش {what}")
+    last = None
+    for candidate in (raw, _cleanup(raw)):
+        try:
+            data = json.loads(candidate, strict=False)
+            if isinstance(data, dict):
+                return data
+        except ValueError as exc:
+            last = exc
     try:
-        data = json.loads(m.group(0), strict=False)
-    except ValueError as exc:
-        raise ValueError(f"رد الموديل في {what} مش مفهوم ({exc})") from exc
-    if not isinstance(data, dict):
-        raise ValueError(f"الموديل ما رجعش {what}")
-    return data
+        import json_repair  # بيصلّح JSON مقطوع أو فيه غلطات
+        data = json_repair.loads(_cleanup(raw))
+        if isinstance(data, dict) and data:
+            return data
+    except Exception as exc:  # noqa: BLE001
+        last = exc
+    raise ValueError(f"رد الموديل في {what} مش مفهوم ({last})")
 
 
 def clean_scenes(scenes, duration: float) -> list[dict]:
@@ -158,10 +204,15 @@ def clean_scenes(scenes, duration: float) -> list[dict]:
     for s in scenes or []:
         if not isinstance(s, dict):
             continue
-        try:
-            start, end = float(s.get("start") or 0), float(s.get("end") or 0)
-        except (TypeError, ValueError):
-            continue
+        def num(v):
+            try:
+                return float(v)
+            except (TypeError, ValueError):
+                return None
+        start, end = num(s.get("start")), num(s.get("end"))
+        prev_end = out[-1]["end"] if out else 0.0
+        start = prev_end if start is None else start
+        end = start if end is None else end
         out.append({**{k: str(v) if not isinstance(v, (int, float)) else v for k, v in s.items()}, "start": start, "end": end})
     out.sort(key=lambda s: s["start"])
     for i, s in enumerate(out):

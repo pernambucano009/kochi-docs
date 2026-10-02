@@ -5821,16 +5821,20 @@ def adapt_ad(aid: str, body: AdAdaptIn):
     return ad_response(aid)
 
 
-def ad_media_chat(messages: list[dict], max_tokens: int = 16000) -> str:
+def ad_media_chat(messages: list[dict], max_tokens: int = 32000) -> str:
     """موديل بيفهم الفيديو والصوت (Gemini). بيجرب المختار، ولو مش متاح اللي بعده."""
     if atlas.mock_mode():
         return "{}"
     errors = []
     for model in atlas.model_candidates(ads_settings()["video_model"], ("gemini-2.5-pro", "gemini-2.5-flash"), AD_VIDEO_FALLBACKS)[:4]:
         try:
+            body = {"model": model, "messages": messages, "temperature": 0.3, "max_tokens": max_tokens,
+                    "response_format": {"type": "json_object"}}
             with httpx.Client(timeout=600) as client:
-                resp = client.post(f"{atlas.LLM_URL}/chat/completions", headers=atlas._headers(),
-                                   json={"model": model, "messages": messages, "temperature": 0.3, "max_tokens": max_tokens})
+                resp = client.post(f"{atlas.LLM_URL}/chat/completions", headers=atlas._headers(), json=body)
+                if resp.status_code in (400, 422):  # موديل مش بيقبل JSON mode
+                    body.pop("response_format")
+                    resp = client.post(f"{atlas.LLM_URL}/chat/completions", headers=atlas._headers(), json=body)
             data = atlas._check(resp, f"موديل الفيديو ({model})")
             text = str(data["choices"][0]["message"]["content"] or "").strip()
             if text:
@@ -5839,6 +5843,22 @@ def ad_media_chat(messages: list[dict], max_tokens: int = 16000) -> str:
         except (atlas.AtlasError, httpx.HTTPError, KeyError, IndexError) as exc:
             errors.append(f"{model}: {str(exc)[:150]}")
     raise atlas.AtlasError("موديل الفيديو مش شغال: " + " | ".join(errors[:3]))
+
+
+def ad_json(text: str, what: str) -> dict:
+    """JSON من رد موديل الفيديو. لو بايظ ومعرفناش نصلّحه، موديل الكلام بيصلّحه (أرخص بكتير من إعادة التحليل)."""
+    try:
+        return az.parse_json(text, what)
+    except ValueError as first:
+        try:
+            fixed = series_chat([
+                {"role": "system", "content": "رجّع نفس البيانات دي كـ JSON صحيح بالظبط من غير أي تغيير في المحتوى ومن غير أي كلام تاني. "
+                                              "لو الرد مقطوع في الآخر اقفله بشكل صحيح."},
+                {"role": "user", "content": text[:60000]},
+            ], json_mode=True)
+            return az.parse_json(fixed, what)
+        except (HTTPException, ValueError):
+            raise first from None
 
 
 def data_url(path: Path, mime: str) -> str:
@@ -5884,14 +5904,14 @@ def run_ad_analysis(aid: str) -> None:
         if atlas.mock_mode():
             analysis = az.mock_analysis(dur)
         else:
-            analysis = az.parse_json(ad_media_chat(az.with_media(az.video_messages(dur, d.get("settings", {}).get("notes", "")),
-                                                                 data_url(proxy, "video/mp4"), "ad.mp4")), "تحليل الإعلان")
+            analysis = ad_json(ad_media_chat(az.with_media(az.video_messages(dur, d.get("settings", {}).get("notes", "")),
+                                                           data_url(proxy, "video/mp4"), "ad.mp4")), "تحليل الإعلان")
         analysis["scenes"] = az.clean_scenes(analysis.get("scenes"), dur)
         audio_data, audio_err = None, None
         if has_audio:
             step("بيسمع الصوت بالتفصيل")
             try:
-                audio_data = az.mock_audio() if atlas.mock_mode() else az.parse_json(
+                audio_data = az.mock_audio() if atlas.mock_mode() else ad_json(
                     ad_media_chat(az.with_media(az.audio_messages(dur), data_url(audio, "audio/mpeg"), "ad.mp3")), "تحليل الصوت")
             except (atlas.AtlasError, ValueError) as exc:
                 audio_err = str(exc)[:400]
@@ -5937,7 +5957,7 @@ def run_ad_adapt(aid: str) -> None:
         else:
             msgs = az.adapt_messages(brand_settings(), d.get("analysis") or {}, d.get("audio") or {}, settings,
                                      ad_style(settings.get("style_id")), d.get("chat") or [])
-            result = az.parse_json(series_chat(msgs), "اقتراح كوتشي")
+            result = ad_json(series_chat(msgs), "اقتراح كوتشي")
         def fn(d):
             d["adaptation"] = result
             d["adapt_status"], d["adapt_error"] = "done", None
