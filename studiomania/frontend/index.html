@@ -467,14 +467,16 @@
               <label class="field slider-field">صوت الأوترو <b id="outroVolVal"></b><input type="range" id="mOutroVol" min="0" max="200" step="5" dir="ltr"></label>
 
               <h3 class="pane-h">🎙️ التعليق الصوتي</h3>
-              <label class="field"><select id="mVoice"></select></label>
+              <div class="sel-up"><label class="field"><select id="mVoice"></select></label>
+                <label class="btn sm" title="ارفع ملف تعليق صوتي من عندك، ويتحط في المونتاج على طول (وبيتحفظ في مكتبة الصوت)">⬆ ارفع<input type="file" data-audio-up="voice" accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg" hidden></label></div>
               <div id="voiceOpts">
                 <label class="field slider-field">الصوت <b id="voiceVolVal"></b><input type="range" id="mVoiceVol" min="0" max="200" step="5" dir="ltr"></label>
                 <p class="hint">حرّكه وقصّه وقسّمه من التايم لاين تحت.</p>
               </div>
 
               <h3 class="pane-h">🎵 الموسيقى</h3>
-              <label class="field"><select id="mMusic"></select></label>
+              <div class="sel-up"><label class="field"><select id="mMusic"></select></label>
+                <label class="btn sm" title="ارفع ملف موسيقى من عندك، ويتحط في المونتاج على طول (وبيتحفظ في مكتبة الصوت)">⬆ ارفع<input type="file" data-audio-up="music" accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg" hidden></label></div>
               <div id="musicOpts">
                 <label class="field slider-field">الصوت <b id="musicVolVal"></b><input type="range" id="mMusicVol" min="0" max="200" step="5" dir="ltr"></label>
                 <p class="hint">حرّكها وقصّها وقسّمها من التايم لاين تحت.</p>

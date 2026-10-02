@@ -1532,6 +1532,29 @@ $("mOutroVol").addEventListener("input", sideInput("outroVol", (d) => {
   d.outro_volume = $("mOutroVol").value / 100;
   d.clips.filter(isOutroClip).forEach((c) => (c.volume = d.outro_volume));
 }));
+// صوت من عندك (تعليق أو موسيقى): بيترفع لمكتبة الصوت ويتحط في المشروع على طول
+document.querySelectorAll("[data-audio-up]").forEach((inp) => inp.addEventListener("change", async () => {
+  const file = inp.files[0];
+  inp.value = "";
+  if (!file || !mt.project) return;
+  const kind = inp.dataset.audioUp;
+  const form = new FormData();
+  form.append("kind", kind);
+  form.append("file", file);
+  try {
+    toast(`⏳ بيرفع ${file.name}...`);
+    const a = await api("/api/audio", { method: "POST", body: form });
+    (kind === "voice" ? mt.voices : mt.music).unshift(a);
+    fillSelects();
+    const sel = $(kind === "voice" ? "mVoice" : "mMusic");
+    sel.value = a.id;
+    sel.dispatchEvent(new Event("change"));
+    renderAll();
+    toast(kind === "voice" ? "✅ التعليق الصوتي اترفع واتحط في المونتاج" : "✅ الموسيقى اترفعت واتحطت في المونتاج");
+  } catch (err) {
+    toast(err.message, true);
+  }
+}));
 $("mVoice").addEventListener("change", sideInput(null, (d) => {
   const vol = d.voice?.parts?.[0]?.volume ?? 1, delay = d.voice?.parts?.[0]?.delay ?? 0;
   d.voice = $("mVoice").value

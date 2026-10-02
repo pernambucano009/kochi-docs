@@ -1162,3 +1162,5 @@ a.pl-link:hover { background: color-mix(in srgb, var(--ok) 24%, transparent); }
 .shot .prompt-busy { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--accent); }
 .shot .prompt-busy .spin { width: 14px; height: 14px; }
 .prompt-new { font-size: 12px; color: #2F855A; background: #F0FFF4; border-radius: 8px; padding: 4px 8px; }
+.sel-up { display: flex; gap: 6px; align-items: center; }
+.sel-up .field { flex: 1; min-width: 0; margin: 0; }
