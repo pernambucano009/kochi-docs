@@ -5036,7 +5036,7 @@ def generate_take(eid: str, shot_id: str):
     return episode_response(eid)
 
 
-def run_render(eid: str) -> None:
+def run_episode_render(eid: str) -> None:
     """يجمّع الحلقة: كل لقطة من نسختها المختارة بمدتها بالظبط من الصوت، وفوقهم الفويس أوفر."""
     work = TMP_DIR / f"ep_{eid}_{uuid.uuid4().hex[:6]}"
     work.mkdir(parents=True, exist_ok=True)
@@ -5093,7 +5093,7 @@ def render_episode(eid: str):
             raise HTTPException(400, "التجميع شغال")
         SERIES_JOBS.add(eid)
     update_episode(eid, lambda d: d.update(render={"status": "working", "export_id": None, "error": None}))
-    render_executor.submit(run_render, eid)
+    render_executor.submit(run_episode_render, eid)
     return episode_response(eid)
 
 

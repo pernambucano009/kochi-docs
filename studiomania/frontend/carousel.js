@@ -582,7 +582,7 @@ async function openLibrary(tab = car.libTab) {
   if (!$("libDialog").open) { libStatus(""); car.libEdit = null; }
   car.libTab = tab;
   car.lib = await api("/api/carousel/library");
-  renderLibrary();
+  renderCarLibrary();
   if (!$("libDialog").open) $("libDialog").showModal();
 }
 const LIB_HINTS = {
@@ -638,7 +638,7 @@ function libDetail(a) {
       <label class="lib-add" title="ضيف صور (لحد 12)">＋<input type="file" data-add accept="image/*" multiple hidden></label></div>
   </div>`;
 }
-function renderLibrary() {
+function renderCarLibrary() {
   const tab = car.libTab;
   document.querySelectorAll("#libTabs [data-t]").forEach((b) => b.classList.toggle("active", b.dataset.t === tab));
   const editing = car.lib.find((a) => a.id === car.libEdit);
@@ -652,7 +652,7 @@ function renderLibrary() {
 }
 $("libTabs").addEventListener("click", (e) => {
   const b = e.target.closest("[data-t]");
-  if (b) { car.libTab = b.dataset.t; car.libEdit = null; renderLibrary(); }
+  if (b) { car.libTab = b.dataset.t; car.libEdit = null; renderCarLibrary(); }
 });
 $("libClose").onclick = () => $("libDialog").close();
 $("libDialog").addEventListener("close", () => car.cur && renderSetup());
@@ -673,7 +673,7 @@ async function libPick(a) {
   try {
     await patchCarousel({ settings });
     renderSetup();
-    renderLibrary();
+    renderCarLibrary();
     libStatus(was ? `اتلغى «${a.name}»` : `✅ اخترت «${a.name}» للكاروسيل`);
   } catch (err) { libStatus(`✕ ${err.message}`, true); }
 }
@@ -742,12 +742,12 @@ $("libItems").addEventListener("click", async (e) => {
   if (card) {
     const a = car.lib.find((x) => x.id === card.dataset.id);
     // ✏️ أو مفيش كاروسيل مفتوح: افتح التفاصيل، غير كده الدوسة بتختار
-    if (e.target.closest("[data-edit]") || !car.cur) { car.libEdit = a.id; libStatus(""); return renderLibrary(); }
+    if (e.target.closest("[data-edit]") || !car.cur) { car.libEdit = a.id; libStatus(""); return renderCarLibrary(); }
     return libPick(a);
   }
   const item = e.target.closest(".lib-item");
   if (!item) return;
-  if (e.target.closest("[data-back]")) { car.libEdit = null; libStatus(""); return renderLibrary(); }
+  if (e.target.closest("[data-back]")) { car.libEdit = null; libStatus(""); return renderCarLibrary(); }
   if (e.target.closest("[data-pick]")) return libPick(car.lib.find((x) => x.id === item.dataset.id));
   if (e.target.closest("[data-describe]")) return describeAsset(item.dataset.id);
   const img = e.target.closest("[data-img]");
