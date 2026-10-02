@@ -1290,3 +1290,4 @@ a.pl-link:hover { background: color-mix(in srgb, var(--ok) 24%, transparent); }
 .ad-motion { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; padding: 8px 10px; border-radius: 10px;
   background: color-mix(in srgb, var(--accent, #E8613C) 8%, transparent); }
 .ad-mg.orig { font-size: 13px; opacity: .85; }
+.ad-comp .kind .up { color: var(--accent, #E8613C); font-weight: 600; }

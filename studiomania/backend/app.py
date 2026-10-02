@@ -6272,6 +6272,7 @@ def prod_to_dict(aid: str, p: dict | None) -> dict | None:
             "frame_url": f"{base}/frames/{s['frame']}" if s.get("frame") else None,
             "frames": [{"file": f, "url": f"{base}/frames/{f}"} for f in s.get("frames") or []],
             "components": [{**c, "image_url": f"{base}/comps/{c['image']}" if c.get("image") else None,
+                            "uploaded": is_uploaded(c.get("image")),
                             "images": [{"file": f, "url": f"{base}/comps/{f}"} for f in c.get("images") or []]}
                            for c in s.get("components") or []],
             "takes": [{**t, "url": f"{base}/takes/{t['file']}" if t.get("file") else None} for t in s.get("takes") or []],
@@ -6519,7 +6520,11 @@ def run_ad_components(aid: str, sid: str) -> None:
             old = {c["name"]: c for c in x.get("components") or [] if c.get("image")}
             for c in comps:  # مكون ليه صورة قبل كده بنفس الاسم بيفضل بصورته
                 if c["name"] in old:
-                    c.update(image=old[c["name"]]["image"], images=old[c["name"]].get("images", []))
+                    o = old.pop(c["name"])
+                    c.update(image=o["image"], images=o.get("images", []), use=o.get("use", True),
+                             **({"uploaded_at": o["uploaded_at"]} if o.get("uploaded_at") else {}))
+            # الصور اللي رفعتها بإيدك متتمسحش أبدًا: لو الموديل ما رجعش المكون بنفس الاسم بيفضل زي ما هو
+            comps.extend(o for o in old.values() if is_uploaded(o.get("image")))
             x.update(components=comps, comp_status="done", comp_error=None,
                      motion_notes=x.get("motion_notes") or str(out.get("motion_notes") or ""), assembly_prompt=str(out.get("assembly_prompt") or x.get("assembly_prompt") or ""))
         update_ad(aid, done)
@@ -6598,9 +6603,14 @@ def prod_comp_upload(aid: str, sid: str, cid: str, file: UploadFile = File(...))
     def fn(d):
         c = find_comp(find_pshot(prod_of(d), sid), cid)
         c.setdefault("images", []).append(name)
-        c.update(image=name, status="done", error=None)
+        c.update(image=name, status="done", error=None, uploaded_at=now())
     update_ad(aid, fn)
     return ad_response(aid)
+
+
+def is_uploaded(image: str | None) -> bool:
+    """صورة مكون رفعها المستخدم من عنده (اسمها فيه -up_)."""
+    return bool(image) and "-up_" in image
 
 
 def set_comp(aid: str, sid: str, cid: str, **kw) -> None:
@@ -6618,6 +6628,7 @@ def run_ad_comp_image(aid: str, sid: str, cid: str) -> None:
             _, d = ad_row(conn, aid)
         p = d["prod"]
         c = find_comp(find_pshot(p, sid), cid)
+        started = now()
         set_comp(aid, sid, cid, status="working", error=None)
         name = f"{cid}-{uuid.uuid4().hex[:6]}.png"
         dest = prod_dir(aid, "comps") / name
@@ -6630,7 +6641,10 @@ def run_ad_comp_image(aid: str, sid: str, cid: str) -> None:
         def done(d):
             x = find_comp(find_pshot(d["prod"], sid), cid)
             x.setdefault("images", []).append(name)
-            x.update(image=name, status="done", error=None)
+            if x.get("uploaded_at", "") >= started:  # رفعت صورة وهو بيولّد: اللي رفعتها هي اللي بتفضل
+                x.update(status="done", error=None)
+            else:
+                x.update(image=name, status="done", error=None)
         update_ad(aid, done)
     except Exception as exc:  # noqa: BLE001
         set_comp(aid, sid, cid, status="failed", error=str(getattr(exc, "detail", None) or exc)[:400])

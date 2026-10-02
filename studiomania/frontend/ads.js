@@ -99,11 +99,11 @@ function renderAdAnalysis() {
     $("adScenes").innerHTML = "";
     return;
   }
-  if (!$("adSummary").contains(document.activeElement)) {
+  if (!editingIn($("adSummary"))) {
     $("adSummary").innerHTML = `${an.brand ? `<p class="muted" data-no-i18n>${adEsc(an.brand)} · ${adFmt(a.source?.duration)}</p>` : ""}` +
       Object.entries(AD_LABELS).map(([k, l]) => adField(l, an[k], `data-an="${k}"`)).join("");
   }
-  if (!$("adScenes").contains(document.activeElement)) {
+  if (!editingIn($("adScenes"))) {
     $("adScenes").innerHTML = (an.scenes || []).map((s) => `<article class="ad-scene" data-scene="${s.n}">
       <div class="ad-scene-media">${s.frame_url ? `<img src="${s.frame_url}" alt="" data-seek="${s.start}">` : ""}
         <b>${s.n}</b><span class="t">${adFmt(s.start)} → ${adFmt(s.end)}</span></div>
@@ -169,7 +169,7 @@ function renderAdAdapt() {
   $("adAdaptGo").disabled = busy || !a.analysis;
   const ad = a.adaptation;
   if (!ad) { $("adAdapt").innerHTML = `<p class="muted">${busy ? "⏳ بيكتب..." : a.analysis ? "لسه مفيش اقتراح. دوس «التالي: اكتب اقتراح كوتشي» تحت التحليل." : "الاقتراح بيتكتب بعد التحليل."}</p>`; return; }
-  if ($("adAdapt").contains(document.activeElement)) return;
+  if (editingIn($("adAdapt"))) return;
   const style = adx.styles.find((s) => s.id === a.settings.style_id);
   $("adAdapt").innerHTML = `<div class="ad-adapt-head">
       <input class="ad-adapt-title" data-ad-key="title" value="${adEsc(ad.title)}" data-no-i18n>
@@ -200,7 +200,7 @@ function renderAdSettings() {
 }
 
 function renderStyleLib() {
-  if ($("adStyleGrid").contains(document.activeElement)) return;
+  if (editingIn($("adStyleGrid"))) return;
   $("adStylesBack").hidden = !adx.cur;
   $("adStyleGrid").innerHTML = adx.styles.map((s) => `<article class="ad-style" data-style="${s.id}">
       <div class="imgs">${s.images.map((u) => `<img src="${u}" alt="">`).join("")}</div>
@@ -641,6 +641,12 @@ async function pDo(btn, label, fn) {
   return busyButton(btn, label, async () => { adx.cur = await fn(); renderAds(); });
 }
 
+// بنوقف إعادة الرسم بس لو بتكتب في خانة، مش لو دوست زرار (الزرار بيفضل متعلّم عليه)
+function editingIn(el) {
+  const f = document.activeElement;
+  return !!f && el.contains(f) && f.matches("textarea, select, input:not([type=checkbox]):not([type=file]):not([type=radio])");
+}
+
 function renderAdProd() {
   const a = adx.cur, p = a.prod;
   $("adProdStart").hidden = !!p;
@@ -648,7 +654,7 @@ function renderAdProd() {
   $("adProdGo").disabled = !a.adaptation?.scenes?.length;
   if (!p) return;
   const h = p.header;
-  if (!$("adHeader").contains(document.activeElement)) {
+  if (!editingIn($("adHeader"))) {
     $("adHeader").innerHTML = Object.entries(HEADER_LABELS).map(([k, l]) => adField(l, h[k], `data-h="${k}"`, k === "style" || k === "characters" ? 3 : 2, k === "style")).join("");
   }
   $("adHeaderStyle").innerHTML = `<option value="">من غير ستايل</option>` + adx.styles.map((s) => `<option value="${s.id}" ${s.id === h.style_id ? "selected" : ""}>${adEsc(s.name)}</option>`).join("");
@@ -658,7 +664,7 @@ function renderAdProd() {
   const okv = shots.filter((s) => s.takes.some((t) => t.id === s.chosen && t.approved)).length;
   $("adPProgress").textContent = `🎨 ${framed}/${n} · 🧩 ${comps}/${n} · ✅ ${shots.filter((s) => s.approved).length}/${n} · 🎬 ${okv}/${n}`;
   $("adPApproveAll").textContent = shots.every((s) => s.approved) ? "↩ الغي اعتماد الكل" : "✅ اعتمد كل اللقطات";
-  if ($("adPShots").contains(document.activeElement)) return;
+  if (editingIn($("adPShots"))) return;
   $("adPShots").innerHTML = shots.map((s) => {
     const fbusy = PBUSY.has(s.frame_status);
     const ref = s.ref_frame ? `<div class="ref"><img src="/media/ads/${a.id}/frames/${s.ref_frame}" alt="">من الإعلان الأصلي (مشهد ${s.ref_scene})</div>` : "";
@@ -686,12 +692,12 @@ function renderAdProd() {
         <div class="ad-comps">${s.components.map((c) => `<div class="ad-comp ${c.use === false ? "off" : ""}" data-pc="${c.id}">
           <div class="img">${c.image_url ? `<img src="${c.image_url}" alt="">` : c.status === "working" ? `<div class="spin"></div>` : "🖼️"}</div>
           ${c.images.length > 1 ? `<div class="vers">${c.images.map((f) => `<img src="${f.url}" data-cimg="${f.file}" class="${f.url === c.image_url ? "sel" : ""}" alt="">`).join("")}</div>` : ""}
-          <span class="kind">${KIND_LABEL[c.kind] || adEsc(c.kind)}</span>
+          <span class="kind">${KIND_LABEL[c.kind] || adEsc(c.kind)}${c.uploaded ? ` · <b class="up">⬆ من عندك</b>` : ""}</span>
           <input type="text" value="${adEsc(c.name)}" data-cf="name" data-no-i18n>
           <textarea rows="3" dir="ltr" data-cf="image_prompt" placeholder="Image prompt" data-no-i18n>${adEsc(c.image_prompt)}</textarea>
           ${c.animation ? `<span class="muted" data-no-i18n>🎞️ ${adEsc(c.animation)}</span>` : ""}
           ${c.error ? `<div class="err">${adEsc(c.error)}</div>` : ""}
-          <div class="row wrap"><button class="btn sm" data-c="img" ${c.status === "working" ? "disabled" : ""}>🖼️ ${c.image_url ? "تاني" : "ولّد"}</button>
+          <div class="row wrap">${c.uploaded ? "" : `<button class="btn sm" data-c="img" ${c.status === "working" ? "disabled" : ""}>🖼️ ${c.image_url ? "تاني" : "ولّد"}</button>`}
             <label class="btn sm" title="صورة من عندك">⬆<input type="file" accept="image/*" data-c="up" hidden></label>
             <label class="check" title="يدخل في الفيديو"><input type="checkbox" data-cf="use" ${c.use === false ? "" : "checked"}>يدخل</label>
             <button class="btn sm danger" data-c="del">✕</button></div>
@@ -727,7 +733,13 @@ $("adHeaderAspect").addEventListener("change", () => pAPI("/header", { method: "
   .then((a) => { adx.cur = a; renderAds(); }).catch((err) => toast(err.message, true)));
 $("adPFrames").onclick = () => pDo($("adPFrames"), "⏳", () => pAPI("/frames", { method: "POST" }));
 $("adPComps").onclick = () => pDo($("adPComps"), "⏳", () => pAPI("/components", { method: "POST" }));
-$("adPCompImgs").onclick = () => pDo($("adPCompImgs"), "⏳", () => pAPI("/comp-images", { method: "POST" }));
+$("adPCompImgs").onclick = () => {
+  const comps = adx.cur.prod.shots.flatMap((s) => s.components).filter((c) => c.use !== false);
+  const todo = comps.filter((c) => !c.image_url && c.status !== "working").length, done = comps.length - todo;
+  if (!todo) return toast("كل المكونات ليها صور ✅");
+  if (!confirm(`هيولّد صور لـ ${todo} مكون ملهمش صورة. المكونات اللي ليها صورة (${done})، ومنها اللي انت رافعها، مش هتتلمس. تكمل؟`)) return;
+  pDo($("adPCompImgs"), "⏳", () => pAPI("/comp-images", { method: "POST" }));
+};
 $("adPApproveAll").onclick = () => pDo($("adPApproveAll"), "⏳", () => pAPI(`/approve-all?approved=${!adx.cur.prod.shots.every((s) => s.approved)}`, { method: "POST" }));
 $("adPGenerate").onclick = () => {
   const n = adx.cur.prod.shots.filter((s) => s.approved && s.frame_url && !s.takes.some((t) => t.status !== "failed")).length;
