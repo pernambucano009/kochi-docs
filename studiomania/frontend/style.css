@@ -1278,3 +1278,12 @@ a.pl-link:hover { background: color-mix(in srgb, var(--ok) 24%, transparent); }
 .ad-scomps { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
 .ad-scomp { background: var(--surface); border-radius: 10px; padding: 4px 8px; font-size: 12px; display: inline-flex; flex-direction: column; max-width: 240px; }
 .ad-scomp small { color: var(--muted); font-size: 11px; }
+
+/* الإعلانات: زرار «التالي» بين الخطوات، وتحذير الخطوة القديمة */
+.ad-next { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-top: 16px;
+  padding: 12px 14px; border-radius: 12px; background: var(--surface-2); border: 1px dashed var(--line, #ddd); }
+.ad-next .muted { font-size: 13px; }
+.ad-stale { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 8px 0 12px; padding: 10px 14px;
+  border-radius: 12px; background: #FFF7E6; color: #7A4B00; font-size: 14px; }
+.ad-stale .grow { flex: 1 1 220px; }
+#adTabs .ad-side-tab { opacity: .85; font-style: italic; }

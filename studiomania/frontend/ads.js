@@ -62,6 +62,7 @@ function renderAds() {
     renderAdAdapt();
     renderAdSettings();
     renderAdProd();
+    renderAdFlow();
   }
   scheduleAdPoll();
 }
@@ -117,14 +118,20 @@ function renderAdAnalysis() {
 function renderAdAudio() {
   const a = adx.cur;
   const au = a.audio, t = a.audio_tech;
+  const working = a.audio_status === "working";
+  $("adAudioGo").hidden = !a.source?.has_audio;
+  $("adAudioGo").disabled = working;
+  $("adAudioGo").textContent = working ? "⏳ بيسمع الصوت..." : au ? "↻ حلّل الصوت تاني" : "🎧 حلّل الصوت";
+  $("adAudioGo").classList.toggle("primary", !au);
   if (!a.source?.has_audio) { $("adAudio").innerHTML = `<p class="muted">الإعلان ده من غير صوت.</p>`; return; }
+  const err = a.audio_error && !working ? `<div class="err">✕ ${adEsc(a.audio_error)}</div>` : "";
   if (!au) {
-    $("adAudio").innerHTML = a.audio_error ? `<div class="err">✕ ${adEsc(a.audio_error)}</div>` : `<p class="muted">⏳ لسه بيسمع الصوت...</p>`;
+    $("adAudio").innerHTML = err || `<p class="muted">${working ? "⏳ بيسمع الصوت بالتفصيل (دقيقة تقريبًا)..." : "لسه متحللش. دوس «🎧 حلّل الصوت» لو محتاجه."}</p>`;
     return;
   }
   const m = au.music || {};
   const tech = t ? `<div class="ad-chips"><span>🔊 الارتفاع ${t.lufs ?? "؟"} LUFS</span><span>📈 أعلى نقطة ${t.true_peak ?? "؟"} dB</span><span>↕ المدى ${t.range_lu ?? "؟"} LU</span></div>` : "";
-  $("adAudio").innerHTML = `${tech}
+  $("adAudio").innerHTML = `${err}${tech}
     <h3 class="pane-h">🗣️ الأصوات</h3>
     <div class="ad-cards">${(au.voices || []).map((v) => `<div class="ad-card" data-no-i18n><b>${adEsc(v.who)}</b>
       <span>${[v.gender, v.age, v.language].filter(Boolean).map(adEsc).join(" · ")}</span>
@@ -148,7 +155,7 @@ function renderAdAdapt() {
   $("adAdaptState").innerHTML = busy ? `<span class="spin-inline"></span> ✍️ بيكتب الاقتراح...` : a.adapt_status === "failed" ? `✕ ${adEsc(a.adapt_error)}` : "";
   $("adAdaptGo").disabled = busy || !a.analysis;
   const ad = a.adaptation;
-  if (!ad) { $("adAdapt").innerHTML = `<p class="muted">${busy ? "⏳ بيكتب..." : a.analysis ? "لسه مفيش اقتراح. دوس «اكتب الاقتراح من جديد» في الإعدادات." : "الاقتراح بيتكتب بعد التحليل."}</p>`; return; }
+  if (!ad) { $("adAdapt").innerHTML = `<p class="muted">${busy ? "⏳ بيكتب..." : a.analysis ? "لسه مفيش اقتراح. دوس «التالي: اكتب اقتراح كوتشي» تحت التحليل." : "الاقتراح بيتكتب بعد التحليل."}</p>`; return; }
   if ($("adAdapt").contains(document.activeElement)) return;
   const style = adx.styles.find((s) => s.id === a.settings.style_id);
   $("adAdapt").innerHTML = `<div class="ad-adapt-head">
@@ -354,7 +361,7 @@ $("adTabs").addEventListener("click", (e) => {
 $("adName").addEventListener("change", () => patchAd({ name: $("adName").value }).then(async () => { adx.list = await api("/api/ads"); renderAds(); }));
 
 async function patchAd(body) {
-  try { adx.cur = await api(`/api/ads/${adx.cur.id}`, { method: "PATCH", ...jsonBody(body) }); }
+  try { adx.cur = await api(`/api/ads/${adx.cur.id}`, { method: "PATCH", ...jsonBody(body) }); renderAdFlow(); }
   catch (err) { toast(err.message, true); }
 }
 // تعديل التحليل: الحقول العامة والمشاهد
@@ -379,6 +386,10 @@ document.querySelector('.view[data-view="10"]').addEventListener("click", (e) =>
   v.play().catch(() => {});
 });
 $("adStatus").addEventListener("click", (e) => { if (e.target.closest("[data-ad-retry]")) reanalyze(); });
+$("adAudioGo").onclick = () => busyButton($("adAudioGo"), "⏳", async () => {
+  adx.cur = await api(`/api/ads/${adx.cur.id}/audio-analyze`, { method: "POST" });
+  renderAds();
+});
 $("adSceneCompsGo").onclick = () => busyButton($("adSceneCompsGo"), "⏳", async () => {
   adx.cur = await api(`/api/ads/${adx.cur.id}/scene-components`, { method: "POST" });
   renderAds();
@@ -451,7 +462,7 @@ $("adReadapt").onclick = () => busyButton($("adReadapt"), "⏳", async () => {
   renderAds();
 });
 function reanalyze() {
-  if (!confirm("تحلل الإعلان من الأول؟ التعديلات اللي عملتها على التحليل هتتمسح، والاقتراح هيتكتب من جديد.")) return;
+  if (!confirm("تحلل الإعلان من الأول؟ التعديلات اللي عملتها على التحليل هتتمسح. الاقتراح الحالي هيفضل لحد ما تدوس «التالي» عشان يتكتب من التحليل الجديد.")) return;
   busyButton($("adReanalyze"), "⏳", async () => {
     adx.cur = await api(`/api/ads/${adx.cur.id}/analyze`, { method: "POST" });
     adx.tab = "analysis";
@@ -518,7 +529,7 @@ $("adStyleGrid").addEventListener("click", async (e) => {
 function scheduleAdPoll() {
   clearTimeout(adx.timer);
   const a = adx.cur;
-  const busy = (a && (["queued", "working"].includes(a.status) || a.adapt_status === "working" || a.scomp_status === "working" || prodBusy(a))) || adx.styles.some((s) => s.status === "working");
+  const busy = (a && (["queued", "working"].includes(a.status) || a.adapt_status === "working" || a.scomp_status === "working" || a.audio_status === "working" || prodBusy(a))) || adx.styles.some((s) => s.status === "working");
   if (!busy || document.querySelector('.view[data-view="10"]').hidden) return;
   adx.timer = setTimeout(async () => {
     try {
@@ -534,6 +545,72 @@ function scheduleAdPoll() {
   }, 3000);
 }
 
+
+// ---------- التنقل بين الخطوات: كل خطوة بتاخد آخر نسخة من اللي قبلها ----------
+// based_on = رقم نسخة الخطوة اللي قبلها وقت ما الخطوة دي اتعملت. لو أقل من الحالي يبقى الخطوة دي قديمة
+const adaptStale = (a) => !!a.adaptation && a.adaptation.based_on != null && a.adaptation.based_on < a.analysis_ver;
+const prodStale = (a) => !!a.prod && a.prod.based_on != null && a.prod.based_on < a.adapt_ver;
+
+function renderAdFlow() {
+  const a = adx.cur;
+  const anBusy = ["queued", "working"].includes(a.status) || a.scomp_status === "working";
+  const adBusy = a.adapt_status === "working";
+  const n1 = $("adNextAnalysis");
+  n1.hidden = !a.analysis;
+  if (a.analysis) {
+    const fresh = a.adaptation && !adaptStale(a);
+    n1.innerHTML = `<span class="muted">${adBusy ? "✍️ اقتراح كوتشي بيتكتب من التحليل ده..." : fresh ? "✅ اقتراح كوتشي متحدّث بآخر نسخة من التحليل والمكونات."
+      : a.adaptation ? "⚠️ التحليل أو المكونات اتغيروا بعد ما الاقتراح اتكتب." : "الخطوة الجاية: اقتراح لكوتشي مبني على المشاهد والمكونات دي."}</span>
+      <button class="btn primary" data-flow="adapt" ${anBusy || adBusy ? "disabled" : ""}>${adBusy ? "⏳ بيكتب الاقتراح..."
+        : fresh ? "التالي: اقتراح كوتشي ←" : "التالي: اكتب اقتراح كوتشي من التحليل ده ←"}</button>`;
+  }
+  const s1 = $("adAdaptStale");
+  s1.hidden = !adaptStale(a) || adBusy;
+  s1.innerHTML = `<span class="grow">⚠️ الاقتراح ده مكتوب على نسخة أقدم من التحليل (التحليل أو المكونات اتغيروا بعده).</span>
+    <button class="btn sm primary" data-flow="adapt" ${anBusy ? "disabled" : ""}>↻ اكتبه من جديد بالتحليل الجديد</button>`;
+  const n2 = $("adNextAdapt");
+  n2.hidden = !a.adaptation?.scenes?.length || adBusy;
+  if (!n2.hidden) {
+    const fresh = a.prod && !prodStale(a);
+    n2.innerHTML = `<span class="muted">${fresh ? "✅ التنفيذ ماشي على آخر نسخة من الاقتراح."
+      : a.prod ? "⚠️ الاقتراح اتغير بعد ما التنفيذ بدأ." : "الخطوة الجاية: التنفيذ (ستوري بورد ← مكونات ← فيديو لكل لقطة)."}</span>
+      <button class="btn primary" data-flow="prod" ${prodBusy(a) && !fresh ? "disabled" : ""}>${fresh ? "التالي: التنفيذ ←" : "التالي: خد الاقتراح ده للتنفيذ ←"}</button>`;
+  }
+  const s2 = $("adProdStale"), hist = a.prod_history || [];
+  const stale = prodStale(a);
+  s2.hidden = !stale && !hist.length;
+  s2.classList.toggle("ad-stale", stale);
+  s2.classList.toggle("ad-next", !stale);
+  s2.innerHTML = `${stale ? `<span class="grow">⚠️ اقتراح كوتشي اتغير بعد ما التنفيذ ده بدأ، فاللقطات هنا ماشية على النسخة القديمة.</span>
+      <button class="btn sm primary" data-flow="prod" ${prodBusy(a) ? "disabled" : ""}>↻ خد الاقتراح الجديد للتنفيذ</button>` : `<span class="grow muted">📦 في تنفيذ قديم محفوظ.</span>`}
+    ${hist.length ? `<button class="btn sm" data-prod-restore="0" ${prodBusy(a) ? "disabled" : ""}>↶ رجّع التنفيذ السابق (${hist[0].shots} لقطة)</button>` : ""}`;
+}
+
+async function adFlow(btn, to) {
+  const a = adx.cur;
+  if (to === "adapt") {
+    if (a.adaptation && !adaptStale(a)) { adx.tab = "adapt"; return renderAds(); }
+    if (a.adaptation && !confirm("هيكتب اقتراح جديد من آخر نسخة من التحليل والمكونات. التعديلات اللي عملتها بإيدك في الاقتراح الحالي هتتشال. تكمل؟")) return;
+    return busyButton(btn, "⏳", async () => {
+      adx.cur = await api(`/api/ads/${a.id}/adapt`, { method: "POST", ...jsonBody({ message: "" }) });
+      adx.tab = "adapt";
+      renderAds();
+    });
+  }
+  if (a.prod && !prodStale(a)) { adx.tab = "prod"; return renderAds(); }
+  if (a.prod && !confirm("هيبدأ تنفيذ جديد من آخر نسخة من الاقتراح. التنفيذ الحالي (صوره وفيديوهاته) هيتحفظ وتقدر ترجعه بزرار «رجّع التنفيذ السابق». تكمل؟")) return;
+  return busyButton(btn, "⏳", async () => {
+    adx.cur = await pAPI("/start", { method: "POST" });
+    adx.tab = "prod";
+    renderAds();
+  });
+}
+document.querySelector('.view[data-view="10"]').addEventListener("click", (e) => {
+  const f = e.target.closest("[data-flow]");
+  if (f) return adFlow(f, f.dataset.flow);
+  const r = e.target.closest("[data-prod-restore]");
+  if (r && confirm("ترجّع التنفيذ السابق؟ التنفيذ الحالي هيتحفظ مكانه.")) pDo(r, "⏳", () => pAPI(`/restore?i=${r.dataset.prodRestore}`, { method: "POST" }));
+});
 
 // ---------- 4. التنفيذ: راس الإعلان ← ستوري بورد ← مكونات ← لقطات ← المونتاج ----------
 const PBUSY = new Set(["queued", "working"]);
@@ -622,7 +699,7 @@ function renderAdProd() {
 
 $("adProdGo").onclick = () => pDo($("adProdGo"), "⏳", () => pAPI("/start", { method: "POST" }));
 $("adProdRestart").onclick = () => {
-  if (!confirm("تبدأ التنفيذ من جديد من اقتراح كوتشي الحالي؟ اللقطات والصور والفيديوهات اللي هنا هتتشال من التنفيذ.")) return;
+  if (!confirm("تبدأ التنفيذ من جديد من اقتراح كوتشي الحالي؟ التنفيذ ده (صوره وفيديوهاته) هيتحفظ وتقدر ترجعه بزرار «رجّع التنفيذ السابق».")) return;
   pDo($("adProdRestart"), "⏳", () => pAPI("/start", { method: "POST" }));
 };
 $("adHeader").addEventListener("change", (e) => {

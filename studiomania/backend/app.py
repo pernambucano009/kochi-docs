@@ -5592,6 +5592,11 @@ def ad_row(conn: sqlite3.Connection, aid: str) -> tuple[sqlite3.Row, dict]:
     return r, json.loads(r["data"])
 
 
+def bump(d: dict, key: str) -> None:
+    """رقم نسخة الخطوة: بيزيد مع كل تغيير عشان الخطوة اللي بعدها تعرف إنها بقت قديمة."""
+    d[key] = int(d.get(key) or 0) + 1
+
+
 def update_ad(aid: str, fn) -> None:
     with ADS_LOCK, closing(db()) as conn, conn:
         r, data = ad_row(conn, aid)
@@ -5611,6 +5616,9 @@ def ad_to_dict(r: sqlite3.Row, d: dict) -> dict:
         "status": d.get("status", "idle"), "step": d.get("step"), "error": d.get("error"),
         "analysis": {**analysis, "scenes": scenes} if analysis else None,
         "audio": d.get("audio"), "audio_error": d.get("audio_error"), "audio_tech": d.get("audio_tech"),
+        "audio_status": d.get("audio_status", "idle"), "has_audio": bool((d.get("source") or {}).get("has_audio")),
+        "analysis_ver": d.get("analysis_ver", 0), "adapt_ver": d.get("adapt_ver", 0),
+        "prod_history": [{"at": h.get("archived_at"), "shots": len(h.get("shots") or [])} for h in d.get("prod_history") or []],
         "settings": d.get("settings") or {},
         "adaptation": d.get("adaptation"), "adapt_status": d.get("adapt_status", "idle"), "adapt_error": d.get("adapt_error"),
         "scomp_status": d.get("scomp_status", "idle"),
@@ -5748,10 +5756,14 @@ def patch_ad(aid: str, body: AdPatchIn):
             for s in scenes:
                 s["frame"] = frames.get(s.get("n"))
             d["analysis"] = {**d["analysis"], **body.analysis, "scenes": scenes}
+            bump(d, "analysis_ver")
         if body.audio is not None:
             d["audio"] = body.audio
         if body.adaptation is not None:
-            d["adaptation"] = body.adaptation
+            # التعديل بإيدك بيفضل على نفس التحليل اللي الاقتراح اتكتب عليه
+            based = (d.get("adaptation") or {}).get("based_on", d.get("analysis_ver", 0))
+            d["adaptation"] = {**body.adaptation, "based_on": based}
+            bump(d, "adapt_ver")
     update_ad(aid, fn)
     return ad_response(aid)
 
@@ -5782,7 +5794,8 @@ def edit_ad(aid: str, body: AdEditIn):
     source = ad_source_from(folder, original, parse_ad_edit(body.start, body.end, body.crop), d["source"].get("name"))
     for f in (folder / "frames").glob("*.jpg"):
         f.unlink(missing_ok=True)
-    update_ad(aid, lambda d: d.update(source=source, status="queued", error=None, analysis=None, audio=None, audio_error=None))
+    update_ad(aid, lambda d: d.update(source=source, status="queued", error=None, analysis=None, audio=None, audio_error=None,
+                                     audio_tech=None, audio_status="idle"))
     threading.Thread(target=run_ad_analysis, args=(aid,), daemon=True).start()
     return ad_response(aid)
 
@@ -5804,6 +5817,7 @@ def run_scene_components(aid: str) -> None:
             az.merge_scene_components(d["analysis"]["scenes"], sc)
             d["analysis"]["components_error"] = None
             d["scomp_status"] = "done"
+            bump(d, "analysis_ver")
         update_ad(aid, fn)
     except Exception as exc:  # noqa: BLE001
         msg = str(getattr(exc, "detail", None) or exc)[:300]
@@ -5921,6 +5935,39 @@ def ad_loudness(path: Path) -> dict:
             "range_lu": float(lra.group(1)) if lra else None}
 
 
+def run_ad_audio(aid: str) -> None:
+    """خطوة جانبية: تفصيص الصوت (كلام، مزيكا، مؤثرات) + قياس الارتفاع."""
+    try:
+        with closing(db()) as conn:
+            _, d = ad_row(conn, aid)
+        folder = ad_dir(aid)
+        src = folder / d["source"]["file"]
+        dur = min(d["source"]["duration"], AD_MAX_SECONDS)
+        audio = folder / "audio.mp3"
+        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src), "-t", f"{dur:.2f}",
+                        "-vn", "-ac", "1", "-b:a", "96k", str(audio)], check=True, capture_output=True, timeout=300)
+        tech = ad_loudness(src)
+        data = az.mock_audio() if atlas.mock_mode() else ad_json(
+            ad_media_chat(az.with_media(az.audio_messages(dur), data_url(audio, "audio/mpeg"), "ad.mp3")), "تحليل الصوت")
+        update_ad(aid, lambda d: d.update(audio=data, audio_tech=tech, audio_error=None, audio_status="done"))
+    except Exception as exc:  # noqa: BLE001
+        msg = str(getattr(exc, "detail", None) or exc)[:400]
+        update_ad(aid, lambda d: d.update(audio_status="failed", audio_error=msg))
+
+
+@app.post("/api/ads/{aid}/audio-analyze")
+def audio_analyze(aid: str):
+    with closing(db()) as conn:
+        _, d = ad_row(conn, aid)
+    if not (d.get("source") or {}).get("has_audio"):
+        raise HTTPException(400, "الفيديو ده مفيهوش صوت")
+    if d.get("audio_status") == "working":
+        raise HTTPException(400, "الصوت بيتحلل بالفعل")
+    update_ad(aid, lambda d: d.update(audio_status="working", audio_error=None))
+    threading.Thread(target=run_ad_audio, args=(aid,), daemon=True).start()
+    return ad_response(aid)
+
+
 def run_ad_analysis(aid: str) -> None:
     def step(label: str):
         update_ad(aid, lambda d: d.update(status="working", step=label))
@@ -5930,19 +5977,13 @@ def run_ad_analysis(aid: str) -> None:
         folder = ad_dir(aid)
         src = folder / d["source"]["file"]
         dur = min(d["source"]["duration"], AD_MAX_SECONDS)
-        has_audio = d["source"].get("has_audio")
         step("بيجهّز الفيديو")
-        proxy, audio = folder / "proxy.mp4", folder / "audio.mp3"
+        proxy = folder / "proxy.mp4"
         # نسخة صغيرة للموديل: الصورة والصوت كفاية للتحليل وحجمها صغير
         subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src), "-t", f"{dur:.2f}",
                         "-vf", "scale='if(gt(iw,ih),min(640,iw),-2)':'if(gt(iw,ih),-2,min(640,ih))',fps=12",
                         "-c:v", "libx264", "-preset", "veryfast", "-crf", "31", "-pix_fmt", "yuv420p",
                         "-c:a", "aac", "-ac", "1", "-b:a", "64k", str(proxy)], check=True, capture_output=True, timeout=600)
-        tech = None
-        if has_audio:
-            subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src), "-t", f"{dur:.2f}",
-                            "-vn", "-ac", "1", "-b:a", "96k", str(audio)], check=True, capture_output=True, timeout=300)
-            tech = ad_loudness(src)
         step("بيتفرج على الإعلان (الصورة والصوت)")
         if atlas.mock_mode():
             analysis = az.mock_analysis(dur)
@@ -5950,14 +5991,6 @@ def run_ad_analysis(aid: str) -> None:
             analysis = ad_json(ad_media_chat(az.with_media(az.video_messages(dur, d.get("settings", {}).get("notes", "")),
                                                            data_url(proxy, "video/mp4"), "ad.mp4")), "تحليل الإعلان")
         analysis["scenes"] = az.clean_scenes(analysis.get("scenes"), dur)
-        audio_data, audio_err = None, None
-        if has_audio:
-            step("بيسمع الصوت بالتفصيل")
-            try:
-                audio_data = az.mock_audio() if atlas.mock_mode() else ad_json(
-                    ad_media_chat(az.with_media(az.audio_messages(dur), data_url(audio, "audio/mpeg"), "ad.mp3")), "تحليل الصوت")
-            except (atlas.AtlasError, ValueError) as exc:
-                audio_err = str(exc)[:400]
         step("بيطلّع صورة من كل مشهد")
         for s in analysis["scenes"]:
             fr = f"scene-{s['n']:02d}.jpg"
@@ -5978,9 +6011,14 @@ def run_ad_analysis(aid: str) -> None:
             analysis["components_error"] = str(getattr(exc, "detail", None) or exc)[:300]
         if not analysis.get("title"):
             analysis["title"] = ""
+        chain = []
         def done(d):
-            d.update(analysis=analysis, audio=audio_data, audio_error=audio_err, audio_tech=tech,
-                     status="done", step=None, error=None, adapt_status="working", adapt_error=None, chat=[])
+            d.update(analysis=analysis, status="done", step=None, error=None)
+            bump(d, "analysis_ver")
+            # أول مرة بس الاقتراح بيتكتب لوحده. بعد كده بزرار «التالي» عشان ميمسحش اقتراح اتعدل
+            if not d.get("adaptation") and d.get("adapt_status") != "working":
+                d.update(adapt_status="working", adapt_error=None, chat=[])
+                chain.append(True)
         update_ad(aid, done)
     except Exception as exc:  # noqa: BLE001
         msg = str(getattr(exc, "detail", None) or exc)[:500]
@@ -5988,7 +6026,8 @@ def run_ad_analysis(aid: str) -> None:
             msg = f"FFmpeg: {(exc.stderr or b'').decode(errors='ignore')[-300:] if isinstance(exc.stderr, bytes) else exc.stderr}"
         update_ad(aid, lambda d: d.update(status="failed", step=None, error=msg))
         return
-    run_ad_adapt(aid)
+    if chain:
+        run_ad_adapt(aid)
 
 
 def ad_style(style_id: str | None) -> dict | None:
@@ -6011,8 +6050,9 @@ def run_ad_adapt(aid: str) -> None:
                                      ad_style(settings.get("style_id")), d.get("chat") or [])
             result = ad_json(series_chat(msgs), "اقتراح كوتشي")
         def fn(d):
-            d["adaptation"] = result
+            d["adaptation"] = {**result, "based_on": d.get("analysis_ver", 0)}
             d["adapt_status"], d["adapt_error"] = "done", None
+            bump(d, "adapt_ver")
             if d.get("chat"):
                 d["chat"].append({"role": "assistant", "content": json.dumps(result, ensure_ascii=False)[:6000]})
         update_ad(aid, fn)
@@ -6159,6 +6199,12 @@ def reset_stuck_ads() -> None:
             if d.get("adapt_status") == "working":
                 d.update(adapt_status="failed", adapt_error="اتقطع لما السيرفر اتقفل. دوس «اكتب الاقتراح تاني»")
                 changed = True
+            if d.get("audio_status") == "working":
+                d.update(audio_status="failed", audio_error="اتقطع لما السيرفر اتقفل. دوس «حلّل الصوت» تاني")
+                changed = True
+            if d.get("scomp_status") == "working":
+                d.update(scomp_status="failed")
+                changed = True
             if changed:
                 conn.execute("UPDATE ads SET data = ? WHERE id = ?", (json.dumps(d, ensure_ascii=False), r["id"]))
         for r in conn.execute("SELECT id, data FROM ad_styles").fetchall():
@@ -6181,6 +6227,17 @@ def prod_dir(aid: str, sub: str) -> Path:
     d = ad_dir(aid) / "prod" / sub
     d.mkdir(parents=True, exist_ok=True)
     return d
+
+
+def prod_busy(p: dict | None) -> bool:
+    for s in (p or {}).get("shots") or []:
+        if "working" in (s.get("frame_status"), s.get("comp_status")):
+            return True
+        if any(c.get("status") == "working" for c in s.get("components") or []):
+            return True
+        if any(t.get("status") in ("queued", "working") for t in s.get("takes") or []):
+            return True
+    return False
 
 
 def prod_of(d: dict) -> dict:
@@ -6238,6 +6295,8 @@ def prod_start(aid: str):
     a = d.get("adaptation")
     if not a or not a.get("scenes"):
         raise HTTPException(400, "مفيش اقتراح لكوتشي لسه")
+    if prod_busy(d.get("prod")):
+        raise HTTPException(400, "في توليد شغال في التنفيذ الحالي. استنى لما يخلص")
     settings = d.get("settings") or {}
     header = az.header_from(a, ad_style(settings.get("style_id")), brand_settings(), settings)
     scenes = a["scenes"]
@@ -6264,7 +6323,30 @@ def prod_start(aid: str):
             "motion_notes": (ref or {}).get("motion_graphics", ""), "assembly_prompt": "",
             "approved": False, "takes": [], "chosen": None,
         })
-    update_ad(aid, lambda d: d.update(prod={"header": header, "shots": shots}))
+    def fn(d):
+        old = d.get("prod")
+        if old and old.get("shots"):
+            # التنفيذ القديم بيتحفظ (ملفاته بأسماء مختلفة فمفيش حاجة بتتمسح)
+            d["prod_history"] = ([{**old, "archived_at": now()}] + (d.get("prod_history") or []))[:5]
+        d["prod"] = {"header": header, "shots": shots, "based_on": d.get("adapt_ver", 0)}
+    update_ad(aid, fn)
+    return ad_response(aid)
+
+
+@app.post("/api/ads/{aid}/prod/restore")
+def prod_restore(aid: str, i: int = 0):
+    """يرجّع تنفيذ قديم من الأرشيف (والحالي بياخد مكانه في الأرشيف)."""
+    def fn(d):
+        hist = d.get("prod_history") or []
+        if not 0 <= i < len(hist):
+            raise HTTPException(404, "مفيش تنفيذ قديم بالرقم ده")
+        if prod_busy(d.get("prod")):
+            raise HTTPException(400, "في توليد شغال في التنفيذ الحالي. استنى لما يخلص")
+        old = {k: v for k, v in hist.pop(i).items() if k != "archived_at"}
+        if d.get("prod") and d["prod"].get("shots"):
+            hist.insert(0, {**d["prod"], "archived_at": now()})
+        d["prod"], d["prod_history"] = old, hist[:5]
+    update_ad(aid, fn)
     return ad_response(aid)
 
 

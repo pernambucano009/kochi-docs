@@ -939,9 +939,9 @@
                 <input class="ad-title" id="adName" data-no-i18n>
                 <nav class="car-steps" id="adTabs">
                   <button data-t="analysis"><i>1</i>التحليل والمشاهد</button>
-                  <button data-t="audio"><i>2</i>الصوت</button>
-                  <button data-t="adapt"><i>3</i>اقتراح كوتشي</button>
-                  <button data-t="prod"><i>4</i>التنفيذ</button>
+                  <button data-t="adapt"><i>2</i>اقتراح كوتشي</button>
+                  <button data-t="prod"><i>3</i>التنفيذ</button>
+                  <button data-t="audio" class="ad-side-tab">🎧 الصوت (جانبي)</button>
                   <button data-t="settings">⚙️ الإعدادات</button>
                 </nav>
               </div>
@@ -956,19 +956,25 @@
                   <button class="btn sm" id="adSceneCompsGo" hidden>🧩 فصّص مكونات المشاهد</button></div>
                 <div class="err" id="adSceneCompsErr" hidden></div>
                 <div class="ad-scenes" id="adScenes"></div>
+                <div class="ad-next" id="adNextAnalysis" hidden></div>
               </section>
 
               <section class="panel ad-sec" data-sec="audio" hidden>
+                <div class="panel-head"><h2>🎧 تفصيص الصوت</h2>
+                  <button class="btn sm" id="adAudioGo">🎧 حلّل الصوت</button></div>
+                <p class="muted">خطوة جانبية: مش لازم للاقتراح ولا للتنفيذ. بتفصّص الكلام والمزيكا والمؤثرات لو محتاجهم كمرجع.</p>
                 <div id="adAudio"></div>
               </section>
 
               <section class="panel ad-sec" data-sec="adapt" hidden>
                 <div class="panel-head"><h2>🎯 اقتراح لكوتشي</h2><span class="muted" id="adAdaptState"></span></div>
+                <div class="ad-stale" id="adAdaptStale" hidden></div>
                 <form class="car-input" id="adAdaptForm">
                   <textarea id="adAdaptMsg" rows="2" placeholder="وجّهه: «خليه مضحك»، «بطولة مدرب ومتدربة»، «أقصر 15 ثانية»... (Enter يبعت)"></textarea>
                   <button class="btn primary" type="submit" id="adAdaptGo">✍️ عدّل الاقتراح</button>
                 </form>
                 <div id="adAdapt"></div>
+                <div class="ad-next" id="adNextAdapt" hidden></div>
               </section>
 
               <section class="panel ad-sec" data-sec="prod" hidden>
@@ -976,6 +982,7 @@
                   <p>التنفيذ بيمشي بالترتيب: <b>راس الإعلان</b> (الستايل والكونسبت) ← <b>ستوري بورد</b> لكل لقطة ← <b>مكونات</b> كل لقطة (شخصيات، خلفيات، عناصر موشن جرافيك) وصورة لكل مكون ← <b>فيديو</b> كل لقطة بـ Seedance من الستوري بورد والمكونات ← <b>المونتاج</b>.</p>
                   <button class="btn primary" id="adProdGo">🎬 ابدأ التنفيذ من اقتراح كوتشي</button>
                 </div>
+                <div class="ad-stale" id="adProdStale" hidden></div>
                 <div id="adProdMain" hidden>
                   <details class="ad-header" id="adHeaderBox" open>
                     <summary>🧭 راس الإعلان (الثوابت اللي بتدخل في كل صورة وفيديو)</summary>
