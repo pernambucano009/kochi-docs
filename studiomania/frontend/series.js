@@ -376,8 +376,9 @@ function renderShotsTab() {
     const frames = (s.frames || []).length > 1 ? `<div class="frame-vers">${s.frames.map((f, i) => `<img src="${f.url}" data-frame="${f.file}" class="${f.url === s.frame_url ? "sel" : ""}" title="نسخة ${i + 1}" alt="">`).join("")}</div>` : "";
     const ready = chosen?.approved;
     return `${head}<article class="shot ${s.approved ? "approved" : ""} ${ready ? "ready" : ""}" data-shot="${s.id}">
-      <header><b>${s.n}</b><span class="t">${serFmt(s.start)} → ${serFmt(s.end)}</span><span class="dur">${s.duration.toFixed(1)}ث</span>
+      <header><b>${s.n}</b>${s.added ? `<span class="added" title="لقطة ضفتها بإيدك">➕</span>` : ""}<span class="t">${serFmt(s.start)} → ${serFmt(s.end)}</span><span class="dur">${s.duration.toFixed(1)}ث</span>
         <button class="btn sm" data-play="${s.start}:${s.end}" title="اسمع الكلام اللي على اللقطة">▶</button>
+        <button class="btn sm" data-add-after title="ضيف لقطة جديدة بعد دي">➕</button>
         <button class="btn sm danger" data-del-shot title="احذف اللقطة">🗑️</button></header>
       <div class="said" data-no-i18n>${said}</div>
       <div class="frame">${frame}</div>
@@ -456,6 +457,7 @@ $("serShots").addEventListener("click", async (e) => {
       return renderSeries();
     }
     if (e.target.closest("[data-del-shot]")) return askDeleteShot(id);
+    if (e.target.closest("[data-add-after]")) return askAddShot(id);
     if (e.target.closest("[data-frame-go]")) {
       ser.ep = await api(`/api/episodes/${ser.ep.id}/frames?shot_id=${id}`, { method: "POST" });
       return renderSeries();
@@ -537,6 +539,60 @@ function askDeleteShot(id) {
   $("serDelCancel").onclick = () => $("serDelDialog").close();
   $("serDelDialog").showModal();
 }
+// لقطة جديدة بين لقطتين: وقتها بيتاخد من اللي جنبها، والحلقة تفضل على طول الصوت
+const ADD_MIN = 0.5;
+function addPlan(prev, next, secs, from) {
+  const roomP = Math.max(0, prev.duration - ADD_MIN), roomN = next ? Math.max(0, next.duration - ADD_MIN) : 0;
+  let a, b;
+  if (from === "prev" || !next) { a = Math.min(secs, roomP); b = 0; }
+  else if (from === "next") { a = 0; b = Math.min(secs, roomN); }
+  else { a = Math.min(secs / 2, roomP); b = Math.min(secs - a, roomN); a = Math.min(secs - b, roomP); }
+  return { a, b, got: a + b };
+}
+function renderAddPlan() {
+  const { prev, next } = ser.adding;
+  const secs = Number($("serAddSecs").value) || 0;
+  const label = (from) => {
+    const p = addPlan(prev, next, secs, from);
+    const parts = [];
+    if (p.a > 0.001) parts.push(`${prev.n}: ${prev.duration.toFixed(1)} ← ${(prev.duration - p.a).toFixed(1)}ث`);
+    if (p.b > 0.001) parts.push(`${next.n}: ${next.duration.toFixed(1)} ← ${(next.duration - p.b).toFixed(1)}ث`);
+    const short = p.got < secs - 0.05 ? ` · ⚠️ المتاح ${p.got.toFixed(1)}ث بس` : "";
+    return `${parts.join(" · ") || "مفيش وقت متاح"}${short}`;
+  };
+  $("serAddBoth").textContent = `من الاتنين (${label("both")})`;
+  $("serAddPrev").textContent = `من اللي قبلها (${label("prev")})`;
+  $("serAddNext").textContent = next ? `من اللي بعدها (${label("next")})` : "";
+  $("serAddNext").closest("label").hidden = !next;
+  $("serAddBoth").closest("label").hidden = !next;
+  if (!next) document.querySelector('[name="serAddFrom"][value="prev"]').checked = true;
+}
+function askAddShot(id) {
+  const shots = ser.ep.shots;
+  const k = shots.findIndex((s) => s.id === id);
+  ser.adding = { prev: shots[k], next: shots[k + 1] || null };
+  $("serAddWhere").textContent = ser.adding.next ? `بين ${shots[k].n} و ${shots[k + 1].n}` : `بعد ${shots[k].n}`;
+  $("serAddIdea").value = "";
+  $("serAddSecs").value = 2;
+  document.querySelector('[name="serAddFrom"][value="both"]').checked = true;
+  renderAddPlan();
+  $("serAddDialog").showModal();
+}
+$("serAddSecs").addEventListener("input", renderAddPlan);
+$("serAddCancel").onclick = () => $("serAddDialog").close();
+$("serAddGo").onclick = () => busyButton($("serAddGo"), "⏳ بيكتب اللقطة...", async () => {
+  const body = { after: ser.adding.prev.id, seconds: Number($("serAddSecs").value) || 2, idea: $("serAddIdea").value.trim(),
+    take_from: document.querySelector('[name="serAddFrom"]:checked').value };
+  const r = await api(`/api/episodes/${ser.ep.id}/shots/insert`, { method: "POST", ...jsonBody(body) });
+  ser.ep = r;
+  $("serAddDialog").close();
+  renderSeries();
+  const s = ser.ep.shots.find((x) => x.id === r.new_shot);
+  toast(`➕ اتضافت اللقطة ${s.n}. راجع البرومبت، ارسم الستوري بورد، واعتمدها عشان تتولد`);
+  const card = document.querySelector(`[data-shot="${r.new_shot}"]`);
+  if (card) { card.scrollIntoView({ behavior: "smooth", block: "center" }); card.classList.add("flash"); setTimeout(() => card.classList.remove("flash"), 2500); }
+});
+
 $("serFramesGo").onclick = () => busyButton($("serFramesGo"), "⏳", async () => {
   ser.ep = await api(`/api/episodes/${ser.ep.id}/frames`, { method: "POST" });
   renderSeries();

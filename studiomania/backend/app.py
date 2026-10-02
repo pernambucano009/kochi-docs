@@ -4651,6 +4651,81 @@ def delete_shot(eid: str, shot_id: str, merge: str = "prev"):
     return episode_response(eid)
 
 
+class InsertShotIn(BaseModel):
+    after: str  # اللقطة اللي الجديدة هتيجي بعدها
+    seconds: float = 2.0
+    take_from: str = "both"  # prev | next | both
+    idea: str = ""
+
+
+MIN_SHOT = 0.5
+
+
+def insert_times(shots: list[dict], after: str, seconds: float, take_from: str) -> tuple[int, float, float, float]:
+    """مكان اللقطة الجديدة ووقتها: بتاخد وقتها من اللي قبلها أو اللي بعدها أو الاتنين، والحلقة تفضل على طول الصوت."""
+    ids = [x["id"] for x in shots]
+    if after not in ids:
+        raise HTTPException(404, "اللقطة مش موجودة")
+    k = ids.index(after) + 1
+    prev, nxt = shots[k - 1], shots[k] if k < len(shots) else None
+    room_prev = max(0.0, prev["end"] - prev["start"] - MIN_SHOT)
+    room_next = max(0.0, nxt["end"] - nxt["start"] - MIN_SHOT) if nxt else 0.0
+    if take_from == "prev" or not nxt:
+        a, b = min(seconds, room_prev), 0.0
+    elif take_from == "next":
+        a, b = 0.0, min(seconds, room_next)
+    else:
+        a = min(seconds / 2, room_prev)
+        b = min(seconds - a, room_next)
+        a = min(seconds - b, room_prev)
+    if a + b < 0.3:
+        raise HTTPException(400, "مفيش وقت كفاية في اللقطات اللي جنبها (كل لقطة لازم تفضل نص ثانية على الأقل)")
+    start = prev["end"] - a
+    return k, start, start + a + b, a + b
+
+
+@app.post("/api/episodes/{eid}/shots/insert")
+def insert_shot(eid: str, body: InsertShotIn):
+    """لقطة جديدة بين لقطتين. وقتها بيتاخد من اللي جنبها، والموديل بيكتب وصفها وبرومبتها على نفس أسلوبهم
+    عشان تتولد ليها ستوري بورد وفيديو زي الباقي."""
+    with closing(db()) as conn:
+        r, data = episode_row(conn, eid)
+        _, sdata = series_for_episode(conn, r)
+    seconds = max(0.3, min(15.0, float(body.seconds or 2)))
+    k, start, end, _ = insert_times(data["shots"], body.after, seconds, body.take_from)
+    prev = data["shots"][k - 1]
+    nxt = data["shots"][k] if k < len(data["shots"]) else None
+    said = [ln["text"] for ln in data["lines"] if ln.get("start") is not None and ln["start"] < end and ln["end"] > start]
+    if atlas.mock_mode():
+        fields = sz.mock_one_shot(prev, body.idea)
+    elif atlas.api_key():
+        try:
+            fields = sz.parse_one_shot(series_chat(sz.insert_shot_messages(
+                sdata["bible"], sdata["character"], prev, nxt, said, end - start, body.idea)))
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+    else:
+        fields = {"title": body.idea.strip()[:80] or "لقطة جديدة", "shot": "", "camera": "", "location": prev.get("location") or "",
+                  "sfx": "", "transition": "cut", "prompt": body.idea.strip()}
+    new_id = uuid.uuid4().hex[:10]
+    def fn(d):
+        shots = d["shots"]
+        k, start, end, _ = insert_times(shots, body.after, seconds, body.take_from)
+        shots[k - 1]["end"] = round(start, 2)
+        if k < len(shots):
+            shots[k]["start"] = round(end, 2)
+        lines = [ln["n"] for ln in d["lines"] if ln.get("start") is not None and ln["start"] < end and ln["end"] > start]
+        shots.insert(k, {"id": new_id, "scene": shots[k - 1].get("scene") or 0, "start": round(start, 2), "end": round(end, 2),
+                         "lines": lines, **fields, "takes": [], "chosen": None, "offset": 0.0, "approved": False,
+                         "frames": [], "frame": None, "frame_status": "idle", "frame_error": None, "added": True})
+        for n, x in enumerate(shots, 1):
+            x["n"] = n
+    update_episode(eid, fn)
+    out = episode_response(eid)
+    out["new_shot"] = new_id
+    return out
+
+
 @app.post("/api/episodes/{eid}/takes/{take_id}/retry")
 def retry_take(eid: str, take_id: str):
     """نسخة فشلت: لو الطلب كان اتبعت لـ Seedance بنكمّل متابعته وتحميله (من غير دفع تاني)، غير كده بيتبعت من الأول."""

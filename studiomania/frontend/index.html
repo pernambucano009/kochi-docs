@@ -1037,6 +1037,22 @@
     <audio id="serGalAudio" preload="auto" hidden></audio>
   </div>
 </dialog>
+<dialog class="bulk-dlg ser-del-dlg ser-add-dlg" id="serAddDialog">
+  <h2>➕ لقطة جديدة <span id="serAddWhere" data-no-i18n></span></h2>
+  <p class="hint">البرنامج يكتب وصفها وبرومبتها على نفس أسلوب اللقطات اللي جنبها، وبعدين ترسم لها ستوري بورد وتعتمدها وتولّد الفيديو زي أي لقطة.</p>
+  <label class="field">إيه اللي يحصل في اللقطة؟ (اختياري)
+    <textarea id="serAddIdea" rows="3" placeholder="مثلًا: لقطة قريبة لإيده وهو بيقلّب في الجوال، أو رد فعل وشه... لو سبتها فاضية البرنامج يقترح"></textarea></label>
+  <label class="field">مدتها بالثواني <input type="number" id="serAddSecs" min="0.3" max="15" step="0.1" value="2"></label>
+  <div class="ser-add-from" id="serAddFrom">
+    <label><input type="radio" name="serAddFrom" value="both" checked> <span id="serAddBoth"></span></label>
+    <label><input type="radio" name="serAddFrom" value="prev"> <span id="serAddPrev"></span></label>
+    <label><input type="radio" name="serAddFrom" value="next"> <span id="serAddNext"></span></label>
+  </div>
+  <div class="row wrap">
+    <button class="btn primary" id="serAddGo">➕ ضيف اللقطة</button>
+    <button class="btn" id="serAddCancel">إلغاء</button>
+  </div>
+</dialog>
 <dialog class="bulk-dlg ser-del-dlg" id="serDelDialog">
   <h2>🗑️ حذف اللقطة <span id="serDelNum"></span></h2>
   <p class="hint" id="serDelInfo"></p>

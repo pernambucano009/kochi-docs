@@ -357,6 +357,61 @@ def mock_script(number: int, chat: list[dict]) -> str:
 
 
 
+
+ONE_SHOT_FORMAT = """{"title": "وصف قصير بالعربي للقطة",
+ "shot": "close-up | medium | wide | insert ...", "camera": "static | slow push-in | ...",
+ "location": "المكان", "sfx": "المؤثرات الصوتية", "transition": "cut | match cut ...",
+ "prompt": "English prompt for the video model ..."}"""
+
+
+def shot_brief(s: dict | None) -> str:
+    if not s:
+        return "(مفيش)"
+    return (f'{s.get("title") or ""} — {s.get("shot") or ""}, {s.get("camera") or ""}, {s.get("location") or ""}\n'
+            f'Prompt: {s.get("prompt") or ""}')
+
+
+def insert_shot_messages(bible: str, character: str, prev: dict | None, nxt: dict | None,
+                         said: list[str], seconds: float, idea: str) -> list[dict]:
+    """لقطة جديدة بين لقطتين: نفس أسلوب اللقطات اللي حواليها عشان الحلقة تفضل متسقة."""
+    system = (
+        "أنت مخرج لمسلسل قصير على السوشيال ميديا، وبتضيف لقطة جديدة في نص حلقة متصورة خلاص. "
+        "اللقطة لازم تبقى متسقة مع اللي قبلها واللي بعدها: نفس المكان والإضاءة واللبس والمزاج، إلا لو المطلوب غير كده.\n\n"
+        f"دستور المسلسل:\n{bible.strip()}\n\n"
+        f"الشخصية (لازم تتوصف بنفس الشكل في البرومبت لو ظاهرة):\n{character.strip()}"
+    )
+    user = (
+        f"اللقطة اللي قبلها:\n{shot_brief(prev)}\n\n"
+        f"اللقطة اللي بعدها:\n{shot_brief(nxt)}\n\n"
+        f"مدة اللقطة الجديدة: {seconds:.1f} ثانية.\n"
+        + (f"الكلام اللي بيتقال وقتها (فويس أوفر): {' '.join('«' + x + '»' for x in said)}\n" if said else "مفيش كلام وقتها.\n")
+        + (f"اللي المستخدم عايزه في اللقطة: {idea.strip()}\n" if idea.strip()
+           else "المستخدم ما حددش: اقترح لقطة تكمّل الإيقاع (insert، رد فعل، تفصيلة من المكان...) وتخدم الكلام.\n")
+        + "\nprompt بالإنجليزي لموديل فيديو (Seedance): الشخصية بوصفها الكامل لو ظاهرة، الفعل، المكان، الإضاءة، العدسة، حركة الكاميرا، المزاج. "
+        "فيديو طولي 9:16 واقعي سينمائي، الشخصية ما بتتكلمش قدام الكاميرا، ومن غير أي كلام مكتوب على الشاشة. اسم الشخصية ما يتذكرش أبدًا.\n\n"
+        f"رجّع JSON بس بالشكل ده:\n{ONE_SHOT_FORMAT}"
+    )
+    return [{"role": "system", "content": system}, {"role": "user", "content": user}]
+
+
+def parse_one_shot(text: str) -> dict:
+    m = re.search(r"\{.*\}", text or "", re.S)
+    if not m:
+        raise ValueError("الموديل ما رجعش وصف اللقطة")
+    data = json.loads(m.group(0), strict=False)
+    if isinstance(data, dict) and isinstance(data.get("shots"), list) and data["shots"]:
+        data = data["shots"][0]
+    if not isinstance(data, dict) or not str(data.get("prompt") or "").strip():
+        raise ValueError("الموديل ما رجعش وصف اللقطة")
+    return {k: str(data.get(k) or "").strip()[:2000] for k in ("title", "shot", "camera", "location", "sfx", "transition", "prompt")}
+
+
+def mock_one_shot(prev: dict | None, idea: str) -> dict:
+    base = prev or {}
+    return {"title": idea.strip()[:60] or "لقطة جديدة", "shot": "insert", "camera": "static",
+            "location": base.get("location") or "", "sfx": "", "transition": "cut",
+            "prompt": f"Insert shot. {idea.strip() or 'Detail of the scene'}. Same setting as before: {base.get('location') or ''}. Vertical 9:16."}
+
 # ---------------------------------------------------------------- كلام جديد على نفس الفيديوهات
 
 WORDS_PER_SECOND = 2.4  # سرعة فويس أوفر عادية بالعربي

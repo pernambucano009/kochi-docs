@@ -1131,3 +1131,7 @@ a.pl-link:hover { background: color-mix(in srgb, var(--ok) 24%, transparent); }
 .rw-line .wc { font-size: 12px; white-space: nowrap; padding-top: 6px; color: var(--muted, #888); }
 .rw-line .wc.long { color: #C05621; }
 .ser-banner { background: #EBF8FF; color: #1A4E7A; border-radius: 10px; padding: 8px 12px; margin: 8px 0; font-size: 14px; }
+.ser-add-from { display: flex; flex-direction: column; gap: 6px; margin: 8px 0 12px; font-size: 14px; }
+.ser-add-dlg textarea { width: 100%; }
+.shot.flash { box-shadow: 0 0 0 3px var(--accent); transition: box-shadow .3s; }
+.shot header .added { font-size: 12px; }
