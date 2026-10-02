@@ -847,10 +847,12 @@
                   <div class="ser-rw-lines" id="serRwLines" data-no-i18n></div>
                   <div class="row wrap" id="serRwActs" hidden>
                     <button class="btn primary" id="serRwApply">✅ اعتمد الكلام الجديد</button>
+                    <button class="btn" id="serRwCopy" title="الكلام بس، كل جملة في سطر، جاهز تحطه في برنامج الصوت">📋 انسخ الكلام</button>
                     <button class="btn" id="serRwDiscard">✕ سيبك منه</button>
                   </div>
                 </section>
-                <div class="ser-banner" id="serVoicePending1" hidden>🎙️ الكلام الجديد اتعتمد. سجّل الفويس أوفر بيه وارفعه في «3 الفويس أوفر»، ودوس «⏱️ رقّم الجمل على الصوت»: اللقطات هتتظبط على الصوت الجديد لوحدها.</div>
+                <div class="ser-banner" id="serVoicePending1" hidden>🎙️ الكلام الجديد اتعتمد. سجّل الفويس أوفر بيه وارفعه في «3 الفويس أوفر»، ودوس «⏱️ رقّم الجمل على الصوت»: اللقطات هتتظبط على الصوت الجديد لوحدها.
+                  <button class="btn sm" id="serCopyVoice2">📋 انسخ الكلام</button></div>
                 <div class="panel-head"><h2>✍️ كتابة الحلقة</h2><span class="muted" id="serWriteState"></span></div>
                 <p class="hint">البرنامج بيكتب الحلقة استكمالًا للحلقات اللي قبلها. لو في حاجة مش عاجباك اكتبله توجيهك وهو يعدّل السكريبت كله. وتقدر تعدّل بإيدك في السكريبت تحت.</p>
                 <div class="car-chat ser-chat" id="serChat" data-no-i18n></div>
@@ -869,6 +871,8 @@
               <section class="panel ser-sec" data-sec="script" hidden>
                 <div class="panel-head ser-audio-head"><h2>🎙️ الفويس أوفر</h2>
                   <span class="row"><label class="btn sm">⬆ ارفع الصوت<input type="file" id="serAudioFile" accept="audio/*" hidden></label>
+                  <button class="btn sm" id="serCopyVoice" title="الكلام بس، كل جملة في سطر، جاهز تحطه في برنامج الصوت">📋 انسخ الكلام</button>
+                  <button class="btn sm" id="serVoiceTxt" title="نفس الكلام في ملف .txt">⬇ .txt</button>
                   <button class="btn sm primary" id="serTiming">⏱️ رقّم الجمل على الصوت</button></span></div>
                 <div class="row wrap"><span class="muted" id="serAudioInfo"></span><span class="muted" id="serTimingState"></span></div>
                 <div class="ser-banner" id="serVoicePending2" hidden>🎙️ ارفع الفويس أوفر الجديد بالكلام اللي اعتمدته، وبعدين دوس «⏱️ رقّم الجمل على الصوت». اللقطات والفيديوهات هتتظبط على الصوت الجديد لوحدها.</div>

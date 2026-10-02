@@ -274,6 +274,34 @@ $("serRwLines").addEventListener("click", (e) => {
     saveRw();
   }
 });
+// نسخ كلام الفويس أوفر بس (من غير أرقام ولا مشاهد)، كل جملة في سطر، عشان يتحط في برنامج الصوت
+const voiceText = (texts) => texts.map((t) => (t || "").trim()).filter(Boolean).join("\n");
+async function copyText(text) {
+  if (!text) return toast("مفيش كلام", true);
+  try { await navigator.clipboard.writeText(text); }
+  catch {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    document.body.append(ta);
+    ta.select();
+    document.execCommand("copy");
+    ta.remove();
+  }
+  toast(`📋 اتنسخ الكلام (${text.split("\n").length} جملة)`);
+}
+$("serRwCopy").onclick = () => copyText(voiceText(rwRows().map((r) => r.text)));
+$("serCopyVoice").onclick = $("serCopyVoice2").onclick = () => copyText(voiceText(ser.ep.lines.map((l) => l.text)));
+$("serVoiceTxt").onclick = () => {
+  const text = voiceText(ser.ep.lines.map((l) => l.text));
+  if (!text) return toast("مفيش كلام", true);
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([text + "\n"], { type: "text/plain;charset=utf-8" }));
+  a.download = `episode-${ser.ep.number}-voiceover.txt`;
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+};
 $("serRwApply").onclick = () => {
   const added = ser.ep.rewrite.lines.filter((x) => x.n == null && x.text.trim()).length;
   if (!confirm(`الكلام الجديد هيبقى سكريبت الحلقة. بعدها تسجّل الفويس أوفر بيه وترفعه، واللقطات تتظبط عليه.${added ? `\nالجمل الجديدة (${added}) هيتعمل لها لقطات جديدة بعد ما ترقّم الجمل على الصوت.` : ""}\n(المونتاج والفيديو اللي صدّرته قبل كده بيفضلوا زي ما هما.)`)) return;
@@ -301,6 +329,7 @@ function renderScriptTab() {
   if (ep.audio && !player.src.endsWith(ep.audio.url)) player.src = ep.audio.url;
   player.hidden = !ep.audio;
   $("serTiming").disabled = !ep.audio;
+  $("serCopyVoice").disabled = $("serVoiceTxt").disabled = !ep.lines.length;
   $("serTimingState").textContent = ep.timing ? TIMING_LABEL[ep.timing] || "" : "";
   const scenes = Object.fromEntries(ep.scenes.map((s) => [s.n, s.title]));
   let last = null;
