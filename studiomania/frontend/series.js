@@ -163,8 +163,22 @@ function renderWriteTab() {
   $("serApproveScript").classList.toggle("primary", !ep.script_approved);
   $("serApproveScript").disabled = !ep.lines.length;
   renderRewrite();
+  const orig = ep.copy_of && ser.cur()?.episodes.find((e) => e.id === ep.copy_of);
+  $("serCopyNote").hidden = !ep.copy_of;
+  $("serCopyNote").textContent = ep.copy_of ? `📑 دي نسخة${orig ? ` من «${orig.name}»` : ""}. أي تعديل هنا مش بيلمس الأصلية.` : "";
   $("serWriteState").textContent = ep.script_approved ? "✅ السكريبت معتمد: سجّل الفويس أوفر وارفعه في «3 الفويس أوفر»" : ep.lines.length ? `${ep.lines.length} جملة فويس أوفر` : "";
 }
+$("serEpDup").onclick = () => {
+  if (!confirm(`تعمل نسخة كاملة من «${ser.ep.name}»؟\nالنسخة فيها السكريبت والصوت والستوري بورد والفيديوهات، وأي تعديل فيها مش هيلمس الحلقة الأصلية.`)) return;
+  busyButton($("serEpDup"), "⏳ بينسخ...", async () => {
+    const copy = await api(`/api/episodes/${ser.ep.id}/duplicate`, { method: "POST" });
+    await loadSeries();
+    ser.ep = copy;
+    remember();
+    renderSeries();
+    toast(`📑 اتعملت «${copy.name}» وإنت دلوقتي جواها. الأصلية في القايمة زي ما هي`);
+  });
+};
 $("serWriteForm").addEventListener("submit", (e) => {
   e.preventDefault();
   const message = $("serWriteMsg").value.trim();

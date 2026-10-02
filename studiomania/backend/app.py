@@ -4160,7 +4160,7 @@ def episode_to_dict(r: sqlite3.Row, data: dict) -> dict:
         "pool": [t for k, t in takes.items() if k not in used],
         "render": data["render"], "busy": eid in SERIES_JOBS, "project_id": data.get("project_id"),
         "export_url": None,
-        "rewrite": data.get("rewrite") or {"chat": [], "lines": []},
+        "rewrite": data.get("rewrite") or {"chat": [], "lines": []}, "copy_of": data.get("copy_of"),
         "voice_pending": bool(data.get("voice_pending")), "retime": bool(data.get("retime")),
         "retimed": data.get("retimed"),
     }
@@ -4256,6 +4256,32 @@ def create_episode(sid: str, body: EpisodeIn):
         conn.execute("INSERT INTO episodes (id, series_id, number, name, data, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
                      (eid, sid, n, body.name.strip() or f"الحلقة {n}", json.dumps(new_episode_data()), now(), now()))
     return episode_response(eid)
+
+
+@app.post("/api/episodes/{eid}/duplicate")
+def duplicate_episode(eid: str):
+    """نسخة كاملة من الحلقة (السكريبت والصوت والستوري بورد والفيديوهات) تعدّل عليها من غير ما تلمس الأصلية."""
+    with closing(db()) as conn:
+        r, data = episode_row(conn, eid)
+    new_id = uuid.uuid4().hex[:12]
+    src, dst = ep_dir(eid), SERIES_DIR / "episodes" / new_id
+    need = sum(f.stat().st_size for f in src.rglob("*") if f.is_file())
+    if free_mb(SERIES_DIR) * 1024 * 1024 < need + 200 * 1024 * 1024:
+        raise HTTPException(400, space_message(None, free_mb(SERIES_DIR)))
+    shutil.copytree(src, dst)
+    data = json.loads(json.dumps(data))
+    # اللي كان شغال وقت النسخ بيكمل في الأصلية بس؛ هنا ↻ بيكمّله من غير دفع تاني
+    for t in data["takes"].values():
+        if t.get("status") in ("queued", "working"):
+            t.update(status="failed", error="كانت بتتولد وقت النسخ. دوس ↻ تكمّل (من غير دفع تاني لو الطلب كان اتبعت)")
+    for sh in data["shots"]:
+        if sh.get("frame_status") in ("queued", "working"):
+            sh.update(frame_status="failed", frame_error="كانت بتترسم وقت النسخ. ارسم تاني")
+    data.update(render={"status": "idle", "export_id": None, "error": None}, project_id=None, copy_of=eid)
+    with closing(db()) as conn, conn:
+        conn.execute("INSERT INTO episodes (id, series_id, number, name, data, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                     (new_id, r["series_id"], r["number"], f"{r['name']} (نسخة)", json.dumps(data, ensure_ascii=False), now(), now()))
+    return episode_response(new_id)
 
 
 @app.get("/api/episodes/{eid}")
@@ -4890,10 +4916,16 @@ def write_episode(eid: str, body: WriteIn):
     with closing(db()) as conn:
         r, data = episode_row(conn, eid)
         _, sdata = series_for_episode(conn, r)
-        previous = []
-        for e in conn.execute("SELECT number, name, data FROM episodes WHERE series_id = ? AND number < ? ORDER BY number",
+        # لو فيه نسخ من نفس الحلقة: الأصلية هي اللي بتتحسب في القصة (أو أحدث نسخة لو الأصلية اتمسحت)
+        by_number: dict[int, dict] = {}
+        for e in conn.execute("SELECT number, name, data, updated_at FROM episodes WHERE series_id = ? AND number < ? ORDER BY updated_at",
                               (r["series_id"], r["number"])):
-            previous.append({"number": e["number"], "name": e["name"], "script": json.loads(e["data"]).get("script", "")})
+            ed = json.loads(e["data"])
+            cur = by_number.get(e["number"])
+            if cur is None or cur["copy"]:
+                by_number[e["number"]] = {"number": e["number"], "name": e["name"], "script": ed.get("script", ""),
+                                          "copy": bool(ed.get("copy_of"))}
+        previous = [by_number[n] for n in sorted(by_number)]
     chat = list(data["chat"])
     if body.message.strip():
         chat.append({"role": "user", "content": body.message.strip()[:4000]})
