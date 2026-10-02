@@ -6501,6 +6501,55 @@ def prod_pick_frame(aid: str, sid: str, body: FramePickIn):
     return ad_response(aid)
 
 
+def clear_frames(s: dict, only: str | None = None) -> list[str]:
+    """يشيل صورة ستوري بورد (نسخة واحدة أو كلها) من اللقطة ويرجّع أسامي الملفات عشان تتمسح."""
+    if s.get("frame_status") in ("queued", "working"):
+        raise HTTPException(400, f"اللقطة {s['n']} بترسم دلوقتي. استنى لما تخلص")
+    if any(t.get("status") in ("queued", "working") for t in s.get("takes") or []):
+        raise HTTPException(400, f"اللقطة {s['n']} بيتولد لها فيديو دلوقتي. استنى لما يخلص")
+    frames = s.get("frames") or []
+    gone = [f for f in frames if only is None or f == only]
+    s["frames"] = [f for f in frames if f not in gone]
+    if s.get("frame") in gone or s.get("frame") is None:
+        s["frame"] = s["frames"][-1] if s["frames"] else None
+    s.update(frame_status="idle" if not s["frame"] else s.get("frame_status"), frame_error=None)
+    return gone
+
+
+@app.delete("/api/ads/{aid}/prod/shots/{sid}/frame")
+def prod_delete_frame(aid: str, sid: str, file: str | None = None, all: bool = False):
+    """يمسح الستوري بورد المعروضة للقطة (أو كل نسخها)، والنسخة اللي قبلها بتظهر مكانها لو موجودة."""
+    gone: list[str] = []
+    def fn(d):
+        s = find_pshot(prod_of(d), sid)
+        target = None if all else (file or s.get("frame"))
+        if not all and not target:
+            raise HTTPException(400, "اللقطة دي ملهاش ستوري بورد")
+        gone.extend(clear_frames(s, target))
+    update_ad(aid, fn)
+    for f in gone:
+        (prod_dir(aid, "frames") / Path(f).name).unlink(missing_ok=True)
+    return ad_response(aid)
+
+
+@app.delete("/api/ads/{aid}/prod/frames")
+def prod_delete_all_frames(aid: str):
+    """يمسح الستوري بورد بتاعة كل اللقطات (كل النسخ)."""
+    gone: list[str] = []
+    def fn(d):
+        shots = prod_of(d)["shots"]
+        busy = [s["n"] for s in shots if s.get("frame_status") in ("queued", "working")
+                or any(t.get("status") in ("queued", "working") for t in s.get("takes") or [])]
+        if busy:
+            raise HTTPException(400, f"في لقطات شغالة دلوقتي ({', '.join(map(str, busy))}). استنى لما تخلص")
+        for s in shots:
+            gone.extend(clear_frames(s))
+    update_ad(aid, fn)
+    for f in gone:
+        (prod_dir(aid, "frames") / Path(f).name).unlink(missing_ok=True)
+    return ad_response(aid)
+
+
 def run_ad_components(aid: str, sid: str) -> None:
     """يفصّص اللقطة لمكوناتها (من صورة الستوري بورد واللقطة المقابلة في الإعلان الأصلي)."""
     try:

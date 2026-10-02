@@ -677,6 +677,7 @@ function renderAdProd() {
         ${ref}
         <div class="row wrap" style="margin-top:6px">
           <button class="btn sm" data-p="frame" ${fbusy ? "disabled" : ""}>🎨 ${s.frame_url ? "ارسم تاني" : "ارسم"}</button>
+          ${s.frame_url && !fbusy ? `<button class="btn sm danger" data-p="delframe" title="امسح الستوري بورد دي">🗑️</button>` : ""}
           <button class="btn sm ${s.approved ? "" : "primary"}" data-p="approve">${s.approved ? "✅ معتمدة" : "✅ اعتمد"}</button>
         </div>
         ${(() => { const n = s.components.filter((c) => c.use !== false && c.image_url).length;
@@ -733,6 +734,12 @@ $("adHeaderStyle").addEventListener("change", () => pAPI("/header", { method: "P
   .then((a) => { adx.cur = a; renderAds(); toast("🎨 الستايل اتغير في راس الإعلان. الصور والفيديوهات الجاية هتتعمل بيه"); }).catch((err) => toast(err.message, true)));
 $("adHeaderAspect").addEventListener("change", () => pAPI("/header", { method: "PATCH", ...jsonBody({ header: { aspect: $("adHeaderAspect").value } }) })
   .then((a) => { adx.cur = a; renderAds(); }).catch((err) => toast(err.message, true)));
+$("adPDelFrames").onclick = () => {
+  const n = adx.cur.prod.shots.filter((s) => s.frames.length).length;
+  if (!n) return toast("مفيش ستوري بورد تتمسح");
+  if (!confirm(`تمسح الستوري بورد بتاعة كل اللقطات (${n} لقطة، بكل نسخها)؟ المكونات والفيديوهات مش هتتلمس.`)) return;
+  pDo($("adPDelFrames"), "⏳", () => pAPI("/frames", { method: "DELETE" }));
+};
 $("adPFrames").onclick = () => pDo($("adPFrames"), "⏳", () => pAPI("/frames", { method: "POST" }));
 $("adPComps").onclick = () => pDo($("adPComps"), "⏳", () => pAPI("/components", { method: "POST" }));
 $("adPCompImgs").onclick = () => {
@@ -793,6 +800,11 @@ $("adPShots").addEventListener("click", async (e) => {
   try {
     if (b.dataset.pframe) adx.cur = await pAPI(`/shots/${sid}/frame`, { method: "POST", ...jsonBody({ file: b.dataset.pframe }) });
     else if (b.dataset.p === "frame") adx.cur = await pAPI(`/frames?shot_id=${sid}`, { method: "POST" });
+    else if (b.dataset.p === "delframe") {
+      const more = s.frames.length > 1;
+      if (!confirm(more ? `تمسح الستوري بورد المعروضة للقطة ${s.n}؟ النسخة اللي قبلها هتظهر مكانها.` : `تمسح الستوري بورد بتاعة اللقطة ${s.n}؟`)) return;
+      adx.cur = await pAPI(`/shots/${sid}/frame`, { method: "DELETE" });
+    }
     else if (b.dataset.p === "approve") adx.cur = await pAPI(`/shots/${sid}`, { method: "PATCH", ...jsonBody({ fields: { approved: !s.approved } }) });
     else if (b.dataset.p === "comps") {
       if (s.components.length && !confirm("تحدّث المكونات من الستوري بورد؟ المكونات اللي ليها صورة بنفس الاسم بتفضل بصورتها.")) return;
