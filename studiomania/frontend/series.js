@@ -443,10 +443,44 @@ function renderShotsTab() {
     ? `🔁 اللقطات اتظبطت على الصوت الجديد. ${rt.short.length} لقطة الفيديو بتاعها بقى أقصر من وقتها (${rt.short.join("، ")}): في المونتاج هتتبطّأ شوية وآخر فريم يقف، أو دوس «🔄 واحد تاني» عليها يتولد على الوقت الجديد.`
     : "🔁 اللقطات اتظبطت على الصوت الجديد، وكل الفيديوهات مكفية وقتها.";
   if (rt?.added?.length) $("serRetimed").textContent += ` ➕ اتعملت لقطات جديدة للجمل اللي ضفتها (${rt.added.join("، ")}): ارسم لها ستوري بورد واعتمدها وولّدها.`;
-  $("serShots").innerHTML = ep.shots.map((s) => {
+  // الكلام الجديد على اللقطات: من المسودة (لسه ما اتعتمدتش)، والجمل الجديدة بتظهر مكانها قبل ما تتسجل
+  const draft = ep.rewrite.lines.length ? ep.rewrite.lines : null;
+  const newText = draft ? Object.fromEntries(draft.filter((x) => x.n != null).map((x) => [x.n, x.text])) : null;
+  const pending = {};
+  {
+    let prev = 0;
+    for (const x of draft || ep.lines) {
+      const isNew = draft ? x.n == null : x.start == null;
+      if (isNew) { if (x.text.trim()) (pending[prev] ||= []).push(x.text); } else prev = x.n;
+    }
+  }
+  const ghostAfter = {};
+  for (const [prev, texts] of Object.entries(pending)) {
+    const p = Number(prev);
+    let k = -1;
+    if (p) {
+      ep.shots.forEach((x, i) => { if ((x.lines || []).includes(p)) k = i; });
+      if (k < 0 && lines[p]?.start != null) k = ep.shots.findIndex((x) => x.start <= lines[p].start && lines[p].start < x.end);
+    }
+    const key = k < 0 ? "start" : ep.shots[k].id;
+    (ghostAfter[key] ||= []).push(...texts);
+  }
+  const ghost = (texts) => texts.map((t) => `<div class="shot-ghost" data-no-i18n><b>➕</b> «${escapeHtml(t)}»
+      <span class="muted">${draft ? "جملة جديدة في المسودة" : "جملة جديدة لسه ما اتسجلتش"}: هيتعمل لها لقطة هنا بعد ما تسجّل الصوت وترقّم الجمل</span></div>`).join("");
+  const changed = draft ? ep.lines.filter((l) => newText[l.n] !== l.text).length : 0;
+  $("serDraftNote").hidden = !draft && !Object.keys(pending).length;
+  $("serDraftNote").textContent = draft
+    ? `📝 بتشوف الكلام الجديد من المسودة في «2 كتابة الحلقة» (لسه ما اتعتمدش): ${changed} جملة اتغيرت. اللون الأخضر الكلام الجديد، والمشطوب القديم. شوف كل فيديو لسه مناسب ولا لأ: لو لأ دوس «✍️ برومبت للكلام الجديد» وارسم وولّد تاني، أو احذف اللقطة.`
+    : "📝 فيه جمل جديدة لسه ما اتسجلتش، ظاهرة في أماكنها. سجّل الصوت وارفعه ورقّم الجمل عشان يتعمل لها لقطات.";
+  $("serShots").innerHTML = (ghostAfter.start ? ghost(ghostAfter.start) : "") + ep.shots.map((s) => {
     const head = s.scene !== scene ? `<div class="ser-scene">المشهد ${s.scene}</div>` : "";
     scene = s.scene;
-    const said = (s.lines || []).map((n) => lines[n]).filter(Boolean).map((l) => `«${escapeHtml(l.text)}»`).join(" ") || `<span class="muted">(من غير كلام)</span>`;
+    const said = (s.lines || []).map((n) => lines[n]).filter(Boolean).map((l) => {
+      if (!newText) return `«${escapeHtml(l.text)}»`;
+      if (!(l.n in newText)) return `<s class="old-said">«${escapeHtml(l.text)}»</s>`;
+      return newText[l.n] === l.text ? `«${escapeHtml(l.text)}»`
+        : `<span class="new-said">«${escapeHtml(newText[l.n])}»</span> <s class="old-said">«${escapeHtml(l.text)}»</s>`;
+    }).join(" ") || `<span class="muted">(من غير كلام)</span>`;
     const chosen = s.takes.find((t) => t.id === s.chosen);
     const short = chosen?.duration && chosen.duration - (s.offset || 0) < s.duration - 0.05;
     const fbusy = s.frame_status === "queued" || s.frame_status === "working";
@@ -470,6 +504,7 @@ function renderShotsTab() {
       <div class="meta" data-no-i18n>${[s.shot, s.camera, s.location, s.sfx && `🔊 ${s.sfx}`, s.transition && `↪ ${s.transition}`].filter(Boolean).map(escapeHtml).join(" · ")}</div>
       <textarea data-f="prompt" rows="4" dir="ltr" placeholder="Prompt" data-no-i18n>${escapeHtml(s.prompt || "")}</textarea>
       <div class="acts">
+        <button class="btn sm" data-redescribe title="الموديل يكتب وصف وبرومبت جديد للقطة على الكلام الجديد (الصور والفيديوهات القديمة بتفضل كنسخ)">✍️ برومبت للكلام الجديد</button>
         <button class="btn sm" data-frame-go ${fbusy ? "disabled" : ""}>🎨 ${s.frame_url ? "ارسم تاني" : "ارسم الستوري بورد"}</button>
         <button class="btn sm ${s.approved ? "" : "primary"}" data-approve>${s.approved ? "✅ معتمدة (دوس تلغي)" : "✅ اعتمد اللقطة"}</button>
       </div>
@@ -484,7 +519,7 @@ function renderShotsTab() {
         ${chosen ? `<label class="off">يبدأ من <input type="number" step="0.1" min="0" data-f="offset" value="${s.offset || 0}">ث</label>` : ""}
         ${short ? `<span class="warn">⚠️ النسخة أقصر من اللقطة: هتتبطّأ شوية وآخر فريم يقف</span>` : ""}
       </div>
-    </article>`;
+    </article>${ghostAfter[s.id] ? ghost(ghostAfter[s.id]) : ""}`;
   }).join("");
   const n = ep.shots.length;
   const framed = ep.shots.filter((s) => s.frame_url).length;
@@ -540,6 +575,12 @@ $("serShots").addEventListener("click", async (e) => {
     }
     if (e.target.closest("[data-del-shot]")) return askDeleteShot(id);
     if (e.target.closest("[data-add-after]")) return askAddShot(id);
+    const rd = e.target.closest("[data-redescribe]");
+    if (rd) return busyButton(rd, "⏳ بيكتب...", async () => {
+      ser.ep = await api(`/api/episodes/${ser.ep.id}/shots/${id}/describe`, { method: "POST" });
+      renderSeries();
+      toast("✍️ اتكتب برومبت جديد. راجعه، ودوس «🎨 ارسم تاني» وبعدين ولّد الفيديو");
+    });
     const mv = e.target.closest("[data-move]");
     if (mv) {
       const ids = ser.ep.shots.map((x) => x.id);

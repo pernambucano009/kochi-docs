@@ -4789,6 +4789,38 @@ def reorder_shots(eid: str, body: ShotOrderIn):
     return episode_response(eid)
 
 
+@app.post("/api/episodes/{eid}/shots/{shot_id}/describe")
+def describe_shot(eid: str, shot_id: str):
+    """وصف وبرومبت جديد للقطة على الكلام الجديد (من المسودة لو فيه)، بنفس أسلوب اللي جنبها.
+    الستوري بورد والفيديوهات القديمة بيفضلوا كنسخ؛ ارسم وولّد تاني."""
+    with closing(db()) as conn:
+        r, data = episode_row(conn, eid)
+        _, sdata = series_for_episode(conn, r)
+    shots = data["shots"]
+    x = find_shot(data, shot_id)
+    k = shots.index(x)
+    draft = {d["n"]: d["text"] for d in (data.get("rewrite") or {}).get("lines") or [] if d.get("n") is not None}
+    said = [draft.get(ln["n"], ln["text"]) for ln in data["lines"] if ln["n"] in (x.get("lines") or [])
+            and (not draft or ln["n"] in draft)]
+    prev = shots[k - 1] if k else None
+    nxt = shots[k + 1] if k + 1 < len(shots) else None
+    idea = f"نفس فكرة اللقطة القديمة لو لسه مناسبة للكلام الجديد: {x.get('title') or ''}"
+    if atlas.mock_mode():
+        fields = sz.mock_one_shot(prev, " ".join(said))
+    else:
+        if not atlas.api_key():
+            raise HTTPException(400, "مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات")
+        try:
+            fields = sz.parse_one_shot(series_chat(sz.insert_shot_messages(
+                sdata["bible"], sdata["character"], prev, nxt, said, x["end"] - x["start"], idea)))
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+    def fn(d):
+        find_shot(d, shot_id).update(fields)
+    update_episode(eid, fn)
+    return episode_response(eid)
+
+
 @app.post("/api/episodes/{eid}/shots/insert")
 def insert_shot(eid: str, body: InsertShotIn):
     """لقطة جديدة بين لقطتين. وقتها بيتاخد من اللي جنبها، والموديل بيكتب وصفها وبرومبتها على نفس أسلوبهم
