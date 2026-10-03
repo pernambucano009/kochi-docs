@@ -1341,3 +1341,4 @@ a.pl-link:hover { background: color-mix(in srgb, var(--ok) 24%, transparent); }
 .ad-lrow input[type=color] { width: 28px; height: 24px; padding: 0; border: 0; }
 .ad-lrow small { flex-basis: 100%; }
 .ad-take-badge { position: absolute; top: 4px; inset-inline-start: 4px; z-index: 2; background: var(--accent); color: #fff; font-size: 10px; border-radius: 6px; padding: 1px 5px; }
+.ad-note { font-size: 12px; margin: 4px 0 0; }

@@ -6628,7 +6628,9 @@ def prod_to_dict(aid: str, p: dict | None) -> dict | None:
         shots.append({
             **s,
             "frame_url": f"{base}/frames/{s['frame']}" if s.get("frame") else None,
-            "frames": [{"file": f, "url": f"{base}/frames/{f}"} for f in s.get("frames") or []],
+            "frames": [{"file": f, "url": f"{base}/frames/{f}", "note": (s.get("frame_notes") or {}).get(f, "")}
+                       for f in s.get("frames") or []],
+            "frame_note": (s.get("frame_notes") or {}).get(s.get("frame") or "", ""),
             "components": [{**c, "image_url": f"{base}/comps/{c['image']}" if c.get("image") else None,
                             "uploaded": is_uploaded(c.get("image")),
                             "images": [{"file": f, "url": f"{base}/comps/{f}"} for f in c.get("images") or []]}
@@ -6796,7 +6798,7 @@ def ref_comps(shot: dict, limit: int) -> list[dict]:
     return sorted(comps, key=lambda c: not is_uploaded(c.get("image")))[:limit]
 
 
-def run_ad_frame(aid: str, sid: str) -> None:
+def run_ad_frame(aid: str, sid: str, note: str = "") -> None:
     try:
         set_pshot(aid, sid, frame_status="working", frame_error=None)
         safe_apply_brain(aid, [sid])  # قبل الرسم: الشاشات واللوجو الحقيقيين من عقل الإعلان
@@ -6824,12 +6826,19 @@ def run_ad_frame(aid: str, sid: str) -> None:
             styles = style_ref_urls(h, min(4, AD_FRAME_REFS - len(comps) - len(orig_refs)))
             refs = [atlas.reference_url(comp_dir / c["image"]) for c in comps] + orig_refs + styles
             prompt = az.frame_prompt(h, s, comps, len(styles), len(comps) + 1 if orig_refs else 0)
+            cur = prod_dir(aid, "frames") / s["frame"] if note and s.get("frame") else None
+            if cur and cur.exists():
+                # تعديل بطلبك: الصورة الحالية أول مرجع، والموديل بيغيّر اللي طلبته بس
+                refs = [atlas.reference_url(cur)] + [atlas.reference_url(comp_dir / c["image"]) for c in comps]
+                prompt = az.frame_edit_prompt(h, note, comps)
             url = atlas.generate_image(carousel_settings()["image_family"], prompt, size,
                                        auth.get_setting("series_frame_quality") or "medium", refs or None)
             atlas.download(url, dest)
         def done(d):
             x = find_pshot(d["prod"], sid)
             x.setdefault("frames", []).append(name)
+            if note:
+                x.setdefault("frame_notes", {})[name] = note
             x.update(frame=name, frame_status="done", frame_error=None)
         update_ad(aid, done)
     except Exception as exc:  # noqa: BLE001
@@ -6837,7 +6846,7 @@ def run_ad_frame(aid: str, sid: str) -> None:
 
 
 @app.post("/api/ads/{aid}/prod/frames")
-def prod_frames(aid: str, shot_id: str | None = None):
+def prod_frames(aid: str, shot_id: str | None = None, note: str = ""):
     """الستوري بورد: لقطة واحدة (نسخة جديدة) أو كل اللقطات اللي لسه ملهاش صورة."""
     if not (atlas.api_key() or atlas.mock_mode()):
         raise HTTPException(400, "مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات")
@@ -6855,8 +6864,9 @@ def prod_frames(aid: str, shot_id: str | None = None):
             if s["id"] in ids:
                 s.update(frame_status="queued", frame_error=None)
     update_ad(aid, fn)
+    note = note.strip()[:1500] if shot_id else ""
     for i in ids:
-        ad_executor.submit(run_ad_frame, aid, i)
+        ad_executor.submit(run_ad_frame, aid, i, note)
     return ad_response(aid)
 
 
@@ -7210,6 +7220,9 @@ def run_ad_take(aid: str, sid: str, tid: str) -> None:
                             "-c:v", "libx264", "-pix_fmt", "yuv420p", str(dest)], check=True, capture_output=True, timeout=120)
         else:
             pid = t.get("prediction_id")
+            if not pid and t.get("note") and not t.get("revised"):
+                t["prompt"] = revise_video_prompt(t["prompt"], t["note"])
+                setp(prompt=t["prompt"], revised=True)
             if not pid:
                 frames, comps = prod_dir(aid, "frames"), prod_dir(aid, "comps")
                 refs = [frames / s["frame"]] + [comps / c["image"] for c in ref_comps(plate_shot(s), AD_MAX_REFS - 1)]
@@ -7391,17 +7404,38 @@ def prod_composite_all(aid: str):
     return ad_response(aid)
 
 
-def queue_ad_take(aid: str, sid: str) -> None:
+def revise_video_prompt(prompt: str, note: str) -> str:
+    """موديل الكلام بيعدّل برومبت الفيديو (إنجليزي) على طلبك ويسيب الباقي زي ما هو."""
+    try:
+        out = series_chat([
+            {"role": "system", "content": "You edit prompts for a video model (Seedance). Apply the director's requested change "
+                                          "(given in Arabic) to the prompt and keep everything else as it is. Reply with JSON only: "
+                                          '{"prompt": "the full revised prompt in English"}'},
+            {"role": "user", "content": f"PROMPT:\n{prompt}\n\nREQUESTED CHANGE:\n{note}"},
+        ])
+        new = str(az.parse_json(out, "تعديل البرومبت").get("prompt") or "").strip()
+        if new:
+            return new
+    except (HTTPException, ValueError, atlas.AtlasError):
+        pass
+    return f"{prompt}\nDirector's change for this version (most important): {note}"
+
+
+def queue_ad_take(aid: str, sid: str, note: str = "", from_take: str | None = None) -> None:
     tid = uuid.uuid4().hex[:10]
     def fn(d):
         p = prod_of(d)
         s = find_pshot(p, sid)
         if not s.get("frame"):
             raise HTTPException(400, f"اللقطة {s['n']} ملهاش ستوري بورد")
+        prompt = az.video_prompt(p["header"], plate_shot(s), ref_comps(plate_shot(s), AD_MAX_REFS - 1))
+        src = next((t for t in s.get("takes") or [] if t["id"] == from_take and not t.get("composite")), None)
+        if note and src and src.get("prompt"):
+            prompt = src["prompt"]  # التعديل بيتبني على برومبت النسخة اللي مش عاجباك
         s.setdefault("takes", []).append({
             "id": tid, "file": None, "status": "queued", "error": None, "approved": False, "duration": None,
             "gen_duration": int(min(atlas.MAX_DURATION, max(atlas.MIN_DURATION, math.ceil(float(s.get("seconds") or 4))))),
-            "prompt": az.video_prompt(p["header"], plate_shot(s), ref_comps(plate_shot(s), AD_MAX_REFS - 1)), "created_at": now()})
+            "prompt": prompt, "note": note, "revised": not note, "created_at": now()})
         if not s.get("chosen"):
             s["chosen"] = tid
     update_ad(aid, fn)
@@ -7409,10 +7443,11 @@ def queue_ad_take(aid: str, sid: str) -> None:
 
 
 @app.post("/api/ads/{aid}/prod/shots/{sid}/generate")
-def prod_generate(aid: str, sid: str):
+def prod_generate(aid: str, sid: str, note: str = "", take_id: str | None = None):
+    """فيديو جديد للقطة. note = عايز تعدّل إيه في النسخة take_id (البرومبت بيتكتب من جديد بطلبك)."""
     if not (atlas.api_key() or atlas.mock_mode()):
         raise HTTPException(400, "مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات")
-    queue_ad_take(aid, sid)
+    queue_ad_take(aid, sid, note.strip()[:1500], take_id)
     return ad_response(aid)
 
 

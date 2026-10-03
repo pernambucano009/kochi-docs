@@ -406,6 +406,20 @@ def frame_prompt(h: dict, shot: dict, ref_comps: list[dict] | None = None, n_sty
     ] if x)
 
 
+def frame_edit_prompt(h: dict, note: str, ref_comps: list[dict]) -> str:
+    """تعديل صورة الستوري بورد بطلب المستخدم: الصورة 1 هي الحالية، وبعدها أصول البراند."""
+    assets = "".join(f"\n- Image {i + 2} = {c.get('name')} (real brand asset, keep exactly as it looks)" for i, c in enumerate(ref_comps))
+    return "\n".join(x for x in [
+        "Edit image 1 (the current storyboard frame of a commercial).",
+        f"REQUESTED CHANGE (written in Arabic by the director — apply it precisely): {note}",
+        "Change only what is requested. Keep everything else identical: composition, camera angle, characters' faces and "
+        "clothing, lighting, colors, style, and every brand asset.",
+        header_text(h),
+        f"Brand assets:{assets}" if assets else "",
+        f"{h.get('aspect', '9:16')} frame, no watermarks.",
+    ] if x)
+
+
 COMPONENTS_FORMAT = """{
   "components": [
     {"name": "اسم قصير بالعربي", "kind": "character | prop | background | graphic | text | ui | icon | effect",

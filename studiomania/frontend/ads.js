@@ -796,6 +796,11 @@ $("adPShots").addEventListener("pointerup", () => {
   saveLayers(d.sid, s.layers.map((L) => (L.id === d.id ? { ...L, x: +d.x.toFixed(3), y: +d.y.toFixed(3) } : L)));
 });
 
+function askNote(q) {
+  const v = prompt(q);
+  return v && v.trim() ? v.trim().slice(0, 1500) : "";
+}
+
 // بيغيّر محتوى العنصر بس لو اتغير فعلًا: الصور والفيديوهات متتحملش من الأول كل ٣ ثواني والصفحة متتهزش
 function setHTML(el, html) {
   if (el._html === html) return;
@@ -837,10 +842,12 @@ function renderAdProd() {
         <div class="frame">${s.frame_url ? `<img src="${s.frame_url}" alt="">` : ""}${fbusy ? `<div class="car-wait over"><div class="spin"></div></div>` : s.frame_url ? "" : "لسه من غير ستوري بورد"}</div>
         ${s.frames.length > 1 ? `<div class="vers">${s.frames.map((f) => `<img src="${f.url}" data-pframe="${f.file}" class="${f.url === s.frame_url ? "sel" : ""}" alt="">`).join("")}</div>` : ""}
         ${s.frame_error ? `<div class="err">${adEsc(s.frame_error)}</div>` : ""}
+        ${s.frame_note ? `<p class="muted ad-note" data-no-i18n>✏️ ${adEsc(s.frame_note)}</p>` : ""}
         ${ref}
         <div class="row wrap" style="margin-top:6px">
           <button class="btn sm" data-p="frame" ${fbusy ? "disabled" : ""}>🎨 ${s.frame_url ? "ارسم تاني" : "ارسم"}</button>
-          ${s.frame_url && !fbusy ? `<button class="btn sm danger" data-p="delframe" title="امسح الستوري بورد دي">🗑️</button>` : ""}
+          ${s.frame_url && !fbusy ? `<button class="btn sm" data-p="editframe" title="قول عايز تغيّر إيه ويرسمها تاني">✏️ عدّل</button>
+            <button class="btn sm danger" data-p="delframe" title="امسح الستوري بورد دي">🗑️</button>` : ""}
           <button class="btn sm ${s.approved ? "" : "primary"}" data-p="approve">${s.approved ? "✅ معتمدة" : "✅ اعتمد"}</button>
         </div>
         ${(() => { const n = s.components.filter((c) => c.use !== false && c.image_url).length;
@@ -873,10 +880,11 @@ function renderAdProd() {
         </div>`).join("")}</div>
         ${adField("برومبت تجميع اللقطة (Seedance)", s.assembly_prompt || s.prompt, 'data-pf="assembly_prompt"', 3, true)}
         ${renderLayers(s)}
-        <div class="ad-takes">${s.takes.map((t) => `<div class="ad-take ${t.id === s.chosen ? "sel" : ""} ${t.approved ? "ok" : ""}" data-pt="${t.id}">
+        <div class="ad-takes">${s.takes.map((t) => `<div class="ad-take ${t.id === s.chosen ? "sel" : ""} ${t.approved ? "ok" : ""}" data-pt="${t.id}" ${t.note ? `title="✏️ ${adEsc(t.note)}"` : ""}>
           ${t.composite ? `<b class="ad-take-badge">✨ موشن</b>` : ""}${t.url ? `<button type="button" class="ad-take-play" data-tplay="${t.id}" title="شغّل وعاين">${lightVideo(t.url, "muted playsinline")}<i>▶</i></button>` : `<div class="wait">${PBUSY.has(t.status) ? `<div class="spin"></div>${t.composite ? "✨ بيركّب" : "🎬 بيتولد"}` : `✕ ${adEsc(t.error || "فشل")}`}</div>`}
           <div class="acts">${t.status === "done" ? `<button class="btn sm" data-t="${t.approved ? "unapprove" : "approve"}">${t.approved ? "✅" : "موافق"}</button>` : ""}
             ${t.status === "failed" ? `<button class="btn sm" data-t="retry">↻</button>` : ""}
+            ${t.status === "done" && !t.composite ? `<button class="btn sm" data-tedit="${t.id}" title="قول عايز تغيّر إيه ويولّد نسخة جديدة">✏️</button>` : ""}
             ${t.id !== s.chosen && t.status === "done" ? `<button class="btn sm" data-t="pick">اختار</button>` : ""}
             ${PBUSY.has(t.status) ? "" : `<button class="btn sm danger" data-t="delete">✕</button>`}</div></div>`).join("")}</div>
         <div class="row wrap">
@@ -990,7 +998,16 @@ $("adPShots").addEventListener("click", async (e) => {
       await saveLayers(sid, s.layers.filter((L) => L.id !== b.dataset.ldel));
       return;
     } else if (b.dataset.p === "lcomp") adx.cur = await pAPI(`/shots/${sid}/composite`, { method: "POST" });
-    else if (b.dataset.p === "delframe") {
+    else if (b.dataset.p === "editframe") {
+      const note = askNote("عايز تعدّل إيه في الصورة دي؟\nمثلًا: قرّب الكاميرا على وشه، خلّي الخلفية جيم، شيل الكوباية، غيّر لون التيشيرت لأزرق");
+      if (!note) return;
+      adx.cur = await pAPI(`/frames?shot_id=${sid}&note=${encodeURIComponent(note)}`, { method: "POST" });
+      toast("✏️ بيرسم نسخة معدّلة، والقديمة بتفضل في النسخ");
+    } else if (b.dataset.tedit) {
+      const note = askNote("عايز تعدّل إيه في الفيديو ده؟\nمثلًا: الكاميرا تتحرك أبطأ، يبتسم في الآخر، من غير ما يبص للكاميرا\n(لو التعديل في الكادر نفسه، عدّل الستوري بورد الأول)");
+      if (!note || !confirm(`تولّد نسخة جديدة للقطة ${s.n} بالتعديل ده بـ Seedance؟ (التوليد بيتحسب عليك)`)) return;
+      adx.cur = await pAPI(`/shots/${sid}/generate?take_id=${b.dataset.tedit}&note=${encodeURIComponent(note)}`, { method: "POST" });
+    } else if (b.dataset.p === "delframe") {
       const more = s.frames.length > 1;
       if (!confirm(more ? `تمسح الستوري بورد المعروضة للقطة ${s.n}؟ النسخة اللي قبلها هتظهر مكانها.` : `تمسح الستوري بورد بتاعة اللقطة ${s.n}؟`)) return;
       adx.cur = await pAPI(`/shots/${sid}/frame`, { method: "DELETE" });
@@ -1160,11 +1177,13 @@ function renderAdGallery() {
       ${t.url ? lightVideo(t.url, "muted playsinline") : `<span>${TAKE_ST[t.status] || ""}</span>`}<small>${t.approved ? "✅" : t.id === s.chosen ? "⭐" : ""} ${k + 1}</small></button>`).join("")
     || `<p class="muted">مفيش نسخ لسه.</p>`);
   const t = s.takes.find((x) => x.id === agal.tid);
+  if (t?.note) $("adGalInfo").innerHTML += `<br><b>✏️ التعديل المطلوب:</b> ${adEsc(t.note)}`;
   $("adGalErr").hidden = !(t?.status === "failed");
   $("adGalErr").textContent = t?.status === "failed" ? `✕ ${t.error || "فشل"}` : "";
   $("adGalActs").innerHTML = (t && t.status === "done" ? `
       <button class="btn ${t.approved ? "" : "primary"}" data-ga="${t.approved ? "unapprove" : "approve"}">${t.approved ? "↩ الغي الموافقة" : "✅ موافق عليه"}</button>
       ${t.id !== s.chosen ? `<button class="btn" data-ga="pick">⭐ اختاره للقطة دي</button>` : ""}
+      ${t.composite ? "" : `<button class="btn" data-ga="edit">✏️ عدّل واعمل نسخة جديدة</button>`}
       <button class="btn danger" data-ga="delete">🗑️ امسح النسخة دي</button>` : t?.status === "failed" ? `<button class="btn" data-ga="retry">↻ جرّب تاني</button>` : "")
     + (s.frame_url ? `<button class="btn" data-ga="gen">🎬 ولّد نسخة تانية</button>` : "");
 }
@@ -1206,6 +1225,11 @@ $("adGalActs").addEventListener("click", async (e) => {
     if (a === "gen") {
       if (!confirm("تولّد نسخة تانية للقطة دي بـ Seedance؟ (التوليد بيتحسب عليك)")) return;
       adx.cur = await pAPI(`/shots/${sid}/generate`, { method: "POST" });
+    } else if (a === "edit") {
+      const note = askNote("عايز تعدّل إيه في الفيديو ده؟\nمثلًا: الكاميرا تتحرك أبطأ، يبتسم في الآخر، من غير ما يبص للكاميرا");
+      if (!note || !confirm("تولّد نسخة جديدة بالتعديل ده بـ Seedance؟ (التوليد بيتحسب عليك)")) return;
+      adx.cur = await pAPI(`/shots/${sid}/generate?take_id=${agal.tid}&note=${encodeURIComponent(note)}`, { method: "POST" });
+      toast("✏️ النسخة المعدّلة بتتولد، وهتظهر جنب القديمة");
     } else {
       if (a === "delete" && !confirm("تمسح النسخة دي؟")) return;
       adx.cur = await pAPI(`/shots/${sid}/take?action=${a}`, { method: "POST", ...jsonBody({ take_id: agal.tid }) });
