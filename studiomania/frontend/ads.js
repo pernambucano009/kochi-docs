@@ -796,9 +796,74 @@ $("adPShots").addEventListener("pointerup", () => {
   saveLayers(d.sid, s.layers.map((L) => (L.id === d.id ? { ...L, x: +d.x.toFixed(3), y: +d.y.toFixed(3) } : L)));
 });
 
-function askNote(q) {
-  const v = prompt(q);
-  return v && v.trim() ? v.trim().slice(0, 1500) : "";
+// ---------- ✏️ نافذة التعديل: طلبك بالكلام + صور مرجعية (لحد 4) ----------
+const fix = { files: [], submit: null };
+function openFix({ title, hint, placeholder, submit }) {
+  fix.files = [];
+  fix.submit = submit;
+  $("adFixTitle").textContent = title;
+  $("adFixHint").textContent = hint || "";
+  $("adFixNote").value = "";
+  $("adFixNote").placeholder = placeholder || "";
+  renderFixThumbs();
+  $("adFixDialog").showModal();
+  $("adFixNote").focus();
+}
+function addFixFiles(list) {
+  for (const f of list) if (f.type.startsWith("image/") && fix.files.length < 4) fix.files.push(f);
+  renderFixThumbs();
+}
+function renderFixThumbs() {
+  $("adFixThumbs").innerHTML = fix.files.map((f, i) => `<span class="th"><img src="${URL.createObjectURL(f)}" alt=""><button type="button" data-fixdel="${i}">✕</button></span>`).join("");
+}
+$("adFixFiles").addEventListener("change", (e) => { addFixFiles([...e.target.files]); e.target.value = ""; });
+$("adFixThumbs").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-fixdel]");
+  if (b) { fix.files.splice(Number(b.dataset.fixdel), 1); renderFixThumbs(); }
+});
+$("adFixDialog").addEventListener("paste", (e) => {
+  const imgs = [...(e.clipboardData?.files || [])].filter((f) => f.type.startsWith("image/"));
+  if (imgs.length) { e.preventDefault(); addFixFiles(imgs); }
+});
+$("adFixCancel").onclick = () => $("adFixDialog").close();
+$("adFixForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const note = $("adFixNote").value.trim();
+  if (!note) return $("adFixNote").focus();
+  const form = new FormData();
+  form.append("note", note.slice(0, 1500));
+  fix.files.forEach((f, i) => form.append("files", f, f.name || `ref-${i + 1}.png`));
+  await busyButton($("adFixGo"), "⏳", async () => {
+    await fix.submit(form);
+    $("adFixDialog").close();
+  });
+});
+function editFrame(s) {
+  openFix({
+    title: `✏️ عدّل الستوري بورد: لقطة ${s.n}`,
+    placeholder: "مثلًا: قرّب الكاميرا على وشه، خلّي الخلفية جيم، شيل الكوباية، لبّسه زي الصورة المرجعية",
+    hint: "الصورة الحالية بتتعدّل: اللي طلبته بس بيتغير والباقي بيفضل زي ما هو. النسخة القديمة بتفضل في النسخ.",
+    submit: async (form) => {
+      adx.cur = await pAPI(`/shots/${s.id}/edit-frame`, { method: "POST", body: form });
+      renderAds();
+      toast("✏️ بيرسم نسخة معدّلة، والقديمة بتفضل في النسخ");
+    },
+  });
+}
+function editTake(s, tid) {
+  openFix({
+    title: `✏️ عدّل فيديو لقطة ${s.n} (نسخة جديدة)`,
+    placeholder: "مثلًا: الكاميرا تتحرك أبطأ، يبتسم في الآخر، من غير ما يبص للكاميرا",
+    hint: "بيولّد نسخة جديدة بـ Seedance (التوليد بيتحسب عليك) والقديمة بتفضل. لو التعديل في الكادر نفسه (المكان، اللبس)، عدّل الستوري بورد الأول.",
+    submit: async (form) => {
+      form.append("take_id", tid || "");
+      adx.cur = await pAPI(`/shots/${s.id}/edit-take`, { method: "POST", body: form });
+      renderAds();
+      if ($("adGalDialog").open) renderAdGallery();
+      scheduleAdPoll();
+      toast("✏️ النسخة المعدّلة بتتولد، وهتظهر جنب القديمة");
+    },
+  });
 }
 
 // بيغيّر محتوى العنصر بس لو اتغير فعلًا: الصور والفيديوهات متتحملش من الأول كل ٣ ثواني والصفحة متتهزش
@@ -998,16 +1063,9 @@ $("adPShots").addEventListener("click", async (e) => {
       await saveLayers(sid, s.layers.filter((L) => L.id !== b.dataset.ldel));
       return;
     } else if (b.dataset.p === "lcomp") adx.cur = await pAPI(`/shots/${sid}/composite`, { method: "POST" });
-    else if (b.dataset.p === "editframe") {
-      const note = askNote("عايز تعدّل إيه في الصورة دي؟\nمثلًا: قرّب الكاميرا على وشه، خلّي الخلفية جيم، شيل الكوباية، غيّر لون التيشيرت لأزرق");
-      if (!note) return;
-      adx.cur = await pAPI(`/frames?shot_id=${sid}&note=${encodeURIComponent(note)}`, { method: "POST" });
-      toast("✏️ بيرسم نسخة معدّلة، والقديمة بتفضل في النسخ");
-    } else if (b.dataset.tedit) {
-      const note = askNote("عايز تعدّل إيه في الفيديو ده؟\nمثلًا: الكاميرا تتحرك أبطأ، يبتسم في الآخر، من غير ما يبص للكاميرا\n(لو التعديل في الكادر نفسه، عدّل الستوري بورد الأول)");
-      if (!note || !confirm(`تولّد نسخة جديدة للقطة ${s.n} بالتعديل ده بـ Seedance؟ (التوليد بيتحسب عليك)`)) return;
-      adx.cur = await pAPI(`/shots/${sid}/generate?take_id=${b.dataset.tedit}&note=${encodeURIComponent(note)}`, { method: "POST" });
-    } else if (b.dataset.p === "delframe") {
+    else if (b.dataset.p === "editframe") return editFrame(s);
+    else if (b.dataset.tedit) return editTake(s, b.dataset.tedit);
+    else if (b.dataset.p === "delframe") {
       const more = s.frames.length > 1;
       if (!confirm(more ? `تمسح الستوري بورد المعروضة للقطة ${s.n}؟ النسخة اللي قبلها هتظهر مكانها.` : `تمسح الستوري بورد بتاعة اللقطة ${s.n}؟`)) return;
       adx.cur = await pAPI(`/shots/${sid}/frame`, { method: "DELETE" });
@@ -1177,7 +1235,8 @@ function renderAdGallery() {
       ${t.url ? lightVideo(t.url, "muted playsinline") : `<span>${TAKE_ST[t.status] || ""}</span>`}<small>${t.approved ? "✅" : t.id === s.chosen ? "⭐" : ""} ${k + 1}</small></button>`).join("")
     || `<p class="muted">مفيش نسخ لسه.</p>`);
   const t = s.takes.find((x) => x.id === agal.tid);
-  if (t?.note) $("adGalInfo").innerHTML += `<br><b>✏️ التعديل المطلوب:</b> ${adEsc(t.note)}`;
+  if (t?.note) $("adGalInfo").innerHTML += `<br><b>✏️ التعديل المطلوب:</b> ${adEsc(t.note)}`
+    + (t.ref_urls?.length ? `<div class="ad-fix-thumbs">${t.ref_urls.map((u) => `<span class="th"><img src="${u}" alt=""></span>`).join("")}</div>` : "");
   $("adGalErr").hidden = !(t?.status === "failed");
   $("adGalErr").textContent = t?.status === "failed" ? `✕ ${t.error || "فشل"}` : "";
   $("adGalActs").innerHTML = (t && t.status === "done" ? `
@@ -1226,10 +1285,7 @@ $("adGalActs").addEventListener("click", async (e) => {
       if (!confirm("تولّد نسخة تانية للقطة دي بـ Seedance؟ (التوليد بيتحسب عليك)")) return;
       adx.cur = await pAPI(`/shots/${sid}/generate`, { method: "POST" });
     } else if (a === "edit") {
-      const note = askNote("عايز تعدّل إيه في الفيديو ده؟\nمثلًا: الكاميرا تتحرك أبطأ، يبتسم في الآخر، من غير ما يبص للكاميرا");
-      if (!note || !confirm("تولّد نسخة جديدة بالتعديل ده بـ Seedance؟ (التوليد بيتحسب عليك)")) return;
-      adx.cur = await pAPI(`/shots/${sid}/generate?take_id=${agal.tid}&note=${encodeURIComponent(note)}`, { method: "POST" });
-      toast("✏️ النسخة المعدّلة بتتولد، وهتظهر جنب القديمة");
+      return editTake(adx.cur.prod.shots.find((x) => x.id === sid), agal.tid);
     } else {
       if (a === "delete" && !confirm("تمسح النسخة دي؟")) return;
       adx.cur = await pAPI(`/shots/${sid}/take?action=${a}`, { method: "POST", ...jsonBody({ take_id: agal.tid }) });

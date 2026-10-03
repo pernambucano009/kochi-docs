@@ -406,16 +406,20 @@ def frame_prompt(h: dict, shot: dict, ref_comps: list[dict] | None = None, n_sty
     ] if x)
 
 
-def frame_edit_prompt(h: dict, note: str, ref_comps: list[dict]) -> str:
-    """تعديل صورة الستوري بورد بطلب المستخدم: الصورة 1 هي الحالية، وبعدها أصول البراند."""
-    assets = "".join(f"\n- Image {i + 2} = {c.get('name')} (real brand asset, keep exactly as it looks)" for i, c in enumerate(ref_comps))
+def frame_edit_prompt(h: dict, note: str, ref_comps: list[dict], n_extra: int = 0) -> str:
+    """تعديل صورة الستوري بورد بطلب المستخدم: الصورة 1 هي الحالية، وبعدها الصور اللي بعتها، وبعدها أصول البراند."""
+    extra = (f"\nImages 2-{n_extra + 1} are reference images the director attached for this change: use them for exactly "
+             "what the change asks (the look of a person, object, outfit, place, pose or style), not as a new layout."
+             if n_extra else "")
+    assets = extra + "".join(f"\n- Image {i + 2 + n_extra} = {c.get('name')} (real brand asset, keep exactly as it looks)"
+                             for i, c in enumerate(ref_comps))
     return "\n".join(x for x in [
         "Edit image 1 (the current storyboard frame of a commercial).",
         f"REQUESTED CHANGE (written in Arabic by the director — apply it precisely): {note}",
         "Change only what is requested. Keep everything else identical: composition, camera angle, characters' faces and "
         "clothing, lighting, colors, style, and every brand asset.",
         header_text(h),
-        f"Brand assets:{assets}" if assets else "",
+        f"Reference images:{assets}" if assets else "",
         f"{h.get('aspect', '9:16')} frame, no watermarks.",
     ] if x)
 

@@ -6635,7 +6635,8 @@ def prod_to_dict(aid: str, p: dict | None) -> dict | None:
                             "uploaded": is_uploaded(c.get("image")),
                             "images": [{"file": f, "url": f"{base}/comps/{f}"} for f in c.get("images") or []]}
                            for c in s.get("components") or []],
-            "takes": [{**t, "url": f"{base}/takes/{t['file']}" if t.get("file") else None} for t in s.get("takes") or []],
+            "takes": [{**t, "url": f"{base}/takes/{t['file']}" if t.get("file") else None,
+                       "ref_urls": [f"{base}/editrefs/{f}" for f in t.get("extra_refs") or []]} for t in s.get("takes") or []],
         })
     return {**p, "shots": shots}
 
@@ -6798,7 +6799,7 @@ def ref_comps(shot: dict, limit: int) -> list[dict]:
     return sorted(comps, key=lambda c: not is_uploaded(c.get("image")))[:limit]
 
 
-def run_ad_frame(aid: str, sid: str, note: str = "") -> None:
+def run_ad_frame(aid: str, sid: str, note: str = "", extra: list[str] | None = None) -> None:
     try:
         set_pshot(aid, sid, frame_status="working", frame_error=None)
         safe_apply_brain(aid, [sid])  # قبل الرسم: الشاشات واللوجو الحقيقيين من عقل الإعلان
@@ -6827,10 +6828,13 @@ def run_ad_frame(aid: str, sid: str, note: str = "") -> None:
             refs = [atlas.reference_url(comp_dir / c["image"]) for c in comps] + orig_refs + styles
             prompt = az.frame_prompt(h, s, comps, len(styles), len(comps) + 1 if orig_refs else 0)
             cur = prod_dir(aid, "frames") / s["frame"] if note and s.get("frame") else None
+            extra_paths = [p for p in (prod_dir(aid, "editrefs") / f for f in extra or []) if p.exists()][:4]
             if cur and cur.exists():
-                # تعديل بطلبك: الصورة الحالية أول مرجع، والموديل بيغيّر اللي طلبته بس
-                refs = [atlas.reference_url(cur)] + [atlas.reference_url(comp_dir / c["image"]) for c in comps]
-                prompt = az.frame_edit_prompt(h, note, comps)
+                # تعديل بطلبك: الصورة الحالية أول مرجع، وبعدها الصور اللي بعتها، والموديل بيغيّر اللي طلبته بس
+                comps = comps[:AD_FRAME_REFS - 1 - len(extra_paths)]
+                refs = ([atlas.reference_url(cur)] + [atlas.reference_url(x) for x in extra_paths]
+                        + [atlas.reference_url(comp_dir / c["image"]) for c in comps])
+                prompt = az.frame_edit_prompt(h, note, comps, len(extra_paths))
             url = atlas.generate_image(carousel_settings()["image_family"], prompt, size,
                                        auth.get_setting("series_frame_quality") or "medium", refs or None)
             atlas.download(url, dest)
@@ -6838,7 +6842,7 @@ def run_ad_frame(aid: str, sid: str, note: str = "") -> None:
             x = find_pshot(d["prod"], sid)
             x.setdefault("frames", []).append(name)
             if note:
-                x.setdefault("frame_notes", {})[name] = note
+                x.setdefault("frame_notes", {})[name] = note + (f" (+{len(extra)} صورة مرجعية)" if extra else "")
             x.update(frame=name, frame_status="done", frame_error=None)
         update_ad(aid, done)
     except Exception as exc:  # noqa: BLE001
@@ -6867,6 +6871,36 @@ def prod_frames(aid: str, shot_id: str | None = None, note: str = ""):
     note = note.strip()[:1500] if shot_id else ""
     for i in ids:
         ad_executor.submit(run_ad_frame, aid, i, note)
+    return ad_response(aid)
+
+
+def save_edit_refs(aid: str, files: list[UploadFile]) -> list[str]:
+    """الصور المرجعية اللي بتبعتها مع طلب التعديل (لحد 4)."""
+    out = []
+    for f in (files or [])[:4]:
+        if f and f.filename and Path(f.filename).suffix.lower() in IMAGE_EXTENSIONS:
+            out.append(save_upload(f, IMAGE_EXTENSIONS, prod_dir(aid, "editrefs"), "ref"))
+    return out
+
+
+@app.post("/api/ads/{aid}/prod/shots/{sid}/edit-frame")
+def prod_edit_frame(aid: str, sid: str, note: str = Form(""), files: list[UploadFile] = File(default=[])):
+    """✏️ تعديل الستوري بورد بطلبك، ومعاه صور مرجعية لو عايز."""
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات")
+    note = note.strip()[:1500]
+    if not note:
+        raise HTTPException(400, "اكتب عايز تعدّل إيه")
+    extra = save_edit_refs(aid, files)
+    def fn(d):
+        s = find_pshot(prod_of(d), sid)
+        if not s.get("frame"):
+            raise HTTPException(400, "اللقطة دي ملهاش ستوري بورد لسه")
+        if s.get("frame_status") in ("queued", "working"):
+            raise HTTPException(400, "الصورة دي بتترسم")
+        s.update(frame_status="queued", frame_error=None)
+    update_ad(aid, fn)
+    ad_executor.submit(run_ad_frame, aid, sid, note, extra)
     return ad_response(aid)
 
 
@@ -7222,10 +7256,16 @@ def run_ad_take(aid: str, sid: str, tid: str) -> None:
             pid = t.get("prediction_id")
             if not pid and t.get("note") and not t.get("revised"):
                 t["prompt"] = revise_video_prompt(t["prompt"], t["note"])
+                if t.get("extra_refs"):
+                    n = len(t["extra_refs"][:AD_MAX_REFS - 1])
+                    t["prompt"] += (f"\nReference images 2-{n + 1} were provided by the director for this change: follow them "
+                                    "for what the change asks (look, object, pose or style).")
                 setp(prompt=t["prompt"], revised=True)
             if not pid:
                 frames, comps = prod_dir(aid, "frames"), prod_dir(aid, "comps")
-                refs = [frames / s["frame"]] + [comps / c["image"] for c in ref_comps(plate_shot(s), AD_MAX_REFS - 1)]
+                extra = [p for p in (prod_dir(aid, "editrefs") / f for f in t.get("extra_refs") or []) if p.exists()][:AD_MAX_REFS - 1]
+                refs = ([frames / s["frame"]] + extra
+                        + [comps / c["image"] for c in ref_comps(plate_shot(s), AD_MAX_REFS - 1 - len(extra))])
                 body = {
                     "model": series_settings()["video_model"], "prompt": t["prompt"],
                     "reference_images": [atlas.upload_media(seedance_ref(x)) for x in refs if x.exists()],
@@ -7421,7 +7461,7 @@ def revise_video_prompt(prompt: str, note: str) -> str:
     return f"{prompt}\nDirector's change for this version (most important): {note}"
 
 
-def queue_ad_take(aid: str, sid: str, note: str = "", from_take: str | None = None) -> None:
+def queue_ad_take(aid: str, sid: str, note: str = "", from_take: str | None = None, extra: list[str] | None = None) -> None:
     tid = uuid.uuid4().hex[:10]
     def fn(d):
         p = prod_of(d)
@@ -7435,7 +7475,7 @@ def queue_ad_take(aid: str, sid: str, note: str = "", from_take: str | None = No
         s.setdefault("takes", []).append({
             "id": tid, "file": None, "status": "queued", "error": None, "approved": False, "duration": None,
             "gen_duration": int(min(atlas.MAX_DURATION, max(atlas.MIN_DURATION, math.ceil(float(s.get("seconds") or 4))))),
-            "prompt": prompt, "note": note, "revised": not note, "created_at": now()})
+            "prompt": prompt, "note": note, "revised": not note, "extra_refs": extra or [], "created_at": now()})
         if not s.get("chosen"):
             s["chosen"] = tid
     update_ad(aid, fn)
@@ -7508,6 +7548,18 @@ def prod_take_act(aid: str, sid: str, body: TakeActIn, action: str = "pick"):
             ad_executor.submit(run_ad_composite, aid, sid, body.take_id)
         else:
             ad_executor.submit(run_ad_take, aid, sid, body.take_id)
+    return ad_response(aid)
+
+
+@app.post("/api/ads/{aid}/prod/shots/{sid}/edit-take")
+def prod_edit_take(aid: str, sid: str, note: str = Form(""), take_id: str = Form(""), files: list[UploadFile] = File(default=[])):
+    """✏️ نسخة جديدة من فيديو اللقطة بطلبك، ومعاه صور مرجعية لو عايز."""
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات")
+    note = note.strip()[:1500]
+    if not note:
+        raise HTTPException(400, "اكتب عايز تعدّل إيه")
+    queue_ad_take(aid, sid, note, take_id or None, save_edit_refs(aid, files))
     return ad_response(aid)
 
 

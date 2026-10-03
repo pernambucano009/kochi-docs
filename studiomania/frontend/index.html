@@ -1275,6 +1275,23 @@
     <audio id="serGalAudio" preload="auto" hidden></audio>
   </div>
 </dialog>
+<dialog class="bulk-dlg ad-fix-dlg" id="adFixDialog">
+  <form method="dialog" id="adFixForm">
+    <h2 id="adFixTitle">✏️ عدّل</h2>
+    <label class="field">عايز تغيّر إيه؟
+      <textarea id="adFixNote" rows="4" required></textarea></label>
+    <p class="hint" id="adFixHint"></p>
+    <div class="ad-fix-refs">
+      <label class="btn sm">🖼️ ضيف صورة مرجعية<input type="file" id="adFixFiles" accept="image/*" multiple hidden></label>
+      <span class="muted">لحد 4 صور: شكل شخص، لبس، مكان، حاجة، أو ستايل. وتقدر تلصق صورة بـ Ctrl+V.</span>
+      <div class="ad-fix-thumbs" id="adFixThumbs"></div>
+    </div>
+    <div class="row wrap">
+      <button class="btn primary" type="submit" id="adFixGo">✏️ نفّذ التعديل</button>
+      <button class="btn" type="button" id="adFixCancel">إلغاء</button>
+    </div>
+  </form>
+</dialog>
 <dialog class="bulk-dlg ser-gal-dlg" id="adGalDialog">
   <div class="panel-head"><h2>🎬 فيديوهات الإعلان</h2><span class="muted" id="adGalCount"></span><button class="btn sm" id="adGalClose">إغلاق</button></div>
   <div id="adGalAll"><div class="ser-gal-grid" id="adGalGrid"></div></div>
