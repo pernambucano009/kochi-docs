@@ -5561,7 +5561,7 @@ ADS_LOCK = threading.Lock()
 AD_MAX_SECONDS = 180  # أطول إعلان بنحلله (الموديل بيستقبل الفيديو كله مرة واحدة)
 DEFAULT_AD_VIDEO_MODEL = "google/gemini-2.5-pro"
 AD_VIDEO_FALLBACKS = ["google/gemini-2.5-pro", "google/gemini-2.5-flash", "google/gemini-3-flash-preview", "google/gemini-3.5-flash"]
-AD_SETTING_KEYS = ("style_id", "brain_id", "duration", "format", "language", "production", "notes")
+AD_SETTING_KEYS = ("style_id", "brain_id", "fidelity", "duration", "format", "language", "production", "notes")
 
 
 def ads_settings() -> dict:
@@ -6813,12 +6813,16 @@ def run_ad_frame(aid: str, sid: str) -> None:
             mock_image(dest, f"{int(w) // 2}x{int(hh) // 2}", f"shot {s['n']}", s["n"])
         else:
             # صور المكونات نفسها (شاشات كوتشي، اللوجو، الشخصيات...) مراجع أساسية، وبعدها صور الستايل للشكل العام
-            comps = ref_comps(s, AD_FRAME_REFS - 2)
+            comps = ref_comps(s, AD_FRAME_REFS - 3)
             comp_dir = prod_dir(aid, "comps")
             comps = [c for c in comps if (comp_dir / c["image"]).exists()]
-            styles = style_ref_urls(h, min(4, AD_FRAME_REFS - len(comps)))
-            refs = [atlas.reference_url(comp_dir / c["image"]) for c in comps] + styles
-            url = atlas.generate_image(carousel_settings()["image_family"], az.frame_prompt(h, s, comps, len(styles)), size,
+            # صورة المشهد الأصلي المقابل: عشان الكادر والتكوين ومكان الجرافيك يطلعوا زي الأصلي
+            orig = ad_dir(aid) / "frames" / s["ref_frame"] if s.get("ref_frame") else None
+            orig_refs = [atlas.reference_url(orig)] if orig and orig.exists() else []
+            styles = style_ref_urls(h, min(4, AD_FRAME_REFS - len(comps) - len(orig_refs)))
+            refs = [atlas.reference_url(comp_dir / c["image"]) for c in comps] + orig_refs + styles
+            prompt = az.frame_prompt(h, s, comps, len(styles), len(comps) + 1 if orig_refs else 0)
+            url = atlas.generate_image(carousel_settings()["image_family"], prompt, size,
                                        auth.get_setting("series_frame_quality") or "medium", refs or None)
             atlas.download(url, dest)
         def done(d):

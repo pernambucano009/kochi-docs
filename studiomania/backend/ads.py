@@ -133,9 +133,19 @@ def adapt_messages(brand: dict, analysis: dict, audio: dict, settings: dict, sty
         f"طريقة التنفيذ: {s['production']}" if s.get("production") else "",
         f"تعليمات إضافية: {s['notes']}" if s.get("notes") else "",
     ]
+    copy = s.get("fidelity", "copy") != "inspired"
+    n_orig = len((analysis or {}).get("scenes") or [])
+    if copy:
+        intro = ("شغلتك تاخد إعلان مرجعي متفصّص وتعمل نسخة منه لكوتشي **لقطة بلقطة**: نفس عدد المشاهد ونفس ترتيبها ومدتها، "
+                 "نفس الكادر وزاوية الكاميرا وحركتها وتكوين الصورة ومكان كل عنصر على الشاشة، نفس الموشن جرافيك والانتقالات والإيقاع. "
+                 "اللي بيتغير بس: المنتج والبراند (كوتشي بدلهم)، الكلام المكتوب والمنطوق، والأشخاص (بلبس محتشم). مناسب للسوق السعودي والخليجي.\n\n")
+        asks.insert(0, f"عدد المشاهد = {n_orig} بالظبط (زي الأصلي)، المشهد رقم n يقابل المشهد الأصلي رقم n (ref_scene = n) وبنفس مدته تقريبًا. "
+                       "متدمجش مشاهد ومتزودش مشاهد ومتغيّرش الترتيب." if n_orig else "")
+    else:
+        intro = ("شغلتك تاخد إعلان مرجعي متفصّص وتقترح إعلان لكوتشي مستوحى منه "
+                 "(نفس الذكاء والبناء والإحساس، مش نسخة)، مناسب للسوق السعودي والخليجي.\n\n")
     system = (
-        f"أنت كريتيف دايركتور لبراند {(brain or {}).get('name') or 'كوتشي'}. شغلتك تاخد إعلان مرجعي متفصّص وتقترح إعلان لكوتشي مستوحى منه "
-        "(نفس الذكاء والبناء والإحساس، مش نسخة)، مناسب للسوق السعودي والخليجي.\n\n"
+        f"أنت كريتيف دايركتور لبراند {(brain or {}).get('name') or 'كوتشي'}. " + intro
         + (f"عقل الإعلان (المنتج وهويته وأصوله الحقيقية، التزم بيه بالظبط):\n{brain_text(brain)}\n"
            "أي شاشة تطبيق أو لوجو أو صورة منتج في الإعلان لازم تكون من الأصول دي (اكتب اسمها في asset)، "
            "ومتخترعش شاشات أو لوجوهات تانية. الألوان والثيم من عقل الإعلان.\n\n" if brain else
@@ -150,7 +160,10 @@ def adapt_messages(brand: dict, analysis: dict, audio: dict, settings: dict, sty
         "واعمل نفس البناء الحركي بمحتوى كوتشي. القصة والكلام يتكتبوا عشان يخدموا الموشن ده.\n"
         "- كل مشهد لازم يكون فيه motion_graphics مفصّل بالتوقيت وmotion_prompt بالإنجليزي، والبرومبت يوصف الموشن كمان. "
         "لو المشهد الأصلي مفيهوش موشن جرافيك اكتب الحركة والانتقال بس.\n"
-        "- مشاهد بنفس روح الإعلان الأصلي لكن بقصة كوتشي، وكل مشهد ببرومبت إنجليزي جاهز لموديل فيديو.\n"
+        + ("- كل مشهد بنفس visual وshot وcamera بتوع المشهد الأصلي المقابل (بمحتوى كوتشي)، وكل مشهد ببرومبت إنجليزي جاهز لموديل فيديو "
+           "بيوصف نفس الكادر والحركة.\n" if copy else
+           "- مشاهد بنفس روح الإعلان الأصلي لكن بقصة كوتشي، وكل مشهد ببرومبت إنجليزي جاهز لموديل فيديو.\n")
+        + 
         "- كل مشهد ref_scene = رقم المشهد الأصلي اللي مستوحى منه. وحوّل مكونات المشهد الأصلي (خصوصًا عناصر الموشن جرافيك) "
         "لنسخة كوتشي: نفس الوظيفة ونفس طريقة الحركة، بس بشكل كوتشي (شاشة التطبيق بدل شاشتهم، لوجو كوتشي بدل لوجوهم، "
         "شخصياتنا بدل ممثليهم). الشخصية اللي بتتكرر في أكتر من مشهد اكتب برومبتها بنفس الوصف بالظبط.\n"
@@ -328,6 +341,7 @@ def header_from(adaptation: dict, style: dict | None, brand: dict, settings: dic
         "locations": a.get("locations", ""),
         "palette": (brain or {}).get("palette") or brand.get("colors", ""),
         "brand": brain_header(brain),
+        "fidelity": (settings or {}).get("fidelity") or "copy",
         "brain_id": (brain or {}).get("id"),
         "rules": "Vertical social ad, consistent characters, wardrobe and lighting in every shot. No watermarks, no random text.",
         "aspect": aspect_of((settings or {}).get("format") or a.get("format") or ""),
@@ -347,7 +361,7 @@ def header_text(h: dict) -> str:
     return "\n".join(p for p in parts if p)
 
 
-def frame_prompt(h: dict, shot: dict, ref_comps: list[dict] | None = None, n_style: int = 0) -> str:
+def frame_prompt(h: dict, shot: dict, ref_comps: list[dict] | None = None, n_style: int = 0, orig_idx: int = 0) -> str:
     """برومبت صورة الستوري بورد. ref_comps = المكونات اللي صورها رايحة للموديل بنفس الترتيب (أول الصور)،
     وبعدها n_style صورة ستايل."""
     ref_comps = ref_comps or []
@@ -362,10 +376,19 @@ def frame_prompt(h: dict, shot: dict, ref_comps: list[dict] | None = None, n_sty
                                  + (f" (motion: {c['animation']})" if c.get("animation") else "")
                                  for i, c in enumerate(ref_comps)))
         if n_style:
-            refs_txt += (f"\nImages {len(ref_comps) + 1}-{len(ref_comps) + n_style} are visual-style references only "
+            first = len(ref_comps) + (2 if orig_idx else 1)
+            refs_txt += (f"\nImages {first}-{first + n_style - 1} are visual-style references only "
                          "(look, lighting, palette). Do not copy their content.")
     elif n_style:
         refs_txt = "The reference images are visual-style references only (look, lighting, palette). Do not copy their content."
+    if orig_idx:
+        refs_txt += (f"\nImage {orig_idx} is the matching frame from the ORIGINAL reference ad. "
+                     + ("Recreate its composition exactly: same framing and shot size, camera angle, subject pose and placement, "
+                        "layout and position of every on-screen graphic, card, text box and screen. Replace only the brand content "
+                        "(app screens, logo, text, product) with ours, and the people with ours in modest clothing. "
+                        "Never copy the original brand's logo, name or text."
+                        if h.get("fidelity", "copy") != "inspired" else
+                        "Use it as loose inspiration for composition and energy only; never copy its brand, logo or text."))
     return "\n".join(x for x in [
         f"Storyboard frame for a {h.get('aspect', '9:16')} commercial shot. Polished, like a real frame grab from the final ad.",
         header_text(h),
