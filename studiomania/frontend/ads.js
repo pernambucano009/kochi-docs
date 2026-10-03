@@ -30,7 +30,7 @@ const SCENE_LABELS = {
   sfx: "المؤثرات", music: "الموسيقى", transition: "الانتقال", purpose: "وظيفة المشهد",
 };
 const ADAPT_LABELS = {
-  concept: "الفكرة", why_it_fits: "ليه مناسب لكوتشي", kochi_angle: "كوتشي بيظهر إزاي", hook: "الهوك", format: "المقاس",
+  concept: "الفكرة", why_it_fits: "ليه مناسب لكوتشي", kochi_angle: "كوتشي بيظهر إزاي", hook: "الهوك", format: "المقاس", angle: "🎯 الزاوية", tone: "🎭 الإحساس", palette: "🎨 ألوان الإعلان ده",
   voiceover_script: "الفويس أوفر كامل", music_direction: "الموسيقى", sound_design: "المؤثرات وتصميم الصوت", cast: "الممثلين",
   locations: "أماكن التصوير", production_notes: "ملاحظات التنفيذ", cta: "الدعوة للفعل", caption: "كابشن البوست",
 };
@@ -165,8 +165,27 @@ function adaptMotion(s) {
 const adaptNoMotion = (a) => !!a.adaptation?.scenes?.length && !a.adaptation.scenes.some((s) => s.motion_graphics)
   && (a.analysis?.scenes || []).some((s) => s.motion_graphics);
 
+// 🎲 الاتجاهات: كروت تختار منها، والاختيار بيتحفظ في الإعدادات ويتكتب بيه الاقتراح
+const DIR_LABELS = { angle: "🎯 الزاوية", hook: "🪝 الهوك", tone: "🎭 الإحساس", setting: "📍 المكان", hero: "🧍 البطل", palette: "🎨 الألوان", feature: "📱 الميزة" };
+function renderDirections(a) {
+  const st = a.settings || {}, working = a.directions_status === "working";
+  $("adDirsGo").disabled = working || !a.analysis;
+  $("adCtlApply").disabled = a.adapt_status === "working" || !a.analysis;
+  $("adDirsState").innerHTML = working ? `<span class="spin-inline"></span> بيفكر في 3 اتجاهات...` : a.directions_status === "failed" ? `✕ ${adEsc(a.directions_error)}` : "";
+  $("adDirChosen").hidden = !st.direction;
+  $("adDirChosen").innerHTML = st.direction ? `<b>✅ الاتجاه المختار:</b> <span data-no-i18n>${adEsc(st.direction)}</span> <button class="btn sm" type="button" data-dir-clear>✕ شيله</button>` : "";
+  setHTML($("adDirs"), (a.directions || []).map((d, i) => `<article class="ad-dir">
+    <h4 data-no-i18n>${adEsc(d.title)}</h4><p data-no-i18n>${adEsc(d.summary)}</p>
+    <dl>${Object.entries(DIR_LABELS).filter(([k]) => d[k]).map(([k, l]) => `<dt>${l}</dt><dd data-no-i18n>${adEsc(d[k])}</dd>`).join("")}</dl>
+    <button class="btn sm primary" type="button" data-dir-pick="${i}">✍️ اختار ده واكتب الاقتراح</button></article>`).join(""));
+}
+function dirText(d) {
+  return [d.title, d.summary, ...Object.entries(DIR_LABELS).filter(([k]) => d[k]).map(([k, l]) => `${l.replace(/^\S+\s/, "")}: ${d[k]}`)].filter(Boolean).join(" — ");
+}
+
 function renderAdAdapt() {
   const a = adx.cur;
+  renderDirections(a);
   const busy = a.adapt_status === "working";
   $("adAdaptState").innerHTML = busy ? `<span class="spin-inline"></span> ✍️ بيكتب الاقتراح...` : a.adapt_status === "failed" ? `✕ ${adEsc(a.adapt_error)}` : "";
   $("adAdaptGo").disabled = busy || !a.analysis;
@@ -178,7 +197,7 @@ function renderAdAdapt() {
       <input class="ad-adapt-title" data-ad-key="title" value="${adEsc(ad.title)}" data-no-i18n>
       <span class="muted">${ad.duration ? `${adEsc(ad.duration)} ثانية` : ""}${style ? ` · 🎨 ${adEsc(style.name)}` : ""}</span>
       <button class="btn sm" data-copy-adapt>📋 انسخ الاقتراح كله</button></div>
-    <div class="ad-fields">${["concept", "why_it_fits", "kochi_angle", "hook", "format"].map((k) => adField(ADAPT_LABELS[k], ad[k], `data-ad-key="${k}"`)).join("")}</div>
+    <div class="ad-fields">${["concept", "angle", "tone", "palette", "why_it_fits", "kochi_angle", "hook", "format"].map((k) => adField(ADAPT_LABELS[k], ad[k], `data-ad-key="${k}"`)).join("")}</div>
     <h3 class="pane-h">🎬 المشاهد</h3>
     <div class="ad-scenes">${(ad.scenes || []).map((s, i) => `<article class="ad-scene adapt" data-ascene="${i}">
       <div class="ad-scene-media"><b>${s.n ?? i + 1}</b><span class="t">${adEsc(s.seconds)}ث</span></div>
@@ -432,7 +451,7 @@ $("adAdapt").addEventListener("click", async (e) => {
   if (cp) return adCopy(adx.cur.adaptation.scenes[Number(cp.dataset.copyPrompt)].prompt || "");
   if (e.target.closest("[data-copy-adapt]")) {
     const ad = adx.cur.adaptation;
-    const parts = [ad.title, "", ...["concept", "why_it_fits", "kochi_angle", "hook", "format"].map((k) => `${ADAPT_LABELS[k]}: ${ad[k] || ""}`), "",
+    const parts = [ad.title, "", ...["concept", "angle", "tone", "palette", "why_it_fits", "kochi_angle", "hook", "format"].map((k) => `${ADAPT_LABELS[k]}: ${ad[k] || ""}`), "",
       ...(ad.scenes || []).map((s, i) => [`— المشهد ${s.n ?? i + 1} (${s.seconds}ث)`, `الموشن جرافيك: ${s.motion_graphics || ""}`, ...Object.entries(ADAPT_SCENE_LABELS).map(([k, l]) => `${l}: ${s[k] || ""}`), `Prompt: ${s.prompt || ""}`].join("\n")), "",
       ...["voiceover_script", "music_direction", "sound_design", "cast", "locations", "production_notes", "cta", "caption"].map((k) => `${ADAPT_LABELS[k]}: ${ad[k] || ""}`)];
     adCopy(parts.join("\n"));
@@ -475,6 +494,29 @@ $("adStylePick").addEventListener("click", async (e) => {
   await patchAd({ settings: { style_id: b.dataset.pickStyle || null } });
   renderAds();
   toast(b.dataset.pickStyle ? "🎨 اتختار الستايل. دوس «اكتب الاقتراح من جديد» عشان البرومبتات تتكتب بيه" : "اتشال الستايل");
+});
+$("adDirsGo").onclick = () => busyButton($("adDirsGo"), "⏳", async () => {
+  adx.cur = await api(`/api/ads/${adx.cur.id}/directions`, { method: "POST" });
+  renderAds(); scheduleAdPoll();
+});
+async function adaptWithControls() {
+  adx.cur = await api(`/api/ads/${adx.cur.id}/adapt`, { method: "POST", ...jsonBody({ message: "" }) });
+  renderAds(); scheduleAdPoll();
+}
+$("adCtlApply").onclick = () => {
+  if (adx.cur.adaptation && !confirm("يكتب الاقتراح من جديد بالاختيارات دي؟ الاقتراح الحالي هيتغير.")) return;
+  busyButton($("adCtlApply"), "⏳", adaptWithControls);
+};
+$("adBrandCtl").addEventListener("click", async (e) => {
+  if (e.target.closest("[data-dir-clear]")) { await patchAd({ settings: { direction: "" } }); renderAds(); return; }
+  const b = e.target.closest("[data-dir-pick]");
+  if (!b) return;
+  const d = adx.cur.directions[+b.dataset.dirPick];
+  if (adx.cur.adaptation && !confirm(`يكتب الاقتراح من جديد على اتجاه «${d.title}»؟ الاقتراح الحالي هيتغير.`)) return;
+  await busyButton(b, "⏳", async () => {
+    await patchAd({ settings: { direction: dirText(d) } });
+    await adaptWithControls();
+  });
 });
 $("adReadapt").onclick = () => busyButton($("adReadapt"), "⏳", async () => {
   adx.cur = await api(`/api/ads/${adx.cur.id}/adapt`, { method: "POST", ...jsonBody({ message: "" }) });
@@ -549,7 +591,7 @@ $("adStyleGrid").addEventListener("click", async (e) => {
 function scheduleAdPoll() {
   clearTimeout(adx.timer);
   const a = adx.cur;
-  const busy = (a && (["queued", "working"].includes(a.status) || a.adapt_status === "working" || a.scomp_status === "working" || a.audio_status === "working" || prodBusy(a))) || adx.styles.some((s) => s.status === "working") || adx.brains.some((b) => b.status === "working");
+  const busy = (a && (["queued", "working"].includes(a.status) || a.adapt_status === "working" || a.directions_status === "working" || a.scomp_status === "working" || a.audio_status === "working" || prodBusy(a))) || adx.styles.some((s) => s.status === "working") || adx.brains.some((b) => b.status === "working");
   if (!busy || document.querySelector('.view[data-view="10"]').hidden) return;
   adx.timer = setTimeout(async () => {
     try {
@@ -627,6 +669,7 @@ function renderAdActivity() {
   const nums = (arr) => arr.map((s) => s.n).join("، ");
   if (["queued", "working"].includes(a.status)) items.push(["analysis", `🔍 بيحلل الإعلان: ${a.step || "في الطابور"}`]);
   if (a.scomp_status === "working") items.push(["analysis", "🎞️ بيستخرج الموشن جرافيك ومكونات كل مشهد"]);
+  if (a.directions_status === "working") items.push(["adapt", "🎲 بيفكر في 3 اتجاهات مختلفة للإعلان"]);
   if (a.adapt_status === "working") items.push(["adapt", a.chain_prod ? "✍️ بيكتب اقتراح كوتشي بالموشن، وبعده هيبدأ التنفيذ" : "✍️ بيكتب اقتراح كوتشي"]);
   if (a.audio_status === "working") items.push(["audio", "🎧 بيسمع الصوت ويفصّصه"]);
   const shots = a.prod?.shots || [];

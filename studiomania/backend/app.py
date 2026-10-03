@@ -5562,7 +5562,9 @@ ADS_LOCK = threading.Lock()
 AD_MAX_SECONDS = 180  # أطول إعلان بنحلله (الموديل بيستقبل الفيديو كله مرة واحدة)
 DEFAULT_AD_VIDEO_MODEL = "google/gemini-2.5-pro"
 AD_VIDEO_FALLBACKS = ["google/gemini-2.5-pro", "google/gemini-2.5-flash", "google/gemini-3-flash-preview", "google/gemini-3.5-flash"]
-AD_SETTING_KEYS = ("style_id", "brain_id", "fidelity", "duration", "format", "language", "production", "notes")
+AD_SETTING_KEYS = ("style_id", "brain_id", "fidelity", "duration", "format", "language", "production", "notes",
+                   # 🎛️ التطبيق على البراند
+                   "angle", "tone", "setting", "hero", "feature", "palette_mode", "palette_custom", "brand_level", "variety", "direction")
 
 
 def ads_settings() -> dict:
@@ -5627,6 +5629,8 @@ def ad_to_dict(r: sqlite3.Row, d: dict) -> dict:
         "prod_history": [{"at": h.get("archived_at"), "shots": len(h.get("shots") or [])} for h in d.get("prod_history") or []],
         "settings": d.get("settings") or {},
         "adaptation": d.get("adaptation"), "adapt_status": d.get("adapt_status", "idle"), "adapt_error": d.get("adapt_error"),
+        "directions": d.get("directions") or [], "directions_status": d.get("directions_status", "idle"),
+        "directions_error": d.get("directions_error"),
         "scomp_status": d.get("scomp_status", "idle"),
         "chat": d.get("chat") or [],
         "thumb": scenes[0]["frame_url"] if scenes and scenes[0].get("frame_url") else None,
@@ -6066,6 +6070,54 @@ def ad_style(style_id: str | None) -> dict | None:
     return {"name": r["name"], **json.loads(r["data"])} if r else None
 
 
+def other_ads(aid: str, limit: int = 8) -> list[dict]:
+    """ملخص الإعلانات التانية (الأحدث الأول) عشان الاقتراح الجديد ميطلعش شبههم."""
+    out = []
+    with closing(db()) as conn:
+        rows = conn.execute("SELECT id, data FROM ads WHERE id != ? ORDER BY created_at DESC", (aid,)).fetchall()
+    for r in rows:
+        a = (json.loads(r["data"]).get("adaptation") or {})
+        if a.get("title"):
+            out.append({**{k: str(a.get(k) or "")[:200] for k in ("title", "hook", "tone", "palette", "locations")},
+                        "angle": str(a.get("angle") or a.get("kochi_angle") or "")[:200]})
+        if len(out) >= limit:
+            break
+    return out
+
+
+def run_ad_directions(aid: str) -> None:
+    try:
+        with closing(db()) as conn:
+            _, d = ad_row(conn, aid)
+        settings = d.get("settings") or {}
+        if atlas.mock_mode():
+            result = az.mock_directions()
+        else:
+            result = ad_json(series_chat(az.directions_messages(brand_settings(), d.get("analysis") or {}, settings,
+                                                                ad_brain(settings), other_ads(aid))), "الاتجاهات")
+        dirs = [x for x in result.get("directions") or [] if isinstance(x, dict)][:4]
+        if not dirs:
+            raise RuntimeError("الموديل ما رجعش اتجاهات")
+        update_ad(aid, lambda d: d.update(directions=dirs, directions_status="done", directions_error=None))
+    except Exception as exc:  # noqa: BLE001
+        msg = str(getattr(exc, "detail", None) or exc)[:400]
+        update_ad(aid, lambda d: d.update(directions_status="failed", directions_error=msg))
+
+
+@app.post("/api/ads/{aid}/directions")
+def ad_directions(aid: str):
+    """🎲 3 اتجاهات مختلفة للتطبيق على البراند تختار منهم قبل ما الاقتراح يتكتب."""
+    with closing(db()) as conn:
+        _, d = ad_row(conn, aid)
+    if not d.get("analysis"):
+        raise HTTPException(400, "استنى لما التحليل يخلص")
+    if d.get("directions_status") == "working":
+        raise HTTPException(400, "بيفكر في الاتجاهات بالفعل")
+    update_ad(aid, lambda d: d.update(directions_status="working", directions_error=None))
+    threading.Thread(target=run_ad_directions, args=(aid,), daemon=True).start()
+    return ad_response(aid)
+
+
 def run_ad_adapt(aid: str) -> None:
     try:
         with closing(db()) as conn:
@@ -6075,7 +6127,7 @@ def run_ad_adapt(aid: str) -> None:
             result = az.mock_adaptation(int(settings.get("duration") or 30))
         else:
             msgs = az.adapt_messages(brand_settings(), d.get("analysis") or {}, d.get("audio") or {}, settings,
-                                     ad_style(settings.get("style_id")), d.get("chat") or [], ad_brain(settings))
+                                     ad_style(settings.get("style_id")), d.get("chat") or [], ad_brain(settings), other_ads(aid))
             result = ad_json(series_chat(msgs), "اقتراح كوتشي")
         def fn(d):
             d["adaptation"] = {**result, "based_on": d.get("analysis_ver", 0)}
@@ -6578,6 +6630,9 @@ def reset_stuck_ads() -> None:
                 changed = True
             if d.get("scomp_status") == "working":
                 d.update(scomp_status="failed")
+                changed = True
+            if d.get("directions_status") == "working":
+                d.update(directions_status="failed", directions_error="اتقطع لما السيرفر اتقفل. دوس تاني")
                 changed = True
             if changed:
                 conn.execute("UPDATE ads SET data = ? WHERE id = ?", (json.dumps(d, ensure_ascii=False), r["id"]))

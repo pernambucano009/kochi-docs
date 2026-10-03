@@ -58,6 +58,9 @@ ADAPT_FORMAT = """{
   "duration": 30,
   "format": "9:16 ريلز / تيك توك ...",
   "hook": "أول 3 ثواني",
+  "angle": "الزاوية / الرسالة البيعية اللي الإعلان ماشي بيها (جملة)",
+  "tone": "الإحساس والتون (كلمتين)",
+  "palette": "ألوان الإعلان ده بالـ hex ودور كل لون (الخلفيات، الإضاءة، اللبس، الجرافيك)",
   "scenes": [
     {"n": 1, "seconds": 3, "ref_scene": 1,
      "motion_graphics": "الموشن جرافيك في المشهد بالتفصيل (بالعربي): كل عنصر متحرك (كارت، شاشة تطبيق، أيقونة، كلام متحرك، لوجو، أشكال) إزاي بيدخل ويتحرك ويخرج، بالتوقيت جوه المشهد (من ثانية كام لكام)، الاتجاه والسرعة والـ easing، والانتقال للمشهد اللي بعده. نفس بناء الموشن في المشهد الأصلي بمحتوى كوتشي",
@@ -119,8 +122,51 @@ def with_media(messages: list[dict], data_url: str, filename: str) -> list[dict]
     return messages[:-1] + [msg]
 
 
+# 🎛️ التطبيق على البراند: الألوان (مفاتيح) والباقي اختيارات بتتكتب للموديل زي ما هي
+PALETTE_MODES = {
+    "": "ألوان البراند هي أساس الإعلان (الخلفيات والجرافيك والجو).",
+    "accent": "الخلفيات والجو والإضاءة بألوان طبيعية مناسبة للمكان والمود، وألوان البراند تظهر كلمسات بس "
+              "(اللوجو، شاشة التطبيق، الأزرار، كلمة مهمة في الجرافيك). متلوّنش المشهد كله بلون البراند.",
+    "reference": "خد باليتة ألوان الإعلان الأصلي وجوّه وإضاءته زي ما هي، والبراند يظهر بلوجوه وشاشاته بس.",
+    "fresh": "اختار باليتة جديدة ومختلفة تناسب مود الإعلان ده ومختلفة عن الإعلانات اللي فاتت "
+             "(مثلًا دافية غروب، نيون ليلي، ألوان باستيل، أبيض وأسود مع لون واحد). ألوان البراند في اللوجو والشاشات بس.",
+}
+BRAND_LEVELS = {
+    "subtle": "البراند خفيف: القصة والإحساس الأول، والتطبيق يظهر في النص التاني أو في الآخر بشكل طبيعي مش إعلاني.",
+    "strong": "البراند قوي: التطبيق واللوجو ظاهرين من أول ثانية والإعلان كله بيوري التطبيق وهو بيشتغل.",
+}
+
+
+def brand_controls(settings: dict, others: list[dict] | None = None) -> str:
+    """توجيهات التطبيق على البراند اللي اختارها المستخدم + الإعلانات اللي فاتت عشان ميكررهاش."""
+    s = settings or {}
+    lines = []
+    if s.get("direction"):
+        lines.append(f"الاتجاه اللي المستخدم اختاره (التزم بيه): {s['direction']}")
+    for k, label in (("angle", "الزاوية / الرسالة البيعية"), ("tone", "الإحساس والتون"), ("setting", "المكان"),
+                     ("hero", "بطل الإعلان"), ("feature", "الميزة أو الشاشة اللي نركز عليها في التطبيق")):
+        if s.get(k):
+            lines.append(f"{label}: {s[k]}")
+    mode = s.get("palette_mode") or ""
+    if mode == "custom" and s.get("palette_custom"):
+        lines.append(f"الألوان: استخدم الألوان دي للإعلان ده: {s['palette_custom']}. ألوان البراند في اللوجو والشاشات بس.")
+    else:
+        lines.append("الألوان: " + PALETTE_MODES.get(mode, PALETTE_MODES[""]))
+    if BRAND_LEVELS.get(s.get("brand_level") or ""):
+        lines.append(BRAND_LEVELS[s["brand_level"]])
+    txt = "التطبيق على البراند (اختيارات المستخدم، ليها الأولوية):\n" + "\n".join(f"- {x}" for x in lines) + "\n"
+    if s.get("variety") != "off" and others:
+        txt += ("إعلانات عملناها قبل كده للبراند ده. الإعلان الجديد لازم يبقى مختلف عنهم بوضوح في الزاوية والهوك "
+                "والتون والألوان والمكان والأشخاص (إلا اللي المستخدم اختاره فوق):\n"
+                + "\n".join("- " + " | ".join(f"{k}: {o[k]}" for k in ("title", "angle", "hook", "tone", "palette", "locations") if o.get(k))
+                             for o in others[:8]) + "\n")
+    if not s.get("angle") and not s.get("direction"):
+        txt += "لو الزاوية مش محددة: متقعش في الزاوية المعتادة (تطبيق بيتابعك وبيوريك تقدمك)، فكّر في زاوية طازة تناسب الإعلان الأصلي.\n"
+    return txt + "\n"
+
+
 def adapt_messages(brand: dict, analysis: dict, audio: dict, settings: dict, style: dict | None, chat: list[dict],
-                   brain: dict | None = None) -> list[dict]:
+                   brain: dict | None = None, others: list[dict] | None = None) -> list[dict]:
     style_txt = ""
     if style:
         style_txt = (f"الستايل البصري المختار «{style.get('name', '')}»:\n{style.get('notes') or ''}\n"
@@ -148,10 +194,12 @@ def adapt_messages(brand: dict, analysis: dict, audio: dict, settings: dict, sty
         f"أنت كريتيف دايركتور لبراند {(brain or {}).get('name') or 'كوتشي'}. " + intro
         + (f"عقل الإعلان (المنتج وهويته وأصوله الحقيقية، التزم بيه بالظبط):\n{brain_text(brain)}\n"
            "أي شاشة تطبيق أو لوجو أو صورة منتج في الإعلان لازم تكون من الأصول دي (اكتب اسمها في asset)، "
-           "ومتخترعش شاشات أو لوجوهات تانية. الألوان والثيم من عقل الإعلان.\n\n" if brain else
+           "ومتخترعش شاشات أو لوجوهات تانية. ألوان البراند اللي في العقل ثابتة في اللوجو والشاشات، "
+           "وألوان الإعلان نفسه حسب «التطبيق على البراند» تحت.\n\n" if brain else
            f"عن كوتشي: {brand.get('about', '')}\nالجمهور: {brand.get('audience', '')}\n"
            f"ألوان البراند: {brand.get('colors', '')}\n\n")
         + style_txt
+        + brand_controls(s, others)
         + "تحليل الإعلان المرجعي (وكل مشهد بمكوناته وعناصر الموشن جرافيك وحركتها):\n" + json.dumps(analysis, ensure_ascii=False)[:40000] + "\n\n"
         + ("تحليل الصوت:\n" + json.dumps(audio, ensure_ascii=False)[:6000] + "\n\n" if audio else "")
         + "المطلوب:\n" + "\n".join(f"- {a}" for a in asks if a) + "\n"
@@ -298,7 +346,8 @@ def mock_audio() -> dict:
 
 def mock_adaptation(duration: int = 30) -> dict:
     return {"title": "كوتشي: إعلان تجريبي", "concept": "فكرة تجريبية", "why_it_fits": "تجربة", "kochi_angle": "التطبيق",
-            "duration": duration, "format": "9:16", "hook": "سؤال سريع",
+            "duration": duration, "format": "9:16", "hook": "سؤال سريع", "angle": "زاوية تجريبية", "tone": "هادي",
+            "palette": "#1D3557 كحلي (الخلفيات)، #F1FAEE أبيض دافي",
             "scenes": [{"n": i + 1, "seconds": 5, "ref_scene": 1 + i % 2, "visual": f"مشهد {i + 1}",
                         "motion_graphics": "كارت كوتشي بينط من تحت في أول ثانية ويكبر، وبعدين بيتزحلق لبرة شمال",
                         "motion_prompt": "A KOCHI card pops up from the bottom in the first second, scales up, then slides out left.", "shot": "medium", "camera": "static",
@@ -329,6 +378,16 @@ def aspect_of(text: str) -> str:
     return "9:16"
 
 
+def ad_palette(a: dict, brand: dict, settings: dict | None, brain: dict | None) -> str:
+    """ألوان الإعلان ده: ألوان البراند كاملة، أو ألوان الإعلان نفسه والبراند لمسات بس (عشان الإعلانات متطلعش كلها شبه بعض)."""
+    brand_pal = (brain or {}).get("palette") or brand.get("colors", "")
+    mode = (settings or {}).get("palette_mode") or ""
+    own = (settings or {}).get("palette_custom") if mode == "custom" else a.get("palette")
+    if not mode or not own:
+        return brand_pal
+    return f"{own}. Brand colors ({brand_pal}) only on the logo, app screens and small accents."
+
+
 def header_from(adaptation: dict, style: dict | None, brand: dict, settings: dict, brain: dict | None = None) -> dict:
     """راس الإعلان: الثوابت اللي بتدخل في كل برومبت عشان الإعلان كله يطلع بنفس الشكل."""
     a = adaptation or {}
@@ -339,7 +398,7 @@ def header_from(adaptation: dict, style: dict | None, brand: dict, settings: dic
         "style_id": (settings or {}).get("style_id"),
         "characters": a.get("cast", ""),
         "locations": a.get("locations", ""),
-        "palette": (brain or {}).get("palette") or brand.get("colors", ""),
+        "palette": ad_palette(a, brand, settings, brain),
         "brand": brain_header(brain),
         "fidelity": (settings or {}).get("fidelity") or "copy",
         "brain_id": (brain or {}).get("id"),
@@ -355,7 +414,7 @@ def header_text(h: dict) -> str:
         f"VISUAL STYLE (must match exactly): {h['style']}" if h.get("style") else "",
         f"CHARACTERS (keep identical in every shot): {h['characters']}" if h.get("characters") else "",
         f"LOCATIONS: {h['locations']}" if h.get("locations") else "",
-        f"BRAND PALETTE: {h['palette']}" if h.get("palette") else "",
+        f"COLOR PALETTE: {h['palette']}" if h.get("palette") else "",
         f"RULES: {h['rules']}" if h.get("rules") else "",
     ]
     return "\n".join(p for p in parts if p)
@@ -465,7 +524,7 @@ def component_prompt(h: dict, comp: dict) -> str:
     return "\n".join(x for x in [
         comp.get("image_prompt") or comp.get("description", ""),
         f"Visual style: {h['style']}" if h.get("style") else "",
-        f"Brand palette: {h['palette']}" if h.get("palette") and comp.get("kind") in ("graphic", "text", "ui", "icon", "effect") else "",
+        f"Color palette: {h['palette']}" if h.get("palette") and comp.get("kind") in ("graphic", "text", "ui", "icon", "effect") else "",
         f"Brand identity: {h['brand']}" if h.get("brand") and comp.get("kind") in ("graphic", "text", "ui", "icon", "effect", "logo") else "",
         "Single isolated element centered on a plain flat light background, nothing else in the image, no watermark.",
     ] if x)
@@ -785,3 +844,42 @@ def find_mentions(text: str, names: list[str]) -> list[str]:
 def mock_sb(shots: list[dict], db_items: list[dict]) -> dict:
     tags = " ".join(f"@{a['name']}" for a in db_items[:2])
     return {"shots": [{"id": s["id"], "prompt": f"Medium shot: {tags} in frame, soft light. Shot {s.get('n')}."} for s in shots]}
+
+
+DIRECTIONS_FORMAT = """{"directions": [
+  {"title": "اسم الاتجاه", "angle": "الزاوية / الرسالة البيعية", "hook": "أول 3 ثواني", "tone": "التون",
+   "setting": "المكان", "hero": "بطل الإعلان", "palette": "الألوان بالكلام وبالـ hex",
+   "feature": "الميزة اللي بنوريها في التطبيق", "summary": "الإعلان في جملتين"}
+]}"""
+
+
+def directions_messages(brand: dict, analysis: dict, settings: dict, brain: dict | None, others: list[dict] | None) -> list[dict]:
+    """3 اتجاهات مختلفة جدًا عن بعض لتطبيق الإعلان على البراند، المستخدم يختار منهم."""
+    about = brain_text(brain) if brain else f"عن كوتشي: {brand.get('about', '')}\nالجمهور: {brand.get('audience', '')}"
+    copy = (settings or {}).get("fidelity", "copy") != "inspired"
+    system = (
+        f"أنت كريتيف دايركتور لبراند {(brain or {}).get('name') or 'كوتشي'}، للسوق السعودي والخليجي.\n{about}\n\n"
+        "ده تحليل إعلان مرجعي هنعمل منه إعلان للبراند"
+        + (" (نفس اللقطات والموشن، بس المحتوى والقصة والألوان والأشخاص بتوعنا)" if copy else " (مستوحى منه)") + ":\n"
+        + json.dumps({k: (analysis or {}).get(k) for k in ("summary", "idea", "hook", "structure", "style", "scenes")}, ensure_ascii=False)[:15000]
+        + "\n\n" + brand_controls({**(settings or {}), "direction": ""}, others)
+        + "اقترح 3 اتجاهات مختلفة جدًا عن بعض (زاوية بيعية مختلفة، تون مختلف، ألوان مختلفة، مكان وأشخاص مختلفين)، "
+        "كلهم ينفعوا على بناء الإعلان المرجعي. لو المستخدم محدد حاجة فوق التزم بيها في التلاتة وغيّر الباقي. "
+        "من غير كليشيهات، واللبس محتشم دايمًا. بالعربي المصري البسيط.\n"
+        f"رجّع JSON بس بالشكل ده:\n{DIRECTIONS_FORMAT}"
+    )
+    return [{"role": "system", "content": system}, {"role": "user", "content": "اقترح 3 اتجاهات."}]
+
+
+def mock_directions() -> dict:
+    return {"directions": [
+        {"title": "مدرب في جيبك", "angle": "متابعة حقيقية من مدرب مش برنامج جاهز", "hook": "رسالة من المدرب الساعة 6 الصبح",
+         "tone": "كوميدي ذكي", "setting": "البيت", "hero": "شاب سعودي", "palette": "دافي: #F4A261 برتقالي، #264653 كحلي",
+         "feature": "المحادثة مع المدرب", "summary": "شاب بيحاول يهرب من التمرين والمدرب دايمًا سابقه بخطوة."},
+        {"title": "أكلنا مش عدو", "angle": "نظام أكل يناسب أكلنا", "hook": "كبسة… ومع ذلك نزل وزن",
+         "tone": "دافي وعائلي", "setting": "سفرة العيلة", "hero": "أم مع العيلة", "palette": "ألوان طبيعية مع لمسات تيل",
+         "feature": "شاشة الوجبات", "summary": "العيلة بتاكل عادي والأم ماشية على خطتها من غير ما تحرم نفسها."},
+        {"title": "١٥ دقيقة", "angle": "مفيش وقت؟ برنامج مرن", "hook": "عداد ١٥:٠٠ بيعد",
+         "tone": "حماسي سريع", "setting": "المكتب", "hero": "بنت بحجاب ولبس رياضي محتشم", "palette": "نيون ليلي: #7B2FF7 بنفسجي، #00F5D4",
+         "feature": "تمرين اليوم", "summary": "تمرين سريع بين الاجتماعات بيغيّر يومها."},
+    ]}

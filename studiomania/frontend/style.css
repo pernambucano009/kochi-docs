@@ -1386,3 +1386,18 @@ a.pl-link:hover { background: color-mix(in srgb, var(--ok) 24%, transparent); }
 .ad-gal-full { display: flex; flex-direction: column; gap: 10px; align-items: center; }
 .ad-gal-full .ser-gal-nav { align-self: stretch; }
 .ad-gal-full audio { width: min(520px, 100%); }
+
+/* 🎛️ التطبيق على البراند */
+.ad-brandctl { border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 10px 12px; margin-bottom: 12px; }
+.ad-brandctl > summary { cursor: pointer; font-weight: 700; margin-bottom: 8px; }
+.ad-brandctl .row { margin-top: 8px; gap: 8px; align-items: center; }
+.ad-dir-chosen { margin-top: 8px; padding: 8px 10px; border-radius: 10px; background: var(--accent-soft); }
+.ad-dirs { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; margin-top: 10px; }
+.ad-dirs:empty { display: none; }
+.ad-dir { border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-2); padding: 10px; display: flex; flex-direction: column; gap: 6px; }
+.ad-dir h4 { margin: 0; }
+.ad-dir p { margin: 0; }
+.ad-dir dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; margin: 0; font-size: .88em; }
+.ad-dir dt { opacity: .75; white-space: nowrap; }
+.ad-dir dd { margin: 0; }
+.ad-dir button { margin-top: auto; align-self: flex-start; }

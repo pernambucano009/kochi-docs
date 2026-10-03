@@ -971,6 +971,86 @@
               <section class="panel ad-sec" data-sec="adapt" hidden>
                 <div class="panel-head"><h2>🎯 اقتراح لكوتشي</h2><span class="muted" id="adAdaptState"></span></div>
                 <div class="ad-stale" id="adAdaptStale" hidden></div>
+                <details class="ad-brandctl" id="adBrandCtl" open>
+                  <summary>🎛️ التطبيق على البراند <span class="muted">(عشان كل إعلان يطلع مختلف)</span></summary>
+                  <div class="ad-set-grid">
+                    <label class="field">الزاوية / الرسالة
+                      <select data-set="angle">
+                        <option value="">🎲 البرنامج يختار زاوية جديدة</option>
+                        <option value="التحوّل والنتيجة: قبل وبعد مع كوتشي">التحوّل والنتيجة (قبل وبعد)</option>
+                        <option value="كوتش شخصي في جيبك: متابعة حقيقية من مدرب مش برنامج جاهز">كوتش شخصي في جيبك</option>
+                        <option value="الأكل والتغذية: نظام أكل يناسب أكلنا وحياتنا من غير حرمان">الأكل والتغذية</option>
+                        <option value="مفيش وقت؟ برنامج مرن وتمارين قصيرة تمشي مع يومك">مفيش وقت؟ برنامج مرن</option>
+                        <option value="الالتزام: المتابعة اليومية اللي بتخليك ما توقفش">الالتزام والاستمرار</option>
+                        <option value="السعر والقيمة: أوفر من المدرب الخاص وأحسن من إنك تتمرن لوحدك">السعر والقيمة</option>
+                        <option value="قصة متدرب من أولها لآخرها">قصة متدرب</option>
+                        <option value="خرافات الجيم والدايت وكوتشي بيصححها">خرافات وكوتشي بيصححها</option>
+                        <option value="تحدي أو ترند على السوشيال">تحدي / ترند</option>
+                      </select></label>
+                    <label class="field">الإحساس
+                      <select data-set="tone">
+                        <option value="">🎲 البرنامج يختار</option>
+                        <option value="حماسي وطاقة عالية">حماسي وطاقة عالية</option>
+                        <option value="كوميدي ذكي من الحياة اليومية السعودية">كوميدي ذكي</option>
+                        <option value="هادي وملهم">هادي وملهم</option>
+                        <option value="فاخر وسينمائي">فاخر وسينمائي</option>
+                        <option value="واقعي UGC كأنه متصوّر بالموبايل">واقعي (UGC بالموبايل)</option>
+                        <option value="عاطفي ودرامي">عاطفي ودرامي</option>
+                        <option value="تعليمي سريع ومباشر">تعليمي سريع</option>
+                      </select></label>
+                    <label class="field">الألوان
+                      <select data-set="palette_mode">
+                        <option value="">ألوان البراند في كل حاجة</option>
+                        <option value="accent">ألوان طبيعية + البراند لمسات بس</option>
+                        <option value="reference">ألوان الإعلان الأصلي + لوجو وشاشات كوتشي</option>
+                        <option value="fresh">🎲 باليتة جديدة مختلفة كل مرة</option>
+                        <option value="custom">ألوان أنا هحددها ↓</option>
+                      </select></label>
+                    <label class="field">ألوانك (لو اخترت «ألوان أنا هحددها») <input type="text" data-set="palette_custom" placeholder="مثلًا: كحلي غامق وذهبي، أو #1D3557 و #E9C46A"></label>
+                    <label class="field">المكان
+                      <select data-set="setting">
+                        <option value="">🎲 البرنامج يختار</option>
+                        <option value="البيت">البيت</option>
+                        <option value="الجيم">الجيم</option>
+                        <option value="المكتب / الشغل">المكتب / الشغل</option>
+                        <option value="برّه: حديقة أو كورنيش أو شارع">برّه (حديقة، كورنيش، شارع)</option>
+                        <option value="كافيه">كافيه</option>
+                        <option value="العربية">العربية</option>
+                        <option value="البر / الصحرا">البر / الصحرا</option>
+                        <option value="استوديو بخلفية لون واحد">استوديو بخلفية لون واحد</option>
+                      </select></label>
+                    <label class="field">بطل الإعلان
+                      <select data-set="hero">
+                        <option value="">🎲 البرنامج يختار</option>
+                        <option value="شاب سعودي">شاب سعودي</option>
+                        <option value="بنت بحجاب ولبس محتشم">بنت</option>
+                        <option value="مدرب كوتشي">مدرب كوتشي</option>
+                        <option value="مدرب ومتدرب مع بعض">مدرب ومتدرب</option>
+                        <option value="أصحاب / مجموعة">أصحاب / مجموعة</option>
+                        <option value="أب أو أم مع العيلة">أب أو أم مع العيلة</option>
+                        <option value="من غير أشخاص: موشن جرافيك وشاشات التطبيق">من غير أشخاص (شاشات وموشن)</option>
+                      </select></label>
+                    <label class="field">قوة البراند
+                      <select data-set="brand_level">
+                        <option value="">متوسط</option>
+                        <option value="subtle">خفيف (القصة الأول وكوتشي في الآخر)</option>
+                        <option value="strong">قوي (التطبيق ظاهر من أول ثانية)</option>
+                      </select></label>
+                    <label class="field">التنويع
+                      <select data-set="variety">
+                        <option value="">مختلف عن الإعلانات اللي عملتها قبل كده</option>
+                        <option value="off">عادي (من غير مقارنة)</option>
+                      </select></label>
+                  </div>
+                  <label class="field">الميزة أو الشاشة اللي نركز عليها <input type="text" data-set="feature" placeholder="مثلًا: شاشة الوجبات، المحادثة مع المدرب، رسم التقدم في الوزن"></label>
+                  <div class="row wrap">
+                    <button class="btn" type="button" id="adDirsGo">🎲 اقترح 3 اتجاهات مختلفة أختار منهم</button>
+                    <button class="btn primary" type="button" id="adCtlApply">✍️ اكتب الاقتراح بالاختيارات دي</button>
+                    <span class="muted" id="adDirsState"></span>
+                  </div>
+                  <div class="ad-dir-chosen" id="adDirChosen" hidden></div>
+                  <div class="ad-dirs" id="adDirs"></div>
+                </details>
                 <form class="car-input" id="adAdaptForm">
                   <textarea id="adAdaptMsg" rows="2" placeholder="وجّهه: «خليه مضحك»، «بطولة مدرب ومتدربة»، «أقصر 15 ثانية»... (Enter يبعت)"></textarea>
                   <button class="btn primary" type="submit" id="adAdaptGo">✍️ عدّل الاقتراح</button>
