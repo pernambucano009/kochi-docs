@@ -633,6 +633,9 @@ function renderAdActivity() {
   const drawing = shots.filter((s) => s.frame_status === "working"), waitDraw = shots.filter((s) => s.frame_status === "queued");
   if (drawing.length) items.push(["prod", `🎨 بيرسم الستوري بورد: لقطة ${nums(drawing)}`]);
   if (waitDraw.length) items.push(["prod", `⏳ مستني يرسم: لقطة ${nums(waitDraw)}`]);
+  if (a.prod?.cast_status === "working") items.push(["prod", "🎭 بيطلّع الأبطال والمكونات المتكررة"]);
+  const ci = (a.prod?.cast || []).filter((c) => c.status === "working");
+  if (ci.length) items.push(["prod", `🖼️ بيرسم صور الأبطال: ${ci.map((c) => c.name).join("، ")}`]);
   const mo = shots.filter((s) => s.motion_status === "working");
   if (mo.length) items.push(["prod", `🎞️ بيستحضر الموشن جرافيك من الإعلان الأصلي: لقطة ${nums(mo)}`]);
   const comps = shots.filter((s) => s.comp_status === "working");
@@ -695,6 +698,7 @@ document.querySelector('.view[data-view="10"]').addEventListener("click", (e) =>
 // ---------- 4. التنفيذ: راس الإعلان ← ستوري بورد ← مكونات ← لقطات ← المونتاج ----------
 const PBUSY = new Set(["queued", "working"]);
 function prodBusy(a) {
+  if (a.prod?.cast_status === "working" || a.prod?.cast?.some((c) => c.status === "working")) return true;
   return !!a.prod?.shots.some((s) => PBUSY.has(s.frame_status) || s.comp_status === "working" || s.motion_status === "working" || s.layers_status === "working"
     || s.components.some((c) => c.status === "working") || s.takes.some((t) => PBUSY.has(t.status)));
 }
@@ -879,12 +883,92 @@ function editingIn(el) {
   return !!f && el.contains(f) && f.matches("textarea, select, input:not([type=checkbox]):not([type=file]):not([type=radio])");
 }
 
+// ---------- 🎭 الأبطال والمكونات المتكررة (قبل الستوري بورد) ----------
+const CAST_KIND = { character: "🧍 شخصية", background: "🏞️ مكان / خلفية", prop: "🧰 أداة" };
+function renderCast(a) {
+  const p = a.prod, cast = p.cast || [], busy = p.cast_status === "working";
+  const pending = cast.filter((c) => !c.approved).length;
+  const head = `<div class="ad-cast-head"><h3 class="pane-h">🎭 الأبطال والمكونات المتكررة</h3>
+      <span class="muted">${cast.length ? `${cast.length - pending}/${cast.length} اتوافق عليهم` : "قبل الستوري بورد: صورة ثابتة لكل شخصية ومكان بيتكرر، عشان يفضلوا هما هما في كل اللقطات."}</span>
+      <button class="btn sm ${cast.length ? "" : "primary"}" data-cast="extract" ${busy ? "disabled" : ""}>${busy ? "⏳ بيطلّعهم..." : cast.length ? "↻ طلّعهم تاني" : "🎭 طلّع الأبطال والمكونات"}</button>
+      ${cast.some((c) => !c.image) ? `<button class="btn sm" data-cast="images">🖼️ ارسم صورهم</button>` : ""}
+      ${cast.some((c) => c.image && !c.approved) ? `<button class="btn sm primary" data-cast="approveall">✅ وافق على الكل</button>` : ""}</div>
+    ${p.cast_error ? `<div class="muted">${adEsc(p.cast_error)}</div>` : ""}
+    ${cast.length ? `<p class="hint">لما توافق، الصورة بتتحفظ في 🧠 عقل الإعلان وبتتربط بكل لقطة العنصر ده فيها، والستوري بورد والفيديو بيستخدموها بالاسم.</p>` : ""}`;
+  const cards = cast.map((c) => `<div class="ad-cast-card ${c.approved ? "ok" : ""}" data-cast-id="${c.id}">
+      <div class="img">${c.image_url ? `<img src="${c.image_url}" alt="">` : c.status === "working" ? `<div class="spin"></div>` : "🖼️"}${c.status === "working" && c.image_url ? `<div class="car-wait over"><div class="spin"></div></div>` : ""}</div>
+      ${c.images.length > 1 ? `<div class="vers">${c.images.map((f) => `<img src="${f.url}" data-cast-pick="${f.file}" class="${f.url === c.image_url ? "sel" : ""}" title="${adEsc(f.note)}" alt="">`).join("")}</div>` : ""}
+      <div class="row"><select data-castf="kind">${Object.entries(CAST_KIND).map(([k, l]) => `<option value="${k}" ${k === c.kind ? "selected" : ""}>${l}</option>`).join("")}</select>
+        ${c.approved ? `<b class="okb">✅ في العقل</b>` : c.from_brain ? `<small class="muted">من عقل الإعلان</small>` : ""}</div>
+      <input type="text" value="${adEsc(c.name)}" data-castf="name" data-no-i18n>
+      <small class="muted">في اللقطات: ${(c.shots || []).join("، ") || "—"}</small>
+      <textarea rows="2" data-castf="description" data-no-i18n>${adEsc(c.description)}</textarea>
+      <textarea rows="3" dir="ltr" data-castf="image_prompt" placeholder="Fixed description (English)" data-no-i18n>${adEsc(c.image_prompt)}</textarea>
+      ${c.error ? `<div class="err">${adEsc(c.error)}</div>` : ""}
+      <div class="row wrap">
+        <button class="btn sm" data-cast="img" ${c.status === "working" ? "disabled" : ""}>🖼️ ${c.image_url ? "تاني" : "ارسم"}</button>
+        ${c.image_url ? `<button class="btn sm" data-cast="edit" ${c.status === "working" ? "disabled" : ""}>✏️ عدّل</button>` : ""}
+        <label class="btn sm" title="صورة من عندك">⬆<input type="file" accept="image/*" data-cast-up hidden></label>
+        ${c.image_url ? `<button class="btn sm ${c.approved ? "" : "primary"}" data-cast="${c.approved ? "unapprove" : "approve"}">${c.approved ? "↩ الغي" : "✅ وافق"}</button>` : ""}
+        <button class="btn sm danger" data-cast="del">✕</button></div>
+    </div>`).join("");
+  setHTML($("adCast"), head + (cast.length ? `<div class="ad-cast-grid">${cards}</div>` : ""));
+}
+const cAPI = (path, opts) => pAPI(`/cast${path}`, opts);
+$("adCast").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-cast], [data-cast-pick]");
+  if (!b) return;
+  const card = b.closest("[data-cast-id]"), cid = card?.dataset.castId, act = b.dataset.cast;
+  try {
+    if (b.dataset.castPick) adx.cur = await cAPI(`/${cid}/pick`, { method: "POST", ...jsonBody({ file: b.dataset.castPick }) });
+    else if (act === "extract") {
+      if (adx.cur.prod.cast?.length && !confirm("يطلّع الأبطال والمكونات تاني من الاقتراح؟ اللي ليهم صور أو اتوافق عليهم بيفضلوا.")) return;
+      adx.cur = await cAPI("/extract", { method: "POST" });
+    } else if (act === "images") adx.cur = await cAPI("/images", { method: "POST" });
+    else if (act === "approveall") adx.cur = await cAPI("/approve-all", { method: "POST" });
+    else if (act === "img") adx.cur = await cAPI(`/images?cast_id=${cid}`, { method: "POST" });
+    else if (act === "approve") { adx.cur = await cAPI(`/${cid}/approve`, { method: "POST" }); toast("✅ اتحفظ في عقل الإعلان واتربط باللقطات"); }
+    else if (act === "unapprove") adx.cur = await cAPI(`/${cid}/approve?undo=true`, { method: "POST" });
+    else if (act === "del") { if (!confirm("تشيله من القايمة؟")) return; adx.cur = await cAPI(`/${cid}`, { method: "DELETE" }); }
+    else if (act === "edit") {
+      const c = adx.cur.prod.cast.find((x) => x.id === cid);
+      return openFix({
+        title: `✏️ عدّل صورة «${c.name}»`,
+        placeholder: "مثلًا: شعره أطول، لبسه أزرق، أكبر في السن، خلّي الجيم أوسع",
+        hint: "الصورة الحالية بتتعدّل والقديمة بتفضل في النسخ.",
+        submit: async (form) => { adx.cur = await cAPI(`/${cid}/edit`, { method: "POST", body: form }); renderAds(); },
+      });
+    }
+    renderAds();
+    scheduleAdPoll();
+  } catch (err) { toast(err.message, true); }
+});
+$("adCast").addEventListener("change", async (e) => {
+  const card = e.target.closest("[data-cast-id]");
+  if (!card) return;
+  const cid = card.dataset.castId;
+  try {
+    if (e.target.matches("[data-cast-up]")) {
+      const f = e.target.files[0];
+      e.target.value = "";
+      if (!f) return;
+      const form = new FormData();
+      form.append("file", f);
+      adx.cur = await cAPI(`/${cid}/upload`, { method: "POST", body: form });
+    } else if (e.target.dataset.castf) {
+      adx.cur = await cAPI(`/${cid}`, { method: "PATCH", ...jsonBody({ fields: { [e.target.dataset.castf]: e.target.value } }) });
+    } else return;
+    renderAds();
+  } catch (err) { toast(err.message, true); }
+});
+
 function renderAdProd() {
   const a = adx.cur, p = a.prod;
   $("adProdStart").hidden = !!p;
   $("adProdMain").hidden = !p;
   $("adProdGo").disabled = !a.adaptation?.scenes?.length;
   if (!p) return;
+  if (!editingIn($("adCast"))) renderCast(a);
   const h = p.header;
   if (!editingIn($("adHeader"))) {
     $("adHeader").innerHTML = Object.entries(HEADER_LABELS).map(([k, l]) => adField(l, h[k], `data-h="${k}"`, k === "style" || k === "characters" ? 3 : 2, k === "style")).join("");
@@ -990,7 +1074,11 @@ $("adPDelFrames").onclick = () => {
   if (!confirm(`تمسح الستوري بورد بتاعة كل اللقطات (${n} لقطة، بكل نسخها)؟ المكونات والفيديوهات مش هتتلمس.`)) return;
   pDo($("adPDelFrames"), "⏳", () => pAPI("/frames", { method: "DELETE" }));
 };
-$("adPFrames").onclick = () => pDo($("adPFrames"), "⏳", () => pAPI("/frames", { method: "POST" }));
+const castWarn = () => {
+  const n = (adx.cur.prod.cast || []).filter((c) => !c.approved).length;
+  return !n || confirm(`في ${n} من الأبطال والمكونات المتكررة لسه ما اتوافقش عليهم، فمش هيدخلوا في الرسم. ترسم برضه؟`);
+};
+$("adPFrames").onclick = () => castWarn() && pDo($("adPFrames"), "⏳", () => pAPI("/frames", { method: "POST" }));
 $("adPComps").onclick = () => pDo($("adPComps"), "⏳", () => pAPI("/components", { method: "POST" }));
 $("adPCompImgs").onclick = () => {
   const comps = adx.cur.prod.shots.flatMap((s) => s.components).filter((c) => c.use !== false);
@@ -1099,7 +1187,7 @@ $("adPShots").addEventListener("click", async (e) => {
 
 
 // ---------- 🧠 عقل الإعلان: المنتج وأصوله الحقيقية (شاشات، لوجو، صور منتج) وهويته المستنبطة ----------
-const BRAIN_KIND_TITLE = { logos: "لوجو", screens: "شاشة", products: "صورة" };
+const BRAIN_KIND_TITLE = { logos: "لوجو", screens: "شاشة", products: "صورة", characters: "شخصيات", sets: "أماكن", props: "أدوات" };
 const curBrain = () => adx.brains.find((b) => b.id === adx.brainId) || adx.brains[0];
 function renderBrain() {
   const b = curBrain();
@@ -1115,7 +1203,7 @@ function renderBrain() {
   document.querySelectorAll("#adBrainBody [data-bf]").forEach((el) => (el.value = b[el.dataset.bf] || ""));
   document.querySelector('#adBrainBody [data-bn="name"]').value = b.name;
   document.querySelectorAll("#adBrainBody [data-bsec]").forEach((el) => (el.hidden = b.type !== "app"));
-  for (const kind of ["logos", "screens", "products"]) {
+  for (const kind of ["logos", "screens", "products", "characters", "sets", "props"]) {
     const grid = document.querySelector(`[data-bgrid="${kind}"]`);
     grid.hidden = kind === "screens" && b.type !== "app";
     grid.innerHTML = b[kind].map((x) => `<div class="ad-brain-item" data-bfile="${adEsc(x.file)}">

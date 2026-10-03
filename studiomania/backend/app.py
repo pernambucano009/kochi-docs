@@ -6090,7 +6090,7 @@ def run_ad_adapt(aid: str) -> None:
 
 # ---------- عقل الإعلان: المنتج (تطبيق / منتج ملموس / خدمة)، أصوله الحقيقية (شاشات، لوجو، صور منتج) وهويته
 
-BRAIN_KINDS = ("screens", "logos", "products")
+BRAIN_KINDS = ("screens", "logos", "products", "characters", "sets", "props")
 BRAIN_FIELDS = ("type", "domain", "about", "audience", "rules", "palette", "theme", "typography", "ui_style", "logo_description")
 BRAIN_LOCK = threading.Lock()
 
@@ -6341,7 +6341,7 @@ def apply_brain(aid: str, sids: list[str] | None = None, use_model: bool = True)
     brain = ad_brain(d.get("settings"))
     if not p or not brain:
         return 0
-    want = {"ui": ("screens",), "logo": ("logos",), "prop": ("products",)}
+    want = {"ui": ("screens",), "logo": ("logos",), "prop": ("products", "props"), "character": ("characters",), "background": ("sets",)}
     todo = []
     for s in p["shots"]:
         if sids and s["id"] not in sids:
@@ -6350,8 +6350,14 @@ def apply_brain(aid: str, sids: list[str] | None = None, use_model: bool = True)
             if c.get("use") is False or c.get("kind") not in want or (is_uploaded(c.get("image")) and not c.get("brain_asset")):
                 continue
             pool = brain_assets(brain, want[c["kind"]])
-            if c["kind"] == "prop" and (brain.get("type") != "physical" or not c.get("asset")):
-                continue  # الأدوات العادية مش المنتج
+            if c["kind"] in ("character", "background", "prop"):
+                # الأبطال والأماكن والأدوات المتكررة: بالاسم بالظبط بس (مفيش تخمين)
+                pool = [a for a in pool if a.get("name") and (a["name"] == c.get("name") or a["name"] == c.get("asset")
+                                                              or (a.get("cast_id") and a.get("cast_id") == c.get("cast_id")))]
+                if c["kind"] == "prop" and not pool and brain.get("type") == "physical" and c.get("asset"):
+                    pool = brain_assets(brain, ("products",))
+                if not pool:
+                    continue
             if pool:
                 todo.append((s["id"], c, pool))
     if not todo:
@@ -6367,7 +6373,7 @@ def apply_brain(aid: str, sids: list[str] | None = None, use_model: bool = True)
     picks: dict[str, str] = {}
     unsure = []
     for sid, c, pool in todo:
-        a = by_name(c, pool) or (pool[0] if len(pool) == 1 else None)
+        a = by_name(c, pool) or (pool[0] if len(pool) == 1 or c.get("kind") in ("character", "background") else None)
         if a:
             picks[c["id"]] = a["file"]
         else:
@@ -6588,6 +6594,8 @@ def prod_dir(aid: str, sub: str) -> Path:
 
 
 def prod_busy(p: dict | None) -> bool:
+    if (p or {}).get("cast_status") == "working" or any(c.get("status") == "working" for c in (p or {}).get("cast") or []):
+        return True
     for s in (p or {}).get("shots") or []:
         if "working" in (s.get("frame_status"), s.get("comp_status"), s.get("motion_status"), s.get("layers_status")):
             return True
@@ -6638,7 +6646,10 @@ def prod_to_dict(aid: str, p: dict | None) -> dict | None:
             "takes": [{**t, "url": f"{base}/takes/{t['file']}" if t.get("file") else None,
                        "ref_urls": [f"{base}/editrefs/{f}" for f in t.get("extra_refs") or []]} for t in s.get("takes") or []],
         })
-    return {**p, "shots": shots}
+    cast = [{**c, "image_url": f"{base}/cast/{c['image']}" if c.get("image") else None,
+             "images": [{"file": f, "url": f"{base}/cast/{f}", "note": (c.get("notes") or {}).get(f, "")} for f in c.get("images") or []]}
+            for c in p.get("cast") or []]
+    return {**p, "shots": shots, "cast": cast}
 
 
 def ref_scene_for(analysis: dict, k: int, total: int) -> dict | None:
@@ -7281,6 +7292,279 @@ def run_ad_take(aid: str, sid: str, tid: str) -> None:
         setp(status="failed", error=str(getattr(exc, "detail", None) or exc)[:400])
 
 
+# ---------- 🎭 الأبطال والمكونات المتكررة: صورة مرجعية ثابتة لكل شخصية ومكان وأداة قبل الستوري بورد
+
+CAST_BRAIN = {"character": "characters", "background": "sets", "prop": "props"}
+
+
+def find_cast(p: dict, cid: str) -> dict:
+    c = next((x for x in p.get("cast") or [] if x["id"] == cid), None)
+    if c is None:
+        raise HTTPException(404, "العنصر ده مش موجود")
+    return c
+
+
+def set_cast(aid: str, cid: str, **kw) -> None:
+    def fn(d):
+        c = next((x for x in (d.get("prod") or {}).get("cast") or [] if x["id"] == cid), None)
+        if c is not None:
+            c.update(**kw)
+    update_ad(aid, fn)
+
+
+def run_cast_extract(aid: str) -> None:
+    try:
+        with closing(db()) as conn:
+            _, d = ad_row(conn, aid)
+        p = d["prod"]
+        if atlas.mock_mode():
+            out = az.mock_cast(p["shots"])
+        else:
+            brain = ad_brain(d.get("settings"))
+            known = [{**a, "kind": k} for k, kind in (("character", "characters"), ("background", "sets"), ("prop", "props"))
+                     for a in (brain or {}).get(kind) or []]
+            out = ad_json(series_chat(az.cast_messages(az.header_text(p["header"]), d.get("adaptation") or {}, p["shots"], known)), "الأبطال")
+        valid_n = {s.get("n") for s in p["shots"]}
+        items = []
+        for x in out.get("cast") or []:
+            if not isinstance(x, dict) or not str(x.get("name") or "").strip():
+                continue
+            shots_n = []
+            for n in x.get("shots") or []:
+                try:
+                    if int(n) in valid_n and int(n) not in shots_n:
+                        shots_n.append(int(n))
+                except (TypeError, ValueError):
+                    pass
+            items.append({"id": uuid.uuid4().hex[:8], "name": str(x["name"]).strip()[:40],
+                          "kind": x.get("kind") if x.get("kind") in az.CAST_KINDS else "character",
+                          "description": str(x.get("description") or "")[:1000], "image_prompt": str(x.get("image_prompt") or "")[:3000],
+                          "shots": shots_n, "image": None, "images": [], "notes": {}, "status": "idle", "error": None,
+                          "approved": False})
+        # اللي موجود قبل كده في عقل الإعلان بنفس الاسم: صورته بتتجاب (وبتستنى موافقتك)
+        brain = ad_brain(d.get("settings"))
+        for it in items:
+            a = next((a for a in (brain or {}).get(CAST_BRAIN[it["kind"]]) or [] if a.get("name") == it["name"]), None)
+            if a and (brain_dir(brain["id"]) / a["file"]).exists():
+                f = f"cast-{it['id']}-brain{Path(a['file']).suffix.lower()}"
+                shutil.copyfile(brain_dir(brain["id"]) / a["file"], prod_dir(aid, "cast") / f)
+                it.update(image=f, images=[f], status="done", image_prompt=a.get("prompt") or it["image_prompt"], from_brain=True)
+        def fn(d):
+            p = d["prod"]
+            # اللي وافقت عليهم قبل كده بيفضلوا، والجديد بيتضاف
+            keep = [c for c in p.get("cast") or [] if c.get("approved") or c.get("image")]
+            names = {c["name"] for c in keep}
+            p["cast"] = keep + [c for c in items if c["name"] not in names][:max(0, 10 - len(keep))]
+            p["cast_status"], p["cast_error"] = "done", None if items else "الموديل ما طلّعش أبطال أو مكونات متكررة"
+        update_ad(aid, fn)
+    except Exception as exc:  # noqa: BLE001
+        msg = str(getattr(exc, "detail", None) or exc)[:300]
+        update_ad(aid, lambda d: d["prod"].update(cast_status="failed", cast_error=msg))
+
+
+@app.post("/api/ads/{aid}/prod/cast/extract")
+def prod_cast_extract(aid: str):
+    def fn(d):
+        p = prod_of(d)
+        if p.get("cast_status") == "working":
+            raise HTTPException(400, "بيطلّع الأبطال بالفعل")
+        p.update(cast_status="working", cast_error=None)
+    update_ad(aid, fn)
+    threading.Thread(target=run_cast_extract, args=(aid,), daemon=True).start()
+    return ad_response(aid)
+
+
+class CastIn(BaseModel):
+    fields: dict
+
+
+@app.patch("/api/ads/{aid}/prod/cast/{cid}")
+def prod_cast_patch(aid: str, cid: str, body: CastIn):
+    def fn(d):
+        c = find_cast(prod_of(d), cid)
+        for k in ("name", "description", "image_prompt"):
+            if k in body.fields:
+                c[k] = str(body.fields[k] or "")[:3000]
+        if body.fields.get("kind") in az.CAST_KINDS:
+            c["kind"] = body.fields["kind"]
+        if "shots" in body.fields and isinstance(body.fields["shots"], list):
+            c["shots"] = [int(n) for n in body.fields["shots"] if str(n).isdigit()]
+    update_ad(aid, fn)
+    return ad_response(aid)
+
+
+@app.delete("/api/ads/{aid}/prod/cast/{cid}")
+def prod_cast_delete(aid: str, cid: str):
+    def fn(d):
+        p = prod_of(d)
+        p["cast"] = [c for c in p.get("cast") or [] if c["id"] != cid]
+    update_ad(aid, fn)
+    return ad_response(aid)
+
+
+def run_cast_image(aid: str, cid: str, note: str = "", extra: list[str] | None = None) -> None:
+    try:
+        set_cast(aid, cid, status="working", error=None)
+        with closing(db()) as conn:
+            _, d = ad_row(conn, aid)
+        p = d["prod"]
+        c = find_cast(p, cid)
+        h = p["header"]
+        size = {"character": "1024x1536", "background": az.ASPECTS.get(h.get("aspect"), az.ASPECTS["9:16"])[0]}.get(c["kind"], "1024x1024")
+        name = f"cast-{cid}-{uuid.uuid4().hex[:6]}.png"
+        dest = prod_dir(aid, "cast") / name
+        if atlas.mock_mode():
+            w, hh = size.split("x")
+            mock_image(dest, f"{int(w) // 3}x{int(hh) // 3}", c["name"][:10], len(c["name"]))
+        else:
+            cur = prod_dir(aid, "cast") / c["image"] if note and c.get("image") else None
+            extra_paths = [x for x in (prod_dir(aid, "editrefs") / f for f in extra or []) if x.exists()][:4]
+            if cur and cur.exists():
+                refs = [atlas.reference_url(cur)] + [atlas.reference_url(x) for x in extra_paths]
+                prompt = az.frame_edit_prompt(h, note, [], len(extra_paths)).replace("storyboard frame of a commercial", "reference image")
+            else:
+                refs = [atlas.reference_url(x) for x in extra_paths] + style_ref_urls(h, 3)
+                prompt = az.cast_prompt(h, c) + (f"\nThe first {len(extra_paths)} reference image(s) were given by the director: "
+                                                 f"follow them for the look. {note}" if extra_paths else (f"\n{note}" if note else ""))
+            url = atlas.generate_image(carousel_settings()["image_family"], prompt, size,
+                                       auth.get_setting("series_frame_quality") or "medium", refs or None)
+            atlas.download(url, dest)
+        def done(d):
+            x = find_cast(d["prod"], cid)
+            x.setdefault("images", []).append(name)
+            if note:
+                x.setdefault("notes", {})[name] = note
+            x.update(image=name, status="done", error=None, approved=False)
+        update_ad(aid, done)
+    except Exception as exc:  # noqa: BLE001
+        set_cast(aid, cid, status="failed", error=str(getattr(exc, "detail", None) or exc)[:400])
+
+
+@app.post("/api/ads/{aid}/prod/cast/images")
+def prod_cast_images(aid: str, cast_id: str | None = None):
+    """🖼️ صورة مرجعية: عنصر واحد (نسخة جديدة) أو كل اللي لسه ملهمش صورة."""
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات")
+    ids: list[str] = []
+    def fn(d):
+        for c in prod_of(d).get("cast") or []:
+            if c.get("status") == "working" or (cast_id and c["id"] != cast_id) or (not cast_id and c.get("image")):
+                continue
+            c.update(status="working", error=None)
+            ids.append(c["id"])
+    update_ad(aid, fn)
+    if not ids:
+        raise HTTPException(400, "كلهم ليهم صور")
+    for i in ids:
+        ad_executor.submit(run_cast_image, aid, i)
+    return ad_response(aid)
+
+
+@app.post("/api/ads/{aid}/prod/cast/{cid}/edit")
+def prod_cast_edit(aid: str, cid: str, note: str = Form(""), files: list[UploadFile] = File(default=[])):
+    """✏️ تعديل الصورة المرجعية بطلبك (ومعاه صور مرجعية)."""
+    note = note.strip()[:1500]
+    if not note:
+        raise HTTPException(400, "اكتب عايز تعدّل إيه")
+    extra = save_edit_refs(aid, files)
+    set_cast(aid, cid, status="working", error=None)
+    ad_executor.submit(run_cast_image, aid, cid, note, extra)
+    return ad_response(aid)
+
+
+@app.post("/api/ads/{aid}/prod/cast/{cid}/upload")
+def prod_cast_upload(aid: str, cid: str, file: UploadFile = File(...)):
+    name = save_upload(file, IMAGE_EXTENSIONS, prod_dir(aid, "cast"), f"cast-{cid}-up")
+    def fn(d):
+        c = find_cast(prod_of(d), cid)
+        c.setdefault("images", []).append(name)
+        c.update(image=name, status="done", error=None, approved=False)
+    update_ad(aid, fn)
+    return ad_response(aid)
+
+
+class CastPickIn(BaseModel):
+    file: str
+
+
+@app.post("/api/ads/{aid}/prod/cast/{cid}/pick")
+def prod_cast_pick(aid: str, cid: str, body: CastPickIn):
+    def fn(d):
+        c = find_cast(prod_of(d), cid)
+        if body.file not in c.get("images") or []:
+            raise HTTPException(404, "النسخة مش موجودة")
+        c.update(image=body.file, approved=False)
+    update_ad(aid, fn)
+    return ad_response(aid)
+
+
+def approve_cast(aid: str, cid: str) -> None:
+    """الموافقة: الصورة بتتحفظ في عقل الإعلان، وبتتربط بكل لقطة العنصر ده فيها (مكون باسمه بالظبط)."""
+    with closing(db()) as conn:
+        _, d = ad_row(conn, aid)
+    c = find_cast(prod_of(d), cid)
+    if not c.get("image"):
+        raise HTTPException(400, f"«{c['name']}» ملوش صورة لسه")
+    brain = ad_brain(d.get("settings"))
+    if not brain:
+        raise HTTPException(400, "مفيش عقل إعلان مختار. اعمله من «🧠 عقل الإعلان»")
+    kind = CAST_BRAIN[c["kind"]]
+    src = prod_dir(aid, "cast") / c["image"]
+    bfile = f"{kind[:-1]}-{cid}-{uuid.uuid4().hex[:6]}{src.suffix.lower()}"
+    shutil.copyfile(src, brain_dir(brain["id"]) / bfile)
+    def bfn(b):
+        lst = b.setdefault(kind, [])
+        old = [a for a in lst if a.get("cast_id") == cid or a.get("name") == c["name"]]
+        for a in old:  # النسخة القديمة من نفس العنصر بتتشال من العقل
+            (brain_dir(brain["id"]) / a["file"]).unlink(missing_ok=True)
+        b[kind] = [a for a in lst if a not in old] + [
+            {"file": bfile, "name": c["name"], "description": c.get("description", ""), "prompt": c.get("image_prompt", ""),
+             "cast_id": cid, "from_ad": aid, "named": True}]
+    update_brain(brain["id"], bfn)
+    comp_kind = {"character": "character", "background": "background", "prop": "prop"}[c["kind"]]
+    def fn(d):
+        p = d["prod"]
+        x = find_cast(p, cid)
+        x.update(approved=True, brain_file=bfile)
+        for s in p["shots"]:
+            if s.get("n") not in x.get("shots") or []:
+                continue
+            comp = next((k for k in s.get("components") or [] if k.get("cast_id") == cid or k.get("name") == x["name"]), None)
+            if comp is None:
+                comp = {"id": uuid.uuid4().hex[:8], "name": x["name"], "kind": comp_kind, "from": "", "description": x.get("description", ""),
+                        "image_prompt": x.get("image_prompt", ""), "animation": "", "image": None, "images": [], "status": "idle",
+                        "error": None, "use": True}
+                s.setdefault("components", []).insert(0, comp)
+            comp.update(cast_id=cid, name=x["name"], kind=comp_kind, image_prompt=x.get("image_prompt", ""))
+        # الشخصيات اللي اتوافق عليها بتدخل في راس الإعلان بوصفها الثابت
+        chars = [k for k in p.get("cast") or [] if k.get("approved") and k["kind"] == "character"]
+        if chars:
+            p["header"]["characters"] = "; ".join(f"{k['name']}: {k.get('image_prompt') or k.get('description', '')}" for k in chars)
+    update_ad(aid, fn)
+    apply_brain(aid, use_model=False)  # صورته بتتنسخ لكل مكون باسمه
+
+
+@app.post("/api/ads/{aid}/prod/cast/{cid}/approve")
+def prod_cast_approve(aid: str, cid: str, undo: bool = False):
+    if undo:
+        set_cast(aid, cid, approved=False)
+    else:
+        approve_cast(aid, cid)
+    return ad_response(aid)
+
+
+@app.post("/api/ads/{aid}/prod/cast/approve-all")
+def prod_cast_approve_all(aid: str):
+    with closing(db()) as conn:
+        _, d = ad_row(conn, aid)
+    todo = [c["id"] for c in prod_of(d).get("cast") or [] if c.get("image") and not c.get("approved")]
+    if not todo:
+        raise HTTPException(400, "مفيش حاجة ليها صورة ومستنية موافقة")
+    for cid in todo:
+        approve_cast(aid, cid)
+    return ad_response(aid)
+
+
 # ---------- ✨ الموشن المتركب: طبقات (عناصر وكلام) بتتحرك فوق فيديو اللقطة وتتطبع عليه
 
 LAYER_KINDS = ("graphic", "text", "ui", "icon", "effect", "logo")
@@ -7625,6 +7909,11 @@ def reset_stuck_prod() -> None:
             p = d.get("prod")
             if not p:
                 continue
+            if p.get("cast_status") == "working":
+                p.update(cast_status="failed", cast_error="اتقطع لما السيرفر اتقفل. دوس تاني")
+            for c in p.get("cast") or []:
+                if c.get("status") == "working":
+                    c.update(status="failed", error="اتقطع لما السيرفر اتقفل")
             for s in p["shots"]:
                 if s.get("frame_status") in ("queued", "working"):
                     s.update(frame_status="failed", frame_error="اتقطع لما السيرفر اتقفل. ارسم تاني")

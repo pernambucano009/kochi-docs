@@ -640,7 +640,9 @@ def brain_text(brain: dict | None) -> str:
                      ("theme", "الثيم"), ("typography", "الخطوط"), ("ui_style", "شكل الواجهة")):
         if brain.get(k):
             lines.append(f"{label}: {brain[k]}")
-    for kind, label in (("screens", "شاشات التطبيق الحقيقية المتاحة"), ("logos", "اللوجوهات المتاحة"), ("products", "صور المنتج المتاحة")):
+    for kind, label in (("screens", "شاشات التطبيق الحقيقية المتاحة"), ("logos", "اللوجوهات المتاحة"), ("products", "صور المنتج المتاحة"),
+                        ("characters", "شخصيات البراند الثابتة (لو مناسبة استخدمها بنفس اسمها)"), ("sets", "أماكن البراند الثابتة"),
+                        ("props", "أدوات البراند الثابتة")):
         items = brain.get(kind) or []
         if items:
             lines.append(f"{label} (استخدم الاسم بالظبط في asset):\n" + "\n".join(f"- {a.get('name') or a['file']}: {a.get('description', '')}" for a in items[:60]))
@@ -671,3 +673,69 @@ def match_messages(comps: list[dict], assets: list[dict]) -> list[dict]:
         + f"\n\nرجّع JSON بس:\n{MATCH_FORMAT}"
     )
     return [{"role": "user", "content": text}]
+
+
+# ================================================================ 🎭 الأبطال والمكونات المتكررة (قبل الستوري بورد)
+
+CAST_KINDS = {"character": "شخصية", "background": "مكان / خلفية", "prop": "أداة / حاجة"}
+
+CAST_FORMAT = """{
+  "cast": [
+    {"name": "اسم قصير مميز (مثلًا: سارة، المدرب فهد، الجيم، الكافيه، زجاجة المية)",
+     "kind": "character | background | prop",
+     "description": "وصفه بالعربي ودوره في الإعلان",
+     "image_prompt": "English, very detailed and fixed description used in EVERY shot. Character: gender, age, Saudi/Gulf look, face, hair, body type, exact modest outfit with colors (women: loose long clothing and hijab). Background: the empty place with its layout, materials, colors and lighting, no people. Prop: exact shape, material, colors, branding.",
+     "shots": [1, 3, 4]}
+  ]
+}"""
+
+
+def cast_messages(header_txt: str, adaptation: dict, shots: list[dict], known: list[dict] | None = None) -> list[dict]:
+    rows = "\n".join(
+        f"لقطة {s.get('n')}: {s.get('visual', '')} | المكونات: " + "، ".join(f"{c.get('name')} ({c.get('kind')})" for c in s.get("components") or [])
+        for s in shots)
+    text = (
+        "أنت كاستنج دايركتور ومصمم إنتاج لإعلان. اطلع من الإعلان ده الأبطال (الشخصيات) والأماكن/الخلفيات والأدوات "
+        "اللي لازم تفضل هي هي في كل لقطة بتظهر فيها، عشان نعمل لكل واحد صورة مرجعية ثابتة قبل الستوري بورد.\n"
+        "- كل شخصية بتظهر في الإعلان (حتى لو في لقطة واحدة) تتعمل لوحدها باسم مميز.\n"
+        "- الأماكن والأدوات: اللي بتتكرر في لقطتين أو أكتر بس.\n"
+        "- متطلّعش شاشات التطبيق ولا اللوجو ولا عناصر الموشن جرافيك (ليهم مكان تاني).\n"
+        "- shots = أرقام اللقطات اللي بيظهر فيها بالظبط.\n"
+        "- اللبس محتشم دايمًا: البنات لبس واسع طويل مع حجاب، والرجالة تيشيرت وبنطلون أو شورت تحت الركبة.\n"
+        "- أقصى حاجة 8، الأهم الأول.\n\n"
+        f"راس الإعلان:\n{header_txt}\n\nالشخصيات المكتوبة في الاقتراح: {adaptation.get('cast', '') or '—'}\n"
+        f"الأماكن: {adaptation.get('locations', '') or '—'}\n\nاللقطات:\n{rows}\n\n"
+        + ("موجودين قبل كده في عقل الإعلان (لو حد منهم مناسب للإعلان ده استخدمه بنفس اسمه ووصفه بالظبط بدل ما تعمل جديد):\n"
+           + "\n".join(f"- {k.get('name')} ({k.get('kind')}): {k.get('prompt') or k.get('description', '')}" for k in known) + "\n\n"
+           if known else "")
+        + 
+        f"رجّع JSON بس بالشكل ده:\n{CAST_FORMAT}"
+    )
+    return [{"role": "user", "content": text}]
+
+
+def cast_prompt(h: dict, item: dict) -> str:
+    kind = item.get("kind")
+    head = {
+        "character": "Character reference sheet for a commercial: ONE person, full body, standing, front view, neutral friendly "
+                     "expression, even soft studio light, plain light grey background, nothing else in the image.",
+        "background": "Location reference plate for a commercial: the empty place only, no people, eye-level wide shot, "
+                      "natural realistic lighting.",
+        "prop": "Product/prop reference for a commercial: the object alone, centered, on a plain light background, soft studio light.",
+    }.get(kind, "Reference image for a commercial.")
+    return "\n".join(x for x in [
+        head,
+        item.get("image_prompt") or item.get("description", ""),
+        f"Visual style: {h['style']}" if h.get("style") else "",
+        f"Brand identity: {h['brand']}" if h.get("brand") and kind != "character" else "",
+        f"{h.get('aspect', '9:16')} framing." if kind == "background" else "",
+        "No text, no watermark.",
+    ] if x)
+
+
+def mock_cast(shots: list[dict]) -> dict:
+    ns = [s.get("n") for s in shots] or [1]
+    return {"cast": [
+        {"name": "المتدرب", "kind": "character", "description": "شاب سعودي في العشرينات", "image_prompt": "A Saudi man in his 20s, short black hair, light beard, loose navy t-shirt, grey track pants.", "shots": ns},
+        {"name": "الجيم", "kind": "background", "description": "جيم حديث", "image_prompt": "A modern bright gym with black rubber floor and wooden walls.", "shots": ns[:2]},
+    ]}
