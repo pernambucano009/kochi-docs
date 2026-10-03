@@ -5633,6 +5633,8 @@ def ad_to_dict(r: sqlite3.Row, d: dict) -> dict:
         "prod": with_ref_motion(prod_to_dict(aid, d.get("prod")), analysis),
         "chain_prod": bool(d.get("chain_prod")),
         "brain_db": ad_brain_db(d.get("settings")),
+        "video_models": [{"key": k, "label": v["label"]} for k, v in AD_VIDEO_MODELS.items()],
+        "ar_voices": [{"id": k, "label": v} for k, v in AR_VOICES.items()],
     }
 
 
@@ -6605,7 +6607,7 @@ def prod_busy(p: dict | None) -> bool:
     if (p or {}).get("cast_status") == "working" or any(c.get("status") == "working" for c in (p or {}).get("cast") or []):
         return True
     for s in (p or {}).get("shots") or []:
-        if "working" in (s.get("frame_status"), s.get("comp_status"), s.get("motion_status"), s.get("layers_status")):
+        if "working" in (s.get("frame_status"), s.get("comp_status"), s.get("motion_status"), s.get("layers_status"), s.get("voice_status")):
             return True
         if any(c.get("status") == "working" for c in s.get("components") or []):
             return True
@@ -6647,6 +6649,7 @@ def prod_to_dict(aid: str, p: dict | None) -> dict | None:
             "frames": [{"file": f, "url": f"{base}/frames/{f}", "note": (s.get("frame_notes") or {}).get(f, "")}
                        for f in s.get("frames") or []],
             "frame_note": (s.get("frame_notes") or {}).get(s.get("frame") or "", ""),
+            "voice_url": f"{base}/voice/{s['voice_file']}" if s.get("voice_file") else None,
             "components": [{**c, "image_url": f"{base}/comps/{c['image']}" if c.get("image") else None,
                             "uploaded": is_uploaded(c.get("image")),
                             "images": [{"file": f, "url": f"{base}/comps/{f}"} for f in c.get("images") or []]}
@@ -6766,7 +6769,7 @@ class ProdShotIn(BaseModel):
     fields: dict
 
 
-PSHOT_FIELDS = ("seconds", "visual", "shot", "camera", "on_screen_text", "voice", "sfx", "music", "prompt", "sb_prompt",
+PSHOT_FIELDS = ("seconds", "visual", "shot", "camera", "on_screen_text", "voice", "sfx", "music", "prompt", "sb_prompt", "speaker", "talking",
                 "assembly_prompt", "motion_notes", "motion_prompt", "approved")
 
 
@@ -6777,7 +6780,7 @@ def prod_shot_patch(aid: str, sid: str, body: ProdShotIn):
         for k in PSHOT_FIELDS:
             if k in body.fields:
                 v = body.fields[k]
-                s[k] = bool(v) if k == "approved" else max(1.0, min(15.0, float(v or 4))) if k == "seconds" else str(v or "")
+                s[k] = bool(v) if k in ("approved", "talking") else max(1.0, min(15.0, float(v or 4))) if k == "seconds" else str(v or "")
         if "sb_prompt" in body.fields:  # المنشنز بتتقري من جديد من البرومبت اللي كتبته
             s["mentions"] = az.find_mentions(s["sb_prompt"], [a["name"] for a in brain_db(ad_brain(d.get("settings")))])
     update_ad(aid, fn)
@@ -7351,12 +7354,18 @@ def run_ad_take(aid: str, sid: str, tid: str) -> None:
                 ments = [brain_dir(brain["id"]) / a["file"] for a in mention_refs(brain, s.get("mentions"))][:max(0, AD_MAX_REFS - 1 - len(extra))]
                 refs = ([frames / s["frame"]] + extra + ments
                         + [comps / c["image"] for c in ref_comps(plate_shot(s), AD_MAX_REFS - 1 - len(extra) - len(ments))])
-                body = {
-                    "model": series_settings()["video_model"], "prompt": t["prompt"],
-                    "reference_images": [atlas.upload_media(seedance_ref(x)) for x in refs if x.exists()],
-                    "duration": t["gen_duration"], "resolution": atlas.RESOLUTION, "ratio": aspect,
-                    "generate_audio": False, "watermark": False,
-                }
+                vm = ad_video_model(t.get("video_model"))
+                if vm["kind"] == "i2v":
+                    img = atlas.reference_url(frames / s["frame"])
+                    body = {"model": vm["model"], "prompt": t["prompt"], "image": img, "image_url": img,
+                            "duration": t["gen_duration"], "aspect_ratio": aspect}
+                else:
+                    body = {
+                        "model": vm["model"], "prompt": t["prompt"],
+                        "reference_images": [atlas.upload_media(seedance_ref(x)) for x in refs if x.exists()],
+                        "duration": t["gen_duration"], "resolution": atlas.RESOLUTION, "ratio": aspect,
+                        "generate_audio": False, "watermark": False,
+                    }
                 pid = atlas.submit_video(body)
                 setp(prediction_id=pid)
             url = atlas.wait_for(pid, lambda _s: None)
@@ -7810,6 +7819,199 @@ def prod_composite_all(aid: str):
     return ad_response(aid)
 
 
+# ---------- 🎬 موديلات الفيديو للإعلانات، 🎙️ الصوت (بيحدد مدة اللقطة)، 👄 الكلام على الوش (لب سينك)
+
+AD_VIDEO_MODELS = {
+    "seedance": {"label": "Seedance (من الإعدادات)", "kind": "ref"},
+    "seedance-2": {"label": "Seedance 2.0", "model": "bytedance/seedance-2.0/reference-to-video", "kind": "ref"},
+    "kling-3-std": {"label": "Kling 3.0 Std (تمثيل وحركة أحسن)", "model": "kwaivgi/kling-v3.0-std/image-to-video", "kind": "i2v"},
+    "kling-3-pro": {"label": "Kling 3.0 Pro (أعلى جودة)", "model": "kwaivgi/kling-v3.0-pro/image-to-video", "kind": "i2v"},
+}
+AR_VOICES = {"Arabic_FriendlyGuy": "راجل ودود", "Arabic_CalmWoman": "ست هادية"}
+TTS_MODEL = "minimax/speech-2.6-hd"
+LIPSYNC = {"video": "veed/lipsync", "image": "atlascloud/infinitetalk"}
+
+
+def ad_video_model(key: str | None) -> dict:
+    vm = AD_VIDEO_MODELS.get(key or "") or AD_VIDEO_MODELS["seedance"]
+    return {**vm, "key": key if key in AD_VIDEO_MODELS else "seedance",
+            "model": vm.get("model") or series_settings()["video_model"]}
+
+
+def take_duration(vm: dict, seconds: float) -> int:
+    if vm["kind"] == "i2v":
+        return 5 if seconds <= 5 else 10  # Kling: 5 أو 10 ثواني
+    return int(min(atlas.MAX_DURATION, max(atlas.MIN_DURATION, math.ceil(seconds))))
+
+
+def shot_voice_id(p: dict, s: dict) -> str:
+    voices = p.get("voices") or {}
+    return voices.get(s.get("speaker") or "__narrator") or voices.get("__narrator") or "Arabic_FriendlyGuy"
+
+
+def set_voice_file(aid: str, sid: str, name: str, dur: float) -> None:
+    def fn(d):
+        s = find_pshot(d["prod"], sid)
+        old = s.get("voice_file")
+        s.update(voice_file=name, voice_dur=round(dur, 2), voice_status="done", voice_error=None,
+                 seconds=max(1.0, min(15.0, round(dur + 0.4, 1))))  # مدة اللقطة = طول الكلام + نفس صغير
+        if old and old != name:
+            (prod_dir(aid, "voice") / old).unlink(missing_ok=True)
+    update_ad(aid, fn)
+
+
+def run_ad_voice(aid: str, sid: str) -> None:
+    try:
+        set_pshot(aid, sid, voice_status="working", voice_error=None)
+        with closing(db()) as conn:
+            _, d = ad_row(conn, aid)
+        p = d["prod"]
+        s = find_pshot(p, sid)
+        text = (s.get("voice") or "").strip()
+        if not text:
+            raise RuntimeError("اللقطة دي ملهاش كلام. اكتب الكلام في خانة «الكلام» الأول")
+        name = f"{sid}-{uuid.uuid4().hex[:6]}.mp3"
+        dest = prod_dir(aid, "voice") / name
+        if atlas.mock_mode():
+            secs = max(1.0, 0.45 * len(text.split()))
+            subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i",
+                            f"sine=frequency=220:duration={secs:.2f}", "-c:a", "libmp3lame", str(dest)], check=True, capture_output=True)
+        else:
+            url = atlas.run_model("Audio", {"model": TTS_MODEL, "text": text[:1500], "voice_id": shot_voice_id(p, s),
+                                            "language_boost": "Arabic"}, "الصوت", max_seconds=300, interval=2)
+            atlas.download(url, dest)
+        set_voice_file(aid, sid, name, probe_duration(dest))
+    except Exception as exc:  # noqa: BLE001
+        set_pshot(aid, sid, voice_status="failed", voice_error=str(getattr(exc, "detail", None) or exc)[:300])
+
+
+@app.post("/api/ads/{aid}/prod/voice")
+def prod_voice(aid: str, shot_id: str | None = None):
+    """🎙️ الصوت: كلام كل لقطة بيتحول لصوت عربي، وطوله بيحدد مدة اللقطة (ومدة الفيديو اللي هيتولد)."""
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات")
+    ids: list[str] = []
+    def fn(d):
+        for s in prod_of(d)["shots"]:
+            if (shot_id and s["id"] != shot_id) or s.get("voice_status") == "working" or not (s.get("voice") or "").strip():
+                continue
+            if not shot_id and s.get("voice_file"):
+                continue  # الكل: اللي ليها صوت بالفعل متتلمسش
+            s.update(voice_status="working", voice_error=None)
+            ids.append(s["id"])
+    update_ad(aid, fn)
+    if not ids:
+        raise HTTPException(400, "مفيش لقطات محتاجة صوت (كلها ليها صوت أو ملهاش كلام)")
+    for i in ids:
+        ad_executor.submit(run_ad_voice, aid, i)
+    return ad_response(aid)
+
+
+@app.post("/api/ads/{aid}/prod/shots/{sid}/voice/upload")
+def prod_voice_upload(aid: str, sid: str, file: UploadFile = File(...)):
+    """صوتك انت (تسجيل) للقطة بدل الصوت المولّد."""
+    name = save_audio_upload(file, prod_dir(aid, "voice"), f"{sid}-up")
+    set_voice_file(aid, sid, name, probe_duration(prod_dir(aid, "voice") / name))
+    return ad_response(aid)
+
+
+@app.delete("/api/ads/{aid}/prod/shots/{sid}/voice")
+def prod_voice_delete(aid: str, sid: str):
+    def fn(d):
+        s = find_pshot(prod_of(d), sid)
+        if s.get("voice_file"):
+            (prod_dir(aid, "voice") / s["voice_file"]).unlink(missing_ok=True)
+        s.update(voice_file=None, voice_dur=None, voice_status="idle", voice_error=None)
+    update_ad(aid, fn)
+    return ad_response(aid)
+
+
+class VoicesIn(BaseModel):
+    voices: dict
+    video_model: str | None = None
+
+
+@app.put("/api/ads/{aid}/prod/voices")
+def prod_voices(aid: str, body: VoicesIn):
+    """الصوت لكل متكلم (الراوي وكل شخصية) وموديل الفيديو للإعلان."""
+    def fn(d):
+        p = prod_of(d)
+        p["voices"] = {str(k)[:60]: str(v)[:80] for k, v in (body.voices or {}).items() if v}
+        if body.video_model in AD_VIDEO_MODELS:
+            p["header"]["video_model"] = body.video_model
+    update_ad(aid, fn)
+    return ad_response(aid)
+
+
+def run_ad_lipsync(aid: str, sid: str, tid: str) -> None:
+    """👄 الكلام على الوش: video = الفيديو المختار + الصوت (سريع)، image = الستوري بورد + الصوت بيتحول لفيديو بيتكلم (أبطأ)."""
+    def setp(**kw):
+        def fn(d):
+            s = next((x for x in (d.get("prod") or {}).get("shots", []) if x["id"] == sid), None)
+            t = next((x for x in (s or {}).get("takes") or [] if x["id"] == tid), None)
+            if t is not None:
+                t.update(**kw)
+        update_ad(aid, fn)
+    try:
+        setp(status="working", error=None)
+        with closing(db()) as conn:
+            _, d = ad_row(conn, aid)
+        s = find_pshot(d["prod"], sid)
+        t = next(x for x in s["takes"] if x["id"] == tid)
+        voice = prod_dir(aid, "voice") / (s.get("voice_file") or "")
+        if not s.get("voice_file") or not voice.exists():
+            raise RuntimeError("اللقطة ملهاش صوت. ولّد الصوت أو ارفعه الأول")
+        dest = prod_dir(aid, "takes") / f"{tid}.mp4"
+        if atlas.mock_mode():
+            src = prod_dir(aid, "takes") / next(x for x in s["takes"] if x["id"] == t["base"])["file"] if t.get("base") else None
+            if src and src.exists():
+                subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src), "-i", str(voice),
+                                "-map", "0:v", "-map", "1:a", "-c:v", "copy", "-shortest", str(dest)], check=True, capture_output=True)
+            else:
+                subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-loop", "1", "-i",
+                                str(prod_dir(aid, "frames") / s["frame"]), "-i", str(voice), "-vf", "scale=480:-2", "-c:v", "libx264",
+                                "-pix_fmt", "yuv420p", "-shortest", str(dest)], check=True, capture_output=True)
+        else:
+            audio_url = atlas.upload_media(voice)
+            if t["method"] == "video":
+                base = next(x for x in s["takes"] if x["id"] == t["base"])
+                body = {"model": LIPSYNC["video"], "video_url": atlas.upload_media(prod_dir(aid, "takes") / base["file"]), "audio_url": audio_url}
+            else:
+                img = atlas.reference_url(prod_dir(aid, "frames") / s["frame"])
+                body = {"model": LIPSYNC["image"], "image": img, "audio": audio_url,
+                        "prompt": f"{s.get('visual', '')}. The person speaks naturally to the camera with natural head movement."}
+            url = atlas.run_model("Video", body, "الكلام على الوش", max_seconds=2400, interval=6)
+            atlas.download(url, dest)
+        setp(status="done", file=dest.name, duration=round(probe_duration(dest), 2), error=None)
+    except Exception as exc:  # noqa: BLE001
+        setp(status="failed", error=str(getattr(exc, "detail", None) or exc)[:400])
+
+
+@app.post("/api/ads/{aid}/prod/shots/{sid}/lipsync")
+def prod_lipsync(aid: str, sid: str, method: str = "video"):
+    if method not in LIPSYNC:
+        raise HTTPException(400, "طريقة غير معروفة")
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات")
+    tid = uuid.uuid4().hex[:10]
+    def fn(d):
+        s = find_pshot(prod_of(d), sid)
+        if not s.get("voice_file"):
+            raise HTTPException(400, "اللقطة ملهاش صوت. ولّد الصوت أو ارفعه الأول")
+        base = base_take(s) if method == "video" else None
+        if method == "video" and not base:
+            raise HTTPException(400, "مفيش فيديو للقطة دي يتركب عليه الكلام. ولّد الفيديو الأول (أو استخدم «من الستوري بورد»)")
+        if method == "image" and not s.get("frame"):
+            raise HTTPException(400, "ارسم الستوري بورد الأول")
+        s["takes"].append({"id": tid, "file": None, "status": "queued", "error": None, "approved": False, "lipsync": True,
+                           "method": method, "base": base["id"] if base else None, "duration": None,
+                           "gen_duration": s.get("voice_dur"), "prompt": "👄 بيتكلم", "created_at": now()})
+        s["chosen"] = tid
+    update_ad(aid, fn)
+    ad_executor.submit(run_ad_lipsync, aid, sid, tid)
+    return ad_response(aid)
+
+
 def revise_video_prompt(prompt: str, note: str) -> str:
     """موديل الكلام بيعدّل برومبت الفيديو (إنجليزي) على طلبك ويسيب الباقي زي ما هو."""
     try:
@@ -7834,14 +8036,18 @@ def queue_ad_take(aid: str, sid: str, note: str = "", from_take: str | None = No
         s = find_pshot(p, sid)
         if not s.get("frame"):
             raise HTTPException(400, f"اللقطة {s['n']} ملهاش ستوري بورد")
-        ments = [{"name": f"@{m['name']}"} for m in mention_refs(ad_brain(d.get("settings")), s.get("mentions"))][:AD_MAX_REFS - 1]
-        prompt = az.video_prompt(p["header"], plate_shot(s), ments + ref_comps(plate_shot(s), AD_MAX_REFS - 1 - len(ments)))
+        vm = ad_video_model(p["header"].get("video_model"))
+        if vm["kind"] == "i2v":  # بيبدأ من صورة الستوري بورد بس (فيها الأبطال والمكونات)
+            prompt = az.video_prompt(p["header"], plate_shot(s), [])
+        else:
+            ments = [{"name": f"@{m['name']}"} for m in mention_refs(ad_brain(d.get("settings")), s.get("mentions"))][:AD_MAX_REFS - 1]
+            prompt = az.video_prompt(p["header"], plate_shot(s), ments + ref_comps(plate_shot(s), AD_MAX_REFS - 1 - len(ments)))
         src = next((t for t in s.get("takes") or [] if t["id"] == from_take and not t.get("composite")), None)
         if note and src and src.get("prompt"):
             prompt = src["prompt"]  # التعديل بيتبني على برومبت النسخة اللي مش عاجباك
         s.setdefault("takes", []).append({
             "id": tid, "file": None, "status": "queued", "error": None, "approved": False, "duration": None,
-            "gen_duration": int(min(atlas.MAX_DURATION, max(atlas.MIN_DURATION, math.ceil(float(s.get("seconds") or 4))))),
+            "gen_duration": take_duration(vm, float(s.get("seconds") or 4)), "video_model": vm["key"],
             "prompt": prompt, "note": note, "revised": not note, "extra_refs": extra or [], "created_at": now()})
         if not s.get("chosen"):
             s["chosen"] = tid
@@ -7913,6 +8119,8 @@ def prod_take_act(aid: str, sid: str, body: TakeActIn, action: str = "pick"):
         t = next(x for x in find_pshot(d["prod"], sid)["takes"] if x["id"] == body.take_id)
         if t.get("composite"):
             ad_executor.submit(run_ad_composite, aid, sid, body.take_id)
+        elif t.get("lipsync"):
+            ad_executor.submit(run_ad_lipsync, aid, sid, body.take_id)
         else:
             ad_executor.submit(run_ad_take, aid, sid, body.take_id)
     return ad_response(aid)
@@ -7943,6 +8151,30 @@ def prod_upload_take(aid: str, shot_id: str, file: UploadFile = File(...)):
         s["chosen"] = tid
     update_ad(aid, fn)
     return ad_response(aid)
+
+
+def ad_voice_track(aid: str, conn: sqlite3.Connection, shots: list[dict], label: str) -> dict | None:
+    """صوت كل لقطة في مكانه على التايم لاين (بداية اللقطة) في ملف تعليق صوتي واحد للمونتاج."""
+    parts, t = [], 0.0
+    for s in shots:
+        f = prod_dir(aid, "voice") / (s.get("voice_file") or "")
+        if s.get("voice_file") and f.exists():
+            parts.append((f, t))
+        t += float(s.get("seconds") or 4)
+    if not parts:
+        return None
+    vid = uuid.uuid4().hex[:12]
+    vfile = f"voice_{vid}.m4a"
+    inputs, chain = [], []
+    for k, (f, start) in enumerate(parts):
+        inputs += ["-i", str(f)]
+        chain.append(f"[{k}:a]adelay={int(start * 1000)}:all=1[a{k}]")
+    chain.append("".join(f"[a{k}]" for k in range(len(parts))) + f"amix=inputs={len(parts)}:normalize=0[out]")
+    subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", *inputs, "-filter_complex", ";".join(chain),
+                    "-map", "[out]", "-c:a", "aac", "-b:a", "160k", str(AUDIO_DIR / vfile)], check=True, capture_output=True, timeout=300)
+    conn.execute("INSERT INTO audio (id, kind, name, filename, duration, created_at) VALUES (?, 'voice', ?, ?, ?, ?)",
+                 (vid, f"🎙️ {label}", vfile, probe_duration(AUDIO_DIR / vfile), now()))
+    return {"id": vid, "volume": 1.0, "delay": 0.0, "offset": 0.0, "length": None, "fade_out": False, "parts": []}
 
 
 @app.post("/api/ads/{aid}/prod/to-editor")
@@ -7976,8 +8208,9 @@ def prod_to_editor(aid: str):
             dur = float(s.get("seconds") or t.get("duration") or 4)
             clips.append({"gen_id": gid, "start": 0.0, "end": min(dur, t.get("duration") or dur),
                           "zoom": 1.0, "x": 0.0, "y": 0.0, "volume": 0.0})
+        voice = ad_voice_track(aid, conn, [s for s, _ in picks], label)
         pid = uuid.uuid4().hex[:12]
-        pdata = {"name": f"📣 {label}", "video_id": None, "coach_id": None, "clips": clips, "voice": None,
+        pdata = {"name": f"📣 {label}", "video_id": None, "coach_id": None, "clips": clips, "voice": voice,
                  "music": default_music(conn), "outro": False, "outro_volume": 1.0, "captions": {}, "logo": {}}
         conn.execute("INSERT INTO projects (id, name, data, render_status, created_at, updated_at) VALUES (?, ?, ?, 'idle', ?, ?)",
                      (pid, pdata["name"], json.dumps(pdata, ensure_ascii=False), now(), now()))
@@ -8006,6 +8239,8 @@ def reset_stuck_prod() -> None:
                     s.update(motion_status="failed", motion_error="اتقطع لما السيرفر اتقفل. استحضر تاني")
                 if s.get("layers_status") == "working":
                     s.update(layers_status="failed", layers_error="اتقطع لما السيرفر اتقفل. خطّط تاني")
+                if s.get("voice_status") == "working":
+                    s.update(voice_status="failed", voice_error="اتقطع لما السيرفر اتقفل. ولّد الصوت تاني")
                 for c in s.get("components") or []:
                     if c.get("status") == "working":
                         c.update(status="failed", error="اتقطع لما السيرفر اتقفل")

@@ -402,3 +402,21 @@ def reference_url(path: Path) -> str:
     url = upload_media(path)
     _uploads[key] = (time.monotonic(), url)
     return url
+
+
+def run_model(kind: str, body: dict, what: str, max_seconds: int = 1800, interval: float = 4) -> str:
+    """أي موديل على Atlas (Video / Audio / Image): يبعت الطلب ويستنى ويرجّع لينك أول ناتج."""
+    with httpx.Client(timeout=90) as client:
+        resp = client.post(f"{BASE_URL}/api/v1/model/generate{kind}", headers=_headers(), json=body)
+    data = _check(resp, what)
+    pid = (data or {}).get("id") or (data or {}).get("prediction_id")
+    if not pid:
+        raise AtlasError(f"{what}: الرد مفيهوش رقم طلب: {str(data)[:200]}")
+    pred = wait_prediction(pid, max_seconds=max_seconds, interval=interval, what=what)
+    outputs = pred.get("outputs") or pred.get("output") or []
+    if isinstance(outputs, str):
+        outputs = [outputs]
+    url = next((o for o in outputs if isinstance(o, str) and o.startswith("http")), None)
+    if not url:
+        raise AtlasError(f"{what} خلص بس مرجعش لينك")
+    return url

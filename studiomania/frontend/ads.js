@@ -642,11 +642,15 @@ function renderAdActivity() {
   if (comps.length) items.push(["prod", `🧩 بيستخرج مكونات: لقطة ${nums(comps)}`]);
   const cimg = shots.filter((s) => s.components.some((c) => c.status === "working"));
   if (cimg.length) items.push(["prod", `🖼️ بيولّد صور ${cimg.reduce((k, s) => k + s.components.filter((c) => c.status === "working").length, 0)} مكون (لقطة ${nums(cimg)})`]);
+  const vc = shots.filter((s) => s.voice_status === "working");
+  if (vc.length) items.push(["prod", `🎙️ بيولّد الصوت: لقطة ${nums(vc)}`]);
+  const ls = shots.filter((s) => s.takes.some((t) => t.lipsync && PBUSY.has(t.status)));
+  if (ls.length) items.push(["prod", `👄 بيحرّك البق مع الكلام: لقطة ${nums(ls)}`]);
   const lp = shots.filter((s) => s.layers_status === "working");
   if (lp.length) items.push(["prod", `🤖 بيخطط طبقات الموشن من الأصلي: لقطة ${nums(lp)}`]);
   const cmp = shots.filter((s) => s.takes.some((t) => t.composite && PBUSY.has(t.status)));
   if (cmp.length) items.push(["prod", `✨ بيركّب الموشن على الفيديو: لقطة ${nums(cmp)}`]);
-  const gen = shots.filter((s) => s.takes.some((t) => t.status === "working" && !t.composite)), waitGen = shots.filter((s) => s.takes.some((t) => t.status === "queued" && !t.composite));
+  const gen = shots.filter((s) => s.takes.some((t) => t.status === "working" && !t.composite && !t.lipsync)), waitGen = shots.filter((s) => s.takes.some((t) => t.status === "queued" && !t.composite && !t.lipsync));
   if (gen.length) items.push(["prod", `🎬 بيولّد فيديو: لقطة ${nums(gen)}`]);
   if (waitGen.length) items.push(["prod", `⏳ فيديو في الطابور: لقطة ${nums(waitGen)}`]);
   const el = $("adActivity");
@@ -699,7 +703,7 @@ document.querySelector('.view[data-view="10"]').addEventListener("click", (e) =>
 const PBUSY = new Set(["queued", "working"]);
 function prodBusy(a) {
   if (a.prod?.cast_status === "working" || a.prod?.cast?.some((c) => c.status === "working")) return true;
-  return !!a.prod?.shots.some((s) => PBUSY.has(s.frame_status) || s.comp_status === "working" || s.motion_status === "working" || s.layers_status === "working"
+  return !!a.prod?.shots.some((s) => PBUSY.has(s.frame_status) || s.comp_status === "working" || s.motion_status === "working" || s.layers_status === "working" || s.voice_status === "working"
     || s.components.some((c) => c.status === "working") || s.takes.some((t) => PBUSY.has(t.status)));
 }
 const HEADER_LABELS = { title: "اسم الإعلان", concept: "الكونسبت", style: "الستايل البصري (بالإنجليزي)", characters: "الشخصيات (نفس الشكل في كل لقطة)",
@@ -907,6 +911,55 @@ function renderSb(a, s) {
     </div></div>`;
 }
 
+// ---------- 🎙️ الصوت (بعد الستوري بورد): بيحدد مدة اللقطة، و👄 الكلام على الوش ----------
+function speakers(a) {
+  return (a.prod.cast || []).filter((c) => c.kind === "character" && c.approved).map((c) => c.name);
+}
+function renderVoice(a, s) {
+  const working = s.voice_status === "working", spk = speakers(a);
+  const base = s.takes.find((t) => t.id === s.chosen && t.url && !t.composite) || [...s.takes].reverse().find((t) => t.url && !t.composite && !t.lipsync);
+  const lipBusy = s.takes.some((t) => t.lipsync && PBUSY.has(t.status));
+  return `<div class="ad-voice">
+    <div class="row wrap">
+      <b>🎙️ الصوت</b>
+      <select data-pf="speaker" title="مين بيتكلم"><option value="">🎙️ راوي (فويس أوفر)</option>${spk.map((n) => `<option value="${adEsc(n)}" ${n === s.speaker ? "selected" : ""}>🧍 ${adEsc(n)}</option>`).join("")}</select>
+      ${s.speaker ? `<label class="check" title="الشخصية بتتكلم قدام الكاميرا وبُقها لازم يتحرك مع الكلام"><input type="checkbox" data-pf="talking" ${s.talking ? "checked" : ""}> 👄 بيتكلم قدام الكاميرا</label>` : ""}
+      ${s.voice_dur ? `<span class="muted">⏱️ ${s.voice_dur} ث ← مدة اللقطة ${s.seconds} ث</span>` : ""}
+    </div>
+    ${s.voice_url ? `<audio src="${s.voice_url}" controls preload="none"></audio>` : ""}
+    ${s.voice_error ? `<div class="err">${adEsc(s.voice_error)}</div>` : ""}
+    <div class="row wrap">
+      <button class="btn sm" data-p="voice" ${working || !s.voice ? "disabled" : ""} title="${s.voice ? "" : "اكتب الكلام الأول"}">${working ? "⏳ بيولّد الصوت..." : s.voice_url ? "↻ ولّد الصوت تاني" : "🎙️ ولّد الصوت"}</button>
+      <label class="btn sm" title="صوتك انت بدل المولّد">⬆ ارفع صوتك<input type="file" accept="audio/*,video/*" data-p="voiceup" hidden></label>
+      ${s.voice_url ? `<button class="btn sm danger" data-p="voicedel" title="امسح الصوت">✕</button>` : ""}
+    </div>
+    ${s.talking && s.voice_url ? `<div class="row wrap ad-lip">
+      <button class="btn sm primary" data-p="lipvideo" ${base && !lipBusy ? "" : "disabled"} title="${base ? "" : "ولّد فيديو اللقطة الأول"}">👄 ركّب الكلام على الفيديو (سريع)</button>
+      <button class="btn sm" data-p="lipimage" ${s.frame_url && !lipBusy ? "" : "disabled"}>👄 خلّيه يتكلم من الستوري بورد (أبطأ)</button>
+    </div>` : ""}
+  </div>`;
+}
+function renderVoices(a) {
+  const p = a.prod, v = p.voices || {}, spk = speakers(a);
+  const sel = (key) => `<select data-voice-of="${adEsc(key)}">${a.ar_voices.map((x) => `<option value="${x.id}" ${x.id === (v[key] || "Arabic_FriendlyGuy") ? "selected" : ""}>${x.label}</option>`).join("")}</select>`;
+  setHTML($("adVoices"), `<div class="row wrap"><b>🎙️ الأصوات</b>
+    <label class="field">الراوي ${sel("__narrator")}</label>
+    ${spk.map((n) => `<label class="field">🧍 ${adEsc(n)} ${sel(n)}</label>`).join("")}
+    <span class="muted">الصوت بيتعمل بعد الستوري بورد: طول كلام كل لقطة بيحدد مدتها ومدة الفيديو اللي هيتولد.</span></div>`);
+  if (document.activeElement !== $("adVideoModelSel")) {
+    $("adVideoModelSel").innerHTML = a.video_models.map((m) => `<option value="${m.key}" ${m.key === (p.header.video_model || "seedance") ? "selected" : ""}>${m.label}</option>`).join("");
+  }
+}
+function saveVoices(extra = {}) {
+  const voices = { ...(adx.cur.prod.voices || {}) };
+  document.querySelectorAll("#adVoices [data-voice-of]").forEach((el) => (voices[el.dataset.voiceOf] = el.value));
+  return pAPI("/voices", { method: "PUT", ...jsonBody({ voices, ...extra }) }).then((r) => { adx.cur = r; renderAds(); }).catch((err) => toast(err.message, true));
+}
+$("adVoices").addEventListener("change", () => saveVoices());
+$("adVideoModelSel").addEventListener("change", () => saveVoices({ video_model: $("adVideoModelSel").value })
+  .then(() => toast("🎬 الفيديوهات الجاية هتتولد بالموديل ده")));
+$("adPVoice").onclick = () => pDo($("adPVoice"), "⏳", () => pAPI("/voice", { method: "POST" }));
+
 // ---------- 🎭 الأبطال والمكونات المتكررة (قبل الستوري بورد) ----------
 const CAST_KIND = { character: "🧍 شخصية", background: "🏞️ مكان / خلفية", prop: "🧰 أداة" };
 function renderCast(a) {
@@ -997,6 +1050,7 @@ function renderAdProd() {
   $("adProdGo").disabled = !a.adaptation?.scenes?.length;
   if (!p) return;
   if (!editingIn($("adCast"))) renderCast(a);
+  if (!editingIn($("adVoices"))) renderVoices(a);
   const h = p.header;
   if (!editingIn($("adHeader"))) {
     $("adHeader").innerHTML = Object.entries(HEADER_LABELS).map(([k, l]) => adField(l, h[k], `data-h="${k}"`, k === "style" || k === "characters" ? 3 : 2, k === "style")).join("");
@@ -1034,6 +1088,7 @@ function renderAdProd() {
         <header><b class="n">${s.n}</b><label class="muted">المدة <input type="number" min="1" max="15" step="0.5" value="${s.seconds}" data-pf="seconds" style="width:64px"> ث</label></header>
         <div class="ad-fields">${Object.entries(PSHOT_LABELS).map(([k, l]) => adField(l, s[k], `data-pf="${k}"`, 1)).join("")}</div>
         ${renderSb(a, s)}
+        ${renderVoice(a, s)}
         <div class="ad-motion">${s.ref_motion ? `<div class="ad-mg orig" data-no-i18n>↩ <b>الموشن في المشهد الأصلي ${adEsc(s.ref_scene)}:</b> ${adEsc(s.ref_motion)}</div>` : ""}
           ${adField("🎞️ الموشن جرافيك في اللقطة", s.motion_notes, 'data-pf="motion_notes"', 2)}
           <div class="row wrap"><button class="btn sm" data-p="motion" ${s.motion_status === "working" ? "disabled" : ""}>${s.motion_status === "working" ? "⏳ بيستحضر الموشن..." : "🎞️ استحضر الموشن من المشهد الأصلي"}</button></div>
@@ -1059,7 +1114,7 @@ function renderAdProd() {
         ${adField("برومبت تجميع اللقطة (Seedance)", s.assembly_prompt || s.prompt, 'data-pf="assembly_prompt"', 3, true)}
         ${renderLayers(s)}
         <div class="ad-takes">${s.takes.map((t) => `<div class="ad-take ${t.id === s.chosen ? "sel" : ""} ${t.approved ? "ok" : ""}" data-pt="${t.id}" ${t.note ? `title="✏️ ${adEsc(t.note)}"` : ""}>
-          ${t.composite ? `<b class="ad-take-badge">✨ موشن</b>` : ""}${t.url ? `<button type="button" class="ad-take-play" data-tplay="${t.id}" title="شغّل وعاين">${lightVideo(t.url, "muted playsinline")}<i>▶</i></button>` : `<div class="wait">${PBUSY.has(t.status) ? `<div class="spin"></div>${t.composite ? "✨ بيركّب" : "🎬 بيتولد"}` : `✕ ${adEsc(t.error || "فشل")}`}</div>`}
+          ${t.composite ? `<b class="ad-take-badge">✨ موشن</b>` : t.lipsync ? `<b class="ad-take-badge">👄 بيتكلم</b>` : t.video_model && t.video_model !== "seedance" ? `<b class="ad-take-badge alt">${adEsc(t.video_model.startsWith("kling") ? "Kling" : t.video_model)}</b>` : ""}${t.url ? `<button type="button" class="ad-take-play" data-tplay="${t.id}" title="شغّل وعاين">${lightVideo(t.url, "muted playsinline")}<i>▶</i></button>` : `<div class="wait">${PBUSY.has(t.status) ? `<div class="spin"></div>${t.composite ? "✨ بيركّب" : t.lipsync ? "👄 بيحرّك البق" : "🎬 بيتولد"}` : `✕ ${adEsc(t.error || "فشل")}`}</div>`}
           <div class="acts">${t.status === "done" ? `<button class="btn sm" data-t="${t.approved ? "unapprove" : "approve"}">${t.approved ? "✅" : "موافق"}</button>` : ""}
             ${t.status === "failed" ? `<button class="btn sm" data-t="retry">↻</button>` : ""}
             ${t.status === "done" && !t.composite ? `<button class="btn sm" data-tedit="${t.id}" title="قول عايز تغيّر إيه ويولّد نسخة جديدة">✏️</button>` : ""}
@@ -1150,7 +1205,9 @@ $("adPShots").addEventListener("change", async (e) => {
   const sid = card.dataset.ps;
   try {
     if (e.target.dataset.pf) {
-      adx.cur = await pAPI(`/shots/${sid}`, { method: "PATCH", ...jsonBody({ fields: { [e.target.dataset.pf]: e.target.value } }) });
+      const v = e.target.type === "checkbox" ? e.target.checked : e.target.value;
+      adx.cur = await pAPI(`/shots/${sid}`, { method: "PATCH", ...jsonBody({ fields: { [e.target.dataset.pf]: v } }) });
+      if (["speaker", "talking"].includes(e.target.dataset.pf)) setTimeout(renderAds, 0);
       if (e.target.dataset.pf === "sb_prompt") setTimeout(renderAds, 0);  // المنشنز اتقرت من جديد
       return;
     }
@@ -1169,6 +1226,7 @@ $("adPShots").addEventListener("change", async (e) => {
     toast("⏳ بيرفع...");
     if (comp && e.target.dataset.c === "up") adx.cur = await pAPI(`/shots/${sid}/components/${comp.dataset.pc}/upload`, { method: "POST", body: form });
     else if (e.target.dataset.p === "uptake") adx.cur = await pAPI(`/upload-take?shot_id=${sid}`, { method: "POST", body: form });
+    else if (e.target.dataset.p === "voiceup") { adx.cur = await pAPI(`/shots/${sid}/voice/upload`, { method: "POST", body: form }); toast("🎙️ الصوت اترفع، ومدة اللقطة اتظبطت عليه"); }
     renderAds();
   } catch (err) { toast(err.message, true); }
 });
@@ -1195,6 +1253,14 @@ $("adPShots").addEventListener("click", async (e) => {
       await saveLayers(sid, s.layers.filter((L) => L.id !== b.dataset.ldel));
       return;
     } else if (b.dataset.p === "lcomp") adx.cur = await pAPI(`/shots/${sid}/composite`, { method: "POST" });
+    else if (b.dataset.p === "voice") adx.cur = await pAPI(`/voice?shot_id=${sid}`, { method: "POST" });
+    else if (b.dataset.p === "voicedel") { if (!confirm("تمسح صوت اللقطة دي؟")) return; adx.cur = await pAPI(`/shots/${sid}/voice`, { method: "DELETE" }); }
+    else if (b.dataset.p === "lipvideo" || b.dataset.p === "lipimage") {
+      const m = b.dataset.p === "lipvideo" ? "video" : "image";
+      if (!confirm(m === "video" ? "يركّب الصوت على فيديو اللقطة ويحرّك البق مع الكلام (نسخة جديدة «👄»). تكمل؟"
+        : "يعمل فيديو جديد من صورة الستوري بورد والشخصية بتقول الكلام ده (أبطأ: ممكن ياخد كذا دقيقة). تكمل؟")) return;
+      adx.cur = await pAPI(`/shots/${sid}/lipsync?method=${m}`, { method: "POST" });
+    }
     else if (b.dataset.p === "sbwrite") adx.cur = await pAPI(`/sb-prompts?shot_id=${sid}`, { method: "POST" });
     else if (b.dataset.p === "editframe") return editFrame(s);
     else if (b.dataset.tedit) return editTake(s, b.dataset.tedit);
