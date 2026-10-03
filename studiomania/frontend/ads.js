@@ -935,7 +935,11 @@ function renderVoice(a, s) {
     </div>` : ""}
   </div>`;
 }
-// السكريبت اللي هتحوّله لصوت بنفسك: كل لقطة فيها كلام، بترتيبها ومين بيقولها
+// السكريبت السادة اللي هتحوّله لصوت: الكلام بس بالترتيب، من غير أرقام لقطات ولا مين بيقول
+function adPlainScript(a) {
+  return a.prod.shots.map((s) => (s.voice || "").trim()).filter(Boolean).join("\n\n");
+}
+// نسخة بالتفاصيل (للمراجعة): كل جملة برقم لقطتها ومين بيقولها
 function adScript(a) {
   const p = a.prod, lines = p.shots.filter((s) => (s.voice || "").trim());
   return [`سكريبت: ${p.header.title || a.name}`, "",
@@ -948,8 +952,8 @@ function renderVoices(a) {
     <div class="row wrap"><b>🎙️ الصوت الكامل للإعلان</b>
       <span class="muted">١) انسخ السكريبت وحوّله لصوت باللهجة والنبرة اللي تعجبك ← ٢) ارفع الصوت كله ملف واحد ← ٣) البرنامج بيقطّعه على اللقطات بتوقيت الكلام، ومدة كل لقطة بتتظبط عليه.</span></div>
     <div class="row wrap">
-      <button class="btn sm" data-fv="copy" ${n ? "" : "disabled"}>📋 انسخ السكريبت (${n} جملة)</button>
-      <button class="btn sm" data-fv="download" ${n ? "" : "disabled"}>⬇ نزّل السكريبت</button>
+      <button class="btn sm" data-fv="copy" ${n ? "" : "disabled"} title="الكلام بس، جاهز تحوّله لصوت">📋 انسخ السكريبت (${n} جملة)</button>
+      <button class="btn sm" data-fv="download" ${n ? "" : "disabled"} title="نسخة فيها رقم كل لقطة ومين بيقول الجملة (للمراجعة)">⬇ نزّل نسخة بالتفاصيل</button>
       <label class="btn sm primary">⬆ ارفع الصوت الكامل<input type="file" accept="audio/*,video/*" data-fv-up hidden></label>
       ${fv.file ? `<button class="btn sm" data-fv="realign" ${working ? "disabled" : ""} title="بعد ما تعدّل الكلام في اللقطات">↻ قطّع تاني</button>` : ""}
       ${working ? `<span class="muted"><span class="spin-inline"></span> بيسمع الصوت ويقطّعه على اللقطات...</span>` : ""}
@@ -969,7 +973,7 @@ function saveVoices(extra = {}) {
 $("adVoices").addEventListener("click", async (e) => {
   const b = e.target.closest("[data-fv]");
   if (!b) return;
-  if (b.dataset.fv === "copy") return adCopy(adScript(adx.cur));
+  if (b.dataset.fv === "copy") return adCopy(adPlainScript(adx.cur));
   if (b.dataset.fv === "download") {
     const url = URL.createObjectURL(new Blob([adScript(adx.cur)], { type: "text/plain;charset=utf-8" }));
     Object.assign(document.createElement("a"), { href: url, download: "ad-script.txt" }).click();
