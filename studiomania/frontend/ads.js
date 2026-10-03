@@ -924,12 +924,12 @@ function renderVoice(a, s) {
     <div class="row wrap">
       <b>🎙️ الصوت</b>
       <select data-pf="speaker" title="مين بيتكلم"><option value="">🎙️ راوي (فويس أوفر)</option>${spk.map((n) => `<option value="${adEsc(n)}" ${n === s.speaker ? "selected" : ""}>🧍 ${adEsc(n)}</option>`).join("")}</select>
-      ${s.speaker ? `<label class="check" title="الشخصية بتتكلم قدام الكاميرا وبُقها لازم يتحرك مع الكلام"><input type="checkbox" data-pf="talking" ${s.talking ? "checked" : ""}> 👄 بيتكلم قدام الكاميرا</label>` : ""}
+      <label class="check" title="الشخصية بتتكلم قدام الكاميرا وبُقها لازم يتحرك مع الكلام"><input type="checkbox" data-pf="talking" ${s.talking ? "checked" : ""}> 👄 بيتكلم قدام الكاميرا</label>
       ${s.a_end != null ? `<span class="muted">⏱️ من ${s.a_start} لـ ${s.a_end} في الصوت الكامل (${s.seconds} ث)</span>` : ""}
     </div>
     ${s.voice_url ? `<audio src="${s.voice_url}" controls preload="none"></audio>` : `<span class="muted">${s.voice ? "الصوت بتاع اللقطة دي بيتقص لوحده لما ترفع الصوت الكامل فوق." : "اللقطة دي من غير كلام."}</span>`}
     ${s.voice_error ? `<div class="muted">⚠️ ${adEsc(s.voice_error)}</div>` : ""}
-    ${s.talking && s.voice_url ? `<div class="row wrap ad-lip">
+    ${s.voice_url ? `<div class="row wrap ad-lip">
       <button class="btn sm primary" data-p="lipvideo" ${base && !lipBusy ? "" : "disabled"} title="${base ? "" : "ولّد فيديو اللقطة الأول"}">👄 ركّب الكلام على الفيديو (سريع)</button>
       <button class="btn sm" data-p="lipimage" ${s.frame_url && !lipBusy ? "" : "disabled"}>👄 خلّيه يتكلم من الستوري بورد (أبطأ)</button>
     </div>` : ""}
@@ -1443,6 +1443,8 @@ function renderAdGallery() {
   const ok = shots.filter((s) => s.takes.some((t) => t.id === s.chosen && t.approved)).length;
   const busy = shots.filter((s) => s.takes.some((t) => PBUSY.has(t.status))).length;
   $("adGalCount").textContent = `${shots.length} لقطة · ✅ ${ok} موافق عليها · 🎬 ${busy} بتتولد`;
+  $("adGalFullHint").textContent = adx.cur.prod.full_voice?.url ? "الفيديوهات المختارة ورا بعض مع صوتك الكامل، عشان تشوف الإعلان واللب سينك زي ما هيطلعوا."
+    : "ارفع الصوت الكامل الأول عشان تقدر تشغّل الإعلان كله بالصوت.";
   const s = shots.find((x) => x.id === agal.sid);
   $("adGalAll").hidden = !!s;
   $("adGalView").hidden = !s;
@@ -1467,9 +1469,17 @@ function renderAdGallery() {
   if (stage.dataset.take !== (take?.id || "") || !stage.firstElementChild) {
     stage.dataset.take = take?.id || "";
     const working = s.takes.find((t) => PBUSY.has(t.status));
-    stage.innerHTML = take ? `<video src="${take.url}" controls autoplay playsinline loop></video>`
+    stage.innerHTML = take ? `<video src="${take.url}" controls autoplay playsinline loop ${take.lipsync ? "" : "muted"}></video>`
       : working ? `<div><div class="spin"></div><p>🎬 الفيديو بيتولد...</p></div>`
       : s.frame_url ? `<img src="${s.frame_url}" alt=""><p style="position:absolute">لسه متولدش فيديو</p>` : `<p>لسه مفيش ستوري بورد ولا فيديو</p>`;
+  }
+  // صوت اللقطة مع الفيديو (الفيديوهات بتتولد من غير صوت). نسخ «👄» فيها الصوت جواها
+  const withVoice = !!(take && s.voice_url && !take.lipsync);
+  $("adGalVoiceRow").hidden = !withVoice;
+  if ($("adGalAudio").dataset.src !== (withVoice ? s.voice_url : "")) {
+    $("adGalAudio").dataset.src = withVoice ? s.voice_url : "";
+    $("adGalAudio").src = withVoice ? s.voice_url : "";
+    bindGalVoice();
   }
   $("adGalInfo").innerHTML = `<b>اللي بيحصل:</b> ${adEsc(s.visual)}${s.voice ? `<br><b>الكلام:</b> ${adEsc(s.voice)}` : ""}${s.motion_notes ? `<br><b>🎞️ الموشن:</b> ${adEsc(s.motion_notes)}` : ""}`;
   setHTML($("adGalTakes"), s.takes.map((t, k) => `<button type="button" class="take ${t.id === agal.tid ? "viewing" : ""} ${t.id === s.chosen ? "sel" : ""}" data-gtake="${t.id}" ${t.url ? "" : "disabled"}>
@@ -1484,17 +1494,82 @@ function renderAdGallery() {
       <button class="btn ${t.approved ? "" : "primary"}" data-ga="${t.approved ? "unapprove" : "approve"}">${t.approved ? "↩ الغي الموافقة" : "✅ موافق عليه"}</button>
       ${t.id !== s.chosen ? `<button class="btn" data-ga="pick">⭐ اختاره للقطة دي</button>` : ""}
       ${t.composite ? "" : `<button class="btn" data-ga="edit">✏️ عدّل واعمل نسخة جديدة</button>`}
+      ${s.voice_url && !t.lipsync && !t.composite ? `<button class="btn" data-ga="lip">👄 ركّب الكلام على الفيديو ده</button>` : ""}
       <button class="btn danger" data-ga="delete">🗑️ امسح النسخة دي</button>` : t?.status === "failed" ? `<button class="btn" data-ga="retry">↻ جرّب تاني</button>` : "")
     + (s.frame_url ? `<button class="btn" data-ga="gen">🎬 ولّد نسخة تانية</button>` : "");
 }
 $("adPGallery").onclick = () => openAdGallery();
+// صوت اللقطة ماشي مع الفيديو: تشغيل، إيقاف، تقديم، وإعادة من الأول
+function bindGalVoice() {
+  const v = $("adGalStage").querySelector("video"), au = $("adGalAudio");
+  if (!v || v._voiceBound) return;
+  v._voiceBound = true;
+  const on = () => $("adGalVoice").checked && au.src;
+  v.addEventListener("play", () => { if (on()) { au.currentTime = v.currentTime; au.play().catch(() => {}); } });
+  v.addEventListener("pause", () => au.pause());
+  v.addEventListener("seeked", () => { if (on()) au.currentTime = v.currentTime; });
+  v.addEventListener("timeupdate", () => { if (on() && Math.abs(au.currentTime - v.currentTime) > 0.25) au.currentTime = v.currentTime; });
+  if (!v.paused && on()) { au.currentTime = v.currentTime; au.play().catch(() => {}); }
+}
+$("adGalVoice").addEventListener("change", () => { if (!$("adGalVoice").checked) $("adGalAudio").pause(); else bindGalVoice(); });
+new MutationObserver(() => bindGalVoice()).observe($("adGalStage"), { childList: true });
+
+// 🎬 الإعلان كله بالصوت الكامل: الفيديو بيتنقل من لقطة للي بعدها على حسب وقت الصوت
+const gfull = { list: [], cur: -1 };
+function fullPlan() {
+  const shots = adGalShots();
+  let t = 0;
+  return shots.map((s) => {
+    const take = s.takes.find((x) => x.id === s.chosen && x.url) || [...s.takes].reverse().find((x) => x.url && x.status === "done");
+    const start = s.a_start != null ? Number(s.a_start) : t;
+    t = start + Number(s.seconds || 4);
+    return { n: s.n, start, end: t, url: take?.url || null, img: s.frame_url };
+  });
+}
+$("adGalFullGo").onclick = () => {
+  const fv = adx.cur.prod.full_voice;
+  if (!fv?.url) return toast("ارفع الصوت الكامل الأول (في قسم «🎙️ الصوت الكامل» فوق اللقطات)", true);
+  gfull.list = fullPlan();
+  gfull.cur = -1;
+  $("adGalAll").hidden = true;
+  $("adGalFull").hidden = false;
+  $("adGalFullA").src = fv.url;
+  $("adGalFullA").currentTime = 0;
+  fullSync();
+  $("adGalFullA").play().catch(() => {});
+};
+function fullSync() {
+  const t = $("adGalFullA").currentTime, L = gfull.list;
+  let i = L.findIndex((x) => t >= x.start && t < x.end);
+  if (i < 0) i = t < (L[0]?.start || 0) ? 0 : L.length - 1;
+  const x = L[i], v = $("adGalFullV");
+  if (!x) return;
+  if (i !== gfull.cur) {
+    gfull.cur = i;
+    $("adGalFullNow").textContent = `لقطة ${x.n}${x.url ? "" : " (لسه من غير فيديو)"}`;
+    $("adGalFullImg").hidden = !!x.url;
+    v.hidden = !x.url;
+    if (x.url) v.src = x.url; else $("adGalFullImg").src = x.img || "";
+  }
+  if (x.url) {
+    const want = Math.max(0, t - x.start);
+    if (Math.abs(v.currentTime - want) > 0.3) v.currentTime = want;
+    if ($("adGalFullA").paused) v.pause(); else v.play().catch(() => {});
+  }
+}
+["timeupdate", "seeked", "play", "pause"].forEach((ev) => $("adGalFullA").addEventListener(ev, fullSync));
+$("adGalFullBack").onclick = () => { $("adGalFullA").pause(); $("adGalFull").hidden = true; $("adGalAll").hidden = false; };
 $("adPLayers").onclick = () => pDo($("adPLayers"), "⏳", () => pAPI("/layers/plan", { method: "POST" }));
 $("adPCompose").onclick = () => {
   if (!confirm("يركّب طبقات الموشن على فيديو كل لقطة ليها طبقات وفيديو خلصان. كل لقطة بتاخد نسخة جديدة «✨ موشن» والأصل بيفضل. تكمل؟")) return;
   pDo($("adPCompose"), "⏳", () => pAPI("/composite-all", { method: "POST" }));
 };
 $("adGalClose").onclick = () => $("adGalDialog").close();
-$("adGalDialog").addEventListener("close", () => { $("adGalStage").innerHTML = ""; $("adGalStage").dataset.take = ""; agal.sid = null; renderAds(); });
+$("adGalDialog").addEventListener("close", () => {
+  $("adGalStage").innerHTML = ""; $("adGalStage").dataset.take = ""; agal.sid = null;
+  $("adGalAudio").pause(); $("adGalFullA").pause(); $("adGalFull").hidden = true; $("adGalAll").hidden = false;
+  renderAds();
+});
 $("adGalDialog").addEventListener("cancel", (e) => { if (agal.sid) { e.preventDefault(); agal.sid = null; renderAdGallery(); } });
 $("adGalBack").onclick = () => { agal.sid = null; $("adGalStage").innerHTML = ""; renderAdGallery(); };
 function adGalStep(d) {
@@ -1527,6 +1602,10 @@ $("adGalActs").addEventListener("click", async (e) => {
       adx.cur = await pAPI(`/shots/${sid}/generate`, { method: "POST" });
     } else if (a === "edit") {
       return editTake(adx.cur.prod.shots.find((x) => x.id === sid), agal.tid);
+    } else if (a === "lip") {
+      if (!confirm("يحرّك البق في الفيديو ده على صوت اللقطة (نسخة جديدة «👄»، بتاخد أقل من دقيقة). تكمل؟")) return;
+      adx.cur = await pAPI(`/shots/${sid}/lipsync?method=video&take_id=${agal.tid}`, { method: "POST" });
+      toast("👄 بيحرّك البق... النسخة الجديدة هتظهر جنب القديمة وفيها الصوت");
     } else {
       if (a === "delete" && !confirm("تمسح النسخة دي؟")) return;
       adx.cur = await pAPI(`/shots/${sid}/take?action=${a}`, { method: "POST", ...jsonBody({ take_id: agal.tid }) });

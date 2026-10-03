@@ -8139,7 +8139,7 @@ def run_ad_lipsync(aid: str, sid: str, tid: str) -> None:
 
 
 @app.post("/api/ads/{aid}/prod/shots/{sid}/lipsync")
-def prod_lipsync(aid: str, sid: str, method: str = "video"):
+def prod_lipsync(aid: str, sid: str, method: str = "video", take_id: str | None = None):
     if method not in LIPSYNC:
         raise HTTPException(400, "طريقة غير معروفة")
     if not (atlas.api_key() or atlas.mock_mode()):
@@ -8149,7 +8149,7 @@ def prod_lipsync(aid: str, sid: str, method: str = "video"):
         s = find_pshot(prod_of(d), sid)
         if not s.get("voice_file"):
             raise HTTPException(400, "اللقطة ملهاش صوت. ولّد الصوت أو ارفعه الأول")
-        base = base_take(s) if method == "video" else None
+        base = base_take(s, take_id) if method == "video" else None
         if method == "video" and not base:
             raise HTTPException(400, "مفيش فيديو للقطة دي يتركب عليه الكلام. ولّد الفيديو الأول (أو استخدم «من الستوري بورد»)")
         if method == "image" and not s.get("frame"):

@@ -1308,7 +1308,15 @@
 </dialog>
 <dialog class="bulk-dlg ser-gal-dlg" id="adGalDialog">
   <div class="panel-head"><h2>🎬 فيديوهات الإعلان</h2><span class="muted" id="adGalCount"></span><button class="btn sm" id="adGalClose">إغلاق</button></div>
-  <div id="adGalAll"><div class="ser-gal-grid" id="adGalGrid"></div></div>
+  <div id="adGalAll">
+    <div class="row wrap ad-gal-full-row"><button class="btn primary" id="adGalFullGo">🎬 شغّل الإعلان كله بالصوت</button>
+      <span class="muted" id="adGalFullHint"></span></div>
+    <div class="ser-gal-grid" id="adGalGrid"></div></div>
+  <div class="ad-gal-full" id="adGalFull" hidden>
+    <div class="row wrap ser-gal-nav"><button class="btn sm" id="adGalFullBack">↩ كل الفيديوهات</button><b id="adGalFullNow" data-no-i18n></b></div>
+    <div class="ser-gal-stage" id="adGalFullStage"><video id="adGalFullV" muted playsinline></video><img id="adGalFullImg" alt="" hidden></div>
+    <audio id="adGalFullA" controls preload="auto"></audio>
+  </div>
   <div class="ser-gal-view" id="adGalView" hidden>
     <div class="row wrap ser-gal-nav">
       <button class="btn sm" id="adGalBack">↩ كل الفيديوهات</button>
@@ -1321,6 +1329,8 @@
       <div class="ser-gal-stage" id="adGalStage"></div>
       <div class="ser-gal-side">
         <div class="said" id="adGalInfo" data-no-i18n></div>
+        <label class="ser-gal-voice" id="adGalVoiceRow" hidden><input type="checkbox" id="adGalVoice" checked> 🔊 شغّل الفيديو بصوت اللقطة</label>
+        <audio id="adGalAudio" preload="auto" hidden></audio>
         <div class="takes ad-gal-takes" id="adGalTakes"></div>
         <div class="err" id="adGalErr" hidden></div>
         <div class="row wrap" id="adGalActs"></div>

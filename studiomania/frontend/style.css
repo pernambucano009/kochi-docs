@@ -1380,3 +1380,9 @@ a.pl-link:hover { background: color-mix(in srgb, var(--ok) 24%, transparent); }
 .ad-voice .muted { font-size: 12px; }
 .ad-lip { background: #EAF6F4; border-radius: 8px; padding: 6px; }
 .ad-take-badge.alt { background: #2B6CB0; }
+/* الإعلان كله بالصوت */
+.ad-gal-full-row { margin-bottom: 10px; gap: 10px; align-items: center; }
+.ad-gal-full-row .muted { font-size: 13px; flex: 1 1 240px; }
+.ad-gal-full { display: flex; flex-direction: column; gap: 10px; align-items: center; }
+.ad-gal-full .ser-gal-nav { align-self: stretch; }
+.ad-gal-full audio { width: min(520px, 100%); }
