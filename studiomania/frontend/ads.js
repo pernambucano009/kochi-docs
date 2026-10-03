@@ -1161,7 +1161,9 @@ function renderAdProd() {
         ${s.frame_note ? `<p class="muted ad-note" data-no-i18n>✏️ ${adEsc(s.frame_note)}</p>` : ""}
         ${ref}
         <div class="row wrap" style="margin-top:6px">
-          <button class="btn sm" data-p="frame" ${fbusy ? "disabled" : ""}>🎨 ${s.frame_url ? "ارسم تاني" : "ارسم"}</button>
+          ${fbusy ? `<button class="btn sm" data-p="frameredo" title="لو الرسم علّق: يلغيه ويبدأ رسم جديد على طول">↻ علّق؟ ابدأ من جديد</button>
+            <button class="btn sm danger" data-p="framecancel" title="يلغي الرسم ويرجّع اللقطة زي ما كانت">✕ الغي</button>`
+            : `<button class="btn sm" data-p="frame">🎨 ${s.frame_url ? "ارسم تاني" : "ارسم"}</button>`}
           ${s.frame_url && !fbusy ? `<button class="btn sm" data-p="editframe" title="قول عايز تغيّر إيه ويرسمها تاني">✏️ عدّل</button>
             <button class="btn sm danger" data-p="delframe" title="امسح الستوري بورد دي">🗑️</button>` : ""}
           <button class="btn sm ${s.approved ? "" : "primary"}" data-p="approve">${s.approved ? "✅ معتمدة" : "✅ اعتمد"}</button>
@@ -1345,6 +1347,11 @@ $("adPShots").addEventListener("click", async (e) => {
       if (!confirm(m === "video" ? "يركّب الصوت على فيديو اللقطة ويحرّك البق مع الكلام (نسخة جديدة «👄»). تكمل؟"
         : "يعمل فيديو جديد من صورة الستوري بورد والشخصية بتقول الكلام ده (بياخد حوالي ٣ دقايق). تكمل؟")) return;
       adx.cur = await pAPI(`/shots/${sid}/lipsync?method=${m}`, { method: "POST" });
+    }
+    else if (b.dataset.p === "framecancel") adx.cur = await pAPI(`/shots/${sid}/frame-cancel`, { method: "POST" });
+    else if (b.dataset.p === "frameredo") {
+      adx.cur = await pAPI(`/shots/${sid}/frame-cancel?redo=true`, { method: "POST" });
+      toast("↻ اتلغى الرسم القديم وبدأ رسم جديد");
     }
     else if (b.dataset.p === "sbwrite") adx.cur = await pAPI(`/sb-prompts?shot_id=${sid}`, { method: "POST" });
     else if (b.dataset.p === "editframe") return editFrame(s);

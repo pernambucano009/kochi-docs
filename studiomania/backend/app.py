@@ -6928,15 +6928,29 @@ def ref_comps(shot: dict, limit: int) -> list[dict]:
     return sorted(comps, key=lambda c: not is_uploaded(c.get("image")))[:limit]
 
 
+def frame_gen(aid: str, sid: str) -> int | None:
+    """رقم محاولة الرسم الحالية (بيزيد لما تلغي)، أو None لو اللقطة مش مستنية رسم (اتلغت قبل ما تبدأ)."""
+    out: list = []
+    def fn(d):
+        x = next((y for y in (d.get("prod") or {}).get("shots", []) if y["id"] == sid), None)
+        if x is not None and x.get("frame_status") in ("queued", "working"):
+            x.update(frame_status="working", frame_error=None)
+            out.append(x.get("frame_gen", 0))
+    update_ad(aid, fn)
+    return out[0] if out else None
+
+
 def run_ad_frame(aid: str, sid: str, note: str = "", extra: list[str] | None = None, replace: bool = False) -> None:
+    gen = frame_gen(aid, sid)
+    if gen is None:
+        return
+    dest = None
     try:
-        set_pshot(aid, sid, frame_status="working", frame_error=None)
         safe_apply_brain(aid, [sid])  # قبل الرسم: الشاشات واللوجو الحقيقيين من عقل الإعلان
         with closing(db()) as conn:
             _, d = ad_row(conn, aid)
         p = d["prod"]
         s = find_pshot(p, sid)
-        set_pshot(aid, sid, frame_status="working", frame_error=None)
         h = p["header"]
         size = az.ASPECTS.get(h.get("aspect"), az.ASPECTS["9:16"])[0]
         name = f"frame-{s['n']:02d}-{uuid.uuid4().hex[:6]}.png"
@@ -6979,6 +6993,9 @@ def run_ad_frame(aid: str, sid: str, note: str = "", extra: list[str] | None = N
         gone: list[str] = []
         def done(d):
             x = find_pshot(d["prod"], sid)
+            if x.get("frame_gen", 0) != gen:  # اتلغى وهو بيرسم: الصورة دي متتحطش
+                gone.append(name)
+                return
             if replace and not x.get("approved"):  # الجديد بيمسح النسخ القديمة (اللقطة مش معتمدة)
                 gone.extend(f for f in x.get("frames") or [] if f != name)
                 x["frames"], x["frame_notes"] = [], {}
@@ -6990,7 +7007,28 @@ def run_ad_frame(aid: str, sid: str, note: str = "", extra: list[str] | None = N
         for f in gone:
             (prod_dir(aid, "frames") / f).unlink(missing_ok=True)
     except Exception as exc:  # noqa: BLE001
-        set_pshot(aid, sid, frame_status="failed", frame_error=str(getattr(exc, "detail", None) or exc)[:400])
+        msg = str(getattr(exc, "detail", None) or exc)[:400]
+        def failed(d):
+            x = next((y for y in (d.get("prod") or {}).get("shots", []) if y["id"] == sid), None)
+            if x is not None and x.get("frame_gen", 0) == gen:
+                x.update(frame_status="failed", frame_error=msg)
+        update_ad(aid, failed)
+
+
+@app.post("/api/ads/{aid}/prod/shots/{sid}/frame-cancel")
+def prod_frame_cancel(aid: str, sid: str, redo: bool = False):
+    """✕ الغي الرسم اللي معلّق (ولو redo يبدأ رسم جديد على طول). الرسم القديم لو خلص بعدين نتيجته بتترمي."""
+    if redo and not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات")
+    def fn(d):
+        s = find_pshot(prod_of(d), sid)
+        s["frame_gen"] = s.get("frame_gen", 0) + 1
+        s.update(frame_status="queued" if redo else ("done" if s.get("frame") else "idle"), frame_error=None)
+    update_ad(aid, fn)
+    if redo:
+        # في Thread لوحده: لو الطابور مليان برسومات معلّقة ميستناش وراهم
+        threading.Thread(target=run_ad_frame, args=(aid, sid), daemon=True).start()
+    return ad_response(aid)
 
 
 @app.post("/api/ads/{aid}/prod/frames")
