@@ -1315,3 +1315,12 @@ a.pl-link:hover { background: color-mix(in srgb, var(--ok) 24%, transparent); }
 .ad-gal-takes .take video { width: 100%; height: 100%; object-fit: cover; display: block; }
 .ad-gal-takes .take.sel { border-color: var(--accent); }
 .ad-gal-takes .take small { position: absolute; bottom: 2px; inset-inline: 2px; background: rgba(0,0,0,.7); border-radius: 4px; }
+/* مقاسات ثابتة في التنفيذ: الصفحة متتهزش وهي بتتحدث أثناء التوليد */
+.ad-pshot .frame { aspect-ratio: var(--ad-ar, 9 / 16); min-height: 0; width: 100%; }
+.ad-pshot .frame img { width: 100%; height: 100%; max-height: none; object-fit: contain; }
+.ad-take-play, .ad-take .wait { aspect-ratio: var(--ad-ar, 9 / 16); }
+.ad-take .wait { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 6px; box-sizing: border-box; }
+.ad-take-play video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ad-pshot .vers img, .ad-pshot .ref img { aspect-ratio: var(--ad-ar, 9 / 16); object-fit: cover; }
+.ad-comp .img { aspect-ratio: 1; }
+.ad-take .acts { min-height: 30px; box-sizing: border-box; }

@@ -703,6 +703,13 @@ async function pDo(btn, label, fn) {
   return busyButton(btn, label, async () => { adx.cur = await fn(); renderAds(); });
 }
 
+// بيغيّر محتوى العنصر بس لو اتغير فعلًا: الصور والفيديوهات متتحملش من الأول كل ٣ ثواني والصفحة متتهزش
+function setHTML(el, html) {
+  if (el._html === html) return;
+  el._html = html;
+  el.innerHTML = html;
+}
+
 // بنوقف إعادة الرسم بس لو بتكتب في خانة، مش لو دوست زرار (الزرار بيفضل متعلّم عليه)
 function editingIn(el) {
   const f = document.activeElement;
@@ -727,7 +734,8 @@ function renderAdProd() {
   $("adPProgress").textContent = `🎨 ${framed}/${n} · 🧩 ${comps}/${n} · ✅ ${shots.filter((s) => s.approved).length}/${n} · 🎬 ${okv}/${n}`;
   $("adPApproveAll").textContent = shots.every((s) => s.approved) ? "↩ الغي اعتماد الكل" : "✅ اعتمد كل اللقطات";
   if (editingIn($("adPShots")) || [...$("adPShots").querySelectorAll("video")].some((v) => !v.paused)) return;
-  $("adPShots").innerHTML = shots.map((s) => {
+  $("adPShots").style.setProperty("--ad-ar", (h.aspect || "9:16").replace(":", " / "));
+  setHTML($("adPShots"), shots.map((s) => {
     const fbusy = PBUSY.has(s.frame_status);
     const ref = s.ref_frame ? `<div class="ref"><img src="/media/ads/${a.id}/frames/${s.ref_frame}" alt="">من الإعلان الأصلي (مشهد ${s.ref_scene})</div>` : "";
     const chosen = s.takes.find((t) => t.id === s.chosen);
@@ -783,7 +791,7 @@ function renderAdProd() {
         </div>
       </div>
     </article>`;
-  }).join("");
+  }).join(""));
 }
 
 $("adProdGo").onclick = () => pDo($("adProdGo"), "⏳", () => pAPI("/start", { method: "POST" }));
@@ -1019,14 +1027,14 @@ function renderAdGallery() {
   $("adGalAll").hidden = !!s;
   $("adGalView").hidden = !s;
   if (!s) {
-    $("adGalGrid").innerHTML = shots.map((x) => {
+    setHTML($("adGalGrid"), shots.map((x) => {
       const t = shotTake(x), approved = x.takes.some((k) => k.id === x.chosen && k.approved), working = x.takes.some((k) => PBUSY.has(k.status));
       const cls = approved ? "done" : t ? "review" : "todo";
       return `<button type="button" class="gal-tile ${cls}" data-gshot="${x.id}">
         ${t ? lightVideo(t.url, "muted playsinline") : x.frame_url ? `<img src="${x.frame_url}" alt="">` : ""}
         ${working ? `<div class="spin"></div>` : ""}<span class="n">${x.n}</span>
         <span class="st">${approved ? "✅ موافق عليها" : working ? "🎬 بيتولد" : t ? "👀 مستنية موافقتك" : x.frame_url ? "لسه متولدتش" : "من غير ستوري بورد"}</span></button>`;
-    }).join("") || `<p class="muted">لسه مفيش لقطات.</p>`;
+    }).join("") || `<p class="muted">لسه مفيش لقطات.</p>`);
     return;
   }
   const i = shots.indexOf(s);
@@ -1044,9 +1052,9 @@ function renderAdGallery() {
       : s.frame_url ? `<img src="${s.frame_url}" alt=""><p style="position:absolute">لسه متولدش فيديو</p>` : `<p>لسه مفيش ستوري بورد ولا فيديو</p>`;
   }
   $("adGalInfo").innerHTML = `<b>اللي بيحصل:</b> ${adEsc(s.visual)}${s.voice ? `<br><b>الكلام:</b> ${adEsc(s.voice)}` : ""}${s.motion_notes ? `<br><b>🎞️ الموشن:</b> ${adEsc(s.motion_notes)}` : ""}`;
-  $("adGalTakes").innerHTML = s.takes.map((t, k) => `<button type="button" class="take ${t.id === agal.tid ? "viewing" : ""} ${t.id === s.chosen ? "sel" : ""}" data-gtake="${t.id}" ${t.url ? "" : "disabled"}>
+  setHTML($("adGalTakes"), s.takes.map((t, k) => `<button type="button" class="take ${t.id === agal.tid ? "viewing" : ""} ${t.id === s.chosen ? "sel" : ""}" data-gtake="${t.id}" ${t.url ? "" : "disabled"}>
       ${t.url ? lightVideo(t.url, "muted playsinline") : `<span>${TAKE_ST[t.status] || ""}</span>`}<small>${t.approved ? "✅" : t.id === s.chosen ? "⭐" : ""} ${k + 1}</small></button>`).join("")
-    || `<p class="muted">مفيش نسخ لسه.</p>`;
+    || `<p class="muted">مفيش نسخ لسه.</p>`);
   const t = s.takes.find((x) => x.id === agal.tid);
   $("adGalErr").hidden = !(t?.status === "failed");
   $("adGalErr").textContent = t?.status === "failed" ? `✕ ${t.error || "فشل"}` : "";
