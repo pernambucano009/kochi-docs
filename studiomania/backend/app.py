@@ -52,6 +52,7 @@ load_env_file(ROOT / ".env")
 import atlas  # noqa: E402  (لازم بعد قراءة .env)
 import captions  # noqa: E402
 import montage  # noqa: E402
+import motion as mo  # noqa: E402
 import publisher  # noqa: E402
 import sheets  # noqa: E402
 import carousel as cz  # noqa: E402
@@ -6588,7 +6589,7 @@ def prod_dir(aid: str, sub: str) -> Path:
 
 def prod_busy(p: dict | None) -> bool:
     for s in (p or {}).get("shots") or []:
-        if "working" in (s.get("frame_status"), s.get("comp_status"), s.get("motion_status")):
+        if "working" in (s.get("frame_status"), s.get("comp_status"), s.get("motion_status"), s.get("layers_status")):
             return True
         if any(c.get("status") == "working" for c in s.get("components") or []):
             return True
@@ -6813,6 +6814,7 @@ def run_ad_frame(aid: str, sid: str) -> None:
             mock_image(dest, f"{int(w) // 2}x{int(hh) // 2}", f"shot {s['n']}", s["n"])
         else:
             # صور المكونات نفسها (شاشات كوتشي، اللوجو، الشخصيات...) مراجع أساسية، وبعدها صور الستايل للشكل العام
+            s = plate_shot(s)  # لو اللقطة ليها موشن متركب: الستوري بورد من غير الجرافيك (بيتركب بعدين)
             comps = ref_comps(s, AD_FRAME_REFS - 3)
             comp_dir = prod_dir(aid, "comps")
             comps = [c for c in comps if (comp_dir / c["image"]).exists()]
@@ -7210,7 +7212,7 @@ def run_ad_take(aid: str, sid: str, tid: str) -> None:
             pid = t.get("prediction_id")
             if not pid:
                 frames, comps = prod_dir(aid, "frames"), prod_dir(aid, "comps")
-                refs = [frames / s["frame"]] + [comps / c["image"] for c in ref_comps(s, AD_MAX_REFS - 1)]
+                refs = [frames / s["frame"]] + [comps / c["image"] for c in ref_comps(plate_shot(s), AD_MAX_REFS - 1)]
                 body = {
                     "model": series_settings()["video_model"], "prompt": t["prompt"],
                     "reference_images": [atlas.upload_media(seedance_ref(x)) for x in refs if x.exists()],
@@ -7226,6 +7228,169 @@ def run_ad_take(aid: str, sid: str, tid: str) -> None:
         setp(status="failed", error=str(getattr(exc, "detail", None) or exc)[:400])
 
 
+# ---------- ✨ الموشن المتركب: طبقات (عناصر وكلام) بتتحرك فوق فيديو اللقطة وتتطبع عليه
+
+LAYER_KINDS = ("graphic", "text", "ui", "icon", "effect", "logo")
+
+
+def layer_comps(s: dict) -> list[dict]:
+    """العناصر اللي ينفع تبقى طبقات موشن (مش الشخصيات ولا الخلفيات)."""
+    return [c for c in s.get("components") or [] if c.get("use", True) and (c.get("kind") in LAYER_KINDS or c.get("motion"))]
+
+
+def plate_shot(s: dict) -> dict:
+    """اللقطة من غير عناصر الموشن المتركب: الستوري بورد والفيديو بيطلعوا نضاف والجرافيك بيتركب عليهم بعدين."""
+    ids = {L.get("comp_id") for L in s.get("layers") or [] if L.get("type") == "image"}
+    if not s.get("layers"):
+        return s
+    return {**s, "clean": True, "on_screen_text": "", "motion_prompt": "",
+            "components": [c for c in s.get("components") or [] if c["id"] not in ids]}
+
+
+def run_ad_layers(aid: str, sids: list[str]) -> None:
+    """الموديل بيتفرج على المشهد الأصلي ويطلّع طبقات الموشن (مكانها وتوقيتها وحركتها) لكل لقطة."""
+    for sid in sids:
+        try:
+            with closing(db()) as conn:
+                _, d = ad_row(conn, aid)
+            p = d["prod"]
+            s = find_pshot(p, sid)
+            comps = layer_comps(s)
+            orig = next((x for x in (d.get("analysis") or {}).get("scenes") or [] if x.get("n") == s.get("ref_scene")), None)
+            proxy = ad_dir(aid) / "proxy.mp4"
+            if atlas.mock_mode():
+                out = mo.mock_layers(s, comps)
+            elif proxy.exists() and orig:
+                out = ad_json(ad_media_chat(az.with_media(mo.layers_messages(az.header_text(p["header"]), s, comps, orig, True),
+                                                          data_url(proxy, "video/mp4"), "ad.mp4"), 8000), "طبقات الموشن")
+            else:
+                out = ad_json(series_chat(mo.layers_messages(az.header_text(p["header"]), s, comps, orig, False)), "طبقات الموشن")
+            layers = mo.clean_layers(out.get("layers"), float(s.get("seconds") or 4), {c["id"] for c in comps})
+            set_pshot(aid, sid, layers=layers, layers_status="done", layers_error=None if layers else "الموديل شاف إن اللقطة دي مفيهاش موشن جرافيك")
+        except Exception as exc:  # noqa: BLE001
+            set_pshot(aid, sid, layers_status="failed", layers_error=str(getattr(exc, "detail", None) or exc)[:300])
+
+
+@app.post("/api/ads/{aid}/prod/layers/plan")
+def prod_layers_plan(aid: str, shot_id: str | None = None):
+    """🤖 خطّط طبقات الموشن (لقطة واحدة أو كل اللقطات اللي لسه ملهاش طبقات)."""
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات")
+    ids: list[str] = []
+    def fn(d):
+        for s in prod_of(d)["shots"]:
+            if s.get("layers_status") == "working" or (shot_id and s["id"] != shot_id) or (not shot_id and s.get("layers")):
+                continue
+            s.update(layers_status="working", layers_error=None)
+            ids.append(s["id"])
+    update_ad(aid, fn)
+    if not ids:
+        raise HTTPException(400, "كل اللقطات ليها طبقات موشن (أو بتتخطط دلوقتي)")
+    threading.Thread(target=run_ad_layers, args=(aid, ids), daemon=True).start()
+    return ad_response(aid)
+
+
+class LayersIn(BaseModel):
+    layers: list[dict]
+
+
+@app.put("/api/ads/{aid}/prod/shots/{sid}/layers")
+def prod_layers_save(aid: str, sid: str, body: LayersIn):
+    def fn(d):
+        s = find_pshot(prod_of(d), sid)
+        s["layers"] = mo.clean_layers(body.layers, float(s.get("seconds") or 4), {c["id"] for c in s.get("components") or []})
+    update_ad(aid, fn)
+    return ad_response(aid)
+
+
+def base_take(s: dict, tid: str | None = None) -> dict | None:
+    """الفيديو اللي الموشن هيتركب عليه: المختار (ولو هو نفسه متركب، الأصل بتاعه)، أو آخر فيديو خلص."""
+    takes = {t["id"]: t for t in s.get("takes") or []}
+    t = takes.get(tid or s.get("chosen") or "")
+    if t and t.get("composite"):
+        t = takes.get(t.get("base") or "")
+    if t and t.get("status") == "done" and t.get("file") and not t.get("composite"):
+        return t
+    done = [x for x in s.get("takes") or [] if x.get("status") == "done" and x.get("file") and not x.get("composite")]
+    return done[-1] if done else None
+
+
+def run_ad_composite(aid: str, sid: str, tid: str) -> None:
+    def setp(**kw):
+        def fn(d):
+            s = next((x for x in (d.get("prod") or {}).get("shots", []) if x["id"] == sid), None)
+            t = next((x for x in (s or {}).get("takes") or [] if x["id"] == tid), None)
+            if t is not None:
+                t.update(**kw)
+        update_ad(aid, fn)
+    try:
+        setp(status="working", error=None)
+        with closing(db()) as conn:
+            _, d = ad_row(conn, aid)
+        s = find_pshot(d["prod"], sid)
+        need = {L["comp_id"] for L in s.get("layers") or [] if L["type"] == "image"}
+        missing = [c for c in s.get("components") or [] if c["id"] in need and not c.get("image")]
+        if missing:  # صور العناصر اللي لسه ملهاش: من عقل الإعلان، والباقي بيتولد
+            safe_apply_brain(aid, [sid])
+            with closing(db()) as conn:
+                _, d = ad_row(conn, aid)
+            s = find_pshot(d["prod"], sid)
+            for c in s.get("components") or []:
+                if c["id"] in need and not c.get("image"):
+                    run_ad_comp_image(aid, sid, c["id"])
+            with closing(db()) as conn:
+                _, d = ad_row(conn, aid)
+            s = find_pshot(d["prod"], sid)
+        t = next(x for x in s["takes"] if x["id"] == tid)
+        base = next((x for x in s["takes"] if x["id"] == t.get("base")), None)
+        if not base or not base.get("file"):
+            raise RuntimeError("الفيديو الأساسي للقطة مش موجود")
+        comp_dir, cut_dir = prod_dir(aid, "comps"), prod_dir(aid, "cuts")
+        images = {}
+        for c in s.get("components") or []:
+            if c["id"] in need and c.get("image") and (comp_dir / c["image"]).exists():
+                images[c["id"]] = mo.cutout(ffmpeg_exe(), comp_dir / c["image"], cut_dir / f"{Path(c['image']).stem}.png", c.get("kind", ""))
+        src = prod_dir(aid, "takes") / base["file"]
+        dur = base.get("duration") or probe_duration(src)
+        dest = prod_dir(aid, "takes") / f"{tid}.mp4"
+        mo.render(ffmpeg_exe(), src, s.get("layers") or [], images, dest, dur, FONTS_DIR, prod_dir(aid, "cuts"))
+        setp(status="done", file=dest.name, duration=round(probe_duration(dest), 2), error=None)
+    except Exception as exc:  # noqa: BLE001
+        setp(status="failed", error=str(getattr(exc, "detail", None) or exc)[:400])
+
+
+@app.post("/api/ads/{aid}/prod/shots/{sid}/composite")
+def prod_composite(aid: str, sid: str, take_id: str | None = None):
+    """✨ ركّب الموشن: نسخة جديدة من فيديو اللقطة عليها طبقات الموشن (الأصل بيفضل زي ما هو)."""
+    tid = uuid.uuid4().hex[:10]
+    def fn(d):
+        s = find_pshot(prod_of(d), sid)
+        if not s.get("layers"):
+            raise HTTPException(400, f"اللقطة {s['n']} ملهاش طبقات موشن. خطّطها الأول")
+        base = base_take(s, take_id)
+        if not base:
+            raise HTTPException(400, f"اللقطة {s['n']} ملهاش فيديو خلصان يتركب عليه الموشن")
+        s["takes"].append({"id": tid, "file": None, "status": "queued", "error": None, "approved": bool(base.get("approved")),
+                           "composite": True, "base": base["id"], "duration": None, "gen_duration": base.get("gen_duration"),
+                           "prompt": "✨ موشن متركب", "created_at": now()})
+        s["chosen"] = tid
+    update_ad(aid, fn)
+    ad_executor.submit(run_ad_composite, aid, sid, tid)
+    return ad_response(aid)
+
+
+@app.post("/api/ads/{aid}/prod/composite-all")
+def prod_composite_all(aid: str):
+    with closing(db()) as conn:
+        _, d = ad_row(conn, aid)
+    ok = [s["id"] for s in prod_of(d)["shots"] if s.get("layers") and base_take(s)]
+    if not ok:
+        raise HTTPException(400, "مفيش لقطات ليها طبقات موشن وفيديو خلصان")
+    for sid in ok:
+        prod_composite(aid, sid)
+    return ad_response(aid)
+
+
 def queue_ad_take(aid: str, sid: str) -> None:
     tid = uuid.uuid4().hex[:10]
     def fn(d):
@@ -7236,7 +7401,7 @@ def queue_ad_take(aid: str, sid: str) -> None:
         s.setdefault("takes", []).append({
             "id": tid, "file": None, "status": "queued", "error": None, "approved": False, "duration": None,
             "gen_duration": int(min(atlas.MAX_DURATION, max(atlas.MIN_DURATION, math.ceil(float(s.get("seconds") or 4))))),
-            "prompt": az.video_prompt(p["header"], s, ref_comps(s, AD_MAX_REFS - 1)), "created_at": now()})
+            "prompt": az.video_prompt(p["header"], plate_shot(s), ref_comps(plate_shot(s), AD_MAX_REFS - 1)), "created_at": now()})
         if not s.get("chosen"):
             s["chosen"] = tid
     update_ad(aid, fn)
@@ -7301,7 +7466,13 @@ def prod_take_act(aid: str, sid: str, body: TakeActIn, action: str = "pick"):
             retry = True
     update_ad(aid, fn)
     if retry:
-        ad_executor.submit(run_ad_take, aid, sid, body.take_id)
+        with closing(db()) as conn:
+            _, d = ad_row(conn, aid)
+        t = next(x for x in find_pshot(d["prod"], sid)["takes"] if x["id"] == body.take_id)
+        if t.get("composite"):
+            ad_executor.submit(run_ad_composite, aid, sid, body.take_id)
+        else:
+            ad_executor.submit(run_ad_take, aid, sid, body.take_id)
     return ad_response(aid)
 
 
@@ -7374,6 +7545,8 @@ def reset_stuck_prod() -> None:
                     s.update(comp_status="failed", comp_error="اتقطع لما السيرفر اتقفل. استخرج تاني")
                 if s.get("motion_status") == "working":
                     s.update(motion_status="failed", motion_error="اتقطع لما السيرفر اتقفل. استحضر تاني")
+                if s.get("layers_status") == "working":
+                    s.update(layers_status="failed", layers_error="اتقطع لما السيرفر اتقفل. خطّط تاني")
                 for c in s.get("components") or []:
                     if c.get("status") == "working":
                         c.update(status="failed", error="اتقطع لما السيرفر اتقفل")

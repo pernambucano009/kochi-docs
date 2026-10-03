@@ -639,7 +639,11 @@ function renderAdActivity() {
   if (comps.length) items.push(["prod", `🧩 بيستخرج مكونات: لقطة ${nums(comps)}`]);
   const cimg = shots.filter((s) => s.components.some((c) => c.status === "working"));
   if (cimg.length) items.push(["prod", `🖼️ بيولّد صور ${cimg.reduce((k, s) => k + s.components.filter((c) => c.status === "working").length, 0)} مكون (لقطة ${nums(cimg)})`]);
-  const gen = shots.filter((s) => s.takes.some((t) => t.status === "working")), waitGen = shots.filter((s) => s.takes.some((t) => t.status === "queued"));
+  const lp = shots.filter((s) => s.layers_status === "working");
+  if (lp.length) items.push(["prod", `🤖 بيخطط طبقات الموشن من الأصلي: لقطة ${nums(lp)}`]);
+  const cmp = shots.filter((s) => s.takes.some((t) => t.composite && PBUSY.has(t.status)));
+  if (cmp.length) items.push(["prod", `✨ بيركّب الموشن على الفيديو: لقطة ${nums(cmp)}`]);
+  const gen = shots.filter((s) => s.takes.some((t) => t.status === "working" && !t.composite)), waitGen = shots.filter((s) => s.takes.some((t) => t.status === "queued" && !t.composite));
   if (gen.length) items.push(["prod", `🎬 بيولّد فيديو: لقطة ${nums(gen)}`]);
   if (waitGen.length) items.push(["prod", `⏳ فيديو في الطابور: لقطة ${nums(waitGen)}`]);
   const el = $("adActivity");
@@ -691,7 +695,7 @@ document.querySelector('.view[data-view="10"]').addEventListener("click", (e) =>
 // ---------- 4. التنفيذ: راس الإعلان ← ستوري بورد ← مكونات ← لقطات ← المونتاج ----------
 const PBUSY = new Set(["queued", "working"]);
 function prodBusy(a) {
-  return !!a.prod?.shots.some((s) => PBUSY.has(s.frame_status) || s.comp_status === "working" || s.motion_status === "working"
+  return !!a.prod?.shots.some((s) => PBUSY.has(s.frame_status) || s.comp_status === "working" || s.motion_status === "working" || s.layers_status === "working"
     || s.components.some((c) => c.status === "working") || s.takes.some((t) => PBUSY.has(t.status)));
 }
 const HEADER_LABELS = { title: "اسم الإعلان", concept: "الكونسبت", style: "الستايل البصري (بالإنجليزي)", characters: "الشخصيات (نفس الشكل في كل لقطة)",
@@ -702,6 +706,95 @@ const pAPI = (path, opts) => api(`/api/ads/${adx.cur.id}/prod${path}`, opts);
 async function pDo(btn, label, fn) {
   return busyButton(btn, label, async () => { adx.cur = await fn(); renderAds(); });
 }
+
+// ---------- ✨ الموشن المتركب: طبقات فوق فيديو اللقطة (مكان، توقيت، حركة دخول وخروج) ----------
+const LAYER_KINDS = new Set(["graphic", "text", "ui", "icon", "effect", "logo"]);
+const ANIM_IN = { fade: "يظهر تدريجي", pop: "ينط (pop)", zoom: "يكبر", slide_up: "يطلع من تحت", slide_down: "ينزل من فوق", slide_left: "يدخل من اليمين", slide_right: "يدخل من الشمال", none: "من غير حركة" };
+const ANIM_OUT = { fade: "يختفي تدريجي", pop: "يصغر ويختفي", zoom: "يصغر", slide_up: "يطلع لفوق", slide_down: "ينزل لتحت", slide_left: "يخرج شمال", slide_right: "يخرج يمين", none: "من غير حركة" };
+const LOOP = { none: "ثابت", float: "بيطفو", pulse: "بينبض" };
+const layerComps = (s) => s.components.filter((c) => c.use !== false && (LAYER_KINDS.has(c.kind) || c.motion));
+const opts = (map, v) => Object.entries(map).map(([k, l]) => `<option value="${k}" ${k === v ? "selected" : ""}>${l}</option>`).join("");
+function renderLayers(s) {
+  const layers = s.layers || [], comps = layerComps(s), byId = Object.fromEntries(s.components.map((c) => [c.id, c]));
+  const base = s.takes.find((t) => t.id === s.chosen && t.url && !t.composite) || [...s.takes].reverse().find((t) => t.url && !t.composite);
+  const working = s.layers_status === "working";
+  const stage = layers.map((L) => {
+    const pos = `left:${L.x * 100}%;top:${L.y * 100}%`;
+    if (L.type === "text") return `<span class="lt" data-lid="${L.id}" style="${pos};font-size:calc(${L.size} * var(--lh));color:${L.color};${L.box ? `background:${L.box}` : ""}" data-no-i18n>${adEsc(L.text)}</span>`;
+    const c = byId[L.comp_id];
+    return c?.image_url ? `<img data-lid="${L.id}" src="${c.image_url}" style="${pos};width:${L.w * 100}%" alt="">`
+      : `<span class="lt ph" data-lid="${L.id}" style="${pos}">${adEsc(c?.name || "؟")}</span>`;
+  }).join("");
+  const rows = layers.map((L) => `<div class="ad-lrow" data-lrow="${L.id}">
+      ${L.type === "text" ? `<input type="text" value="${adEsc(L.text)}" data-lf="text" data-no-i18n>
+        <input type="color" value="${L.color}" data-lf="color" title="لون الكلام"><input type="color" value="${L.box || "#000000"}" data-lf="box" title="لون الخلفية">`
+      : `<b data-no-i18n>${adEsc(byId[L.comp_id]?.name || "عنصر")}</b>`}
+      <label>من <input type="number" step="0.1" min="0" value="${L.start}" data-lf="start"></label>
+      <label>لـ <input type="number" step="0.1" min="0" value="${L.end}" data-lf="end"></label>
+      <label>الحجم <input type="number" step="${L.type === "text" ? 0.005 : 0.05}" min="0.01" value="${L.type === "text" ? L.size : L.w}" data-lf="${L.type === "text" ? "size" : "w"}"></label>
+      <select data-lf="in" title="الدخول">${opts(ANIM_IN, L.in)}</select>
+      <select data-lf="out" title="الخروج">${opts(ANIM_OUT, L.out)}</select>
+      <select data-lf="loop" title="وهو ظاهر">${opts(LOOP, L.loop)}</select>
+      <button type="button" class="btn sm danger" data-ldel="${L.id}">✕</button>
+      ${L.note ? `<small class="muted" data-no-i18n>${adEsc(L.note)}</small>` : ""}</div>`).join("");
+  return `<div class="ad-layers">
+    <h4 class="pane-h">✨ الموشن المتركب ${working ? `<span class="spin-inline"></span>` : ""}
+      <button class="btn sm" data-p="lplan" ${working ? "disabled" : ""}>${working ? "⏳ بيخطط من الأصلي..." : "🤖 خطّط من الإعلان الأصلي"}</button>
+      <select class="btn sm" data-laddimg><option value="">＋ عنصر</option>${comps.map((c) => `<option value="${c.id}">${adEsc(c.name)}</option>`).join("")}</select>
+      <button class="btn sm" data-p="ltext">＋ كلام</button>
+      <button class="btn sm primary" data-p="lcomp" ${layers.length && base ? "" : "disabled"} title="${base ? "" : "ولّد فيديو اللقطة الأول"}">✨ ركّب على الفيديو</button></h4>
+    ${s.layers_error ? `<div class="muted">${adEsc(s.layers_error)}</div>` : ""}
+    ${layers.length ? `<p class="hint">العناصر والكلام بيتطبعوا فوق الفيديو بحركتهم. اسحب أي عنصر في المعاينة عشان تغيّر مكانه. اللقطات اللي ليها موشن متركب الستوري بورد والفيديو بتوعها بيترسموا من غير الجرافيك.</p>
+      <div class="ad-lwrap"><div class="ad-lstage" data-lstage="${s.id}">${base ? `<video src="${base.url}" muted playsinline loop preload="metadata"></video>` : s.frame_url ? `<img class="bg" src="${s.frame_url}" alt="">` : ""}${stage}</div>
+      <div class="ad-lrows">${rows}</div></div>` : ""}
+  </div>`;
+}
+async function saveLayers(sid, layers) {
+  try { adx.cur = await pAPI(`/shots/${sid}/layers`, { method: "PUT", ...jsonBody({ layers }) }); renderAds(); }
+  catch (err) { toast(err.message, true); }
+}
+$("adPShots").addEventListener("change", (e) => {
+  const card = e.target.closest("[data-ps]");
+  if (!card) return;
+  const s = adx.cur.prod.shots.find((x) => x.id === card.dataset.ps);
+  if (e.target.matches("[data-laddimg]")) {
+    const cid = e.target.value;
+    if (!cid) return;
+    return saveLayers(s.id, [...(s.layers || []), { type: "image", comp_id: cid, start: 0.3, end: Math.max(1, s.seconds - 0.2), x: 0.5, y: 0.5, w: 0.5, in: "pop", out: "fade" }]);
+  }
+  const row = e.target.closest("[data-lrow]"), f = e.target.dataset.lf;
+  if (!row || !f) return;
+  const v = ["start", "end", "size", "w"].includes(f) ? Number(e.target.value) : e.target.value;
+  saveLayers(s.id, s.layers.map((L) => (L.id === row.dataset.lrow ? { ...L, [f]: v } : L)));
+});
+// سحب العناصر في المعاينة
+let ldrag = null;
+$("adPShots").addEventListener("pointerdown", (e) => {
+  const el = e.target.closest("[data-lstage] [data-lid]");
+  if (!el) return;
+  e.preventDefault();
+  const stage = el.closest("[data-lstage]");
+  ldrag = { el, stage, sid: stage.dataset.lstage, id: el.dataset.lid, r: stage.getBoundingClientRect() };
+  el.setPointerCapture(e.pointerId);
+  el.classList.add("drag");
+});
+$("adPShots").addEventListener("pointermove", (e) => {
+  if (!ldrag) return;
+  const x = Math.min(1, Math.max(0, (e.clientX - ldrag.r.left) / ldrag.r.width));
+  const y = Math.min(1, Math.max(0, (e.clientY - ldrag.r.top) / ldrag.r.height));
+  Object.assign(ldrag, { x, y });
+  ldrag.el.style.left = `${x * 100}%`;
+  ldrag.el.style.top = `${y * 100}%`;
+});
+$("adPShots").addEventListener("pointerup", () => {
+  if (!ldrag) return;
+  const d = ldrag;
+  ldrag = null;
+  d.el.classList.remove("drag");
+  if (d.x == null) return;
+  const s = adx.cur.prod.shots.find((x) => x.id === d.sid);
+  saveLayers(d.sid, s.layers.map((L) => (L.id === d.id ? { ...L, x: +d.x.toFixed(3), y: +d.y.toFixed(3) } : L)));
+});
 
 // بيغيّر محتوى العنصر بس لو اتغير فعلًا: الصور والفيديوهات متتحملش من الأول كل ٣ ثواني والصفحة متتهزش
 function setHTML(el, html) {
@@ -733,7 +826,7 @@ function renderAdProd() {
   const okv = shots.filter((s) => s.takes.some((t) => t.id === s.chosen && t.approved)).length;
   $("adPProgress").textContent = `🎨 ${framed}/${n} · 🧩 ${comps}/${n} · ✅ ${shots.filter((s) => s.approved).length}/${n} · 🎬 ${okv}/${n}`;
   $("adPApproveAll").textContent = shots.every((s) => s.approved) ? "↩ الغي اعتماد الكل" : "✅ اعتمد كل اللقطات";
-  if (editingIn($("adPShots")) || [...$("adPShots").querySelectorAll("video")].some((v) => !v.paused)) return;
+  if (ldrag || editingIn($("adPShots")) || [...$("adPShots").querySelectorAll("video")].some((v) => !v.paused)) return;
   $("adPShots").style.setProperty("--ad-ar", (h.aspect || "9:16").replace(":", " / "));
   setHTML($("adPShots"), shots.map((s) => {
     const fbusy = PBUSY.has(s.frame_status);
@@ -779,8 +872,9 @@ function renderAdProd() {
             <button class="btn sm danger" data-c="del">✕</button></div>
         </div>`).join("")}</div>
         ${adField("برومبت تجميع اللقطة (Seedance)", s.assembly_prompt || s.prompt, 'data-pf="assembly_prompt"', 3, true)}
+        ${renderLayers(s)}
         <div class="ad-takes">${s.takes.map((t) => `<div class="ad-take ${t.id === s.chosen ? "sel" : ""} ${t.approved ? "ok" : ""}" data-pt="${t.id}">
-          ${t.url ? `<button type="button" class="ad-take-play" data-tplay="${t.id}" title="شغّل وعاين">${lightVideo(t.url, "muted playsinline")}<i>▶</i></button>` : `<div class="wait">${PBUSY.has(t.status) ? `<div class="spin"></div>🎬 بيتولد` : `✕ ${adEsc(t.error || "فشل")}`}</div>`}
+          ${t.composite ? `<b class="ad-take-badge">✨ موشن</b>` : ""}${t.url ? `<button type="button" class="ad-take-play" data-tplay="${t.id}" title="شغّل وعاين">${lightVideo(t.url, "muted playsinline")}<i>▶</i></button>` : `<div class="wait">${PBUSY.has(t.status) ? `<div class="spin"></div>${t.composite ? "✨ بيركّب" : "🎬 بيتولد"}` : `✕ ${adEsc(t.error || "فشل")}`}</div>`}
           <div class="acts">${t.status === "done" ? `<button class="btn sm" data-t="${t.approved ? "unapprove" : "approve"}">${t.approved ? "✅" : "موافق"}</button>` : ""}
             ${t.status === "failed" ? `<button class="btn sm" data-t="retry">↻</button>` : ""}
             ${t.id !== s.chosen && t.status === "done" ? `<button class="btn sm" data-t="pick">اختار</button>` : ""}
@@ -886,6 +980,16 @@ $("adPShots").addEventListener("click", async (e) => {
     if (b.dataset.pframe) adx.cur = await pAPI(`/shots/${sid}/frame`, { method: "POST", ...jsonBody({ file: b.dataset.pframe }) });
     else if (b.dataset.p === "frame") adx.cur = await pAPI(`/frames?shot_id=${sid}`, { method: "POST" });
     else if (b.dataset.p === "motion") adx.cur = await pAPI(`/motion?shot_id=${sid}`, { method: "POST" });
+    else if (b.dataset.p === "lplan") {
+      if (s.layers?.length && !confirm("الطبقات الحالية هتتبدل بخطة جديدة من الإعلان الأصلي. تكمل؟")) return;
+      adx.cur = await pAPI(`/layers/plan?shot_id=${sid}`, { method: "POST" });
+    } else if (b.dataset.p === "ltext") {
+      await saveLayers(sid, [...(s.layers || []), { type: "text", text: "كلام جديد", start: 0.3, end: Math.max(1, s.seconds - 0.3), x: 0.5, y: 0.2, size: 0.05, color: "#FFFFFF", box: "#57B8AF", in: "pop", out: "fade" }]);
+      return;
+    } else if (b.dataset.ldel) {
+      await saveLayers(sid, s.layers.filter((L) => L.id !== b.dataset.ldel));
+      return;
+    } else if (b.dataset.p === "lcomp") adx.cur = await pAPI(`/shots/${sid}/composite`, { method: "POST" });
     else if (b.dataset.p === "delframe") {
       const more = s.frames.length > 1;
       if (!confirm(more ? `تمسح الستوري بورد المعروضة للقطة ${s.n}؟ النسخة اللي قبلها هتظهر مكانها.` : `تمسح الستوري بورد بتاعة اللقطة ${s.n}؟`)) return;
@@ -1065,6 +1169,11 @@ function renderAdGallery() {
     + (s.frame_url ? `<button class="btn" data-ga="gen">🎬 ولّد نسخة تانية</button>` : "");
 }
 $("adPGallery").onclick = () => openAdGallery();
+$("adPLayers").onclick = () => pDo($("adPLayers"), "⏳", () => pAPI("/layers/plan", { method: "POST" }));
+$("adPCompose").onclick = () => {
+  if (!confirm("يركّب طبقات الموشن على فيديو كل لقطة ليها طبقات وفيديو خلصان. كل لقطة بتاخد نسخة جديدة «✨ موشن» والأصل بيفضل. تكمل؟")) return;
+  pDo($("adPCompose"), "⏳", () => pAPI("/composite-all", { method: "POST" }));
+};
 $("adGalClose").onclick = () => $("adGalDialog").close();
 $("adGalDialog").addEventListener("close", () => { $("adGalStage").innerHTML = ""; $("adGalStage").dataset.take = ""; agal.sid = null; renderAds(); });
 $("adGalDialog").addEventListener("cancel", (e) => { if (agal.sid) { e.preventDefault(); agal.sid = null; renderAdGallery(); } });

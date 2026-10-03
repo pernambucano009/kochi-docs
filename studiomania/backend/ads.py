@@ -399,6 +399,8 @@ def frame_prompt(h: dict, shot: dict, ref_comps: list[dict] | None = None, n_sty
         refs_txt,
         ("Other elements to draw: " + "; ".join(f"{c.get('name')}: {c.get('image_prompt') or c.get('description')}" for c in rest)) if rest else "",
         f"Details: {shot.get('prompt', '')}" if shot.get("prompt") else "",
+        ("CLEAN PLATE: do not draw any floating graphics, UI cards, icons, captions, on-screen text or logos — they are "
+         "composited later as motion-graphics layers. Keep natural empty space where they will sit." if shot.get("clean") else ""),
         ("Any app screen or logo in the frame must be one of the reference images above."
          if any(c.get("kind") in ("ui", "logo") for c in ref_comps) else ""),
     ] if x)
@@ -462,6 +464,8 @@ def video_prompt(h: dict, shot: dict, ref_comps: list[dict] | int = 0) -> str:
     return "\n".join(x for x in [
         shot.get("assembly_prompt") or shot.get("prompt") or shot.get("visual", ""),
         f"Motion graphics animation: {shot['motion_prompt']}" if shot.get("motion_prompt") and not shot.get("assembly_prompt") else "",
+        ("Clean plate: no on-screen graphics, UI cards, text or logos (motion graphics are composited later)."
+         if shot.get("clean") else ""),
         refs,
         f"Visual style: {h['style']}" if h.get("style") else "",
         f"Characters: {h['characters']}" if h.get("characters") else "",
