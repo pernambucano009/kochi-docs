@@ -1004,6 +1004,7 @@
                     <button class="btn" id="adPCompImgs">🖼️ ولّد صور المكونات</button>
                     <button class="btn" id="adPApproveAll">✅ اعتمد كل اللقطات</button>
                     <button class="btn primary" id="adPGenerate">🎬 ولّد المعتمدة</button>
+                    <button class="btn" id="adPGallery">▶️ اعرض الفيديوهات</button>
                     <button class="btn primary" id="adPEditor">🎞️ افتح في المونتاج</button>
                     <span class="muted" id="adPProgress"></span>
                   </div>
@@ -1265,6 +1266,28 @@
       </div>
     </div>
     <audio id="serGalAudio" preload="auto" hidden></audio>
+  </div>
+</dialog>
+<dialog class="bulk-dlg ser-gal-dlg" id="adGalDialog">
+  <div class="panel-head"><h2>🎬 فيديوهات الإعلان</h2><span class="muted" id="adGalCount"></span><button class="btn sm" id="adGalClose">إغلاق</button></div>
+  <div id="adGalAll"><div class="ser-gal-grid" id="adGalGrid"></div></div>
+  <div class="ser-gal-view" id="adGalView" hidden>
+    <div class="row wrap ser-gal-nav">
+      <button class="btn sm" id="adGalBack">↩ كل الفيديوهات</button>
+      <b id="adGalTitle" data-no-i18n></b>
+      <span class="spacer"></span>
+      <button class="btn sm" id="adGalPrev">→ اللي قبلها</button>
+      <button class="btn sm" id="adGalNext">اللي بعدها ←</button>
+    </div>
+    <div class="ser-gal-body">
+      <div class="ser-gal-stage" id="adGalStage"></div>
+      <div class="ser-gal-side">
+        <div class="said" id="adGalInfo" data-no-i18n></div>
+        <div class="takes ad-gal-takes" id="adGalTakes"></div>
+        <div class="err" id="adGalErr" hidden></div>
+        <div class="row wrap" id="adGalActs"></div>
+      </div>
+    </div>
   </div>
 </dialog>
 <dialog class="bulk-dlg ser-del-dlg ser-add-dlg" id="serAddDialog">

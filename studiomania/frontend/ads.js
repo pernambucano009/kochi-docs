@@ -562,6 +562,7 @@ function scheduleAdPoll() {
         if (changed) adx.list = await api("/api/ads");
       }
       renderAds();
+      if ($("adGalDialog").open) renderAdGallery();
     } catch { scheduleAdPoll(); }
   }, 3000);
 }
@@ -725,7 +726,7 @@ function renderAdProd() {
   const okv = shots.filter((s) => s.takes.some((t) => t.id === s.chosen && t.approved)).length;
   $("adPProgress").textContent = `🎨 ${framed}/${n} · 🧩 ${comps}/${n} · ✅ ${shots.filter((s) => s.approved).length}/${n} · 🎬 ${okv}/${n}`;
   $("adPApproveAll").textContent = shots.every((s) => s.approved) ? "↩ الغي اعتماد الكل" : "✅ اعتمد كل اللقطات";
-  if (editingIn($("adPShots"))) return;
+  if (editingIn($("adPShots")) || [...$("adPShots").querySelectorAll("video")].some((v) => !v.paused)) return;
   $("adPShots").innerHTML = shots.map((s) => {
     const fbusy = PBUSY.has(s.frame_status);
     const ref = s.ref_frame ? `<div class="ref"><img src="/media/ads/${a.id}/frames/${s.ref_frame}" alt="">من الإعلان الأصلي (مشهد ${s.ref_scene})</div>` : "";
@@ -771,7 +772,7 @@ function renderAdProd() {
         </div>`).join("")}</div>
         ${adField("برومبت تجميع اللقطة (Seedance)", s.assembly_prompt || s.prompt, 'data-pf="assembly_prompt"', 3, true)}
         <div class="ad-takes">${s.takes.map((t) => `<div class="ad-take ${t.id === s.chosen ? "sel" : ""} ${t.approved ? "ok" : ""}" data-pt="${t.id}">
-          ${t.url ? lightVideo(t.url, 'controls playsinline') : `<div class="wait">${PBUSY.has(t.status) ? `<div class="spin"></div>🎬 بيتولد` : `✕ ${adEsc(t.error || "فشل")}`}</div>`}
+          ${t.url ? `<button type="button" class="ad-take-play" data-tplay="${t.id}" title="شغّل وعاين">${lightVideo(t.url, "muted playsinline")}<i>▶</i></button>` : `<div class="wait">${PBUSY.has(t.status) ? `<div class="spin"></div>🎬 بيتولد` : `✕ ${adEsc(t.error || "فشل")}`}</div>`}
           <div class="acts">${t.status === "done" ? `<button class="btn sm" data-t="${t.approved ? "unapprove" : "approve"}">${t.approved ? "✅" : "موافق"}</button>` : ""}
             ${t.status === "failed" ? `<button class="btn sm" data-t="retry">↻</button>` : ""}
             ${t.id !== s.chosen && t.status === "done" ? `<button class="btn sm" data-t="pick">اختار</button>` : ""}
@@ -869,6 +870,8 @@ $("adPShots").addEventListener("click", async (e) => {
   if (!card) return;
   const sid = card.dataset.ps;
   const s = adx.cur.prod.shots.find((x) => x.id === sid);
+  const tp = e.target.closest("[data-tplay]");
+  if (tp) return openAdGallery(sid, tp.dataset.tplay);
   const b = e.target.closest("button, img[data-pframe], img[data-cimg]");
   if (!b) return;
   try {
@@ -991,4 +994,107 @@ $("adBrainBody").addEventListener("click", (e) => {
   const item = e.target.closest("[data-bfile]");
   if (!item || !e.target.closest("[data-bdel]") || !confirm("تحذف الصورة دي من عقل الإعلان؟")) return;
   brainSave(() => bAPI(`/assets/${encodeURIComponent(item.dataset.bfile)}`, { method: "DELETE" }));
+});
+
+
+// ---------- ▶️ معاينة فيديوهات الإعلان: كل اللقطات قدامك، ودوسة تكبّر الفيديو وتشغّله ----------
+const agal = { sid: null, tid: null };
+const TAKE_ST = { queued: "⏳ في الطابور", working: "🎬 بيتولد", failed: "✕ فشل" };
+function adGalShots() { return adx.cur?.prod?.shots || []; }
+function openAdGallery(sid = null, tid = null) {
+  agal.sid = sid;
+  agal.tid = tid;
+  if (!$("adGalDialog").open) $("adGalDialog").showModal();
+  renderAdGallery();
+}
+function shotTake(s) {
+  return s.takes.find((t) => t.id === s.chosen && t.url) || [...s.takes].reverse().find((t) => t.url) || null;
+}
+function renderAdGallery() {
+  const shots = adGalShots();
+  const ok = shots.filter((s) => s.takes.some((t) => t.id === s.chosen && t.approved)).length;
+  const busy = shots.filter((s) => s.takes.some((t) => PBUSY.has(t.status))).length;
+  $("adGalCount").textContent = `${shots.length} لقطة · ✅ ${ok} موافق عليها · 🎬 ${busy} بتتولد`;
+  const s = shots.find((x) => x.id === agal.sid);
+  $("adGalAll").hidden = !!s;
+  $("adGalView").hidden = !s;
+  if (!s) {
+    $("adGalGrid").innerHTML = shots.map((x) => {
+      const t = shotTake(x), approved = x.takes.some((k) => k.id === x.chosen && k.approved), working = x.takes.some((k) => PBUSY.has(k.status));
+      const cls = approved ? "done" : t ? "review" : "todo";
+      return `<button type="button" class="gal-tile ${cls}" data-gshot="${x.id}">
+        ${t ? lightVideo(t.url, "muted playsinline") : x.frame_url ? `<img src="${x.frame_url}" alt="">` : ""}
+        ${working ? `<div class="spin"></div>` : ""}<span class="n">${x.n}</span>
+        <span class="st">${approved ? "✅ موافق عليها" : working ? "🎬 بيتولد" : t ? "👀 مستنية موافقتك" : x.frame_url ? "لسه متولدتش" : "من غير ستوري بورد"}</span></button>`;
+    }).join("") || `<p class="muted">لسه مفيش لقطات.</p>`;
+    return;
+  }
+  const i = shots.indexOf(s);
+  $("adGalPrev").disabled = i <= 0;
+  $("adGalNext").disabled = i >= shots.length - 1;
+  $("adGalTitle").textContent = `لقطة ${s.n} من ${shots.length}`;
+  const take = s.takes.find((t) => t.id === agal.tid && t.url) || shotTake(s);
+  agal.tid = take?.id || null;
+  const stage = $("adGalStage");
+  if (stage.dataset.take !== (take?.id || "") || !stage.firstElementChild) {
+    stage.dataset.take = take?.id || "";
+    const working = s.takes.find((t) => PBUSY.has(t.status));
+    stage.innerHTML = take ? `<video src="${take.url}" controls autoplay playsinline loop></video>`
+      : working ? `<div><div class="spin"></div><p>🎬 الفيديو بيتولد...</p></div>`
+      : s.frame_url ? `<img src="${s.frame_url}" alt=""><p style="position:absolute">لسه متولدش فيديو</p>` : `<p>لسه مفيش ستوري بورد ولا فيديو</p>`;
+  }
+  $("adGalInfo").innerHTML = `<b>اللي بيحصل:</b> ${adEsc(s.visual)}${s.voice ? `<br><b>الكلام:</b> ${adEsc(s.voice)}` : ""}${s.motion_notes ? `<br><b>🎞️ الموشن:</b> ${adEsc(s.motion_notes)}` : ""}`;
+  $("adGalTakes").innerHTML = s.takes.map((t, k) => `<button type="button" class="take ${t.id === agal.tid ? "viewing" : ""} ${t.id === s.chosen ? "sel" : ""}" data-gtake="${t.id}" ${t.url ? "" : "disabled"}>
+      ${t.url ? lightVideo(t.url, "muted playsinline") : `<span>${TAKE_ST[t.status] || ""}</span>`}<small>${t.approved ? "✅" : t.id === s.chosen ? "⭐" : ""} ${k + 1}</small></button>`).join("")
+    || `<p class="muted">مفيش نسخ لسه.</p>`;
+  const t = s.takes.find((x) => x.id === agal.tid);
+  $("adGalErr").hidden = !(t?.status === "failed");
+  $("adGalErr").textContent = t?.status === "failed" ? `✕ ${t.error || "فشل"}` : "";
+  $("adGalActs").innerHTML = (t && t.status === "done" ? `
+      <button class="btn ${t.approved ? "" : "primary"}" data-ga="${t.approved ? "unapprove" : "approve"}">${t.approved ? "↩ الغي الموافقة" : "✅ موافق عليه"}</button>
+      ${t.id !== s.chosen ? `<button class="btn" data-ga="pick">⭐ اختاره للقطة دي</button>` : ""}
+      <button class="btn danger" data-ga="delete">🗑️ امسح النسخة دي</button>` : t?.status === "failed" ? `<button class="btn" data-ga="retry">↻ جرّب تاني</button>` : "")
+    + (s.frame_url ? `<button class="btn" data-ga="gen">🎬 ولّد نسخة تانية</button>` : "");
+}
+$("adPGallery").onclick = () => openAdGallery();
+$("adGalClose").onclick = () => $("adGalDialog").close();
+$("adGalDialog").addEventListener("close", () => { $("adGalStage").innerHTML = ""; $("adGalStage").dataset.take = ""; agal.sid = null; renderAds(); });
+$("adGalDialog").addEventListener("cancel", (e) => { if (agal.sid) { e.preventDefault(); agal.sid = null; renderAdGallery(); } });
+$("adGalBack").onclick = () => { agal.sid = null; $("adGalStage").innerHTML = ""; renderAdGallery(); };
+function adGalStep(d) {
+  const shots = adGalShots(), i = shots.findIndex((x) => x.id === agal.sid);
+  const n = shots[i + d];
+  if (n) { agal.sid = n.id; agal.tid = null; renderAdGallery(); }
+}
+$("adGalPrev").onclick = () => adGalStep(-1);
+$("adGalNext").onclick = () => adGalStep(1);
+document.addEventListener("keydown", (e) => {
+  if (!$("adGalDialog").open || !agal.sid || e.target.closest?.("input, textarea")) return;
+  if (e.key === "ArrowLeft") adGalStep(1);  // RTL: الشمال = اللي بعدها
+  if (e.key === "ArrowRight") adGalStep(-1);
+});
+$("adGalGrid").addEventListener("click", (e) => {
+  const t = e.target.closest("[data-gshot]");
+  if (t) { agal.sid = t.dataset.gshot; agal.tid = null; renderAdGallery(); }
+});
+$("adGalTakes").addEventListener("click", (e) => {
+  const t = e.target.closest("[data-gtake]");
+  if (t) { agal.tid = t.dataset.gtake; renderAdGallery(); }
+});
+$("adGalActs").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-ga]");
+  if (!b) return;
+  const sid = agal.sid, a = b.dataset.ga;
+  try {
+    if (a === "gen") {
+      if (!confirm("تولّد نسخة تانية للقطة دي بـ Seedance؟ (التوليد بيتحسب عليك)")) return;
+      adx.cur = await pAPI(`/shots/${sid}/generate`, { method: "POST" });
+    } else {
+      if (a === "delete" && !confirm("تمسح النسخة دي؟")) return;
+      adx.cur = await pAPI(`/shots/${sid}/take?action=${a}`, { method: "POST", ...jsonBody({ take_id: agal.tid }) });
+      if (a === "delete") agal.tid = null;
+    }
+    renderAdGallery();
+    scheduleAdPoll();
+  } catch (err) { toast(err.message, true); }
 });
