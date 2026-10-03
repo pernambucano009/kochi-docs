@@ -8137,6 +8137,8 @@ def run_ad_lipsync(aid: str, sid: str, tid: str) -> None:
                         "prompt": f"{scene}. The person speaks naturally to the camera in Arabic, lips perfectly synced to the audio, "
                                   "natural blinking, subtle head movement and small hand gestures. Keep the face, outfit, "
                                   "background and phone screen exactly as in the image."}
+                if t["method"] == "omni":  # OmniHuman بيطلب الأسماء دي كمان (اتجربت)
+                    body.update(image_url=img, audio_url=audio_url)
             url = atlas.run_model("Video", body, "الكلام على الوش", max_seconds=2400, interval=6)
             atlas.download(url, dest)
         setp(status="done", file=dest.name, duration=round(probe_duration(dest), 2), error=None)
