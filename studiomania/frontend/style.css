@@ -1366,3 +1366,8 @@ a.pl-link:hover { background: color-mix(in srgb, var(--ok) 24%, transparent); }
 .ad-cast-card .vers img.sel { border-color: var(--accent); }
 .ad-cast-card input, .ad-cast-card textarea, .ad-cast-card select { width: 100%; font-size: 12px; }
 .ad-cast-card .okb { color: #2F855A; font-size: 12px; white-space: nowrap; }
+/* ✍️ برومبت الستوري بورد بالمنشن */
+.ad-sb { border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; background: var(--surface); }
+.ad-ments { display: flex; flex-wrap: wrap; gap: 6px; }
+.ad-ments .ment { display: inline-flex; align-items: center; gap: 5px; background: #EAF6F4; color: #1F4D48; border-radius: 999px; padding: 2px 10px 2px 2px; font-size: 12px; font-weight: 600; }
+.ad-ments .ment img { width: 26px; height: 26px; border-radius: 50%; object-fit: cover; background: #fff; }

@@ -5632,7 +5632,14 @@ def ad_to_dict(r: sqlite3.Row, d: dict) -> dict:
         "thumb": scenes[0]["frame_url"] if scenes and scenes[0].get("frame_url") else None,
         "prod": with_ref_motion(prod_to_dict(aid, d.get("prod")), analysis),
         "chain_prod": bool(d.get("chain_prod")),
+        "brain_db": ad_brain_db(d.get("settings")),
     }
+
+
+def ad_brain_db(settings: dict | None) -> list[dict]:
+    """عناصر عقل الإعلان اللي ينفع يتعملها منشن (الاسم والنوع والصورة) عشان تظهر في الواجهة."""
+    brain = ad_brain(settings)
+    return [{"name": a["name"], "kind": a["kind"], "url": f"/media/ads/brains/{brain['id']}/{a['file']}"} for a in brain_db(brain)]
 
 
 def with_ref_motion(prod: dict | None, analysis: dict) -> dict | None:
@@ -6758,7 +6765,7 @@ class ProdShotIn(BaseModel):
     fields: dict
 
 
-PSHOT_FIELDS = ("seconds", "visual", "shot", "camera", "on_screen_text", "voice", "sfx", "music", "prompt",
+PSHOT_FIELDS = ("seconds", "visual", "shot", "camera", "on_screen_text", "voice", "sfx", "music", "prompt", "sb_prompt",
                 "assembly_prompt", "motion_notes", "motion_prompt", "approved")
 
 
@@ -6770,6 +6777,53 @@ def prod_shot_patch(aid: str, sid: str, body: ProdShotIn):
             if k in body.fields:
                 v = body.fields[k]
                 s[k] = bool(v) if k == "approved" else max(1.0, min(15.0, float(v or 4))) if k == "seconds" else str(v or "")
+        if "sb_prompt" in body.fields:  # المنشنز بتتقري من جديد من البرومبت اللي كتبته
+            s["mentions"] = az.find_mentions(s["sb_prompt"], [a["name"] for a in brain_db(ad_brain(d.get("settings")))])
+    update_ad(aid, fn)
+    return ad_response(aid)
+
+
+BRAIN_DB_KINDS = {"characters": "character", "sets": "background", "props": "prop", "screens": "screen", "logos": "logo", "products": "product"}
+
+
+def brain_db(brain: dict | None) -> list[dict]:
+    """عقل الإعلان كقاعدة بيانات: كل عنصر ليه اسم يتعمله منشن (@الاسم) وصورة مرجعية."""
+    out = []
+    for kind, label in BRAIN_DB_KINDS.items():
+        for a in (brain or {}).get(kind) or []:
+            if a.get("name"):
+                out.append({**a, "kind": label, "brain_kind": kind})
+    return out
+
+
+def mention_refs(brain: dict | None, names: list[str]) -> list[dict]:
+    """المنشنز ← صورها الحقيقية من العقل (الشخصيات الأول)."""
+    db = {a["name"]: a for a in brain_db(brain)}
+    items = [db[n] for n in names or [] if n in db and (brain_dir(brain["id"]) / db[n]["file"]).exists()]
+    order = {"character": 0, "background": 1, "prop": 2, "product": 2, "screen": 3, "logo": 4}
+    return sorted(items, key=lambda a: order.get(a["kind"], 5))
+
+
+@app.post("/api/ads/{aid}/prod/sb-prompts")
+def prod_sb_prompts(aid: str, shot_id: str | None = None):
+    """✍️ يكتب برومبت الستوري بورد لكل لقطة ويعمل منشن (@الاسم) لعناصر عقل الإعلان اللي فيها."""
+    with closing(db()) as conn:
+        _, d = ad_row(conn, aid)
+    p = prod_of(d)
+    brain = ad_brain(d.get("settings"))
+    items = brain_db(brain)
+    shots = [s for s in p["shots"] if not shot_id or s["id"] == shot_id]
+    if not shots:
+        raise HTTPException(404, "اللقطة مش موجودة")
+    out = az.mock_sb(shots, items) if atlas.mock_mode() else ad_json(
+        series_chat(az.sb_messages(az.header_text(p["header"]), shots, items)), "برومبتات الستوري بورد")
+    got = {str(x.get("id")): str(x.get("prompt") or "").strip() for x in out.get("shots") or [] if isinstance(x, dict)}
+    names = [a["name"] for a in items]
+    def fn(d):
+        for s in d["prod"]["shots"]:
+            if got.get(s["id"]):
+                s["sb_prompt"] = got[s["id"]][:4000]
+                s["mentions"] = az.find_mentions(s["sb_prompt"], names)
     update_ad(aid, fn)
     return ad_response(aid)
 
@@ -6829,14 +6883,23 @@ def run_ad_frame(aid: str, sid: str, note: str = "", extra: list[str] | None = N
         else:
             # صور المكونات نفسها (شاشات كوتشي، اللوجو، الشخصيات...) مراجع أساسية، وبعدها صور الستايل للشكل العام
             s = plate_shot(s)  # لو اللقطة ليها موشن متركب: الستوري بورد من غير الجرافيك (بيتركب بعدين)
-            comps = ref_comps(s, AD_FRAME_REFS - 3)
             comp_dir = prod_dir(aid, "comps")
-            comps = [c for c in comps if (comp_dir / c["image"]).exists()]
+            # المنشنز من عقل الإعلان: صورهم الحقيقية أول المراجع
+            brain = ad_brain(d.get("settings"))
+            ments = mention_refs(brain, s.get("mentions"))[:6]
+            m_files = {a["file"] for a in ments}
+            comps = [c for c in ref_comps(s, AD_FRAME_REFS - 3 - len(ments))
+                     if (comp_dir / c["image"]).exists() and c.get("brain_asset") not in m_files]
+            mention_comps = [{"id": f"m-{a['file']}", "name": f"@{a['name']}", "kind": a["kind"],
+                              "description": a.get("prompt") or a.get("description", ""), "_path": brain_dir(brain["id"]) / a["file"]}
+                             for a in ments]
             # صورة المشهد الأصلي المقابل: عشان الكادر والتكوين ومكان الجرافيك يطلعوا زي الأصلي
             orig = ad_dir(aid) / "frames" / s["ref_frame"] if s.get("ref_frame") else None
             orig_refs = [atlas.reference_url(orig)] if orig and orig.exists() else []
             styles = style_ref_urls(h, min(4, AD_FRAME_REFS - len(comps) - len(orig_refs)))
-            refs = [atlas.reference_url(comp_dir / c["image"]) for c in comps] + orig_refs + styles
+            refs = ([atlas.reference_url(c["_path"]) for c in mention_comps] + [atlas.reference_url(comp_dir / c["image"]) for c in comps]
+                    + orig_refs + styles)
+            comps = mention_comps + comps
             prompt = az.frame_prompt(h, s, comps, len(styles), len(comps) + 1 if orig_refs else 0)
             cur = prod_dir(aid, "frames") / s["frame"] if note and s.get("frame") else None
             extra_paths = [p for p in (prod_dir(aid, "editrefs") / f for f in extra or []) if p.exists()][:4]
@@ -6844,7 +6907,7 @@ def run_ad_frame(aid: str, sid: str, note: str = "", extra: list[str] | None = N
                 # تعديل بطلبك: الصورة الحالية أول مرجع، وبعدها الصور اللي بعتها، والموديل بيغيّر اللي طلبته بس
                 comps = comps[:AD_FRAME_REFS - 1 - len(extra_paths)]
                 refs = ([atlas.reference_url(cur)] + [atlas.reference_url(x) for x in extra_paths]
-                        + [atlas.reference_url(comp_dir / c["image"]) for c in comps])
+                        + [atlas.reference_url(c["_path"] if c.get("_path") else comp_dir / c["image"]) for c in comps])
                 prompt = az.frame_edit_prompt(h, note, comps, len(extra_paths))
             url = atlas.generate_image(carousel_settings()["image_family"], prompt, size,
                                        auth.get_setting("series_frame_quality") or "medium", refs or None)
@@ -7275,8 +7338,10 @@ def run_ad_take(aid: str, sid: str, tid: str) -> None:
             if not pid:
                 frames, comps = prod_dir(aid, "frames"), prod_dir(aid, "comps")
                 extra = [p for p in (prod_dir(aid, "editrefs") / f for f in t.get("extra_refs") or []) if p.exists()][:AD_MAX_REFS - 1]
-                refs = ([frames / s["frame"]] + extra
-                        + [comps / c["image"] for c in ref_comps(plate_shot(s), AD_MAX_REFS - 1 - len(extra))])
+                brain = ad_brain(d.get("settings"))
+                ments = [brain_dir(brain["id"]) / a["file"] for a in mention_refs(brain, s.get("mentions"))][:max(0, AD_MAX_REFS - 1 - len(extra))]
+                refs = ([frames / s["frame"]] + extra + ments
+                        + [comps / c["image"] for c in ref_comps(plate_shot(s), AD_MAX_REFS - 1 - len(extra) - len(ments))])
                 body = {
                     "model": series_settings()["video_model"], "prompt": t["prompt"],
                     "reference_images": [atlas.upload_media(seedance_ref(x)) for x in refs if x.exists()],
@@ -7752,7 +7817,8 @@ def queue_ad_take(aid: str, sid: str, note: str = "", from_take: str | None = No
         s = find_pshot(p, sid)
         if not s.get("frame"):
             raise HTTPException(400, f"اللقطة {s['n']} ملهاش ستوري بورد")
-        prompt = az.video_prompt(p["header"], plate_shot(s), ref_comps(plate_shot(s), AD_MAX_REFS - 1))
+        ments = [{"name": f"@{m['name']}"} for m in mention_refs(ad_brain(d.get("settings")), s.get("mentions"))][:AD_MAX_REFS - 1]
+        prompt = az.video_prompt(p["header"], plate_shot(s), ments + ref_comps(plate_shot(s), AD_MAX_REFS - 1 - len(ments)))
         src = next((t for t in s.get("takes") or [] if t["id"] == from_take and not t.get("composite")), None)
         if note and src and src.get("prompt"):
             prompt = src["prompt"]  # التعديل بيتبني على برومبت النسخة اللي مش عاجباك

@@ -393,6 +393,7 @@ def frame_prompt(h: dict, shot: dict, ref_comps: list[dict] | None = None, n_sty
         f"Storyboard frame for a {h.get('aspect', '9:16')} commercial shot. Polished, like a real frame grab from the final ad.",
         header_text(h),
         f"SHOT {shot.get('n')}: {shot.get('visual', '')}",
+        f"STORYBOARD PROMPT (main instruction; @Name = the matching reference image below): {shot['sb_prompt']}" if shot.get("sb_prompt") else "",
         f"Framing / camera: {shot.get('shot', '')} {shot.get('camera', '')}".strip(),
         f"On-screen graphics or text in this shot: {shot['on_screen_text']}" if shot.get("on_screen_text") else "",
         f"Motion graphics in this shot (show them mid-animation, at their key pose): {shot['motion_prompt']}" if shot.get("motion_prompt") else "",
@@ -739,3 +740,48 @@ def mock_cast(shots: list[dict]) -> dict:
         {"name": "المتدرب", "kind": "character", "description": "شاب سعودي في العشرينات", "image_prompt": "A Saudi man in his 20s, short black hair, light beard, loose navy t-shirt, grey track pants.", "shots": ns},
         {"name": "الجيم", "kind": "background", "description": "جيم حديث", "image_prompt": "A modern bright gym with black rubber floor and wooden walls.", "shots": ns[:2]},
     ]}
+
+
+# ================================================================ ✍️ برومبتات الستوري بورد بالمنشن من عقل الإعلان
+
+SB_FORMAT = """{"shots": [{"id": "id اللقطة زي ما هو", "prompt": "English storyboard prompt that mentions database items as @Name exactly"}]}"""
+
+
+def sb_messages(header_txt: str, shots: list[dict], db_items: list[dict]) -> list[dict]:
+    db = "\n".join(f"- @{a['name']} ({a['kind']}): {a.get('prompt') or a.get('description', '')}" for a in db_items)
+    rows = []
+    for s in shots:
+        rows.append(
+            f"### id={s['id']} (لقطة {s.get('n')}، {s.get('seconds')} ثانية)\n"
+            f"اللي بيحصل: {s.get('visual', '')}\nاللقطة: {s.get('shot', '')} | الكاميرا: {s.get('camera', '')}\n"
+            + ("الجرافيك بيتركب بعدين: متكتبش جرافيك ولا كلام على الشاشة.\n" if s.get("layers") else
+               f"كلام على الشاشة: {s.get('on_screen_text', '') or '—'}\nالموشن: {s.get('motion_notes', '') or '—'}\n")
+            + f"المكونات: {', '.join(c.get('name', '') for c in s.get('components') or [])}\n"
+            + f"البرومبت الحالي: {s.get('sb_prompt') or s.get('prompt', '')}")
+    text = (
+        "أنت ستوري بورد آرتيست. اكتب لكل لقطة برومبت إنجليزي لموديل صور يرسم كادر الستوري بورد.\n"
+        "عندك قاعدة بيانات عقل الإعلان: كل عنصر فيها ليه صورة مرجعية حقيقية هتتبعت مع البرومبت.\n"
+        "القواعد:\n"
+        "- أي شخصية أو مكان أو أداة أو شاشة أو لوجو موجود في قاعدة البيانات وبيظهر في اللقطة: اعمله منشن بـ @ والاسم بالظبط زي ما هو مكتوب.\n"
+        "- متوصفش شكل العنصر اللي عملتله منشن (صورته المرجعية هي اللي بتحدد شكله)، اكتب بس هو بيعمل إيه، مكانه في الكادر، وضعه، وتعبيره.\n"
+        "- اكتب الكادر والكاميرا والإضاءة والتكوين بوضوح.\n"
+        "- اللبس محتشم دايمًا.\n\n"
+        f"راس الإعلان:\n{header_txt}\n\nقاعدة بيانات عقل الإعلان:\n{db or '—'}\n\nاللقطات:\n" + "\n\n".join(rows)
+        + f"\n\nرجّع JSON بس بالشكل ده:\n{SB_FORMAT}"
+    )
+    return [{"role": "user", "content": text}]
+
+
+def find_mentions(text: str, names: list[str]) -> list[str]:
+    """المنشنز في البرومبت (@الاسم). الأسامي الأطول الأول عشان «@المدرب فهد» متتقريش «@المدرب»."""
+    found, t = [], text or ""
+    for n in sorted({n for n in names if n}, key=len, reverse=True):
+        if f"@{n}" in t:
+            found.append(n)
+            t = t.replace(f"@{n}", " ")
+    return found
+
+
+def mock_sb(shots: list[dict], db_items: list[dict]) -> dict:
+    tags = " ".join(f"@{a['name']}" for a in db_items[:2])
+    return {"shots": [{"id": s["id"], "prompt": f"Medium shot: {tags} in frame, soft light. Shot {s.get('n')}."} for s in shots]}
