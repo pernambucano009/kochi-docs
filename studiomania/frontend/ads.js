@@ -915,7 +915,7 @@ function renderCast(a) {
   const head = `<div class="ad-cast-head"><h3 class="pane-h">🎭 الأبطال والمكونات المتكررة</h3>
       <span class="muted">${cast.length ? `${cast.length - pending}/${cast.length} اتوافق عليهم` : "قبل الستوري بورد: صورة ثابتة لكل شخصية ومكان بيتكرر، عشان يفضلوا هما هما في كل اللقطات."}</span>
       <button class="btn sm ${cast.length ? "" : "primary"}" data-cast="extract" ${busy ? "disabled" : ""}>${busy ? "⏳ بيطلّعهم..." : cast.length ? "↻ طلّعهم تاني" : "🎭 طلّع الأبطال والمكونات"}</button>
-      ${cast.some((c) => !c.image) ? `<button class="btn sm" data-cast="images">🖼️ ارسم صورهم</button>` : ""}
+      ${cast.some((c) => !c.approved) ? `<button class="btn sm" data-cast="images">🖼️ ${cast.some((c) => c.image) ? "ارسم اللي مش معتمدين" : "ارسم صورهم"}</button>` : ""}
       ${cast.some((c) => c.image && !c.approved) ? `<button class="btn sm primary" data-cast="approveall">🧠 اعتمد الكل وضيفهم للعقل</button>` : ""}</div>
     ${p.cast_error ? `<div class="muted">${adEsc(p.cast_error)}</div>` : ""}
     ${cast.length ? `<p class="hint">لما تعتمد، الصورة بتتحفظ في 🧠 عقل الإعلان باسمها، وبرومبتات الستوري بورد بتعمل لها منشن (@الاسم) فصورتها الحقيقية بتتبعت مع الرسم في كل لقطة.</p>` : ""}`;
@@ -948,7 +948,11 @@ $("adCast").addEventListener("click", async (e) => {
     else if (act === "extract") {
       if (adx.cur.prod.cast?.length && !confirm("يطلّع الأبطال والمكونات تاني من الاقتراح؟ اللي ليهم صور أو اتوافق عليهم بيفضلوا.")) return;
       adx.cur = await cAPI("/extract", { method: "POST" });
-    } else if (act === "images") adx.cur = await cAPI("/images", { method: "POST" });
+    } else if (act === "images") {
+      const redo = adx.cur.prod.cast.filter((c) => !c.approved && c.image_url);
+      if (redo.length && !confirm(`في ${redo.length} (${redo.map((c) => c.name).join("، ")}) ليهم صور ومش معتمدين: هيترسموا من جديد والصورة القديمة بتاعتهم هتتمسح.\n\nلو في صورة عاجباك، اعتمدها الأول بـ «🧠 اعتمد وضيفه للعقل» عشان متتمسحش.\n\nتكمل؟`)) return;
+      adx.cur = await cAPI(`/images?redo=true`, { method: "POST" });
+    }
     else if (act === "approveall") adx.cur = await cAPI("/approve-all", { method: "POST" });
     else if (act === "img") adx.cur = await cAPI(`/images?cast_id=${cid}`, { method: "POST" });
     else if (act === "approve") { adx.cur = await cAPI(`/${cid}/approve`, { method: "POST" }); toast("✅ اتحفظ في عقل الإعلان واتربط باللقطات"); }
@@ -1105,17 +1109,17 @@ const castWarn = () => {
 };
 $("adPFrames").onclick = () => {
   if (!castWarn()) return;
-  const shots = adx.cur.prod.shots, drawn = shots.filter((s) => s.frame_url).length;
-  const redraw = drawn > 0 && confirm(`${drawn} لقطة ليها ستوري بورد بالفعل. ترسمهم كلهم من جديد بالبرومبتات الجديدة؟\n(«إلغاء» = يكتب البرومبتات للكل ويرسم اللي ملهاش بس)`);
+  // المعتمدة متتلمسش. اللي مش معتمدة: البرومبت بيتكتب من جديد بالمنشن وبتترسم، والجديد بيمسح القديم
+  const shots = adx.cur.prod.shots, todo = shots.filter((s) => !s.approved);
+  if (!todo.length) return toast("كل اللقطات معتمدة ✅. الغي اعتماد اللقطة اللي عايز ترسمها تاني");
+  const old = todo.filter((s) => s.frame_url);
+  if (old.length && !confirm(`${old.length} لقطة (${old.map((s) => s.n).join("، ")}) ليها ستوري بورد ومش معتمدة: هتترسم من جديد والصورة القديمة بتاعتها هتتمسح.\n\nلو في ستوري بورد عاجبك، اعتمده الأول بـ «✅ اعتمد» تحت الصورة عشان ميتمسحش.\n\nالمعتمدة (${shots.length - todo.length}) مش هتتلمس. تكمل؟`)) return;
   busyButton($("adPFrames"), "✍️ بيكتب البرومبتات...", async () => {
-    adx.cur = await pAPI("/sb-prompts", { method: "POST" });
+    adx.cur = await pAPI("/sb-prompts?skip_approved=true", { method: "POST" });
     renderAds();
-    const targets = redraw ? shots : shots.filter((s) => !s.frame_url);
-    if (!targets.length) return toast("✍️ البرومبتات اتكتبت بالمنشن. كل اللقطات ليها ستوري بورد");
-    if (redraw) for (const s of targets) adx.cur = await pAPI(`/frames?shot_id=${s.id}`, { method: "POST" });
-    else adx.cur = await pAPI("/frames", { method: "POST" });
+    adx.cur = await pAPI("/frames?redo=true", { method: "POST" });
     renderAds();
-    toast("🎨 بيرسم بصور المنشنز من عقل الإعلان");
+    toast(`🎨 بيرسم ${todo.length} لقطة بصور المنشنز من عقل الإعلان`);
   });
 };
 $("adPComps").onclick = () => pDo($("adPComps"), "⏳", () => pAPI("/components", { method: "POST" }));

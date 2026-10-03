@@ -6806,16 +6806,16 @@ def mention_refs(brain: dict | None, names: list[str]) -> list[dict]:
 
 
 @app.post("/api/ads/{aid}/prod/sb-prompts")
-def prod_sb_prompts(aid: str, shot_id: str | None = None):
+def prod_sb_prompts(aid: str, shot_id: str | None = None, skip_approved: bool = False):
     """✍️ يكتب برومبت الستوري بورد لكل لقطة ويعمل منشن (@الاسم) لعناصر عقل الإعلان اللي فيها."""
     with closing(db()) as conn:
         _, d = ad_row(conn, aid)
     p = prod_of(d)
     brain = ad_brain(d.get("settings"))
     items = brain_db(brain)
-    shots = [s for s in p["shots"] if not shot_id or s["id"] == shot_id]
+    shots = [s for s in p["shots"] if (not shot_id or s["id"] == shot_id) and not (skip_approved and s.get("approved"))]
     if not shots:
-        raise HTTPException(404, "اللقطة مش موجودة")
+        raise HTTPException(400, "كل اللقطات معتمدة" if skip_approved else "اللقطة مش موجودة")
     out = az.mock_sb(shots, items) if atlas.mock_mode() else ad_json(
         series_chat(az.sb_messages(az.header_text(p["header"]), shots, items)), "برومبتات الستوري بورد")
     got = {str(x.get("id")): str(x.get("prompt") or "").strip() for x in out.get("shots") or [] if isinstance(x, dict)}
@@ -6865,7 +6865,7 @@ def ref_comps(shot: dict, limit: int) -> list[dict]:
     return sorted(comps, key=lambda c: not is_uploaded(c.get("image")))[:limit]
 
 
-def run_ad_frame(aid: str, sid: str, note: str = "", extra: list[str] | None = None) -> None:
+def run_ad_frame(aid: str, sid: str, note: str = "", extra: list[str] | None = None, replace: bool = False) -> None:
     try:
         set_pshot(aid, sid, frame_status="working", frame_error=None)
         safe_apply_brain(aid, [sid])  # قبل الرسم: الشاشات واللوجو الحقيقيين من عقل الإعلان
@@ -6913,19 +6913,26 @@ def run_ad_frame(aid: str, sid: str, note: str = "", extra: list[str] | None = N
             url = atlas.generate_image(carousel_settings()["image_family"], prompt, size,
                                        auth.get_setting("series_frame_quality") or "medium", refs or None)
             atlas.download(url, dest)
+        gone: list[str] = []
         def done(d):
             x = find_pshot(d["prod"], sid)
+            if replace and not x.get("approved"):  # الجديد بيمسح النسخ القديمة (اللقطة مش معتمدة)
+                gone.extend(f for f in x.get("frames") or [] if f != name)
+                x["frames"], x["frame_notes"] = [], {}
             x.setdefault("frames", []).append(name)
             if note:
                 x.setdefault("frame_notes", {})[name] = note + (f" (+{len(extra)} صورة مرجعية)" if extra else "")
             x.update(frame=name, frame_status="done", frame_error=None)
         update_ad(aid, done)
+        for f in gone:
+            (prod_dir(aid, "frames") / f).unlink(missing_ok=True)
     except Exception as exc:  # noqa: BLE001
         set_pshot(aid, sid, frame_status="failed", frame_error=str(getattr(exc, "detail", None) or exc)[:400])
 
 
 @app.post("/api/ads/{aid}/prod/frames")
-def prod_frames(aid: str, shot_id: str | None = None, note: str = ""):
+def prod_frames(aid: str, shot_id: str | None = None, note: str = "", redo: bool = False):
+    """redo: كل اللقطات اللي مش معتمدة بتترسم من جديد والجديد بيمسح القديم (المعتمدة متتلمسش)."""
     """الستوري بورد: لقطة واحدة (نسخة جديدة) أو كل اللقطات اللي لسه ملهاش صورة."""
     if not (atlas.api_key() or atlas.mock_mode()):
         raise HTTPException(400, "مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات")
@@ -6933,7 +6940,8 @@ def prod_frames(aid: str, shot_id: str | None = None, note: str = ""):
         _, d = ad_row(conn, aid)
     p = prod_of(d)
     busy = {"queued", "working"}
-    ids = [shot_id] if shot_id else [s["id"] for s in p["shots"] if not s.get("frame") and s.get("frame_status") not in busy]
+    ids = [shot_id] if shot_id else [s["id"] for s in p["shots"] if s.get("frame_status") not in busy
+                                     and (not s.get("frame") or (redo and not s.get("approved")))]
     if shot_id and find_pshot(p, shot_id).get("frame_status") in busy:
         raise HTTPException(400, "الصورة دي بتترسم")
     if not ids:
@@ -6945,7 +6953,7 @@ def prod_frames(aid: str, shot_id: str | None = None, note: str = ""):
     update_ad(aid, fn)
     note = note.strip()[:1500] if shot_id else ""
     for i in ids:
-        ad_executor.submit(run_ad_frame, aid, i, note)
+        ad_executor.submit(run_ad_frame, aid, i, note, None, redo)
     return ad_response(aid)
 
 
@@ -7468,7 +7476,7 @@ def prod_cast_delete(aid: str, cid: str):
     return ad_response(aid)
 
 
-def run_cast_image(aid: str, cid: str, note: str = "", extra: list[str] | None = None) -> None:
+def run_cast_image(aid: str, cid: str, note: str = "", extra: list[str] | None = None, replace: bool = False) -> None:
     try:
         set_cast(aid, cid, status="working", error=None)
         with closing(db()) as conn:
@@ -7495,34 +7503,42 @@ def run_cast_image(aid: str, cid: str, note: str = "", extra: list[str] | None =
             url = atlas.generate_image(carousel_settings()["image_family"], prompt, size,
                                        auth.get_setting("series_frame_quality") or "medium", refs or None)
             atlas.download(url, dest)
+        gone: list[str] = []
         def done(d):
             x = find_cast(d["prod"], cid)
+            if replace and not x.get("approved"):  # الجديد بيمسح القديم (مش معتمد)
+                gone.extend(f for f in x.get("images") or [] if f != name)
+                x["images"], x["notes"] = [], {}
             x.setdefault("images", []).append(name)
             if note:
                 x.setdefault("notes", {})[name] = note
             x.update(image=name, status="done", error=None, approved=False)
         update_ad(aid, done)
+        for f in gone:
+            (prod_dir(aid, "cast") / f).unlink(missing_ok=True)
     except Exception as exc:  # noqa: BLE001
         set_cast(aid, cid, status="failed", error=str(getattr(exc, "detail", None) or exc)[:400])
 
 
 @app.post("/api/ads/{aid}/prod/cast/images")
-def prod_cast_images(aid: str, cast_id: str | None = None):
-    """🖼️ صورة مرجعية: عنصر واحد (نسخة جديدة) أو كل اللي لسه ملهمش صورة."""
+def prod_cast_images(aid: str, cast_id: str | None = None, redo: bool = False):
+    """🖼️ صورة مرجعية: عنصر واحد (نسخة جديدة)، أو كل اللي ملهمش صورة، أو (redo) كل اللي مش معتمدين والجديد بيمسح القديم."""
     if not (atlas.api_key() or atlas.mock_mode()):
         raise HTTPException(400, "مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات")
     ids: list[str] = []
     def fn(d):
         for c in prod_of(d).get("cast") or []:
-            if c.get("status") == "working" or (cast_id and c["id"] != cast_id) or (not cast_id and c.get("image")):
+            if c.get("status") == "working" or (cast_id and c["id"] != cast_id):
+                continue
+            if not cast_id and (c.get("approved") if redo else c.get("image")):
                 continue
             c.update(status="working", error=None)
             ids.append(c["id"])
     update_ad(aid, fn)
     if not ids:
-        raise HTTPException(400, "كلهم ليهم صور")
+        raise HTTPException(400, "كلهم معتمدين" if redo else "كلهم ليهم صور")
     for i in ids:
-        ad_executor.submit(run_cast_image, aid, i)
+        ad_executor.submit(run_cast_image, aid, i, "", None, redo and not cast_id)
     return ad_response(aid)
 
 
