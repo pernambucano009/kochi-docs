@@ -6161,6 +6161,7 @@ def ad_brain(settings: dict | None) -> dict | None:
         return None
     b = brain_row(bid) if bid else None
     if b is None:
+        seed_brain()  # أول مرة: عقل لكوتشي بيتعمل لوحده (حتى لو صفحة العقل ما اتفتحتش)
         with closing(db()) as conn:
             r = conn.execute("SELECT id FROM ad_brains ORDER BY created_at LIMIT 1").fetchone()
         b = brain_row(r["id"]) if r else None
