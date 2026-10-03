@@ -7834,7 +7834,10 @@ AD_VIDEO_MODELS = {
 }
 AR_VOICES = {"Arabic_FriendlyGuy": "راجل ودود", "Arabic_CalmWoman": "ست هادية"}
 TTS_MODEL = "minimax/speech-2.6-hd"
-LIPSYNC = {"video": "veed/lipsync", "image": "atlascloud/infinitetalk"}
+LIPSYNC = {"video": "veed/lipsync", "image": "atlascloud/infinitetalk",
+           # بيعملوا الفيديو من الأول: صورة الستوري بورد + صوتنا + برومبت → شخصية بتتكلم بصوتنا
+           "omni": "bytedance/avatar-omni-human-v1.5", "kavatar": "kwaivgi/kling-v2.6-pro/avatar"}
+LIPSYNC_FROM_FRAME = ("image", "omni", "kavatar")
 
 
 def ad_video_model(key: str | None) -> dict:
@@ -8129,8 +8132,11 @@ def run_ad_lipsync(aid: str, sid: str, tid: str) -> None:
                 body = {"model": LIPSYNC["video"], "video_url": atlas.upload_media(prod_dir(aid, "takes") / base["file"]), "audio_url": audio_url}
             else:
                 img = atlas.reference_url(prod_dir(aid, "frames") / s["frame"])
-                body = {"model": LIPSYNC["image"], "image": img, "audio": audio_url,
-                        "prompt": f"{s.get('visual', '')}. The person speaks naturally to the camera with natural head movement."}
+                scene = (s.get("sb_prompt") or s.get("visual") or "").strip()
+                body = {"model": LIPSYNC[t["method"]], "image": img, "audio": audio_url,
+                        "prompt": f"{scene}. The person speaks naturally to the camera in Arabic, lips perfectly synced to the audio, "
+                                  "natural blinking, subtle head movement and small hand gestures. Keep the face, outfit, "
+                                  "background and phone screen exactly as in the image."}
             url = atlas.run_model("Video", body, "الكلام على الوش", max_seconds=2400, interval=6)
             atlas.download(url, dest)
         setp(status="done", file=dest.name, duration=round(probe_duration(dest), 2), error=None)
@@ -8152,7 +8158,7 @@ def prod_lipsync(aid: str, sid: str, method: str = "video", take_id: str | None 
         base = base_take(s, take_id) if method == "video" else None
         if method == "video" and not base:
             raise HTTPException(400, "مفيش فيديو للقطة دي يتركب عليه الكلام. ولّد الفيديو الأول (أو استخدم «من الستوري بورد»)")
-        if method == "image" and not s.get("frame"):
+        if method in LIPSYNC_FROM_FRAME and not s.get("frame"):
             raise HTTPException(400, "ارسم الستوري بورد الأول")
         s["takes"].append({"id": tid, "file": None, "status": "queued", "error": None, "approved": False, "lipsync": True,
                            "method": method, "base": base["id"] if base else None, "duration": None,

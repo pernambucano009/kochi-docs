@@ -930,8 +930,8 @@ function renderVoice(a, s) {
     ${s.voice_url ? `<audio src="${s.voice_url}" controls preload="none"></audio>` : `<span class="muted">${s.voice ? "الصوت بتاع اللقطة دي بيتقص لوحده لما ترفع الصوت الكامل فوق." : "اللقطة دي من غير كلام."}</span>`}
     ${s.voice_error ? `<div class="muted">⚠️ ${adEsc(s.voice_error)}</div>` : ""}
     ${s.voice_url ? `<div class="row wrap ad-lip">
-      <button class="btn sm primary" data-p="lipvideo" ${base && !lipBusy ? "" : "disabled"} title="${base ? "" : "ولّد فيديو اللقطة الأول"}">👄 ركّب الكلام على الفيديو (سريع)</button>
-      <button class="btn sm" data-p="lipimage" ${s.frame_url && !lipBusy ? "" : "disabled"}>👄 خلّيه يتكلم من الستوري بورد (أبطأ)</button>
+      <button class="btn sm primary" data-p="lipkavatar" ${s.frame_url && !lipBusy ? "" : "disabled"} title="صورة الستوري بورد + صوتنا + البرومبت → فيديو جديد الشخصية بتقول فيه الكلام بصوتنا">🎬👄 فيديو بيتكلم بصوتنا من الستوري بورد (الأفضل)</button>
+      <button class="btn sm" data-p="lipvideo" ${base && !lipBusy ? "" : "disabled"} title="${base ? "" : "ولّد فيديو اللقطة الأول"}">👄 ركّب الكلام على الفيديو (سريع)</button>
     </div>` : ""}
   </div>`;
 }
@@ -1297,10 +1297,10 @@ $("adPShots").addEventListener("click", async (e) => {
     } else if (b.dataset.p === "lcomp") adx.cur = await pAPI(`/shots/${sid}/composite`, { method: "POST" });
     else if (b.dataset.p === "voice") adx.cur = await pAPI(`/voice?shot_id=${sid}`, { method: "POST" });
     else if (b.dataset.p === "voicedel") { if (!confirm("تمسح صوت اللقطة دي؟")) return; adx.cur = await pAPI(`/shots/${sid}/voice`, { method: "DELETE" }); }
-    else if (b.dataset.p === "lipvideo" || b.dataset.p === "lipimage") {
-      const m = b.dataset.p === "lipvideo" ? "video" : "image";
+    else if (["lipvideo", "lipimage", "lipkavatar"].includes(b.dataset.p)) {
+      const m = { lipvideo: "video", lipimage: "image", lipkavatar: "kavatar" }[b.dataset.p];
       if (!confirm(m === "video" ? "يركّب الصوت على فيديو اللقطة ويحرّك البق مع الكلام (نسخة جديدة «👄»). تكمل؟"
-        : "يعمل فيديو جديد من صورة الستوري بورد والشخصية بتقول الكلام ده (أبطأ: ممكن ياخد كذا دقيقة). تكمل؟")) return;
+        : "يعمل فيديو جديد من صورة الستوري بورد والشخصية بتقول الكلام ده (بياخد حوالي ٣ دقايق). تكمل؟")) return;
       adx.cur = await pAPI(`/shots/${sid}/lipsync?method=${m}`, { method: "POST" });
     }
     else if (b.dataset.p === "sbwrite") adx.cur = await pAPI(`/sb-prompts?shot_id=${sid}`, { method: "POST" });
@@ -1496,7 +1496,8 @@ function renderAdGallery() {
       ${t.composite ? "" : `<button class="btn" data-ga="edit">✏️ عدّل واعمل نسخة جديدة</button>`}
       ${s.voice_url && !t.lipsync && !t.composite ? `<button class="btn" data-ga="lip">👄 ركّب الكلام على الفيديو ده</button>` : ""}
       <button class="btn danger" data-ga="delete">🗑️ امسح النسخة دي</button>` : t?.status === "failed" ? `<button class="btn" data-ga="retry">↻ جرّب تاني</button>` : "")
-    + (s.frame_url ? `<button class="btn" data-ga="gen">🎬 ولّد نسخة تانية</button>` : "");
+    + (s.frame_url ? `<button class="btn" data-ga="gen">🎬 ولّد نسخة تانية</button>` : "")
+    + (s.frame_url && s.voice_url ? `<button class="btn primary" data-ga="kavatar">🎬👄 فيديو بيتكلم بصوتنا من الستوري بورد</button>` : "");
 }
 $("adPGallery").onclick = () => openAdGallery();
 // صوت اللقطة ماشي مع الفيديو: تشغيل، إيقاف، تقديم، وإعادة من الأول
@@ -1602,6 +1603,10 @@ $("adGalActs").addEventListener("click", async (e) => {
       adx.cur = await pAPI(`/shots/${sid}/generate`, { method: "POST" });
     } else if (a === "edit") {
       return editTake(adx.cur.prod.shots.find((x) => x.id === sid), agal.tid);
+    } else if (a === "kavatar") {
+      if (!confirm("يعمل فيديو جديد من صورة الستوري بورد والشخصية بتقول كلام اللقطة بصوتنا (بياخد حوالي ٣ دقايق). تكمل؟")) return;
+      adx.cur = await pAPI(`/shots/${sid}/lipsync?method=kavatar`, { method: "POST" });
+      toast("🎬👄 بيعمل الفيديو اللي بيتكلم... هيظهر هنا لما يخلص");
     } else if (a === "lip") {
       if (!confirm("يحرّك البق في الفيديو ده على صوت اللقطة (نسخة جديدة «👄»، بتاخد أقل من دقيقة). تكمل؟")) return;
       adx.cur = await pAPI(`/shots/${sid}/lipsync?method=video&take_id=${agal.tid}`, { method: "POST" });
