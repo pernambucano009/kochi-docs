@@ -642,6 +642,7 @@ function renderAdActivity() {
   if (comps.length) items.push(["prod", `🧩 بيستخرج مكونات: لقطة ${nums(comps)}`]);
   const cimg = shots.filter((s) => s.components.some((c) => c.status === "working"));
   if (cimg.length) items.push(["prod", `🖼️ بيولّد صور ${cimg.reduce((k, s) => k + s.components.filter((c) => c.status === "working").length, 0)} مكون (لقطة ${nums(cimg)})`]);
+  if (a.prod?.full_voice?.status === "working") items.push(["prod", "🎙️ بيسمع الصوت الكامل ويقطّعه على اللقطات"]);
   const vc = shots.filter((s) => s.voice_status === "working");
   if (vc.length) items.push(["prod", `🎙️ بيولّد الصوت: لقطة ${nums(vc)}`]);
   const ls = shots.filter((s) => s.takes.some((t) => t.lipsync && PBUSY.has(t.status)));
@@ -702,7 +703,7 @@ document.querySelector('.view[data-view="10"]').addEventListener("click", (e) =>
 // ---------- 4. التنفيذ: راس الإعلان ← ستوري بورد ← مكونات ← لقطات ← المونتاج ----------
 const PBUSY = new Set(["queued", "working"]);
 function prodBusy(a) {
-  if (a.prod?.cast_status === "working" || a.prod?.cast?.some((c) => c.status === "working")) return true;
+  if (a.prod?.cast_status === "working" || a.prod?.cast?.some((c) => c.status === "working") || a.prod?.full_voice?.status === "working") return true;
   return !!a.prod?.shots.some((s) => PBUSY.has(s.frame_status) || s.comp_status === "working" || s.motion_status === "working" || s.layers_status === "working" || s.voice_status === "working"
     || s.components.some((c) => c.status === "working") || s.takes.some((t) => PBUSY.has(t.status)));
 }
@@ -924,41 +925,78 @@ function renderVoice(a, s) {
       <b>🎙️ الصوت</b>
       <select data-pf="speaker" title="مين بيتكلم"><option value="">🎙️ راوي (فويس أوفر)</option>${spk.map((n) => `<option value="${adEsc(n)}" ${n === s.speaker ? "selected" : ""}>🧍 ${adEsc(n)}</option>`).join("")}</select>
       ${s.speaker ? `<label class="check" title="الشخصية بتتكلم قدام الكاميرا وبُقها لازم يتحرك مع الكلام"><input type="checkbox" data-pf="talking" ${s.talking ? "checked" : ""}> 👄 بيتكلم قدام الكاميرا</label>` : ""}
-      ${s.voice_dur ? `<span class="muted">⏱️ ${s.voice_dur} ث ← مدة اللقطة ${s.seconds} ث</span>` : ""}
+      ${s.a_end != null ? `<span class="muted">⏱️ من ${s.a_start} لـ ${s.a_end} في الصوت الكامل (${s.seconds} ث)</span>` : ""}
     </div>
-    ${s.voice_url ? `<audio src="${s.voice_url}" controls preload="none"></audio>` : ""}
-    ${s.voice_error ? `<div class="err">${adEsc(s.voice_error)}</div>` : ""}
-    <div class="row wrap">
-      <button class="btn sm" data-p="voice" ${working || !s.voice ? "disabled" : ""} title="${s.voice ? "" : "اكتب الكلام الأول"}">${working ? "⏳ بيولّد الصوت..." : s.voice_url ? "↻ ولّد الصوت تاني" : "🎙️ ولّد الصوت"}</button>
-      <label class="btn sm" title="صوتك انت بدل المولّد">⬆ ارفع صوتك<input type="file" accept="audio/*,video/*" data-p="voiceup" hidden></label>
-      ${s.voice_url ? `<button class="btn sm danger" data-p="voicedel" title="امسح الصوت">✕</button>` : ""}
-    </div>
+    ${s.voice_url ? `<audio src="${s.voice_url}" controls preload="none"></audio>` : `<span class="muted">${s.voice ? "الصوت بتاع اللقطة دي بيتقص لوحده لما ترفع الصوت الكامل فوق." : "اللقطة دي من غير كلام."}</span>`}
+    ${s.voice_error ? `<div class="muted">⚠️ ${adEsc(s.voice_error)}</div>` : ""}
     ${s.talking && s.voice_url ? `<div class="row wrap ad-lip">
       <button class="btn sm primary" data-p="lipvideo" ${base && !lipBusy ? "" : "disabled"} title="${base ? "" : "ولّد فيديو اللقطة الأول"}">👄 ركّب الكلام على الفيديو (سريع)</button>
       <button class="btn sm" data-p="lipimage" ${s.frame_url && !lipBusy ? "" : "disabled"}>👄 خلّيه يتكلم من الستوري بورد (أبطأ)</button>
     </div>` : ""}
   </div>`;
 }
+// السكريبت اللي هتحوّله لصوت بنفسك: كل لقطة فيها كلام، بترتيبها ومين بيقولها
+function adScript(a) {
+  const p = a.prod, lines = p.shots.filter((s) => (s.voice || "").trim());
+  return [`سكريبت: ${p.header.title || a.name}`, "",
+    ...lines.map((s) => `لقطة ${s.n} — ${s.speaker || "الراوي"}${s.talking ? " (بيتكلم قدام الكاميرا)" : ""}:\n«${s.voice.trim()}»\n`)].join("\n");
+}
 function renderVoices(a) {
-  const p = a.prod, v = p.voices || {}, spk = speakers(a);
-  const sel = (key) => `<select data-voice-of="${adEsc(key)}">${a.ar_voices.map((x) => `<option value="${x.id}" ${x.id === (v[key] || "Arabic_FriendlyGuy") ? "selected" : ""}>${x.label}</option>`).join("")}</select>`;
-  setHTML($("adVoices"), `<div class="row wrap"><b>🎙️ الأصوات</b>
-    <label class="field">الراوي ${sel("__narrator")}</label>
-    ${spk.map((n) => `<label class="field">🧍 ${adEsc(n)} ${sel(n)}</label>`).join("")}
-    <span class="muted">الصوت بيتعمل بعد الستوري بورد: طول كلام كل لقطة بيحدد مدتها ومدة الفيديو اللي هيتولد.</span></div>`);
+  const p = a.prod, fv = p.full_voice || {}, working = fv.status === "working";
+  const n = p.shots.filter((s) => (s.voice || "").trim()).length;
+  setHTML($("adVoices"), `<div class="ad-fullvoice">
+    <div class="row wrap"><b>🎙️ الصوت الكامل للإعلان</b>
+      <span class="muted">١) انسخ السكريبت وحوّله لصوت باللهجة والنبرة اللي تعجبك ← ٢) ارفع الصوت كله ملف واحد ← ٣) البرنامج بيقطّعه على اللقطات بتوقيت الكلام، ومدة كل لقطة بتتظبط عليه.</span></div>
+    <div class="row wrap">
+      <button class="btn sm" data-fv="copy" ${n ? "" : "disabled"}>📋 انسخ السكريبت (${n} جملة)</button>
+      <button class="btn sm" data-fv="download" ${n ? "" : "disabled"}>⬇ نزّل السكريبت</button>
+      <label class="btn sm primary">⬆ ارفع الصوت الكامل<input type="file" accept="audio/*,video/*" data-fv-up hidden></label>
+      ${fv.file ? `<button class="btn sm" data-fv="realign" ${working ? "disabled" : ""} title="بعد ما تعدّل الكلام في اللقطات">↻ قطّع تاني</button>` : ""}
+      ${working ? `<span class="muted"><span class="spin-inline"></span> بيسمع الصوت ويقطّعه على اللقطات...</span>` : ""}
+      ${fv.status === "done" ? `<span class="muted">✅ ${fv.duration} ث · اتطابق ${Math.round((fv.ratio || 0) * 100)}% من الكلام</span>` : ""}
+    </div>
+    ${fv.url ? `<audio src="${fv.url}" controls preload="none"></audio>` : ""}
+    ${fv.error ? `<div class="err">✕ ${adEsc(fv.error)}</div>` : ""}
+  </div>`);
   if (document.activeElement !== $("adVideoModelSel")) {
     $("adVideoModelSel").innerHTML = a.video_models.map((m) => `<option value="${m.key}" ${m.key === (p.header.video_model || "seedance") ? "selected" : ""}>${m.label}</option>`).join("");
   }
 }
 function saveVoices(extra = {}) {
-  const voices = { ...(adx.cur.prod.voices || {}) };
-  document.querySelectorAll("#adVoices [data-voice-of]").forEach((el) => (voices[el.dataset.voiceOf] = el.value));
-  return pAPI("/voices", { method: "PUT", ...jsonBody({ voices, ...extra }) }).then((r) => { adx.cur = r; renderAds(); }).catch((err) => toast(err.message, true));
+  return pAPI("/voices", { method: "PUT", ...jsonBody({ voices: adx.cur.prod.voices || {}, ...extra }) })
+    .then((r) => { adx.cur = r; renderAds(); }).catch((err) => toast(err.message, true));
 }
-$("adVoices").addEventListener("change", () => saveVoices());
+$("adVoices").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-fv]");
+  if (!b) return;
+  if (b.dataset.fv === "copy") return adCopy(adScript(adx.cur));
+  if (b.dataset.fv === "download") {
+    const url = URL.createObjectURL(new Blob([adScript(adx.cur)], { type: "text/plain;charset=utf-8" }));
+    Object.assign(document.createElement("a"), { href: url, download: "ad-script.txt" }).click();
+    return setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }
+  if (b.dataset.fv === "realign") {
+    try { adx.cur = await pAPI("/full-voice", { method: "POST", body: new FormData() }); renderAds(); scheduleAdPoll(); }
+    catch (err) { toast(err.message, true); }
+  }
+});
+$("adVoices").addEventListener("change", async (e) => {
+  if (!e.target.matches("[data-fv-up]")) return;
+  const f = e.target.files[0];
+  e.target.value = "";
+  if (!f) return;
+  const form = new FormData();
+  form.append("file", f);
+  try {
+    toast("⏳ بيرفع الصوت...");
+    adx.cur = await pAPI("/full-voice", { method: "POST", body: form });
+    renderAds();
+    scheduleAdPoll();
+    toast("🎙️ اترفع. البرنامج بيسمعه ويقطّعه على اللقطات");
+  } catch (err) { toast(err.message, true); }
+});
 $("adVideoModelSel").addEventListener("change", () => saveVoices({ video_model: $("adVideoModelSel").value })
   .then(() => toast("🎬 الفيديوهات الجاية هتتولد بالموديل ده")));
-$("adPVoice").onclick = () => pDo($("adPVoice"), "⏳", () => pAPI("/voice", { method: "POST" }));
 
 // ---------- 🎭 الأبطال والمكونات المتكررة (قبل الستوري بورد) ----------
 const CAST_KIND = { character: "🧍 شخصية", background: "🏞️ مكان / خلفية", prop: "🧰 أداة" };

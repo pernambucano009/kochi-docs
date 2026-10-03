@@ -6604,6 +6604,8 @@ def prod_dir(aid: str, sub: str) -> Path:
 
 
 def prod_busy(p: dict | None) -> bool:
+    if ((p or {}).get("full_voice") or {}).get("status") == "working":
+        return True
     if (p or {}).get("cast_status") == "working" or any(c.get("status") == "working" for c in (p or {}).get("cast") or []):
         return True
     for s in (p or {}).get("shots") or []:
@@ -6660,7 +6662,10 @@ def prod_to_dict(aid: str, p: dict | None) -> dict | None:
     cast = [{**c, "image_url": f"{base}/cast/{c['image']}" if c.get("image") else None,
              "images": [{"file": f, "url": f"{base}/cast/{f}", "note": (c.get("notes") or {}).get(f, "")} for f in c.get("images") or []]}
             for c in p.get("cast") or []]
-    return {**p, "shots": shots, "cast": cast}
+    fv = p.get("full_voice")
+    if fv and fv.get("file"):
+        fv = {**fv, "url": f"{base}/voice/{fv['file']}"}
+    return {**p, "shots": shots, "cast": cast, "full_voice": fv}
 
 
 def ref_scene_for(analysis: dict, k: int, total: int) -> dict | None:
@@ -7943,6 +7948,152 @@ def prod_voices(aid: str, body: VoicesIn):
     return ad_response(aid)
 
 
+# ---------- 🎙️ الصوت الكامل: سكريبت ← انت بتعمل الصوت بنفسك ← البرنامج بيقطّعه على اللقطات بتوقيت الكلام
+
+def shot_windows(shots: list[dict], spans: list[dict | None], total: float) -> list[tuple[float, float]]:
+    """كل لقطة من إمتى لإمتى على الصوت الكامل. spans = وقت كلام اللقطة (أو None لو ملهاش كلام).
+    الحدود بتقع في نص السكوت بين كلام لقطتين، واللقطات اللي من غير كلام بتاخد السكوت اللي بينهم بالتساوي.
+    اللقطات اللي بعد آخر كلام بتحتفظ بمدتها (زي لقطة اللوجو في الآخر)."""
+    n = len(shots)
+    voiced = [i for i in range(n) if spans[i]]
+    if not voiced:
+        return []
+    cuts = [0.0] * (n + 1)
+    first = voiced[0]
+    lead_end = max(0.0, spans[first]["start"] - 0.1)
+    for j in range(1, first + 1):  # لقطات قبل أول كلام
+        cuts[j] = lead_end * j / first if first else 0.0
+    for a, b in zip(voiced, voiced[1:]):
+        left, right = spans[a]["end"], spans[b]["start"]
+        if right < left:
+            left = right = (left + right) / 2
+        g = b - a - 1  # لقطات ساكتة بينهم
+        for t in range(g + 1):
+            cuts[a + 1 + t] = left + (right - left) * (t + 0.5) / (g + 1)
+    last = voiced[-1]
+    end = max(spans[last]["end"] + 0.35, min(total, spans[last]["end"] + 0.8))
+    cuts[last + 1] = end
+    for k in range(last + 1, n):  # لقطات بعد آخر كلام
+        cuts[k + 1] = cuts[k] + float(shots[k].get("seconds") or 2)
+    return [(round(cuts[i], 2), round(cuts[i + 1], 2)) for i in range(n)]
+
+
+def silences(src: Path, min_len: float = 0.25) -> list[tuple[float, float]]:
+    """أماكن السكوت الحقيقي في الصوت (موديل الكلام ساعات بيمد آخر كلمة جوه السكوت)."""
+    err = subprocess.run([ffmpeg_exe(), "-hide_banner", "-i", str(src), "-af", f"silencedetect=noise=-35dB:d={min_len}", "-f", "null", "-"],
+                         capture_output=True, text=True, timeout=120).stderr
+    starts = [float(x) for x in re.findall(r"silence_start: (-?[\d.]+)", err)]
+    ends = [float(x) for x in re.findall(r"silence_end: (-?[\d.]+)", err)]
+    return [(max(0.0, a), b) for a, b in zip(starts, ends)]
+
+
+def snap_spans(spans: list[dict | None], quiet: list[tuple[float, float]]) -> None:
+    """بداية ونهاية كلام كل لقطة بتتظبط على السكوت الحقيقي."""
+    for sp in spans:
+        if not sp:
+            continue
+        for a, b in quiet:
+            # سكوت في أول الجملة (أو قبلها بشوية): الكلام بيبدأ بعده
+            if a <= sp["start"] + 0.35 and sp["start"] < b < sp["end"]:
+                sp["start"] = b
+            # سكوت في آخر الجملة: الكلام بيخلص قبله
+            if b >= sp["end"] - 0.35 and sp["start"] < a < sp["end"]:
+                sp["end"] = a
+
+
+def min_silent(shots: list[dict], wins: list[tuple[float, float]], spans: list[dict | None], least: float = 1.0) -> list[tuple[float, float]]:
+    """لقطة من غير كلام لازم تاخد ثانية على الأقل: بتاخدها من اللقطة اللي قبلها أو بعدها (لو مش شخصية بتتكلم قدام الكاميرا)."""
+    w = [list(x) for x in wins]
+    for i, s in enumerate(shots[:len(w)]):
+        if spans[i] or w[i][1] - w[i][0] >= least:
+            continue
+        need = least - (w[i][1] - w[i][0])
+        for j, side in ((i - 1, "prev"), (i + 1, "next")):
+            if need <= 0 or not 0 <= j < len(w) or shots[j].get("talking"):
+                continue
+            room = (w[j][1] - w[j][0]) - 1.0
+            take = max(0.0, min(need, room))
+            if take <= 0:
+                continue
+            if side == "prev":
+                w[j][1] -= take
+                w[i][0] -= take
+            else:
+                w[j][0] += take
+                w[i][1] += take
+            need -= take
+    return [(round(a, 2), round(b, 2)) for a, b in w]
+
+
+def run_full_voice(aid: str) -> None:
+    try:
+        with closing(db()) as conn:
+            _, d = ad_row(conn, aid)
+        p = d["prod"]
+        fv = p["full_voice"]
+        src = prod_dir(aid, "voice") / fv["file"]
+        total = probe_duration(src)
+        words = atlas.transcribe(src, total)
+        shots = p["shots"]
+        lines = [{"text": s.get("voice") or ""} for s in shots]
+        voiced_idx = [i for i, ln in enumerate(lines) if ln["text"].strip()]
+        timed, ratio = sz.align_with_ratio(words, [lines[i] for i in voiced_idx]) if voiced_idx else ([], 0.0)
+        spans: list[dict | None] = [None] * len(shots)
+        for i, t in zip(voiced_idx, timed):
+            if t.get("start") is not None and t.get("end") is not None:
+                spans[i] = {"start": float(t["start"]), "end": float(t["end"])}
+        snap_spans(spans, silences(src))
+        wins = shot_windows(shots, spans, total)
+        wins = min_silent(shots, wins, spans) if wins else wins
+        if not wins:
+            raise RuntimeError("مقدرتش ألاقي كلام اللقطات في الصوت. اتأكد إن خانة «الكلام» في اللقطات هي نفس اللي في الصوت")
+        cuts = {}
+        for s, (a, b) in zip(shots, wins):
+            if a >= total:
+                continue  # لقطة بعد آخر الصوت (من غير كلام)
+            name = f"{s['id']}-cut-{uuid.uuid4().hex[:6]}.m4a"
+            subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{a:.2f}", "-i", str(src),
+                            "-t", f"{max(0.1, min(b, total) - a):.2f}", "-c:a", "aac", "-b:a", "160k", str(prod_dir(aid, "voice") / name)],
+                           check=True, capture_output=True, timeout=120)
+            cuts[s["id"]] = name
+        def fn(d):
+            p = d["prod"]
+            for s, (a, b), sp in zip(p["shots"], wins, spans):
+                old = s.get("voice_file")
+                if old and old != cuts.get(s["id"]):
+                    (prod_dir(aid, "voice") / old).unlink(missing_ok=True)
+                s.update(a_start=a, a_end=b, seconds=round(max(0.5, b - a), 2), voice_file=cuts.get(s["id"]),
+                         voice_dur=round(b - a, 2) if s["id"] in cuts else None, voice_status="done" if s["id"] in cuts else "idle",
+                         voice_error=None if sp or not (s.get("voice") or "").strip() else "الكلام ده ما اتلقطش في الصوت بالظبط (اتحط بالتقريب)")
+            p["full_voice"].update(status="done", error=None, duration=round(total, 2), ratio=round(ratio, 2))
+        update_ad(aid, fn)
+    except Exception as exc:  # noqa: BLE001
+        msg = str(getattr(exc, "detail", None) or exc)[:300]
+        update_ad(aid, lambda d: d["prod"]["full_voice"].update(status="failed", error=msg))
+
+
+@app.post("/api/ads/{aid}/prod/full-voice")
+def prod_full_voice(aid: str, file: UploadFile | None = File(default=None)):
+    """⬆ الصوت الكامل للإعلان (انت عامله بنفسك). من غير ملف = يقطّع الصوت الموجود تاني (بعد ما عدّلت الكلام مثلًا)."""
+    with closing(db()) as conn:
+        _, d = ad_row(conn, aid)
+    p = prod_of(d)
+    if file is not None and file.filename:
+        name = save_audio_upload(file, prod_dir(aid, "voice"), "full")
+        old = (p.get("full_voice") or {}).get("file")
+        if old and old != name:
+            (prod_dir(aid, "voice") / old).unlink(missing_ok=True)
+    elif (p.get("full_voice") or {}).get("file"):
+        name = p["full_voice"]["file"]
+    else:
+        raise HTTPException(400, "ارفع ملف الصوت الأول")
+    if (p.get("full_voice") or {}).get("status") == "working":
+        raise HTTPException(400, "بيقطّع الصوت بالفعل")
+    update_ad(aid, lambda d: d["prod"].update(full_voice={"file": name, "status": "working", "error": None}))
+    threading.Thread(target=run_full_voice, args=(aid,), daemon=True).start()
+    return ad_response(aid)
+
+
 def run_ad_lipsync(aid: str, sid: str, tid: str) -> None:
     """👄 الكلام على الوش: video = الفيديو المختار + الصوت (سريع)، image = الستوري بورد + الصوت بيتحول لفيديو بيتكلم (أبطأ)."""
     def setp(**kw):
@@ -8154,7 +8305,18 @@ def prod_upload_take(aid: str, shot_id: str, file: UploadFile = File(...)):
 
 
 def ad_voice_track(aid: str, conn: sqlite3.Connection, shots: list[dict], label: str) -> dict | None:
-    """صوت كل لقطة في مكانه على التايم لاين (بداية اللقطة) في ملف تعليق صوتي واحد للمونتاج."""
+    """التعليق الصوتي للمونتاج: الصوت الكامل زي ما هو (لو موجود)، وإلا صوت كل لقطة في مكانه على التايم لاين."""
+    with closing(db()) as c2:
+        _, d = ad_row(c2, aid)
+    fv = (d.get("prod") or {}).get("full_voice") or {}
+    if fv.get("file") and fv.get("status") == "done" and (prod_dir(aid, "voice") / fv["file"]).exists():
+        vid = uuid.uuid4().hex[:12]
+        src = prod_dir(aid, "voice") / fv["file"]
+        vfile = f"voice_{vid}{src.suffix}"
+        shutil.copyfile(src, AUDIO_DIR / vfile)
+        conn.execute("INSERT INTO audio (id, kind, name, filename, duration, created_at) VALUES (?, 'voice', ?, ?, ?, ?)",
+                     (vid, f"🎙️ {label}", vfile, probe_duration(AUDIO_DIR / vfile), now()))
+        return {"id": vid, "volume": 1.0, "delay": 0.0, "offset": 0.0, "length": None, "fade_out": False, "parts": []}
     parts, t = [], 0.0
     for s in shots:
         f = prod_dir(aid, "voice") / (s.get("voice_file") or "")
@@ -8227,6 +8389,8 @@ def reset_stuck_prod() -> None:
                 continue
             if p.get("cast_status") == "working":
                 p.update(cast_status="failed", cast_error="اتقطع لما السيرفر اتقفل. دوس تاني")
+            if (p.get("full_voice") or {}).get("status") == "working":
+                p["full_voice"].update(status="failed", error="اتقطع لما السيرفر اتقفل. دوس «قطّع تاني»")
             for c in p.get("cast") or []:
                 if c.get("status") == "working":
                     c.update(status="failed", error="اتقطع لما السيرفر اتقفل")
