@@ -53,6 +53,7 @@ import atlas  # noqa: E402  (لازم بعد قراءة .env)
 import captions  # noqa: E402
 import montage  # noqa: E402
 import fx  # noqa: E402  (محرك الافيكتس)
+import lab  # noqa: E402  (معمل التفكيك)
 import motion as mo  # noqa: E402
 import publisher  # noqa: E402
 import sheets  # noqa: E402
@@ -3203,6 +3204,7 @@ app.mount("/media/carousels", StaticFiles(directory=CAROUSELS_DIR), name="carous
 app.mount("/media/series", StaticFiles(directory=SERIES_DIR), name="series")
 app.mount("/media/ads", StaticFiles(directory=ADS_DIR), name="ads")
 app.mount("/media/brand", StaticFiles(directory=BRAND_DIR), name="brand")
+app.mount("/media/lab", StaticFiles(directory=DATA_DIR / "lab", check_dir=False), name="lab")
 app.mount("/fonts", StaticFiles(directory=FONTS_DIR), name="fonts")
 
 
@@ -8834,6 +8836,434 @@ def reset_stuck_prod() -> None:
 
 
 reset_stuck_prod()
+
+
+# ================================================================ 🔬 معمل التفكيك
+
+LAB_DIR = DATA_DIR / "lab"
+LAB_DIR.mkdir(parents=True, exist_ok=True)
+LAB_LOCK = threading.Lock()
+LAB_STEPS = ("shots", "audio", "elements")
+LAYERS_MODEL = "bytedance/seedream-v5.0-pro/layer-decomposition"
+
+
+def lab_dir(lid: str) -> Path:
+    return LAB_DIR / Path(lid).name
+
+
+def lab_load(lid: str) -> dict:
+    f = lab_dir(lid) / "lab.json"
+    if not f.exists():
+        raise HTTPException(404, "الفيديو ده مش موجود في المعمل")
+    return json.loads(f.read_text(encoding="utf-8"))
+
+
+def lab_update(lid: str, fn) -> dict:
+    with LAB_LOCK:
+        d = lab_load(lid)
+        fn(d)
+        d["updated_at"] = now()
+        tmp = lab_dir(lid) / "lab.json.tmp"
+        tmp.write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+        tmp.replace(lab_dir(lid) / "lab.json")
+        return d
+
+
+def lab_step(lid: str, step: str, **kw) -> None:
+    lab_update(lid, lambda d: d.setdefault("steps", {}).setdefault(step, {}).update(**kw))
+
+
+def lab_reviews(d: dict) -> dict:
+    """عدّاد المراجعة: كام حاجة اتوافق عليها / اترفضت / لسه، لكل نوع."""
+    groups: dict[str, list] = {"shots": [s for s in d.get("shots") or []],
+                               "sfx": (d.get("audio") or {}).get("sfx") or [],
+                               "music": (d.get("audio") or {}).get("music") or [],
+                               "speech": (d.get("audio") or {}).get("speech") or [],
+                               "elements": [e for s in d.get("shots") or [] for e in (s.get("analysis") or {}).get("elements") or []],
+                               "actions": [a for s in d.get("shots") or [] for e in (s.get("analysis") or {}).get("elements") or []
+                                           for a in e.get("actions") or []],
+                               "layers": [L for s in d.get("shots") or [] for L in (s.get("layers") or {}).get("items") or []]}
+    out = {}
+    for k, items in groups.items():
+        oks = [((x.get("review") or {}).get("ok")) for x in items]
+        out[k] = {"total": len(items), "ok": oks.count(True), "bad": oks.count(False)}
+    return out
+
+
+def lab_to_dict(lid: str, d: dict) -> dict:
+    base = f"/media/lab/{lid}"
+    shots = []
+    for s in d.get("shots") or []:
+        lay = s.get("layers") or {}
+        shots.append({**s, "frames": [{**f, "url": f"{base}/frames/{f['file']}"} for f in s.get("frames") or []],
+                      "layers": {**lay, "base_url": f"{base}/layers/{lay['base']}" if lay.get("base") else None,
+                                 "frame_url": f"{base}/layers/{lay['frame']}" if lay.get("frame") else None,
+                                 "items": [{**L, "url": f"{base}/layers/{L['file']}"} for L in lay.get("items") or []]}})
+    audio = d.get("audio") or {}
+    audio = {**audio, "sfx": [{**x, "clip_url": f"{base}/sfx/{x['clip']}" if x.get("clip") else None} for x in audio.get("sfx") or []]}
+    return {**d, "id": lid, "source_url": f"{base}/{d['source']['file']}", "shots": shots, "audio": audio,
+            "reviews": lab_reviews(d), "busy": any((v or {}).get("status") == "working" for v in (d.get("steps") or {}).values())
+            or any((s.get("layers") or {}).get("status") == "working" for s in d.get("shots") or [])}
+
+
+def lab_list_items() -> list[dict]:
+    out = []
+    for f in sorted(LAB_DIR.glob("*/lab.json"), key=lambda x: x.stat().st_mtime, reverse=True):
+        try:
+            d = json.loads(f.read_text(encoding="utf-8"))
+        except ValueError:
+            continue
+        lid = f.parent.name
+        thumb = next((fr["file"] for s in d.get("shots") or [] for fr in (s.get("frames") or [])[:1]), None)
+        out.append({"id": lid, "name": d.get("name"), "created_at": d.get("created_at"), "duration": d["source"]["duration"],
+                    "shots": len(d.get("shots") or []), "thumb": f"/media/lab/{lid}/frames/{thumb}" if thumb else None,
+                    "busy": any((v or {}).get("status") == "working" for v in (d.get("steps") or {}).values())})
+    return out
+
+
+@app.get("/api/lab")
+def lab_list():
+    return lab_list_items()
+
+
+@app.post("/api/lab")
+def lab_create(file: UploadFile = File(...), name: str = Form("")):
+    """ترفع فيديو والتفكيك بيبدأ لوحده: القطعات ← الصوت ← عناصر كل لقطة."""
+    lid = uuid.uuid4().hex[:12]
+    folder = lab_dir(lid)
+    folder.mkdir(parents=True, exist_ok=True)
+    fname = save_upload(file, VIDEO_EXTENSIONS, folder, "source")
+    try:
+        info = media_info(folder / fname)
+    except Exception as exc:  # noqa: BLE001
+        shutil.rmtree(folder, ignore_errors=True)
+        raise HTTPException(400, f"مقدرتش أقرا الفيديو: {exc}") from exc
+    if info.duration > 300:
+        shutil.rmtree(folder, ignore_errors=True)
+        raise HTTPException(400, "الفيديو أطول من 5 دقايق. قصّه الأول")
+    d = {"name": name.strip() or Path(file.filename or "فيديو").stem, "created_at": now(), "updated_at": now(),
+         "source": {"file": fname, "duration": round(info.duration, 2), "width": info.width, "height": info.height,
+                    "has_audio": info.has_audio},
+         "steps": {k: {"status": "queued"} for k in LAB_STEPS}, "shots": [], "audio": {}}
+    (folder / "lab.json").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+    threading.Thread(target=run_lab, args=(lid, list(LAB_STEPS)), daemon=True).start()
+    return lab_to_dict(lid, d)
+
+
+@app.get("/api/lab/{lid}")
+def lab_get(lid: str):
+    return lab_to_dict(lid, lab_load(lid))
+
+
+class LabPatchIn(BaseModel):
+    name: str | None = None
+
+
+@app.patch("/api/lab/{lid}")
+def lab_patch(lid: str, body: LabPatchIn):
+    def fn(d):
+        if body.name and body.name.strip():
+            d["name"] = body.name.strip()[:120]
+    return lab_to_dict(lid, lab_update(lid, fn))
+
+
+@app.delete("/api/lab/{lid}")
+def lab_delete(lid: str):
+    lab_load(lid)
+    shutil.rmtree(lab_dir(lid), ignore_errors=True)
+    return {"ok": True}
+
+
+@app.post("/api/lab/{lid}/run")
+def lab_run(lid: str, step: str = "all"):
+    """يعيد خطوة (أو كله). العناصر بتتعمل من جديد لأن الأصوات والقطعات بتأثر عليها."""
+    steps = list(LAB_STEPS) if step == "all" else [step] if step in LAB_STEPS else []
+    if not steps:
+        raise HTTPException(400, "خطوة غير معروفة")
+    d = lab_load(lid)
+    if any((d.get("steps") or {}).get(k, {}).get("status") == "working" for k in LAB_STEPS):
+        raise HTTPException(400, "التفكيك شغال بالفعل. استنى لما يخلص")
+    if "shots" in steps or "audio" in steps:
+        steps = sorted(set(steps) | {"elements"}, key=LAB_STEPS.index)
+    lab_update(lid, lambda d: [d.setdefault("steps", {}).update({k: {"status": "queued"}}) for k in steps])
+    threading.Thread(target=run_lab, args=(lid, steps), daemon=True).start()
+    return lab_to_dict(lid, lab_load(lid))
+
+
+def lab_media_chat(messages: list[dict]) -> str:
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise atlas.AtlasError("مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات")
+    return ad_media_chat(messages)
+
+
+def run_lab(lid: str, steps: list[str]) -> None:
+    folder = lab_dir(lid)
+    for step in steps:
+        try:
+            lab_step(lid, step, status="working", error=None, progress="")
+            d = lab_load(lid)
+            src = folder / d["source"]["file"]
+            dur = d["source"]["duration"]
+            if step == "shots":
+                shutil.rmtree(folder / "frames", ignore_errors=True)
+                shots = lab.detect_shots(ffmpeg_exe(), src, dur)
+                for k, s in enumerate(shots):
+                    lab_step(lid, step, progress=f"فريمات اللقطة {k + 1} من {len(shots)}")
+                    s["frames"] = lab.extract_frames(ffmpeg_exe(), src, s["start"], s["end"], folder / "frames", f"s{s['n']:03d}")
+                    s["review"] = None
+                old = {s["n"]: s.get("layers") for s in d.get("shots") or []}
+                for s in shots:  # الطبقات اللي اتفككت قبل كده بتفضل لو اللقطة لسه بنفس الرقم
+                    if old.get(s["n"]):
+                        s["layers"] = old[s["n"]]
+                lab_update(lid, lambda d: d.update(shots=shots))
+            elif step == "audio":
+                if not d["source"].get("has_audio"):
+                    lab_update(lid, lambda d: d.update(audio={"none": True}))
+                else:
+                    run_lab_audio(lid, d, src, dur)
+            elif step == "elements":
+                run_lab_elements(lid)
+            lab_step(lid, step, status="done", error=None, progress="", at=now())
+        except Exception as exc:  # noqa: BLE001
+            lab_step(lid, step, status="failed", error=str(getattr(exc, "detail", None) or exc)[:400], progress="")
+            if step == "shots":
+                return
+
+
+def run_lab_audio(lid: str, d: dict, src: Path, dur: float) -> None:
+    folder = lab_dir(lid)
+    lab_step(lid, "audio", progress="بيقيس بدايات الأصوات")
+    marks = lab.onsets(lab.pcm(ffmpeg_exe(), src))
+    audio_mp3 = folder / "audio.mp3"
+    subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src), "-vn", "-ac", "1", "-b:a", "96k",
+                    str(audio_mp3)], check=True, capture_output=True, timeout=300)
+    lab_step(lid, "audio", progress="بيفرّغ الكلام")
+    try:
+        words = atlas.transcribe(audio_mp3, dur)
+    except Exception:  # noqa: BLE001  من غير كلام أو التفريغ فشل: نكمل بالموديل بس
+        words = []
+    speech = lab.speech_segments(words)
+    lab_step(lid, "audio", progress="بيسمع ويصنّف المؤثرات والموسيقى")
+    if atlas.mock_mode():
+        res = lab.mock_audio(dur, marks)
+    else:
+        proxy = folder / "proxy.mp4"
+        if not proxy.exists():
+            subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src),
+                            "-vf", "scale='if(gt(iw,ih),min(640,iw),-2)':'if(gt(iw,ih),-2,min(640,ih))',fps=12",
+                            "-c:v", "libx264", "-preset", "veryfast", "-crf", "31", "-pix_fmt", "yuv420p",
+                            "-c:a", "aac", "-ac", "1", "-b:a", "96k", str(proxy)], check=True, capture_output=True, timeout=600)
+        res = ad_json(lab_media_chat(az.with_media(lab.audio_messages(dur, marks, speech), data_url(proxy, "video/mp4"), "video.mp4")),
+                      "تفكيك الصوت")
+    shutil.rmtree(folder / "sfx", ignore_errors=True)
+    (folder / "sfx").mkdir(parents=True, exist_ok=True)
+    sfx = []
+    for i, x in enumerate(sorted((x for x in res.get("sfx") or [] if isinstance(x, dict)), key=lambda x: float(x.get("t") or 0))):
+        try:
+            t0 = float(x.get("t") or 0)
+        except (TypeError, ValueError):
+            continue
+        t, snapped = lab.snap(t0, marks)
+        if not 0 <= t < dur:
+            continue
+        try:
+            sd = min(2.0, max(0.08, float(x.get("dur") or 0.3)))
+        except (TypeError, ValueError):
+            sd = 0.3
+        sid = f"x{i + 1}"
+        clip = f"{sid}.mp3"
+        lab.cut_audio(ffmpeg_exe(), src, t - 0.04, min(sd + 0.12, dur - t + 0.04), folder / "sfx" / clip)
+        sfx.append({"id": sid, "t": round(t, 3), "t_model": round(t0, 3), "snapped": snapped, "dur": round(sd, 2),
+                    "label": str(x.get("label") or "")[:80], "category": x.get("category") if x.get("category") in lab.SFX_CATEGORIES else "other",
+                    "what": str(x.get("what") or "")[:300], "clip": clip, "review": None})
+    gem_speech = [x for x in res.get("speech") or [] if isinstance(x, dict)]
+    if speech:  # التوقيت من التفريغ (أدق)، واسم المتكلم من الموديل
+        for s in speech:
+            hit = next((g for g in gem_speech if float(g.get("start") or 0) <= s["end"] and float(g.get("end") or 0) >= s["start"]), None)
+            s.update(speaker=str((hit or {}).get("speaker") or "")[:60], review=None)
+    else:
+        speech = [{"start": round(float(g.get("start") or 0), 2), "end": round(float(g.get("end") or 0), 2),
+                   "text": str(g.get("text") or "")[:500], "speaker": str(g.get("speaker") or "")[:60], "review": None} for g in gem_speech]
+    music = [{"start": round(float(m.get("start") or 0), 2), "end": round(float(m.get("end") or 0), 2),
+              "description": str(m.get("description") or "")[:300], "mood": str(m.get("mood") or "")[:80], "review": None}
+             for m in res.get("music") or [] if isinstance(m, dict)]
+    lab_update(lid, lambda d: d.update(audio={"sfx": sfx, "speech": speech, "music": music, "onsets": marks[:300],
+                                               "stems": None}))
+
+
+def run_lab_elements(lid: str) -> None:
+    folder = lab_dir(lid)
+    d = lab_load(lid)
+    shots = d.get("shots") or []
+    audio = d.get("audio") or {}
+    for k, s in enumerate(shots):
+        lab_step(lid, "elements", progress=f"بيفكك عناصر اللقطة {k + 1} من {len(shots)}")
+        sfx = [x for x in audio.get("sfx") or [] if s["start"] - 0.05 <= x["t"] < s["end"]]
+        speech = [x for x in audio.get("speech") or [] if x["start"] < s["end"] and x["end"] > s["start"]]
+        try:
+            if atlas.mock_mode():
+                raw = lab.mock_elements(s, sfx)
+            else:
+                frames = [{"t": f["t"], "data_url": data_url(folder / "frames" / f["file"], "image/jpeg")} for f in s.get("frames") or []]
+                raw = ad_json(lab_media_chat(lab.elements_messages(s, frames, sfx, speech)), f"عناصر اللقطة {s['n']}")
+            res = lab.clean_elements(raw, s, {x["id"] for x in sfx})
+            err = None
+        except Exception as exc:  # noqa: BLE001  لقطة فشلت متوقفش الباقي
+            res, err = None, str(getattr(exc, "detail", None) or exc)[:300]
+        def fn(d, n=s["n"], res=res, err=err):
+            x = next((y for y in d.get("shots") or [] if y["n"] == n), None)
+            if x is not None:
+                x["analysis"], x["analysis_error"] = res, err
+        lab_update(lid, fn)
+
+
+@app.post("/api/lab/{lid}/shots/{n}/layers")
+def lab_layers(lid: str, n: int, t: float | None = None):
+    """🧩 يفكك فريم من اللقطة لطبقات شفافة (Seedream). بيتحسب على Atlas (حوالي 0.4$ للفريم)."""
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات")
+    d = lab_load(lid)
+    s = next((x for x in d.get("shots") or [] if x["n"] == n), None)
+    if not s:
+        raise HTTPException(404, "اللقطة مش موجودة")
+    if (s.get("layers") or {}).get("status") == "working":
+        raise HTTPException(400, "بيفكك اللقطة دي بالفعل")
+    at = t if t is not None and s["start"] <= t <= s["end"] else (s["start"] + s["end"]) / 2
+    def fn(d):
+        x = next(y for y in d["shots"] if y["n"] == n)
+        x["layers"] = {**(x.get("layers") or {}), "status": "working", "error": None, "t": round(at, 3)}
+    lab_update(lid, fn)
+    threading.Thread(target=run_lab_layers, args=(lid, n, at), daemon=True).start()
+    return lab_to_dict(lid, lab_load(lid))
+
+
+def run_lab_layers(lid: str, n: int, at: float) -> None:
+    folder = lab_dir(lid) / "layers"
+    folder.mkdir(parents=True, exist_ok=True)
+    def setl(**kw):
+        def fn(d):
+            x = next(y for y in d["shots"] if y["n"] == n)
+            x["layers"] = {**(x.get("layers") or {}), **kw}
+        lab_update(lid, fn)
+    try:
+        d = lab_load(lid)
+        tag = f"s{n:03d}-{uuid.uuid4().hex[:5]}"
+        frame = lab.grab_frame(ffmpeg_exe(), lab_dir(lid) / d["source"]["file"], at, folder / f"{tag}-frame.jpg")
+        items, base, price = [], None, None
+        if atlas.mock_mode():
+            from PIL import Image  # تجربة: طبقتين متقصوصين من الفريم
+            im = Image.open(frame).convert("RGBA")
+            base = f"{tag}-base.jpg"
+            im.convert("RGB").save(folder / base)
+            for i, (box, nm) in enumerate((((0, 0, im.width // 2, im.height // 2), "عنصر تجريبي ١"),
+                                          ((im.width // 2, im.height // 2, im.width, im.height), "عنصر تجريبي ٢"))):
+                f = f"{tag}-L{i + 1}.png"
+                im.crop(box).save(folder / f)
+                items.append({"file": f, "name": nm, "description": "تجربة", "z": i + 1, "box": list(box), "review": None})
+        else:
+            body = {"model": LAYERS_MODEL, "image": atlas.upload_media(frame)}
+            with httpx.Client(timeout=90) as client:
+                resp = client.post(f"{atlas.BASE_URL}/api/v1/model/generateImage", headers=atlas._headers(), json=body)
+            data = atlas._check(resp, "تفكيك الطبقات")
+            pid = (data or {}).get("id")
+            if not pid:
+                raise atlas.AtlasError(f"تفكيك الطبقات: الرد مفيهوش رقم طلب: {str(data)[:200]}")
+            pred = atlas.wait_prediction(pid, max_seconds=900, interval=5, what="تفكيك الطبقات")
+            outs = [o for o in pred.get("outputs") or [] if isinstance(o, str) and o.startswith("http")]
+            meta = pred.get("layers") or []
+            price = pred.get("price")
+            for i, url in enumerate(outs):
+                ext = ".png" if url.split("?")[0].lower().endswith(".png") else ".jpg"
+                info = meta[i] if i < len(meta) and isinstance(meta[i], dict) else {}
+                if i == 0 and not info.get("bounding_box"):  # أول ناتج = الخلفية من غير العناصر
+                    base = f"{tag}-base{ext}"
+                    atlas.download(url, folder / base)
+                    continue
+                f = f"{tag}-L{i}{ext}"
+                atlas.download(url, folder / f)
+                items.append({"file": f, "name": str(info.get("name") or f"طبقة {i}")[:80], "description": str(info.get("description") or "")[:400],
+                              "z": info.get("z_index", i), "box": (info.get("bounding_box") or {}).get("absolute"), "review": None})
+        setl(status="done", error=None, frame=frame.name, base=base, items=items, price=price, at=now())
+    except Exception as exc:  # noqa: BLE001
+        setl(status="failed", error=str(getattr(exc, "detail", None) or exc)[:400])
+
+
+class LabReviewIn(BaseModel):
+    kind: str            # shot | sfx | music | speech | background | element | action | layer
+    ref: str             # رقم/id العنصر (الأكشن: elementId:index، الطبقة: shotN:index)
+    ok: bool | None = None
+    note: str = ""
+    fix: dict = {}       # تصحيح الاسم/النوع/التصنيف/الوقت
+
+
+LAB_FIX_KEYS = {"sfx": ("label", "category", "t"), "music": ("description", "mood"), "speech": ("speaker", "text"),
+                "background": ("name", "description"), "element": ("name", "type", "description"),
+                "action": ("action", "detail"), "layer": ("name",), "shot": ()}
+
+
+@app.patch("/api/lab/{lid}/review")
+def lab_review(lid: str, body: LabReviewIn):
+    """👤 تقييمك: موافق ✅ / غلط ❌ / ملاحظة، والتصحيح بيتحفظ مع الأصل عشان نتعلم منه."""
+    if body.kind not in LAB_FIX_KEYS:
+        raise HTTPException(400, "نوع غير معروف")
+    def find(d):
+        shots = d.get("shots") or []
+        audio = d.get("audio") or {}
+        if body.kind == "shot":
+            return next((s for s in shots if str(s["n"]) == body.ref), None)
+        if body.kind == "sfx":
+            return next((x for x in audio.get("sfx") or [] if x["id"] == body.ref), None)
+        if body.kind in ("music", "speech"):
+            lst = audio.get(body.kind) or []
+            return lst[int(body.ref)] if body.ref.isdigit() and int(body.ref) < len(lst) else None
+        if body.kind == "background":
+            s = next((s for s in shots if str(s["n"]) == body.ref), None)
+            return ((s or {}).get("analysis") or {}).get("background")
+        els = [e for s in shots for e in (s.get("analysis") or {}).get("elements") or []]
+        if body.kind == "element":
+            return next((e for e in els if e["id"] == body.ref), None)
+        if body.kind == "action":
+            eid, _, idx = body.ref.rpartition(":")
+            e = next((e for e in els if e["id"] == eid), None)
+            return (e or {}).get("actions", [])[int(idx)] if e and idx.isdigit() and int(idx) < len(e.get("actions") or []) else None
+        if body.kind == "layer":
+            sn, _, idx = body.ref.partition(":")
+            s = next((s for s in shots if str(s["n"]) == sn), None)
+            items = ((s or {}).get("layers") or {}).get("items") or []
+            return items[int(idx)] if idx.isdigit() and int(idx) < len(items) else None
+        return None
+    def fn(d):
+        x = find(d)
+        if x is None:
+            raise HTTPException(404, "العنصر ده مش موجود")
+        fix = {k: body.fix[k] for k in LAB_FIX_KEYS[body.kind] if k in body.fix}
+        if fix:
+            x.setdefault("original", {k: x.get(k) for k in fix})  # الأصل بتاع الموديل بيتحفظ للمقارنة والتعلم
+            x.update(fix)
+        x["review"] = {"ok": body.ok, "note": body.note.strip()[:500], "at": now()}
+    return lab_to_dict(lid, lab_update(lid, fn))
+
+
+def reset_stuck_lab() -> None:
+    for f in LAB_DIR.glob("*/lab.json"):
+        try:
+            d = json.loads(f.read_text(encoding="utf-8"))
+        except ValueError:
+            continue
+        changed = False
+        for v in (d.get("steps") or {}).values():
+            if v.get("status") in ("working", "queued"):
+                v.update(status="failed", error="اتقطع لما السيرفر اتقفل. دوس «فكّك تاني»")
+                changed = True
+        for s in d.get("shots") or []:
+            if (s.get("layers") or {}).get("status") == "working":
+                s["layers"].update(status="failed", error="اتقطع لما السيرفر اتقفل")
+                changed = True
+        if changed:
+            f.write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+
+
+reset_stuck_lab()
 
 
 class SeriesSettingsIn(BaseModel):
