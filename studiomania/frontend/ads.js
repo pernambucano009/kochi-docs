@@ -41,12 +41,24 @@ const ADAPT_SCENE_LABELS = {
 const adFmt = (t) => `${Math.floor((t || 0) / 60)}:${((t || 0) % 60).toFixed(1).padStart(4, "0")}`;
 const adEsc = (v) => escapeHtml(v == null ? "" : String(v));
 
+// مراحل المشروع في القايمة الجانبية: وصل لفين
+function adStages(g) {
+  if (!g) return "";
+  const st = (on, label, title) => `<i class="${on ? "on" : ""}" title="${title}">${label}</i>`;
+  return `<span class="ad-stages">${st(g.analysis, "🔍", "التحليل")}${st(g.adapt, "✍️", "الاقتراح")}
+    ${g.shots ? st(g.frames === g.shots, `🎨 ${g.frames}/${g.shots}`, "الستوري بورد") + st(g.videos === g.shots, `🎬 ${g.videos}/${g.shots}`, "الفيديوهات") : st(false, "🎬", "التنفيذ")}
+    ${st(g.editor, "🎞️", "المونتاج")}${g.compare != null ? st(true, `🔬 ${g.compare}%`, "المطابقة مع الأصلي") : ""}</span>`;
+}
+const AD_MODE = { replica: "🧪 طبق الأصل", inspired: "💡 مستوحى" };
 function renderAds() {
+  $("adCount").textContent = adx.list.length ? `(${adx.list.length})` : "";
   $("adList").innerHTML = adx.list.map((a) => `<li class="${a.id === adx.cur?.id ? "active" : ""}" data-ad="${a.id}">
       ${a.thumb ? `<img src="${a.thumb}" alt="">` : `<span class="ph">🎬</span>`}
-      <span class="nm" data-no-i18n>${adEsc(a.name)}</span>
+      <span class="ad-li-body"><span class="nm" data-no-i18n>${adEsc(a.name)}</span>
+        <small class="muted">${new Date(a.created_at).toLocaleDateString("ar-EG", { day: "numeric", month: "short" })}${AD_MODE[a.progress?.mode] ? ` · ${AD_MODE[a.progress.mode]}` : ""}</small>
+        ${adStages(a.progress)}</span>
       <small>${a.status === "working" || a.status === "queued" ? "⏳" : a.status === "failed" ? "✕" : a.adapt_status === "working" ? "✍️" : ""}</small></li>`).join("")
-    || `<li class="muted">لسه مفيش إعلانات.</li>`;
+    || `<li class="muted">لسه مفيش مشاريع. دوس «＋ مشروع إعلان جديد» وارفع إعلان عاجبك.</li>`;
   const a = adx.cur;
   $("adStyles").hidden = adx.view !== "styles";
   $("adBrain").hidden = adx.view !== "brain";
@@ -670,6 +682,7 @@ function renderAdActivity() {
   if (["queued", "working"].includes(a.status)) items.push(["analysis", `🔍 بيحلل الإعلان: ${a.step || "في الطابور"}`]);
   if (a.scomp_status === "working") items.push(["analysis", "🎞️ بيستخرج الموشن جرافيك ومكونات كل مشهد"]);
   if (a.directions_status === "working") items.push(["adapt", "🎲 بيفكر في 3 اتجاهات مختلفة للإعلان"]);
+  if (a.compare?.status === "working") items.push(["prod", `🔬 ${a.compare.step || "بيقارن بالأصلي"}`]);
   if (a.adapt_status === "working") items.push(["adapt", a.chain_prod ? "✍️ بيكتب اقتراح كوتشي بالموشن، وبعده هيبدأ التنفيذ" : "✍️ بيكتب اقتراح كوتشي"]);
   if (a.audio_status === "working") items.push(["audio", "🎧 بيسمع الصوت ويفصّصه"]);
   const shots = a.prod?.shots || [];
@@ -746,6 +759,7 @@ document.querySelector('.view[data-view="10"]').addEventListener("click", (e) =>
 // ---------- 4. التنفيذ: راس الإعلان ← ستوري بورد ← مكونات ← لقطات ← المونتاج ----------
 const PBUSY = new Set(["queued", "working"]);
 function prodBusy(a) {
+  if (a.compare?.status === "working") return true;
   if (a.prod?.cast_status === "working" || a.prod?.cast?.some((c) => c.status === "working") || a.prod?.full_voice?.status === "working") return true;
   return !!a.prod?.shots.some((s) => PBUSY.has(s.frame_status) || s.comp_status === "working" || s.motion_status === "working" || s.layers_status === "working" || s.voice_status === "working"
     || s.components.some((c) => c.status === "working") || s.takes.some((t) => PBUSY.has(t.status)));
@@ -988,6 +1002,58 @@ function adScript(a) {
   return [`سكريبت: ${p.header.title || a.name}`, "",
     ...lines.map((s) => `لقطة ${s.n} — ${s.speaker || "الراوي"}${s.talking ? " (بيتكلم قدام الكاميرا)" : ""}:\n«${s.voice.trim()}»\n`)].join("\n");
 }
+// ---------- 🔬 المطابقة مع الأصلي: الاتنين جنب بعض ودرجة لكل مشهد والفجوات ----------
+const CMP_DIMS = { composition: "الكادر والتكوين", characters: "الأشخاص", setting: "المكان والإضاءة", camera_motion: "حركة الكاميرا",
+  motion_graphics: "الموشن جرافيك", text: "الكلام المكتوب", timing: "التوقيت والإيقاع", audio: "الصوت" };
+const CMP_STAGES = { analysis: "🔍 التحليل", storyboard: "🎨 الستوري بورد", video_prompt: "✍️ برومبت الفيديو", video_model: "🎬 موديل الفيديو",
+  motion_graphics: "🎞️ الموشن جرافيك", voice: "🎙️ الصوت", editing: "✂️ المونتاج" };
+const cmpColor = (v) => v >= 80 ? "var(--ok)" : v >= 55 ? "var(--warn)" : "var(--danger)";
+function renderCompare(a) {
+  const c = a.compare || {}, r = c.result;
+  $("adPCompare").disabled = c.status === "working";
+  if (!c.status) return setHTML($("adCompare"), "");
+  if ([...$("adCompare").querySelectorAll("video")].some((v) => !v.paused)) return;
+  const scenes = a.analysis?.scenes || [];
+  setHTML($("adCompare"), `<details class="ad-cmp" open><summary>🔬 المطابقة مع الإعلان الأصلي
+      ${r ? `<b class="ad-cmp-score" style="color:${cmpColor(r.score)}">${r.score}%</b>` : ""}
+      ${c.status === "working" ? `<span class="muted"><span class="spin-inline"></span> ${adEsc(c.step || "")}...</span>` : ""}</summary>
+    ${c.error ? `<div class="err">✕ ${adEsc(c.error)}</div>` : ""}
+    ${c.url ? `<div class="ad-cmp-vids">
+        <figure><figcaption>الأصلي</figcaption><video src="${a.source_url}" data-cmp="orig" playsinline preload="metadata"></video></figure>
+        <figure><figcaption>النسخة المولدة</figcaption><video src="${c.url}" data-cmp="gen" playsinline preload="metadata"></video></figure></div>
+      <div class="row wrap"><button class="btn sm primary" data-cmpplay>▶️ شغّل الاتنين مع بعض</button>
+        <label class="check"><input type="checkbox" data-cmpsound> 🔊 صوت النسخة المولدة (بدل الأصلي)</label></div>` : ""}
+    ${r ? `<p data-no-i18n>${adEsc(r.verdict)}</p>
+      <div class="ad-cmp-dims">${Object.entries(CMP_DIMS).filter(([k]) => r.dimensions?.[k] != null).map(([k, l]) =>
+        `<div><span>${l}</span><i style="--v:${r.dimensions[k]}%;--c:${cmpColor(r.dimensions[k])}"></i><b>${r.dimensions[k]}</b></div>`).join("")}</div>
+      <h4>المشاهد <span class="muted">(دوس على مشهد يروح له في الفيديوهين)</span></h4>
+      <div class="ad-cmp-scenes">${(r.scenes || []).map((x) => { const sh = (c.shots || []).find((y) => y.n === x.n), o = scenes.find((y) => y.n === x.n);
+        return `<button type="button" class="ad-cmp-scene" data-cmpseek="${o?.start ?? 0}|${sh?.at ?? 0}">
+          <b style="color:${cmpColor(x.score)}">${x.n} · ${x.score}%</b>${sh ? `<small class="muted">${adEsc(sh.src)}</small>` : ""}
+          <span data-no-i18n>✅ ${adEsc(x.matches)}</span><span data-no-i18n>❌ ${adEsc(x.differences)}</span></button>`; }).join("")}</div>
+      <h4>الفجوات وإزاي نعالجها</h4>
+      <ol class="ad-cmp-gaps">${(r.gaps || []).map((g) => `<li class="${adEsc(g.impact)}"><b>${CMP_STAGES[g.stage] || adEsc(g.stage)}</b>
+        <span data-no-i18n>${adEsc(g.problem)}</span><span class="muted" data-no-i18n>💡 ${adEsc(g.fix)}</span></li>`).join("")}</ol>` : ""}
+  </details>`);
+}
+$("adCompare").addEventListener("click", (e) => {
+  const vids = () => [$("adCompare").querySelector('[data-cmp="orig"]'), $("adCompare").querySelector('[data-cmp="gen"]')];
+  const play = e.target.closest("[data-cmpplay]"), seek = e.target.closest("[data-cmpseek]");
+  if (!play && !seek) return;
+  const [o, g] = vids();
+  if (!o || !g) return;
+  const genSound = $("adCompare").querySelector("[data-cmpsound]")?.checked;
+  o.muted = !!genSound; g.muted = !genSound;
+  if (seek) { const [a, b] = seek.dataset.cmpseek.split("|").map(Number); o.currentTime = a; g.currentTime = b; }
+  else if (!o.paused) { o.pause(); g.pause(); return; }
+  else if (o.ended || g.ended) { o.currentTime = 0; g.currentTime = 0; }
+  o.play(); g.play();
+});
+$("adPCompare").onclick = () => {
+  if (!confirm("يجمع النسخة المولدة لقطة ورا لقطة ويخلّي موديل الفيديو يقارنها بالأصلي مشهد بمشهد (طلب واحد لموديل التحليل). تكمل؟")) return;
+  pDo($("adPCompare"), "⏳", () => pAPI("/compare", { method: "POST" })).then(scheduleAdPoll);
+};
+
 function renderVoices(a) {
   const p = a.prod, fv = p.full_voice || {}, working = fv.status === "working";
   const n = p.shots.filter((s) => (s.voice || "").trim()).length;
@@ -998,6 +1064,7 @@ function renderVoices(a) {
       <button class="btn sm" data-fv="copy" ${n ? "" : "disabled"} title="الكلام بس، جاهز تحوّله لصوت">📋 انسخ السكريبت (${n} جملة)</button>
       <button class="btn sm" data-fv="download" ${n ? "" : "disabled"} title="نسخة فيها رقم كل لقطة ومين بيقول الجملة (للمراجعة)">⬇ نزّل نسخة بالتفاصيل</button>
       <label class="btn sm primary">⬆ ارفع الصوت الكامل<input type="file" accept="audio/*,video/*" data-fv-up hidden></label>
+      ${a.has_audio ? `<button class="btn sm ${a.settings.fidelity === "replica" ? "primary" : ""}" data-fv="original" ${working ? "disabled" : ""} title="يستخدم صوت الإعلان الأصلي نفسه (مناسب لتجربة النسخة طبق الأصل)">🎧 استخدم صوت الإعلان الأصلي</button>` : ""}
       ${fv.file ? `<button class="btn sm" data-fv="realign" ${working ? "disabled" : ""} title="بعد ما تعدّل الكلام في اللقطات">↻ قطّع تاني</button>` : ""}
       ${working ? `<span class="muted"><span class="spin-inline"></span> بيسمع الصوت ويقطّعه على اللقطات...</span>` : ""}
       ${fv.status === "done" ? `<span class="muted">✅ ${fv.duration} ث · اتطابق ${Math.round((fv.ratio || 0) * 100)}% من الكلام</span>` : ""}
@@ -1021,6 +1088,12 @@ $("adVoices").addEventListener("click", async (e) => {
     const url = URL.createObjectURL(new Blob([adScript(adx.cur)], { type: "text/plain;charset=utf-8" }));
     Object.assign(document.createElement("a"), { href: url, download: "ad-script.txt" }).click();
     return setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }
+  if (b.dataset.fv === "original") {
+    if (adx.cur.prod.full_voice?.file && !confirm("يحط صوت الإعلان الأصلي مكان الصوت الكامل الحالي ويقطّعه على اللقطات. تكمل؟")) return;
+    try { adx.cur = await pAPI("/full-voice-original", { method: "POST" }); renderAds(); scheduleAdPoll(); }
+    catch (err) { toast(err.message, true); }
+    return;
   }
   if (b.dataset.fv === "realign") {
     try { adx.cur = await pAPI("/full-voice", { method: "POST", body: new FormData() }); renderAds(); scheduleAdPoll(); }
@@ -1136,6 +1209,7 @@ function renderAdProd() {
   if (!p) return;
   if (!editingIn($("adCast"))) renderCast(a);
   if (!editingIn($("adVoices"))) renderVoices(a);
+  renderCompare(a);
   const h = p.header;
   if (!editingIn($("adHeader"))) {
     $("adHeader").innerHTML = Object.entries(HEADER_LABELS).map(([k, l]) => adField(l, h[k], `data-h="${k}"`, k === "style" || k === "characters" ? 3 : 2, k === "style")).join("");
@@ -1280,10 +1354,10 @@ $("adPGenerate").onclick = () => {
 };
 $("adPEditor").onclick = () => busyButton($("adPEditor"), "⏳", async () => {
   const r = await pAPI("/to-editor", { method: "POST" });
-  storageSet("studiomania.projectId", r.project_id);
+  storageSet("studiomania.projectId.ads", r.project_id);
   if (typeof mt !== "undefined") mt.project = null;
-  toast("🎞️ اتفتح الإعلان في المونتاج");
-  showStep("6");
+  toast("🎞️ اتفتح الإعلان في مونتاج الإعلانات");
+  showStep("6a");
 });
 
 $("adPShots").addEventListener("change", async (e) => {

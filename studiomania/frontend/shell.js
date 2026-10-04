@@ -14,6 +14,8 @@ const STEP_INFO = {
   8: { num: "", title: "صناعة الكاروسيل" },
   9: { num: "", title: "المسلسلات" },
   10: { num: "", title: "الإعلانات" },
+  "6s": { num: "", title: "🎞️ مونتاج المسلسلات" },
+  "6a": { num: "", title: "🎞️ مونتاج الإعلانات" },
   settings: { num: "", title: "الإعدادات" },
 };
 const NEXT_LABEL = {
@@ -51,6 +53,7 @@ async function flowFolder(refresh = false) {
 
 // ---------- الشاشة الكبيرة ----------
 function tileFor(step) {
+  step = { "6s": "9", "6a": "10" }[step] || step;
   return document.querySelector(`#bento [data-open="${step}"]`) || document.querySelector(`.rail-btn[data-goto="${step}"]`);
 }
 
@@ -142,7 +145,7 @@ $("stagePrev").onclick = () => {
 $("stageNext").onclick = () => goNext(shell.step);
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && !$("stage").hidden && !document.querySelector("dialog[open]") &&
-      !e.target.matches("input, textarea, select") && shell.step !== "6") showStep("home");
+      !e.target.matches("input, textarea, select") && !["6", "6s", "6a"].includes(shell.step)) showStep("home");
 });
 
 // ---------- الخطوة الجاية بناتج الخطوة دي ----------
@@ -340,3 +343,32 @@ $("bento").addEventListener("click", (e) => {
 // ---------- اللغة ----------
 $("langToggle").querySelector(".lang-code").textContent = I18N.lang === "en" ? "ع" : "EN";
 $("langToggle").onclick = () => I18N.setLang(I18N.lang === "en" ? "ar" : "en");
+
+// ---------- 💰 رصيد Atlas: بيتحدث كل دقيقة، والصرف بيتحسب من نزول الرصيد ----------
+const money = { last: null };
+async function loadMoney() {
+  try {
+    money.last = await api("/api/atlas/money");
+    $("moneyBtn").hidden = false;
+    $("moneyVal").textContent = `$${money.last.balance.toFixed(2)}`;
+    $("moneyBtn").title = `رصيد Atlas · اتصرف النهارده $${money.last.spent_today.toFixed(2)}`;
+    if ($("moneyDialog").open) renderMoney();
+  } catch { /* من غير مفتاح أو Atlas مش بيرد: العداد بيستخبى */ }
+}
+function renderMoney() {
+  const m = money.last;
+  if (!m) return;
+  const since = new Date(m.tracked_since).toLocaleString("ar-EG", { dateStyle: "medium", timeStyle: "short" });
+  $("moneyBody").innerHTML = `<div class="money-grid">
+      <div><span>الرصيد دلوقتي</span><b>$${m.balance.toFixed(2)}</b></div>
+      <div><span>اتصرف النهارده</span><b>$${m.spent_today.toFixed(2)}</b></div>
+      <div><span>اتصرف آخر 7 أيام</span><b>$${m.spent_week.toFixed(2)}</b></div></div>
+    <p class="muted">الصرف بيتحسب من نزول الرصيد من ساعة ما البرنامج بدأ يتابعه (${since}). الشحن مش بيتحسب صرف.</p>
+    ${m.models_recent.length ? `<h4>الطلبات لكل موديل (آخر يومين)</h4><table class="money-tbl">${m.models_recent.map((x) =>
+      `<tr><td dir="ltr">${escapeHtml(x.name)}</td><td>${x.requests}</td></tr>`).join("")}</table>` : ""}`;
+}
+$("moneyBtn").onclick = () => { renderMoney(); $("moneyDialog").showModal(); loadMoney(); };
+$("moneyClose").onclick = () => $("moneyDialog").close();
+$("moneyRefresh").onclick = loadMoney;
+loadMoney();
+setInterval(() => { if (!document.hidden) loadMoney(); }, 60000);

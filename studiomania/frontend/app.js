@@ -761,14 +761,17 @@ $("clipsGrid").addEventListener("click", async (e) => {
 // ---------- التنقل بين الخطوات ----------
 const viewHooks = {}; // كل صفحة بتسجّل هنا اللي يحصل لما تفتح
 // "home" = الرئيسية (المربعات). أي خطوة تانية بتفتح في الشاشة الكبيرة (shell.js)
+// خطوات بتفتح نفس الصفحة بس لقسم تاني: مونتاج المسلسلات والإعلانات منفصل عن مونتاج فيديوهات المدربين
+const VIEW_OF = { "6s": "6", "6a": "6" };
 function showStep(step) {
-  if (step !== "home" && !document.querySelector(`.view[data-view="${step}"]`)) step = "home";
+  const view = VIEW_OF[step] || step;
+  if (step !== "home" && !document.querySelector(`.view[data-view="${view}"]`)) step = "home";
   document.querySelectorAll("video, audio").forEach((m) => m.pause());
   if (location.hash !== `#${step}`) history.replaceState(null, "", `#${step}`);
   if (step === "home") return closeStage();
-  document.querySelectorAll(".view").forEach((v) => (v.hidden = v.dataset.view !== step));
+  document.querySelectorAll(".view").forEach((v) => (v.hidden = v.dataset.view !== (VIEW_OF[step] || step)));
   openStage(step);
-  viewHooks[step]?.();
+  (viewHooks[step] || viewHooks[VIEW_OF[step]])?.();
 }
 document.addEventListener("click", (e) => {
   const a = e.target.closest("[data-goto]");

@@ -847,10 +847,10 @@ $("serToEditor").onclick = () => {
 };
 const openInEditor = () => busyButton($("serToEditor"), "⏳", async () => {
   const r = await api(`/api/episodes/${ser.ep.id}/to-editor`, { method: "POST" });
-  storageSet("studiomania.projectId", r.project_id);
+  storageSet("studiomania.projectId.series", r.project_id);
   if (typeof mt !== "undefined") mt.project = null;
-  toast("اتفتحت الحلقة في محرر الفيديو");
-  showStep("6");
+  toast("اتفتحت الحلقة في مونتاج المسلسلات");
+  showStep("6s");
 });
 $("serRenderGo").onclick = () => busyButton($("serRenderGo"), "⏳", async () => {
   ser.ep = await api(`/api/episodes/${ser.ep.id}/render`, { method: "POST" });

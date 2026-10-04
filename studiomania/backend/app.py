@@ -22,7 +22,7 @@ import uuid
 from urllib.parse import quote
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import closing
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import httpx
@@ -1917,6 +1917,24 @@ class ProjectIn(BaseModel):
     outro_volume: float = 1.0
     captions: dict = {}  # {enabled, template, font, size, y, words, color, highlight, ...}
     logo: dict = {}  # {enabled, size, x, y, opacity, on_outro}
+    section: str | None = None  # المونتاج بتاع أنهي قسم: coach (فيديوهات المدربين) / series / ads
+
+
+PROJECT_SECTIONS = ("coach", "series", "ads")
+
+
+def tag_project_sections() -> None:
+    """المشاريع القديمة: نعرف قسمها من الفيديوهات اللي فيها (ad: / series:) عشان كل قسم ليه مونتاج لوحده."""
+    with closing(db()) as conn, conn:
+        for r in conn.execute("SELECT id, data FROM projects").fetchall():
+            d = json.loads(r["data"])
+            if d.get("section"):
+                continue
+            ids = [c.get("gen_id") for c in d.get("clips") or [] if c.get("gen_id")]
+            kinds = {(g["clip_id"] or "").split(":")[0] for g in conn.execute(
+                f"SELECT clip_id FROM generations WHERE id IN ({','.join('?' * len(ids))})", ids).fetchall()} if ids else set()
+            d["section"] = "ads" if "ad" in kinds else "series" if "series" in kinds else "coach"
+            conn.execute("UPDATE projects SET data = ? WHERE id = ?", (json.dumps(d, ensure_ascii=False), r["id"]))
 
 
 def project_to_dict(r: sqlite3.Row) -> dict:
@@ -1924,6 +1942,7 @@ def project_to_dict(r: sqlite3.Row) -> dict:
         "id": r["id"],
         "name": r["name"],
         "data": json.loads(r["data"]),
+        "section": json.loads(r["data"]).get("section") or "coach",
         "render_status": r["render_status"],
         "render_error": r["render_error"],
         "render_progress": RENDER_ACTIVE.get(r["id"]),
@@ -1957,6 +1976,7 @@ def create_project(body: ProjectIn):
     project_id = uuid.uuid4().hex[:12]
     data = body.model_dump()
     data["name"] = body.name.strip() or "مشروع جديد"
+    data["section"] = body.section if body.section in PROJECT_SECTIONS else "coach"
     with closing(db()) as conn, conn:
         conn.execute(
             "INSERT INTO projects (id, name, data, render_status, created_at, updated_at) VALUES (?, ?, ?, 'idle', ?, ?)",
@@ -1970,7 +1990,8 @@ def save_project(project_id: str, body: ProjectIn):
     data = body.model_dump()
     data["name"] = body.name.strip() or "مشروع جديد"
     with closing(db()) as conn, conn:
-        get_project(conn, project_id)
+        old = json.loads(get_project(conn, project_id)["data"])
+        data["section"] = old.get("section") or "coach"  # القسم مبيتغيرش من الحفظ
         conn.execute(
             "UPDATE projects SET name = ?, data = ?, updated_at = ? WHERE id = ?",
             (data["name"], json.dumps(data), now(), project_id),
@@ -2444,6 +2465,7 @@ def reset_stuck_renders() -> None:
 
 
 reset_stuck_renders()
+tag_project_sections()
 
 
 # ---------------------------------------------------------------- فولدر الفيديوهات الجاهزة والنشر (الخطوة 7)
@@ -5520,7 +5542,7 @@ def episode_to_editor(eid: str):
         conn.execute("INSERT INTO audio (id, kind, name, filename, duration, created_at) VALUES (?, 'voice', ?, ?, ?, ?)",
                      (vid, f"🎙️ {label}", vfile, data["audio"]["duration"], now()))
         pid = uuid.uuid4().hex[:12]
-        pdata = {"name": label, "video_id": None, "coach_id": None, "clips": clips,
+        pdata = {"name": label, "section": "series", "video_id": None, "coach_id": None, "clips": clips,
                  "voice": {"id": vid, "volume": 1.0, "delay": 0.0, "offset": 0.0, "length": None, "fade_out": False, "parts": []},
                  "music": default_music(conn), "outro": False, "outro_volume": 1.0, "captions": {}, "logo": {}}
         conn.execute("INSERT INTO projects (id, name, data, render_status, created_at, updated_at) VALUES (?, ?, ?, 'idle', ?, ?)",
@@ -5587,6 +5609,64 @@ def put_ads_settings(body: AdsSettingsIn):
     return ads_settings()
 
 
+# ---------- 💰 عداد فلوس Atlas: الرصيد من Atlas، والصرف بنحسبه من نزول الرصيد
+
+ATLAS_PUBLIC = f"{atlas.BASE_URL}/public/v1"
+MONEY_TZ = timezone(timedelta(hours=3))  # توقيت السعودية
+
+
+def money_log() -> list[dict]:
+    try:
+        return json.loads(auth.get_setting("atlas_balance_log") or "[]")
+    except ValueError:
+        return []
+
+
+def spent_since(log: list[dict], since: datetime) -> float:
+    """مجموع النزول في الرصيد من وقت معين (الشحن بيتجاهل)."""
+    out, prev = 0.0, None
+    for x in log:
+        t = datetime.fromisoformat(x["t"])
+        if prev is not None and t >= since and x["v"] < prev:
+            out += prev - x["v"]
+        prev = x["v"]
+    return round(out, 4)
+
+
+@app.get("/api/atlas/money")
+def atlas_money():
+    """الرصيد دلوقتي، واتصرف قد إيه النهارده والأسبوع ده، وعدد الطلبات لكل موديل في آخر يومين."""
+    if atlas.mock_mode():
+        return {"balance": 10.5, "currency": "usd", "spent_today": 0.42, "spent_week": 3.1, "tracked_since": now(),
+                "models_recent": [{"name": "kwaivgi/kling-v2.6-pro/avatar", "type": "video", "requests": 2}]}
+    if not atlas.api_key():
+        raise HTTPException(400, "مفتاح Atlas مش متسجل")
+    try:
+        with httpx.Client(timeout=20) as client:
+            b = client.get(f"{ATLAS_PUBLIC}/balance", headers=atlas._headers()).json()
+            today = datetime.now(MONEY_TZ).date()
+            u = client.get(f"{ATLAS_PUBLIC}/usage", headers=atlas._headers(),
+                           params={"start_date": str(today - timedelta(days=1)), "end_date": str(today + timedelta(days=1)),
+                                   "group_by[]": "model"}).json()
+    except (httpx.HTTPError, ValueError) as exc:
+        raise HTTPException(502, f"Atlas مش بيرد: {exc}") from exc
+    bal = float(((b or {}).get("available") or {}).get("value") or 0)
+    log = money_log()
+    if not log or abs(log[-1]["v"] - bal) > 1e-6:
+        log.append({"t": datetime.now(MONEY_TZ).isoformat(timespec="seconds"), "v": bal})
+        auth.set_setting("atlas_balance_log", json.dumps(log[-2000:]))
+    midnight = datetime.now(MONEY_TZ).replace(hour=0, minute=0, second=0, microsecond=0)
+    models: dict[str, dict] = {}
+    for bucket in (u or {}).get("data") or []:  # إمبارح والنهارده (أيام Atlas بتوقيت UTC)
+        for r in bucket.get("results") or []:
+            m = r.get("model") or {}
+            x = models.setdefault(m.get("name") or "?", {"name": m.get("name") or "?", "type": m.get("type", ""), "requests": 0})
+            x["requests"] += int((r.get("usage") or {}).get("requests") or 0)
+    return {"balance": bal, "currency": ((b or {}).get("available") or {}).get("currency", "usd"),
+            "spent_today": spent_since(log, midnight), "spent_week": spent_since(log, midnight - timedelta(days=6)),
+            "tracked_since": log[0]["t"], "models_recent": sorted(models.values(), key=lambda x: -x["requests"])}
+
+
 def ad_dir(aid: str) -> Path:
     d = ADS_DIR / Path(aid).name
     (d / "frames").mkdir(parents=True, exist_ok=True)
@@ -5629,6 +5709,8 @@ def ad_to_dict(r: sqlite3.Row, d: dict) -> dict:
         "prod_history": [{"at": h.get("archived_at"), "shots": len(h.get("shots") or [])} for h in d.get("prod_history") or []],
         "settings": d.get("settings") or {},
         "adaptation": d.get("adaptation"), "adapt_status": d.get("adapt_status", "idle"), "adapt_error": d.get("adapt_error"),
+        "compare": {**(d.get("compare") or {}), "url": f"{base}/prod/compare/{d['compare']['file']}"} if (d.get("compare") or {}).get("file")
+                   else (d.get("compare") or {}),
         "directions": d.get("directions") or [], "directions_status": d.get("directions_status", "idle"),
         "directions_error": d.get("directions_error"),
         "scomp_status": d.get("scomp_status", "idle"),
@@ -5664,14 +5746,29 @@ def ad_response(aid: str) -> dict:
     return ad_to_dict(r, d)
 
 
+def ad_progress(d: dict) -> dict:
+    """ملخص مراحل المشروع للقايمة الجانبية: وصل لفين."""
+    shots = (d.get("prod") or {}).get("shots") or []
+    def chosen_ok(s):
+        return any(t["id"] == s.get("chosen") and t.get("status") == "done" for t in s.get("takes") or [])
+    return {"analysis": bool(d.get("analysis")), "adapt": bool(d.get("adaptation")), "shots": len(shots),
+            "frames": sum(1 for s in shots if s.get("frame")), "videos": sum(1 for s in shots if chosen_ok(s)),
+            "editor": bool((d.get("prod") or {}).get("project_id")),
+            "compare": ((d.get("compare") or {}).get("result") or {}).get("score"),
+            "mode": (d.get("settings") or {}).get("fidelity") or "copy"}
+
+
 @app.get("/api/ads")
 def list_ads():
     with closing(db()) as conn:
         rows = conn.execute("SELECT * FROM ads ORDER BY created_at DESC").fetchall()
     out = []
     for r in rows:
-        a = ad_to_dict(r, json.loads(r["data"]))
-        out.append({k: a[k] for k in ("id", "name", "created_at", "status", "step", "thumb", "adapt_status")})
+        d = json.loads(r["data"])
+        scenes = (d.get("analysis") or {}).get("scenes") or []
+        out.append({"id": r["id"], "name": r["name"], "created_at": r["created_at"], "status": d.get("status", "idle"),
+                    "step": d.get("step"), "adapt_status": d.get("adapt_status", "idle"), "progress": ad_progress(d),
+                    "thumb": f"/media/ads/{r['id']}/frames/{scenes[0]['frame']}" if scenes and scenes[0].get("frame") else None})
     return out
 
 
@@ -5776,6 +5873,8 @@ def patch_ad(aid: str, body: AdPatchIn):
     if body.name is not None and body.name.strip():
         with closing(db()) as conn, conn:
             conn.execute("UPDATE ads SET name = ? WHERE id = ?", (body.name.strip()[:120], aid))
+    if body.settings is not None and "fidelity" in body.settings:
+        replica_brain(aid, body.settings.get("fidelity") == "replica")
     def fn(d):
         if body.settings is not None:
             d["settings"] = {**(d.get("settings") or {}), **{k: body.settings[k] for k in AD_SETTING_KEYS if k in body.settings}}
@@ -5796,6 +5895,24 @@ def patch_ad(aid: str, body: AdPatchIn):
             bump(d, "adapt_ver")
     update_ad(aid, fn)
     return ad_response(aid)
+
+
+def replica_brain(aid: str, on: bool) -> None:
+    """🧪 النسخة طبق الأصل ليها عقل لوحدها (فاضي، فيه أبطال الإعلان ده بس) عشان أصول كوتشي متدخلش في الرسم."""
+    with closing(db()) as conn:
+        r, d = ad_row(conn, aid)
+    st = d.get("settings") or {}
+    cur = brain_row(st["brain_id"]) if st.get("brain_id") not in (None, "", "none") else None
+    if on and not (cur and cur.get("replica_of") == aid):
+        bid = uuid.uuid4().hex[:12]
+        data = {"type": "app", **{k: "" for k in BRAIN_FIELDS if k != "type"}, "screens": [], "logos": [], "products": [],
+                "status": "idle", "replica_of": aid}
+        with closing(db()) as conn, conn:
+            conn.execute("INSERT INTO ad_brains (id, name, data, created_at) VALUES (?, ?, ?, ?)",
+                         (bid, f"🧪 نسخة: {r['name']}"[:80], json.dumps(data, ensure_ascii=False), now()))
+        update_ad(aid, lambda d: d.setdefault("settings", {}).update(brain_id=bid))
+    elif not on and cur and cur.get("replica_of") == aid:
+        update_ad(aid, lambda d: d.setdefault("settings", {}).update(brain_id=""))
 
 
 @app.delete("/api/ads/{aid}")
@@ -6630,6 +6747,9 @@ def reset_stuck_ads() -> None:
                 changed = True
             if d.get("scomp_status") == "working":
                 d.update(scomp_status="failed")
+                changed = True
+            if (d.get("compare") or {}).get("status") == "working":
+                d["compare"].update(status="failed", error="اتقطع لما السيرفر اتقفل. قارن تاني", step=None)
                 changed = True
             if d.get("directions_status") == "working":
                 d.update(directions_status="failed", directions_error="اتقطع لما السيرفر اتقفل. دوس تاني")
@@ -8190,6 +8310,129 @@ def prod_full_voice(aid: str, file: UploadFile | None = File(default=None)):
     return ad_response(aid)
 
 
+@app.post("/api/ads/{aid}/prod/full-voice-original")
+def prod_full_voice_original(aid: str):
+    """🎧 صوت الإعلان الأصلي نفسه كصوت كامل (لتجربة النسخة طبق الأصل): بيتقطع على اللقطات زي أي صوت مرفوع."""
+    with closing(db()) as conn:
+        _, d = ad_row(conn, aid)
+    p = prod_of(d)
+    if not (d.get("source") or {}).get("has_audio"):
+        raise HTTPException(400, "الإعلان الأصلي مفيهوش صوت")
+    if (p.get("full_voice") or {}).get("status") == "working":
+        raise HTTPException(400, "بيقطّع الصوت بالفعل")
+    name = f"full-original-{uuid.uuid4().hex[:6]}.mp3"
+    dur = min(d["source"]["duration"], AD_MAX_SECONDS)
+    try:
+        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(ad_dir(aid) / d["source"]["file"]),
+                        "-t", f"{dur:.2f}", "-vn", "-ac", "2", "-b:a", "192k", str(prod_dir(aid, "voice") / name)],
+                       check=True, capture_output=True, timeout=300)
+    except subprocess.CalledProcessError as exc:
+        raise HTTPException(400, f"مقدرتش أطلّع الصوت: {exc.stderr.decode(errors='ignore')[-200:]}") from exc
+    old = (p.get("full_voice") or {}).get("file")
+    if old and old != name:
+        (prod_dir(aid, "voice") / old).unlink(missing_ok=True)
+    update_ad(aid, lambda d: d["prod"].update(full_voice={"file": name, "status": "working", "error": None, "original": True}))
+    threading.Thread(target=run_full_voice, args=(aid,), daemon=True).start()
+    return ad_response(aid)
+
+
+# ---------- 🔬 المطابقة: النسخة المولدة جنب الأصلي ودرجة تشابه مشهد بمشهد
+
+COMPARE_SIZE = {"9:16": (480, 854), "16:9": (854, 480), "1:1": (640, 640)}
+
+
+def has_audio_stream(path: Path) -> bool:
+    r = subprocess.run([ffmpeg_exe(), "-hide_banner", "-i", str(path)], capture_output=True, text=True)
+    return "Audio:" in r.stderr
+
+
+def build_compare_video(aid: str, p: dict, out: Path) -> list[dict]:
+    """كل لقطة بالفيديو المختار (أو آخر فيديو خلص، أو صورة الستوري بورد، أو شاشة سودا) بمدتها، ورا بعض."""
+    w, h = COMPARE_SIZE.get(p["header"].get("aspect"), COMPARE_SIZE["9:16"])
+    work = out.parent / "parts"
+    shutil.rmtree(work, ignore_errors=True)
+    work.mkdir(parents=True)
+    vf = f"scale={w}:{h}:force_original_aspect_ratio=decrease,pad={w}:{h}:(ow-iw)/2:(oh-ih)/2,fps=24,setsar=1"
+    parts, info, at = [], [], 0.0
+    for s in p["shots"]:
+        dur = float(s.get("seconds") or 4)
+        done = [t for t in s.get("takes") or [] if t.get("status") == "done" and t.get("file")]
+        t = next((x for x in done if x["id"] == s.get("chosen")), None) or (done[-1] if done else None)
+        part = work / f"{s['n']:03d}.mp4"
+        silence = ["-f", "lavfi", "-i", "anullsrc=r=44100:cl=mono"]
+        if t:
+            src = prod_dir(aid, "takes") / t["file"]
+            label = "فيديو بيتكلم" if t.get("lipsync") else "موشن متركب" if t.get("composite") else f"فيديو {t.get('video_model') or ''}".strip()
+            inputs = ["-i", str(src)] + ([] if has_audio_stream(src) else silence)
+            amap = "0:a" if len(inputs) == 2 else "1:a"
+            # فيديو أقصر من اللقطة: آخر فريم بيفضل لحد آخر المدة، والصوت بيتكمل سكوت
+            filt = ["-vf", vf + f",tpad=stop_mode=clone:stop_duration={dur:.3f}", "-af", "apad"]
+        elif s.get("frame") and (prod_dir(aid, "frames") / s["frame"]).exists():
+            label = "صورة الستوري بورد (مفيش فيديو)"
+            inputs, amap, filt = ["-loop", "1", "-i", str(prod_dir(aid, "frames") / s["frame"])] + silence, "1:a", ["-vf", vf]
+        else:
+            label = "مفيش (شاشة سودا)"
+            inputs, amap, filt = ["-f", "lavfi", "-i", f"color=c=black:s={w}x{h}:r=24"] + silence, "1:a", ["-vf", vf]
+        cmd = ([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y"] + inputs + ["-map", "0:v", "-map", amap, "-t", f"{dur:.3f}"]
+               + filt + ["-c:v", "libx264", "-preset", "veryfast", "-crf", "28", "-pix_fmt", "yuv420p",
+                         "-c:a", "aac", "-ac", "1", "-ar", "44100", "-b:a", "64k", str(part)])
+        subprocess.run(cmd, check=True, capture_output=True, timeout=300)
+        parts.append(part)
+        info.append({"n": s["n"], "at": round(at, 2), "len": dur, "src": label})
+        at += dur
+    lst = work / "list.txt"
+    lst.write_text("".join(f"file '{x.as_posix()}'\n" for x in parts))
+    subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-f", "concat", "-safe", "0", "-i", str(lst),
+                    "-c", "copy", "-movflags", "+faststart", str(out)], check=True, capture_output=True, timeout=300)
+    shutil.rmtree(work, ignore_errors=True)
+    return info
+
+
+def run_ad_compare(aid: str) -> None:
+    try:
+        with closing(db()) as conn:
+            _, d = ad_row(conn, aid)
+        p = d["prod"]
+        folder = prod_dir(aid, "compare")
+        name = f"generated-{uuid.uuid4().hex[:6]}.mp4"
+        info = build_compare_video(aid, p, folder / name)
+        old = (d.get("compare") or {}).get("file")
+        if old and old != name:
+            (folder / old).unlink(missing_ok=True)
+        update_ad(aid, lambda d: d["compare"].update(file=name, shots=info, step="بيقارن بالأصلي"))
+        scenes = (d.get("analysis") or {}).get("scenes") or []
+        if atlas.mock_mode():
+            result = az.mock_compare(len(info))
+        else:
+            proxy = ad_dir(aid) / "proxy.mp4"
+            msg = az.compare_messages(scenes, info)[0]
+            msg = {"role": "user", "content": [
+                {"type": "text", "text": msg["content"]},
+                {"type": "file", "file": {"filename": "original.mp4", "file_data": data_url(proxy, "video/mp4")}},
+                {"type": "file", "file": {"filename": "generated.mp4", "file_data": data_url(folder / name, "video/mp4")}}]}
+            result = ad_json(ad_media_chat([msg]), "المطابقة")
+        update_ad(aid, lambda d: d["compare"].update(status="done", result=result, error=None, step=None, at=now()))
+    except Exception as exc:  # noqa: BLE001
+        msg = str(getattr(exc, "detail", None) or exc)[:400]
+        update_ad(aid, lambda d: d.setdefault("compare", {}).update(status="failed", error=msg, step=None))
+
+
+@app.post("/api/ads/{aid}/prod/compare")
+def prod_compare(aid: str):
+    """🔬 يجمع النسخة المولدة لقطة ورا لقطة ويقارنها بالإعلان الأصلي (درجة لكل مشهد والفجوات وإزاي نعالجها)."""
+    with closing(db()) as conn:
+        _, d = ad_row(conn, aid)
+    p = prod_of(d)
+    if not any(t.get("status") == "done" for s in p["shots"] for t in s.get("takes") or []):
+        raise HTTPException(400, "ولّد فيديو لقطة واحدة على الأقل الأول")
+    if (d.get("compare") or {}).get("status") == "working":
+        raise HTTPException(400, "المقارنة شغالة بالفعل")
+    update_ad(aid, lambda d: d.update(compare={**(d.get("compare") or {}), "status": "working", "error": None,
+                                               "step": "بيجمع النسخة المولدة"}))
+    threading.Thread(target=run_ad_compare, args=(aid,), daemon=True).start()
+    return ad_response(aid)
+
+
 def run_ad_lipsync(aid: str, sid: str, tid: str) -> None:
     """👄 الكلام على الوش: video = الفيديو المختار + الصوت (سريع)، image = الستوري بورد + الصوت بيتحول لفيديو بيتكلم (أبطأ)."""
     def setp(**kw):
@@ -8473,7 +8716,7 @@ def prod_to_editor(aid: str):
                           "zoom": 1.0, "x": 0.0, "y": 0.0, "volume": 0.0})
         voice = ad_voice_track(aid, conn, [s for s, _ in picks], label)
         pid = uuid.uuid4().hex[:12]
-        pdata = {"name": f"📣 {label}", "video_id": None, "coach_id": None, "clips": clips, "voice": voice,
+        pdata = {"name": f"📣 {label}", "section": "ads", "video_id": None, "coach_id": None, "clips": clips, "voice": voice,
                  "music": default_music(conn), "outro": False, "outro_volume": 1.0, "captions": {}, "logo": {}}
         conn.execute("INSERT INTO projects (id, name, data, render_status, created_at, updated_at) VALUES (?, ?, ?, 'idle', ?, ?)",
                      (pid, pdata["name"], json.dumps(pdata, ensure_ascii=False), now(), now()))

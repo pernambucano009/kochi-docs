@@ -1401,3 +1401,41 @@ a.pl-link:hover { background: color-mix(in srgb, var(--ok) 24%, transparent); }
 .ad-dir dt { opacity: .75; white-space: nowrap; }
 .ad-dir dd { margin: 0; }
 .ad-dir button { margin-top: auto; align-self: flex-start; }
+
+/* 💰 رصيد Atlas */
+.money-btn b { font-size: 11px; font-weight: 700; color: var(--ok); direction: ltr; }
+.money-dlg { max-width: 460px; }
+.money-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 10px 0; }
+.money-grid div { background: var(--surface-2); border-radius: var(--radius-sm); padding: 10px; display: flex; flex-direction: column; gap: 4px; }
+.money-grid span { font-size: 12px; color: var(--muted); }
+.money-grid b { font-size: 20px; direction: ltr; text-align: start; }
+.money-tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+.money-tbl td { padding: 4px 6px; border-bottom: 1px solid var(--line); }
+.money-tbl td:last-child { text-align: end; font-weight: 700; }
+@media (max-width: 520px) { .money-grid { grid-template-columns: 1fr; } }
+
+/* 📁 مشاريع الإعلانات */
+.ad-li-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.ad-list .ad-li-body .nm { flex: none; }
+.ad-stages { display: flex; flex-wrap: wrap; gap: 3px; }
+.ad-stages i { font-style: normal; font-size: 10.5px; padding: 1px 5px; border-radius: 6px; background: var(--surface-2); opacity: .45; white-space: nowrap; }
+.ad-stages i.on { opacity: 1; background: var(--accent-soft); }
+
+/* 🔬 المطابقة مع الأصلي */
+.ad-compare:empty { display: none; }
+.ad-cmp { border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 10px 12px; margin: 10px 0; }
+.ad-cmp > summary { cursor: pointer; font-weight: 700; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ad-cmp-score { font-size: 22px; }
+.ad-cmp-vids { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0; max-width: 620px; }
+.ad-cmp-vids figure { margin: 0; display: flex; flex-direction: column; gap: 4px; }
+.ad-cmp-vids video { width: 100%; max-height: 52vh; background: #000; border-radius: 10px; }
+.ad-cmp-dims { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px 14px; margin: 8px 0; }
+.ad-cmp-dims div { display: grid; grid-template-columns: 110px 1fr 32px; align-items: center; gap: 6px; font-size: 13px; }
+.ad-cmp-dims i { height: 8px; border-radius: 4px; background: linear-gradient(90deg, var(--c) var(--v), var(--surface-2) var(--v)); }
+[dir="rtl"] .ad-cmp-dims i { background: linear-gradient(270deg, var(--c) var(--v), var(--surface-2) var(--v)); }
+.ad-cmp-scenes { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
+.ad-cmp-scene { text-align: start; display: flex; flex-direction: column; gap: 4px; padding: 8px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-2); font: inherit; font-size: 13px; cursor: pointer; }
+.ad-cmp-gaps { display: flex; flex-direction: column; gap: 6px; padding-inline-start: 20px; }
+.ad-cmp-gaps li { display: flex; flex-direction: column; gap: 2px; }
+.ad-cmp-gaps li.high b::after { content: " · مهم"; color: var(--danger); font-size: 12px; }
+@media (max-width: 520px) { .ad-cmp-vids { grid-template-columns: 1fr 1fr; gap: 6px; } .ad-cmp-dims div { grid-template-columns: 90px 1fr 28px; } }

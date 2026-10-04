@@ -4,7 +4,11 @@ const FPS = 30;
 const PV_W = 252, PV_H = 448; // حجم كادر المعاينة (9:16)
 const MIN_CLIP = 1 / 30; // أقل طول لقطعة: فريم واحد
 const PPS_MIN = 8, PPS_MAX = 600; // حدود زووم التايم لاين (بكسل لكل ثانية)
-const PROJECT_KEY = "studiomania.projectId";
+// كل قسم ليه مونتاج لوحده: مشاريعه ومشروعه المفتوح (فيديوهات المدربين / المسلسلات / الإعلانات)
+const SECTION_OF_STEP = { "6": "coach", "6s": "series", "6a": "ads" };
+const SECTION_BACK = { series: ["9", "↩ رجوع للمسلسلات"], ads: ["10", "↩ رجوع للإعلانات"] };
+const projectKey = (section) => section === "coach" ? "studiomania.projectId" : `studiomania.projectId.${section}`;
+let PROJECT_KEY = projectKey("coach");
 const CLIP_DEFAULTS = { start: 0, end: null, zoom: 1, x: 0, y: 0, volume: 1 };
 
 const mt = {
@@ -69,10 +73,20 @@ function blankProject(name) {
 }
 
 async function initMontage() {
-  [mt.projects, mt.sources, mt.coaches, mt.voices, mt.music, mt.videos] = await Promise.all([
+  const section = SECTION_OF_STEP[shell.step] || "coach";
+  if (section !== mt.section) mt.project = null;  // قسم تاني: متفتحش مشروع القسم اللي فات
+  mt.section = section;
+  PROJECT_KEY = projectKey(section);
+  const back = SECTION_BACK[section];
+  $("montageBack").hidden = !back;
+  if (back) { $("montageBack").dataset.goto = back[0]; $("montageBack").textContent = back[1]; }
+  $("newFromVideo").hidden = section !== "coach";
+  let all;
+  [all, mt.sources, mt.coaches, mt.voices, mt.music, mt.videos] = await Promise.all([
     api("/api/projects"), api("/api/montage/sources"), api("/api/coaches"),
     api("/api/audio?kind=voice"), api("/api/audio?kind=music"), api("/api/videos"),
   ]);
+  mt.projects = all.filter((p) => (p.section || "coach") === section);
   fillSelects();
   const wanted = mt.project?.id || storageGet(PROJECT_KEY);
   const p = mt.projects.find((x) => x.id === wanted) || mt.projects[0];
@@ -1643,7 +1657,7 @@ $("newProject").onclick = async () => {
   const p = await api("/api/projects", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
+    body: JSON.stringify({ ...data, section: mt.section || "coach" }),
   });
   mt.projects.unshift(p);
   openProject(p);
@@ -1669,7 +1683,7 @@ async function openMontageForVideo(videoId) {
     mt.handoff = { draft };
   }
   if (mt.project) await saveProject();
-  storageSet(PROJECT_KEY, p.id);
+  storageSet(projectKey("coach"), p.id);
   mt.project = null;
   showStep("6");
 }

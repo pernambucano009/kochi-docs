@@ -165,6 +165,36 @@ def brand_controls(settings: dict, others: list[dict] | None = None) -> str:
     return txt + "\n"
 
 
+REPLICA_NOTE = ("REPLICA TEST: rebuild the ORIGINAL reference ad exactly as it is — the same brand, product, logos, app screens, "
+                "people, wardrobe, places, colors, on-screen text and spoken language. Do not convert anything to another brand.")
+
+
+def replica_messages(analysis: dict, audio: dict, style_txt: str, asks: list[str], n_orig: int, chat: list[dict]) -> list[dict]:
+    """🧪 تجربة نسخة طبق الأصل: نفس البروسيس بالظبط بس من غير أي تغيير في الإعلان، عشان نقيس التحليل والتوليد."""
+    system = (
+        "أنت مخرج إعلانات. دي تجربة لقياس دقة التحليل والتوليد: شغلتك تكتب خطة إنتاج تعيد بناء الإعلان المرجعي ده "
+        "**طبق الأصل من غير أي تغيير**: نفس البراند والمنتج واللوجوهات وشاشات التطبيق، نفس الأشخاص بنفس شكلهم ولبسهم "
+        "(اوصفهم بدقة: السن، البشرة، الشعر، اللبس، الألوان)، نفس الأماكن والإضاءة والألوان، نفس الكلام المكتوب على الشاشة حرفيًا، "
+        "ونفس الكلام المنطوق حرفيًا بلغته الأصلية. نفس الكادر وزاوية الكاميرا وحركتها، ونفس الموشن جرافيك بتوقيته.\n"
+        "متغيرش البراند لكوتشي ومتضيفش ولا تشيل حاجة.\n\n"
+        + style_txt
+        + "تحليل الإعلان المرجعي:\n" + json.dumps(analysis, ensure_ascii=False)[:40000] + "\n\n"
+        + ("تحليل الصوت:\n" + json.dumps(audio, ensure_ascii=False)[:6000] + "\n\n" if audio else "")
+        + "المطلوب:\n"
+        f"- عدد المشاهد = {n_orig} بالظبط، المشهد رقم n = المشهد الأصلي رقم n (ref_scene = n) وبنفس مدته بالظبط.\n"
+        "- voice = الكلام المنطوق في المشهد حرفيًا بلغته، on_screen_text = الكلام المكتوب حرفيًا.\n"
+        "- prompt وmotion_prompt بالإنجليزي ويوصفوا المشهد الأصلي بأدق تفاصيل ممكنة (الشخص، اللبس، المكان، الإضاءة، الكادر، "
+        "حركة الكاميرا، الحركة، الموشن جرافيك ومكانه وتوقيته).\n"
+        "- components = مكونات المشهد الأصلي نفسها (from = نفس الاسم)، asset فاضي.\n"
+        "- palette = ألوان الإعلان الأصلي بالـ hex. angle وtone = زي الأصلي. title = اسم الإعلان الأصلي + «(نسخة طبق الأصل)».\n"
+        "- اللبس محتشم.\n"
+        + "".join(f"- {a}\n" for a in asks if a and not a.startswith(("المدة", "اللغة", "الكلام")))
+        + f"رجّع JSON بس بالشكل ده:\n{ADAPT_FORMAT}"
+    )
+    first = {"role": "user", "content": "اكتب خطة إعادة بناء الإعلان ده طبق الأصل."}
+    return [{"role": "system", "content": system}, first] + chat[-12:]
+
+
 def adapt_messages(brand: dict, analysis: dict, audio: dict, settings: dict, style: dict | None, chat: list[dict],
                    brain: dict | None = None, others: list[dict] | None = None) -> list[dict]:
     style_txt = ""
@@ -179,8 +209,11 @@ def adapt_messages(brand: dict, analysis: dict, audio: dict, settings: dict, sty
         f"طريقة التنفيذ: {s['production']}" if s.get("production") else "",
         f"تعليمات إضافية: {s['notes']}" if s.get("notes") else "",
     ]
+    replica = s.get("fidelity") == "replica"
     copy = s.get("fidelity", "copy") != "inspired"
     n_orig = len((analysis or {}).get("scenes") or [])
+    if replica:
+        return replica_messages(analysis, audio, style_txt, asks, n_orig, chat)
     if copy:
         intro = ("شغلتك تاخد إعلان مرجعي متفصّص وتعمل نسخة منه لكوتشي **لقطة بلقطة**: نفس عدد المشاهد ونفس ترتيبها ومدتها، "
                  "نفس الكادر وزاوية الكاميرا وحركتها وتكوين الصورة ومكان كل عنصر على الشاشة، نفس الموشن جرافيك والانتقالات والإيقاع. "
@@ -380,6 +413,8 @@ def aspect_of(text: str) -> str:
 
 def ad_palette(a: dict, brand: dict, settings: dict | None, brain: dict | None) -> str:
     """ألوان الإعلان ده: ألوان البراند كاملة، أو ألوان الإعلان نفسه والبراند لمسات بس (عشان الإعلانات متطلعش كلها شبه بعض)."""
+    if (settings or {}).get("fidelity") == "replica":
+        return a.get("palette") or ""
     brand_pal = (brain or {}).get("palette") or brand.get("colors", "")
     mode = (settings or {}).get("palette_mode") or ""
     own = (settings or {}).get("palette_custom") if mode == "custom" else a.get("palette")
@@ -399,7 +434,7 @@ def header_from(adaptation: dict, style: dict | None, brand: dict, settings: dic
         "characters": a.get("cast", ""),
         "locations": a.get("locations", ""),
         "palette": ad_palette(a, brand, settings, brain),
-        "brand": brain_header(brain),
+        "brand": "" if (settings or {}).get("fidelity") == "replica" else brain_header(brain),
         "fidelity": (settings or {}).get("fidelity") or "copy",
         "brain_id": (brain or {}).get("id"),
         "rules": "Vertical social ad, consistent characters, wardrobe and lighting in every shot. No watermarks, no random text.",
@@ -409,6 +444,7 @@ def header_from(adaptation: dict, style: dict | None, brand: dict, settings: dic
 
 def header_text(h: dict) -> str:
     parts = [
+        REPLICA_NOTE if h.get("fidelity") == "replica" else "",
         f"AD: {h.get('title', '')}. CONCEPT: {h.get('concept', '')}",
         f"PRODUCT / BRAND IDENTITY (stay strictly on-brand): {h['brand']}" if h.get("brand") else "",
         f"VISUAL STYLE (must match exactly): {h['style']}" if h.get("style") else "",
@@ -883,3 +919,38 @@ def mock_directions() -> dict:
          "tone": "حماسي سريع", "setting": "المكتب", "hero": "بنت بحجاب ولبس رياضي محتشم", "palette": "نيون ليلي: #7B2FF7 بنفسجي، #00F5D4",
          "feature": "تمرين اليوم", "summary": "تمرين سريع بين الاجتماعات بيغيّر يومها."},
     ]}
+
+
+COMPARE_FORMAT = """{
+  "score": 0,
+  "verdict": "الحكم في جملتين",
+  "dimensions": {"composition": 0, "characters": 0, "setting": 0, "camera_motion": 0, "motion_graphics": 0, "text": 0, "timing": 0, "audio": 0},
+  "scenes": [{"n": 1, "score": 0, "matches": "إيه اللي طالع مطابق", "differences": "إيه اللي مختلف بالظبط"}],
+  "gaps": [{"stage": "analysis | storyboard | video_prompt | video_model | motion_graphics | voice | editing",
+            "problem": "المشكلة", "fix": "إزاي نعالجها في البرنامج", "impact": "high | medium | low"}]
+}"""
+
+
+def compare_messages(scenes: list[dict], shots: list[dict]) -> list[dict]:
+    """🔬 مقارنة الإعلان الأصلي (أول فيديو) بالنسخة المولدة (تاني فيديو) مشهد بمشهد."""
+    plan = "\n".join(f"- مشهد {s.get('n')}: الأصلي من {s.get('start', 0):.1f} لـ {s.get('end', 0):.1f} ث — {s.get('visual', '')}" for s in scenes)
+    gen = "\n".join(f"- لقطة {s['n']}: في النسخة المولدة من {s['at']:.1f} لـ {s['at'] + s['len']:.1f} ث ({s['src']})" for s in shots)
+    text = (
+        "أنت مراجع جودة لإنتاج إعلانات بالذكاء الاصطناعي. الفيديو الأول = الإعلان الأصلي. الفيديو التاني = محاولة إعادة بنائه "
+        "طبق الأصل بالبروسيس بتاعنا (تحليل ← ستوري بورد بموديل صور ← موشن جرافيك ← صوت ← فيديو بموديل فيديو ← مونتاج).\n"
+        "قارن الاتنين مشهد بمشهد بدقة وبصراحة: الكادر والتكوين، الأشخاص وشكلهم ولبسهم، المكان والإضاءة والألوان، حركة الكاميرا والحركة، "
+        "الموشن جرافيك ومكانه وتوقيته، الكلام المكتوب، التوقيت والإيقاع، والصوت والكلام.\n"
+        "الدرجات من 0 لـ 100 (100 = مطابق تمامًا). وفي gaps: حدد كل فجوة جاية من أنهي مرحلة في البروسيس، "
+        "وإزاي نعالجها عشان النسخة الجاية تطلع أقرب (مرتبة من الأهم للأقل).\n\n"
+        f"مشاهد الأصلي:\n{plan}\n\nلقطات النسخة المولدة:\n{gen}\n\n"
+        "اكتب بالعربي المصري البسيط. رجّع JSON بس بالشكل ده:\n" + COMPARE_FORMAT
+    )
+    return [{"role": "user", "content": text}]
+
+
+def mock_compare(n: int) -> dict:
+    return {"score": 62, "verdict": "التكوين قريب بس الأشخاص والموشن جرافيك بعاد.",
+            "dimensions": {"composition": 75, "characters": 50, "setting": 70, "camera_motion": 60, "motion_graphics": 40,
+                           "text": 55, "timing": 80, "audio": 65},
+            "scenes": [{"n": i + 1, "score": 60 + i, "matches": "الكادر", "differences": "لون اللبس"} for i in range(n)],
+            "gaps": [{"stage": "storyboard", "problem": "الشخص مختلف", "fix": "صورة مرجعية من الأصلي للشخصية", "impact": "high"}]}

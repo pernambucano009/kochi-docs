@@ -48,6 +48,7 @@
     <button class="rail-btn" data-goto="3" title="التعليق الصوتي"><svg><use href="#i-mic"/></svg><span>التعليق الصوتي</span></button>
     <button class="rail-btn" data-goto="5" title="الموسيقى"><svg><use href="#i-music"/></svg><span>الموسيقى</span></button>
     <span class="spacer"></span>
+    <button class="rail-btn money-btn" id="moneyBtn" title="رصيد Atlas" hidden><b id="moneyVal">$—</b><span>Atlas</span></button>
     <button class="rail-btn" id="langToggle" title="English / عربي"><svg><use href="#i-globe"/></svg><span class="lang-code">EN</span></button>
     <button class="rail-btn" id="openSettings" title="الإعدادات"><svg><use href="#i-gear"/></svg><span>الإعدادات</span></button>
     <button class="rail-btn" id="logout" title="خروج"><svg><use href="#i-out"/></svg><span>خروج</span></button>
@@ -382,6 +383,7 @@
         <!-- الخطوة 6: المونتاج -->
         <main class="view" data-view="6" hidden>
           <div class="panel project-bar">
+            <button class="btn sm" id="montageBack" data-goto="10" hidden>↩ رجوع</button>
             <select id="projectSelect"></select>
             <span class="new-project">
               <select id="newFromVideo" title="تعمل المشروع من فيديو خام؟"></select>
@@ -927,9 +929,9 @@
           <div class="alert warn" id="adAlert" hidden>⚠️ مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات.</div>
           <div class="car-layout">
             <aside class="panel ad-side">
-              <div class="panel-head"><h2>📣 الإعلانات</h2></div>
-              <p class="hint">ارفع إعلان عاجبك، والبرنامج يفصّصه ويقترح إعلان لكوتشي مستوحى منه.</p>
-              <label class="btn primary ad-up">⬆ ارفع إعلان<input type="file" id="adFile" accept="video/*,.mp4,.mov,.webm,.mkv" hidden></label>
+              <div class="panel-head"><h2>📁 مشاريع الإعلانات <span class="muted" id="adCount"></span></h2></div>
+              <label class="btn primary ad-up">＋ مشروع إعلان جديد<input type="file" id="adFile" accept="video/*,.mp4,.mov,.webm,.mkv" hidden></label>
+              <p class="hint">كل مشروع = إعلان رفعته وكل اللي اتعمل عليه (تحليل ← اقتراح ← تنفيذ ← مونتاج). دوس على أي مشروع تكمل فيه.</p>
               <ul class="ad-list" id="adList"></ul>
               <button class="btn ad-styles-go" id="adBrainGo">🧠 عقل الإعلان</button>
               <button class="btn ad-styles-go" id="adStylesGo">🎨 مكتبة الستايلات</button>
@@ -1091,8 +1093,10 @@
                     <button class="btn" id="adPCompose">✨ ركّب الموشن على الفيديوهات</button>
                     <button class="btn" id="adPGallery">▶️ اعرض الفيديوهات</button>
                     <button class="btn primary" id="adPEditor">🎞️ افتح في المونتاج</button>
+                    <button class="btn" id="adPCompare" title="يجمع النسخة المولدة ويقارنها بالإعلان الأصلي مشهد بمشهد">🔬 قارن بالأصلي</button>
                     <span class="muted" id="adPProgress"></span>
                   </div>
+                  <section class="ad-compare" id="adCompare"></section>
                   <div class="ad-pshots" id="adPShots"></div>
                 </div>
               </section>
@@ -1112,6 +1116,7 @@
                     <select id="adSetFidelity" data-set="fidelity">
                       <option value="">نسخة لقطة بلقطة بمحتوى كوتشي</option>
                       <option value="inspired">مستوحى منه بس (قصة جديدة)</option>
+                      <option value="replica">🧪 تجربة: نسخة طبق الأصل (من غير أي تغيير)</option>
                     </select></label>
                   <label class="field">المدة المطلوبة (ثانية) <input type="number" id="adSetDuration" min="5" max="180" data-set="duration"></label>
                   <label class="field">المقاس / المنصة <input type="text" id="adSetFormat" data-set="format"></label>
@@ -1247,6 +1252,10 @@
   </div>
 </div>
 
+<dialog class="bulk-dlg money-dlg" id="moneyDialog">
+  <div class="row"><h3>💰 فلوس Atlas</h3><span class="spacer"></span><button class="btn sm" id="moneyRefresh">↻</button><button class="btn sm" id="moneyClose">✕</button></div>
+  <div id="moneyBody"></div>
+</dialog>
 <dialog class="tr-dlg" id="trDialog">
   <div class="panel-head"><h2>✎ تعديل كلام الكابشن</h2><button class="btn sm" id="trClose">✕</button></div>
   <p class="hint">عدّل أي جملة زي ما تحب. لو غيّرت عدد الكلمات، البرنامج بيوزّعها على نفس الوقت. وتقدر تشغّل الجملة عشان تسمعها.</p>
