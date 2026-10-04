@@ -1,7 +1,7 @@
 // StudioMania — 🔬 معمل التفكيك: البرنامج بيفكك أي فيديو لعناصره، وإنت بتراجع وتقيّم كل حاجة.
 // القطعات وبدايات الأصوات بتتقاس بالكود، والموديل بيسمّي ويوصف، وتقييمك (✅ ❌ والتصحيح) بيتحفظ مع الأصل.
 
-const labx = { list: [], cur: null, timer: null, pick: {}, hear: { speech: true, music: true, sfx: true }, stems: null, win: {} };
+const labx = { list: [], cur: null, timer: null, pick: {}, aopen: {}, view: "lab", hear: { speech: true, music: true, sfx: true }, stems: null, win: {} };
 const LAB_KEY = "studiomania.lab";
 const LAB_SFX_CAT = { click: "🖱️ كليك", whoosh: "💨 ووش", pop: "💥 بوب", impact: "🥁 خبطة", typing: "⌨️ كتابة", swipe: "🖍️ سحبة",
   notification: "🔔 إشعار", riser: "📈 رايزر", transition: "🔀 انتقال", ui: "📱 صوت واجهة", foley: "👣 فولي", ambience: "🌫️ جو المكان", other: "❔ تاني" };
@@ -22,8 +22,10 @@ async function initLab() {
   labx.list = await api("/api/lab");
   const want = labx.cur?.id || storageGet(LAB_KEY);
   const id = labx.list.some((x) => x.id === want) ? want : labx.list[0]?.id;
+  labLibCount();
   if (id) await openLab(id);
   else renderLab();
+  if (labx.view === "lib") openLib(asx.cur?.id);
 }
 async function openLab(id) {
   const fresh = await api(`/api/lab/${id}`);
@@ -66,10 +68,12 @@ function renderLab() {
       <span class="ad-li-body"><span class="nm" data-no-i18n>${le(x.name)}</span>
         <small class="muted">${x.duration} ث · ${x.shots} لقطة</small></span>
       <small>${x.busy ? "⏳" : ""}</small></li>`).join("") || `<li class="muted">لسه مفيش فيديوهات.</li>`;
-  const d = labx.cur;
-  $("labMain").hidden = !d;
-  $("labEmpty").hidden = !!d;
-  if (!d) return;
+  const d = labx.cur, lib = labx.view === "lib";
+  $("labLibBtn").classList.toggle("active", lib);
+  $("labLib").hidden = !lib;
+  $("labMain").hidden = !d || lib;
+  $("labEmpty").hidden = !!d || lib;
+  if (!d || lib) return;
   if (document.activeElement !== $("labName")) $("labName").value = d.name;
   document.querySelectorAll("[data-labrun]").forEach((b) => (b.disabled = d.busy));
   $("labStatus").innerHTML = Object.entries(LAB_STEP).map(([k, l]) => {
@@ -223,6 +227,29 @@ function labStems(d) {
       : step.error ? `✕ ${le(step.error)}` : "لسه ما اتفصلتش."}</p>`}`;
 }
 
+// 📚 احفظ مقطع من اللقطة (بحركته وخلفيته وصوته) كأصل في المكتبة
+const ASSET_CATS = { motion_graphics: "✨ موشن جرافيك", effect: "💥 افيكت", transition: "🔀 انتقال", text: "🔤 كلام متحرك",
+  screen: "🖥️ تسجيل شاشة / واجهة", cursor: "🖱️ حركة ماوس", character: "🧍 شخصية", background: "🖼️ خلفية", product: "📦 منتج", other: "تاني" };
+function labAssetForm(d, s) {
+  const els = s.analysis?.elements || [], done = (s.vedits || []).filter((v) => v.status === "done");
+  const guess = s.analysis?.scene_type === "screen_recording" ? "screen" : s.analysis?.scene_type === "motion_graphics" ? "motion_graphics" : "other";
+  return `<details class="lab-asset" data-ashot="${s.n}" ${labx.aopen[s.n] ? "open" : ""}><summary>📚 احفظ كأصل في المكتبة</summary>
+    <small class="muted">بتاخد المقطع كامل زي ما هو (الحركة والخلفية والصوت) ومعاه تفكيك عناصره، وبعدين من المكتبة تقدر تعدّل فيه جوه المشهد.</small>
+    <div class="lab-chips"><button type="button" class="chip" data-arange="${s.start},${s.end}">🎬 اللقطة كلها</button>
+      ${els.map((e) => `<button type="button" class="chip" data-arange="${e.first_t},${e.last_t}" data-aname="${le(e.name)}">${LAB_TYPES[e.type]?.split(" ")[0] || ""} ${le(e.name)} <small>${lt(e.first_t)}–${lt(e.last_t)}</small></button>`).join("")}</div>
+    <div class="row wrap">
+      <input type="text" data-af="name" placeholder="اسم الأصل" value="${le((s.analysis?.summary || "").slice(0, 80))}" data-no-i18n>
+      <select data-af="category">${labOpts(ASSET_CATS, guess)}</select>
+      <input type="text" data-af="tags" placeholder="تاجز: ماوس، سحب، فولدر" data-no-i18n>
+    </div>
+    <div class="row wrap"><label>من <input type="number" step="0.05" min="${s.start}" max="${s.end}" value="${s.start.toFixed(2)}" data-af="t0"></label>
+      <label>لـ <input type="number" step="0.05" min="${s.start}" max="${s.end}" value="${s.end.toFixed(2)}" data-af="t1"></label>
+      <small class="muted">(بالثواني من أول الفيديو)</small>
+      ${done.length ? `<select data-af="vedit"><option value="">من الأصلي</option>${done.map((v) => `<option value="${v.id}">من النسخة ${(s.vedits || []).indexOf(v) + 1}</option>`).join("")}</select>` : ""}
+      <button type="button" class="btn sm primary" data-asave>📚 احفظ</button></div>
+  </details>`;
+}
+
 // ✏️ التعديل جوه المشهد: نفس اللقطة بحركتها، وكل عنصر يتغيّر بالكلام
 function labVedit(d, s) {
   const els = s.analysis?.elements || [], vs = s.vedits || [], dur = (s.end - s.start);
@@ -292,13 +319,13 @@ function renderLabShots(d) {
             ${rv("action", `${e.id}:${i}`, x.review)}</div>`).join("")}
         </div>`).join("") || `<p class="muted">مفيش عناصر.</p>`}</div>`
         : `<p class="muted">${d.steps?.elements?.status === "working" ? "⏳ بيفكك العناصر..." : "العناصر لسه ما اتفككتش."}</p>`}
+      ${labAssetForm(d, s)}
       ${labVedit(d, s)}
       <div class="lab-layers">
         <div class="row wrap"><button type="button" class="btn sm" data-layers="${s.n}" ${L.status === "working" ? "disabled" : ""}>
           ${L.status === "working" ? `<span class="spin-inline"></span> بيفكك الطبقات...` : `🗂️ فكّك الفريم ${lt(pick)} لطبقات`}</button>
           <span class="muted">اختار الفريم من الشريط فوق · بيتحسب على Atlas (حوالي 0.40$ للفريم)${L.price ? ` · آخر مرة: ${le(L.price)}$` : ""}</span></div>
         ${L.error ? `<div class="err">${le(L.error)}</div>` : ""}
-        ${(L.items || []).length ? `<button type="button" class="btn primary" data-studio="${s.n}">🎛️ افتح استوديو التحكم في العناصر دي</button>` : ""}
         ${(L.items || []).length ? `<div class="lab-lgrid">
           ${L.base_url ? `<figure><div class="lab-ck"><img src="${L.base_url}" alt=""></div><figcaption>🖼️ الخلفية لوحدها</figcaption></figure>` : ""}
           ${L.items.map((x, i) => `<figure><div class="lab-ck"><img src="${x.url}" alt=""></div>
@@ -311,6 +338,7 @@ function renderLabShots(d) {
 // ---------- الأحداث
 const labAudio = new Audio();
 document.querySelector('.view[data-view="11"]').addEventListener("click", async (e) => {
+  if (e.target.closest("#labLib")) return;  // المكتبة ليها أحداثها في assets.js
   const hear = e.target.closest("[data-hear]");
   if (hear) {
     labx.hear[hear.dataset.hear] = !labx.hear[hear.dataset.hear];
@@ -356,6 +384,27 @@ document.querySelector('.view[data-view="11"]').addEventListener("click", async 
     }
     return;
   }
+  const abox = e.target.closest("[data-ashot]");
+  if (abox) {
+    const ar = e.target.closest("[data-arange]"), save = e.target.closest("[data-asave]");
+    const f = (k) => abox.querySelector(`[data-af="${k}"]`);
+    if (ar) {
+      const [a, b] = ar.dataset.arange.split(",").map(Number);
+      f("t0").value = a.toFixed(2); f("t1").value = b.toFixed(2);
+      if (ar.dataset.aname) f("name").value = ar.dataset.aname;
+      return;
+    }
+    if (save) {
+      return busyButton(save, "⏳", async () => {
+        const a = await api(`/api/lab/${labx.cur.id}/shots/${abox.dataset.ashot}/asset`, { method: "POST", ...jsonBody({
+          name: f("name").value, category: f("category").value, tags: f("tags").value.split(/[,،]/),
+          t0: Number(f("t0").value), t1: Number(f("t1").value), vedit: f("vedit")?.value || null }) });
+        toast(`📚 اتحفظ في المكتبة: ${a.name}`);
+        labLibCount();
+      });
+    }
+    return;
+  }
   const vbox = e.target.closest("[data-vshot]");
   if (vbox) {
     const n = vbox.dataset.vshot, chip = e.target.closest("[data-vchip]");
@@ -390,10 +439,8 @@ document.querySelector('.view[data-view="11"]').addEventListener("click", async 
       return;
     }
   }
-  const stu = e.target.closest("[data-studio]");
-  if (stu) return openStudio(stu.dataset.studio);
   const li = e.target.closest("[data-lab]");
-  if (li) return openLab(li.dataset.lab);
+  if (li) { labx.view = "lab"; return openLab(li.dataset.lab); }
   const ok = e.target.closest("[data-rvok]");
   if (ok) {
     const box = ok.closest(".lab-rv"), val = ok.dataset.rvok === "1";
@@ -416,7 +463,11 @@ document.querySelector('.view[data-view="11"]').addEventListener("click", async 
     catch (err) { toast(err.message, true); }
   }
 });
+document.querySelector('.view[data-view="11"]').addEventListener("toggle", (e) => {
+  if (e.target.matches?.("[data-ashot]")) labx.aopen[e.target.dataset.ashot] = e.target.open;
+}, true);
 document.querySelector('.view[data-view="11"]').addEventListener("change", (e) => {
+  if (e.target.closest("#labLib")) return;
   if (e.target.dataset.shotloop) {
     const v = document.querySelector(`[data-shotvid="${e.target.dataset.shotloop}"]`);
     if (v) v.dataset.loop = e.target.checked ? "1" : "0";
@@ -481,273 +532,3 @@ $("labDelete").onclick = async () => {
     await initLab();
   } catch (err) { toast(err.message, true); }
 };
-
-// ---------- 🎛️ استوديو التحكم: كل عنصر من الفريم المفكك طبقة نتحكم فيها (مكان، حجم، دوران، لون، حركة وصوتها)
-const ls = { lid: null, n: null, sc: null, sel: null, t: 0, playing: false, saveT: null, endMode: false, sfxUrl: {} };
-const LS_ENTER = { none: "من غير", fade: "يظهر تدريجي", pop: "ينط (pop)", zoom: "يكبر", slide_up: "يطلع من تحت", slide_down: "ينزل من فوق", slide_left: "يدخل من اليمين", slide_right: "يدخل من الشمال" };
-const LS_EXIT = { none: "من غير", fade: "يختفي تدريجي", pop: "يصغر ويختفي", zoom: "يصغر", slide_up: "يطلع لفوق", slide_down: "ينزل لتحت", slide_left: "يخرج شمال", slide_right: "يخرج يمين" };
-const LS_EASE = { ease_out: "بيهدى في الآخر", linear: "سرعة ثابتة", ease_in_out: "ناعم من الطرفين", back: "بيعدّي ويرجع (نطة)" };
-const lsEase = (p, k) => { p = Math.max(0, Math.min(1, p)); return k === "linear" ? p : k === "ease_in_out" ? 3 * p * p - 2 * p * p * p
-  : k === "back" ? 1 + 2.70158 * (p - 1) ** 3 + 1.70158 * (p - 1) ** 2 : 1 - (1 - p) ** 3; };
-const LS_SLIDE = { slide_up: [0, 1], slide_down: [0, -1], slide_left: [1, 0], slide_right: [-1, 0] };
-// نفس حسبة السيرفر (scene.pose) عشان المعاينة تطلع زي الفيديو
-function lsPose(L, t) {
-  const p = { dx: L.dx, dy: L.dy, scale: L.scale, rot: L.rot, opacity: L.opacity }, a = L.anim, en = L.enter, ex = L.exit;
-  if (a.on && a.t1 > a.t0) { const q = lsEase((t - a.t0) / (a.t1 - a.t0), a.ease); for (const k in p) p[k] += (a[k] - p[k]) * q; }
-  if (en.type !== "none") {
-    if (t < en.t) return null;
-    const q = Math.min(1, (t - en.t) / en.dur);
-    if (en.type === "fade") p.opacity *= q;
-    else if (en.type === "pop") p.scale *= Math.max(0, lsEase(q, "back"));
-    else if (en.type === "zoom") { p.scale *= 0.6 + 0.4 * lsEase(q); p.opacity *= q; }
-    else if (LS_SLIDE[en.type]) { const [sx, sy] = LS_SLIDE[en.type]; p.dx += sx * 0.3 * (1 - lsEase(q)); p.dy += sy * 0.3 * (1 - lsEase(q)); p.opacity *= Math.min(1, q * 2); }
-  }
-  if (ex.type !== "none" && t >= ex.t) {
-    const q = Math.min(1, (t - ex.t) / ex.dur);
-    if (q >= 1) return null;
-    if (ex.type === "fade" || ex.type === "zoom") p.opacity *= 1 - q;
-    if (ex.type === "pop" || ex.type === "zoom") p.scale *= 1 - (ex.type === "zoom" ? 0.4 : 1) * q * q;
-    else if (LS_SLIDE[ex.type]) { const [sx, sy] = LS_SLIDE[ex.type]; p.dx -= sx * 0.3 * q * q; p.dy -= sy * 0.3 * q * q; }
-  }
-  return p.opacity > 0.003 && p.scale > 0.01 ? p : null;
-}
-function lsSfxEvents(sc) {
-  const ENTER = { pop: "pop", zoom: "whoosh", slide_up: "whoosh", slide_down: "whoosh", slide_left: "whoosh", slide_right: "whoosh" }, ev = [];
-  for (const L of sc.layers) {
-    if (!L.visible) continue;
-    const en = L.enter, ex = L.exit, a = L.anim;
-    if (en.type !== "none" && en.sfx !== "none") { const n = en.sfx === "auto" ? ENTER[en.type] : en.sfx; if (n) ev.push([en.t + (en.type === "pop" ? en.dur * 0.55 : 0), n]); }
-    if (a.on && a.sfx !== "none" && a.t1 > a.t0) {
-      const moved = Math.hypot(a.dx - L.dx, a.dy - L.dy) > 0.03 || Math.abs(a.rot - L.rot) > 10, grew = Math.abs(a.scale - L.scale) > 0.1;
-      const n = a.sfx === "auto" ? (moved ? "whoosh" : grew ? "pop" : null) : a.sfx;
-      if (n) ev.push([n === "whoosh" ? a.t0 : a.t1, n]);
-    }
-    if (ex.type !== "none" && ex.sfx !== "none") { const n = ex.sfx === "auto" ? ENTER[ex.type] : ex.sfx; if (n) ev.push([ex.t, n]); }
-  }
-  return ev.sort((x, y) => x[0] - y[0]);
-}
-
-async function openStudio(n) {
-  ls.lid = labx.cur.id; ls.n = Number(n); ls.sel = null; ls.t = 0; ls.endMode = false;
-  try { ls.sc = await api(`/api/lab/${ls.lid}/shots/${n}/scene`); }
-  catch (err) { return toast(err.message, true); }
-  $("lsTitle").textContent = `لقطة ${n} · ${ls.sc.layers.length} طبقة`;
-  $("lsOut").innerHTML = "";
-  $("labStudio").showModal();
-  lsRenderAll();
-}
-function lsRenderAll() {
-  const sc = ls.sc;
-  $("lsDur").value = sc.duration;
-  $("lsScrub").max = sc.duration;
-  $("lsBgOn").checked = sc.bg.visible !== false;
-  $("lsBgVer").innerHTML = [sc.bg.file, ...(sc.bg.versions || []).slice().reverse()].filter((v, i, a) => v && a.indexOf(v) === i)
-    .map((f, i) => `<option value="${f}">${i === 0 ? "الخلفية الحالية" : f === sc.bg.orig_file ? "الخلفية الأصلية" : `نسخة ${i}`}</option>`).join("");
-  const st = $("lsStage");
-  st.style.aspectRatio = `${sc.W} / ${sc.H}`;
-  st.innerHTML = (sc.bg.url ? `<img class="bg" src="${sc.bg.url}" alt="">` : "")
-    + sc.layers.map((L) => `<img data-lsl="${L.id}" src="${L.url}" alt="" draggable="false">`).join("")
-    + `<div class="lab-st-ghost" id="lsGhost" hidden></div>`;
-  lsLayersList();
-  lsProps();
-  lsPaint();
-}
-function lsLayersList() {
-  $("lsLayers").innerHTML = ls.sc.layers.slice().sort((a, b) => b.z - a.z).map((L) => `<div class="lab-st-li ${L.id === ls.sel ? "sel" : ""}" data-lssel="${L.id}">
-    <button type="button" data-lseye="${L.id}" title="إظهار / إخفاء">${L.visible ? "👁" : "🚫"}</button>
-    <span class="ck"><img src="${L.url}" alt=""></span><span class="nm" data-no-i18n>${le(L.name)}</span>
-    ${L.anim.on || L.enter.type !== "none" || L.exit.type !== "none" ? `<small title="ليه حركة">🎬</small>` : ""}</div>`).join("");
-}
-// رسم المعاينة في اللحظة ls.t
-function lsPaint() {
-  const sc = ls.sc, st = $("lsStage");
-  const bg = st.querySelector("img.bg");
-  if (bg) bg.style.visibility = sc.bg.visible === false ? "hidden" : "";
-  for (const L of sc.layers) {
-    const el = st.querySelector(`[data-lsl="${L.id}"]`);
-    if (!el) continue;
-    const p = L.visible ? lsPose(L, ls.t) : null;
-    el.hidden = !p;
-    if (!p) continue;
-    const [x1, y1, x2, y2] = L.box;
-    Object.assign(el.style, { left: `${(x1 / sc.W) * 100}%`, top: `${(y1 / sc.H) * 100}%`, width: `${((x2 - x1) / sc.W) * 100}%`,
-      height: `${((y2 - y1) / sc.H) * 100}%`, zIndex: 10 + L.z, opacity: p.opacity,
-      transform: `translate(${p.dx * 100 * sc.W / (x2 - x1)}%, ${p.dy * 100 * sc.H / (y2 - y1)}%) rotate(${p.rot}deg) scale(${p.scale * (L.flip ? -1 : 1)}, ${p.scale})`,
-      filter: `hue-rotate(${L.hue}deg) saturate(${L.sat}) brightness(${L.bright})` });
-    el.classList.toggle("sel", L.id === ls.sel);
-  }
-  // شبح مكان نهاية الحركة للطبقة المختارة
-  const L = ls.sc.layers.find((x) => x.id === ls.sel), g = $("lsGhost");
-  g.hidden = !(L && L.anim.on);
-  if (L && L.anim.on) {
-    const [x1, y1, x2, y2] = L.box;
-    Object.assign(g.style, { left: `${(x1 / sc.W + L.anim.dx) * 100}%`, top: `${(y1 / sc.H + L.anim.dy) * 100}%`,
-      width: `${((x2 - x1) / sc.W) * 100}%`, height: `${((y2 - y1) / sc.H) * 100}%`,
-      transform: `rotate(${L.anim.rot}deg) scale(${L.anim.scale})`, zIndex: 999 });
-  }
-  $("lsT").textContent = ls.t.toFixed(2);
-  $("lsScrub").value = ls.t;
-}
-const lsNum = (k, label, min, max, step, val, suffix = "") => `<label class="lab-st-f"><span>${label}</span>
-  <input type="range" min="${min}" max="${max}" step="${step}" value="${val}" data-lsf="${k}"><b>${Number(val).toFixed(step < 1 ? 2 : 0)}${suffix}</b></label>`;
-function lsProps() {
-  const L = ls.sc.layers.find((x) => x.id === ls.sel);
-  if (!L) { $("lsProps").innerHTML = `<p class="muted">دوس على أي عنصر في الصورة أو في القايمة عشان تتحكم فيه. اسحبه بالماوس عشان تغيّر مكانه.</p>`; return; }
-  const sfxOpts = (v) => `<option value="auto" ${v === "auto" ? "selected" : ""}>🔊 صوت تلقائي</option><option value="none" ${v === "none" ? "selected" : ""}>🔇 من غير صوت</option>`
-    + (ls.sc.sfx || []).map((s) => `<option value="${s}" ${s === v ? "selected" : ""}>${s}</option>`).join("");
-  $("lsProps").innerHTML = `<div class="row"><b data-no-i18n>${le(L.name)}</b><span class="spacer"></span>
-      <button type="button" class="btn sm" data-lsz="1" title="لقدام">⬆</button><button type="button" class="btn sm" data-lsz="-1" title="لورا">⬇</button>
-      <button type="button" class="btn sm" data-lsreset>↺ زي الأصل</button></div>
-    ${lsNum("scale", "الحجم", 0.1, 4, 0.01, L.scale, "×")}${lsNum("rot", "الدوران", -180, 180, 1, L.rot, "°")}
-    ${lsNum("opacity", "الشفافية", 0, 1, 0.01, L.opacity)}${lsNum("hue", "اللون", -180, 180, 1, L.hue, "°")}
-    ${lsNum("sat", "التشبع", 0, 3, 0.01, L.sat)}${lsNum("bright", "السطوع", 0, 3, 0.01, L.bright)}
-    <label class="check"><input type="checkbox" data-lsf="flip" ${L.flip ? "checked" : ""}> ↔️ اقلبه</label>
-    <div class="lab-st-sub"><b>✏️ غيّر شكله بالـ AI</b> <small class="muted">(لون محدد، لبس، تفاصيل · حوالي 0.005$)</small>
-      <div class="row"><input type="text" id="lsEditTxt" placeholder="مثلًا: make it blue / خليه أحمر لامع"><button type="button" class="btn sm" data-lsedit>✨</button></div>
-      <div class="row"><label class="btn sm">⬆ بدّله بصورة<input type="file" accept="image/*" data-lsup hidden></label>
-        ${(L.versions || []).length ? `<select data-lsver class="sm"><option value="">النسخ القديمة (${L.versions.length})</option>${L.versions.slice().reverse().map((v, i) => `<option value="${v}">${v === L.orig_file ? "الأصلية" : `نسخة ${L.versions.length - i}`}</option>`).join("")}</select>` : ""}</div></div>
-    <div class="lab-st-sub"><b>🎬 الحركة</b>
-      <label class="lab-st-f"><span>دخول</span><select data-lsx="enter.type">${labOpts(LS_ENTER, L.enter.type)}</select>
-        <input type="number" step="0.1" min="0" value="${L.enter.t}" data-lsx="enter.t" title="إمتى (ثانية)"><select data-lsx="enter.sfx">${sfxOpts(L.enter.sfx)}</select></label>
-      <label class="check"><input type="checkbox" data-lsx="anim.on" ${L.anim.on ? "checked" : ""}> ينتقل لمكان/حجم تاني</label>
-      ${L.anim.on ? `<div class="lab-st-anim">
-        <label class="lab-st-f"><span>من ثانية</span><input type="number" step="0.1" min="0" value="${L.anim.t0}" data-lsx="anim.t0"><span>لـ</span><input type="number" step="0.1" min="0" value="${L.anim.t1}" data-lsx="anim.t1"></label>
-        <button type="button" class="btn sm ${ls.endMode ? "primary" : ""}" data-lsend>${ls.endMode ? "✅ خلصت (اسحب العنصر لمكان النهاية)" : "📍 حدد مكان النهاية بالسحب"}</button>
-        ${lsNum("anim.scale", "حجم النهاية", 0.1, 4, 0.01, L.anim.scale, "×")}${lsNum("anim.rot", "دوران النهاية", -360, 360, 1, L.anim.rot, "°")}
-        ${lsNum("anim.opacity", "شفافية النهاية", 0, 1, 0.01, L.anim.opacity)}
-        <label class="lab-st-f"><span>الإحساس</span><select data-lsx="anim.ease">${labOpts(LS_EASE, L.anim.ease)}</select><select data-lsx="anim.sfx">${sfxOpts(L.anim.sfx)}</select></label>
-      </div>` : ""}
-      <label class="lab-st-f"><span>خروج</span><select data-lsx="exit.type">${labOpts(LS_EXIT, L.exit.type)}</select>
-        <input type="number" step="0.1" min="0" value="${L.exit.t}" data-lsx="exit.t" title="إمتى (ثانية)"><select data-lsx="exit.sfx">${sfxOpts(L.exit.sfx)}</select></label>
-    </div>`;
-}
-function lsSave() {
-  clearTimeout(ls.saveT);
-  ls.saveT = setTimeout(async () => {
-    try {
-      const { sfx, ...body } = ls.sc;
-      const keep = ls.sel;
-      ls.sc = await api(`/api/lab/${ls.lid}/shots/${ls.n}/scene`, { method: "PUT", ...jsonBody(body) });
-      ls.sel = keep;
-    } catch (err) { toast(err.message, true); }
-  }, 500);
-}
-const lsLayer = () => ls.sc.layers.find((x) => x.id === ls.sel);
-function lsSetPath(obj, path, v) { const [a, b] = path.split("."); if (b) obj[a][b] = v; else obj[a] = v; }
-
-$("labStudio").addEventListener("input", (e) => {
-  const L = lsLayer();
-  const f = e.target.dataset.lsf;
-  if (f && L) {
-    const v = e.target.type === "checkbox" ? e.target.checked : Number(e.target.value);
-    lsSetPath(L, f, v);
-    const b = e.target.parentElement.querySelector("b");
-    if (b && e.target.type === "range") b.textContent = `${v.toFixed(Number(e.target.step) < 1 ? 2 : 0)}`;
-    lsPaint(); lsSave();
-  }
-  if (e.target === $("lsScrub")) { ls.t = Number(e.target.value); lsPaint(); }
-});
-$("labStudio").addEventListener("change", (e) => {
-  const L = lsLayer(), x = e.target.dataset.lsx;
-  if (x && L) {
-    const v = e.target.type === "checkbox" ? e.target.checked : e.target.type === "number" ? Number(e.target.value) : e.target.value;
-    lsSetPath(L, x, v);
-    if (x === "anim.on" && v) Object.assign(L.anim, { dx: L.dx + 0.15, dy: L.dy - 0.1, scale: L.scale, rot: L.rot, opacity: L.opacity, t1: Math.max(L.anim.t1, L.anim.t0 + 0.6) });
-    if (x === "enter.type" && v !== "none" && L.enter.dur === undefined) L.enter.dur = 0.4;
-    lsProps(); lsLayersList(); lsPaint(); lsSave();
-    return;
-  }
-  if (e.target === $("lsDur")) { ls.sc.duration = Number(e.target.value) || 4; $("lsScrub").max = ls.sc.duration; lsSave(); }
-  if (e.target === $("lsBgOn")) { ls.sc.bg.visible = e.target.checked; lsPaint(); lsSave(); }
-  if (e.target === $("lsBgVer") && e.target.value) {
-    const old = ls.sc.bg.file; ls.sc.bg.file = e.target.value;
-    ls.sc.bg.versions = [...(ls.sc.bg.versions || []).filter((v) => v !== e.target.value), old];
-    lsSave(); setTimeout(() => lsReload(), 700);
-  }
-  if (e.target.matches("[data-lsver]") && e.target.value && L) {
-    const old = L.file; L.file = e.target.value; L.versions = [...L.versions.filter((v) => v !== e.target.value), old];
-    lsSave(); setTimeout(() => lsReload(), 700);
-  }
-  if (e.target.matches("[data-lsup]") && L) {
-    const f = e.target.files[0];
-    if (!f) return;
-    const form = new FormData(); form.append("file", f);
-    toast("⏳ بيحط الصورة مكان العنصر...");
-    api(`/api/lab/${ls.lid}/shots/${ls.n}/scene/layers/${L.id}/upload`, { method: "POST", body: form })
-      .then((sc) => { ls.sc = sc; lsRenderAll(); }).catch((err) => toast(err.message, true));
-  }
-});
-async function lsReload() { const keep = ls.sel; ls.sc = await api(`/api/lab/${ls.lid}/shots/${ls.n}/scene`); ls.sel = keep; lsRenderAll(); }
-$("labStudio").addEventListener("click", async (e) => {
-  const sel = e.target.closest("[data-lssel]"), eye = e.target.closest("[data-lseye]");
-  if (eye) { const L = ls.sc.layers.find((x) => x.id === eye.dataset.lseye); L.visible = !L.visible; lsLayersList(); lsPaint(); lsSave(); return; }
-  if (sel) { ls.sel = sel.dataset.lssel; ls.endMode = false; lsLayersList(); lsProps(); lsPaint(); return; }
-  const L = lsLayer();
-  if (e.target.closest("[data-lsz]") && L) { L.z += Number(e.target.closest("[data-lsz]").dataset.lsz) * 1.5; lsLayersList(); lsPaint(); lsSave(); return; }
-  if (e.target.closest("[data-lsreset]") && L) {
-    Object.assign(L, { dx: 0, dy: 0, scale: 1, rot: 0, opacity: 1, flip: false, hue: 0, sat: 1, bright: 1 });
-    L.anim.on = false; L.enter.type = "none"; L.exit.type = "none";
-    lsProps(); lsLayersList(); lsPaint(); lsSave(); return;
-  }
-  if (e.target.closest("[data-lsend]")) { ls.endMode = !ls.endMode; if (ls.endMode && L) { ls.t = L.anim.t1; } lsProps(); lsPaint(); return; }
-  const ed = e.target.closest("[data-lsedit]");
-  if (ed && L) {
-    const txt = $("lsEditTxt").value.trim();
-    if (!txt) return toast("اكتب التعديل", true);
-    await busyButton(ed, "⏳", async () => { clearTimeout(ls.saveT); ls.sc = await api(`/api/lab/${ls.lid}/shots/${ls.n}/scene/layers/${L.id}/edit`, { method: "POST", ...jsonBody({ instruction: txt }) }); });
-    lsRenderAll();
-  }
-});
-$("lsClose").onclick = () => { ls.playing = false; $("labStudio").close(); };
-$("lsAskGo").onclick = () => busyButton($("lsAskGo"), "⏳ بيفكر...", async () => {
-  const txt = $("lsAsk").value.trim();
-  if (!txt) return toast("اكتب عايز تعمل إيه", true);
-  clearTimeout(ls.saveT);
-  const r = await api(`/api/lab/${ls.lid}/shots/${ls.n}/scene/ai`, { method: "POST", ...jsonBody({ instruction: txt }) });
-  ls.sc = r;
-  $("lsAskNote").textContent = [r.notes, r.edits?.length ? `✏️ اتعدّل شكل ${r.edits.length} عنصر بالـ AI` : "", ...(r.errors || [])].filter(Boolean).join(" · ");
-  lsRenderAll();
-});
-$("lsBgClean").onclick = () => busyButton($("lsBgClean"), "⏳", async () => {
-  if (!confirm("يعمل خلفية نضيفة من غير ناس ولا عناصر (بالـ AI، حوالي 0.005$)؟")) return;
-  clearTimeout(ls.saveT);
-  ls.sc = await api(`/api/lab/${ls.lid}/shots/${ls.n}/scene/bg/clean`, { method: "POST" });
-  lsRenderAll();
-});
-// المعاينة: الحركة بتتشغل في المتصفح بأصواتها
-$("lsPlay").onclick = () => {
-  if (ls.playing) { ls.playing = false; $("lsPlay").textContent = "▶️ معاينة"; return; }
-  ls.playing = true; $("lsPlay").textContent = "⏸ وقف";
-  const ev = lsSfxEvents(ls.sc), t0 = performance.now(); let k = 0;
-  const step = () => {
-    if (!ls.playing) return;
-    ls.t = (performance.now() - t0) / 1000;
-    while (k < ev.length && ev[k][0] <= ls.t) { new Audio(`/api/fx/sfx/${ev[k][1]}.wav`).play().catch(() => {}); k++; }
-    if (ls.t >= ls.sc.duration) { ls.t = ls.sc.duration; ls.playing = false; $("lsPlay").textContent = "▶️ معاينة"; }
-    lsPaint();
-    if (ls.playing) requestAnimationFrame(step);
-  };
-  requestAnimationFrame(step);
-};
-$("lsRender").onclick = () => busyButton($("lsRender"), "⏳ بيرسم...", async () => {
-  clearTimeout(ls.saveT);
-  const { sfx, ...body } = ls.sc;
-  ls.sc = await api(`/api/lab/${ls.lid}/shots/${ls.n}/scene`, { method: "PUT", ...jsonBody(body) });
-  const r = await api(`/api/lab/${ls.lid}/shots/${ls.n}/scene/render`, { method: "POST" });
-  $("lsOut").innerHTML = `<video src="${r.url}" controls autoplay playsinline></video><a class="btn sm" href="${r.url}" download>⬇ نزّل الفيديو</a>`;
-});
-// السحب: بيغيّر المكان (أو مكان النهاية لو «حدد مكان النهاية» شغال)
-$("lsStage").addEventListener("pointerdown", (e) => {
-  const el = e.target.closest("[data-lsl]");
-  if (!el) return;
-  e.preventDefault();
-  ls.sel = el.dataset.lsl;
-  const L = lsLayer(), r = $("lsStage").getBoundingClientRect();
-  if (!ls.endMode) { lsLayersList(); lsProps(); }
-  const key = ls.endMode && L.anim.on ? L.anim : L;
-  const sx = e.clientX, sy = e.clientY, ox = key.dx, oy = key.dy;
-  const move = (ev) => { key.dx = ox + (ev.clientX - sx) / r.width; key.dy = oy + (ev.clientY - sy) / r.height; lsPaint(); };
-  const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); lsSave(); };
-  window.addEventListener("pointermove", move);
-  window.addEventListener("pointerup", up);
-});

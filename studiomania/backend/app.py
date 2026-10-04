@@ -55,7 +55,6 @@ import montage  # noqa: E402
 import fx  # noqa: E402  (محرك الافيكتس)
 import lab  # noqa: E402  (معمل التفكيك)
 import audioshake  # noqa: E402  (فصل الكلام / الموسيقى / المؤثرات)
-import scene as scn  # noqa: E402  (استوديو التحكم في طبقات الفريم)
 import motion as mo  # noqa: E402
 import publisher  # noqa: E402
 import sheets  # noqa: E402
@@ -3207,6 +3206,7 @@ app.mount("/media/series", StaticFiles(directory=SERIES_DIR), name="series")
 app.mount("/media/ads", StaticFiles(directory=ADS_DIR), name="ads")
 app.mount("/media/brand", StaticFiles(directory=BRAND_DIR), name="brand")
 app.mount("/media/lab", StaticFiles(directory=DATA_DIR / "lab", check_dir=False), name="lab")
+app.mount("/media/assets", StaticFiles(directory=DATA_DIR / "assets", check_dir=False), name="assets")
 app.mount("/fonts", StaticFiles(directory=FONTS_DIR), name="fonts")
 
 
@@ -9311,214 +9311,11 @@ def lab_review(lid: str, body: LabReviewIn):
     return lab_to_dict(lid, lab_update(lid, fn))
 
 
-# ---------- 🎛️ استوديو التحكم: طبقات الفريم المفكك كمشهد نتحكم في كل عنصر فيه
-
 def lab_shot(d: dict, n: int) -> dict:
     s = next((x for x in d.get("shots") or [] if x["n"] == n), None)
     if not s:
         raise HTTPException(404, "اللقطة مش موجودة")
     return s
-
-
-def lab_scene_dict(lid: str, sc: dict) -> dict:
-    base = f"/media/lab/{lid}/layers"
-    return {**sc, "bg": {**sc["bg"], "url": f"{base}/{sc['bg']['file']}" if sc["bg"].get("file") else None},
-            "layers": [{**L, "url": f"{base}/{L['file']}"} for L in sc["layers"]], "sfx": list(fx.SFX)}
-
-
-def lab_scene_get(lid: str, n: int) -> dict:
-    """المشهد بتاع اللقطة (ولو أول مرة: بيتعمل من الطبقات اللي اتفككت)."""
-    d = lab_load(lid)
-    s = lab_shot(d, n)
-    lay = s.get("layers") or {}
-    if not lay.get("items"):
-        raise HTTPException(400, "فكّك فريم من اللقطة دي لطبقات الأول")
-    sc = s.get("scene")
-    if not sc or sc.get("from") != lay.get("at"):
-        from PIL import Image
-        folder = lab_dir(lid) / "layers"
-        ref = folder / (lay.get("base") or lay.get("frame"))
-        W, H = Image.open(ref).size
-        sc = {**scn.new_scene(W, H, lay.get("base") or lay.get("frame"), lay["items"], round(min(4.0, max(1.0, s["end"] - s["start"])), 2)),
-              "from": lay.get("at")}
-        def fn(d):
-            lab_shot(d, n)["scene"] = sc
-        lab_update(lid, fn)
-    return sc
-
-
-@app.get("/api/lab/{lid}/shots/{n}/scene")
-def lab_scene(lid: str, n: int):
-    return lab_scene_dict(lid, lab_scene_get(lid, n))
-
-
-@app.put("/api/lab/{lid}/shots/{n}/scene")
-def lab_scene_put(lid: str, n: int, body: dict):
-    old = lab_scene_get(lid, n)
-    sc = {**scn.clean({**body, "W": old["W"], "H": old["H"]}), "from": old.get("from")}
-    known = {L["file"] for L in old["layers"]} | {v for L in old["layers"] for v in L.get("versions") or []} | {L["orig_file"] for L in old["layers"]}
-    for L in sc["layers"]:  # الملفات لازم تبقى من طبقات المشهد نفسه
-        if L["file"] not in known:
-            raise HTTPException(400, "ملف طبقة مش معروف")
-    def fn(d):
-        lab_shot(d, n)["scene"] = sc
-    lab_update(lid, fn)
-    return lab_scene_dict(lid, sc)
-
-
-class SceneAiIn(BaseModel):
-    instruction: str
-
-
-@app.post("/api/lab/{lid}/shots/{n}/scene/ai")
-def lab_scene_ai(lid: str, n: int, body: SceneAiIn):
-    """💬 قول عايز إيه: الموديل بيحوّل كلامك لتعديلات على الطبقات (ولو لون أو شكل جديد: تعديل صورة العنصر بالـ AI)."""
-    text = body.instruction.strip()[:1500]
-    if not text:
-        raise HTTPException(400, "اكتب عايز تعمل إيه")
-    sc = lab_scene_get(lid, n)
-    if atlas.mock_mode():
-        patch = {"layers": [{"id": sc["layers"][0]["id"], "scale": 0.7, "hue": 90,
-                             "anim": {"on": True, "t0": 0.3, "t1": 1.3, "dx": 0.2, "dy": -0.2}}], "notes": "تجربة"}
-    else:
-        patch = ad_json(series_chat(scn.patch_messages(sc, text)), "تعديل المشهد")
-    sc, edits, notes = scn.apply_patch(sc, patch)
-    sc["from"] = lab_scene_get(lid, n).get("from")
-    def fn(d):
-        lab_shot(d, n)["scene"] = sc
-    lab_update(lid, fn)
-    errors = []
-    for lid2, instr in edits[:3]:
-        try:
-            lab_layer_edit_run(lid, n, lid2, instr)
-        except Exception as exc:  # noqa: BLE001
-            errors.append(f"{lid2}: {str(getattr(exc, 'detail', None) or exc)[:150]}")
-    return {**lab_scene_dict(lid, lab_scene_get(lid, n)), "notes": notes, "edits": [e[0] for e in edits], "errors": errors}
-
-
-def lab_layer_save_version(lid: str, n: int, layer_id: str, im) -> None:
-    """نسخة جديدة من صورة العنصر بتتحط في نفس مربعه (والقديمة بتفضل في النسخ)."""
-    sc = lab_scene_get(lid, n)
-    L = next((x for x in sc["layers"] if x["id"] == layer_id), None)
-    if not L:
-        raise HTTPException(404, "الطبقة مش موجودة")
-    folder = lab_dir(lid) / "layers"
-    from PIL import Image
-    ow, oh = Image.open(folder / L["orig_file"]).size
-    name = f"{Path(L['orig_file']).stem}-v{uuid.uuid4().hex[:5]}.png"
-    scn.fit_into(im, ow, oh).save(folder / name)
-    def fn(d):
-        x = next(y for y in lab_shot(d, n)["scene"]["layers"] if y["id"] == layer_id)
-        x["versions"] = ([*(x.get("versions") or []), x["file"]])[-10:]
-        x["file"] = name
-    lab_update(lid, fn)
-
-
-def lab_layer_edit_run(lid: str, n: int, layer_id: str, instruction: str) -> None:
-    from PIL import Image
-    sc = lab_scene_get(lid, n)
-    L = next((x for x in sc["layers"] if x["id"] == layer_id), None)
-    if not L:
-        raise HTTPException(404, "الطبقة مش موجودة")
-    folder = lab_dir(lid) / "layers"
-    work = lab_dir(lid) / "work"
-    work.mkdir(parents=True, exist_ok=True)
-    src = Image.open(folder / L["file"]).convert("RGBA")
-    if atlas.mock_mode():
-        out = scn._filters(src, 120, 1.2, 1.0)
-    else:
-        # العنصر على خلفية خضرا سادة، والموديل بيرجّعه بنفس الخلفية فبتتشال بالكروما
-        green = Image.new("RGBA", src.size, (0, 255, 0, 255))
-        green.alpha_composite(src)
-        inp = work / f"edit-in-{uuid.uuid4().hex[:5]}.png"
-        green.convert("RGB").save(inp)
-        size = "1024x1536" if src.height > src.width * 1.2 else "1536x1024" if src.width > src.height * 1.2 else "1024x1024"
-        prompt = (f"Edit this isolated element: {instruction}. Keep its shape, pose, perspective, proportions and lighting identical "
-                  "unless the edit asks otherwise. Output only the element, centered, on a plain solid pure green (#00FF00) background, "
-                  "no shadow, no text, nothing else.")
-        url = atlas.generate_image("sunburst", prompt, size, "medium", [atlas.reference_url(inp)])
-        raw = work / f"edit-out-{uuid.uuid4().hex[:5]}.png"
-        atlas.download(url, raw)
-        keyed = mo.cutout(ffmpeg_exe(), raw, work / f"{raw.stem}-cut.png", "object")
-        out = Image.open(keyed).convert("RGBA")
-    lab_layer_save_version(lid, n, layer_id, out)
-
-
-class LayerEditIn(BaseModel):
-    instruction: str
-
-
-@app.post("/api/lab/{lid}/shots/{n}/scene/layers/{layer_id}/edit")
-def lab_layer_edit(lid: str, n: int, layer_id: str, body: LayerEditIn):
-    """✏️ تعديل شكل عنصر بالـ AI (لون، لبس، تفاصيل) والنتيجة بتتحط في نفس مكانه. حوالي 0.005$."""
-    if not body.instruction.strip():
-        raise HTTPException(400, "اكتب التعديل")
-    if not (atlas.api_key() or atlas.mock_mode()):
-        raise HTTPException(400, "مفتاح Atlas مش متسجل")
-    lab_layer_edit_run(lid, n, layer_id, body.instruction.strip()[:500])
-    return lab_scene_dict(lid, lab_scene_get(lid, n))
-
-
-@app.post("/api/lab/{lid}/shots/{n}/scene/layers/{layer_id}/upload")
-def lab_layer_upload(lid: str, n: int, layer_id: str, file: UploadFile = File(...)):
-    """⬆ تبدّل العنصر بصورة من عندك (PNG شفاف أحسن) في نفس مكانه وحجمه."""
-    from PIL import Image
-    work = lab_dir(lid) / "work"
-    work.mkdir(parents=True, exist_ok=True)
-    fname = save_upload(file, IMAGE_EXTENSIONS, work, "up")
-    im = Image.open(work / fname)
-    if im.mode != "RGBA":  # من غير شفافية: لون الركن بيتشال
-        im = Image.open(mo.cutout(ffmpeg_exe(), work / fname, work / f"{Path(fname).stem}-cut.png", "object"))
-    lab_layer_save_version(lid, n, layer_id, im)
-    return lab_scene_dict(lid, lab_scene_get(lid, n))
-
-
-@app.post("/api/lab/{lid}/shots/{n}/scene/bg/clean")
-def lab_scene_bg_clean(lid: str, n: int):
-    """🧹 خلفية نضيفة: الموديل بيشيل الناس والعناصر ويكمّل المكان (عشان لما تحرّك عنصر ميبانش وراه شبح). حوالي 0.005$."""
-    from PIL import Image
-    sc = lab_scene_get(lid, n)
-    folder = lab_dir(lid) / "layers"
-    src = folder / sc["bg"]["orig_file"]
-    name = f"{src.stem}-clean-{uuid.uuid4().hex[:5]}.png"
-    if atlas.mock_mode():
-        Image.open(src).convert("RGB").filter(__import__("PIL.ImageFilter", fromlist=["x"]).GaussianBlur(12)).save(folder / name)
-    else:
-        if not atlas.api_key():
-            raise HTTPException(400, "مفتاح Atlas مش متسجل")
-        W, H = sc["W"], sc["H"]
-        size = "1024x1536" if H > W * 1.2 else "1536x1024" if W > H * 1.2 else "1024x1024"
-        names = ", ".join(L["name"] for L in sc["layers"])
-        prompt = ("Remove every person and every foreground object from this image and fill those areas naturally with the "
-                  f"surrounding background, as an empty clean plate. Objects to remove include: {names}. Keep the camera angle, "
-                  "lens, lighting, colors and all background architecture exactly the same. No people at all.")
-        url = atlas.generate_image("sunburst", prompt, size, "medium", [atlas.reference_url(src)])
-        tmp = folder / f"{name}.tmp.png"
-        atlas.download(url, tmp)
-        Image.open(tmp).convert("RGB").resize((W, H), Image.LANCZOS).save(folder / name)
-        tmp.unlink(missing_ok=True)
-    def fn(d):
-        b = lab_shot(d, n)["scene"]["bg"]
-        b["versions"] = ([*(b.get("versions") or []), b["file"]])[-10:]
-        b["file"] = name
-    lab_update(lid, fn)
-    return lab_scene_dict(lid, lab_scene_get(lid, n))
-
-
-@app.post("/api/lab/{lid}/shots/{n}/scene/render")
-def lab_scene_render(lid: str, n: int):
-    """🎬 فيديو المشهد بحركاته وأصواتها."""
-    sc = lab_scene_get(lid, n)
-    folder = lab_dir(lid) / "scenes"
-    folder.mkdir(parents=True, exist_ok=True)
-    for old in folder.glob(f"s{n:03d}-*.mp4"):
-        old.unlink(missing_ok=True)
-    out = folder / f"s{n:03d}-{uuid.uuid4().hex[:6]}.mp4"
-    try:
-        scn.render(ffmpeg_exe(), sc, lab_dir(lid) / "layers", out, lab_dir(lid) / "work", FX_DIR / "sfx")
-    except RuntimeError as exc:
-        raise HTTPException(500, str(exc)) from exc
-    return {"url": f"/media/lab/{lid}/scenes/{out.name}"}
 
 
 # ---------- ✏️ التعديل جوه المشهد: نفس الفيديو بحركته، وكل عنصر فيه يتغيّر بالكلام (موديل تعديل فيديو)
@@ -9550,47 +9347,29 @@ def lab_vedit_set(lid: str, n: int, vid: str, **kw) -> None:
     lab_update(lid, fn)
 
 
-def run_lab_vedit(lid: str, n: int, vid: str) -> None:
-    try:
-        d = lab_load(lid)
-        s = lab_shot(d, n)
-        v = next(x for x in s["vedits"] if x["id"] == vid)
-        src = lab_shot_clip(lid, s, v.get("base"))
-        out = lab_dir(lid) / "vedit" / f"s{n:03d}-{vid}.mp4"
-        if v["kind"] == "speed":
-            lab.retime(ffmpeg_exe(), src, out, v["t0"], v["t1"], v["factor"], probe_duration(src))
-        elif atlas.mock_mode():
-            subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src), "-vf", "hue=h=120",
-                            "-c:a", "copy", str(out)], check=True, capture_output=True, timeout=300)
-            lab_vedit_set(lid, n, vid, prompt="(تجربة) hue shift")
-        else:
-            lab_vedit_set(lid, n, vid, step="بيكتب التعليمات")
-            prompt = str(ad_json(series_chat(lab.vedit_messages(s, v["instruction"])), "تعليمات التعديل").get("prompt") or "").strip()
-            if not prompt:
-                raise RuntimeError("الموديل مكتبش تعليمات")
-            lab_vedit_set(lid, n, vid, prompt=prompt, step="موديل الفيديو بيعدّل المشهد")
-            m = lab.VEDIT_MODELS[v["model"]]
-            url = atlas.run_model("Video", {"model": m["model"], "video": atlas.upload_media(src), "prompt": prompt},
-                                  "تعديل المشهد", max_seconds=1500, interval=6)
-            atlas.download(url, out)
-        lab_vedit_set(lid, n, vid, status="done", file=out.name, step=None, error=None, duration=round(probe_duration(out), 2))
-    except Exception as exc:  # noqa: BLE001
-        lab_vedit_set(lid, n, vid, status="failed", step=None, error=str(getattr(exc, "detail", None) or exc)[:400])
+def vedit_render(v: dict, src: Path, out: Path, context: dict, setv) -> None:
+    """نسخة جديدة من مقطع: ⏩ سرعة جزء (بالكود) أو ✏️ تعديل جوه المشهد بموديل فيديو (الحركة زي ما هي).
+    context = {"analysis": ...} عشان التعليمات توصف العناصر بشكلها ومكانها."""
+    if v["kind"] == "speed":
+        lab.retime(ffmpeg_exe(), src, out, v["t0"], v["t1"], v["factor"], probe_duration(src))
+    elif atlas.mock_mode():
+        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src), "-vf", "hue=h=120",
+                        "-c:a", "copy", str(out)], check=True, capture_output=True, timeout=300)
+        setv(prompt="(تجربة) hue shift")
+    else:
+        setv(step="بيكتب التعليمات")
+        prompt = str(ad_json(series_chat(lab.vedit_messages(context, v["instruction"])), "تعليمات التعديل").get("prompt") or "").strip()
+        if not prompt:
+            raise RuntimeError("الموديل مكتبش تعليمات")
+        setv(prompt=prompt, step="موديل الفيديو بيعدّل المشهد")
+        m = lab.VEDIT_MODELS[v["model"]]
+        url = atlas.run_model("Video", {"model": m["model"], "video": atlas.upload_media(src), "prompt": prompt},
+                              "تعديل المشهد", max_seconds=1500, interval=6)
+        atlas.download(url, out)
 
 
-class VeditIn(BaseModel):
-    instruction: str = ""
-    model: str = "gemini"
-    base: str | None = None       # نكمّل على نسخة متعدلة
-    speed: dict | None = None     # {"t0", "t1", "factor"} = تسريع/تبطيء جزء (من غير AI)
-
-
-@app.post("/api/lab/{lid}/shots/{n}/vedit")
-def lab_vedit(lid: str, n: int, body: VeditIn):
-    """✏️ تعديل جوه المشهد (لون، حجم، استبدال، مكان النهاية...) والحركة زي ما هي، أو ⏩ سرعة جزء منه."""
-    d = lab_load(lid)
-    s = lab_shot(d, n)
-    vid = uuid.uuid4().hex[:8]
+def vedit_item(body) -> dict:
+    """طلب نسخة (من اللقطة أو من أصل في المكتبة) بعد التأكد من القيم."""
     if body.speed:
         try:
             t0, t1, f = float(body.speed["t0"]), float(body.speed["t1"]), float(body.speed["factor"])
@@ -9607,10 +9386,42 @@ def lab_vedit(lid: str, n: int, body: VeditIn):
             raise HTTPException(400, "موديل غير معروف")
         if not (atlas.api_key() or atlas.mock_mode()):
             raise HTTPException(400, "مفتاح Atlas مش متسجل")
-        if s["end"] - s["start"] > 10.5 and not body.base:
-            raise HTTPException(400, "اللقطة أطول من 10 ثواني، وموديلات التعديل بتقبل لحد 10")
         item = {"kind": "ai", "instruction": text, "model": body.model}
-    item.update(id=vid, base=body.base, status="working", step="بيجهّز", file=None, error=None, review=None, created_at=now())
+    return {**item, "id": uuid.uuid4().hex[:8], "base": body.base, "status": "working", "step": "بيجهّز", "file": None,
+            "error": None, "review": None, "created_at": now()}
+
+
+def run_lab_vedit(lid: str, n: int, vid: str) -> None:
+    def setv(**kw):
+        lab_vedit_set(lid, n, vid, **kw)
+    try:
+        d = lab_load(lid)
+        s = lab_shot(d, n)
+        v = next(x for x in s["vedits"] if x["id"] == vid)
+        src = lab_shot_clip(lid, s, v.get("base"))
+        out = lab_dir(lid) / "vedit" / f"s{n:03d}-{vid}.mp4"
+        vedit_render(v, src, out, s, setv)
+        setv(status="done", file=out.name, step=None, error=None, duration=round(probe_duration(out), 2))
+    except Exception as exc:  # noqa: BLE001
+        setv(status="failed", step=None, error=str(getattr(exc, "detail", None) or exc)[:400])
+
+
+class VeditIn(BaseModel):
+    instruction: str = ""
+    model: str = "gemini"
+    base: str | None = None       # نكمّل على نسخة متعدلة
+    speed: dict | None = None     # {"t0", "t1", "factor"} = تسريع/تبطيء جزء (من غير AI)
+
+
+@app.post("/api/lab/{lid}/shots/{n}/vedit")
+def lab_vedit(lid: str, n: int, body: VeditIn):
+    """✏️ تعديل جوه المشهد (لون، حجم، استبدال، مكان النهاية...) والحركة زي ما هي، أو ⏩ سرعة جزء منه."""
+    d = lab_load(lid)
+    s = lab_shot(d, n)
+    item = vedit_item(body)
+    vid = item["id"]
+    if item["kind"] == "ai" and s["end"] - s["start"] > 10.5 and not body.base:
+        raise HTTPException(400, "اللقطة أطول من 10 ثواني، وموديلات التعديل بتقبل لحد 10")
     def fn(d):
         lab_shot(d, n).setdefault("vedits", []).append(item)
     lab_update(lid, fn)
@@ -9627,6 +9438,230 @@ def lab_vedit_delete(lid: str, n: int, vid: str):
                 (lab_dir(lid) / "vedit" / v["file"]).unlink(missing_ok=True)
         s["vedits"] = [v for v in s.get("vedits") or [] if v["id"] != vid]
     return lab_to_dict(lid, lab_update(lid, fn))
+
+
+# ================================================================ 📚 مكتبة الأصول
+# الأصل = مقطع من فيديو بحركته وخلفيته وصوته (افيكت، موشن جرافيك، انتقال، حركة ماوس...) + كل اللي اتفهم عنه
+# (العناصر وحركاتها والأصوات). بيتحكم فيه بالتعديل جوه المشهد وبالسرعة، وكل تعديل بيبقى نسخة منه.
+
+ASSETS_DIR = DATA_DIR / "assets"
+ASSETS_DIR.mkdir(parents=True, exist_ok=True)
+ASSET_LOCK = threading.Lock()
+ASSET_CATS = ("motion_graphics", "effect", "transition", "text", "screen", "cursor", "character", "background", "product", "other")
+
+
+def asset_dir(aid: str) -> Path:
+    return ASSETS_DIR / Path(aid).name
+
+
+def asset_load(aid: str) -> dict:
+    f = asset_dir(aid) / "asset.json"
+    if not f.exists():
+        raise HTTPException(404, "الأصل ده مش موجود")
+    return json.loads(f.read_text(encoding="utf-8"))
+
+
+def asset_update(aid: str, fn) -> dict:
+    with ASSET_LOCK:
+        d = asset_load(aid)
+        fn(d)
+        d["updated_at"] = now()
+        tmp = asset_dir(aid) / "asset.json.tmp"
+        tmp.write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+        tmp.replace(asset_dir(aid) / "asset.json")
+        return d
+
+
+def asset_to_dict(aid: str, d: dict) -> dict:
+    base = f"/media/assets/{aid}"
+    return {**d, "id": aid, "url": f"{base}/{d['file']}", "thumb_url": f"{base}/{d['thumb']}",
+            "variants": [{**v, "url": f"{base}/variants/{v['file']}" if v.get("file") else None} for v in d.get("variants") or []],
+            "busy": any(v.get("status") == "working" for v in d.get("variants") or []),
+            "vedit_models": [{"key": k, "label": v["label"], "per_sec": v["per_sec"]} for k, v in lab.VEDIT_MODELS.items()]}
+
+
+class AssetIn(BaseModel):
+    name: str = ""
+    category: str = "other"
+    tags: list[str] = []
+    notes: str = ""
+    t0: float | None = None   # من أول الفيديو (ولو نسخة متعدلة: من أول النسخة)
+    t1: float | None = None
+    vedit: str | None = None  # نحفظ نسخة متعدلة بدل الأصلي
+
+
+@app.post("/api/lab/{lid}/shots/{n}/asset")
+def lab_save_asset(lid: str, n: int, body: AssetIn):
+    """📚 احفظ مقطع من اللقطة (أو من نسخة متعدلة منها) كأصل في المكتبة، ومعاه عناصره وحركاتها وأصواته."""
+    d = lab_load(lid)
+    s = lab_shot(d, n)
+    if body.vedit:
+        v = next((x for x in s.get("vedits") or [] if x["id"] == body.vedit and x.get("file")), None)
+        if not v:
+            raise HTTPException(404, "النسخة دي مش موجودة")
+        src, offset, length = lab_dir(lid) / "vedit" / v["file"], s["start"], v.get("duration") or (s["end"] - s["start"])
+        a0 = max(0.0, (body.t0 if body.t0 is not None else s["start"]) - s["start"])
+        a1 = min(length, (body.t1 if body.t1 is not None else s["end"]) - s["start"])
+    else:
+        src, offset = lab_dir(lid) / d["source"]["file"], 0.0
+        a0 = max(s["start"], body.t0 if body.t0 is not None else s["start"])
+        a1 = min(s["end"], body.t1 if body.t1 is not None else s["end"])
+    if a1 - a0 < 0.15:
+        raise HTTPException(400, "المقطع قصير أوي")
+    t0, t1 = a0 + offset, a1 + offset   # نفس المقطع بأوقات الفيديو الأصلي (عشان العناصر والأصوات)
+    aid = uuid.uuid4().hex[:12]
+    folder = asset_dir(aid)
+    (folder / "variants").mkdir(parents=True, exist_ok=True)
+    subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{a0:.3f}", "-i", str(src), "-t", f"{a1 - a0:.3f}",
+                    "-c:v", "libx264", "-preset", "veryfast", "-crf", "16", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k",
+                    "-movflags", "+faststart", str(folder / "clip.mp4")], check=True, capture_output=True, timeout=300)
+    subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{(a1 - a0) / 2:.3f}", "-i", str(folder / "clip.mp4"),
+                    "-frames:v", "1", "-vf", "scale=480:-2", "-q:v", "3", str(folder / "thumb.jpg")], check=True, capture_output=True, timeout=60)
+    info = media_info(folder / "clip.mp4")
+    an = s.get("analysis") or {}
+    rb = lambda t: round(max(0.0, min(t1, t) - t0), 2)  # noqa: E731  الوقت من أول الأصل
+    elements = []
+    for e in an.get("elements") or []:
+        if e["last_t"] < t0 or e["first_t"] > t1:
+            continue
+        acts = [{**{k: a.get(k) for k in ("action", "from", "to", "detail")}, "t0": rb(a["t0"]), "t1": rb(a["t1"])}
+                for a in e.get("actions") or [] if a["t1"] >= t0 and a["t0"] <= t1]
+        elements.append({"name": e["name"], "type": e["type"], "description": e.get("description", ""), "box": e.get("box"),
+                         "first_t": rb(e["first_t"]), "last_t": rb(e["last_t"]), "actions": acts})
+    sfx = [{"t": rb(x["t"]), "label": x.get("label"), "category": x.get("category")}
+           for x in (d.get("audio") or {}).get("sfx") or [] if t0 <= x["t"] <= t1]
+    data = {"name": body.name.strip()[:120] or an.get("summary", "")[:80] or f"أصل من {d.get('name', '')}",
+            "category": body.category if body.category in ASSET_CATS else "other",
+            "tags": [t.strip()[:30] for t in body.tags if t.strip()][:12], "notes": body.notes.strip()[:1000],
+            "file": "clip.mp4", "thumb": "thumb.jpg", "duration": round(info.duration, 2), "width": info.width, "height": info.height,
+            "source": {"lab": lid, "lab_name": d.get("name"), "shot": n, "t0": round(t0, 3), "t1": round(t1, 3), "vedit": body.vedit},
+            "scene_type": an.get("scene_type"), "summary": an.get("summary", ""), "background": an.get("background"),
+            "elements": elements, "sfx": sfx, "variants": [], "created_at": now(), "updated_at": now()}
+    (folder / "asset.json").write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+    return asset_to_dict(aid, data)
+
+
+@app.get("/api/assets")
+def assets_list():
+    out = []
+    for f in sorted(ASSETS_DIR.glob("*/asset.json"), key=lambda x: x.stat().st_mtime, reverse=True):
+        try:
+            d = json.loads(f.read_text(encoding="utf-8"))
+        except ValueError:
+            continue
+        aid = f.parent.name
+        out.append({"id": aid, "name": d["name"], "category": d["category"], "tags": d.get("tags") or [], "duration": d["duration"],
+                    "url": f"/media/assets/{aid}/{d['file']}", "thumb_url": f"/media/assets/{aid}/{d['thumb']}",
+                    "elements": len(d.get("elements") or []), "variants": len([v for v in d.get("variants") or [] if v.get("file")]),
+                    "summary": d.get("summary", ""), "created_at": d.get("created_at")})
+    return out
+
+
+@app.get("/api/assets/{aid}")
+def asset_get(aid: str):
+    return asset_to_dict(aid, asset_load(aid))
+
+
+class AssetPatchIn(BaseModel):
+    name: str | None = None
+    category: str | None = None
+    tags: list[str] | None = None
+    notes: str | None = None
+
+
+@app.patch("/api/assets/{aid}")
+def asset_patch(aid: str, body: AssetPatchIn):
+    def fn(d):
+        if body.name is not None and body.name.strip():
+            d["name"] = body.name.strip()[:120]
+        if body.category in ASSET_CATS:
+            d["category"] = body.category
+        if body.tags is not None:
+            d["tags"] = [t.strip()[:30] for t in body.tags if t.strip()][:12]
+        if body.notes is not None:
+            d["notes"] = body.notes.strip()[:1000]
+    return asset_to_dict(aid, asset_update(aid, fn))
+
+
+@app.delete("/api/assets/{aid}")
+def asset_delete(aid: str):
+    asset_load(aid)
+    shutil.rmtree(asset_dir(aid), ignore_errors=True)
+    return {"ok": True}
+
+
+def run_asset_variant(aid: str, vid: str) -> None:
+    def setv(**kw):
+        def fn(d):
+            v = next((x for x in d.get("variants") or [] if x["id"] == vid), None)
+            if v is not None:
+                v.update(**kw)
+        asset_update(aid, fn)
+    try:
+        d = asset_load(aid)
+        v = next(x for x in d["variants"] if x["id"] == vid)
+        base = next((x for x in d["variants"] if x["id"] == v.get("base") and x.get("file")), None)
+        src = asset_dir(aid) / ("variants/" + base["file"] if base else d["file"])
+        out = asset_dir(aid) / "variants" / f"{vid}.mp4"
+        context = {"analysis": {"summary": d.get("summary"), "background": d.get("background"), "elements": d.get("elements")}}
+        vedit_render(v, src, out, context, setv)
+        setv(status="done", file=out.name, step=None, error=None, duration=round(probe_duration(out), 2))
+    except Exception as exc:  # noqa: BLE001
+        setv(status="failed", step=None, error=str(getattr(exc, "detail", None) or exc)[:400])
+
+
+@app.post("/api/assets/{aid}/variants")
+def asset_variant(aid: str, body: VeditIn):
+    """✏️ نسخة من الأصل: تعديل جوه المشهد (الحركة زي ما هي) أو ⏩ سرعة جزء."""
+    d = asset_load(aid)
+    item = vedit_item(body)
+    if item["kind"] == "ai" and d["duration"] > 10.5 and not body.base:
+        raise HTTPException(400, "الأصل أطول من 10 ثواني، وموديلات التعديل بتقبل لحد 10")
+    asset_update(aid, lambda d: d.setdefault("variants", []).append(item))
+    threading.Thread(target=run_asset_variant, args=(aid, item["id"]), daemon=True).start()
+    return asset_to_dict(aid, asset_load(aid))
+
+
+@app.delete("/api/assets/{aid}/variants/{vid}")
+def asset_variant_delete(aid: str, vid: str):
+    def fn(d):
+        for v in d.get("variants") or []:
+            if v["id"] == vid and v.get("file"):
+                (asset_dir(aid) / "variants" / v["file"]).unlink(missing_ok=True)
+        d["variants"] = [v for v in d.get("variants") or [] if v["id"] != vid]
+    return asset_to_dict(aid, asset_update(aid, fn))
+
+
+class AssetReviewIn(BaseModel):
+    variant: str
+    ok: bool | None = None
+    note: str = ""
+
+
+@app.patch("/api/assets/{aid}/review")
+def asset_review(aid: str, body: AssetReviewIn):
+    def fn(d):
+        v = next((x for x in d.get("variants") or [] if x["id"] == body.variant), None)
+        if v is None:
+            raise HTTPException(404, "النسخة مش موجودة")
+        v["review"] = {"ok": body.ok, "note": body.note.strip()[:500], "at": now()}
+    return asset_to_dict(aid, asset_update(aid, fn))
+
+
+def reset_stuck_assets() -> None:
+    for f in ASSETS_DIR.glob("*/asset.json"):
+        try:
+            d = json.loads(f.read_text(encoding="utf-8"))
+        except ValueError:
+            continue
+        bad = [v for v in d.get("variants") or [] if v.get("status") == "working"]
+        for v in bad:
+            v.update(status="failed", step=None, error="اتقطع لما السيرفر اتقفل. اعمله تاني")
+        if bad:
+            f.write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+
+
+reset_stuck_assets()
 
 
 def reset_stuck_lab() -> None:

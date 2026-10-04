@@ -1523,43 +1523,6 @@ a.pl-link:hover { background: color-mix(in srgb, var(--ok) 24%, transparent); }
 .lab-hearnote.on { color: var(--warn); font-weight: 600; }
 @media (max-width: 760px) { .lab-shot { grid-template-columns: 1fr; } .lab-shotplay { position: static; } .lab-shotplay video { max-height: 50vh; } .lab-ll { width: 78px; } }
 
-/* 🎛️ استوديو التحكم */
-.lab-studio { width: min(1280px, 96vw); max-width: 96vw; height: 92vh; max-height: 92vh; padding: 0; border: none; border-radius: var(--radius-sm); background: var(--bg, #f6f5f2); }
-.lab-studio[open] { display: flex; flex-direction: column; }
-.lab-st-head { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
-.lab-st-body { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 360px; gap: 12px; padding: 12px; }
-.lab-st-left { min-height: 0; display: flex; flex-direction: column; align-items: center; gap: 8px; overflow: auto; }
-.lab-stage { position: relative; height: min(70vh, 900px); max-width: 100%; background: #111; overflow: hidden; border-radius: 10px; touch-action: none; }
-.lab-stage img { position: absolute; user-select: none; -webkit-user-drag: none; cursor: grab; transform-origin: 50% 50%; }
-.lab-stage img.bg { inset: 0; width: 100%; height: 100%; object-fit: fill; cursor: default; }
-.lab-stage img.sel { outline: 2px dashed var(--accent); outline-offset: 2px; }
-.lab-st-ghost { position: absolute; border: 2px dashed #fff; background: rgba(229, 97, 62, .18); pointer-events: none; transform-origin: 50% 50%; }
-.lab-st-scrub { width: 100%; max-width: 600px; gap: 8px; }
-.lab-st-scrub input { flex: 1; }
-#lsOut { display: flex; flex-direction: column; align-items: center; gap: 6px; }
-#lsOut video { max-height: 50vh; border-radius: 10px; background: #000; }
-.lab-st-right { min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 8px; }
-.lab-st-box { border: 1px solid var(--line); border-radius: 10px; padding: 8px; display: flex; flex-direction: column; gap: 6px; background: var(--surface); }
-.lab-st-box textarea { width: 100%; }
-.lab-st-layers { display: flex; flex-direction: column; gap: 3px; max-height: 32vh; overflow: auto; }
-.lab-st-li { display: flex; align-items: center; gap: 6px; padding: 4px 6px; border-radius: 8px; cursor: pointer; background: var(--surface-2); font-size: 13px; }
-.lab-st-li.sel { background: var(--accent-soft); }
-.lab-st-li button { border: none; background: none; cursor: pointer; }
-.lab-st-li .ck { width: 34px; height: 34px; border-radius: 6px; flex: none; display: flex; align-items: center; justify-content: center; overflow: hidden;
-  background: repeating-conic-gradient(#d9d9d9 0 25%, #f2f2f2 0 50%) 0 0 / 10px 10px; }
-.lab-st-li .ck img { max-width: 100%; max-height: 100%; }
-.lab-st-li .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.lab-st-f { display: flex; align-items: center; gap: 6px; font-size: 13px; }
-.lab-st-f > span { width: 74px; flex: none; color: var(--muted); }
-.lab-st-f input[type=range] { flex: 1; }
-.lab-st-f input[type=number] { width: 62px; }
-.lab-st-f b { width: 46px; text-align: end; font-size: 12px; direction: ltr; }
-.lab-st-sub { border-top: 1px dashed var(--line); padding-top: 6px; display: flex; flex-direction: column; gap: 6px; }
-.lab-st-sub .row input[type=text] { flex: 1; }
-.lab-st-anim { padding-inline-start: 10px; display: flex; flex-direction: column; gap: 6px; }
-@media (max-width: 860px) { .lab-st-body { grid-template-columns: 1fr; overflow: auto; } .lab-stage { height: 55vh; } .lab-st-right { overflow: visible; } }
-.lab-st-right > * { flex-shrink: 0; }
-.lab-st-f select { min-width: 0; flex: 1 1 0; }
 /* ✏️ التعديل جوه المشهد */
 .lab-vedit { border: 1px solid var(--accent); border-radius: 10px; padding: 8px; display: flex; flex-direction: column; gap: 6px; background: var(--accent-soft); }
 .lab-vedit textarea { width: 100%; }
@@ -1571,3 +1534,26 @@ a.pl-link:hover { background: color-mix(in srgb, var(--ok) 24%, transparent); }
 .lab-ver { background: var(--surface); border-radius: 10px; padding: 6px; display: flex; flex-direction: column; gap: 4px; }
 .lab-ver video { width: 100%; max-height: 260px; background: #000; border-radius: 8px; }
 .lab-ver-wait { min-height: 120px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; font-size: 12px; }
+
+/* 📚 مكتبة الأصول */
+.lab-libbtn { width: 100%; margin-top: 10px; justify-content: center; }
+.lab-libbtn.active { border-color: var(--accent); background: var(--accent-soft); }
+.lab-asset { border: 1px dashed var(--line); border-radius: 10px; padding: 6px 8px; display: flex; flex-direction: column; gap: 6px; }
+.lab-asset[open] { border-style: solid; border-color: var(--ok); }
+.lab-asset summary { cursor: pointer; font-weight: 600; font-size: 13px; }
+.lab-asset .row { gap: 6px; margin-top: 4px; }
+.lab-asset input[type=number] { width: 80px; }
+.lab-asset input[data-af=name] { flex: 1 1 220px; }
+.lab-chips .chip.on { border-color: var(--accent); background: var(--accent-soft); }
+.as-filter { gap: 8px; margin-bottom: 10px; }
+.as-filter input[type=search] { flex: 0 1 260px; }
+.as-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+.as-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 6px; display: flex; flex-direction: column; gap: 4px; cursor: pointer; }
+.as-card:hover { border-color: var(--accent); }
+.as-card video { width: 100%; aspect-ratio: 16 / 10; object-fit: contain; background: #000; border-radius: 8px; pointer-events: none; }
+.as-tags { color: var(--accent); }
+.as-top { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 12px; align-items: start; margin-bottom: 12px; }
+.as-top video { width: 100%; max-height: 60vh; background: #000; border-radius: var(--radius-sm); }
+.as-meta { display: flex; flex-direction: column; gap: 8px; }
+.as-meta label { display: flex; flex-direction: column; gap: 3px; font-size: 13px; }
+@media (max-width: 760px) { .as-top { grid-template-columns: 1fr; } }

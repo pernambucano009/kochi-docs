@@ -934,6 +934,8 @@
               <label class="btn primary ad-up">＋ فيديو للتفكيك<input type="file" id="labFile" accept="video/*,.mp4,.mov,.webm,.mkv" hidden></label>
               <p class="hint">ارفع أي فيديو والبرنامج يفككه: اللقطات، الكلام والموسيقى والمؤثرات الصوتية، وكل عنصر في كل لقطة وبيعمل إيه وإمتى. وإنت تراجع وتقيّم كل حاجة ✅ ❌.</p>
               <ul class="ad-list" id="labList"></ul>
+              <button type="button" class="btn lab-libbtn" id="labLibBtn">📚 مكتبة الأصول <span class="muted" id="labLibCount"></span></button>
+              <p class="hint">الأصول = مقاطع حقيقية من الفيديوهات (موشن، افيكت، حركة ماوس...) بحركتها وصوتها، محفوظة ومتفككة، وتقدر تعدّل فيها جوه المشهد.</p>
             </aside>
             <section class="car-main" id="labMain" hidden>
               <div class="car-head">
@@ -956,6 +958,7 @@
               <section class="panel lab-sec" id="labAudio"></section>
               <section class="panel lab-sec" id="labShots"></section>
             </section>
+            <section class="car-main" id="labLib" hidden></section>
             <div class="panel muted" id="labEmpty" hidden>ارفع فيديو من «＋ فيديو للتفكيك» عشان نبدأ.</div>
           </div>
         </main>
@@ -1310,38 +1313,6 @@
   </div>
 </div>
 
-<dialog class="lab-studio" id="labStudio">
-  <div class="lab-st-head">
-    <b>🎛️ استوديو التحكم</b> <span class="muted" id="lsTitle"></span>
-    <span class="spacer"></span>
-    <label class="muted">المدة <input type="number" id="lsDur" min="0.5" max="15" step="0.5" style="width:64px"> ث</label>
-    <button class="btn sm" id="lsPlay">▶️ معاينة</button>
-    <button class="btn sm primary" id="lsRender">🎬 صدّر فيديو</button>
-    <button class="btn sm" id="lsClose">✕</button>
-  </div>
-  <div class="lab-st-body">
-    <div class="lab-st-left">
-      <div class="lab-stage" id="lsStage"></div>
-      <div class="row lab-st-scrub"><span class="lab-time" id="lsT">0.00</span><input type="range" id="lsScrub" min="0" max="4" step="0.01" value="0"></div>
-      <div id="lsOut"></div>
-    </div>
-    <div class="lab-st-right">
-      <div class="lab-st-box">
-        <b>💬 قول عايز إيه</b>
-        <textarea id="lsAsk" rows="2" placeholder="مثلًا: صغّر الموبايل وخليه يطير لفوق يمين في ثانية، وخلي لون الكوباية أزرق، والراجل يخرج شمال في الآخر"></textarea>
-        <button class="btn sm primary" id="lsAskGo">✨ نفّذ</button>
-        <small class="muted" id="lsAskNote"></small>
-      </div>
-      <div class="lab-st-box row wrap">
-        <label class="check"><input type="checkbox" id="lsBgOn" checked> 🖼️ الخلفية</label>
-        <button class="btn sm" id="lsBgClean" title="يشيل الناس والعناصر من الخلفية ويكمّل المكان (حوالي 0.005$)">🧹 نضّف الخلفية</button>
-        <select id="lsBgVer" class="sm"></select>
-      </div>
-      <div class="lab-st-layers" id="lsLayers"></div>
-      <div class="lab-st-box" id="lsProps"></div>
-    </div>
-  </div>
-</dialog>
 <dialog class="bulk-dlg money-dlg" id="moneyDialog">
   <div class="row"><h3>💰 فلوس Atlas</h3><span class="spacer"></span><button class="btn sm" id="moneyRefresh">↻</button><button class="btn sm" id="moneyClose">✕</button></div>
   <div id="moneyBody"></div>
@@ -1594,6 +1565,7 @@
 <script src="/series.js"></script>
 <script src="/ads.js"></script>
 <script src="/lab.js"></script>
+<script src="/assets.js"></script>
 <script src="/shell.js"></script>
 </body>
 </html>
