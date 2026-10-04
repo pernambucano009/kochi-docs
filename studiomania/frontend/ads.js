@@ -197,6 +197,11 @@ function dirText(d) {
 
 function renderAdAdapt() {
   const a = adx.cur;
+  const replica = a.settings?.fidelity === "replica";
+  $("adBrandCtl").hidden = replica;  // النسخة طبق الأصل مفيهاش تطبيق على البراند
+  $("adReplicaNote").hidden = !replica;
+  $("adReplicaNote").innerHTML = replica ? `🧪 <b>وضع النسخة طبق الأصل:</b> المشاهد والكلام والموشن بتتاخد من التحليل زي ما هي، والموديل بيكتب البرومبتات بس.
+    ${a.adaptation && !a.adaptation.replica ? `<br>⚠️ الاقتراح اللي تحت اتكتب قبل ما تختار الوضع ده. <button class="btn sm primary" type="button" data-replica-redo>✍️ اكتبه من جديد كنسخة طبق الأصل</button>` : ""}` : "";
   renderDirections(a);
   const busy = a.adapt_status === "working";
   $("adAdaptState").innerHTML = busy ? `<span class="spin-inline"></span> ✍️ بيكتب الاقتراح...` : a.adapt_status === "failed" ? `✕ ${adEsc(a.adapt_error)}` : "";
@@ -515,6 +520,10 @@ async function adaptWithControls() {
   adx.cur = await api(`/api/ads/${adx.cur.id}/adapt`, { method: "POST", ...jsonBody({ message: "" }) });
   renderAds(); scheduleAdPoll();
 }
+$("adReplicaNote").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-replica-redo]");
+  if (b) busyButton(b, "⏳", adaptWithControls);
+});
 $("adCtlApply").onclick = () => {
   if (adx.cur.adaptation && !confirm("يكتب الاقتراح من جديد بالاختيارات دي؟ الاقتراح الحالي هيتغير.")) return;
   busyButton($("adCtlApply"), "⏳", adaptWithControls);

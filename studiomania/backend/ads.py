@@ -169,30 +169,71 @@ REPLICA_NOTE = ("REPLICA TEST: rebuild the ORIGINAL reference ad exactly as it i
                 "people, wardrobe, places, colors, on-screen text and spoken language. Do not convert anything to another brand.")
 
 
+REPLICA_FORMAT = """{
+  "title": "اسم الإعلان الأصلي",
+  "concept": "الإعلان الأصلي في جملتين",
+  "cast": "كل شخص في الإعلان بوصف دقيق ثابت بالإنجليزي: السن، البشرة، الشعر، الجسم، اللبس بألوانه",
+  "locations": "الأماكن بالتفصيل",
+  "palette": "ألوان الإعلان الأصلي بالـ hex ودور كل لون",
+  "music_direction": "الموسيقى زي الأصلي", "sound_design": "المؤثرات زي الأصلي",
+  "scenes": [
+    {"n": 1,
+     "prompt": "English prompt for an image/video model that recreates THIS original scene exactly: subject, look, wardrobe, action, setting, lighting, lens, framing, camera move, any on-screen text verbatim and where it is",
+     "motion_prompt": "English description of the scene's motion graphics exactly as in the original (elements, position, timing, animation), or empty",
+     "components": [{"name": "نفس اسم المكون في التحليل", "image_prompt": "English prompt to recreate this element alone exactly as in the original, on a plain flat background"}]}
+  ]
+}"""
+
+
 def replica_messages(analysis: dict, audio: dict, style_txt: str, asks: list[str], n_orig: int, chat: list[dict]) -> list[dict]:
-    """🧪 تجربة نسخة طبق الأصل: نفس البروسيس بالظبط بس من غير أي تغيير في الإعلان، عشان نقيس التحليل والتوليد."""
+    """🧪 تجربة نسخة طبق الأصل: المشاهد بتتبني من التحليل نفسه (replica_from_analysis)، والموديل بيكتب البرومبتات الإنجليزي بس."""
     system = (
-        "أنت مخرج إعلانات. دي تجربة لقياس دقة التحليل والتوليد: شغلتك تكتب خطة إنتاج تعيد بناء الإعلان المرجعي ده "
-        "**طبق الأصل من غير أي تغيير**: نفس البراند والمنتج واللوجوهات وشاشات التطبيق، نفس الأشخاص بنفس شكلهم ولبسهم "
-        "(اوصفهم بدقة: السن، البشرة، الشعر، اللبس، الألوان)، نفس الأماكن والإضاءة والألوان، نفس الكلام المكتوب على الشاشة حرفيًا، "
-        "ونفس الكلام المنطوق حرفيًا بلغته الأصلية. نفس الكادر وزاوية الكاميرا وحركتها، ونفس الموشن جرافيك بتوقيته.\n"
-        "متغيرش البراند لكوتشي ومتضيفش ولا تشيل حاجة.\n\n"
+        "دي تجربة لقياس دقة البرنامج: هنعيد بناء الإعلان المرجعي ده بالذكاء الاصطناعي طبق الأصل، من غير أي تغيير. "
+        "مفيش براند تاني ومفيش تعديل: نفس المنتج والبراند واللوجو، نفس الأشخاص بشكلهم ولبسهم، نفس الأماكن والإضاءة والألوان، "
+        "نفس الكلام المكتوب حرفيًا. شغلتك تكتب لكل مشهد برومبت إنجليزي دقيق جدًا يوصف المشهد الأصلي زي ما هو، "
+        "ووصف ثابت لكل شخص عشان يطلع نفس الشكل في كل اللقطات.\n\n"
         + style_txt
         + "تحليل الإعلان المرجعي:\n" + json.dumps(analysis, ensure_ascii=False)[:40000] + "\n\n"
         + ("تحليل الصوت:\n" + json.dumps(audio, ensure_ascii=False)[:6000] + "\n\n" if audio else "")
-        + "المطلوب:\n"
-        f"- عدد المشاهد = {n_orig} بالظبط، المشهد رقم n = المشهد الأصلي رقم n (ref_scene = n) وبنفس مدته بالظبط.\n"
-        "- voice = الكلام المنطوق في المشهد حرفيًا بلغته، on_screen_text = الكلام المكتوب حرفيًا.\n"
-        "- prompt وmotion_prompt بالإنجليزي ويوصفوا المشهد الأصلي بأدق تفاصيل ممكنة (الشخص، اللبس، المكان، الإضاءة، الكادر، "
-        "حركة الكاميرا، الحركة، الموشن جرافيك ومكانه وتوقيته).\n"
-        "- components = مكونات المشهد الأصلي نفسها (from = نفس الاسم)، asset فاضي.\n"
-        "- palette = ألوان الإعلان الأصلي بالـ hex. angle وtone = زي الأصلي. title = اسم الإعلان الأصلي + «(نسخة طبق الأصل)».\n"
-        "- اللبس محتشم.\n"
-        + "".join(f"- {a}\n" for a in asks if a and not a.startswith(("المدة", "اللغة", "الكلام")))
-        + f"رجّع JSON بس بالشكل ده:\n{ADAPT_FORMAT}"
+        + f"لازم ترجع {n_orig} مشهد بنفس أرقام التحليل. "
+        + "".join(f"{a}. " for a in asks if a and not a.startswith(("المدة", "اللغة", "الكلام", "عدد المشاهد")))
+        + f"\nرجّع JSON بس بالشكل ده:\n{REPLICA_FORMAT}"
     )
-    first = {"role": "user", "content": "اكتب خطة إعادة بناء الإعلان ده طبق الأصل."}
+    first = {"role": "user", "content": "اكتب برومبتات إعادة بناء الإعلان ده طبق الأصل."}
     return [{"role": "system", "content": system}, first] + chat[-12:]
+
+
+def replica_from_analysis(analysis: dict, llm: dict) -> dict:
+    """الاقتراح في وضع النسخة طبق الأصل: المشاهد والكلام والموشن والمكونات من التحليل حرفيًا، والبرومبتات من الموديل."""
+    llm = llm or {}
+    by_n = {}
+    for x in llm.get("scenes") or []:
+        if isinstance(x, dict) and str(x.get("n", "")).strip().isdigit():
+            by_n[int(str(x["n"]).strip())] = x
+    scenes = []
+    for i, o in enumerate((analysis or {}).get("scenes") or []):
+        n = int(o.get("n") or i + 1)
+        x = by_n.get(n, {})
+        prompts = {c.get("name"): c.get("image_prompt", "") for c in x.get("components") or [] if isinstance(c, dict)}
+        scenes.append({
+            "n": n, "ref_scene": n, "seconds": round(max(0.5, float(o.get("end") or 0) - float(o.get("start") or 0)), 2),
+            **{k: o.get(k, "") for k in ("visual", "shot", "camera", "on_screen_text", "voice", "sfx", "music")},
+            "motion_graphics": o.get("motion_graphics", ""),
+            "motion_prompt": x.get("motion_prompt", ""),
+            "prompt": x.get("prompt") or o.get("visual", ""),
+            "components": [{**{k: c.get(k, "") for k in ("name", "kind", "description", "animation")}, "from": c.get("name", ""), "asset": "",
+                            "image_prompt": prompts.get(c.get("name"), "")} for c in o.get("components") or [] if isinstance(c, dict)],
+        })
+    a = analysis or {}
+    total = sum(s["seconds"] for s in scenes)
+    return {"title": f"{llm.get('title') or a.get('title') or 'الإعلان'} (نسخة طبق الأصل)", "concept": llm.get("concept") or a.get("summary", ""),
+            "why_it_fits": "🧪 تجربة: نسخة طبق الأصل من الإعلان من غير أي تغيير، عشان نقيس دقة التحليل والتوليد.",
+            "kochi_angle": "", "angle": a.get("idea", ""), "tone": a.get("tone", ""), "hook": a.get("hook", ""),
+            "palette": llm.get("palette") or a.get("colors", ""), "duration": round(total, 1), "format": "", "scenes": scenes,
+            "voiceover_script": "\n".join(s["voice"] for s in scenes if s.get("voice")),
+            "music_direction": llm.get("music_direction", ""), "sound_design": llm.get("sound_design", ""),
+            "cast": llm.get("cast", ""), "locations": llm.get("locations", ""), "production_notes": "", "cta": a.get("cta", ""),
+            "caption": "", "replica": True}
 
 
 def adapt_messages(brand: dict, analysis: dict, audio: dict, settings: dict, style: dict | None, chat: list[dict],

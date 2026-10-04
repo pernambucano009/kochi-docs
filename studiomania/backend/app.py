@@ -6246,6 +6246,8 @@ def run_ad_adapt(aid: str) -> None:
             msgs = az.adapt_messages(brand_settings(), d.get("analysis") or {}, d.get("audio") or {}, settings,
                                      ad_style(settings.get("style_id")), d.get("chat") or [], ad_brain(settings), other_ads(aid))
             result = ad_json(series_chat(msgs), "اقتراح كوتشي")
+        if settings.get("fidelity") == "replica":  # 🧪 النسخة طبق الأصل: المشاهد من التحليل حرفيًا
+            result = az.replica_from_analysis(d.get("analysis") or {}, {} if atlas.mock_mode() else result)
         def fn(d):
             d["adaptation"] = {**result, "based_on": d.get("analysis_ver", 0)}
             d["adapt_status"], d["adapt_error"] = "done", None
