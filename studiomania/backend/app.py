@@ -8463,7 +8463,7 @@ def lab_to_dict(lid: str, d: dict) -> dict:
             "components": comps,
             "audioshake": bool(audioshake.api_key() or atlas.mock_mode()),
             "reviews": lab_reviews(d), "busy": any((v or {}).get("status") in ("working", "queued") for v in (d.get("steps") or {}).values()),
-            "categories": list(CLIP_CATS)}
+            "categories": list(lab.COMPONENT_CATS)}
 
 
 def lab_list_items() -> list[dict]:
@@ -8725,6 +8725,10 @@ def run_lab_elements(lid: str) -> None:
             x = next((y for y in d.get("shots") or [] if y["n"] == n), None)
             if x is not None:
                 x["analysis"], x["analysis_error"] = res, err
+                # 🙈 تصوير عادي من غير موشن جرافيك بيتشال لوحده (إلا لو إنت اللي رجّعته أو شلته بإيدك)
+                if res and (x.get("ignored") or {}).get("by") != "user" and not x.get("keep"):
+                    x["ignored"] = None if res.get("motion_graphics") else {
+                        "by": "auto", "reason": res.get("mg_reason") or "مفيهاش موشن جرافيك", "at": now()}
         lab_update(lid, fn)
 
 
@@ -8779,6 +8783,36 @@ def lab_review(lid: str, body: LabReviewIn):
             x.setdefault("original", {k: x.get(k) for k in fix})  # الأصل بتاع الموديل بيتحفظ للمقارنة والتعلم
             x.update(fix)
         x["review"] = {"ok": body.ok, "note": body.note.strip()[:500], "at": now()}
+    return lab_to_dict(lid, lab_update(lid, fn))
+
+
+class ShotIn(BaseModel):
+    ignored: bool
+
+
+@app.patch("/api/lab/{lid}/shots/{n}")
+def lab_shot_patch(lid: str, n: int, body: ShotIn):
+    """🗑️ شيل لقطة (مش هتدخل في الكومبوننتس) أو ↩ رجّعها. اللقطة نفسها بتفضل عشان ترجعها وقت ما تحب."""
+    def fn(d):
+        s = lab_shot(d, n)
+        s["ignored"] = {"by": "user", "reason": "شلتها بإيدك", "at": now()} if body.ignored else None
+        s["keep"] = not body.ignored  # رجّعتها: التفكيك الجاي ميشيلهاش تاني
+    return lab_to_dict(lid, lab_update(lid, fn))
+
+
+@app.post("/api/lab/{lid}/shots/prune")
+def lab_shots_prune(lid: str):
+    """🧹 يشيل كل اللقطات اللي ملهاش ولا كومبوننت (غير المرفوضة)."""
+    def fn(d):
+        live = [c for c in d.get("components") or [] if (c.get("review") or {}).get("ok") is not False]
+        gone = 0
+        for s in d.get("shots") or []:
+            if s.get("ignored") or any(c["t0"] < s["end"] and c["t1"] > s["start"] for c in live):
+                continue
+            s["ignored"], s["keep"] = {"by": "user", "reason": "ملهاش كومبوننتس", "at": now()}, False
+            gone += 1
+        if not gone:
+            raise HTTPException(400, "كل اللقطات اللي فاضلة فيها كومبوننتس")
     return lab_to_dict(lid, lab_update(lid, fn))
 
 

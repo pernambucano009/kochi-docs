@@ -108,7 +108,7 @@ function renderLabTimeline(d) {
   const allOn = Object.values(labx.hear).every(Boolean), hasAudio = !!(a.sfx || a.speech || a.music);
   const cst = (c) => c.asset ? "ok" : c.review?.ok === false ? "bad" : "";
   $("labTimeline").innerHTML =
-    lane("✂️ اللقطات", (d.shots || []).map((s) => `<i class="blk shot ${s.review?.ok === false ? "bad" : ""}" style="right:${pct(s.start)};width:calc(${pct(s.end - s.start)} - 2px)" data-seek="${s.start}" title="لقطة ${s.n}">${s.n}</i>`).join(""))
+    lane("✂️ اللقطات", (d.shots || []).map((s) => `<i class="blk shot ${s.review?.ok === false ? "bad" : ""} ${s.ignored ? "off" : ""}" style="right:${pct(s.start)};width:calc(${pct(s.end - s.start)} - 2px)" data-seek="${s.start}" title="لقطة ${s.n}">${s.n}</i>`).join(""))
     + lane("💡 كومبوننتس", (d.components || []).map((c) => `<i class="blk comp ${cst(c)}" style="right:${pct(c.t0)};width:calc(${pct(c.t1 - c.t0)} - 2px)" data-seek="${c.t0}" data-gocomp="${c.id}" title="${le(c.name)}"></i>`).join(""))
     + (!hasAudio ? "" : `<div class="lab-hearnote ${allOn ? "" : "on"}">${allOn ? "🎧 دوس 🔊 جنب أي حارة عشان تقفلها وتسمع الباقي لوحده"
       : labx.stems ? "🎚️ بتسمع التراكات المفصولة اللي مفتوحة بس" : "⚠️ مفيش تراكات مفصولة: الصوت بيسكت برا أوقات الحاجات اللي مفتوحة (تقدر تتأكد من التوقيت، بس الكلام والموسيقى في نفس اللحظة بيبقوا مع بعض)"}</div>`
@@ -315,7 +315,16 @@ async function labComp(cid, body, btn) {
 function renderLabShots(d) {
   const sfxById = Object.fromEntries((d.audio?.sfx || []).map((x) => [x.id, x]));
   if (!(d.shots || []).length) { $("labShots").innerHTML = `<h3 class="pane-h">🎬 اللقطات</h3><p class="muted">${d.steps?.shots?.status === "working" ? "⏳ بيدور على القطعات..." : "لسه."}</p>`; return; }
-  $("labShots").innerHTML = `<h3 class="pane-h">🎬 اللقطات وعناصرها <span class="muted">(${d.shots.length})</span></h3>` + d.shots.map((s) => {
+  const kept = d.shots.filter((s) => !s.ignored), gone = d.shots.filter((s) => s.ignored);
+  const noComp = kept.filter((s) => !(d.components || []).some((c) => c.review?.ok !== false && c.t0 < s.end && c.t1 > s.start));
+  $("labShots").innerHTML = `<h3 class="pane-h">🎬 اللقطات وعناصرها <span class="muted">(${kept.length}${gone.length ? ` من ${d.shots.length}` : ""})</span>
+      ${noComp.length && (d.components || []).length ? `<button type="button" class="btn sm" data-prune title="${noComp.map((s) => s.n).join("، ")}">🧹 شيل اللقطات اللي ملهاش كومبوننتس (${noComp.length})</button>` : ""}</h3>
+    ${gone.length ? `<details class="lab-gone"><summary>🙈 لقطات اتشالت (${gone.length}) <span class="muted">مش بتدخل في الكومبوننتس. البرنامج بيشيل لوحده التصوير العادي اللي مفيهوش موشن جرافيك.</span></summary>
+      ${gone.map((s) => `<div class="lab-row"><img src="${s.frames?.[0]?.url || ""}" alt="" class="lab-gone-th">
+        <b>لقطة ${s.n}</b> <span class="lab-time">${lt(s.start)} ← ${lt(s.end)}</span>
+        <small class="muted grow" data-no-i18n>${s.ignored.by === "auto" ? "🤖 " : "✋ "}${le(s.ignored.reason)}${s.analysis?.summary ? ` · ${le(s.analysis.summary)}` : ""}</small>
+        <button type="button" class="btn sm" data-seek="${s.start}" data-playvid>▶️</button>
+        <button type="button" class="btn sm" data-unhide="${s.n}">↩ رجّعها</button></div>`).join("")}</details>` : ""}` + kept.map((s) => {
     const an = s.analysis, pick = labx.pick[s.n] ?? -1;
     return `<article class="lab-shot" data-shot="${s.n}">
       <div class="lab-shotplay">
@@ -327,7 +336,8 @@ function renderLabShots(d) {
       <div class="lab-shotbody">
       <header><b>لقطة ${s.n}</b> <span class="lab-time">${lt(s.start)} ← ${lt(s.end)} (${(s.end - s.start).toFixed(2)} ث)</span>
         ${an ? `<span class="chip">${LAB_SCENE[an.scene_type] || ""}</span>` : ""}
-        <span class="muted">القطع مظبوط؟</span>${rv("shot", s.n, s.review)}</header>
+        <span class="muted">القطع مظبوط؟</span>${rv("shot", s.n, s.review)}
+        <button type="button" class="btn sm" data-hide="${s.n}" title="مش هتدخل في الكومبوننتس، وتقدر ترجّعها">🗑️ شيلها</button></header>
       <div class="lab-strip">${(s.frames || []).map((f) => `<img src="${f.url}" data-seek="${f.t}" data-pickt="${f.t}" class="${Math.abs(f.t - pick) < 0.001 ? "sel" : ""}" title="${lt(f.t)}" alt="">`).join("")}</div>
       ${s.analysis_error ? `<div class="err">${le(s.analysis_error)}</div>` : ""}
       ${an ? `<p data-no-i18n>${le(an.summary)}</p>
@@ -400,6 +410,15 @@ document.querySelector('.view[data-view="11"]').addEventListener("click", async 
       renderLabShots(labx.cur);
     }
     return;
+  }
+  const hide = e.target.closest("[data-hide], [data-unhide]"), prune = e.target.closest("[data-prune]");
+  if (hide || prune) {
+    if (prune && !confirm("يشيل كل اللقطات اللي ملهاش ولا كومبوننت؟ (تقدر ترجّع أي واحدة بعدين)")) return;
+    const url = prune ? `/api/lab/${labx.cur.id}/shots/prune` : `/api/lab/${labx.cur.id}/shots/${hide.dataset.hide || hide.dataset.unhide}`;
+    return busyButton(hide || prune, "⏳", async () => {
+      labx.cur = await api(url, prune ? { method: "POST" } : { method: "PATCH", ...jsonBody({ ignored: !!hide.dataset.hide }) });
+      renderLab();
+    });
   }
   const cf = e.target.closest("[data-cfilter]");
   if (cf) { labx.cfilter = cf.dataset.cfilter; return renderLabComps(labx.cur); }

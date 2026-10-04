@@ -156,6 +156,8 @@ def audio_messages(duration: float, marks: list[dict], speech: list[dict]) -> li
 ELEMENTS_FORMAT = """{
   "scene_type": "live_action | screen_recording | motion_graphics | mixed",
   "summary": "اللقطة في جملة",
+  "motion_graphics": true,
+  "mg_reason": "ليه فيها أو مفيهاش موشن جرافيك ينفع يتاخد (جملة قصيرة)",
   "background": {"name": "اسم الخلفية", "description": "شكلها بالتفصيل"},
   "elements": [
     {"id": "e1", "name": "اسم العنصر (مثلًا: مؤشر ماوس أخضر)",
@@ -180,6 +182,9 @@ def elements_messages(shot: dict, frames: list[dict], sfx: list[dict], speech: l
         "وكل حاجة بيعملها بتوقيتها بالظبط: بيظهر/بيختفي/بيتحرك من فين لفين (from/to = [x, y] كنسب)/بيدوس/بيسحب/بيكتب...\n"
         "اربط كل حركة بالصوت اللي حصل معاها لو فيه (اكتب id الصوت من القايمة).\n"
         f"الأصوات اللي في اللقطة دي:\n{sounds}\nالكلام اللي بيتقال:\n{said}\n\n"
+        "motion_graphics = true لو اللقطة فيها موشن جرافيك أو افيكتس ينفع تتاخد كأصل: جرافيك متحرك، كلام متحرك، انتقالات، "
+        "واجهة تطبيق أو شاشة بتتحرك، حركة ماوس، أيقونات وأشكال بتتحرك، افيكتس. و false لو هي تصوير عادي (شخص بيتكلم، "
+        "منتج، مكان) والجرافيك فيها مش موجود أو مجرد ترجمة/كلام ثابت ملوش قيمة كأصل.\n"
         "متخترعش عناصر مش باينة. الأسماء والأوصاف بالعربي المصري البسيط. رجّع JSON بس بالشكل ده:\n" + ELEMENTS_FORMAT
     )
     parts: list[dict] = [{"type": "text", "text": text}]
@@ -225,19 +230,22 @@ def clean_elements(data: dict, shot: dict, sfx_ids: set[str]) -> dict:
     return {"scene_type": (data or {}).get("scene_type") if (data or {}).get("scene_type") in
             ("live_action", "screen_recording", "motion_graphics", "mixed") else "mixed",
             "summary": str((data or {}).get("summary") or "")[:400],
+            "motion_graphics": (data or {}).get("motion_graphics") is not False,
+            "mg_reason": str((data or {}).get("mg_reason") or "")[:200],
             "background": {"name": str(bg.get("name") or "")[:80], "description": str(bg.get("description") or "")[:600], "review": None},
             "elements": els}
 
 
 # ------------------------------------------------------------ 💡 الكومبوننتس: قطع من الفيديو تنفع تتعاد وتتحكم فيها
 
-COMPONENT_CATS = ("motion_graphics", "effect", "transition", "text", "screen", "cursor", "character", "background", "product", "other")
+# الكومبوننتس موشن جرافيك وافيكتس بس (مش شخصيات ولا منتجات ولا تصوير عادي)
+COMPONENT_CATS = ("motion_graphics", "effect", "transition", "text", "screen", "cursor", "other")
 CONTROL_TYPES = ("text", "color", "choice", "number")
 
 COMPONENTS_FORMAT = """{
   "components": [
     {"name": "اسم قصير واضح (مثلًا: ماوس بيسحب ملفات لسلة المهملات)",
-     "category": "motion_graphics | effect | transition | text | screen | cursor | character | background | product | other",
+     "category": "motion_graphics | effect | transition | text | screen | cursor | other",
      "t0": 1.20, "t1": 3.80,
      "elements": ["s1e1", "s1e2"],
      "description": "إيه اللي بيحصل فيه بالظبط (الحركة والإيقاع والشكل)",
@@ -257,6 +265,8 @@ def components_messages(d: dict, rejected: list[dict]) -> list[dict]:
     lines = []
     for s in d.get("shots") or []:
         an = s.get("analysis") or {}
+        if s.get("ignored"):  # لقطات اتشالت (تصوير عادي من غير موشن)
+            continue
         lines.append(f"\n## لقطة {s['n']} ({s['start']:.2f}–{s['end']:.2f}) · {an.get('scene_type', '')}: {an.get('summary', '')}")
         if (an.get("background") or {}).get("name"):
             lines.append(f"الخلفية: {an['background']['name']} — {an['background'].get('description', '')}")
@@ -274,6 +284,8 @@ def components_messages(d: dict, rejected: list[dict]) -> list[dict]:
         "- كل كومبوننت حتة واحدة مكتملة ليها بداية ونهاية واضحة (حركة كاملة، افيكت كامل، انتقال كامل). "
         "سيب هامش صغير قبلها وبعدها (حوالي 0.15 ثانية) من غير ما تدخل في حاجة تانية.\n"
         "- ممكن يعدّي القطع بين لقطتين لو هو انتقال أو حركة مستمرة. ومفيش حد أدنى ولا أقصى للمدة: خليه زي ما هو في الفيديو.\n"
+        "- موشن جرافيك وافيكتس بس: جرافيك متحرك، كلام متحرك، انتقالات، واجهات وشاشات بتتحرك، حركات ماوس، افيكتس. "
+        "متطلعش شخصيات ولا تصوير عادي لناس أو منتجات أو أماكن ولا خلفيات لوحدها، حتى لو باينة في الفيديو.\n"
         "- متكررش نفس الحتة، ومتطلعش حاجات عادية ملهاش قيمة كأصل (لقطة واقفة من غير حركة مثلًا).\n"
         "- elements = ids العناصر اللي جواه من القايمة.\n"
         "- controls = الحاجات اللي العميل هيحب يغيّرها فيه، بقيمتها الحالية زي ما هي في الفيديو بالظبط "
@@ -325,7 +337,7 @@ def mock_components(d: dict) -> dict:
     comps = []
     for s in d.get("shots") or []:
         els = (s.get("analysis") or {}).get("elements") or []
-        if not els:
+        if not els or s.get("ignored"):
             continue
         comps.append({"name": f"تجربة: ماوس بيسحب ملف (لقطة {s['n']})", "category": "cursor", "t0": s["start"], "t1": s["end"],
                       "elements": [e["id"] for e in els], "description": "المؤشر بيتحرك وبيسحب الملف للسلة", "use": "شرح ميزة في تطبيق",
@@ -347,7 +359,12 @@ def mock_audio(duration: float, marks: list[dict]) -> dict:
 
 def mock_elements(shot: dict, sfx: list[dict]) -> dict:
     s, e = shot["start"], shot["end"]
-    return {"scene_type": "screen_recording", "summary": "تجربة: ماوس بيسحب ملف",
+    if shot["n"] % 2 == 0:
+        return {"scene_type": "live_action", "summary": "تجربة: شخص بيتكلم قدام الكاميرا", "motion_graphics": False,
+                "mg_reason": "تصوير عادي من غير جرافيك", "background": {"name": "كافيه", "description": "تجربة"},
+                "elements": [{"id": "e1", "name": "شخص", "type": "character", "description": "راجل قاعد", "first_t": s, "last_t": e,
+                              "actions": [{"t0": s, "t1": e, "action": "speak", "detail": "بيتكلم"}]}]}
+    return {"scene_type": "screen_recording", "summary": "تجربة: ماوس بيسحب ملف", "motion_graphics": True,
             "background": {"name": "سطح مكتب", "description": "خلفية زرقا فاتحة"},
             "elements": [{"id": "e1", "name": "مؤشر ماوس أخضر", "type": "cursor", "description": "سهم أخضر", "first_t": s, "last_t": e,
                           "box": [0.45, 0.45, 0.05, 0.05],

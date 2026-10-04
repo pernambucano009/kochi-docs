@@ -1526,3 +1526,7 @@ a.pl-link:hover { background: color-mix(in srgb, var(--ok) 24%, transparent); }
 .as-ctls > b, .as-ctls > small { flex-basis: 100%; }
 .as-ctl { display: flex; flex-direction: column; gap: 3px; font-size: 12px; min-width: 140px; }
 .as-ctl input[type=color] { width: 56px; height: 32px; padding: 0; }
+.lab-lt .blk.shot.off { background: #c9ced3; color: #6b7280; text-decoration: line-through; }
+.lab-gone { border: 1px dashed var(--line); border-radius: 10px; padding: 6px 10px; margin-bottom: 10px; }
+.lab-gone summary { cursor: pointer; }
+.lab-gone-th { width: 54px; height: 54px; object-fit: cover; border-radius: 6px; }
