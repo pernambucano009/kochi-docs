@@ -1078,6 +1078,8 @@ function renderVoices(a) {
       ${working ? `<span class="muted"><span class="spin-inline"></span> بيسمع الصوت ويقطّعه على اللقطات...</span>` : ""}
       ${fv.status === "done" ? `<span class="muted">✅ ${fv.duration} ث · اتطابق ${Math.round((fv.ratio || 0) * 100)}% من الكلام</span>` : ""}
     </div>
+    ${a.settings.fidelity === "replica" ? `<div class="ad-dir-chosen">🧪 في النسخة طبق الأصل الفويس أوفر هو <b>صوت الإعلان الأصلي نفسه</b>، وبيتحط ويتقطع على اللقطات لوحده لما التنفيذ يبدأ.
+      ${fv.file && !fv.original ? `<br>⚠️ الصوت الكامل الحالي مش صوت الإعلان الأصلي. دوس «🎧 استخدم صوت الإعلان الأصلي».` : ""}</div>` : ""}
     ${fv.url ? `<audio src="${fv.url}" controls preload="none"></audio>` : ""}
     ${fv.error ? `<div class="err">✕ ${adEsc(fv.error)}</div>` : ""}
   </div>`);

@@ -6900,6 +6900,12 @@ def prod_start(aid: str):
     update_ad(aid, fn)
     # شاشات التطبيق واللوجو وصور المنتج الحقيقية من عقل الإعلان بتتحط في المكونات لوحدها
     threading.Thread(target=safe_apply_brain, args=(aid,), daemon=True).start()
+    if settings.get("fidelity") == "replica" and (d.get("source") or {}).get("has_audio"):
+        # 🧪 النسخة طبق الأصل: الفويس أوفر هو صوت الإعلان الأصلي نفسه، بيتقطع على اللقطات لوحده
+        try:
+            prod_full_voice_original(aid)
+        except HTTPException:
+            pass
     return ad_response(aid)
 
 
@@ -8307,7 +8313,8 @@ def prod_full_voice(aid: str, file: UploadFile | None = File(default=None)):
         raise HTTPException(400, "ارفع ملف الصوت الأول")
     if (p.get("full_voice") or {}).get("status") == "working":
         raise HTTPException(400, "بيقطّع الصوت بالفعل")
-    update_ad(aid, lambda d: d["prod"].update(full_voice={"file": name, "status": "working", "error": None}))
+    original = name == (p.get("full_voice") or {}).get("file") and (p.get("full_voice") or {}).get("original", False)
+    update_ad(aid, lambda d: d["prod"].update(full_voice={"file": name, "status": "working", "error": None, "original": original}))
     threading.Thread(target=run_full_voice, args=(aid,), daemon=True).start()
     return ad_response(aid)
 
