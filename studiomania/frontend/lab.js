@@ -1,7 +1,7 @@
 // StudioMania — 🔬 معمل التفكيك: البرنامج بيفكك أي فيديو لعناصره، وإنت بتراجع وتقيّم كل حاجة.
 // القطعات وبدايات الأصوات بتتقاس بالكود، والموديل بيسمّي ويوصف، وتقييمك (✅ ❌ والتصحيح) بيتحفظ مع الأصل.
 
-const labx = { list: [], cur: null, timer: null, pick: {}, aopen: {}, view: "lab", hear: { speech: true, music: true, sfx: true }, stems: null, win: {} };
+const labx = { list: [], cur: null, timer: null, pick: {}, aopen: {}, view: "lab", cfilter: "", audioOpen: false, hear: { speech: true, music: true, sfx: true }, stems: null, win: {} };
 const LAB_KEY = "studiomania.lab";
 const LAB_SFX_CAT = { click: "🖱️ كليك", whoosh: "💨 ووش", pop: "💥 بوب", impact: "🥁 خبطة", typing: "⌨️ كتابة", swipe: "🖍️ سحبة",
   notification: "🔔 إشعار", riser: "📈 رايزر", transition: "🔀 انتقال", ui: "📱 صوت واجهة", foley: "👣 فولي", ambience: "🌫️ جو المكان", other: "❔ تاني" };
@@ -11,7 +11,7 @@ const LAB_TYPES = { character: "🧍 شخصية", background: "🖼️ خلفي�
 const LAB_ACTIONS = { appear: "بيظهر", disappear: "بيختفي", move: "بيتحرك", click: "بيدوس", drag: "بيسحب", drop: "بيسيب", type: "بيكتب",
   scale: "بيكبر/يصغر", rotate: "بيلف", highlight: "بيتعمله هايلايت", transform: "بيتحول", speak: "بيتكلم", gesture: "بيشاور", other: "تاني" };
 const LAB_SCENE = { live_action: "🎥 تصوير حقيقي", screen_recording: "🖥️ تسجيل شاشة", motion_graphics: "✨ موشن جرافيك", mixed: "🔀 مزيج" };
-const LAB_STEP = { shots: "✂️ القطعات", stems: "🎚️ فصل التراكات", audio: "🎧 الصوت", elements: "🧩 العناصر" };
+const LAB_STEP = { shots: "✂️ القطعات", elements: "🧩 العناصر", components: "💡 الكومبوننتس", stems: "🎚️ فصل التراكات", audio: "🎧 الصوت" };
 const LAB_STEMS = { dialogue: "🗣️ الكلام", music: "🎵 الموسيقى", effects: "🔊 المؤثرات" };
 const lt = (t) => `${Math.floor((t || 0) / 60)}:${((t || 0) % 60).toFixed(2).padStart(5, "0")}`;
 const le = (v) => escapeHtml(v == null ? "" : String(v));
@@ -76,7 +76,7 @@ function renderLab() {
   if (!d || lib) return;
   if (document.activeElement !== $("labName")) $("labName").value = d.name;
   document.querySelectorAll("[data-labrun]").forEach((b) => (b.disabled = d.busy));
-  $("labStatus").innerHTML = Object.entries(LAB_STEP).map(([k, l]) => {
+  $("labStatus").innerHTML = Object.entries(LAB_STEP).filter(([k]) => !["stems", "audio"].includes(k) || d.steps?.[k]).map(([k, l]) => {
     const s = d.steps?.[k] || {};
     return `<span class="lab-st ${s.status || ""}">${s.status === "working" ? `<span class="spin-inline"></span>` : s.status === "done" ? "✅" : s.status === "failed" ? "✕" : s.status === "skipped" ? "⏭" : "⏸"}
       ${l}${s.progress ? ` <small>${le(s.progress)}</small>` : ""}${s.error ? ` <small class="err">${le(s.error)}</small>` : ""}</span>`;
@@ -84,15 +84,17 @@ function renderLab() {
   renderLabScore(d);
   renderLabTimeline(d);
   const busyEdit = (el) => el.contains(document.activeElement) && document.activeElement.matches("input, select, textarea");
+  const compPlaying = [...$("labComps").querySelectorAll("video")].some((v) => !v.paused);
+  if (!busyEdit($("labComps")) && !compPlaying) renderLabComps(d);
   if (!busyEdit($("labAudio"))) renderLabAudio(d);
-  const shotPlaying = [...document.querySelectorAll("[data-shotvid], [data-vedvid]")].some((v) => !v.paused);
+  const shotPlaying = [...document.querySelectorAll("[data-shotvid]")].some((v) => !v.paused);
   if (!busyEdit($("labShots")) && !shotPlaying) renderLabShots(d);
 }
 
-const LAB_SCORE = { shots: "✂️ القطعات", stems: "🎚️ التراكات", sfx: "🔊 المؤثرات", music: "🎵 الموسيقى", speech: "🗣️ الكلام", elements: "🧩 العناصر", actions: "🎬 الحركات", layers: "🗂️ الطبقات" };
+const LAB_SCORE = { components: "💡 الكومبوننتس المقبولة", shots: "✂️ القطعات", stems: "🎚️ التراكات", sfx: "🔊 المؤثرات", music: "🎵 الموسيقى", speech: "🗣️ الكلام" };
 function renderLabScore(d) {
   const r = d.reviews || {};
-  $("labScore").innerHTML = `<b>👤 تقييمك لدقة التفكيك:</b>` + Object.entries(LAB_SCORE).filter(([k]) => r[k]?.total).map(([k, l]) => {
+  $("labScore").innerHTML = `<b>👤 تقييمك:</b>` + Object.entries(LAB_SCORE).filter(([k]) => r[k]?.total && (k === "components" || r[k].ok + r[k].bad)).map(([k, l]) => {
     const x = r[k], done = x.ok + x.bad, acc = done ? Math.round((x.ok / done) * 100) : null;
     return `<span class="lab-sc" title="✅ ${x.ok} · ❌ ${x.bad} · لسه ${x.total - done}">${l} <b>${acc == null ? "—" : acc + "%"}</b>
       <small>${done}/${x.total}</small></span>`;
@@ -103,14 +105,16 @@ function renderLabScore(d) {
 function renderLabTimeline(d) {
   const T = d.source.duration || 1, pct = (t) => `${(Math.max(0, Math.min(T, t)) / T) * 100}%`, a = d.audio || {};
   const lane = (label, items, k) => `<div class="lab-lane"><span class="lab-ll">${k ? `<button type="button" class="lab-hear ${labx.hear[k] ? "on" : ""}" data-hear="${k}" title="اسمع / اقفل">${labx.hear[k] ? "🔊" : "🔇"}</button>` : ""}${label}</span><div class="lab-lt">${items}</div></div>`;
-  const allOn = Object.values(labx.hear).every(Boolean);
+  const allOn = Object.values(labx.hear).every(Boolean), hasAudio = !!(a.sfx || a.speech || a.music);
+  const cst = (c) => c.asset ? "ok" : c.review?.ok === false ? "bad" : "";
   $("labTimeline").innerHTML =
-    `<div class="lab-hearnote ${allOn ? "" : "on"}">${allOn ? "🎧 دوس 🔊 جنب أي حارة عشان تقفلها وتسمع الباقي لوحده"
+    lane("✂️ اللقطات", (d.shots || []).map((s) => `<i class="blk shot ${s.review?.ok === false ? "bad" : ""}" style="right:${pct(s.start)};width:calc(${pct(s.end - s.start)} - 2px)" data-seek="${s.start}" title="لقطة ${s.n}">${s.n}</i>`).join(""))
+    + lane("💡 كومبوننتس", (d.components || []).map((c) => `<i class="blk comp ${cst(c)}" style="right:${pct(c.t0)};width:calc(${pct(c.t1 - c.t0)} - 2px)" data-seek="${c.t0}" data-gocomp="${c.id}" title="${le(c.name)}"></i>`).join(""))
+    + (!hasAudio ? "" : `<div class="lab-hearnote ${allOn ? "" : "on"}">${allOn ? "🎧 دوس 🔊 جنب أي حارة عشان تقفلها وتسمع الباقي لوحده"
       : labx.stems ? "🎚️ بتسمع التراكات المفصولة اللي مفتوحة بس" : "⚠️ مفيش تراكات مفصولة: الصوت بيسكت برا أوقات الحاجات اللي مفتوحة (تقدر تتأكد من التوقيت، بس الكلام والموسيقى في نفس اللحظة بيبقوا مع بعض)"}</div>`
-    + lane("✂️ اللقطات", (d.shots || []).map((s) => `<i class="blk shot ${s.review?.ok === false ? "bad" : ""}" style="right:${pct(s.start)};width:calc(${pct(s.end - s.start)} - 2px)" data-seek="${s.start}" title="لقطة ${s.n}">${s.n}</i>`).join(""))
     + lane("🗣️ كلام", (a.speech || []).map((s) => `<i class="blk sp" style="right:${pct(s.start)};width:${pct(s.end - s.start)}" data-seek="${s.start}" title="${le(s.text)}"></i>`).join(""), "speech")
     + lane("🎵 موسيقى", (a.music || []).map((s) => `<i class="blk mu" style="right:${pct(s.start)};width:${pct(s.end - s.start)}" data-seek="${s.start}" title="${le(s.description)}"></i>`).join(""), "music")
-    + lane("🔊 مؤثرات", (a.sfx || []).map((x) => `<i class="tick ${x.review?.ok === false ? "bad" : x.review?.ok ? "ok" : ""}" style="right:${pct(x.t)}" data-seek="${x.t}" data-clip="${x.clip_url || ""}" title="${le(x.label)} · ${lt(x.t)}"></i>`).join(""), "sfx")
+    + lane("🔊 مؤثرات", (a.sfx || []).map((x) => `<i class="tick ${x.review?.ok === false ? "bad" : x.review?.ok ? "ok" : ""}" style="right:${pct(x.t)}" data-seek="${x.t}" data-clip="${x.clip_url || ""}" title="${le(x.label)} · ${lt(x.t)}"></i>`).join(""), "sfx"))
     + `<div class="lab-head" id="labHead"></div>`;
   labHead();
 }
@@ -157,6 +161,9 @@ function labGateLoop() {
     if (!x.paused) x.volume = labAudible(x.currentTime) ? 1 : 0;
     labShotStop(x);
   });
+  document.querySelectorAll("[data-cvid]").forEach((x) => {  // كارت الكومبوننت: بيلف على الحتة بتاعته بس
+    if (!x.paused && (x.currentTime >= Number(x.dataset.t1) || x.currentTime < Number(x.dataset.t0) - 0.3)) x.currentTime = Number(x.dataset.t0);
+  });
   requestAnimationFrame(labGateLoop);
 }
 requestAnimationFrame(labGateLoop);
@@ -183,11 +190,17 @@ function labPlayShot(n, from, to) {
 }
 
 function renderLabAudio(d) {
+  const inner = labAudioInner(d);
+  $("labAudio").innerHTML = `<details data-audiobox ${labx.audioOpen ? "open" : ""}><summary><b>🎧 الصوت</b> <span class="muted">(متوقف دلوقتي: الأصل بيتحفظ بصوته الأصلي، والتحليل ده تجريبي)</span></summary>
+    <div class="row wrap"><button type="button" class="btn sm" data-labrun="stems">🎚️ افصل التراكات (AudioShake)</button>
+      <button type="button" class="btn sm" data-labrun="audio">🎧 حلّل الصوت</button></div>${inner}</details>`;
+}
+function labAudioInner(d) {
   const a = d.audio || {};
-  if (a.none) { $("labAudio").innerHTML = `<h3 class="pane-h">🎧 الصوت</h3><p class="muted">الفيديو ده مفيهوش صوت.</p>`; return; }
-  if (!a.sfx && !a.speech) { $("labAudio").innerHTML = `<h3 class="pane-h">🎧 الصوت</h3><p class="muted">${d.steps?.audio?.status === "working" ? "⏳ بيفكك الصوت..." : "لسه ما اتفككش."}</p>`; return; }
+  if (a.none) return `<p class="muted">الفيديو ده مفيهوش صوت.</p>`;
+  if (!a.sfx && !a.speech) return `<p class="muted">${d.steps?.audio?.status === "working" ? "⏳ بيفكك الصوت..." : "لسه ما اتفككش."}</p>`;
   const sfx = a.sfx || [];
-  $("labAudio").innerHTML = `<h3 class="pane-h">🎧 الصوت <span class="muted">(${sfx.length} مؤثر · ${(a.speech || []).length} جملة · ${(a.music || []).length} موسيقى · ${(a.onsets || []).length} بداية صوت اتقاست)</span></h3>
+  return `<h4>🎧 الصوت <span class="muted">(${sfx.length} مؤثر · ${(a.speech || []).length} جملة · ${(a.music || []).length} موسيقى · ${(a.onsets || []).length} بداية صوت اتقاست)</span></h4>
     ${labStems(d)}
     <p class="hint">⏱️ = الوقت اتظبط على بداية الصوت اللي اتقاست بالكود (دقة 10 مللي ثانية)${a.from_stem ? "، ومن تراك المؤثرات النضيف" : ""}. ▶️ بيشغّل الصوت لوحده وبيودّي الفيديو للحظته.</p>
     <h4>🔊 المؤثرات الصوتية</h4>
@@ -231,10 +244,10 @@ function labStems(d) {
 const ASSET_CATS = { motion_graphics: "✨ موشن جرافيك", effect: "💥 افيكت", transition: "🔀 انتقال", text: "🔤 كلام متحرك",
   screen: "🖥️ تسجيل شاشة / واجهة", cursor: "🖱️ حركة ماوس", character: "🧍 شخصية", background: "🖼️ خلفية", product: "📦 منتج", other: "تاني" };
 function labAssetForm(d, s) {
-  const els = s.analysis?.elements || [], done = (s.vedits || []).filter((v) => v.status === "done");
+  const els = s.analysis?.elements || [], T = d.source.duration;
   const guess = s.analysis?.scene_type === "screen_recording" ? "screen" : s.analysis?.scene_type === "motion_graphics" ? "motion_graphics" : "other";
-  return `<details class="lab-asset" data-ashot="${s.n}" ${labx.aopen[s.n] ? "open" : ""}><summary>📚 احفظ كأصل في المكتبة</summary>
-    <small class="muted">بتاخد المقطع كامل زي ما هو (الحركة والخلفية والصوت) ومعاه تفكيك عناصره، وبعدين من المكتبة تقدر تعدّل فيه جوه المشهد.</small>
+  return `<details class="lab-asset" data-ashot="${s.n}" ${labx.aopen[s.n] ? "open" : ""}><summary>📚 احفظ حتة بإيدك</summary>
+    <small class="muted">لو الاقتراحات فاتتها حاجة: بتاخد المقطع زي ما هو (الحركة والخلفية والصوت) ومعاه تفكيك عناصره، وتقدر تعدّي حدود اللقطة.</small>
     <div class="lab-chips"><button type="button" class="chip" data-arange="${s.start},${s.end}">🎬 اللقطة كلها</button>
       ${els.map((e) => `<button type="button" class="chip" data-arange="${e.first_t},${e.last_t}" data-aname="${le(e.name)}">${LAB_TYPES[e.type]?.split(" ")[0] || ""} ${le(e.name)} <small>${lt(e.first_t)}–${lt(e.last_t)}</small></button>`).join("")}</div>
     <div class="row wrap">
@@ -242,51 +255,68 @@ function labAssetForm(d, s) {
       <select data-af="category">${labOpts(ASSET_CATS, guess)}</select>
       <input type="text" data-af="tags" placeholder="تاجز: ماوس، سحب، فولدر" data-no-i18n>
     </div>
-    <div class="row wrap"><label>من <input type="number" step="0.05" min="${s.start}" max="${s.end}" value="${s.start.toFixed(2)}" data-af="t0"></label>
-      <label>لـ <input type="number" step="0.05" min="${s.start}" max="${s.end}" value="${s.end.toFixed(2)}" data-af="t1"></label>
+    <div class="row wrap"><label>من <input type="number" step="0.05" min="0" max="${T}" value="${s.start.toFixed(2)}" data-af="t0"></label>
+      <label>لـ <input type="number" step="0.05" min="0" max="${T}" value="${s.end.toFixed(2)}" data-af="t1"></label>
       <small class="muted">(بالثواني من أول الفيديو)</small>
-      ${done.length ? `<select data-af="vedit"><option value="">من الأصلي</option>${done.map((v) => `<option value="${v.id}">من النسخة ${(s.vedits || []).indexOf(v) + 1}</option>`).join("")}</select>` : ""}
       <button type="button" class="btn sm primary" data-asave>📚 احفظ</button></div>
   </details>`;
 }
 
-// ✏️ التعديل جوه المشهد: نفس اللقطة بحركتها، وكل عنصر يتغيّر بالكلام
-function labVedit(d, s) {
-  const els = s.analysis?.elements || [], vs = s.vedits || [], dur = (s.end - s.start);
-  const models = d.vedit_models || [];
-  const done = vs.filter((v) => v.status === "done");
-  return `<div class="lab-vedit" data-vshot="${s.n}">
-    <b>✏️ عدّل جوه المشهد</b> <small class="muted">المشهد بيفضل زي ما هو بحركته وخلفيته، واللي بتطلبه بس هو اللي بيتغيّر</small>
-    ${els.length ? `<div class="lab-chips">${els.map((e) => `<button type="button" class="chip" data-vchip="${le(e.name)}" title="${le(e.description)}">${LAB_TYPES[e.type]?.split(" ")[0] || ""} ${le(e.name)}</button>`).join("")}</div>` : ""}
-    <textarea rows="2" data-vtext placeholder="مثلًا: «مؤشر الماوس» خليه أزرق وأصغر، و«الملفات» غيّر أساميها لسعاد ولمياء وكريم، وبدل ما يحطهم في السلة يحطهم في فولدر «فواتير»"></textarea>
-    <div class="row wrap">
-      <select data-vmodel>${models.map((m) => `<option value="${m.key}">${le(m.label)} · ~${(m.per_sec * dur).toFixed(2)}$</option>`).join("")}</select>
-      ${done.length ? `<select data-vbase><option value="">على الأصلي</option>${done.map((v, i) => `<option value="${v.id}">على النسخة ${i + 1}</option>`).join("")}</select>` : ""}
-      <button type="button" class="btn sm primary" data-vgo>✨ عدّل المشهد</button>
-    </div>
-    <details class="lab-speed"><summary>⏩ سرّع / بطّأ جزء من اللقطة (ببلاش، من غير AI)</summary>
-      <div class="row wrap"><label>من <input type="number" step="0.05" min="0" max="${dur.toFixed(2)}" value="0" data-sp="t0"></label>
-        <label>لـ <input type="number" step="0.05" min="0" max="${dur.toFixed(2)}" value="${dur.toFixed(2)}" data-sp="t1"></label>
-        <label>السرعة <input type="number" step="0.1" min="0.2" max="5" value="1.5" data-sp="factor">×</label>
-        <button type="button" class="btn sm" data-vspeed>⏩ طبّق</button></div>
-      <small class="muted">الأوقات من أول اللقطة (0 لـ ${dur.toFixed(2)} ث). مثلًا حركة الماوس من ثانية كام لكام تبقى أسرع ×2 والباقي زي ما هو.</small></details>
-    ${vs.length ? `<div class="lab-vgrid">${vs.map((v, i) => `<div class="lab-ver">
-      ${v.status === "done" ? `<video data-vedvid="${v.id}" src="${v.url}" playsinline controls preload="metadata"></video>`
-        : v.status === "working" ? `<div class="lab-ver-wait"><span class="spin"></span><small>${le(v.step || "شغال...")}</small></div>`
-        : `<div class="lab-ver-wait err">✕ ${le(v.error)}</div>`}
-      <small data-no-i18n><b>${i + 1}.</b> ${le(v.instruction)}${v.base ? ` <span class="muted">(على نسخة ${vs.findIndex((x) => x.id === v.base) + 1})</span>` : ""}</small>
-      ${v.prompt ? `<details><summary class="muted">التعليمات اللي اتبعتت للموديل</summary><small dir="ltr" data-no-i18n>${le(v.prompt)}</small></details>` : ""}
-      <div class="row wrap">${v.status === "done" ? `<button type="button" class="btn sm" data-vcmp="${v.id}">▶️ مع الأصلي</button>` : ""}
-        <button type="button" class="btn sm danger" data-vdel="${v.id}">🗑️</button>${v.status === "done" ? rv("vedit", `${s.n}:${v.id}`, v.review) : ""}</div>
-    </div>`).join("")}</div>` : ""}
-  </div>`;
+// ---------- 💡 الكومبوننتس المقترحة: كل كارت حتة من الفيديو بتلف لوحدها، ✅ = تدخل المكتبة، ❌ = مرفوضة (وسببك بيعلّم الموديل)
+const COMP_FILTER = { "": "الكل", todo: "لسه", ok: "في المكتبة", bad: "مرفوضة" };
+const compState = (c) => (c.asset ? "ok" : c.review?.ok === false ? "bad" : "todo");
+function compPoster(d, t) {
+  const fr = (d.shots || []).flatMap((s) => s.frames || []);
+  return (fr.find((f) => f.t >= t) || fr[fr.length - 1])?.url || "";
+}
+function renderLabComps(d) {
+  const all = d.components || [], st = d.steps?.components || {};
+  const n = { todo: 0, ok: 0, bad: 0 };
+  all.forEach((c) => n[compState(c)]++);
+  const items = all.filter((c) => !labx.cfilter || compState(c) === labx.cfilter);
+  $("labComps").innerHTML = `<h3 class="pane-h">💡 الكومبوننتس المقترحة <span class="muted">(${all.length})</span>
+      <button type="button" class="btn sm" data-labrun="components" ${d.busy ? "disabled" : ""} title="اقتراحات جديدة. اللي قبلته أو رفضته بيفضل زي ما هو">↻ اقترح تاني</button></h3>
+    <p class="hint">الموديل طلّع الحتت دي من التفكيك. اتفرج على كل واحدة: ✅ تدخل المكتبة على طول بحركتها وخلفيتها وصوتها ومفاتيح التحكم بتاعتها، ❌ ترفضها واكتب السبب عشان الاقتراحات الجاية تبقى أحسن. تقدر تظبط الاسم والبداية والنهاية قبل ما تقبل.</p>
+    ${st.status === "working" || st.status === "queued" ? `<p class="muted"><span class="spin-inline"></span> ${le(st.progress || "مستني العناصر تخلص...")}</p>` : ""}
+    ${st.status === "skipped" || st.status === "failed" ? `<p class="err">${le(st.error)}</p>` : ""}
+    ${all.length ? `<div class="lab-chips">${Object.entries(COMP_FILTER).map(([k, l]) => `<button type="button" class="chip ${labx.cfilter === k ? "on" : ""}" data-cfilter="${k}">${l} <small>${k ? n[k] : all.length}</small></button>`).join("")}</div>` : ""}
+    <div class="lab-comps">${items.map((c) => {
+      const s = compState(c), cat = d.categories || Object.keys(ASSET_CATS);
+      return `<article class="lab-comp ${s}" data-comp="${c.id}">
+        <video data-cvid data-t0="${c.t0}" data-t1="${c.t1}" src="${d.source_url}#t=${c.t0}" poster="${compPoster(d, c.t0)}" preload="none" playsinline controls></video>
+        <input type="text" class="lab-cname" value="${le(c.name)}" data-cf="name" data-no-i18n>
+        <div class="row wrap"><select data-cf="category">${cat.map((k) => `<option value="${k}" ${k === c.category ? "selected" : ""}>${ASSET_CATS[k] || k}</option>`).join("")}</select>
+          <label>من <input type="number" step="0.05" min="0" max="${d.source.duration}" value="${c.t0}" data-cf="t0"></label>
+          <label>لـ <input type="number" step="0.05" min="0" max="${d.source.duration}" value="${c.t1}" data-cf="t1"></label>
+          <small class="muted">${(c.t1 - c.t0).toFixed(2)} ث</small></div>
+        ${c.description ? `<small data-no-i18n>${le(c.description)}</small>` : ""}
+        ${c.use ? `<small class="muted" data-no-i18n>💼 ${le(c.use)}</small>` : ""}
+        ${(c.controls || []).length ? `<div class="lab-ctls"><b>🎛️ مفاتيح التحكم:</b>${c.controls.map((k) => `<span class="lab-ctl" title="${le(k.target)}">${k.type === "color" && /^#[0-9a-f]{3,8}$/i.test(k.value) ? `<i style="background:${le(k.value)}"></i>` : ""}<span data-no-i18n>${le(k.label)}: <b>${le(k.value)}</b></span></span>`).join("")}</div>` : ""}
+        ${(c.tags || []).length ? `<small class="as-tags" data-no-i18n>${c.tags.map((t) => `#${le(t)}`).join(" ")}</small>` : ""}
+        <div class="row wrap lab-cact">
+          ${c.asset ? `<button type="button" class="btn sm ok" data-casset="${c.asset}">📚 في المكتبة ↗</button>`
+            : `<button type="button" class="btn sm primary" data-cok>✅ اقبل وحطه في المكتبة</button>`}
+          <button type="button" class="btn sm ${s === "bad" ? "danger" : ""}" data-cbad>❌ ${s === "bad" ? "مرفوض" : "ارفض"}</button>
+          <input type="text" class="lab-note grow" value="${le(c.review?.note)}" placeholder="ليه؟ (مثلًا: مقطوع من النص، مش مفيد)" data-cnote>
+        </div>
+      </article>`;
+    }).join("") || (all.length ? `<p class="muted">مفيش حاجة هنا.</p>` : st.status === "done" ? `<p class="muted">الموديل ملقاش حتت تستاهل تتحفظ.</p>` : "")}</div>`;
+}
+async function labComp(cid, body, btn) {
+  const go = async () => {
+    labx.cur = await api(`/api/lab/${labx.cur.id}/components/${cid}`, { method: "PATCH", ...jsonBody(body) });
+    renderLabComps(labx.cur); renderLabTimeline(labx.cur); renderLabScore(labx.cur);
+    if (body.ok) { toast("📚 اتحفظ في المكتبة"); labLibCount(); }
+  };
+  if (btn) return busyButton(btn, "⏳", go);
+  try { await go(); } catch (err) { toast(err.message, true); }
 }
 
 function renderLabShots(d) {
   const sfxById = Object.fromEntries((d.audio?.sfx || []).map((x) => [x.id, x]));
   if (!(d.shots || []).length) { $("labShots").innerHTML = `<h3 class="pane-h">🎬 اللقطات</h3><p class="muted">${d.steps?.shots?.status === "working" ? "⏳ بيدور على القطعات..." : "لسه."}</p>`; return; }
   $("labShots").innerHTML = `<h3 class="pane-h">🎬 اللقطات وعناصرها <span class="muted">(${d.shots.length})</span></h3>` + d.shots.map((s) => {
-    const an = s.analysis, L = s.layers || {}, pick = labx.pick[s.n] ?? L.t ?? (s.start + s.end) / 2;
+    const an = s.analysis, pick = labx.pick[s.n] ?? -1;
     return `<article class="lab-shot" data-shot="${s.n}">
       <div class="lab-shotplay">
         <video data-shotvid="${s.n}" data-start="${s.start}" data-end="${s.end}" src="${d.source_url}#t=${s.start},${s.end}"
@@ -302,12 +332,12 @@ function renderLabShots(d) {
       ${s.analysis_error ? `<div class="err">${le(s.analysis_error)}</div>` : ""}
       ${an ? `<p data-no-i18n>${le(an.summary)}</p>
         <div class="lab-row"><b>🖼️ الخلفية:</b> <input type="text" value="${le(an.background?.name)}" data-fix="background|${s.n}|name" data-no-i18n>
-          <small class="muted grow" data-no-i18n>${le(an.background?.description)}</small>${rv("background", s.n, an.background?.review)}</div>
+          <small class="muted grow" data-no-i18n>${le(an.background?.description)}</small></div>
         <div class="lab-els">${(an.elements || []).map((e) => `<div class="lab-el">
           <div class="lab-row"><select data-fix="element|${e.id}|type">${labOpts(LAB_TYPES, e.type)}</select>
             <input type="text" value="${le(e.name)}" data-fix="element|${e.id}|name" data-no-i18n>
             <button type="button" class="btn sm" data-seek="${e.first_t}" data-to="${e.last_t}" title="شغّل العنصر من أول ما يظهر لحد ما يختفي">▶️</button>
-          <span class="lab-time">${lt(e.first_t)} ← ${lt(e.last_t)}</span>${orig(e)}${rv("element", e.id, e.review)}</div>
+          <span class="lab-time">${lt(e.first_t)} ← ${lt(e.last_t)}</span>${orig(e)}</div>
           <small class="muted" data-no-i18n>${le(e.description)}</small>
           ${(e.actions || []).map((x, i) => `<div class="lab-row lab-act">
             <button type="button" class="btn sm" data-seek="${x.t0}" data-to="${x.t1}" data-playvid>▶️</button>
@@ -316,21 +346,10 @@ function renderLabShots(d) {
             ${x.from && x.to ? `<small class="muted" dir="ltr">(${x.from.join(", ")}) → (${x.to.join(", ")})</small>` : ""}
             <small class="grow" data-no-i18n>${le(x.detail)}</small>
             ${x.sfx && sfxById[x.sfx] ? `<button type="button" class="btn sm" data-seek="${sfxById[x.sfx].t}" data-to="${sfxById[x.sfx].t + 0.4}" title="الصوت المربوط">🔊 ${le(sfxById[x.sfx].label)}</button>` : ""}
-            ${rv("action", `${e.id}:${i}`, x.review)}</div>`).join("")}
+            </div>`).join("")}
         </div>`).join("") || `<p class="muted">مفيش عناصر.</p>`}</div>`
         : `<p class="muted">${d.steps?.elements?.status === "working" ? "⏳ بيفكك العناصر..." : "العناصر لسه ما اتفككتش."}</p>`}
       ${labAssetForm(d, s)}
-      ${labVedit(d, s)}
-      <div class="lab-layers">
-        <div class="row wrap"><button type="button" class="btn sm" data-layers="${s.n}" ${L.status === "working" ? "disabled" : ""}>
-          ${L.status === "working" ? `<span class="spin-inline"></span> بيفكك الطبقات...` : `🗂️ فكّك الفريم ${lt(pick)} لطبقات`}</button>
-          <span class="muted">اختار الفريم من الشريط فوق · بيتحسب على Atlas (حوالي 0.40$ للفريم)${L.price ? ` · آخر مرة: ${le(L.price)}$` : ""}</span></div>
-        ${L.error ? `<div class="err">${le(L.error)}</div>` : ""}
-        ${(L.items || []).length ? `<div class="lab-lgrid">
-          ${L.base_url ? `<figure><div class="lab-ck"><img src="${L.base_url}" alt=""></div><figcaption>🖼️ الخلفية لوحدها</figcaption></figure>` : ""}
-          ${L.items.map((x, i) => `<figure><div class="lab-ck"><img src="${x.url}" alt=""></div>
-            <input type="text" value="${le(x.name)}" data-fix="layer|${s.n}:${i}|name" data-no-i18n>${orig(x)}
-            ${x.description ? `<small class="muted" data-no-i18n>${le(x.description)}</small>` : ""}${rv("layer", `${s.n}:${i}`, x.review)}</figure>`).join("")}</div>` : ""}
       </div></div></article>`;
   }).join("");
 }
@@ -363,8 +382,6 @@ document.querySelector('.view[data-view="11"]').addEventListener("click", async 
     const v = inShot.querySelector("[data-shotvid]");
     labx.pick[inShot.dataset.shot] = Number(seekIn.dataset.pickt);
     inShot.querySelectorAll("[data-pickt]").forEach((x) => x.classList.toggle("sel", x === seekIn));
-    const lb = inShot.querySelector("[data-layers]");
-    if (lb && !lb.disabled) lb.innerHTML = `🗂️ فكّك الفريم ${lt(Number(seekIn.dataset.pickt))} لطبقات`;
     if (v) {
       const show = () => { v.pause(); v.currentTime = Number(seekIn.dataset.pickt); };
       if (v.readyState < 1) { v.preload = "auto"; v.addEventListener("loadedmetadata", show, { once: true }); v.load(); } else show();
@@ -384,6 +401,27 @@ document.querySelector('.view[data-view="11"]').addEventListener("click", async 
     }
     return;
   }
+  const cf = e.target.closest("[data-cfilter]");
+  if (cf) { labx.cfilter = cf.dataset.cfilter; return renderLabComps(labx.cur); }
+  const gc = e.target.closest("[data-gocomp]");
+  if (gc) {
+    labx.cfilter = "";
+    renderLabComps(labx.cur);
+    const card = $("labComps").querySelector(`[data-comp="${gc.dataset.gocomp}"]`);
+    card?.scrollIntoView({ behavior: "smooth", block: "center" });
+    card?.classList.add("flash"); setTimeout(() => card?.classList.remove("flash"), 1200);
+    return;
+  }
+  const comp = e.target.closest("[data-comp]");
+  if (comp) {
+    const cid = comp.dataset.comp, c = labx.cur.components.find((x) => x.id === cid);
+    const okb = e.target.closest("[data-cok]"), badb = e.target.closest("[data-cbad]"), asset = e.target.closest("[data-casset]");
+    if (asset) return openLib(asset.dataset.casset);
+    const note = comp.querySelector("[data-cnote]").value;
+    if (okb) return labComp(cid, { review: true, ok: true, note }, okb);
+    if (badb) return labComp(cid, { review: true, ok: c.review?.ok === false ? null : false, note }, badb);
+    return;
+  }
   const abox = e.target.closest("[data-ashot]");
   if (abox) {
     const ar = e.target.closest("[data-arange]"), save = e.target.closest("[data-asave]");
@@ -396,48 +434,14 @@ document.querySelector('.view[data-view="11"]').addEventListener("click", async 
     }
     if (save) {
       return busyButton(save, "⏳", async () => {
-        const a = await api(`/api/lab/${labx.cur.id}/shots/${abox.dataset.ashot}/asset`, { method: "POST", ...jsonBody({
+        const a = await api(`/api/lab/${labx.cur.id}/asset`, { method: "POST", ...jsonBody({
           name: f("name").value, category: f("category").value, tags: f("tags").value.split(/[,،]/),
-          t0: Number(f("t0").value), t1: Number(f("t1").value), vedit: f("vedit")?.value || null }) });
+          t0: Number(f("t0").value), t1: Number(f("t1").value) }) });
         toast(`📚 اتحفظ في المكتبة: ${a.name}`);
         labLibCount();
       });
     }
     return;
-  }
-  const vbox = e.target.closest("[data-vshot]");
-  if (vbox) {
-    const n = vbox.dataset.vshot, chip = e.target.closest("[data-vchip]");
-    if (chip) { const ta = vbox.querySelector("[data-vtext]"); ta.value += `${ta.value && !ta.value.endsWith(" ") ? " " : ""}«${chip.dataset.vchip}» `; ta.focus(); return; }
-    const go = e.target.closest("[data-vgo]"), sp = e.target.closest("[data-vspeed]"), del = e.target.closest("[data-vdel]"), cmp = e.target.closest("[data-vcmp]");
-    if (go) {
-      const text = vbox.querySelector("[data-vtext]").value.trim();
-      if (!text) return toast("اكتب عايز تغيّر إيه", true);
-      const sel = vbox.querySelector("[data-vmodel]");
-      if (!confirm(`يعدّل المشهد بـ ${sel.selectedOptions[0].textContent}؟`)) return;
-      return busyButton(go, "⏳", async () => {
-        labx.cur = await api(`/api/lab/${labx.cur.id}/shots/${n}/vedit`, { method: "POST", ...jsonBody({ instruction: text, model: sel.value, base: vbox.querySelector("[data-vbase]")?.value || null }) });
-        renderLabShots(labx.cur); scheduleLabPoll();
-      });
-    }
-    if (sp) {
-      const g = (k) => Number(vbox.querySelector(`[data-sp="${k}"]`).value);
-      return busyButton(sp, "⏳", async () => {
-        labx.cur = await api(`/api/lab/${labx.cur.id}/shots/${n}/vedit`, { method: "POST", ...jsonBody({ speed: { t0: g("t0"), t1: g("t1"), factor: g("factor") }, base: vbox.querySelector("[data-vbase]")?.value || null }) });
-        renderLabShots(labx.cur); scheduleLabPoll();
-      });
-    }
-    if (del) {
-      if (!confirm("تمسح النسخة دي؟")) return;
-      labx.cur = await api(`/api/lab/${labx.cur.id}/shots/${n}/vedit/${del.dataset.vdel}`, { method: "DELETE" });
-      return renderLabShots(labx.cur);
-    }
-    if (cmp) {  // الأصلي في مربع اللقطة والنسخة جنبه، بيبدأوا مع بعض
-      const v = vbox.querySelector(`[data-vedvid="${cmp.dataset.vcmp}"]`), o = document.querySelector(`[data-shotvid="${n}"]`);
-      v.currentTime = 0; v.muted = false; v.play().catch(() => {});
-      if (o) { o.muted = true; labPlayShot(n, Number(o.dataset.start)); }
-      return;
-    }
   }
   const li = e.target.closest("[data-lab]");
   if (li) { labx.view = "lab"; return openLab(li.dataset.lab); }
@@ -449,25 +453,31 @@ document.querySelector('.view[data-view="11"]').addEventListener("click", async 
   }
   const run = e.target.closest("[data-labrun]");
   if (run) {
-    if (!confirm(run.dataset.labrun === "all" ? "تفكك الفيديو من الأول؟ تقييمك للحاجات اللي هتتعمل من جديد هيتمسح." : "تعيد الخطوة دي؟ (والعناصر بتتعمل من جديد بعدها)")) return;
+    const ask = { all: "تفكك الفيديو من الأول؟ (الكومبوننتس اللي قبلتها أو رفضتها بتفضل، واللي في المكتبة مش بيتمسح)",
+      components: "يقترح كومبوننتس جديدة؟ اللي قبلته أو رفضته بيفضل زي ما هو، ورفضك بيتبعت له عشان يتعلم منه." }[run.dataset.labrun]
+      || "تعيد الخطوة دي؟ (العناصر والكومبوننتس بيتعملوا من جديد بعدها)";
+    if (!confirm(ask)) return;
     try { labx.cur = await api(`/api/lab/${labx.cur.id}/run?step=${run.dataset.labrun}`, { method: "POST" }); renderLab(); scheduleLabPoll(); }
     catch (err) { toast(err.message, true); }
     return;
   }
-  const lay = e.target.closest("[data-layers]");
-  if (lay) {
-    const n = lay.dataset.layers, s = labx.cur.shots.find((x) => String(x.n) === n);
-    const t = labx.pick[n] ?? (s.start + s.end) / 2;
-    if (!confirm(`يفكك الفريم ${lt(t)} من لقطة ${n} لطبقات شفافة؟ (بيتحسب على Atlas، حوالي 0.40$)`)) return;
-    try { labx.cur = await api(`/api/lab/${labx.cur.id}/shots/${n}/layers?t=${t}`, { method: "POST" }); renderLab(); scheduleLabPoll(); }
-    catch (err) { toast(err.message, true); }
-  }
 });
 document.querySelector('.view[data-view="11"]').addEventListener("toggle", (e) => {
   if (e.target.matches?.("[data-ashot]")) labx.aopen[e.target.dataset.ashot] = e.target.open;
+  if (e.target.matches?.("[data-audiobox]")) labx.audioOpen = e.target.open;
 }, true);
 document.querySelector('.view[data-view="11"]').addEventListener("change", (e) => {
   if (e.target.closest("#labLib")) return;
+  const comp = e.target.closest("[data-comp]");
+  if (comp) {
+    const cid = comp.dataset.comp, c = labx.cur.components.find((x) => x.id === cid);
+    if (e.target.dataset.cf) {
+      const k = e.target.dataset.cf;
+      return labComp(cid, { [k]: ["t0", "t1"].includes(k) ? Number(e.target.value) : e.target.value });
+    }
+    if (e.target.matches("[data-cnote]") && c.review) return labComp(cid, { review: true, ok: c.review.ok, note: e.target.value });
+    return;
+  }
   if (e.target.dataset.shotloop) {
     const v = document.querySelector(`[data-shotvid="${e.target.dataset.shotloop}"]`);
     if (v) v.dataset.loop = e.target.checked ? "1" : "0";

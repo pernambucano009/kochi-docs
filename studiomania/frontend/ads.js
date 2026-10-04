@@ -5,8 +5,7 @@ const adx = { list: [], cur: null, styles: [], brains: [], brainId: null, tab: "
 const AD_KEY = "studiomania.ad";
 
 async function initAds() {
-  [adx.list, adx.styles, adx.brains, adx.fx] = await Promise.all([api("/api/ads"), api("/api/ad-styles"), api("/api/ad-brains"),
-    api("/api/fx").catch(() => null)]);
+  [adx.list, adx.styles, adx.brains] = await Promise.all([api("/api/ads"), api("/api/ad-styles"), api("/api/ad-brains")]);
   api("/api/ads-settings").then((s) => ($("adVideoModel").value = s.video_model)).catch(() => {});
   const want = adx.cur?.id || storageGet(AD_KEY);
   const id = adx.list.some((a) => a.id === want) ? want : adx.list[0]?.id;
@@ -48,9 +47,9 @@ function adStages(g) {
   const st = (on, label, title) => `<i class="${on ? "on" : ""}" title="${title}">${label}</i>`;
   return `<span class="ad-stages">${st(g.analysis, "🔍", "التحليل")}${st(g.adapt, "✍️", "الاقتراح")}
     ${g.shots ? st(g.frames === g.shots, `🎨 ${g.frames}/${g.shots}`, "الستوري بورد") + st(g.videos === g.shots, `🎬 ${g.videos}/${g.shots}`, "الفيديوهات") : st(false, "🎬", "التنفيذ")}
-    ${st(g.editor, "🎞️", "المونتاج")}${g.compare != null ? st(true, `🔬 ${g.compare}%`, "المطابقة مع الأصلي") : ""}</span>`;
+    ${st(g.editor, "🎞️", "المونتاج")}</span>`;
 }
-const AD_MODE = { replica: "🧪 طبق الأصل", inspired: "💡 مستوحى" };
+const AD_MODE = { inspired: "💡 مستوحى" };
 function renderAds() {
   $("adCount").textContent = adx.list.length ? `(${adx.list.length})` : "";
   $("adList").innerHTML = adx.list.map((a) => `<li class="${a.id === adx.cur?.id ? "active" : ""}" data-ad="${a.id}">
@@ -63,8 +62,6 @@ function renderAds() {
   const a = adx.cur;
   $("adStyles").hidden = adx.view !== "styles";
   $("adBrain").hidden = adx.view !== "brain";
-  $("adFx").hidden = adx.view !== "fx";
-  if (adx.view === "fx") renderFxLib();
   $("adMain").hidden = adx.view !== "ad" || !a;
   $("adEmpty").hidden = adx.view !== "ad" || !!a;
   if (adx.view === "styles") renderStyleLib();
@@ -200,11 +197,6 @@ function dirText(d) {
 
 function renderAdAdapt() {
   const a = adx.cur;
-  const replica = a.settings?.fidelity === "replica";
-  $("adBrandCtl").hidden = replica;  // النسخة طبق الأصل مفيهاش تطبيق على البراند
-  $("adReplicaNote").hidden = !replica;
-  $("adReplicaNote").innerHTML = replica ? `🧪 <b>وضع النسخة طبق الأصل:</b> المشاهد والكلام والموشن بتتاخد من التحليل زي ما هي، والموديل بيكتب البرومبتات بس.
-    ${a.adaptation && !a.adaptation.replica ? `<br>⚠️ الاقتراح اللي تحت اتكتب قبل ما تختار الوضع ده. <button class="btn sm primary" type="button" data-replica-redo>✍️ اكتبه من جديد كنسخة طبق الأصل</button>` : ""}` : "";
   renderDirections(a);
   const busy = a.adapt_status === "working";
   $("adAdaptState").innerHTML = busy ? `<span class="spin-inline"></span> ✍️ بيكتب الاقتراح...` : a.adapt_status === "failed" ? `✕ ${adEsc(a.adapt_error)}` : "";
@@ -523,10 +515,6 @@ async function adaptWithControls() {
   adx.cur = await api(`/api/ads/${adx.cur.id}/adapt`, { method: "POST", ...jsonBody({ message: "" }) });
   renderAds(); scheduleAdPoll();
 }
-$("adReplicaNote").addEventListener("click", (e) => {
-  const b = e.target.closest("[data-replica-redo]");
-  if (b) busyButton(b, "⏳", adaptWithControls);
-});
 $("adCtlApply").onclick = () => {
   if (adx.cur.adaptation && !confirm("يكتب الاقتراح من جديد بالاختيارات دي؟ الاقتراح الحالي هيتغير.")) return;
   busyButton($("adCtlApply"), "⏳", adaptWithControls);
@@ -694,7 +682,6 @@ function renderAdActivity() {
   if (["queued", "working"].includes(a.status)) items.push(["analysis", `🔍 بيحلل الإعلان: ${a.step || "في الطابور"}`]);
   if (a.scomp_status === "working") items.push(["analysis", "🎞️ بيستخرج الموشن جرافيك ومكونات كل مشهد"]);
   if (a.directions_status === "working") items.push(["adapt", "🎲 بيفكر في 3 اتجاهات مختلفة للإعلان"]);
-  if (a.compare?.status === "working") items.push(["prod", `🔬 ${a.compare.step || "بيقارن بالأصلي"}`]);
   if (a.adapt_status === "working") items.push(["adapt", a.chain_prod ? "✍️ بيكتب اقتراح كوتشي بالموشن، وبعده هيبدأ التنفيذ" : "✍️ بيكتب اقتراح كوتشي"]);
   if (a.audio_status === "working") items.push(["audio", "🎧 بيسمع الصوت ويفصّصه"]);
   const shots = a.prod?.shots || [];
@@ -704,8 +691,6 @@ function renderAdActivity() {
   if (a.prod?.cast_status === "working") items.push(["prod", "🎭 بيطلّع الأبطال والمكونات المتكررة"]);
   const ci = (a.prod?.cast || []).filter((c) => c.status === "working");
   if (ci.length) items.push(["prod", `🖼️ بيرسم صور الأبطال: ${ci.map((c) => c.name).join("، ")}`]);
-  const mo = shots.filter((s) => s.motion_status === "working");
-  if (mo.length) items.push(["prod", `🎞️ بيستحضر الموشن جرافيك من الإعلان الأصلي: لقطة ${nums(mo)}`]);
   const comps = shots.filter((s) => s.comp_status === "working");
   if (comps.length) items.push(["prod", `🧩 بيستخرج مكونات: لقطة ${nums(comps)}`]);
   const cimg = shots.filter((s) => s.components.some((c) => c.status === "working"));
@@ -715,10 +700,6 @@ function renderAdActivity() {
   if (vc.length) items.push(["prod", `🎙️ بيولّد الصوت: لقطة ${nums(vc)}`]);
   const ls = shots.filter((s) => s.takes.some((t) => t.lipsync && PBUSY.has(t.status)));
   if (ls.length) items.push(["prod", `👄 بيحرّك البق مع الكلام: لقطة ${nums(ls)}`]);
-  const lp = shots.filter((s) => s.layers_status === "working");
-  if (lp.length) items.push(["prod", `🤖 بيخطط طبقات الموشن من الأصلي: لقطة ${nums(lp)}`]);
-  const cmp = shots.filter((s) => s.takes.some((t) => t.composite && PBUSY.has(t.status)));
-  if (cmp.length) items.push(["prod", `✨ بيركّب الموشن على الفيديو: لقطة ${nums(cmp)}`]);
   const gen = shots.filter((s) => s.takes.some((t) => t.status === "working" && !t.composite && !t.lipsync)), waitGen = shots.filter((s) => s.takes.some((t) => t.status === "queued" && !t.composite && !t.lipsync));
   if (gen.length) items.push(["prod", `🎬 بيولّد فيديو: لقطة ${nums(gen)}`]);
   if (waitGen.length) items.push(["prod", `⏳ فيديو في الطابور: لقطة ${nums(waitGen)}`]);
@@ -771,9 +752,8 @@ document.querySelector('.view[data-view="10"]').addEventListener("click", (e) =>
 // ---------- 4. التنفيذ: راس الإعلان ← ستوري بورد ← مكونات ← لقطات ← المونتاج ----------
 const PBUSY = new Set(["queued", "working"]);
 function prodBusy(a) {
-  if (a.compare?.status === "working") return true;
   if (a.prod?.cast_status === "working" || a.prod?.cast?.some((c) => c.status === "working") || a.prod?.full_voice?.status === "working") return true;
-  return !!a.prod?.shots.some((s) => PBUSY.has(s.frame_status) || s.comp_status === "working" || s.motion_status === "working" || s.layers_status === "working" || s.voice_status === "working"
+  return !!a.prod?.shots.some((s) => PBUSY.has(s.frame_status) || s.comp_status === "working" || s.voice_status === "working"
     || s.components.some((c) => c.status === "working") || s.takes.some((t) => PBUSY.has(t.status)));
 }
 const HEADER_LABELS = { title: "اسم الإعلان", concept: "الكونسبت", style: "الستايل البصري (بالإنجليزي)", characters: "الشخصيات (نفس الشكل في كل لقطة)",
@@ -785,108 +765,6 @@ async function pDo(btn, label, fn) {
   return busyButton(btn, label, async () => { adx.cur = await fn(); renderAds(); });
 }
 
-// ---------- ✨ الموشن المتركب: طبقات فوق فيديو اللقطة (مكان، توقيت، حركة دخول وخروج) ----------
-const LAYER_KINDS = new Set(["graphic", "text", "ui", "icon", "effect", "logo"]);
-const ANIM_IN = { fade: "يظهر تدريجي", pop: "ينط (pop)", zoom: "يكبر", slide_up: "يطلع من تحت", slide_down: "ينزل من فوق", slide_left: "يدخل من اليمين", slide_right: "يدخل من الشمال", none: "من غير حركة" };
-const ANIM_OUT = { fade: "يختفي تدريجي", pop: "يصغر ويختفي", zoom: "يصغر", slide_up: "يطلع لفوق", slide_down: "ينزل لتحت", slide_left: "يخرج شمال", slide_right: "يخرج يمين", none: "من غير حركة" };
-const LOOP = { none: "ثابت", float: "بيطفو", pulse: "بينبض" };
-const layerComps = (s) => s.components.filter((c) => c.use !== false && (LAYER_KINDS.has(c.kind) || c.motion));
-const opts = (map, v) => Object.entries(map).map(([k, l]) => `<option value="${k}" ${k === v ? "selected" : ""}>${l}</option>`).join("");
-function renderLayers(s) {
-  const layers = s.layers || [], comps = layerComps(s), byId = Object.fromEntries(s.components.map((c) => [c.id, c]));
-  const base = s.takes.find((t) => t.id === s.chosen && t.url && !t.composite) || [...s.takes].reverse().find((t) => t.url && !t.composite);
-  const working = s.layers_status === "working";
-  const stage = layers.map((L) => {
-    const pos = `left:${L.x * 100}%;top:${L.y * 100}%`;
-    if (L.type === "text") return `<span class="lt" data-lid="${L.id}" style="${pos};font-size:calc(${L.size} * var(--lh));color:${L.color};${L.box ? `background:${L.box}` : ""}" data-no-i18n>${adEsc(L.text)}</span>`;
-    const c = byId[L.comp_id];
-    return c?.image_url ? `<img data-lid="${L.id}" src="${c.image_url}" style="${pos};width:${L.w * 100}%" alt="">`
-      : `<span class="lt ph" data-lid="${L.id}" style="${pos}">${adEsc(c?.name || "؟")}</span>`;
-  }).join("");
-  const rows = layers.map((L) => `<div class="ad-lrow" data-lrow="${L.id}">
-      ${L.type === "text" ? `<input type="text" value="${adEsc(L.text)}" data-lf="text" data-no-i18n>
-        <input type="color" value="${L.color}" data-lf="color" title="لون الكلام"><input type="color" value="${L.box || "#000000"}" data-lf="box" title="لون الخلفية">`
-      : `<b data-no-i18n>${adEsc(byId[L.comp_id]?.name || "عنصر")}</b>`}
-      <label>من <input type="number" step="0.1" min="0" value="${L.start}" data-lf="start"></label>
-      <label>لـ <input type="number" step="0.1" min="0" value="${L.end}" data-lf="end"></label>
-      <label>الحجم <input type="number" step="${L.type === "text" ? 0.005 : 0.05}" min="0.01" value="${L.type === "text" ? L.size : L.w}" data-lf="${L.type === "text" ? "size" : "w"}"></label>
-      <select data-lf="in" title="الدخول">${opts(L.type === "text" ? fxAnimsText() : ANIM_IN, L.in)}</select>
-      ${L.type === "text" && ["typewriter", "words"].includes(L.in) ? `<label title="${L.in === "words" ? "كلمة" : "حرف"} في الثانية (0 = تلقائي)">⚡ <input type="number" min="0" max="60" step="1" value="${L.speed || 0}" data-lf="speed"></label>` : ""}
-      ${L.type === "text" && L.in === "highlight" ? `<input type="color" value="${L.accent || "#FFD54A"}" data-lf="accent" title="لون الهايلايت">` : ""}
-      <select data-lf="out" title="الخروج">${opts(ANIM_OUT, L.out)}</select>
-      <select data-lf="loop" title="وهو ظاهر">${opts(LOOP, L.loop)}</select>
-      <select data-lf="sfx" title="صوت الحركة">${opts(fxSfxOpts(), L.sfx || "auto")}</select>
-      <button type="button" class="btn sm danger" data-ldel="${L.id}">✕</button>
-      ${L.note ? `<small class="muted" data-no-i18n>${adEsc(L.note)}</small>` : ""}</div>`).join("");
-  return `<div class="ad-layers">
-    <h4 class="pane-h">✨ الموشن المتركب ${working ? `<span class="spin-inline"></span>` : ""}
-      <button class="btn sm" data-p="lplan" ${working ? "disabled" : ""}>${working ? "⏳ بيخطط من الأصلي..." : "🤖 خطّط من الإعلان الأصلي"}</button>
-      <select class="btn sm" data-laddimg><option value="">＋ عنصر</option>${comps.map((c) => `<option value="${c.id}">${adEsc(c.name)}</option>`).join("")}</select>
-      <button class="btn sm" data-p="ltext">＋ كلام</button>
-      <button class="btn sm primary" data-p="lcomp" ${layers.length && base ? "" : "disabled"} title="${base ? "" : "ولّد فيديو اللقطة الأول"}">✨ ركّب على الفيديو</button></h4>
-    ${s.layers_error ? `<div class="muted">${adEsc(s.layers_error)}</div>` : ""}
-    ${layers.length ? `<p class="hint">العناصر والكلام بيتطبعوا فوق الفيديو بحركتهم. اسحب أي عنصر في المعاينة عشان تغيّر مكانه. اللقطات اللي ليها موشن متركب الستوري بورد والفيديو بتوعها بيترسموا من غير الجرافيك.</p>
-      <div class="ad-lwrap"><div class="ad-lstage" data-lstage="${s.id}">${base ? `<video src="${base.url}" muted playsinline loop preload="metadata"></video>` : s.frame_url ? `<img class="bg" src="${s.frame_url}" alt="">` : ""}${stage}</div>
-      <div class="ad-lrows">${rows}</div></div>` : ""}
-  </div>`;
-}
-// ✨ حركات الكلام وأصواتها من مكتبة الافيكتس
-function fxAnimsText() {
-  return adx.fx ? Object.fromEntries(adx.fx.templates.map((t) => [t.id, t.label])) : ANIM_IN;
-}
-function fxSfxOpts() {
-  return { auto: "🔊 صوت الحركة", none: "🔇 من غير صوت", ...Object.fromEntries((adx.fx?.sfx || []).map((x) => [x.id, x.label])) };
-}
-
-// ---------- ✨ مكتبة الافيكتس ----------
-function fxForm() {
-  const f = Object.fromEntries([...document.querySelectorAll("[data-fxf]")].map((el) => [el.dataset.fxf, el.type === "checkbox" ? el.checked : el.value]));
-  return { text: f.text, font: f.font, color: f.color, box: f.nobox ? "" : f.box, accent: f.accent, size: Number(f.size),
-    speed: Number(f.speed) || 0, sfx_vol: Number(f.sfx_vol), y: 0.45, x: 0.5, out: "fade", bg: f.bg };
-}
-function renderFxLib() {
-  const lib = adx.fx;
-  if (!lib) { $("adFxGrid").innerHTML = `<p class="muted">مقدرتش أجيب المكتبة. اعمل ريفريش.</p>`; return; }
-  $("adFxWarn").hidden = lib.available;
-  const fsel = document.querySelector('[data-fxf="font"]');
-  if (!fsel.options.length) fsel.innerHTML = lib.fonts.map((f) => `<option value="${f.family}">${adEsc(f.label)}</option>`).join("");
-  const bsel = document.querySelector('[data-fxf="bg"]');
-  const frames = (adx.cur?.prod?.shots || []).filter((s) => s.frame_url);
-  const keep = bsel.value;
-  bsel.innerHTML = `<option value="">خلفية جاهزة</option>` + frames.map((s) => `<option value="${s.frame_url}">ستوري بورد لقطة ${s.n}</option>`).join("");
-  bsel.value = [...bsel.options].some((o) => o.value === keep) ? keep : "";
-  if (!$("adFxGrid").children.length) {
-    $("adFxGrid").innerHTML = lib.templates.filter((t) => t.id !== "none").map((t) => `<article class="ad-fx" data-fx="${t.id}">
-      <div class="ad-fx-vid"><span class="muted">${t.sfx ? "🔊" : "🔇"}</span></div>
-      <b>${adEsc(t.label)}</b>${t.hint ? `<small class="muted">${adEsc(t.hint)}</small>` : ""}
-      <button class="btn sm primary" type="button" data-fxprev="${t.id}">▶️ معاينة</button></article>`).join("");
-  }
-  if (!$("adFxSfx").children.length) {
-    $("adFxSfx").innerHTML = lib.sfx.map((x) => `<button class="btn sm" type="button" data-fxsfx="${x.url}">${adEsc(x.label)}</button>`).join("");
-  }
-}
-$("adFxGo").onclick = () => { adx.view = "fx"; renderAds(); };
-$("adFxBack").onclick = () => { adx.view = "ad"; renderAds(); };
-$("adFxGrid").addEventListener("click", (e) => {
-  const b = e.target.closest("[data-fxprev]");
-  if (!b) return;
-  const card = b.closest("[data-fx]"), f = fxForm();
-  if (!f.text.trim()) return toast("اكتب الكلام الأول", true);
-  const { bg, ...layer } = f;
-  busyButton(b, "⏳ بيرسم...", async () => {
-    const r = await api("/api/fx/preview", { method: "POST", ...jsonBody({ layer: { ...layer, in: card.dataset.fx }, seconds: 4, aspect: "9:16", bg }) });
-    card.querySelector(".ad-fx-vid").innerHTML = `<video src="${r.url}" playsinline controls autoplay></video>`;
-  });
-});
-$("adFxSfx").addEventListener("click", (e) => {
-  const b = e.target.closest("[data-fxsfx]");
-  if (b) new Audio(b.dataset.fxsfx).play().catch(() => {});
-});
-
-async function saveLayers(sid, layers) {
-  try { adx.cur = await pAPI(`/shots/${sid}/layers`, { method: "PUT", ...jsonBody({ layers }) }); renderAds(); }
-  catch (err) { toast(err.message, true); }
-}
 $("adPShots").addEventListener("change", (e) => {
   const card = e.target.closest("[data-ps]");
   if (!card) return;
@@ -898,45 +776,7 @@ $("adPShots").addEventListener("change", (e) => {
     return pAPI(`/shots/${s.id}`, { method: "PATCH", ...jsonBody({ fields: { sb_prompt: text } }) })
       .then((r) => { adx.cur = r; renderAds(); }).catch((err) => toast(err.message, true));
   }
-  if (e.target.matches("[data-laddimg]")) {
-    const cid = e.target.value;
-    if (!cid) return;
-    return saveLayers(s.id, [...(s.layers || []), { type: "image", comp_id: cid, start: 0.3, end: Math.max(1, s.seconds - 0.2), x: 0.5, y: 0.5, w: 0.5, in: "pop", out: "fade" }]);
-  }
-  const row = e.target.closest("[data-lrow]"), f = e.target.dataset.lf;
-  if (!row || !f) return;
-  const v = ["start", "end", "size", "w", "speed", "sfx_vol"].includes(f) ? Number(e.target.value) : e.target.value;
-  saveLayers(s.id, s.layers.map((L) => (L.id === row.dataset.lrow ? { ...L, [f]: v } : L)));
 });
-// سحب العناصر في المعاينة
-let ldrag = null;
-$("adPShots").addEventListener("pointerdown", (e) => {
-  const el = e.target.closest("[data-lstage] [data-lid]");
-  if (!el) return;
-  e.preventDefault();
-  const stage = el.closest("[data-lstage]");
-  ldrag = { el, stage, sid: stage.dataset.lstage, id: el.dataset.lid, r: stage.getBoundingClientRect() };
-  el.setPointerCapture(e.pointerId);
-  el.classList.add("drag");
-});
-$("adPShots").addEventListener("pointermove", (e) => {
-  if (!ldrag) return;
-  const x = Math.min(1, Math.max(0, (e.clientX - ldrag.r.left) / ldrag.r.width));
-  const y = Math.min(1, Math.max(0, (e.clientY - ldrag.r.top) / ldrag.r.height));
-  Object.assign(ldrag, { x, y });
-  ldrag.el.style.left = `${x * 100}%`;
-  ldrag.el.style.top = `${y * 100}%`;
-});
-$("adPShots").addEventListener("pointerup", () => {
-  if (!ldrag) return;
-  const d = ldrag;
-  ldrag = null;
-  d.el.classList.remove("drag");
-  if (d.x == null) return;
-  const s = adx.cur.prod.shots.find((x) => x.id === d.sid);
-  saveLayers(d.sid, s.layers.map((L) => (L.id === d.id ? { ...L, x: +d.x.toFixed(3), y: +d.y.toFixed(3) } : L)));
-});
-
 // ---------- ✏️ نافذة التعديل: طلبك بالكلام + صور مرجعية (لحد 4) ----------
 const fix = { files: [], submit: null };
 function openFix({ title, hint, placeholder, submit }) {
@@ -1070,58 +910,6 @@ function adScript(a) {
   return [`سكريبت: ${p.header.title || a.name}`, "",
     ...lines.map((s) => `لقطة ${s.n} — ${s.speaker || "الراوي"}${s.talking ? " (بيتكلم قدام الكاميرا)" : ""}:\n«${s.voice.trim()}»\n`)].join("\n");
 }
-// ---------- 🔬 المطابقة مع الأصلي: الاتنين جنب بعض ودرجة لكل مشهد والفجوات ----------
-const CMP_DIMS = { composition: "الكادر والتكوين", characters: "الأشخاص", setting: "المكان والإضاءة", camera_motion: "حركة الكاميرا",
-  motion_graphics: "الموشن جرافيك", text: "الكلام المكتوب", timing: "التوقيت والإيقاع", audio: "الصوت" };
-const CMP_STAGES = { analysis: "🔍 التحليل", storyboard: "🎨 الستوري بورد", video_prompt: "✍️ برومبت الفيديو", video_model: "🎬 موديل الفيديو",
-  motion_graphics: "🎞️ الموشن جرافيك", voice: "🎙️ الصوت", editing: "✂️ المونتاج" };
-const cmpColor = (v) => v >= 80 ? "var(--ok)" : v >= 55 ? "var(--warn)" : "var(--danger)";
-function renderCompare(a) {
-  const c = a.compare || {}, r = c.result;
-  $("adPCompare").disabled = c.status === "working";
-  if (!c.status) return setHTML($("adCompare"), "");
-  if ([...$("adCompare").querySelectorAll("video")].some((v) => !v.paused)) return;
-  const scenes = a.analysis?.scenes || [];
-  setHTML($("adCompare"), `<details class="ad-cmp" open><summary>🔬 المطابقة مع الإعلان الأصلي
-      ${r ? `<b class="ad-cmp-score" style="color:${cmpColor(r.score)}">${r.score}%</b>` : ""}
-      ${c.status === "working" ? `<span class="muted"><span class="spin-inline"></span> ${adEsc(c.step || "")}...</span>` : ""}</summary>
-    ${c.error ? `<div class="err">✕ ${adEsc(c.error)}</div>` : ""}
-    ${c.url ? `<div class="ad-cmp-vids">
-        <figure><figcaption>الأصلي</figcaption><video src="${a.source_url}" data-cmp="orig" playsinline preload="metadata"></video></figure>
-        <figure><figcaption>النسخة المولدة</figcaption><video src="${c.url}" data-cmp="gen" playsinline preload="metadata"></video></figure></div>
-      <div class="row wrap"><button class="btn sm primary" data-cmpplay>▶️ شغّل الاتنين مع بعض</button>
-        <label class="check"><input type="checkbox" data-cmpsound> 🔊 صوت النسخة المولدة (بدل الأصلي)</label></div>` : ""}
-    ${r ? `<p data-no-i18n>${adEsc(r.verdict)}</p>
-      <div class="ad-cmp-dims">${Object.entries(CMP_DIMS).filter(([k]) => r.dimensions?.[k] != null).map(([k, l]) =>
-        `<div><span>${l}</span><i style="--v:${r.dimensions[k]}%;--c:${cmpColor(r.dimensions[k])}"></i><b>${r.dimensions[k]}</b></div>`).join("")}</div>
-      <h4>المشاهد <span class="muted">(دوس على مشهد يروح له في الفيديوهين)</span></h4>
-      <div class="ad-cmp-scenes">${(r.scenes || []).map((x) => { const sh = (c.shots || []).find((y) => y.n === x.n), o = scenes.find((y) => y.n === x.n);
-        return `<button type="button" class="ad-cmp-scene" data-cmpseek="${o?.start ?? 0}|${sh?.at ?? 0}">
-          <b style="color:${cmpColor(x.score)}">${x.n} · ${x.score}%</b>${sh ? `<small class="muted">${adEsc(sh.src)}</small>` : ""}
-          <span data-no-i18n>✅ ${adEsc(x.matches)}</span><span data-no-i18n>❌ ${adEsc(x.differences)}</span></button>`; }).join("")}</div>
-      <h4>الفجوات وإزاي نعالجها</h4>
-      <ol class="ad-cmp-gaps">${(r.gaps || []).map((g) => `<li class="${adEsc(g.impact)}"><b>${CMP_STAGES[g.stage] || adEsc(g.stage)}</b>
-        <span data-no-i18n>${adEsc(g.problem)}</span><span class="muted" data-no-i18n>💡 ${adEsc(g.fix)}</span></li>`).join("")}</ol>` : ""}
-  </details>`);
-}
-$("adCompare").addEventListener("click", (e) => {
-  const vids = () => [$("adCompare").querySelector('[data-cmp="orig"]'), $("adCompare").querySelector('[data-cmp="gen"]')];
-  const play = e.target.closest("[data-cmpplay]"), seek = e.target.closest("[data-cmpseek]");
-  if (!play && !seek) return;
-  const [o, g] = vids();
-  if (!o || !g) return;
-  const genSound = $("adCompare").querySelector("[data-cmpsound]")?.checked;
-  o.muted = !!genSound; g.muted = !genSound;
-  if (seek) { const [a, b] = seek.dataset.cmpseek.split("|").map(Number); o.currentTime = a; g.currentTime = b; }
-  else if (!o.paused) { o.pause(); g.pause(); return; }
-  else if (o.ended || g.ended) { o.currentTime = 0; g.currentTime = 0; }
-  o.play(); g.play();
-});
-$("adPCompare").onclick = () => {
-  if (!confirm("يجمع النسخة المولدة لقطة ورا لقطة ويخلّي موديل الفيديو يقارنها بالأصلي مشهد بمشهد (طلب واحد لموديل التحليل). تكمل؟")) return;
-  pDo($("adPCompare"), "⏳", () => pAPI("/compare", { method: "POST" })).then(scheduleAdPoll);
-};
-
 function renderVoices(a) {
   const p = a.prod, fv = p.full_voice || {}, working = fv.status === "working";
   const n = p.shots.filter((s) => (s.voice || "").trim()).length;
@@ -1132,13 +920,10 @@ function renderVoices(a) {
       <button class="btn sm" data-fv="copy" ${n ? "" : "disabled"} title="الكلام بس، جاهز تحوّله لصوت">📋 انسخ السكريبت (${n} جملة)</button>
       <button class="btn sm" data-fv="download" ${n ? "" : "disabled"} title="نسخة فيها رقم كل لقطة ومين بيقول الجملة (للمراجعة)">⬇ نزّل نسخة بالتفاصيل</button>
       <label class="btn sm primary">⬆ ارفع الصوت الكامل<input type="file" accept="audio/*,video/*" data-fv-up hidden></label>
-      ${a.has_audio ? `<button class="btn sm ${a.settings.fidelity === "replica" ? "primary" : ""}" data-fv="original" ${working ? "disabled" : ""} title="يستخدم صوت الإعلان الأصلي نفسه (مناسب لتجربة النسخة طبق الأصل)">🎧 استخدم صوت الإعلان الأصلي</button>` : ""}
       ${fv.file ? `<button class="btn sm" data-fv="realign" ${working ? "disabled" : ""} title="بعد ما تعدّل الكلام في اللقطات">↻ قطّع تاني</button>` : ""}
       ${working ? `<span class="muted"><span class="spin-inline"></span> بيسمع الصوت ويقطّعه على اللقطات...</span>` : ""}
       ${fv.status === "done" ? `<span class="muted">✅ ${fv.duration} ث · اتطابق ${Math.round((fv.ratio || 0) * 100)}% من الكلام</span>` : ""}
     </div>
-    ${a.settings.fidelity === "replica" ? `<div class="ad-dir-chosen">🧪 في النسخة طبق الأصل الفويس أوفر هو <b>صوت الإعلان الأصلي نفسه</b>، وبيتحط ويتقطع على اللقطات لوحده لما التنفيذ يبدأ.
-      ${fv.file && !fv.original ? `<br>⚠️ الصوت الكامل الحالي مش صوت الإعلان الأصلي. دوس «🎧 استخدم صوت الإعلان الأصلي».` : ""}</div>` : ""}
     ${fv.url ? `<audio src="${fv.url}" controls preload="none"></audio>` : ""}
     ${fv.error ? `<div class="err">✕ ${adEsc(fv.error)}</div>` : ""}
   </div>`);
@@ -1158,12 +943,6 @@ $("adVoices").addEventListener("click", async (e) => {
     const url = URL.createObjectURL(new Blob([adScript(adx.cur)], { type: "text/plain;charset=utf-8" }));
     Object.assign(document.createElement("a"), { href: url, download: "ad-script.txt" }).click();
     return setTimeout(() => URL.revokeObjectURL(url), 2000);
-  }
-  if (b.dataset.fv === "original") {
-    if (adx.cur.prod.full_voice?.file && !confirm("يحط صوت الإعلان الأصلي مكان الصوت الكامل الحالي ويقطّعه على اللقطات. تكمل؟")) return;
-    try { adx.cur = await pAPI("/full-voice-original", { method: "POST" }); renderAds(); scheduleAdPoll(); }
-    catch (err) { toast(err.message, true); }
-    return;
   }
   if (b.dataset.fv === "realign") {
     try { adx.cur = await pAPI("/full-voice", { method: "POST", body: new FormData() }); renderAds(); scheduleAdPoll(); }
@@ -1279,7 +1058,6 @@ function renderAdProd() {
   if (!p) return;
   if (!editingIn($("adCast"))) renderCast(a);
   if (!editingIn($("adVoices"))) renderVoices(a);
-  renderCompare(a);
   const h = p.header;
   if (!editingIn($("adHeader"))) {
     $("adHeader").innerHTML = Object.entries(HEADER_LABELS).map(([k, l]) => adField(l, h[k], `data-h="${k}"`, k === "style" || k === "characters" ? 3 : 2, k === "style")).join("");
@@ -1294,7 +1072,7 @@ function renderAdProd() {
   const allOk = drawn.length > 0 && drawn.every((s) => s.approved);
   $("adPApproveAll").textContent = allOk ? "↩ الغي اعتماد كل الستوري بورد" : `✅ اعتمد كل الستوري بورد (${drawn.filter((s) => !s.approved).length})`;
   $("adPApproveAll").disabled = !drawn.length;
-  if (ldrag || editingIn($("adPShots")) || [...$("adPShots").querySelectorAll("video")].some((v) => !v.paused)) return;
+  if (editingIn($("adPShots")) || [...$("adPShots").querySelectorAll("video")].some((v) => !v.paused)) return;
   $("adPShots").style.setProperty("--ad-ar", (h.aspect || "9:16").replace(":", " / "));
   setHTML($("adPShots"), shots.map((s) => {
     const fbusy = PBUSY.has(s.frame_status);
@@ -1325,8 +1103,6 @@ function renderAdProd() {
         ${renderVoice(a, s)}
         <div class="ad-motion">${s.ref_motion ? `<div class="ad-mg orig" data-no-i18n>↩ <b>الموشن في المشهد الأصلي ${adEsc(s.ref_scene)}:</b> ${adEsc(s.ref_motion)}</div>` : ""}
           ${adField("🎞️ الموشن جرافيك في اللقطة", s.motion_notes, 'data-pf="motion_notes"', 2)}
-          <div class="row wrap"><button class="btn sm" data-p="motion" ${s.motion_status === "working" ? "disabled" : ""}>${s.motion_status === "working" ? "⏳ بيستحضر الموشن..." : "🎞️ استحضر الموشن من المشهد الأصلي"}</button></div>
-          ${s.motion_error ? `<div class="err">${adEsc(s.motion_error)}</div>` : ""}
           ${adField("Motion prompt (بيدخل في الستوري بورد والفيديو)", s.motion_prompt, 'data-pf="motion_prompt"', 2, true)}</div>
         <h4 class="pane-h">🧩 المكونات ${s.comp_status === "working" ? `<span class="spin-inline"></span>` : ""}
           <button class="btn sm" data-p="comps" ${!s.frame_url || s.comp_status === "working" ? "disabled" : ""} title="الموديل يشوف الستوري بورد واللقطة الأصلية ويظبط المكونات عليهم">${s.components.length ? "↻ حدّث المكونات من الستوري بورد" : "🧩 استخرج المكونات"}</button>
@@ -1346,7 +1122,6 @@ function renderAdProd() {
             <button class="btn sm danger" data-c="del">✕</button></div>
         </div>`).join("")}</div>
         ${adField("برومبت تجميع اللقطة (Seedance)", s.assembly_prompt || s.prompt, 'data-pf="assembly_prompt"', 3, true)}
-        ${renderLayers(s)}
         <div class="ad-takes">${s.takes.map((t) => `<div class="ad-take ${t.id === s.chosen ? "sel" : ""} ${t.approved ? "ok" : ""}" data-pt="${t.id}" ${t.note ? `title="✏️ ${adEsc(t.note)}"` : ""}>
           ${t.composite ? `<b class="ad-take-badge">✨ موشن</b>` : t.lipsync ? `<b class="ad-take-badge">👄 بيتكلم</b>` : t.video_model && t.video_model !== "seedance" ? `<b class="ad-take-badge alt">${adEsc(t.video_model.startsWith("kling") ? "Kling" : t.video_model)}</b>` : ""}${t.url ? `<button type="button" class="ad-take-play" data-tplay="${t.id}" title="شغّل وعاين">${lightVideo(t.url, "muted playsinline")}<i>▶</i></button>` : `<div class="wait">${PBUSY.has(t.status) ? `<div class="spin"></div>${t.composite ? "✨ بيركّب" : t.lipsync ? "👄 بيحرّك البق" : "🎬 بيتولد"}` : `✕ ${adEsc(t.error || "فشل")}`}</div>`}
           <div class="acts">${t.status === "done" ? `<button class="btn sm" data-t="${t.approved ? "unapprove" : "approve"}">${t.approved ? "✅" : "موافق"}</button>` : ""}
@@ -1382,10 +1157,6 @@ $("adPBrain").onclick = () => busyButton($("adPBrain"), "⏳", async () => {
   renderAds();
   toast(r.applied ? `🧠 اتحط ${r.applied} مكون من عقل الإعلان (شاشات / لوجو / منتج)` : "مفيش مكونات شاشات أو لوجو محتاجة صور من عقل الإعلان");
 });
-$("adPMotion").onclick = () => {
-  if (!confirm("يتفرج على كل مشهد في الإعلان الأصلي ويستحضر الموشن جرافيك بتاعه في اللقطة المقابلة (الموشن المكتوب + عناصر الموشن كمكونات). الموشن المكتوب دلوقتي هيتبدل، والمكونات الموجودة مش هتتلمس. تكمل؟")) return;
-  pDo($("adPMotion"), "⏳", () => pAPI("/motion", { method: "POST" }));
-};
 $("adPDelFrames").onclick = () => {
   const n = adx.cur.prod.shots.filter((s) => s.frames.length).length;
   if (!n) return toast("مفيش ستوري بورد تتمسح");
@@ -1485,17 +1256,6 @@ $("adPShots").addEventListener("click", async (e) => {
   try {
     if (b.dataset.pframe) adx.cur = await pAPI(`/shots/${sid}/frame`, { method: "POST", ...jsonBody({ file: b.dataset.pframe }) });
     else if (b.dataset.p === "frame") adx.cur = await pAPI(`/frames?shot_id=${sid}`, { method: "POST" });
-    else if (b.dataset.p === "motion") adx.cur = await pAPI(`/motion?shot_id=${sid}`, { method: "POST" });
-    else if (b.dataset.p === "lplan") {
-      if (s.layers?.length && !confirm("الطبقات الحالية هتتبدل بخطة جديدة من الإعلان الأصلي. تكمل؟")) return;
-      adx.cur = await pAPI(`/layers/plan?shot_id=${sid}`, { method: "POST" });
-    } else if (b.dataset.p === "ltext") {
-      await saveLayers(sid, [...(s.layers || []), { type: "text", text: "كلام جديد", start: 0.3, end: Math.max(1, s.seconds - 0.3), x: 0.5, y: 0.2, size: 0.05, color: "#FFFFFF", box: "#57B8AF", in: "pop", out: "fade" }]);
-      return;
-    } else if (b.dataset.ldel) {
-      await saveLayers(sid, s.layers.filter((L) => L.id !== b.dataset.ldel));
-      return;
-    } else if (b.dataset.p === "lcomp") adx.cur = await pAPI(`/shots/${sid}/composite`, { method: "POST" });
     else if (b.dataset.p === "voice") adx.cur = await pAPI(`/voice?shot_id=${sid}`, { method: "POST" });
     else if (b.dataset.p === "voicedel") { if (!confirm("تمسح صوت اللقطة دي؟")) return; adx.cur = await pAPI(`/shots/${sid}/voice`, { method: "DELETE" }); }
     else if (["lipvideo", "lipimage", "lipkavatar"].includes(b.dataset.p)) {
@@ -1766,11 +1526,6 @@ function fullSync() {
 }
 ["timeupdate", "seeked", "play", "pause"].forEach((ev) => $("adGalFullA").addEventListener(ev, fullSync));
 $("adGalFullBack").onclick = () => { $("adGalFullA").pause(); $("adGalFull").hidden = true; $("adGalAll").hidden = false; };
-$("adPLayers").onclick = () => pDo($("adPLayers"), "⏳", () => pAPI("/layers/plan", { method: "POST" }));
-$("adPCompose").onclick = () => {
-  if (!confirm("يركّب طبقات الموشن على فيديو كل لقطة ليها طبقات وفيديو خلصان. كل لقطة بتاخد نسخة جديدة «✨ موشن» والأصل بيفضل. تكمل؟")) return;
-  pDo($("adPCompose"), "⏳", () => pAPI("/composite-all", { method: "POST" }));
-};
 $("adGalClose").onclick = () => $("adGalDialog").close();
 $("adGalDialog").addEventListener("close", () => {
   $("adGalStage").innerHTML = ""; $("adGalStage").dataset.take = ""; agal.sid = null;

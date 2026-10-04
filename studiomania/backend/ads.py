@@ -165,77 +165,6 @@ def brand_controls(settings: dict, others: list[dict] | None = None) -> str:
     return txt + "\n"
 
 
-REPLICA_NOTE = ("REPLICA TEST: rebuild the ORIGINAL reference ad exactly as it is — the same brand, product, logos, app screens, "
-                "people, wardrobe, places, colors, on-screen text and spoken language. Do not convert anything to another brand.")
-
-
-REPLICA_FORMAT = """{
-  "title": "اسم الإعلان الأصلي",
-  "concept": "الإعلان الأصلي في جملتين",
-  "cast": "كل شخص في الإعلان بوصف دقيق ثابت بالإنجليزي: السن، البشرة، الشعر، الجسم، اللبس بألوانه",
-  "locations": "الأماكن بالتفصيل",
-  "palette": "ألوان الإعلان الأصلي بالـ hex ودور كل لون",
-  "music_direction": "الموسيقى زي الأصلي", "sound_design": "المؤثرات زي الأصلي",
-  "scenes": [
-    {"n": 1,
-     "prompt": "English prompt for an image/video model that recreates THIS original scene exactly: subject, look, wardrobe, action, setting, lighting, lens, framing, camera move, any on-screen text verbatim and where it is",
-     "motion_prompt": "English description of the scene's motion graphics exactly as in the original (elements, position, timing, animation), or empty",
-     "components": [{"name": "نفس اسم المكون في التحليل", "image_prompt": "English prompt to recreate this element alone exactly as in the original, on a plain flat background"}]}
-  ]
-}"""
-
-
-def replica_messages(analysis: dict, audio: dict, style_txt: str, asks: list[str], n_orig: int, chat: list[dict]) -> list[dict]:
-    """🧪 تجربة نسخة طبق الأصل: المشاهد بتتبني من التحليل نفسه (replica_from_analysis)، والموديل بيكتب البرومبتات الإنجليزي بس."""
-    system = (
-        "دي تجربة لقياس دقة البرنامج: هنعيد بناء الإعلان المرجعي ده بالذكاء الاصطناعي طبق الأصل، من غير أي تغيير. "
-        "مفيش براند تاني ومفيش تعديل: نفس المنتج والبراند واللوجو، نفس الأشخاص بشكلهم ولبسهم، نفس الأماكن والإضاءة والألوان، "
-        "نفس الكلام المكتوب حرفيًا. شغلتك تكتب لكل مشهد برومبت إنجليزي دقيق جدًا يوصف المشهد الأصلي زي ما هو، "
-        "ووصف ثابت لكل شخص عشان يطلع نفس الشكل في كل اللقطات.\n\n"
-        + style_txt
-        + "تحليل الإعلان المرجعي:\n" + json.dumps(analysis, ensure_ascii=False)[:40000] + "\n\n"
-        + ("تحليل الصوت:\n" + json.dumps(audio, ensure_ascii=False)[:6000] + "\n\n" if audio else "")
-        + f"لازم ترجع {n_orig} مشهد بنفس أرقام التحليل. "
-        + "".join(f"{a}. " for a in asks if a and not a.startswith(("المدة", "اللغة", "الكلام", "عدد المشاهد")))
-        + f"\nرجّع JSON بس بالشكل ده:\n{REPLICA_FORMAT}"
-    )
-    first = {"role": "user", "content": "اكتب برومبتات إعادة بناء الإعلان ده طبق الأصل."}
-    return [{"role": "system", "content": system}, first] + chat[-12:]
-
-
-def replica_from_analysis(analysis: dict, llm: dict) -> dict:
-    """الاقتراح في وضع النسخة طبق الأصل: المشاهد والكلام والموشن والمكونات من التحليل حرفيًا، والبرومبتات من الموديل."""
-    llm = llm or {}
-    by_n = {}
-    for x in llm.get("scenes") or []:
-        if isinstance(x, dict) and str(x.get("n", "")).strip().isdigit():
-            by_n[int(str(x["n"]).strip())] = x
-    scenes = []
-    for i, o in enumerate((analysis or {}).get("scenes") or []):
-        n = int(o.get("n") or i + 1)
-        x = by_n.get(n, {})
-        prompts = {c.get("name"): c.get("image_prompt", "") for c in x.get("components") or [] if isinstance(c, dict)}
-        scenes.append({
-            "n": n, "ref_scene": n, "seconds": round(max(0.5, float(o.get("end") or 0) - float(o.get("start") or 0)), 2),
-            **{k: o.get(k, "") for k in ("visual", "shot", "camera", "on_screen_text", "voice", "sfx", "music")},
-            "motion_graphics": o.get("motion_graphics", ""),
-            "motion_prompt": x.get("motion_prompt", ""),
-            "prompt": x.get("prompt") or o.get("visual", ""),
-            "components": [{**{k: c.get(k, "") for k in ("name", "kind", "description", "animation")}, "from": c.get("name", ""), "asset": "",
-                            "image_prompt": prompts.get(c.get("name"), "")} for c in o.get("components") or [] if isinstance(c, dict)],
-        })
-    a = analysis or {}
-    total = sum(s["seconds"] for s in scenes)
-    return {"title": f"{llm.get('title') or a.get('title') or 'الإعلان'} (نسخة طبق الأصل)", "concept": llm.get("concept") or a.get("summary", ""),
-            "why_it_fits": "🧪 تجربة: نسخة طبق الأصل من الإعلان من غير أي تغيير، عشان نقيس دقة التحليل والتوليد.",
-            "kochi_angle": "", "angle": a.get("idea", ""), "tone": a.get("tone", ""), "hook": a.get("hook", ""),
-            "palette": llm.get("palette") or a.get("colors", ""), "duration": round(total, 1), "format": "", "scenes": scenes,
-            "voiceover_script": "\n".join(s["voice"] for s in scenes if s.get("voice")),
-            "music_direction": llm.get("music_direction", ""), "sound_design": llm.get("sound_design", ""),
-            "cast": llm.get("cast", ""), "locations": llm.get("locations", ""), "production_notes": "", "cta": a.get("cta", ""),
-            "caption": "", "replica": True}
-
-
 def adapt_messages(brand: dict, analysis: dict, audio: dict, settings: dict, style: dict | None, chat: list[dict],
                    brain: dict | None = None, others: list[dict] | None = None) -> list[dict]:
     style_txt = ""
@@ -250,11 +179,8 @@ def adapt_messages(brand: dict, analysis: dict, audio: dict, settings: dict, sty
         f"طريقة التنفيذ: {s['production']}" if s.get("production") else "",
         f"تعليمات إضافية: {s['notes']}" if s.get("notes") else "",
     ]
-    replica = s.get("fidelity") == "replica"
     copy = s.get("fidelity", "copy") != "inspired"
     n_orig = len((analysis or {}).get("scenes") or [])
-    if replica:
-        return replica_messages(analysis, audio, style_txt, asks, n_orig, chat)
     if copy:
         intro = ("شغلتك تاخد إعلان مرجعي متفصّص وتعمل نسخة منه لكوتشي **لقطة بلقطة**: نفس عدد المشاهد ونفس ترتيبها ومدتها، "
                  "نفس الكادر وزاوية الكاميرا وحركتها وتكوين الصورة ومكان كل عنصر على الشاشة، نفس الموشن جرافيك والانتقالات والإيقاع. "
@@ -454,8 +380,6 @@ def aspect_of(text: str) -> str:
 
 def ad_palette(a: dict, brand: dict, settings: dict | None, brain: dict | None) -> str:
     """ألوان الإعلان ده: ألوان البراند كاملة، أو ألوان الإعلان نفسه والبراند لمسات بس (عشان الإعلانات متطلعش كلها شبه بعض)."""
-    if (settings or {}).get("fidelity") == "replica":
-        return a.get("palette") or ""
     brand_pal = (brain or {}).get("palette") or brand.get("colors", "")
     mode = (settings or {}).get("palette_mode") or ""
     own = (settings or {}).get("palette_custom") if mode == "custom" else a.get("palette")
@@ -475,7 +399,7 @@ def header_from(adaptation: dict, style: dict | None, brand: dict, settings: dic
         "characters": a.get("cast", ""),
         "locations": a.get("locations", ""),
         "palette": ad_palette(a, brand, settings, brain),
-        "brand": "" if (settings or {}).get("fidelity") == "replica" else brain_header(brain),
+        "brand": brain_header(brain),
         "fidelity": (settings or {}).get("fidelity") or "copy",
         "brain_id": (brain or {}).get("id"),
         "rules": "Vertical social ad, consistent characters, wardrobe and lighting in every shot. No watermarks, no random text.",
@@ -485,7 +409,6 @@ def header_from(adaptation: dict, style: dict | None, brand: dict, settings: dic
 
 def header_text(h: dict) -> str:
     parts = [
-        REPLICA_NOTE if h.get("fidelity") == "replica" else "",
         f"AD: {h.get('title', '')}. CONCEPT: {h.get('concept', '')}",
         f"PRODUCT / BRAND IDENTITY (stay strictly on-brand): {h['brand']}" if h.get("brand") else "",
         f"VISUAL STYLE (must match exactly): {h['style']}" if h.get("style") else "",
@@ -636,7 +559,6 @@ def mock_components() -> dict:
     ], "motion_notes": "حركة تجريبية", "assembly_prompt": "Test assembly prompt."}
 
 
-
 SCENE_COMPONENTS_FORMAT = """{
   "scenes": [
     {"n": 1,
@@ -687,59 +609,6 @@ def mock_scene_components(scenes: list[dict]) -> dict:
                         "components": [{"name": "الممثل", "kind": "character", "description": "شاب", "animation": "ثابت"},
                                        {"name": "كارت سعر", "kind": "graphic", "description": "كارت أبيض", "animation": "بينط من تحت"}]}
                        for s in scenes]}
-
-
-# ================================================================ استحضار الموشن جرافيك للقطات التنفيذ
-
-MOTION_FORMAT = """{
-  "shots": [
-    {"id": "رقم اللقطة زي ما هو",
-     "motion_graphics": "الموشن جرافيك في لقطة كوتشي بالتفصيل (بالعربي): كل عنصر متحرك، دخوله وحركته وخروجه، التوقيت جوه اللقطة (من ثانية كام لكام)، الاتجاه والسرعة والـ easing، والانتقال للقطة اللي بعدها",
-     "motion_prompt": "English description of the same motion-graphics animation for image/video models",
-     "components": [
-       {"name": "اسم العنصر في نسخة كوتشي", "kind": "graphic | text | ui | icon | effect | logo",
-        "from": "العنصر اللي يقابله في الإعلان الأصلي",
-        "description": "شكله ودوره",
-        "image_prompt": "English prompt to create this element alone, isolated on a plain flat background, in the ad style",
-        "animation": "حركته بالتفصيل"}
-     ]}
-  ]
-}"""
-
-
-def motion_messages(h: dict, items: list[dict], with_video: bool) -> list[dict]:
-    """items: لكل لقطة من التنفيذ، اللقطة نفسها والمشهد الأصلي المقابل (بوقته ومكوناته)."""
-    rows = []
-    for it in items:
-        s, o = it["shot"], it.get("orig") or {}
-        rows.append(
-            f"### لقطة كوتشي id={s['id']} (رقم {s.get('n')}، {s.get('seconds', '')} ثانية)\n"
-            f"اللي بيحصل: {s.get('visual', '')}\nكلام على الشاشة: {s.get('on_screen_text', '') or '—'}\n"
-            f"الموشن المكتوب لها دلوقتي: {s.get('motion_notes', '') or '—'}\n"
-            f"المكونات الحالية: {', '.join(c.get('name', '') for c in s.get('components') or []) or '—'}\n"
-            + (f"المشهد الأصلي المقابل: رقم {o.get('n')} من {o.get('start', 0):.1f} لـ {o.get('end', 0):.1f} ثانية في الفيديو. "
-               f"{o.get('visual', '')}\nالموشن في الأصلي (من التحليل): {o.get('motion_graphics', '') or '—'}\n"
-               f"مكونات الأصلي: {json.dumps(o.get('components') or [], ensure_ascii=False)}\n" if o else "مفيش مشهد أصلي مقابل.\n"))
-    text = (
-        "أنت موشن ديزاينر لإعلانات كوتشي. "
-        + ("اتفرج على الإعلان الأصلي المرفق، وركّز في كل مشهد أصلي مذكور بوقته تحت. " if with_video else "")
-        + "المطلوب: تستحضر الموشن جرافيك بتاع كل مشهد أصلي وتطبّقه على لقطة كوتشي المقابلة: نفس العناصر المتحركة بوظيفتها، "
-        "نفس طريقة الدخول والحركة والخروج، نفس التوقيت والإيقاع والانتقالات، بس بمحتوى كوتشي "
-        "(شاشات تطبيق كوتشي، لوجو كوتشي، كلام كوتشي، ألوان البراند). لو المشهد الأصلي مفيهوش موشن جرافيك خالص، "
-        "اكتب الحركة والانتقال بس ورجّع components فاضية.\n"
-        "components = عناصر الموشن جرافيك بس (مش الشخصيات ولا الخلفيات)، ومتكررش عنصر موجود في المكونات الحالية بنفس الاسم.\n\n"
-        f"راس الإعلان:\n{header_text(h)}\n\n" + "\n".join(rows) + "\n"
-        f"رجّع JSON بس بالشكل ده (لقطة لكل id):\n{MOTION_FORMAT}"
-    )
-    return [{"role": "user", "content": text}]
-
-
-def mock_motion(items: list[dict]) -> dict:
-    return {"shots": [{"id": it["shot"]["id"], "motion_graphics": f"مستحضر من المشهد {(it.get('orig') or {}).get('n', '؟')}: كارت كوتشي بيطلع من الموبايل",
-                       "motion_prompt": "A KOCHI card slides out of the phone with a soft bounce.",
-                       "components": [{"name": "كارت كوتشي متحرك", "kind": "graphic", "from": "كارت سعر", "description": "كارت أبيض بلوجو كوتشي",
-                                       "image_prompt": "A white KOCHI card UI element.", "animation": "بيطلع من الموبايل ويتنطط"}]}
-                      for it in items]}
 
 
 # ================================================================ عقل الإعلان: المنتج وأصوله (شاشات، لوجو، صور المنتج) والهوية
@@ -961,37 +830,3 @@ def mock_directions() -> dict:
          "feature": "تمرين اليوم", "summary": "تمرين سريع بين الاجتماعات بيغيّر يومها."},
     ]}
 
-
-COMPARE_FORMAT = """{
-  "score": 0,
-  "verdict": "الحكم في جملتين",
-  "dimensions": {"composition": 0, "characters": 0, "setting": 0, "camera_motion": 0, "motion_graphics": 0, "text": 0, "timing": 0, "audio": 0},
-  "scenes": [{"n": 1, "score": 0, "matches": "إيه اللي طالع مطابق", "differences": "إيه اللي مختلف بالظبط"}],
-  "gaps": [{"stage": "analysis | storyboard | video_prompt | video_model | motion_graphics | voice | editing",
-            "problem": "المشكلة", "fix": "إزاي نعالجها في البرنامج", "impact": "high | medium | low"}]
-}"""
-
-
-def compare_messages(scenes: list[dict], shots: list[dict]) -> list[dict]:
-    """🔬 مقارنة الإعلان الأصلي (أول فيديو) بالنسخة المولدة (تاني فيديو) مشهد بمشهد."""
-    plan = "\n".join(f"- مشهد {s.get('n')}: الأصلي من {s.get('start', 0):.1f} لـ {s.get('end', 0):.1f} ث — {s.get('visual', '')}" for s in scenes)
-    gen = "\n".join(f"- لقطة {s['n']}: في النسخة المولدة من {s['at']:.1f} لـ {s['at'] + s['len']:.1f} ث ({s['src']})" for s in shots)
-    text = (
-        "أنت مراجع جودة لإنتاج إعلانات بالذكاء الاصطناعي. الفيديو الأول = الإعلان الأصلي. الفيديو التاني = محاولة إعادة بنائه "
-        "طبق الأصل بالبروسيس بتاعنا (تحليل ← ستوري بورد بموديل صور ← موشن جرافيك ← صوت ← فيديو بموديل فيديو ← مونتاج).\n"
-        "قارن الاتنين مشهد بمشهد بدقة وبصراحة: الكادر والتكوين، الأشخاص وشكلهم ولبسهم، المكان والإضاءة والألوان، حركة الكاميرا والحركة، "
-        "الموشن جرافيك ومكانه وتوقيته، الكلام المكتوب، التوقيت والإيقاع، والصوت والكلام.\n"
-        "الدرجات من 0 لـ 100 (100 = مطابق تمامًا). وفي gaps: حدد كل فجوة جاية من أنهي مرحلة في البروسيس، "
-        "وإزاي نعالجها عشان النسخة الجاية تطلع أقرب (مرتبة من الأهم للأقل).\n\n"
-        f"مشاهد الأصلي:\n{plan}\n\nلقطات النسخة المولدة:\n{gen}\n\n"
-        "اكتب بالعربي المصري البسيط. رجّع JSON بس بالشكل ده:\n" + COMPARE_FORMAT
-    )
-    return [{"role": "user", "content": text}]
-
-
-def mock_compare(n: int) -> dict:
-    return {"score": 62, "verdict": "التكوين قريب بس الأشخاص والموشن جرافيك بعاد.",
-            "dimensions": {"composition": 75, "characters": 50, "setting": 70, "camera_motion": 60, "motion_graphics": 40,
-                           "text": 55, "timing": 80, "audio": 65},
-            "scenes": [{"n": i + 1, "score": 60 + i, "matches": "الكادر", "differences": "لون اللبس"} for i in range(n)],
-            "gaps": [{"stage": "storyboard", "problem": "الشخص مختلف", "fix": "صورة مرجعية من الأصلي للشخصية", "impact": "high"}]}

@@ -10,6 +10,7 @@ import json
 import math
 import re
 import subprocess
+import uuid
 from array import array
 from pathlib import Path
 
@@ -226,6 +227,114 @@ def clean_elements(data: dict, shot: dict, sfx_ids: set[str]) -> dict:
             "summary": str((data or {}).get("summary") or "")[:400],
             "background": {"name": str(bg.get("name") or "")[:80], "description": str(bg.get("description") or "")[:600], "review": None},
             "elements": els}
+
+
+# ------------------------------------------------------------ 💡 الكومبوننتس: قطع من الفيديو تنفع تتعاد وتتحكم فيها
+
+COMPONENT_CATS = ("motion_graphics", "effect", "transition", "text", "screen", "cursor", "character", "background", "product", "other")
+CONTROL_TYPES = ("text", "color", "choice", "number")
+
+COMPONENTS_FORMAT = """{
+  "components": [
+    {"name": "اسم قصير واضح (مثلًا: ماوس بيسحب ملفات لسلة المهملات)",
+     "category": "motion_graphics | effect | transition | text | screen | cursor | character | background | product | other",
+     "t0": 1.20, "t1": 3.80,
+     "elements": ["s1e1", "s1e2"],
+     "description": "إيه اللي بيحصل فيه بالظبط (الحركة والإيقاع والشكل)",
+     "use": "ينفع يتستخدم في إيه في فيديو تاني",
+     "tags": ["ماوس", "سحب"],
+     "controls": [
+       {"label": "لون المؤشر", "type": "color", "target": "مؤشر ماوس أخضر", "value": "#3CFF6B"},
+       {"label": "اسم الملف الأول", "type": "text", "target": "ملف صورة: علي", "value": "علي"},
+       {"label": "الملفات بتترمي فين", "type": "choice", "target": "سلة المهملات", "value": "سلة المهملات", "options": ["سلة المهملات", "فولدر"]}
+     ]}
+  ]
+}"""
+
+
+def components_messages(d: dict, rejected: list[dict]) -> list[dict]:
+    """من التفكيك (اللقطات وعناصرها وحركاتها بتوقيتها) لكومبوننتس جاهزة تتحفظ في المكتبة."""
+    lines = []
+    for s in d.get("shots") or []:
+        an = s.get("analysis") or {}
+        lines.append(f"\n## لقطة {s['n']} ({s['start']:.2f}–{s['end']:.2f}) · {an.get('scene_type', '')}: {an.get('summary', '')}")
+        if (an.get("background") or {}).get("name"):
+            lines.append(f"الخلفية: {an['background']['name']} — {an['background'].get('description', '')}")
+        for e in an.get("elements") or []:
+            lines.append(f"- [{e['id']}] {e['name']} ({e['type']}) {e['first_t']:.2f}–{e['last_t']:.2f}: {e.get('description', '')}")
+            for a in e.get("actions") or []:
+                lines.append(f"    · {a['t0']:.2f}–{a['t1']:.2f} {a['action']}: {a.get('detail', '')}")
+    bad = "\n".join(f"- «{r.get('name')}» ({r.get('t0')}–{r.get('t1')}): {r.get('note') or 'من غير سبب'}" for r in rejected[:30])
+    text = (
+        "أنت موشن ديزاينر بتبني مكتبة أصول (assets) من فيديوهات حقيقية: موشن جرافيك، افيكتس، انتقالات، كلام متحرك، "
+        "تسجيلات شاشة، حركات ماوس... كل أصل = مقطع من الفيديو زي ما هو بحركته وخلفيته وصوته، وبعدين أي عميل يقدر "
+        "يغيّر فيه حاجات (ألوان، كلام، أسامي، وجهة حركة، سرعة) والحركة تفضل زي ما هي.\n"
+        f"ده تفكيك فيديو مدته {d['source']['duration']:.2f} ثانية (الأوقات بالثانية من أول الفيديو):\n" + "\n".join(lines) + "\n\n"
+        "طلّع منه الكومبوننتس اللي تستاهل تتحفظ وتتعاد:\n"
+        "- كل كومبوننت حتة واحدة مكتملة ليها بداية ونهاية واضحة (حركة كاملة، افيكت كامل، انتقال كامل). "
+        "سيب هامش صغير قبلها وبعدها (حوالي 0.15 ثانية) من غير ما تدخل في حاجة تانية.\n"
+        "- ممكن يعدّي القطع بين لقطتين لو هو انتقال أو حركة مستمرة. ومفيش حد أدنى ولا أقصى للمدة: خليه زي ما هو في الفيديو.\n"
+        "- متكررش نفس الحتة، ومتطلعش حاجات عادية ملهاش قيمة كأصل (لقطة واقفة من غير حركة مثلًا).\n"
+        "- elements = ids العناصر اللي جواه من القايمة.\n"
+        "- controls = الحاجات اللي العميل هيحب يغيّرها فيه، بقيمتها الحالية زي ما هي في الفيديو بالظبط "
+        "(الكلام المكتوب حرفيًا، اللون بالـ hex). type: text للكلام والأسامي، color للألوان، choice لما يبقى فيه اختيارات، "
+        "number للأرقام. target = اسم العنصر اللي بيتغيّر. من 1 لـ 6 مفاتيح.\n"
+        + (f"\nاقتراحات اترفضت قبل كده وسبب الرفض (اتعلم منها ومتكررهاش):\n{bad}\n" if bad else "")
+        + "\nالأسامي والأوصاف بالعربي المصري البسيط. رجّع JSON بس بالشكل ده:\n" + COMPONENTS_FORMAT
+    )
+    return [{"role": "user", "content": text}]
+
+
+def clean_components(data: dict, duration: float, element_ids: set[str]) -> list[dict]:
+    def num(v, dflt=0.0):
+        try:
+            x = float(v)
+            return x if x == x else dflt
+        except (TypeError, ValueError):
+            return dflt
+
+    out = []
+    for c in (data or {}).get("components") or []:
+        if not isinstance(c, dict) or not str(c.get("name") or "").strip():
+            continue
+        t0 = min(duration, max(0.0, num(c.get("t0"))))
+        t1 = min(duration, max(t0, num(c.get("t1"), duration)))
+        if t1 - t0 < 0.15:
+            continue
+        controls = []
+        for k in c.get("controls") or []:
+            if not isinstance(k, dict) or not str(k.get("label") or "").strip():
+                continue
+            ctype = k.get("type") if k.get("type") in CONTROL_TYPES else "text"
+            ctl = {"key": f"k{len(controls) + 1}", "label": str(k["label"])[:60], "type": ctype,
+                   "target": str(k.get("target") or "")[:80], "value": str(k.get("value") if k.get("value") is not None else "")[:200]}
+            if ctype == "choice":
+                ctl["options"] = [str(o)[:80] for o in k.get("options") or [] if str(o).strip()][:8] or [ctl["value"]]
+            controls.append(ctl)
+        out.append({"id": uuid.uuid4().hex[:8], "name": str(c["name"])[:100],
+                    "category": c.get("category") if c.get("category") in COMPONENT_CATS else "other",
+                    "t0": round(t0, 2), "t1": round(t1, 2),
+                    "elements": [str(e) for e in c.get("elements") or [] if str(e) in element_ids],
+                    "description": str(c.get("description") or "")[:600], "use": str(c.get("use") or "")[:300],
+                    "tags": [str(t).strip()[:30] for t in c.get("tags") or [] if str(t).strip()][:8],
+                    "controls": controls[:6], "review": None, "asset": None})
+    return sorted(out, key=lambda c: c["t0"])
+
+
+def mock_components(d: dict) -> dict:
+    comps = []
+    for s in d.get("shots") or []:
+        els = (s.get("analysis") or {}).get("elements") or []
+        if not els:
+            continue
+        comps.append({"name": f"تجربة: ماوس بيسحب ملف (لقطة {s['n']})", "category": "cursor", "t0": s["start"], "t1": s["end"],
+                      "elements": [e["id"] for e in els], "description": "المؤشر بيتحرك وبيسحب الملف للسلة", "use": "شرح ميزة في تطبيق",
+                      "tags": ["ماوس", "سحب"],
+                      "controls": [{"label": "لون المؤشر", "type": "color", "target": els[0]["name"], "value": "#3CFF6B"},
+                                   {"label": "اسم الملف", "type": "text", "target": els[-1]["name"], "value": "علي"},
+                                   {"label": "الملف بيروح فين", "type": "choice", "target": "السلة", "value": "سلة المهملات",
+                                    "options": ["سلة المهملات", "فولدر"]}]})
+    return {"components": comps}
 
 
 # ------------------------------------------------------------ تجارب من غير Atlas

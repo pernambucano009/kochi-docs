@@ -71,8 +71,9 @@ function assetDetail(a) {
         <label>تاجز <input type="text" data-asf="tags" value="${le((a.tags || []).join("، "))}" placeholder="ماوس، سحب، فولدر" data-no-i18n></label>
         <label>ملاحظات <textarea rows="2" data-asf="notes" placeholder="هتستخدمه في إيه؟ إيه اللي حلو فيه؟" data-no-i18n>${le(a.notes)}</textarea></label>
         <small class="muted">${a.duration} ث · ${a.width}×${a.height} · من
-          <a href="#" data-asgolab="${src.lab}" data-no-i18n>«${le(src.lab_name)}»</a> لقطة ${src.shot} (${lt(src.t0)} ← ${lt(src.t1)})${src.vedit ? " · من نسخة متعدلة" : ""}</small>
-        ${a.summary ? `<p data-no-i18n>${le(a.summary)}</p>` : ""}
+          <a href="#" data-asgolab="${src.lab}" data-no-i18n>«${le(src.lab_name)}»</a> ${(src.shots || [src.shot]).length > 1 ? `لقطات ${(src.shots || []).join("، ")}` : `لقطة ${(src.shots || [src.shot])[0]}`} (${lt(src.t0)} ← ${lt(src.t1)})</small>
+        ${a.description || a.summary ? `<p data-no-i18n>${le(a.description || a.summary)}</p>` : ""}
+        ${a.use ? `<small class="muted" data-no-i18n>💼 ${le(a.use)}</small>` : ""}
       </div>
     </div>
     <section class="panel lab-sec"><h4>🧩 اللي جواه</h4>
@@ -88,8 +89,14 @@ function assetDetail(a) {
     </section>
     <section class="panel lab-sec"><div class="lab-vedit" data-asedit>
       <b>✏️ اطلع منه نسخة</b> <small class="muted">المشهد بيفضل بحركته وخلفيته، واللي بتطلبه بس هو اللي بيتغيّر</small>
+      ${(a.controls || []).length ? `<div class="as-ctls"><b>🎛️ مفاتيح التحكم</b> <small class="muted">غيّر اللي إنت عايزه بس وسيب الباقي</small>
+        ${a.controls.map((k) => `<label class="as-ctl" title="${le(k.target)}"><span data-no-i18n>${le(k.label)}</span>
+          ${k.type === "color" ? `<input type="color" value="${/^#[0-9a-f]{6}$/i.test(k.value) ? k.value : "#000000"}" data-ctl="${k.key}">`
+            : k.type === "choice" ? `<select data-ctl="${k.key}">${(k.options || []).map((o) => `<option ${o === k.value ? "selected" : ""} data-no-i18n>${le(o)}</option>`).join("")}</select>`
+            : `<input type="${k.type === "number" ? "number" : "text"}" value="${le(k.value)}" data-ctl="${k.key}" data-no-i18n>`}</label>`).join("")}
+      </div>` : ""}
       ${(a.elements || []).length ? `<div class="lab-chips">${a.elements.map((e) => `<button type="button" class="chip" data-vchip="${le(e.name)}">${LAB_TYPES[e.type]?.split(" ")[0] || ""} ${le(e.name)}</button>`).join("")}</div>` : ""}
-      <textarea rows="2" data-vtext placeholder="مثلًا: «مؤشر الماوس» خليه بلون البراند، والفولدر اسمه «عملاء كوتشي»"></textarea>
+      <textarea rows="2" data-vtext placeholder="${(a.controls || []).length ? "وأي حاجة تانية عايز تغيّرها بالكلام (اختياري)" : "مثلًا: «مؤشر الماوس» خليه بلون البراند، والفولدر اسمه «عملاء»"}"></textarea>
       <div class="row wrap">
         <select data-vmodel>${models.map((m) => `<option value="${m.key}">${le(m.label)} · ~${(m.per_sec * dur).toFixed(2)}$</option>`).join("")}</select>
         ${done.length ? `<select data-vbase><option value="">على الأصل</option>${done.map((v) => `<option value="${v.id}">على النسخة ${vs.indexOf(v) + 1}</option>`).join("")}</select>` : ""}
@@ -168,8 +175,13 @@ $("labLib").addEventListener("click", async (e) => {
   const base = () => box.querySelector("[data-vbase]")?.value || null;
   const go = t.closest("[data-vgo]"), sp = t.closest("[data-vspeed]"), del = t.closest("[data-asvdel]"), cmp = t.closest("[data-ascmp]");
   if (go) {
-    const text = box.querySelector("[data-vtext]").value.trim();
-    if (!text) return toast("اكتب عايز تغيّر إيه", true);
+    // مفاتيح التحكم اللي اتغيرت بتتحول لطلب واحد مع الكلام اللي اتكتب
+    const changes = (asx.cur.controls || []).map((k) => {
+      const v = box.querySelector(`[data-ctl="${k.key}"]`)?.value ?? k.value;
+      return String(v).toLowerCase() === String(k.value).toLowerCase() ? null : `${k.label}${k.target ? ` («${k.target}»)` : ""}: من «${k.value}» لـ «${v}»`;
+    }).filter(Boolean);
+    const text = [...changes, box.querySelector("[data-vtext]").value.trim()].filter(Boolean).join("\n");
+    if (!text) return toast("غيّر مفتاح أو اكتب عايز تغيّر إيه", true);
     const sel = box.querySelector("[data-vmodel]");
     if (!confirm(`يعدّل الأصل بـ ${sel.selectedOptions[0].textContent}؟`)) return;
     return busyButton(go, "⏳", async () => {

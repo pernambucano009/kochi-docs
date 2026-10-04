@@ -52,10 +52,8 @@ load_env_file(ROOT / ".env")
 import atlas  # noqa: E402  (لازم بعد قراءة .env)
 import captions  # noqa: E402
 import montage  # noqa: E402
-import fx  # noqa: E402  (محرك الافيكتس)
 import lab  # noqa: E402  (معمل التفكيك)
 import audioshake  # noqa: E402  (فصل الكلام / الموسيقى / المؤثرات)
-import motion as mo  # noqa: E402
 import publisher  # noqa: E402
 import sheets  # noqa: E402
 import carousel as cz  # noqa: E402
@@ -5170,7 +5168,6 @@ def render_episode(eid: str):
     return episode_response(eid)
 
 
-
 class WriteIn(BaseModel):
     message: str = ""
 
@@ -5714,8 +5711,6 @@ def ad_to_dict(r: sqlite3.Row, d: dict) -> dict:
         "prod_history": [{"at": h.get("archived_at"), "shots": len(h.get("shots") or [])} for h in d.get("prod_history") or []],
         "settings": d.get("settings") or {},
         "adaptation": d.get("adaptation"), "adapt_status": d.get("adapt_status", "idle"), "adapt_error": d.get("adapt_error"),
-        "compare": {**(d.get("compare") or {}), "url": f"{base}/prod/compare/{d['compare']['file']}"} if (d.get("compare") or {}).get("file")
-                   else (d.get("compare") or {}),
         "directions": d.get("directions") or [], "directions_status": d.get("directions_status", "idle"),
         "directions_error": d.get("directions_error"),
         "scomp_status": d.get("scomp_status", "idle"),
@@ -5759,7 +5754,6 @@ def ad_progress(d: dict) -> dict:
     return {"analysis": bool(d.get("analysis")), "adapt": bool(d.get("adaptation")), "shots": len(shots),
             "frames": sum(1 for s in shots if s.get("frame")), "videos": sum(1 for s in shots if chosen_ok(s)),
             "editor": bool((d.get("prod") or {}).get("project_id")),
-            "compare": ((d.get("compare") or {}).get("result") or {}).get("score"),
             "mode": (d.get("settings") or {}).get("fidelity") or "copy"}
 
 
@@ -5878,8 +5872,6 @@ def patch_ad(aid: str, body: AdPatchIn):
     if body.name is not None and body.name.strip():
         with closing(db()) as conn, conn:
             conn.execute("UPDATE ads SET name = ? WHERE id = ?", (body.name.strip()[:120], aid))
-    if body.settings is not None and "fidelity" in body.settings:
-        replica_brain(aid, body.settings.get("fidelity") == "replica")
     def fn(d):
         if body.settings is not None:
             d["settings"] = {**(d.get("settings") or {}), **{k: body.settings[k] for k in AD_SETTING_KEYS if k in body.settings}}
@@ -5900,24 +5892,6 @@ def patch_ad(aid: str, body: AdPatchIn):
             bump(d, "adapt_ver")
     update_ad(aid, fn)
     return ad_response(aid)
-
-
-def replica_brain(aid: str, on: bool) -> None:
-    """🧪 النسخة طبق الأصل ليها عقل لوحدها (فاضي، فيه أبطال الإعلان ده بس) عشان أصول كوتشي متدخلش في الرسم."""
-    with closing(db()) as conn:
-        r, d = ad_row(conn, aid)
-    st = d.get("settings") or {}
-    cur = brain_row(st["brain_id"]) if st.get("brain_id") not in (None, "", "none") else None
-    if on and not (cur and cur.get("replica_of") == aid):
-        bid = uuid.uuid4().hex[:12]
-        data = {"type": "app", **{k: "" for k in BRAIN_FIELDS if k != "type"}, "screens": [], "logos": [], "products": [],
-                "status": "idle", "replica_of": aid}
-        with closing(db()) as conn, conn:
-            conn.execute("INSERT INTO ad_brains (id, name, data, created_at) VALUES (?, ?, ?, ?)",
-                         (bid, f"🧪 نسخة: {r['name']}"[:80], json.dumps(data, ensure_ascii=False), now()))
-        update_ad(aid, lambda d: d.setdefault("settings", {}).update(brain_id=bid))
-    elif not on and cur and cur.get("replica_of") == aid:
-        update_ad(aid, lambda d: d.setdefault("settings", {}).update(brain_id=""))
 
 
 @app.delete("/api/ads/{aid}")
@@ -6251,8 +6225,6 @@ def run_ad_adapt(aid: str) -> None:
             msgs = az.adapt_messages(brand_settings(), d.get("analysis") or {}, d.get("audio") or {}, settings,
                                      ad_style(settings.get("style_id")), d.get("chat") or [], ad_brain(settings), other_ads(aid))
             result = ad_json(series_chat(msgs), "اقتراح كوتشي")
-        if settings.get("fidelity") == "replica":  # 🧪 النسخة طبق الأصل: المشاهد من التحليل حرفيًا
-            result = az.replica_from_analysis(d.get("analysis") or {}, {} if atlas.mock_mode() else result)
         def fn(d):
             d["adaptation"] = {**result, "based_on": d.get("analysis_ver", 0)}
             d["adapt_status"], d["adapt_error"] = "done", None
@@ -6755,9 +6727,6 @@ def reset_stuck_ads() -> None:
             if d.get("scomp_status") == "working":
                 d.update(scomp_status="failed")
                 changed = True
-            if (d.get("compare") or {}).get("status") == "working":
-                d["compare"].update(status="failed", error="اتقطع لما السيرفر اتقفل. قارن تاني", step=None)
-                changed = True
             if d.get("directions_status") == "working":
                 d.update(directions_status="failed", directions_error="اتقطع لما السيرفر اتقفل. دوس تاني")
                 changed = True
@@ -6791,7 +6760,7 @@ def prod_busy(p: dict | None) -> bool:
     if (p or {}).get("cast_status") == "working" or any(c.get("status") == "working" for c in (p or {}).get("cast") or []):
         return True
     for s in (p or {}).get("shots") or []:
-        if "working" in (s.get("frame_status"), s.get("comp_status"), s.get("motion_status"), s.get("layers_status"), s.get("voice_status")):
+        if "working" in (s.get("frame_status"), s.get("comp_status"), s.get("voice_status")):
             return True
         if any(c.get("status") == "working" for c in s.get("components") or []):
             return True
@@ -6905,12 +6874,6 @@ def prod_start(aid: str):
     update_ad(aid, fn)
     # شاشات التطبيق واللوجو وصور المنتج الحقيقية من عقل الإعلان بتتحط في المكونات لوحدها
     threading.Thread(target=safe_apply_brain, args=(aid,), daemon=True).start()
-    if settings.get("fidelity") == "replica" and (d.get("source") or {}).get("has_audio"):
-        # 🧪 النسخة طبق الأصل: الفويس أوفر هو صوت الإعلان الأصلي نفسه، بيتقطع على اللقطات لوحده
-        try:
-            prod_full_voice_original(aid)
-        except HTTPException:
-            pass
     return ad_response(aid)
 
 
@@ -7097,7 +7060,6 @@ def run_ad_frame(aid: str, sid: str, note: str = "", extra: list[str] | None = N
             mock_image(dest, f"{int(w) // 2}x{int(hh) // 2}", f"shot {s['n']}", s["n"])
         else:
             # صور المكونات نفسها (شاشات كوتشي، اللوجو، الشخصيات...) مراجع أساسية، وبعدها صور الستايل للشكل العام
-            s = plate_shot(s)  # لو اللقطة ليها موشن متركب: الستوري بورد من غير الجرافيك (بيتركب بعدين)
             comp_dir = prod_dir(aid, "comps")
             # المنشنز من عقل الإعلان: صورهم الحقيقية أول المراجع
             brain = ad_brain(d.get("settings"))
@@ -7237,74 +7199,6 @@ def prod_pick_frame(aid: str, sid: str, body: FramePickIn):
             raise HTTPException(404, "النسخة مش موجودة")
         s["frame"] = body.file
     update_ad(aid, fn)
-    return ad_response(aid)
-
-
-def run_ad_motion(aid: str, sids: list[str]) -> None:
-    """يستحضر الموشن جرافيك من المشاهد الأصلية للقطات التنفيذ (بيتفرج على الفيديو الأصلي لو موجود)."""
-    try:
-        with closing(db()) as conn:
-            _, d = ad_row(conn, aid)
-        p = d["prod"]
-        orig = {x.get("n"): x for x in (d.get("analysis") or {}).get("scenes") or []}
-        items = [{"shot": s, "orig": orig.get(s.get("ref_scene"))} for s in p["shots"] if s["id"] in sids]
-        proxy = ad_dir(aid) / "proxy.mp4"
-        if atlas.mock_mode():
-            out = az.mock_motion(items)
-        elif proxy.exists():
-            out = ad_json(ad_media_chat(az.with_media(az.motion_messages(p["header"], items, True),
-                                                      data_url(proxy, "video/mp4"), "ad.mp4")), "الموشن جرافيك")
-        else:
-            out = ad_json(series_chat(az.motion_messages(p["header"], items, False)), "الموشن جرافيك")
-        got = {str(x.get("id")): x for x in out.get("shots") or [] if isinstance(x, dict)}
-        def fn(d):
-            for s in d["prod"]["shots"]:
-                if s["id"] not in sids:
-                    continue
-                x = got.get(s["id"])
-                if not x:
-                    s.update(motion_status="failed", motion_error="الموديل ما رجعش موشن للقطة دي. جرّب تاني")
-                    continue
-                s["motion_notes"] = str(x.get("motion_graphics") or s.get("motion_notes") or "")
-                s["motion_prompt"] = str(x.get("motion_prompt") or s.get("motion_prompt") or "")
-                names = {c["name"] for c in s.get("components") or []}
-                for c in x.get("components") or []:
-                    if not isinstance(c, dict) or not c.get("name") or str(c["name"]) in names:
-                        continue
-                    s.setdefault("components", []).append({
-                        "id": uuid.uuid4().hex[:8], "name": str(c["name"])[:60], "kind": str(c.get("kind") or "graphic")[:20],
-                        "from": str(c.get("from") or ""), "description": str(c.get("description") or ""),
-                        "image_prompt": str(c.get("image_prompt") or ""), "animation": str(c.get("animation") or ""),
-                        "image": None, "images": [], "status": "idle", "error": None, "use": True, "motion": True})
-                s.update(motion_status="done", motion_error=None)
-        update_ad(aid, fn)
-        safe_apply_brain(aid, sids)
-    except Exception as exc:  # noqa: BLE001
-        msg = str(getattr(exc, "detail", None) or exc)[:400]
-        def fail(d):
-            for s in (d.get("prod") or {}).get("shots") or []:
-                if s["id"] in sids and s.get("motion_status") == "working":
-                    s.update(motion_status="failed", motion_error=msg)
-        update_ad(aid, fail)
-
-
-@app.post("/api/ads/{aid}/prod/motion")
-def prod_motion(aid: str, shot_id: str | None = None):
-    """زرار «استحضر الموشن جرافيك»: لقطة واحدة أو كل اللقطات."""
-    if not (atlas.api_key() or atlas.mock_mode()):
-        raise HTTPException(400, "مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات")
-    ids: list[str] = []
-    def fn(d):
-        p = prod_of(d)
-        for s in p["shots"]:
-            if (shot_id and s["id"] != shot_id) or s.get("motion_status") == "working":
-                continue
-            s.update(motion_status="working", motion_error=None)
-            ids.append(s["id"])
-    update_ad(aid, fn)
-    if not ids:
-        raise HTTPException(400, "الموشن بيتستحضر بالفعل")
-    threading.Thread(target=run_ad_motion, args=(aid, ids), daemon=True).start()
     return ad_response(aid)
 
 
@@ -7588,7 +7482,7 @@ def run_ad_take(aid: str, sid: str, tid: str) -> None:
                 brain = ad_brain(d.get("settings"))
                 ments = [brain_dir(brain["id"]) / a["file"] for a in mention_refs(brain, s.get("mentions"))][:max(0, AD_MAX_REFS - 1 - len(extra))]
                 refs = ([frames / s["frame"]] + extra + ments
-                        + [comps / c["image"] for c in ref_comps(plate_shot(s), AD_MAX_REFS - 1 - len(extra) - len(ments))])
+                        + [comps / c["image"] for c in ref_comps(s, AD_MAX_REFS - 1 - len(extra) - len(ments))])
                 vm = ad_video_model(t.get("video_model"))
                 if vm["kind"] == "i2v":
                     img = atlas.reference_url(frames / s["frame"])
@@ -7891,81 +7785,6 @@ def prod_cast_approve_all(aid: str):
     return ad_response(aid)
 
 
-# ---------- ✨ الموشن المتركب: طبقات (عناصر وكلام) بتتحرك فوق فيديو اللقطة وتتطبع عليه
-
-LAYER_KINDS = ("graphic", "text", "ui", "icon", "effect", "logo")
-
-
-def layer_comps(s: dict) -> list[dict]:
-    """العناصر اللي ينفع تبقى طبقات موشن (مش الشخصيات ولا الخلفيات)."""
-    return [c for c in s.get("components") or [] if c.get("use", True) and (c.get("kind") in LAYER_KINDS or c.get("motion"))]
-
-
-def plate_shot(s: dict) -> dict:
-    """اللقطة من غير عناصر الموشن المتركب: الستوري بورد والفيديو بيطلعوا نضاف والجرافيك بيتركب عليهم بعدين."""
-    ids = {L.get("comp_id") for L in s.get("layers") or [] if L.get("type") == "image"}
-    if not s.get("layers"):
-        return s
-    return {**s, "clean": True, "on_screen_text": "", "motion_prompt": "",
-            "components": [c for c in s.get("components") or [] if c["id"] not in ids]}
-
-
-def run_ad_layers(aid: str, sids: list[str]) -> None:
-    """الموديل بيتفرج على المشهد الأصلي ويطلّع طبقات الموشن (مكانها وتوقيتها وحركتها) لكل لقطة."""
-    for sid in sids:
-        try:
-            with closing(db()) as conn:
-                _, d = ad_row(conn, aid)
-            p = d["prod"]
-            s = find_pshot(p, sid)
-            comps = layer_comps(s)
-            orig = next((x for x in (d.get("analysis") or {}).get("scenes") or [] if x.get("n") == s.get("ref_scene")), None)
-            proxy = ad_dir(aid) / "proxy.mp4"
-            if atlas.mock_mode():
-                out = mo.mock_layers(s, comps)
-            elif proxy.exists() and orig:
-                out = ad_json(ad_media_chat(az.with_media(mo.layers_messages(az.header_text(p["header"]), s, comps, orig, True),
-                                                          data_url(proxy, "video/mp4"), "ad.mp4"), 8000), "طبقات الموشن")
-            else:
-                out = ad_json(series_chat(mo.layers_messages(az.header_text(p["header"]), s, comps, orig, False)), "طبقات الموشن")
-            layers = mo.clean_layers(out.get("layers"), float(s.get("seconds") or 4), {c["id"] for c in comps})
-            set_pshot(aid, sid, layers=layers, layers_status="done", layers_error=None if layers else "الموديل شاف إن اللقطة دي مفيهاش موشن جرافيك")
-        except Exception as exc:  # noqa: BLE001
-            set_pshot(aid, sid, layers_status="failed", layers_error=str(getattr(exc, "detail", None) or exc)[:300])
-
-
-@app.post("/api/ads/{aid}/prod/layers/plan")
-def prod_layers_plan(aid: str, shot_id: str | None = None):
-    """🤖 خطّط طبقات الموشن (لقطة واحدة أو كل اللقطات اللي لسه ملهاش طبقات)."""
-    if not (atlas.api_key() or atlas.mock_mode()):
-        raise HTTPException(400, "مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات")
-    ids: list[str] = []
-    def fn(d):
-        for s in prod_of(d)["shots"]:
-            if s.get("layers_status") == "working" or (shot_id and s["id"] != shot_id) or (not shot_id and s.get("layers")):
-                continue
-            s.update(layers_status="working", layers_error=None)
-            ids.append(s["id"])
-    update_ad(aid, fn)
-    if not ids:
-        raise HTTPException(400, "كل اللقطات ليها طبقات موشن (أو بتتخطط دلوقتي)")
-    threading.Thread(target=run_ad_layers, args=(aid, ids), daemon=True).start()
-    return ad_response(aid)
-
-
-class LayersIn(BaseModel):
-    layers: list[dict]
-
-
-@app.put("/api/ads/{aid}/prod/shots/{sid}/layers")
-def prod_layers_save(aid: str, sid: str, body: LayersIn):
-    def fn(d):
-        s = find_pshot(prod_of(d), sid)
-        s["layers"] = mo.clean_layers(body.layers, float(s.get("seconds") or 4), {c["id"] for c in s.get("components") or []})
-    update_ad(aid, fn)
-    return ad_response(aid)
-
-
 def base_take(s: dict, tid: str | None = None) -> dict | None:
     """الفيديو اللي الموشن هيتركب عليه: المختار (ولو هو نفسه متركب، الأصل بتاعه)، أو آخر فيديو خلص."""
     takes = {t["id"]: t for t in s.get("takes") or []}
@@ -7976,143 +7795,6 @@ def base_take(s: dict, tid: str | None = None) -> dict | None:
         return t
     done = [x for x in s.get("takes") or [] if x.get("status") == "done" and x.get("file") and not x.get("composite")]
     return done[-1] if done else None
-
-
-# ---------- ✨ مكتبة الافيكتس: قوالب الكلام المتحرك وأصواتها، ومعاينة أي قالب على طول
-
-FX_DIR = ADS_DIR / "fx"
-
-
-@app.get("/api/fx")
-def fx_library():
-    return {"available": fx.available(),
-            "templates": [{"id": k, **v} for k, v in fx.TEXT_FX.items()],
-            "sfx": [{"id": k, "label": v["label"], "url": f"/api/fx/sfx/{k}.wav"} for k, v in fx.SFX.items()],
-            "fonts": [{"family": f["family"], "label": f["label"]} for f in captions.FONTS]}
-
-
-@app.get("/api/fx/sfx/{name}.wav")
-def fx_sfx(name: str):
-    if name not in fx.SFX:
-        raise HTTPException(404, "الصوت ده مش موجود")
-    return FileResponse(fx.sfx_file(ffmpeg_exe(), FX_DIR / "sfx", name), media_type="audio/wav")
-
-
-class FxPreviewIn(BaseModel):
-    layer: dict
-    aspect: str = "9:16"
-    seconds: float = 4.0
-    bg: str = ""  # لينك صورة من البرنامج (ستوري بورد مثلًا) أو فاضي = خلفية جاهزة
-
-
-@app.post("/api/fx/preview")
-def fx_preview(body: FxPreviewIn):
-    """🎬 معاينة قالب: الكلام بحركته وصوته على خلفية، بيتحفظ عشان نفس المعاينة متترسمش تاني."""
-    dur = max(1.5, min(8.0, float(body.seconds)))
-    W, H = {"16:9": (1280, 720), "1:1": (900, 900)}.get(body.aspect, (720, 1280))
-    layer = {**body.layer, "type": "text", "start": body.layer.get("start", 0.3), "end": body.layer.get("end", dur - 0.2)}
-    layers = mo.clean_layers([layer], dur, set())
-    if not layers:
-        raise HTTPException(400, "اكتب الكلام الأول")
-    bg = None
-    if body.bg.startswith("/media/ads/"):
-        cand = (ADS_DIR / body.bg[len("/media/ads/"):].split("?")[0]).resolve()
-        if cand.is_file() and ADS_DIR.resolve() in cand.parents:
-            bg = cand
-    key = hashlib.sha1(json.dumps([layers, W, H, dur, str(bg or ""), fx.available()], sort_keys=True).encode()).hexdigest()[:16]
-    folder = FX_DIR / "previews"
-    out = folder / f"{key}.mp4"
-    if not out.exists():
-        folder.mkdir(parents=True, exist_ok=True)
-        base = folder / f"{key}-bg.mp4"
-        src = (["-loop", "1", "-i", str(bg), "-vf", f"scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},setsar=1"] if bg else
-               ["-f", "lavfi", "-i", f"gradients=s={W}x{H}:c0=0x16222A:c1=0x3A6073:d={dur}:speed=0.02"])
-        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", *src, "-t", f"{dur:.2f}", "-r", "30",
-                        "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p", str(base)], check=True, capture_output=True, timeout=120)
-        try:
-            mo.render(ffmpeg_exe(), base, layers, {}, out, dur, FONTS_DIR, folder / "work", FX_DIR / "sfx")
-        finally:
-            base.unlink(missing_ok=True)
-        old = sorted(folder.glob("*.mp4"), key=lambda x: x.stat().st_mtime)
-        for f in old[:-200]:  # آخر 200 معاينة بس
-            f.unlink(missing_ok=True)
-    return {"url": f"/media/ads/fx/previews/{out.name}", "layer": layers[0], "engine": "fx" if fx.available() else "ass"}
-
-
-def run_ad_composite(aid: str, sid: str, tid: str) -> None:
-    def setp(**kw):
-        def fn(d):
-            s = next((x for x in (d.get("prod") or {}).get("shots", []) if x["id"] == sid), None)
-            t = next((x for x in (s or {}).get("takes") or [] if x["id"] == tid), None)
-            if t is not None:
-                t.update(**kw)
-        update_ad(aid, fn)
-    try:
-        setp(status="working", error=None)
-        with closing(db()) as conn:
-            _, d = ad_row(conn, aid)
-        s = find_pshot(d["prod"], sid)
-        need = {L["comp_id"] for L in s.get("layers") or [] if L["type"] == "image"}
-        missing = [c for c in s.get("components") or [] if c["id"] in need and not c.get("image")]
-        if missing:  # صور العناصر اللي لسه ملهاش: من عقل الإعلان، والباقي بيتولد
-            safe_apply_brain(aid, [sid])
-            with closing(db()) as conn:
-                _, d = ad_row(conn, aid)
-            s = find_pshot(d["prod"], sid)
-            for c in s.get("components") or []:
-                if c["id"] in need and not c.get("image"):
-                    run_ad_comp_image(aid, sid, c["id"])
-            with closing(db()) as conn:
-                _, d = ad_row(conn, aid)
-            s = find_pshot(d["prod"], sid)
-        t = next(x for x in s["takes"] if x["id"] == tid)
-        base = next((x for x in s["takes"] if x["id"] == t.get("base")), None)
-        if not base or not base.get("file"):
-            raise RuntimeError("الفيديو الأساسي للقطة مش موجود")
-        comp_dir, cut_dir = prod_dir(aid, "comps"), prod_dir(aid, "cuts")
-        images = {}
-        for c in s.get("components") or []:
-            if c["id"] in need and c.get("image") and (comp_dir / c["image"]).exists():
-                images[c["id"]] = mo.cutout(ffmpeg_exe(), comp_dir / c["image"], cut_dir / f"{Path(c['image']).stem}.png", c.get("kind", ""))
-        src = prod_dir(aid, "takes") / base["file"]
-        dur = base.get("duration") or probe_duration(src)
-        dest = prod_dir(aid, "takes") / f"{tid}.mp4"
-        mo.render(ffmpeg_exe(), src, s.get("layers") or [], images, dest, dur, FONTS_DIR, prod_dir(aid, "cuts"), FX_DIR / "sfx")
-        setp(status="done", file=dest.name, duration=round(probe_duration(dest), 2), error=None)
-    except Exception as exc:  # noqa: BLE001
-        setp(status="failed", error=str(getattr(exc, "detail", None) or exc)[:400])
-
-
-@app.post("/api/ads/{aid}/prod/shots/{sid}/composite")
-def prod_composite(aid: str, sid: str, take_id: str | None = None):
-    """✨ ركّب الموشن: نسخة جديدة من فيديو اللقطة عليها طبقات الموشن (الأصل بيفضل زي ما هو)."""
-    tid = uuid.uuid4().hex[:10]
-    def fn(d):
-        s = find_pshot(prod_of(d), sid)
-        if not s.get("layers"):
-            raise HTTPException(400, f"اللقطة {s['n']} ملهاش طبقات موشن. خطّطها الأول")
-        base = base_take(s, take_id)
-        if not base:
-            raise HTTPException(400, f"اللقطة {s['n']} ملهاش فيديو خلصان يتركب عليه الموشن")
-        s["takes"].append({"id": tid, "file": None, "status": "queued", "error": None, "approved": bool(base.get("approved")),
-                           "composite": True, "base": base["id"], "duration": None, "gen_duration": base.get("gen_duration"),
-                           "prompt": "✨ موشن متركب", "created_at": now()})
-        s["chosen"] = tid
-    update_ad(aid, fn)
-    ad_executor.submit(run_ad_composite, aid, sid, tid)
-    return ad_response(aid)
-
-
-@app.post("/api/ads/{aid}/prod/composite-all")
-def prod_composite_all(aid: str):
-    with closing(db()) as conn:
-        _, d = ad_row(conn, aid)
-    ok = [s["id"] for s in prod_of(d)["shots"] if s.get("layers") and base_take(s)]
-    if not ok:
-        raise HTTPException(400, "مفيش لقطات ليها طبقات موشن وفيديو خلصان")
-    for sid in ok:
-        prod_composite(aid, sid)
-    return ad_response(aid)
 
 
 # ---------- 🎬 موديلات الفيديو للإعلانات، 🎙️ الصوت (بيحدد مدة اللقطة)، 👄 الكلام على الوش (لب سينك)
@@ -8389,129 +8071,6 @@ def prod_full_voice(aid: str, file: UploadFile | None = File(default=None)):
     return ad_response(aid)
 
 
-@app.post("/api/ads/{aid}/prod/full-voice-original")
-def prod_full_voice_original(aid: str):
-    """🎧 صوت الإعلان الأصلي نفسه كصوت كامل (لتجربة النسخة طبق الأصل): بيتقطع على اللقطات زي أي صوت مرفوع."""
-    with closing(db()) as conn:
-        _, d = ad_row(conn, aid)
-    p = prod_of(d)
-    if not (d.get("source") or {}).get("has_audio"):
-        raise HTTPException(400, "الإعلان الأصلي مفيهوش صوت")
-    if (p.get("full_voice") or {}).get("status") == "working":
-        raise HTTPException(400, "بيقطّع الصوت بالفعل")
-    name = f"full-original-{uuid.uuid4().hex[:6]}.mp3"
-    dur = min(d["source"]["duration"], AD_MAX_SECONDS)
-    try:
-        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(ad_dir(aid) / d["source"]["file"]),
-                        "-t", f"{dur:.2f}", "-vn", "-ac", "2", "-b:a", "192k", str(prod_dir(aid, "voice") / name)],
-                       check=True, capture_output=True, timeout=300)
-    except subprocess.CalledProcessError as exc:
-        raise HTTPException(400, f"مقدرتش أطلّع الصوت: {exc.stderr.decode(errors='ignore')[-200:]}") from exc
-    old = (p.get("full_voice") or {}).get("file")
-    if old and old != name:
-        (prod_dir(aid, "voice") / old).unlink(missing_ok=True)
-    update_ad(aid, lambda d: d["prod"].update(full_voice={"file": name, "status": "working", "error": None, "original": True}))
-    threading.Thread(target=run_full_voice, args=(aid,), daemon=True).start()
-    return ad_response(aid)
-
-
-# ---------- 🔬 المطابقة: النسخة المولدة جنب الأصلي ودرجة تشابه مشهد بمشهد
-
-COMPARE_SIZE = {"9:16": (480, 854), "16:9": (854, 480), "1:1": (640, 640)}
-
-
-def has_audio_stream(path: Path) -> bool:
-    r = subprocess.run([ffmpeg_exe(), "-hide_banner", "-i", str(path)], capture_output=True, text=True)
-    return "Audio:" in r.stderr
-
-
-def build_compare_video(aid: str, p: dict, out: Path) -> list[dict]:
-    """كل لقطة بالفيديو المختار (أو آخر فيديو خلص، أو صورة الستوري بورد، أو شاشة سودا) بمدتها، ورا بعض."""
-    w, h = COMPARE_SIZE.get(p["header"].get("aspect"), COMPARE_SIZE["9:16"])
-    work = out.parent / "parts"
-    shutil.rmtree(work, ignore_errors=True)
-    work.mkdir(parents=True)
-    vf = f"scale={w}:{h}:force_original_aspect_ratio=decrease,pad={w}:{h}:(ow-iw)/2:(oh-ih)/2,fps=24,setsar=1"
-    parts, info, at = [], [], 0.0
-    for s in p["shots"]:
-        dur = float(s.get("seconds") or 4)
-        done = [t for t in s.get("takes") or [] if t.get("status") == "done" and t.get("file")]
-        t = next((x for x in done if x["id"] == s.get("chosen")), None) or (done[-1] if done else None)
-        part = work / f"{s['n']:03d}.mp4"
-        silence = ["-f", "lavfi", "-i", "anullsrc=r=44100:cl=mono"]
-        if t:
-            src = prod_dir(aid, "takes") / t["file"]
-            label = "فيديو بيتكلم" if t.get("lipsync") else "موشن متركب" if t.get("composite") else f"فيديو {t.get('video_model') or ''}".strip()
-            inputs = ["-i", str(src)] + ([] if has_audio_stream(src) else silence)
-            amap = "0:a" if len(inputs) == 2 else "1:a"
-            # فيديو أقصر من اللقطة: آخر فريم بيفضل لحد آخر المدة، والصوت بيتكمل سكوت
-            filt = ["-vf", vf + f",tpad=stop_mode=clone:stop_duration={dur:.3f}", "-af", "apad"]
-        elif s.get("frame") and (prod_dir(aid, "frames") / s["frame"]).exists():
-            label = "صورة الستوري بورد (مفيش فيديو)"
-            inputs, amap, filt = ["-loop", "1", "-i", str(prod_dir(aid, "frames") / s["frame"])] + silence, "1:a", ["-vf", vf]
-        else:
-            label = "مفيش (شاشة سودا)"
-            inputs, amap, filt = ["-f", "lavfi", "-i", f"color=c=black:s={w}x{h}:r=24"] + silence, "1:a", ["-vf", vf]
-        cmd = ([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y"] + inputs + ["-map", "0:v", "-map", amap, "-t", f"{dur:.3f}"]
-               + filt + ["-c:v", "libx264", "-preset", "veryfast", "-crf", "28", "-pix_fmt", "yuv420p",
-                         "-c:a", "aac", "-ac", "1", "-ar", "44100", "-b:a", "64k", str(part)])
-        subprocess.run(cmd, check=True, capture_output=True, timeout=300)
-        parts.append(part)
-        info.append({"n": s["n"], "at": round(at, 2), "len": dur, "src": label})
-        at += dur
-    lst = work / "list.txt"
-    lst.write_text("".join(f"file '{x.as_posix()}'\n" for x in parts))
-    subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-f", "concat", "-safe", "0", "-i", str(lst),
-                    "-c", "copy", "-movflags", "+faststart", str(out)], check=True, capture_output=True, timeout=300)
-    shutil.rmtree(work, ignore_errors=True)
-    return info
-
-
-def run_ad_compare(aid: str) -> None:
-    try:
-        with closing(db()) as conn:
-            _, d = ad_row(conn, aid)
-        p = d["prod"]
-        folder = prod_dir(aid, "compare")
-        name = f"generated-{uuid.uuid4().hex[:6]}.mp4"
-        info = build_compare_video(aid, p, folder / name)
-        old = (d.get("compare") or {}).get("file")
-        if old and old != name:
-            (folder / old).unlink(missing_ok=True)
-        update_ad(aid, lambda d: d["compare"].update(file=name, shots=info, step="بيقارن بالأصلي"))
-        scenes = (d.get("analysis") or {}).get("scenes") or []
-        if atlas.mock_mode():
-            result = az.mock_compare(len(info))
-        else:
-            proxy = ad_dir(aid) / "proxy.mp4"
-            msg = az.compare_messages(scenes, info)[0]
-            msg = {"role": "user", "content": [
-                {"type": "text", "text": msg["content"]},
-                {"type": "file", "file": {"filename": "original.mp4", "file_data": data_url(proxy, "video/mp4")}},
-                {"type": "file", "file": {"filename": "generated.mp4", "file_data": data_url(folder / name, "video/mp4")}}]}
-            result = ad_json(ad_media_chat([msg]), "المطابقة")
-        update_ad(aid, lambda d: d["compare"].update(status="done", result=result, error=None, step=None, at=now()))
-    except Exception as exc:  # noqa: BLE001
-        msg = str(getattr(exc, "detail", None) or exc)[:400]
-        update_ad(aid, lambda d: d.setdefault("compare", {}).update(status="failed", error=msg, step=None))
-
-
-@app.post("/api/ads/{aid}/prod/compare")
-def prod_compare(aid: str):
-    """🔬 يجمع النسخة المولدة لقطة ورا لقطة ويقارنها بالإعلان الأصلي (درجة لكل مشهد والفجوات وإزاي نعالجها)."""
-    with closing(db()) as conn:
-        _, d = ad_row(conn, aid)
-    p = prod_of(d)
-    if not any(t.get("status") == "done" for s in p["shots"] for t in s.get("takes") or []):
-        raise HTTPException(400, "ولّد فيديو لقطة واحدة على الأقل الأول")
-    if (d.get("compare") or {}).get("status") == "working":
-        raise HTTPException(400, "المقارنة شغالة بالفعل")
-    update_ad(aid, lambda d: d.update(compare={**(d.get("compare") or {}), "status": "working", "error": None,
-                                               "step": "بيجمع النسخة المولدة"}))
-    threading.Thread(target=run_ad_compare, args=(aid,), daemon=True).start()
-    return ad_response(aid)
-
-
 def run_ad_lipsync(aid: str, sid: str, tid: str) -> None:
     """👄 الكلام على الوش: video = الفيديو المختار + الصوت (سريع)، image = الستوري بورد + الصوت بيتحول لفيديو بيتكلم (أبطأ)."""
     def setp(**kw):
@@ -8612,10 +8171,10 @@ def queue_ad_take(aid: str, sid: str, note: str = "", from_take: str | None = No
             raise HTTPException(400, f"اللقطة {s['n']} ملهاش ستوري بورد")
         vm = ad_video_model(p["header"].get("video_model"))
         if vm["kind"] == "i2v":  # بيبدأ من صورة الستوري بورد بس (فيها الأبطال والمكونات)
-            prompt = az.video_prompt(p["header"], plate_shot(s), [])
+            prompt = az.video_prompt(p["header"], s, [])
         else:
             ments = [{"name": f"@{m['name']}"} for m in mention_refs(ad_brain(d.get("settings")), s.get("mentions"))][:AD_MAX_REFS - 1]
-            prompt = az.video_prompt(p["header"], plate_shot(s), ments + ref_comps(plate_shot(s), AD_MAX_REFS - 1 - len(ments)))
+            prompt = az.video_prompt(p["header"], s, ments + ref_comps(s, AD_MAX_REFS - 1 - len(ments)))
         src = next((t for t in s.get("takes") or [] if t["id"] == from_take and not t.get("composite")), None)
         if note and src and src.get("prompt"):
             prompt = src["prompt"]  # التعديل بيتبني على برومبت النسخة اللي مش عاجباك
@@ -8691,9 +8250,7 @@ def prod_take_act(aid: str, sid: str, body: TakeActIn, action: str = "pick"):
         with closing(db()) as conn:
             _, d = ad_row(conn, aid)
         t = next(x for x in find_pshot(d["prod"], sid)["takes"] if x["id"] == body.take_id)
-        if t.get("composite"):
-            ad_executor.submit(run_ad_composite, aid, sid, body.take_id)
-        elif t.get("lipsync"):
+        if t.get("lipsync"):
             ad_executor.submit(run_ad_lipsync, aid, sid, body.take_id)
         else:
             ad_executor.submit(run_ad_take, aid, sid, body.take_id)
@@ -8822,10 +8379,6 @@ def reset_stuck_prod() -> None:
                     s.update(frame_status="failed", frame_error="اتقطع لما السيرفر اتقفل. ارسم تاني")
                 if s.get("comp_status") == "working":
                     s.update(comp_status="failed", comp_error="اتقطع لما السيرفر اتقفل. استخرج تاني")
-                if s.get("motion_status") == "working":
-                    s.update(motion_status="failed", motion_error="اتقطع لما السيرفر اتقفل. استحضر تاني")
-                if s.get("layers_status") == "working":
-                    s.update(layers_status="failed", layers_error="اتقطع لما السيرفر اتقفل. خطّط تاني")
                 if s.get("voice_status") == "working":
                     s.update(voice_status="failed", voice_error="اتقطع لما السيرفر اتقفل. ولّد الصوت تاني")
                 for c in s.get("components") or []:
@@ -8845,8 +8398,9 @@ reset_stuck_prod()
 LAB_DIR = DATA_DIR / "lab"
 LAB_DIR.mkdir(parents=True, exist_ok=True)
 LAB_LOCK = threading.Lock()
-LAB_STEPS = ("shots", "stems", "audio", "elements")
-LAYERS_MODEL = "bytedance/seedream-v5.0-pro/layer-decomposition"
+LAB_STEPS = ("shots", "stems", "audio", "elements", "components")
+# التفكيك العادي: القطعات ← العناصر ← اقتراح الكومبوننتس. الصوت (فصل التراكات وتحليله) متوقف ومش بيشتغل غير لو طلبته
+LAB_DEFAULT = ("shots", "elements", "components")
 
 
 def lab_dir(lid: str) -> Path:
@@ -8885,7 +8439,7 @@ def lab_reviews(d: dict) -> dict:
                                "elements": [e for s in d.get("shots") or [] for e in (s.get("analysis") or {}).get("elements") or []],
                                "actions": [a for s in d.get("shots") or [] for e in (s.get("analysis") or {}).get("elements") or []
                                            for a in e.get("actions") or []],
-                               "layers": [L for s in d.get("shots") or [] for L in (s.get("layers") or {}).get("items") or []]}
+                               "components": d.get("components") or []}
     out = {}
     for k, items in groups.items():
         oks = [((x.get("review") or {}).get("ok")) for x in items]
@@ -8897,22 +8451,19 @@ def lab_to_dict(lid: str, d: dict) -> dict:
     base = f"/media/lab/{lid}"
     shots = []
     for s in d.get("shots") or []:
-        lay = s.get("layers") or {}
-        shots.append({**s, "frames": [{**f, "url": f"{base}/frames/{f['file']}"} for f in s.get("frames") or []],
-                      "vedits": [{**v, "url": f"{base}/vedit/{v['file']}" if v.get("file") else None} for v in s.get("vedits") or []],
-                      "layers": {**lay, "base_url": f"{base}/layers/{lay['base']}" if lay.get("base") else None,
-                                 "frame_url": f"{base}/layers/{lay['frame']}" if lay.get("frame") else None,
-                                 "items": [{**L, "url": f"{base}/layers/{L['file']}"} for L in lay.get("items") or []]}})
+        s = {k: v for k, v in s.items() if k not in ("layers", "vedits")}
+        shots.append({**s, "frames": [{**f, "url": f"{base}/frames/{f['file']}"} for f in s.get("frames") or []]})
+    comps = [{**c, "asset": c["asset"] if c.get("asset") and (clip_dir(c["asset"]) / "asset.json").exists() else None}
+             for c in d.get("components") or []]
     audio = d.get("audio") or {}
     audio = {**audio, "sfx": [{**x, "clip_url": f"{base}/sfx/{x['clip']}" if x.get("clip") else None} for x in audio.get("sfx") or []]}
     stems = {k: {**v, "url": f"{base}/stems/{v['file']}" if v.get("file") else None}
              for k, v in (d.get("stems") or {}).items() if isinstance(v, dict)}
     return {**d, "id": lid, "source_url": f"{base}/{d['source']['file']}", "shots": shots, "audio": audio, "stems": stems,
+            "components": comps,
             "audioshake": bool(audioshake.api_key() or atlas.mock_mode()),
-            "reviews": lab_reviews(d), "busy": any((v or {}).get("status") == "working" for v in (d.get("steps") or {}).values())
-            or any((s.get("layers") or {}).get("status") == "working" for s in d.get("shots") or [])
-            or any(v.get("status") == "working" for s in d.get("shots") or [] for v in s.get("vedits") or []),
-            "vedit_models": [{"key": k, "label": v["label"], "per_sec": v["per_sec"]} for k, v in lab.VEDIT_MODELS.items()]}
+            "reviews": lab_reviews(d), "busy": any((v or {}).get("status") in ("working", "queued") for v in (d.get("steps") or {}).values()),
+            "categories": list(CLIP_CATS)}
 
 
 def lab_list_items() -> list[dict]:
@@ -8953,9 +8504,9 @@ def lab_create(file: UploadFile = File(...), name: str = Form("")):
     d = {"name": name.strip() or Path(file.filename or "فيديو").stem, "created_at": now(), "updated_at": now(),
          "source": {"file": fname, "duration": round(info.duration, 2), "width": info.width, "height": info.height,
                     "has_audio": info.has_audio},
-         "steps": {k: {"status": "queued"} for k in LAB_STEPS}, "shots": [], "audio": {}}
+         "steps": {k: {"status": "queued"} for k in LAB_DEFAULT}, "shots": [], "audio": {}, "components": []}
     (folder / "lab.json").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
-    threading.Thread(target=run_lab, args=(lid, list(LAB_STEPS)), daemon=True).start()
+    threading.Thread(target=run_lab, args=(lid, list(LAB_DEFAULT)), daemon=True).start()
     return lab_to_dict(lid, d)
 
 
@@ -8985,8 +8536,8 @@ def lab_delete(lid: str):
 
 @app.post("/api/lab/{lid}/run")
 def lab_run(lid: str, step: str = "all"):
-    """يعيد خطوة (أو كله). العناصر بتتعمل من جديد لأن الأصوات والقطعات بتأثر عليها."""
-    steps = list(LAB_STEPS) if step == "all" else [step] if step in LAB_STEPS else []
+    """يعيد خطوة (أو كله). اللي بعدها بيتعمل من جديد: القطعات/الصوت ← العناصر ← الكومبوننتس."""
+    steps = list(LAB_DEFAULT) if step == "all" else [step] if step in LAB_STEPS else []
     if not steps:
         raise HTTPException(400, "خطوة غير معروفة")
     d = lab_load(lid)
@@ -8996,6 +8547,8 @@ def lab_run(lid: str, step: str = "all"):
         steps = sorted(set(steps) | {"audio", "elements"}, key=LAB_STEPS.index)
     if "shots" in steps or "audio" in steps:
         steps = sorted(set(steps) | {"elements"}, key=LAB_STEPS.index)
+    if "elements" in steps:
+        steps = sorted(set(steps) | {"components"}, key=LAB_STEPS.index)
     lab_update(lid, lambda d: [d.setdefault("steps", {}).update({k: {"status": "queued"}}) for k in steps])
     threading.Thread(target=run_lab, args=(lid, steps), daemon=True).start()
     return lab_to_dict(lid, lab_load(lid))
@@ -9022,10 +8575,6 @@ def run_lab(lid: str, steps: list[str]) -> None:
                     lab_step(lid, step, progress=f"فريمات اللقطة {k + 1} من {len(shots)}")
                     s["frames"] = lab.extract_frames(ffmpeg_exe(), src, s["start"], s["end"], folder / "frames", f"s{s['n']:03d}")
                     s["review"] = None
-                old = {s["n"]: s.get("layers") for s in d.get("shots") or []}
-                for s in shots:  # الطبقات اللي اتفككت قبل كده بتفضل لو اللقطة لسه بنفس الرقم
-                    if old.get(s["n"]):
-                        s["layers"] = old[s["n"]]
                 lab_update(lid, lambda d: d.update(shots=shots))
             elif step == "stems":
                 run_lab_stems(lid, d, src)
@@ -9036,6 +8585,8 @@ def run_lab(lid: str, steps: list[str]) -> None:
                     run_lab_audio(lid, d, src, dur)
             elif step == "elements":
                 run_lab_elements(lid)
+            elif step == "components":
+                run_lab_components(lid)
             lab_step(lid, step, status="done", error=None, progress="", at=now())
         except LabSkip as exc:
             lab_step(lid, step, status="skipped", error=str(exc), progress="")
@@ -9177,88 +8728,17 @@ def run_lab_elements(lid: str) -> None:
         lab_update(lid, fn)
 
 
-@app.post("/api/lab/{lid}/shots/{n}/layers")
-def lab_layers(lid: str, n: int, t: float | None = None):
-    """🧩 يفكك فريم من اللقطة لطبقات شفافة (Seedream). بيتحسب على Atlas (حوالي 0.4$ للفريم)."""
-    if not (atlas.api_key() or atlas.mock_mode()):
-        raise HTTPException(400, "مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات")
-    d = lab_load(lid)
-    s = next((x for x in d.get("shots") or [] if x["n"] == n), None)
-    if not s:
-        raise HTTPException(404, "اللقطة مش موجودة")
-    if (s.get("layers") or {}).get("status") == "working":
-        raise HTTPException(400, "بيفكك اللقطة دي بالفعل")
-    at = t if t is not None and s["start"] <= t <= s["end"] else (s["start"] + s["end"]) / 2
-    def fn(d):
-        x = next(y for y in d["shots"] if y["n"] == n)
-        x["layers"] = {**(x.get("layers") or {}), "status": "working", "error": None, "t": round(at, 3)}
-    lab_update(lid, fn)
-    threading.Thread(target=run_lab_layers, args=(lid, n, at), daemon=True).start()
-    return lab_to_dict(lid, lab_load(lid))
-
-
-def run_lab_layers(lid: str, n: int, at: float) -> None:
-    folder = lab_dir(lid) / "layers"
-    folder.mkdir(parents=True, exist_ok=True)
-    def setl(**kw):
-        def fn(d):
-            x = next(y for y in d["shots"] if y["n"] == n)
-            x["layers"] = {**(x.get("layers") or {}), **kw}
-        lab_update(lid, fn)
-    try:
-        d = lab_load(lid)
-        tag = f"s{n:03d}-{uuid.uuid4().hex[:5]}"
-        frame = lab.grab_frame(ffmpeg_exe(), lab_dir(lid) / d["source"]["file"], at, folder / f"{tag}-frame.jpg")
-        items, base, price = [], None, None
-        if atlas.mock_mode():
-            from PIL import Image  # تجربة: طبقتين متقصوصين من الفريم
-            im = Image.open(frame).convert("RGBA")
-            base = f"{tag}-base.jpg"
-            im.convert("RGB").save(folder / base)
-            for i, (box, nm) in enumerate((((0, 0, im.width // 2, im.height // 2), "عنصر تجريبي ١"),
-                                          ((im.width // 2, im.height // 2, im.width, im.height), "عنصر تجريبي ٢"))):
-                f = f"{tag}-L{i + 1}.png"
-                im.crop(box).save(folder / f)
-                items.append({"file": f, "name": nm, "description": "تجربة", "z": i + 1, "box": list(box), "review": None})
-        else:
-            body = {"model": LAYERS_MODEL, "image": atlas.upload_media(frame)}
-            with httpx.Client(timeout=90) as client:
-                resp = client.post(f"{atlas.BASE_URL}/api/v1/model/generateImage", headers=atlas._headers(), json=body)
-            data = atlas._check(resp, "تفكيك الطبقات")
-            pid = (data or {}).get("id")
-            if not pid:
-                raise atlas.AtlasError(f"تفكيك الطبقات: الرد مفيهوش رقم طلب: {str(data)[:200]}")
-            pred = atlas.wait_prediction(pid, max_seconds=900, interval=5, what="تفكيك الطبقات")
-            outs = [o for o in pred.get("outputs") or [] if isinstance(o, str) and o.startswith("http")]
-            meta = pred.get("layers") or []
-            price = pred.get("price")
-            for i, url in enumerate(outs):
-                ext = ".png" if url.split("?")[0].lower().endswith(".png") else ".jpg"
-                info = meta[i] if i < len(meta) and isinstance(meta[i], dict) else {}
-                if i == 0 and not info.get("bounding_box"):  # أول ناتج = الخلفية من غير العناصر
-                    base = f"{tag}-base{ext}"
-                    atlas.download(url, folder / base)
-                    continue
-                f = f"{tag}-L{i}{ext}"
-                atlas.download(url, folder / f)
-                items.append({"file": f, "name": str(info.get("name") or f"طبقة {i}")[:80], "description": str(info.get("description") or "")[:400],
-                              "z": info.get("z_index", i), "box": (info.get("bounding_box") or {}).get("absolute"), "review": None})
-        setl(status="done", error=None, frame=frame.name, base=base, items=items, price=price, at=now())
-    except Exception as exc:  # noqa: BLE001
-        setl(status="failed", error=str(getattr(exc, "detail", None) or exc)[:400])
-
-
 class LabReviewIn(BaseModel):
-    kind: str            # shot | sfx | music | speech | background | element | action | layer
-    ref: str             # رقم/id العنصر (الأكشن: elementId:index، الطبقة: shotN:index)
+    kind: str            # shot | stem | sfx | music | speech | background | element | action
+    ref: str             # رقم/id العنصر (الأكشن: elementId:index)
     ok: bool | None = None
     note: str = ""
     fix: dict = {}       # تصحيح الاسم/النوع/التصنيف/الوقت
 
 
-LAB_FIX_KEYS = {"vedit": (), "stem": (), "sfx": ("label", "category", "t"), "music": ("description", "mood"), "speech": ("speaker", "text"),
+LAB_FIX_KEYS = {"stem": (), "sfx": ("label", "category", "t"), "music": ("description", "mood"), "speech": ("speaker", "text"),
                 "background": ("name", "description"), "element": ("name", "type", "description"),
-                "action": ("action", "detail"), "layer": ("name",), "shot": ()}
+                "action": ("action", "detail"), "shot": ()}
 
 
 @app.patch("/api/lab/{lid}/review")
@@ -9273,10 +8753,6 @@ def lab_review(lid: str, body: LabReviewIn):
             return next((s for s in shots if str(s["n"]) == body.ref), None)
         if body.kind == "sfx":
             return next((x for x in audio.get("sfx") or [] if x["id"] == body.ref), None)
-        if body.kind == "vedit":
-            sn, _, vid = body.ref.partition(":")
-            s = next((s for s in shots if str(s["n"]) == sn), None)
-            return next((v for v in (s or {}).get("vedits") or [] if v["id"] == vid), None)
         if body.kind == "stem":
             x = (d.get("stems") or {}).get(body.ref)
             return x if isinstance(x, dict) else None
@@ -9293,11 +8769,6 @@ def lab_review(lid: str, body: LabReviewIn):
             eid, _, idx = body.ref.rpartition(":")
             e = next((e for e in els if e["id"] == eid), None)
             return (e or {}).get("actions", [])[int(idx)] if e and idx.isdigit() and int(idx) < len(e.get("actions") or []) else None
-        if body.kind == "layer":
-            sn, _, idx = body.ref.partition(":")
-            s = next((s for s in shots if str(s["n"]) == sn), None)
-            items = ((s or {}).get("layers") or {}).get("items") or []
-            return items[int(idx)] if idx.isdigit() and int(idx) < len(items) else None
         return None
     def fn(d):
         x = find(d)
@@ -9318,34 +8789,7 @@ def lab_shot(d: dict, n: int) -> dict:
     return s
 
 
-# ---------- ✏️ التعديل جوه المشهد: نفس الفيديو بحركته، وكل عنصر فيه يتغيّر بالكلام (موديل تعديل فيديو)
-
-def lab_shot_clip(lid: str, s: dict, base: str | None) -> Path:
-    """مقطع اللقطة (من الفيديو الأصلي) أو نسخة متعدلة قبل كده عشان نكمّل عليها."""
-    folder = lab_dir(lid) / "vedit"
-    folder.mkdir(parents=True, exist_ok=True)
-    if base:
-        v = next((x for x in s.get("vedits") or [] if x["id"] == base and x.get("file")), None)
-        if not v:
-            raise HTTPException(404, "النسخة دي مش موجودة")
-        return folder / v["file"]
-    clip = folder / f"s{s['n']:03d}-orig.mp4"
-    if not clip.exists():
-        d = lab_load(lid)
-        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{s['start']:.3f}", "-i",
-                        str(lab_dir(lid) / d["source"]["file"]), "-t", f"{s['end'] - s['start']:.3f}", "-c:v", "libx264",
-                        "-preset", "veryfast", "-crf", "16", "-pix_fmt", "yuv420p", "-c:a", "aac", str(clip)],
-                       check=True, capture_output=True, timeout=300)
-    return clip
-
-
-def lab_vedit_set(lid: str, n: int, vid: str, **kw) -> None:
-    def fn(d):
-        v = next((x for x in lab_shot(d, n).get("vedits") or [] if x["id"] == vid), None)
-        if v is not None:
-            v.update(**kw)
-    lab_update(lid, fn)
-
+# ---------- ✏️ التعديل جوه المشهد (للأصول في المكتبة): نفس الفيديو بحركته، وكل عنصر فيه يتغيّر بالكلام
 
 def vedit_render(v: dict, src: Path, out: Path, context: dict, setv) -> None:
     """نسخة جديدة من مقطع: ⏩ سرعة جزء (بالكود) أو ✏️ تعديل جوه المشهد بموديل فيديو (الحركة زي ما هي).
@@ -9391,53 +8835,11 @@ def vedit_item(body) -> dict:
             "error": None, "review": None, "created_at": now()}
 
 
-def run_lab_vedit(lid: str, n: int, vid: str) -> None:
-    def setv(**kw):
-        lab_vedit_set(lid, n, vid, **kw)
-    try:
-        d = lab_load(lid)
-        s = lab_shot(d, n)
-        v = next(x for x in s["vedits"] if x["id"] == vid)
-        src = lab_shot_clip(lid, s, v.get("base"))
-        out = lab_dir(lid) / "vedit" / f"s{n:03d}-{vid}.mp4"
-        vedit_render(v, src, out, s, setv)
-        setv(status="done", file=out.name, step=None, error=None, duration=round(probe_duration(out), 2))
-    except Exception as exc:  # noqa: BLE001
-        setv(status="failed", step=None, error=str(getattr(exc, "detail", None) or exc)[:400])
-
-
 class VeditIn(BaseModel):
     instruction: str = ""
     model: str = "gemini"
     base: str | None = None       # نكمّل على نسخة متعدلة
     speed: dict | None = None     # {"t0", "t1", "factor"} = تسريع/تبطيء جزء (من غير AI)
-
-
-@app.post("/api/lab/{lid}/shots/{n}/vedit")
-def lab_vedit(lid: str, n: int, body: VeditIn):
-    """✏️ تعديل جوه المشهد (لون، حجم، استبدال، مكان النهاية...) والحركة زي ما هي، أو ⏩ سرعة جزء منه."""
-    d = lab_load(lid)
-    s = lab_shot(d, n)
-    item = vedit_item(body)
-    vid = item["id"]
-    if item["kind"] == "ai" and s["end"] - s["start"] > 10.5 and not body.base:
-        raise HTTPException(400, "اللقطة أطول من 10 ثواني، وموديلات التعديل بتقبل لحد 10")
-    def fn(d):
-        lab_shot(d, n).setdefault("vedits", []).append(item)
-    lab_update(lid, fn)
-    threading.Thread(target=run_lab_vedit, args=(lid, n, vid), daemon=True).start()
-    return lab_to_dict(lid, lab_load(lid))
-
-
-@app.delete("/api/lab/{lid}/shots/{n}/vedit/{vid}")
-def lab_vedit_delete(lid: str, n: int, vid: str):
-    def fn(d):
-        s = lab_shot(d, n)
-        for v in s.get("vedits") or []:
-            if v["id"] == vid and v.get("file"):
-                (lab_dir(lid) / "vedit" / v["file"]).unlink(missing_ok=True)
-        s["vedits"] = [v for v in s.get("vedits") or [] if v["id"] != vid]
-    return lab_to_dict(lid, lab_update(lid, fn))
 
 
 # ================================================================ 📚 مكتبة الأصول
@@ -9446,33 +8848,33 @@ def lab_vedit_delete(lid: str, n: int, vid: str):
 
 ASSETS_DIR = DATA_DIR / "assets"
 ASSETS_DIR.mkdir(parents=True, exist_ok=True)
-ASSET_LOCK = threading.Lock()
-ASSET_CATS = ("motion_graphics", "effect", "transition", "text", "screen", "cursor", "character", "background", "product", "other")
+CLIP_LOCK = threading.Lock()
+CLIP_CATS = ("motion_graphics", "effect", "transition", "text", "screen", "cursor", "character", "background", "product", "other")
 
 
-def asset_dir(aid: str) -> Path:
+def clip_dir(aid: str) -> Path:
     return ASSETS_DIR / Path(aid).name
 
 
-def asset_load(aid: str) -> dict:
-    f = asset_dir(aid) / "asset.json"
+def clip_load(aid: str) -> dict:
+    f = clip_dir(aid) / "asset.json"
     if not f.exists():
         raise HTTPException(404, "الأصل ده مش موجود")
     return json.loads(f.read_text(encoding="utf-8"))
 
 
-def asset_update(aid: str, fn) -> dict:
-    with ASSET_LOCK:
-        d = asset_load(aid)
+def clip_update(aid: str, fn) -> dict:
+    with CLIP_LOCK:
+        d = clip_load(aid)
         fn(d)
         d["updated_at"] = now()
-        tmp = asset_dir(aid) / "asset.json.tmp"
+        tmp = clip_dir(aid) / "asset.json.tmp"
         tmp.write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
-        tmp.replace(asset_dir(aid) / "asset.json")
+        tmp.replace(clip_dir(aid) / "asset.json")
         return d
 
 
-def asset_to_dict(aid: str, d: dict) -> dict:
+def clip_to_dict(aid: str, d: dict) -> dict:
     base = f"/media/assets/{aid}"
     return {**d, "id": aid, "url": f"{base}/{d['file']}", "thumb_url": f"{base}/{d['thumb']}",
             "variants": [{**v, "url": f"{base}/variants/{v['file']}" if v.get("file") else None} for v in d.get("variants") or []],
@@ -9480,65 +8882,134 @@ def asset_to_dict(aid: str, d: dict) -> dict:
             "vedit_models": [{"key": k, "label": v["label"], "per_sec": v["per_sec"]} for k, v in lab.VEDIT_MODELS.items()]}
 
 
+def clip_from_lab(lid: str, d: dict, t0: float, t1: float, meta: dict) -> dict:
+    """📚 مقطع من الفيديو الأصلي (بحركته وخلفيته وصوته) بيتحفظ كأصل، ومعاه العناصر والحركات والأصوات اللي جواه."""
+    dur = d["source"]["duration"]
+    t0, t1 = max(0.0, t0), min(dur, t1)
+    if t1 - t0 < 0.15:
+        raise HTTPException(400, "المقطع قصير أوي")
+    aid = uuid.uuid4().hex[:12]
+    folder = clip_dir(aid)
+    (folder / "variants").mkdir(parents=True, exist_ok=True)
+    try:
+        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{t0:.3f}", "-i", str(lab_dir(lid) / d["source"]["file"]),
+                        "-t", f"{t1 - t0:.3f}", "-c:v", "libx264", "-preset", "veryfast", "-crf", "16", "-pix_fmt", "yuv420p",
+                        "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", str(folder / "clip.mp4")],
+                       check=True, capture_output=True, timeout=300)
+        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{(t1 - t0) / 2:.3f}", "-i", str(folder / "clip.mp4"),
+                        "-frames:v", "1", "-vf", "scale=480:-2", "-q:v", "3", str(folder / "thumb.jpg")], check=True, capture_output=True, timeout=60)
+        info = media_info(folder / "clip.mp4")
+    except Exception:
+        shutil.rmtree(folder, ignore_errors=True)
+        raise
+    shots = [s for s in d.get("shots") or [] if s["start"] < t1 and s["end"] > t0]
+    ans = [s.get("analysis") or {} for s in shots]
+    rb = lambda t: round(max(0.0, min(t1, t) - t0), 2)  # noqa: E731  الوقت من أول الأصل
+    elements = []
+    for an in ans:
+        for e in an.get("elements") or []:
+            if e["last_t"] < t0 or e["first_t"] > t1:
+                continue
+            acts = [{**{k: a.get(k) for k in ("action", "from", "to", "detail")}, "t0": rb(a["t0"]), "t1": rb(a["t1"])}
+                    for a in e.get("actions") or [] if a["t1"] >= t0 and a["t0"] <= t1]
+            elements.append({"id": e["id"], "name": e["name"], "type": e["type"], "description": e.get("description", ""), "box": e.get("box"),
+                             "first_t": rb(e["first_t"]), "last_t": rb(e["last_t"]), "actions": acts})
+    sfx = [{"t": rb(x["t"]), "label": x.get("label"), "category": x.get("category")}
+           for x in (d.get("audio") or {}).get("sfx") or [] if t0 <= x["t"] <= t1]
+    summary = " ← ".join(a.get("summary", "") for a in ans if a.get("summary"))
+    data = {"name": str(meta.get("name") or "").strip()[:120] or summary[:80] or f"أصل من {d.get('name', '')}",
+            "category": meta.get("category") if meta.get("category") in CLIP_CATS else "other",
+            "tags": [str(t).strip()[:30] for t in meta.get("tags") or [] if str(t).strip()][:12],
+            "notes": str(meta.get("notes") or "").strip()[:1000],
+            "description": str(meta.get("description") or "")[:600], "use": str(meta.get("use") or "")[:300],
+            "controls": meta.get("controls") or [],
+            "file": "clip.mp4", "thumb": "thumb.jpg", "duration": round(info.duration, 2), "width": info.width, "height": info.height,
+            "source": {"lab": lid, "lab_name": d.get("name"), "shots": [s["n"] for s in shots], "t0": round(t0, 3), "t1": round(t1, 3),
+                       "component": meta.get("component")},
+            "scene_type": (ans[0] if ans else {}).get("scene_type"), "summary": summary,
+            "background": (ans[0] if ans else {}).get("background"),
+            "elements": elements, "sfx": sfx, "variants": [], "created_at": now(), "updated_at": now()}
+    (folder / "asset.json").write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+    return clip_to_dict(aid, data)
+
+
 class AssetIn(BaseModel):
     name: str = ""
     category: str = "other"
     tags: list[str] = []
     notes: str = ""
-    t0: float | None = None   # من أول الفيديو (ولو نسخة متعدلة: من أول النسخة)
-    t1: float | None = None
-    vedit: str | None = None  # نحفظ نسخة متعدلة بدل الأصلي
+    t0: float               # بالثواني من أول الفيديو
+    t1: float
 
 
-@app.post("/api/lab/{lid}/shots/{n}/asset")
-def lab_save_asset(lid: str, n: int, body: AssetIn):
-    """📚 احفظ مقطع من اللقطة (أو من نسخة متعدلة منها) كأصل في المكتبة، ومعاه عناصره وحركاتها وأصواته."""
+@app.post("/api/lab/{lid}/asset")
+def lab_save_asset(lid: str, body: AssetIn):
+    """📚 احفظ أي مقطع من الفيديو بإيدك كأصل (لو الاقتراحات فاتتها حاجة)."""
+    return clip_from_lab(lid, lab_load(lid), body.t0, body.t1, body.model_dump())
+
+
+# ---------- 💡 الكومبوننتس: الموديل بيقترح من التفكيك، وإنت بتقبل (بيدخل المكتبة) أو ترفض (وسببك بيعلّمه)
+
+def run_lab_components(lid: str) -> None:
     d = lab_load(lid)
-    s = lab_shot(d, n)
-    if body.vedit:
-        v = next((x for x in s.get("vedits") or [] if x["id"] == body.vedit and x.get("file")), None)
-        if not v:
-            raise HTTPException(404, "النسخة دي مش موجودة")
-        src, offset, length = lab_dir(lid) / "vedit" / v["file"], s["start"], v.get("duration") or (s["end"] - s["start"])
-        a0 = max(0.0, (body.t0 if body.t0 is not None else s["start"]) - s["start"])
-        a1 = min(length, (body.t1 if body.t1 is not None else s["end"]) - s["start"])
-    else:
-        src, offset = lab_dir(lid) / d["source"]["file"], 0.0
-        a0 = max(s["start"], body.t0 if body.t0 is not None else s["start"])
-        a1 = min(s["end"], body.t1 if body.t1 is not None else s["end"])
-    if a1 - a0 < 0.15:
-        raise HTTPException(400, "المقطع قصير أوي")
-    t0, t1 = a0 + offset, a1 + offset   # نفس المقطع بأوقات الفيديو الأصلي (عشان العناصر والأصوات)
-    aid = uuid.uuid4().hex[:12]
-    folder = asset_dir(aid)
-    (folder / "variants").mkdir(parents=True, exist_ok=True)
-    subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{a0:.3f}", "-i", str(src), "-t", f"{a1 - a0:.3f}",
-                    "-c:v", "libx264", "-preset", "veryfast", "-crf", "16", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k",
-                    "-movflags", "+faststart", str(folder / "clip.mp4")], check=True, capture_output=True, timeout=300)
-    subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{(a1 - a0) / 2:.3f}", "-i", str(folder / "clip.mp4"),
-                    "-frames:v", "1", "-vf", "scale=480:-2", "-q:v", "3", str(folder / "thumb.jpg")], check=True, capture_output=True, timeout=60)
-    info = media_info(folder / "clip.mp4")
-    an = s.get("analysis") or {}
-    rb = lambda t: round(max(0.0, min(t1, t) - t0), 2)  # noqa: E731  الوقت من أول الأصل
-    elements = []
-    for e in an.get("elements") or []:
-        if e["last_t"] < t0 or e["first_t"] > t1:
-            continue
-        acts = [{**{k: a.get(k) for k in ("action", "from", "to", "detail")}, "t0": rb(a["t0"]), "t1": rb(a["t1"])}
-                for a in e.get("actions") or [] if a["t1"] >= t0 and a["t0"] <= t1]
-        elements.append({"name": e["name"], "type": e["type"], "description": e.get("description", ""), "box": e.get("box"),
-                         "first_t": rb(e["first_t"]), "last_t": rb(e["last_t"]), "actions": acts})
-    sfx = [{"t": rb(x["t"]), "label": x.get("label"), "category": x.get("category")}
-           for x in (d.get("audio") or {}).get("sfx") or [] if t0 <= x["t"] <= t1]
-    data = {"name": body.name.strip()[:120] or an.get("summary", "")[:80] or f"أصل من {d.get('name', '')}",
-            "category": body.category if body.category in ASSET_CATS else "other",
-            "tags": [t.strip()[:30] for t in body.tags if t.strip()][:12], "notes": body.notes.strip()[:1000],
-            "file": "clip.mp4", "thumb": "thumb.jpg", "duration": round(info.duration, 2), "width": info.width, "height": info.height,
-            "source": {"lab": lid, "lab_name": d.get("name"), "shot": n, "t0": round(t0, 3), "t1": round(t1, 3), "vedit": body.vedit},
-            "scene_type": an.get("scene_type"), "summary": an.get("summary", ""), "background": an.get("background"),
-            "elements": elements, "sfx": sfx, "variants": [], "created_at": now(), "updated_at": now()}
-    (folder / "asset.json").write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
-    return asset_to_dict(aid, data)
+    if not any(s.get("analysis") for s in d.get("shots") or []):
+        raise LabSkip("مفيش عناصر متفككة. فكّك العناصر الأول")
+    old = d.get("components") or []
+    keep = [c for c in old if (c.get("review") or {}).get("ok") is not None or c.get("asset")]
+    rejected = [{"name": c["name"], "t0": c["t0"], "t1": c["t1"], "note": (c.get("review") or {}).get("note")}
+                for c in keep if (c.get("review") or {}).get("ok") is False]
+    lab_step(lid, "components", progress="بيدور على الحتت اللي تنفع تتعاد")
+    raw = lab.mock_components(d) if atlas.mock_mode() else ad_json(series_chat(lab.components_messages(d, rejected)), "الكومبوننتس")
+    ids = {e["id"] for s in d.get("shots") or [] for e in (s.get("analysis") or {}).get("elements") or []}
+    new = [c for c in lab.clean_components(raw, d["source"]["duration"], ids)
+           if not any(abs(c["t0"] - k["t0"]) < 0.3 and abs(c["t1"] - k["t1"]) < 0.3 for k in keep)]  # نفس اللي اتراجع قبل كده
+    lab_update(lid, lambda d: d.update(components=sorted(keep + new, key=lambda c: c["t0"])))
+
+
+class ComponentIn(BaseModel):
+    name: str | None = None
+    category: str | None = None
+    t0: float | None = None
+    t1: float | None = None
+    review: bool = False      # true = ده تقييم (ok/note)
+    ok: bool | None = None    # ✅ = يدخل المكتبة على طول، ❌ = مرفوض
+    note: str = ""
+
+
+@app.patch("/api/lab/{lid}/components/{cid}")
+def lab_component(lid: str, cid: str, body: ComponentIn):
+    """تعديل الاقتراح (الاسم/النوع/البداية والنهاية) أو تقييمه. ✅ بيحفظه في المكتبة."""
+    def fn(d):
+        c = next((x for x in d.get("components") or [] if x["id"] == cid), None)
+        if c is None:
+            raise HTTPException(404, "الاقتراح ده مش موجود")
+        dur = d["source"]["duration"]
+        fix = {}
+        if body.name is not None and body.name.strip():
+            fix["name"] = body.name.strip()[:100]
+        if body.category in CLIP_CATS:
+            fix["category"] = body.category
+        if body.t0 is not None:
+            fix["t0"] = round(min(dur, max(0.0, body.t0)), 2)
+        if body.t1 is not None:
+            fix["t1"] = round(min(dur, max(0.0, body.t1)), 2)
+        if fix:
+            c.setdefault("original", {k: c.get(k) for k in fix})
+            c.update(fix)
+            if c["t1"] - c["t0"] < 0.15:
+                raise HTTPException(400, "المقطع قصير أوي")
+        if body.review:
+            c["review"] = {"ok": body.ok, "note": body.note.strip()[:500], "at": now()}
+    d = lab_update(lid, fn)
+    c = next(x for x in d["components"] if x["id"] == cid)
+    if body.review and body.ok and not (c.get("asset") and (clip_dir(c["asset"]) / "asset.json").exists()):
+        a = clip_from_lab(lid, d, c["t0"], c["t1"], {**c, "component": cid})
+        def link(d):
+            x = next((y for y in d.get("components") or [] if y["id"] == cid), None)
+            if x is not None:
+                x["asset"] = a["id"]
+        d = lab_update(lid, link)
+    return lab_to_dict(lid, d)
 
 
 @app.get("/api/assets")
@@ -9559,7 +9030,7 @@ def assets_list():
 
 @app.get("/api/assets/{aid}")
 def asset_get(aid: str):
-    return asset_to_dict(aid, asset_load(aid))
+    return clip_to_dict(aid, clip_load(aid))
 
 
 class AssetPatchIn(BaseModel):
@@ -9574,19 +9045,19 @@ def asset_patch(aid: str, body: AssetPatchIn):
     def fn(d):
         if body.name is not None and body.name.strip():
             d["name"] = body.name.strip()[:120]
-        if body.category in ASSET_CATS:
+        if body.category in CLIP_CATS:
             d["category"] = body.category
         if body.tags is not None:
             d["tags"] = [t.strip()[:30] for t in body.tags if t.strip()][:12]
         if body.notes is not None:
             d["notes"] = body.notes.strip()[:1000]
-    return asset_to_dict(aid, asset_update(aid, fn))
+    return clip_to_dict(aid, clip_update(aid, fn))
 
 
 @app.delete("/api/assets/{aid}")
 def asset_delete(aid: str):
-    asset_load(aid)
-    shutil.rmtree(asset_dir(aid), ignore_errors=True)
+    clip_load(aid)
+    shutil.rmtree(clip_dir(aid), ignore_errors=True)
     return {"ok": True}
 
 
@@ -9596,13 +9067,13 @@ def run_asset_variant(aid: str, vid: str) -> None:
             v = next((x for x in d.get("variants") or [] if x["id"] == vid), None)
             if v is not None:
                 v.update(**kw)
-        asset_update(aid, fn)
+        clip_update(aid, fn)
     try:
-        d = asset_load(aid)
+        d = clip_load(aid)
         v = next(x for x in d["variants"] if x["id"] == vid)
         base = next((x for x in d["variants"] if x["id"] == v.get("base") and x.get("file")), None)
-        src = asset_dir(aid) / ("variants/" + base["file"] if base else d["file"])
-        out = asset_dir(aid) / "variants" / f"{vid}.mp4"
+        src = clip_dir(aid) / ("variants/" + base["file"] if base else d["file"])
+        out = clip_dir(aid) / "variants" / f"{vid}.mp4"
         context = {"analysis": {"summary": d.get("summary"), "background": d.get("background"), "elements": d.get("elements")}}
         vedit_render(v, src, out, context, setv)
         setv(status="done", file=out.name, step=None, error=None, duration=round(probe_duration(out), 2))
@@ -9613,13 +9084,13 @@ def run_asset_variant(aid: str, vid: str) -> None:
 @app.post("/api/assets/{aid}/variants")
 def asset_variant(aid: str, body: VeditIn):
     """✏️ نسخة من الأصل: تعديل جوه المشهد (الحركة زي ما هي) أو ⏩ سرعة جزء."""
-    d = asset_load(aid)
+    d = clip_load(aid)
     item = vedit_item(body)
     if item["kind"] == "ai" and d["duration"] > 10.5 and not body.base:
         raise HTTPException(400, "الأصل أطول من 10 ثواني، وموديلات التعديل بتقبل لحد 10")
-    asset_update(aid, lambda d: d.setdefault("variants", []).append(item))
+    clip_update(aid, lambda d: d.setdefault("variants", []).append(item))
     threading.Thread(target=run_asset_variant, args=(aid, item["id"]), daemon=True).start()
-    return asset_to_dict(aid, asset_load(aid))
+    return clip_to_dict(aid, clip_load(aid))
 
 
 @app.delete("/api/assets/{aid}/variants/{vid}")
@@ -9627,9 +9098,9 @@ def asset_variant_delete(aid: str, vid: str):
     def fn(d):
         for v in d.get("variants") or []:
             if v["id"] == vid and v.get("file"):
-                (asset_dir(aid) / "variants" / v["file"]).unlink(missing_ok=True)
+                (clip_dir(aid) / "variants" / v["file"]).unlink(missing_ok=True)
         d["variants"] = [v for v in d.get("variants") or [] if v["id"] != vid]
-    return asset_to_dict(aid, asset_update(aid, fn))
+    return clip_to_dict(aid, clip_update(aid, fn))
 
 
 class AssetReviewIn(BaseModel):
@@ -9645,7 +9116,7 @@ def asset_review(aid: str, body: AssetReviewIn):
         if v is None:
             raise HTTPException(404, "النسخة مش موجودة")
         v["review"] = {"ok": body.ok, "note": body.note.strip()[:500], "at": now()}
-    return asset_to_dict(aid, asset_update(aid, fn))
+    return clip_to_dict(aid, clip_update(aid, fn))
 
 
 def reset_stuck_assets() -> None:
@@ -9674,14 +9145,6 @@ def reset_stuck_lab() -> None:
         for v in (d.get("steps") or {}).values():
             if v.get("status") in ("working", "queued"):
                 v.update(status="failed", error="اتقطع لما السيرفر اتقفل. دوس «فكّك تاني»")
-                changed = True
-        for s in d.get("shots") or []:
-            for v in s.get("vedits") or []:
-                if v.get("status") == "working":
-                    v.update(status="failed", step=None, error="اتقطع لما السيرفر اتقفل. اعمله تاني")
-                    changed = True
-            if (s.get("layers") or {}).get("status") == "working":
-                s["layers"].update(status="failed", error="اتقطع لما السيرفر اتقفل")
                 changed = True
         if changed:
             f.write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
