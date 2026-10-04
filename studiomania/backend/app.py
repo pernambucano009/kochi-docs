@@ -55,6 +55,7 @@ import montage  # noqa: E402
 import fx  # noqa: E402  (محرك الافيكتس)
 import lab  # noqa: E402  (معمل التفكيك)
 import audioshake  # noqa: E402  (فصل الكلام / الموسيقى / المؤثرات)
+import scene as scn  # noqa: E402  (استوديو التحكم في طبقات الفريم)
 import motion as mo  # noqa: E402
 import publisher  # noqa: E402
 import sheets  # noqa: E402
@@ -9301,6 +9302,216 @@ def lab_review(lid: str, body: LabReviewIn):
             x.update(fix)
         x["review"] = {"ok": body.ok, "note": body.note.strip()[:500], "at": now()}
     return lab_to_dict(lid, lab_update(lid, fn))
+
+
+# ---------- 🎛️ استوديو التحكم: طبقات الفريم المفكك كمشهد نتحكم في كل عنصر فيه
+
+def lab_shot(d: dict, n: int) -> dict:
+    s = next((x for x in d.get("shots") or [] if x["n"] == n), None)
+    if not s:
+        raise HTTPException(404, "اللقطة مش موجودة")
+    return s
+
+
+def lab_scene_dict(lid: str, sc: dict) -> dict:
+    base = f"/media/lab/{lid}/layers"
+    return {**sc, "bg": {**sc["bg"], "url": f"{base}/{sc['bg']['file']}" if sc["bg"].get("file") else None},
+            "layers": [{**L, "url": f"{base}/{L['file']}"} for L in sc["layers"]], "sfx": list(fx.SFX)}
+
+
+def lab_scene_get(lid: str, n: int) -> dict:
+    """المشهد بتاع اللقطة (ولو أول مرة: بيتعمل من الطبقات اللي اتفككت)."""
+    d = lab_load(lid)
+    s = lab_shot(d, n)
+    lay = s.get("layers") or {}
+    if not lay.get("items"):
+        raise HTTPException(400, "فكّك فريم من اللقطة دي لطبقات الأول")
+    sc = s.get("scene")
+    if not sc or sc.get("from") != lay.get("at"):
+        from PIL import Image
+        folder = lab_dir(lid) / "layers"
+        ref = folder / (lay.get("base") or lay.get("frame"))
+        W, H = Image.open(ref).size
+        sc = {**scn.new_scene(W, H, lay.get("base") or lay.get("frame"), lay["items"], round(min(4.0, max(1.0, s["end"] - s["start"])), 2)),
+              "from": lay.get("at")}
+        def fn(d):
+            lab_shot(d, n)["scene"] = sc
+        lab_update(lid, fn)
+    return sc
+
+
+@app.get("/api/lab/{lid}/shots/{n}/scene")
+def lab_scene(lid: str, n: int):
+    return lab_scene_dict(lid, lab_scene_get(lid, n))
+
+
+@app.put("/api/lab/{lid}/shots/{n}/scene")
+def lab_scene_put(lid: str, n: int, body: dict):
+    old = lab_scene_get(lid, n)
+    sc = {**scn.clean({**body, "W": old["W"], "H": old["H"]}), "from": old.get("from")}
+    known = {L["file"] for L in old["layers"]} | {v for L in old["layers"] for v in L.get("versions") or []} | {L["orig_file"] for L in old["layers"]}
+    for L in sc["layers"]:  # الملفات لازم تبقى من طبقات المشهد نفسه
+        if L["file"] not in known:
+            raise HTTPException(400, "ملف طبقة مش معروف")
+    def fn(d):
+        lab_shot(d, n)["scene"] = sc
+    lab_update(lid, fn)
+    return lab_scene_dict(lid, sc)
+
+
+class SceneAiIn(BaseModel):
+    instruction: str
+
+
+@app.post("/api/lab/{lid}/shots/{n}/scene/ai")
+def lab_scene_ai(lid: str, n: int, body: SceneAiIn):
+    """💬 قول عايز إيه: الموديل بيحوّل كلامك لتعديلات على الطبقات (ولو لون أو شكل جديد: تعديل صورة العنصر بالـ AI)."""
+    text = body.instruction.strip()[:1500]
+    if not text:
+        raise HTTPException(400, "اكتب عايز تعمل إيه")
+    sc = lab_scene_get(lid, n)
+    if atlas.mock_mode():
+        patch = {"layers": [{"id": sc["layers"][0]["id"], "scale": 0.7, "hue": 90,
+                             "anim": {"on": True, "t0": 0.3, "t1": 1.3, "dx": 0.2, "dy": -0.2}}], "notes": "تجربة"}
+    else:
+        patch = ad_json(series_chat(scn.patch_messages(sc, text)), "تعديل المشهد")
+    sc, edits, notes = scn.apply_patch(sc, patch)
+    sc["from"] = lab_scene_get(lid, n).get("from")
+    def fn(d):
+        lab_shot(d, n)["scene"] = sc
+    lab_update(lid, fn)
+    errors = []
+    for lid2, instr in edits[:3]:
+        try:
+            lab_layer_edit_run(lid, n, lid2, instr)
+        except Exception as exc:  # noqa: BLE001
+            errors.append(f"{lid2}: {str(getattr(exc, 'detail', None) or exc)[:150]}")
+    return {**lab_scene_dict(lid, lab_scene_get(lid, n)), "notes": notes, "edits": [e[0] for e in edits], "errors": errors}
+
+
+def lab_layer_save_version(lid: str, n: int, layer_id: str, im) -> None:
+    """نسخة جديدة من صورة العنصر بتتحط في نفس مربعه (والقديمة بتفضل في النسخ)."""
+    sc = lab_scene_get(lid, n)
+    L = next((x for x in sc["layers"] if x["id"] == layer_id), None)
+    if not L:
+        raise HTTPException(404, "الطبقة مش موجودة")
+    folder = lab_dir(lid) / "layers"
+    from PIL import Image
+    ow, oh = Image.open(folder / L["orig_file"]).size
+    name = f"{Path(L['orig_file']).stem}-v{uuid.uuid4().hex[:5]}.png"
+    scn.fit_into(im, ow, oh).save(folder / name)
+    def fn(d):
+        x = next(y for y in lab_shot(d, n)["scene"]["layers"] if y["id"] == layer_id)
+        x["versions"] = ([*(x.get("versions") or []), x["file"]])[-10:]
+        x["file"] = name
+    lab_update(lid, fn)
+
+
+def lab_layer_edit_run(lid: str, n: int, layer_id: str, instruction: str) -> None:
+    from PIL import Image
+    sc = lab_scene_get(lid, n)
+    L = next((x for x in sc["layers"] if x["id"] == layer_id), None)
+    if not L:
+        raise HTTPException(404, "الطبقة مش موجودة")
+    folder = lab_dir(lid) / "layers"
+    work = lab_dir(lid) / "work"
+    work.mkdir(parents=True, exist_ok=True)
+    src = Image.open(folder / L["file"]).convert("RGBA")
+    if atlas.mock_mode():
+        out = scn._filters(src, 120, 1.2, 1.0)
+    else:
+        # العنصر على خلفية خضرا سادة، والموديل بيرجّعه بنفس الخلفية فبتتشال بالكروما
+        green = Image.new("RGBA", src.size, (0, 255, 0, 255))
+        green.alpha_composite(src)
+        inp = work / f"edit-in-{uuid.uuid4().hex[:5]}.png"
+        green.convert("RGB").save(inp)
+        size = "1024x1536" if src.height > src.width * 1.2 else "1536x1024" if src.width > src.height * 1.2 else "1024x1024"
+        prompt = (f"Edit this isolated element: {instruction}. Keep its shape, pose, perspective, proportions and lighting identical "
+                  "unless the edit asks otherwise. Output only the element, centered, on a plain solid pure green (#00FF00) background, "
+                  "no shadow, no text, nothing else.")
+        url = atlas.generate_image("sunburst", prompt, size, "medium", [atlas.reference_url(inp)])
+        raw = work / f"edit-out-{uuid.uuid4().hex[:5]}.png"
+        atlas.download(url, raw)
+        keyed = mo.cutout(ffmpeg_exe(), raw, work / f"{raw.stem}-cut.png", "object")
+        out = Image.open(keyed).convert("RGBA")
+    lab_layer_save_version(lid, n, layer_id, out)
+
+
+class LayerEditIn(BaseModel):
+    instruction: str
+
+
+@app.post("/api/lab/{lid}/shots/{n}/scene/layers/{layer_id}/edit")
+def lab_layer_edit(lid: str, n: int, layer_id: str, body: LayerEditIn):
+    """✏️ تعديل شكل عنصر بالـ AI (لون، لبس، تفاصيل) والنتيجة بتتحط في نفس مكانه. حوالي 0.005$."""
+    if not body.instruction.strip():
+        raise HTTPException(400, "اكتب التعديل")
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل")
+    lab_layer_edit_run(lid, n, layer_id, body.instruction.strip()[:500])
+    return lab_scene_dict(lid, lab_scene_get(lid, n))
+
+
+@app.post("/api/lab/{lid}/shots/{n}/scene/layers/{layer_id}/upload")
+def lab_layer_upload(lid: str, n: int, layer_id: str, file: UploadFile = File(...)):
+    """⬆ تبدّل العنصر بصورة من عندك (PNG شفاف أحسن) في نفس مكانه وحجمه."""
+    from PIL import Image
+    work = lab_dir(lid) / "work"
+    work.mkdir(parents=True, exist_ok=True)
+    fname = save_upload(file, IMAGE_EXTENSIONS, work, "up")
+    im = Image.open(work / fname)
+    if im.mode != "RGBA":  # من غير شفافية: لون الركن بيتشال
+        im = Image.open(mo.cutout(ffmpeg_exe(), work / fname, work / f"{Path(fname).stem}-cut.png", "object"))
+    lab_layer_save_version(lid, n, layer_id, im)
+    return lab_scene_dict(lid, lab_scene_get(lid, n))
+
+
+@app.post("/api/lab/{lid}/shots/{n}/scene/bg/clean")
+def lab_scene_bg_clean(lid: str, n: int):
+    """🧹 خلفية نضيفة: الموديل بيشيل الناس والعناصر ويكمّل المكان (عشان لما تحرّك عنصر ميبانش وراه شبح). حوالي 0.005$."""
+    from PIL import Image
+    sc = lab_scene_get(lid, n)
+    folder = lab_dir(lid) / "layers"
+    src = folder / sc["bg"]["orig_file"]
+    name = f"{src.stem}-clean-{uuid.uuid4().hex[:5]}.png"
+    if atlas.mock_mode():
+        Image.open(src).convert("RGB").filter(__import__("PIL.ImageFilter", fromlist=["x"]).GaussianBlur(12)).save(folder / name)
+    else:
+        if not atlas.api_key():
+            raise HTTPException(400, "مفتاح Atlas مش متسجل")
+        W, H = sc["W"], sc["H"]
+        size = "1024x1536" if H > W * 1.2 else "1536x1024" if W > H * 1.2 else "1024x1024"
+        names = ", ".join(L["name"] for L in sc["layers"])
+        prompt = ("Remove every person and every foreground object from this image and fill those areas naturally with the "
+                  f"surrounding background, as an empty clean plate. Objects to remove include: {names}. Keep the camera angle, "
+                  "lens, lighting, colors and all background architecture exactly the same. No people at all.")
+        url = atlas.generate_image("sunburst", prompt, size, "medium", [atlas.reference_url(src)])
+        tmp = folder / f"{name}.tmp.png"
+        atlas.download(url, tmp)
+        Image.open(tmp).convert("RGB").resize((W, H), Image.LANCZOS).save(folder / name)
+        tmp.unlink(missing_ok=True)
+    def fn(d):
+        b = lab_shot(d, n)["scene"]["bg"]
+        b["versions"] = ([*(b.get("versions") or []), b["file"]])[-10:]
+        b["file"] = name
+    lab_update(lid, fn)
+    return lab_scene_dict(lid, lab_scene_get(lid, n))
+
+
+@app.post("/api/lab/{lid}/shots/{n}/scene/render")
+def lab_scene_render(lid: str, n: int):
+    """🎬 فيديو المشهد بحركاته وأصواتها."""
+    sc = lab_scene_get(lid, n)
+    folder = lab_dir(lid) / "scenes"
+    folder.mkdir(parents=True, exist_ok=True)
+    for old in folder.glob(f"s{n:03d}-*.mp4"):
+        old.unlink(missing_ok=True)
+    out = folder / f"s{n:03d}-{uuid.uuid4().hex[:6]}.mp4"
+    try:
+        scn.render(ffmpeg_exe(), sc, lab_dir(lid) / "layers", out, lab_dir(lid) / "work", FX_DIR / "sfx")
+    except RuntimeError as exc:
+        raise HTTPException(500, str(exc)) from exc
+    return {"url": f"/media/lab/{lid}/scenes/{out.name}"}
 
 
 def reset_stuck_lab() -> None:
