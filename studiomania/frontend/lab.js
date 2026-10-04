@@ -81,7 +81,7 @@ function renderLab() {
   renderLabTimeline(d);
   const busyEdit = (el) => el.contains(document.activeElement) && document.activeElement.matches("input, select, textarea");
   if (!busyEdit($("labAudio"))) renderLabAudio(d);
-  const shotPlaying = [...document.querySelectorAll("[data-shotvid]")].some((v) => !v.paused);
+  const shotPlaying = [...document.querySelectorAll("[data-shotvid], [data-vedvid]")].some((v) => !v.paused);
   if (!busyEdit($("labShots")) && !shotPlaying) renderLabShots(d);
 }
 
@@ -223,6 +223,38 @@ function labStems(d) {
       : step.error ? `✕ ${le(step.error)}` : "لسه ما اتفصلتش."}</p>`}`;
 }
 
+// ✏️ التعديل جوه المشهد: نفس اللقطة بحركتها، وكل عنصر يتغيّر بالكلام
+function labVedit(d, s) {
+  const els = s.analysis?.elements || [], vs = s.vedits || [], dur = (s.end - s.start);
+  const models = d.vedit_models || [];
+  const done = vs.filter((v) => v.status === "done");
+  return `<div class="lab-vedit" data-vshot="${s.n}">
+    <b>✏️ عدّل جوه المشهد</b> <small class="muted">المشهد بيفضل زي ما هو بحركته وخلفيته، واللي بتطلبه بس هو اللي بيتغيّر</small>
+    ${els.length ? `<div class="lab-chips">${els.map((e) => `<button type="button" class="chip" data-vchip="${le(e.name)}" title="${le(e.description)}">${LAB_TYPES[e.type]?.split(" ")[0] || ""} ${le(e.name)}</button>`).join("")}</div>` : ""}
+    <textarea rows="2" data-vtext placeholder="مثلًا: «مؤشر الماوس» خليه أزرق وأصغر، و«الملفات» غيّر أساميها لسعاد ولمياء وكريم، وبدل ما يحطهم في السلة يحطهم في فولدر «فواتير»"></textarea>
+    <div class="row wrap">
+      <select data-vmodel>${models.map((m) => `<option value="${m.key}">${le(m.label)} · ~${(m.per_sec * dur).toFixed(2)}$</option>`).join("")}</select>
+      ${done.length ? `<select data-vbase><option value="">على الأصلي</option>${done.map((v, i) => `<option value="${v.id}">على النسخة ${i + 1}</option>`).join("")}</select>` : ""}
+      <button type="button" class="btn sm primary" data-vgo>✨ عدّل المشهد</button>
+    </div>
+    <details class="lab-speed"><summary>⏩ سرّع / بطّأ جزء من اللقطة (ببلاش، من غير AI)</summary>
+      <div class="row wrap"><label>من <input type="number" step="0.05" min="0" max="${dur.toFixed(2)}" value="0" data-sp="t0"></label>
+        <label>لـ <input type="number" step="0.05" min="0" max="${dur.toFixed(2)}" value="${dur.toFixed(2)}" data-sp="t1"></label>
+        <label>السرعة <input type="number" step="0.1" min="0.2" max="5" value="1.5" data-sp="factor">×</label>
+        <button type="button" class="btn sm" data-vspeed>⏩ طبّق</button></div>
+      <small class="muted">الأوقات من أول اللقطة (0 لـ ${dur.toFixed(2)} ث). مثلًا حركة الماوس من ثانية كام لكام تبقى أسرع ×2 والباقي زي ما هو.</small></details>
+    ${vs.length ? `<div class="lab-vgrid">${vs.map((v, i) => `<div class="lab-ver">
+      ${v.status === "done" ? `<video data-vedvid="${v.id}" src="${v.url}" playsinline controls preload="metadata"></video>`
+        : v.status === "working" ? `<div class="lab-ver-wait"><span class="spin"></span><small>${le(v.step || "شغال...")}</small></div>`
+        : `<div class="lab-ver-wait err">✕ ${le(v.error)}</div>`}
+      <small data-no-i18n><b>${i + 1}.</b> ${le(v.instruction)}${v.base ? ` <span class="muted">(على نسخة ${vs.findIndex((x) => x.id === v.base) + 1})</span>` : ""}</small>
+      ${v.prompt ? `<details><summary class="muted">التعليمات اللي اتبعتت للموديل</summary><small dir="ltr" data-no-i18n>${le(v.prompt)}</small></details>` : ""}
+      <div class="row wrap">${v.status === "done" ? `<button type="button" class="btn sm" data-vcmp="${v.id}">▶️ مع الأصلي</button>` : ""}
+        <button type="button" class="btn sm danger" data-vdel="${v.id}">🗑️</button>${v.status === "done" ? rv("vedit", `${s.n}:${v.id}`, v.review) : ""}</div>
+    </div>`).join("")}</div>` : ""}
+  </div>`;
+}
+
 function renderLabShots(d) {
   const sfxById = Object.fromEntries((d.audio?.sfx || []).map((x) => [x.id, x]));
   if (!(d.shots || []).length) { $("labShots").innerHTML = `<h3 class="pane-h">🎬 اللقطات</h3><p class="muted">${d.steps?.shots?.status === "working" ? "⏳ بيدور على القطعات..." : "لسه."}</p>`; return; }
@@ -260,6 +292,7 @@ function renderLabShots(d) {
             ${rv("action", `${e.id}:${i}`, x.review)}</div>`).join("")}
         </div>`).join("") || `<p class="muted">مفيش عناصر.</p>`}</div>`
         : `<p class="muted">${d.steps?.elements?.status === "working" ? "⏳ بيفكك العناصر..." : "العناصر لسه ما اتفككتش."}</p>`}
+      ${labVedit(d, s)}
       <div class="lab-layers">
         <div class="row wrap"><button type="button" class="btn sm" data-layers="${s.n}" ${L.status === "working" ? "disabled" : ""}>
           ${L.status === "working" ? `<span class="spin-inline"></span> بيفكك الطبقات...` : `🗂️ فكّك الفريم ${lt(pick)} لطبقات`}</button>
@@ -322,6 +355,40 @@ document.querySelector('.view[data-view="11"]').addEventListener("click", async 
       renderLabShots(labx.cur);
     }
     return;
+  }
+  const vbox = e.target.closest("[data-vshot]");
+  if (vbox) {
+    const n = vbox.dataset.vshot, chip = e.target.closest("[data-vchip]");
+    if (chip) { const ta = vbox.querySelector("[data-vtext]"); ta.value += `${ta.value && !ta.value.endsWith(" ") ? " " : ""}«${chip.dataset.vchip}» `; ta.focus(); return; }
+    const go = e.target.closest("[data-vgo]"), sp = e.target.closest("[data-vspeed]"), del = e.target.closest("[data-vdel]"), cmp = e.target.closest("[data-vcmp]");
+    if (go) {
+      const text = vbox.querySelector("[data-vtext]").value.trim();
+      if (!text) return toast("اكتب عايز تغيّر إيه", true);
+      const sel = vbox.querySelector("[data-vmodel]");
+      if (!confirm(`يعدّل المشهد بـ ${sel.selectedOptions[0].textContent}؟`)) return;
+      return busyButton(go, "⏳", async () => {
+        labx.cur = await api(`/api/lab/${labx.cur.id}/shots/${n}/vedit`, { method: "POST", ...jsonBody({ instruction: text, model: sel.value, base: vbox.querySelector("[data-vbase]")?.value || null }) });
+        renderLabShots(labx.cur); scheduleLabPoll();
+      });
+    }
+    if (sp) {
+      const g = (k) => Number(vbox.querySelector(`[data-sp="${k}"]`).value);
+      return busyButton(sp, "⏳", async () => {
+        labx.cur = await api(`/api/lab/${labx.cur.id}/shots/${n}/vedit`, { method: "POST", ...jsonBody({ speed: { t0: g("t0"), t1: g("t1"), factor: g("factor") }, base: vbox.querySelector("[data-vbase]")?.value || null }) });
+        renderLabShots(labx.cur); scheduleLabPoll();
+      });
+    }
+    if (del) {
+      if (!confirm("تمسح النسخة دي؟")) return;
+      labx.cur = await api(`/api/lab/${labx.cur.id}/shots/${n}/vedit/${del.dataset.vdel}`, { method: "DELETE" });
+      return renderLabShots(labx.cur);
+    }
+    if (cmp) {  // الأصلي في مربع اللقطة والنسخة جنبه، بيبدأوا مع بعض
+      const v = vbox.querySelector(`[data-vedvid="${cmp.dataset.vcmp}"]`), o = document.querySelector(`[data-shotvid="${n}"]`);
+      v.currentTime = 0; v.muted = false; v.play().catch(() => {});
+      if (o) { o.muted = true; labPlayShot(n, Number(o.dataset.start)); }
+      return;
+    }
   }
   const stu = e.target.closest("[data-studio]");
   if (stu) return openStudio(stu.dataset.studio);

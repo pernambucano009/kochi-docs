@@ -251,3 +251,49 @@ def mock_elements(shot: dict, sfx: list[dict]) -> dict:
 
 def to_json(d: dict) -> str:
     return json.dumps(d, ensure_ascii=False)
+
+
+# ------------------------------------------------------------ ✏️ التعديل جوه المشهد (الحركة زي ما هي)
+
+VEDIT_MODELS = {
+    "gemini": {"model": "google/gemini-omni-1.1-flash/video-edit", "label": "Gemini Omni 1.1 (الأدق في الحفاظ على الحركة)", "per_sec": 0.107},
+    "flux": {"model": "black-forest-labs/flux-3/edit-video", "label": "FLUX 3 (أرخص، بيغيّر التوقيت أحيانًا)", "per_sec": 0.03},
+    "kling": {"model": "kwaivgi/kling-video-o3-std/video-edit", "label": "Kling O3 (ضعيف في الكلام العربي)", "per_sec": 0.107},
+}
+
+VEDIT_FORMAT = """{"prompt": "the full English edit instruction"}"""
+
+
+def vedit_messages(shot: dict, instruction: str) -> list[dict]:
+    """يحوّل طلبك (بالعربي ومذكور فيه أسامي العناصر) لتعليمات إنجليزي دقيقة لموديل تعديل الفيديو."""
+    an = shot.get("analysis") or {}
+    els = "\n".join(f"- {e['name']} ({e['type']}): {e.get('description', '')}" for e in an.get("elements") or [])
+    text = (
+        "You write instructions for an AI video-edit model that edits an existing clip while preserving its motion.\n"
+        f"The clip: {an.get('summary', '')}\nBackground: {(an.get('background') or {}).get('description', '')}\n"
+        f"Elements in the clip:\n{els or '—'}\n\n"
+        f"The user's requested changes (Arabic):\n{instruction}\n\n"
+        "Write ONE precise English instruction for the video-edit model: name each element by its look and position so the model "
+        "finds it, state exactly what changes (color, size, content, text — keep any Arabic text the user wants verbatim in Arabic "
+        "script, in quotes), and if the user changes a motion (where it goes, path, destination) describe the new motion clearly. "
+        "End by saying that everything else — background, layout, other elements, camera, timing and the smooth motion — must stay "
+        "exactly the same.\n"
+        f"Reply with JSON only: {VEDIT_FORMAT}"
+    )
+    return [{"role": "user", "content": text}]
+
+
+def retime(ffmpeg: str, src: Path, out: Path, t0: float, t1: float, factor: float, duration: float) -> Path:
+    """⏩ يسرّع أو يبطّأ جزء من اللقطة بس (من t0 لـ t1) والباقي زي ما هو. factor > 1 = أسرع."""
+    t0, t1 = max(0.0, t0), min(duration, t1)
+    parts = []
+    fc = []
+    segs = [(0.0, t0, 1.0), (t0, t1, factor), (t1, duration, 1.0)]
+    for i, (a, b, f) in enumerate(s for s in segs if s[1] - s[0] > 0.02):
+        fc.append(f"[0:v]trim={a:.3f}:{b:.3f},setpts=(PTS-STARTPTS)/{f:.4f}[v{i}]")
+        parts.append(f"[v{i}]")
+    fc.append("".join(parts) + f"concat=n={len(parts)}:v=1:a=0[vout]")
+    subprocess.run([ffmpeg, "-hide_banner", "-loglevel", "error", "-y", "-i", str(src), "-filter_complex", ";".join(fc),
+                    "-map", "[vout]", "-an", "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p", str(out)],
+                   check=True, capture_output=True, timeout=300)
+    return out

@@ -8899,6 +8899,7 @@ def lab_to_dict(lid: str, d: dict) -> dict:
     for s in d.get("shots") or []:
         lay = s.get("layers") or {}
         shots.append({**s, "frames": [{**f, "url": f"{base}/frames/{f['file']}"} for f in s.get("frames") or []],
+                      "vedits": [{**v, "url": f"{base}/vedit/{v['file']}" if v.get("file") else None} for v in s.get("vedits") or []],
                       "layers": {**lay, "base_url": f"{base}/layers/{lay['base']}" if lay.get("base") else None,
                                  "frame_url": f"{base}/layers/{lay['frame']}" if lay.get("frame") else None,
                                  "items": [{**L, "url": f"{base}/layers/{L['file']}"} for L in lay.get("items") or []]}})
@@ -8909,7 +8910,9 @@ def lab_to_dict(lid: str, d: dict) -> dict:
     return {**d, "id": lid, "source_url": f"{base}/{d['source']['file']}", "shots": shots, "audio": audio, "stems": stems,
             "audioshake": bool(audioshake.api_key() or atlas.mock_mode()),
             "reviews": lab_reviews(d), "busy": any((v or {}).get("status") == "working" for v in (d.get("steps") or {}).values())
-            or any((s.get("layers") or {}).get("status") == "working" for s in d.get("shots") or [])}
+            or any((s.get("layers") or {}).get("status") == "working" for s in d.get("shots") or [])
+            or any(v.get("status") == "working" for s in d.get("shots") or [] for v in s.get("vedits") or []),
+            "vedit_models": [{"key": k, "label": v["label"], "per_sec": v["per_sec"]} for k, v in lab.VEDIT_MODELS.items()]}
 
 
 def lab_list_items() -> list[dict]:
@@ -9253,7 +9256,7 @@ class LabReviewIn(BaseModel):
     fix: dict = {}       # تصحيح الاسم/النوع/التصنيف/الوقت
 
 
-LAB_FIX_KEYS = {"stem": (), "sfx": ("label", "category", "t"), "music": ("description", "mood"), "speech": ("speaker", "text"),
+LAB_FIX_KEYS = {"vedit": (), "stem": (), "sfx": ("label", "category", "t"), "music": ("description", "mood"), "speech": ("speaker", "text"),
                 "background": ("name", "description"), "element": ("name", "type", "description"),
                 "action": ("action", "detail"), "layer": ("name",), "shot": ()}
 
@@ -9270,6 +9273,10 @@ def lab_review(lid: str, body: LabReviewIn):
             return next((s for s in shots if str(s["n"]) == body.ref), None)
         if body.kind == "sfx":
             return next((x for x in audio.get("sfx") or [] if x["id"] == body.ref), None)
+        if body.kind == "vedit":
+            sn, _, vid = body.ref.partition(":")
+            s = next((s for s in shots if str(s["n"]) == sn), None)
+            return next((v for v in (s or {}).get("vedits") or [] if v["id"] == vid), None)
         if body.kind == "stem":
             x = (d.get("stems") or {}).get(body.ref)
             return x if isinstance(x, dict) else None
@@ -9514,6 +9521,114 @@ def lab_scene_render(lid: str, n: int):
     return {"url": f"/media/lab/{lid}/scenes/{out.name}"}
 
 
+# ---------- ✏️ التعديل جوه المشهد: نفس الفيديو بحركته، وكل عنصر فيه يتغيّر بالكلام (موديل تعديل فيديو)
+
+def lab_shot_clip(lid: str, s: dict, base: str | None) -> Path:
+    """مقطع اللقطة (من الفيديو الأصلي) أو نسخة متعدلة قبل كده عشان نكمّل عليها."""
+    folder = lab_dir(lid) / "vedit"
+    folder.mkdir(parents=True, exist_ok=True)
+    if base:
+        v = next((x for x in s.get("vedits") or [] if x["id"] == base and x.get("file")), None)
+        if not v:
+            raise HTTPException(404, "النسخة دي مش موجودة")
+        return folder / v["file"]
+    clip = folder / f"s{s['n']:03d}-orig.mp4"
+    if not clip.exists():
+        d = lab_load(lid)
+        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{s['start']:.3f}", "-i",
+                        str(lab_dir(lid) / d["source"]["file"]), "-t", f"{s['end'] - s['start']:.3f}", "-c:v", "libx264",
+                        "-preset", "veryfast", "-crf", "16", "-pix_fmt", "yuv420p", "-c:a", "aac", str(clip)],
+                       check=True, capture_output=True, timeout=300)
+    return clip
+
+
+def lab_vedit_set(lid: str, n: int, vid: str, **kw) -> None:
+    def fn(d):
+        v = next((x for x in lab_shot(d, n).get("vedits") or [] if x["id"] == vid), None)
+        if v is not None:
+            v.update(**kw)
+    lab_update(lid, fn)
+
+
+def run_lab_vedit(lid: str, n: int, vid: str) -> None:
+    try:
+        d = lab_load(lid)
+        s = lab_shot(d, n)
+        v = next(x for x in s["vedits"] if x["id"] == vid)
+        src = lab_shot_clip(lid, s, v.get("base"))
+        out = lab_dir(lid) / "vedit" / f"s{n:03d}-{vid}.mp4"
+        if v["kind"] == "speed":
+            lab.retime(ffmpeg_exe(), src, out, v["t0"], v["t1"], v["factor"], probe_duration(src))
+        elif atlas.mock_mode():
+            subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src), "-vf", "hue=h=120",
+                            "-c:a", "copy", str(out)], check=True, capture_output=True, timeout=300)
+            lab_vedit_set(lid, n, vid, prompt="(تجربة) hue shift")
+        else:
+            lab_vedit_set(lid, n, vid, step="بيكتب التعليمات")
+            prompt = str(ad_json(series_chat(lab.vedit_messages(s, v["instruction"])), "تعليمات التعديل").get("prompt") or "").strip()
+            if not prompt:
+                raise RuntimeError("الموديل مكتبش تعليمات")
+            lab_vedit_set(lid, n, vid, prompt=prompt, step="موديل الفيديو بيعدّل المشهد")
+            m = lab.VEDIT_MODELS[v["model"]]
+            url = atlas.run_model("Video", {"model": m["model"], "video": atlas.upload_media(src), "prompt": prompt},
+                                  "تعديل المشهد", max_seconds=1500, interval=6)
+            atlas.download(url, out)
+        lab_vedit_set(lid, n, vid, status="done", file=out.name, step=None, error=None, duration=round(probe_duration(out), 2))
+    except Exception as exc:  # noqa: BLE001
+        lab_vedit_set(lid, n, vid, status="failed", step=None, error=str(getattr(exc, "detail", None) or exc)[:400])
+
+
+class VeditIn(BaseModel):
+    instruction: str = ""
+    model: str = "gemini"
+    base: str | None = None       # نكمّل على نسخة متعدلة
+    speed: dict | None = None     # {"t0", "t1", "factor"} = تسريع/تبطيء جزء (من غير AI)
+
+
+@app.post("/api/lab/{lid}/shots/{n}/vedit")
+def lab_vedit(lid: str, n: int, body: VeditIn):
+    """✏️ تعديل جوه المشهد (لون، حجم، استبدال، مكان النهاية...) والحركة زي ما هي، أو ⏩ سرعة جزء منه."""
+    d = lab_load(lid)
+    s = lab_shot(d, n)
+    vid = uuid.uuid4().hex[:8]
+    if body.speed:
+        try:
+            t0, t1, f = float(body.speed["t0"]), float(body.speed["t1"]), float(body.speed["factor"])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise HTTPException(400, "حدد الجزء والسرعة") from exc
+        if not (0.2 <= f <= 5) or t1 - t0 < 0.05:
+            raise HTTPException(400, "السرعة من 0.2 لـ 5، والجزء لازم يبقى أطول من كده")
+        item = {"kind": "speed", "t0": t0, "t1": t1, "factor": f, "instruction": f"⏩ سرعة ×{f:g} من {t0:.2f} لـ {t1:.2f}"}
+    else:
+        text = body.instruction.strip()[:2000]
+        if not text:
+            raise HTTPException(400, "اكتب عايز تغيّر إيه")
+        if body.model not in lab.VEDIT_MODELS:
+            raise HTTPException(400, "موديل غير معروف")
+        if not (atlas.api_key() or atlas.mock_mode()):
+            raise HTTPException(400, "مفتاح Atlas مش متسجل")
+        if s["end"] - s["start"] > 10.5 and not body.base:
+            raise HTTPException(400, "اللقطة أطول من 10 ثواني، وموديلات التعديل بتقبل لحد 10")
+        item = {"kind": "ai", "instruction": text, "model": body.model}
+    item.update(id=vid, base=body.base, status="working", step="بيجهّز", file=None, error=None, review=None, created_at=now())
+    def fn(d):
+        lab_shot(d, n).setdefault("vedits", []).append(item)
+    lab_update(lid, fn)
+    threading.Thread(target=run_lab_vedit, args=(lid, n, vid), daemon=True).start()
+    return lab_to_dict(lid, lab_load(lid))
+
+
+@app.delete("/api/lab/{lid}/shots/{n}/vedit/{vid}")
+def lab_vedit_delete(lid: str, n: int, vid: str):
+    def fn(d):
+        s = lab_shot(d, n)
+        for v in s.get("vedits") or []:
+            if v["id"] == vid and v.get("file"):
+                (lab_dir(lid) / "vedit" / v["file"]).unlink(missing_ok=True)
+        s["vedits"] = [v for v in s.get("vedits") or [] if v["id"] != vid]
+    return lab_to_dict(lid, lab_update(lid, fn))
+
+
 def reset_stuck_lab() -> None:
     for f in LAB_DIR.glob("*/lab.json"):
         try:
@@ -9526,6 +9641,10 @@ def reset_stuck_lab() -> None:
                 v.update(status="failed", error="اتقطع لما السيرفر اتقفل. دوس «فكّك تاني»")
                 changed = True
         for s in d.get("shots") or []:
+            for v in s.get("vedits") or []:
+                if v.get("status") == "working":
+                    v.update(status="failed", step=None, error="اتقطع لما السيرفر اتقفل. اعمله تاني")
+                    changed = True
             if (s.get("layers") or {}).get("status") == "working":
                 s["layers"].update(status="failed", error="اتقطع لما السيرفر اتقفل")
                 changed = True
