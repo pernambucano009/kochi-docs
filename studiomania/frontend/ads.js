@@ -1231,7 +1231,10 @@ function renderAdProd() {
   const framed = shots.filter((s) => s.frame).length, comps = shots.filter((s) => s.components.length).length;
   const okv = shots.filter((s) => s.takes.some((t) => t.id === s.chosen && t.approved)).length;
   $("adPProgress").textContent = `🎨 ${framed}/${n} · 🧩 ${comps}/${n} · ✅ ${shots.filter((s) => s.approved).length}/${n} · 🎬 ${okv}/${n}`;
-  $("adPApproveAll").textContent = shots.every((s) => s.approved) ? "↩ الغي اعتماد الكل" : "✅ اعتمد كل اللقطات";
+  const drawn = shots.filter((s) => s.frame_url && !PBUSY.has(s.frame_status));
+  const allOk = drawn.length > 0 && drawn.every((s) => s.approved);
+  $("adPApproveAll").textContent = allOk ? "↩ الغي اعتماد كل الستوري بورد" : `✅ اعتمد كل الستوري بورد (${drawn.filter((s) => !s.approved).length})`;
+  $("adPApproveAll").disabled = !drawn.length;
   if (ldrag || editingIn($("adPShots")) || [...$("adPShots").querySelectorAll("video")].some((v) => !v.paused)) return;
   $("adPShots").style.setProperty("--ad-ar", (h.aspect || "9:16").replace(":", " / "));
   setHTML($("adPShots"), shots.map((s) => {
@@ -1357,7 +1360,16 @@ $("adPCompImgs").onclick = () => {
   if (!confirm(`هيولّد صور لـ ${todo} مكون ملهمش صورة. المكونات اللي ليها صورة (${done})، ومنها اللي انت رافعها، مش هتتلمس. تكمل؟`)) return;
   pDo($("adPCompImgs"), "⏳", () => pAPI("/comp-images", { method: "POST" }));
 };
-$("adPApproveAll").onclick = () => pDo($("adPApproveAll"), "⏳", () => pAPI(`/approve-all?approved=${!adx.cur.prod.shots.every((s) => s.approved)}`, { method: "POST" }));
+$("adPApproveAll").onclick = () => {
+  const drawn = adx.cur.prod.shots.filter((s) => s.frame_url && !PBUSY.has(s.frame_status));
+  const on = !(drawn.length && drawn.every((s) => s.approved));
+  const missing = adx.cur.prod.shots.length - drawn.length;
+  if (on && missing && !confirm(`هيعتمد ${drawn.length} ستوري بورد. فيه ${missing} لقطة لسه ملهاش ستوري بورد (أو بترسم) ومش هتتعتمد. تكمل؟`)) return;
+  busyButton($("adPApproveAll"), "⏳", async () => {
+    adx.cur = await pAPI(`/approve-all?approved=${on}`, { method: "POST" });
+    toast(on ? "✅ اتعتمد كل الستوري بورد" : "↩ اتلغى الاعتماد");
+  }).then(renderAds);  // بعد ما الزرار يرجع: العدد الجديد يظهر عليه
+};
 $("adPGenerate").onclick = () => {
   const n = adx.cur.prod.shots.filter((s) => s.approved && s.frame_url && !s.takes.some((t) => t.status !== "failed")).length;
   if (n && !confirm(`تولّد فيديو لـ ${n} لقطة بـ Seedance؟ (التوليد بيتحسب عليك)`)) return;

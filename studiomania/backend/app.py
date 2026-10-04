@@ -7022,9 +7022,13 @@ def prod_sb_prompts(aid: str, shot_id: str | None = None, skip_approved: bool = 
 
 @app.post("/api/ads/{aid}/prod/approve-all")
 def prod_approve_all(aid: str, approved: bool = True):
+    """✅ اعتمد كل الستوري بورد: اللقطات اللي ليها صورة مرسومة بس (واللي بترسم دلوقتي لأ). الإلغاء بيشيل الاعتماد من الكل."""
     def fn(d):
         for s in prod_of(d)["shots"]:
-            s["approved"] = bool(approved)
+            if not approved:
+                s["approved"] = False
+            elif s.get("frame") and s.get("frame_status") not in ("queued", "working"):
+                s["approved"] = True
     update_ad(aid, fn)
     return ad_response(aid)
 
