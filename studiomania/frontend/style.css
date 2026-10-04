@@ -1508,3 +1508,6 @@ a.pl-link:hover { background: color-mix(in srgb, var(--ok) 24%, transparent); }
 .lab-ck img { max-width: 100%; max-height: 100%; object-fit: contain; }
 .lab-lgrid input { width: 100%; }
 @media (max-width: 760px) { .lab-top { grid-template-columns: 1fr; } .lab-top video { max-height: 45vh; } .lab-ll { width: 64px; } }
+.lab-st.skipped { background: #f3efe2; }
+.lab-stem-l { width: 110px; flex: none; }
+.lab-row audio { height: 34px; flex: 1 1 220px; max-width: 420px; }

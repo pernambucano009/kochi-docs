@@ -11,7 +11,8 @@ const LAB_TYPES = { character: "🧍 شخصية", background: "🖼️ خلفي�
 const LAB_ACTIONS = { appear: "بيظهر", disappear: "بيختفي", move: "بيتحرك", click: "بيدوس", drag: "بيسحب", drop: "بيسيب", type: "بيكتب",
   scale: "بيكبر/يصغر", rotate: "بيلف", highlight: "بيتعمله هايلايت", transform: "بيتحول", speak: "بيتكلم", gesture: "بيشاور", other: "تاني" };
 const LAB_SCENE = { live_action: "🎥 تصوير حقيقي", screen_recording: "🖥️ تسجيل شاشة", motion_graphics: "✨ موشن جرافيك", mixed: "🔀 مزيج" };
-const LAB_STEP = { shots: "✂️ القطعات", audio: "🎧 الصوت", elements: "🧩 العناصر" };
+const LAB_STEP = { shots: "✂️ القطعات", stems: "🎚️ فصل التراكات", audio: "🎧 الصوت", elements: "🧩 العناصر" };
+const LAB_STEMS = { dialogue: "🗣️ الكلام", music: "🎵 الموسيقى", effects: "🔊 المؤثرات" };
 const lt = (t) => `${Math.floor((t || 0) / 60)}:${((t || 0) % 60).toFixed(2).padStart(5, "0")}`;
 const le = (v) => escapeHtml(v == null ? "" : String(v));
 const labOpts = (map, v) => Object.entries(map).map(([k, l]) => `<option value="${k}" ${k === v ? "selected" : ""}>${l}</option>`).join("");
@@ -70,7 +71,7 @@ function renderLab() {
   document.querySelectorAll("[data-labrun]").forEach((b) => (b.disabled = d.busy));
   $("labStatus").innerHTML = Object.entries(LAB_STEP).map(([k, l]) => {
     const s = d.steps?.[k] || {};
-    return `<span class="lab-st ${s.status || ""}">${s.status === "working" ? `<span class="spin-inline"></span>` : s.status === "done" ? "✅" : s.status === "failed" ? "✕" : "⏸"}
+    return `<span class="lab-st ${s.status || ""}">${s.status === "working" ? `<span class="spin-inline"></span>` : s.status === "done" ? "✅" : s.status === "failed" ? "✕" : s.status === "skipped" ? "⏭" : "⏸"}
       ${l}${s.progress ? ` <small>${le(s.progress)}</small>` : ""}${s.error ? ` <small class="err">${le(s.error)}</small>` : ""}</span>`;
   }).join("");
   renderLabScore(d);
@@ -80,7 +81,7 @@ function renderLab() {
   if (!busyEdit($("labShots"))) renderLabShots(d);
 }
 
-const LAB_SCORE = { shots: "✂️ القطعات", sfx: "🔊 المؤثرات", music: "🎵 الموسيقى", speech: "🗣️ الكلام", elements: "🧩 العناصر", actions: "🎬 الحركات", layers: "🗂️ الطبقات" };
+const LAB_SCORE = { shots: "✂️ القطعات", stems: "🎚️ التراكات", sfx: "🔊 المؤثرات", music: "🎵 الموسيقى", speech: "🗣️ الكلام", elements: "🧩 العناصر", actions: "🎬 الحركات", layers: "🗂️ الطبقات" };
 function renderLabScore(d) {
   const r = d.reviews || {};
   $("labScore").innerHTML = `<b>👤 تقييمك لدقة التفكيك:</b>` + Object.entries(LAB_SCORE).filter(([k]) => r[k]?.total).map(([k, l]) => {
@@ -118,7 +119,8 @@ function renderLabAudio(d) {
   if (!a.sfx && !a.speech) { $("labAudio").innerHTML = `<h3 class="pane-h">🎧 الصوت</h3><p class="muted">${d.steps?.audio?.status === "working" ? "⏳ بيفكك الصوت..." : "لسه ما اتفككش."}</p>`; return; }
   const sfx = a.sfx || [];
   $("labAudio").innerHTML = `<h3 class="pane-h">🎧 الصوت <span class="muted">(${sfx.length} مؤثر · ${(a.speech || []).length} جملة · ${(a.music || []).length} موسيقى · ${(a.onsets || []).length} بداية صوت اتقاست)</span></h3>
-    <p class="hint">⏱️ = الوقت اتظبط على بداية الصوت اللي اتقاست بالكود (دقة 10 مللي ثانية). ▶️ بيشغّل الصوت لوحده وبيودّي الفيديو للحظته. فصل التراكات نفسها (ملف للكلام وملف للمؤثرات) محتاج خدمة خارجية، وهنضيفها لما تختارها.</p>
+    ${labStems(d)}
+    <p class="hint">⏱️ = الوقت اتظبط على بداية الصوت اللي اتقاست بالكود (دقة 10 مللي ثانية)${a.from_stem ? "، ومن تراك المؤثرات النضيف" : ""}. ▶️ بيشغّل الصوت لوحده وبيودّي الفيديو للحظته.</p>
     <h4>🔊 المؤثرات الصوتية</h4>
     <div class="lab-rows">${sfx.map((x) => `<div class="lab-row" data-sfx="${x.id}">
       <button type="button" class="btn sm" data-play="${x.clip_url}" data-seek="${x.t}">▶️</button>
@@ -141,6 +143,19 @@ function renderLabAudio(d) {
       <input type="text" class="sm" value="${le(s.speaker)}" placeholder="مين" data-fix="speech|${i}|speaker" data-no-i18n>
       <input type="text" value="${le(s.text)}" data-fix="speech|${i}|text" data-no-i18n>${orig(s)}
       ${rv("speech", i, s.review)}</div>`).join("") || `<p class="muted">مفيش كلام.</p>`}</div>`;
+}
+
+// 🎚️ التراكات المفصولة (AudioShake): كل تراك تسمعه لوحده وتقيّمه
+function labStems(d) {
+  const st = d.stems || {}, step = d.steps?.stems || {};
+  const rows = Object.entries(LAB_STEMS).filter(([k]) => st[k]).map(([k, l]) => `<div class="lab-row">
+      <b class="lab-stem-l">${l}</b>
+      ${st[k].url ? `<audio src="${st[k].url}" controls preload="none"></audio><a class="btn sm" href="${st[k].url}" download>⬇</a>` : `<span class="err">✕ ${le(st[k].error || "مطلعش")}</span>`}
+      ${st[k].url ? rv("stem", k, st[k].review) : ""}</div>`).join("");
+  return `<h4>🎚️ التراكات المفصولة</h4>${rows ? `<div class="lab-rows">${rows}</div>`
+    : `<p class="muted">${step.status === "working" ? `<span class="spin-inline"></span> ${le(step.progress || "بيفصل التراكات...")}`
+      : !d.audioshake ? "مفتاح AudioShake مش متسجل، فالتحليل اشتغل على الصوت كله. حطه على Railway في المتغير AUDIOSHAKE_API_KEY وبعدين دوس «🎚️ التراكات»."
+      : step.error ? `✕ ${le(step.error)}` : "لسه ما اتفصلتش."}</p>`}`;
 }
 
 function renderLabShots(d) {

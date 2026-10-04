@@ -54,6 +54,7 @@ import captions  # noqa: E402
 import montage  # noqa: E402
 import fx  # noqa: E402  (محرك الافيكتس)
 import lab  # noqa: E402  (معمل التفكيك)
+import audioshake  # noqa: E402  (فصل الكلام / الموسيقى / المؤثرات)
 import motion as mo  # noqa: E402
 import publisher  # noqa: E402
 import sheets  # noqa: E402
@@ -8843,7 +8844,7 @@ reset_stuck_prod()
 LAB_DIR = DATA_DIR / "lab"
 LAB_DIR.mkdir(parents=True, exist_ok=True)
 LAB_LOCK = threading.Lock()
-LAB_STEPS = ("shots", "audio", "elements")
+LAB_STEPS = ("shots", "stems", "audio", "elements")
 LAYERS_MODEL = "bytedance/seedream-v5.0-pro/layer-decomposition"
 
 
@@ -8876,6 +8877,7 @@ def lab_step(lid: str, step: str, **kw) -> None:
 def lab_reviews(d: dict) -> dict:
     """عدّاد المراجعة: كام حاجة اتوافق عليها / اترفضت / لسه، لكل نوع."""
     groups: dict[str, list] = {"shots": [s for s in d.get("shots") or []],
+                               "stems": [v for v in (d.get("stems") or {}).values() if isinstance(v, dict) and v.get("file")],
                                "sfx": (d.get("audio") or {}).get("sfx") or [],
                                "music": (d.get("audio") or {}).get("music") or [],
                                "speech": (d.get("audio") or {}).get("speech") or [],
@@ -8901,7 +8903,10 @@ def lab_to_dict(lid: str, d: dict) -> dict:
                                  "items": [{**L, "url": f"{base}/layers/{L['file']}"} for L in lay.get("items") or []]}})
     audio = d.get("audio") or {}
     audio = {**audio, "sfx": [{**x, "clip_url": f"{base}/sfx/{x['clip']}" if x.get("clip") else None} for x in audio.get("sfx") or []]}
-    return {**d, "id": lid, "source_url": f"{base}/{d['source']['file']}", "shots": shots, "audio": audio,
+    stems = {k: {**v, "url": f"{base}/stems/{v['file']}" if v.get("file") else None}
+             for k, v in (d.get("stems") or {}).items() if isinstance(v, dict)}
+    return {**d, "id": lid, "source_url": f"{base}/{d['source']['file']}", "shots": shots, "audio": audio, "stems": stems,
+            "audioshake": bool(audioshake.api_key() or atlas.mock_mode()),
             "reviews": lab_reviews(d), "busy": any((v or {}).get("status") == "working" for v in (d.get("steps") or {}).values())
             or any((s.get("layers") or {}).get("status") == "working" for s in d.get("shots") or [])}
 
@@ -8983,6 +8988,8 @@ def lab_run(lid: str, step: str = "all"):
     d = lab_load(lid)
     if any((d.get("steps") or {}).get(k, {}).get("status") == "working" for k in LAB_STEPS):
         raise HTTPException(400, "التفكيك شغال بالفعل. استنى لما يخلص")
+    if "stems" in steps:
+        steps = sorted(set(steps) | {"audio", "elements"}, key=LAB_STEPS.index)
     if "shots" in steps or "audio" in steps:
         steps = sorted(set(steps) | {"elements"}, key=LAB_STEPS.index)
     lab_update(lid, lambda d: [d.setdefault("steps", {}).update({k: {"status": "queued"}}) for k in steps])
@@ -9016,6 +9023,8 @@ def run_lab(lid: str, steps: list[str]) -> None:
                     if old.get(s["n"]):
                         s["layers"] = old[s["n"]]
                 lab_update(lid, lambda d: d.update(shots=shots))
+            elif step == "stems":
+                run_lab_stems(lid, d, src)
             elif step == "audio":
                 if not d["source"].get("has_audio"):
                     lab_update(lid, lambda d: d.update(audio={"none": True}))
@@ -9024,6 +9033,8 @@ def run_lab(lid: str, steps: list[str]) -> None:
             elif step == "elements":
                 run_lab_elements(lid)
             lab_step(lid, step, status="done", error=None, progress="", at=now())
+        except LabSkip as exc:
+            lab_step(lid, step, status="skipped", error=str(exc), progress="")
         except Exception as exc:  # noqa: BLE001
             lab_step(lid, step, status="failed", error=str(getattr(exc, "detail", None) or exc)[:400], progress="")
             if step == "shots":
@@ -9033,7 +9044,10 @@ def run_lab(lid: str, steps: list[str]) -> None:
 def run_lab_audio(lid: str, d: dict, src: Path, dur: float) -> None:
     folder = lab_dir(lid)
     lab_step(lid, "audio", progress="بيقيس بدايات الأصوات")
-    marks = lab.onsets(lab.pcm(ffmpeg_exe(), src))
+    # لو التراكات اتفصلت: بدايات الأصوات وقص كل مؤثر بيتعملوا من تراك المؤثرات النضيف (من غير كلام وموسيقى)
+    fx_stem = (d.get("stems") or {}).get("effects", {}).get("file")
+    fx_src = folder / "stems" / fx_stem if fx_stem and (folder / "stems" / fx_stem).exists() else None
+    marks = lab.onsets(lab.pcm(ffmpeg_exe(), fx_src or src))
     audio_mp3 = folder / "audio.mp3"
     subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src), "-vn", "-ac", "1", "-b:a", "96k",
                     str(audio_mp3)], check=True, capture_output=True, timeout=300)
@@ -9072,7 +9086,7 @@ def run_lab_audio(lid: str, d: dict, src: Path, dur: float) -> None:
             sd = 0.3
         sid = f"x{i + 1}"
         clip = f"{sid}.mp3"
-        lab.cut_audio(ffmpeg_exe(), src, t - 0.04, min(sd + 0.12, dur - t + 0.04), folder / "sfx" / clip)
+        lab.cut_audio(ffmpeg_exe(), fx_src or src, t - 0.04, min(sd + 0.12, dur - t + 0.04), folder / "sfx" / clip)
         sfx.append({"id": sid, "t": round(t, 3), "t_model": round(t0, 3), "snapped": snapped, "dur": round(sd, 2),
                     "label": str(x.get("label") or "")[:80], "category": x.get("category") if x.get("category") in lab.SFX_CATEGORIES else "other",
                     "what": str(x.get("what") or "")[:300], "clip": clip, "review": None})
@@ -9088,7 +9102,49 @@ def run_lab_audio(lid: str, d: dict, src: Path, dur: float) -> None:
               "description": str(m.get("description") or "")[:300], "mood": str(m.get("mood") or "")[:80], "review": None}
              for m in res.get("music") or [] if isinstance(m, dict)]
     lab_update(lid, lambda d: d.update(audio={"sfx": sfx, "speech": speech, "music": music, "onsets": marks[:300],
-                                               "stems": None}))
+                                               "from_stem": bool(fx_src)}))
+
+
+def run_lab_stems(lid: str, d: dict, src: Path) -> None:
+    """🎚️ فصل الصوت لكلام / موسيقى / مؤثرات (AudioShake). من غير مفتاح الخطوة بتتخطى والتحليل بيكمل على الصوت كله."""
+    folder = lab_dir(lid) / "stems"
+    if not d["source"].get("has_audio"):
+        lab_update(lid, lambda d: d.update(stems={}))
+        return
+    if not (audioshake.api_key() or atlas.mock_mode()):
+        lab_step(lid, "stems", status="skipped", progress="")
+        raise LabSkip("مفتاح AudioShake مش متسجل (AUDIOSHAKE_API_KEY)، فالتحليل اشتغل على الصوت كله")
+    shutil.rmtree(folder, ignore_errors=True)
+    folder.mkdir(parents=True, exist_ok=True)
+    mix = folder / "mix.mp3"
+    subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src), "-vn", "-ac", "2", "-b:a", "192k",
+                    str(mix)], check=True, capture_output=True, timeout=300)
+    stems = {}
+    if atlas.mock_mode():  # تجربة: فلاتر بدل الفصل الحقيقي
+        for name, af in (("dialogue", "bandpass=f=1200:width_type=h:w=2400"), ("music", "lowpass=f=400"), ("effects", "highpass=f=3000")):
+            f = f"{name}.mp3"
+            subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(mix), "-af", af, str(folder / f)],
+                           check=True, capture_output=True, timeout=120)
+            stems[name] = {"file": f, "status": "done", "review": None}
+    else:
+        lab_step(lid, "stems", progress="بيرفع الصوت")
+        tid = audioshake.create_task(atlas.upload_media(mix))
+        lab_step(lid, "stems", progress="AudioShake بيفصل الكلام والموسيقى والمؤثرات")
+        res = audioshake.wait(tid)
+        for name in audioshake.STEMS:
+            r = res.get(name) or {}
+            if r.get("link") and r["status"] not in ("error", "failed"):
+                f = f"{name}.mp3"
+                atlas.download(r["link"], folder / f)
+                stems[name] = {"file": f, "status": "done", "review": None}
+            else:
+                stems[name] = {"file": None, "status": "failed", "error": str(r.get("error") or "مرجعش ملف")[:200], "review": None}
+        stems["_task"] = tid
+    lab_update(lid, lambda d: d.update(stems=stems))
+
+
+class LabSkip(Exception):
+    """خطوة اتخطت لسبب معروف (مش فشل)."""
 
 
 def run_lab_elements(lid: str) -> None:
@@ -9196,7 +9252,7 @@ class LabReviewIn(BaseModel):
     fix: dict = {}       # تصحيح الاسم/النوع/التصنيف/الوقت
 
 
-LAB_FIX_KEYS = {"sfx": ("label", "category", "t"), "music": ("description", "mood"), "speech": ("speaker", "text"),
+LAB_FIX_KEYS = {"stem": (), "sfx": ("label", "category", "t"), "music": ("description", "mood"), "speech": ("speaker", "text"),
                 "background": ("name", "description"), "element": ("name", "type", "description"),
                 "action": ("action", "detail"), "layer": ("name",), "shot": ()}
 
@@ -9213,6 +9269,9 @@ def lab_review(lid: str, body: LabReviewIn):
             return next((s for s in shots if str(s["n"]) == body.ref), None)
         if body.kind == "sfx":
             return next((x for x in audio.get("sfx") or [] if x["id"] == body.ref), None)
+        if body.kind == "stem":
+            x = (d.get("stems") or {}).get(body.ref)
+            return x if isinstance(x, dict) else None
         if body.kind in ("music", "speech"):
             lst = audio.get(body.kind) or []
             return lst[int(body.ref)] if body.ref.isdigit() and int(body.ref) < len(lst) else None
