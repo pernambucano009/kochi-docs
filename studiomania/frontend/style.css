@@ -1464,7 +1464,7 @@ a.pl-link:hover { background: color-mix(in srgb, var(--ok) 24%, transparent); }
 .lab-top video { width: 100%; max-height: 60vh; background: #000; border-radius: 12px; }
 .lab-tl { position: relative; display: flex; flex-direction: column; gap: 6px; padding: 8px; border: 1px solid var(--line); border-radius: var(--radius-sm); }
 .lab-lane { display: flex; align-items: center; height: 26px; }
-.lab-ll { width: 84px; flex: none; font-size: 12px; color: var(--muted); }
+.lab-ll { width: 96px; flex: none; font-size: 12px; color: var(--muted); }
 .lab-lt { position: relative; flex: 1; height: 100%; background: var(--surface-2); border-radius: 6px; overflow: hidden; }
 .lab-lt .blk { position: absolute; top: 3px; bottom: 3px; border-radius: 4px; cursor: pointer; font-style: normal; font-size: 11px; color: #fff;
   display: flex; align-items: center; justify-content: center; overflow: hidden; }
@@ -1511,3 +1511,14 @@ a.pl-link:hover { background: color-mix(in srgb, var(--ok) 24%, transparent); }
 .lab-st.skipped { background: #f3efe2; }
 .lab-stem-l { width: 110px; flex: none; }
 .lab-row audio { height: 34px; flex: 1 1 220px; max-width: 420px; }
+/* مربع عرض كل لقطة + اسمع حارة وحدة */
+.lab-shot { display: grid; grid-template-columns: 210px 1fr; gap: 12px; align-items: start; }
+.lab-shotplay { position: sticky; top: 8px; display: flex; flex-direction: column; gap: 6px; }
+.lab-shotplay video { width: 100%; max-height: 360px; background: #000; border-radius: 10px; object-fit: contain; }
+.lab-shotbody { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.lab-hear { border: none; background: none; cursor: pointer; padding: 0 2px; font-size: 14px; opacity: .55; }
+.lab-hear.on { opacity: 1; }
+.lab-ll { display: inline-flex; align-items: center; gap: 2px; }
+.lab-hearnote { font-size: 12px; color: var(--muted); margin-bottom: 2px; }
+.lab-hearnote.on { color: var(--warn); font-weight: 600; }
+@media (max-width: 760px) { .lab-shot { grid-template-columns: 1fr; } .lab-shotplay { position: static; } .lab-shotplay video { max-height: 50vh; } .lab-ll { width: 78px; } }
