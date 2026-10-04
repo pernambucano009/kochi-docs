@@ -10,9 +10,11 @@ import re
 import subprocess
 from pathlib import Path
 
+import fx
 from captions import FONTS, ass_color, ass_time, filter_path
 
 IN_ANIMS = ("none", "fade", "pop", "zoom", "slide_up", "slide_down", "slide_left", "slide_right")
+TEXT_ANIMS = IN_ANIMS + ("typewriter", "words", "counter", "highlight")  # حركات للكلام بس (محرك الافيكتس)
 OUT_ANIMS = ("none", "fade", "pop", "zoom", "slide_up", "slide_down", "slide_left", "slide_right")
 LOOPS = ("none", "float", "pulse")
 DEFAULT_FONT = FONTS[0]["family"]
@@ -43,18 +45,22 @@ def clean_layers(layers, seconds: float, comp_ids: set[str]) -> list[dict]:
         layer = {
             "id": str(x.get("id") or f"L{i + 1}")[:12], "type": kind, "start": round(start, 2), "end": round(end, 2),
             "x": round(_num(x.get("x"), 0.5, -0.2, 1.2), 3), "y": round(_num(x.get("y"), 0.5, -0.2, 1.2), 3),
-            "in": x.get("in") if x.get("in") in IN_ANIMS else "fade",
+            "in": x.get("in") if x.get("in") in (TEXT_ANIMS if kind == "text" else IN_ANIMS) else ("fade" if kind == "text" else "pop"),
             "out": x.get("out") if x.get("out") in OUT_ANIMS else "fade",
             "loop": x.get("loop") if x.get("loop") in LOOPS else "none",
             "in_dur": round(_num(x.get("in_dur"), 0.4, 0.05, 3), 2), "out_dur": round(_num(x.get("out_dur"), 0.3, 0.05, 3), 2),
             "note": str(x.get("note") or "")[:200],
+            # 🔊 صوت الحركة: auto = الصوت بتاع القالب، none = من غير صوت، أو اسم صوت من المكتبة
+            "sfx": x.get("sfx") if x.get("sfx") in ("auto", "none", *fx.SFX) else "auto",
+            "sfx_vol": round(_num(x.get("sfx_vol"), 1.0, 0, 2), 2),
         }
         if kind == "image":
             layer.update(comp_id=str(x["comp_id"]), w=round(_num(x.get("w"), 0.5, 0.03, 1.5), 3))
         else:
             layer.update(text=text, size=round(_num(x.get("size"), 0.045, 0.015, 0.2), 3),
                          color=_hex(x.get("color"), "#FFFFFF"), box=_hex(x.get("box"), "") if x.get("box") else "",
-                         font=str(x.get("font") or DEFAULT_FONT)[:40], bold=bool(x.get("bold", True)))
+                         font=str(x.get("font") or DEFAULT_FONT)[:40], bold=bool(x.get("bold", True)),
+                         accent=_hex(x.get("accent"), "#FFD54A"), speed=round(_num(x.get("speed"), 0, 0, 60), 1))
         out.append(layer)
     return out[:20]
 
@@ -158,6 +164,8 @@ def build_ass(layers: list[dict], W: int, H: int, total: float) -> str:
              "MarginR, MarginV, Encoding"]
     events = []
     for k, L in enumerate(layers):
+        if L["in"] not in IN_ANIMS:  # من غير محرك الافيكتس: الحركات الجديدة بتظهر تدريجي
+            L = {**L, "in": "fade"}
         size = max(10, int(L["size"] * H))
         box = bool(L.get("box"))
         lines.append(f"Style: T{k},{L['font']},{size},{ass_color(L['color'])},{ass_color(L['color'])},"
@@ -195,10 +203,21 @@ def video_size(ffmpeg: str, path: Path) -> tuple[int, int]:
     return (int(m.group(1)), int(m.group(2))) if m else (720, 1280)
 
 
+def has_audio(ffmpeg: str, path: Path) -> bool:
+    err = subprocess.run([ffmpeg, "-hide_banner", "-i", str(path)], capture_output=True, text=True, timeout=30).stderr
+    return "Audio:" in err
+
+
+def font_files(fonts_dir: Path) -> dict[str, Path]:
+    return {f["family"]: fonts_dir / f["file"] for f in FONTS if (fonts_dir / f["file"]).exists()}
+
+
 def render(ffmpeg: str, base: Path, layers: list[dict], images: dict[str, Path], out: Path, duration: float,
-           fonts_dir: Path, work: Path) -> None:
-    """images: comp_id → صورة مقصوصة (PNG شفاف). بيطلع فيديو بنفس مقاس ومدة الأساس، والصوت لو موجود."""
+           fonts_dir: Path, work: Path, sfx_cache: Path | None = None) -> None:
+    """images: comp_id → صورة مقصوصة (PNG شفاف). بيطلع فيديو بنفس مقاس ومدة الأساس.
+    الكلام بيترسم بمحرك الافيكتس (فريم بفريم) لو متاح، وكل حركة بتطلع بصوتها فوق صوت اللقطة."""
     W, H = video_size(ffmpeg, base)
+    work.mkdir(parents=True, exist_ok=True)
     inputs = ["-i", str(base)]
     chain, last = [], "[0:v]"
     imgs = [L for L in layers if L["type"] == "image" and L["comp_id"] in images]
@@ -213,18 +232,54 @@ def render(ffmpeg: str, base: Path, layers: list[dict], images: dict[str, Path],
         chain.append(f"{last}[l{k}]overlay=x='{x}':y='{y}':eval=frame:enable='between(t,{L['start']},{L['end']})'[v{k}]")
         last = f"[v{k}]"
     texts = [L for L in layers if L["type"] == "text"]
-    if texts:
+    nxt = len(imgs) + 1
+    piped = bool(texts) and fx.available()
+    if piped:  # الكلام فريمات شفافة جاية من محرك الافيكتس على stdin
+        inputs += ["-f", "rawvideo", "-pix_fmt", "rgba", "-s", f"{W}x{H}", "-r", str(fx.FPS), "-i", "pipe:0"]
+        chain.append(f"{last}[{nxt}:v]overlay=0:0:eof_action=pass[vt]")
+        last = "[vt]"
+        nxt += 1
+    elif texts:
         ass = work / f"{out.stem}.ass"
         ass.write_text(build_ass(texts, W, H, duration), encoding="utf-8")
         chain.append(f"{last}subtitles=filename='{filter_path(ass)}':fontsdir='{filter_path(fonts_dir)}'[vt]")
         last = "[vt]"
     chain.append(f"{last}format=yuv420p[vout]")
+    # 🔊 أصوات الحركات (كليك الكتابة، بوب، ووش...) بتتجمع في تراك واحد ويتركب على صوت اللقطة
+    events = [e for L in layers for e in fx.sfx_events(L)]
+    sfx_wav = fx.mix_events(ffmpeg, sfx_cache or work / "sfx", events, duration, work / f"{out.stem}-sfx.wav") if events else None
+    amap = ["-map", "0:a?", "-c:a", "copy"]
+    if sfx_wav:
+        inputs += ["-i", str(sfx_wav)]
+        if has_audio(ffmpeg, base):
+            chain.append(f"[0:a][{nxt}:a]amix=inputs=2:duration=first:normalize=0[aout]")
+        else:
+            chain.append(f"[{nxt}:a]apad=whole_dur={duration:.2f}[aout]")
+        amap = ["-map", "[aout]", "-c:a", "aac", "-b:a", "160k"]
     cmd = [ffmpeg, "-hide_banner", "-loglevel", "error", "-y", *inputs, "-filter_complex", ";".join(chain),
-           "-map", "[vout]", "-map", "0:a?", "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
-           "-c:a", "copy", "-t", f"{duration:.2f}", "-movflags", "+faststart", str(out)]
-    r = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
-    if r.returncode != 0:
-        raise RuntimeError(f"تركيب الموشن فشل: {(r.stderr or '')[-400:]}")
+           "-map", "[vout]", *amap, "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
+           "-t", f"{duration:.2f}", "-movflags", "+faststart", str(out)]
+    errlog = work / f"{out.stem}.log"
+    with open(errlog, "wb") as err:
+        proc = subprocess.Popen(cmd, stdin=subprocess.PIPE if piped else subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=err)
+        try:
+            if piped:
+                try:
+                    for frame in fx.frames(texts, W, H, duration, font_files(fonts_dir)):
+                        proc.stdin.write(frame)
+                except BrokenPipeError:
+                    pass
+                finally:
+                    proc.stdin.close()
+            code = proc.wait(timeout=900)
+        except Exception:
+            proc.kill()
+            raise
+    if code != 0:
+        raise RuntimeError(f"تركيب الموشن فشل: {errlog.read_text(errors='ignore')[-400:]}")
+    errlog.unlink(missing_ok=True)
+    if sfx_wav:
+        sfx_wav.unlink(missing_ok=True)
 
 
 # ------------------------------------------------------------ خطة الطبقات بالموديل
@@ -237,7 +292,9 @@ LAYERS_FORMAT = """{
      "out": "fade | pop | zoom | slide_* | none", "out_dur": 0.3, "loop": "none | float | pulse",
      "note": "ليه الطبقة دي وإيه اللي بتقابله في الأصلي (بالعربي)"},
     {"type": "text", "text": "كلام قصير بالعربي", "start": 0.5, "end": 2.5, "x": 0.5, "y": 0.2, "size": 0.05,
-     "color": "#FFFFFF", "box": "#57B8AF أو فاضي", "in": "slide_up", "out": "fade", "loop": "none"}
+     "color": "#FFFFFF", "box": "#57B8AF أو فاضي",
+     "in": "typewriter | words | counter | highlight | pop | fade | zoom | slide_* | none", "speed": 16,
+     "accent": "#FFD54A (لون الهايلايت)", "out": "fade", "loop": "none", "sfx": "auto | none"}
   ]
 }"""
 
@@ -258,6 +315,9 @@ def layers_messages(header_txt: str, shot: dict, comps: list[dict], orig: dict |
         "القواعد: الأوقات بالثواني من أول اللقطة (0 لـ مدة اللقطة). x وy = مكان نص العنصر كنسبة من عرض وطول الشاشة (0 لـ 1). "
         "w = عرض الصورة كنسبة من عرض الشاشة. size = حجم الكلام كنسبة من طول الشاشة. متغطيش وش الشخص. "
         "الكلام القصير (عناوين، أرقام، CTA) يبقى طبقة text. متستخدمش الشخصيات أو الخلفيات كطبقات. "
+        "حركات الكلام: typewriter = بيتكتب حرف حرف (speed = حروف في الثانية)، words = كلمة كلمة، counter = الرقم بيعد، "
+        "highlight = خط ماركر ورا الكلام (accent لونه). اختار الحركة اللي بتطابق الأصلي بالظبط. "
+        "كل حركة بتطلع بصوتها لوحدها (sfx: auto)، وsfx: none لو الأصلي الحركة دي مفيهاش صوت. "
         "لو اللقطة مفيهاش موشن جرافيك رجّع layers فاضية.\n"
         f"رجّع JSON بس بالشكل ده:\n{LAYERS_FORMAT}"
     )

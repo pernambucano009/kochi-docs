@@ -5,7 +5,8 @@ const adx = { list: [], cur: null, styles: [], brains: [], brainId: null, tab: "
 const AD_KEY = "studiomania.ad";
 
 async function initAds() {
-  [adx.list, adx.styles, adx.brains] = await Promise.all([api("/api/ads"), api("/api/ad-styles"), api("/api/ad-brains")]);
+  [adx.list, adx.styles, adx.brains, adx.fx] = await Promise.all([api("/api/ads"), api("/api/ad-styles"), api("/api/ad-brains"),
+    api("/api/fx").catch(() => null)]);
   api("/api/ads-settings").then((s) => ($("adVideoModel").value = s.video_model)).catch(() => {});
   const want = adx.cur?.id || storageGet(AD_KEY);
   const id = adx.list.some((a) => a.id === want) ? want : adx.list[0]?.id;
@@ -62,6 +63,8 @@ function renderAds() {
   const a = adx.cur;
   $("adStyles").hidden = adx.view !== "styles";
   $("adBrain").hidden = adx.view !== "brain";
+  $("adFx").hidden = adx.view !== "fx";
+  if (adx.view === "fx") renderFxLib();
   $("adMain").hidden = adx.view !== "ad" || !a;
   $("adEmpty").hidden = adx.view !== "ad" || !!a;
   if (adx.view === "styles") renderStyleLib();
@@ -807,9 +810,12 @@ function renderLayers(s) {
       <label>من <input type="number" step="0.1" min="0" value="${L.start}" data-lf="start"></label>
       <label>لـ <input type="number" step="0.1" min="0" value="${L.end}" data-lf="end"></label>
       <label>الحجم <input type="number" step="${L.type === "text" ? 0.005 : 0.05}" min="0.01" value="${L.type === "text" ? L.size : L.w}" data-lf="${L.type === "text" ? "size" : "w"}"></label>
-      <select data-lf="in" title="الدخول">${opts(ANIM_IN, L.in)}</select>
+      <select data-lf="in" title="الدخول">${opts(L.type === "text" ? fxAnimsText() : ANIM_IN, L.in)}</select>
+      ${L.type === "text" && ["typewriter", "words"].includes(L.in) ? `<label title="${L.in === "words" ? "كلمة" : "حرف"} في الثانية (0 = تلقائي)">⚡ <input type="number" min="0" max="60" step="1" value="${L.speed || 0}" data-lf="speed"></label>` : ""}
+      ${L.type === "text" && L.in === "highlight" ? `<input type="color" value="${L.accent || "#FFD54A"}" data-lf="accent" title="لون الهايلايت">` : ""}
       <select data-lf="out" title="الخروج">${opts(ANIM_OUT, L.out)}</select>
       <select data-lf="loop" title="وهو ظاهر">${opts(LOOP, L.loop)}</select>
+      <select data-lf="sfx" title="صوت الحركة">${opts(fxSfxOpts(), L.sfx || "auto")}</select>
       <button type="button" class="btn sm danger" data-ldel="${L.id}">✕</button>
       ${L.note ? `<small class="muted" data-no-i18n>${adEsc(L.note)}</small>` : ""}</div>`).join("");
   return `<div class="ad-layers">
@@ -824,6 +830,59 @@ function renderLayers(s) {
       <div class="ad-lrows">${rows}</div></div>` : ""}
   </div>`;
 }
+// ✨ حركات الكلام وأصواتها من مكتبة الافيكتس
+function fxAnimsText() {
+  return adx.fx ? Object.fromEntries(adx.fx.templates.map((t) => [t.id, t.label])) : ANIM_IN;
+}
+function fxSfxOpts() {
+  return { auto: "🔊 صوت الحركة", none: "🔇 من غير صوت", ...Object.fromEntries((adx.fx?.sfx || []).map((x) => [x.id, x.label])) };
+}
+
+// ---------- ✨ مكتبة الافيكتس ----------
+function fxForm() {
+  const f = Object.fromEntries([...document.querySelectorAll("[data-fxf]")].map((el) => [el.dataset.fxf, el.type === "checkbox" ? el.checked : el.value]));
+  return { text: f.text, font: f.font, color: f.color, box: f.nobox ? "" : f.box, accent: f.accent, size: Number(f.size),
+    speed: Number(f.speed) || 0, sfx_vol: Number(f.sfx_vol), y: 0.45, x: 0.5, out: "fade", bg: f.bg };
+}
+function renderFxLib() {
+  const lib = adx.fx;
+  if (!lib) { $("adFxGrid").innerHTML = `<p class="muted">مقدرتش أجيب المكتبة. اعمل ريفريش.</p>`; return; }
+  $("adFxWarn").hidden = lib.available;
+  const fsel = document.querySelector('[data-fxf="font"]');
+  if (!fsel.options.length) fsel.innerHTML = lib.fonts.map((f) => `<option value="${f.family}">${adEsc(f.label)}</option>`).join("");
+  const bsel = document.querySelector('[data-fxf="bg"]');
+  const frames = (adx.cur?.prod?.shots || []).filter((s) => s.frame_url);
+  const keep = bsel.value;
+  bsel.innerHTML = `<option value="">خلفية جاهزة</option>` + frames.map((s) => `<option value="${s.frame_url}">ستوري بورد لقطة ${s.n}</option>`).join("");
+  bsel.value = [...bsel.options].some((o) => o.value === keep) ? keep : "";
+  if (!$("adFxGrid").children.length) {
+    $("adFxGrid").innerHTML = lib.templates.filter((t) => t.id !== "none").map((t) => `<article class="ad-fx" data-fx="${t.id}">
+      <div class="ad-fx-vid"><span class="muted">${t.sfx ? "🔊" : "🔇"}</span></div>
+      <b>${adEsc(t.label)}</b>${t.hint ? `<small class="muted">${adEsc(t.hint)}</small>` : ""}
+      <button class="btn sm primary" type="button" data-fxprev="${t.id}">▶️ معاينة</button></article>`).join("");
+  }
+  if (!$("adFxSfx").children.length) {
+    $("adFxSfx").innerHTML = lib.sfx.map((x) => `<button class="btn sm" type="button" data-fxsfx="${x.url}">${adEsc(x.label)}</button>`).join("");
+  }
+}
+$("adFxGo").onclick = () => { adx.view = "fx"; renderAds(); };
+$("adFxBack").onclick = () => { adx.view = "ad"; renderAds(); };
+$("adFxGrid").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-fxprev]");
+  if (!b) return;
+  const card = b.closest("[data-fx]"), f = fxForm();
+  if (!f.text.trim()) return toast("اكتب الكلام الأول", true);
+  const { bg, ...layer } = f;
+  busyButton(b, "⏳ بيرسم...", async () => {
+    const r = await api("/api/fx/preview", { method: "POST", ...jsonBody({ layer: { ...layer, in: card.dataset.fx }, seconds: 4, aspect: "9:16", bg }) });
+    card.querySelector(".ad-fx-vid").innerHTML = `<video src="${r.url}" playsinline controls autoplay></video>`;
+  });
+});
+$("adFxSfx").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-fxsfx]");
+  if (b) new Audio(b.dataset.fxsfx).play().catch(() => {});
+});
+
 async function saveLayers(sid, layers) {
   try { adx.cur = await pAPI(`/shots/${sid}/layers`, { method: "PUT", ...jsonBody({ layers }) }); renderAds(); }
   catch (err) { toast(err.message, true); }
@@ -846,7 +905,7 @@ $("adPShots").addEventListener("change", (e) => {
   }
   const row = e.target.closest("[data-lrow]"), f = e.target.dataset.lf;
   if (!row || !f) return;
-  const v = ["start", "end", "size", "w"].includes(f) ? Number(e.target.value) : e.target.value;
+  const v = ["start", "end", "size", "w", "speed", "sfx_vol"].includes(f) ? Number(e.target.value) : e.target.value;
   saveLayers(s.id, s.layers.map((L) => (L.id === row.dataset.lrow ? { ...L, [f]: v } : L)));
 });
 // سحب العناصر في المعاينة

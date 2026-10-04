@@ -1439,3 +1439,14 @@ a.pl-link:hover { background: color-mix(in srgb, var(--ok) 24%, transparent); }
 .ad-cmp-gaps li { display: flex; flex-direction: column; gap: 2px; }
 .ad-cmp-gaps li.high b::after { content: " · مهم"; color: var(--danger); font-size: 12px; }
 @media (max-width: 520px) { .ad-cmp-vids { grid-template-columns: 1fr 1fr; gap: 6px; } .ad-cmp-dims div { grid-template-columns: 90px 1fr 28px; } }
+
+/* ✨ مكتبة الافيكتس */
+.ad-fx-form { margin: 10px 0; }
+.ad-fx-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; margin: 12px 0; }
+.ad-fx { border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 8px; display: flex; flex-direction: column; gap: 6px; background: var(--surface-2); }
+.ad-fx-vid { aspect-ratio: 9 / 16; border-radius: 10px; background: linear-gradient(160deg, #16222A, #3A6073); display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.ad-fx-vid video { width: 100%; height: 100%; object-fit: cover; }
+.ad-fx small { font-size: 12px; }
+.ad-fx button { margin-top: auto; }
+.ad-fx-sfx { display: flex; flex-wrap: wrap; gap: 6px; }
+@media (max-width: 520px) { .ad-fx-grid { grid-template-columns: repeat(2, 1fr); } }

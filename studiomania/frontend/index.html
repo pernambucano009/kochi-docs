@@ -935,6 +935,7 @@
               <ul class="ad-list" id="adList"></ul>
               <button class="btn ad-styles-go" id="adBrainGo">🧠 عقل الإعلان</button>
               <button class="btn ad-styles-go" id="adStylesGo">🎨 مكتبة الستايلات</button>
+              <button class="btn ad-styles-go" id="adFxGo">✨ مكتبة الافيكتس</button>
             </aside>
 
             <section class="car-main" id="adMain" hidden>
@@ -1151,6 +1152,27 @@
                   <label class="btn primary">⬆ ارفع صور الستايل<input type="file" id="adStyleFiles" accept="image/*" multiple hidden></label>
                 </form>
                 <div class="ad-style-grid" id="adStyleGrid"></div>
+              </div>
+            </section>
+            <section class="car-main" id="adFx" hidden>
+              <div class="panel">
+                <div class="panel-head"><h2>✨ مكتبة الافيكتس</h2><button class="btn sm" id="adFxBack">↩ رجوع للإعلان</button></div>
+                <p class="hint">كل افيكت = حركة + صوتها مربوطين ببعض (الكتابة حرف حرف بتطلع بكليك مع كل حرف، العداد بيتكتك ويرن في الآخر...). اكتب الكلام، اختار الشكل، ودوس «▶️ معاينة» على أي افيكت تشوفه وتسمعه. نفس الافيكتس دي موجودة في «✨ الموشن المتركب» في كل لقطة.</p>
+                <div class="alert warn" id="adFxWarn" hidden>⚠️ محرك الافيكتس مش شغال على السيرفر لسه، فالكلام هيترسم بالطريقة القديمة (من غير الكتابة حرف حرف). الأصوات شغالة عادي.</div>
+                <div class="ad-set-grid ad-fx-form" id="adFxForm">
+                  <label class="field">الكلام <input type="text" data-fxf="text" value="ابدأ رحلتك مع كوتشي النهارده"></label>
+                  <label class="field">الخط <select data-fxf="font"></select></label>
+                  <label class="field">لون الكلام <input type="color" data-fxf="color" value="#FFFFFF"></label>
+                  <label class="field">خلفية الكلام <span class="row"><input type="color" data-fxf="box" value="#111111"><label class="check"><input type="checkbox" data-fxf="nobox"> من غير</label></span></label>
+                  <label class="field">لون الهايلايت <input type="color" data-fxf="accent" value="#FFD54A"></label>
+                  <label class="field">الحجم <input type="range" min="0.025" max="0.12" step="0.005" value="0.055" data-fxf="size"></label>
+                  <label class="field">السرعة (حرف/كلمة في الثانية) <input type="number" min="0" max="60" step="1" value="16" data-fxf="speed"></label>
+                  <label class="field">علو الصوت <input type="range" min="0" max="2" step="0.1" value="1" data-fxf="sfx_vol"></label>
+                  <label class="field">الخلفية <select data-fxf="bg"></select></label>
+                </div>
+                <div class="ad-fx-grid" id="adFxGrid"></div>
+                <h3 class="pane-h">🔊 مكتبة الأصوات <span class="muted">(متولدة بالبرنامج، ملهاش حقوق)</span></h3>
+                <div class="ad-fx-sfx" id="adFxSfx"></div>
               </div>
             </section>
             <section class="car-main" id="adBrain" hidden>

@@ -52,6 +52,7 @@ load_env_file(ROOT / ".env")
 import atlas  # noqa: E402  (لازم بعد قراءة .env)
 import captions  # noqa: E402
 import montage  # noqa: E402
+import fx  # noqa: E402  (محرك الافيكتس)
 import motion as mo  # noqa: E402
 import publisher  # noqa: E402
 import sheets  # noqa: E402
@@ -7973,6 +7974,67 @@ def base_take(s: dict, tid: str | None = None) -> dict | None:
     return done[-1] if done else None
 
 
+# ---------- ✨ مكتبة الافيكتس: قوالب الكلام المتحرك وأصواتها، ومعاينة أي قالب على طول
+
+FX_DIR = ADS_DIR / "fx"
+
+
+@app.get("/api/fx")
+def fx_library():
+    return {"available": fx.available(),
+            "templates": [{"id": k, **v} for k, v in fx.TEXT_FX.items()],
+            "sfx": [{"id": k, "label": v["label"], "url": f"/api/fx/sfx/{k}.wav"} for k, v in fx.SFX.items()],
+            "fonts": [{"family": f["family"], "label": f["label"]} for f in captions.FONTS]}
+
+
+@app.get("/api/fx/sfx/{name}.wav")
+def fx_sfx(name: str):
+    if name not in fx.SFX:
+        raise HTTPException(404, "الصوت ده مش موجود")
+    return FileResponse(fx.sfx_file(ffmpeg_exe(), FX_DIR / "sfx", name), media_type="audio/wav")
+
+
+class FxPreviewIn(BaseModel):
+    layer: dict
+    aspect: str = "9:16"
+    seconds: float = 4.0
+    bg: str = ""  # لينك صورة من البرنامج (ستوري بورد مثلًا) أو فاضي = خلفية جاهزة
+
+
+@app.post("/api/fx/preview")
+def fx_preview(body: FxPreviewIn):
+    """🎬 معاينة قالب: الكلام بحركته وصوته على خلفية، بيتحفظ عشان نفس المعاينة متترسمش تاني."""
+    dur = max(1.5, min(8.0, float(body.seconds)))
+    W, H = {"16:9": (1280, 720), "1:1": (900, 900)}.get(body.aspect, (720, 1280))
+    layer = {**body.layer, "type": "text", "start": body.layer.get("start", 0.3), "end": body.layer.get("end", dur - 0.2)}
+    layers = mo.clean_layers([layer], dur, set())
+    if not layers:
+        raise HTTPException(400, "اكتب الكلام الأول")
+    bg = None
+    if body.bg.startswith("/media/ads/"):
+        cand = (ADS_DIR / body.bg[len("/media/ads/"):].split("?")[0]).resolve()
+        if cand.is_file() and ADS_DIR.resolve() in cand.parents:
+            bg = cand
+    key = hashlib.sha1(json.dumps([layers, W, H, dur, str(bg or ""), fx.available()], sort_keys=True).encode()).hexdigest()[:16]
+    folder = FX_DIR / "previews"
+    out = folder / f"{key}.mp4"
+    if not out.exists():
+        folder.mkdir(parents=True, exist_ok=True)
+        base = folder / f"{key}-bg.mp4"
+        src = (["-loop", "1", "-i", str(bg), "-vf", f"scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},setsar=1"] if bg else
+               ["-f", "lavfi", "-i", f"gradients=s={W}x{H}:c0=0x16222A:c1=0x3A6073:d={dur}:speed=0.02"])
+        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", *src, "-t", f"{dur:.2f}", "-r", "30",
+                        "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p", str(base)], check=True, capture_output=True, timeout=120)
+        try:
+            mo.render(ffmpeg_exe(), base, layers, {}, out, dur, FONTS_DIR, folder / "work", FX_DIR / "sfx")
+        finally:
+            base.unlink(missing_ok=True)
+        old = sorted(folder.glob("*.mp4"), key=lambda x: x.stat().st_mtime)
+        for f in old[:-200]:  # آخر 200 معاينة بس
+            f.unlink(missing_ok=True)
+    return {"url": f"/media/ads/fx/previews/{out.name}", "layer": layers[0], "engine": "fx" if fx.available() else "ass"}
+
+
 def run_ad_composite(aid: str, sid: str, tid: str) -> None:
     def setp(**kw):
         def fn(d):
@@ -8011,7 +8073,7 @@ def run_ad_composite(aid: str, sid: str, tid: str) -> None:
         src = prod_dir(aid, "takes") / base["file"]
         dur = base.get("duration") or probe_duration(src)
         dest = prod_dir(aid, "takes") / f"{tid}.mp4"
-        mo.render(ffmpeg_exe(), src, s.get("layers") or [], images, dest, dur, FONTS_DIR, prod_dir(aid, "cuts"))
+        mo.render(ffmpeg_exe(), src, s.get("layers") or [], images, dest, dur, FONTS_DIR, prod_dir(aid, "cuts"), FX_DIR / "sfx")
         setp(status="done", file=dest.name, duration=round(probe_duration(dest), 2), error=None)
     except Exception as exc:  # noqa: BLE001
         setp(status="failed", error=str(getattr(exc, "detail", None) or exc)[:400])
