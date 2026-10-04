@@ -944,7 +944,11 @@
                 <input class="ad-title" id="labName" data-no-i18n>
                 <div class="row wrap lab-actions">
                   <button class="btn sm" data-labrun="all">↻ فكّك تاني</button>
-                  <button class="btn sm" data-labrun="shots">✂️ القطعات</button>
+                  <select class="btn sm" id="labSplit" title="البرنامج بيقسم الفيديو إزاي">
+                    <option value="fine">🔀 قسّم على كل تغيير</option>
+                    <option value="cuts">✂️ القطعات بس</option>
+                  </select>
+                  <button class="btn sm" data-labrun="shots">✂️ قسّم تاني</button>
                   <button class="btn sm" data-labrun="elements">🧩 العناصر</button>
                   <button class="btn sm" data-labrun="components">💡 الكومبوننتس</button>
                   <button class="btn sm danger" id="labDelete">🗑️</button>

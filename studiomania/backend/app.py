@@ -8630,6 +8630,7 @@ def lab_get(lid: str):
 
 class LabPatchIn(BaseModel):
     name: str | None = None
+    split: str | None = None   # fine = كل تغيير جوه المشهد، cuts = القطعات بس
 
 
 @app.patch("/api/lab/{lid}")
@@ -8637,6 +8638,8 @@ def lab_patch(lid: str, body: LabPatchIn):
     def fn(d):
         if body.name and body.name.strip():
             d["name"] = body.name.strip()[:120]
+        if body.split in ("fine", "cuts"):
+            d["split"] = body.split
     return lab_to_dict(lid, lab_update(lid, fn))
 
 
@@ -8684,6 +8687,9 @@ def run_lab(lid: str, steps: list[str]) -> None:
             if step == "shots":
                 shutil.rmtree(folder / "frames", ignore_errors=True)
                 shots = lab.detect_shots(ffmpeg_exe(), src, dur)
+                if d.get("split", "fine") == "fine":  # 🔀 كمان كل تغيير جوه المشهد (مش القطعات بس)
+                    lab_step(lid, step, progress="بيدور على التغييرات جوه كل لقطة")
+                    shots = lab.fine_shots(ffmpeg_exe(), src, shots)
                 for k, s in enumerate(shots):
                     lab_step(lid, step, progress=f"فريمات اللقطة {k + 1} من {len(shots)}")
                     s["frames"] = lab.extract_frames(ffmpeg_exe(), src, s["start"], s["end"], folder / "frames", f"s{s['n']:03d}")
@@ -8913,6 +8919,27 @@ def lab_shot_patch(lid: str, n: int, body: ShotIn):
     return lab_to_dict(lid, lab_update(lid, fn))
 
 
+@app.post("/api/lab/{lid}/shots/{n}/merge")
+def lab_shot_merge(lid: str, n: int):
+    """🔗 يدمج الحتة دي مع اللي بعدها (لو التقسيم فصل حركة واحدة)."""
+    def fn(d):
+        shots = d.get("shots") or []
+        i = next((k for k, x in enumerate(shots) if x["n"] == n), None)
+        if i is None or i + 1 >= len(shots):
+            raise HTTPException(400, "مفيش لقطة بعدها تتدمج معاها")
+        a, b = shots[i], shots[i + 1]
+        an, bn = a.get("analysis"), b.get("analysis")
+        if an or bn:
+            an, bn = an or {}, bn or {}
+            a["analysis"] = {**an, "summary": " ← ".join(x for x in (an.get("summary"), bn.get("summary")) if x),
+                             "motion_graphics": bool(an.get("motion_graphics") or bn.get("motion_graphics")),
+                             "elements": (an.get("elements") or []) + (bn.get("elements") or [])}
+        a.update(end=b["end"], frames=(a.get("frames") or []) + (b.get("frames") or []), review=None,
+                 ignored=a.get("ignored") if b.get("ignored") else None)
+        del shots[i + 1]
+    return lab_to_dict(lid, lab_update(lid, fn))
+
+
 @app.post("/api/lab/{lid}/shots/prune")
 def lab_shots_prune(lid: str):
     """🧹 يشيل كل اللقطات اللي ملهاش ولا كومبوننت (غير المرفوضة)."""
@@ -9108,7 +9135,8 @@ def run_lab_components(lid: str) -> None:
     lab_step(lid, "components", progress="بيدور على الحتت اللي تنفع تتعاد")
     raw = lab.mock_components(d) if atlas.mock_mode() else ad_json(series_chat(lab.components_messages(d, rejected)), "الكومبوننتس")
     ids = {e["id"] for s in d.get("shots") or [] for e in (s.get("analysis") or {}).get("elements") or []}
-    new = [c for c in lab.clean_components(raw, d["source"]["duration"], ids)
+    bounds = sorted({x for s in d.get("shots") or [] if not s.get("ignored") for x in (s["start"], s["end"])})
+    new = [c for c in lab.clean_components(raw, d["source"]["duration"], ids, bounds)
            if not any(abs(c["t0"] - k["t0"]) < 0.3 and abs(c["t1"] - k["t1"]) < 0.3 for k in keep)]  # نفس اللي اتراجع قبل كده
     lab_update(lid, lambda d: d.update(components=sorted(keep + new, key=lambda c: c["t0"])))
 

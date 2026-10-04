@@ -1550,3 +1550,4 @@ a.pl-link:hover { background: color-mix(in srgb, var(--ok) 24%, transparent); }
   border-radius: 999px; padding: 3px 10px 3px 4px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; max-width: 200px; }
 .stage-client .client-av { width: 26px; height: 26px; font-size: 12px; }
 .stage-client span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lab-lt .blk.shot.chg { background: #7d93a8; border-inline-end: 2px dashed #fff; }

@@ -39,6 +39,64 @@ def detect_shots(ffmpeg: str, src: Path, duration: float, threshold: float = 0.2
     return [{"n": i + 1, "start": bounds[i], "end": bounds[i + 1]} for i in range(len(bounds) - 1)]
 
 
+def motion_curve(ffmpeg: str, src: Path) -> tuple[list[float], list[float]]:
+    """مقدار تغيّر الصورة بين كل فريم واللي بعده (15 فريم في الثانية على نسخة صغيرة): 0 = ساكن، 1 = اتغيرت كلها."""
+    r = subprocess.run([ffmpeg, "-hide_banner", "-i", str(src), "-an", "-vf",
+                        "scale=192:-2,fps=15,select='gte(scene\\,0)',metadata=print:file=-", "-f", "null", "-"],
+                       capture_output=True, text=True, timeout=900)
+    ts = [float(x) for x in re.findall(r"pts_time:([0-9.]+)", r.stdout)]
+    sc = [float(x) for x in re.findall(r"scene_score=([0-9.]+)", r.stdout)]
+    n = min(len(ts), len(sc))
+    return ts[:n], sc[:n]
+
+
+def motion_splits(ts: list[float], sc: list[float], a: float, b: float, min_gap: float = 0.4, min_len: float = 0.5,
+                  soft: float = 0.1) -> list[float]:
+    """🔀 التغييرات جوه اللقطة من غير قطع: كل دفعة حركة بعد وقفة ساكنة (أو قفزة كبيرة في الصورة) بتبدأ حتة جديدة.
+    الوقفة اللي بعد الحركة بتفضل معاها (العنصر بيخلص حركته ويثبت)."""
+    idx = [i for i, t in enumerate(ts) if a <= t < b]
+    if len(idx) < 6:
+        return []
+    vals = sorted(sc[i] for i in idx)
+    thr = max(0.006, vals[int(len(vals) * 0.3)] * 1.8)   # فوق رعشة الصورة العادية
+    act = [sc[i] > thr for i in idx]
+    act = [any(act[max(0, k - 1):k + 2]) for k in range(len(act))]  # الحركة المتقطعة حركة واحدة
+    gap = max(2, int(min_gap * 15))
+    runs: list[list[int]] = []
+    k = 0
+    while k < len(act):
+        if act[k]:
+            j = k
+            while j < len(act) and act[j]:
+                j += 1
+            if runs and k - runs[-1][1] < gap:
+                runs[-1][1] = j
+            else:
+                runs.append([k, j])
+            k = j
+        else:
+            k += 1
+    cuts = [ts[idx[r[0]]] - 0.07 for r in runs[1:]] + [ts[i] for i in idx if soft < sc[i] <= 0.27]
+    out: list[float] = []
+    for c in sorted(cuts):
+        if c - (out[-1] if out else a) >= min_len and b - c >= min_len:
+            out.append(round(c, 3))
+    return out
+
+
+def fine_shots(ffmpeg: str, src: Path, shots: list[dict]) -> list[dict]:
+    """كل لقطة بتتقسم على كل تغيير جوه المشهد، فكل حركة / عنصر جديد بيبقى حتة لوحده."""
+    ts, sc = motion_curve(ffmpeg, src)
+    out = []
+    for s in shots:
+        bounds = [s["start"], *motion_splits(ts, sc, s["start"], s["end"]), s["end"]]
+        for i in range(len(bounds) - 1):
+            out.append({"start": bounds[i], "end": bounds[i + 1], "cut": "hard" if i == 0 else "change"})
+    for i, s in enumerate(out):
+        s["n"] = i + 1
+    return out
+
+
 def extract_frames(ffmpeg: str, src: Path, start: float, end: float, folder: Path, prefix: str,
                    max_frames: int = 32, per_sec: float = 6, width: int = 360) -> list[dict]:
     """فريمات اللقطة بتوقيتها (للمراجعة وللموديل): لحد 6 في الثانية و32 للقطة."""
@@ -262,12 +320,13 @@ COMPONENTS_FORMAT = """{
 
 def components_messages(d: dict, rejected: list[dict]) -> list[dict]:
     """من التفكيك (اللقطات وعناصرها وحركاتها بتوقيتها) لكومبوننتس جاهزة تتحفظ في المكتبة."""
+    fine = any(s.get("cut") == "change" for s in d.get("shots") or [])
     lines = []
     for s in d.get("shots") or []:
         an = s.get("analysis") or {}
         if s.get("ignored"):  # لقطات اتشالت (تصوير عادي من غير موشن)
             continue
-        lines.append(f"\n## لقطة {s['n']} ({s['start']:.2f}–{s['end']:.2f}) · {an.get('scene_type', '')}: {an.get('summary', '')}")
+        lines.append(f"\n## لقطة {s['n']} ({s['start']:.2f}–{s['end']:.2f}){' 🔀' if s.get('cut') == 'change' else ''} · {an.get('scene_type', '')}: {an.get('summary', '')}")
         if (an.get("background") or {}).get("name"):
             lines.append(f"الخلفية: {an['background']['name']} — {an['background'].get('description', '')}")
         for e in an.get("elements") or []:
@@ -284,6 +343,9 @@ def components_messages(d: dict, rejected: list[dict]) -> list[dict]:
         "- كل كومبوننت حتة واحدة مكتملة ليها بداية ونهاية واضحة (حركة كاملة، افيكت كامل، انتقال كامل). "
         "سيب هامش صغير قبلها وبعدها (حوالي 0.15 ثانية) من غير ما تدخل في حاجة تانية.\n"
         "- ممكن يعدّي القطع بين لقطتين لو هو انتقال أو حركة مستمرة. ومفيش حد أدنى ولا أقصى للمدة: خليه زي ما هو في الفيديو.\n"
+        + ("- اللقطات هنا متقسمة على كل تغيير في الحركة (🔀 = تغيير جوه نفس المشهد من غير قطع)، فكل لقطة غالبًا كومبوننت لوحده: "
+           "خلّي t0 و t1 هما حدود اللقطة بالظبط، ومتجمعش لقطتين إلا لو هي نفس الحركة مكملة.\n" if fine else "")
+        +
         "- موشن جرافيك وافيكتس بس: جرافيك متحرك، كلام متحرك، انتقالات، واجهات وشاشات بتتحرك، حركات ماوس، افيكتس. "
         "متطلعش شخصيات ولا تصوير عادي لناس أو منتجات أو أماكن ولا خلفيات لوحدها، حتى لو باينة في الفيديو.\n"
         "- متكررش نفس الحتة، ومتطلعش حاجات عادية ملهاش قيمة كأصل (لقطة واقفة من غير حركة مثلًا).\n"
@@ -297,7 +359,13 @@ def components_messages(d: dict, rejected: list[dict]) -> list[dict]:
     return [{"role": "user", "content": text}]
 
 
-def clean_components(data: dict, duration: float, element_ids: set[str]) -> list[dict]:
+def snap_to(t: float, bounds: list[float], within: float = 0.3) -> float:
+    """حدود الكومبوننت على حدود اللقطات لو قريبة منها (عشان كل حتة تبقى كاملة)."""
+    near = min(bounds, key=lambda x: abs(x - t), default=t)
+    return near if abs(near - t) <= within else t
+
+
+def clean_components(data: dict, duration: float, element_ids: set[str], bounds: list[float] | None = None) -> list[dict]:
     def num(v, dflt=0.0):
         try:
             x = float(v)
@@ -309,8 +377,8 @@ def clean_components(data: dict, duration: float, element_ids: set[str]) -> list
     for c in (data or {}).get("components") or []:
         if not isinstance(c, dict) or not str(c.get("name") or "").strip():
             continue
-        t0 = min(duration, max(0.0, num(c.get("t0"))))
-        t1 = min(duration, max(t0, num(c.get("t1"), duration)))
+        t0 = min(duration, max(0.0, snap_to(num(c.get("t0")), bounds or [])))
+        t1 = min(duration, max(t0, snap_to(num(c.get("t1"), duration), bounds or [])))
         if t1 - t0 < 0.15:
             continue
         controls = []

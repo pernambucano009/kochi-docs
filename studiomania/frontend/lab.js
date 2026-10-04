@@ -75,6 +75,8 @@ function renderLab() {
   $("labEmpty").hidden = !!d || lib;
   if (!d || lib) return;
   if (document.activeElement !== $("labName")) $("labName").value = d.name;
+  $("labSplit").value = d.split || "fine";
+  $("labSplit").disabled = d.busy;
   document.querySelectorAll("[data-labrun]").forEach((b) => (b.disabled = d.busy));
   $("labStatus").innerHTML = Object.entries(LAB_STEP).filter(([k]) => !["stems", "audio"].includes(k) || d.steps?.[k]).map(([k, l]) => {
     const s = d.steps?.[k] || {};
@@ -108,7 +110,7 @@ function renderLabTimeline(d) {
   const allOn = Object.values(labx.hear).every(Boolean), hasAudio = !!(a.sfx || a.speech || a.music);
   const cst = (c) => c.asset ? "ok" : c.review?.ok === false ? "bad" : "";
   $("labTimeline").innerHTML =
-    lane("✂️ اللقطات", (d.shots || []).map((s) => `<i class="blk shot ${s.review?.ok === false ? "bad" : ""} ${s.ignored ? "off" : ""}" style="right:${pct(s.start)};width:calc(${pct(s.end - s.start)} - 2px)" data-seek="${s.start}" title="لقطة ${s.n}">${s.n}</i>`).join(""))
+    lane("✂️ اللقطات", (d.shots || []).map((s) => `<i class="blk shot ${s.review?.ok === false ? "bad" : ""} ${s.ignored ? "off" : ""} ${s.cut === "change" ? "chg" : ""}" style="right:${pct(s.start)};width:calc(${pct(s.end - s.start)} - 2px)" data-seek="${s.start}" title="لقطة ${s.n}">${s.n}</i>`).join(""))
     + lane("💡 كومبوننتس", (d.components || []).map((c) => `<i class="blk comp ${cst(c)}" style="right:${pct(c.t0)};width:calc(${pct(c.t1 - c.t0)} - 2px)" data-seek="${c.t0}" data-gocomp="${c.id}" title="${le(c.name)}"></i>`).join(""))
     + (!hasAudio ? "" : `<div class="lab-hearnote ${allOn ? "" : "on"}">${allOn ? "🎧 دوس 🔊 جنب أي حارة عشان تقفلها وتسمع الباقي لوحده"
       : labx.stems ? "🎚️ بتسمع التراكات المفصولة اللي مفتوحة بس" : "⚠️ مفيش تراكات مفصولة: الصوت بيسكت برا أوقات الحاجات اللي مفتوحة (تقدر تتأكد من التوقيت، بس الكلام والموسيقى في نفس اللحظة بيبقوا مع بعض)"}</div>`
@@ -337,7 +339,9 @@ function renderLabShots(d) {
       <header><b>لقطة ${s.n}</b> <span class="lab-time">${lt(s.start)} ← ${lt(s.end)} (${(s.end - s.start).toFixed(2)} ث)</span>
         ${an ? `<span class="chip">${LAB_SCENE[an.scene_type] || ""}</span>` : ""}
         <span class="muted">القطع مظبوط؟</span>${rv("shot", s.n, s.review)}
-        <button type="button" class="btn sm" data-hide="${s.n}" title="مش هتدخل في الكومبوننتس، وتقدر ترجّعها">🗑️ شيلها</button></header>
+        ${s.cut === "change" ? `<span class="chip" title="مفيش قطع هنا: الحركة وقفت وبدأت حركة جديدة في نفس المشهد">🔀 تغيير جوه المشهد</span>` : ""}
+        <button type="button" class="btn sm" data-hide="${s.n}" title="مش هتدخل في الكومبوننتس، وتقدر ترجّعها">🗑️ شيلها</button>
+        ${d.shots[d.shots.length - 1].n !== s.n ? `<button type="button" class="btn sm" data-merge="${s.n}" title="لو الحتة دي واللي بعدها حركة واحدة">🔗 ادمج مع اللي بعدها</button>` : ""}</header>
       <div class="lab-strip">${(s.frames || []).map((f) => `<img src="${f.url}" data-seek="${f.t}" data-pickt="${f.t}" class="${Math.abs(f.t - pick) < 0.001 ? "sel" : ""}" title="${lt(f.t)}" alt="">`).join("")}</div>
       ${s.analysis_error ? `<div class="err">${le(s.analysis_error)}</div>` : ""}
       ${an ? `<p data-no-i18n>${le(an.summary)}</p>
@@ -410,6 +414,14 @@ document.querySelector('.view[data-view="11"]').addEventListener("click", async 
       renderLabShots(labx.cur);
     }
     return;
+  }
+  const merge = e.target.closest("[data-merge]");
+  if (merge) {
+    return busyButton(merge, "⏳", async () => {
+      labx.cur = await api(`/api/lab/${labx.cur.id}/shots/${merge.dataset.merge}/merge`, { method: "POST" });
+      renderLab();
+      toast("🔗 اتدمجوا. لو عايز الكومبوننتس تتظبط عليهم دوس «↻ اقترح تاني»");
+    });
   }
   const hide = e.target.closest("[data-hide], [data-unhide]"), prune = e.target.closest("[data-prune]");
   if (hide || prune) {
@@ -561,3 +573,16 @@ $("labDelete").onclick = async () => {
     await initLab();
   } catch (err) { toast(err.message, true); }
 };
+
+$("labSplit").addEventListener("change", async () => {
+  const v = $("labSplit").value;
+  try {
+    labx.cur = await api(`/api/lab/${labx.cur.id}`, { method: "PATCH", ...jsonBody({ split: v }) });
+    if (confirm(v === "fine" ? "تقسّم الفيديو من جديد على كل تغيير جوه المشهد؟ (العناصر والكومبوننتس بيتعملوا من جديد بعدها)"
+      : "تقسّم الفيديو من جديد على القطعات بس؟ (العناصر والكومبوننتس بيتعملوا من جديد بعدها)")) {
+      labx.cur = await api(`/api/lab/${labx.cur.id}/run?step=shots`, { method: "POST" });
+      scheduleLabPoll();
+    }
+    renderLab();
+  } catch (err) { toast(err.message, true); }
+});
