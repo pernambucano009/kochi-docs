@@ -553,6 +553,7 @@ $("brandSave").onclick = () => busyButton($("brandSave"), "⏳", async () => {
   if (car.cur) renderSetup();
   $("carModelName").textContent = car.cfg.text_model;
   $("brandDialog").close();
+  loadClients();
   toast("✅ اتحفظ");
 });
 $("brandTest").onclick = () => busyButton($("brandTest"), "⏳", async () => {
@@ -586,8 +587,8 @@ async function openLibrary(tab = car.libTab) {
   if (!$("libDialog").open) $("libDialog").showModal();
 }
 const LIB_HINTS = {
-  template: "دوس على التصميم اللي عاجبك يتختار للكاروسيل (ودوسة تانية تلغيه). البرنامج بياخد التقسيم والشكل ويلوّنه بألوان كوتشي ويحط كلامنا.",
-  style: "دوس على الستايل يتختار (ودوسة تانية تلغيه). البرنامج بياخد طريقة الرسم بس ويرسم شخصيات جديدة بألوان كوتشي.",
+  template: "دوس على التصميم اللي عاجبك يتختار للكاروسيل (ودوسة تانية تلغيه). البرنامج بياخد التقسيم والشكل ويلوّنه بألوان العميل ويحط كلامنا.",
+  style: "دوس على الستايل يتختار (ودوسة تانية تلغيه). البرنامج بياخد طريقة الرسم بس ويرسم شخصيات جديدة بألوان العميل.",
   character: "دوس على الشخصيات اللي عايزها في الكاروسيل (لحد 4).",
   coach: "دوس على المدرب يتختار لكاروسيل «معلومات من مدرب».",
 };

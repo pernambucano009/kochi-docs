@@ -174,7 +174,7 @@ function liveCaption(c) {
 function sampleWords(n) {
   const voice = mt.project?.data.voice;
   const tr = voice && brand.tr[voice.id];
-  const src = tr?.status === "done" && tr.words.length ? tr.words.map((w) => w.w) : "ده مثال للكابشن على الفيديو بتاعك يا كوتشي".split(" ");
+  const src = tr?.status === "done" && tr.words.length ? tr.words.map((w) => w.w) : "ده مثال للكابشن على الفيديو بتاعك".split(" ");
   return src.slice(0, Math.max(1, n));
 }
 

@@ -38,6 +38,7 @@
 
 <div class="app">
   <aside class="rail">
+    <button class="rail-btn client-btn" id="clientBtn" title="العميل اللي شغال عليه دلوقتي"><i class="client-av" id="clientAv">👤</i><span id="clientName" data-no-i18n>العميل</span></button>
     <button class="rail-btn" data-goto="home" title="الرئيسية"><svg><use href="#i-home"/></svg><span>الرئيسية</span></button>
     <span class="rail-sep"></span>
     <p class="rail-label">المكتبات</p>
@@ -147,6 +148,7 @@
     <header class="stage-head">
       <button class="icon-btn" id="stageMin" title="صغّر ورجع للرئيسية"><svg><use href="#i-min"/></svg></button>
       <div class="stage-title"><span class="tile-num" id="stageNum"></span><h2 id="stageTitle"></h2></div>
+      <button class="stage-client" id="stageClient" title="العميل اللي شغال عليه (دوس تغيّره)"><i class="client-av" id="stageClientAv">👤</i><span id="stageClientName" data-no-i18n></span></button>
       <nav class="flow" id="flowNav">
         <button data-step="0"><i>1</i><span>المشاريع</span></button>
         <button data-step="1"><i>2</i><span>التقطيع</span></button>
@@ -706,7 +708,7 @@
                   <button class="btn sm" data-q="اختار أقوى فكرة وقولي ليه، واقترح هوك أقوى لأول سلايد">🎯 أقوى فكرة</button>
                 </div>
                 <div class="car-setup">
-                  <p class="hint car-mix-hint">اختار اللي يعجبك من كل حاجة وجمّعهم مع بعض (تيمبليت + ستايل + شخصيات + مدرب). كلهم اختياري، ودوسة تانية على أي حاجة تلغيها. من غير اختيار البرنامج بيرسم بستايل كوتشي.</p>
+                  <p class="hint car-mix-hint">اختار اللي يعجبك من كل حاجة وجمّعهم مع بعض (تيمبليت + ستايل + شخصيات + مدرب). كلهم اختياري، ودوسة تانية على أي حاجة تلغيها. من غير اختيار البرنامج بيرسم بستايل العميل.</p>
                   <div class="car-pick" id="carPickTemplate">
                     <div class="car-setup-title">🧩 التصميم (تيمبليت) <a href="#" class="lib-link" data-lib="template">📚 المكتبة</a></div>
                     <div class="car-assets" id="carTemplates"></div>
@@ -971,7 +973,7 @@
               <label class="btn primary ad-up">＋ مشروع إعلان جديد<input type="file" id="adFile" accept="video/*,.mp4,.mov,.webm,.mkv" hidden></label>
               <p class="hint">كل مشروع = إعلان رفعته وكل اللي اتعمل عليه (تحليل ← اقتراح ← تنفيذ ← مونتاج). دوس على أي مشروع تكمل فيه.</p>
               <ul class="ad-list" id="adList"></ul>
-              <button class="btn ad-styles-go" id="adBrainGo">🧠 عقل الإعلان</button>
+              <button class="btn ad-styles-go" id="adBrainGo">👤 ملف العميل</button>
               <button class="btn ad-styles-go" id="adStylesGo">🎨 مكتبة الستايلات</button>
             </aside>
 
@@ -980,7 +982,7 @@
                 <input class="ad-title" id="adName" data-no-i18n>
                 <nav class="car-steps" id="adTabs">
                   <button data-t="analysis"><i>1</i>التحليل والمشاهد</button>
-                  <button data-t="adapt"><i>2</i>اقتراح كوتشي</button>
+                  <button data-t="adapt"><i>2</i>الاقتراح للعميل</button>
                   <button data-t="prod"><i>3</i>التنفيذ</button>
                   <button data-t="audio" class="ad-side-tab">🎧 الصوت (جانبي)</button>
                   <button data-t="settings">⚙️ الإعدادات</button>
@@ -1009,7 +1011,7 @@
               </section>
 
               <section class="panel ad-sec" data-sec="adapt" hidden>
-                <div class="panel-head"><h2>🎯 اقتراح لكوتشي</h2><span class="muted" id="adAdaptState"></span></div>
+                <div class="panel-head"><h2>🎯 الاقتراح للعميل</h2><span class="muted" id="adAdaptState"></span></div>
                 <div class="ad-stale" id="adAdaptStale" hidden></div>
                 <details class="ad-brandctl" id="adBrandCtl" open>
                   <summary>🎛️ التطبيق على البراند <span class="muted">(عشان كل إعلان يطلع مختلف)</span></summary>
@@ -1017,21 +1019,21 @@
                     <label class="field">الزاوية / الرسالة
                       <select data-set="angle">
                         <option value="">🎲 البرنامج يختار زاوية جديدة</option>
-                        <option value="التحوّل والنتيجة: قبل وبعد مع كوتشي">التحوّل والنتيجة (قبل وبعد)</option>
-                        <option value="كوتش شخصي في جيبك: متابعة حقيقية من مدرب مش برنامج جاهز">كوتش شخصي في جيبك</option>
-                        <option value="الأكل والتغذية: نظام أكل يناسب أكلنا وحياتنا من غير حرمان">الأكل والتغذية</option>
-                        <option value="مفيش وقت؟ برنامج مرن وتمارين قصيرة تمشي مع يومك">مفيش وقت؟ برنامج مرن</option>
-                        <option value="الالتزام: المتابعة اليومية اللي بتخليك ما توقفش">الالتزام والاستمرار</option>
-                        <option value="السعر والقيمة: أوفر من المدرب الخاص وأحسن من إنك تتمرن لوحدك">السعر والقيمة</option>
-                        <option value="قصة متدرب من أولها لآخرها">قصة متدرب</option>
-                        <option value="خرافات الجيم والدايت وكوتشي بيصححها">خرافات وكوتشي بيصححها</option>
+                        <option value="التحوّل والنتيجة: قبل وبعد مع البراند">التحوّل والنتيجة (قبل وبعد)</option>
+                        <option value="المشكلة والحل: مشكلة يومية حقيقية والبراند بيحلها">المشكلة والحل</option>
+                        <option value="الميزة الأساسية: أهم حاجة بيقدمها المنتج وإزاي بتفرق في حياة العميل">الميزة الأساسية</option>
+                        <option value="مفيش وقت؟ حل سريع وسهل يمشي مع يومك">مفيش وقت؟ حل سريع</option>
+                        <option value="الثقة: تجارب وآراء عملاء حقيقيين">الثقة وآراء العملاء</option>
+                        <option value="السعر والقيمة: ليه يستاهل أكتر من البدائل">السعر والقيمة</option>
+                        <option value="قصة عميل من أولها لآخرها">قصة عميل</option>
+                        <option value="خرافات شائعة في المجال والبراند بيصححها">خرافات والبراند بيصححها</option>
                         <option value="تحدي أو ترند على السوشيال">تحدي / ترند</option>
                       </select></label>
                     <label class="field">الإحساس
                       <select data-set="tone">
                         <option value="">🎲 البرنامج يختار</option>
                         <option value="حماسي وطاقة عالية">حماسي وطاقة عالية</option>
-                        <option value="كوميدي ذكي من الحياة اليومية السعودية">كوميدي ذكي</option>
+                        <option value="كوميدي ذكي من الحياة اليومية">كوميدي ذكي</option>
                         <option value="هادي وملهم">هادي وملهم</option>
                         <option value="فاخر وسينمائي">فاخر وسينمائي</option>
                         <option value="واقعي UGC كأنه متصوّر بالموبايل">واقعي (UGC بالموبايل)</option>
@@ -1042,7 +1044,7 @@
                       <select data-set="palette_mode">
                         <option value="">ألوان البراند في كل حاجة</option>
                         <option value="accent">ألوان طبيعية + البراند لمسات بس</option>
-                        <option value="reference">ألوان الإعلان الأصلي + لوجو وشاشات كوتشي</option>
+                        <option value="reference">ألوان الإعلان الأصلي + لوجو وشاشات البراند</option>
                         <option value="fresh">🎲 باليتة جديدة مختلفة كل مرة</option>
                         <option value="custom">ألوان أنا هحددها ↓</option>
                       </select></label>
@@ -1062,19 +1064,19 @@
                     <label class="field">بطل الإعلان
                       <select data-set="hero">
                         <option value="">🎲 البرنامج يختار</option>
-                        <option value="شاب سعودي">شاب سعودي</option>
-                        <option value="بنت بحجاب ولبس محتشم">بنت</option>
-                        <option value="مدرب كوتشي">مدرب كوتشي</option>
-                        <option value="مدرب ومتدرب مع بعض">مدرب ومتدرب</option>
+                        <option value="شاب">شاب</option>
+                        <option value="بنت">بنت</option>
+                        <option value="متخصص أو خبير من البراند">متخصص من البراند</option>
+                        <option value="متخصص وعميل مع بعض">متخصص وعميل</option>
                         <option value="أصحاب / مجموعة">أصحاب / مجموعة</option>
                         <option value="أب أو أم مع العيلة">أب أو أم مع العيلة</option>
-                        <option value="من غير أشخاص: موشن جرافيك وشاشات التطبيق">من غير أشخاص (شاشات وموشن)</option>
+                        <option value="من غير أشخاص: موشن جرافيك وشاشات المنتج">من غير أشخاص (شاشات وموشن)</option>
                       </select></label>
                     <label class="field">قوة البراند
                       <select data-set="brand_level">
                         <option value="">متوسط</option>
-                        <option value="subtle">خفيف (القصة الأول وكوتشي في الآخر)</option>
-                        <option value="strong">قوي (التطبيق ظاهر من أول ثانية)</option>
+                        <option value="subtle">خفيف (القصة الأول والبراند في الآخر)</option>
+                        <option value="strong">قوي (المنتج ظاهر من أول ثانية)</option>
                       </select></label>
                     <label class="field">التنويع
                       <select data-set="variety">
@@ -1102,7 +1104,7 @@
               <section class="panel ad-sec" data-sec="prod" hidden>
                 <div id="adProdStart" class="ad-prod-start" hidden>
                   <p>التنفيذ بيمشي بالترتيب: <b>راس الإعلان</b> (الستايل والكونسبت) ← <b>ستوري بورد</b> لكل لقطة ← <b>مكونات</b> كل لقطة (شخصيات، خلفيات، عناصر موشن جرافيك) وصورة لكل مكون ← <b>فيديو</b> كل لقطة بـ Seedance من الستوري بورد والمكونات ← <b>المونتاج</b>.</p>
-                  <button class="btn primary" id="adProdGo">🎬 ابدأ التنفيذ من اقتراح كوتشي</button>
+                  <button class="btn primary" id="adProdGo">🎬 ابدأ التنفيذ من الاقتراح</button>
                 </div>
                 <div class="ad-stale" id="adProdStale" hidden></div>
                 <div id="adProdMain" hidden>
@@ -1119,8 +1121,8 @@
                   <section class="ad-cast" id="adCast"></section>
                   <section class="ad-voices" id="adVoices"></section>
                   <div class="row wrap ser-bulk">
-                    <button class="btn" id="adPBrain" title="يحط شاشات التطبيق واللوجو وصور المنتج الحقيقية من عقل الإعلان مكان المكونات">🧠 طبّق عقل الإعلان</button>
-                    <button class="btn primary" id="adPFrames" title="بيكتب برومبت كل لقطة من جديد ويعمل منشن (@) للأبطال والمكونات اللي في عقل الإعلان، وبعدين يرسم بصورهم">✍️🎨 اكتب البرومبتات بالمنشن وارسم الستوري بورد</button>
+                    <button class="btn" id="adPBrain" title="يحط شاشات التطبيق واللوجو وصور المنتج الحقيقية من ملف العميل مكان المكونات">🧠 طبّق ملف العميل</button>
+                    <button class="btn primary" id="adPFrames" title="بيكتب برومبت كل لقطة من جديد ويعمل منشن (@) للأبطال والمكونات اللي في ملف العميل، وبعدين يرسم بصورهم">✍️🎨 اكتب البرومبتات بالمنشن وارسم الستوري بورد</button>
                     <button class="btn" id="adPApproveAll" title="يعتمد كل اللقطات اللي ليها ستوري بورد مرسوم">✅ اعتمد كل الستوري بورد</button>
                     <button class="btn danger" id="adPDelFrames">🗑️ امسح كل الستوري بورد</button>
                     <button class="btn" id="adPComps">🧩 استخرج المكونات</button>
@@ -1140,14 +1142,14 @@
                 <div class="ad-style-pick" id="adStylePick"></div>
                 <div class="row wrap"><button class="btn sm" id="adSaveStyle">🎨 احفظ ستايل الإعلان ده في المكتبة</button>
                   <button class="btn sm" id="adStylesGo2">＋ ضيف ستايل من صور</button></div>
-                <h3 class="pane-h">🧠 عقل الإعلان</h3>
+                <h3 class="pane-h">👤 ملف العميل</h3>
                 <div class="row wrap"><label class="field">المنتج اللي الإعلان عنه <select id="adSetBrain" data-set="brain_id"></select></label>
-                  <button class="btn sm" id="adBrainGo2">🧠 افتح عقل الإعلان</button></div>
+                  <button class="btn sm" id="adBrainGo2">👤 افتح ملف العميل</button></div>
                 <h3 class="pane-h">⚙️ إعدادات الإعلان</h3>
                 <div class="ad-set-grid">
                   <label class="field">الشبه بالإعلان الأصلي
                     <select id="adSetFidelity" data-set="fidelity">
-                      <option value="">نسخة لقطة بلقطة بمحتوى كوتشي</option>
+                      <option value="">نسخة لقطة بلقطة بمحتوى العميل</option>
                       <option value="inspired">مستوحى منه بس (قصة جديدة)</option>
                     </select></label>
                   <label class="field">المدة المطلوبة (ثانية) <input type="number" id="adSetDuration" min="5" max="180" data-set="duration"></label>
@@ -1186,11 +1188,11 @@
             </section>
             <section class="car-main" id="adBrain" hidden>
               <div class="panel">
-                <div class="panel-head"><h2>🧠 عقل الإعلان</h2><button class="btn sm" id="adBrainBack">↩ رجوع للإعلان</button></div>
-                <p class="hint">هنا كل حاجة عن المنتج: نوعه ومجاله وشاشاته ولوجوهه. البرنامج بيستنبط منها الألوان والثيم، وأي ستوري بورد أو فيديو بيستخدم الشاشات واللوجو دول بالظبط بدل ما يخترع.</p>
+                <div class="panel-head"><h2>👤 ملف العميل</h2><button class="btn sm" id="adBrainBack">↩ رجوع للإعلان</button></div>
+                <p class="hint">هنا كل حاجة عن العميل: منتجه ومجاله وسوقه ولغته وشاشاته ولوجوهاته. البرنامج بيستنبط منها الألوان والثيم، وأي كاروسيل أو ستوري بورد أو فيديو بيستخدمهم بالظبط بدل ما يخترع.</p>
                 <div class="row wrap">
-                  <label class="field">المنتج <select id="adBrainPick"></select></label>
-                  <button class="btn sm" id="adBrainNew">＋ منتج جديد</button>
+                  <label class="field">العميل <select id="adBrainPick"></select></label>
+                  <button class="btn sm" id="adBrainNew">＋ عميل جديد</button>
                   <button class="btn sm danger" id="adBrainDel">🗑️ احذف</button>
                   <span class="muted" id="adBrainState"></span>
                 </div>
@@ -1199,11 +1201,16 @@
                     <label class="field">الاسم <input type="text" data-bn="name"></label>
                     <label class="field">نوع المنتج
                       <select data-bf="type"><option value="app">📱 تطبيق موبايل</option><option value="physical">📦 منتج ملموس</option><option value="service">🤝 خدمة</option></select></label>
-                    <label class="field">المجال <input type="text" data-bf="domain" placeholder="مثلًا: لياقة وتغذية"></label>
+                    <label class="field">المجال <input type="text" data-bf="domain" placeholder="مثلًا: لياقة، مطاعم، عقارات"></label>
                   </div>
                   <label class="field">عن المنتج <textarea rows="2" data-bf="about"></textarea></label>
                   <label class="field">الجمهور <textarea rows="2" data-bf="audience"></textarea></label>
-                  <label class="field">قواعد لازم تتراعى في أي إعلان <textarea rows="2" data-bf="rules" placeholder="مثلًا: اللوجو دايمًا في الآخر، من غير وعود صحية مبالغ فيها"></textarea></label>
+                  <div class="ad-set-grid">
+                    <label class="field">السوق <input type="text" data-bf="market" placeholder="مثلًا: السعودية والخليج"></label>
+                    <label class="field">اللغة واللهجة <input type="text" data-bf="language" placeholder="مثلًا: اللهجة السعودية البيضاء"></label>
+                    <label class="field">لبس محتشم دايمًا <select data-bf="modest"><option value="">لأ</option><option value="1">أيوه</option></select></label>
+                  </div>
+                  <label class="field">قواعد لازم تتراعى في أي محتوى <textarea rows="2" data-bf="rules" placeholder="مثلًا: اللوجو دايمًا في الآخر، من غير وعود مبالغ فيها"></textarea></label>
 
                   <h3 class="pane-h">🏷️ اللوجو</h3>
                   <div class="row wrap"><label class="btn sm primary">⬆ ارفع اللوجو<input type="file" accept="image/*" multiple data-bup="logos" hidden></label></div>
@@ -1236,6 +1243,8 @@
                   <label class="field">الألوان <textarea rows="2" data-bf="palette" dir="ltr"></textarea></label>
                   <label class="field">الثيم <textarea rows="2" data-bf="theme"></textarea></label>
                   <label class="field">الخطوط <textarea rows="1" data-bf="typography"></textarea></label>
+                  <label class="field">ستايل الرسم للكاروسيل (بالإنجليزي أحسن) <textarea rows="2" data-bf="style" dir="auto"></textarea></label>
+                  <label class="field">مكان اللوجو <input type="text" data-bf="logo_rule" placeholder="مثلًا: اللوجو صغير في نفس الركن في كل السلايدات"></label>
                   <label class="field">شكل الواجهة (بالإنجليزي للبرومبتات) <textarea rows="3" data-bf="ui_style" dir="ltr"></textarea></label>
                   <label class="field">وصف اللوجو <textarea rows="2" data-bf="logo_description" dir="ltr"></textarea></label>
                 </div>
@@ -1321,8 +1330,15 @@
     <span class="muted" id="bulkProgress"></span>
   </div>
 </dialog>
+<dialog class="bulk-dlg client-dlg" id="clientDialog">
+  <div class="panel-head"><h2>👤 العملاء</h2><button class="btn sm" id="clientClose">إغلاق</button></div>
+  <p class="hint">كل عميل ليه هويته (الاسم والجمهور والسوق واللغة والألوان والخط واللوجو) وأصوله، وإعلاناته وكاروسيلاته ومسلسلاته. البرنامج كله بيشتغل على العميل اللي مختاره. مكتبة الأصول ومعمل التفكيك مشتركين بين كل العملاء.</p>
+  <div class="client-list" id="clientList"></div>
+  <div class="row wrap gap-top"><button class="btn primary" id="clientNew">＋ عميل جديد</button>
+    <button class="btn" id="clientEdit">✏️ ملف العميل الحالي</button></div>
+</dialog>
 <dialog class="bulk-dlg" id="brandDialog">
-  <div class="panel-head"><h2>🎨 هوية كوتشي البصرية والموديلات</h2><button class="btn sm" id="brandClose">إغلاق</button></div>
+  <div class="panel-head"><h2>🎨 هوية العميل البصرية والموديلات <span class="muted" data-client-name data-no-i18n></span></h2><button class="btn sm" id="brandClose">إغلاق</button></div>
   <div class="brand-grid">
     <div>
       <label class="field">اسم البراند <input type="text" data-b="name"></label>
@@ -1332,9 +1348,13 @@
       <label class="field">الخط <input type="text" data-b="font"></label>
       <label class="field">ستايل الرسم (بالإنجليزي أحسن) <textarea rows="3" data-b="style" dir="auto"></textarea></label>
       <label class="field">مكان اللوجو <input type="text" data-b="logo_rule"></label>
+      <label class="field">السوق <input type="text" data-b="market" placeholder="مثلًا: السعودية والخليج، أو مصر"></label>
+      <label class="field">اللغة واللهجة <input type="text" data-b="language" placeholder="مثلًا: اللهجة السعودية البيضاء، أو العامية المصرية"></label>
+      <label class="field">لبس محتشم في كل الصور والفيديوهات <select data-b="modest"><option value="">لأ</option><option value="1">أيوه</option></select></label>
+      <label class="field">قواعد لازم تتراعى <textarea rows="2" data-b="rules"></textarea></label>
     </div>
     <div>
-      <div class="field">اللوجو <div class="brand-logo" id="brandLogo"></div><span class="hint">نفس لوجو المونتاج. بيتغيّر من المونتاج ← البراند.</span></div>
+      <div class="field">اللوجو <div class="brand-logo" id="brandLogo"></div><span class="hint">أول لوجو في ملف العميل (وهو نفسه لوجو المونتاج).</span></div>
       <div class="field">أنواع الدعوة (CTA)
         <div class="cta-list" id="ctaList"></div>
         <div class="row"><button type="button" class="btn sm" id="ctaAdd">＋ دعوة جديدة</button><button type="button" class="btn sm" id="ctaReset">↺ رجّع الأصلي</button></div>
@@ -1537,6 +1557,7 @@
 <script src="/ads.js"></script>
 <script src="/lab.js"></script>
 <script src="/assets.js"></script>
+<script src="/clients.js"></script>
 <script src="/shell.js"></script>
 </body>
 </html>

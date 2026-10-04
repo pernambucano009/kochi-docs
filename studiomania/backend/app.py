@@ -343,7 +343,7 @@ with closing(db()) as _conn, _conn:
             tiktok TEXT
         )"""
     )
-    # الإعلانات المرجعية (التحليل والاقتراح لكوتشي) وستايلات الإعلانات
+    # الإعلانات المرجعية (التحليل والاقتراح للعميل) وستايلات الإعلانات
     _conn.execute(
         """CREATE TABLE IF NOT EXISTS ads (
             id TEXT PRIMARY KEY, name TEXT NOT NULL, data TEXT NOT NULL,
@@ -2999,35 +2999,46 @@ def save_transcript(audio_id: str, body: TranscriptIn):
     return {"status": "done", "words": words, "edited": True}
 
 
-def logo_path() -> Path | None:
+def legacy_logo_path() -> Path | None:
     name = auth.get_setting("logo")
     path = BRAND_DIR / name if name else None
     return path if path and path.exists() else None
 
 
+def logo_path() -> Path | None:
+    """لوجو العميل المختار (أول لوجو في ملفه)."""
+    c = active_client()
+    for a in (c or {}).get("logos") or []:
+        p = brain_dir(c["id"]) / a["file"]
+        if p.exists():
+            return p
+    return None
+
+
 @app.get("/api/logo")
 def get_logo():
     path = logo_path()
-    return {"url": f"/media/brand/{path.name}" if path else None}
+    return {"url": f"/media/ads/brains/{path.parent.name}/{path.name}" if path else None}
 
 
 @app.post("/api/logo")
 def upload_logo(file: UploadFile = File(...)):
-    old = logo_path()
-    filename = save_upload(file, IMAGE_EXTENSIONS, BRAND_DIR, "logo")
-    auth.set_setting("logo", filename)
-    if old:
-        old.unlink(missing_ok=True)
+    """اللوجو الأساسي للعميل المختار (بيبقى أول لوجو في ملفه)."""
+    cid = active_client_id()
+    if not cid:
+        raise HTTPException(400, "اختار عميل الأول")
+    name = save_upload(file, IMAGE_EXTENSIONS, brain_dir(cid), "logo")
+    update_brain(cid, lambda d: d.update(logos=[{"file": name, "name": "اللوجو", "description": ""}] + (d.get("logos") or [])))
     return get_logo()
 
 
 @app.delete("/api/logo")
 def delete_logo():
-    old = logo_path()
-    auth.set_setting("logo", None)
-    if old:
+    cid, old = active_client_id(), logo_path()
+    if cid and old:
+        update_brain(cid, lambda d: d.update(logos=[a for a in d.get("logos") or [] if a["file"] != old.name]))
         old.unlink(missing_ok=True)
-    return {"url": None}
+    return get_logo()
 
 
 # ---------------------------------------------------------------- المشاريع (الفولدرات)
@@ -3223,22 +3234,33 @@ def carousel_settings() -> dict:
     }
 
 
-def brand_settings() -> dict:
+def legacy_brand() -> dict:
+    """الهوية القديمة (قبل العملاء): كانت إعداد واحد للبرنامج كله. بتتنقل لأول عميل مرة واحدة."""
     try:
         saved = json.loads(auth.get_setting("brand") or "{}")
     except ValueError:
         saved = {}
     if saved.get("style") in cz.OLD_DEFAULT_STYLES:
-        saved.pop("style")  # الستايل القديم اتغيّر بالهوية الرسمية
-    return {**cz.DEFAULT_BRAND, **{k: v for k, v in saved.items() if k in cz.DEFAULT_BRAND and v}}
+        saved.pop("style")
+    return {**cz.LEGACY_BRAND, **{k: v for k, v in saved.items() if k in cz.LEGACY_BRAND and v}}
+
+
+# حقول الهوية في ملف العميل ← أسمائها في البرومبتات
+CLIENT_BRAND_MAP = {"about": "about", "audience": "audience", "palette": "colors", "typography": "font", "style": "style",
+                    "logo_rule": "logo_rule", "market": "market", "language": "language", "modest": "modest", "rules": "rules",
+                    "domain": "domain"}
+
+
+def brand_settings() -> dict:
+    """👤 هوية العميل المختار (الاسم والجمهور والألوان والخط والستايل واللغة والسوق) لكل البرومبتات."""
+    c = active_client() or {}
+    b = {cz_key: str(c.get(k) or "") for k, cz_key in CLIENT_BRAND_MAP.items()}
+    return {**cz.DEFAULT_BRAND, **{k: v for k, v in b.items() if v}, "name": c.get("name") or ""}
 
 
 def cta_list() -> list[dict]:
-    try:
-        saved = json.loads(auth.get_setting("carousel_ctas") or "null")
-    except ValueError:
-        saved = None
-    return saved if isinstance(saved, list) and saved else cz.DEFAULT_CTAS
+    ctas = (active_client() or {}).get("ctas")
+    return ctas if isinstance(ctas, list) and ctas else cz.DEFAULT_CTAS
 
 
 @app.get("/api/carousel/settings")
@@ -3281,9 +3303,14 @@ def save_carousel_settings(body: CarouselSettingsIn):
         if body.quality not in cz.QUALITIES:
             raise HTTPException(400, "الجودة غير معروفة")
         auth.set_setting("carousel_quality", body.quality)
-    if body.brand is not None:
-        clean = {k: str(v).strip()[:2000] for k, v in body.brand.items() if k in cz.DEFAULT_BRAND}
-        auth.set_setting("brand", json.dumps(clean, ensure_ascii=False))
+    if body.brand is not None and (cid := active_client_id()):
+        back = {v: k for k, v in CLIENT_BRAND_MAP.items()}
+        def fn(d):
+            for k, v in body.brand.items():
+                if k in back:
+                    d[back[k]] = str(v).strip()[:2000]
+            return str(body.brand.get("name") or "").strip()[:80] or None
+        update_brain(cid, fn)
     if body.ctas is not None:
         ctas, seen = [], set()
         for c in body.ctas:
@@ -3292,18 +3319,19 @@ def save_carousel_settings(body: CarouselSettingsIn):
             if label and text and cid not in seen and cid not in ("auto", "custom"):
                 seen.add(cid)
                 ctas.append({"id": cid, "label": label, "text": text})
-        auth.set_setting("carousel_ctas", json.dumps(ctas, ensure_ascii=False) if ctas else None)
+        if cid := active_client_id():
+            update_brain(cid, lambda d: d.update(ctas=ctas or None))
     return get_carousel_settings()
 
 
 @app.post("/api/carousel/test-model")
 def test_text_model():
-    """بيتأكد إن موديل الكلام شغال بمفتاح Atlas، وبيرجّع جملة تجريبية باللهجة السعودية."""
+    """بيتأكد إن موديل الكلام شغال بمفتاح Atlas، وبيرجّع جملة تجريبية بلغة العميل."""
     if atlas.mock_mode():
-        return {"ok": True, "reply": "هلا والله، أنا جاهز نشتغل على الكاروسيل 👌"}
+        return {"ok": True, "reply": "أهلًا، أنا جاهز نشتغل على الكاروسيل 👌"}
     try:
         reply = atlas.chat(
-            [{"role": "user", "content": "قل جملة ترحيب قصيرة باللهجة السعودية لمتابعين حساب لياقة."}],
+            [{"role": "user", "content": f"قل جملة ترحيب قصيرة بـ{brand_settings()['language']} لمتابعين حساب «{brand_settings()['name'] or 'البراند'}»."}],
             carousel_settings()["text_model"], max_tokens=120,
         )
     except (atlas.AtlasError, httpx.HTTPError) as exc:
@@ -3480,10 +3508,9 @@ async def import_library_pack(file: UploadFile = File(...)):
                              "VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (aid, kind, values[0], values[1], values[2], values[3], key, now()))
                 added += 1
     # الهوية (الألوان والستايل) بعد ما الإضافة تتقفل، عشان الإعدادات قاعدة بيانات تانية
-    if isinstance(manifest.get("brand"), dict):
-        current = json.loads(auth.get_setting("brand") or "{}")
-        current.update({k: str(v) for k, v in manifest["brand"].items() if k in cz.DEFAULT_BRAND})
-        auth.set_setting("brand", json.dumps(current, ensure_ascii=False))
+    if isinstance(manifest.get("brand"), dict) and (cid := active_client_id()):
+        back = {v: k for k, v in CLIENT_BRAND_MAP.items()}
+        update_brain(cid, lambda d: d.update({back[k]: str(v) for k, v in manifest["brand"].items() if k in back}))
     return {"added": added, "updated": updated}
 
 
@@ -3637,6 +3664,8 @@ def list_carousels():
     with closing(db()) as conn:
         out = []
         for r in conn.execute("SELECT * FROM carousels ORDER BY updated_at DESC"):
+            if not owned(json.loads(r["data"]).get("client_id")):
+                continue  # كاروسيلات عميل تاني
             d = carousel_to_dict(r)
             done = [s for s in d["slides"] if s["url"]]
             out.append({"id": d["id"], "name": d["name"], "updated_at": d["updated_at"], "busy": d["busy"],
@@ -3655,7 +3684,7 @@ def create_carousel(body: CarouselIn):
     cid = uuid.uuid4().hex[:12]
     with closing(db()) as conn, conn:
         conn.execute("INSERT INTO carousels (id, name, data, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
-                     (cid, name, json.dumps(new_carousel_data()), now(), now()))
+                     (cid, name, json.dumps({**new_carousel_data(), "client_id": active_client_id()}), now(), now()))
         row, data = load_carousel(conn, cid)
         return carousel_to_dict(row, data)
 
@@ -3795,7 +3824,7 @@ def carousel_context(data: dict) -> tuple[dict, dict]:
 
 
 def check_kind_ready(data: dict) -> None:
-    """كل الاختيارات اختيارية: من غير حاجة بيرسم بستايل كوتشي وشخصيات جديدة."""
+    """كل الاختيارات اختيارية: من غير حاجة بيرسم بستايل العميل وشخصيات جديدة."""
     return None
 
 
@@ -4325,6 +4354,8 @@ def list_series():
         out = []
         for r in conn.execute("SELECT * FROM series ORDER BY created_at"):
             data = {**new_series_data(), **json.loads(r["data"])}
+            if not owned(data.get("client_id")):
+                continue  # مسلسلات عميل تاني
             eps = [{"id": e["id"], "number": e["number"], "name": e["name"]}
                    for e in conn.execute("SELECT id, number, name FROM episodes WHERE series_id = ? ORDER BY number", (r["id"],))]
             out.append(series_to_dict(r, data, eps))
@@ -4340,7 +4371,7 @@ def create_series(body: NameIn):
     sid = uuid.uuid4().hex[:12]
     with closing(db()) as conn, conn:
         conn.execute("INSERT INTO series (id, name, data, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
-                     (sid, body.name.strip() or "مسلسل جديد", json.dumps(new_series_data()), now(), now()))
+                     (sid, body.name.strip() or "مسلسل جديد", json.dumps({**new_series_data(), "client_id": active_client_id()}), now(), now()))
     return list_series()
 
 
@@ -5580,7 +5611,7 @@ def reset_stuck_series() -> None:
 reset_stuck_series()
 
 
-# ================================================================ الإعلانات: تفصيص إعلان مرجعي واقتراح لكوتشي
+# ================================================================ الإعلانات: تفصيص إعلان مرجعي واقتراح للعميل
 
 ADS_LOCK = threading.Lock()
 AD_MAX_SECONDS = 180  # أطول إعلان بنحلله (الموديل بيستقبل الفيديو كله مرة واحدة)
@@ -5725,13 +5756,13 @@ def ad_to_dict(r: sqlite3.Row, d: dict) -> dict:
 
 
 def ad_brain_db(settings: dict | None) -> list[dict]:
-    """عناصر عقل الإعلان اللي ينفع يتعملها منشن (الاسم والنوع والصورة) عشان تظهر في الواجهة."""
+    """عناصر ملف العميل اللي ينفع يتعملها منشن (الاسم والنوع والصورة) عشان تظهر في الواجهة."""
     brain = ad_brain(settings)
     return [{"name": a["name"], "kind": a["kind"], "url": f"/media/ads/brains/{brain['id']}/{a['file']}"} for a in brain_db(brain)]
 
 
 def with_ref_motion(prod: dict | None, analysis: dict) -> dict | None:
-    """الموشن جرافيك بتاع المشهد الأصلي المقابل لكل لقطة (من آخر تحليل)، عشان يظهر جنب الموشن بتاع كوتشي."""
+    """الموشن جرافيك بتاع المشهد الأصلي المقابل لكل لقطة (من آخر تحليل)، عشان يظهر جنب الموشن بتاع البراند."""
     if not prod:
         return prod
     by_n = {s.get("n"): s for s in (analysis or {}).get("scenes") or []}
@@ -5764,6 +5795,8 @@ def list_ads():
     out = []
     for r in rows:
         d = json.loads(r["data"])
+        if not owned((d.get("settings") or {}).get("brain_id") if (d.get("settings") or {}).get("brain_id") != "none" else None):
+            continue  # إعلانات عميل تاني
         scenes = (d.get("analysis") or {}).get("scenes") or []
         out.append({"id": r["id"], "name": r["name"], "created_at": r["created_at"], "status": d.get("status", "idle"),
                     "step": d.get("step"), "adapt_status": d.get("adapt_status", "idle"), "progress": ad_progress(d),
@@ -5833,7 +5866,7 @@ def ad_source_from(folder: Path, original: str, edit: dict | None, display_name:
 @app.post("/api/ads")
 def create_ad(file: UploadFile = File(...), name: str = Form(""), trim_start: float | None = Form(None),
               trim_end: float | None = Form(None), crop: str = Form("")):
-    """ترفع إعلان مرجعي (ولو عايز تقصه أو تعمله كروب قبلها) والتحليل بيبدأ لوحده، وبعده اقتراح لكوتشي."""
+    """ترفع إعلان مرجعي (ولو عايز تقصه أو تعمله كروب قبلها) والتحليل بيبدأ لوحده، وبعده اقتراح للعميل."""
     aid = uuid.uuid4().hex[:12]
     folder = ad_dir(aid)
     fname = save_upload(file, VIDEO_EXTENSIONS, folder, "original")
@@ -5845,7 +5878,7 @@ def create_ad(file: UploadFile = File(...), name: str = Form(""), trim_start: fl
     info = source
     data = {"source": source,
             "status": "queued", "settings": {"duration": min(60, max(10, round(info["duration"]))), "format": "9:16 ريلز وتيك توك",
-                                             "language": "اللهجة السعودية"}}
+                                             "language": brand_settings().get("language") or "", "brain_id": active_client_id()}}
     with closing(db()) as conn, conn:
         conn.execute("INSERT INTO ads (id, name, data, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
                      (aid, name.strip() or Path(file.filename or "إعلان").stem, json.dumps(data, ensure_ascii=False), now(), now()))
@@ -5986,7 +6019,7 @@ class AdAdaptIn(BaseModel):
 
 @app.post("/api/ads/{aid}/adapt")
 def adapt_ad(aid: str, body: AdAdaptIn):
-    """اقتراح كوتشي من جديد (بالإعدادات والستايل الحاليين)، أو تعديله برسالة منك."""
+    """الاقتراح من جديد (بالإعدادات والستايل الحاليين)، أو تعديله برسالة منك."""
     with closing(db()) as conn:
         _, d = ad_row(conn, aid)
     if not d.get("analysis"):
@@ -6224,7 +6257,7 @@ def run_ad_adapt(aid: str) -> None:
         else:
             msgs = az.adapt_messages(brand_settings(), d.get("analysis") or {}, d.get("audio") or {}, settings,
                                      ad_style(settings.get("style_id")), d.get("chat") or [], ad_brain(settings), other_ads(aid))
-            result = ad_json(series_chat(msgs), "اقتراح كوتشي")
+            result = ad_json(series_chat(msgs), "اقتراح الإعلان")
         def fn(d):
             d["adaptation"] = {**result, "based_on": d.get("analysis_ver", 0)}
             d["adapt_status"], d["adapt_error"] = "done", None
@@ -6245,10 +6278,11 @@ def run_ad_adapt(aid: str) -> None:
             update_ad(aid, lambda d: d.update(adapt_error=f"الاقتراح اتكتب بس التنفيذ مبدأش: {exc.detail}"))
 
 
-# ---------- عقل الإعلان: المنتج (تطبيق / منتج ملموس / خدمة)، أصوله الحقيقية (شاشات، لوجو، صور منتج) وهويته
+# ---------- ملف العميل: المنتج (تطبيق / منتج ملموس / خدمة)، أصوله الحقيقية (شاشات، لوجو، صور منتج) وهويته
 
 BRAIN_KINDS = ("screens", "logos", "products", "characters", "sets", "props")
-BRAIN_FIELDS = ("type", "domain", "about", "audience", "rules", "palette", "theme", "typography", "ui_style", "logo_description")
+BRAIN_FIELDS = ("type", "domain", "about", "audience", "rules", "palette", "theme", "typography", "ui_style", "logo_description",
+                "style", "market", "language", "logo_rule", "modest")
 BRAIN_LOCK = threading.Lock()
 
 
@@ -6268,7 +6302,7 @@ def update_brain(bid: str, fn) -> None:
     with BRAIN_LOCK, closing(db()) as conn, conn:
         r = conn.execute("SELECT * FROM ad_brains WHERE id = ?", (bid,)).fetchone()
         if r is None:
-            raise HTTPException(404, "العقل ده مش موجود")
+            raise HTTPException(404, "العميل ده مش موجود")
         d = json.loads(r["data"])
         name = fn(d)
         conn.execute("UPDATE ad_brains SET data = ?" + (", name = ?" if name else "") + " WHERE id = ?",
@@ -6285,37 +6319,113 @@ def brain_to_dict(b: dict) -> dict:
 
 
 def seed_brain() -> None:
-    """أول مرة: عقل لكوتشي من هوية البراند واللوجو الموجودين."""
-    with closing(db()) as conn:
-        if conn.execute("SELECT 1 FROM ad_brains LIMIT 1").fetchone():
+    """👤 العملاء: أول مرة بيتعمل عميل. لو البرنامج كان شغال لكوتشي قبل كده، هويتها ولوجوها وجملها بتتنقل لملف عميل كوتشي."""
+    if auth.get_setting("clients_v1"):
+        return
+    with CLIENTS_LOCK:
+        if auth.get_setting("clients_v1"):
             return
-    b = brand_settings()
-    bid = uuid.uuid4().hex[:12]
-    data = {"type": "app", "domain": "لياقة وتغذية وتدريب أونلاين", "about": b.get("about", ""), "audience": b.get("audience", ""),
-            "rules": "", "palette": b.get("colors", ""), "theme": "", "typography": b.get("font", ""), "ui_style": "",
-            "logo_description": "", "screens": [], "logos": [], "products": [], "status": "idle"}
-    logo = logo_path()
-    if logo and logo.exists():
-        f = f"logo-{uuid.uuid4().hex[:6]}{logo.suffix.lower()}"
-        shutil.copyfile(logo, brain_dir(bid) / f)
-        data["logos"].append({"file": f, "name": "لوجو " + (b.get("name") or ""), "description": ""})
-    with closing(db()) as conn, conn:
-        conn.execute("INSERT INTO ad_brains (id, name, data, created_at) VALUES (?, ?, ?, ?)",
-                     (bid, b.get("name") or "KOCHI", json.dumps(data, ensure_ascii=False), now()))
+        with closing(db()) as conn:
+            first = conn.execute("SELECT id FROM ad_brains ORDER BY created_at LIMIT 1").fetchone()
+            used = any(conn.execute(f"SELECT 1 FROM {t} LIMIT 1").fetchone() for t in ("ads", "carousels", "series", "coaches"))
+        legacy = used or bool(first) or bool(auth.get_setting("brand")) or bool(legacy_logo_path())
+        lb = legacy_brand() if legacy else {}
+        fields = {"about": lb.get("about", ""), "audience": lb.get("audience", ""), "palette": lb.get("colors", ""),
+                  "typography": lb.get("font", ""), "style": lb.get("style", ""), "logo_rule": lb.get("logo_rule", ""),
+                  "market": lb.get("market", ""), "language": lb.get("language", ""), "modest": lb.get("modest", ""),
+                  "domain": "لياقة وتغذية وتدريب أونلاين" if legacy else "",
+                  "rules": ("اللبس محتشم دايمًا: البنات لبس واسع طويل مع حجاب، والرجالة تيشيرت وبنطلون أو شورت تحت الركبة. "
+                            + lb.get("rules", "")) if legacy else ""}
+        if first:
+            bid = first["id"]
+            update_brain(bid, lambda d: d.update({k: v for k, v in fields.items() if v and not d.get(k)}))
+        else:
+            bid = uuid.uuid4().hex[:12]
+            data = {"type": "app", **{k: "" for k in BRAIN_FIELDS if k != "type"}, **fields, "theme": "", "ui_style": "",
+                    "logo_description": "", "screens": [], "logos": [], "products": [], "status": "idle"}
+            with closing(db()) as conn, conn:
+                conn.execute("INSERT INTO ad_brains (id, name, data, created_at) VALUES (?, ?, ?, ?)",
+                             (bid, (lb.get("name") or "KOCHI") if legacy else "عميلي", json.dumps(data, ensure_ascii=False), now()))
+        if legacy:
+            try:
+                ctas = json.loads(auth.get_setting("carousel_ctas") or "null")
+            except ValueError:
+                ctas = None
+            logo = legacy_logo_path()
+            def move(d):
+                d.setdefault("ctas", ctas if isinstance(ctas, list) and ctas else cz.LEGACY_CTAS)
+                if logo and not d.get("logos"):
+                    f = f"logo-{uuid.uuid4().hex[:6]}{logo.suffix.lower()}"
+                    shutil.copyfile(logo, brain_dir(bid) / f)
+                    d["logos"] = [{"file": f, "name": "اللوجو", "description": ""}]
+            update_brain(bid, move)
+        auth.set_setting("active_client", auth.get_setting("active_client") or bid)
+        auth.set_setting("clients_v1", "1")
+
+
+CLIENTS_LOCK = threading.Lock()
+
+
+def first_client_id() -> str | None:
+    """أقدم عميل: الحاجات اللي اتعملت قبل العملاء (من غير عميل) بتاعته."""
+    seed_brain()
+    with closing(db()) as conn:
+        r = conn.execute("SELECT id FROM ad_brains ORDER BY created_at LIMIT 1").fetchone()
+    return r["id"] if r else None
+
+
+def active_client_id() -> str | None:
+    seed_brain()
+    cid = auth.get_setting("active_client")
+    if cid and brain_row(cid):
+        return cid
+    return first_client_id()
+
+
+def active_client() -> dict | None:
+    cid = active_client_id()
+    return brain_row(cid) if cid else None
+
+
+def owned(client_id: str | None) -> bool:
+    """الحاجة دي بتاعة العميل المختار؟ (اللي ملهاش عميل، أو عميلها اتمسح، بتاعة أقدم عميل)"""
+    if client_id and brain_row(client_id):
+        return client_id == active_client_id()
+    return first_client_id() == active_client_id()
 
 
 def ad_brain(settings: dict | None) -> dict | None:
-    """عقل الإعلان المختار للإعلان ده (ولو مش مختار: أول عقل)."""
+    """ملف العميل المختار للإعلان ده (ولو مش مختار: العميل الحالي)."""
     bid = (settings or {}).get("brain_id")
     if bid == "none":
         return None
-    b = brain_row(bid) if bid else None
-    if b is None:
-        seed_brain()  # أول مرة: عقل لكوتشي بيتعمل لوحده (حتى لو صفحة العقل ما اتفتحتش)
-        with closing(db()) as conn:
-            r = conn.execute("SELECT id FROM ad_brains ORDER BY created_at LIMIT 1").fetchone()
-        b = brain_row(r["id"]) if r else None
-    return b
+    return (brain_row(bid) if bid else None) or active_client()
+
+
+atlas.modesty_on = lambda: bool((active_client() or {}).get("modest"))  # اللبس المحتشم حسب ملف العميل
+
+
+@app.get("/api/clients")
+def list_clients():
+    """👤 العملاء (للاختيار من فوق) والعميل المختار."""
+    active = active_client_id()
+    out = []
+    for b in list_brains():
+        out.append({"id": b["id"], "name": b["name"], "domain": b.get("domain", ""),
+                    "logo": (b.get("logos") or [{}])[0].get("url"), "active": b["id"] == active})
+    return {"clients": out, "active": active}
+
+
+class ActiveClientIn(BaseModel):
+    id: str
+
+
+@app.put("/api/clients/active")
+def set_active_client(body: ActiveClientIn):
+    if not brain_row(body.id):
+        raise HTTPException(404, "العميل ده مش موجود")
+    auth.set_setting("active_client", body.id)
+    return list_clients()
 
 
 @app.get("/api/ad-brains")
@@ -6340,7 +6450,7 @@ def create_brain(body: BrainIn):
         data["type"] = body.fields["type"]
     with closing(db()) as conn, conn:
         conn.execute("INSERT INTO ad_brains (id, name, data, created_at) VALUES (?, ?, ?, ?)",
-                     (bid, (body.name or "").strip()[:80] or "منتج جديد", json.dumps(data, ensure_ascii=False), now()))
+                     (bid, (body.name or "").strip()[:80] or "عميل جديد", json.dumps(data, ensure_ascii=False), now()))
     return brain_to_dict(brain_row(bid))
 
 
@@ -6362,6 +6472,9 @@ def patch_brain(bid: str, body: BrainIn):
 
 @app.delete("/api/ad-brains/{bid}")
 def delete_brain(bid: str):
+    with closing(db()) as conn:
+        if conn.execute("SELECT COUNT(*) FROM ad_brains").fetchone()[0] <= 1:
+            raise HTTPException(400, "ده آخر عميل. اعمل عميل تاني الأول")
     with closing(db()) as conn, conn:
         conn.execute("DELETE FROM ad_brains WHERE id = ?", (bid,))
     shutil.rmtree(ADS_DIR / "brains" / Path(bid).name, ignore_errors=True)
@@ -6374,7 +6487,7 @@ def upload_brain_assets(bid: str, kind: str = Form("screens"), files: list[Uploa
     if kind not in BRAIN_KINDS:
         raise HTTPException(400, "نوع غير معروف")
     if brain_row(bid) is None:
-        raise HTTPException(404, "العقل ده مش موجود")
+        raise HTTPException(404, "العميل ده مش موجود")
     folder = brain_dir(bid)
     added = []
     for f in files[:120]:
@@ -6428,7 +6541,7 @@ def delete_brain_asset(bid: str, file: str):
 def analyze_brain(bid: str):
     b = brain_row(bid)
     if b is None:
-        raise HTTPException(404, "العقل ده مش موجود")
+        raise HTTPException(404, "العميل ده مش موجود")
     if not any(b.get(k) for k in BRAIN_KINDS):
         raise HTTPException(400, "ارفع اللوجو أو شاشات التطبيق الأول")
     update_brain(bid, lambda d: d.update(status="working", error=None))
@@ -6454,13 +6567,13 @@ def run_brain_analyze(bid: str) -> None:
         assets = [a for k in ("logos", "screens", "products") for a in b.get(k) or []][:24]
         if atlas.mock_mode():
             out = {"palette": "#57B8AF teal (accent), #EEECDA cream (background)", "theme": "فاتح وهادي", "typography": "خط عريض مستدير",
-                   "ui_style": "Clean light UI with teal accents and rounded cards.", "logo_description": "Teal KOCHI wordmark.",
+                   "ui_style": "Clean light UI with teal accents and rounded cards.", "logo_description": "Teal wordmark.",
                    "assets": [{"file": a["file"], "name": a["name"], "description": f"وصف تجريبي لـ {a['name']}"} for a in assets]}
         else:
             parts = [{"type": "text", "text": az.brain_messages(b, [a["file"] for a in assets])}]
             for a in assets:
                 parts.append({"type": "image_url", "image_url": {"url": data_url(model_image(folder / a["file"]), "image/jpeg")}})
-            out = ad_json(ad_media_chat([{"role": "user", "content": parts}], 12000), "عقل الإعلان")
+            out = ad_json(ad_media_chat([{"role": "user", "content": parts}], 12000), "ملف العميل")
         got = {str(x.get("file")): x for x in out.get("assets") or [] if isinstance(x, dict)}
         def fn(d):
             for k in ("palette", "theme", "typography", "ui_style", "logo_description"):
@@ -6491,7 +6604,7 @@ def brain_assets(brain: dict | None, kinds: tuple[str, ...]) -> list[dict]:
 
 
 def apply_brain(aid: str, sids: list[str] | None = None, use_model: bool = True) -> int:
-    """يحط الأصول الحقيقية من عقل الإعلان مكان مكونات اللقطات: الشاشات للـ ui، اللوجو للـ logo، وصورة المنتج للمنتج.
+    """يحط الأصول الحقيقية من ملف العميل مكان مكونات اللقطات: الشاشات للـ ui، اللوجو للـ logo، وصورة المنتج للمنتج.
     الصور اللي انت رافعها بنفسك متتلمسش. بيرجّع عدد المكونات اللي اتطبّق عليها."""
     with closing(db()) as conn:
         _, d = ad_row(conn, aid)
@@ -6578,7 +6691,7 @@ def prod_apply_brain(aid: str, shot_id: str | None = None):
         _, d = ad_row(conn, aid)
     prod_of(d)
     if not ad_brain(d.get("settings")):
-        raise HTTPException(400, "مفيش عقل إعلان مختار. اعمله من «🧠 عقل الإعلان»")
+        raise HTTPException(400, "مفيش ملف عميل مختار. اعمله من «👤 ملف العميل»")
     n = apply_brain(aid, [shot_id] if shot_id else None)
     return {**ad_response(aid), "applied": n}
 
@@ -6829,12 +6942,12 @@ def ref_scene_for(analysis: dict, k: int, total: int) -> dict | None:
 
 @app.post("/api/ads/{aid}/prod/start")
 def prod_start(aid: str):
-    """يبدأ التنفيذ من اقتراح كوتشي: راس الإعلان (الستايل والكونسبت) ولقطة لكل مشهد."""
+    """يبدأ التنفيذ من الاقتراح: راس الإعلان (الستايل والكونسبت) ولقطة لكل مشهد."""
     with closing(db()) as conn:
         _, d = ad_row(conn, aid)
     a = d.get("adaptation")
     if not a or not a.get("scenes"):
-        raise HTTPException(400, "مفيش اقتراح لكوتشي لسه")
+        raise HTTPException(400, "مفيش اقتراح للإعلان ده لسه")
     if prod_busy(d.get("prod")):
         raise HTTPException(400, "في توليد شغال في التنفيذ الحالي. استنى لما يخلص")
     settings = d.get("settings") or {}
@@ -6860,7 +6973,7 @@ def prod_start(aid: str):
             "ref_scene": ref.get("n") if ref else None, "ref_frame": ref.get("frame") if ref else None,
             "frame": None, "frames": [], "frame_status": "idle", "frame_error": None,
             "components": comps, "comp_status": "done" if comps else "idle", "comp_error": None,
-            # الموشن جرافيك المكتوب في الاقتراح لكوتشي، ولو مش موجود (اقتراح قديم) بتاع المشهد الأصلي
+            # الموشن جرافيك المكتوب في الاقتراح، ولو مش موجود (اقتراح قديم) بتاع المشهد الأصلي
             "motion_notes": str(sc.get("motion_graphics") or (ref or {}).get("motion_graphics", "")),
             "motion_prompt": str(sc.get("motion_prompt") or ""), "assembly_prompt": "",
             "approved": False, "takes": [], "chosen": None,
@@ -6872,7 +6985,7 @@ def prod_start(aid: str):
             d["prod_history"] = ([{**old, "archived_at": now()}] + (d.get("prod_history") or []))[:5]
         d["prod"] = {"header": header, "shots": shots, "based_on": d.get("adapt_ver", 0)}
     update_ad(aid, fn)
-    # شاشات التطبيق واللوجو وصور المنتج الحقيقية من عقل الإعلان بتتحط في المكونات لوحدها
+    # شاشات التطبيق واللوجو وصور المنتج الحقيقية من ملف العميل بتتحط في المكونات لوحدها
     threading.Thread(target=safe_apply_brain, args=(aid,), daemon=True).start()
     return ad_response(aid)
 
@@ -6907,7 +7020,7 @@ class ProdHeaderIn(BaseModel):
 
 @app.patch("/api/ads/{aid}/prod/header")
 def prod_header(aid: str, body: ProdHeaderIn):
-    keys = ("title", "concept", "style", "style_id", "characters", "locations", "palette", "brand", "rules", "aspect")
+    keys = ("title", "concept", "style", "style_id", "characters", "locations", "palette", "brand", "rules", "aspect", "market", "modest")
     def fn(d):
         p = prod_of(d)
         h = {**p["header"], **{k: body.header[k] for k in keys if k in body.header}}
@@ -6947,7 +7060,7 @@ BRAIN_DB_KINDS = {"characters": "character", "sets": "background", "props": "pro
 
 
 def brain_db(brain: dict | None) -> list[dict]:
-    """عقل الإعلان كقاعدة بيانات: كل عنصر ليه اسم يتعمله منشن (@الاسم) وصورة مرجعية."""
+    """ملف العميل كقاعدة بيانات: كل عنصر ليه اسم يتعمله منشن (@الاسم) وصورة مرجعية."""
     out = []
     for kind, label in BRAIN_DB_KINDS.items():
         for a in (brain or {}).get(kind) or []:
@@ -6966,7 +7079,7 @@ def mention_refs(brain: dict | None, names: list[str]) -> list[dict]:
 
 @app.post("/api/ads/{aid}/prod/sb-prompts")
 def prod_sb_prompts(aid: str, shot_id: str | None = None, skip_approved: bool = False):
-    """✍️ يكتب برومبت الستوري بورد لكل لقطة ويعمل منشن (@الاسم) لعناصر عقل الإعلان اللي فيها."""
+    """✍️ يكتب برومبت الستوري بورد لكل لقطة ويعمل منشن (@الاسم) لعناصر ملف العميل اللي فيها."""
     with closing(db()) as conn:
         _, d = ad_row(conn, aid)
     p = prod_of(d)
@@ -7046,7 +7159,7 @@ def run_ad_frame(aid: str, sid: str, note: str = "", extra: list[str] | None = N
         return
     dest = None
     try:
-        safe_apply_brain(aid, [sid])  # قبل الرسم: الشاشات واللوجو الحقيقيين من عقل الإعلان
+        safe_apply_brain(aid, [sid])  # قبل الرسم: الشاشات واللوجو الحقيقيين من ملف العميل
         with closing(db()) as conn:
             _, d = ad_row(conn, aid)
         p = d["prod"]
@@ -7059,9 +7172,9 @@ def run_ad_frame(aid: str, sid: str, note: str = "", extra: list[str] | None = N
             w, hh = size.split("x")
             mock_image(dest, f"{int(w) // 2}x{int(hh) // 2}", f"shot {s['n']}", s["n"])
         else:
-            # صور المكونات نفسها (شاشات كوتشي، اللوجو، الشخصيات...) مراجع أساسية، وبعدها صور الستايل للشكل العام
+            # صور المكونات نفسها (شاشات المنتج، اللوجو، الشخصيات...) مراجع أساسية، وبعدها صور الستايل للشكل العام
             comp_dir = prod_dir(aid, "comps")
-            # المنشنز من عقل الإعلان: صورهم الحقيقية أول المراجع
+            # المنشنز من ملف العميل: صورهم الحقيقية أول المراجع
             brain = ad_brain(d.get("settings"))
             ments = mention_refs(brain, s.get("mentions"))[:6]
             m_files = {a["file"] for a in ments}
@@ -7422,7 +7535,7 @@ def prod_comp_images(aid: str, shot_id: str | None = None, comp_id: str | None =
     if not (atlas.api_key() or atlas.mock_mode()):
         raise HTTPException(400, "مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات")
     if not comp_id:
-        safe_apply_brain(aid, [shot_id] if shot_id else None)  # الشاشات واللوجو من عقل الإعلان بدل ما يتولدوا
+        safe_apply_brain(aid, [shot_id] if shot_id else None)  # الشاشات واللوجو من ملف العميل بدل ما يتولدوا
     with closing(db()) as conn:
         _, d = ad_row(conn, aid)
     p = prod_of(d)
@@ -7553,7 +7666,7 @@ def run_cast_extract(aid: str) -> None:
                           "description": str(x.get("description") or "")[:1000], "image_prompt": str(x.get("image_prompt") or "")[:3000],
                           "shots": shots_n, "image": None, "images": [], "notes": {}, "status": "idle", "error": None,
                           "approved": False})
-        # اللي موجود قبل كده في عقل الإعلان بنفس الاسم: صورته بتتجاب (وبتستنى موافقتك)
+        # اللي موجود قبل كده في ملف العميل بنفس الاسم: صورته بتتجاب (وبتستنى موافقتك)
         brain = ad_brain(d.get("settings"))
         for it in items:
             a = next((a for a in (brain or {}).get(CAST_BRAIN[it["kind"]]) or [] if a.get("name") == it["name"]), None)
@@ -7719,7 +7832,7 @@ def prod_cast_pick(aid: str, cid: str, body: CastPickIn):
 
 
 def approve_cast(aid: str, cid: str) -> None:
-    """الموافقة: الصورة بتتحفظ في عقل الإعلان، وبتتربط بكل لقطة العنصر ده فيها (مكون باسمه بالظبط)."""
+    """الموافقة: الصورة بتتحفظ في ملف العميل، وبتتربط بكل لقطة العنصر ده فيها (مكون باسمه بالظبط)."""
     with closing(db()) as conn:
         _, d = ad_row(conn, aid)
     c = find_cast(prod_of(d), cid)
@@ -7727,7 +7840,7 @@ def approve_cast(aid: str, cid: str) -> None:
         raise HTTPException(400, f"«{c['name']}» ملوش صورة لسه")
     brain = ad_brain(d.get("settings"))
     if not brain:
-        raise HTTPException(400, "مفيش عقل إعلان مختار. اعمله من «🧠 عقل الإعلان»")
+        raise HTTPException(400, "مفيش ملف عميل مختار. اعمله من «👤 ملف العميل»")
     kind = CAST_BRAIN[c["kind"]]
     src = prod_dir(aid, "cast") / c["image"]
     bfile = f"{kind[:-1]}-{cid}-{uuid.uuid4().hex[:6]}{src.suffix.lower()}"

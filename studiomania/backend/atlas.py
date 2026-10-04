@@ -79,7 +79,7 @@ def upload_media(path: Path) -> str:
     return url
 
 
-# قاعدة ثابتة على كل صورة وكل فيديو بيتولد من البرنامج (السوق السعودي): لبس محتشم دايمًا
+# قاعدة اللبس المحتشم على كل صورة وكل فيديو، للعملاء اللي مفعّلينها في ملفهم (السوق السعودي مثلًا)
 MODESTY_RULE = (
     "Wardrobe rule (always): everyone is modestly dressed. Women wear loose, non-transparent clothing that fully covers "
     "arms to the wrists, legs to the ankles, chest and midriff (loose long-sleeve tops, long loose pants or skirts, abaya), "
@@ -88,8 +88,14 @@ MODESTY_RULE = (
 )
 
 
+def modesty_on() -> bool:  # البرنامج بيبدّلها بإعداد العميل المختار
+    return True
+
+
 def with_modesty(prompt: str) -> str:
     prompt = prompt or ""
+    if not modesty_on():
+        return prompt
     return prompt if MODESTY_RULE in prompt else f"{prompt.rstrip()}\n{MODESTY_RULE}"
 
 

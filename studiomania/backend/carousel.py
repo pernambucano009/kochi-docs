@@ -1,8 +1,8 @@
-"""صناعة الكاروسيل: البرومبتات والهوية البصرية لكوتشي.
+"""صناعة الكاروسيل: البرومبتات، والهوية البصرية بتاعة العميل المختار.
 
 الخطوات:
 1. نقاش مع موديل الكلام لحد ما نوصل لفكرة.
-2. الموديل يكتب خطة الكاروسيل (نص كل سلايد ووصف الرسمة) باللهجة السعودي، كـ JSON.
+2. الموديل يكتب خطة الكاروسيل (نص كل سلايد ووصف الرسمة) بلغة العميل ولهجته، كـ JSON.
 3. تنقيح: نفس الموديل يراجع الإملاء واللهجة (بعد أي تعديل بإيدك).
 4. GPT Image يرسم الكاروسيل كله في صورة واحدة (عشان يطلع متسق).
 5. بعد الموافقة، يرسم السلايدات واحدة واحدة بالمقاس النهائي،
@@ -15,7 +15,23 @@ import re
 
 # ---------------------------------------------------------------- الهوية البصرية (بتتعدّل من الإعدادات)
 
+# الافتراضي لأي عميل لسه ملوش هوية: محايد (من غير اسم براند ولا سوق معيّن)
 DEFAULT_BRAND = {
+    "name": "",
+    "about": "",
+    "audience": "",
+    "colors": "",
+    "font": "خط عربي عريض وواضح (زي Tajawal أو Cairo)، العناوين Bold والكلام العادي Regular",
+    "style": ("2D flat vector illustration, clean shapes, solid fills, no 3D, no photorealism, consistent characters "
+              "across slides, generous white space, modern social-media carousel layout"),
+    "logo_rule": "اللوجو صغير في نفس الركن في كل السلايدات",
+    "market": "",
+    "language": "عربي بسيط",
+    "modest": "",
+}
+
+# هوية كوتشي القديمة: بتتنقل مرة واحدة لملف عميل كوتشي (البرنامج كان معمول ليها قبل ما يبقى لأي عميل)
+LEGACY_BRAND = {
     "name": "KOCHI",
     "about": "كوتشي منصة تدريب رياضي وتغذية أونلاين بتوصّل المتدربين في السعودية والخليج بمدربين معتمدين.",
     "audience": "شباب وبنات في السعودية والخليج مهتمين باللياقة والتغذية والجسم الصحي",
@@ -28,6 +44,10 @@ DEFAULT_BRAND = {
         "shading, no 3D, no photorealism, no gradient fills. Athletic but approachable, like a fitness sketchbook."
     ),
     "logo_rule": "اللوجو صغير في نفس الركن في كل السلايدات",
+    "market": "السعودية والخليج",
+    "language": "اللهجة السعودية البيضاء",
+    "modest": "1",
+    "rules": "من غير وعود صحية مبالغ فيها.",
 }
 
 # الستايل القديم (قبل الهوية الرسمية): لو متسجل في الإعدادات نتجاهله
@@ -56,11 +76,21 @@ KINDS = {
 # الدعوة في آخر سلايد (CTA). بتتعدّل من الهوية، و«auto» الموديل بيختار
 DEFAULT_CTAS = [
     {"id": "comment", "label": "💬 اكتب كلمة في الكومنت", "text": "اكتب «{keyword}» بالتعليقات و{reward}"},
+    {"id": "follow", "label": "➕ تابعنا", "text": "تابعنا عشان تشوف أكتر"},
+    {"id": "save", "label": "🔖 احفظ وشارك", "text": "احفظ البوست وشاركه مع اللي محتاجه"},
+    {"id": "coach", "label": "🧑‍🏫 تابع المتكلم", "text": "تابع {coach}"},
+]
+LEGACY_CTAS = [
+    {"id": "comment", "label": "💬 اكتب كلمة في الكومنت", "text": "اكتب «{keyword}» بالتعليقات و{reward}"},
     {"id": "follow", "label": "➕ تابعنا", "text": "تابعنا، كل يوم معلومة جديدة"},
     {"id": "platform", "label": "📱 منصة كوتشي", "text": "كوتشي أول منصة عربية تربطك بمدربك المعتمد"},
     {"id": "save", "label": "🔖 احفظ وشارك", "text": "احفظ البوست وأرسله لربعك اللي يحتاجونه"},
     {"id": "coach", "label": "🧑‍🏫 تابع المدرب", "text": "تابع الكوتش {coach} وابدأ رحلتك في كوتشي"},
 ]
+
+
+def full_brand(brand: dict | None) -> dict:
+    return {**DEFAULT_BRAND, **{k: v for k, v in (brand or {}).items() if v}}
 
 
 def style_text(style: dict | None) -> str | None:
@@ -73,8 +103,11 @@ def style_text(style: dict | None) -> str | None:
 
 
 def brand_block(brand: dict, kind: str = "characters", style: dict | None = None) -> str:
-    b = {**DEFAULT_BRAND, **{k: v for k, v in (brand or {}).items() if v}}
-    lines = [f"Brand: {b['name']}. {b['about']}", f"Audience: {b['audience']}"]
+    b = full_brand(brand)
+    lines = [f"Brand: {b['name'] or 'the brand'}. {b['about']}".strip(), f"Audience: {b['audience']}" if b["audience"] else ""]
+    if b.get("market"):
+        lines.append(f"Market: {b['market']}")
+    lines = [x for x in lines if x]
     lines.append(f"Illustration style (for every character, icon and drawing): {style_text(style) or b['style']}")
     lines.append(f"Typography: {b['font']}")
     if b.get("colors"):
@@ -105,30 +138,32 @@ def cta_text(cta: dict | None, ctas: list[dict], coach_name: str | None) -> str 
 
 # ---------------------------------------------------------------- الكلام
 
-DIALECT_RULES = """قواعد الكتابة على السلايدات:
-- اللهجة سعودية بيضاء طبيعية (زي ما يتكلم شاب سعودي على السوشيال)، مش فصحى ومش مصري.
+def dialect_rules(brand: dict | None) -> str:
+    b = full_brand(brand)
+    return f"""قواعد الكتابة على السلايدات:
+- اللغة: {b['language']}، طبيعية زي ما الجمهور بيتكلم على السوشيال{f" ({b['market']})" if b.get("market") else ""}.
 - إملاء صحيح 100%: الهمزات والتاء المربوطة والألف المقصورة في مكانها.
 - من غير تشكيل، ومن غير إيموجي جوه نص السلايد.
 - جمل قصيرة جدًا: العنوان من 2 لـ 6 كلمات، والكلام تحته 20 كلمة بالكتير.
-- معلومات صحيحة علميًا ومفيدة، ومن غير وعود مبالغ فيها.
-- أول سلايد هوك يوقّف السكرول."""
+- معلومات صحيحة ومفيدة، ومن غير وعود مبالغ فيها.
+- أول سلايد هوك يوقّف السكرول.""" + (f"\n- قواعد العميل: {b['rules']}" if b.get("rules") else "")
 
 
 def chat_system(brand: dict) -> str:
-    b = {**DEFAULT_BRAND, **{k: v for k, v in (brand or {}).items() if v}}
-    return f"""انت كاتب محتوى ومخطط كاروسيلات لإنستجرام وتيك توك لبراند {b['name']}.
+    b = full_brand(brand)
+    return f"""انت كاتب محتوى ومخطط كاروسيلات لإنستجرام وتيك توك لبراند {b['name'] or 'العميل'}.
 {b['about']}
-الجمهور: {b['audience']}.
+الجمهور: {b['audience'] or b.get('market') or '—'}.
 
 شغلك في النقاش: تقترح أفكار كاروسيل قوية (هوك واضح، قيمة حقيقية، تسلسل منطقي)، وتطوّر الفكرة مع المستخدم.
 لما تقترح أفكار: رقّمها، ولكل فكرة عنوان/هوك وسطر يشرح الزاوية وعدد السلايدات المقترح.
-اتكلم مع المستخدم بالعربي البسيط، وأي نص مقترح للسلايدات يكون باللهجة السعودية.
-{DIALECT_RULES}"""
+اتكلم مع المستخدم بالعربي البسيط، وأي نص مقترح للسلايدات يكون بـ{b['language']}.
+{dialect_rules(b)}"""
 
 
 PLAN_SCHEMA = """{
   "title": "اسم قصير للكاروسيل",
-  "caption": "كابشن البوست باللهجة السعودية",
+  "caption": "كابشن البوست بنفس لغة السلايدات",
   "hashtags": ["#هاشتاق", "..."],
   "slides": [
     {"headline": "عنوان السلايد", "body": "الكلام تحت العنوان (ممكن يبقى فاضي)", "visual": "وصف الرسمة بالإنجليزي"}
@@ -155,19 +190,20 @@ def kind_writing_rules(ctx: dict) -> str:
     return "\n".join(rules)
 
 
-def cta_rule(ctx: dict) -> str:
+def cta_rule(ctx: dict, brand: dict | None = None) -> str:
     text = ctx.get("cta_text")
     if text:
         return f"- آخر سلايد هو الدعوة (CTA) ونصها لازم يكون بالمعنى ده بالظبط، ولو فيه كلمة بين « » تفضل زي ما هي: {text}\n- الكابشن يكرر نفس الدعوة."
+    name = full_brand(brand)["name"]
     return ("- آخر سلايد دعوة (CTA): اختار الأنسب للمحتوى من دول: اكتب كلمة في الكومنت ونرسلك حاجة، "
-            "أو تابعنا عشان كل يوم معلومة جديدة، أو كوتشي أول منصة عربية تربطك بمدربك المعتمد، أو احفظ البوست وشاركه.")
+            f"أو تابعنا عشان تشوف أكتر،{f' أو جملة قصيرة عن {name}،' if name else ''} أو احفظ البوست وشاركه.")
 
 
 def plan_messages(brand: dict, chat: list[dict], slides: int, ctx: dict) -> list[dict]:
     ask = f"""اكتب الكاروسيل النهائي من النقاش اللي فات، في {slides} سلايدات بالظبط.
-{DIALECT_RULES}
+{dialect_rules(brand)}
 {kind_writing_rules(ctx)}
-{cta_rule(ctx)}
+{cta_rule(ctx, brand)}
 رجّع JSON بس، من غير أي كلام قبله أو بعده، بالشكل ده:
 {PLAN_SCHEMA}"""
     return [{"role": "system", "content": chat_system(brand)}, *chat[-20:], {"role": "user", "content": ask}]
@@ -178,11 +214,11 @@ def polish_messages(brand: dict, plan: dict, ctx: dict | None = None) -> list[di
     if ctx and ctx.get("cta_text"):
         keep = f"\n- سيب معنى الدعوة في آخر سلايد زي ما هو، وأي كلمة بين « » متتغيرش: {ctx['cta_text']}"
     ask = f"""راجع نص الكاروسيل ده ونقّحه:
-- حوّل أي كلمة مش سعودية للهجة السعودية البيضاء.
+- خلّي كل الكلام بـ{full_brand(brand)['language']}، وحوّل أي كلمة خارجة عنها.
 - صحّح أي غلطة إملائية أو همزة أو تاء مربوطة.
 - قصّر أي جملة طويلة من غير ما المعنى يضيع.
 - متغيّرش عدد السلايدات ولا حقل visual.{keep}
-{DIALECT_RULES}
+{dialect_rules(brand)}
 رجّع نفس الـ JSON بالظبط بعد التنقيح، من غير أي كلام تاني:
 {json.dumps(plan, ensure_ascii=False, indent=1)}"""
     return [{"role": "system", "content": chat_system(brand)}, {"role": "user", "content": ask}]
@@ -218,7 +254,7 @@ def parse_plan(text: str, slides: int | None = None) -> dict:
 # ---------------------------------------------------------------- الصور
 
 TEXT_RULES = (
-    "All on-image text is Arabic, right-to-left, in Saudi dialect. Render every text EXACTLY as written between "
+    "All on-image text is Arabic, right-to-left. Render every text EXACTLY as written between "
     "the quotes: same letters, same words, same order. Do not translate, add, remove or rephrase any word, "
     "no diacritics, no extra text, no lorem ipsum, no watermarks. Arabic letters must be correctly connected."
 )
@@ -250,7 +286,8 @@ def slide_text(s: dict) -> str:
     return " | ".join(parts) or "(no text on this slide)"
 
 
-def kind_design_rules(ctx: dict) -> str:
+def kind_design_rules(ctx: dict, brand: dict | None = None) -> str:
+    b = full_brand(brand)
     """قواعد الرسم من الاختيارات مع بعض: التيمبليت للتقسيم، والمدرب والشخصيات للناس، والستايل لطريقة الرسم."""
     parts = []
     t = ctx.get("template")
@@ -260,14 +297,14 @@ def kind_design_rules(ctx: dict) -> str:
             "text hierarchy and positions, shapes and decorative motifs, spacing and logo position, on every slide. "
             "If a reference is a mockup photo of slides on a phone or table, ignore the phone, perspective, shadows "
             "and background: take only the flat slide designs and adapt them to the vertical slide size. "
-            "RECOLOR everything to the KOCHI brand palette below (do not keep the template's own colors unless the "
+            "RECOLOR everything to the brand palette below (do not keep the template's own colors unless the "
             "template notes say so). Only the text and content visuals change between slides."
             + (f" Template notes: {t['notes']}" if t.get("notes") else ""))
     c = ctx.get("coach")
     if c:
         handle = f' and the handle "@{c["instagram"]}"' if c.get("instagram") else ""
         parts.append(
-            f"COACH: the carousel is presented by the KOCHI coach {c.get('name', '')}. Reproduce the coach from the "
+            f"COACH: the carousel is presented by {c.get('name', '')}. Reproduce the coach from the "
             "coach reference image(s): same face, hair or head covering, skin tone, body type and outfit, drawn as an "
             "illustrated character in the illustration style below. Show the coach on the first and last slides at "
             f'least (posing or demonstrating the tip), with the name "{c.get("name", "")}"{handle} written small near '
@@ -279,9 +316,10 @@ def kind_design_rules(ctx: dict) -> str:
             "outfits and colors, drawn in the illustration style below. Never redesign the characters.")
     elif not c:
         parts.append(
-            "CHARACTERS: when a slide shows people, invent ONE or TWO original Gulf characters (modest sportswear, "
-            "Saudi everyday look) drawn in the illustration style below, and keep them identical on every slide.")
-    return "DESIGN of this KOCHI carousel.\n" + "\n".join(parts) + f"\n{EYES_RULE}"
+            "CHARACTERS: when a slide shows people, invent ONE or TWO original characters that fit the audience"
+            + (f" ({b['market']})" if b.get("market") else "") + (", modestly dressed" if b.get("modest") else "")
+            + ", drawn in the illustration style below, and keep them identical on every slide.")
+    return f"DESIGN of this {b['name'] or 'brand'} carousel.\n" + "\n".join(parts) + f"\n{EYES_RULE}"
 
 
 def overview_prompt(brand: dict, plan: dict, ratio: str, refs: dict, ctx: dict) -> str:
@@ -293,7 +331,7 @@ def overview_prompt(brand: dict, plan: dict, ratio: str, refs: dict, ctx: dict) 
         "Slide 1 is the top-left panel and the order continues left to right, row by row. "
         "Every panel is a finished slide. All panels share one visual system: same background treatment, "
         "same color palette, same typography, same characters, same logo position.",
-        kind_design_rules(ctx),
+        kind_design_rules(ctx, brand),
         brand_block(brand, style=ctx.get("style")),
         TEXT_RULES,
     ]
@@ -316,7 +354,7 @@ def slide_prompt(brand: dict, plan: dict, k: int, ratio: str, refs: dict, ctx: d
     ]
     if refs.get("previous"):
         lines.append("Reference image 2 is the finished previous slide: match its exact style, colors, fonts and character design.")
-    lines += [kind_design_rules(ctx), brand_block(brand, style=ctx.get("style")), TEXT_RULES]
+    lines += [kind_design_rules(ctx, brand), brand_block(brand, style=ctx.get("style")), TEXT_RULES]
     lines += reference_notes(refs)
     lines.append(f"Slide {k} text: {slide_text(s)}")
     lines.append(f"Visual: {s.get('visual') or 'supporting visual'}")
@@ -414,10 +452,10 @@ def mock_plan(slides: int, cta: str | None = None) -> str:
         {"headline": "نام ٧ ساعات على الأقل", "body": "قلة النوم ترفع الكورتيزول وتوقف التقدم", "visual": "moon and clock icons"},
         {"headline": "يوم راحة مو كسل", "body": "خذ يومين راحة بالأسبوع وخلك نشيط بمشي خفيف", "visual": "character walking in a park"},
         {"headline": "كل بروتين كافي", "body": "حوالي ١.٦ جرام لكل كيلو من وزنك يوميًا", "visual": "plate with chicken, eggs and yogurt"},
-        {"headline": "ابدأ مع مدربك في كوتشي", "body": "خطة تمرين وتغذية تناسبك", "visual": "coach character giving thumbs up with phone showing app"},
+        {"headline": "ابدأ مع مدربك النهارده", "body": "خطة تمرين وتغذية تناسبك", "visual": "coach character giving thumbs up with phone showing app"},
     ]
     while len(items) < slides:
         items.insert(-1, {"headline": f"نصيحة رقم {len(items)}", "body": "كلام تجريبي للسلايد", "visual": "flat icon"})
-    return json.dumps({"title": "الراحة جزء من التمرين", "caption": "الراحة مو رفاهية 💪", "hashtags": ["#كوتشي", "#لياقة"],
+    return json.dumps({"title": "الراحة جزء من التمرين", "caption": "الراحة مو رفاهية 💪", "hashtags": ["#لياقة"],
                        "slides": items[: slides - 1] + [{"headline": cta, "body": "", "visual": "call to action"} if cta else items[-1]]},
                       ensure_ascii=False)

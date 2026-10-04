@@ -1,4 +1,4 @@
-"""الإعلانات: تفصيص إعلان مرجعي (مشاهد، فكرة، تصوير، إخراج، أصوات، مؤثرات) واقتراح تنفيذه لكوتشي.
+"""الإعلانات: تفصيص إعلان مرجعي (مشاهد، فكرة، تصوير، إخراج، أصوات، مؤثرات) واقتراح تنفيذه للعميل المختار.
 
 التحليل بيتعمل بموديل بيفهم الفيديو والصوت مع بعض (Gemini عن طريق Atlas)، وبعده تحليل للصوت لوحده
 بتفاصيل أكتر، والاقتراح بيكتبه موديل الكلام.
@@ -51,10 +51,10 @@ AUDIO_FORMAT = """{
 }"""
 
 ADAPT_FORMAT = """{
-  "title": "اسم الإعلان المقترح لكوتشي",
+  "title": "اسم الإعلان المقترح للبراند",
   "concept": "الفكرة في جملتين",
-  "why_it_fits": "ليه الفكرة دي مناسبة لكوتشي ولجمهوره، وإيه اللي اتاخد من الإعلان الأصلي وإيه اللي اتغير",
-  "kochi_angle": "إزاي كوتشي (التطبيق / المدربين / المتدربين) بيظهر في الإعلان",
+  "why_it_fits": "ليه الفكرة دي مناسبة للبراند ولجمهوره، وإيه اللي اتاخد من الإعلان الأصلي وإيه اللي اتغير",
+  "kochi_angle": "إزاي البراند (المنتج / الخدمة / الناس بتوعه) بيظهر في الإعلان",
   "duration": 30,
   "format": "9:16 ريلز / تيك توك ...",
   "hook": "أول 3 ثواني",
@@ -63,18 +63,18 @@ ADAPT_FORMAT = """{
   "palette": "ألوان الإعلان ده بالـ hex ودور كل لون (الخلفيات، الإضاءة، اللبس، الجرافيك)",
   "scenes": [
     {"n": 1, "seconds": 3, "ref_scene": 1,
-     "motion_graphics": "الموشن جرافيك في المشهد بالتفصيل (بالعربي): كل عنصر متحرك (كارت، شاشة تطبيق، أيقونة، كلام متحرك، لوجو، أشكال) إزاي بيدخل ويتحرك ويخرج، بالتوقيت جوه المشهد (من ثانية كام لكام)، الاتجاه والسرعة والـ easing، والانتقال للمشهد اللي بعده. نفس بناء الموشن في المشهد الأصلي بمحتوى كوتشي",
+     "motion_graphics": "الموشن جرافيك في المشهد بالتفصيل (بالعربي): كل عنصر متحرك (كارت، شاشة تطبيق، أيقونة، كلام متحرك، لوجو، أشكال) إزاي بيدخل ويتحرك ويخرج، بالتوقيت جوه المشهد (من ثانية كام لكام)، الاتجاه والسرعة والـ easing، والانتقال للمشهد اللي بعده. نفس بناء الموشن في المشهد الأصلي بمحتوى البراند",
      "motion_prompt": "English description of the same motion-graphics animation for a video model: each animated element, how it enters, moves and exits, timing, easing, and the transition out",
      "visual": "اللي هيحصل في المشهد",
      "shot": "نوع اللقطة", "camera": "حركة الكاميرا والعدسة",
      "on_screen_text": "الكلام المكتوب على الشاشة",
-     "voice": "الكلام اللي هيتقال (باللهجة السعودية)",
+     "voice": "الكلام اللي هيتقال (باللغة واللهجة المطلوبة)",
      "sfx": "المؤثرات الصوتية", "music": "الموسيقى في المشهد",
-     "prompt": "English prompt for a video model (Seedance) for this scene: subject, action, setting in Saudi Arabia, lighting, lens, camera move, mood, the chosen visual style, AND the motion-graphics elements and how they animate. Vertical 9:16.",
+     "prompt": "English prompt for a video model (Seedance) for this scene: subject, action, setting (in the brand's market), lighting, lens, camera move, mood, the chosen visual style, AND the motion-graphics elements and how they animate. Vertical 9:16.",
      "components": [
-       {"name": "اسم المكون في إعلان كوتشي", "kind": "character | prop | background | graphic | text | ui | icon | effect",
+       {"name": "اسم المكون في إعلان البراند", "kind": "character | prop | background | graphic | text | ui | icon | effect",
         "from": "اسم المكون اللي يقابله في المشهد الأصلي (أو فاضي لو جديد)",
-        "asset": "لو المكون ده شاشة تطبيق أو لوجو أو صورة المنتج: اسم الأصل الحقيقي من عقل الإعلان بالظبط (وإلا فاضي)",
+        "asset": "لو المكون ده شاشة تطبيق أو لوجو أو صورة المنتج: اسم الأصل الحقيقي من ملف العميل بالظبط (وإلا فاضي)",
         "description": "شكله ودوره في المشهد",
         "image_prompt": "English prompt to create this element alone, isolated on a plain flat background, in the ad style",
         "animation": "حركته في المشهد (زي حركة المكون الأصلي لو ليه أصل)"}
@@ -165,8 +165,20 @@ def brand_controls(settings: dict, others: list[dict] | None = None) -> str:
     return txt + "\n"
 
 
+def who(brand: dict | None, brain: dict | None) -> dict:
+    """البراند اللي بنعمل له الإعلان: اسمه وسوقه ولغته وقواعده (من ملف العميل)."""
+    b, c = brand or {}, brain or {}
+    return {"name": c.get("name") or b.get("name") or "البراند", "market": c.get("market") or b.get("market") or "",
+            "language": c.get("language") or b.get("language") or "", "modest": bool(c.get("modest") or b.get("modest"))}
+
+
+MODEST_AR = ("- اللبس محتشم دايمًا في كل مشهد وكل برومبت: البنات لبس واسع طويل مغطي الدراعات والرجلين بالكامل مع حجاب، "
+             "والرجالة لابسين تيشيرت دايمًا وشورت تحت الركبة أو بنطلون. متكتبش أي لبس ضيق أو قصير أو مكشوف.\n")
+
+
 def adapt_messages(brand: dict, analysis: dict, audio: dict, settings: dict, style: dict | None, chat: list[dict],
                    brain: dict | None = None, others: list[dict] | None = None) -> list[dict]:
+    w = who(brand, brain)
     style_txt = ""
     if style:
         style_txt = (f"الستايل البصري المختار «{style.get('name', '')}»:\n{style.get('notes') or ''}\n"
@@ -175,28 +187,29 @@ def adapt_messages(brand: dict, analysis: dict, audio: dict, settings: dict, sty
     asks = [
         f"المدة المطلوبة: حوالي {s['duration']} ثانية" if s.get("duration") else "",
         f"المقاس / المنصة: {s['format']}" if s.get("format") else "",
-        f"اللغة واللهجة: {s['language']}" if s.get("language") else "الكلام باللهجة السعودية",
+        f"اللغة واللهجة: {s.get('language') or w['language']}" if s.get("language") or w["language"] else "",
         f"طريقة التنفيذ: {s['production']}" if s.get("production") else "",
         f"تعليمات إضافية: {s['notes']}" if s.get("notes") else "",
     ]
     copy = s.get("fidelity", "copy") != "inspired"
     n_orig = len((analysis or {}).get("scenes") or [])
+    name, market = w["name"], (f" مناسب لسوق {w['market']}." if w["market"] else "")
     if copy:
-        intro = ("شغلتك تاخد إعلان مرجعي متفصّص وتعمل نسخة منه لكوتشي **لقطة بلقطة**: نفس عدد المشاهد ونفس ترتيبها ومدتها، "
+        intro = (f"شغلتك تاخد إعلان مرجعي متفصّص وتعمل نسخة منه لـ«{name}» **لقطة بلقطة**: نفس عدد المشاهد ونفس ترتيبها ومدتها، "
                  "نفس الكادر وزاوية الكاميرا وحركتها وتكوين الصورة ومكان كل عنصر على الشاشة، نفس الموشن جرافيك والانتقالات والإيقاع. "
-                 "اللي بيتغير بس: المنتج والبراند (كوتشي بدلهم)، الكلام المكتوب والمنطوق، والأشخاص (بلبس محتشم). مناسب للسوق السعودي والخليجي.\n\n")
+                 f"اللي بيتغير بس: المنتج والبراند («{name}» بدلهم)، الكلام المكتوب والمنطوق، والأشخاص.{market}\n\n")
         asks.insert(0, f"عدد المشاهد = {n_orig} بالظبط (زي الأصلي)، المشهد رقم n يقابل المشهد الأصلي رقم n (ref_scene = n) وبنفس مدته تقريبًا. "
                        "متدمجش مشاهد ومتزودش مشاهد ومتغيّرش الترتيب." if n_orig else "")
     else:
-        intro = ("شغلتك تاخد إعلان مرجعي متفصّص وتقترح إعلان لكوتشي مستوحى منه "
-                 "(نفس الذكاء والبناء والإحساس، مش نسخة)، مناسب للسوق السعودي والخليجي.\n\n")
+        intro = (f"شغلتك تاخد إعلان مرجعي متفصّص وتقترح إعلان لـ«{name}» مستوحى منه "
+                 f"(نفس الذكاء والبناء والإحساس، مش نسخة).{market}\n\n")
     system = (
-        f"أنت كريتيف دايركتور لبراند {(brain or {}).get('name') or 'كوتشي'}. " + intro
-        + (f"عقل الإعلان (المنتج وهويته وأصوله الحقيقية، التزم بيه بالظبط):\n{brain_text(brain)}\n"
+        f"أنت كريتيف دايركتور لبراند «{name}». " + intro
+        + (f"ملف العميل (المنتج وهويته وأصوله الحقيقية، التزم بيه بالظبط):\n{brain_text(brain)}\n"
            "أي شاشة تطبيق أو لوجو أو صورة منتج في الإعلان لازم تكون من الأصول دي (اكتب اسمها في asset)، "
-           "ومتخترعش شاشات أو لوجوهات تانية. ألوان البراند اللي في العقل ثابتة في اللوجو والشاشات، "
+           "ومتخترعش شاشات أو لوجوهات تانية. ألوان البراند اللي في ملف العميل ثابتة في اللوجو والشاشات، "
            "وألوان الإعلان نفسه حسب «التطبيق على البراند» تحت.\n\n" if brain else
-           f"عن كوتشي: {brand.get('about', '')}\nالجمهور: {brand.get('audience', '')}\n"
+           f"عن «{name}»: {brand.get('about', '')}\nالجمهور: {brand.get('audience', '')}\n"
            f"ألوان البراند: {brand.get('colors', '')}\n\n")
         + style_txt
         + brand_controls(s, others)
@@ -205,22 +218,21 @@ def adapt_messages(brand: dict, analysis: dict, audio: dict, settings: dict, sty
         + "المطلوب:\n" + "\n".join(f"- {a}" for a in asks if a) + "\n"
         "- الإعلان الجديد بيتبني على الموشن جرافيك بتاع الأصلي مش على الفكرة بس: امشي مشهد بمشهد على الأصلي، "
         "وخد من كل مشهد الموشن جرافيك بتاعه (العناصر المتحركة، طريقة دخولها وحركتها وخروجها، توقيتها، الإيقاع، الانتقالات) "
-        "واعمل نفس البناء الحركي بمحتوى كوتشي. القصة والكلام يتكتبوا عشان يخدموا الموشن ده.\n"
+        f"واعمل نفس البناء الحركي بمحتوى «{name}». القصة والكلام يتكتبوا عشان يخدموا الموشن ده.\n"
         "- كل مشهد لازم يكون فيه motion_graphics مفصّل بالتوقيت وmotion_prompt بالإنجليزي، والبرومبت يوصف الموشن كمان. "
         "لو المشهد الأصلي مفيهوش موشن جرافيك اكتب الحركة والانتقال بس.\n"
-        + ("- كل مشهد بنفس visual وshot وcamera بتوع المشهد الأصلي المقابل (بمحتوى كوتشي)، وكل مشهد ببرومبت إنجليزي جاهز لموديل فيديو "
+        + (f"- كل مشهد بنفس visual وshot وcamera بتوع المشهد الأصلي المقابل (بمحتوى «{name}»)، وكل مشهد ببرومبت إنجليزي جاهز لموديل فيديو "
            "بيوصف نفس الكادر والحركة.\n" if copy else
-           "- مشاهد بنفس روح الإعلان الأصلي لكن بقصة كوتشي، وكل مشهد ببرومبت إنجليزي جاهز لموديل فيديو.\n")
+           f"- مشاهد بنفس روح الإعلان الأصلي لكن بقصة «{name}»، وكل مشهد ببرومبت إنجليزي جاهز لموديل فيديو.\n")
         + 
         "- كل مشهد ref_scene = رقم المشهد الأصلي اللي مستوحى منه. وحوّل مكونات المشهد الأصلي (خصوصًا عناصر الموشن جرافيك) "
-        "لنسخة كوتشي: نفس الوظيفة ونفس طريقة الحركة، بس بشكل كوتشي (شاشة التطبيق بدل شاشتهم، لوجو كوتشي بدل لوجوهم، "
+        f"لنسخة «{name}»: نفس الوظيفة ونفس طريقة الحركة، بس بشكل «{name}» (شاشات المنتج بدل شاشتهم، لوجو «{name}» بدل لوجوهم، "
         "شخصياتنا بدل ممثليهم). الشخصية اللي بتتكرر في أكتر من مشهد اكتب برومبتها بنفس الوصف بالظبط.\n"
         "- من غير كليشيهات إعلانات ومن غير وعود صحية مبالغ فيها.\n"
-        "- اللبس محتشم دايمًا في كل مشهد وكل برومبت: البنات لبس واسع طويل مغطي الدراعات والرجلين بالكامل مع حجاب، "
-        "والرجالة لابسين تيشيرت دايمًا وشورت تحت الركبة أو بنطلون. متكتبش أي لبس ضيق أو قصير أو مكشوف.\n"
-        f"رجّع JSON بس بالشكل ده:\n{ADAPT_FORMAT}"
+        + (MODEST_AR if w["modest"] else "")
+        + f"رجّع JSON بس بالشكل ده:\n{ADAPT_FORMAT}"
     )
-    first = {"role": "user", "content": "اقترح إعلان كوتشي مستوحى من الإعلان ده."}
+    first = {"role": "user", "content": f"اقترح إعلان لـ«{name}» مستوحى من الإعلان ده."}
     return [{"role": "system", "content": system}, first] + chat[-12:]
 
 
@@ -345,20 +357,20 @@ def mock_audio() -> dict:
 
 
 def mock_adaptation(duration: int = 30) -> dict:
-    return {"title": "كوتشي: إعلان تجريبي", "concept": "فكرة تجريبية", "why_it_fits": "تجربة", "kochi_angle": "التطبيق",
+    return {"title": "إعلان تجريبي", "concept": "فكرة تجريبية", "why_it_fits": "تجربة", "kochi_angle": "التطبيق",
             "duration": duration, "format": "9:16", "hook": "سؤال سريع", "angle": "زاوية تجريبية", "tone": "هادي",
             "palette": "#1D3557 كحلي (الخلفيات)، #F1FAEE أبيض دافي",
             "scenes": [{"n": i + 1, "seconds": 5, "ref_scene": 1 + i % 2, "visual": f"مشهد {i + 1}",
-                        "motion_graphics": "كارت كوتشي بينط من تحت في أول ثانية ويكبر، وبعدين بيتزحلق لبرة شمال",
-                        "motion_prompt": "A KOCHI card pops up from the bottom in the first second, scales up, then slides out left.", "shot": "medium", "camera": "static",
+                        "motion_graphics": "كارت البراند بينط من تحت في أول ثانية ويكبر، وبعدين بيتزحلق لبرة شمال",
+                        "motion_prompt": "A brand card pops up from the bottom in the first second, scales up, then slides out left.", "shot": "medium", "camera": "static",
                         "on_screen_text": "", "voice": "جملة تجريبية", "sfx": "", "music": "", "prompt": "Test scene. Vertical 9:16.",
                         "components": [{"name": "المتدرب", "kind": "character", "from": "الممثل", "description": "شاب سعودي",
                                         "image_prompt": "A young Saudi man, full body.", "animation": "ثابت"},
-                                       {"name": "كارت كوتشي", "kind": "ui", "from": "كارت سعر", "description": "كارت التطبيق",
-                                        "image_prompt": "A KOCHI app card UI.", "animation": "بينط من تحت"}]}
+                                       {"name": "كارت البراند", "kind": "ui", "from": "كارت سعر", "description": "كارت التطبيق",
+                                        "image_prompt": "A brand app card UI.", "animation": "بينط من تحت"}]}
                        for i in range(3)],
             "voiceover_script": "فويس أوفر تجريبي", "music_direction": "beat", "sound_design": "whoosh",
-            "cast": "مدرب", "locations": "جيم", "production_notes": "تجربة", "cta": "حمّل كوتشي", "caption": "كابشن"}
+            "cast": "مدرب", "locations": "جيم", "production_notes": "تجربة", "cta": "حمّل التطبيق", "caption": "كابشن"}
 
 
 # ================================================================ التنفيذ: راس الإعلان ← ستوري بورد ← مكونات ← لقطات
@@ -400,6 +412,9 @@ def header_from(adaptation: dict, style: dict | None, brand: dict, settings: dic
         "locations": a.get("locations", ""),
         "palette": ad_palette(a, brand, settings, brain),
         "brand": brain_header(brain),
+        "brand_name": who(brand, brain)["name"],
+        "market": who(brand, brain)["market"],
+        "modest": who(brand, brain)["modest"],
         "fidelity": (settings or {}).get("fidelity") or "copy",
         "brain_id": (brain or {}).get("id"),
         "rules": "Vertical social ad, consistent characters, wardrobe and lighting in every shot. No watermarks, no random text.",
@@ -415,6 +430,9 @@ def header_text(h: dict) -> str:
         f"CHARACTERS (keep identical in every shot): {h['characters']}" if h.get("characters") else "",
         f"LOCATIONS: {h['locations']}" if h.get("locations") else "",
         f"COLOR PALETTE: {h['palette']}" if h.get("palette") else "",
+        f"MARKET (people, places and details should fit it): {h['market']}" if h.get("market") else "",
+        "WARDROBE: everyone modestly dressed (women in loose long clothing with hijab, men in shirts and long or below-knee shorts)."
+        if h.get("modest") else "",
         f"RULES: {h['rules']}" if h.get("rules") else "",
     ]
     return "\n".join(p for p in parts if p)
@@ -444,7 +462,7 @@ def frame_prompt(h: dict, shot: dict, ref_comps: list[dict] | None = None, n_sty
         refs_txt += (f"\nImage {orig_idx} is the matching frame from the ORIGINAL reference ad. "
                      + ("Recreate its composition exactly: same framing and shot size, camera angle, subject pose and placement, "
                         "layout and position of every on-screen graphic, card, text box and screen. Replace only the brand content "
-                        "(app screens, logo, text, product) with ours, and the people with ours in modest clothing. "
+                        "(app screens, logo, text, product) with ours, and the people with ours. "
                         "Never copy the original brand's logo, name or text."
                         if h.get("fidelity", "copy") != "inspired" else
                         "Use it as loose inspiration for composition and energy only; never copy its brand, logo or text."))
@@ -498,17 +516,17 @@ COMPONENTS_FORMAT = """{
 
 def components_messages(h: dict, shot: dict, has_reference: bool) -> list[dict]:
     text = (
-        "أنت موشن ديزاينر ومخرج إعلانات. قدامك صورة الستوري بورد للقطة من إعلان كوتشي"
+        f"أنت موشن ديزاينر ومخرج إعلانات. قدامك صورة الستوري بورد للقطة من إعلان «{h.get('brand_name') or 'البراند'}»"
         + (" وبعدها صورة من اللقطة المقابلة في الإعلان الأصلي اللي بنستلهم منه" if has_reference else "")
         + ".\nفصّص اللقطة لمكوناتها عشان كل مكون يتعمل لوحده بموديل صور وبعدين نجمعهم في فيديو: "
         "الشخصيات، الأدوات والمنتجات، الخلفية، وكل عناصر الموشن جرافيك (أيقونات، كروت كلام، شاشات تطبيق، أشكال، أسهم، "
-        "إيموجي، تأثيرات). لو الإعلان الأصلي فيه موشن جرافيك في اللقطة دي، استخرج عناصره وطريقة حركتها وطبّقها على كوتشي.\n\n"
+        "إيموجي، تأثيرات). لو الإعلان الأصلي فيه موشن جرافيك في اللقطة دي، استخرج عناصره وطريقة حركتها وطبّقها على البراند.\n\n"
         f"راس الإعلان (ثابت لكل اللقطات):\n{header_text(h)}\n\n"
         f"اللقطة {shot.get('n')} ({shot.get('seconds', '')} ثانية): {shot.get('visual', '')}\n"
         f"كلام على الشاشة: {shot.get('on_screen_text', '') or '—'}\nالصوت: {shot.get('voice', '') or '—'}\n"
         + (f"الموشن جرافيك المطلوب في اللقطة (التزم بيه): {shot.get('motion_notes')}\n" if shot.get("motion_notes") else "")
         + "\n"
-        + (f"مكونات المشهد الأصلي المقابل (حوّلها لنسخة كوتشي بنفس الوظيفة والحركة): "
+        + (f"مكونات المشهد الأصلي المقابل (حوّلها لنسخة البراند بنفس الوظيفة والحركة): "
            f"{json.dumps(shot.get('ref_components'), ensure_ascii=False)}\nالموشن جرافيك في الأصلي: {shot.get('ref_motion', '')}\n"
            if shot.get("ref_components") else "")
         + (f"المكونات المقترحة للقطة دي (عدّلها على الستوري بورد وكمّل الناقص): "
@@ -554,7 +572,7 @@ def video_prompt(h: dict, shot: dict, ref_comps: list[dict] | int = 0) -> str:
 def mock_components() -> dict:
     return {"components": [
         {"name": "المدرب", "kind": "character", "description": "مدرب بيشاور على الموبايل", "image_prompt": "A fitness coach character, full body.", "animation": "بيدخل من اليمين"},
-        {"name": "شاشة التطبيق", "kind": "ui", "description": "شاشة كوتشي", "image_prompt": "A phone screen showing a fitness app UI.", "animation": "بتكبر من النص"},
+        {"name": "شاشة التطبيق", "kind": "ui", "description": "شاشة التطبيق", "image_prompt": "A phone screen showing a fitness app UI.", "animation": "بتكبر من النص"},
         {"name": "أيقونة نار", "kind": "icon", "description": "إيموجي حماس", "image_prompt": "A flat fire icon.", "animation": "بتنط فوق الموبايل"},
     ], "motion_notes": "حركة تجريبية", "assembly_prompt": "Test assembly prompt."}
 
@@ -611,7 +629,7 @@ def mock_scene_components(scenes: list[dict]) -> dict:
                        for s in scenes]}
 
 
-# ================================================================ عقل الإعلان: المنتج وأصوله (شاشات، لوجو، صور المنتج) والهوية
+# ================================================================ ملف العميل: المنتج وأصوله (شاشات، لوجو، صور المنتج) والهوية
 
 BRAIN_TYPES = {"app": "تطبيق موبايل", "physical": "منتج ملموس", "service": "خدمة"}
 
@@ -638,11 +656,12 @@ def brain_messages(brain: dict, files: list[str]) -> str:
 
 
 def brain_text(brain: dict | None) -> str:
-    """ملخص عقل الإعلان اللي بيدخل في كتابة الاقتراح."""
+    """ملخص ملف العميل اللي بيدخل في كتابة الاقتراح."""
     if not brain:
         return ""
     lines = [f"المنتج: {brain.get('name', '')} ({BRAIN_TYPES.get(brain.get('type'), '')})" + (f" — المجال: {brain['domain']}" if brain.get("domain") else "")]
-    for k, label in (("about", "عنه"), ("audience", "الجمهور"), ("rules", "قواعد لازم تتراعى"), ("palette", "الألوان"),
+    for k, label in (("about", "عنه"), ("audience", "الجمهور"), ("market", "السوق"), ("language", "اللغة واللهجة"),
+                     ("rules", "قواعد لازم تتراعى"), ("palette", "الألوان"),
                      ("theme", "الثيم"), ("typography", "الخطوط"), ("ui_style", "شكل الواجهة")):
         if brain.get(k):
             lines.append(f"{label}: {brain[k]}")
@@ -690,7 +709,7 @@ CAST_FORMAT = """{
     {"name": "اسم قصير مميز (مثلًا: سارة، المدرب فهد، الجيم، الكافيه، زجاجة المية)",
      "kind": "character | background | prop",
      "description": "وصفه بالعربي ودوره في الإعلان",
-     "image_prompt": "English, very detailed and fixed description used in EVERY shot. Character: gender, age, Saudi/Gulf look, face, hair, body type, exact modest outfit with colors (women: loose long clothing and hijab). Background: the empty place with its layout, materials, colors and lighting, no people. Prop: exact shape, material, colors, branding.",
+     "image_prompt": "English, very detailed and fixed description used in EVERY shot. Character: gender, age, a look that fits the market in the header, face, hair, body type, exact outfit with colors (follow the WARDROBE rule in the header if there is one). Background: the empty place with its layout, materials, colors and lighting, no people. Prop: exact shape, material, colors, branding.",
      "shots": [1, 3, 4]}
   ]
 }"""
@@ -707,11 +726,11 @@ def cast_messages(header_txt: str, adaptation: dict, shots: list[dict], known: l
         "- الأماكن والأدوات: اللي بتتكرر في لقطتين أو أكتر بس.\n"
         "- متطلّعش شاشات التطبيق ولا اللوجو ولا عناصر الموشن جرافيك (ليهم مكان تاني).\n"
         "- shots = أرقام اللقطات اللي بيظهر فيها بالظبط.\n"
-        "- اللبس محتشم دايمًا: البنات لبس واسع طويل مع حجاب، والرجالة تيشيرت وبنطلون أو شورت تحت الركبة.\n"
+        "- التزم بقاعدة اللبس اللي في راس الإعلان لو موجودة.\n"
         "- أقصى حاجة 8، الأهم الأول.\n\n"
         f"راس الإعلان:\n{header_txt}\n\nالشخصيات المكتوبة في الاقتراح: {adaptation.get('cast', '') or '—'}\n"
         f"الأماكن: {adaptation.get('locations', '') or '—'}\n\nاللقطات:\n{rows}\n\n"
-        + ("موجودين قبل كده في عقل الإعلان (لو حد منهم مناسب للإعلان ده استخدمه بنفس اسمه ووصفه بالظبط بدل ما تعمل جديد):\n"
+        + ("موجودين قبل كده في ملف العميل (لو حد منهم مناسب للإعلان ده استخدمه بنفس اسمه ووصفه بالظبط بدل ما تعمل جديد):\n"
            + "\n".join(f"- {k.get('name')} ({k.get('kind')}): {k.get('prompt') or k.get('description', '')}" for k in known) + "\n\n"
            if known else "")
         + 
@@ -747,7 +766,7 @@ def mock_cast(shots: list[dict]) -> dict:
     ]}
 
 
-# ================================================================ ✍️ برومبتات الستوري بورد بالمنشن من عقل الإعلان
+# ================================================================ ✍️ برومبتات الستوري بورد بالمنشن من ملف العميل
 
 SB_FORMAT = """{"shots": [{"id": "id اللقطة زي ما هو", "prompt": "English storyboard prompt that mentions database items as @Name exactly"}]}"""
 
@@ -765,13 +784,13 @@ def sb_messages(header_txt: str, shots: list[dict], db_items: list[dict]) -> lis
             + f"البرومبت الحالي: {s.get('sb_prompt') or s.get('prompt', '')}")
     text = (
         "أنت ستوري بورد آرتيست. اكتب لكل لقطة برومبت إنجليزي لموديل صور يرسم كادر الستوري بورد.\n"
-        "عندك قاعدة بيانات عقل الإعلان: كل عنصر فيها ليه صورة مرجعية حقيقية هتتبعت مع البرومبت.\n"
+        "عندك قاعدة بيانات ملف العميل: كل عنصر فيها ليه صورة مرجعية حقيقية هتتبعت مع البرومبت.\n"
         "القواعد:\n"
         "- أي شخصية أو مكان أو أداة أو شاشة أو لوجو موجود في قاعدة البيانات وبيظهر في اللقطة: اعمله منشن بـ @ والاسم بالظبط زي ما هو مكتوب.\n"
         "- متوصفش شكل العنصر اللي عملتله منشن (صورته المرجعية هي اللي بتحدد شكله)، اكتب بس هو بيعمل إيه، مكانه في الكادر، وضعه، وتعبيره.\n"
         "- اكتب الكادر والكاميرا والإضاءة والتكوين بوضوح.\n"
-        "- اللبس محتشم دايمًا.\n\n"
-        f"راس الإعلان:\n{header_txt}\n\nقاعدة بيانات عقل الإعلان:\n{db or '—'}\n\nاللقطات:\n" + "\n\n".join(rows)
+        "- التزم بقاعدة اللبس اللي في راس الإعلان لو موجودة.\n\n"
+        f"راس الإعلان:\n{header_txt}\n\nقاعدة بيانات ملف العميل:\n{db or '—'}\n\nاللقطات:\n" + "\n\n".join(rows)
         + f"\n\nرجّع JSON بس بالشكل ده:\n{SB_FORMAT}"
     )
     return [{"role": "user", "content": text}]
@@ -801,17 +820,19 @@ DIRECTIONS_FORMAT = """{"directions": [
 
 def directions_messages(brand: dict, analysis: dict, settings: dict, brain: dict | None, others: list[dict] | None) -> list[dict]:
     """3 اتجاهات مختلفة جدًا عن بعض لتطبيق الإعلان على البراند، المستخدم يختار منهم."""
-    about = brain_text(brain) if brain else f"عن كوتشي: {brand.get('about', '')}\nالجمهور: {brand.get('audience', '')}"
+    w = who(brand, brain)
+    about = brain_text(brain) if brain else f"عن «{w['name']}»: {brand.get('about', '')}\nالجمهور: {brand.get('audience', '')}"
     copy = (settings or {}).get("fidelity", "copy") != "inspired"
     system = (
-        f"أنت كريتيف دايركتور لبراند {(brain or {}).get('name') or 'كوتشي'}، للسوق السعودي والخليجي.\n{about}\n\n"
+        f"أنت كريتيف دايركتور لبراند «{w['name']}»" + (f"، لسوق {w['market']}" if w["market"] else "") + f".\n{about}\n\n"
         "ده تحليل إعلان مرجعي هنعمل منه إعلان للبراند"
         + (" (نفس اللقطات والموشن، بس المحتوى والقصة والألوان والأشخاص بتوعنا)" if copy else " (مستوحى منه)") + ":\n"
         + json.dumps({k: (analysis or {}).get(k) for k in ("summary", "idea", "hook", "structure", "style", "scenes")}, ensure_ascii=False)[:15000]
         + "\n\n" + brand_controls({**(settings or {}), "direction": ""}, others)
         + "اقترح 3 اتجاهات مختلفة جدًا عن بعض (زاوية بيعية مختلفة، تون مختلف، ألوان مختلفة، مكان وأشخاص مختلفين)، "
         "كلهم ينفعوا على بناء الإعلان المرجعي. لو المستخدم محدد حاجة فوق التزم بيها في التلاتة وغيّر الباقي. "
-        "من غير كليشيهات، واللبس محتشم دايمًا. بالعربي المصري البسيط.\n"
+        + ("من غير كليشيهات" + ("، واللبس محتشم دايمًا" if w["modest"] else "") + ". بالعربي المصري البسيط.\n")
+        + 
         f"رجّع JSON بس بالشكل ده:\n{DIRECTIONS_FORMAT}"
     )
     return [{"role": "system", "content": system}, {"role": "user", "content": "اقترح 3 اتجاهات."}]

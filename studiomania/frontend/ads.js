@@ -1,4 +1,4 @@
-// StudioMania — الإعلانات: إعلان مرجعي ← تفصيص (مشاهد، فكرة، تصوير، إخراج، أصوات، مؤثرات) ← اقتراح لكوتشي
+// StudioMania — الإعلانات: إعلان مرجعي ← تفصيص (مشاهد، فكرة، تصوير، إخراج، أصوات، مؤثرات) ← اقتراح للعميل
 // ومكتبة ستايلات (صور) بتتحفظ وتتختار لأي إعلان
 
 const adx = { list: [], cur: null, styles: [], brains: [], brainId: null, tab: "analysis", timer: null, view: "ad" };
@@ -11,6 +11,10 @@ async function initAds() {
   const id = adx.list.some((a) => a.id === want) ? want : adx.list[0]?.id;
   if (id) await openAd(id);
   else renderAds();
+  if (adx.wantBrain) {  // جاي من «✏️ ملف العميل»
+    adx.view = "brain"; adx.brainId = adx.wantBrain; adx.wantBrain = null;
+    renderAds();
+  }
 }
 viewHooks["10"] = initAds;
 
@@ -30,7 +34,7 @@ const SCENE_LABELS = {
   sfx: "المؤثرات", music: "الموسيقى", transition: "الانتقال", purpose: "وظيفة المشهد",
 };
 const ADAPT_LABELS = {
-  concept: "الفكرة", why_it_fits: "ليه مناسب لكوتشي", kochi_angle: "كوتشي بيظهر إزاي", hook: "الهوك", format: "المقاس", angle: "🎯 الزاوية", tone: "🎭 الإحساس", palette: "🎨 ألوان الإعلان ده",
+  concept: "الفكرة", why_it_fits: "ليه مناسب للبراند", kochi_angle: "البراند بيظهر إزاي", hook: "الهوك", format: "المقاس", angle: "🎯 الزاوية", tone: "🎭 الإحساس", palette: "🎨 ألوان الإعلان ده",
   voiceover_script: "الفويس أوفر كامل", music_direction: "الموسيقى", sound_design: "المؤثرات وتصميم الصوت", cast: "الممثلين",
   locations: "أماكن التصوير", production_notes: "ملاحظات التنفيذ", cta: "الدعوة للفعل", caption: "كابشن البوست",
 };
@@ -169,7 +173,7 @@ function adaptMotion(s) {
   const orig = (adx.cur.analysis?.scenes || []).find((x) => String(x.n) === String(s.ref_scene));
   return `<div class="ad-motion">
     ${orig?.motion_graphics ? `<div class="ad-mg orig" data-no-i18n>↩ <b>الموشن في المشهد الأصلي ${adEsc(orig.n)}:</b> ${adEsc(orig.motion_graphics)}</div>` : ""}
-    ${adField("🎞️ الموشن جرافيك في المشهد (نسخة كوتشي)", s.motion_graphics, 'data-ask="motion_graphics"', 3)}
+    ${adField("🎞️ الموشن جرافيك في المشهد (نسخة البراند)", s.motion_graphics, 'data-ask="motion_graphics"', 3)}
     ${adField("Motion prompt", s.motion_prompt, 'data-ask="motion_prompt"', 2, true)}</div>`;
 }
 
@@ -202,7 +206,7 @@ function renderAdAdapt() {
   $("adAdaptState").innerHTML = busy ? `<span class="spin-inline"></span> ✍️ بيكتب الاقتراح...` : a.adapt_status === "failed" ? `✕ ${adEsc(a.adapt_error)}` : "";
   $("adAdaptGo").disabled = busy || !a.analysis;
   const ad = a.adaptation;
-  if (!ad) { $("adAdapt").innerHTML = `<p class="muted">${busy ? "⏳ بيكتب..." : a.analysis ? "لسه مفيش اقتراح. دوس «التالي: اكتب اقتراح كوتشي» تحت التحليل." : "الاقتراح بيتكتب بعد التحليل."}</p>`; return; }
+  if (!ad) { $("adAdapt").innerHTML = `<p class="muted">${busy ? "⏳ بيكتب..." : a.analysis ? "لسه مفيش اقتراح. دوس «التالي: اكتب الاقتراح» تحت التحليل." : "الاقتراح بيتكتب بعد التحليل."}</p>`; return; }
   if (editingIn($("adAdapt"))) return;
   const style = adx.styles.find((s) => s.id === a.settings.style_id);
   $("adAdapt").innerHTML = `<div class="ad-adapt-head">
@@ -226,8 +230,8 @@ function renderAdAdapt() {
 function renderAdSettings() {
   const a = adx.cur, st = a.settings || {};
   if (document.activeElement !== $("adSetBrain")) {
-    $("adSetBrain").innerHTML = `<option value="">تلقائي${adx.brains[0] ? ` (${adEsc(adx.brains[0].name)})` : ""}</option>`
-      + adx.brains.map((b) => `<option value="${b.id}">${adEsc(b.name)}</option>`).join("") + `<option value="none">من غير عقل إعلان</option>`;
+    $("adSetBrain").innerHTML = `<option value="">العميل الحالي${clientx.cur ? ` (${adEsc(clientx.cur.name)})` : ""}</option>`
+      + adx.brains.map((b) => `<option value="${b.id}">${adEsc(b.name)}</option>`).join("") + `<option value="none">من غير ملف عميل</option>`;
   }
   for (const el of document.querySelectorAll("[data-set]")) if (document.activeElement !== el) el.value = st[el.dataset.set] ?? "";
   $("adStylePick").innerHTML = `<button type="button" class="ad-style-card ${!st.style_id ? "sel" : ""}" data-pick-style=""><span class="ph">∅</span><b>من غير ستايل</b></button>` +
@@ -275,7 +279,7 @@ async function uploadAd(file, edit) {
   adx.view = "ad";
   storageSet(AD_KEY, a.id);
   renderAds();
-  toast("✅ اترفع. التحليل بدأ وبعده الاقتراح لكوتشي");
+  toast("✅ اترفع. التحليل بدأ وبعده الاقتراح للعميل");
 }
 
 // ---------- محرر القص والكروب ----------
@@ -644,10 +648,10 @@ function renderAdFlow() {
       <button class="btn primary" data-scomps ${anBusy ? "disabled" : ""}>🎞️ استخرج الموشن جرافيك والمكونات</button>`;
   } else if (a.analysis) {
     const fresh = a.adaptation && !adaptStale(a);
-    n1.innerHTML = `<span class="muted">${adBusy ? "✍️ اقتراح كوتشي بيتكتب من التحليل ده..." : fresh ? "✅ اقتراح كوتشي متحدّث بآخر نسخة من التحليل والمكونات."
-      : a.adaptation ? "⚠️ التحليل أو المكونات اتغيروا بعد ما الاقتراح اتكتب." : "الخطوة الجاية: اقتراح لكوتشي مبني على المشاهد والمكونات دي."}</span>
+    n1.innerHTML = `<span class="muted">${adBusy ? "✍️ الاقتراح بيتكتب من التحليل ده..." : fresh ? "✅ الاقتراح متحدّث بآخر نسخة من التحليل والمكونات."
+      : a.adaptation ? "⚠️ التحليل أو المكونات اتغيروا بعد ما الاقتراح اتكتب." : "الخطوة الجاية: اقتراح للعميل مبني على المشاهد والمكونات دي."}</span>
       <button class="btn primary" data-flow="adapt" ${anBusy || adBusy ? "disabled" : ""}>${adBusy ? "⏳ بيكتب الاقتراح..."
-        : fresh ? "التالي: اقتراح كوتشي ←" : "التالي: اكتب اقتراح كوتشي من التحليل ده ←"}</button>`;
+        : fresh ? "التالي: الاقتراح ←" : "التالي: اكتب الاقتراح من التحليل ده ←"}</button>`;
   }
   const s1 = $("adAdaptStale");
   s1.hidden = !adaptStale(a) || adBusy;
@@ -670,7 +674,7 @@ function renderAdFlow() {
   s2.classList.toggle("ad-stale", stale);
   s2.classList.toggle("ad-next", !stale);
   s2.innerHTML = `${stale ? `<span class="grow">${adaptStale(a) ? "⚠️ التحليل أو الموشن جرافيك اتغيروا بعد ما الاقتراح اتكتب، فاللقطات هنا ماشية على النسخة القديمة."
-      : "⚠️ اقتراح كوتشي اتغير بعد ما التنفيذ ده بدأ، فاللقطات هنا ماشية على النسخة القديمة."}</span>
+      : "⚠️ الاقتراح اتغير بعد ما التنفيذ ده بدأ، فاللقطات هنا ماشية على النسخة القديمة."}</span>
       <button class="btn sm primary" data-flow="prod" ${prodBusy(a) || a.adapt_status === "working" ? "disabled" : ""}>${adaptStale(a) ? "↻ حدّث الاقتراح بالموشن وخده للتنفيذ" : "↻ خد الاقتراح الجديد للتنفيذ"}</button>` : `<span class="grow muted">📦 في تنفيذ قديم محفوظ.</span>`}
     ${hist.length ? `<button class="btn sm" data-prod-restore="0" ${prodBusy(a) ? "disabled" : ""}>↶ رجّع التنفيذ السابق (${hist[0].shots} لقطة)</button>` : ""}`;
 }
@@ -682,7 +686,7 @@ function renderAdActivity() {
   if (["queued", "working"].includes(a.status)) items.push(["analysis", `🔍 بيحلل الإعلان: ${a.step || "في الطابور"}`]);
   if (a.scomp_status === "working") items.push(["analysis", "🎞️ بيستخرج الموشن جرافيك ومكونات كل مشهد"]);
   if (a.directions_status === "working") items.push(["adapt", "🎲 بيفكر في 3 اتجاهات مختلفة للإعلان"]);
-  if (a.adapt_status === "working") items.push(["adapt", a.chain_prod ? "✍️ بيكتب اقتراح كوتشي بالموشن، وبعده هيبدأ التنفيذ" : "✍️ بيكتب اقتراح كوتشي"]);
+  if (a.adapt_status === "working") items.push(["adapt", a.chain_prod ? "✍️ بيكتب الاقتراح بالموشن، وبعده هيبدأ التنفيذ" : "✍️ بيكتب الاقتراح"]);
   if (a.audio_status === "working") items.push(["audio", "🎧 بيسمع الصوت ويفصّصه"]);
   const shots = a.prod?.shots || [];
   const drawing = shots.filter((s) => s.frame_status === "working"), waitDraw = shots.filter((s) => s.frame_status === "queued");
@@ -757,7 +761,7 @@ function prodBusy(a) {
     || s.components.some((c) => c.status === "working") || s.takes.some((t) => PBUSY.has(t.status)));
 }
 const HEADER_LABELS = { title: "اسم الإعلان", concept: "الكونسبت", style: "الستايل البصري (بالإنجليزي)", characters: "الشخصيات (نفس الشكل في كل لقطة)",
-  locations: "الأماكن", palette: "ألوان البراند", brand: "🧠 هوية المنتج (من عقل الإعلان)", rules: "قواعد ثابتة" };
+  locations: "الأماكن", palette: "ألوان البراند", brand: "🧠 هوية المنتج (من ملف العميل)", rules: "قواعد ثابتة" };
 const KIND_LABEL = { character: "🧍 شخصية", prop: "📦 أداة", background: "🏞️ خلفية", graphic: "✨ جرافيك", text: "🔤 كلام", ui: "📱 شاشة", icon: "⭐ أيقونة", effect: "💫 تأثير", logo: "🏷️ لوجو" };
 const PSHOT_LABELS = { visual: "اللي بيحصل", shot: "اللقطة", camera: "الكاميرا", on_screen_text: "كلام على الشاشة", voice: "الكلام", sfx: "المؤثرات" };
 const pAPI = (path, opts) => api(`/api/ads/${adx.cur.id}/prod${path}`, opts);
@@ -860,20 +864,20 @@ function editingIn(el) {
   return !!f && el.contains(f) && f.matches("textarea, select, input:not([type=checkbox]):not([type=file]):not([type=radio])");
 }
 
-// ---------- ✍️ برومبت الستوري بورد بالمنشن: @الاسم = صورة حقيقية من عقل الإعلان بتتبعت مع الرسم ----------
+// ---------- ✍️ برومبت الستوري بورد بالمنشن: @الاسم = صورة حقيقية من ملف العميل بتتبعت مع الرسم ----------
 const DB_KIND = { character: "🧍", background: "🏞️", prop: "🧰", product: "📦", screen: "📱", logo: "🏷️" };
 function renderSb(a, s) {
   const db = a.brain_db || [], byName = Object.fromEntries(db.map((x) => [x.name, x]));
   const ments = (s.mentions || []).filter((n) => byName[n]);
   const rest = db.filter((x) => !ments.includes(x.name));
   return `<div class="ad-sb">
-    <label class="ad-f"><span>✍️ برومبت الستوري بورد (بالمنشن من 🧠 العقل)</span>
+    <label class="ad-f"><span>✍️ برومبت الستوري بورد (بالمنشن من 👤 ملف العميل)</span>
       <textarea rows="3" dir="ltr" data-pf="sb_prompt" placeholder="لسه متكتبش. دوس «✍️ اكتبه بالمنشن» أو زرار الرسم فوق" data-no-i18n>${adEsc(s.sb_prompt || "")}</textarea></label>
     <div class="ad-ments">${ments.map((n) => `<span class="ment" title="${adEsc(byName[n].kind)}"><img src="${byName[n].url}" alt="">@${adEsc(n)}</span>`).join("")
-      || `<span class="muted">مفيش منشن لسه: الرسم مش هياخد صور من العقل للقطة دي.</span>`}</div>
+      || `<span class="muted">مفيش منشن لسه: الرسم مش هياخد صور من ملف العميل للقطة دي.</span>`}</div>
     <div class="row wrap">
       <button class="btn sm" data-p="sbwrite">✍️ ${s.sb_prompt ? "اكتبه تاني بالمنشن" : "اكتبه بالمنشن"}</button>
-      ${rest.length ? `<select class="btn sm" data-addment><option value="">＋ منشن من العقل</option>${rest.map((x) => `<option value="${adEsc(x.name)}">${DB_KIND[x.kind] || ""} @${adEsc(x.name)}</option>`).join("")}</select>` : ""}
+      ${rest.length ? `<select class="btn sm" data-addment><option value="">＋ منشن من ملف العميل</option>${rest.map((x) => `<option value="${adEsc(x.name)}">${DB_KIND[x.kind] || ""} @${adEsc(x.name)}</option>`).join("")}</select>` : ""}
     </div></div>`;
 }
 
@@ -976,14 +980,14 @@ function renderCast(a) {
       <span class="muted">${cast.length ? `${cast.length - pending}/${cast.length} اتوافق عليهم` : "قبل الستوري بورد: صورة ثابتة لكل شخصية ومكان بيتكرر، عشان يفضلوا هما هما في كل اللقطات."}</span>
       <button class="btn sm ${cast.length ? "" : "primary"}" data-cast="extract" ${busy ? "disabled" : ""}>${busy ? "⏳ بيطلّعهم..." : cast.length ? "↻ طلّعهم تاني" : "🎭 طلّع الأبطال والمكونات"}</button>
       ${cast.some((c) => !c.approved) ? `<button class="btn sm" data-cast="images">🖼️ ${cast.some((c) => c.image) ? "ارسم اللي مش معتمدين" : "ارسم صورهم"}</button>` : ""}
-      ${cast.some((c) => c.image && !c.approved) ? `<button class="btn sm primary" data-cast="approveall">🧠 اعتمد الكل وضيفهم للعقل</button>` : ""}</div>
+      ${cast.some((c) => c.image && !c.approved) ? `<button class="btn sm primary" data-cast="approveall">👤 اعتمد الكل وضيفهم لملف العميل</button>` : ""}</div>
     ${p.cast_error ? `<div class="muted">${adEsc(p.cast_error)}</div>` : ""}
-    ${cast.length ? `<p class="hint">لما تعتمد، الصورة بتتحفظ في 🧠 عقل الإعلان باسمها، وبرومبتات الستوري بورد بتعمل لها منشن (@الاسم) فصورتها الحقيقية بتتبعت مع الرسم في كل لقطة.</p>` : ""}`;
+    ${cast.length ? `<p class="hint">لما تعتمد، الصورة بتتحفظ في 👤 ملف العميل باسمها، وبرومبتات الستوري بورد بتعمل لها منشن (@الاسم) فصورتها الحقيقية بتتبعت مع الرسم في كل لقطة.</p>` : ""}`;
   const cards = cast.map((c) => `<div class="ad-cast-card ${c.approved ? "ok" : ""}" data-cast-id="${c.id}">
       <div class="img">${c.image_url ? `<img src="${c.image_url}" alt="">` : c.status === "working" ? `<div class="spin"></div>` : "🖼️"}${c.status === "working" && c.image_url ? `<div class="car-wait over"><div class="spin"></div></div>` : ""}</div>
       ${c.images.length > 1 ? `<div class="vers">${c.images.map((f) => `<img src="${f.url}" data-cast-pick="${f.file}" class="${f.url === c.image_url ? "sel" : ""}" title="${adEsc(f.note)}" alt="">`).join("")}</div>` : ""}
       <div class="row"><select data-castf="kind">${Object.entries(CAST_KIND).map(([k, l]) => `<option value="${k}" ${k === c.kind ? "selected" : ""}>${l}</option>`).join("")}</select>
-        ${c.approved ? `<b class="okb">🧠 @${adEsc(c.name)}</b>` : c.from_brain ? `<small class="muted">من عقل الإعلان</small>` : ""}</div>
+        ${c.approved ? `<b class="okb">🧠 @${adEsc(c.name)}</b>` : c.from_brain ? `<small class="muted">من ملف العميل</small>` : ""}</div>
       <input type="text" value="${adEsc(c.name)}" data-castf="name" data-no-i18n>
       <small class="muted">في اللقطات: ${(c.shots || []).join("، ") || "—"}</small>
       <textarea rows="2" data-castf="description" data-no-i18n>${adEsc(c.description)}</textarea>
@@ -993,7 +997,7 @@ function renderCast(a) {
         <button class="btn sm" data-cast="img" ${c.status === "working" ? "disabled" : ""}>🖼️ ${c.image_url ? "تاني" : "ارسم"}</button>
         ${c.image_url ? `<button class="btn sm" data-cast="edit" ${c.status === "working" ? "disabled" : ""}>✏️ عدّل</button>` : ""}
         <label class="btn sm" title="صورة من عندك">⬆<input type="file" accept="image/*" data-cast-up hidden></label>
-        ${c.image_url ? `<button class="btn sm ${c.approved ? "" : "primary"}" data-cast="${c.approved ? "unapprove" : "approve"}">${c.approved ? "↩ الغي الاعتماد" : "🧠 اعتمد وضيفه للعقل"}</button>` : ""}
+        ${c.image_url ? `<button class="btn sm ${c.approved ? "" : "primary"}" data-cast="${c.approved ? "unapprove" : "approve"}">${c.approved ? "↩ الغي الاعتماد" : "👤 اعتمد وضيفه لملف العميل"}</button>` : ""}
         <button class="btn sm danger" data-cast="del">✕</button></div>
     </div>`).join("");
   setHTML($("adCast"), head + (cast.length ? `<div class="ad-cast-grid">${cards}</div>` : ""));
@@ -1015,7 +1019,7 @@ $("adCast").addEventListener("click", async (e) => {
     }
     else if (act === "approveall") adx.cur = await cAPI("/approve-all", { method: "POST" });
     else if (act === "img") adx.cur = await cAPI(`/images?cast_id=${cid}`, { method: "POST" });
-    else if (act === "approve") { adx.cur = await cAPI(`/${cid}/approve`, { method: "POST" }); toast("✅ اتحفظ في عقل الإعلان واتربط باللقطات"); }
+    else if (act === "approve") { adx.cur = await cAPI(`/${cid}/approve`, { method: "POST" }); toast("✅ اتحفظ في ملف العميل واتربط باللقطات"); }
     else if (act === "unapprove") adx.cur = await cAPI(`/${cid}/approve?undo=true`, { method: "POST" });
     else if (act === "del") { if (!confirm("تشيله من القايمة؟")) return; adx.cur = await cAPI(`/${cid}`, { method: "DELETE" }); }
     else if (act === "edit") {
@@ -1111,7 +1115,7 @@ function renderAdProd() {
         <div class="ad-comps">${s.components.map((c) => `<div class="ad-comp ${c.use === false ? "off" : ""}" data-pc="${c.id}">
           <div class="img">${c.image_url ? `<img src="${c.image_url}" alt="">` : c.status === "working" ? `<div class="spin"></div>` : "🖼️"}</div>
           ${c.images.length > 1 ? `<div class="vers">${c.images.map((f) => `<img src="${f.url}" data-cimg="${f.file}" class="${f.url === c.image_url ? "sel" : ""}" alt="">`).join("")}</div>` : ""}
-          <span class="kind">${KIND_LABEL[c.kind] || adEsc(c.kind)}${c.motion ? " · 🎞️" : ""}${c.brain_asset ? ` · <b class="up">🧠 من عقل الإعلان</b>` : c.uploaded ? ` · <b class="up">⬆ من عندك</b>` : ""}</span>
+          <span class="kind">${KIND_LABEL[c.kind] || adEsc(c.kind)}${c.motion ? " · 🎞️" : ""}${c.brain_asset ? ` · <b class="up">🧠 من ملف العميل</b>` : c.uploaded ? ` · <b class="up">⬆ من عندك</b>` : ""}</span>
           <input type="text" value="${adEsc(c.name)}" data-cf="name" data-no-i18n>
           <textarea rows="3" dir="ltr" data-cf="image_prompt" placeholder="Image prompt" data-no-i18n>${adEsc(c.image_prompt)}</textarea>
           ${c.animation ? `<span class="muted" data-no-i18n>🎞️ ${adEsc(c.animation)}</span>` : ""}
@@ -1140,7 +1144,7 @@ function renderAdProd() {
 
 $("adProdGo").onclick = () => pDo($("adProdGo"), "⏳", () => pAPI("/start", { method: "POST" }));
 $("adProdRestart").onclick = () => {
-  if (!confirm("تبدأ التنفيذ من جديد من اقتراح كوتشي الحالي؟ التنفيذ ده (صوره وفيديوهاته) هيتحفظ وتقدر ترجعه بزرار «رجّع التنفيذ السابق».")) return;
+  if (!confirm("تبدأ التنفيذ من جديد من الاقتراح الحالي؟ التنفيذ ده (صوره وفيديوهاته) هيتحفظ وتقدر ترجعه بزرار «رجّع التنفيذ السابق».")) return;
   pDo($("adProdRestart"), "⏳", () => pAPI("/start", { method: "POST" }));
 };
 $("adHeader").addEventListener("change", (e) => {
@@ -1155,7 +1159,7 @@ $("adPBrain").onclick = () => busyButton($("adPBrain"), "⏳", async () => {
   const r = await pAPI("/apply-brain", { method: "POST" });
   adx.cur = r;
   renderAds();
-  toast(r.applied ? `🧠 اتحط ${r.applied} مكون من عقل الإعلان (شاشات / لوجو / منتج)` : "مفيش مكونات شاشات أو لوجو محتاجة صور من عقل الإعلان");
+  toast(r.applied ? `🧠 اتحط ${r.applied} مكون من ملف العميل (شاشات / لوجو / منتج)` : "مفيش مكونات شاشات أو لوجو محتاجة صور من ملف العميل");
 });
 $("adPDelFrames").onclick = () => {
   const n = adx.cur.prod.shots.filter((s) => s.frames.length).length;
@@ -1179,7 +1183,7 @@ $("adPFrames").onclick = () => {
     renderAds();
     adx.cur = await pAPI("/frames?redo=true", { method: "POST" });
     renderAds();
-    toast(`🎨 بيرسم ${todo.length} لقطة بصور المنشنز من عقل الإعلان`);
+    toast(`🎨 بيرسم ${todo.length} لقطة بصور المنشنز من ملف العميل`);
   });
 };
 $("adPComps").onclick = () => pDo($("adPComps"), "⏳", () => pAPI("/components", { method: "POST" }));
@@ -1305,7 +1309,7 @@ $("adPShots").addEventListener("click", async (e) => {
 });
 
 
-// ---------- 🧠 عقل الإعلان: المنتج وأصوله الحقيقية (شاشات، لوجو، صور منتج) وهويته المستنبطة ----------
+// ---------- 👤 ملف العميل: المنتج وأصوله الحقيقية (شاشات، لوجو، صور منتج) وهويته المستنبطة ----------
 const BRAIN_KIND_TITLE = { logos: "لوجو", screens: "شاشة", products: "صورة", characters: "شخصيات", sets: "أماكن", props: "أدوات" };
 const curBrain = () => adx.brains.find((b) => b.id === adx.brainId) || adx.brains[0];
 function renderBrain() {
@@ -1339,18 +1343,19 @@ async function brainSave(fn) {
     const b = await fn();
     adx.brains = adx.brains.map((x) => (x.id === b.id ? b : x));
     renderAds();
+    loadClients();
   } catch (err) { toast(err.message, true); }
 }
 $("adBrainGo").onclick = $("adBrainGo2").onclick = async () => {
   adx.view = "brain";
-  if (adx.cur?.settings?.brain_id && adx.cur.settings.brain_id !== "none") adx.brainId = adx.cur.settings.brain_id;
+  adx.brainId = adx.cur?.settings?.brain_id && adx.cur.settings.brain_id !== "none" ? adx.cur.settings.brain_id : clientx.active;
   adx.brains = await api("/api/ad-brains");
   renderAds();
 };
 $("adBrainBack").onclick = () => { adx.view = "ad"; renderAds(); };
 $("adBrainPick").onchange = () => { adx.brainId = $("adBrainPick").value; renderAds(); };
 $("adBrainNew").onclick = async () => {
-  const name = prompt("اسم المنتج؟");
+  const name = prompt("اسم العميل؟");
   if (!name?.trim()) return;
   try {
     const b = await api("/api/ad-brains", { method: "POST", ...jsonBody({ name, fields: {} }) });
@@ -1361,8 +1366,8 @@ $("adBrainNew").onclick = async () => {
 };
 $("adBrainDel").onclick = async () => {
   const b = curBrain();
-  if (!b || !confirm(`تحذف عقل «${b.name}» بكل شاشاته ولوجوهاته؟`)) return;
-  try { await api(`/api/ad-brains/${b.id}`, { method: "DELETE" }); adx.brains = await api("/api/ad-brains"); adx.brainId = null; renderAds(); }
+  if (!b || !confirm(`تحذف العميل «${b.name}» بكل شاشاته ولوجوهاته؟ (إعلاناته وكاروسيلاته بتروح لأقدم عميل)`)) return;
+  try { await api(`/api/ad-brains/${b.id}`, { method: "DELETE" }); adx.brains = await api("/api/ad-brains"); adx.brainId = null; renderAds(); loadClients(); }
   catch (err) { toast(err.message, true); }
 };
 $("adBrainAnalyze").onclick = () => brainSave(() => bAPI("/analyze", { method: "POST" }));
@@ -1386,7 +1391,7 @@ $("adBrainBody").addEventListener("change", async (e) => {
 });
 $("adBrainBody").addEventListener("click", (e) => {
   const item = e.target.closest("[data-bfile]");
-  if (!item || !e.target.closest("[data-bdel]") || !confirm("تحذف الصورة دي من عقل الإعلان؟")) return;
+  if (!item || !e.target.closest("[data-bdel]") || !confirm("تحذف الصورة دي من ملف العميل؟")) return;
   brainSave(() => bAPI(`/assets/${encodeURIComponent(item.dataset.bfile)}`, { method: "DELETE" }));
 });
 
