@@ -39,59 +39,91 @@ def detect_shots(ffmpeg: str, src: Path, duration: float, threshold: float = 0.2
     return [{"n": i + 1, "start": bounds[i], "end": bounds[i + 1]} for i in range(len(bounds) - 1)]
 
 
-def motion_curve(ffmpeg: str, src: Path) -> tuple[list[float], list[float]]:
-    """مقدار تغيّر الصورة بين كل فريم واللي بعده (15 فريم في الثانية على نسخة صغيرة): 0 = ساكن، 1 = اتغيرت كلها."""
-    r = subprocess.run([ffmpeg, "-hide_banner", "-i", str(src), "-an", "-vf",
-                        "scale=192:-2,fps=15,select='gte(scene\\,0)',metadata=print:file=-", "-f", "null", "-"],
-                       capture_output=True, text=True, timeout=900)
-    ts = [float(x) for x in re.findall(r"pts_time:([0-9.]+)", r.stdout)]
-    sc = [float(x) for x in re.findall(r"scene_score=([0-9.]+)", r.stdout)]
-    n = min(len(ts), len(sc))
-    return ts[:n], sc[:n]
+FINE_FPS = 15
+FINE_W, FINE_H = 40, 72
 
 
-def motion_splits(ts: list[float], sc: list[float], a: float, b: float, min_gap: float = 0.4, min_len: float = 0.5,
-                  soft: float = 0.1) -> list[float]:
-    """🔀 التغييرات جوه اللقطة من غير قطع: كل دفعة حركة بعد وقفة ساكنة (أو قفزة كبيرة في الصورة) بتبدأ حتة جديدة.
-    الوقفة اللي بعد الحركة بتفضل معاها (العنصر بيخلص حركته ويثبت)."""
-    idx = [i for i, t in enumerate(ts) if a <= t < b]
-    if len(idx) < 6:
+def frame_signals(ffmpeg: str, src: Path) -> tuple[list[float], list[list[float]]]:
+    """من فريمات صغيرة (15 في الثانية): الحركة (قد إيه الفريم اتغير عن اللي قبله، حتى لو عنصر صغير بيتحرك)
+    وتوزيع الألوان (العنصر اللي بيتحرك من مكان لمكان مبيغيّروش، العنصر الجديد اللي بيدخل بيغيّره)."""
+    r = subprocess.run([ffmpeg, "-hide_banner", "-loglevel", "error", "-i", str(src), "-an", "-vf",
+                        f"fps={FINE_FPS},scale={FINE_W}:{FINE_H},format=rgb24", "-f", "rawvideo", "-"],
+                       capture_output=True, timeout=900)
+    size, px = FINE_W * FINE_H * 3, FINE_W * FINE_H
+    motion, hists, prev = [], [], None
+    for k in range(len(r.stdout) // size):
+        fr = r.stdout[k * size:(k + 1) * size]
+        hist = [0] * 64
+        for i in range(0, size, 3):
+            hist[(fr[i] >> 6) << 4 | (fr[i + 1] >> 6) << 2 | fr[i + 2] >> 6] += 1
+        hists.append([x / px for x in hist])
+        motion.append(0.0 if prev is None else sum(abs(x - y) for x, y in zip(fr, prev)) / size / 255)
+        prev = fr
+    return motion, hists
+
+
+def motion_splits(motion: list[float], a: float, b: float, still: float = 0.0015, min_gap: float = 0.45) -> list[float]:
+    """⏸️ وقفة ساكنة وبعدها حركة جديدة = حتة جديدة (الوقفة بتفضل مع الحركة اللي قبلها: العنصر بيخلص ويثبت).
+    «ساكن» بمقياس ثابت: الفيديو اللي فيه حركة طول الوقت (شخص بيتكلم، خلفية متحركة) مش بيتقطع على الفاضي."""
+    i0, i1 = max(1, int(a * FINE_FPS) + 1), min(len(motion), int(b * FINE_FPS))
+    if i1 - i0 < 6:
         return []
-    vals = sorted(sc[i] for i in idx)
-    thr = max(0.006, vals[int(len(vals) * 0.3)] * 1.8)   # فوق رعشة الصورة العادية
-    act = [sc[i] > thr for i in idx]
-    act = [any(act[max(0, k - 1):k + 2]) for k in range(len(act))]  # الحركة المتقطعة حركة واحدة
-    gap = max(2, int(min_gap * 15))
-    runs: list[list[int]] = []
-    k = 0
-    while k < len(act):
-        if act[k]:
-            j = k
-            while j < len(act) and act[j]:
-                j += 1
-            if runs and k - runs[-1][1] < gap:
-                runs[-1][1] = j
-            else:
-                runs.append([k, j])
-            k = j
+    gap, cuts, quiet = int(min_gap * FINE_FPS), [], 0
+    for i in range(i0, i1):
+        if motion[i] < still:
+            quiet += 1
         else:
-            k += 1
-    cuts = [ts[idx[r[0]]] - 0.07 for r in runs[1:]] + [ts[i] for i in idx if soft < sc[i] <= 0.27]
+            if quiet >= gap:
+                cuts.append(round(i / FINE_FPS - 0.07, 3))
+            quiet = 0
+    return cuts
+
+
+def _hd(a: list[float], b: list[float]) -> float:
+    return sum(abs(x - y) for x, y in zip(a, b)) / 2   # 0 = نفس المحتوى، 1 = محتوى تاني خالص
+
+
+def content_splits(hists: list[list[float]], a: float, b: float, ratio: float = 2.2, floor: float = 0.03,
+                   refractory: float = 0.6) -> list[float]:
+    """➕ عنصر جديد دخل حتى لو الحركة ما وقفتش: سرعة تغيّر المحتوى (الألوان) بتقفز فجأة فوق اللي كانت عليه
+    في الثانية اللي فاتت. التغيير البطيء المستمر (خلفية بتتحرك، كاميرا ماشية، شخص بيتكلم) مبيقطعش."""
+    i0, i1 = max(3, int(a * FINE_FPS) + 3), min(len(hists), int(b * FINE_FPS))
+    if i1 - i0 < 8:
+        return []
+    rate = {i: _hd(hists[i], hists[i - 3]) for i in range(i0 - 3 if i0 > 5 else 3, i1)}
+    cuts, last = [], -9.0
+    for i in range(i0 + 4, i1):
+        prev = sorted(rate[k] for k in range(max(i0, i - FINE_FPS), i - 1) if k in rate)
+        base = prev[len(prev) // 2] if prev else 0.0
+        if rate[i] > max(floor, ratio * base) and i / FINE_FPS - last >= refractory:
+            j = i   # بداية القفزة
+            while j - 1 in rate and i - j < 5 and rate[j - 1] > max(floor * 0.5, base * 1.3):
+                j -= 1
+            cuts.append(round(max(a, (j - 3) / FINE_FPS), 3))
+            last = i / FINE_FPS
+    return cuts
+
+
+def merge_cuts(a: float, b: float, *lists: list[float], min_len: float = 0.5) -> list[float]:
     out: list[float] = []
-    for c in sorted(cuts):
+    for c in sorted(x for lst in lists for x in lst):
         if c - (out[-1] if out else a) >= min_len and b - c >= min_len:
             out.append(round(c, 3))
     return out
 
 
 def fine_shots(ffmpeg: str, src: Path, shots: list[dict]) -> list[dict]:
-    """كل لقطة بتتقسم على كل تغيير جوه المشهد، فكل حركة / عنصر جديد بيبقى حتة لوحده."""
-    ts, sc = motion_curve(ffmpeg, src)
+    """كل لقطة بتتقسم على كل تغيير جوه المشهد، فكل حركة / عنصر جديد بيبقى حتة لوحده:
+    وقفة بين حركتين، أو عنصر جديد دخل حتى لو الحركة مكملة."""
+    motion, hists = frame_signals(ffmpeg, src)
     out = []
     for s in shots:
-        bounds = [s["start"], *motion_splits(ts, sc, s["start"], s["end"]), s["end"]]
+        inner = merge_cuts(s["start"], s["end"], motion_splits(motion, s["start"], s["end"]),
+                           content_splits(hists, s["start"], s["end"]))
+        bounds = [s["start"], *inner, s["end"]]
         for i in range(len(bounds) - 1):
-            out.append({"start": bounds[i], "end": bounds[i + 1], "cut": "hard" if i == 0 else "change"})
+            out.append({"start": bounds[i], "end": bounds[i + 1], "cut": "hard" if i == 0 else "change",
+                        "uid": uuid.uuid4().hex[:4]})
     for i, s in enumerate(out):
         s["n"] = i + 1
     return out
@@ -278,7 +310,7 @@ def clean_elements(data: dict, shot: dict, sfx_ids: set[str]) -> dict:
                          "from": pt(a.get("from")), "to": pt(a.get("to")), "detail": str(a.get("detail") or "")[:300],
                          "sfx": str(a.get("sfx")) if str(a.get("sfx") or "") in sfx_ids else None, "review": None})
         box = e.get("box") if isinstance(e.get("box"), list) and len(e["box"]) == 4 else None
-        els.append({"id": f"s{shot['n']}e{i + 1}", "name": str(e["name"])[:80],
+        els.append({"id": f"{shot.get('uid') or 's' + str(shot['n'])}e{i + 1}", "name": str(e["name"])[:80],
                     "type": e.get("type") if e.get("type") in ELEMENT_TYPES else "other",
                     "description": str(e.get("description") or "")[:600],
                     "first_t": round(num(e.get("first_t"), shot["start"]), 2), "last_t": round(num(e.get("last_t"), shot["end"]), 2),

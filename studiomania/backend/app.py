@@ -8692,7 +8692,7 @@ def run_lab(lid: str, steps: list[str]) -> None:
                     shots = lab.fine_shots(ffmpeg_exe(), src, shots)
                 for k, s in enumerate(shots):
                     lab_step(lid, step, progress=f"فريمات اللقطة {k + 1} من {len(shots)}")
-                    s["frames"] = lab.extract_frames(ffmpeg_exe(), src, s["start"], s["end"], folder / "frames", f"s{s['n']:03d}")
+                    s["frames"] = lab.extract_frames(ffmpeg_exe(), src, s["start"], s["end"], folder / "frames", shot_key(s))
                     s["review"] = None
                 lab_update(lid, lambda d: d.update(shots=shots))
             elif step == "stems":
@@ -8821,10 +8821,15 @@ class LabSkip(Exception):
     """خطوة اتخطت لسبب معروف (مش فشل)."""
 
 
-def run_lab_elements(lid: str) -> None:
+def shot_key(s: dict) -> str:
+    """مفتاح ثابت للحتة (رقمها بيتغير لما تتقسم أو تتدمج)."""
+    return s.get("uid") or f"s{s['n']:03d}"
+
+
+def run_lab_elements(lid: str, only: set[str] | None = None) -> None:
     folder = lab_dir(lid)
     d = lab_load(lid)
-    shots = d.get("shots") or []
+    shots = [s for s in d.get("shots") or [] if only is None or shot_key(s) in only]
     audio = d.get("audio") or {}
     for k, s in enumerate(shots):
         lab_step(lid, "elements", progress=f"بيفكك عناصر اللقطة {k + 1} من {len(shots)}")
@@ -8840,8 +8845,8 @@ def run_lab_elements(lid: str) -> None:
             err = None
         except Exception as exc:  # noqa: BLE001  لقطة فشلت متوقفش الباقي
             res, err = None, str(getattr(exc, "detail", None) or exc)[:300]
-        def fn(d, n=s["n"], res=res, err=err):
-            x = next((y for y in d.get("shots") or [] if y["n"] == n), None)
+        def fn(d, key=shot_key(s), res=res, err=err):
+            x = next((y for y in d.get("shots") or [] if shot_key(y) == key), None)
             if x is not None:
                 x["analysis"], x["analysis_error"] = res, err
                 # 🙈 تصوير عادي من غير موشن جرافيك بيتشال لوحده (إلا لو إنت اللي رجّعته أو شلته بإيدك)
@@ -8937,7 +8942,53 @@ def lab_shot_merge(lid: str, n: int):
         a.update(end=b["end"], frames=(a.get("frames") or []) + (b.get("frames") or []), review=None,
                  ignored=a.get("ignored") if b.get("ignored") else None)
         del shots[i + 1]
+        renumber(shots)
     return lab_to_dict(lid, lab_update(lid, fn))
+
+
+def renumber(shots: list[dict]) -> None:
+    for k, x in enumerate(shots):
+        if not x.get("uid"):
+            x["uid"] = f"s{x['n']:03d}"   # المفتاح القديم بيفضل زي ما هو (أسامي الفريمات والعناصر)
+        x["n"] = k + 1
+
+
+class SplitIn(BaseModel):
+    t: float
+
+
+@app.post("/api/lab/{lid}/shots/{n}/split")
+def lab_shot_split(lid: str, n: int, body: SplitIn):
+    """✂️ يقسم الحتة عند وقت معيّن (لو البرنامج فوّت تغيير)، والعناصر بتتحلل للحتتين من جديد."""
+    d = lab_load(lid)
+    s = lab_shot(d, n)
+    t = round(body.t, 3)
+    if not (s["start"] + 0.25 <= t <= s["end"] - 0.25):
+        raise HTTPException(400, "اختار وقت جوه الحتة (مش في أولها أو آخرها بالظبط)")
+    if any((v or {}).get("status") in ("working", "queued") for v in (d.get("steps") or {}).values()):
+        raise HTTPException(400, "استنى لما التفكيك اللي شغال يخلص")
+    src, folder = lab_dir(lid) / d["source"]["file"], lab_dir(lid) / "frames"
+    keys = [uuid.uuid4().hex[:4], uuid.uuid4().hex[:4]]
+    parts = [{"start": s["start"], "end": t, "cut": s.get("cut") or "hard", "uid": keys[0]},
+             {"start": t, "end": s["end"], "cut": "change", "uid": keys[1]}]
+    for p in parts:
+        p["frames"] = lab.extract_frames(ffmpeg_exe(), src, p["start"], p["end"], folder, p["uid"])
+        p.update(review=None, analysis=None, ignored=None, keep=bool(s.get("keep")))
+    def fn(d):
+        shots = d["shots"]
+        i = next(k for k, x in enumerate(shots) if x["n"] == n)
+        shots[i:i + 1] = parts
+        renumber(shots)
+        d.setdefault("steps", {})["elements"] = {"status": "working", "progress": "بيفكك عناصر الحتتين الجداد"}
+    d = lab_update(lid, fn)
+    def run():
+        try:
+            run_lab_elements(lid, set(keys))
+            lab_step(lid, "elements", status="done", error=None, progress="", at=now())
+        except Exception as exc:  # noqa: BLE001
+            lab_step(lid, "elements", status="failed", error=str(exc)[:300], progress="")
+    threading.Thread(target=run, daemon=True).start()
+    return lab_to_dict(lid, d)
 
 
 @app.post("/api/lab/{lid}/shots/prune")

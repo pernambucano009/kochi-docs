@@ -340,6 +340,7 @@ function renderLabShots(d) {
         ${an ? `<span class="chip">${LAB_SCENE[an.scene_type] || ""}</span>` : ""}
         <span class="muted">القطع مظبوط؟</span>${rv("shot", s.n, s.review)}
         ${s.cut === "change" ? `<span class="chip" title="مفيش قطع هنا: الحركة وقفت وبدأت حركة جديدة في نفس المشهد">🔀 تغيير جوه المشهد</span>` : ""}
+        <button type="button" class="btn sm" data-split="${s.n}" title="لو البرنامج فوّت تغيير: اختار فريم من الشريط (أو وقّف الفيديو عند المكان) ودوس هنا">✂️ قسّم هنا</button>
         <button type="button" class="btn sm" data-hide="${s.n}" title="مش هتدخل في الكومبوننتس، وتقدر ترجّعها">🗑️ شيلها</button>
         ${d.shots[d.shots.length - 1].n !== s.n ? `<button type="button" class="btn sm" data-merge="${s.n}" title="لو الحتة دي واللي بعدها حركة واحدة">🔗 ادمج مع اللي بعدها</button>` : ""}</header>
       <div class="lab-strip">${(s.frames || []).map((f) => `<img src="${f.url}" data-seek="${f.t}" data-pickt="${f.t}" class="${Math.abs(f.t - pick) < 0.001 ? "sel" : ""}" title="${lt(f.t)}" alt="">`).join("")}</div>
@@ -415,10 +416,25 @@ document.querySelector('.view[data-view="11"]').addEventListener("click", async 
     }
     return;
   }
+  const split = e.target.closest("[data-split]");
+  if (split) {
+    const n = split.dataset.split, s = labx.cur.shots.find((x) => String(x.n) === n);
+    const v = document.querySelector(`[data-shotvid="${n}"]`), pick = labx.pick[n];
+    const t = pick > s.start + 0.2 && pick < s.end - 0.2 ? pick
+      : v && v.currentTime > s.start + 0.2 && v.currentTime < s.end - 0.2 ? v.currentTime : null;
+    if (t == null) return toast("اختار الفريم اللي التغيير بيبدأ عنده من الشريط، أو وقّف الفيديو بتاع الحتة عنده", true);
+    if (!confirm(`تقسم الحتة عند ${lt(t)}؟ (العناصر بتتحلل للحتتين من جديد)`)) return;
+    return busyButton(split, "⏳", async () => {
+      labx.cur = await api(`/api/lab/${labx.cur.id}/shots/${n}/split`, { method: "POST", ...jsonBody({ t }) });
+      labx.pick = {};
+      renderLab(); scheduleLabPoll();
+    });
+  }
   const merge = e.target.closest("[data-merge]");
   if (merge) {
     return busyButton(merge, "⏳", async () => {
       labx.cur = await api(`/api/lab/${labx.cur.id}/shots/${merge.dataset.merge}/merge`, { method: "POST" });
+      labx.pick = {};
       renderLab();
       toast("🔗 اتدمجوا. لو عايز الكومبوننتس تتظبط عليهم دوس «↻ اقترح تاني»");
     });
