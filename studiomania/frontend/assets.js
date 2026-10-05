@@ -1,6 +1,6 @@
 // 📚 مكتبة الأصول: مقاطع حقيقية من الفيديوهات بحركتها وخلفيتها وصوتها، ومعاها تفكيكها،
 // وكل أصل تقدر تطلع منه نسخ: تعديل جوه المشهد بالكلام، أو سرعة جزء منه.
-const asx = { list: [], cur: null, q: "", cat: "", timer: null };
+const asx = { list: [], cur: null, q: "", cat: "", timer: null, labs: null, shots: {}, tmode: "rebuild", tsel: {} };
 
 async function labLibCount() {
   try {
@@ -77,7 +77,7 @@ function assetDetail(a) {
         ${a.use ? `<small class="muted" data-no-i18n>💼 ${le(a.use)}</small>` : ""}
       </div>
     </div>
-    ${a.connector ? assetConnector(a) : ""}
+    ${a.connector ? assetConnector(a) + assetTrials(a) : ""}
     <section class="panel lab-sec"><h4>🧩 اللي جواه</h4>
       ${a.background?.name ? `<div class="lab-row"><b>🖼️ الخلفية:</b> <span data-no-i18n>${le(a.background.name)}</span> <small class="muted" data-no-i18n>${le(a.background.description)}</small></div>` : ""}
       ${(a.elements || []).map((e) => `<div class="lab-el">
@@ -146,6 +146,77 @@ function assetConnector(a) {
   </section>`;
 }
 
+// 🧪 جرّب الكونيكتور: بين نفس النقطتين في الفيديو الأصلي (إعادة بناء) أو بين لقطتين تانيين (نقل)
+const TRIAL_ST = { planning: "🧠 بيكتب الخطة", planned: "📝 الخطة جاهزة", working: "🎬 بيولّد", done: "✅ خلص", failed: "✕ فشل" };
+function trialSidePick(side) {
+  const sel = asx.tsel[side] || {}, labs = asx.labs || [];
+  const shots = (asx.shots[sel.lab] || []).filter((x) => !x.ignored || true);
+  return `<div class="as-tside"><b>${side === "a" ? "اللقطة A (هنبدأ من آخرها)" : "اللقطة B (هنوصل لأولها)"}</b>
+    <select data-tlab="${side}"><option value="">اختار فيديو من المعمل</option>${labs.map((l) => `<option value="${l.id}" ${l.id === sel.lab ? "selected" : ""} data-no-i18n>${le(l.name)}</option>`).join("")}</select>
+    ${sel.lab ? `<select data-tshot="${side}"><option value="">اختار اللقطة</option>${shots.map((x) => `<option value="${x.n}" ${String(x.n) === String(sel.n) ? "selected" : ""} data-no-i18n>لقطة ${x.n} (${lt(x.start)}–${lt(x.end)}) ${le((x.analysis?.summary || "").slice(0, 50))}</option>`).join("")}</select>` : ""}
+    ${sel.lab && sel.n ? (() => { const x = shots.find((y) => String(y.n) === String(sel.n)); const fr = x?.frames || []; const f = side === "a" ? fr[fr.length - 1] : fr[0];
+      return f ? `<img src="${f.url}" alt="" class="as-tthumb">` : ""; })() : ""}
+  </div>`;
+}
+function assetTrials(a) {
+  const models = a.trial_models || [];
+  return `<section class="panel lab-sec as-trials" data-trials><h4>🧪 جرّب الكونيكتور ده</h4>
+    <p class="hint">البرنامج بيكتب خطة على مقاس اللقطتين (ببلاش تقريبًا)، تراجعها وتعدّلها، وبعدين يولّد: صور مفتاحية للمراحل، وحركة بين كل صورتين بموديل فيديو بياخد صورة بداية وصورة نهاية، ويجمّع آخر A ← الكونيكتور ← أول B.</p>
+    <div class="row wrap as-tmode">
+      <label class="check"><input type="radio" name="tmode" value="rebuild" data-tmode ${asx.tmode === "rebuild" ? "checked" : ""}> 🔁 إعادة بناء (نفس المكان في الفيديو الأصلي: نقارن بالأصلي)</label>
+      <label class="check"><input type="radio" name="tmode" value="transfer" data-tmode ${asx.tmode === "transfer" ? "checked" : ""}> 🔀 نقل (بين لقطتين تانيين)</label>
+    </div>
+    ${asx.tmode === "transfer" ? `<div class="as-tsides">${trialSidePick("a")}<span class="as-tarrow">⟵ 🔗 ⟵</span>${trialSidePick("b")}</div>` : ""}
+    <div class="row wrap"><select data-tmodel>${models.map((m) => `<option value="${m.key}">${le(m.label)} · ~${m.per_sec}$/ث</option>`).join("")}</select>
+      <select data-tres><option value="480p">480p</option><option value="720p">720p (الضعف)</option></select>
+      <button type="button" class="btn sm primary" data-tnew>🧠 اعمل الخطة</button></div>
+    ${(a.trials || []).map((t) => trialCard(a, t)).join("")}
+  </section>`;
+}
+function trialCard(a, t) {
+  const p = t.plan || {}, editable = t.status === "planned" || t.status === "failed" || t.status === "done";
+  const imgs = [t.a_url, ...(t.key_urls || []), t.b_url];
+  return `<article class="as-trial ${t.status}" data-trial="${t.id}">
+    <header><b>${t.mode === "rebuild" ? "🔁 إعادة بناء" : "🔀 نقل"}</b> <span class="lab-st ${t.status === "working" || t.status === "planning" ? "working" : t.status}">${t.status === "working" || t.status === "planning" ? `<span class="spin-inline"></span>` : ""} ${TRIAL_ST[t.status] || ""}</span>
+      ${t.step ? `<small class="muted">${le(t.step)}</small>` : ""}${t.error ? `<small class="err">${le(t.error)}</small>` : ""}
+      <small class="muted grow" data-no-i18n>${le(t.a?.label)} ⟵ ${le(t.b?.label)}</small>
+      <button type="button" class="btn sm danger" data-tdel>🗑️</button></header>
+    <div class="as-tchain">${imgs.map((u, i) => u ? `<figure><img src="${u}" alt=""><figcaption>${i === 0 ? "A" : i === imgs.length - 1 ? "B" : `مرحلة ${i}`}</figcaption></figure>` : "").join(`<span>←</span>`)}</div>
+    ${t.status === "done" ? `<div class="as-tvids">
+        <figure><figcaption>🧪 التجربة (آخر A ← الكونيكتور ← أول B)</figcaption><video data-tvid="gen" src="${t.final_url}" playsinline controls preload="metadata"></video></figure>
+        <figure><figcaption>🎯 الكونيكتور الأصلي</figcaption><video data-tvid="ref" src="${a.url}" playsinline controls preload="metadata" muted></video></figure></div>
+      <div class="row wrap"><button type="button" class="btn sm" data-tboth>▶️ شغّل الاتنين مع بعض</button>
+        <a class="btn sm" href="${t.conn_url}" download>⬇️ الكونيكتور لوحده</a>
+        <span class="lab-rv" data-trv><button type="button" class="${t.review?.ok === true ? "on ok" : ""}" data-tok="1">✅</button><button type="button" class="${t.review?.ok === false ? "on bad" : ""}" data-tok="0">❌</button>
+          <input type="text" class="lab-note" value="${le(t.review?.note)}" placeholder="إيه اللي حلو أو وحش؟ (مهم للتجارب الجاية)" data-tnote></span></div>` : ""}
+    ${p.segments ? `<details class="as-tplan" ${t.status === "planned" ? "open" : ""}><summary>📝 الخطة ${t.cost ? `<small class="muted">· التوليد حوالي ${t.cost}$</small>` : ""}</summary>
+      ${p.adapted ? `<p class="as-tadapt" data-no-i18n>${le(p.adapted)}</p>` : ""}
+      ${(p.anchors || []).length ? `<p><b>📌 بيفضل ثابت:</b> <span data-no-i18n>${p.anchors.map(le).join("، ")}</span></p>` : ""}
+      ${(p.keyframes || []).map((k, i) => `<label class="lab-xe">🖼️ مرحلة ${i + 1}: <span data-no-i18n>${le(k.label)}</span><textarea rows="2" data-tk="${i}" dir="ltr" ${editable ? "" : "disabled"} data-no-i18n>${le(k.prompt)}</textarea></label>`).join("")}
+      ${p.segments.map((x, i) => `<label class="lab-xe">🎬 حركة ${i + 1}: <span data-no-i18n>${le(x.label)}</span>
+        <span class="row">الطول في الفيديو <input type="number" step="0.1" min="0.6" max="6" value="${x.seconds}" data-tsec="${i}" ${editable ? "" : "disabled"}> ث</span>
+        <textarea rows="2" data-ts="${i}" dir="ltr" ${editable ? "" : "disabled"} data-no-i18n>${le(x.prompt)}</textarea></label>`).join("")}
+      ${editable ? `<div class="row wrap"><button type="button" class="btn sm primary" data-trun>🎬 ${t.status === "done" ? "ولّد تاني" : "ولّد"} (~${t.cost}$)</button>
+        <small class="muted">التعديلات بتتحفظ لوحدها قبل التوليد</small></div>` : ""}
+    </details>` : ""}
+  </article>`;
+}
+function trialPlanFrom(card) {
+  const g = (sel) => [...card.querySelectorAll(sel)];
+  const plan = { keyframes: g("[data-tk]").map((el) => ({ label: "", prompt: el.value })), segments: g("[data-ts]").map((el, i) => ({
+    label: "", prompt: el.value, seconds: Number(card.querySelector(`[data-tsec="${i}"]`).value) })) };
+  const t = asx.cur.trials.find((x) => x.id === card.dataset.trial);
+  plan.keyframes.forEach((k, i) => (k.label = t.plan.keyframes[i]?.label || ""));
+  plan.segments.forEach((k, i) => (k.label = t.plan.segments[i]?.label || ""));
+  return plan;
+}
+async function trialLabs() {
+  if (!asx.labs) asx.labs = await api("/api/lab");
+}
+async function trialShots(lid) {
+  if (lid && !asx.shots[lid]) asx.shots[lid] = (await api(`/api/lab/${lid}`)).shots || [];
+}
+
 function asPlay(t0, t1) {
   const v = $("labLib").querySelector("[data-asmain]");
   if (!v) return;
@@ -202,6 +273,52 @@ $("labLib").addEventListener("click", async (e) => {
   if (play) return asPlay(Number(play.dataset.asplay), Number(play.dataset.to));
   const okb = t.closest("[data-asok]");
   if (okb) return asReview(okb.closest("[data-asrv]"), okb.classList.contains("on") ? null : okb.dataset.asok === "1");
+  const trials = t.closest("[data-trials]");
+  if (trials) {
+    const card = t.closest("[data-trial]"), tid = card?.dataset.trial;
+    const T = (path, opts) => api(`/api/assets/${asx.cur.id}/trials${path}`, opts);
+    const nb = t.closest("[data-tnew]");
+    if (nb) {
+      const body = { mode: asx.tmode, model: trials.querySelector("[data-tmodel]").value, resolution: trials.querySelector("[data-tres]").value };
+      if (asx.tmode === "transfer") {
+        const a = asx.tsel.a || {}, b = asx.tsel.b || {};
+        if (!a.lab || !a.n || !b.lab || !b.n) return toast("اختار اللقطة A واللقطة B", true);
+        body.a = { lab: a.lab, n: Number(a.n) }; body.b = { lab: b.lab, n: Number(b.n) };
+      }
+      return busyButton(nb, "⏳", async () => { asx.cur = await T("", { method: "POST", ...jsonBody(body) }); renderLib(); scheduleAssetPoll(); });
+    }
+    if (!card) return;
+    const run = t.closest("[data-trun]");
+    if (run) {
+      const tr = asx.cur.trials.find((x) => x.id === tid);
+      return busyButton(run, "⏳", async () => {
+        asx.cur = await T(`/${tid}`, { method: "PATCH", ...jsonBody({ plan: trialPlanFrom(card) }) });
+        const cost = asx.cur.trials.find((x) => x.id === tid).cost;
+        if (!confirm(`يولّد التجربة دي؟ هتتحسب على Atlas حوالي ${cost}$ (${tr.plan.keyframes.length} صورة و${tr.plan.segments.length} حركة)، وبتاخد كام دقيقة.`)) return renderLib();
+        asx.cur = await T(`/${tid}/run`, { method: "POST" });
+        renderLib(); scheduleAssetPoll();
+      });
+    }
+    if (t.closest("[data-tdel]")) {
+      if (!confirm("تمسح التجربة دي؟")) return;
+      try { asx.cur = await T(`/${tid}`, { method: "DELETE" }); renderLib(); } catch (err) { toast(err.message, true); }
+      return;
+    }
+    if (t.closest("[data-tboth]")) {
+      const g = card.querySelector('[data-tvid="gen"]'), r = card.querySelector('[data-tvid="ref"]');
+      // الأصلي بيبدأ مع أول الكونيكتور في التجربة (بعد ثانيتين من A)
+      g.currentTime = 0; r.currentTime = 0; g.play().catch(() => {});
+      setTimeout(() => r.play().catch(() => {}), Math.max(0, (asx.cur.trials.find((x) => x.id === tid).a.ctx[1] - asx.cur.trials.find((x) => x.id === tid).a.ctx[0]) * 1000));
+      return;
+    }
+    const ok = t.closest("[data-tok]");
+    if (ok) {
+      const val = ok.classList.contains("on") ? null : ok.dataset.tok === "1";
+      try { asx.cur = await T(`/${tid}/review`, { method: "PATCH", ...jsonBody({ ok: val, note: card.querySelector("[data-tnote]").value }) }); renderLib(); }
+      catch (err) { toast(err.message, true); }
+    }
+    return;
+  }
   const box = t.closest("[data-asedit]");
   if (!box) return;
   const chip = t.closest("[data-vchip]");
@@ -252,6 +369,20 @@ $("labLib").addEventListener("input", (e) => {
 });
 
 $("labLib").addEventListener("change", async (e) => {
+  if (e.target.matches("[data-tmode]")) {
+    asx.tmode = e.target.value;
+    if (asx.tmode === "transfer") await trialLabs();
+    return renderLib();
+  }
+  const tl = e.target.dataset.tlab, ts = e.target.dataset.tshot;
+  if (tl) { asx.tsel[tl] = { lab: e.target.value, n: "" }; await trialShots(e.target.value); return renderLib(); }
+  if (ts) { asx.tsel[ts] = { ...(asx.tsel[ts] || {}), n: e.target.value }; return renderLib(); }
+  if (e.target.matches("[data-tnote]")) {
+    const card = e.target.closest("[data-trial]"), tr = asx.cur.trials.find((x) => x.id === card.dataset.trial);
+    try { asx.cur = await api(`/api/assets/${asx.cur.id}/trials/${tr.id}/review`, { method: "PATCH", ...jsonBody({ ok: tr.review?.ok ?? null, note: e.target.value }) }); }
+    catch (err) { toast(err.message, true); }
+    return;
+  }
   const f = e.target.dataset.asf;
   if (f) {
     const v = e.target.value;

@@ -1599,3 +1599,26 @@ a.pl-link:hover { background: color-mix(in srgb, var(--ok) 24%, transparent); }
 .lab-conn-chat .msg { font-size: 12px; }
 .lab-conn-chat .msg.model { color: var(--accent); }
 @media (max-width: 760px) { .lab-xe2 { grid-template-columns: 1fr; } }
+
+/* 🧪 تجربة الكونيكتور */
+.as-tmode { gap: 14px; }
+.as-tsides { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.as-tside { display: flex; flex-direction: column; gap: 4px; flex: 1 1 220px; }
+.as-tthumb { width: 120px; border-radius: 8px; }
+.as-tarrow { font-size: 18px; }
+.as-trial { border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 10px; margin-top: 10px; display: flex; flex-direction: column; gap: 8px; background: var(--surface); }
+.as-trial.done { border-color: var(--ok); }
+.as-trial.failed { border-color: var(--danger); }
+.as-trial > header { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.as-tchain { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.as-tchain figure { margin: 0; }
+.as-tchain img { width: 110px; border-radius: 8px; display: block; }
+.as-tchain figcaption { font-size: 11px; text-align: center; color: var(--muted); }
+.as-tvids { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; max-width: 720px; }
+.as-tvids figure { margin: 0; display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
+.as-tvids video { width: 100%; max-height: 60vh; background: #000; border-radius: 10px; }
+.as-tplan summary { cursor: pointer; font-weight: 600; }
+.as-tplan { display: flex; flex-direction: column; gap: 6px; }
+.as-tadapt { white-space: pre-line; background: var(--surface-2); border-radius: 8px; padding: 6px 8px; }
+.as-tplan input[type=number] { width: 70px; }
+@media (max-width: 620px) { .as-tvids { grid-template-columns: 1fr; } }

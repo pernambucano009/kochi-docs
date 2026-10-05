@@ -9130,7 +9130,10 @@ def clip_to_dict(aid: str, d: dict) -> dict:
     return {**d, "id": aid, "url": f"{base}/{d['file']}", "thumb_url": f"{base}/{d['thumb']}",
             "keyframes": [{**k, "url": f"{base}/{k['file']}"} for k in d.get("keyframes") or []],
             "variants": [{**v, "url": f"{base}/variants/{v['file']}" if v.get("file") else None} for v in d.get("variants") or []],
-            "busy": any(v.get("status") == "working" for v in d.get("variants") or []),
+            "busy": any(v.get("status") == "working" for v in d.get("variants") or [])
+            or any(t.get("status") in ("planning", "working") for t in d.get("trials") or []),
+            "trials": [trial_to_dict(aid, t) for t in d.get("trials") or []],
+            "trial_models": [{"key": k, "label": v["label"], "per_sec": v["per_sec"]} for k, v in TRIAL_MODELS.items()],
             "vedit_models": [{"key": k, "label": v["label"], "per_sec": v["per_sec"]} for k, v in lab.VEDIT_MODELS.items()]}
 
 
@@ -9607,6 +9610,296 @@ def asset_review(aid: str, body: AssetReviewIn):
     return clip_to_dict(aid, clip_update(aid, fn))
 
 
+# ---------- 🧪 تجربة كونيكتور: الوصفة بين لقطتين (خطة ← صور مفتاحية ← حركة بين كل صورتين ← تجميع)
+
+TRIAL_MODELS = {
+    "seedance-fast": {"label": "Seedance 2.0 Fast (أرخص)", "model": "bytedance/seedance-2.0-fast/image-to-video", "per_sec": 0.027},
+    "seedance": {"label": "Seedance 2.0 (أجود)", "model": "bytedance/seedance-2.0/image-to-video", "per_sec": 0.09},
+}
+TRIAL_KEY_COST = 0.06   # صورة مفتاحية واحدة (تقريبًا)
+TRIAL_CTX = 2.0         # ثواني من A قبل الكونيكتور ومن B بعده في الفيديو النهائي
+
+
+def trial_dir(aid: str, tid: str) -> Path:
+    return clip_dir(aid) / "trials" / Path(tid).name
+
+
+def trial_set(aid: str, tid: str, **kw) -> None:
+    def fn(a):
+        t = next((x for x in a.get("trials") or [] if x["id"] == tid), None)
+        if t is not None:
+            t.update(**kw)
+    clip_update(aid, fn)
+
+
+def trial_cost(t: dict) -> float:
+    plan = t.get("plan") or {}
+    secs = sum(trial_gen_seconds(x["seconds"]) for x in plan.get("segments") or [])
+    per = TRIAL_MODELS.get(t.get("model"), TRIAL_MODELS["seedance-fast"])["per_sec"] * (2 if t.get("resolution") == "720p" else 1)
+    return round(len(plan.get("keyframes") or []) * TRIAL_KEY_COST + secs * per, 2)
+
+
+def trial_gen_seconds(seconds: float) -> int:
+    return int(min(atlas.MAX_DURATION, max(atlas.MIN_DURATION, math.ceil(seconds))))
+
+
+def trial_to_dict(aid: str, t: dict) -> dict:
+    base = f"/media/assets/{aid}/trials/{t['id']}"
+    f = t.get("files") or {}
+    url = lambda name: f"{base}/{name}" if name else None  # noqa: E731
+    return {**t, "a_url": url(f.get("a")), "b_url": url(f.get("b")), "final_url": url(f.get("final")), "conn_url": url(f.get("conn")),
+            "key_urls": [url(x) for x in f.get("keys") or []], "seg_urls": [url(x) for x in f.get("segs") or []],
+            "cost": trial_cost(t)}
+
+
+def cut_clip(src: Path, a: float, b: float, out: Path) -> Path:
+    subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{a:.3f}", "-i", str(src), "-t", f"{max(0.1, b - a):.3f}",
+                    "-an", "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p", str(out)],
+                   check=True, capture_output=True, timeout=300)
+    return out
+
+
+def still_at(src: Path, t: float, out: Path) -> Path:
+    subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{max(0.0, t):.3f}", "-i", str(src), "-frames:v", "1",
+                    "-vf", "scale='if(gt(iw,ih),min(1280,iw),-2)':'if(gt(iw,ih),-2,min(1280,ih))'", "-q:v", "2", str(out)],
+                   check=True, capture_output=True, timeout=60)
+    if not out.exists():
+        raise HTTPException(400, "مقدرتش أطلّع الفريم ده")
+    return out
+
+
+def trial_side(lab_id: str, n: int | None, t: float | None, side: str) -> dict:
+    """نقطة A (آخر اللقطة) أو B (أول اللقطة) من فيديو في المعمل."""
+    d = lab_load(lab_id)
+    dur = d["source"]["duration"]
+    if n is not None:
+        s = lab_shot(d, n)
+        t = s["end"] - 0.04 if side == "a" else s["start"] + 0.04
+        label = f"«{d.get('name')}» لقطة {n}: {(s.get('analysis') or {}).get('summary', '')}"
+        lo, hi = s["start"], s["end"]
+    else:
+        label, lo, hi = f"«{d.get('name')}» عند {t:.2f}", 0.0, dur
+    t = min(dur - 0.04, max(0.0, float(t or 0)))
+    return {"lab": lab_id, "lab_name": d.get("name"), "n": n, "t": round(t, 3), "label": label[:300],
+            "ctx": [round(max(lo, t - TRIAL_CTX), 3), round(t, 3)] if side == "a" else [round(t, 3), round(min(hi, t + TRIAL_CTX), 3)],
+            "src": d["source"]["file"]}
+
+
+class TrialSideIn(BaseModel):
+    lab: str
+    n: int
+
+
+class TrialIn(BaseModel):
+    mode: str = "rebuild"            # rebuild = نفس النقطتين في الفيديو الأصلي، transfer = لقطتين تانيين
+    a: TrialSideIn | None = None
+    b: TrialSideIn | None = None
+    model: str = "seedance-fast"
+    resolution: str = "480p"
+
+
+@app.post("/api/assets/{aid}/trials")
+def asset_trial_create(aid: str, body: TrialIn):
+    """🧪 تجربة جديدة: بيطلّع فريم A وفريم B وبيكتب الخطة (رخيص). التوليد بيستنى موافقتك."""
+    asset = clip_load(aid)
+    if asset.get("category") != "connector" or not asset.get("connector"):
+        raise HTTPException(400, "التجربة للكونيكتورز بس")
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل")
+    src = asset.get("source") or {}
+    if body.mode == "rebuild":
+        if not src.get("lab") or not (lab_dir(src["lab"]) / "lab.json").exists():
+            raise HTTPException(400, "الفيديو الأصلي للكونيكتور ده اتمسح من المعمل")
+        a = trial_side(src["lab"], None, src["t0"], "a")
+        b = trial_side(src["lab"], None, src["t1"], "b")
+        a["label"], b["label"] = "قبل الكونيكتور الأصلي مباشرة", "بعد الكونيكتور الأصلي مباشرة"
+    else:
+        if not (body.a and body.b):
+            raise HTTPException(400, "اختار اللقطة A واللقطة B")
+        a, b = trial_side(body.a.lab, body.a.n, None, "a"), trial_side(body.b.lab, body.b.n, None, "b")
+    tid = uuid.uuid4().hex[:8]
+    folder = trial_dir(aid, tid)
+    folder.mkdir(parents=True, exist_ok=True)
+    still_at(lab_dir(a["lab"]) / a["src"], a["t"], folder / "a.jpg")
+    still_at(lab_dir(b["lab"]) / b["src"], b["t"], folder / "b.jpg")
+    t = {"id": tid, "mode": "rebuild" if body.mode == "rebuild" else "transfer", "a": a, "b": b,
+         "model": body.model if body.model in TRIAL_MODELS else "seedance-fast",
+         "resolution": body.resolution if body.resolution in ("480p", "720p") else "480p",
+         "status": "planning", "step": "بيكتب الخطة", "error": None, "plan": None,
+         "files": {"a": "a.jpg", "b": "b.jpg"}, "review": None, "created_at": now()}
+    clip_update(aid, lambda x: x.setdefault("trials", []).insert(0, t))
+    threading.Thread(target=run_trial_plan, args=(aid, tid), daemon=True).start()
+    return clip_to_dict(aid, clip_load(aid))
+
+
+def run_trial_plan(aid: str, tid: str) -> None:
+    try:
+        asset = clip_load(aid)
+        t = next(x for x in asset["trials"] if x["id"] == tid)
+        folder = trial_dir(aid, tid)
+        if atlas.mock_mode():
+            raw = lab.mock_trial_plan()
+        else:
+            text = lab.trial_plan_messages(asset["connector"], t["mode"], t["a"]["label"], t["b"]["label"])
+            parts: list[dict] = [{"type": "text", "text": text}]
+            imgs = [folder / "a.jpg", folder / "b.jpg"] + [clip_dir(aid) / k["file"] for k in asset.get("keyframes") or []]
+            for p in imgs:
+                if p.exists():
+                    parts.append({"type": "image_url", "image_url": {"url": data_url(model_image(p, 768), "image/jpeg")}})
+            raw = ad_json(ad_media_chat([{"role": "user", "content": parts}], 8000), "خطة الكونيكتور")
+        trial_set(aid, tid, plan=lab.clean_trial_plan(raw), status="planned", step=None, error=None)
+    except Exception as exc:  # noqa: BLE001
+        trial_set(aid, tid, status="failed", step=None, error=str(getattr(exc, "detail", None) or exc)[:400])
+
+
+class TrialPatchIn(BaseModel):
+    plan: dict | None = None
+    model: str | None = None
+    resolution: str | None = None
+
+
+@app.patch("/api/assets/{aid}/trials/{tid}")
+def asset_trial_patch(aid: str, tid: str, body: TrialPatchIn):
+    """تعدّل الخطة (البرومبتات والأطوال) أو الموديل قبل التوليد."""
+    def fn(a):
+        t = next((x for x in a.get("trials") or [] if x["id"] == tid), None)
+        if t is None:
+            raise HTTPException(404, "التجربة دي مش موجودة")
+        if t["status"] in ("planning", "working"):
+            raise HTTPException(400, "استنى لما الشغل اللي شغال يخلص")
+        if body.plan is not None:
+            t["plan"] = lab.clean_trial_plan({**(t.get("plan") or {}), **body.plan})
+        if body.model in TRIAL_MODELS:
+            t["model"] = body.model
+        if body.resolution in ("480p", "720p"):
+            t["resolution"] = body.resolution
+    return clip_to_dict(aid, clip_update(aid, fn))
+
+
+@app.post("/api/assets/{aid}/trials/{tid}/run")
+def asset_trial_run(aid: str, tid: str):
+    """🎬 التوليد: الصور المفتاحية، والحركة بين كل صورتين، والتجميع. بيتحسب على Atlas."""
+    def fn(a):
+        t = next((x for x in a.get("trials") or [] if x["id"] == tid), None)
+        if t is None:
+            raise HTTPException(404, "التجربة دي مش موجودة")
+        if t["status"] in ("planning", "working") or not t.get("plan"):
+            raise HTTPException(400, "الخطة لسه مخلصتش")
+        t.update(status="working", step="بيبدأ", error=None, review=None)
+    clip_update(aid, fn)
+    threading.Thread(target=run_trial_gen, args=(aid, tid), daemon=True).start()
+    return clip_to_dict(aid, clip_load(aid))
+
+
+def nearest_ratio(w: int, h: int) -> str:
+    r = w / max(1, h)
+    return min(("9:16", "16:9", "1:1", "3:4", "4:3"), key=lambda k: abs(r - int(k.split(":")[0]) / int(k.split(":")[1])))
+
+
+def run_trial_gen(aid: str, tid: str) -> None:
+    def step(msg: str) -> None:
+        trial_set(aid, tid, step=msg)
+    try:
+        asset = clip_load(aid)
+        t = next(x for x in asset["trials"] if x["id"] == tid)
+        plan, folder = t["plan"], trial_dir(aid, tid)
+        info = media_info(folder / "a.jpg")
+        W, H = info.width // 2 * 2, info.height // 2 * 2
+        ratio = nearest_ratio(W, H)
+        size = az.ASPECTS.get(ratio, az.ASPECTS["9:16"])[0] if ratio in az.ASPECTS else "1024x1024"
+        # ١) الصور المفتاحية: كل مرحلة من اللي قبلها، ومعاها صورة النهاية عشان تعرف رايحة فين
+        chain, keys = [folder / "a.jpg"], []
+        for i, k in enumerate(plan["keyframes"]):
+            step(f"🖼️ بيرسم المرحلة {i + 1} من {len(plan['keyframes'])}: {k['label']}")
+            out = folder / f"k{i + 1}.png"
+            if atlas.mock_mode():
+                subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(chain[-1]), "-vf", f"hue=h={60 * (i + 1)}",
+                                str(out)], check=True, capture_output=True, timeout=60)
+            else:
+                prompt = (k["prompt"] + "\nIMAGE 1 is the current frame and the base to edit. IMAGE 2 is the final frame we are "
+                          "heading to (reference only). Keep the same framing, aspect ratio, style and every on-screen text exactly as "
+                          "written unless the instruction changes it.")
+                url = atlas.generate_image(carousel_settings()["image_family"], prompt, size, "medium",
+                                           [atlas.reference_url(chain[-1]), atlas.reference_url(folder / "b.jpg")])
+                atlas.download(url, out)
+            chain.append(out)
+            keys.append(out.name)
+            trial_set(aid, tid, files={**t["files"], "keys": keys})
+        chain.append(folder / "b.jpg")
+        # ٢) الحركة بين كل صورتين (صورة بداية + صورة نهاية)
+        m, segs = TRIAL_MODELS[t["model"]], []
+        for i, sg in enumerate(plan["segments"]):
+            step(f"🎬 بيولّد الحركة {i + 1} من {len(plan['segments'])}: {sg['label']}")
+            out, secs = folder / f"s{i + 1}.mp4", trial_gen_seconds(sg["seconds"])
+            if atlas.mock_mode():
+                subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-loop", "1", "-t", str(secs), "-i", str(chain[i]),
+                                "-loop", "1", "-t", str(secs), "-i", str(chain[i + 1]), "-filter_complex",
+                                f"[0]scale={W}:{H},setsar=1,fps=30[a];[1]scale={W}:{H},setsar=1,fps=30[b];"
+                                f"[a][b]xfade=transition=fade:duration={secs - 0.5}:offset=0.25,format=yuv420p",
+                                "-t", str(secs), str(out)], check=True, capture_output=True, timeout=120)
+            else:
+                body = {"model": m["model"], "prompt": sg["prompt"] + " One continuous shot, no cuts, no text changes.",
+                        "image": atlas.reference_url(chain[i]), "last_image": atlas.reference_url(chain[i + 1]),
+                        "duration": secs, "resolution": t["resolution"], "ratio": ratio, "generate_audio": False}
+                atlas.download(atlas.run_model("Video", body, "حركة الكونيكتور", max_seconds=1500, interval=6), out)
+            segs.append(out.name)
+            trial_set(aid, tid, files={**t["files"], "keys": keys, "segs": segs})
+        # ٣) التجميع: آخر A ← الحركات (كل واحدة على قد طولها في الخطة) ← أول B
+        step("🎞️ بيجمّع")
+        a_src, b_src = lab_dir(t["a"]["lab"]) / t["a"]["src"], lab_dir(t["b"]["lab"]) / t["b"]["src"]
+        parts = [cut_clip(a_src, *t["a"]["ctx"], folder / "a_ctx.mp4")]
+        for name, sg in zip(segs, plan["segments"]):
+            p = folder / name
+            factor = sg["seconds"] / max(0.1, probe_duration(p))
+            parts.append((p, factor))
+        parts.append(cut_clip(b_src, *t["b"]["ctx"], folder / "b_ctx.mp4"))
+        def chain_video(items: list, out: Path) -> Path:
+            inputs, fc = [], []
+            for i, it in enumerate(items):
+                p, f = (it if isinstance(it, tuple) else (it, 1.0))
+                inputs += ["-i", str(p)]
+                fc.append(f"[{i}:v]scale={W}:{H}:force_original_aspect_ratio=decrease,pad={W}:{H}:(ow-iw)/2:(oh-ih)/2,setsar=1,"
+                          f"fps=30,setpts={f:.4f}*(PTS-STARTPTS)[v{i}]")
+            fc.append("".join(f"[v{i}]" for i in range(len(items))) + f"concat=n={len(items)}:v=1:a=0[out]")
+            subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", *inputs, "-filter_complex", ";".join(fc),
+                            "-map", "[out]", "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p",
+                            "-movflags", "+faststart", str(out)], check=True, capture_output=True, timeout=600)
+            return out
+        chain_video(parts, folder / "final.mp4")
+        chain_video(parts[1:-1], folder / "conn.mp4")
+        trial_set(aid, tid, status="done", step=None, error=None, done_at=now(),
+                  files={"a": "a.jpg", "b": "b.jpg", "keys": keys, "segs": segs, "final": "final.mp4", "conn": "conn.mp4"})
+    except Exception as exc:  # noqa: BLE001
+        trial_set(aid, tid, status="failed", step=None, error=str(getattr(exc, "detail", None) or exc)[:400])
+
+
+class TrialReviewIn(BaseModel):
+    ok: bool | None = None
+    note: str = ""
+
+
+@app.patch("/api/assets/{aid}/trials/{tid}/review")
+def asset_trial_review(aid: str, tid: str, body: TrialReviewIn):
+    def fn(a):
+        t = next((x for x in a.get("trials") or [] if x["id"] == tid), None)
+        if t is None:
+            raise HTTPException(404, "التجربة دي مش موجودة")
+        t["review"] = {"ok": body.ok, "note": body.note.strip()[:1000], "at": now()}
+    return clip_to_dict(aid, clip_update(aid, fn))
+
+
+@app.delete("/api/assets/{aid}/trials/{tid}")
+def asset_trial_delete(aid: str, tid: str):
+    def fn(a):
+        t = next((x for x in a.get("trials") or [] if x["id"] == tid), None)
+        if t and t["status"] in ("planning", "working"):
+            raise HTTPException(400, "استنى لما الشغل اللي شغال يخلص")
+        a["trials"] = [x for x in a.get("trials") or [] if x["id"] != tid]
+    d = clip_update(aid, fn)
+    shutil.rmtree(trial_dir(aid, tid), ignore_errors=True)
+    return clip_to_dict(aid, d)
+
+
 def reset_stuck_assets() -> None:
     for f in ASSETS_DIR.glob("*/asset.json"):
         try:
@@ -9614,6 +9907,7 @@ def reset_stuck_assets() -> None:
         except ValueError:
             continue
         bad = [v for v in d.get("variants") or [] if v.get("status") == "working"]
+        bad += [t for t in d.get("trials") or [] if t.get("status") in ("planning", "working")]
         for v in bad:
             v.update(status="failed", step=None, error="اتقطع لما السيرفر اتقفل. اعمله تاني")
         if bad:

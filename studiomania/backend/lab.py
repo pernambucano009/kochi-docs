@@ -614,6 +614,70 @@ def mock_connectors(d: dict) -> dict:
         "story_role": "بيوري نتيجة الطلب في نفس اللحظة من غير قطع"}]}
 
 
+# ------------------------------------------------------------ 🧪 تجربة كونيكتور: نطبّق الوصفة بين لقطتين
+
+TRIAL_FORMAT = """{
+  "adapted": "الوصفة هتتنفذ بين اللقطتين دول إزاي (بالعربي، خطوات قصيرة مرقمة)",
+  "anchors": ["اللي هيفضل ثابت والعين ماسكاه بين اللقطتين دول"],
+  "keyframes": [{"label": "اسم المرحلة بالعربي (مثلًا: الإطار اتشال والخلفية بقت خريطة)",
+                 "prompt": "English image-edit instruction. IMAGE 1 is the current frame, IMAGE 2 is the final frame we are heading to. Describe exactly the in-between state to draw from IMAGE 1: what stays identical (layout, text, cursor...), what has changed and how far along the transformation is"}],
+  "segments": [{"label": "الحركة دي بالعربي",
+                "prompt": "English prompt for a start-frame/end-frame video model: one continuous shot with no cut, the exact motion from the start frame to the end frame (camera move, what transforms into what and in which order, easing), keep everything else steady",
+                "seconds": 2.0}]
+}"""
+
+
+def trial_plan_messages(recipe: dict, mode: str, a_label: str, b_label: str, max_keys: int = 2) -> str:
+    """نص الطلب. الصور بتتحط بعده بالترتيب: 1 = آخر فريم في A، 2 = أول فريم في B، وبعدهم فريمات الكونيكتور المرجعي."""
+    r = {k: recipe.get(k) for k in ("family", "trigger", "anchors", "transforms", "camera", "rhythm", "recipe", "story_role", "sound")}
+    goal = ("🔁 تجربة إعادة بناء: A وB هما نفس النقطتين اللي الكونيكتور الأصلي بينهم في الفيديو. المطلوب نعيد عمله بأقرب شكل للأصلي."
+            if mode == "rebuild" else
+            "🔀 تجربة نقل: A وB لقطتين مختلفين عن الكونيكتور الأصلي. المطلوب نطبّق نفس الفكرة والإحساس على قصة اللقطتين دول.")
+    return (
+        "أنت مخرج موشن جرافيك. عندنا «كونيكتور»: تحوّل بيحكي بيودّي من مشهد لمشهد من غير قطع، ومعاه وصفته.\n"
+        f"{goal}\n\n"
+        f"وصفة الكونيكتور:\n{json.dumps(r, ensure_ascii=False, indent=1)}\n\n"
+        f"اللقطة A: {a_label}\nاللقطة B: {b_label}\n\n"
+        "الصور بالترتيب: الصورة 1 = آخر فريم في A (البداية). الصورة 2 = أول فريم في B (النهاية). "
+        "والصور اللي بعدهم = فريمات الكونيكتور المرجعي (البداية والنص والنهاية) عشان تشوف الشكل والإحساس.\n\n"
+        "هنفّذها كده: صور مفتاحية للمراحل اللي في النص (بموديل تعديل صور بياخد الصورة اللي قبلها)، وبعدين موديل فيديو "
+        "بياخد صورة بداية وصورة نهاية ويعمل الحركة بينهم. الحتت بالترتيب: الصورة 1 ← المراحل ← الصورة 2.\n"
+        f"- keyframes من 0 لـ {max_keys} (المراحل اللي لازم تتحدد عشان التحوّل يمشي صح؛ لو التحوّل بسيط خليها 0 أو 1).\n"
+        "- segments = عدد keyframes + 1 بالظبط، كل واحدة الحركة من الصورة اللي قبلها للي بعدها.\n"
+        "- seconds = الطول اللي الحتة المفروض تاخده في الفيديو النهائي (حسب إيقاع الكونيكتور الأصلي)، من 0.6 لـ 6.\n"
+        "- البرومبتات بالإنجليزي ودقيقة: الكلام المكتوب على الشاشة يفضل زي ما هو بالظبط، ومفيش قطع.\n"
+        "رجّع JSON بس بالشكل ده:\n" + TRIAL_FORMAT
+    )
+
+
+def clean_trial_plan(data: dict, max_keys: int = 2) -> dict:
+    d = data or {}
+    keys = [{"label": str(k.get("label") or f"مرحلة {i + 1}")[:120], "prompt": str(k.get("prompt") or "")[:2000]}
+            for i, k in enumerate(d.get("keyframes") or []) if isinstance(k, dict) and str(k.get("prompt") or "").strip()][:max_keys]
+    segs = []
+    for i, x in enumerate(d.get("segments") or []):
+        if not isinstance(x, dict):
+            continue
+        try:
+            sec = float(x.get("seconds") or 2)
+        except (TypeError, ValueError):
+            sec = 2.0
+        segs.append({"label": str(x.get("label") or f"حركة {i + 1}")[:120], "prompt": str(x.get("prompt") or "")[:2000],
+                     "seconds": round(min(6.0, max(0.6, sec)), 2)})
+    while len(segs) < len(keys) + 1:   # لازم حركة بين كل صورتين
+        segs.append({"label": f"حركة {len(segs) + 1}", "prompt": "Smooth continuous transformation from the start frame to the end frame, no cut.",
+                     "seconds": 2.0})
+    return {"adapted": str(d.get("adapted") or "")[:2000], "anchors": [str(x)[:200] for x in d.get("anchors") or []][:8],
+            "keyframes": keys, "segments": segs[:len(keys) + 1]}
+
+
+def mock_trial_plan() -> dict:
+    return {"adapted": "١. زووم ناعم على العنصر اللي اتداس\n٢. الخلفية تتحول للمشهد الجديد", "anchors": ["الكلام المكتوب"],
+            "keyframes": [{"label": "النص: الخلفية بتتحول", "prompt": "Halfway state: background morphing into the next scene."}],
+            "segments": [{"label": "زووم وبداية التحوّل", "prompt": "Slow zoom in, background starts morphing.", "seconds": 1.5},
+                         {"label": "التحوّل بيكمل", "prompt": "Background finishes morphing into the final frame.", "seconds": 1.5}]}
+
+
 # ------------------------------------------------------------ تجارب من غير Atlas
 
 def mock_audio(duration: float, marks: list[dict]) -> dict:
