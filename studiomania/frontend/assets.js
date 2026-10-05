@@ -42,7 +42,8 @@ function assetGrid() {
   const items = asx.list.filter((a) => (!asx.cat || a.category === asx.cat)
     && (!q || [a.name, a.summary, ...(a.tags || [])].join(" ").toLowerCase().includes(q)));
   const counts = asx.list.reduce((m, a) => ((m[a.category] = (m[a.category] || 0) + 1), m), {});
-  return `<div class="car-head"><h2>📚 مكتبة الأصول <span class="muted">(${asx.list.length})</span></h2></div>
+  return `<div class="car-head"><h2>📚 مكتبة الأصول <span class="muted">(${asx.list.length})</span></h2>
+      ${asx.list.length ? `<button type="button" class="btn sm danger" data-asclear>🗑️ امسح المكتبة كلها</button>` : ""}</div>
     <div class="row wrap as-filter">
       <input type="search" data-asq placeholder="🔎 دوّر بالاسم أو التاجز" value="${le(asx.q)}" data-no-i18n>
       <div class="lab-chips"><button type="button" class="chip ${asx.cat ? "" : "on"}" data-ascat="">الكل</button>
@@ -152,6 +153,18 @@ $("labLib").addEventListener("click", async (e) => {
   const open = t.closest("[data-asopen]");
   if (open) return openLib(open.dataset.asopen);
   if (t.closest("[data-asback]")) { asx.cur = null; return openLib(); }
+  const clear = t.closest("[data-asclear]");
+  if (clear) {
+    if (!confirm(`تمسح كل الأصول اللي في المكتبة (${asx.list.length}) بكل نسخها؟ مفيش رجوع.`)) return;
+    if (!confirm("متأكد؟ المكتبة هتبقى فاضية. (الفيديوهات اللي في المعمل مش هتتمسح، والكومبوننتس اللي كنت قبلتها هترجع «لسه» وتقدر تقبلها تاني)")) return;
+    return busyButton(clear, "⏳", async () => {
+      const r = await api("/api/assets", { method: "DELETE" });
+      toast(`🗑️ اتمسح ${r.deleted} أصل. المكتبة فاضية`);
+      asx.cur = null; asx.cat = ""; asx.q = "";
+      if (labx.cur) labx.cur = await api(`/api/lab/${labx.cur.id}`);
+      await openLib();
+    });
+  }
   const golab = t.closest("[data-asgolab]");
   if (golab) {
     e.preventDefault();

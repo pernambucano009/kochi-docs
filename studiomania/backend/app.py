@@ -9238,6 +9238,32 @@ def lab_component(lid: str, cid: str, body: ComponentIn):
     return lab_to_dict(lid, d)
 
 
+@app.delete("/api/assets")
+def assets_clear():
+    """🗑️ يمسح المكتبة كلها (الأصول ونسخها). الكومبوننتس في المعمل بترجع «لسه» وتقدر تقبلها تاني."""
+    busy = [f.parent.name for f in ASSETS_DIR.glob("*/asset.json")
+            if any(v.get("status") == "working" for v in json.loads(f.read_text(encoding="utf-8")).get("variants") or [])]
+    if busy:
+        raise HTTPException(400, "فيه نسخة بتتعمل دلوقتي. استنى لما تخلص")
+    n = 0
+    for f in ASSETS_DIR.glob("*/asset.json"):
+        shutil.rmtree(f.parent, ignore_errors=True)
+        n += 1
+    for f in LAB_DIR.glob("*/lab.json"):  # الكومبوننتس المقبولة ترجع زي ما كانت قبل ما تتقبل
+        try:
+            lid = f.parent.name
+            def fn(d):
+                for c in d.get("components") or []:
+                    if c.get("asset"):
+                        c["asset"] = None
+                        if (c.get("review") or {}).get("ok"):
+                            c["review"] = None
+            lab_update(lid, fn)
+        except (ValueError, HTTPException):
+            continue
+    return {"deleted": n}
+
+
 @app.get("/api/assets")
 def assets_list():
     out = []
