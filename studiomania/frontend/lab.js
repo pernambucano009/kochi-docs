@@ -277,7 +277,8 @@ function renderLabComps(d) {
   all.forEach((c) => n[compState(c)]++);
   const items = all.filter((c) => !labx.cfilter || compState(c) === labx.cfilter);
   $("labComps").innerHTML = `<h3 class="pane-h">💡 الكومبوننتس المقترحة <span class="muted">(${all.length})</span>
-      <button type="button" class="btn sm" data-labrun="components" ${d.busy ? "disabled" : ""} title="اقتراحات جديدة. اللي قبلته أو رفضته بيفضل زي ما هو">↻ اقترح تاني</button></h3>
+      <button type="button" class="btn sm" data-labrun="components" ${d.busy ? "disabled" : ""} title="اقتراحات جديدة. اللي قبلته أو رفضته بيفضل زي ما هو">↻ اقترح تاني</button>
+      ${all.length ? `<button type="button" class="btn sm danger" data-compfresh ${d.busy ? "disabled" : ""} title="يمسح كل الاقتراحات ويقترح من الصفر">🗑️ امسح واقترح من جديد</button>` : ""}</h3>
     <p class="hint">الموديل طلّع الحتت دي من التفكيك. اتفرج على كل واحدة: ✅ تدخل المكتبة على طول بحركتها وخلفيتها وصوتها ومفاتيح التحكم بتاعتها، ❌ ترفضها واكتب السبب عشان الاقتراحات الجاية تبقى أحسن. تقدر تظبط الاسم والبداية والنهاية قبل ما تقبل.</p>
     ${st.status === "working" || st.status === "queued" ? `<p class="muted"><span class="spin-inline"></span> ${le(st.progress || "مستني العناصر تخلص...")}</p>` : ""}
     ${st.status === "skipped" || st.status === "failed" ? `<p class="err">${le(st.error)}</p>` : ""}
@@ -446,6 +447,15 @@ document.querySelector('.view[data-view="11"]').addEventListener("click", async 
     return busyButton(hide || prune, "⏳", async () => {
       labx.cur = await api(url, prune ? { method: "POST" } : { method: "PATCH", ...jsonBody({ ignored: !!hide.dataset.hide }) });
       renderLab();
+    });
+  }
+  const fresh = e.target.closest("[data-compfresh]");
+  if (fresh) {
+    if (!confirm("تمسح كل اقتراحات الكومبوننتس (حتى اللي قبلتها أو رفضتها) ويقترح من الصفر؟\nاللي اتحفظ في المكتبة بيفضل فيها، وأسباب الرفض بتفضل محفوظة عشان الموديل يتعلم منها.")) return;
+    return busyButton(fresh, "⏳", async () => {
+      labx.cur = await api(`/api/lab/${labx.cur.id}/run?step=components&fresh=true`, { method: "POST" });
+      labx.cfilter = "";
+      renderLab(); scheduleLabPoll();
     });
   }
   const cf = e.target.closest("[data-cfilter]");

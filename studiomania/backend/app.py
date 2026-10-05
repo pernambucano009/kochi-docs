@@ -8651,8 +8651,9 @@ def lab_delete(lid: str):
 
 
 @app.post("/api/lab/{lid}/run")
-def lab_run(lid: str, step: str = "all"):
-    """يعيد خطوة (أو كله). اللي بعدها بيتعمل من جديد: القطعات/الصوت ← العناصر ← الكومبوننتس."""
+def lab_run(lid: str, step: str = "all", fresh: bool = False):
+    """يعيد خطوة (أو كله). اللي بعدها بيتعمل من جديد: القطعات/الصوت ← العناصر ← الكومبوننتس.
+    fresh = يمسح كل اقتراحات الكومبوننتس (حتى اللي قبلتها أو رفضتها) ويقترح من الصفر."""
     steps = list(LAB_DEFAULT) if step == "all" else [step] if step in LAB_STEPS else []
     if not steps:
         raise HTTPException(400, "خطوة غير معروفة")
@@ -8665,7 +8666,16 @@ def lab_run(lid: str, step: str = "all"):
         steps = sorted(set(steps) | {"elements"}, key=LAB_STEPS.index)
     if "elements" in steps:
         steps = sorted(set(steps) | {"components"}, key=LAB_STEPS.index)
-    lab_update(lid, lambda d: [d.setdefault("steps", {}).update({k: {"status": "queued"}}) for k in steps])
+    def fn(d):
+        for k in steps:
+            d.setdefault("steps", {})[k] = {"status": "queued"}
+        if fresh and "components" in steps:
+            # أسباب الرفض بتتحفظ عشان الموديل يفضل يتعلم منها، والاقتراحات نفسها بتتمسح (الأصول اللي في المكتبة بتفضل)
+            d["comp_lessons"] = ([{"name": c["name"], "t0": c["t0"], "t1": c["t1"], "note": (c.get("review") or {}).get("note")}
+                                  for c in d.get("components") or [] if (c.get("review") or {}).get("ok") is False]
+                                 + (d.get("comp_lessons") or []))[:40]
+            d["components"] = []
+    lab_update(lid, fn)
     threading.Thread(target=run_lab, args=(lid, steps), daemon=True).start()
     return lab_to_dict(lid, lab_load(lid))
 
@@ -9182,7 +9192,7 @@ def run_lab_components(lid: str) -> None:
     old = d.get("components") or []
     keep = [c for c in old if (c.get("review") or {}).get("ok") is not None or c.get("asset")]
     rejected = [{"name": c["name"], "t0": c["t0"], "t1": c["t1"], "note": (c.get("review") or {}).get("note")}
-                for c in keep if (c.get("review") or {}).get("ok") is False]
+                for c in keep if (c.get("review") or {}).get("ok") is False] + (d.get("comp_lessons") or [])
     lab_step(lid, "components", progress="بيدور على الحتت اللي تنفع تتعاد")
     raw = lab.mock_components(d) if atlas.mock_mode() else ad_json(series_chat(lab.components_messages(d, rejected)), "الكومبوننتس")
     ids = {e["id"] for s in d.get("shots") or [] for e in (s.get("analysis") or {}).get("elements") or []}
