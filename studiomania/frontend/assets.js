@@ -77,6 +77,7 @@ function assetDetail(a) {
         ${a.use ? `<small class="muted" data-no-i18n>💼 ${le(a.use)}</small>` : ""}
       </div>
     </div>
+    ${a.connector ? assetConnector(a) : ""}
     <section class="panel lab-sec"><h4>🧩 اللي جواه</h4>
       ${a.background?.name ? `<div class="lab-row"><b>🖼️ الخلفية:</b> <span data-no-i18n>${le(a.background.name)}</span> <small class="muted" data-no-i18n>${le(a.background.description)}</small></div>` : ""}
       ${(a.elements || []).map((e) => `<div class="lab-el">
@@ -123,6 +124,26 @@ function assetDetail(a) {
             <input type="text" class="lab-note" value="${le(v.review?.note)}" placeholder="ملاحظة" data-asnote></span>` : ""}</div>
       </div>`).join("")}</div>` : ""}
     </div></section>`;
+}
+
+// 🔗 وصفة الكونيكتور: الشرارة واللي بيفضل ثابت والتحوّلات والكاميرا والإيقاع، والفريمات المفتاحية
+function assetConnector(a) {
+  const c = a.connector || {}, t0 = a.source?.t0 || 0;
+  return `<section class="panel lab-sec as-conn"><h4>🔗 وصفة الكونيكتور</h4>
+    ${(a.keyframes || []).length ? `<div class="lab-conn-keys">${a.keyframes.map((k) => `<figure><img src="${k.url}" alt="" data-asplay="${k.t}" data-to="${k.t + 0.6}"><figcaption>${k.label} · ${lt(k.t)}</figcaption></figure>`).join("")}</div>` : ""}
+    ${c.from_scene || c.to_scene ? `<div class="lab-conn-story" data-no-i18n><span>${le(c.from_scene)}</span> <b>⟵</b> <span>${le(c.to_scene)}</span></div>` : ""}
+    <dl class="lab-conn-dl">
+      ${c.trigger ? `<dt>🎯 الشرارة</dt><dd data-no-i18n>${le(c.trigger)}</dd>` : ""}
+      ${(c.anchors || []).length ? `<dt>📌 بيفضل ثابت</dt><dd data-no-i18n>${c.anchors.map((x) => `<span class="chip">${le(x)}</span>`).join(" ")}</dd>` : ""}
+      ${(c.transforms || []).length ? `<dt>🔄 التحوّلات</dt><dd><ol class="lab-conn-tr">${c.transforms.map((x) => `<li><button type="button" class="btn sm" data-asplay="${Math.max(0, x.t0 - t0)}" data-to="${Math.max(0, x.t1 - t0)}">▶️</button>
+        <span data-no-i18n><b>${le(x.from)}</b> ← ${le(x.to)}${x.how ? ` <small class="muted">(${le(x.how)})</small>` : ""}</span></li>`).join("")}</ol></dd>` : ""}
+      ${c.camera ? `<dt>🎥 الكاميرا</dt><dd data-no-i18n>${le(c.camera)}</dd>` : ""}
+      ${c.rhythm ? `<dt>⏱️ الإيقاع</dt><dd data-no-i18n>${le(c.rhythm)}</dd>` : ""}
+      ${c.sound ? `<dt>🔊 الصوت</dt><dd data-no-i18n>${le(c.sound)}</dd>` : ""}
+      ${c.story_role ? `<dt>📖 بيخدم القصة إزاي</dt><dd data-no-i18n>${le(c.story_role)}</dd>` : ""}
+    </dl>
+    ${(c.recipe || []).length ? `<h4>🧪 الوصفة</h4><ol class="as-recipe" data-no-i18n>${c.recipe.map((x) => `<li>${le(x)}</li>`).join("")}</ol>` : ""}
+  </section>`;
 }
 
 function asPlay(t0, t1) {

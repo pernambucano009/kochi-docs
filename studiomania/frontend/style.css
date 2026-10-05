@@ -1556,3 +1556,31 @@ a.pl-link:hover { background: color-mix(in srgb, var(--ok) 24%, transparent); }
   font-size: 12px; padding: 1px 4px; cursor: pointer; opacity: 0; transition: opacity .15s; }
 .lab-fr:hover .lab-frcut, .lab-frcut:focus { opacity: 1; }
 @media (hover: none) { .lab-frcut { opacity: .85; } }
+
+/* 🔗 الكونيكتورز */
+.lab-lt .blk.conn { background: #7b5cd6; opacity: .85; }
+.lab-lt .blk.conn.ok { background: var(--ok); opacity: 1; }
+.lab-lt .blk.conn.bad { background: var(--danger); opacity: .45; }
+.lab-conns { display: flex; flex-direction: column; gap: 12px; margin-top: 8px; }
+.lab-conn { display: grid; grid-template-columns: minmax(220px, 300px) 1fr; gap: 12px; border: 1px solid var(--line); border-radius: var(--radius-sm);
+  padding: 10px; background: var(--surface); transition: box-shadow .3s; }
+.lab-conn.ok { border-color: var(--ok); background: #f1faf5; }
+.lab-conn.bad { opacity: .6; }
+.lab-conn.flash { box-shadow: 0 0 0 3px var(--accent); }
+.lab-conn-media video { width: 100%; max-height: 420px; background: #000; border-radius: 8px; }
+.lab-conn-keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-top: 6px; }
+.lab-conn-keys figure { margin: 0; }
+.lab-conn-keys img { width: 100%; border-radius: 6px; cursor: pointer; display: block; }
+.lab-conn-keys figcaption { font-size: 11px; color: var(--muted); text-align: center; }
+.lab-conn-body { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.lab-conn-body input[type=number] { width: 72px; }
+.lab-conn-story { background: var(--surface-2); border-radius: 8px; padding: 6px 8px; font-size: 13px; }
+.lab-conn-dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; margin: 0; font-size: 13px; }
+.lab-conn-dl dt { font-weight: 600; white-space: nowrap; }
+.lab-conn-dl dd { margin: 0; }
+.lab-conn-tr { margin: 0; padding-inline-start: 18px; display: flex; flex-direction: column; gap: 4px; }
+.lab-conn-recipe { display: flex; flex-direction: column; gap: 3px; font-size: 13px; font-weight: 600; }
+.lab-conn-recipe textarea { width: 100%; font-weight: 400; }
+@media (max-width: 760px) { .lab-conn { grid-template-columns: 1fr; } }
+.as-conn .lab-conn-keys { max-width: 520px; }
+.as-recipe { margin: 0; padding-inline-start: 20px; display: flex; flex-direction: column; gap: 3px; }

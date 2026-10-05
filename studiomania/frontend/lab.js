@@ -11,7 +11,7 @@ const LAB_TYPES = { character: "🧍 شخصية", background: "🖼️ خلفي�
 const LAB_ACTIONS = { appear: "بيظهر", disappear: "بيختفي", move: "بيتحرك", click: "بيدوس", drag: "بيسحب", drop: "بيسيب", type: "بيكتب",
   scale: "بيكبر/يصغر", rotate: "بيلف", highlight: "بيتعمله هايلايت", transform: "بيتحول", speak: "بيتكلم", gesture: "بيشاور", other: "تاني" };
 const LAB_SCENE = { live_action: "🎥 تصوير حقيقي", screen_recording: "🖥️ تسجيل شاشة", motion_graphics: "✨ موشن جرافيك", mixed: "🔀 مزيج" };
-const LAB_STEP = { shots: "✂️ القطعات", elements: "🧩 العناصر", components: "💡 الكومبوننتس", stems: "🎚️ فصل التراكات", audio: "🎧 الصوت" };
+const LAB_STEP = { shots: "✂️ القطعات", elements: "🧩 العناصر", components: "💡 الكومبوننتس", connectors: "🔗 الكونيكتورز", stems: "🎚️ فصل التراكات", audio: "🎧 الصوت" };
 const LAB_STEMS = { dialogue: "🗣️ الكلام", music: "🎵 الموسيقى", effects: "🔊 المؤثرات" };
 const lt = (t) => `${Math.floor((t || 0) / 60)}:${((t || 0) % 60).toFixed(2).padStart(5, "0")}`;
 const le = (v) => escapeHtml(v == null ? "" : String(v));
@@ -88,6 +88,8 @@ function renderLab() {
   const busyEdit = (el) => el.contains(document.activeElement) && document.activeElement.matches("input, select, textarea");
   const compPlaying = [...$("labComps").querySelectorAll("video")].some((v) => !v.paused);
   if (!busyEdit($("labComps")) && !compPlaying) renderLabComps(d);
+  const connPlaying = [...$("labConns").querySelectorAll("video")].some((v) => !v.paused);
+  if (!busyEdit($("labConns")) && !connPlaying) renderLabConns(d);
   if (!busyEdit($("labAudio"))) renderLabAudio(d);
   const shotPlaying = [...document.querySelectorAll("[data-shotvid]")].some((v) => !v.paused);
   if (!busyEdit($("labShots")) && !shotPlaying) renderLabShots(d);
@@ -111,6 +113,7 @@ function renderLabTimeline(d) {
   const cst = (c) => c.asset ? "ok" : c.review?.ok === false ? "bad" : "";
   $("labTimeline").innerHTML =
     lane("✂️ اللقطات", (d.shots || []).map((s) => `<i class="blk shot ${s.review?.ok === false ? "bad" : ""} ${s.ignored ? "off" : ""} ${s.cut === "change" ? "chg" : ""}" style="right:${pct(s.start)};width:calc(${pct(s.end - s.start)} - 2px)" data-seek="${s.start}" title="لقطة ${s.n}">${s.n}</i>`).join(""))
+    + lane("🔗 كونيكتورز", (d.connectors || []).map((c) => `<i class="blk conn ${cst(c)}" style="right:${pct(c.t0)};width:calc(${pct(c.t1 - c.t0)} - 2px)" data-seek="${c.t0}" data-goconn="${c.id}" title="${le(c.name)}"></i>`).join(""))
     + lane("💡 كومبوننتس", (d.components || []).map((c) => `<i class="blk comp ${cst(c)}" style="right:${pct(c.t0)};width:calc(${pct(c.t1 - c.t0)} - 2px)" data-seek="${c.t0}" data-gocomp="${c.id}" title="${le(c.name)}"></i>`).join(""))
     + (!hasAudio ? "" : `<div class="lab-hearnote ${allOn ? "" : "on"}">${allOn ? "🎧 دوس 🔊 جنب أي حارة عشان تقفلها وتسمع الباقي لوحده"
       : labx.stems ? "🎚️ بتسمع التراكات المفصولة اللي مفتوحة بس" : "⚠️ مفيش تراكات مفصولة: الصوت بيسكت برا أوقات الحاجات اللي مفتوحة (تقدر تتأكد من التوقيت، بس الكلام والموسيقى في نفس اللحظة بيبقوا مع بعض)"}</div>`
@@ -243,7 +246,7 @@ function labStems(d) {
 }
 
 // 📚 احفظ مقطع من اللقطة (بحركته وخلفيته وصوته) كأصل في المكتبة
-const ASSET_CATS = { motion_graphics: "✨ موشن جرافيك", effect: "💥 افيكت", transition: "🔀 انتقال", text: "🔤 كلام متحرك",
+const ASSET_CATS = { connector: "🔗 كونيكتور", motion_graphics: "✨ موشن جرافيك", effect: "💥 افيكت", transition: "🔀 انتقال", text: "🔤 كلام متحرك",
   screen: "🖥️ تسجيل شاشة / واجهة", cursor: "🖱️ حركة ماوس", character: "🧍 شخصية", background: "🖼️ خلفية", product: "📦 منتج", other: "تاني" };
 function labAssetForm(d, s) {
   const els = s.analysis?.elements || [], T = d.source.duration;
@@ -315,6 +318,66 @@ async function labComp(cid, body, btn) {
   try { await go(); } catch (err) { toast(err.message, true); }
 }
 
+// ---------- 🔗 الكونيكتورز: تحوّل بيحكي بيودّي من مشهد لمشهد من غير قطع، بوصفته اللي تتطبق على أي مشهدين
+function renderLabConns(d) {
+  const all = d.connectors || [], st = d.steps?.connectors || {}, fam = d.families || {};
+  const n = { todo: 0, ok: 0, bad: 0 };
+  all.forEach((c) => n[compState(c)]++);
+  const items = all.filter((c) => !labx.xfilter || compState(c) === labx.xfilter);
+  $("labConns").innerHTML = `<h3 class="pane-h">🔗 الكونيكتورز <span class="muted">(${all.length})</span>
+      <button type="button" class="btn sm" data-labrun="connectors" ${d.busy ? "disabled" : ""} title="يتفرج على الفيديو تاني ويدوّر على كونيكتورز. اللي قبلته أو رفضته بيفضل">↻ دوّر تاني</button>
+      ${all.length ? `<button type="button" class="btn sm danger" data-connfresh ${d.busy ? "disabled" : ""}>🗑️ امسح ودوّر من جديد</button>` : ""}</h3>
+    <p class="hint">الكونيكتور = لحظة القصة فيها بتتحوّل للمشهد اللي بعده قدام عينك من غير قطع (زووم جوه حاجة، الخلفية تبقى عالم تاني، الماوس بيودّينا لمكان...). الموديل بيتفرج على الفيديو كله ويكتب لكل واحد وصفته: الشرارة، واللي بيفضل ثابت، وإيه بيتحول لإيه، والكاميرا والإيقاع. ✅ يدخل المكتبة بوصفته وفريماته.</p>
+    ${st.status === "working" || st.status === "queued" ? `<p class="muted"><span class="spin-inline"></span> ${le(st.progress || "مستني...")}</p>` : ""}
+    ${st.status === "failed" ? `<p class="err">${le(st.error)}</p>` : ""}
+    ${!st.status && !all.length ? `<p class="muted">الفيديو ده اتفكك قبل خطوة الكونيكتورز. دوس «↻ دوّر تاني» فوق.</p>` : ""}
+    ${all.length ? `<div class="lab-chips">${Object.entries(COMP_FILTER).map(([k, l]) => `<button type="button" class="chip ${(labx.xfilter || "") === k ? "on" : ""}" data-xfilter="${k}">${l} <small>${k ? n[k] : all.length}</small></button>`).join("")}</div>` : ""}
+    <div class="lab-conns">${items.map((c) => {
+      const s = compState(c);
+      return `<article class="lab-conn ${s}" data-conn="${c.id}">
+        <div class="lab-conn-media">
+          <video data-cvid data-t0="${c.t0}" data-t1="${c.t1}" src="${d.source_url}#t=${c.t0}" poster="${c.keyframes?.[0]?.url || ""}" preload="none" playsinline controls></video>
+          <div class="lab-conn-keys">${(c.keyframes || []).map((k) => `<figure><img src="${k.url}" alt="" data-seek="${k.t}"><figcaption>${k.label} · ${lt(k.t)}</figcaption></figure>`).join("")}</div>
+        </div>
+        <div class="lab-conn-body">
+          <input type="text" class="lab-cname" value="${le(c.name)}" data-xf="name" data-no-i18n>
+          <div class="row wrap"><select data-xf="family">${Object.entries(fam).map(([k, l]) => `<option value="${k}" ${k === c.family ? "selected" : ""}>${l}</option>`).join("")}</select>
+            <label>من <input type="number" step="0.05" min="0" max="${d.source.duration}" value="${c.t0}" data-xf="t0"></label>
+            <label>لـ <input type="number" step="0.05" min="0" max="${d.source.duration}" value="${c.t1}" data-xf="t1"></label>
+            <small class="muted">${(c.t1 - c.t0).toFixed(2)} ث</small></div>
+          <div class="lab-conn-story" data-no-i18n><span>${le(c.from_scene)}</span> <b>⟵</b> <span>${le(c.to_scene)}</span></div>
+          <dl class="lab-conn-dl">
+            ${c.trigger ? `<dt>🎯 الشرارة</dt><dd data-no-i18n>${le(c.trigger)}</dd>` : ""}
+            ${(c.anchors || []).length ? `<dt>📌 بيفضل ثابت</dt><dd data-no-i18n>${c.anchors.map((x) => `<span class="chip">${le(x)}</span>`).join(" ")}</dd>` : ""}
+            ${(c.transforms || []).length ? `<dt>🔄 التحوّلات</dt><dd><ol class="lab-conn-tr">${c.transforms.map((x) => `<li><button type="button" class="btn sm" data-seek="${x.t0}" data-to="${x.t1}" data-cplay="${c.id}">▶️</button>
+              <span class="lab-time">${lt(x.t0)}–${lt(x.t1)}</span> <span data-no-i18n><b>${le(x.from)}</b> ← ${le(x.to)}${x.how ? ` <small class="muted">(${le(x.how)})</small>` : ""}</span></li>`).join("")}</ol></dd>` : ""}
+            ${c.camera ? `<dt>🎥 الكاميرا</dt><dd data-no-i18n>${le(c.camera)}</dd>` : ""}
+            ${c.rhythm ? `<dt>⏱️ الإيقاع</dt><dd data-no-i18n>${le(c.rhythm)}</dd>` : ""}
+            ${c.sound ? `<dt>🔊 الصوت</dt><dd data-no-i18n>${le(c.sound)}</dd>` : ""}
+            ${c.story_role ? `<dt>📖 بيخدم القصة إزاي</dt><dd data-no-i18n>${le(c.story_role)}</dd>` : ""}
+          </dl>
+          <label class="lab-conn-recipe">🧪 الوصفة (تتطبق على أي مشهدين، سطر لكل خطوة)
+            <textarea rows="${Math.max(3, (c.recipe || []).length)}" data-xf="recipe" data-no-i18n>${le((c.recipe || []).join("\n"))}</textarea></label>
+          <div class="row wrap lab-cact">
+            ${c.asset ? `<button type="button" class="btn sm ok" data-casset="${c.asset}">📚 في المكتبة ↗</button>`
+              : `<button type="button" class="btn sm primary" data-xok>✅ اقبل وحطه في المكتبة</button>`}
+            <button type="button" class="btn sm ${s === "bad" ? "danger" : ""}" data-xbad>❌ ${s === "bad" ? "مرفوض" : "ارفض"}</button>
+            <input type="text" class="lab-note grow" value="${le(c.review?.note)}" placeholder="ليه؟ (مثلًا: ده قطع عادي مش كونيكتور)" data-xnote>
+          </div>
+        </div>
+      </article>`;
+    }).join("") || (st.status === "done" && !all.length ? `<p class="muted">الموديل ملقاش كونيكتورز في الفيديو ده.</p>` : "")}</div>`;
+}
+async function labConn(cid, body, btn) {
+  const go = async () => {
+    labx.cur = await api(`/api/lab/${labx.cur.id}/connectors/${cid}`, { method: "PATCH", ...jsonBody(body) });
+    renderLabConns(labx.cur); renderLabTimeline(labx.cur); renderLabScore(labx.cur);
+    if (body.ok) { toast("📚 الكونيكتور اتحفظ في المكتبة بوصفته"); labLibCount(); }
+  };
+  if (btn) return busyButton(btn, "⏳", go);
+  try { await go(); } catch (err) { toast(err.message, true); }
+}
+
 function renderLabShots(d) {
   const sfxById = Object.fromEntries((d.audio?.sfx || []).map((x) => [x.id, x]));
   if (!(d.shots || []).length) { $("labShots").innerHTML = `<h3 class="pane-h">🎬 اللقطات</h3><p class="muted">${d.steps?.shots?.status === "working" ? "⏳ بيدور على القطعات..." : "لسه."}</p>`; return; }
@@ -374,6 +437,24 @@ function renderLabShots(d) {
 const labAudio = new Audio();
 document.querySelector('.view[data-view="11"]').addEventListener("click", async (e) => {
   if (e.target.closest("#labLib")) return;  // المكتبة ليها أحداثها في assets.js
+  const conn = e.target.closest("[data-conn]");
+  if (conn) {
+    const cid = conn.dataset.conn, c = labx.cur.connectors.find((x) => x.id === cid);
+    const asset = e.target.closest("[data-casset]");
+    if (asset) return openLib(asset.dataset.casset);
+    const cp = e.target.closest("[data-cplay]"), key = e.target.closest(".lab-conn-keys [data-seek]");
+    if (cp || key) {  // التحوّل ده لوحده في مربع الكونيكتور
+      const v = conn.querySelector("[data-cvid]");
+      v.currentTime = Number((cp || key).dataset.seek);
+      if (cp) v.play().catch(() => {}); else v.pause();
+      return;
+    }
+    const note = conn.querySelector("[data-xnote]").value;
+    const okb = e.target.closest("[data-xok]"), badb = e.target.closest("[data-xbad]");
+    if (okb) return labConn(cid, { review: true, ok: true, note }, okb);
+    if (badb) return labConn(cid, { review: true, ok: c.review?.ok === false ? null : false, note }, badb);
+    return;
+  }
   const hear = e.target.closest("[data-hear]");
   if (hear) {
     labx.hear[hear.dataset.hear] = !labx.hear[hear.dataset.hear];
@@ -459,6 +540,26 @@ document.querySelector('.view[data-view="11"]').addEventListener("click", async 
       renderLab();
     });
   }
+  const xf = e.target.closest("[data-xfilter]");
+  if (xf) { labx.xfilter = xf.dataset.xfilter; return renderLabConns(labx.cur); }
+  const gx = e.target.closest("[data-goconn]");
+  if (gx) {
+    labx.xfilter = "";
+    renderLabConns(labx.cur);
+    const card = $("labConns").querySelector(`[data-conn="${gx.dataset.goconn}"]`);
+    card?.scrollIntoView({ behavior: "smooth", block: "center" });
+    card?.classList.add("flash"); setTimeout(() => card?.classList.remove("flash"), 1200);
+    return;
+  }
+  const cfresh = e.target.closest("[data-connfresh]");
+  if (cfresh) {
+    if (!confirm("تمسح كل الكونيكتورز اللي اتلقطت في الفيديو ده (حتى اللي قبلتها أو رفضتها) ويدوّر من الأول؟ اللي في المكتبة بيفضل فيها.")) return;
+    return busyButton(cfresh, "⏳", async () => {
+      labx.cur = await api(`/api/lab/${labx.cur.id}/run?step=connectors&fresh=true`, { method: "POST" });
+      labx.xfilter = "";
+      renderLab(); scheduleLabPoll();
+    });
+  }
   const fresh = e.target.closest("[data-compfresh]");
   if (fresh) {
     if (!confirm("تمسح كل اقتراحات الكومبوننتس (حتى اللي قبلتها أو رفضتها) ويقترح من الصفر؟\nاللي اتحفظ في المكتبة بيفضل فيها، وأسباب الرفض بتفضل محفوظة عشان الموديل يتعلم منها.")) return;
@@ -535,6 +636,14 @@ document.querySelector('.view[data-view="11"]').addEventListener("toggle", (e) =
 }, true);
 document.querySelector('.view[data-view="11"]').addEventListener("change", (e) => {
   if (e.target.closest("#labLib")) return;
+  const conn = e.target.closest("[data-conn]");
+  if (conn) {
+    const cid = conn.dataset.conn, c = labx.cur.connectors.find((x) => x.id === cid), k = e.target.dataset.xf;
+    if (k === "recipe") return labConn(cid, { recipe: e.target.value.split("\n") });
+    if (k) return labConn(cid, { [k]: ["t0", "t1"].includes(k) ? Number(e.target.value) : e.target.value });
+    if (e.target.matches("[data-xnote]") && c.review) return labConn(cid, { review: true, ok: c.review.ok, note: e.target.value });
+    return;
+  }
   const comp = e.target.closest("[data-comp]");
   if (comp) {
     const cid = comp.dataset.comp, c = labx.cur.components.find((x) => x.id === cid);

@@ -8511,9 +8511,9 @@ reset_stuck_prod()
 LAB_DIR = DATA_DIR / "lab"
 LAB_DIR.mkdir(parents=True, exist_ok=True)
 LAB_LOCK = threading.Lock()
-LAB_STEPS = ("shots", "stems", "audio", "elements", "components")
+LAB_STEPS = ("shots", "stems", "audio", "elements", "components", "connectors")
 # التفكيك العادي: القطعات ← العناصر ← اقتراح الكومبوننتس. الصوت (فصل التراكات وتحليله) متوقف ومش بيشتغل غير لو طلبته
-LAB_DEFAULT = ("shots", "elements", "components")
+LAB_DEFAULT = ("shots", "elements", "components", "connectors")
 
 
 def lab_dir(lid: str) -> Path:
@@ -8552,7 +8552,7 @@ def lab_reviews(d: dict) -> dict:
                                "elements": [e for s in d.get("shots") or [] for e in (s.get("analysis") or {}).get("elements") or []],
                                "actions": [a for s in d.get("shots") or [] for e in (s.get("analysis") or {}).get("elements") or []
                                            for a in e.get("actions") or []],
-                               "components": d.get("components") or []}
+                               "components": d.get("components") or [], "connectors": d.get("connectors") or []}
     out = {}
     for k, items in groups.items():
         oks = [((x.get("review") or {}).get("ok")) for x in items]
@@ -8568,12 +8568,15 @@ def lab_to_dict(lid: str, d: dict) -> dict:
         shots.append({**s, "frames": [{**f, "url": f"{base}/frames/{f['file']}"} for f in s.get("frames") or []]})
     comps = [{**c, "asset": c["asset"] if c.get("asset") and (clip_dir(c["asset"]) / "asset.json").exists() else None}
              for c in d.get("components") or []]
+    conns = [{**c, "asset": c["asset"] if c.get("asset") and (clip_dir(c["asset"]) / "asset.json").exists() else None,
+              "keyframes": [{**k, "url": f"{base}/frames/{k['file']}"} for k in c.get("keyframes") or []]}
+             for c in d.get("connectors") or []]
     audio = d.get("audio") or {}
     audio = {**audio, "sfx": [{**x, "clip_url": f"{base}/sfx/{x['clip']}" if x.get("clip") else None} for x in audio.get("sfx") or []]}
     stems = {k: {**v, "url": f"{base}/stems/{v['file']}" if v.get("file") else None}
              for k, v in (d.get("stems") or {}).items() if isinstance(v, dict)}
     return {**d, "id": lid, "source_url": f"{base}/{d['source']['file']}", "shots": shots, "audio": audio, "stems": stems,
-            "components": comps,
+            "components": comps, "connectors": conns, "families": lab.CONNECTOR_FAMILIES,
             "audioshake": bool(audioshake.api_key() or atlas.mock_mode()),
             "reviews": lab_reviews(d), "busy": any((v or {}).get("status") in ("working", "queued") for v in (d.get("steps") or {}).values()),
             "categories": list(lab.COMPONENT_CATS)}
@@ -8665,7 +8668,7 @@ def lab_run(lid: str, step: str = "all", fresh: bool = False):
     if "shots" in steps or "audio" in steps:
         steps = sorted(set(steps) | {"elements"}, key=LAB_STEPS.index)
     if "elements" in steps:
-        steps = sorted(set(steps) | {"components"}, key=LAB_STEPS.index)
+        steps = sorted(set(steps) | {"components", "connectors"}, key=LAB_STEPS.index)
     def fn(d):
         for k in steps:
             d.setdefault("steps", {})[k] = {"status": "queued"}
@@ -8675,6 +8678,11 @@ def lab_run(lid: str, step: str = "all", fresh: bool = False):
                                   for c in d.get("components") or [] if (c.get("review") or {}).get("ok") is False]
                                  + (d.get("comp_lessons") or []))[:40]
             d["components"] = []
+        if fresh and "connectors" in steps:
+            d["conn_lessons"] = ([{"name": c["name"], "t0": c["t0"], "t1": c["t1"], "note": (c.get("review") or {}).get("note")}
+                                  for c in d.get("connectors") or [] if (c.get("review") or {}).get("ok") is False]
+                                 + (d.get("conn_lessons") or []))[:40]
+            d["connectors"] = []
     lab_update(lid, fn)
     threading.Thread(target=run_lab, args=(lid, steps), daemon=True).start()
     return lab_to_dict(lid, lab_load(lid))
@@ -8716,6 +8724,8 @@ def run_lab(lid: str, steps: list[str]) -> None:
                 run_lab_elements(lid)
             elif step == "components":
                 run_lab_components(lid)
+            elif step == "connectors":
+                run_lab_connectors(lid)
             lab_step(lid, step, status="done", error=None, progress="", at=now())
         except LabSkip as exc:
             lab_step(lid, step, status="skipped", error=str(exc), progress="")
@@ -8745,12 +8755,7 @@ def run_lab_audio(lid: str, d: dict, src: Path, dur: float) -> None:
     if atlas.mock_mode():
         res = lab.mock_audio(dur, marks)
     else:
-        proxy = folder / "proxy.mp4"
-        if not proxy.exists():
-            subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src),
-                            "-vf", "scale='if(gt(iw,ih),min(640,iw),-2)':'if(gt(iw,ih),-2,min(640,ih))',fps=12",
-                            "-c:v", "libx264", "-preset", "veryfast", "-crf", "31", "-pix_fmt", "yuv420p",
-                            "-c:a", "aac", "-ac", "1", "-b:a", "96k", str(proxy)], check=True, capture_output=True, timeout=600)
+        proxy = lab_proxy(lid, d)
         res = ad_json(lab_media_chat(az.with_media(lab.audio_messages(dur, marks, speech), data_url(proxy, "video/mp4"), "video.mp4")),
                       "تفكيك الصوت")
     shutil.rmtree(folder / "sfx", ignore_errors=True)
@@ -8787,6 +8792,17 @@ def run_lab_audio(lid: str, d: dict, src: Path, dur: float) -> None:
              for m in res.get("music") or [] if isinstance(m, dict)]
     lab_update(lid, lambda d: d.update(audio={"sfx": sfx, "speech": speech, "music": music, "onsets": marks[:300],
                                                "from_stem": bool(fx_src)}))
+
+
+def lab_proxy(lid: str, d: dict) -> Path:
+    """نسخة صغيرة من الفيديو (بالصوت) عشان الموديل يتفرج عليه كله."""
+    proxy = lab_dir(lid) / "proxy.mp4"
+    if not proxy.exists():
+        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(lab_dir(lid) / d["source"]["file"]),
+                        "-vf", "scale='if(gt(iw,ih),min(640,iw),-2)':'if(gt(iw,ih),-2,min(640,ih))',fps=12",
+                        "-c:v", "libx264", "-preset", "veryfast", "-crf", "31", "-pix_fmt", "yuv420p",
+                        "-c:a", "aac", "-ac", "1", "-b:a", "96k", str(proxy)], check=True, capture_output=True, timeout=600)
+    return proxy
 
 
 def run_lab_stems(lid: str, d: dict, src: Path) -> None:
@@ -9084,7 +9100,7 @@ class VeditIn(BaseModel):
 ASSETS_DIR = DATA_DIR / "assets"
 ASSETS_DIR.mkdir(parents=True, exist_ok=True)
 CLIP_LOCK = threading.Lock()
-CLIP_CATS = ("motion_graphics", "effect", "transition", "text", "screen", "cursor", "character", "background", "product", "other")
+CLIP_CATS = ("connector", "motion_graphics", "effect", "transition", "text", "screen", "cursor", "character", "background", "product", "other")
 
 
 def clip_dir(aid: str) -> Path:
@@ -9112,6 +9128,7 @@ def clip_update(aid: str, fn) -> dict:
 def clip_to_dict(aid: str, d: dict) -> dict:
     base = f"/media/assets/{aid}"
     return {**d, "id": aid, "url": f"{base}/{d['file']}", "thumb_url": f"{base}/{d['thumb']}",
+            "keyframes": [{**k, "url": f"{base}/{k['file']}"} for k in d.get("keyframes") or []],
             "variants": [{**v, "url": f"{base}/variants/{v['file']}" if v.get("file") else None} for v in d.get("variants") or []],
             "busy": any(v.get("status") == "working" for v in d.get("variants") or []),
             "vedit_models": [{"key": k, "label": v["label"], "per_sec": v["per_sec"]} for k, v in lab.VEDIT_MODELS.items()]}
@@ -9158,12 +9175,20 @@ def clip_from_lab(lid: str, d: dict, t0: float, t1: float, meta: dict) -> dict:
             "notes": str(meta.get("notes") or "").strip()[:1000],
             "description": str(meta.get("description") or "")[:600], "use": str(meta.get("use") or "")[:300],
             "controls": meta.get("controls") or [],
+            "connector": meta.get("connector"),
             "file": "clip.mp4", "thumb": "thumb.jpg", "duration": round(info.duration, 2), "width": info.width, "height": info.height,
             "source": {"lab": lid, "lab_name": d.get("name"), "shots": [s["n"] for s in shots], "t0": round(t0, 3), "t1": round(t1, 3),
                        "component": meta.get("component")},
             "scene_type": (ans[0] if ans else {}).get("scene_type"), "summary": summary,
             "background": (ans[0] if ans else {}).get("background"),
             "elements": elements, "sfx": sfx, "variants": [], "created_at": now(), "updated_at": now()}
+    keys = []
+    for k in meta.get("keyframes") or []:  # فريمات الكونيكتور المفتاحية (بداية / نص / نهاية)
+        src_k = lab_dir(lid) / "frames" / k["file"]
+        if src_k.exists():
+            shutil.copyfile(src_k, folder / k["file"])
+            keys.append({"t": round(k["t"] - t0, 2), "file": k["file"], "label": k.get("label", "")})
+    data["keyframes"] = keys
     (folder / "asset.json").write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
     return clip_to_dict(aid, data)
 
@@ -9200,6 +9225,91 @@ def run_lab_components(lid: str) -> None:
     new = [c for c in lab.clean_components(raw, d["source"]["duration"], ids, bounds)
            if not any(abs(c["t0"] - k["t0"]) < 0.3 and abs(c["t1"] - k["t1"]) < 0.3 for k in keep)]  # نفس اللي اتراجع قبل كده
     lab_update(lid, lambda d: d.update(components=sorted(keep + new, key=lambda c: c["t0"])))
+
+
+def run_lab_connectors(lid: str) -> None:
+    """🔗 الموديل بيتفرج على الفيديو كله ويطلّع الكونيكتورز بوصفتها، ولكل واحد 3 فريمات مفتاحية."""
+    d = lab_load(lid)
+    old = d.get("connectors") or []
+    keep = [c for c in old if (c.get("review") or {}).get("ok") is not None or c.get("asset")]
+    rejected = [{"name": c["name"], "t0": c["t0"], "t1": c["t1"], "note": (c.get("review") or {}).get("note")}
+                for c in keep if (c.get("review") or {}).get("ok") is False] + (d.get("conn_lessons") or [])
+    if atlas.mock_mode():
+        raw = lab.mock_connectors(d)
+    else:
+        lab_step(lid, "connectors", progress="بيجهّز الفيديو")
+        proxy = lab_proxy(lid, d)
+        lab_step(lid, "connectors", progress="بيتفرج على الفيديو كله ويدوّر على التحوّلات")
+        raw = ad_json(lab_media_chat(az.with_media(lab.connectors_messages(d, rejected), data_url(proxy, "video/mp4"), "video.mp4")),
+                      "الكونيكتورز")
+    new = [c for c in lab.clean_connectors(raw, d["source"]["duration"])
+           if not any(abs(c["t0"] - k["t0"]) < 0.3 and abs(c["t1"] - k["t1"]) < 0.3 for k in keep)]
+    src, folder = lab_dir(lid) / d["source"]["file"], lab_dir(lid) / "frames"
+    folder.mkdir(parents=True, exist_ok=True)
+    for c in new:
+        lab_step(lid, "connectors", progress=f"فريمات «{c['name'][:30]}»")
+        c["keyframes"] = []
+        for k, (t, label) in enumerate(((c["t0"], "البداية"), ((c["t0"] + c["t1"]) / 2, "النص"), (c["t1"], "النهاية"))):
+            name = f"cx{c['id']}-{k}.jpg"
+            subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{min(t, d['source']['duration'] - 0.05):.3f}",
+                            "-i", str(src), "-frames:v", "1", "-vf", "scale=360:-2", "-q:v", "4", str(folder / name)],
+                           capture_output=True, timeout=60)
+            if (folder / name).exists():
+                c["keyframes"].append({"t": round(t, 2), "file": name, "label": label})
+    lab_update(lid, lambda d: d.update(connectors=sorted(keep + new, key=lambda c: c["t0"])))
+
+
+class ConnectorIn(BaseModel):
+    name: str | None = None
+    family: str | None = None
+    t0: float | None = None
+    t1: float | None = None
+    recipe: list[str] | None = None
+    review: bool = False
+    ok: bool | None = None
+    note: str = ""
+
+
+@app.patch("/api/lab/{lid}/connectors/{cid}")
+def lab_connector(lid: str, cid: str, body: ConnectorIn):
+    """تعديل الكونيكتور (الاسم/العيلة/التوقيت/الوصفة) أو تقييمه. ✅ بيحفظه في المكتبة بوصفته وفريماته."""
+    def fn(d):
+        c = next((x for x in d.get("connectors") or [] if x["id"] == cid), None)
+        if c is None:
+            raise HTTPException(404, "الكونيكتور ده مش موجود")
+        dur = d["source"]["duration"]
+        fix = {}
+        if body.name is not None and body.name.strip():
+            fix["name"] = body.name.strip()[:100]
+        if body.family in lab.CONNECTOR_FAMILIES:
+            fix["family"] = body.family
+        if body.t0 is not None:
+            fix["t0"] = round(min(dur, max(0.0, body.t0)), 2)
+        if body.t1 is not None:
+            fix["t1"] = round(min(dur, max(0.0, body.t1)), 2)
+        if body.recipe is not None:
+            fix["recipe"] = [x.strip()[:300] for x in body.recipe if x.strip()][:12]
+        if fix:
+            c.setdefault("original", {k: c.get(k) for k in fix})
+            c.update(fix)
+            if c["t1"] - c["t0"] < 0.2:
+                raise HTTPException(400, "المقطع قصير أوي")
+        if body.review:
+            c["review"] = {"ok": body.ok, "note": body.note.strip()[:500], "at": now()}
+    d = lab_update(lid, fn)
+    c = next(x for x in d["connectors"] if x["id"] == cid)
+    if body.review and body.ok and not (c.get("asset") and (clip_dir(c["asset"]) / "asset.json").exists()):
+        recipe = {k: c.get(k) for k in ("family", "from_scene", "to_scene", "trigger", "anchors", "transforms", "camera",
+                                         "rhythm", "recipe", "story_role", "sound")}
+        a = clip_from_lab(lid, d, c["t0"], c["t1"], {
+            "name": c["name"], "category": "connector", "tags": [lab.CONNECTOR_FAMILIES.get(c["family"], "").split(" ", 1)[-1]],
+            "description": c.get("story_role", ""), "connector": recipe, "keyframes": c.get("keyframes") or [], "component": cid})
+        def link(d):
+            x = next((y for y in d.get("connectors") or [] if y["id"] == cid), None)
+            if x is not None:
+                x["asset"] = a["id"]
+        d = lab_update(lid, link)
+    return lab_to_dict(lid, d)
 
 
 class ComponentIn(BaseModel):

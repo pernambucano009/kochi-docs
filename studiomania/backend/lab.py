@@ -449,6 +449,118 @@ def mock_components(d: dict) -> dict:
     return {"components": comps}
 
 
+# ------------------------------------------------------------ 🔗 الكونيكتورز: تحوّل بيحكي بيودّي من مشهد لمشهد من غير قطع
+
+CONNECTOR_FAMILIES = {
+    "zoom_through": "🔍 زووم جوه حاجة (العنصر بيبقى العالم الجديد)",
+    "background_swap": "🖼️ تبديل الخلفية (اللي قدام ثابت)",
+    "anchor_carry": "📌 مرساة ماشية (ماوس / كاركتر / عنصر بينقلنا)",
+    "scatter": "✨ تبعثر أو تساقط (العناصر بتقع أو بتتفرق)",
+    "material_shift": "🧱 تغيير الخامة (رقمي ← ورق، شاشة ← حقيقي...)",
+    "reveal_pullback": "🔭 كشف بالزووم أوت (نبعد فنكتشف أكبر)",
+    "morph": "🫧 تحوّل شكل لشكل",
+    "ui_to_world": "📱 من الشاشة للعالم الحقيقي (أو العكس)",
+    "other": "تاني / جديد",
+}
+
+CONNECTORS_FORMAT = """{
+  "connectors": [
+    {"name": "اسم قصير للكونيكتور (مثلًا: زرار Enter بيفتح خريطة إسبانيا)",
+     "family": "zoom_through | background_swap | anchor_carry | scatter | material_shift | reveal_pullback | morph | ui_to_world | other",
+     "t0": 3.20, "t1": 5.10,
+     "from_scene": "المشهد قبله بيحكي إيه",
+     "to_scene": "المشهد بعده بيحكي إيه",
+     "trigger": "الشرارة اللي بتبدأ التحوّل (ضغطة، كلمة، حركة...) وإمتى",
+     "anchors": ["اللي بيفضل ثابت والعين ماسكاه طول التحوّل (الكلام المكتوب، الماوس...)"],
+     "transforms": [{"t0": 3.4, "t1": 4.0, "from": "إطار مربع المحادثة", "to": "بيختفي والكلام يفضل", "how": "fade للإطار بس، ease-out"}],
+     "camera": "حركة الكاميرا الافتراضية (زووم إن ناعم على...، زووم أوت، بان...) بالسرعة والـ easing",
+     "rhythm": "الإيقاع: كل خطوة واخدة قد إيه، فيه وقفات؟ متزامن مع صوت؟",
+     "recipe": ["الوصفة عامة من غير تفاصيل القصة دي عشان تتطبق على أي مشهدين: خطوة ١ ...", "خطوة ٢ ..."],
+     "story_role": "التحوّل ده بيخدم القصة إزاي (ليه أحسن من قطع عادي)",
+     "sound": "الصوت المصاحب لو فيه"}
+  ]
+}"""
+
+
+def connectors_messages(d: dict, rejected: list[dict] | None = None) -> list[dict]:
+    """الموديل بيتفرج على الفيديو كله ويطلّع كل لحظة القصة فيها بتتحوّل لمشهد تاني من غير قطع، بوصفتها."""
+    lines = []
+    for s in d.get("shots") or []:
+        an = s.get("analysis") or {}
+        els = "، ".join(e["name"] for e in (an.get("elements") or [])[:12])
+        lines.append(f"- لقطة {s['n']} ({s['start']:.2f}–{s['end']:.2f}): {an.get('summary', '')}" + (f" | عناصر: {els}" if els else ""))
+    fams = "\n".join(f"- {k}: {v}" for k, v in CONNECTOR_FAMILIES.items())
+    text = (
+        "أنت مخرج موشن جرافيك ومونتير محترف. اتفرج على الفيديو ده كله بالصوت.\n"
+        "بنجمع «كونيكتورز»: مش ترانزيشن عادي (فيد، زحلقة، تصغير بين آخر فريم وأول فريم)، لكن تحوّل بيحكي جوه القصة نفسها: "
+        "المشهد بيتحوّل للمشهد اللي بعده قدام عين المشاهد من غير قطع. مثلًا: الماوس بيدوس Enter ← زووم ناعم على مربع "
+        "المحادثة ← إطاره بيختفي والكلام يفضل ← الزرار يتلوّن إنه اتداس ← الخلفية تتحوّل لخريطة عليها فنادق بتقييماتها ← "
+        "الماوس يدوس على فندق ← الفنادق التانية تقع زي حبات الخرز ← الخريطة تبقى ورق ← زووم أوت نلاقي الكاركتر ماسكها وهو سايق.\n"
+        "كل حتة من دول ممكن تبقى كونيكتور لوحده لو ليها شرارة ونتيجة واضحة، أو كونيكتور واحد طويل لو هي حركة واحدة متصلة.\n\n"
+        f"الفيديو مدته {d['source']['duration']:.2f} ثانية. التقطيع والعناصر اللي اتعرفت (للمساعدة، الفيديو هو المرجع):\n"
+        + "\n".join(lines) + "\n\n"
+        "طلّع كل الكونيكتورز اللي في الفيديو بالتوقيت الدقيق (t0 أول ما التحوّل يبدأ، t1 لما المشهد الجديد يستقر). لكل واحد:\n"
+        "- الشرارة، واللي بيفضل ثابت (المرساة)، وكل تحوّل (إيه بيتحول لإيه، إمتى، وإزاي بالظبط: الحركة والـ easing)، "
+        "وحركة الكاميرا، والإيقاع، والصوت.\n"
+        "- recipe = وصفة عامة بخطوات مرقمة تنفع تتطبق على أي مشهدين تانيين (من غير أسامي المنتج أو المكان اللي في الفيديو ده).\n"
+        f"- family واحدة من دول:\n{fams}\n"
+        "- القطع العادي والترانزيشن البدائي (فيد بين مشهدين مالهمش علاقة ببعض) مش كونيكتور: متطلّعهوش.\n"
+        "- لو الفيديو مفيهوش كونيكتورز رجّع قايمة فاضية. متخترعش.\n"
+        + ("اقتراحات اترفضت قبل كده وسبب الرفض (اتعلم منها):\n"
+           + "\n".join(f"- «{r.get('name')}» ({r.get('t0')}–{r.get('t1')}): {r.get('note') or 'من غير سبب'}" for r in rejected[:30]) + "\n"
+           if rejected else "")
+        +
+        "الكلام بالعربي المصري البسيط. رجّع JSON بس بالشكل ده:\n" + CONNECTORS_FORMAT
+    )
+    return [{"role": "user", "content": text}]
+
+
+def clean_connectors(data: dict, duration: float) -> list[dict]:
+    def num(v, dflt=0.0):
+        try:
+            x = float(v)
+            return x if x == x else dflt
+        except (TypeError, ValueError):
+            return dflt
+
+    def strs(v, n=10, k=300):
+        return [str(x)[:k] for x in v or [] if str(x).strip()][:n] if isinstance(v, list) else []
+
+    out = []
+    for c in (data or {}).get("connectors") or []:
+        if not isinstance(c, dict) or not str(c.get("name") or "").strip():
+            continue
+        t0 = min(duration, max(0.0, num(c.get("t0"))))
+        t1 = min(duration, max(t0, num(c.get("t1"), t0)))
+        if t1 - t0 < 0.2:
+            continue
+        tr = [{"t0": round(min(t1, max(t0, num(x.get("t0"), t0))), 2), "t1": round(min(t1, max(t0, num(x.get("t1"), t1))), 2),
+               "from": str(x.get("from") or "")[:200], "to": str(x.get("to") or "")[:200], "how": str(x.get("how") or "")[:300]}
+              for x in c.get("transforms") or [] if isinstance(x, dict)][:12]
+        out.append({"id": uuid.uuid4().hex[:8], "name": str(c["name"])[:100],
+                    "family": c.get("family") if c.get("family") in CONNECTOR_FAMILIES else "other",
+                    "t0": round(t0, 2), "t1": round(t1, 2),
+                    **{k: str(c.get(k) or "")[:500] for k in ("from_scene", "to_scene", "trigger", "camera", "rhythm", "story_role", "sound")},
+                    "anchors": strs(c.get("anchors"), 8, 200), "transforms": sorted(tr, key=lambda x: x["t0"]),
+                    "recipe": strs(c.get("recipe"), 12, 300), "review": None, "asset": None})
+    return sorted(out, key=lambda c: c["t0"])
+
+
+def mock_connectors(d: dict) -> dict:
+    dur = d["source"]["duration"]
+    a, b = round(dur * 0.3, 2), round(dur * 0.55, 2)
+    return {"connectors": [{
+        "name": "تجربة: زرار بيفتح خريطة", "family": "background_swap", "t0": a, "t1": b,
+        "from_scene": "حد بيكتب سؤال لموديل ذكاء اصطناعي", "to_scene": "خريطة عليها فنادق",
+        "trigger": "الماوس بيدوس Enter", "anchors": ["الكلام المكتوب", "مؤشر الماوس"],
+        "transforms": [{"t0": a, "t1": a + 0.4, "from": "إطار المربع", "to": "بيختفي", "how": "fade للإطار بس"},
+                       {"t0": a + 0.4, "t1": b, "from": "الخلفية", "to": "خريطة", "how": "تتلوّن من النص لبرة"}],
+        "camera": "زووم إن ناعم 8% ease-in-out", "rhythm": "سريع وبعدين وقفة نص ثانية", "sound": "ووش خفيف",
+        "recipe": ["الضغطة على زرار بتعمل زووم إن ناعم على العنصر", "إطار العنصر بيختفي والمحتوى بيفضل",
+                   "الخلفية بتتحول للعالم اللي المحتوى بيتكلم عنه"],
+        "story_role": "بيوري نتيجة الطلب في نفس اللحظة من غير قطع"}]}
+
+
 # ------------------------------------------------------------ تجارب من غير Atlas
 
 def mock_audio(duration: float, marks: list[dict]) -> dict:
