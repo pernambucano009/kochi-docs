@@ -1516,6 +1516,7 @@ function renderSide() {
 
   $("mVoice").value = d.voice?.id || "";
   $("voiceOpts").hidden = !d.voice;
+  renderVoiceSync();
   if (d.voice) {
     const vv = d.voice.parts?.[0]?.volume ?? d.voice.volume ?? 1;
     $("mVoiceVol").value = Math.round(vv * 100);
@@ -1581,12 +1582,33 @@ document.querySelectorAll("[data-audio-up]").forEach((inp) => inp.addEventListen
     toast(err.message, true);
   }
 }));
+// 🎙️ تعليق صوتي جديد مكان القديم: بيفضل بنفس العلو ونفس مكان البداية، والملف كله من أوله (القص والتقسيم بتوع القديم بيتشالوا)
+function newVoiceTrack(d, id) {
+  const vol = d.voice?.parts?.[0]?.volume ?? d.voice?.volume ?? 1, delay = d.voice?.parts?.[0]?.delay ?? d.voice?.delay ?? 0;
+  if (d.captions?.removed?.length) d.captions.removed = [];  // الكلام اللي اتمسح من الكابشن كان من الصوت القديم
+  return id ? { id, volume: vol, delay: 0, offset: 0, length: null, fade_out: false, parts: [{ delay, offset: 0, length: null, volume: vol }] } : null;
+}
 $("mVoice").addEventListener("change", sideInput(null, (d) => {
-  const vol = d.voice?.parts?.[0]?.volume ?? 1, delay = d.voice?.parts?.[0]?.delay ?? 0;
-  d.voice = $("mVoice").value
-    ? { id: $("mVoice").value, volume: vol, delay: 0, offset: 0, length: null, fade_out: false, parts: [{ delay, offset: 0, length: null, volume: vol }] }
-    : null;
+  d.voice = newVoiceTrack(d, $("mVoice").value);
+  if (d.voice) toast("✅ التعليق الصوتي اتبدّل في المونتاج");
 }));
+// لو التعليق الصوتي بتاع المشروع (الفيديو الخام) اتغير بعد ما المونتاج اتعمل: تنبيه وزرار يبدّله
+function renderVoiceSync() {
+  const d = mt.project?.data, box = $("voiceSync");
+  const video = d?.video_id && mt.videos.find((v) => v.id === d.video_id);
+  const fresh = video?.voice;
+  const stale = fresh && fresh.id !== d.voice?.id && mt.voices.some((a) => a.id === fresh.id);
+  box.hidden = $("voiceSyncTop").hidden = !stale;
+  if (!stale) return;
+  const cur = mt.voices.find((a) => a.id === d.voice?.id);
+  box.innerHTML = `<b>⚠️ التعليق الصوتي بتاع المشروع اتغيّر</b>
+    <span>المشروع دلوقتي على «<b data-no-i18n>${escapeHtml(fresh.name)}</b>» والمونتاج لسه ${cur ? `على «<b data-no-i18n>${escapeHtml(cur.name)}</b>»` : "من غير تعليق"}.</span>
+    <button type="button" class="btn sm primary" id="voiceSyncGo">🔁 بدّله بالجديد</button>`;
+  $("voiceSyncGo").onclick = $("voiceSyncTop").onclick = sideInput(null, (dd) => {
+    dd.voice = newVoiceTrack(dd, fresh.id);
+    toast(`✅ التعليق الصوتي اتبدّل بـ «${fresh.name}»`);
+  });
+}
 // سلايدر الصوت في التاب بيغيّر كل قطع التعليق مرة واحدة
 function setTrackVolume(t, v) {
   t.volume = v;
@@ -1805,7 +1827,7 @@ $("refreshFromVideo").onclick = async () => {
     const outros = d.clips.filter(isAnyOutro);
     d.clips = [...draft.gen_ids.map((gen_id) => old.get(gen_id) || { gen_id, ...CLIP_DEFAULTS }), ...outros];
     if (draft.voice && d.voice?.id !== draft.voice.id) {
-      d.voice = { id: draft.voice.id, volume: d.voice?.volume ?? 1, delay: d.voice?.delay ?? 0, offset: 0, length: null, fade_out: false };
+      d.voice = newVoiceTrack(d, draft.voice.id);  // كان بيتحط من غير قطع فمكانش بيظهر في التايم لاين
     }
     if (!d.coach_id) d.coach_id = draft.coach_id;
     mt.sel = null;

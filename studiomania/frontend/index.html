@@ -396,6 +396,7 @@
             <input type="text" id="projectName" placeholder="اسم المشروع">
             <span class="linked-video" id="linkedVideo" hidden></span>
             <button class="btn sm" id="refreshFromVideo" hidden title="يجيب آخر الفيديوهات المولَّدة للفيديو ده والصوت المربوط بيه">🔄 حدّث من الفيديو</button>
+            <button class="btn sm warn-btn" id="voiceSyncTop" hidden title="التعليق الصوتي بتاع المشروع اتغيّر بعد ما المونتاج اتعمل. دوس عشان تحط الجديد مكان القديم">⚠️🎙️ التعليق الصوتي اتغيّر: بدّله</button>
             <span class="muted" id="saveState"></span>
             <span class="spacer"></span>
             <button class="btn sm danger" id="deleteProject">حذف المشروع</button>
@@ -474,7 +475,8 @@
               <label class="field slider-field">صوت الأوترو <b id="outroVolVal"></b><input type="range" id="mOutroVol" min="0" max="200" step="5" dir="ltr"></label>
 
               <h3 class="pane-h">🎙️ التعليق الصوتي</h3>
-              <div class="sel-up"><label class="field"><select id="mVoice"></select></label>
+              <div class="voice-sync" id="voiceSync" hidden></div>
+              <div class="sel-up"><label class="field" title="اختار تعليق صوتي تاني من المكتبة ويتحط مكان الحالي"><select id="mVoice"></select></label>
                 <label class="btn sm" title="ارفع ملف تعليق صوتي من عندك، ويتحط في المونتاج على طول (وبيتحفظ في مكتبة الصوت)">⬆ ارفع<input type="file" data-audio-up="voice" accept="audio/*,video/*,.mp3,.wav,.m4a,.aac,.ogg,.opus,.flac,.amr,.caf,.aif,.aiff,.wma,.3gp,.webm,.mp4,.mov" hidden></label></div>
               <div id="voiceOpts">
                 <label class="field slider-field">الصوت <b id="voiceVolVal"></b><input type="range" id="mVoiceVol" min="0" max="200" step="5" dir="ltr"></label>
