@@ -1551,3 +1551,8 @@ a.pl-link:hover { background: color-mix(in srgb, var(--ok) 24%, transparent); }
 .stage-client .client-av { width: 26px; height: 26px; font-size: 12px; }
 .stage-client span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lab-lt .blk.shot.chg { background: #7d93a8; border-inline-end: 2px dashed #fff; }
+.lab-fr { position: relative; flex: none; }
+.lab-frcut { position: absolute; top: 3px; inset-inline-end: 3px; border: none; border-radius: 6px; background: rgba(0,0,0,.6); color: #fff;
+  font-size: 12px; padding: 1px 4px; cursor: pointer; opacity: 0; transition: opacity .15s; }
+.lab-fr:hover .lab-frcut, .lab-frcut:focus { opacity: 1; }
+@media (hover: none) { .lab-frcut { opacity: .85; } }

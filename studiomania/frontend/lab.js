@@ -75,7 +75,7 @@ function renderLab() {
   $("labEmpty").hidden = !!d || lib;
   if (!d || lib) return;
   if (document.activeElement !== $("labName")) $("labName").value = d.name;
-  $("labSplit").value = d.split || "fine";
+  $("labSplit").value = d.split || "cuts";
   $("labSplit").disabled = d.busy;
   document.querySelectorAll("[data-labrun]").forEach((b) => (b.disabled = d.busy));
   $("labStatus").innerHTML = Object.entries(LAB_STEP).filter(([k]) => !["stems", "audio"].includes(k) || d.steps?.[k]).map(([k, l]) => {
@@ -344,7 +344,7 @@ function renderLabShots(d) {
         <button type="button" class="btn sm" data-split="${s.n}" title="لو البرنامج فوّت تغيير: اختار فريم من الشريط (أو وقّف الفيديو عند المكان) ودوس هنا">✂️ قسّم هنا</button>
         <button type="button" class="btn sm" data-hide="${s.n}" title="مش هتدخل في الكومبوننتس، وتقدر ترجّعها">🗑️ شيلها</button>
         ${d.shots[d.shots.length - 1].n !== s.n ? `<button type="button" class="btn sm" data-merge="${s.n}" title="لو الحتة دي واللي بعدها حركة واحدة">🔗 ادمج مع اللي بعدها</button>` : ""}</header>
-      <div class="lab-strip">${(s.frames || []).map((f) => `<img src="${f.url}" data-seek="${f.t}" data-pickt="${f.t}" class="${Math.abs(f.t - pick) < 0.001 ? "sel" : ""}" title="${lt(f.t)}" alt="">`).join("")}</div>
+      <div class="lab-strip">${(s.frames || []).map((f) => `<span class="lab-fr"><img src="${f.url}" data-seek="${f.t}" data-pickt="${f.t}" class="${Math.abs(f.t - pick) < 0.001 ? "sel" : ""}" title="${lt(f.t)}" alt="">${f.t > s.start + 0.25 && f.t < s.end - 0.25 ? `<button type="button" class="lab-frcut" data-splitat="${f.t}" data-splitn="${s.n}" title="قسّم الحتة هنا (عند ${lt(f.t)})">✂️</button>` : ""}</span>`).join("")}</div>
       ${s.analysis_error ? `<div class="err">${le(s.analysis_error)}</div>` : ""}
       ${an ? `<p data-no-i18n>${le(an.summary)}</p>
         <div class="lab-row"><b>🖼️ الخلفية:</b> <input type="text" value="${le(an.background?.name)}" data-fix="background|${s.n}|name" data-no-i18n>
@@ -416,6 +416,16 @@ document.querySelector('.view[data-view="11"]').addEventListener("click", async 
       renderLabShots(labx.cur);
     }
     return;
+  }
+  const cutAt = e.target.closest("[data-splitat]");
+  if (cutAt) {  // ✂️ على الفريم نفسه: دوسة واحدة
+    const n = cutAt.dataset.splitn, t = Number(cutAt.dataset.splitat);
+    if (!confirm(`تقسم الحتة ${n} عند ${lt(t)}؟`)) return;
+    return busyButton(cutAt, "⏳", async () => {
+      labx.cur = await api(`/api/lab/${labx.cur.id}/shots/${n}/split`, { method: "POST", ...jsonBody({ t }) });
+      labx.pick = {};
+      renderLab(); scheduleLabPoll();
+    });
   }
   const split = e.target.closest("[data-split]");
   if (split) {

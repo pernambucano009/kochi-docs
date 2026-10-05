@@ -8697,7 +8697,7 @@ def run_lab(lid: str, steps: list[str]) -> None:
             if step == "shots":
                 shutil.rmtree(folder / "frames", ignore_errors=True)
                 shots = lab.detect_shots(ffmpeg_exe(), src, dur)
-                if d.get("split", "fine") == "fine":  # 🔀 كمان كل تغيير جوه المشهد (مش القطعات بس)
+                if d.get("split", "cuts") == "fine":  # 🔀 لو اخترته: كمان كل تغيير جوه المشهد (الأساسي القطعات بس، وإنت بتقسم)
                     lab_step(lid, step, progress="بيدور على التغييرات جوه كل لقطة")
                     shots = lab.fine_shots(ffmpeg_exe(), src, shots)
                 for k, s in enumerate(shots):
