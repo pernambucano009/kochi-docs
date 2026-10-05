@@ -9244,19 +9244,30 @@ def run_lab_connectors(lid: str) -> None:
                       "الكونيكتورز")
     new = [c for c in lab.clean_connectors(raw, d["source"]["duration"])
            if not any(abs(c["t0"] - k["t0"]) < 0.3 and abs(c["t1"] - k["t1"]) < 0.3 for k in keep)]
-    src, folder = lab_dir(lid) / d["source"]["file"], lab_dir(lid) / "frames"
-    folder.mkdir(parents=True, exist_ok=True)
     for c in new:
         lab_step(lid, "connectors", progress=f"فريمات «{c['name'][:30]}»")
-        c["keyframes"] = []
-        for k, (t, label) in enumerate(((c["t0"], "البداية"), ((c["t0"] + c["t1"]) / 2, "النص"), (c["t1"], "النهاية"))):
-            name = f"cx{c['id']}-{k}.jpg"
-            subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{min(t, d['source']['duration'] - 0.05):.3f}",
-                            "-i", str(src), "-frames:v", "1", "-vf", "scale=360:-2", "-q:v", "4", str(folder / name)],
-                           capture_output=True, timeout=60)
-            if (folder / name).exists():
-                c["keyframes"].append({"t": round(t, 2), "file": name, "label": label})
+        c["keyframes"] = conn_keyframes(lid, d, c)
     lab_update(lid, lambda d: d.update(connectors=sorted(keep + new, key=lambda c: c["t0"])))
+
+
+def conn_keyframes(lid: str, d: dict, c: dict) -> list[dict]:
+    """3 فريمات للكونيكتور: البداية والنص والنهاية (أسامي جديدة كل مرة عشان المتصفح ميعرضش القديمة)."""
+    src, folder = lab_dir(lid) / d["source"]["file"], lab_dir(lid) / "frames"
+    folder.mkdir(parents=True, exist_ok=True)
+    for k in c.get("keyframes") or []:
+        (folder / k["file"]).unlink(missing_ok=True)
+    tag, out = uuid.uuid4().hex[:4], []
+    for k, (t, label) in enumerate(((c["t0"], "البداية"), ((c["t0"] + c["t1"]) / 2, "النص"), (c["t1"], "النهاية"))):
+        name = f"cx{c['id']}-{tag}-{k}.jpg"
+        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{min(t, d['source']['duration'] - 0.05):.3f}",
+                        "-i", str(src), "-frames:v", "1", "-vf", "scale=360:-2", "-q:v", "4", str(folder / name)],
+                       capture_output=True, timeout=60)
+        if (folder / name).exists():
+            out.append({"t": round(t, 2), "file": name, "label": label})
+    return out
+
+
+CONN_TEXT = ("from_scene", "to_scene", "trigger", "camera", "rhythm", "story_role", "sound")
 
 
 class ConnectorIn(BaseModel):
@@ -9265,51 +9276,156 @@ class ConnectorIn(BaseModel):
     t0: float | None = None
     t1: float | None = None
     recipe: list[str] | None = None
+    anchors: list[str] | None = None
+    transforms: list[dict] | None = None
+    from_scene: str | None = None
+    to_scene: str | None = None
+    trigger: str | None = None
+    camera: str | None = None
+    rhythm: str | None = None
+    story_role: str | None = None
+    sound: str | None = None
     review: bool = False
     ok: bool | None = None
     note: str = ""
 
 
+def conn_fix(c: dict, fix: dict, dur: float) -> dict:
+    """يطبّق تعديل على الكونيكتور (والنسخة الأصلية من الموديل بتتحفظ مرة واحدة للمقارنة والتعلم)."""
+    if not fix:
+        return c
+    c.setdefault("original", {k: c.get(k) for k in lab.CONNECTOR_KEYS})
+    c.update(fix)
+    c["t0"], c["t1"] = round(min(dur, max(0.0, c["t0"])), 2), round(min(dur, max(0.0, c["t1"])), 2)
+    if c["t1"] - c["t0"] < 0.2:
+        raise HTTPException(400, "المقطع قصير أوي")
+    c["edited"] = True
+    return c
+
+
+def conn_sync(lid: str, cid: str, range_changed: bool) -> dict:
+    """بعد التعديل: الفريمات بتتعمل من جديد لو التوقيت اتغير، والنسخة اللي في المكتبة (لو اتقبل) بتتحدّث."""
+    d = lab_load(lid)
+    c = next(x for x in d["connectors"] if x["id"] == cid)
+    if range_changed:
+        keys = conn_keyframes(lid, d, c)
+        d = lab_update(lid, lambda d: next(x for x in d["connectors"] if x["id"] == cid).update(keyframes=keys))
+        c = next(x for x in d["connectors"] if x["id"] == cid)
+    aid = c.get("asset")
+    if aid and (clip_dir(aid) / "asset.json").exists():
+        if range_changed:  # المقطع نفسه اتغير: نسخة جديدة في المكتبة مكان القديمة
+            shutil.rmtree(clip_dir(aid), ignore_errors=True)
+            d = conn_to_library(lid, d, c)
+        else:
+            rec = conn_recipe(c)
+            clip_update(aid, lambda a: a.update(name=c["name"], description=c.get("story_role", ""), connector=rec))
+    return d
+
+
+def conn_recipe(c: dict) -> dict:
+    return {k: c.get(k) for k in ("family", "from_scene", "to_scene", "trigger", "anchors", "transforms", "camera",
+                                  "rhythm", "recipe", "story_role", "sound")}
+
+
+def conn_to_library(lid: str, d: dict, c: dict) -> dict:
+    a = clip_from_lab(lid, d, c["t0"], c["t1"], {
+        "name": c["name"], "category": "connector", "tags": [lab.CONNECTOR_FAMILIES.get(c["family"], "").split(" ", 1)[-1]],
+        "description": c.get("story_role", ""), "connector": conn_recipe(c), "keyframes": c.get("keyframes") or [],
+        "component": c["id"]})
+    def link(d):
+        x = next((y for y in d.get("connectors") or [] if y["id"] == c["id"]), None)
+        if x is not None:
+            x["asset"] = a["id"]
+    return lab_update(lid, link)
+
+
 @app.patch("/api/lab/{lid}/connectors/{cid}")
 def lab_connector(lid: str, cid: str, body: ConnectorIn):
-    """تعديل الكونيكتور (الاسم/العيلة/التوقيت/الوصفة) أو تقييمه. ✅ بيحفظه في المكتبة بوصفته وفريماته."""
+    """تعديل الكونيكتور (الاسم/العيلة/التوقيت/الشرح/الوصفة) أو تقييمه. ✅ بيحفظه في المكتبة بوصفته وفريماته."""
+    moved = []
     def fn(d):
         c = next((x for x in d.get("connectors") or [] if x["id"] == cid), None)
         if c is None:
             raise HTTPException(404, "الكونيكتور ده مش موجود")
-        dur = d["source"]["duration"]
         fix = {}
         if body.name is not None and body.name.strip():
             fix["name"] = body.name.strip()[:100]
         if body.family in lab.CONNECTOR_FAMILIES:
             fix["family"] = body.family
-        if body.t0 is not None:
-            fix["t0"] = round(min(dur, max(0.0, body.t0)), 2)
-        if body.t1 is not None:
-            fix["t1"] = round(min(dur, max(0.0, body.t1)), 2)
+        for k in ("t0", "t1"):
+            v = getattr(body, k)
+            if v is not None and abs(v - c[k]) > 0.005:
+                fix[k] = v
+        for k in CONN_TEXT:
+            v = getattr(body, k)
+            if v is not None:
+                fix[k] = v.strip()[:500]
         if body.recipe is not None:
             fix["recipe"] = [x.strip()[:300] for x in body.recipe if x.strip()][:12]
-        if fix:
-            c.setdefault("original", {k: c.get(k) for k in fix})
-            c.update(fix)
-            if c["t1"] - c["t0"] < 0.2:
-                raise HTTPException(400, "المقطع قصير أوي")
+        if body.anchors is not None:
+            fix["anchors"] = [x.strip()[:200] for x in body.anchors if x.strip()][:8]
+        if body.transforms is not None:
+            fix["transforms"] = [{"t0": float(x.get("t0") or 0), "t1": float(x.get("t1") or 0), "from": str(x.get("from") or "")[:200],
+                                  "to": str(x.get("to") or "")[:200], "how": str(x.get("how") or "")[:300]}
+                                 for x in body.transforms if isinstance(x, dict) and (x.get("from") or x.get("to"))][:12]
+        moved.append("t0" in fix or "t1" in fix)
+        conn_fix(c, fix, d["source"]["duration"])
         if body.review:
             c["review"] = {"ok": body.ok, "note": body.note.strip()[:500], "at": now()}
     d = lab_update(lid, fn)
+    if not body.review:
+        d = conn_sync(lid, cid, moved[0])
     c = next(x for x in d["connectors"] if x["id"] == cid)
     if body.review and body.ok and not (c.get("asset") and (clip_dir(c["asset"]) / "asset.json").exists()):
-        recipe = {k: c.get(k) for k in ("family", "from_scene", "to_scene", "trigger", "anchors", "transforms", "camera",
-                                         "rhythm", "recipe", "story_role", "sound")}
-        a = clip_from_lab(lid, d, c["t0"], c["t1"], {
-            "name": c["name"], "category": "connector", "tags": [lab.CONNECTOR_FAMILIES.get(c["family"], "").split(" ", 1)[-1]],
-            "description": c.get("story_role", ""), "connector": recipe, "keyframes": c.get("keyframes") or [], "component": cid})
-        def link(d):
-            x = next((y for y in d.get("connectors") or [] if y["id"] == cid), None)
-            if x is not None:
-                x["asset"] = a["id"]
-        d = lab_update(lid, link)
+        d = conn_to_library(lid, d, c)
     return lab_to_dict(lid, d)
+
+
+class RefineIn(BaseModel):
+    message: str
+
+
+@app.post("/api/lab/{lid}/connectors/{cid}/refine")
+def lab_connector_refine(lid: str, cid: str, body: RefineIn):
+    """💬 تقول للشرح «عدّل كذا»: الموديل بيتفرج على الحتة دي تاني (ومعاها ثانية ونص قبلها وبعدها) ويعدّل."""
+    msg = body.message.strip()[:1500]
+    if not msg:
+        raise HTTPException(400, "اكتب عايز تعدّل إيه")
+    d = lab_load(lid)
+    c = next((x for x in d.get("connectors") or [] if x["id"] == cid), None)
+    if c is None:
+        raise HTTPException(404, "الكونيكتور ده مش موجود")
+    dur = d["source"]["duration"]
+    a0, a1 = max(0.0, c["t0"] - 1.5), min(dur, c["t1"] + 1.5)
+    if atlas.mock_mode():
+        res = {"reply": "تمام، عدّلت الشرح على كلامك (تجربة).",
+               "connector": {"story_role": f"{c.get('story_role', '')} — {msg}", "t0": c["t0"] - a0, "t1": c["t1"] - a0}}
+    else:
+        if not (atlas.api_key()):
+            raise HTTPException(400, "مفتاح Atlas مش متسجل")
+        clip = lab_dir(lid) / "tmp" / f"refine-{cid}.mp4"
+        clip.parent.mkdir(parents=True, exist_ok=True)
+        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{a0:.3f}", "-i", str(lab_dir(lid) / d["source"]["file"]),
+                        "-t", f"{a1 - a0:.3f}", "-vf", "scale='if(gt(iw,ih),min(720,iw),-2)':'if(gt(iw,ih),-2,min(720,ih))',fps=15",
+                        "-c:v", "libx264", "-preset", "veryfast", "-crf", "28", "-pix_fmt", "yuv420p", "-c:a", "aac", "-ac", "1",
+                        str(clip)], check=True, capture_output=True, timeout=300)
+        try:
+            res = ad_json(lab_media_chat(az.with_media(lab.connector_refine_messages(c, msg, a0, c.get("chat") or []),
+                                                       data_url(clip, "video/mp4"), "clip.mp4")), "تعديل الشرح")
+        finally:
+            clip.unlink(missing_ok=True)
+    fix = lab.apply_refine(c, res, a0, dur)
+    if not fix:
+        raise HTTPException(502, "الموديل ما رجعش شرح مفهوم. جرّب تاني بكلام أوضح")
+    moved = abs(fix["t0"] - c["t0"]) > 0.005 or abs(fix["t1"] - c["t1"]) > 0.005
+    reply = str(res.get("reply") or "اتعدّل")[:500]
+    def fn(d):
+        x = next(y for y in d["connectors"] if y["id"] == cid)
+        conn_fix(x, fix, dur)
+        x.setdefault("chat", []).extend([{"role": "user", "text": msg, "at": now()}, {"role": "model", "text": reply, "at": now()}])
+        x["chat"] = x["chat"][-20:]
+    lab_update(lid, fn)
+    return {**lab_to_dict(lid, conn_sync(lid, cid, moved)), "reply": reply}
 
 
 class ComponentIn(BaseModel):

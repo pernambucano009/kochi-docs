@@ -1,7 +1,7 @@
 // StudioMania — 🔬 معمل التفكيك: البرنامج بيفكك أي فيديو لعناصره، وإنت بتراجع وتقيّم كل حاجة.
 // القطعات وبدايات الأصوات بتتقاس بالكود، والموديل بيسمّي ويوصف، وتقييمك (✅ ❌ والتصحيح) بيتحفظ مع الأصل.
 
-const labx = { list: [], cur: null, timer: null, pick: {}, aopen: {}, view: "lab", cfilter: "", audioOpen: false, hear: { speech: true, music: true, sfx: true }, stems: null, win: {} };
+const labx = { list: [], cur: null, timer: null, pick: {}, aopen: {}, view: "lab", cfilter: "", audioOpen: false, xedit: {}, xwide: {}, hear: { speech: true, music: true, sfx: true }, stems: null, win: {} };
 const LAB_KEY = "studiomania.lab";
 const LAB_SFX_CAT = { click: "🖱️ كليك", whoosh: "💨 ووش", pop: "💥 بوب", impact: "🥁 خبطة", typing: "⌨️ كتابة", swipe: "🖍️ سحبة",
   notification: "🔔 إشعار", riser: "📈 رايزر", transition: "🔀 انتقال", ui: "📱 صوت واجهة", foley: "👣 فولي", ambience: "🌫️ جو المكان", other: "❔ تاني" };
@@ -89,7 +89,7 @@ function renderLab() {
   const compPlaying = [...$("labComps").querySelectorAll("video")].some((v) => !v.paused);
   if (!busyEdit($("labComps")) && !compPlaying) renderLabComps(d);
   const connPlaying = [...$("labConns").querySelectorAll("video")].some((v) => !v.paused);
-  if (!busyEdit($("labConns")) && !connPlaying) renderLabConns(d);
+  if (!busyEdit($("labConns")) && !connPlaying && !Object.values(labx.xedit).some(Boolean)) renderLabConns(d);
   if (!busyEdit($("labAudio"))) renderLabAudio(d);
   const shotPlaying = [...document.querySelectorAll("[data-shotvid]")].some((v) => !v.paused);
   if (!busyEdit($("labShots")) && !shotPlaying) renderLabShots(d);
@@ -336,7 +336,15 @@ function renderLabConns(d) {
       const s = compState(c);
       return `<article class="lab-conn ${s}" data-conn="${c.id}">
         <div class="lab-conn-media">
-          <video data-cvid data-t0="${c.t0}" data-t1="${c.t1}" src="${d.source_url}#t=${c.t0}" poster="${c.keyframes?.[0]?.url || ""}" preload="none" playsinline controls></video>
+          <video data-cvid data-t0="${labx.xwide[c.id] ? Math.max(0, c.t0 - 3) : c.t0}" data-t1="${labx.xwide[c.id] ? Math.min(d.source.duration, c.t1 + 3) : c.t1}"
+            src="${d.source_url}#t=${labx.xwide[c.id] ? Math.max(0, c.t0 - 3) : c.t0}" poster="${c.keyframes?.[0]?.url || ""}" preload="none" playsinline controls></video>
+          <div class="lab-conn-range">
+            <label class="check" title="بيشغّل 3 ثواني قبل الكونيكتور و3 بعده عشان تشوف هو بيبدأ ويخلص فين بالظبط"><input type="checkbox" data-xwide ${labx.xwide[c.id] ? "checked" : ""}> 🔓 شوف اللي حواليه</label>
+            <div class="row wrap"><b>البداية</b> <button type="button" class="btn sm" data-xnudge="t0:-0.5">−½ث</button><button type="button" class="btn sm" data-xnudge="t0:0.5">+½ث</button>
+              <button type="button" class="btn sm" data-xset="t0" title="وقّف الفيديو عند أول الكونيكتور ودوس هنا">⏮ من هنا</button></div>
+            <div class="row wrap"><b>النهاية</b> <button type="button" class="btn sm" data-xnudge="t1:-0.5">−½ث</button><button type="button" class="btn sm" data-xnudge="t1:0.5">+½ث</button>
+              <button type="button" class="btn sm" data-xset="t1" title="وقّف الفيديو عند آخر الكونيكتور ودوس هنا">⏭ لحد هنا</button></div>
+          </div>
           <div class="lab-conn-keys">${(c.keyframes || []).map((k) => `<figure><img src="${k.url}" alt="" data-seek="${k.t}"><figcaption>${k.label} · ${lt(k.t)}</figcaption></figure>`).join("")}</div>
         </div>
         <div class="lab-conn-body">
@@ -345,6 +353,8 @@ function renderLabConns(d) {
             <label>من <input type="number" step="0.05" min="0" max="${d.source.duration}" value="${c.t0}" data-xf="t0"></label>
             <label>لـ <input type="number" step="0.05" min="0" max="${d.source.duration}" value="${c.t1}" data-xf="t1"></label>
             <small class="muted">${(c.t1 - c.t0).toFixed(2)} ث</small></div>
+          ${labx.xedit[c.id] ? connEditForm(c) : `<div class="row wrap"><button type="button" class="btn sm" data-xedit>✏️ عدّل الشرح</button>
+            ${c.edited ? `<span class="chip" title="الشرح ده اتعدّل (بإيدك أو بالكلام مع الموديل)">✏️ اتعدّل</span>` : ""}</div>
           <div class="lab-conn-story" data-no-i18n><span>${le(c.from_scene)}</span> <b>⟵</b> <span>${le(c.to_scene)}</span></div>
           <dl class="lab-conn-dl">
             ${c.trigger ? `<dt>🎯 الشرارة</dt><dd data-no-i18n>${le(c.trigger)}</dd>` : ""}
@@ -355,7 +365,12 @@ function renderLabConns(d) {
             ${c.rhythm ? `<dt>⏱️ الإيقاع</dt><dd data-no-i18n>${le(c.rhythm)}</dd>` : ""}
             ${c.sound ? `<dt>🔊 الصوت</dt><dd data-no-i18n>${le(c.sound)}</dd>` : ""}
             ${c.story_role ? `<dt>📖 بيخدم القصة إزاي</dt><dd data-no-i18n>${le(c.story_role)}</dd>` : ""}
-          </dl>
+          </dl>`}
+          <div class="lab-conn-chat">
+            ${(c.chat || []).slice(-6).map((m) => `<div class="msg ${m.role}" data-no-i18n>${m.role === "user" ? "👤" : "🤖"} ${le(m.text)}</div>`).join("")}
+            <div class="row"><input type="text" class="grow" data-xchat placeholder="💬 قول للشرح يعدّل إيه، مثلًا: الماوس مش بيدوس Enter، بيدوس على أيقونة البحث، والكونيكتور بيكمل لحد ما الخريطة تبان كلها" data-no-i18n>
+              <button type="button" class="btn sm primary" data-xsend>✨ عدّل</button></div>
+          </div>
           <label class="lab-conn-recipe">🧪 الوصفة (تتطبق على أي مشهدين، سطر لكل خطوة)
             <textarea rows="${Math.max(3, (c.recipe || []).length)}" data-xf="recipe" data-no-i18n>${le((c.recipe || []).join("\n"))}</textarea></label>
           <div class="row wrap lab-cact">
@@ -367,6 +382,27 @@ function renderLabConns(d) {
         </div>
       </article>`;
     }).join("") || (st.status === "done" && !all.length ? `<p class="muted">الموديل ملقاش كونيكتورز في الفيديو ده.</p>` : "")}</div>`;
+}
+// ✏️ الشرح كخانات تكتب فيها
+function connEditForm(c) {
+  const f = (k, label, rows = 1) => `<label class="lab-xe">${label}<textarea rows="${rows}" data-xe="${k}" data-no-i18n>${le(c[k])}</textarea></label>`;
+  return `<div class="lab-xedit">
+    <div class="lab-xe2">${f("from_scene", "المشهد قبله")}${f("to_scene", "المشهد بعده")}</div>
+    ${f("trigger", "🎯 الشرارة")}
+    <label class="lab-xe">📌 بيفضل ثابت (سطر لكل حاجة)<textarea rows="2" data-xe="anchors" data-no-i18n>${le((c.anchors || []).join("\n"))}</textarea></label>
+    <div class="lab-xe">🔄 التحوّلات
+      <div class="lab-xtr">${(c.transforms || []).map((x) => connTrRow(x)).join("")}</div>
+      <button type="button" class="btn sm" data-xtradd>＋ تحوّل</button></div>
+    ${f("camera", "🎥 الكاميرا")}${f("rhythm", "⏱️ الإيقاع")}${f("sound", "🔊 الصوت")}${f("story_role", "📖 بيخدم القصة إزاي", 2)}
+    <div class="row wrap"><button type="button" class="btn sm primary" data-xsave>💾 احفظ الشرح</button><button type="button" class="btn sm" data-xcancel>إلغاء</button></div>
+  </div>`;
+}
+function connTrRow(x = {}) {
+  return `<div class="lab-xtr-row" data-xtr>
+    <input type="number" step="0.05" value="${x.t0 ?? ""}" data-k="t0" title="من (ثانية)"><input type="number" step="0.05" value="${x.t1 ?? ""}" data-k="t1" title="لـ">
+    <input type="text" value="${le(x.from)}" data-k="from" placeholder="إيه" data-no-i18n><span>←</span><input type="text" value="${le(x.to)}" data-k="to" placeholder="بقى إيه" data-no-i18n>
+    <input type="text" value="${le(x.how)}" data-k="how" placeholder="إزاي (الحركة والنعومة)" class="grow" data-no-i18n>
+    <button type="button" class="btn sm danger" data-xtrdel>✕</button></div>`;
 }
 async function labConn(cid, body, btn) {
   const go = async () => {
@@ -448,6 +484,46 @@ document.querySelector('.view[data-view="11"]').addEventListener("click", async 
       v.currentTime = Number((cp || key).dataset.seek);
       if (cp) v.play().catch(() => {}); else v.pause();
       return;
+    }
+    const v = conn.querySelector("[data-cvid]");
+    const nudge = e.target.closest("[data-xnudge]"), xset = e.target.closest("[data-xset]");
+    if (nudge) {
+      const [k, dt] = nudge.dataset.xnudge.split(":");
+      return labConn(cid, { [k]: Math.round((c[k] + Number(dt)) * 100) / 100 }, nudge);
+    }
+    if (xset) {
+      if (!v || v.readyState < 1) return toast("شغّل الفيديو ووقّفه عند المكان الأول", true);
+      return labConn(cid, { [xset.dataset.xset]: Math.round(v.currentTime * 100) / 100 }, xset);
+    }
+    if (e.target.closest("[data-xedit]")) { labx.xedit[cid] = true; return renderLabConns(labx.cur); }
+    if (e.target.closest("[data-xcancel]")) { labx.xedit[cid] = false; return renderLabConns(labx.cur); }
+    if (e.target.closest("[data-xtradd]")) {
+      conn.querySelector(".lab-xtr").insertAdjacentHTML("beforeend", connTrRow({ t0: c.t0, t1: c.t1 }));
+      return;
+    }
+    const trdel = e.target.closest("[data-xtrdel]");
+    if (trdel) { trdel.closest("[data-xtr]").remove(); return; }
+    const save = e.target.closest("[data-xsave]");
+    if (save) {
+      const body = {};
+      conn.querySelectorAll("[data-xe]").forEach((el) => {
+        body[el.dataset.xe] = el.dataset.xe === "anchors" ? el.value.split("\n") : el.value;
+      });
+      body.transforms = [...conn.querySelectorAll("[data-xtr]")].map((row) => Object.fromEntries(
+        [...row.querySelectorAll("[data-k]")].map((el) => [el.dataset.k, ["t0", "t1"].includes(el.dataset.k) ? Number(el.value) : el.value])));
+      labx.xedit[cid] = false;
+      return labConn(cid, body, save);
+    }
+    const send = e.target.closest("[data-xsend]");
+    if (send) {
+      const inp = conn.querySelector("[data-xchat]"), message = inp.value.trim();
+      if (!message) return toast("اكتب عايز تعدّل إيه", true);
+      return busyButton(send, "⏳ بيتفرج ويعدّل...", async () => {
+        const r = await api(`/api/lab/${labx.cur.id}/connectors/${cid}/refine`, { method: "POST", ...jsonBody({ message }) });
+        labx.cur = r; labx.xedit[cid] = false;
+        renderLabConns(labx.cur); renderLabTimeline(labx.cur);
+        toast(`🤖 ${r.reply}`);
+      });
     }
     const note = conn.querySelector("[data-xnote]").value;
     const okb = e.target.closest("[data-xok]"), badb = e.target.closest("[data-xbad]");
@@ -639,6 +715,7 @@ document.querySelector('.view[data-view="11"]').addEventListener("change", (e) =
   const conn = e.target.closest("[data-conn]");
   if (conn) {
     const cid = conn.dataset.conn, c = labx.cur.connectors.find((x) => x.id === cid), k = e.target.dataset.xf;
+    if (e.target.matches("[data-xwide]")) { labx.xwide[cid] = e.target.checked; return renderLabConns(labx.cur); }
     if (k === "recipe") return labConn(cid, { recipe: e.target.value.split("\n") });
     if (k) return labConn(cid, { [k]: ["t0", "t1"].includes(k) ? Number(e.target.value) : e.target.value });
     if (e.target.matches("[data-xnote]") && c.review) return labConn(cid, { review: true, ok: c.review.ok, note: e.target.value });

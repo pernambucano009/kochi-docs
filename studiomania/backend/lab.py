@@ -515,6 +515,59 @@ def connectors_messages(d: dict, rejected: list[dict] | None = None) -> list[dic
     return [{"role": "user", "content": text}]
 
 
+CONNECTOR_KEYS = ("name", "family", "t0", "t1", "from_scene", "to_scene", "trigger", "anchors", "transforms", "camera",
+                  "rhythm", "recipe", "story_role", "sound")
+
+
+def connector_refine_messages(c: dict, note: str, clip_start: float, history: list[dict]) -> list[dict]:
+    """💬 المستخدم بيقول للشرح «عدّل كذا»: الموديل بيتفرج على الحتة تاني (ومعاها شوية قبلها وبعدها) ويعدّل الشرح."""
+    cur = {k: c.get(k) for k in CONNECTOR_KEYS}
+    rel = json.loads(json.dumps(cur))   # الأوقات من أول المقطع المبعوت
+    for k in ("t0", "t1"):
+        rel[k] = round(float(rel[k]) - clip_start, 2)
+    for x in rel.get("transforms") or []:
+        x["t0"], x["t1"] = round(x["t0"] - clip_start, 2), round(x["t1"] - clip_start, 2)
+    past = "\n".join(f"- {h['role']}: {h['text']}" for h in history[-8:])
+    text = (
+        "أنت مخرج موشن جرافيك. ده مقطع من فيديو فيه «كونيكتور»: تحوّل بيحكي بيودّي من مشهد لمشهد من غير قطع. "
+        "المقطع فيه شوية قبل الكونيكتور وشوية بعده عشان تشوف الصورة كاملة، والأوقات كلها بالثواني من أول المقطع ده.\n"
+        f"ده الشرح الحالي:\n{json.dumps(rel, ensure_ascii=False, indent=1)}\n\n"
+        + (f"كلام قبل كده عن نفس الكونيكتور:\n{past}\n\n" if past else "")
+        + f"المستخدم شايف إن الشرح محتاج يتعدّل وبيقولك:\n«{note}»\n\n"
+        "اتفرج على المقطع تاني بدقة، ونفّذ طلبه، وصحّح أي حاجة تانية غلط تشوفها. لو طلب تغيير البداية أو النهاية غيّر t0 و t1. "
+        "الوصفة (recipe) تفضل عامة تنفع لأي مشهدين. family واحدة من: " + ", ".join(CONNECTOR_FAMILIES) + ".\n"
+        "بالعربي المصري البسيط. رجّع JSON بس: {\"reply\": \"رد قصير ليه عملت كده\", \"connector\": {نفس شكل الشرح الحالي بالظبط}}"
+    )
+    return [{"role": "user", "content": text}]
+
+
+def apply_refine(c: dict, data: dict, clip_start: float, duration: float) -> dict:
+    """الشرح المعدّل بأوقات الفيديو الأصلي (والحاجات الإدارية زي التقييم والفريمات بتفضل)."""
+    got = (data or {}).get("connector") if isinstance((data or {}).get("connector"), dict) else data
+    if not isinstance(got, dict):
+        return {}
+    got = {**got}
+    for k in ("t0", "t1"):
+        if got.get(k) is not None:
+            try:
+                got[k] = float(got[k]) + clip_start
+            except (TypeError, ValueError):
+                got.pop(k)
+    for x in got.get("transforms") or []:
+        if isinstance(x, dict):
+            for k in ("t0", "t1"):
+                try:
+                    x[k] = float(x.get(k)) + clip_start
+                except (TypeError, ValueError):
+                    x[k] = got.get("t0", c["t0"])
+    merged = {**{k: c.get(k) for k in CONNECTOR_KEYS}, **{k: v for k, v in got.items() if k in CONNECTOR_KEYS and v not in (None, "")}}
+    clean = clean_connectors({"connectors": [merged]}, duration)
+    if not clean:
+        return {}
+    out = clean[0]
+    return {k: out[k] for k in CONNECTOR_KEYS}
+
+
 def clean_connectors(data: dict, duration: float) -> list[dict]:
     def num(v, dflt=0.0):
         try:

@@ -1584,3 +1584,18 @@ a.pl-link:hover { background: color-mix(in srgb, var(--ok) 24%, transparent); }
 @media (max-width: 760px) { .lab-conn { grid-template-columns: 1fr; } }
 .as-conn .lab-conn-keys { max-width: 520px; }
 .as-recipe { margin: 0; padding-inline-start: 20px; display: flex; flex-direction: column; gap: 3px; }
+.lab-conn-range { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; font-size: 12px; }
+.lab-conn-range .row { gap: 4px; align-items: center; }
+.lab-conn-range b { width: 52px; }
+.lab-xedit { display: flex; flex-direction: column; gap: 6px; border: 1px dashed var(--accent); border-radius: 10px; padding: 8px; }
+.lab-xe { display: flex; flex-direction: column; gap: 3px; font-size: 12px; font-weight: 600; }
+.lab-xe textarea { width: 100%; font-weight: 400; }
+.lab-xe2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.lab-xtr { display: flex; flex-direction: column; gap: 4px; }
+.lab-xtr-row { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; font-weight: 400; }
+.lab-xtr-row input[type=number] { width: 64px; }
+.lab-xtr-row input[type=text] { flex: 1 1 110px; min-width: 0; }
+.lab-conn-chat { display: flex; flex-direction: column; gap: 4px; background: var(--surface-2); border-radius: 10px; padding: 6px 8px; }
+.lab-conn-chat .msg { font-size: 12px; }
+.lab-conn-chat .msg.model { color: var(--accent); }
+@media (max-width: 760px) { .lab-xe2 { grid-template-columns: 1fr; } }
