@@ -9613,7 +9613,8 @@ def asset_review(aid: str, body: AssetReviewIn):
 # ---------- 🧪 تجربة كونيكتور: الوصفة بين لقطتين (خطة ← صور مفتاحية ← حركة بين كل صورتين ← تجميع)
 
 TRIAL_MODELS = {
-    "seedance-fast": {"label": "Seedance 2.0 Fast (أرخص)", "model": "bytedance/seedance-2.0-fast/image-to-video", "per_sec": 0.027},
+    "seedance-mini": {"label": "Seedance 2.0 Mini (الأرخص)", "model": "bytedance/seedance-2.0-mini/image-to-video", "per_sec": 0.011},
+    "seedance-fast": {"label": "Seedance 2.0 Fast", "model": "bytedance/seedance-2.0-fast/image-to-video", "per_sec": 0.027},
     "seedance": {"label": "Seedance 2.0 (أجود)", "model": "bytedance/seedance-2.0/image-to-video", "per_sec": 0.09},
 }
 TRIAL_KEY_COST = 0.06   # صورة مفتاحية واحدة (تقريبًا)
@@ -9635,7 +9636,7 @@ def trial_set(aid: str, tid: str, **kw) -> None:
 def trial_cost(t: dict) -> float:
     plan = t.get("plan") or {}
     secs = sum(trial_gen_seconds(x["seconds"]) for x in plan.get("segments") or [])
-    per = TRIAL_MODELS.get(t.get("model"), TRIAL_MODELS["seedance-fast"])["per_sec"] * (2 if t.get("resolution") == "720p" else 1)
+    per = TRIAL_MODELS.get(t.get("model"), TRIAL_MODELS["seedance-mini"])["per_sec"] * (2 if t.get("resolution") == "720p" else 1)
     return round(len(plan.get("keyframes") or []) * TRIAL_KEY_COST + secs * per, 2)
 
 
@@ -9694,7 +9695,7 @@ class TrialIn(BaseModel):
     mode: str = "rebuild"            # rebuild = نفس النقطتين في الفيديو الأصلي، transfer = لقطتين تانيين
     a: TrialSideIn | None = None
     b: TrialSideIn | None = None
-    model: str = "seedance-fast"
+    model: str = "seedance-mini"
     resolution: str = "480p"
 
 
@@ -9723,7 +9724,7 @@ def asset_trial_create(aid: str, body: TrialIn):
     still_at(lab_dir(a["lab"]) / a["src"], a["t"], folder / "a.jpg")
     still_at(lab_dir(b["lab"]) / b["src"], b["t"], folder / "b.jpg")
     t = {"id": tid, "mode": "rebuild" if body.mode == "rebuild" else "transfer", "a": a, "b": b,
-         "model": body.model if body.model in TRIAL_MODELS else "seedance-fast",
+         "model": body.model if body.model in TRIAL_MODELS else "seedance-mini",
          "resolution": body.resolution if body.resolution in ("480p", "720p") else "480p",
          "status": "planning", "step": "بيكتب الخطة", "error": None, "plan": None,
          "files": {"a": "a.jpg", "b": "b.jpg"}, "review": None, "created_at": now()}
