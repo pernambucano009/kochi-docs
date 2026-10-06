@@ -168,6 +168,44 @@ function tvPanelImg(v, j) {
   return u ? `<img src="${u}" alt="" class="${p.full ? "" : "tv-cell"}" title="${p.full ? "واضحة" : "من الشيت (لسه ما اتوضّحتش)"}">` : `<div class="fm-ph">لوحة ${j + 1}</div>`;
 }
 
+// صورة الشيت ومربعات القص (وفي وضع التعديل: المربعات بتتسحب وبتتكبّر بإيدك)
+function tvSheetView(sh, busy) {
+  const ed = tplx.edit?.[sh.k], boxes = ed || sh.boxes || [];
+  const msg = { found: ["muted", "✂️ لقيت اللوحات في الصورة وقطعتها زي ما اترسمت، وكل لوحة اتكمّلت لـ 9:16 من غير ما يتقص منها حاجة (الأطراف المغبّشة «وضّح» بيكمّلها)"],
+    manual: ["muted", "✏️ اتقطعت بالمربعات اللي إنت ظبطتها"], grid: ["muted", "✂️ قطعتها على الشبكة اللي طلبناها"],
+    equal: ["err", "⚠️ ملقتش فواصل واضحة بين اللوحات، فقطعتها خانات متساوية. بص على المربعات، ولو مش مظبوطة: «✏️ ظبّط القص بإيدك»"] }[sh.how];
+  return `<div class="tv-sheetwrap ${ed ? "editing" : ""}" data-sheetwrap="${sh.k}"><img src="${sh.url}" alt="" class="tv-sheetimg" draggable="false">
+      ${boxes.map((b, i) => `<span class="tv-box" data-bi="${i}" style="left:${b[0] * 100}%;width:${(b[1] - b[0]) * 100}%;top:${b[2] * 100}%;height:${(b[3] - b[2]) * 100}%">${sh.cells[i] + 1}${ed ? `<i class="tv-handle" data-handle></i>` : ""}</span>`).join("")}</div>
+    ${msg && !ed ? `<small class="${msg[0]}">${msg[1]}</small>` : ""}
+    ${ed ? `<small class="muted">اسحب أي مربع عشان تحرّكه، واسحب الركن عشان تكبّره أو تصغّره. كل مربع لازم يغطي اللوحة بتاعته بالظبط (الرقم = رقم اللوحة).</small>
+      <div class="row wrap"><button type="button" class="btn sm primary" data-tvcut="${sh.k}">💾 قطّع بالمربعات دي</button>
+        <button type="button" class="btn sm" data-tvcutcancel="${sh.k}">إلغاء</button></div>`
+      : `<div class="row wrap"><button type="button" class="btn sm" data-tvedit="${sh.k}" ${busy ? "disabled" : ""}>✏️ ظبّط القص بإيدك</button>
+        <button type="button" class="btn sm" data-tvreslice="${sh.k}" ${busy ? "disabled" : ""} title="يدوّر على اللوحات في الصورة من جديد ويقطّعها (ببلاش)">✂️ دوّر وقطّع تاني</button></div>`}`;
+}
+
+// سحب المربعات (تحريك أو تكبير من الركن)
+document.addEventListener("pointerdown", (e) => {
+  const box = e.target.closest("[data-sheetwrap].editing [data-bi]");
+  if (!box) return;
+  e.preventDefault();
+  const wrap = box.closest("[data-sheetwrap]"), k = wrap.dataset.sheetwrap, i = Number(box.dataset.bi);
+  const r = wrap.getBoundingClientRect(), start = [...tplx.edit[k][i]], sx = e.clientX, sy = e.clientY, resize = !!e.target.closest("[data-handle]");
+  const clamp = (v) => Math.min(1, Math.max(0, v));
+  const move = (ev) => {
+    const dx = (ev.clientX - sx) / r.width, dy = (ev.clientY - sy) / r.height, b = tplx.edit[k][i];
+    if (resize) { b[1] = clamp(Math.max(start[0] + 0.03, start[1] + dx)); b[3] = clamp(Math.max(start[2] + 0.03, start[3] + dy)); }
+    else {
+      const w = start[1] - start[0], h = start[3] - start[2];
+      b[0] = clamp(Math.min(1 - w, start[0] + dx)); b[1] = b[0] + w; b[2] = clamp(Math.min(1 - h, start[2] + dy)); b[3] = b[2] + h;
+    }
+    Object.assign(box.style, { left: `${b[0] * 100}%`, width: `${(b[1] - b[0]) * 100}%`, top: `${b[2] * 100}%`, height: `${(b[3] - b[2]) * 100}%` });
+  };
+  const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); };
+  window.addEventListener("pointermove", move);
+  window.addEventListener("pointerup", up);
+});
+
 function tvDetail(v) {
   const sch = v.schema, fill = v.fill, c = v.costs || {}, busy = v.busy, beats = sch.beats;
   // كل خطوة بتفتح لوحدها لما ييجي دورها، إلا لو انت فتحتها أو قفلتها بإيدك
@@ -213,10 +251,7 @@ function tvDetail(v) {
         <div class="row wrap"><button type="button" class="btn sm" data-tvcopyp="${sh.k}">📋 انسخ البرومبت (لـ ChatGPT)</button>
           <button type="button" class="btn sm primary" data-tvdraw="${sh.k}" ${busy ? "disabled" : ""}>${sh.url ? "↻ ارسم الشيت تاني" : "🖼️ ارسمه هنا"} (~${c.sheets && (c.sheets / v.sheets.length).toFixed(2)}$)</button>
           <button type="button" class="btn sm" data-tvup="${sh.k}" ${busy ? "disabled" : ""}>⬆ ارفع الشيت من ChatGPT</button></div>
-        ${sh.url ? `<div class="tv-sheetwrap"><img src="${sh.url}" alt="" class="tv-sheetimg">
-          ${(sh.boxes || []).map((b, i) => `<span class="tv-box" style="left:${b[0] * 100}%;width:${(b[1] - b[0]) * 100}%;top:${b[2] * 100}%;height:${(b[3] - b[2]) * 100}%">${sh.cells[i] + 1}</span>`).join("")}</div>
-          <small class="${sh.how === "found" ? "muted" : "err"}">${sh.how === "found" ? "✂️ لقيت اللوحات في الصورة وقطعتها زي ما اترسمت، وكل لوحة اتكمّلت لـ 9:16 (الأطراف المغبّشة «وضّح» بيكمّلها)"
-            : sh.how === "grid" ? "✂️ قطعتها على الشبكة اللي طلبناها" : "⚠️ ملقتش فواصل واضحة بين اللوحات، فقطعتها خانات متساوية. بص على المربعات: لو مش مظبوطة ارسم الشيت تاني"}</small>` : ""}
+        ${sh.url ? tvSheetView(sh, busy) : ""}
         <small class="muted">لو بتستخدم ChatGPT: الصق البرومبت، وارفع معاه صور اللوجو والشاشات اللي في البرومبت، وبعدين ارفع الصورة اللي يطلّعها هنا. البرنامج بيقطّعها لوحده.</small>
       </div>`).join("")}
     </details>
@@ -332,6 +367,34 @@ $("labTpl").addEventListener("click", async (e) => {
   if (sh) {
     if (!confirm(`يوضّح كل اللوحات اللي لسه ما اتوضّحتش؟ حوالي ${tplx.cur.costs.sharpen}$`)) return;
     return go(sh, () => V("/sharpen", { method: "POST", ...jsonBody({}) }));
+  }
+  const edb = t.closest("[data-tvedit]");
+  if (edb) {
+    const sh = tplx.cur.sheets[Number(edb.dataset.tvedit)];
+    const cols = sh.cols, rows = sh.rows;
+    (tplx.edit ||= {})[sh.k] = (sh.boxes?.length === sh.cells.length ? sh.boxes : sh.cells.map((_, i) => {
+      const r = Math.floor(i / cols), c = i % cols;
+      return [c / cols + 0.01, (c + 1) / cols - 0.01, r / rows + 0.01, (r + 1) / rows - 0.01];
+    })).map((b) => [...b]);
+    return renderTpl();
+  }
+  const cc = t.closest("[data-tvcutcancel]");
+  if (cc) { delete tplx.edit[cc.dataset.tvcutcancel]; return renderTpl(); }
+  const cut = t.closest("[data-tvcut]");
+  if (cut) {
+    const k = cut.dataset.tvcut;
+    return busyButton(cut, "⏳", async () => {
+      tplx.cur = await V(`/sheets/${k}/slice`, { method: "POST", ...jsonBody({ boxes: tplx.edit[k] }) });
+      delete tplx.edit[k]; renderTpl(); toast("✂️ اتقطّعت بالمربعات بتاعتك");
+    });
+  }
+  const rs = t.closest("[data-tvreslice]");
+  if (rs) {
+    if (!confirm("يدوّر على اللوحات في الصورة من جديد ويقطّعها؟ اللوحات الحالية (والموضّحة منها) هتتبدل.")) return;
+    return busyButton(rs, "⏳", async () => {
+      tplx.cur = await V(`/sheets/${rs.dataset.tvreslice}/slice`, { method: "POST", ...jsonBody({}) });
+      renderTpl(); toast("✂️ اتقطّع تاني");
+    });
   }
   const rd = t.closest("[data-tvredraw]");
   if (rd) {

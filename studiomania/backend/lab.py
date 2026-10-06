@@ -966,6 +966,8 @@ def sheet_prompt(schema: dict, fill: dict, cells: list[int], ratio: str, text_mo
     empty = cols * rows - len(cells)
     return (
         f"IMAGE FORMAT: the whole image is {shape}.\n"
+        f"SAFE AREA: each panel may be trimmed to an exact {shape} frame from its centre, so keep every important element "
+        "(subject, device, logo, faces, the empty text area) well inside the centre of its panel; near the panel edges put only background.\n"
         f"One single image: a storyboard sheet, an exact grid of {rows} rows x {cols} columns of equal cells. EVERY cell is a {shape} frame "
         f"(never square, never cropped differently), all the same size, read left to right, top to bottom, separated by thin plain white "
         "gutters, no borders, no panel numbers, no captions.\n"
@@ -1031,7 +1033,10 @@ def sheet_panels(gray: bytes, w: int, h: int, need: int) -> list[tuple[float, fl
     بيرجّع (x0, x1, y0, y1) بالنسبة، أو None لو ما لقاش العدد المطلوب."""
     if len(gray) < w * h:
         return None
-    px = lambda x, y: gray[y * w + x] > 244  # noqa: E731  الفواصل بيضا صافية (الخلفيات الفاتحة جوه اللوحات مش فواصل)
+    # لون الفواصل = لون أطراف الشيت (أبيض، رمادي، أسود... أيًا كان)، والبكسل «فاصل» لو قريب منه جدًا
+    edge = sorted([gray[y * w + x] for y in (0, 1, h - 2, h - 1) for x in range(w)] + [gray[y * w + x] for x in (0, 1, w - 2, w - 1) for y in range(h)])
+    bg = edge[len(edge) // 2]
+    px = lambda x, y: abs(gray[y * w + x] - bg) <= 9  # noqa: E731
     rows = _content_runs([sum(px(x, y) for x in range(w)) / w for y in range(h)], h)
     out = []
     for y0, y1 in rows:
@@ -1058,7 +1063,9 @@ def sheet_cells(gray: bytes, w: int, h: int, rows: int, cols: int) -> tuple[list
 
 def panel_redraw_prompt(schema: dict, fill: dict, j: int, ratio: str, text_mode: str, text: str, note: str, n_refs: int, n_style: int) -> str:
     """🎨 لوحة واحدة من الأول (لو اللي في الشيت باظت)، بنفس عالم اللوحات اللي جنبها."""
-    return (f"A {RATIO_WORDS.get(ratio, ratio)} final frame (frame {j + 1} of {len(fill['panels'])}) of ONE continuous video shot.\n"
+    return (f"A {RATIO_WORDS.get(ratio, ratio)} final frame (frame {j + 1} of {len(fill['panels'])}) of ONE continuous video shot. "
+            "If the output is not exactly that shape it will be trimmed from the centre: keep every important element well inside the "
+            "central area and put only background near the edges.\n"
             f"WORLD: {fill.get('world') or schema.get('style')}\nSTYLE: {schema.get('style')}\nPALETTE: {schema.get('palette')}\n"
             f"RECURRING ELEMENT: {schema.get('spine')}\nTHIS FRAME: {fill['panels'][j]['desc']}"
             + (f'\nOn-screen text exactly: "{text}".' if text_mode == "en" and text else "\nNo text or letters except inside real brand assets.")
@@ -1072,7 +1079,8 @@ def panel_sharpen_prompt(desc: str, text_mode: str, text: str, note: str = "", p
     return ("IMAGE 1 is one panel cut out of a storyboard sheet. Redraw it as a full-resolution final frame in the output's exact aspect "
             "ratio (keep everything inside the frame, extend the background if needed instead of stretching): EXACTLY the same composition, "
             "camera angle, elements, colors, lighting and style, only sharper and fully detailed. Do not add or remove anything. "
-            "Fill the whole frame (no gutters or borders)."
+            "Fill the whole frame (no gutters or borders). If the output is not exactly 9:16 it will be trimmed from the centre, so keep "
+            "every important element well inside the central area and put only background near the edges."
             + (" The blurred bands at the edges of IMAGE 1 are only padding to reach the right frame shape: replace them by naturally "
                "extending the scene (background, floor, surroundings) so it looks like one complete frame; the sharp central picture stays "
                "exactly as it is." if padded else "")

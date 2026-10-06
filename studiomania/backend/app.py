@@ -11627,7 +11627,7 @@ def tvideo_refill(vid: str):
     return tv_start(vid, "filling", "بيملا الخانات بمحتوى العميل", run_tv_fill)
 
 
-def tv_slice(vid: str, k: int) -> None:
+def tv_slice(vid: str, k: int, manual: list | None = None) -> None:
     """✂️ تقطيع الشيت: البرنامج بيلاقي اللوحات زي ما اترسمت فعلًا (حتى لو مش شبكة منتظمة)، ولو ملقاش: خانات متساوية.
     كل لوحة بتتكمّل للمقاس الصح (9:16) بخلفية مغبّشة من نفسها بدل ما تتقص، و«وضّح» بيكمّل الأطراف دي طبيعي."""
     d = tv_load(vid)
@@ -11641,8 +11641,8 @@ def tv_slice(vid: str, k: int) -> None:
     sh_ = max(2, round(H * sw / W))
     raw = subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-i", str(src), "-vf", f"scale={sw}:{sh_},format=gray",
                           "-f", "rawvideo", "-frames:v", "1", "-"], capture_output=True, timeout=60).stdout
-    boxes = lab.sheet_panels(raw, sw, sh_, len(cells))
-    how = "found"
+    boxes = [tuple(min(1.0, max(0.0, float(v))) for v in b[:4]) for b in manual] if manual else lab.sheet_panels(raw, sw, sh_, len(cells))
+    how = "manual" if manual else "found"
     if not boxes:   # الشبكة اللي طلبناها (بفواصلها لو واضحة، أو متساوية)
         grid = lab.sheet_cells(raw, sw, sh_, rows, cols)
         xs = grid[0] if grid else [(c / cols, (c + 1) / cols) for c in range(cols)]
@@ -11682,6 +11682,33 @@ def tv_slice(vid: str, k: int) -> None:
                 (x.get("segs") or {}).pop(str(s_), None)
         x["final"] = None
     tv_update(vid, fn)
+
+
+class TvSliceIn(BaseModel):
+    boxes: list | None = None   # [[x0, x1, y0, y1], ...] بالنسبة (0..1)، لكل لوحة بالترتيب. فاضي = يدوّر لوحده تاني
+
+
+@app.post("/api/tvideos/{vid}/sheets/{k}/slice")
+def tvideo_sheet_slice(vid: str, k: int, body: TvSliceIn):
+    """✂️ يقطّع الشيت تاني: بالمربعات اللي إنت ظبطتها بإيدك، أو يدوّر على اللوحات من جديد."""
+    d = tv_load(vid)
+    if not 0 <= k < len(tv_sheets(d)):
+        raise HTTPException(404, "الشيت ده مش موجود")
+    if not ((d.get("sheets") or {}).get(str(k)) or {}).get("file"):
+        raise HTTPException(400, "ارسم أو ارفع الشيت الأول")
+    if d.get("status") in TV_BUSY:
+        raise HTTPException(400, "استنى لما الشغل اللي شغال يخلص")
+    n = len(tv_sheets(d)[k])
+    boxes = body.boxes
+    if boxes is not None:
+        try:
+            boxes = [[float(v) for v in b[:4]] for b in boxes]
+        except (TypeError, ValueError):
+            raise HTTPException(400, "المربعات مش مظبوطة") from None
+        if len(boxes) != n or any(b[1] - b[0] < 0.02 or b[3] - b[2] < 0.02 for b in boxes):
+            raise HTTPException(400, f"لازم {n} مربع، وكل مربع ليه مساحة")
+    tv_slice(vid, k, boxes)
+    return tv_to_dict(vid, tv_update(vid, lambda x: x.update(status=tv_idle(x), step=None, error=None)))
 
 
 @app.post("/api/tvideos/{vid}/sheets/{k}/draw")
