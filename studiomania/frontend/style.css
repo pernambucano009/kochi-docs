@@ -1661,3 +1661,13 @@ a.pl-link:hover { background: color-mix(in srgb, var(--ok) 24%, transparent); }
 @media (max-width: 620px) { .fm-link { margin-inline: 0; } .fm-frame img, .fm-frame video, .fm-ph { width: 100px; } }
 .fm-board.wide .fm-frame img, .fm-board.wide .fm-frame video, .fm-board.wide .fm-ph { width: 220px; aspect-ratio: 16 / 9; }
 .fm-board.square .fm-frame img, .fm-board.square .fm-frame video, .fm-board.square .fm-ph { aspect-ratio: 1; }
+.fm-fix { border: 1px dashed var(--line); border-radius: 10px; padding: 6px 8px; display: flex; flex-direction: column; gap: 6px; }
+.fm-fix[open] { border-color: var(--accent); }
+.fm-fix summary { cursor: pointer; font-weight: 600; font-size: 13px; }
+.fm-fix > input { width: 100%; }
+.fm-refs { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.fm-ref { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; width: 76px; padding: 4px; border: 2px solid var(--line); border-radius: 8px; cursor: pointer; background: var(--surface); }
+.fm-ref.on { border-color: var(--accent); background: var(--accent-soft); }
+.fm-ref img { width: 64px; height: 64px; object-fit: contain; border-radius: 6px; background: var(--surface-2); }
+.fm-ref small { font-size: 10px; max-width: 70px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fm-ref button { position: absolute; top: -6px; inset-inline-end: -6px; width: 20px; height: 20px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); font-size: 11px; line-height: 1; padding: 0; cursor: pointer; }

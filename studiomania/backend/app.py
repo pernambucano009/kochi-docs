@@ -10008,7 +10008,11 @@ def film_to_dict(fid: str, d: dict) -> dict:
         return f"{base}/{name}?v={int((folder / name).stat().st_mtime)}"
     f = film_files(json.loads(json.dumps(d)))
     links = (d.get("plan") or {}).get("links") or []
-    return {**d, "id": fid, "busy": d.get("status") in FILM_BUSY, "costs": film_costs(d),
+    brain = brain_row(d.get("client_id") or "") or active_client()
+    client_assets = [{"name": a.get("name") or a["file"], "kind": k, "url": f"/media/ads/brains/{brain['id']}/{a['file']}"}
+                     for k in ("logos", "screens", "products") for a in (brain or {}).get(k) or []]
+    return {**d, "id": fid, "busy": d.get("status") in FILM_BUSY, "costs": film_costs(d), "client_assets": client_assets,
+            "ref_files": [{**r, "url": url(r["file"])} for r in d.get("refs") or [] if url(r["file"])],
             "final_url": url((d.get("files") or {}).get("final")),
             "scene_files": [{"a": url(x.get("a")), "b": url(x.get("b")), "video": url(x.get("video"))} for x in f["scenes"]],
             "link_files": [{"keys": [url(k) for k in x.get("keys") or []], "video": url(x.get("video"))} for x in f["links"]],
@@ -10183,6 +10187,8 @@ def film_replan(fid: str):
 
 class FilmFrameIn(BaseModel):
     note: str = ""
+    refs: list[str] = []      # صور إنت رافعها للفيديو ده
+    client: list[str] = []    # أصول من ملف العميل (اللوجو، الشاشات...) بالاسم
 
 
 @app.post("/api/films/{fid}/frames")
@@ -10199,10 +10205,14 @@ def film_frame_redo(fid: str, i: int, which: str, body: FilmFrameIn):
     d = film_load(fid)
     if not 0 <= i < len((d.get("plan") or {}).get("scenes") or []):
         raise HTTPException(404, "المشهد ده مش موجود")
-    return film_start(fid, "drawing", "بيرسم", run_film_frames, (i, which), body.note.strip()[:1000])
+    brain = brain_row(d.get("client_id") or "") or active_client()
+    extra = [film_dir(fid) / Path(x).name for x in body.refs if Path(x).name.startswith("ref_")]
+    extra += [p for x in body.client if (p := film_brain_ref(brain, x))]
+    return film_start(fid, "drawing", "بيرسم", run_film_frames, (i, which), body.note.strip()[:1000], extra[:6])
 
 
-def film_frame_prompt(d: dict, brain: dict | None, sc: dict, i: int, has_ref: bool, has_style: bool) -> str:
+def film_frame_prompt(d: dict, brain: dict | None, sc: dict, i: int, ref_notes: list[str]) -> str:
+    """ref_notes = وصف كل صورة مرجعية بنفس ترتيبها (IMAGE 1، IMAGE 2...)."""
     p = d["plan"]
     parts = [f"A {d['ratio']} frame (scene {i + 1} of {len(p['scenes'])}) of a short premium motion-graphics promo video"
              + (f" for {brain['name']}" if brain and brain.get("name") else "") + ".",
@@ -10211,11 +10221,11 @@ def film_frame_prompt(d: dict, brain: dict | None, sc: dict, i: int, has_ref: bo
              f"SCENE: {sc['start']}",
              f'ON-SCREEN TEXT (write it exactly as given, correct Arabic letters joined right-to-left, nothing else written): "{sc["text"]}"'
              if sc.get("text") else "No on-screen text except what the brand asset itself contains.",
-             "IMAGE 1 is the REAL brand asset: put it into the frame exactly as it is (same screen content, layout, logo, colors, text)."
-             if has_ref else "",
-             f"IMAGE {2 if has_ref else 1} is the previous scene of the same video: match its visual style, rendering, colors and typography "
-             "(not its content)." if has_style else ""]
+             *[f"IMAGE {n + 1} {x}" for n, x in enumerate(ref_notes)]]
     return "\n".join(x for x in parts if x)
+
+
+REF_EXACT = "Use it exactly as it is (same shapes, letters, colors), never redraw or invent a different one."
 
 
 def film_brain_ref(brain: dict | None, name: str) -> Path | None:
@@ -10268,7 +10278,7 @@ def film_plan_link(fid: str, i: int) -> None:
     film_update(fid, fn)
 
 
-def run_film_frames(fid: str, only: tuple | None, note: str) -> None:
+def run_film_frames(fid: str, only: tuple | None, note: str, extra: list | None = None) -> None:
     """يرسم الفريمات. أول المشهد من البرومبت (ومعاه أصل العميل والمشهد اللي قبله كستايل)، وآخره تعديل على أوله."""
     try:
         d = film_load(fid)
@@ -10283,6 +10293,9 @@ def run_film_frames(fid: str, only: tuple | None, note: str) -> None:
                 todo += [(i, w) for w in ("a", "b") if not f["scenes"][i].get(w)]
             elif only[0] == i:
                 todo += [(i, "a"), (i, "b")] if only[1] == "a" else [(i, "b")]
+        extras = [x for x in extra or [] if x.exists()]
+        extra_txt = "".join(f"\nIMAGE {n + 2} is a correct reference the user attached (for example the real logo or the real app screen); "
+                            f"wherever the frame shows that element, replace it with this one. {REF_EXACT}" for n in range(len(extras)))
         changed = set()
         for n, (i, w) in enumerate(todo):
             sc = p["scenes"][i]
@@ -10292,19 +10305,41 @@ def run_film_frames(fid: str, only: tuple | None, note: str) -> None:
                 film_mock_image(out, d["ratio"], i * 2 + (w == "b"))
             elif w == "a":
                 old = folder / f"sc{i + 1}_a.png"
-                if note and only and old.exists():
-                    refs, prompt = [old], (f"Edit this frame: {note}\nKeep everything else identical (layout, style, on-screen text).")
+                if (note or extras) and only and old.exists():
+                    refs = [old, *extras]
+                    prompt = ("IMAGE 1 is the frame to edit." + extra_txt + (f"\nEdit: {note}" if note else "")
+                              + "\nKeep everything else identical (layout, style, framing, on-screen text).")
                 else:
+                    refs, notes = [], []
                     ref = film_brain_ref(brain, sc.get("screen"))
+                    if ref:
+                        refs.append(ref)
+                        notes.append("is the REAL brand asset: put it into the frame exactly as it is (same screen content, layout, logo, colors, text).")
+                    for x in extras:
+                        refs.append(x)
+                        notes.append(f"is a reference the user attached for this scene. {REF_EXACT}")
+                    logo = film_brain_ref(brain, ((brain or {}).get("logos") or [{}])[0].get("file", ""))
+                    if logo and logo not in refs:
+                        refs.append(logo)
+                        notes.append(f"is the brand's REAL logo. If a logo appears in the frame it must be this one. {REF_EXACT}")
                     style = folder / f"sc{i}_a.png" if i > 0 else None
-                    refs = [x for x in (ref, style) if x and x.exists()]
-                    prompt = film_frame_prompt(d, brain, sc, i, bool(ref and ref.exists()), bool(style and style.exists()))
+                    if style and style.exists():
+                        refs.append(style)
+                        notes.append("is the previous scene of the same video: match its visual style, rendering, colors and typography (not its content).")
+                    prompt = film_frame_prompt(d, brain, sc, i, notes)
                 atlas.download(atlas.generate_image(family, prompt, size, "medium", [atlas.reference_url(x) for x in refs]), out)
             else:
-                prompt = (f"IMAGE 1 is the FIRST frame of this scene. Draw the LAST frame of the same scene: {sc['end']}"
-                          + (f"\nAlso: {note}" if note and only and only[1] == "b" else "")
-                          + "\nKeep the exact same visual style, framing, aspect ratio, colors and on-screen text unless the instruction changes them.")
-                atlas.download(atlas.generate_image(family, prompt, size, "medium", [atlas.reference_url(folder / f"sc{i + 1}_a.png")]), out)
+                own = only and only[1] == "b"
+                old = folder / f"sc{i + 1}_b.png"
+                if own and old.exists() and (note or extras):   # تعديل على آخر المشهد نفسه
+                    refs = [old, *extras]
+                    prompt = ("IMAGE 1 is the frame to edit." + extra_txt + (f"\nEdit: {note}" if note else "")
+                              + "\nKeep everything else identical (layout, style, framing, on-screen text).")
+                else:
+                    refs = [folder / f"sc{i + 1}_a.png", *extras]
+                    prompt = (f"IMAGE 1 is the FIRST frame of this scene. Draw the LAST frame of the same scene: {sc['end']}" + extra_txt
+                              + "\nKeep the exact same visual style, framing, aspect ratio, colors, logo and on-screen text unless the instruction changes them.")
+                atlas.download(atlas.generate_image(family, prompt, size, "medium", [atlas.reference_url(x) for x in refs]), out)
             changed.add(i)
             def fn(x, i=i, w=w):
                 fx = film_files(x)
@@ -10322,6 +10357,23 @@ def run_film_frames(fid: str, only: tuple | None, note: str) -> None:
         film_set(fid, status="drawn", step=None, error=None)
     except Exception as exc:  # noqa: BLE001
         film_set(fid, status="failed", step=None, error=str(getattr(exc, "detail", None) or exc)[:400])
+
+
+@app.post("/api/films/{fid}/refs")
+def film_ref_upload(fid: str, file: UploadFile = File(...)):
+    """📎 صورة مرجعية (مثلًا اللوجو الصح) تبعتها مع تعديل فريم."""
+    film_load(fid)
+    name = save_upload(file, IMAGE_EXTENSIONS, film_dir(fid), "ref")
+    d = film_update(fid, lambda x: x.setdefault("refs", []).append({"file": name, "name": Path(file.filename or name).stem[:60]}))
+    return {**film_to_dict(fid, d), "uploaded": name}
+
+
+@app.delete("/api/films/{fid}/refs/{name}")
+def film_ref_delete(fid: str, name: str):
+    name = Path(name).name
+    (film_dir(fid) / name).unlink(missing_ok=True)
+    d = film_update(fid, lambda x: x.update(refs=[r for r in x.get("refs") or [] if r["file"] != name]))
+    return film_to_dict(fid, d)
 
 
 @app.post("/api/films/{fid}/links/{i}/plan")
