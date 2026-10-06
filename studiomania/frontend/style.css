@@ -1691,3 +1691,6 @@ a.pl-link:hover { background: color-mix(in srgb, var(--ok) 24%, transparent); }
 .fm-copy { gap: 6px; margin-top: 6px; }
 .fm-done { color: var(--ok); font-size: 12px; font-weight: 600; }
 .fm-todo { color: var(--muted); font-size: 12px; }
+.fm-redo { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 6px 8px; }
+.fm-redo input { flex: 1 1 260px; }
+.fm-redo small { flex-basis: 100%; }

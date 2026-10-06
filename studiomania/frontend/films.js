@@ -118,7 +118,6 @@ function fmLink(f, l, i) {
         ${la.name || filmx.conns.some((a) => a.id === l.asset) ? "" : `<option selected value="${le(l.asset)}">⚠️ اتمسح من المكتبة</option>`}</select>
       ${!f.busy && (p || (f.scene_files[i]?.b && f.scene_files[i + 1]?.a)) ? `<button type="button" class="btn sm ${p ? "" : "primary"}" data-fmlplan="${i}" title="خطة للكونيكتور ده بين المشهدين دول">🧠 ${p ? "خطة تانية" : "اعمل الخطة"}</button>` : ""}
       ${lf.video ? `<span class="fm-done">✅ اتولد</span>` : `<span class="fm-todo">⏳ لسه متولدش</span>`}
-      ${lf.video && !f.busy ? `<button type="button" class="btn sm" data-fmgen="link" data-i="${i}" title="يولّد الكونيكتور ده تاني">↻ ولّده تاني</button>` : ""}
       ${!lf.video && p && !f.busy ? `<button type="button" class="btn sm primary" data-fmgen="link" data-i="${i}" data-new="1">🎬 ولّد الكونيكتور ده (~${f.costs?.links?.[i] ?? ""}$)</button>` : ""}</header>
     ${l.why ? `<p class="muted" data-no-i18n>💡 ${le(l.why)}</p>` : ""}
     <div class="fm-row">
@@ -126,6 +125,12 @@ function fmLink(f, l, i) {
       ${(lf.keys || []).filter(Boolean).map((u, j) => `<figure class="fm-frame"><img src="${u}" alt=""><figcaption>مرحلة ${j + 1}</figcaption></figure>`).join("")}
       ${lf.video ? `<figure class="fm-frame"><video src="${lf.video}" controls playsinline preload="metadata"></video><figcaption>🔗 عندنا</figcaption></figure>` : ""}
     </div>
+    ${lf.video && !f.busy ? `<div class="fm-redo" data-redo="${i}">
+      <b>مش عاجبك؟</b>
+      <input type="text" data-lnote placeholder="قول إيه اللي مش عاجبك (مثلًا: الحركة سريعة، اللوجو بيتشوّه، عايز الزووم أوضح) أو سيبها فاضية لمحاولة جديدة بنفس الخطة" data-no-i18n>
+      <button type="button" class="btn sm primary" data-fmlredo="${i}">↻ ولّد الكونيكتور تاني (~${f.costs?.links?.[i] ?? ""}$)</button>
+      ${(l.notes || []).length ? `<small class="muted" data-no-i18n>ملاحظاتك اللي فاتت: ${l.notes.map(le).join(" · ")}</small>` : ""}
+    </div>` : ""}
     ${p ? `<details class="fm-edit" data-dk="link${i}" ${filmx.open.has(`link${i}`) ? "open" : ""}><summary>📝 خطة الكونيكتور</summary>
       ${p.adapted ? `<p class="as-tadapt" data-no-i18n>${le(p.adapted)}</p>` : ""}
       ${(p.keyframes || []).map((k, j) => `<label>🖼️ مرحلة ${j + 1}: <span data-no-i18n>${le(k.label)}</span><textarea rows="2" dir="ltr" data-lk="${j}" ${lock} data-no-i18n>${le(k.prompt)}</textarea></label>`).join("")}
@@ -369,6 +374,13 @@ $("labFilm").addEventListener("click", async (e) => {
   }
   const lp = t.closest("[data-fmlplan]");
   if (lp) { try { await filmSave("links"); } catch (err) { return toast(err.message, true); } return go(lp, () => F(`/links/${lp.dataset.fmlplan}/plan`, { method: "POST" })); }
+  const lr = t.closest("[data-fmlredo]");
+  if (lr) {
+    const i = Number(lr.dataset.fmlredo), note = lr.closest("[data-redo]").querySelector("[data-lnote]").value.trim();
+    try { await filmSave("links"); } catch (err) { return toast(err.message, true); }
+    if (!confirm(`${note ? `يعدّل خطة الكونيكتور ${i + 1} على ملاحظتك («${note}») ويولّده تاني` : `يولّد الكونيكتور ${i + 1} تاني بنفس الخطة (محاولة جديدة)`}؟ حوالي ${filmx.cur.costs?.links?.[i]}$، والفيديو القديم بيتبدل.`)) return;
+    return go(lr, () => F(`/links/${i}/redo`, { method: "POST", ...jsonBody({ note }) }));
+  }
   const run = t.closest("[data-fmrun]"), gen = t.closest("[data-fmgen]");
   if (run || gen) {
     await filmSave();

@@ -188,7 +188,11 @@ function trialCard(a, t) {
       <div class="row wrap"><button type="button" class="btn sm" data-tboth>▶️ شغّل الاتنين مع بعض</button>
         <a class="btn sm" href="${t.conn_url}" download>⬇️ الكونيكتور لوحده</a>
         <span class="lab-rv" data-trv><button type="button" class="${t.review?.ok === true ? "on ok" : ""}" data-tok="1">✅</button><button type="button" class="${t.review?.ok === false ? "on bad" : ""}" data-tok="0">❌</button>
-          <input type="text" class="lab-note" value="${le(t.review?.note)}" placeholder="إيه اللي حلو أو وحش؟ (مهم للتجارب الجاية)" data-tnote></span></div>` : ""}
+          <input type="text" class="lab-note" value="${le(t.review?.note)}" placeholder="إيه اللي حلو أو وحش؟ (مهم للتجارب الجاية)" data-tnote></span></div>
+      <div class="fm-redo"><b>مش عاجبك؟</b>
+        <input type="text" data-tredonote placeholder="قول إيه اللي مش عاجبك (مثلًا: الحركة سريعة، عايز الزووم أوضح) أو سيبها فاضية لمحاولة جديدة بنفس الخطة" data-no-i18n>
+        <button type="button" class="btn sm primary" data-tredo>↻ ولّد تاني (~${t.cost}$)</button>
+        ${(t.notes || []).length ? `<small class="muted" data-no-i18n>ملاحظاتك اللي فاتت: ${t.notes.map(le).join(" · ")}</small>` : ""}</div>` : ""}
     ${p.segments ? `<details class="as-tplan" ${t.status === "planned" ? "open" : ""}><summary>📝 الخطة ${t.cost ? `<small class="muted">· التوليد حوالي ${t.cost}$</small>` : ""}</summary>
       ${p.adapted ? `<p class="as-tadapt" data-no-i18n>${le(p.adapted)}</p>` : ""}
       ${(p.anchors || []).length ? `<p><b>📌 بيفضل ثابت:</b> <span data-no-i18n>${p.anchors.map(le).join("، ")}</span></p>` : ""}
@@ -298,6 +302,12 @@ $("labLib").addEventListener("click", async (e) => {
         asx.cur = await T(`/${tid}/run`, { method: "POST" });
         renderLib(); scheduleAssetPoll();
       });
+    }
+    const redo = t.closest("[data-tredo]");
+    if (redo) {
+      const note = card.querySelector("[data-tredonote]").value.trim(), tr = asx.cur.trials.find((x) => x.id === tid);
+      if (!confirm(`${note ? `يعدّل الخطة على ملاحظتك («${note}») ويولّد تاني` : "يولّد تاني بنفس الخطة (محاولة جديدة)"}؟ حوالي ${tr.cost}$، والنتيجة القديمة بتتبدل.`)) return;
+      return busyButton(redo, "⏳", async () => { asx.cur = await T(`/${tid}/redo`, { method: "POST", ...jsonBody({ note }) }); renderLib(); scheduleAssetPoll(); });
     }
     if (t.closest("[data-tdel]")) {
       if (!confirm("تمسح التجربة دي؟")) return;

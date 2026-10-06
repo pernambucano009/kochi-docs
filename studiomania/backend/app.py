@@ -9734,7 +9734,7 @@ def asset_trial_create(aid: str, body: TrialIn):
     return clip_to_dict(aid, clip_load(aid))
 
 
-def run_trial_plan(aid: str, tid: str) -> None:
+def run_trial_plan(aid: str, tid: str, note: str = "") -> bool:
     try:
         asset = clip_load(aid)
         t = next(x for x in asset["trials"] if x["id"] == tid)
@@ -9743,15 +9743,48 @@ def run_trial_plan(aid: str, tid: str) -> None:
             raw = lab.mock_trial_plan()
         else:
             text = lab.trial_plan_messages(asset["connector"], t["mode"], t["a"]["label"], t["b"]["label"])
+            if note and t.get("plan"):
+                notes = [*(t.get("notes") or []), note][-5:]
+                text += ("\n\n⚠️ التجربة دي اتولّدت قبل كده بالخطة دي والمستخدم ما عجبهوش:\n"
+                         f"{json.dumps(t['plan'], ensure_ascii=False, indent=1)}\n"
+                         "ملاحظات المستخدم (الأخيرة هي الأهم، ولازم تتصلّح في الخطة الجديدة):\n" + "\n".join(f"- {x}" for x in notes))
             parts: list[dict] = [{"type": "text", "text": text}]
             imgs = [folder / "a.jpg", folder / "b.jpg"] + [clip_dir(aid) / k["file"] for k in asset.get("keyframes") or []]
             for p in imgs:
                 if p.exists():
                     parts.append({"type": "image_url", "image_url": {"url": data_url(model_image(p, 768), "image/jpeg")}})
             raw = ad_json(ad_media_chat([{"role": "user", "content": parts}], 8000), "خطة الكونيكتور")
-        trial_set(aid, tid, plan=lab.clean_trial_plan(raw), status="planned", step=None, error=None)
+        extra = {"notes": [*(t.get("notes") or []), note][-5:]} if note else {}
+        trial_set(aid, tid, plan=lab.clean_trial_plan(raw), status="planned", step=None, error=None, **extra)
+        return True
     except Exception as exc:  # noqa: BLE001
         trial_set(aid, tid, status="failed", step=None, error=str(getattr(exc, "detail", None) or exc)[:400])
+        return False
+
+
+class TrialRedoIn(BaseModel):
+    note: str = ""
+
+
+@app.post("/api/assets/{aid}/trials/{tid}/redo")
+def asset_trial_redo(aid: str, tid: str, body: TrialRedoIn):
+    """↻ التجربة ما عجبتكش: بملاحظة = خطة جديدة عليها وبعدين توليد، من غيرها = محاولة جديدة بنفس الخطة."""
+    note = body.note.strip()[:1000]
+    def fn(a):
+        t = next((x for x in a.get("trials") or [] if x["id"] == tid), None)
+        if t is None:
+            raise HTTPException(404, "التجربة دي مش موجودة")
+        if t["status"] in ("planning", "working") or not t.get("plan"):
+            raise HTTPException(400, "استنى لما الشغل اللي شغال يخلص")
+        t.update(status="planning" if note else "working", step="🧠 بيعدّل الخطة على ملاحظتك" if note else "بيبدأ", error=None, review=None)
+    clip_update(aid, fn)
+    def job():
+        if note and not run_trial_plan(aid, tid, note):
+            return
+        trial_set(aid, tid, status="working", step="بيبدأ")
+        run_trial_gen(aid, tid)
+    threading.Thread(target=job, daemon=True).start()
+    return clip_to_dict(aid, clip_load(aid))
 
 
 class TrialPatchIn(BaseModel):
@@ -10170,6 +10203,8 @@ def film_patch(fid: str, body: FilmPatchIn):
                     f["links"][i] = {}      # كونيكتور تاني: الخطة بتتعمل من جديد
                     b["plan"] = None
                 else:
+                    if a.get("notes"):
+                        b["notes"] = a["notes"]   # ملاحظاتك على المحاولات اللي فاتت
                     b["plan"] = lab.clean_trial_plan(lp["plan"]) if isinstance(lp, dict) and lp.get("plan") else a.get("plan")
                     if b["plan"] != a.get("plan"):
                         f["links"][i] = {}
@@ -10269,7 +10304,7 @@ def film_mock_image(out: Path, ratio: str, i: int) -> Path:
     return out
 
 
-def film_plan_link(fid: str, i: int) -> None:
+def film_plan_link(fid: str, i: int, note: str = "") -> None:
     """خطة الكونيكتور بين آخر المشهد i وأول المشهد i+1 (بنفس طريقة تجارب الكونيكتور)."""
     d = film_load(fid)
     p, folder = d["plan"], film_dir(fid)
@@ -10286,6 +10321,11 @@ def film_plan_link(fid: str, i: int) -> None:
                                        f"أول المشهد «{sb['label']}» ({sb['feature']})")
         if link.get("why"):
             text += f"\n\nليه الكونيكتور ده هنا: {link['why']}"
+        if note and link.get("plan"):
+            notes = [*(link.get("notes") or []), note][-5:]
+            text += ("\n\n⚠️ الكونيكتور ده اتولّد قبل كده بالخطة دي والمستخدم ما عجبهوش:\n"
+                     f"{json.dumps(link['plan'], ensure_ascii=False, indent=1)}\n"
+                     "ملاحظات المستخدم (الأخيرة هي الأهم، ولازم تتصلّح في الخطة الجديدة):\n" + "\n".join(f"- {x}" for x in notes))
         parts: list[dict] = [{"type": "text", "text": text}]
         imgs = [a_img, b_img] + [clip_dir(link["asset"]) / k["file"] for k in asset.get("keyframes") or []]
         for x in imgs:
@@ -10427,6 +10467,31 @@ def film_ref_delete(fid: str, name: str):
     (film_dir(fid) / name).unlink(missing_ok=True)
     d = film_update(fid, lambda x: x.update(refs=[r for r in x.get("refs") or [] if r["file"] != name]))
     return film_to_dict(fid, d)
+
+
+class FilmRedoIn(BaseModel):
+    note: str = ""
+
+
+@app.post("/api/films/{fid}/links/{i}/redo")
+def film_link_redo(fid: str, i: int, body: FilmRedoIn):
+    """↻ الكونيكتور ما عجبكش: من غير ملاحظة = نفس الخطة بمحاولة جديدة. بملاحظة = الخطة بتتعدّل عليها الأول وبعدين يتولّد."""
+    d = film_load(fid)
+    links = (d.get("plan") or {}).get("links") or []
+    if not 0 <= i < len(links) or not links[i].get("plan"):
+        raise HTTPException(400, "الكونيكتور ده لسه ملوش خطة")
+    note = body.note.strip()[:1000]
+    return film_start(fid, "working", "🧠 بيعدّل الخطة على ملاحظتك" if note else "بيبدأ", run_film_link_redo, i, note)
+
+
+def run_film_link_redo(fid: str, i: int, note: str) -> None:
+    try:
+        if note:
+            film_plan_link(fid, i, note)
+            film_update(fid, lambda x: x["plan"]["links"][i].update(notes=[*(x["plan"]["links"][i].get("notes") or []), note][-5:]))
+    except Exception as exc:  # noqa: BLE001
+        return film_fail(fid, exc)
+    run_film_gen(fid, ("link", i))
 
 
 @app.post("/api/films/{fid}/links/{i}/plan")
