@@ -9863,17 +9863,34 @@ def gen_motion(model_key: str, resolution: str, ratio: str, prompt: str, img_a: 
 
 
 def chain_clips(items: list, out: Path, W: int, H: int) -> Path:
-    """يلزق المقاطع ورا بعض؛ كل عنصر (مسار، معامل الطول) عشان كل حتة تاخد الطول اللي في الخطة."""
-    inputs, fc = [], []
-    for i, it in enumerate(items):
-        p, f = (it if isinstance(it, tuple) else (it, 1.0))
-        inputs += ["-i", str(p)]
-        fc.append(f"[{i}:v]scale={W}:{H}:force_original_aspect_ratio=decrease,pad={W}:{H}:(ow-iw)/2:(oh-ih)/2,setsar=1,"
-                  f"fps=30,setpts={f:.4f}*(PTS-STARTPTS)[v{i}]")
-    fc.append("".join(f"[v{i}]" for i in range(len(items))) + f"concat=n={len(items)}:v=1:a=0[out]")
-    subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", *inputs, "-filter_complex", ";".join(fc),
-                    "-map", "[out]", "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p",
-                    "-movflags", "+faststart", str(out)], check=True, capture_output=True, timeout=900)
+    """يلزق المقاطع ورا بعض؛ كل عنصر (مسار، معامل الطول) عشان كل حتة تاخد الطول اللي في الخطة.
+    كل حتة بتتجهز لوحدها (نفس المقاس و30 فريم)، وبعدين بتتلزق من غير ما تتحسب تاني: أخف على الذاكرة مهما كانت الحتت كتير."""
+    tmp = out.parent / f".chain_{uuid.uuid4().hex[:8]}"
+    tmp.mkdir(parents=True, exist_ok=True)
+    def run(cmd: list, what: str) -> None:
+        try:
+            subprocess.run(cmd, check=True, capture_output=True, timeout=600)
+        except subprocess.CalledProcessError as e:
+            raise RuntimeError(f"{what}: {(e.stderr or b'').decode(errors='ignore').strip()[-300:]}") from None
+        except subprocess.TimeoutExpired:
+            raise RuntimeError(f"{what}: أخد وقت أطول من اللازم") from None
+    try:
+        names = []
+        for i, it in enumerate(items):
+            p, f = (it if isinstance(it, tuple) else (it, 1.0))
+            name = tmp / f"{i:03d}.mp4"
+            run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(p), "-an",
+                 "-vf", f"setpts={f:.4f}*(PTS-STARTPTS),scale={W}:{H}:force_original_aspect_ratio=decrease,"
+                        f"pad={W}:{H}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30,format=yuv420p",
+                 "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-video_track_timescale", "15360", str(name)],
+                f"تجهيز الحتة {i + 1} ({Path(p).name})")
+            names.append(name)
+        lst = tmp / "list.txt"
+        lst.write_text("".join(f"file '{n.name}'\n" for n in names), encoding="utf-8")
+        run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-f", "concat", "-safe", "0", "-i", str(lst),
+             "-c", "copy", "-movflags", "+faststart", str(out)], "لزق الحتت")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
     return out
 
 
@@ -10922,28 +10939,43 @@ def film_dims(folder: Path) -> tuple[int, int]:
 def film_raw(fid: str):
     """▶️ معاينة خام: كل الحتت اللي اتولدت ورا بعض بطولها الأصلي (من غير فويس ولا تسريع ولا قص)."""
     d = film_load(fid)
-    if d.get("status") in FILM_BUSY:
-        raise HTTPException(400, "استنى لما الشغل اللي شغال يخلص")
-    p, folder, f = d.get("plan") or {}, film_dir(fid), film_files(d)
-    parts, skipped = [], []
-    for i in range(len(p.get("scenes") or [])):
-        v = f["scenes"][i].get("video")
-        if v and (folder / v).exists():
-            parts.append(folder / v)
-        else:
-            skipped.append(f"المشهد {i + 1}")
-        if i < len(f["links"]):
-            segs = [folder / x for x in f["links"][i].get("segs") or [] if (folder / x).exists()]
-            if segs:
-                parts += segs   # حركات الكونيكتور زي ما اتولدت، من غير ما تتظبط على الخطة
-            else:
-                skipped.append(f"الكونيكتور {i + 1}")
-    if not parts:
+    f = film_files(d)
+    if not any(x.get("video") for x in f["scenes"]) and not any(x.get("segs") for x in f["links"]):
         raise HTTPException(400, "لسه مفيش ولا حتة اتولدت")
-    W, H = film_dims(folder)
-    chain_clips(parts, folder / "raw.mp4", W, H)
-    film_update(fid, lambda x: film_files(x).update(raw="raw.mp4"))
-    return {**film_to_dict(fid, film_load(fid)), "skipped": skipped}
+    prev = d.get("status")
+    return film_start(fid, "working", "▶️ بيجمّع الخام", run_film_raw, prev)
+
+
+def run_film_raw(fid: str, prev: str) -> None:
+    try:
+        d = film_load(fid)
+        p, folder, f = d.get("plan") or {}, film_dir(fid), film_files(d)
+        parts, skipped = [], []
+        for i in range(len(p.get("scenes") or [])):
+            v = f["scenes"][i].get("video")
+            if v and (folder / v).exists():
+                parts.append(folder / v)
+            else:
+                skipped.append(f"المشهد {i + 1}")
+            if i < len(f["links"]):
+                segs = [folder / x for x in f["links"][i].get("segs") or [] if (folder / x).exists()]
+                if segs:
+                    parts += segs   # حركات الكونيكتور زي ما اتولدت، من غير ما تتظبط على الخطة
+                else:
+                    skipped.append(f"الكونيكتور {i + 1}")
+        if not parts:
+            raise HTTPException(400, "لسه مفيش ولا حتة اتولدت")
+        info = media_info(parts[0])   # بمقاس الفيديوهات نفسها (من غير تكبير)
+        W, H = max(2, info.width // 2 * 2), max(2, info.height // 2 * 2)
+        chain_clips(parts, folder / "raw.mp4", W, H)
+        def fn(x):
+            film_files(x)["raw"] = "raw.mp4"
+            x.update(status=prev if prev not in FILM_BUSY and prev != "failed" else film_idle_status(x), step=None,
+                     error=f"لسه متولدش (مش في الخام): {'، '.join(skipped)}" if skipped else None)
+        film_update(fid, fn)
+    except Exception as exc:  # noqa: BLE001
+        film_set(fid, status=film_idle_status(film_load(fid)), step=None,
+                 error="الخام ما اتجمّعش: " + str(getattr(exc, "detail", None) or exc)[:350])
 
 
 @app.post("/api/films/{fid}/to-editor")

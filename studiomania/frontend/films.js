@@ -334,10 +334,8 @@ $("labFilm").addEventListener("click", async (e) => {
   const raw = t.closest("[data-fmraw]");
   if (raw) {
     return busyButton(raw, "⏳", async () => {
-      const r = await F("/raw", { method: "POST" });
-      filmx.cur = r; filmx.view = "raw"; renderFilm();
-      if (r.skipped?.length) toast(`لسه متولدش (مش في الخام): ${r.skipped.join("، ")}`);
-      $("labFilm").querySelector(".fm-final video")?.play().catch(() => {});
+      filmx.cur = await F("/raw", { method: "POST" });
+      filmx.view = "raw"; renderFilm(); scheduleFilmPoll();
     });
   }
   const ed = t.closest("[data-fmeditor]");
