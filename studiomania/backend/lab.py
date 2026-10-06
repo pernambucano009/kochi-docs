@@ -942,8 +942,13 @@ def mock_fill(schema: dict, brand: str) -> dict:
 
 
 def sheet_grid(count: int) -> tuple[int, int]:
-    cols = 3 if count > 4 else 2 if count > 1 else 1
-    return cols, -(-count // cols)
+    """شبكة مربعة (2×2 أو 3×3): كده الشيت كله بنفس نسبة اللوحة الواحدة، فاللوحات بتطلع بالمقاس الصح."""
+    k = 1 if count <= 1 else 2 if count <= 4 else 3
+    return k, k
+
+
+RATIO_WORDS = {"9:16": "tall vertical portrait (width:height = 9:16, like a phone screen)",
+               "16:9": "wide horizontal landscape (width:height = 16:9)", "1:1": "square (1:1)"}
 
 
 def sheet_prompt(schema: dict, fill: dict, cells: list[int], ratio: str, text_mode: str, texts: list[str],
@@ -957,10 +962,16 @@ def sheet_prompt(schema: dict, fill: dict, cells: list[int], ratio: str, text_mo
                " Leave a clean empty area where the headline would go (no letters)." if text_mode != "en" and t else "")
         lines.append(f"Panel {k + 1}: {fill['panels'][j]['desc']}{txt}")
     ref_txt = "".join(f"\nReference image {i + 1} is {r}: use it exactly as it is wherever it appears." for i, r in enumerate(refs))
+    shape = RATIO_WORDS.get(ratio, ratio)
+    empty = cols * rows - len(cells)
     return (
-        f"One single image: a storyboard sheet with a grid of {rows} rows x {cols} columns of equal {ratio} panels, read left to right, "
-        "top to bottom, separated by thin plain white gutters, no borders, no panel numbers, no captions.\n"
-        "All panels are frames of ONE continuous video shot in ONE world: identical style, lighting, background, colors, materials and the "
+        f"IMAGE FORMAT: the whole image is {shape}.\n"
+        f"One single image: a storyboard sheet, an exact grid of {rows} rows x {cols} columns of equal cells. EVERY cell is a {shape} frame "
+        f"(never square, never cropped differently), all the same size, read left to right, top to bottom, separated by thin plain white "
+        "gutters, no borders, no panel numbers, no captions.\n"
+        + (f"There are {len(cells)} panels: fill the first {len(cells)} cells in reading order and leave the last {empty} cell(s) plain white.\n"
+           if empty else "")
+        + "All panels are frames of ONE continuous video shot in ONE world: identical style, lighting, background, colors, materials and the "
         "same recurring elements in every panel, so that consecutive panels look like moments of the same take.\n"
         f"WORLD: {fill.get('world') or schema.get('style')}\n"
         f"STYLE: {schema.get('style')}\nPALETTE: {schema.get('palette')}\nRECURRING ELEMENT: {schema.get('spine')}\n"
@@ -1007,8 +1018,21 @@ def sheet_cells(gray: bytes, w: int, h: int, rows: int, cols: int) -> tuple[list
     return [(a / w, b / w) for a, b in xs], [(a / h, b / h) for a, b in ys]
 
 
+def panel_redraw_prompt(schema: dict, fill: dict, j: int, ratio: str, text_mode: str, text: str, note: str, n_refs: int, n_style: int) -> str:
+    """🎨 لوحة واحدة من الأول (لو اللي في الشيت باظت)، بنفس عالم اللوحات اللي جنبها."""
+    return (f"A {RATIO_WORDS.get(ratio, ratio)} final frame (frame {j + 1} of {len(fill['panels'])}) of ONE continuous video shot.\n"
+            f"WORLD: {fill.get('world') or schema.get('style')}\nSTYLE: {schema.get('style')}\nPALETTE: {schema.get('palette')}\n"
+            f"RECURRING ELEMENT: {schema.get('spine')}\nTHIS FRAME: {fill['panels'][j]['desc']}"
+            + (f'\nOn-screen text exactly: "{text}".' if text_mode == "en" and text else "\nNo text or letters except inside real brand assets.")
+            + (f"\nAlso: {note}" if note else "")
+            + "".join(f"\nIMAGE {i + 1} is a real brand asset: keep it exactly as it is wherever it appears." for i in range(n_refs))
+            + "".join(f"\nIMAGE {n_refs + i + 1} is a neighbouring frame of the same shot: match its world, style, lighting and recurring elements exactly."
+                      for i in range(n_style)))
+
+
 def panel_sharpen_prompt(desc: str, text_mode: str, text: str, note: str = "") -> str:
-    return ("IMAGE 1 is one panel cut out of a storyboard sheet. Redraw it as a full-resolution final frame: EXACTLY the same composition, "
+    return ("IMAGE 1 is one panel cut out of a storyboard sheet. Redraw it as a full-resolution final frame in the output's exact aspect "
+            "ratio (keep everything inside the frame, extend the background if needed instead of stretching): EXACTLY the same composition, "
             "camera angle, elements, colors, lighting and style, only sharper and fully detailed. Do not add or remove anything. "
             "Fill the whole frame (no gutters or borders)."
             + (f' On-screen text exactly: "{text}".' if text_mode == "en" and text else " No text or letters except inside real brand assets.")

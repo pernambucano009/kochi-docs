@@ -11625,6 +11625,14 @@ def tv_slice(vid: str, k: int) -> None:
         (fx0, fx1), (fy0, fy1) = xs[c], ys[r]
         x0, y0 = int((fx0 + pad) * W), int((fy0 + pad) * H)
         w, h = int((fx1 - fx0 - 2 * pad) * W) // 2 * 2, int((fy1 - fy0 - 2 * pad) * H) // 2 * 2
+        # لو الخانة طلعت بنسبة غلط: قص من النص على النسبة الصح (من غير مط)
+        pw, ph = (9, 16) if d["ratio"] == "9:16" else (16, 9) if d["ratio"] == "16:9" else (1, 1)
+        if w / h > pw / ph:
+            nw = int(h * pw / ph) // 2 * 2
+            x0, w = x0 + (w - nw) // 2, nw
+        else:
+            nh = int(w * ph / pw) // 2 * 2
+            y0, h = y0 + (h - nh) // 2, nh
         name = f"cell{j + 1}-{tag}.png"
         subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src), "-vf", f"crop={w}:{h}:{x0}:{y0}",
                         "-frames:v", "1", str(folder / name)], check=True, capture_output=True, timeout=60)
@@ -11658,11 +11666,7 @@ def run_tv_sheet(vid: str, k: int) -> None:
         d = tv_load(vid)
         folder = tv_dir(vid)
         brain = brain_row(d.get("client_id") or "") or active_client()
-        cells = tv_sheets(d)[k]
-        cols, rows = lab.sheet_grid(len(cells))
-        pw, ph = (9, 16) if d["ratio"] == "9:16" else (16, 9) if d["ratio"] == "16:9" else (1, 1)
-        target = (cols * pw) / (rows * ph)
-        size = min((v[0] for v in az.ASPECTS.values()), key=lambda sz: abs(int(sz.split("x")[0]) / int(sz.split("x")[1]) - target))
+        size = az.ASPECTS.get(d["ratio"], az.ASPECTS["9:16"])[0]   # الشبكة مربعة، فالشيت كله بنفس نسبة اللوحة
         name = f"sheet{k + 1}-{uuid.uuid4().hex[:4]}.png"
         if atlas.mock_mode():
             w, h = (int(x) // 3 for x in size.split("x"))
@@ -11759,6 +11763,48 @@ def run_tv_sharpen(vid: str, only: int | None, note: str) -> None:
                     (x.get("segs") or {}).pop(str(s_), None)
                 x["final"] = None
             tv_update(vid, fn)
+        tv_update(vid, lambda x: x.update(status=tv_idle(x), step=None, error=None))
+    except Exception as exc:  # noqa: BLE001
+        tv_fail(vid, exc)
+
+
+@app.post("/api/tvideos/{vid}/panels/{j}/redraw")
+def tvideo_panel_redraw(vid: str, j: int, body: TvSharpenIn):
+    """🎨 لوحة واحدة من الأول (من وصفها، وبعالم اللوحات اللي جنبها) لو اللي اتقطعت من الشيت مش نافعة."""
+    d = tv_load(vid)
+    if not 0 <= j < len((d.get("fill") or {}).get("panels") or []):
+        raise HTTPException(404, "اللوحة دي مش موجودة")
+    return tv_start(vid, "sharpening", f"🎨 بيرسم اللوحة {j + 1} من الأول", run_tv_redraw, j, body.note.strip()[:1000])
+
+
+def run_tv_redraw(vid: str, j: int, note: str) -> None:
+    try:
+        d = tv_load(vid)
+        folder = tv_dir(vid)
+        brain = brain_row(d.get("client_id") or "") or active_client()
+        size = az.ASPECTS.get(d["ratio"], az.ASPECTS["9:16"])[0]
+        texts = [b.get("text", "") for b in d["fill"]["beats"]] + [""]
+        name = f"full{j + 1}-{uuid.uuid4().hex[:4]}.png"
+        if atlas.mock_mode():
+            w, h = (int(x) // 2 for x in size.split("x"))
+            subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i", f"color=c=0x57B8AF:s={w}x{h}",
+                            "-frames:v", "1", str(folder / name)], check=True, capture_output=True, timeout=60)
+        else:
+            refs = [r[0] for r in tv_refs(d, brain)][:6]
+            style = [tv_panel(d, folder, k) for k in (j - 1, j + 1) if 0 <= k < len(d["fill"]["panels"])
+                     and (d.get("panels") or {}).get(str(k), {}).get("cell")]
+            prompt = lab.panel_redraw_prompt(d["schema"], d["fill"], j, d["ratio"], d["text_mode"], texts[j], note, len(refs), len(style))
+            atlas.download(atlas.generate_image(carousel_settings()["image_family"], prompt, size, "high",
+                                                [atlas.reference_url(x) for x in [*refs, *style]]), folder / name)
+        def fn(x):
+            old = x.setdefault("panels", {}).get(str(j)) or {}
+            for f in {old.get("cell"), old.get("full")} - {None}:
+                (folder / f).unlink(missing_ok=True)
+            x["panels"][str(j)] = {"cell": name, "full": name, "redrawn": True}
+            for s_ in (j - 1, j):
+                (x.get("segs") or {}).pop(str(s_), None)
+            x["final"] = None
+        tv_update(vid, fn)
         tv_update(vid, lambda x: x.update(status=tv_idle(x), step=None, error=None))
     except Exception as exc:  # noqa: BLE001
         tv_fail(vid, exc)

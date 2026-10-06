@@ -211,18 +211,21 @@ function tvDetail(v) {
         <b>${v.sheets.length > 1 ? `الشيت ${sh.k + 1}: ` : ""}لوحات ${sh.cells[0] + 1}–${sh.cells.at(-1) + 1} (${sh.rows}×${sh.cols})</b>
         <textarea rows="4" dir="ltr" readonly data-no-i18n>${le(sh.prompt)}</textarea>
         <div class="row wrap"><button type="button" class="btn sm" data-tvcopyp="${sh.k}">📋 انسخ البرومبت (لـ ChatGPT)</button>
-          <button type="button" class="btn sm primary" data-tvdraw="${sh.k}" ${busy ? "disabled" : ""}>🖼️ ارسمه هنا (~${c.sheets && (c.sheets / v.sheets.length).toFixed(2)}$)</button>
+          <button type="button" class="btn sm primary" data-tvdraw="${sh.k}" ${busy ? "disabled" : ""}>${sh.url ? "↻ ارسم الشيت تاني" : "🖼️ ارسمه هنا"} (~${c.sheets && (c.sheets / v.sheets.length).toFixed(2)}$)</button>
           <button type="button" class="btn sm" data-tvup="${sh.k}" ${busy ? "disabled" : ""}>⬆ ارفع الشيت من ChatGPT</button></div>
         ${sh.url ? `<img src="${sh.url}" alt="" class="tv-sheetimg">` : ""}
         <small class="muted">لو بتستخدم ChatGPT: الصق البرومبت، وارفع معاه صور اللوجو والشاشات اللي في البرومبت، وبعدين ارفع الصورة اللي يطلّعها هنا. البرنامج بيقطّعها لوحده.</small>
       </div>`).join("")}
     </details>
     <details class="panel tv-step" data-dk="s3" ${open("s3", cutAll && missSegs)}><summary>٣. ✨ اللوحات <small class="muted">${v.panel_files.filter((p) => p.full).length}/${v.panel_files.length} واضحة</small></summary>
+      ${v.sheets.some((sh) => sh.url) ? `<div class="row wrap">${v.sheets.map((sh) => `<button type="button" class="btn sm" data-tvdraw="${sh.k}" ${busy ? "disabled" : ""}
+        title="يرسم الشيت كله من جديد ويقطّعه (اللوحات اللي منه بتتبدل)">↻ ارسم ${v.sheets.length > 1 ? `الشيت ${sh.k + 1}` : "الشيت"} تاني</button>`).join("")}</div>` : ""}
       <p class="hint">اللوحات المقطوعة من الشيت صغيرة. «وضّح» بيرسم كل لوحة بجودة كاملة بنفس شكلها بالظبط. ممكن تولّد من غير توضيح بس الجودة هتبقى أقل.</p>
       ${c.sharpen ? `<button type="button" class="btn primary" data-tvsharp ${busy || !cutAll ? "disabled" : ""}>✨ وضّح كل اللوحات (~${c.sharpen}$)</button>` : ""}
       <div class="tv-panels">${v.panel_files.map((p, j) => `<div class="tv-panel" data-tp="${j}">${tvPanelImg(v, j)}
         <small>لوحة ${j + 1} ${p.full ? "✅" : p.cell ? "✂️" : ""}</small>
-        ${p.cell && !busy ? `<input type="text" data-tpnote placeholder="ملاحظة (اختياري)" data-no-i18n><button type="button" class="btn sm" data-tvsharp1="${j}">${p.full ? "↻ ارسمها تاني" : "✨ وضّحها"}</button>` : ""}</div>`).join("")}</div>
+        ${p.cell && !busy ? `<input type="text" data-tpnote placeholder="ملاحظة (اختياري)" data-no-i18n><button type="button" class="btn sm" data-tvsharp1="${j}" title="بيرسمها بجودة كاملة بنفس شكلها اللي في الشيت">${p.full ? "✨ وضّحها تاني" : "✨ وضّحها"}</button>
+          <button type="button" class="btn sm" data-tvredraw="${j}" title="لو اللوحة اللي في الشيت باظت: بترسم من وصفها من الأول، بعالم اللوحات اللي جنبها">🎨 ارسمها من جديد</button>` : ""}</div>`).join("")}</div>
     </details>
     <details class="panel tv-step" data-dk="s4" ${open("s4", cutAll)}><summary>٤. 🎬 الفيديو <small class="muted">${v.seg_files.filter(Boolean).length}/${beats.length} جزء اتولد</small></summary>
       ${missSegs ? `<button type="button" class="btn primary" data-tvrun ${busy || !cutAll ? "disabled" : ""}>🎬 ولّد اللي لسه متولدش بس (${missSegs} جزء) ~${c.video}$</button>`
@@ -326,6 +329,12 @@ $("labTpl").addEventListener("click", async (e) => {
   if (sh) {
     if (!confirm(`يوضّح كل اللوحات اللي لسه ما اتوضّحتش؟ حوالي ${tplx.cur.costs.sharpen}$`)) return;
     return go(sh, () => V("/sharpen", { method: "POST", ...jsonBody({}) }));
+  }
+  const rd = t.closest("[data-tvredraw]");
+  if (rd) {
+    const j = Number(rd.dataset.tvredraw), note = rd.closest("[data-tp]").querySelector("[data-tpnote]").value.trim();
+    if (!confirm(`يرسم اللوحة ${j + 1} من الأول من وصفها (حوالي 0.06$)؟ اللي في الشيت بتتبدل.`)) return;
+    return go(rd, () => V(`/panels/${j}/redraw`, { method: "POST", ...jsonBody({ note }) }));
   }
   const sh1 = t.closest("[data-tvsharp1]");
   if (sh1) {
