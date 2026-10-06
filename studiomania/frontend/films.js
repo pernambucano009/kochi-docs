@@ -192,7 +192,8 @@ function filmDetail(f) {
   const ready = sc.length && !framesLeft && (p.links || []).every((l) => l.plan);
   return `<div class="car-head"><button type="button" class="btn sm" data-fmback>→ كل الفيديوهات</button>
       <input class="ad-title" data-fmname value="${le(f.name)}" data-no-i18n>
-      <div class="row wrap">${f.final_url ? `<a class="btn sm" href="${f.final_url}" download="${le(f.name)}.mp4">⬇️ نزّل</a>` : ""}
+      <div class="row wrap">${f.scene_files.some((x) => x.a) ? `<button type="button" class="btn sm primary" data-fmeditor ${working ? "disabled" : ""} title="كل مشهد وكل كونيكتور قطعة لوحده في المونتاج، ومعاهم الفويس أوفر في مكانه والموسيقى">🎞️ انقل للمونتاج</button>` : ""}
+        ${f.final_url ? `<a class="btn sm" href="${f.final_url}" download="${le(f.name)}.mp4">⬇️ نزّل</a>` : ""}
         <button type="button" class="btn sm danger" data-fmdel ${working ? "disabled" : ""}>🗑️</button></div></div>
     <div class="fm-status"><span class="lab-st ${working ? "working" : f.status}">${working ? `<span class="spin-inline"></span>` : ""} ${FILM_ST[f.status] || ""}</span>
       ${f.step ? `<small class="muted">${le(f.step)}</small>` : ""}${f.error ? `<small class="err">${le(f.error)}</small>` : ""}</div>
@@ -202,7 +203,6 @@ function filmDetail(f) {
     ${sc.length ? `<div class="row wrap fm-actions">
         ${framesLeft ? `<button type="button" class="btn primary" data-fmframes ${working ? "disabled" : ""}>🖼️ ارسم الفريمات (~${c.frames}$)</button>` : ""}
         ${ready ? `<button type="button" class="btn primary" data-fmrun ${working ? "disabled" : ""}>🎬 ${f.final_url ? "ولّد اللي اتغيّر وجمّع" : "ولّد الفيديو"} (~${c.video}$)</button>` : ""}
-        ${f.scene_files.every((x) => x.video) && f.link_files.every((x) => x.video) ? `<button type="button" class="btn" data-fmeditor ${working ? "disabled" : ""} title="كل مشهد وكل كونيكتور قطعة لوحده في المونتاج، ومعاهم الفويس أوفر في مكانه والموسيقى">🎞️ افتح في المونتاج</button>` : ""}
         <button type="button" class="btn sm" data-fmreplan ${working ? "disabled" : ""}>✍️ سيناريو جديد</button>
         <small class="muted">التعديلات بتتحفظ لوحدها. اللي اتولد قبل كده بيفضل، والتوليد بيعمل الناقص بس.</small></div>` : ""}
     <div class="fm-board ${f.ratio === "16:9" ? "wide" : f.ratio === "1:1" ? "square" : ""}">${sc.map((s, i) => fmScene(f, s, i) + (i < sc.length - 1 && p.links?.[i] ? fmLink(f, p.links[i], i) : "")).join("")}</div>`;
@@ -313,6 +313,8 @@ $("labFilm").addEventListener("click", async (e) => {
   const ed = t.closest("[data-fmeditor]");
   if (ed) {
     return busyButton(ed, "⏳", async () => {
+      const miss = [...filmx.cur.scene_files.map((x, i) => (x.video ? null : `المشهد ${i + 1}`)), ...filmx.cur.link_files.map((x, i) => (x.video ? null : `الكونيكتور ${i + 1}`))].filter(Boolean);
+      if (miss.length && !confirm(`لسه متولدش: ${miss.join("، ")}. أنقل اللي جاهز؟ (المشهد اللي ملوش حركة بيدخل صورة ثابتة، والكونيكتور اللي ملوش فيديو بيتشال)`)) return;
       const r = await F("/to-editor", { method: "POST" });
       storageSet("studiomania.projectId.ads", r.project_id);
       if (typeof mt !== "undefined") mt.project = null;

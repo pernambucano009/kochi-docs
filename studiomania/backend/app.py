@@ -10838,15 +10838,6 @@ def film_dims(folder: Path) -> tuple[int, int]:
     return int(m.group(1)) // 2 * 2, int(m.group(2)) // 2 * 2
 
 
-def film_starts(p: dict) -> list[float]:
-    """كل مشهد بيبدأ إمتى في الفيديو المتجمّع (مشهد ← كونيكتور ← مشهد)."""
-    t, out = 0.0, []
-    for i, sc in enumerate(p["scenes"]):
-        out.append(t)
-        t += sc["seconds"] + (film_link_len(p, i) if i < len(p["scenes"]) - 1 else 0)
-    return out
-
-
 @app.post("/api/films/{fid}/to-editor")
 def film_to_editor(fid: str):
     """🎞️ المشاهد والكونيكتورز بالترتيب (كل واحد قطعة لوحده) في مشروع مونتاج، ومعاهم الفويس أوفر في مكانه."""
@@ -10855,29 +10846,46 @@ def film_to_editor(fid: str):
     if d.get("status") in FILM_BUSY:
         raise HTTPException(400, "استنى لما الشغل اللي شغال يخلص")
     f = film_files(d)
-    miss = [f"المشهد {i + 1}" for i, x in enumerate(f["scenes"]) if not (x.get("video") and (folder / x["video"]).exists())]
-    miss += [f"الكونيكتور {i + 1}" for i, x in enumerate(f["links"]) if not (x.get("video") and (folder / x["video"]).exists())]
-    if not p.get("scenes") or miss:
-        raise HTTPException(400, "لسه متولدش: " + "، ".join(miss) if miss else "مفيش مشاهد")
+    if not p.get("scenes") or not (folder / "sc1_a.png").exists():
+        raise HTTPException(400, "ارسم الفريمات الأول")
     W, H = film_dims(folder)
     label = d.get("name") or "فيديو"
-    pieces = []
+    # اللي اتولد بيتنقل؛ المشهد اللي لسه ملوش حركة بيدخل صورة أوله ثابتة على طوله، والكونيكتور اللي لسه متولدش بيتشال
+    pieces, skipped = [], []
+    has = lambda name: bool(name) and (folder / name).exists()  # noqa: E731
     for i, sc in enumerate(p["scenes"]):
-        pieces.append((folder / f"sc{i + 1}.mp4", sc["seconds"], f"🎬 مشهد {i + 1}: {sc['label']}"))
+        x = f["scenes"][i]
+        if has(x.get("video")):
+            pieces.append((folder / x["video"], sc["seconds"], f"🎬 مشهد {i + 1}: {sc['label']}", i))
+        elif has(x.get("a")):
+            pieces.append((folder / x["a"], sc["seconds"], f"🖼️ مشهد {i + 1} (صورة): {sc['label']}", i))
+            skipped.append(f"المشهد {i + 1} (دخل صورة)")
+        else:
+            skipped.append(f"المشهد {i + 1}")
         if i < len(p["scenes"]) - 1:
-            pieces.append((folder / f"L{i + 1}.mp4", None, f"🔗 كونيكتور {i + 1}"))
+            if has(f["links"][i].get("video")):
+                pieces.append((folder / f["links"][i]["video"], None, f"🔗 كونيكتور {i + 1}", None))
+            else:
+                skipped.append(f"الكونيكتور {i + 1}")
     lines = film_voice_lines(d)
     full = (d.get("voice") or {}).get("full")
     with closing(db()) as conn, conn:
-        clips = []
-        for src, secs, name in pieces:
+        clips, starts, t = [], {}, 0.0
+        for src, secs, name, si in pieces:
             gid = uuid.uuid4().hex[:12]
             out = GENERATED_DIR / f"{gid}.mp4"
-            if secs:
+            if src.suffix == ".png":
+                subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-loop", "1", "-t", f"{secs:.2f}", "-i", str(src),
+                                "-vf", f"scale={W}:{H},setsar=1,fps=30,format=yuv420p", "-c:v", "libx264", "-preset", "veryfast",
+                                "-crf", "18", str(out)], check=True, capture_output=True, timeout=120)
+            elif secs:
                 chain_clips([timed(src, secs)], out, W, H)   # المشهد على الطول اللي في الخطة (طول جملته)
             else:
                 shutil.copyfile(src, out)
             dur = probe_duration(out)
+            if si is not None:
+                starts[si] = t
+            t += dur
             conn.execute(
                 "INSERT INTO generations (id, clip_id, clip_filename, clip_label, coach_id, coach_name, coach_image, model, prompt, "
                 "params, status, output_filename, created_at, updated_at) VALUES (?, ?, ?, ?, '', '', '', 'seedance', '', '{}', 'completed', ?, ?, ?)",
@@ -10888,9 +10896,9 @@ def film_to_editor(fid: str):
         if any(ln and (folder / ln["file"]).exists() for ln in lines):
             # كل جملة في أول المشهد بتاعها، زي الفيديو المتجمّع بالظبط
             vfile = f"voice_{vid}.m4a"
-            starts, inputs, chain, k = film_starts(p), [], [], 0
+            inputs, chain, k = [], [], 0
             for i, ln in enumerate(lines):
-                if ln and (folder / ln["file"]).exists():
+                if ln and (folder / ln["file"]).exists() and i in starts:
                     inputs += ["-i", str(folder / ln["file"])]
                     ms = int(round((starts[i] + (0.1 if (d.get("voice") or {}).get("mode") == "tts" else 0)) * 1000))
                     chain.append(f"[{k}:a]aresample=44100,adelay={ms}|{ms}[a{k}]")
@@ -10913,7 +10921,7 @@ def film_to_editor(fid: str):
         conn.execute("INSERT INTO projects (id, name, data, render_status, created_at, updated_at) VALUES (?, ?, ?, 'idle', ?, ?)",
                      (pid, pdata["name"], json.dumps(pdata, ensure_ascii=False), now(), now()))
     film_update(fid, lambda x: x.update(project_id=pid))
-    return {"project_id": pid}
+    return {"project_id": pid, "skipped": skipped}
 
 
 @app.delete("/api/films/{fid}/voice")
