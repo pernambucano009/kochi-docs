@@ -9996,7 +9996,10 @@ def film_costs(d: dict) -> dict:
     frames = sum((0 if x.get("a") else 1) + (0 if x.get("b") else 1) for x in f["scenes"]) * TRIAL_KEY_COST
     video = sum(trial_gen_seconds(sc["seconds"]) * per for sc, x in zip(p["scenes"], f["scenes"]) if not x.get("video"))
     video += sum(film_link_cost(d, i) for i, x in enumerate(f["links"]) if not x.get("segs"))
-    return {"frames": round(frames, 2), "video": round(video, 2)}
+    return {"frames": round(frames, 2), "video": round(video, 2),
+            "scenes": [round(trial_gen_seconds(sc["seconds"]) * per, 2) for sc in p["scenes"]],   # تمن كل حتة لوحدها
+            "links": [round(film_link_cost(d, i), 2) for i in range(len(p.get("links") or []))],
+            "todo_scenes": sum(1 for x in f["scenes"] if not x.get("video")), "todo_links": sum(1 for x in f["links"] if not x.get("segs"))}
 
 
 def film_to_dict(fid: str, d: dict) -> dict:
@@ -10451,11 +10454,18 @@ def film_run(fid: str, body: FilmRunIn):
     """🎬 يولّد اللي لسه متولدش (أو حتة واحدة تاني) ويجمّع الفيديو. بيتحسب على Atlas."""
     d = film_load(fid)
     f = film_files(d)
-    if any(not (x.get("a") and x.get("b")) for x in f["scenes"]):
-        raise HTTPException(400, "ارسم الفريمات الأول")
-    if any(not l.get("plan") for l in d["plan"]["links"]):
-        raise HTTPException(400, "فيه كونيكتور لسه ملوش خطة")
     only = (body.kind, body.i) if body.kind in ("scene", "link") and body.i is not None else None
+    if only and only[0] == "scene":
+        if not 0 <= only[1] < len(f["scenes"]) or not (f["scenes"][only[1]].get("a") and f["scenes"][only[1]].get("b")):
+            raise HTTPException(400, "ارسم فريمات المشهد ده الأول")
+    elif only:
+        if not 0 <= only[1] < len(f["links"]) or not d["plan"]["links"][only[1]].get("plan"):
+            raise HTTPException(400, "الكونيكتور ده لسه ملوش خطة")
+    else:
+        if any(not (x.get("a") and x.get("b")) for x in f["scenes"]):
+            raise HTTPException(400, "ارسم الفريمات الأول")
+        if any(not l.get("plan") for l in d["plan"]["links"]):
+            raise HTTPException(400, "فيه كونيكتور لسه ملوش خطة")
     return film_start(fid, "working", "بيبدأ", run_film_gen, only)
 
 
@@ -10469,14 +10479,15 @@ def run_film_gen(fid: str, only: tuple | None) -> None:
         f = film_files(d)
         n = len(p["scenes"])
         for i, sc in enumerate(p["scenes"]):
-            if f["scenes"][i].get("video") and only != ("scene", i):   # اللي اتولد قبل كده بيفضل، إلا الحتة اللي طالبها تاني
+            # من غير اختيار: الناقص بس. حتة معيّنة: هي بس (حتى لو اتولدت قبل كده)
+            if (only and only != ("scene", i)) or (not only and f["scenes"][i].get("video")):
                 continue
             film_set(fid, step=f"🎬 بيولّد المشهد {i + 1} من {n}: {sc['label']}")
             gen_motion(d["model"], d["resolution"], ratio, sc["motion"], folder / f"sc{i + 1}_a.png", folder / f"sc{i + 1}_b.png",
                        trial_gen_seconds(sc["seconds"]), folder / f"sc{i + 1}.mp4", W, H, "حركة المشهد")
             film_update(fid, lambda x, i=i: film_files(x)["scenes"][i].update(video=f"sc{i + 1}.mp4"))
         for i, link in enumerate(p["links"]):
-            if f["links"][i].get("segs") and only != ("link", i):
+            if (only and only != ("link", i)) or (not only and f["links"][i].get("segs")):
                 continue
             lp = link["plan"]
             chain, keys = [folder / f"sc{i + 1}_b.png"], []
@@ -10494,9 +10505,13 @@ def run_film_gen(fid: str, only: tuple | None) -> None:
             chain_clips([timed(folder / x, sg["seconds"]) for x, sg in zip(segs, lp["segments"])], folder / f"L{i + 1}.mp4", W, H)
             film_update(fid, lambda x, i=i, keys=keys, segs=segs: film_files(x)["links"].__setitem__(
                 i, {"keys": keys, "segs": segs, "video": f"L{i + 1}.mp4"}))
-        # التجميع: مشهد ← كونيكتور ← مشهد ...
-        film_set(fid, step="🎞️ بيجمّع الفيديو")
+        # التجميع: مشهد ← كونيكتور ← مشهد ... (لو كل الحتت جاهزة)
         d = film_load(fid)
+        fx = film_files(d)
+        if not all(x.get("video") for x in fx["scenes"]) or not all(x.get("video") for x in fx["links"]):
+            film_set(fid, status=film_idle_status(d), step=None, error=None)
+            return
+        film_set(fid, step="🎞️ بيجمّع الفيديو")
         p = d["plan"]
         parts = []
         for i, sc in enumerate(p["scenes"]):

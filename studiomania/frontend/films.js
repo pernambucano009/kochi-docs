@@ -90,7 +90,9 @@ function fmScene(f, sc, i) {
   const lock = f.status === "planning" ? "disabled" : "", v = f.scene_files[i]?.video;
   return `<article class="fm-scene" data-scene="${i}">
     <header><b>🎬 المشهد ${i + 1}</b> <input data-sf="label" value="${le(sc.label)}" ${lock} data-no-i18n>
-      <small class="muted" data-no-i18n>${le(sc.feature)}</small></header>
+      <small class="muted" data-no-i18n>${le(sc.feature)}</small>
+      ${v ? `<span class="fm-done">✅ اتولد</span>` : `<span class="fm-todo">⏳ لسه متولدش</span>`}
+      ${!v && f.scene_files[i]?.a && f.scene_files[i]?.b && !f.busy ? `<button type="button" class="btn sm primary" data-fmgen="scene" data-i="${i}" data-new="1">🎬 ولّد المشهد ده (~${f.costs?.scenes?.[i] ?? ""}$)</button>` : ""}</header>
     <div class="fm-row">
       ${fmFrame(f, i, "a")}<span class="fm-arrow">←</span>${fmFrame(f, i, "b")}
       ${v ? `<figure class="fm-frame"><video src="${v}" controls playsinline preload="metadata"></video>
@@ -115,7 +117,9 @@ function fmLink(f, l, i) {
       <select data-la ${lock}>${filmx.conns.map((a) => `<option value="${a.id}" ${a.id === l.asset ? "selected" : ""} data-no-i18n>${le(a.name)}</option>`).join("")}
         ${la.name || filmx.conns.some((a) => a.id === l.asset) ? "" : `<option selected value="${le(l.asset)}">⚠️ اتمسح من المكتبة</option>`}</select>
       ${!f.busy && (p || (f.scene_files[i]?.b && f.scene_files[i + 1]?.a)) ? `<button type="button" class="btn sm ${p ? "" : "primary"}" data-fmlplan="${i}" title="خطة للكونيكتور ده بين المشهدين دول">🧠 ${p ? "خطة تانية" : "اعمل الخطة"}</button>` : ""}
-      ${lf.video && !f.busy ? `<button type="button" class="btn sm" data-fmgen="link" data-i="${i}" title="يولّد الكونيكتور ده تاني">↻ ولّده تاني</button>` : ""}</header>
+      ${lf.video ? `<span class="fm-done">✅ اتولد</span>` : `<span class="fm-todo">⏳ لسه متولدش</span>`}
+      ${lf.video && !f.busy ? `<button type="button" class="btn sm" data-fmgen="link" data-i="${i}" title="يولّد الكونيكتور ده تاني">↻ ولّده تاني</button>` : ""}
+      ${!lf.video && p && !f.busy ? `<button type="button" class="btn sm primary" data-fmgen="link" data-i="${i}" data-new="1">🎬 ولّد الكونيكتور ده (~${f.costs?.links?.[i] ?? ""}$)</button>` : ""}</header>
     ${l.why ? `<p class="muted" data-no-i18n>💡 ${le(l.why)}</p>` : ""}
     <div class="fm-row">
       ${la.url ? `<figure class="fm-frame"><video src="${la.url}" poster="${la.thumb_url}" muted loop playsinline controls preload="none"></video><figcaption>🎯 الأصلي</figcaption></figure>` : ""}
@@ -202,7 +206,9 @@ function filmDetail(f) {
     ${sc.length ? fmScript(f) : ""}
     ${sc.length ? `<div class="row wrap fm-actions">
         ${framesLeft ? `<button type="button" class="btn primary" data-fmframes ${working ? "disabled" : ""}>🖼️ ارسم الفريمات (~${c.frames}$)</button>` : ""}
-        ${ready ? `<button type="button" class="btn primary" data-fmrun ${working ? "disabled" : ""}>🎬 ${f.final_url ? "ولّد اللي اتغيّر وجمّع" : "ولّد الفيديو"} (~${c.video}$)</button>` : ""}
+        ${ready ? (c.todo_scenes || c.todo_links
+          ? `<button type="button" class="btn primary" data-fmrun ${working ? "disabled" : ""}>🎬 ولّد اللي لسه متولدش بس (${[c.todo_scenes ? `${c.todo_scenes} مشهد` : "", c.todo_links ? `${c.todo_links} كونيكتور` : ""].filter(Boolean).join(" و")}) ~${c.video}$</button>`
+          : `<button type="button" class="btn ${f.final_url ? "" : "primary"}" data-fmrun ${working ? "disabled" : ""}>🎞️ ${f.final_url ? "جمّع الفيديو تاني" : "جمّع الفيديو"} (ببلاش)</button>`) : ""}
         <button type="button" class="btn sm" data-fmreplan ${working ? "disabled" : ""}>✍️ سيناريو جديد</button>
         <small class="muted">التعديلات بتتحفظ لوحدها. اللي اتولد قبل كده بيفضل، والتوليد بيعمل الناقص بس.</small></div>` : ""}
     <div class="fm-board ${f.ratio === "16:9" ? "wide" : f.ratio === "1:1" ? "square" : ""}">${sc.map((s, i) => fmScene(f, s, i) + (i < sc.length - 1 && p.links?.[i] ? fmLink(f, p.links[i], i) : "")).join("")}</div>`;
@@ -367,12 +373,16 @@ $("labFilm").addEventListener("click", async (e) => {
   if (run || gen) {
     await filmSave();
     const c = filmx.cur.costs.video;
-    const what = gen ? `${gen.dataset.fmgen === "scene" ? "حركة المشهد" : "الكونيكتور"} ${Number(gen.dataset.i) + 1} تاني` : "الفيديو";
+    const gi = gen ? Number(gen.dataset.i) : 0, gc = gen ? filmx.cur.costs?.[gen.dataset.fmgen === "scene" ? "scenes" : "links"]?.[gi] : 0;
+    const cc = filmx.cur.costs || {};
+    const what = gen ? `${gen.dataset.fmgen === "scene" ? "حركة المشهد" : "الكونيكتور"} ${gi + 1}${gen.dataset.new ? "" : " تاني"} بس (حوالي ${gc}$)`
+      : cc.todo_scenes || cc.todo_links ? `اللي لسه متولدش بس: ${[cc.todo_scenes ? `${cc.todo_scenes} مشهد` : "", cc.todo_links ? `${cc.todo_links} كونيكتور` : ""].filter(Boolean).join(" و")}. اللي اتولد قبل كده مش هيتلمس` : "";
+    if (!gen && !what) return go(run, () => F("/run", { method: "POST", ...jsonBody({}) }));   // كله جاهز: تجميع بس، ببلاش
     const staleN = (filmx.cur.stale || []).filter(Boolean).length;
     if (staleN && !confirm(`فيه ${staleN} مشهد السكريبت بتاعه اتغيّر والفريمات لسه على القديم. تكمّل من غير «✨ طبّق التعديلات على الفريمات»؟`)) return renderFilm();
     const voStale = (filmx.cur.voice?.lines || []).some((l) => l?.stale);
     if (voStale && !confirm("فيه جمل في الفويس أوفر اتغيرت وصوتها لسه القديم. تكمّل؟")) return renderFilm();
-    if (!confirm(`يولّد ${what}؟ هيتحسب على Atlas${c && !gen ? ` حوالي ${c}$` : ""}، وبياخد كام دقيقة.`)) return renderFilm();
+    if (!confirm(`يولّد ${what}؟ هيتحسب على Atlas${c && !gen ? ` حوالي ${c}$` : ""}، وبياخد كام دقيقة.${gen ? " (الفيديو الكامل بيتجمّع لوحده لما كل الحتت تبقى جاهزة)" : ""}`)) return renderFilm();
     return go(run || gen, () => F("/run", { method: "POST", ...jsonBody(gen ? { kind: gen.dataset.fmgen, i: Number(gen.dataset.i) } : {}) }));
   }
 });
