@@ -15,7 +15,9 @@ function renderLabSchema(d) {
   el.hidden = false;
   const roles = d.schema_roles || {};
   el.innerHTML = `<details class="sch" ${tplx.schOpen === false ? "" : "open"} data-schbox><summary><b>🗺️ مخطط الفيديو</b>
-      ${sc.status === "working" ? `<span class="lab-st working"><span class="spin-inline"></span> بيتفرج على الفيديو كله</span>` : ""}
+      ${sc.status === "working" ? `<span class="lab-st working"><span class="spin-inline"></span> بيتفرج على الفيديو كله</span>
+        <button type="button" class="btn sm" data-schstop>⏹ وقّف</button>` : ""}
+      ${sc.status !== "working" && (data || sc.error) ? `<button type="button" class="btn sm danger" data-schdel title="يمسح المخطط ده (التيمبليتس اللي اتحفظت منه بتفضل)">🗑️ امسح المخطط</button>` : ""}
       ${sc.error ? `<small class="err">${le(sc.error)}</small>` : ""}
       ${data ? `<small class="muted">${data.beats.length} جزء${data.beat_sec ? ` · بيت كل ${data.beat_sec} ث` : ""}</small>` : ""}</summary>
     ${data ? `<p class="sch-sum" data-no-i18n><b>${le(data.title)}</b> — ${le(data.summary)}</p>
@@ -57,7 +59,8 @@ function schPlay(t0, t1) {
 
 $("labSchemaBtn").onclick = () => {
   const has = labx.cur?.schema?.data;
-  if (has && !confirm("تطلّع المخطط من جديد؟ التعديلات اللي عملتها عليه هتتبدل (التيمبليتس اللي اتحفظت مش هتتأثر).")) return;
+  if (!confirm(has ? `تطلّع مخطط «${labx.cur.name}» من جديد؟ التعديلات اللي عملتها عليه هتتبدل (التيمبليتس اللي اتحفظت مش هتتأثر).`
+    : `يطلّع مخطط الفيديو المفتوح دلوقتي: «${labx.cur.name}»؟ (لو عايز فيديو تاني، اختاره من القايمة الأول)`)) return;
   busyButton($("labSchemaBtn"), "⏳", async () => {
     labx.cur = await api(`/api/lab/${labx.cur.id}/schema`, { method: "POST" });
     renderLab(); scheduleLabPoll();
@@ -65,6 +68,23 @@ $("labSchemaBtn").onclick = () => {
 };
 
 $("labSchema").addEventListener("click", async (e) => {
+  const stop = e.target.closest("[data-schstop]");
+  if (stop) {
+    e.preventDefault();
+    return busyButton(stop, "⏳", async () => {
+      labx.cur = await api(`/api/lab/${labx.cur.id}/schema/stop`, { method: "POST" });
+      renderLab(); toast("⏹ اتوقف");
+    });
+  }
+  const del = e.target.closest("[data-schdel]");
+  if (del) {
+    e.preventDefault();
+    if (!confirm(`تمسح مخطط «${labx.cur.name}»؟ (التيمبليتس اللي اتحفظت منه بتفضل)`)) return;
+    return busyButton(del, "⏳", async () => {
+      labx.cur = await api(`/api/lab/${labx.cur.id}/schema`, { method: "DELETE" });
+      renderLab(); toast("🗑️ اتمسح");
+    });
+  }
   const pl = e.target.closest("[data-schplay]");
   if (pl) { e.preventDefault(); return schPlay(Number(pl.dataset.schplay), Number(pl.dataset.to)); }
   const save = e.target.closest("[data-schtpl]");

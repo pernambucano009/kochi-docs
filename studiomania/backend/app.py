@@ -11142,27 +11142,69 @@ def lab_schema(lid: str):
         raise HTTPException(400, "بيطلّع المخطط بالفعل")
     if not (atlas.api_key() or atlas.mock_mode()):
         raise HTTPException(400, "مفتاح Atlas مش متسجل")
-    lab_update(lid, lambda x: x.update(schema={**(x.get("schema") or {}), "status": "working", "error": None}))
-    threading.Thread(target=run_lab_schema, args=(lid,), daemon=True).start()
+    run = uuid.uuid4().hex[:8]
+    lab_update(lid, lambda x: x.update(schema={**(x.get("schema") or {}), "status": "working", "error": None, "run": run}))
+    threading.Thread(target=run_lab_schema, args=(lid, run), daemon=True).start()
     return lab_to_dict(lid, lab_load(lid))
 
 
-def run_lab_schema(lid: str) -> None:
+def schema_mine(lid: str, run: str) -> bool:
+    """المحاولة دي لسه هي الشغالة؟ (لو اتوقفت أو اتمسحت، نتيجتها بتترمي)"""
+    sc = lab_load(lid).get("schema") or {}
+    return sc.get("status") == "working" and sc.get("run") == run
+
+
+def run_lab_schema(lid: str, run: str) -> None:
     try:
         d = lab_load(lid)
         if atlas.mock_mode():
+            time.sleep(2)   # زي الموديل الحقيقي: بياخد وقت (عشان زرار «وقّف» يبان في التجربة)
             raw = lab.mock_schema(d)
         else:
             proxy = lab_proxy(lid, d)
             raw = ad_json(lab_media_chat(az.with_media(lab.schema_messages(d), data_url(proxy, "video/mp4"), "video.mp4")), "مخطط الفيديو")
+        if not schema_mine(lid, run):
+            return
         data = lab.clean_schema(raw, d["source"]["duration"])
         if not data["beats"]:
             raise HTTPException(400, "الموديل ما طلّعش أجزاء. جرّب تاني")
+        old = ((d.get("schema") or {}).get("data") or {}).get("beats") or []
         schema_thumbs(lid, d, data["beats"])
+        if not schema_mine(lid, run):
+            return
+        for b in old:   # صور المخطط القديم
+            if b.get("thumb"):
+                (lab_dir(lid) / "frames" / b["thumb"]).unlink(missing_ok=True)
         lab_update(lid, lambda x: x.update(schema={"status": "done", "error": None, "data": data, "at": now()}))
     except Exception as exc:  # noqa: BLE001
+        if not schema_mine(lid, run):
+            return
         msg = str(getattr(exc, "detail", None) or exc)[:400]
         lab_update(lid, lambda x: x.update(schema={**(x.get("schema") or {}), "status": "failed", "error": msg}))
+
+
+@app.post("/api/lab/{lid}/schema/stop")
+def lab_schema_stop(lid: str):
+    """⏹ يوقّف استخراج المخطط (لو فيه مخطط قديم بيفضل زي ما هو)."""
+    def fn(x):
+        sc = x.get("schema") or {}
+        if sc.get("status") != "working":
+            return
+        x["schema"] = {**sc, "status": "done" if sc.get("data") else "stopped", "error": None, "run": None}
+        if not sc.get("data"):
+            x["schema"] = None
+    return lab_to_dict(lid, lab_update(lid, fn))
+
+
+@app.delete("/api/lab/{lid}/schema")
+def lab_schema_delete(lid: str):
+    """🗑️ يمسح المخطط (التيمبليتس اللي اتحفظت منه بتفضل)."""
+    def fn(x):
+        for b in ((x.get("schema") or {}).get("data") or {}).get("beats") or []:
+            if b.get("thumb"):
+                (lab_dir(lid) / "frames" / b["thumb"]).unlink(missing_ok=True)
+        x["schema"] = None
+    return lab_to_dict(lid, lab_update(lid, fn))
 
 
 class SchemaIn(BaseModel):
