@@ -206,7 +206,15 @@ function filmDetail(f) {
         <button type="button" class="btn sm danger" data-fmdel ${working ? "disabled" : ""}>🗑️</button></div></div>
     <div class="fm-status"><span class="lab-st ${working ? "working" : f.status}">${working ? `<span class="spin-inline"></span>` : ""} ${FILM_ST[f.status] || ""}</span>
       ${f.step ? `<small class="muted">${le(f.step)}</small>` : ""}${f.error ? `<small class="err">${le(f.error)}</small>` : ""}</div>
-    ${f.final_url ? `<section class="panel fm-final"><video src="${f.final_url}" controls playsinline preload="metadata"></video></section>` : ""}
+    ${f.final_url || f.raw_url || f.scene_files.some((x) => x.video) ? `<section class="panel fm-final">
+      <div class="row wrap fm-views">
+        ${f.final_url ? `<button type="button" class="chip ${filmx.view !== "raw" ? "on" : ""}" data-fmview="final">🎬 الفيديو المتجمّع (بالفويس)</button>` : ""}
+        <button type="button" class="chip ${filmx.view === "raw" || !f.final_url ? "on" : ""}" data-fmraw ${working ? "disabled" : ""} title="كل حتة اتولدت بطولها الأصلي، ورا بعض، من غير فويس ولا تسريع ولا قص">▶️ الخام كامل (من غير فويس ولا قص)</button>
+        ${f.raw_url && (filmx.view === "raw" || !f.final_url) ? `<a class="btn sm" href="${f.raw_url}" download="${le(f.name)}-خام.mp4">⬇️ نزّل الخام</a>` : ""}
+      </div>
+      ${(filmx.view === "raw" || !f.final_url) ? (f.raw_url ? `<video src="${f.raw_url}" controls playsinline preload="metadata"></video>` : `<p class="muted">دوس «▶️ الخام كامل» عشان يتجمّع.</p>`)
+        : `<video src="${f.final_url}" controls playsinline preload="metadata"></video>`}
+    </section>` : ""}
     ${p.idea ? `<p class="panel fm-idea" data-no-i18n><b>${le(p.title)}</b><br>${le(p.idea)}</p>` : ""}
     ${sc.length ? fmScript(f) : ""}
     ${sc.length ? `<div class="row wrap fm-actions">
@@ -320,6 +328,17 @@ $("labFilm").addEventListener("click", async (e) => {
     if (cp.dataset.fmcopy === "voice") return copyText(voiceText(sc.map((x) => x.voice)));
     return copyText(sc.map((x, i) => [`المشهد ${i + 1}: ${x.label}`, x.voice ? `🎙️ ${x.voice.trim()}` : "", x.text ? `🔤 ${x.text.trim()}` : ""]
       .filter(Boolean).join("\n")).join("\n\n"));
+  }
+  const vw = t.closest("[data-fmview]");
+  if (vw) { filmx.view = vw.dataset.fmview; return renderFilm(); }
+  const raw = t.closest("[data-fmraw]");
+  if (raw) {
+    return busyButton(raw, "⏳", async () => {
+      const r = await F("/raw", { method: "POST" });
+      filmx.cur = r; filmx.view = "raw"; renderFilm();
+      if (r.skipped?.length) toast(`لسه متولدش (مش في الخام): ${r.skipped.join("، ")}`);
+      $("labFilm").querySelector(".fm-final video")?.play().catch(() => {});
+    });
   }
   const ed = t.closest("[data-fmeditor]");
   if (ed) {

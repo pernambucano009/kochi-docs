@@ -10057,7 +10057,7 @@ def film_to_dict(fid: str, d: dict) -> dict:
             "stale": [film_stale(d, i) for i in range(len(scenes))],
             "link_lens": [film_link_len(d["plan"], i) for i in range(len(d["plan"]["links"]))] if scenes else [],
             "ref_files": [{**r, "url": url(r["file"])} for r in d.get("refs") or [] if url(r["file"])],
-            "final_url": url((d.get("files") or {}).get("final")),
+            "final_url": url((d.get("files") or {}).get("final")), "raw_url": url((d.get("files") or {}).get("raw")),
             "scene_files": [{"a": url(x.get("a")), "b": url(x.get("b")), "video": url(x.get("video"))} for x in f["scenes"]],
             "link_files": [{"keys": [url(k) for k in x.get("keys") or []], "video": url(x.get("video"))} for x in f["links"]],
             "link_assets": [{"id": l.get("asset"), **({"name": a.get("name"), "url": f"/media/assets/{l['asset']}/{a['file']}",
@@ -10916,6 +10916,34 @@ def film_dims(folder: Path) -> tuple[int, int]:
     if not m:
         raise HTTPException(400, "مقدرتش أقرا مقاس أول فريم. ارسمه تاني")
     return int(m.group(1)) // 2 * 2, int(m.group(2)) // 2 * 2
+
+
+@app.post("/api/films/{fid}/raw")
+def film_raw(fid: str):
+    """▶️ معاينة خام: كل الحتت اللي اتولدت ورا بعض بطولها الأصلي (من غير فويس ولا تسريع ولا قص)."""
+    d = film_load(fid)
+    if d.get("status") in FILM_BUSY:
+        raise HTTPException(400, "استنى لما الشغل اللي شغال يخلص")
+    p, folder, f = d.get("plan") or {}, film_dir(fid), film_files(d)
+    parts, skipped = [], []
+    for i in range(len(p.get("scenes") or [])):
+        v = f["scenes"][i].get("video")
+        if v and (folder / v).exists():
+            parts.append(folder / v)
+        else:
+            skipped.append(f"المشهد {i + 1}")
+        if i < len(f["links"]):
+            segs = [folder / x for x in f["links"][i].get("segs") or [] if (folder / x).exists()]
+            if segs:
+                parts += segs   # حركات الكونيكتور زي ما اتولدت، من غير ما تتظبط على الخطة
+            else:
+                skipped.append(f"الكونيكتور {i + 1}")
+    if not parts:
+        raise HTTPException(400, "لسه مفيش ولا حتة اتولدت")
+    W, H = film_dims(folder)
+    chain_clips(parts, folder / "raw.mp4", W, H)
+    film_update(fid, lambda x: film_files(x).update(raw="raw.mp4"))
+    return {**film_to_dict(fid, film_load(fid)), "skipped": skipped}
 
 
 @app.post("/api/films/{fid}/to-editor")

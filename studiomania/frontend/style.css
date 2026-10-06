@@ -1694,3 +1694,4 @@ a.pl-link:hover { background: color-mix(in srgb, var(--ok) 24%, transparent); }
 .fm-redo { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 6px 8px; }
 .fm-redo input { flex: 1 1 260px; }
 .fm-redo small { flex-basis: 100%; }
+.fm-views { gap: 6px; margin-bottom: 8px; justify-content: center; }
