@@ -949,7 +949,7 @@
               <div class="car-head">
                 <input class="ad-title" id="labName" data-no-i18n>
                 <div class="row wrap lab-actions">
-                  <button class="btn sm" data-labrun="all">↻ فكّك تاني</button>
+                  <button class="btn sm danger" id="labStop" hidden title="يوقّف التفكيك. اللي خلص بيفضل">⏹ وقّف</button>
                   <select class="btn sm" id="labSplit" title="البرنامج بيقسم الفيديو إزاي">
                     <option value="cuts">✂️ القطعات بس</option>
                     <option value="fine">🔀 قسّم على كل تغيير (تجريبي)</option>
@@ -963,6 +963,7 @@
                 </div>
               </div>
               <div class="lab-status" id="labStatus"></div>
+              <div class="lab-pick" id="labPick"></div>
               <div class="lab-score" id="labScore"></div>
               <div class="lab-top">
                 <video id="labVideo" controls playsinline preload="metadata"></video>

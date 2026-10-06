@@ -8517,6 +8517,20 @@ LAB_LOCK = threading.Lock()
 LAB_STEPS = ("shots", "stems", "audio", "elements", "components", "connectors")
 # التفكيك العادي: القطعات ← العناصر ← اقتراح الكومبوننتس. الصوت (فصل التراكات وتحليله) متوقف ومش بيشتغل غير لو طلبته
 LAB_DEFAULT = ("shots", "elements", "components", "connectors")
+LAB_UPLOAD = ("shots",)   # الرفع بيقسم بس (من غير AI)، وإنت بتختار تطلّع إيه بعد كده
+LAB_NEEDS = {"components": "elements", "elements": "shots", "connectors": "shots", "audio": "shots", "stems": "shots"}
+LAB_PROXY_LOCK = threading.Lock()
+
+
+class LabStop(Exception):
+    """الشغل اتوقف بطلبك."""
+
+
+def lab_stopping(lid: str) -> bool:
+    try:
+        return bool(lab_load(lid).get("stop"))
+    except HTTPException:
+        return True
 
 
 def lab_dir(lid: str) -> Path:
@@ -8629,9 +8643,9 @@ def lab_create(file: UploadFile = File(...), name: str = Form("")):
     d = {"name": name.strip() or Path(file.filename or "فيديو").stem, "created_at": now(), "updated_at": now(),
          "source": {"file": fname, "duration": round(info.duration, 2), "width": info.width, "height": info.height,
                     "has_audio": info.has_audio},
-         "steps": {k: {"status": "queued"} for k in LAB_DEFAULT}, "shots": [], "audio": {}, "components": []}
+         "steps": {k: {"status": "queued"} for k in LAB_UPLOAD}, "shots": [], "audio": {}, "components": []}
     (folder / "lab.json").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
-    threading.Thread(target=run_lab, args=(lid, list(LAB_DEFAULT)), daemon=True).start()
+    threading.Thread(target=run_lab, args=(lid, list(LAB_UPLOAD)), daemon=True).start()
     return lab_to_dict(lid, d)
 
 
@@ -8663,22 +8677,28 @@ def lab_delete(lid: str):
 
 
 @app.post("/api/lab/{lid}/run")
-def lab_run(lid: str, step: str = "all", fresh: bool = False):
-    """يعيد خطوة (أو كله). اللي بعدها بيتعمل من جديد: القطعات/الصوت ← العناصر ← الكومبوننتس.
+def lab_run(lid: str, step: str = "all", fresh: bool = False, steps: str = ""):
+    """يشغّل الخطوات اللي إنت اخترتها بس (steps = "elements,connectors" مثلًا، أو step واحدة).
+    الخطوة اللي محتاجة خطوة قبلها لسه ما اتعملتش (الكومبوننتس محتاجة العناصر) بتاخدها معاها.
     fresh = يمسح كل اقتراحات الكومبوننتس (حتى اللي قبلتها أو رفضتها) ويقترح من الصفر."""
-    steps = list(LAB_DEFAULT) if step == "all" else [step] if step in LAB_STEPS else []
-    if not steps:
-        raise HTTPException(400, "خطوة غير معروفة")
+    want = [x for x in steps.split(",") if x in LAB_STEPS] if steps else list(LAB_DEFAULT) if step == "all" else [step] if step in LAB_STEPS else []
+    if not want:
+        raise HTTPException(400, "اختار خطوة واحدة على الأقل")
     d = lab_load(lid)
-    if any((d.get("steps") or {}).get(k, {}).get("status") == "working" for k in LAB_STEPS):
-        raise HTTPException(400, "التفكيك شغال بالفعل. استنى لما يخلص")
-    if "stems" in steps:
-        steps = sorted(set(steps) | {"audio", "elements"}, key=LAB_STEPS.index)
-    if "shots" in steps or "audio" in steps:
-        steps = sorted(set(steps) | {"elements"}, key=LAB_STEPS.index)
-    if "elements" in steps:
-        steps = sorted(set(steps) | {"components", "connectors"}, key=LAB_STEPS.index)
+    if any((d.get("steps") or {}).get(k, {}).get("status") in ("working", "queued") for k in LAB_STEPS):
+        raise HTTPException(400, "التفكيك شغال بالفعل. استنى لما يخلص أو دوس «⏹ وقّف»")
+    done = {k for k, v in (d.get("steps") or {}).items() if (v or {}).get("status") == "done"}
+    steps_ = set(want)
+    for k in list(want):
+        need = LAB_NEEDS.get(k)
+        while need and need not in done and need not in steps_:
+            steps_.add(need)
+            need = LAB_NEEDS.get(need)
+    if "stems" in steps_:
+        steps_.add("audio")
+    steps = sorted(steps_, key=LAB_STEPS.index)
     def fn(d):
+        d["stop"] = False
         for k in steps:
             d.setdefault("steps", {})[k] = {"status": "queued"}
         if fresh and "components" in steps:
@@ -8697,6 +8717,22 @@ def lab_run(lid: str, step: str = "all", fresh: bool = False):
     return lab_to_dict(lid, lab_load(lid))
 
 
+@app.post("/api/lab/{lid}/stop")
+def lab_stop(lid: str):
+    """⏹ يوقّف التفكيك: الخطوات اللي مستنية بتتلغي، واللي شغالة بتقف عند أقرب نقطة (طلب اتبعت للموديل بيكمل وبيتحسب)."""
+    def fn(d):
+        d["stop"] = True
+        for k, v in (d.get("steps") or {}).items():
+            if (v or {}).get("status") == "queued":
+                v.update(status="stopped", error=None, progress="")
+            elif (v or {}).get("status") == "working":
+                v["progress"] = "⏹ بيوقف..."
+        sc = d.get("schema") or {}
+        if sc.get("status") == "working":
+            d["schema"] = {**sc, "status": "done", "error": None, "run": None} if sc.get("data") else None
+    return lab_to_dict(lid, lab_update(lid, fn))
+
+
 def lab_media_chat(messages: list[dict]) -> str:
     if not (atlas.api_key() or atlas.mock_mode()):
         raise atlas.AtlasError("مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات")
@@ -8705,14 +8741,21 @@ def lab_media_chat(messages: list[dict]) -> str:
 
 def run_lab(lid: str, steps: list[str]) -> None:
     folder = lab_dir(lid)
-    for step in steps:
+    for n, step in enumerate(steps):
+        if lab_stopping(lid):
+            for k in steps[n:]:
+                lab_step(lid, k, status="stopped", error=None, progress="")
+            return
         try:
             lab_step(lid, step, status="working", error=None, progress="")
             d = lab_load(lid)
             src = folder / d["source"]["file"]
             dur = d["source"]["duration"]
             if step == "shots":
-                shutil.rmtree(folder / "frames", ignore_errors=True)
+                # فريمات اللقطات القديمة بس (صور المخطط والكونيكتورز بتفضل)
+                for f in (folder / "frames").glob("*"):
+                    if not f.name.startswith(("sch-", "cx")):
+                        f.unlink(missing_ok=True)
                 shots = lab.detect_shots(ffmpeg_exe(), src, dur)
                 if d.get("split", "cuts") == "fine":  # 🔀 لو اخترته: كمان كل تغيير جوه المشهد (الأساسي القطعات بس، وإنت بتقسم)
                     lab_step(lid, step, progress="بيدور على التغييرات جوه كل لقطة")
@@ -8738,6 +8781,11 @@ def run_lab(lid: str, steps: list[str]) -> None:
             lab_step(lid, step, status="done", error=None, progress="", at=now())
         except LabSkip as exc:
             lab_step(lid, step, status="skipped", error=str(exc), progress="")
+        except LabStop:
+            lab_step(lid, step, status="stopped", error=None, progress="")
+            for k in steps[n + 1:]:
+                lab_step(lid, k, status="stopped", error=None, progress="")
+            return
         except Exception as exc:  # noqa: BLE001
             lab_step(lid, step, status="failed", error=str(getattr(exc, "detail", None) or exc)[:400], progress="")
             if step == "shots":
@@ -8806,7 +8854,9 @@ def run_lab_audio(lid: str, d: dict, src: Path, dur: float) -> None:
 def lab_proxy(lid: str, d: dict) -> Path:
     """نسخة صغيرة من الفيديو (بالصوت) عشان الموديل يتفرج عليه كله."""
     proxy = lab_dir(lid) / "proxy.mp4"
-    if not proxy.exists():
+    with LAB_PROXY_LOCK:
+        if proxy.exists():
+            return proxy
         subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(lab_dir(lid) / d["source"]["file"]),
                         "-vf", "scale='if(gt(iw,ih),min(640,iw),-2)':'if(gt(iw,ih),-2,min(640,ih))',fps=12",
                         "-c:v", "libx264", "-preset", "veryfast", "-crf", "31", "-pix_fmt", "yuv420p",
@@ -8867,6 +8917,8 @@ def run_lab_elements(lid: str, only: set[str] | None = None) -> None:
     shots = [s for s in d.get("shots") or [] if only is None or shot_key(s) in only]
     audio = d.get("audio") or {}
     for k, s in enumerate(shots):
+        if lab_stopping(lid):
+            raise LabStop()
         lab_step(lid, "elements", progress=f"بيفكك عناصر اللقطة {k + 1} من {len(shots)}")
         sfx = [x for x in audio.get("sfx") or [] if s["start"] - 0.05 <= x["t"] < s["end"]]
         speech = [x for x in audio.get("speech") or [] if x["start"] < s["end"] and x["end"] > s["start"]]
@@ -9015,11 +9067,14 @@ def lab_shot_split(lid: str, n: int, body: SplitIn):
         shots[i:i + 1] = parts
         renumber(shots)
         d.setdefault("steps", {})["elements"] = {"status": "working", "progress": "بيفكك عناصر الحتتين الجداد"}
+        d["stop"] = False
     d = lab_update(lid, fn)
     def run():
         try:
             run_lab_elements(lid, set(keys))
             lab_step(lid, "elements", status="done", error=None, progress="", at=now())
+        except LabStop:
+            lab_step(lid, "elements", status="stopped", error=None, progress="")
         except Exception as exc:  # noqa: BLE001
             lab_step(lid, "elements", status="failed", error=str(exc)[:300], progress="")
     threading.Thread(target=run, daemon=True).start()

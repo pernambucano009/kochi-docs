@@ -1738,3 +1738,4 @@ img.tv-cell { outline: 2px dashed #f0b54a; outline-offset: -2px; }
 .tv-segimgs img, .tv-segimgs .fm-ph { width: 70px; aspect-ratio: 9 / 16; object-fit: cover; border-radius: 6px; }
 .tv-seg video { width: 100%; border-radius: 8px; background: #000; max-height: 320px; }
 @media (max-width: 620px) { .tv-brow { flex-direction: column; } }
+.lab-pick { margin: 6px 0; } .lab-pickrow { gap: 10px; align-items: center; }

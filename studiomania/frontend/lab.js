@@ -40,6 +40,23 @@ async function openLab(id) {
   scheduleLabPoll();
 }
 
+// ▶️ إنت بتختار تطلّع إيه من الفيديو (كل خطوة لوحدها)
+const LAB_PICK = { elements: "🧩 العناصر", components: "💡 الكومبوننتس", connectors: "🔗 الكونيكتورز", schema: "🗺️ المخطط" };
+const LAB_PICK_KEY = "studiomania.lab.pick";
+function labPicked() {
+  try { return new Set(JSON.parse(storageGet(LAB_PICK_KEY) || "null") || ["schema"]); } catch { return new Set(["schema"]); }
+}
+function renderLabPick(d) {
+  const pick = labPicked(), st = d.steps || {};
+  const fresh = !["elements", "components", "connectors"].some((k) => st[k]) && !d.schema;
+  const note = (k) => (k === "components" && st.elements?.status !== "done" ? " <small class=\"muted\">(محتاج العناصر، هتتعمل معاه)</small>" : "")
+    + (st[k]?.status === "done" || (k === "schema" && d.schema?.data) ? " ✅" : "");
+  $("labPick").innerHTML = `${fresh && st.shots?.status === "done" ? `<p class="hint">✂️ الفيديو اتقسّم. اختار إنت عايز تطلّع إيه منه (كل حاجة لوحدها، والأسرع المخطط بس):</p>` : ""}
+    <div class="row wrap lab-pickrow"><b>عايز تطلّع إيه؟</b>
+      ${Object.entries(LAB_PICK).map(([k, l]) => `<label class="check"><input type="checkbox" data-pick="${k}" ${pick.has(k) ? "checked" : ""} ${d.busy ? "disabled" : ""}> ${l}${note(k)}</label>`).join("")}
+      <button type="button" class="btn sm primary" data-pickgo ${d.busy ? "disabled" : ""}>▶️ طلّع اللي اخترته</button></div>`;
+}
+
 function scheduleLabPoll() {
   clearTimeout(labx.timer);
   if (!labx.cur?.busy || document.querySelector('.view[data-view="11"]').hidden) return;
@@ -84,9 +101,12 @@ function renderLab() {
   $("labSplit").value = d.split || "cuts";
   $("labSplit").disabled = d.busy;
   document.querySelectorAll("[data-labrun]").forEach((b) => (b.disabled = d.busy));
-  $("labStatus").innerHTML = Object.entries(LAB_STEP).filter(([k]) => !["stems", "audio"].includes(k) || d.steps?.[k]).map(([k, l]) => {
+  $("labStop").hidden = !d.busy;
+  renderLabPick(d);
+  // الخطوات اللي اتطلبت بس (كل خطوة بتشتغل لما تختارها)
+  $("labStatus").innerHTML = Object.entries(LAB_STEP).filter(([k]) => d.steps?.[k]).map(([k, l]) => {
     const s = d.steps?.[k] || {};
-    return `<span class="lab-st ${s.status || ""}">${s.status === "working" ? `<span class="spin-inline"></span>` : s.status === "done" ? "✅" : s.status === "failed" ? "✕" : s.status === "skipped" ? "⏭" : "⏸"}
+    return `<span class="lab-st ${s.status || ""}">${s.status === "working" ? `<span class="spin-inline"></span>` : s.status === "done" ? "✅" : s.status === "failed" ? "✕" : s.status === "skipped" ? "⏭" : s.status === "stopped" ? "⏹" : "⏳"}
       ${l}${s.progress ? ` <small>${le(s.progress)}</small>` : ""}${s.error ? ` <small class="err">${le(s.error)}</small>` : ""}</span>`;
   }).join("");
   renderLabScore(d);
@@ -702,11 +722,26 @@ document.querySelector('.view[data-view="11"]').addEventListener("click", async 
     const cur = ok.classList.contains("on");
     return labReview(box.dataset.kind, box.dataset.ref, { ok: cur ? null : val, note: box.querySelector("[data-rvnote]").value });
   }
+  const go = e.target.closest("[data-pickgo]");
+  if (go) {
+    const pick = [...document.querySelectorAll("#labPick [data-pick]:checked")].map((x) => x.dataset.pick);
+    if (!pick.length) return toast("اختار حاجة واحدة على الأقل", true);
+    storageSet(LAB_PICK_KEY, JSON.stringify(pick));
+    const steps = pick.filter((k) => k !== "schema");
+    if (!confirm(`يطلّع من «${labx.cur.name}»: ${pick.map((k) => LAB_PICK[k]).join("، ")}؟`)) return;
+    return busyButton(go, "⏳", async () => {
+      if (steps.length) labx.cur = await api(`/api/lab/${labx.cur.id}/run?steps=${steps.join(",")}`, { method: "POST" });
+      if (pick.includes("schema")) labx.cur = await api(`/api/lab/${labx.cur.id}/schema`, { method: "POST" });
+      renderLab(); scheduleLabPoll();
+    });
+  }
   const run = e.target.closest("[data-labrun]");
   if (run) {
-    const ask = { all: "تفكك الفيديو من الأول؟ (الكومبوننتس اللي قبلتها أو رفضتها بتفضل، واللي في المكتبة مش بيتمسح)",
-      components: "يقترح كومبوننتس جديدة؟ اللي قبلته أو رفضته بيفضل زي ما هو، ورفضك بيتبعت له عشان يتعلم منه." }[run.dataset.labrun]
-      || "تعيد الخطوة دي؟ (العناصر والكومبوننتس بيتعملوا من جديد بعدها)";
+    const ask = { shots: "يقسّم الفيديو تاني؟ (العناصر بتاعة اللقطات القديمة هتروح، ولو عايزها دوس «🧩 العناصر» بعدها)",
+      elements: "يفكك عناصر كل لقطة؟ (بياخد وقت: الموديل بيشوف كل لقطة لوحدها)",
+      components: "يقترح كومبوننتس جديدة؟ اللي قبلته أو رفضته بيفضل زي ما هو، ورفضك بيتبعت له عشان يتعلم منه.",
+      connectors: "يدوّر على كونيكتورز؟ اللي قبلته أو رفضته بيفضل." }[run.dataset.labrun]
+      || "تعيد الخطوة دي؟";
     if (!confirm(ask)) return;
     try { labx.cur = await api(`/api/lab/${labx.cur.id}/run?step=${run.dataset.labrun}`, { method: "POST" }); renderLab(); scheduleLabPoll(); }
     catch (err) { toast(err.message, true); }
@@ -814,4 +849,10 @@ $("labSplit").addEventListener("change", async () => {
     }
     renderLab();
   } catch (err) { toast(err.message, true); }
+});
+
+$("labStop").onclick = () => busyButton($("labStop"), "⏳", async () => {
+  labx.cur = await api(`/api/lab/${labx.cur.id}/stop`, { method: "POST" });
+  renderLab(); scheduleLabPoll();
+  toast("⏹ بيوقف. اللي خلص بيفضل، والخطوة اللي شغالة بتقف عند أقرب نقطة");
 });
