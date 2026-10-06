@@ -796,6 +796,227 @@ def film_script_rewrite_messages(brain_txt: str, plan: dict, instruction: str) -
     )
 
 
+# ------------------------------------------------------------ 🗺️ مخطط الفيديو (تيمبليت كامل)
+
+SCHEMA_ROLES = {"hook": "🪝 هوك", "problem": "😣 مشكلة", "feature": "✨ ميزة", "proof": "📈 دليل", "cta": "👉 دعوة", "other": "• تاني"}
+
+SCHEMA_FORMAT = """{
+  "title": "اسم قصير للأسلوب ده (بالعربي)",
+  "summary": "الفيديو ده ماشي إزاي في سطرين (بالعربي)",
+  "beat_sec": 0.5,
+  "style": "English: the single visual world of the whole video (render style, materials, lighting, background, depth, typography look) so it can be recreated",
+  "palette": "English: main colors",
+  "spine": "English: the element(s) that stay on screen and carry the eye through the whole video (or how continuity is kept)",
+  "camera": "English: the overall camera language (always moving? push-ins? orbit? speed and easing)",
+  "text_style": "English: how on-screen text looks and where it sits",
+  "music": "نوع الموسيقى وإيقاعها (بالعربي)",
+  "beats": [{"t0": 0.0, "t1": 1.5, "role": "hook | problem | feature | proof | cta | other",
+             "what": "اللي بيحصل في الجزء ده بالعربي",
+             "layout": "English: the composition of this beat with content SLOTS in brackets, e.g. [app screen] in a phone at center, [headline] top third",
+             "slots": [{"kind": "screen | logo | headline | subtext | product | person | icon | other", "desc": "English: what goes there"}],
+             "camera": "English: camera move inside this beat",
+             "into_next": "English: exactly how this beat flows into the next one with no cut (what moves/morphs/zooms), or empty for the last",
+             "keeps": "English: what stays identical going into the next beat",
+             "sfx": "المؤثر الصوتي لو فيه"}]
+}"""
+
+
+def schema_messages(d: dict) -> list[dict]:
+    """الموديل بيتفرج على الفيديو كله ويطلّع مخططه: الثوابت، والتايم لاين جزء جزء بالخانات اللي بتتملا بمحتوى أي عميل."""
+    lines = [f"- لقطة {s['n']} ({s['start']:.2f}–{s['end']:.2f}): {(s.get('analysis') or {}).get('summary', '')}" for s in d.get("shots") or []]
+    conns = [f"- {c['name']} ({c['t0']:.2f}–{c['t1']:.2f}): {c.get('trigger', '')}" for c in d.get("connectors") or []]
+    text = (
+        "أنت مخرج موشن جرافيك محترف. اتفرج على الفيديو ده كله بالصوت. الفيديو ده بيحس إنه قطعة واحدة متصلة، "
+        "والمطلوب نطلّع «مخططه» عشان نعمل فيديوهات تانية لعملاء تانيين بنفس الإحساس بالظبط: نفس العالم، ونفس الإيقاع، "
+        "ونفس حركة الكاميرا، ونفس طريقة انتقال كل جزء للي بعده من غير قطع.\n\n"
+        f"الفيديو مدته {d['source']['duration']:.2f} ثانية.\n"
+        + ("اللقطات اللي اتعرفت (للمساعدة، الفيديو هو المرجع):\n" + "\n".join(lines) + "\n" if lines else "")
+        + ("الكونيكتورز اللي اتعرفت:\n" + "\n".join(conns) + "\n" if conns else "")
+        + "\nقسّم الفيديو لأجزاء (beats) على الإيقاع: كل جزء ليه وظيفة في القصة ووضع واضح للشاشة (من 0.8 لـ 4 ثواني غالبًا). "
+        "الأجزاء ورا بعض من غير فراغ (t1 بتاع جزء = t0 بتاع اللي بعده) وبتغطي الفيديو كله.\n"
+        "- اكتب المحتوى كخانات عامة بين أقواس [ ] (مثلًا [app screen]، [headline]، [logo]) بدل اسم المنتج أو الكلام اللي في الفيديو ده، "
+        "عشان التيمبليت ينفع لأي عميل.\n"
+        "- into_next أهم حاجة: إزاي الجزء ده بيتحوّل للي بعده قدام العين من غير قطع (زووم جوه حاجة، عنصر بيكبر ويبقى الخلفية، الكاميرا بتلف...).\n"
+        "- beat_sec = طول البيت في الموسيقى (لو مش واضح اكتب 0).\n"
+        "رجّع JSON بس بالشكل ده:\n" + SCHEMA_FORMAT
+    )
+    return [{"role": "user", "content": text}]
+
+
+def _f(v, d=0.0):
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return d
+
+
+def clean_schema(data: dict, duration: float) -> dict:
+    d = data or {}
+    beats = []
+    for x in d.get("beats") or []:
+        if not isinstance(x, dict):
+            continue
+        t0, t1 = max(0.0, _f(x.get("t0"))), min(duration, _f(x.get("t1")))
+        if t1 - t0 < 0.2:
+            continue
+        slots = [{"kind": str(z.get("kind") or "other")[:20], "desc": str(z.get("desc") or "")[:300]}
+                 for z in x.get("slots") or [] if isinstance(z, dict)][:6]
+        beats.append({"t0": round(t0, 2), "t1": round(t1, 2), "role": x.get("role") if x.get("role") in SCHEMA_ROLES else "other",
+                      "what": str(x.get("what") or "")[:600], "layout": str(x.get("layout") or "")[:800], "slots": slots,
+                      "camera": str(x.get("camera") or "")[:400], "into_next": str(x.get("into_next") or "")[:800],
+                      "keeps": str(x.get("keeps") or "")[:400], "sfx": str(x.get("sfx") or "")[:200]})
+    beats.sort(key=lambda b: b["t0"])
+    beats = beats[:16]
+    if beats:
+        beats[-1]["into_next"] = ""
+    return {k: str(d.get(k) or "")[:1500] for k in ("title", "summary", "style", "palette", "spine", "camera", "text_style", "music")} | {
+        "beat_sec": round(max(0.0, _f(d.get("beat_sec"))), 3), "beats": beats}
+
+
+def mock_schema(d: dict) -> dict:
+    dur = d["source"]["duration"]
+    n = max(2, min(5, int(dur // 2)))
+    step = dur / n
+    roles = ["hook", "feature", "feature", "proof", "cta"]
+    return {"title": "موبايل في النص والكاميرا ماشية", "summary": "موبايل ثابت في النص والكاميرا بتدخل جوه الشاشات", "beat_sec": 0.5,
+            "style": "Clean 3D render, soft studio light, pastel background.", "palette": "teal, cream", "spine": "A phone at center.",
+            "camera": "Always pushing in slowly.", "text_style": "Bold sans headline in the top third.", "music": "بيت خفيف",
+            "beats": [{"t0": round(i * step, 2), "t1": round((i + 1) * step, 2), "role": roles[min(i, 4)], "what": f"جزء {i + 1}",
+                       "layout": "[app screen] in a phone at center, [headline] top third", "slots": [{"kind": "screen", "desc": "app screen"}],
+                       "camera": "slow push in", "into_next": "zoom into the screen until it becomes the background" if i < n - 1 else "",
+                       "keeps": "the phone", "sfx": ""} for i in range(n)]}
+
+
+TEXT_MODES = {"blank": "مساحات فاضية (الكلام العربي في المونتاج)", "en": "كلام إنجليزي جوه الصور"}
+
+FILL_FORMAT = """{
+  "title": "اسم الفيديو",
+  "world": "English: ONE consistent world for the whole video (style, lighting, background, the spine element, the brand colors) repeated in every panel",
+  "panels": [{"desc": "English: exactly what the frame looks like at this moment (composition per the template layout, which real brand asset fills which slot)", "asset": "اسم الأصل من ملف العميل اللي بيظهر هنا أو فاضي"}],
+  "beats": [{"motion": "English prompt for a start-frame/end-frame video model: the continuous motion from this panel to the next one (camera move + the template's into_next), no cut",
+             "text": "الكلام اللي على الشاشة في الجزء ده", "voice": "جملة فويس أوفر للجزء ده (بلغة ولهجة العميل) أو فاضي"}]
+}"""
+
+
+def fill_messages(brain_txt: str, schema: dict, brief: str, text_mode: str) -> str:
+    n = len(schema["beats"])
+    beats = [{k: b[k] for k in ("t0", "t1", "role", "what", "layout", "slots", "camera", "into_next", "keeps")} for b in schema["beats"]]
+    glob = {k: schema.get(k) for k in ("style", "palette", "spine", "camera", "text_style")}
+    text_rule = ("الكلام اللي على الشاشة بالإنجليزي (قصير جدًا، ٢-٥ كلمات) وهيترسم جوه الصور." if text_mode == "en" else
+                 "الكلام اللي على الشاشة بلغة ولهجة العميل (قصير جدًا) ومش هيترسم في الصور: الصور بتسيب مكانه فاضي "
+                 "(مساحة نضيفة في مكان خانة الكلام) وهيتضاف في المونتاج.")
+    return (
+        "أنت مخرج إعلانات موشن جرافيك. عندنا «تيمبليت» متطلّع من فيديو احترافي بيحس إنه قطعة واحدة. "
+        "المطلوب تعمل فيديو جديد للعميل ده على نفس التيمبليت بالظبط: نفس عدد الأجزاء ونفس وظيفة كل جزء ونفس الكاميرا ونفس طريقة الانتقال، "
+        "بس المحتوى (الخانات) بتتملا بمنتج العميل وأصوله الحقيقية.\n\n"
+        f"ملف العميل:\n{brain_txt or '(مفيش)'}\n\nالمطلوب من الفيديو: {brief or 'فيديو بيعرض أهم مميزات المنتج'}\n\n"
+        f"ثوابت التيمبليت:\n{json.dumps(glob, ensure_ascii=False, indent=1)}\n\nأجزاء التيمبليت:\n{json.dumps(beats, ensure_ascii=False, indent=1)}\n\n"
+        f"- panels = {n + 1} لوحة بالظبط: لوحة رقم i هي شكل الشاشة في أول الجزء i، واللوحة الأخيرة شكلها في آخر الفيديو. "
+        "يعني الجزء i بيتحرك من اللوحة i للوحة i+1، فاللوحتين لازم يكونوا نفس العالم ونفس العناصر، والفرق بينهم هو اللي بيعمله into_next.\n"
+        f"- beats = {n} بالظبط بنفس الترتيب.\n"
+        "- العالم واحد في كل اللوحات: نفس الخلفية والإضاءة والألوان، والعمود الفقري (spine) موجود ومتوصف بنفس الكلام في كل لوحة.\n"
+        f"- {text_rule}\n"
+        "- لو خانة فيها شاشة التطبيق أو اللوجو أو المنتج، اكتب اسمه في asset بالظبط زي ملف العميل.\n"
+        "رجّع JSON بس بالشكل ده:\n" + FILL_FORMAT
+    )
+
+
+def clean_fill(data: dict, n: int) -> dict:
+    d = data or {}
+    panels = [{"desc": str(x.get("desc") or "")[:2000], "asset": str(x.get("asset") or "")[:120]}
+              for x in d.get("panels") or [] if isinstance(x, dict)][:n + 1]
+    while len(panels) < n + 1:
+        panels.append({"desc": panels[-1]["desc"] if panels else "", "asset": ""})
+    beats = [{"motion": str(x.get("motion") or "")[:1500], "text": str(x.get("text") or "")[:200], "voice": str(x.get("voice") or "")[:600]}
+             for x in d.get("beats") or [] if isinstance(x, dict)][:n]
+    while len(beats) < n:
+        beats.append({"motion": "Smooth continuous camera move from the start frame to the end frame, no cut.", "text": "", "voice": ""})
+    return {"title": str(d.get("title") or "")[:120], "world": str(d.get("world") or "")[:2000], "panels": panels, "beats": beats}
+
+
+def mock_fill(schema: dict, brand: str) -> dict:
+    n = len(schema["beats"])
+    return {"title": f"{brand} على التيمبليت", "world": "Pastel 3D studio, a teal phone at center.",
+            "panels": [{"desc": f"Panel {i + 1}: the phone at center showing screen {i + 1}.", "asset": ""} for i in range(n + 1)],
+            "beats": [{"motion": "Slow push in.", "text": f"{brand} {i + 1}", "voice": f"جملة {i + 1}"} for i in range(n)]}
+
+
+def sheet_grid(count: int) -> tuple[int, int]:
+    cols = 3 if count > 4 else 2 if count > 1 else 1
+    return cols, -(-count // cols)
+
+
+def sheet_prompt(schema: dict, fill: dict, cells: list[int], ratio: str, text_mode: str, texts: list[str],
+                 refs: list[str], style_from_prev: bool) -> str:
+    """برومبت شيت ستوري بورد واحد فيه اللوحات دي كلها، ينفع يتحط في ChatGPT زي ما هو."""
+    cols, rows = sheet_grid(len(cells))
+    lines = []
+    for k, j in enumerate(cells):
+        t = texts[j] if j < len(texts) else ""
+        txt = (f' On-screen text: "{t}".' if text_mode == "en" and t else
+               " Leave a clean empty area where the headline would go (no letters)." if text_mode != "en" and t else "")
+        lines.append(f"Panel {k + 1}: {fill['panels'][j]['desc']}{txt}")
+    ref_txt = "".join(f"\nReference image {i + 1} is {r}: use it exactly as it is wherever it appears." for i, r in enumerate(refs))
+    return (
+        f"One single image: a storyboard sheet with a grid of {rows} rows x {cols} columns of equal {ratio} panels, read left to right, "
+        "top to bottom, separated by thin plain white gutters, no borders, no panel numbers, no captions.\n"
+        "All panels are frames of ONE continuous video shot in ONE world: identical style, lighting, background, colors, materials and the "
+        "same recurring elements in every panel, so that consecutive panels look like moments of the same take.\n"
+        f"WORLD: {fill.get('world') or schema.get('style')}\n"
+        f"STYLE: {schema.get('style')}\nPALETTE: {schema.get('palette')}\nRECURRING ELEMENT: {schema.get('spine')}\n"
+        + ("No text or letters anywhere except inside real brand assets.\n" if text_mode != "en" else
+           f"TEXT STYLE: {schema.get('text_style')} Spell English text exactly as given.\n")
+        + ("The previous storyboard sheet is attached: match its world and style exactly.\n" if style_from_prev else "")
+        + "\n".join(lines) + ref_txt
+    )
+
+
+def _bands(white: list[float], n: int, parts: int, thr: float = 0.9) -> list[tuple[int, int]] | None:
+    """حدود كل خانة على محور واحد من نسبة البكسلات البيضا في كل عمود/صف. None لو الفواصل مش واضحة."""
+    runs, start = [], None
+    for i, v in enumerate(white + [0.0]):
+        if v >= thr and start is None:
+            start = i
+        elif v < thr and start is not None:
+            runs.append((start, i))
+            start = None
+    lead = runs[0][1] if runs and runs[0][0] == 0 else 0
+    tail = runs[-1][0] if runs and runs[-1][1] >= n else n
+    inner = [r for r in runs if r[0] > 0 and r[1] < n]
+    seps = []
+    for k in range(1, parts):
+        want = lead + (tail - lead) * k / parts
+        best = min(inner, key=lambda r: abs((r[0] + r[1]) / 2 - want), default=None)
+        if best is None or abs((best[0] + best[1]) / 2 - want) > (tail - lead) / parts * 0.3 or best in seps:
+            return None
+        seps.append(best)
+    edges = [lead] + [x for r in seps for x in r] + [tail]
+    out = [(edges[2 * k], edges[2 * k + 1]) for k in range(parts)]
+    return out if all(b - a > n / parts * 0.5 for a, b in out) else None
+
+
+def sheet_cells(gray: bytes, w: int, h: int, rows: int, cols: int) -> tuple[list, list] | None:
+    """الفواصل البيضا بين اللوحات (من صورة رمادي صغيرة). بيرجّع حدود الأعمدة والصفوف بالنسبة (0..1)، أو None."""
+    if len(gray) < w * h:
+        return None
+    col_white = [sum(1 for y in range(h) if gray[y * w + x] > 228) / h for x in range(w)]
+    row_white = [sum(1 for x in range(w) if gray[y * w + x] > 228) / w for y in range(h)]
+    xs, ys = _bands(col_white, w, cols), _bands(row_white, h, rows)
+    if not xs or not ys:
+        return None
+    return [(a / w, b / w) for a, b in xs], [(a / h, b / h) for a, b in ys]
+
+
+def panel_sharpen_prompt(desc: str, text_mode: str, text: str, note: str = "") -> str:
+    return ("IMAGE 1 is one panel cut out of a storyboard sheet. Redraw it as a full-resolution final frame: EXACTLY the same composition, "
+            "camera angle, elements, colors, lighting and style, only sharper and fully detailed. Do not add or remove anything. "
+            "Fill the whole frame (no gutters or borders)."
+            + (f' On-screen text exactly: "{text}".' if text_mode == "en" and text else " No text or letters except inside real brand assets.")
+            + (f"\nThe frame shows: {desc}" if desc else "")
+            + (f"\nAlso: {note}" if note else "")
+            + "\nOther attached images (if any) are the real brand assets: keep them exactly as they are.")
+
+
 # ------------------------------------------------------------ تجارب من غير Atlas
 
 def mock_audio(duration: float, marks: list[dict]) -> dict:

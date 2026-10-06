@@ -27,6 +27,7 @@ async function initLab() {
   else renderLab();
   if (labx.view === "lib") openLib(asx.cur?.id);
   if (labx.view === "film") openFilm(filmx.cur?.id);
+  if (labx.view === "tpl") openTpl(tplx.cur?.id);
 }
 async function openLab(id) {
   const fresh = await api(`/api/lab/${id}`);
@@ -69,11 +70,13 @@ function renderLab() {
       <span class="ad-li-body"><span class="nm" data-no-i18n>${le(x.name)}</span>
         <small class="muted">${x.duration} ث · ${x.shots} لقطة</small></span>
       <small>${x.busy ? "⏳" : ""}</small></li>`).join("") || `<li class="muted">لسه مفيش فيديوهات.</li>`;
-  const d = labx.cur, lib = labx.view === "lib" || labx.view === "film";
+  const d = labx.cur, lib = ["lib", "film", "tpl"].includes(labx.view);
   $("labLibBtn").classList.toggle("active", labx.view === "lib");
   $("labFilmBtn").classList.toggle("active", labx.view === "film");
   $("labLib").hidden = labx.view !== "lib";
   $("labFilm").hidden = labx.view !== "film";
+  $("labTplBtn").classList.toggle("active", labx.view === "tpl");
+  $("labTpl").hidden = labx.view !== "tpl";
   $("labMain").hidden = !d || lib;
   $("labEmpty").hidden = !!d || lib;
   if (!d || lib) return;
@@ -93,6 +96,7 @@ function renderLab() {
   if (!busyEdit($("labComps")) && !compPlaying) renderLabComps(d);
   const connPlaying = [...$("labConns").querySelectorAll("video")].some((v) => !v.paused);
   if (!busyEdit($("labConns")) && !connPlaying && !Object.values(labx.xedit).some(Boolean)) renderLabConns(d);
+  if (!busyEdit($("labSchema"))) renderLabSchema(d);
   if (!busyEdit($("labAudio"))) renderLabAudio(d);
   const shotPlaying = [...document.querySelectorAll("[data-shotvid]")].some((v) => !v.paused);
   if (!busyEdit($("labShots")) && !shotPlaying) renderLabShots(d);
@@ -475,7 +479,7 @@ function renderLabShots(d) {
 // ---------- الأحداث
 const labAudio = new Audio();
 document.querySelector('.view[data-view="11"]').addEventListener("click", async (e) => {
-  if (e.target.closest("#labLib, #labFilm")) return;  // المكتبة ليها أحداثها في assets.js
+  if (e.target.closest("#labLib, #labFilm, #labTpl, #labSchema")) return;  // المكتبة ليها أحداثها في assets.js
   const conn = e.target.closest("[data-conn]");
   if (conn) {
     const cid = conn.dataset.conn, c = labx.cur.connectors.find((x) => x.id === cid);
@@ -714,7 +718,7 @@ document.querySelector('.view[data-view="11"]').addEventListener("toggle", (e) =
   if (e.target.matches?.("[data-audiobox]")) labx.audioOpen = e.target.open;
 }, true);
 document.querySelector('.view[data-view="11"]').addEventListener("change", (e) => {
-  if (e.target.closest("#labLib, #labFilm")) return;
+  if (e.target.closest("#labLib, #labFilm, #labTpl, #labSchema")) return;
   const conn = e.target.closest("[data-conn]");
   if (conn) {
     const cid = conn.dataset.conn, c = labx.cur.connectors.find((x) => x.id === cid), k = e.target.dataset.xf;
