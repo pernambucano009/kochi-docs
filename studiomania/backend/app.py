@@ -10463,11 +10463,7 @@ def run_film_gen(fid: str, only: tuple | None) -> None:
     try:
         d = film_load(fid)
         p, folder = d["plan"], film_dir(fid)
-        err = subprocess.run([ffmpeg_exe(), "-hide_banner", "-i", str(folder / "sc1_a.png")], capture_output=True, text=True).stderr
-        m = re.search(r"Video:.*?(\d{2,5})x(\d{2,5})", err)
-        if not m:
-            raise HTTPException(400, "مقدرتش أقرا مقاس أول فريم. ارسمه تاني")
-        W, H = int(m.group(1)) // 2 * 2, int(m.group(2)) // 2 * 2
+        W, H = film_dims(folder)
         ratio = az.ASPECTS.get(d["ratio"], az.ASPECTS["9:16"])[1]
         size = az.ASPECTS.get(d["ratio"], az.ASPECTS["9:16"])[0]
         f = film_files(d)
@@ -10743,8 +10739,8 @@ def film_voice_upload(fid: str, file: UploadFile | None = File(default=None)):
     """⬆ فويس أوفر كامل انت عامله: البرنامج بيسمعه ويلاقي جملة كل مشهد، ويقطّعه، والمشاهد بتتظبط عليه.
     من غير ملف = يقطّع الملف اللي اترفع قبل كده تاني (بعد ما عدّلت السكريبت مثلًا)."""
     d = film_load(fid)
-    if not any((s.get("voice") or "").strip() for s in (d.get("plan") or {}).get("scenes") or []):
-        raise HTTPException(400, "اكتب جمل الفويس أوفر في السكريبت الأول (نفس الكلام اللي في التسجيل) عشان أعرف أقطّعه على المشاهد")
+    if not (d.get("plan") or {}).get("scenes"):
+        raise HTTPException(400, "استنى لما السيناريو يخلص")
     if d.get("status") in FILM_BUSY:
         raise HTTPException(400, "استنى لما الشغل اللي شغال يخلص")
     if file is not None and file.filename:
@@ -10762,19 +10758,32 @@ def run_film_voice_upload(fid: str, name: str) -> None:
         p, folder = d["plan"], film_dir(fid)
         src = folder / name
         total = probe_duration(src)
+        film_set(fid, step="🎧 بيسمع التسجيل ويكتب كلامه")
         words = atlas.transcribe(src, total)
         scenes = [{**s, "talking": False} for s in p["scenes"]]
         texts = [{"text": s.get("voice") or ""} for s in scenes]
         voiced = [i for i, t in enumerate(texts) if t["text"].strip()]
-        timed, _ = sz.align_with_ratio(words, [texts[i] for i in voiced])
         spans: list[dict | None] = [None] * len(scenes)
-        for i, t in zip(voiced, timed):
-            if t.get("start") is not None and t.get("end") is not None:
-                spans[i] = {"start": float(t["start"]), "end": float(t["end"])}
+        if voiced:
+            timed, ratio = sz.align_with_ratio(words, [texts[i] for i in voiced])
+            for i, t in zip(voiced, timed):
+                if t.get("start") is not None and t.get("end") is not None:
+                    spans[i] = {"start": float(t["start"]), "end": float(t["end"])}
+        else:
+            ratio = 0.0
+        filled = False
+        if not voiced or ratio < 0.3 or not any(spans):
+            # السكريبت فاضي أو مش شبه التسجيل: التسجيل بيتقسم على المشاهد عند أطول وقفات، وكلامه بيتكتب في السكريبت
+            chunks = film_split_words(words, len(scenes))
+            if not chunks:
+                raise HTTPException(400, "مقدرتش أسمع كلام في التسجيل ده. اتأكد إن فيه صوت واضح")
+            spans = [{"start": c[0]["s"], "end": c[-1]["e"]} if c else None for c in chunks]
+            texts = [{"text": " ".join(w["w"] for w in c)} for c in chunks]
+            filled = True
         snap_spans(spans, silences(src))
         wins = shot_windows(scenes, spans, total)
         if not wins:
-            raise HTTPException(400, "مقدرتش ألاقي جمل السكريبت في الصوت. اتأكد إن جمل الفويس أوفر في السكريبت هي نفس اللي في التسجيل")
+            raise HTTPException(400, "مقدرتش أقسّم التسجيل على المشاهد")
         wins = min_silent(scenes, wins, spans)
         old = {ln["file"] for ln in film_voice_lines(d) if ln}
         lines: list = []
@@ -10794,9 +10803,117 @@ def run_film_voice_upload(fid: str, name: str) -> None:
         prev = (d.get("voice") or {}).get("full")
         if prev and prev != name:
             (folder / prev).unlink(missing_ok=True)
-        film_voice_done(fid, mode="upload", full=name, lines=lines, duration=round(total, 2))
+        if filled:   # كلام التسجيل بقى هو جمل الفويس أوفر في السكريبت
+            def fill(x):
+                for sc, t in zip(x["plan"]["scenes"], texts):
+                    sc["voice"] = t["text"][:600]
+            film_update(fid, fill)
+        film_voice_done(fid, mode="upload", full=name, lines=lines, duration=round(total, 2), filled=filled)
     except Exception as exc:  # noqa: BLE001
         film_fail(fid, exc)
+
+
+def film_split_words(words: list[dict], n: int) -> list[list[dict]]:
+    """كلمات التسجيل على n مشهد: القطع عند أطول n-1 وقفة بين الكلمات (بالترتيب)."""
+    ws = [w for w in words if str(w.get("w", "")).strip()]
+    if not ws:
+        return []
+    if len(ws) < n:
+        return [[w] for w in ws] + [[] for _ in range(n - len(ws))]
+    # كل قطع حوالين مكانه لو الكلام اتقسم بالتساوي، وعند أطول وقفة في المنطقة دي
+    cuts, m = [0], len(ws)
+    for k in range(1, n):
+        lo = max(cuts[-1] + 1, round(m * (k - 0.45) / n))
+        hi = min(m - (n - k), round(m * (k + 0.45) / n))
+        cuts.append(max(range(lo, max(lo, hi) + 1), key=lambda j: ws[j]["s"] - ws[j - 1]["e"]))
+    cuts.append(m)
+    return [ws[a:b] for a, b in zip(cuts, cuts[1:])]
+
+
+def film_dims(folder: Path) -> tuple[int, int]:
+    err = subprocess.run([ffmpeg_exe(), "-hide_banner", "-i", str(folder / "sc1_a.png")], capture_output=True, text=True).stderr
+    m = re.search(r"Video:.*?(\d{2,5})x(\d{2,5})", err)
+    if not m:
+        raise HTTPException(400, "مقدرتش أقرا مقاس أول فريم. ارسمه تاني")
+    return int(m.group(1)) // 2 * 2, int(m.group(2)) // 2 * 2
+
+
+def film_starts(p: dict) -> list[float]:
+    """كل مشهد بيبدأ إمتى في الفيديو المتجمّع (مشهد ← كونيكتور ← مشهد)."""
+    t, out = 0.0, []
+    for i, sc in enumerate(p["scenes"]):
+        out.append(t)
+        t += sc["seconds"] + (film_link_len(p, i) if i < len(p["scenes"]) - 1 else 0)
+    return out
+
+
+@app.post("/api/films/{fid}/to-editor")
+def film_to_editor(fid: str):
+    """🎞️ المشاهد والكونيكتورز بالترتيب (كل واحد قطعة لوحده) في مشروع مونتاج، ومعاهم الفويس أوفر في مكانه."""
+    d = film_load(fid)
+    p, folder = d.get("plan") or {}, film_dir(fid)
+    if d.get("status") in FILM_BUSY:
+        raise HTTPException(400, "استنى لما الشغل اللي شغال يخلص")
+    f = film_files(d)
+    miss = [f"المشهد {i + 1}" for i, x in enumerate(f["scenes"]) if not (x.get("video") and (folder / x["video"]).exists())]
+    miss += [f"الكونيكتور {i + 1}" for i, x in enumerate(f["links"]) if not (x.get("video") and (folder / x["video"]).exists())]
+    if not p.get("scenes") or miss:
+        raise HTTPException(400, "لسه متولدش: " + "، ".join(miss) if miss else "مفيش مشاهد")
+    W, H = film_dims(folder)
+    label = d.get("name") or "فيديو"
+    pieces = []
+    for i, sc in enumerate(p["scenes"]):
+        pieces.append((folder / f"sc{i + 1}.mp4", sc["seconds"], f"🎬 مشهد {i + 1}: {sc['label']}"))
+        if i < len(p["scenes"]) - 1:
+            pieces.append((folder / f"L{i + 1}.mp4", None, f"🔗 كونيكتور {i + 1}"))
+    lines = film_voice_lines(d)
+    full = (d.get("voice") or {}).get("full")
+    with closing(db()) as conn, conn:
+        clips = []
+        for src, secs, name in pieces:
+            gid = uuid.uuid4().hex[:12]
+            out = GENERATED_DIR / f"{gid}.mp4"
+            if secs:
+                chain_clips([timed(src, secs)], out, W, H)   # المشهد على الطول اللي في الخطة (طول جملته)
+            else:
+                shutil.copyfile(src, out)
+            dur = probe_duration(out)
+            conn.execute(
+                "INSERT INTO generations (id, clip_id, clip_filename, clip_label, coach_id, coach_name, coach_image, model, prompt, "
+                "params, status, output_filename, created_at, updated_at) VALUES (?, ?, ?, ?, '', '', '', 'seedance', '', '{}', 'completed', ?, ?, ?)",
+                (gid, f"ad:film-{fid}", src.name, f"🎞️ {label} · {name}", out.name, now(), now()))
+            clips.append({"gen_id": gid, "start": 0.0, "end": round(dur, 3), "zoom": 1.0, "x": 0.0, "y": 0.0, "volume": 0.0})
+        voice = None
+        vid = uuid.uuid4().hex[:12]
+        if any(ln and (folder / ln["file"]).exists() for ln in lines):
+            # كل جملة في أول المشهد بتاعها، زي الفيديو المتجمّع بالظبط
+            vfile = f"voice_{vid}.m4a"
+            starts, inputs, chain, k = film_starts(p), [], [], 0
+            for i, ln in enumerate(lines):
+                if ln and (folder / ln["file"]).exists():
+                    inputs += ["-i", str(folder / ln["file"])]
+                    ms = int(round((starts[i] + (0.1 if (d.get("voice") or {}).get("mode") == "tts" else 0)) * 1000))
+                    chain.append(f"[{k}:a]aresample=44100,adelay={ms}|{ms}[a{k}]")
+                    k += 1
+            chain.append("".join(f"[a{j}]" for j in range(k)) + f"amix=inputs={k}:normalize=0:duration=longest[out]")
+            subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", *inputs, "-filter_complex", ";".join(chain),
+                            "-map", "[out]", "-c:a", "aac", "-b:a", "192k", str(AUDIO_DIR / vfile)], check=True, capture_output=True, timeout=300)
+        elif full and (folder / full).exists():
+            vfile = f"voice_{vid}{Path(full).suffix}"
+            shutil.copyfile(folder / full, AUDIO_DIR / vfile)
+        else:
+            vfile = None
+        if vfile:
+            conn.execute("INSERT INTO audio (id, kind, name, filename, duration, created_at) VALUES (?, 'voice', ?, ?, ?, ?)",
+                         (vid, f"🎙️ {label}", vfile, probe_duration(AUDIO_DIR / vfile), now()))
+            voice = {"id": vid, "volume": 1.0, "delay": 0.0, "offset": 0.0, "length": None, "fade_out": False, "parts": []}
+        pid = uuid.uuid4().hex[:12]
+        pdata = {"name": label, "section": "ads", "video_id": None, "coach_id": None, "clips": clips, "voice": voice,
+                 "music": default_music(conn), "outro": False, "outro_volume": 1.0, "captions": {}, "logo": {}}
+        conn.execute("INSERT INTO projects (id, name, data, render_status, created_at, updated_at) VALUES (?, ?, ?, 'idle', ?, ?)",
+                     (pid, pdata["name"], json.dumps(pdata, ensure_ascii=False), now(), now()))
+    film_update(fid, lambda x: x.update(project_id=pid))
+    return {"project_id": pid}
 
 
 @app.delete("/api/films/{fid}/voice")

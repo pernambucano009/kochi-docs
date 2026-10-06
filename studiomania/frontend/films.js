@@ -167,7 +167,7 @@ function fmScript(f) {
       <div class="row wrap">
         <select data-fmvoice>${(f.voices || []).map((x) => `<option value="${x.id}" ${x.id === v?.voice_id ? "selected" : ""}>${le(x.label)}</option>`).join("")}</select>
         <button type="button" class="btn sm primary" data-fmtts ${busy ? "disabled" : ""}>🎙️ ${v?.mode === "tts" ? "ولّد الجمل اللي اتغيرت" : "ولّد الفويس أوفر"}</button>
-        <label class="btn sm ${busy ? "disabled" : ""}">⬆ ارفع فويس أوفر كامل<input type="file" accept="audio/*,video/*" data-fmvoup hidden ${busy ? "disabled" : ""}></label>
+        <button type="button" class="btn sm" data-fmvoup ${busy ? "disabled" : ""} title="تسجيلك الكامل. لو جمل السكريبت فاضية أو مختلفة، كلام التسجيل نفسه بيتقسم على المشاهد ويتكتب في السكريبت">⬆ ارفع فويس أوفر كامل</button>
         ${v?.mode === "upload" ? `<button type="button" class="btn sm" data-fmrecut ${busy ? "disabled" : ""} title="بعد ما عدّلت جمل السكريبت">✂️ قطّعه تاني</button>` : ""}
         ${v ? `<button type="button" class="btn sm danger" data-fmvodel ${busy ? "disabled" : ""}>🗑️ شيل الفويس</button>` : ""}
       </div>
@@ -202,6 +202,7 @@ function filmDetail(f) {
     ${sc.length ? `<div class="row wrap fm-actions">
         ${framesLeft ? `<button type="button" class="btn primary" data-fmframes ${working ? "disabled" : ""}>🖼️ ارسم الفريمات (~${c.frames}$)</button>` : ""}
         ${ready ? `<button type="button" class="btn primary" data-fmrun ${working ? "disabled" : ""}>🎬 ${f.final_url ? "ولّد اللي اتغيّر وجمّع" : "ولّد الفيديو"} (~${c.video}$)</button>` : ""}
+        ${f.scene_files.every((x) => x.video) && f.link_files.every((x) => x.video) ? `<button type="button" class="btn" data-fmeditor ${working ? "disabled" : ""} title="كل مشهد وكل كونيكتور قطعة لوحده في المونتاج، ومعاهم الفويس أوفر في مكانه والموسيقى">🎞️ افتح في المونتاج</button>` : ""}
         <button type="button" class="btn sm" data-fmreplan ${working ? "disabled" : ""}>✍️ سيناريو جديد</button>
         <small class="muted">التعديلات بتتحفظ لوحدها. اللي اتولد قبل كده بيفضل، والتوليد بيعمل الناقص بس.</small></div>` : ""}
     <div class="fm-board ${f.ratio === "16:9" ? "wide" : f.ratio === "1:1" ? "square" : ""}">${sc.map((s, i) => fmScene(f, s, i) + (i < sc.length - 1 && p.links?.[i] ? fmLink(f, p.links[i], i) : "")).join("")}</div>`;
@@ -309,6 +310,16 @@ $("labFilm").addEventListener("click", async (e) => {
     return copyText(sc.map((x, i) => [`المشهد ${i + 1}: ${x.label}`, x.voice ? `🎙️ ${x.voice.trim()}` : "", x.text ? `🔤 ${x.text.trim()}` : ""]
       .filter(Boolean).join("\n")).join("\n\n"));
   }
+  const ed = t.closest("[data-fmeditor]");
+  if (ed) {
+    return busyButton(ed, "⏳", async () => {
+      const r = await F("/to-editor", { method: "POST" });
+      storageSet("studiomania.projectId.ads", r.project_id);
+      if (typeof mt !== "undefined") mt.project = null;
+      toast("🎞️ اتفتح في مونتاج الإعلانات: كل مشهد وكل كونيكتور قطعة لوحده، والفويس أوفر في مكانه");
+      showStep("6a");
+    });
+  }
   const apply = t.closest("[data-fmapply]");
   if (apply) {
     try { await filmSave("scenes"); } catch (err) { return toast(err.message, true); }
@@ -332,6 +343,11 @@ $("labFilm").addEventListener("click", async (e) => {
     const force = filmx.cur.voice?.mode === "tts" && filmx.cur.voice.voice_id !== voice;
     if (!confirm(`يولّد الفويس أوفر${force ? " كله بالصوت الجديد" : ""}؟ (رخيص، وبيتحسب على Atlas)`)) return;
     return go(tts, () => F("/voice/tts", { method: "POST", ...jsonBody({ voice_id: voice }) }));
+  }
+  const vup = t.closest("[data-fmvoup]");
+  if (vup) {
+    try { await filmSave("scenes"); } catch (err) { return toast(err.message, true); }
+    return fmVoiceInput().click();
   }
   const recut = t.closest("[data-fmrecut]");
   if (recut) {
@@ -387,15 +403,6 @@ $("labFilm").addEventListener("change", async (e) => {
       filmx.cur = await api(`/api/films/${filmx.cur.id}`, { method: "PATCH", ...jsonBody({ name: t.value }) });
       return toast("✅ اتحفظ");
     }
-    if (t.matches("[data-fmvoup]")) {
-      const file = t.files[0];
-      if (!file) return;
-      const fd = new FormData(); fd.append("file", file);
-      toast("⬆ بيرفع الفويس أوفر...");
-      filmx.cur = await api(`/api/films/${filmx.cur.id}/voice/upload`, { method: "POST", body: fd });
-      renderFilm(); scheduleFilmPoll();
-      return;
-    }
     if (t.matches("[data-fmrw], [data-fmvoice]")) return;
     if (t.closest("[data-scene], [data-link], [data-sline]")) {
       await filmSave(t.closest("[data-scene], [data-sline]") ? "scenes" : "links");
@@ -423,3 +430,23 @@ $("labFilm").addEventListener("toggle", (e) => {
   const k = e.target.dataset?.dk;
   if (k) filmx.open[e.target.open ? "add" : "delete"](k);
 }, true);
+
+// خانة رفع الفويس أوفر برة الجزء اللي بيترسم تاني، عشان الملف ما يضيعش لو الصفحة اتحدثت وانت بتختاره
+function fmVoiceInput() {
+  let inp = document.getElementById("fmVoiceFile");
+  if (inp) return inp;
+  inp = Object.assign(document.createElement("input"), { type: "file", accept: "audio/*,video/*,.mp3,.m4a,.wav,.aac,.ogg,.opus,.mp4,.mov", id: "fmVoiceFile", hidden: true });
+  document.body.append(inp);
+  inp.addEventListener("change", async () => {
+    const file = inp.files[0], fid = filmx.cur?.id;
+    inp.value = "";
+    if (!file || !fid) return;
+    const fd = new FormData(); fd.append("file", file);
+    toast(`⬆ بيرفع «${file.name}»...`);
+    try {
+      filmx.cur = await api(`/api/films/${fid}/voice/upload`, { method: "POST", body: fd });
+      renderFilm(); scheduleFilmPoll();
+    } catch (err) { toast(err.message, true); }
+  });
+  return inp;
+}
