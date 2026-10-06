@@ -137,6 +137,9 @@ function fmScript(f) {
   const p = f.plan, v = f.voice, lines = v?.lines || [], lock = f.status === "planning" ? "disabled" : "", busy = f.busy;
   const staleN = (f.stale || []).filter(Boolean).length;
   return `<details class="panel fm-script" data-dk="script" ${filmx.open.has("script") ? "open" : ""}><summary>📜 السكريبت والفويس أوفر</summary>
+    <div class="row wrap fm-copy">
+      <button type="button" class="btn sm" data-fmcopy="voice" title="جمل الفويس أوفر بس، كل جملة في سطر (عشان تسجّلها أو تحطها في برنامج الصوت)">📋 انسخ الفويس أوفر</button>
+      <button type="button" class="btn sm" data-fmcopy="all" title="كل مشهد: الفويس أوفر والكلام اللي على الشاشة">📋 انسخ السكريبت كامل</button></div>
     <div class="fm-slines">${p.scenes.map((sc, i) => {
       const ln = lines[i], link = i < p.scenes.length - 1 ? f.link_lens?.[i] : 0;
       return `<div class="fm-sline ${f.stale?.[i] ? "stale" : ""}" data-sline="${i}">
@@ -298,6 +301,13 @@ $("labFilm").addEventListener("click", async (e) => {
     s.has(k) ? s.delete(k) : s.add(k);
     ref.classList.toggle("on", s.has(k));
     return;
+  }
+  const cp = t.closest("[data-fmcopy]");
+  if (cp) {   // من الخانات نفسها، عشان ياخد آخر تعديل حتى لو لسه ما اتحفظش
+    const sc = filmPlanFrom().scenes;
+    if (cp.dataset.fmcopy === "voice") return copyText(voiceText(sc.map((x) => x.voice)));
+    return copyText(sc.map((x, i) => [`المشهد ${i + 1}: ${x.label}`, x.voice ? `🎙️ ${x.voice.trim()}` : "", x.text ? `🔤 ${x.text.trim()}` : ""]
+      .filter(Boolean).join("\n")).join("\n\n"));
   }
   const apply = t.closest("[data-fmapply]");
   if (apply) {

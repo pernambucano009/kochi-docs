@@ -1688,3 +1688,4 @@ a.pl-link:hover { background: color-mix(in srgb, var(--ok) 24%, transparent); }
 .fm-rewrite input { flex: 1 1 260px; }
 .fm-voice { display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--line); padding-top: 8px; }
 .fm-voice audio { width: 100%; max-width: 420px; }
+.fm-copy { gap: 6px; margin-top: 6px; }
