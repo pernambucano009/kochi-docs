@@ -1006,6 +1006,44 @@ def _bands(white: list[float], n: int, parts: int, thr: float = 0.9) -> list[tup
     return out if all(b - a > n / parts * 0.5 for a, b in out) else None
 
 
+def _content_runs(white: list[float], n: int, thr: float = 0.9, max_gutter: float = 0.08, min_panel: float = 0.06) -> list[tuple[int, int]]:
+    """أجزاء المحتوى على محور واحد. الفاصل = خط أبيض رفيع (أو هامش على الطرف)؛ مساحة بيضا عريضة جوه لوحة مش فاصل."""
+    gaps, start = [], None
+    for i, v in enumerate(white + [0.0]):
+        if v >= thr and start is None:
+            start = i
+        elif v < thr and start is not None:
+            if start == 0 or i >= n or i - start <= n * max_gutter:
+                gaps.append((start, i))
+            start = None
+    cuts, pos = [], 0
+    for a, b in gaps:
+        if a > pos:
+            cuts.append((pos, a))
+        pos = b
+    if pos < n:
+        cuts.append((pos, n))
+    return [c for c in cuts if c[1] - c[0] >= n * min_panel]
+
+
+def sheet_panels(gray: bytes, w: int, h: int, need: int) -> list[tuple[float, float, float, float]] | None:
+    """اللوحات زي ما اترسمت فعلًا (صفوف، وجوه كل صف أعمدته)، بالترتيب من الشمال لليمين ومن فوق لتحت.
+    بيرجّع (x0, x1, y0, y1) بالنسبة، أو None لو ما لقاش العدد المطلوب."""
+    if len(gray) < w * h:
+        return None
+    px = lambda x, y: gray[y * w + x] > 244  # noqa: E731  الفواصل بيضا صافية (الخلفيات الفاتحة جوه اللوحات مش فواصل)
+    rows = _content_runs([sum(px(x, y) for x in range(w)) / w for y in range(h)], h)
+    out = []
+    for y0, y1 in rows:
+        cols = _content_runs([sum(px(x, y) for y in range(y0, y1)) / (y1 - y0) for x in range(w)], w)
+        for x0, x1 in cols:
+            # الحدود من فوق وتحت لكل لوحة لوحدها (لو الصف فيه لوحات بأطوال مختلفة)
+            ys = _content_runs([sum(px(x, y) for x in range(x0, x1)) / (x1 - x0) for y in range(y0, y1)], y1 - y0, min_panel=0.3)
+            a, b = (ys[0][0] + y0, ys[-1][1] + y0) if ys else (y0, y1)
+            out.append((x0 / w, x1 / w, a / h, b / h))
+    return out if len(out) >= need else None
+
+
 def sheet_cells(gray: bytes, w: int, h: int, rows: int, cols: int) -> tuple[list, list] | None:
     """الفواصل البيضا بين اللوحات (من صورة رمادي صغيرة). بيرجّع حدود الأعمدة والصفوف بالنسبة (0..1)، أو None."""
     if len(gray) < w * h:
@@ -1030,11 +1068,14 @@ def panel_redraw_prompt(schema: dict, fill: dict, j: int, ratio: str, text_mode:
                       for i in range(n_style)))
 
 
-def panel_sharpen_prompt(desc: str, text_mode: str, text: str, note: str = "") -> str:
+def panel_sharpen_prompt(desc: str, text_mode: str, text: str, note: str = "", padded: bool = False) -> str:
     return ("IMAGE 1 is one panel cut out of a storyboard sheet. Redraw it as a full-resolution final frame in the output's exact aspect "
             "ratio (keep everything inside the frame, extend the background if needed instead of stretching): EXACTLY the same composition, "
             "camera angle, elements, colors, lighting and style, only sharper and fully detailed. Do not add or remove anything. "
             "Fill the whole frame (no gutters or borders)."
+            + (" The blurred bands at the edges of IMAGE 1 are only padding to reach the right frame shape: replace them by naturally "
+               "extending the scene (background, floor, surroundings) so it looks like one complete frame; the sharp central picture stays "
+               "exactly as it is." if padded else "")
             + (f' On-screen text exactly: "{text}".' if text_mode == "en" and text else " No text or letters except inside real brand assets.")
             + (f"\nThe frame shows: {desc}" if desc else "")
             + (f"\nAlso: {note}" if note else "")

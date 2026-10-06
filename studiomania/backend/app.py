@@ -11477,7 +11477,8 @@ def tv_to_dict(vid: str, d: dict) -> dict:
         for k, cells in enumerate(tv_sheets(d)):
             cols, rows = lab.sheet_grid(len(cells))
             sh = (d.get("sheets") or {}).get(str(k)) or {}
-            sheets.append({"k": k, "cells": cells, "cols": cols, "rows": rows, "prompt": prompts[k], "url": url(sh.get("file"))})
+            sheets.append({"k": k, "cells": cells, "cols": cols, "rows": rows, "prompt": prompts[k], "url": url(sh.get("file")),
+                           "boxes": sh.get("boxes") if sh.get("file") else None, "how": sh.get("how")})
     panels = d.get("panels") or {}
     per = TRIAL_MODELS.get(d.get("model"), TRIAL_MODELS["seedance-mini"])["per_sec"] * (2 if d.get("resolution") == "720p" else 1)
     beats = d["schema"]["beats"]
@@ -11627,7 +11628,8 @@ def tvideo_refill(vid: str):
 
 
 def tv_slice(vid: str, k: int) -> None:
-    """✂️ الشيت بيتقطّع خانات متساوية (مع شيلة صغيرة من الأطراف عشان الفواصل البيضا)."""
+    """✂️ تقطيع الشيت: البرنامج بيلاقي اللوحات زي ما اترسمت فعلًا (حتى لو مش شبكة منتظمة)، ولو ملقاش: خانات متساوية.
+    كل لوحة بتتكمّل للمقاس الصح (9:16) بخلفية مغبّشة من نفسها بدل ما تتقص، و«وضّح» بيكمّل الأطراف دي طبيعي."""
     d = tv_load(vid)
     folder = tv_dir(vid)
     cells = tv_sheets(d)[k]
@@ -11635,42 +11637,46 @@ def tv_slice(vid: str, k: int) -> None:
     src = folder / sh["file"]
     W, H = image_dims(src)
     cols, rows = lab.sheet_grid(len(cells))
-    # الفواصل البيضا بتتلاقي من الصورة نفسها (ChatGPT ساعات بيرسم الخانات مش متساوية)، ولو مش واضحة: خانات متساوية
     sw = 240
     sh_ = max(2, round(H * sw / W))
     raw = subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-i", str(src), "-vf", f"scale={sw}:{sh_},format=gray",
                           "-f", "rawvideo", "-frames:v", "1", "-"], capture_output=True, timeout=60).stdout
-    found = lab.sheet_cells(raw, sw, sh_, rows, cols)
-    xs = found[0] if found else [(c / cols, (c + 1) / cols) for c in range(cols)]
-    ys = found[1] if found else [(r / rows, (r + 1) / rows) for r in range(rows)]
-    pad = 0.008 if found else 0.025
+    boxes = lab.sheet_panels(raw, sw, sh_, len(cells))
+    how = "found"
+    if not boxes:   # الشبكة اللي طلبناها (بفواصلها لو واضحة، أو متساوية)
+        grid = lab.sheet_cells(raw, sw, sh_, rows, cols)
+        xs = grid[0] if grid else [(c / cols, (c + 1) / cols) for c in range(cols)]
+        ys = grid[1] if grid else [(r / rows, (r + 1) / rows) for r in range(rows)]
+        inset = 0.004 if grid else 0.012
+        boxes = [(xs[c][0] + inset, xs[c][1] - inset, ys[r][0] + inset, ys[r][1] - inset) for r in range(rows) for c in range(cols)]
+        how = "grid" if grid else "equal"
+    pw, ph = RATIO_WH.get(d["ratio"], (9, 16))
     tag = uuid.uuid4().hex[:4]
-    made = {}
+    made, padded = {}, {}
     for idx, j in enumerate(cells):
-        r, c = divmod(idx, cols)
-        (fx0, fx1), (fy0, fy1) = xs[c], ys[r]
-        x0, y0 = int((fx0 + pad) * W), int((fy0 + pad) * H)
-        w, h = int((fx1 - fx0 - 2 * pad) * W) // 2 * 2, int((fy1 - fy0 - 2 * pad) * H) // 2 * 2
-        # لو الخانة طلعت بنسبة غلط: قص من النص على النسبة الصح (من غير مط)
-        pw, ph = (9, 16) if d["ratio"] == "9:16" else (16, 9) if d["ratio"] == "16:9" else (1, 1)
-        if w / h > pw / ph:
-            nw = int(h * pw / ph) // 2 * 2
-            x0, w = x0 + (w - nw) // 2, nw
-        else:
-            nh = int(w * ph / pw) // 2 * 2
-            y0, h = y0 + (h - nh) // 2, nh
+        fx0, fx1, fy0, fy1 = boxes[idx]
+        x0, y0 = int(fx0 * W), int(fy0 * H)
+        w, h = max(2, int((fx1 - fx0) * W) // 2 * 2), max(2, int((fy1 - fy0) * H) // 2 * 2)
+        if w / h > pw / ph:   # أعرض من اللازم: بتتكمّل من فوق وتحت
+            tw, th = w, int(w * ph / pw) // 2 * 2
+        else:                  # أطول من اللازم: بتتكمّل من الجناب
+            tw, th = int(h * pw / ph) // 2 * 2, h
         name = f"cell{j + 1}-{tag}.png"
-        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src), "-vf", f"crop={w}:{h}:{x0}:{y0}",
+        fc = (f"[0]crop={w}:{h}:{x0}:{y0},split[a][b];"
+              f"[b]scale={tw}:{th}:force_original_aspect_ratio=increase,crop={tw}:{th},boxblur=24:2,eq=brightness=-0.04[bg];"
+              f"[a]scale={tw}:{th}:force_original_aspect_ratio=decrease[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2")
+        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src), "-filter_complex", fc,
                         "-frames:v", "1", str(folder / name)], check=True, capture_output=True, timeout=60)
         made[str(j)] = name
+        padded[str(j)] = abs(w / h - pw / ph) > 0.02
     def fn(x):
-        x.setdefault("sheets", {}).setdefault(str(k), {})["gutters"] = bool(found)
+        x.setdefault("sheets", {}).setdefault(str(k), {}).update(how=how, boxes=[[round(v, 4) for v in boxes[i]] for i in range(len(cells))])
         for j, name in made.items():
             old = (x.setdefault("panels", {}).get(j) or {})
             for f in (old.get("cell"), old.get("full")):
                 if f:
                     (folder / f).unlink(missing_ok=True)
-            x["panels"][j] = {"cell": name}
+            x["panels"][j] = {"cell": name, "padded": padded[j]}
             i = int(j)   # اللوحة دي بداية الجزء i ونهاية الجزء i-1
             for s_ in (i - 1, i):
                 (x.get("segs") or {}).pop(str(s_), None)
@@ -11777,7 +11783,8 @@ def run_tv_sharpen(vid: str, only: int | None, note: str) -> None:
                 subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(base), "-vf", f"scale={w}:{h}",
                                 str(folder / name)], check=True, capture_output=True, timeout=60)
             else:
-                prompt = lab.panel_sharpen_prompt(d["fill"]["panels"][j]["desc"], d["text_mode"], texts[j], note)
+                prompt = lab.panel_sharpen_prompt(d["fill"]["panels"][j]["desc"], d["text_mode"], texts[j], note,
+                                                  bool(pan.get("padded")) and not (note and pan.get("full")))
                 atlas.download(atlas.generate_image(carousel_settings()["image_family"], prompt, size, "high",
                                                     [atlas.reference_url(x) for x in [base, *refs]]), folder / name)
                 conform_image(folder / name, d["ratio"])

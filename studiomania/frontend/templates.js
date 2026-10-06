@@ -213,7 +213,10 @@ function tvDetail(v) {
         <div class="row wrap"><button type="button" class="btn sm" data-tvcopyp="${sh.k}">📋 انسخ البرومبت (لـ ChatGPT)</button>
           <button type="button" class="btn sm primary" data-tvdraw="${sh.k}" ${busy ? "disabled" : ""}>${sh.url ? "↻ ارسم الشيت تاني" : "🖼️ ارسمه هنا"} (~${c.sheets && (c.sheets / v.sheets.length).toFixed(2)}$)</button>
           <button type="button" class="btn sm" data-tvup="${sh.k}" ${busy ? "disabled" : ""}>⬆ ارفع الشيت من ChatGPT</button></div>
-        ${sh.url ? `<img src="${sh.url}" alt="" class="tv-sheetimg">` : ""}
+        ${sh.url ? `<div class="tv-sheetwrap"><img src="${sh.url}" alt="" class="tv-sheetimg">
+          ${(sh.boxes || []).map((b, i) => `<span class="tv-box" style="left:${b[0] * 100}%;width:${(b[1] - b[0]) * 100}%;top:${b[2] * 100}%;height:${(b[3] - b[2]) * 100}%">${sh.cells[i] + 1}</span>`).join("")}</div>
+          <small class="${sh.how === "found" ? "muted" : "err"}">${sh.how === "found" ? "✂️ لقيت اللوحات في الصورة وقطعتها زي ما اترسمت، وكل لوحة اتكمّلت لـ 9:16 (الأطراف المغبّشة «وضّح» بيكمّلها)"
+            : sh.how === "grid" ? "✂️ قطعتها على الشبكة اللي طلبناها" : "⚠️ ملقتش فواصل واضحة بين اللوحات، فقطعتها خانات متساوية. بص على المربعات: لو مش مظبوطة ارسم الشيت تاني"}</small>` : ""}
         <small class="muted">لو بتستخدم ChatGPT: الصق البرومبت، وارفع معاه صور اللوجو والشاشات اللي في البرومبت، وبعدين ارفع الصورة اللي يطلّعها هنا. البرنامج بيقطّعها لوحده.</small>
       </div>`).join("")}
     </details>
