@@ -1013,6 +1013,8 @@ window.I18N_EN = {
   "مفيش ستايلات لسه. ضيف من 📚 المكتبة صور رسومات عاجبك ستايلها.": "No styles yet. Add drawings whose style you like from 📚 Library.",
   "رسومات عاجبك ستايلها (الخطوط والأشكال والتظليل). البرنامج بياخد طريقة الرسم بس، ويرسم شخصيات جديدة بألوان كوتشي.": "Drawings whose style you like (lines, shapes, shading). Only the drawing style is used: new characters are drawn in KOCHI colors.",
   "اسم الستايل": "Style name",
+  "⏳ في الدور": "⏳ Queued",
+  "⏳ اتحط في الدور: هيترسم أول ما اللي شغال يخلص": "⏳ Queued: it will be drawn as soon as the current job finishes",
   "امسحها": "Delete it",
   "مثلًا: اللوجو اللي استخدمته غلط، حط اللوجو اللي في الصورة": "e.g. the logo you used is wrong, use the logo in the image",
   "🛠️ صلّح فريم (ملاحظة وصور مرجعية)": "🛠️ Fix a frame (note and reference images)",

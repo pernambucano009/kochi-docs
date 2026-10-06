@@ -1,6 +1,6 @@
 // 🎞️ فيديو بالكونيكتورز: سيناريو بيتكتب على مقاس الكونيكتورز اللي في المكتبة، فريم أول وآخر لكل مشهد،
 // وبين كل مشهدين كونيكتور بيتنفذ بنفس طريقة التجارب، وبعدين الفيديو كله بيتجمّع.
-const filmx = { list: [], cur: null, conns: [], pick: null, timer: null, sel: {}, notes: {} };
+const filmx = { list: [], cur: null, conns: [], pick: null, timer: null, sel: {}, notes: {}, open: new Set() };
 const FILM_ST = { planning: "✍️ بيكتب السيناريو", planned: "📝 السيناريو جاهز", drawing: "🖼️ بيرسم", drawn: "🖼️ الفريمات جاهزة",
   working: "🎬 بيولّد", done: "✅ الفيديو جاهز", failed: "✕ فشل" };
 
@@ -31,6 +31,7 @@ function scheduleFilmPoll() {
 }
 
 function renderFilm() {
+  $("labFilm").querySelectorAll("details[data-dk]").forEach((d) => filmx.open[d.open ? "add" : "delete"](d.dataset.dk));
   $("labFilm").innerHTML = filmx.cur ? filmDetail(filmx.cur) : filmHome();
 }
 
@@ -61,10 +62,12 @@ function filmHome() {
 }
 
 function fmFrame(f, i, w) {
-  const u = f.scene_files[i]?.[w];
+  const u = f.scene_files[i]?.[w], can = !["planning", "working"].includes(f.status);
+  const queued = (f.queue || []).some((q) => q.only[0] === i && (q.only[1] === w || q.only[1] === "a"));
   return `<figure class="fm-frame">${u ? `<img src="${u}" alt="">` : `<div class="fm-ph">${w === "a" ? "أول المشهد" : "آخر المشهد"}</div>`}
     <figcaption>${w === "a" ? "أول المشهد" : "آخر المشهد"}
-      ${u && !f.busy ? `<button type="button" class="btn sm" data-fmredo="${i}" data-w="${w}" title="${w === "a" ? "يرسمه تاني (وآخر المشهد معاه)" : "يرسمه تاني"}">↻</button>` : ""}</figcaption></figure>`;
+      ${queued ? `<small class="fm-queued">⏳ في الدور</small>` : ""}
+      ${u && can ? `<button type="button" class="btn sm" data-fmredo="${i}" data-w="${w}" title="${w === "a" ? "يرسمه تاني (وآخر المشهد معاه)" : "يرسمه تاني"}">↻</button>` : ""}</figcaption></figure>`;
 }
 
 // ✏️ تعديل فريم: ملاحظة + صور مرجعية (لوجو أو شاشة من ملف العميل، أو صورة ترفعها) وبعدين ↻ على الفريم
@@ -72,7 +75,7 @@ function fmFix(f, i) {
   const sel = filmx.sel[i] || new Set();
   const chip = (key, url, name, del) => `<span class="fm-ref ${sel.has(key) ? "on" : ""}" data-fmref="${le(key)}" data-i="${i}" title="${le(name)}">
     <img src="${url}" alt=""><small data-no-i18n>${le(name)}</small>${del ? `<button type="button" data-fmrefdel="${le(del)}" title="امسحها">✕</button>` : ""}</span>`;
-  return `<details class="fm-fix" ${sel.size || filmx.notes[i] ? "open" : ""}><summary>🛠️ صلّح فريم (ملاحظة وصور مرجعية)</summary>
+  return `<details class="fm-fix" data-dk="fix${i}" ${filmx.open.has(`fix${i}`) || sel.size || filmx.notes[i] ? "open" : ""}><summary>🛠️ صلّح فريم (ملاحظة وصور مرجعية)</summary>
     <input type="text" data-fmnote="${i}" value="${le(filmx.notes[i])}" placeholder="مثلًا: اللوجو اللي استخدمته غلط، حط اللوجو اللي في الصورة" data-no-i18n>
     <div class="fm-refs">
       ${(f.client_assets || []).map((a) => chip(`c:${a.name}`, a.url, `${a.kind === "logos" ? "🏷️" : a.kind === "screens" ? "📱" : "📦"} ${a.name}`)).join("")}
@@ -84,7 +87,7 @@ function fmFix(f, i) {
 }
 
 function fmScene(f, sc, i) {
-  const lock = f.busy ? "disabled" : "", v = f.scene_files[i]?.video;
+  const lock = f.status === "planning" ? "disabled" : "", v = f.scene_files[i]?.video;
   return `<article class="fm-scene" data-scene="${i}">
     <header><b>🎬 المشهد ${i + 1}</b> <input data-sf="label" value="${le(sc.label)}" ${lock} data-no-i18n>
       <small class="muted" data-no-i18n>${le(sc.feature)}</small></header>
@@ -93,8 +96,8 @@ function fmScene(f, sc, i) {
       ${v ? `<figure class="fm-frame"><video src="${v}" controls playsinline preload="metadata"></video>
         <figcaption>الحركة ${!f.busy ? `<button type="button" class="btn sm" data-fmgen="scene" data-i="${i}" title="يولّد حركة المشهد ده تاني">↻</button>` : ""}</figcaption></figure>` : ""}
     </div>
-    ${f.scene_files[i]?.a && !f.busy ? fmFix(f, i) : ""}
-    <details class="fm-edit"><summary>✏️ الكلام والبرومبتات</summary>
+    ${f.scene_files[i]?.a && !["planning", "working"].includes(f.status) ? fmFix(f, i) : ""}
+    <details class="fm-edit" data-dk="edit${i}" ${filmx.open.has(`edit${i}`) ? "open" : ""}><summary>✏️ الكلام والبرومبتات</summary>
       <label>الكلام على الشاشة <input data-sf="text" value="${le(sc.text)}" ${lock} data-no-i18n></label>
       <label>أصل من ملف العميل (شاشة / لوجو) <input data-sf="screen" value="${le(sc.screen)}" ${lock} data-no-i18n></label>
       <label>أول المشهد <textarea rows="2" dir="ltr" data-sf="start" ${lock} data-no-i18n>${le(sc.start)}</textarea></label>
@@ -107,7 +110,7 @@ function fmScene(f, sc, i) {
 }
 
 function fmLink(f, l, i) {
-  const lock = f.busy ? "disabled" : "", la = f.link_assets[i] || {}, lf = f.link_files[i] || {}, p = l.plan;
+  const lock = f.status === "planning" ? "disabled" : "", la = f.link_assets[i] || {}, lf = f.link_files[i] || {}, p = l.plan;
   return `<article class="fm-link" data-link="${i}">
     <header><b>🔗 الكونيكتور ${i + 1}</b>
       <select data-la ${lock}>${filmx.conns.map((a) => `<option value="${a.id}" ${a.id === l.asset ? "selected" : ""} data-no-i18n>${le(a.name)}</option>`).join("")}
@@ -120,7 +123,7 @@ function fmLink(f, l, i) {
       ${(lf.keys || []).filter(Boolean).map((u, j) => `<figure class="fm-frame"><img src="${u}" alt=""><figcaption>مرحلة ${j + 1}</figcaption></figure>`).join("")}
       ${lf.video ? `<figure class="fm-frame"><video src="${lf.video}" controls playsinline preload="metadata"></video><figcaption>🔗 عندنا</figcaption></figure>` : ""}
     </div>
-    ${p ? `<details class="fm-edit"><summary>📝 خطة الكونيكتور</summary>
+    ${p ? `<details class="fm-edit" data-dk="link${i}" ${filmx.open.has(`link${i}`) ? "open" : ""}><summary>📝 خطة الكونيكتور</summary>
       ${p.adapted ? `<p class="as-tadapt" data-no-i18n>${le(p.adapted)}</p>` : ""}
       ${(p.keyframes || []).map((k, j) => `<label>🖼️ مرحلة ${j + 1}: <span data-no-i18n>${le(k.label)}</span><textarea rows="2" dir="ltr" data-lk="${j}" ${lock} data-no-i18n>${le(k.prompt)}</textarea></label>`).join("")}
       ${(p.segments || []).map((x, j) => `<label>🎬 حركة ${j + 1}: <span data-no-i18n>${le(x.label)}</span>
@@ -172,8 +175,10 @@ function filmPlanFrom() {
   return { scenes, links };
 }
 
-async function filmSave() {
-  filmx.cur = await api(`/api/films/${filmx.cur.id}`, { method: "PATCH", ...jsonBody({ plan: filmPlanFrom() }) });
+// part = "scenes" أو "links": بيتبعت الجزء اللي اتعدّل بس، عشان ما يغطيش على اللي البرنامج بيكتبه وهو شغال
+async function filmSave(part) {
+  const all = filmPlanFrom(), plan = part ? { [part]: all[part] } : all;
+  filmx.cur = await api(`/api/films/${filmx.cur.id}`, { method: "PATCH", ...jsonBody({ plan }) });
 }
 
 $("labFilmBtn").onclick = () => (labx.view === "film" && !filmx.cur ? (labx.view = "lab", renderLab()) : openFilm());
@@ -218,12 +223,13 @@ $("labFilm").addEventListener("click", async (e) => {
     const note = $("labFilm").querySelector(`[data-fmnote="${i}"]`)?.value.trim() || "";
     const keys = [...(filmx.sel[i] || [])], refs = keys.filter((k) => k.startsWith("u:")).map((k) => k.slice(2));
     const client = keys.filter((k) => k.startsWith("c:")).map((k) => k.slice(2));
-    await filmSave();
+    try { await filmSave("scenes"); } catch (err) { return toast(err.message, true); }
     const what = note || keys.length ? "يعدّل" : "يرسم";
     if (!confirm(`${what} ${w === "a" ? "أول المشهد (وآخره بيترسم من جديد معاه)" : "آخر المشهد"}${note ? ` بالملاحظة: «${note}»` : ""}${keys.length ? ` ومعاه ${keys.length} صورة مرجعية` : ""}؟ (حوالي ${w === "a" ? 0.12 : 0.06}$)`)) return renderFilm();
     return go(redo, async () => {
       const r = await F(`/scenes/${i}/${w}`, { method: "POST", ...jsonBody({ note, refs, client }) });
       delete filmx.sel[i]; delete filmx.notes[i];
+      if (r.queue?.length && filmx.cur?.status === "drawing") toast("⏳ اتحط في الدور: هيترسم أول ما اللي شغال يخلص");
       return r;
     });
   }
@@ -243,7 +249,7 @@ $("labFilm").addEventListener("click", async (e) => {
     return;
   }
   const lp = t.closest("[data-fmlplan]");
-  if (lp) { await filmSave(); return go(lp, () => F(`/links/${lp.dataset.fmlplan}/plan`, { method: "POST" })); }
+  if (lp) { try { await filmSave("links"); } catch (err) { return toast(err.message, true); } return go(lp, () => F(`/links/${lp.dataset.fmlplan}/plan`, { method: "POST" })); }
   const run = t.closest("[data-fmrun]"), gen = t.closest("[data-fmgen]");
   if (run || gen) {
     await filmSave();
@@ -283,7 +289,8 @@ $("labFilm").addEventListener("change", async (e) => {
       return toast("✅ اتحفظ");
     }
     if (t.closest("[data-scene], [data-link]")) {
-      await filmSave();
+      await filmSave(t.closest("[data-scene]") ? "scenes" : "links");
+      toast("✅ اتحفظ");
       if (t.matches("[data-la], [data-lsec], [data-sf=seconds], [data-sf=motion]")) renderFilm();   // التمن والحاجات اللي هتتولد تاني اتغيرت
     }
   } catch (err) { toast(err.message, true); }
@@ -300,3 +307,9 @@ $("labFilm").addEventListener("mouseout", (e) => {
 $("labFilm").addEventListener("input", (e) => {
   if (e.target.matches("[data-fmnote]")) filmx.notes[e.target.dataset.fmnote] = e.target.value;
 });
+
+// القوايم المفتوحة بتفضل مفتوحة لما الصفحة تتحدث وهو شغال
+$("labFilm").addEventListener("toggle", (e) => {
+  const k = e.target.dataset?.dk;
+  if (k) filmx.open[e.target.open ? "add" : "delete"](k);
+}, true);
