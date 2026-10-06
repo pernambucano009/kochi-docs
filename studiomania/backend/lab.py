@@ -684,6 +684,7 @@ FILM_FORMAT = """{
   "title": "اسم الفيديو",
   "idea": "الفكرة في سطرين: القصة اللي بتربط المشاهد والكونيكتورز",
   "scenes": [{"label": "اسم المشهد بالعربي", "feature": "الميزة اللي المشهد بيعرضها",
+              "voice": "جملة الفويس أوفر اللي بتتقال على المشهد ده (بلغة ولهجة العميل، طبيعية ومتسلسلة مع اللي قبلها، تتقال في وقت المشهد والكونيكتور اللي بعده)",
               "text": "الكلام المكتوب على الشاشة في المشهد ده (قصير، بلغة ولهجة العميل) أو فاضي",
               "screen": "اسم شاشة / لوجو / صورة منتج من ملف العميل لو المشهد محتاجها بالظبط، أو فاضي",
               "start": "English image prompt for the FIRST frame of the scene (composition, subject, UI, background, colors, the on-screen text in quotes)",
@@ -714,6 +715,8 @@ def film_plan_messages(brain_txt: str, brief: str, conns: list[dict], n_scenes: 
         "- الكلام على الشاشة قصير جدًا (٣-٧ كلمات) ومكتوب صح بلغة ولهجة العميل.\n"
         "- لو المشهد فيه شاشة التطبيق أو اللوجو الحقيقي اكتب اسمه في screen بالظبط زي ما هو في ملف العميل.\n"
         "- البرومبتات بالإنجليزي، والكلام اللي هيتكتب على الشاشة يتحط بين علامات تنصيص زي ما هو بالعربي.\n"
+        "- الفويس أوفر: جملة واحدة قصيرة لكل مشهد (٥-١٢ كلمة)، والجمل مع بعض بتحكي قصة واحدة متصلة، والكلام اللي على الشاشة "
+        "مش لازم يكرر الفويس بالحرف.\n"
         "- seconds للمشهد من 2 لـ 5.\n"
         "رجّع JSON بس بالشكل ده:\n" + FILM_FORMAT
     )
@@ -730,9 +733,10 @@ def clean_film_plan(data: dict, conn_ids: list[str], max_scenes: int = 8) -> dic
         except (TypeError, ValueError):
             sec = 3.0
         scenes.append({"label": str(x.get("label") or f"مشهد {i + 1}")[:120], "feature": str(x.get("feature") or "")[:300],
+                       "voice": str(x.get("voice") or "")[:600],
                        "text": str(x.get("text") or "")[:200], "screen": str(x.get("screen") or "")[:120],
                        "start": str(x.get("start") or "")[:3000], "end": str(x.get("end") or "")[:3000],
-                       "motion": str(x.get("motion") or "")[:2000], "seconds": round(min(5.0, max(2.0, sec)), 2)})
+                       "motion": str(x.get("motion") or "")[:2000], "seconds": round(min(10.0, max(1.0, sec)), 2)})
     scenes = scenes[:max_scenes]
     links = []
     for i in range(max(0, len(scenes) - 1)):
@@ -748,10 +752,48 @@ def clean_film_plan(data: dict, conn_ids: list[str], max_scenes: int = 8) -> dic
 def mock_film_plan(conns: list[dict], n_scenes: int, brand: str) -> dict:
     feats = ["الهوك", "ميزة أولى", "ميزة تانية", "ميزة تالتة", "ميزة رابعة", "ميزة خامسة", "ميزة سادسة", "الختام"]
     scenes = [{"label": f"مشهد {i + 1}", "feature": feats[min(i, len(feats) - 1)], "text": f"{brand} {i + 1}", "screen": "",
+               "voice": f"دي الجملة رقم {i + 1} في الفويس أوفر",
                "start": f"Scene {i + 1} first frame.", "end": "Element moves to the center.", "motion": "Slow push in.", "seconds": 3}
               for i in range(n_scenes)]
     links = [{"asset": conns[i % len(conns)]["id"], "why": "تجربة"} for i in range(n_scenes - 1)] if conns else []
     return {"title": f"مميزات {brand}", "idea": "فيديو تجريبي", "scenes": scenes, "links": links}
+
+
+SCRIPT_APPLY_FORMAT = """{"scenes": [{"i": "رقم المشهد زي ما هو", "action": "none أو text أو redraw",
+  "why": "ليه (بالعربي، سطر)",
+  "start": "English prompt جديد لأول المشهد (لو redraw بس)", "end": "English prompt جديد لآخر المشهد (لو redraw بس)",
+  "motion": "English motion prompt جديد (لو redraw بس)"}]}"""
+
+
+def film_script_apply_messages(plan: dict, changed: list[dict]) -> str:
+    """السكريبت اتعدّل: لكل مشهد اتغير، الموديل بيقرر الفريمات تتعدّل إزاي."""
+    scenes = [{"i": i, "label": s["label"], "voice": s.get("voice", ""), "text": s.get("text", "")} for i, s in enumerate(plan["scenes"])]
+    return (
+        "أنت مخرج موشن جرافيك. عندنا فيديو اترسمت فريماته، والمستخدم عدّل في السكريبت (الفويس أوفر والكلام اللي على الشاشة). "
+        "المطلوب لكل مشهد اتغير تقرر الفريمات بتاعته تتعدّل إزاي:\n"
+        "- none: التغيير مش محتاج يتشاف في الصورة (مثلًا الفويس اتظبطت صياغته بس والمعنى زي ما هو، والكلام اللي على الشاشة ما اتغيرش).\n"
+        "- text: الصورة زي ما هي، بس الكلام المكتوب على الشاشة يتبدل بالجديد.\n"
+        "- redraw: معنى المشهد اتغير (ميزة تانية، حاجة تانية لازم تظهر) والفريمات لازم تترسم من جديد: اكتب start وend وmotion جداد "
+        "بنفس أسلوب القديمة، ومن غير ما تبوّظ علاقة آخر المشهد بالكونيكتور اللي بعده وأوله بالكونيكتور اللي قبله.\n\n"
+        f"فكرة الفيديو: {plan.get('idea', '')}\n\nالسكريبت كله دلوقتي:\n{json.dumps(scenes, ensure_ascii=False, indent=1)}\n\n"
+        f"المشاهد اللي اتغيرت (القديم والجديد والبرومبتات الحالية):\n{json.dumps(changed, ensure_ascii=False, indent=1)}\n\n"
+        "رجّع JSON بس بالشكل ده، لكل مشهد اتغير:\n" + SCRIPT_APPLY_FORMAT
+    )
+
+
+SCRIPT_REWRITE_FORMAT = """{"scenes": [{"i": "رقم المشهد", "voice": "جملة الفويس أوفر الجديدة", "text": "الكلام الجديد على الشاشة"}]}"""
+
+
+def film_script_rewrite_messages(brain_txt: str, plan: dict, instruction: str) -> str:
+    scenes = [{"i": i, "feature": s.get("feature", ""), "voice": s.get("voice", ""), "text": s.get("text", "")}
+              for i, s in enumerate(plan["scenes"])]
+    return (
+        "أنت كاتب إعلانات. ده سكريبت فيديو قصير (لكل مشهد: جملة فويس أوفر وكلام مكتوب على الشاشة). "
+        "عدّله حسب طلب المستخدم وبس، والمشاهد اللي الطلب مش بيخصها سيبها زي ما هي بالحرف. "
+        "خلي اللغة واللهجة زي ملف العميل، وعدد المشاهد زي ما هو.\n\n"
+        f"ملف العميل:\n{brain_txt or '(مفيش)'}\n\nالسكريبت:\n{json.dumps(scenes, ensure_ascii=False, indent=1)}\n\n"
+        f"طلب المستخدم: {instruction}\n\nرجّع JSON بس بالشكل ده (كل المشاهد):\n" + SCRIPT_REWRITE_FORMAT
+    )
 
 
 # ------------------------------------------------------------ تجارب من غير Atlas

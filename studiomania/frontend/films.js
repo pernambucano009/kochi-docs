@@ -1,8 +1,8 @@
 // 🎞️ فيديو بالكونيكتورز: سيناريو بيتكتب على مقاس الكونيكتورز اللي في المكتبة، فريم أول وآخر لكل مشهد،
 // وبين كل مشهدين كونيكتور بيتنفذ بنفس طريقة التجارب، وبعدين الفيديو كله بيتجمّع.
-const filmx = { list: [], cur: null, conns: [], pick: null, timer: null, sel: {}, notes: {}, open: new Set() };
+const filmx = { list: [], cur: null, conns: [], pick: null, timer: null, sel: {}, notes: {}, open: new Set(["script"]) };
 const FILM_ST = { planning: "✍️ بيكتب السيناريو", planned: "📝 السيناريو جاهز", drawing: "🖼️ بيرسم", drawn: "🖼️ الفريمات جاهزة",
-  working: "🎬 بيولّد", done: "✅ الفيديو جاهز", failed: "✕ فشل" };
+  working: "🎬 بيولّد", voicing: "🎙️ الفويس أوفر", done: "✅ الفيديو جاهز", failed: "✕ فشل" };
 
 async function openFilm(fid) {
   labx.view = "film";
@@ -98,7 +98,6 @@ function fmScene(f, sc, i) {
     </div>
     ${f.scene_files[i]?.a && !["planning", "working"].includes(f.status) ? fmFix(f, i) : ""}
     <details class="fm-edit" data-dk="edit${i}" ${filmx.open.has(`edit${i}`) ? "open" : ""}><summary>✏️ الكلام والبرومبتات</summary>
-      <label>الكلام على الشاشة <input data-sf="text" value="${le(sc.text)}" ${lock} data-no-i18n></label>
       <label>أصل من ملف العميل (شاشة / لوجو) <input data-sf="screen" value="${le(sc.screen)}" ${lock} data-no-i18n></label>
       <label>أول المشهد <textarea rows="2" dir="ltr" data-sf="start" ${lock} data-no-i18n>${le(sc.start)}</textarea></label>
       <label>آخر المشهد <textarea rows="2" dir="ltr" data-sf="end" ${lock} data-no-i18n>${le(sc.end)}</textarea></label>
@@ -133,6 +132,57 @@ function fmLink(f, l, i) {
   </article>`;
 }
 
+// 📜 السكريبت كله في مكان واحد: الفويس أوفر والكلام اللي على الشاشة لكل مشهد، والفويس نفسه
+function fmScript(f) {
+  const p = f.plan, v = f.voice, lines = v?.lines || [], lock = f.status === "planning" ? "disabled" : "", busy = f.busy;
+  const staleN = (f.stale || []).filter(Boolean).length;
+  return `<details class="panel fm-script" data-dk="script" ${filmx.open.has("script") ? "open" : ""}><summary>📜 السكريبت والفويس أوفر</summary>
+    <div class="fm-slines">${p.scenes.map((sc, i) => {
+      const ln = lines[i], link = i < p.scenes.length - 1 ? f.link_lens?.[i] : 0;
+      return `<div class="fm-sline ${f.stale?.[i] ? "stale" : ""}" data-sline="${i}">
+        <b class="fm-snum">${i + 1}</b>
+        <div class="fm-sbody">
+          <small class="muted" data-no-i18n>${le(sc.label)}${sc.feature ? ` · ${le(sc.feature)}` : ""}</small>
+          <label>🎙️ الفويس أوفر <textarea rows="2" data-sf="voice" ${lock} data-no-i18n>${le(sc.voice)}</textarea></label>
+          <label>🔤 على الشاشة <input data-sf="text" value="${le(sc.text)}" ${lock} data-no-i18n></label>
+          <div class="row wrap fm-smeta">
+            <small class="fm-stale">✏️ اتغيّر بعد ما الفريمات اترسمت</small>
+            ${ln ? `<audio src="${ln.url}" controls preload="none"></audio><small class="muted">${ln.dur} ث</small>
+              ${ln.stale ? `<small class="err">🎙️ الجملة اتغيرت، الصوت لسه القديم</small>` : ""}${ln.missed ? `<small class="err">مالقتهاش في التسجيل بالظبط (اتحطت بالتقريب)</small>` : ""}` : ""}
+            <small class="muted">⏱️ المشهد ${sc.seconds} ث${link ? ` + الكونيكتور ${link} ث` : ""}</small>
+          </div>
+        </div></div>`;
+    }).join("")}</div>
+    <div class="row wrap fm-sapply" ${staleN ? "" : "hidden"}>
+      <button type="button" class="btn primary" data-fmapply ${busy ? "disabled" : ""}>✨ طبّق التعديلات على الفريمات (<span data-fmstalen>${staleN}</span> مشهد)</button>
+      <small class="muted">الموديل بيقرر لكل مشهد: يبدّل الكلام اللي على الشاشة بس، ولا يرسم المشهد من جديد لو معناه اتغير.</small></div>
+    <div class="row wrap fm-rewrite"><input type="text" data-fmrw placeholder="اطلب تعديل على السكريبت كله (مثلًا: خلي الهوك أقوى، والجمل أقصر)" data-no-i18n>
+      <button type="button" class="btn sm" data-fmrewrite ${busy ? "disabled" : ""}>✍️ عدّل</button></div>
+    <div class="fm-voice">
+      <b>🎙️ الفويس أوفر</b>
+      ${v ? `<small class="muted">${v.mode === "tts" ? `مولّد (${le((f.voices || []).find((x) => x.id === v.voice_id)?.label || v.voice_id)})` : "تسجيلك"}</small>` : `<small class="muted">لسه مفيش</small>`}
+      <div class="row wrap">
+        <select data-fmvoice>${(f.voices || []).map((x) => `<option value="${x.id}" ${x.id === v?.voice_id ? "selected" : ""}>${le(x.label)}</option>`).join("")}</select>
+        <button type="button" class="btn sm primary" data-fmtts ${busy ? "disabled" : ""}>🎙️ ${v?.mode === "tts" ? "ولّد الجمل اللي اتغيرت" : "ولّد الفويس أوفر"}</button>
+        <label class="btn sm ${busy ? "disabled" : ""}">⬆ ارفع فويس أوفر كامل<input type="file" accept="audio/*,video/*" data-fmvoup hidden ${busy ? "disabled" : ""}></label>
+        ${v?.mode === "upload" ? `<button type="button" class="btn sm" data-fmrecut ${busy ? "disabled" : ""} title="بعد ما عدّلت جمل السكريبت">✂️ قطّعه تاني</button>` : ""}
+        ${v ? `<button type="button" class="btn sm danger" data-fmvodel ${busy ? "disabled" : ""}>🗑️ شيل الفويس</button>` : ""}
+      </div>
+      ${v?.full_url ? `<audio src="${v.full_url}" controls preload="none"></audio>` : ""}
+      <small class="muted">كل مشهد (والكونيكتور اللي بعده) بياخد طول جملته، وجملة كل مشهد بتبدأ مع أوله. لو مشهد طوله اتغير كتير، حركته بتتولد تاني وده بيبان في تمن «ولّد».
+        التسجيل الكامل لازم يكون نفس كلام جمل الفويس أوفر اللي فوق عشان يتقطّع صح.</small>
+    </div>
+  </details>`;
+}
+
+// بعد الحفظ: علامة «اتغيّر» وزرار التطبيق بيتحدثوا من غير ما الصفحة تترسم تاني (عشان الكتابة ما تتقطعش)
+function fmScriptSync() {
+  const f = filmx.cur, box = $("labFilm");
+  box.querySelectorAll("[data-sline]").forEach((el) => el.classList.toggle("stale", !!f.stale?.[Number(el.dataset.sline)]));
+  const n = (f.stale || []).filter(Boolean).length, ap = box.querySelector(".fm-sapply");
+  if (ap) { ap.hidden = !n; ap.querySelector("[data-fmstalen]").textContent = n; }
+}
+
 function filmDetail(f) {
   const p = f.plan || {}, sc = p.scenes || [], c = f.costs || {};
   const framesLeft = f.scene_files.some((x) => !x.a || !x.b), working = f.busy;
@@ -145,6 +195,7 @@ function filmDetail(f) {
       ${f.step ? `<small class="muted">${le(f.step)}</small>` : ""}${f.error ? `<small class="err">${le(f.error)}</small>` : ""}</div>
     ${f.final_url ? `<section class="panel fm-final"><video src="${f.final_url}" controls playsinline preload="metadata"></video></section>` : ""}
     ${p.idea ? `<p class="panel fm-idea" data-no-i18n><b>${le(p.title)}</b><br>${le(p.idea)}</p>` : ""}
+    ${sc.length ? fmScript(f) : ""}
     ${sc.length ? `<div class="row wrap fm-actions">
         ${framesLeft ? `<button type="button" class="btn primary" data-fmframes ${working ? "disabled" : ""}>🖼️ ارسم الفريمات (~${c.frames}$)</button>` : ""}
         ${ready ? `<button type="button" class="btn primary" data-fmrun ${working ? "disabled" : ""}>🎬 ${f.final_url ? "ولّد اللي اتغيّر وجمّع" : "ولّد الفيديو"} (~${c.video}$)</button>` : ""}
@@ -156,8 +207,8 @@ function filmDetail(f) {
 function filmPlanFrom() {
   const box = $("labFilm"), p = filmx.cur.plan;
   const scenes = p.scenes.map((s, i) => {
-    const el = box.querySelector(`[data-scene="${i}"]`), out = { ...s };
-    el?.querySelectorAll("[data-sf]").forEach((x) => (out[x.dataset.sf] = x.dataset.sf === "seconds" ? Number(x.value) : x.value));
+    const out = { ...s };
+    box.querySelectorAll(`[data-scene="${i}"] [data-sf], [data-sline="${i}"] [data-sf]`).forEach((x) => (out[x.dataset.sf] = x.dataset.sf === "seconds" ? Number(x.value) : x.value));
     return out;
   });
   const links = p.links.map((l, i) => {
@@ -248,6 +299,40 @@ $("labFilm").addEventListener("click", async (e) => {
     ref.classList.toggle("on", s.has(k));
     return;
   }
+  const apply = t.closest("[data-fmapply]");
+  if (apply) {
+    try { await filmSave("scenes"); } catch (err) { return toast(err.message, true); }
+    const n = (filmx.cur.stale || []).filter(Boolean).length;
+    if (!confirm(`يطبّق تعديلات السكريبت على ${n} مشهد؟ كل مشهد بيتعدّل بحوالي 0.12$ (ولو التعديل مش محتاج يتشاف في الصورة مش بيتحسب).`)) return;
+    return go(apply, () => F("/script/apply", { method: "POST" }));
+  }
+  const rw = t.closest("[data-fmrewrite]");
+  if (rw) {
+    const ins = $("labFilm").querySelector("[data-fmrw]").value.trim();
+    if (!ins) return toast("اكتب عايز تعدّل إيه في السكريبت", true);
+    return busyButton(rw, "⏳", async () => {
+      filmx.cur = await F("/script/rewrite", { method: "POST", ...jsonBody({ instruction: ins }) });
+      renderFilm(); toast("✍️ السكريبت اتعدّل. راجعه، وبعدين «✨ طبّق التعديلات على الفريمات»");
+    });
+  }
+  const tts = t.closest("[data-fmtts]");
+  if (tts) {
+    try { await filmSave("scenes"); } catch (err) { return toast(err.message, true); }
+    const voice = $("labFilm").querySelector("[data-fmvoice]").value;
+    const force = filmx.cur.voice?.mode === "tts" && filmx.cur.voice.voice_id !== voice;
+    if (!confirm(`يولّد الفويس أوفر${force ? " كله بالصوت الجديد" : ""}؟ (رخيص، وبيتحسب على Atlas)`)) return;
+    return go(tts, () => F("/voice/tts", { method: "POST", ...jsonBody({ voice_id: voice }) }));
+  }
+  const recut = t.closest("[data-fmrecut]");
+  if (recut) {
+    try { await filmSave("scenes"); } catch (err) { return toast(err.message, true); }
+    return go(recut, () => F("/voice/upload", { method: "POST", body: new FormData() }));
+  }
+  const vdel = t.closest("[data-fmvodel]");
+  if (vdel) {
+    if (!confirm("تشيل الفويس أوفر؟ (المشاهد بتفضل بطولها الحالي)")) return;
+    return go(vdel, () => F("/voice", { method: "DELETE" }));
+  }
   const lp = t.closest("[data-fmlplan]");
   if (lp) { try { await filmSave("links"); } catch (err) { return toast(err.message, true); } return go(lp, () => F(`/links/${lp.dataset.fmlplan}/plan`, { method: "POST" })); }
   const run = t.closest("[data-fmrun]"), gen = t.closest("[data-fmgen]");
@@ -255,6 +340,10 @@ $("labFilm").addEventListener("click", async (e) => {
     await filmSave();
     const c = filmx.cur.costs.video;
     const what = gen ? `${gen.dataset.fmgen === "scene" ? "حركة المشهد" : "الكونيكتور"} ${Number(gen.dataset.i) + 1} تاني` : "الفيديو";
+    const staleN = (filmx.cur.stale || []).filter(Boolean).length;
+    if (staleN && !confirm(`فيه ${staleN} مشهد السكريبت بتاعه اتغيّر والفريمات لسه على القديم. تكمّل من غير «✨ طبّق التعديلات على الفريمات»؟`)) return renderFilm();
+    const voStale = (filmx.cur.voice?.lines || []).some((l) => l?.stale);
+    if (voStale && !confirm("فيه جمل في الفويس أوفر اتغيرت وصوتها لسه القديم. تكمّل؟")) return renderFilm();
     if (!confirm(`يولّد ${what}؟ هيتحسب على Atlas${c && !gen ? ` حوالي ${c}$` : ""}، وبياخد كام دقيقة.`)) return renderFilm();
     return go(run || gen, () => F("/run", { method: "POST", ...jsonBody(gen ? { kind: gen.dataset.fmgen, i: Number(gen.dataset.i) } : {}) }));
   }
@@ -288,8 +377,19 @@ $("labFilm").addEventListener("change", async (e) => {
       filmx.cur = await api(`/api/films/${filmx.cur.id}`, { method: "PATCH", ...jsonBody({ name: t.value }) });
       return toast("✅ اتحفظ");
     }
-    if (t.closest("[data-scene], [data-link]")) {
-      await filmSave(t.closest("[data-scene]") ? "scenes" : "links");
+    if (t.matches("[data-fmvoup]")) {
+      const file = t.files[0];
+      if (!file) return;
+      const fd = new FormData(); fd.append("file", file);
+      toast("⬆ بيرفع الفويس أوفر...");
+      filmx.cur = await api(`/api/films/${filmx.cur.id}/voice/upload`, { method: "POST", body: fd });
+      renderFilm(); scheduleFilmPoll();
+      return;
+    }
+    if (t.matches("[data-fmrw], [data-fmvoice]")) return;
+    if (t.closest("[data-scene], [data-link], [data-sline]")) {
+      await filmSave(t.closest("[data-scene], [data-sline]") ? "scenes" : "links");
+      fmScriptSync();
       toast("✅ اتحفظ");
       if (t.matches("[data-la], [data-lsec], [data-sf=seconds], [data-sf=motion]")) renderFilm();   // التمن والحاجات اللي هتتولد تاني اتغيرت
     }

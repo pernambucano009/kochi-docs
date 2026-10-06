@@ -1672,3 +1672,19 @@ a.pl-link:hover { background: color-mix(in srgb, var(--ok) 24%, transparent); }
 .fm-ref small { font-size: 10px; max-width: 70px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fm-ref button { position: absolute; top: -6px; inset-inline-end: -6px; width: 20px; height: 20px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); font-size: 11px; line-height: 1; padding: 0; cursor: pointer; }
 .fm-queued { color: var(--accent); font-weight: 600; }
+.fm-script > summary { cursor: pointer; font-weight: 700; font-size: 15px; }
+.fm-script { display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px; }
+.fm-slines { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.fm-sline { display: flex; gap: 10px; border: 1px solid var(--line); border-radius: 10px; padding: 8px; background: var(--surface); }
+.fm-sline.stale { border-color: #f0b54a; background: #fff8ea; }
+.fm-snum { width: 26px; height: 26px; border-radius: 50%; background: var(--accent-soft); display: grid; place-items: center; flex: none; }
+.fm-sbody { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.fm-sbody label { display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+.fm-sbody textarea, .fm-sbody input { width: 100%; }
+.fm-smeta { gap: 8px; align-items: center; }
+.fm-smeta audio { height: 30px; max-width: 220px; }
+.fm-stale { display: none; color: #b7791f; font-weight: 600; }
+.fm-sline.stale .fm-stale { display: inline; }
+.fm-rewrite input { flex: 1 1 260px; }
+.fm-voice { display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--line); padding-top: 8px; }
+.fm-voice audio { width: 100%; max-width: 420px; }
