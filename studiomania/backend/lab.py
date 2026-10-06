@@ -678,6 +678,82 @@ def mock_trial_plan() -> dict:
                          {"label": "التحوّل بيكمل", "prompt": "Background finishes morphing into the final frame.", "seconds": 1.5}]}
 
 
+# ------------------------------------------------------------ 🎞️ فيديو مبني على الكونيكتورز
+
+FILM_FORMAT = """{
+  "title": "اسم الفيديو",
+  "idea": "الفكرة في سطرين: القصة اللي بتربط المشاهد والكونيكتورز",
+  "scenes": [{"label": "اسم المشهد بالعربي", "feature": "الميزة اللي المشهد بيعرضها",
+              "text": "الكلام المكتوب على الشاشة في المشهد ده (قصير، بلغة ولهجة العميل) أو فاضي",
+              "screen": "اسم شاشة / لوجو / صورة منتج من ملف العميل لو المشهد محتاجها بالظبط، أو فاضي",
+              "start": "English image prompt for the FIRST frame of the scene (composition, subject, UI, background, colors, the on-screen text in quotes)",
+              "end": "English image-edit instruction from the first frame to the LAST frame of the scene: what moved or appeared, and how it is set up so the next connector can start (keep the same style and text)",
+              "motion": "English prompt for a start-frame/end-frame video model: the continuous motion inside the scene, no cut",
+              "seconds": 3}],
+  "links": [{"asset": "id الكونيكتور من القايمة", "why": "ليه الكونيكتور ده بالذات بين المشهدين دول وإزاي بيكمّل القصة"}]
+}"""
+
+
+def film_plan_messages(brain_txt: str, brief: str, conns: list[dict], n_scenes: int) -> str:
+    """نص طلب السيناريو. بعده بتيجي فريمات كل كونيكتور مرجعي بالترتيب اللي في القايمة."""
+    rows = []
+    for c in conns:
+        r = c.get("connector") or {}
+        rows.append({"id": c["id"], "name": c.get("name"), **{k: r.get(k) for k in (
+            "family", "from_scene", "to_scene", "trigger", "anchors", "transforms", "camera", "rhythm", "recipe", "story_role")}})
+    return (
+        "أنت مخرج إعلانات موشن جرافيك. هنعمل فيديو قصير مبني على «كونيكتورز»: تحوّلات بتحكي وبتودّي من مشهد لمشهد من غير قطع. "
+        "الكونيكتورز دي اتطلعت من فيديوهات حقيقية ومعاها وصفتها. المطلوب سيناريو المشاهد يتكتب على مقاس الكونيكتورز: "
+        "كل مشهد لازم يخلص في وضع يخلي شرارة الكونيكتور اللي بعده تحصل طبيعي، والمشهد اللي بعده يبدأ مكان ما الكونيكتور بيوصل.\n\n"
+        f"ملف العميل:\n{brain_txt or '(مفيش)'}\n\n"
+        f"المطلوب من الفيديو: {brief or 'فيديو قصير بيعرض أهم مميزات المنتج'}\n\n"
+        f"الكونيكتورز المتاحة (استخدم كل واحد مرة على الأقل لو ينفع، بالترتيب اللي يخدم القصة):\n{json.dumps(rows, ensure_ascii=False, indent=1)}\n\n"
+        "الصور اللي بعد الكلام ده = فريمات الكونيكتورز المرجعية بنفس ترتيب القايمة (البداية والنص والنهاية لكل واحد).\n\n"
+        f"- عدد المشاهد {n_scenes}، وعدد links = عدد المشاهد - 1 بالظبط (link رقم 1 بين المشهد 1 و2 وهكذا).\n"
+        "- كل مشهد بيعرض ميزة واحدة واضحة. أول مشهد هوك قوي، وآخر مشهد فيه اسم/لوجو البراند وجملة تحفيز.\n"
+        "- الكلام على الشاشة قصير جدًا (٣-٧ كلمات) ومكتوب صح بلغة ولهجة العميل.\n"
+        "- لو المشهد فيه شاشة التطبيق أو اللوجو الحقيقي اكتب اسمه في screen بالظبط زي ما هو في ملف العميل.\n"
+        "- البرومبتات بالإنجليزي، والكلام اللي هيتكتب على الشاشة يتحط بين علامات تنصيص زي ما هو بالعربي.\n"
+        "- seconds للمشهد من 2 لـ 5.\n"
+        "رجّع JSON بس بالشكل ده:\n" + FILM_FORMAT
+    )
+
+
+def clean_film_plan(data: dict, conn_ids: list[str], max_scenes: int = 8) -> dict:
+    d = data or {}
+    scenes = []
+    for i, x in enumerate(d.get("scenes") or []):
+        if not isinstance(x, dict):
+            continue
+        try:
+            sec = float(x.get("seconds") or 3)
+        except (TypeError, ValueError):
+            sec = 3.0
+        scenes.append({"label": str(x.get("label") or f"مشهد {i + 1}")[:120], "feature": str(x.get("feature") or "")[:300],
+                       "text": str(x.get("text") or "")[:200], "screen": str(x.get("screen") or "")[:120],
+                       "start": str(x.get("start") or "")[:3000], "end": str(x.get("end") or "")[:3000],
+                       "motion": str(x.get("motion") or "")[:2000], "seconds": round(min(5.0, max(2.0, sec)), 2)})
+    scenes = scenes[:max_scenes]
+    links = []
+    for i in range(max(0, len(scenes) - 1)):
+        x = (d.get("links") or [])[i] if i < len(d.get("links") or []) else {}
+        x = x if isinstance(x, dict) else {}
+        aid = str(x.get("asset") or "")
+        if aid not in conn_ids and conn_ids:
+            aid = conn_ids[i % len(conn_ids)]
+        links.append({"asset": aid, "why": str(x.get("why") or "")[:1000]})
+    return {"title": str(d.get("title") or "")[:120], "idea": str(d.get("idea") or "")[:2000], "scenes": scenes, "links": links}
+
+
+def mock_film_plan(conns: list[dict], n_scenes: int, brand: str) -> dict:
+    feats = ["الهوك", "ميزة أولى", "ميزة تانية", "ميزة تالتة", "ميزة رابعة", "ميزة خامسة", "ميزة سادسة", "الختام"]
+    scenes = [{"label": f"مشهد {i + 1}", "feature": feats[min(i, len(feats) - 1)], "text": f"{brand} {i + 1}", "screen": "",
+               "start": f"Scene {i + 1} first frame.", "end": "Element moves to the center.", "motion": "Slow push in.", "seconds": 3}
+              for i in range(n_scenes)]
+    links = [{"asset": conns[i % len(conns)]["id"], "why": "تجربة"} for i in range(n_scenes - 1)] if conns else []
+    return {"title": f"مميزات {brand}", "idea": "فيديو تجريبي", "scenes": scenes, "links": links}
+
+
 # ------------------------------------------------------------ تجارب من غير Atlas
 
 def mock_audio(duration: float, marks: list[dict]) -> dict:

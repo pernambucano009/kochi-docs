@@ -26,6 +26,7 @@ async function initLab() {
   if (id) await openLab(id);
   else renderLab();
   if (labx.view === "lib") openLib(asx.cur?.id);
+  if (labx.view === "film") openFilm(filmx.cur?.id);
 }
 async function openLab(id) {
   const fresh = await api(`/api/lab/${id}`);
@@ -68,9 +69,11 @@ function renderLab() {
       <span class="ad-li-body"><span class="nm" data-no-i18n>${le(x.name)}</span>
         <small class="muted">${x.duration} ث · ${x.shots} لقطة</small></span>
       <small>${x.busy ? "⏳" : ""}</small></li>`).join("") || `<li class="muted">لسه مفيش فيديوهات.</li>`;
-  const d = labx.cur, lib = labx.view === "lib";
-  $("labLibBtn").classList.toggle("active", lib);
-  $("labLib").hidden = !lib;
+  const d = labx.cur, lib = labx.view === "lib" || labx.view === "film";
+  $("labLibBtn").classList.toggle("active", labx.view === "lib");
+  $("labFilmBtn").classList.toggle("active", labx.view === "film");
+  $("labLib").hidden = labx.view !== "lib";
+  $("labFilm").hidden = labx.view !== "film";
   $("labMain").hidden = !d || lib;
   $("labEmpty").hidden = !!d || lib;
   if (!d || lib) return;
@@ -472,7 +475,7 @@ function renderLabShots(d) {
 // ---------- الأحداث
 const labAudio = new Audio();
 document.querySelector('.view[data-view="11"]').addEventListener("click", async (e) => {
-  if (e.target.closest("#labLib")) return;  // المكتبة ليها أحداثها في assets.js
+  if (e.target.closest("#labLib, #labFilm")) return;  // المكتبة ليها أحداثها في assets.js
   const conn = e.target.closest("[data-conn]");
   if (conn) {
     const cid = conn.dataset.conn, c = labx.cur.connectors.find((x) => x.id === cid);
@@ -711,7 +714,7 @@ document.querySelector('.view[data-view="11"]').addEventListener("toggle", (e) =
   if (e.target.matches?.("[data-audiobox]")) labx.audioOpen = e.target.open;
 }, true);
 document.querySelector('.view[data-view="11"]').addEventListener("change", (e) => {
-  if (e.target.closest("#labLib")) return;
+  if (e.target.closest("#labLib, #labFilm")) return;
   const conn = e.target.closest("[data-conn]");
   if (conn) {
     const cid = conn.dataset.conn, c = labx.cur.connectors.find((x) => x.id === cid), k = e.target.dataset.xf;

@@ -3216,6 +3216,7 @@ app.mount("/media/ads", StaticFiles(directory=ADS_DIR), name="ads")
 app.mount("/media/brand", StaticFiles(directory=BRAND_DIR), name="brand")
 app.mount("/media/lab", StaticFiles(directory=DATA_DIR / "lab", check_dir=False), name="lab")
 app.mount("/media/assets", StaticFiles(directory=DATA_DIR / "assets", check_dir=False), name="assets")
+app.mount("/media/films", StaticFiles(directory=DATA_DIR / "films", check_dir=False), name="films")
 app.mount("/fonts", StaticFiles(directory=FONTS_DIR), name="fonts")
 
 
@@ -9797,6 +9798,56 @@ def nearest_ratio(w: int, h: int) -> str:
     return min(("9:16", "16:9", "1:1", "3:4", "4:3"), key=lambda k: abs(r - int(k.split(":")[0]) / int(k.split(":")[1])))
 
 
+def draw_key(prompt: str, base: Path, target: Path, out: Path, size: str, i: int = 0) -> Path:
+    """صورة مرحلة: تعديل على الصورة اللي قبلها، ومعاها الصورة اللي رايحين لها كمرجع."""
+    if atlas.mock_mode():
+        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(base), "-vf", f"hue=h={60 * (i + 1)}",
+                        str(out)], check=True, capture_output=True, timeout=60)
+        return out
+    prompt += ("\nIMAGE 1 is the current frame and the base to edit. IMAGE 2 is the final frame we are "
+               "heading to (reference only). Keep the same framing, aspect ratio, style and every on-screen text exactly as "
+               "written unless the instruction changes it.")
+    atlas.download(atlas.generate_image(carousel_settings()["image_family"], prompt, size, "medium",
+                                        [atlas.reference_url(base), atlas.reference_url(target)]), out)
+    return out
+
+
+def gen_motion(model_key: str, resolution: str, ratio: str, prompt: str, img_a: Path, img_b: Path, secs: int,
+               out: Path, W: int, H: int, what: str = "حركة الكونيكتور") -> Path:
+    """حركة بين صورة بداية وصورة نهاية (Seedance)."""
+    if atlas.mock_mode():
+        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-loop", "1", "-t", str(secs), "-i", str(img_a),
+                        "-loop", "1", "-t", str(secs), "-i", str(img_b), "-filter_complex",
+                        f"[0]scale={W}:{H},setsar=1,fps=30[a];[1]scale={W}:{H},setsar=1,fps=30[b];"
+                        f"[a][b]xfade=transition=fade:duration={secs - 0.5}:offset=0.25,format=yuv420p",
+                        "-t", str(secs), str(out)], check=True, capture_output=True, timeout=120)
+        return out
+    body = {"model": TRIAL_MODELS[model_key]["model"], "prompt": prompt + " One continuous shot, no cuts, no text changes.",
+            "image": atlas.reference_url(img_a), "last_image": atlas.reference_url(img_b),
+            "duration": secs, "resolution": resolution, "ratio": ratio, "generate_audio": False}
+    atlas.download(atlas.run_model("Video", body, what, max_seconds=1500, interval=6), out)
+    return out
+
+
+def chain_clips(items: list, out: Path, W: int, H: int) -> Path:
+    """يلزق المقاطع ورا بعض؛ كل عنصر (مسار، معامل الطول) عشان كل حتة تاخد الطول اللي في الخطة."""
+    inputs, fc = [], []
+    for i, it in enumerate(items):
+        p, f = (it if isinstance(it, tuple) else (it, 1.0))
+        inputs += ["-i", str(p)]
+        fc.append(f"[{i}:v]scale={W}:{H}:force_original_aspect_ratio=decrease,pad={W}:{H}:(ow-iw)/2:(oh-ih)/2,setsar=1,"
+                  f"fps=30,setpts={f:.4f}*(PTS-STARTPTS)[v{i}]")
+    fc.append("".join(f"[v{i}]" for i in range(len(items))) + f"concat=n={len(items)}:v=1:a=0[out]")
+    subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", *inputs, "-filter_complex", ";".join(fc),
+                    "-map", "[out]", "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p",
+                    "-movflags", "+faststart", str(out)], check=True, capture_output=True, timeout=900)
+    return out
+
+
+def timed(p: Path, seconds: float) -> tuple:
+    return (p, seconds / max(0.1, probe_duration(p)))
+
+
 def run_trial_gen(aid: str, tid: str) -> None:
     def step(msg: str) -> None:
         trial_set(aid, tid, step=msg)
@@ -9812,62 +9863,26 @@ def run_trial_gen(aid: str, tid: str) -> None:
         chain, keys = [folder / "a.jpg"], []
         for i, k in enumerate(plan["keyframes"]):
             step(f"🖼️ بيرسم المرحلة {i + 1} من {len(plan['keyframes'])}: {k['label']}")
-            out = folder / f"k{i + 1}.png"
-            if atlas.mock_mode():
-                subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(chain[-1]), "-vf", f"hue=h={60 * (i + 1)}",
-                                str(out)], check=True, capture_output=True, timeout=60)
-            else:
-                prompt = (k["prompt"] + "\nIMAGE 1 is the current frame and the base to edit. IMAGE 2 is the final frame we are "
-                          "heading to (reference only). Keep the same framing, aspect ratio, style and every on-screen text exactly as "
-                          "written unless the instruction changes it.")
-                url = atlas.generate_image(carousel_settings()["image_family"], prompt, size, "medium",
-                                           [atlas.reference_url(chain[-1]), atlas.reference_url(folder / "b.jpg")])
-                atlas.download(url, out)
-            chain.append(out)
-            keys.append(out.name)
+            chain.append(draw_key(k["prompt"], chain[-1], folder / "b.jpg", folder / f"k{i + 1}.png", size, i))
+            keys.append(chain[-1].name)
             trial_set(aid, tid, files={**t["files"], "keys": keys})
         chain.append(folder / "b.jpg")
         # ٢) الحركة بين كل صورتين (صورة بداية + صورة نهاية)
-        m, segs = TRIAL_MODELS[t["model"]], []
+        segs = []
         for i, sg in enumerate(plan["segments"]):
             step(f"🎬 بيولّد الحركة {i + 1} من {len(plan['segments'])}: {sg['label']}")
-            out, secs = folder / f"s{i + 1}.mp4", trial_gen_seconds(sg["seconds"])
-            if atlas.mock_mode():
-                subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-loop", "1", "-t", str(secs), "-i", str(chain[i]),
-                                "-loop", "1", "-t", str(secs), "-i", str(chain[i + 1]), "-filter_complex",
-                                f"[0]scale={W}:{H},setsar=1,fps=30[a];[1]scale={W}:{H},setsar=1,fps=30[b];"
-                                f"[a][b]xfade=transition=fade:duration={secs - 0.5}:offset=0.25,format=yuv420p",
-                                "-t", str(secs), str(out)], check=True, capture_output=True, timeout=120)
-            else:
-                body = {"model": m["model"], "prompt": sg["prompt"] + " One continuous shot, no cuts, no text changes.",
-                        "image": atlas.reference_url(chain[i]), "last_image": atlas.reference_url(chain[i + 1]),
-                        "duration": secs, "resolution": t["resolution"], "ratio": ratio, "generate_audio": False}
-                atlas.download(atlas.run_model("Video", body, "حركة الكونيكتور", max_seconds=1500, interval=6), out)
-            segs.append(out.name)
+            gen_motion(t["model"], t["resolution"], ratio, sg["prompt"], chain[i], chain[i + 1], trial_gen_seconds(sg["seconds"]),
+                       folder / f"s{i + 1}.mp4", W, H)
+            segs.append(f"s{i + 1}.mp4")
             trial_set(aid, tid, files={**t["files"], "keys": keys, "segs": segs})
         # ٣) التجميع: آخر A ← الحركات (كل واحدة على قد طولها في الخطة) ← أول B
         step("🎞️ بيجمّع")
         a_src, b_src = lab_dir(t["a"]["lab"]) / t["a"]["src"], lab_dir(t["b"]["lab"]) / t["b"]["src"]
         parts = [cut_clip(a_src, *t["a"]["ctx"], folder / "a_ctx.mp4")]
-        for name, sg in zip(segs, plan["segments"]):
-            p = folder / name
-            factor = sg["seconds"] / max(0.1, probe_duration(p))
-            parts.append((p, factor))
+        parts += [timed(folder / name, sg["seconds"]) for name, sg in zip(segs, plan["segments"])]
         parts.append(cut_clip(b_src, *t["b"]["ctx"], folder / "b_ctx.mp4"))
-        def chain_video(items: list, out: Path) -> Path:
-            inputs, fc = [], []
-            for i, it in enumerate(items):
-                p, f = (it if isinstance(it, tuple) else (it, 1.0))
-                inputs += ["-i", str(p)]
-                fc.append(f"[{i}:v]scale={W}:{H}:force_original_aspect_ratio=decrease,pad={W}:{H}:(ow-iw)/2:(oh-ih)/2,setsar=1,"
-                          f"fps=30,setpts={f:.4f}*(PTS-STARTPTS)[v{i}]")
-            fc.append("".join(f"[v{i}]" for i in range(len(items))) + f"concat=n={len(items)}:v=1:a=0[out]")
-            subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", *inputs, "-filter_complex", ";".join(fc),
-                            "-map", "[out]", "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p",
-                            "-movflags", "+faststart", str(out)], check=True, capture_output=True, timeout=600)
-            return out
-        chain_video(parts, folder / "final.mp4")
-        chain_video(parts[1:-1], folder / "conn.mp4")
+        chain_clips(parts, folder / "final.mp4", W, H)
+        chain_clips(parts[1:-1], folder / "conn.mp4", W, H)
         trial_set(aid, tid, status="done", step=None, error=None, done_at=now(),
                   files={"a": "a.jpg", "b": "b.jpg", "keys": keys, "segs": segs, "final": "final.mp4", "conn": "conn.mp4"})
     except Exception as exc:  # noqa: BLE001
@@ -9899,6 +9914,527 @@ def asset_trial_delete(aid: str, tid: str):
     d = clip_update(aid, fn)
     shutil.rmtree(trial_dir(aid, tid), ignore_errors=True)
     return clip_to_dict(aid, d)
+
+
+# ---------- 🎞️ فيديو بالكونيكتورز: سيناريو مكتوب على مقاس الكونيكتورز اللي في المكتبة
+# السيناريو ← فريم أول وآخر لكل مشهد ← خطة كل كونيكتور بين مشهدين ← حركة المشاهد والكونيكتورز ← تجميع
+
+FILMS_DIR = DATA_DIR / "films"
+FILMS_DIR.mkdir(parents=True, exist_ok=True)
+FILM_LOCK = threading.Lock()
+FILM_BUSY = ("planning", "drawing", "working")
+
+
+def film_dir(fid: str) -> Path:
+    return FILMS_DIR / Path(fid).name
+
+
+def film_load(fid: str) -> dict:
+    f = film_dir(fid) / "film.json"
+    if not f.exists():
+        raise HTTPException(404, "الفيديو ده مش موجود")
+    return json.loads(f.read_text(encoding="utf-8"))
+
+
+def film_save(fid: str, d: dict) -> None:
+    d["updated_at"] = now()
+    tmp = film_dir(fid) / "film.json.tmp"
+    tmp.write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+    tmp.replace(film_dir(fid) / "film.json")
+
+
+def film_update(fid: str, fn) -> dict:
+    with FILM_LOCK:
+        d = film_load(fid)
+        fn(d)
+        film_save(fid, d)
+        return d
+
+
+def film_set(fid: str, **kw) -> dict:
+    return film_update(fid, lambda d: d.update(**kw))
+
+
+def film_files(d: dict) -> dict:
+    """ملفات كل مشهد وكل كونيكتور، على قد عدد المشاهد في السيناريو."""
+    n = len((d.get("plan") or {}).get("scenes") or [])
+    f = d.setdefault("files", {})
+    f["scenes"] = (f.get("scenes") or []) + [{} for _ in range(n - len(f.get("scenes") or []))]
+    f["scenes"] = f["scenes"][:n]
+    f["links"] = (f.get("links") or []) + [{} for _ in range(max(0, n - 1) - len(f.get("links") or []))]
+    f["links"] = f["links"][:max(0, n - 1)]
+    return f
+
+
+def film_conns(ids: list[str]) -> list[dict]:
+    out = []
+    for aid in ids:
+        try:
+            a = clip_load(aid)
+        except HTTPException:
+            continue
+        if a.get("category") == "connector" and a.get("connector"):
+            out.append({**a, "id": aid})
+    return out
+
+
+def film_link_cost(d: dict, i: int) -> float:
+    lp = (d["plan"]["links"][i].get("plan") or {})
+    per = TRIAL_MODELS.get(d.get("model"), TRIAL_MODELS["seedance-mini"])["per_sec"] * (2 if d.get("resolution") == "720p" else 1)
+    if not lp:
+        return 1 * TRIAL_KEY_COST + 2 * atlas.MIN_DURATION * per
+    return len(lp.get("keyframes") or []) * TRIAL_KEY_COST + sum(trial_gen_seconds(x["seconds"]) for x in lp.get("segments") or []) * per
+
+
+def film_costs(d: dict) -> dict:
+    """تمن الفريمات اللي لسه متترسمتش، وتمن الفيديو (المشاهد والكونيكتورز اللي لسه متولدتش)."""
+    p = d.get("plan") or {}
+    if not p.get("scenes"):
+        return {"frames": 0, "video": 0}
+    f = film_files(json.loads(json.dumps(d)))
+    per = TRIAL_MODELS.get(d.get("model"), TRIAL_MODELS["seedance-mini"])["per_sec"] * (2 if d.get("resolution") == "720p" else 1)
+    frames = sum((0 if x.get("a") else 1) + (0 if x.get("b") else 1) for x in f["scenes"]) * TRIAL_KEY_COST
+    video = sum(trial_gen_seconds(sc["seconds"]) * per for sc, x in zip(p["scenes"], f["scenes"]) if not x.get("video"))
+    video += sum(film_link_cost(d, i) for i, x in enumerate(f["links"]) if not x.get("segs"))
+    return {"frames": round(frames, 2), "video": round(video, 2)}
+
+
+def film_to_dict(fid: str, d: dict) -> dict:
+    base = f"/media/films/{fid}"
+    folder = film_dir(fid)
+    def url(name):
+        if not name or not (folder / name).exists():
+            return None
+        return f"{base}/{name}?v={int((folder / name).stat().st_mtime)}"
+    f = film_files(json.loads(json.dumps(d)))
+    links = (d.get("plan") or {}).get("links") or []
+    return {**d, "id": fid, "busy": d.get("status") in FILM_BUSY, "costs": film_costs(d),
+            "final_url": url((d.get("files") or {}).get("final")),
+            "scene_files": [{"a": url(x.get("a")), "b": url(x.get("b")), "video": url(x.get("video"))} for x in f["scenes"]],
+            "link_files": [{"keys": [url(k) for k in x.get("keys") or []], "video": url(x.get("video"))} for x in f["links"]],
+            "link_assets": [{"id": l.get("asset"), **({"name": a.get("name"), "url": f"/media/assets/{l['asset']}/{a['file']}",
+                             "thumb_url": f"/media/assets/{l['asset']}/{a['thumb']}"} if (a := film_asset_brief(l.get("asset"))) else {})}
+                            for l in links],
+            "models": [{"key": k, "label": v["label"], "per_sec": v["per_sec"]} for k, v in TRIAL_MODELS.items()]}
+
+
+def film_asset_brief(aid: str | None) -> dict | None:
+    if not aid or not (clip_dir(aid) / "asset.json").exists():
+        return None
+    try:
+        return clip_load(aid)
+    except (HTTPException, ValueError):
+        return None
+
+
+@app.get("/api/films")
+def films_list():
+    out = []
+    for f in sorted(FILMS_DIR.glob("*/film.json"), key=lambda x: x.stat().st_mtime, reverse=True):
+        try:
+            d = json.loads(f.read_text(encoding="utf-8"))
+        except ValueError:
+            continue
+        if not owned(d.get("client_id")):
+            continue
+        fid = f.parent.name
+        first = ((d.get("files") or {}).get("scenes") or [{}])[0].get("a")
+        out.append({"id": fid, "name": d.get("name"), "status": d.get("status"), "scenes": len((d.get("plan") or {}).get("scenes") or []),
+                    "thumb": f"/media/films/{fid}/{first}" if first else None, "created_at": d.get("created_at")})
+    return out
+
+
+@app.get("/api/films/{fid}")
+def film_get(fid: str):
+    return film_to_dict(fid, film_load(fid))
+
+
+class FilmIn(BaseModel):
+    name: str = ""
+    brief: str = ""
+    connectors: list[str] = []
+    scenes: int = 0
+    ratio: str = "9:16"
+    model: str = "seedance-mini"
+    resolution: str = "480p"
+
+
+@app.post("/api/films")
+def film_create(body: FilmIn):
+    """🎞️ فيديو جديد: البرنامج بيكتب سيناريو على مقاس الكونيكتورز اللي اخترتها (رخيص). الرسم والتوليد بيستنوا موافقتك."""
+    conns = film_conns(body.connectors)
+    if not conns:
+        raise HTTPException(400, "اختار كونيكتور واحد على الأقل من المكتبة")
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل")
+    client = active_client() or {}
+    fid = uuid.uuid4().hex[:10]
+    film_dir(fid).mkdir(parents=True, exist_ok=True)
+    n = body.scenes if 2 <= body.scenes <= 8 else min(8, max(3, len(conns) + 1))
+    d = {"name": body.name.strip()[:120] or f"🎞️ {client.get('name') or 'فيديو'}: المميزات", "client_id": client.get("id"),
+         "brief": body.brief.strip()[:3000] or f"فيديو قصير بيعرض أهم مميزات {client.get('name') or 'المنتج'}",
+         "connectors": [c["id"] for c in conns], "n_scenes": n,
+         "ratio": body.ratio if body.ratio in az.ASPECTS else "9:16",
+         "model": body.model if body.model in TRIAL_MODELS else "seedance-mini",
+         "resolution": body.resolution if body.resolution in ("480p", "720p") else "480p",
+         "status": "planning", "step": "بيكتب السيناريو", "error": None, "plan": None, "files": {}, "created_at": now()}
+    with FILM_LOCK:
+        film_save(fid, d)
+    threading.Thread(target=run_film_plan, args=(fid,), daemon=True).start()
+    return film_to_dict(fid, d)
+
+
+def run_film_plan(fid: str) -> None:
+    try:
+        d = film_load(fid)
+        conns = film_conns(d["connectors"])
+        brain = brain_row(d.get("client_id") or "") or active_client()
+        if not conns:
+            raise HTTPException(400, "الكونيكتورز اللي اخترتها اتمسحت من المكتبة")
+        if atlas.mock_mode():
+            raw = lab.mock_film_plan(conns, d["n_scenes"], (brain or {}).get("name") or "البراند")
+        else:
+            parts: list[dict] = [{"type": "text", "text": lab.film_plan_messages(az.brain_text(brain), d["brief"], conns, d["n_scenes"])}]
+            for c in conns:
+                for k in (c.get("keyframes") or [])[:3]:
+                    p = clip_dir(c["id"]) / k["file"]
+                    if p.exists():
+                        parts.append({"type": "image_url", "image_url": {"url": data_url(model_image(p, 512), "image/jpeg")}})
+            raw = ad_json(ad_media_chat([{"role": "user", "content": parts}], 12000), "سيناريو الفيديو")
+        plan = lab.clean_film_plan(raw, [c["id"] for c in conns])
+        if len(plan["scenes"]) < 2:
+            raise HTTPException(400, "السيناريو طلع أقل من مشهدين. جرّب تاني")
+        def fn(x):
+            for f in film_dir(fid).glob("*"):
+                if f.name != "film.json":
+                    f.unlink(missing_ok=True)
+            x.update(plan=plan, files={}, status="planned", step=None, error=None)
+            if plan.get("title") and x["name"].startswith("🎞️"):
+                x["name"] = "🎞️ " + plan["title"]
+        film_update(fid, fn)
+    except Exception as exc:  # noqa: BLE001
+        film_set(fid, status="failed", step=None, error=str(getattr(exc, "detail", None) or exc)[:400])
+
+
+class FilmPatchIn(BaseModel):
+    name: str | None = None
+    brief: str | None = None
+    plan: dict | None = None
+    model: str | None = None
+    resolution: str | None = None
+
+
+@app.patch("/api/films/{fid}")
+def film_patch(fid: str, body: FilmPatchIn):
+    """تعديل السيناريو (الكلام والبرومبتات والأطوال، والكونيكتور اللي بين كل مشهدين) أو الموديل."""
+    def fn(d):
+        if body.plan is not None and d.get("status") in FILM_BUSY:
+            raise HTTPException(400, "استنى لما الشغل اللي شغال يخلص")
+        if body.name is not None and body.name.strip():
+            d["name"] = body.name.strip()[:120]
+        if body.brief is not None:
+            d["brief"] = body.brief.strip()[:3000]
+        if body.model in TRIAL_MODELS:
+            d["model"] = body.model
+        if body.resolution in ("480p", "720p"):
+            d["resolution"] = body.resolution
+        if body.plan is not None and d.get("plan"):
+            old = d["plan"]
+            new = lab.clean_film_plan({**old, **body.plan}, [l["asset"] for l in old["links"]] + d["connectors"])
+            if len(new["scenes"]) != len(old["scenes"]):
+                raise HTTPException(400, "عدد المشاهد مينفعش يتغير هنا. اكتب السيناريو من جديد")
+            f = film_files(d)
+            for i, (a, b) in enumerate(zip(old["scenes"], new["scenes"])):
+                if a["motion"] != b["motion"] or a["seconds"] != b["seconds"]:
+                    f["scenes"][i].pop("video", None)
+            for i, (a, b) in enumerate(zip(old["links"], new["links"])):
+                lp = (body.plan.get("links") or [{}] * len(new["links"]))[i] if i < len(body.plan.get("links") or []) else {}
+                if a["asset"] != b["asset"]:
+                    f["links"][i] = {}      # كونيكتور تاني: الخطة بتتعمل من جديد
+                    b["plan"] = None
+                else:
+                    b["plan"] = lab.clean_trial_plan(lp["plan"]) if isinstance(lp, dict) and lp.get("plan") else a.get("plan")
+                    if b["plan"] != a.get("plan"):
+                        f["links"][i] = {}
+            if new != old:
+                f.pop("final", None)
+            d["plan"] = new
+    d = film_update(fid, fn)
+    return film_to_dict(fid, d)
+
+
+def film_start(fid: str, status: str, step: str, target, *args) -> dict:
+    def fn(d):
+        if d.get("status") in FILM_BUSY:
+            raise HTTPException(400, "استنى لما الشغل اللي شغال يخلص")
+        if status != "planning" and not (d.get("plan") or {}).get("scenes"):
+            raise HTTPException(400, "السيناريو لسه مخلصش")
+        d.update(status=status, step=step, error=None)
+    d = film_update(fid, fn)
+    threading.Thread(target=target, args=(fid, *args), daemon=True).start()
+    return film_to_dict(fid, d)
+
+
+@app.post("/api/films/{fid}/replan")
+def film_replan(fid: str):
+    """✍️ سيناريو جديد من الأول (الفريمات والفيديوهات القديمة بتتمسح)."""
+    return film_start(fid, "planning", "بيكتب السيناريو", run_film_plan)
+
+
+class FilmFrameIn(BaseModel):
+    note: str = ""
+
+
+@app.post("/api/films/{fid}/frames")
+def film_frames(fid: str):
+    """🖼️ يرسم الفريمات اللي لسه متترسمتش (أول وآخر كل مشهد) ويكتب خطة كل كونيكتور."""
+    return film_start(fid, "drawing", "بيبدأ يرسم", run_film_frames, None, "")
+
+
+@app.post("/api/films/{fid}/scenes/{i}/{which}")
+def film_frame_redo(fid: str, i: int, which: str, body: FilmFrameIn):
+    """↻ يرسم فريم واحد تاني (ولو فيه ملاحظة بيعدّل عليه بيها). لو أول المشهد اترسم، آخره بيترسم معاه."""
+    if which not in ("a", "b"):
+        raise HTTPException(400, "a أو b")
+    d = film_load(fid)
+    if not 0 <= i < len((d.get("plan") or {}).get("scenes") or []):
+        raise HTTPException(404, "المشهد ده مش موجود")
+    return film_start(fid, "drawing", "بيرسم", run_film_frames, (i, which), body.note.strip()[:1000])
+
+
+def film_frame_prompt(d: dict, brain: dict | None, sc: dict, i: int, has_ref: bool, has_style: bool) -> str:
+    p = d["plan"]
+    parts = [f"A {d['ratio']} frame (scene {i + 1} of {len(p['scenes'])}) of a short premium motion-graphics promo video"
+             + (f" for {brain['name']}" if brain and brain.get("name") else "") + ".",
+             az.brain_header(brain), f"Color palette: {brain['palette']}" if brain and brain.get("palette") else "",
+             f"Video concept: {p.get('idea')}" if p.get("idea") else "",
+             f"SCENE: {sc['start']}",
+             f'ON-SCREEN TEXT (write it exactly as given, correct Arabic letters joined right-to-left, nothing else written): "{sc["text"]}"'
+             if sc.get("text") else "No on-screen text except what the brand asset itself contains.",
+             "IMAGE 1 is the REAL brand asset: put it into the frame exactly as it is (same screen content, layout, logo, colors, text)."
+             if has_ref else "",
+             f"IMAGE {2 if has_ref else 1} is the previous scene of the same video: match its visual style, rendering, colors and typography "
+             "(not its content)." if has_style else ""]
+    return "\n".join(x for x in parts if x)
+
+
+def film_brain_ref(brain: dict | None, name: str) -> Path | None:
+    if not brain or not name:
+        return None
+    for kind in ("screens", "logos", "products", "characters", "sets", "props"):
+        for a in brain.get(kind) or []:
+            if name in (a.get("name"), a.get("file")):
+                p = brain_dir(brain["id"]) / a["file"]
+                return p if p.exists() else None
+    return None
+
+
+def film_mock_image(out: Path, ratio: str, i: int) -> Path:
+    w, h = {"9:16": (576, 1024), "16:9": (1024, 576), "1:1": (768, 768)}.get(ratio, (576, 1024))
+    colors = ["0x57B8AF", "0xEEECDA", "0x2F3437", "0xE07A5F", "0x81B29A", "0xF2CC8F", "0x3D405B", "0x9C89B8"]
+    subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i", f"color=c={colors[i % 8]}:s={w}x{h}",
+                    "-frames:v", "1", str(out)], check=True, capture_output=True, timeout=60)
+    return out
+
+
+def film_plan_link(fid: str, i: int) -> None:
+    """خطة الكونيكتور بين آخر المشهد i وأول المشهد i+1 (بنفس طريقة تجارب الكونيكتور)."""
+    d = film_load(fid)
+    p, folder = d["plan"], film_dir(fid)
+    link = p["links"][i]
+    asset = film_asset_brief(link.get("asset"))
+    if not asset or not asset.get("connector"):
+        raise HTTPException(400, f"الكونيكتور اللي بين المشهد {i + 1} و{i + 2} اتمسح من المكتبة. اختار غيره")
+    a_img, b_img = folder / f"sc{i + 1}_b.png", folder / f"sc{i + 2}_a.png"
+    if atlas.mock_mode():
+        raw = lab.mock_trial_plan()
+    else:
+        sa, sb = p["scenes"][i], p["scenes"][i + 1]
+        text = lab.trial_plan_messages(asset["connector"], "transfer", f"آخر المشهد «{sa['label']}» ({sa['feature']})",
+                                       f"أول المشهد «{sb['label']}» ({sb['feature']})")
+        if link.get("why"):
+            text += f"\n\nليه الكونيكتور ده هنا: {link['why']}"
+        parts: list[dict] = [{"type": "text", "text": text}]
+        imgs = [a_img, b_img] + [clip_dir(link["asset"]) / k["file"] for k in asset.get("keyframes") or []]
+        for x in imgs:
+            if x.exists():
+                parts.append({"type": "image_url", "image_url": {"url": data_url(model_image(x, 768), "image/jpeg")}})
+        raw = ad_json(ad_media_chat([{"role": "user", "content": parts}], 8000), "خطة الكونيكتور")
+    lp = lab.clean_trial_plan(raw)
+    def fn(x):
+        x["plan"]["links"][i]["plan"] = lp
+        film_files(x)["links"][i] = {}
+        (x.get("files") or {}).pop("final", None)
+    film_update(fid, fn)
+
+
+def run_film_frames(fid: str, only: tuple | None, note: str) -> None:
+    """يرسم الفريمات. أول المشهد من البرومبت (ومعاه أصل العميل والمشهد اللي قبله كستايل)، وآخره تعديل على أوله."""
+    try:
+        d = film_load(fid)
+        p, folder = d["plan"], film_dir(fid)
+        brain = brain_row(d.get("client_id") or "") or active_client()
+        size = az.ASPECTS.get(d["ratio"], az.ASPECTS["9:16"])[0]
+        family = carousel_settings()["image_family"]
+        f = film_files(d)
+        todo = []
+        for i in range(len(p["scenes"])):
+            if only is None:
+                todo += [(i, w) for w in ("a", "b") if not f["scenes"][i].get(w)]
+            elif only[0] == i:
+                todo += [(i, "a"), (i, "b")] if only[1] == "a" else [(i, "b")]
+        changed = set()
+        for n, (i, w) in enumerate(todo):
+            sc = p["scenes"][i]
+            film_set(fid, step=f"🖼️ بيرسم {'أول' if w == 'a' else 'آخر'} المشهد {i + 1} ({n + 1} من {len(todo)}): {sc['label']}")
+            out = folder / f"sc{i + 1}_{w}.png"
+            if atlas.mock_mode():
+                film_mock_image(out, d["ratio"], i * 2 + (w == "b"))
+            elif w == "a":
+                old = folder / f"sc{i + 1}_a.png"
+                if note and only and old.exists():
+                    refs, prompt = [old], (f"Edit this frame: {note}\nKeep everything else identical (layout, style, on-screen text).")
+                else:
+                    ref = film_brain_ref(brain, sc.get("screen"))
+                    style = folder / f"sc{i}_a.png" if i > 0 else None
+                    refs = [x for x in (ref, style) if x and x.exists()]
+                    prompt = film_frame_prompt(d, brain, sc, i, bool(ref and ref.exists()), bool(style and style.exists()))
+                atlas.download(atlas.generate_image(family, prompt, size, "medium", [atlas.reference_url(x) for x in refs]), out)
+            else:
+                prompt = (f"IMAGE 1 is the FIRST frame of this scene. Draw the LAST frame of the same scene: {sc['end']}"
+                          + (f"\nAlso: {note}" if note and only and only[1] == "b" else "")
+                          + "\nKeep the exact same visual style, framing, aspect ratio, colors and on-screen text unless the instruction changes them.")
+                atlas.download(atlas.generate_image(family, prompt, size, "medium", [atlas.reference_url(folder / f"sc{i + 1}_a.png")]), out)
+            changed.add(i)
+            def fn(x, i=i, w=w):
+                fx = film_files(x)
+                fx["scenes"][i][w] = f"sc{i + 1}_{w}.png"
+                fx["scenes"][i].pop("video", None)
+                x["files"].pop("final", None)
+            film_update(fid, fn)
+        # الكونيكتورز اللي فريماتها اتغيرت (أو لسه ملهاش خطة) بتتخطط
+        d = film_load(fid)
+        for i, link in enumerate(d["plan"]["links"]):
+            ok = (folder / f"sc{i + 1}_b.png").exists() and (folder / f"sc{i + 2}_a.png").exists()
+            if ok and (i in changed or i + 1 in changed or not link.get("plan")):
+                film_set(fid, step=f"🧠 بيخطط الكونيكتور {i + 1} من {len(d['plan']['links'])}")
+                film_plan_link(fid, i)
+        film_set(fid, status="drawn", step=None, error=None)
+    except Exception as exc:  # noqa: BLE001
+        film_set(fid, status="failed", step=None, error=str(getattr(exc, "detail", None) or exc)[:400])
+
+
+@app.post("/api/films/{fid}/links/{i}/plan")
+def film_link_replan(fid: str, i: int):
+    """🧠 خطة جديدة للكونيكتور اللي بين مشهدين."""
+    d = film_load(fid)
+    if not 0 <= i < len((d.get("plan") or {}).get("links") or []):
+        raise HTTPException(404, "الكونيكتور ده مش موجود")
+    def job(fid, i):
+        try:
+            film_plan_link(fid, i)
+            film_set(fid, status="drawn", step=None, error=None)
+        except Exception as exc:  # noqa: BLE001
+            film_set(fid, status="failed", step=None, error=str(getattr(exc, "detail", None) or exc)[:400])
+    return film_start(fid, "drawing", f"🧠 بيخطط الكونيكتور {i + 1}", job, i)
+
+
+class FilmRunIn(BaseModel):
+    kind: str | None = None      # scene / link: يولّد الحتة دي تاني بس
+    i: int | None = None
+
+
+@app.post("/api/films/{fid}/run")
+def film_run(fid: str, body: FilmRunIn):
+    """🎬 يولّد اللي لسه متولدش (أو حتة واحدة تاني) ويجمّع الفيديو. بيتحسب على Atlas."""
+    d = film_load(fid)
+    f = film_files(d)
+    if any(not (x.get("a") and x.get("b")) for x in f["scenes"]):
+        raise HTTPException(400, "ارسم الفريمات الأول")
+    if any(not l.get("plan") for l in d["plan"]["links"]):
+        raise HTTPException(400, "فيه كونيكتور لسه ملوش خطة")
+    only = (body.kind, body.i) if body.kind in ("scene", "link") and body.i is not None else None
+    return film_start(fid, "working", "بيبدأ", run_film_gen, only)
+
+
+def run_film_gen(fid: str, only: tuple | None) -> None:
+    try:
+        d = film_load(fid)
+        p, folder = d["plan"], film_dir(fid)
+        err = subprocess.run([ffmpeg_exe(), "-hide_banner", "-i", str(folder / "sc1_a.png")], capture_output=True, text=True).stderr
+        m = re.search(r"Video:.*?(\d{2,5})x(\d{2,5})", err)
+        if not m:
+            raise HTTPException(400, "مقدرتش أقرا مقاس أول فريم. ارسمه تاني")
+        W, H = int(m.group(1)) // 2 * 2, int(m.group(2)) // 2 * 2
+        ratio = az.ASPECTS.get(d["ratio"], az.ASPECTS["9:16"])[1]
+        size = az.ASPECTS.get(d["ratio"], az.ASPECTS["9:16"])[0]
+        f = film_files(d)
+        n = len(p["scenes"])
+        for i, sc in enumerate(p["scenes"]):
+            if f["scenes"][i].get("video") and only != ("scene", i):   # اللي اتولد قبل كده بيفضل، إلا الحتة اللي طالبها تاني
+                continue
+            film_set(fid, step=f"🎬 بيولّد المشهد {i + 1} من {n}: {sc['label']}")
+            gen_motion(d["model"], d["resolution"], ratio, sc["motion"], folder / f"sc{i + 1}_a.png", folder / f"sc{i + 1}_b.png",
+                       trial_gen_seconds(sc["seconds"]), folder / f"sc{i + 1}.mp4", W, H, "حركة المشهد")
+            film_update(fid, lambda x, i=i: film_files(x)["scenes"][i].update(video=f"sc{i + 1}.mp4"))
+        for i, link in enumerate(p["links"]):
+            if f["links"][i].get("segs") and only != ("link", i):
+                continue
+            lp = link["plan"]
+            chain, keys = [folder / f"sc{i + 1}_b.png"], []
+            for j, k in enumerate(lp["keyframes"]):
+                film_set(fid, step=f"🖼️ الكونيكتور {i + 1}: بيرسم المرحلة {j + 1}: {k['label']}")
+                chain.append(draw_key(k["prompt"], chain[-1], folder / f"sc{i + 2}_a.png", folder / f"L{i + 1}_k{j + 1}.png", size, j))
+                keys.append(chain[-1].name)
+            chain.append(folder / f"sc{i + 2}_a.png")
+            segs = []
+            for j, sg in enumerate(lp["segments"]):
+                film_set(fid, step=f"🔗 الكونيكتور {i + 1}: بيولّد الحركة {j + 1} من {len(lp['segments'])}: {sg['label']}")
+                gen_motion(d["model"], d["resolution"], ratio, sg["prompt"], chain[j], chain[j + 1], trial_gen_seconds(sg["seconds"]),
+                           folder / f"L{i + 1}_s{j + 1}.mp4", W, H)
+                segs.append(f"L{i + 1}_s{j + 1}.mp4")
+            chain_clips([timed(folder / x, sg["seconds"]) for x, sg in zip(segs, lp["segments"])], folder / f"L{i + 1}.mp4", W, H)
+            film_update(fid, lambda x, i=i, keys=keys, segs=segs: film_files(x)["links"].__setitem__(
+                i, {"keys": keys, "segs": segs, "video": f"L{i + 1}.mp4"}))
+        # التجميع: مشهد ← كونيكتور ← مشهد ...
+        film_set(fid, step="🎞️ بيجمّع الفيديو")
+        d = film_load(fid)
+        parts = []
+        for i, sc in enumerate(p["scenes"]):
+            parts.append(timed(folder / f"sc{i + 1}.mp4", sc["seconds"]))
+            if i < n - 1:
+                parts.append(folder / f"L{i + 1}.mp4")
+        chain_clips(parts, folder / "film.mp4", W, H)
+        def fn(x):
+            film_files(x)
+            x["files"]["final"] = "film.mp4"
+            x.update(status="done", step=None, error=None, done_at=now())
+        film_update(fid, fn)
+    except Exception as exc:  # noqa: BLE001
+        film_set(fid, status="failed", step=None, error=str(getattr(exc, "detail", None) or exc)[:400])
+
+
+@app.delete("/api/films/{fid}")
+def film_delete(fid: str):
+    d = film_load(fid)
+    if d.get("status") in FILM_BUSY:
+        raise HTTPException(400, "استنى لما الشغل اللي شغال يخلص")
+    shutil.rmtree(film_dir(fid), ignore_errors=True)
+    return {"ok": True}
+
+
+def reset_stuck_films() -> None:
+    for f in FILMS_DIR.glob("*/film.json"):
+        try:
+            d = json.loads(f.read_text(encoding="utf-8"))
+        except ValueError:
+            continue
+        if d.get("status") in FILM_BUSY:
+            d.update(status="failed", step=None, error="اتقطع لما السيرفر اتقفل. دوس الزرار تاني")
+            f.write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+
+
+reset_stuck_films()
 
 
 def reset_stuck_assets() -> None:
