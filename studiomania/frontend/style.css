@@ -1729,7 +1729,7 @@ a.pl-link:hover { background: color-mix(in srgb, var(--ok) 24%, transparent); }
 .tv-sheetimg { max-width: 360px; width: 100%; border-radius: 8px; border: 1px solid var(--line); }
 .tv-panels { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
 .tv-panel { display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
-.tv-panel img, .tv-panel .fm-ph { width: 100%; aspect-ratio: 9 / 16; object-fit: cover; border-radius: 8px; }
+.tv-panel img, .tv-panel .fm-ph { width: 100%; aspect-ratio: 9 / 16; object-fit: contain; background: #111; border-radius: 8px; }
 .tv-panel input { width: 100%; font-size: 12px; }
 img.tv-cell { outline: 2px dashed #f0b54a; outline-offset: -2px; }
 .tv-segs { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; margin-top: 8px; }

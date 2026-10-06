@@ -10470,6 +10470,7 @@ def film_draw(fid: str, only: tuple | None, note: str, extra: list | None) -> se
                     notes.append("is the previous scene of the same video: match its visual style, rendering, colors and typography (not its content).")
                 prompt = film_frame_prompt(d, brain, sc, i, notes)
             atlas.download(atlas.generate_image(family, prompt, size, "medium", [atlas.reference_url(x) for x in refs]), out)
+            conform_image(out, d["ratio"])
         else:
             own = only and only[1] == "b"
             old = folder / f"sc{i + 1}_b.png"
@@ -10482,6 +10483,7 @@ def film_draw(fid: str, only: tuple | None, note: str, extra: list | None) -> se
                 prompt = (f"IMAGE 1 is the FIRST frame of this scene. Draw the LAST frame of the same scene: {sc['end']}" + extra_txt
                           + "\nKeep the exact same visual style, framing, aspect ratio, colors, logo and on-screen text unless the instruction changes them.")
             atlas.download(atlas.generate_image(family, prompt, size, "medium", [atlas.reference_url(x) for x in refs]), out)
+            conform_image(out, d["ratio"])
         changed.add(i)
         def fn(x, i=i, w=w):
             fx = film_files(x)
@@ -10618,7 +10620,9 @@ def run_film_gen(fid: str, only: tuple | None) -> None:
     try:
         d = film_load(fid)
         p, folder = d["plan"], film_dir(fid)
-        W, H = film_dims(folder)
+        W, H = RATIO_VIDEO.get(d["ratio"], RATIO_VIDEO["9:16"])
+        for x in folder.glob("sc*_[ab].png"):   # الفريمات اللي طلعت بمقاس غلط بتتظبط قبل التوليد
+            conform_image(x, d["ratio"])
         ratio = az.ASPECTS.get(d["ratio"], az.ASPECTS["9:16"])[1]
         size = az.ASPECTS.get(d["ratio"], az.ASPECTS["9:16"])[0]
         f = film_files(d)
@@ -10999,6 +11003,29 @@ def image_dims(path: Path) -> tuple[int, int]:
     return int(m.group(1)) // 2 * 2, int(m.group(2)) // 2 * 2
 
 
+RATIO_WH = {"9:16": (9, 16), "16:9": (16, 9), "1:1": (1, 1)}
+RATIO_VIDEO = {"9:16": (720, 1280), "16:9": (1280, 720), "1:1": (1024, 1024)}   # مقاس الفيديو المتجمّع
+
+
+def conform_image(path: Path, ratio: str) -> Path:
+    """موديل الصور مش دايمًا بيلتزم بالمقاس (ChatGPT أطوله 2:3): الصورة بتتقص من النص على النسبة الصح بالظبط (من غير مط)."""
+    if not path.exists() or ratio not in RATIO_WH:
+        return path
+    w, h = image_dims(path)
+    pw, ph = RATIO_WH[ratio]
+    if abs(w / h - pw / ph) < 0.012:
+        return path
+    if w / h > pw / ph:
+        cw, ch = int(h * pw / ph) // 2 * 2, h // 2 * 2
+    else:
+        cw, ch = w // 2 * 2, int(w * ph / pw) // 2 * 2
+    tmp = path.with_name(f".conform-{path.name}")
+    subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(path), "-vf", f"crop={cw}:{ch}",
+                    "-frames:v", "1", str(tmp)], check=True, capture_output=True, timeout=60)
+    tmp.replace(path)
+    return path
+
+
 def film_dims(folder: Path) -> tuple[int, int]:
     return image_dims(folder / "sc1_a.png")
 
@@ -11033,8 +11060,7 @@ def run_film_raw(fid: str, prev: str) -> None:
                     skipped.append(f"الكونيكتور {i + 1}")
         if not parts:
             raise HTTPException(400, "لسه مفيش ولا حتة اتولدت")
-        info = media_info(parts[0])   # بمقاس الفيديوهات نفسها (من غير تكبير)
-        W, H = max(2, info.width // 2 * 2), max(2, info.height // 2 * 2)
+        W, H = RATIO_VIDEO.get(d.get("ratio"), RATIO_VIDEO["9:16"])
         chain_clips(parts, folder / "raw.mp4", W, H)
         def fn(x):
             film_files(x)["raw"] = "raw.mp4"
@@ -11056,7 +11082,7 @@ def film_to_editor(fid: str):
     f = film_files(d)
     if not p.get("scenes") or not (folder / "sc1_a.png").exists():
         raise HTTPException(400, "ارسم الفريمات الأول")
-    W, H = film_dims(folder)
+    W, H = RATIO_VIDEO.get(d.get("ratio"), RATIO_VIDEO["9:16"])
     label = d.get("name") or "فيديو"
     # اللي اتولد بيتنقل؛ المشهد اللي لسه ملوش حركة بيدخل صورة أوله ثابتة على طوله، والكونيكتور اللي لسه متولدش بيتشال
     pieces, skipped = [], []
@@ -11754,6 +11780,7 @@ def run_tv_sharpen(vid: str, only: int | None, note: str) -> None:
                 prompt = lab.panel_sharpen_prompt(d["fill"]["panels"][j]["desc"], d["text_mode"], texts[j], note)
                 atlas.download(atlas.generate_image(carousel_settings()["image_family"], prompt, size, "high",
                                                     [atlas.reference_url(x) for x in [base, *refs]]), folder / name)
+                conform_image(folder / name, d["ratio"])
             def fn(x, j=j, name=name):
                 old = x["panels"][str(j)].get("full")
                 if old and old != name:
@@ -11796,6 +11823,7 @@ def run_tv_redraw(vid: str, j: int, note: str) -> None:
             prompt = lab.panel_redraw_prompt(d["schema"], d["fill"], j, d["ratio"], d["text_mode"], texts[j], note, len(refs), len(style))
             atlas.download(atlas.generate_image(carousel_settings()["image_family"], prompt, size, "high",
                                                 [atlas.reference_url(x) for x in [*refs, *style]]), folder / name)
+            conform_image(folder / name, d["ratio"])
         def fn(x):
             old = x.setdefault("panels", {}).get(str(j)) or {}
             for f in {old.get("cell"), old.get("full")} - {None}:
@@ -11839,7 +11867,10 @@ def run_tv_gen(vid: str, only: int | None) -> None:
         folder = tv_dir(vid)
         beats, fill = d["schema"]["beats"], d["fill"]
         ratio = az.ASPECTS.get(d["ratio"], az.ASPECTS["9:16"])[1]
-        W, H = image_dims(tv_panel(d, folder, 0))
+        W, H = RATIO_VIDEO.get(d["ratio"], RATIO_VIDEO["9:16"])
+        for j in range(len(beats) + 1):   # اللوحات القديمة اللي طلعت بمقاس غلط بتتظبط قبل التوليد
+            if (d.get("panels") or {}).get(str(j), {}).get("cell"):
+                conform_image(tv_panel(d, folder, j), d["ratio"])
         for i, b in enumerate(beats):
             if (only is not None and only != i) or (only is None and (d.get("segs") or {}).get(str(i), {}).get("file")):
                 continue
@@ -11883,8 +11914,7 @@ def tvideo_to_editor(vid: str):
     ready = [(i, b) for i, b in enumerate(beats) if (segs.get(str(i)) or {}).get("file") and (folder / segs[str(i)]["file"]).exists()]
     if not ready:
         raise HTTPException(400, "لسه مفيش ولا جزء اتولد")
-    info = media_info(folder / segs[str(ready[0][0])]["file"])
-    W, H = info.width // 2 * 2, info.height // 2 * 2
+    W, H = RATIO_VIDEO.get(d["ratio"], RATIO_VIDEO["9:16"])
     label = d.get("name") or "فيديو"
     with closing(db()) as conn, conn:
         clips = []
