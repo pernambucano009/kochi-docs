@@ -4,6 +4,7 @@
 const tplx = { list: [], tvs: [], cur: null, timer: null, stop: null };
 const TV_ST = { filling: "✍️ بيملا الخانات", filled: "📝 الخانات جاهزة", sheeting: "🖼️ بيرسم الشيت", cut: "✂️ اللوحات جاهزة",
   sharpening: "✨ بيوضّح", working: "🎬 بيولّد", done: "✅ الفيديو جاهز", failed: "✕ فشل" };
+const TV_RATIOS = { "9:16": "📱 9:16 طولي (ريلز)", "16:9": "🖥️ 16:9 عرضي", "1:1": "⬛ 1:1 مربع" };
 const SCH_GLOBAL = { style: "🎨 العالم والستايل", spine: "🦴 العمود الفقري (اللي ماسك العين طول الفيديو)", camera: "🎥 لغة الكاميرا",
   text_style: "🔤 شكل الكلام", palette: "🌈 الألوان", music: "🎵 الموسيقى" };
 const SCH_BEAT = { what: "اللي بيحصل", layout: "🧩 التكوين والخانات", camera: "🎥 الكاميرا", into_next: "➡️ بيدخل في اللي بعده إزاي", keeps: "📌 بيفضل ثابت", sfx: "🔊 الصوت" };
@@ -143,7 +144,8 @@ function tplHome() {
       ${L.length ? `<div class="tp-list">${L.map((t) => `<article class="tp-card">
           <div class="tp-strip">${t.schema.beats.slice(0, 6).map((b) => (b.thumb_url ? `<img src="${b.thumb_url}" alt="">` : "")).join("")}</div>
           <input class="tp-name" data-tpname="${t.id}" value="${le(t.name)}" data-no-i18n>
-          <small class="muted">${t.schema.beats.length} جزء · ${t.duration} ث · ${le(t.ratio)} · من «<span data-no-i18n>${le(t.lab_name)}</span>»</small>
+          <small class="muted">${t.schema.beats.length} جزء · ${t.duration} ث · من «<span data-no-i18n>${le(t.lab_name)}</span>»</small>
+          <label class="row">المقاس <select data-tpratio="${t.id}">${Object.entries(TV_RATIOS).map(([k, l]) => `<option value="${k}" ${k === t.ratio ? "selected" : ""}>${l}</option>`).join("")}</select></label>
           <div class="row wrap">${t.source_url ? `<a class="btn sm" href="${t.source_url}" target="_blank" rel="noopener">▶️ الأصلي</a>` : ""}
             <button type="button" class="btn sm danger" data-tpdel="${t.id}">🗑️</button></div>
         </article>`).join("")}</div>`
@@ -153,6 +155,7 @@ function tplHome() {
       <label>التيمبليت <select data-tvf="template">${L.map((t) => `<option value="${t.id}" data-no-i18n>${le(t.name)} (${t.schema.beats.length} جزء)</option>`).join("")}</select></label>
       <label>الفيديو عن إيه؟ <textarea rows="2" data-tvf="brief" placeholder="مثلًا: أهم ٣ مميزات في التطبيق، والختام: حمّل التطبيق"></textarea></label>
       <div class="row wrap">
+        <label>المقاس <select data-tvf="ratio">${Object.entries(TV_RATIOS).map(([k, l]) => `<option value="${k}">${l}</option>`).join("")}</select></label>
         <label>الكلام على الشاشة <select data-tvf="text_mode"><option value="blank">مساحات فاضية (العربي في المونتاج)</option><option value="en">إنجليزي جوه الصور</option></select></label>
         <label>موديل الحركة <select data-tvf="model"><option value="seedance-mini">Seedance 2.0 Mini (الأرخص)</option><option value="seedance-fast">Seedance 2.0 Fast</option><option value="seedance">Seedance 2.0 (أجود)</option></select></label>
         <label>الجودة <select data-tvf="resolution"><option value="480p">480p</option><option value="720p">720p (الضعف)</option></select></label>
@@ -222,6 +225,7 @@ function tvDetail(v) {
       <small class="muted">📐 <span data-no-i18n>${le(v.template_name)}</span> · ${beats.length} جزء · ${(beats.at(-1).t1 - beats[0].t0).toFixed(1)} ث</small></div>
     ${v.final_url ? `<section class="panel fm-final"><video src="${v.final_url}" controls playsinline preload="metadata"></video></section>` : ""}
     <div class="row wrap tv-opts">
+      <label>المقاس <select data-tvopt="ratio" ${busy ? "disabled" : ""}>${Object.entries(TV_RATIOS).map(([k, l]) => `<option value="${k}" ${k === v.ratio ? "selected" : ""}>${l}</option>`).join("")}</select></label>
       <label>الكلام على الشاشة <select data-tvopt="text_mode">${Object.entries(v.text_modes).map(([k, l]) => `<option value="${k}" ${k === v.text_mode ? "selected" : ""}>${l}</option>`).join("")}</select></label>
       <label>موديل الحركة <select data-tvopt="model">${v.models.map((m) => `<option value="${m.key}" ${m.key === v.model ? "selected" : ""}>${le(m.label)}</option>`).join("")}</select></label>
       <label>الجودة <select data-tvopt="resolution"><option value="480p" ${v.resolution === "480p" ? "selected" : ""}>480p</option><option value="720p" ${v.resolution === "720p" ? "selected" : ""}>720p</option></select></label>
@@ -326,7 +330,7 @@ $("labTpl").addEventListener("click", async (e) => {
     const g = (k) => $("labTpl").querySelector(`[data-tvf="${k}"]`).value;
     return busyButton(nb, "⏳", async () => {
       tplx.user = {};
-      tplx.cur = await api("/api/tvideos", { method: "POST", ...jsonBody({ template: g("template"), brief: g("brief"), text_mode: g("text_mode"),
+      tplx.cur = await api("/api/tvideos", { method: "POST", ...jsonBody({ template: g("template"), brief: g("brief"), text_mode: g("text_mode"), ratio: g("ratio"),
         model: g("model"), resolution: g("resolution") }) });
       tplx.tvs = await api("/api/tvideos");
       renderTpl(); scheduleTplPoll();
@@ -434,6 +438,11 @@ $("labTpl").addEventListener("click", (e) => {
 
 $("labTpl").addEventListener("change", async (e) => {
   const t = e.target;
+  if (t.matches('[data-tvf="template"]')) {   // المقاس بيمشي على التيمبليت اللي اخترته (وتقدر تغيّره)
+    const tp = tplx.list.find((x) => x.id === t.value), r = $("labTpl").querySelector('[data-tvf="ratio"]');
+    if (tp && r) r.value = tp.ratio || "9:16";
+    return;
+  }
   try {
     if (t.matches("[data-tpname]")) {
       await api(`/api/templates/${t.dataset.tpname}`, { method: "PATCH", ...jsonBody({ name: t.value }) });
@@ -441,6 +450,16 @@ $("labTpl").addEventListener("change", async (e) => {
     }
     if (!tplx.cur) return;
     if (t.matches("[data-tvname]")) { tplx.cur = await api(`/api/tvideos/${tplx.cur.id}`, { method: "PATCH", ...jsonBody({ name: t.value }) }); return toast("✅ اتحفظ"); }
+    if (t.matches("[data-tpratio]")) {
+      await api(`/api/templates/${t.dataset.tpratio}`, { method: "PATCH", ...jsonBody({ ratio: t.value }) });
+      tplx.list = await api("/api/templates");
+      return toast("✅ اتحفظ. الفيديوهات الجديدة من التيمبليت ده هتبقى بالمقاس ده");
+    }
+    if (t.matches('[data-tvopt="ratio"]')) {
+      if ((tplx.cur.sheets || []).some((x) => x.url) && !confirm("تغيّر المقاس؟ الشيتات واللوحات والفيديوهات اللي اتعملت بالمقاس القديم هتتمسح، ولازم ترسم الشيت تاني.")) {
+        t.value = tplx.cur.ratio; return;
+      }
+    }
     if (t.matches("[data-tvopt]")) {
       tplx.cur = await api(`/api/tvideos/${tplx.cur.id}`, { method: "PATCH", ...jsonBody({ [t.dataset.tvopt]: t.value }) });
       renderTpl();

@@ -33,10 +33,15 @@ def probe(ffmpeg: str, path: Path) -> MediaInfo:
         raise ValueError(f"تعذّر قراءة الملف: {path.name}")
     h, m, s = d.groups()
     size = re.search(r"Video:.*?(\d{2,5})x(\d{2,5})", err)
+    w, hh = (int(size.group(1)), int(size.group(2))) if size else (0, 0)
+    # فيديو الموبايل الطولي بيتخزن ساعات بالعرض ومعاه «لفّه 90 درجة»، وFFmpeg بيلفّه وهو بيقراه: المقاس الحقيقي بالعكس
+    rot = re.search(r"rotation of (-?\d+(?:\.\d+)?) degrees|rotate\s*:\s*(-?\d+)", err)
+    if rot and round(abs(float(rot.group(1) or rot.group(2)))) % 180 == 90:
+        w, hh = hh, w
     return MediaInfo(
         duration=int(h) * 3600 + int(m) * 60 + float(s),
-        width=int(size.group(1)) if size else 0,
-        height=int(size.group(2)) if size else 0,
+        width=w,
+        height=hh,
         has_audio=bool(re.search(r"Stream #\d+:\d+.*Audio:", err)),
         fps=float(fps.group(1)) if (fps := re.search(r"Video:.*?(\d+(?:\.\d+)?) fps", err)) else 30.0,
     )

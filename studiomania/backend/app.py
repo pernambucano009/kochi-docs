@@ -11338,6 +11338,7 @@ def tpl_to_dict(tid: str, d: dict) -> dict:
 
 class TplIn(BaseModel):
     name: str = ""
+    ratio: str = ""
 
 
 @app.post("/api/lab/{lid}/schema/template")
@@ -11361,12 +11362,18 @@ def lab_schema_template(lid: str, body: TplIn):
         src = None
     with TPL_LOCK:
         tpl_save(tid, {"name": body.name.strip()[:120] or data.get("title") or d.get("name") or "تيمبليت", "schema": data,
-                       "lab": lid, "lab_name": d.get("name"), "ratio": lab_ratio(d), "source": src, "created_at": now()})
+                       "lab": lid, "lab_name": d.get("name"), "ratio": lab_ratio(d, lid), "source": src, "created_at": now()})
     return tpl_to_dict(tid, tpl_load(tid))
 
 
-def lab_ratio(d: dict) -> str:
+def lab_ratio(d: dict, lid: str | None = None) -> str:
     w, h = d["source"].get("width") or 9, d["source"].get("height") or 16
+    if lid:   # المقاس بيتقري تاني (الفيديوهات القديمة اتسجلت بالعرض لو كانت ملفوفة)
+        try:
+            info = montage.probe(ffmpeg_exe(), lab_dir(lid) / d["source"]["file"])
+            w, h = info.width or w, info.height or h
+        except Exception:  # noqa: BLE001
+            pass
     return nearest_ratio(int(w), int(h)) if nearest_ratio(int(w), int(h)) in az.ASPECTS else ("9:16" if h >= w else "16:9")
 
 
@@ -11386,6 +11393,8 @@ def template_patch(tid: str, body: TplIn):
     d = tpl_load(tid)
     if body.name.strip():
         d["name"] = body.name.strip()[:120]
+    if body.ratio in az.ASPECTS:
+        d["ratio"] = body.ratio
     with TPL_LOCK:
         tpl_save(tid, d)
     return tpl_to_dict(tid, d)
@@ -11519,6 +11528,7 @@ def tvideo_get(vid: str):
 
 class TvIn(BaseModel):
     template: str
+    ratio: str = ""
     brief: str = ""
     text_mode: str = "blank"
     model: str = "seedance-mini"
@@ -11535,7 +11545,8 @@ def tvideo_create(body: TvIn):
     vid = uuid.uuid4().hex[:10]
     tv_dir(vid).mkdir(parents=True, exist_ok=True)
     d = {"name": f"📐 {client.get('name') or 'فيديو'} · {t['name']}", "client_id": client.get("id"), "template": body.template,
-         "template_name": t["name"], "schema": t["schema"], "ratio": t.get("ratio") or "9:16",
+         "template_name": t["name"], "schema": t["schema"],
+         "ratio": body.ratio if body.ratio in az.ASPECTS else t.get("ratio") or "9:16",
          "brief": body.brief.strip()[:3000] or f"فيديو بيعرض أهم مميزات {client.get('name') or 'المنتج'}",
          "text_mode": body.text_mode if body.text_mode in lab.TEXT_MODES else "blank",
          "model": body.model if body.model in TRIAL_MODELS else "seedance-mini",
@@ -11569,6 +11580,7 @@ def run_tv_fill(vid: str) -> None:
 
 class TvPatchIn(BaseModel):
     name: str | None = None
+    ratio: str | None = None
     fill: dict | None = None
     text_mode: str | None = None
     model: str | None = None
@@ -11582,6 +11594,11 @@ def tvideo_patch(vid: str, body: TvPatchIn):
             d["name"] = body.name.strip()[:120]
         if body.text_mode in lab.TEXT_MODES:
             d["text_mode"] = body.text_mode
+        if body.ratio in az.ASPECTS and body.ratio != d.get("ratio"):
+            if d.get("status") in TV_BUSY:
+                raise HTTPException(400, "استنى لما الشغل اللي شغال يخلص")
+            d["ratio"] = body.ratio   # الشيتات واللوحات القديمة بمقاس تاني: لازم تترسم تاني
+            d.update(sheets={}, panels={}, segs={}, final=None, status="filled" if d.get("fill") else d.get("status"))
         if body.model in TRIAL_MODELS:
             d["model"] = body.model
         if body.resolution in ("480p", "720p"):
