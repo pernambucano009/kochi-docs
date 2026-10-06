@@ -156,6 +156,7 @@ function tplHome() {
       <label>الفيديو عن إيه؟ <textarea rows="2" data-tvf="brief" placeholder="مثلًا: أهم ٣ مميزات في التطبيق، والختام: حمّل التطبيق"></textarea></label>
       <div class="row wrap">
         <label>المقاس <select data-tvf="ratio">${Object.entries(TV_RATIOS).map(([k, l]) => `<option value="${k}">${l}</option>`).join("")}</select></label>
+        <label>موديل الصور <select data-tvf="image_model"><option value="nano2">Nano Banana 2 (بيلتزم بالمقاس، رخيص)</option><option value="nanopro">Nano Banana Pro (أجود)</option><option value="sunburst">GPT Image 2.5 (زي ChatGPT)</option></select></label>
         <label>الكلام على الشاشة <select data-tvf="text_mode"><option value="blank">مساحات فاضية (العربي في المونتاج)</option><option value="en">إنجليزي جوه الصور</option></select></label>
         <label>موديل الحركة <select data-tvf="model"><option value="seedance-mini">Seedance 2.0 Mini (الأرخص)</option><option value="seedance-fast">Seedance 2.0 Fast</option><option value="seedance">Seedance 2.0 (أجود)</option></select></label>
         <label>الجودة <select data-tvf="resolution"><option value="480p">480p</option><option value="720p">720p (الضعف)</option></select></label>
@@ -226,6 +227,7 @@ function tvDetail(v) {
     ${v.final_url ? `<section class="panel fm-final"><video src="${v.final_url}" controls playsinline preload="metadata"></video></section>` : ""}
     <div class="row wrap tv-opts">
       <label>المقاس <select data-tvopt="ratio" ${busy ? "disabled" : ""}>${Object.entries(TV_RATIOS).map(([k, l]) => `<option value="${k}" ${k === v.ratio ? "selected" : ""}>${l}</option>`).join("")}</select></label>
+      <label>موديل الصور <select data-tvopt="image_model">${(v.image_models || []).map((m) => `<option value="${m.key}" ${m.key === v.image_model ? "selected" : ""}>${le(m.label)}</option>`).join("")}</select></label>
       <label>الكلام على الشاشة <select data-tvopt="text_mode">${Object.entries(v.text_modes).map(([k, l]) => `<option value="${k}" ${k === v.text_mode ? "selected" : ""}>${l}</option>`).join("")}</select></label>
       <label>موديل الحركة <select data-tvopt="model">${v.models.map((m) => `<option value="${m.key}" ${m.key === v.model ? "selected" : ""}>${le(m.label)}</option>`).join("")}</select></label>
       <label>الجودة <select data-tvopt="resolution"><option value="480p" ${v.resolution === "480p" ? "selected" : ""}>480p</option><option value="720p" ${v.resolution === "720p" ? "selected" : ""}>720p</option></select></label>
@@ -330,7 +332,7 @@ $("labTpl").addEventListener("click", async (e) => {
     const g = (k) => $("labTpl").querySelector(`[data-tvf="${k}"]`).value;
     return busyButton(nb, "⏳", async () => {
       tplx.user = {};
-      tplx.cur = await api("/api/tvideos", { method: "POST", ...jsonBody({ template: g("template"), brief: g("brief"), text_mode: g("text_mode"), ratio: g("ratio"),
+      tplx.cur = await api("/api/tvideos", { method: "POST", ...jsonBody({ template: g("template"), brief: g("brief"), text_mode: g("text_mode"), ratio: g("ratio"), image_model: g("image_model"),
         model: g("model"), resolution: g("resolution") }) });
       tplx.tvs = await api("/api/tvideos");
       renderTpl(); scheduleTplPoll();
@@ -403,7 +405,7 @@ $("labTpl").addEventListener("click", async (e) => {
   const rd = t.closest("[data-tvredraw]");
   if (rd) {
     const j = Number(rd.dataset.tvredraw), note = rd.closest("[data-tp]").querySelector("[data-tpnote]").value.trim();
-    if (!confirm(`يرسم اللوحة ${j + 1} من الأول من وصفها (حوالي 0.06$)؟ اللي في الشيت بتتبدل.`)) return;
+    if (!confirm(`يرسم اللوحة ${j + 1} من الأول من وصفها (حوالي ${tplx.cur.costs.panel}$)؟ اللي في الشيت بتتبدل.`)) return;
     return go(rd, () => V(`/panels/${j}/redraw`, { method: "POST", ...jsonBody({ note }) }));
   }
   const sh1 = t.closest("[data-tvsharp1]");
@@ -463,7 +465,8 @@ $("labTpl").addEventListener("change", async (e) => {
     if (t.matches("[data-tvopt]")) {
       tplx.cur = await api(`/api/tvideos/${tplx.cur.id}`, { method: "PATCH", ...jsonBody({ [t.dataset.tvopt]: t.value }) });
       renderTpl();
-      return toast(t.dataset.tvopt === "text_mode" ? "✅ اتغير. البرومبتات اتحدثت؛ ارسم الشيت تاني عشان ياخد بيه" : "✅ اتحفظ");
+      return toast(t.dataset.tvopt === "text_mode" ? "✅ اتغير. البرومبتات اتحدثت؛ ارسم الشيت تاني عشان ياخد بيه"
+        : t.dataset.tvopt === "image_model" ? "✅ اتغير. دوس «↻ ارسم الشيت تاني» عشان يترسم بالموديل الجديد" : "✅ اتحفظ");
     }
     if (t.matches("[data-pd], [data-tf]")) {
       tplx.cur = await api(`/api/tvideos/${tplx.cur.id}`, { method: "PATCH", ...jsonBody({ fill: tvFillFromDom() }) });

@@ -376,12 +376,33 @@ IMAGE_MODELS = {
 }
 
 
+# موديلات بتاخد نسبة المقاس كإعداد (aspect_ratio) بدل مقاس بالبكسل: بتلتزم بيها بالظبط (9:16 بيطلع 9:16)
+ASPECT_IMAGE_MODELS = {
+    "nano2": ("google/nano-banana-2/text-to-image-developer", "google/nano-banana-2/edit-developer", "Nano Banana 2"),
+    "nanopro": ("google/nano-banana-pro/text-to-image-developer", "google/nano-banana-pro/edit-developer", "Nano Banana Pro"),
+}
+ASPECT_RATIOS = ("9:16", "16:9", "1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4")
+
+
+def size_ratio(size: str) -> str:
+    try:
+        w, h = (int(x) for x in size.lower().replace("*", "x").split("x"))
+    except ValueError:
+        return "1:1"
+    return min(ASPECT_RATIOS, key=lambda r: abs(int(r.split(":")[0]) / int(r.split(":")[1]) - w / h))
+
+
 def generate_image(family: str, prompt: str, size: str, quality: str, images: list[str] | None = None) -> str:
     """يرسم صورة ويرجّع لينكها. لو فيه صور مرجعية بيستخدم نسخة الـ edit (لحد 16 صورة)."""
-    t2i, edit, _ = IMAGE_MODELS.get(family) or IMAGE_MODELS["sunburst"]
-    body = {"model": edit if images else t2i, "prompt": with_modesty(prompt[:31000]), "size": size, "quality": quality, "output_format": "png"}
+    if family in ASPECT_IMAGE_MODELS:
+        t2i, edit, _ = ASPECT_IMAGE_MODELS[family]
+        body = {"model": edit if images else t2i, "prompt": with_modesty(prompt[:31000]), "aspect_ratio": size_ratio(size),
+                "resolution": "2k" if quality == "high" else "1k"}
+    else:
+        t2i, edit, _ = IMAGE_MODELS.get(family) or IMAGE_MODELS["sunburst"]
+        body = {"model": edit if images else t2i, "prompt": with_modesty(prompt[:31000]), "size": size, "quality": quality, "output_format": "png"}
     if images:
-        body["images"] = images[:16]
+        body["images"] = images[:14]
     with httpx.Client(timeout=90) as client:
         resp = client.post(f"{BASE_URL}/api/v1/model/generateImage", headers=_headers(), json=body)
     data = _check(resp, "طلب الصورة")

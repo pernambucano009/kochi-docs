@@ -11416,6 +11416,14 @@ TV_LOCK = threading.Lock()
 TV_BUSY = ("filling", "sheeting", "sharpening", "working")
 SHEET_MAX = 9
 SHEET_COST = 0.1
+# موديل الصور للشيت واللوحات: (تمن الشيت، تمن اللوحة، الاسم). Nano Banana بياخد المقاس كإعداد فبيلتزم بـ 9:16
+TV_IMAGE_MODELS = {"nano2": (0.045, 0.03, "Nano Banana 2 (بيلتزم بالمقاس، رخيص)"),
+                   "nanopro": (0.08, 0.05, "Nano Banana Pro (أجود)"),
+                   "sunburst": (0.1, 0.06, "GPT Image 2.5 (زي ChatGPT)")}
+
+
+def tv_img(d: dict) -> str:
+    return d.get("image_model") if d.get("image_model") in TV_IMAGE_MODELS else "nano2"
 
 
 def tv_dir(vid: str) -> Path:
@@ -11498,7 +11506,9 @@ def tv_to_dict(vid: str, d: dict) -> dict:
                             for j in range(n_p)],
             "seg_files": [url((segs.get(str(i)) or {}).get("file")) for i in range(len(beats))],
             "final_url": url(d.get("final")),
-            "costs": {"sheets": round(len(sheets) * SHEET_COST, 2), "sharpen": round(sum(1 for j in range(n_p) if not (panels.get(str(j)) or {}).get("full")) * TRIAL_KEY_COST, 2),
+            "image_models": [{"key": k, "label": v[2]} for k, v in TV_IMAGE_MODELS.items()], "image_model": tv_img(d),
+            "costs": {"sheets": round(len(sheets) * TV_IMAGE_MODELS[tv_img(d)][0], 2), "panel": TV_IMAGE_MODELS[tv_img(d)][1],
+                      "sharpen": round(sum(1 for j in range(n_p) if not (panels.get(str(j)) or {}).get("full")) * TV_IMAGE_MODELS[tv_img(d)][1], 2),
                       "video": round(sum(trial_gen_seconds(b["t1"] - b["t0"]) * per for i, b in enumerate(beats) if not (segs.get(str(i)) or {}).get("file")), 2),
                       "seg": [round(trial_gen_seconds(b["t1"] - b["t0"]) * per, 2) for b in beats]},
             "models": [{"key": k, "label": v["label"], "per_sec": v["per_sec"]} for k, v in TRIAL_MODELS.items()]}
@@ -11529,6 +11539,7 @@ def tvideo_get(vid: str):
 class TvIn(BaseModel):
     template: str
     ratio: str = ""
+    image_model: str = "nano2"
     brief: str = ""
     text_mode: str = "blank"
     model: str = "seedance-mini"
@@ -11549,6 +11560,7 @@ def tvideo_create(body: TvIn):
          "ratio": body.ratio if body.ratio in az.ASPECTS else t.get("ratio") or "9:16",
          "brief": body.brief.strip()[:3000] or f"فيديو بيعرض أهم مميزات {client.get('name') or 'المنتج'}",
          "text_mode": body.text_mode if body.text_mode in lab.TEXT_MODES else "blank",
+         "image_model": body.image_model if body.image_model in TV_IMAGE_MODELS else "nano2",
          "model": body.model if body.model in TRIAL_MODELS else "seedance-mini",
          "resolution": body.resolution if body.resolution in ("480p", "720p") else "480p",
          "status": "filling", "step": "بيملا الخانات بمحتوى العميل", "error": None, "fill": None, "sheets": {}, "panels": {}, "segs": {},
@@ -11581,6 +11593,7 @@ def run_tv_fill(vid: str) -> None:
 class TvPatchIn(BaseModel):
     name: str | None = None
     ratio: str | None = None
+    image_model: str | None = None
     fill: dict | None = None
     text_mode: str | None = None
     model: str | None = None
@@ -11594,6 +11607,8 @@ def tvideo_patch(vid: str, body: TvPatchIn):
             d["name"] = body.name.strip()[:120]
         if body.text_mode in lab.TEXT_MODES:
             d["text_mode"] = body.text_mode
+        if body.image_model in TV_IMAGE_MODELS:
+            d["image_model"] = body.image_model
         if body.ratio in az.ASPECTS and body.ratio != d.get("ratio"):
             if d.get("status") in TV_BUSY:
                 raise HTTPException(400, "استنى لما الشغل اللي شغال يخلص")
@@ -11754,7 +11769,7 @@ def run_tv_sheet(vid: str, k: int) -> None:
             if prev and (folder / prev["file"]).exists():
                 refs.append(folder / prev["file"])
             prompt = tv_prompts(d, brain)[k]
-            atlas.download(atlas.generate_image(carousel_settings()["image_family"], prompt, size, "high",
+            atlas.download(atlas.generate_image(tv_img(d), prompt, size, "high",
                                                 [atlas.reference_url(x) for x in refs]), folder / name)
         def fn(x):
             old = (x.setdefault("sheets", {}).get(str(k)) or {}).get("file")
@@ -11829,7 +11844,7 @@ def run_tv_sharpen(vid: str, only: int | None, note: str) -> None:
             else:
                 prompt = lab.panel_sharpen_prompt(d["fill"]["panels"][j]["desc"], d["text_mode"], texts[j], note,
                                                   bool(pan.get("padded")) and not (note and pan.get("full")))
-                atlas.download(atlas.generate_image(carousel_settings()["image_family"], prompt, size, "high",
+                atlas.download(atlas.generate_image(tv_img(d), prompt, size, "medium" if tv_img(d) in atlas.ASPECT_IMAGE_MODELS else "high",
                                                     [atlas.reference_url(x) for x in [base, *refs]]), folder / name)
                 conform_image(folder / name, d["ratio"])
             def fn(x, j=j, name=name):
@@ -11872,7 +11887,7 @@ def run_tv_redraw(vid: str, j: int, note: str) -> None:
             style = [tv_panel(d, folder, k) for k in (j - 1, j + 1) if 0 <= k < len(d["fill"]["panels"])
                      and (d.get("panels") or {}).get(str(k), {}).get("cell")]
             prompt = lab.panel_redraw_prompt(d["schema"], d["fill"], j, d["ratio"], d["text_mode"], texts[j], note, len(refs), len(style))
-            atlas.download(atlas.generate_image(carousel_settings()["image_family"], prompt, size, "high",
+            atlas.download(atlas.generate_image(tv_img(d), prompt, size, "medium" if tv_img(d) in atlas.ASPECT_IMAGE_MODELS else "high",
                                                 [atlas.reference_url(x) for x in [*refs, *style]]), folder / name)
             conform_image(folder / name, d["ratio"])
         def fn(x):
