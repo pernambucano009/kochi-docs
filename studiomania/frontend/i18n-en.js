@@ -1013,6 +1013,8 @@ window.I18N_EN = {
   "مفيش ستايلات لسه. ضيف من 📚 المكتبة صور رسومات عاجبك ستايلها.": "No styles yet. Add drawings whose style you like from 📚 Library.",
   "رسومات عاجبك ستايلها (الخطوط والأشكال والتظليل). البرنامج بياخد طريقة الرسم بس، ويرسم شخصيات جديدة بألوان كوتشي.": "Drawings whose style you like (lines, shapes, shading). Only the drawing style is used: new characters are drawn in KOCHI colors.",
   "اسم الستايل": "Style name",
+  "🎬 عايز مونتاج أنهي مدرب؟": "🎬 Which coach do you want to edit?",
+  "المشروع ده اتولّد بأكتر من مدرب. كل مدرب ليه مونتاج لوحده.": "This project was generated with more than one coach. Each coach gets their own edit.",
   "Seedance 2.5 (لحد 30 ثانية في توليدة واحدة، أغلى)": "Seedance 2.5 (up to 30 s in one generation, pricier)",
   "الفيديو أطول من {0} ثانية، فهيتولّد على {1} حتت. كل حتة بتكمّل على اللي قبلها من آخر فريم فيها، فبيفضل لقطة واحدة. (Seedance 2.5 بيعمل لحد 30 ثانية في توليدة واحدة)": "The video is longer than {0} seconds, so it will be generated in {1} pieces. Each piece continues from the last frame of the one before it, so it stays one shot. (Seedance 2.5 does up to 30 seconds in one generation)",
   "🎬 ولّد الفيديو كله مرة واحدة": "🎬 Generate the whole video in one pass",

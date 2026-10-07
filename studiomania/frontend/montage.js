@@ -1685,19 +1685,47 @@ $("newProject").onclick = async () => {
   openProject(p);
   $("projectName").select();
 };
-// من صفحة التوليد: يفتح مونتاج الفيديو ده بآخر الفيديوهات المولَّدة (أو يعمل له مشروع لو مفيش)
+// لو المشروع اتولّد بأكتر من مدرب: يسأل أنهي مدرب (null = لغى). مدرب واحد أو مفيش: من غير سؤال
+async function pickVideoCoach(videoId) {
+  const list = await api(`/api/videos/${videoId}/coaches`);
+  if (list.length < 2) return { coach: list[0] || null, many: false };
+  return new Promise((resolve) => {
+    const dlg = document.createElement("dialog");
+    dlg.className = "bulk-dlg coach-pick-dlg";
+    dlg.innerHTML = `<div class="panel-head"><h2>🎬 عايز مونتاج أنهي مدرب؟</h2><button class="btn sm" data-x>إلغاء</button></div>
+      <p class="hint">المشروع ده اتولّد بأكتر من مدرب. كل مدرب ليه مونتاج لوحده.</p>
+      <div class="coach-pick">${list.map((c, i) => `<button type="button" class="coach-pick-item" data-i="${i}">
+        <img src="${c.image_url}" alt=""><b data-no-i18n>${escapeHtml(c.name)}</b>
+        <small class="muted">${c.ready} / ${c.total} جاهز</small></button>`).join("")}</div>`;
+    const done = (v) => { dlg.close(); dlg.remove(); resolve(v); };
+    dlg.addEventListener("click", (e) => {
+      const it = e.target.closest("[data-i]");
+      if (it) return done({ coach: list[Number(it.dataset.i)], many: true });
+      if (e.target.closest("[data-x]") || e.target === dlg) done(null);
+    });
+    dlg.addEventListener("cancel", (e) => { e.preventDefault(); done(null); });
+    document.body.appendChild(dlg);
+    dlg.showModal();
+  });
+}
+
+// يفتح مونتاج الفيديو ده بآخر الفيديوهات المولَّدة للمدرب المختار (أو يعمل له مشروع لو مفيش)
 async function openMontageForVideo(videoId) {
+  const pick = await pickVideoCoach(videoId);
+  if (!pick) return;
+  const coachId = pick.coach?.id || null;
   const projects = await api("/api/projects");
-  const mine = projects.filter((x) => x.data.video_id === videoId)
+  const mine = projects.filter((x) => x.data.video_id === videoId && (!pick.many || x.data.coach_id === coachId))
     .sort((a, b) => (b.updated_at || "").localeCompare(a.updated_at || ""));
   let p = mine[0];
   if (p) {
     mt.handoff = { refresh: true };
   } else {
     mt.music = await api("/api/audio?kind=music");
-    const draft = await api(`/api/videos/${videoId}/montage-draft`);
+    const draft = await api(`/api/videos/${videoId}/montage-draft${coachId ? `?coach_id=${coachId}` : ""}`);
+    const name = pick.many ? `${draft.name} · ${pick.coach.name}` : draft.name;
     const data = {
-      ...blankProject(draft.name), name: draft.name, video_id: videoId, coach_id: draft.coach_id,
+      ...blankProject(name), name, video_id: videoId, coach_id: draft.coach_id,
       clips: draft.gen_ids.map((gen_id) => ({ gen_id, ...CLIP_DEFAULTS })),
       voice: draft.voice ? { id: draft.voice.id, volume: 1, delay: 0, offset: 0, length: null, fade_out: false } : null,
     };

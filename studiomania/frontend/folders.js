@@ -349,27 +349,8 @@ $("goCut").onclick = async () => {
 };
 $("goGenerate").onclick = () => openGenerateWith(fol.current.video.id, fol.current.coach?.id || null);
 $("goMontage").onclick = async () => {
-  const f = fol.current;
   try {
-    let pid = f.montage_project;
-    if (!pid) {
-      const draft = await api(`/api/videos/${f.video.id}/montage-draft`);
-      const p = await api("/api/projects", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: f.name, video_id: f.video.id, coach_id: draft.coach_id,
-          clips: draft.gen_ids.map((gen_id) => ({ gen_id, start: 0, end: null, zoom: 1, x: 0, y: 0, volume: 1 })),
-          voice: draft.voice ? { id: draft.voice.id, volume: 1, delay: 0, offset: 0, fade_out: false } : null,
-          music: null, outro: true, outro_volume: 1,
-        }),
-      });
-      pid = p.id;
-      if (draft.missing.length) toast(`لسه ${draft.missing.length} قطعة متولّدتش. دوس «حدّث من الفيديو» لما يخلصوا`, true);
-    }
-    storageSet("studiomania.projectId", pid);
-    mt.project = null;
-    showStep("6");
+    await openMontageForVideo(fol.current.video.id);   // لو اتولّد بأكتر من مدرب بيسأل أنهي واحد
   } catch (err) {
     toast(err.message, true);
   }

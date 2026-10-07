@@ -782,6 +782,30 @@ def montage_draft(video_id: str, coach_id: str | None = None):
     }
 
 
+@app.get("/api/videos/{video_id}/coaches")
+def video_coaches(video_id: str):
+    """المدربين اللي اتولّد لهم فيديوهات من المشروع ده (عشان المونتاج يسأل أنهي مدرب)، وكام قطعة جاهزة لكل واحد."""
+    with closing(db()) as conn:
+        video = get_video(conn, video_id)
+        total = conn.execute("SELECT COUNT(*) FROM clips WHERE video_id = ?", (video_id,)).fetchone()[0]
+        rows = conn.execute(
+            "SELECT g.coach_id, g.clip_id, g.output_filename, MAX(g.created_at) AS at FROM generations g JOIN clips c ON c.id = g.clip_id "
+            "WHERE c.video_id = ? AND g.status = 'completed' AND g.coach_id != '' GROUP BY g.coach_id, g.clip_id, g.output_filename",
+            (video_id,)).fetchall()
+        ready: dict[str, set] = {}
+        last: dict[str, str] = {}
+        for r in rows:
+            if r["output_filename"] and (GENERATED_DIR / r["output_filename"]).exists():
+                ready.setdefault(r["coach_id"], set()).add(r["clip_id"])
+                last[r["coach_id"]] = max(last.get(r["coach_id"], ""), r["at"] or "")
+        out = []
+        for cid in sorted(ready, key=lambda k: last[k], reverse=True):
+            c = conn.execute("SELECT * FROM coaches WHERE id = ?", (cid,)).fetchone()
+            if c:
+                out.append({**coach_to_dict(c), "ready": len(ready[cid]), "total": total, "linked": cid == video["coach_id"]})
+    return out
+
+
 @app.delete("/api/videos/{video_id}")
 def delete_video(video_id: str):
     with closing(db()) as conn, conn:

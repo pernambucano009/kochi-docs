@@ -1747,3 +1747,8 @@ img.tv-cell { outline: 2px dashed #f0b54a; outline-offset: -2px; }
 .tv-sheetwrap.editing .tv-box { pointer-events: auto; cursor: move; background: rgba(87, 184, 175, .18); touch-action: none; }
 .tv-handle { position: absolute; right: -6px; bottom: -6px; width: 14px; height: 14px; border-radius: 50%; background: var(--accent); border: 2px solid #fff; cursor: nwse-resize; }
 .tv-once { display: grid; gap: 8px; margin: 12px 0; } .tv-once .btn { justify-self: start; }
+.coach-pick-dlg { width: min(560px, 94vw); }
+.coach-pick { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
+.coach-pick-item { display: grid; gap: 4px; justify-items: center; padding: 10px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); cursor: pointer; font: inherit; color: inherit; }
+.coach-pick-item:hover { border-color: var(--accent); }
+.coach-pick-item img { width: 72px; height: 72px; border-radius: 50%; object-fit: cover; }
