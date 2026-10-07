@@ -12687,6 +12687,10 @@ class TypoPatchIn(BaseModel):
     bg: dict | None = None
     blocks: list | None = None
     words: list | None = None
+    fonts: dict | None = None
+
+
+TYPO_FONT_OK = re.compile(r"^(TY|SM) [A-Za-z]{2,20}$")
 
 
 @app.patch("/api/typo/{pid}")
@@ -12700,6 +12704,8 @@ def typo_patch(pid: str, body: TypoPatchIn):
             d["style"] = body.style
         if body.brief is not None:
             d["brief"] = body.brief[:1000]
+        if body.fonts is not None:   # خط الكلام في الحركات الاحترافية (إنجليزي / عربي)
+            d["fonts"] = {k: v for k, v in body.fonts.items() if k in ("sans", "sansAr") and isinstance(v, str) and TYPO_FONT_OK.match(v)}
         if body.bg is not None:
             bg = {**(d.get("bg") or {}), **{k: v for k, v in body.bg.items() if k in ("kind", "color", "dim")}}
             if bg.get("kind") not in ("theme", "solid", "image", "video", "source", "none"):
@@ -12718,7 +12724,7 @@ def typo_patch(pid: str, body: TypoPatchIn):
                     ws[i]["w"] = w.strip()
         if body.blocks is not None:
             d["blocks"] = typo_clean_blocks(body.blocks, d)
-        if body.blocks is not None or body.words is not None or body.bg is not None or body.style is not None or body.ratio:
+        if body.blocks is not None or body.words is not None or body.bg is not None or body.style is not None or body.ratio or body.fonts is not None:
             d["final"] = None
         if d.get("status") not in TYPO_BUSY:
             d["status"] = typo_idle(d)
@@ -13040,7 +13046,8 @@ def typo_doc(pid: str, d: dict) -> dict:
                                        round((kk["box"][2] * sw * k - ox) / W, 4), round((kk["box"][3] * sh * k - oy) / H, 4)]}
                 for kk in a["keys"]]}
     return {"w": W, "h": H, "fps": TYPO_FPS, "anchors": anchors, "duration": d.get("duration") or (blocks[-1]["t1"] if blocks else 1),
-            "style": {k: st.get(k) for k in ("font", "case", "grain", "weight", "light", "dark", "accent")},
+            "style": {**{k: st.get(k) for k in ("font", "case", "grain", "weight", "light", "dark", "accent")},
+                      "moments": {**(st.get("moments") or {}), **(d.get("fonts") or {})}},
             "transparent": kind != "theme", "blocks": blocks}
 
 

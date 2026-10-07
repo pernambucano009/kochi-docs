@@ -23,20 +23,34 @@
 
   const PAL = { paper: "#ecebe8", edge: "#b9b7b3", ink: "#191716", rule: "#7d3a33", red: "#c8121b", yellow: "#e0ab1c", yellowInk: "#3b2408",
     scribble: "#e0261f", star1: "#a9fbff", star2: "#1c46ff", dark: "#0c0808" };
-  // الخطوط: هندسي للكلام، إمضا، وخط إيد للافتتاح (عربي ولاتيني)
-  const FONTS = { sans: ["TY Jakarta", "TY Alexandria"], sign: ["TY Sign", "TY Ruqaa"], hand: ["TY Rock", "TY Ruqaa"] };
-  const FACES = [["TY Jakarta", "TY-Jakarta-800.ttf", 800], ["TY Jakarta", "TY-Jakarta-700.ttf", 700], ["TY Alexandria", "TY-Alexandria-800.ttf", 800],
-    ["TY Alexandria", "TY-Alexandria-500.ttf", 500], ["TY Sign", "TY-MrsSaintDelafield.ttf", 400], ["TY Ruqaa", "TY-ArefRuqaa-700.ttf", 700], ["TY Rock", "TY-RockSalt.ttf", 400]];
+  // الخطوط: هندسي للكلام، إمضا، وخط إيد للافتتاح (عربي ولاتيني). خط الكلام بيتغير من الستايل/المشروع (style.moments.sans / sansAr)
+  const FONTS = { sans: ["TY Outfit", "TY Alexandria"], sign: ["TY Sign", "TY Ruqaa"], hand: ["TY Rock", "TY Ruqaa"] };
+  E.MOMENT_FONTS = {
+    latin: [["TY Outfit", "Outfit (زي الفيديو المرجع)"], ["TY Urbanist", "Urbanist"], ["TY Gabarito", "Gabarito"], ["TY Jakarta", "Plus Jakarta Sans"],
+      ["TY Readex", "Readex Pro"]],
+    arabic: [["TY Alexandria", "Alexandria (هندسي)"], ["TY Readex", "Readex Pro"], ["SM Cairo", "القاهرة"], ["SM Tajawal", "تجوال"], ["SM Changa", "تشانجا"],
+      ["SM Lalezar", "لاله‌زار (عريض)"], ["SM Kufi", "كوفي"]],
+  };
+  const FACES = [["TY Outfit", "TY-Outfit-800.ttf", "800 900"], ["TY Outfit", "TY-Outfit-700.ttf", "500 799"], ["TY Urbanist", "TY-Urbanist-800.ttf", "500 900"],
+    ["TY Gabarito", "TY-Gabarito-800.ttf", "800 900"], ["TY Gabarito", "TY-Gabarito-700.ttf", "500 799"], ["TY Readex", "TY-ReadexPro-700.ttf", "500 900"],
+    ["TY Jakarta", "TY-Jakarta-800.ttf", "800 900"], ["TY Jakarta", "TY-Jakarta-700.ttf", "500 799"], ["TY Alexandria", "TY-Alexandria-800.ttf", "700 900"],
+    ["TY Alexandria", "TY-Alexandria-500.ttf", "400 699"], ["TY Sign", "TY-MrsSaintDelafield.ttf", "400"], ["TY Ruqaa", "TY-ArefRuqaa-700.ttf", "400 900"],
+    ["TY Rock", "TY-RockSalt.ttf", "400"]];
   let facesP = null;
   E.momentFonts = () => facesP || (facesP = Promise.all(FACES.map(([fam, file, w]) =>
-    new FontFace(fam, `url(/fonts/${file})`, { weight: String(w) }).load().then((f) => document.fonts.add(f)).catch(() => {}))));
-  const fam = (kind, ar) => `'${FONTS[kind][ar ? 1 : 0]}'`;   // علامة ' مش " (جوه style="...")
+    new FontFace(fam, `url(/fonts/${file})`, { weight: w }).load().then((f) => document.fonts.add(f)).catch(() => {}))));
   const MCTX = document.createElement("canvas").getContext("2d");
   const measure = (txt, font, ls = 0) => { MCTX.font = font; MCTX.letterSpacing = `${ls}px`; return MCTX.measureText(txt).width; };
   const baseOff = (font, size) => { MCTX.font = font; MCTX.letterSpacing = "0px"; const m = MCTX.measureText("Hxg"); return (size - (m.fontBoundingBoxAscent + m.fontBoundingBoxDescent)) / 2 + m.fontBoundingBoxAscent; };
 
   E.FULL = new Set(["track", "sign", "spot"]);
   const P = E.prototype;
+  // خط بنوعه (علامة ' مش " عشان بيتحط جوه style="...")
+  P.fam = function (kind, ar) {
+    const m = this.doc.style?.moments || {};
+    const f = kind === "sans" ? (ar ? m.sansAr : m.sans) || FONTS.sans[ar ? 1 : 0] : FONTS[kind][ar ? 1 : 0];
+    return `'${f}', '${FONTS[kind][ar ? 1 : 0]}'`;
+  };
 
   P.pal = function () { return { ...PAL, ...(this.doc.style?.moments || {}) }; };
   P.mU = function () { const { w, h } = this.doc; return { W: w, H: h, tall: h > w * 1.2, S: Math.min(w, h) }; };
@@ -101,7 +115,7 @@
     const ws = this.words(b), ar = AR.test(ws.map((w) => w.w).join(" "));
     // افتتاح: 3 لقطات سريعة (خط إيد ← أحمر ممطوط ← أصفر)
     if (b.intro === "flash" && t < b.t0 + 0.125) return this.mFlash(b, t, ws[0]?.w || "", ar);
-    const BIG = S * (tall ? 0.27 : 0.315), F = `800 ${BIG}px ${fam("sans", ar)}`, LS = ar ? 0 : -BIG * 0.045;
+    const BIG = S * (tall ? 0.27 : 0.315), F = `800 ${BIG}px ${this.fam("sans", ar)}`, LS = ar ? 0 : -BIG * 0.045;
     const base = H * (tall ? 0.55 : 0.57), top = base - BIG * (ar ? 0.42 : 0.52);
     // أماكن الكلمات على السطر (العربي ماشي ناحية الشمال)
     const sp = measure(" ", F, LS);
@@ -156,11 +170,11 @@
 
   P.mFlash = function (b, t, word, ar) {
     const { W, H, S } = this.mU(), pal = this.pal(), f = Math.floor((t - b.t0) / 0.0417);
-    if (f <= 0) return this.mPaper("#efeeeb", "#d8d6d2") + `<div dir="auto" style="position:absolute;left:0;right:0;top:${H * 0.22}px;text-align:center;font:${S * 0.24}px ${fam("hand", ar)};color:#1b1918;transform:rotate(-6deg)">${esc(ar ? word : word.toUpperCase())}</div>` + this.mGrain(t);
+    if (f <= 0) return this.mPaper("#efeeeb", "#d8d6d2") + `<div dir="auto" style="position:absolute;left:0;right:0;top:${H * 0.22}px;text-align:center;font:${S * 0.24}px ${this.fam("hand", ar)};color:#1b1918;transform:rotate(-6deg)">${esc(ar ? word : word.toUpperCase())}</div>` + this.mGrain(t);
     if (f === 1) return `<div style="position:absolute;inset:0;background:${pal.red}"></div>
-      <div dir="auto" style="position:absolute;left:0;right:0;top:${-H * 0.16}px;text-align:center;font:800 ${S * 0.48}px ${fam("sans", ar)};letter-spacing:-0.06em;color:#120a0a;transform:scaleY(1.9) scaleX(.8)">${esc(word)}</div>` + this.mGrain(t);
+      <div dir="auto" style="position:absolute;left:0;right:0;top:${-H * 0.16}px;text-align:center;font:800 ${S * 0.48}px ${this.fam("sans", ar)};letter-spacing:-0.06em;color:#120a0a;transform:scaleY(1.9) scaleX(.8)">${esc(word)}</div>` + this.mGrain(t);
     return `<div style="position:absolute;inset:0;background:${pal.yellow}"></div>${this.mDash(H * 0.065, 0.9)}${this.mDash(H * 0.915, 0.9)}
-      <div dir="auto" style="position:absolute;left:0;right:0;top:${H * 0.3}px;text-align:center;font:800 ${S * 0.23}px ${fam("sans", ar)};letter-spacing:-0.05em;color:${pal.yellowInk}">${esc(word)}</div>` + this.mGrain(t);
+      <div dir="auto" style="position:absolute;left:0;right:0;top:${H * 0.3}px;text-align:center;font:800 ${S * 0.23}px ${this.fam("sans", ar)};letter-spacing:-0.05em;color:${pal.yellowInk}">${esc(word)}</div>` + this.mGrain(t);
   };
 
   // الكلام بيتكسّر بكسلات وبيصغر ويتحوّل لشرَط ويختفي
@@ -199,7 +213,7 @@
   P.k_sign = function (b, t, k, th, bi) {
     const { W, H, tall, S } = this.mU(), pal = this.pal();
     const sent = this.mSent(b), ar = AR.test(sent.map((w) => w.w).join(" "));
-    const SM = S * (tall ? 0.085 : 0.05), F = `${ar ? 800 : 700} ${SM}px ${fam("sans", ar)}`, LS = ar ? 0 : -SM * 0.02;
+    const SM = S * (tall ? 0.085 : 0.05), F = `${ar ? 800 : 700} ${SM}px ${this.fam("sans", ar)}`, LS = ar ? 0 : -SM * 0.02;
     const maxW = W * (tall ? 0.86 : 0.94);
     const L = lines(sent, F, LS, maxW, ar);
     const lh = SM * 1.35, y0 = H * 0.5 - (L.length - 1) * lh / 2;
@@ -212,14 +226,14 @@
     const sig = (b.sign || (focus ? focus.w : this.words(b).slice(-2).map((w) => w.w).join(" "))).trim();
     // كتابة كبيرة مغبّشة في الخلفية (عمق)
     const bk = seg(t, b.t0, b.t0 + 0.6);
-    h += `<div dir="auto" style="position:absolute;${ar ? "right" : "left"}:${lerp(W * 0.5, W * 0.6, bk).toFixed(1)}px;top:${lerp(H * 0.06, H * 0.04, bk).toFixed(1)}px;font:${S * 0.3}px ${fam("sign", ar)};
+    h += `<div dir="auto" style="position:absolute;${ar ? "right" : "left"}:${lerp(W * 0.5, W * 0.6, bk).toFixed(1)}px;top:${lerp(H * 0.06, H * 0.04, bk).toFixed(1)}px;font:${S * 0.3}px ${this.fam("sign", ar)};
       color:#3b3937;opacity:${(0.32 * (1 - seg(k, 0.55, 0.7))).toFixed(2)};filter:blur(${(S * 0.013).toFixed(1)}px);white-space:nowrap;transform:rotate(-8deg)">${esc(sig)}</div>`;
     // الكلام
     sent.forEach((w, i) => {
       if (w.t0 > t) return;
       const a = seg(t, w.t0, w.t0 + 0.08), p = at[i];
       const bold = i === fi && t >= w.t0;
-      h += `<span style="position:absolute;left:${p.x.toFixed(1)}px;top:${(p.y - SM * 0.8).toFixed(1)}px;font:${bold ? 800 : ar ? 800 : 700} ${SM}px ${fam("sans", ar)};letter-spacing:${LS}px;white-space:nowrap;
+      h += `<span style="position:absolute;left:${p.x.toFixed(1)}px;top:${(p.y - SM * 0.8).toFixed(1)}px;font:${bold ? 800 : ar ? 800 : 700} ${SM}px ${this.fam("sans", ar)};letter-spacing:${LS}px;white-space:nowrap;
         color:${pal.ink};opacity:${lerp(0.25, 1, a).toFixed(2)}">${esc(w.w)}</span>`;
     });
     const pw = S * 0.0045;
@@ -238,7 +252,7 @@
     const yS = y0 + (L.length - 1) * lh + SM * 1.2;
     if (k < 0.75) {
       const rv = eIO(seg(k, 0.02, 0.6)), fade = 1 - seg(k, 0.62, 0.75);
-      h += `<div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;${ar ? "right" : "left"}:${W * 0.1}px;top:${yS}px;font:${S * 0.14}px ${fam("sign", ar)};color:#1d1b1a;white-space:nowrap;opacity:${fade.toFixed(2)};
+      h += `<div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;${ar ? "right" : "left"}:${W * 0.1}px;top:${yS}px;font:${S * 0.14}px ${this.fam("sign", ar)};color:#1d1b1a;white-space:nowrap;opacity:${fade.toFixed(2)};
         clip-path:inset(0 ${ar ? 0 : (100 - rv * 100).toFixed(1)}% 0 ${ar ? (100 - rv * 100).toFixed(1) : 0}%);transform:rotate(-4deg)">${esc(sig)}</div>`;
     }
     // خطوط القلم: خط نازل، ومنحنى كبير، وبرق ودايرة حوالين الكلمة المهمة
@@ -307,9 +321,9 @@
     });
     // الجملة: في النص على عرض الكادر، والكلمة المهمة بتتقل لما تتقال
     const SMx = S * (tall ? 0.085 : 0.05);
-    let SM = SMx, F = `${ar ? 800 : 700} ${SM}px ${fam("sans", ar)}`;
+    let SM = SMx, F = `${ar ? 800 : 700} ${SM}px ${this.fam("sans", ar)}`;
     const total = (f) => measure(sent.map((w) => w.w).join(" "), f, ar ? 0 : -SM * 0.02);
-    if (!tall) while (total(F) > W * 0.985 && SM > S * 0.03) { SM -= 1; F = `${ar ? 800 : 700} ${SM}px ${fam("sans", ar)}`; }
+    if (!tall) while (total(F) > W * 0.985 && SM > S * 0.03) { SM -= 1; F = `${ar ? 800 : 700} ${SM}px ${this.fam("sans", ar)}`; }
     const L = lines(sent, F, ar ? 0 : -SM * 0.02, W * (tall ? 0.74 : 0.985), ar);
     const shift = tall ? (ar ? -1 : 1) * W * 0.07 : 0;   // في الطولي الكلام بيبعد عن ناحية النجمة
     const lh = SM * 1.35, y0 = H * 0.5 - (L.length - 1) * lh / 2;
@@ -321,7 +335,7 @@
       const hot = focus && w.t0 === focus.t0 && t >= w.t0;
       const x = (W - ln.width) / 2 + it.x + shift;
       const lead = ar ? it.x > ln.width * 0.7 : it.x < ln.width * 0.18;   // أول الجملة بيبهت ناحية النجمة
-      h += `<span style="position:absolute;left:${x.toFixed(1)}px;top:${(y0 + li * lh - SM * 0.8).toFixed(1)}px;font:${hot ? 800 : ar ? 800 : 700} ${SM}px ${fam("sans", ar)};
+      h += `<span style="position:absolute;left:${x.toFixed(1)}px;top:${(y0 + li * lh - SM * 0.8).toFixed(1)}px;font:${hot ? 800 : ar ? 800 : 700} ${SM}px ${this.fam("sans", ar)};
         letter-spacing:${ar ? 0 : -SM * 0.02}px;white-space:nowrap;color:${hot ? "#0d0c0c" : `rgba(25,23,22,${lerp(1, 0.82, v).toFixed(2)})`};
         opacity:${(lerp(0.25, 1, a) * (lead ? lerp(1, 0.55, v) : 1)).toFixed(2)}">${esc(w.w)}</span>`;
     }));

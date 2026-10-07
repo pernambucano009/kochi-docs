@@ -4,3 +4,7 @@ Typography section fonts (from Google Fonts):
 - TY-Jakarta-*.ttf: Plus Jakarta Sans, SIL Open Font License 1.1
 - TY-MrsSaintDelafield.ttf: Mrs Saint Delafield, SIL Open Font License 1.1
 - TY-RockSalt.ttf: Rock Salt, Apache License 2.0
+- TY-Outfit-*.ttf: Outfit, SIL Open Font License 1.1
+- TY-Urbanist-800.ttf: Urbanist, SIL Open Font License 1.1
+- TY-Gabarito-*.ttf: Gabarito, SIL Open Font License 1.1
+- TY-ReadexPro-700.ttf: Readex Pro, SIL Open Font License 1.1

@@ -74,6 +74,9 @@ function tyRenderProj() {
     <div class="row wrap tv-opts">
       <label>المقاس <select data-tyopt="ratio">${v.ratios.map((r) => `<option ${r === v.ratio ? "selected" : ""}>${r}</option>`).join("")}</select></label>
       <label>الستايل <select data-tyopt="style">${stOpts}</select></label>
+      ${tyx.styles.find((x) => x.id === v.style)?.pro && TypoEngine.MOMENT_FONTS ? `
+        <label>خط الإنجليزي <select data-tyfont="sans">${TypoEngine.MOMENT_FONTS.latin.map(([f, l]) => `<option value="${f}" ${f === (v.fonts?.sans || "TY Outfit") ? "selected" : ""}>${l}</option>`).join("")}</select></label>
+        <label>خط العربي <select data-tyfont="sansAr">${TypoEngine.MOMENT_FONTS.arabic.map(([f, l]) => `<option value="${f}" ${f === (v.fonts?.sansAr || "TY Alexandria") ? "selected" : ""}>${l}</option>`).join("")}</select></label>` : ""}
       <label>الخلفية <select data-tybg="kind">${Object.entries(TY_BG).filter(([k]) => k !== "source" || v.source?.kind === "video")
         .map(([k, l]) => `<option value="${k}" ${k === bg.kind ? "selected" : ""}>${l}</option>`).join("")}</select></label>
       ${bg.kind === "solid" ? `<label>اللون <input type="color" data-tybg="color" value="${tye(bg.color || "#101010")}"></label>` : ""}
@@ -399,6 +402,7 @@ $("tyMain").addEventListener("change", async (e) => {
   try {
     if (t.matches("[data-tyname]")) { tyx.cur = await api(TY(`/${v.id}`), { method: "PATCH", ...jsonBody({ name: t.value }) }); tyx.list = await api(TY("")); return tyRender(); }
     if (t.matches("[data-tyopt]")) return tyPatch({ [t.dataset.tyopt]: t.value });
+    if (t.matches("[data-tyfont]")) return tyPatch({ fonts: { ...(v.fonts || {}), [t.dataset.tyfont]: t.value } });
     if (t.matches("[data-tybg]")) return tyPatch({ bg: { ...(v.bg || {}), [t.dataset.tybg]: t.dataset.tybg === "dim" ? Number(t.value) : t.value } });
     if (t.matches("[data-tybgfile]") && t.files[0]) {
       const fd = new FormData();
