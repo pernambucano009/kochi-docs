@@ -32,8 +32,28 @@ PRO_KINDS = {
             "(لآخر الجملة/السؤال/الخلاصة، من كلمة لـ 4 كلمات، وبيستنى لحد ما الجملة الجاية تبدأ)",
 }
 KINDS.update(PRO_KINDS)
-INTROS = {"track": ("", "flash"), "spot": ("", "burst")}
-OUTROS = {"track": ("", "pixel"), "spot": ("", "red")}
+INTROS = {"track": ("", "flash", "card"), "spot": ("", "burst")}
+OUTROS = {"track": ("", "pixel", "wipe"), "spot": ("", "red", "white")}
+# لغة الستايل: الاختيارات اللي بتخلّي كل لقطة مختلفة وهي من نفس العيلة
+VARIANTS = {"tone": ("", "paper", "dark", "yellow", "red"), "layout": ("", "line", "stack"), "frame": ("", "brackets", "box", "none"),
+            "sigpos": ("", "below", "behind", "none"), "flank": ("", "left", "right"), "color": ("", "blue", "red", "yellow"),
+            "arrange": ("", "scatter", "row"), "flare": ("", "star", "none")}
+MARKS = {"box": "صندوق بالقلم (تركيز)", "circle": "دايرة حمرا بالقلم (أهم كلمة)", "underline": "خط تحتها (تأكيد)",
+         "strike": "شطب (نفي، حاجة غلط، «مش»)", "arrow": "سهم بالإيد جاي عليها (بص هنا)", "highlight": "لون ورا الكلمة (رقم أو اسم)",
+         "redact": "شريط أسود بيغطيها وبينسحب (مفاجأة، كشف)"}
+PRO_GRAMMAR = (
+    "لغة الستايل ده (ركّب منها لقطات جديدة، ما تكررش نفس التوليفة مرتين ورا بعض):\n"
+    "- tone: paper (ورق فاتح، الأساس) | dark (غامق: للجد والحزن والسر) | yellow (كارت أصفر: طاقة وحماس) | red (كارت أحمر: تحذير، صدمة)\n"
+    "- track: layout = line (سطر والكاميرا ماشية) | stack (كلمة تحت كلمة والكاميرا طالعة: للتعداد والخطوات)؛ "
+    "intro = flash (أول الفيديو بس) | card (كارت ملون بالكلمة الأولى) | فاضي؛ outro = pixel (بيتكسّر بكسلات) | wipe (شريط أسود بيمسح) | فاضي\n"
+    "- sign: frame = brackets | box | none؛ sigpos = below (الإمضا تحت) | behind (إمضا حمرا كبيرة ورا الكلام) | none؛ sign = الكلمتين اللي يتكتبوا إمضا\n"
+    "- spot: flank = left | right (ناحية النجمة)؛ color = blue | red | yellow؛ arrange = scatter (أيقونات حوالين) | row (صف أيقونات تحت الكلام: للتعداد)؛ "
+    "flare = star | none؛ tone dark = النجمة على أسود من غير بقعة نور؛ intro = burst | فاضي؛ outro = red | white | فاضي\n"
+    "- marks: علامات قلم على كلمات جوه البلوك [{\"type\": ..., \"word\": رقم الكلمة جوه البلوك من 0}] (من 0 لـ 3 في البلوك):\n"
+    + "".join(f"  - {k}: {v}\n" for k, v in MARKS.items())
+    + "- خلّي العلامة على معنى الكلمة: النفي strike، الكلمة الأهم circle، المفاجأة redact، الأرقام highlight، الإشارة arrow.\n"
+    "- غيّر بين tone وlayout وcolor وside على طول الفيديو، والمفاجآت (card أحمر/أصفر، dark) في اللحظات القوية بس.\n"
+)
 PLACES = ("auto", "left", "right", "above", "below", "on")
 THEMES = ("light", "dark", "accent")
 
@@ -44,7 +64,8 @@ BUILTIN_STYLES = {
         "light": {"bg": "#ECEBE8", "ink": "#191716", "accent": "#E0261F"},
         "dark": {"bg": "#0C0808", "ink": "#F4F4F2", "accent": "#E0261F"},
         "accent": {"bg": "#E0AB1C", "ink": "#3B2408", "accent": "#191716"},
-        "rules": ["كل جملة: track لأولها (أول جملة في الفيديو intro=flash)، وبعدين sign لكمالتها، وspot لآخرها لو سؤال أو خلاصة (intro=burst)",
+        "rules": ["الإيقاع: كل جملة غالبًا track لأولها، وsign لكمالتها، وspot لآخرها لو سؤال أو خلاصة؛ بس اكسر القاعدة لما المعنى يستاهل",
+                  "أول الفيديو track intro=flash",
                   "track قبل sign دايمًا outro=pixel", "spot قبل تغيير كبير (جملة جديدة بإحساس تاني) outro=red",
                   "focus في sign وspot = الكلمة اللي عليها الضغط", "sign = كلمة أو كلمتين بتتكتب إمضا (أهم كلمتين في الجزء ده)"],
         "kinds": {"track": 3, "sign": 3, "spot": 2},
@@ -76,7 +97,8 @@ PLAN_FORMAT = """{
               "side": "اسم ستيكر/صورة كبيرة جنب الكلام في build أو فاضي",
               "anchor": "رقم مرساة من الفيديو (a1...) أو فاضي", "place": "auto | left | right | above | below | on", "skip": -1,
               "intro": "flash (track) | burst (spot) | فاضي", "outro": "pixel (track) | red (spot) | فاضي",
-              "sign": "كلمة أو كلمتين تتكتب إمضا (sign)", "box": 1, "redact": 2}]
+              "sign": "كلمة أو كلمتين تتكتب إمضا (sign)", "marks": [{"type": "circle", "word": 0}],
+              "tone": "paper", "layout": "line", "frame": "brackets", "sigpos": "below", "flank": "left", "color": "blue", "arrange": "scatter", "flare": "star"}]
 }"""
 
 
@@ -126,7 +148,7 @@ def plan_messages(words: list[dict], style: dict, stickers: list[str], brief: st
         "- icon/letters/ring/side محتاجين صور: اختار من المكتبة بالاسم الأول، ولو مفيش مناسب اكتب اسم قصير بالإنجليزي لأيقونة جديدة (2-3 كلمات، من غير كلمة icon). "
         "ring محتاج 5-6 icons.\n"
         "- الأيقونات الجديدة بتترسم بفلوس: الفيديو كله ميزيدش عن 8 أيقونات جديدة مختلفة، وكرر نفس الاسم بالظبط لو نفس الحاجة اتكررت.\n"
-        + ("- ده ستايل احترافي: استخدم track وsign وspot بس، وبالترتيب اللي في القواعد. spot أيقوناته 2-4 (icons).\n" if pro else "")
+        + ("- ده ستايل احترافي: استخدم track وsign وspot بس. spot أيقوناته 2-4 (icons).\n" + PRO_GRAMMAR if pro else "")
         + "- letters: text كلمة واحدة قصيرة، وletter = رقم الحرف اللي هيتبدل (من 0).\n"
         "- focus = رقم الكلمة جوه البلوك اللي تنوّر (من 0) أو -1.\n"
         "- text في pop/icon/letters/scatter كلمة أو كلمتين بس من الكلام نفسه، بنفس لغته.\n"
@@ -168,12 +190,17 @@ def clean_plan(raw: dict, words: list[dict], duration: float, pro: bool = False)
                     "place": b.get("place") if b.get("place") in PLACES else "auto", "skip": _i(b.get("skip"), -1),
                     "intro": b.get("intro") if b.get("intro") in INTROS.get(kind, ("",)) else "",
                     "outro": b.get("outro") if b.get("outro") in OUTROS.get(kind, ("",)) else "",
-                    "sign": str(b.get("sign") or "").strip()[:40], "box": _i(b.get("box"), -1), "redact": _i(b.get("redact"), -1)})
+                    "sign": str(b.get("sign") or "").strip()[:40], "box": _i(b.get("box"), -1), "redact": _i(b.get("redact"), -1),
+                    **{k: (b.get(k) if b.get(k) in vals else "") for k, vals in VARIANTS.items()},
+                    "marks": [{"type": m["type"], "word": _i(m.get("word")), **({"color": m["color"]} if m.get("color") in ("red", "yellow") else {})}
+                              for m in (b.get("marks") or []) if isinstance(m, dict) and m.get("type") in MARKS][:4]})
     if not out and n:
         return pro_plan(words, duration) if pro else mock_plan(words, duration)
     # كلمات اتسابت في الآخر: تتضاف لآخر بلوك
     if out and out[-1]["to"] < n - 1:
         out[-1]["to"] = n - 1
+    for b in out:   # العلامات على كلام جوه البلوك بس
+        b["marks"] = [m for m in b["marks"] if 0 <= m["word"] <= b["to"] - b["from"]]
     if pro and out:   # الانتقالات اللي بتعمل الإيقاع لو الموديل نسيها
         if out[0]["kind"] == "track" and not out[0]["intro"]:
             out[0]["intro"] = "flash"
@@ -211,25 +238,37 @@ def sentences(words: list[dict]) -> list[list[int]]:
 
 
 def pro_plan(words: list[dict], duration: float, icons: list[str] | None = None) -> list[dict]:
-    """الإخراج الاحترافي من غير موديل (نفس إيقاع الفيديو المرجع): كل جملة track ← sign ← spot."""
+    """الإخراج الاحترافي من غير موديل: إيقاع الفيديو المرجع (track ← sign ← spot) مع تنويع ثابت من جملة للتانية."""
+    import random
     out = []
-    for si, sent in enumerate(sentences(words)):
+    sents = sentences(words)
+    for si, sent in enumerate(sents):
+        rnd = random.Random(si * 7919 + len(words))
         n = len(sent)
         head = sent[: min(4, max(1, n // 3))] if n > 2 else sent
         rest = sent[len(head):]
         tail = rest[-min(3, max(1, len(rest) // 3)):] if len(rest) >= 3 else []
         mid = rest[: len(rest) - len(tail)]
-        out.append({"from": head[0], "to": head[-1], "kind": "track", "intro": "flash" if si == 0 else "", "outro": "pixel" if mid or tail else ""})
+        neg = [i for i, k in enumerate(head) if re.search(r"(n't|not|no|مش|ما|لا|مفيش)", words[k]["w"].lower())]
+        tr = {"from": head[0], "to": head[-1], "kind": "track", "intro": "flash" if si == 0 else rnd.choice(["", "", "card"]),
+              "outro": rnd.choice(["pixel", "pixel", "wipe"]) if mid or tail else "", "tone": "" if si == 0 else rnd.choice(["", "", "dark", "yellow"]),
+              "layout": "stack" if n >= 6 and rnd.random() < 0.35 else "",
+              "marks": [{"type": "strike", "word": neg[0]}] if neg else [{"type": rnd.choice(["box", "underline", "redact"]), "word": min(1, len(head) - 1)}]}
+        out.append(tr)
         if mid:
             longest = max(mid, key=lambda i: len(words[i]["w"]))
-            out.append({"from": mid[0], "to": mid[-1], "kind": "sign", "focus": mid.index(longest), "sign": words[longest]["w"].strip(".,،؟?!")})
+            out.append({"from": mid[0], "to": mid[-1], "kind": "sign", "focus": mid.index(longest), "sign": words[longest]["w"].strip(".,،؟?!"),
+                        "frame": rnd.choice(["brackets", "box", "none"]), "sigpos": rnd.choice(["below", "behind"]),
+                        "tone": rnd.choice(["", "", "dark"]), "marks": [{"type": rnd.choice(["circle", "underline", "arrow"]), "word": mid.index(longest)}]})
         if tail:
-            out.append({"from": tail[0], "to": tail[-1], "kind": "spot", "intro": "burst", "outro": "red" if si < len(sentences(words)) - 1 else "",
-                        "icons": (icons or [])[:4], "focus": len(tail) - 1})
+            out.append({"from": tail[0], "to": tail[-1], "kind": "spot", "intro": "burst", "outro": "red" if si < len(sents) - 1 else "",
+                        "icons": (icons or [])[:4], "focus": len(tail) - 1, "flank": rnd.choice(["", "right"]), "color": rnd.choice(["blue", "red", "yellow"]),
+                        "arrange": rnd.choice(["scatter", "row"]), "tone": rnd.choice(["", "", "dark"])})
     for b in out:
         b.setdefault("theme", "light")
         for k, v in (("text", ""), ("focus", -1), ("icon", ""), ("icons", []), ("letter", 1), ("side", ""), ("anchor", ""), ("place", "auto"),
-                     ("skip", -1), ("intro", ""), ("outro", ""), ("sign", ""), ("box", -1), ("redact", -1)):
+                     ("skip", -1), ("intro", ""), ("outro", ""), ("sign", ""), ("box", -1), ("redact", -1), ("marks", []),
+                     *((k2, "") for k2 in VARIANTS)):
             b.setdefault(k, v)
     return timed(out, words, duration)
 

@@ -13017,7 +13017,7 @@ def typo_doc(pid: str, d: dict) -> dict:
         sent = next(([{"w": words[i]["w"], "t0": words[i]["s"], "t1": words[i]["e"]} for i in range(sn[0], sn[-1] + 1)]
                      for sn in sents if sn[0] <= b.get("from", 0) <= sn[-1]), None)
         blocks.append({**{k: b.get(k) for k in ("t0", "t1", "kind", "theme", "text", "words", "focus", "letter", "anchor", "place", "skip",
-                                                 "intro", "outro", "sign", "box", "redact")}, "sent": sent,
+                                                 "intro", "outro", "sign", "box", "redact", "marks", *typo.VARIANTS)}, "sent": sent,
                        "icon": img(b.get("icon")), "side": img(b.get("side")), "icons": [u for u in (img(i) for i in b.get("icons") or []) if u]})
     kind = (d.get("bg") or {}).get("kind", "theme")
     if kind != "theme":
