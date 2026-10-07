@@ -869,7 +869,7 @@ def clean_schema(data: dict, duration: float) -> dict:
     beats = beats[:16]
     if beats:
         beats[-1]["into_next"] = ""
-    return {k: str(d.get(k) or "")[:1500] for k in ("title", "summary", "style", "palette", "spine", "camera", "text_style", "music")} | {
+    return {k: _plain(d.get(k))[:1500] for k in ("title", "summary", "style", "palette", "spine", "camera", "text_style", "music")} | {
         "beat_sec": round(max(0.0, _f(d.get("beat_sec"))), 3), "beats": beats}
 
 
@@ -916,22 +916,33 @@ def fill_messages(brain_txt: str, schema: dict, brief: str, text_mode: str) -> s
         f"- beats = {n} بالظبط بنفس الترتيب.\n"
         "- العالم واحد في كل اللوحات: نفس الخلفية والإضاءة والألوان، والعمود الفقري (spine) موجود ومتوصف بنفس الكلام في كل لوحة.\n"
         f"- {text_rule}\n"
-        "- لو خانة فيها شاشة التطبيق أو اللوجو أو المنتج، اكتب اسمه في asset بالظبط زي ملف العميل.\n"
+        "- لو خانة فيها شاشة التطبيق أو اللوجو أو المنتج، اكتب اسمه في asset بالظبط زي ملف العميل (لو اللوحة فيها موبايل بيعرض التطبيق، "
+        "لازم asset = اسم شاشة حقيقية من ملف العميل).\n"
+        "- ⚠️ desc بيوصف محتوى حقيقي من منتج العميل: الميزة الحقيقية والشاشة الحقيقية. ممنوع تمامًا أي كلام عام أو خانات زي "
+        "[headline] أو headline أو CTA أو proof statement أو feature description أو placeholder أو label، وممنوع أقواس [ ].\n"
+        + ("- ⚠️ الصور من غير كلام: desc ما يذكرش أي كلام مكتوب أو عناوين أو أزرار عليها كلام أو أرقام. مكان الكلام اكتب بداله: "
+           "\"a clean empty area in the upper part (reserved for text added later)\".\n" if text_mode != "en" else "")
+        + "- العمود الفقري (spine) فكرة استمرارية (حركة، عنصر ثابت)، مش خط أو علامة تترسم: وصّفه كعنصر حقيقي في المشهد أو كطريقة حركة.\n"
         "رجّع JSON بس بالشكل ده:\n" + FILL_FORMAT
     )
 
 
+def _plain(v) -> str:
+    """الموديل ساعات بينسخ «English:» من الشكل المطلوب: بيتشال."""
+    return re.sub(r"^\s*English\s*:\s*", "", str(v or "")).strip()
+
+
 def clean_fill(data: dict, n: int) -> dict:
     d = data or {}
-    panels = [{"desc": str(x.get("desc") or "")[:2000], "asset": str(x.get("asset") or "")[:120]}
+    panels = [{"desc": _plain(x.get("desc"))[:2000], "asset": str(x.get("asset") or "")[:120]}
               for x in d.get("panels") or [] if isinstance(x, dict)][:n + 1]
     while len(panels) < n + 1:
         panels.append({"desc": panels[-1]["desc"] if panels else "", "asset": ""})
-    beats = [{"motion": str(x.get("motion") or "")[:1500], "text": str(x.get("text") or "")[:200], "voice": str(x.get("voice") or "")[:600]}
+    beats = [{"motion": _plain(x.get("motion"))[:1500], "text": str(x.get("text") or "")[:200], "voice": str(x.get("voice") or "")[:600]}
              for x in d.get("beats") or [] if isinstance(x, dict)][:n]
     while len(beats) < n:
         beats.append({"motion": "Smooth continuous camera move from the start frame to the end frame, no cut.", "text": "", "voice": ""})
-    return {"title": str(d.get("title") or "")[:120], "world": str(d.get("world") or "")[:2000], "panels": panels, "beats": beats}
+    return {"title": str(d.get("title") or "")[:120], "world": _plain(d.get("world"))[:2000], "panels": panels, "beats": beats}
 
 
 def mock_fill(schema: dict, brand: str) -> dict:
@@ -942,9 +953,17 @@ def mock_fill(schema: dict, brand: str) -> dict:
 
 
 def sheet_grid(count: int) -> tuple[int, int]:
-    """شبكة مربعة (2×2 أو 3×3): كده الشيت كله بنفس نسبة اللوحة الواحدة، فاللوحات بتطلع بالمقاس الصح."""
-    k = 1 if count <= 1 else 2 if count <= 4 else 3
-    return k, k
+    """(أعمدة، صفوف): أقل خانات فاضية ممكنة (الموديل بيرسم في الخانات الفاضية)، والشيت كله بياخد النسبة اللي تطلّع كل لوحة بالمقاس."""
+    return {1: (1, 1), 2: (2, 1), 3: (3, 1), 4: (2, 2), 5: (3, 2), 6: (3, 2), 7: (4, 2), 8: (4, 2), 9: (3, 3)}.get(count, (3, 3))
+
+
+def sheet_ratio(count: int, ratio: str) -> str:
+    """نسبة الشيت كله = نسبة اللوحة × الشبكة (أقرب نسبة الموديل بيدعمها)."""
+    cols, rows = sheet_grid(count)
+    pw, ph = {"9:16": (9, 16), "16:9": (16, 9)}.get(ratio, (1, 1))
+    want = cols * pw / (rows * ph)
+    return min(("9:16", "16:9", "1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "21:9"),
+               key=lambda r: abs(int(r.split(":")[0]) / int(r.split(":")[1]) - want))
 
 
 RATIO_WORDS = {"9:16": "tall vertical portrait (width:height = 9:16, like a phone screen)",
@@ -965,7 +984,7 @@ def sheet_prompt(schema: dict, fill: dict, cells: list[int], ratio: str, text_mo
     shape = RATIO_WORDS.get(ratio, ratio)
     empty = cols * rows - len(cells)
     return (
-        f"IMAGE FORMAT: the whole image is {shape}.\n"
+        f"IMAGE FORMAT: the whole sheet is {sheet_ratio(len(cells), ratio)} (width:height); each of the {rows}x{cols} cells inside it is a {shape} frame.\n"
         f"SAFE AREA: each panel may be trimmed to an exact {shape} frame from its centre, so keep every important element "
         "(subject, device, logo, faces, the empty text area) well inside the centre of its panel; near the panel edges put only background.\n"
         f"One single image: a storyboard sheet, an exact grid of {rows} rows x {cols} columns of equal cells. EVERY cell is a {shape} frame "
@@ -976,11 +995,15 @@ def sheet_prompt(schema: dict, fill: dict, cells: list[int], ratio: str, text_mo
         + "All panels are frames of ONE continuous video shot in ONE world: identical style, lighting, background, colors, materials and the "
         "same recurring elements in every panel, so that consecutive panels look like moments of the same take.\n"
         f"WORLD: {fill.get('world') or schema.get('style')}\n"
-        f"STYLE: {schema.get('style')}\nPALETTE: {schema.get('palette')}\nRECURRING ELEMENT: {schema.get('spine')}\n"
+        f"STYLE: {schema.get('style')}\nPALETTE: {schema.get('palette')}\n"
+        f"CONTINUITY (an idea about how the shot stays one piece; do NOT draw it as lines, guides, arrows or marks): {schema.get('spine')}\n"
         + ("No text or letters anywhere except inside real brand assets.\n" if text_mode != "en" else
            f"TEXT STYLE: {schema.get('text_style')} Spell English text exactly as given.\n")
         + ("The previous storyboard sheet is attached: match its world and style exactly.\n" if style_from_prev else "")
         + "\n".join(lines) + ref_txt
+        + f"\nDraw exactly {len(cells)} panels" + (f" and leave the other {empty} cell(s) completely plain white." if empty else ".")
+        + ("\nREMINDER: absolutely no letters, words, numbers, labels or placeholder text anywhere (only inside the real logo/screens given)."
+           if text_mode != "en" else "")
     )
 
 

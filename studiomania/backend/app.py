@@ -11467,12 +11467,16 @@ def tv_refs(d: dict, brain: dict | None) -> list[tuple[Path, str]]:
     """أصول العميل اللي الخانات طالباها (بالاسم) + اللوجو: بتتبعت مع الشيت والتوضيح."""
     out, seen = [], set()
     names = [p.get("asset") for p in (d.get("fill") or {}).get("panels") or [] if p.get("asset")]
+    # شاشات التطبيق الحقيقية بتتبعت دايمًا (لحد 4) عشان أي موبايل في اللوحات يعرضها هي مش شاشة متألفة
+    screens = [a.get("name") or a["file"] for a in ((brain or {}).get("screens") or [])[:4]]
     logo = ((brain or {}).get("logos") or [{}])[0].get("file")
-    for nm in names + ([logo] if logo else []):
+    for nm in names + screens + ([logo] if logo else []):
         pth = film_brain_ref(brain, nm)
         if pth and str(pth) not in seen:
             seen.add(str(pth))
-            out.append((pth, "the brand's real logo" if nm == logo else f"the real brand asset «{nm}»"))
+            out.append((pth, "the brand's real logo" if nm == logo else
+                        f"a real app screen «{nm}»: any phone showing the app displays this screen exactly" if nm in screens else
+                        f"the real brand asset «{nm}»"))
     return out[:8]
 
 
@@ -11757,7 +11761,10 @@ def run_tv_sheet(vid: str, k: int) -> None:
         d = tv_load(vid)
         folder = tv_dir(vid)
         brain = brain_row(d.get("client_id") or "") or active_client()
-        size = az.ASPECTS.get(d["ratio"], az.ASPECTS["9:16"])[0]   # الشبكة مربعة، فالشيت كله بنفس نسبة اللوحة
+        sr = lab.sheet_ratio(len(tv_sheets(d)[k]), d["ratio"])   # نسبة الشيت كله على قد الشبكة
+        a, b = (int(x) for x in sr.split(":"))
+        size = f"{a * 128}x{b * 128}" if tv_img(d) in atlas.ASPECT_IMAGE_MODELS else min(
+            (v[0] for v in az.ASPECTS.values()), key=lambda z: abs(int(z.split("x")[0]) / int(z.split("x")[1]) - a / b))
         name = f"sheet{k + 1}-{uuid.uuid4().hex[:4]}.png"
         if atlas.mock_mode():
             w, h = (int(x) // 3 for x in size.split("x"))
