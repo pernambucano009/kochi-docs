@@ -13098,7 +13098,7 @@ def run_typo_render(pid: str, base: str, quality: str) -> None:
             grain = float(typo_style(d.get("style")).get("grain") or 0)
             fl = (f"[0:v]scale={vw}:{vh}:force_original_aspect_ratio=increase,crop={vw}:{vh},setsar=1,fps={TYPO_FPS}"
                   + (f",colorchannelmixer=rr={1 - dim}:gg={1 - dim}:bb={1 - dim}" if dim else "") + "[bg];"
-                  f"[bg][1:v]overlay=0:0:shortest=1" + (f",noise=alls={int(grain * 70)}:allf=t" if grain else "") + ",format=yuv420p[v]")
+                  f"[bg][1:v]overlay=0:0:shortest=1" + (f",noise=alls={int(grain * 35)}:allf=t" if grain else "") + ",format=yuv420p[v]")
         audio_in = None
         if src and (d.get("source") or {}).get("kind") in ("audio", "video"):
             cmd += ["-i", str(folder / src)]
@@ -13109,7 +13109,9 @@ def run_typo_render(pid: str, base: str, quality: str) -> None:
             cmd += ["-map", f"{inputs}:v", "-vf", "format=yuv420p"]
         if audio_in is not None:
             cmd += ["-map", f"{audio_in}:a?", "-c:a", "aac", "-b:a", "160k", "-shortest"]
-        cmd += ["-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-r", str(TYPO_FPS), "-t", f"{dur:.3f}", "-movflags", "+faststart", str(tmp_v)]
+        # سقف للحجم: الحبيبات بتخلّي الملف يكبر جدًا من غير حد
+        cmd += ["-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-maxrate", "12M", "-bufsize", "24M",
+                "-r", str(TYPO_FPS), "-t", f"{dur:.3f}", "-movflags", "+faststart", str(tmp_v)]
         proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
         with sync_playwright() as p:
             browser = typo_browser(p)
