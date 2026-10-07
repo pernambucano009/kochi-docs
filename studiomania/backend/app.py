@@ -9680,6 +9680,8 @@ TRIAL_MODELS = {
     "seedance-mini": {"label": "Seedance 2.0 Mini (الأرخص)", "model": "bytedance/seedance-2.0-mini/image-to-video", "per_sec": 0.011},
     "seedance-fast": {"label": "Seedance 2.0 Fast", "model": "bytedance/seedance-2.0-fast/image-to-video", "per_sec": 0.027},
     "seedance": {"label": "Seedance 2.0 (أجود)", "model": "bytedance/seedance-2.0/image-to-video", "per_sec": 0.09},
+    "seedance-2.5": {"label": "Seedance 2.5 (لحد 30 ثانية في توليدة واحدة، أغلى)", "model": "bytedance/seedance-2.5/image-to-video",
+                     "per_sec": 0.134, "max": 30},
 }
 TRIAL_KEY_COST = 0.06   # صورة مفتاحية واحدة (تقريبًا)
 TRIAL_CTX = 2.0         # ثواني من A قبل الكونيكتور ومن B بعده في الفيديو النهائي
@@ -11515,10 +11517,7 @@ def tv_to_dict(vid: str, d: dict) -> dict:
                       "sharpen": round(sum(1 for j in range(n_p) if not (panels.get(str(j)) or {}).get("full")) * TV_IMAGE_MODELS[tv_img(d)][1], 2),
                       "video": round(sum(trial_gen_seconds(b["t1"] - b["t0"]) * per for i, b in enumerate(beats) if not (segs.get(str(i)) or {}).get("file")), 2),
                       "seg": [round(trial_gen_seconds(b["t1"] - b["t0"]) * per, 2) for b in beats],
-                      "once": round(sum(trial_gen_seconds(sum(beats[i]["t1"] - beats[i]["t0"] for i in range(sh["cells"][0], sh["cells"][-1])))
-                                        * per for sh in sheets if len(sh["cells"]) > 1)
-                                    + sum(trial_gen_seconds(beats[sh["cells"][0] - 1]["t1"] - beats[sh["cells"][0] - 1]["t0"]) * per
-                                          for sh in sheets[1:]), 2)},
+                      "once": tv_once_cost(d, per), "once_parts": len(tv_chunks(beats, tv_once_max(d))), "once_max": tv_once_max(d)},
             "models": [{"key": k, "label": v["label"], "per_sec": v["per_sec"]} for k, v in TRIAL_MODELS.items()]}
 
 
@@ -11993,9 +11992,32 @@ def tv_r2v(model_key: str) -> str:
     return TRIAL_MODELS.get(model_key, TRIAL_MODELS["seedance-mini"])["model"].replace("image-to-video", "reference-to-video")
 
 
+def tv_once_max(d: dict) -> int:
+    return TRIAL_MODELS.get(d.get("model"), TRIAL_MODELS["seedance-mini"]).get("max", atlas.MAX_DURATION)
+
+
+def tv_chunks(beats: list, cap: float) -> list[list[int]]:
+    """الأجزاء على توليدات: كل توليدة لحد أقصى طول الموديل، والقطع دايمًا عند لوحة."""
+    out, cur, tot = [], [], 0.0
+    for i, b in enumerate(beats):
+        d = b["t1"] - b["t0"]
+        if cur and tot + d > cap + 0.25:
+            out.append(cur)
+            cur, tot = [], 0.0
+        cur.append(i)
+        tot += d
+    return out + ([cur] if cur else [])
+
+
+def tv_once_cost(d: dict, per: float) -> float:
+    cap = tv_once_max(d)
+    return round(sum(max(atlas.MIN_DURATION, min(cap, math.ceil(sum(d["schema"]["beats"][i]["t1"] - d["schema"]["beats"][i]["t0"] for i in g))))
+                     for g in tv_chunks(d["schema"]["beats"], cap)) * per, 2)
+
+
 def run_tv_once(vid: str) -> None:
-    """🎬 الفيديو كله في توليدة واحدة: الشيت كله صورة مرجع، والموديل يمشي على اللوحات بالترتيب في لقطة واحدة متصلة
-    (مفيش أجزاء بتتلزق، فمفيش وقفة/بداية جديدة كل جزء). لو فيه أكتر من شيت: توليدة لكل شيت، وبينهم حركة من آخر لوحة لأول لوحة."""
+    """🎬 الفيديو كله لقطة واحدة: الشيت كله صورة مرجع، والموديل يمشي على اللوحات بالترتيب (مفيش أجزاء بتتلزق، فمفيش وقفة كل جزء).
+    لو الفيديو أطول من أقصى طول للموديل: التوليدة اللي بعدها بتكمّل على الفيديو اللي قبلها (extend) من آخر فريم فيه."""
     try:
         d = tv_load(vid)
         folder = tv_dir(vid)
@@ -12003,38 +12025,36 @@ def run_tv_once(vid: str) -> None:
         ratio = az.ASPECTS.get(d["ratio"], az.ASPECTS["9:16"])[1]
         W, H = RATIO_VIDEO.get(d["ratio"], RATIO_VIDEO["9:16"])
         brain = brain_row(d.get("client_id") or "") or active_client()
-        refs = tv_refs(d, brain)[:8]
+        refs = tv_refs(d, brain)
         sheets = tv_sheets(d)
-        parts = []
-        for k, cells in enumerate(sheets):
-            if k:   # من آخر لوحة في الشيت اللي فات لأول لوحة في ده
-                i = cells[0] - 1
-                b = beats[i]
-                tv_set(vid, step=f"🎬 بيوصل الشيت {k} بالشيت {k + 1}")
-                if not all(((d.get("panels") or {}).get(str(j)) or {}).get("cell") for j in (i, i + 1)):
-                    raise RuntimeError(f"قطّع الشيتات الأول عشان الوصلة بين الشيت {k} و{k + 1}")
-                name = f"once-b{k}-{uuid.uuid4().hex[:4]}.mp4"
-                gen_motion(d["model"], d["resolution"], ratio, fill["beats"][i]["motion"], tv_panel(d, folder, i), tv_panel(d, folder, i + 1),
-                           trial_gen_seconds(b["t1"] - b["t0"]), folder / name, W, H, "الوصلة")
-                parts.append(folder / name)
-            if len(cells) < 2:
-                continue
-            span = sum(beats[i]["t1"] - beats[i]["t0"] for i in range(cells[0], cells[-1]))
-            secs = trial_gen_seconds(span)
-            what = "الفيديو كله" if len(sheets) == 1 else f"الشيت {k + 1}"
+        cap = tv_once_max(d)
+        chunks = tv_chunks(beats, cap)
+        parts, prev = [], None
+        for c, ids in enumerate(chunks):
+            span = sum(beats[i]["t1"] - beats[i]["t0"] for i in ids)
+            secs = int(max(atlas.MIN_DURATION, min(cap, math.ceil(span))))
+            what = "الفيديو كله" if len(chunks) == 1 else f"الحتة {c + 1} من {len(chunks)}"
             tv_set(vid, step=f"🎬 بيولّد {what} مرة واحدة ({secs} ث)")
-            sheet = folder / d["sheets"][str(k)]["file"]
-            name = f"once{k + 1}-{uuid.uuid4().hex[:4]}.mp4"
+            need = set(range(ids[0], ids[-1] + 2))
+            use = [k for k, cells in enumerate(sheets) if need & set(cells)]
+            name = f"once{c + 1}-{uuid.uuid4().hex[:4]}.mp4"
             if atlas.mock_mode():
+                sheet = folder / d["sheets"][str(use[0])]["file"]
                 gen_motion(d["model"], d["resolution"], ratio, "", sheet, sheet, secs, folder / name, W, H)
             else:
-                prompt = lab.once_prompt(d["schema"], fill, cells, secs, [r[1] for r in refs])
+                notes = [f"a storyboard sheet holding panels {sheets[k][0] + 1} to {sheets[k][-1] + 1} in reading order." for k in use]
+                brand = refs[:max(0, 9 - len(use))]
+                prompt = lab.once_prompt(d["schema"], fill, ids, secs, notes, [r[1] for r in brand], prev is not None)
                 body = {"model": tv_r2v(d.get("model")), "prompt": prompt,
-                        "reference_images": [atlas.reference_url(sheet)] + [atlas.reference_url(r[0]) for r in refs],
+                        "reference_images": [atlas.reference_url(folder / d["sheets"][str(k)]["file"]) for k in use]
+                                            + [atlas.reference_url(r[0]) for r in brand],
                         "duration": secs, "resolution": d.get("resolution") or "480p", "ratio": ratio,
                         "generate_audio": False, "watermark": False}
+                if prev is not None:
+                    body["reference_videos"] = [atlas.upload_media(prev)]
                 atlas.download(atlas.run_model("Video", body, "توليد الفيديو كله", max_seconds=1800, interval=6), folder / name)
-            parts.append(folder / name)
+            prev = folder / name
+            parts.append(prev)
         tv_set(vid, step="🎞️ بيجهّز الفيديو")
         name = f"final-{uuid.uuid4().hex[:4]}.mp4"
         chain_clips(parts, folder / name, W, H)

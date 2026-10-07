@@ -1007,28 +1007,36 @@ def sheet_prompt(schema: dict, fill: dict, cells: list[int], ratio: str, text_mo
     )
 
 
-def once_prompt(schema: dict, fill: dict, cells: list[int], secs: float, refs: list[str]) -> str:
-    """برومبت توليد الفيديو كله مرة واحدة: صورة 1 هي الشيت كله، والموديل يمشي على اللوحات بالترتيب في لقطة واحدة متصلة."""
+def once_prompt(schema: dict, fill: dict, ids: list[int], secs: float, sheets: list[str], refs: list[str], extend: bool) -> str:
+    """برومبت توليدة واحدة بتمشي على لوحات الأجزاء دي بالترتيب في لقطة واحدة متصلة. sheets: وصف كل صورة شيت (رقمها = ترتيبها)،
+    refs: أصول العميل بعدها. extend: التوليدة دي بتكمّل على الفيديو اللي قبلها (@video1) من آخر فريم فيه."""
     beats = schema["beats"]
-    lo, hi = cells[0], cells[-1]
-    span = sum(beats[i]["t1"] - beats[i]["t0"] for i in range(lo, hi)) or 1
+    span = sum(beats[i]["t1"] - beats[i]["t0"] for i in ids) or 1
     f, t, lines = secs / span, 0.0, []
-    for i in range(lo, hi):
+    for i in ids:
         b, d = beats[i], (beats[i]["t1"] - beats[i]["t0"]) * f
-        bits = [fill["beats"][i].get("motion") or "", f"Camera: {b['camera']}." if b.get("camera") else "",
-                f"Flows into the next panel: {b['into_next']}." if b.get("into_next") else ""]
-        lines.append(f"{t:.1f}s-{t + d:.1f}s: panel {i - lo + 1} to panel {i - lo + 2}. " + " ".join(x for x in bits if x))
+        bits = [_plain(fill["beats"][i].get("motion")), f"Camera: {_plain(b.get('camera')).rstrip('.')}." if b.get("camera") else "",
+                f"Flows into the next panel: {_plain(b.get('into_next')).rstrip('.')}." if b.get("into_next") else ""]
+        lines.append(f"{t:.1f}s-{t + d:.1f}s: from panel {i + 1} to panel {i + 2}. " + " ".join(x for x in bits if x))
         t += d
-    ref_txt = "".join(f"\nImage {k + 2} is {r}: keep it exactly as it looks wherever it appears." for k, r in enumerate(refs))
+    first, last = ids[0], ids[-1] + 1
+    sheet_txt = "".join(f"@image{k + 1} is {x}\n" for k, x in enumerate(sheets))
+    ref_txt = "".join(f"\n@image{len(sheets) + k + 1} is {r}: keep it exactly as it looks wherever it appears." for k, r in enumerate(refs))
+    head = (f"Extend @video1 forward. The first frame of this video continues directly from the last frame of @video1, which shows panel {first + 1}: "
+            f"{fill['panels'][first]['desc']} Same framing, lighting and the same camera motion and direction, with no cut, no fade and no restart. "
+            "Do not replay anything from @video1.\n"
+            if extend else f"The video opens on panel {first + 1}. ")
     return (
-        "Image 1 is a storyboard sheet: its panels, read left to right and top to bottom, are consecutive moments of ONE video. "
-        f"Turn them into ONE continuous single-take {secs:.0f}-second video that passes through every panel in order. "
-        "No cuts, no fades, no pauses: the camera keeps moving the whole time and every move flows straight into the next one, "
-        "so the whole video feels like one piece.\n"
-        f"CAMERA LANGUAGE: {schema.get('camera') or ''}\n"
-        f"CONTINUITY: {schema.get('spine') or ''}\n"
-        f"WORLD: {fill.get('world') or schema.get('style') or ''}\n"
+        head + sheet_txt
+        + "The storyboard panels, read left to right and top to bottom, are consecutive moments of ONE video. "
+        f"Turn panels {first + 1} to {last + 1} into ONE continuous single-take {secs:.0f}-second video that passes through every one of them in order "
+        f"and ends exactly on panel {last + 1}. No cuts, no fades, no pauses, never go back to an earlier panel: the camera keeps moving the whole "
+        "time and every move flows straight into the next one, so the whole video feels like one piece.\n"
+        f"CAMERA LANGUAGE: {_plain(schema.get('camera'))}\n"
+        f"CONTINUITY: {_plain(schema.get('spine'))}\n"
+        f"WORLD: {_plain(fill.get('world') or schema.get('style'))}\n"
         "TIMELINE:\n" + "\n".join(lines) + "\n"
+        f"END STATE: panel {last + 1}: {fill['panels'][last]['desc']}\n"
         "Keep the look, colors, lighting, UI and every element identical to the storyboard. The output is a full-screen frame: "
         "never show the storyboard grid, the white gutters, several panels at once, panel numbers or any notes. "
         "Do not add any new text or letters." + ref_txt

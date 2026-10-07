@@ -158,7 +158,7 @@ function tplHome() {
         <label>المقاس <select data-tvf="ratio">${Object.entries(TV_RATIOS).map(([k, l]) => `<option value="${k}">${l}</option>`).join("")}</select></label>
         <label>موديل الصور <select data-tvf="image_model"><option value="nano2">Nano Banana 2 (بيلتزم بالمقاس، رخيص)</option><option value="nanopro">Nano Banana Pro (أجود)</option><option value="sunburst">GPT Image 2.5 (زي ChatGPT)</option></select></label>
         <label>الكلام على الشاشة <select data-tvf="text_mode"><option value="blank">مساحات فاضية (العربي في المونتاج)</option><option value="en">إنجليزي جوه الصور</option></select></label>
-        <label>موديل الحركة <select data-tvf="model"><option value="seedance-mini">Seedance 2.0 Mini (الأرخص)</option><option value="seedance-fast">Seedance 2.0 Fast</option><option value="seedance">Seedance 2.0 (أجود)</option></select></label>
+        <label>موديل الحركة <select data-tvf="model"><option value="seedance-mini">Seedance 2.0 Mini (الأرخص)</option><option value="seedance-fast">Seedance 2.0 Fast</option><option value="seedance">Seedance 2.0 (أجود)</option><option value="seedance-2.5">Seedance 2.5 (لحد 30 ثانية في توليدة واحدة، أغلى)</option></select></label>
         <label>الجودة <select data-tvf="resolution"><option value="480p">480p</option><option value="720p">720p (الضعف)</option></select></label>
         <button type="button" class="btn primary" data-tvnew>✍️ املا التيمبليت</button></div>
     </section>` : ""}
@@ -266,6 +266,7 @@ function tvDetail(v) {
       <p class="hint">الشيت كله بيتبعت للموديل مرة واحدة، فبيطلّع فيديو واحد ماشي على اللوحات بالترتيب من غير ما يتقطع. محتاج الشيت بس، من غير تقطيع ولا توضيح.</p>
       <button type="button" class="btn primary" data-tvonce ${busy || !sheetsAll ? "disabled" : ""}>${v.final_kind === "once" ? "↻ ولّده تاني" : "🎬 ولّد الفيديو كله مرة واحدة"} (~${c.once}$)</button>
       ${!sheetsAll ? `<small class="muted">ارسم الشيت أو ارفعه الأول (خطوة ٢)</small>` : ""}
+      ${c.once_parts > 1 ? `<small class="muted">الفيديو أطول من ${c.once_max} ثانية، فهيتولّد على ${c.once_parts} حتت. كل حتة بتكمّل على اللي قبلها من آخر فريم فيها، فبيفضل لقطة واحدة. (Seedance 2.5 بيعمل لحد 30 ثانية في توليدة واحدة)</small>` : ""}
     </section>
     <details class="panel tv-step" data-dk="s3" ${open("s3", false)}><summary>٣. ✨ اللوحات <small class="muted">${v.panel_files.filter((p) => p.full).length}/${v.panel_files.length} واضحة</small></summary>
       ${v.sheets.some((sh) => sh.url) ? `<div class="row wrap">${v.sheets.map((sh) => `<button type="button" class="btn sm" data-tvdraw="${sh.k}" ${busy ? "disabled" : ""}
