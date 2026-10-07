@@ -937,52 +937,55 @@
           <div class="car-layout">
             <aside class="panel ad-side">
               <div class="panel-head"><h2>🔬 معمل التفكيك</h2></div>
-              <label class="btn primary ad-up">＋ فيديو للتفكيك<input type="file" id="labFile" accept="video/*,.mp4,.mov,.webm,.mkv" hidden></label>
-              <p class="hint">ارفع أي فيديو والبرنامج يفككه: اللقطات، وكل عنصر فيها وبيعمل إيه وإمتى، وبعدين يقترح عليك الكومبوننتس اللي تنفع تتحفظ كأصول. إنت تقبل ✅ أو ترفض ❌.</p>
+              <label class="btn primary ad-up">＋ فيديو للتقسيم<input type="file" id="labFile" accept="video/*,.mp4,.mov,.webm,.mkv" hidden></label>
+              <p class="hint">ارفع أي فيديو والبرنامج يقسّمه لـ ٤: 🎬 الصورة من غير صوت، و🗣️ الكلام، و🎵 الموسيقى، و🔊 المؤثرات. كل جزء تسمعه لوحده وتنزّله.</p>
               <ul class="ad-list" id="labList"></ul>
-              <button type="button" class="btn lab-libbtn" id="labLibBtn">📚 مكتبة الأصول <span class="muted" id="labLibCount"></span></button>
-              <p class="hint">الأصول = مقاطع حقيقية من الفيديوهات (موشن، افيكت، حركة ماوس...) بحركتها وصوتها، محفوظة ومتفككة، وتقدر تعدّل فيها جوه المشهد.</p>
-              <button type="button" class="btn lab-libbtn" id="labTplBtn">📐 فيديو من تيمبليت</button>
-              <p class="hint">التيمبليت = مخطط فيديو احترافي كامل. البرنامج بيملاه بمحتوى العميل، ويرسم كل اللقطات في شيت واحد عشان تطلع متسقة، والفيديو بيتولّد لقطة واحدة متصلة.</p>
-              <button type="button" class="btn lab-libbtn" id="labFilmBtn">🎞️ فيديو بالكونيكتورز</button>
-              <p class="hint">فيديو جديد للعميل، السيناريو بتاعه بيتكتب على مقاس الكونيكتورز اللي في المكتبة، والكونيكتورز بتتطبق بين المشاهد.</p>
+              <button type="button" hidden data-archived class="btn lab-libbtn" id="labLibBtn">📚 مكتبة الأصول <span class="muted" id="labLibCount"></span></button>
+              <p class="hint" hidden data-archived>الأصول = مقاطع حقيقية من الفيديوهات (موشن، افيكت، حركة ماوس...) بحركتها وصوتها، محفوظة ومتفككة، وتقدر تعدّل فيها جوه المشهد.</p>
+              <button type="button" hidden data-archived class="btn lab-libbtn" id="labTplBtn">📐 فيديو من تيمبليت</button>
+              <p class="hint" hidden data-archived>التيمبليت = مخطط فيديو احترافي كامل. البرنامج بيملاه بمحتوى العميل، ويرسم كل اللقطات في شيت واحد عشان تطلع متسقة، والفيديو بيتولّد لقطة واحدة متصلة.</p>
+              <button type="button" hidden data-archived class="btn lab-libbtn" id="labFilmBtn">🎞️ فيديو بالكونيكتورز</button>
+              <p class="hint" hidden data-archived>فيديو جديد للعميل، السيناريو بتاعه بيتكتب على مقاس الكونيكتورز اللي في المكتبة، والكونيكتورز بتتطبق بين المشاهد.</p>
             </aside>
             <section class="car-main" id="labMain" hidden>
               <div class="car-head">
                 <input class="ad-title" id="labName" data-no-i18n>
                 <div class="row wrap lab-actions">
                   <button class="btn sm danger" id="labStop" hidden title="يوقّف التفكيك. اللي خلص بيفضل">⏹ وقّف</button>
-                  <select class="btn sm" id="labSplit" title="البرنامج بيقسم الفيديو إزاي">
+                  <select class="btn sm" id="labSplit" hidden data-archived title="البرنامج بيقسم الفيديو إزاي">
                     <option value="cuts">✂️ القطعات بس</option>
                     <option value="fine">🔀 قسّم على كل تغيير (تجريبي)</option>
                   </select>
-                  <button class="btn sm" data-labrun="shots">✂️ قسّم تاني</button>
-                  <button class="btn sm" data-labrun="elements">🧩 العناصر</button>
-                  <button class="btn sm" data-labrun="components">💡 الكومبوننتس</button>
-                  <button class="btn sm" data-labrun="connectors">🔗 الكونيكتورز</button>
-                  <button class="btn sm" id="labTypoBtn" title="يطلّع كل لحظة الكلام فيها اتحوّل لكلمات أو أشكال أو أيقونات، والستايل، والأيقونات كستيكرات شفافة">🔤 التايبوجرافي</button>
-                  <button class="btn sm" id="labSchemaBtn" title="الموديل بيتفرج على الفيديو كله ويطلّع مخططه: تيمبليت كامل تعمل عليه فيديوهات لعملاء تانيين">🗺️ المخطط</button>
+                  <button class="btn sm" data-labrun="shots" hidden data-archived>✂️ قسّم تاني</button>
+                  <button class="btn sm" data-labrun="elements" hidden data-archived>🧩 العناصر</button>
+                  <button class="btn sm" data-labrun="components" hidden data-archived>💡 الكومبوننتس</button>
+                  <button class="btn sm" data-labrun="connectors" hidden data-archived>🔗 الكونيكتورز</button>
+                  <button class="btn sm" id="labTypoBtn" hidden data-archived title="يطلّع كل لحظة الكلام فيها اتحوّل لكلمات أو أشكال أو أيقونات، والستايل، والأيقونات كستيكرات شفافة">🔤 التايبوجرافي</button>
+                  <button class="btn sm" id="labSchemaBtn" hidden data-archived title="الموديل بيتفرج على الفيديو كله ويطلّع مخططه: تيمبليت كامل تعمل عليه فيديوهات لعملاء تانيين">🗺️ المخطط</button>
+                  <button class="btn sm" data-labrun="split" title="يقسّم الفيديو من جديد لصورة وكلام وموسيقى ومؤثرات">🎚️ قسّم تاني</button>
                   <button class="btn sm danger" id="labDelete">🗑️</button>
                 </div>
               </div>
               <div class="lab-status" id="labStatus"></div>
-              <div class="lab-pick" id="labPick"></div>
-              <div class="lab-score" id="labScore"></div>
+              <div class="lab-pick" id="labPick" hidden data-archived></div>
+              <div class="lab-score" id="labScore" hidden data-archived></div>
               <div class="lab-top">
                 <video id="labVideo" controls playsinline preload="metadata"></video>
-                <div class="lab-tl" id="labTimeline"></div>
+                <div class="lab-tl" id="labTimeline" hidden data-archived></div>
               </div>
-              <section class="panel lab-sec" id="labSchema"></section>
-              <section class="panel lab-sec" id="labTypo" hidden></section>
-              <section class="panel lab-sec" id="labConns"></section>
-              <section class="panel lab-sec" id="labComps"></section>
-              <section class="panel lab-sec" id="labAudio"></section>
-              <section class="panel lab-sec" id="labShots"></section>
+              <section class="panel lab-sec" id="labParts"></section>
+              <!-- متأرشف: الكود موجود بس مش ظاهر -->
+              <section class="panel lab-sec" id="labSchema" hidden data-archived></section>
+              <section class="panel lab-sec" id="labTypo" hidden data-archived></section>
+              <section class="panel lab-sec" id="labConns" hidden data-archived></section>
+              <section class="panel lab-sec" id="labComps" hidden data-archived></section>
+              <section class="panel lab-sec" id="labAudio" hidden data-archived></section>
+              <section class="panel lab-sec" id="labShots" hidden data-archived></section>
             </section>
             <section class="car-main" id="labLib" hidden></section>
             <section class="car-main" id="labFilm" hidden></section>
             <section class="car-main" id="labTpl" hidden></section>
-            <div class="panel muted" id="labEmpty" hidden>ارفع فيديو من «＋ فيديو للتفكيك» عشان نبدأ.</div>
+            <div class="panel muted" id="labEmpty" hidden>ارفع فيديو من «＋ فيديو للتقسيم» عشان نبدأ.</div>
           </div>
         </main>
 

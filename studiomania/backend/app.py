@@ -8542,10 +8542,12 @@ reset_stuck_prod()
 LAB_DIR = DATA_DIR / "lab"
 LAB_DIR.mkdir(parents=True, exist_ok=True)
 LAB_LOCK = threading.Lock()
-LAB_STEPS = ("shots", "stems", "audio", "elements", "components", "connectors")
+LAB_STEPS = ("split", "shots", "stems", "audio", "elements", "components", "connectors")
 # التفكيك العادي: القطعات ← العناصر ← اقتراح الكومبوننتس. الصوت (فصل التراكات وتحليله) متوقف ومش بيشتغل غير لو طلبته
 LAB_DEFAULT = ("shots", "elements", "components", "connectors")
-LAB_UPLOAD = ("shots",)   # الرفع بيقسم بس (من غير AI)، وإنت بتختار تطلّع إيه بعد كده
+# المعمل دلوقتي بيقسّم الفيديو لـ ٤ بس: صورة (من غير صوت) / كلام / موسيقى / مؤثرات.
+# باقي الخطوات (القطعات، العناصر، الكومبوننتس، الكونيكتورز، تحليل الصوت، المخطط) متأرشفة: الكود موجود بس مش ظاهرة
+LAB_UPLOAD = ("split",)
 LAB_NEEDS = {"components": "elements", "elements": "shots", "connectors": "shots", "audio": "shots", "stems": "shots"}
 LAB_PROXY_LOCK = threading.Lock()
 
@@ -8624,7 +8626,8 @@ def lab_to_dict(lid: str, d: dict) -> dict:
     if sch.get("data"):
         sch = {**sch, "data": {**sch["data"], "beats": [{**b, "thumb_url": f"{base}/frames/{b['thumb']}" if b.get("thumb") else None}
                                                      for b in sch["data"]["beats"]]}}
-    return {**d, "id": lid, "source_url": f"{base}/{d['source']['file']}", "shots": shots, "audio": audio, "stems": stems, "schema": sch or None,
+    return {**d, "id": lid, "source_url": f"{base}/{d['source']['file']}", "shots": shots,
+            "picture_url": f"{base}/{d['picture']}" if d.get("picture") else None, "audio": audio, "stems": stems, "schema": sch or None,
             "schema_roles": lab.SCHEMA_ROLES,
             "components": comps, "connectors": conns, "families": lab.CONNECTOR_FAMILIES,
             "audioshake": bool(audioshake.api_key() or atlas.mock_mode()),
@@ -8642,9 +8645,11 @@ def lab_list_items() -> list[dict]:
         except ValueError:
             continue
         lid = f.parent.name
-        thumb = next((fr["file"] for s in d.get("shots") or [] for fr in (s.get("frames") or [])[:1]), None)
+        thumb = next((f"frames/{fr['file']}" for s in d.get("shots") or [] for fr in (s.get("frames") or [])[:1]), None)
+        if not thumb and (f.parent / "poster.jpg").exists():
+            thumb = "poster.jpg"
         out.append({"id": lid, "name": d.get("name"), "created_at": d.get("created_at"), "duration": d["source"]["duration"],
-                    "shots": len(d.get("shots") or []), "thumb": f"/media/lab/{lid}/frames/{thumb}" if thumb else None,
+                    "shots": len(d.get("shots") or []), "thumb": f"/media/lab/{lid}/{thumb}" if thumb else None,
                     "busy": any((v or {}).get("status") == "working" for v in (d.get("steps") or {}).values())})
     return out
 
@@ -8780,7 +8785,9 @@ def run_lab(lid: str, steps: list[str]) -> None:
             d = lab_load(lid)
             src = folder / d["source"]["file"]
             dur = d["source"]["duration"]
-            if step == "shots":
+            if step == "split":
+                run_lab_split(lid, d, src)
+            elif step == "shots":
                 # فريمات اللقطات القديمة بس (صور المخطط والكونيكتورز بتفضل)
                 for f in (folder / "frames").glob("*"):
                     if not f.name.startswith(("sch-", "cx")):
@@ -8904,15 +8911,33 @@ def lab_proxy(lid: str, d: dict) -> Path:
     return proxy
 
 
-def run_lab_stems(lid: str, d: dict, src: Path) -> None:
+def run_lab_split(lid: str, d: dict, src: Path) -> None:
+    """✂️ يقسّم الفيديو لـ ٤: الصورة من غير صوت، والكلام والموسيقى والمؤثرات (AudioShake)."""
+    folder = lab_dir(lid)
+    lab_step(lid, "split", progress="بيفصل الصورة عن الصوت")
+    pic = folder / "picture.mp4"
+    base = [ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src), "-an"]
+    try:
+        subprocess.run(base + ["-c:v", "copy", "-movflags", "+faststart", str(pic)], check=True, capture_output=True, timeout=300)
+    except subprocess.CalledProcessError:  # الكوديك مينفعش يتنسخ في mp4: نحوّله
+        subprocess.run(base + ["-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p", "-movflags", "+faststart",
+                               str(pic)], check=True, capture_output=True, timeout=900)
+    subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", str(min(0.5, d["source"]["duration"] / 2)), "-i", str(src),
+                    "-frames:v", "1", "-vf", "scale=320:-2", str(folder / "poster.jpg")], capture_output=True, timeout=60)
+    lab_update(lid, lambda d: d.update(picture="picture.mp4"))
+    run_lab_stems(lid, d, src, step="split")
+
+
+def run_lab_stems(lid: str, d: dict, src: Path, step: str = "stems") -> None:
     """🎚️ فصل الصوت لكلام / موسيقى / مؤثرات (AudioShake). من غير مفتاح الخطوة بتتخطى والتحليل بيكمل على الصوت كله."""
     folder = lab_dir(lid) / "stems"
     if not d["source"].get("has_audio"):
         lab_update(lid, lambda d: d.update(stems={}))
         return
     if not (audioshake.api_key() or atlas.mock_mode()):
-        lab_step(lid, "stems", status="skipped", progress="")
-        raise LabSkip("مفتاح AudioShake مش متسجل (AUDIOSHAKE_API_KEY)، فالتحليل اشتغل على الصوت كله")
+        lab_step(lid, step, status="skipped", progress="")
+        raise LabSkip("مفتاح AudioShake مش متسجل (AUDIOSHAKE_API_KEY)، فالصوت ما اتفصلش" if step == "split"
+                      else "مفتاح AudioShake مش متسجل (AUDIOSHAKE_API_KEY)، فالتحليل اشتغل على الصوت كله")
     shutil.rmtree(folder, ignore_errors=True)
     folder.mkdir(parents=True, exist_ok=True)
     mix = folder / "mix.mp3"
@@ -8926,10 +8951,13 @@ def run_lab_stems(lid: str, d: dict, src: Path) -> None:
                            check=True, capture_output=True, timeout=120)
             stems[name] = {"file": f, "status": "done", "review": None}
     else:
-        lab_step(lid, "stems", progress="بيرفع الصوت")
+        lab_step(lid, step, progress="بيرفع الصوت")
         tid = audioshake.create_task(atlas.upload_media(mix))
-        lab_step(lid, "stems", progress="AudioShake بيفصل الكلام والموسيقى والمؤثرات")
-        res = audioshake.wait(tid)
+        t0 = time.time()
+        def tick(out):
+            done = sum(v["status"] in ("completed", "complete", "done", "succeeded") for v in out.values())
+            lab_step(lid, step, progress=f"AudioShake بيفصل الكلام والموسيقى والمؤثرات ({done}/{len(out) or 3} خلص · {int(time.time() - t0)} ث)")
+        res = audioshake.wait(tid, on_status=tick)
         for name in audioshake.STEMS:
             r = res.get(name) or {}
             if r.get("link") and r["status"] not in ("error", "failed"):

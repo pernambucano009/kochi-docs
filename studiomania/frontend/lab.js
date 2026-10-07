@@ -11,7 +11,7 @@ const LAB_TYPES = { character: "🧍 شخصية", background: "🖼️ خلفي�
 const LAB_ACTIONS = { appear: "بيظهر", disappear: "بيختفي", move: "بيتحرك", click: "بيدوس", drag: "بيسحب", drop: "بيسيب", type: "بيكتب",
   scale: "بيكبر/يصغر", rotate: "بيلف", highlight: "بيتعمله هايلايت", transform: "بيتحول", speak: "بيتكلم", gesture: "بيشاور", other: "تاني" };
 const LAB_SCENE = { live_action: "🎥 تصوير حقيقي", screen_recording: "🖥️ تسجيل شاشة", motion_graphics: "✨ موشن جرافيك", mixed: "🔀 مزيج" };
-const LAB_STEP = { shots: "✂️ القطعات", elements: "🧩 العناصر", components: "💡 الكومبوننتس", connectors: "🔗 الكونيكتورز", stems: "🎚️ فصل التراكات", audio: "🎧 الصوت" };
+const LAB_STEP = { split: "🎚️ التقسيم", shots: "✂️ القطعات", elements: "🧩 العناصر", components: "💡 الكومبوننتس", connectors: "🔗 الكونيكتورز", stems: "🎚️ فصل التراكات", audio: "🎧 الصوت" };
 const LAB_STEMS = { dialogue: "🗣️ الكلام", music: "🎵 الموسيقى", effects: "🔊 المؤثرات" };
 const lt = (t) => `${Math.floor((t || 0) / 60)}:${((t || 0) % 60).toFixed(2).padStart(5, "0")}`;
 const le = (v) => escapeHtml(v == null ? "" : String(v));
@@ -85,7 +85,7 @@ function renderLab() {
   $("labList").innerHTML = labx.list.map((x) => `<li class="${x.id === labx.cur?.id ? "active" : ""}" data-lab="${x.id}">
       ${x.thumb ? `<img src="${x.thumb}" alt="">` : `<span class="ph">🎬</span>`}
       <span class="ad-li-body"><span class="nm" data-no-i18n>${le(x.name)}</span>
-        <small class="muted">${x.duration} ث · ${x.shots} لقطة</small></span>
+        <small class="muted">${x.duration} ث</small></span>
       <small>${x.busy ? "⏳" : ""}</small></li>`).join("") || `<li class="muted">لسه مفيش فيديوهات.</li>`;
   const d = labx.cur, lib = ["lib", "film", "tpl"].includes(labx.view);
   $("labLibBtn").classList.toggle("active", labx.view === "lib");
@@ -102,13 +102,16 @@ function renderLab() {
   $("labSplit").disabled = d.busy;
   document.querySelectorAll("[data-labrun]").forEach((b) => (b.disabled = d.busy));
   $("labStop").hidden = !d.busy;
-  renderLabPick(d);
-  // الخطوات اللي اتطلبت بس (كل خطوة بتشتغل لما تختارها)
-  $("labStatus").innerHTML = Object.entries(LAB_STEP).filter(([k]) => d.steps?.[k]).map(([k, l]) => {
+  // المعمل بيقسّم لـ ٤ بس (صورة / كلام / موسيقى / مؤثرات)، وباقي الخطوات متأرشفة
+  $("labStatus").innerHTML = Object.entries(LAB_STEP).filter(([k]) => k === "split" && d.steps?.[k]).map(([k, l]) => {
     const s = d.steps?.[k] || {};
     return `<span class="lab-st ${s.status || ""}">${s.status === "working" ? `<span class="spin-inline"></span>` : s.status === "done" ? "✅" : s.status === "failed" ? "✕" : s.status === "skipped" ? "⏭" : s.status === "stopped" ? "⏹" : "⏳"}
       ${l}${s.progress ? ` <small>${le(s.progress)}</small>` : ""}${s.error ? ` <small class="err">${le(s.error)}</small>` : ""}</span>`;
   }).join("");
+  renderLabParts(d);
+  return;
+  /* متأرشف */
+  renderLabPick(d);
   renderLabScore(d);
   renderLabTimeline(d);
   const busyEdit = (el) => el.contains(document.activeElement) && document.activeElement.matches("input, select, textarea");
@@ -121,6 +124,43 @@ function renderLab() {
   if (!busyEdit($("labAudio"))) renderLabAudio(d);
   const shotPlaying = [...document.querySelectorAll("[data-shotvid]")].some((v) => !v.paused);
   if (!busyEdit($("labShots")) && !shotPlaying) renderLabShots(d);
+}
+
+// 🎚️ الفيديو متقسم لـ ٤: كل جزء تسمعه / تشوفه لوحده وتنزّله، والفيديو الكبير فوق بيشغّل اللي مفتوح بس
+const LAB_PARTS = { dialogue: ["speech", "🗣️ الكلام"], music: ["music", "🎵 الموسيقى"], effects: ["sfx", "🔊 المؤثرات"] };
+function renderLabParts(d) {
+  const st = d.stems || {}, step = d.steps?.split || {}, el = $("labParts");
+  const key = JSON.stringify([d.id, d.picture_url, step.status, step.progress, step.error, Object.values(st).map((x) => x?.url || x?.error), labx.hear, d.audioshake]);
+  if (el.dataset.key === key) return;
+  if (el.dataset.lab === d.id && [...el.querySelectorAll("audio, video")].some((x) => !x.paused)) {
+    // متقطعش اللي شغال: حدّث زراير الإسكات بس
+    el.querySelectorAll("[data-hear]").forEach((x) => { const on = labx.hear[x.dataset.hear]; x.classList.toggle("on", on); x.textContent = on ? "🔊" : "🔇"; });
+    return;
+  }
+  el.dataset.lab = d.id;
+  el.dataset.key = key;
+  const working = step.status === "working" || step.status === "queued";
+  const wait = (msg) => `<span class="muted">${working ? `<span class="spin-inline"></span> ${le(step.progress || "بيقسّم...")}` : msg}</span>`;
+  const card = (icon, label, media, url, extra = "") => `<div class="lab-part"><div class="row"><b>${icon} ${label}</b>${extra}
+      ${url ? `<a class="btn sm" href="${url}" download>⬇ نزّل</a>` : ""}</div>${media}</div>`;
+  const noAudio = d.source?.has_audio === false;
+  const stemMsg = noAudio ? "الفيديو ده مفيهوش صوت." : !d.audioshake ? "مفتاح AudioShake مش متسجل (AUDIOSHAKE_API_KEY على Railway)."
+    : step.error ? `<span class="err">✕ ${le(step.error)}</span>` : "لسه ما اتقسمش.";
+  const parts = Object.entries(LAB_PARTS).map(([k, [h, l]]) => {
+    const x = st[k];
+    const tog = x?.url ? ` <button type="button" class="lab-hear ${labx.hear[h] ? "on" : ""}" data-hear="${h}" title="اسمعه في الفيديو اللي فوق / اقفله">${labx.hear[h] ? "🔊" : "🔇"}</button>` : "";
+    const [icon, ...rest] = l.split(" ");
+    return card(icon, rest.join(" "), x?.url ? `<audio src="${x.url}" controls preload="none"></audio>`
+      : x?.error ? `<span class="err">✕ ${le(x.error)}</span>` : wait(stemMsg), x?.url, tog);
+  }).join("");
+  const isNew = !d.steps?.split;
+  el.innerHTML = `<h3>🎚️ الفيديو متقسم لـ ٤</h3>
+    ${isNew ? `<p class="hint">الفيديو ده اترفع قبل التقسيم الجديد. دوس «🎚️ قسّم تاني» فوق عشان يتقسم لصورة وكلام وموسيقى ومؤثرات.</p>` : ""}
+    ${labx.stems ? `<p class="hint">🎧 الفيديو اللي فوق بيشغّل التراكات المفصولة: دوس 🔊 جنب أي جزء عشان تقفله وتسمع الباقي لوحده.</p>` : ""}
+    <div class="lab-parts">
+      ${card("🎬", "الصورة (من غير صوت)", d.picture_url ? `<video src="${d.picture_url}" controls muted playsinline preload="metadata"></video>` : wait(isNew ? "لسه ما اتقسمش." : step.error ? `<span class="err">✕ ${le(step.error)}</span>` : "لسه."), d.picture_url)}
+      ${parts}
+    </div>`;
 }
 
 const LAB_SCORE = { components: "💡 الكومبوننتس المقبولة", shots: "✂️ القطعات", stems: "🎚️ التراكات", sfx: "🔊 المؤثرات", music: "🎵 الموسيقى", speech: "🗣️ الكلام" };
@@ -563,7 +603,7 @@ document.querySelector('.view[data-view="11"]').addEventListener("click", async 
   if (hear) {
     labx.hear[hear.dataset.hear] = !labx.hear[hear.dataset.hear];
     if (Object.values(labx.hear).every(Boolean)) $("labVideo").volume = 1;
-    renderLabTimeline(labx.cur);
+    renderLabParts(labx.cur);
     return;
   }
   const sp = e.target.closest("[data-shotplay]");
@@ -738,7 +778,7 @@ document.querySelector('.view[data-view="11"]').addEventListener("click", async 
   }
   const run = e.target.closest("[data-labrun]");
   if (run) {
-    const ask = { shots: "يقسّم الفيديو تاني؟ (العناصر بتاعة اللقطات القديمة هتروح، ولو عايزها دوس «🧩 العناصر» بعدها)",
+    const ask = { split: "يقسّم الفيديو تاني لصورة وكلام وموسيقى ومؤثرات؟ (AudioShake بيتحسب تاني)", shots: "يقسّم الفيديو تاني؟ (العناصر بتاعة اللقطات القديمة هتروح، ولو عايزها دوس «🧩 العناصر» بعدها)",
       elements: "يفكك عناصر كل لقطة؟ (بياخد وقت: الموديل بيشوف كل لقطة لوحدها)",
       components: "يقترح كومبوننتس جديدة؟ اللي قبلته أو رفضته بيفضل زي ما هو، ورفضك بيتبعت له عشان يتعلم منه.",
       connectors: "يدوّر على كونيكتورز؟ اللي قبلته أو رفضته بيفضل." }[run.dataset.labrun]
@@ -822,7 +862,7 @@ $("labFile").addEventListener("change", async (e) => {
     const d = await api("/api/lab", { method: "POST", body: form });
     labx.list = await api("/api/lab");
     await openLab(d.id);
-    toast("🔬 بدأ التفكيك");
+    toast("🎚️ بدأ التقسيم");
   } catch (err) { toast(err.message, true); }
 });
 $("labName").addEventListener("change", async () => {
@@ -830,7 +870,7 @@ $("labName").addEventListener("change", async () => {
   catch (err) { toast(err.message, true); }
 });
 $("labDelete").onclick = async () => {
-  if (!confirm("تمسح الفيديو ده من المعمل بكل تفكيكه وتقييمك؟")) return;
+  if (!confirm("تمسح الفيديو ده من المعمل بكل أجزائه؟")) return;
   try {
     await api(`/api/lab/${labx.cur.id}`, { method: "DELETE" });
     labx.cur = null;
