@@ -2,11 +2,13 @@
 // وكمان خطوة «🔤 التايبوجرافي» في معمل التفكيك (اللي بتطلّع الستايل والأيقونات من فيديو).
 
 const tyx = { list: [], cur: null, stk: [], styles: [], view: "home", timer: null, eng: null, play: null, t: 0, open: {} };
-const TY_KINDS = { pop: "💥 كلمة كبيرة", type: "⌨️ كتابة بمؤشر", build: "✨ كلمة كلمة", icon: "🖼️ كلمة وأيقونة", letters: "🔠 حرف بيتبدل بصورة", scatter: "🌪️ حروف بتتجمع", ring: "⭕ دايرة أيقونات" };
+const TY_KINDS = { pop: "💥 كلمة كبيرة", type: "⌨️ كتابة بمؤشر", build: "✨ كلمة كلمة", icon: "🖼️ كلمة وأيقونة", letters: "🔠 حرف بيتبدل بصورة", scatter: "🌪️ حروف بتتجمع", ring: "⭕ دايرة أيقونات", anchor: "📍 مندمج مع الفيديو" };
+const TY_PLACES = { auto: "📍 مكان الكلام: البرنامج يختار", left: "⬅️ شمالها", right: "➡️ يمينها", above: "⬆️ فوقها", below: "⬇️ تحتها", on: "📝 عليها" };
+const TY_AKINDS = { photo: "🖼️ صورة", paper: "📄 ورقة", screen: "📱 شاشة", object: "📦 حاجة", product: "🛍️ منتج", face: "🙂 وش", person: "🧍 شخص", sign: "🪧 يافطة", space: "⬜ مساحة فاضية" };
 const TY_THEMES = { light: "☀️ فاتح", dark: "🌙 غامق", accent: "🟨 ملوّن" };
 const TY_BG = { theme: "🎨 ألوان الستايل", solid: "🟦 لون سادة", image: "🖼️ صورة", video: "🎬 فيديو", source: "🎥 الفيديو المرفوع" };
 const TY_ST = { new: "", ready: "📝 الكلام جاهز", planned: "🧠 الحركات جاهزة", done: "✅ الفيديو جاهز", failed: "⚠️ فشل",
-  transcribing: "🎧 بيسمع", planning: "🧠 بيوزّع", drawing: "🎨 بيرسم الأيقونات", rendering: "🎬 بيعمل الفيديو" };
+  transcribing: "🎧 بيسمع", analyzing: "👁️ بيحلل الفيديو", planning: "🧠 بيوزّع", drawing: "🎨 بيرسم الأيقونات", rendering: "🎬 بيعمل الفيديو" };
 const tye = (v) => escapeHtml(v == null ? "" : String(v));
 const tyT = (t) => `${Math.floor((t || 0) / 60)}:${((t || 0) % 60).toFixed(1).padStart(4, "0")}`;
 const TY = (p) => `/api/typo${p}`;
@@ -86,6 +88,7 @@ function tyRenderProj() {
       ${v.source_url && v.source?.kind !== "text" ? (v.source.kind === "video" ? `<video src="${v.source_url}" controls playsinline preload="metadata" class="ty-src"></video>`
         : `<audio src="${v.source_url}" controls preload="metadata"></audio>`) : ""}
     </details>
+    ${v.source?.kind === "video" ? tySceneView(v, busy) : ""}
     <details class="panel tv-step" ${tyx.open.s2 ?? !!v.words?.length ? "open" : ""} data-tydk="s2"><summary>٢. 🧠 الحركات <small class="muted">${v.blocks?.length ? `${v.blocks.length} لقطة` : ""}</small></summary>
       <div class="row wrap"><input type="text" data-tybrief placeholder="عن الفيديو (اختياري): مين بيتكلم ولمين وإيه الإحساس" value="${tye(v.brief || "")}" data-no-i18n>
         <button type="button" class="btn primary" data-typlan ${busy || !v.words?.length ? "disabled" : ""}>🧠 ${v.blocks?.length ? "وزّعه من جديد" : "وزّع الكلام على الحركات"}</button></div>
@@ -106,6 +109,17 @@ function tyRenderProj() {
   tyMountPreview();
 }
 
+function tySceneView(v, busy) {
+  const an = v.scene?.anchors;
+  return `<details class="panel tv-step" ${tyx.open.s15 ?? true ? "open" : ""} data-tydk="s15"><summary>👁️ اللي في الفيديو <small class="muted">${an ? `${an.length} حاجة` : "لسه ما اتحللش"}</small></summary>
+    <p class="hint">البرنامج بيشوف الحاجات اللي في الكادر (صورة، ورقة، شاشة، وش...) وأماكنها وهي بتتحرك، عشان الكلام يتكتب جنبها أو عليها، والكلمة اللي بتشاور على حاجة (زي «me» وفيه صورتك) ما تتكتبش والحاجة نفسها تبقى مكانها. بيتعمل لوحده مع «🧠 وزّع».</p>
+    <div class="row wrap"><button type="button" class="btn sm" data-tyscene ${busy ? "disabled" : ""}>👁️ ${an ? "حلّله من جديد" : "حلّل الفيديو"}</button>
+      <label class="ty-check"><input type="checkbox" data-tyguides ${tyx.guides ? "checked" : ""}> اعرض أماكنها على المعاينة</label></div>
+    ${an?.length ? `<div class="ty-anchors">${an.map((a) => `<figure class="ty-anchor" data-tyseek="${a.t0}">${a.thumb_url ? `<img src="${a.thumb_url}" alt="">` : ""}
+      <figcaption><b>${a.id}</b> ${TY_AKINDS[a.kind] || a.kind}<small dir="ltr" data-no-i18n>${tye(a.label)}</small><small class="muted">${tyT(a.t0)} ← ${tyT(a.t1)}</small></figcaption></figure>`).join("")}</div>` : ""}
+  </details>`;
+}
+
 function tyBlockRow(v, b, i) {
   const icons = b.kind === "letters" || b.kind === "ring" ? b.icons || [] : b.kind === "icon" ? [b.icon].filter(Boolean) : [];
   const side = b.kind === "build" ? [b.side].filter(Boolean) : [];
@@ -117,6 +131,11 @@ function tyBlockRow(v, b, i) {
       <small class="muted" dir="auto" data-no-i18n>«${tye((b.words || []).map((w) => w.w).join(" "))}»</small>
       ${i < v.blocks.length - 1 ? `<button type="button" class="btn sm" data-tymerge="${i}" title="يضم اللقطة دي مع اللي بعدها">⤵ ضم</button>` : ""}
       ${(b.to - b.from) >= 1 ? `<button type="button" class="btn sm" data-tysplit="${i}" title="يقسم اللقطة نصين">✂️ قسّم</button>` : ""}</header>
+    ${v.scene?.anchors?.length && v.bg?.kind === "source" ? `<div class="row wrap">
+      <select data-tbf="anchor"><option value="">📍 من غير مرساة (نص الشاشة)</option>${v.scene.anchors.map((a) => `<option value="${a.id}" ${a.id === b.anchor ? "selected" : ""}>📍 ${a.id} · ${TY_AKINDS[a.kind] || a.kind} · ${tye(a.label)}</option>`).join("")}</select>
+      ${b.anchor ? `<select data-tbf="place">${Object.entries(TY_PLACES).map(([k, l]) => `<option value="${k}" ${k === (b.place || "auto") ? "selected" : ""}>${l}</option>`).join("")}</select>` : ""}
+      ${b.anchor && b.kind === "anchor" ? `<label>الكلمة اللي الحاجة نفسها مكانها <select data-tbf="skip"><option value="-1">—</option>${(b.words || []).map((w, j) => `<option value="${j}" ${j === b.skip ? "selected" : ""}>${tye(w.w)}</option>`).join("")}</select></label>` : ""}
+    </div>` : ""}
     <div class="row wrap"><label>المكتوب <input data-tbf="text" value="${tye(b.text)}" dir="auto" data-no-i18n></label>
       ${b.kind === "build" ? `<label>الكلمة اللي تنوّر <select data-tbf="focus"><option value="-1">—</option>${(b.words || []).map((w, j) => `<option value="${j}" ${j === b.focus ? "selected" : ""}>${tye(w.w)}</option>`).join("")}</select></label>` : ""}
       ${b.kind === "letters" ? `<label>الحرف اللي يتبدل <input type="number" min="0" max="20" data-tbf="letter" value="${b.letter ?? 1}"></label>` : ""}
@@ -140,7 +159,8 @@ async function tyMountPreview() {
   if (!stage) return;
   const doc = await api(TY(`/${v.id}/doc`));
   tyx.eng = new TypoEngine(stage, doc);
-  Object.assign(stage.style, { position: "absolute", left: "0", top: "0" });   // الصفحة عربي (RTL): المسرح يفضل من الشمال
+  Object.assign(stage.style, { position: "absolute", left: "0", top: "0" });
+  tyx.eng.showAnchors = !!tyx.guides;   // الصفحة عربي (RTL): المسرح يفضل من الشمال
   tyx.doc = doc;
   const screen = $("tyScreen");
   const fit = () => {
@@ -213,7 +233,7 @@ function tyBlocksFromDom() {
     const b = blocks[Number(card.dataset.tyb)];
     card.querySelectorAll("[data-tbf]").forEach((x) => {
       const k = x.dataset.tbf;
-      b[k] = k === "focus" || k === "letter" ? Number(x.value) : x.value;
+      b[k] = k === "focus" || k === "letter" || k === "skip" ? Number(x.value) : x.value;
     });
   });
   return blocks;
@@ -289,6 +309,8 @@ $("tyMain").addEventListener("click", async (e) => {
   if (play) return tyx.play ? tyStop() : tyStart();
   const seek = t.closest("[data-tyseek]");
   if (seek) { tyStop(); tySeek(Number(seek.dataset.tyseek)); return $("tyScreen")?.scrollIntoView({ behavior: "smooth", block: "center" }); }
+  const sc = t.closest("[data-tyscene]");
+  if (sc) return wrap(sc, async () => { tyx.cur = await api(TY(`/${v.id}/scene`), { method: "POST" }); tyRender(); tyPoll(); });
   const st = t.closest("[data-tysavetext]");
   if (st) return wrap(st, () => tyPatch({ text: document.querySelector("[data-tytext]").value }));
   const plan = t.closest("[data-typlan]");
@@ -388,6 +410,7 @@ $("tyMain").addEventListener("change", async (e) => {
       tyRender();
       return tyPoll();
     }
+    if (t.matches("[data-tyguides]")) { tyx.guides = t.checked; if (tyx.eng) { tyx.eng.showAnchors = tyx.guides; tySeek(tyx.t); } return; }
     if (t.matches("[data-tyscrub]")) return;
     if (t.matches("[data-tyadd]") && t.value) {
       const bl = tyBlocksFromDom(), b = bl[Number(t.closest("[data-tyb]").dataset.tyb)];

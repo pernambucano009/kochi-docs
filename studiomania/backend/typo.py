@@ -19,7 +19,10 @@ KINDS = {
     "letters": "كلمة قصيرة بحروف متباعدة وحرف منها بيتبدل بأيقونات ورا بعض (كلمة عاطفية أو الخلاصة)",
     "scatter": "حروف متبعترة بتتجمّع لحد ما تبقى الكلمة (لحظة فهم أو تحوّل، أو الختام)",
     "ring": "أيقونات كتير في دايرة بتلف (لما الكلام بيعدّ حاجات كتير أو «كل حاجة»)",
+    "anchor": "الكلام بيتكتب كلمة كلمة جنب أو فوق أو على حاجة ظاهرة في الفيديو (مرساة) وبيتحرك معاها، "
+              "وكلمة منه ممكن ما تتكتبش وتبقى الحاجة نفسها هي الكلمة (skip) ويترسم حواليها دايرة بالقلم",
 }
+PLACES = ("auto", "left", "right", "above", "below", "on")
 THEMES = ("light", "dark", "accent")
 
 # الستايل اللي اتطلّع من فيديو المرجع (أبيض رمادي / أسود / أحمر، وكارت أصفر للكلمة الكبيرة)
@@ -48,7 +51,8 @@ PLAN_FORMAT = """{
   "blocks": [{"from": 0, "to": 3, "kind": "pop | type | build | icon | letters | scatter | ring", "theme": "light | dark | accent",
               "text": "الكلام اللي يتكتب (من كلام الجمل دي بالظبط، ممكن تختصره لكلمة أو كلمتين في pop/icon/letters/scatter)",
               "focus": 0, "icon": "اسم ستيكر من المكتبة أو وصف قصير بالإنجليزي لأيقونة جديدة", "icons": ["..."], "letter": 1,
-              "side": "اسم ستيكر/صورة كبيرة جنب الكلام في build أو فاضي"}]
+              "side": "اسم ستيكر/صورة كبيرة جنب الكلام في build أو فاضي",
+              "anchor": "رقم مرساة من الفيديو (a1...) أو فاضي", "place": "auto | left | right | above | below | on", "skip": -1}]
 }"""
 
 
@@ -56,8 +60,18 @@ def words_text(words: list[dict]) -> str:
     return " ".join(f"[{i}]{w['w']}({w['s']:.2f})" for i, w in enumerate(words))
 
 
-def plan_messages(words: list[dict], style: dict, stickers: list[str], brief: str) -> list[dict]:
-    """الموديل بيقسم الكلام (كل كلمة برقمها ووقتها) على بلوكات، ولكل بلوك حركة وأيقونات."""
+def anchors_text(anchors: list[dict]) -> str:
+    out = []
+    for a in anchors:
+        k = a["keys"][len(a["keys"]) // 2]["box"]
+        out.append(f"- {a['id']}: {a['label']} ({a['kind']}) من {a['t0']:.1f} لـ {a['t1']:.1f} ث، مكانها في الكادر تقريبًا "
+                   f"x {k[0]:.2f}-{k[2]:.2f} / y {k[1]:.2f}-{k[3]:.2f}" + (f" — {a['note']}" if a.get("note") else ""))
+    return "\n".join(out)
+
+
+def plan_messages(words: list[dict], style: dict, stickers: list[str], brief: str, anchors: list[dict] | None = None) -> list[dict]:
+    """الموديل بيقسم الكلام (كل كلمة برقمها ووقتها) على بلوكات، ولكل بلوك حركة وأيقونات.
+    لو فيه فيديو متحلّل: بيشوف المراسي (الحاجات اللي في الكادر وأماكنها) وبيدمج الكلام معاها."""
     kinds = "\n".join(f"- {k}: {v}" for k, v in KINDS.items())
     rules = "\n".join(f"- {r}" for r in style.get("rules") or [])
     weights = ", ".join(f"{k}×{v}" for k, v in (style.get("kinds") or {}).items())
@@ -70,6 +84,15 @@ def plan_messages(words: list[dict], style: dict, stickers: list[str], brief: st
         + (f"عن الفيديو: {brief}\n" if brief else "")
         + (f"الستيكرات اللي في المكتبة (استخدم الاسم بالظبط لو مناسب): {', '.join(stickers[:120])}\n" if stickers else
            "مفيش ستيكرات في المكتبة: اكتب وصف قصير بالإنجليزي لكل أيقونة محتاجها وهتترسم.\n")
+        + ("\nالكلام ده هيتركب فوق فيديو متصوّر. دي الحاجات اللي ظاهرة فيه (المراسي) وإمتى وفين:\n" + anchors_text(anchors) + "\n"
+           "اندمج مع الفيديو: استخدم anchor كتير لما يكون فيه حاجة مناسبة ظاهرة وقت الكلام ده (الوقت لازم يكون جوه وقت المرساة):\n"
+           "- لو الكلام بيشاور على حاجة ظاهرة (me/this/here/ده/دي/هنا/الصورة/الورقة/المنتج/اسمها...): kind=anchor على المرساة دي، "
+           "وskip = رقم الكلمة دي جوه البلوك (من 0) عشان ما تتكتبش والحاجة نفسها تبقى مكانها. مثال: «this is me» وفيه صورة ← "
+           "this is جنب الصورة، وme ما تتكتبش.\n"
+           "- place: left/right/above/below = جنبها في المساحة الفاضية، on = مكتوب عليها (ورقة، شاشة، حيطة سادة)، auto = البرنامج يختار.\n"
+           "- type/build/icon ممكن كمان تاخد anchor وplace عشان تتحط جنب الحاجة بدل نص الشاشة. pop/ring/letters/scatter ملو الشاشة من غير anchor.\n"
+           "- ما تكتبش أبدًا فوق وش حد (المراسي اللي نوعها face): حط الكلام جنبه.\n"
+           "- الخلفية هي الفيديو نفسه، فـ theme هنا بيحدد لون الكلام بس (dark = كلام فاتح).\n" if anchors else "")
         + "\nالكلام:\n" + words_text(words) + "\n\n"
         "القواعد:\n"
         "- from/to = أرقام الكلمات (من كام لكام، شامل). البلوكات ورا بعض وبتغطي كل الكلمات من غير ما تسيب ولا كلمة.\n"
@@ -110,7 +133,8 @@ def clean_plan(raw: dict, words: list[dict], duration: float) -> list[dict]:
         out.append({"from": a, "to": z, "kind": kind, "theme": b.get("theme") if b.get("theme") in THEMES else "light",
                     "text": str(b.get("text") or "").strip(), "focus": _i(b.get("focus"), -1),
                     "icon": str(b.get("icon") or "").strip(), "icons": icons, "letter": _i(b.get("letter"), 1),
-                    "side": str(b.get("side") or "").strip()})
+                    "side": str(b.get("side") or "").strip(), "anchor": str(b.get("anchor") or "").strip(),
+                    "place": b.get("place") if b.get("place") in PLACES else "auto", "skip": _i(b.get("skip"), -1)})
     if not out and n:
         return mock_plan(words, duration)
     # كلمات اتسابت في الآخر: تتضاف لآخر بلوك
@@ -266,22 +290,95 @@ def box_messages(name: str, desc: str, frames: list[str]) -> list[dict]:
         f"Find this single object: «{name}» — {desc}.\n"
         f"You get {len(frames)} frames (frame 0, 1, 2...). Pick the frame where the object is most fully visible, sharp and least covered, "
         "and give a tight box around that ONE object only (not neighbours, not text).\n"
-        'Return JSON only: {"frame": 0, "box_2d": [ymin, xmin, ymax, xmax]} with coordinates 0-1000. '
-        'If it is not visible in any frame return {"frame": -1}.')}]
+        'Return JSON only: {"frame": 0, "top": 0, "left": 0, "bottom": 0, "right": 0} where top/bottom are vertical and left/right '
+        'are horizontal positions scaled to 0-1000 of the image height/width. If it is not visible in any frame return {"frame": -1}.')}]
     for i, f in enumerate(frames):
         parts += [{"type": "text", "text": f"frame {i}:"}, {"type": "image_url", "image_url": {"url": f}}]
     return [{"role": "user", "content": parts}]
 
 
-def clean_box(raw: dict, n: int) -> tuple[int, list[float]] | None:
+def iou(a: list[float], b: list[float]) -> float:
+    ix = max(0.0, min(a[2], b[2]) - max(a[0], b[0]))
+    iy = max(0.0, min(a[3], b[3]) - max(a[1], b[1]))
+    inter = ix * iy
+    ua = (a[2] - a[0]) * (a[3] - a[1]) + (b[2] - b[0]) * (b[3] - b[1]) - inter
+    return inter / ua if ua > 0 else 0.0
+
+
+def clean_box(raw: dict, n: int, prior: list[float] | None = None) -> tuple[int, list[float]] | None:
+    """box_2d المفروض [ymin, xmin, ymax, xmax] من 0 لـ 1000، بس الموديل ساعات بيقلبها x قبل y:
+    لو معانا مكان تقريبي (من الفيديو) بناخد الترتيب اللي أقرب له."""
     try:
-        k = int((raw or {}).get("frame", -1))
-        y0, x0, y1, x1 = [min(1.0, max(0.0, float(v) / 1000)) for v in raw.get("box_2d")][:4]
+        k = int((raw or {}).get("frame", 0 if n == 1 else -1))
+        if all(key in raw for key in ("top", "left", "bottom", "right")):   # بالأسماء: مفيش لخبطة في الترتيب
+            b = [min(1.0, max(0.0, float(raw[key]) / 1000)) for key in ("left", "top", "right", "bottom")]
+            return (k, b) if 0 <= k < n and b[2] - b[0] >= 0.02 and b[3] - b[1] >= 0.02 else None
+        v = [min(1.0, max(0.0, float(x) / 1000)) for x in raw.get("box_2d")][:4]
     except (TypeError, ValueError, AttributeError):
         return None
-    if not 0 <= k < n or x1 - x0 < 0.02 or y1 - y0 < 0.02:
+    if not 0 <= k < n or len(v) != 4:
         return None
-    return k, [x0, y0, x1, y1]
+    yx = [v[1], v[0], v[3], v[2]]
+    box = yx
+    if prior and iou(v, prior) > iou(yx, prior) + 0.05:
+        box = v
+    if box[2] - box[0] < 0.02 or box[3] - box[1] < 0.02:
+        return None
+    return k, box
+
+
+# ---------------------------------------------------------------- تحليل الفيديو اللي التايبوجرافي هيتركب عليه
+
+ANCHOR_KINDS = ("photo", "paper", "screen", "object", "product", "face", "person", "sign", "space")
+SCENE_FORMAT = """{"anchors": [{"label": "English: short name (e.g. framed photo of the speaker, sheet of paper on the desk)",
+  "kind": "photo | paper | screen | object | product | face | person | sign | space",
+  "t0": 0.0, "t1": 3.0, "left": 0.1, "top": 0.2, "right": 0.4, "bottom": 0.6,
+  "note": "بالعربي: إيه اللي ينفع يتعمل معاها (اكتب جنبها، عليها، هي نفسها كلمة...)"}]}"""
+
+
+def scene_messages(duration: float, words: list[dict]) -> list[dict]:
+    text = (
+        "أنت مصمم موشن تايبوجرافي هيكتب كلام متحرك فوق الفيديو ده ويدمجه مع اللي في الكادر. اتفرج على الفيديو كله، "
+        "وطلّع كل الحاجات الظاهرة اللي الكلام ممكن يندمج معاها (المراسي):\n"
+        "- صور أو براويز، أوراق وكتب ومكاتب، شاشات وموبايلات، منتجات وحاجات في الإيد، يافطات، الوشوش والأشخاص، "
+        "ومساحات فاضية واضحة (حيطة سادة، سما) ينفع يتكتب فيها (kind=space).\n"
+        f"الفيديو مدته {duration:.2f} ثانية.\n"
+        + ("الكلام المتقال بتوقيته (عشان تركّز على الحاجات اللي الكلام بيشاور عليها):\n" + words_text(words) + "\n" if words else "")
+        + "- t0/t1 = من إمتى لإمتى الحاجة ظاهرة. left/right = مكانها بالعرض وtop/bottom = بالطول "
+        "(من 0 لـ 1 من عرض/طول الكادر) في نص المدة دي.\n"
+        "- لو الكاميرا بتتقطع أو الحاجة بتختفي وترجع، اكتبها مرتين.\n"
+        "- من 3 لـ 15 مرساة، الأهم الأول.\n"
+        "رجّع JSON بس بالشكل ده:\n" + SCENE_FORMAT
+    )
+    return [{"role": "user", "content": text}]
+
+
+def clean_scene(raw: dict, duration: float) -> list[dict]:
+    out = []
+    for a in (raw or {}).get("anchors") or []:
+        if not isinstance(a, dict):
+            continue
+        try:
+            t0, t1 = max(0.0, float(a.get("t0"))), min(duration, float(a.get("t1")))
+            raw_box = [a.get(k) for k in ("left", "top", "right", "bottom")] if a.get("left") is not None else a.get("box")
+            box = [min(1.0, max(0.0, float(v))) for v in raw_box][:4]
+        except (TypeError, ValueError):
+            continue
+        if t1 - t0 < 0.2 or len(box) != 4 or box[2] - box[0] < 0.02 or box[3] - box[1] < 0.02:
+            continue
+        out.append({"id": f"a{len(out) + 1}", "label": _plain(a.get("label"))[:80] or "thing",
+                    "kind": a.get("kind") if a.get("kind") in ANCHOR_KINDS else "object", "t0": round(t0, 2), "t1": round(t1, 2),
+                    "note": str(a.get("note") or "")[:200], "keys": [{"t": round((t0 + t1) / 2, 2), "box": box}]})
+    return out[:15]
+
+
+def mock_scene(duration: float) -> list[dict]:
+    d = max(1.0, duration)
+    return clean_scene({"anchors": [
+        {"label": "framed photo", "kind": "photo", "t0": 0, "t1": d * 0.6, "box": [0.55, 0.25, 0.9, 0.6], "note": "صورة على الحيطة"},
+        {"label": "speaker face", "kind": "face", "t0": 0, "t1": d, "box": [0.15, 0.2, 0.45, 0.55], "note": "ما تكتبش عليه"},
+        {"label": "sheet of paper", "kind": "paper", "t0": d * 0.5, "t1": d, "box": [0.2, 0.65, 0.7, 0.9], "note": "ينفع يتكتب عليها"},
+    ]}, duration)
 
 
 # ---------------------------------------------------------------- الستيكرات: شيل الخلفية
@@ -339,3 +436,58 @@ def json_or(text: str, default):
         return json.loads(text)
     except (TypeError, ValueError):
         return default
+
+
+# ---------------------------------------------------------------- تتبّع الحاجة وهي بتتحرك (من غير موديل)
+
+def track_template(frames: list, mid: int, box: list[float]) -> list[list[float] | None]:
+    """frames: صور رمادي صغيرة (numpy) ورا بعض. الحاجة معروف مكانها بالظبط في الفريم mid (box من 0 لـ 1)،
+    وفي باقي الفريمات بندوّر على نفس الحتة (normalized cross-correlation) قريب من مكانها في الفريم اللي قبله."""
+    import numpy as np
+
+    h, w = frames[mid].shape
+    x0, y0, x1, y1 = int(box[0] * w), int(box[1] * h), int(box[2] * w), int(box[3] * h)
+    x1, y1 = max(x1, x0 + 4), max(y1, y0 + 4)
+    tpl = frames[mid][y0:y1, x0:x1].astype(np.float32)
+    th, tw = tpl.shape
+    tz = tpl - tpl.mean()
+    tn = float(np.sqrt((tz ** 2).sum())) or 1.0
+    out: list = [None] * len(frames)
+    out[mid] = [x0 / w, y0 / h, x1 / w, y1 / h]
+
+    P = (th, tw)   # الحواف بتتمد عشان الحاجة تفضل تتتبع وهي خارجة من الكادر
+
+    def find(img, px, py):
+        rx, ry = max(8, int(w * 0.12)), max(8, int(h * 0.12))   # بيدوّر قريب من المكان اللي فات
+        big = np.pad(img, ((P[0], P[0]), (P[1], P[1])), mode="edge")
+        ax, ay = max(0, px + P[1] - rx), max(0, py + P[0] - ry)
+        bx, by = min(w + 2 * P[1], px + P[1] + tw + rx), min(h + 2 * P[0], py + P[0] + th + ry)
+        win = big[ay:by, ax:bx].astype(np.float32)
+        if win.shape[0] < th or win.shape[1] < tw:
+            return None
+        H2, W2 = win.shape
+        F = np.fft.rfft2(win, s=(H2 + th, W2 + tw))
+        T = np.fft.rfft2(tz[::-1, ::-1], s=(H2 + th, W2 + tw))
+        corr = np.fft.irfft2(F * T, s=(H2 + th, W2 + tw))[th - 1:H2, tw - 1:W2]
+        ii = np.pad(win, ((1, 0), (1, 0))).cumsum(0).cumsum(1)
+        ii2 = np.pad(win ** 2, ((1, 0), (1, 0))).cumsum(0).cumsum(1)
+        s = ii[th:, tw:] - ii[:-th, tw:] - ii[th:, :-tw] + ii[:-th, :-tw]
+        s2 = ii2[th:, tw:] - ii2[:-th, tw:] - ii2[th:, :-tw] + ii2[:-th, :-tw]
+        n = th * tw
+        den = np.sqrt(np.maximum(s2 - s * s / n, 1e-6)) * tn
+        ncc = corr[: s.shape[0], : s.shape[1]] / den[: corr.shape[0], : corr.shape[1]]
+        j = int(np.argmax(ncc))
+        yy, xx = divmod(j, ncc.shape[1])
+        if float(ncc.flat[j]) < 0.45:   # مش لاقيها (اختفت أو اتغطّت)
+            return None
+        return ax + xx - P[1], ay + yy - P[0]
+
+    for rng_ in (range(mid + 1, len(frames)), range(mid - 1, -1, -1)):
+        px, py = x0, y0
+        for i in rng_:
+            hit = find(frames[i], px, py)
+            if hit is None:
+                break
+            px, py = hit
+            out[i] = [px / w, py / h, (px + tw) / w, (py + th) / h]
+    return out

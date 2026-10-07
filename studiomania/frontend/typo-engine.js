@@ -119,13 +119,24 @@
       let html = "";
       if (b) {
         const k = (t - b.t0) / Math.max(0.01, b.t1 - b.t0);
-        const fn = this[`k_${b.kind}`] || this.k_build;
-        const zoom = 1 + 0.035 * easeInOut(k);    // الكاميرا مش واقفة أبدًا: زووم خفيف طول البلوك
-        html = `<div class="ty-cam" style="position:absolute;inset:0;transform:scale(${zoom.toFixed(4)})">${fn.call(this, b, t, k, th, i)}</div>`;
-        // أول لحظة في البلوك: فلاش صغير (القطع بيبان مقصود)
-        const flash = 1 - clamp((t - b.t0) / 0.08);
-        if (flash > 0 && i > 0) html += `<div style="position:absolute;inset:0;background:${th.ink};opacity:${(flash * 0.12).toFixed(3)}"></div>`;
+        const box = this.anchorBox(b.anchor, t);
+        if (box) {
+          // مندمج مع الفيديو: الكلام في المكان اللي جنب/على الحاجة، ومن غير زووم (عشان يفضل لازق فيها وهي بتتحرك)
+          const r = this.placeRect(box, b.place);
+          html = b.kind === "anchor" ? this.k_anchor(b, t, k, th, i, box, r)
+            : `<div style="position:absolute;left:${r.x.toFixed(1)}px;top:${r.y.toFixed(1)}px;width:${r.w.toFixed(1)}px;height:${r.h.toFixed(1)}px">
+                ${(this[`k_${b.kind}`] || this.k_build).call(this, b, t, k, th, i)}</div>`;
+        } else {
+          const fn = this[`k_${b.kind === "anchor" ? "build" : b.kind}`] || this.k_build;
+          const zoom = 1 + 0.035 * easeInOut(k);    // الكاميرا مش واقفة أبدًا: زووم خفيف طول البلوك
+          html = `<div class="ty-cam" style="position:absolute;inset:0;transform:scale(${zoom.toFixed(4)})">${fn.call(this, b, t, k, th, i)}</div>`;
+          // أول لحظة في البلوك: فلاش صغير (القطع بيبان مقصود)
+          const flash = 1 - clamp((t - b.t0) / 0.08);
+          if (flash > 0 && i > 0) html += `<div style="position:absolute;inset:0;background:${th.ink};opacity:${(flash * 0.12).toFixed(3)}"></div>`;
+        }
+        if (this.doc.transparent) html = `<div style="position:absolute;inset:0;text-shadow:${th.ink === this.style.dark.ink ? "0 2px 14px rgba(0,0,0,.55)" : "none"}">${html}</div>`;
       }
+      if (this.showAnchors) html += this.anchorGuides(t);
       if (!this.doc.transparent) html += this.vignette(th);
       if (this.style.grain > 0 && !this.doc.transparent) html += this.grain(t);   // فوق صورة/فيديو: الحبيبات بتتحط في FFmpeg
       this.stage.style.background = bg;
@@ -158,6 +169,94 @@
       return `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;${extra}">${inner}</div>`;
     }
 
+    // ---- المراسي: حاجات في الفيديو (صورة، ورقة، شاشة...) ومكانها بيتغير مع الوقت
+    anchorBox(id, t) {
+      const a = id && (this.doc.anchors || {})[id];
+      if (!a?.keys?.length) return null;
+      const ks = a.keys;
+      let box = ks[0].box;
+      if (t >= ks[ks.length - 1].t) box = ks[ks.length - 1].box;
+      else for (let j = 0; j < ks.length - 1; j++) {
+        if (t >= ks[j].t && t <= ks[j + 1].t) {
+          const m = (t - ks[j].t) / Math.max(0.001, ks[j + 1].t - ks[j].t);
+          box = ks[j].box.map((v, q) => lerp(v, ks[j + 1].box[q], m));
+          break;
+        }
+      }
+      const { w, h } = this.doc;
+      return { x0: box[0] * w, y0: box[1] * h, x1: box[2] * w, y1: box[3] * h };
+    }
+
+    // المساحة اللي الكلام هيتكتب فيها: جنب الحاجة (أوسع ناحية فاضية لو auto) أو عليها
+    placeRect(bx, place) {
+      const { w, h } = this.doc, m = this.u * 3;
+      const bw = bx.x1 - bx.x0, bh = bx.y1 - bx.y0;
+      const space = { left: bx.x0 * h, right: (w - bx.x1) * h, above: bx.y0 * w, below: (h - bx.y1) * w };
+      if (!place || place === "auto") place = Object.entries(space).sort((a, b) => b[1] - a[1])[0][0];
+      const cy = (bx.y0 + bx.y1) / 2, cx = (bx.x0 + bx.x1) / 2;
+      const tallH = Math.max(bh, h * 0.28), wideW = Math.max(bw, w * 0.6);
+      let r;
+      if (place === "on") r = { x: bx.x0 + bw * 0.08, y: bx.y0 + bh * 0.08, w: bw * 0.84, h: bh * 0.84 };
+      else if (place === "left") r = { x: m, y: cy - tallH / 2, w: bx.x0 - m * 2, h: tallH };
+      else if (place === "right") r = { x: bx.x1 + m, y: cy - tallH / 2, w: w - bx.x1 - m * 2, h: tallH };
+      else if (place === "above") r = { x: cx - wideW / 2, y: m, w: wideW, h: bx.y0 - m * 2 };
+      else r = { x: cx - wideW / 2, y: bx.y1 + m, w: wideW, h: h - bx.y1 - m * 2 };
+      // جوه الكادر ومش أصغر من حد معقول
+      r.w = Math.max(r.w, w * 0.22); r.h = Math.max(r.h, h * 0.1);
+      r.x = clamp(r.x, 0, w - r.w); r.y = clamp(r.y, 0, h - r.h);
+      r.side = place;
+      return r;
+    }
+
+    // ---- anchor: الكلام كلمة كلمة جنب الحاجة، والكلمة اللي هي الحاجة نفسها (skip) ما بتتكتبش ويترسم حواليها دايرة بالقلم
+    k_anchor(b, t, k, th, i, bx, r) {
+      const u = this.u;
+      const ws = this.words(b);
+      const size = Math.min(u * 6 * this.ts, r.side === "on" ? r.h * 0.32 : 1e9);
+      const skip = Number.isInteger(b.skip) ? b.skip : -1;
+      const txt = ws.map((w) => w.w).join(" ");
+      const parts = ws.map((w, j) => {
+        if (j === skip) return "";
+        const a = clamp((t - w.t0) / 0.18);
+        const hot = j === b.focus;
+        return `<span style="display:inline-block;margin:0 ${(size * 0.13).toFixed(1)}px;opacity:${a.toFixed(3)};filter:blur(${((1 - a) * 6).toFixed(1)}px);
+          transform:translateY(${((1 - easeOut(a)) * size * 0.35).toFixed(1)}px);${hot ? `color:${th.accent}` : ""}">${esc(this.text(w.w))}</span>`;
+      }).join("");
+      // الكلام بيقرّب ناحية الحاجة: لو هو على شمالها يبقى لازق يمينه، والعكس
+      const just = r.side === "left" ? "flex-end" : r.side === "right" ? "flex-start" : "center";
+      let html = `<div style="position:absolute;left:${r.x.toFixed(1)}px;top:${r.y.toFixed(1)}px;width:${r.w.toFixed(1)}px;height:${r.h.toFixed(1)}px;
+          display:flex;align-items:center;justify-content:${just}">
+        <div dir="${this.dir(txt)}" style="font-size:${size.toFixed(1)}px;line-height:1.25;text-align:${r.side === "left" ? "end" : r.side === "right" ? "start" : "center"};
+          ${r.side === "on" ? `color:${this.style.light.ink};text-shadow:none` : ""}">${parts}</div></div>`;
+      // علامات حوالين الحاجة: زوايا بتدخل أول البلوك، ودايرة قلم لما الكلمة اللي هي الحاجة تتقال
+      const pad = u * 1.5, x0 = bx.x0 - pad, y0 = bx.y0 - pad, x1 = bx.x1 + pad, y1 = bx.y1 + pad;
+      const c = easeOut((t - b.t0) / 0.35), L = Math.min(x1 - x0, y1 - y0) * 0.18 * c, sw = u * 0.45;
+      html += `<svg viewBox="0 0 ${this.doc.w} ${this.doc.h}" style="position:absolute;inset:0;width:100%;height:100%;overflow:visible">
+        <path d="M${x0},${y0 + L} V${y0} H${x0 + L} M${x1 - L},${y0} H${x1} V${y0 + L} M${x1},${y1 - L} V${y1} H${x1 - L} M${x0 + L},${y1} H${x0} V${y1 - L}"
+          fill="none" stroke="${th.ink}" stroke-width="${sw.toFixed(1)}" opacity="${(0.85 * c).toFixed(2)}"/></svg>`;
+      const sw0 = ws[skip];
+      if (sw0 && t >= sw0.t0 - 0.05) {
+        const p = easeOut((t - sw0.t0 + 0.05) / 0.45);
+        const cx = (bx.x0 + bx.x1) / 2, cy = (bx.y0 + bx.y1) / 2, rx = (bx.x1 - bx.x0) / 2 + u * 3, ry = (bx.y1 - bx.y0) / 2 + u * 3;
+        const r0 = rng(i + 3), pts = [];
+        for (let a = 0; a <= 1.12; a += 0.04) {   // دايرة بالإيد: مش مقفولة بالظبط ونصف قطرها بيتهز شوية
+          const ang = -Math.PI / 2 + a * Math.PI * 2, wob = 1 + (r0() - 0.5) * 0.06;
+          pts.push(`${(cx + Math.cos(ang) * rx * wob).toFixed(1)},${(cy + Math.sin(ang) * ry * wob).toFixed(1)}`);
+        }
+        html += scribbleSvg(this.doc, `M${pts.join(" L")}`, th.accent, u * 0.7, p, 0.95);
+      }
+      return html;
+    }
+
+    anchorGuides(t) {
+      return Object.entries(this.doc.anchors || {}).map(([id, a]) => {
+        if (t < a.t0 - 0.2 || t > a.t1 + 0.2) return "";
+        const b = this.anchorBox(id, t);
+        return `<div style="position:absolute;left:${b.x0}px;top:${b.y0}px;width:${b.x1 - b.x0}px;height:${b.y1 - b.y0}px;border:${this.u * 0.4}px dashed ${a.kind === "face" ? "#ff4d4d" : "#4dd2ff"};
+          font:600 ${this.u * 2.6}px sans-serif;color:#fff;text-shadow:0 1px 4px #000"><span style="position:absolute;top:-1.4em;left:0">${esc(id)} · ${esc(a.kind)}</span></div>`;
+      }).join("");
+    }
+
     // ---- pop: كلمة كبيرة على كارت ملون وبتتشطب في الآخر
     k_pop(b, t, k, th) {
       const u = this.u, size = u * 22;
@@ -165,9 +264,10 @@
       const strike = easeInOut((k - 0.72) / 0.2);
       const txt = this.text(b.text || "");
       const dash = `repeating-linear-gradient(90deg, ${th.ink} 0 ${u * 2}px, transparent ${u * 2}px ${u * 3.4}px)`;
-      return `<div style="position:absolute;inset:0;background:${th.bg}"></div>
+      // فوق فيديو/صورة: الكلمة لوحدها من غير الكارت (عشان ما تغطيش الفيديو)
+      return (this.doc.transparent ? "" : `<div style="position:absolute;inset:0;background:${th.bg}"></div>
         <div style="position:absolute;left:0;right:0;top:${u * 8}px;height:${u * 0.35}px;background:${dash};opacity:.55"></div>
-        <div style="position:absolute;left:0;right:0;bottom:${u * 8}px;height:${u * 0.35}px;background:${dash};opacity:.55"></div>`
+        <div style="position:absolute;left:0;right:0;bottom:${u * 8}px;height:${u * 0.35}px;background:${dash};opacity:.55"></div>`)
         + this.center(`<div dir="${this.dir(txt)}" style="position:relative;font-size:${size}px;line-height:1;letter-spacing:-0.03em;color:${th.ink};
             transform:scale(${lerp(1.18, 1, inK).toFixed(3)});opacity:${inK.toFixed(3)}">${esc(txt)}
             <div style="position:absolute;left:-6%;top:22%;height:56%;width:${(strike * 112).toFixed(1)}%;background:${th.accent}"></div></div>`);
@@ -345,7 +445,7 @@
     }
     return loaded[family];
   };
-  TypoEngine.KINDS = ["pop", "type", "build", "icon", "letters", "scatter", "ring"];
+  TypoEngine.KINDS = ["pop", "type", "build", "icon", "letters", "scatter", "ring", "anchor"];
   TypoEngine.DEFAULT_STYLE = DEFAULT_STYLE;
   window.TypoEngine = TypoEngine;
 })();

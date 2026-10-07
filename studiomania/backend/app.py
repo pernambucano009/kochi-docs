@@ -11356,7 +11356,7 @@ def run_lab_typo(lid: str, run: str) -> None:
                 pick = (1, ic["box"])
                 if not atlas.mock_mode():   # المكان الدقيق: من الصور الثابتة مش من الفيديو
                     small = [data_url(model_image(f, 1024), "image/jpeg") for f in frames]
-                    pick = typo.clean_box(ad_json(lab_media_chat(typo.box_messages(ic["name"], ic.get("desc", ""), small)), "مكان الأيقونة"), 3)
+                    pick = typo.clean_box(ad_json(lab_media_chat(typo.box_messages(ic["name"], ic.get("desc", ""), small)), "مكان الأيقونة"), 3, ic.get("box"))
                 if not pick:
                     ic["sticker"] = None
                     return
@@ -12341,7 +12341,7 @@ TYPO_STYLES = TYPO_DIR / "styles"
 for _d in (TYPO_PROJ, TYPO_STK, TYPO_STYLES):
     _d.mkdir(parents=True, exist_ok=True)
 TYPO_LOCK = threading.Lock()
-TYPO_BUSY = ("transcribing", "planning", "drawing", "rendering")
+TYPO_BUSY = ("transcribing", "analyzing", "planning", "drawing", "rendering")
 TYPO_RATIOS = {"9:16": (1080, 1920), "16:9": (1920, 1080), "1:1": (1080, 1080), "4:5": (1080, 1350)}
 TYPO_STICKER_COST = 0.03
 TYPO_FPS = 30
@@ -12607,7 +12607,10 @@ def typo_to_dict(pid: str, d: dict) -> dict:
         return f"{base}/{name}?v={int((folder / name).stat().st_mtime)}" if name and (folder / name).exists() else None
     stk = {s["id"]: s for s in stickers_load()}
     missing = sorted({n for b in d.get("blocks") or [] for n in typo_block_icons(b) if not typo_icon_id(n, stk)})
-    return {**d, "id": pid, "busy": d.get("status") in TYPO_BUSY, "source_url": url((d.get("source") or {}).get("file")),
+    scene = d.get("scene")
+    if scene:
+        scene = {**scene, "anchors": [{**a, "thumb_url": url(a.get("thumb"))} for a in scene.get("anchors") or []]}
+    return {**d, "id": pid, "busy": d.get("status") in TYPO_BUSY, "source_url": url((d.get("source") or {}).get("file")), "scene": scene,
             "bg_url": url((d.get("bg") or {}).get("file")), "final_url": url(d.get("final")), "alpha_url": url(d.get("alpha")),
             "missing_icons": missing, "draw_cost": round(len(missing) * TYPO_STICKER_COST, 2),
             "ratios": list(TYPO_RATIOS), "kinds": typo.KINDS, "fonts": [{"family": f["family"], "label": f["label"]} for f in captions.FONTS]}
@@ -12753,7 +12756,8 @@ def typo_source(pid: str, file: UploadFile = File(...)):
     ext = Path(file.filename or "").suffix.lower()
     kind = "video" if ext in VIDEO_EXTENSIONS else "audio"
     name = save_upload(file, VIDEO_EXTENSIONS, folder, "src") if kind == "video" else save_audio_upload(file, folder, "src")
-    dur = probe_duration(folder / name)
+    info = media_info(folder / name)
+    dur = info.duration
     if dur > 180:
         (folder / name).unlink(missing_ok=True)
         raise HTTPException(400, "الملف أطول من 3 دقايق. قصّه الأول")
@@ -12761,9 +12765,9 @@ def typo_source(pid: str, file: UploadFile = File(...)):
     if old and old != name:
         (folder / old).unlink(missing_ok=True)
     def fn(x):
-        x["source"] = {"kind": kind, "file": name, "name": file.filename, "duration": round(dur, 3)}
+        x["source"] = {"kind": kind, "file": name, "name": file.filename, "duration": round(dur, 3), "w": info.width, "h": info.height}
         x["duration"] = round(dur, 3)
-        x.update(words=[], blocks=[], final=None)
+        x.update(words=[], blocks=[], final=None, scene=None)
         if kind == "video":
             x["bg"] = {**(x.get("bg") or {}), "kind": "source"}
     typo_update(pid, fn)
@@ -12823,12 +12827,32 @@ def run_typo_plan(pid: str) -> None:
         d = typo_load(pid)
         words, dur = d["words"], d.get("duration") or d["words"][-1]["e"] + 0.5
         items = stickers_load()
+        anchors = None
+        if (d.get("source") or {}).get("kind") == "video":   # فوق فيديو: الموديل لازم يشوف اللي في الكادر الأول
+            anchors = (d.get("scene") or {}).get("anchors")
+            if anchors is None:
+                typo_set(pid, step="👁️ بيحلل الفيديو: إيه اللي في الكادر وفين")
+                anchors = typo_analyze(pid)
+            typo_set(pid, step="🧠 بيوزّع الكلام على الحركات والمشهد")
         if atlas.mock_mode() or not atlas.api_key():
             blocks = typo.mock_plan(words, dur)
+            spot = next((a for a in anchors or [] if a["kind"] != "face"), None)
+            if spot and len(blocks) > 1:   # التجربة: بلوك بيندمج مع أول حاجة في الكادر وآخر كلمة فيه بتبقى هي
+                blocks[1].update(kind="anchor", anchor=spot["id"], place="auto", skip=len(blocks[1]["words"]) - 1)
         else:
             st = typo_style(d.get("style"))
-            raw = ad_json(series_chat(typo.plan_messages(words, st, [s["name"] for s in items], d.get("brief") or "")), "خطة التايبوجرافي")
+            raw = ad_json(series_chat(typo.plan_messages(words, st, [s["name"] for s in items], d.get("brief") or "", anchors)), "خطة التايبوجرافي")
             blocks = typo.clean_plan(raw, words, dur)
+        ids = {a["id"] for a in anchors or []}
+        for b in blocks:
+            if b["kind"] in ("pop", "ring", "letters", "scatter"):   # دول ملو الشاشة: مش جنب حاجة
+                b["anchor"] = ""
+            if b.get("anchor") not in ids:
+                b["anchor"] = ""
+                if b["kind"] == "anchor":
+                    b["kind"] = "build"
+            elif 0 <= b.get("skip", -1) < len(b["words"]):   # كلمة هي الحاجة نفسها ← الحركة المندمجة
+                b["kind"] = "anchor"
         stk = {s["id"]: s for s in items}
         for b in blocks:   # الأسماء اللي ليها ستيكر في المكتبة بتتربط بيه على طول
             for k in ("icon", "side"):
@@ -12836,6 +12860,104 @@ def run_typo_plan(pid: str) -> None:
                     b[k] = typo_icon_id(b[k], stk) or b[k]
             b["icons"] = [typo_icon_id(x, stk) or x for x in b.get("icons") or []]
         typo_update(pid, lambda x: x.update(blocks=blocks, final=None, status="planned", step=None, error=None))
+    except Exception as exc:  # noqa: BLE001
+        typo_fail(pid, exc)
+
+
+def typo_frame(src: Path, t: float, out: Path, width: int = 768) -> Path:
+    subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{max(0.0, t):.2f}", "-i", str(src), "-frames:v", "1",
+                    "-vf", f"scale={width}:-2", str(out)], check=True, capture_output=True, timeout=60)
+    return out
+
+
+def typo_analyze(pid: str) -> list[dict]:
+    """👁️ الحاجات اللي في الكادر (المراسي): الموديل بيتفرج على الفيديو كله ويطلّعها، وبعدين على فريمات ثابتة
+    بيحدد مكان كل واحدة بالظبط في كذا لحظة (عشان الكلام يتحرك معاها)."""
+    d = typo_load(pid)
+    folder = TYPO_PROJ / pid
+    src = folder / d["source"]["file"]
+    dur = d["duration"]
+    if atlas.mock_mode() or not atlas.api_key():
+        anchors = typo.mock_scene(dur)
+    else:
+        proxy = TMP_DIR / f"typo_proxy_{pid}.mp4"
+        try:
+            subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src),
+                            "-vf", "scale='if(gt(iw,ih),min(640,iw),-2)':'if(gt(iw,ih),-2,min(640,ih))',fps=8",
+                            "-c:v", "libx264", "-preset", "veryfast", "-crf", "30", "-pix_fmt", "yuv420p", "-c:a", "aac", "-ac", "1", "-b:a", "64k",
+                            str(proxy)], check=True, capture_output=True, timeout=600)
+            anchors = typo.clean_scene(ad_json(lab_media_chat(az.with_media(typo.scene_messages(dur, d.get("words") or []),
+                                                                            data_url(proxy, "video/mp4"), "video.mp4")), "تحليل الفيديو"), dur)
+        finally:
+            proxy.unlink(missing_ok=True)
+
+    def track(a):
+        # 1) مكانها بالظبط في فريم ثابت من نص وقتها (الموديل على الصور الثابتة أدق بكتير)
+        # 2) تتبّعها في باقي الفريمات (4 في الثانية) بمطابقة الصورة نفسها، فالكلام يمشي معاها لو الكاميرا أو الحاجة اتحركت
+        import numpy as np
+        tm = (a["t0"] + a["t1"]) / 2
+        still = TMP_DIR / f"tya_{uuid.uuid4().hex[:8]}.jpg"
+        try:
+            typo_frame(src, tm, still)
+            box = a["keys"][0]["box"]
+            if not (atlas.mock_mode() or not atlas.api_key()):
+                pick = typo.clean_box(ad_json(lab_media_chat(typo.box_messages(a["label"], a.get("note") or a["kind"], [data_url(still, "image/jpeg")])),
+                                              "مكان المرساة"), 1, box)
+                if pick:
+                    box = pick[1]
+            fps, tw = 4, 270
+            raw = subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-ss", f"{a['t0']:.2f}", "-t", f"{a['t1'] - a['t0']:.2f}",
+                                  "-i", str(src), "-vf", f"fps={fps},scale={tw}:-2,format=gray", "-f", "rawvideo", "-"],
+                                 check=True, capture_output=True, timeout=120).stdout
+            from PIL import Image
+            th = Image.open(still).size
+            th = int(round(tw * th[1] / th[0] / 2) * 2)
+            n = len(raw) // (tw * th)
+            keys = [{"t": round(tm, 2), "box": box}]
+            if n >= 2:
+                frames = list(np.frombuffer(raw[: n * tw * th], dtype=np.uint8).reshape(n, th, tw))
+                mid = min(n - 1, max(0, int(round((tm - a["t0"]) * fps))))
+                boxes = typo.track_template(frames, mid, box)
+                keys = [{"t": round(a["t0"] + i / fps, 2), "box": [round(v, 4) for v in b]} for i, b in enumerate(boxes) if b]
+            a["keys"] = keys or [{"t": round(tm, 2), "box": box}]
+            # صورة صغيرة للمرساة (عشان تعرفها في الصفحة)
+            im = Image.open(still)
+            W, H = im.size
+            x0, y0, x1, y1 = box
+            im.crop((int(x0 * W), int(y0 * H), max(int(x0 * W) + 2, int(x1 * W)), max(int(y0 * H) + 2, int(y1 * H)))).convert("RGB").save(folder / f"anc_{a['id']}.jpg")
+            a["thumb"] = f"anc_{a['id']}.jpg"
+        except Exception:  # noqa: BLE001  (مرساة واحدة باظت: تفضل بالمكان التقريبي)
+            pass
+        finally:
+            still.unlink(missing_ok=True)
+
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        list(pool.map(track, anchors))
+    # الفيديو فاتح ولا غامق؟ (لون الكلام اللي فوقه بيتحدد على كده)
+    bright = 100.0
+    try:
+        raw = subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-i", str(src), "-vf", "fps=1,scale=32:32,format=gray",
+                              "-frames:v", "12", "-f", "rawvideo", "-"], check=True, capture_output=True, timeout=120).stdout
+        bright = sum(raw) / max(1, len(raw))
+    except Exception:  # noqa: BLE001
+        pass
+    typo_update(pid, lambda x: x.update(scene={"anchors": anchors, "bright": round(bright, 1), "at": now()}))
+    return anchors
+
+
+@app.post("/api/typo/{pid}/scene")
+def typo_scene(pid: str):
+    """👁️ يحلل الفيديو من جديد (إيه اللي في الكادر وفين)."""
+    d = typo_load(pid)
+    if (d.get("source") or {}).get("kind") != "video":
+        raise HTTPException(400, "ارفع فيديو الأول")
+    return typo_start(pid, "analyzing", "👁️ بيحلل الفيديو: إيه اللي في الكادر وفين", run_typo_scene)
+
+
+def run_typo_scene(pid: str) -> None:
+    try:
+        typo_analyze(pid)
+        typo_update(pid, lambda x: x.update(status=typo_idle(x), step=None, error=None, final=None))
     except Exception as exc:  # noqa: BLE001
         typo_fail(pid, exc)
 
@@ -12881,7 +13003,7 @@ def typo_doc(pid: str, d: dict) -> dict:
         return stk.get(typo_icon_id(n, items) or "") if n else None
     blocks = []
     for b in d.get("blocks") or []:
-        blocks.append({**{k: b.get(k) for k in ("t0", "t1", "kind", "theme", "text", "words", "focus", "letter")},
+        blocks.append({**{k: b.get(k) for k in ("t0", "t1", "kind", "theme", "text", "words", "focus", "letter", "anchor", "place", "skip")},
                        "icon": img(b.get("icon")), "side": img(b.get("side")), "icons": [u for u in (img(i) for i in b.get("icons") or []) if u]})
     kind = (d.get("bg") or {}).get("kind", "theme")
     if kind != "theme":
@@ -12891,11 +13013,25 @@ def typo_doc(pid: str, d: dict) -> dict:
             lum = sum(int(c[i:i + 2], 16) * k for i, k in ((1, 0.299), (3, 0.587), (5, 0.114))) if kind in ("solid", "none") else 0
         except ValueError:
             lum = 0
-        side = "light" if lum > 150 else "dark"
+        if kind == "source":   # الفيديو المرفوع: على قد نوره (بيتقاس وقت التحليل)، والتغميق بيخليه أغمق
+            lum = float((d.get("scene") or {}).get("bright") or 0) * (1 - float((d.get("bg") or {}).get("dim") or 0))
+        side = "light" if lum > (120 if kind == "source" else 150) else "dark"   # الفيديو: الدرجات المتوسطة بتتقري أحسن بكلام غامق
         for b in blocks:
-            if b.get("theme") != "accent":
+            if b.get("theme") != "accent" or kind == "source":   # فوق الفيديو: حتى الملوّن لونه على قد نور الفيديو
                 b["theme"] = side
-    return {"w": W, "h": H, "fps": TYPO_FPS, "duration": d.get("duration") or (blocks[-1]["t1"] if blocks else 1),
+    # المراسي بس لو الخلفية هي الفيديو المرفوع نفسه: أماكنها بتتحوّل من كادر الفيديو لكادر الفيديو النهائي (المقصوص على المقاس)
+    anchors = {}
+    srcd = d.get("source") or {}
+    if kind == "source" and srcd.get("w") and srcd.get("h"):
+        sw, sh = srcd["w"], srcd["h"]
+        k = max(W / sw, H / sh)
+        ox, oy = (sw * k - W) / 2, (sh * k - H) / 2
+        for a in (d.get("scene") or {}).get("anchors") or []:
+            anchors[a["id"]] = {"kind": a["kind"], "t0": a["t0"], "t1": a["t1"], "keys": [
+                {"t": kk["t"], "box": [round((kk["box"][0] * sw * k - ox) / W, 4), round((kk["box"][1] * sh * k - oy) / H, 4),
+                                       round((kk["box"][2] * sw * k - ox) / W, 4), round((kk["box"][3] * sh * k - oy) / H, 4)]}
+                for kk in a["keys"]]}
+    return {"w": W, "h": H, "fps": TYPO_FPS, "anchors": anchors, "duration": d.get("duration") or (blocks[-1]["t1"] if blocks else 1),
             "style": {k: st.get(k) for k in ("font", "case", "grain", "weight", "light", "dark", "accent")},
             "transparent": kind != "theme", "blocks": blocks}
 
