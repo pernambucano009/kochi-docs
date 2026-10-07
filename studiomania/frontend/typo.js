@@ -74,6 +74,8 @@ function tyRenderProj() {
     <div class="row wrap tv-opts">
       <label>المقاس <select data-tyopt="ratio">${v.ratios.map((r) => `<option ${r === v.ratio ? "selected" : ""}>${r}</option>`).join("")}</select></label>
       <label>الستايل <select data-tyopt="style">${stOpts}</select></label>
+      <label title="من غير ذكاء اصطناعي: الحركات بالقواعد، والأيقونات من القاموس بس، والكلام بيتفرّغ على السيرفر لو متفعّل">الذكاء <select data-tyopt="ai">
+        <option value="smart" ${v.ai !== "off" ? "selected" : ""}>🤖 ذكي</option><option value="off" ${v.ai === "off" ? "selected" : ""}>⚙️ من غير ذكاء اصطناعي</option></select></label>
       ${tyx.styles.find((x) => x.id === v.style)?.pro && TypoEngine.MOMENT_FONTS ? `
         <label>خط الإنجليزي <select data-tyfont="sans">${TypoEngine.MOMENT_FONTS.latin.map(([f, l]) => `<option value="${f}" ${f === (v.fonts?.sans || "TY Outfit") ? "selected" : ""}>${l}</option>`).join("")}</select></label>
         <label>خط العربي <select data-tyfont="sansAr">${TypoEngine.MOMENT_FONTS.arabic.map(([f, l]) => `<option value="${f}" ${f === (v.fonts?.sansAr || "TY Alexandria") ? "selected" : ""}>${l}</option>`).join("")}</select></label>` : ""}
@@ -299,7 +301,7 @@ $("tyNew").onclick = async () => {
 $("tyStkBtn").onclick = async () => {
   tyStop();
   tyx.view = "stk";
-  tyx.stk = await api(TY("/stickers"));
+  [tyx.stk, tyx.dict] = await Promise.all([api(TY("/stickers")), api(TY("/concepts"))]);
   tyRender();
 };
 
@@ -453,8 +455,11 @@ function tyRenderStk() {
       <select data-stkstyle>${tyx.styles.map((s) => `<option value="${s.id}">${tye(s.name)}</option>`).join("")}</select>
       <button type="button" class="btn sm" data-stkdraw>🎨 ارسمها (~0.03$)</button></div>
     <p class="hint">الستيكرات اللي اتقصت من فيديو ممكن يبقى فيها حتت من حاجات جنبها: «✨ نضّفها» بيرسمها لوحدها بنفس شكلها (حوالي 0.03$).</p>
+    ${tyDictView()}
     <div class="ty-stk">${tyx.stk.map((s) => `<figure data-stk="${s.id}"><div class="ty-checker"><img src="${s.url}" alt=""></div>
-      <input value="${tye(s.name)}" data-stkname data-no-i18n><small class="muted">${s.source.startsWith("lab:") ? "🔬 من المعمل" : s.source === "drawn" ? "🎨 مترسومة" : "⬆ مرفوعة"}</small>
+      <input value="${tye(s.name)}" data-stkname data-no-i18n>
+      <label class="ty-concept" title="معنى الأيقونة في القاموس: الكلام اللي بيدل عليه بيجيب الأيقونة دي">📖 <input value="${tye(s.concept || "")}" data-stkconcept placeholder="المعنى" data-no-i18n></label>
+      <small class="muted">${s.source.startsWith("lab:") ? "🔬 من المعمل" : s.source === "drawn" ? "🎨 مترسومة" : "⬆ مرفوعة"}${s.style ? ` · ${tye(tyx.styles.find((x) => x.id === s.style)?.name || s.style)}` : ""}</small>
       <div class="row">${s.source.startsWith("lab:") ? `<button type="button" class="btn sm" data-stkclean title="يرسمها لوحدها نضيفة بنفس شكلها">✨ نضّفها</button>` : ""}
         <button type="button" class="btn sm danger" data-stkdel>🗑️</button></div></figure>`).join("") || `<p class="muted">لسه مفيش ستيكرات</p>`}</div>`;
 }
@@ -495,11 +500,51 @@ $("tyStk").addEventListener("change", async (e) => {
       tyx.stk = await api(TY("/stickers"));
       return tyRender();
     }
+    if (t.matches("[data-stkconcept]")) {
+      tyx.stk = await api(TY(`/stickers/${t.closest("[data-stk]").dataset.stk}`), { method: "PATCH", ...jsonBody({ concept: t.value }) });
+      tyx.dict = await api(TY("/concepts"));
+      tyRender();
+      return toast("📖 اتحفظ في القاموس");
+    }
     if (t.matches("[data-stkname]")) {
       tyx.stk = await api(TY(`/stickers/${t.closest("[data-stk]").dataset.stk}`), { method: "PATCH", ...jsonBody({ name: t.value }) });
       return toast("✅ اتحفظ");
     }
   } catch (err) { toast(err.message, true); }
+});
+
+// ---------- 📖 القاموس: كلمة ← معنى ← أيقونة بروح الستايل
+
+function tyDictView() {
+  const d = tyx.dict;
+  if (!d) return "";
+  return `<details class="panel ty-dict" ${tyx.open.dict ? "open" : ""} data-tydictdk><summary>📖 القاموس <small class="muted">${d.concepts.length} معنى · ${d.learned} كلمة اتعلّمت</small></summary>
+    <p class="hint">بيتملي لوحده: كل أيقونة بتتطلّع من فيديو في المعمل (أو بتترسم) بتدخل بمعناها وكلماتها عربي وإنجليزي. الكلمة اللي ميعرفهاش بيسأل عليها موديل صغير مرة واحدة ويحفظ الإجابة.
+      ونفس المعنى ممكن يبقى ليه أيقونة مختلفة في كل ستايل: المشروع بياخد أيقونة الستايل بتاعه الأول.</p>
+    ${d.untagged ? `<button type="button" class="btn sm" data-dicttag>🏷️ دخّل ${d.untagged} أيقونة قديمة للقاموس</button>` : ""}
+    <div class="row wrap"><input type="text" data-dictc placeholder="المعنى (مثلًا dumbbell)" data-no-i18n><input type="text" data-dictar placeholder="كلمات عربي: حديد، دمبل، جيم" data-no-i18n>
+      <input type="text" data-dicten placeholder="English words: weights, gym" data-no-i18n><button type="button" class="btn sm" data-dictadd>＋ ضيف</button></div>
+    <div class="ty-dict-list">${d.concepts.map((c) => `<div><b data-no-i18n>${tye(c.concept)}</b> <small class="muted">${c.stickers.length ? `🧩 ${c.stickers.length}` : "❔ مفيش أيقونة"}</small>
+      <small dir="auto" data-no-i18n>${tye([...c.ar, ...c.en].slice(0, 14).join("، "))}</small></div>`).join("")}</div></details>`;
+}
+
+$("tyStk").addEventListener("toggle", (e) => { if (e.target.matches("[data-tydictdk]")) tyx.open.dict = e.target.open; }, true);
+
+$("tyStk").addEventListener("click", async (e) => {
+  const t = e.target;
+  const wrap = (btn, fn) => busyButton(btn, "⏳", async () => { try { await fn(); } catch (err) { toast(err.message, true); } });
+  const tag = t.closest("[data-dicttag]");
+  if (tag) return wrap(tag, async () => { tyx.dict = await api(TY("/concepts/tag"), { method: "POST" }); tyx.stk = await api(TY("/stickers")); tyRender(); toast("🏷️ اتضافوا للقاموس"); });
+  const add = t.closest("[data-dictadd]");
+  if (add) {
+    const val = (k) => document.querySelector(`[data-dict${k}]`).value.trim();
+    const split = (x) => x.split(/[,،]/).map((w) => w.trim()).filter(Boolean);
+    if (!val("c")) return toast("اكتب المعنى", true);
+    return wrap(add, async () => {
+      tyx.dict = await api(TY("/concepts"), { method: "POST", ...jsonBody({ concept: val("c"), ar: split(val("ar")), en: split(val("en")) }) });
+      tyx.open.dict = true; tyRender(); toast("📖 اتضاف");
+    });
+  }
 });
 
 // ---------- 🔬 المعمل: خطوة «🔤 التايبوجرافي»

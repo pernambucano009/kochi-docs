@@ -61,6 +61,8 @@ import carousel as cz  # noqa: E402
 import series as sz  # noqa: E402
 import ads as az  # noqa: E402
 import typo  # noqa: E402  (التايبوجرافي)
+import concepts  # noqa: E402  (قاموس المعاني: كلمة ← أيقونة)
+import stt_local  # noqa: E402  (تفريغ على السيرفر من غير خدمة برّه)
 from auth import SESSION_COOKIE, SESSION_DAYS, Auth  # noqa: E402
 
 MAX_CLIP_SECONDS = 15.0
@@ -11367,7 +11369,7 @@ def run_lab_typo(lid: str, run: str) -> None:
                 crop = frames[pick[0]].with_suffix(".crop.png")
                 im.crop((int(max(0, x0 - mx) * W), int(max(0, y0 - my) * H), int(min(1, x1 + mx) * W), int(min(1, y1 + my) * H))).save(crop)
                 ic["box"] = pick[1]
-                ic["sticker"] = sticker_add(crop, ic["name"], f"lab:{lid}", True, ic.get("desc", ""))["id"]
+                ic["sticker"] = sticker_add(crop, ic["name"], f"lab:{lid}", True, ic.get("desc", ""), f"lab-{lid}")["id"]
                 crop.unlink(missing_ok=True)
             except Exception:  # noqa: BLE001  (أيقونة واحدة باظت ما توقفش الباقي)
                 ic["sticker"] = None
@@ -11383,6 +11385,8 @@ def run_lab_typo(lid: str, run: str) -> None:
             return
         style = {**data["style"], "source_lab": lid, "name": data["style"]["name"] or d.get("name") or "ستايل"}
         sid = f"lab-{lid}"
+        lab_update(lid, lambda x: x["typo"].update(step="📖 بيضيف الأيقونات للقاموس") if x.get("typo") else None)
+        concepts_tag([ic["sticker"] for ic in icons if ic.get("sticker")])   # القاموس بيتملي لوحده من كل فيديو بيتحلل
         (TYPO_STYLES / f"{sid}.json").write_text(json.dumps(style, ensure_ascii=False), encoding="utf-8")
         if not typo_mine(lid, run):
             return
@@ -12344,6 +12348,8 @@ TYPO_LOCK = threading.Lock()
 TYPO_BUSY = ("transcribing", "analyzing", "planning", "drawing", "rendering")
 TYPO_RATIOS = {"9:16": (1080, 1920), "16:9": (1920, 1080), "1:1": (1080, 1080), "4:5": (1080, 1350)}
 TYPO_STICKER_COST = 0.03
+TYPO_DICT = TYPO_DIR / "concepts.json"
+TYPO_DICT_LOCK = threading.Lock()
 TYPO_FPS = 30
 app.mount("/media/typo", StaticFiles(directory=TYPO_DIR), name="typo")
 
@@ -12409,7 +12415,7 @@ def sticker_slug(name: str) -> str:
     return re.sub(r"[^a-z0-9؀-ۿ-]+", "-", (name or "").lower()).strip("-")[:40] or "sticker"
 
 
-def sticker_add(src: Path, name: str, source: str, key: bool = True, desc: str = "") -> dict:
+def sticker_add(src: Path, name: str, source: str, key: bool = True, desc: str = "", style: str = "", concept: str = "") -> dict:
     """صورة ← ستيكر شفاف في المكتبة (الخلفية السادة بتتشال لوحدها)."""
     sid = uuid.uuid4().hex[:10]
     out = TYPO_STK / f"{sid}.png"
@@ -12418,12 +12424,91 @@ def sticker_add(src: Path, name: str, source: str, key: bool = True, desc: str =
     else:
         from PIL import Image
         Image.open(src).convert("RGBA").save(out, "PNG")
-    item = {"id": sid, "name": sticker_slug(name), "file": out.name, "source": source, "desc": desc[:200], "created_at": now()}
+    item = {"id": sid, "name": sticker_slug(name), "file": out.name, "source": source, "desc": desc[:200], "style": style,
+            "concept": concepts.slug(concept), "created_at": now()}
     with TYPO_LOCK:
         items = stickers_load()
         items.insert(0, item)
         stickers_save(items)
     return item
+
+
+def dict_ai() -> bool:
+    return bool(atlas.api_key()) and not atlas.mock_mode()
+
+
+def dict_chat(messages: list[dict]) -> dict:
+    """الموديل الصغير بتاع القاموس (رخيص وسريع)، ولو مش شغال بنرجع لموديل الكتابة العادي."""
+    preferred = os.environ.get("TYPO_DICT_MODEL") or "google/gemini-3.1-flash-lite"
+    for model in atlas.model_candidates(preferred, ("flash-lite", "nano", "mini"), [atlas.DEFAULT_VISION_MODEL])[:3]:
+        try:
+            return ad_json(atlas.chat(messages, model, temperature=0.2, max_tokens=3000, json_mode=True), "القاموس")
+        except (atlas.AtlasError, httpx.HTTPError):
+            continue
+    return ad_json(series_chat(messages), "القاموس")
+
+
+def concepts_tag(ids: list[str]) -> int:
+    """ستيكرات من غير معنى ← معنى + كلماته عربي وإنجليزي (بالموديل الصغير، أو من اسمها لو مفيش موديل). بيرجّع عدد اللي اتعلّم."""
+    items = stickers_load()
+    todo = [s for s in items if s["id"] in set(ids) and not s.get("concept")]
+    if not todo:
+        return 0
+    tags = {}
+    if dict_ai():
+        try:
+            for k in range(0, len(todo), 40):
+                for t in (dict_chat(concepts.tag_messages(todo[k:k + 40])).get("icons") or []):
+                    if isinstance(t, dict) and t.get("id"):
+                        tags[t["id"]] = t
+        except Exception:  # noqa: BLE001  (القاموس ميوقفش الشغل)
+            tags = {}
+    with TYPO_DICT_LOCK:
+        d = concepts.load(TYPO_DICT)
+        for s in todo:
+            t = tags.get(s["id"]) or {}
+            c = concepts.learn(d, t.get("concept") or concepts.guess_concept(s["name"]), [*(t.get("en") or []), s["name"].replace("-", " ")], t.get("ar"))
+            s["concept"] = c
+        concepts.save(TYPO_DICT, d)
+    with TYPO_LOCK:
+        cur = stickers_load()
+        got = {s["id"]: s["concept"] for s in todo}
+        for s in cur:
+            if s["id"] in got and not s.get("concept"):
+                s["concept"] = got[s["id"]]
+        stickers_save(cur)
+    return len(todo)
+
+
+def dict_hits(words: list[str], ai: bool) -> dict[int, str]:
+    """كلام ← معاني. اللي القاموس ميعرفوش بيتسأل للموديل الصغير مرة واحدة (لو مسموح) وبيتحفظ."""
+    with TYPO_DICT_LOCK:
+        d = concepts.load(TYPO_DICT)
+    hits, unknown = concepts.lookup(words, d)
+    if unknown and ai and dict_ai():
+        try:
+            raw = dict_chat(concepts.ask_messages(unknown, list(d["concepts"])))
+        except Exception:  # noqa: BLE001
+            raw = None
+        if raw is not None:
+            with TYPO_DICT_LOCK:
+                d = concepts.load(TYPO_DICT)
+                concepts.apply_answer(d, unknown, raw)
+                concepts.save(TYPO_DICT, d)
+            hits, _ = concepts.lookup(words, d)
+    return hits
+
+
+def typo_resolve_icon(name: str, items: list[dict], style: str, idx: dict) -> str:
+    """اسم أيقونة من الخطة ← ستيكر: رقمه، أو معناه في القاموس بأيقونة الستايل، أو أقرب اسم. لو مفيش بيفضل اسم (يترسم)."""
+    stk = {s["id"]: s for s in items}
+    if name in stk:
+        return name
+    c = name if name in {s.get("concept") for s in items} else idx.get(concepts.norm(name.replace("-", " "))) or idx.get(concepts.norm(name))
+    if c:
+        return concepts.pick(c, items, style) or c
+    found = sticker_find(name, items)
+    return found["id"] if found else name
 
 
 def sticker_find(name: str, items: list[dict]) -> dict | None:
@@ -12437,7 +12522,7 @@ def sticker_find(name: str, items: list[dict]) -> dict | None:
     return best if best and words & set(best["name"].split("-")) else None
 
 
-def sticker_draw(desc: str, name: str, icon_style: str, source: str, ref: Path | None = None) -> dict:
+def sticker_draw(desc: str, name: str, icon_style: str, source: str, ref: Path | None = None, style: str = "", concept: str = "") -> dict:
     """يرسم أيقونة جديدة (أو ينضّف واحدة مقصوصة من فيديو) على خلفية بيضا، وبعدين بتتشال الخلفية."""
     tmp = TMP_DIR / f"stk_{uuid.uuid4().hex[:8]}.png"
     try:
@@ -12454,7 +12539,10 @@ def sticker_draw(desc: str, name: str, icon_style: str, source: str, ref: Path |
                 prompt = ("Redraw ONLY the main object from the reference image as one clean isolated sticker, exactly the same look, "
                           "colors and style, nothing cut off, other objects removed. " + prompt)
             atlas.download(atlas.generate_image("nano2", prompt, "1024x1024", "medium", [atlas.reference_url(ref)] if ref else None), tmp)
-        return sticker_add(tmp, name, source, True, desc)
+        item = sticker_add(tmp, name, source, True, desc, style, concept)
+        if not concept:
+            concepts_tag([item["id"]])
+        return item
     finally:
         tmp.unlink(missing_ok=True)
 
@@ -12491,7 +12579,7 @@ def typo_sticker_draw(body: StickerDrawIn):
     if not (atlas.api_key() or atlas.mock_mode()):
         raise HTTPException(400, "مفتاح Atlas مش متسجل")
     st = typo_style(body.style) if body.style else {}
-    return sticker_dict(sticker_draw(body.desc.strip(), body.name or body.desc, st.get("icon_style", ""), "drawn"))
+    return sticker_dict(sticker_draw(body.desc.strip(), body.name or body.desc, st.get("icon_style", ""), "drawn", style=body.style or ""))
 
 
 @app.post("/api/typo/stickers/{sid}/clean")
@@ -12507,24 +12595,72 @@ def typo_sticker_clean(sid: str):
     bg.alpha_composite(im)
     bg.convert("RGB").save(flat)
     try:
-        return sticker_dict(sticker_draw(s.get("desc") or s["name"], s["name"], "", s.get("source", "lab"), flat))
+        return sticker_dict(sticker_draw(s.get("desc") or s["name"], s["name"], "", s.get("source", "lab"), flat, s.get("style", ""), s.get("concept", "")))
     finally:
         flat.unlink(missing_ok=True)
 
 
 class StickerIn(BaseModel):
-    name: str
+    name: str | None = None
+    concept: str | None = None
 
 
 @app.patch("/api/typo/stickers/{sid}")
 def typo_sticker_rename(sid: str, body: StickerIn):
     with TYPO_LOCK:
         items = stickers_load()
-        for s in items:
-            if s["id"] == sid:
-                s["name"] = sticker_slug(body.name)
+        hit = next((x for x in items if x["id"] == sid), None)
+        if hit and body.name is not None:
+            hit["name"] = sticker_slug(body.name)
+        if hit and body.concept is not None:   # تصليح معنى الأيقونة بإيدك
+            hit["concept"] = concepts.slug(body.concept)
         stickers_save(items)
+    if hit and hit.get("concept") and body.concept is not None:
+        with TYPO_DICT_LOCK:
+            d = concepts.load(TYPO_DICT)
+            concepts.learn(d, hit["concept"], [hit["concept"].replace("-", " ")])
+            concepts.save(TYPO_DICT, d)
     return typo_stickers()
+
+
+@app.get("/api/typo/concepts")
+def typo_concepts():
+    """📖 القاموس: كل معنى وكلماته وأيقوناته في كل ستايل."""
+    d = concepts.load(TYPO_DICT)
+    items = stickers_load()
+    out = []
+    for c, e in sorted(d["concepts"].items()):
+        out.append({"concept": c, "en": e.get("en", []), "ar": e.get("ar", []),
+                    "stickers": [{"id": s["id"], "style": s.get("style", "")} for s in items if s.get("concept") == c]})
+    return {"concepts": out, "learned": sum(1 for v in d["words"].values() if v), "skipped": sum(1 for v in d["words"].values() if not v),
+            "untagged": sum(1 for s in items if not s.get("concept"))}
+
+
+@app.post("/api/typo/concepts/tag")
+def typo_concepts_tag():
+    """🏷️ الأيقونات القديمة اللي لسه ملهاش معنى تدخل القاموس."""
+    n = concepts_tag([s["id"] for s in stickers_load() if not s.get("concept")])
+    return {**typo_concepts(), "tagged": n}
+
+
+class ConceptIn(BaseModel):
+    concept: str
+    en: list[str] = []
+    ar: list[str] = []
+
+
+@app.post("/api/typo/concepts")
+def typo_concept_add(body: ConceptIn):
+    """كلمات زيادة لمعنى (أو معنى جديد) بإيدك."""
+    with TYPO_DICT_LOCK:
+        d = concepts.load(TYPO_DICT)
+        c = concepts.learn(d, body.concept, body.en, body.ar)
+        for w in [*body.en, *body.ar]:   # اللي اتكتب بإيدك بيكسب على أي تخمين قديم
+            for part in str(w).split():
+                if concepts.content(part):
+                    d["words"][concepts.norm(part)] = c
+        concepts.save(TYPO_DICT, d)
+    return typo_concepts()
 
 
 @app.delete("/api/typo/stickers/{sid}")
@@ -12688,6 +12824,7 @@ class TypoPatchIn(BaseModel):
     blocks: list | None = None
     words: list | None = None
     fonts: dict | None = None
+    ai: str | None = None
 
 
 TYPO_FONT_OK = re.compile(r"^(TY|SM) [A-Za-z]{2,20}$")
@@ -12704,6 +12841,8 @@ def typo_patch(pid: str, body: TypoPatchIn):
             d["style"] = body.style
         if body.brief is not None:
             d["brief"] = body.brief[:1000]
+        if body.ai in ("smart", "off"):   # «من غير ذكاء اصطناعي»: قواعد + قاموس + تفريغ على السيرفر
+            d["ai"] = body.ai
         if body.fonts is not None:   # خط الكلام في الحركات الاحترافية (إنجليزي / عربي)
             d["fonts"] = {k: v for k, v in body.fonts.items() if k in ("sans", "sansAr") and isinstance(v, str) and TYPO_FONT_OK.match(v)}
         if body.bg is not None:
@@ -12789,7 +12928,8 @@ def run_typo_transcribe(pid: str) -> None:
         subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src), "-vn", "-ac", "1", "-c:a", "aac", "-b:a", "96k", str(audio)],
                        check=True, capture_output=True, timeout=300)
         try:
-            words = atlas.transcribe(audio, d["duration"])
+            local = stt_local.enabled() and (d.get("ai") == "off" or os.environ.get("STT_LOCAL_ALWAYS") == "1" or not atlas.api_key())
+            words = stt_local.transcribe(audio) if local else atlas.transcribe(audio, d["duration"])
         finally:
             audio.unlink(missing_ok=True)
         if not words:
@@ -12841,9 +12981,14 @@ def run_typo_plan(pid: str) -> None:
                 anchors = typo_analyze(pid)
             typo_set(pid, step="🧠 بيوزّع الكلام على الحركات والمشهد")
         pro = bool(typo_style(d.get("style")).get("pro"))
-        if (atlas.mock_mode() or not atlas.api_key()) and pro:
-            blocks = typo.pro_plan(words, dur, [x["id"] for x in items[:4]])
-        elif atlas.mock_mode() or not atlas.api_key():
+        smart = d.get("ai", "smart") != "off" and atlas.api_key() and not atlas.mock_mode()
+        style = d.get("style") or ""
+        typo_set(pid, step="📖 بيدوّر في القاموس على أيقونات للكلام")
+        hits = dict_hits([w["w"] for w in words], bool(smart))
+        if not smart and pro:
+            blocks = typo.pro_plan(words, dur, [x["id"] for x in items[:4]],
+                                   pick=lambda idxs: concepts.icons_for(idxs, hits, items, style))
+        elif not smart:
             blocks = typo.mock_plan(words, dur)
             spot = next((a for a in anchors or [] if a["kind"] != "face"), None)
             if spot and len(blocks) > 1:   # التجربة: بلوك بيندمج مع أول حاجة في الكادر وآخر كلمة فيه بتبقى هي
@@ -12862,12 +13007,19 @@ def run_typo_plan(pid: str) -> None:
                     b["kind"] = "build"
             elif 0 <= b.get("skip", -1) < len(b["words"]):   # كلمة هي الحاجة نفسها ← الحركة المندمجة
                 b["kind"] = "anchor"
-        stk = {s["id"]: s for s in items}
-        for b in blocks:   # الأسماء اللي ليها ستيكر في المكتبة بتتربط بيه على طول
+        idx = concepts.index(concepts.load(TYPO_DICT))
+        for b in blocks:   # الأسماء ← ستيكرات بروح الستايل (القاموس الأول)، والحركة اللي محتاجة أيقونات وملهاش تاخد من معاني كلامها
             for k in ("icon", "side"):
                 if b.get(k):
-                    b[k] = typo_icon_id(b[k], stk) or b[k]
-            b["icons"] = [typo_icon_id(x, stk) or x for x in b.get("icons") or []]
+                    b[k] = typo_resolve_icon(b[k], items, style, idx)
+            b["icons"] = list(dict.fromkeys(typo_resolve_icon(x, items, style, idx) for x in b.get("icons") or []))
+            span = list(range(b.get("from", 0), b.get("to", -1) + 1))
+            if b["kind"] in ("spot", "icon", "scatter") and not b["icons"] and not b.get("icon"):
+                found = concepts.icons_for(span, hits, items, style)
+                if b["kind"] == "icon":
+                    b["icon"] = found[0] if found else ""
+                else:
+                    b["icons"] = found
         typo_update(pid, lambda x: x.update(blocks=blocks, final=None, status="planned", step=None, error=None))
     except Exception as exc:  # noqa: BLE001
         typo_fail(pid, exc)
@@ -12988,7 +13140,8 @@ def run_typo_icons(pid: str) -> None:
         made = {}
         for n, name in enumerate(d["missing_icons"]):
             typo_set(pid, step=f"🎨 بيرسم الأيقونة {n + 1} من {len(d['missing_icons'])}: {name}")
-            made[name] = sticker_draw(name, name, st.get("icon_style", ""), "drawn")["id"]
+            known = name if name in concepts.load(TYPO_DICT)["concepts"] else ""
+            made[name] = sticker_draw(name, name, st.get("icon_style", ""), "drawn", style=d.get("style") or "", concept=known)["id"]
         def fn(x):
             for b in x.get("blocks") or []:
                 for k in ("icon", "side"):

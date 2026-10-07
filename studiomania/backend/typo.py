@@ -237,8 +237,9 @@ def sentences(words: list[dict]) -> list[list[int]]:
     return out + ([cur] if cur else [])
 
 
-def pro_plan(words: list[dict], duration: float, icons: list[str] | None = None) -> list[dict]:
-    """الإخراج الاحترافي من غير موديل: إيقاع الفيديو المرجع (track ← sign ← spot) مع تنويع ثابت من جملة للتانية."""
+def pro_plan(words: list[dict], duration: float, icons: list[str] | None = None, pick=None) -> list[dict]:
+    """الإخراج الاحترافي من غير موديل: إيقاع الفيديو المرجع (track ← sign ← spot) مع تنويع ثابت من جملة للتانية.
+    pick(أرقام كلام الجملة) ← أيقونات من القاموس بروح الستايل (الجملة اللي فيها حاجة ملموسة بتاخد spot بأيقوناتها)."""
     import random
     out = []
     sents = sentences(words)
@@ -248,6 +249,9 @@ def pro_plan(words: list[dict], duration: float, icons: list[str] | None = None)
         head = sent[: min(4, max(1, n // 3))] if n > 2 else sent
         rest = sent[len(head):]
         tail = rest[-min(3, max(1, len(rest) // 3)):] if len(rest) >= 3 else []
+        found = pick(sent) if pick else []
+        if found and not tail and rest:   # فيها حاجة ليها أيقونة: آخر كلمة بتبقى spot
+            tail = rest[-1:]
         mid = rest[: len(rest) - len(tail)]
         neg = [i for i, k in enumerate(head) if re.search(r"(n't|not|no|مش|ما|لا|مفيش)", words[k]["w"].lower())]
         tr = {"from": head[0], "to": head[-1], "kind": "track", "intro": "flash" if si == 0 else rnd.choice(["", "", "card"]),
@@ -262,7 +266,7 @@ def pro_plan(words: list[dict], duration: float, icons: list[str] | None = None)
                         "tone": rnd.choice(["", "", "dark"]), "marks": [{"type": rnd.choice(["circle", "underline", "arrow"]), "word": mid.index(longest)}]})
         if tail:
             out.append({"from": tail[0], "to": tail[-1], "kind": "spot", "intro": "burst", "outro": "red" if si < len(sents) - 1 else "",
-                        "icons": (icons or [])[:4], "focus": len(tail) - 1, "flank": rnd.choice(["", "right"]), "color": rnd.choice(["blue", "red", "yellow"]),
+                        "icons": (found if pick else icons or [])[:4], "focus": len(tail) - 1, "flank": rnd.choice(["", "right"]), "color": rnd.choice(["blue", "red", "yellow"]),
                         "arrange": rnd.choice(["scatter", "row"]), "tone": rnd.choice(["", "", "dark"])})
     for b in out:
         b.setdefault("theme", "light")
