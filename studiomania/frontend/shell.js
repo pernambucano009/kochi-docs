@@ -137,10 +137,20 @@ async function renderStageProject() {
 $("stageMin").onclick = () => showStep("home");
 $("flowNav").addEventListener("click", (e) => {
   const b = e.target.closest("button[data-step]");
-  if (b) showStep(b.dataset.step);
+  if (!b) return;
+  if (b.dataset.step === "6") return openFlowMontage().catch((err) => toast(err.message, true));
+  showStep(b.dataset.step);
 });
+
+// المونتاج من شريط الخطوات: لو المشروع اللي شغال عليه اتولّد بأكتر من مدرب، يسأل أنهي مدرب
+async function openFlowMontage() {
+  const f = await flowFolder();
+  if (f?.video?.generated && (await api(`/api/videos/${f.video.id}/coaches`)).length > 1) return openMontageForVideo(f.video.id);
+  showStep("6");
+}
 $("stagePrev").onclick = () => {
   const i = PROCESS.indexOf(shell.step);
+  if (i > 0 && PROCESS[i - 1] === "6") return openFlowMontage().catch((err) => toast(err.message, true));
   if (i > 0) showStep(PROCESS[i - 1]);
 };
 $("stageNext").onclick = () => goNext(shell.step);
