@@ -22,11 +22,33 @@ KINDS = {
     "anchor": "الكلام بيتكتب كلمة كلمة جنب أو فوق أو على حاجة ظاهرة في الفيديو (مرساة) وبيتحرك معاها، "
               "وكلمة منه ممكن ما تتكتبش وتبقى الحاجة نفسها هي الكلمة (skip) ويترسم حواليها دايرة بالقلم",
 }
+# الحركات الاحترافية (frontend/typo-moments.js): متبنية من الفيديو المرجع لحظة بلحظة
+PRO_KINDS = {
+    "track": "كلام كبير جدًا قاعد على خطين متقطعين والكاميرا ماشية معاه كلمة كلمة، وصندوق بالقلم حوالين كلمة وشريط أسود بينسحب عن كلمة "
+             "(لأول الجملة/الهوك، من 2 لـ 4 كلمات قصيرة)",
+    "sign": "السطر الصغير (الجملة لحد دلوقتي) بين أقواس، وإمضا بالقلم بتتكتب تحته، وخطوط قلم، ودايرة بالقلم حوالين الكلمة المهمة (focus) "
+            "(لكمالة الجملة، من 2 لـ 7 كلمات)",
+    "spot": "الجملة كاملة في النص، ونجمة لمعة كبيرة من الجنب، والكادر بيضلم حوالين بقعة نور، و2-4 أيقونات بتطفو "
+            "(لآخر الجملة/السؤال/الخلاصة، من كلمة لـ 4 كلمات، وبيستنى لحد ما الجملة الجاية تبدأ)",
+}
+KINDS.update(PRO_KINDS)
+INTROS = {"track": ("", "flash"), "spot": ("", "burst")}
+OUTROS = {"track": ("", "pixel"), "spot": ("", "red")}
 PLACES = ("auto", "left", "right", "above", "below", "on")
 THEMES = ("light", "dark", "accent")
 
 # الستايل اللي اتطلّع من فيديو المرجع (أبيض رمادي / أسود / أحمر، وكارت أصفر للكلمة الكبيرة)
 BUILTIN_STYLES = {
+    "pro": {
+        "name": "⭐ احترافي (زي الفيديو المرجع)", "font": "SM Tajawal", "case": "lower", "grain": 0.12, "weight": 700, "pro": True,
+        "light": {"bg": "#ECEBE8", "ink": "#191716", "accent": "#E0261F"},
+        "dark": {"bg": "#0C0808", "ink": "#F4F4F2", "accent": "#E0261F"},
+        "accent": {"bg": "#E0AB1C", "ink": "#3B2408", "accent": "#191716"},
+        "rules": ["كل جملة: track لأولها (أول جملة في الفيديو intro=flash)، وبعدين sign لكمالتها، وspot لآخرها لو سؤال أو خلاصة (intro=burst)",
+                  "track قبل sign دايمًا outro=pixel", "spot قبل تغيير كبير (جملة جديدة بإحساس تاني) outro=red",
+                  "focus في sign وspot = الكلمة اللي عليها الضغط", "sign = كلمة أو كلمتين بتتكتب إمضا (أهم كلمتين في الجزء ده)"],
+        "kinds": {"track": 3, "sign": 3, "spot": 2},
+    },
     "mono-red": {
         "name": "أبيض وأسود وأحمر (المرجع)", "font": "SM Tajawal", "case": "lower", "grain": 0.12, "weight": 700,
         "light": {"bg": "#ECEBE8", "ink": "#141414", "accent": "#E5322D"},
@@ -52,7 +74,9 @@ PLAN_FORMAT = """{
               "text": "الكلام اللي يتكتب (من كلام الجمل دي بالظبط، ممكن تختصره لكلمة أو كلمتين في pop/icon/letters/scatter)",
               "focus": 0, "icon": "اسم ستيكر من المكتبة أو وصف قصير بالإنجليزي لأيقونة جديدة", "icons": ["..."], "letter": 1,
               "side": "اسم ستيكر/صورة كبيرة جنب الكلام في build أو فاضي",
-              "anchor": "رقم مرساة من الفيديو (a1...) أو فاضي", "place": "auto | left | right | above | below | on", "skip": -1}]
+              "anchor": "رقم مرساة من الفيديو (a1...) أو فاضي", "place": "auto | left | right | above | below | on", "skip": -1,
+              "intro": "flash (track) | burst (spot) | فاضي", "outro": "pixel (track) | red (spot) | فاضي",
+              "sign": "كلمة أو كلمتين تتكتب إمضا (sign)", "box": 1, "redact": 2}]
 }"""
 
 
@@ -72,7 +96,8 @@ def anchors_text(anchors: list[dict]) -> str:
 def plan_messages(words: list[dict], style: dict, stickers: list[str], brief: str, anchors: list[dict] | None = None) -> list[dict]:
     """الموديل بيقسم الكلام (كل كلمة برقمها ووقتها) على بلوكات، ولكل بلوك حركة وأيقونات.
     لو فيه فيديو متحلّل: بيشوف المراسي (الحاجات اللي في الكادر وأماكنها) وبيدمج الكلام معاها."""
-    kinds = "\n".join(f"- {k}: {v}" for k, v in KINDS.items())
+    pro = bool(style.get("pro"))
+    kinds = "\n".join(f"- {k}: {v}" for k, v in (PRO_KINDS if pro else {k: v for k, v in KINDS.items() if k not in PRO_KINDS}).items())
     rules = "\n".join(f"- {r}" for r in style.get("rules") or [])
     weights = ", ".join(f"{k}×{v}" for k, v in (style.get("kinds") or {}).items())
     text = (
@@ -101,12 +126,16 @@ def plan_messages(words: list[dict], style: dict, stickers: list[str], brief: st
         "- icon/letters/ring/side محتاجين صور: اختار من المكتبة بالاسم الأول، ولو مفيش مناسب اكتب اسم قصير بالإنجليزي لأيقونة جديدة (2-3 كلمات، من غير كلمة icon). "
         "ring محتاج 5-6 icons.\n"
         "- الأيقونات الجديدة بتترسم بفلوس: الفيديو كله ميزيدش عن 8 أيقونات جديدة مختلفة، وكرر نفس الاسم بالظبط لو نفس الحاجة اتكررت.\n"
-        "- letters: text كلمة واحدة قصيرة، وletter = رقم الحرف اللي هيتبدل (من 0).\n"
+        + ("- ده ستايل احترافي: استخدم track وsign وspot بس، وبالترتيب اللي في القواعد. spot أيقوناته 2-4 (icons).\n" if pro else "")
+        + "- letters: text كلمة واحدة قصيرة، وletter = رقم الحرف اللي هيتبدل (من 0).\n"
         "- focus = رقم الكلمة جوه البلوك اللي تنوّر (من 0) أو -1.\n"
         "- text في pop/icon/letters/scatter كلمة أو كلمتين بس من الكلام نفسه، بنفس لغته.\n"
-        "رجّع JSON بس بالشكل ده:\n" + PLAN_FORMAT
+        "رجّع JSON بس بالشكل ده:\n" + (PLAN_FORMAT.replace("pop | type | build | icon | letters | scatter | ring", "track | sign | spot") if pro else PLAN_FORMAT)
     )
     return [{"role": "user", "content": text}]
+
+
+PRO_MAP = {"pop": "track", "type": "track", "build": "sign", "anchor": "sign", "icon": "spot", "letters": "spot", "scatter": "spot", "ring": "spot"}
 
 
 def _i(v, d=0):
@@ -116,7 +145,7 @@ def _i(v, d=0):
         return d
 
 
-def clean_plan(raw: dict, words: list[dict], duration: float) -> list[dict]:
+def clean_plan(raw: dict, words: list[dict], duration: float, pro: bool = False) -> list[dict]:
     """البلوكات بأوقات حقيقية من الكلمات: كل بلوك من أول كلمة فيه لحد أول كلمة في اللي بعده."""
     n = len(words)
     out = []
@@ -129,17 +158,30 @@ def clean_plan(raw: dict, words: list[dict], duration: float) -> list[dict]:
         if a > z:
             continue
         kind = b.get("kind") if b.get("kind") in KINDS else "build"
+        if pro and kind not in PRO_KINDS:   # الستايل الاحترافي: أي حركة قديمة بتتحوّل لأقرب حركة احترافية
+            kind = PRO_MAP.get(kind, "sign")
         icons = [str(x).strip() for x in (b.get("icons") or []) if str(x).strip()][:9]
         out.append({"from": a, "to": z, "kind": kind, "theme": b.get("theme") if b.get("theme") in THEMES else "light",
                     "text": str(b.get("text") or "").strip(), "focus": _i(b.get("focus"), -1),
                     "icon": str(b.get("icon") or "").strip(), "icons": icons, "letter": _i(b.get("letter"), 1),
                     "side": str(b.get("side") or "").strip(), "anchor": str(b.get("anchor") or "").strip(),
-                    "place": b.get("place") if b.get("place") in PLACES else "auto", "skip": _i(b.get("skip"), -1)})
+                    "place": b.get("place") if b.get("place") in PLACES else "auto", "skip": _i(b.get("skip"), -1),
+                    "intro": b.get("intro") if b.get("intro") in INTROS.get(kind, ("",)) else "",
+                    "outro": b.get("outro") if b.get("outro") in OUTROS.get(kind, ("",)) else "",
+                    "sign": str(b.get("sign") or "").strip()[:40], "box": _i(b.get("box"), -1), "redact": _i(b.get("redact"), -1)})
     if not out and n:
-        return mock_plan(words, duration)
+        return pro_plan(words, duration) if pro else mock_plan(words, duration)
     # كلمات اتسابت في الآخر: تتضاف لآخر بلوك
     if out and out[-1]["to"] < n - 1:
         out[-1]["to"] = n - 1
+    if pro and out:   # الانتقالات اللي بتعمل الإيقاع لو الموديل نسيها
+        if out[0]["kind"] == "track" and not out[0]["intro"]:
+            out[0]["intro"] = "flash"
+        for a, b in zip(out, out[1:] + [None]):
+            if a["kind"] == "track" and b and b["kind"] != "track" and not a["outro"]:
+                a["outro"] = "pixel"
+            if a["kind"] == "spot" and not a["intro"]:
+                a["intro"] = "burst"
     return timed(out, words, duration)
 
 
@@ -154,6 +196,42 @@ def timed(blocks: list[dict], words: list[dict], duration: float) -> list[dict]:
         b["t1"] = blocks[k + 1]["t0"] if k + 1 < len(blocks) else round(max(duration, b["words"][-1]["t1"] + 0.4), 3)
         b["t1"] = max(b["t1"], b["t0"] + 0.3)
     return blocks
+
+
+def sentences(words: list[dict]) -> list[list[int]]:
+    """أرقام كلام كل جملة (لحد . ؟ ! أو وقفة طويلة)."""
+    out, cur = [], []
+    for i, w in enumerate(words):
+        cur.append(i)
+        gap = (words[i + 1]["s"] - w["e"]) if i + 1 < len(words) else 9
+        if re.search(r"[.!?؟]$", w["w"]) or gap > 0.9:
+            out.append(cur)
+            cur = []
+    return out + ([cur] if cur else [])
+
+
+def pro_plan(words: list[dict], duration: float, icons: list[str] | None = None) -> list[dict]:
+    """الإخراج الاحترافي من غير موديل (نفس إيقاع الفيديو المرجع): كل جملة track ← sign ← spot."""
+    out = []
+    for si, sent in enumerate(sentences(words)):
+        n = len(sent)
+        head = sent[: min(4, max(1, n // 3))] if n > 2 else sent
+        rest = sent[len(head):]
+        tail = rest[-min(3, max(1, len(rest) // 3)):] if len(rest) >= 3 else []
+        mid = rest[: len(rest) - len(tail)]
+        out.append({"from": head[0], "to": head[-1], "kind": "track", "intro": "flash" if si == 0 else "", "outro": "pixel" if mid or tail else ""})
+        if mid:
+            longest = max(mid, key=lambda i: len(words[i]["w"]))
+            out.append({"from": mid[0], "to": mid[-1], "kind": "sign", "focus": mid.index(longest), "sign": words[longest]["w"].strip(".,،؟?!")})
+        if tail:
+            out.append({"from": tail[0], "to": tail[-1], "kind": "spot", "intro": "burst", "outro": "red" if si < len(sentences(words)) - 1 else "",
+                        "icons": (icons or [])[:4], "focus": len(tail) - 1})
+    for b in out:
+        b.setdefault("theme", "light")
+        for k, v in (("text", ""), ("focus", -1), ("icon", ""), ("icons", []), ("letter", 1), ("side", ""), ("anchor", ""), ("place", "auto"),
+                     ("skip", -1), ("intro", ""), ("outro", ""), ("sign", ""), ("box", -1), ("redact", -1)):
+            b.setdefault(k, v)
+    return timed(out, words, duration)
 
 
 def mock_plan(words: list[dict], duration: float) -> list[dict]:

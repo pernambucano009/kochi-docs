@@ -91,7 +91,8 @@
       const urls = new Set();
       for (const b of this.doc.blocks || []) for (const u of [b.icon, b.side, ...(b.icons || [])]) if (u) urls.add(u);
       const imgs = [...urls].map((u) => new Promise((res) => { const i = new Image(); i.onload = i.onerror = res; i.src = u; }));
-      return Promise.all([TypoEngine.font(this.style.font), TypoEngine.font("SM Tajawal"), ...imgs]);
+      const pro = TypoEngine.FULL && (this.doc.blocks || []).some((b) => TypoEngine.FULL.has(b.kind));
+      return Promise.all([TypoEngine.font(this.style.font), TypoEngine.font("SM Tajawal"), pro ? TypoEngine.momentFonts() : null, ...imgs]);
     }
 
     theme(b) {
@@ -117,6 +118,12 @@
       const th = this.theme(b);
       const bg = this.doc.transparent ? "transparent" : th.bg;
       let html = "";
+      if (b && TypoEngine.FULL?.has(b.kind)) {
+        // الحركات الاحترافية (typo-moments.js) بترسم الكادر كله بنفسها: الورق والإضاءة والحبيبات
+        this.stage.style.background = "#000";
+        this.stage.innerHTML = this[`k_${b.kind}`](b, t, (t - b.t0) / Math.max(0.01, b.t1 - b.t0), th, i) + (this.showAnchors ? this.anchorGuides(t) : "");
+        return;
+      }
       if (b) {
         const k = (t - b.t0) / Math.max(0.01, b.t1 - b.t0);
         const box = this.anchorBox(b.anchor, t);

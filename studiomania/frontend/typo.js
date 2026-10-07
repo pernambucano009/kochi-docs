@@ -2,7 +2,9 @@
 // وكمان خطوة «🔤 التايبوجرافي» في معمل التفكيك (اللي بتطلّع الستايل والأيقونات من فيديو).
 
 const tyx = { list: [], cur: null, stk: [], styles: [], view: "home", timer: null, eng: null, play: null, t: 0, open: {} };
-const TY_KINDS = { pop: "💥 كلمة كبيرة", type: "⌨️ كتابة بمؤشر", build: "✨ كلمة كلمة", icon: "🖼️ كلمة وأيقونة", letters: "🔠 حرف بيتبدل بصورة", scatter: "🌪️ حروف بتتجمع", ring: "⭕ دايرة أيقونات", anchor: "📍 مندمج مع الفيديو" };
+const TY_KINDS = { track: "⭐ 🎬 كلام كبير على الخطوط", sign: "⭐ ✍️ سطر وإمضا", spot: "⭐ 🌟 نجمة وبقعة نور", pop: "💥 كلمة كبيرة", type: "⌨️ كتابة بمؤشر", build: "✨ كلمة كلمة", icon: "🖼️ كلمة وأيقونة", letters: "🔠 حرف بيتبدل بصورة", scatter: "🌪️ حروف بتتجمع", ring: "⭕ دايرة أيقونات", anchor: "📍 مندمج مع الفيديو" };
+const TY_INTRO = { track: { "": "من غير افتتاح", flash: "⚡ افتتاح بفلاشات" }, spot: { "": "من غير فلاش", burst: "💛 فلاش أصفر قبلها" } };
+const TY_OUTRO = { track: { "": "من غير قفلة", pixel: "▦ تتكسّر بكسلات" }, spot: { "": "من غير قفلة", red: "🔴 فلاش أحمر في الآخر" } };
 const TY_PLACES = { auto: "📍 مكان الكلام: البرنامج يختار", left: "⬅️ شمالها", right: "➡️ يمينها", above: "⬆️ فوقها", below: "⬇️ تحتها", on: "📝 عليها" };
 const TY_AKINDS = { photo: "🖼️ صورة", paper: "📄 ورقة", screen: "📱 شاشة", object: "📦 حاجة", product: "🛍️ منتج", face: "🙂 وش", person: "🧍 شخص", sign: "🪧 يافطة", space: "⬜ مساحة فاضية" };
 const TY_THEMES = { light: "☀️ فاتح", dark: "🌙 غامق", accent: "🟨 ملوّن" };
@@ -121,7 +123,7 @@ function tySceneView(v, busy) {
 }
 
 function tyBlockRow(v, b, i) {
-  const icons = b.kind === "letters" || b.kind === "ring" ? b.icons || [] : b.kind === "icon" ? [b.icon].filter(Boolean) : [];
+  const icons = b.kind === "letters" || b.kind === "ring" || b.kind === "spot" ? b.icons || [] : b.kind === "icon" ? [b.icon].filter(Boolean) : [];
   const side = b.kind === "build" ? [b.side].filter(Boolean) : [];
   const stkOpts = `<option value="">＋ ستيكر</option>` + tyx.stk.map((s) => `<option value="${s.id}">${tye(s.name)}</option>`).join("");
   return `<article class="ty-block" data-tyb="${i}">
@@ -136,10 +138,16 @@ function tyBlockRow(v, b, i) {
       ${b.anchor ? `<select data-tbf="place">${Object.entries(TY_PLACES).map(([k, l]) => `<option value="${k}" ${k === (b.place || "auto") ? "selected" : ""}>${l}</option>`).join("")}</select>` : ""}
       ${b.anchor && b.kind === "anchor" ? `<label>الكلمة اللي الحاجة نفسها مكانها <select data-tbf="skip"><option value="-1">—</option>${(b.words || []).map((w, j) => `<option value="${j}" ${j === b.skip ? "selected" : ""}>${tye(w.w)}</option>`).join("")}</select></label>` : ""}
     </div>` : ""}
+    ${TY_INTRO[b.kind] || b.kind === "sign" ? `<div class="row wrap">
+      ${TY_INTRO[b.kind] ? `<select data-tbf="intro">${Object.entries(TY_INTRO[b.kind]).map(([k, l]) => `<option value="${k}" ${k === (b.intro || "") ? "selected" : ""}>${l}</option>`).join("")}</select>
+        <select data-tbf="outro">${Object.entries(TY_OUTRO[b.kind]).map(([k, l]) => `<option value="${k}" ${k === (b.outro || "") ? "selected" : ""}>${l}</option>`).join("")}</select>` : ""}
+      ${b.kind === "sign" || b.kind === "spot" ? `<label>الكلمة اللي عليها الضغط <select data-tbf="focus"><option value="-1">—</option>${(b.words || []).map((w, j) => `<option value="${j}" ${j === b.focus ? "selected" : ""}>${tye(w.w)}</option>`).join("")}</select></label>` : ""}
+      ${b.kind === "sign" ? `<label>الإمضا <input data-tbf="sign" value="${tye(b.sign || "")}" dir="auto" data-no-i18n></label>` : ""}
+    </div>` : ""}
     <div class="row wrap"><label>المكتوب <input data-tbf="text" value="${tye(b.text)}" dir="auto" data-no-i18n></label>
       ${b.kind === "build" ? `<label>الكلمة اللي تنوّر <select data-tbf="focus"><option value="-1">—</option>${(b.words || []).map((w, j) => `<option value="${j}" ${j === b.focus ? "selected" : ""}>${tye(w.w)}</option>`).join("")}</select></label>` : ""}
       ${b.kind === "letters" ? `<label>الحرف اللي يتبدل <input type="number" min="0" max="20" data-tbf="letter" value="${b.letter ?? 1}"></label>` : ""}
-      ${["icon", "letters", "ring"].includes(b.kind) ? `<span class="ty-icons">${icons.map((n, j) => tyIconChip(n, `data-tyrm="${j}"`)).join("")}
+      ${["icon", "letters", "ring", "spot"].includes(b.kind) ? `<span class="ty-icons">${icons.map((n, j) => tyIconChip(n, `data-tyrm="${j}"`)).join("")}
         <select data-tyadd>${stkOpts}</select></span>` : ""}
       ${b.kind === "build" ? `<span class="ty-icons">${side.map((n) => tyIconChip(n, 'data-tyrmside="1"')).join("")}${side.length ? "" : `<select data-tyside>${stkOpts.replace("＋ ستيكر", "＋ صورة جنب الكلام")}</select>`}</span>` : ""}
     </div></article>`;

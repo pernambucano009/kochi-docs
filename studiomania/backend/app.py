@@ -12834,7 +12834,10 @@ def run_typo_plan(pid: str) -> None:
                 typo_set(pid, step="👁️ بيحلل الفيديو: إيه اللي في الكادر وفين")
                 anchors = typo_analyze(pid)
             typo_set(pid, step="🧠 بيوزّع الكلام على الحركات والمشهد")
-        if atlas.mock_mode() or not atlas.api_key():
+        pro = bool(typo_style(d.get("style")).get("pro"))
+        if (atlas.mock_mode() or not atlas.api_key()) and pro:
+            blocks = typo.pro_plan(words, dur, [x["id"] for x in items[:4]])
+        elif atlas.mock_mode() or not atlas.api_key():
             blocks = typo.mock_plan(words, dur)
             spot = next((a for a in anchors or [] if a["kind"] != "face"), None)
             if spot and len(blocks) > 1:   # التجربة: بلوك بيندمج مع أول حاجة في الكادر وآخر كلمة فيه بتبقى هي
@@ -12842,7 +12845,7 @@ def run_typo_plan(pid: str) -> None:
         else:
             st = typo_style(d.get("style"))
             raw = ad_json(series_chat(typo.plan_messages(words, st, [s["name"] for s in items], d.get("brief") or "", anchors)), "خطة التايبوجرافي")
-            blocks = typo.clean_plan(raw, words, dur)
+            blocks = typo.clean_plan(raw, words, dur, pro)
         ids = {a["id"] for a in anchors or []}
         for b in blocks:
             if b["kind"] in ("pop", "ring", "letters", "scatter"):   # دول ملو الشاشة: مش جنب حاجة
@@ -13002,8 +13005,13 @@ def typo_doc(pid: str, d: dict) -> dict:
     def img(n):
         return stk.get(typo_icon_id(n, items) or "") if n else None
     blocks = []
+    words = d.get("words") or []
+    sents = typo.sentences(words) if words else []   # الحركات الاحترافية بتعرض الجملة كلها (اللي اتقال منها قبل البلوك ظاهر)
     for b in d.get("blocks") or []:
-        blocks.append({**{k: b.get(k) for k in ("t0", "t1", "kind", "theme", "text", "words", "focus", "letter", "anchor", "place", "skip")},
+        sent = next(([{"w": words[i]["w"], "t0": words[i]["s"], "t1": words[i]["e"]} for i in range(sn[0], sn[-1] + 1)]
+                     for sn in sents if sn[0] <= b.get("from", 0) <= sn[-1]), None)
+        blocks.append({**{k: b.get(k) for k in ("t0", "t1", "kind", "theme", "text", "words", "focus", "letter", "anchor", "place", "skip",
+                                                 "intro", "outro", "sign", "box", "redact")}, "sent": sent,
                        "icon": img(b.get("icon")), "side": img(b.get("side")), "icons": [u for u in (img(i) for i in b.get("icons") or []) if u]})
     kind = (d.get("bg") or {}).get("kind", "theme")
     if kind != "theme":
