@@ -8,6 +8,7 @@
 import base64
 import gzip
 import hashlib
+import hmac
 import json
 import math
 import os
@@ -517,10 +518,19 @@ def gzipped_asset(request: Request) -> Response | None:
     )
 
 
+def export_token_ok(request: Request) -> bool:
+    """مفتاح قراءة بس لنسخ «الصورة + المؤثرات» في المعمل (LAB_EXPORT_TOKEN على Railway)، عشان تتسحب من برا من غير باسورد."""
+    want = (os.environ.get("LAB_EXPORT_TOKEN") or "").strip()
+    got = request.headers.get("x-export-token") or ""
+    path = request.url.path
+    allowed = path.startswith("/api/lab/export/") or (path.startswith("/media/lab/") and path.endswith("/picture_fx.mp4"))
+    return bool(want) and len(want) >= 16 and allowed and request.method == "GET" and hmac.compare_digest(want, got)
+
+
 @app.middleware("http")
 async def require_login(request: Request, call_next):
     path = request.url.path
-    if path in PUBLIC_PATHS or auth.valid_token(request.cookies.get(SESSION_COOKIE)):
+    if path in PUBLIC_PATHS or auth.valid_token(request.cookies.get(SESSION_COOKIE)) or export_token_ok(request):
         if (fast := gzipped_asset(request)) is not None:
             return fast
         response = await call_next(request)
@@ -8683,6 +8693,22 @@ def lab_create(file: UploadFile = File(...), name: str = Form("")):
     (folder / "lab.json").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
     threading.Thread(target=run_lab, args=(lid, list(LAB_UPLOAD)), daemon=True).start()
     return lab_to_dict(lid, d)
+
+
+@app.get("/api/lab/export/list")
+def lab_export_list():
+    """قايمة الفيديوهات اللي ليها نسخة «الصورة + المؤثرات» (الاسم واللينك والحالة)."""
+    out = []
+    for f in sorted(LAB_DIR.glob("*/lab.json"), key=lambda x: x.stat().st_mtime):
+        try:
+            d = json.loads(f.read_text(encoding="utf-8"))
+        except ValueError:
+            continue
+        st = (d.get("steps") or {}).get("split") or {}
+        out.append({"id": f.parent.name, "name": d.get("name"), "duration": d["source"]["duration"], "status": st.get("status"),
+                    "error": st.get("error"), "updated_at": d.get("updated_at"),
+                    "url": f"/media/lab/{f.parent.name}/picture_fx.mp4" if d.get("picture_fx") else None})
+    return out
 
 
 @app.get("/api/lab/export/picture-fx.zip")
