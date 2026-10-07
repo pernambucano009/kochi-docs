@@ -1,0 +1,17 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>typo render</title>
+<style>html,body{margin:0;padding:0;background:transparent;overflow:hidden}</style></head>
+<body><div id="stage"></div>
+<script src="/typo-engine.js"></script>
+<script>
+// صفحة الرسم اللي السيرفر بيفتحها في المتصفح: بتجيب الخطة وتستنى الخطوط والصور، والسيرفر بينادي renderAt لكل فريم ويصوّر
+window.typoReady = (async () => {
+  const id = new URLSearchParams(location.search).get("id");
+  const doc = await (await fetch(`/api/typo/${encodeURIComponent(id)}/doc`)).json();
+  const eng = new TypoEngine(document.getElementById("stage"), doc);
+  await eng.ready();
+  window.renderAt = (t) => eng.renderAt(t);
+  eng.renderAt(0);
+  return { w: doc.w, h: doc.h, duration: doc.duration };
+})();
+</script></body></html>

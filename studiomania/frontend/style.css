@@ -1752,3 +1752,41 @@ img.tv-cell { outline: 2px dashed #f0b54a; outline-offset: -2px; }
 .coach-pick-item { display: grid; gap: 4px; justify-items: center; padding: 10px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); cursor: pointer; font: inherit; color: inherit; }
 .coach-pick-item:hover { border-color: var(--accent); }
 .coach-pick-item img { width: 72px; height: 72px; border-radius: 50%; object-fit: cover; }
+
+/* ---------- 🔤 التايبوجرافي */
+.ty-words { padding: 10px 12px; border-radius: var(--radius-sm); background: var(--surface-2); line-height: 1.8; margin: 0 0 10px; }
+.ty-src { width: min(320px, 100%); border-radius: var(--radius-sm); display: block; margin-top: 10px; }
+.ty-blocks { display: grid; gap: 8px; margin-top: 10px; }
+.ty-block { border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 8px 10px; background: var(--surface); display: grid; gap: 6px; }
+.ty-block header { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.ty-block header small { flex: 1; min-width: 120px; }
+.ty-block label { display: flex; gap: 6px; align-items: center; font-size: 13px; }
+.ty-block input[data-tbf="text"] { min-width: 160px; }
+.ty-icons { display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.ty-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px 2px 2px; border-radius: 999px; background: var(--surface-2); cursor: pointer; font-size: 12px; }
+.ty-chip img { width: 28px; height: 28px; object-fit: contain; }
+.ty-chip.miss { outline: 1px dashed var(--warn); }
+.ty-miss { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; margin: 10px 0; padding: 8px 10px; border-radius: var(--radius-sm); background: var(--accent-soft); }
+.ty-preview { display: grid; gap: 10px; }
+.ty-screen { display: flex; justify-content: center; }
+.ty-box { position: relative; overflow: hidden; border-radius: 8px; box-shadow: 0 8px 30px -12px rgba(0,0,0,.35); }
+.ty-box > #tyStage { position: absolute; top: 0; left: 0; }
+.ty-bg { position: absolute; inset: 0; overflow: hidden; }
+.ty-bg img, .ty-bg video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.ty-ctrl { display: flex; gap: 8px; align-items: center; }
+.ty-ctrl input { flex: 1; }
+.ty-final { width: min(360px, 100%); border-radius: var(--radius-sm); }
+.ty-stk { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+.ty-stk figure { margin: 0; min-width: 0; display: grid; gap: 4px; padding: 8px; border-radius: var(--radius-sm); background: var(--surface); border: 1px solid var(--line); }
+.ty-checker { aspect-ratio: 1; border-radius: 10px; display: grid; place-items: center;
+  background: repeating-conic-gradient(#d9d9d6 0 25%, #f3f3f1 0 50%) 0 0 / 16px 16px; }
+.ty-checker { overflow: hidden; }
+.ty-checker img { width: 90%; height: 90%; object-fit: contain; }
+.ty-check { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; }
+.ty-labstyle { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
+.ty-sw { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 8px; font-weight: 700; border: 1px solid var(--line); }
+.ty-sw i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.ty-sw.sm { width: 14px; height: 14px; padding: 0; vertical-align: middle; }
+.ty-rules { margin: 4px 0 8px; padding-inline-start: 20px; font-size: 13px; }
+.ty-moments { display: grid; gap: 6px; }
+.ty-moment { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 6px 8px; border-radius: 10px; background: var(--surface-2); font-size: 13px; }

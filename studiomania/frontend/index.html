@@ -32,6 +32,7 @@
   <symbol id="i-max" viewBox="0 0 24 24"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></symbol>
   <symbol id="i-slides" viewBox="0 0 24 24"><rect x="7" y="3.5" width="10" height="17" rx="2"/><path d="M4 6v12M20 6v12"/></symbol>
   <symbol id="i-lab" viewBox="0 0 24 24"><path d="M9 3.5h6M10 3.5v5.2L4.6 18.2A1.6 1.6 0 0 0 6 20.5h12a1.6 1.6 0 0 0 1.4-2.3L14 8.7V3.5M7.2 14h9.6"/></symbol>
+  <symbol id="i-type" viewBox="0 0 24 24"><path d="M5 6.5V5h14v1.5M12 5v14M9 19h6"/></symbol>
   <symbol id="i-box" viewBox="0 0 24 24"><path d="M4 7.5 12 4l8 3.5v9L12 20l-8-3.5z"/><path d="M4 7.5l8 3.5 8-3.5M12 11v9"/></symbol>
 </svg>
 <div class="bg-art" aria-hidden="true"><i class="blob b1"></i><i class="blob b2"></i><i class="blob b3"></i><i class="ring r1"></i><i class="ring r2"></i></div>
@@ -46,6 +47,7 @@
     <button class="rail-btn" data-goto="9" title="المسلسلات"><svg><use href="#i-film"/></svg><span>المسلسلات</span></button>
     <button class="rail-btn" data-goto="10" title="الإعلانات"><svg><use href="#i-spark"/></svg><span>الإعلانات</span></button>
     <button class="rail-btn" data-goto="11" title="معمل التفكيك"><svg><use href="#i-lab"/></svg><span>معمل التفكيك</span></button>
+    <button class="rail-btn" data-goto="12" title="التايبوجرافي"><svg><use href="#i-type"/></svg><span>التايبوجرافي</span></button>
     <span class="rail-sep"></span>
     <button class="rail-btn" data-goto="4" title="المدربين"><svg><use href="#i-users"/></svg><span>المدربين</span></button>
     <button class="rail-btn" data-goto="3" title="التعليق الصوتي"><svg><use href="#i-mic"/></svg><span>التعليق الصوتي</span></button>
@@ -958,6 +960,7 @@
                   <button class="btn sm" data-labrun="elements">🧩 العناصر</button>
                   <button class="btn sm" data-labrun="components">💡 الكومبوننتس</button>
                   <button class="btn sm" data-labrun="connectors">🔗 الكونيكتورز</button>
+                  <button class="btn sm" id="labTypoBtn" title="يطلّع كل لحظة الكلام فيها اتحوّل لكلمات أو أشكال أو أيقونات، والستايل، والأيقونات كستيكرات شفافة">🔤 التايبوجرافي</button>
                   <button class="btn sm" id="labSchemaBtn" title="الموديل بيتفرج على الفيديو كله ويطلّع مخططه: تيمبليت كامل تعمل عليه فيديوهات لعملاء تانيين">🗺️ المخطط</button>
                   <button class="btn sm danger" id="labDelete">🗑️</button>
                 </div>
@@ -970,6 +973,7 @@
                 <div class="lab-tl" id="labTimeline"></div>
               </div>
               <section class="panel lab-sec" id="labSchema"></section>
+              <section class="panel lab-sec" id="labTypo" hidden></section>
               <section class="panel lab-sec" id="labConns"></section>
               <section class="panel lab-sec" id="labComps"></section>
               <section class="panel lab-sec" id="labAudio"></section>
@@ -979,6 +983,22 @@
             <section class="car-main" id="labFilm" hidden></section>
             <section class="car-main" id="labTpl" hidden></section>
             <div class="panel muted" id="labEmpty" hidden>ارفع فيديو من «＋ فيديو للتفكيك» عشان نبدأ.</div>
+          </div>
+        </main>
+
+        <main class="view" data-view="12" hidden>
+          <div class="car-layout">
+            <aside class="panel ad-side">
+              <div class="panel-head"><h2>🔤 التايبوجرافي</h2></div>
+              <button type="button" class="btn primary ad-up" id="tyNew">＋ فيديو تايبوجرافي جديد</button>
+              <p class="hint">الكلام بيتحوّل لموشن جرافيك: كلمات بتتكتب وتتبعتر وتتجمع، وحروف بتتبدل بأيقونات. من كلام بتكتبه، أو صوت، أو فيديو متصوّر (الكلام بيتركب فوقه).</p>
+              <ul class="ad-list" id="tyList"></ul>
+              <button type="button" class="btn lab-libbtn" id="tyStkBtn">🧩 مكتبة الستيكرات <span class="muted" id="tyStkCount"></span></button>
+              <p class="hint">الأيقونات والصور الشفافة اللي الكلام بيتحوّل لها. بتيجي من «🔤 التايبوجرافي» في معمل التفكيك، أو ترفعها، أو تترسم بالوصف.</p>
+            </aside>
+            <section class="car-main" id="tyMain" hidden></section>
+            <section class="car-main" id="tyStk" hidden></section>
+            <div class="panel muted" id="tyEmpty">اعمل فيديو جديد من «＋ فيديو تايبوجرافي جديد».</div>
           </div>
         </main>
 
@@ -1576,6 +1596,8 @@
 <script src="/assets.js"></script>
 <script src="/films.js"></script>
 <script src="/templates.js"></script>
+<script src="/typo-engine.js"></script>
+<script src="/typo.js"></script>
 <script src="/clients.js"></script>
 <script src="/shell.js"></script>
 </body>

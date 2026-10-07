@@ -6,6 +6,8 @@ COPY backend/requirements.txt backend/requirements.txt
 # FFmpeg بييجي جاهز مع مكتبة imageio-ffmpeg، فمش محتاجين نثبّته من النظام
 RUN pip install --no-cache-dir -r backend/requirements.txt \
  && python -c "import imageio_ffmpeg; print(imageio_ffmpeg.get_ffmpeg_exe())"
+# متصفح Chromium: بيرسم فيديوهات التايبوجرافي فريم فريم (frontend/typo-engine.js)
+RUN python -m playwright install --with-deps chromium
 COPY backend backend
 COPY frontend frontend
 COPY fonts fonts

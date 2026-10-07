@@ -1,0 +1,535 @@
+// StudioMania — 🔤 التايبوجرافي: الكلام ← حركات (بلوكات) ← معاينة حية بنفس محرّك الرسم ← فيديو.
+// وكمان خطوة «🔤 التايبوجرافي» في معمل التفكيك (اللي بتطلّع الستايل والأيقونات من فيديو).
+
+const tyx = { list: [], cur: null, stk: [], styles: [], view: "home", timer: null, eng: null, play: null, t: 0, open: {} };
+const TY_KINDS = { pop: "💥 كلمة كبيرة", type: "⌨️ كتابة بمؤشر", build: "✨ كلمة كلمة", icon: "🖼️ كلمة وأيقونة", letters: "🔠 حرف بيتبدل بصورة", scatter: "🌪️ حروف بتتجمع", ring: "⭕ دايرة أيقونات" };
+const TY_THEMES = { light: "☀️ فاتح", dark: "🌙 غامق", accent: "🟨 ملوّن" };
+const TY_BG = { theme: "🎨 ألوان الستايل", solid: "🟦 لون سادة", image: "🖼️ صورة", video: "🎬 فيديو", source: "🎥 الفيديو المرفوع" };
+const TY_ST = { new: "", ready: "📝 الكلام جاهز", planned: "🧠 الحركات جاهزة", done: "✅ الفيديو جاهز", failed: "⚠️ فشل",
+  transcribing: "🎧 بيسمع", planning: "🧠 بيوزّع", drawing: "🎨 بيرسم الأيقونات", rendering: "🎬 بيعمل الفيديو" };
+const tye = (v) => escapeHtml(v == null ? "" : String(v));
+const tyT = (t) => `${Math.floor((t || 0) / 60)}:${((t || 0) % 60).toFixed(1).padStart(4, "0")}`;
+const TY = (p) => `/api/typo${p}`;
+
+viewHooks["12"] = initTypo;
+
+async function initTypo() {
+  try {
+    [tyx.list, tyx.stk, tyx.styles] = await Promise.all([api(TY("")), api(TY("/stickers")), api(TY("/styles"))]);
+  } catch (err) { return toast(err.message, true); }
+  const last = storageGet("studiomania.typo");
+  if (!tyx.cur && last && tyx.list.some((p) => p.id === last)) await tyOpen(last);
+  tyRender();
+}
+
+async function tyOpen(id) {
+  tyStop();
+  tyx.cur = await api(TY(`/${id}`));
+  tyx.view = "proj";
+  storageSet("studiomania.typo", id);
+  tyRender();
+  tyPoll();
+}
+
+function tyRender() {
+  $("tyStkCount").textContent = tyx.stk.length ? `(${tyx.stk.length})` : "";
+  $("tyList").innerHTML = tyx.list.map((p) => `<li class="${tyx.cur?.id === p.id && tyx.view === "proj" ? "active" : ""}" data-tyopen="${p.id}">
+    <b data-no-i18n>${tye(p.name)}</b><small class="muted">${p.ratio} · ${TY_ST[p.status] || ""}</small></li>`).join("") || `<li class="muted">لسه مفيش</li>`;
+  $("tyMain").hidden = tyx.view !== "proj" || !tyx.cur;
+  $("tyStk").hidden = tyx.view !== "stk";
+  $("tyEmpty").hidden = !(tyx.view === "home" || (tyx.view === "proj" && !tyx.cur));
+  if (tyx.view === "stk") tyRenderStk();
+  if (tyx.view === "proj" && tyx.cur) tyRenderProj();
+}
+
+// ---------- المشروع
+
+function tyStickerUrl(name) {
+  const s = tyx.stk.find((x) => x.id === name) || tyx.stk.find((x) => x.name === name);
+  return s?.url || null;
+}
+
+function tyIconChip(name, attr) {
+  const url = tyStickerUrl(name);
+  return `<span class="ty-chip ${url ? "" : "miss"}" ${attr || ""} title="${tye(name)}">${url ? `<img src="${url}" alt="">` : "❔"}<small data-no-i18n>${tye(url ? (tyx.stk.find((x) => x.id === name || x.name === name)?.name) : name)}</small></span>`;
+}
+
+function tyRenderProj() {
+  const v = tyx.cur, busy = v.busy, el = $("tyMain");
+  const keep = el.contains(document.activeElement) && document.activeElement.matches("input, textarea, select");
+  if (keep && !tyx.force) return tyStatusOnly();
+  tyx.force = false;
+  const kindTxt = v.source?.kind === "video" ? `🎬 ${tye(v.source.name || "فيديو")}` : v.source?.kind === "audio" ? `🎙️ ${tye(v.source.name || "صوت")}` : "";
+  const bg = v.bg || { kind: "theme" };
+  const stOpts = tyx.styles.map((s) => `<option value="${s.id}" ${s.id === v.style ? "selected" : ""}>${tye(s.name)}</option>`).join("");
+  el.innerHTML = `<div class="car-head"><input class="ad-title" data-tyname value="${tye(v.name)}" data-no-i18n>
+      <div class="row wrap">${v.final_url ? `<a class="btn sm" href="${v.final_url}" download="${tye(v.name)}.mp4">⬇️ نزّل</a>
+        <button type="button" class="btn sm primary" data-tyedit>🎞️ انقل للمونتاج</button>` : ""}
+        <button type="button" class="btn sm danger" data-tydel ${busy ? "disabled" : ""}>🗑️</button></div></div>
+    <div class="fm-status" id="tyStatus"></div>
+    <div class="row wrap tv-opts">
+      <label>المقاس <select data-tyopt="ratio">${v.ratios.map((r) => `<option ${r === v.ratio ? "selected" : ""}>${r}</option>`).join("")}</select></label>
+      <label>الستايل <select data-tyopt="style">${stOpts}</select></label>
+      <label>الخلفية <select data-tybg="kind">${Object.entries(TY_BG).filter(([k]) => k !== "source" || v.source?.kind === "video")
+        .map(([k, l]) => `<option value="${k}" ${k === bg.kind ? "selected" : ""}>${l}</option>`).join("")}</select></label>
+      ${bg.kind === "solid" ? `<label>اللون <input type="color" data-tybg="color" value="${tye(bg.color || "#101010")}"></label>` : ""}
+      ${bg.kind === "image" || bg.kind === "video" ? `<label class="btn sm">⬆ ${bg.file ? "غيّر" : "ارفع"} ${bg.kind === "image" ? "الصورة" : "الفيديو"}
+        <input type="file" data-tybgfile accept="${bg.kind === "image" ? "image/*" : "video/*"}" hidden></label>` : ""}
+      ${["image", "video", "source"].includes(bg.kind) ? `<label>تغميق <input type="range" min="0" max="0.8" step="0.05" data-tybg="dim" value="${bg.dim || 0}"></label>` : ""}
+    </div>
+    <details class="panel tv-step" ${tyx.open.s1 ?? !v.words?.length ? "open" : ""} data-tydk="s1"><summary>١. 🗣️ الكلام <small class="muted">${v.words?.length ? `${v.words.length} كلمة · ${tyT(v.duration)}` : ""} ${kindTxt}</small></summary>
+      <p class="hint">اكتب الكلام (وكل كلمة بتاخد وقت تقريبي)، أو ارفع صوت أو فيديو والكلام بيتكتب بتوقيته. لو رفعت فيديو، التايبوجرافي بيتركب فوقه.</p>
+      ${v.source?.kind === "audio" || v.source?.kind === "video" ? `<p class="ty-words" dir="auto" data-no-i18n>${(v.words || []).map((w) => tye(w.w)).join(" ")}</p>`
+        : `<textarea rows="4" dir="auto" data-tytext placeholder="الكلام اللي هيتحوّل لتايبوجرافي" data-no-i18n>${tye(v.script || "")}</textarea>
+           <button type="button" class="btn sm" data-tysavetext ${busy ? "disabled" : ""}>✍️ استخدم الكلام ده</button>`}
+      <label class="btn sm">⬆ ارفع صوت أو فيديو<input type="file" data-tysrc accept="audio/*,video/*,.mp3,.m4a,.wav,.mp4,.mov" hidden></label>
+      ${v.source_url && v.source?.kind !== "text" ? (v.source.kind === "video" ? `<video src="${v.source_url}" controls playsinline preload="metadata" class="ty-src"></video>`
+        : `<audio src="${v.source_url}" controls preload="metadata"></audio>`) : ""}
+    </details>
+    <details class="panel tv-step" ${tyx.open.s2 ?? !!v.words?.length ? "open" : ""} data-tydk="s2"><summary>٢. 🧠 الحركات <small class="muted">${v.blocks?.length ? `${v.blocks.length} لقطة` : ""}</small></summary>
+      <div class="row wrap"><input type="text" data-tybrief placeholder="عن الفيديو (اختياري): مين بيتكلم ولمين وإيه الإحساس" value="${tye(v.brief || "")}" data-no-i18n>
+        <button type="button" class="btn primary" data-typlan ${busy || !v.words?.length ? "disabled" : ""}>🧠 ${v.blocks?.length ? "وزّعه من جديد" : "وزّع الكلام على الحركات"}</button></div>
+      ${v.missing_icons?.length ? `<div class="ty-miss"><span>أيقونات مش في المكتبة: ${v.missing_icons.map((n) => tyIconChip(n)).join("")}</span>
+        <button type="button" class="btn sm primary" data-tyicons ${busy ? "disabled" : ""}>🎨 ارسمهم (~${v.draw_cost}$)</button></div>` : ""}
+      <div class="ty-blocks">${(v.blocks || []).map((b, i) => tyBlockRow(v, b, i)).join("")}</div>
+    </details>
+    ${v.blocks?.length ? `<section class="panel ty-preview">
+      <div class="ty-screen" id="tyScreen"><div class="ty-box" id="tyBox"><div class="ty-bg" id="tyBg"></div><div id="tyStage"></div></div></div>
+      <div class="ty-ctrl"><button type="button" class="btn sm" data-typlay>▶️</button>
+        <input type="range" min="0" max="${v.duration}" step="0.01" value="${tyx.t}" data-tyscrub><small class="muted" id="tyTime"></small></div>
+      <div class="row wrap"><select data-tyq><option value="high">جودة كاملة (1080)</option><option value="fast">أسرع (720)</option></select>
+        <button type="button" class="btn primary" data-tyrender ${busy ? "disabled" : ""}>🎬 ${v.final_url ? "اعمل الفيديو تاني" : "اعمل الفيديو"}</button>
+        <small class="muted">المعاينة هنا بنفس الرسم اللي هيطلع في الفيديو. الفيديو بيترسم على السيرفر فريم فريم (دقيقة تقريبًا لكل 15 ثانية).</small></div>
+      ${v.final_url ? `<video src="${v.final_url}" controls playsinline preload="metadata" class="ty-final"></video>` : ""}
+    </section>` : ""}`;
+  tyStatusOnly();
+  tyMountPreview();
+}
+
+function tyBlockRow(v, b, i) {
+  const icons = b.kind === "letters" || b.kind === "ring" ? b.icons || [] : b.kind === "icon" ? [b.icon].filter(Boolean) : [];
+  const side = b.kind === "build" ? [b.side].filter(Boolean) : [];
+  const stkOpts = `<option value="">＋ ستيكر</option>` + tyx.stk.map((s) => `<option value="${s.id}">${tye(s.name)}</option>`).join("");
+  return `<article class="ty-block" data-tyb="${i}">
+    <header><button type="button" class="btn sm" data-tyseek="${b.t0}">▶️ ${tyT(b.t0)}</button>
+      <select data-tbf="kind">${Object.entries(TY_KINDS).map(([k, l]) => `<option value="${k}" ${k === b.kind ? "selected" : ""}>${l}</option>`).join("")}</select>
+      <select data-tbf="theme">${Object.entries(TY_THEMES).map(([k, l]) => `<option value="${k}" ${k === b.theme ? "selected" : ""}>${l}</option>`).join("")}</select>
+      <small class="muted" dir="auto" data-no-i18n>«${tye((b.words || []).map((w) => w.w).join(" "))}»</small>
+      ${i < v.blocks.length - 1 ? `<button type="button" class="btn sm" data-tymerge="${i}" title="يضم اللقطة دي مع اللي بعدها">⤵ ضم</button>` : ""}
+      ${(b.to - b.from) >= 1 ? `<button type="button" class="btn sm" data-tysplit="${i}" title="يقسم اللقطة نصين">✂️ قسّم</button>` : ""}</header>
+    <div class="row wrap"><label>المكتوب <input data-tbf="text" value="${tye(b.text)}" dir="auto" data-no-i18n></label>
+      ${b.kind === "build" ? `<label>الكلمة اللي تنوّر <select data-tbf="focus"><option value="-1">—</option>${(b.words || []).map((w, j) => `<option value="${j}" ${j === b.focus ? "selected" : ""}>${tye(w.w)}</option>`).join("")}</select></label>` : ""}
+      ${b.kind === "letters" ? `<label>الحرف اللي يتبدل <input type="number" min="0" max="20" data-tbf="letter" value="${b.letter ?? 1}"></label>` : ""}
+      ${["icon", "letters", "ring"].includes(b.kind) ? `<span class="ty-icons">${icons.map((n, j) => tyIconChip(n, `data-tyrm="${j}"`)).join("")}
+        <select data-tyadd>${stkOpts}</select></span>` : ""}
+      ${b.kind === "build" ? `<span class="ty-icons">${side.map((n) => tyIconChip(n, 'data-tyrmside="1"')).join("")}${side.length ? "" : `<select data-tyside>${stkOpts.replace("＋ ستيكر", "＋ صورة جنب الكلام")}</select>`}</span>` : ""}
+    </div></article>`;
+}
+
+function tyStatusOnly() {
+  const v = tyx.cur, el = $("tyStatus");
+  if (!el) return;
+  el.innerHTML = `<span class="lab-st ${v.busy ? "working" : v.status}">${v.busy ? `<span class="spin-inline"></span>` : ""} ${TY_ST[v.status] || ""}</span>
+    ${v.step ? `<small class="muted">${tye(v.step)}</small>` : ""}${v.error ? `<small class="err">${tye(v.error)}</small>` : ""}`;
+}
+
+// ---------- المعاينة الحية (نفس المحرك اللي بيرسم الفيديو)
+
+async function tyMountPreview() {
+  const v = tyx.cur, stage = $("tyStage");
+  if (!stage) return;
+  const doc = await api(TY(`/${v.id}/doc`));
+  tyx.eng = new TypoEngine(stage, doc);
+  Object.assign(stage.style, { position: "absolute", left: "0", top: "0" });   // الصفحة عربي (RTL): المسرح يفضل من الشمال
+  tyx.doc = doc;
+  const screen = $("tyScreen");
+  const fit = () => {
+    const k = Math.min(screen.clientWidth / doc.w, 560 / doc.h);
+    stage.style.transform = `scale(${k})`;
+    stage.style.transformOrigin = "top left";
+    Object.assign($("tyBox").style, { width: `${doc.w * k}px`, height: `${doc.h * k}px` });
+  };
+  fit();
+  const bg = v.bg || {}, bgEl = $("tyBg");
+  bgEl.innerHTML = !doc.transparent ? "" : bg.kind === "solid" ? `<div style="position:absolute;inset:0;background:${tye(bg.color)}"></div>`
+    : bg.kind === "image" && v.bg_url ? `<img src="${v.bg_url}">` : (bg.kind === "video" && v.bg_url) || (bg.kind === "source" && v.source_url)
+      ? `<video src="${bg.kind === "source" ? v.source_url : v.bg_url}" muted playsinline preload="auto"></video>` : `<div style="position:absolute;inset:0;background:#111"></div>`;
+  if (bg.dim && doc.transparent) bgEl.insertAdjacentHTML("beforeend", `<div style="position:absolute;inset:0;background:#000;opacity:${bg.dim}"></div>`);
+  await tyx.eng.ready();
+  tySeek(tyx.t);
+}
+
+function tySeek(t) {
+  if (!tyx.eng) return;
+  tyx.t = Math.max(0, Math.min(t, tyx.doc.duration));
+  tyx.eng.renderAt(tyx.t);
+  const s = document.querySelector("[data-tyscrub]");
+  if (s) s.value = tyx.t;
+  const tm = $("tyTime");
+  if (tm) tm.textContent = `${tyT(tyx.t)} / ${tyT(tyx.doc.duration)}`;
+  const bv = $("tyBg")?.querySelector("video");
+  if (bv && !tyx.play) { try { bv.currentTime = tyx.t % (bv.duration || 1e9); } catch { /* لسه بيحمّل */ } }
+}
+
+function tyStop() {
+  if (tyx.play) cancelAnimationFrame(tyx.play.raf);
+  tyx.play?.audio?.pause();
+  $("tyBg")?.querySelector("video")?.pause();
+  tyx.play = null;
+  const b = document.querySelector("[data-typlay]");
+  if (b) b.textContent = "▶️";
+}
+
+function tyStart() {
+  if (!tyx.eng) return;
+  if (tyx.t >= tyx.doc.duration - 0.05) tyx.t = 0;
+  const v = tyx.cur;
+  let audio = null;
+  if (v.source_url && v.source?.kind !== "text") {
+    audio = new Audio(v.source_url);
+    audio.currentTime = tyx.t;
+    audio.play().catch(() => {});
+  }
+  const bv = $("tyBg")?.querySelector("video");
+  if (bv) { bv.currentTime = tyx.t; bv.play().catch(() => {}); }
+  const t0 = performance.now() - tyx.t * 1000;
+  tyx.play = { audio };
+  const tick = (now) => {
+    if (!tyx.play) return;
+    const t = audio && !audio.paused ? audio.currentTime : (now - t0) / 1000;
+    tySeek(t);
+    if (t >= tyx.doc.duration) return tyStop();
+    tyx.play.raf = requestAnimationFrame(tick);
+  };
+  tyx.play.raf = requestAnimationFrame(tick);
+  document.querySelector("[data-typlay]").textContent = "⏸";
+}
+
+// ---------- تعديل البلوكات
+
+function tyBlocksFromDom() {
+  const blocks = JSON.parse(JSON.stringify(tyx.cur.blocks));
+  document.querySelectorAll("#tyMain [data-tyb]").forEach((card) => {
+    const b = blocks[Number(card.dataset.tyb)];
+    card.querySelectorAll("[data-tbf]").forEach((x) => {
+      const k = x.dataset.tbf;
+      b[k] = k === "focus" || k === "letter" ? Number(x.value) : x.value;
+    });
+  });
+  return blocks;
+}
+
+async function tySaveBlocks(blocks, msg) {
+  try {
+    tyStop();
+    tyx.cur = await api(TY(`/${tyx.cur.id}`), { method: "PATCH", ...jsonBody({ blocks }) });
+    tyx.force = true;
+    tyRender();
+    if (msg) toast(msg);
+  } catch (err) { toast(err.message, true); }
+}
+
+async function tyPatch(body) {
+  tyStop();
+  tyx.cur = await api(TY(`/${tyx.cur.id}`), { method: "PATCH", ...jsonBody(body) });
+  tyx.force = true;
+  tyRender();
+}
+
+function tyPoll() {
+  clearTimeout(tyx.timer);
+  if (!tyx.cur?.busy || document.querySelector('.view[data-view="12"]').hidden) return;
+  tyx.timer = setTimeout(async () => {
+    try {
+      const was = tyx.cur.status;
+      tyx.cur = await api(TY(`/${tyx.cur.id}`));
+      if (!tyx.cur.busy) {
+        [tyx.list, tyx.stk] = await Promise.all([api(TY("")), api(TY("/stickers"))]);
+        tyx.force = true;
+        tyRender();
+        if (tyx.cur.status === "failed") toast(tyx.cur.error || "فشل", true);
+        else if (was === "rendering") toast("🎬 الفيديو جاهز");
+      } else tyStatusOnly();
+    } catch { /* السيرفر بيعيد التشغيل */ }
+    tyPoll();
+  }, 1500);
+}
+
+$("tyNew").onclick = async () => {
+  const name = prompt("اسم الفيديو:", "تايبوجرافي");
+  if (name === null) return;
+  try {
+    const v = await api(TY(""), { method: "POST", ...jsonBody({ name, ratio: "9:16", style: tyx.styles[0]?.id || "mono-red" }) });
+    tyx.list = await api(TY(""));
+    await tyOpen(v.id);
+  } catch (err) { toast(err.message, true); }
+};
+
+$("tyStkBtn").onclick = async () => {
+  tyStop();
+  tyx.view = "stk";
+  tyx.stk = await api(TY("/stickers"));
+  tyRender();
+};
+
+$("tyList").addEventListener("click", (e) => {
+  const li = e.target.closest("[data-tyopen]");
+  if (li) tyOpen(li.dataset.tyopen).catch((err) => toast(err.message, true));
+});
+
+$("tyMain").addEventListener("toggle", (e) => {
+  const d = e.target.closest?.("[data-tydk]");
+  if (d) tyx.open[d.dataset.tydk] = d.open;
+}, true);
+
+$("tyMain").addEventListener("click", async (e) => {
+  const t = e.target, v = tyx.cur;
+  const wrap = (btn, fn) => busyButton(btn, "⏳", async () => { try { await fn(); } catch (err) { toast(err.message, true); } });
+  const play = t.closest("[data-typlay]");
+  if (play) return tyx.play ? tyStop() : tyStart();
+  const seek = t.closest("[data-tyseek]");
+  if (seek) { tyStop(); tySeek(Number(seek.dataset.tyseek)); return $("tyScreen")?.scrollIntoView({ behavior: "smooth", block: "center" }); }
+  const st = t.closest("[data-tysavetext]");
+  if (st) return wrap(st, () => tyPatch({ text: document.querySelector("[data-tytext]").value }));
+  const plan = t.closest("[data-typlan]");
+  if (plan) {
+    if (v.blocks?.length && !confirm("توزّع الكلام من جديد؟ التعديلات اللي عملتها على اللقطات هتتبدل.")) return;
+    return wrap(plan, async () => {
+      tyx.cur = await api(TY(`/${v.id}/plan`), { method: "POST", ...jsonBody({ brief: document.querySelector("[data-tybrief]").value }) });
+      tyRender(); tyPoll();
+    });
+  }
+  const ic = t.closest("[data-tyicons]");
+  if (ic) {
+    if (!confirm(`يرسم ${v.missing_icons.length} أيقونة ناقصة بالستايل ده؟ حوالي ${v.draw_cost}$`)) return;
+    return wrap(ic, async () => { tyx.cur = await api(TY(`/${v.id}/icons`), { method: "POST" }); tyRender(); tyPoll(); });
+  }
+  const ren = t.closest("[data-tyrender]");
+  if (ren) {
+    return wrap(ren, async () => {
+      tyStop();
+      tyx.cur = await api(TY(`/${v.id}/render`), { method: "POST", ...jsonBody({ quality: document.querySelector("[data-tyq]").value }) });
+      tyStatusOnly(); tyPoll();
+      ren.disabled = true;
+    });
+  }
+  const ed = t.closest("[data-tyedit]");
+  if (ed) {
+    return wrap(ed, async () => {
+      const r = await api(TY(`/${v.id}/to-editor`), { method: "POST" });
+      storageSet("studiomania.projectId.ads", r.project_id);
+      if (typeof mt !== "undefined") mt.project = null;
+      toast("🎞️ اتفتح في مونتاج الإعلانات");
+      showStep("6a");
+    });
+  }
+  const del = t.closest("[data-tydel]");
+  if (del) {
+    if (!confirm(`تمسح «${v.name}»؟`)) return;
+    return wrap(del, async () => {
+      await api(TY(`/${v.id}`), { method: "DELETE" });
+      tyx.cur = null; tyx.view = "home";
+      tyx.list = await api(TY(""));
+      tyRender();
+    });
+  }
+  const merge = t.closest("[data-tymerge]");
+  if (merge) {
+    const i = Number(merge.dataset.tymerge), bl = tyBlocksFromDom();
+    bl[i].to = bl[i + 1].to;
+    bl[i].text = "";
+    bl.splice(i + 1, 1);
+    return tySaveBlocks(bl, "⤵ اتضمّوا");
+  }
+  const split = t.closest("[data-tysplit]");
+  if (split) {
+    const i = Number(split.dataset.tysplit), bl = tyBlocksFromDom(), b = bl[i];
+    const mid = b.from + Math.floor((b.to - b.from + 1) / 2) - 1;
+    bl.splice(i + 1, 0, { ...b, from: mid + 1, text: "", kind: b.kind === "pop" ? "build" : b.kind });
+    b.to = mid;
+    b.text = "";
+    return tySaveBlocks(bl, "✂️ اتقسمت");
+  }
+  const rm = t.closest("[data-tyrm]");
+  if (rm) {
+    const bl = tyBlocksFromDom(), b = bl[Number(rm.closest("[data-tyb]").dataset.tyb)];
+    if (b.kind === "icon") b.icon = ""; else b.icons.splice(Number(rm.dataset.tyrm), 1);
+    return tySaveBlocks(bl);
+  }
+  const rms = t.closest("[data-tyrmside]");
+  if (rms) {
+    const bl = tyBlocksFromDom();
+    bl[Number(rms.closest("[data-tyb]").dataset.tyb)].side = "";
+    return tySaveBlocks(bl);
+  }
+});
+
+$("tyMain").addEventListener("change", async (e) => {
+  const t = e.target, v = tyx.cur;
+  try {
+    if (t.matches("[data-tyname]")) { tyx.cur = await api(TY(`/${v.id}`), { method: "PATCH", ...jsonBody({ name: t.value }) }); tyx.list = await api(TY("")); return tyRender(); }
+    if (t.matches("[data-tyopt]")) return tyPatch({ [t.dataset.tyopt]: t.value });
+    if (t.matches("[data-tybg]")) return tyPatch({ bg: { ...(v.bg || {}), [t.dataset.tybg]: t.dataset.tybg === "dim" ? Number(t.value) : t.value } });
+    if (t.matches("[data-tybgfile]") && t.files[0]) {
+      const fd = new FormData();
+      fd.append("file", t.files[0]);
+      toast("⬆ بيرفع...");
+      tyx.cur = await api(TY(`/${v.id}/bg`), { method: "POST", body: fd });
+      tyx.force = true;
+      return tyRender();
+    }
+    if (t.matches("[data-tysrc]") && t.files[0]) {
+      if (v.blocks?.length && !confirm("ترفع ملف جديد؟ الكلام والحركات الحالية هيتبدلوا.")) return;
+      const fd = new FormData();
+      fd.append("file", t.files[0]);
+      toast("⬆ بيرفع...");
+      tyx.cur = await api(TY(`/${v.id}/source`), { method: "POST", body: fd });
+      tyx.force = true;
+      tyRender();
+      return tyPoll();
+    }
+    if (t.matches("[data-tyscrub]")) return;
+    if (t.matches("[data-tyadd]") && t.value) {
+      const bl = tyBlocksFromDom(), b = bl[Number(t.closest("[data-tyb]").dataset.tyb)];
+      if (b.kind === "icon") b.icon = t.value; else b.icons = [...(b.icons || []), t.value];
+      return tySaveBlocks(bl);
+    }
+    if (t.matches("[data-tyside]") && t.value) {
+      const bl = tyBlocksFromDom();
+      bl[Number(t.closest("[data-tyb]").dataset.tyb)].side = t.value;
+      return tySaveBlocks(bl);
+    }
+    if (t.matches("[data-tbf]")) return tySaveBlocks(tyBlocksFromDom(), "✅ اتحفظ");
+    if (t.matches("[data-tybrief]")) { tyx.cur = await api(TY(`/${v.id}`), { method: "PATCH", ...jsonBody({ brief: t.value }) }); }
+  } catch (err) { toast(err.message, true); }
+});
+
+$("tyMain").addEventListener("input", (e) => {
+  if (e.target.matches("[data-tyscrub]")) { tyStop(); tySeek(Number(e.target.value)); }
+});
+
+// ---------- 🧩 مكتبة الستيكرات
+
+function tyRenderStk() {
+  $("tyStk").innerHTML = `<div class="car-head"><h2>🧩 مكتبة الستيكرات <small class="muted">${tyx.stk.length}</small></h2>
+      <div class="row wrap"><label class="btn sm primary">⬆ ارفع صور<input type="file" data-stkup accept="image/*" multiple hidden></label>
+        <label class="ty-check"><input type="checkbox" data-stkkey checked> شيل الخلفية السادة</label></div></div>
+    <div class="row wrap"><input type="text" data-stkdesc placeholder="وصف أيقونة جديدة (مثلًا: pixel art dumbbell)" data-no-i18n>
+      <select data-stkstyle>${tyx.styles.map((s) => `<option value="${s.id}">${tye(s.name)}</option>`).join("")}</select>
+      <button type="button" class="btn sm" data-stkdraw>🎨 ارسمها (~0.03$)</button></div>
+    <p class="hint">الستيكرات اللي اتقصت من فيديو ممكن يبقى فيها حتت من حاجات جنبها: «✨ نضّفها» بيرسمها لوحدها بنفس شكلها (حوالي 0.03$).</p>
+    <div class="ty-stk">${tyx.stk.map((s) => `<figure data-stk="${s.id}"><div class="ty-checker"><img src="${s.url}" alt=""></div>
+      <input value="${tye(s.name)}" data-stkname data-no-i18n><small class="muted">${s.source.startsWith("lab:") ? "🔬 من المعمل" : s.source === "drawn" ? "🎨 مترسومة" : "⬆ مرفوعة"}</small>
+      <div class="row">${s.source.startsWith("lab:") ? `<button type="button" class="btn sm" data-stkclean title="يرسمها لوحدها نضيفة بنفس شكلها">✨ نضّفها</button>` : ""}
+        <button type="button" class="btn sm danger" data-stkdel>🗑️</button></div></figure>`).join("") || `<p class="muted">لسه مفيش ستيكرات</p>`}</div>`;
+}
+
+$("tyStk").addEventListener("click", async (e) => {
+  const t = e.target;
+  const wrap = (btn, fn) => busyButton(btn, "⏳", async () => { try { await fn(); } catch (err) { toast(err.message, true); } });
+  const draw = t.closest("[data-stkdraw]");
+  if (draw) {
+    const desc = document.querySelector("[data-stkdesc]").value.trim();
+    if (!desc) return toast("اكتب وصف الأيقونة", true);
+    return wrap(draw, async () => {
+      await api(TY("/stickers/draw"), { method: "POST", ...jsonBody({ desc, style: document.querySelector("[data-stkstyle]").value }) });
+      tyx.stk = await api(TY("/stickers")); tyRender(); toast("🎨 اتضافت");
+    });
+  }
+  const fig = t.closest("[data-stk]");
+  if (!fig) return;
+  const id = fig.dataset.stk;
+  const clean = t.closest("[data-stkclean]");
+  if (clean) return wrap(clean, async () => { await api(TY(`/stickers/${id}/clean`), { method: "POST" }); tyx.stk = await api(TY("/stickers")); tyRender(); toast("✨ اتضافت نسخة نضيفة"); });
+  const del = t.closest("[data-stkdel]");
+  if (del) {
+    if (!confirm("تمسح الستيكر ده؟")) return;
+    return wrap(del, async () => { await api(TY(`/stickers/${id}`), { method: "DELETE" }); tyx.stk = await api(TY("/stickers")); tyRender(); });
+  }
+});
+
+$("tyStk").addEventListener("change", async (e) => {
+  const t = e.target;
+  try {
+    if (t.matches("[data-stkup]") && t.files.length) {
+      const fd = new FormData();
+      [...t.files].forEach((f) => fd.append("files", f));
+      fd.append("key", document.querySelector("[data-stkkey]").checked ? "1" : "0");
+      toast("⬆ بيرفع...");
+      await api(TY("/stickers"), { method: "POST", body: fd });
+      tyx.stk = await api(TY("/stickers"));
+      return tyRender();
+    }
+    if (t.matches("[data-stkname]")) {
+      tyx.stk = await api(TY(`/stickers/${t.closest("[data-stk]").dataset.stk}`), { method: "PATCH", ...jsonBody({ name: t.value }) });
+      return toast("✅ اتحفظ");
+    }
+  } catch (err) { toast(err.message, true); }
+});
+
+// ---------- 🔬 المعمل: خطوة «🔤 التايبوجرافي»
+
+function renderLabTypo(d) {
+  const ty = d.typo, el = $("labTypo"), data = ty?.data;
+  if (!ty) { el.innerHTML = ""; el.hidden = true; return; }
+  if (el.contains(document.activeElement) && document.activeElement.matches("input, textarea, select")) return;
+  el.hidden = false;
+  const sw = (th) => `<span class="ty-sw" style="background:${th.bg};color:${th.ink}">Aa<i style="background:${th.accent}"></i></span>`;
+  el.innerHTML = `<details class="sch" open><summary><b>🔤 التايبوجرافي</b>
+      ${ty.status === "working" ? `<span class="lab-st working"><span class="spin-inline"></span> ${tye(ty.step || "بيتفرج على الفيديو")}</span>
+        <button type="button" class="btn sm" data-ltstop>⏹ وقّف</button>` : ""}
+      ${ty.status !== "working" && (data || ty.error) ? `<button type="button" class="btn sm danger" data-ltdel title="الستايل والستيكرات اللي اتحفظوا بيفضلوا">🗑️ امسح النتيجة</button>` : ""}
+      ${ty.error ? `<small class="err">${tye(ty.error)}</small>` : ""}
+      ${data ? `<small class="muted">${data.moments.length} لحظة · ${data.moments.reduce((a, m) => a + m.icons.filter((i) => i.url).length, 0)} ستيكر</small>` : ""}</summary>
+    ${data ? `<div class="ty-labstyle"><b data-no-i18n>${tye(data.style.name)}</b> ${sw(data.style.light)}${sw(data.style.dark)}${sw(data.style.accent)}
+        <small class="muted" dir="ltr" data-no-i18n>${tye(data.style.font_look)} ${data.style.icon_style ? `· ${tye(data.style.icon_style)}` : ""}</small>
+        <button type="button" class="btn sm primary" data-ltuse>🔤 اعمل فيديو بالستايل ده</button></div>
+      ${data.style.rules?.length ? `<ul class="ty-rules" data-no-i18n>${data.style.rules.map((r) => `<li>${tye(r)}</li>`).join("")}</ul>` : ""}
+      <div class="ty-moments">${data.moments.map((m) => `<article class="ty-moment">
+        <button type="button" class="btn sm" data-schplay="${m.t0}" data-to="${m.t1}">▶️ ${lt(m.t0)}</button>
+        <b>${TY_KINDS[m.kind] || "❓ " + tye(m.kind)}</b> <span class="ty-sw sm" style="background:${data.style[m.theme]?.bg}"></span>
+        <span dir="auto" data-no-i18n>«${tye(m.text)}»</span>
+        <small class="muted" data-no-i18n>${tye(m.how)}</small>
+        ${m.icons.length ? `<span class="ty-icons">${m.icons.map((i) => i.url ? `<span class="ty-chip"><img src="${i.url}" alt=""><small data-no-i18n>${tye(i.name)}</small></span>`
+          : `<span class="ty-chip miss" title="${tye(i.desc)}">❔<small data-no-i18n>${tye(i.name)}</small></span>`).join("")}</span>` : ""}
+      </article>`).join("")}</div>` : ""}
+  </details>`;
+}
+
+$("labTypoBtn").onclick = () => {
+  const has = labx.cur?.typo?.data;
+  if (!confirm(has ? `تطلّع تايبوجرافي «${labx.cur.name}» من جديد؟ (الستايل والستيكرات القديمة بيفضلوا في المكتبة)`
+    : `يطلّع التايبوجرافي من «${labx.cur.name}»: الستايل، وكل لحظة الكلام اتحوّل فيها لشكل، والأيقونات كستيكرات شفافة؟`)) return;
+  busyButton($("labTypoBtn"), "⏳", async () => {
+    try {
+      labx.cur = await api(`/api/lab/${labx.cur.id}/typo`, { method: "POST" });
+      renderLab(); scheduleLabPoll();
+    } catch (err) { toast(err.message, true); }
+  });
+};
+
+$("labTypo").addEventListener("click", async (e) => {
+  const t = e.target;
+  const pl = t.closest("[data-schplay]");
+  if (pl) { e.preventDefault(); return schPlay(Number(pl.dataset.schplay), Number(pl.dataset.to)); }
+  const stop = t.closest("[data-ltstop]");
+  if (stop) { e.preventDefault(); labx.cur = await api(`/api/lab/${labx.cur.id}/typo/stop`, { method: "POST" }); renderLab(); return toast("⏹ اتوقف"); }
+  const del = t.closest("[data-ltdel]");
+  if (del) {
+    e.preventDefault();
+    if (!confirm("تمسح نتيجة التايبوجرافي؟ (الستايل والستيكرات بيفضلوا في المكتبة)")) return;
+    labx.cur = await api(`/api/lab/${labx.cur.id}/typo`, { method: "DELETE" });
+    return renderLab();
+  }
+  const use = t.closest("[data-ltuse]");
+  if (use) {
+    const name = prompt("اسم الفيديو:", "تايبوجرافي");
+    if (name === null) return;
+    try {
+      const v = await api(TY(""), { method: "POST", ...jsonBody({ name, ratio: "9:16", style: labx.cur.typo.style_id }) });
+      storageSet("studiomania.typo", v.id);
+      tyx.cur = null;
+      showStep("12");
+    } catch (err) { toast(err.message, true); }
+  }
+});

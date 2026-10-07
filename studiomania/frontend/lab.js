@@ -117,6 +117,7 @@ function renderLab() {
   const connPlaying = [...$("labConns").querySelectorAll("video")].some((v) => !v.paused);
   if (!busyEdit($("labConns")) && !connPlaying && !Object.values(labx.xedit).some(Boolean)) renderLabConns(d);
   if (!busyEdit($("labSchema"))) renderLabSchema(d);
+  renderLabTypo(d);
   if (!busyEdit($("labAudio"))) renderLabAudio(d);
   const shotPlaying = [...document.querySelectorAll("[data-shotvid]")].some((v) => !v.paused);
   if (!busyEdit($("labShots")) && !shotPlaying) renderLabShots(d);
@@ -499,7 +500,7 @@ function renderLabShots(d) {
 // ---------- الأحداث
 const labAudio = new Audio();
 document.querySelector('.view[data-view="11"]').addEventListener("click", async (e) => {
-  if (e.target.closest("#labLib, #labFilm, #labTpl, #labSchema")) return;  // المكتبة ليها أحداثها في assets.js
+  if (e.target.closest("#labLib, #labFilm, #labTpl, #labSchema, #labTypo")) return;  // المكتبة ليها أحداثها في assets.js
   const conn = e.target.closest("[data-conn]");
   if (conn) {
     const cid = conn.dataset.conn, c = labx.cur.connectors.find((x) => x.id === cid);
@@ -753,7 +754,7 @@ document.querySelector('.view[data-view="11"]').addEventListener("toggle", (e) =
   if (e.target.matches?.("[data-audiobox]")) labx.audioOpen = e.target.open;
 }, true);
 document.querySelector('.view[data-view="11"]').addEventListener("change", (e) => {
-  if (e.target.closest("#labLib, #labFilm, #labTpl, #labSchema")) return;
+  if (e.target.closest("#labLib, #labFilm, #labTpl, #labSchema, #labTypo")) return;
   const conn = e.target.closest("[data-conn]");
   if (conn) {
     const cid = conn.dataset.conn, c = labx.cur.connectors.find((x) => x.id === cid), k = e.target.dataset.xf;

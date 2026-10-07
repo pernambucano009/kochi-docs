@@ -5,6 +5,7 @@
 الخطوة 4: مكتبة المدربين (الصورة والأوترو).
 """
 
+import base64
 import gzip
 import hashlib
 import json
@@ -59,6 +60,7 @@ import sheets  # noqa: E402
 import carousel as cz  # noqa: E402
 import series as sz  # noqa: E402
 import ads as az  # noqa: E402
+import typo  # noqa: E402  (التايبوجرافي)
 from auth import SESSION_COOKIE, SESSION_DAYS, Auth  # noqa: E402
 
 MAX_CLIP_SECONDS = 15.0
@@ -8625,7 +8627,8 @@ def lab_to_dict(lid: str, d: dict) -> dict:
             "components": comps, "connectors": conns, "families": lab.CONNECTOR_FAMILIES,
             "audioshake": bool(audioshake.api_key() or atlas.mock_mode()),
             "reviews": lab_reviews(d), "busy": any((v or {}).get("status") in ("working", "queued") for v in (d.get("steps") or {}).values())
-            or sch.get("status") == "working",
+            or sch.get("status") == "working" or (d.get("typo") or {}).get("status") == "working",
+            "typo": lab_typo_view(d.get("typo")),
             "categories": list(lab.COMPONENT_CATS)}
 
 
@@ -8873,6 +8876,17 @@ def run_lab_audio(lid: str, d: dict, src: Path, dur: float) -> None:
              for m in res.get("music") or [] if isinstance(m, dict)]
     lab_update(lid, lambda d: d.update(audio={"sfx": sfx, "speech": speech, "music": music, "onsets": marks[:300],
                                                "from_stem": bool(fx_src)}))
+
+
+def lab_typo_view(ty: dict | None) -> dict | None:
+    """نتيجة التايبوجرافي بلينكات الستيكرات."""
+    if not ty:
+        return None
+    if not ty.get("data"):
+        return ty
+    stk = {s["id"]: sticker_dict(s)["url"] for s in stickers_load()}
+    moments = [{**m, "icons": [{**ic, "url": stk.get(ic.get("sticker") or "")} for ic in m["icons"]]} for m in ty["data"]["moments"]]
+    return {**ty, "data": {**ty["data"], "moments": moments}}
 
 
 def lab_proxy(lid: str, d: dict) -> Path:
@@ -11290,6 +11304,111 @@ def run_lab_schema(lid: str, run: str) -> None:
         lab_update(lid, lambda x: x.update(schema={**(x.get("schema") or {}), "status": "failed", "error": msg}))
 
 
+@app.post("/api/lab/{lid}/typo")
+def lab_typo(lid: str):
+    """🔤 يطلّع التايبوجرافي من الفيديو: كل لحظة الكلام اتحوّل فيها لكلمات/أشكال/أيقونات، والستايل، والأيقونات كستيكرات شفافة."""
+    d = lab_load(lid)
+    if (d.get("typo") or {}).get("status") == "working":
+        raise HTTPException(400, "بيطلّع التايبوجرافي بالفعل")
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل")
+    run = uuid.uuid4().hex[:8]
+    lab_update(lid, lambda x: x.update(typo={**(x.get("typo") or {}), "status": "working", "error": None, "run": run, "step": "بيتفرج على الفيديو"}))
+    threading.Thread(target=run_lab_typo, args=(lid, run), daemon=True).start()
+    return lab_to_dict(lid, lab_load(lid))
+
+
+def typo_mine(lid: str, run: str) -> bool:
+    ty = lab_load(lid).get("typo") or {}
+    return ty.get("status") == "working" and ty.get("run") == run
+
+
+def run_lab_typo(lid: str, run: str) -> None:
+    try:
+        d = lab_load(lid)
+        dur = d["source"]["duration"]
+        if atlas.mock_mode():
+            time.sleep(1.5)
+            data = typo.mock_extract(dur)
+        else:
+            proxy = lab_proxy(lid, d)
+            data = typo.clean_extract(ad_json(lab_media_chat(az.with_media(typo.extract_messages(dur), data_url(proxy, "video/mp4"), "video.mp4")),
+                                              "تايبوجرافي الفيديو"), dur)
+        if not typo_mine(lid, run):
+            return
+        if not data["moments"]:
+            raise HTTPException(400, "الموديل ملقاش تايبوجرافي في الفيديو ده")
+        # الأيقونات: فريم في وقتها ← قص على مكانها ← شيل الخلفية ← ستيكر في المكتبة
+        src = lab_dir(lid) / d["source"]["file"]
+        icons = [ic for m in data["moments"] for ic in m["icons"] if ic.get("box") or not atlas.mock_mode()]
+        done_n = [0]
+
+        def cut(ic):   # كل أيقونة لوحدها (4 مع بعض)
+            if not typo_mine(lid, run):
+                return
+            frames = [TMP_DIR / f"lt_{uuid.uuid4().hex[:8]}_{k}.png" for k in range(3)]
+            try:
+                from PIL import Image
+                for k, f in enumerate(frames):
+                    tt = min(dur - 0.05, max(0.0, ic["t"] + (k - 1) * 0.35))
+                    subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{tt:.2f}", "-i", str(src), "-frames:v", "1", str(f)],
+                                   check=True, capture_output=True, timeout=60)
+                pick = (1, ic["box"])
+                if not atlas.mock_mode():   # المكان الدقيق: من الصور الثابتة مش من الفيديو
+                    small = [data_url(model_image(f, 1024), "image/jpeg") for f in frames]
+                    pick = typo.clean_box(ad_json(lab_media_chat(typo.box_messages(ic["name"], ic.get("desc", ""), small)), "مكان الأيقونة"), 3)
+                if not pick:
+                    ic["sticker"] = None
+                    return
+                im = Image.open(frames[pick[0]])
+                W, H = im.size
+                x0, y0, x1, y1 = pick[1]
+                mx, my = (x1 - x0) * 0.06, (y1 - y0) * 0.06
+                crop = frames[pick[0]].with_suffix(".crop.png")
+                im.crop((int(max(0, x0 - mx) * W), int(max(0, y0 - my) * H), int(min(1, x1 + mx) * W), int(min(1, y1 + my) * H))).save(crop)
+                ic["box"] = pick[1]
+                ic["sticker"] = sticker_add(crop, ic["name"], f"lab:{lid}", True, ic.get("desc", ""))["id"]
+                crop.unlink(missing_ok=True)
+            except Exception:  # noqa: BLE001  (أيقونة واحدة باظت ما توقفش الباقي)
+                ic["sticker"] = None
+            finally:
+                for f in frames:
+                    f.unlink(missing_ok=True)
+                done_n[0] += 1
+                lab_update(lid, lambda x: x["typo"].update(step=f"✂️ بيقص الأيقونات ({done_n[0]} من {len(icons)})") if x.get("typo") else None)
+
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            list(pool.map(cut, icons))
+        if not typo_mine(lid, run):
+            return
+        style = {**data["style"], "source_lab": lid, "name": data["style"]["name"] or d.get("name") or "ستايل"}
+        sid = f"lab-{lid}"
+        (TYPO_STYLES / f"{sid}.json").write_text(json.dumps(style, ensure_ascii=False), encoding="utf-8")
+        if not typo_mine(lid, run):
+            return
+        lab_update(lid, lambda x: x.update(typo={"status": "done", "error": None, "data": data, "style_id": sid, "at": now()}))
+    except Exception as exc:  # noqa: BLE001
+        if not typo_mine(lid, run):
+            return
+        msg = str(getattr(exc, "detail", None) or exc)[:400]
+        lab_update(lid, lambda x: x.update(typo={**(x.get("typo") or {}), "status": "failed", "error": msg, "step": None}))
+
+
+@app.post("/api/lab/{lid}/typo/stop")
+def lab_typo_stop(lid: str):
+    def fn(x):
+        ty = x.get("typo") or {}
+        if ty.get("status") == "working":
+            x["typo"] = {**ty, "status": "done" if ty.get("data") else "stopped", "run": None, "step": None}
+    return lab_to_dict(lid, lab_update(lid, fn))
+
+
+@app.delete("/api/lab/{lid}/typo")
+def lab_typo_delete(lid: str):
+    """🗑️ يمسح نتيجة التايبوجرافي (الستايل والستيكرات اللي اتحفظت بيفضلوا في المكتبة)."""
+    return lab_to_dict(lid, lab_update(lid, lambda x: x.update(typo=None)))
+
+
 @app.post("/api/lab/{lid}/schema/stop")
 def lab_schema_stop(lid: str):
     """⏹ يوقّف استخراج المخطط (لو فيه مخطط قديم بيفضل زي ما هو)."""
@@ -12154,6 +12273,9 @@ def reset_stuck_tv() -> None:
         if (d.get("schema") or {}).get("status") == "working":
             d["schema"].update(status="failed", error="اتقطع لما السيرفر اتقفل. دوس «🗺️ المخطط» تاني")
             f.write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+        if (d.get("typo") or {}).get("status") == "working":
+            d["typo"].update(status="failed", step=None, error="اتقطع لما السيرفر اتقفل. دوس «🔤 التايبوجرافي» تاني")
+            f.write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
 
 
 reset_stuck_tv()
@@ -12206,6 +12328,725 @@ def save_series_settings(body: SeriesSettingsIn):
     if body.video_model is not None:
         auth.set_setting("series_video_model", body.video_model.strip() or None)
     return series_settings()
+
+
+# ---------------------------------------------------------------- 🔤 التايبوجرافي
+# الكلام المتقال ← بلوكات (كل بلوك حركة: كتابة بمؤشر، كلمة وأيقونة، حروف بتتجمع...) ← المتصفح بيرسمها فريم فريم ← فيديو.
+# الرسم كله في frontend/typo-engine.js (نفس الملف للمعاينة وللفيديو النهائي)، والستيكرات صور شفافة في مكتبة مشتركة.
+
+TYPO_DIR = DATA_DIR / "typo"
+TYPO_PROJ = TYPO_DIR / "projects"
+TYPO_STK = TYPO_DIR / "stickers"
+TYPO_STYLES = TYPO_DIR / "styles"
+for _d in (TYPO_PROJ, TYPO_STK, TYPO_STYLES):
+    _d.mkdir(parents=True, exist_ok=True)
+TYPO_LOCK = threading.Lock()
+TYPO_BUSY = ("transcribing", "planning", "drawing", "rendering")
+TYPO_RATIOS = {"9:16": (1080, 1920), "16:9": (1920, 1080), "1:1": (1080, 1080), "4:5": (1080, 1350)}
+TYPO_STICKER_COST = 0.03
+TYPO_FPS = 30
+app.mount("/media/typo", StaticFiles(directory=TYPO_DIR), name="typo")
+
+
+def typo_load(pid: str) -> dict:
+    f = TYPO_PROJ / Path(pid).name / "typo.json"
+    if not f.exists():
+        raise HTTPException(404, "المشروع ده مش موجود")
+    return json.loads(f.read_text(encoding="utf-8"))
+
+
+def typo_update(pid: str, fn) -> dict:
+    with TYPO_LOCK:
+        d = typo_load(pid)
+        fn(d)
+        d["updated_at"] = now()
+        folder = TYPO_PROJ / Path(pid).name
+        (folder / "typo.json.tmp").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+        (folder / "typo.json.tmp").replace(folder / "typo.json")
+        return d
+
+
+def typo_set(pid: str, **kw) -> dict:
+    return typo_update(pid, lambda d: d.update(**kw))
+
+
+def typo_fail(pid: str, exc: Exception) -> None:
+    typo_set(pid, status="failed", step=None, error=str(getattr(exc, "detail", None) or exc)[:400])
+
+
+def typo_idle(d: dict) -> str:
+    return "done" if d.get("final") else "planned" if d.get("blocks") else "ready" if d.get("words") else "new"
+
+
+def typo_start(pid: str, status: str, step: str, target, *args) -> dict:
+    def fn(d):
+        if d.get("status") in TYPO_BUSY:
+            raise HTTPException(400, "استنى لما الشغل اللي شغال يخلص")
+        d.update(status=status, step=step, error=None)
+    typo_update(pid, fn)
+    threading.Thread(target=target, args=(pid, *args), daemon=True).start()
+    return typo_to_dict(pid, typo_load(pid))
+
+
+# ---- الستيكرات (مكتبة واحدة لكل العملاء، زي مكتبة الأصول)
+
+def stickers_load() -> list[dict]:
+    f = TYPO_STK / "stickers.json"
+    return json.loads(f.read_text(encoding="utf-8")) if f.exists() else []
+
+
+def stickers_save(items: list[dict]) -> None:
+    (TYPO_STK / "stickers.json.tmp").write_text(json.dumps(items, ensure_ascii=False), encoding="utf-8")
+    (TYPO_STK / "stickers.json.tmp").replace(TYPO_STK / "stickers.json")
+
+
+def sticker_dict(s: dict) -> dict:
+    f = TYPO_STK / s["file"]
+    return {**s, "url": f"/media/typo/stickers/{s['file']}?v={int(f.stat().st_mtime) if f.exists() else 0}"}
+
+
+def sticker_slug(name: str) -> str:
+    return re.sub(r"[^a-z0-9؀-ۿ-]+", "-", (name or "").lower()).strip("-")[:40] or "sticker"
+
+
+def sticker_add(src: Path, name: str, source: str, key: bool = True, desc: str = "") -> dict:
+    """صورة ← ستيكر شفاف في المكتبة (الخلفية السادة بتتشال لوحدها)."""
+    sid = uuid.uuid4().hex[:10]
+    out = TYPO_STK / f"{sid}.png"
+    if key:
+        typo.key_background(src, out)
+    else:
+        from PIL import Image
+        Image.open(src).convert("RGBA").save(out, "PNG")
+    item = {"id": sid, "name": sticker_slug(name), "file": out.name, "source": source, "desc": desc[:200], "created_at": now()}
+    with TYPO_LOCK:
+        items = stickers_load()
+        items.insert(0, item)
+        stickers_save(items)
+    return item
+
+
+def sticker_find(name: str, items: list[dict]) -> dict | None:
+    """اسم من الموديل ← ستيكر من المكتبة (بالاسم بالظبط، أو كلمة مشتركة)."""
+    slug = sticker_slug(name)
+    for s in items:
+        if s["name"] == slug or s["id"] == name:
+            return s
+    words = set(slug.split("-"))
+    best = max(items, key=lambda s: len(words & set(s["name"].split("-"))), default=None)
+    return best if best and words & set(best["name"].split("-")) else None
+
+
+def sticker_draw(desc: str, name: str, icon_style: str, source: str, ref: Path | None = None) -> dict:
+    """يرسم أيقونة جديدة (أو ينضّف واحدة مقصوصة من فيديو) على خلفية بيضا، وبعدين بتتشال الخلفية."""
+    tmp = TMP_DIR / f"stk_{uuid.uuid4().hex[:8]}.png"
+    try:
+        if atlas.mock_mode():
+            from PIL import Image, ImageDraw
+            im = Image.new("RGB", (512, 512), "white")
+            dr = ImageDraw.Draw(im)
+            h = int(hashlib.md5(name.encode()).hexdigest()[:6], 16)
+            dr.ellipse((96, 96, 416, 416), fill=(h >> 16 & 255, h >> 8 & 255, h & 255), outline="black", width=14)
+            im.save(tmp)
+        else:
+            prompt = typo.sticker_prompt(desc or name, icon_style)
+            if ref:
+                prompt = ("Redraw ONLY the main object from the reference image as one clean isolated sticker, exactly the same look, "
+                          "colors and style, nothing cut off, other objects removed. " + prompt)
+            atlas.download(atlas.generate_image("nano2", prompt, "1024x1024", "medium", [atlas.reference_url(ref)] if ref else None), tmp)
+        return sticker_add(tmp, name, source, True, desc)
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
+@app.get("/api/typo/stickers")
+def typo_stickers():
+    return [sticker_dict(s) for s in stickers_load() if (TYPO_STK / s["file"]).exists()]
+
+
+@app.post("/api/typo/stickers")
+def typo_sticker_upload(files: list[UploadFile] = File(...), key: str = Form("1")):
+    """⬆ صور ← ستيكرات (الخلفية السادة بتتشال، أو PNG شفاف زي ما هو)."""
+    out = []
+    for f in files:
+        name = save_upload(f, IMAGE_EXTENSIONS, TMP_DIR, "stk")
+        try:
+            out.append(sticker_dict(sticker_add(TMP_DIR / name, Path(f.filename or "sticker").stem, "upload", key == "1")))
+        finally:
+            (TMP_DIR / name).unlink(missing_ok=True)
+    return out
+
+
+class StickerDrawIn(BaseModel):
+    desc: str
+    name: str = ""
+    style: str = ""
+
+
+@app.post("/api/typo/stickers/draw")
+def typo_sticker_draw(body: StickerDrawIn):
+    """🎨 أيقونة جديدة بالوصف (حوالي 0.03$)."""
+    if not body.desc.strip():
+        raise HTTPException(400, "اكتب وصف الأيقونة")
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل")
+    st = typo_style(body.style) if body.style else {}
+    return sticker_dict(sticker_draw(body.desc.strip(), body.name or body.desc, st.get("icon_style", ""), "drawn"))
+
+
+@app.post("/api/typo/stickers/{sid}/clean")
+def typo_sticker_clean(sid: str):
+    """✨ ستيكر متقصوص من فيديو وفيه حتت من حاجات تانية: بيترسم نضيف لوحده (ستيكر جديد جنبه)."""
+    s = next((x for x in stickers_load() if x["id"] == sid), None)
+    if not s:
+        raise HTTPException(404, "الستيكر ده مش موجود")
+    flat = TMP_DIR / f"flat_{sid}.png"
+    from PIL import Image
+    im = Image.open(TYPO_STK / s["file"]).convert("RGBA")
+    bg = Image.new("RGBA", im.size, (255, 255, 255, 255))
+    bg.alpha_composite(im)
+    bg.convert("RGB").save(flat)
+    try:
+        return sticker_dict(sticker_draw(s.get("desc") or s["name"], s["name"], "", s.get("source", "lab"), flat))
+    finally:
+        flat.unlink(missing_ok=True)
+
+
+class StickerIn(BaseModel):
+    name: str
+
+
+@app.patch("/api/typo/stickers/{sid}")
+def typo_sticker_rename(sid: str, body: StickerIn):
+    with TYPO_LOCK:
+        items = stickers_load()
+        for s in items:
+            if s["id"] == sid:
+                s["name"] = sticker_slug(body.name)
+        stickers_save(items)
+    return typo_stickers()
+
+
+@app.delete("/api/typo/stickers/{sid}")
+def typo_sticker_delete(sid: str):
+    with TYPO_LOCK:
+        items = stickers_load()
+        for s in [x for x in items if x["id"] == sid]:
+            (TYPO_STK / s["file"]).unlink(missing_ok=True)
+        stickers_save([x for x in items if x["id"] != sid])
+    return {"ok": True}
+
+
+# ---- الستايلات: الجاهزة + اللي اتطلّعت من فيديوهات في المعمل
+
+def typo_styles() -> dict:
+    out = {k: {**v, "id": k, "builtin": True} for k, v in typo.BUILTIN_STYLES.items()}
+    for f in sorted(TYPO_STYLES.glob("*.json"), key=lambda x: x.stat().st_mtime, reverse=True):
+        try:
+            out[f.stem] = {**json.loads(f.read_text(encoding="utf-8")), "id": f.stem, "builtin": False}
+        except ValueError:
+            continue
+    return out
+
+
+def typo_style(sid: str | None) -> dict:
+    styles = typo_styles()
+    return styles.get(sid or "") or styles["mono-red"]
+
+
+@app.get("/api/typo/styles")
+def typo_styles_list():
+    return list(typo_styles().values())
+
+
+class TypoStyleIn(BaseModel):
+    name: str | None = None
+    font: str | None = None
+    case: str | None = None
+    grain: float | None = None
+    light: dict | None = None
+    dark: dict | None = None
+    accent: dict | None = None
+
+
+@app.patch("/api/typo/styles/{sid}")
+def typo_style_patch(sid: str, body: TypoStyleIn):
+    """تعديل ستايل (الجاهز بيتنسخ نسخة باسمك)."""
+    st = typo_style(sid)
+    if st.get("builtin"):
+        sid = uuid.uuid4().hex[:10]
+        st = {**st, "name": f"{st['name']} (نسختي)"}
+    st = {k: v for k, v in st.items() if k not in ("id", "builtin")}
+    for k, v in body.model_dump(exclude_none=True).items():
+        if k in ("light", "dark", "accent"):
+            st[k] = typo._theme(v, st[k])
+        elif k == "font":
+            st[k] = v if any(f["family"] == v for f in captions.FONTS) else st.get("font")
+        elif k == "case":
+            st[k] = v if v in ("lower", "upper", "none") else st.get("case")
+        elif k == "grain":
+            st[k] = min(0.4, max(0.0, v))
+        else:
+            st[k] = str(v)[:60]
+    (TYPO_STYLES / f"{Path(sid).name}.json").write_text(json.dumps(st, ensure_ascii=False), encoding="utf-8")
+    return {**st, "id": sid, "builtin": False}
+
+
+@app.delete("/api/typo/styles/{sid}")
+def typo_style_delete(sid: str):
+    (TYPO_STYLES / f"{Path(sid).name}.json").unlink(missing_ok=True)
+    return {"ok": True}
+
+
+# ---- المشاريع
+
+def typo_to_dict(pid: str, d: dict) -> dict:
+    base = f"/media/typo/projects/{pid}"
+    folder = TYPO_PROJ / pid
+    def url(name):
+        return f"{base}/{name}?v={int((folder / name).stat().st_mtime)}" if name and (folder / name).exists() else None
+    stk = {s["id"]: s for s in stickers_load()}
+    missing = sorted({n for b in d.get("blocks") or [] for n in typo_block_icons(b) if not typo_icon_id(n, stk)})
+    return {**d, "id": pid, "busy": d.get("status") in TYPO_BUSY, "source_url": url((d.get("source") or {}).get("file")),
+            "bg_url": url((d.get("bg") or {}).get("file")), "final_url": url(d.get("final")), "alpha_url": url(d.get("alpha")),
+            "missing_icons": missing, "draw_cost": round(len(missing) * TYPO_STICKER_COST, 2),
+            "ratios": list(TYPO_RATIOS), "kinds": typo.KINDS, "fonts": [{"family": f["family"], "label": f["label"]} for f in captions.FONTS]}
+
+
+def typo_block_icons(b: dict) -> list[str]:
+    return [x for x in [b.get("icon"), b.get("side"), *(b.get("icons") or [])] if x]
+
+
+def typo_icon_id(name: str, stk: dict) -> str | None:
+    """الأيقونة في البلوك: رقم ستيكر من المكتبة (اتحطت من الموديل أو بإيدك)، أو اسم لسه محتاج يترسم."""
+    if name in stk:
+        return name
+    found = sticker_find(name, list(stk.values()))
+    return found["id"] if found else None
+
+
+@app.get("/api/typo")
+def typo_list():
+    out = []
+    for f in sorted(TYPO_PROJ.glob("*/typo.json"), key=lambda x: x.stat().st_mtime, reverse=True):
+        try:
+            d = json.loads(f.read_text(encoding="utf-8"))
+        except ValueError:
+            continue
+        if owned(d.get("client_id")):
+            out.append({"id": f.parent.name, "name": d.get("name"), "status": d.get("status"), "ratio": d.get("ratio"),
+                        "updated_at": d.get("updated_at"), "busy": d.get("status") in TYPO_BUSY})
+    return out
+
+
+class TypoNewIn(BaseModel):
+    name: str = ""
+    ratio: str = "9:16"
+    text: str = ""
+    style: str = "mono-red"
+
+
+def typo_text_words(text: str) -> list[dict]:
+    """كلام مكتوب من غير صوت: كل كلمة ليها وقت تقريبي (وقفة أطول بعد علامات الوقف)."""
+    out, t = [], 0.3
+    for w in text.split():
+        d = 0.32 + 0.035 * len(w)
+        out.append({"w": w, "s": round(t, 3), "e": round(t + d, 3)})
+        t += d + (0.35 if re.search(r"[.!?؟،,:]$", w) else 0.05)
+    return out
+
+
+@app.post("/api/typo")
+def typo_new(body: TypoNewIn):
+    pid = uuid.uuid4().hex[:10]
+    (TYPO_PROJ / pid).mkdir(parents=True)
+    words = typo_text_words(body.text) if body.text.strip() else []
+    d = {"name": body.name.strip()[:120] or "تايبوجرافي", "client_id": active_client_id(), "ratio": body.ratio if body.ratio in TYPO_RATIOS else "9:16",
+         "style": body.style, "source": {"kind": "text"} if words else None, "script": body.text.strip(), "words": words,
+         "duration": round(words[-1]["e"] + 0.6, 3) if words else 0, "bg": {"kind": "theme", "color": "#101010"},
+         "blocks": [], "brief": "", "status": "ready" if words else "new", "step": None, "error": None, "final": None,
+         "created_at": now(), "updated_at": now()}
+    (TYPO_PROJ / pid / "typo.json").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+    return typo_to_dict(pid, d)
+
+
+@app.get("/api/typo/{pid}")
+def typo_get(pid: str):
+    return typo_to_dict(pid, typo_load(pid))
+
+
+class TypoPatchIn(BaseModel):
+    name: str | None = None
+    ratio: str | None = None
+    style: str | None = None
+    brief: str | None = None
+    text: str | None = None
+    bg: dict | None = None
+    blocks: list | None = None
+    words: list | None = None
+
+
+@app.patch("/api/typo/{pid}")
+def typo_patch(pid: str, body: TypoPatchIn):
+    def fn(d):
+        if body.name is not None:
+            d["name"] = body.name.strip()[:120] or d["name"]
+        if body.ratio in TYPO_RATIOS:
+            d["ratio"] = body.ratio
+        if body.style is not None:
+            d["style"] = body.style
+        if body.brief is not None:
+            d["brief"] = body.brief[:1000]
+        if body.bg is not None:
+            bg = {**(d.get("bg") or {}), **{k: v for k, v in body.bg.items() if k in ("kind", "color", "dim")}}
+            if bg.get("kind") not in ("theme", "solid", "image", "video", "source", "none"):
+                bg["kind"] = "theme"
+            d["bg"] = bg
+        if body.text is not None and (d.get("source") or {}).get("kind") in (None, "text"):
+            d["script"] = body.text.strip()
+            d["words"] = typo_text_words(d["script"])
+            d["source"] = {"kind": "text"}
+            d["duration"] = round(d["words"][-1]["e"] + 0.6, 3) if d["words"] else 0
+            d["blocks"] = []
+        if body.words is not None:   # تصليح كلمة اتفهمت غلط (نفس العدد والأوقات)
+            ws = d.get("words") or []
+            for i, w in enumerate(body.words[:len(ws)]):
+                if isinstance(w, str) and w.strip():
+                    ws[i]["w"] = w.strip()
+        if body.blocks is not None:
+            d["blocks"] = typo_clean_blocks(body.blocks, d)
+        if body.blocks is not None or body.words is not None or body.bg is not None or body.style is not None or body.ratio:
+            d["final"] = None
+        if d.get("status") not in TYPO_BUSY:
+            d["status"] = typo_idle(d)
+    return typo_to_dict(pid, typo_update(pid, fn))
+
+
+def typo_clean_blocks(blocks: list, d: dict) -> list[dict]:
+    """تعديلات البلوكات من الصفحة: الحركة والكلام والأيقونات والخلفية (الأوقات جاية من الكلمات)."""
+    words = d.get("words") or []
+    raw = []
+    for b in blocks:
+        if isinstance(b, dict):
+            raw.append({**b, "from": typo._i(b.get("from")), "to": typo._i(b.get("to"))})
+    out = typo.clean_plan({"blocks": raw}, words, d.get("duration") or 0) if words else []
+    # الأيقونات اللي اتختارت بإيدك (رقم ستيكر) بتفضل زي ما هي
+    return out
+
+
+@app.delete("/api/typo/{pid}")
+def typo_delete(pid: str):
+    d = typo_load(pid)
+    if d.get("status") in TYPO_BUSY:
+        raise HTTPException(400, "استنى لما الشغل اللي شغال يخلص")
+    shutil.rmtree(TYPO_PROJ / Path(pid).name, ignore_errors=True)
+    return {"ok": True}
+
+
+@app.post("/api/typo/{pid}/source")
+def typo_source(pid: str, file: UploadFile = File(...)):
+    """🎙️/🎬 صوت أو فيديو: الكلام بيتفرّغ بتوقيته، والفيديو ممكن يبقى الخلفية والصوت بتاعه هو صوت الفيديو."""
+    d = typo_load(pid)
+    if d.get("status") in TYPO_BUSY:
+        raise HTTPException(400, "استنى لما الشغل اللي شغال يخلص")
+    folder = TYPO_PROJ / pid
+    ext = Path(file.filename or "").suffix.lower()
+    kind = "video" if ext in VIDEO_EXTENSIONS else "audio"
+    name = save_upload(file, VIDEO_EXTENSIONS, folder, "src") if kind == "video" else save_audio_upload(file, folder, "src")
+    dur = probe_duration(folder / name)
+    if dur > 180:
+        (folder / name).unlink(missing_ok=True)
+        raise HTTPException(400, "الملف أطول من 3 دقايق. قصّه الأول")
+    old = (d.get("source") or {}).get("file")
+    if old and old != name:
+        (folder / old).unlink(missing_ok=True)
+    def fn(x):
+        x["source"] = {"kind": kind, "file": name, "name": file.filename, "duration": round(dur, 3)}
+        x["duration"] = round(dur, 3)
+        x.update(words=[], blocks=[], final=None)
+        if kind == "video":
+            x["bg"] = {**(x.get("bg") or {}), "kind": "source"}
+    typo_update(pid, fn)
+    return typo_start(pid, "transcribing", "🎧 بيسمع الكلام ويكتبه بتوقيته", run_typo_transcribe)
+
+
+def run_typo_transcribe(pid: str) -> None:
+    try:
+        d = typo_load(pid)
+        folder = TYPO_PROJ / pid
+        src = folder / d["source"]["file"]
+        audio = TMP_DIR / f"typo_{pid}.m4a"
+        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src), "-vn", "-ac", "1", "-c:a", "aac", "-b:a", "96k", str(audio)],
+                       check=True, capture_output=True, timeout=300)
+        try:
+            words = atlas.transcribe(audio, d["duration"])
+        finally:
+            audio.unlink(missing_ok=True)
+        if not words:
+            raise RuntimeError("مقدرتش أسمع كلام في الملف ده")
+        typo_update(pid, lambda x: x.update(words=words, script=" ".join(w["w"] for w in words), status="ready", step=None, error=None))
+    except Exception as exc:  # noqa: BLE001
+        typo_fail(pid, exc)
+
+
+@app.post("/api/typo/{pid}/bg")
+def typo_bg(pid: str, file: UploadFile = File(...)):
+    """🖼️ صورة أو فيديو للخلفية."""
+    folder = TYPO_PROJ / pid
+    d = typo_load(pid)
+    ext = Path(file.filename or "").suffix.lower()
+    kind = "video" if ext in VIDEO_EXTENSIONS else "image"
+    name = save_upload(file, VIDEO_EXTENSIONS | IMAGE_EXTENSIONS, folder, "bg")
+    old = (d.get("bg") or {}).get("file")
+    if old and old != name:
+        (folder / old).unlink(missing_ok=True)
+    return typo_to_dict(pid, typo_update(pid, lambda x: x.update(bg={**(x.get("bg") or {}), "kind": kind, "file": name}, final=None)))
+
+
+class TypoPlanIn(BaseModel):
+    brief: str | None = None
+
+
+@app.post("/api/typo/{pid}/plan")
+def typo_plan(pid: str, body: TypoPlanIn):
+    """🧠 الموديل بيقسم الكلام على حركات ويختار الأيقونات."""
+    d = typo_load(pid)
+    if not d.get("words"):
+        raise HTTPException(400, "مفيش كلام لسه: اكتبه أو ارفع صوت/فيديو")
+    if body.brief is not None:
+        typo_set(pid, brief=body.brief[:1000])
+    return typo_start(pid, "planning", "🧠 بيوزّع الكلام على الحركات", run_typo_plan)
+
+
+def run_typo_plan(pid: str) -> None:
+    try:
+        d = typo_load(pid)
+        words, dur = d["words"], d.get("duration") or d["words"][-1]["e"] + 0.5
+        items = stickers_load()
+        if atlas.mock_mode() or not atlas.api_key():
+            blocks = typo.mock_plan(words, dur)
+        else:
+            st = typo_style(d.get("style"))
+            raw = ad_json(series_chat(typo.plan_messages(words, st, [s["name"] for s in items], d.get("brief") or "")), "خطة التايبوجرافي")
+            blocks = typo.clean_plan(raw, words, dur)
+        stk = {s["id"]: s for s in items}
+        for b in blocks:   # الأسماء اللي ليها ستيكر في المكتبة بتتربط بيه على طول
+            for k in ("icon", "side"):
+                if b.get(k):
+                    b[k] = typo_icon_id(b[k], stk) or b[k]
+            b["icons"] = [typo_icon_id(x, stk) or x for x in b.get("icons") or []]
+        typo_update(pid, lambda x: x.update(blocks=blocks, final=None, status="planned", step=None, error=None))
+    except Exception as exc:  # noqa: BLE001
+        typo_fail(pid, exc)
+
+
+@app.post("/api/typo/{pid}/icons")
+def typo_draw_icons(pid: str):
+    """🎨 يرسم الأيقونات اللي في الخطة ومش في المكتبة (حوالي 0.03$ للواحدة)."""
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل")
+    if not typo_to_dict(pid, typo_load(pid))["missing_icons"]:
+        raise HTTPException(400, "كل الأيقونات موجودة في المكتبة")
+    return typo_start(pid, "drawing", "🎨 بيرسم الأيقونات", run_typo_icons)
+
+
+def run_typo_icons(pid: str) -> None:
+    try:
+        d = typo_to_dict(pid, typo_load(pid))
+        st = typo_style(d.get("style"))
+        made = {}
+        for n, name in enumerate(d["missing_icons"]):
+            typo_set(pid, step=f"🎨 بيرسم الأيقونة {n + 1} من {len(d['missing_icons'])}: {name}")
+            made[name] = sticker_draw(name, name, st.get("icon_style", ""), "drawn")["id"]
+        def fn(x):
+            for b in x.get("blocks") or []:
+                for k in ("icon", "side"):
+                    if b.get(k) in made:
+                        b[k] = made[b[k]]
+                b["icons"] = [made.get(i, i) for i in b.get("icons") or []]
+            x["final"] = None
+        typo_update(pid, fn)
+        typo_update(pid, lambda x: x.update(status=typo_idle(x), step=None, error=None))
+    except Exception as exc:  # noqa: BLE001
+        typo_fail(pid, exc)
+
+
+def typo_doc(pid: str, d: dict) -> dict:
+    """الخطة بالشكل اللي المحرّك بيرسمه: المقاس والستايل والبلوكات بلينكات الصور."""
+    W, H = TYPO_RATIOS.get(d.get("ratio"), TYPO_RATIOS["9:16"])
+    st = typo_style(d.get("style"))
+    items = {s["id"]: s for s in stickers_load()}
+    stk = {k: sticker_dict(s)["url"] for k, s in items.items()}
+    def img(n):
+        return stk.get(typo_icon_id(n, items) or "") if n else None
+    blocks = []
+    for b in d.get("blocks") or []:
+        blocks.append({**{k: b.get(k) for k in ("t0", "t1", "kind", "theme", "text", "words", "focus", "letter")},
+                       "icon": img(b.get("icon")), "side": img(b.get("side")), "icons": [u for u in (img(i) for i in b.get("icons") or []) if u]})
+    kind = (d.get("bg") or {}).get("kind", "theme")
+    if kind != "theme":
+        # فوق خلفية بتاعتك: لون الكلام على قد الخلفية (فاتحة ← كلام غامق، غامقة/صورة/فيديو ← كلام فاتح)، والكارت الملون زي ما هو
+        c = (d.get("bg") or {}).get("color") or "#101010"
+        try:
+            lum = sum(int(c[i:i + 2], 16) * k for i, k in ((1, 0.299), (3, 0.587), (5, 0.114))) if kind in ("solid", "none") else 0
+        except ValueError:
+            lum = 0
+        side = "light" if lum > 150 else "dark"
+        for b in blocks:
+            if b.get("theme") != "accent":
+                b["theme"] = side
+    return {"w": W, "h": H, "fps": TYPO_FPS, "duration": d.get("duration") or (blocks[-1]["t1"] if blocks else 1),
+            "style": {k: st.get(k) for k in ("font", "case", "grain", "weight", "light", "dark", "accent")},
+            "transparent": kind != "theme", "blocks": blocks}
+
+
+@app.get("/api/typo/{pid}/doc")
+def typo_doc_get(pid: str):
+    return typo_doc(pid, typo_load(pid))
+
+
+class TypoRenderIn(BaseModel):
+    quality: str = "high"
+
+
+@app.post("/api/typo/{pid}/render")
+def typo_render(pid: str, body: TypoRenderIn, request: Request):
+    """🎬 يرسم الفيديو: المتصفح بيرسم كل فريم، وFFmpeg بيركّبه على الخلفية ومعاه الصوت."""
+    d = typo_load(pid)
+    if not d.get("blocks"):
+        raise HTTPException(400, "وزّع الكلام على الحركات الأول (🧠)")
+    host, port = request.scope.get("server") or ("127.0.0.1", 8000)
+    return typo_start(pid, "rendering", "🎬 بيجهّز", run_typo_render, f"http://127.0.0.1:{port}", body.quality)
+
+
+def typo_browser(p):
+    """Chromium اللي اتثبت مع playwright، ولو مش موجود (على جهاز التطوير) اللي في TYPO_CHROMIUM أو /opt/pw-browsers."""
+    for path in (os.environ.get("TYPO_CHROMIUM"), None, "/opt/pw-browsers/chromium"):
+        try:
+            return p.chromium.launch(executable_path=path) if path else p.chromium.launch()
+        except Exception:  # noqa: BLE001
+            continue
+    raise RuntimeError("المتصفح اللي بيرسم التايبوجرافي مش متثبت على السيرفر (playwright install chromium)")
+
+
+def run_typo_render(pid: str, base: str, quality: str) -> None:
+    folder = TYPO_PROJ / pid
+    tmp_v = folder / f".render_{uuid.uuid4().hex[:6]}.mp4"
+    try:
+        from playwright.sync_api import sync_playwright
+
+        d = typo_load(pid)
+        doc = typo_doc(pid, d)
+        W, H = doc["w"], doc["h"]
+        scale = 1.0 if quality == "high" else 2 / 3
+        vw, vh = int(W * scale) // 2 * 2, int(H * scale) // 2 * 2
+        dur = float(doc["duration"])
+        n = max(1, int(math.ceil(dur * TYPO_FPS)))
+        bg = d.get("bg") or {}
+        kind = bg.get("kind", "theme")
+        src = (d.get("source") or {}).get("file")
+        cmd = [ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y"]
+        inputs, fl = 0, ""
+        if kind == "solid" or kind == "none":
+            cmd += ["-f", "lavfi", "-i", f"color=c={bg.get('color') or '#101010'}:s={vw}x{vh}:r={TYPO_FPS}:d={dur:.3f}"]
+            inputs = 1
+        elif kind in ("image", "video", "source") and (bg.get("file") or src):
+            f = folder / (src if kind == "source" else bg["file"])
+            cmd += (["-loop", "1", "-framerate", str(TYPO_FPS), "-t", f"{dur:.3f}", "-i", str(f)] if kind == "image"
+                    else ["-stream_loop", "-1", "-t", f"{dur:.3f}", "-i", str(f)])
+            inputs = 1
+        # من غير خلفية تحت: الفريم كامل JPEG (أسرع بكتير)، وفوق خلفية: PNG شفاف والحبيبات بتتحط هنا
+        cmd += ["-f", "image2pipe", "-framerate", str(TYPO_FPS), "-c:v", "png" if inputs else "mjpeg", "-i", "-"]
+        if inputs:
+            dim = float(bg.get("dim") or 0)
+            grain = float(typo_style(d.get("style")).get("grain") or 0)
+            fl = (f"[0:v]scale={vw}:{vh}:force_original_aspect_ratio=increase,crop={vw}:{vh},setsar=1,fps={TYPO_FPS}"
+                  + (f",colorchannelmixer=rr={1 - dim}:gg={1 - dim}:bb={1 - dim}" if dim else "") + "[bg];"
+                  f"[bg][1:v]overlay=0:0:shortest=1" + (f",noise=alls={int(grain * 70)}:allf=t" if grain else "") + ",format=yuv420p[v]")
+        audio_in = None
+        if src and (d.get("source") or {}).get("kind") in ("audio", "video"):
+            cmd += ["-i", str(folder / src)]
+            audio_in = inputs + 1
+        if fl:
+            cmd += ["-filter_complex", fl, "-map", "[v]"]
+        else:
+            cmd += ["-map", f"{inputs}:v", "-vf", "format=yuv420p"]
+        if audio_in is not None:
+            cmd += ["-map", f"{audio_in}:a?", "-c:a", "aac", "-b:a", "160k", "-shortest"]
+        cmd += ["-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-r", str(TYPO_FPS), "-t", f"{dur:.3f}", "-movflags", "+faststart", str(tmp_v)]
+        proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+        with sync_playwright() as p:
+            browser = typo_browser(p)
+            try:
+                ctx = browser.new_context(viewport={"width": W, "height": H}, device_scale_factor=scale)
+                ctx.add_cookies([{"name": SESSION_COOKIE, "value": auth.make_token(), "url": base}])
+                page = ctx.new_page()
+                page.goto(f"{base}/typo-render.html?id={pid}", wait_until="load", timeout=60000)
+                page.evaluate("window.typoReady")
+                cdp = ctx.new_cdp_session(page)
+                if inputs:
+                    cdp.send("Emulation.setDefaultBackgroundColorOverride", {"color": {"r": 0, "g": 0, "b": 0, "a": 0}})
+                shot = {"format": "png", "optimizeForSpeed": True} if inputs else {"format": "jpeg", "quality": 93, "optimizeForSpeed": True}
+                for i in range(n):
+                    page.evaluate(f"renderAt({i / TYPO_FPS:.4f})")
+                    proc.stdin.write(base64.b64decode(cdp.send("Page.captureScreenshot", shot)["data"]))
+                    if i % TYPO_FPS == 0:
+                        typo_set(pid, step=f"🎬 بيرسم {i // TYPO_FPS} من {int(dur)} ثانية")
+            finally:
+                browser.close()
+        proc.stdin.close()
+        err = proc.stderr.read().decode(errors="ignore")
+        if proc.wait(timeout=600) != 0:
+            raise RuntimeError(f"FFmpeg: {err.strip()[-300:]}")
+        name = f"typo-{uuid.uuid4().hex[:4]}.mp4"
+        tmp_v.replace(folder / name)
+        def fin(x):
+            if x.get("final"):
+                (folder / x["final"]).unlink(missing_ok=True)
+            x["final"] = name
+        typo_update(pid, fin)
+        typo_update(pid, lambda x: x.update(status="done", step=None, error=None))
+    except Exception as exc:  # noqa: BLE001
+        tmp_v.unlink(missing_ok=True)
+        typo_fail(pid, exc)
+
+
+@app.post("/api/typo/{pid}/to-editor")
+def typo_to_editor(pid: str):
+    """🎞️ الفيديو في مونتاج الإعلانات (بصوته)."""
+    d = typo_load(pid)
+    f = TYPO_PROJ / pid / (d.get("final") or "")
+    if not d.get("final") or not f.exists():
+        raise HTTPException(400, "اعمل الفيديو الأول (🎬)")
+    gid = uuid.uuid4().hex[:12]
+    shutil.copy(f, GENERATED_DIR / f"{gid}.mp4")
+    label = d.get("name") or "تايبوجرافي"
+    with closing(db()) as conn, conn:
+        conn.execute(
+            "INSERT INTO generations (id, clip_id, clip_filename, clip_label, coach_id, coach_name, coach_image, model, prompt, "
+            "params, status, output_filename, created_at, updated_at) VALUES (?, ?, ?, ?, '', '', '', 'typo', '', '{}', 'completed', ?, ?, ?)",
+            (gid, f"ad:typo-{pid}", d["final"], f"🔤 {label}", f"{gid}.mp4", now(), now()))
+        clips = [{"gen_id": gid, "start": 0.0, "end": round(probe_duration(GENERATED_DIR / f"{gid}.mp4"), 3), "zoom": 1.0, "x": 0.0, "y": 0.0, "volume": 1.0}]
+        prj = uuid.uuid4().hex[:12]
+        pdata = {"name": label, "section": "ads", "video_id": None, "coach_id": None, "clips": clips, "voice": None,
+                 "music": None, "outro": False, "outro_volume": 1.0, "captions": {}, "logo": {}}
+        conn.execute("INSERT INTO projects (id, name, data, render_status, created_at, updated_at) VALUES (?, ?, ?, 'idle', ?, ?)",
+                     (prj, label, json.dumps(pdata, ensure_ascii=False), now(), now()))
+    return {"project_id": prj}
+
+
+def reset_stuck_typo() -> None:
+    for f in TYPO_PROJ.glob("*/typo.json"):
+        try:
+            d = json.loads(f.read_text(encoding="utf-8"))
+        except ValueError:
+            continue
+        if d.get("status") in TYPO_BUSY:
+            d.update(status="failed", step=None, error="اتقطع لما السيرفر اتقفل. دوس الزرار تاني")
+            f.write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+
+
+reset_stuck_typo()
 
 
 @app.get("/")
