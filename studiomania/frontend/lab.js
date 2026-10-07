@@ -85,8 +85,11 @@ function renderLab() {
   $("labList").innerHTML = labx.list.map((x) => `<li class="${x.id === labx.cur?.id ? "active" : ""}" data-lab="${x.id}">
       ${x.thumb ? `<img src="${x.thumb}" alt="">` : `<span class="ph">🎬</span>`}
       <span class="ad-li-body"><span class="nm" data-no-i18n>${le(x.name)}</span>
-        <small class="muted">${x.duration} ث</small></span>
+        <small class="muted">${x.duration} ث${x.fx ? " · 🎬🔊" : ""}</small></span>
       <small>${x.busy ? "⏳" : ""}</small></li>`).join("") || `<li class="muted">لسه مفيش فيديوهات.</li>`;
+  const nfx = labx.list.filter((x) => x.fx).length;
+  $("labFxCount").textContent = nfx ? `(${nfx})` : "";
+  $("labFxZip").classList.toggle("disabled", !nfx);
   const d = labx.cur, lib = ["lib", "film", "tpl"].includes(labx.view);
   $("labLibBtn").classList.toggle("active", labx.view === "lib");
   $("labFilmBtn").classList.toggle("active", labx.view === "film");
@@ -130,7 +133,7 @@ function renderLab() {
 const LAB_PARTS = { dialogue: ["speech", "🗣️ الكلام"], music: ["music", "🎵 الموسيقى"], effects: ["sfx", "🔊 المؤثرات"] };
 function renderLabParts(d) {
   const st = d.stems || {}, step = d.steps?.split || {}, el = $("labParts");
-  const key = JSON.stringify([d.id, d.picture_url, step.status, step.progress, step.error, Object.values(st).map((x) => x?.url || x?.error), labx.hear, d.audioshake]);
+  const key = JSON.stringify([d.id, d.picture_url, d.picture_fx_url, step.status, step.progress, step.error, Object.values(st).map((x) => x?.url || x?.error), labx.hear, d.audioshake]);
   if (el.dataset.key === key) return;
   if (el.dataset.lab === d.id && [...el.querySelectorAll("audio, video")].some((x) => !x.paused)) {
     // متقطعش اللي شغال: حدّث زراير الإسكات بس
@@ -141,7 +144,7 @@ function renderLabParts(d) {
   el.dataset.key = key;
   const working = step.status === "working" || step.status === "queued";
   const wait = (msg) => `<span class="muted">${working ? `<span class="spin-inline"></span> ${le(step.progress || "بيقسّم...")}` : msg}</span>`;
-  const card = (icon, label, media, url, extra = "") => `<div class="lab-part"><div class="row"><b>${icon} ${label}</b>${extra}
+  const card = (icon, label, media, url, extra = "", cls = "") => `<div class="lab-part ${cls}"><div class="row"><b>${icon} ${label}</b>${extra}
       ${url ? `<a class="btn sm" href="${url}" download>⬇ نزّل</a>` : ""}</div>${media}</div>`;
   const noAudio = d.source?.has_audio === false;
   const stemMsg = noAudio ? "الفيديو ده مفيهوش صوت." : !d.audioshake ? "مفتاح AudioShake مش متسجل (AUDIOSHAKE_API_KEY على Railway)."
@@ -158,6 +161,8 @@ function renderLabParts(d) {
     ${isNew ? `<p class="hint">الفيديو ده اترفع قبل التقسيم الجديد. دوس «🎚️ قسّم تاني» فوق عشان يتقسم لصورة وكلام وموسيقى ومؤثرات.</p>` : ""}
     ${labx.stems ? `<p class="hint">🎧 الفيديو اللي فوق بيشغّل التراكات المفصولة: دوس 🔊 جنب أي جزء عشان تقفله وتسمع الباقي لوحده.</p>` : ""}
     <div class="lab-parts">
+      ${card("🎬🔊", "الصورة + المؤثرات", d.picture_fx_url ? `<video src="${d.picture_fx_url}" controls playsinline preload="metadata"></video>`
+        : wait(noAudio ? "الفيديو ده مفيهوش صوت." : isNew ? "لسه ما اتقسمش." : step.error ? `<span class="err">✕ ${le(step.error)}</span>` : stemMsg), d.picture_fx_url, "", "main")}
       ${card("🎬", "الصورة (من غير صوت)", d.picture_url ? `<video src="${d.picture_url}" controls muted playsinline preload="metadata"></video>` : wait(isNew ? "لسه ما اتقسمش." : step.error ? `<span class="err">✕ ${le(step.error)}</span>` : "لسه."), d.picture_url)}
       ${parts}
     </div>`;
@@ -852,18 +857,24 @@ async function labReview(kind, ref, { ok, note, fix, keep }) {
   } catch (err) { toast(err.message, true); }
 }
 $("labFile").addEventListener("change", async (e) => {
-  const f = e.target.files[0];
+  const files = [...e.target.files];
   e.target.value = "";
-  if (!f) return;
-  const form = new FormData();
-  form.append("file", f);
-  try {
-    toast("⏳ بيرفع الفيديو...");
-    const d = await api("/api/lab", { method: "POST", body: form });
-    labx.list = await api("/api/lab");
-    await openLab(d.id);
-    toast("🎚️ بدأ التقسيم");
-  } catch (err) { toast(err.message, true); }
+  if (!files.length) return;
+  // كذا فيديو: بيترفعوا ورا بعض، وكل واحد بيبدأ يتقسم أول ما يوصل
+  let last = null, ok = 0;
+  for (const [i, f] of files.entries()) {
+    const form = new FormData();
+    form.append("file", f);
+    try {
+      toast(files.length > 1 ? `⏳ بيرفع ${i + 1} من ${files.length}: ${f.name}` : "⏳ بيرفع الفيديو...");
+      last = await api("/api/lab", { method: "POST", body: form });
+      ok++;
+      labx.list = await api("/api/lab");
+      renderLab();
+    } catch (err) { toast(`${f.name}: ${err.message}`, true); }
+  }
+  if (last) await openLab(last.id);
+  if (ok) toast(files.length > 1 ? `🎚️ اترفع ${ok} من ${files.length} وبيتقسموا` : "🎚️ بدأ التقسيم");
 });
 $("labName").addEventListener("change", async () => {
   try { labx.cur = await api(`/api/lab/${labx.cur.id}`, { method: "PATCH", ...jsonBody({ name: $("labName").value }) }); labx.list = await api("/api/lab"); renderLab(); }

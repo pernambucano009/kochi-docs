@@ -1808,3 +1808,6 @@ img.tv-cell { outline: 2px dashed #f0b54a; outline-offset: -2px; }
 .lab-part .row b { flex: 1; }
 .lab-part video { width: 100%; border-radius: 6px; background: #000; max-height: 220px; }
 .lab-part audio { width: 100%; }
+.lab-part.main { grid-column: 1 / -1; background: var(--accent-soft, #fde9e2); }
+.lab-part.main video { max-height: 360px; }
+a.btn.disabled { opacity: .45; pointer-events: none; }

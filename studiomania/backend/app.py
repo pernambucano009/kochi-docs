@@ -29,7 +29,7 @@ from pathlib import Path
 import httpx
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi import Request
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -8627,7 +8627,8 @@ def lab_to_dict(lid: str, d: dict) -> dict:
         sch = {**sch, "data": {**sch["data"], "beats": [{**b, "thumb_url": f"{base}/frames/{b['thumb']}" if b.get("thumb") else None}
                                                      for b in sch["data"]["beats"]]}}
     return {**d, "id": lid, "source_url": f"{base}/{d['source']['file']}", "shots": shots,
-            "picture_url": f"{base}/{d['picture']}" if d.get("picture") else None, "audio": audio, "stems": stems, "schema": sch or None,
+            "picture_url": f"{base}/{d['picture']}" if d.get("picture") else None,
+            "picture_fx_url": f"{base}/{d['picture_fx']}" if d.get("picture_fx") else None, "audio": audio, "stems": stems, "schema": sch or None,
             "schema_roles": lab.SCHEMA_ROLES,
             "components": comps, "connectors": conns, "families": lab.CONNECTOR_FAMILIES,
             "audioshake": bool(audioshake.api_key() or atlas.mock_mode()),
@@ -8649,6 +8650,7 @@ def lab_list_items() -> list[dict]:
         if not thumb and (f.parent / "poster.jpg").exists():
             thumb = "poster.jpg"
         out.append({"id": lid, "name": d.get("name"), "created_at": d.get("created_at"), "duration": d["source"]["duration"],
+                    "fx": bool(d.get("picture_fx")),
                     "shots": len(d.get("shots") or []), "thumb": f"/media/lab/{lid}/{thumb}" if thumb else None,
                     "busy": any((v or {}).get("status") == "working" for v in (d.get("steps") or {}).values())})
     return out
@@ -8681,6 +8683,53 @@ def lab_create(file: UploadFile = File(...), name: str = Form("")):
     (folder / "lab.json").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
     threading.Thread(target=run_lab, args=(lid, list(LAB_UPLOAD)), daemon=True).start()
     return lab_to_dict(lid, d)
+
+
+@app.get("/api/lab/export/picture-fx.zip")
+def lab_export_fx():
+    """⬇ كل نسخ «الصورة + المؤثرات» في ملف zip واحد (الاسم = اسم الفيديو في المعمل)."""
+    import zipfile
+    files, used = [], set()
+    for f in sorted(LAB_DIR.glob("*/lab.json"), key=lambda x: x.stat().st_mtime):
+        try:
+            d = json.loads(f.read_text(encoding="utf-8"))
+        except ValueError:
+            continue
+        mp4 = f.parent / (d.get("picture_fx") or "-")
+        if d.get("picture_fx") and mp4.exists():
+            name = export_file_name(d.get("name") or f.parent.name)
+            stem, n = Path(name).stem, 2
+            while name in used:
+                name, n = f"{stem} ({n}).mp4", n + 1
+            used.add(name)
+            files.append((mp4, name))
+    if not files:
+        raise HTTPException(404, "لسه مفيش فيديوهات اتقسمت لصورة + مؤثرات")
+    # بيتبعت وهو بيتعمل (من غير ملف مؤقت على السيرفر، عشان المساحة)
+    class Sink:
+        def __init__(self):
+            self.parts = []
+        def write(self, b):
+            self.parts.append(bytes(b))
+            return len(b)
+        def flush(self):
+            pass
+        def take(self):
+            out, self.parts = b"".join(self.parts), []
+            return out
+
+    def gen():
+        sink = Sink()
+        with zipfile.ZipFile(sink, "w", zipfile.ZIP_STORED) as z:
+            for mp4, name in files:
+                with open(mp4, "rb") as r, z.open(name, "w", force_zip64=True) as w:
+                    while chunk := r.read(1 << 20):
+                        w.write(chunk)
+                        yield sink.take()
+                yield sink.take()
+        yield sink.take()
+    return StreamingResponse(gen(), media_type="application/zip",
+                             headers={"Content-Disposition": 'attachment; filename="studiomania-picture-fx.zip"'})
 
 
 @app.get("/api/lab/{lid}")
@@ -8911,7 +8960,18 @@ def lab_proxy(lid: str, d: dict) -> Path:
     return proxy
 
 
+LAB_SPLIT_SEM = threading.Semaphore(3)   # لو رفعت فيديوهات كتير مرة واحدة: ٣ بس بيتقسموا في نفس الوقت والباقي في الطابور
+
+
 def run_lab_split(lid: str, d: dict, src: Path) -> None:
+    lab_step(lid, "split", progress="مستني دوره في الطابور")
+    with LAB_SPLIT_SEM:
+        if lab_stopping(lid):
+            raise LabStop()
+        _run_lab_split(lid, lab_load(lid), src)
+
+
+def _run_lab_split(lid: str, d: dict, src: Path) -> None:
     """✂️ يقسّم الفيديو لـ ٤: الصورة من غير صوت، والكلام والموسيقى والمؤثرات (AudioShake)."""
     folder = lab_dir(lid)
     lab_step(lid, "split", progress="بيفصل الصورة عن الصوت")
@@ -8924,8 +8984,22 @@ def run_lab_split(lid: str, d: dict, src: Path) -> None:
                                str(pic)], check=True, capture_output=True, timeout=900)
     subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", str(min(0.5, d["source"]["duration"] / 2)), "-i", str(src),
                     "-frames:v", "1", "-vf", "scale=320:-2", str(folder / "poster.jpg")], capture_output=True, timeout=60)
-    lab_update(lid, lambda d: d.update(picture="picture.mp4"))
+    lab_update(lid, lambda d: d.update(picture="picture.mp4", picture_fx=None))
     run_lab_stems(lid, d, src, step="split")
+    lab_picture_fx(lid)
+
+
+def lab_picture_fx(lid: str) -> None:
+    """🎬🔊 نسخة الصورة + المؤثرات بس (من غير كلام ولا موسيقى): دي اللي بنفكك منها الموشن."""
+    folder, d = lab_dir(lid), lab_load(lid)
+    fx = ((d.get("stems") or {}).get("effects") or {}).get("file")
+    if not d.get("picture") or not fx or not (folder / "stems" / fx).exists():
+        return
+    lab_step(lid, "split", progress="بيركّب الصورة مع المؤثرات")
+    subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(folder / d["picture"]), "-i", str(folder / "stems" / fx),
+                    "-map", "0:v", "-map", "1:a", "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-shortest", "-movflags", "+faststart",
+                    str(folder / "picture_fx.mp4")], check=True, capture_output=True, timeout=600)
+    lab_update(lid, lambda d: d.update(picture_fx="picture_fx.mp4"))
 
 
 def run_lab_stems(lid: str, d: dict, src: Path, step: str = "stems") -> None:

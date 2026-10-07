@@ -937,9 +937,11 @@
           <div class="car-layout">
             <aside class="panel ad-side">
               <div class="panel-head"><h2>🔬 معمل التفكيك</h2></div>
-              <label class="btn primary ad-up">＋ فيديو للتقسيم<input type="file" id="labFile" accept="video/*,.mp4,.mov,.webm,.mkv" hidden></label>
-              <p class="hint">ارفع أي فيديو والبرنامج يقسّمه لـ ٤: 🎬 الصورة من غير صوت، و🗣️ الكلام، و🎵 الموسيقى، و🔊 المؤثرات. كل جزء تسمعه لوحده وتنزّله.</p>
+              <label class="btn primary ad-up">＋ فيديو للتقسيم<input type="file" id="labFile" accept="video/*,.mp4,.mov,.webm,.mkv" multiple hidden></label>
+              <p class="hint">ارفع فيديو أو كذا فيديو مرة واحدة، والبرنامج يطلّع من كل واحد 🎬🔊 نسخة الصورة + المؤثرات بس. وكمان الأجزاء لوحدها: 🎬 الصورة، و🗣️ الكلام، و🎵 الموسيقى، و🔊 المؤثرات.</p>
               <ul class="ad-list" id="labList"></ul>
+              <a class="btn lab-libbtn" id="labFxZip" href="/api/lab/export/picture-fx.zip" download>⬇ كل نسخ «الصورة + المؤثرات» <span class="muted" id="labFxCount"></span></a>
+              <p class="hint">ملف zip واحد فيه كل الفيديوهات اللي اتقسمت، كل واحد بالصورة والمؤثرات بس (من غير كلام ولا موسيقى).</p>
               <button type="button" hidden data-archived class="btn lab-libbtn" id="labLibBtn">📚 مكتبة الأصول <span class="muted" id="labLibCount"></span></button>
               <p class="hint" hidden data-archived>الأصول = مقاطع حقيقية من الفيديوهات (موشن، افيكت، حركة ماوس...) بحركتها وصوتها، محفوظة ومتفككة، وتقدر تعدّل فيها جوه المشهد.</p>
               <button type="button" hidden data-archived class="btn lab-libbtn" id="labTplBtn">📐 فيديو من تيمبليت</button>
