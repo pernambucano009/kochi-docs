@@ -20,8 +20,25 @@ class AudioShakeError(RuntimeError):
     pass
 
 
+_NAMES = ("AUDIOSHAKE_API_KEY", "AUDIOSHAKE_KEY", "AUDIO_SHAKE_API_KEY", "AUDIOSHAKE_TOKEN")
+
+
 def api_key() -> str | None:
-    return os.environ.get("AUDIOSHAKE_API_KEY")
+    for n in _NAMES:
+        v = (os.environ.get(n) or "").strip().strip('"').strip("'")
+        if v:
+            return v
+    # اسم متكتب بحروف صغيرة أو بمسافة زيادة
+    for k, v in os.environ.items():
+        if k.strip().upper() in _NAMES and v.strip():
+            return v.strip().strip('"').strip("'")
+    return None
+
+
+def missing_hint() -> str:
+    """لو المفتاح مش لاقيه: أسماء المتغيرات الشبه (من غير قيمها) عشان نعرف الغلطة فين."""
+    near = sorted(k for k in os.environ if "SHAKE" in k.upper() or "AUDIO" in k.upper())
+    return f" (لقيت متغيرات بأسماء: {', '.join(near)})" if near else " (السيرفر مش شايف أي متغير اسمه فيه AUDIOSHAKE: غالبًا التغيير لسه ما اتعملّوش Deploy على Railway، أو اتحط في خدمة تانية)"
 
 
 def _headers() -> dict:

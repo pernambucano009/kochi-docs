@@ -8936,7 +8936,7 @@ def run_lab_stems(lid: str, d: dict, src: Path, step: str = "stems") -> None:
         return
     if not (audioshake.api_key() or atlas.mock_mode()):
         lab_step(lid, step, status="skipped", progress="")
-        raise LabSkip("مفتاح AudioShake مش متسجل (AUDIOSHAKE_API_KEY)، فالصوت ما اتفصلش" if step == "split"
+        raise LabSkip("مفتاح AudioShake مش متسجل (AUDIOSHAKE_API_KEY)، فالصوت ما اتفصلش" + audioshake.missing_hint() if step == "split"
                       else "مفتاح AudioShake مش متسجل (AUDIOSHAKE_API_KEY)، فالتحليل اشتغل على الصوت كله")
     shutil.rmtree(folder, ignore_errors=True)
     folder.mkdir(parents=True, exist_ok=True)
