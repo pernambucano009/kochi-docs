@@ -9026,20 +9026,47 @@ def run_lab_stems(lid: str, d: dict, src: Path, step: str = "stems") -> None:
             stems[name] = {"file": f, "status": "done", "review": None}
     else:
         lab_step(lid, step, progress="بيرفع الصوت")
-        tid = audioshake.create_task(atlas.upload_media(mix))
+        tid, plan = audioshake.create_task(atlas.upload_media(mix))
         t0 = time.time()
         def tick(out):
             done = sum(v["status"] in ("completed", "complete", "done", "succeeded") for v in out.values())
             lab_step(lid, step, progress=f"AudioShake بيفصل الكلام والموسيقى والمؤثرات ({done}/{len(out) or 3} خلص · {int(time.time() - t0)} ث)")
         res = audioshake.wait(tid, on_status=tick)
-        for name in audioshake.STEMS:
-            r = res.get(name) or {}
+        lab_step(lid, step, progress="بيحمّل التراكات")
+        raw = folder / "raw"
+        raw.mkdir(exist_ok=True)
+        got, errs = {}, {}
+        for name, r in res.items():
             if r.get("link") and r["status"] not in ("error", "failed"):
-                f = f"{name}.mp3"
-                atlas.download(r["link"], folder / f)
-                stems[name] = {"file": f, "status": "done", "review": None}
+                atlas.download(r["link"], raw / f"{name}.wav")
+                got[name] = raw / f"{name}.wav"
             else:
-                stems[name] = {"file": None, "status": "failed", "error": str(r.get("error") or "مرجعش ملف")[:200], "review": None}
+                errs[name] = str(r.get("error") or "مرجعش ملف")[:200]
+        ff = [ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y"]
+        wav = {}   # التراكات بتاعتنا (wav عشان الطرح يبقى مظبوط بالعينة)
+        for name in ("dialogue", "effects", "music"):
+            how = plan[name]
+            src_of = lambda n: wav.get(n) or got.get(n)  # noqa: E731
+            try:
+                if how[0] == "target":
+                    if how[1] not in got:
+                        raise RuntimeError(errs.get(how[1]) or "مرجعش ملف")
+                    wav[name] = got[how[1]]
+                else:   # طرح: a − b
+                    a, b = src_of(how[1]), src_of(how[2])
+                    if not a or not b:
+                        raise RuntimeError(f"ناقص {how[1] if not a else how[2]}")
+                    out = raw / f"{name}.wav"
+                    subprocess.run(ff + ["-i", str(a), "-i", str(b), "-filter_complex",
+                                         "[1:a]volume=-1[n];[0:a][n]amix=inputs=2:normalize=0:duration=first[o]", "-map", "[o]", str(out)],
+                                   check=True, capture_output=True, timeout=300)
+                    wav[name] = out
+                f = f"{name}.mp3"
+                subprocess.run(ff + ["-i", str(wav[name]), "-b:a", "192k", str(folder / f)], check=True, capture_output=True, timeout=300)
+                stems[name] = {"file": f, "status": "done", "review": None, "how": "/".join(how[1:]) if how[0] == "sub" else how[1]}
+            except Exception as exc:  # noqa: BLE001
+                stems[name] = {"file": None, "status": "failed", "error": str(exc)[:200], "review": None}
+        shutil.rmtree(raw, ignore_errors=True)
         stems["_task"] = tid
     lab_update(lid, lambda d: d.update(stems=stems))
 
