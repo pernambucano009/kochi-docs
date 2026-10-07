@@ -11514,7 +11514,11 @@ def tv_to_dict(vid: str, d: dict) -> dict:
             "costs": {"sheets": round(len(sheets) * TV_IMAGE_MODELS[tv_img(d)][0], 2), "panel": TV_IMAGE_MODELS[tv_img(d)][1],
                       "sharpen": round(sum(1 for j in range(n_p) if not (panels.get(str(j)) or {}).get("full")) * TV_IMAGE_MODELS[tv_img(d)][1], 2),
                       "video": round(sum(trial_gen_seconds(b["t1"] - b["t0"]) * per for i, b in enumerate(beats) if not (segs.get(str(i)) or {}).get("file")), 2),
-                      "seg": [round(trial_gen_seconds(b["t1"] - b["t0"]) * per, 2) for b in beats]},
+                      "seg": [round(trial_gen_seconds(b["t1"] - b["t0"]) * per, 2) for b in beats],
+                      "once": round(sum(trial_gen_seconds(sum(beats[i]["t1"] - beats[i]["t0"] for i in range(sh["cells"][0], sh["cells"][-1])))
+                                        * per for sh in sheets if len(sh["cells"]) > 1)
+                                    + sum(trial_gen_seconds(beats[sh["cells"][0] - 1]["t1"] - beats[sh["cells"][0] - 1]["t0"]) * per
+                                          for sh in sheets[1:]), 2)},
             "models": [{"key": k, "label": v["label"], "per_sec": v["per_sec"]} for k, v in TRIAL_MODELS.items()]}
 
 
@@ -11913,6 +11917,7 @@ def run_tv_redraw(vid: str, j: int, note: str) -> None:
 
 class TvRunIn(BaseModel):
     i: int | None = None
+    once: bool = False
 
 
 @app.post("/api/tvideos/{vid}/run")
@@ -11920,6 +11925,11 @@ def tvideo_run(vid: str, body: TvRunIn):
     """🎬 كل جزء = حركة من لوحته للوحة اللي بعدها (الناقص بس، أو جزء واحد تاني)، والفيديو بيتجمّع لقطة واحدة."""
     d = tv_load(vid)
     n = len(d["schema"]["beats"])
+    if body.once:
+        miss = [sh["k"] + 1 for sh in tv_to_dict(vid, d)["sheets"] if not sh["url"]]
+        if miss:
+            raise HTTPException(400, f"ارسم الشيت الأول ({', '.join(map(str, miss))})")
+        return tv_start(vid, "working", "🎬 بيبدأ", run_tv_once)
     need = [body.i, body.i + 1] if body.i is not None else list(range(n + 1))
     if body.i is not None and not 0 <= body.i < n:
         raise HTTPException(404, "الجزء ده مش موجود")
@@ -11972,7 +11982,69 @@ def run_tv_gen(vid: str, only: int | None) -> None:
                 if x.get("final"):
                     (folder / x["final"]).unlink(missing_ok=True)
                 x["final"] = name
+                x["final_kind"] = "segs"
             tv_update(vid, fin)
+        tv_update(vid, lambda x: x.update(status=tv_idle(x), step=None, error=None))
+    except Exception as exc:  # noqa: BLE001
+        tv_fail(vid, exc)
+
+
+def tv_r2v(model_key: str) -> str:
+    return TRIAL_MODELS.get(model_key, TRIAL_MODELS["seedance-mini"])["model"].replace("image-to-video", "reference-to-video")
+
+
+def run_tv_once(vid: str) -> None:
+    """🎬 الفيديو كله في توليدة واحدة: الشيت كله صورة مرجع، والموديل يمشي على اللوحات بالترتيب في لقطة واحدة متصلة
+    (مفيش أجزاء بتتلزق، فمفيش وقفة/بداية جديدة كل جزء). لو فيه أكتر من شيت: توليدة لكل شيت، وبينهم حركة من آخر لوحة لأول لوحة."""
+    try:
+        d = tv_load(vid)
+        folder = tv_dir(vid)
+        beats, fill = d["schema"]["beats"], d["fill"]
+        ratio = az.ASPECTS.get(d["ratio"], az.ASPECTS["9:16"])[1]
+        W, H = RATIO_VIDEO.get(d["ratio"], RATIO_VIDEO["9:16"])
+        brain = brain_row(d.get("client_id") or "") or active_client()
+        refs = tv_refs(d, brain)[:8]
+        sheets = tv_sheets(d)
+        parts = []
+        for k, cells in enumerate(sheets):
+            if k:   # من آخر لوحة في الشيت اللي فات لأول لوحة في ده
+                i = cells[0] - 1
+                b = beats[i]
+                tv_set(vid, step=f"🎬 بيوصل الشيت {k} بالشيت {k + 1}")
+                if not all(((d.get("panels") or {}).get(str(j)) or {}).get("cell") for j in (i, i + 1)):
+                    raise RuntimeError(f"قطّع الشيتات الأول عشان الوصلة بين الشيت {k} و{k + 1}")
+                name = f"once-b{k}-{uuid.uuid4().hex[:4]}.mp4"
+                gen_motion(d["model"], d["resolution"], ratio, fill["beats"][i]["motion"], tv_panel(d, folder, i), tv_panel(d, folder, i + 1),
+                           trial_gen_seconds(b["t1"] - b["t0"]), folder / name, W, H, "الوصلة")
+                parts.append(folder / name)
+            if len(cells) < 2:
+                continue
+            span = sum(beats[i]["t1"] - beats[i]["t0"] for i in range(cells[0], cells[-1]))
+            secs = trial_gen_seconds(span)
+            what = "الفيديو كله" if len(sheets) == 1 else f"الشيت {k + 1}"
+            tv_set(vid, step=f"🎬 بيولّد {what} مرة واحدة ({secs} ث)")
+            sheet = folder / d["sheets"][str(k)]["file"]
+            name = f"once{k + 1}-{uuid.uuid4().hex[:4]}.mp4"
+            if atlas.mock_mode():
+                gen_motion(d["model"], d["resolution"], ratio, "", sheet, sheet, secs, folder / name, W, H)
+            else:
+                prompt = lab.once_prompt(d["schema"], fill, cells, secs, [r[1] for r in refs])
+                body = {"model": tv_r2v(d.get("model")), "prompt": prompt,
+                        "reference_images": [atlas.reference_url(sheet)] + [atlas.reference_url(r[0]) for r in refs],
+                        "duration": secs, "resolution": d.get("resolution") or "480p", "ratio": ratio,
+                        "generate_audio": False, "watermark": False}
+                atlas.download(atlas.run_model("Video", body, "توليد الفيديو كله", max_seconds=1800, interval=6), folder / name)
+            parts.append(folder / name)
+        tv_set(vid, step="🎞️ بيجهّز الفيديو")
+        name = f"final-{uuid.uuid4().hex[:4]}.mp4"
+        chain_clips(parts, folder / name, W, H)
+        def fin(x):
+            for f in {x.get("final"), *((x.get("once") or {}).get("parts") or [])} - {None}:
+                (folder / f).unlink(missing_ok=True)
+            x["final"] = name
+            x["final_kind"] = "once"
+            x["once"] = {"parts": [p.name for p in parts]}
+        tv_update(vid, fin)
         tv_update(vid, lambda x: x.update(status=tv_idle(x), step=None, error=None))
     except Exception as exc:  # noqa: BLE001
         tv_fail(vid, exc)
@@ -11985,6 +12057,9 @@ def tvideo_to_editor(vid: str):
     folder = tv_dir(vid)
     beats, segs = d["schema"]["beats"], d.get("segs") or {}
     ready = [(i, b) for i, b in enumerate(beats) if (segs.get(str(i)) or {}).get("file") and (folder / segs[str(i)]["file"]).exists()]
+    once = d.get("final_kind") == "once" and d.get("final") and (folder / d["final"]).exists()
+    if once:   # الفيديو اللي اتولّد مرة واحدة بيتنقل حتة واحدة زي ما هو
+        ready = [(0, {"t0": 0, "t1": probe_duration(folder / d["final"]), "file": d["final"]})]
     if not ready:
         raise HTTPException(400, "لسه مفيش ولا جزء اتولد")
     W, H = RATIO_VIDEO.get(d["ratio"], RATIO_VIDEO["9:16"])
@@ -11993,11 +12068,12 @@ def tvideo_to_editor(vid: str):
         clips = []
         for i, b in ready:
             gid = uuid.uuid4().hex[:12]
-            chain_clips([timed(folder / segs[str(i)]["file"], b["t1"] - b["t0"])], GENERATED_DIR / f"{gid}.mp4", W, H)
+            src = b.get("file") or segs[str(i)]["file"]
+            chain_clips([timed(folder / src, b["t1"] - b["t0"])], GENERATED_DIR / f"{gid}.mp4", W, H)
             conn.execute(
                 "INSERT INTO generations (id, clip_id, clip_filename, clip_label, coach_id, coach_name, coach_image, model, prompt, "
                 "params, status, output_filename, created_at, updated_at) VALUES (?, ?, ?, ?, '', '', '', 'seedance', '', '{}', 'completed', ?, ?, ?)",
-                (gid, f"ad:tv-{vid}", segs[str(i)]["file"], f"📐 {label} · جزء {i + 1}", f"{gid}.mp4", now(), now()))
+                (gid, f"ad:tv-{vid}", src, f"📐 {label}" + ("" if once else f" · جزء {i + 1}"), f"{gid}.mp4", now(), now()))
             clips.append({"gen_id": gid, "start": 0.0, "end": round(probe_duration(GENERATED_DIR / f"{gid}.mp4"), 3),
                           "zoom": 1.0, "x": 0.0, "y": 0.0, "volume": 0.0})
         pid = uuid.uuid4().hex[:12]
@@ -12005,7 +12081,7 @@ def tvideo_to_editor(vid: str):
                  "music": default_music(conn), "outro": False, "outro_volume": 1.0, "captions": {}, "logo": {}}
         conn.execute("INSERT INTO projects (id, name, data, render_status, created_at, updated_at) VALUES (?, ?, ?, 'idle', ?, ?)",
                      (pid, pdata["name"], json.dumps(pdata, ensure_ascii=False), now(), now()))
-    return {"project_id": pid, "skipped": [i + 1 for i in range(len(beats)) if i not in dict(ready)]}
+    return {"project_id": pid, "skipped": [] if once else [i + 1 for i in range(len(beats)) if i not in dict(ready)]}
 
 
 @app.delete("/api/tvideos/{vid}")

@@ -1007,6 +1007,34 @@ def sheet_prompt(schema: dict, fill: dict, cells: list[int], ratio: str, text_mo
     )
 
 
+def once_prompt(schema: dict, fill: dict, cells: list[int], secs: float, refs: list[str]) -> str:
+    """برومبت توليد الفيديو كله مرة واحدة: صورة 1 هي الشيت كله، والموديل يمشي على اللوحات بالترتيب في لقطة واحدة متصلة."""
+    beats = schema["beats"]
+    lo, hi = cells[0], cells[-1]
+    span = sum(beats[i]["t1"] - beats[i]["t0"] for i in range(lo, hi)) or 1
+    f, t, lines = secs / span, 0.0, []
+    for i in range(lo, hi):
+        b, d = beats[i], (beats[i]["t1"] - beats[i]["t0"]) * f
+        bits = [fill["beats"][i].get("motion") or "", f"Camera: {b['camera']}." if b.get("camera") else "",
+                f"Flows into the next panel: {b['into_next']}." if b.get("into_next") else ""]
+        lines.append(f"{t:.1f}s-{t + d:.1f}s: panel {i - lo + 1} to panel {i - lo + 2}. " + " ".join(x for x in bits if x))
+        t += d
+    ref_txt = "".join(f"\nImage {k + 2} is {r}: keep it exactly as it looks wherever it appears." for k, r in enumerate(refs))
+    return (
+        "Image 1 is a storyboard sheet: its panels, read left to right and top to bottom, are consecutive moments of ONE video. "
+        f"Turn them into ONE continuous single-take {secs:.0f}-second video that passes through every panel in order. "
+        "No cuts, no fades, no pauses: the camera keeps moving the whole time and every move flows straight into the next one, "
+        "so the whole video feels like one piece.\n"
+        f"CAMERA LANGUAGE: {schema.get('camera') or ''}\n"
+        f"CONTINUITY: {schema.get('spine') or ''}\n"
+        f"WORLD: {fill.get('world') or schema.get('style') or ''}\n"
+        "TIMELINE:\n" + "\n".join(lines) + "\n"
+        "Keep the look, colors, lighting, UI and every element identical to the storyboard. The output is a full-screen frame: "
+        "never show the storyboard grid, the white gutters, several panels at once, panel numbers or any notes. "
+        "Do not add any new text or letters." + ref_txt
+    )
+
+
 def _bands(white: list[float], n: int, parts: int, thr: float = 0.9) -> list[tuple[int, int]] | None:
     """حدود كل خانة على محور واحد من نسبة البكسلات البيضا في كل عمود/صف. None لو الفواصل مش واضحة."""
     runs, start = [], None

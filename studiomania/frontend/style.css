@@ -1746,3 +1746,4 @@ img.tv-cell { outline: 2px dashed #f0b54a; outline-offset: -2px; }
 .tv-sheetwrap.editing { max-width: 560px; }
 .tv-sheetwrap.editing .tv-box { pointer-events: auto; cursor: move; background: rgba(87, 184, 175, .18); touch-action: none; }
 .tv-handle { position: absolute; right: -6px; bottom: -6px; width: 14px; height: 14px; border-radius: 50%; background: var(--accent); border: 2px solid #fff; cursor: nwse-resize; }
+.tv-once { display: grid; gap: 8px; margin: 12px 0; } .tv-once .btn { justify-self: start; }

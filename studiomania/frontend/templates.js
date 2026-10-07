@@ -216,9 +216,10 @@ function tvDetail(v) {
   const open = (k, def) => ((tplx.user?.[k] ?? def) ? "open" : "");
   const cutAll = v.panel_files.length && v.panel_files.every((p) => p.cell);
   const missSegs = v.seg_files.filter((x) => !x).length;
+  const sheetsAll = v.sheets.length && v.sheets.every((sh) => sh.url);
   return `<div class="car-head"><button type="button" class="btn sm" data-tvback>→ كل الفيديوهات</button>
       <input class="ad-title" data-tvname value="${le(v.name)}" data-no-i18n>
-      <div class="row wrap">${v.seg_files.some(Boolean) ? `<button type="button" class="btn sm primary" data-tveditor ${busy ? "disabled" : ""}>🎞️ انقل للمونتاج</button>` : ""}
+      <div class="row wrap">${v.seg_files.some(Boolean) || v.final_url ? `<button type="button" class="btn sm primary" data-tveditor ${busy ? "disabled" : ""}>🎞️ انقل للمونتاج</button>` : ""}
         ${v.final_url ? `<a class="btn sm" href="${v.final_url}" download="${le(v.name)}.mp4">⬇️ نزّل</a>` : ""}
         <button type="button" class="btn sm danger" data-tvdel ${busy ? "disabled" : ""}>🗑️</button></div></div>
     <div class="fm-status"><span class="lab-st ${busy ? "working" : v.status}">${busy ? `<span class="spin-inline"></span>` : ""} ${TV_ST[v.status] || ""}</span>
@@ -261,7 +262,12 @@ function tvDetail(v) {
         <small class="muted">لو بتستخدم ChatGPT: الصق البرومبت، وارفع معاه صور اللوجو والشاشات اللي في البرومبت، وبعدين ارفع الصورة اللي يطلّعها هنا. البرنامج بيقطّعها لوحده.</small>
       </div>`).join("")}
     </details>
-    <details class="panel tv-step" data-dk="s3" ${open("s3", cutAll && missSegs)}><summary>٣. ✨ اللوحات <small class="muted">${v.panel_files.filter((p) => p.full).length}/${v.panel_files.length} واضحة</small></summary>
+    <section class="panel tv-once"><b>🎬 الفيديو كله مرة واحدة (لقطة متصلة)</b>
+      <p class="hint">الشيت كله بيتبعت للموديل مرة واحدة، فبيطلّع فيديو واحد ماشي على اللوحات بالترتيب من غير ما يتقطع. محتاج الشيت بس، من غير تقطيع ولا توضيح.</p>
+      <button type="button" class="btn primary" data-tvonce ${busy || !sheetsAll ? "disabled" : ""}>${v.final_kind === "once" ? "↻ ولّده تاني" : "🎬 ولّد الفيديو كله مرة واحدة"} (~${c.once}$)</button>
+      ${!sheetsAll ? `<small class="muted">ارسم الشيت أو ارفعه الأول (خطوة ٢)</small>` : ""}
+    </section>
+    <details class="panel tv-step" data-dk="s3" ${open("s3", false)}><summary>٣. ✨ اللوحات <small class="muted">${v.panel_files.filter((p) => p.full).length}/${v.panel_files.length} واضحة</small></summary>
       ${v.sheets.some((sh) => sh.url) ? `<div class="row wrap">${v.sheets.map((sh) => `<button type="button" class="btn sm" data-tvdraw="${sh.k}" ${busy ? "disabled" : ""}
         title="يرسم الشيت كله من جديد ويقطّعه (اللوحات اللي منه بتتبدل)">↻ ارسم ${v.sheets.length > 1 ? `الشيت ${sh.k + 1}` : "الشيت"} تاني</button>`).join("")}</div>` : ""}
       <p class="hint">اللوحات المقطوعة من الشيت صغيرة. «وضّح» بيرسم كل لوحة بجودة كاملة بنفس شكلها بالظبط. ممكن تولّد من غير توضيح بس الجودة هتبقى أقل.</p>
@@ -271,7 +277,7 @@ function tvDetail(v) {
         ${p.cell && !busy ? `<input type="text" data-tpnote placeholder="ملاحظة (اختياري)" data-no-i18n><button type="button" class="btn sm" data-tvsharp1="${j}" title="بيرسمها بجودة كاملة بنفس شكلها اللي في الشيت">${p.full ? "✨ وضّحها تاني" : "✨ وضّحها"}</button>
           <button type="button" class="btn sm" data-tvredraw="${j}" title="لو اللوحة اللي في الشيت باظت: بترسم من وصفها من الأول، بعالم اللوحات اللي جنبها">🎨 ارسمها من جديد</button>` : ""}</div>`).join("")}</div>
     </details>
-    <details class="panel tv-step" data-dk="s4" ${open("s4", cutAll)}><summary>٤. 🎬 الفيديو <small class="muted">${v.seg_files.filter(Boolean).length}/${beats.length} جزء اتولد</small></summary>
+    <details class="panel tv-step" data-dk="s4" ${open("s4", false)}><summary>٤. 🧩 أو جزء جزء <small class="muted">(كل لوحتين = جزء، وبيتلزقوا) ${v.seg_files.filter(Boolean).length}/${beats.length} جزء اتولد</small></summary>
       ${missSegs ? `<button type="button" class="btn primary" data-tvrun ${busy || !cutAll ? "disabled" : ""}>🎬 ولّد اللي لسه متولدش بس (${missSegs} جزء) ~${c.video}$</button>`
         : `<button type="button" class="btn" data-tvrun ${busy ? "disabled" : ""}>🎞️ جمّع الفيديو تاني (ببلاش)</button>`}
       <div class="tv-segs">${beats.map((b, i) => `<div class="tv-seg">
@@ -412,6 +418,11 @@ $("labTpl").addEventListener("click", async (e) => {
   if (sh1) {
     const j = Number(sh1.dataset.tvsharp1), note = sh1.closest("[data-tp]").querySelector("[data-tpnote]").value.trim();
     return go(sh1, () => V("/sharpen", { method: "POST", ...jsonBody({ j, note }) }));
+  }
+  const once = t.closest("[data-tvonce]");
+  if (once) {
+    if (!confirm(`يولّد الفيديو كله في توليدة واحدة من الشيت؟ حوالي ${tplx.cur.costs.once}$`)) return;
+    return go(once, () => V("/run", { method: "POST", ...jsonBody({ once: true }) }));
   }
   const run = t.closest("[data-tvrun]"), run1 = t.closest("[data-tvrun1]");
   if (run || run1) {
