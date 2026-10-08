@@ -99,9 +99,13 @@
     return `<div style="position:absolute;left:0;right:0;top:${y.toFixed(1)}px;display:flex;justify-content:center;transform:translateY(-50%)">${inner}</div>`;
   };
   // السيرفر بيستنى الصور اللي في الفريم تتحمل قبل ما يصوّر
+  // لازم الصورة تبقى اتحملت واتفكّت فعلًا (decode) وبعدين يحصل رسم واحد على الأقل: قص الشخص من الكلام (mask)
+  // بيستخدم الصورة دي، ولو الفريم اتصوّر قبلها الكلام بيطلع كامل فوق الراس
   P.settle = function () {
-    const imgs = [...this.stage.querySelectorAll("img")].filter((i) => !i.complete);
-    return Promise.all(imgs.map((i) => new Promise((r) => { i.onload = i.onerror = r; })));
+    const imgs = [...this.stage.querySelectorAll("img")];
+    const one = (i) => (i.complete ? Promise.resolve() : new Promise((r) => { i.onload = i.onerror = r; })).then(() => (i.decode ? i.decode().catch(() => {}) : null));
+    const frame = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    return Promise.all(imgs.map(one)).then(imgs.length ? frame : null);
   };
   // المعاينة: الفريمات اللي جاية بتتحمل قبلها عشان مايبقاش فيه رعشة
   P.prefetchPerson = function (t) {
@@ -123,28 +127,83 @@
   const backdrop = (eng, th) => (onVideo(eng) ? "" : `<div style="position:absolute;inset:0;background:${th.bg}"></div>`);
 
   // ---------- behind: كلام عملاق ورا الشخص
+  // مكان الراس الثابت للبلوك كله (الوسيط من الفريمات اللي القصّة فيها مضمونة): الكلام اللي وراه مايترعشش مع حركة الراس
+  P.blockHead = function (b) {
+    this._bh = this._bh || new Map();
+    const key = `${b.t0}|${b.t1}`;
+    if (!this._bh.has(key)) {
+      const hs = [];
+      for (let t = b.t0; t <= b.t1; t += 0.1) { const hd = this.headAt(t); if (hd.solid) hs.push(hd); }
+      const med = (f) => { const v = hs.map(f).sort((x, y) => x - y); return v[Math.floor(v.length / 2)]; };
+      this._bh.set(key, hs.length ? { x: med((q) => q.x), y: med((q) => q.y), r: med((q) => q.r), top: med((q) => q.top) } : null);
+    }
+    return this._bh.get(key);
+  };
+  // مقاسات الحبر الحقيقية للكلمة (عشان نحط الحروف نفسها في المكان، مش الصندوق اللي حواليها)
+  const ink = (s, font) => {
+    MC.font = font;
+    const m = MC.measureText(s);
+    return { w: m.width, a: m.actualBoundingBoxAscent, d: m.actualBoundingBoxDescent, fa: m.fontBoundingBoxAscent, fd: m.fontBoundingBoxDescent };
+  };
+
+  // ---------- behind
   P.k_behind = function (b, t, k, th) {
     const { w, h } = this.doc;
     const ws = this.words(b);
     const txt = this.text(b.text || ws.map((x) => x.w).join(" ")).trim();
-    const lines = txt.split(/\s+/).length > 2 ? [txt.split(/\s+/).slice(0, Math.ceil(txt.split(/\s+/).length / 2)).join(" "), txt.split(/\s+/).slice(Math.ceil(txt.split(/\s+/).length / 2)).join(" ")] : [txt];
+    const parts = txt.split(/\s+/);
+    const lines = parts.length > 2 ? [parts.slice(0, Math.ceil(parts.length / 2)).join(" "), parts.slice(Math.ceil(parts.length / 2)).join(" ")] : [txt];
     const ff = fam(txt, "TY Anton", "SM Lalezar");
-    const hd = this.headAt(t);
     const bs = this.blockSolid(b);
-    const safe = bs === null || bs;
-    let html = "";
-    const maxW = w * 0.9, maxH = h * (h > w ? 0.2 : 0.4) / lines.length;
+    const hd = bs ? this.blockHead(b) : null;
+    const m = Math.min(w, h) * 0.035;
+    // 1) أكبر مقاس يكفّي العرض
+    let size = Math.min(...lines.map((ln) => (w * 0.92) / Math.max(1, ink(ln, `400 100px ${ff}`).w) * 100), h * (h > w ? 0.3 : 0.5) / lines.length);
+    const mt = (sz) => lines.map((ln) => ink(ln, `400 ${sz}px ${ff}`));
+    let ms = mt(size);
+    const lineH = (q) => q.a + q.d;
+    const gap = () => size * 0.06;
+    const blockH = () => ms.reduce((a2, q) => a2 + lineH(q), 0) + gap() * (lines.length - 1);
+    // 2) المكان: لو الراس صغيرة بالنسبة للكلمة (زي المرجع) الكلمة ورا الراس على طول، والراس بتغطي حرف أو اتنين
+    //    لو الراس كبيرة (لقطة قريبة) الكلمة بتطلع لفوق والشعر بيغطي الجزء التحتاني منها بس، ولو مفيش مكان بتصغر
+    let cy, cx = w / 2;
+    const widest = () => Math.max(...ms.map((q) => q.w));
+    if (hd) {
+      const cover = (hd.r * 2) / widest();
+      if (cover <= 0.3) cy = hd.y - hd.r * 0.35;
+      else {
+        // لقطة قريبة: فوق الراس لو فيه مكان يكفّي كلمة كبيرة، والشعر بيغطي أقل من ربع الحروف من تحت
+        const room = hd.top - m, full = size;
+        const fitAbove = Math.min(full, size * room / Math.max(1, blockH() * 0.78));
+        const left = hd.x - hd.r - m, right = w - m - (hd.x + hd.r);
+        const space = Math.max(left, right);
+        if (fitAbove >= full * 0.6 || space < w * 0.28) {
+          size = Math.max(fitAbove, h * 0.05); ms = mt(size);
+          cy = hd.top - blockH() * 0.28;
+        } else {
+          // مفيش مكان فوق: الكلمة في الناحية الفاضية ورا طرف الراس (الراس بتغطي أول الكلمة بس)
+          const span = space * 1.25;
+          size = Math.min(full, size * span / Math.max(1, widest()), h * 0.3); ms = mt(size);
+          const ww = widest();
+          cx = right >= left ? Math.min(w - m - ww / 2, hd.x + hd.r - space * 0.25 + ww / 2) : Math.max(m + ww / 2, hd.x - hd.r + space * 0.25 - ww / 2);
+          cy = hd.y - hd.r * 0.15;
+        }
+      }
+    } else if (bs === false) cy = m + blockH() / 2;   // القصّة مش مضمونة: فوق في الكادر بعيد عن الراس
+    else cy = h * 0.32;
+    cy = clamp(cy, m + blockH() / 2, h - m - blockH() / 2);
+    // 3) كل سطر: بنحط الحبر نفسه في مكانه (الصندوق بيتحسب من مقاسات الخط)
+    let y = cy - blockH() / 2, html = "";
     lines.forEach((ln, li) => {
-      const base = measure(ln, `400 100px ${ff}`) || 100;
-      const size = Math.min((maxW / base) * 100, maxH * 1.25);
-      // الكلام بيقعد بحيث الراس يغطي الجزء التحتاني منه
-      // القصّة مش مضمونة (ضلمة، ضهره للكاميرا): الكلام فوق في الكادر بعيد عن الراس بدل ما يتحط وراها
-      const cy = safe ? clamp(hd.top + size * (0.15 + li * 0.95) - (lines.length - 1) * size * 0.45, size * 0.6, h * 0.7)
-        : h * 0.06 + size * (0.5 + li * 0.95);
+      const q = ms[li];
       const t0 = (ws[Math.min(ws.length - 1, li * Math.ceil(ws.length / lines.length))]?.t0) ?? b.t0;
-      const e = eOut(seg(t, t0, t0 + 0.22)), out = 1 - seg(t, b.t1 - 0.15, b.t1);
+      const inkTop = y;
+      y += lineH(q) + gap();
       if (t < t0) return;
-      html += `<div style="position:absolute;left:${w / 2}px;top:${cy.toFixed(1)}px;transform:translate(-50%,-50%) scale(${lerp(1.12, 1, e).toFixed(3)},${lerp(0.55, 1, e).toFixed(3)});
+      const e = eOut(seg(t, t0, t0 + 0.22)), out = 1 - seg(t, b.t1 - 0.15, b.t1);
+      const base = (size - (q.fa + q.fd)) / 2 + q.fa;   // مكان السطر الأساسي جوه صندوق line-height:1
+      const boxTop = inkTop + q.a - base;
+      html += `<div style="position:absolute;left:${(cx - w / 2).toFixed(1)}px;width:${w}px;top:${boxTop.toFixed(1)}px;height:${size.toFixed(1)}px;text-align:center;transform:scale(${lerp(1.12, 1, e).toFixed(3)},${lerp(0.55, 1, e).toFixed(3)});transform-origin:50% ${(base - q.a / 2).toFixed(1)}px;
         font-family:${ff};font-size:${size.toFixed(1)}px;line-height:1;white-space:nowrap;color:${inkOf(this, th)};opacity:${(e * out).toFixed(3)};
         letter-spacing:-0.01em;filter:blur(${((1 - e) * 8).toFixed(1)}px);${onVideo(this) ? "text-shadow:0 6px 30px rgba(0,0,0,.25);" : ""}" dir="${this.dir(ln)}">${esc(ln)}</div>`;
     });
