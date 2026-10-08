@@ -14,7 +14,10 @@ const TY_KINDS = { track: "⭐ 🎬 كلام كبير على الخطوط", sign
   outline: "🎬 🩷 كلمة بحدود بينك بتنط", spin: "🎬 🌀 حروف عملاقة بتلف", sweep: "🎬 💨 كلمة بتعدّي ودايرة نسخ", extrude: "🎬 🧱 كلام بينك 3D ومربع أسود",
   stories: "🎬 📲 كروت ستوري 3D", post: "🎬 🖼️ كارت بوست والكلام طالع منه",
   retro: "🎬 📰 بوستر قديم ونجمة حمرا", duotone: "🎬 🟦 فيديو أزرق وكلام ورا الشخص", label: "🎬 🏷️ كلمة حمرا وتاج أزرق", mirror: "🎬 🪞 كلمة وانعكاسها",
-  banners: "🎬 🎗️ شرايط مايلة بتتحرك", tiles: "🎬 🔲 كروت صور وكارت أحمر", bubble: "🎬 💬 فقاعة كلام حمرا", band: "🎬 🟦 شريط أزرق ورا كلمة", emerge: "🎬 🗣️ الكلام بيطلع من ورا الراس" };
+  banners: "🎬 🎗️ شرايط مايلة بتتحرك", tiles: "🎬 🔲 كروت صور وكارت أحمر", bubble: "🎬 💬 فقاعة كلام حمرا", band: "🎬 🟦 شريط أزرق ورا كلمة", emerge: "🎬 🗣️ الكلام بيطلع من ورا الراس",
+  film: "🎬 🎞️ برواز فيلم", ghost: "🎬 👻 كلمة عملاقة باهتة ورا", notify: "🎬 🔔 إشعارات موبايل", dialog: "🎬 🖥️ رسالة نظام قديمة",
+  pills: "🎬 💊 زراير لامعة والماوس", steps: "🎬 🔢 كروت مرقّمة", scribble: "🎬 ⭕ دايرة بالقلم", list: "🎬 📋 لستة بسهم",
+  prompt: "🎬 🤖 مربع ذكاء اصطناعي", spread: "🎬 ✨ كلام متفرّق" };
 const TY_INTRO = { track: { "": "من غير افتتاح", flash: "⚡ افتتاح بفلاشات" }, spot: { "": "من غير فلاش", burst: "💛 فلاش أصفر قبلها" } };
 const TY_OUTRO = { track: { "": "من غير قفلة", pixel: "▦ تتكسّر بكسلات" }, spot: { "": "من غير قفلة", red: "🔴 فلاش أحمر في الآخر" } };
 const TY_PLACES = { auto: "📍 مكان الكلام: البرنامج يختار", left: "⬅️ شمالها", right: "➡️ يمينها", above: "⬆️ فوقها", below: "⬇️ تحتها", on: "📝 عليها" };
@@ -169,7 +172,7 @@ function tyBlockRow(v, b, i) {
     ${TY_INTRO[b.kind] || b.kind === "sign" ? `<div class="row wrap">
       ${TY_INTRO[b.kind] ? `<select data-tbf="intro">${Object.entries(TY_INTRO[b.kind]).map(([k, l]) => `<option value="${k}" ${k === (b.intro || "") ? "selected" : ""}>${l}</option>`).join("")}</select>
         <select data-tbf="outro">${Object.entries(TY_OUTRO[b.kind]).map(([k, l]) => `<option value="${k}" ${k === (b.outro || "") ? "selected" : ""}>${l}</option>`).join("")}</select>` : ""}
-      ${["sign", "spot", "arc", "artype", "stack", "halo", "space", "cube", "lock", "outline", "label", "tiles", "bubble"].includes(b.kind) ? `<label>الكلمة اللي عليها الضغط <select data-tbf="focus"><option value="-1">—</option>${(b.words || []).map((w, j) => `<option value="${j}" ${j === b.focus ? "selected" : ""}>${tye(w.w)}</option>`).join("")}</select></label>` : ""}
+      ${["sign", "spot", "arc", "artype", "stack", "halo", "space", "cube", "lock", "outline", "label", "tiles", "bubble", "film", "ghost", "scribble", "spread"].includes(b.kind) ? `<label>الكلمة اللي عليها الضغط <select data-tbf="focus"><option value="-1">—</option>${(b.words || []).map((w, j) => `<option value="${j}" ${j === b.focus ? "selected" : ""}>${tye(w.w)}</option>`).join("")}</select></label>` : ""}
       ${b.kind === "sign" || b.kind === "signature" ? `<label>الإمضا <input data-tbf="sign" value="${tye(b.sign || "")}" dir="auto" data-no-i18n></label>` : ""}
     </div>` : ""}
     <div class="row wrap"><label>📐 حجم الكلام <input type="range" min="0.3" max="2.5" step="0.05" data-tbf="ms" value="${b.ms ?? 1}"></label>

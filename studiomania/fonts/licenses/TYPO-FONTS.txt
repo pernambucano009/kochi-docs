@@ -12,3 +12,6 @@ Typography section fonts (from Google Fonts):
 TY-Anton.ttf — Anton by Vernon Adams, SIL Open Font License 1.1 (Google Fonts)
 TY-DawningPen.ttf — Dawning of a New Day by Kimberly Geswein, SIL Open Font License 1.1 (Google Fonts)
 TY-PlexArabic-400/700.ttf — IBM Plex Sans Arabic by IBM, SIL Open Font License 1.1 (Google Fonts)
+TY-InstrumentSerif(-Italic).ttf — Instrument Serif by Instrument, SIL Open Font License 1.1 (Google Fonts)
+TY-VT323.ttf — VT323 by Peter Hull, SIL Open Font License 1.1 (Google Fonts)
+TY-SpecialElite.ttf — Special Elite by Astigmatic, Apache License 2.0 (Google Fonts)

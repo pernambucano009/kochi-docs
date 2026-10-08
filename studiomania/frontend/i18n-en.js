@@ -3166,5 +3166,15 @@ window.I18N_EN = {
   "اسحب الفيديوهات هنا أو دوس واختارهم": "Drag videos here or click to choose",
   "فيديو أو صورة أو zip · تقدر تختار كذا ملف مرة واحدة": "Video, image or zip · you can choose several files at once",
   "لسه مفيش حاجة في الأرشيف.": "Nothing in the archive yet.",
-  "⚠️ الرفع وقف: جرب تاني": "⚠️ Upload stopped: try again"
+  "⚠️ الرفع وقف: جرب تاني": "⚠️ Upload stopped: try again",
+  "🎬 🎞️ برواز فيلم": "🎬 🎞️ Film frame",
+  "🎬 👻 كلمة عملاقة باهتة ورا": "🎬 👻 Giant faded word behind",
+  "🎬 🔔 إشعارات موبايل": "🎬 🔔 Phone notifications",
+  "🎬 🖥️ رسالة نظام قديمة": "🎬 🖥️ Retro system message",
+  "🎬 💊 زراير لامعة والماوس": "🎬 💊 Glossy buttons and cursor",
+  "🎬 🔢 كروت مرقّمة": "🎬 🔢 Numbered cards",
+  "🎬 ⭕ دايرة بالقلم": "🎬 ⭕ Pen circle",
+  "🎬 📋 لستة بسهم": "🎬 📋 List with arrow",
+  "🎬 🤖 مربع ذكاء اصطناعي": "🎬 🤖 AI prompt box",
+  "🎬 ✨ كلام متفرّق": "🎬 ✨ Scattered words"
 };
