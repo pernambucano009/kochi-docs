@@ -70,7 +70,23 @@ STUDIO_KINDS.update({
     "dots": "الشخص بيتحول لنقط منوّرة والكلام جنبه (للتكنولوجيا والذكاء الاصطناعي والتحول، من 2 لـ 6 كلمات، لما يكون فيه شخص)",
     "neon": "كلمة أو كلمتين نيون أحمر منوّر ورا الشخص (للعنوان أو اسم المنتج، لما يكون فيه شخص)",
 })
-STILL_KINDS = {"fill", "polaroid", "cards"}
+STUDIO_KINDS.update({
+    "outline": "كلمة أو كلمتين كبار بيض بحدود بينك وعمق، حروفهم بتنط واحدة واحدة، وتاج بينك مايل بيتكتب فيه الكلمة المهمة (focus) (للهوك والطاقة والكلام البوب، من كلمة لـ 4)",
+    "spin": "أول حرفين من الكلمة عملاقين بيلفوا مالين الكادر بينك وأسود، وبعدين الكلمة كاملة (لكلمة واحدة قوية، فعل أو نداء)",
+    "sweep": "كلمة عملاقة بتعدّي بسرعة بموشن بلير وبعدين بتصغر في النص ونسخ منها بتلف حواليها (للتحذير والتنبيه، كلمة أو كلمتين)",
+    "extrude": "كلام بينك بعمق 3D بيتكتب حرف حرف على شبكة، وآخر كلمة في مربع أسود (لجملة قصيرة فيها كلمة خطيرة في الآخر، من 2 لـ 5 كلمات)",
+    "stories": "كروت ستوري بتلف في 3D والكلام على الكارت اللي في النص (للسوشيال والقصص اليومية، من 2 لـ 5 كلمات)",
+    "post": "كارت بوست بيدخل بنطة والكلام طالع منه بحدود بينك (لما بيتكلم عن بوست أو صورة أو ترند، من 2 لـ 4 كلمات)",
+    "retro": "بوستر قديم: ورق بيج ونجمة حمرا ورا الشخص (سيلويت أسود) وكلام كريمي مضغوط عملاق وراه، وباقي الكلام في لافتات سودا (لافتتاحية قوية، من 2 لـ 6 كلمات)",
+    "duotone": "الفيديو أزرق بنقط والشخص سيلويت، كلام كريمي عملاق وراه كلمة تحت كلمة، وآخر الكلام أحمر بيتكتب تحت (لجملة درامية، من 3 لـ 6 كلمات)",
+    "label": "كلمة حمرا كبيرة مضغوطة (focus) وتاج أزرق بيتكتب فوقها بباقي الكلام (من 2 لـ 5 كلمات)",
+    "mirror": "كلمة مضغوطة وانعكاسها تحتها (للتأمل ومراجعة النفس، كلمة أو كلمتين)",
+    "banners": "شرايط مايلة بتتحرك عكس بعض فيها الكلمة متكررة (لكلمة بتتكرر أو شعار، كلمة أو كلمتين)",
+    "tiles": "كروت صور مدوّرة من الفيديو وكارت أحمر في النص فيه الكلمة المهمة (focus) متكررة، أو الكلام كله (من 1 لـ 3 كلمات)",
+    "bubble": "فقاعة كلام حمرا فيها الكلمة المهمة (focus)، وكلمة كبيرة كريمي وكلمة صغيرة سودا (للمقارنة والردود، من 2 لـ 4 كلمات)",
+    "band": "شريط أزرق مايل ورا كلمة كريمي عملاقة، وكلمة صغيرة سودا بتعدّي عليها (لأمر أو نصيحة: «إنقذ نفسك»، كلمتين أو 3)",
+})
+STILL_KINDS = {"fill", "polaroid", "cards", "stories", "post", "tiles"}
 # عناصر ستوديو اللي ممكن تتحط جنب حاجة في الفيديو (anchor)
 ANCHOR_STUDIO = {"stack", "tags", "ransom", "comments"}
 KINDS.update(STUDIO_KINDS)
@@ -114,12 +130,17 @@ BUILTIN_STYLES = {
                   "الجمل اللي فيها كلمتين مهمين stack جنب الشخص",
                   "الأرقام counter، والمحادثات chat، وردود الناس comments، والسفر route، والربط والتحليل board",
                   "موضوع الفيديو fill، والذكرى polaroid، والعروض والاختيارات cards، والحماس burst، والتكنولوجيا dots، والعنوان ورا الشخص neon",
+                  "ستايل البوب البينك: outline للهوك، spin لكلمة قوية، sweep للتحذير، extrude لجملة آخرها خطير، stories وpost للسوشيال",
+                  "ستايل البوستر القديم: retro للافتتاحية، duotone للدراما، label وband للأوامر والنصايح، mirror للتأمل، banners لشعار، tiles وbubble للردود",
+                  "متخلطش الستايلين في نفس الجملة: الجملة كلها من عيلة واحدة",
                   "الحاجة المختارة cube، والمضمون أو الممنوع lock، والإحساس القوي thermal، والتأمل shapes، والتصميم select، والخيال space",
                   "build وtype للجمل العادية الطويلة"],
         "kinds": {"behind": 2, "arc": 2, "artype": 2, "redword": 2, "signature": 1, "stack": 2, "tags": 1, "push": 1, "poster": 1,
                   "crt": 1, "ransom": 1, "halo": 1, "floor": 1, "hand": 1, "build": 1,
                   "space": 1, "route": 1, "board": 1, "cube": 1, "comments": 1, "lock": 1, "thermal": 1, "shapes": 1, "select": 1, "chat": 1, "counter": 1,
-                  "fill": 1, "polaroid": 1, "cards": 1, "burst": 1, "dots": 1, "neon": 1},
+                  "fill": 1, "polaroid": 1, "cards": 1, "burst": 1, "dots": 1, "neon": 1,
+                  "outline": 1, "spin": 1, "sweep": 1, "extrude": 1, "stories": 1, "post": 1,
+                  "retro": 1, "duotone": 1, "label": 1, "mirror": 1, "banners": 1, "tiles": 1, "bubble": 1, "band": 1},
     },
     "pro": {
         "name": "⭐ احترافي (زي الفيديو المرجع)", "font": "SM Tajawal", "case": "lower", "grain": 0.12, "weight": 700, "pro": True,
@@ -153,7 +174,7 @@ BUILTIN_STYLES = {
 }
 
 PLAN_FORMAT = """{
-  "blocks": [{"from": 0, "to": 3, "kind": "pop | type | build | icon | letters | scatter | ring | behind | arc | artype | redword | signature | poster | stack | push | crt | ransom | halo | floor | hand | tags | space | route | board | cube | comments | lock | thermal | shapes | select | chat | counter | fill | polaroid | cards | burst | dots | neon", "theme": "light | dark | accent",
+  "blocks": [{"from": 0, "to": 3, "kind": "pop | type | build | icon | letters | scatter | ring | behind | arc | artype | redword | signature | poster | stack | push | crt | ransom | halo | floor | hand | tags | space | route | board | cube | comments | lock | thermal | shapes | select | chat | counter | fill | polaroid | cards | burst | dots | neon | outline | spin | sweep | extrude | stories | post | retro | duotone | label | mirror | banners | tiles | bubble | band", "theme": "light | dark | accent",
               "text": "الكلام اللي يتكتب (من كلام الجمل دي بالظبط، ممكن تختصره لكلمة أو كلمتين في pop/icon/letters/scatter)",
               "focus": 0, "icon": "اسم ستيكر من المكتبة أو وصف قصير بالإنجليزي لأيقونة جديدة", "icons": ["..."], "letter": 1,
               "side": "اسم ستيكر/صورة كبيرة جنب الكلام في build أو فاضي",

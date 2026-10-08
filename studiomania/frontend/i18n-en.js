@@ -3124,5 +3124,19 @@ window.I18N_EN = {
   "🎬 🔴 نيون ورا الشخص": "🎬 🔴 Neon behind the person",
   "🧍 مفيش شخص ظاهر بوضوح في الفيديو": "🧍 No person clearly visible in the video",
   "🧍 الشخص اتقرا بموديل الفيديو ✓": "🧍 Person read with the video model ✓",
-  "🧍 الشخص اتقرا بالموديل القديم (حلّل الفيديو تاني بعد تحديث السيرفر)": "🧍 Person read with the old model (analyze the video again after the server update)"
+  "🧍 الشخص اتقرا بالموديل القديم (حلّل الفيديو تاني بعد تحديث السيرفر)": "🧍 Person read with the old model (analyze the video again after the server update)",
+  "🎬 🩷 كلمة بحدود بينك بتنط": "🎬 🩷 Bouncing word with pink outline",
+  "🎬 🌀 حروف عملاقة بتلف": "🎬 🌀 Giant spinning letters",
+  "🎬 💨 كلمة بتعدّي ودايرة نسخ": "🎬 💨 Sweeping word and a ring of copies",
+  "🎬 🧱 كلام بينك 3D ومربع أسود": "🎬 🧱 Pink 3D text and a black box",
+  "🎬 📲 كروت ستوري 3D": "🎬 📲 3D story cards",
+  "🎬 🖼️ كارت بوست والكلام طالع منه": "🎬 🖼️ Post card with text popping out",
+  "🎬 📰 بوستر قديم ونجمة حمرا": "🎬 📰 Retro poster and red star",
+  "🎬 🟦 فيديو أزرق وكلام ورا الشخص": "🎬 🟦 Blue duotone with text behind the person",
+  "🎬 🏷️ كلمة حمرا وتاج أزرق": "🎬 🏷️ Red word and a blue tag",
+  "🎬 🪞 كلمة وانعكاسها": "🎬 🪞 Word and its reflection",
+  "🎬 🎗️ شرايط مايلة بتتحرك": "🎬 🎗️ Moving diagonal banners",
+  "🎬 🔲 كروت صور وكارت أحمر": "🎬 🔲 Photo tiles and a red tile",
+  "🎬 💬 فقاعة كلام حمرا": "🎬 💬 Red speech bubble",
+  "🎬 🟦 شريط أزرق ورا كلمة": "🎬 🟦 Blue band behind a word"
 };
