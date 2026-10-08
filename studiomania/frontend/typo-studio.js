@@ -34,7 +34,8 @@
     "retro", "duotone", "label", "mirror", "banners", "tiles", "bubble", "band", "emerge",
     "film", "ghost", "notify", "dialog", "pills", "steps", "scribble", "list", "prompt", "spread",
     "serif", "chalk", "ticket", "frame", "toggle", "years", "wave", "spaced", "search", "digits", "torn",
-    "emoji", "doodle", "browser", "split", "spotlight", "phone"]);
+    "emoji", "doodle", "browser", "split", "spotlight", "phone",
+    "window", "inline", "bigtype", "checks", "progress", "flow", "aura", "stairs", "dates", "endcard"]);
   E.TYPING = new Set(["type", "artype"]);
   const MC = document.createElement("canvas").getContext("2d");
   const measure = (s, font) => { MC.font = font; return MC.measureText(s).width; };
@@ -2637,7 +2638,8 @@
     if (!it.length) return "";
     const src = imgOf(b);
     if (src) this._want = src;
-    const cs = chunks(it, 2);
+    const vsAt = it.findIndex((x) => /^(vs\.?|versus|ضد|قصاد|مقابل|ولا)$/i.test(x.w));
+    const cs = vsAt > 0 && vsAt < it.length - 1 ? [it.slice(0, vsAt), it.slice(vsAt + 1)].map((g) => ({ w: g.map((x) => x.w).join(" "), t0: g[0].t0 })) : chunks(it, 2);
     const ar = isAr(it);
     const tall = h > w;
     const pw = tall ? w * 0.86 : w * 0.42, ph = tall ? h * 0.32 : h * 0.6;
@@ -2659,6 +2661,11 @@
     };
     let html = onVideo(this) ? `<div style="position:absolute;inset:0;background:rgba(0,0,0,.45)"></div>` : `<div style="position:absolute;inset:0;background:radial-gradient(ellipse at 50% 40%,#3A3D44,#141518 80%)"></div>`;
     html += panel(0) + panel(1);
+    if (vsAt > 0 && t >= it[vsAt].t0) {
+      const vz = mn * 0.09, e2 = eBack(seg(t, it[vsAt].t0, it[vsAt].t0 + 0.3));
+      html += `<div style="position:absolute;left:50%;top:50%;width:${(vz * 1.6).toFixed(0)}px;height:${(vz * 1.6).toFixed(0)}px;transform:translate(-50%,-50%) scale(${e2.toFixed(3)});border-radius:50%;background:#fff;color:#151515;
+        display:flex;align-items:center;justify-content:center;font:800 ${vz.toFixed(1)}px ${famOf(it[vsAt].w)};box-shadow:0 ${(vz * 0.1).toFixed(0)}px ${(vz * 0.4).toFixed(0)}px rgba(0,0,0,.35)">${esc(this.text(it[vsAt].w))}</div>`;
+    }
     return html;
   };
 
@@ -2739,7 +2746,7 @@
   //   whip سحبة سريعة بموشن بلير · zoom زووم داخل · glitch جلتش ألوان · flash فلاش أبيض · iris دايرة بتفتح
   //   leak تسريب نور برتقاني · burn حرق فيلم · rise طالع من تحت
   // =====================================================================
-  const TRANS_DUR = { whip: 0.28, zoom: 0.32, glitch: 0.3, flash: 0.25, iris: 0.4, leak: 0.7, burn: 0.6, rise: 0.35 };
+  const TRANS_DUR = { whip: 0.28, zoom: 0.32, glitch: 0.3, flash: 0.25, iris: 0.4, leak: 0.7, burn: 0.6, rise: 0.35, wipe: 0.45, blur: 0.4, pop: 0.35 };
   P.applyTrans = function (b, t, bi) {
     const tr = b?.trans;
     if (!tr || !TRANS_DUR[tr]) return;
@@ -2755,6 +2762,15 @@
     if (tr === "whip") { wrap.style.transform = `translateX(${(dir * inv * w * 0.7).toFixed(1)}px) skewX(${(dir * -inv * 18).toFixed(1)}deg)`; wrap.style.filter = `blur(${(inv * mn * 0.025).toFixed(1)}px)`; }
     else if (tr === "zoom") { wrap.style.transform = `scale(${lerp(1.7, 1, e).toFixed(4)})`; wrap.style.filter = `blur(${(inv * mn * 0.02).toFixed(1)}px)`; wrap.style.opacity = clamp(q * 3).toFixed(3); }
     else if (tr === "rise") { wrap.style.transform = `translateY(${(inv * h * 0.18).toFixed(1)}px)`; wrap.style.opacity = clamp(q * 2.5).toFixed(3); wrap.style.filter = `blur(${(inv * mn * 0.012).toFixed(1)}px)`; }
+    else if (tr === "wipe") {
+      // لوح لون بيعدّي الكادر ويكشف اللقطة الجديدة وراه
+      const c = ["#F2602A", "#2F7CF6", "#151515"][bi % 3];
+      const px = lerp(-1.05, 1.05, eOut(q));
+      over = `<div style="position:absolute;top:0;bottom:0;left:0;width:100%;background:${c};transform:translateX(${(px * w).toFixed(1)}px)"></div>`;
+      wrap.style.clipPath = `inset(0 ${(clamp(1 - px) * 100).toFixed(1)}% 0 0)`;
+    }
+    else if (tr === "blur") { wrap.style.filter = `blur(${(inv * mn * 0.04).toFixed(1)}px)`; wrap.style.opacity = clamp(q * 1.6).toFixed(3); }
+    else if (tr === "pop") { wrap.style.transform = `scale(${lerp(0.82, 1, eBack(q)).toFixed(4)})`; wrap.style.clipPath = `inset(${(inv * 8).toFixed(2)}% round ${(inv * mn * 0.05).toFixed(0)}px)`; }
     else if (tr === "iris") { const R = Math.hypot(w, h) * 0.55 * eOut(q); wrap.style.clipPath = `circle(${R.toFixed(1)}px at 50% 50%)`; }
     else if (tr === "glitch") {
       const rr = rng(Math.floor(t * 30) + bi * 7);
@@ -2776,5 +2792,340 @@
     while (this.stage.firstChild) wrap.appendChild(this.stage.firstChild);
     this.stage.appendChild(wrap);
     if (over) this.stage.insertAdjacentHTML("beforeend", over);
+  };
+
+  // =====================================================================
+  // الدفعة 10 (فيديوهات الأرشيف: إعلانات منتجات بستايل واجهات وإديتوريال):
+  //   window    الفيديو بيصغر جوه برواز بعلامات أركان على ورق فاتح، وكلام كبير جنبه
+  //   inline    كلام كبير وصورة صغيرة من الفيديو جوه السطر نفسه
+  //   bigtype   كلمة عملاقة بتتكتب حرف حرف بمؤشر عريض ملوّن، ورقم فصل صغير
+  //   checks    لستة بتتعلّم ✓ واحدة واحدة
+  //   progress  شرايط بتتملا بنسب
+  //   flow      خطوات أوتوميشن: بداية ← خطوة ← نتيجة بخطوط بتوصل بينهم
+  //   aura      خلفية ألوان ناعمة بتتحرك وكلام صغير في النص
+  //   stairs    كلمات في مربعات بيضا نازلة زي السلم وقبل كل واحدة رمز
+  //   dates     شريط أيام/أرقام والرقم المهم عليه دايرة
+  //   endcard   كارت النهاية: علامة وكلمة كبيرة وجملة في كبسولة
+  // =====================================================================
+  const PAPER = "#EFEDE8", INK = "#151515", ORG = "#F2602A";
+  // البرواز اللي الفيديو بيبان منه (أو صورة من الفيديو لو مفيش فيديو ورا)
+  P.k_window = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    if (!it.length) return "";
+    const tall = h > w;
+    const box = this.personAt((b.t0 + b.t1) / 2)?.st?.box;
+    // البرواز: حوالين الشخص لو باين، وإلا ناحية
+    let R;
+    if (tall) R = { x: w * 0.12, y: h * 0.1, w: w * 0.76, h: h * 0.42 };
+    else R = { x: w * 0.5, y: h * 0.18, w: w * 0.42, h: h * 0.64 };
+    if (box && !tall) { const cx = (box[0] + box[2]) / 2; if (cx < w / 2) R.x = w * 0.06; }
+    const textLeft = !tall && R.x > w * 0.3;
+    const e = eOut(seg(t, b.t0, b.t0 + 0.6));
+    const cur = { x: lerp(0, R.x, e), y: lerp(0, R.y, e), w: lerp(w, R.w, e), h: lerp(h, R.h, e) };
+    const vid = onVideo(this);
+    const src = imgOf(b);
+    if (src) this._want = src;
+    let html = vid ? `<div style="position:absolute;left:${cur.x.toFixed(1)}px;top:${cur.y.toFixed(1)}px;width:${cur.w.toFixed(1)}px;height:${cur.h.toFixed(1)}px;box-shadow:0 0 0 ${(Math.max(w, h) * 2).toFixed(0)}px ${PAPER}"></div>`
+      : `<div style="position:absolute;inset:0;background:${PAPER}"></div><div style="position:absolute;left:${cur.x.toFixed(1)}px;top:${cur.y.toFixed(1)}px;width:${cur.w.toFixed(1)}px;height:${cur.h.toFixed(1)}px;background:${src ? `url(${src}) center/cover` : "linear-gradient(160deg,#9AA3B5,#4B5468)"}"></div>`;
+    // علامات الأركان والنقط
+    const L = mn * 0.03, lw = Math.max(1.5, mn * 0.003), o = mn * 0.012, ka = seg(t, b.t0 + 0.4, b.t0 + 0.7);
+    [[0, 0], [1, 0], [0, 1], [1, 1]].forEach(([cx, cy]) => {
+      const x = cur.x + cx * cur.w + (cx ? o : -o), y = cur.y + cy * cur.h + (cy ? o : -o);
+      html += `<i style="position:absolute;left:${(x - (cx ? L : 0)).toFixed(1)}px;top:${(y - (cy ? L : 0)).toFixed(1)}px;width:${L.toFixed(1)}px;height:${L.toFixed(1)}px;opacity:${ka.toFixed(2)};
+        border-${cx ? "right" : "left"}:${lw.toFixed(1)}px solid ${INK};border-${cy ? "bottom" : "top"}:${lw.toFixed(1)}px solid ${INK}"></i>`;
+    });
+    html += `<div dir="ltr" style="position:absolute;left:${(R.x).toFixed(0)}px;top:${(R.y + R.h + o * 2.5).toFixed(0)}px;font:400 ${(mn * 0.022).toFixed(1)}px 'TY Pixel',monospace;color:${INK};opacity:${(ka * 0.7).toFixed(2)};letter-spacing:.1em">( ${String(bi + 1).padStart(2, "0")} )</div>`;
+    // الكلام الكبير في الناحية الفاضية
+    const ar = isAr(it), ff = famOf(ar ? "ع" : "a");
+    const area = tall ? { x: w * 0.1, y: R.y + R.h + mn * 0.12, w: w * 0.8, h: h * 0.36 } : textLeft ? { x: w * 0.06, y: h * 0.2, w: R.x - w * 0.1, h: h * 0.6 } : { x: R.x + R.w + w * 0.04, y: h * 0.2, w: w - (R.x + R.w) - w * 0.1, h: h * 0.6 };
+    let sz = mn * (tall ? 0.11 : 0.12);
+    let lines = this.wrapItems(it, `600 ${sz}px ${ff}`, area.w);
+    for (let q = 0; q < 6 && lines.length * sz * 1.02 > area.h; q++) { sz *= 0.88; lines = this.wrapItems(it, `600 ${sz}px ${ff}`, area.w); }
+    const y0 = area.y + Math.max(0, (area.h - lines.length * sz * 1.02) / 2);
+    lines.forEach((ln, li) => {
+      html += `<div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:${area.x.toFixed(1)}px;width:${area.w.toFixed(1)}px;top:${(y0 + li * sz * 1.02).toFixed(1)}px;text-align:${ar ? "right" : "left"};white-space:nowrap;font:600 ${sz.toFixed(1)}px ${ff};letter-spacing:-0.045em;line-height:1;color:${INK}">${ln.map((x) => {
+        const q = eOut(seg(t, x.t0, x.t0 + 0.3));
+        return `<span style="display:inline-block;opacity:${q.toFixed(3)};transform:translateY(${((1 - q) * sz * 0.35).toFixed(1)}px)">${esc(this.text(x.w))}</span>`;
+      }).join(" ")}</div>`;
+    });
+    return html;
+  };
+
+  // ---------- inline: صورة صغيرة جوه السطر
+  P.k_inline = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    if (!it.length) return "";
+    const src = imgOf(b);
+    if (src) this._want = src;
+    const ar = isAr(it), ff = famOf(ar ? "ع" : "a");
+    const fi = b.focus >= 0 && b.focus < it.length ? b.focus : -1;
+    const at = Math.min(it.length - 1, Math.max(0, Math.floor(it.length / 2) - 1));
+    let sz = mn * 0.13;
+    const chipW = sz * 1.25;
+    const fake = it.map((x, i) => (i === at ? { ...x, w: x.w + " WWW" } : x));
+    let lines = this.wrapItems(fake, `600 ${sz}px ${ff}`, w * 0.84);
+    for (let q = 0; q < 6 && lines.length * sz > h * 0.6; q++) { sz *= 0.88; lines = this.wrapItems(fake, `600 ${sz}px ${ff}`, w * 0.84); }
+    const y0 = h / 2 - (lines.length * sz * 0.98) / 2;
+    let html = `<div style="position:absolute;inset:0;background:${PAPER}"></div>`;
+    lines.forEach((ln, li) => {
+      html += `<div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:${(w * 0.08).toFixed(0)}px;right:${(w * 0.08).toFixed(0)}px;top:${(y0 + li * sz * 0.98).toFixed(1)}px;white-space:nowrap;text-align:${li % 2 ? (ar ? "left" : "right") : (ar ? "right" : "left")};
+        font:600 ${sz.toFixed(1)}px ${ff};letter-spacing:-0.05em;line-height:1;color:${INK}">${ln.map((x) => {
+        const i = fake.indexOf(x), real = it[i];
+        const q = eOut(seg(t, real.t0, real.t0 + 0.28));
+        let s = `<span style="display:inline-block;opacity:${q.toFixed(3)};transform:translateY(${((1 - q) * sz * 0.3).toFixed(1)}px);${i === fi ? `color:${ORG}` : ""}">${esc(this.text(real.w))}</span>`;
+        if (i === at) {
+          const c = eBack(seg(t, real.t0 + 0.1, real.t0 + 0.4));
+          s += ` <span style="display:inline-block;width:${(chipW * c).toFixed(1)}px;height:${(sz * 0.78).toFixed(1)}px;vertical-align:-0.06em;border-radius:${(sz * 0.12).toFixed(1)}px;overflow:hidden;
+            background:${src ? `url(${src}) center/cover` : `linear-gradient(160deg,${ORG},#7B4DFF)`};box-shadow:0 ${(sz * 0.05).toFixed(1)}px ${(sz * 0.15).toFixed(1)}px rgba(0,0,0,.2)"></span>`;
+        }
+        return s;
+      }).join(" ")}</div>`;
+    });
+    return html;
+  };
+
+  // ---------- bigtype: كلمة عملاقة بتتكتب بمؤشر عريض
+  P.k_bigtype = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    if (!it.length) return "";
+    const vid = onVideo(this);
+    const ink = vid ? "#fff" : INK, acc = accentOf(th, bi, [ORG, "#2F7CF6", "#3BD24A"]);
+    const num = it[0].w.match(/^[0-9٠-٩]{1,2}$/) ? this.text(it[0].w) : String(bi + 1).padStart(2, "0");
+    const words = it[0].w.match(/^[0-9٠-٩]{1,2}$/) ? it.slice(1) : it;
+    const full = words.map((x) => this.text(x.w)).join(" ");
+    const ff = famOf(full);
+    const sz = fitSize(full, `500 {}px ${ff}`, w * 0.84, mn * 0.36);
+    const shown = words.filter((x) => t >= x.t0).map((x, i, a) => (i === a.length - 1 ? typed(this.text(x.w), t, x.t0, 14) : this.text(x.w))).join(" ");
+    const cy = this.blockSolid(b) ? this.belowHead(b, sz) : h * 0.52;
+    const blink = Math.floor(t * 2.4) % 2 || shown.length < full.length;
+    let html = vid ? "" : `<div style="position:absolute;inset:0;background:${PAPER}"></div>`;
+    html += `<div dir="ltr" style="position:absolute;left:${(w * 0.08).toFixed(0)}px;top:${(cy - sz * 0.95).toFixed(1)}px;font:500 ${(sz * 0.32).toFixed(1)}px 'TY Outfit';letter-spacing:-0.04em;color:${ink};opacity:${seg(t, b.t0, b.t0 + 0.3).toFixed(2)}">${esc(num)}</div>
+      <div dir="${this.dir(full)}" style="position:absolute;left:0;right:0;top:${cy.toFixed(1)}px;transform:translateY(-50%);text-align:center;white-space:nowrap;font:500 ${sz.toFixed(1)}px ${ff};letter-spacing:-0.06em;line-height:1;color:${ink};${shadow(this)}">${esc(shown)}<span style="display:inline-block;width:${(sz * 0.07).toFixed(1)}px;height:${(sz * 0.9).toFixed(1)}px;background:${acc};vertical-align:-0.08em;margin:0 ${(sz * 0.05).toFixed(1)}px;opacity:${blink ? 1 : 0}"></span></div>`;
+    return html;
+  };
+
+  // كارت أبيض للعناصر اللي فوق الفيديو
+  const card = (x, y, cw, chh, mn, inner, extra = "") => `<div style="position:absolute;left:${x.toFixed(1)}px;top:${y.toFixed(1)}px;width:${cw.toFixed(1)}px;${chh ? `height:${chh.toFixed(1)}px;` : ""}box-sizing:border-box;background:rgba(255,255,255,.96);border-radius:${(mn * 0.03).toFixed(0)}px;
+    box-shadow:0 ${(mn * 0.015).toFixed(0)}px ${(mn * 0.05).toFixed(0)}px rgba(0,0,0,.18);padding:${(mn * 0.04).toFixed(0)}px;${extra}">${inner}</div>`;
+
+  // ---------- checks: لستة بتتعلّم
+  P.k_checks = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    const cs = chunks(it, Math.min(5, Math.max(1, Math.ceil(it.length / 2))));
+    const ar = isAr(it);
+    const r = this.freeRect(b);
+    const sz = mn * 0.05 * this.ts;
+    const row = sz * 1.55;
+    const acc = accentOf(th, bi, ["#16A34A", "#2F7CF6", ORG]);
+    const shown = cs.filter((c) => t >= c.t0);
+    const maxN = Math.max(1, Math.floor(Math.min(r.h, h * 0.5) / row));
+    const vis = shown.slice(-maxN);
+    const cw = Math.min(r.w, w * 0.84);
+    let html = onVideo(this) ? "" : `<div style="position:absolute;inset:0;background:${PAPER}"></div>`;
+    const inner = vis.map((c) => {
+      const s = this.text(c.w), ff = famOf(s);
+      const ck = seg(t, c.t0 + 0.15, c.t0 + 0.45), a = eOut(seg(t, c.t0, c.t0 + 0.25));
+      const z = fitSize(s, `500 {}px ${ff}`, cw - sz * 3.4, sz);
+      return `<div dir="${ar ? "rtl" : "ltr"}" style="display:flex;align-items:center;gap:${(sz * 0.5).toFixed(1)}px;height:${row.toFixed(1)}px;opacity:${a.toFixed(3)};transform:translateY(${((1 - a) * sz * 0.5).toFixed(1)}px)">
+        <svg width="${(sz * 1.15).toFixed(0)}" height="${(sz * 1.15).toFixed(0)}" viewBox="0 0 24 24" style="flex:none"><circle cx="12" cy="12" r="10" fill="${ck >= 1 ? acc : "none"}" stroke="${ck > 0 ? acc : "#B4B4BC"}" stroke-width="2"/>
+          <path d="M7 12.5l3.3 3.2L17 9" fill="none" stroke="${ck >= 1 ? "#fff" : acc}" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="16" stroke-dashoffset="${(16 * (1 - ck)).toFixed(1)}"/></svg>
+        <span style="white-space:nowrap;font:500 ${z.toFixed(1)}px ${ff};letter-spacing:-0.02em;color:${ck >= 1 ? INK : "#8A8A92"}">${esc(s)}</span></div>`;
+    }).join("");
+    const chh = vis.length * row + mn * 0.08;
+    html += card(r.x + (r.w - cw) / 2, r.y + Math.max(0, (r.h - chh) / 2), cw, 0, mn, inner);
+    return html;
+  };
+
+  // ---------- progress: شرايط بتتملا
+  P.k_progress = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    const cs = chunks(it, Math.min(4, Math.max(1, Math.ceil(it.length / 2))));
+    const ar = isAr(it);
+    const r = this.freeRect(b);
+    const sz = mn * 0.042 * this.ts;
+    const cw = Math.min(r.w, w * 0.84);
+    const cols = [["#DDF6C8", "#2E7D32"], ["#FCE7A8", "#8A6100"], ["#D6E6FF", "#1E5FE0"], ["#FFD9CC", "#B83A0E"]];
+    let html = onVideo(this) ? "" : `<div style="position:absolute;inset:0;background:${PAPER}"></div>`;
+    const inner = cs.map((c, i) => {
+      if (t < c.t0) return "";
+      const s = this.text(c.w), ff = famOf(s);
+      const m = c.w.match(/[0-9٠-٩]+/);
+      const pct = m ? clamp(parseInt(m[0].replace(/[٠-٩]/g, (d) => "٠١٢٣٤٥٦٧٨٩".indexOf(d)), 10), 5, 100) : 62 + ((i * 17 + bi * 11) % 34);
+      const f = eOut(seg(t, c.t0 + 0.1, c.t0 + 0.8));
+      const [pb, pf] = cols[(i + bi) % cols.length];
+      const z = fitSize(s, `500 {}px ${ff}`, cw * 0.62, sz);
+      return `<div dir="${ar ? "rtl" : "ltr"}" style="margin-bottom:${(sz * 0.9).toFixed(1)}px;opacity:${eOut(seg(t, c.t0, c.t0 + 0.2)).toFixed(3)}">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:${(sz * 0.35).toFixed(1)}px"><span style="white-space:nowrap;font:500 ${z.toFixed(1)}px ${ff};color:${INK}">${esc(s)}</span>
+          <span dir="ltr" style="font:600 ${(sz * 0.85).toFixed(1)}px 'TY Outfit';background:${pb};color:${pf};padding:${(sz * 0.12).toFixed(1)}px ${(sz * 0.4).toFixed(1)}px;border-radius:${(sz * 0.25).toFixed(1)}px">${Math.round(pct * f)}%</span></div>
+        <div style="height:${(sz * 0.32).toFixed(1)}px;border-radius:${sz.toFixed(0)}px;background:#E6E6EA;overflow:hidden"><i style="display:block;height:100%;width:${(pct * f).toFixed(1)}%;background:${INK};border-radius:${sz.toFixed(0)}px;${ar ? "margin-left:auto" : ""}"></i></div></div>`;
+    }).join("");
+    const chh = cs.length * sz * 2.6;
+    html += card(r.x + (r.w - cw) / 2, r.y + Math.max(0, (r.h - chh) / 2), cw, 0, mn, inner);
+    return html;
+  };
+
+  // ---------- flow: خطوات أوتوميشن
+  P.k_flow = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    const cs = chunks(it, Math.min(3, Math.max(1, Math.ceil(it.length / 2))));
+    const ar = isAr(it);
+    const r = this.freeRect(b);
+    const sz = mn * 0.04 * this.ts;
+    const nw = Math.min(r.w, w * 0.78), nh = sz * 3.1, gap = sz * 1.8;
+    const total = cs.length * nh + (cs.length - 1) * gap;
+    const x = r.x + (r.w - nw) / 2, y0 = r.y + Math.max(0, (r.h - total) / 2);
+    const labs = ar ? ["البداية", "الخطوة", "النتيجة"] : ["TRIGGER", "ACTION", "RESULT"];
+    const icons = ["⚡", "▶", "✓"];
+    const acc = accentOf(th, bi, ["#16A34A", ORG, "#7B4DFF"]);
+    let html = onVideo(this) ? "" : `<div style="position:absolute;inset:0;background:${PAPER}"></div>`;
+    let svg = "";
+    cs.forEach((c, i) => {
+      if (t < c.t0) return;
+      const y = y0 + i * (nh + gap);
+      const a = eBack(seg(t, c.t0, c.t0 + 0.3));
+      if (i > 0) {
+        const q = seg(t, c.t0 - 0.15, c.t0 + 0.15), ya = y - gap, len = gap;
+        svg += `<path d="M${(x + nw / 2).toFixed(1)} ${ya.toFixed(1)} L${(x + nw / 2).toFixed(1)} ${(ya + len * q).toFixed(1)}" stroke="#9A9AA2" stroke-width="${Math.max(1.5, mn * 0.003).toFixed(1)}"/>
+          <circle cx="${(x + nw / 2).toFixed(1)}" cy="${(ya + len * q).toFixed(1)}" r="${(mn * 0.007).toFixed(1)}" fill="#9A9AA2"/>`;
+      }
+      const s = this.text(c.w), ff = famOf(s);
+      const z = fitSize(s, `600 {}px ${ff}`, nw - sz * 4, sz * 1.05);
+      html += `<div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:${x.toFixed(1)}px;top:${y.toFixed(1)}px;width:${nw.toFixed(1)}px;height:${nh.toFixed(1)}px;box-sizing:border-box;transform:scale(${a.toFixed(3)});
+        background:#fff;border:1px solid #E2E2E6;border-${ar ? "right" : "left"}:${(sz * 0.18).toFixed(1)}px solid ${acc};border-radius:${(sz * 0.4).toFixed(1)}px;box-shadow:0 ${(sz * 0.2).toFixed(1)}px ${(sz * 0.6).toFixed(1)}px rgba(0,0,0,.12);
+        display:flex;align-items:center;gap:${(sz * 0.6).toFixed(1)}px;padding:0 ${(sz * 0.7).toFixed(1)}px">
+        <span style="flex:none;width:${(sz * 1.6).toFixed(0)}px;height:${(sz * 1.6).toFixed(0)}px;border-radius:${(sz * 0.4).toFixed(0)}px;background:${acc}22;color:${acc};display:flex;align-items:center;justify-content:center;font:700 ${(sz * 0.8).toFixed(0)}px 'TY Outfit'">${icons[Math.min(2, i)]}</span>
+        <span style="min-width:0"><span style="display:block;font:600 ${(sz * 0.55).toFixed(1)}px ${famOf(labs[0])};letter-spacing:.12em;color:#8A8A92">${labs[i === cs.length - 1 && i > 0 ? 2 : Math.min(1, i)]}</span>
+        <span style="display:block;white-space:nowrap;font:600 ${z.toFixed(1)}px ${ff};color:${INK}">${esc(s)}</span></span></div>`;
+    });
+    return html + `<svg data-free width="${w}" height="${h}" style="position:absolute;inset:0;overflow:visible">${svg}</svg>`;
+  };
+
+  // ---------- aura: خلفية ألوان ناعمة بتتحرك
+  const AURA = [["#FF8A3D", "#FF5FA2", "#B9A6FF", "#FFE3C8"], ["#7FB8FF", "#9AF0D2", "#C9B6FF", "#EAF4FF"], ["#B5E86A", "#FFD36A", "#7FD1B0", "#F3F8E6"]];
+  P.k_aura = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    if (!it.length) return "";
+    const [c1, c2, c3, base] = AURA[bi % AURA.length];
+    const u = t - b.t0;
+    const blob = (c, x, y, r) => `radial-gradient(circle ${(r * mn).toFixed(0)}px at ${x.toFixed(1)}% ${y.toFixed(1)}%,${c},transparent 70%)`;
+    const bgI = [blob(c1, 30 + Math.sin(u * 0.7) * 18, 70 + Math.cos(u * 0.5) * 10, 0.9), blob(c2, 75 + Math.cos(u * 0.6) * 15, 35 + Math.sin(u * 0.8) * 12, 0.8), blob(c3, 50 + Math.sin(u * 0.9) * 20, 55, 0.7)].join(",");
+    const a = eOut(seg(t, b.t0, b.t0 + 0.5));
+    let html = `<div style="position:absolute;inset:0;background:${bgI},${base};opacity:${a.toFixed(3)};filter:blur(${(mn * 0.02).toFixed(0)}px)"></div>`;
+    const ar = isAr(it), ff = famOf(ar ? "ع" : "a");
+    const sz = mn * 0.045 * this.ts;
+    const lines = this.wrapItems(it, `500 ${sz}px ${ff}`, w * 0.7);
+    const y0 = h / 2 - (lines.length - 1) * sz * 0.65;
+    lines.forEach((ln, li) => {
+      html += lineHtml(this, ln, sz, ff, "#1E1E22", y0 + li * sz * 1.3, "font-weight:500;letter-spacing:-0.01em", (x) => {
+        const q = eOut(seg(t, x.t0, x.t0 + 0.4));
+        return `<span style="display:inline-block;opacity:${q.toFixed(3)};filter:blur(${((1 - q) * sz * 0.25).toFixed(1)}px)">${esc(this.text(x.w))}</span>`;
+      });
+    });
+    return html;
+  };
+
+  // ---------- stairs: كلمات في مربعات نازلة زي السلم
+  // رموز مرسومة (مش حروف، عشان الخط مش لازم يكون فيه الرمز)
+  const STAIR_ICONS = ['<path d="M3 12h15M12 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>',
+    '<path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6 5.6 18.4" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>',
+    '<path d="M12 4v16M4 12h16" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>',
+    '<path d="M12 2l2.6 7.4L22 12l-7.4 2.6L12 22l-2.6-7.4L2 12l7.4-2.6z" fill="currentColor"/>'];
+  P.k_stairs = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    const cs = chunks(it, Math.min(4, Math.max(1, it.length)));
+    const ar = isAr(it);
+    const r = this.freeRect(b);
+    const sz = mn * 0.075 * this.ts;
+    const step = sz * 1.7;
+    const total = cs.length * step;
+    const y0 = r.y + Math.max(0, (r.h - total) / 2);
+    const dx = Math.min(sz * 1.2, (r.w * 0.4) / Math.max(1, cs.length - 1));
+    let html = onVideo(this) ? "" : `<div style="position:absolute;inset:0;background:${PAPER}"></div>`;
+    cs.forEach((c, i) => {
+      if (t < c.t0) return;
+      const s = this.text(c.w), ff = famOf(s);
+      const z = fitSize(s, `500 {}px ${ff}`, r.w * 0.7, sz);
+      const a = eOut(seg(t, c.t0, c.t0 + 0.25));
+      const off = r.x + r.w * 0.08 + i * dx;
+      const pos = ar ? `right:${(w - (r.x + r.w) + r.w * 0.08 + i * dx).toFixed(1)}px` : `left:${off.toFixed(1)}px`;
+      html += `<div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;${pos};top:${(y0 + i * step).toFixed(1)}px;display:flex;align-items:center;gap:${(z * 0.25).toFixed(1)}px;opacity:${a.toFixed(3)};transform:translateY(${((1 - a) * z * 0.4).toFixed(1)}px)">
+        <svg width="${(z * 0.62).toFixed(0)}" height="${(z * 0.62).toFixed(0)}" viewBox="0 0 24 24" style="flex:none;color:${onVideo(this) ? "#fff" : INK};${ar ? "transform:scaleX(-1)" : ""}">${STAIR_ICONS[(i + bi) % STAIR_ICONS.length]}</svg>
+        <span style="white-space:nowrap;background:#fff;color:${INK};font:500 ${z.toFixed(1)}px ${ff};letter-spacing:-0.04em;line-height:1.05;padding:${(z * 0.08).toFixed(1)}px ${(z * 0.18).toFixed(1)}px;box-shadow:0 ${(z * 0.05).toFixed(1)}px ${(z * 0.15).toFixed(1)}px rgba(0,0,0,.12)">${esc(s)}</span></div>`;
+    });
+    return html;
+  };
+
+  // ---------- dates: شريط أيام والرقم المهم عليه دايرة
+  P.k_dates = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    if (!it.length) return "";
+    const ni = it.findIndex((x) => /[0-9٠-٩]/.test(x.w));
+    const n0 = ni >= 0 ? parseInt(it[ni].w.replace(/[٠-٩]/g, (d) => "٠١٢٣٤٥٦٧٨٩".indexOf(d)).replace(/[^0-9]/g, ""), 10) : 12 + (bi % 15);
+    const vid = onVideo(this), ink = vid ? "#fff" : INK;
+    const sz = mn * 0.13;
+    const gapX = sz * 1.15 * (String(n0).length > 2 ? 2.1 : 1);
+    const cy = this.blockSolid(b) ? Math.min(h * 0.82, this.belowHead(b, sz) + sz * 0.6) : h * 0.55;
+    const slide = (1 - eOut(seg(t, b.t0, b.t0 + 0.7))) * gapX * 3;
+    let html = vid ? `<div style="position:absolute;left:0;right:0;top:${(cy - sz * 0.9).toFixed(0)}px;height:${(sz * 1.8).toFixed(0)}px;background:linear-gradient(transparent,rgba(0,0,0,.35),transparent)"></div>` : `<div style="position:absolute;inset:0;background:${PAPER}"></div>`;
+    for (let q = -6; q <= 6; q++) {
+      const x = w / 2 + q * gapX + slide;
+      if (x < -gapX || x > w + gapX) continue;
+      const d = Math.abs(x - w / 2) / gapX;
+      html += `<div dir="ltr" style="position:absolute;left:${x.toFixed(1)}px;top:${cy.toFixed(1)}px;transform:translate(-50%,-50%);font:500 ${sz.toFixed(1)}px 'TY Outfit';letter-spacing:-0.04em;color:${ink};opacity:${clamp(1 - d * 0.18, 0.15, 1).toFixed(3)};${shadow(this)}">${n0 + q}</div>`;
+    }
+    const ring = seg(t, b.t0 + 0.6, b.t0 + 1.0);
+    const R = sz * (String(n0).length > 2 ? 1.25 : 0.75);
+    const L = 2 * Math.PI * R;
+    html += `<svg data-free width="${w}" height="${h}" style="position:absolute;inset:0;overflow:visible"><ellipse cx="${(w / 2).toFixed(1)}" cy="${cy.toFixed(1)}" rx="${R.toFixed(1)}" ry="${(sz * 0.75).toFixed(1)}" fill="none" stroke="${ink}" stroke-width="${Math.max(2, mn * 0.004).toFixed(1)}"
+      stroke-dasharray="${L.toFixed(0)}" stroke-dashoffset="${(L * (1 - ring)).toFixed(1)}" transform="rotate(-90 ${(w / 2).toFixed(1)} ${cy.toFixed(1)})"/></svg>`;
+    const rest = it.filter((x, i) => i !== ni && t >= x.t0).map((x) => this.text(x.w)).join(" ");
+    if (rest) { const f2 = famOf(rest), z = fitSize(rest, `500 {}px ${f2}`, w * 0.84, mn * 0.05 * this.ts);
+      html += `<div dir="${this.dir(rest)}" style="position:absolute;left:0;right:0;top:${(cy - sz * 1.3).toFixed(1)}px;transform:translateY(-50%);text-align:center;white-space:nowrap;font:500 ${z.toFixed(1)}px ${f2};color:${ink};${shadow(this)}">${esc(rest)}</div>`; }
+    return html;
+  };
+
+  // ---------- endcard: كارت النهاية
+  P.k_endcard = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    if (!it.length) return "";
+    const fi = b.focus >= 0 && b.focus < it.length ? b.focus : 0;
+    const main = this.text(it[fi].w), rest = it.filter((x, i) => i !== fi);
+    const acc = accentOf(th, bi, [ORG, "#2F7CF6", "#16A34A"]);
+    const ff = famOf(main);
+    const sz = fitSize(main, `700 {}px ${ff}`, w * 0.6, mn * 0.11);
+    const a = eOut(seg(t, b.t0, b.t0 + 0.5));
+    const m = sz * 0.95;
+    // العلامة: دايرة بخطوط زي الغروب
+    const mark = `<svg width="${m.toFixed(0)}" height="${m.toFixed(0)}" viewBox="0 0 20 20"><defs><clipPath id="tyEc${bi}"><circle cx="10" cy="10" r="9.5"/></clipPath></defs><g clip-path="url(#tyEc${bi})"><rect width="20" height="20" fill="${acc}"/>
+      ${[11.5, 14, 16.5].map((y) => `<rect x="0" y="${y}" width="20" height="1.1" fill="${PAPER}"/>`).join("")}</g></svg>`;
+    let html = `<div style="position:absolute;inset:0;background:${PAPER}"></div>
+      <div dir="${this.dir(main)}" style="position:absolute;left:0;right:0;top:${(h * 0.47).toFixed(1)}px;transform:translateY(-50%) scale(${lerp(0.92, 1, a).toFixed(3)});display:flex;justify-content:center;align-items:center;gap:${(sz * 0.2).toFixed(1)}px;opacity:${a.toFixed(3)}">
+        ${mark}<span style="white-space:nowrap;font:700 ${sz.toFixed(1)}px ${ff};letter-spacing:-0.04em;color:${INK}">${esc(main)}</span></div>`;
+    if (rest.length && t >= rest[0].t0) {
+      const s = rest.map((x) => this.text(x.w)).join(" "), f2 = famOf(s), z = fitSize(s, `500 {}px ${f2}`, w * 0.7, mn * 0.04 * this.ts);
+      html += `<div style="position:absolute;left:0;right:0;top:${(h * 0.47 + sz * 1.1).toFixed(1)}px;text-align:center;opacity:${eOut(seg(t, rest[0].t0, rest[0].t0 + 0.3)).toFixed(3)}">
+        <span dir="${this.dir(s)}" style="display:inline-block;white-space:nowrap;font:500 ${z.toFixed(1)}px ${f2};color:${INK};border:${Math.max(1.5, z * 0.06).toFixed(1)}px solid ${INK};border-radius:999px;padding:${(z * 0.2).toFixed(1)}px ${(z * 0.7).toFixed(1)}px">${esc(s)}</span></div>`;
+    }
+    return html;
   };
 })();

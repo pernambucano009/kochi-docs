@@ -21,12 +21,14 @@ const TY_KINDS = { track: "⭐ 🎬 كلام كبير على الخطوط", sign
   serif: "🎬 🖋️ كلمة بخط سيريف مايل", chalk: "🎬 🧑‍🏫 سبورة طباشير", ticket: "🎬 🎟️ تذكرة سينما", frame: "🎬 🖼️ برواز دهب", toggle: "🎬 🔘 زرار تشغيل",
   years: "🎬 📅 أرقام بتلف", wave: "🎬 〰️ كلام على خط متعرج", spaced: "🎬 ↔️ كلام بمسافات واسعة", search: "🎬 🔎 خانة بحث", digits: "🎬 🔢 أرقام في مربعات",
   torn: "🎬 📜 شرايط ورق مقطوع", emoji: "🎬 😀 إيموجي على قد المعنى", doodle: "🎬 ✏️ خربشة بالقلم", browser: "🎬 🌐 شباك متصفح", split: "🎬 ↔️ قبل وبعد",
-  spotlight: "🎬 🔦 كشاف نور", phone: "🎬 📱 موبايل" };
+  spotlight: "🎬 🔦 كشاف نور", phone: "🎬 📱 موبايل",
+  window: "🎬 🪟 الفيديو في برواز", inline: "🎬 🖼️ صورة جوه السطر", bigtype: "🎬 ⌨️ كلمة عملاقة بتتكتب", checks: "🎬 ✅ لستة بتتعلّم", progress: "🎬 📊 شرايط نسب",
+  flow: "🎬 🔀 خطوات أوتوميشن", aura: "🎬 🌈 ألوان ناعمة", stairs: "🎬 🪜 كلمات زي السلم", dates: "🎬 📆 شريط أيام", endcard: "🎬 🏁 كارت النهاية" };
 // العناصر اللي ليها «الكلمة اللي عليها الضغط»
 const TY_FOCUS = ["sign", "spot", "arc", "artype", "stack", "halo", "space", "cube", "lock", "outline", "label", "tiles", "bubble", "film", "ghost", "scribble", "spread",
-  "serif", "toggle", "emoji", "doodle", "spotlight", "frame", "years", "digits", "spaced", "phone", "browser"];
+  "serif", "toggle", "emoji", "doodle", "spotlight", "frame", "years", "digits", "spaced", "phone", "browser", "inline", "endcard"];
 const TY_TRANS = { "": "من غير ترانزيشن", whip: "💨 سحبة سريعة", zoom: "🔍 زووم داخل", glitch: "📺 جلتش", flash: "⚡ فلاش", iris: "⭕ دايرة بتفتح",
-  leak: "🌅 تسريب نور", burn: "🔥 حرق فيلم", rise: "⬆️ طالع من تحت" };
+  leak: "🌅 تسريب نور", burn: "🔥 حرق فيلم", rise: "⬆️ طالع من تحت", wipe: "🟧 مسحة لون", blur: "🌫️ بلير", pop: "🫧 نطة من جوه" };
 const TY_INTRO = { track: { "": "من غير افتتاح", flash: "⚡ افتتاح بفلاشات" }, spot: { "": "من غير فلاش", burst: "💛 فلاش أصفر قبلها" } };
 const TY_OUTRO = { track: { "": "من غير قفلة", pixel: "▦ تتكسّر بكسلات" }, spot: { "": "من غير قفلة", red: "🔴 فلاش أحمر في الآخر" } };
 const TY_PLACES = { auto: "📍 مكان الكلام: البرنامج يختار", left: "⬅️ شمالها", right: "➡️ يمينها", above: "⬆️ فوقها", below: "⬇️ تحتها", on: "📝 عليها" };

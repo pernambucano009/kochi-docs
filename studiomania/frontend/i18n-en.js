@@ -3221,5 +3221,20 @@ window.I18N_EN = {
   "🔥 حرق فيلم": "🔥 Film burn",
   "⬆️ طالع من تحت": "⬆️ Rise up",
   "ابدأ دلوقتي": "Get started",
-  "اعرف أكتر": "Learn more"
+  "اعرف أكتر": "Learn more",
+  "🎬 🪟 الفيديو في برواز": "🎬 🪟 Video in a frame",
+  "🎬 🖼️ صورة جوه السطر": "🎬 🖼️ Image inside the line",
+  "🎬 ⌨️ كلمة عملاقة بتتكتب": "🎬 ⌨️ Giant typed word",
+  "🎬 ✅ لستة بتتعلّم": "🎬 ✅ Self-ticking checklist",
+  "🎬 📊 شرايط نسب": "🎬 📊 Progress bars",
+  "🎬 🔀 خطوات أوتوميشن": "🎬 🔀 Automation steps",
+  "🎬 🌈 ألوان ناعمة": "🎬 🌈 Soft gradient",
+  "🎬 🪜 كلمات زي السلم": "🎬 🪜 Stair words",
+  "🎬 📆 شريط أيام": "🎬 📆 Date strip",
+  "🎬 🏁 كارت النهاية": "🎬 🏁 End card",
+  "🟧 مسحة لون": "🟧 Color wipe",
+  "🌫️ بلير": "🌫️ Blur",
+  "🫧 نطة من جوه": "🫧 Pop in",
+  "الخطوة": "Action",
+  "النتيجة": "Result"
 };
