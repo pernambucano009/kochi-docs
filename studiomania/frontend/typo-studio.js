@@ -642,17 +642,17 @@
     let cur = 0;
     it.forEach((x, i) => { if (t >= x.t0) cur = i; });
     const nx = it[cur + 1]?.t0 ?? b.t1;
-    const cam = D * (cur + eOut(seg(t, it[cur]?.t0 ?? b.t0, nx)) * 0.85);
-    const r = rng(bi * 31 + 3);
+    // كل كلمة على عمق، والكاميرا بتقرّب كلمة كلمة: الكلمة الحالية قريبة، واللي جاية بعيدة ولونها خفيف، واللي فاتت بتعدّي جنب الكاميرا
+    const cam = D * (cur + 0.6 * eOut(seg(t, it[cur]?.t0 ?? b.t0, nx)));
     let world = "";
     it.forEach((x, i) => {
-      const px = (i === 0 ? 0 : (r() - 0.5) * w * 0.62), py = (i === 0 ? 0 : (r() - 0.5) * h * 0.4), ry = (r() - 0.5) * 40;
-      const z = -(i + 1) * D + cam;
-      if (z > -D * 0.25 || z < -D * 4) return;
-      const a = clamp((z + D * 4) / (D * 1.2)) * clamp((-z - D * 0.25) / (D * 0.35));
+      const ang = i * 2.4 + bi;
+      const px = i === 0 ? 0 : Math.cos(ang) * w * 0.3, py = i === 0 ? 0 : Math.sin(ang) * h * 0.16, ry = Math.cos(ang) * -18;
+      const z = -(i + 0.5) * D + cam;
+      if (z > D * 0.08 || z < -D * 3.2) return;
+      const a = (t >= x.t0 - 0.6 ? 1 : 0.35) * clamp((z + D * 3.2) / D) * clamp((D * 0.08 - z) / (D * 0.2));
       const focus = i === b.focus || x.w.length >= 7;
-      let sz = mn * (focus ? 0.26 : 0.18) * this.ts;
-      sz = fitSize(x.w, `800 {}px ${famOf(x.w)}`, w * 1.3, sz);
+      const sz = fitSize(x.w, `800 {}px ${famOf(x.w)}`, w * 0.9, mn * (focus ? 0.2 : 0.15) * this.ts);
       world += `<div dir="${this.dir(x.w)}" style="position:absolute;left:50%;top:45%;transform:translate(-50%,-50%) translate3d(${px.toFixed(1)}px,${py.toFixed(1)}px,${z.toFixed(1)}px) rotateY(${ry.toFixed(1)}deg);
         opacity:${a.toFixed(3)};font:800 ${sz.toFixed(1)}px ${famOf(x.w)};letter-spacing:-0.03em;white-space:nowrap;color:${focus ? th.accent || RED : inkOf(this, th)};${shadow(this)}">${esc(this.text(x.w))}</div>`;
     });
