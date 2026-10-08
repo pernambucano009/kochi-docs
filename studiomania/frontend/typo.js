@@ -14,7 +14,7 @@ const TY_KINDS = { track: "⭐ 🎬 كلام كبير على الخطوط", sign
   outline: "🎬 🩷 كلمة بحدود بينك بتنط", spin: "🎬 🌀 حروف عملاقة بتلف", sweep: "🎬 💨 كلمة بتعدّي ودايرة نسخ", extrude: "🎬 🧱 كلام بينك 3D ومربع أسود",
   stories: "🎬 📲 كروت ستوري 3D", post: "🎬 🖼️ كارت بوست والكلام طالع منه",
   retro: "🎬 📰 بوستر قديم ونجمة حمرا", duotone: "🎬 🟦 فيديو أزرق وكلام ورا الشخص", label: "🎬 🏷️ كلمة حمرا وتاج أزرق", mirror: "🎬 🪞 كلمة وانعكاسها",
-  banners: "🎬 🎗️ شرايط مايلة بتتحرك", tiles: "🎬 🔲 كروت صور وكارت أحمر", bubble: "🎬 💬 فقاعة كلام حمرا", band: "🎬 🟦 شريط أزرق ورا كلمة" };
+  banners: "🎬 🎗️ شرايط مايلة بتتحرك", tiles: "🎬 🔲 كروت صور وكارت أحمر", bubble: "🎬 💬 فقاعة كلام حمرا", band: "🎬 🟦 شريط أزرق ورا كلمة", emerge: "🎬 🗣️ الكلام بيطلع من ورا الراس" };
 const TY_INTRO = { track: { "": "من غير افتتاح", flash: "⚡ افتتاح بفلاشات" }, spot: { "": "من غير فلاش", burst: "💛 فلاش أصفر قبلها" } };
 const TY_OUTRO = { track: { "": "من غير قفلة", pixel: "▦ تتكسّر بكسلات" }, spot: { "": "من غير قفلة", red: "🔴 فلاش أحمر في الآخر" } };
 const TY_PLACES = { auto: "📍 مكان الكلام: البرنامج يختار", left: "⬅️ شمالها", right: "➡️ يمينها", above: "⬆️ فوقها", below: "⬇️ تحتها", on: "📝 عليها" };
@@ -121,12 +121,14 @@ function tyRenderProj() {
       <div class="ty-blocks">${(v.blocks || []).map((b, i) => tyBlockRow(v, b, i)).join("")}</div>
     </details>
     ${v.blocks?.length ? `<section class="panel ty-preview">
-      <div class="ty-screen" id="tyScreen"><div class="ty-box" id="tyBox"><div class="ty-bg" id="tyBg"></div><div id="tyStage"></div></div></div>
+      <div class="ty-screen" id="tyScreen"><div class="ty-box" id="tyBox" style="touch-action:none;cursor:grab"><div class="ty-bg" id="tyBg"></div><div id="tyStage"></div></div></div>
+      <p class="hint">✋ اسحب الكلام في المعاينة عشان تغيّر مكانه، وحجمه من «حجم الكلام» في اللقطة نفسها</p>
       <div class="ty-ctrl"><button type="button" class="btn sm" data-typlay>▶️</button>
         <input type="range" min="0" max="${v.duration}" step="0.01" value="${tyx.t}" data-tyscrub><small class="muted" id="tyTime"></small></div>
       <div class="row wrap"><select data-tyq><option value="high">جودة كاملة (1080)</option><option value="fast">أسرع (720)</option></select>
         <button type="button" class="btn primary" data-tyrender ${busy ? "disabled" : ""}>🎬 ${v.final_url ? "اعمل الفيديو تاني" : "اعمل الفيديو"}</button>
         <small class="muted">المعاينة هنا بنفس الرسم اللي هيطلع في الفيديو. الفيديو بيترسم على السيرفر فريم فريم (دقيقة تقريبًا لكل 15 ثانية).</small></div>
+      ${tySoundLine(v.sound)}
       ${v.final_url ? `<video src="${v.final_url}" controls playsinline preload="metadata" class="ty-final"></video>` : ""}
     </section>` : ""}`;
   tyStatusOnly();
@@ -169,6 +171,8 @@ function tyBlockRow(v, b, i) {
       ${["sign", "spot", "arc", "artype", "stack", "halo", "space", "cube", "lock", "outline", "label", "tiles", "bubble"].includes(b.kind) ? `<label>الكلمة اللي عليها الضغط <select data-tbf="focus"><option value="-1">—</option>${(b.words || []).map((w, j) => `<option value="${j}" ${j === b.focus ? "selected" : ""}>${tye(w.w)}</option>`).join("")}</select></label>` : ""}
       ${b.kind === "sign" || b.kind === "signature" ? `<label>الإمضا <input data-tbf="sign" value="${tye(b.sign || "")}" dir="auto" data-no-i18n></label>` : ""}
     </div>` : ""}
+    <div class="row wrap"><label>📐 حجم الكلام <input type="range" min="0.3" max="2.5" step="0.05" data-tbf="ms" value="${b.ms ?? 1}"></label>
+      ${(b.mx || b.my || (b.ms ?? 1) !== 1) ? `<button type="button" class="btn sm" data-tyreset="${i}">↺ رجّع المكان والحجم</button>` : ""}</div>
     <div class="row wrap"><label>المكتوب <input data-tbf="text" value="${tye(b.text)}" dir="auto" data-no-i18n></label>
       ${b.kind === "build" ? `<label>الكلمة اللي تنوّر <select data-tbf="focus"><option value="-1">—</option>${(b.words || []).map((w, j) => `<option value="${j}" ${j === b.focus ? "selected" : ""}>${tye(w.w)}</option>`).join("")}</select></label>` : ""}
       ${b.kind === "letters" ? `<label>الحرف اللي يتبدل <input type="number" min="0" max="20" data-tbf="letter" value="${b.letter ?? 1}"></label>` : ""}
@@ -183,6 +187,16 @@ function tyStatusOnly() {
   if (!el) return;
   el.innerHTML = `<span class="lab-st ${v.busy ? "working" : v.status}">${v.busy ? `<span class="spin-inline"></span>` : ""} ${TY_ST[v.status] || ""}</span>
     ${v.step ? `<small class="muted">${tye(v.step)}</small>` : ""}${v.error ? `<small class="err">${tye(v.error)}</small>` : ""}`;
+}
+
+// 🔊 الصوت اللي هيبقى في الفيديو النهائي (عشان لو حاجة ناقصة تبان قبل ما تعمل الفيديو)
+function tySoundLine(sd) {
+  if (!sd) return "";
+  const n = (sd.sfx?.click || 0) + (sd.sfx?.key || 0) + (sd.sfx?.typing || 0);
+  const voice = sd.voice === "source" ? "🎙️ صوت الفيديو" : sd.voice === "bg" ? "🎙️ صوت فيديو الخلفية"
+    : sd.voice === "silent" ? "⚠️ الفيديو اللي رفعته مفيهوش صوت (لو ده «الصورة بس» من المعمل، ارفع الفيديو الأصلي)" : "🔇 مفيش صوت كلام (الكلام مكتوب)";
+  const fx = !sd.sfx_on ? "🔇 الأصوات الرسمية مقفولة" : n ? `🔊 الأصوات الرسمية (${n} صوت)` : "⚠️ مكتبة الأصوات فاضية على السيرفر: ارفعها تاني من «🔊 الأصوات»";
+  return `<p class="hint">${voice} · ${fx}</p>`;
 }
 
 // ---------- المعاينة الحية (نفس المحرك اللي بيرسم الفيديو)
@@ -210,6 +224,42 @@ async function tyMountPreview() {
   if (bg.dim && doc.transparent) bgEl.insertAdjacentHTML("beforeend", `<div style="position:absolute;inset:0;background:#000;opacity:${bg.dim}"></div>`);
   await tyx.eng.ready();
   tySeek(tyx.t);
+  tyDrag($("tyBox"), doc);
+}
+
+// ✋ سحب الكلام في المعاينة: بيحرك كلام اللقطة اللي ظاهرة دلوقتي، وبيتحفظ أول ما تسيب
+function tyDrag(box, doc) {
+  if (!box || box.dataset.drag) return;
+  box.dataset.drag = "1";
+  let d = null;
+  box.addEventListener("pointerdown", (e) => {
+    const i = (doc.blocks || []).findIndex((b) => tyx.t >= b.t0 && tyx.t < b.t1);
+    if (i < 0) return;
+    tyStop();
+    const r = box.getBoundingClientRect();
+    d = { i, x: e.clientX, y: e.clientY, mx: Number(doc.blocks[i].mx) || 0, my: Number(doc.blocks[i].my) || 0, kw: r.width, kh: r.height };
+    box.setPointerCapture(e.pointerId);
+    box.style.cursor = "grabbing";
+  });
+  box.addEventListener("pointermove", (e) => {
+    if (!d) return;
+    const b = doc.blocks[d.i];
+    b.mx = Math.max(-0.6, Math.min(0.6, d.mx + (e.clientX - d.x) / d.kw));
+    b.my = Math.max(-0.6, Math.min(0.6, d.my + (e.clientY - d.y) / d.kh));
+    tyx.eng.renderAt(tyx.t);
+  });
+  const end = () => {
+    if (!d) return;
+    const { i } = d, b = doc.blocks[i];
+    d = null;
+    box.style.cursor = "grab";
+    const blocks = JSON.parse(JSON.stringify(tyx.cur.blocks));
+    if (!blocks[i] || (Math.abs((blocks[i].mx || 0) - b.mx) < 0.002 && Math.abs((blocks[i].my || 0) - b.my) < 0.002)) return;
+    Object.assign(blocks[i], { mx: Math.round(b.mx * 1000) / 1000, my: Math.round(b.my * 1000) / 1000 });
+    tySaveBlocks(blocks, "✋ مكان الكلام اتحفظ");
+  };
+  box.addEventListener("pointerup", end);
+  box.addEventListener("pointercancel", end);
 }
 
 function tySeek(t) {
@@ -266,7 +316,7 @@ function tyBlocksFromDom() {
     const b = blocks[Number(card.dataset.tyb)];
     card.querySelectorAll("[data-tbf]").forEach((x) => {
       const k = x.dataset.tbf;
-      b[k] = k === "focus" || k === "letter" || k === "skip" ? Number(x.value) : x.value;
+      b[k] = ["focus", "letter", "skip", "ms"].includes(k) ? Number(x.value) : x.value;
     });
   });
   return blocks;
@@ -377,6 +427,12 @@ $("tyMain").addEventListener("click", async (e) => {
   const wrap = (btn, fn) => busyButton(btn, "⏳", async () => { try { await fn(); } catch (err) { toast(err.message, true); } });
   const play = t.closest("[data-typlay]");
   if (play) return tyx.play ? tyStop() : tyStart();
+  const rs = t.closest("[data-tyreset]");
+  if (rs) {
+    const blocks = JSON.parse(JSON.stringify(v.blocks));
+    Object.assign(blocks[Number(rs.dataset.tyreset)], { mx: 0, my: 0, ms: 1 });
+    return tySaveBlocks(blocks, "↺ رجع مكانه");
+  }
   const seek = t.closest("[data-tyseek]");
   if (seek) { tyStop(); tySeek(Number(seek.dataset.tyseek)); return $("tyScreen")?.scrollIntoView({ behavior: "smooth", block: "center" }); }
   const sc = t.closest("[data-tyscene]");

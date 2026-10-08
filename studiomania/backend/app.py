@@ -553,7 +553,8 @@ async def require_login(request: Request, call_next):
 def health():
     # رقم النسخة (من Railway) وموديل قراءة الشخص: عشان نعرف التحديث نزل ولا لأ من غير ما ندخل السيرفر
     return {"ok": True, "build": (os.environ.get("RAILWAY_GIT_COMMIT_SHA") or "")[:7],
-            "person": person.model_status(Path(os.environ.get("PERSON_MODELS") or (DATA_DIR / "models")))}
+            "person": person.model_status(Path(os.environ.get("PERSON_MODELS") or (DATA_DIR / "models"))),
+            "sfx": {k: len(v) for k, v in sfx.library(TYPO_SFX).items()}}
 
 
 @app.get("/login")
@@ -12950,7 +12951,35 @@ def typo_to_dict(pid: str, d: dict) -> dict:
     return {**d, "id": pid, "busy": d.get("status") in TYPO_BUSY, "source_url": url((d.get("source") or {}).get("file")), "scene": scene,
             "bg_url": url((d.get("bg") or {}).get("file")), "final_url": url(d.get("final")), "alpha_url": url(d.get("alpha")),
             "missing_icons": missing, "draw_cost": round(len(missing) * TYPO_STICKER_COST, 2),
-            "ratios": list(TYPO_RATIOS), "kinds": typo.KINDS, "fonts": [{"family": f["family"], "label": f["label"]} for f in captions.FONTS]}
+            "ratios": list(TYPO_RATIOS), "kinds": typo.KINDS, "fonts": [{"family": f["family"], "label": f["label"]} for f in captions.FONTS],
+            "sound": typo_sound(folder, d)}
+
+
+_has_audio_cache: dict[str, bool] = {}
+
+
+def typo_has_audio(f: Path) -> bool:
+    if not f.exists():
+        return False
+    key = f"{f}:{f.stat().st_mtime}"
+    if key not in _has_audio_cache:
+        try:
+            _has_audio_cache[key] = bool(media_info(f).has_audio)
+        except Exception:  # noqa: BLE001
+            _has_audio_cache[key] = False
+    return _has_audio_cache[key]
+
+
+def typo_sound(folder: Path, d: dict) -> dict:
+    """🔊 الصوت اللي هيبقى في الفيديو النهائي: صوت المصدر (أو صوت فيديو الخلفية) والأصوات الرسمية."""
+    srcd, bg = d.get("source") or {}, d.get("bg") or {}
+    voice = ""
+    if srcd.get("kind") in ("audio", "video") and srcd.get("file"):
+        voice = "source" if typo_has_audio(folder / srcd["file"]) else "silent"
+    elif bg.get("kind") == "video" and bg.get("file"):
+        voice = "bg" if typo_has_audio(folder / bg["file"]) else "silent"
+    lib = {k: len(v) for k, v in sfx.library(TYPO_SFX).items()}
+    return {"voice": voice, "sfx_on": d.get("sfx", "on") != "off", "sfx": lib}
 
 
 def typo_block_icons(b: dict) -> list[str]:
@@ -13190,8 +13219,12 @@ def run_typo_plan(pid: str) -> None:
         typo_set(pid, step="📖 بيدوّر في القاموس على أيقونات للكلام")
         hits = dict_hits([w["w"] for w in words], bool(smart))
         studio = bool(typo_style(d.get("style")).get("studio"))
+        # 🎲 كوليكشن عشوائية (غير آخر واحدة) لكل توزيع جديد، عشان الفيديوهات ماتطلعش شبه بعض
+        collection = typo.pick_collection(d.get("collection")) if studio else None
+        if collection:
+            typo_update(pid, lambda x: x.update(collection=collection))
         if not smart and studio:
-            blocks = typo.studio_plan(words, dur, (d.get("scene") or {}).get("person"))
+            blocks = typo.studio_plan(words, dur, (d.get("scene") or {}).get("person"), collection)
         elif not smart and pro:
             blocks = typo.pro_plan(words, dur, [x["id"] for x in items[:4]],
                                    pick=lambda idxs: concepts.icons_for(idxs, hits, items, style))
@@ -13203,7 +13236,7 @@ def run_typo_plan(pid: str) -> None:
         else:
             st = typo_style(d.get("style"))
             raw = ad_json(series_chat(typo.plan_messages(words, st, [s["name"] for s in items], d.get("brief") or "", anchors,
-                                                         (d.get("scene") or {}).get("person"))), "خطة التايبوجرافي")
+                                                         (d.get("scene") or {}).get("person"), collection)), "خطة التايبوجرافي")
             blocks = typo.clean_plan(raw, words, dur, pro)
         ids = {a["id"] for a in anchors or []}
         for b in blocks:
@@ -13410,7 +13443,7 @@ def typo_doc(pid: str, d: dict) -> dict:
         sent = next(([{"w": words[i]["w"], "t0": words[i]["s"], "t1": words[i]["e"]} for i in range(sn[0], sn[-1] + 1)]
                      for sn in sents if sn[0] <= b.get("from", 0) <= sn[-1]), None)
         blocks.append({**{k: b.get(k) for k in ("t0", "t1", "kind", "theme", "text", "words", "focus", "letter", "anchor", "place", "skip",
-                                                 "intro", "outro", "sign", "box", "redact", "marks", *typo.VARIANTS)}, "sent": sent,
+                                                 "intro", "outro", "sign", "box", "redact", "marks", "mx", "my", "ms", *typo.VARIANTS)}, "sent": sent,
                        "icon": img(b.get("icon")), "side": img(b.get("side")), "icons": [u for u in (img(i) for i in b.get("icons") or []) if u]})
     # الحركات اللي محتاجة صورة من الفيديو نفسه (الصورة جوه الحروف، البولارويد، الكروت): لقطة من نص البلوك
     srcf = (d.get("source") or {})
@@ -13545,11 +13578,15 @@ def run_typo_render(pid: str, base: str, quality: str) -> None:
             fl = (f"[0:v]scale={vw}:{vh}:force_original_aspect_ratio=increase,crop={vw}:{vh},setsar=1,fps={TYPO_FPS}"
                   + (f",colorchannelmixer=rr={1 - dim}:gg={1 - dim}:bb={1 - dim}" if dim else "") + "[bg];"
                   f"[bg][1:v]overlay=0:0:shortest=1" + (f",noise=alls={int(grain * 35)}:allf=t" if grain else "") + ",format=yuv420p[v]")
-        audio_in = None
+        audio_in, audio_path = None, None
         nxt = inputs + 1
         if src and (d.get("source") or {}).get("kind") in ("audio", "video"):
             cmd += ["-i", str(folder / src)]
-            audio_in, nxt = nxt, nxt + 1
+            audio_in, audio_path, nxt = nxt, folder / src, nxt + 1
+        elif kind == "video" and bg.get("file") and media_info(folder / bg["file"]).has_audio:
+            # الكلام مكتوب والفيديو خلفية: صوت الفيديو نفسه بيفضل في الفيديو النهائي
+            cmd += ["-stream_loop", "-1", "-t", f"{dur:.3f}", "-i", str(folder / bg["file"])]
+            audio_in, audio_path, nxt = nxt, folder / bg["file"], nxt + 1
         # 🔊 الأصوات الرسمية: كليك على كل ظهور/اختفاء، وكيبورد على كتابة الرسايل
         sfx_in = None
         sfx_wav = folder / ".sfx.wav"
@@ -13557,7 +13594,7 @@ def run_typo_render(pid: str, base: str, quality: str) -> None:
             cmd += ["-i", str(sfx_wav)]
             sfx_in = nxt
         if audio_in is not None and sfx_in is not None:
-            has_a = media_info(folder / src).has_audio
+            has_a = media_info(audio_path).has_audio
             fl = (fl + ";" if fl else f"[{inputs}:v]format=yuv420p[v];") + (
                 f"[{audio_in}:a][{sfx_in}:a]amix=inputs=2:duration=longest:normalize=0[a]" if has_a else f"[{sfx_in}:a]anull[a]")
             cmd += ["-filter_complex", fl, "-map", "[v]", "-map", "[a]", "-c:a", "aac", "-b:a", "160k"]

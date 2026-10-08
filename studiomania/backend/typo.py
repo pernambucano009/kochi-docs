@@ -86,7 +86,36 @@ STUDIO_KINDS.update({
     "bubble": "فقاعة كلام حمرا فيها الكلمة المهمة (focus)، وكلمة كبيرة كريمي وكلمة صغيرة سودا (للمقارنة والردود، من 2 لـ 4 كلمات)",
     "band": "شريط أزرق مايل ورا كلمة كريمي عملاقة، وكلمة صغيرة سودا بتعدّي عليها (لأمر أو نصيحة: «إنقذ نفسك»، كلمتين أو 3)",
 })
+STUDIO_KINDS["emerge"] = ("الكلام بيطلع من ورا راس الشخص: كل كلمة بتبدأ مستخبية وراه وبتتزحلق برّه لناحية (شمال ويمين بالتبادل) "
+                          "(لما بيقول فكرة طالعة من دماغه أو اسم حاجات، من 2 لـ 6 كلمات، لما يكون فيه شخص)")
 STILL_KINDS = {"fill", "polaroid", "cards", "stories", "post", "tiles"}
+# الحركات اللي محتاجة شخص ظاهر في الفيديو
+PERSON_KINDS = {"behind", "arc", "halo", "thermal", "dots", "neon", "emerge"}
+
+# 🎲 كوليكشنز خفية: كل واحدة مجموعة عناصر شكلها لايق على بعض. كل مرة الكلام بيتوزع، البرنامج بيختار واحدة عشوائي
+# (غير اللي اتعملت آخر مرة) عشان الفيديوهات ماتطلعش شبه بعض، من غير ما العميل يختار حاجة
+COLLECTIONS = {
+    "editorial": {"note": "هادي وأنيق: كلام ورا الشخص ومتقوّس حواليه، كلمة حمرا، خط إيد وإمضا",
+                  "kinds": {"behind": 3, "arc": 2, "redword": 2, "signature": 1, "hand": 2, "artype": 2, "emerge": 2, "halo": 1, "floor": 1}},
+    "pop": {"note": "بوب بينك وأسود بطاقة عالية: حروف بتنط بحدود بينك، حروف بتلف، كروت ستوري وبوستات",
+            "kinds": {"outline": 3, "spin": 1, "sweep": 1, "extrude": 2, "stories": 1, "post": 1, "emerge": 2, "behind": 1, "stack": 1}},
+    "retro": {"note": "بوستر قديم على ورق بيج وأحمر وأزرق: نجمة وسيلويت، دوتون، تاجات وشرايط",
+              "kinds": {"retro": 2, "duotone": 2, "label": 2, "mirror": 1, "banners": 1, "tiles": 1, "bubble": 1, "band": 2, "ransom": 1}},
+    "tech": {"note": "تكنولوجيا وشاشات: جلتش، الشخص نقط، كاميرا حرارية، أرقام بتعدّ، مربع تحديد",
+             "kinds": {"crt": 2, "dots": 2, "thermal": 1, "select": 2, "counter": 2, "space": 1, "sweep": 1, "push": 2, "cube": 1}},
+    "collage": {"note": "كولاج وقصاصات: حروف مقصوصة، لوحة تحقيق، بولارويد، تاجات، شات وكومنتات",
+                "kinds": {"ransom": 2, "board": 2, "polaroid": 2, "tags": 2, "stack": 2, "comments": 1, "chat": 1, "burst": 1, "fill": 1}},
+    "cinema": {"note": "سينمائي: نيون ورا الشخص، كلام على الأرض، أشكال فيلم، قفل ومكعب، بوستر",
+               "kinds": {"neon": 2, "floor": 2, "shapes": 2, "halo": 1, "lock": 1, "cube": 1, "poster": 2, "emerge": 1, "mirror": 1}},
+}
+
+
+def pick_collection(prev: str | None = None, rnd=None) -> str:
+    import random
+
+    r = rnd or random.Random()
+    names = [n for n in COLLECTIONS if n != prev] or list(COLLECTIONS)
+    return r.choice(names)
 # عناصر ستوديو اللي ممكن تتحط جنب حاجة في الفيديو (anchor)
 ANCHOR_STUDIO = {"stack", "tags", "ransom", "comments"}
 KINDS.update(STUDIO_KINDS)
@@ -140,7 +169,7 @@ BUILTIN_STYLES = {
                   "space": 1, "route": 1, "board": 1, "cube": 1, "comments": 1, "lock": 1, "thermal": 1, "shapes": 1, "select": 1, "chat": 1, "counter": 1,
                   "fill": 1, "polaroid": 1, "cards": 1, "burst": 1, "dots": 1, "neon": 1,
                   "outline": 1, "spin": 1, "sweep": 1, "extrude": 1, "stories": 1, "post": 1,
-                  "retro": 1, "duotone": 1, "label": 1, "mirror": 1, "banners": 1, "tiles": 1, "bubble": 1, "band": 1},
+                  "retro": 1, "duotone": 1, "label": 1, "mirror": 1, "banners": 1, "tiles": 1, "bubble": 1, "band": 1, "emerge": 1},
     },
     "pro": {
         "name": "⭐ احترافي (زي الفيديو المرجع)", "font": "SM Tajawal", "case": "lower", "grain": 0.12, "weight": 700, "pro": True,
@@ -174,7 +203,7 @@ BUILTIN_STYLES = {
 }
 
 PLAN_FORMAT = """{
-  "blocks": [{"from": 0, "to": 3, "kind": "pop | type | build | icon | letters | scatter | ring | behind | arc | artype | redword | signature | poster | stack | push | crt | ransom | halo | floor | hand | tags | space | route | board | cube | comments | lock | thermal | shapes | select | chat | counter | fill | polaroid | cards | burst | dots | neon | outline | spin | sweep | extrude | stories | post | retro | duotone | label | mirror | banners | tiles | bubble | band", "theme": "light | dark | accent",
+  "blocks": [{"from": 0, "to": 3, "kind": "pop | type | build | icon | letters | scatter | ring | behind | arc | artype | redword | signature | poster | stack | push | crt | ransom | halo | floor | hand | tags | space | route | board | cube | comments | lock | thermal | shapes | select | chat | counter | fill | polaroid | cards | burst | dots | neon | outline | spin | sweep | extrude | stories | post | retro | duotone | label | mirror | banners | tiles | bubble | band | emerge", "theme": "light | dark | accent",
               "text": "الكلام اللي يتكتب (من كلام الجمل دي بالظبط، ممكن تختصره لكلمة أو كلمتين في pop/icon/letters/scatter)",
               "focus": 0, "icon": "اسم ستيكر من المكتبة أو وصف قصير بالإنجليزي لأيقونة جديدة", "icons": ["..."], "letter": 1,
               "side": "اسم ستيكر/صورة كبيرة جنب الكلام في build أو فاضي",
@@ -199,18 +228,22 @@ def anchors_text(anchors: list[dict]) -> str:
 
 
 def plan_messages(words: list[dict], style: dict, stickers: list[str], brief: str, anchors: list[dict] | None = None,
-                  person: dict | None = None) -> list[dict]:
+                  person: dict | None = None, collection: str | None = None) -> list[dict]:
     """الموديل بيقسم الكلام (كل كلمة برقمها ووقتها) على بلوكات، ولكل بلوك حركة وأيقونات.
     لو فيه فيديو متحلّل: بيشوف المراسي (الحاجات اللي في الكادر وأماكنها) وبيدمج الكلام معاها."""
     pro = bool(style.get("pro"))
     pool = PRO_KINDS if pro else {k: v for k, v in KINDS.items() if k not in PRO_KINDS}
+    col = COLLECTIONS.get(collection or "") if style.get("studio") else None
     if style.get("studio"):
         pool = {k: v for k, v in KINDS.items() if k in STUDIO_KINDS or k in ("build", "type", "pop")}
+        if col:   # الكوليكشن اللي اتختارت للفيديو ده: حركاتها بس (عشان الفيديو يبقى ليه شخصية واحدة)
+            pool = {k: v for k, v in pool.items() if k in col["kinds"] or k == "counter"}
     if not (person or {}).get("present"):   # من غير شخص: الحركات اللي محتاجاه مالهاش لازمة
-        pool = {k: v for k, v in pool.items() if k not in ("behind", "arc", "halo", "thermal", "dots", "neon")}
+        pool = {k: v for k, v in pool.items() if k not in PERSON_KINDS}
     kinds = "\n".join(f"- {k}: {v}" for k, v in pool.items())
-    rules = "\n".join(f"- {r}" for r in style.get("rules") or [])
-    weights = ", ".join(f"{k}×{v}" for k, v in (style.get("kinds") or {}).items())
+    rules = "\n".join(f"- {r}" for r in ([f"شخصية الفيديو ده: {col['note']}. استخدم الحركات اللي فوق بس ولف بينها"] if col else [])
+                       + list(style.get("rules") or []))
+    weights = ", ".join(f"{k}×{v}" for k, v in ((col or {}).get("kinds") or style.get("kinds") or {}).items() if k in pool)
     text = (
         "أنت مصمم موشن تايبوجرافي محترف (زي فيديوهات الكلام المتحرك اللي الكلام فيها بيتحول لكلمات وأشكال وأيقونات). "
         "قدامك كلام متقال، كل كلمة برقمها ووقت ما اتقالت. قسّمه على بلوكات ورا بعض، كل بلوك = لقطة على الشاشة بحركة من دول:\n"
@@ -251,6 +284,14 @@ def plan_messages(words: list[dict], style: dict, stickers: list[str], brief: st
 PRO_MAP = {"pop": "track", "type": "track", "build": "sign", "anchor": "sign", "icon": "spot", "letters": "spot", "scatter": "spot", "ring": "spot"}
 
 
+def _f(v, d=0.0, lo=-1e9, hi=1e9):
+    try:
+        x = float(v)
+    except (TypeError, ValueError):
+        return d
+    return round(min(hi, max(lo, x)), 4) if x == x else d
+
+
 def _i(v, d=0):
     try:
         return int(v)
@@ -282,6 +323,8 @@ def clean_plan(raw: dict, words: list[dict], duration: float, pro: bool = False)
                     "intro": b.get("intro") if b.get("intro") in INTROS.get(kind, ("",)) else "",
                     "outro": b.get("outro") if b.get("outro") in OUTROS.get(kind, ("",)) else "",
                     "sign": str(b.get("sign") or "").strip()[:40], "box": _i(b.get("box"), -1), "redact": _i(b.get("redact"), -1),
+                    # مكان وحجم الكلام اللي المستخدم ظبطه بإيده (سحب في المعاينة): إزاحة بكسور من الكادر، وحجم
+                    "mx": _f(b.get("mx"), 0, -0.6, 0.6), "my": _f(b.get("my"), 0, -0.6, 0.6), "ms": _f(b.get("ms"), 1, 0.3, 2.5),
                     **{k: (b.get(k) if b.get(k) in vals else "") for k, vals in VARIANTS.items()},
                     "marks": [{"type": m["type"], "word": _i(m.get("word")), **({"color": m["color"]} if m.get("color") in ("red", "yellow") else {})}
                               for m in (b.get("marks") or []) if isinstance(m, dict) and m.get("type") in MARKS][:4]})
@@ -368,43 +411,52 @@ def pro_plan(words: list[dict], duration: float, icons: list[str] | None = None,
     return timed(out, words, duration)
 
 
-def studio_plan(words: list[dict], duration: float, person: dict | None = None) -> list[dict]:
-    """ستوديو من غير موديل: كل جملة بتتقسم على عناصر الفيديوهات المرجعية على حسب طولها ولغتها، ووجود شخص في الفيديو."""
+# طول الجزء اللي كل حركة لايقة عليه (عدد الكلمات)
+KIND_LEN = {
+    "short": {"behind", "neon", "fill", "poster", "burst", "spin", "sweep", "mirror", "banners", "ransom", "redword", "outline", "lock", "tiles"},
+    "mid": {"arc", "stack", "halo", "tags", "cube", "hand", "push", "lock", "select", "emerge", "extrude", "label", "bubble", "band", "retro",
+            "duotone", "outline", "stories", "post", "crt", "shapes", "floor", "space", "dots", "thermal", "artype", "redword"},
+    "long": {"stack", "chat", "board", "comments", "hand", "cards", "polaroid", "crt", "space", "duotone", "artype", "emerge"},
+}
+
+
+def studio_plan(words: list[dict], duration: float, person: dict | None = None, collection: str | None = None,
+                seed: int | None = None) -> list[dict]:
+    """ستوديو من غير موديل: الكلام بيتقسم على أجزاء (جملة جملة)، وكل جزء بياخد حركة عشوائية من الكوليكشن اللي اتختارت
+    على قد طوله، من غير ما نفس الحركة تتكرر ورا بعض. الأرقام counter، وآخر جزء ممكن يبقى إمضا."""
+    import random
+
+    r = random.Random(seed)
     has = bool((person or {}).get("present"))
+    col = COLLECTIONS.get(collection or "") or COLLECTIONS[pick_collection(None, r)]
+    weights = {k: v for k, v in col["kinds"].items() if has or k not in PERSON_KINDS}
+    if not weights:
+        weights = {"build": 1}
+    # أجزاء من 1 لـ 6 كلمات: الجملة الطويلة بتتقسم، والقصيرة جزء واحد
+    chunks = []
+    for sent in sentences(words):
+        i = 0
+        while i < len(sent):
+            left = len(sent) - i
+            n = left if left <= 6 else r.choice((2, 3, 4, 5)) if left > 7 else left // 2
+            chunks.append(sent[i:i + n])
+            i += n
     out = []
-    sents = sentences(words)
-    for si, sent in enumerate(sents):
-        n = len(sent)
-        ar = any(AR.search(words[i]["w"]) for i in sent)
-        longest = lambda idx: max(idx, key=lambda i: len(words[i]["w"]))  # noqa: E731
-        if n <= 2:
-            kind = ("behind", "neon", "fill")[si % 3] if has and si % 2 == 0 else ("signature" if si == len(sents) - 1 else ("redword", "poster", "ransom", "burst", "fill")[si % 5])
-            out.append({"from": sent[0], "to": sent[-1], "kind": kind, "sign": " ".join(words[i]["w"] for i in sent).strip(".,،؟?!")})
+    for ci, ch in enumerate(chunks):
+        n = len(ch)
+        if any(re.search(r"[\d٠-٩]", words[i]["w"]) for i in ch):
+            out.append({"from": ch[0], "to": ch[-1], "kind": "counter"})
             continue
-        head = sent[:1] if n < 6 else sent[:2]
-        rest = sent[len(head):]
-        if has and si % 3 != 2:
-            out.append({"from": head[0], "to": head[-1], "kind": "behind"})
-        else:
-            rest = sent
-        tail = rest[-2:] if len(rest) >= 6 else []
-        mid = rest[: len(rest) - len(tail)]
-        if mid and any(re.search(r"[\d٠-٩]", words[i]["w"]) for i in mid):
-            out.append({"from": mid[0], "to": mid[-1], "kind": "counter"})
-            mid = []
-        if mid:
-            # بيلف على العناصر عشان كل جملة تبقى شكل مختلف
-            if ar and si % 4 == 1:
-                kind = "artype"
-            elif has:
-                kind = ("arc", "stack", "halo", "tags", "cube", "hand", "push", "lock", "select")[si % 9] if len(mid) <= 6 else ("stack", "chat", "board", "comments", "hand", "cards", "polaroid", "dots")[si % 8]
-            else:
-                kind = ("redword", "stack", "crt", "push", "shapes", "floor", "space", "select", "lock")[si % 9] if len(mid) <= 6 else ("hand", "chat", "board", "space", "crt", "cards")[si % 6]
-            out.append({"from": mid[0], "to": mid[-1], "kind": kind, "focus": mid.index(longest(mid))})
-        if tail:
-            last = si == len(sents) - 1
-            out.append({"from": tail[0], "to": tail[-1], "kind": "signature" if last else "redword",
-                        "sign": " ".join(words[i]["w"] for i in tail).strip(".,،؟?!")})
+        size = "short" if n <= 2 else "mid" if n <= 6 else "long"
+        # أي حركة في الكوليكشن ممكن تيجي، بس اللي على قد طول الجزء فرصتها أكبر، وآخر حركتين مايتكرروش على طول
+        recent = [b["kind"] for b in out[-2:]]
+        opts = {k: v * (3 if k in KIND_LEN[size] else 0.6) for k, v in weights.items() if k not in recent and k != "counter"} or {"build": 1}
+        kind = r.choices(list(opts), weights=list(opts.values()))[0]
+        if ci == len(chunks) - 1 and n <= 3 and r.random() < 0.35:
+            kind = "signature"
+        longest = max(range(n), key=lambda j: len(words[ch[j]]["w"]))
+        out.append({"from": ch[0], "to": ch[-1], "kind": kind, "focus": longest if kind in ("arc", "stack", "halo", "outline", "label", "tiles", "bubble", "lock", "cube") else -1,
+                    "sign": " ".join(words[i]["w"] for i in ch).strip(".,،؟?!") if kind == "signature" else ""})
     for b in out:
         b.setdefault("theme", "light")
         for k, v in (("text", ""), ("focus", -1), ("icon", ""), ("icons", []), ("letter", 1), ("side", ""), ("anchor", ""), ("place", "auto"),

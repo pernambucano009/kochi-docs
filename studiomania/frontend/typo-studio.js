@@ -29,7 +29,7 @@
     "space", "route", "board", "cube", "comments", "lock", "thermal", "shapes", "select", "chat", "counter",
     "fill", "polaroid", "cards", "burst", "dots", "neon",
     "outline", "spin", "sweep", "extrude", "stories", "post",
-    "retro", "duotone", "label", "mirror", "banners", "tiles", "bubble", "band"]);
+    "retro", "duotone", "label", "mirror", "banners", "tiles", "bubble", "band", "emerge"]);
   E.TYPING = new Set(["type", "artype"]);
   const MC = document.createElement("canvas").getContext("2d");
   const measure = (s, font) => { MC.font = font; return MC.measureText(s).width; };
@@ -1716,5 +1716,37 @@
       html += `<div dir="${this.dir(r)}" style="position:absolute;left:0;right:0;top:${(cy - z * 0.05).toFixed(1)}px;transform:translateY(-50%) rotate(-4deg);text-align:center;font:400 ${(z * 0.2).toFixed(1)}px ${cond(r)};color:${INKR};white-space:nowrap">${esc(typed(r, t, rest[0].t0, 16))}</div>`;
     }
     return html;
+  };
+
+  // ---------- emerge: الكلام بيطلع من ورا راس الشخص
+  // كل كلمة بتبدأ مستخبية ورا الراس (الشخص قدامها)، وبعدين بتتزحلق برّه لناحية وتكبر، ناحية شمال وناحية يمين بالتبادل
+  P.k_emerge = function (b, t, k, th) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    const bs = this.blockSolid(b);
+    const hd = (bs && this.blockHead(b)) || { x: w / 2, y: h * 0.38, r: mn * 0.13, top: h * 0.25 };
+    const ink = inkOf(this, th);
+    let html = "";
+    // الناحية اللي فيها مكان: لو ناحية ضيقة (الراس قريبة من الحرف) الكلام كله بيطلع للناحية التانية تحت بعض
+    const roomL = hd.x - hd.r * 1.2 - mn * 0.04, roomR = w - (hd.x + hd.r * 1.2) - mn * 0.04;
+    const both = Math.min(roomL, roomR) > w * 0.25;
+    const only = roomR >= roomL ? 1 : -1;
+    it.forEach((x, i) => {
+      if (t < x.t0) return;
+      const s = this.text(x.w);
+      const ff = famOf(s);
+      const side = both ? (i % 2 ? 1 : -1) : only;
+      const room = side < 0 ? roomL : roomR;
+      const sz = fitSize(s, `800 {}px ${ff}`, Math.max(room, w * 0.25), mn * 0.11 * this.ts);
+      const tw = measure(s, `800 ${sz}px ${ff}`);
+      const row = both ? Math.floor(i / 2) : i;
+      const ex = hd.x + side * (hd.r * 1.2 + tw / 2), ey = hd.y - hd.r * 0.9 + row * sz * 1.15;
+      const e = eOut(seg(t, x.t0, x.t0 + 0.5));
+      const px = lerp(hd.x, ex, e), py = lerp(hd.y - hd.r * 0.3, ey, e);
+      html += `<div dir="${this.dir(s)}" style="position:absolute;left:${px.toFixed(1)}px;top:${py.toFixed(1)}px;transform:translate(-50%,-50%) scale(${lerp(0.55, 1, e).toFixed(3)}) rotate(${(side * (1 - e) * -10).toFixed(1)}deg);
+        font:800 ${sz.toFixed(1)}px ${ff};letter-spacing:-0.03em;white-space:nowrap;color:${i === b.focus ? th.accent || RED : ink};${shadow(this)}">${esc(s)}</div>`;
+    });
+    return backdrop(this, th) + (bs ? this.behindPerson(t, html) : html);
   };
 })();

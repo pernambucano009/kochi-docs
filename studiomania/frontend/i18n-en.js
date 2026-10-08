@@ -3138,5 +3138,18 @@ window.I18N_EN = {
   "🎬 🎗️ شرايط مايلة بتتحرك": "🎬 🎗️ Moving diagonal banners",
   "🎬 🔲 كروت صور وكارت أحمر": "🎬 🔲 Photo tiles and a red tile",
   "🎬 💬 فقاعة كلام حمرا": "🎬 💬 Red speech bubble",
-  "🎬 🟦 شريط أزرق ورا كلمة": "🎬 🟦 Blue band behind a word"
+  "🎬 🟦 شريط أزرق ورا كلمة": "🎬 🟦 Blue band behind a word",
+  "✋ اسحب الكلام في المعاينة عشان تغيّر مكانه، وحجمه من «حجم الكلام» في اللقطة نفسها": "✋ Drag the text in the preview to move it, and set its size with “Text size” in the shot itself",
+  "📐 حجم الكلام": "📐 Text size",
+  "↺ رجّع المكان والحجم": "↺ Reset position and size",
+  "↺ رجع مكانه": "↺ Back in place",
+  "✋ مكان الكلام اتحفظ": "✋ Text position saved",
+  "🎙️ صوت الفيديو": "🎙️ Video sound",
+  "🎙️ صوت فيديو الخلفية": "🎙️ Background video sound",
+  "⚠️ الفيديو اللي رفعته مفيهوش صوت (لو ده «الصورة بس» من المعمل، ارفع الفيديو الأصلي)": "⚠️ The uploaded video has no sound (if it is the lab's “picture only” file, upload the original video)",
+  "🔇 مفيش صوت كلام (الكلام مكتوب)": "🔇 No speech sound (the text is typed)",
+  "🔇 الأصوات الرسمية مقفولة": "🔇 Official sounds are off",
+  "🔊 الأصوات الرسمية ({0} صوت)": "🔊 Official sounds ({0} sounds)",
+  "⚠️ مكتبة الأصوات فاضية على السيرفر: ارفعها تاني من «🔊 الأصوات»": "⚠️ The sound library is empty on the server: upload it again from “🔊 Sounds”",
+  "🎬 🗣️ الكلام بيطلع من ورا الراس": "🎬 🗣️ Text comes out from behind the head"
 };

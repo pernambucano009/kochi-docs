@@ -119,6 +119,7 @@
       const blocks = this.doc.blocks || [];
       const i = blocks.findIndex((b) => t >= b.t0 && t < b.t1);
       const b = blocks[i];
+      this._b = b || null;
       const th = this.theme(b);
       const bg = this.doc.transparent ? "transparent" : th.bg;
       let html = "";
@@ -173,16 +174,26 @@
       const st = this.stage.getBoundingClientRect();
       if (!st.width) return;
       const k = st.width / w, m = Math.min(w, h) * 0.03;
-      const lines = [...this.stage.querySelectorAll("*")].filter((el) => {
+      const all = [...this.stage.querySelectorAll("*")].filter((el) => {
         const ws = el.style?.whiteSpace;
         if (ws !== "nowrap" && ws !== "pre") return false;
-        if (el.closest("[data-free]")) return false;
         if (!el.textContent.trim()) return false;
         // السطر الخارجي بس (مش كل حرف جواه)
         let p = el.parentElement;
         while (p && p !== this.stage) { if (p.style?.whiteSpace === "nowrap" || p.style?.whiteSpace === "pre") return false; p = p.parentElement; }
         return true;
       });
+      const lines = all.filter((el) => !el.closest("[data-free]"));
+      // مكان وحجم الكلام اللي المستخدم ظبطه بإيده (سحب في المعاينة): بيتطبّق على سطور الكلام بس، مش الخلفية والأشكال
+      const ub = this._b, mx = Number(ub?.mx) || 0, my = Number(ub?.my) || 0, ms = Number(ub?.ms) || 1;
+      if (mx || my || ms !== 1) {
+        // الحركات القديمة (من غير سطور nowrap): البلوك كله بيتحرك (الخلفية بتاعتها لون المسرح نفسه)
+        const targets = all.length ? all : [...this.stage.querySelectorAll(".ty-cam")];
+        for (const el of targets) {
+          const old = el.style.transform || "";
+          el.style.transform = `translate(${(mx * w).toFixed(1)}px,${(my * h).toFixed(1)}px) ${old}${ms !== 1 ? ` scale(${ms.toFixed(3)})` : ""}`;
+        }
+      }
       const box = (el) => {
         const r = document.createRange();
         r.selectNodeContents(el);
