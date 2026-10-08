@@ -12955,6 +12955,16 @@ def typo_to_dict(pid: str, d: dict) -> dict:
             "sound": typo_sound(folder, d)}
 
 
+def typo_sfx_level(d: dict) -> int:
+    """عداد الكليكات (0..100). المشاريع القديمة: «من غير» = 0، وغير كده كل كلمة."""
+    if d.get("sfx") == "off":
+        return 0
+    try:
+        return max(0, min(100, int(d.get("sfx_level", 100))))
+    except (TypeError, ValueError):
+        return 100
+
+
 def typo_sfx_gain(f: Path) -> float:
     """قد إيه نعلّي الكليكات: على قد علو الكلام (RMS) في أول دقيقة. الكلام العادي ≈ 0.03، والعالي جدًا ≈ 0.25."""
     try:
@@ -12992,7 +13002,7 @@ def typo_sound(folder: Path, d: dict) -> dict:
     elif bg.get("kind") == "video" and bg.get("file"):
         voice = "bg" if typo_has_audio(folder / bg["file"]) else "silent"
     lib = {k: len(v) for k, v in sfx.library(TYPO_SFX).items()}
-    return {"voice": voice, "sfx_on": d.get("sfx", "on") != "off", "sfx": lib}
+    return {"voice": voice, "sfx_on": typo_sfx_level(d) > 0, "sfx_level": typo_sfx_level(d), "sfx": lib}
 
 
 def typo_block_icons(b: dict) -> list[str]:
@@ -13069,6 +13079,7 @@ class TypoPatchIn(BaseModel):
     fonts: dict | None = None
     ai: str | None = None
     sfx: str | None = None
+    sfx_level: int | None = None
 
 
 TYPO_FONT_OK = re.compile(r"^(TY|SM) [A-Za-z]{2,20}$")
@@ -13089,6 +13100,10 @@ def typo_patch(pid: str, body: TypoPatchIn):
             d["ai"] = body.ai
         if body.sfx in ("on", "off"):   # 🔊 الأصوات الرسمية على الفيديو
             d["sfx"] = body.sfx
+        if body.sfx_level is not None:   # 🔊 عداد الكليكات: 0 مفيش، 100 كل كلمة
+            d["sfx_level"] = max(0, min(100, int(body.sfx_level)))
+            d["sfx"] = "on" if d["sfx_level"] > 0 else "off"
+            d["final"] = None
         if body.fonts is not None:   # خط الكلام في الحركات الاحترافية (إنجليزي / عربي)
             d["fonts"] = {k: v for k, v in body.fonts.items() if k in ("sans", "sansAr") and isinstance(v, str) and TYPO_FONT_OK.match(v)}
         if body.bg is not None:
@@ -13606,7 +13621,7 @@ def run_typo_render(pid: str, base: str, quality: str) -> None:
         # 🔊 الأصوات الرسمية: كليك على كل ظهور/اختفاء، وكيبورد على كتابة الرسايل
         sfx_in = None
         sfx_wav = folder / ".sfx.wav"
-        if d.get("sfx", "on") != "off" and sfx.render(TYPO_SFX, doc["blocks"], dur, sfx_wav, seed=sum(map(ord, pid))):
+        if d.get("sfx", "on") != "off" and sfx.render(TYPO_SFX, doc["blocks"], dur, sfx_wav, seed=sum(map(ord, pid)), level=typo_sfx_level(d)):
             cmd += ["-i", str(sfx_wav)]
             sfx_in = nxt
         if audio_in is not None and sfx_in is not None:

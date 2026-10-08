@@ -3154,5 +3154,8 @@ window.I18N_EN = {
   "🎬 🗣️ الكلام بيطلع من ورا الراس": "🎬 🗣️ Text comes out from behind the head",
   "✅ اترفع": "✅ Uploaded",
   "الرفع وقف: اتأكد من النت وجرب تاني": "The upload stopped: check your connection and try again",
-  "الرفع خد وقت طويل جدًا: جرب فيديو أصغر": "The upload took too long: try a smaller video"
+  "الرفع خد وقت طويل جدًا: جرب فيديو أصغر": "The upload took too long: try a smaller video",
+  "🔊 الكليكات": "🔊 Clicks",
+  "🔇 من غير كليكات": "🔇 No clicks",
+  "0 = مفيش كليكات خالص، 100 = كليك على كل كلمة، وما بينهم الكليكات بتقل أو تكتر": "0 = no clicks at all, 100 = a click on every word; in between, fewer or more words click"
 };

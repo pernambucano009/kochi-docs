@@ -91,8 +91,9 @@ function tyRenderProj() {
       <label>الستايل <select data-tyopt="style">${stOpts}</select></label>
       <label title="من غير ذكاء اصطناعي: الحركات بالقواعد، والأيقونات من القاموس بس، والكلام بيتفرّغ على السيرفر لو متفعّل">الذكاء <select data-tyopt="ai">
         <option value="smart" ${v.ai !== "off" ? "selected" : ""}>🤖 ذكي</option><option value="off" ${v.ai === "off" ? "selected" : ""}>⚙️ من غير ذكاء اصطناعي</option></select></label>
-      <label title="الأصوات الرسمية: كليك على ظهور واختفاء الكلام والعناصر، وكيبورد على كتابة الرسايل">الأصوات <select data-tyopt="sfx">
-        <option value="on" ${v.sfx !== "off" ? "selected" : ""}>🔊 شغالة</option><option value="off" ${v.sfx === "off" ? "selected" : ""}>🔇 من غير</option></select></label>
+      <label title="0 = مفيش كليكات خالص، 100 = كليك على كل كلمة، وما بينهم الكليكات بتقل أو تكتر">🔊 الكليكات
+        <input type="range" min="0" max="100" step="5" data-tysfx value="${v.sound?.sfx_level ?? (v.sfx === "off" ? 0 : 100)}">
+        <b data-tysfxval>${v.sound?.sfx_level ?? (v.sfx === "off" ? 0 : 100)}</b></label>
       ${tyx.styles.find((x) => x.id === v.style)?.pro && TypoEngine.MOMENT_FONTS ? `
         <label>خط الإنجليزي <select data-tyfont="sans">${TypoEngine.MOMENT_FONTS.latin.map(([f, l]) => `<option value="${f}" ${f === (v.fonts?.sans || "TY Outfit") ? "selected" : ""}>${l}</option>`).join("")}</select></label>
         <label>خط العربي <select data-tyfont="sansAr">${TypoEngine.MOMENT_FONTS.arabic.map(([f, l]) => `<option value="${f}" ${f === (v.fonts?.sansAr || "TY Alexandria") ? "selected" : ""}>${l}</option>`).join("")}</select></label>` : ""}
@@ -222,7 +223,7 @@ function tySoundLine(sd) {
   const n = (sd.sfx?.click || 0) + (sd.sfx?.key || 0) + (sd.sfx?.typing || 0);
   const voice = sd.voice === "source" ? "🎙️ صوت الفيديو" : sd.voice === "bg" ? "🎙️ صوت فيديو الخلفية"
     : sd.voice === "silent" ? "⚠️ الفيديو اللي رفعته مفيهوش صوت (لو ده «الصورة بس» من المعمل، ارفع الفيديو الأصلي)" : "🔇 مفيش صوت كلام (الكلام مكتوب)";
-  const fx = !sd.sfx_on ? "🔇 الأصوات الرسمية مقفولة" : n ? `🔊 الأصوات الرسمية (${n} صوت)` : "⚠️ مكتبة الأصوات فاضية على السيرفر: ارفعها تاني من «🔊 الأصوات»";
+  const fx = !sd.sfx_on ? "🔇 من غير كليكات" : n ? `🔊 الكليكات ${sd.sfx_level ?? 100}٪ (${n} صوت في المكتبة)` : "⚠️ مكتبة الأصوات فاضية على السيرفر: ارفعها تاني من «🔊 الأصوات»";
   return `<p class="hint">${voice} · ${fx}</p>`;
 }
 
@@ -539,11 +540,16 @@ $("tyMain").addEventListener("click", async (e) => {
   }
 });
 
+$("tyMain").addEventListener("input", (e) => {
+  if (e.target.matches("[data-tysfx]")) { const b = document.querySelector("[data-tysfxval]"); if (b) b.textContent = e.target.value; }
+});
+
 $("tyMain").addEventListener("change", async (e) => {
   const t = e.target, v = tyx.cur;
   try {
     if (t.matches("[data-tyname]")) { tyx.cur = await api(TY(`/${v.id}`), { method: "PATCH", ...jsonBody({ name: t.value }) }); tyx.list = await api(TY("")); return tyRender(); }
     if (t.matches("[data-tyopt]")) return tyPatch({ [t.dataset.tyopt]: t.value });
+    if (t.matches("[data-tysfx]")) { await tyPatch({ sfx_level: Number(t.value) }); return toast(Number(t.value) ? `🔊 الكليكات: ${t.value}` : "🔇 من غير كليكات"); }
     if (t.matches("[data-tyfont]")) return tyPatch({ fonts: { ...(v.fonts || {}), [t.dataset.tyfont]: t.value } });
     if (t.matches("[data-tybg]")) return tyPatch({ bg: { ...(v.bg || {}), [t.dataset.tybg]: t.dataset.tybg === "dim" ? Number(t.value) : t.value } });
     if (t.matches("[data-tybgfile]") && t.files[0]) {

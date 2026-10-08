@@ -82,8 +82,20 @@ def library(folder: Path) -> dict[str, list[Path]]:
     return lib
 
 
-def events(blocks: list[dict], duration: float) -> list[tuple[float, str, float]]:
-    """(وقت، نوع الصوت، قوة) لكل ظهور/اختفاء في الفيديو، على نفس توقيت المحرّك."""
+def _score(t: float, salt: int) -> float:
+    """رقم ثابت من 0 لـ 1 لكل صوت (نفس الصوت دايمًا نفس الرقم): الصوت بيتسمع لو رقمه أقل من العداد.
+    كده لما العداد يعلى أصوات جديدة بتتضاف، واللي كانت موجودة بتفضل زي ما هي."""
+    return random.Random(f"{t:.3f}|{salt}").random()
+
+
+def events(blocks: list[dict], duration: float, level: int = 100) -> list[tuple[float, str, float]]:
+    """(وقت، نوع الصوت، قوة) لكل ظهور/اختفاء في الفيديو، على نفس توقيت المحرّك.
+    level من 0 (مفيش كليكات) لـ 100 (كل كلمة): أول كليك لكل عنصر بيفضل طول ما العداد فوق الصفر،
+    وكليكات الكلمات وضغطات الكيبورد بتزيد مع العداد."""
+    level = max(0, min(100, int(level)))
+    if level <= 0:
+        return []
+    keep = lambda t, salt: _score(t, salt) < level / 100  # noqa: E731
     ev: list[tuple[float, str, float]] = []
     for b in blocks:
         t0, t1 = float(b.get("t0") or 0), float(b.get("t1") or 0)
@@ -101,12 +113,16 @@ def events(blocks: list[dict], duration: float) -> list[tuple[float, str, float]
                 a = float(w.get("t0", t0))
                 d = max(0.12, min(0.35, float(w.get("t1", a + 0.3)) - a))
                 for i in range(len(chars)):
-                    ev.append((a + d * i / len(chars), "key", 0.75))
+                    tk = a + d * i / len(chars)
+                    if i == 0 or keep(tk, 3):   # أول حرف في الكلمة دايمًا، والباقي على قد العداد
+                        ev.append((tk, "key", 0.75))
             continue
-        ev.append((t0, "click", 0.85))   # العنصر بيظهر
+        ev.append((t0, "click", 0.85))   # العنصر بيظهر (دايمًا طول ما العداد فوق الصفر)
         for w in ws:
-            ev.append((float(w.get("t0", t0)), "click", 0.7))
-        if t1 < duration - 0.05:
+            tw = float(w.get("t0", t0))
+            if keep(tw, 1):
+                ev.append((tw, "click", 0.7))
+        if t1 < duration - 0.05 and keep(t1, 2):
             ev.append((t1 - 0.02, "click", 0.45))   # بيختفي (أخف)
     ev.sort()
     out: list[tuple[float, str, float]] = []
@@ -118,7 +134,7 @@ def events(blocks: list[dict], duration: float) -> list[tuple[float, str, float]
     return out
 
 
-def render(folder: Path, blocks: list[dict], duration: float, out: Path, seed: int = 7) -> bool:
+def render(folder: Path, blocks: list[dict], duration: float, out: Path, seed: int = 7, level: int = 100) -> bool:
     """بيكتب تراك المؤثرات. بيرجع False لو المكتبة فاضية أو مفيش أحداث."""
     lib = library(folder)
     cache: dict[Path, np.ndarray] = {}
@@ -128,7 +144,7 @@ def render(folder: Path, blocks: list[dict], duration: float, out: Path, seed: i
             cache[p] = read_wav(p.read_bytes())
         return cache[p]
 
-    ev = events(blocks, duration)
+    ev = events(blocks, duration, level)
     if not ev:
         return False
     rnd = random.Random(seed)
