@@ -13205,7 +13205,7 @@ def run_typo_plan(pid: str) -> None:
             blocks = typo.clean_plan(raw, words, dur, pro)
         ids = {a["id"] for a in anchors or []}
         for b in blocks:
-            if b["kind"] in ("pop", "ring", "letters", "scatter", *typo.STUDIO_KINDS):   # دول ملو الشاشة أو على الشخص: مش جنب حاجة
+            if b["kind"] in ("pop", "ring", "letters", "scatter", *(set(typo.STUDIO_KINDS) - typo.ANCHOR_STUDIO)):   # دول ملو الشاشة أو على الشخص: مش جنب حاجة
                 b["anchor"] = ""
             if b.get("anchor") not in ids:
                 b["anchor"] = ""
@@ -13378,6 +13378,21 @@ def run_typo_icons(pid: str) -> None:
         typo_fail(pid, exc)
 
 
+def typo_still(pid: str, src: Path, t: float) -> str | None:
+    """لقطة واحدة من الفيديو المرفوع (بتتعمل مرة وتتحفظ)."""
+    folder = TYPO_PROJ / pid / "stills"
+    name = f"s_{int(round(t * 10)):06d}.jpg"
+    out = folder / name
+    if not out.exists():
+        try:
+            folder.mkdir(parents=True, exist_ok=True)
+            subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{max(0.0, t):.2f}", "-i", str(src), "-frames:v", "1",
+                            "-vf", "scale=720:-2", "-q:v", "4", str(out)], check=True, capture_output=True, timeout=60)
+        except (OSError, subprocess.SubprocessError):
+            return None
+    return f"/media/typo/projects/{pid}/stills/{name}" if out.exists() else None
+
+
 def typo_doc(pid: str, d: dict) -> dict:
     """الخطة بالشكل اللي المحرّك بيرسمه: المقاس والستايل والبلوكات بلينكات الصور."""
     W, H = TYPO_RATIOS.get(d.get("ratio"), TYPO_RATIOS["9:16"])
@@ -13395,6 +13410,12 @@ def typo_doc(pid: str, d: dict) -> dict:
         blocks.append({**{k: b.get(k) for k in ("t0", "t1", "kind", "theme", "text", "words", "focus", "letter", "anchor", "place", "skip",
                                                  "intro", "outro", "sign", "box", "redact", "marks", *typo.VARIANTS)}, "sent": sent,
                        "icon": img(b.get("icon")), "side": img(b.get("side")), "icons": [u for u in (img(i) for i in b.get("icons") or []) if u]})
+    # الحركات اللي محتاجة صورة من الفيديو نفسه (الصورة جوه الحروف، البولارويد، الكروت): لقطة من نص البلوك
+    srcf = (d.get("source") or {})
+    if srcf.get("kind") == "video" and srcf.get("file"):
+        for bl in blocks:
+            if bl.get("kind") in typo.STILL_KINDS:
+                bl["img"] = typo_still(pid, TYPO_PROJ / pid / srcf["file"], ((bl.get("t0") or 0) + (bl.get("t1") or 0)) / 2)
     kind = (d.get("bg") or {}).get("kind", "theme")
     if kind != "theme":
         # فوق خلفية بتاعتك: لون الكلام على قد الخلفية (فاتحة ← كلام غامق، غامقة/صورة/فيديو ← كلام فاتح)، والكارت الملون زي ما هو

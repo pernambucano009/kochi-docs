@@ -26,7 +26,8 @@
     new FontFace(fam, `url(/fonts/${file})`, { weight: w }).load().then((f) => document.fonts.add(f)).catch(() => {})),
     ...["SM Lalezar", "SM Changa", "SM Kufi", "SM Tajawal"].map((f) => E.font(f))]));
   E.STUDIO = new Set(["behind", "arc", "artype", "redword", "signature", "poster", "stack", "push", "crt", "ransom", "halo", "floor", "hand", "tags",
-    "space", "route", "board", "cube", "comments", "lock", "thermal", "shapes", "select", "chat", "counter"]);
+    "space", "route", "board", "cube", "comments", "lock", "thermal", "shapes", "select", "chat", "counter",
+    "fill", "polaroid", "cards", "burst", "dots", "neon"]);
   E.TYPING = new Set(["type", "artype"]);
   const MC = document.createElement("canvas").getContext("2d");
   const measure = (s, font) => { MC.font = font; return MC.measureText(s).width; };
@@ -958,5 +959,188 @@
     if (str) html += `<div style="position:absolute;left:0;right:0;top:${y.toFixed(1)}px;transform:translateY(-50%);text-align:center;font:700 ${size.toFixed(1)}px 'TY Outfit';color:${ink};white-space:nowrap;text-shadow:0 0 ${kk >= 1 ? 40 : 10}px rgba(255,255,255,.45)">${esc(str)}<i style="display:inline-block;width:${(size * 0.06).toFixed(1)}px;height:${(size * 0.85).toFixed(1)}px;background:${MAG};box-shadow:0 0 ${(size * 0.15).toFixed(0)}px ${MAG};vertical-align:-8%;margin-left:${(size * 0.04).toFixed(1)}px;opacity:${Math.floor(t * 2.5) % 2 || kk < 1 ? 1 : 0}"></i></div>`;
     if (after) html += `<div dir="${this.dir(after)}" style="position:absolute;left:0;right:0;top:${(y + size * 0.75).toFixed(1)}px;text-align:center;font:600 ${(mn * 0.06).toFixed(1)}px ${famOf(after)};color:${ink};${shadow(this)}">${esc(after)}</div>`;
     return html;
+  };
+
+  // =====================================================================
+  // الدفعة الرابعة
+  //   fill      الصورة من الفيديو جوه حروف عملاقة (16)
+  //   polaroid  بولارويد فيه لقطة من الفيديو والكلام بخط إيد بيتكتب (20)
+  //   cards     كروت ملونة طايرة في 3D (8)
+  //   burst     انفجار كوميكس برتقاني والكلمة في النص (20)
+  //   dots      الشخص بيتحول لنقط منوّرة (11، 12)
+  //   neon      كلام نيون أحمر منوّر ورا الشخص (13)
+  // b.img = لقطة من الفيديو (السيرفر بيعملها)، ولو مفيش: أيقونة البلوك
+  // =====================================================================
+  const imgOf = (b) => b.img || b.icon || "";
+
+  // ---------- fill
+  P.k_fill = function (b, t, k, th) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    const txt = it.map((x) => x.w).join(" ");
+    const ar = AR.test(txt);
+    const ff = ar ? "'SM Lalezar', 'SM Tajawal'" : "'TY Anton', 'TY Outfit'";
+    const lines = it.length > 1 && !ar ? it.map((x) => x.w.toUpperCase()) : [ar ? txt : txt.toUpperCase()];
+    const maxH = (h * 0.62) / lines.length;
+    const src = imgOf(b);
+    if (src) this._want = src;
+    const paint = src ? `background:url(${src}) center/cover;-webkit-background-clip:text;background-clip:text;color:transparent;filter:contrast(1.2) brightness(1.7) saturate(1.1)`
+      : `background:linear-gradient(160deg,#fff 0%,${th.accent || RED} 120%);-webkit-background-clip:text;background-clip:text;color:transparent`;
+    // على أحمر دايمًا (زي المرجع) وحدود فاتحة رفيعة عشان الحروف تتقري حتى لو اللقطة غامقة
+    let html = `<div style="position:absolute;inset:0;background:${RED}"></div>`;
+    let y = (h - lines.reduce((a, l) => a + Math.min(maxH, fitSize(l, `400 {}px ${ff}`, w * 0.92, maxH * 1.2)) * 0.92, 0)) / 2;
+    lines.forEach((ln, i) => {
+      const sz = Math.min(maxH, fitSize(ln, `400 {}px ${ff}`, w * 0.92, maxH * 1.2));
+      const t0 = it[Math.min(i, it.length - 1)].t0;
+      if (t >= t0) {
+        const p = eBack(seg(t, t0, t0 + 0.2));
+        html += `<div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:${w / 2}px;top:${(y + sz * 0.46).toFixed(1)}px;transform:translate(-50%,-50%) scale(${p.toFixed(3)}) scaleY(1.08);font-family:${ff};font-size:${sz.toFixed(1)}px;line-height:.95;white-space:nowrap;
+          background-position:${(50 + (t - b.t0) * 3).toFixed(1)}% ${(40 + i * 20)}%;${paint};-webkit-text-stroke:${Math.max(1.5, sz * 0.008).toFixed(1)}px rgba(255,240,235,.9)">${esc(ln)}</div>`;
+      }
+      y += sz * 0.92;
+    });
+    return html;
+  };
+
+  // ---------- polaroid
+  P.k_polaroid = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    const src = imgOf(b);
+    if (src) this._want = src;
+    const pw = Math.min(w * 0.78, h * 0.5), ph = pw * 1.18;
+    const k2 = eOut(seg(t, b.t0, b.t0 + 0.35));
+    const rot = lerp(-9, -3, k2) + (bi % 2 ? 4 : 0);
+    const cx = w / 2, cy = h * 0.44 + (1 - k2) * h * 0.1;
+    const full = it.map((x) => this.text(x.w)).join(" ");
+    const ar = AR.test(full);
+    const ff = ar ? "'TY Ruqaa', 'SM Tajawal'" : "'TY Rock', 'TY Outfit'";
+    const sz = fitSize(full, `400 {}px ${ff}`, pw * 0.86, mn * 0.06);
+    // الكتابة بتظهر حرف حرف (زي إيد بتكتب) ومع رعشة خفيفة
+    const n = Math.ceil(seg(t, it[0]?.t0 ?? b.t0, Math.max((it[it.length - 1]?.t0 ?? b.t0) + 0.4, (it[0]?.t0 ?? b.t0) + 0.6)) * [...full].length);
+    const j = rng(Math.floor(t * 12) + bi);
+    const under = onVideo(this) ? `<div style="position:absolute;inset:0;background:rgba(80,10,14,.55);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)"></div>` : backdrop(this, th);
+    return under + `<div style="position:absolute;left:${(cx - pw / 2).toFixed(1)}px;top:${(cy - ph / 2).toFixed(1)}px;width:${pw.toFixed(1)}px;height:${ph.toFixed(1)}px;background:#ECEAE4;
+      box-shadow:0 ${(mn * 0.03).toFixed(0)}px ${(mn * 0.06).toFixed(0)}px rgba(0,0,0,.45);transform:rotate(${rot.toFixed(2)}deg);opacity:${k2.toFixed(3)}">
+      <div style="position:absolute;left:6%;top:5%;width:88%;height:70%;background:${src ? `url(${src}) center/cover` : `linear-gradient(150deg, ${th.accent || RED}, #121A2E)`};filter:saturate(.9) contrast(1.05)"></div>
+      <div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:6%;right:6%;top:79%;text-align:center;font:400 ${sz.toFixed(1)}px ${ff};color:#1a1a1a;white-space:nowrap;
+        transform:translate(${((j() - 0.5) * 2).toFixed(1)}px,${((j() - 0.5) * 2).toFixed(1)}px)">${esc([...full].slice(0, n).join(""))}</div></div>`;
+  };
+
+  // ---------- cards
+  const CARD_COLS = [["#E5261F", "#fff"], ["#F4EFE9", "#121A2E"], ["#121A2E", "#F4EFE9"], ["#F7D046", "#111"], ["#2F7CF6", "#fff"]];
+  P.k_cards = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const cs = chunks(this.items(b), Math.min(4, Math.max(2, Math.ceil(this.items(b).length / 2))));
+    const src = imgOf(b);
+    if (src) this._want = src;
+    const cw = Math.min(w * 0.5, h * 0.34), chh = cw * 1.42;
+    let html = backdrop(this, th) + (onVideo(this) ? `<div style="position:absolute;inset:0;background:rgba(0,0,0,.45)"></div>` : "");
+    html += `<div style="position:absolute;inset:0;perspective:${(mn * 1.6).toFixed(0)}px">`;
+    cs.forEach((c, i) => {
+      if (t < c.t0 - 0.1) return;
+      const kk = eOut(seg(t, c.t0 - 0.1, c.t0 + 0.35));
+      const [bgc, col] = CARD_COLS[(i + bi) % CARD_COLS.length];
+      const slot = i - (cs.length - 1) / 2;
+      const x = w / 2 + slot * cw * 0.42 - cw / 2, y = h * 0.42 - chh / 2 + Math.abs(slot) * mn * 0.02;
+      const z = lerp(-mn * 1.4, -Math.abs(slot) * mn * 0.08, kk);
+      const fs = fitSize(c.w, `800 {}px ${famOf(c.w)}`, cw * 0.84, cw * 0.13);
+      html += `<div dir="${this.dir(c.w)}" style="position:absolute;left:${x.toFixed(1)}px;top:${y.toFixed(1)}px;width:${cw.toFixed(1)}px;height:${chh.toFixed(1)}px;box-sizing:border-box;
+        transform:rotateY(${lerp(-60, -24 + slot * 6, kk).toFixed(1)}deg) translateZ(${z.toFixed(1)}px) rotateZ(${(slot * 3).toFixed(1)}deg);filter:blur(${((1 - kk) * 8).toFixed(1)}px);opacity:${clamp(kk * 2).toFixed(3)};
+        background:${bgc};color:${col};border-radius:${(cw * 0.04).toFixed(1)}px;padding:${(cw * 0.08).toFixed(1)}px;box-shadow:0 ${(mn * 0.03).toFixed(0)}px ${(mn * 0.06).toFixed(0)}px rgba(0,0,0,.45);overflow:hidden">
+        <div style="display:flex;justify-content:space-between;font:600 ${(cw * 0.035).toFixed(1)}px 'TY Outfit';opacity:.7"><span>■ ${String(i + 1).padStart(2, "0")}</span><span style="border:1px solid;border-radius:9px;padding:0 6px">NEW</span></div>
+        <div style="font:800 ${fs.toFixed(1)}px ${famOf(c.w)};line-height:1.05;margin:${(cw * 0.06).toFixed(1)}px 0">${esc(this.text(c.w))}</div>
+        <div style="height:${(chh * 0.36).toFixed(1)}px;border-radius:6px;background:${src ? `url(${src}) ${30 + i * 20}% 40%/cover` : `${col}22`}"></div>
+        ${[70, 90, 55].map((pc) => `<div style="height:${(chh * 0.012).toFixed(1)}px;width:${pc}%;background:${col};opacity:.35;margin:${(chh * 0.022).toFixed(1)}px 0"></div>`).join("")}</div>`;
+    });
+    return html + "</div>";
+  };
+
+  // ---------- burst
+  P.k_burst = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    const txt = it.map((x) => this.text(x.w)).join(" ");
+    const ar = AR.test(txt);
+    const ff = ar ? "'SM Lalezar', 'SM Tajawal'" : "'TY Rock', 'TY Outfit'";
+    const cx = w / 2, cy = h * 0.45;
+    const t0 = it[0]?.t0 ?? b.t0;
+    const pk = eBack(seg(t, t0, t0 + 0.18)), lk = eOut(seg(t, t0 - 0.05, t0 + 0.2));
+    const r = rng(bi * 7 + 4);
+    let lines = "";
+    for (let i = 0; i < 18; i++) {
+      const a = (i / 18) * 6.283 + r() * 0.2, r1 = mn * (0.3 + r() * 0.06), r2 = mn * (0.55 + r() * 0.2) * lk;
+      lines += `<line x1="${(cx + Math.cos(a) * r1).toFixed(1)}" y1="${(cy + Math.sin(a) * r1).toFixed(1)}" x2="${(cx + Math.cos(a) * Math.max(r1, r2)).toFixed(1)}" y2="${(cy + Math.sin(a) * Math.max(r1, r2)).toFixed(1)}" stroke="#111" stroke-width="${(mn * (0.006 + r() * 0.006)).toFixed(1)}" stroke-linecap="round"/>`;
+    }
+    const sz = fitSize(txt, `400 {}px ${ff}`, w * 0.84, mn * 0.2);
+    const shake = t - t0 < 0.25 ? (r() - 0.5) * mn * 0.02 : 0;
+    return `<div style="position:absolute;inset:0;background:radial-gradient(circle at 50% 45%, #f6a33a, #ee8a1c 55%, #d96f0f)"></div>
+      <div style="position:absolute;inset:0;background:radial-gradient(circle, rgba(0,0,0,.14) 22%, transparent 24%) 0 0/${(mn * 0.025).toFixed(0)}px ${(mn * 0.025).toFixed(0)}px"></div>
+      <svg style="position:absolute;inset:0" width="${w}" height="${h}">${lines}</svg>
+      <div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:${(cx + shake).toFixed(1)}px;top:${cy.toFixed(1)}px;transform:translate(-50%,-50%) rotate(-4deg) scale(${pk.toFixed(3)});font:400 ${sz.toFixed(1)}px ${ff};color:#fff;
+        -webkit-text-stroke:${(sz * 0.05).toFixed(1)}px #111;paint-order:stroke fill;white-space:nowrap;text-shadow:${(sz * 0.04).toFixed(1)}px ${(sz * 0.05).toFixed(1)}px 0 #111">${esc(txt)}</div>`;
+  };
+
+  // ---------- dots
+  P.k_dots = function (b, t, k, th) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const a = this.personAt(t);
+    const kk = eOut(seg(t, b.t0, b.t0 + 0.8));
+    const step = mn * 0.012;
+    let html = `<div style="position:absolute;inset:0;background:rgba(4,6,14,${onVideo(this) ? 0.86 : 1})"></div>`;
+    if (a) {
+      const { x, y, w: iw, h: ih } = a.img;
+      this._want = a.url;
+      const dot = `radial-gradient(circle, #000 ${(step * 0.28).toFixed(1)}px, transparent ${(step * 0.36).toFixed(1)}px) 0 0/${step.toFixed(1)}px ${step.toFixed(1)}px`;
+      html += `<img src="${a.url}" alt="" style="position:absolute;left:${x.toFixed(1)}px;top:${y.toFixed(1)}px;width:${iw.toFixed(1)}px;height:${ih.toFixed(1)}px;pointer-events:none;
+        filter:brightness(${lerp(1, 2.1, kk).toFixed(2)}) saturate(1.3) drop-shadow(0 0 ${(mn * 0.006).toFixed(1)}px rgba(255,230,190,.6));-webkit-mask:${dot};mask:${dot};opacity:${lerp(0.4, 1, kk).toFixed(3)}">`;
+    }
+    // نقط بتلمع حوالين الشخص
+    const r = rng(Math.floor(t * 15) + 3), hd = this.headAt(t);
+    for (let i = 0; i < 70; i++) {
+      const px = hd.x + (r() - 0.5) * w * 0.7, py = hd.y + (r() - 0.3) * h * 0.5, sz = 2 + r() * 3;
+      html += `<i style="position:absolute;left:${px.toFixed(1)}px;top:${py.toFixed(1)}px;width:${sz.toFixed(1)}px;height:${sz.toFixed(1)}px;background:#ffe9c4;opacity:${(r() * 0.8 * kk).toFixed(2)}"></i>`;
+    }
+    const it = this.items(b), fr = this.freeRect(b);
+    const shown = it.filter((x) => t >= x.t0);
+    shown.forEach((x, i) => {
+      const p = POP(t, x.t0);
+      const sz = fitSize(x.w, `800 {}px ${famOf(x.w)}`, fr.w * 0.9, mn * 0.08);
+      html += `<div dir="${this.dir(x.w)}" style="position:absolute;left:${(fr.x + fr.w / 2).toFixed(1)}px;top:${(fr.y + fr.h * 0.2 + i * sz * 1.25).toFixed(1)}px;transform:translate(-50%,-50%) scale(${p.s.toFixed(3)});opacity:${p.a.toFixed(3)};
+        font:800 ${sz.toFixed(1)}px ${famOf(x.w)};letter-spacing:-0.03em;white-space:nowrap;color:${i === b.focus ? th.accent || RED : "#fff"};text-shadow:0 0 ${(sz * 0.3).toFixed(0)}px rgba(255,230,190,.35)">${esc(this.text(x.w))}</div>`;
+    });
+    return html;
+  };
+
+  // ---------- neon
+  P.k_neon = function (b, t, k, th) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    const txt = it.map((x) => x.w).join(" ");
+    const ar = AR.test(txt);
+    const ff = ar ? "'SM Lalezar', 'SM Tajawal'" : "'TY Anton', 'TY Outfit'";
+    const bs = this.blockSolid(b);
+    const hd = this.headAt(t);
+    const s2 = ar ? txt : txt.toUpperCase();
+    const sz = fitSize(s2, `400 {}px ${ff}`, w * 0.92, mn * 0.36);
+    // سطر واحد ورا فوق الراس (زي الكلام اللي ورا الشخص)، والشخص بيغطي الجزء التحتاني منه
+    const cy = bs ? clamp(hd.top + sz * 0.3, sz * 0.6, h * 0.7) : h * 0.42;
+    let html = onVideo(this) ? `<div style="position:absolute;inset:0;background:rgba(0,0,0,.35)"></div>` : `<div style="position:absolute;inset:0;background:#08080A"></div>`;
+    const shown = it.filter((x) => t >= x.t0);
+    if (shown.length) {
+      const last = shown[shown.length - 1];
+      // النيون بيولّع برعشة
+      const on = seg(t, last.t0, last.t0 + 0.25), fl = on < 1 ? (Math.floor(t * 30) % 3 ? 1 : 0.3) * on : 0.92 + Math.sin(t * 40) * 0.04;
+      html += `<div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:${w / 2}px;top:${cy.toFixed(1)}px;transform:translate(-50%,-50%);font:400 ${sz.toFixed(1)}px ${ff};line-height:1;white-space:nowrap;color:#ff2a32;
+        text-shadow:0 0 ${(sz * 0.05).toFixed(0)}px #ff1a24,0 0 ${(sz * 0.16).toFixed(0)}px #ff0010,0 0 ${(sz * 0.32).toFixed(0)}px rgba(255,0,20,.6)">${shown.map((x) =>
+        `<span style="opacity:${(x === last ? fl : 0.92 + Math.sin(t * 40) * 0.04).toFixed(3)}">${esc(ar ? x.w : x.w.toUpperCase())}</span>`).join(" ")}</div>`;
+    }
+    return html + (bs ? this.personLayer(t) : "");
   };
 })();

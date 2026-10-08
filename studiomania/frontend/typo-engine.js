@@ -89,7 +89,7 @@
     // الصور لازم تكون اتحملت قبل أول فريم (السيرفر بيستنى ده قبل ما يصوّر)
     ready() {
       const urls = new Set();
-      for (const b of this.doc.blocks || []) for (const u of [b.icon, b.side, ...(b.icons || [])]) if (u) urls.add(u);
+      for (const b of this.doc.blocks || []) for (const u of [b.icon, b.side, b.img, ...(b.icons || [])]) if (u) urls.add(u);
       const imgs = [...urls].map((u) => new Promise((res) => { const i = new Image(); i.onload = i.onerror = res; i.src = u; }));
       const pro = TypoEngine.FULL && (this.doc.blocks || []).some((b) => TypoEngine.FULL.has(b.kind));
       const mf = this.doc.style?.moments || {};

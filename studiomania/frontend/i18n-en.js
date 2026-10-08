@@ -3115,5 +3115,11 @@ window.I18N_EN = {
   "🎬 🎞️ أشكال فيلم بتترعش": "🎬 🎞️ Shaky film shapes",
   "🎬 🖱️ مربع تحديد وماوس": "🎬 🖱️ Selection box and cursor",
   "🎬 📱 فقاعات شات": "🎬 📱 Chat bubbles",
-  "🎬 🔢 رقم بيعدّ": "🎬 🔢 Counting number"
+  "🎬 🔢 رقم بيعدّ": "🎬 🔢 Counting number",
+  "🎬 🖼️ الصورة جوه الحروف": "🎬 🖼️ Image inside the letters",
+  "🎬 📸 بولارويد بخط إيد": "🎬 📸 Polaroid with handwriting",
+  "🎬 🃏 كروت طايرة 3D": "🎬 🃏 Flying 3D cards",
+  "🎬 💥 انفجار كوميكس": "🎬 💥 Comic burst",
+  "🎬 ✨ الشخص بيتحول لنقط": "🎬 ✨ Person turns into dots",
+  "🎬 🔴 نيون ورا الشخص": "🎬 🔴 Neon behind the person"
 };

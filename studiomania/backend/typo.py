@@ -62,6 +62,17 @@ STUDIO_KINDS = {
     "chat": "فقاعات شات ورا بعض وقبل كل واحدة نقط الكتابة (لما بيحكي محادثة أو رسايل، من 3 لـ 9 كلمات)",
     "counter": "رقم بيعدّ من الصفر لحد قيمته بمؤشر منوّر (بس لما يكون فيه رقم في الكلام: فلوس، نسبة، عدد)",
 }
+STUDIO_KINDS.update({
+    "fill": "كلمة أو كلمتين عملاقين والصورة من الفيديو جواهم (للكلمة اللي هي موضوع الفيديو، من كلمة لـ 3 كلمات)",
+    "polaroid": "صورة بولارويد من الفيديو والكلام بخط إيد تحتها (للذكرى واللحظة والقصة، من 2 لـ 6 كلمات)",
+    "cards": "كروت ملونة طايرة في 3D كل كارت عليه جزء من الكلام (للعروض والخدمات والاختيارات، من 3 لـ 9 كلمات)",
+    "burst": "انفجار كوميكس برتقاني والكلمة بيضا بحدود سودا في النص (للحماس والصدمة والضحك، من كلمة لـ 2)",
+    "dots": "الشخص بيتحول لنقط منوّرة والكلام جنبه (للتكنولوجيا والذكاء الاصطناعي والتحول، من 2 لـ 6 كلمات، لما يكون فيه شخص)",
+    "neon": "كلمة أو كلمتين نيون أحمر منوّر ورا الشخص (للعنوان أو اسم المنتج، لما يكون فيه شخص)",
+})
+STILL_KINDS = {"fill", "polaroid", "cards"}
+# عناصر ستوديو اللي ممكن تتحط جنب حاجة في الفيديو (anchor)
+ANCHOR_STUDIO = {"stack", "tags", "ransom", "comments"}
 KINDS.update(STUDIO_KINDS)
 INTROS = {"track": ("", "flash", "card"), "spot": ("", "burst")}
 OUTROS = {"track": ("", "pixel", "wipe"), "spot": ("", "red", "white")}
@@ -102,11 +113,13 @@ BUILTIN_STYLES = {
                   "الكلام الشخصي والذكريات hand، والكلام عن نفسه أو فكرة في دماغه halo، وبداية فصل جديد floor",
                   "الجمل اللي فيها كلمتين مهمين stack جنب الشخص",
                   "الأرقام counter، والمحادثات chat، وردود الناس comments، والسفر route، والربط والتحليل board",
+                  "موضوع الفيديو fill، والذكرى polaroid، والعروض والاختيارات cards، والحماس burst، والتكنولوجيا dots، والعنوان ورا الشخص neon",
                   "الحاجة المختارة cube، والمضمون أو الممنوع lock، والإحساس القوي thermal، والتأمل shapes، والتصميم select، والخيال space",
                   "build وtype للجمل العادية الطويلة"],
         "kinds": {"behind": 2, "arc": 2, "artype": 2, "redword": 2, "signature": 1, "stack": 2, "tags": 1, "push": 1, "poster": 1,
                   "crt": 1, "ransom": 1, "halo": 1, "floor": 1, "hand": 1, "build": 1,
-                  "space": 1, "route": 1, "board": 1, "cube": 1, "comments": 1, "lock": 1, "thermal": 1, "shapes": 1, "select": 1, "chat": 1, "counter": 1},
+                  "space": 1, "route": 1, "board": 1, "cube": 1, "comments": 1, "lock": 1, "thermal": 1, "shapes": 1, "select": 1, "chat": 1, "counter": 1,
+                  "fill": 1, "polaroid": 1, "cards": 1, "burst": 1, "dots": 1, "neon": 1},
     },
     "pro": {
         "name": "⭐ احترافي (زي الفيديو المرجع)", "font": "SM Tajawal", "case": "lower", "grain": 0.12, "weight": 700, "pro": True,
@@ -140,7 +153,7 @@ BUILTIN_STYLES = {
 }
 
 PLAN_FORMAT = """{
-  "blocks": [{"from": 0, "to": 3, "kind": "pop | type | build | icon | letters | scatter | ring | behind | arc | artype | redword | signature | poster | stack | push | crt | ransom | halo | floor | hand | tags | space | route | board | cube | comments | lock | thermal | shapes | select | chat | counter", "theme": "light | dark | accent",
+  "blocks": [{"from": 0, "to": 3, "kind": "pop | type | build | icon | letters | scatter | ring | behind | arc | artype | redword | signature | poster | stack | push | crt | ransom | halo | floor | hand | tags | space | route | board | cube | comments | lock | thermal | shapes | select | chat | counter | fill | polaroid | cards | burst | dots | neon", "theme": "light | dark | accent",
               "text": "الكلام اللي يتكتب (من كلام الجمل دي بالظبط، ممكن تختصره لكلمة أو كلمتين في pop/icon/letters/scatter)",
               "focus": 0, "icon": "اسم ستيكر من المكتبة أو وصف قصير بالإنجليزي لأيقونة جديدة", "icons": ["..."], "letter": 1,
               "side": "اسم ستيكر/صورة كبيرة جنب الكلام في build أو فاضي",
@@ -173,7 +186,7 @@ def plan_messages(words: list[dict], style: dict, stickers: list[str], brief: st
     if style.get("studio"):
         pool = {k: v for k, v in KINDS.items() if k in STUDIO_KINDS or k in ("build", "type", "pop")}
     if not (person or {}).get("present"):   # من غير شخص: الحركات اللي محتاجاه مالهاش لازمة
-        pool = {k: v for k, v in pool.items() if k not in ("behind", "arc", "halo", "thermal")}
+        pool = {k: v for k, v in pool.items() if k not in ("behind", "arc", "halo", "thermal", "dots", "neon")}
     kinds = "\n".join(f"- {k}: {v}" for k, v in pool.items())
     rules = "\n".join(f"- {r}" for r in style.get("rules") or [])
     weights = ", ".join(f"{k}×{v}" for k, v in (style.get("kinds") or {}).items())
@@ -344,7 +357,7 @@ def studio_plan(words: list[dict], duration: float, person: dict | None = None) 
         ar = any(AR.search(words[i]["w"]) for i in sent)
         longest = lambda idx: max(idx, key=lambda i: len(words[i]["w"]))  # noqa: E731
         if n <= 2:
-            kind = "behind" if has and si % 2 == 0 else ("signature" if si == len(sents) - 1 else ("redword", "poster", "ransom")[si % 3])
+            kind = ("behind", "neon", "fill")[si % 3] if has and si % 2 == 0 else ("signature" if si == len(sents) - 1 else ("redword", "poster", "ransom", "burst", "fill")[si % 5])
             out.append({"from": sent[0], "to": sent[-1], "kind": kind, "sign": " ".join(words[i]["w"] for i in sent).strip(".,،؟?!")})
             continue
         head = sent[:1] if n < 6 else sent[:2]
@@ -363,9 +376,9 @@ def studio_plan(words: list[dict], duration: float, person: dict | None = None) 
             if ar and si % 4 == 1:
                 kind = "artype"
             elif has:
-                kind = ("arc", "stack", "halo", "tags", "cube", "hand", "push", "lock", "select")[si % 9] if len(mid) <= 6 else ("stack", "chat", "board", "comments", "hand")[si % 5]
+                kind = ("arc", "stack", "halo", "tags", "cube", "hand", "push", "lock", "select")[si % 9] if len(mid) <= 6 else ("stack", "chat", "board", "comments", "hand", "cards", "polaroid", "dots")[si % 8]
             else:
-                kind = ("redword", "stack", "crt", "push", "shapes", "floor", "space", "select", "lock")[si % 9] if len(mid) <= 6 else ("hand", "chat", "board", "space", "crt")[si % 5]
+                kind = ("redword", "stack", "crt", "push", "shapes", "floor", "space", "select", "lock")[si % 9] if len(mid) <= 6 else ("hand", "chat", "board", "space", "crt", "cards")[si % 6]
             out.append({"from": mid[0], "to": mid[-1], "kind": kind, "focus": mid.index(longest(mid))})
         if tail:
             last = si == len(sents) - 1
