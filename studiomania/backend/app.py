@@ -12955,6 +12955,19 @@ def typo_to_dict(pid: str, d: dict) -> dict:
             "sound": typo_sound(folder, d)}
 
 
+def typo_sfx_gain(f: Path) -> float:
+    """قد إيه نعلّي الكليكات: على قد علو الكلام (RMS) في أول دقيقة. الكلام العادي ≈ 0.03، والعالي جدًا ≈ 0.25."""
+    try:
+        raw = subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-i", str(f), "-t", "60", "-vn", "-ac", "1", "-ar", "8000", "-f", "s16le", "-"],
+                             capture_output=True, timeout=120).stdout
+        import numpy as np
+        a = np.frombuffer(raw, np.int16).astype(np.float32) / 32768
+        rms = float(np.sqrt((a ** 2).mean())) if len(a) else 0.03
+    except Exception:  # noqa: BLE001
+        rms = 0.03
+    return max(1.0, min(4.0, rms / 0.035))
+
+
 _has_audio_cache: dict[str, bool] = {}
 
 
@@ -13595,8 +13608,12 @@ def run_typo_render(pid: str, base: str, quality: str) -> None:
             sfx_in = nxt
         if audio_in is not None and sfx_in is not None:
             has_a = media_info(audio_path).has_audio
+            # الكليك على قد علو الفيديو: لو الكلام عالي (بودكاست/ريلز) الكليك بيعلى معاه، والكلام بيوطى شوية،
+            # وفي الآخر ليميتر عشان الصوت مايتكسرش (من غيره الكليك كان بيضيع تحت الكلام العالي)
+            g = typo_sfx_gain(audio_path) if has_a else 1.0
             fl = (fl + ";" if fl else f"[{inputs}:v]format=yuv420p[v];") + (
-                f"[{audio_in}:a][{sfx_in}:a]amix=inputs=2:duration=longest:normalize=0[a]" if has_a else f"[{sfx_in}:a]anull[a]")
+                f"[{audio_in}:a]volume=0.8[va];[{sfx_in}:a]volume={g:.2f}[fa];[va][fa]amix=inputs=2:duration=longest:normalize=0,alimiter=limit=0.95[a]"
+                if has_a else f"[{sfx_in}:a]anull[a]")
             cmd += ["-filter_complex", fl, "-map", "[v]", "-map", "[a]", "-c:a", "aac", "-b:a", "160k"]
         else:
             if fl:
