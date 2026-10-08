@@ -24,6 +24,13 @@ MODEL_URL = "https://storage.googleapis.com/mediapipe-models/image_segmenter/sel
 RVM_URL = "https://github.com/PeterL1n/RobustVideoMatting/releases/download/v1.0.0/rvm_mobilenetv3_fp32.onnx"
 
 
+def model_status(models_dir: Path) -> dict:
+    """إيه اللي موجود على السيرفر (للتشخيص): مكتبة موديل الفيديو وملفه، أو موديل الصور."""
+    f = models_dir / "rvm_mobilenetv3_fp32.onnx"
+    return {"video_lib": _has("onnxruntime"), "video_model": f.exists() and f.stat().st_size > 1_000_000,
+            "image_lib": _has("ai_edge_litert.interpreter")}
+
+
 def available() -> bool:
     return _has("onnxruntime") or _has("ai_edge_litert.interpreter")
 
@@ -308,7 +315,12 @@ def analyze(ffmpeg: str, src: Path, out_dir: Path, models_dir: Path, fps: int, d
             # وبعدين نعومة بكسل واحد بس عشان الحافة ماتبقاش مسننة
             # (في الأماكن اللي الموديل مش متأكد فيها، زي شعر غامق على خلفية غامقة، القرار بيتاخد على متوسط اللي حواليه:
             # حافة واحدة ناعمة بدل نقط رمادي متبعترة)
-            a = _box((_box(mat.alpha(rgb), max(2, mw // 240)) > 0.45).astype(np.float32), 1)
+            # 4) ذاكرة للقرار (hysteresis): النقطة بتتغير من شخص لخلفية أو العكس بس لما الموديل يبقى متأكد (فوق 0.55 أو تحت 0.35)؛
+            #    في النص بتفضل زي ما كانت في الفريم اللي قبله، فالحافة في الأماكن المشكوك فيها ماترمشش
+            pha = _box(mat.alpha(rgb), max(2, mw // 240))
+            hard = pha > 0.45 if prev_a is None else np.where(pha > 0.55, True, np.where(pha < 0.35, False, prev_a))
+            prev_a = hard
+            a = _box(hard.astype(np.float32), 1)
         else:
             m256 = seg.mask(rgb)
             p = np.asarray(Image.fromarray(m256.astype(np.float32)).resize((mw, mh), Image.BILINEAR), dtype=np.float32)
@@ -316,12 +328,14 @@ def analyze(ffmpeg: str, src: Path, out_dir: Path, models_dir: Path, fps: int, d
             # 1) الحواف على الصورة الحقيقية، و2) حافة حادة (من غير هالة ضبابية حوالين الشعر)
             a = np.clip((guided(gray, p, r) - 0.5) * 6 + 0.5, 0, 1)
         # 3) ثبات بين الفريمات (موديل الصور بس؛ موديل الفيديو ثابت لوحده): اللي مااتحركش بياخد من الفريم اللي قبله
-        if seg is not None and prev_a is not None:
+        if seg is not None and prev_a is not None and prev_g is not None:
             # الرعشة فرق صغير في الحافة: ده بس اللي بيتنعّم. الحركة الحقيقية (فرق كبير أو الصورة اتغيرت) بتاخد الفريم الجديد على طول من غير ديل
             move = _box(np.abs(gray - prev_g), 3)
             k = np.where((np.abs(a - prev_a) < 0.35) & (move < 0.04), 0.5, 1.0)
             a = a * k + prev_a * (1 - k)
-        prev_a, prev_g = a, gray
+        if seg is not None:
+            prev_a = a
+        prev_g = gray
         a = fill_holes(a)
         # 32 درجة شفافية بس: الفرق مش باين في الحافة، والملف بيصغر للنص تقريبًا
         q8 = (np.round(a * 31) * (255 / 31)).astype(np.uint8)
@@ -336,7 +350,7 @@ def analyze(ffmpeg: str, src: Path, out_dir: Path, models_dir: Path, fps: int, d
         if on_step and i % fps == 0:
             on_step(i // fps, int(dur))
     proc.wait(timeout=60)
-    info = {"fps": fps, "n": i, "sw": sw, "sh": sh, "mw": mw, "frames": frames}
+    info = {"fps": fps, "n": i, "sw": sw, "sh": sh, "mw": mw, "model": "video" if mat is not None else "image", "frames": frames}
     (out_dir / "person.json").write_text(json.dumps(info), encoding="utf-8")
     return info
 
@@ -354,4 +368,4 @@ def summary(info: dict | None) -> dict:
     cover = float(np.median([f["cover"] for f in have]))
     side = "left" if hx < 0.4 else "right" if hx > 0.6 else "center"
     return {"present": True, "head_x": round(hx, 2), "head_y": round(hy, 2), "cover": round(cover, 2), "side": side,
-            "share": round(len(have) / len(fr), 2)}
+            "share": round(len(have) / len(fr), 2), "model": info.get("model", "image")}

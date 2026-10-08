@@ -135,6 +135,9 @@ function tySceneView(v, busy) {
     <p class="hint">البرنامج بيشوف الحاجات اللي في الكادر (صورة، ورقة، شاشة، وش...) وأماكنها وهي بتتحرك، عشان الكلام يتكتب جنبها أو عليها، والكلمة اللي بتشاور على حاجة (زي «me» وفيه صورتك) ما تتكتبش والحاجة نفسها تبقى مكانها. بيتعمل لوحده مع «🧠 وزّع».</p>
     <div class="row wrap"><button type="button" class="btn sm" data-tyscene ${busy ? "disabled" : ""}>👁️ ${an ? "حلّله من جديد" : "حلّل الفيديو"}</button>
       <label class="ty-check"><input type="checkbox" data-tyguides ${tyx.guides ? "checked" : ""}> اعرض أماكنها على المعاينة</label></div>
+    ${v.scene ? `<p class="hint">${!v.scene.person?.present ? "🧍 مفيش شخص ظاهر بوضوح في الفيديو"
+      : v.scene.person.model === "video" ? "🧍 الشخص اتقرا بموديل الفيديو ✓"
+      : "🧍 الشخص اتقرا بالموديل القديم (حلّل الفيديو تاني بعد تحديث السيرفر)"}</p>` : ""}
     ${an?.length ? `<div class="ty-anchors">${an.map((a) => `<figure class="ty-anchor" data-tyseek="${a.t0}">${a.thumb_url ? `<img src="${a.thumb_url}" alt="">` : ""}
       <figcaption><b>${a.id}</b> ${TY_AKINDS[a.kind] || a.kind}<small dir="ltr" data-no-i18n>${tye(a.label)}</small><small class="muted">${tyT(a.t0)} ← ${tyT(a.t1)}</small></figcaption></figure>`).join("")}</div>` : ""}
   </details>`;

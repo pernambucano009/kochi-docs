@@ -551,7 +551,9 @@ async def require_login(request: Request, call_next):
 
 @app.get("/health")
 def health():
-    return {"ok": True}
+    # رقم النسخة (من Railway) وموديل قراءة الشخص: عشان نعرف التحديث نزل ولا لأ من غير ما ندخل السيرفر
+    return {"ok": True, "build": (os.environ.get("RAILWAY_GIT_COMMIT_SHA") or "")[:7],
+            "person": person.model_status(Path(os.environ.get("PERSON_MODELS") or (DATA_DIR / "models")))}
 
 
 @app.get("/login")

@@ -3121,5 +3121,8 @@ window.I18N_EN = {
   "🎬 🃏 كروت طايرة 3D": "🎬 🃏 Flying 3D cards",
   "🎬 💥 انفجار كوميكس": "🎬 💥 Comic burst",
   "🎬 ✨ الشخص بيتحول لنقط": "🎬 ✨ Person turns into dots",
-  "🎬 🔴 نيون ورا الشخص": "🎬 🔴 Neon behind the person"
+  "🎬 🔴 نيون ورا الشخص": "🎬 🔴 Neon behind the person",
+  "🧍 مفيش شخص ظاهر بوضوح في الفيديو": "🧍 No person clearly visible in the video",
+  "🧍 الشخص اتقرا بموديل الفيديو ✓": "🧍 Person read with the video model ✓",
+  "🧍 الشخص اتقرا بالموديل القديم (حلّل الفيديو تاني بعد تحديث السيرفر)": "🧍 Person read with the old model (analyze the video again after the server update)"
 };
