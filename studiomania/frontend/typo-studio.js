@@ -252,7 +252,7 @@
       for (const ch of chars) {
         const cw = measure(ch, `800 ${sz}px ${f}`), aa = a + (off + cw / 2) / R;
         const x0 = cx + Math.cos(aa) * R, y0 = cy + Math.sin(aa) * R;
-        html += `<div style="position:absolute;left:${x0.toFixed(1)}px;top:${y0.toFixed(1)}px;transform:translate(-50%,-50%) rotate(${(aa + Math.PI / 2).toFixed(4)}rad) scale(${e.toFixed(3)});
+        html += `<div data-free style="position:absolute;left:${x0.toFixed(1)}px;top:${y0.toFixed(1)}px;transform:translate(-50%,-50%) rotate(${(aa + Math.PI / 2).toFixed(4)}rad) scale(${e.toFixed(3)});
           font:800 ${sz.toFixed(1)}px ${f};color:${i === b.focus ? (th.accent || RED) : inkOf(this, th)};white-space:pre;line-height:1;${shadow(this)}">${esc(ch)}</div>`;
         off += cw;
       }
@@ -731,7 +731,7 @@
       world += `<div dir="${this.dir(x.w)}" style="position:absolute;left:50%;top:45%;transform:translate(-50%,-50%) translate3d(${px.toFixed(1)}px,${py.toFixed(1)}px,${z.toFixed(1)}px) rotateY(${ry.toFixed(1)}deg);
         opacity:${a.toFixed(3)};font:800 ${sz.toFixed(1)}px ${famOf(x.w)};letter-spacing:-0.03em;white-space:nowrap;color:${focus ? th.accent || RED : inkOf(this, th)};${shadow(this)}">${esc(this.text(x.w))}</div>`;
     });
-    return backdrop(this, th) + `<div style="position:absolute;inset:0;perspective:${D.toFixed(0)}px;perspective-origin:50% 45%;overflow:hidden"><div style="position:absolute;inset:0;transform-style:preserve-3d">${world}</div></div>`;
+    return backdrop(this, th) + `<div data-free style="position:absolute;inset:0;perspective:${D.toFixed(0)}px;perspective-origin:50% 45%;overflow:hidden"><div style="position:absolute;inset:0;transform-style:preserve-3d">${world}</div></div>`;
   };
 
   // ---------- route
@@ -1294,9 +1294,9 @@
       const kk = eOut(seg(t, b.t0, split));
       const rot = lerp(-120, -20, kk), sc = lerp(1.6, 1.05, kk);
       html += `<div style="position:absolute;left:0;top:0;width:${(w * 0.42).toFixed(0)}px;height:${h}px;background:${PINK}"></div>
-        <div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) rotate(${rot.toFixed(1)}deg) scale(${sc.toFixed(3)});font:800 ${(mn * 1.05).toFixed(0)}px ${ff};line-height:.8;white-space:nowrap;color:${PINKD};mix-blend-mode:normal;
+        <div data-free dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) rotate(${rot.toFixed(1)}deg) scale(${sc.toFixed(3)});font:800 ${(mn * 1.05).toFixed(0)}px ${ff};line-height:.8;white-space:nowrap;color:${PINKD};mix-blend-mode:normal;
         -webkit-text-stroke:${(mn * 0.01).toFixed(1)}px #111">${esc(g)}</div>
-        <div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:${(w * 0.25).toFixed(0)}px;top:50%;transform:translate(-50%,-50%) rotate(-90deg);font:600 ${(mn * 0.14).toFixed(0)}px ${ff};color:#fff;opacity:${seg(t, b.t0 + dur * 0.15, b.t0 + dur * 0.25).toFixed(3)};white-space:nowrap;letter-spacing:-0.02em">${esc(ar ? s : s.toLowerCase())}</div>`;
+        <div data-free dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:${(w * 0.25).toFixed(0)}px;top:50%;transform:translate(-50%,-50%) rotate(-90deg);font:600 ${(mn * 0.14).toFixed(0)}px ${ff};color:#fff;opacity:${seg(t, b.t0 + dur * 0.15, b.t0 + dur * 0.25).toFixed(3)};white-space:nowrap;letter-spacing:-0.02em">${esc(ar ? s : s.toLowerCase())}</div>`;
     } else {
       const p = eBack(seg(t, split, split + 0.18));
       const sz = fitSize(s, `800 {}px ${ff}`, w * 0.7, mn * 0.13);
@@ -1325,7 +1325,7 @@
       const sz = mn * 0.55;
       for (let q = 3; q >= 0; q--) {
         const xx = x + q * mn * 0.06 * (1 - kk);
-        html += `<div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:${xx.toFixed(1)}px;top:50%;transform:translateY(-50%) perspective(${(mn * 2).toFixed(0)}px) rotateY(${lerp(-35, 10, kk).toFixed(1)}deg) rotateZ(${lerp(14, -6, kk).toFixed(1)}deg);
+        html += `<div data-free dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:${xx.toFixed(1)}px;top:50%;transform:translateY(-50%) perspective(${(mn * 2).toFixed(0)}px) rotateY(${lerp(-35, 10, kk).toFixed(1)}deg) rotateZ(${lerp(14, -6, kk).toFixed(1)}deg);
           font:800 ${sz.toFixed(0)}px ${ff};color:#fff;white-space:nowrap;opacity:${(q ? 0.22 : 1).toFixed(2)};filter:blur(${(q * 4 + (1 - kk) * 10).toFixed(1)}px)">${esc(big)}</div>`;
       }
     } else {
@@ -1339,7 +1339,7 @@
         r += `<div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) rotateY(${a.toFixed(1)}deg) translateZ(${R.toFixed(0)}px);font:500 ${rz.toFixed(1)}px ${ff};color:#fff;white-space:nowrap;
           opacity:${(0.25 + 0.55 * Math.max(0, Math.cos((a * Math.PI) / 180))).toFixed(2)};filter:blur(${(Math.max(0, -Math.cos((a * Math.PI) / 180)) * 2).toFixed(1)}px)">${esc(ar ? s : s.toLowerCase())}</div>`;
       }
-      html += `<div style="position:absolute;inset:0;perspective:${(mn * 1.6).toFixed(0)}px;opacity:${kk.toFixed(3)}"><div style="position:absolute;inset:0;transform-style:preserve-3d;transform:rotateX(-16deg)">${r}</div></div>`;
+      html += `<div data-free style="position:absolute;inset:0;perspective:${(mn * 1.6).toFixed(0)}px;opacity:${kk.toFixed(3)}"><div style="position:absolute;inset:0;transform-style:preserve-3d;transform:rotateX(-16deg)">${r}</div></div>`;
       const sz = fitSize(s, `800 {}px ${ff}`, w * 0.6, mn * 0.11);
       html += `<div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) rotate(-4deg) scale(${lerp(2.5, 1, kk).toFixed(3)});filter:blur(${((1 - kk) * 8).toFixed(1)}px);font:800 ${sz.toFixed(1)}px ${ff};color:#fff;white-space:nowrap">${esc(ar ? s : s.toLowerCase())}</div>`;
     }
@@ -1620,7 +1620,7 @@
       const t0 = b.t0 + i * 0.12;
       if (t < t0) return;
       const e = eOut(seg(t, t0, t0 + 0.3)), off = ((t - b.t0) * mn * 0.25 * dir) % (w * 0.8) - w * 0.4;
-      html += `<div style="position:absolute;left:${(-w * 0.3).toFixed(0)}px;width:${(w * 1.6).toFixed(0)}px;top:${y.toFixed(0)}px;transform:translateY(-50%) rotate(${rot}deg) scaleX(${e.toFixed(3)});background:${bg};overflow:hidden;height:${(sz * 1.35).toFixed(0)}px">
+      html += `<div data-free style="position:absolute;left:${(-w * 0.3).toFixed(0)}px;width:${(w * 1.6).toFixed(0)}px;top:${y.toFixed(0)}px;transform:translateY(-50%) rotate(${rot}deg) scaleX(${e.toFixed(3)});background:${bg};overflow:hidden;height:${(sz * 1.35).toFixed(0)}px">
         <div dir="ltr" style="position:absolute;left:${off.toFixed(1)}px;top:50%;transform:translateY(-50%);white-space:nowrap;font:400 ${sz.toFixed(1)}px ${cond(s)};color:${fg};letter-spacing:.02em">${rep}</div></div>`;
     });
     return html;

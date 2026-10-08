@@ -135,6 +135,7 @@
         if (this.doc.transparent) {
           this.stage.style.background = "transparent";
           this.stage.innerHTML = html + (this.showAnchors ? this.anchorGuides(t) : "");
+          this.fitFrame();
           return;
         }
       } else if (b) {
@@ -162,6 +163,50 @@
       this.stage.style.background = bg;
       this.stage.style.color = th.ink;
       this.stage.innerHTML = html;
+      this.fitFrame();
+    }
+
+    // أي سطر كلام طالع برّه الكادر (كلمة طويلة، ميلان، نطة): بيصغر ويدخل جوه بهامش صغير.
+    // الحاجات اللي طالعة برّه بالقصد (شرايط، حروف عملاقة بتلف، فراغ 3D) عليها data-free ومش بتتلمس.
+    fitFrame() {
+      const { w, h } = this.doc;
+      const st = this.stage.getBoundingClientRect();
+      if (!st.width) return;
+      const k = st.width / w, m = Math.min(w, h) * 0.03;
+      const lines = [...this.stage.querySelectorAll("*")].filter((el) => {
+        const ws = el.style?.whiteSpace;
+        if (ws !== "nowrap" && ws !== "pre") return false;
+        if (el.closest("[data-free]")) return false;
+        if (!el.textContent.trim()) return false;
+        // السطر الخارجي بس (مش كل حرف جواه)
+        let p = el.parentElement;
+        while (p && p !== this.stage) { if (p.style?.whiteSpace === "nowrap" || p.style?.whiteSpace === "pre") return false; p = p.parentElement; }
+        return true;
+      });
+      const box = (el) => {
+        const r = document.createRange();
+        r.selectNodeContents(el);
+        const b = r.getBoundingClientRect();
+        return { x0: (b.left - st.left) / k, x1: (b.right - st.left) / k, y0: (b.top - st.top) / k, y1: (b.bottom - st.top) / k };
+      };
+      for (const el of lines) {
+        let b = box(el);
+        const bw = b.x1 - b.x0, bh = b.y1 - b.y0;
+        if (!(bw > 0) || (b.x0 >= m && b.x1 <= w - m && b.y0 >= m * 0.5 && b.y1 <= h - m * 0.5)) continue;
+        const f = Math.min(1, (w - m * 2) / bw, (h - m) / bh);
+        const old = el.style.transform || "";
+        if (f < 0.999) {
+          // التصغير حوالين نص الكلام نفسه (مش نص الصندوق)
+          const r0 = el.getBoundingClientRect();
+          const ox = ((b.x0 + b.x1) / 2) - (r0.left - st.left) / k, oy = ((b.y0 + b.y1) / 2) - (r0.top - st.top) / k;
+          el.style.transformOrigin = `${ox.toFixed(1)}px ${oy.toFixed(1)}px`;
+          el.style.transform = `${old} scale(${f.toFixed(4)})`;
+          b = box(el);
+        }
+        const dx = b.x0 < m ? m - b.x0 : b.x1 > w - m ? w - m - b.x1 : 0;
+        const dy = b.y0 < m * 0.5 ? m * 0.5 - b.y0 : b.y1 > h - m * 0.5 ? h - m * 0.5 - b.y1 : 0;
+        if (dx || dy) el.style.transform = `translate(${dx.toFixed(1)}px,${dy.toFixed(1)}px) ${el.style.transform || ""}`;
+      }
     }
 
     vignette(th) {
