@@ -16,7 +16,7 @@ RUN if [ "$LOCAL_STT" = "1" ]; then pip install --no-cache-dir "faster-whisper>=
  && python -c "from faster_whisper import WhisperModel; WhisperModel('small', device='cpu', compute_type='int8', download_root='/opt/whisper')"; fi
 # موديل فصل الشخص عن الخلفية (16MB) بيتحمّل وقت البناء عشان أول فيديو مايستناش
 ENV PERSON_MODELS=/opt/models
-RUN mkdir -p /opt/models && python -c "import urllib.request; urllib.request.urlretrieve('https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_multiclass_256x256/float32/latest/selfie_multiclass_256x256.tflite', '/opt/models/selfie_multiclass_256x256.tflite')" || true
+RUN mkdir -p /opt/models && python -c "import urllib.request; urllib.request.urlretrieve('https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_multiclass_256x256/float32/latest/selfie_multiclass_256x256.tflite', '/opt/models/selfie_multiclass_256x256.tflite'); urllib.request.urlretrieve('https://github.com/PeterL1n/RobustVideoMatting/releases/download/v1.0.0/rvm_mobilenetv3_fp32.onnx', '/opt/models/rvm_mobilenetv3_fp32.onnx')" || true
 COPY backend backend
 COPY frontend frontend
 COPY fonts fonts

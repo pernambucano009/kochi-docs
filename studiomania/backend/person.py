@@ -4,11 +4,14 @@
 - صورة WebP شفافة للشخص لوحده (عشان الكلام يتحط وراه: الكلام تحت والشخص فوقه)
 - مكانه: الصندوق حوالين الجسم، ونص الراس ونص قطرها (عشان الكلام يتقوّس حوالين الراس أو يتحط جنبه)
 
-الموديل: MediaPipe selfie multiclass (256×256، بيشتغل على الـ CPU). بيتحمّل أول مرة بس.
+الموديل: RobustVideoMatting (MobileNetV3، ONNX على الـ CPU) لأنه بيفصل الفيديو وهو فاكر الفريمات اللي قبله؛
+ولو مش موجود: MediaPipe selfie multiclass (256×256). بيتحمّلوا أول مرة بس (أو وقت بناء السيرفر)، ومش جوه الكود.
+الرخص: RobustVideoMatting تحت GPL-3.0 (github.com/PeterL1n/RobustVideoMatting)، وMediaPipe تحت Apache-2.0.
 """
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import urllib.request
 from pathlib import Path
@@ -18,12 +21,57 @@ import numpy as np
 MODEL_URL = "https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_multiclass_256x256/float32/latest/selfie_multiclass_256x256.tflite"
 
 
+RVM_URL = "https://github.com/PeterL1n/RobustVideoMatting/releases/download/v1.0.0/rvm_mobilenetv3_fp32.onnx"
+
+
 def available() -> bool:
+    return _has("onnxruntime") or _has("ai_edge_litert.interpreter")
+
+
+def _has(mod: str) -> bool:
     try:
-        import ai_edge_litert.interpreter  # noqa: F401
+        __import__(mod)
         return True
     except Exception:  # noqa: BLE001
         return False
+
+
+class Matter:
+    """RobustVideoMatting (MobileNetV3): بيفصل الشخص في الفيديو وهو فاكر الفريمات اللي قبله،
+    فالحافة ثابتة من فريم لفريم ومفيهاش رعشة، وبيمسك الشعر أحسن بكتير من موديل الصور."""
+
+    def __init__(self, models_dir: Path):
+        import onnxruntime as ort
+
+        models_dir.mkdir(parents=True, exist_ok=True)
+        f = models_dir / "rvm_mobilenetv3_fp32.onnx"
+        if not f.exists() or f.stat().st_size < 1_000_000:
+            tmp = f.with_suffix(".part")
+            urllib.request.urlretrieve(RVM_URL, tmp)
+            tmp.replace(f)
+        so = ort.SessionOptions()
+        so.intra_op_num_threads = max(1, min(4, os.cpu_count() or 2))
+        self.sess = ort.InferenceSession(str(f), so, providers=["CPUExecutionProvider"])
+        self.rec = [np.zeros((1, 1, 1, 1), np.float32)] * 4
+
+    def alpha(self, rgb: np.ndarray, work: int = 720) -> np.ndarray:
+        """احتمال إن البكسل شخص (0..1) بنفس مقاس الصورة. الموديل بيشتغل على 720 بالعرض (أسرع)،
+        والنتيجة بتتكبّر ناعمة للمقاس الكامل قبل ما الحافة تتحسم."""
+        from PIL import Image
+
+        H0, W0 = rgb.shape[:2]
+        if W0 > work:
+            rgb = np.asarray(Image.fromarray(rgb).resize((work, max(2, int(work * H0 / W0 / 2 + 0.5) * 2)), Image.BILINEAR))
+        h, w = rgb.shape[:2]
+        # الموديل بيشتغل جوه على حوالي ربع ميجا بكسل (أدق من كده بيبطّأ من غير فرق باين)
+        ds = np.array([min(1.0, (250_000 / (w * h)) ** 0.5)], np.float32)
+        src = (rgb.astype(np.float32) / 255).transpose(2, 0, 1)[None]
+        out = self.sess.run(None, {"src": src, "r1i": self.rec[0], "r2i": self.rec[1], "r3i": self.rec[2], "r4i": self.rec[3], "downsample_ratio": ds})
+        self.rec = out[2:]
+        a = out[1][0, 0].astype(np.float32)
+        if a.shape != (H0, W0):
+            a = np.asarray(Image.fromarray(a).resize((W0, H0), Image.BILINEAR), dtype=np.float32)
+        return a
 
 
 def _model(models_dir: Path) -> Path:
@@ -220,7 +268,7 @@ def guided(gray: np.ndarray, p: np.ndarray, r: int, eps: float = 1e-3, s: int = 
 
 
 def analyze(ffmpeg: str, src: Path, out_dir: Path, models_dir: Path, fps: int, duration: float, width: int = 540,
-            on_step=None, max_seconds: float = 120, mask_width: int = 720) -> dict:
+            on_step=None, max_seconds: float = 120, mask_width: int = 1080) -> dict:
     """بيكتب out_dir/p_00000.webp (الشخص لوحده، 540) وm_00000.webp (شكل الشخص بس بدقة الفيديو، للكلام اللي وراه)
     ويرجّع {fps, n, sw, sh, mw, frames: [stats|None, ...]}."""
     from PIL import Image
@@ -228,14 +276,18 @@ def analyze(ffmpeg: str, src: Path, out_dir: Path, models_dir: Path, fps: int, d
     out_dir.mkdir(parents=True, exist_ok=True)
     for f in [*out_dir.glob("p_*.webp"), *out_dir.glob("m_*.webp")]:
         f.unlink()
-    seg = Segmenter(models_dir)
+    try:
+        mat, seg = Matter(models_dir), None
+    except Exception as exc:  # noqa: BLE001  (من غير onnxruntime أو الموديل: موديل الصور القديم)
+        print(f"person: video matting unavailable ({exc}), using image segmentation", flush=True)
+        mat, seg = None, Segmenter(models_dir)
     dur = min(duration, max_seconds)
     probe = subprocess.run([ffmpeg, "-hide_banner", "-i", str(src)], capture_output=True, text=True).stderr
     import re
     m = re.search(r"Video:.*?(\d{2,5})x(\d{2,5})", probe)
     sw, sh = (int(m.group(1)), int(m.group(2))) if m else (width, width)
     even = lambda v: max(2, int(v / 2 + 0.5) * 2)  # noqa: E731
-    # الماسك بدقة قريبة من الفيديو (لحد 720) عشان حواف الشعر ماتتغبّش لما تتكبّر في الكادر
+    # الماسك بدقة الفيديو نفسه (لحد 1080) عشان حواف الشعر ماتتغبّش لما تتكبّر في الكادر
     # الطول بنحسبه إحنا ونبعته لـ FFmpeg بالظبط: لو كل واحد قرّب بطريقة، الفريمات بتتقري مزاحة وبتبعد عن الشخص كل ما الفيديو يمشي
     mw = even(min(mask_width, sw))
     mh = even(mw * sh / sw)
@@ -251,13 +303,20 @@ def analyze(ffmpeg: str, src: Path, out_dir: Path, models_dir: Path, fps: int, d
             break
         rgb = np.frombuffer(buf, np.uint8).reshape(mh, mw, 3)
         gray = (rgb[..., 0] * 0.299 + rgb[..., 1] * 0.587 + rgb[..., 2] * 0.114).astype(np.float32) / 255
-        m256 = seg.mask(rgb)
-        p = np.asarray(Image.fromarray(m256.astype(np.float32)).resize((mw, mh), Image.BILINEAR), dtype=np.float32)
-        p = np.clip((p - 0.35) / 0.3, 0, 1)
-        # 1) الحواف على الصورة الحقيقية، و2) حافة حادة (من غير هالة ضبابية حوالين الشعر)
-        a = np.clip((guided(gray, p, r) - 0.5) * 6 + 0.5, 0, 1)
-        # 3) ثبات بين الفريمات: اللي مااتحركش بياخد من الفريم اللي قبله (مايرتعشش)، واللي اتحرك بيمشي مع الفريم الجديد على طول
-        if prev_a is not None:
+        if mat is not None:
+            # الحافة بتتشد شوية: الموديل في الشعر الغامق على خلفية غامقة بيسيب منطقة نص شفافة (هالة ضبابية)
+            # وبعدين نعومة بكسل واحد بس عشان الحافة ماتبقاش مسننة
+            # (في الأماكن اللي الموديل مش متأكد فيها، زي شعر غامق على خلفية غامقة، القرار بيتاخد على متوسط اللي حواليه:
+            # حافة واحدة ناعمة بدل نقط رمادي متبعترة)
+            a = _box((_box(mat.alpha(rgb), max(2, mw // 240)) > 0.45).astype(np.float32), 1)
+        else:
+            m256 = seg.mask(rgb)
+            p = np.asarray(Image.fromarray(m256.astype(np.float32)).resize((mw, mh), Image.BILINEAR), dtype=np.float32)
+            p = np.clip((p - 0.35) / 0.3, 0, 1)
+            # 1) الحواف على الصورة الحقيقية، و2) حافة حادة (من غير هالة ضبابية حوالين الشعر)
+            a = np.clip((guided(gray, p, r) - 0.5) * 6 + 0.5, 0, 1)
+        # 3) ثبات بين الفريمات (موديل الصور بس؛ موديل الفيديو ثابت لوحده): اللي مااتحركش بياخد من الفريم اللي قبله
+        if seg is not None and prev_a is not None:
             # الرعشة فرق صغير في الحافة: ده بس اللي بيتنعّم. الحركة الحقيقية (فرق كبير أو الصورة اتغيرت) بتاخد الفريم الجديد على طول من غير ديل
             move = _box(np.abs(gray - prev_g), 3)
             k = np.where((np.abs(a - prev_a) < 0.35) & (move < 0.04), 0.5, 1.0)
