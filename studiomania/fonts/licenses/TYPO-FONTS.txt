@@ -8,3 +8,7 @@ Typography section fonts (from Google Fonts):
 - TY-Urbanist-800.ttf: Urbanist, SIL Open Font License 1.1
 - TY-Gabarito-*.ttf: Gabarito, SIL Open Font License 1.1
 - TY-ReadexPro-700.ttf: Readex Pro, SIL Open Font License 1.1
+
+TY-Anton.ttf — Anton by Vernon Adams, SIL Open Font License 1.1 (Google Fonts)
+TY-DawningPen.ttf — Dawning of a New Day by Kimberly Geswein, SIL Open Font License 1.1 (Google Fonts)
+TY-PlexArabic-400/700.ttf — IBM Plex Sans Arabic by IBM, SIL Open Font License 1.1 (Google Fonts)

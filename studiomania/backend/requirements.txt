@@ -7,3 +7,4 @@ json-repair>=0.30
 Pillow>=10.0
 playwright>=1.45
 numpy>=1.26
+ai-edge-litert>=1.0  # فصل الشخص عن الخلفية في فيديوهات التايبوجرافي (موديل MediaPipe على الـ CPU)

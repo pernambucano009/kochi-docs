@@ -14,6 +14,9 @@ ARG LOCAL_STT=0
 ENV STT_LOCAL_DIR=/opt/whisper
 RUN if [ "$LOCAL_STT" = "1" ]; then pip install --no-cache-dir "faster-whisper>=1.0" \
  && python -c "from faster_whisper import WhisperModel; WhisperModel('small', device='cpu', compute_type='int8', download_root='/opt/whisper')"; fi
+# موديل فصل الشخص عن الخلفية (16MB) بيتحمّل وقت البناء عشان أول فيديو مايستناش
+ENV PERSON_MODELS=/opt/models
+RUN mkdir -p /opt/models && python -c "import urllib.request; urllib.request.urlretrieve('https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_multiclass_256x256/float32/latest/selfie_multiclass_256x256.tflite', '/opt/models/selfie_multiclass_256x256.tflite')" || true
 COPY backend backend
 COPY frontend frontend
 COPY fonts fonts

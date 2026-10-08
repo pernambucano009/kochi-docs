@@ -19,7 +19,7 @@ SR = 44100
 KINDS = ("click", "key", "typing")
 NAME = re.compile(r"^(click|key|typing)_[A-Za-z0-9_-]{1,40}\.wav$")
 # الحركات اللي هي كتابة رسالة
-TYPING_KINDS = {"type"}
+TYPING_KINDS = {"type", "artype"}
 
 
 def kind_of(name: str) -> str | None:

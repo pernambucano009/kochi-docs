@@ -67,6 +67,7 @@ import typo  # noqa: E402  (التايبوجرافي)
 import concepts  # noqa: E402  (قاموس المعاني: كلمة ← أيقونة)
 import stt_local  # noqa: E402  (تفريغ على السيرفر من غير خدمة برّه)
 import sfx  # noqa: E402  (الأصوات الرسمية: كليكات وكيبورد)
+import person  # noqa: E402  (قراءة الشخص في الفيديو: فصله ومكان راسه)
 from auth import SESSION_COOKIE, SESSION_DAYS, Auth  # noqa: E402
 
 MAX_CLIP_SECONDS = 15.0
@@ -13186,7 +13187,10 @@ def run_typo_plan(pid: str) -> None:
         style = d.get("style") or ""
         typo_set(pid, step="📖 بيدوّر في القاموس على أيقونات للكلام")
         hits = dict_hits([w["w"] for w in words], bool(smart))
-        if not smart and pro:
+        studio = bool(typo_style(d.get("style")).get("studio"))
+        if not smart and studio:
+            blocks = typo.studio_plan(words, dur, (d.get("scene") or {}).get("person"))
+        elif not smart and pro:
             blocks = typo.pro_plan(words, dur, [x["id"] for x in items[:4]],
                                    pick=lambda idxs: concepts.icons_for(idxs, hits, items, style))
         elif not smart:
@@ -13196,11 +13200,12 @@ def run_typo_plan(pid: str) -> None:
                 blocks[1].update(kind="anchor", anchor=spot["id"], place="auto", skip=len(blocks[1]["words"]) - 1)
         else:
             st = typo_style(d.get("style"))
-            raw = ad_json(series_chat(typo.plan_messages(words, st, [s["name"] for s in items], d.get("brief") or "", anchors)), "خطة التايبوجرافي")
+            raw = ad_json(series_chat(typo.plan_messages(words, st, [s["name"] for s in items], d.get("brief") or "", anchors,
+                                                         (d.get("scene") or {}).get("person"))), "خطة التايبوجرافي")
             blocks = typo.clean_plan(raw, words, dur, pro)
         ids = {a["id"] for a in anchors or []}
         for b in blocks:
-            if b["kind"] in ("pop", "ring", "letters", "scatter"):   # دول ملو الشاشة: مش جنب حاجة
+            if b["kind"] in ("pop", "ring", "letters", "scatter", *typo.STUDIO_KINDS):   # دول ملو الشاشة أو على الشخص: مش جنب حاجة
                 b["anchor"] = ""
             if b.get("anchor") not in ids:
                 b["anchor"] = ""
@@ -13303,8 +13308,25 @@ def typo_analyze(pid: str) -> list[dict]:
         bright = sum(raw) / max(1, len(raw))
     except Exception:  # noqa: BLE001
         pass
-    typo_update(pid, lambda x: x.update(scene={"anchors": anchors, "bright": round(bright, 1), "at": now()}))
+    pinfo = typo_person(pid, src, dur)
+    typo_update(pid, lambda x: x.update(scene={"anchors": anchors, "bright": round(bright, 1), "at": now(),
+                                               "person": person.summary(pinfo)}))
     return anchors
+
+
+def typo_person(pid: str, src: Path, dur: float) -> dict | None:
+    """🧍 الشخص في كل فريم: صورة شفافة ليه لوحده ومكان راسه (للكلام اللي ورا الشخص أو حوالين راسه). من غير المكتبة بيتخطى."""
+    if not person.available():
+        return None
+    folder = TYPO_PROJ / pid / "person"
+    try:
+        typo_set(pid, step="🧍 بيقرا الشخص اللي في الفيديو (بيفصله عن الخلفية)")
+        return person.analyze(ffmpeg_exe(), src, folder, Path(os.environ.get("PERSON_MODELS") or (DATA_DIR / "models")), TYPO_FPS, dur,
+                              on_step=lambda a, b: typo_set(pid, step=f"🧍 بيقرا الشخص: {a} من {b} ثانية"))
+    except Exception as exc:  # noqa: BLE001  (من غير الشخص الحركات بتشتغل في نص الكادر)
+        print(f"typo person {pid}: {exc}", flush=True)
+        shutil.rmtree(folder, ignore_errors=True)
+        return None
 
 
 @app.post("/api/typo/{pid}/scene")
@@ -13399,7 +13421,24 @@ def typo_doc(pid: str, d: dict) -> dict:
                 {"t": kk["t"], "box": [round((kk["box"][0] * sw * k - ox) / W, 4), round((kk["box"][1] * sh * k - oy) / H, 4),
                                        round((kk["box"][2] * sw * k - ox) / W, 4), round((kk["box"][3] * sh * k - oy) / H, 4)]}
                 for kk in a["keys"]]}
-    return {"w": W, "h": H, "fps": TYPO_FPS, "anchors": anchors, "duration": d.get("duration") or (blocks[-1]["t1"] if blocks else 1),
+    pdoc = None
+    pj = TYPO_PROJ / pid / "person" / "person.json"
+    if kind == "source" and pj.exists():
+        try:
+            pi = json.loads(pj.read_text(encoding="utf-8"))
+            sw, sh = pi["sw"], pi["sh"]
+            k = max(W / sw, H / sh)
+            ox, oy = (sw * k - W) / 2, (sh * k - H) / 2
+            fx = lambda v: round(v * sw * k - ox, 1)  # noqa: E731
+            fy = lambda v: round(v * sh * k - oy, 1)  # noqa: E731
+            pdoc = {"fps": pi["fps"], "n": pi["n"], "base": f"/media/typo/projects/{pid}/person/p_",
+                    "img": {"x": -ox, "y": -oy, "w": sw * k, "h": sh * k},
+                    "frames": [{"box": [fx(f["box"][0]), fy(f["box"][1]), fx(f["box"][2]), fy(f["box"][3])],
+                                "head": [fx(f["head"][0]), fy(f["head"][1]), round(f["head"][2] * sw * k, 1)]} if f else None
+                               for f in pi["frames"]]}
+        except (OSError, ValueError, KeyError):
+            pdoc = None
+    return {"w": W, "h": H, "fps": TYPO_FPS, "anchors": anchors, "person": pdoc, "dim": float((d.get("bg") or {}).get("dim") or 0), "duration": d.get("duration") or (blocks[-1]["t1"] if blocks else 1),
             "style": {**{k: st.get(k) for k in ("font", "case", "grain", "weight", "light", "dark", "accent")},
                       "moments": {**(st.get("moments") or {}), **(d.get("fonts") or {})}},
             "transparent": kind != "theme", "blocks": blocks}

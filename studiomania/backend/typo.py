@@ -32,6 +32,15 @@ PRO_KINDS = {
             "(لآخر الجملة/السؤال/الخلاصة، من كلمة لـ 4 كلمات، وبيستنى لحد ما الجملة الجاية تبدأ)",
 }
 KINDS.update(PRO_KINDS)
+# عناصر ستوديو (frontend/typo-studio.js): متاخدة من الفيديوهات المرجعية، وبتقرا الشخص اللي في الفيديو
+STUDIO_KINDS = {
+    "behind": "كلمة أو كلمتين عملاقين ورا الشخص (الشخص قدام الكلام). للهوك والكلمة الأقوى، بس لما يكون فيه شخص في الفيديو",
+    "arc": "الكلام متقوّس حوالين راس الشخص كلمة كلمة، والكلمة المهمة (focus) حمرا وأكبر (من 2 لـ 5 كلمات، لما يكون فيه شخص)",
+    "artype": "سطر بيتكتب حرف حرف بمؤشر برتقاني، ونقطة برتقاني وخط متعرج على الكلمة المهمة (focus). ممتاز للعربي وللرسايل والأسئلة",
+    "redword": "كلمة واحدة بس في النص حمرا ومنوّرة، بتتبدل مع كل كلمة بتتقال (للجمل المؤثرة واللحظات الجد، من 1 لـ 6 كلمات)",
+    "signature": "إمضا بتتكتب بقلم رفيع بخط الإيد ومعاها خطوط قلم (لاسم، براند، توقيع، أو كلمة الختام). sign = الكلمة أو الكلمتين اللي يتكتبوا",
+}
+KINDS.update(STUDIO_KINDS)
 INTROS = {"track": ("", "flash", "card"), "spot": ("", "burst")}
 OUTROS = {"track": ("", "pixel", "wipe"), "spot": ("", "red", "white")}
 # لغة الستايل: الاختيارات اللي بتخلّي كل لقطة مختلفة وهي من نفس العيلة
@@ -59,6 +68,17 @@ THEMES = ("light", "dark", "accent")
 
 # الستايل اللي اتطلّع من فيديو المرجع (أبيض رمادي / أسود / أحمر، وكارت أصفر للكلمة الكبيرة)
 BUILTIN_STYLES = {
+    "studio": {
+        "name": "🎬 ستوديو (عناصر الفيديوهات المرجعية)", "font": "SM Tajawal", "case": "none", "grain": 0.06, "weight": 700, "studio": True,
+        "light": {"bg": "#F4EFE9", "ink": "#121A2E", "accent": "#E5261F"},
+        "dark": {"bg": "#0E0E10", "ink": "#F4F4F2", "accent": "#E5261F"},
+        "accent": {"bg": "#E5261F", "ink": "#FFFFFF", "accent": "#121A2E"},
+        "rules": ["لو فيه شخص في الفيديو: أول كلمة أو كلمتين في الهوك behind، والجمل اللي بتتقال وهو بيتكلم arc حوالين راسه",
+                  "الكلام العربي والأسئلة والرسايل artype", "الجمل المؤثرة والجد redword",
+                  "الأسماء والبراند والختام signature", "غيّر بين العناصر ومتكررش نفس العنصر أكتر من مرتين ورا بعض",
+                  "build وtype للجمل العادية الطويلة"],
+        "kinds": {"behind": 2, "arc": 3, "artype": 2, "redword": 2, "signature": 1, "build": 1},
+    },
     "pro": {
         "name": "⭐ احترافي (زي الفيديو المرجع)", "font": "SM Tajawal", "case": "lower", "grain": 0.12, "weight": 700, "pro": True,
         "light": {"bg": "#ECEBE8", "ink": "#191716", "accent": "#E0261F"},
@@ -91,7 +111,7 @@ BUILTIN_STYLES = {
 }
 
 PLAN_FORMAT = """{
-  "blocks": [{"from": 0, "to": 3, "kind": "pop | type | build | icon | letters | scatter | ring", "theme": "light | dark | accent",
+  "blocks": [{"from": 0, "to": 3, "kind": "pop | type | build | icon | letters | scatter | ring | behind | arc | artype | redword | signature", "theme": "light | dark | accent",
               "text": "الكلام اللي يتكتب (من كلام الجمل دي بالظبط، ممكن تختصره لكلمة أو كلمتين في pop/icon/letters/scatter)",
               "focus": 0, "icon": "اسم ستيكر من المكتبة أو وصف قصير بالإنجليزي لأيقونة جديدة", "icons": ["..."], "letter": 1,
               "side": "اسم ستيكر/صورة كبيرة جنب الكلام في build أو فاضي",
@@ -115,11 +135,17 @@ def anchors_text(anchors: list[dict]) -> str:
     return "\n".join(out)
 
 
-def plan_messages(words: list[dict], style: dict, stickers: list[str], brief: str, anchors: list[dict] | None = None) -> list[dict]:
+def plan_messages(words: list[dict], style: dict, stickers: list[str], brief: str, anchors: list[dict] | None = None,
+                  person: dict | None = None) -> list[dict]:
     """الموديل بيقسم الكلام (كل كلمة برقمها ووقتها) على بلوكات، ولكل بلوك حركة وأيقونات.
     لو فيه فيديو متحلّل: بيشوف المراسي (الحاجات اللي في الكادر وأماكنها) وبيدمج الكلام معاها."""
     pro = bool(style.get("pro"))
-    kinds = "\n".join(f"- {k}: {v}" for k, v in (PRO_KINDS if pro else {k: v for k, v in KINDS.items() if k not in PRO_KINDS}).items())
+    pool = PRO_KINDS if pro else {k: v for k, v in KINDS.items() if k not in PRO_KINDS}
+    if style.get("studio"):
+        pool = {k: v for k, v in KINDS.items() if k in STUDIO_KINDS or k in ("build", "type", "pop")}
+    if not (person or {}).get("present"):   # من غير شخص: الحركات اللي محتاجاه مالهاش لازمة
+        pool = {k: v for k, v in pool.items() if k not in ("behind", "arc")}
+    kinds = "\n".join(f"- {k}: {v}" for k, v in pool.items())
     rules = "\n".join(f"- {r}" for r in style.get("rules") or [])
     weights = ", ".join(f"{k}×{v}" for k, v in (style.get("kinds") or {}).items())
     text = (
@@ -140,6 +166,8 @@ def plan_messages(words: list[dict], style: dict, stickers: list[str], brief: st
            "- type/build/icon ممكن كمان تاخد anchor وplace عشان تتحط جنب الحاجة بدل نص الشاشة. pop/ring/letters/scatter ملو الشاشة من غير anchor.\n"
            "- ما تكتبش أبدًا فوق وش حد (المراسي اللي نوعها face): حط الكلام جنبه.\n"
            "- الخلفية هي الفيديو نفسه، فـ theme هنا بيحدد لون الكلام بس (dark = كلام فاتح).\n" if anchors else "")
+        + (f"\nفيه شخص ظاهر في الفيديو ({int(person.get('share', 1) * 100)}% من الوقت)، راسه حوالين x={person.get('head_x')} y={person.get('head_y')} "
+           "من الكادر: استخدم behind للكلمات القوية القصيرة (بتتكتب عملاقة وراه)، وarc للكلام اللي بيقوله وهو بيتكلم.\n" if (person or {}).get("present") else "")
         + "\nالكلام:\n" + words_text(words) + "\n\n"
         "القواعد:\n"
         "- from/to = أرقام الكلمات (من كام لكام، شامل). البلوكات ورا بعض وبتغطي كل الكلمات من غير ما تسيب ولا كلمة.\n"
@@ -275,6 +303,51 @@ def pro_plan(words: list[dict], duration: float, icons: list[str] | None = None,
                      *((k2, "") for k2 in VARIANTS)):
             b.setdefault(k, v)
     return timed(out, words, duration)
+
+
+def studio_plan(words: list[dict], duration: float, person: dict | None = None) -> list[dict]:
+    """ستوديو من غير موديل: كل جملة بتتقسم على عناصر الفيديوهات المرجعية على حسب طولها ولغتها، ووجود شخص في الفيديو."""
+    has = bool((person or {}).get("present"))
+    out = []
+    sents = sentences(words)
+    for si, sent in enumerate(sents):
+        n = len(sent)
+        ar = any(AR.search(words[i]["w"]) for i in sent)
+        longest = lambda idx: max(idx, key=lambda i: len(words[i]["w"]))  # noqa: E731
+        if n <= 2:
+            kind = "behind" if has and si % 2 == 0 else ("signature" if si == len(sents) - 1 else "redword")
+            out.append({"from": sent[0], "to": sent[-1], "kind": kind, "sign": " ".join(words[i]["w"] for i in sent).strip(".,،؟?!")})
+            continue
+        head = sent[:1] if n < 6 else sent[:2]
+        rest = sent[len(head):]
+        if has and si % 3 != 2:
+            out.append({"from": head[0], "to": head[-1], "kind": "behind"})
+        else:
+            rest = sent
+        tail = rest[-2:] if len(rest) >= 6 else []
+        mid = rest[: len(rest) - len(tail)]
+        if mid:
+            if ar or si % 3 == 1:
+                kind = "artype"
+            elif has:
+                kind = "arc" if len(mid) <= 5 else "build"
+            else:
+                kind = "redword" if si % 2 else "build"
+            out.append({"from": mid[0], "to": mid[-1], "kind": kind, "focus": mid.index(longest(mid))})
+        if tail:
+            last = si == len(sents) - 1
+            out.append({"from": tail[0], "to": tail[-1], "kind": "signature" if last else "redword",
+                        "sign": " ".join(words[i]["w"] for i in tail).strip(".,،؟?!")})
+    for b in out:
+        b.setdefault("theme", "light")
+        for k, v in (("text", ""), ("focus", -1), ("icon", ""), ("icons", []), ("letter", 1), ("side", ""), ("anchor", ""), ("place", "auto"),
+                     ("skip", -1), ("intro", ""), ("outro", ""), ("sign", ""), ("box", -1), ("redact", -1), ("marks", []),
+                     *((k2, "") for k2 in VARIANTS)):
+            b.setdefault(k, v)
+    return timed(out, words, duration)
+
+
+AR = re.compile(r"[\u0600-\u06FF]")
 
 
 def mock_plan(words: list[dict], duration: float) -> list[dict]:

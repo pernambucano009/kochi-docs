@@ -93,7 +93,9 @@
       const imgs = [...urls].map((u) => new Promise((res) => { const i = new Image(); i.onload = i.onerror = res; i.src = u; }));
       const pro = TypoEngine.FULL && (this.doc.blocks || []).some((b) => TypoEngine.FULL.has(b.kind));
       const mf = this.doc.style?.moments || {};
+      const studio = TypoEngine.STUDIO && (this.doc.blocks || []).some((b) => TypoEngine.STUDIO.has(b.kind));
       return Promise.all([TypoEngine.font(this.style.font), TypoEngine.font("SM Tajawal"), pro ? TypoEngine.momentFonts() : null,
+        studio ? TypoEngine.studioFonts() : null, studio && TypoEngine.momentFonts ? TypoEngine.momentFonts() : null,
         TypoEngine.font(mf.sans), TypoEngine.font(mf.sansAr), ...imgs]);
     }
 
@@ -126,7 +128,16 @@
         this.stage.innerHTML = this[`k_${b.kind}`](b, t, (t - b.t0) / Math.max(0.01, b.t1 - b.t0), th, i) + (this.showAnchors ? this.anchorGuides(t) : "");
         return;
       }
-      if (b) {
+      if (b && TypoEngine.STUDIO?.has(b.kind)) {
+        // عناصر ستوديو (typo-studio.js): بتقرا مكان الشخص، فمن غير زووم الكاميرا عشان الكلام يفضل مظبوط عليه
+        if (this.prefetchPerson) this.prefetchPerson(t);
+        html = this[`k_${b.kind}`](b, t, (t - b.t0) / Math.max(0.01, b.t1 - b.t0), th, i);
+        if (this.doc.transparent) {
+          this.stage.style.background = "transparent";
+          this.stage.innerHTML = html + (this.showAnchors ? this.anchorGuides(t) : "");
+          return;
+        }
+      } else if (b) {
         const k = (t - b.t0) / Math.max(0.01, b.t1 - b.t0);
         const box = this.anchorBox(b.anchor, t);
         if (box) {

@@ -4,6 +4,7 @@
 <body><div id="stage"></div>
 <script src="/typo-engine.js"></script>
 <script src="/typo-moments.js"></script>
+<script src="/typo-studio.js"></script>
 <script>
 // صفحة الرسم اللي السيرفر بيفتحها في المتصفح: بتجيب الخطة وتستنى الخطوط والصور، والسيرفر بينادي renderAt لكل فريم ويصوّر
 window.typoReady = (async () => {
@@ -11,7 +12,8 @@ window.typoReady = (async () => {
   const doc = await (await fetch(`/api/typo/${encodeURIComponent(id)}/doc`)).json();
   const eng = new TypoEngine(document.getElementById("stage"), doc);
   await eng.ready();
-  window.renderAt = (t) => eng.renderAt(t);
+  // بيستنى صورة الشخص (لو فيه) تتحمل قبل ما السيرفر يصوّر الفريم
+  window.renderAt = (t) => { eng.renderAt(t); return eng.settle ? eng.settle() : null; };
   eng.renderAt(0);
   return { w: doc.w, h: doc.h, duration: doc.duration };
 })();
