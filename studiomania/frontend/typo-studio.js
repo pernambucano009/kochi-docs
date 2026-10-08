@@ -39,7 +39,8 @@
     const p = this.doc.person;
     if (!p?.n) return null;
     const i = clamp(Math.round(t * p.fps), 0, p.n - 1);
-    return { i, url: `${p.base}${String(i).padStart(5, "0")}.webp`, st: p.frames?.[i] || null, img: p.img };
+    const n = String(i).padStart(5, "0");
+    return { i, url: `${p.base}${n}.webp`, murl: p.mbase ? `${p.mbase}${n}.webp` : "", st: p.frames?.[i] || null, img: p.img };
   };
   // الشخص لوحده فوق الكلام (نفس قص الفيديو ونفس التغميق)
   P.personLayer = function (t) {
@@ -56,9 +57,10 @@
     const a = this.personAt(t);
     if (!a || !this.doc.transparent) return inner + (a ? this.personLayer(t) : "");
     const { x, y, w, h } = a.img;
-    this._want = a.url;
-    const m = `linear-gradient(#000,#000) 0 0/100% 100% no-repeat, url(${a.url}) ${x.toFixed(1)}px ${y.toFixed(1)}px/${w.toFixed(1)}px ${h.toFixed(1)}px no-repeat`;
-    return `<img src="${a.url}" alt="" style="position:absolute;width:1px;height:1px;opacity:0">`
+    const src = a.murl || a.url;
+    this._want = src;
+    const m = `linear-gradient(#000,#000) 0 0/100% 100% no-repeat, url(${src}) ${x.toFixed(1)}px ${y.toFixed(1)}px/${w.toFixed(1)}px ${h.toFixed(1)}px no-repeat`;
+    return `<img src="${src}" alt="" style="position:absolute;width:1px;height:1px;opacity:0">`
       + `<div style="position:absolute;inset:0;-webkit-mask:${m};-webkit-mask-composite:xor;mask:${m};mask-composite:exclude">${inner}</div>`;
   };
   // الراس بالبكسل (لو مفيش شخص: نص الكادر من فوق شوية)
@@ -115,7 +117,7 @@
     for (let j = 0; j < 12; j++) {
       const i = clamp(Math.round(t * p.fps) + j, 0, p.n - 1);
       if (this._pc.has(i)) continue;
-      const im = new Image(); im.src = `${p.base}${String(i).padStart(5, "0")}.webp`; this._pc.set(i, im);
+      const im = new Image(); im.src = `${p.mbase || p.base}${String(i).padStart(5, "0")}.webp`; this._pc.set(i, im);
       if (this._pc.size > 240) this._pc.delete(this._pc.keys().next().value);
     }
   };

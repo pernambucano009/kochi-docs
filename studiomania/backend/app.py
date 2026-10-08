@@ -13465,6 +13465,8 @@ def typo_doc(pid: str, d: dict) -> dict:
                 best = max([f, *(f.get("others") or [])], key=seen)
                 return best if seen(best) > W * H * 0.01 else None
             pdoc = {"fps": pi["fps"], "n": pi["n"], "base": f"/media/typo/projects/{pid}/person/p_",
+                    # شكل الشخص بدقة الفيديو (للكلام اللي وراه)، لو التحليل اتعمل بالنسخة الجديدة
+                    "mbase": f"/media/typo/projects/{pid}/person/m_" if (pj.parent / "m_00000.webp").exists() else "",
                     "img": {"x": -ox, "y": -oy, "w": sw * k, "h": sh * k},
                     "frames": [{"box": [fx(f["box"][0]), fy(f["box"][1]), fx(f["box"][2]), fy(f["box"][3])],
                                 "head": [fx(f["head"][0]), fy(f["head"][1]), round(f["head"][2] * sw * k, 1)],
