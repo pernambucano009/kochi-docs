@@ -5,7 +5,10 @@ const tyx = { list: [], cur: null, stk: [], styles: [], view: "home", timer: nul
 const TY_KINDS = { track: "⭐ 🎬 كلام كبير على الخطوط", sign: "⭐ ✍️ سطر وإمضا", spot: "⭐ 🌟 نجمة وبقعة نور", pop: "💥 كلمة كبيرة", type: "⌨️ كتابة بمؤشر", build: "✨ كلمة كلمة", icon: "🖼️ كلمة وأيقونة", letters: "🔠 حرف بيتبدل بصورة", scatter: "🌪️ حروف بتتجمع", ring: "⭕ دايرة أيقونات", anchor: "📍 مندمج مع الفيديو",
   behind: "🎬 🧍 كلام عملاق ورا الشخص", arc: "🎬 🌙 كلام متقوّس حوالين الراس", artype: "🎬 ⌨️ كتابة بمؤشر برتقاني", redword: "🎬 🔴 كلمة حمرا واحدة", signature: "🎬 ✒️ إمضا بتتكتب",
   poster: "🎬 🟥 بوستر أحمر", stack: "🎬 📚 كومة كلام مايلة جنب الشخص", push: "🎬 ➡️ كلمة بتزق اللي قبلها", crt: "🎬 📺 شاشة قديمة وجلتش",
-  ransom: "🎬 ✂️ حروف مقصوصة", halo: "🎬 ⭕ دايرة حوالين الراس", floor: "🎬 🛣️ كلام على الأرض", hand: "🎬 🖊️ خط إيد بيرتعش", tags: "🎬 🏷️ كلمات على مربعات حمرا" };
+  ransom: "🎬 ✂️ حروف مقصوصة", halo: "🎬 ⭕ دايرة حوالين الراس", floor: "🎬 🛣️ كلام على الأرض", hand: "🎬 🖊️ خط إيد بيرتعش", tags: "🎬 🏷️ كلمات على مربعات حمرا",
+  space: "🎬 🌌 كلام في فراغ 3D", route: "🎬 ✈️ خريطة ومسار وطيارة", board: "🎬 🧵 لوحة تحقيق", cube: "🎬 🧊 مكعب سلكي حوالين الشخص",
+  comments: "🎬 💬 كومنتات على لوحة زجاج", lock: "🎬 🔒 كبسولة بقفل", thermal: "🎬 🌡️ كاميرا حرارية", shapes: "🎬 🎞️ أشكال فيلم بتترعش",
+  select: "🎬 🖱️ مربع تحديد وماوس", chat: "🎬 📱 فقاعات شات", counter: "🎬 🔢 رقم بيعدّ" };
 const TY_INTRO = { track: { "": "من غير افتتاح", flash: "⚡ افتتاح بفلاشات" }, spot: { "": "من غير فلاش", burst: "💛 فلاش أصفر قبلها" } };
 const TY_OUTRO = { track: { "": "من غير قفلة", pixel: "▦ تتكسّر بكسلات" }, spot: { "": "من غير قفلة", red: "🔴 فلاش أحمر في الآخر" } };
 const TY_PLACES = { auto: "📍 مكان الكلام: البرنامج يختار", left: "⬅️ شمالها", right: "➡️ يمينها", above: "⬆️ فوقها", below: "⬇️ تحتها", on: "📝 عليها" };
@@ -154,7 +157,7 @@ function tyBlockRow(v, b, i) {
     ${TY_INTRO[b.kind] || b.kind === "sign" ? `<div class="row wrap">
       ${TY_INTRO[b.kind] ? `<select data-tbf="intro">${Object.entries(TY_INTRO[b.kind]).map(([k, l]) => `<option value="${k}" ${k === (b.intro || "") ? "selected" : ""}>${l}</option>`).join("")}</select>
         <select data-tbf="outro">${Object.entries(TY_OUTRO[b.kind]).map(([k, l]) => `<option value="${k}" ${k === (b.outro || "") ? "selected" : ""}>${l}</option>`).join("")}</select>` : ""}
-      ${["sign", "spot", "arc", "artype", "stack", "halo"].includes(b.kind) ? `<label>الكلمة اللي عليها الضغط <select data-tbf="focus"><option value="-1">—</option>${(b.words || []).map((w, j) => `<option value="${j}" ${j === b.focus ? "selected" : ""}>${tye(w.w)}</option>`).join("")}</select></label>` : ""}
+      ${["sign", "spot", "arc", "artype", "stack", "halo", "space", "cube", "lock"].includes(b.kind) ? `<label>الكلمة اللي عليها الضغط <select data-tbf="focus"><option value="-1">—</option>${(b.words || []).map((w, j) => `<option value="${j}" ${j === b.focus ? "selected" : ""}>${tye(w.w)}</option>`).join("")}</select></label>` : ""}
       ${b.kind === "sign" || b.kind === "signature" ? `<label>الإمضا <input data-tbf="sign" value="${tye(b.sign || "")}" dir="auto" data-no-i18n></label>` : ""}
     </div>` : ""}
     <div class="row wrap"><label>المكتوب <input data-tbf="text" value="${tye(b.text)}" dir="auto" data-no-i18n></label>

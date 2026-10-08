@@ -49,6 +49,18 @@ STUDIO_KINDS = {
     "floor": "كلام نايم على الأرض بمنظور ومنوّر (لجملة هادية أو بداية فصل جديد، من 2 لـ 6 كلمات)",
     "hand": "خط إيد بيرتعش زي فيلم قديم بحواف خضرا وبنفسجي (للإحساس والذكريات والكلام الشخصي، من 2 لـ 8 كلمات)",
     "tags": "كلمات على مربعات حمرا تحت بعض في الناحية الفاضية جنب الشخص (لتعداد مميزات أو أسماء أو كلمات مفتاحية، من 2 لـ 5 كلمات). ممكن anchor وplace",
+    "space": "الكلام متوزع في فراغ 3D والكاميرا ماشية جواه كلمة كلمة (للخيال والمستقبل والأفكار الكتير، من 3 لـ 7 كلمات)",
+    "route": "خريطة نقط ومسار بيترسم وطيارة من مكان لمكان (للسفر والانتقال من حالة لحالة). أول كلمة = المكان الأول وآخر كلمة = التاني، "
+             "أو اكتب text بالشكل «القاهرة → دبي»",
+    "board": "لوحة تحقيق: ورق متدبّس وخيوط حمرا منوّرة بتوصل بينهم (لما بيربط أفكار أو يحلل أو يكشف سر، من 3 لـ 9 كلمات)",
+    "cube": "مكعب سلكي بيلف حوالين راس الشخص والكلام تحته (لما بيشاور على حاجة واحدة مختارة: «ده بالظبط»، من كلمة لـ 4 كلمات)",
+    "comments": "لوحة زجاج فيها كومنتات ناس بتطلع ورا بعض (لما بيتكلم عن ردود الناس أو الأسئلة اللي بتجيله، من 3 لـ 9 كلمات)",
+    "lock": "كبسولة فيها قفل بيتقفل على الكلمة المهمة (focus) والباقي تحتها (للحاجة الثابتة أو المضمونة أو الممنوعة، من كلمة لـ 4 كلمات)",
+    "thermal": "الشخص بألوان كاميرا حرارية والكلام بطباشير فوق راسه (للإحساس القوي: غضب، توتر، طاقة، من 2 لـ 6 كلمات، لما يكون فيه شخص)",
+    "shapes": "أشكال مرسومة بتترعش زي فيلم 16مم (دايرة وخطوط) والكلام في النص (للهدوء والتأمل والفلسفة، من 2 لـ 5 كلمات)",
+    "select": "الكلام جوه مربع تحديد زي برامج التصميم والماوس بيمسك الركن ويكبّره (للتصميم والتعديل والتكبير، من كلمة لـ 4 كلمات)",
+    "chat": "فقاعات شات ورا بعض وقبل كل واحدة نقط الكتابة (لما بيحكي محادثة أو رسايل، من 3 لـ 9 كلمات)",
+    "counter": "رقم بيعدّ من الصفر لحد قيمته بمؤشر منوّر (بس لما يكون فيه رقم في الكلام: فلوس، نسبة، عدد)",
 }
 KINDS.update(STUDIO_KINDS)
 INTROS = {"track": ("", "flash", "card"), "spot": ("", "burst")}
@@ -89,9 +101,12 @@ BUILTIN_STYLES = {
                   "التعداد tags أو push، والصدمة والعنوان poster، والغموض والتحذير crt، والمفاجأة ransom",
                   "الكلام الشخصي والذكريات hand، والكلام عن نفسه أو فكرة في دماغه halo، وبداية فصل جديد floor",
                   "الجمل اللي فيها كلمتين مهمين stack جنب الشخص",
+                  "الأرقام counter، والمحادثات chat، وردود الناس comments، والسفر route، والربط والتحليل board",
+                  "الحاجة المختارة cube، والمضمون أو الممنوع lock، والإحساس القوي thermal، والتأمل shapes، والتصميم select، والخيال space",
                   "build وtype للجمل العادية الطويلة"],
         "kinds": {"behind": 2, "arc": 2, "artype": 2, "redword": 2, "signature": 1, "stack": 2, "tags": 1, "push": 1, "poster": 1,
-                  "crt": 1, "ransom": 1, "halo": 1, "floor": 1, "hand": 1, "build": 1},
+                  "crt": 1, "ransom": 1, "halo": 1, "floor": 1, "hand": 1, "build": 1,
+                  "space": 1, "route": 1, "board": 1, "cube": 1, "comments": 1, "lock": 1, "thermal": 1, "shapes": 1, "select": 1, "chat": 1, "counter": 1},
     },
     "pro": {
         "name": "⭐ احترافي (زي الفيديو المرجع)", "font": "SM Tajawal", "case": "lower", "grain": 0.12, "weight": 700, "pro": True,
@@ -125,7 +140,7 @@ BUILTIN_STYLES = {
 }
 
 PLAN_FORMAT = """{
-  "blocks": [{"from": 0, "to": 3, "kind": "pop | type | build | icon | letters | scatter | ring | behind | arc | artype | redword | signature | poster | stack | push | crt | ransom | halo | floor | hand | tags", "theme": "light | dark | accent",
+  "blocks": [{"from": 0, "to": 3, "kind": "pop | type | build | icon | letters | scatter | ring | behind | arc | artype | redword | signature | poster | stack | push | crt | ransom | halo | floor | hand | tags | space | route | board | cube | comments | lock | thermal | shapes | select | chat | counter", "theme": "light | dark | accent",
               "text": "الكلام اللي يتكتب (من كلام الجمل دي بالظبط، ممكن تختصره لكلمة أو كلمتين في pop/icon/letters/scatter)",
               "focus": 0, "icon": "اسم ستيكر من المكتبة أو وصف قصير بالإنجليزي لأيقونة جديدة", "icons": ["..."], "letter": 1,
               "side": "اسم ستيكر/صورة كبيرة جنب الكلام في build أو فاضي",
@@ -158,7 +173,7 @@ def plan_messages(words: list[dict], style: dict, stickers: list[str], brief: st
     if style.get("studio"):
         pool = {k: v for k, v in KINDS.items() if k in STUDIO_KINDS or k in ("build", "type", "pop")}
     if not (person or {}).get("present"):   # من غير شخص: الحركات اللي محتاجاه مالهاش لازمة
-        pool = {k: v for k, v in pool.items() if k not in ("behind", "arc", "halo")}
+        pool = {k: v for k, v in pool.items() if k not in ("behind", "arc", "halo", "thermal")}
     kinds = "\n".join(f"- {k}: {v}" for k, v in pool.items())
     rules = "\n".join(f"- {r}" for r in style.get("rules") or [])
     weights = ", ".join(f"{k}×{v}" for k, v in (style.get("kinds") or {}).items())
@@ -340,14 +355,17 @@ def studio_plan(words: list[dict], duration: float, person: dict | None = None) 
             rest = sent
         tail = rest[-2:] if len(rest) >= 6 else []
         mid = rest[: len(rest) - len(tail)]
+        if mid and any(re.search(r"[\d٠-٩]", words[i]["w"]) for i in mid):
+            out.append({"from": mid[0], "to": mid[-1], "kind": "counter"})
+            mid = []
         if mid:
             # بيلف على العناصر عشان كل جملة تبقى شكل مختلف
             if ar and si % 4 == 1:
                 kind = "artype"
             elif has:
-                kind = ("arc", "stack", "halo", "tags", "hand", "push")[si % 6] if len(mid) <= 6 else ("stack", "hand", "build")[si % 3]
+                kind = ("arc", "stack", "halo", "tags", "cube", "hand", "push", "lock", "select")[si % 9] if len(mid) <= 6 else ("stack", "chat", "board", "comments", "hand")[si % 5]
             else:
-                kind = ("redword", "stack", "crt", "push", "hand", "floor")[si % 6] if len(mid) <= 6 else ("hand", "build", "crt")[si % 3]
+                kind = ("redword", "stack", "crt", "push", "shapes", "floor", "space", "select", "lock")[si % 9] if len(mid) <= 6 else ("hand", "chat", "board", "space", "crt")[si % 5]
             out.append({"from": mid[0], "to": mid[-1], "kind": kind, "focus": mid.index(longest(mid))})
         if tail:
             last = si == len(sents) - 1

@@ -3104,5 +3104,16 @@ window.I18N_EN = {
   "🎬 🛣️ كلام على الأرض": "🎬 🛣️ Text on the floor",
   "🎬 🖊️ خط إيد بيرتعش": "🎬 🖊️ Shaky handwriting",
   "🎬 🏷️ كلمات على مربعات حمرا": "🎬 🏷️ Words on red tags",
-  "🎬 ستوديو (عناصر الفيديوهات المرجعية)": "🎬 Studio (reference video elements)"
+  "🎬 ستوديو (عناصر الفيديوهات المرجعية)": "🎬 Studio (reference video elements)",
+  "🎬 🌌 كلام في فراغ 3D": "🎬 🌌 Words in 3D space",
+  "🎬 ✈️ خريطة ومسار وطيارة": "🎬 ✈️ Map, route and plane",
+  "🎬 🧵 لوحة تحقيق": "🎬 🧵 Investigation board",
+  "🎬 🧊 مكعب سلكي حوالين الشخص": "🎬 🧊 Wire cube around the person",
+  "🎬 💬 كومنتات على لوحة زجاج": "🎬 💬 Comments on a glass panel",
+  "🎬 🔒 كبسولة بقفل": "🎬 🔒 Lock capsule",
+  "🎬 🌡️ كاميرا حرارية": "🎬 🌡️ Thermal camera",
+  "🎬 🎞️ أشكال فيلم بتترعش": "🎬 🎞️ Shaky film shapes",
+  "🎬 🖱️ مربع تحديد وماوس": "🎬 🖱️ Selection box and cursor",
+  "🎬 📱 فقاعات شات": "🎬 📱 Chat bubbles",
+  "🎬 🔢 رقم بيعدّ": "🎬 🔢 Counting number"
 };
