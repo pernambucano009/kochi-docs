@@ -189,6 +189,33 @@ function tyStatusOnly() {
     ${v.step ? `<small class="muted">${tye(v.step)}</small>` : ""}${v.error ? `<small class="err">${tye(v.error)}</small>` : ""}`;
 }
 
+// ⬆ رفع ملف بشريط تقدم ونسبة (الفيديو الطويل بياخد وقت، فلازم يبان إنه شغال)، والغلط بيظهر برسالة
+function tyUpload(url, file) {
+  return new Promise((resolve, reject) => {
+    const el = $("tyStatus");
+    const mb = (file.size / 1048576).toFixed(1);
+    const show = (pct) => {
+      if (el) el.innerHTML = `<span class="lab-st working"><span class="spin-inline"></span> ⬆ بيرفع ${tye(file.name)} (${mb} ميجا): ${pct}%</span>
+        <span class="bar" style="display:inline-block;width:160px;height:6px;border-radius:3px;background:rgba(127,127,127,.25);vertical-align:middle;overflow:hidden"><i style="display:block;height:100%;width:${pct}%;background:var(--accent,#3b82f6)"></i></span>`;
+    };
+    show(0);
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", url);
+    xhr.upload.onprogress = (e) => { if (e.lengthComputable) show(Math.round((e.loaded / e.total) * 100)); };
+    xhr.onload = () => {
+      let data = {};
+      try { data = JSON.parse(xhr.responseText); } catch { /* مش JSON */ }
+      if (xhr.status >= 200 && xhr.status < 300) { toast("✅ اترفع"); resolve(data); }
+      else reject(new Error(typeof data.detail === "string" ? data.detail : `الرفع فشل (${xhr.status})`));
+    };
+    xhr.onerror = () => reject(new Error("الرفع وقف: اتأكد من النت وجرب تاني"));
+    xhr.ontimeout = () => reject(new Error("الرفع خد وقت طويل جدًا: جرب فيديو أصغر"));
+    const fd = new FormData();
+    fd.append("file", file);
+    xhr.send(fd);
+  });
+}
+
 // 🔊 الصوت اللي هيبقى في الفيديو النهائي (عشان لو حاجة ناقصة تبان قبل ما تعمل الفيديو)
 function tySoundLine(sd) {
   if (!sd) return "";
@@ -520,19 +547,13 @@ $("tyMain").addEventListener("change", async (e) => {
     if (t.matches("[data-tyfont]")) return tyPatch({ fonts: { ...(v.fonts || {}), [t.dataset.tyfont]: t.value } });
     if (t.matches("[data-tybg]")) return tyPatch({ bg: { ...(v.bg || {}), [t.dataset.tybg]: t.dataset.tybg === "dim" ? Number(t.value) : t.value } });
     if (t.matches("[data-tybgfile]") && t.files[0]) {
-      const fd = new FormData();
-      fd.append("file", t.files[0]);
-      toast("⬆ بيرفع...");
-      tyx.cur = await api(TY(`/${v.id}/bg`), { method: "POST", body: fd });
+      tyx.cur = await tyUpload(TY(`/${v.id}/bg`), t.files[0]);
       tyx.force = true;
       return tyRender();
     }
     if (t.matches("[data-tysrc]") && t.files[0]) {
       if (v.blocks?.length && !confirm("ترفع ملف جديد؟ الكلام والحركات الحالية هيتبدلوا.")) return;
-      const fd = new FormData();
-      fd.append("file", t.files[0]);
-      toast("⬆ بيرفع...");
-      tyx.cur = await api(TY(`/${v.id}/source`), { method: "POST", body: fd });
+      tyx.cur = await tyUpload(TY(`/${v.id}/source`), t.files[0]);
       tyx.force = true;
       tyRender();
       return tyPoll();

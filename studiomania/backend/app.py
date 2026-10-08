@@ -13170,6 +13170,9 @@ def run_typo_transcribe(pid: str) -> None:
         d = typo_load(pid)
         folder = TYPO_PROJ / pid
         src = folder / d["source"]["file"]
+        if not typo_has_audio(src):
+            raise RuntimeError("الفيديو ده مفيهوش صوت، فمش هقدر أسمع الكلام. لو ده «الصورة بس» من المعمل ارفع الفيديو الأصلي، "
+                               "أو اكتب الكلام بنفسك وحط الفيديو خلفية")
         audio = TMP_DIR / f"typo_{pid}.m4a"
         subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src), "-vn", "-ac", "1", "-c:a", "aac", "-b:a", "96k", str(audio)],
                        check=True, capture_output=True, timeout=300)

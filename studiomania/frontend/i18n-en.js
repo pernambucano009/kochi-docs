@@ -3151,5 +3151,8 @@ window.I18N_EN = {
   "🔇 الأصوات الرسمية مقفولة": "🔇 Official sounds are off",
   "🔊 الأصوات الرسمية ({0} صوت)": "🔊 Official sounds ({0} sounds)",
   "⚠️ مكتبة الأصوات فاضية على السيرفر: ارفعها تاني من «🔊 الأصوات»": "⚠️ The sound library is empty on the server: upload it again from “🔊 Sounds”",
-  "🎬 🗣️ الكلام بيطلع من ورا الراس": "🎬 🗣️ Text comes out from behind the head"
+  "🎬 🗣️ الكلام بيطلع من ورا الراس": "🎬 🗣️ Text comes out from behind the head",
+  "✅ اترفع": "✅ Uploaded",
+  "الرفع وقف: اتأكد من النت وجرب تاني": "The upload stopped: check your connection and try again",
+  "الرفع خد وقت طويل جدًا: جرب فيديو أصغر": "The upload took too long: try a smaller video"
 };
