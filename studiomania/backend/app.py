@@ -102,9 +102,12 @@ for d in (RAW_DIR, CLIPS_DIR, COACHES_DIR, GENERATED_DIR, AUDIO_DIR, EXPORTS_DIR
 # الكابشن بيدوّر على الخطوط عن طريق fontconfig، والسيرفر (Railway) مفيهوش إعداداته خالص.
 # فبنعمل ملف إعدادات صغير يشاور على فولدر الخطوط بتاعنا، وكل أوامر FFmpeg بتستخدمه.
 FONTCONFIG_FILE = TMP_DIR / "fonts.conf"
+# خط الإيموجي الملوّن بتاع السيستم (عنصر الإيموجي في التايبوجرافي): فولدره بس، عشان باقي الخطوط تفضل بتاعتنا
+EMOJI_FONT_DIRS = sorted({str(f.parent) for d in ("/usr/share/fonts", "/usr/local/share/fonts") for f in Path(d).rglob("NotoColorEmoji*.ttf")}) if Path("/usr/share/fonts").exists() else []
 FONTCONFIG_FILE.write_text(
     '<?xml version="1.0"?>\n<!DOCTYPE fontconfig SYSTEM "fonts.dtd">\n<fontconfig>\n'
     f"  <dir>{xml_escape(str(FONTS_DIR))}</dir>\n"
+    + "".join(f"  <dir>{xml_escape(d)}</dir>\n" for d in EMOJI_FONT_DIRS) +
     f"  <cachedir>{xml_escape(str(TMP_DIR / 'fontcache'))}</cachedir>\n"
     "</fontconfig>\n",
     encoding="utf-8",
@@ -13636,7 +13639,7 @@ def typo_doc(pid: str, d: dict) -> dict:
         sent = next(([{"w": words[i]["w"], "t0": words[i]["s"], "t1": words[i]["e"]} for i in range(sn[0], sn[-1] + 1)]
                      for sn in sents if sn[0] <= b.get("from", 0) <= sn[-1]), None)
         blocks.append({**{k: b.get(k) for k in ("t0", "t1", "kind", "theme", "text", "words", "focus", "letter", "anchor", "place", "skip",
-                                                 "intro", "outro", "sign", "box", "redact", "marks", "mx", "my", "ms", *typo.VARIANTS)}, "sent": sent,
+                                                 "intro", "outro", "sign", "box", "redact", "marks", "mx", "my", "ms", "trans", *typo.VARIANTS)}, "sent": sent,
                        "icon": img(b.get("icon")), "side": img(b.get("side")), "icons": [u for u in (img(i) for i in b.get("icons") or []) if u]})
     # الحركات اللي محتاجة صورة من الفيديو نفسه (الصورة جوه الحروف، البولارويد، الكروت): لقطة من نص البلوك
     srcf = (d.get("source") or {})

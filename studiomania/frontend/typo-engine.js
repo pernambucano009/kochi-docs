@@ -137,6 +137,7 @@
           this.stage.style.background = "transparent";
           this.stage.innerHTML = html + (this.showAnchors ? this.anchorGuides(t) : "");
           this.fitFrame();
+          if (this.applyTrans) this.applyTrans(b, t, i);
           return;
         }
       } else if (b) {
@@ -165,6 +166,7 @@
       this.stage.style.color = th.ink;
       this.stage.innerHTML = html;
       this.fitFrame();
+      if (b && TypoEngine.STUDIO?.has(b.kind) && this.applyTrans) this.applyTrans(b, t, i);
     }
 
     // أي سطر كلام طالع برّه الكادر (كلمة طويلة، ميلان، نطة): بيصغر ويدخل جوه بهامش صغير.

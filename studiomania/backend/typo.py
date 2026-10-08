@@ -100,7 +100,26 @@ STUDIO_KINDS.update({
     "prompt": "مربع كتابة بتاع ذكاء اصطناعي منوّر والكلام بيتكتب فيه وزرار الإرسال (للذكاء الاصطناعي والأسئلة والطلبات، من 3 لـ 12 كلمة)",
     "spread": "الكلام متفرّق كلمة كلمة في أماكن مختلفة من الكادر وبيفضل، والكلمة المهمة (focus) أكبر وملونة (للأفكار المتلخبطة والتأمل، من 4 لـ 9 كلمات)",
 })
-STILL_KINDS = {"fill", "polaroid", "cards", "stories", "post", "tiles"}
+STUDIO_KINDS.update({
+    "serif": "كلام عريض والكلمة المهمة (focus) بخط سيريف مايل ملوّن جنبه (لجملة أنيقة فيها كلمة مميزة: «real edits»، من 2 لـ 6 كلمات)",
+    "chalk": "سبورة متعلقة والكلام بيتكتب عليها بالطباشير حرف حرف (للشرح والدرس والنصيحة، من 3 لـ 10 كلمات)",
+    "ticket": "تذكرة سينما بحروف مقطّعة والكلام عليها (للعروض والدعوات والأحداث والأسعار، من 1 لـ 4 كلمات)",
+    "frame": "برواز دهب فخم فيه الكلام بحروف دهبي (للقرار الذكي والإنجاز والحاجة القيّمة، من 2 لـ 6 كلمات)",
+    "toggle": "زرار تشغيل بيتقلب والكلمة المهمة (focus) بتنوّر عملاقة تحته (لـ«شغّل»، اختيار، قبل وبعد، من 1 لـ 4 كلمات)",
+    "years": "عمود أرقام بيلف ويقف على الرقم (سنة أو عدد) أو الكلمة المهمة متكررة، وباقي الكلام تحت (للتواريخ والتاريخ والأرقام، من 1 لـ 6 كلمات)",
+    "wave": "كلام أحمر عملاق ماشي على خط متعرج بيعدّي الكادر (للطاقة والحماس والكلام اللي بيجري، من 2 لـ 6 كلمات)",
+    "spaced": "الكلام متوزّع على عرض الكادر بمسافات واسعة كلمة كلمة (لجملة هادية فيها تشويق، من 3 لـ 10 كلمات)",
+    "search": "خانة بحث والكلام بيتكتب فيها وتحتها اقتراحات (لما بيقول «دوّر على»، سؤال الناس، أو اسم موقع، من 2 لـ 8 كلمات)",
+    "digits": "الرقم أو الكلمة المهمة في مربعات بتتقلب حرف حرف، وباقي الكلام فوقها (للأرقام والأسعار والنسب، من 1 لـ 5 كلمات)",
+    "torn": "شرايط ورق مقطوع بخط آلة كاتبة فوق بعض (للقصص والتاريخ والأسرار والاقتباسات، من 3 لـ 10 كلمات)",
+    "emoji": "الكلام وإيموجي على قد المعنى بتطلع وتطفو حواليه، والكلمة المهمة (focus) منوّرة (للإحساس والضحك والقصص الخفيفة، من 2 لـ 8 كلمات)",
+    "doodle": "خربشة بالقلم حوالين الكلام: لمعة ونجمة وسهم ملفوف وخط متعرج (للنصيحة والفكرة المهمة، من 2 لـ 6 كلمات)",
+    "browser": "شباك متصفح: العنوان بيتكتب والكلام عنوان الصفحة وزراير (لموقع أو منتج أو خدمة أونلاين، من 2 لـ 7 كلمات)",
+    "split": "قبل وبعد: صورتين من الفيديو، الأولى باهتة والتانية بألوان، وكل نص عليه جزء من الكلام (للمقارنة والتحول، من 2 لـ 6 كلمات)",
+    "spotlight": "مسرح غامق وكشاف نور نازل على الكلمة المهمة (focus) وباقي الكلام صغير حواليها (للكشف والإعلان واللحظة المهمة، من 1 لـ 5 كلمات)",
+    "phone": "موبايل في النص والكلام على شاشته فوق صورة من الفيديو زي بوست (للسوشيال والتطبيقات والترند، من 3 لـ 9 كلمات)",
+})
+STILL_KINDS = {"fill", "polaroid", "cards", "stories", "post", "tiles", "split", "phone"}
 # الحركات اللي محتاجة شخص ظاهر في الفيديو
 PERSON_KINDS = {"behind", "arc", "halo", "thermal", "dots", "neon", "emerge"}
 
@@ -108,22 +127,34 @@ PERSON_KINDS = {"behind", "arc", "halo", "thermal", "dots", "neon", "emerge"}
 # (غير اللي اتعملت آخر مرة) عشان الفيديوهات ماتطلعش شبه بعض، من غير ما العميل يختار حاجة
 COLLECTIONS = {
     "editorial": {"note": "هادي وأنيق: كلام ورا الشخص ومتقوّس حواليه، كلمة حمرا، خط إيد وإمضا",
-                  "kinds": {"behind": 3, "arc": 2, "redword": 2, "signature": 1, "hand": 2, "artype": 2, "emerge": 2, "halo": 1, "floor": 1, "ghost": 1}},
+                  "kinds": {"behind": 3, "arc": 2, "redword": 2, "signature": 1, "hand": 2, "artype": 2, "emerge": 2, "halo": 1, "floor": 1, "ghost": 1, "serif": 2, "spaced": 1}},
     "pop": {"note": "بوب بينك وأسود بطاقة عالية: حروف بتنط بحدود بينك، حروف بتلف، كروت ستوري وبوستات",
             "kinds": {"outline": 3, "spin": 1, "sweep": 1, "extrude": 2, "stories": 1, "post": 1, "emerge": 2, "behind": 1, "stack": 1}},
     "retro": {"note": "بوستر قديم على ورق بيج وأحمر وأزرق: نجمة وسيلويت، دوتون، تاجات وشرايط",
               "kinds": {"retro": 2, "duotone": 2, "label": 2, "mirror": 1, "banners": 1, "tiles": 1, "bubble": 1, "band": 2, "ransom": 1}},
     "tech": {"note": "تكنولوجيا وشاشات: جلتش، الشخص نقط، كاميرا حرارية، أرقام بتعدّ، مربع تحديد",
-             "kinds": {"crt": 2, "dots": 2, "thermal": 1, "select": 2, "counter": 2, "space": 1, "sweep": 1, "push": 2, "cube": 1, "prompt": 1, "dialog": 1}},
+             "kinds": {"crt": 2, "dots": 2, "thermal": 1, "select": 2, "counter": 2, "space": 1, "sweep": 1, "push": 2, "cube": 1, "prompt": 1, "dialog": 1, "digits": 1, "search": 1}},
     "collage": {"note": "كولاج وقصاصات: حروف مقصوصة، لوحة تحقيق، بولارويد، تاجات، شات وكومنتات",
                 "kinds": {"ransom": 2, "board": 2, "polaroid": 2, "tags": 2, "stack": 2, "comments": 1, "chat": 1, "burst": 1, "fill": 1, "scribble": 1, "notify": 1}},
     "screens": {"note": "واجهات وشاشات: إشعارات، رسالة نظام قديمة، زراير لامعة، مربع ذكاء اصطناعي، لستة، كروت مرقّمة، شات",
                 "kinds": {"notify": 2, "dialog": 1, "pills": 2, "prompt": 2, "list": 2, "steps": 2, "chat": 1, "select": 1, "counter": 1, "emerge": 1}},
     "print": {"note": "طباعة وفيلم: برواز فيلم، كلمة عملاقة باهتة، دايرة بالقلم، كلام متفرّق، كلمة حمرا، إمضا",
               "kinds": {"film": 3, "ghost": 2, "scribble": 2, "spread": 2, "redword": 1, "signature": 1, "behind": 2, "mirror": 1, "list": 1}},
+    "vintage": {"note": "قديم ودافي: سبورة، تذكرة، برواز دهب، شرايط ورق، سنين بتلف، مسرح وكشاف",
+                "kinds": {"chalk": 2, "ticket": 2, "frame": 2, "torn": 2, "years": 2, "spotlight": 2, "digits": 1, "serif": 1, "film": 1}},
+    "social": {"note": "سوشيال وإنترنت: موبايل، متصفح، بحث، إيموجي، خربشة، زرار تشغيل، قبل وبعد",
+               "kinds": {"phone": 2, "browser": 2, "search": 2, "emoji": 2, "doodle": 2, "toggle": 1, "split": 1, "pills": 1, "notify": 1}},
     "cinema": {"note": "سينمائي: نيون ورا الشخص، كلام على الأرض، أشكال فيلم، قفل ومكعب، بوستر",
-               "kinds": {"neon": 2, "floor": 2, "shapes": 2, "halo": 1, "lock": 1, "cube": 1, "poster": 2, "emerge": 1, "mirror": 1}},
+               "kinds": {"neon": 2, "floor": 2, "shapes": 2, "halo": 1, "lock": 1, "cube": 1, "poster": 2, "emerge": 1, "mirror": 1, "spotlight": 2, "wave": 1}},
 }
+
+
+# 🎞️ ترانزيشن أول البلوك (عناصر ستوديو): متاخدة من الفيديوهات المرجعية
+TRANS = ("", "whip", "zoom", "glitch", "flash", "iris", "leak", "burn", "rise")
+COL_TRANS = {"editorial": ("rise", "iris", "zoom"), "pop": ("whip", "zoom", "flash"), "retro": ("burn", "leak", "iris"),
+             "tech": ("glitch", "whip", "flash"), "collage": ("whip", "rise", "zoom"), "screens": ("rise", "zoom", "glitch"),
+             "print": ("leak", "burn", "rise"), "cinema": ("leak", "burn", "iris", "flash"),
+             "vintage": ("burn", "leak", "iris"), "social": ("whip", "rise", "glitch")}
 
 
 def pick_collection(prev: str | None = None, rnd=None) -> str:
@@ -180,6 +211,9 @@ BUILTIN_STYLES = {
                   "متخلطش الستايلين في نفس الجملة: الجملة كلها من عيلة واحدة",
                   "الشاشات: notify للأخبار والرسايل، dialog للغلطة والتحذير، pills للمميزات، prompt للذكاء الاصطناعي، list وsteps للتعداد والخطوات",
                   "الطباعة: film لجملة قوية، ghost للفكرة الكبيرة، scribble للكلمة الأهم، spread للأفكار المتلخبطة",
+                  "القديم: chalk للشرح، ticket للعروض، frame للإنجاز، torn للقصص، years وdigits للتواريخ والأرقام، spotlight للكشف",
+                  "السوشيال: phone للبوستات، browser للمواقع، search للأسئلة، emoji للإحساس، doodle للنصيحة، split للمقارنة، toggle للاختيار",
+                  "trans (اختياري) = ترانزيشن أول البلوك: whip | zoom | glitch | flash | iris | leak | burn | rise (مش على كل بلوك)",
                   "الحاجة المختارة cube، والمضمون أو الممنوع lock، والإحساس القوي thermal، والتأمل shapes، والتصميم select، والخيال space",
                   "build وtype للجمل العادية الطويلة"],
         "kinds": {"behind": 2, "arc": 2, "artype": 2, "redword": 2, "signature": 1, "stack": 2, "tags": 1, "push": 1, "poster": 1,
@@ -188,7 +222,9 @@ BUILTIN_STYLES = {
                   "fill": 1, "polaroid": 1, "cards": 1, "burst": 1, "dots": 1, "neon": 1,
                   "outline": 1, "spin": 1, "sweep": 1, "extrude": 1, "stories": 1, "post": 1,
                   "retro": 1, "duotone": 1, "label": 1, "mirror": 1, "banners": 1, "tiles": 1, "bubble": 1, "band": 1, "emerge": 1,
-                  "film": 1, "ghost": 1, "notify": 1, "dialog": 1, "pills": 1, "steps": 1, "scribble": 1, "list": 1, "prompt": 1, "spread": 1},
+                  "film": 1, "ghost": 1, "notify": 1, "dialog": 1, "pills": 1, "steps": 1, "scribble": 1, "list": 1, "prompt": 1, "spread": 1,
+                  "serif": 1, "chalk": 1, "ticket": 1, "frame": 1, "toggle": 1, "years": 1, "wave": 1, "spaced": 1, "search": 1, "digits": 1, "torn": 1,
+                  "emoji": 1, "doodle": 1, "browser": 1, "split": 1, "spotlight": 1, "phone": 1},
     },
     "pro": {
         "name": "⭐ احترافي (زي الفيديو المرجع)", "font": "SM Tajawal", "case": "lower", "grain": 0.12, "weight": 700, "pro": True,
@@ -222,7 +258,7 @@ BUILTIN_STYLES = {
 }
 
 PLAN_FORMAT = """{
-  "blocks": [{"from": 0, "to": 3, "kind": "pop | type | build | icon | letters | scatter | ring | behind | arc | artype | redword | signature | poster | stack | push | crt | ransom | halo | floor | hand | tags | space | route | board | cube | comments | lock | thermal | shapes | select | chat | counter | fill | polaroid | cards | burst | dots | neon | outline | spin | sweep | extrude | stories | post | retro | duotone | label | mirror | banners | tiles | bubble | band | emerge | film | ghost | notify | dialog | pills | steps | scribble | list | prompt | spread", "theme": "light | dark | accent",
+  "blocks": [{"from": 0, "to": 3, "kind": "pop | type | build | icon | letters | scatter | ring | behind | arc | artype | redword | signature | poster | stack | push | crt | ransom | halo | floor | hand | tags | space | route | board | cube | comments | lock | thermal | shapes | select | chat | counter | fill | polaroid | cards | burst | dots | neon | outline | spin | sweep | extrude | stories | post | retro | duotone | label | mirror | banners | tiles | bubble | band | emerge | film | ghost | notify | dialog | pills | steps | scribble | list | prompt | spread | serif | chalk | ticket | frame | toggle | years | wave | spaced | search | digits | torn | emoji | doodle | browser | split | spotlight | phone", "theme": "light | dark | accent",
               "text": "الكلام اللي يتكتب (من كلام الجمل دي بالظبط، ممكن تختصره لكلمة أو كلمتين في pop/icon/letters/scatter)",
               "focus": 0, "icon": "اسم ستيكر من المكتبة أو وصف قصير بالإنجليزي لأيقونة جديدة", "icons": ["..."], "letter": 1,
               "side": "اسم ستيكر/صورة كبيرة جنب الكلام في build أو فاضي",
@@ -344,6 +380,7 @@ def clean_plan(raw: dict, words: list[dict], duration: float, pro: bool = False)
                     "sign": str(b.get("sign") or "").strip()[:40], "box": _i(b.get("box"), -1), "redact": _i(b.get("redact"), -1),
                     # مكان وحجم الكلام اللي المستخدم ظبطه بإيده (سحب في المعاينة): إزاحة بكسور من الكادر، وحجم
                     "mx": _f(b.get("mx"), 0, -0.6, 0.6), "my": _f(b.get("my"), 0, -0.6, 0.6), "ms": _f(b.get("ms"), 1, 0.3, 2.5),
+                    "trans": b.get("trans") if b.get("trans") in TRANS else "",
                     **{k: (b.get(k) if b.get(k) in vals else "") for k, vals in VARIANTS.items()},
                     "marks": [{"type": m["type"], "word": _i(m.get("word")), **({"color": m["color"]} if m.get("color") in ("red", "yellow") else {})}
                               for m in (b.get("marks") or []) if isinstance(m, dict) and m.get("type") in MARKS][:4]})
@@ -432,12 +469,14 @@ def pro_plan(words: list[dict], duration: float, icons: list[str] | None = None,
 
 # طول الجزء اللي كل حركة لايقة عليه (عدد الكلمات)
 KIND_LEN = {
-    "short": {"behind", "neon", "fill", "poster", "burst", "spin", "sweep", "mirror", "banners", "ransom", "redword", "outline", "lock", "tiles", "scribble", "film", "ghost", "dialog"},
+    "short": {"behind", "neon", "fill", "poster", "burst", "spin", "sweep", "mirror", "banners", "ransom", "redword", "outline", "lock", "tiles", "scribble", "film", "ghost", "dialog", "ticket", "toggle", "years", "digits", "spotlight"},
     "mid": {"arc", "stack", "halo", "tags", "cube", "hand", "push", "lock", "select", "emerge", "extrude", "label", "bubble", "band", "retro",
             "duotone", "outline", "stories", "post", "crt", "shapes", "floor", "space", "dots", "thermal", "artype", "redword",
-            "film", "ghost", "dialog", "pills", "scribble", "spread", "notify", "steps", "list", "prompt"},
+            "film", "ghost", "dialog", "pills", "scribble", "spread", "notify", "steps", "list", "prompt",
+            "serif", "frame", "wave", "spaced", "search", "emoji", "doodle", "browser", "split", "spotlight", "years", "digits"},
     "long": {"stack", "chat", "board", "comments", "hand", "cards", "polaroid", "crt", "space", "duotone", "artype", "emerge",
-             "notify", "steps", "list", "prompt", "pills", "spread", "ghost"},
+             "notify", "steps", "list", "prompt", "pills", "spread", "ghost",
+             "chalk", "torn", "spaced", "search", "emoji", "browser", "phone"},
 }
 
 
@@ -476,12 +515,20 @@ def studio_plan(words: list[dict], duration: float, person: dict | None = None, 
         if ci == len(chunks) - 1 and n <= 3 and r.random() < 0.35:
             kind = "signature"
         longest = max(range(n), key=lambda j: len(words[ch[j]]["w"]))
-        out.append({"from": ch[0], "to": ch[-1], "kind": kind, "focus": longest if kind in ("arc", "stack", "halo", "outline", "label", "tiles", "bubble", "lock", "cube", "film", "ghost", "scribble", "spread") else -1,
+        out.append({"from": ch[0], "to": ch[-1], "kind": kind, "focus": longest if kind in ("arc", "stack", "halo", "outline", "label", "tiles", "bubble", "lock", "cube", "film", "ghost", "scribble", "spread", "serif", "toggle", "emoji", "doodle", "spotlight", "frame") else -1,
                     "sign": " ".join(words[i]["w"] for i in ch).strip(".,،؟?!") if kind == "signature" else ""})
+    # الترانزيشنز: حوالي نص البلوكات (غير الأول) بتدخل بترانزيشن من بتوع الكوليكشن، ومن غير ما نفس الترانزيشن يتكرر ورا بعض
+    name = next((k for k, v in COLLECTIONS.items() if v is col), "")
+    tl = COL_TRANS.get(name) or ("rise", "zoom")
+    last = ""
+    for i, b in enumerate(out):
+        if i and r.random() < 0.55:
+            last = r.choice([x for x in tl if x != last] or list(tl))
+            b["trans"] = last
     for b in out:
         b.setdefault("theme", "light")
         for k, v in (("text", ""), ("focus", -1), ("icon", ""), ("icons", []), ("letter", 1), ("side", ""), ("anchor", ""), ("place", "auto"),
-                     ("skip", -1), ("intro", ""), ("outro", ""), ("sign", ""), ("box", -1), ("redact", -1), ("marks", []),
+                     ("skip", -1), ("intro", ""), ("outro", ""), ("sign", ""), ("trans", ""), ("box", -1), ("redact", -1), ("marks", []),
                      *((k2, "") for k2 in VARIANTS)):
             b.setdefault(k, v)
     return timed(out, words, duration)

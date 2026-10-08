@@ -8,6 +8,8 @@ RUN pip install --no-cache-dir -r backend/requirements.txt \
  && python -c "import imageio_ffmpeg; print(imageio_ffmpeg.get_ffmpeg_exe())"
 # متصفح Chromium: بيرسم فيديوهات التايبوجرافي فريم فريم (frontend/typo-engine.js)
 RUN python -m playwright install --with-deps chromium
+# خط الإيموجي الملوّن (عنصر emoji في التايبوجرافي)
+RUN apt-get update && apt-get install -y --no-install-recommends fonts-noto-color-emoji && rm -rf /var/lib/apt/lists/*
 # تفريغ الكلام على السيرفر من غير خدمة برّه (اختياري): LOCAL_STT=1 وقت البناء + STT_LOCAL=1 في المتغيرات
 # بيزوّد حوالي 700MB (المكتبة + موديل Whisper small) وبيفرّغ دقيقة الكلام في نص دقيقة تقريبًا على CPU
 ARG LOCAL_STT=0
