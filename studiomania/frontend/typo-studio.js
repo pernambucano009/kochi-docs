@@ -50,6 +50,17 @@
     return `<img src="${a.url}" alt="" style="position:absolute;left:${x.toFixed(1)}px;top:${y.toFixed(1)}px;width:${w.toFixed(1)}px;height:${h.toFixed(1)}px;
       filter:brightness(${(1 - (this.doc.dim || 0)).toFixed(3)});pointer-events:none">`;
   };
+  // الكلام اللي ورا الشخص: بدل ما نحط صورة الشخص فوق الكلام، بنقص شكل الشخص من الكلام نفسه
+  // فالشخص اللي بيبان هو الفيديو الأصلي بجودته وألوانه (من غير صورة مكبّرة ولا اختلاف لون)
+  P.behindPerson = function (t, inner) {
+    const a = this.personAt(t);
+    if (!a || !this.doc.transparent) return inner + (a ? this.personLayer(t) : "");
+    const { x, y, w, h } = a.img;
+    this._want = a.url;
+    const m = `linear-gradient(#000,#000) 0 0/100% 100% no-repeat, url(${a.url}) ${x.toFixed(1)}px ${y.toFixed(1)}px/${w.toFixed(1)}px ${h.toFixed(1)}px no-repeat`;
+    return `<img src="${a.url}" alt="" style="position:absolute;width:1px;height:1px;opacity:0">`
+      + `<div style="position:absolute;inset:0;-webkit-mask:${m};-webkit-mask-composite:xor;mask:${m};mask-composite:exclude">${inner}</div>`;
+  };
   // الراس بالبكسل (لو مفيش شخص: نص الكادر من فوق شوية)
   P.headAt = function (t) {
     const { w, h } = this.doc;
@@ -121,7 +132,7 @@
     const hd = this.headAt(t);
     const bs = this.blockSolid(b);
     const safe = bs === null || bs;
-    let html = backdrop(this, th);
+    let html = "";
     const maxW = w * 0.9, maxH = h * (h > w ? 0.2 : 0.4) / lines.length;
     lines.forEach((ln, li) => {
       const base = measure(ln, `400 100px ${ff}`) || 100;
@@ -137,7 +148,7 @@
         font-family:${ff};font-size:${size.toFixed(1)}px;line-height:1;white-space:nowrap;color:${inkOf(this, th)};opacity:${(e * out).toFixed(3)};
         letter-spacing:-0.01em;filter:blur(${((1 - e) * 8).toFixed(1)}px);${onVideo(this) ? "text-shadow:0 6px 30px rgba(0,0,0,.25);" : ""}" dir="${this.dir(ln)}">${esc(ln)}</div>`;
     });
-    return html + (bs ? this.personLayer(t) : "");
+    return backdrop(this, th) + (bs ? this.behindPerson(t, html) : html);
   };
 
   // ---------- arc: الكلام متقوّس حوالين الراس
@@ -1131,7 +1142,8 @@
     const sz = fitSize(s2, `400 {}px ${ff}`, w * 0.92, mn * 0.36);
     // سطر واحد ورا فوق الراس (زي الكلام اللي ورا الشخص)، والشخص بيغطي الجزء التحتاني منه
     const cy = bs ? clamp(hd.top + sz * 0.3, sz * 0.6, h * 0.7) : h * 0.42;
-    let html = onVideo(this) ? `<div style="position:absolute;inset:0;background:rgba(0,0,0,.35)"></div>` : `<div style="position:absolute;inset:0;background:#08080A"></div>`;
+    const under = onVideo(this) ? `<div style="position:absolute;inset:0;background:rgba(0,0,0,.35)"></div>` : `<div style="position:absolute;inset:0;background:#08080A"></div>`;
+    let html = "";
     const shown = it.filter((x) => t >= x.t0);
     if (shown.length) {
       const last = shown[shown.length - 1];
@@ -1141,6 +1153,6 @@
         text-shadow:0 0 ${(sz * 0.05).toFixed(0)}px #ff1a24,0 0 ${(sz * 0.16).toFixed(0)}px #ff0010,0 0 ${(sz * 0.32).toFixed(0)}px rgba(255,0,20,.6)">${shown.map((x) =>
         `<span style="opacity:${(x === last ? fl : 0.92 + Math.sin(t * 40) * 0.04).toFixed(3)}">${esc(ar ? x.w : x.w.toUpperCase())}</span>`).join(" ")}</div>`;
     }
-    return html + (bs ? this.personLayer(t) : "");
+    return under + (bs ? this.behindPerson(t, html) : html);
   };
 })();

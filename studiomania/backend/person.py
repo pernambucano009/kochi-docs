@@ -199,12 +199,13 @@ def analyze(ffmpeg: str, src: Path, out_dir: Path, models_dir: Path, fps: int, d
     dur = min(duration, max_seconds)
     probe = subprocess.run([ffmpeg, "-hide_banner", "-i", str(src)], capture_output=True, text=True).stderr
     # الفريمات بمقاس ثابت بالعرض والطول بنفس النسبة
-    proc = subprocess.Popen([ffmpeg, "-hide_banner", "-loglevel", "error", "-i", str(src), "-t", f"{dur:.3f}",
-                             "-vf", f"fps={fps},scale={width}:-2", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], stdout=subprocess.PIPE)
     import re
     m = re.search(r"Video:.*?(\d{2,5})x(\d{2,5})", probe)
     sw, sh = (int(m.group(1)), int(m.group(2))) if m else (width, width)
-    ph = int(round(width * sh / sw / 2)) * 2
+    # الطول بنحسبه إحنا ونبعته لـ FFmpeg بالظبط: لو كل واحد قرّب بطريقة، الفريمات بتتقري مزاحة وبتبعد عن الشخص كل ما الفيديو يمشي
+    ph = max(2, int(width * sh / sw / 2 + 0.5) * 2)
+    proc = subprocess.Popen([ffmpeg, "-hide_banner", "-loglevel", "error", "-i", str(src), "-t", f"{dur:.3f}",
+                             "-vf", f"fps={fps},scale={width}:{ph}", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], stdout=subprocess.PIPE)
     size = width * ph * 3
     frames, i, prev = [], 0, None
     while True:
