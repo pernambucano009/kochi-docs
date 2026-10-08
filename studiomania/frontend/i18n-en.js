@@ -3157,5 +3157,14 @@ window.I18N_EN = {
   "الرفع خد وقت طويل جدًا: جرب فيديو أصغر": "The upload took too long: try a smaller video",
   "🔊 الكليكات": "🔊 Clicks",
   "🔇 من غير كليكات": "🔇 No clicks",
-  "0 = مفيش كليكات خالص، 100 = كليك على كل كلمة، وما بينهم الكليكات بتقل أو تكتر": "0 = no clicks at all, 100 = a click on every word; in between, fewer or more words click"
+  "0 = مفيش كليكات خالص، 100 = كليك على كل كلمة، وما بينهم الكليكات بتقل أو تكتر": "0 = no clicks at all, 100 = a click on every word; in between, fewer or more words click",
+  "الأرشيف": "Archive",
+  "أرشيف المراجع": "References archive",
+  "📦 أرشيف المراجع": "📦 References archive",
+  "→ رجوع للبرنامج": "← Back to the app",
+  "ارفع هنا الفيديوهات والصور اللي عايزنا نطلّع منها ستايلات وعناصر جديدة. بتتحفظ زي ما هي: من غير تقسيم ولا تحليل ولا أي تكلفة.": "Upload the videos and images you want new styles and elements taken from. They're stored as-is: no splitting, no analysis, no cost.",
+  "اسحب الفيديوهات هنا أو دوس واختارهم": "Drag videos here or click to choose",
+  "فيديو أو صورة أو zip · تقدر تختار كذا ملف مرة واحدة": "Video, image or zip · you can choose several files at once",
+  "لسه مفيش حاجة في الأرشيف.": "Nothing in the archive yet.",
+  "⚠️ الرفع وقف: جرب تاني": "⚠️ Upload stopped: try again"
 };

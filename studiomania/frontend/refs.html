@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>📦 أرشيف المراجع · StudioMania</title>
+<script src="/i18n-en.js"></script>
+<script src="/i18n.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@200;300;400;500;600;700&display=swap">
+<link rel="stylesheet" href="/style.css">
+<style>
+  /* 📦 أرشيف المراجع: صفحة لوحدها، رفع كتير مرة واحدة بشريط لكل ملف */
+  .refs { max-width: 920px; margin: 0 auto; padding: 24px 16px 60px; }
+  .refs h1 { font-size: 1.5rem; margin: 6px 0 4px; }
+  .refs-drop { border: 2px dashed rgba(127, 127, 127, .45); border-radius: 18px; padding: 34px 16px; text-align: center; cursor: pointer; margin: 16px 0; }
+  .refs-drop.over { border-color: var(--accent, #E5613E); background: rgba(229, 97, 62, .06); }
+  .refs-row { display: flex; align-items: center; gap: 10px; padding: 9px 4px; border-bottom: 1px solid rgba(127, 127, 127, .18); }
+  .refs-row .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .refs-bar { width: 150px; height: 6px; border-radius: 3px; background: rgba(127, 127, 127, .25); overflow: hidden; flex: none; }
+  .refs-bar i { display: block; height: 100%; width: 0; background: var(--accent, #E5613E); }
+  .refs-sum { margin: 18px 0 6px; }
+  @media (max-width: 560px) { .refs-bar { width: 80px; } .refs-row small { display: none; } }
+</style>
+</head>
+<body>
+<div class="refs">
+  <a href="/" class="btn sm">→ رجوع للبرنامج</a>
+  <h1>📦 أرشيف المراجع</h1>
+  <p class="hint">ارفع هنا الفيديوهات والصور اللي عايزنا نطلّع منها ستايلات وعناصر جديدة. بتتحفظ زي ما هي: من غير تقسيم ولا تحليل ولا أي تكلفة.</p>
+  <label class="refs-drop" id="drop">
+    <b>اسحب الفيديوهات هنا أو دوس واختارهم</b><br><small class="muted">فيديو أو صورة أو zip · تقدر تختار كذا ملف مرة واحدة</small>
+    <input type="file" id="pick" multiple accept="video/*,image/*,.zip,.mov,.mkv" hidden>
+  </label>
+  <div id="queue"></div>
+  <p class="refs-sum muted" id="sum"></p>
+  <div id="list"></div>
+</div>
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const mb = (n) => `${(n / 1048576).toFixed(1)} ميجا`;
+let busy = false;
+const pending = [];
+
+async function load() {
+  const r = await fetch("/api/refs");
+  if (r.status === 401) { location.href = "/login"; return; }
+  const items = await r.json();
+  $("sum").textContent = items.length ? `${items.length} ملف · ${mb(items.reduce((a, x) => a + x.size, 0))}` : "لسه مفيش حاجة في الأرشيف.";
+  $("list").innerHTML = items.map((x) => `<div class="refs-row">
+    <span class="nm" dir="auto" data-no-i18n>${esc(x.name)}</span><small class="muted">${mb(x.size)} · ${esc((x.created_at || "").slice(0, 16).replace("T", " "))}</small>
+    <a class="btn sm" href="${x.url}" target="_blank" rel="noopener">▶️</a>
+    <button type="button" class="btn sm danger" data-del="${x.id}" data-name="${esc(x.name)}">🗑️</button></div>`).join("");
+}
+
+function upload(file) {
+  return new Promise((resolve) => {
+    const row = document.createElement("div");
+    row.className = "refs-row";
+    row.innerHTML = `<span class="nm" dir="auto" data-no-i18n>${esc(file.name)}</span><small class="muted">${mb(file.size)}</small>
+      <span class="refs-bar"><i></i></span><b class="pct">0%</b>`;
+    $("queue").appendChild(row);
+    const bar = row.querySelector("i"), pct = row.querySelector(".pct");
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "/api/refs");
+    xhr.upload.onprogress = (e) => {
+      if (!e.lengthComputable) return;
+      const p = Math.round((e.loaded / e.total) * 100);
+      bar.style.width = `${p}%`; pct.textContent = `${p}%`;
+    };
+    xhr.onload = () => {
+      let d = {};
+      try { d = JSON.parse(xhr.responseText); } catch { /* مش JSON */ }
+      if (xhr.status >= 200 && xhr.status < 300) { row.remove(); load(); }
+      else { pct.textContent = `⚠️ ${d.detail || xhr.status}`; pct.className = "err"; }
+      resolve();
+    };
+    xhr.onerror = () => { pct.textContent = "⚠️ الرفع وقف: جرب تاني"; pct.className = "err"; resolve(); };
+    const fd = new FormData();
+    fd.append("file", file);
+    xhr.send(fd);
+  });
+}
+
+// الملفات بتترفع واحد ورا التاني (عشان كل واحد ياخد سرعة النت كلها وشريطه يبقى صادق)
+async function run() {
+  if (busy) return;
+  busy = true;
+  while (pending.length) await upload(pending.shift());
+  busy = false;
+}
+function add(files) { pending.push(...files); run(); }
+
+$("pick").addEventListener("change", (e) => { add([...e.target.files]); e.target.value = ""; });
+const drop = $("drop");
+drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("over"); });
+drop.addEventListener("dragleave", () => drop.classList.remove("over"));
+drop.addEventListener("drop", (e) => { e.preventDefault(); drop.classList.remove("over"); add([...e.dataTransfer.files]); });
+$("list").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-del]");
+  if (!b || !confirm(`تمسح «${b.dataset.name}» من الأرشيف؟`)) return;
+  await fetch(`/api/refs/${b.dataset.del}`, { method: "DELETE" });
+  load();
+});
+window.addEventListener("beforeunload", (e) => { if (busy || pending.length) { e.preventDefault(); e.returnValue = ""; } });
+load();
+</script>
+</body>
+</html>

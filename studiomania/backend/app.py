@@ -8719,6 +8719,83 @@ def lab_export_list():
     return out
 
 
+# ---------------------------------------------------------------- 📦 أرشيف المراجع
+# فيديوهات وصور مرجعية بتترفع زي ما هي (من غير تقسيم ولا تحليل ولا أي تكلفة)، عشان نطلّع منها ستايلات وعناصر جديدة.
+# بتتشاف من الصفحة (refs.html) وبتتسحب من برّه بنفس مفتاح القراءة بتاع المعمل.
+REFS_DIR = DATA_DIR / "refs"
+REFS_DIR.mkdir(parents=True, exist_ok=True)
+REFS_EXT = {".mp4", ".mov", ".m4v", ".webm", ".mkv", ".avi", ".gif", ".jpg", ".jpeg", ".png", ".webp", ".zip"}
+
+
+def refs_list() -> list[dict]:
+    out = []
+    for m in sorted(REFS_DIR.glob("*.json"), key=lambda x: x.stat().st_mtime, reverse=True):
+        try:
+            d = json.loads(m.read_text(encoding="utf-8"))
+        except ValueError:
+            continue
+        f = REFS_DIR / f"{m.stem}{d.get('ext', '')}"
+        if f.exists():
+            out.append({**d, "id": m.stem, "size": f.stat().st_size, "url": f"/api/refs/{m.stem}/file"})
+    return out
+
+
+@app.get("/api/refs")
+def refs_get():
+    return refs_list()
+
+
+@app.post("/api/refs")
+def refs_upload(file: UploadFile = File(...)):
+    ext = Path(file.filename or "").suffix.lower()
+    if ext not in REFS_EXT:
+        raise HTTPException(400, f"نوع الملف ده مش مدعوم في الأرشيف: {ext or 'من غير امتداد'}")
+    rid = uuid.uuid4().hex[:12]
+    with (REFS_DIR / f"{rid}{ext}").open("wb") as out:
+        shutil.copyfileobj(file.file, out)
+    (REFS_DIR / f"{rid}.json").write_text(json.dumps({"name": Path(file.filename or rid).name[:200], "ext": ext, "created_at": now()},
+                                                     ensure_ascii=False), encoding="utf-8")
+    return next((r for r in refs_list() if r["id"] == rid), {"id": rid})
+
+
+def refs_file(rid: str) -> tuple[Path, dict]:
+    rid = Path(rid).name
+    try:
+        d = json.loads((REFS_DIR / f"{rid}.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        raise HTTPException(404, "مش موجود") from None
+    f = REFS_DIR / f"{rid}{d.get('ext', '')}"
+    if not f.exists():
+        raise HTTPException(404, "مش موجود")
+    return f, d
+
+
+@app.get("/api/refs/{rid}/file")
+def refs_download(rid: str):
+    f, d = refs_file(rid)
+    return FileResponse(f, filename=d.get("name") or f.name)
+
+
+@app.delete("/api/refs/{rid}")
+def refs_delete(rid: str):
+    f, _ = refs_file(rid)
+    f.unlink(missing_ok=True)
+    (REFS_DIR / f"{Path(rid).name}.json").unlink(missing_ok=True)
+    return {"ok": True}
+
+
+@app.get("/api/lab/export/refs")
+def refs_export_list():
+    """قايمة الأرشيف (بمفتاح القراءة من برّه)."""
+    return [{**r, "url": f"/api/lab/export/refs/{r['id']}"} for r in refs_list()]
+
+
+@app.get("/api/lab/export/refs/{rid}")
+def refs_export_file(rid: str):
+    f, d = refs_file(rid)
+    return FileResponse(f, filename=d.get("name") or f.name)
+
+
 @app.get("/api/lab/export/source/{lid}")
 def lab_export_source(lid: str):
     """⬇ الفيديو الأصلي زي ما اترفع (للفيديوهات المرجعية اللي محتاجين منها التايبوجرافي بس، من غير تقسيم الصوت)."""
