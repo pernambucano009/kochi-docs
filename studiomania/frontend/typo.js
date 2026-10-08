@@ -19,7 +19,7 @@ viewHooks["12"] = initTypo;
 
 async function initTypo() {
   try {
-    [tyx.list, tyx.stk, tyx.styles] = await Promise.all([api(TY("")), api(TY("/stickers")), api(TY("/styles"))]);
+    [tyx.list, tyx.stk, tyx.styles, tyx.sfx] = await Promise.all([api(TY("")), api(TY("/stickers")), api(TY("/styles")), api(TY("/sfx")).catch(() => null)]);
   } catch (err) { return toast(err.message, true); }
   const last = storageGet("studiomania.typo");
   if (!tyx.cur && last && tyx.list.some((p) => p.id === last)) await tyOpen(last);
@@ -41,8 +41,11 @@ function tyRender() {
     <b data-no-i18n>${tye(p.name)}</b><small class="muted">${p.ratio} · ${TY_ST[p.status] || ""}</small></li>`).join("") || `<li class="muted">لسه مفيش</li>`;
   $("tyMain").hidden = tyx.view !== "proj" || !tyx.cur;
   $("tyStk").hidden = tyx.view !== "stk";
+  $("tySfx").hidden = tyx.view !== "sfx";
+  if (tyx.sfx) $("tySfxCount").textContent = `(${Object.values(tyx.sfx).flat().length})`;
   $("tyEmpty").hidden = !(tyx.view === "home" || (tyx.view === "proj" && !tyx.cur));
   if (tyx.view === "stk") tyRenderStk();
+  if (tyx.view === "sfx") tyRenderSfx();
   if (tyx.view === "proj" && tyx.cur) tyRenderProj();
 }
 
@@ -76,6 +79,8 @@ function tyRenderProj() {
       <label>الستايل <select data-tyopt="style">${stOpts}</select></label>
       <label title="من غير ذكاء اصطناعي: الحركات بالقواعد، والأيقونات من القاموس بس، والكلام بيتفرّغ على السيرفر لو متفعّل">الذكاء <select data-tyopt="ai">
         <option value="smart" ${v.ai !== "off" ? "selected" : ""}>🤖 ذكي</option><option value="off" ${v.ai === "off" ? "selected" : ""}>⚙️ من غير ذكاء اصطناعي</option></select></label>
+      <label title="الأصوات الرسمية: كليك على ظهور واختفاء الكلام والعناصر، وكيبورد على كتابة الرسايل">الأصوات <select data-tyopt="sfx">
+        <option value="on" ${v.sfx !== "off" ? "selected" : ""}>🔊 شغالة</option><option value="off" ${v.sfx === "off" ? "selected" : ""}>🔇 من غير</option></select></label>
       ${tyx.styles.find((x) => x.id === v.style)?.pro && TypoEngine.MOMENT_FONTS ? `
         <label>خط الإنجليزي <select data-tyfont="sans">${TypoEngine.MOMENT_FONTS.latin.map(([f, l]) => `<option value="${f}" ${f === (v.fonts?.sans || "TY Outfit") ? "selected" : ""}>${l}</option>`).join("")}</select></label>
         <label>خط العربي <select data-tyfont="sansAr">${TypoEngine.MOMENT_FONTS.arabic.map(([f, l]) => `<option value="${f}" ${f === (v.fonts?.sansAr || "TY Alexandria") ? "selected" : ""}>${l}</option>`).join("")}</select></label>` : ""}
@@ -297,6 +302,43 @@ $("tyNew").onclick = async () => {
     await tyOpen(v.id);
   } catch (err) { toast(err.message, true); }
 };
+
+// ---------- 🔊 الأصوات الرسمية
+const TY_SFX = { click: ["🖱️ كليكات", "على كل كلمة أو حرف أو عنصر بيظهر أو بيختفي (البرنامج بيبدّل بينهم)"],
+  key: ["⌨️ ضغطات كيبورد", "على كتابة الرسايل بس (حرف حرف)"], typing: ["💬 تايبينج", "صوت كتابة رسالة كامل (احتياطي لو مفيش ضغطات)"] };
+function tyRenderSfx() {
+  const lib = tyx.sfx || {};
+  $("tySfx").innerHTML = `<div class="car-head"><h2>🔊 الأصوات الرسمية <small class="muted">${Object.values(lib).flat().length}</small></h2>
+      <label class="btn sm primary">⬆ ارفع wav أو zip<input type="file" data-sfxup accept=".wav,.zip,audio/wav" multiple hidden></label></div>
+    <p class="hint">اسم الملف بيحدد هو بيتحط فين: <b>click_</b>… كليك ظهور واختفاء · <b>key_</b>… ضغطة كيبورد · <b>typing_</b>… كتابة رسالة. الأصوات بتتحط لوحدها لما تعمل الفيديو، وتقدر تقفلها من «الأصوات» في المشروع.</p>
+    ${Object.entries(TY_SFX).map(([k, [l, h]]) => `<section class="ty-sfx"><h3>${l} <small class="muted">${(lib[k] || []).length} · ${h}</small></h3>
+      <div class="ty-sfx-list">${(lib[k] || []).map((f) => `<div class="ty-sfx-row"><button type="button" class="btn sm" data-sfxplay="${f.url}">▶️</button>
+        <span data-no-i18n>${tye(f.name)}</span><button type="button" class="btn sm danger" data-sfxdel="${tye(f.name)}">🗑️</button></div>`).join("") || `<p class="muted">لسه مفيش.</p>`}</div></section>`).join("")}`;
+}
+$("tySfxBtn").onclick = async () => {
+  tyStop();
+  tyx.view = "sfx";
+  tyx.sfx = await api(TY("/sfx"));
+  tyRender();
+};
+$("tySfx").addEventListener("click", async (e) => {
+  const pl = e.target.closest("[data-sfxplay]");
+  if (pl) { new Audio(pl.dataset.sfxplay).play().catch(() => {}); return; }
+  const del = e.target.closest("[data-sfxdel]");
+  if (del && confirm(`تمسح ${del.dataset.sfxdel}؟`)) {
+    try { tyx.sfx = await api(TY(`/sfx/${encodeURIComponent(del.dataset.sfxdel)}`), { method: "DELETE" }); tyRender(); } catch (err) { toast(err.message, true); }
+  }
+});
+$("tySfx").addEventListener("change", async (e) => {
+  if (!e.target.matches("[data-sfxup]") || !e.target.files.length) return;
+  const fd = new FormData();
+  for (const f of e.target.files) fd.append("files", f);
+  e.target.value = "";
+  try {
+    const r = await api(TY("/sfx"), { method: "POST", body: fd });
+    tyx.sfx = r; toast(`🔊 اتضاف ${r.added.length} صوت`); tyRender();
+  } catch (err) { toast(err.message, true); }
+});
 
 $("tyStkBtn").onclick = async () => {
   tyStop();

@@ -1811,3 +1811,9 @@ img.tv-cell { outline: 2px dashed #f0b54a; outline-offset: -2px; }
 .lab-part.main { grid-column: 1 / -1; background: var(--accent-soft, #fde9e2); }
 .lab-part.main video { max-height: 360px; }
 a.btn.disabled { opacity: .45; pointer-events: none; }
+/* 🔊 الأصوات الرسمية */
+.ty-sfx { margin: 10px 0; }
+.ty-sfx h3 { margin: 6px 0; font-size: 15px; }
+.ty-sfx-list { display: flex; flex-direction: column; gap: 4px; }
+.ty-sfx-row { display: flex; align-items: center; gap: 8px; padding: 4px 8px; background: var(--surface-2); border-radius: 8px; }
+.ty-sfx-row span { flex: 1; font-family: monospace; font-size: 13px; }

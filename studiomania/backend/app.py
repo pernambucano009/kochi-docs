@@ -9,6 +9,8 @@ import base64
 import gzip
 import hashlib
 import hmac
+import wave
+import zipfile
 import json
 import math
 import os
@@ -64,6 +66,7 @@ import ads as az  # noqa: E402
 import typo  # noqa: E402  (التايبوجرافي)
 import concepts  # noqa: E402  (قاموس المعاني: كلمة ← أيقونة)
 import stt_local  # noqa: E402  (تفريغ على السيرفر من غير خدمة برّه)
+import sfx  # noqa: E402  (الأصوات الرسمية: كليكات وكيبورد)
 from auth import SESSION_COOKIE, SESSION_DAYS, Auth  # noqa: E402
 
 MAX_CLIP_SECONDS = 15.0
@@ -12504,6 +12507,7 @@ TYPO_BUSY = ("transcribing", "analyzing", "planning", "drawing", "rendering")
 TYPO_RATIOS = {"9:16": (1080, 1920), "16:9": (1920, 1080), "1:1": (1080, 1080), "4:5": (1080, 1350)}
 TYPO_STICKER_COST = 0.03
 TYPO_DICT = TYPO_DIR / "concepts.json"
+TYPO_SFX = TYPO_DIR / "sfx"   # الأصوات الرسمية (بتترفع من البرنامج، مش في الكود)
 TYPO_DICT_LOCK = threading.Lock()
 TYPO_FPS = 30
 app.mount("/media/typo", StaticFiles(directory=TYPO_DIR), name="typo")
@@ -12778,6 +12782,45 @@ def typo_sticker_rename(sid: str, body: StickerIn):
     return typo_stickers()
 
 
+@app.get("/api/typo/sfx")
+def typo_sfx_list():
+    lib = sfx.library(TYPO_SFX)
+    return {k: [{"name": f.name, "url": f"/api/typo/sfx/{f.name}"} for f in v] for k, v in lib.items()}
+
+
+@app.post("/api/typo/sfx")
+async def typo_sfx_add(files: list[UploadFile] = File(...)):
+    """⬆ ملفات wav أو zip. الاسم بيحدد النوع: click_… (ظهور/اختفاء) · key_… (ضغطة كيبورد) · typing_… (كتابة رسالة)."""
+    added = []
+    for f in files:
+        data = await f.read()
+        if len(data) > 30_000_000:
+            raise HTTPException(400, f"{f.filename}: الملف كبير")
+        try:
+            added += sfx.add_files(TYPO_SFX, f.filename or "", data)
+        except (ValueError, zipfile.BadZipFile, wave.Error) as exc:
+            raise HTTPException(400, f"{f.filename}: {exc}") from exc
+    if not added:
+        raise HTTPException(400, "مفيش ولا ملف اسمه بيبدأ بـ click_ أو key_ أو typing_")
+    return {"added": added, **typo_sfx_list()}
+
+
+@app.get("/api/typo/sfx/{name}")
+def typo_sfx_file(name: str):
+    f = TYPO_SFX / Path(name).name
+    if not sfx.kind_of(f.name) or not f.exists():
+        raise HTTPException(404, "الصوت مش موجود")
+    return FileResponse(f, media_type="audio/wav")
+
+
+@app.delete("/api/typo/sfx/{name}")
+def typo_sfx_delete(name: str):
+    f = TYPO_SFX / Path(name).name
+    if sfx.kind_of(f.name):
+        f.unlink(missing_ok=True)
+    return typo_sfx_list()
+
+
 @app.get("/api/typo/concepts")
 def typo_concepts():
     """📖 القاموس: كل معنى وكلماته وأيقوناته في كل ستايل."""
@@ -12980,6 +13023,7 @@ class TypoPatchIn(BaseModel):
     words: list | None = None
     fonts: dict | None = None
     ai: str | None = None
+    sfx: str | None = None
 
 
 TYPO_FONT_OK = re.compile(r"^(TY|SM) [A-Za-z]{2,20}$")
@@ -12998,6 +13042,8 @@ def typo_patch(pid: str, body: TypoPatchIn):
             d["brief"] = body.brief[:1000]
         if body.ai in ("smart", "off"):   # «من غير ذكاء اصطناعي»: قواعد + قاموس + تفريغ على السيرفر
             d["ai"] = body.ai
+        if body.sfx in ("on", "off"):   # 🔊 الأصوات الرسمية على الفيديو
+            d["sfx"] = body.sfx
         if body.fonts is not None:   # خط الكلام في الحركات الاحترافية (إنجليزي / عربي)
             d["fonts"] = {k: v for k, v in body.fonts.items() if k in ("sans", "sansAr") and isinstance(v, str) and TYPO_FONT_OK.match(v)}
         if body.bg is not None:
@@ -13423,15 +13469,30 @@ def run_typo_render(pid: str, base: str, quality: str) -> None:
                   + (f",colorchannelmixer=rr={1 - dim}:gg={1 - dim}:bb={1 - dim}" if dim else "") + "[bg];"
                   f"[bg][1:v]overlay=0:0:shortest=1" + (f",noise=alls={int(grain * 35)}:allf=t" if grain else "") + ",format=yuv420p[v]")
         audio_in = None
+        nxt = inputs + 1
         if src and (d.get("source") or {}).get("kind") in ("audio", "video"):
             cmd += ["-i", str(folder / src)]
-            audio_in = inputs + 1
-        if fl:
-            cmd += ["-filter_complex", fl, "-map", "[v]"]
+            audio_in, nxt = nxt, nxt + 1
+        # 🔊 الأصوات الرسمية: كليك على كل ظهور/اختفاء، وكيبورد على كتابة الرسايل
+        sfx_in = None
+        sfx_wav = folder / ".sfx.wav"
+        if d.get("sfx", "on") != "off" and sfx.render(TYPO_SFX, doc["blocks"], dur, sfx_wav, seed=sum(map(ord, pid))):
+            cmd += ["-i", str(sfx_wav)]
+            sfx_in = nxt
+        if audio_in is not None and sfx_in is not None:
+            has_a = media_info(folder / src).has_audio
+            fl = (fl + ";" if fl else f"[{inputs}:v]format=yuv420p[v];") + (
+                f"[{audio_in}:a][{sfx_in}:a]amix=inputs=2:duration=longest:normalize=0[a]" if has_a else f"[{sfx_in}:a]anull[a]")
+            cmd += ["-filter_complex", fl, "-map", "[v]", "-map", "[a]", "-c:a", "aac", "-b:a", "160k"]
         else:
-            cmd += ["-map", f"{inputs}:v", "-vf", "format=yuv420p"]
-        if audio_in is not None:
-            cmd += ["-map", f"{audio_in}:a?", "-c:a", "aac", "-b:a", "160k", "-shortest"]
+            if fl:
+                cmd += ["-filter_complex", fl, "-map", "[v]"]
+            else:
+                cmd += ["-map", f"{inputs}:v", "-vf", "format=yuv420p"]
+            if audio_in is not None:
+                cmd += ["-map", f"{audio_in}:a?", "-c:a", "aac", "-b:a", "160k", "-shortest"]
+            elif sfx_in is not None:
+                cmd += ["-map", f"{sfx_in}:a", "-c:a", "aac", "-b:a", "160k"]
         # سقف للحجم: الحبيبات بتخلّي الملف يكبر جدًا من غير حد
         cmd += ["-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-maxrate", "12M", "-bufsize", "24M",
                 "-r", str(TYPO_FPS), "-t", f"{dur:.3f}", "-movflags", "+faststart", str(tmp_v)]
@@ -13459,6 +13520,7 @@ def run_typo_render(pid: str, base: str, quality: str) -> None:
         err = proc.stderr.read().decode(errors="ignore")
         if proc.wait(timeout=600) != 0:
             raise RuntimeError(f"FFmpeg: {err.strip()[-300:]}")
+        (folder / ".sfx.wav").unlink(missing_ok=True)
         name = f"typo-{uuid.uuid4().hex[:4]}.mp4"
         tmp_v.replace(folder / name)
         def fin(x):
