@@ -13431,11 +13431,24 @@ def typo_doc(pid: str, d: dict) -> dict:
             ox, oy = (sw * k - W) / 2, (sh * k - H) / 2
             fx = lambda v: round(v * sw * k - ox, 1)  # noqa: E731
             fy = lambda v: round(v * sh * k - oy, 1)  # noqa: E731
+
+            def seen(c):   # قد إيه من الشخص ده باين في الكادر بعد القص (والراس جوه الكادر بيكسب)
+                x0, y0, x1, y1 = fx(c["box"][0]), fy(c["box"][1]), fx(c["box"][2]), fy(c["box"][3])
+                area = max(0, min(x1, W) - max(x0, 0)) * max(0, min(y1, H) - max(y0, 0))
+                hx, hy = fx(c["head"][0]), fy(c["head"][1])
+                return area * (1.0 if 0 <= hx <= W and 0 <= hy <= H else 0.1)
+
+            def pick(f):
+                if not f:
+                    return None
+                best = max([f, *(f.get("others") or [])], key=seen)
+                return best if seen(best) > W * H * 0.01 else None
             pdoc = {"fps": pi["fps"], "n": pi["n"], "base": f"/media/typo/projects/{pid}/person/p_",
                     "img": {"x": -ox, "y": -oy, "w": sw * k, "h": sh * k},
                     "frames": [{"box": [fx(f["box"][0]), fy(f["box"][1]), fx(f["box"][2]), fy(f["box"][3])],
-                                "head": [fx(f["head"][0]), fy(f["head"][1]), round(f["head"][2] * sw * k, 1)]} if f else None
-                               for f in pi["frames"]]}
+                                "head": [fx(f["head"][0]), fy(f["head"][1]), round(f["head"][2] * sw * k, 1)],
+                                "solid": f.get("solid", 1)} if f else None
+                               for f in map(pick, pi["frames"])]}
         except (OSError, ValueError, KeyError):
             pdoc = None
     return {"w": W, "h": H, "fps": TYPO_FPS, "anchors": anchors, "person": pdoc, "dim": float((d.get("bg") or {}).get("dim") or 0), "duration": d.get("duration") or (blocks[-1]["t1"] if blocks else 1),

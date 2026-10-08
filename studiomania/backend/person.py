@@ -59,13 +59,18 @@ class Segmenter:
         return 1 - y[..., 0]   # كل حاجة غير الخلفية = الشخص (شعر، وش، جسم، هدوم)
 
 
-def _largest(on: np.ndarray) -> np.ndarray:
-    """أكبر جزء متصل بس (إيدين أو حاجات طايرة في الكادر ماتلخبطش مكان الراس). بيشتغل على نسخة صغيرة."""
+def _components(on: np.ndarray) -> tuple[np.ndarray, list[tuple[int, int]], int, int]:
+    """الأجزاء المتصلة على نسخة صغيرة: (الأرقام، [(رقم، حجم)] من الأكبر، sy، sx)."""
     h, w = on.shape
     sy, sx = max(1, h // 64), max(1, w // 64)
-    small = on[::sy, ::sx]
+    small = on[::sy, ::sx].copy()
+    # الراس والجسم ممكن يتفصلوا بخط رفيع (رقبة غامقة): بنوصّل الحتت القريبة من بعض
+    for _ in range(2):   # بالطول بس، عشان شخصين جنب بعض مايتلزقوش
+        d = small.copy()
+        d[1:] |= small[:-1]; d[:-1] |= small[1:]
+        small = d
     lab = np.zeros(small.shape, np.int32)
-    best, best_n, cur = 0, 0, 0
+    sizes, cur = [], 0
     H, W = small.shape
     for y0 in range(H):
         for x0 in range(W):
@@ -80,21 +85,63 @@ def _largest(on: np.ndarray) -> np.ndarray:
                         if 0 <= yy < H and 0 <= xx < W and small[yy, xx] and not lab[yy, xx]:
                             lab[yy, xx] = cur
                             stack.append((yy, xx))
-                if n > best_n:
-                    best, best_n = cur, n
-    keep = np.kron(lab == best, np.ones((sy, sx), bool))[:h, :w]
+                sizes.append((cur, n))
+    sizes.sort(key=lambda c: -c[1])
+    return lab, sizes, sy, sx
+
+
+def _part(on: np.ndarray, lab: np.ndarray, num: int, sy: int, sx: int) -> np.ndarray:
+    h, w = on.shape
+    keep = np.kron(lab == num, np.ones((sy, sx), bool))[:h, :w]
     if keep.shape != on.shape:
         keep = np.pad(keep, ((0, h - keep.shape[0]), (0, w - keep.shape[1])))
     return on & keep
 
 
-def _stats(alpha: np.ndarray) -> dict | None:
-    """الصندوق ومكان الراس من الماسك (0..1)، بكسور من عرض وطول الفريم."""
+def fill_holes(alpha: np.ndarray) -> np.ndarray:
+    """الخروم جوه الشخص (شعر غامق، نضارة) بتتملي، عشان الكلام اللي وراه مايبانش من جوه راسه."""
+    from PIL import Image, ImageFilter
+
     h, w = alpha.shape
-    on = alpha > 0.5
-    if on.mean() < 0.01:
-        return None
-    on = _largest(on)
+    # الأول بنقفل الشقوق الصغيرة اللي بتفتح الخرم على برّه (تكبير وبعدين تصغير)
+    im = Image.fromarray((alpha * 255).astype(np.uint8))
+    k = max(5, (w // 40) | 1)
+    closed = np.asarray(im.filter(ImageFilter.MaxFilter(k)).filter(ImageFilter.MinFilter(k)), dtype=np.float32) / 255
+    alpha = np.maximum(alpha, closed)
+    f = 4
+    on = alpha[: h // f * f, : w // f * f].reshape(h // f, f, w // f, f).max((1, 3)) > 0.4
+    out = np.zeros_like(on)
+    out[0, :], out[-1, :], out[:, 0], out[:, -1] = ~on[0, :], ~on[-1, :], ~on[:, 0], ~on[:, -1]
+    for _ in range(400):   # الخلفية اللي توصل لحرف الكادر = برّه، الباقي خروم
+        nxt = out.copy()
+        nxt[1:] |= out[:-1]; nxt[:-1] |= out[1:]; nxt[:, 1:] |= out[:, :-1]; nxt[:, :-1] |= out[:, 1:]
+        nxt &= ~on
+        if (nxt == out).all():
+            break
+        out = nxt
+    holes = ~on & ~out
+    if not holes.any():
+        return alpha
+    soft = np.asarray(Image.fromarray(holes.astype(np.uint8) * 255).resize((w // f * f, h // f * f), Image.BILINEAR)
+                      .filter(ImageFilter.GaussianBlur(f / 2)), dtype=np.float32) / 255
+    full = np.zeros((h, w), np.float32)
+    full[: soft.shape[0], : soft.shape[1]] = np.clip(soft * 1.6, 0, 1)
+    return np.maximum(alpha, full)
+
+
+def _solid(alpha: np.ndarray, st: dict) -> float:
+    """قد إيه الراس متقصوصة صح (0..1). الضلمة أو الضهر للكاميرا بيخلّوها ضعيفة، ووقتها الكلام مايتحطش وراها."""
+    h, w = alpha.shape
+    cx, cy, r = st["head"][0] * w, st["head"][1] * h, st["head"][2] * w
+    yy, xx = np.ogrid[:h, :w]
+    inside = (xx - cx) ** 2 + (yy - cy) ** 2 <= (r * 0.8) ** 2
+    if inside.sum() < 20 or r < w * 0.03:
+        return 0.0
+    return round(float((alpha[inside] > 0.75).mean()), 2)
+
+
+def _stats_one(on: np.ndarray, cover: float) -> dict:
+    h, w = on.shape
     rows, cols = np.where(on.any(1))[0], np.where(on.any(0))[0]
     y0, y1, x0, x1 = rows[0], rows[-1], cols[0], cols[-1]
     # الراس: من فوق الجسم لحد ما العرض يتضاعف (الكتاف). عرض الراس = متوسط العرض في الجزء ده
@@ -111,8 +158,33 @@ def _stats(alpha: np.ndarray) -> dict | None:
     wmed = float(np.median(widths[max(1, end // 3):max(2, end)])) if end > 3 else (x1 - x0) * 0.3
     r = max(wmed / 2, 4.0)
     cy = y0 + r * 1.15
-    return {"box": [round(x0 / w, 4), round(y0 / h, 4), round(x1 / w, 4), round(y1 / h, 4)],
-            "head": [round(cx / w, 4), round(cy / h, 4), round(r / w, 4)], "cover": round(float(on.mean()), 3)}
+    return {"box": [round(float(x0) / w, 4), round(float(y0) / h, 4), round(float(x1) / w, 4), round(float(y1) / h, 4)],
+            "head": [round(cx / w, 4), round(float(cy) / h, 4), round(r / w, 4)], "cover": round(cover, 3)}
+
+
+def _stats(alpha: np.ndarray) -> dict | None:
+    """الصندوق ومكان الراس من الماسك (0..1)، بكسور من عرض وطول الفريم.
+    لو فيه أكتر من شخص (أو صورة جوه صورة) بيتحفظوا كلهم في others، والكادر النهائي بيختار اللي باين فيه."""
+    on = alpha > 0.5
+    if on.mean() < 0.01:
+        return None
+    lab, sizes, sy, sx = _components(on)
+    if not sizes:
+        return None
+    parts = [c for c in sizes[:3] if c[1] >= sizes[0][1] * 0.2]
+    found = []
+    for num, _ in parts:
+        part = _part(on, lab, num, sy, sx)
+        if part.any():
+            st = _stats_one(part, float(part.mean()))
+            st["solid"] = _solid(alpha, st)
+            found.append(st)
+    if not found:
+        return None
+    main = dict(found[0])
+    if len(found) > 1:
+        main["others"] = found[1:]
+    return main
 
 
 def analyze(ffmpeg: str, src: Path, out_dir: Path, models_dir: Path, fps: int, duration: float, width: int = 540,
@@ -146,6 +218,7 @@ def analyze(ffmpeg: str, src: Path, out_dir: Path, models_dir: Path, fps: int, d
         prev = m256
         alpha = np.asarray(Image.fromarray((np.clip((m256 - 0.35) / 0.3, 0, 1) * 255).astype(np.uint8)).resize((width, ph), Image.BICUBIC),
                            dtype=np.float32) / 255
+        alpha = fill_holes(alpha)
         st = _stats(alpha)
         frames.append(st)
         im = Image.fromarray(rgb).convert("RGBA")

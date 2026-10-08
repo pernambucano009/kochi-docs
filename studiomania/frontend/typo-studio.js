@@ -53,8 +53,36 @@
     const a = this.personAt(t);
     // الراس لازم يكون جوه الكادر بعد القص (فيديو عريض في كادر طولي ممكن يقص الشخص برّه)
     if (a?.st && a.st.head[0] > w * 0.08 && a.st.head[0] < w * 0.92 && a.st.head[1] > 0 && a.st.head[1] < h * 0.85)
-      return { x: a.st.head[0], y: a.st.head[1], r: Math.max(a.st.head[2], Math.min(w, h) * 0.06), top: Math.max(0, a.st.box[1]), has: true };
-    return { x: w / 2, y: h * 0.42, r: Math.min(w, h) * 0.13, top: h * 0.3, has: false };
+      return { x: a.st.head[0], y: a.st.head[1], r: Math.max(a.st.head[2], Math.min(w, h) * 0.06), top: Math.max(0, a.st.box[1]), has: true,
+               solid: (a.st.solid ?? 1) >= 0.6 };
+    return { x: w / 2, y: h * 0.42, r: Math.min(w, h) * 0.13, top: h * 0.3, has: false, solid: false, any: !!a?.st };
+  };
+  // القرار (ورا الراس ولا بعيد عنها) مرة واحدة للبلوك كله، عشان الكلام مايتنططش بين الفريمات
+  P.blockSolid = function (b) {
+    const p = this.doc.person;
+    if (!p?.n) return null;
+    this._bs = this._bs || new Map();
+    const key = `${b.t0}|${b.t1}`;
+    if (!this._bs.has(key)) {
+      let n = 0, ok = 0;
+      for (let t = b.t0; t <= b.t1; t += 0.1) {
+        const hd = this.headAt(t);
+        n++; if (hd.solid) ok++;
+      }
+      this._bs.set(key, n ? ok / n >= 0.6 : false);
+    }
+    return this._bs.get(key);
+  };
+  // الكلام اللي في النص بينزل تحت الدقن لو فيه وش (مرة واحدة للبلوك كله)
+  P.belowHead = function (b, size) {
+    const { h } = this.doc;
+    if (!this.blockSolid(b)) return h * 0.5;
+    let low = 0;
+    for (let t = b.t0; t <= b.t1; t += 0.1) { const hd = this.headAt(t); if (hd.solid) low = Math.max(low, hd.y + hd.r * 1.2); }
+    return clamp(low + size * 0.6, h * 0.5, h * 0.64);
+  };
+  P.atY = function (y, inner) {
+    return `<div style="position:absolute;left:0;right:0;top:${y.toFixed(1)}px;display:flex;justify-content:center;transform:translateY(-50%)">${inner}</div>`;
   };
   // السيرفر بيستنى الصور اللي في الفريم تتحمل قبل ما يصوّر
   P.settle = function () {
@@ -88,13 +116,17 @@
     const lines = txt.split(/\s+/).length > 2 ? [txt.split(/\s+/).slice(0, Math.ceil(txt.split(/\s+/).length / 2)).join(" "), txt.split(/\s+/).slice(Math.ceil(txt.split(/\s+/).length / 2)).join(" ")] : [txt];
     const ff = fam(txt, "TY Anton", "SM Lalezar");
     const hd = this.headAt(t);
+    const bs = this.blockSolid(b);
+    const safe = bs === null || bs;
     let html = backdrop(this, th);
     const maxW = w * 0.9, maxH = h * (h > w ? 0.2 : 0.4) / lines.length;
     lines.forEach((ln, li) => {
       const base = measure(ln, `400 100px ${ff}`) || 100;
       const size = Math.min((maxW / base) * 100, maxH * 1.25);
       // الكلام بيقعد بحيث الراس يغطي الجزء التحتاني منه
-      const cy = clamp(hd.top + size * (0.15 + li * 0.95) - (lines.length - 1) * size * 0.45, size * 0.6, h * 0.7);
+      // القصّة مش مضمونة (ضلمة، ضهره للكاميرا): الكلام فوق في الكادر بعيد عن الراس بدل ما يتحط وراها
+      const cy = safe ? clamp(hd.top + size * (0.15 + li * 0.95) - (lines.length - 1) * size * 0.45, size * 0.6, h * 0.7)
+        : h * 0.06 + size * (0.5 + li * 0.95);
       const t0 = (ws[Math.min(ws.length - 1, li * Math.ceil(ws.length / lines.length))]?.t0) ?? b.t0;
       const e = eOut(seg(t, t0, t0 + 0.22)), out = 1 - seg(t, b.t1 - 0.15, b.t1);
       if (t < t0) return;
@@ -102,7 +134,7 @@
         font-family:${ff};font-size:${size.toFixed(1)}px;line-height:1;white-space:nowrap;color:${inkOf(this, th)};opacity:${(e * out).toFixed(3)};
         letter-spacing:-0.01em;filter:blur(${((1 - e) * 8).toFixed(1)}px);${onVideo(this) ? "text-shadow:0 6px 30px rgba(0,0,0,.25);" : ""}" dir="${this.dir(ln)}">${esc(ln)}</div>`;
     });
-    return html + this.personLayer(t);
+    return html + (bs ? this.personLayer(t) : "");
   };
 
   // ---------- arc: الكلام متقوّس حوالين الراس
@@ -110,13 +142,19 @@
     const { w, h } = this.doc;
     const ws = this.words(b);
     const hd = this.headAt(t);
-    const R = Math.min(Math.max(hd.r * 2.1, Math.min(w, h) * 0.22), Math.min(w, h) * 0.4);
+    let R = Math.min(Math.max(hd.r * 2.1, Math.min(w, h) * 0.22), Math.min(w, h) * 0.4);
+    const pad = Math.min(w, h) * 0.075 * this.ts * 1.2;
+    // الراس قريبة من حرف الكادر: الدايرة بتصغر بس بتفضل حوالين الراس (ماتعديش فوقها)
+    if (hd.solid) R = Math.max(hd.r * 1.7, Math.min(R, hd.x - pad, w - hd.x - pad, hd.y - pad * 1.5));
     const ar = AR.test(ws.map((x) => x.w).join(""));
     const base = Math.min(w, h) * 0.075 * this.ts;
     // كل كلمة بزاويتها (من فوق الشمال لفوق اليمين حوالين الراس)
-    const sizes = ws.map((x, i) => (i === b.focus ? base * 1.6 : base));
-    const lens = ws.map((x, i) => measure(this.text(x.w) + " ", `800 ${sizes[i]}px ${fam(x.w, "TY Outfit", "SM Lalezar")}`));
-    const total = lens.reduce((a, c) => a + c, 0);
+    let sizes = ws.map((x, i) => (i === b.focus ? base * 1.6 : base));
+    let lens = ws.map((x, i) => measure(this.text(x.w) + " ", `800 ${sizes[i]}px ${fam(x.w, "TY Outfit", "SM Lalezar")}`));
+    let total = lens.reduce((a, c) => a + c, 0);
+    // الكلام أطول من القوس: الخط بيصغر بدل ما الكلمات تركب على بعض
+    const room = Math.PI * 1.2 * R;
+    if (total > room) { const f = room / total; sizes = sizes.map((z) => z * f); lens = lens.map((z) => z * f); total = room; }
     const span = Math.min(Math.PI * 1.25, total / R);
     let ang = -Math.PI / 2 - span / 2;
     const order = ar ? [...ws.keys()].reverse() : [...ws.keys()];
@@ -124,7 +162,9 @@
     for (const i of order) { at[i] = ang + (lens[i] / R) / 2; ang += lens[i] / R; }
     // الدايرة كلها جوه الكادر
     const m = base * 1.2;
-    const cx = clamp(hd.x, R + m, w - R - m), cy = clamp(hd.y, R + m * 1.5, h - m);
+    // القصّة مش مضمونة: القوس فوق في الكادر بدل ما نخمّن مكان الراس
+    const guess = this.blockSolid(b) === false || (!hd.solid && (hd.has || hd.any));
+    const cx = guess ? w / 2 : clamp(hd.x, R + m, w - R - m), cy = guess ? R + m * 1.5 : clamp(hd.y, R + m * 1.5, h - m);
     let html = backdrop(this, th);
     ws.forEach((x, i) => {
       if (t < x.t0) return;
@@ -174,7 +214,7 @@
     });
     const on = typing || Math.floor(t * 2.4) % 2 === 0;
     const caret = `<span style="display:inline-block;width:${(size * 0.07).toFixed(1)}px;height:${(size * 1.05).toFixed(1)}px;background:${ORANGE};vertical-align:-0.18em;margin-inline-start:${(size * 0.12).toFixed(1)}px;opacity:${on ? 1 : 0}"></span>`;
-    return bgc + this.center(`<div dir="${dir}" style="font-family:${fam(full, "TY Outfit", "TY PlexAr")};font-weight:400;font-size:${size.toFixed(1)}px;color:${ink};max-width:86%;text-align:center;line-height:1.5;${shadow(this)}">${shown}${caret}</div>`);
+    return bgc + this.atY(this.belowHead(b, size), `<div dir="${dir}" style="font-family:${fam(full, "TY Outfit", "TY PlexAr")};font-weight:400;font-size:${size.toFixed(1)}px;color:${ink};max-width:86%;text-align:center;line-height:1.5;${shadow(this)}">${shown}${caret}</div>`);
   };
 
   // ---------- redword: كلمة واحدة حمرا في النص
@@ -192,7 +232,7 @@
     if (tw > w * 0.8) size *= (w * 0.8) / tw;
     const e = seg(t, cur.t0, cur.t0 + 0.08);
     const col = th.accent || RED;
-    return backdrop(this, th) + this.center(`<div dir="${this.dir(s)}" style="font:700 ${size.toFixed(1)}px ${ff};color:${col};letter-spacing:0.02em;
+    return backdrop(this, th) + this.atY(this.belowHead(b, size), `<div dir="${this.dir(s)}" style="font:700 ${size.toFixed(1)}px ${ff};color:${col};letter-spacing:0.02em;
       text-transform:uppercase;filter:blur(${((1 - e) * 5).toFixed(1)}px);text-shadow:0 0 ${(size * 0.25).toFixed(1)}px ${col}66">${esc(s)}</div>`);
   };
 
@@ -207,7 +247,7 @@
     let size = Math.min(w, h) * 0.16 * this.ts;
     const tw = measure(s, `400 ${size}px ${ff}`);
     if (tw > w * 0.86) size *= (w * 0.86) / tw;
-    const W2 = Math.min(tw, w * 0.86), cx = w / 2, cy = h * 0.5;
+    const W2 = Math.min(tw, w * 0.86), cx = w / 2, cy = this.belowHead(b, size);
     const t0 = ws[0]?.t0 ?? b.t0, dur = Math.max(0.6, Math.min(1.6, (b.t1 - t0) * 0.7));
     const p = eOut(seg(t, t0, t0 + dur));
     const r = rng(i + 3);
