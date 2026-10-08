@@ -3176,5 +3176,21 @@ window.I18N_EN = {
   "🎬 ⭕ دايرة بالقلم": "🎬 ⭕ Pen circle",
   "🎬 📋 لستة بسهم": "🎬 📋 List with arrow",
   "🎬 🤖 مربع ذكاء اصطناعي": "🎬 🤖 AI prompt box",
-  "🎬 ✨ كلام متفرّق": "🎬 ✨ Scattered words"
+  "🎬 ✨ كلام متفرّق": "🎬 ✨ Scattered words",
+  "معمل التفكيك (تقسيم الفيديوهات)": "Breakdown lab (video splitting)",
+  "فيديوهات التايبوجرافي": "Typography videos",
+  "📦 أرشيف المراجع": "📦 References archive",
+  "الإعلانات": "Ads",
+  "المسلسلات": "Series",
+  "الأفلام": "Films",
+  "الكاروسيل": "Carousel",
+  "مكتبة العناصر": "Assets library",
+  "فيديوهات التيمبليتس": "Template videos",
+  "🗑️ امسح كل فيديوهات التفكيك": "🗑️ Delete all lab videos",
+  "🗑️ امسح كل فيديوهات التايبوجرافي": "🗑️ Delete all typography videos",
+  "🗑️ امسح كل الأرشيف": "🗑️ Delete the whole archive",
+  "🗑️ امسح كل الفيديوهات الخام": "🗑️ Delete all raw videos",
+  "🗑️ امسح كل الفيديوهات الجاهزة": "🗑️ Delete all finished videos",
+  "القسم ده مينفعش يتمسح كله": "This section can't be wiped",
+  "الملفات المؤقتة هي صور التايم لاين وبقايا التصدير، وبتتعمل تاني لوحدها. عشان تفضّي مساحة أكتر دوس 🗑️ جنب القسم اللي عايز تمسح فيديوهاته كلها مرة واحدة (اللي شغال دلوقتي بيفضل).": "Temporary files are timeline thumbnails and export leftovers; they're rebuilt on their own. To free more space, press 🗑️ next to a section to delete all its videos at once (anything running right now is kept)."
 };

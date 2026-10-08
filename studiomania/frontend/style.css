@@ -810,7 +810,7 @@ dialog.bulk-dlg { width: min(900px, 96vw); max-height: 90vh; border: 1px solid v
 .storage .bar { height: 10px; background: var(--surface-2); border-radius: 6px; overflow: hidden; margin: 4px 0; }
 .storage .bar span { display: block; height: 100%; }
 .storage ul { list-style: none; padding: 0; margin: 6px 0 10px; font-size: 13px; }
-.storage li { display: flex; justify-content: space-between; padding: 3px 0; border-bottom: 1px solid var(--line); }
+.storage li { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 3px 0; border-bottom: 1px solid var(--line); }
 .storage li b { direction: ltr; }
 .render-log { max-height: 300px; overflow: auto; background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 8px; font-size: 11px; white-space: pre-wrap; word-break: break-all; text-align: left; }
 

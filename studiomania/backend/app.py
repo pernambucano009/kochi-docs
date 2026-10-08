@@ -2261,10 +2261,80 @@ def get_storage():
         "raw": RAW_DIR, "clips": CLIPS_DIR, "generated": GENERATED_DIR, "coaches": COACHES_DIR,
         "audio": AUDIO_DIR, "exports": EXPORTS_DIR, "tmp": TMP_DIR,
     }
+    folders.update({"lab": LAB_DIR, "typo": TYPO_PROJ, "refs": REFS_DIR, "ads": ADS_DIR, "series": SERIES_DIR, "films": FILMS_DIR,
+                    "carousels": CAROUSELS_DIR, "assets": ASSETS_DIR, "tvideos": TV_DIR})
     return {
         "total_mb": usage.total // 2**20, "free_mb": usage.free // 2**20,
-        "folders": {k: folder_mb(v) for k, v in folders.items()},
+        "folders": {k: folder_mb(v) for k, v in folders.items() if v.exists()},
+        "wipe": {k: storage_count(k) for k in WIPE_SECTIONS},
     }
+
+
+# 🗑️ مسح كل الفيديوهات في قسم مرة واحدة (عشان تفضّي مساحة). اللي شغال دلوقتي بيفضل زي ما هو
+WIPE_SECTIONS = ("lab", "typo", "refs", "raw", "exports")
+
+
+def storage_count(section: str) -> int:
+    if section == "lab":
+        return len(list(LAB_DIR.glob("*/lab.json")))
+    if section == "typo":
+        return len(list(TYPO_PROJ.glob("*/typo.json")))
+    if section == "refs":
+        return len(list(REFS_DIR.glob("*.json")))
+    with closing(db()) as conn:
+        return conn.execute(f"SELECT COUNT(*) FROM {'videos' if section == 'raw' else 'exports'}").fetchone()[0]
+
+
+@app.post("/api/storage/wipe/{section}")
+def wipe_storage(section: str):
+    if section not in WIPE_SECTIONS:
+        raise HTTPException(400, "القسم ده مينفعش يتمسح كله")
+    if RENDER_ACTIVE and section in ("raw", "exports"):
+        raise HTTPException(400, "فيه تصدير شغال دلوقتي، استنى لما يخلص")
+    before = shutil.disk_usage(DATA_DIR).free
+    gone, kept = 0, 0
+    if section == "lab":
+        for f in list(LAB_DIR.glob("*/lab.json")):
+            try:
+                d = json.loads(f.read_text(encoding="utf-8"))
+            except ValueError:
+                d = {}
+            if any((v or {}).get("status") in ("working", "queued") for v in (d.get("steps") or {}).values()):
+                kept += 1
+                continue
+            shutil.rmtree(f.parent, ignore_errors=True)
+            gone += 1
+    elif section == "typo":
+        for f in list(TYPO_PROJ.glob("*/typo.json")):
+            try:
+                d = json.loads(f.read_text(encoding="utf-8"))
+            except ValueError:
+                d = {}
+            if d.get("status") in TYPO_BUSY:
+                kept += 1
+                continue
+            shutil.rmtree(f.parent, ignore_errors=True)
+            gone += 1
+    elif section == "refs":
+        for m in list(REFS_DIR.glob("*.json")):
+            for f in REFS_DIR.glob(f"{m.stem}.*"):
+                f.unlink(missing_ok=True)
+            gone += 1
+    elif section == "raw":
+        with closing(db()) as conn, conn:
+            for r in conn.execute("SELECT id FROM videos").fetchall():
+                remove_video(conn, r["id"])
+                gone += 1
+    else:
+        with closing(db()) as conn, conn:
+            for r in conn.execute("SELECT id, filename FROM exports").fetchall():
+                if conn.execute("SELECT COUNT(*) FROM posts WHERE export_id = ? AND status IN ('scheduled', 'sending', 'publishing')", (r["id"],)).fetchone()[0]:
+                    kept += 1
+                    continue
+                conn.execute("DELETE FROM exports WHERE id = ?", (r["id"],))
+                (EXPORTS_DIR / r["filename"]).unlink(missing_ok=True)
+                gone += 1
+    return {"deleted": gone, "kept": kept, "freed_mb": round(max(0, shutil.disk_usage(DATA_DIR).free - before) / 2**20, 1)}
 
 
 @app.post("/api/storage/clean")
