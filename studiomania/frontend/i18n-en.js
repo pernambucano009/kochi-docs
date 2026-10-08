@@ -3089,5 +3089,20 @@ window.I18N_EN = {
   "اسم حساب إنستجرام مش مظبوط: {0}": "Invalid Instagram account name: {0}",
   "الحزمة أكبر من 300 ميجا": "The pack is larger than 300 MB",
   "ده مش ملف حزمة مكتبة (لازم zip فيه manifest.json)": "This isn't a library pack (it must be a zip with manifest.json)",
-  "صورة المدرب الحقيقية واسمه": "The coach's real photo and name"
+  "صورة المدرب الحقيقية واسمه": "The coach's real photo and name",
+  "🎬 🧍 كلام عملاق ورا الشخص": "🎬 🧍 Giant text behind the person",
+  "🎬 🌙 كلام متقوّس حوالين الراس": "🎬 🌙 Text arcing around the head",
+  "🎬 ⌨️ كتابة بمؤشر برتقاني": "🎬 ⌨️ Typing with an orange cursor",
+  "🎬 🔴 كلمة حمرا واحدة": "🎬 🔴 One red word",
+  "🎬 ✒️ إمضا بتتكتب": "🎬 ✒️ Signature being written",
+  "🎬 🟥 بوستر أحمر": "🎬 🟥 Red poster",
+  "🎬 📚 كومة كلام مايلة جنب الشخص": "🎬 📚 Tilted word stack beside the person",
+  "🎬 ➡️ كلمة بتزق اللي قبلها": "🎬 ➡️ Word pushes the previous one",
+  "🎬 📺 شاشة قديمة وجلتش": "🎬 📺 Old screen with glitch",
+  "🎬 ✂️ حروف مقصوصة": "🎬 ✂️ Cut-out letters",
+  "🎬 ⭕ دايرة حوالين الراس": "🎬 ⭕ Ring around the head",
+  "🎬 🛣️ كلام على الأرض": "🎬 🛣️ Text on the floor",
+  "🎬 🖊️ خط إيد بيرتعش": "🎬 🖊️ Shaky handwriting",
+  "🎬 🏷️ كلمات على مربعات حمرا": "🎬 🏷️ Words on red tags",
+  "🎬 ستوديو (عناصر الفيديوهات المرجعية)": "🎬 Studio (reference video elements)"
 };

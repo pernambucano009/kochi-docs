@@ -39,6 +39,16 @@ STUDIO_KINDS = {
     "artype": "سطر بيتكتب حرف حرف بمؤشر برتقاني، ونقطة برتقاني وخط متعرج على الكلمة المهمة (focus). ممتاز للعربي وللرسايل والأسئلة",
     "redword": "كلمة واحدة بس في النص حمرا ومنوّرة، بتتبدل مع كل كلمة بتتقال (للجمل المؤثرة واللحظات الجد، من 1 لـ 6 كلمات)",
     "signature": "إمضا بتتكتب بقلم رفيع بخط الإيد ومعاها خطوط قلم (لاسم، براند، توقيع، أو كلمة الختام). sign = الكلمة أو الكلمتين اللي يتكتبوا",
+    "poster": "بوستر أحمر مالي الشاشة بكلام أسود مضغوط عملاق (للصدمة والعنوان والجملة اللي لازم تتشاف، من كلمة لـ 5 كلمات، بيغطي الفيديو)",
+    "stack": "كومة كلام مايلة: كلام أبيض صغير وكلمات حمرا كبيرة مايلة، في الناحية الفاضية جنب الشخص (لشرح جملة فيها كلمتين مهمين، من 3 لـ 7 كلمات). "
+             "focus = الكلمة الأهم، وممكن anchor وplace زي type",
+    "push": "كلمة واحدة في الكادر، والكلمة الجاية بتزقها وتاخد مكانها (لتعداد سريع أو جملة بإيقاع سريع، من 3 لـ 6 كلمات)",
+    "crt": "شاشة قديمة: كلام أبيض منوّر ضبابي بحواف أحمر وأزرق وجلتش على كل كلمة (للغموض والتحذير والكلام التقني أو المخيف، من 2 لـ 8 كلمات)",
+    "ransom": "حروف مقصوصة من مجلات، كل حرف بلون وخط (لكلمة مفاجئة أو سر أو حاجة مجنونة، من كلمة لـ 3 كلمات)",
+    "halo": "دايرة متقطعة بتلف حوالين راس الشخص، والكلام بخط إيد حواليها (لما بيتكلم عن نفسه أو عن فكرة في دماغه، من 2 لـ 6 كلمات، لما يكون فيه شخص)",
+    "floor": "كلام نايم على الأرض بمنظور ومنوّر (لجملة هادية أو بداية فصل جديد، من 2 لـ 6 كلمات)",
+    "hand": "خط إيد بيرتعش زي فيلم قديم بحواف خضرا وبنفسجي (للإحساس والذكريات والكلام الشخصي، من 2 لـ 8 كلمات)",
+    "tags": "كلمات على مربعات حمرا تحت بعض في الناحية الفاضية جنب الشخص (لتعداد مميزات أو أسماء أو كلمات مفتاحية، من 2 لـ 5 كلمات). ممكن anchor وplace",
 }
 KINDS.update(STUDIO_KINDS)
 INTROS = {"track": ("", "flash", "card"), "spot": ("", "burst")}
@@ -76,8 +86,12 @@ BUILTIN_STYLES = {
         "rules": ["لو فيه شخص في الفيديو: أول كلمة أو كلمتين في الهوك behind، والجمل اللي بتتقال وهو بيتكلم arc حوالين راسه",
                   "الكلام العربي والأسئلة والرسايل artype", "الجمل المؤثرة والجد redword",
                   "الأسماء والبراند والختام signature", "غيّر بين العناصر ومتكررش نفس العنصر أكتر من مرتين ورا بعض",
+                  "التعداد tags أو push، والصدمة والعنوان poster، والغموض والتحذير crt، والمفاجأة ransom",
+                  "الكلام الشخصي والذكريات hand، والكلام عن نفسه أو فكرة في دماغه halo، وبداية فصل جديد floor",
+                  "الجمل اللي فيها كلمتين مهمين stack جنب الشخص",
                   "build وtype للجمل العادية الطويلة"],
-        "kinds": {"behind": 2, "arc": 3, "artype": 2, "redword": 2, "signature": 1, "build": 1},
+        "kinds": {"behind": 2, "arc": 2, "artype": 2, "redword": 2, "signature": 1, "stack": 2, "tags": 1, "push": 1, "poster": 1,
+                  "crt": 1, "ransom": 1, "halo": 1, "floor": 1, "hand": 1, "build": 1},
     },
     "pro": {
         "name": "⭐ احترافي (زي الفيديو المرجع)", "font": "SM Tajawal", "case": "lower", "grain": 0.12, "weight": 700, "pro": True,
@@ -111,7 +125,7 @@ BUILTIN_STYLES = {
 }
 
 PLAN_FORMAT = """{
-  "blocks": [{"from": 0, "to": 3, "kind": "pop | type | build | icon | letters | scatter | ring | behind | arc | artype | redword | signature", "theme": "light | dark | accent",
+  "blocks": [{"from": 0, "to": 3, "kind": "pop | type | build | icon | letters | scatter | ring | behind | arc | artype | redword | signature | poster | stack | push | crt | ransom | halo | floor | hand | tags", "theme": "light | dark | accent",
               "text": "الكلام اللي يتكتب (من كلام الجمل دي بالظبط، ممكن تختصره لكلمة أو كلمتين في pop/icon/letters/scatter)",
               "focus": 0, "icon": "اسم ستيكر من المكتبة أو وصف قصير بالإنجليزي لأيقونة جديدة", "icons": ["..."], "letter": 1,
               "side": "اسم ستيكر/صورة كبيرة جنب الكلام في build أو فاضي",
@@ -144,7 +158,7 @@ def plan_messages(words: list[dict], style: dict, stickers: list[str], brief: st
     if style.get("studio"):
         pool = {k: v for k, v in KINDS.items() if k in STUDIO_KINDS or k in ("build", "type", "pop")}
     if not (person or {}).get("present"):   # من غير شخص: الحركات اللي محتاجاه مالهاش لازمة
-        pool = {k: v for k, v in pool.items() if k not in ("behind", "arc")}
+        pool = {k: v for k, v in pool.items() if k not in ("behind", "arc", "halo")}
     kinds = "\n".join(f"- {k}: {v}" for k, v in pool.items())
     rules = "\n".join(f"- {r}" for r in style.get("rules") or [])
     weights = ", ".join(f"{k}×{v}" for k, v in (style.get("kinds") or {}).items())
@@ -180,7 +194,7 @@ def plan_messages(words: list[dict], style: dict, stickers: list[str], brief: st
         + "- letters: text كلمة واحدة قصيرة، وletter = رقم الحرف اللي هيتبدل (من 0).\n"
         "- focus = رقم الكلمة جوه البلوك اللي تنوّر (من 0) أو -1.\n"
         "- text في pop/icon/letters/scatter كلمة أو كلمتين بس من الكلام نفسه، بنفس لغته.\n"
-        "رجّع JSON بس بالشكل ده:\n" + (PLAN_FORMAT.replace("pop | type | build | icon | letters | scatter | ring", "track | sign | spot") if pro else PLAN_FORMAT)
+        "رجّع JSON بس بالشكل ده:\n" + (re.sub(r'"kind": "[^"]*"', '"kind": "track | sign | spot"', PLAN_FORMAT, count=1) if pro else PLAN_FORMAT)
     )
     return [{"role": "user", "content": text}]
 
@@ -315,7 +329,7 @@ def studio_plan(words: list[dict], duration: float, person: dict | None = None) 
         ar = any(AR.search(words[i]["w"]) for i in sent)
         longest = lambda idx: max(idx, key=lambda i: len(words[i]["w"]))  # noqa: E731
         if n <= 2:
-            kind = "behind" if has and si % 2 == 0 else ("signature" if si == len(sents) - 1 else "redword")
+            kind = "behind" if has and si % 2 == 0 else ("signature" if si == len(sents) - 1 else ("redword", "poster", "ransom")[si % 3])
             out.append({"from": sent[0], "to": sent[-1], "kind": kind, "sign": " ".join(words[i]["w"] for i in sent).strip(".,،؟?!")})
             continue
         head = sent[:1] if n < 6 else sent[:2]
@@ -327,12 +341,13 @@ def studio_plan(words: list[dict], duration: float, person: dict | None = None) 
         tail = rest[-2:] if len(rest) >= 6 else []
         mid = rest[: len(rest) - len(tail)]
         if mid:
-            if ar or si % 3 == 1:
+            # بيلف على العناصر عشان كل جملة تبقى شكل مختلف
+            if ar and si % 4 == 1:
                 kind = "artype"
             elif has:
-                kind = "arc" if len(mid) <= 5 else "build"
+                kind = ("arc", "stack", "halo", "tags", "hand", "push")[si % 6] if len(mid) <= 6 else ("stack", "hand", "build")[si % 3]
             else:
-                kind = "redword" if si % 2 else "build"
+                kind = ("redword", "stack", "crt", "push", "hand", "floor")[si % 6] if len(mid) <= 6 else ("hand", "build", "crt")[si % 3]
             out.append({"from": mid[0], "to": mid[-1], "kind": kind, "focus": mid.index(longest(mid))})
         if tail:
             last = si == len(sents) - 1
