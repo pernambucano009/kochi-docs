@@ -8714,8 +8714,23 @@ def lab_export_list():
         st = (d.get("steps") or {}).get("split") or {}
         out.append({"id": f.parent.name, "name": d.get("name"), "duration": d["source"]["duration"], "status": st.get("status"),
                     "error": st.get("error"), "updated_at": d.get("updated_at"),
-                    "url": f"/media/lab/{f.parent.name}/picture_fx.mp4" if d.get("picture_fx") else None})
+                    "url": f"/media/lab/{f.parent.name}/picture_fx.mp4" if d.get("picture_fx") else None,
+                    "source_url": f"/api/lab/export/source/{f.parent.name}", "has_audio": (d.get("source") or {}).get("has_audio")})
     return out
+
+
+@app.get("/api/lab/export/source/{lid}")
+def lab_export_source(lid: str):
+    """⬇ الفيديو الأصلي زي ما اترفع (للفيديوهات المرجعية اللي محتاجين منها التايبوجرافي بس، من غير تقسيم الصوت)."""
+    folder = lab_dir(Path(lid).name)
+    try:
+        d = json.loads((folder / "lab.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        raise HTTPException(404, "مش موجود") from None
+    f = folder / d["source"]["file"]
+    if not f.exists():
+        raise HTTPException(404, "مش موجود")
+    return FileResponse(f, filename=export_file_name(d.get("name") or lid))
 
 
 @app.get("/api/lab/export/picture-fx.zip")
