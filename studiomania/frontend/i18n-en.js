@@ -3236,5 +3236,14 @@ window.I18N_EN = {
   "🌫️ بلير": "🌫️ Blur",
   "🫧 نطة من جوه": "🫧 Pop in",
   "الخطوة": "Action",
-  "النتيجة": "Result"
+  "النتيجة": "Result",
+  "🎨 معرض العناصر (شوف كل الحركات شغالة)": "🎨 Elements gallery (see every motion live)",
+  "🎨 معرض العناصر": "🎨 Elements gallery",
+  "✨ الكل": "✨ All",
+  "🎞️ الترانزيشنز": "🎞️ Transitions",
+  "📱 طولي": "📱 Vertical",
+  "🖥️ عرضي": "🖥️ Landscape",
+  "🧍 أحلى مع فيديو فيه شخص": "🧍 Best on a video with a person",
+  "الترانزيشن في أول اللقطة التانية": "The transition at the start of the second shot",
+  "كل حركات «ستوديو» شغالة قدامك بكلام تجربة. البرنامج بيختار منهم لوحده لما تدوس «🧠 وزّع» (كوليكشن مخفية عشوائي كل مرة)، وتقدر تغيّر أي لقطة بإيدك من قايمة الحركة جوه مشروع التايبوجرافي. دوس على أي كارت عشان تشوفه كبير.": "Every Studio motion playing with sample text. The app picks from them on its own when you press «🧠 Distribute» (a random hidden collection each time), and you can change any shot by hand from the motion list inside a typography project. Click any card to see it large."
 };

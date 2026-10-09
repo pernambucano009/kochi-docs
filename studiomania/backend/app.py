@@ -13057,6 +13057,14 @@ def typo_style(sid: str | None) -> dict:
     return styles.get(sid or "") or styles["mono-red"]
 
 
+@app.get("/api/typo/gallery")
+def typo_gallery():
+    """🎨 معرض العناصر: كل عناصر ستوديو ووصفها، والكوليكشنز المخفية، والترانزيشنز، وستايل ستوديو نفسه (عشان المعاينة في الصفحة)."""
+    return {"kinds": typo.STUDIO_KINDS, "person": sorted(typo.PERSON_KINDS), "trans": [t for t in typo.TRANS if t],
+            "collections": {k: {"note": v["note"], "kinds": list(v["kinds"])} for k, v in typo.COLLECTIONS.items()},
+            "style": typo.BUILTIN_STYLES["studio"]}
+
+
 @app.get("/api/typo/styles")
 def typo_styles_list():
     return list(typo_styles().values())
