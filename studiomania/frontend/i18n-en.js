@@ -3298,5 +3298,8 @@ window.I18N_EN = {
   "🎬 🪜 خطوات بشريط تقدّم": "🎬 🪜 Step wizard",
   "🎬 🎰 كلمات بتلف رأسي": "🎬 🎰 Vertical word roll",
   "🎬 🔢 رقم عملاق على الحرف": "🎬 🔢 Giant edge number",
-  "🎬 🗒️ ملاحظات متعلقة": "🎬 🗒️ Pinned sticky notes"
+  "🎬 🗒️ ملاحظات متعلقة": "🎬 🗒️ Pinned sticky notes",
+  "🎬 🎨 لوحة اختيار لون": "🎬 🎨 Color picker",
+  "🎬 📎 ملفات بتترفع": "🎬 📎 Files uploading",
+  "🎬 ⏱️ تايمر تنازلي": "🎬 ⏱️ Countdown timer"
 };

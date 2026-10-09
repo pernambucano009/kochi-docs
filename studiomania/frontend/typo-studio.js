@@ -43,7 +43,8 @@
     "promptline", "crowd", "photohero", "menu", "pricing", "pins", "result", "calendar", "mapdots", "marker",
     "lowerthird", "cardwords", "bars", "table", "dayplan", "stutter",
     "section", "worklog", "toggles", "checkout", "lockscreen", "wizard",
-    "wordroll", "bignum", "stickynote"]);
+    "wordroll", "bignum", "stickynote",
+    "colorpicker", "uploads", "timer"]);
   E.TYPING = new Set(["type", "artype"]);
   const MC = document.createElement("canvas").getContext("2d");
   const measure = (s, font) => { MC.font = font; return MC.measureText(s).width; };
@@ -4775,6 +4776,90 @@
           <div style="font:500 ${sz.toFixed(1)}px ${ff};color:#222;margin:${(sz * 0.4).toFixed(1)}px 0;line-height:1.3">${esc(s)}</div>
           <span dir="ltr" style="display:inline-flex;width:${(sz * 1.4).toFixed(0)}px;height:${(sz * 1.4).toFixed(0)}px;border-radius:50%;background:rgba(0,0,0,.12);align-items:center;justify-content:center;font:600 ${(sz * 0.5).toFixed(1)}px 'TY Outfit';color:#333">${initials[i % 3]}</span></div>`;
     });
+    return html;
+  };
+
+  // =====================================================================
+  // فيديو مرجعي 9 (موقع طباخ في 10 دقايق):
+  //   colorpicker لوحة اختيار لون: المربع بيتلوّن والسلايدر بيتحرك والكود بيتغير
+  //   uploads     ملفات بتترفع جنب مربع الكتابة بسبينر وبعدين ✓
+  //   timer       تايمر بيعدّ تنازلي «09:59» ونقط برتقاني حواليه
+  // =====================================================================
+  const HUES = [[150, "#2E8B57"], [20, "#E8622C"], [220, "#3B4BE8"], [330, "#D64C9E"]];
+  P.k_colorpicker = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    if (!it.length) return "";
+    const ar = isAr(it), ff = famOf(ar ? "ع" : "a");
+    const r = this.freeRect(b);
+    const cw = Math.min(r.w, w * 0.7), sz = cw * 0.06;
+    const x = r.x + (r.w - cw) / 2, y = r.y + Math.max(0, (r.h - cw * 1.25) / 2);
+    const [hue0] = HUES[bi % HUES.length];
+    const q = eOut(seg(t, b.t0 + 0.2, b.t1 - 0.2));
+    const hue = (hue0 + 40 * Math.sin(q * Math.PI)) % 360;
+    const col = `hsl(${hue.toFixed(0)},62%,48%)`;
+    const hex = (() => { const c = document.createElement("canvas").getContext("2d"); c.fillStyle = col; return c.fillStyle.toUpperCase(); })();
+    const label = it.filter((z) => t >= z.t0).map((z) => this.text(z.w)).join(" ");
+    const sx = 0.62 + 0.15 * Math.sin(q * 3), sy = 0.3 + 0.1 * Math.cos(q * 2.5);
+    let html = onVideo(this) ? "" : `<div style="position:absolute;inset:0;background:#E4EFE4"></div>`;
+    html += `<div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:${x.toFixed(1)}px;top:${y.toFixed(1)}px;width:${cw.toFixed(1)}px;box-sizing:border-box;background:#fff;border-radius:${(sz * 0.8).toFixed(1)}px;padding:${sz.toFixed(1)}px;box-shadow:0 ${(sz * 0.3).toFixed(1)}px ${sz.toFixed(1)}px rgba(0,0,0,.18);opacity:${eOut(seg(t, b.t0, b.t0 + 0.3)).toFixed(3)}">
+      <div style="display:flex;gap:${sz.toFixed(1)}px;font:600 ${(sz * 0.8).toFixed(1)}px ${ff};margin-bottom:${(sz * 0.6).toFixed(1)}px"><span style="color:#999">${ar ? "الثيم" : "Theme"}</span><span style="color:#111;border-bottom:2px solid #111">${ar ? "مخصص" : "Custom"}</span></div>
+      <div style="position:relative;height:${(cw * 0.55).toFixed(0)}px;border-radius:${(sz * 0.4).toFixed(1)}px;background:linear-gradient(transparent,#000),linear-gradient(90deg,#fff,hsl(${hue.toFixed(0)},100%,50%))">
+        <i style="position:absolute;left:${(sx * 100).toFixed(1)}%;top:${(sy * 100).toFixed(1)}%;width:${(sz * 0.9).toFixed(0)}px;height:${(sz * 0.9).toFixed(0)}px;border-radius:50%;border:3px solid #fff;transform:translate(-50%,-50%);box-shadow:0 0 0 1px rgba(0,0,0,.3)"></i></div>
+      <div style="position:relative;height:${(sz * 0.55).toFixed(1)}px;border-radius:${sz.toFixed(0)}px;margin:${(sz * 0.8).toFixed(1)}px 0;background:linear-gradient(90deg,red,#ff0,lime,cyan,blue,#f0f,red)">
+        <i style="position:absolute;left:${((hue / 360) * 100).toFixed(1)}%;top:50%;width:${(sz * 0.9).toFixed(0)}px;height:${(sz * 0.9).toFixed(0)}px;border-radius:50%;background:#fff;border:2px solid #333;transform:translate(-50%,-50%)"></i></div>
+      <div style="display:flex;align-items:center;gap:${(sz * 0.5).toFixed(1)}px"><span style="width:${(sz * 1.3).toFixed(0)}px;height:${(sz * 1.3).toFixed(0)}px;border-radius:50%;background:${col}"></span>
+        <span dir="ltr" style="flex:1;font:600 ${(sz * 0.9).toFixed(1)}px 'TY Pixel',monospace;border:1px solid #DDD;border-radius:${(sz * 0.3).toFixed(1)}px;padding:${(sz * 0.2).toFixed(1)}px ${(sz * 0.4).toFixed(1)}px;color:#222">${hex}</span>
+        <span style="font:600 ${(sz * 0.8).toFixed(1)}px 'TY Outfit';color:#555">100%</span></div>
+      <div style="margin-top:${(sz * 0.8).toFixed(1)}px;font:600 ${sz.toFixed(1)}px ${ff};color:#111;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(label)}</div>
+      <div style="display:flex;gap:${(sz * 0.4).toFixed(1)}px;margin-top:${(sz * 0.5).toFixed(1)}px">${[0, 1, 2, 3, 4, 5].map((i) => `<i style="width:${(sz * 1.1).toFixed(0)}px;height:${(sz * 1.1).toFixed(0)}px;border-radius:50%;background:hsl(${hue.toFixed(0)},${20 + i * 12}%,${80 - i * 11}%)"></i>`).join("")}</div></div>`;
+    return html;
+  };
+
+  // ---------- uploads: ملفات بتترفع
+  P.k_uploads = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    if (!it.length) return "";
+    const ar = isAr(it), ff = famOf(ar ? "ع" : "a");
+    const sz = mn * 0.04 * this.ts;
+    const bw = Math.min(w * 0.88, sz * 19);
+    const x = (w - bw) / 2, y = h * 0.4;
+    const files = [`${this.text(it[0].w).replace(/\s+/g, "_")}_1.jpg`, `${this.text(it[Math.min(1, it.length - 1)].w).replace(/\s+/g, "_")}_2.jpeg`];
+    const txt = it.filter((q) => t >= q.t0).map((q, i, a) => (i === a.length - 1 ? typed(this.text(q.w), t, q.t0, 28) : this.text(q.w))).join(" ");
+    let html = onVideo(this) ? "" : `<div style="position:absolute;inset:0;background:#F6F6F4"></div>`;
+    html += `<div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:${x.toFixed(1)}px;top:${y.toFixed(1)}px;width:${bw.toFixed(1)}px;box-sizing:border-box;background:#fff;border-radius:${(sz * 0.7).toFixed(1)}px;padding:${(sz * 0.7).toFixed(1)}px;box-shadow:0 ${(sz * 0.3).toFixed(1)}px ${sz.toFixed(1)}px rgba(0,0,0,.12);opacity:${eOut(seg(t, b.t0, b.t0 + 0.3)).toFixed(3)}">
+      <div style="display:flex;gap:${(sz * 0.5).toFixed(1)}px">${files.map((f, i) => { const t0 = b.t0 + 0.2 + i * 0.3; if (t < t0) return ""; const done = t > t0 + 0.8;
+        return `<span dir="ltr" style="display:inline-flex;align-items:center;gap:${(sz * 0.35).toFixed(1)}px;border:1px solid #E1E1E4;border-radius:${(sz * 0.4).toFixed(1)}px;padding:${(sz * 0.3).toFixed(1)}px ${(sz * 0.5).toFixed(1)}px;font:500 ${(sz * 0.75).toFixed(1)}px 'TY Outfit';color:#333;max-width:${(bw * 0.45).toFixed(0)}px;overflow:hidden;white-space:nowrap">
+          ${done ? `<svg width="${(sz * 0.8).toFixed(0)}" height="${(sz * 0.8).toFixed(0)}" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#16A34A"/><path d="M7 12.5l3 3L17 9" fill="none" stroke="#fff" stroke-width="2.6"/></svg>` : `<svg width="${(sz * 0.8).toFixed(0)}" height="${(sz * 0.8).toFixed(0)}" viewBox="0 0 24 24" style="transform:rotate(${((t * 720) % 360).toFixed(0)}deg)"><circle cx="12" cy="12" r="9" fill="none" stroke="#999" stroke-width="3" stroke-dasharray="40 20"/></svg>`}
+          ${esc(f)} <b style="color:#999;font-weight:400">×</b></span>`; }).join("")}</div>
+      <div style="font:500 ${sz.toFixed(1)}px ${ff};color:#111;margin:${(sz * 0.8).toFixed(1)}px 0;min-height:${(sz * 1.4).toFixed(0)}px">${esc(txt)}<span style="display:inline-block;width:2px;height:${sz.toFixed(0)}px;background:#111;vertical-align:-0.1em;opacity:${Math.floor(t * 3) % 2}"></span></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;font:500 ${(sz * 0.8).toFixed(1)}px ${ff};color:#444"><span style="display:flex;align-items:center;gap:${(sz*0.4).toFixed(0)}px">+ <svg width="${sz.toFixed(0)}" height="${sz.toFixed(0)}" viewBox="0 0 20 20"><circle cx="10" cy="10" r="7" fill="none" stroke="#444" stroke-width="2"/><circle cx="10" cy="10" r="3" fill="#444"/></svg> ${ar ? "تلقائي" : "Auto"}</span><span style="background:#F1F1F3;border-radius:50%;width:${(sz * 1.5).toFixed(0)}px;height:${(sz * 1.5).toFixed(0)}px;display:flex;align-items:center;justify-content:center"><svg width="${(sz*0.8).toFixed(0)}" height="${(sz*0.8).toFixed(0)}" viewBox="0 0 20 20"><path d="M10 16V4M4 10l6-6 6 6" fill="none" stroke="#333" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span></div></div>`;
+    return html;
+  };
+
+  // ---------- timer: تايمر تنازلي
+  P.k_timer = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    const ni = it.findIndex((x) => /[0-9٠-٩]/.test(x.w));
+    const mins = ni >= 0 ? Math.min(99, parseInt(it[ni].w.replace(/[٠-٩]/g, (d) => "٠١٢٣٤٥٦٧٨٩".indexOf(d)).replace(/[^0-9]/g, ""), 10) || 10) : 10;
+    const left = Math.max(0, mins * 60 - 1 - Math.floor((t - b.t0) * 1));
+    const s = `${String(Math.floor(left / 60)).padStart(2, "0")}:${String(left % 60).padStart(2, "0")}`;
+    const vid = onVideo(this), ink = vid ? "#fff" : INK;
+    const sz = mn * 0.16;
+    const cy = this.blockSolid(b) ? this.belowHead(b, sz) : h * 0.5;
+    let html = vid ? `<div style="position:absolute;inset:0;background:rgba(0,0,0,.3)"></div>` : `<div style="position:absolute;inset:0;background:${PAPER}"></div>`;
+    const a = eOut(seg(t, b.t0, b.t0 + 0.3));
+    html += `<div dir="ltr" style="position:absolute;left:0;right:0;top:${cy.toFixed(1)}px;transform:translateY(-50%) scale(${lerp(0.9, 1, a).toFixed(3)});text-align:center;font:500 ${sz.toFixed(1)}px 'TY Outfit';letter-spacing:-0.03em;color:${ink};opacity:${a.toFixed(3)};${shadow(this)}">${s}</div>`;
+    const tw = measure(s, `500 ${sz}px 'TY Outfit'`);
+    [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([dx, dy]) => { html += `<i style="position:absolute;left:${(w / 2 + dx * (tw / 2 + sz * 0.3)).toFixed(0)}px;top:${(cy + dy * sz * 0.55).toFixed(0)}px;width:${(mn * 0.012).toFixed(0)}px;height:${(mn * 0.012).toFixed(0)}px;background:${ORG};opacity:${a.toFixed(2)}"></i>`; });
+    const label = it.filter((x, i) => i !== ni && t >= x.t0).map((x) => this.text(x.w)).join(" ");
+    if (label) { const ff = famOf(label), z = fitSize(label, `500 {}px ${ff}`, w * 0.84, mn * 0.05 * this.ts);
+      html += `<div dir="${this.dir(label)}" style="position:absolute;left:0;right:0;top:${(cy + sz * 0.85).toFixed(1)}px;text-align:center;white-space:nowrap;font:500 ${z.toFixed(1)}px ${ff};color:${ink};opacity:.8">${esc(label)}</div>`; }
     return html;
   };
 })();
