@@ -419,11 +419,13 @@
               </section>
 
               <section class="ed-player">
-                <div class="frame" id="previewFrame">
+                <div class="ty-wrap" id="pvWrap"><div class="frame" id="previewFrame">
                   <div class="pv-stage" id="pvStage"></div>
+                  <div class="pv-typo" id="pvTypo"><div id="pvTypoStage"></div></div>
                   <img class="pv-logo" id="pvLogo" alt="" hidden><div class="pv-cap" id="pvCap" hidden></div>
                   <div class="pv-empty" id="pvEmpty">التايم لاين فاضي</div>
-                </div>
+                </div><svg class="ty-giz" id="mtGiz"></svg></div>
+                <div class="ty-gbar mt-gbar" id="mtGbar"></div>
                 <div class="transport" dir="ltr">
                   <span class="tc" id="tcNow">00:00:00</span><span class="tc total">/ <span id="tcTotal">00:00:00</span></span>
                   <span class="spacer"></span>
@@ -442,9 +444,12 @@
                   <button data-tab="clip" class="active">🎞️ القطعة</button>
                   <button data-tab="audio">🔊 الصوت</button>
                   <button data-tab="caps">✍️ الكابشن</button>
+                  <button data-tab="typo">🔤 تايبوجرافي</button>
                   <button data-tab="logo">🏷️ اللوجو</button>
                   <button data-tab="export">🎬 تصدير</button>
                 </div>
+
+                <div class="pane" data-pane="typo" hidden><div id="mtTypoPane"></div></div>
 
                 <div class="pane" data-pane="clip">
                   <p class="empty" id="clipNone">دوس على قطعة في التايم لاين عشان تعدّلها.</p>
@@ -578,6 +583,7 @@
                   <div class="h-voice">🎙️ تعليق</div>
                   <div class="h-music">🎵 موسيقى</div>
                   <div class="h-caps">✍️ كابشن</div>
+                  <div class="h-typo">🔤 تايبوجرافي</div>
                 </div>
                 <div class="tl-scroll" id="tlScroll">
                   <div class="tl-canvas" id="tlCanvas">
@@ -586,6 +592,7 @@
                     <div class="tl-track t-voice" id="trkVoice"></div>
                     <div class="tl-track t-music" id="trkMusic"></div>
                     <div class="tl-track t-caps" id="trkCaps"></div>
+                    <div class="tl-track t-typo" id="trkTypo"></div>
                     <div class="tl-hover" id="tlHover" hidden></div>
                     <div class="tl-playhead" id="tlPlayhead"><span></span></div>
                   </div>
@@ -1610,6 +1617,7 @@
 <script src="/typo-moments.js"></script>
 <script src="/typo-studio.js"></script>
 <script src="/typo.js"></script>
+<script src="/montage-typo.js"></script>
 <script src="/clients.js"></script>
 <script src="/shell.js"></script>
 </body>

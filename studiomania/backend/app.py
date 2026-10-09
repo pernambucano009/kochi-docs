@@ -1967,6 +1967,8 @@ class ProjectIn(BaseModel):
     captions: dict = {}  # {enabled, template, font, size, y, words, color, highlight, ...}
     logo: dict = {}  # {enabled, size, x, y, opacity, on_outro}
     section: str | None = None  # المونتاج بتاع أنهي قسم: coach (فيديوهات المدربين) / series / ads
+    typo_id: str | None = None  # مشروع التايبوجرافي اللي مربوط بالمونتاج (طبقة الكلام والعناصر فوق الفيديو)
+    typo_on: bool = True        # التايبوجرافي ظاهرة في المعاينة والتصدير
 
 
 PROJECT_SECTIONS = ("coach", "series", "ads")
@@ -2415,7 +2417,7 @@ def run_ffmpeg(cmd: list[str], project_id: str, length: float, pct: tuple[int, i
     return proc.returncode, stderr
 
 
-def run_render(project_id: str, export_id: str, cmds: list[list[str]], total: float, name: str, work_dir: Path) -> None:
+def run_render(project_id: str, export_id: str, cmds: list[list[str]], total: float, name: str, work_dir: Path, typo_id: str | None = None, base_url: str = "") -> None:
     filename = f"{export_id}.mp4"
     error = None
     RENDER_LOG.write_text("", encoding="utf-8")
@@ -2445,6 +2447,14 @@ def run_render(project_id: str, export_id: str, cmds: list[list[str]], total: fl
             if code != 0:
                 error = render_error(subprocess.CompletedProcess(cmd, code, "", stderr))
                 break
+            if cmd is cmds[-2] and typo_id:
+                # 🔤 طبقة التايبوجرافي (الكلام والعناصر) بتترسم فوق الصورة قبل ما الصوت يتركّب
+                vid = Path(cmd[-1])
+                if typo_has_layer(typo_id):
+                    RENDER_ACTIVE[project_id] = "🔤 بيرسم التايبوجرافي"
+                    typo_overlay(typo_id, vid, vid.with_name("video_t.mp4"), base_url,
+                                 lambda f: RENDER_ACTIVE.__setitem__(project_id, f"🔤 بيرسم التايبوجرافي {int(f * 100)}٪"))
+                    vid.with_name("video_t.mp4").replace(vid)
         if project_id in RENDER_CANCELLED:
             error = "إنت لغيت التصدير."
     except Exception as exc:  # أي مشكلة غير متوقعة لازم تظهر، مش يفضل «بيصدّر» على طول
@@ -2495,7 +2505,7 @@ render_executor = ThreadPoolExecutor(max_workers=1)
 
 
 @app.post("/api/projects/{project_id}/render")
-def render_project(project_id: str):
+def render_project(project_id: str, request: Request):
     with closing(db()) as conn, conn:
         row = get_project(conn, project_id)
         if row["render_status"] == "rendering":
@@ -2516,7 +2526,11 @@ def render_project(project_id: str):
             "UPDATE projects SET render_status = 'rendering', render_error = NULL, updated_at = ? WHERE id = ?",
             (now(), project_id),
         )
-    render_executor.submit(run_render, project_id, export_id, cmd, total, row["name"], work_dir)
+    tid = data.get("typo_id") if data.get("typo_on", True) else None
+    if tid and not (TYPO_PROJ / Path(tid).name / "typo.json").exists():
+        tid = None
+    port = (request.scope.get("server") or ("127.0.0.1", 8000))[1]
+    render_executor.submit(run_render, project_id, export_id, cmd, total, row["name"], work_dir, tid, f"http://127.0.0.1:{port}")
     return {"ok": True, "duration": total}
 
 
@@ -13731,6 +13745,118 @@ def typo_doc(pid: str, d: dict) -> dict:
 @app.get("/api/typo/{pid}/doc")
 def typo_doc_get(pid: str):
     return typo_doc(pid, typo_load(pid))
+
+
+# ---------------------------------------------------------------- 🔤 التايبوجرافي جوه المونتاج
+# المونتاج بيبقى مربوط بمشروع تايبوجرافي مخفي، والفيديو بتاعه هو المونتاج نفسه (اللقطات بعد القص من غير كابشن ولوجو).
+# كده كل اللي في التايبوجرافي بيشتغل على المونتاج: سماع الكلام، العناصر، ورا الشخص، التراك، والتحكم، والتصدير بيرسمها فوقه.
+
+class MontageTypoIn(BaseModel):
+    brief: str | None = None
+
+
+@app.post("/api/projects/{project_id}/typo")
+def montage_typo(project_id: str, body: MontageTypoIn):
+    """🧠 يجهّز فيديو المونتاج ويسمع الكلام ويوزّع عليه التايبوجرافي."""
+    with closing(db()) as conn, conn:
+        row = get_project(conn, project_id)
+        data = json.loads(row["data"])
+        segments, voice, music, _ = build_montage(conn, data)
+        tid = data.get("typo_id")
+        if not tid or not (TYPO_PROJ / Path(tid).name / "typo.json").exists():
+            tid = uuid.uuid4().hex[:10]
+            (TYPO_PROJ / tid).mkdir(parents=True)
+            d = {"name": f"🎬 {row['name']}", "client_id": active_client_id(), "ratio": "9:16", "style": "studio", "montage": project_id,
+                 "source": None, "script": "", "words": [], "duration": 0, "bg": {"kind": "source", "color": "#101010"},
+                 "blocks": [], "brief": "", "status": "new", "step": None, "error": None, "final": None, "created_at": now(), "updated_at": now()}
+            (TYPO_PROJ / tid / "typo.json").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+            data["typo_id"] = tid
+            conn.execute("UPDATE projects SET data = ?, updated_at = ? WHERE id = ?", (json.dumps(data), now(), project_id))
+    if body.brief is not None:
+        typo_set(tid, brief=body.brief[:1000])
+    return typo_start(tid, "transcribing", "🎬 بيجهّز فيديو المونتاج", run_montage_typo, segments, voice, music)
+
+
+def run_montage_typo(tid: str, segments, voice, music) -> None:
+    try:
+        folder = TYPO_PROJ / tid
+        work = TMP_DIR / f"mtypo-{tid}"
+        name = f"src_{uuid.uuid4().hex[:8]}.mp4"
+        cmds, total = montage.build_commands(ffmpeg_exe(), segments, folder / name, work, voice, music,
+                                             low_memory=(system_info()["memory_limit_mb"] or 99999) < 1500)
+        try:
+            for n, c in enumerate(cmds, start=1):
+                typo_set(tid, step=f"🎬 بيجهّز فيديو المونتاج ({n} من {len(cmds)})")
+                r = subprocess.run(c, capture_output=True, timeout=1800)
+                if r.returncode != 0:
+                    raise RuntimeError(f"تجهيز فيديو المونتاج فشل: {r.stderr.decode(errors='ignore')[-300:]}")
+        finally:
+            shutil.rmtree(work, ignore_errors=True)
+        info = media_info(folder / name)
+        old = (typo_load(tid).get("source") or {}).get("file")
+
+        def fn(x):
+            x["source"] = {"kind": "video", "file": name, "name": "المونتاج", "duration": round(info.duration, 3), "w": info.width, "h": info.height}
+            x.update(duration=round(info.duration, 3), words=[], blocks=[], scene=None, tracks={}, final=None, bg={"kind": "source", "color": "#101010"})
+        typo_update(tid, fn)
+        if old and old != name:
+            (folder / old).unlink(missing_ok=True)
+        shutil.rmtree(folder / "person", ignore_errors=True)
+        typo_set(tid, step="🎧 بيسمع الكلام ويكتبه بتوقيته")
+        run_typo_transcribe(tid)
+        if typo_load(tid).get("status") == "failed":
+            return
+        typo_set(tid, status="planning", step="🧠 بيوزّع التايبوجرافي على المونتاج")
+        run_typo_plan(tid)
+    except Exception as exc:  # noqa: BLE001
+        typo_fail(tid, exc)
+
+
+def typo_has_layer(tid: str) -> bool:
+    try:
+        d = typo_load(tid)
+    except HTTPException:
+        return False
+    return bool(d.get("blocks") or d.get("fx"))
+
+
+def typo_overlay(tid: str, base: Path, out: Path, base_url: str, progress=None) -> None:
+    """الكلام والعناصر بتترسم فريم فريم (شفافة) وبتتركّب فوق فيديو المونتاج من غير صوت."""
+    from playwright.sync_api import sync_playwright
+    d = typo_load(tid)
+    doc = typo_doc(tid, d)
+    W, H = doc["w"], doc["h"]
+    dur = media_info(base).duration
+    n = int(dur * TYPO_FPS)
+    cmd = [ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(base),
+           "-f", "image2pipe", "-framerate", str(TYPO_FPS), "-c:v", "png", "-i", "-",
+           "-filter_complex", f"[1:v]scale={W}:{H}[ov];[0:v][ov]overlay=0:0:eof_action=pass,format=yuv420p[v]", "-map", "[v]",
+           "-an", "-c:v", "libx264", "-preset", "veryfast", "-crf", "19", "-t", f"{dur:.3f}", str(out)]
+    proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+    base_url = base_url or f"http://127.0.0.1:{os.environ.get('PORT', '8000')}"
+    try:
+        with sync_playwright() as p:
+            browser = typo_browser(p)
+            try:
+                ctx = browser.new_context(viewport={"width": W, "height": H}, device_scale_factor=1)
+                ctx.add_cookies([{"name": SESSION_COOKIE, "value": auth.make_token(), "url": base_url}])
+                page = ctx.new_page()
+                page.goto(f"{base_url}/typo-render.html?id={tid}", wait_until="load", timeout=60000)
+                page.evaluate("window.typoReady")
+                cdp = ctx.new_cdp_session(page)
+                cdp.send("Emulation.setDefaultBackgroundColorOverride", {"color": {"r": 0, "g": 0, "b": 0, "a": 0}})
+                for i in range(n):
+                    page.evaluate(f"renderAt({i / TYPO_FPS:.4f})")
+                    proc.stdin.write(base64.b64decode(cdp.send("Page.captureScreenshot", {"format": "png", "optimizeForSpeed": True})["data"]))
+                    if progress and i % TYPO_FPS == 0:
+                        progress(i / max(1, n))
+            finally:
+                browser.close()
+    finally:
+        proc.stdin.close()
+    err = proc.stderr.read().decode(errors="ignore")
+    if proc.wait(timeout=600) != 0:
+        raise RuntimeError(f"تركيب التايبوجرافي فشل: {err.strip()[-300:]}")
 
 
 # 📦 قراءة بس من برّه (بنفس مفتاح المعمل): مشاريع التايبوجرافي عشان نراجع مشكلة في مشروع بعينه
