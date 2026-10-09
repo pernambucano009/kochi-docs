@@ -1936,3 +1936,5 @@ a.btn.disabled { opacity: .45; pointer-events: none; }
 .db-opts { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; }
 .db-out { display: flex; flex-direction: column; gap: 6px; max-width: 320px; }
 .db-out .ok { color: var(--ok); margin: 0; }
+.db-add { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.db-add select { min-width: 200px; }

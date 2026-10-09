@@ -14755,6 +14755,7 @@ reset_stuck_typo()
 # ← الموسيقى والمؤثرات بتفضل (AudioShake) ← ليب سينك (اختياري) ← نسخة في الفيديوهات الجاهزة للنشر لكل لهجة.
 
 import dub  # noqa: E402
+import fasih  # noqa: E402
 
 DUB_DIR = DATA_DIR / "dub"
 DUB_DIR.mkdir(parents=True, exist_ok=True)
@@ -14791,6 +14792,8 @@ def dub_to_dict(did: str, d: dict) -> dict:
         return f"{base}/{n}?v={int((folder / n).stat().st_mtime)}" if n and (folder / n).exists() else None
     targets = {}
     for k, t in (d.get("targets") or {}).items():
+        if k not in dub.DIALECTS:   # لهجة من نسخة قديمة
+            continue
         texts = [x["text"] for x in t.get("lines") or []]
         targets[k] = {**t, "video_url": url(t.get("video")), "audio_url": url(t.get("audio")),
                       "cost": {v: dub.estimate(texts, v, d["source"].get("duration") or 0, None) for v in dub.DIALECTS[k]["voices"]},
@@ -14799,8 +14802,9 @@ def dub_to_dict(did: str, d: dict) -> dict:
 
 
 def dub_info() -> dict:
-    return {"dialects": {k: {"label": v["label"], "voices": v["voices"], "sample": v["sample"]} for k, v in dub.DIALECTS.items()},
+    return {"dialects": {k: {"label": v["label"], "voices": v["voices"], "group": v["group"]} for k, v in dub.DIALECTS.items()},
             "voices": {k: v["label"] for k, v in dub.VOICES.items()},
+            "fasih": bool(fasih.api_key() or atlas.mock_mode()),
             "lipsync": {k: v["label"] for k, v in dub.LIPSYNC.items()},
             "separate": bool(audioshake.api_key() or atlas.mock_mode())}
 
@@ -14923,6 +14927,8 @@ def dub_target(did: str, body: DubTargetIn):
     voice = body.voice if body.voice in dub.DIALECTS[body.dialect]["voices"] else dub.DIALECTS[body.dialect]["voices"][0]
     if not (atlas.api_key() or atlas.mock_mode()):
         raise HTTPException(400, "مفتاح Atlas مش متسجل")
+    if dub.DIALECTS[body.dialect]["group"] == "ar" and not (fasih.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "اللهجات العربية بتتقال بأصوات فصيح: ضيف مفتاحه FASIH_API_KEY في متغيرات Railway الأول")
 
     def fn(d):
         if not d.get("lines"):
@@ -14943,7 +14949,7 @@ def run_dub_adapt(did: str, dialect: str) -> None:
         d = dub_load(did)
         lines = d["lines"]
         if atlas.mock_mode():
-            out = [f"{dub.DIALECTS[dialect]['sample']} {i + 1}" for i in range(len(lines))]
+            out = [f"{dub.DIALECTS[dialect]['label']} — جملة تجريبية {i + 1}" for i in range(len(lines))]
         else:
             res = ad_json(series_chat(dub.adapt_messages(dialect, lines, d["source"]["duration"], d.get("brief") or ""), json_mode=True), "الدبلجة")
             out = [dub.clean_line(x) for x in (res.get("lines") or [])]
@@ -14962,6 +14968,9 @@ class DubLinesIn(BaseModel):
 @app.put("/api/dub/{did}/target/{dialect}")
 def dub_target_edit(did: str, dialect: str, body: DubLinesIn):
     """✏️ تعديل الكلام أو الصوت."""
+    if dialect not in dub.DIALECTS:
+        raise HTTPException(400, "اللهجة دي مش موجودة")
+
     def fn(d):
         t = d["targets"].get(dialect)
         if not t:
@@ -14982,6 +14991,10 @@ class DubRenderIn(BaseModel):
 
 @app.post("/api/dub/{did}/target/{dialect}/render")
 def dub_render(did: str, dialect: str, body: DubRenderIn):
+    if dialect not in dub.DIALECTS:
+        raise HTTPException(400, "اللهجة دي مش موجودة")
+    if dub.DIALECTS[dialect]["group"] == "ar" and not (fasih.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "اللهجات العربية بتتقال بأصوات فصيح: ضيف مفتاحه FASIH_API_KEY في متغيرات Railway الأول")
     """🎙️ الصوت باللهجة في مكانه + الموسيقى والمؤثرات + ليب سينك (اختياري) ← فيديو جاهز للنشر."""
     if body.lipsync and body.lipsync not in dub.LIPSYNC:
         raise HTTPException(400, "نوع الليب سينك مش معروف")
@@ -15056,6 +15069,8 @@ def run_dub_render(did: str, dialect: str, lipsync: str | None, background: str)
     try:
         d = dub_load(did)
         t = d["targets"][dialect]
+        if t.get("voice") not in dub.DIALECTS[dialect]["voices"]:
+            t["voice"] = dub.DIALECTS[dialect]["voices"][0]
         folder = DUB_DIR / did
         work = folder / f"work_{dialect}"
         shutil.rmtree(work, ignore_errors=True)
@@ -15073,9 +15088,12 @@ def run_dub_render(did: str, dialect: str, lipsync: str | None, background: str)
                 subprocess.run(ff + ["-f", "lavfi", "-i", f"sine=frequency={300 + 40 * (i % 5)}:duration={dur:.2f}", "-ar", "48000", str(out)],
                                check=True, capture_output=True, timeout=60)
             else:
-                url = atlas.run_model("Audio", dub.tts_body(t["voice"], dialect, texts[i]), "صوت الجملة", max_seconds=300, interval=2)
                 raw = work / f"l{i:03d}.src"
-                atlas.download(url, raw)
+                v = dub.VOICES[t["voice"]]
+                if v["provider"] == "fasih":
+                    fasih.speak(texts[i], v["voice"], v["dialect"], raw)
+                else:
+                    atlas.download(atlas.run_model("Audio", dub.tts_body(t["voice"], dialect, texts[i]), "صوت الجملة", max_seconds=300, interval=2), raw)
                 subprocess.run(ff + ["-i", str(raw), "-ac", "1", "-ar", "48000", str(out)], check=True, capture_output=True, timeout=60)
                 raw.unlink(missing_ok=True)
             done[0] += 1
