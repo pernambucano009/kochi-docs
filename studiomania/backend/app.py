@@ -13323,6 +13323,15 @@ def typo_patch(pid: str, body: TypoPatchIn):
             for i, w in enumerate(body.words[:len(ws)]):
                 if isinstance(w, str) and w.strip():
                     ws[i]["w"] = w.strip()
+            # اللقطات شايلة نسخة من كلامها: بتتحدّث، والكلام المكتوب لو كان هو نفس اللي اتقال بيتحدّث معاه
+            for b in d.get("blocks") or []:
+                if "from" not in b or not b.get("words"):
+                    continue
+                old = " ".join(x["w"] for x in b["words"])
+                part = ws[b["from"]: b["to"] + 1]
+                b["words"] = [{"w": x["w"], "t0": x["s"], "t1": x["e"]} for x in part]
+                if (b.get("text") or "").strip() in ("", old):
+                    b["text"] = " ".join(x["w"] for x in part)
         if body.blocks is not None:
             d["blocks"] = typo_clean_blocks(body.blocks, d)
         if body.blocks is not None or body.words is not None or body.bg is not None or body.style is not None or body.ratio or body.fonts is not None:

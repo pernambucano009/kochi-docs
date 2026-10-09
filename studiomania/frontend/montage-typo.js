@@ -234,7 +234,10 @@ function mtTypoPaneRender() {
     h += `<div class="mt-typo-row"><h3>لقطة ${i + 1} <small class="muted" dir="auto">«${escapeHtml(txt)}»</small></h3>
       <label>العنصر <select id="mtTyKind">${Object.entries(TY_KINDS).map(([k, l]) => `<option value="${k}" ${k === r.kind ? "selected" : ""}>${l}</option>`).join("")}</select></label>
       ${studio ? `<label>🎞️ الترانزيشن <select id="mtTyTrans">${Object.entries(TY_TRANS).map(([k, l]) => `<option value="${k}" ${k === (r.trans || "") ? "selected" : ""}>${l}</option>`).join("")}</select></label>` : ""}
-      <label>المكتوب <input id="mtTyText" value="${escapeHtml(r.text || "")}" placeholder="${escapeHtml(txt)}" dir="auto"></label>
+      <div><b>✏️ الكلام</b> <small class="muted">دوس على أي كلمة وصلّحها لو اتسمعت غلط (توقيتها بيفضل زي ما هو)</small>
+        <div class="wd-row" dir="auto">${(mtx.cur.words || []).slice(r.from, r.to + 1).map((w, j) => `<input class="wd" data-wi="${r.from + j}" value="${escapeHtml(w.w)}" size="${Math.max(2, [...w.w].length + 1)}" dir="auto" spellcheck="false">`).join("")}</div></div>
+      <details class="wd-more"><summary>اكتب الكلام اللي يظهر بنفسك (بدل اللي اتقال)</summary>
+        <input id="mtTyText" value="${escapeHtml(r.text || "")}" placeholder="${escapeHtml(txt)}" dir="auto"></details>
       <div class="row wrap"><button class="btn sm" id="mtTyPrev">→ اللي قبلها</button><button class="btn sm" id="mtTyNext">اللي بعدها ←</button>
         <button class="btn sm danger" id="mtTyDel">🗑 شيلها</button></div></div>`;
   }
@@ -274,8 +277,22 @@ $("mtTypoPane").addEventListener("click", async (e) => {
   if (t.id === "mtTyDel") deleteSelected();
 });
 
-$("mtTypoPane").addEventListener("change", (e) => {
+$("mtTypoPane").addEventListener("input", (e) => {
+  if (e.target.classList.contains("wd")) e.target.size = Math.max(2, [...e.target.value].length + 1);
+});
+$("mtTypoPane").addEventListener("change", async (e) => {
   const t = e.target;
+  if (t.classList.contains("wd")) {   // تصليح كلمة: نفس العدد والأوقات، والكلام بيتحدث في كل اللقطات
+    const v = t.value.trim();
+    if (!v) { t.value = mtx.cur.words[Number(t.dataset.wi)].w; return; }
+    const words = mtx.cur.words.map((w) => w.w);
+    words[Number(t.dataset.wi)] = v;
+    try {
+      mtx.cur = await api(`/api/typo/${mtx.id}`, { method: "PATCH", ...jsonBody({ words }) });
+      await mtTypoDoc(); renderTimeline(); toast("✏️ الكلمة اتصلّحت");
+    } catch (err) { toast(err.message, true); }
+    return;
+  }
   if (t.id === "mtTypoOn") { mt.project.data.typo_on = t.checked; scheduleSave(); return mtTypoDraw(); }
   if (t.id === "mtClickOn" || t.id === "mtClickVol") {
     const ts = mt.project.data.typo_sfx = { on: true, volume: 1, ...(mt.project.data.typo_sfx || {}) };

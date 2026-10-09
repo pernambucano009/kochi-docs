@@ -1835,3 +1835,34 @@ a.btn.disabled { opacity: .45; pointer-events: none; }
 .h-click, .t-click { height: 30px; }
 .tl-audio.click { background: #3a2a14; }
 .tl-audio.click.off { opacity: .45; }
+/* 🎛️ أدوات التحكم في التايبوجرافي: شريط زجاجي غامق، كل وضع بيظهر أدواته بس */
+.ty-gbar { flex-direction: column; align-items: center; gap: 6px; }
+.gz-bar { display: inline-flex; align-items: center; gap: 2px; padding: 4px; border-radius: 14px; direction: rtl;
+  background: rgba(22, 23, 29, .92); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 10px 30px -12px rgba(0,0,0,.6), inset 0 0 0 1px rgba(255,255,255,.07); }
+.gz-seg { display: inline-flex; gap: 2px; padding: 2px; border-radius: 11px; background: rgba(255,255,255,.04); }
+.gz-sep { width: 1px; height: 22px; margin: 0 4px; background: rgba(255,255,255,.1); }
+.gz-btn { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 11px; border: 0; border-radius: 9px; background: transparent;
+  color: #b9bcc8; font: 500 12.5px/1 inherit; cursor: pointer; white-space: nowrap; transition: background .15s, color .15s, box-shadow .15s, transform .1s; }
+.gz-btn svg { flex: none; opacity: .9; }
+.gz-btn:hover:not(:disabled) { background: rgba(255,255,255,.07); color: #fff; }
+.gz-btn:active:not(:disabled) { transform: scale(.96); }
+.gz-btn:disabled { opacity: .35; cursor: not-allowed; }
+.gz-seg .gz-btn.on { color: #fff; background: linear-gradient(180deg, #6a97ff, #3f6ff2); box-shadow: 0 6px 14px -6px rgba(63,111,242,.9), inset 0 1px 0 rgba(255,255,255,.25); }
+.gz-bar > .gz-btn.on { color: #FFD45C; background: rgba(250,204,21,.13); box-shadow: inset 0 0 0 1px rgba(250,204,21,.35); }
+.gz-sub { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px; max-width: 560px; direction: rtl; }
+.gz-hint { color: var(--muted, #8a8f9c); font-size: 11.5px; }
+.gz-pill { display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--line, #d9dbe2);
+  background: var(--surface, #fff); color: inherit; font: 500 11.5px/1 inherit; cursor: pointer; transition: border-color .15s, background .15s; }
+.gz-pill svg { width: 14px; height: 14px; }
+.gz-pill:hover { border-color: #5B8CFF; }
+.gz-pill.on { background: #FACC15; border-color: #FACC15; color: #1a1a1a; }
+.gz-chip { display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; color: #c58b00; }
+.gz-chip svg { width: 14px; height: 14px; }
+.ty-giz text { user-select: none; }
+.wd-row { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; margin: 6px 0; }
+.wd-row .wd { width: auto; min-width: 2.2em; padding: 4px 8px; border-radius: 8px; border: 1px solid var(--line, #d9dbe2); background: var(--surface-2, #f4f5f8);
+  font: 500 13px/1.2 inherit; text-align: center; transition: border-color .15s, box-shadow .15s, background .15s; }
+.wd-row .wd:hover { border-color: #9db4ff; }
+.wd-row .wd:focus { outline: none; border-color: #5B8CFF; background: var(--surface, #fff); box-shadow: 0 0 0 3px rgba(91,140,255,.18); }
+.wd-more summary { cursor: pointer; font-size: 12px; color: var(--muted, #8a8f9c); margin: 4px 0; }

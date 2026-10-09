@@ -191,6 +191,7 @@ function tyBlockRow(v, b, i) {
     <div class="row wrap"><label>📐 حجم الكلام <input type="range" min="0.3" max="2.5" step="0.05" data-tbf="ms" value="${b.ms ?? 1}"></label>
       ${window.TypoEngine?.STUDIO?.has(b.kind) ? `<label>🎞️ الدخول <select data-tbf="trans">${Object.entries(TY_TRANS).map(([k, l]) => `<option value="${k}" ${k === (b.trans || "") ? "selected" : ""}>${l}</option>`).join("")}</select></label>` : ""}
       ${(b.mx || b.my || (b.ms ?? 1) !== 1) ? `<button type="button" class="btn sm" data-tyreset="${i}">↺ رجّع المكان والحجم</button>` : ""}</div>
+    ${v.words?.length && b.to >= b.from ? `<div class="wd-row" dir="auto" title="دوس على أي كلمة وصلّحها لو اتسمعت غلط">✏️ ${v.words.slice(b.from, b.to + 1).map((w, j) => `<input class="wd" data-tyword="${b.from + j}" value="${tye(w.w)}" size="${Math.max(2, [...w.w].length + 1)}" dir="auto" spellcheck="false" data-no-i18n>`).join("")}</div>` : ""}
     <div class="row wrap"><label>المكتوب <input data-tbf="text" value="${tye(b.text)}" dir="auto" data-no-i18n></label>
       ${b.kind === "build" ? `<label>الكلمة اللي تنوّر <select data-tbf="focus"><option value="-1">—</option>${(b.words || []).map((w, j) => `<option value="${j}" ${j === b.focus ? "selected" : ""}>${tye(w.w)}</option>`).join("")}</select></label>` : ""}
       ${b.kind === "letters" ? `<label>الحرف اللي يتبدل <input type="number" min="0" max="20" data-tbf="letter" value="${b.letter ?? 1}"></label>` : ""}
@@ -590,6 +591,14 @@ $("tyMain").addEventListener("input", (e) => {
 $("tyMain").addEventListener("change", async (e) => {
   const t = e.target, v = tyx.cur;
   try {
+    if (t.matches("[data-tyword]")) {   // تصليح كلمة اتسمعت غلط: نفس التوقيت
+      const val = t.value.trim(), i = Number(t.dataset.tyword);
+      if (!val) { t.value = v.words[i].w; return; }
+      const words = v.words.map((w) => w.w);
+      words[i] = val;
+      await tyPatch({ words });
+      return toast("✏️ الكلمة اتصلّحت");
+    }
     if (t.matches("[data-tyname]")) { tyx.cur = await api(TY(`/${v.id}`), { method: "PATCH", ...jsonBody({ name: t.value }) }); tyx.list = await api(TY("")); return tyRender(); }
     if (t.matches("[data-tyopt]")) return tyPatch({ [t.dataset.tyopt]: t.value });
     if (t.matches("[data-tysfx]")) { await tyPatch({ sfx_level: Number(t.value) }); return toast(Number(t.value) ? `🔊 الكليكات: ${t.value}` : "🔇 من غير كليكات"); }
@@ -831,30 +840,65 @@ function tyGizPts() {
   return { pts, W: r0.width, H: r0.height };
 }
 
+const GZI = {   // أيقونات خطوط بسيطة (24×24)
+  move: '<path d="M12 3v18M3 12h18M12 3 9.5 5.5M12 3l2.5 2.5M12 21l-2.5-2.5M12 21l2.5-2.5M3 12l2.5-2.5M3 12l2.5 2.5M21 12l-2.5-2.5M21 12l-2.5 2.5"/>',
+  rotate: '<path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v4.5h-4.5"/>',
+  pin: '<path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/><path d="m12 9 3 3-3 3-3-3z"/>',
+  track: '<circle cx="12" cy="12" r="7.5"/><circle cx="12" cy="12" r="2.5"/><path d="M12 1.5v3.5M12 19v3.5M1.5 12H5M19 12h3.5"/>',
+  person: '<circle cx="12" cy="7.5" r="3.5"/><path d="M5 21c.9-4.6 3.6-7 7-7s6.1 2.4 7 7"/>',
+  keys: '<path d="m7 12 5-5 5 5-5 5z"/><path d="M2 12h3M19 12h3"/>',
+  reset: '<path d="M4 12a8 8 0 1 0 2.34-5.66"/><path d="M4 4v4.5h4.5"/>',
+  trash: '<path d="M4 7h16M9.5 7V4.5h5V7M6.5 7l1 13h9l1-13"/>',
+  x: '<path d="M6 6l12 12M18 6 6 18"/>',
+  paper: '<path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h6"/>',
+};
+const gzIcon = (n) => `<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${GZI[n]}</svg>`;
+const GZ_MODES = [["move", "تحريك", "اسحب من نص الكلام عشان تحرّكه، ومن أي ركن عشان تكبّره أو تصغّره"],
+  ["rotate", "لفّ", "اسحب على الدواير: الأزرق لفّة عادية (Shift = كل 15°)، الأحمر لقدام وورا، الأخضر يمين وشمال"],
+  ["pin", "أركان", "اسحب كل ركن لوحده لركن الورقة أو الشاشة اللي في الفيديو، ومن النص بيتحرك كله"],
+  ["track", "تراك", "اختار نوع الحاجة وارسم مربع عليها في المعاينة، والكلام هيمشي معاها. لو التراك غلط في فريم اسحب النقط الصفرا"]];
+
 function tyGizDraw() {
   const svg = GZ.svg(), bar = GZ.bar();
   if (!svg) return;
   const g = tyGizBlock(), P = g && tyGizPts();
   const box = GZ.box();
   svg.setAttribute("width", box.offsetWidth + 160); svg.setAttribute("height", box.offsetHeight + 160);
-  if (!g || !P || GZ.playing) { svg.innerHTML = ""; if (bar && !g) bar.innerHTML = ""; return; }
+  if (!g || !P || GZ.playing) { svg.innerHTML = ""; if (bar && !g) { bar.innerHTML = ""; bar.dataset.sig = ""; } return; }
+  const mode = GZ.st.mode || "move";
   const o = 80, f = g.b.xf || {}, pin = !!TypoEngine.xfAt(g.b, GZ.t).pin;
   const pts = P.pts.map(([x, y]) => [x + o, y + o]);
   const [cx, cy] = pts[4];
+  const poly = pts.slice(0, 4).map((p) => p.map((v) => v.toFixed(1)).join(",")).join(" ");
   const span = Math.max(Math.hypot(pts[1][0] - pts[0][0], pts[1][1] - pts[0][1]), Math.hypot(pts[3][0] - pts[0][0], pts[3][1] - pts[0][1]));
-  const R = Math.max(26, Math.min(70, span * 0.32));
-  let h = `<polygon data-g="move" points="${pts.slice(0, 4).map((p) => p.join(",")).join(" ")}" fill="rgba(59,130,246,.06)" stroke="#fff" stroke-width="1.5" stroke-dasharray="5 4" style="cursor:move"/>`;
-  // التراك: مكان الحاجة اللي البرنامج تابعها، وأركانها بتتسحب لو التراك غلط في الفريم ده
-  if (f.tr && GZ.eng.trackQuad(f.tr, GZ.t)) {
-    const k = P.W / GZ.doc.w, q = GZ.eng.trackQuad(f.tr, GZ.t).map(([x, y]) => [x * k + o, y * k + o]);
-    h += `<polygon points="${q.map((p) => p.join(",")).join(" ")}" fill="none" stroke="#FACC15" stroke-width="2" stroke-dasharray="3 3"/>`
-      + q.map((p, j) => `<circle data-g="t${j}" cx="${p[0]}" cy="${p[1]}" r="7" fill="#FACC15" stroke="#000" stroke-width="1" style="cursor:crosshair"/>`).join("");
+  const R = Math.max(30, Math.min(78, span * 0.34));
+  const acc = { move: "#5B8CFF", rotate: "#5B8CFF", pin: "#FF8A3D", track: "#FACC15" }[mode];
+  let h = `<defs><filter id="gzSh" x="-50%" y="-50%" width="200%" height="200%"><feDropShadow dx="0" dy="1" stdDeviation="1.4" flood-color="#000" flood-opacity=".55"/></filter></defs>`;
+  // إطار المحتوى: خط أبيض رفيع وتحته ظل غامق عشان يبان على أي فيديو
+  h += `<polygon points="${poly}" fill="none" stroke="rgba(0,0,0,.45)" stroke-width="3"/>
+    <polygon data-g="move" points="${poly}" fill="${mode === "pin" ? "rgba(255,138,61,.07)" : mode === "move" ? "rgba(91,140,255,.07)" : "transparent"}" stroke="${mode === "rotate" || mode === "track" ? "rgba(255,255,255,.55)" : "#fff"}" stroke-width="1.2" ${mode === "rotate" || mode === "track" ? 'stroke-dasharray="4 4"' : ""} style="cursor:move"/>`;
+  if (mode === "move") {
+    h += pts.slice(0, 4).map((p, j) => `<g filter="url(#gzSh)"><circle data-g="c${j}" cx="${p[0]}" cy="${p[1]}" r="6.5" fill="#fff" stroke="${acc}" stroke-width="2.2" style="cursor:nwse-resize"/></g>`).join("")
+      + `<g filter="url(#gzSh)" style="pointer-events:none"><circle cx="${cx}" cy="${cy}" r="3.2" fill="#fff"/><path d="M${cx - 9} ${cy}h5M${cx + 4} ${cy}h5M${cx} ${cy - 9}v5M${cx} ${cy + 4}v5" stroke="#fff" stroke-width="1.4"/></g>`;
+  } else if (mode === "rotate") {
+    const ring = (role, el, col, lx, ly, lab) => `${el.replace("/>", ` fill="none" stroke="${col}" stroke-width="2.4" opacity=".95" filter="url(#gzSh)" style="pointer-events:none"/>`)}
+      ${el.replace("/>", ` data-g="${role}" fill="none" stroke="transparent" stroke-width="14" style="cursor:${role === "rx" ? "ns-resize" : role === "ry" ? "ew-resize" : "grab"}"/>`)}
+      <g filter="url(#gzSh)" style="pointer-events:none"><rect x="${lx - 8}" y="${ly - 8}" width="16" height="16" rx="5" fill="${col}"/><text x="${lx}" y="${ly + 3.6}" text-anchor="middle" font-size="10" font-weight="700" fill="#fff" font-family="system-ui">${lab}</text></g>`;
+    h += ring("rz", `<circle cx="${cx}" cy="${cy}" r="${R * 1.2}"/>`, "#5B8CFF", cx, cy - R * 1.2, "Z")
+      + ring("rx", `<ellipse cx="${cx}" cy="${cy}" rx="${R}" ry="${R * 0.3}"/>`, "#FF5A6E", cx + R, cy, "X")
+      + ring("ry", `<ellipse cx="${cx}" cy="${cy}" rx="${R * 0.3}" ry="${R}"/>`, "#2FD48A", cx, cy + R, "Y")
+      + `<g filter="url(#gzSh)" style="pointer-events:none"><circle cx="${cx}" cy="${cy}" r="4" fill="#fff"/></g>`;
+  } else if (mode === "pin") {
+    h += pts.slice(0, 4).map((p, j) => `<g filter="url(#gzSh)"><rect data-g="c${j}" x="${p[0] - 6.5}" y="${p[1] - 6.5}" width="13" height="13" rx="2.5" transform="rotate(45 ${p[0]} ${p[1]})" fill="${pin ? acc : "#fff"}" stroke="#fff" stroke-width="1.6" style="cursor:crosshair"/></g>`).join("");
+  } else if (mode === "track") {
+    const tq = f.tr && GZ.eng.trackQuad(f.tr, GZ.t);
+    if (tq) {
+      const k = P.W / GZ.doc.w, q = tq.map(([x, y]) => [x * k + o, y * k + o]);
+      h += `<polygon points="${q.map((p) => p.join(",")).join(" ")}" fill="rgba(250,204,21,.08)" stroke="${acc}" stroke-width="1.6" stroke-dasharray="5 3" filter="url(#gzSh)"/>`
+        + q.map((p, j) => `<g filter="url(#gzSh)"><circle data-g="t${j}" cx="${p[0]}" cy="${p[1]}" r="6" fill="${acc}" stroke="#1a1a1a" stroke-width="1.4" style="cursor:crosshair"/></g>`).join("");
+    }
+    if (GZ.st.pick) h += `<rect data-g="pick" x="${o}" y="${o}" width="${P.W}" height="${P.H}" fill="rgba(250,204,21,.04)" stroke="${acc}" stroke-width="1" stroke-dasharray="2 4" style="cursor:crosshair"/>`;
   }
-  h += `<ellipse data-g="rx" cx="${cx}" cy="${cy}" rx="${R}" ry="${R * 0.32}" fill="none" stroke="${TYG_RING.x}" stroke-width="5" style="cursor:ns-resize" opacity="${pin ? 0.25 : 0.95}"/>
-    <ellipse data-g="ry" cx="${cx}" cy="${cy}" rx="${R * 0.32}" ry="${R}" fill="none" stroke="${TYG_RING.y}" stroke-width="5" style="cursor:ew-resize" opacity="${pin ? 0.25 : 0.95}"/>
-    <circle data-g="rz" cx="${cx}" cy="${cy}" r="${R * 1.18}" fill="none" stroke="${TYG_RING.z}" stroke-width="5" style="cursor:grab" opacity="${pin ? 0.25 : 0.95}"/>
-    <circle data-g="move" cx="${cx}" cy="${cy}" r="7" fill="#fff" stroke="#111" style="cursor:move"/>`;
-  h += pts.slice(0, 4).map((p, j) => `<rect data-g="c${j}" x="${p[0] - 8}" y="${p[1] - 8}" width="16" height="16" rx="${pin ? 8 : 3}" fill="${pin ? "#F97316" : "#fff"}" stroke="#111" stroke-width="1.5" style="cursor:${pin ? "crosshair" : "nwse-resize"}"/>`).join("");
   svg.innerHTML = h;
   tyGizBar(g, pin);
 }
@@ -862,21 +906,32 @@ function tyGizDraw() {
 function tyGizBar(g, pin) {
   const bar = GZ.bar();
   if (!bar) return;
-  const f = g.b.xf || {}, keys = g.b.xk?.length || 0;
+  const f = g.b.xf || {}, keys = g.b.xk?.length || 0, mode = GZ.st.mode || "move";
   const person = !!GZ.doc.person;
   const canTrack = GZ.cur?.bg?.kind === "source" && GZ.cur?.source?.kind === "video";
-  const sig = `${g.i}|${pin}|${f.z}|${keys}|${GZ.st.keymode}|${f.tr}|${person}|${canTrack}|${GZ.st.pick || ""}`;
+  const sig = `${g.i}|${pin}|${f.z}|${keys}|${GZ.st.keymode}|${f.tr}|${person}|${canTrack}|${GZ.st.pick || ""}|${mode}`;
   if (bar.dataset.sig === sig) return;
   bar.dataset.sig = sig;
-  bar.innerHTML = `<b class="muted">لقطة ${g.i + 1}</b>
-    <button type="button" class="btn sm ${pin ? "primary" : ""}" data-tyg="pin" title="كل ركن يتسحب لوحده عشان تلزق البلوك على ورقة أو شاشة">🔲 أركان</button>
-    <button type="button" class="btn sm ${f.z === "behind" ? "primary" : ""}" data-tyg="z" ${person ? "" : 'disabled title="حلّل الفيديو الأول عشان البرنامج يعرف مكان الشخص"'}>🧍 ${f.z === "behind" ? "ورا الشخص" : "قدام الشخص"}</button>
-    <button type="button" class="btn sm ${keys || GZ.st.keymode ? "primary" : ""}" data-tyg="keys" title="كل تعديل يتحفظ في الثانية دي، والبلوك بيتحرك بين المفاتيح">🔑 حركة${keys ? ` (${keys})` : ""}</button>
-    ${keys ? `<button type="button" class="btn sm" data-tyg="nokeys">🗑️ امسح المفاتيح</button>` : ""}
-    ${canTrack ? `<button type="button" class="btn sm ${GZ.st.pick ? "primary" : ""}" data-tyg="track" title="ارسم مربع على الحاجة اللي في الفيديو والكلام هيمشي معاها">🎯 ${f.tr ? "تراك من جديد" : "تراك"}</button>
-      ${f.tr ? `<button type="button" class="btn sm" data-tyg="notrack">✖ شيل التراك</button>` : ""}` : ""}
-    <button type="button" class="btn sm" data-tyg="reset">↺ رجّع</button>
-    ${GZ.st.pick ? `<small class="muted">${GZ.st.pick === "surface" ? "📄 اسحب مربع على الورقة/الشاشة" : "🎯 اسحب مربع على الحاجة"} في المعاينة · <a href="#" data-tyg="pickmode">${GZ.st.pick === "surface" ? "حاجة بتتحرك؟" : "ورقة أو شاشة؟"}</a></small>` : ""}`;
+  const modes = GZ_MODES.filter(([m]) => m !== "track" || canTrack);
+  const btn = (act, icon, label, on, extra = "") => `<button type="button" class="gz-btn ${on ? "on" : ""}" data-tyg="${act}" ${extra}>${gzIcon(icon)}<span>${label}</span></button>`;
+  let sub = "";
+  if (mode === "pin") sub = pin ? `<button type="button" class="gz-pill" data-tyg="unpin">${gzIcon("x")}فك الأركان</button>` : "";
+  else if (mode === "rotate") sub = `<button type="button" class="gz-pill" data-tyg="zrot">${gzIcon("reset")}صفّر اللفّ</button>`;
+  else if (mode === "track") sub = `<button type="button" class="gz-pill ${GZ.st.pick === "follow" ? "on" : ""}" data-tyg="pick:follow">${gzIcon("track")}حاجة بتتحرك</button>
+    <button type="button" class="gz-pill ${GZ.st.pick === "surface" ? "on" : ""}" data-tyg="pick:surface">${gzIcon("paper")}ورقة أو شاشة</button>
+    ${f.tr ? `<button type="button" class="gz-pill" data-tyg="notrack">${gzIcon("x")}شيل التراك</button>` : ""}`;
+  if (keys) sub += `<span class="gz-chip">${gzIcon("keys")}${keys} مفتاح حركة</span><button type="button" class="gz-pill" data-tyg="nokeys">${gzIcon("trash")}امسحهم</button>`;
+  const hint = GZ.st.pick ? (GZ.st.pick === "surface" ? "ارسم مربع على الورقة أو الشاشة في المعاينة" : "ارسم مربع على الحاجة اللي الكلام هيمشي معاها")
+    : (GZ_MODES.find(([m]) => m === mode) || [])[2];
+  bar.innerHTML = `<div class="gz-bar" role="toolbar">
+      <div class="gz-seg">${modes.map(([m, l]) => btn(`mode:${m}`, m, l, mode === m)).join("")}</div>
+      <i class="gz-sep"></i>
+      ${btn("z", "person", f.z === "behind" ? "ورا الشخص" : "قدام الشخص", f.z === "behind", person ? 'title="الكلام يبان ورا الشخص ولا قدامه"' : 'disabled title="حلّل الفيديو الأول عشان البرنامج يعرف مكان الشخص"')}
+      ${btn("keys", "keys", "مفاتيح", !!(keys || GZ.st.keymode), 'title="كل تعديل يتحفظ في الثانية دي، والبلوك بيتحرك لوحده بين المفاتيح"')}
+      <i class="gz-sep"></i>
+      ${btn("reset", "reset", "رجّع", false, 'title="يرجّع اللقطة زي ما كانت"')}
+    </div>
+    <div class="gz-sub"><small class="gz-hint">لقطة ${g.i + 1} · ${hint || ""}</small>${sub}</div>`;
 }
 
 // القيم الحالية بتتغير: لو المفاتيح شغالة بتتحفظ مفتاح في الثانية دي، غير كده بتتحفظ للبلوك كله
@@ -946,8 +1001,12 @@ function tyGizBind(ctx = GZ) {
       else tyXfPatch(b, { x: v.x + dx / d.W, y: v.y + dy / d.H });
     } else if (d.role[0] === "c") {
       const j = Number(d.role[1]);
-      if (v.pin) { const pin = v.pin.map((p) => [...p]); pin[j] = [v.pin[j][0] + dx / d.W, v.pin[j][1] + dy / d.H]; tyXfPatch(b, { pin }); }
-      else {
+      if (v.pin && (GZ.st.mode || "move") === "pin") { const pin = v.pin.map((p) => [...p]); pin[j] = [v.pin[j][0] + dx / d.W, v.pin[j][1] + dy / d.H]; tyXfPatch(b, { pin }); }
+      else if (v.pin) {   // الأركان متلزقة ووضع التحريك: الركن بيكبّر/يصغّر الشكل كله حوالين نصه
+        const c0 = v.pin.reduce((a, p) => [a[0] + p[0] / 4, a[1] + p[1] / 4], [0, 0]), C = [c0[0] * d.W, c0[1] * d.H];
+        const k = Math.hypot(x - C[0], y - C[1]) / Math.max(1, Math.hypot(d.q[j][0] - C[0], d.q[j][1] - C[1]));
+        tyXfPatch(b, { pin: v.pin.map(([px, py]) => [c0[0] + (px - c0[0]) * k, c0[1] + (py - c0[1]) * k]) });
+      } else {
         const r0 = Math.hypot(d.q[j][0] - d.c[0], d.q[j][1] - d.c[1]), r1 = Math.hypot(x - d.c[0], y - d.c[1]);
         tyXfPatch(b, { s: Math.max(0.05, Math.min(8, v.s * (r1 / Math.max(1, r0)))) });
       }
@@ -989,6 +1048,19 @@ function tyGizBind(ctx = GZ) {
     const g = tyGizBlock();
     if (!g) return;
     const b = g.b, act = btn.dataset.tyg;
+    if (act.startsWith("mode:")) {
+      const m = act.slice(5);
+      GZ.st.mode = m; GZ.st.pick = null;
+      if (m === "pin" && !TypoEngine.xfAt(b, GZ.t).pin) {   // أول مرة: الأركان بتبدأ من مكان الكلام دلوقتي
+        const P = tyGizPts();
+        tyXfPatch(b, { pin: P.pts.slice(0, 4).map(([x, y]) => [x / P.W, y / P.H]) });
+        return tyGizSave(g.i);
+      }
+      return tyGizDraw();
+    }
+    if (act.startsWith("pick:")) { const m = act.slice(5); GZ.st.pick = GZ.st.pick === m ? null : m; return tyGizDraw(); }
+    if (act === "unpin") { tyXfPatch(b, { pin: null }); GZ.st.mode = "move"; return tyGizSave(g.i, "رجع بلوك عادي"); }
+    if (act === "zrot") { tyXfPatch(b, { rx: 0, ry: 0, rz: 0 }); return tyGizSave(g.i); }
     if (act === "pin") {
       const v = TypoEngine.xfAt(b, GZ.t);
       if (v.pin) tyXfPatch(b, { pin: null });
@@ -1005,7 +1077,7 @@ function tyGizBind(ctx = GZ) {
       return tyGizSave(g.i);
     }
     if (act === "nokeys") { b.xk = []; GZ.st.keymode = false; return tyGizSave(g.i, "🗑️ المفاتيح اتمسحت"); }
-    if (act === "reset") { b.xf = b.xf?.tr ? { tr: b.xf.tr, tref: b.xf.tref } : {}; b.xk = []; GZ.st.keymode = false; return tyGizSave(g.i, "↺ رجع زي ما كان"); }
+    if (act === "reset") { b.xf = b.xf?.tr ? { tr: b.xf.tr, tref: b.xf.tref } : {}; b.xk = []; GZ.st.keymode = false; GZ.st.mode = "move"; return tyGizSave(g.i, "↺ رجع زي ما كان"); }
     if (act === "track") { GZ.st.pick = GZ.st.pick ? null : "follow"; return tyGizDraw(); }
     if (act === "pickmode") { GZ.st.pick = GZ.st.pick === "surface" ? "follow" : "surface"; return tyGizDraw(); }
     if (act === "notrack") { const { tr, tref, ...rest } = b.xf; b.xf = rest; return tyGizSave(g.i, "✖ التراك اتشال"); }
