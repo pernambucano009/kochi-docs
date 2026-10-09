@@ -3343,5 +3343,9 @@ window.I18N_EN = {
   "🎬 〰️ سطرين ماشيين": "🎬 〰️ Double marquee",
   "🎬 🗓️ شريط أيام": "🎬 🗓️ Date strip",
   "🎬 📄 أيقونة ملف": "🎬 📄 File icon",
-  "🎬 🌀 سطح مكتب زحمة": "🎬 🌀 Desktop chaos"
+  "🎬 🌀 سطح مكتب زحمة": "🎬 🌀 Desktop chaos",
+  "🎬 🌈 جملة وكلمة متدرّجة": "🎬 🌈 Gradient word line",
+  "🎬 🫧 كتابة على خلفية ضبابية": "🎬 🫧 Mesh prompt",
+  "🎬 🟠 كلمتين وكورة بينهم": "🎬 🟠 Orb split",
+  "🎬 🍱 شبكة كروت": "🎬 🍱 Bento grid"
 };

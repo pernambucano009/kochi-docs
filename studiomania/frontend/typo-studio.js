@@ -54,7 +54,8 @@
     "post", "highlightpan", "blocklines", "reactions",
     "qr", "codetag", "toolbar", "terminal", "scan",
     "toasts", "footer", "marquee", "datestrip",
-    "fileicon", "chaos"]);
+    "fileicon", "chaos",
+    "gradword", "meshprompt", "orbsplit", "bento"]);
   E.TYPING = new Set(["type", "artype"]);
   const MC = document.createElement("canvas").getContext("2d");
   const measure = (s, font) => { MC.font = font; return MC.measureText(s).width; };
@@ -5961,6 +5962,91 @@
     }
     if (s) { const ff = famOf(s), z = fitSize(s, `700 {}px ${ff}`, w * 0.8, mn * 0.08 * this.ts);
       html += `<div dir="${this.dir(s)}" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);white-space:nowrap;font:700 ${z.toFixed(1)}px ${ff};color:#fff;background:#151515;padding:${(z * 0.2).toFixed(0)}px ${(z * 0.5).toFixed(0)}px;border-radius:${(z * 0.25).toFixed(0)}px;box-shadow:0 6px 24px rgba(0,0,0,.3)">${esc(s)}</div>`; }
+    return html;
+  };
+  // ---------- gradword: جملة هادية وآخر كلمة متلوّنة بتدرّج ماشي
+  P.k_gradword = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    if (!it.length) return "";
+    const fi = b.focus >= 0 && b.focus < it.length ? b.focus : it.length - 1;
+    const full = it.map((x) => this.text(x.w)).join(" "), ff = famOf(full);
+    const sz = fitSize(full, `500 {}px ${ff}`, w * 0.8, mn * 0.075 * this.ts);
+    const G = [["#F2602A", "#C64BDB", "#6C5CE7"], ["#2F7CF6", "#3BD2C4", "#7ED957"], ["#E5484D", "#F5B800", "#F2602A"]][bi % 3];
+    const sh = ((t - b.t0) * 60) % 200;
+    let html = onVideo(this) ? `<div style="position:absolute;inset:0;background:rgba(242,241,239,.9)"></div>` : `<div style="position:absolute;inset:0;background:#F2F1EF"></div>`;
+    html += `<div dir="${this.dir(full)}" style="position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);text-align:center;white-space:nowrap;font:400 ${sz.toFixed(1)}px ${ff};color:#222;letter-spacing:-0.01em">${it.map((x, i) => { const on = t >= x.t0, a = eOut(seg(t, x.t0, x.t0 + 0.3));
+      return i === fi ? `<span style="opacity:${a.toFixed(2)};background:linear-gradient(90deg,${G.join(",")},${G[0]}) ${sh.toFixed(0)}% 0/200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;font-weight:500">${esc(this.text(x.w))}</span>` : `<span style="opacity:${on ? 1 : 0};display:inline-block;transform:translateY(${((1 - a) * sz * 0.3).toFixed(1)}px)">${esc(this.text(x.w))}</span>`; }).join(" ")}</div>`;
+    return html;
+  };
+
+  // ---------- meshprompt: مربع كتابة إزاز على خلفية ضبابية لونها بيتغير
+  P.k_meshprompt = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    if (!it.length) return "";
+    const s = it.map((x) => this.text(x.w)).join(" "), ff = famOf(s), ar = AR.test(s);
+    const M = [["#F7B39A", "#C7A5E0", "#FCE3C8"], ["#2C4A3E", "#7FA88C", "#C9D6A8"], ["#7BA4C9", "#E7C3B0", "#3E5A7A"], ["#F2C2A0", "#B05A4C", "#FBE6D4"]][bi % 4];
+    const dr = (t - b.t0) * 8;
+    const sh = typed(s, t, b.t0 + 0.2, 18);
+    const pw = Math.min(w * 0.86, mn * 0.95), ph = mn * 0.15, fz = Math.min(ph * 0.36, fitSize(s, `400 {}px ${ff}`, pw * 0.78, ph * 0.36));
+    let html = `<div style="position:absolute;inset:0;background:${M[2]}"></div>
+      <div style="position:absolute;inset:-20%;background:radial-gradient(circle at ${(30 + dr).toFixed(0)}% 30%,${M[0]},transparent 55%),radial-gradient(circle at ${(75 - dr).toFixed(0)}% 70%,${M[1]},transparent 55%);filter:blur(${(mn * 0.04).toFixed(0)}px)"></div>`;
+    html += `<div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:${((w - pw) / 2).toFixed(1)}px;top:${(h / 2 - ph / 2).toFixed(1)}px;width:${pw.toFixed(1)}px;height:${ph.toFixed(1)}px;border-radius:${(ph * 0.25).toFixed(0)}px;background:rgba(255,255,255,.28);border:1px solid rgba(255,255,255,.55);backdrop-filter:blur(8px);box-shadow:0 8px 30px rgba(0,0,0,.12);display:flex;align-items:center;justify-content:space-between;padding:0 ${(ph * 0.3).toFixed(0)}px;box-sizing:border-box">
+      <span style="font:400 ${fz.toFixed(1)}px ${ff};color:rgba(255,255,255,.95);white-space:nowrap;overflow:hidden;text-shadow:0 1px 6px rgba(0,0,0,.15)">${esc(sh)}<span style="opacity:${Math.floor(t * 2.5) % 2}">|</span></span>
+      <i style="flex:none;width:${(ph * 0.5).toFixed(0)}px;height:${(ph * 0.5).toFixed(0)}px;border-radius:${(ph * 0.12).toFixed(0)}px;background:${sh.length >= s.length ? ORG : "rgba(255,255,255,.5)"}"></i></div>`;
+    return html;
+  };
+
+  // ---------- orbsplit: كلمتين بيبعدوا عن بعض وكورة متدرّجة بتطلع بينهم
+  P.k_orbsplit = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    if (!it.length) return "";
+    const half = Math.ceil(it.length / 2);
+    const A = it.slice(0, half).map((x) => this.text(x.w)).join(" "), B = it.slice(half).map((x) => this.text(x.w)).join(" ");
+    const ar = AR.test(A + B), ff = famOf(A + B);
+    const sz = Math.min(mn * 0.07 * this.ts, fitSize(A + "  " + B, `400 {}px ${ff}`, w * 0.5, mn * 0.07));
+    const p = eOut(seg(t, b.t0 + 0.2, b.t0 + 0.9));
+    const gap = lerp(sz * 0.3, w * 0.36, p);
+    const d = lerp(0, mn * 0.18, eBack(seg(t, b.t0 + 0.3, b.t0 + 0.8)));
+    const rot = (t - b.t0) * 90;
+    let html = `<div style="position:absolute;inset:0;background:linear-gradient(135deg,#E9C9D6,#F6D2B8 55%,#F2B79B)"></div>`;
+    const L = ar ? B : A, R = ar ? A : B;
+    html += `<div dir="${this.dir(L)}" style="position:absolute;right:${(w / 2 + gap / 2).toFixed(1)}px;top:50%;transform:translateY(-50%);white-space:nowrap;font:400 ${sz.toFixed(1)}px ${ff};color:rgba(255,255,255,.95)">${esc(L)}</div>
+      <div dir="${this.dir(R)}" style="position:absolute;left:${(w / 2 + gap / 2).toFixed(1)}px;top:50%;transform:translateY(-50%);white-space:nowrap;font:400 ${sz.toFixed(1)}px ${ff};color:rgba(255,255,255,.95);opacity:${B ? 1 : 0}">${esc(R)}</div>
+      <div style="position:absolute;left:${(w / 2 - d / 2).toFixed(1)}px;top:${(h / 2 - d / 2).toFixed(1)}px;width:${d.toFixed(1)}px;height:${d.toFixed(1)}px;border-radius:50%;background:conic-gradient(from ${rot.toFixed(0)}deg,#F2602A,#FFB28A,#F7D9C4,#F2602A);box-shadow:0 0 ${(d * 0.5).toFixed(0)}px rgba(242,96,42,.45);filter:blur(${(mn * 0.002).toFixed(1)}px)"></div>`;
+    return html;
+  };
+
+  // ---------- bento: شبكة كروت تطبيقات مختلفة بتطلع واحدة ورا التانية
+  P.k_bento = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    if (!it.length) return "";
+    const tall = h > w, cols = tall ? 2 : 3, rows = tall ? 3 : 2;
+    const pad = mn * 0.04, gap = mn * 0.025;
+    const cw = (w - pad * 2 - gap * (cols - 1)) / cols, ch = (h * 0.8 - gap * (rows - 1)) / rows, y0 = h * 0.1;
+    const C = [["#F3D9E3", "#C4507A"], ["#1B1B1B", "#BFE36B"], ["#F2A93B", "#3A2105"], ["#C9C2F2", "#2A2160"], ["#EEF0EC", "#1F3A2A"], ["#FCE7DA", "#B5452A"]];
+    let html = `<div style="position:absolute;inset:0;background:${onVideo(this) ? "rgba(244,242,238,.9)" : "#F4F2EE"}"></div>`;
+    for (let i = 0; i < cols * rows; i++) {
+      const x = pad + (i % cols) * (cw + gap), y = y0 + Math.floor(i / cols) * (ch + gap);
+      const [bg, fg] = C[(i + bi) % C.length];
+      const lab = it[i % it.length], s = this.text(lab.w);
+      const p = eBack(seg(t, b.t0 + i * 0.1, b.t0 + i * 0.1 + 0.35));
+      const kind = i % 3;
+      const fz = Math.min(cw * 0.13, fitSize(s, `600 {}px ${famOf(s)}`, cw * 0.8, cw * 0.13));
+      let inner = "";
+      if (kind === 0) inner = `<div dir="ltr" style="position:absolute;left:8%;bottom:8%;font:600 ${(cw * 0.2).toFixed(1)}px 'TY Outfit';color:${fg}">$${(1000 + i * 2371) % 9000 + 100}</div>`;
+      else if (kind === 1) inner = `<svg style="position:absolute;left:8%;bottom:10%" width="${(cw * 0.84).toFixed(0)}" height="${(ch * 0.4).toFixed(0)}" viewBox="0 0 100 40" preserveAspectRatio="none"><path d="M0 34 C15 30 22 12 35 18 S55 34 68 14 85 8 100 4" stroke="${fg}" stroke-width="2.5" fill="none" pathLength="1" stroke-dasharray="1" stroke-dashoffset="${(1 - eOut(seg(t, b.t0 + i * 0.1 + 0.2, b.t0 + i * 0.1 + 1))).toFixed(3)}"/></svg>`;
+      else inner = `<div style="position:absolute;left:50%;top:58%;width:${(Math.min(cw, ch) * 0.42).toFixed(0)}px;height:${(Math.min(cw, ch) * 0.42).toFixed(0)}px;transform:translate(-50%,-50%);border-radius:50%;background:conic-gradient(${fg} ${(eOut(seg(t, b.t0 + i * 0.1 + 0.2, b.t0 + i * 0.1 + 1)) * 72).toFixed(0)}%,rgba(0,0,0,.08) 0);-webkit-mask:radial-gradient(circle,transparent 55%,#000 56%);mask:radial-gradient(circle,transparent 55%,#000 56%)"></div>`;
+      html += `<div dir="${this.dir(s)}" style="position:absolute;left:${x.toFixed(1)}px;top:${y.toFixed(1)}px;width:${cw.toFixed(1)}px;height:${ch.toFixed(1)}px;border-radius:${(mn * 0.03).toFixed(0)}px;background:${bg};overflow:hidden;transform:scale(${p.toFixed(3)});box-shadow:0 4px 16px rgba(0,0,0,.08)">
+        <div style="position:absolute;left:8%;right:8%;top:8%;font:600 ${fz.toFixed(1)}px ${famOf(s)};color:${fg};white-space:nowrap">${esc(s)}</div>${inner}</div>`;
+    }
     return html;
   };
 })();
