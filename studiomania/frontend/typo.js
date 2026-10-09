@@ -324,6 +324,8 @@ function tySeek(t) {
 
 function tyStop() {
   if (tyx.play) cancelAnimationFrame(tyx.play.raf);
+  if (tyx.play?.vfc && tyx.play.video?.cancelVideoFrameCallback) tyx.play.video.cancelVideoFrameCallback(tyx.play.vfc);
+  if (tyx.play?.video) tyx.play.video.muted = true;
   tyx.play?.audio?.pause();
   $("tyBg")?.querySelector("video")?.pause();
   tyx.play = null;
@@ -337,12 +339,30 @@ function tyStart() {
   if (tyx.t >= tyx.doc.duration - 0.05) tyx.t = 0;
   const v = tyx.cur;
   let audio = null;
-  if (v.source_url && v.source?.kind !== "text") {
+  const sync = v.bg?.kind === "source" && !!$("tyBg")?.querySelector("video")?.requestVideoFrameCallback;
+  if (!sync && v.source_url && v.source?.kind !== "text") {
     audio = new Audio(v.source_url);
     audio.currentTime = tyx.t;
     audio.play().catch(() => {});
   }
   const bv = $("tyBg")?.querySelector("video");
+  // الخلفية هي الفيديو نفسه: الفيديو هو الساعة (وصوته هو الصوت)، والكلام بيترسم على نفس الفريم اللي ظاهر بالظبط
+  // (من غير كده الفيديو والكلام كانوا بيمشوا بساعتين، فقص الشخص من الكلمة ييجي على فريم تاني والكلمة ترعش)
+  if (bv && sync) {
+    bv.muted = false;
+    bv.currentTime = tyx.t;
+    tyx.play = { video: bv };
+    const onFrame = (now, meta) => {
+      if (!tyx.play) return;
+      tySeek(meta.mediaTime);
+      if (meta.mediaTime >= tyx.doc.duration - 0.04 || bv.ended) return tyStop();
+      tyx.play.vfc = bv.requestVideoFrameCallback(onFrame);
+    };
+    tyx.play.vfc = bv.requestVideoFrameCallback(onFrame);
+    bv.play().catch(() => { bv.muted = true; bv.play().catch(() => {}); });
+    document.querySelector("[data-typlay]").textContent = "⏸";
+    return;
+  }
   if (bv) { bv.currentTime = tyx.t; bv.play().catch(() => {}); }
   const t0 = performance.now() - tyx.t * 1000;
   tyx.play = { audio };
