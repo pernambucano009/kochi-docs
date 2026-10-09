@@ -3283,5 +3283,11 @@ window.I18N_EN = {
   "🎬 🔗 نتيجة بحث": "🎬 🔗 Search result card",
   "🎬 🗓️ كاليندر وموعد": "🎬 🗓️ Calendar with event",
   "🎬 🗺️ خريطة ودواير بتنبض": "🎬 🗺️ Map with pulsing spots",
-  "🎬 🖍️ عنوان بهايلايتر أصفر": "🎬 🖍️ Serif title with yellow marker"
+  "🎬 🖍️ عنوان بهايلايتر أصفر": "🎬 🖍️ Serif title with yellow marker",
+  "🎬 🪪 اسم ووظيفة تحت": "🎬 🪪 Lower third name tag",
+  "🎬 🃏 كروت بكلمات عملاقة": "🎬 🃏 Cards with giant words",
+  "🎬 📊 رسم بياني بيكبر": "🎬 📊 Growing chart",
+  "🎬 🧾 جدول بتاجات": "🎬 🧾 Table with tags",
+  "🎬 🕘 جدول اليوم": "🎬 🕘 Day schedule",
+  "🎬 🔁 كلمة بتتهته": "🎬 🔁 Stuttering word"
 };
