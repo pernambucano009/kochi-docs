@@ -133,8 +133,9 @@ def track(path: str, t0: float, t1: float, tref: float, box: list[float], mode: 
 def _order(pts):
     """4 نقط بالترتيب: فوق شمال، فوق يمين، تحت يمين، تحت شمال."""
     p = np.array(pts, np.float32).reshape(4, 2)
-    s, d = p.sum(1), np.diff(p, axis=1).reshape(-1)
-    return np.array([p[np.argmin(s)], p[np.argmin(d)], p[np.argmax(s)], p[np.argmax(d)]], np.float32)
+    c = p.mean(0)
+    p = p[np.argsort(np.arctan2(p[:, 1] - c[1], p[:, 0] - c[0]))]   # لفّة مع عقارب الساعة (y لتحت) — مبيكررش نقطة حتى لو المربع مايل 45°
+    return np.roll(p, -int(np.argmin(p.sum(1))), axis=0)
 
 
 def _boxy(q) -> bool:

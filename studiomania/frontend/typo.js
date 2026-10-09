@@ -988,7 +988,7 @@ function tyGizBind(ctx = GZ) {
     if (!g) return;
     const [x, y, W, H] = at(e);
     GZ.stop();
-    if (e.target.dataset?.g === "pick") {   // التراك: دوسة على الحاجة (أو مربع حواليها)
+    if (e.target.dataset?.g === "pick" || e.target.closest?.("#gzHover")) {   // التراك: دوسة على الحاجة (أو مربع حواليها)
       d = { pick: true, x0: x, y0: y, W, H, i: g.i };
       svg.setPointerCapture(e.pointerId);
       return;
@@ -1003,7 +1003,7 @@ function tyGizBind(ctx = GZ) {
     e.preventDefault();
   });
   svg.addEventListener("pointermove", (e) => {
-    if (!d && e.target.dataset?.g === "pick") { const [hx, hy, HW, HH] = at(e); tyGizHover(hx / HW, hy / HH, hx, hy); return; }
+    if (!d && (e.target.dataset?.g === "pick" || e.target.closest?.("#gzHover"))) { const [hx, hy, HW, HH] = at(e); tyGizHover(hx / HW, hy / HH, hx, hy); return; }
     if (!d) return;
     const [x, y] = at(e), b = GZ.doc.blocks[d.i], v = d.v;
     const dx = x - d.x, dy = y - d.y;
@@ -1106,7 +1106,7 @@ async function tyTrackRun(i, sel) {
     // الكلام بينقل على الحاجة اللي اتحددت (نصه على مكان الدوسة أو نص المربع)، وبعدين بيمشي معاها
     const b = GZ.doc.blocks[i], P = tyGizPts(), v = TypoEngine.xfAt(b, GZ.t);
     if (P && !v.pin) {
-      const [tx, ty] = sel.point || [(sel.box[0] + sel.box[2]) / 2, (sel.box[1] + sel.box[3]) / 2];
+      const [tx, ty] = sel.point || (sel.quad ? [0, 2, 4, 6].reduce((c, k) => [c[0] + sel.quad[k] / 4, c[1] + sel.quad[k + 1] / 4], [0, 0]) : [(sel.box[0] + sel.box[2]) / 2, (sel.box[1] + sel.box[3]) / 2]);
       tyXfPatch(b, { x: v.x + tx - P.pts[4][0] / P.W, y: v.y + ty - P.pts[4][1] / P.H });
       const list = JSON.parse(JSON.stringify(GZ.cur.blocks));
       list[i].xf = { ...(b.xf || {}) }; list[i].xk = b.xk || [];
@@ -1174,7 +1174,7 @@ function tyGizHover(nx, ny, px, py) {
   const pts = reg.poly.map(([x, y]) => `${(x * W + o).toFixed(1)},${(y * H + o).toFixed(1)}`).join(" ");
   const xs = reg.poly.map((p) => p[0] * W + o), ys = reg.poly.map((p) => p[1] * H + o);
   const lx = Math.min(...xs), ly = Math.min(...ys) - 8;
-  el.innerHTML = `<polygon points="${pts}" fill="rgba(250,204,21,.22)" stroke="#FACC15" stroke-width="2.2" stroke-linejoin="round" filter="url(#gzSh)"/>
+  el.innerHTML = `<polygon points="${pts}" fill="rgba(250,204,21,.22)" stroke="#FACC15" stroke-width="2.2" stroke-linejoin="round" filter="url(#gzSh)" style="pointer-events:none"/>
     <g filter="url(#gzSh)"><rect x="${lx}" y="${ly - 14}" width="${12 + reg.name.length * 7}" height="17" rx="6" fill="#FACC15"/>
     <text x="${lx + 6 + reg.name.length * 3.5}" y="${ly - 2}" text-anchor="middle" font-size="10.5" font-weight="700" fill="#1a1a1a" font-family="system-ui">${reg.name}</text></g>`;
 }
