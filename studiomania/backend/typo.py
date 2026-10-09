@@ -205,7 +205,14 @@ STUDIO_KINDS.update({
     "uploads": "ملفات بتترفع جنب مربع الكتابة بسبينر وبعدين ✓ والكلام بيتكتب في المربع (لما بيرفع صور أو ملفات ويطلب حاجة، من 3 لـ 10 كلمات)",
     "timer": "تايمر بيعدّ تنازلي «09:59» ونقط برتقاني حواليه، والرقم اللي في الكلام هو الدقايق والباقي تحته (للوقت والسرعة: «في 10 دقايق»، من 1 لـ 5 كلمات)",
 })
-STILL_KINDS = {"fill", "polaroid", "cards", "stories", "post", "tiles", "split", "phone", "window", "inline", "wintitle", "corners", "call", "chapter", "sidepanel", "photowords", "dragdrop", "lineup", "photohero", "pins", "calendar"}
+STUDIO_KINDS.update({
+    "anchorword": "كلمة واحدة ضخمة بعرض الشاشة لازقة في تحت والخلفية بتقطع بسرعة ورا منها، والكلمة المهمة (focus) هي اللي بتكبر والباقي صغير فوق (لافتتاحية أو اسم فئة: «البنّايين»، من 1 لـ 4 كلمات)",
+    "orders": "تلات تذاكر طلبات متعلقة على حديدة: أول كلمة اسم المحل والباقي سطور الطلب في التذكرة اللي في النص (لمطعم أو طلبات أو قايمة مهام، من 3 لـ 8 كلمات)",
+    "stats": "دواير أرقام بتنط وتعدّ «75+ 48+ 6K+» والكلام تحتها، الأرقام اللي في الكلام هي اللي بتظهر (للإحصائيات والإنجازات، من 2 لـ 7 كلمات)",
+    "duo": "الفيديو في كادر مدوّر على أسود بيتقسم لشاشتين والكلام تحت (لمقارنة أو حاجتين بيحصلوا مع بعض، من 2 لـ 7 كلمات)",
+    "route": "كارت خريطة طريقها بيترسم أزرق لحد الدبوس الأحمر ووقت الوصول «23 دقيقة» من الرقم اللي في الكلام (للمشاوير والتوصيل والمسافة، من 2 لـ 6 كلمات)",
+})
+STILL_KINDS = {"fill", "polaroid", "cards", "stories", "post", "tiles", "split", "phone", "window", "inline", "wintitle", "corners", "call", "chapter", "sidepanel", "photowords", "dragdrop", "lineup", "photohero", "pins", "calendar", "anchorword", "duo"}
 # الحركات اللي محتاجة شخص ظاهر في الفيديو
 PERSON_KINDS = {"behind", "arc", "halo", "thermal", "dots", "neon", "emerge"}
 
@@ -250,6 +257,8 @@ COLLECTIONS = {
                 "kinds": {"wordroll": 2, "bignum": 2, "stickynote": 2, "photohero": 1, "donut": 1, "loading": 1, "isomap": 1, "spaced": 1, "notify": 1, "colorcard": 1, "endcard": 1}},
     "tenminutes": {"note": "موقع في 10 دقايق، سينمائي: عنوان بيتبني، قبل وبعد، مربع كتابة، صورة وكلمة عملاقة، لون، ملفات بتترفع، تايمر",
                 "kinds": {"titlecard": 2, "split": 1, "prompt": 1, "photohero": 1, "colorpicker": 1, "uploads": 1, "timer": 2, "promptline": 1, "countdown": 1, "lineup": 1}},
+    "crew": {"note": "إعلان البنّايين: كلمة ضخمة تحت مع وشوش بتتغير، حروف عملاقة بتعدي، كلمة في مربع، تذاكر طلبات، أرقام، شاشتين، خريطة، كارت أزرق ونهاية",
+                "kinds": {"anchorword": 2, "megapan": 1, "marker": 1, "corners": 1, "orders": 1, "stats": 1, "duo": 1, "route": 1, "colorcard": 1, "endcard": 1, "crowd": 1}},
     "cinema": {"note": "سينمائي: نيون ورا الشخص، كلام على الأرض، أشكال فيلم، قفل ومكعب، بوستر",
                "kinds": {"neon": 2, "floor": 2, "shapes": 2, "halo": 1, "lock": 1, "cube": 1, "poster": 2, "emerge": 1, "mirror": 1, "spotlight": 2, "wave": 1}},
 }
@@ -260,7 +269,7 @@ TRANS = ("", "whip", "zoom", "glitch", "flash", "iris", "leak", "burn", "rise", 
 COL_TRANS = {"editorial": ("rise", "iris", "zoom"), "pop": ("whip", "zoom", "flash"), "retro": ("burn", "leak", "iris"),
              "tech": ("glitch", "whip", "flash"), "collage": ("whip", "rise", "zoom"), "screens": ("rise", "zoom", "glitch"),
              "print": ("leak", "burn", "rise"), "cinema": ("leak", "burn", "iris", "flash"),
-             "vintage": ("burn", "leak", "iris"), "social": ("whip", "rise", "glitch"), "product": ("wipe", "blur", "pop", "rise"), "assistant": ["pop", "blur", "wipe"], "family": ["wipe", "pop", "blur"], "builder": ["blur", "pop", "wipe"], "cinematic": ["blur", "whip", "leak"], "maker": ["blur", "pop", "wipe"], "interview": ["pop", "wipe", "blur"], "chapters": ["pop", "wipe", "blur"], "agency": ["blur", "pop", "wipe"], "tenminutes": ["blur", "leak", "whip"]}
+             "vintage": ("burn", "leak", "iris"), "social": ("whip", "rise", "glitch"), "product": ("wipe", "blur", "pop", "rise"), "assistant": ["pop", "blur", "wipe"], "family": ["wipe", "pop", "blur"], "builder": ["blur", "pop", "wipe"], "cinematic": ["blur", "whip", "leak"], "maker": ["blur", "pop", "wipe"], "interview": ["pop", "wipe", "blur"], "chapters": ["pop", "wipe", "blur"], "agency": ["blur", "pop", "wipe"], "tenminutes": ["blur", "leak", "whip"], "crew": ["whip", "flash", "blur"]}
 
 
 def pick_collection(prev: str | None = None, rnd=None) -> str:
@@ -332,7 +341,7 @@ BUILTIN_STYLES = {
                   "film": 1, "ghost": 1, "notify": 1, "dialog": 1, "pills": 1, "steps": 1, "scribble": 1, "list": 1, "prompt": 1, "spread": 1,
                   "serif": 1, "chalk": 1, "ticket": 1, "frame": 1, "toggle": 1, "years": 1, "wave": 1, "spaced": 1, "search": 1, "digits": 1, "torn": 1,
                   "emoji": 1, "doodle": 1, "browser": 1, "split": 1, "spotlight": 1, "phone": 1,
-                  "window": 1, "inline": 1, "bigtype": 1, "checks": 1, "progress": 1, "flow": 1, "aura": 1, "stairs": 1, "dates": 1, "endcard": 1, "wintitle": 1, "corners": 1, "inbox": 1, "doc": 1, "workcards": 1, "call": 1, "canvas": 1, "colorcard": 1, "imsg": 1, "dashboard": 1, "apps": 1, "bell": 1, "chapter": 1, "sidepanel": 1, "clones": 1, "megapan": 1, "badge": 1, "leaderboard": 1, "donut": 1, "photowords": 1, "titlecard": 1, "departures": 1, "loading": 1, "countdown": 1, "dragdrop": 1, "lineup": 1, "isomap": 1, "stickers": 1, "promptline": 1, "crowd": 1, "photohero": 1, "menu": 1, "pricing": 1, "pins": 1, "result": 1, "calendar": 1, "mapdots": 1, "marker": 1, "lowerthird": 1, "cardwords": 1, "bars": 1, "table": 1, "dayplan": 1, "stutter": 1, "section": 1, "worklog": 1, "toggles": 1, "checkout": 1, "lockscreen": 1, "wizard": 1, "wordroll": 1, "bignum": 1, "stickynote": 1, "colorpicker": 1, "uploads": 1, "timer": 1},
+                  "window": 1, "inline": 1, "bigtype": 1, "checks": 1, "progress": 1, "flow": 1, "aura": 1, "stairs": 1, "dates": 1, "endcard": 1, "wintitle": 1, "corners": 1, "inbox": 1, "doc": 1, "workcards": 1, "call": 1, "canvas": 1, "colorcard": 1, "imsg": 1, "dashboard": 1, "apps": 1, "bell": 1, "chapter": 1, "sidepanel": 1, "clones": 1, "megapan": 1, "badge": 1, "leaderboard": 1, "donut": 1, "photowords": 1, "titlecard": 1, "departures": 1, "loading": 1, "countdown": 1, "dragdrop": 1, "lineup": 1, "isomap": 1, "stickers": 1, "promptline": 1, "crowd": 1, "photohero": 1, "menu": 1, "pricing": 1, "pins": 1, "result": 1, "calendar": 1, "mapdots": 1, "marker": 1, "lowerthird": 1, "cardwords": 1, "bars": 1, "table": 1, "dayplan": 1, "stutter": 1, "section": 1, "worklog": 1, "toggles": 1, "checkout": 1, "lockscreen": 1, "wizard": 1, "wordroll": 1, "bignum": 1, "stickynote": 1, "colorpicker": 1, "uploads": 1, "timer": 1, "anchorword": 1, "orders": 1, "stats": 1, "duo": 1, "route": 1},
     },
     "pro": {
         "name": "⭐ احترافي (زي الفيديو المرجع)", "font": "SM Tajawal", "case": "lower", "grain": 0.12, "weight": 700, "pro": True,
@@ -366,7 +375,7 @@ BUILTIN_STYLES = {
 }
 
 PLAN_FORMAT = """{
-  "blocks": [{"from": 0, "to": 3, "kind": "pop | type | build | icon | letters | scatter | ring | behind | arc | artype | redword | signature | poster | stack | push | crt | ransom | halo | floor | hand | tags | space | route | board | cube | comments | lock | thermal | shapes | select | chat | counter | fill | polaroid | cards | burst | dots | neon | outline | spin | sweep | extrude | stories | post | retro | duotone | label | mirror | banners | tiles | bubble | band | emerge | film | ghost | notify | dialog | pills | steps | scribble | list | prompt | spread | serif | chalk | ticket | frame | toggle | years | wave | spaced | search | digits | torn | emoji | doodle | browser | split | spotlight | phone | window | inline | bigtype | checks | progress | flow | aura | stairs | dates | endcard | wintitle | corners | inbox | doc | workcards | call | canvas | colorcard | imsg | dashboard | apps | bell | chapter | sidepanel | clones | megapan | badge | leaderboard | donut | photowords | titlecard | departures | loading | countdown | dragdrop | lineup | isomap | stickers | promptline | crowd | photohero | menu | pricing | pins | result | calendar | mapdots | marker | lowerthird | cardwords | bars | table | dayplan | stutter | section | worklog | toggles | checkout | lockscreen | wizard | wordroll | bignum | stickynote | colorpicker | uploads | timer", "theme": "light | dark | accent",
+  "blocks": [{"from": 0, "to": 3, "kind": "pop | type | build | icon | letters | scatter | ring | behind | arc | artype | redword | signature | poster | stack | push | crt | ransom | halo | floor | hand | tags | space | route | board | cube | comments | lock | thermal | shapes | select | chat | counter | fill | polaroid | cards | burst | dots | neon | outline | spin | sweep | extrude | stories | post | retro | duotone | label | mirror | banners | tiles | bubble | band | emerge | film | ghost | notify | dialog | pills | steps | scribble | list | prompt | spread | serif | chalk | ticket | frame | toggle | years | wave | spaced | search | digits | torn | emoji | doodle | browser | split | spotlight | phone | window | inline | bigtype | checks | progress | flow | aura | stairs | dates | endcard | wintitle | corners | inbox | doc | workcards | call | canvas | colorcard | imsg | dashboard | apps | bell | chapter | sidepanel | clones | megapan | badge | leaderboard | donut | photowords | titlecard | departures | loading | countdown | dragdrop | lineup | isomap | stickers | promptline | crowd | photohero | menu | pricing | pins | result | calendar | mapdots | marker | lowerthird | cardwords | bars | table | dayplan | stutter | section | worklog | toggles | checkout | lockscreen | wizard | wordroll | bignum | stickynote | colorpicker | uploads | timer | anchorword | orders | stats | duo | route", "theme": "light | dark | accent",
               "text": "الكلام اللي يتكتب (من كلام الجمل دي بالظبط، ممكن تختصره لكلمة أو كلمتين في pop/icon/letters/scatter)",
               "focus": 0, "icon": "اسم ستيكر من المكتبة أو وصف قصير بالإنجليزي لأيقونة جديدة", "icons": ["..."], "letter": 1,
               "side": "اسم ستيكر/صورة كبيرة جنب الكلام في build أو فاضي",
@@ -578,15 +587,15 @@ def pro_plan(words: list[dict], duration: float, icons: list[str] | None = None,
 # طول الجزء اللي كل حركة لايقة عليه (عدد الكلمات)
 KIND_LEN = {
     "short": {"behind", "neon", "fill", "poster", "burst", "spin", "sweep", "mirror", "banners", "ransom", "redword", "outline", "lock", "tiles", "scribble", "film", "ghost", "dialog", "ticket", "toggle", "years", "digits", "spotlight",
-              "bigtype", "dates", "stairs", "wintitle", "colorcard", "dashboard", "apps", "bell", "chapter", "megapan", "badge", "donut", "photowords", "titlecard", "countdown", "dragdrop", "isomap", "stickers", "crowd", "photohero", "calendar", "mapdots", "marker", "lowerthird", "cardwords", "bars", "stutter", "section", "checkout", "wizard", "bignum", "colorpicker", "timer"},
+              "bigtype", "dates", "stairs", "wintitle", "colorcard", "dashboard", "apps", "bell", "chapter", "megapan", "badge", "donut", "photowords", "titlecard", "countdown", "dragdrop", "isomap", "stickers", "crowd", "photohero", "calendar", "mapdots", "marker", "lowerthird", "cardwords", "bars", "stutter", "section", "checkout", "wizard", "bignum", "colorpicker", "timer", "anchorword", "stats", "duo", "route"},
     "mid": {"arc", "stack", "halo", "tags", "cube", "hand", "push", "lock", "select", "emerge", "extrude", "label", "bubble", "band", "retro",
             "duotone", "outline", "stories", "post", "crt", "shapes", "floor", "space", "dots", "thermal", "artype", "redword",
             "film", "ghost", "dialog", "pills", "scribble", "spread", "notify", "steps", "list", "prompt",
             "serif", "frame", "wave", "spaced", "search", "emoji", "doodle", "browser", "split", "spotlight", "years", "digits",
-            "window", "inline", "checks", "progress", "flow", "aura", "stairs", "dates", "endcard", "wintitle", "corners", "inbox", "doc", "workcards", "call", "canvas", "colorcard", "imsg", "dashboard", "apps", "bell", "chapter", "sidepanel", "clones", "badge", "leaderboard", "donut", "photowords", "titlecard", "departures", "loading", "countdown", "dragdrop", "lineup", "isomap", "stickers", "promptline", "crowd", "photohero", "menu", "pricing", "pins", "result", "calendar", "mapdots", "marker", "lowerthird", "cardwords", "bars", "table", "dayplan", "section", "worklog", "toggles", "checkout", "lockscreen", "wizard", "wordroll", "bignum", "stickynote", "colorpicker", "uploads", "timer"},
+            "window", "inline", "checks", "progress", "flow", "aura", "stairs", "dates", "endcard", "wintitle", "corners", "inbox", "doc", "workcards", "call", "canvas", "colorcard", "imsg", "dashboard", "apps", "bell", "chapter", "sidepanel", "clones", "badge", "leaderboard", "donut", "photowords", "titlecard", "departures", "loading", "countdown", "dragdrop", "lineup", "isomap", "stickers", "promptline", "crowd", "photohero", "menu", "pricing", "pins", "result", "calendar", "mapdots", "marker", "lowerthird", "cardwords", "bars", "table", "dayplan", "section", "worklog", "toggles", "checkout", "lockscreen", "wizard", "wordroll", "bignum", "stickynote", "colorpicker", "uploads", "timer", "orders", "stats", "duo", "route"},
     "long": {"stack", "chat", "board", "comments", "hand", "cards", "polaroid", "crt", "space", "duotone", "artype", "emerge",
              "notify", "steps", "list", "prompt", "pills", "spread", "ghost",
-             "chalk", "torn", "spaced", "search", "emoji", "browser", "phone", "window", "inline", "checks", "progress", "flow", "aura", "corners", "inbox", "doc", "workcards", "call", "canvas", "imsg", "sidepanel", "clones", "leaderboard", "departures", "loading", "lineup", "promptline", "menu", "pricing", "pins", "result", "table", "dayplan", "worklog", "toggles", "lockscreen", "wordroll", "stickynote", "uploads"},
+             "chalk", "torn", "spaced", "search", "emoji", "browser", "phone", "window", "inline", "checks", "progress", "flow", "aura", "corners", "inbox", "doc", "workcards", "call", "canvas", "imsg", "sidepanel", "clones", "leaderboard", "departures", "loading", "lineup", "promptline", "menu", "pricing", "pins", "result", "table", "dayplan", "worklog", "toggles", "lockscreen", "wordroll", "stickynote", "uploads", "orders"},
 }
 
 
@@ -625,7 +634,7 @@ def studio_plan(words: list[dict], duration: float, person: dict | None = None, 
         if ci == len(chunks) - 1 and n <= 3 and r.random() < 0.35:
             kind = "signature"
         longest = max(range(n), key=lambda j: len(words[ch[j]]["w"]))
-        out.append({"from": ch[0], "to": ch[-1], "kind": kind, "focus": longest if kind in ("arc", "stack", "halo", "outline", "label", "tiles", "bubble", "lock", "cube", "film", "ghost", "scribble", "spread", "serif", "toggle", "emoji", "doodle", "spotlight", "frame", "inline", "endcard", "wintitle", "megapan", "badge", "photohero", "result", "marker", "stutter") else -1,
+        out.append({"from": ch[0], "to": ch[-1], "kind": kind, "focus": longest if kind in ("arc", "stack", "halo", "outline", "label", "tiles", "bubble", "lock", "cube", "film", "ghost", "scribble", "spread", "serif", "toggle", "emoji", "doodle", "spotlight", "frame", "inline", "endcard", "wintitle", "megapan", "badge", "photohero", "result", "marker", "stutter", "anchorword") else -1,
                     "sign": " ".join(words[i]["w"] for i in ch).strip(".,،؟?!") if kind == "signature" else ""})
     # الترانزيشنز: حوالي نص البلوكات (غير الأول) بتدخل بترانزيشن من بتوع الكوليكشن، ومن غير ما نفس الترانزيشن يتكرر ورا بعض
     name = next((k for k, v in COLLECTIONS.items() if v is col), "")

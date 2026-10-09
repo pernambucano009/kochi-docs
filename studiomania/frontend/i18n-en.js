@@ -3301,5 +3301,10 @@ window.I18N_EN = {
   "🎬 🗒️ ملاحظات متعلقة": "🎬 🗒️ Pinned sticky notes",
   "🎬 🎨 لوحة اختيار لون": "🎬 🎨 Color picker",
   "🎬 📎 ملفات بتترفع": "🎬 📎 Files uploading",
-  "🎬 ⏱️ تايمر تنازلي": "🎬 ⏱️ Countdown timer"
+  "🎬 ⏱️ تايمر تنازلي": "🎬 ⏱️ Countdown timer",
+  "🎬 🅱️ كلمة ضخمة تحت": "🎬 🅱️ Anchored giant word",
+  "🎬 🧾 تذاكر طلبات": "🎬 🧾 Order tickets",
+  "🎬 🔢 دواير أرقام": "🎬 🔢 Stat bubbles",
+  "🎬 🪟 شاشتين جنب بعض": "🎬 🪟 Split duo frame",
+  "🎬 🗺️ طريق على الخريطة": "🎬 🗺️ Map route"
 };
