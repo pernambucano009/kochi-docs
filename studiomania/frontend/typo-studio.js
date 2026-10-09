@@ -66,7 +66,13 @@
   P.personAt = function (t) {
     const p = this.doc.person;
     if (!p?.n) return null;
-    const i = clamp(Math.round(t * p.fps), 0, p.n - 1);
+    let i = clamp(Math.round(t * p.fps), 0, p.n - 1);
+    // المعاينة: لو شكل الشخص في الفريم ده لسه ما اتحمّلش، نستخدم أقرب فريم اتحمّل (من غيره الكلمة كانت بتظهر فوق الراس
+    // لحظة وبعدين تتقص فبترعش). الفيديو النهائي بيستنى كل صورة تتحمّل فمش محتاج ده
+    if (this.editing && this._pc) {
+      const ok = (j) => { const im = this._pc.get(j); return im && im.complete && im.naturalWidth > 0; };
+      if (!ok(i)) for (let d = 1; d <= 20; d++) { if (ok(i - d)) { i -= d; break; } if (ok(i + d)) { i += d; break; } }
+    }
     const n = String(i).padStart(5, "0");
     return { i, url: `${p.base}${n}.webp`, murl: p.mbase ? `${p.mbase}${n}.webp` : "", st: p.frames?.[i] || null, img: p.img };
   };
@@ -144,11 +150,11 @@
     const p = this.doc.person;
     if (!p?.n) return;
     this._pc = this._pc || new Map();
-    for (let j = 0; j < 12; j++) {
+    for (let j = 0; j < (this.editing ? 45 : 12); j++) {
       const i = clamp(Math.round(t * p.fps) + j, 0, p.n - 1);
       if (this._pc.has(i)) continue;
       const im = new Image(); im.src = `${p.mbase || p.base}${String(i).padStart(5, "0")}.webp`; this._pc.set(i, im);
-      if (this._pc.size > 240) this._pc.delete(this._pc.keys().next().value);
+      if (this._pc.size > 400) this._pc.delete(this._pc.keys().next().value);
     }
   };
 
