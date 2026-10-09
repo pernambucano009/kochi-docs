@@ -49,7 +49,8 @@
     "flank", "flood", "chips", "wordtiles",
     "profile", "bigbutton", "gauge", "rule", "iconrow",
     "led", "drop", "report", "serp",
-    "files", "generating", "portfolio"]);
+    "files", "generating", "portfolio",
+    "letterorb", "connect", "assistant", "themeswap", "slider", "weather"]);
   E.TYPING = new Set(["type", "artype"]);
   const MC = document.createElement("canvas").getContext("2d");
   const measure = (s, font) => { MC.font = font; return MC.measureText(s).width; };
@@ -5431,6 +5432,153 @@
     }
     const cap = caps.length ? caps[idx % caps.length] : String(2020 + (idx % 6));
     html += `<div dir="${this.dir(cap)}" style="position:absolute;left:0;right:0;top:${((h + phh) / 2 + mn * 0.05).toFixed(1)}px;text-align:center;font:400 ${(mn * 0.035).toFixed(1)}px ${AR.test(cap) ? famOf(cap) : "'TY Pixel',monospace"};color:#CCC;letter-spacing:.12em">${esc(cap)} <span dir="ltr" style="opacity:.5">— ${String((idx % 12) + 1).padStart(2, "0")}</span></div>`;
+    return html;
+  };
+  // ---------- letterorb: كلمة وحرف منها كورة متدرجة بتلف
+  P.k_letterorb = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    if (!it.length) return "";
+    const fi = b.focus >= 0 && b.focus < it.length ? b.focus : 0;
+    const word = this.text(it[fi].w), ff = famOf(word), ar = AR.test(word);
+    const ch = [...word];
+    const oi = ar ? -1 : Math.max(0, ch.findIndex((c, i) => i > 0 && /[oO0aeAE]/.test(c)));
+    const sz = fitSize(word, `500 {}px ${ff}`, w * 0.8, mn * 0.3);
+    const a = eOut(seg(t, b.t0, b.t0 + 0.4));
+    const rot = (t - b.t0) * 120;
+    const orb = (d) => `<span style="display:inline-block;width:${d.toFixed(1)}px;height:${d.toFixed(1)}px;border-radius:50%;vertical-align:${ar ? "middle" : "-0.02em"};margin:0 ${(d * 0.04).toFixed(1)}px;background:conic-gradient(from ${rot.toFixed(0)}deg,#F2602A,#FFC6A0,#FF8A3D,#F7E3D2,#F2602A);transform:scale(${eBack(seg(t, b.t0 + 0.2, b.t0 + 0.6)).toFixed(3)});box-shadow:inset 0 0 ${(d * 0.2).toFixed(0)}px rgba(255,255,255,.6)"></span>`;
+    let html = onVideo(this) ? `<div style="position:absolute;inset:0;background:rgba(250,247,243,.9)"></div>` : `<div style="position:absolute;inset:0;background:#FAF7F3"></div>`;
+    const body = ar ? `${esc(word)} ${orb(sz * 0.6)}` : ch.map((c, i) => (i === oi ? orb(sz * 0.62) : esc(c))).join("");
+    html += `<div dir="${this.dir(word)}" style="position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);text-align:center;white-space:nowrap;font:500 ${sz.toFixed(1)}px ${ff};letter-spacing:-0.04em;color:#151515;opacity:${a.toFixed(2)}">${body}</div>`;
+    const rest = it.filter((x, i) => i !== fi && t >= x.t0).map((x) => this.text(x.w)).join(" ");
+    if (rest) { const rf = famOf(rest), z = fitSize(rest, `500 {}px ${rf}`, w * 0.84, mn * 0.06 * this.ts);
+      html += `<div dir="${this.dir(rest)}" style="position:absolute;left:0;right:0;top:${(h / 2 + sz * 0.75).toFixed(1)}px;text-align:center;white-space:nowrap;font:500 ${z.toFixed(1)}px ${rf};color:#555">${esc(rest)}</div>`; }
+    return html;
+  };
+
+  // ---------- connect: زرارين بيتوصلوا ببعض بلينك
+  P.k_connect = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    if (!it.length) return "";
+    const half = Math.ceil(it.length / 2);
+    const A = it.slice(0, half).map((x) => this.text(x.w)).join(" "), B = it.slice(half).map((x) => this.text(x.w)).join(" ") || "Drive";
+    const fz = Math.min(mn * 0.055, fitSize(A + B, `600 {}px ${famOf(A + B)}`, w * 0.6, mn * 0.055));
+    const p1 = eBack(seg(t, b.t0, b.t0 + 0.3)), p2 = eBack(seg(t, it[half] ? it[half].t0 : b.t0 + 0.4, (it[half] ? it[half].t0 : b.t0 + 0.4) + 0.3));
+    const lk = eOut(seg(t, b.t0 + 0.5, b.t0 + 0.9));
+    const ok = t > b.t0 + 1;
+    const gap = fz * 2.4 * lk + fz * 0.6;
+    const pill = (s, bg, fg, ic, sc, side) => `<div dir="${this.dir(s)}" style="display:flex;align-items:center;gap:${(fz * 0.4).toFixed(0)}px;background:${bg};color:${fg};font:600 ${fz.toFixed(1)}px ${famOf(s)};padding:${(fz * 0.45).toFixed(0)}px ${(fz * 0.7).toFixed(0)}px;border-radius:${(fz * 0.4).toFixed(0)}px;white-space:nowrap;transform:scale(${sc.toFixed(3)}) translateX(${(side * (1 - lk) * fz).toFixed(1)}px)">${ic}${esc(s)}</div>`;
+    const icA = `<svg width="${fz.toFixed(0)}" height="${fz.toFixed(0)}" viewBox="0 0 20 20"><rect x="2" y="2" width="16" height="16" rx="4" fill="#fff" opacity=".9"/><path d="M6 13l3-6 3 4 2-2" stroke="#7A3FC8" stroke-width="2" fill="none"/></svg>`;
+    const icB = `<svg width="${fz.toFixed(0)}" height="${fz.toFixed(0)}" viewBox="0 0 20 20"><path d="M7 2h6l6 10-3 6H4l-3-6z" fill="none"/><path d="M7 2l-6 10 3 6z" fill="#0F9D58"/><path d="M13 2H7l6 10h6z" fill="#FFC107"/><path d="M4 18h12l3-6H7z" fill="#4285F4"/></svg>`;
+    let html = `<div style="position:absolute;inset:0;background:${onVideo(this) ? "rgba(10,10,12,.82)" : "#0A0A0C"}"></div>`;
+    html += `<div dir="ltr" style="position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);display:flex;justify-content:center;align-items:center;gap:${gap.toFixed(1)}px">
+      ${pill(A, "#7A3FC8", "#fff", icA, p1, 1)}
+      <svg width="${(fz * 1.2).toFixed(0)}" height="${(fz * 1.2).toFixed(0)}" viewBox="0 0 24 24" style="opacity:${lk.toFixed(2)};transform:rotate(${((1 - lk) * 90).toFixed(0)}deg)"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" stroke="${ok ? "#3BD24A" : "#999"}" stroke-width="2.2" fill="none" stroke-linecap="round"/></svg>
+      ${pill(B, "#fff", "#222", icB, p2, -1)}</div>`;
+    if (ok) html += `<div style="position:absolute;left:0;right:0;top:${(h / 2 + fz * 1.6).toFixed(1)}px;text-align:center;font:500 ${(fz * 0.6).toFixed(1)}px ${famOf(A)};color:#3BD24A;opacity:${eOut(seg(t, b.t0 + 1, b.t0 + 1.2)).toFixed(2)}">✓ ${AR.test(A + B) ? "اتوصّلوا" : "Connected"}</div>`;
+    return html;
+  };
+
+  // ---------- assistant: كارت مساعد ذكي بتحية واقتراحات سريعة
+  P.k_assistant = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    if (!it.length) return "";
+    const ar = isAr(it), ff = famOf(ar ? "ع" : "a");
+    const cut = Math.max(1, Math.ceil(it.length * 0.55));
+    const msg = it.slice(0, cut).map((x) => this.text(x.w)).join(" ");
+    const sugg = it.slice(cut);
+    const cw = Math.min(w * 0.86, mn * 0.9), fz = cw * 0.062;
+    const cx = (w - cw) / 2, cy = h * 0.28;
+    const p = eOut(seg(t, b.t0, b.t0 + 0.35));
+    const shown = typed(msg, t, b.t0 + 0.2, 24);
+    const C = [["#CDB8F5", "#2A1B4A", "#5B3E9E"], ["#BFE6CF", "#14402B", "#2E7D55"], ["#FFD8B8", "#4A2410", "#C2541E"]][bi % 3];
+    let html = onVideo(this) ? `<div style="position:absolute;inset:0;background:rgba(0,0,0,.3)"></div>` : `<div style="position:absolute;inset:0;background:#2B1F22"></div>`;
+    html += `<div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:${cx.toFixed(1)}px;top:${cy.toFixed(1)}px;width:${cw.toFixed(1)}px;background:${C[0]};border-radius:${(cw * 0.05).toFixed(0)}px;padding:${(cw * 0.06).toFixed(0)}px;box-sizing:border-box;color:${C[1]};transform:translateY(${((1 - p) * mn * 0.08).toFixed(1)}px);opacity:${p.toFixed(2)};box-shadow:0 ${(mn * 0.02).toFixed(0)}px ${(mn * 0.05).toFixed(0)}px rgba(0,0,0,.3)">
+      <div style="font:600 ${(fz * 1.4).toFixed(1)}px ${ff};display:flex;align-items:center;gap:${(fz * 0.4).toFixed(0)}px"><svg width="${(fz * 1.3).toFixed(0)}" height="${(fz * 1.3).toFixed(0)}" viewBox="0 0 24 24"><path d="M12 2l2.2 6.3L20 10l-5.8 1.7L12 18l-2.2-6.3L4 10l5.8-1.7zM19 15l1 2.5 2.5 1-2.5 1L19 22l-1-2.5-2.5-1 2.5-1z" fill="${C[2]}"/></svg>${ar ? "مساعد ذكي" : "AI Assistant"}</div>
+      <div style="font:400 ${fz.toFixed(1)}px ${ff};line-height:1.5;margin:${(fz * 0.7).toFixed(0)}px 0 ${(fz * 1).toFixed(0)}px;min-height:${(fz * 3).toFixed(0)}px">${esc(shown)}</div>
+      <div style="font:500 ${(fz * 0.9).toFixed(1)}px ${ff};margin-bottom:${(fz * 0.5).toFixed(0)}px;opacity:.8">${ar ? "اقتراحات سريعة" : "Quick suggestions"}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:${(fz * 0.5).toFixed(0)}px">${(sugg.length ? sugg : it.slice(-1)).map((x, i) => { const q = eBack(seg(t, x.t0, x.t0 + 0.3)), hot = i === 0 && t > b.t1 - 0.6;
+        return `<span style="background:${hot ? C[1] : C[2]};color:#fff;font:500 ${(fz * 0.9).toFixed(1)}px ${ff};padding:${(fz * 0.35).toFixed(0)}px ${(fz * 0.8).toFixed(0)}px;border-radius:99px;transform:scale(${q.toFixed(3)});white-space:nowrap">${esc(this.text(x.w))}</span>`; }).join("")}</div></div>`;
+    return html;
+  };
+
+  // ---------- themeswap: صفحة واحدة ألوانها بتتبدّل كل شوية
+  P.k_themeswap = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    if (!it.length) return "";
+    const T = [["#F4F1EA", "#151515", "#F2602A"], ["#2A3BE0", "#fff", "#F6E04B"], ["#5FD38A", "#0F2D1C", "#fff"], ["#151515", "#F4F1EA", "#E05568"]];
+    const per = Math.max(0.5, (b.t1 - b.t0) / 3.2), idx = Math.floor((t - b.t0) / per) + bi;
+    const [bg, fg, ac] = T[idx % T.length];
+    const fi = b.focus >= 0 && b.focus < it.length ? b.focus : 0;
+    const word = this.text(it[fi].w), ff = AR.test(word) ? famOf(word) : SERIF(word).replace("'TY SerifI'", "'TY Instrument'");
+    const sz = fitSize(word + ".", `400 {}px ${ff}`, w * 0.7, mn * 0.24);
+    const rest = it.filter((x, i) => i !== fi).map((x) => this.text(x.w));
+    const flash = seg((t - b.t0) % per, 0, 0.08);
+    let html = `<div style="position:absolute;inset:0;background:${bg}"></div>`;
+    html += `<div dir="${this.dir(word)}" style="position:absolute;left:${(w * 0.08).toFixed(0)}px;right:${(w * 0.08).toFixed(0)}px;top:${(h * 0.12).toFixed(0)}px;font:400 ${sz.toFixed(1)}px ${ff};color:${fg};line-height:1;white-space:nowrap">${esc(word)}<span style="color:${ac}">.</span></div>`;
+    const cards = [0, 1, 2, 3];
+    const gw = w * 0.84, cw2 = (gw - mn * 0.04) / 2, ch2 = cw2 * 0.62;
+    cards.forEach((c) => { const x = w * 0.08 + (c % 2) * (cw2 + mn * 0.04), y = h * 0.12 + sz * 1.4 + Math.floor(c / 2) * (ch2 + mn * 0.04);
+      const lab = rest[c] || "";
+      html += `<div dir="${this.dir(lab || "a")}" style="position:absolute;left:${x.toFixed(1)}px;top:${y.toFixed(1)}px;width:${cw2.toFixed(1)}px;height:${ch2.toFixed(1)}px;border:${(mn * 0.004).toFixed(1)}px solid ${fg};border-radius:${(mn * 0.015).toFixed(0)}px;background:${c === 1 ? ac : "transparent"};color:${c === 1 ? bg : fg};padding:${(mn * 0.02).toFixed(0)}px;box-sizing:border-box;font:600 ${(mn * 0.04).toFixed(1)}px ${famOf(lab || "a")};overflow:hidden">${esc(lab)}
+        <div dir="ltr" style="position:absolute;right:${(mn * 0.02).toFixed(0)}px;bottom:${(mn * 0.015).toFixed(0)}px;font:500 ${(mn * 0.06).toFixed(1)}px 'TY Pixel',monospace">${[1224, 102, 1231, 88][c]}</div></div>`; });
+    html += `<div style="position:absolute;inset:0;background:#fff;opacity:${((1 - flash) * (t - b.t0 > per * 0.5 ? 0.5 : 0)).toFixed(2)}"></div>`;
+    return html;
+  };
+
+  // ---------- slider: سلايدر وقت بمقبض أصفر بيتزحلق بين المواعيد
+  P.k_slider = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    if (!it.length) return "";
+    const s = it.filter((x) => t >= x.t0).map((x) => this.text(x.w)).join(" ");
+    const ff = famOf(s || "a");
+    const tw = w * 0.84, x0 = (w - tw) / 2, cy = h * 0.5, th2 = mn * 0.12;
+    const p = eOut(seg(t, b.t0 + 0.2, b.t1 - 0.3));
+    const kx = x0 + th2 / 2 + p * (tw - th2);
+    const col = ["#F5B800", "#2F7CF6", ORG][bi % 3];
+    let html = `<div style="position:absolute;inset:0;background:${onVideo(this) ? "rgba(255,255,255,.92)" : "#fff"}"></div>`;
+    html += `<div style="position:absolute;left:${x0.toFixed(1)}px;top:${(cy - th2 / 2).toFixed(1)}px;width:${tw.toFixed(1)}px;height:${th2.toFixed(1)}px;border-radius:${th2}px;background:#EFEFEF"></div>
+      <div style="position:absolute;left:${x0.toFixed(1)}px;top:${(cy - th2 / 2).toFixed(1)}px;width:${(kx - x0 + th2 / 2).toFixed(1)}px;height:${th2.toFixed(1)}px;border-radius:${th2}px;background:${col}"></div>`;
+    for (let i = 0; i < 5; i++) { const dx = x0 + th2 / 2 + (i / 4) * (tw - th2);
+      html += `<i style="position:absolute;left:${(dx - th2 * 0.06).toFixed(1)}px;top:${(cy - th2 * 0.06).toFixed(1)}px;width:${(th2 * 0.12).toFixed(1)}px;height:${(th2 * 0.12).toFixed(1)}px;border-radius:50%;background:${dx < kx ? "#fff" : "#CCC"}"></i>`; }
+    html += `<div style="position:absolute;left:${(kx - th2 * 0.42).toFixed(1)}px;top:${(cy - th2 * 0.42).toFixed(1)}px;width:${(th2 * 0.84).toFixed(1)}px;height:${(th2 * 0.84).toFixed(1)}px;border-radius:50%;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.2)"></div>`;
+    const mins = 540 + Math.round(p * 180 / 15) * 15;
+    const lab = `${String(Math.floor(mins / 60)).padStart(2, "0")}:${String(mins % 60).padStart(2, "0")}${mins < 720 ? "am" : "pm"}`;
+    html += `<div dir="ltr" style="position:absolute;left:0;right:0;top:${(cy + th2 * 0.9).toFixed(1)}px;display:flex;justify-content:space-around;font:300 ${(mn * 0.045).toFixed(1)}px 'TY Outfit';color:#999"><span>09:00am</span><span>10:30am</span><span>12:00pm</span></div>`;
+    html += `<div dir="ltr" style="position:absolute;left:${(kx).toFixed(1)}px;top:${(cy - th2 * 1.25).toFixed(1)}px;transform:translateX(-50%);font:500 ${(mn * 0.05).toFixed(1)}px 'TY Outfit';color:#222;white-space:nowrap">${lab}</div>`;
+    if (s) { const z = fitSize(s, `500 {}px ${ff}`, w * 0.84, mn * 0.08 * this.ts);
+      html += `<div dir="${this.dir(s)}" style="position:absolute;left:0;right:0;top:${(cy - th2 * 2.6).toFixed(1)}px;text-align:center;white-space:nowrap;font:500 ${z.toFixed(1)}px ${ff};color:#BBB">${esc(s)}</div>`; }
+    return html;
+  };
+
+  // ---------- weather: ويدجت طقس سودا بكلام متقطع ودرجة بكسل
+  P.k_weather = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    if (!it.length) return "";
+    const ar = isAr(it), ff = famOf(ar ? "ع" : "a");
+    const ni = it.findIndex((x) => /[0-9٠-٩]/.test(x.w));
+    const deg = ni >= 0 ? this.text(it[ni].w).replace(/[^0-9٠-٩-]/g, "") : "19";
+    const words = it.filter((x, i) => i !== ni);
+    const cw = Math.min(w * 0.6, mn * 0.62), chh = cw * 0.92;
+    const cx = (w - cw) / 2, cy = (h - chh) / 2;
+    const p = eBack(seg(t, b.t0, b.t0 + 0.35));
+    let html = onVideo(this) ? "" : `<div style="position:absolute;inset:0;background:linear-gradient(180deg,#C9D6E3,#F2E2D5)"></div>`;
+    const dg = eOut(seg(t, b.t0 + 0.2, b.t0 + 0.9));
+    html += `<div dir="ltr" style="position:absolute;left:0;right:0;top:${(cy - chh * 0.55).toFixed(1)}px;text-align:center;font:400 ${(cw * 0.5).toFixed(1)}px 'TY Pixel',monospace;color:rgba(255,255,255,.85);text-shadow:0 0 ${(cw * 0.05).toFixed(0)}px rgba(255,255,255,.6);opacity:${dg.toFixed(2)}">${esc(String(Math.round((parseInt(deg.replace(/[٠-٩]/g, (c) => "٠١٢٣٤٥٦٧٨٩".indexOf(c)), 10) || 19) * dg)))}°</div>`;
+    html += `<div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:${cx.toFixed(1)}px;top:${(cy + chh * 0.25).toFixed(1)}px;width:${cw.toFixed(1)}px;background:#111;border-radius:${(cw * 0.08).toFixed(0)}px;padding:${(cw * 0.08).toFixed(0)}px;box-sizing:border-box;color:#fff;transform:scale(${p.toFixed(3)});box-shadow:0 ${(mn * 0.02).toFixed(0)}px ${(mn * 0.05).toFixed(0)}px rgba(0,0,0,.35)">
+      <div dir="ltr" style="font:400 ${(cw * 0.05).toFixed(1)}px 'TY Pixel',monospace;opacity:.6;margin-bottom:${(cw * 0.03).toFixed(0)}px;text-align:${ar ? "right" : "left"}">● ${ar ? "الحالة" : "STATUS"}</div>
+      <div style="font:400 ${(cw * 0.085).toFixed(1)}px ${ff};line-height:1.2">${words.map((x, i) => `<span style="opacity:${t >= x.t0 ? (i % 2 ? 1 : 0.65) : 0.1};${i % 2 ? "font-weight:700" : ""}">${esc(this.text(x.w))}</span>`).join(" ")}</div></div>`;
     return html;
   };
 })();

@@ -3322,5 +3322,11 @@ window.I18N_EN = {
   "🎬 🔍 نتيجة بحث": "🎬 🔍 Search result",
   "🎬 🗂️ قايمة ملفات بتتحدد": "🎬 🗂️ File list selecting",
   "🎬 🖼️ صور بتتعمل": "🎬 🖼️ Generating images",
-  "🎬 📷 صفحة بورتفوليو": "🎬 📷 Portfolio page"
+  "🎬 📷 صفحة بورتفوليو": "🎬 📷 Portfolio page",
+  "🎬 🟠 كلمة بكورة متدرجة": "🎬 🟠 Word with gradient orb",
+  "🎬 🔗 زرارين بيتوصلوا": "🎬 🔗 Connect two pills",
+  "🎬 ✨ كارت مساعد ذكي": "🎬 ✨ AI assistant card",
+  "🎬 🎨 ألوان الصفحة بتتبدّل": "🎬 🎨 Theme swap",
+  "🎬 🎚️ سلايدر وقت": "🎬 🎚️ Time slider",
+  "🎬 🌤️ ويدجت طقس": "🎬 🌤️ Weather widget"
 };
