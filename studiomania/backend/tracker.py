@@ -13,8 +13,11 @@ WORK_W = 640   # الفريمات بتتصغّر للحساب (أسرع بكتي
 
 
 def _features(gray, quad, n=300):
+    # النقط من جوه الحاجة بس (الحدود متصغّرة شوية ناحية النص) عشان الخلفية اللي وراها ما تشدّش التراك
+    c = quad.mean(0)
+    inner = c + (quad - c) * 0.7
     mask = np.zeros(gray.shape, np.uint8)
-    cv2.fillConvexPoly(mask, quad.astype(np.int32), 255)
+    cv2.fillConvexPoly(mask, inner.astype(np.int32), 255)
     pts = cv2.goodFeaturesToTrack(gray, maxCorners=n, qualityLevel=0.008, minDistance=4, blockSize=7, mask=mask)
     return pts.reshape(-1, 2).astype(np.float32) if pts is not None else np.zeros((0, 2), np.float32)
 
@@ -67,8 +70,8 @@ def _smooth(qs, ref, r=2):
     return out
 
 
-def track(path: str, t0: float, t1: float, tref: float, box: list[float], mode: str = "follow", progress=None) -> dict:
-    """box: [x0, y0, x1, y1] بكسور من مقاس الفيديو في الثانية tref. بيرجّع {t0, fps, q: [[8 أرقام]...]}"""
+def track(path: str, t0: float, t1: float, tref: float, box: list[float], mode: str = "follow", progress=None, quad: list[float] | None = None) -> dict:
+    """box: [x0, y0, x1, y1] أو quad: 8 أرقام (4 أركان) بكسور من مقاس الفيديو في الثانية tref. بيرجّع {t0, fps, q: [[8 أرقام]...]}"""
     cap = cv2.VideoCapture(path)
     if not cap.isOpened():
         raise RuntimeError("مش قادر يفتح الفيديو عشان يعمل تراك")
@@ -101,8 +104,11 @@ def track(path: str, t0: float, t1: float, tref: float, box: list[float], mode: 
     ref = int(round(min(max(tref - f0 / vfps, 0), (n - 1) / fps) * fps))
     ref = min(max(ref, 0), n - 1)
     gw, gh = grays[0].shape[1], grays[0].shape[0]
-    x0, y0, x1, y1 = box
-    q = np.array([[x0 * gw, y0 * gh], [x1 * gw, y0 * gh], [x1 * gw, y1 * gh], [x0 * gw, y1 * gh]], np.float32)
+    if quad:
+        q = np.array([[quad[j * 2] * gw, quad[j * 2 + 1] * gh] for j in range(4)], np.float32)
+    else:
+        x0, y0, x1, y1 = box
+        q = np.array([[x0 * gw, y0 * gh], [x1 * gw, y0 * gh], [x1 * gw, y1 * gh], [x0 * gw, y1 * gh]], np.float32)
     qs = [None] * n
     qs[ref] = q
     done = 0
@@ -122,3 +128,102 @@ def track(path: str, t0: float, t1: float, tref: float, box: list[float], mode: 
     sm = _smooth(qs, ref)
     return {"t0": round(f0 / vfps, 4), "fps": round(fps, 4), "mode": mode,
             "q": [[round(float(v), 5) for p in fq for v in (p[0] / gw, p[1] / gh)] for fq in sm]}
+
+
+def _order(pts):
+    """4 نقط بالترتيب: فوق شمال، فوق يمين، تحت يمين، تحت شمال."""
+    p = np.array(pts, np.float32).reshape(4, 2)
+    s, d = p.sum(1), np.diff(p, axis=1).reshape(-1)
+    return np.array([p[np.argmin(s)], p[np.argmin(d)], p[np.argmax(s)], p[np.argmax(d)]], np.float32)
+
+
+def _boxy(q) -> bool:
+    """شكل قريب من مستطيل في المنظور: كل زاوية بين 55° و125° ومفيش ضلع أقصر من ربع اللي قصاده."""
+    q = np.asarray(q, np.float64)
+    for i in range(4):
+        a, b, c = q[i - 1], q[i], q[(i + 1) % 4]
+        v1, v2 = a - b, c - b
+        cosv = np.dot(v1, v2) / max(1e-6, np.linalg.norm(v1) * np.linalg.norm(v2))
+        if not (55 <= np.degrees(np.arccos(np.clip(cosv, -1, 1))) <= 125):
+            return False
+    sides = [np.linalg.norm(q[i] - q[(i + 1) % 4]) for i in range(4)]
+    return min(sides[0], sides[2]) > 0.25 * max(sides[0], sides[2]) and min(sides[1], sides[3]) > 0.25 * max(sides[1], sides[3])
+
+
+def detect(path: str, t: float, pt: list[float], person_mask: str | None = None) -> tuple[list[float], str]:
+    """🎯 دوسة على حاجة في الفريم ← حدودها (4 أركان بكسور من الفيديو) ونوعها:
+    surface لو ليها حواف مربعة واضحة (ورقة، شاشة، يافطة) فبتتتبع بالمنظور، وfollow لأي حاجة تانية (شخص، وش، علبة)."""
+    cap = cv2.VideoCapture(path)
+    cap.set(cv2.CAP_PROP_POS_MSEC, max(0.0, t) * 1000)
+    ok, fr = cap.read()
+    cap.release()
+    if not ok:
+        raise RuntimeError("مش قادر يقرا الفريم ده من الفيديو")
+    H0, W0 = fr.shape[:2]
+    k = WORK_W / W0 if W0 > WORK_W else 1.0
+    img = cv2.resize(fr, (int(W0 * k), int(H0 * k))) if k != 1.0 else fr
+    h, w = img.shape[:2]
+    px, py = float(pt[0]) * w, float(pt[1]) * h
+    area = w * h
+    norm = lambda q: [round(float(v), 5) for p in _order(q) for v in (p[0] / w, p[1] / h)]  # noqa: E731
+
+    # 1) حاجة ليها 4 حواف واضحة حوالين الدوسة (ورقة، شاشة، كتاب، يافطة)
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    edges = cv2.dilate(cv2.Canny(cv2.bilateralFilter(gray, 7, 50, 50), 40, 120), np.ones((3, 3), np.uint8))
+    cnts, _ = cv2.findContours(edges, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+    best = None
+    for c in cnts:
+        ca = cv2.contourArea(c)
+        if not (area * 0.004 < ca < area * 0.7) or cv2.pointPolygonTest(c, (px, py), False) < 0:
+            continue
+        ap = cv2.approxPolyDP(c, 0.03 * cv2.arcLength(c, True), True)
+        if len(ap) == 4 and cv2.isContourConvex(ap) and _boxy(ap.reshape(4, 2)) and (best is None or ca < best[0]):
+            best = (ca, ap.reshape(4, 2))
+    if best is not None:
+        return norm(best[1]), "surface"
+
+    # 2) حاجة لونها واحد تقريبًا (كوباية، تيشيرت، علبة): بنملا من مكان الدوسة على قد ما اللون قريب
+    lab_img = cv2.cvtColor(cv2.bilateralFilter(img, 9, 60, 60), cv2.COLOR_BGR2LAB)
+    for tol in (10, 16, 24):
+        ffm = np.zeros((h + 2, w + 2), np.uint8)
+        cv2.floodFill(lab_img.copy(), ffm, (int(px), int(py)), (0, 0, 0), (tol,) * 3, (tol,) * 3,
+                      4 | cv2.FLOODFILL_MASK_ONLY | cv2.FLOODFILL_FIXED_RANGE | (255 << 8))
+        reg = cv2.morphologyEx(ffm[1:-1, 1:-1], cv2.MORPH_CLOSE, np.ones((9, 9), np.uint8))
+        ra = int((reg > 0).sum())
+        if area * 0.003 < ra < area * 0.45:
+            return norm(cv2.boxPoints(cv2.minAreaRect(cv2.findNonZero(reg)))), "follow"
+        if ra >= area * 0.45:
+            break
+
+    # 3) أي حاجة تانية: GrabCut من حوالين الدوسة (والدوسة نفسها أكيد جوه الحاجة)
+    try:
+        s = int(min(w, h) * 0.5)
+        rx, ry = int(max(0, min(w - s, px - s / 2))), int(max(0, min(h - s, py - s / 2)))
+        mask = np.full((h, w), cv2.GC_BGD, np.uint8)
+        mask[ry:ry + s, rx:rx + s] = cv2.GC_PR_FGD
+        cv2.circle(mask, (int(px), int(py)), max(4, s // 25), cv2.GC_FGD, -1)
+        bgd, fgd = np.zeros((1, 65), np.float64), np.zeros((1, 65), np.float64)
+        cv2.grabCut(img, mask, None, bgd, fgd, 4, cv2.GC_INIT_WITH_MASK)
+        fg = ((mask == cv2.GC_FGD) | (mask == cv2.GC_PR_FGD)).astype(np.uint8)
+        n, lab = cv2.connectedComponents(fg)
+        if lab[int(py), int(px)] > 0:
+            comp = (lab == lab[int(py), int(px)]).astype(np.uint8)
+            if area * 0.002 < comp.sum() < s * s * 0.8:   # فصل الحاجة فعلًا (مش رجّع المربع كله)
+                pts = cv2.findNonZero(comp)
+                return norm(cv2.boxPoints(cv2.minAreaRect(pts))), "follow"
+    except cv2.error:
+        pass
+    # 4) الشخص (لو الفيديو اتحلل): الدوسة جوه الشخص ومفيش حاجة أصغر اتعرفت ← حدود الشخص كله
+    if person_mask:
+        m = cv2.imread(person_mask, cv2.IMREAD_UNCHANGED)
+        if m is not None:
+            a = m[..., 3] if m.ndim == 3 and m.shape[2] == 4 else (cv2.cvtColor(m, cv2.COLOR_BGR2GRAY) if m.ndim == 3 else m)
+            a = cv2.resize(a, (w, h)) > 128
+            if a[int(min(h - 1, max(0, py))), int(min(w - 1, max(0, px)))]:
+                n, lab = cv2.connectedComponents(a.astype(np.uint8))
+                comp = (lab == lab[int(py), int(px)]).astype(np.uint8)
+                x, y, bw, bh = cv2.boundingRect(comp)
+                return norm([[x, y], [x + bw, y], [x + bw, y + bh], [x, y + bh]]), "follow"
+
+    s = min(w, h) * 0.18   # مالقاش حدود واضحة: مربع صغير حوالين الدوسة
+    return norm([[px - s, py - s], [px + s, py - s], [px + s, py + s], [px - s, py + s]]), "follow"

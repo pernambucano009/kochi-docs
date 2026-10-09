@@ -13957,8 +13957,10 @@ def typo_export_file(pid: str, name: str):
 class TypoTrackIn(BaseModel):
     block: int
     t: float
-    box: list[float]          # [x0, y0, x1, y1] بكسور من كادر الفيديو النهائي
-    mode: str = "follow"      # follow: حاجة بتتحرك · surface: ورقة/شاشة (بالمنظور)
+    box: list[float] = []     # [x0, y0, x1, y1] بكسور من كادر الفيديو النهائي (لو المستخدم رسم مربع)
+    point: list[float] = []   # [x, y]: دوسة على الحاجة، والبرنامج بيلاقي حدودها لوحده
+    mode: str = "auto"        # auto: البرنامج بيختار · follow: حاجة بتتحرك · surface: ورقة/شاشة (بالمنظور)
+    fx: bool = False          # التراك لعنصر حر (مش لقطة كلام)
 
 
 def typo_frame_map(d: dict):
@@ -13981,39 +13983,63 @@ def typo_track(pid: str, body: TypoTrackIn):
     src = d.get("source") or {}
     if src.get("kind") != "video" or (d.get("bg") or {}).get("kind") != "source":
         raise HTTPException(400, "التراك بيشتغل لما الخلفية هي الفيديو اللي رفعته")
-    blocks = d.get("blocks") or []
-    if not 0 <= body.block < len(blocks) or len(body.box) != 4:
-        raise HTTPException(400, "اختار اللقطة والمربع تاني")
-    x0, y0, x1, y1 = [min(1.2, max(-0.2, float(v))) for v in body.box]
-    if x1 - x0 < 0.01 or y1 - y0 < 0.01:
-        raise HTTPException(400, "المربع صغير قوي: ارسمه على الحاجة كلها")
-    mode = body.mode if body.mode in ("follow", "surface") else "follow"
-    return typo_start(pid, "tracking", "🎯 بيتابع الحاجة فريم فريم", run_typo_track, body.block, float(body.t), [x0, y0, x1, y1], mode)
+    lst = d.get("fx" if body.fx else "blocks") or []
+    if not 0 <= body.block < len(lst):
+        raise HTTPException(400, "اختار اللقطة تاني")
+    box = None
+    if len(body.point) == 2:
+        pt = [min(1.0, max(0.0, float(v))) for v in body.point]
+    elif len(body.box) == 4:
+        pt = None
+        box = [min(1.2, max(-0.2, float(v))) for v in body.box]
+        if box[2] - box[0] < 0.01 or box[3] - box[1] < 0.01:
+            raise HTTPException(400, "المربع صغير قوي: ارسمه على الحاجة كلها")
+    else:
+        raise HTTPException(400, "دوس على الحاجة اللي عايز تتابعها")
+    mode = body.mode if body.mode in ("follow", "surface") else "auto"
+    return typo_start(pid, "tracking", "🎯 بيدوّر على الحاجة ويتابعها فريم فريم", run_typo_track, body.block, float(body.t), box, mode, pt, body.fx)
 
 
-def run_typo_track(pid: str, bi: int, t: float, box: list[float], mode: str) -> None:
+def run_typo_track(pid: str, bi: int, t: float, box: list[float] | None, mode: str, pt: list[float] | None = None, is_fx: bool = False) -> None:
     try:
         import tracker
         d = typo_load(pid)
         to_src = typo_frame_map(d)
-        b = d["blocks"][bi]
-        (sx0, sy0), (sx1, sy1) = to_src(box[0], box[1]), to_src(box[2], box[3])
-        words = d.get("words") or []
-        bt0 = words[b["from"]]["s"] if words and b.get("from") is not None else 0
-        nxt = d["blocks"][bi + 1] if bi + 1 < len(d["blocks"]) else None
-        bt1 = words[nxt["from"]]["s"] if nxt and words else (d.get("duration") or bt0 + 5)
+        key = "fx" if is_fx else "blocks"
+        lst = d[key]
+        b = lst[bi]
         src = TYPO_PROJ / pid / d["source"]["file"]
+        if is_fx:
+            bt0, bt1 = b["t0"], b["t1"]
+        else:
+            words = d.get("words") or []
+            bt0 = words[b["from"]]["s"] if words and b.get("from") is not None else 0
+            nxt = lst[bi + 1] if bi + 1 < len(lst) else None
+            bt1 = words[nxt["from"]]["s"] if nxt and words else (d.get("duration") or bt0 + 5)
+        quad = None
+        if pt:   # دوسة: البرنامج بيلاقي حدود الحاجة في الفريم ده (وبيعرف هي ورقة/شاشة ولا حاجة بتتحرك)
+            typo_set(pid, step="🎯 بيدوّر على حدود الحاجة اللي دوست عليها")
+            spt = to_src(pt[0], pt[1])
+            pm = TYPO_PROJ / pid / "person" / f"m_{int(round(t * TYPO_FPS)):05d}.webp"
+            quad, kind = tracker.detect(str(src), t, list(spt), str(pm) if pm.exists() else None)
+            if mode == "auto":
+                mode = kind
+            sx0 = sy0 = sx1 = sy1 = 0.0
+        else:
+            (sx0, sy0), (sx1, sy1) = to_src(box[0], box[1]), to_src(box[2], box[3])
+            if mode == "auto":
+                mode = "follow"
         res = tracker.track(str(src), max(0.0, bt0 - 0.2), bt1 + 0.2, t, [sx0, sy0, sx1, sy1], mode,
-                            progress=lambda f: typo_set(pid, step=f"🎯 بيتابع الحاجة: {int(f * 100)}٪"))
+                            progress=lambda f: typo_set(pid, step=f"🎯 بيتابع الحاجة: {int(f * 100)}٪"), quad=quad)
         tid = f"tr{uuid.uuid4().hex[:6]}"
 
         def fn(x):
             tr = x.setdefault("tracks", {})
-            old = ((x["blocks"][bi].get("xf") or {}).get("tr"))
+            old = ((x[key][bi].get("xf") or {}).get("tr"))
             tr[tid] = res
-            xf = {**(x["blocks"][bi].get("xf") or {}), "tr": tid, "tref": round(t, 3)}
-            x["blocks"][bi]["xf"] = xf
-            used = {(bb.get("xf") or {}).get("tr") for bb in x["blocks"]}
+            xf = {**(x[key][bi].get("xf") or {}), "tr": tid, "tref": round(t, 3)}
+            x[key][bi]["xf"] = xf
+            used = {(bb.get("xf") or {}).get("tr") for bb in [*x.get("blocks", []), *x.get("fx", [])]}
             if old and old not in used:
                 tr.pop(old, None)
             x.update(status=typo_idle(x), step=None, error=None, final=None)

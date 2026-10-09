@@ -17,9 +17,10 @@ const GZ_MT = {
 const GZ_FX = {
   st: {},
   get doc() { return mtx.fxdoc; }, get eng() { return mtx.fxeng; }, get t() { return mt.t; }, get playing() { return mt.playing; },
-  get cur() { return mtx.cur ? { ...mtx.cur, blocks: mtx.cur.fx || [], bg: null, source: null } : null; }, set cur(v) { mtx.cur = v; },
+  get cur() { return mtx.cur ? { ...mtx.cur, blocks: mtx.cur.fx || [] } : null; }, set cur(v) { mtx.cur = v; },
+  isFx: true,
   box: () => $("previewFrame"), stage: () => $("pvFxStage"), svg: () => $("mtGiz"), bar: () => $("mtGbar"),
-  stop: () => pause(), save: (fx, msg) => mtFxSave(fx, msg), redraw: () => mtTypoDraw(), after: () => mtTypoPaneRender(),
+  stop: () => pause(), save: (fx, msg) => mtFxSave(fx, msg), redraw: () => mtTypoDraw(), after: () => { mtTypoPaneRender(); mtTypoPoll(); },
   selIndex: () => (mt.sel?.kind === "fx" ? mt.sel.i : null),
 };
 
@@ -81,7 +82,7 @@ function mtTypoDraw() {
   mtx.eng.renderAt(mt.t);
   mtx.fxeng?.renderAt(mt.t);
   const ctx = mt.sel?.kind === "typo" ? GZ_MT : mt.sel?.kind === "fx" ? GZ_FX : null;
-  if (ctx && !mt.playing) { if (GZ !== ctx) $("mtGbar").dataset.sig = ""; tyGizBind(ctx); GZ = ctx; tyGizDraw(); }
+  if (ctx && (!mt.playing || ctx.st.mode === "track")) { if (GZ !== ctx) $("mtGbar").dataset.sig = ""; tyGizBind(ctx); GZ = ctx; tyGizDraw(); }
   else if ($("mtGbar").dataset.sig) { $("mtGiz").innerHTML = ""; $("mtGbar").innerHTML = ""; $("mtGbar").dataset.sig = ""; }
   else $("mtGiz").innerHTML = "";
 }
@@ -222,10 +223,13 @@ function mtTypoPoll() {
       const id = mtx.id;
       const cur = await api(`/api/typo/${id}`);
       if (id !== mtx.id) return;
+      if (cur.busy) mtx.lastStep = cur.step || mtx.lastStep;
       mtx.cur = cur;
       if (!cur.busy) {
-        if (cur.blocks?.length) await mtTypoDoc();
-        if (cur.status === "failed") toast(`🔤 ${cur.error || "التوزيع فشل"}`, true);
+        const was = mtx.lastStep || "";
+        if (cur.blocks?.length || cur.fx?.length) await mtTypoDoc();
+        if (cur.status === "failed") toast(`🔤 ${cur.error || "حصلت مشكلة"}`, true);
+        else if (was.includes("🎯")) toast("🎯 لقيت الحاجة وتابعتها: شغّل الفيديو وشوف الحدود الصفرا");
         else if (cur.blocks?.length) toast("🔤 التايبوجرافي اتوزّعت على المونتاج");
         syncPreview();
       }
