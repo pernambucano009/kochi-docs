@@ -3306,5 +3306,9 @@ window.I18N_EN = {
   "🎬 🧾 تذاكر طلبات": "🎬 🧾 Order tickets",
   "🎬 🔢 دواير أرقام": "🎬 🔢 Stat bubbles",
   "🎬 🪟 شاشتين جنب بعض": "🎬 🪟 Split duo frame",
-  "🎬 🗺️ طريق على الخريطة": "🎬 🗺️ Map route"
+  "🎬 🗺️ طريق على الخريطة": "🎬 🗺️ Map route",
+  "🎬 ▫️ كلمة بين كادرين": "🎬 ▫️ Word between frames",
+  "🎬 📆 نتيجة بتتزحم": "🎬 📆 Calendar flood",
+  "🎬 ▪️ شرايح كلمات": "🎬 ▪️ Word chips",
+  "🎬 🧩 بلاطات كلمات": "🎬 🧩 Word tiles"
 };
