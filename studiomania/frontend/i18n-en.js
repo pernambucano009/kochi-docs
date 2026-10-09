@@ -3341,5 +3341,7 @@ window.I18N_EN = {
   "🎬 🔔 إشعارات بتتراكم": "🎬 🔔 Toast flood",
   "🎬 🦶 فوتر موقع": "🎬 🦶 Site footer",
   "🎬 〰️ سطرين ماشيين": "🎬 〰️ Double marquee",
-  "🎬 🗓️ شريط أيام": "🎬 🗓️ Date strip"
+  "🎬 🗓️ شريط أيام": "🎬 🗓️ Date strip",
+  "🎬 📄 أيقونة ملف": "🎬 📄 File icon",
+  "🎬 🌀 سطح مكتب زحمة": "🎬 🌀 Desktop chaos"
 };

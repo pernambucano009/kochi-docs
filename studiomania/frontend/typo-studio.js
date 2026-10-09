@@ -53,7 +53,8 @@
     "letterorb", "connect", "assistant", "themeswap", "slider", "weather",
     "post", "highlightpan", "blocklines", "reactions",
     "qr", "codetag", "toolbar", "terminal", "scan",
-    "toasts", "footer", "marquee", "datestrip"]);
+    "toasts", "footer", "marquee", "datestrip",
+    "fileicon", "chaos"]);
   E.TYPING = new Set(["type", "artype"]);
   const MC = document.createElement("canvas").getContext("2d");
   const measure = (s, font) => { MC.font = font; return MC.measureText(s).width; };
@@ -5907,6 +5908,59 @@
     html += `<div style="position:absolute;left:${(w / 2 - cw * 0.47).toFixed(1)}px;top:${(cy - cw * 0.75).toFixed(1)}px;width:${(cw * 0.94).toFixed(1)}px;height:${(cw * 1.5).toFixed(1)}px;border:${(mn * 0.006).toFixed(1)}px solid #fff;border-radius:${cw}px;box-sizing:border-box"></div>`;
     if (rest) { const ff = famOf(rest), z = fitSize(rest, `600 {}px ${ff}`, w * 0.86, mn * 0.065 * this.ts);
       html += `<div dir="${this.dir(rest)}" style="position:absolute;left:0;right:0;top:${(cy - cw * 1.4).toFixed(1)}px;text-align:center;white-space:nowrap;font:600 ${z.toFixed(1)}px ${ff};color:#fff;${shadow(this)}">${esc(rest)}</div>`; }
+    return html;
+  };
+  // ---------- fileicon: أيقونة ملف PDF بتنط واسم الملف تحتها
+  P.k_fileicon = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    if (!it.length) return "";
+    const s = it.map((x) => this.text(x.w)).join(" ");
+    const ar = AR.test(s);
+    const fname = ar ? s.replace(/\s+/g, "_") + ".pdf" : s.toLowerCase().replace(/\s+/g, "_") + ".pdf";
+    const types = ["PDF", "DOC", "XLS"], cols = ["#E5484D", "#2F7CF6", "#1F8A4C"];
+    const ty = types[Math.floor(bi / 3) % 3], col = cols[Math.floor(bi / 3) % 3];
+    const fw = mn * 0.34, fh = fw * 1.3, cx = w / 2, cy = h * 0.44;
+    const p = eBack(seg(t, b.t0, b.t0 + 0.4)), fl = Math.sin((t - b.t0) * 3) * fw * 0.03;
+    let html = onVideo(this) ? `<div style="position:absolute;inset:0;background:rgba(236,236,236,.92)"></div>` : `<div style="position:absolute;inset:0;background:#ECECEC"></div>`;
+    html += `<svg style="position:absolute;left:${(cx - fw / 2).toFixed(1)}px;top:${(cy - fh / 2 + fl).toFixed(1)}px;transform:scale(${p.toFixed(3)}) rotate(${((1 - p) * -10).toFixed(1)}deg);filter:drop-shadow(0 ${(fw * 0.06).toFixed(0)}px ${(fw * 0.08).toFixed(0)}px rgba(0,0,0,.18))" width="${fw.toFixed(0)}" height="${fh.toFixed(0)}" viewBox="0 0 100 130">
+      <path d="M2 2h66l30 30v96H2z" fill="#fff" stroke="#D5D5D5" stroke-width="2"/><path d="M68 2v30h30" fill="#F1F1F1" stroke="#D5D5D5" stroke-width="2"/>
+      ${[44, 54, 64, 74].map((y, i) => `<rect x="14" y="${y}" width="${[60, 70, 52, 66][i]}" height="4" rx="2" fill="#E2E2E2"/>`).join("")}
+      <rect x="22" y="92" width="56" height="20" rx="4" fill="${col}"/><text x="50" y="107" text-anchor="middle" font-family="TY Outfit" font-weight="700" font-size="14" fill="#fff">${ty}</text></svg>`;
+    const q = eOut(seg(t, b.t0 + 0.3, b.t0 + 0.6));
+    const fz = fitSize(fname, `500 {}px ${famOf(fname)}`, w * 0.84, mn * 0.045);
+    html += `<div dir="${this.dir(fname)}" style="position:absolute;left:0;right:0;top:${(cy + fh / 2 + mn * 0.04).toFixed(1)}px;text-align:center;white-space:nowrap;font:500 ${fz.toFixed(1)}px ${famOf(fname)};color:#222;opacity:${q.toFixed(2)}">${esc(fname)}</div>`;
+    return html;
+  };
+
+  // ---------- chaos: سطح مكتب بيتملي شبابيك وإيميلات ورسايل ومكالمات
+  P.k_chaos = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    if (!it.length) return "";
+    const s = it.filter((x) => t >= x.t0).map((x) => this.text(x.w)).join(" ");
+    const r = rng(bi * 53 + 17);
+    const n = 46, prog = eOut(seg(t, b.t0, b.t1 - 0.3)), m = Math.floor(prog * n);
+    const KIND = ["win", "chat", "mail", "doc", "call", "folder"];
+    let html = `<div style="position:absolute;inset:0;background:${onVideo(this) ? "rgba(236,238,241,.9)" : "#ECEEF1"}"></div>`;
+    for (let i = 0; i < n; i++) {
+      const kd = KIND[Math.floor(r() * KIND.length)], x = r() * w * 0.95 - w * 0.03, y = r() * h * 0.92, sc = 0.6 + r() * 0.7, rot = (r() - 0.5) * 6;
+      if (i >= m) continue;
+      const p = eBack(clamp((prog * n - i) / 2));
+      const u = mn * 0.06 * sc;
+      let el = "";
+      if (kd === "win") el = `<div style="width:${(u * 4).toFixed(0)}px;height:${(u * 2.8).toFixed(0)}px;background:#fff;border-radius:${(u * 0.15).toFixed(0)}px;box-shadow:0 2px 8px rgba(0,0,0,.18);overflow:hidden"><div style="height:${(u * 0.4).toFixed(0)}px;background:#F2F2F4;display:flex;gap:3px;align-items:center;padding:0 4px">${["#FF5F57", "#FEBC2E", "#28C840"].map((c) => `<i style="width:${(u * 0.14).toFixed(0)}px;height:${(u * 0.14).toFixed(0)}px;border-radius:50%;background:${c}"></i>`).join("")}</div>${[0.7, 0.5, 0.8].map((q) => `<i style="display:block;margin:${(u * 0.2).toFixed(0)}px ${(u * 0.25).toFixed(0)}px 0;width:${(u * 3.4 * q).toFixed(0)}px;height:${(u * 0.15).toFixed(0)}px;background:#E3E5EA;border-radius:2px"></i>`).join("")}</div>`;
+      else if (kd === "chat") el = `<div style="width:${(u * 3).toFixed(0)}px;padding:${(u * 0.2).toFixed(0)}px;background:#2F7CF6;border-radius:${(u * 0.3).toFixed(0)}px ${(u * 0.3).toFixed(0)}px ${(u * 0.3).toFixed(0)}px 2px;box-shadow:0 2px 6px rgba(0,0,0,.15)">${[0.9, 0.6].map((q) => `<i style="display:block;margin:2px 0;width:${(u * 2.6 * q).toFixed(0)}px;height:${(u * 0.14).toFixed(0)}px;background:rgba(255,255,255,.8);border-radius:2px"></i>`).join("")}</div>`;
+      else if (kd === "mail") el = `<svg width="${(u * 1.3).toFixed(0)}" height="${u.toFixed(0)}" viewBox="0 0 26 20"><rect x="1" y="1" width="24" height="18" rx="3" fill="#2F7CF6"/><path d="M2 3l11 8 11-8" stroke="#fff" stroke-width="2" fill="none"/><circle cx="23" cy="3" r="3" fill="#E5484D"/></svg>`;
+      else if (kd === "doc") el = `<div style="width:${(u * 2).toFixed(0)}px;height:${(u * 2.6).toFixed(0)}px;background:#FFFBEA;box-shadow:0 2px 6px rgba(0,0,0,.15);padding:${(u * 0.2).toFixed(0)}px;box-sizing:border-box">${[0.9, 0.7, 0.85, 0.5].map((q) => `<i style="display:block;margin:${(u * 0.15).toFixed(0)}px 0;width:${(u * 1.6 * q).toFixed(0)}px;height:${(u * 0.12).toFixed(0)}px;background:#D9D2B5"></i>`).join("")}</div>`;
+      else if (kd === "call") el = `<div style="width:${(u * 2.6).toFixed(0)}px;height:${(u * 2).toFixed(0)}px;background:linear-gradient(160deg,${AVC[i % 4]},#555);border-radius:${(u * 0.2).toFixed(0)}px;box-shadow:0 2px 8px rgba(0,0,0,.2);position:relative"><i style="position:absolute;left:50%;bottom:${(u * 0.15).toFixed(0)}px;margin-left:${(-u * 0.2).toFixed(0)}px;width:${(u * 0.4).toFixed(0)}px;height:${(u * 0.4).toFixed(0)}px;border-radius:50%;background:#E5484D"></i></div>`;
+      else el = `<svg width="${(u * 1.4).toFixed(0)}" height="${(u * 1.1).toFixed(0)}" viewBox="0 0 28 22"><path d="M1 4a2 2 0 0 1 2-2h7l3 3h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2z" fill="#5AA9F5"/></svg>`;
+      html += `<div style="position:absolute;left:${x.toFixed(1)}px;top:${y.toFixed(1)}px;transform:rotate(${rot.toFixed(1)}deg) scale(${p.toFixed(3)})">${el}</div>`;
+    }
+    if (s) { const ff = famOf(s), z = fitSize(s, `700 {}px ${ff}`, w * 0.8, mn * 0.08 * this.ts);
+      html += `<div dir="${this.dir(s)}" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);white-space:nowrap;font:700 ${z.toFixed(1)}px ${ff};color:#fff;background:#151515;padding:${(z * 0.2).toFixed(0)}px ${(z * 0.5).toFixed(0)}px;border-radius:${(z * 0.25).toFixed(0)}px;box-shadow:0 6px 24px rgba(0,0,0,.3)">${esc(s)}</div>`; }
     return html;
   };
 })();
