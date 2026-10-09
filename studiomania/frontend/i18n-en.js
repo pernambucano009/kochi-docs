@@ -3337,5 +3337,9 @@ window.I18N_EN = {
   "🎬 ‹› كلام بين أقواس كود": "🎬 ‹› Code brackets",
   "🎬 🧰 شريط أدوات": "🎬 🧰 Toolbar",
   "🎬 ⌨️ تيرمينال": "🎬 ⌨️ Terminal command",
-  "🎬 🛡️ فحص أمان": "🎬 🛡️ Security scan"
+  "🎬 🛡️ فحص أمان": "🎬 🛡️ Security scan",
+  "🎬 🔔 إشعارات بتتراكم": "🎬 🔔 Toast flood",
+  "🎬 🦶 فوتر موقع": "🎬 🦶 Site footer",
+  "🎬 〰️ سطرين ماشيين": "🎬 〰️ Double marquee",
+  "🎬 🗓️ شريط أيام": "🎬 🗓️ Date strip"
 };

@@ -52,7 +52,8 @@
     "files", "generating", "portfolio",
     "letterorb", "connect", "assistant", "themeswap", "slider", "weather",
     "post", "highlightpan", "blocklines", "reactions",
-    "qr", "codetag", "toolbar", "terminal", "scan"]);
+    "qr", "codetag", "toolbar", "terminal", "scan",
+    "toasts", "footer", "marquee", "datestrip"]);
   E.TYPING = new Set(["type", "artype"]);
   const MC = document.createElement("canvas").getContext("2d");
   const measure = (s, font) => { MC.font = font; return MC.measureText(s).width; };
@@ -5808,6 +5809,104 @@
     const lab = s || (ar ? "فحص الأمان" : "Security check");
     const ff = famOf(lab), z = fitSize(lab, `600 {}px ${ff}`, w * 0.8, mn * 0.06 * this.ts);
     html += `<div dir="${this.dir(lab)}" style="position:absolute;left:0;right:0;top:${(y0 + rows * cell + mn * 0.05).toFixed(1)}px;text-align:center;white-space:nowrap;font:600 ${z.toFixed(1)}px ${ff};color:#EEE">${esc(lab)} <span dir="ltr" style="color:#E5484D;font-size:.7em">⚠ ${bad}</span></div>`;
+    return html;
+  };
+  // ---------- toasts: إشعارات كتير بتتراكم وتغطي الشاشة
+  P.k_toasts = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    if (!it.length) return "";
+    const ar = isAr(it), ff = famOf(ar ? "ع" : "a");
+    const title = it.slice(0, Math.min(2, it.length)).map((x) => this.text(x.w)).join(" ");
+    const body = it.slice(2).map((x) => this.text(x.w)).join(" ");
+    const tw = Math.min(w * 0.44, mn * 0.5), tht = tw * 0.36, fz = tw * 0.06;
+    const cols = Math.max(2, Math.floor(w / (tw * 1.02))), rows = Math.ceil(h / (tht * 1.15)) + 1;
+    const n = cols * rows, r = rng(bi * 23 + 1);
+    const shown = Math.floor(eOut(seg(t, b.t0, b.t1 - 0.2)) * n * 0.9) + 1;
+    const order = Array.from({ length: n }, (_, i) => i).sort(() => r() - 0.5);
+    let html = "";
+    const names = NAMES[ar ? "ar" : "en"];
+    order.slice(0, shown).forEach((cell, j) => {
+      const cx = (cell % cols) * (w / cols) + (w / cols - tw) / 2 + (r() - 0.5) * tw * 0.2;
+      const cy = Math.floor(cell / cols) * tht * 1.15 - tht * 0.3 + (r() - 0.5) * tht * 0.3;
+      const p = eBack(clamp((t - b.t0 - j * ((b.t1 - b.t0 - 0.3) / n)) / 0.25));
+      html += `<div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:${cx.toFixed(1)}px;top:${cy.toFixed(1)}px;width:${tw.toFixed(1)}px;height:${tht.toFixed(1)}px;background:rgba(255,255,255,.97);border-radius:${(tw * 0.04).toFixed(0)}px;box-shadow:0 ${(mn * 0.008).toFixed(0)}px ${(mn * 0.025).toFixed(0)}px rgba(0,0,0,.25);transform:scale(${p.toFixed(3)});padding:${(tw * 0.05).toFixed(0)}px;box-sizing:border-box;display:flex;gap:${(tw * 0.04).toFixed(0)}px;font:400 ${fz.toFixed(1)}px ${ff};color:#333">
+        <i style="flex:none;width:${(tw * 0.13).toFixed(0)}px;height:${(tw * 0.13).toFixed(0)}px;border-radius:${(tw * 0.03).toFixed(0)}px;background:${ORG}"></i>
+        <div style="min-width:0"><div style="font-weight:700;font-size:1.15em;color:#111">${esc(title)}</div><div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(names[j % 4])} ${esc(body)}</div><div dir="ltr" style="color:${ORG};font-weight:600;text-align:${ar ? "right" : "left"}">$${(20 + (j * 7) % 60)}.00</div></div></div>`;
+    });
+    return html;
+  };
+
+  // ---------- footer: فوتر موقع بأعمدة لينكات وكلمة عملاقة مقصوصة تحت
+  P.k_footer = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    if (!it.length) return "";
+    const ar = isAr(it), ff = famOf(ar ? "ع" : "a");
+    const brand = this.text(it[0].w);
+    const links = it.slice(1).map((x) => this.text(x.w));
+    const C = ar ? [["تسوّق", links.slice(0, 4)], ["اتعلّم", links.slice(4, 7)], ["عنّا", links.slice(7)]] : [["SHOP", links.slice(0, 4)], ["LEARN", links.slice(4, 7)], ["INFO", links.slice(7)]];
+    const cols = C.filter((c) => c[1].length);
+    const fz = mn * 0.05, bg = ["#E9E3A6", "#F2D4C8", "#CFE3D2"][bi % 3];
+    const hov = Math.floor(seg(t, b.t0 + 0.3, b.t1) * links.length);
+    const bz = fitSize(brand.toUpperCase(), `800 {}px ${ff}`, w * (ar ? 0.96 : 1.1), h * 0.38);
+    const rise = eOut(seg(t, b.t0, b.t0 + 0.6));
+    let html = `<div style="position:absolute;inset:0;background:${bg}"></div>`;
+    let li = 0;
+    html += `<div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:${(w * 0.07).toFixed(0)}px;right:${(w * 0.07).toFixed(0)}px;top:${(h * 0.12).toFixed(0)}px;display:flex;gap:${(w * 0.08).toFixed(0)}px">${cols.map(([hd, ls]) => `<div><div style="font:600 ${(fz * 0.6).toFixed(1)}px ${famOf(hd)};letter-spacing:.1em;color:#333;margin-bottom:${(fz * 0.5).toFixed(0)}px">${hd}</div>${ls.map((x) => { const i = li++, on = i === hov, vis = t >= b.t0 + 0.1 + i * 0.05;
+      return `<div style="font:400 ${fz.toFixed(1)}px ${AR.test(x) ? famOf(x) : SERIF(x).replace("'TY SerifI'", "'TY Serif'")};color:#151515;opacity:${vis ? (on ? 1 : 0.85) : 0};text-decoration:${on ? "underline" : "none"};line-height:1.35">${esc(x)}</div>`; }).join("")}</div>`).join("")}</div>`;
+    html += `<div data-free dir="${this.dir(brand)}" style="position:absolute;left:0;right:0;bottom:${(-bz * 0.35 + (1 - rise) * -bz * 0.5).toFixed(1)}px;text-align:center;white-space:nowrap;font:800 ${bz.toFixed(1)}px ${ff};color:#2B2B2B;line-height:1;letter-spacing:-0.03em">${esc(ar ? brand : brand.toUpperCase())}</div>`;
+    return html;
+  };
+
+  // ---------- marquee: سطرين كلام عريض ماشيين عكس بعض فوق الصورة
+  P.k_marquee = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    if (!it.length) return "";
+    const s = it.map((x) => this.text(x.w)).join(" "), ar = AR.test(s), ff = ar ? famOf(s) : "'TY Anton', 'TY Outfit'";
+    const txt = ar ? s : s.toUpperCase();
+    const sz = mn * 0.13;
+    const unit = measure(txt, `400 ${sz}px ${ff}`) + sz * 0.9;
+    const v = mn * 0.25;
+    const dx = ((t - b.t0) * v) % unit;
+    const R = { x: w * 0.06, y: h * 0.5 - sz * 1.6, w: w * 0.88, h: sz * 3.2 };
+    let html = this.hole(b, R, onVideo(this) ? "rgba(240,237,232,.0)" : PAPER, mn * 0.01);
+    const line = (y, dir) => `<div data-free dir="ltr" style="position:absolute;left:${(dir > 0 ? -unit + dx : -dx).toFixed(1)}px;top:${y.toFixed(1)}px;white-space:nowrap;font:400 ${sz.toFixed(1)}px ${ff};color:#fff;line-height:1;text-shadow:0 3px 16px rgba(0,0,0,.35)">${Array.from({ length: Math.ceil(w / unit) + 2 }, () => `<span dir="${this.dir(txt)}">${esc(txt)}</span><span style="display:inline-block;width:${(sz * 0.9).toFixed(0)}px;text-align:center"><svg width="${(sz * 0.42).toFixed(0)}" height="${(sz * 0.42).toFixed(0)}" viewBox="0 0 20 20" style="vertical-align:middle"><path d="M10 0C11 7 13 9 20 10 13 11 11 13 10 20 9 13 7 11 0 10 7 9 9 7 10 0z" fill="${ORG}"/></svg></span>`).join("")}</div>`;
+    html += line(h * 0.5 - sz * 1.15, 1) + line(h * 0.5 + sz * 0.15, -1);
+    return html;
+  };
+
+  // ---------- datestrip: شريط أيام والدايرة بتتنقل على يوم بعد يوم
+  P.k_datestrip = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    if (!it.length) return "";
+    const ar = isAr(it);
+    const ni = it.findIndex((x) => /[0-9٠-٩]/.test(x.w));
+    const d0 = ni >= 0 ? parseInt(it[ni].w.replace(/[٠-٩]/g, (c) => "٠١٢٣٤٥٦٧٨٩".indexOf(c)).replace(/[^0-9]/g, ""), 10) || 12 : 12;
+    const rest = it.filter((x, i) => i !== ni && t >= x.t0).map((x) => this.text(x.w)).join(" ");
+    const DN = ar ? ["الحد", "التنين", "التلات", "الأربع", "الخميس", "الجمعة", "السبت"] : ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const cw = mn * 0.2, cy = h * 0.62;
+    const step = seg(t, b.t0 + 0.3, b.t1 - 0.2) * 2;
+    const shift = Math.floor(step) + eOut(step % 1 * 1.6 > 1 ? 1 : (step % 1) * 1.6);
+    let html = onVideo(this) ? `<div style="position:absolute;left:0;right:0;top:${(cy - cw).toFixed(0)}px;height:${(cw * 2).toFixed(0)}px;background:linear-gradient(transparent,rgba(0,0,0,.35),transparent)"></div>` : `<div style="position:absolute;inset:0;background:#3B2A22"></div>`;
+    for (let i = -4; i <= 6; i++) {
+      const x = w / 2 + (i - shift) * cw * 1.05;
+      if (x < -cw || x > w + cw) continue;
+      const d = d0 + i, wd = DN[((d % 7) + 7) % 7];
+      const near = clamp(1 - Math.abs(i - shift));
+      html += `<div style="position:absolute;left:${(x - cw / 2).toFixed(1)}px;top:${(cy - cw * 0.75).toFixed(1)}px;width:${cw.toFixed(1)}px;height:${(cw * 1.5).toFixed(1)}px;text-align:center;color:#fff;opacity:${(0.6 + near * 0.4).toFixed(2)}">
+        <div style="font:400 ${(cw * 0.2).toFixed(1)}px ${AR.test(wd) ? famOf(wd) : "'TY SerifI', serif"};margin-top:${(cw * 0.15).toFixed(0)}px">${wd}</div>
+        <div style="font:600 ${(cw * 0.55).toFixed(1)}px 'TY Outfit';letter-spacing:-0.03em">${d}</div></div>`;
+    }
+    html += `<div style="position:absolute;left:${(w / 2 - cw * 0.47).toFixed(1)}px;top:${(cy - cw * 0.75).toFixed(1)}px;width:${(cw * 0.94).toFixed(1)}px;height:${(cw * 1.5).toFixed(1)}px;border:${(mn * 0.006).toFixed(1)}px solid #fff;border-radius:${cw}px;box-sizing:border-box"></div>`;
+    if (rest) { const ff = famOf(rest), z = fitSize(rest, `600 {}px ${ff}`, w * 0.86, mn * 0.065 * this.ts);
+      html += `<div dir="${this.dir(rest)}" style="position:absolute;left:0;right:0;top:${(cy - cw * 1.4).toFixed(1)}px;text-align:center;white-space:nowrap;font:600 ${z.toFixed(1)}px ${ff};color:#fff;${shadow(this)}">${esc(rest)}</div>`; }
     return html;
   };
 })();
