@@ -3333,5 +3333,9 @@ window.I18N_EN = {
   "🎬 🖍️ كلام عملاق متظلل": "🎬 🖍️ Giant highlighted pan",
   "🎬 🟧 سطور على بلوكات": "🎬 🟧 Block lines",
   "🎬 👍 تفاعلات بوست": "🎬 👍 Post reactions",
-  "🎬 🔳 ورقة QR": "🎬 🔳 QR sticker"
+  "🎬 🔳 ورقة QR": "🎬 🔳 QR sticker",
+  "🎬 ‹› كلام بين أقواس كود": "🎬 ‹› Code brackets",
+  "🎬 🧰 شريط أدوات": "🎬 🧰 Toolbar",
+  "🎬 ⌨️ تيرمينال": "🎬 ⌨️ Terminal command",
+  "🎬 🛡️ فحص أمان": "🎬 🛡️ Security scan"
 };

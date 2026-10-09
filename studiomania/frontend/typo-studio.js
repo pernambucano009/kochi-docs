@@ -52,7 +52,7 @@
     "files", "generating", "portfolio",
     "letterorb", "connect", "assistant", "themeswap", "slider", "weather",
     "post", "highlightpan", "blocklines", "reactions",
-    "qr"]);
+    "qr", "codetag", "toolbar", "terminal", "scan"]);
   E.TYPING = new Set(["type", "artype"]);
   const MC = document.createElement("canvas").getContext("2d");
   const measure = (s, font) => { MC.font = font; return MC.measureText(s).width; };
@@ -5706,6 +5706,108 @@
       <i style="position:absolute;left:50%;top:${(-cw * 0.04).toFixed(0)}px;width:${(cw * 0.3).toFixed(0)}px;height:${(cw * 0.09).toFixed(0)}px;margin-left:${(-cw * 0.15).toFixed(0)}px;background:rgba(240,230,190,.85);transform:rotate(3deg)"></i>
       <svg style="position:absolute;left:${(cw * 0.1).toFixed(1)}px;top:${(cw * 0.1).toFixed(1)}px" width="${(cell * N).toFixed(1)}" height="${(cell * N).toFixed(1)}" viewBox="0 0 ${N} ${N}" fill="#151515" shape-rendering="crispEdges">${cells}</svg>
       <div dir="${this.dir(s || "a")}" style="position:absolute;left:0;right:0;top:${(cw * 0.95).toFixed(1)}px;text-align:center;white-space:nowrap;font:700 ${fitSize(s || "a", `700 {}px ${ff}`, cw * 0.85, cw * 0.09).toFixed(1)}px ${ff};color:#151515">${esc(s)}</div></div>`;
+    return html;
+  };
+  // ---------- codetag: الكلام بين أقواس كود < > وشرط طايرة
+  P.k_codetag = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    if (!it.length) return "";
+    const s = it.filter((x) => t >= x.t0).map((x) => this.text(x.w)).join(" "), full = it.map((x) => this.text(x.w)).join(" ");
+    const ff = famOf(full);
+    const sz = fitSize(full, `500 {}px ${ff}`, w * 0.5, mn * 0.09 * this.ts);
+    const tw = measure(full, `500 ${sz}px ${ff}`);
+    const a = eOut(seg(t, b.t0, b.t0 + 0.4));
+    const gap = lerp(sz * 0.2, sz * 0.8, a);
+    let html = onVideo(this) ? `<div style="position:absolute;inset:0;background:rgba(240,237,232,.9)"></div>` : `<div style="position:absolute;inset:0;background:#F0EDE8"></div>`;
+    const cy = h / 2;
+    html += `<div dir="ltr" style="position:absolute;left:${(w / 2 - tw / 2 - gap - sz * 0.5).toFixed(1)}px;top:${cy.toFixed(1)}px;transform:translateY(-50%);font:300 ${(sz * 1.1).toFixed(1)}px 'TY Outfit';color:#151515">&lt;</div>
+      <div dir="ltr" style="position:absolute;left:${(w / 2 + tw / 2 + gap).toFixed(1)}px;top:${cy.toFixed(1)}px;transform:translateY(-50%);font:300 ${(sz * 1.1).toFixed(1)}px 'TY Outfit';color:#151515">&gt;</div>
+      <div dir="${this.dir(full)}" style="position:absolute;left:0;right:0;top:${cy.toFixed(1)}px;transform:translateY(-50%);text-align:center;white-space:nowrap;font:500 ${sz.toFixed(1)}px ${ff};color:#151515">${esc(s)}<span style="opacity:${s.length < full.length ? 1 : 0}">|</span></div>`;
+    [[0.68, -0.22, 0, "#151515"], [0.72, 0.1, 1, "#151515"], [0.3, 0.22, 2, ORG], [0.52, -0.4, 3, "#151515"]].forEach(([fx, fy, i, c]) => {
+      const q = seg(t, b.t0 + 0.1 + i * 0.12, b.t0 + 0.5 + i * 0.12), sp = (t - b.t0) * 25 * (i % 2 ? 1 : -1);
+      html += `<i style="position:absolute;left:${(w * fx).toFixed(0)}px;top:${(cy + mn * fy).toFixed(0)}px;width:${(mn * 0.006).toFixed(1)}px;height:${(sz * 0.6).toFixed(0)}px;background:${c};transform:rotate(${(20 + sp).toFixed(0)}deg) scale(${eBack(q).toFixed(3)})"></i>`; });
+    return html;
+  };
+
+  // ---------- toolbar: شريط أدوات بأيقونات وزرار مشاركة والماوس بيدوس
+  P.k_toolbar = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    if (!it.length) return "";
+    const s = this.text(it[it.length - 1].w), ff = famOf(s);
+    const rest = it.slice(0, -1).filter((x) => t >= x.t0).map((x) => this.text(x.w)).join(" ");
+    const isz = mn * 0.14, fz = isz * 0.45;
+    const z = lerp(1.15, 1, eOut(seg(t, b.t0, b.t1)));
+    const IC = ['<path d="M12 2a10 10 0 0 0-3.2 19.5c.5.1.7-.2.7-.5v-1.7c-2.8.6-3.4-1.3-3.4-1.3-.5-1.2-1.1-1.5-1.1-1.5-.9-.6.1-.6.1-.6 1 .1 1.5 1 1.5 1 .9 1.5 2.4 1.1 3 .8.1-.6.4-1.1.6-1.3-2.2-.3-4.6-1.1-4.6-5a3.9 3.9 0 0 1 1-2.7c-.1-.3-.5-1.3.1-2.7 0 0 .8-.3 2.7 1a9.4 9.4 0 0 1 5 0c1.9-1.3 2.7-1 2.7-1 .6 1.4.2 2.4.1 2.7a3.9 3.9 0 0 1 1 2.7c0 3.9-2.4 4.7-4.6 5 .4.3.7.9.7 1.9V21c0 .3.2.6.7.5A10 10 0 0 0 12 2z" fill="#222"/>',
+      '<path d="M2 12h4l3-7 4 14 3-7h6" stroke="#222" stroke-width="2" fill="none" stroke-linejoin="round"/>', '<path d="M8 6l-6 6 6 6M16 6l6 6-6 6" stroke="#222" stroke-width="2" fill="none"/>'];
+    const sw = measure(s, `500 ${fz}px ${ff}`) + fz * 1.6;
+    const tot = IC.length * (isz + isz * 0.25) + sw, x0 = (w - tot) / 2, cy = h * 0.46;
+    const ci = Math.min(IC.length, Math.floor(seg(t, b.t0 + 0.3, b.t1 - 0.3) * (IC.length + 1)));
+    let html = `<div style="position:absolute;inset:0;background:${onVideo(this) ? "rgba(255,255,255,.9)" : "#fff"}"></div>`;
+    html += `<div data-free style="position:absolute;left:0;top:0;width:${w}px;height:${h}px;transform:scale(${z.toFixed(3)});transform-origin:50% 46%">`;
+    let x = x0, cx = x0;
+    IC.forEach((ic, i) => { const on = i === ci;
+      if (on) cx = x + isz * 0.55;
+      html += `<div style="position:absolute;left:${x.toFixed(1)}px;top:${(cy - isz / 2).toFixed(1)}px;width:${isz.toFixed(1)}px;height:${isz.toFixed(1)}px;border-radius:${(isz * 0.2).toFixed(0)}px;background:${on ? "#EDEDED" : "transparent"};display:flex;align-items:center;justify-content:center"><svg width="${(isz * 0.5).toFixed(0)}" height="${(isz * 0.5).toFixed(0)}" viewBox="0 0 24 24">${ic}</svg></div>`; x += isz * 1.25; });
+    const shOn = ci === IC.length;
+    if (shOn) cx = x + sw * 0.5;
+    html += `<div dir="${this.dir(s)}" style="position:absolute;left:${x.toFixed(1)}px;top:${(cy - isz * 0.42).toFixed(1)}px;height:${(isz * 0.84).toFixed(1)}px;padding:0 ${(fz * 0.8).toFixed(0)}px;border:1px solid #DDD;border-radius:${(isz * 0.2).toFixed(0)}px;display:flex;align-items:center;font:500 ${fz.toFixed(1)}px ${ff};background:${shOn ? "#151515" : "#fff"};color:${shOn ? "#fff" : "#151515"};white-space:nowrap">${esc(s)}</div>`;
+    html += cursorSvg(cx, cy + isz * 0.1, mn * 0.05) + `</div>`;
+    if (rest) { const rf = famOf(rest), rz = fitSize(rest, `500 {}px ${rf}`, w * 0.84, mn * 0.06 * this.ts);
+      html += `<div dir="${this.dir(rest)}" style="position:absolute;left:0;right:0;top:${(cy + isz * 1.3).toFixed(1)}px;text-align:center;white-space:nowrap;font:500 ${rz.toFixed(1)}px ${rf};color:#444">${esc(rest)}</div>`; }
+    return html;
+  };
+
+  // ---------- terminal: سهم أخضر وأمر بيتكتب على أسود والنتيجة تحته
+  P.k_terminal = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    if (!it.length) return "";
+    const cmd = it.map((x) => (AR.test(x.w) ? this.text(x.w) : this.text(x.w).toLowerCase())).join(" ");
+    const ar = AR.test(cmd), ff = ar ? famOf(cmd) : "'TY Outfit', monospace";
+    const sz = fitSize(cmd + "  ", `400 {}px ${ff}`, w * 0.78, mn * 0.09 * this.ts);
+    const sh = typed(cmd, t, b.t0 + 0.15, 12);
+    const done = sh.length >= cmd.length && t > b.t0 + 0.4 + cmd.length / 12;
+    const blink = Math.floor(t * 2.5) % 2 || !done;
+    let html = `<div style="position:absolute;inset:0;background:${onVideo(this) ? "rgba(26,26,26,.9)" : "#1A1A1A"}"></div>`;
+    html += `<div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:${(w * 0.1).toFixed(0)}px;right:${(w * 0.08).toFixed(0)}px;top:50%;transform:translateY(-50%);font:400 ${sz.toFixed(1)}px ${ff};color:#F1F1F1;white-space:nowrap;display:flex;align-items:center;gap:${(sz * 0.3).toFixed(0)}px">
+      <svg width="${(sz * 0.6).toFixed(0)}" height="${(sz * 0.6).toFixed(0)}" viewBox="0 0 20 20" style="flex:none;transform:scaleX(${ar ? -1 : 1})"><path d="M2 10h14M11 5l5 5-5 5" stroke="#5CC27A" stroke-width="2" fill="none"/></svg>${esc(sh)}<span style="display:inline-block;width:${(sz * 0.06).toFixed(1)}px;height:${(sz * 0.95).toFixed(1)}px;background:#F1F1F1;opacity:${blink ? 1 : 0}"></span></div>`;
+    if (done) { const q = eOut(seg(t, b.t0 + 0.4 + cmd.length / 12, b.t0 + 0.8 + cmd.length / 12));
+      html += `<div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:${(w * 0.1).toFixed(0)}px;right:${(w * 0.08).toFixed(0)}px;top:calc(50% + ${(sz * 0.9).toFixed(0)}px);font:400 ${(sz * 0.42).toFixed(1)}px ${ar ? famOf("ع") : "'TY Pixel', monospace"};color:#5CC27A;opacity:${q.toFixed(2)}">✓ ${ar ? "تمام، اتنفّذ" : "done in 0.8s"}</div>`; }
+    return html;
+  };
+
+  // ---------- scan: فحص أمان: شبكة دروع خضرا والتحذيرات الحمرا بتطلع
+  P.k_scan = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    if (!it.length) return "";
+    const s = it.filter((x) => t >= x.t0).map((x) => this.text(x.w)).join(" ");
+    const cols = h > w ? 9 : 14, rows = h > w ? 10 : 7, cell = Math.min(w * 0.86 / cols, h * 0.55 / rows);
+    const x0 = (w - cols * cell) / 2, y0 = h * 0.44 - rows * cell / 2;
+    const r = rng(bi * 41 + 9);
+    const sweep = seg(t, b.t0 + 0.1, b.t1 - 0.4);
+    let html = `<div style="position:absolute;inset:0;background:${onVideo(this) ? "rgba(26,26,26,.92)" : "#1A1A1A"}"></div>`;
+    let bad = 0;
+    for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) {
+      const v = r();
+      const vis = (x + 0.5) / cols < sweep;
+      const cx = x0 + (x + 0.5) * cell, cy = y0 + (y + 0.5) * cell, z = cell * 0.4;
+      if (!vis || v < 0.25) { html += `<i style="position:absolute;left:${(cx - 1.5).toFixed(0)}px;top:${(cy - 1.5).toFixed(0)}px;width:3px;height:3px;border-radius:50%;background:#555"></i>`; continue; }
+      const warn = v > 0.95; if (warn) bad++;
+      html += warn ? `<svg style="position:absolute;left:${(cx - z / 2).toFixed(1)}px;top:${(cy - z / 2).toFixed(1)}px" width="${z.toFixed(0)}" height="${z.toFixed(0)}" viewBox="0 0 20 20"><path d="M10 2l8 15H2z" fill="none" stroke="#E5484D" stroke-width="2" stroke-linejoin="round"/></svg>`
+        : `<svg style="position:absolute;left:${(cx - z / 2).toFixed(1)}px;top:${(cy - z / 2).toFixed(1)}px" width="${z.toFixed(0)}" height="${z.toFixed(0)}" viewBox="0 0 20 20"><path d="M10 2l7 3v5c0 4-3 7-7 8-4-1-7-4-7-8V5z" fill="none" stroke="#C9D94A" stroke-width="2" stroke-linejoin="round"/></svg>`;
+    }
+    html += `<i style="position:absolute;left:${(x0 + sweep * cols * cell).toFixed(1)}px;top:${(y0 - cell * 0.3).toFixed(1)}px;width:2px;height:${(rows * cell + cell * 0.6).toFixed(1)}px;background:#C9D94A;box-shadow:0 0 12px #C9D94A;opacity:${sweep < 1 ? 1 : 0}"></i>`;
+    const ar = AR.test(s || "a");
+    const lab = s || (ar ? "فحص الأمان" : "Security check");
+    const ff = famOf(lab), z = fitSize(lab, `600 {}px ${ff}`, w * 0.8, mn * 0.06 * this.ts);
+    html += `<div dir="${this.dir(lab)}" style="position:absolute;left:0;right:0;top:${(y0 + rows * cell + mn * 0.05).toFixed(1)}px;text-align:center;white-space:nowrap;font:600 ${z.toFixed(1)}px ${ff};color:#EEE">${esc(lab)} <span dir="ltr" style="color:#E5484D;font-size:.7em">⚠ ${bad}</span></div>`;
     return html;
   };
 })();
