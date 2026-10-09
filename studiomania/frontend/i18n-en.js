@@ -3319,5 +3319,8 @@ window.I18N_EN = {
   "🎬 🔴 أرقام ديجيتال": "🎬 🔴 LED digits",
   "🎬 🚀 عداد إطلاق": "🎬 🚀 Launch countdown",
   "🎬 📡 كارت تقرير مباشر": "🎬 📡 Live report card",
-  "🎬 🔍 نتيجة بحث": "🎬 🔍 Search result"
+  "🎬 🔍 نتيجة بحث": "🎬 🔍 Search result",
+  "🎬 🗂️ قايمة ملفات بتتحدد": "🎬 🗂️ File list selecting",
+  "🎬 🖼️ صور بتتعمل": "🎬 🖼️ Generating images",
+  "🎬 📷 صفحة بورتفوليو": "🎬 📷 Portfolio page"
 };

@@ -48,7 +48,8 @@
     "anchorword", "orders", "stats", "duo", "route",
     "flank", "flood", "chips", "wordtiles",
     "profile", "bigbutton", "gauge", "rule", "iconrow",
-    "led", "drop", "report", "serp"]);
+    "led", "drop", "report", "serp",
+    "files", "generating", "portfolio"]);
   E.TYPING = new Set(["type", "artype"]);
   const MC = document.createElement("canvas").getContext("2d");
   const measure = (s, font) => { MC.font = font; return MC.measureText(s).width; };
@@ -5344,6 +5345,92 @@
         <div style="color:#1A0DAB;font-size:1.3em;font-weight:500;margin-top:${(fz * 0.4).toFixed(0)}px">${esc(name)}</div>
         <div style="color:#4D5156;font-size:.9em;line-height:1.4">${esc(desc)}</div></div>
         <div style="flex:none;width:${(cw * 0.28).toFixed(0)}px;height:${(cw * 0.28).toFixed(0)}px;border-radius:${(fz * 0.4).toFixed(0)}px;background:${src ? `url(${src}) center/cover` : "linear-gradient(160deg,#8EC5E8,#2B6E99)"}"></div></div></div>`;
+    return html;
+  };
+  // ---------- files: قايمة ملفات والتحديد الأزرق بينزل عليها
+  P.k_files = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    if (!it.length) return "";
+    const ar = isAr(it), ff = famOf(ar ? "ع" : "a");
+    const folder = it.map((x) => this.text(x.w)).join(" ");
+    const cw = Math.min(w * 0.82, mn * 0.85), chh = Math.min(h * 0.62, cw * 1.25);
+    const cx = (w - cw) / 2, cy = (h - chh) / 2;
+    const p = eOut(seg(t, b.t0, b.t0 + 0.3));
+    const rh = chh * 0.055, hdr = chh * 0.11, n = Math.floor((chh - hdr) / rh);
+    const sel = Math.floor(clamp((t - b.t0 - 0.4) / Math.max(0.5, b.t1 - b.t0 - 0.8)) * n);
+    let rows = "";
+    for (let i = 0; i < n; i++) { const on = i < sel;
+      rows += `<div dir="ltr" style="height:${rh.toFixed(1)}px;display:flex;align-items:center;justify-content:space-between;padding:0 ${(cw * 0.04).toFixed(0)}px;background:${on ? "#1F5FE0" : i % 2 ? "#F6F6F7" : "#fff"};color:${on ? "#fff" : "#333"};font:400 ${(rh * 0.5).toFixed(1)}px 'TY Outfit'"><span><svg width="${(rh * 0.5).toFixed(0)}" height="${(rh * 0.55).toFixed(0)}" viewBox="0 0 10 12" style="vertical-align:-1px;margin-right:6px"><path d="M1 1h5l3 3v7H1z" fill="${on ? "#fff" : "#9AA0AA"}"/></svg>2026_${String(bi * 40 + i + 1).padStart(3, "0")}_photo.jpg</span><span style="opacity:.7">${(i % 28) + 1} Sep 2026</span></div>`; }
+    let html = onVideo(this) ? `<div style="position:absolute;inset:0;background:rgba(0,0,0,.35)"></div>` : `<div style="position:absolute;inset:0;background:#1B1B1D"></div>`;
+    html += `<div style="position:absolute;left:${cx.toFixed(1)}px;top:${cy.toFixed(1)}px;width:${cw.toFixed(1)}px;height:${chh.toFixed(1)}px;background:#fff;border-radius:${(cw * 0.025).toFixed(0)}px;overflow:hidden;transform:scale(${lerp(0.94, 1, p).toFixed(3)});opacity:${p.toFixed(2)};box-shadow:0 ${(mn * 0.02).toFixed(0)}px ${(mn * 0.06).toFixed(0)}px rgba(0,0,0,.45)">
+      <div style="height:${hdr.toFixed(1)}px;display:flex;align-items:center;gap:${(cw * 0.03).toFixed(0)}px;padding:0 ${(cw * 0.04).toFixed(0)}px;background:#ECECEE;border-bottom:1px solid #DDD">
+        <span dir="ltr" style="display:flex;gap:5px">${["#FF5F57", "#FEBC2E", "#28C840"].map((c) => `<i style="width:${(hdr * 0.18).toFixed(0)}px;height:${(hdr * 0.18).toFixed(0)}px;border-radius:50%;background:${c}"></i>`).join("")}</span>
+        <span dir="${this.dir(folder)}" style="font:600 ${(hdr * 0.3).toFixed(1)}px ${ff};color:#222;white-space:nowrap;overflow:hidden">📁 ${esc(folder)}</span></div>${rows}</div>`;
+    const cnt = ar ? `${sel} ملف متحدد` : `${sel} items selected`;
+    html += `<div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:0;right:0;top:${(cy + chh + mn * 0.03).toFixed(1)}px;text-align:center;font:500 ${(mn * 0.04).toFixed(1)}px ${ff};color:#fff;opacity:${sel ? 0.85 : 0}">${esc(cnt)}</div>`;
+    return html;
+  };
+
+  // ---------- generating: «بيعمل صور… 3/12» والصور بتتملا واحدة واحدة
+  P.k_generating = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    if (!it.length) return "";
+    const ar = isAr(it), ff = famOf(ar ? "ع" : "a");
+    const s = it.filter((x) => t >= x.t0).map((x) => this.text(x.w)).join(" ");
+    const cw = Math.min(w * 0.88, mn * 0.95), fz = cw * 0.064;
+    const total = 12, prog = clamp((t - b.t0 - 0.3) / Math.max(0.6, b.t1 - b.t0 - 0.5));
+    const done = Math.min(total, Math.floor(prog * total));
+    const tn = h > w ? 3 : 5, tw = (cw - (tn - 1) * cw * 0.025) / tn;
+    const src = imgOf(b); if (src) this._want = src;
+    const cy = h * 0.5;
+    const spin = ((t - b.t0) * 360) % 360;
+    let html = `<div style="position:absolute;inset:0;background:${onVideo(this) ? "rgba(238,241,246,.93)" : "#EEF1F6"}"></div>`;
+    html += `<div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:${((w - cw) / 2).toFixed(1)}px;width:${cw.toFixed(1)}px;top:${(cy - tw * 0.5 - fz * 4.6).toFixed(1)}px;font:400 ${fz.toFixed(1)}px ${ff};color:#1E1E1E;line-height:1.45">${esc(s)}
+      <div style="margin-top:${(fz * 0.7).toFixed(0)}px;color:#3B5BDB;font-size:.9em;display:flex;align-items:center;gap:${(fz * 0.4).toFixed(0)}px"><svg width="${fz.toFixed(0)}" height="${fz.toFixed(0)}" viewBox="0 0 20 20" style="transform:rotate(${spin.toFixed(0)}deg)"><circle cx="10" cy="10" r="7" fill="none" stroke="#3B5BDB" stroke-width="2.5" stroke-dasharray="30 14"/></svg>${ar ? "بيعمل صور…" : "Generating images…"} <span dir="ltr">${done}/${total}</span></div></div>`;
+    const G = ["#D9C7A8", "#8FB3C9", "#C9A27E", "#A8B89A", "#E2CDB5"];
+    for (let i = 0; i < tn; i++) {
+      const on = done > i * (total / tn);
+      const a = eOut(clamp((prog * total - i * (total / tn)) / 1.5));
+      const pos = ["30% 40%", "60% 30%", "45% 60%", "70% 55%", "20% 50%"][i];
+      html += `<div style="position:absolute;left:${((w - cw) / 2 + (ar ? tn - 1 - i : i) * (tw + cw * 0.025)).toFixed(1)}px;top:${(cy - tw * 0.4).toFixed(1)}px;width:${tw.toFixed(1)}px;height:${(tw * 1.1).toFixed(1)}px;border-radius:${(tw * 0.08).toFixed(0)}px;overflow:hidden;background:#DDE2EA">
+        <div style="position:absolute;inset:0;background:linear-gradient(100deg,transparent 30%,rgba(255,255,255,.7) 50%,transparent 70%) ${(((t - b.t0) * 150 + i * 30) % 300 - 100).toFixed(0)}% 0/200% 100%;opacity:${on ? 0 : 1}"></div>
+        <div style="position:absolute;inset:0;background:${src ? `url(${src}) ${pos}/${(260 + i * 40)}% auto` : `linear-gradient(160deg,${G[i % G.length]},#4B5468)`};opacity:${a.toFixed(2)};transform:scale(${lerp(1.15, 1, a).toFixed(3)});filter:sepia(${(i % 2) * 0.3})"></div></div>`;
+    }
+    return html;
+  };
+
+  // ---------- portfolio: صفحة بورتفوليو سودا وصورة في النص بتتغير والاسم فوق
+  P.k_portfolio = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    if (!it.length) return "";
+    const ar = isAr(it), ff = famOf(ar ? "ع" : "a");
+    const name = it.slice(0, Math.min(2, it.length)).map((x) => this.text(x.w)).join(" ");
+    const caps = it.slice(2).map((x) => this.text(x.w));
+    const src = imgOf(b); if (src) this._want = src;
+    const per = 0.9, idx = Math.floor((t - b.t0) / per), ph = seg((t - b.t0) % per, 0, 0.3);
+    const pw = Math.min(w * 0.5, mn * 0.55), phh = pw * 1.3;
+    const G = [["#9CC4DB", "#2F6E8F"], ["#E9EEF2", "#8497A6"], ["#7A7A7A", "#1E1E1E"], ["#D2A06A", "#6E3E22"]];
+    let html = `<div style="position:absolute;inset:0;background:#121212"></div>`;
+    const nav = ar ? ["السلسلة", "مطبوعات", "عنّي"] : ["SERIES", "PRINTS", "ABOUT"];
+    html += `<div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:${(w * 0.05).toFixed(0)}px;right:${(w * 0.05).toFixed(0)}px;top:${(h * 0.05).toFixed(0)}px;display:flex;justify-content:space-between;align-items:center;color:#EEE;font:500 ${(mn * 0.04).toFixed(1)}px ${ff};letter-spacing:.06em">
+      <span style="font-weight:700">${esc(ar ? name : name.toUpperCase())}</span><span style="display:flex;gap:${(mn * 0.035).toFixed(0)}px;opacity:.7">${nav.map((x) => `<span>${x}</span>`).join("")}</span></div>`;
+    // الاسم كبير شفاف ورا الصورة
+    const gz = fitSize(name, `800 {}px ${ff}`, w * 0.96, h * 0.2);
+    html += `<div dir="${this.dir(name)}" style="position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);text-align:center;white-space:nowrap;font:800 ${gz.toFixed(1)}px ${ff};color:rgba(255,255,255,.06)">${esc(name)}</div>`;
+    for (let j = Math.max(0, idx - 2); j <= idx; j++) {
+      const top = j === idx, [g0, g1] = G[(j + bi) % G.length];
+      const rot = ((j * 37) % 9) - 4;
+      const sc = top ? lerp(1.08, 1, eOut(ph)) : 1;
+      html += `<div style="position:absolute;left:${((w - pw) / 2).toFixed(1)}px;top:${((h - phh) / 2).toFixed(1)}px;width:${pw.toFixed(1)}px;height:${phh.toFixed(1)}px;transform:rotate(${rot}deg) scale(${sc.toFixed(3)});opacity:${top ? eOut(ph).toFixed(2) : 1};background:${src ? `url(${src}) ${(20 + j * 23) % 80}% 50%/${220 + (j % 3) * 30}% auto` : `linear-gradient(160deg,${g0},${g1})`};filter:${j % 3 === 2 ? "grayscale(1) contrast(1.1)" : "none"};box-shadow:0 ${(mn * 0.02).toFixed(0)}px ${(mn * 0.05).toFixed(0)}px rgba(0,0,0,.6)"></div>`;
+    }
+    const cap = caps.length ? caps[idx % caps.length] : String(2020 + (idx % 6));
+    html += `<div dir="${this.dir(cap)}" style="position:absolute;left:0;right:0;top:${((h + phh) / 2 + mn * 0.05).toFixed(1)}px;text-align:center;font:400 ${(mn * 0.035).toFixed(1)}px ${AR.test(cap) ? famOf(cap) : "'TY Pixel',monospace"};color:#CCC;letter-spacing:.12em">${esc(cap)} <span dir="ltr" style="opacity:.5">— ${String((idx % 12) + 1).padStart(2, "0")}</span></div>`;
     return html;
   };
 })();
