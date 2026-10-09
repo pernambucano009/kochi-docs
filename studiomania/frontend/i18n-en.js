@@ -3295,5 +3295,8 @@ window.I18N_EN = {
   "🎬 🔛 مفاتيح بتتفتح": "🎬 🔛 Switches turning on",
   "🎬 🛒 فاتورة وزرار الدفع": "🎬 🛒 Checkout",
   "🎬 📱 شاشة مقفولة وإشعارات": "🎬 📱 Lock screen notifications",
-  "🎬 🪜 خطوات بشريط تقدّم": "🎬 🪜 Step wizard"
+  "🎬 🪜 خطوات بشريط تقدّم": "🎬 🪜 Step wizard",
+  "🎬 🎰 كلمات بتلف رأسي": "🎬 🎰 Vertical word roll",
+  "🎬 🔢 رقم عملاق على الحرف": "🎬 🔢 Giant edge number",
+  "🎬 🗒️ ملاحظات متعلقة": "🎬 🗒️ Pinned sticky notes"
 };

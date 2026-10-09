@@ -42,7 +42,8 @@
     "titlecard", "departures", "loading", "countdown", "dragdrop", "lineup", "isomap", "stickers",
     "promptline", "crowd", "photohero", "menu", "pricing", "pins", "result", "calendar", "mapdots", "marker",
     "lowerthird", "cardwords", "bars", "table", "dayplan", "stutter",
-    "section", "worklog", "toggles", "checkout", "lockscreen", "wizard"]);
+    "section", "worklog", "toggles", "checkout", "lockscreen", "wizard",
+    "wordroll", "bignum", "stickynote"]);
   E.TYPING = new Set(["type", "artype"]);
   const MC = document.createElement("canvas").getContext("2d");
   const measure = (s, font) => { MC.font = font; return MC.measureText(s).width; };
@@ -4687,6 +4688,93 @@
       <div style="height:${(sz * 0.3).toFixed(1)}px;background:#EEE;border-radius:${sz.toFixed(0)}px;margin:${(sz * 0.4).toFixed(1)}px 0 ${(sz * 0.9).toFixed(1)}px;overflow:hidden"><i style="display:block;height:100%;width:${(pr * 100).toFixed(1)}%;background:${ORG};${ar ? "margin-left:auto" : ""}"></i></div>
       <div style="display:flex;gap:${(sz * 0.5).toFixed(1)}px;font:500 ${(sz * 0.8).toFixed(1)}px ${ff}"><span style="flex:1;text-align:center;border:1px solid #DDD;border-radius:${(sz * 0.3).toFixed(1)}px;padding:${(sz * 0.35).toFixed(1)}px">${ar ? "› السابق" : "‹ Previous"}</span><span style="flex:1;text-align:center;background:#111;color:#fff;border-radius:${(sz * 0.3).toFixed(1)}px;padding:${(sz * 0.35).toFixed(1)}px">${ar ? "التالي ‹" : "Next ›"}</span></div>
       <div style="margin-top:${sz.toFixed(1)}px;font:600 ${(sz * 1.05).toFixed(1)}px ${ff};color:#111;line-height:1.3">${ar ? `الخطوة ${stepN}: ` : `Step ${stepN}: `}${esc(s)}</div></div>`;
+    return html;
+  };
+
+  // =====================================================================
+  // فيديو مرجعي 8 (وكالات):
+  //   wordroll   لستة كلمات بتلف رأسي والحالية غامقة والباقي باهت فوق وتحت
+  //   bignum     رقم عملاق مقصوص على حرف الكادر وجنبه كلام صغير
+  //   stickynote ملاحظات ملونة متعلقة بخط ودبوس وأول حرف من اسم الشخص
+  // =====================================================================
+  P.k_wordroll = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    if (!it.length) return "";
+    const vid = onVideo(this);
+    const ink = vid ? "#fff" : INK;
+    const shown = it.filter((x) => t >= x.t0);
+    const ai = Math.max(0, shown.length - 1);
+    const prev = Math.max(0, ai - 1);
+    const e = shown.length ? eOut(seg(t, it[ai].t0, it[ai].t0 + 0.3)) : 0;
+    const pos = lerp(prev, ai, e);
+    const sz = mn * 0.11;
+    const cy = h * 0.5;
+    let html = vid ? `<div style="position:absolute;inset:0;background:rgba(0,0,0,.35)"></div>` : `<div style="position:absolute;inset:0;background:${PAPER}"></div>`;
+    it.forEach((x, i) => {
+      const d = i - pos;
+      if (Math.abs(d) > 4) return;
+      const s = this.text(x.w), ff = famOf(s);
+      const z = fitSize(s, `600 {}px ${ff}`, w * 0.84, sz);
+      const on = Math.abs(d) < 0.5;
+      html += `<div dir="${this.dir(s)}" style="position:absolute;left:0;right:0;top:${(cy + d * sz * 1.25).toFixed(1)}px;transform:translateY(-50%);text-align:center;white-space:nowrap;font:600 ${z.toFixed(1)}px ${ff};letter-spacing:-0.04em;line-height:1;
+        color:${ink};opacity:${on ? 1 : clamp(0.32 - (Math.abs(d) - 1) * 0.08, 0.06, 0.32).toFixed(3)};${on ? shadow(this) : ""}">${esc(s)}</div>`;
+    });
+    // نقط صغيرة على الجنبين زي المرجع
+    html += `<i style="position:absolute;left:${(w * 0.08).toFixed(0)}px;top:${(cy - sz * 1.4).toFixed(0)}px;width:${(mn * 0.01).toFixed(0)}px;height:${(mn * 0.01).toFixed(0)}px;background:${ORG}"></i>
+      <i style="position:absolute;right:${(w * 0.08).toFixed(0)}px;top:${(cy + sz * 1.4).toFixed(0)}px;width:${(mn * 0.01).toFixed(0)}px;height:${(mn * 0.01).toFixed(0)}px;background:${ORG}"></i>`;
+    return html;
+  };
+
+  // ---------- bignum: رقم عملاق مقصوص على الحرف
+  P.k_bignum = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    if (!it.length) return "";
+    const ni = it.findIndex((x) => /[0-9٠-٩]/.test(x.w));
+    const raw = ni >= 0 ? it[ni].w.replace(/[٠-٩]/g, (d) => "٠١٢٣٤٥٦٧٨٩".indexOf(d)).replace(/[^0-9]/g, "") : String(15 + bi);
+    const target = parseInt(raw, 10) || 15;
+    const cnt = Math.round(target * eOut(seg(t, b.t0, b.t0 + 0.9)));
+    const label = it.filter((x, i) => i !== ni && t >= x.t0).map((x) => this.text(x.w)).join(" ");
+    const ar = isAr(it);
+    const vid = onVideo(this), ink = vid ? "#fff" : INK;
+    const nz = Math.min(h * 0.48, w * 0.62);
+    let html = vid ? "" : `<div style="position:absolute;inset:0;background:${PAPER}"></div>`;
+    html += `<div data-free dir="ltr" style="position:absolute;${ar ? "right" : "left"}:${(-nz * 0.18).toFixed(0)}px;bottom:${(-nz * 0.12).toFixed(0)}px;font:600 ${nz.toFixed(0)}px 'TY Outfit';letter-spacing:-0.07em;line-height:1;color:${ink}">${cnt}</div>`;
+    if (label) { const ff = famOf(label), z = fitSize(label, `600 {}px ${ff}`, w * 0.5, mn * 0.06 * this.ts);
+      html += `<div dir="${this.dir(label)}" style="position:absolute;${ar ? "left" : "right"}:${(w * 0.08).toFixed(0)}px;top:${(h * 0.55).toFixed(0)}px;white-space:nowrap;font:600 ${z.toFixed(1)}px ${ff};color:${ink};${shadow(this)}">${esc(label)}</div>
+        <div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;${ar ? "left" : "right"}:${(w * 0.08).toFixed(0)}px;top:${(h * 0.55 + z * 1.4).toFixed(0)}px;width:${(w * 0.4).toFixed(0)}px;font:400 ${(z * 0.45).toFixed(1)}px ${ff};color:${ink};opacity:.6;line-height:1.4">${ar ? "اتعمل في دقايق ومتابع لوحده" : "Built in minutes, tracked automatically"}</div>`; }
+    return html;
+  };
+
+  // ---------- stickynote: ملاحظات ملونة متعلقة
+  const NOTE = ["#FFF3A8", "#CDE7FF", "#E2D6FF", "#D7F5C8"];
+  P.k_stickynote = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    const cs = chunks(it, Math.min(3, Math.max(1, Math.ceil(it.length / 4))));
+    const ar = isAr(it), ff = famOf(ar ? "ع" : "a");
+    const sz = mn * 0.042 * this.ts;
+    const nw = Math.min(w * 0.6, sz * 11);
+    const spots = [[0.12, 0.2], [0.42, 0.42], [0.18, 0.62]];
+    const initials = ["MJ", "DF", "OC"];
+    let html = onVideo(this) ? "" : `<div style="position:absolute;inset:0;background:linear-gradient(160deg,#EEF4E6,#DDE9CF)"></div>`;
+    cs.forEach((c, i) => {
+      if (t < c.t0) return;
+      const [fx, fy] = spots[i % 3];
+      const x = Math.min(fx * w, w - nw - mn * 0.03), y = fy * h;
+      const p = eBack(seg(t, c.t0, c.t0 + 0.3));
+      const s = this.text(c.w);
+      const pinX = x + nw * 0.5, pinY = y + sz * 6.6;
+      html += `<svg data-free width="${w}" height="${h}" style="position:absolute;inset:0;overflow:visible;opacity:${clamp(p).toFixed(3)}"><line x1="${pinX.toFixed(0)}" y1="${(pinY - sz).toFixed(0)}" x2="${pinX.toFixed(0)}" y2="${(pinY + sz * 2.5).toFixed(0)}" stroke="#1E5FE0" stroke-width="2"/><circle cx="${pinX.toFixed(0)}" cy="${(pinY + sz * 2.5).toFixed(0)}" r="${(sz * 0.25).toFixed(1)}" fill="#fff" stroke="#1E5FE0" stroke-width="2"/></svg>
+        <div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:${x.toFixed(1)}px;top:${y.toFixed(1)}px;width:${nw.toFixed(1)}px;box-sizing:border-box;background:${NOTE[(i + bi) % 4]};border-radius:${(sz * 0.3).toFixed(1)}px;padding:${(sz * 0.6).toFixed(1)}px;transform:scale(${p.toFixed(3)}) rotate(${(i % 2 ? 2 : -2)}deg);transform-origin:50% 100%;box-shadow:0 ${(sz * 0.2).toFixed(1)}px ${(sz * 0.7).toFixed(1)}px rgba(0,0,0,.15)">
+          <span style="display:inline-block;font:600 ${(sz * 0.55).toFixed(1)}px ${ff};background:rgba(0,0,0,.08);padding:${(sz * 0.08).toFixed(1)}px ${(sz * 0.35).toFixed(1)}px;border-radius:${(sz * 0.2).toFixed(1)}px;color:#444">${ar ? "ملاحظة" : "Status"}</span>
+          <div style="font:500 ${sz.toFixed(1)}px ${ff};color:#222;margin:${(sz * 0.4).toFixed(1)}px 0;line-height:1.3">${esc(s)}</div>
+          <span dir="ltr" style="display:inline-flex;width:${(sz * 1.4).toFixed(0)}px;height:${(sz * 1.4).toFixed(0)}px;border-radius:50%;background:rgba(0,0,0,.12);align-items:center;justify-content:center;font:600 ${(sz * 0.5).toFixed(1)}px 'TY Outfit';color:#333">${initials[i % 3]}</span></div>`;
+    });
     return html;
   };
 })();
