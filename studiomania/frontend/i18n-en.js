@@ -3289,5 +3289,11 @@ window.I18N_EN = {
   "🎬 📊 رسم بياني بيكبر": "🎬 📊 Growing chart",
   "🎬 🧾 جدول بتاجات": "🎬 🧾 Table with tags",
   "🎬 🕘 جدول اليوم": "🎬 🕘 Day schedule",
-  "🎬 🔁 كلمة بتتهته": "🎬 🔁 Stuttering word"
+  "🎬 🔁 كلمة بتتهته": "🎬 🔁 Stuttering word",
+  "🎬 🔢 فصل كامل برقم ورمز": "🎬 🔢 Full chapter with number and symbol",
+  "🎬 📋 سجل شغل": "🎬 📋 Work log",
+  "🎬 🔛 مفاتيح بتتفتح": "🎬 🔛 Switches turning on",
+  "🎬 🛒 فاتورة وزرار الدفع": "🎬 🛒 Checkout",
+  "🎬 📱 شاشة مقفولة وإشعارات": "🎬 📱 Lock screen notifications",
+  "🎬 🪜 خطوات بشريط تقدّم": "🎬 🪜 Step wizard"
 };

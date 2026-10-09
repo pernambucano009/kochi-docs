@@ -41,7 +41,8 @@
     "clones", "megapan", "badge", "leaderboard", "donut", "photowords",
     "titlecard", "departures", "loading", "countdown", "dragdrop", "lineup", "isomap", "stickers",
     "promptline", "crowd", "photohero", "menu", "pricing", "pins", "result", "calendar", "mapdots", "marker",
-    "lowerthird", "cardwords", "bars", "table", "dayplan", "stutter"]);
+    "lowerthird", "cardwords", "bars", "table", "dayplan", "stutter",
+    "section", "worklog", "toggles", "checkout", "lockscreen", "wizard"]);
   E.TYPING = new Set(["type", "artype"]);
   const MC = document.createElement("canvas").getContext("2d");
   const measure = (s, font) => { MC.font = font; return MC.measureText(s).width; };
@@ -2840,8 +2841,9 @@
     const vid = onVideo(this);
     const src = imgOf(b);
     if (src) this._want = src;
-    let html = vid ? `<div style="position:absolute;left:${cur.x.toFixed(1)}px;top:${cur.y.toFixed(1)}px;width:${cur.w.toFixed(1)}px;height:${cur.h.toFixed(1)}px;box-shadow:0 0 0 ${(Math.max(w, h) * 2).toFixed(0)}px ${PAPER}"></div>`
-      : `<div style="position:absolute;inset:0;background:${PAPER}"></div><div style="position:absolute;left:${cur.x.toFixed(1)}px;top:${cur.y.toFixed(1)}px;width:${cur.w.toFixed(1)}px;height:${cur.h.toFixed(1)}px;background:${src ? `url(${src}) center/cover` : "linear-gradient(160deg,#9AA3B5,#4B5468)"}"></div>`;
+    const winBg = bi % 3 === 2 ? ORG : PAPER;
+    let html = vid ? `<div style="position:absolute;left:${cur.x.toFixed(1)}px;top:${cur.y.toFixed(1)}px;width:${cur.w.toFixed(1)}px;height:${cur.h.toFixed(1)}px;box-shadow:0 0 0 ${(Math.max(w, h) * 2).toFixed(0)}px ${winBg}"></div>`
+      : `<div style="position:absolute;inset:0;background:${winBg}"></div><div style="position:absolute;left:${cur.x.toFixed(1)}px;top:${cur.y.toFixed(1)}px;width:${cur.w.toFixed(1)}px;height:${cur.h.toFixed(1)}px;background:${src ? `url(${src}) center/cover` : "linear-gradient(160deg,#9AA3B5,#4B5468)"}"></div>`;
     // علامات الأركان والنقط
     const L = mn * 0.03, lw = Math.max(1.5, mn * 0.003), o = mn * 0.012, ka = seg(t, b.t0 + 0.4, b.t0 + 0.7);
     [[0, 0], [1, 0], [0, 1], [1, 1]].forEach(([cx, cy]) => {
@@ -4504,6 +4506,187 @@
     // أرقام صغيرة بتعدّ جنبها (زي المرجع)
     const n1 = Math.round(117 * seg(t, b.t0, b.t1)), n2 = Math.round(346 * seg(t, b.t0, b.t1));
     html += `<div dir="ltr" style="position:absolute;left:${(w * 0.1).toFixed(0)}px;top:${(cy - sz * 1.8).toFixed(0)}px;font:500 ${(mn * 0.05).toFixed(1)}px 'TY Outfit';color:${ink};opacity:.55">${n1}<br>${n2}</div>`;
+    return html;
+  };
+
+  // =====================================================================
+  // فيديو مرجعي 7 (تطبيق في دقايق، فصول):
+  //   section    فصل كامل: الرقم بيتكتب «01|»، بعدين كلمة عملاقة مقصوصة على برتقاني، بعدين «01 العنوان» ورمز كبير
+  //   worklog    سجل شغل: «كتب، عدّل، عمل» وجنب كل واحد تاج
+  //   toggles    لستة مفاتيح بتتفتح واحد ورا التاني
+  //   checkout   فاتورة: المجموع والشحن والإجمالي وزرار الدفع بيتداس
+  //   lockscreen شاشة موبايل مقفولة: الساعة والإشعارات بتتراكم
+  //   wizard     خطوات بشريط تقدّم «الخطوة 3 من 17»
+  // =====================================================================
+  const GLYPHS = ['<path d="M12 2l2.2 6.8L21 6l-4.2 6 4.2 6-6.8-2.8L12 22l-2.2-6.8L3 18l4.2-6L3 6l6.8 2.8z"/>',
+    '<path d="M12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10zm10 5-3 1a7 7 0 0 1-.8 1.9l1.5 2.8-2.1 2.1-2.8-1.5a7 7 0 0 1-1.9.8l-1 3h-3l-1-3a7 7 0 0 1-1.9-.8l-2.8 1.5-2.1-2.1 1.5-2.8A7 7 0 0 1 5 13l-3-1v-3l3-1a7 7 0 0 1 .8-1.9L4.3 3.3l2.1-2.1 2.8 1.5A7 7 0 0 1 11 2l1-3"/>',
+    '<path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"/>', '<path d="M3 14h6V8h6V2h6v20H3z"/>'];
+  P.k_section = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    if (!it.length) return "";
+    const m = it[0].w.match(/^[0-9٠-٩]{1,2}$/);
+    const num = m ? this.text(it[0].w).padStart(2, "0") : String(bi + 1).padStart(2, "0");
+    const words = m ? it.slice(1) : it;
+    const title = words.map((x) => this.text(x.w)).join(" ") || num;
+    const ar = AR.test(title), ff = famOf(title);
+    const D = b.t1 - b.t0;
+    const p1 = b.t0 + D * 0.28, p2 = b.t0 + D * 0.58;
+    const caret = (sz, col, on = true) => `<span style="display:inline-block;width:${(sz * 0.07).toFixed(1)}px;height:${(sz * 0.85).toFixed(1)}px;background:${col};vertical-align:-0.06em;margin:0 ${(sz * 0.04).toFixed(1)}px;opacity:${on ? 1 : 0}"></span>`;
+    const blink = Math.floor(t * 2.6) % 2 === 0;
+    let html = "";
+    if (t < p1) {
+      // 1) الرقم بيتكتب
+      const sz = mn * 0.5;
+      const s = typed(num, t, b.t0 + 0.1, 8);
+      html = `<div style="position:absolute;inset:0;background:${PAPER}"></div><div dir="ltr" style="position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);text-align:center;white-space:nowrap;font:500 ${sz.toFixed(0)}px 'TY Outfit';letter-spacing:-0.06em;color:${INK}">${esc(s)}${caret(sz, ORG, blink || s.length < num.length)}</div>`;
+    } else if (t < p2) {
+      // 2) الكلمة العملاقة بتتكتب على برتقاني ومقصوصة من الناحيتين
+      const big = this.text(words[0]?.w || title);
+      const sz = mn * 0.75;
+      const s = typed(big, t, p1, 9);
+      const tw = measure(s, `500 ${sz}px ${famOf(big)}`);
+      const shift = Math.max(0, tw - w * 0.8);
+      html = `<div style="position:absolute;inset:0;background:${ORG}"></div><div data-free dir="${this.dir(big)}" style="position:absolute;${ar ? "right" : "left"}:${(w * 0.1 - shift).toFixed(1)}px;top:50%;transform:translateY(-52%);white-space:nowrap;font:500 ${sz.toFixed(0)}px ${famOf(big)};letter-spacing:-0.05em;line-height:1;color:${INK}">${esc(s)}${caret(sz, "#fff")}</div>`;
+    } else {
+      // 3) «01 العنوان» ورمز كبير في مربع ملوّن
+      const q = eOut(seg(t, p2, p2 + 0.35));
+      const sz = fitSize(title, `600 {}px ${ff}`, w * 0.84, mn * 0.12);
+      const G = mn * 0.36;
+      const shownT = typed(title, t, p2 + 0.05, 45);
+      html = `<div style="position:absolute;inset:0;background:${PAPER}"></div>
+        <div style="position:absolute;${ar ? "left" : "right"}:${(w * 0.08).toFixed(0)}px;top:${(h * 0.5 - G * 1.25).toFixed(0)}px;width:${G.toFixed(0)}px;height:${G.toFixed(0)}px;background:${ORG};display:flex;align-items:center;justify-content:center;transform:scale(${q.toFixed(3)});box-shadow:${(G * 0.08).toFixed(0)}px 0 0 #3B4BE8">
+          <svg width="${(G * 0.7).toFixed(0)}" height="${(G * 0.7).toFixed(0)}" viewBox="0 0 24 24" fill="${INK}">${GLYPHS[bi % GLYPHS.length]}</svg></div>
+        <div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:${(w * 0.08).toFixed(0)}px;right:${(w * 0.08).toFixed(0)}px;top:${(h * 0.5).toFixed(0)}px;font:600 ${sz.toFixed(1)}px ${ff};letter-spacing:-0.04em;line-height:1;color:${INK}">
+          <div dir="ltr" style="text-align:${ar ? "right" : "left"};font-family:'TY Outfit'">${num}</div><div style="white-space:nowrap">${esc(shownT)}${caret(sz, "#3B4BE8", shownT.length < title.length || blink)}</div></div>`;
+    }
+    return html;
+  };
+
+  // ---------- worklog: سجل شغل
+  P.k_worklog = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    if (!it.length) return "";
+    const ar = isAr(it), ff = famOf(ar ? "ع" : "a");
+    const r = this.freeRect(b);
+    const sz = mn * 0.04 * this.ts, row = sz * 1.9;
+    const verbs = ar ? ["كتب", "عدّل", "كتب", "عمل صورة", "راجع", "كتب"] : ["Wrote", "Edited", "Wrote", "Generated image", "Reviewed", "Wrote"];
+    const cw = Math.min(r.w, w * 0.84);
+    const x = r.x + (r.w - cw) / 2, y = r.y + Math.max(0, (r.h - it.length * row) / 2);
+    let html = onVideo(this) ? "" : `<div style="position:absolute;inset:0;background:#FFFFFF"></div>`;
+    html += `<div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:${x.toFixed(1)}px;top:${y.toFixed(1)}px;width:${cw.toFixed(1)}px;box-sizing:border-box;background:#fff;border-radius:${(sz * 0.5).toFixed(1)}px;padding:${(sz * 0.6).toFixed(1)}px ${(sz * 0.8).toFixed(1)}px;box-shadow:0 ${(sz * 0.2).toFixed(1)}px ${(sz * 0.8).toFixed(1)}px rgba(0,0,0,.12)">
+      ${it.slice(0, 7).map((q, i) => { if (t < q.t0) return ""; const a = eOut(seg(t, q.t0, q.t0 + 0.2)); const busy = t < q.t0 + 0.35;
+        return `<div style="display:flex;align-items:center;gap:${(sz * 0.5).toFixed(1)}px;height:${row.toFixed(1)}px;opacity:${a.toFixed(3)}">
+          <svg width="${(sz * 0.9).toFixed(0)}" height="${(sz * 0.9).toFixed(0)}" viewBox="0 0 24 24"><path d="M6 2h9l5 5v15H6z" fill="none" stroke="#777" stroke-width="2"/></svg>
+          <span style="font:500 ${(sz * 0.85).toFixed(1)}px ${ff};color:${busy ? "#AAA" : "#555"}">${verbs[i % verbs.length]}${busy ? "…" : ""}</span>
+          <span style="font:500 ${(sz * 0.8).toFixed(1)}px ${famOf(q.w)};background:#F0F0F2;color:#222;padding:${(sz * 0.12).toFixed(1)}px ${(sz * 0.45).toFixed(1)}px;border-radius:${(sz * 0.3).toFixed(1)}px;white-space:nowrap">${esc(this.text(q.w))}</span></div>`; }).join("")}</div>`;
+    return html;
+  };
+
+  // ---------- toggles: مفاتيح بتتفتح
+  P.k_toggles = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    const cs = chunks(it, Math.min(4, Math.max(1, Math.ceil(it.length / 2))));
+    const ar = isAr(it), ff = famOf(ar ? "ع" : "a");
+    const r = this.freeRect(b);
+    const sz = mn * 0.042 * this.ts, row = sz * 3;
+    const cw = Math.min(r.w, w * 0.88);
+    const x = r.x + (r.w - cw) / 2, y = r.y + Math.max(0, (r.h - cs.length * row) / 2);
+    const when = ar ? ["كل يوم الساعة 11 بالليل", "كل اتنين الساعة 10", "كل جمعة الساعة 6", "كل شهر"] : ["Every night at 11:00 pm", "Every Monday at 10:00 am", "Every Friday at 6:00 pm", "Every month"];
+    let html = onVideo(this) ? "" : `<div style="position:absolute;inset:0;background:#F4F4F2"></div>`;
+    cs.forEach((c, i) => {
+      if (t < c.t0) return;
+      const a = eOut(seg(t, c.t0, c.t0 + 0.25)), on = eOut(seg(t, c.t0 + 0.3, c.t0 + 0.5));
+      const tw = sz * 2.2, tg = sz * 1.2;
+      html += `<div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:${x.toFixed(1)}px;top:${(y + i * row).toFixed(1)}px;width:${cw.toFixed(1)}px;height:${(row - sz * 0.4).toFixed(1)}px;box-sizing:border-box;opacity:${a.toFixed(3)};
+        background:#fff;border:1px solid #E6E6E8;border-radius:${(sz * 0.5).toFixed(1)}px;display:flex;align-items:center;gap:${(sz * 0.8).toFixed(1)}px;padding:0 ${(sz * 0.8).toFixed(1)}px">
+        <span style="flex:none;position:relative;width:${tw.toFixed(0)}px;height:${tg.toFixed(0)}px;border-radius:999px;background:${lerpCol("#D0D0D4", "#F2602A", on)}"><i style="position:absolute;top:${(tg * 0.1).toFixed(1)}px;${ar ? "right" : "left"}:${lerp(tg * 0.1, tw - tg * 0.9, on).toFixed(1)}px;width:${(tg * 0.8).toFixed(1)}px;height:${(tg * 0.8).toFixed(1)}px;border-radius:50%;background:#fff"></i></span>
+        <span style="min-width:0"><span style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font:600 ${sz.toFixed(1)}px ${ff};color:#111">${esc(this.text(c.w))}</span>
+          <span style="display:block;font:400 ${(sz * 0.7).toFixed(1)}px ${ff};color:#888">${when[i % 4]}</span></span></div>`;
+    });
+    return html;
+  };
+
+  // ---------- checkout: فاتورة وزرار الدفع
+  P.k_checkout = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    if (!it.length) return "";
+    const ar = isAr(it), ff = famOf(ar ? "ع" : "a");
+    const sz = mn * 0.045 * this.ts;
+    const cw = Math.min(w * 0.84, sz * 16);
+    const x = (w - cw) / 2, y = h * 0.32;
+    const nums = it.map((q) => q.w.match(/[0-9٠-٩]+/)).filter(Boolean).map((m) => parseInt(m[0].replace(/[٠-٩]/g, (d) => "٠١٢٣٤٥٦٧٨٩".indexOf(d)), 10));
+    const sub = nums[0] ?? 162, ship = 15, tax = 7.4;
+    const label = it.filter((q) => !/[0-9٠-٩]/.test(q.w)).map((q) => this.text(q.w)).join(" ") || (ar ? "ادفع دلوقتي" : "Proceed to checkout");
+    const rows = [[ar ? "المجموع" : "Subtotal", sub], [ar ? "الضريبة" : "Tax", tax], [ar ? "الشحن" : "Shipping", ship]];
+    const cnt = eOut(seg(t, b.t0 + 0.2, b.t0 + 0.9));
+    const lastT = it[it.length - 1].t0;
+    const press = t > lastT + 0.35 && t < lastT + 0.55;
+    let html = `<div style="position:absolute;inset:0;background:#FBFBEF"></div>
+      <div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:${x.toFixed(1)}px;top:${y.toFixed(1)}px;width:${cw.toFixed(1)}px;font:500 ${sz.toFixed(1)}px ${ff};color:#333">
+      ${rows.map(([l, v], i) => `<div style="display:flex;justify-content:space-between;padding:${(sz * 0.5).toFixed(1)}px 0;opacity:${eOut(seg(t, b.t0 + i * 0.12, b.t0 + i * 0.12 + 0.25)).toFixed(3)}"><span>${l}</span><span dir="ltr">$${(v * cnt).toFixed(2)}</span></div>`).join("")}
+      <div style="border-top:1px solid #DDD;display:flex;justify-content:space-between;padding:${(sz * 0.6).toFixed(1)}px 0;font-weight:700;font-size:${(sz * 1.15).toFixed(1)}px;color:#111"><span>${ar ? "الإجمالي" : "Total"}</span><span dir="ltr">$${((sub + ship + tax) * cnt).toFixed(2)}</span></div>
+      <div style="margin-top:${(sz * 0.6).toFixed(1)}px;background:#22C55E;color:#fff;text-align:center;padding:${(sz * 0.55).toFixed(1)}px;border-radius:${(sz * 0.3).toFixed(1)}px;font-weight:600;transform:scale(${press ? 0.96 : 1});opacity:${eOut(seg(t, it[0].t0, it[0].t0 + 0.3)).toFixed(3)}">🛒 ${esc(label)}</div></div>`;
+    if (t > lastT + 0.05) {
+      const e = eOut(seg(t, lastT + 0.05, lastT + 0.35));
+      html += cursorSvg(lerp(w * 0.85, w / 2, e), lerp(h * 0.9, y + sz * 7.8, e), sz * 1.1);
+    }
+    return html;
+  };
+
+  // ---------- lockscreen: شاشة مقفولة وإشعارات
+  P.k_lockscreen = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    const cs = chunks(it, Math.min(4, Math.max(1, Math.ceil(it.length / 2))));
+    const ar = isAr(it), ff = famOf(ar ? "ع" : "a");
+    const phh = Math.min(h * 0.82, w * 1.3), pw = phh * 0.48;
+    const px = (w - pw) / 2, py = (h - phh) / 2;
+    const sz = pw * 0.06;
+    const days = ar ? "الاتنين، 1 يونيو" : "Monday, June 1";
+    let html = onVideo(this) ? "" : `<div style="position:absolute;inset:0;background:#F2F2F0"></div>`;
+    let cards = "";
+    const shown = cs.filter((c) => t >= c.t0).reverse();
+    shown.forEach((c, i) => {
+      const a = i === 0 ? eBack(seg(t, c.t0, c.t0 + 0.3)) : 1;
+      cards += `<div dir="${ar ? "rtl" : "ltr"}" style="margin:0 ${(pw * 0.05).toFixed(0)}px ${(sz * 0.4).toFixed(1)}px;background:rgba(255,255,255,.55);backdrop-filter:blur(8px);border-radius:${(sz * 1.2).toFixed(1)}px;padding:${(sz * 0.7).toFixed(1)}px;display:flex;gap:${(sz * 0.6).toFixed(1)}px;transform:scale(${a.toFixed(3)});opacity:${clamp(a).toFixed(3)}">
+        <span style="flex:none;width:${(sz * 2.4).toFixed(0)}px;height:${(sz * 2.4).toFixed(0)}px;border-radius:${(sz * 0.6).toFixed(0)}px;background:${ORG}"></span>
+        <span style="min-width:0"><span style="display:block;font:700 ${sz.toFixed(1)}px ${ff};color:#111;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(this.text(c.w))}</span><span style="display:block;font:400 ${(sz * 0.85).toFixed(1)}px ${ff};color:#333">${ar ? "طلب جديد اتأكد" : "New order confirmed"} #${4870 + cs.indexOf(c)}</span></span></div>`;
+    });
+    html += `<div style="position:absolute;left:${px.toFixed(1)}px;top:${py.toFixed(1)}px;width:${pw.toFixed(1)}px;height:${phh.toFixed(1)}px;box-sizing:border-box;border-radius:${(pw * 0.15).toFixed(0)}px;border:${(pw * 0.035).toFixed(0)}px solid #111;overflow:hidden;
+      background:linear-gradient(170deg,#3D7BFF,#9BC3FF 55%,#F6B26B);transform:translateY(${((1 - eOut(seg(t, b.t0, b.t0 + 0.4))) * h * 0.3).toFixed(1)}px)">
+      <div style="text-align:center;color:#fff;margin-top:${(phh * 0.08).toFixed(0)}px"><div style="font:500 ${(sz * 1.1).toFixed(1)}px ${famOf(days)}">${days}</div><div dir="ltr" style="font:600 ${(pw * 0.24).toFixed(0)}px 'TY Outfit';letter-spacing:-0.03em;line-height:1">9:41</div></div>
+      <div style="margin-top:${(phh * 0.05).toFixed(0)}px">${cards}</div></div>`;
+    return html;
+  };
+
+  // ---------- wizard: خطوات بشريط تقدّم
+  P.k_wizard = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    if (!it.length) return "";
+    const ar = isAr(it), ff = famOf(ar ? "ع" : "a");
+    const sz = mn * 0.042 * this.ts;
+    const cw = Math.min(w * 0.88, sz * 18);
+    const x = (w - cw) / 2, y = h * 0.34;
+    const total = 17, stepN = 3 + (bi % 10);
+    const pr = eOut(seg(t, b.t0 + 0.2, b.t0 + 0.9)) * (stepN / total);
+    const s = it.filter((q) => t >= q.t0).map((q) => this.text(q.w)).join(" ");
+    let html = `<div style="position:absolute;inset:0;background:#F6F6F4"></div>
+      <div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:${x.toFixed(1)}px;top:${y.toFixed(1)}px;width:${cw.toFixed(1)}px;box-sizing:border-box;background:#fff;border-radius:${(sz * 0.5).toFixed(1)}px;padding:${sz.toFixed(1)}px;box-shadow:0 ${(sz * 0.2).toFixed(1)}px ${(sz * 0.8).toFixed(1)}px rgba(0,0,0,.1)">
+      <div style="display:flex;justify-content:space-between;font:600 ${(sz * 0.65).toFixed(1)}px ${ff};color:#888;letter-spacing:.06em"><span>${ar ? `الخطوة ${stepN} من ${total}` : `STEP ${stepN} OF ${total}`}</span><span dir="ltr">${Math.round(pr * 100)}%</span></div>
+      <div style="height:${(sz * 0.3).toFixed(1)}px;background:#EEE;border-radius:${sz.toFixed(0)}px;margin:${(sz * 0.4).toFixed(1)}px 0 ${(sz * 0.9).toFixed(1)}px;overflow:hidden"><i style="display:block;height:100%;width:${(pr * 100).toFixed(1)}%;background:${ORG};${ar ? "margin-left:auto" : ""}"></i></div>
+      <div style="display:flex;gap:${(sz * 0.5).toFixed(1)}px;font:500 ${(sz * 0.8).toFixed(1)}px ${ff}"><span style="flex:1;text-align:center;border:1px solid #DDD;border-radius:${(sz * 0.3).toFixed(1)}px;padding:${(sz * 0.35).toFixed(1)}px">${ar ? "› السابق" : "‹ Previous"}</span><span style="flex:1;text-align:center;background:#111;color:#fff;border-radius:${(sz * 0.3).toFixed(1)}px;padding:${(sz * 0.35).toFixed(1)}px">${ar ? "التالي ‹" : "Next ›"}</span></div>
+      <div style="margin-top:${sz.toFixed(1)}px;font:600 ${(sz * 1.05).toFixed(1)}px ${ff};color:#111;line-height:1.3">${ar ? `الخطوة ${stepN}: ` : `Step ${stepN}: `}${esc(s)}</div></div>`;
     return html;
   };
 })();
