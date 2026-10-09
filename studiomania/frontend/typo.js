@@ -329,6 +329,7 @@ function tyStop() {
   tyx.play = null;
   const b = document.querySelector("[data-typlay]");
   if (b) b.textContent = "▶️";
+  tyGizDraw();   // أدوات التحكم بتستخبى وقت التشغيل وبترجع أول ما يقف
 }
 
 function tyStart() {

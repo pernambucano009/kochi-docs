@@ -13733,6 +13733,34 @@ def typo_doc_get(pid: str):
     return typo_doc(pid, typo_load(pid))
 
 
+# 📦 قراءة بس من برّه (بنفس مفتاح المعمل): مشاريع التايبوجرافي عشان نراجع مشكلة في مشروع بعينه
+@app.get("/api/lab/export/typo")
+def typo_export_list():
+    out = []
+    for f in sorted(TYPO_PROJ.glob("*/typo.json"), key=lambda x: x.stat().st_mtime):
+        try:
+            d = json.loads(f.read_text(encoding="utf-8"))
+        except ValueError:
+            continue
+        out.append({"id": f.parent.name, "name": d.get("name"), "status": d.get("status"), "kind": (d.get("source") or {}).get("kind"),
+                    "blocks": len(d.get("blocks") or []), "final": d.get("final"), "updated": f.stat().st_mtime})
+    return out
+
+
+@app.get("/api/lab/export/typo/{pid}")
+def typo_export_one(pid: str):
+    d = typo_load(pid)
+    return {"project": d, "doc": typo_doc(pid, d), "files": sorted(p.name for p in (TYPO_PROJ / Path(pid).name).iterdir() if p.is_file())}
+
+
+@app.get("/api/lab/export/typo/{pid}/file/{name}")
+def typo_export_file(pid: str, name: str):
+    f = TYPO_PROJ / Path(pid).name / Path(name).name
+    if not f.is_file():
+        raise HTTPException(404, "مش موجود")
+    return FileResponse(f)
+
+
 class TypoTrackIn(BaseModel):
     block: int
     t: float
