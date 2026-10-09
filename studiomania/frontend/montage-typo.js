@@ -90,7 +90,33 @@ deleteSelected = function () {
 $("tlDelete").onclick = $("edDelete").onclick = () => deleteSelected();
 
 // ---------- خط التايبوجرافي في التايم لاين
+// خط كليكات التايبوجرافي: نفس أصوات فيديو التايبوجرافي، بموجتها، وبتشتغل في المعاينة والتصدير
+const mtClickOn = () => mt.project && (mt.project.data.typo_sfx?.on ?? true);
+const mtClickVol = () => Number(mt.project?.data.typo_sfx?.volume ?? 1);
+const mtClickUrl = () => (mtx.id && mtx.doc?.blocks?.length ? `/api/typo/${mtx.id}/clicks.wav?v=${encodeURIComponent(mtx.cur?.updated_at || "")}` : "");
+function mtClickTrack() {
+  const el = $("trkClick");
+  if (!el) return;
+  const url = mtClickUrl();
+  if (!url) { el.innerHTML = `<div class="tl-empty-track">كليكات التايبوجرافي بتظهر هنا</div>`; return; }
+  const dur = mtx.doc.duration;
+  el.innerHTML = `<div class="tl-audio click ${mtClickOn() ? "" : "off"}" style="left:0;width:${dur * mt.pps}px" title="كليكات التايبوجرافي (العلو من تاب 🔤)"><canvas></canvas><span class="nm">🔊 كليكات ${mtClickOn() ? `${Math.round(mtClickVol() * 100)}٪` : "(مقفولة)"}</span></div>`;
+  drawWave(el.querySelector("canvas"), url, 0, dur, mtClickOn() ? "#ffb86b" : "#6b7180", mtClickOn() ? mtClickVol() : 0.3);
+}
+let mtClickEl = null;
+function mtClickSync() {
+  const url = mtClickUrl();
+  if (!mt.playing || !url || !mtClickOn() || !mtTypoOn()) { mtClickEl?.pause(); return; }
+  if (!mtClickEl) { mtClickEl = new Audio(); mtClickEl.preload = "auto"; }
+  syncAudio(mtClickEl, { t0: 0, t1: mtx.doc.duration, offset: 0, url, volume: Math.min(1, mtClickVol()), t: {} }, mt.t, totalLength(), false);
+}
+const _mtTick = tick;
+tick = function () { _mtTick(); mtClickSync(); };
+const _mtPause = pause;
+pause = function () { const r = _mtPause(); mtClickEl?.pause(); return r; };
+
 function mtTypoTrack() {
+  mtClickTrack();
   const el = $("trkTypo");
   if (!el || !mt.project) return;
   if (!mtx.id || !mtx.doc?.blocks?.length) {
@@ -198,6 +224,8 @@ function mtTypoPaneRender() {
     <div class="row wrap"><button class="btn primary sm" id="mtTypoPlan" ${busy || !d.clips.length ? "disabled" : ""}>🧠 ${c?.blocks?.length ? "وزّع من جديد" : "وزّع التايبوجرافي"}</button>
       ${c ? `<label class="check"><input type="checkbox" id="mtTypoOn" ${mtTypoOn() ? "checked" : ""}> اظهرها في المعاينة والتصدير</label>` : ""}
       ${c ? `<button class="btn sm" id="mtTypoOpen" title="المحرر الكامل: الستايل والأيقونات والعلامات">✏️ المحرر الكامل</button>` : ""}</div>
+    ${c?.blocks?.length ? `<div class="row wrap"><label class="check"><input type="checkbox" id="mtClickOn" ${mtClickOn() ? "checked" : ""}> 🔊 كليكات التايبوجرافي</label>
+      <label>العلو <b>${Math.round(mtClickVol() * 100)}٪</b> <input type="range" id="mtClickVol" min="0" max="200" step="5" value="${Math.round(mtClickVol() * 100)}" ${mtClickOn() ? "" : "disabled"}></label></div>` : ""}
   </div>`;
   const i = mt.sel?.kind === "typo" ? mt.sel.i : -1, b = mtx.doc?.blocks?.[i], r = mtx.cur?.blocks?.[i];
   if (b && r) {
@@ -249,6 +277,12 @@ $("mtTypoPane").addEventListener("click", async (e) => {
 $("mtTypoPane").addEventListener("change", (e) => {
   const t = e.target;
   if (t.id === "mtTypoOn") { mt.project.data.typo_on = t.checked; scheduleSave(); return mtTypoDraw(); }
+  if (t.id === "mtClickOn" || t.id === "mtClickVol") {
+    const ts = mt.project.data.typo_sfx = { on: true, volume: 1, ...(mt.project.data.typo_sfx || {}) };
+    if (t.id === "mtClickOn") ts.on = t.checked; else ts.volume = Number(t.value) / 100;
+    scheduleSave(); mtClickTrack(); mtTypoPaneRender();
+    return;
+  }
   const i = mt.sel?.kind === "typo" ? mt.sel.i : -1;
   if (i < 0 || !mtx.cur?.blocks?.[i]) return;
   const blocks = JSON.parse(JSON.stringify(mtx.cur.blocks));

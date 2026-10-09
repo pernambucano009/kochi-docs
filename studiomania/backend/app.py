@@ -1969,6 +1969,7 @@ class ProjectIn(BaseModel):
     section: str | None = None  # المونتاج بتاع أنهي قسم: coach (فيديوهات المدربين) / series / ads
     typo_id: str | None = None  # مشروع التايبوجرافي اللي مربوط بالمونتاج (طبقة الكلام والعناصر فوق الفيديو)
     typo_on: bool = True        # التايبوجرافي ظاهرة في المعاينة والتصدير
+    typo_sfx: dict = {}         # كليكات التايبوجرافي في المونتاج: {on, volume}
 
 
 PROJECT_SECTIONS = ("coach", "series", "ads")
@@ -2417,7 +2418,7 @@ def run_ffmpeg(cmd: list[str], project_id: str, length: float, pct: tuple[int, i
     return proc.returncode, stderr
 
 
-def run_render(project_id: str, export_id: str, cmds: list[list[str]], total: float, name: str, work_dir: Path, typo_id: str | None = None, base_url: str = "") -> None:
+def run_render(project_id: str, export_id: str, cmds: list[list[str]], total: float, name: str, work_dir: Path, typo_id: str | None = None, base_url: str = "", typo_click_vol: float = 0.0) -> None:
     filename = f"{export_id}.mp4"
     error = None
     RENDER_LOG.write_text("", encoding="utf-8")
@@ -2447,6 +2448,17 @@ def run_render(project_id: str, export_id: str, cmds: list[list[str]], total: fl
             if code != 0:
                 error = render_error(subprocess.CompletedProcess(cmd, code, "", stderr))
                 break
+            if cmd is cmds[-3] and typo_id and typo_click_vol:
+                # 🔊 كليكات التايبوجرافي بتتخلط مع صوت المونتاج
+                mix = Path(cmd[-1])
+                wav = typo_sfx_wav(typo_id)
+                if wav:
+                    out = mix.with_name("mix_c.flac")
+                    r = subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(mix), "-i", str(wav), "-filter_complex",
+                                        f"[1:a]aresample=48000,aformat=channel_layouts=stereo,volume={typo_click_vol:.2f}[c];[0:a][c]amix=inputs=2:duration=first:normalize=0,alimiter=limit=0.95[a]",
+                                        "-map", "[a]", "-c:a", "flac", "-sample_fmt", "s16", str(out)], capture_output=True, timeout=600)
+                    if r.returncode == 0:
+                        out.replace(mix)
             if cmd is cmds[-2] and typo_id:
                 # 🔤 طبقة التايبوجرافي (الكلام والعناصر) بتترسم فوق الصورة قبل ما الصوت يتركّب
                 vid = Path(cmd[-1])
@@ -2530,7 +2542,9 @@ def render_project(project_id: str, request: Request):
     if tid and not (TYPO_PROJ / Path(tid).name / "typo.json").exists():
         tid = None
     port = (request.scope.get("server") or ("127.0.0.1", 8000))[1]
-    render_executor.submit(run_render, project_id, export_id, cmd, total, row["name"], work_dir, tid, f"http://127.0.0.1:{port}")
+    ts = data.get("typo_sfx") or {}
+    click = float(ts.get("volume", 1.0)) if tid and ts.get("on", True) else 0.0
+    render_executor.submit(run_render, project_id, export_id, cmd, total, row["name"], work_dir, tid, f"http://127.0.0.1:{port}", click)
     return {"ok": True, "duration": total}
 
 
@@ -13812,6 +13826,30 @@ def run_montage_typo(tid: str, segments, voice, music) -> None:
         typo_fail(tid, exc)
 
 
+def typo_sfx_wav(tid: str) -> Path | None:
+    """تراك كليكات التايبوجرافي (نفس اللي في فيديو التايبوجرافي) كملف صوت لوحده، بيتعمل من جديد لو المشروع اتغيّر."""
+    d = typo_load(tid)
+    out = TYPO_PROJ / Path(tid).name / ".clicks.wav"
+    stamp = out.with_suffix(".stamp")
+    key = f"{d.get('updated_at')}|{typo_sfx_level(d)}"
+    if out.exists() and stamp.exists() and stamp.read_text() == key:
+        return out
+    doc = typo_doc(tid, d)
+    if not doc["blocks"] or not sfx.render(TYPO_SFX, doc["blocks"], doc["duration"], out, seed=sum(map(ord, tid)), level=typo_sfx_level(d)):
+        out.unlink(missing_ok=True)
+        return None
+    stamp.write_text(key)
+    return out
+
+
+@app.get("/api/typo/{pid}/clicks.wav")
+def typo_clicks(pid: str):
+    f = typo_sfx_wav(pid)
+    if not f:
+        raise HTTPException(404, "مفيش كليكات")
+    return FileResponse(f, media_type="audio/wav")
+
+
 def typo_has_layer(tid: str) -> bool:
     try:
         d = typo_load(tid)
@@ -14120,8 +14158,11 @@ def run_typo_render(pid: str, base: str, quality: str) -> None:
 def typo_to_editor(pid: str):
     """🎞️ الفيديو في مونتاج الإعلانات (بصوته)."""
     d = typo_load(pid)
-    f = TYPO_PROJ / pid / (d.get("final") or "")
-    if not d.get("final") or not f.exists():
+    src = d.get("source") or {}
+    # الكلام فوق الفيديو بتاعك: الفيديو الأصلي بيروح للمونتاج والتايبوجرافي بتفضل طبقة تتعدّل هناك (خط «🔤 تايبوجرافي»)
+    linked = src.get("kind") == "video" and (d.get("bg") or {}).get("kind") == "source" and bool(d.get("blocks"))
+    f = TYPO_PROJ / pid / (src.get("file") if linked else (d.get("final") or ""))
+    if not linked and (not d.get("final") or not f.exists()):
         raise HTTPException(400, "اعمل الفيديو الأول (🎬)")
     gid = uuid.uuid4().hex[:12]
     shutil.copy(f, GENERATED_DIR / f"{gid}.mp4")
@@ -14130,11 +14171,12 @@ def typo_to_editor(pid: str):
         conn.execute(
             "INSERT INTO generations (id, clip_id, clip_filename, clip_label, coach_id, coach_name, coach_image, model, prompt, "
             "params, status, output_filename, created_at, updated_at) VALUES (?, ?, ?, ?, '', '', '', 'typo', '', '{}', 'completed', ?, ?, ?)",
-            (gid, f"ad:typo-{pid}", d["final"], f"🔤 {label}", f"{gid}.mp4", now(), now()))
+            (gid, f"ad:typo-{pid}", f.name, f"🔤 {label}", f"{gid}.mp4", now(), now()))
         clips = [{"gen_id": gid, "start": 0.0, "end": round(probe_duration(GENERATED_DIR / f"{gid}.mp4"), 3), "zoom": 1.0, "x": 0.0, "y": 0.0, "volume": 1.0}]
         prj = uuid.uuid4().hex[:12]
         pdata = {"name": label, "section": "ads", "video_id": None, "coach_id": None, "clips": clips, "voice": None,
-                 "music": None, "outro": False, "outro_volume": 1.0, "captions": {}, "logo": {}}
+                 "music": None, "outro": False, "outro_volume": 1.0, "captions": {}, "logo": {},
+                 **({"typo_id": pid, "typo_on": True, "typo_sfx": {"on": True, "volume": 1.0}} if linked else {})}
         conn.execute("INSERT INTO projects (id, name, data, render_status, created_at, updated_at) VALUES (?, ?, ?, 'idle', ?, ?)",
                      (prj, label, json.dumps(pdata, ensure_ascii=False), now(), now()))
     return {"project_id": prj}

@@ -1832,3 +1832,6 @@ a.btn.disabled { opacity: .45; pointer-events: none; }
 #pvWrap { display: inline-block; }
 .mt-gbar { justify-content: center; margin-top: 6px; }
 .mt-typo-row { display: grid; gap: 6px; margin-bottom: 10px; }
+.h-click, .t-click { height: 30px; }
+.tl-audio.click { background: #3a2a14; }
+.tl-audio.click.off { opacity: .45; }
