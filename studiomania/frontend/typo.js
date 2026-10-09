@@ -897,7 +897,11 @@ function tyGizDraw() {
       h += `<polygon points="${q.map((p) => p.join(",")).join(" ")}" fill="rgba(250,204,21,.10)" stroke="${acc}" stroke-width="2" filter="url(#gzSh)" style="pointer-events:none"/>`;
       if (!GZ.playing) h += q.map((p, j) => `<g filter="url(#gzSh)"><rect data-g="t${j}" x="${p[0] - 6.5}" y="${p[1] - 6.5}" width="13" height="13" rx="2.5" transform="rotate(45 ${p[0]} ${p[1]})" fill="${acc}" stroke="#1a1a1a" stroke-width="1.4" style="cursor:crosshair"/></g>`).join("");
     }
-    if (GZ.st.pick || !tq) h += `<rect data-g="pick" x="${o}" y="${o}" width="${P.W}" height="${P.H}" fill="rgba(250,204,21,.03)" stroke="${acc}" stroke-width="1" stroke-dasharray="2 4" style="cursor:crosshair"/>`;
+    if (GZ.st.pick || !tq) {
+      GZ.st.hover = null;
+      h += `<rect data-g="pick" x="${o}" y="${o}" width="${P.W}" height="${P.H}" fill="rgba(250,204,21,.03)" stroke="${acc}" stroke-width="1" stroke-dasharray="2 4" style="cursor:crosshair"/><g id="gzHover" style="pointer-events:none"></g>`;
+      if (!GZ.playing) tyGizRegions();
+    }
   }
   svg.innerHTML = h;
   if (!GZ.playing) tyGizBar(g, pin);
@@ -910,7 +914,7 @@ function tyGizBar(g, pin) {
   const person = !!GZ.doc.person;
   const canTrack = GZ.cur?.bg?.kind === "source" && GZ.cur?.source?.kind === "video";
   const busy = !!GZ.cur?.busy;
-  const sig = `${g.i}|${pin}|${f.z}|${keys}|${GZ.st.keymode}|${f.tr}|${person}|${canTrack}|${GZ.st.pick || ""}|${mode}|${busy}`;
+  const sig = `${g.i}|${pin}|${f.z}|${keys}|${GZ.st.keymode}|${f.tr}|${person}|${canTrack}|${GZ.st.pick || ""}|${mode}|${busy}|${GZ.st.reg?.loading ? 1 : 0}`;
   if (bar.dataset.sig === sig) return;
   bar.dataset.sig = sig;
   const btn = (act, icon, label, on, extra = "") => `<button type="button" class="gz-btn ${on ? "on" : ""}" data-tyg="${act}" ${extra}>${gzIcon(icon)}<span>${label}</span></button>`;
@@ -920,20 +924,23 @@ function tyGizBar(g, pin) {
     if (pin) { hint = "الكلام متلزق على الحاجة: اسحبه من النص أو كبّره من الأركان"; sub = `<button type="button" class="gz-pill" data-tyg="unpin">${gzIcon("x")}فك اللزق</button>`; }
     else sub = `<button type="button" class="gz-pill" data-tyg="zrot">${gzIcon("reset")}صفّر اللفّ</button>`;
   } else if (busy) hint = `⏳ ${GZ.cur.step || "بيتابع الحاجة…"}`;
-  else if (!f.tr || GZ.st.pick) hint = "دوس على الحاجة اللي في الفيديو (أو اسحب مربع حواليها)، والبرنامج هيلاقي حدودها ويتابعها فريم فريم";
-  else {
+  else if (!f.tr || GZ.st.pick) {
+    const rg = GZ.st.reg;
+    hint = rg?.loading ? "⏳ بيتعرّف على الحاجات اللي في الفريم ده…" : "عدّي بالماوس على الحاجة اللي في الفيديو: حدودها هتنوّر. دوس عليها والبرنامج هيتابعها فريم فريم";
+    sub = `<button type="button" class="gz-pill ${GZ.st.keymode || keys ? "on" : ""}" data-tyg="keys">${gzIcon("keys")}حركة بالوقت (من غير تراك)</button>`;
+  } else {
     hint = "شغّل الفيديو وشوف الحدود الصفرا ماشية مع الحاجة. لو غلطت في فريم: وقّف عليه واسحب أركانها لمكانها الصح";
     sub = `<button type="button" class="gz-pill" data-tyg="stick">${gzIcon("pin")}${pin ? "فك اللزق" : "الزق الكلام عليها"}</button>
       <button type="button" class="gz-pill" data-tyg="repick">${gzIcon("track")}حاجة تانية</button>
-      <button type="button" class="gz-pill" data-tyg="notrack">${gzIcon("x")}شيل التراك</button>`;
+      <button type="button" class="gz-pill" data-tyg="notrack">${gzIcon("x")}شيل التراك</button>
+      <button type="button" class="gz-pill ${GZ.st.keymode || keys ? "on" : ""}" data-tyg="keys">${gzIcon("keys")}حركة بالوقت</button>`;
   }
   if (keys) sub += `<span class="gz-chip">${gzIcon("keys")}${keys} نقط حركة</span><button type="button" class="gz-pill" data-tyg="nokeys">${gzIcon("trash")}امسحهم</button>`;
-  else if (GZ.st.keymode) hint = "روح لثانية تانية وحرّك الكلام أو لفّه: البرنامج هيحرّكه لوحده من مكانه هنا لمكانه هناك";
+  else if (GZ.st.keymode) hint = "⏱️ حركة بالوقت: روح لثانية تانية وحرّك الكلام أو لفّه من «تحريك ولفّ»: البرنامج هيحرّكه لوحده من مكانه هنا لمكانه هناك";
   bar.innerHTML = `<div class="gz-bar" role="toolbar">
       <div class="gz-seg">${btn("mode:move", "move", "تحريك ولفّ", mode === "move")}${canTrack ? btn("mode:track", "track", "تراك", mode === "track") : ""}</div>
       <i class="gz-sep"></i>
       ${btn("z", "person", f.z === "behind" ? "ورا الشخص" : "قدام الشخص", f.z === "behind", person ? 'title="الكلام يبان ورا الشخص ولا قدامه"' : 'disabled title="حلّل الفيديو الأول عشان البرنامج يعرف مكان الشخص"')}
-      ${btn("keys", "keys", "حركة بالوقت", !!(keys || GZ.st.keymode), 'title="الكلام يتحرك لوحده: حطه في مكان في ثانية، وفي مكان تاني في ثانية تانية، والبرنامج بيحرّكه بينهم"')}
       <i class="gz-sep"></i>
       ${btn("reset", "reset", "رجّع", false, 'title="يرجّع اللقطة زي ما كانت"')}
     </div>
@@ -996,6 +1003,7 @@ function tyGizBind(ctx = GZ) {
     e.preventDefault();
   });
   svg.addEventListener("pointermove", (e) => {
+    if (!d && e.target.dataset?.g === "pick") { const [hx, hy, HW, HH] = at(e); tyGizHover(hx / HW, hy / HH, hx, hy); return; }
     if (!d) return;
     const [x, y] = at(e), b = GZ.doc.blocks[d.i], v = d.v;
     const dx = x - d.x, dy = y - d.y;
@@ -1041,6 +1049,8 @@ function tyGizBind(ctx = GZ) {
       const drag = dd.x1 != null && Math.abs(dd.x1 - dd.x0) > 8 && Math.abs(dd.y1 - dd.y0) > 8;
       tyGizDraw();
       if (drag) return tyTrackRun(dd.i, { box: [Math.min(dd.x0, dd.x1) / dd.W, Math.min(dd.y0, dd.y1) / dd.H, Math.max(dd.x0, dd.x1) / dd.W, Math.max(dd.y0, dd.y1) / dd.H] });
+      const reg = tyGizRegionAt(dd.x0 / dd.W, dd.y0 / dd.H);   // الحاجة اللي كانت منوّرة تحت الماوس
+      if (reg) return tyTrackRun(dd.i, { quad: reg.quad, mode: reg.kind });
       return tyTrackRun(dd.i, { point: [dd.x0 / dd.W, dd.y0 / dd.H] });
     }
     if (dd.role[0] === "t") return tyTrackSave(GZ.doc.blocks[dd.i].xf.tr);
@@ -1125,4 +1135,46 @@ async function tyTrackSave(tid) {
     await api(TY(`/${GZ.cur.id}/tracks/${tid}`), { method: "PUT", ...jsonBody({ q: GZ.doc.tracks[tid].q }) });
     toast("✋ التراك اتصلّح");
   } catch (err) { toast(err.message, true); }
+}
+
+
+// 🖱️ التراك: الحاجات اللي في الفريم بتتحسب مرة واحدة، والماوس بيوريك حدود اللي تحته فورًا قبل ما تدوس
+function tyGizRegions() {
+  const id = GZ.cur?.id, fi = Math.round(GZ.t * 30), key = `${id}|${fi}`;
+  const rg = GZ.st.reg;
+  if (!id || (rg && rg.key === key)) return;
+  GZ.st.reg = { key, loading: true };
+  const ctx = GZ;
+  clearTimeout(ctx.st.regTimer);
+  ctx.st.regTimer = setTimeout(async () => {
+    try {
+      const data = await api(TY(`/${id}/regions?t=${(fi / 30).toFixed(3)}`));
+      if (ctx.st.reg?.key !== key) return;
+      ctx.st.reg = { key, data };
+    } catch (err) { if (ctx.st.reg?.key === key) ctx.st.reg = { key, data: null }; }
+    if (GZ === ctx) { ctx.bar().dataset.sig = ""; tyGizDraw(); }
+  }, 180);
+}
+
+function tyGizRegionAt(nx, ny) {
+  const data = GZ.st.reg?.data;
+  if (!data || nx < 0 || ny < 0 || nx >= 1 || ny >= 1) return null;
+  const g = data.grid, i = g.cells[Math.floor(ny * g.h) * g.w + Math.floor(nx * g.w)];
+  return i >= 0 ? data.regions[i] : null;
+}
+
+function tyGizHover(nx, ny, px, py) {
+  const el = GZ.svg()?.querySelector("#gzHover");
+  if (!el) return;
+  const reg = tyGizRegionAt(nx, ny);
+  if (reg === GZ.st.hover) return;
+  GZ.st.hover = reg;
+  if (!reg) { el.innerHTML = ""; return; }
+  const box = GZ.box(), W = box.getBoundingClientRect().width, H = box.getBoundingClientRect().height, o = 80;
+  const pts = reg.poly.map(([x, y]) => `${(x * W + o).toFixed(1)},${(y * H + o).toFixed(1)}`).join(" ");
+  const xs = reg.poly.map((p) => p[0] * W + o), ys = reg.poly.map((p) => p[1] * H + o);
+  const lx = Math.min(...xs), ly = Math.min(...ys) - 8;
+  el.innerHTML = `<polygon points="${pts}" fill="rgba(250,204,21,.22)" stroke="#FACC15" stroke-width="2.2" stroke-linejoin="round" filter="url(#gzSh)"/>
+    <g filter="url(#gzSh)"><rect x="${lx}" y="${ly - 14}" width="${12 + reg.name.length * 7}" height="17" rx="6" fill="#FACC15"/>
+    <text x="${lx + 6 + reg.name.length * 3.5}" y="${ly - 2}" text-anchor="middle" font-size="10.5" font-weight="700" fill="#1a1a1a" font-family="system-ui">${reg.name}</text></g>`;
 }

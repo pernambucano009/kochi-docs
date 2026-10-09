@@ -13959,6 +13959,7 @@ class TypoTrackIn(BaseModel):
     t: float
     box: list[float] = []     # [x0, y0, x1, y1] بكسور من كادر الفيديو النهائي (لو المستخدم رسم مربع)
     point: list[float] = []   # [x, y]: دوسة على الحاجة، والبرنامج بيلاقي حدودها لوحده
+    quad: list[float] = []    # 8 أرقام: حدود الحاجة اللي نوّرت تحت الماوس (من /regions) بكسور من الكادر
     mode: str = "auto"        # auto: البرنامج بيختار · follow: حاجة بتتحرك · surface: ورقة/شاشة (بالمنظور)
     fx: bool = False          # التراك لعنصر حر (مش لقطة كلام)
 
@@ -13987,7 +13988,10 @@ def typo_track(pid: str, body: TypoTrackIn):
     if not 0 <= body.block < len(lst):
         raise HTTPException(400, "اختار اللقطة تاني")
     box = None
-    if len(body.point) == 2:
+    if len(body.quad) == 8:
+        pt = None
+        box = [float(v) for v in body.quad]
+    elif len(body.point) == 2:
         pt = [min(1.0, max(0.0, float(v))) for v in body.point]
     elif len(body.box) == 4:
         pt = None
@@ -14017,6 +14021,11 @@ def run_typo_track(pid: str, bi: int, t: float, box: list[float] | None, mode: s
             nxt = lst[bi + 1] if bi + 1 < len(lst) else None
             bt1 = words[nxt["from"]]["s"] if nxt and words else (d.get("duration") or bt0 + 5)
         quad = None
+        if box and len(box) == 8:   # الحاجة اللي نوّرت تحت الماوس: حدودها جاهزة
+            quad = [v for j in range(4) for v in to_src(box[j * 2], box[j * 2 + 1])]
+            if mode == "auto":
+                mode = "follow"
+            box = [0.0, 0.0, 0.0, 0.0]
         if pt:   # دوسة: البرنامج بيلاقي حدود الحاجة في الفريم ده (وبيعرف هي ورقة/شاشة ولا حاجة بتتحرك)
             typo_set(pid, step="🎯 بيدوّر على حدود الحاجة اللي دوست عليها")
             spt = to_src(pt[0], pt[1])
@@ -14025,10 +14034,12 @@ def run_typo_track(pid: str, bi: int, t: float, box: list[float] | None, mode: s
             if mode == "auto":
                 mode = kind
             sx0 = sy0 = sx1 = sy1 = 0.0
-        else:
+        elif quad is None:
             (sx0, sy0), (sx1, sy1) = to_src(box[0], box[1]), to_src(box[2], box[3])
             if mode == "auto":
                 mode = "follow"
+        else:
+            sx0 = sy0 = sx1 = sy1 = 0.0
         res = tracker.track(str(src), max(0.0, bt0 - 0.2), bt1 + 0.2, t, [sx0, sy0, sx1, sy1], mode,
                             progress=lambda f: typo_set(pid, step=f"🎯 بيتابع الحاجة: {int(f * 100)}٪"), quad=quad)
         tid = f"tr{uuid.uuid4().hex[:6]}"
@@ -14046,6 +14057,56 @@ def run_typo_track(pid: str, bi: int, t: float, box: list[float] | None, mode: s
         typo_update(pid, fn)
     except Exception as exc:  # noqa: BLE001
         typo_fail(pid, exc)
+
+
+TYPO_REGIONS: dict = {}
+
+
+@app.get("/api/typo/{pid}/regions")
+def typo_regions(pid: str, t: float):
+    """🖱️ الحاجات اللي في الفريم ده وحدودها (بكسور من كادر الفيديو النهائي)، وخريطة صغيرة للماوس."""
+    import tracker
+    d = typo_load(pid)
+    src = d.get("source") or {}
+    if src.get("kind") != "video" or not src.get("file"):
+        raise HTTPException(400, "التراك بيشتغل على الفيديو اللي رفعته")
+    fi = int(round(t * TYPO_FPS))
+    key = (pid, src["file"], fi, d.get("ratio"))
+    if key in TYPO_REGIONS:
+        return TYPO_REGIONS[key]
+    W, H = TYPO_RATIOS.get(d.get("ratio"), TYPO_RATIOS["9:16"])
+    sw, sh = src["w"], src["h"]
+    k = max(W / sw, H / sh)
+    ox, oy = (sw * k - W) / 2, (sh * k - H) / 2
+    fx = lambda x: (x * sw * k - ox) / W  # noqa: E731
+    fy = lambda y: (y * sh * k - oy) / H  # noqa: E731
+    pm = TYPO_PROJ / pid / "person" / f"m_{fi:05d}.webp"
+    head = None
+    pj = TYPO_PROJ / pid / "person" / "person.json"
+    if pj.exists():
+        try:
+            pf = json.loads(pj.read_text(encoding="utf-8"))["frames"]
+            f0 = pf[min(fi, len(pf) - 1)] if pf else None
+            head = f0["head"] if f0 else None
+        except (OSError, ValueError, KeyError, TypeError):
+            head = None
+    regs, grid = tracker.regions(str(TYPO_PROJ / pid / src["file"]), t, str(pm) if pm.exists() else None, head)
+    out = [{"kind": r["kind"], "name": r["name"], "poly": [[round(fx(x), 4), round(fy(y), 4)] for x, y in r["poly"]],
+            "quad": [round(fx(r["quad"][j]) if j % 2 == 0 else fy(r["quad"][j]), 5) for j in range(8)]} for r in regs]
+    gw = 72
+    gh = max(1, round(gw * H / W))
+    gh_s, gw_s = grid.shape
+    cells = []
+    for gy in range(gh):
+        for gx in range(gw):
+            X, Y = (gx + 0.5) / gw, (gy + 0.5) / gh   # كادر الفيديو النهائي ← الفيديو الأصلي
+            sx, sy = (X * W + ox) / (sw * k), (Y * H + oy) / (sh * k)
+            cells.append(int(grid[min(gh_s - 1, max(0, int(sy * gh_s))), min(gw_s - 1, max(0, int(sx * gw_s)))]) if 0 <= sx < 1 and 0 <= sy < 1 else -1)
+    res = {"t": t, "regions": out, "grid": {"w": gw, "h": gh, "cells": cells}}
+    if len(TYPO_REGIONS) > 200:
+        TYPO_REGIONS.clear()
+    TYPO_REGIONS[key] = res
+    return res
 
 
 class TypoTrackFixIn(BaseModel):

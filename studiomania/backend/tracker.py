@@ -227,3 +227,89 @@ def detect(path: str, t: float, pt: list[float], person_mask: str | None = None)
 
     s = min(w, h) * 0.18   # مالقاش حدود واضحة: مربع صغير حوالين الدوسة
     return norm([[px - s, py - s], [px + s, py - s], [px + s, py + s], [px - s, py + s]]), "follow"
+
+
+def regions(path: str, t: float, person_mask: str | None = None, head: list[float] | None = None) -> tuple[list[dict], np.ndarray]:
+    """🖱️ كل الحاجات اللي في الفريم وحدودها (عشان لما الماوس يعدّي على حاجة حدودها تنوّر قبل ما تدوس):
+    الراس، الشخص، الحاجات اللي ليها 4 حواف (ورقة/شاشة)، وأجزاء لونها واحد (إيد، كوباية، تيشيرت، علبة).
+    بيرجّع الحاجات (حدود بكسور من الفيديو) وخريطة صغيرة فيها رقم الحاجة اللي في كل نقطة (-1 = مفيش)."""
+    cap = cv2.VideoCapture(path)
+    cap.set(cv2.CAP_PROP_POS_MSEC, max(0.0, t) * 1000)
+    ok, fr = cap.read()
+    cap.release()
+    if not ok:
+        raise RuntimeError("مش قادر يقرا الفريم ده من الفيديو")
+    H0, W0 = fr.shape[:2]
+    k = 360 / W0 if W0 > 360 else 1.0
+    img = cv2.resize(fr, (int(W0 * k), int(H0 * k)), interpolation=cv2.INTER_AREA) if k != 1.0 else fr
+    h, w = img.shape[:2]
+    area = w * h
+    out: list[dict] = []
+    masks: list[np.ndarray] = []
+
+    def add(mask: np.ndarray, kind: str, name: str, quad=None):
+        cnts, _ = cv2.findContours(mask.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        if not cnts:
+            return
+        c = max(cnts, key=cv2.contourArea)
+        poly = cv2.approxPolyDP(c, 0.006 * cv2.arcLength(c, True), True).reshape(-1, 2)
+        if len(poly) < 3:
+            return
+        q = _order(quad if quad is not None else cv2.boxPoints(cv2.minAreaRect(c)))
+        out.append({"kind": kind, "name": name, "poly": [[round(float(x) / w, 4), round(float(y) / h, 4)] for x, y in poly],
+                    "quad": [round(float(v), 5) for p in q for v in (p[0] / w, p[1] / h)]})
+        masks.append(mask.astype(bool))
+
+    # الشخص وراسه
+    pm = None
+    if person_mask:
+        m = cv2.imread(person_mask, cv2.IMREAD_UNCHANGED)
+        if m is not None:
+            a = m[..., 3] if m.ndim == 3 and m.shape[2] == 4 else (cv2.cvtColor(m, cv2.COLOR_BGR2GRAY) if m.ndim == 3 else m)
+            pm = cv2.resize(a, (w, h)) > 128
+    if head:
+        hm = np.zeros((h, w), np.uint8)
+        cv2.circle(hm, (int(head[0] * w), int(head[1] * h)), max(4, int(head[2] * w * 0.55)), 1, -1)
+        if pm is not None:
+            hm &= pm.astype(np.uint8)
+        if hm.sum() > area * 0.002:
+            add(hm, "follow", "الراس")
+    # أجزاء لونها واحد (بعد تنعيم يخلي كل حاجة لون واحد تقريبًا)
+    sm = cv2.pyrMeanShiftFiltering(img, 8, 22)
+    lab = cv2.cvtColor(sm, cv2.COLOR_BGR2LAB).reshape(-1, 3).astype(np.float32)
+    K = 10
+    _, lbl, _ = cv2.kmeans(lab, K, None, (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 12, 1.0), 2, cv2.KMEANS_PP_CENTERS)
+    lbl = lbl.reshape(h, w)
+    ker = np.ones((5, 5), np.uint8)
+    for c in range(K):
+        mc = cv2.morphologyEx((lbl == c).astype(np.uint8), cv2.MORPH_OPEN, ker)
+        n, cc, stats, _ = cv2.connectedComponentsWithStats(mc)
+        for j in range(1, n):
+            a = stats[j, cv2.CC_STAT_AREA]
+            if area * 0.006 < a < area * 0.4:
+                comp = cv2.morphologyEx((cc == j).astype(np.uint8), cv2.MORPH_CLOSE, ker)
+                add(comp, "follow", "حاجة")
+    # حاجات ليها 4 حواف واضحة (ورقة، شاشة، يافطة)
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    edges = cv2.dilate(cv2.Canny(cv2.bilateralFilter(gray, 7, 50, 50), 40, 120), np.ones((3, 3), np.uint8))
+    cnts, _ = cv2.findContours(edges, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+    for c in cnts:
+        ca = cv2.contourArea(c)
+        if not (area * 0.01 < ca < area * 0.6):
+            continue
+        ap = cv2.approxPolyDP(c, 0.03 * cv2.arcLength(c, True), True)
+        if len(ap) == 4 and cv2.isContourConvex(ap) and _boxy(ap.reshape(4, 2)):
+            mq = np.zeros((h, w), np.uint8)
+            cv2.fillConvexPoly(mq, ap.reshape(4, 2).astype(np.int32), 1)
+            add(mq, "surface", "سطح", ap.reshape(4, 2))
+    if pm is not None and pm.sum() > area * 0.01:
+        add(pm, "follow", "الشخص")
+    # الخريطة: كل نقطة بتاخد أصغر حاجة فيها (الراس قبل الشخص، والكوباية قبل الحيطة)
+    grid = np.full((h, w), -1, np.int16)
+    best = np.full((h, w), np.inf)
+    for i, m in enumerate(masks):
+        a = m.sum()
+        sel = m & (a < best)
+        grid[sel] = i
+        best[sel] = a
+    return out, grid
