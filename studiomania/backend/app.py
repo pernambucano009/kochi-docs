@@ -13765,7 +13765,7 @@ def run_typo_render(pid: str, base: str, quality: str) -> None:
         kind = bg.get("kind", "theme")
         src = (d.get("source") or {}).get("file")
         cmd = [ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y"]
-        inputs, fl = 0, ""
+        inputs, fl, bg_pts = 0, "", ""
         if kind == "solid" or kind == "none":
             cmd += ["-f", "lavfi", "-i", f"color=c={bg.get('color') or '#101010'}:s={vw}x{vh}:r={TYPO_FPS}:d={dur:.3f}"]
             inputs = 1
@@ -13773,13 +13773,18 @@ def run_typo_render(pid: str, base: str, quality: str) -> None:
             f = folder / (src if kind == "source" else bg["file"])
             cmd += (["-loop", "1", "-framerate", str(TYPO_FPS), "-t", f"{dur:.3f}", "-i", str(f)] if kind == "image"
                     else ["-stream_loop", "-1", "-t", f"{dur:.3f}", "-i", str(f)])
+            # الفيديو اللي بيعيد نفسه (stream_loop) توقيته بيقفز عند كل لفة، والكلام اللي فوقه كان بيتأخر ثانية ويقف:
+            # بنعدّ فريمات الخلفية من الأول بسرعتها الأصلية عشان التوقيت يمشي مستقيم
+            # (فيديو الخلفية المرفوع بس: الفيديو الأصلي بتاع الكلام مربوط بالصوت ومش بيلف)
+            if kind == "video":
+                bg_pts = f"setpts=N/{media_info(f).fps or 30:g}/TB,"
             inputs = 1
         # من غير خلفية تحت: الفريم كامل JPEG (أسرع بكتير)، وفوق خلفية: PNG شفاف والحبيبات بتتحط هنا
         cmd += ["-f", "image2pipe", "-framerate", str(TYPO_FPS), "-c:v", "png" if inputs else "mjpeg", "-i", "-"]
         if inputs:
             dim = float(bg.get("dim") or 0)
             grain = float(typo_style(d.get("style")).get("grain") or 0)
-            fl = (f"[0:v]scale={vw}:{vh}:force_original_aspect_ratio=increase,crop={vw}:{vh},setsar=1,fps={TYPO_FPS}"
+            fl = (f"[0:v]{bg_pts}scale={vw}:{vh}:force_original_aspect_ratio=increase,crop={vw}:{vh},setsar=1,fps={TYPO_FPS}"
                   + (f",colorchannelmixer=rr={1 - dim}:gg={1 - dim}:bb={1 - dim}" if dim else "") + "[bg];"
                   f"[bg][1:v]overlay=0:0:shortest=1" + (f",noise=alls={int(grain * 35)}:allf=t" if grain else "") + ",format=yuv420p[v]")
         audio_in, audio_path = None, None

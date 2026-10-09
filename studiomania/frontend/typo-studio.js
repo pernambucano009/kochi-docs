@@ -39,7 +39,8 @@
     "wintitle", "corners", "inbox", "doc", "workcards", "call", "canvas",
     "colorcard", "imsg", "dashboard", "apps", "bell", "chapter", "sidepanel",
     "clones", "megapan", "badge", "leaderboard", "donut", "photowords",
-    "titlecard", "departures", "loading", "countdown", "dragdrop", "lineup", "isomap", "stickers"]);
+    "titlecard", "departures", "loading", "countdown", "dragdrop", "lineup", "isomap", "stickers",
+    "promptline", "crowd", "photohero", "menu", "pricing", "pins", "result", "calendar", "mapdots", "marker"]);
   E.TYPING = new Set(["type", "artype"]);
   const MC = document.createElement("canvas").getContext("2d");
   const measure = (s, font) => { MC.font = font; return MC.measureText(s).width; };
@@ -119,7 +120,9 @@
     const imgs = [...this.stage.querySelectorAll("img")];
     const one = (i) => (i.complete ? Promise.resolve() : new Promise((r) => { i.onload = i.onerror = r; })).then(() => (i.decode ? i.decode().catch(() => {}) : null));
     const frame = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-    return Promise.all(imgs.map(one)).then(imgs.length ? frame : null);
+    // رسمة واحدة على الأقل دايمًا قبل التصوير (حتى من غير صور): من غيرها السيرفر ساعات بيصوّر الفريم القديم
+    // فترانزيشن زي المسحة كان بيفضل لازق ثانية في الفيديو النهائي
+    return Promise.all(imgs.map(one)).then(frame);
   };
   // المعاينة: الفريمات اللي جاية بتتحمل قبلها عشان مايبقاش فيه رعشة
   P.prefetchPerson = function (t) {
@@ -3657,13 +3660,14 @@
     const fi = b.focus >= 0 && b.focus < it.length ? b.focus : it.reduce((a2, x, i) => (x.w.length > it[a2].w.length ? i : a2), 0);
     const s = this.text(it[fi].w), ff = famOf(s);
     const sz = Math.min(w, h) * 0.95;
-    const tw = measure(s, `500 ${sz}px ${ff}`);
+    const tw = bi % 2 === 1 ? measure(s, `400 ${sz * 1.05}px ${SERIF(s)}`) : measure(s, `500 ${sz}px ${ff}`);
     const ar = AR.test(s);
     const q = seg(t, b.t0, b.t1);
     const pos = lerp(w * 0.1, w * 0.9 - tw, ar ? 1 - q : q);
     const vid = onVideo(this);
     let html = vid ? "" : `<div style="position:absolute;inset:0;background:${PAPER}"></div>`;
-    html += `<div data-free dir="ltr" style="position:absolute;left:${pos.toFixed(1)}px;top:50%;transform:translateY(-52%);white-space:nowrap;font:500 ${sz.toFixed(0)}px ${ff};letter-spacing:-0.06em;line-height:1;color:${vid ? "#fff" : INK}">${esc(s)}</div>`;
+    const serifV = bi % 2 === 1;
+    html += `<div data-free dir="ltr" style="position:absolute;left:${pos.toFixed(1)}px;top:50%;transform:translateY(-52%);white-space:nowrap;font:${serifV ? `400 ${(sz * 1.05).toFixed(0)}px ${SERIF(s)}` : `500 ${sz.toFixed(0)}px ${ff}`};letter-spacing:${serifV ? "-0.03em" : "-0.06em"};line-height:1;color:${serifV ? "#F2E23A" : vid ? "#fff" : INK}">${esc(s)}</div>`;
     return html;
   };
 
@@ -4025,6 +4029,304 @@
       const q = eOut(seg(t, big[0].t0, big[0].t0 + 0.3));
       html += `<div data-free dir="${this.dir(s)}" style="position:absolute;left:50%;bottom:${(-z * 0.12).toFixed(0)}px;transform:translateX(-50%) translateY(${((1 - q) * z * 0.5).toFixed(1)}px);white-space:nowrap;font:400 ${z.toFixed(1)}px ${cond(s)};line-height:1;color:${ink}">${esc(s)}</div>`;
     }
+    return html;
+  };
+
+  // =====================================================================
+  // فيديو مرجعي 5 (مواقع لأصحاب المشاريع):
+  //   promptline سطر كتابة صغير فوق الفيديو وزرار إرسال برتقاني في آخره
+  //   crowd      بوستر أزرق: الشخص متكرر سيلويتات بيضا وعنوان كبير
+  //   photohero  كارت صورة من الفيديو وكلمة عملاقة بيضا راكبة عليه
+  //   menu       قايمة منسدلة والماوس بيعدّي على الاختيارات
+  //   pricing    اختيارات منتج بأسعار وزرار اختيار بيتنقل
+  //   pins       نقط مرقّمة بتطلع فوق صورة وعليها كلام
+  //   result     كارت نتيجة بحث: اسم الموقع واللينك وعنوان أزرق ووصف
+  //   calendar   كاليندر شهر وكارت موعد بيطلع على يوم
+  //   mapdots    خريطة ودواير أماكن بتنبض وعليها أسامي
+  //   marker     عنوان سيريف كبير وهايلايتر أصفر بيتسحب ورا جزء منه
+  // =====================================================================
+  P.k_promptline = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    if (!it.length) return "";
+    const ar = isAr(it), ff = famOf(ar ? "ع" : "a");
+    const txt = it.filter((x) => t >= x.t0).map((x, i, a) => (i === a.length - 1 ? typed(this.text(x.w), t, x.t0, 26) : this.text(x.w))).join(" ");
+    const full = it.map((x) => this.text(x.w)).join(" ");
+    const sz = fitSize(full, `500 {}px ${ff}`, w * 0.72, mn * 0.045 * this.ts);
+    const cy = this.blockSolid(b) ? this.belowHead(b, sz) : h * 0.5;
+    const done = t > it[it.length - 1].t0 + 0.4;
+    return backdrop(this, th) + `<div style="position:absolute;left:0;right:0;top:${cy.toFixed(1)}px;transform:translateY(-50%);display:flex;justify-content:center;align-items:center;gap:${(sz * 0.4).toFixed(1)}px;opacity:${eOut(seg(t, b.t0, b.t0 + 0.25)).toFixed(3)}">
+      <span dir="${ar ? "rtl" : "ltr"}" style="white-space:nowrap;font:500 ${sz.toFixed(1)}px ${ff};color:#fff;text-shadow:0 2px 12px rgba(0,0,0,.45)">${esc(txt)}</span>
+      <span style="flex:none;width:${(sz * 1.15).toFixed(0)}px;height:${(sz * 1.15).toFixed(0)}px;border-radius:${(sz * 0.25).toFixed(0)}px;background:${ORG};display:flex;align-items:center;justify-content:center;transform:scale(${done ? 1 + 0.08 * Math.sin(t * 9) : 1})">
+        <svg width="${(sz * 0.6).toFixed(0)}" height="${(sz * 0.6).toFixed(0)}" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></span></div>`;
+  };
+
+  // ---------- crowd: بوستر أزرق وسيلويتات
+  P.k_crowd = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    if (!it.length) return "";
+    const bg = ["#2D5BFF", ORG, "#151515"][bi % 3];
+    let html = `<div style="position:absolute;inset:0;background:${bg}"></div>`;
+    const a = this.personAt(t);
+    if (a && this.doc.transparent) {
+      const { y, w: iw, h: ih } = a.img, msrc = a.murl || a.url;
+      this._want = msrc;
+      const n = 4, sc = 0.55;
+      for (let q = 0; q < n; q++) {
+        const e = eOut(seg(t, b.t0 + q * 0.12, b.t0 + q * 0.12 + 0.35));
+        const cx = w * (0.2 + q * 0.2);
+        html += `<div style="position:absolute;left:${(cx - (iw * sc) / 2).toFixed(1)}px;top:${(y + ih * (1 - sc) + h * 0.05).toFixed(1)}px;width:${(iw * sc).toFixed(1)}px;height:${(ih * sc).toFixed(1)}px;background:#fff;opacity:${e.toFixed(3)};
+          transform:translateX(${((1 - e) * w * 0.1).toFixed(1)}px);-webkit-mask:url(${msrc}) 0 0/100% 100% no-repeat;mask:url(${msrc}) 0 0/100% 100% no-repeat"></div>`;
+      }
+    }
+    const s = it.map((x) => (AR.test(x.w) ? x.w : this.text(x.w).toUpperCase()));
+    const lines = [];
+    for (let i = 0; i < s.length; i += Math.max(1, Math.ceil(s.length / 3))) lines.push(it.slice(i, i + Math.max(1, Math.ceil(s.length / 3))));
+    const font = cond(s.join(""));
+    const z = Math.min(...lines.map((ln) => fitSize(ln.map((x) => (AR.test(x.w) ? x.w : this.text(x.w).toUpperCase())).join(" "), `400 {}px ${font}`, w * 0.86, mn * 0.16)));
+    lines.forEach((ln, li) => {
+      html += `<div dir="${AR.test(ln[0].w) ? "rtl" : "ltr"}" style="position:absolute;left:${(w * 0.07).toFixed(0)}px;right:${(w * 0.07).toFixed(0)}px;top:${(h * 0.08 + li * z * 1.02).toFixed(1)}px;white-space:nowrap;font:400 ${z.toFixed(1)}px ${font};line-height:1;color:#fff">${ln.map((x) => {
+        const q = eOut(seg(t, x.t0, x.t0 + 0.2));
+        return `<span style="display:inline-block;opacity:${q.toFixed(3)};transform:translateY(${((1 - q) * z * 0.3).toFixed(1)}px)">${esc(AR.test(x.w) ? x.w : this.text(x.w).toUpperCase())}</span>`;
+      }).join(" ")}${li === lines.length - 1 ? ` <span dir="ltr" style="font-size:.5em;vertical-align:.6em">©${2026}</span>` : ""}</div>`;
+    });
+    return html;
+  };
+
+  // ---------- photohero: صورة وكلمة عملاقة راكبة عليها
+  P.k_photohero = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    if (!it.length) return "";
+    const src = imgOf(b);
+    if (src) this._want = src;
+    const fi = b.focus >= 0 && b.focus < it.length ? b.focus : it.reduce((a2, x, i) => (x.w.length > it[a2].w.length ? i : a2), 0);
+    const s = this.text(it[fi].w), ff = famOf(s);
+    const cw = w * 0.86, chh = Math.min(h * 0.62, cw * 1.05);
+    const x = (w - cw) / 2, y = (h - chh) / 2;
+    const e = eOut(seg(t, b.t0, b.t0 + 0.5));
+    const z = fitSize(s, `800 {}px ${ff}`, cw * 0.95, mn * 0.3);
+    const q = eOut(seg(t, it[fi].t0, it[fi].t0 + 0.35));
+    let html = `<div style="position:absolute;inset:0;background:${PAPER}"></div>
+      <div style="position:absolute;left:${x.toFixed(1)}px;top:${y.toFixed(1)}px;width:${cw.toFixed(1)}px;height:${chh.toFixed(1)}px;overflow:hidden;transform:scale(${lerp(1.08, 1, e).toFixed(4)});opacity:${e.toFixed(3)};
+        background:${src ? `url(${src}) center/cover` : "linear-gradient(160deg,#4E7A3A,#1E3A1A)"}">
+        <div dir="${this.dir(s)}" style="position:absolute;left:0;right:0;bottom:${(-z * 0.12).toFixed(1)}px;text-align:center;white-space:nowrap;font:800 ${z.toFixed(1)}px ${ff};letter-spacing:-0.05em;line-height:1;color:#fff;transform:translateY(${((1 - q) * z * 0.6).toFixed(1)}px)">${esc(s)}</div></div>
+      ${dotCorners({ x, y, w: cw, h: chh }, mn * 0.01, ORG, e)}`;
+    const rest = it.filter((x2, i) => i !== fi && t >= x2.t0).map((x2) => this.text(x2.w)).join(" ");
+    if (rest) { const f2 = famOf(rest), z2 = fitSize(rest, `500 {}px ${SERIF(rest)}`, cw, mn * 0.05 * this.ts);
+      html += `<div dir="${this.dir(rest)}" style="position:absolute;left:${x.toFixed(1)}px;right:${x.toFixed(1)}px;top:${(y + chh + z2 * 0.5).toFixed(1)}px;white-space:nowrap;font:400 ${z2.toFixed(1)}px ${SERIF(rest)};color:${INK}">${esc(rest)}</div>`; void f2; }
+    return html;
+  };
+
+  // ---------- menu: قايمة منسدلة
+  P.k_menu = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    const cs = chunks(it, Math.min(4, Math.max(1, Math.ceil(it.length / 2))));
+    const ar = isAr(it), ff = famOf(ar ? "ع" : "a");
+    const r = this.freeRect(b);
+    const sz = mn * 0.045 * this.ts;
+    const mw = Math.min(r.w, w * 0.78), row = sz * 2;
+    const x = r.x + (r.w - mw) / 2, y = r.y + Math.max(0, (r.h - cs.length * row) / 2);
+    const p = eOut(seg(t, b.t0, b.t0 + 0.25));
+    const shown = cs.filter((c) => t >= c.t0);
+    const ai = shown.length - 1;
+    const icons = ["◫", "⇪", "▤", "✦"];
+    let html = onVideo(this) ? "" : `<div style="position:absolute;inset:0;background:#7A1F24"></div>`;
+    html += `<div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:${x.toFixed(1)}px;top:${y.toFixed(1)}px;width:${mw.toFixed(1)}px;box-sizing:border-box;background:#fff;border-radius:${(sz * 0.4).toFixed(1)}px;padding:${(sz * 0.3).toFixed(1)}px;
+      box-shadow:0 ${(sz * 0.3).toFixed(1)}px ${sz.toFixed(1)}px rgba(0,0,0,.25);transform:scaleY(${p.toFixed(3)});transform-origin:50% 0">
+      ${cs.map((c, i) => `<div style="display:flex;align-items:center;gap:${(sz * 0.5).toFixed(1)}px;height:${(row - sz * 0.2).toFixed(1)}px;padding:0 ${(sz * 0.5).toFixed(1)}px;border-radius:${(sz * 0.25).toFixed(1)}px;
+        background:${i === ai ? "#F0F0F2" : "transparent"};opacity:${t >= c.t0 ? 1 : 0.3}"><span style="font:400 ${sz.toFixed(0)}px 'TY Outfit';color:#555">${icons[i % 4]}</span>
+        <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font:500 ${sz.toFixed(1)}px ${ff};color:#111">${t >= c.t0 ? esc(this.text(c.w)) : ""}</span></div>`).join("")}</div>`;
+    if (ai >= 0) {
+      const cyR = y + sz * 0.3 + ai * row + row * 0.55;
+      html += cursorSvg(ar ? x + mw * 0.3 : x + mw * 0.7, cyR, sz * 0.9);
+    }
+    return html;
+  };
+
+  // ---------- pricing: اختيارات بأسعار
+  P.k_pricing = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    const cs = chunks(it, Math.min(3, Math.max(1, Math.ceil(it.length / 2))));
+    const ar = isAr(it), ff = famOf(ar ? "ع" : "a");
+    const r = this.freeRect(b);
+    const sz = mn * 0.042 * this.ts;
+    const cw = Math.min(r.w, w * 0.8), row = sz * 2.8;
+    const x = r.x + (r.w - cw) / 2, y = r.y + Math.max(0, (r.h - cs.length * row - sz * 3) / 2);
+    const shown = cs.filter((c) => t >= c.t0);
+    const ai = shown.length - 1;
+    const prices = [90, 75, 60, 120];
+    let html = onVideo(this) ? "" : `<div style="position:absolute;inset:0;background:#F7F3EE"></div>`;
+    html += `<div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:${x.toFixed(1)}px;top:${y.toFixed(1)}px;width:${cw.toFixed(1)}px;box-sizing:border-box;background:#fff;border-radius:${(sz * 0.4).toFixed(1)}px;padding:${(sz * 0.8).toFixed(1)}px;box-shadow:0 ${(sz * 0.3).toFixed(1)}px ${sz.toFixed(1)}px rgba(0,0,0,.15);opacity:${eOut(seg(t, b.t0, b.t0 + 0.3)).toFixed(3)}">
+      ${cs.map((c, i) => { const on = i === ai, vis = t >= c.t0;
+        return `<div style="display:flex;align-items:center;gap:${(sz * 0.6).toFixed(1)}px;height:${row.toFixed(1)}px;border-bottom:1px solid #EEE;opacity:${vis ? 1 : 0.25}">
+          <span style="flex:1;min-width:0"><span style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font:700 ${sz.toFixed(1)}px ${ff};color:#C0322D">${vis ? esc(this.text(c.w)) : "—"}</span>
+          <span style="display:block;font:400 ${(sz * 0.6).toFixed(1)}px ${ff};color:#888">${ar ? "شحن مجاني · متاح" : "Free shipping · in stock"}</span></span>
+          <span dir="ltr" style="font:600 ${sz.toFixed(1)}px 'TY Outfit';color:#111">$${prices[i % 4]}.00</span>
+          <span style="flex:none;width:${(sz * 0.9).toFixed(0)}px;height:${(sz * 0.9).toFixed(0)}px;border-radius:50%;border:2px solid ${on ? "#C0322D" : "#BBB"};box-sizing:border-box;display:flex;align-items:center;justify-content:center">${on ? `<i style="width:55%;height:55%;border-radius:50%;background:#C0322D"></i>` : ""}</span></div>`; }).join("")}
+      <div style="margin-top:${(sz * 0.8).toFixed(1)}px;text-align:center;background:#C0322D;color:#fff;font:700 ${(sz * 0.85).toFixed(1)}px ${ff};padding:${(sz * 0.45).toFixed(1)}px;border-radius:${(sz * 0.3).toFixed(1)}px">${ar ? "اطلب دلوقتي" : "PRE-ORDER"}</div></div>`;
+    return html;
+  };
+
+  // ---------- pins: نقط مرقّمة على صورة
+  P.k_pins = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    if (!it.length) return "";
+    const src = imgOf(b);
+    if (src) this._want = src;
+    const cs = chunks(it, Math.min(4, it.length));
+    const ar = isAr(it);
+    const cw = w * 0.88, chh = Math.min(h * 0.6, cw * 0.95);
+    const x = (w - cw) / 2, y = (h - chh) / 2;
+    const e = eOut(seg(t, b.t0, b.t0 + 0.4));
+    const spots = [[0.25, 0.3], [0.72, 0.25], [0.6, 0.68], [0.22, 0.72]];
+    let html = `<div style="position:absolute;inset:0;background:${PAPER}"></div>
+      <div style="position:absolute;left:${x.toFixed(1)}px;top:${y.toFixed(1)}px;width:${cw.toFixed(1)}px;height:${chh.toFixed(1)}px;border-radius:${(mn * 0.02).toFixed(0)}px;opacity:${e.toFixed(3)};
+        background:${src ? `url(${src}) center/cover` : "linear-gradient(160deg,#DCE6FF,#9CB3F0)"};box-shadow:0 ${(mn * 0.02).toFixed(0)}px ${(mn * 0.05).toFixed(0)}px rgba(0,0,0,.18)"></div>`;
+    const pz = mn * 0.06;
+    cs.forEach((c, i) => {
+      if (t < c.t0) return;
+      const [fx, fy] = spots[i];
+      const px = x + fx * cw, py = y + fy * chh;
+      const p = eBack(seg(t, c.t0, c.t0 + 0.3));
+      const s = this.text(c.w), z = fitSize(s, `600 {}px ${famOf(s)}`, cw * 0.45, mn * 0.038 * this.ts);
+      const right = fx < 0.5;
+      html += `<div style="position:absolute;left:${px.toFixed(1)}px;top:${py.toFixed(1)}px;width:${pz.toFixed(0)}px;height:${pz.toFixed(0)}px;transform:translate(-50%,-50%) scale(${p.toFixed(3)});border-radius:50%;background:#fff;border:${(pz * 0.06).toFixed(1)}px solid #111;
+        display:flex;align-items:center;justify-content:center;font:700 ${(pz * 0.5).toFixed(1)}px 'TY Outfit';color:#111;box-shadow:0 0 0 ${(pz * 0.3 * (1 + Math.sin(t * 5))).toFixed(1)}px rgba(255,255,255,.35)">${i + 1}</div>
+        <div dir="${this.dir(s)}" style="position:absolute;${right ? `left:${(px + pz * 0.7).toFixed(1)}px` : `right:${(w - px + pz * 0.7).toFixed(1)}px`};top:${py.toFixed(1)}px;transform:translateY(-50%);opacity:${clamp(p).toFixed(3)};white-space:nowrap;
+          font:600 ${z.toFixed(1)}px ${famOf(s)};color:#111;background:#fff;padding:${(z * 0.2).toFixed(1)}px ${(z * 0.45).toFixed(1)}px;border-radius:${(z * 0.25).toFixed(1)}px;box-shadow:0 ${(z * 0.1).toFixed(1)}px ${(z * 0.4).toFixed(1)}px rgba(0,0,0,.18)">${esc(s)}</div>`;
+    });
+    void ar;
+    return html;
+  };
+
+  // ---------- result: نتيجة بحث
+  P.k_result = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    if (!it.length) return "";
+    const ar = isAr(it), ff = famOf(ar ? "ع" : "a");
+    const title = it.map((x) => this.text(x.w)).join(" ");
+    const fi = focusOf(b, it);
+    const site = AR.test(it[fi].w) ? (ar ? "موقعك" : "Site") : this.text(it[fi].w);
+    const slug = AR.test(it[fi].w) ? "studio.app" : `${site.toLowerCase().replace(/[^a-z0-9]/g, "") || "studio"}.com`;
+    const sz = mn * 0.05 * this.ts;
+    const cw = Math.min(w * 0.9, sz * 18);
+    const x = (w - cw) / 2, y = h * 0.34;
+    const shown = it.filter((q) => t >= q.t0).map((q) => this.text(q.w)).join(" ");
+    const a = eOut(seg(t, b.t0, b.t0 + 0.35));
+    const tabs = ar ? ["الكل", "صور", "فيديوهات", "أخبار"] : ["All", "Images", "Videos", "News"];
+    let html = `<div style="position:absolute;inset:0;background:#FFFFFF"></div>
+      <div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:${x.toFixed(1)}px;top:${(y - sz * 2.2).toFixed(1)}px;display:flex;gap:${(sz * 1).toFixed(1)}px;font:500 ${(sz * 0.7).toFixed(1)}px ${ff};color:#5F6368">${tabs.map((q, i) => `<span style="${i === 0 ? "color:#111;border-bottom:3px solid #111;padding-bottom:4px" : ""}">${q}</span>`).join("")}</div>
+      <div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:${x.toFixed(1)}px;top:${y.toFixed(1)}px;width:${cw.toFixed(1)}px;opacity:${a.toFixed(3)};transform:translateY(${((1 - a) * sz).toFixed(1)}px)">
+        <div style="display:flex;align-items:center;gap:${(sz * 0.4).toFixed(1)}px"><span style="width:${(sz * 1.2).toFixed(0)}px;height:${(sz * 1.2).toFixed(0)}px;border-radius:50%;background:#3B4BE8;color:#fff;display:flex;align-items:center;justify-content:center;font:700 ${(sz * 0.6).toFixed(0)}px ${famOf(site)}">${esc([...site][0] || "S")}</span>
+          <span><span style="display:block;font:500 ${(sz * 0.7).toFixed(1)}px ${famOf(site)};color:#202124">${esc(site)}</span><span dir="ltr" style="display:block;font:400 ${(sz * 0.6).toFixed(1)}px 'TY Outfit';color:#5F6368">https://www.${esc(slug)}</span></span></div>
+        <div style="font:500 ${(sz * 1.1).toFixed(1)}px ${ff};color:#1A0DAB;margin-top:${(sz * 0.4).toFixed(1)}px;line-height:1.3">${esc(shown)}</div>
+        <div style="font:400 ${(sz * 0.7).toFixed(1)}px ${ff};color:#4D5156;line-height:1.5;margin-top:${(sz * 0.3).toFixed(1)}px;opacity:${seg(t, it[it.length - 1].t0, it[it.length - 1].t0 + 0.4).toFixed(3)}">${esc(ar ? `${title}. اعرف كل حاجة عن ${site} واحجز دلوقتي وابدأ النهارده.` : `${title}. Learn everything about ${site}, book online and get started today.`)}</div></div>`;
+    void fi;
+    return html;
+  };
+
+  // ---------- calendar: شهر وموعد بيطلع على يوم
+  P.k_calendar = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    if (!it.length) return "";
+    const ar = isAr(it), ff = famOf(ar ? "ع" : "a");
+    const src = imgOf(b);
+    if (src) this._want = src;
+    const gw = w * 0.92, cell = gw / 7, gh = cell * 5;
+    const x0 = (w - gw) / 2, y0 = (h - gh) / 2 + mn * 0.03;
+    const days = ar ? ["أحد", "اتنين", "تلات", "أربع", "خميس", "جمعة", "سبت"] : ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+    const target = 10 + (bi % 12);
+    const a = eOut(seg(t, b.t0, b.t0 + 0.3));
+    let html = `<div style="position:absolute;inset:0;background:#FBFBFA"></div>`;
+    days.forEach((d, i) => { html += `<div style="position:absolute;left:${(x0 + i * cell).toFixed(1)}px;top:${(y0 - mn * 0.05).toFixed(1)}px;width:${cell.toFixed(1)}px;text-align:center;font:600 ${(mn * 0.022).toFixed(1)}px ${famOf(d)};color:#888;opacity:${a.toFixed(3)}">${d}</div>`; });
+    for (let q = 0; q < 35; q++) {
+      const c = q % 7, rI = Math.floor(q / 7), day = q - 2;
+      html += `<div style="position:absolute;left:${(x0 + c * cell).toFixed(1)}px;top:${(y0 + rI * cell).toFixed(1)}px;width:${cell.toFixed(1)}px;height:${cell.toFixed(1)}px;box-sizing:border-box;border:1px solid #ECECEE;opacity:${a.toFixed(3)}">
+        <span dir="ltr" style="position:absolute;left:${(cell * 0.1).toFixed(0)}px;top:${(cell * 0.08).toFixed(0)}px;font:500 ${(cell * 0.16).toFixed(1)}px 'TY Outfit';color:${day === target ? ORG : "#999"}">${day > 0 && day <= 31 ? day : ""}</span></div>`;
+    }
+    const tq = target + 2, tc = tq % 7, tr2 = Math.floor(tq / 7);
+    const p = eBack(seg(t, it[0].t0, it[0].t0 + 0.35));
+    const s = it.filter((q) => t >= q.t0).map((q) => this.text(q.w)).join(" ");
+    const ew = cell * 2.4, eh = cell * 2.4;
+    const ex = clamp(x0 + tc * cell + cell / 2 - ew / 2, x0, x0 + gw - ew), ey = y0 + tr2 * cell + cell / 2 - eh / 2;
+    html += `<div style="position:absolute;left:${ex.toFixed(1)}px;top:${ey.toFixed(1)}px;width:${ew.toFixed(1)}px;height:${eh.toFixed(1)}px;transform:scale(${p.toFixed(3)});border-radius:${(cell * 0.08).toFixed(0)}px;overflow:hidden;
+      background:${src ? `url(${src}) center/cover` : "#2E6B3A"};box-shadow:0 ${(cell * 0.1).toFixed(0)}px ${(cell * 0.3).toFixed(0)}px rgba(0,0,0,.3)">
+      <div dir="${this.dir(s)}" style="position:absolute;left:0;right:0;bottom:0;padding:${(cell * 0.12).toFixed(0)}px;background:linear-gradient(transparent,rgba(0,0,0,.65));font:400 ${(cell * 0.2).toFixed(1)}px ${SERIF(s || "a")};color:#fff;line-height:1.1">${esc(s)}<span dir="ltr" style="display:block;font:600 ${(cell * 0.14).toFixed(1)}px 'TY Outfit'">${target}.08 · 2:00 PM</span></div></div>`;
+    void ff;
+    return html;
+  };
+
+  // ---------- mapdots: خريطة ودواير بتنبض
+  P.k_mapdots = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    if (!it.length) return "";
+    const cs = chunks(it, Math.min(4, it.length));
+    const ar = isAr(it), ff = famOf(ar ? "ع" : "a");
+    const cw = w * 0.88, chh = Math.min(h * 0.5, cw * 0.8);
+    const x = (w - cw) / 2, y = (h - chh) / 2;
+    const a = eOut(seg(t, b.t0, b.t0 + 0.35));
+    const rr = rng(bi * 7 + 1);
+    let roads = "";
+    for (let q = 0; q < 9; q++) roads += `<path d="M${(rr() * cw).toFixed(0)} 0 C${(rr() * cw).toFixed(0)} ${(chh * 0.3).toFixed(0)} ${(rr() * cw).toFixed(0)} ${(chh * 0.7).toFixed(0)} ${(rr() * cw).toFixed(0)} ${chh.toFixed(0)}" stroke="#D6DCE6" stroke-width="${(mn * 0.004).toFixed(1)}" fill="none"/>`;
+    let html = `<div style="position:absolute;inset:0;background:#F2EEE6"></div>
+      <div style="position:absolute;left:${x.toFixed(1)}px;top:${y.toFixed(1)}px;width:${cw.toFixed(1)}px;height:${chh.toFixed(1)}px;border-radius:${(mn * 0.025).toFixed(0)}px;overflow:hidden;background:#EEF1F5;opacity:${a.toFixed(3)};box-shadow:0 ${(mn * 0.015).toFixed(0)}px ${(mn * 0.04).toFixed(0)}px rgba(0,0,0,.15)">
+        <svg width="${cw.toFixed(0)}" height="${chh.toFixed(0)}" style="position:absolute;inset:0">${roads}<path d="M0 ${(chh * 0.6).toFixed(0)} Q${(cw * 0.4).toFixed(0)} ${(chh * 0.4).toFixed(0)} ${cw.toFixed(0)} ${(chh * 0.7).toFixed(0)}" stroke="#BFD4F2" stroke-width="${(mn * 0.03).toFixed(0)}" fill="none"/></svg></div>
+      <div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:${(x + mn * 0.03).toFixed(1)}px;top:${(y - mn * 0.06).toFixed(1)}px;font:600 ${(mn * 0.03).toFixed(1)}px ${ff};color:#111">${ar ? "المبيعات حسب المكان" : "Sales by location"}</div>`;
+    const spots = [[0.3, 0.4], [0.65, 0.3], [0.5, 0.7], [0.8, 0.62]];
+    cs.forEach((c, i) => {
+      if (t < c.t0) return;
+      const [fx, fy] = spots[i];
+      const px = x + fx * cw, py = y + fy * chh;
+      const p = eBack(seg(t, c.t0, c.t0 + 0.3));
+      const R = mn * (0.035 + (i % 3) * 0.012);
+      const pulse = 1 + 0.5 * ((t * 1.2 + i * 0.3) % 1);
+      const s = this.text(c.w), z = fitSize(s, `600 {}px ${famOf(s)}`, cw * 0.4, mn * 0.032 * this.ts);
+      html += `<div style="position:absolute;left:${px.toFixed(1)}px;top:${py.toFixed(1)}px;width:${(R * 2).toFixed(0)}px;height:${(R * 2).toFixed(0)}px;transform:translate(-50%,-50%) scale(${(p * pulse).toFixed(3)});border-radius:50%;background:rgba(59,75,232,${(0.35 / pulse).toFixed(2)})"></div>
+        <div style="position:absolute;left:${px.toFixed(1)}px;top:${py.toFixed(1)}px;width:${(R * 0.8).toFixed(0)}px;height:${(R * 0.8).toFixed(0)}px;transform:translate(-50%,-50%) scale(${p.toFixed(3)});border-radius:50%;background:#3B4BE8;border:2px solid #fff"></div>
+        <div dir="${this.dir(s)}" style="position:absolute;left:${px.toFixed(1)}px;top:${(py + R * 1.1).toFixed(1)}px;transform:translateX(-50%);opacity:${clamp(p).toFixed(3)};white-space:nowrap;font:600 ${z.toFixed(1)}px ${famOf(s)};color:#111">${esc(s)}</div>`;
+    });
+    return html;
+  };
+
+  // ---------- marker: عنوان سيريف وهايلايتر أصفر
+  P.k_marker = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    if (!it.length) return "";
+    const ar = isAr(it);
+    const fi = focusOf(b, it);
+    const sz = mn * 0.11 * this.ts * 0.8;
+    const font = SERIF(ar ? "ع" : "a");
+    const lines = this.wrapItems(it, `400 ${sz}px ${font}`, w * 0.84);
+    const vid = onVideo(this);
+    const ink = vid ? "#fff" : INK;
+    const y0 = h * 0.62 - (lines.length - 1) * sz * 0.55;
+    let html = vid ? `<div style="position:absolute;inset:0;background:linear-gradient(transparent 40%,rgba(0,0,0,.45))"></div>` : `<div style="position:absolute;inset:0;background:${PAPER}"></div>`;
+    lines.forEach((ln, li) => {
+      html += `<div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:0;right:0;top:${(y0 + li * sz * 1.1).toFixed(1)}px;transform:translateY(-50%);text-align:center;white-space:nowrap;font:400 ${sz.toFixed(1)}px ${font};line-height:1.1;color:${ink}">${ln.map((x) => {
+        const q = eOut(seg(t, x.t0, x.t0 + 0.25)), hot = it.indexOf(x) === fi;
+        const hl = hot ? seg(t, x.t0 + 0.1, x.t0 + 0.5) : 0;
+        return `<span style="display:inline-block;opacity:${q.toFixed(3)};padding:0 ${(sz * 0.08).toFixed(1)}px;${hot ? `color:#111;background:linear-gradient(${ar ? 270 : 90}deg,#F7E733 ${(hl * 100).toFixed(0)}%,transparent ${(hl * 100).toFixed(0)}%)` : ""}">${esc(this.text(x.w))}</span>`;
+      }).join(" ")}</div>`;
+    });
     return html;
   };
 })();

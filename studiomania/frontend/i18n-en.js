@@ -3273,5 +3273,15 @@ window.I18N_EN = {
   "🎬 🖐️ صور بتطير لمربع الكتابة": "🎬 🖐️ Photos dropped into the prompt",
   "🎬 🎤 قايمة أسامي كبيرة": "🎬 🎤 Big name lineup",
   "🎬 🗺️ خريطة أيزومتريك": "🎬 🗺️ Isometric map",
-  "🎬 🏷️ كلمة عملاقة وتاجات مايلة": "🎬 🏷️ Giant word with tilted tags"
+  "🎬 🏷️ كلمة عملاقة وتاجات مايلة": "🎬 🏷️ Giant word with tilted tags",
+  "🎬 ⌨️ سطر كتابة وزرار إرسال": "🎬 ⌨️ Prompt line with send button",
+  "🎬 👥 بوستر بسيلويتات": "🎬 👥 Silhouette poster",
+  "🎬 🖼️ صورة وكلمة عملاقة عليها": "🎬 🖼️ Photo with a giant word",
+  "🎬 🖱️ قايمة منسدلة": "🎬 🖱️ Dropdown menu",
+  "🎬 💲 اختيارات بأسعار": "🎬 💲 Pricing options",
+  "🎬 📍 نقط مرقّمة على صورة": "🎬 📍 Numbered pins on a photo",
+  "🎬 🔗 نتيجة بحث": "🎬 🔗 Search result card",
+  "🎬 🗓️ كاليندر وموعد": "🎬 🗓️ Calendar with event",
+  "🎬 🗺️ خريطة ودواير بتنبض": "🎬 🗺️ Map with pulsing spots",
+  "🎬 🖍️ عنوان بهايلايتر أصفر": "🎬 🖍️ Serif title with yellow marker"
 };
