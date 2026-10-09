@@ -3245,5 +3245,12 @@ window.I18N_EN = {
   "🖥️ عرضي": "🖥️ Landscape",
   "🧍 أحلى مع فيديو فيه شخص": "🧍 Best on a video with a person",
   "الترانزيشن في أول اللقطة التانية": "The transition at the start of the second shot",
-  "كل حركات «ستوديو» شغالة قدامك بكلام تجربة. البرنامج بيختار منهم لوحده لما تدوس «🧠 وزّع» (كوليكشن مخفية عشوائي كل مرة)، وتقدر تغيّر أي لقطة بإيدك من قايمة الحركة جوه مشروع التايبوجرافي. دوس على أي كارت عشان تشوفه كبير.": "Every Studio motion playing with sample text. The app picks from them on its own when you press «🧠 Distribute» (a random hidden collection each time), and you can change any shot by hand from the motion list inside a typography project. Click any card to see it large."
+  "كل حركات «ستوديو» شغالة قدامك بكلام تجربة. البرنامج بيختار منهم لوحده لما تدوس «🧠 وزّع» (كوليكشن مخفية عشوائي كل مرة)، وتقدر تغيّر أي لقطة بإيدك من قايمة الحركة جوه مشروع التايبوجرافي. دوس على أي كارت عشان تشوفه كبير.": "Every Studio motion playing with sample text. The app picks from them on its own when you press «🧠 Distribute» (a random hidden collection each time), and you can change any shot by hand from the motion list inside a typography project. Click any card to see it large.",
+  "🎬 🪟 كلمة عملاقة على البرواز": "🎬 🪟 Giant word on the frame",
+  "🎬 📐 كلام في الركنين": "🎬 📐 Text in opposite corners",
+  "🎬 📥 صندوق رسايل": "🎬 📥 Inbox",
+  "🎬 📝 دوكيومنت بهايلايتر": "🎬 📝 Highlighted document",
+  "🎬 📅 كارت موعد ورسالة وملف": "🎬 📅 Meeting, message and file cards",
+  "🎬 📞 مكالمة فيديو": "🎬 📞 Video call",
+  "🎬 🗂️ لوحة كروت والكاميرا بتقرّب": "🎬 🗂️ Card canvas with camera zoom"
 };
