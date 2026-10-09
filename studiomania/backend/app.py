@@ -68,6 +68,8 @@ import concepts  # noqa: E402  (قاموس المعاني: كلمة ← أيقو
 import stt_local  # noqa: E402  (تفريغ على السيرفر من غير خدمة برّه)
 import sfx  # noqa: E402  (الأصوات الرسمية: كليكات وكيبورد)
 import person  # noqa: E402  (قراءة الشخص في الفيديو: فصله ومكان راسه)
+import scene  # noqa: E402  (🪄 تغيير الخلفية وشيل الحاجات من الفيديو)
+import numpy as np  # noqa: E402
 from auth import SESSION_COOKIE, SESSION_DAYS, Auth  # noqa: E402
 
 MAX_CLIP_SECONDS = 15.0
@@ -2422,7 +2424,7 @@ def run_ffmpeg(cmd: list[str], project_id: str, length: float, pct: tuple[int, i
     return proc.returncode, stderr
 
 
-def run_render(project_id: str, export_id: str, cmds: list[list[str]], total: float, name: str, work_dir: Path, typo_id: str | None = None, base_url: str = "", typo_click_vol: float = 0.0) -> None:
+def run_render(project_id: str, export_id: str, cmds: list[list[str]], total: float, name: str, work_dir: Path, typo_id: str | None = None, base_url: str = "", typo_click_vol: float = 0.0, scene_id: str | None = None) -> None:
     filename = f"{export_id}.mp4"
     error = None
     RENDER_LOG.write_text("", encoding="utf-8")
@@ -2440,6 +2442,11 @@ def run_render(project_id: str, export_id: str, cmds: list[list[str]], total: fl
         for cmd, label, pct in steps:
             if project_id in RENDER_CANCELLED:
                 break
+            if cmd is cmds[-2] and scene_id:
+                # 🪄 الخلفية الجديدة والحاجات اللي اتشالت: على الصورة قبل اللوجو والكابشن
+                RENDER_ACTIVE[project_id] = "🪄 بيركّب المشهد"
+                if scene_export(scene_id, cmd, work_dir, lambda f: RENDER_ACTIVE.__setitem__(project_id, f"🪄 بيركّب المشهد {int(f * 100)}٪")):
+                    log_render("🪄 المشهد اتركّب (الخلفية / الحاجات اللي اتشالت)")
             length = float(cmd[cmd.index("-t") + 1]) if cmd in segs else total
             code, stderr = run_ffmpeg(cmd, project_id, length, pct, label)
             if project_id in RENDER_CANCELLED:
@@ -2548,7 +2555,8 @@ def render_project(project_id: str, request: Request):
     port = (request.scope.get("server") or ("127.0.0.1", 8000))[1]
     ts = data.get("typo_sfx") or {}
     click = float(ts.get("volume", 1.0)) if tid and ts.get("on", True) else 0.0
-    render_executor.submit(run_render, project_id, export_id, cmd, total, row["name"], work_dir, tid, f"http://127.0.0.1:{port}", click)
+    sid = data.get("typo_id") if data.get("typo_id") and (TYPO_PROJ / Path(data["typo_id"]).name / "typo.json").exists() else None
+    render_executor.submit(run_render, project_id, export_id, cmd, total, row["name"], work_dir, tid, f"http://127.0.0.1:{port}", click, sid)
     return {"ok": True, "duration": total}
 
 
@@ -12704,7 +12712,7 @@ TYPO_STYLES = TYPO_DIR / "styles"
 for _d in (TYPO_PROJ, TYPO_STK, TYPO_STYLES):
     _d.mkdir(parents=True, exist_ok=True)
 TYPO_LOCK = threading.Lock()
-TYPO_BUSY = ("transcribing", "analyzing", "planning", "drawing", "rendering", "tracking")
+TYPO_BUSY = ("transcribing", "analyzing", "planning", "drawing", "rendering", "tracking", "scene")
 TYPO_RATIOS = {"9:16": (1080, 1920), "16:9": (1920, 1080), "1:1": (1080, 1080), "4:5": (1080, 1350)}
 TYPO_STICKER_COST = 0.03
 TYPO_DICT = TYPO_DIR / "concepts.json"
@@ -13818,31 +13826,43 @@ def montage_typo(project_id: str, body: MontageTypoIn):
     return typo_start(tid, "transcribing", "🎬 بيجهّز فيديو المونتاج", run_montage_typo, segments, voice, music)
 
 
+def montage_source(tid: str, segments, voice, music, keep: bool = False) -> None:
+    """فيديو المونتاج (اللقطات بعد القص من غير كابشن ولوجو) بيبقى الفيديو بتاع مشروع التايبوجرافي/المشهد.
+    keep: الكلام والعناصر بيفضلوا (تجهيز المشهد بس)؛ من غيره بيتمسحوا عشان هيتوزعوا من جديد."""
+    folder = TYPO_PROJ / tid
+    work = TMP_DIR / f"mtypo-{tid}"
+    name = f"src_{uuid.uuid4().hex[:8]}.mp4"
+    cmds, total = montage.build_commands(ffmpeg_exe(), segments, folder / name, work, voice, music,
+                                         low_memory=(system_info()["memory_limit_mb"] or 99999) < 1500)
+    try:
+        for n, c in enumerate(cmds, start=1):
+            typo_set(tid, step=f"🎬 بيجهّز فيديو المونتاج ({n} من {len(cmds)})")
+            r = subprocess.run(c, capture_output=True, timeout=1800)
+            if r.returncode != 0:
+                raise RuntimeError(f"تجهيز فيديو المونتاج فشل: {r.stderr.decode(errors='ignore')[-300:]}")
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+    info = media_info(folder / name)
+    old = (typo_load(tid).get("source") or {}).get("file")
+
+    def fn(x):
+        x["source"] = {"kind": "video", "file": name, "name": "المونتاج", "duration": round(info.duration, 3), "w": info.width, "h": info.height}
+        x.update(duration=round(info.duration, 3), final=None, bg={"kind": "source", "color": "#101010"}, removals=[])
+        if not keep:
+            x.update(words=[], blocks=[], scene=None, tracks={})
+    typo_update(tid, fn)
+    if old and old != name:
+        (folder / old).unlink(missing_ok=True)
+    # الفيديو اتغيّر: الشخص وحركة الكاميرا والحاجات اللي اتشالت بتتحسب من جديد
+    shutil.rmtree(folder / "person", ignore_errors=True)
+    (folder / "scene_cam.json").unlink(missing_ok=True)
+    for f in folder.glob("rm_*.mp4"):
+        f.unlink(missing_ok=True)
+
+
 def run_montage_typo(tid: str, segments, voice, music) -> None:
     try:
-        folder = TYPO_PROJ / tid
-        work = TMP_DIR / f"mtypo-{tid}"
-        name = f"src_{uuid.uuid4().hex[:8]}.mp4"
-        cmds, total = montage.build_commands(ffmpeg_exe(), segments, folder / name, work, voice, music,
-                                             low_memory=(system_info()["memory_limit_mb"] or 99999) < 1500)
-        try:
-            for n, c in enumerate(cmds, start=1):
-                typo_set(tid, step=f"🎬 بيجهّز فيديو المونتاج ({n} من {len(cmds)})")
-                r = subprocess.run(c, capture_output=True, timeout=1800)
-                if r.returncode != 0:
-                    raise RuntimeError(f"تجهيز فيديو المونتاج فشل: {r.stderr.decode(errors='ignore')[-300:]}")
-        finally:
-            shutil.rmtree(work, ignore_errors=True)
-        info = media_info(folder / name)
-        old = (typo_load(tid).get("source") or {}).get("file")
-
-        def fn(x):
-            x["source"] = {"kind": "video", "file": name, "name": "المونتاج", "duration": round(info.duration, 3), "w": info.width, "h": info.height}
-            x.update(duration=round(info.duration, 3), words=[], blocks=[], scene=None, tracks={}, final=None, bg={"kind": "source", "color": "#101010"})
-        typo_update(tid, fn)
-        if old and old != name:
-            (folder / old).unlink(missing_ok=True)
-        shutil.rmtree(folder / "person", ignore_errors=True)
+        montage_source(tid, segments, voice, music)
         typo_set(tid, step="🎧 بيسمع الكلام ويكتبه بتوقيته")
         run_typo_transcribe(tid)
         if typo_load(tid).get("status") == "failed":
@@ -14107,6 +14127,424 @@ def typo_regions(pid: str, t: float):
         TYPO_REGIONS.clear()
     TYPO_REGIONS[key] = res
     return res
+
+
+# ---------------------------------------------------------------- 🪄 المشهد: تغيير الخلفية ورا الشخص وشيل الحاجات
+# بيشتغل على فيديو المونتاج (مشروع التايبوجرافي المخفي): ماسك الشخص فريم فريم + حركة الكاميرا في كل لقطة.
+# المعاينة بتتعمل في المتصفح (طبقة فوق الفيديو)، والتصدير بيتركّب في السيرفر قبل الكابشن واللوجو.
+
+BGX_KINDS = ("off", "color", "image", "video", "blur")
+BG_AI_COST = 0.05   # تقريبًا: صورة واحدة Nano Banana 2
+
+
+def scene_cam(pid: str, d: dict, make: bool = False) -> dict | None:
+    """حركة الكاميرا واللقطات (بتتحسب مرة واحدة لكل فيديو)."""
+    src = (d.get("source") or {}).get("file")
+    if not src:
+        return None
+    f = TYPO_PROJ / pid / "scene_cam.json"
+    if f.exists():
+        try:
+            c = json.loads(f.read_text(encoding="utf-8"))
+            if c.get("src") == src:
+                return c
+        except ValueError:
+            pass
+    if not make:
+        return None
+    pd = TYPO_PROJ / pid / "person"
+    c = scene.camera(str(TYPO_PROJ / pid / src), pd if pd.exists() else None,
+                     progress=lambda x: typo_set(pid, step=f"🎥 بيحسب حركة الكاميرا: {int(x * 100)}٪"))
+    c["src"] = src
+    f.write_text(json.dumps(c), encoding="utf-8")
+    return c
+
+
+def scene_person(pid: str) -> dict | None:
+    pj = TYPO_PROJ / pid / "person" / "person.json"
+    try:
+        return json.loads(pj.read_text(encoding="utf-8")) if pj.exists() else None
+    except ValueError:
+        return None
+
+
+def scene_shots(d: dict, cam: dict | None, pinfo: dict | None) -> list[list]:
+    """[[f0, f1, on]]: الخلفية بتتغير في اللقطات اللي فيها الشخص (أو اللي المستخدم اختارها بنفسه)."""
+    if not cam:
+        return []
+    auto = scene.shots_on(cam["shots"], (pinfo or {}).get("frames") or [])
+    pick = ((d.get("bgx") or {}).get("shots")) or {}
+    return [[f0, f1, bool(pick.get(str(j), auto[j]))] for j, (f0, f1) in enumerate(cam["shots"])]
+
+
+def scene_active(d: dict) -> bool:
+    return (d.get("bgx") or {}).get("kind", "off") != "off" or bool(d.get("removals"))
+
+
+@app.get("/api/typo/{pid}/scene/doc")
+def typo_scene_get(pid: str):
+    """المعاينة: ماسك الشخص، الخلفية الجديدة، حركة الكاميرا (بكسل الكادر)، والحاجات اللي اتشالت."""
+    d = typo_load(pid)
+    src = d.get("source") or {}
+    base = f"/media/typo/projects/{pid}"
+    pinfo = scene_person(pid)
+    cam = scene_cam(pid, d)
+    bgx = {"kind": "off", "color": "#101010", "blur": 24, "dim": 0.0, "follow": True, **(d.get("bgx") or {})}
+    if bgx.get("file") and (TYPO_PROJ / pid / bgx["file"]).exists():
+        bgx["url"] = f"{base}/{bgx['file']}"
+    out = {"w": None, "h": None, "fps": TYPO_FPS, "person": None, "bgx": bgx, "shots": scene_shots(d, cam, pinfo), "cam": None,
+           "removals": [], "src": f"{base}/{src['file']}" if src.get("file") else None, "duration": src.get("duration"),
+           "ready": {"source": bool(src.get("file")), "person": bool(pinfo), "camera": bool(cam)}, "busy": d.get("status") in TYPO_BUSY,
+           "step": d.get("step"), "status": d.get("status"), "error": d.get("error")}
+    if src.get("file"):
+        doc = typo_doc(pid, d)
+        out.update(w=doc["w"], h=doc["h"], person=doc["person"])
+        if cam and bgx.get("follow"):
+            W, H = doc["w"], doc["h"]
+            k = max(W / src["w"], H / src["h"])
+            ox, oy = (src["w"] * k - W) / 2, (src["h"] * k - H) / 2
+            A = np.array([[k, 0, -ox], [0, k, -oy], [0, 0, 1]])
+            Ai = np.linalg.inv(A)
+            out["cam"] = [[round(float(v), 4) for v in (A @ scene.cam_mat(c) @ Ai)[:2].reshape(-1)] for c in cam["cam"]]
+    for r in d.get("removals") or []:
+        f = TYPO_PROJ / pid / f"rm_{r['id']}.mp4"
+        if f.exists():
+            out["removals"].append({**{k: r.get(k) for k in ("id", "name", "f0", "f1", "t", "holes", "ai")},
+                                    "url": f"{base}/rm_{r['id']}.mp4?v={int(f.stat().st_mtime)}"})
+    return out
+
+
+class SceneBgIn(BaseModel):
+    kind: str | None = None
+    color: str | None = None
+    blur: float | None = None
+    dim: float | None = None
+    follow: bool | None = None
+    shots: dict[str, bool] | None = None
+    prompt: str | None = None
+
+
+@app.patch("/api/typo/{pid}/bgx")
+def typo_bgx(pid: str, body: SceneBgIn):
+    def fn(x):
+        g = {"kind": "off", "color": "#101010", "blur": 24, "dim": 0.0, "follow": True, **(x.get("bgx") or {})}
+        if body.kind is not None:
+            if body.kind not in BGX_KINDS:
+                raise HTTPException(400, "نوع خلفية مش معروف")
+            if body.kind in ("image", "video") and not (g.get("file") and Path(g["file"]).suffix.lower() in (IMAGE_EXTENSIONS if body.kind == "image" else {".mp4"})):
+                raise HTTPException(400, "ارفع الصورة أو الفيديو الأول")
+            g["kind"] = body.kind
+        if body.color is not None and re.fullmatch(r"#[0-9a-fA-F]{6}", body.color):
+            g["color"] = body.color
+        if body.blur is not None:
+            g["blur"] = max(2.0, min(80.0, float(body.blur)))
+        if body.dim is not None:
+            g["dim"] = max(0.0, min(0.8, float(body.dim)))
+        if body.follow is not None:
+            g["follow"] = bool(body.follow)
+        if body.shots is not None:
+            g["shots"] = {str(k): bool(v) for k, v in body.shots.items() if str(k).isdigit()}
+        x["bgx"] = g
+        x["final"] = None
+    typo_update(pid, fn)
+    return typo_scene_get(pid)
+
+
+def bgx_set_file(pid: str, name: str, kind: str) -> None:
+    old = (typo_load(pid).get("bgx") or {}).get("file")
+
+    def fn(x):
+        x["bgx"] = {"color": "#101010", "blur": 24, "dim": 0.0, "follow": True, **(x.get("bgx") or {})}
+        x["bgx"].update(file=name, kind=kind)
+        x["final"] = None
+    typo_update(pid, fn)
+    if old and old != name:
+        (TYPO_PROJ / pid / Path(old).name).unlink(missing_ok=True)
+
+
+@app.post("/api/typo/{pid}/bgx/file")
+def typo_bgx_file(pid: str, file: UploadFile = File(...)):
+    """🖼️ خلفية من عندك: صورة أو فيديو (الفيديو بيتحوّل لـ mp4 عشان يشتغل في المعاينة والتصدير)."""
+    typo_load(pid)
+    folder = TYPO_PROJ / Path(pid).name
+    ext = Path(file.filename or "").suffix.lower()
+    if ext in IMAGE_EXTENSIONS:
+        bgx_set_file(pid, save_upload(file, IMAGE_EXTENSIONS, folder, "bgx"), "image")
+    elif ext in VIDEO_EXTENSIONS:
+        raw = save_upload(file, VIDEO_EXTENSIONS, folder, "bgxraw")
+        name = f"bgx_{uuid.uuid4().hex[:8]}.mp4"
+        try:
+            r = subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(folder / raw), "-t", "120", "-an",
+                                "-vf", "scale='if(gt(iw,ih),-2,min(1080,iw))':'if(gt(iw,ih),min(1080,ih),-2)',fps=30", "-c:v", "libx264",
+                                "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(folder / name)],
+                               capture_output=True, text=True, timeout=900)
+        finally:
+            (folder / raw).unlink(missing_ok=True)
+        if r.returncode != 0:
+            (folder / name).unlink(missing_ok=True)
+            raise HTTPException(400, f"مش قادر أقرا الفيديو ده: {r.stderr[-200:]}")
+        bgx_set_file(pid, name, "video")
+    else:
+        raise HTTPException(400, "ارفع صورة (png / jpg / webp) أو فيديو (mp4 / mov)")
+    return typo_scene_get(pid)
+
+
+def scene_frame(pid: str, d: dict, fi: int, out: Path) -> Path:
+    src = TYPO_PROJ / pid / d["source"]["file"]
+    subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{fi / TYPO_FPS:.3f}", "-i", str(src),
+                    "-frames:v", "1", "-q:v", "2", str(out)], check=True, capture_output=True, timeout=120)
+    return out
+
+
+def scene_ref_frame(pid: str, d: dict) -> int:
+    """فريم فيه الشخص باين (نص أول لقطة فيها شخص) عشان الـ AI يفهم المكان والزاوية."""
+    cam = scene_cam(pid, d)
+    pinfo = scene_person(pid)
+    for f0, f1, on in scene_shots(d, cam, pinfo):
+        if on:
+            return (f0 + f1) // 2
+    return int((d.get("duration") or 1) * TYPO_FPS / 2)
+
+
+@app.post("/api/typo/{pid}/bgx/ai")
+def typo_bgx_ai(pid: str, body: SceneBgIn):
+    """✨ خلفية بالـ AI: صورة واحدة بنفس زاوية الكاميرا (من فريم من الفيديو) والمكان اللي اتوصف."""
+    if not (body.prompt or "").strip():
+        raise HTTPException(400, "اكتب وصف للخلفية اللي عايزها")
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل")
+    d = typo_load(pid)
+    if not (d.get("source") or {}).get("file"):
+        raise HTTPException(400, "جهّز المشهد الأول")
+    return typo_start(pid, "scene", "✨ بيعمل الخلفية بالـ AI", run_bgx_ai, body.prompt.strip()[:600])
+
+
+def run_bgx_ai(pid: str, prompt: str) -> None:
+    try:
+        d = typo_load(pid)
+        folder = TYPO_PROJ / pid
+        ref = scene_frame(pid, d, scene_ref_frame(pid, d), folder / ".bgx_ref.jpg")
+        name = f"bgx_{uuid.uuid4().hex[:8]}.png"
+        w, h = d["source"]["w"], d["source"]["h"]
+        if atlas.mock_mode():
+            from PIL import Image, ImageDraw
+            im = Image.new("RGB", (w, h), (40, 70, 110))
+            dr = ImageDraw.Draw(im)
+            for j in range(0, h, 40):
+                dr.rectangle([0, j, w, j + 18], fill=(60 + j % 120, 90, 140))
+            im.save(folder / name)
+        else:
+            full = (f"Using IMAGE 1 only for the camera angle, framing, perspective and lighting direction: create an empty background plate "
+                    f"of this place: {prompt}. Remove the person and everything in front of the camera completely; no people, no hands, "
+                    "no text, no logos. Photorealistic, same eye-level camera height and lens as IMAGE 1, natural light, slightly soft focus "
+                    "like a real background behind a person talking to camera.")
+            atlas.download(atlas.generate_image("nano2", full, f"{w}x{h}", "medium", [atlas.reference_url(ref)]), folder / name)
+        ref.unlink(missing_ok=True)
+        bgx_set_file(pid, name, "image")
+        typo_update(pid, lambda x: (x["bgx"].update(prompt=prompt), x.update(status=typo_idle(x), step=None, error=None)))
+    except Exception as exc:  # noqa: BLE001
+        typo_fail(pid, exc)
+
+
+class SceneRemoveIn(BaseModel):
+    t: float
+    polys: list[list[list[float]]]   # حدود الحاجة (أو أكتر من حتة) بكسور من كادر الفيديو النهائي
+    name: str = "حاجة"
+    ai: bool = False
+
+
+@app.post("/api/projects/{project_id}/scene")
+def montage_scene(project_id: str):
+    """🪄 تجهيز المشهد: فيديو المونتاج + فصل الشخص + حركة الكاميرا (مرة واحدة، والتايبوجرافي لو موجودة بتفضل زي ما هي)."""
+    res = montage_typo(project_id, MontageTypoIn(run=False))
+    tid = res["id"]
+    with closing(db()) as conn:
+        data = json.loads(get_project(conn, project_id)["data"])
+        segments, voice, music, _ = build_montage(conn, data)
+    total = sum(sg.duration for sg in segments)
+    return typo_start(tid, "scene", "🪄 بيجهّز المشهد", run_scene_prep, segments, voice, music, total)
+
+
+def run_scene_prep(tid: str, segments, voice, music, total: float) -> None:
+    try:
+        d = typo_load(tid)
+        src = d.get("source") or {}
+        if not src.get("file") or abs(float(src.get("duration") or 0) - total) > 0.25:
+            montage_source(tid, segments, voice, music, keep=True)
+            d = typo_load(tid)
+        if not scene_person(tid):
+            if not person.available():
+                raise RuntimeError("فصل الشخص مش متاح على السيرفر ده")
+            typo_person(tid, TYPO_PROJ / tid / d["source"]["file"], float(d["source"]["duration"]))
+            if not scene_person(tid):
+                raise RuntimeError("مالقيتش شخص في الفيديو أفصله عن الخلفية")
+        typo_set(tid, step="🎥 بيحسب حركة الكاميرا")
+        scene_cam(tid, typo_load(tid), make=True)
+        typo_update(tid, lambda x: x.update(status=typo_idle(x), step=None, error=None))
+    except Exception as exc:  # noqa: BLE001
+        typo_fail(tid, exc)
+
+
+@app.post("/api/typo/{pid}/remove")
+def typo_remove(pid: str, body: SceneRemoveIn):
+    """🧽 شيل حاجة: الحدود اللي اتحددت في الثانية t بتتتبع طول اللقطة، والمكان بيتملا من الفريمات التانية."""
+    d = typo_load(pid)
+    if not (d.get("source") or {}).get("file"):
+        raise HTTPException(400, "جهّز المشهد الأول")
+    polys = [p for p in body.polys if len(p) >= 3]
+    if not polys:
+        raise HTTPException(400, "حدد الحاجة اللي عايز تشيلها")
+    if body.ai and not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل")
+    to_src = typo_frame_map(d)
+    rid = uuid.uuid4().hex[:8]
+    spec = {"id": rid, "t": round(body.t, 3), "name": body.name[:30] or "حاجة", "ai": body.ai,
+            "polys": [[[round(v, 5) for v in to_src(x, y)] for x, y in p] for p in polys]}
+    return typo_start(pid, "scene", f"🧽 بيشيل {spec['name']}", run_scene_remove, spec)
+
+
+@app.post("/api/typo/{pid}/remove/{rid}/ai")
+def typo_remove_ai(pid: str, rid: str):
+    """✨ المكان اللي عمره ما ظهر يتملا بالـ AI (صورة واحدة) بدل الملء التقريبي."""
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل")
+    d = typo_load(pid)
+    r = next((x for x in d.get("removals") or [] if x["id"] == rid), None)
+    if not r:
+        raise HTTPException(404, "مش موجودة")
+    return typo_start(pid, "scene", f"✨ بيملا مكان {r['name']} بالـ AI", run_scene_remove, {**r, "ai": True})
+
+
+@app.delete("/api/typo/{pid}/remove/{rid}")
+def typo_remove_del(pid: str, rid: str):
+    def fn(x):
+        x["removals"] = [r for r in x.get("removals") or [] if r["id"] != rid]
+        x["final"] = None
+    typo_update(pid, fn)
+    for f in (f"rm_{rid}.mp4", f"rm_{rid}_m.mp4"):
+        (TYPO_PROJ / Path(pid).name / f).unlink(missing_ok=True)
+    return typo_scene_get(pid)
+
+
+def scene_ai_plate(pid: str, d: dict, fi: int, mask: np.ndarray, name: str) -> np.ndarray:
+    """صورة الفريم من غير الحاجة (Nano Banana 2): الصورة نفسها + نسخة عليها المكان بالأحمر."""
+    import cv2
+    folder = TYPO_PROJ / pid
+    ref = scene_frame(pid, d, fi, folder / ".rm_ref.jpg")
+    img = cv2.imread(str(ref))
+    if atlas.mock_mode():
+        out = cv2.inpaint(img, (cv2.resize(mask, (img.shape[1], img.shape[0])) > 0).astype(np.uint8) * 255, 9, cv2.INPAINT_NS)
+        ref.unlink(missing_ok=True)
+        return out
+    red = img.copy()
+    mm = cv2.resize(mask, (img.shape[1], img.shape[0])) > 0
+    red[mm] = (red[mm] * 0.35 + np.array([0, 0, 255]) * 0.65).astype(np.uint8)
+    marked = folder / ".rm_mark.jpg"
+    cv2.imwrite(str(marked), red)
+    what = "the person" if name == "الشخص" else "the object"
+    prompt = (f"IMAGE 1 is a frame from a video. IMAGE 2 is the same frame with {what} to remove highlighted in red. "
+              f"Remove {what} that is under the red area completely and fill that area with the background that would naturally be "
+              "behind it (continue walls, floor, furniture, lines and lighting). Keep every other pixel exactly the same as IMAGE 1: "
+              "same framing, crop, colors, people and text. Do not add anything new. Output the cleaned IMAGE 1 only, with no red.")
+    h, w = img.shape[:2]
+    out_p = folder / ".rm_ai.png"
+    atlas.download(atlas.generate_image("nano2", prompt, f"{w}x{h}", "medium", [atlas.reference_url(ref), atlas.reference_url(marked)]), out_p)
+    out = cv2.imread(str(out_p))
+    for f in (ref, marked, out_p):
+        f.unlink(missing_ok=True)
+    if out is None:
+        raise RuntimeError("صورة الـ AI مارجعتش")
+    return cv2.resize(out, (w, h), interpolation=cv2.INTER_AREA)
+
+
+def run_scene_remove(pid: str, spec: dict) -> None:
+    try:
+        import tracker
+        d = typo_load(pid)
+        src = TYPO_PROJ / pid / d["source"]["file"]
+        W, H = int(d["source"]["w"]), int(d["source"]["h"])
+        typo_set(pid, step="🎥 بيحسب حركة الكاميرا")
+        cam = scene_cam(pid, d, make=True)
+        fi = int(round(spec["t"] * TYPO_FPS))
+        f0, f1 = next(((a, b) for a, b in cam["shots"] if a <= fi <= b), (fi, fi))
+        polys = spec["polys"]
+        if spec["name"] == "الشخص" and (TYPO_PROJ / pid / "person").exists():
+            mask_fn = scene.person_masks(TYPO_PROJ / pid / "person", W, H)
+        else:
+            # الحاجة بتتتبع (أركان مستطيل حوالين كل الحتت) والحدود بتتحرك معاها
+            pts = np.array([p for poly in polys for p in poly], np.float32)
+            q = tracker._order(cv2_box(pts * [W, H])) / [W, H]
+            typo_set(pid, step=f"🎯 بيتابع {spec['name']}")
+            tr = tracker.track(str(src), f0 / TYPO_FPS, f1 / TYPO_FPS, spec["t"], [0, 0, 0, 0], "follow",
+                               progress=lambda f: typo_set(pid, step=f"🎯 بيتابع {spec['name']}: {int(f * 100)}٪"), quad=q.reshape(-1).tolist())
+            per = [scene.polys_from_track(tr, p, fi, f0, f1) for p in polys]
+            mask_fn = scene.poly_masks({i: [pp[i] for pp in per] for i in range(f0, f1 + 1)}, W, H)
+        plate = None
+        if spec.get("ai"):
+            typo_set(pid, step="✨ الـ AI بيرسم اللي ورا الحاجة")
+            plate = scene_ai_plate(pid, d, fi, mask_fn(fi), spec["name"])
+        rid = spec["id"]
+        typo_set(pid, step=f"🧽 بيشيل {spec['name']}")
+        res = scene.removal(ffmpeg_exe(), str(src), TYPO_PROJ / pid / f"rm_{rid}.tmp.mp4", TYPO_PROJ / pid / f"rm_{rid}_m.tmp.mp4",
+                            f0, f1, fi, mask_fn, cam["cam"], plate,
+                            progress=lambda f: typo_set(pid, step=f"🧽 بيشيل {spec['name']}: {int(f * 100)}٪"))
+        (TYPO_PROJ / pid / f"rm_{rid}.tmp.mp4").replace(TYPO_PROJ / pid / f"rm_{rid}.mp4")
+        (TYPO_PROJ / pid / f"rm_{rid}_m.tmp.mp4").replace(TYPO_PROJ / pid / f"rm_{rid}_m.mp4")
+        item = {**spec, "f0": f0, "f1": f1, "holes": res["holes"], "bbox": res["bbox"]}
+
+        def fn(x):
+            lst = [r for r in x.get("removals") or [] if r["id"] != rid]
+            x["removals"] = [*lst, item]
+            x.update(status=typo_idle(x), step=None, error=None, final=None)
+        typo_update(pid, fn)
+    except Exception as exc:  # noqa: BLE001
+        typo_fail(pid, exc)
+
+
+def cv2_box(pts: np.ndarray) -> np.ndarray:
+    import cv2
+    return cv2.boxPoints(cv2.minAreaRect(pts.astype(np.float32)))
+
+
+def scene_export(tid: str, cmd: list[str], work_dir: Path, progress=None) -> bool:
+    """التصدير: الحاجات اللي اتشالت والخلفية الجديدة بيتركّبوا على فيديو المونتاج (قبل اللوجو والكابشن).
+    بيبدّل دخل أمر التجميع النهائي بالفيديو الجديد. False لو مفيش حاجة تتعمل أو الفيديو اتغيّر بعد التجهيز."""
+    try:
+        d = typo_load(tid)
+    except HTTPException:
+        return False
+    if not scene_active(d) or not (d.get("source") or {}).get("file"):
+        return False
+    try:
+        i = cmd.index("concat") - 1
+    except ValueError:
+        return False
+    total = float(cmd[cmd.index("-t") + 1])
+    if abs(float(d["source"].get("duration") or 0) - total) > 0.25:
+        log_render("🪄 المشهد اتخطّى: المونتاج اتغيّر بعد ما اتجهّز (جهّزه تاني من تاب 🪄)")
+        return False
+    folder = TYPO_PROJ / tid
+    rms = [{"f0": r["f0"], "f1": r["f1"], "clean": str(folder / f"rm_{r['id']}.mp4"), "mask": str(folder / f"rm_{r['id']}_m.mp4")}
+           for r in d.get("removals") or [] if (folder / f"rm_{r['id']}.mp4").exists() and (folder / f"rm_{r['id']}_m.mp4").exists()]
+    bg = None
+    g = d.get("bgx") or {}
+    pinfo = scene_person(tid)
+    cam = scene_cam(tid, d)
+    if g.get("kind", "off") != "off" and pinfo and cam:
+        on = [False] * cam["n"]
+        for f0, f1, o in scene_shots(d, cam, pinfo):
+            for j in range(f0, min(f1 + 1, len(on))):
+                on[j] = o
+        fp = str(folder / g["file"]) if g.get("file") else None
+        bg = {"kind": g["kind"], "color": g.get("color"), "blur": g.get("blur", 24), "dim": g.get("dim", 0), "follow": g.get("follow", True),
+              "image": fp if g["kind"] == "image" else None, "video": fp if g["kind"] == "video" else None,
+              "cam": cam["cam"], "on": on, "person_dir": folder / "person", "n": int(pinfo["n"])}
+    if not rms and not bg:
+        return False
+    out = work_dir / "scene.mp4"
+    scene.composite(ffmpeg_exe(), cmd[i:i + 6], out, montage.WIDTH, montage.HEIGHT, montage.FPS, total, rms, bg, progress)
+    cmd[i:i + 6] = ["-i", str(out)]
+    return True
 
 
 class TypoTrackFixIn(BaseModel):

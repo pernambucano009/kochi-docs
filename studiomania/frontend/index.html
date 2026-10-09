@@ -421,9 +421,11 @@
               <section class="ed-player">
                 <div class="ty-wrap" id="pvWrap"><div class="frame" id="previewFrame">
                   <div class="pv-stage" id="pvStage"></div>
+                  <div class="pv-typo pv-scene" id="pvScene" hidden><div id="pvSceneStage"></div></div>
                   <div class="pv-typo" id="pvTypo"><div id="pvTypoStage"></div><div id="pvFxStage"></div></div>
                   <img class="pv-logo" id="pvLogo" alt="" hidden><div class="pv-cap" id="pvCap" hidden></div>
                   <div class="pv-empty" id="pvEmpty">التايم لاين فاضي</div>
+                  <svg class="sc-pick" id="scPick" style="display:none"></svg>
                 </div><svg class="ty-giz" id="mtGiz"></svg></div>
                 <div class="ty-gbar mt-gbar" id="mtGbar"></div>
                 <div class="transport" dir="ltr">
@@ -445,11 +447,13 @@
                   <button data-tab="audio">🔊 الصوت</button>
                   <button data-tab="caps">✍️ الكابشن</button>
                   <button data-tab="typo">🔤 تايبوجرافي</button>
+                  <button data-tab="scene">🪄 المشهد</button>
                   <button data-tab="logo">🏷️ اللوجو</button>
                   <button data-tab="export">🎬 تصدير</button>
                 </div>
 
                 <div class="pane" data-pane="typo" hidden><div id="mtTypoPane"></div></div>
+                <div class="pane" data-pane="scene" hidden><div id="mtScenePane"></div></div>
 
                 <div class="pane" data-pane="clip">
                   <p class="empty" id="clipNone">دوس على قطعة في التايم لاين عشان تعدّلها.</p>
@@ -1622,6 +1626,7 @@
 <script src="/typo-studio.js"></script>
 <script src="/typo.js"></script>
 <script src="/montage-typo.js"></script>
+  <script src="/montage-scene.js"></script>
 <script src="/clients.js"></script>
 <script src="/shell.js"></script>
 </body>

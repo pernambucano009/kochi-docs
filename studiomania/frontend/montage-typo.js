@@ -229,6 +229,7 @@ function mtTypoPoll() {
         const was = mtx.lastStep || "";
         if (cur.blocks?.length || cur.fx?.length) await mtTypoDoc();
         if (cur.status === "failed") toast(`🔤 ${cur.error || "حصلت مشكلة"}`, true);
+        else if (/^(🪄|🧽|✨|🎥)/u.test(was)) { /* المشهد: التاب بتاعه بيقول خلص */ }
         else if (was.includes("🎯")) toast("🎯 لقيت الحاجة وتابعتها: شغّل الفيديو وشوف الحدود الصفرا");
         else if (cur.blocks?.length) toast("🔤 التايبوجرافي اتوزّعت على المونتاج");
         syncPreview();
