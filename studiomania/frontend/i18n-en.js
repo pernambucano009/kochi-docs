@@ -3315,5 +3315,9 @@ window.I18N_EN = {
   "🎬 🔘 زرار عملاق": "🎬 🔘 Giant button",
   "🎬 ⭕ عداد دايري": "🎬 ⭕ Ring gauge",
   "🎬 ⚡ جملة أتمتة": "🎬 ⚡ Automation rule",
-  "🎬 ✳️ صف أيقونات": "🎬 ✳️ Icon row"
+  "🎬 ✳️ صف أيقونات": "🎬 ✳️ Icon row",
+  "🎬 🔴 أرقام ديجيتال": "🎬 🔴 LED digits",
+  "🎬 🚀 عداد إطلاق": "🎬 🚀 Launch countdown",
+  "🎬 📡 كارت تقرير مباشر": "🎬 📡 Live report card",
+  "🎬 🔍 نتيجة بحث": "🎬 🔍 Search result"
 };
