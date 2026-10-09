@@ -3252,5 +3252,12 @@ window.I18N_EN = {
   "🎬 📝 دوكيومنت بهايلايتر": "🎬 📝 Highlighted document",
   "🎬 📅 كارت موعد ورسالة وملف": "🎬 📅 Meeting, message and file cards",
   "🎬 📞 مكالمة فيديو": "🎬 📞 Video call",
-  "🎬 🗂️ لوحة كروت والكاميرا بتقرّب": "🎬 🗂️ Card canvas with camera zoom"
+  "🎬 🗂️ لوحة كروت والكاميرا بتقرّب": "🎬 🗂️ Card canvas with camera zoom",
+  "🎬 🟦 كارت لون وكلام صغير": "🎬 🟦 Color card with small text",
+  "🎬 📲 محادثة موبايل": "🎬 📲 Phone conversation",
+  "🎬 📈 كارت داشبورد": "🎬 📈 Dashboard card",
+  "🎬 🔌 تطبيقات بتتوصل": "🎬 🔌 Apps connecting",
+  "🎬 🔔 جرس والعداد بيزيد": "🎬 🔔 Bell with rising counter",
+  "🎬 🔢 رقم فصل عملاق": "🎬 🔢 Giant chapter number",
+  "🎬 🗃️ فيديو وبانل جنبه": "🎬 🗃️ Video with side panel"
 };

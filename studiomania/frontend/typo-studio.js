@@ -36,7 +36,8 @@
     "serif", "chalk", "ticket", "frame", "toggle", "years", "wave", "spaced", "search", "digits", "torn",
     "emoji", "doodle", "browser", "split", "spotlight", "phone",
     "window", "inline", "bigtype", "checks", "progress", "flow", "aura", "stairs", "dates", "endcard",
-    "wintitle", "corners", "inbox", "doc", "workcards", "call", "canvas"]);
+    "wintitle", "corners", "inbox", "doc", "workcards", "call", "canvas",
+    "colorcard", "imsg", "dashboard", "apps", "bell", "chapter", "sidepanel"]);
   E.TYPING = new Set(["type", "artype"]);
   const MC = document.createElement("canvas").getContext("2d");
   const measure = (s, font) => { MC.font = font; return MC.measureText(s).width; };
@@ -3111,21 +3112,23 @@
     if (!it.length) return "";
     const fi = b.focus >= 0 && b.focus < it.length ? b.focus : 0;
     const main = this.text(it[fi].w), rest = it.filter((x, i) => i !== fi);
-    const acc = accentOf(th, bi, [ORG, "#2F7CF6", "#16A34A"]);
+    // كارت فاتح أو كارت أزرق بكلام أبيض (زي المرجع)
+    const solid = bi % 2 === 1, ecInk = solid ? "#fff" : INK;
+    const acc = solid ? "#FFFFFF" : accentOf(th, bi, [ORG, "#2F7CF6", "#16A34A"]);
     const ff = famOf(main);
     const sz = fitSize(main, `700 {}px ${ff}`, w * 0.6, mn * 0.11);
     const a = eOut(seg(t, b.t0, b.t0 + 0.5));
     const m = sz * 0.95;
     // العلامة: دايرة بخطوط زي الغروب
     const mark = `<svg width="${m.toFixed(0)}" height="${m.toFixed(0)}" viewBox="0 0 20 20"><defs><clipPath id="tyEc${bi}"><circle cx="10" cy="10" r="9.5"/></clipPath></defs><g clip-path="url(#tyEc${bi})"><rect width="20" height="20" fill="${acc}"/>
-      ${[11.5, 14, 16.5].map((y) => `<rect x="0" y="${y}" width="20" height="1.1" fill="${PAPER}"/>`).join("")}</g></svg>`;
-    let html = `<div style="position:absolute;inset:0;background:${PAPER}"></div>
+      ${[11.5, 14, 16.5].map((y) => `<rect x="0" y="${y}" width="20" height="1.1" fill="${solid ? "#3B4BE8" : PAPER}"/>`).join("")}</g></svg>`;
+    let html = `<div style="position:absolute;inset:0;background:${solid ? "#3B4BE8" : PAPER}"></div>
       <div dir="${this.dir(main)}" style="position:absolute;left:0;right:0;top:${(h * 0.47).toFixed(1)}px;transform:translateY(-50%) scale(${lerp(0.92, 1, a).toFixed(3)});display:flex;justify-content:center;align-items:center;gap:${(sz * 0.2).toFixed(1)}px;opacity:${a.toFixed(3)}">
-        ${mark}<span style="white-space:nowrap;font:700 ${sz.toFixed(1)}px ${ff};letter-spacing:-0.04em;color:${INK}">${esc(main)}</span></div>`;
+        ${mark}<span style="white-space:nowrap;font:700 ${sz.toFixed(1)}px ${ff};letter-spacing:-0.04em;color:${ecInk}">${esc(main)}</span></div>`;
     if (rest.length && t >= rest[0].t0) {
       const s = rest.map((x) => this.text(x.w)).join(" "), f2 = famOf(s), z = fitSize(s, `500 {}px ${f2}`, w * 0.7, mn * 0.04 * this.ts);
       html += `<div style="position:absolute;left:0;right:0;top:${(h * 0.47 + sz * 1.1).toFixed(1)}px;text-align:center;opacity:${eOut(seg(t, rest[0].t0, rest[0].t0 + 0.3)).toFixed(3)}">
-        <span dir="${this.dir(s)}" style="display:inline-block;white-space:nowrap;font:500 ${z.toFixed(1)}px ${f2};color:${INK};border:${Math.max(1.5, z * 0.06).toFixed(1)}px solid ${INK};border-radius:999px;padding:${(z * 0.2).toFixed(1)}px ${(z * 0.7).toFixed(1)}px">${esc(s)}</span></div>`;
+        <span dir="${this.dir(s)}" style="display:inline-block;white-space:nowrap;font:500 ${z.toFixed(1)}px ${f2};color:${ecInk};border:${Math.max(1.5, z * 0.06).toFixed(1)}px solid ${ecInk};border-radius:999px;padding:${(z * 0.2).toFixed(1)}px ${(z * 0.7).toFixed(1)}px">${esc(s)}</span></div>`;
     }
     return html;
   };
@@ -3378,5 +3381,223 @@
       }
     });
     return `<div style="position:absolute;inset:0;background:#FBFBFA"></div><div style="position:absolute;left:0;top:0;width:${w}px;height:${h}px;transform-origin:0 0;transform:translate(${tx.toFixed(1)}px,${ty.toFixed(1)}px) scale(${Z.toFixed(4)})">${inner}</div>`;
+  };
+
+  // =====================================================================
+  // فيديو مرجعي 2 (إعلان تطبيق عيلة/شغل):
+  //   colorcard  خلفية لون واحد وكلام صغير أبيض في النص كلمة كلمة
+  //   imsg       محادثة موبايل بهيدر فيه صورة واسم الشخص
+  //   dashboard  كارت داشبورد: أرقام بتعدّ وخط بياني بيترسم
+  //   apps       شبكة تطبيقات بتتوصل واحد واحد بسبينر
+  //   bell       جرس إشعارات والعداد بيزيد وزرار «إنشاء» كبير
+  //   chapter    خلفية ملونة والفيديو في ركن ورقم فصل عملاق «01)»
+  //   sidepanel  الفيديو في ناحية وبانل أبيض فيه صفوف بأرقام في الناحية التانية
+  // =====================================================================
+  const SOLID = ["#3B4BE8", ORG, "#151515", "#16A34A"];
+  P.k_colorcard = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    if (!it.length) return "";
+    const ar = isAr(it), ff = famOf(ar ? "ع" : "a");
+    const sz = mn * 0.05 * this.ts;
+    const lines = this.wrapItems(it, `500 ${sz}px ${ff}`, w * 0.7);
+    const y0 = h / 2 - (lines.length - 1) * sz * 0.65;
+    let html = `<div style="position:absolute;inset:0;background:${SOLID[bi % SOLID.length]}"></div>`;
+    lines.forEach((ln, li) => {
+      html += lineHtml(this, ln, sz, ff, "#fff", y0 + li * sz * 1.3, "font-weight:500;letter-spacing:-0.02em", (x) => {
+        const q = eOut(seg(t, x.t0, x.t0 + 0.25));
+        return `<span style="display:inline-block;opacity:${q.toFixed(3)};transform:translateY(${((1 - q) * sz * 0.3).toFixed(1)}px)">${esc(this.text(x.w))}</span>`;
+      });
+    });
+    return html;
+  };
+
+  // ---------- imsg
+  P.k_imsg = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    const cs = chunks(it, Math.min(4, Math.max(1, Math.ceil(it.length / 3))));
+    const ar = isAr(it), L = ar ? "ar" : "en", ff = famOf(ar ? "ع" : "a");
+    const sz = mn * 0.05 * this.ts;
+    const nm = NAMES[L][bi % 4];
+    const hy = h * 0.12;
+    let html = `<div style="position:absolute;inset:0;background:#FFFFFF"></div>
+      <div style="position:absolute;left:0;right:0;top:${(hy - sz * 1.6).toFixed(0)}px;display:flex;flex-direction:column;align-items:center;gap:${(sz * 0.2).toFixed(1)}px;opacity:${eOut(seg(t, b.t0, b.t0 + 0.3)).toFixed(3)}">
+        <span style="width:${(sz * 2.6).toFixed(0)}px;height:${(sz * 2.6).toFixed(0)}px;border-radius:50%;background:${AVC[bi % 4]};display:flex;align-items:center;justify-content:center;font:700 ${(sz * 1.1).toFixed(0)}px ${famOf(nm)};color:#333">${esc([...nm][0])}</span>
+        <span style="font:500 ${(sz * 0.8).toFixed(1)}px ${famOf(nm)};color:#111">${esc(nm)} ›</span></div>
+      <div dir="ltr" style="position:absolute;left:${(w * 0.05).toFixed(0)}px;top:${(hy - sz * 1.4).toFixed(0)}px;font:600 ${(sz * 0.7).toFixed(1)}px 'TY Outfit';color:#fff;background:#8E8E93;border-radius:999px;padding:${(sz * 0.1).toFixed(1)}px ${(sz * 0.45).toFixed(1)}px">${12 + bi * 7}</div>
+      <div style="position:absolute;left:0;right:0;top:${(hy + sz * 2.4).toFixed(0)}px;height:1px;background:#E5E5EA"></div>`;
+    let y = hy + sz * 3.6;
+    cs.forEach((c, i) => {
+      if (t < c.t0) return;
+      const me = i % 2 === 1;
+      const p = eBack(seg(t, c.t0, c.t0 + 0.25));
+      const s = this.text(c.w);
+      const lines = Math.max(1, Math.ceil(measure(s, `500 ${sz}px ${ff}`) / (w * 0.6)));
+      const bh = sz * 1.3 * lines + sz * 1.1;
+      html += `<div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;${me ? "right" : "left"}:${(w * 0.06).toFixed(0)}px;top:${y.toFixed(1)}px;max-width:${(w * 0.68).toFixed(0)}px;transform:scale(${p.toFixed(3)});transform-origin:${me ? "100%" : "0"} 100%;
+        background:${me ? "#1E9BFF" : "#E9E9EB"};color:${me ? "#fff" : "#111"};font:500 ${sz.toFixed(1)}px ${ff};line-height:1.3;padding:${(sz * 0.5).toFixed(1)}px ${(sz * 0.85).toFixed(1)}px;border-radius:${(sz * 1.1).toFixed(1)}px">${esc(s)}</div>`;
+      y += bh + sz * 0.5;
+    });
+    return html;
+  };
+
+  // ---------- dashboard: أرقام بتعدّ وخط بياني
+  P.k_dashboard = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    if (!it.length) return "";
+    const ar = isAr(it), ff = famOf(ar ? "ع" : "a");
+    const r = this.freeRect(b);
+    const cw = Math.min(r.w, w * 0.86), ch = Math.min(r.h, cw * 0.78);
+    const x = r.x + (r.w - cw) / 2, y = r.y + (r.h - ch) / 2;
+    const sz = cw * 0.05;
+    const acc = ["#3B4BE8", "#16A34A", ORG][bi % 3];
+    const nums = it.map((q) => q.w.match(/[0-9٠-٩]+/)).filter(Boolean).map((m) => parseInt(m[0].replace(/[٠-٩]/g, (d) => "٠١٢٣٤٥٦٧٨٩".indexOf(d)), 10));
+    const vals = [nums[0] ?? 15 + bi, nums[1] ?? 3 + (bi % 5)];
+    const title = it.filter((q) => !/[0-9٠-٩]/.test(q.w)).map((q) => this.text(q.w)).join(" ");
+    const a = eOut(seg(t, b.t0, b.t0 + 0.35)), cnt = eOut(seg(t, b.t0 + 0.2, b.t0 + 1.2)), ln = seg(t, b.t0 + 0.4, b.t0 + 1.6);
+    const rr = rng(bi * 19 + 3);
+    const pts = Array.from({ length: 9 }, (_, i) => [i / 8, 0.25 + rr() * 0.6]);
+    const gw = cw * 0.86, gh = ch * 0.38, gx = cw * 0.07, gy = ch * 0.52;
+    const path = pts.map(([px, py], i) => `${i ? "L" : "M"}${(gx + px * gw).toFixed(1)} ${(gy + gh - py * gh).toFixed(1)}`).join(" ");
+    const area = path + ` L${(gx + gw).toFixed(1)} ${(gy + gh).toFixed(1)} L${gx.toFixed(1)} ${(gy + gh).toFixed(1)}Z`;
+    const L2 = gw * 1.6;
+    let html = onVideo(this) ? "" : `<div style="position:absolute;inset:0;background:${PAPER}"></div>`;
+    html += `<div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:${x.toFixed(1)}px;top:${y.toFixed(1)}px;width:${cw.toFixed(1)}px;height:${ch.toFixed(1)}px;box-sizing:border-box;transform:translateY(${((1 - a) * ch * 0.2).toFixed(1)}px);opacity:${a.toFixed(3)};
+      background:#fff;border-radius:${(sz * 0.6).toFixed(1)}px;box-shadow:0 ${(sz * 0.3).toFixed(1)}px ${sz.toFixed(1)}px rgba(0,0,0,.16);padding:${(sz * 1.1).toFixed(1)}px">
+      <div style="font:700 ${(sz * 1.25).toFixed(1)}px ${ff};color:${acc};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(title || (ar ? "نظرة عامة" : "Overview"))}</div>
+      <div dir="ltr" style="display:flex;gap:${(sz * 2).toFixed(1)}px;margin-top:${(sz * 0.6).toFixed(1)}px">${vals.map((v, i) => `<div><div style="font:700 ${(sz * 2.2).toFixed(1)}px 'TY Outfit';color:#111;letter-spacing:-0.04em">${Math.round(v * cnt).toLocaleString("en")}<span style="font-size:.4em;color:${i ? ORG : acc}"> ●</span></div>
+        <div style="font:500 ${(sz * 0.7).toFixed(1)}px ${famOf(ar ? "ع" : "a")};color:#777">${ar ? ["الأسبوع ده", "النهارده"][i] : ["this week", "today"][i]}</div></div>`).join("")}</div>
+      <svg width="${cw.toFixed(0)}" height="${ch.toFixed(0)}" style="position:absolute;left:0;top:0;overflow:visible">
+        ${[0, 1, 2, 3].map((q) => `<line x1="${gx.toFixed(0)}" x2="${(gx + gw).toFixed(0)}" y1="${(gy + (q / 3) * gh).toFixed(0)}" y2="${(gy + (q / 3) * gh).toFixed(0)}" stroke="#EEE"/>`).join("")}
+        <path d="${area}" fill="${acc}" opacity="${(0.12 * ln).toFixed(3)}"/>
+        <path d="${path}" fill="none" stroke="${acc}" stroke-width="${(sz * 0.18).toFixed(1)}" stroke-linejoin="round" stroke-dasharray="${L2.toFixed(0)}" stroke-dashoffset="${(L2 * (1 - ln)).toFixed(1)}"/></svg></div>`;
+    return html;
+  };
+
+  // ---------- apps: شبكة تطبيقات بتتوصل
+  const APPC = [["#EA4335", "M"], ["#1A73E8", "31"], ["#5E6AD2", "◐"], ["#635BFF", "S"], ["#0F9D58", "▲"], ["#188038", "▦"]];
+  P.k_apps = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    if (!it.length) return "";
+    const ar = isAr(it), ff = famOf(ar ? "ع" : "a");
+    const r = this.freeRect(b);
+    // عمود واحد لو المكان ضيق (الطولي)، وإلا عمودين
+    const cols = r.w < w * 0.6 || h > w ? 1 : 2, rows = cols === 1 ? Math.min(5, Math.max(3, it.length)) : 3;
+    const gw = Math.min(cols === 1 ? Math.max(r.w, w * 0.7) : r.w, w * 0.88), tile = gw / cols, th2 = Math.min(cols === 1 ? tile * 0.2 : tile * 0.5, (r.h || h * 0.5) / rows);
+    const x0 = Math.max(mn * 0.03, r.x + (r.w - gw) / 2), y0 = r.y + Math.max(0, (r.h - th2 * rows) / 2);
+    const names = it.map((x) => this.text(x.w));
+    const sz = th2 * 0.24;
+    let html = onVideo(this) ? "" : `<div style="position:absolute;inset:0;background:#F2F2F0"></div>`;
+    for (let i = 0; i < cols * rows; i++) {
+      const c = i % cols, rI = Math.floor(i / cols);
+      const nm = names[i % names.length];
+      const t0 = b.t0 + i * ((b.t1 - b.t0 - 0.4) / (cols * rows));
+      const a = eOut(seg(t, t0 - 0.2, t0 + 0.1));
+      const busy = t >= t0 && t < t0 + 0.45, done = t >= t0 + 0.45;
+      const [col, glyph] = APPC[(i + bi) % APPC.length];
+      html += `<div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:${(x0 + c * tile + tile * 0.03).toFixed(1)}px;top:${(y0 + rI * th2 + th2 * 0.05).toFixed(1)}px;width:${(tile * 0.94).toFixed(1)}px;height:${(th2 * 0.9).toFixed(1)}px;box-sizing:border-box;opacity:${a.toFixed(3)};
+        background:#fff;border-radius:${(sz * 0.6).toFixed(1)}px;border:${done ? 2 : 1}px solid ${done ? col : "#E3E3E6"};display:flex;align-items:center;gap:${(sz * 0.7).toFixed(1)}px;padding:0 ${(sz * 0.9).toFixed(1)}px">
+        <span dir="ltr" style="flex:none;width:${(sz * 2).toFixed(0)}px;height:${(sz * 2).toFixed(0)}px;border-radius:${(sz * 0.5).toFixed(0)}px;background:${col};color:#fff;display:flex;align-items:center;justify-content:center;font:800 ${(sz * 0.9).toFixed(0)}px 'TY Outfit'">${glyph}</span>
+        <span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font:600 ${sz.toFixed(1)}px ${ff};color:#111">${esc(nm)}</span>
+        ${busy ? `<svg width="${sz.toFixed(0)}" height="${sz.toFixed(0)}" viewBox="0 0 24 24" style="flex:none;transform:rotate(${((t * 720) % 360).toFixed(0)}deg)"><circle cx="12" cy="12" r="9" fill="none" stroke="#999" stroke-width="3" stroke-dasharray="40 20"/></svg>`
+          : done ? `<svg width="${sz.toFixed(0)}" height="${sz.toFixed(0)}" viewBox="0 0 24 24" style="flex:none"><circle cx="12" cy="12" r="11" fill="${col}"/><path d="M7 12.5l3 3L17 9" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/></svg>` : ""}</div>`;
+    }
+    return html;
+  };
+
+  // ---------- bell: جرس والعداد بيزيد
+  P.k_bell = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    if (!it.length) return "";
+    const ar = isAr(it), ff = famOf(ar ? "ع" : "a");
+    const sz = mn * 0.13;
+    const cy = this.blockSolid(b) ? Math.min(h * 0.72, this.belowHead(b, sz)) : h * 0.42;
+    const ni = it.findIndex((x) => /[0-9٠-٩]/.test(x.w));
+    const target = ni >= 0 ? parseInt(it[ni].w.replace(/[٠-٩]/g, (d) => "٠١٢٣٤٥٦٧٨٩".indexOf(d)).replace(/[^0-9]/g, ""), 10) || 3 : 3;
+    const n = Math.max(1, Math.round(target * seg(t, b.t0 + 0.2, b.t1 - 0.4)));
+    const ring = Math.sin((t - b.t0) * 18) * 12 * Math.max(0, 1 - ((t - b.t0) % 1) * 3);
+    const zoom = lerp(1.25, 1, eOut(seg(t, b.t0, b.t0 + 0.6)));
+    const label = it.filter((x, i) => i !== ni).map((x) => this.text(x.w)).join(" ") || (ar ? "إشعارات" : "Updates");
+    let html = onVideo(this) ? `<div style="position:absolute;inset:0;background:rgba(255,255,255,.88)"></div>` : `<div style="position:absolute;inset:0;background:#FAFAFA"></div>`;
+    html += `<div style="position:absolute;left:50%;top:${cy.toFixed(1)}px;transform:translate(-50%,-50%) scale(${zoom.toFixed(3)});display:flex;gap:${(sz * 0.25).toFixed(1)}px;align-items:center">
+      <span style="width:${sz.toFixed(0)}px;height:${sz.toFixed(0)}px;border-radius:${(sz * 0.28).toFixed(0)}px;border:2px solid #E5E5E8;background:#fff;display:flex;align-items:center;justify-content:center">
+        <svg width="${(sz * 0.42).toFixed(0)}" height="${(sz * 0.42).toFixed(0)}" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="#9AA0A6" stroke-width="2.4"/><path d="M15.5 15.5 21 21" stroke="#9AA0A6" stroke-width="2.6" stroke-linecap="round"/></svg></span>
+      <span style="position:relative;width:${sz.toFixed(0)}px;height:${sz.toFixed(0)}px;border-radius:${(sz * 0.28).toFixed(0)}px;border:2px solid #E5E5E8;background:#fff;display:flex;align-items:center;justify-content:center">
+        <svg width="${(sz * 0.5).toFixed(0)}" height="${(sz * 0.5).toFixed(0)}" viewBox="0 0 24 24" style="transform:rotate(${ring.toFixed(1)}deg);transform-origin:50% 10%"><path d="M12 3a6 6 0 0 1 6 6v4l2 3H4l2-3V9a6 6 0 0 1 6-6zM10 19a2 2 0 0 0 4 0" fill="none" stroke="#111" stroke-width="2" stroke-linejoin="round"/></svg>
+        <b dir="ltr" style="position:absolute;top:${(-sz * 0.16).toFixed(0)}px;right:${(-sz * 0.16).toFixed(0)}px;min-width:${(sz * 0.42).toFixed(0)}px;height:${(sz * 0.42).toFixed(0)}px;border-radius:999px;background:#F2542D;color:#fff;font:700 ${(sz * 0.26).toFixed(0)}px 'TY Outfit';display:flex;align-items:center;justify-content:center;padding:0 ${(sz * 0.06).toFixed(0)}px">${n}</b></span>
+      <span style="height:${sz.toFixed(0)}px;border-radius:${(sz * 0.28).toFixed(0)}px;background:#111;color:#fff;display:flex;align-items:center;gap:${(sz * 0.12).toFixed(0)}px;padding:0 ${(sz * 0.35).toFixed(0)}px;font:500 ${(sz * 0.36).toFixed(0)}px ${ff}"><span style="font-family:'TY Outfit'">+</span> ${ar ? "إنشاء" : "Create"}</span></div>`;
+    const z = fitSize(label, `500 {}px ${ff}`, w * 0.84, mn * 0.08);
+    html += `<div dir="${this.dir(label)}" style="position:absolute;left:0;right:0;top:${(cy + sz * 1.1).toFixed(1)}px;text-align:center;white-space:nowrap;font:500 ${z.toFixed(1)}px ${ff};letter-spacing:-0.03em;color:#111;opacity:${eOut(seg(t, it[0].t0, it[0].t0 + 0.3)).toFixed(3)}">${esc(label)} <span dir="ltr">(${n})</span></div>`;
+    return html;
+  };
+
+  // ---------- chapter: خلفية ملونة والفيديو في ركن ورقم فصل عملاق
+  P.k_chapter = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    if (!it.length) return "";
+    const e = eOut(seg(t, b.t0, b.t0 + 0.55));
+    const T = h > w ? { x: w * 0.42, y: h * 0.12, w: w * 0.5, h: h * 0.28 } : { x: w * 0.6, y: h * 0.08, w: w * 0.34, h: h * 0.44 };
+    const R = { x: lerp(0, T.x, e), y: lerp(0, T.y, e), w: lerp(w, T.w, e), h: lerp(h, T.h, e) };
+    const bg = SOLID[bi % 2];
+    let html = this.hole(b, R, bg);
+    const m = it[0].w.match(/^[0-9٠-٩]{1,2}$/);
+    const num = m ? this.text(it[0].w) : String(bi + 1).padStart(2, "0");
+    const words = m ? it.slice(1) : it;
+    const nz = mn * 0.62;
+    const q = eOut(seg(t, b.t0 + 0.2, b.t0 + 0.7));
+    html += `<div dir="ltr" style="position:absolute;left:${(-nz * 0.12).toFixed(0)}px;bottom:${(h * 0.05).toFixed(0)}px;font:500 ${nz.toFixed(0)}px 'TY Outfit';letter-spacing:-0.07em;line-height:.8;color:#fff;opacity:${q.toFixed(3)};transform:translateY(${((1 - q) * nz * 0.2).toFixed(1)}px)">${esc(num)})</div>`;
+    if (words.length && t >= words[0].t0) {
+      const s = words.filter((x) => t >= x.t0).map((x) => this.text(x.w)).join(" "), ff = famOf(s);
+      const z = fitSize(s, `500 {}px ${ff}`, w * 0.4, mn * 0.05 * this.ts);
+      html += `<div dir="${this.dir(s)}" style="position:absolute;left:${(T.x).toFixed(0)}px;top:${(T.y + T.h + z * 0.6).toFixed(0)}px;white-space:nowrap;font:500 ${z.toFixed(1)}px ${ff};color:#fff">${esc(s)}</div>`;
+    }
+    html += `<div dir="ltr" style="position:absolute;right:${(w * 0.05).toFixed(0)}px;bottom:${(h * 0.04).toFixed(0)}px;font:400 ${(mn * 0.018).toFixed(1)}px 'TY Pixel',monospace;letter-spacing:.12em;color:#fff;opacity:.7">CHAPTER ${esc(num)}</div>`;
+    return html;
+  };
+
+  // ---------- sidepanel: الفيديو في ناحية وبانل أبيض بصفوف في الناحية التانية
+  P.k_sidepanel = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    const cs = chunks(it, Math.min(5, Math.max(1, Math.ceil(it.length / 2))));
+    const ar = isAr(it), ff = famOf(ar ? "ع" : "a");
+    const tall = h > w;
+    const e = eOut(seg(t, b.t0, b.t0 + 0.5));
+    const P2 = tall ? { x: 0, y: h * 0.5, w, h: h * 0.5 } : { x: ar ? w * 0.5 : 0, y: 0, w: w * 0.5, h };
+    const V = tall ? { x: 0, y: 0, w, h: h * 0.5 } : { x: ar ? 0 : w * 0.5, y: 0, w: w * 0.5, h };
+    const R = { x: lerp(0, V.x, e), y: lerp(0, V.y, e), w: lerp(w, V.w, e), h: lerp(h, V.h, e) };
+    let html = this.hole(b, R, "#FFFFFF");
+    const sz = mn * 0.042 * this.ts;
+    const row = sz * 2.6;
+    const pad = Math.min(P2.w, P2.h) * 0.08;
+    const dateMode = bi % 2 === 1;
+    cs.forEach((c, i) => {
+      if (t < c.t0) return;
+      const a = eOut(seg(t, c.t0, c.t0 + 0.3));
+      const y = P2.y + pad + i * row;
+      if (y + row > P2.y + P2.h) return;
+      const s = this.text(c.w);
+      const n = c.w.match(/[0-9٠-٩]+/);
+      const val = n ? this.text(n[0]) : (1000 + ((i * 733 + bi * 97) % 6000)).toLocaleString("en");
+      html += `<div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:${(P2.x + pad).toFixed(1)}px;width:${(P2.w - pad * 2).toFixed(1)}px;top:${y.toFixed(1)}px;height:${(row - sz * 0.4).toFixed(1)}px;display:flex;align-items:center;gap:${(sz * 0.6).toFixed(1)}px;
+        border-bottom:1px solid #EEE;opacity:${a.toFixed(3)};transform:translateY(${((1 - a) * sz).toFixed(1)}px)">
+        ${dateMode ? `<span dir="ltr" style="flex:none;width:${(sz * 1.8).toFixed(0)}px;height:${(sz * 1.8).toFixed(0)}px;border-radius:${(sz * 0.4).toFixed(0)}px;background:${["#FFE1D6", "#E0E7FF", "#DCFCE7", "#FEF3C7"][i % 4]};display:flex;align-items:center;justify-content:center;font:700 ${(sz * 0.8).toFixed(0)}px 'TY Outfit';color:#333">${10 + i * 3}</span>` : ""}
+        <span style="flex:1;min-width:0"><span style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font:600 ${sz.toFixed(1)}px ${ff};color:#111">${esc(s)}</span>
+          ${dateMode ? "" : `<span dir="ltr" style="display:block;font:500 ${(sz * 0.7).toFixed(1)}px 'TY Outfit';color:#888">${val} ${ar ? "مشاهدة" : "views"}</span>`}</span>
+        <span dir="ltr" style="flex:none;font:600 ${(sz * 0.75).toFixed(1)}px 'TY Outfit';color:${dateMode ? "#16A34A" : "#3B4BE8"}">${dateMode ? (ar ? "النهارده" : "today") : `${1 + (i % 4)}:${String(10 + ((i * 17) % 50)).padStart(2, "0")} avg`}</span></div>`;
+    });
+    return html;
   };
 })();
