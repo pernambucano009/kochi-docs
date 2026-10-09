@@ -3265,5 +3265,13 @@ window.I18N_EN = {
   "🎬 🔴 دايرة بأول حرف بتكبر": "🎬 🔴 Initial circle that grows",
   "🎬 🏆 لوحة ترتيب": "🎬 🏆 Leaderboard",
   "🎬 🍩 دايرة نسبة": "🎬 🍩 Donut percentage",
-  "🎬 🖼️ كلمات وصور طايرة": "🎬 🖼️ Words with floating photos"
+  "🎬 🖼️ كلمات وصور طايرة": "🎬 🖼️ Words with floating photos",
+  "🎬 🎬 عنوان سينمائي بيتبني": "🎬 🎬 Cinematic building title",
+  "🎬 🚆 لوحة مواعيد قطر": "🎬 🚆 Train departure board",
+  "🎬 ⚙️ شاشة بيتعمل دلوقتي": "🎬 ⚙️ Building screen",
+  "🎬 ⏳ عدّاد تنازلي": "🎬 ⏳ Countdown",
+  "🎬 🖐️ صور بتطير لمربع الكتابة": "🎬 🖐️ Photos dropped into the prompt",
+  "🎬 🎤 قايمة أسامي كبيرة": "🎬 🎤 Big name lineup",
+  "🎬 🗺️ خريطة أيزومتريك": "🎬 🗺️ Isometric map",
+  "🎬 🏷️ كلمة عملاقة وتاجات مايلة": "🎬 🏷️ Giant word with tilted tags"
 };
