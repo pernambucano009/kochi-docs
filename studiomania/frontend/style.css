@@ -1912,3 +1912,27 @@ a.btn.disabled { opacity: .45; pointer-events: none; }
 #mtScenePane textarea { width: 100%; box-sizing: border-box; }
 .sc-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
 .sc-item { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 8px 10px; display: flex; flex-direction: column; gap: 4px; }
+
+/* 🌍 الدبلجة */
+.db-head { display: grid; grid-template-columns: 200px 1fr; gap: 16px; align-items: start; }
+@media (max-width: 700px) { .db-head { grid-template-columns: 1fr; } }
+.db-src video, .db-out video { width: 100%; max-height: 360px; border-radius: 14px; background: #000; }
+.db-meta { display: flex; flex-direction: column; gap: 8px; }
+.db-meta h2 { margin: 0; }
+.db-meta input { width: 100%; box-sizing: border-box; font: inherit; border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; background: #fff; margin-top: 4px; }
+.db-meta label { display: flex; flex-direction: column; font-size: 13px; color: var(--muted); }
+.db-meta #dbDel { align-self: flex-start; }
+.db-dialect { display: flex; flex-direction: column; gap: 10px; }
+.db-dh { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.db-dh h3 { margin: 0; margin-inline-end: auto; }
+.db-lines { display: flex; flex-direction: column; gap: 6px; max-height: 60vh; overflow-y: auto; padding-inline-end: 4px; }
+.db-line { display: grid; grid-template-columns: 56px 1fr 1.3fr; gap: 10px; align-items: start; padding: 8px; border-radius: 12px; background: var(--surface-2); }
+@media (max-width: 800px) { .db-line { grid-template-columns: 48px 1fr; } .db-line textarea { grid-column: 1 / -1; } }
+.db-t { font-variant-numeric: tabular-nums; font-size: 13px; display: flex; flex-direction: column; color: var(--muted); }
+.db-t small { font-size: 11px; }
+.db-src-t { font-size: 13px; color: var(--muted); line-height: 1.6; }
+.db-line textarea { width: 100%; box-sizing: border-box; font: inherit; font-size: 15px; line-height: 1.6; border-radius: 10px; border: 1px solid var(--line); padding: 6px 8px; background: #fff; resize: vertical; }
+.db-line textarea.over { border-color: var(--warn); box-shadow: 0 0 0 2px rgba(227, 161, 58, .2); }
+.db-opts { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; }
+.db-out { display: flex; flex-direction: column; gap: 6px; max-width: 320px; }
+.db-out .ok { color: var(--ok); margin: 0; }

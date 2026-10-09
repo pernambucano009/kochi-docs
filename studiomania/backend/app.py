@@ -14750,6 +14750,420 @@ def reset_stuck_typo() -> None:
 reset_stuck_typo()
 
 
+# ---------------------------------------------------------------- 🌍 الدبلجة باللهجات العامية
+# فيديو (من برّه أو من الفيديوهات الجاهزة) ← الكلام بيتسمع ← يتحوّل للهجة (تقدر تعدّله) ← كل جملة بصوت جاهز في مكانها
+# ← الموسيقى والمؤثرات بتفضل (AudioShake) ← ليب سينك (اختياري) ← نسخة في الفيديوهات الجاهزة للنشر لكل لهجة.
+
+import dub  # noqa: E402
+
+DUB_DIR = DATA_DIR / "dub"
+DUB_DIR.mkdir(parents=True, exist_ok=True)
+DUB_LOCK = threading.Lock()
+app.mount("/media/dub", StaticFiles(directory=DUB_DIR), name="dub")
+
+
+def dub_load(did: str) -> dict:
+    f = DUB_DIR / Path(did).name / "dub.json"
+    if not f.exists():
+        raise HTTPException(404, "مشروع الدبلجة ده مش موجود")
+    return json.loads(f.read_text(encoding="utf-8"))
+
+
+def dub_update(did: str, fn) -> dict:
+    with DUB_LOCK:
+        d = dub_load(did)
+        fn(d)
+        d["updated_at"] = now()
+        folder = DUB_DIR / Path(did).name
+        (folder / "dub.json.tmp").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+        (folder / "dub.json.tmp").replace(folder / "dub.json")
+        return d
+
+
+def dub_busy(d: dict) -> bool:
+    return bool(d.get("busy")) or any(t.get("busy") for t in (d.get("targets") or {}).values())
+
+
+def dub_to_dict(did: str, d: dict) -> dict:
+    base = f"/media/dub/{did}"
+    folder = DUB_DIR / did
+    def url(n):
+        return f"{base}/{n}?v={int((folder / n).stat().st_mtime)}" if n and (folder / n).exists() else None
+    targets = {}
+    for k, t in (d.get("targets") or {}).items():
+        texts = [x["text"] for x in t.get("lines") or []]
+        targets[k] = {**t, "video_url": url(t.get("video")), "audio_url": url(t.get("audio")),
+                      "cost": {v: dub.estimate(texts, v, d["source"].get("duration") or 0, None) for v in dub.DIALECTS[k]["voices"]},
+                      "lip_cost": {m: round((d["source"].get("duration") or 0) * x["per_sec"], 2) for m, x in dub.LIPSYNC.items()}}
+    return {**d, "id": did, "busy": dub_busy(d), "source": {**d["source"], "url": url(d["source"].get("file"))}, "targets": targets}
+
+
+def dub_info() -> dict:
+    return {"dialects": {k: {"label": v["label"], "voices": v["voices"], "sample": v["sample"]} for k, v in dub.DIALECTS.items()},
+            "voices": {k: v["label"] for k, v in dub.VOICES.items()},
+            "lipsync": {k: v["label"] for k, v in dub.LIPSYNC.items()},
+            "separate": bool(audioshake.api_key() or atlas.mock_mode())}
+
+
+@app.get("/api/dub")
+def dub_list():
+    out = []
+    for f in sorted(DUB_DIR.glob("*/dub.json"), key=lambda x: x.stat().st_mtime, reverse=True):
+        try:
+            d = json.loads(f.read_text(encoding="utf-8"))
+        except ValueError:
+            continue
+        if d.get("client_id") and d["client_id"] != active_client_id():
+            continue
+        out.append({"id": f.parent.name, "name": d.get("name"), "busy": dub_busy(d), "targets": list((d.get("targets") or {}).keys()),
+                    "duration": (d.get("source") or {}).get("duration"), "updated_at": d.get("updated_at")})
+    return {"items": out, **dub_info()}
+
+
+def dub_create(src: Path, name: str) -> dict:
+    did = uuid.uuid4().hex[:10]
+    folder = DUB_DIR / did
+    folder.mkdir(parents=True)
+    file = f"src{src.suffix.lower() or '.mp4'}"
+    shutil.move(str(src), folder / file)
+    try:
+        info = media_info(folder / file)
+    except Exception as exc:  # noqa: BLE001
+        shutil.rmtree(folder, ignore_errors=True)
+        raise HTTPException(400, f"مش قادر أقرا الفيديو ده: {exc}") from exc
+    d = {"name": name[:120] or "دبلجة", "client_id": active_client_id(), "brief": "",
+         "source": {"file": file, "duration": round(info.duration, 3), "w": info.width, "h": info.height},
+         "words": [], "lines": [], "bg": None, "targets": {}, "busy": True, "step": "🎧 بيسمع الكلام", "error": None,
+         "created_at": now(), "updated_at": now()}
+    (folder / "dub.json").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+    threading.Thread(target=run_dub_transcribe, args=(did,), daemon=True).start()
+    return dub_to_dict(did, d)
+
+
+@app.post("/api/dub")
+def dub_upload(file: UploadFile = File(...)):
+    """🌍 دبلجة جديدة من فيديو من برّه."""
+    tmp = save_upload(file, VIDEO_EXTENSIONS, TMP_DIR, "dubup")
+    return dub_create(TMP_DIR / tmp, Path(file.filename or "فيديو").stem)
+
+
+class DubFromExportIn(BaseModel):
+    export_id: str
+
+
+@app.post("/api/dub/from-export")
+def dub_from_export(body: DubFromExportIn):
+    """🌍 دبلجة لفيديو من الفيديوهات الجاهزة (اللي اتصدّرت من عندنا)."""
+    with closing(db()) as conn:
+        r = conn.execute("SELECT * FROM exports WHERE id = ?", (body.export_id,)).fetchone()
+    if not r or not (EXPORTS_DIR / r["filename"]).exists():
+        raise HTTPException(404, "الفيديو ده مش موجود")
+    tmp = TMP_DIR / f"dubexp_{uuid.uuid4().hex[:8]}{Path(r['filename']).suffix}"
+    shutil.copy(EXPORTS_DIR / r["filename"], tmp)
+    return dub_create(tmp, r["name"])
+
+
+@app.get("/api/dub/{did}")
+def dub_get(did: str):
+    return {**dub_to_dict(did, dub_load(did)), "info": dub_info()}
+
+
+@app.delete("/api/dub/{did}")
+def dub_delete(did: str):
+    d = dub_load(did)
+    if dub_busy(d):
+        raise HTTPException(400, "استنى لما الشغل اللي شغال يخلص")
+    shutil.rmtree(DUB_DIR / Path(did).name, ignore_errors=True)
+    return {"ok": True}
+
+
+def dub_fail(did: str, exc: Exception, target: str | None = None) -> None:
+    msg = str(getattr(exc, "detail", None) or exc)[:400]
+    def fn(d):
+        if target:
+            d["targets"][target].update(busy=False, step=None, error=msg)
+        else:
+            d.update(busy=False, step=None, error=msg)
+    dub_update(did, fn)
+
+
+def run_dub_transcribe(did: str) -> None:
+    try:
+        d = dub_load(did)
+        folder = DUB_DIR / did
+        src = folder / d["source"]["file"]
+        if not typo_has_audio(src):
+            raise RuntimeError("الفيديو ده مفيهوش صوت")
+        audio = TMP_DIR / f"dub_{did}.m4a"
+        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src), "-vn", "-ac", "1", "-c:a", "aac", "-b:a", "96k", str(audio)],
+                       check=True, capture_output=True, timeout=300)
+        try:
+            words = atlas.transcribe(audio, d["source"]["duration"])
+        finally:
+            audio.unlink(missing_ok=True)
+        if not words:
+            raise RuntimeError("مقدرتش أسمع كلام في الفيديو ده")
+        lines = dub.lines_from_words(words, typo.sentences(words))
+        dub_update(did, lambda x: x.update(words=words, lines=lines, busy=False, step=None, error=None))
+    except Exception as exc:  # noqa: BLE001
+        dub_fail(did, exc)
+
+
+class DubTargetIn(BaseModel):
+    dialect: str
+    voice: str | None = None
+    brief: str | None = None
+
+
+@app.post("/api/dub/{did}/target")
+def dub_target(did: str, body: DubTargetIn):
+    """🗣️ لهجة جديدة (أو من جديد): الكلام بيتحوّل للهجة على قد وقت كل جملة، وتقدر تعدّله قبل الصوت."""
+    if body.dialect not in dub.DIALECTS:
+        raise HTTPException(400, "اللهجة دي مش موجودة")
+    voice = body.voice if body.voice in dub.DIALECTS[body.dialect]["voices"] else dub.DIALECTS[body.dialect]["voices"][0]
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل")
+
+    def fn(d):
+        if not d.get("lines"):
+            raise HTTPException(400, "استنى لما الكلام يتسمع الأول")
+        if dub_busy(d):
+            raise HTTPException(400, "استنى لما الشغل اللي شغال يخلص")
+        if body.brief is not None:
+            d["brief"] = body.brief[:600]
+        old = d["targets"].get(body.dialect) or {}
+        d["targets"][body.dialect] = {**old, "voice": voice, "lines": [], "busy": True, "step": "✍️ بيكتب الكلام باللهجة", "error": None}
+    d = dub_update(did, fn)
+    threading.Thread(target=run_dub_adapt, args=(did, body.dialect), daemon=True).start()
+    return dub_to_dict(did, d)
+
+
+def run_dub_adapt(did: str, dialect: str) -> None:
+    try:
+        d = dub_load(did)
+        lines = d["lines"]
+        if atlas.mock_mode():
+            out = [f"{dub.DIALECTS[dialect]['sample']} {i + 1}" for i in range(len(lines))]
+        else:
+            res = ad_json(series_chat(dub.adapt_messages(dialect, lines, d["source"]["duration"], d.get("brief") or ""), json_mode=True), "الدبلجة")
+            out = [dub.clean_line(x) for x in (res.get("lines") or [])]
+            if len(out) != len(lines):   # الموديل غيّر عدد الجمل: نكمّل بالأصل عشان المواعيد ماتبوظش
+                out = (out + [ln["src"] for ln in lines[len(out):]])[: len(lines)]
+        dub_update(did, lambda x: x["targets"][dialect].update(lines=[{"text": t} for t in out], busy=False, step=None, error=None))
+    except Exception as exc:  # noqa: BLE001
+        dub_fail(did, exc, dialect)
+
+
+class DubLinesIn(BaseModel):
+    texts: list[str] | None = None
+    voice: str | None = None
+
+
+@app.put("/api/dub/{did}/target/{dialect}")
+def dub_target_edit(did: str, dialect: str, body: DubLinesIn):
+    """✏️ تعديل الكلام أو الصوت."""
+    def fn(d):
+        t = d["targets"].get(dialect)
+        if not t:
+            raise HTTPException(404, "اللهجة دي لسه ما اتعملتش")
+        if body.texts is not None:
+            if len(body.texts) != len(d["lines"]):
+                raise HTTPException(400, "عدد الجمل اتغيّر")
+            t["lines"] = [{"text": dub.clean_line(x)} for x in body.texts]
+        if body.voice in dub.DIALECTS[dialect]["voices"]:
+            t["voice"] = body.voice
+    return dub_to_dict(did, dub_update(did, fn))
+
+
+class DubRenderIn(BaseModel):
+    lipsync: str | None = None      # None / sync / veed
+    background: str = "auto"        # auto / separate / low / none
+
+
+@app.post("/api/dub/{did}/target/{dialect}/render")
+def dub_render(did: str, dialect: str, body: DubRenderIn):
+    """🎙️ الصوت باللهجة في مكانه + الموسيقى والمؤثرات + ليب سينك (اختياري) ← فيديو جاهز للنشر."""
+    if body.lipsync and body.lipsync not in dub.LIPSYNC:
+        raise HTTPException(400, "نوع الليب سينك مش معروف")
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل")
+
+    def fn(d):
+        t = d["targets"].get(dialect)
+        if not t or not t.get("lines"):
+            raise HTTPException(400, "اكتب الكلام باللهجة الأول")
+        if dub_busy(d):
+            raise HTTPException(400, "استنى لما الشغل اللي شغال يخلص")
+        t.update(busy=True, step="🎙️ بيسجّل الجمل", error=None, lipsync=body.lipsync)
+    d = dub_update(did, fn)
+    threading.Thread(target=run_dub_render, args=(did, dialect, body.lipsync, body.background), daemon=True).start()
+    return dub_to_dict(did, d)
+
+
+def dub_background(did: str, d: dict, mode: str) -> Path | None:
+    """الموسيقى والمؤثرات من غير الكلام (AudioShake)، أو الصوت الأصلي واطي، أو ولا حاجة."""
+    folder = DUB_DIR / did
+    src = folder / d["source"]["file"]
+    if mode == "auto":
+        mode = "separate" if (audioshake.api_key() or atlas.mock_mode()) else "none"
+    ff = [ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y"]
+    if mode == "none":
+        return None
+    if mode == "low":
+        out = folder / "bg_low.wav"
+        subprocess.run(ff + ["-i", str(src), "-vn", "-ac", "2", "-ar", "48000", "-af", "volume=0.12", str(out)], check=True, capture_output=True, timeout=600)
+        return out
+    out = folder / "bg.wav"
+    if out.exists():
+        return out
+    mix = folder / "mix.wav"
+    subprocess.run(ff + ["-i", str(src), "-vn", "-ac", "2", "-ar", "48000", str(mix)], check=True, capture_output=True, timeout=600)
+    if atlas.mock_mode():
+        subprocess.run(ff + ["-i", str(mix), "-af", "lowpass=f=300", str(out)], check=True, capture_output=True, timeout=300)
+        return out
+    if not audioshake.api_key():
+        raise RuntimeError("فصل الموسيقى عن الكلام محتاج مفتاح AudioShake" + audioshake.missing_hint())
+    mp3 = folder / "mix.mp3"
+    subprocess.run(ff + ["-i", str(mix), "-b:a", "192k", str(mp3)], check=True, capture_output=True, timeout=300)
+    tid, plan = audioshake.create_task(atlas.upload_media(mp3))
+    res = audioshake.wait(tid)
+    raw = folder / "stems"
+    raw.mkdir(exist_ok=True)
+    got = {}
+    for name, r in res.items():
+        if r.get("link") and r["status"] not in ("error", "failed"):
+            atlas.download(r["link"], raw / f"{name}.wav")
+            got[name] = raw / f"{name}.wav"
+    keep = [got[n] for n in got if n not in ("dialogue", "vocals", "speech")]
+    if keep:   # موسيقى + مؤثرات
+        cmd = ff + sum([["-i", str(p)] for p in keep], []) + ["-filter_complex",
+                                                              "".join(f"[{i}:a]" for i in range(len(keep))) + f"amix=inputs={len(keep)}:normalize=0[o]",
+                                                              "-map", "[o]", "-ac", "2", "-ar", "48000", str(out)]
+    elif "dialogue" in got:   # الأصل − الكلام
+        cmd = ff + ["-i", str(mix), "-i", str(got["dialogue"]), "-filter_complex",
+                    "[1:a]aresample=48000,volume=-1[n];[0:a][n]amix=inputs=2:normalize=0:duration=first[o]", "-map", "[o]", str(out)]
+    else:
+        raise RuntimeError("AudioShake مرجعش تراكات")
+    subprocess.run(cmd, check=True, capture_output=True, timeout=600)
+    for f in (mix, mp3):
+        f.unlink(missing_ok=True)
+    return out
+
+
+def run_dub_render(did: str, dialect: str, lipsync: str | None, background: str) -> None:
+    from concurrent.futures import ThreadPoolExecutor
+    step = lambda s: dub_update(did, lambda x: x["targets"][dialect].update(step=s))  # noqa: E731
+    try:
+        d = dub_load(did)
+        t = d["targets"][dialect]
+        folder = DUB_DIR / did
+        work = folder / f"work_{dialect}"
+        shutil.rmtree(work, ignore_errors=True)
+        work.mkdir()
+        lines, texts, total = d["lines"], [x["text"] for x in t["lines"]], float(d["source"]["duration"])
+        ff = [ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y"]
+        done = [0]
+
+        def say(i):
+            out = work / f"l{i:03d}.wav"
+            if not texts[i].strip():
+                return None
+            if atlas.mock_mode():
+                dur = max(0.4, len(texts[i]) / dub.CHARS_PER_SEC)
+                subprocess.run(ff + ["-f", "lavfi", "-i", f"sine=frequency={300 + 40 * (i % 5)}:duration={dur:.2f}", "-ar", "48000", str(out)],
+                               check=True, capture_output=True, timeout=60)
+            else:
+                url = atlas.run_model("Audio", dub.tts_body(t["voice"], dialect, texts[i]), "صوت الجملة", max_seconds=300, interval=2)
+                raw = work / f"l{i:03d}.src"
+                atlas.download(url, raw)
+                subprocess.run(ff + ["-i", str(raw), "-ac", "1", "-ar", "48000", str(out)], check=True, capture_output=True, timeout=60)
+                raw.unlink(missing_ok=True)
+            done[0] += 1
+            step(f"🎙️ بيسجّل الجمل ({done[0]} من {len(texts)})")
+            return out
+        with ThreadPoolExecutor(4) as pool:
+            files = list(pool.map(say, range(len(lines))))
+        durs = [probe_duration(f) if f else 0.0 for f in files]
+        spots = dub.place(lines, durs, total)
+        # الكلام لوحده (للليب سينك) والكلام + الخلفية (للفيديو النهائي)
+        step("🎚️ بيركّب الصوت في مكانه")
+        parts = [(f, sp) for f, sp in zip(files, spots) if f]
+        voice = work / "voice.wav"
+        flt, ins = [], []
+        for j, (f, sp) in enumerate(parts):
+            ins += ["-i", str(f)]
+            tempo = f"atempo={sp['speed']:.3f}," if sp["speed"] > 1.001 else ""
+            ms = int(sp["start"] * 1000)
+            flt.append(f"[{j}:a]{tempo}adelay={ms}:all=1[a{j}]")
+        flt.append("".join(f"[a{j}]" for j in range(len(parts))) + f"amix=inputs={len(parts)}:normalize=0,apad=whole_dur={total:.3f},atrim=0:{total:.3f}[v]")
+        subprocess.run(ff + ins + ["-filter_complex", ";".join(flt), "-map", "[v]", "-ac", "1", "-ar", "48000", str(voice)],
+                       check=True, capture_output=True, timeout=600)
+        step("🎵 بيفصل الموسيقى والمؤثرات عن الكلام" if background in ("auto", "separate") else "🎚️ بيجهّز الخلفية")
+        bg = dub_background(did, d, background)
+        audio = folder / f"{dialect}.m4a"
+        if bg:
+            subprocess.run(ff + ["-i", str(voice), "-i", str(bg), "-filter_complex",
+                                 "[0:a]aformat=channel_layouts=stereo,volume=1.0[v];[1:a]aformat=channel_layouts=stereo[b];"
+                                 "[v][b]amix=inputs=2:normalize=0:duration=first,alimiter=limit=0.95[o]",
+                                 "-map", "[o]", "-c:a", "aac", "-b:a", "192k", str(audio)], check=True, capture_output=True, timeout=600)
+        else:
+            subprocess.run(ff + ["-i", str(voice), "-ac", "2", "-c:a", "aac", "-b:a", "192k", str(audio)], check=True, capture_output=True, timeout=600)
+        src = folder / d["source"]["file"]
+        video_in = src
+        if lipsync:
+            step(f"👄 ليب سينك ({dub.LIPSYNC[lipsync]['label']}) — بياخد دقايق")
+            lip = work / "lip.mp4"
+            if atlas.mock_mode():
+                shutil.copy(src, lip)
+            else:
+                vurl, aurl = atlas.upload_media(src), atlas.upload_media(voice)
+                body = {"model": dub.LIPSYNC[lipsync]["model"], "video_url": vurl, "audio_url": aurl, "video": vurl, "audio": aurl}
+                if lipsync == "sync":
+                    body["sync_mode"] = "cut_off"
+                atlas.download(atlas.run_model("Video", body, "الليب سينك", max_seconds=3600, interval=6), lip)
+            video_in = lip
+        step("🎬 بيحفظ الفيديو")
+        out = folder / f"{dialect}.mp4"
+        subprocess.run(ff + ["-i", str(video_in), "-i", str(audio), "-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy", "-c:a", "copy",
+                             "-t", f"{total:.3f}", "-movflags", "+faststart", str(out)], check=True, capture_output=True, timeout=900)
+        # نسخة في الفيديوهات الجاهزة (للنشر)
+        export_id = uuid.uuid4().hex[:12]
+        filename = f"dub_{export_id}.mp4"
+        shutil.copy(out, EXPORTS_DIR / filename)
+        name = f"{d['name']} — {dub.DIALECTS[dialect]['label']}"
+        with closing(db()) as conn, conn:
+            old = t.get("export_id")
+            if old:   # النسخة القديمة من نفس اللهجة بتتبدل
+                r = conn.execute("SELECT filename FROM exports WHERE id = ?", (old,)).fetchone()
+                if r:
+                    (EXPORTS_DIR / r["filename"]).unlink(missing_ok=True)
+                    conn.execute("DELETE FROM exports WHERE id = ?", (old,))
+            conn.execute("INSERT INTO exports (id, name, filename, duration, source, project_id, created_at) VALUES (?, ?, ?, ?, 'dub', NULL, ?)",
+                         (export_id, name, filename, total, now()))
+        shutil.rmtree(work, ignore_errors=True)
+        dub_update(did, lambda x: x["targets"][dialect].update(busy=False, step=None, error=None, video=out.name, audio=audio.name,
+                                                               export_id=export_id, rendered_at=now(), spots=spots))
+    except Exception as exc:  # noqa: BLE001
+        dub_fail(did, exc, dialect)
+
+
+def reset_stuck_dub() -> None:
+    for f in DUB_DIR.glob("*/dub.json"):
+        try:
+            d = json.loads(f.read_text(encoding="utf-8"))
+        except ValueError:
+            continue
+        if dub_busy(d):
+            d.update(busy=False, step=None)
+            for t in (d.get("targets") or {}).values():
+                if t.get("busy"):
+                    t.update(busy=False, step=None, error="اتقطع لما السيرفر اتقفل. دوس الزرار تاني")
+            f.write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+
+
+reset_stuck_dub()
+
+
 @app.get("/")
 @app.get("/index.html")
 def index():

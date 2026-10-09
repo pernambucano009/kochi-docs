@@ -48,6 +48,7 @@
     <button class="rail-btn" data-goto="10" title="الإعلانات"><svg><use href="#i-spark"/></svg><span>الإعلانات</span></button>
     <button class="rail-btn" data-goto="11" title="معمل التفكيك"><svg><use href="#i-lab"/></svg><span>معمل التفكيك</span></button>
     <button class="rail-btn" data-goto="12" title="التايبوجرافي"><svg><use href="#i-type"/></svg><span>التايبوجرافي</span></button>
+    <button class="rail-btn" data-goto="13" title="الدبلجة باللهجات"><svg><use href="#i-globe"/></svg><span>الدبلجة</span></button>
     <a class="rail-btn" href="/refs.html" title="أرشيف المراجع"><svg><use href="#i-box"/></svg><span>الأرشيف</span></a>
     <span class="rail-sep"></span>
     <button class="rail-btn" data-goto="4" title="المدربين"><svg><use href="#i-users"/></svg><span>المدربين</span></button>
@@ -1007,6 +1008,21 @@
           </div>
         </main>
 
+        <main class="view" data-view="13" hidden>
+          <div class="car-layout">
+            <aside class="panel ad-side">
+              <div class="panel-head"><h2>🌍 الدبلجة</h2></div>
+              <label class="btn primary ad-up">＋ فيديو من عندك<input type="file" id="dbUpload" accept="video/*" hidden></label>
+              <button type="button" class="btn" id="dbFromExport">🎬 من الفيديوهات الجاهزة</button>
+              <ul class="ad-list" id="dbExports" hidden></ul>
+              <p class="hint">الكلام بيتسمع ويتحوّل لمصري أو سعودي عامي طبيعي، وتقدر تعدّله قبل الصوت. كل جملة بتتقال في وقتها، والموسيقى بتفضل، والليب سينك اختياري. النسخة بتنزل في الفيديوهات الجاهزة للنشر.</p>
+              <ul class="ad-list" id="dbList"></ul>
+            </aside>
+            <section class="car-main" id="dbMain" hidden></section>
+            <div class="panel muted" id="dbEmpty">ارفع فيديو أو اختار واحد من الفيديوهات الجاهزة عشان تدبلجه.</div>
+          </div>
+        </main>
+
         <main class="view" data-view="12" hidden>
           <div class="car-layout">
             <aside class="panel ad-side">
@@ -1627,6 +1643,7 @@
 <script src="/typo.js"></script>
 <script src="/montage-typo.js"></script>
   <script src="/montage-scene.js"></script>
+<script src="/dub.js"></script>
 <script src="/clients.js"></script>
 <script src="/shell.js"></script>
 </body>
