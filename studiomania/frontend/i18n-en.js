@@ -3332,5 +3332,6 @@ window.I18N_EN = {
   "🎬 📝 بوست بكلام متظلل": "🎬 📝 Highlighted post",
   "🎬 🖍️ كلام عملاق متظلل": "🎬 🖍️ Giant highlighted pan",
   "🎬 🟧 سطور على بلوكات": "🎬 🟧 Block lines",
-  "🎬 👍 تفاعلات بوست": "🎬 👍 Post reactions"
+  "🎬 👍 تفاعلات بوست": "🎬 👍 Post reactions",
+  "🎬 🔳 ورقة QR": "🎬 🔳 QR sticker"
 };

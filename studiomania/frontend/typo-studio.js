@@ -51,7 +51,8 @@
     "led", "drop", "report", "serp",
     "files", "generating", "portfolio",
     "letterorb", "connect", "assistant", "themeswap", "slider", "weather",
-    "post", "highlightpan", "blocklines", "reactions"]);
+    "post", "highlightpan", "blocklines", "reactions",
+    "qr"]);
   E.TYPING = new Set(["type", "artype"]);
   const MC = document.createElement("canvas").getContext("2d");
   const measure = (s, font) => { MC.font = font; return MC.measureText(s).width; };
@@ -5677,6 +5678,34 @@
       <div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:${(w * 0.06).toFixed(0)}px;right:${(w * 0.06).toFixed(0)}px;top:${(cy + isz * 1.4).toFixed(1)}px;display:flex;gap:${(fz * 2).toFixed(0)}px;font:600 ${(fz * 1.1).toFixed(1)}px ${ff};color:#444">
       <span style="display:flex;align-items:center;gap:${(fz * 0.4).toFixed(0)}px;color:${liked ? "#378FE9" : "#444"}"><svg style="transform:scale(${liked ? lp.toFixed(3) : 1})" width="${(fz * 1.3).toFixed(0)}" height="${(fz * 1.3).toFixed(0)}" viewBox="0 0 24 24"><path d="M7 11v8H4v-8zM9 19v-8l3-7c1.5 0 2.2 1 2 2.4L13.5 10H19c1 0 1.7 1 1.4 2l-1.8 6c-.2.6-.8 1-1.4 1z" fill="${liked ? "#378FE9" : "none"}" stroke="currentColor" stroke-width="1.6"/></svg>${ar ? "عجبني" : "Like"}</span>
       <span style="display:flex;align-items:center;gap:${(fz * 0.4).toFixed(0)}px"><svg width="${(fz * 1.3).toFixed(0)}" height="${(fz * 1.3).toFixed(0)}" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>${ar ? "تعليق" : "Comment"}</span></div>`;
+    return html;
+  };
+  // ---------- qr: ورقة QR متلزقة بشريط والكود بيترسم مربع مربع
+  P.k_qr = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    if (!it.length) return "";
+    const s = it.filter((x) => t >= x.t0).map((x) => this.text(x.w)).join(" "), ff = famOf(s || "a");
+    const N = 21, cw = Math.min(w * 0.6, mn * 0.6), cell = cw * 0.8 / N;
+    const cx = (w - cw) / 2, cy = h * 0.42 - cw * 0.6;
+    const p = eBack(seg(t, b.t0, b.t0 + 0.35)), d = seg(t, b.t0 + 0.2, b.t0 + 1.1);
+    const r = rng(bi * 97 + 13);
+    const finder = (x, y) => (x < 7 && y < 7) || (x >= N - 7 && y < 7) || (x < 7 && y >= N - 7);
+    const fOn = (x, y) => { const lx = x >= N - 7 ? x - (N - 7) : x, ly = y >= N - 7 ? y - (N - 7) : y; return lx === 0 || lx === 6 || ly === 0 || ly === 6 || (lx >= 2 && lx <= 4 && ly >= 2 && ly <= 4); };
+    let cells = "";
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      const on = finder(x, y) ? fOn(x, y) : r() > 0.52;
+      if (!on) continue;
+      const order = (x + y) / (2 * N);
+      if (order > d * 1.05) continue;
+      cells += `<rect x="${x}" y="${y}" width="1.02" height="1.02"/>`;
+    }
+    let html = onVideo(this) ? `<div style="position:absolute;inset:0;background:rgba(0,0,0,.25)"></div>` : `<div style="position:absolute;inset:0;background:#B98B5E"></div>`;
+    html += `<div style="position:absolute;left:${cx.toFixed(1)}px;top:${cy.toFixed(1)}px;width:${cw.toFixed(1)}px;height:${(cw * 1.2).toFixed(1)}px;background:#FAF8F3;transform:rotate(-4deg) scale(${p.toFixed(3)});box-shadow:0 ${(mn * 0.015).toFixed(0)}px ${(mn * 0.04).toFixed(0)}px rgba(0,0,0,.35)">
+      <i style="position:absolute;left:50%;top:${(-cw * 0.04).toFixed(0)}px;width:${(cw * 0.3).toFixed(0)}px;height:${(cw * 0.09).toFixed(0)}px;margin-left:${(-cw * 0.15).toFixed(0)}px;background:rgba(240,230,190,.85);transform:rotate(3deg)"></i>
+      <svg style="position:absolute;left:${(cw * 0.1).toFixed(1)}px;top:${(cw * 0.1).toFixed(1)}px" width="${(cell * N).toFixed(1)}" height="${(cell * N).toFixed(1)}" viewBox="0 0 ${N} ${N}" fill="#151515" shape-rendering="crispEdges">${cells}</svg>
+      <div dir="${this.dir(s || "a")}" style="position:absolute;left:0;right:0;top:${(cw * 0.95).toFixed(1)}px;text-align:center;white-space:nowrap;font:700 ${fitSize(s || "a", `700 {}px ${ff}`, cw * 0.85, cw * 0.09).toFixed(1)}px ${ff};color:#151515">${esc(s)}</div></div>`;
     return html;
   };
 })();
