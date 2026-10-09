@@ -600,6 +600,23 @@ def clean_xk(v) -> list:
     return out
 
 
+def clean_fx(v) -> list:
+    """✨ العناصر الحرة: عنصر في أي وقت من غير ما يكون مربوط بكلام متقال (بدايته ونهايته بالثواني والكلام اللي فيه مكتوب)."""
+    out = []
+    for q in (v if isinstance(v, list) else [])[:80]:
+        if not isinstance(q, dict):
+            continue
+        t0 = _f(q.get("t0"), 0, 0, 36000)
+        t1 = max(t0 + 0.2, _f(q.get("t1"), t0 + 2.5, 0, 36000))
+        kind = q.get("kind") if q.get("kind") in KINDS else "lowerthird"
+        out.append({"id": re.sub(r"[^a-z0-9]", "", str(q.get("id") or ""))[:12] or f"fx{len(out)}", "t0": round(t0, 3), "t1": round(t1, 3),
+                    "kind": kind, "text": str(q.get("text") or "").strip()[:200] or "اكتب هنا",
+                    "theme": q.get("theme") if q.get("theme") in THEMES else "dark", "focus": _i(q.get("focus"), -1),
+                    "trans": q.get("trans") if q.get("trans") in TRANS else "", "xf": clean_xf(q.get("xf")), "xk": clean_xk(q.get("xk"))})
+    out.sort(key=lambda q: q["t0"])
+    return out
+
+
 def clean_plan(raw: dict, words: list[dict], duration: float, pro: bool = False) -> list[dict]:
     """البلوكات بأوقات حقيقية من الكلمات: كل بلوك من أول كلمة فيه لحد أول كلمة في اللي بعده."""
     n = len(words)

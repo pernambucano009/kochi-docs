@@ -822,6 +822,8 @@ const TYG_RING = { z: "#3B82F6", x: "#EF4444", y: "#22C55E" };
 
 function tyGizBlock() {
   const blocks = GZ.doc?.blocks || [];
+  const want = GZ.selIndex?.();   // اللقطة المختارة لو بتغطي الوقت ده (العناصر الحرة ممكن تتراكب)
+  if (want != null && blocks[want] && GZ.t >= blocks[want].t0 && GZ.t < blocks[want].t1) return { i: want, b: blocks[want] };
   const i = blocks.findIndex((b) => GZ.t >= b.t0 && GZ.t < b.t1);
   return i < 0 ? null : { i, b: blocks[i] };
 }
@@ -962,9 +964,11 @@ function tyGizSave(i, msg) {
 function tyGizBind(ctx = GZ) {
   GZ = ctx;
   const svg = ctx.svg(), bar = ctx.bar();
-  if (!svg || svg.dataset.bound) return;
+  if (!svg) return;
+  svg._gz = ctx;   // نفس المكان ممكن يخدم أكتر من طبقة (الكلام والعناصر الحرة في المونتاج)
+  if (svg.dataset.bound) return;
   svg.dataset.bound = "1";
-  const use = () => { GZ = ctx; };
+  const use = () => { GZ = svg._gz; };
   svg.addEventListener("pointerdown", use, true); svg.addEventListener("pointermove", use, true); bar.addEventListener("click", use, true);
   let d = null;
   const at = (e) => { const r = GZ.box().getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top, r.width, r.height]; };

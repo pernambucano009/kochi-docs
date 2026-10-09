@@ -1936,6 +1936,7 @@ class ClipEdit(BaseModel):
     x: float = 0.0
     y: float = 0.0
     volume: float = 1.0
+    trans: dict | None = None  # الترانزيشن من القطعة اللي قبلها: {type, dur}
 
 
 class TrackPart(BaseModel):
@@ -2086,11 +2087,14 @@ def build_montage(conn: sqlite3.Connection, data: dict):
         end = clamp(c["end"] if c["end"] is not None else info.duration, 0, info.duration)
         if end - start < 1 / 30 - 0.001:
             raise HTTPException(400, f"الفيديو رقم {i} مقصوص لدرجة إنه مفيهوش ولا فريم")
+        tr = c.get("trans") or {}
         segments.append(
             montage.Segment(
                 path, start, end,
                 zoom=clamp(c["zoom"], 1, 4), x=clamp(c["x"], -1, 1), y=clamp(c["y"], -1, 1),
-                volume=clamp(c["volume"], 0, 3), has_audio=info.has_audio,
+                volume=clamp(c["volume"], 0, 3), has_audio=info.has_audio, src_duration=info.duration,
+                trans_in=tr.get("type") if tr.get("type") in montage.TRANSITIONS and i > 1 else "",
+                trans_dur=clamp(float(tr.get("dur") or 0.5), 0.1, 2.0),
             )
         )
     if not segments:
@@ -13277,6 +13281,7 @@ class TypoPatchIn(BaseModel):
     bg: dict | None = None
     blocks: list | None = None
     words: list | None = None
+    fx: list | None = None
     fonts: dict | None = None
     ai: str | None = None
     sfx: str | None = None
@@ -13334,7 +13339,9 @@ def typo_patch(pid: str, body: TypoPatchIn):
                     b["text"] = " ".join(x["w"] for x in part)
         if body.blocks is not None:
             d["blocks"] = typo_clean_blocks(body.blocks, d)
-        if body.blocks is not None or body.words is not None or body.bg is not None or body.style is not None or body.ratio or body.fonts is not None:
+        if body.fx is not None:
+            d["fx"] = typo.clean_fx(body.fx)
+        if body.blocks is not None or body.fx is not None or body.words is not None or body.bg is not None or body.style is not None or body.ratio or body.fonts is not None:
             d["final"] = None
         if d.get("status") not in TYPO_BUSY:
             d["status"] = typo_idle(d)
@@ -13759,7 +13766,15 @@ def typo_doc(pid: str, d: dict) -> dict:
                                for f in map(pick, pi["frames"])]}
         except (OSError, ValueError, KeyError):
             pdoc = None
-    return {"w": W, "h": H, "fps": TYPO_FPS, "anchors": anchors, "tracks": tracks, "person": pdoc, "dim": float((d.get("bg") or {}).get("dim") or 0), "duration": d.get("duration") or (blocks[-1]["t1"] if blocks else 1),
+    # ✨ العناصر الحرة: الكلام المكتوب بيتوزّع على أول جزء من وقت العنصر (كأنه بيتقال)
+    fx = []
+    for q in d.get("fx") or []:
+        toks = q["text"].split() or ["…"]
+        span = (q["t1"] - q["t0"]) * 0.6 / len(toks)
+        fx.append({**q, "words": [{"w": w, "t0": round(q["t0"] + 0.15 + j * span, 3), "t1": round(q["t0"] + 0.15 + (j + 1) * span, 3)} for j, w in enumerate(toks)],
+                   "icon": None, "side": None, "icons": []})
+    return {"w": W, "h": H, "fps": TYPO_FPS, "anchors": anchors, "tracks": tracks, "person": pdoc, "fx": fx, "dim": float((d.get("bg") or {}).get("dim") or 0),
+            "duration": max(d.get("duration") or (blocks[-1]["t1"] if blocks else 1), *[q["t1"] for q in fx]) if fx else (d.get("duration") or (blocks[-1]["t1"] if blocks else 1)),
             "style": {**{k: st.get(k) for k in ("font", "case", "grain", "weight", "light", "dark", "accent")},
                       "moments": {**(st.get("moments") or {}), **(d.get("fonts") or {})}},
             "transparent": kind != "theme", "blocks": blocks}
@@ -13776,6 +13791,7 @@ def typo_doc_get(pid: str):
 
 class MontageTypoIn(BaseModel):
     brief: str | None = None
+    run: bool = True   # False: بس اربط مشروع فاضي (عشان العناصر الحرة) من غير ما يسمع ويوزّع
 
 
 @app.post("/api/projects/{project_id}/typo")
@@ -13797,6 +13813,8 @@ def montage_typo(project_id: str, body: MontageTypoIn):
             conn.execute("UPDATE projects SET data = ?, updated_at = ? WHERE id = ?", (json.dumps(data), now(), project_id))
     if body.brief is not None:
         typo_set(tid, brief=body.brief[:1000])
+    if not body.run:
+        return typo_to_dict(tid, typo_load(tid))
     return typo_start(tid, "transcribing", "🎬 بيجهّز فيديو المونتاج", run_montage_typo, segments, voice, music)
 
 
@@ -13844,7 +13862,9 @@ def typo_sfx_wav(tid: str) -> Path | None:
     if out.exists() and stamp.exists() and stamp.read_text() == key:
         return out
     doc = typo_doc(tid, d)
-    if not doc["blocks"] or not sfx.render(TYPO_SFX, doc["blocks"], doc["duration"], out, seed=sum(map(ord, tid)), level=typo_sfx_level(d)):
+    allb = sorted(doc["blocks"] + doc.get("fx", []), key=lambda b: b["t0"])
+    dur = max([doc["duration"], *[b["t1"] for b in allb]] or [0])
+    if not allb or not sfx.render(TYPO_SFX, allb, dur, out, seed=sum(map(ord, tid)), level=typo_sfx_level(d)):
         out.unlink(missing_ok=True)
         return None
     stamp.write_text(key)
@@ -13864,7 +13884,7 @@ def typo_has_layer(tid: str) -> bool:
         d = typo_load(tid)
     except HTTPException:
         return False
-    return bool(d.get("blocks") or d.get("fx"))
+    return bool(d.get("blocks") or d.get("fx"))  # الكلام أو العناصر الحرة
 
 
 def typo_overlay(tid: str, base: Path, out: Path, base_url: str, progress=None) -> None:

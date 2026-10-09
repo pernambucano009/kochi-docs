@@ -3,7 +3,7 @@
 // وبيظهر خط «🔤 تايبوجرافي» في التايم لاين، والطبقة بتترسم فوق المعاينة بنفس المحرك، وأدوات التحكم (الأركان والدواير والتراك)
 // بتشتغل على المعاينة لما تختار لقطة، والتصدير بيرسمها فوق الفيديو.
 
-const mtx = { id: null, cur: null, doc: null, eng: null, timer: null, loading: null };
+const mtx = { id: null, cur: null, doc: null, eng: null, fxdoc: null, fxeng: null, timer: null, loading: null };
 
 const GZ_MT = {
   st: {},
@@ -11,6 +11,16 @@ const GZ_MT = {
   get cur() { return mtx.cur; }, set cur(v) { mtx.cur = v; },
   box: () => $("previewFrame"), stage: () => $("pvTypoStage"), svg: () => $("mtGiz"), bar: () => $("mtGbar"),
   stop: () => pause(), save: (blocks, msg) => mtTypoSave(blocks, msg), redraw: () => mtTypoDraw(), after: () => { mtTypoPaneRender(); mtTypoPoll(); },
+  selIndex: () => (mt.sel?.kind === "typo" ? mt.sel.i : null),
+};
+// ✨ العناصر الحرة: نفس الأدوات على طبقتها (من غير تراك: التراك بتاع الكلام بس)
+const GZ_FX = {
+  st: {},
+  get doc() { return mtx.fxdoc; }, get eng() { return mtx.fxeng; }, get t() { return mt.t; }, get playing() { return mt.playing; },
+  get cur() { return mtx.cur ? { ...mtx.cur, blocks: mtx.cur.fx || [], bg: null, source: null } : null; }, set cur(v) { mtx.cur = v; },
+  box: () => $("previewFrame"), stage: () => $("pvFxStage"), svg: () => $("mtGiz"), bar: () => $("mtGbar"),
+  stop: () => pause(), save: (fx, msg) => mtFxSave(fx, msg), redraw: () => mtTypoDraw(), after: () => mtTypoPaneRender(),
+  selIndex: () => (mt.sel?.kind === "fx" ? mt.sel.i : null),
 };
 
 const mtTypoOn = () => mt.project && mt.project.data.typo_on !== false;
@@ -18,12 +28,12 @@ const mtTypoOn = () => mt.project && mt.project.data.typo_on !== false;
 // المشروع اتفتح (أو اتغير): نحمّل التايبوجرافي بتاعته لو موجودة
 async function mtTypoLoad() {
   const id = mt.project?.data.typo_id || null;
-  if (id !== mtx.id) { mtx.id = id; mtx.cur = mtx.doc = null; mtx.eng = null; $("pvTypoStage").innerHTML = ""; }
+  if (id !== mtx.id) { mtx.id = id; mtx.cur = mtx.doc = mtx.fxdoc = null; mtx.eng = mtx.fxeng = null; $("pvTypoStage").innerHTML = ""; $("pvFxStage").innerHTML = ""; }
   if (!id) { mtTypoPaneRender(); renderTimeline(); return; }
   const job = (async () => {
     try {
       mtx.cur = await api(`/api/typo/${id}`);
-      if (mtx.cur.blocks?.length) await mtTypoDoc();
+      if (mtx.cur.blocks?.length || mtx.cur.fx?.length) await mtTypoDoc();
     } catch (err) {
       mtx.cur = null;
       if (!String(err.message).includes("مش موجود")) toast(err.message, true);
@@ -47,7 +57,14 @@ async function mtTypoDoc() {
   mtx.eng._cb = null;
   mtx.eng.editing = true;
   stage.style.position = "absolute";
-  await mtx.eng.ready();
+  const fxs = $("pvFxStage"), fxdoc = { ...doc, blocks: doc.fx || [], transparent: true };
+  mtx.fxdoc = fxdoc;
+  if (!mtx.fxeng) mtx.fxeng = new TypoEngine(fxs, fxdoc);
+  else mtx.fxeng.set(fxdoc);
+  mtx.fxeng._cb = null;
+  mtx.fxeng.editing = true;
+  Object.assign(fxs.style, { position: "absolute", left: "0", top: "0" });
+  await Promise.all([mtx.eng.ready(), mtx.fxeng.ready()]);
   mtTypoDraw();
 }
 
@@ -60,8 +77,11 @@ function mtTypoDraw() {
   if (!show) { $("mtGiz").innerHTML = ""; $("mtGbar").innerHTML = ""; return; }
   const k = $("previewFrame").clientWidth / mtx.doc.w;
   $("pvTypoStage").style.transform = `scale(${k})`;
+  $("pvFxStage").style.transform = `scale(${k})`;
   mtx.eng.renderAt(mt.t);
-  if (mt.sel?.kind === "typo" && !mt.playing) { tyGizBind(GZ_MT); GZ = GZ_MT; tyGizDraw(); }
+  mtx.fxeng?.renderAt(mt.t);
+  const ctx = mt.sel?.kind === "typo" ? GZ_MT : mt.sel?.kind === "fx" ? GZ_FX : null;
+  if (ctx && !mt.playing) { if (GZ !== ctx) $("mtGbar").dataset.sig = ""; tyGizBind(ctx); GZ = ctx; tyGizDraw(); }
   else if ($("mtGbar").dataset.sig) { $("mtGiz").innerHTML = ""; $("mtGbar").innerHTML = ""; $("mtGbar").dataset.sig = ""; }
   else $("mtGiz").innerHTML = "";
 }
@@ -77,10 +97,16 @@ const _mtOpen = openProject;
 openProject = function (p) { const r = _mtOpen(p); mtTypoLoad(); return r; };
 
 const _mtInspector = renderInspector;
-renderInspector = function () { _mtInspector(); if (mt.sel?.kind === "typo") mtTypoPaneRender(); };
+renderInspector = function () { _mtInspector(); if (mt.sel?.kind === "typo" || mt.sel?.kind === "fx") mtTypoPaneRender(); };
 
 const _mtDelete = deleteSelected;
 deleteSelected = function () {
+  if (mt.sel?.kind === "fx") {
+    const fx = JSON.parse(JSON.stringify(mtx.cur.fx || []));
+    fx.splice(mt.sel.i, 1);
+    mt.sel = null;
+    return mtFxSave(fx, "🗑️ العنصر اتشال");
+  }
   if (mt.sel?.kind !== "typo") return _mtDelete();
   const i = mt.sel.i, blocks = JSON.parse(JSON.stringify(mtx.cur.blocks));
   blocks.splice(i, 1);
@@ -117,6 +143,7 @@ pause = function () { const r = _mtPause(); mtClickEl?.pause(); return r; };
 
 function mtTypoTrack() {
   mtClickTrack();
+  mtFxTrack();
   const el = $("trkTypo");
   if (!el || !mt.project) return;
   if (!mtx.id || !mtx.doc?.blocks?.length) {
@@ -241,6 +268,7 @@ function mtTypoPaneRender() {
       <div class="row wrap"><button class="btn sm" id="mtTyPrev">→ اللي قبلها</button><button class="btn sm" id="mtTyNext">اللي بعدها ←</button>
         <button class="btn sm danger" id="mtTyDel">🗑 شيلها</button></div></div>`;
   }
+  h += mtFxPaneHtml();
   el.innerHTML = h;
 }
 
@@ -312,3 +340,217 @@ $("mtTypoPane").addEventListener("change", async (e) => {
 
 // الخلفية الشفافة: صفحة المونتاج ما بتحتاجش ستايل خلفية للكلام
 window.addEventListener("resize", () => mtTypoDraw());
+
+
+// ---------- ✨ خط العناصر الحرة: عنصر في أي وقت (اسمك، QR، أرقام، شعار…) من غير ما يكون مربوط بكلام متقال
+const FX_DEFAULT = "lowerthird";
+
+async function mtFxEnsure() {   // العناصر محتاجة مشروع تايبوجرافي مربوط (من غير ما يسمع ولا يوزّع)
+  if (mtx.id && mtx.cur) return true;
+  await saveProject();
+  try {
+    const res = await api(`/api/projects/${mt.project.id}/typo`, { method: "POST", ...jsonBody({ run: false }) });
+    mt.project.data.typo_id = res.id;
+    mtx.id = res.id; mtx.cur = res;
+    scheduleSave();
+    return true;
+  } catch (err) { toast(err.message, true); return false; }
+}
+
+async function mtFxSave(fx, msg) {
+  try {
+    mtx.cur = await api(`/api/typo/${mtx.id}`, { method: "PATCH", ...jsonBody({ fx }) });
+    await mtTypoDoc();
+    renderTimeline();
+    mtTypoPaneRender();
+    if (msg) toast(msg);
+  } catch (err) { toast(err.message, true); }
+}
+
+async function mtFxAdd(kind, text) {
+  if (!(await mtFxEnsure())) return;
+  const fx = JSON.parse(JSON.stringify(mtx.cur.fx || []));
+  const t0 = Math.round(mt.t * 100) / 100;
+  fx.push({ id: `fx${Date.now().toString(36)}`, t0, t1: t0 + 2.5, kind: kind || FX_DEFAULT, text: text || "اكتب هنا", theme: "dark" });
+  await mtFxSave(fx, "✨ العنصر اتضاف عند المؤشر");
+  const i = (mtx.cur.fx || []).findIndex((q) => Math.abs(q.t0 - t0) < 0.01);
+  if (i >= 0) { mt.sel = { kind: "fx", i }; showTab("typo"); renderTimeline(); mtTypoPaneRender(); syncPreview(); }
+}
+
+function mtFxTrack() {
+  const el = $("trkFx");
+  if (!el || !mt.project) return;
+  const fx = mtx.cur?.fx || [];
+  if (!fx.length) { el.innerHTML = `<div class="tl-empty-track">دوس ＋ عشان تحط عنصر في أي وقت (اسمك، QR، رقم، شعار…)</div>`; return; }
+  // العناصر اللي بتتراكب بتنزل صف تحت التاني
+  const lanes = [];
+  const lane = fx.map((q) => { let k = 0; while ((lanes[k] ?? -1) > q.t0 + 0.001) k++; lanes[k] = q.t1; return k; });
+  const n = Math.max(1, lanes.length), hh = 100 / n;
+  el.innerHTML = fx.map((q, i) => {
+    const sel = mt.sel?.kind === "fx" && mt.sel.i === i;
+    const label = (TY_KINDS[q.kind] || q.kind).replace(/^[⭐🎬\s]+/, "");
+    return `<div class="tl-fx ${sel ? "selected" : ""}" data-fx="${i}" title="${escapeHtml(q.text)}" style="left:${q.t0 * mt.pps}px;width:${Math.max(6, (q.t1 - q.t0) * mt.pps)}px;top:calc(${lane[i] * hh}% + 2px);height:calc(${hh}% - 4px)">
+      ${q.trans ? `<span class="tr">◆</span>` : ""}<b>${escapeHtml(label)}</b><span dir="auto">${escapeHtml(q.text)}</span><i class="h l" data-h="l"></i><i class="h r" data-h="r"></i></div>`;
+  }).join("");
+}
+
+$("trkFx").addEventListener("pointerdown", (e) => {
+  const box = e.target.closest(".tl-fx");
+  if (!box) return;
+  e.stopPropagation();
+  const i = Number(box.dataset.fx), fx = JSON.parse(JSON.stringify(mtx.cur.fx)), q = fx[i];
+  mt.sel = { kind: "fx", i };
+  showTab("typo");
+  pause();
+  const h = e.target.dataset.h, x0 = e.clientX, a = q.t0, z = q.t1;
+  let moved = false;
+  box.setPointerCapture(e.pointerId);
+  const move = (ev) => {
+    const dt = Math.round(((ev.clientX - x0) / mt.pps) * 30) / 30;
+    if (Math.abs(ev.clientX - x0) > 2) moved = true;
+    if (h === "l") q.t0 = Math.max(0, Math.min(z - 0.2, a + dt));
+    else if (h === "r") q.t1 = Math.max(a + 0.2, z + dt);
+    else { q.t0 = Math.max(0, a + dt); q.t1 = q.t0 + (z - a); }
+    box.style.left = `${q.t0 * mt.pps}px`;
+    box.style.width = `${Math.max(6, (q.t1 - q.t0) * mt.pps)}px`;
+  };
+  const up = () => {
+    box.removeEventListener("pointermove", move); box.removeEventListener("pointerup", up);
+    if (moved) return mtFxSave(fx);
+    if (mt.t < q.t0 || mt.t >= q.t1) seek(q.t0 + 0.05);
+    renderTimeline(); mtTypoPaneRender(); syncPreview();
+  };
+  box.addEventListener("pointermove", move);
+  box.addEventListener("pointerup", up);
+});
+
+$("fxAddQuick").addEventListener("click", (e) => { e.stopPropagation(); showTab("typo"); mtFxAdd(FX_DEFAULT, ""); });
+
+function mtFxPaneHtml() {
+  const kinds = Object.entries(TY_KINDS).filter(([k]) => window.TypoEngine?.STUDIO?.has(k));
+  const i = mt.sel?.kind === "fx" ? mt.sel.i : -1, q = mtx.cur?.fx?.[i];
+  let h = `<div class="mt-typo-row fx-box"><h3>✨ العناصر الحرة</h3>
+    <p class="hint">عنصر يظهر في أي وقت تختاره حتى لو مش مربوط بكلام متقال، زي اسمك في الأول، أو QR في الآخر، أو رقم مهم. بيظهر فوق التايبوجرافي.</p>
+    <div class="row wrap"><select id="fxNewKind">${kinds.map(([k, l]) => `<option value="${k}" ${k === FX_DEFAULT ? "selected" : ""}>${l}</option>`).join("")}</select>
+      <input id="fxNewText" placeholder="الكلام اللي فيه" dir="auto">
+      <button class="btn sm primary" id="fxAdd">＋ ضيف عند المؤشر</button></div></div>`;
+  if (q) {
+    h += `<div class="mt-typo-row fx-box"><h3>عنصر ${i + 1} <small class="muted" dir="ltr">${fmtTC(q.t0)} ← ${fmtTC(q.t1)}</small></h3>
+      <label>العنصر <select id="fxKind">${kinds.map(([k, l]) => `<option value="${k}" ${k === q.kind ? "selected" : ""}>${l}</option>`).join("")}</select></label>
+      <label>🎞️ الترانزيشن <select id="fxTrans">${Object.entries(TY_TRANS).map(([k, l]) => `<option value="${k}" ${k === (q.trans || "") ? "selected" : ""}>${l}</option>`).join("")}</select></label>
+      <label>الكلام <input id="fxText" value="${escapeHtml(q.text)}" dir="auto"></label>
+      <div class="row wrap"><button class="btn sm" id="fxHere">⇤ يبدأ عند المؤشر</button><button class="btn sm" id="fxDup">⧉ كرّر</button>
+        <button class="btn sm danger" id="fxDel">🗑 شيله</button></div>
+      <p class="hint">اسحبه في خط «✨ عناصر» عشان تغيّر وقته، ومن طرفه عشان تطوّله أو تقصّره. والأدوات على المعاينة بتحرّكه وتلفّه.</p></div>`;
+  }
+  return h;
+}
+
+$("mtTypoPane").addEventListener("click", (e) => {
+  const t = e.target, i = mt.sel?.kind === "fx" ? mt.sel.i : -1;
+  if (t.id === "fxAdd") return mtFxAdd($("fxNewKind").value, $("fxNewText").value.trim());
+  if (i < 0 || !mtx.cur?.fx?.[i]) return;
+  const fx = JSON.parse(JSON.stringify(mtx.cur.fx)), q = fx[i];
+  if (t.id === "fxDel") return deleteSelected();
+  if (t.id === "fxDup") { const len = q.t1 - q.t0; fx.push({ ...q, id: `fx${Date.now().toString(36)}`, t0: q.t1, t1: q.t1 + len }); return mtFxSave(fx, "⧉ اتكرر بعده"); }
+  if (t.id === "fxHere") { const len = q.t1 - q.t0; q.t0 = Math.round(mt.t * 100) / 100; q.t1 = q.t0 + len; return mtFxSave(fx); }
+});
+
+$("mtTypoPane").addEventListener("change", (e) => {
+  const t = e.target, i = mt.sel?.kind === "fx" ? mt.sel.i : -1;
+  if (!["fxKind", "fxTrans", "fxText"].includes(t.id) || i < 0 || !mtx.cur?.fx?.[i]) return;
+  const fx = JSON.parse(JSON.stringify(mtx.cur.fx));
+  fx[i][{ fxKind: "kind", fxTrans: "trans", fxText: "text" }[t.id]] = t.value;
+  mtFxSave(fx);
+});
+
+// ---------- ◆ ترانزيشنز بين لقطات الفيديو: معيّن بين كل قطعتين، تدوس عليه وتختار
+const MT_TRANS = [["", "من غير", "✂️"], ["fade", "تلاشي", "◐"], ["fadeblack", "سواد", "●"], ["fadewhite", "فلاش أبيض", "○"], ["dissolve", "ذوبان", "░"],
+  ["slideleft", "زحلقة", "⇠"], ["smoothleft", "زحلقة ناعمة", "↜"], ["slideup", "لفوق", "⇡"], ["wipeleft", "مسحة", "▤"], ["circleopen", "دايرة بتفتح", "◎"],
+  ["radial", "عقارب", "◔"], ["zoomin", "زووم", "⊕"], ["pixelize", "بكسلات", "▦"], ["hblur", "ضباب", "≋"], ["squeezeh", "عصرة", "⇔"], ["diagtl", "مايلة", "◩"]];
+const mtTransName = (k) => (MT_TRANS.find((x) => x[0] === k) || [k, k])[1];
+
+function mtTransMarks() {
+  const tv = $("trkVideo");
+  if (!tv || !mt.project) return;
+  const { items } = seq();
+  tv.querySelectorAll(".tl-trans").forEach((x) => x.remove());
+  items.forEach((it, k) => {
+    if (k === 0 || it.kind !== "clip" || items[k - 1].kind !== "clip") return;
+    const tr = it.c.trans;
+    const el = document.createElement("button");
+    el.type = "button";
+    el.className = `tl-trans ${tr?.type ? "on" : ""}`;
+    el.dataset.ci = it.i;
+    el.title = tr?.type ? `ترانزيشن: ${mtTransName(tr.type)} (${(tr.dur || 0.5).toFixed(1)}ث)` : "ضيف ترانزيشن بين اللقطتين";
+    el.style.left = `${it.t0 * mt.pps}px`;
+    el.innerHTML = `<i></i>`;
+    tv.appendChild(el);
+  });
+}
+const _mtTimeline2 = renderTimeline;
+renderTimeline = function () { _mtTimeline2(); mtTransMarks(); };
+
+function mtTransPop(ci, anchor) {
+  document.querySelector(".tr-pop")?.remove();
+  const c = mt.project.data.clips[ci];
+  const cur = c.trans?.type || "", dur = c.trans?.dur || 0.5;
+  const pop = document.createElement("div");
+  pop.className = "tr-pop";
+  pop.innerHTML = `<div class="tr-head"><b>◆ الترانزيشن</b><button type="button" class="tr-x" data-trx>✕</button></div>
+    <div class="tr-grid">${MT_TRANS.map(([k, l, ic]) => `<button type="button" class="tr-opt ${k === cur ? "on" : ""}" data-trk="${k}"><span class="tr-ic tr-${k || "cut"}">${ic}</span>${l}</button>`).join("")}</div>
+    <label class="tr-dur">المدة <b>${dur.toFixed(1)}ث</b><input type="range" min="0.2" max="1.5" step="0.1" value="${dur}" data-trd ${cur ? "" : "disabled"}></label>
+    <small class="muted">الطول الكلي للفيديو مبيتغيّرش، والترانزيشن بيبقى في نص اللقطتين. المعاينة هنا تقريبية، والتصدير بيعمله بالظبط.</small>`;
+  document.body.appendChild(pop);
+  const r = anchor.getBoundingClientRect();
+  const pw = 330;
+  pop.style.left = `${Math.max(8, Math.min(window.innerWidth - pw - 8, r.left + r.width / 2 - pw / 2))}px`;
+  pop.style.top = `${Math.max(8, r.top - pop.offsetHeight - 10)}px`;
+  const set = (patch) => {
+    pushHistory();
+    const t = { type: cur, dur, ...(c.trans || {}), ...patch };
+    c.trans = t.type ? { type: t.type, dur: t.dur || 0.5 } : null;
+    changed();
+  };
+  pop.addEventListener("click", (e) => {
+    const o = e.target.closest("[data-trk]");
+    if (o) { set({ type: o.dataset.trk }); mtTransPop(ci, document.querySelector(`.tl-trans[data-ci="${ci}"]`) || anchor); return; }
+    if (e.target.closest("[data-trx]")) pop.remove();
+  });
+  pop.addEventListener("change", (e) => { if (e.target.matches("[data-trd]")) { set({ dur: Number(e.target.value) }); mtTransPop(ci, document.querySelector(`.tl-trans[data-ci="${ci}"]`) || anchor); } });
+  pop.addEventListener("input", (e) => { if (e.target.matches("[data-trd]")) pop.querySelector(".tr-dur b").textContent = `${Number(e.target.value).toFixed(1)}ث`; });
+  setTimeout(() => document.addEventListener("pointerdown", function off(ev) {
+    if (!pop.contains(ev.target) && !ev.target.closest(".tl-trans")) { pop.remove(); document.removeEventListener("pointerdown", off, true); }
+  }, true), 0);
+}
+
+$("trkVideo").addEventListener("pointerdown", (e) => {
+  const m = e.target.closest(".tl-trans");
+  if (!m) return;
+  e.stopPropagation(); e.preventDefault();
+  mtTransPop(Number(m.dataset.ci), m);
+}, true);
+
+// المعاينة: الترانزيشن بيتشاف تقريبًا (تغميق/فلاش/ضباب حوالين القطع)، والتصدير بيعمله حقيقي
+function mtTransPreview() {
+  let ov = $("pvTrans");
+  if (!ov) { ov = document.createElement("div"); ov.id = "pvTrans"; ov.className = "pv-trans"; $("previewFrame").appendChild(ov); }
+  ov.style.opacity = 0; $("pvStage").style.filter = ""; $("pvStage").style.transform = "";
+  if (!mt.project) return;
+  const { items } = seq();
+  for (let k = 1; k < items.length; k++) {
+    const it = items[k], tr = it.kind === "clip" && it.c.trans;
+    if (!tr?.type) continue;
+    const d = tr.dur || 0.5, T = it.t0;
+    if (mt.t < T - d / 2 || mt.t > T + d / 2) continue;
+    const p = 1 - Math.abs(mt.t - T) / (d / 2);   // 0 → 1 عند القطع → 0
+    const white = tr.type === "fadewhite";
+    ov.style.background = white ? "#fff" : "#000";
+    ov.style.opacity = (["fade", "dissolve"].includes(tr.type) ? p * 0.55 : ["fadeblack", "fadewhite"].includes(tr.type) ? p : p * 0.25).toFixed(3);
+    if (["hblur", "pixelize", "dissolve", "zoomin"].includes(tr.type)) $("pvStage").style.filter = `blur(${(p * 6).toFixed(1)}px)`;
+    if (tr.type === "zoomin") $("pvStage").style.transform = `scale(${(1 + p * 0.15).toFixed(3)})`;
+    break;
+  }
+}
+const _mtOverlays2 = updatePreviewOverlays;
+updatePreviewOverlays = function () { _mtOverlays2(); mtTransPreview(); };

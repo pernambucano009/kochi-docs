@@ -1,7 +1,7 @@
 <!doctype html>
 <html><head><meta charset="utf-8"><title>typo render</title>
 <style>html,body{margin:0;padding:0;background:transparent;overflow:hidden}</style></head>
-<body><div id="stage"></div>
+<body><div id="stage"></div><div id="fx" style="position:absolute;left:0;top:0"></div>
 <script src="/typo-engine.js"></script>
 <script src="/typo-moments.js"></script>
 <script src="/typo-studio.js"></script>
@@ -12,8 +12,20 @@ window.typoReady = (async () => {
   const doc = await (await fetch(`/api/typo/${encodeURIComponent(id)}/doc`)).json();
   const eng = new TypoEngine(document.getElementById("stage"), doc);
   await eng.ready();
+  // ✨ العناصر الحرة: طبقة تانية فوق الكلام بنفس المحرك
+  let fx = null;
+  if (doc.fx?.length) {
+    const el = document.getElementById("fx");
+    fx = new TypoEngine(el, { ...doc, blocks: doc.fx, transparent: true });
+    Object.assign(el.style, { position: "absolute", left: "0", top: "0" });
+    await fx.ready();
+  }
   // بيستنى صورة الشخص (لو فيه) تتحمل قبل ما السيرفر يصوّر الفريم
-  window.renderAt = (t) => { eng.renderAt(t); return eng.settle ? eng.settle() : null; };
+  window.renderAt = (t) => {
+    eng.renderAt(t);
+    if (fx) fx.renderAt(t);
+    return Promise.all([eng.settle ? eng.settle() : null, fx?.settle ? fx.settle() : null]);
+  };
   eng.renderAt(0);
   return { w: doc.w, h: doc.h, duration: doc.duration };
 })();
