@@ -3328,5 +3328,9 @@ window.I18N_EN = {
   "🎬 ✨ كارت مساعد ذكي": "🎬 ✨ AI assistant card",
   "🎬 🎨 ألوان الصفحة بتتبدّل": "🎬 🎨 Theme swap",
   "🎬 🎚️ سلايدر وقت": "🎬 🎚️ Time slider",
-  "🎬 🌤️ ويدجت طقس": "🎬 🌤️ Weather widget"
+  "🎬 🌤️ ويدجت طقس": "🎬 🌤️ Weather widget",
+  "🎬 📝 بوست بكلام متظلل": "🎬 📝 Highlighted post",
+  "🎬 🖍️ كلام عملاق متظلل": "🎬 🖍️ Giant highlighted pan",
+  "🎬 🟧 سطور على بلوكات": "🎬 🟧 Block lines",
+  "🎬 👍 تفاعلات بوست": "🎬 👍 Post reactions"
 };

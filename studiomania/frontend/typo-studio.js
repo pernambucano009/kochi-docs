@@ -50,7 +50,8 @@
     "profile", "bigbutton", "gauge", "rule", "iconrow",
     "led", "drop", "report", "serp",
     "files", "generating", "portfolio",
-    "letterorb", "connect", "assistant", "themeswap", "slider", "weather"]);
+    "letterorb", "connect", "assistant", "themeswap", "slider", "weather",
+    "post", "highlightpan", "blocklines", "reactions"]);
   E.TYPING = new Set(["type", "artype"]);
   const MC = document.createElement("canvas").getContext("2d");
   const measure = (s, font) => { MC.font = font; return MC.measureText(s).width; };
@@ -5579,6 +5580,103 @@
     html += `<div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:${cx.toFixed(1)}px;top:${(cy + chh * 0.25).toFixed(1)}px;width:${cw.toFixed(1)}px;background:#111;border-radius:${(cw * 0.08).toFixed(0)}px;padding:${(cw * 0.08).toFixed(0)}px;box-sizing:border-box;color:#fff;transform:scale(${p.toFixed(3)});box-shadow:0 ${(mn * 0.02).toFixed(0)}px ${(mn * 0.05).toFixed(0)}px rgba(0,0,0,.35)">
       <div dir="ltr" style="font:400 ${(cw * 0.05).toFixed(1)}px 'TY Pixel',monospace;opacity:.6;margin-bottom:${(cw * 0.03).toFixed(0)}px;text-align:${ar ? "right" : "left"}">● ${ar ? "الحالة" : "STATUS"}</div>
       <div style="font:400 ${(cw * 0.085).toFixed(1)}px ${ff};line-height:1.2">${words.map((x, i) => `<span style="opacity:${t >= x.t0 ? (i % 2 ? 1 : 0.65) : 0.1};${i % 2 ? "font-weight:700" : ""}">${esc(this.text(x.w))}</span>`).join(" ")}</div></div>`;
+    return html;
+  };
+  // ---------- post: بوست سوشيال باسم وصورة والكلمات المهمة بتتظلل بنفسجي
+  const LAV = "#CEC6FA";
+  P.k_post = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    if (!it.length) return "";
+    const ar = isAr(it), ff = famOf(ar ? "ع" : "a");
+    const nm = NAMES[ar ? "ar" : "en"][bi % 4];
+    const cw = Math.min(w * 0.88, mn * 0.95), fz = cw * (h > w ? 0.078 : 0.058);
+    const cx = (w - cw) / 2, cy = h * 0.24;
+    const p = eOut(seg(t, b.t0, b.t0 + 0.35));
+    const fi = b.focus >= 0 && b.focus < it.length ? b.focus : -1;
+    const body = it.map((x, i) => { const on = t >= x.t0, hl = (fi >= 0 ? Math.abs(i - fi) <= 1 : i % 4 < 2 && i < 3) ? eOut(seg(t, x.t0, x.t0 + 0.25)) : 0;
+      return `<span style="opacity:${on ? 1 : 0.15};background:linear-gradient(${LAV},${LAV}) ${ar ? "100%" : "0"} 0/${(hl * 100).toFixed(0)}% 100% no-repeat">${esc(this.text(x.w))}</span>`; }).join(" ");
+    let html = `<div style="position:absolute;inset:0;background:${onVideo(this) ? "rgba(255,255,255,.94)" : "#fff"}"></div>`;
+    html += `<div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:${cx.toFixed(1)}px;top:${cy.toFixed(1)}px;width:${cw.toFixed(1)}px;transform:translateY(${((1 - p) * mn * 0.05).toFixed(1)}px);opacity:${p.toFixed(2)};font:400 ${fz.toFixed(1)}px ${ff};color:#1D1D1D;line-height:1.45">
+      <div style="display:flex;align-items:center;gap:${(fz * 0.6).toFixed(0)}px;margin-bottom:${(fz * 0.9).toFixed(0)}px">
+        <div style="flex:none;width:${(fz * 2.6).toFixed(0)}px;height:${(fz * 2.6).toFixed(0)}px;border-radius:50%;background:${AVC[bi % AVC.length]};display:flex;align-items:center;justify-content:center;color:#fff;font:700 ${(fz * 1.1).toFixed(1)}px ${famOf(nm)}">${esc([...nm][0])}</div>
+        <div><div style="font:700 ${(fz * 1.05).toFixed(1)}px ${famOf(nm)}">${esc(nm)}</div><div style="font-size:.8em;color:#666">${ar ? "871 متابع · 20 س" : "871 followers · 20h"}</div></div></div>${body}</div>`;
+    return html;
+  };
+
+  // ---------- highlightpan: كلام عملاق والكاميرا ماشية عليه وكلمات متظللة
+  P.k_highlightpan = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    if (!it.length) return "";
+    const ar = isAr(it), ff = famOf(ar ? "ع" : "a");
+    const half = Math.ceil(it.length / 2), L = [it.slice(0, half), it.slice(half)].filter((x) => x.length);
+    const sz = mn * 0.2;
+    const lw = Math.max(...L.map((ln) => measure(ln.map((x) => this.text(x.w)).join(" "), `500 ${sz}px ${ff}`)));
+    const travel = Math.max(0, lw - w * 0.8);
+    const pk = eOut(seg(t, b.t0, b.t1)) * 0.9 + 0.05;
+    const off = ar ? -travel / 2 + pk * travel : travel / 2 - pk * travel;
+    const fi = b.focus >= 0 && b.focus < it.length ? b.focus : 0;
+    let html = `<div style="position:absolute;inset:0;background:${onVideo(this) ? "rgba(255,255,255,.95)" : "#fff"}"></div>`;
+    L.forEach((ln, li) => {
+      const y = h * 0.5 + (li - (L.length - 1) / 2) * sz * 1.15;
+      html += `<div data-free dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:50%;top:${y.toFixed(1)}px;transform:translate(calc(-50% + ${off.toFixed(1)}px),-50%) rotate(${li ? 0 : -0}deg);white-space:nowrap;font:500 ${sz.toFixed(1)}px ${ff};letter-spacing:-0.02em;color:#151515;line-height:1">${ln.map((x) => { const gi = it.indexOf(x), hl = (gi === fi || gi === fi + 1) ? eOut(seg(t, x.t0, x.t0 + 0.3)) : 0;
+        return `<span style="padding:0 .08em;background:linear-gradient(${LAV},${LAV}) ${ar ? "100%" : "0"} 0/${(hl * 100).toFixed(0)}% 100% no-repeat">${esc(this.text(x.w))}</span>`; }).join(" ")}</div>`;
+    });
+    return html;
+  };
+
+  // ---------- blocklines: سطور كلام أبيض كل سطر على بلوك برتقاني
+  P.k_blocklines = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    if (!it.length) return "";
+    const ar = isAr(it), ff = famOf(ar ? "ع" : "a");
+    const acc = accentOf(th, bi, [ORG, "#3B5BDB", "#151515"]);
+    const sz = Math.min(mn * 0.11 * this.ts, w * 0.12);
+    const lines = this.wrapItems ? this.wrapItems(it, `600 ${sz}px ${ff}`, w * 0.82) : [it];
+    const L = lines.length ? lines : [it];
+    const tot = L.length * sz * 1.22, y0 = (h - tot) / 2;
+    let html = onVideo(this) ? "" : `<div style="position:absolute;inset:0;background:#F1EEE8"></div>`;
+    L.forEach((ln, li) => {
+      const s = ln.map((x) => this.text(x.w)).join(" ");
+      const a = eOut(seg(t, ln[0].t0, ln[0].t0 + 0.3));
+      const y = y0 + li * sz * 1.22;
+      html += `<div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;${ar ? "right" : "left"}:${(w * 0.06).toFixed(0)}px;top:${y.toFixed(1)}px;white-space:nowrap;font:600 ${sz.toFixed(1)}px ${ff};line-height:1.12;color:#fff;letter-spacing:-0.02em">
+        <span style="display:inline-block;padding:0 ${(sz * 0.18).toFixed(0)}px;background:${acc};clip-path:inset(0 ${ar ? 0 : (1 - a) * 100}% 0 ${ar ? (1 - a) * 100 : 0}%)">${ln.map((x) => `<span style="opacity:${t >= x.t0 ? 1 : 0}">${esc(this.text(x.w))}</span>`).join(" ")}</span></div>`;
+    });
+    return html;
+  };
+
+  // ---------- reactions: أيقونات تفاعل وعدد بيزيد وزراير لايك وكومنت
+  P.k_reactions = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    if (!it.length) return "";
+    const ar = isAr(it), ff = famOf(ar ? "ع" : "a");
+    const ni = it.findIndex((x) => /[0-9٠-٩]/.test(x.w));
+    const tgt = ni >= 0 ? parseInt(it[ni].w.replace(/[٠-٩]/g, (c) => "٠١٢٣٤٥٦٧٨٩".indexOf(c)).replace(/[^0-9]/g, ""), 10) || 1594 : 1594;
+    const nm = it.filter((x, i) => i !== ni).map((x) => this.text(x.w)).join(" ") || NAMES[ar ? "ar" : "en"][bi % 4];
+    const n = Math.round(tgt * eOut(seg(t, b.t0 + 0.2, b.t1 - 0.2)));
+    const fz = Math.min(mn * 0.07, w * 0.068), isz = fz * 1.6;
+    const cy = h * 0.46;
+    const ICONS = [["#378FE9", '<path d="M7 11v7H4v-7zM9 18V10l3-6c1.5 0 2 1 2 2l-.5 3H18c1 0 1.6.9 1.3 1.8l-1.6 5.5c-.2.7-.8 1.2-1.5 1.2z" fill="#fff"/>'],
+      ["#6DAE4F", '<path d="M8 13V6.5a1.2 1.2 0 0 1 2.4 0V11M10.4 10V5a1.2 1.2 0 0 1 2.4 0v5M12.8 10V6a1.2 1.2 0 0 1 2.4 0v6c0 3-2 6-5 6s-4.5-2-5.5-4l-1-2a1.1 1.1 0 0 1 1.8-1.2L8 13" stroke="#fff" stroke-width="1.4" fill="none"/>'],
+      ["#F5BB5C", '<path d="M12 4a5 5 0 0 0-3 9v2h6v-2a5 5 0 0 0-3-9zM10 17h4M10.5 19h3" stroke="#fff" stroke-width="1.6" fill="none"/>'],
+      ["#DF704D", '<path d="M12 19s-7-4.4-7-9a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 4.6-7 9-7 9z" fill="#fff"/>']];
+    let html = `<div style="position:absolute;inset:0;background:${onVideo(this) ? "rgba(255,255,255,.95)" : "#fff"}"></div>`;
+    html += `<div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:${(w * 0.06).toFixed(0)}px;right:${(w * 0.06).toFixed(0)}px;top:${(cy - isz / 2).toFixed(1)}px;display:flex;align-items:center;gap:${(fz * 0.5).toFixed(0)}px;font:400 ${fz.toFixed(1)}px ${ff};color:#555;white-space:nowrap">
+      <span dir="ltr" style="display:flex">${ICONS.slice(0, 3).map(([c, p], i) => `<svg style="margin-left:${i ? (-isz * 0.3).toFixed(0) : 0}px;transform:scale(${eBack(seg(t, b.t0 + i * 0.1, b.t0 + i * 0.1 + 0.3)).toFixed(3)})" width="${isz.toFixed(0)}" height="${isz.toFixed(0)}" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="${c}" stroke="#fff" stroke-width="1.5"/>${p}</svg>`).join("")}</span>
+      <span>${esc(nm)} ${ar ? "و" : "and"} <span dir="ltr">${n.toLocaleString("en")}</span> ${ar ? "غيرهم" : "others"}</span></div>`;
+    const liked = t > b.t0 + (b.t1 - b.t0) * 0.55, lp = eBack(seg(t, b.t0 + (b.t1 - b.t0) * 0.55, b.t0 + (b.t1 - b.t0) * 0.55 + 0.3));
+    html += `<div style="position:absolute;left:${(w * 0.06).toFixed(0)}px;right:${(w * 0.06).toFixed(0)}px;top:${(cy + isz).toFixed(1)}px;border-top:1px solid #E5E5E5"></div>
+      <div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:${(w * 0.06).toFixed(0)}px;right:${(w * 0.06).toFixed(0)}px;top:${(cy + isz * 1.4).toFixed(1)}px;display:flex;gap:${(fz * 2).toFixed(0)}px;font:600 ${(fz * 1.1).toFixed(1)}px ${ff};color:#444">
+      <span style="display:flex;align-items:center;gap:${(fz * 0.4).toFixed(0)}px;color:${liked ? "#378FE9" : "#444"}"><svg style="transform:scale(${liked ? lp.toFixed(3) : 1})" width="${(fz * 1.3).toFixed(0)}" height="${(fz * 1.3).toFixed(0)}" viewBox="0 0 24 24"><path d="M7 11v8H4v-8zM9 19v-8l3-7c1.5 0 2.2 1 2 2.4L13.5 10H19c1 0 1.7 1 1.4 2l-1.8 6c-.2.6-.8 1-1.4 1z" fill="${liked ? "#378FE9" : "none"}" stroke="currentColor" stroke-width="1.6"/></svg>${ar ? "عجبني" : "Like"}</span>
+      <span style="display:flex;align-items:center;gap:${(fz * 0.4).toFixed(0)}px"><svg width="${(fz * 1.3).toFixed(0)}" height="${(fz * 1.3).toFixed(0)}" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>${ar ? "تعليق" : "Comment"}</span></div>`;
     return html;
   };
 })();
