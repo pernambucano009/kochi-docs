@@ -12672,7 +12672,7 @@ TYPO_STYLES = TYPO_DIR / "styles"
 for _d in (TYPO_PROJ, TYPO_STK, TYPO_STYLES):
     _d.mkdir(parents=True, exist_ok=True)
 TYPO_LOCK = threading.Lock()
-TYPO_BUSY = ("transcribing", "analyzing", "planning", "drawing", "rendering")
+TYPO_BUSY = ("transcribing", "analyzing", "planning", "drawing", "rendering", "tracking")
 TYPO_RATIOS = {"9:16": (1080, 1920), "16:9": (1920, 1080), "1:1": (1080, 1080), "4:5": (1080, 1350)}
 TYPO_STICKER_COST = 0.03
 TYPO_DICT = TYPO_DIR / "concepts.json"
@@ -13647,7 +13647,7 @@ def typo_doc(pid: str, d: dict) -> dict:
         sent = next(([{"w": words[i]["w"], "t0": words[i]["s"], "t1": words[i]["e"]} for i in range(sn[0], sn[-1] + 1)]
                      for sn in sents if sn[0] <= b.get("from", 0) <= sn[-1]), None)
         blocks.append({**{k: b.get(k) for k in ("t0", "t1", "kind", "theme", "text", "words", "focus", "letter", "anchor", "place", "skip",
-                                                 "intro", "outro", "sign", "box", "redact", "marks", "mx", "my", "ms", "trans", *typo.VARIANTS)}, "sent": sent,
+                                                 "intro", "outro", "sign", "box", "redact", "marks", "mx", "my", "ms", "trans", "xf", "xk", *typo.VARIANTS)}, "sent": sent,
                        "icon": img(b.get("icon")), "side": img(b.get("side")), "icons": [u for u in (img(i) for i in b.get("icons") or []) if u]})
     # الحركات اللي محتاجة صورة من الفيديو نفسه (الصورة جوه الحروف، البولارويد، الكروت): لقطة من نص البلوك
     srcf = (d.get("source") or {})
@@ -13681,6 +13681,15 @@ def typo_doc(pid: str, d: dict) -> dict:
                 {"t": kk["t"], "box": [round((kk["box"][0] * sw * k - ox) / W, 4), round((kk["box"][1] * sh * k - oy) / H, 4),
                                        round((kk["box"][2] * sw * k - ox) / W, 4), round((kk["box"][3] * sh * k - oy) / H, 4)]}
                 for kk in a["keys"]]}
+    # التراك: أركان الحاجة اللي البرنامج تابعها فريم فريم (محفوظة بكسور من الفيديو الأصلي) بتتحوّل لكادر الفيديو النهائي
+    tracks = {}
+    if kind == "source" and srcd.get("w") and srcd.get("h"):
+        sw, sh = srcd["w"], srcd["h"]
+        k = max(W / sw, H / sh)
+        ox, oy = (sw * k - W) / 2, (sh * k - H) / 2
+        for tid, tr in (d.get("tracks") or {}).items():
+            tracks[tid] = {"t0": tr["t0"], "fps": tr["fps"], "mode": tr.get("mode", "follow"),
+                           "q": [[round(((q[j] * sw * k - ox) / W) if j % 2 == 0 else ((q[j] * sh * k - oy) / H), 4) for j in range(8)] for q in tr["q"]]}
     pdoc = None
     pj = TYPO_PROJ / pid / "person" / "person.json"
     if kind == "source" and pj.exists():
@@ -13713,7 +13722,7 @@ def typo_doc(pid: str, d: dict) -> dict:
                                for f in map(pick, pi["frames"])]}
         except (OSError, ValueError, KeyError):
             pdoc = None
-    return {"w": W, "h": H, "fps": TYPO_FPS, "anchors": anchors, "person": pdoc, "dim": float((d.get("bg") or {}).get("dim") or 0), "duration": d.get("duration") or (blocks[-1]["t1"] if blocks else 1),
+    return {"w": W, "h": H, "fps": TYPO_FPS, "anchors": anchors, "tracks": tracks, "person": pdoc, "dim": float((d.get("bg") or {}).get("dim") or 0), "duration": d.get("duration") or (blocks[-1]["t1"] if blocks else 1),
             "style": {**{k: st.get(k) for k in ("font", "case", "grain", "weight", "light", "dark", "accent")},
                       "moments": {**(st.get("moments") or {}), **(d.get("fonts") or {})}},
             "transparent": kind != "theme", "blocks": blocks}
@@ -13722,6 +13731,96 @@ def typo_doc(pid: str, d: dict) -> dict:
 @app.get("/api/typo/{pid}/doc")
 def typo_doc_get(pid: str):
     return typo_doc(pid, typo_load(pid))
+
+
+class TypoTrackIn(BaseModel):
+    block: int
+    t: float
+    box: list[float]          # [x0, y0, x1, y1] بكسور من كادر الفيديو النهائي
+    mode: str = "follow"      # follow: حاجة بتتحرك · surface: ورقة/شاشة (بالمنظور)
+
+
+def typo_frame_map(d: dict):
+    """تحويل من كادر الفيديو الأصلي لكادر الفيديو النهائي (المقصوص على المقاس) والعكس."""
+    W, H = TYPO_RATIOS.get(d.get("ratio"), TYPO_RATIOS["9:16"])
+    src = d.get("source") or {}
+    sw, sh = src.get("w"), src.get("h")
+    if not sw or not sh:
+        raise HTTPException(400, "مقاس الفيديو مش معروف: ارفعه تاني")
+    k = max(W / sw, H / sh)
+    ox, oy = (sw * k - W) / 2, (sh * k - H) / 2
+    to_src = lambda x, y: ((x * W + ox) / (sw * k), (y * H + oy) / (sh * k))  # noqa: E731
+    return to_src
+
+
+@app.post("/api/typo/{pid}/track")
+def typo_track(pid: str, body: TypoTrackIn):
+    """🎯 تراك: الكلام يمشي مع حاجة في الفيديو (المستخدم رسم مربع عليها في الثانية t)."""
+    d = typo_load(pid)
+    src = d.get("source") or {}
+    if src.get("kind") != "video" or (d.get("bg") or {}).get("kind") != "source":
+        raise HTTPException(400, "التراك بيشتغل لما الخلفية هي الفيديو اللي رفعته")
+    blocks = d.get("blocks") or []
+    if not 0 <= body.block < len(blocks) or len(body.box) != 4:
+        raise HTTPException(400, "اختار اللقطة والمربع تاني")
+    x0, y0, x1, y1 = [min(1.2, max(-0.2, float(v))) for v in body.box]
+    if x1 - x0 < 0.01 or y1 - y0 < 0.01:
+        raise HTTPException(400, "المربع صغير قوي: ارسمه على الحاجة كلها")
+    mode = body.mode if body.mode in ("follow", "surface") else "follow"
+    return typo_start(pid, "tracking", "🎯 بيتابع الحاجة فريم فريم", run_typo_track, body.block, float(body.t), [x0, y0, x1, y1], mode)
+
+
+def run_typo_track(pid: str, bi: int, t: float, box: list[float], mode: str) -> None:
+    try:
+        import tracker
+        d = typo_load(pid)
+        to_src = typo_frame_map(d)
+        b = d["blocks"][bi]
+        (sx0, sy0), (sx1, sy1) = to_src(box[0], box[1]), to_src(box[2], box[3])
+        words = d.get("words") or []
+        bt0 = words[b["from"]]["s"] if words and b.get("from") is not None else 0
+        nxt = d["blocks"][bi + 1] if bi + 1 < len(d["blocks"]) else None
+        bt1 = words[nxt["from"]]["s"] if nxt and words else (d.get("duration") or bt0 + 5)
+        src = TYPO_PROJ / pid / d["source"]["file"]
+        res = tracker.track(str(src), max(0.0, bt0 - 0.2), bt1 + 0.2, t, [sx0, sy0, sx1, sy1], mode,
+                            progress=lambda f: typo_set(pid, step=f"🎯 بيتابع الحاجة: {int(f * 100)}٪"))
+        tid = f"tr{uuid.uuid4().hex[:6]}"
+
+        def fn(x):
+            tr = x.setdefault("tracks", {})
+            old = ((x["blocks"][bi].get("xf") or {}).get("tr"))
+            tr[tid] = res
+            xf = {**(x["blocks"][bi].get("xf") or {}), "tr": tid, "tref": round(t, 3)}
+            x["blocks"][bi]["xf"] = xf
+            used = {(bb.get("xf") or {}).get("tr") for bb in x["blocks"]}
+            if old and old not in used:
+                tr.pop(old, None)
+            x.update(status=typo_idle(x), step=None, error=None, final=None)
+        typo_update(pid, fn)
+    except Exception as exc:  # noqa: BLE001
+        typo_fail(pid, exc)
+
+
+class TypoTrackFixIn(BaseModel):
+    q: list[list[float]]      # الأركان فريم فريم بكسور من كادر الفيديو النهائي (بعد التصليح بالإيد)
+
+
+@app.put("/api/typo/{pid}/tracks/{tid}")
+def typo_track_fix(pid: str, tid: str, body: TypoTrackFixIn):
+    """✋ تصليح التراك بالإيد: الأركان اللي المستخدم سحبها بتتحفظ مكان اللي البرنامج حسبه."""
+    d = typo_load(pid)
+    to_src = typo_frame_map(d)
+    if tid not in (d.get("tracks") or {}):
+        raise HTTPException(404, "التراك ده مش موجود")
+    if len(body.q) != len(d["tracks"][tid]["q"]) or any(len(q) != 8 for q in body.q):
+        raise HTTPException(400, "بيانات التراك ناقصة")
+    qs = [[round(v, 5) for j in range(4) for v in to_src(q[j * 2], q[j * 2 + 1])] for q in body.q]
+
+    def fn(x):
+        x["tracks"][tid]["q"] = qs
+        x["final"] = None
+    typo_update(pid, fn)
+    return {"ok": True}
 
 
 class TypoRenderIn(BaseModel):
@@ -13766,6 +13865,8 @@ def run_typo_render(pid: str, base: str, quality: str) -> None:
         src = (d.get("source") or {}).get("file")
         cmd = [ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y"]
         inputs, fl, bg_pts = 0, "", ""
+        # المتصفح بيصوّر الفريم بمقاسه الكامل حتى في الجودة الأسرع، فبيتصغّر هنا على مقاس الفيديو
+        rs = f"scale={vw}:{vh}," if scale != 1 else ""
         if kind == "solid" or kind == "none":
             cmd += ["-f", "lavfi", "-i", f"color=c={bg.get('color') or '#101010'}:s={vw}x{vh}:r={TYPO_FPS}:d={dur:.3f}"]
             inputs = 1
@@ -13786,7 +13887,7 @@ def run_typo_render(pid: str, base: str, quality: str) -> None:
             grain = float(typo_style(d.get("style")).get("grain") or 0)
             fl = (f"[0:v]{bg_pts}scale={vw}:{vh}:force_original_aspect_ratio=increase,crop={vw}:{vh},setsar=1,fps={TYPO_FPS}"
                   + (f",colorchannelmixer=rr={1 - dim}:gg={1 - dim}:bb={1 - dim}" if dim else "") + "[bg];"
-                  f"[bg][1:v]overlay=0:0:shortest=1" + (f",noise=alls={int(grain * 35)}:allf=t" if grain else "") + ",format=yuv420p[v]")
+                  + (f"[1:v]scale={vw}:{vh}[ov];[bg][ov]" if scale != 1 else "[bg][1:v]") + "overlay=0:0:shortest=1" + (f",noise=alls={int(grain * 35)}:allf=t" if grain else "") + ",format=yuv420p[v]")
         audio_in, audio_path = None, None
         nxt = inputs + 1
         if src and (d.get("source") or {}).get("kind") in ("audio", "video"):
@@ -13807,7 +13908,7 @@ def run_typo_render(pid: str, base: str, quality: str) -> None:
             # الكليك على قد علو الفيديو: لو الكلام عالي (بودكاست/ريلز) الكليك بيعلى معاه، والكلام بيوطى شوية،
             # وفي الآخر ليميتر عشان الصوت مايتكسرش (من غيره الكليك كان بيضيع تحت الكلام العالي)
             g = typo_sfx_gain(audio_path) if has_a else 1.0
-            fl = (fl + ";" if fl else f"[{inputs}:v]format=yuv420p[v];") + (
+            fl = (fl + ";" if fl else f"[{inputs}:v]{rs}format=yuv420p[v];") + (
                 f"[{audio_in}:a]volume=0.8[va];[{sfx_in}:a]volume={g:.2f}[fa];[va][fa]amix=inputs=2:duration=longest:normalize=0,alimiter=limit=0.95[a]"
                 if has_a else f"[{sfx_in}:a]anull[a]")
             cmd += ["-filter_complex", fl, "-map", "[v]", "-map", "[a]", "-c:a", "aac", "-b:a", "160k"]
@@ -13815,7 +13916,7 @@ def run_typo_render(pid: str, base: str, quality: str) -> None:
             if fl:
                 cmd += ["-filter_complex", fl, "-map", "[v]"]
             else:
-                cmd += ["-map", f"{inputs}:v", "-vf", "format=yuv420p"]
+                cmd += ["-map", f"{inputs}:v", "-vf", f"{rs}format=yuv420p"]
             if audio_in is not None:
                 cmd += ["-map", f"{audio_in}:a?", "-c:a", "aac", "-b:a", "160k", "-shortest"]
             elif sfx_in is not None:

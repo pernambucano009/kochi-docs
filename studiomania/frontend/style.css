@@ -1817,3 +1817,7 @@ a.btn.disabled { opacity: .45; pointer-events: none; }
 .ty-sfx-list { display: flex; flex-direction: column; gap: 4px; }
 .ty-sfx-row { display: flex; align-items: center; gap: 8px; padding: 4px 8px; background: var(--surface-2); border-radius: 8px; }
 .ty-sfx-row span { flex: 1; font-family: monospace; font-size: 13px; }
+.ty-wrap { position: relative; }
+.ty-giz { position: absolute; left: -80px; top: -80px; overflow: visible; pointer-events: none; z-index: 3; }
+.ty-giz * { pointer-events: auto; }
+.ty-gbar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; min-height: 30px; }

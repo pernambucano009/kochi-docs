@@ -116,6 +116,13 @@
     }
 
     renderAt(t) {
+      this.renderRaw(t);
+      const b = this._b;
+      if (b && !TypoEngine.FULL?.has(b.kind)) this.applyXf(b, t);
+      else this._xf = null;
+    }
+
+    renderRaw(t) {
       const blocks = this.doc.blocks || [];
       const i = blocks.findIndex((b) => t >= b.t0 && t < b.t1);
       const b = blocks[i];
@@ -220,6 +227,157 @@
         const dy = b.y0 < m * 0.5 ? m * 0.5 - b.y0 : b.y1 > h - m * 0.5 ? h - m * 0.5 - b.y1 : 0;
         if (dx || dy) el.style.transform = `translate(${dx.toFixed(1)}px,${dy.toFixed(1)}px) ${el.style.transform || ""}`;
       }
+    }
+
+    // ---- التحكم اليدوي في البلوك (xf): مكان، حجم، لفّ على X وY وZ، أركان (corner pin)، قدام/ورا الشخص، تراك
+    // كل ده بيتطبّق على طبقة الكلام والعناصر بس؛ الخلفيات اللي مالية الكادر (لون/تغميق/حبيبات) بتفضل مكانها
+    static xfAt(b, t) {
+      const f = b.xf || {};
+      const v = { x: +f.x || 0, y: +f.y || 0, s: f.s == null ? 1 : +f.s, rx: +f.rx || 0, ry: +f.ry || 0, rz: +f.rz || 0, pin: f.pin || null };
+      const ks = b.xk;
+      if (!ks?.length) return v;
+      const one = (q) => ({ x: +q.x || 0, y: +q.y || 0, s: q.s == null ? 1 : +q.s, rx: +q.rx || 0, ry: +q.ry || 0, rz: +q.rz || 0, pin: q.pin || null });
+      if (t <= ks[0].t) return one(ks[0]);
+      if (t >= ks[ks.length - 1].t) return one(ks[ks.length - 1]);
+      for (let j = 0; j < ks.length - 1; j++) {
+        if (t >= ks[j].t && t <= ks[j + 1].t) {
+          const a = one(ks[j]), c = one(ks[j + 1]), m = easeInOut((t - ks[j].t) / Math.max(1e-4, ks[j + 1].t - ks[j].t));
+          const o = {};
+          for (const k of ["x", "y", "s", "rx", "ry", "rz"]) o[k] = lerp(a[k], c[k], m);
+          o.pin = a.pin && c.pin ? a.pin.map((p, q) => [lerp(p[0], c.pin[q][0], m), lerp(p[1], c.pin[q][1], m)]) : (m < 0.5 ? a.pin : c.pin);
+          return o;
+        }
+      }
+      return v;
+    }
+
+    // هوموجرافي: بتحوّل 4 نقط لـ 4 نقط (عشان الكلام يتلزق على ورقة/شاشة مايلة)
+    static homog(src, dst) {
+      const A = [], B = [];
+      for (let i = 0; i < 4; i++) {
+        const [x, y] = src[i], [u, v] = dst[i];
+        A.push([x, y, 1, 0, 0, 0, -u * x, -u * y]); B.push(u);
+        A.push([0, 0, 0, x, y, 1, -v * x, -v * y]); B.push(v);
+      }
+      const n = 8;
+      for (let c = 0; c < n; c++) {
+        let p = c;
+        for (let r = c + 1; r < n; r++) if (Math.abs(A[r][c]) > Math.abs(A[p][c])) p = r;
+        [A[c], A[p]] = [A[p], A[c]]; [B[c], B[p]] = [B[p], B[c]];
+        const d = A[c][c];
+        if (Math.abs(d) < 1e-12) return null;
+        for (let r = 0; r < n; r++) {
+          if (r === c) continue;
+          const f = A[r][c] / d;
+          if (!f) continue;
+          for (let q = c; q < n; q++) A[r][q] -= f * A[c][q];
+          B[r] -= f * B[c];
+        }
+      }
+      return B.map((v, i) => v / A[i][i]);
+    }
+
+    static m3d(H) {
+      return `matrix3d(${H[0]},${H[3]},0,${H[6]},${H[1]},${H[4]},0,${H[7]},0,0,1,0,${H[2]},${H[5]},0,1)`;
+    }
+
+    // مكان الحاجة اللي اتعملها تراك في وقت معيّن (4 أركان بالبكسل)
+    trackQuad(id, t) {
+      const tr = (this.doc.tracks || {})[id];
+      if (!tr?.q?.length) return null;
+      const f = clamp((t - tr.t0) * tr.fps, 0, tr.q.length - 1);
+      const i = Math.floor(f), m = f - i, a = tr.q[i], c = tr.q[Math.min(i + 1, tr.q.length - 1)];
+      const { w, h } = this.doc;
+      return [0, 1, 2, 3].map((k) => [lerp(a[k * 2], c[k * 2], m) * w, lerp(a[k * 2 + 1], c[k * 2 + 1], m) * h]);
+    }
+
+    trackH(b, t) {
+      const f = b.xf || {};
+      if (!f.tr) return null;
+      const q0 = this.trackQuad(f.tr, f.tref || 0), q1 = this.trackQuad(f.tr, t);
+      return q0 && q1 ? TypoEngine.homog(q0, q1) : null;
+    }
+
+    // المساحة اللي محتوى البلوك واخدها (بتتقاس مرة واحدة قرب آخر البلوك، لما كل حاجة تكون ظهرت)
+    cbKey(b) { return `${b.t0}|${b.t1}|${b.kind}|${b.text}|${b.ms ?? 1}|${b.focus}`; }
+
+    contentBox(b) {
+      const key = this.cbKey(b);
+      this._cb = this._cb || new Map();
+      if (this._cb.has(key)) return this._cb.get(key);
+      const { w, h } = this.doc;
+      this.renderRaw(b.t0 + (b.t1 - b.t0) * 0.85);
+      const st = this.stage.getBoundingClientRect();
+      const k = st.width / w || 1;
+      let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+      for (const el of this.stage.querySelectorAll("*")) {
+        const r = el.getBoundingClientRect();
+        const rw = r.width / k, rh = r.height / k;
+        if (rw < 1 || rh < 1 || rw * rh > w * h * 0.85) continue;
+        x0 = Math.min(x0, (r.left - st.left) / k); y0 = Math.min(y0, (r.top - st.top) / k);
+        x1 = Math.max(x1, (r.right - st.left) / k); y1 = Math.max(y1, (r.bottom - st.top) / k);
+      }
+      let box = x1 > x0 && y1 > y0 ? { x0: clamp(x0, 0, w), y0: clamp(y0, 0, h), x1: clamp(x1, 0, w), y1: clamp(y1, 0, h) } : null;
+      if (!box || box.x1 - box.x0 < 4 || box.y1 - box.y0 < 4) box = { x0: w * 0.2, y0: h * 0.4, x1: w * 0.8, y1: h * 0.6 };
+      this._cb.set(key, box);
+      return box;
+    }
+
+    applyXf(b, t) {
+      const v = TypoEngine.xfAt(b, t), f = b.xf || {};
+      const H = this.trackH(b, t);
+      const behind = f.z === "behind" && this.doc.transparent && this.personAt;
+      const plain = !v.pin && !v.x && !v.y && v.s === 1 && !v.rx && !v.ry && !v.rz && !H && !behind;
+      if (plain && !this.editing) { this._xf = null; return; }
+      const had = this._cb?.has(this.cbKey(b));
+      const box = this.contentBox(b);
+      if (!had) this.renderRaw(t);   // القياس رسم وقت تاني: نرجع للفريم الحالي
+      const { w, h } = this.doc;
+      const fx = (el) => {   // خلفية مالية الكادر من غير كلام ولا صور: بتفضل ثابتة
+        if (el.textContent.trim() || el.matches("img,svg,video,canvas") || el.querySelector("img,svg,video,canvas")) return false;
+        const cs = el.style;
+        return (cs.inset === "0px" || cs.inset === "0") || (el.offsetWidth >= w * 0.95 && el.offsetHeight >= h * 0.95);
+      };
+      const kids = [...this.stage.children];
+      const moving = kids.filter((el) => !fx(el));
+      const inner = document.createElement("div");
+      inner.style.cssText = "position:absolute;left:0;top:0;width:100%;height:100%;transform-origin:0 0";
+      const cx = (box.x0 + box.x1) / 2, cy = (box.y0 + box.y1) / 2;
+      const D = Math.max(w, h) * 1.6;
+      if (v.pin) {
+        const Hp = TypoEngine.homog([[box.x0, box.y0], [box.x1, box.y0], [box.x1, box.y1], [box.x0, box.y1]], v.pin.map((p) => [p[0] * w, p[1] * h]));
+        if (Hp) inner.style.transform = TypoEngine.m3d(Hp);
+      } else {
+        inner.style.transform = `translate(${(cx + v.x * w).toFixed(2)}px,${(cy + v.y * h).toFixed(2)}px) perspective(${D.toFixed(0)}px) rotateX(${v.rx.toFixed(2)}deg) rotateY(${v.ry.toFixed(2)}deg) rotateZ(${v.rz.toFixed(2)}deg) scale(${v.s.toFixed(4)}) translate(${(-cx).toFixed(2)}px,${(-cy).toFixed(2)}px)`;
+      }
+      if (moving[0]) this.stage.insertBefore(inner, moving[0]); else this.stage.appendChild(inner);
+      for (const el of moving) inner.appendChild(el);
+      // علامات مش ظاهرة على أركان المحتوى: المحرر بيقرا مكانها الحقيقي بعد اللف عشان يرسم المقابض عليها
+      inner.insertAdjacentHTML("beforeend", [[box.x0, box.y0], [box.x1, box.y0], [box.x1, box.y1], [box.x0, box.y1], [cx, cy]]
+        .map(([x, y], i) => `<i data-xfm="${i}" style="position:absolute;left:${x.toFixed(1)}px;top:${y.toFixed(1)}px;width:0;height:0"></i>`).join(""));
+      let top = inner;
+      if (H) {
+        const outer = document.createElement("div");
+        outer.style.cssText = `position:absolute;left:0;top:0;width:100%;height:100%;transform-origin:0 0;transform:${TypoEngine.m3d(H)}`;
+        this.stage.insertBefore(outer, inner);
+        outer.appendChild(inner);
+        top = outer;
+      }
+      if (behind) {
+        const a = this.personAt(t);
+        if (a) {
+          const { x, y, w: pw, h: ph } = a.img, src = a.murl || a.url;
+          this._want = src;
+          const m = `linear-gradient(#000,#000) 0 0/100% 100% no-repeat, url(${src}) ${x.toFixed(1)}px ${y.toFixed(1)}px/${pw.toFixed(1)}px ${ph.toFixed(1)}px no-repeat`;
+          const mk = document.createElement("div");
+          mk.style.cssText = "position:absolute;inset:0";
+          mk.style.webkitMask = m; mk.style.webkitMaskComposite = "xor"; mk.style.mask = m; mk.style.maskComposite = "exclude";
+          this.stage.insertBefore(mk, top);
+          mk.appendChild(top);
+          mk.insertAdjacentHTML("afterbegin", `<img src="${src}" alt="" style="position:absolute;width:1px;height:1px;opacity:0">`);
+        }
+      }
+      this._xf = { box, v, H: !!H };
     }
 
     vignette(th) {

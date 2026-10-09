@@ -556,6 +556,50 @@ def _i(v, d=0):
         return d
 
 
+def _pin(v):
+    """4 أركان (كسور من الكادر) لو المستخدم لزق البلوك على سطح."""
+    if not isinstance(v, list) or len(v) != 4:
+        return None
+    try:
+        return [[_f(p[0], 0, -2, 3), _f(p[1], 0, -2, 3)] for p in v]
+    except (TypeError, IndexError):
+        return None
+
+
+def clean_xf(v) -> dict:
+    """التحكم اليدوي في البلوك: إزاحة وحجم ولفّ على 3 محاور وأركان وقدام/ورا الشخص وتراك."""
+    if not isinstance(v, dict):
+        return {}
+    o = {"x": _f(v.get("x"), 0, -3, 3), "y": _f(v.get("y"), 0, -3, 3), "s": _f(v.get("s"), 1, 0.05, 8),
+         "rx": _f(v.get("rx"), 0, -89, 89), "ry": _f(v.get("ry"), 0, -89, 89), "rz": _f(v.get("rz"), 0, -720, 720)}
+    pin = _pin(v.get("pin"))
+    if pin:
+        o["pin"] = pin
+    if v.get("z") == "behind":
+        o["z"] = "behind"
+    tr = re.sub(r"[^a-z0-9_]", "", str(v.get("tr") or ""))[:24]
+    if tr:
+        o["tr"], o["tref"] = tr, _f(v.get("tref"), 0, 0, 1e6)
+    plain = not pin and not o.get("z") and not tr and o["s"] == 1 and not any(o[k] for k in ("x", "y", "rx", "ry", "rz"))
+    return {} if plain else o
+
+
+def clean_xk(v) -> list:
+    """مفاتيح حركة (keyframes) للتحكم اليدوي: كل مفتاح وقت وقيم، ومترتبين."""
+    out = []
+    for q in (v if isinstance(v, list) else [])[:120]:
+        if not isinstance(q, dict):
+            continue
+        k = {"t": _f(q.get("t"), 0, 0, 1e6), "x": _f(q.get("x"), 0, -3, 3), "y": _f(q.get("y"), 0, -3, 3), "s": _f(q.get("s"), 1, 0.05, 8),
+             "rx": _f(q.get("rx"), 0, -89, 89), "ry": _f(q.get("ry"), 0, -89, 89), "rz": _f(q.get("rz"), 0, -720, 720)}
+        pin = _pin(q.get("pin"))
+        if pin:
+            k["pin"] = pin
+        out.append(k)
+    out.sort(key=lambda k: k["t"])
+    return out
+
+
 def clean_plan(raw: dict, words: list[dict], duration: float, pro: bool = False) -> list[dict]:
     """البلوكات بأوقات حقيقية من الكلمات: كل بلوك من أول كلمة فيه لحد أول كلمة في اللي بعده."""
     n = len(words)
@@ -583,6 +627,7 @@ def clean_plan(raw: dict, words: list[dict], duration: float, pro: bool = False)
                     # مكان وحجم الكلام اللي المستخدم ظبطه بإيده (سحب في المعاينة): إزاحة بكسور من الكادر، وحجم
                     "mx": _f(b.get("mx"), 0, -0.6, 0.6), "my": _f(b.get("my"), 0, -0.6, 0.6), "ms": _f(b.get("ms"), 1, 0.3, 2.5),
                     "trans": b.get("trans") if b.get("trans") in TRANS else "",
+                    "xf": clean_xf(b.get("xf")), "xk": clean_xk(b.get("xk")),
                     **{k: (b.get(k) if b.get(k) in vals else "") for k, vals in VARIANTS.items()},
                     "marks": [{"type": m["type"], "word": _i(m.get("word")), **({"color": m["color"]} if m.get("color") in ("red", "yellow") else {})}
                               for m in (b.get("marks") or []) if isinstance(m, dict) and m.get("type") in MARKS][:4]})
