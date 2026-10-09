@@ -3259,5 +3259,11 @@ window.I18N_EN = {
   "🎬 🔌 تطبيقات بتتوصل": "🎬 🔌 Apps connecting",
   "🎬 🔔 جرس والعداد بيزيد": "🎬 🔔 Bell with rising counter",
   "🎬 🔢 رقم فصل عملاق": "🎬 🔢 Giant chapter number",
-  "🎬 🗃️ فيديو وبانل جنبه": "🎬 🗃️ Video with side panel"
+  "🎬 🗃️ فيديو وبانل جنبه": "🎬 🗃️ Video with side panel",
+  "🎬 👯 الشخص متكرر": "🎬 👯 Person repeated",
+  "🎬 🔠 كلمة عملاقة والكاميرا ماشية عليها": "🎬 🔠 Giant word camera pan",
+  "🎬 🔴 دايرة بأول حرف بتكبر": "🎬 🔴 Initial circle that grows",
+  "🎬 🏆 لوحة ترتيب": "🎬 🏆 Leaderboard",
+  "🎬 🍩 دايرة نسبة": "🎬 🍩 Donut percentage",
+  "🎬 🖼️ كلمات وصور طايرة": "🎬 🖼️ Words with floating photos"
 };
