@@ -46,7 +46,8 @@
     "wordroll", "bignum", "stickynote",
     "colorpicker", "uploads", "timer",
     "anchorword", "orders", "stats", "duo", "route",
-    "flank", "flood", "chips", "wordtiles"]);
+    "flank", "flood", "chips", "wordtiles",
+    "profile", "bigbutton", "gauge", "rule", "iconrow"]);
   E.TYPING = new Set(["type", "artype"]);
   const MC = document.createElement("canvas").getContext("2d");
   const measure = (s, font) => { MC.font = font; return MC.measureText(s).width; };
@@ -5106,6 +5107,126 @@
       const p = eBack(seg(t, x.t0, x.t0 + 0.3));
       html += `<div dir="${this.dir(s)}" style="position:absolute;left:${(w * fx).toFixed(1)}px;top:${(h * fy).toFixed(1)}px;transform:translate(-50%,-50%) rotate(${((r() - 0.5) * 4).toFixed(1)}deg) scale(${p.toFixed(3)});background:${st.bg};border:${st.b};color:${st.fg};font:${font.replace("{}", sz.toFixed(1))};line-height:1.15;padding:${(sz * 0.12).toFixed(0)}px ${(sz * 0.3).toFixed(0)}px;white-space:nowrap;box-shadow:0 ${(mn * 0.008).toFixed(0)}px ${(mn * 0.025).toFixed(0)}px rgba(0,0,0,.12)">${i % 4 === 2 ? `<svg style="margin-inline-end:.25em;vertical-align:0" width="${(sz * 0.55).toFixed(0)}" height="${(sz * 0.4).toFixed(0)}" viewBox="0 0 22 16"><path d="M2 2l6 6-6 6M12 2l6 6-6 6" stroke="currentColor" stroke-width="3" fill="none"/></svg>` : ""}${esc(s)}</div>`;
     });
+    return html;
+  };
+  // ---------- profile: كارت بروفايل بصورة مدورة على خلفية منقطة وزرار متابعة
+  P.k_profile = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    if (!it.length) return "";
+    const fi = b.focus >= 0 && b.focus < it.length ? b.focus : 0;
+    const nm = it.slice(0, Math.min(2, it.length)).map((x) => this.text(x.w)).join(" ");
+    const bio = it.slice(Math.min(2, it.length)).filter((x) => t >= x.t0).map((x) => this.text(x.w)).join(" ");
+    const ar = isAr(it), ff = famOf(nm);
+    const cw = Math.min(w * 0.7, mn * 0.72), chh = cw * 1.25;
+    const cx = (w - cw) / 2, cy = (h - chh) / 2;
+    const p = eBack(seg(t, b.t0, b.t0 + 0.4));
+    const src = imgOf(b); if (src) this._want = src;
+    const av = cw * 0.36, bh = chh * 0.4;
+    const C = [["#C9372C", "#5DA34A"], ["#2F5FD0", "#F2C230"], ["#3C7A4E", "#F08A3C"]][bi % 3];
+    const dots = Array.from({ length: 14 }, (_, j) => { const r = rng(j * 11 + bi); return `<circle cx="${(r() * 100).toFixed(1)}" cy="${(r() * 40).toFixed(1)}" r="${(3 + r() * 5).toFixed(1)}" fill="${C[1]}"/>`; }).join("");
+    const fol = t > b.t0 + (b.t1 - b.t0) * 0.6;
+    let html = onVideo(this) ? `<div style="position:absolute;inset:0;background:rgba(0,0,0,.3)"></div>` : `<div style="position:absolute;inset:0;background:${PAPER}"></div>`;
+    html += `<div style="position:absolute;left:${cx.toFixed(1)}px;top:${cy.toFixed(1)}px;width:${cw.toFixed(1)}px;height:${chh.toFixed(1)}px;background:#FBF8F1;border-radius:${(cw * 0.05).toFixed(0)}px;overflow:hidden;transform:scale(${p.toFixed(3)});box-shadow:0 ${(mn * 0.02).toFixed(0)}px ${(mn * 0.05).toFixed(0)}px rgba(0,0,0,.25)">
+      <svg style="position:absolute;left:0;top:0" width="${cw.toFixed(0)}" height="${bh.toFixed(0)}" viewBox="0 0 100 40" preserveAspectRatio="xMidYMid slice"><rect width="100" height="40" fill="${C[0]}"/>${dots}</svg>
+      <div style="position:absolute;left:${((cw - av) / 2).toFixed(1)}px;top:${(bh - av * 0.55).toFixed(1)}px;width:${av.toFixed(1)}px;height:${av.toFixed(1)}px;border-radius:50%;border:${(cw * 0.015).toFixed(0)}px solid #FBF8F1;background:${src ? `url(${src}) center/cover` : "linear-gradient(160deg,#C8B49E,#6E5A48)"}"></div>
+      <div dir="${this.dir(nm)}" style="position:absolute;left:0;right:0;top:${(bh + av * 0.55).toFixed(1)}px;text-align:center;font:600 ${fitSize(nm, `600 {}px ${ff}`, cw * 0.84, cw * 0.075).toFixed(1)}px ${ff};color:#222;white-space:nowrap">${esc(nm)}</div>
+      <div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:${(cw * 0.12).toFixed(0)}px;right:${(cw * 0.12).toFixed(0)}px;top:${(bh + av * 0.55 + cw * 0.12).toFixed(1)}px;text-align:center;font:400 ${(cw * 0.045).toFixed(1)}px ${ar ? famOf("ع") : "'TY Pixel',monospace"};color:#555;line-height:1.35">${esc(bio)}</div>
+      <div style="position:absolute;left:50%;bottom:${(chh * 0.16).toFixed(0)}px;transform:translateX(-50%) scale(${fol ? 1.06 : 1});background:${fol ? "#222" : C[0]};color:#fff;font:600 ${(cw * 0.045).toFixed(1)}px ${famOf(ar ? "ع" : "a")};padding:${(cw * 0.018).toFixed(0)}px ${(cw * 0.06).toFixed(0)}px;border-radius:99px;white-space:nowrap">${fol ? (ar ? "✓ متابَع" : "✓ Following") : (ar ? "تابِع" : "Follow")}</div>
+      <div dir="ltr" style="position:absolute;left:0;right:0;bottom:${(chh * 0.04).toFixed(0)}px;display:flex;justify-content:space-around;font:500 ${(cw * 0.035).toFixed(1)}px 'TY Outfit';color:#777"><span>♥ 5.8K</span><span>▣ 329</span><span>◉ 12K</span></div></div>`;
+    return html;
+  };
+
+  // ---------- bigbutton: زرار عملاق قريب أوي من الكاميرا والإيد بتدوس
+  P.k_bigbutton = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    if (!it.length) return "";
+    const s = it.map((x) => this.text(x.w)).join(" "), ff = famOf(s);
+    const sz = mn * 0.16;
+    const tw = measure(s, `500 ${sz}px ${ff}`);
+    const bw = tw + sz * 2.4, bh = sz * 1.9;
+    const z = lerp(1.25, 1, eOut(seg(t, b.t0, b.t0 + 0.8)));
+    const rtl = AR.test(s), pk = eOut(seg(t, b.t0 + 0.3, b.t1 - 0.2));
+    const press = seg(t, b.t1 - 0.6, b.t1 - 0.45) - seg(t, b.t1 - 0.4, b.t1 - 0.25);
+    const xs = rtl ? Math.min((w - bw) / 2, w * 0.94 - bw) : Math.max(w * 0.06, (w - bw) / 2);
+    const x0 = rtl ? xs + lerp(0, Math.max(0, w * 0.06 - xs), pk) : xs + lerp(0, Math.min(0, w * 0.94 - bw - xs), pk), y0 = h * 0.5 - bh / 2;
+    const acc = ["#6E8A4E", ORG, "#2F7CF6"][bi % 3];
+    let html = onVideo(this) ? `<div style="position:absolute;inset:0;background:rgba(240,238,233,.88)"></div>` : `<div style="position:absolute;inset:0;background:${PAPER}"></div>`;
+    html += `<div data-free style="position:absolute;left:${(x0 - sz * 0.25).toFixed(1)}px;top:${(y0 - sz * 0.25).toFixed(1)}px;width:${(bw + sz * 0.5).toFixed(1)}px;height:${(bh + sz * 0.5).toFixed(1)}px;border-radius:${bh}px;background:#2B2B2B;transform:scale(${z.toFixed(3)});transform-origin:${rtl ? "100%" : "0"} 50%"></div>
+      <div data-free dir="${this.dir(s)}" style="position:absolute;left:${x0.toFixed(1)}px;top:${y0.toFixed(1)}px;width:${bw.toFixed(1)}px;height:${bh.toFixed(1)}px;border-radius:${bh}px;background:#E4E2D6;display:flex;align-items:center;gap:${(sz * 0.4).toFixed(0)}px;padding:0 ${(sz * 0.2).toFixed(0)}px;box-sizing:border-box;transform:scale(${(z * (1 - press * 0.05)).toFixed(3)});transform-origin:${rtl ? "100%" : "0"} 50%;white-space:nowrap">
+        <div style="flex:none;width:${(bh * 0.8).toFixed(0)}px;height:${(bh * 0.8).toFixed(0)}px;border-radius:50%;background:${acc};display:flex;align-items:center;justify-content:center"><svg width="${(bh * 0.4).toFixed(0)}" height="${(bh * 0.4).toFixed(0)}" viewBox="0 0 24 24"><path d="M5 9h14l-1.5 11h-11zM9 9V7a3 3 0 0 1 6 0v2" fill="none" stroke="#fff" stroke-width="2.2" stroke-linejoin="round"/></svg></div>
+        <span style="font:500 ${sz.toFixed(1)}px ${ff};color:#2B2B2B;letter-spacing:-0.02em">${esc(s)}</span></div>`;
+    return html;
+  };
+
+  // ---------- gauge: عداد دايري بيتملى ورقم في النص
+  P.k_gauge = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    if (!it.length) return "";
+    const ni = it.findIndex((x) => /[0-9٠-٩]/.test(x.w));
+    const big = ni >= 0 ? this.text(it[ni].w) : this.text(it[0].w);
+    const rest = it.filter((x, i) => i !== (ni >= 0 ? ni : 0) && t >= x.t0).map((x) => this.text(x.w)).join(" ");
+    const d = mn * 0.62, cx = w / 2, cy = this.blockSolid(b) ? this.belowHead(b, d) : h * 0.47;
+    const p = eOut(seg(t, b.t0, b.t0 + 1.2));
+    const frac = 0.72 * p;
+    const C = 2 * Math.PI * 42;
+    let html = `<div style="position:absolute;inset:0;background:#15172B${onVideo(this) ? "E6" : ""}"></div>`;
+    html += `<svg style="position:absolute;left:${(cx - d / 2).toFixed(1)}px;top:${(cy - d / 2).toFixed(1)}px" width="${d.toFixed(0)}" height="${d.toFixed(0)}" viewBox="0 0 100 100">
+      <circle cx="50" cy="50" r="42" fill="none" stroke="#2A2E4F" stroke-width="7"/>
+      <circle cx="50" cy="50" r="42" fill="none" stroke="#4C7DF0" stroke-width="7" stroke-linecap="round" stroke-dasharray="${(C * frac).toFixed(2)} ${C.toFixed(2)}" transform="rotate(-90 50 50)"/>
+      <circle cx="50" cy="50" r="33" fill="none" stroke="#7FA3F7" stroke-width="2" stroke-dasharray="${(2 * Math.PI * 33 * frac * 0.8).toFixed(2)} 300" transform="rotate(-90 50 50)" opacity=".6"/>
+      ${[0, 90, 180, 270].map((a) => `<line x1="50" y1="2" x2="50" y2="5" stroke="#555A80" stroke-width="1" transform="rotate(${a} 50 50)"/>`).join("")}</svg>`;
+    const fz = fitSize(big, `600 {}px 'TY Outfit', 'SM Tajawal'`, d * 0.5, d * 0.2);
+    html += `<div dir="${this.dir(big)}" style="position:absolute;left:0;right:0;top:${cy.toFixed(1)}px;transform:translateY(-50%) scale(${lerp(0.8, 1, p).toFixed(3)});text-align:center;font:600 ${fz.toFixed(1)}px 'TY Outfit', ${famOf(big)};color:#fff;opacity:${p.toFixed(2)}">${esc(big)}</div>`;
+    if (rest) { const ff = famOf(rest), z = fitSize(rest, `500 {}px ${ff}`, w * 0.86, mn * 0.065 * this.ts);
+      html += `<div dir="${this.dir(rest)}" style="position:absolute;left:0;right:0;top:${(cy - d / 2 - z * 1.6).toFixed(1)}px;text-align:center;white-space:nowrap;font:500 ${z.toFixed(1)}px ${ff};color:#DDE3FF">${esc(rest)}</div>`; }
+    return html;
+  };
+
+  // ---------- rule: جملة أتمتة «لما ... ابعت على ...» والكلمات المهمة متسطّرة
+  P.k_rule = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    if (!it.length) return "";
+    const ar = isAr(it), ff = famOf(ar ? "ع" : "a");
+    const KEY = /^(لما|لو|ابعت|بلّغ|بلغ|على|في|when|if|then|notify|on|send|to)$/i;
+    const all = it.map((x) => this.text(x.w)).join(" ");
+    const fz = Math.min(mn * 0.085 * this.ts, fitSize(all, `500 {}px ${ff}`, w * 0.84 * 2.6, mn * 0.085));
+    const a = eOut(seg(t, b.t0, b.t0 + 0.3));
+    let html = onVideo(this) ? `<div style="position:absolute;inset:0;background:rgba(240,238,233,.92)"></div>` : `<div style="position:absolute;inset:0;background:${PAPER}"></div>`;
+    const words = it.map((x) => { const s = this.text(x.w), key = KEY.test(x.w);
+      const on = t >= x.t0, ul = eOut(seg(t, x.t0 + 0.1, x.t0 + 0.4));
+      return `<span style="opacity:${on ? 1 : 0.12};${key ? "color:#333" : `color:#111;font-weight:600;background:linear-gradient(90deg,#3B5BDB 50%,transparent 0) 0 100%/${(fz * 0.3).toFixed(0)}px ${Math.max(1, fz * 0.05).toFixed(1)}px repeat-x;-webkit-mask:none;padding-bottom:${(fz * 0.08).toFixed(0)}px;background-size:${(fz * 0.3).toFixed(0)}px ${(Math.max(1, fz * 0.05) * ul).toFixed(1)}px`}">${esc(s)}</span>`; });
+    html += `<div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:${(w * 0.08).toFixed(0)}px;right:${(w * 0.08).toFixed(0)}px;top:50%;transform:translateY(-50%);text-align:center;font:400 ${fz.toFixed(1)}px ${ff};line-height:1.6;opacity:${a.toFixed(2)}">
+      <div dir="ltr" style="font:500 ${(fz * 0.45).toFixed(1)}px 'TY Pixel',monospace;color:#888;letter-spacing:.08em;margin-bottom:${(fz * 0.3).toFixed(0)}px">⚡ ${ar ? "حدث تلقائي" : "DATA EVENT"}</div>${words.join(" ")}</div>`;
+    html += dotCorners({ x: w * 0.05, y: h * 0.5 - fz * 3, w: w * 0.9, h: fz * 6 }, mn * 0.008, "#999", a);
+    return html;
+  };
+
+  // ---------- iconrow: صف أيقونات بتطلع ورا بعض والكلام تحت
+  P.k_iconrow = function (b, t, k, th, bi) {
+    const { w, h } = this.doc;
+    const mn = Math.min(w, h);
+    const it = this.items(b);
+    if (!it.length) return "";
+    const ICONS = ['<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/>',
+      '<rect x="4" y="4" width="16" height="16" rx="2" fill="currentColor"/><path d="M9 8v8M9 8h4a2 2 0 0 1 0 4H9h4.5a2 2 0 0 1 0 4H9" stroke="#fff"/>',
+      '<path d="M12 3v18M3 12h18M6 6l12 12M18 6L6 18"/>', '<circle cx="12" cy="8" r="4"/><path d="M4 21c1-5 4-7 8-7s7 2 8 7"/>',
+      '<path d="M12 2l2 7 7 1-5 5 2 7-6-4-6 4 2-7-5-5 7-1z"/>', '<rect x="4" y="8" width="12" height="12" rx="2"/><path d="M12 4h8v8M20 4l-9 9"/>'];
+    const n = ICONS.length, isz = Math.min(mn * 0.12, w * 0.8 / n), gap = isz * 0.3;
+    const tot = n * isz + (n - 1) * gap, x0 = (w - tot) / 2, cy = h * 0.46;
+    let html = onVideo(this) ? `<div style="position:absolute;inset:0;background:rgba(245,244,240,.92)"></div>` : `<div style="position:absolute;inset:0;background:#F5F4F0"></div>`;
+    ICONS.forEach((ic, i) => { const p = eBack(seg(t, b.t0 + i * 0.08, b.t0 + i * 0.08 + 0.3));
+      html += `<svg style="position:absolute;left:${(x0 + i * (isz + gap)).toFixed(1)}px;top:${(cy - isz / 2).toFixed(1)}px;transform:scale(${p.toFixed(3)});color:#151515" width="${isz.toFixed(0)}" height="${isz.toFixed(0)}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">${ic}</svg>`; });
+    const s = it.filter((x) => t >= x.t0).map((x) => this.text(x.w)).join(" ");
+    if (s) { const ff = famOf(s), z = fitSize(s, `600 {}px ${ff}`, w * 0.86, mn * 0.07 * this.ts);
+      html += `<div dir="${this.dir(s)}" style="position:absolute;left:0;right:0;top:${(cy + isz * 1.1).toFixed(1)}px;text-align:center;white-space:nowrap;font:600 ${z.toFixed(1)}px ${ff};color:#151515">${esc(s)}</div>`; }
     return html;
   };
 })();

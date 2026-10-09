@@ -3310,5 +3310,10 @@ window.I18N_EN = {
   "🎬 ▫️ كلمة بين كادرين": "🎬 ▫️ Word between frames",
   "🎬 📆 نتيجة بتتزحم": "🎬 📆 Calendar flood",
   "🎬 ▪️ شرايح كلمات": "🎬 ▪️ Word chips",
-  "🎬 🧩 بلاطات كلمات": "🎬 🧩 Word tiles"
+  "🎬 🧩 بلاطات كلمات": "🎬 🧩 Word tiles",
+  "🎬 👤 كارت بروفايل": "🎬 👤 Profile card",
+  "🎬 🔘 زرار عملاق": "🎬 🔘 Giant button",
+  "🎬 ⭕ عداد دايري": "🎬 ⭕ Ring gauge",
+  "🎬 ⚡ جملة أتمتة": "🎬 ⚡ Automation rule",
+  "🎬 ✳️ صف أيقونات": "🎬 ✳️ Icon row"
 };
