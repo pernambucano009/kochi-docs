@@ -55,7 +55,7 @@
     "qr", "codetag", "toolbar", "terminal", "scan",
     "toasts", "footer", "marquee", "datestrip",
     "fileicon", "chaos",
-    "gradword", "meshprompt", "orbsplit", "bento", "figdays", "figcurve", "figplay", "figequal", "figwords", "figphone", "figdrop", "figcount", "figgears", "figbar", "figcheck", "figcta", "goldcap", "iconbelt", "glowsweep", "namepill", "kashida", "molecule", "weightstack", "stretch", "desatpop", "arcs", "chrome", "inkverse", "poemfade", "hashend", "flipverb", "strobe", "duoline", "capstack", "pillword", "blurduo", "tagstack", "underbars", "contactcard", "iconorbit", "blurstrobe", "kinstack", "incall", "cineband", "scriptover", "tricolor", "drumpicker", "redmix", "headbubble", "pincard", "emojifloat", "slotreel", "posterwall", "quoteline", "medallion", "clockhand", "roadtext", "markpan", "objectquote", "racechart", "calflip", "glosscards", "dropword", "tasklens", "monostack", "dashbox", "sparklist", "followbtn", "silhouette", "petalstack", "followcount", "twopillars", "cutmat", "labelbox", "stampcard", "lcdtype", "genpanel", "holopulse", "coverflow", "featuretag", "luxmix", "goldframes", "goldrows", "tilegrid", "goldpill", "holoclock", "curvewall", "newsscan", "neonvenn", "wavebelt", "cardarc", "shadowquote", "haloring", "noirtitle", "stickerstack", "graphhop", "podium", "hudcallout", "termbar", "glowtoggle", "pinkdoodle", "lensfind", "echostack", "dofwords", "portalchat", "cardframe", "wordvoid"]);
+    "gradword", "meshprompt", "orbsplit", "bento", "figdays", "figcurve", "figplay", "figequal", "figwords", "figphone", "figdrop", "figcount", "figgears", "figbar", "figcheck", "figcta", "goldcap", "iconbelt", "glowsweep", "namepill", "kashida", "molecule", "weightstack", "stretch", "desatpop", "arcs", "chrome", "inkverse", "poemfade", "hashend", "flipverb", "strobe", "duoline", "capstack", "pillword", "blurduo", "tagstack", "underbars", "contactcard", "iconorbit", "blurstrobe", "kinstack", "incall", "cineband", "scriptover", "tricolor", "drumpicker", "redmix", "headbubble", "pincard", "emojifloat", "slotreel", "posterwall", "quoteline", "medallion", "clockhand", "roadtext", "markpan", "objectquote", "racechart", "calflip", "glosscards", "dropword", "tasklens", "monostack", "dashbox", "sparklist", "followbtn", "silhouette", "petalstack", "followcount", "twopillars", "cutmat", "labelbox", "stampcard", "lcdtype", "genpanel", "holopulse", "coverflow", "featuretag", "luxmix", "goldframes", "goldrows", "tilegrid", "goldpill", "holoclock", "curvewall", "newsscan", "neonvenn", "wavebelt", "cardarc", "shadowquote", "haloring", "noirtitle", "stickerstack", "graphhop", "podium", "hudcallout", "termbar", "glowtoggle", "pinkdoodle", "lensfind", "echostack", "dofwords", "portalchat", "cardframe", "wordvoid", "facecam"]);
   E.TYPING = new Set(["type", "artype"]);
   const MC = document.createElement("canvas").getContext("2d");
   const measure = (s, font) => { MC.font = font; return MC.measureText(s).width; };
@@ -7820,5 +7820,28 @@
       const ox = ((i * 0.37 + bi * 0.21) % 1 - 0.5) * w * 0.7, oy = ((i * 0.53 + 0.3) % 1 - 0.5) * h * 0.5, z = mn * 0.06 * sc, op = clamp((3 - d) * 0.6) * clamp((d + 0.3) * 3), bl = d < 0.4 ? (0.4 - d) * 30 : d > 1.6 ? (d - 1.6) * 4 : 0;
       html += `<div dir="${this.dir(s)}" style="position:absolute;left:${(w / 2 + ox * sc).toFixed(1)}px;top:${(h / 2 + oy * sc).toFixed(1)}px;transform:translate(-50%,-50%) rotate(${(((i * 37) % 30) - 15) * 0.4}deg);white-space:nowrap;${ST[(i + bi) % ST.length](z.toFixed(1), ff)};opacity:${op.toFixed(2)};filter:blur(${bl.toFixed(1)}px)">${esc(s)}</div>`; });
     return html;
+  };
+  // ======== r38 «شرح برنامج» — الكادر رمادي غامق فيه شباك برنامج مونتاج وهمي فوق، والشخص باين من دايرة بحلقة نار برتقاني تحت، والكابشن كلمة كلمة بينهم ========
+  P.k_facecam = function (b, t, k, th, bi) {
+    const it = this.items(b); if (!it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h), hd = this.headAt(t);
+    const R = Math.min(w * 0.32, mn * 0.36), cx = hd.has ? hd.x : w / 2, cy = hd.has ? clamp(hd.y + hd.r * 0.4, h * 0.3, h * 0.8) : h * 0.3, p = eOut(seg(t, b.t0, b.t0 + 0.4));
+    const Rr = lerp(Math.hypot(w, h), R, p), fl = (t - b.t0) * 90;
+    // شباك البرنامج: فوق لو الدايرة تحت، وتحت لو الدايرة فوق
+    const top = cy > h * 0.5, py = top ? h * 0.04 : cy + R + h * 0.05, ph = top ? cy - R - h * 0.1 : h - py - h * 0.04, pw = w * 0.9, px = w * 0.05;
+    let rows = ""; const r = rng(5 + bi); for (let i = 0; i < 6; i++) { const x0 = r() * 0.4, ww = 0.2 + r() * 0.5, c = ["#6C8CFF", "#FF6B6B", "#4FD1A5", "#FFC24B", "#B07CFF", "#7FD3FF"][i];
+      rows += `<div style="position:absolute;left:22%;right:3%;top:${(56 + i * 7)}%;height:5%"><i style="position:absolute;left:${(x0 * 100).toFixed(0)}%;width:${(ww * 100).toFixed(0)}%;top:0;bottom:0;background:${c};opacity:.75;border-radius:2px"></i></div><div style="position:absolute;left:3%;width:17%;top:${(56 + i * 7)}%;height:5%;background:rgba(255,255,255,.08);border-radius:2px"></div>`; }
+    const play = ((t - b.t0) * 0.12) % 1;
+    const panel = ph > h * 0.15 ? `<div style="position:absolute;left:${px.toFixed(1)}px;top:${py.toFixed(1)}px;width:${pw.toFixed(1)}px;height:${ph.toFixed(1)}px;border-radius:${(mn * 0.015).toFixed(1)}px;background:#262626;border:1px solid #3A3A3A;overflow:hidden;opacity:${p.toFixed(2)}">
+      <div style="position:absolute;left:25%;right:25%;top:4%;height:46%;background:linear-gradient(160deg,#3B4A5C,#141A22);border-radius:3px"><i style="position:absolute;left:50%;top:50%;width:${(mn * 0.04).toFixed(0)}px;height:${(mn * 0.04).toFixed(0)}px;margin:-${(mn * 0.02).toFixed(0)}px;border-radius:50%;border:2px solid rgba(255,255,255,.6)"></i></div>
+      <div style="position:absolute;left:3%;right:3%;top:51%;height:3%;display:flex;gap:6px">${["T", "✎", "◻", "⬚", "✂"].map((g) => `<span style="font:600 ${(ph * 0.03).toFixed(0)}px 'TY Mono';color:#bbb">${g}</span>`).join("")}</div>${rows}
+      <i style="position:absolute;top:54%;bottom:2%;left:${(22 + play * 75).toFixed(1)}%;width:2px;background:#4FA3FF"></i></div>` : "";
+    let ci = 0; it.forEach((x, i) => { if (t >= x.t0 - 0.03) ci = i; });
+    const s = it.slice(Math.max(0, ci - 1), ci + 1).map((x) => this.text(x.w)).join(" "), ff = famOf(s), z = mn * 0.04 * this.ts, capY = top ? cy - R - z * 2 : cy + R + z * 0.6;
+    return `<svg style="position:absolute;inset:0" width="${w}" height="${h}"><defs><mask id="fc${bi}"><rect width="${w}" height="${h}" fill="#fff"/><circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${Rr.toFixed(1)}" fill="#000"/></mask>
+        <linearGradient id="fg${bi}" gradientTransform="rotate(${fl.toFixed(0)} .5 .5)"><stop offset="0" stop-color="#FF7A1A"/><stop offset=".5" stop-color="#FFD27A"/><stop offset="1" stop-color="#FF4A12"/></linearGradient></defs>
+      <rect width="${w}" height="${h}" fill="#1E1E1E" mask="url(#fc${bi})"/>
+      <circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${Rr.toFixed(1)}" fill="none" stroke="url(#fg${bi})" stroke-width="${(mn * 0.008).toFixed(1)}" style="filter:drop-shadow(0 0 ${(mn * 0.015).toFixed(0)}px #FF7A1A) drop-shadow(0 0 ${(mn * 0.03).toFixed(0)}px rgba(255,120,30,.6))" opacity="${p.toFixed(2)}"/></svg>${panel}
+      <div dir="${this.dir(s)}" style="position:absolute;left:0;right:0;top:${capY.toFixed(1)}px;text-align:center;font:800 ${z.toFixed(1)}px ${ff};${AR.test(s) ? "" : "font-style:italic;"}color:#fff;text-shadow:0 2px 6px rgba(0,0,0,.7)">${esc(s)}</div>`;
   };
 })();
