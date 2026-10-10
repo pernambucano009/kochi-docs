@@ -11854,7 +11854,7 @@ def tpl_to_dict(tid: str, d: dict) -> dict:
             "schema": {**sch, "beats": [{**b, "thumb_url": f"{base}/{b['thumb']}" if b.get("thumb") else None} for b in sch["beats"]]},
             "source_url": f"{base}/{d['source']}" if d.get("source") else None,
             "sample_url": url(d.get("sample")), "cover_url": url(d.get("cover")) or next((f"{base}/{b['thumb']}" for b in sch["beats"] if b.get("thumb")), None),
-            "sample_cost": tpl_sample_cost(d)}
+            "sample_cost": tpl_sample_cost(d), "sample_old": bool(d.get("sample")) and d.get("sample_kind") != "scenes" and d.get("mode") != "scenes"}
 
 
 class TplIn(BaseModel):
@@ -12120,13 +12120,11 @@ def tvideo_create(body: TvIn):
                  transition=(t["schema"].get("transition") or t.get("transition") or ""))
         if body.image_model not in TV_IMAGE_MODELS:
             d["image_model"] = "sunburst"
-        if t.get("mode") == "scenes":   # 🎬 Vox: مشاهد ١٠ ثواني ثابتة
-            n = max(3, min(12, round(body.length / SCENE_SEC)))
-            d.update(mode="scenes", scene_cfg=t["scene"], scenes=[], scene_files={}, transition="cut", voice_tone=t.get("voice_tone"),
-                     schema={**t["schema"], "beats": [{**t["schema"]["beats"][0], "t0": i * SCENE_SEC, "t1": (i + 1) * SCENE_SEC,
-                                                       "role": "hook" if i == 0 else "cta" if i == n - 1 else "proof", "what": f"مشهد {i + 1}"} for i in range(n)]})
-        else:
-            d["voice_tone"] = t.get("voice_tone")
+        # 🎬 كل القوالب: مشاهد ١٠ ثواني ثابتة بمفتاح ستايل (خدعة اللقطة الواحدة)
+        n = max(3, min(12, round(body.length / SCENE_SEC)))
+        d.update(mode="scenes", scene_cfg=scene_cfg_for(t), scenes=[], scene_files={}, transition="cut", voice_tone=t.get("voice_tone"),
+                 schema={**t["schema"], "beats": [{**t["schema"]["beats"][0], "t0": i * SCENE_SEC, "t1": (i + 1) * SCENE_SEC,
+                                                   "role": "hook" if i == 0 else "cta" if i == n - 1 else "proof", "what": f"مشهد {i + 1}"} for i in range(n)]})
     with TV_LOCK:
         (tv_dir(vid) / "tv.json").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
     job = run_tv_scenes_script if d.get("mode") == "scenes" else run_tv_script if d.get("section") == "templates" else run_tv_fill
@@ -15303,12 +15301,8 @@ seed_templates()
 
 
 def tpl_sample_cost(d: dict) -> float:
-    if d.get("mode") == "scenes":   # عينة ٣ مشاهد (٣٠ ثانية) + مفتاح الستايل
-        return round(TV_IMAGE_MODELS["sunburst"][0] + 3 * 10 * TRIAL_MODELS["seedance-mini"]["per_sec"], 2)
-    beats = (d.get("schema") or {}).get("beats") or []
-    sheets = -(-(len(beats) + 1) // SHEET_MAX) if beats else 0
-    per = TRIAL_MODELS["seedance-mini"]["per_sec"]
-    return round(sheets * TV_IMAGE_MODELS["sunburst"][0] + sum(trial_gen_seconds(b["t1"] - b["t0"]) for b in beats) * per, 2)
+    """عينة ٣ مشاهد (٣٠ ثانية) + مفتاح الستايل."""
+    return round(TV_IMAGE_MODELS["sunburst"][0] + 3 * 10 * TRIAL_MODELS["seedance-mini"]["per_sec"], 2)
 
 
 def vo_say(text: str, voice: str, lang: str, out: Path) -> Path:
@@ -15476,6 +15470,30 @@ def tvideo_voice(vid: str, body: TvVoiceIn):
 # ---------------------------------------------------------------- 🎬 قوالب «مشاهد» (Vox): ١٠ ثواني لكل مشهد + مفتاح ستايل
 SCENE_SEC = 10.0
 SCENE_VO_MAX, SCENE_VO_MIN = 9.7, 7.5   # الجملة لو أطول/أقصر من كده بتتكتب تاني وتتسجّل تاني
+SCENE_NEG = "readable text, gibberish letters, words, numbers, captions, subtitles, watermark, logo, lip-sync, talking characters, color drift"
+
+
+def scene_cfg_for(t: dict) -> dict:
+    """كل القوالب بقت بطريقة المشاهد: القوالب اللي اتطلّعت من فيديو (أو الجاهزة القديمة) بيتعملها مفتاح ستايل وبرومتات مشاهد
+    من الـ Style DNA بتاعها، وشكل النبضات بتاعها بيبقى إيقاع المشاهد."""
+    if t.get("scene"):
+        return t["scene"]
+    sch = t.get("schema") or {}
+    style, bg, pal = sch.get("style") or "", sch.get("background") or "", sch.get("palette") or "unspecified"
+    rhythm = "; ".join(f"{b.get('what') or ''} ({round(b['t1'] - b['t0'], 1)}s): {b.get('layout') or ''}" for b in sch.get("beats") or [])[:2500]
+    return {
+        "tokens": " ".join(x for x in (style, f"Persistent background: {bg}." if bg else "", f"Locked palette: {pal}.",
+                                       f"Text look (not actual text): {sch.get('text_style')}." if sch.get("text_style") else "") if x),
+        "negative": ", ".join(x for x in (SCENE_NEG, sch.get("negative") or "") if x),
+        "key": ("A style swatch image that locks the look of a video: " + style + (f" Persistent background: {bg}." if bg else "")
+                + " Palette: {palette}. Abstract composition of the style's typical elements only: no letters, no words, no numbers, no logos, no real people."),
+        "variants": [("classic", "زي القالب بالظبط", pal), ("bold", "ألوان أقوى وتباين أعلى", f"{pal}, more saturated and higher contrast"),
+                     ("soft", "أهدى وألوان أنعم", f"{pal}, softer and lighter")],
+        "devices": f"the visual devices of this style; the original video's beat shape (use it as the rhythm inside the scenes): {rhythm}",
+        "motion": f"{sch.get('camera') or 'smooth camera movement'}; ONE continuous camera move per scene, starting from motion blur and ending fully "
+                  "motion-blurred mid-move, an impact moment every ~3 seconds",
+        "allow_label": False,
+    }
 
 
 def seed_scene_templates() -> None:
@@ -15834,8 +15852,11 @@ def tpl_mark(tid: str, **kw) -> None:
 def run_tpl_sample(tid: str) -> None:
     try:
         t = tpl_load(tid)
-        if t.get("mode") == "scenes":
-            return run_tpl_sample_scenes(tid, t)
+        if t.get("sample_kind") != "scenes" and t.get("sample_vid") and (tv_dir(t["sample_vid"]) / "tv.json").exists() \
+                and tv_load(t["sample_vid"]).get("mode") != "scenes":
+            t["sample_vid"] = None   # العينة القديمة كانت بالطريقة التانية: بنبدأ عينة مشاهد جديدة
+            tpl_mark(tid, sample_vid=None)
+        return run_tpl_sample_scenes(tid, t)
         old = t.get("sample_vid")
         if old and (tv_dir(old) / "tv.json").exists() and tv_load(old).get("fill"):
             # 🔁 العينة اللي وقفت بتكمّل من مكانها (الشيتات واللقطات اللي اتعملت ما بتتدفعش تاني)
@@ -15869,7 +15890,7 @@ def run_tpl_sample_scenes(tid: str, t: dict) -> None:
             d = {"name": f"🎞️ عينة {t['name']}", "client_id": None, "template": tid, "template_name": t["name"], "schema": {**t["schema"], "beats": beats},
                  "ratio": t.get("ratio") or "9:16", "brief": t.get("sample_brief") or t["name"], "text_mode": "blank", "image_model": "sunburst",
                  "model": "seedance-mini", "resolution": "480p", "status": "filling", "step": None, "error": None, "fill": None, "sheets": {}, "panels": {},
-                 "segs": {}, "sample_of": tid, "section": "templates", "mode": "scenes", "scene_cfg": t["scene"], "scenes": [], "scene_files": {},
+                 "segs": {}, "sample_of": tid, "section": "templates", "mode": "scenes", "scene_cfg": scene_cfg_for(t), "scenes": [], "scene_files": {},
                  "lang": "en", "voice": "eleven_liam", "voice_on": False, "script_mode": "ai", "script": "", "voice_tone": t.get("voice_tone"),
                  "transition": "cut", "created_at": now()}
             with TV_LOCK:
@@ -15897,7 +15918,7 @@ def run_tpl_sample_scenes(tid: str, t: dict) -> None:
         folder = TPL_DIR / tid
         shutil.copyfile(tv_dir(vid) / x["final"], folder / "sample.mp4")
         shutil.copyfile(tv_dir(vid) / x["stylekey"], folder / "cover.png")
-        tpl_mark(tid, sample="sample.mp4", cover="cover.png", sample_status="done", sample_step=None, sample_error=None)
+        tpl_mark(tid, sample="sample.mp4", cover="cover.png", sample_status="done", sample_step=None, sample_error=None, sample_kind="scenes")
     except Exception as exc:  # noqa: BLE001
         tpl_mark(tid, sample_status="failed", sample_step=None, sample_error=str(getattr(exc, "detail", None) or exc)[:300])
 
