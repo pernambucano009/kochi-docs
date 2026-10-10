@@ -15282,11 +15282,11 @@ def seed_templates() -> None:
                 old = json.loads(f.read_text(encoding="utf-8"))
             except ValueError:
                 old = None
-            if old and old.get("seed_v", 0) >= TPL_SEED_V and (old.get("sample") or not (ROOT / "backend" / "tplseed" / tid / "sample.mp4").exists()):
+            if old and old.get("seed_v", 0) >= TPL_SEED_V and (old.get("sample") or not (ROOT / "backend" / "tplseed_media" / tid / "sample.mp4").exists()):
                 continue
         schema = lab.clean_schema({**t["schema"], "transition": t["transition"]}, 999)
         # عينات جاهزة جوه الكود (لو اتعملت قبل كده): بتتنسخ أول مرة عشان المعرض يبان على طول
-        seed_dir = ROOT / "backend" / "tplseed" / tid
+        seed_dir = ROOT / "backend" / "tplseed_media" / tid
         (TPL_DIR / tid).mkdir(parents=True, exist_ok=True)
         for name in ("sample.mp4", "cover.png"):
             if (seed_dir / name).exists() and not (TPL_DIR / tid / name).exists():
@@ -15487,12 +15487,18 @@ def seed_scene_templates() -> None:
                 old = json.loads(f.read_text(encoding="utf-8"))
             except ValueError:
                 old = None
-            if old and old.get("seed_v", 0) >= TPL_SEED_V:
+            if old and old.get("seed_v", 0) >= TPL_SEED_V and (old.get("sample") or not (ROOT / "backend" / "tplseed_media" / tid / "sample.mp4").exists()):
                 continue
         beats = [{"t0": i * SCENE_SEC, "t1": (i + 1) * SCENE_SEC, "role": "hook" if i == 0 else "cta" if i == 5 else "proof", "what": f"مشهد {i + 1}",
                   "layout": "", "slots": [], "camera": "", "into_next": "", "keeps": "", "sfx": ""} for i in range(6)]
         schema = {"title": t["name"], "summary": t["uses"], "style": t["tokens"], "negative": t["negative"], "transition": "cut", "beats": beats,
                   "palette": "", "spine": "", "camera": t["motion"], "text_style": "", "music": "", "background": "", "last_frame": "", "beat_sec": 0.0}
+        seed_dir = ROOT / "backend" / "tplseed_media" / tid
+        (TPL_DIR / tid).mkdir(parents=True, exist_ok=True)
+        for name in ("sample.mp4", "cover.png"):   # العينات اللي جوه الكود
+            if (seed_dir / name).exists() and not (TPL_DIR / tid / name).exists():
+                shutil.copyfile(seed_dir / name, TPL_DIR / tid / name)
+                old = {**(old or {}), name.split(".")[0]: name, **({"sample_status": "done"} if name == "sample.mp4" else {})}
         keep = {k: old[k] for k in ("sample", "cover", "sample_vid", "sample_status", "sample_error") if old and k in old}
         with TPL_LOCK:
             tpl_save(tid, {"name": t["name"], "icon": t["icon"], "uses": t["uses"], "voice_tone": t["voice_tone"], "sample_brief": t["sample"],
