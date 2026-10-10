@@ -1,7 +1,8 @@
 // StudioMania — الكابشن واللوجو في المونتاج
 
 const brand = { options: null, logoUrl: null, tr: {}, trTimer: null, editing: null };
-const FRAME_SCALE = PV_W / 1080; // كادر المعاينة بالنسبة لحجم الفيديو الحقيقي
+// كادر المعاينة بالنسبة لحجم الفيديو الحقيقي (بيتغير مع مقاس الكادر)
+const frameScale = () => PV_W / (typeof OUT_W === "number" ? OUT_W : 1080);
 
 async function loadBrandOptions() {
   if (!brand.options) {
@@ -143,8 +144,8 @@ function updatePreviewOverlays() {
   cap.hidden = !live;
   if (cap.hidden) return;
   const { words, hl: hlIndex } = live;
-  const stroke = c.box ? "" : `-webkit-text-stroke:${Math.max(1, (c.size / 16) * FRAME_SCALE * 2)}px #000;paint-order:stroke fill;`;
-  cap.style.cssText = `top:${(H * c.y) / 100}px;font-family:'${c.font}';font-size:${c.size * FRAME_SCALE}px;color:${c.color};`;
+  const stroke = c.box ? "" : `-webkit-text-stroke:${Math.max(1, (c.size / 16) * frameScale() * 2)}px #000;paint-order:stroke fill;`;
+  cap.style.cssText = `top:${(H * c.y) / 100}px;font-family:'${c.font}';font-size:${c.size * frameScale()}px;color:${c.color};`;
   cap.innerHTML = `<span style="${c.box ? `background:${c.box_color};` : ""}${stroke}">${words
     .map((w, i) => (i === hlIndex ? `<b style="color:${c.highlight};font-weight:inherit">${escapeHtml(w)}</b>` : escapeHtml(w)))
     .join(" ")}</span>`;

@@ -96,8 +96,10 @@ def chunk_words(words: list[dict], per_chunk: int) -> list[list[dict]]:
     return chunks
 
 
-def build_ass(words: list[dict], settings: dict, total: float) -> str:
-    """words: [{"w": كلمة, "s": بداية, "e": نهاية}] بالثواني على تايم لاين الفيديو النهائي."""
+def build_ass(words: list[dict], settings: dict, total: float, size: tuple[int, int] | None = None) -> str:
+    """words: [{"w": كلمة, "s": بداية, "e": نهاية}] بالثواني على تايم لاين الفيديو النهائي.
+    size: مقاس الفيديو (الافتراضي 1080×1920)."""
+    WIDTH, HEIGHT = size or (globals()["WIDTH"], globals()["HEIGHT"])
     st = style_for(settings)
     words = [dict(w, w=clean(w["w"])) for w in words if clean(w.get("w", "")) and w["s"] < total]
     border = 3 if st["box"] else 1

@@ -9,7 +9,7 @@ const GZ_MT = {
   st: {},
   get doc() { return mtx.doc; }, get eng() { return mtx.eng; }, get t() { return mt.t; }, get playing() { return mt.playing; },
   get cur() { return mtx.cur; }, set cur(v) { mtx.cur = v; },
-  box: () => $("previewFrame"), stage: () => $("pvTypoStage"), svg: () => $("mtGiz"), bar: () => $("mtGbar"),
+  box: () => $("pvTypo"), stage: () => $("pvTypoStage"), svg: () => $("mtGiz"), bar: () => $("mtGbar"),
   stop: () => pause(), save: (blocks, msg) => mtTypoSave(blocks, msg), redraw: () => mtTypoDraw(), after: () => { mtTypoPaneRender(); mtTypoPoll(); },
   selIndex: () => (mt.sel?.kind === "typo" ? mt.sel.i : null),
 };
@@ -19,7 +19,7 @@ const GZ_FX = {
   get doc() { return mtx.fxdoc; }, get eng() { return mtx.fxeng; }, get t() { return mt.t; }, get playing() { return mt.playing; },
   get cur() { return mtx.cur ? { ...mtx.cur, blocks: mtx.cur.fx || [] } : null; }, set cur(v) { mtx.cur = v; },
   isFx: true,
-  box: () => $("previewFrame"), stage: () => $("pvFxStage"), svg: () => $("mtGiz"), bar: () => $("mtGbar"),
+  box: () => $("pvTypo"), stage: () => $("pvFxStage"), svg: () => $("mtGiz"), bar: () => $("mtGbar"),
   stop: () => pause(), save: (fx, msg) => mtFxSave(fx, msg), redraw: () => mtTypoDraw(), after: () => { mtTypoPaneRender(); mtTypoPoll(); },
   selIndex: () => (mt.sel?.kind === "fx" ? mt.sel.i : null),
 };
@@ -76,7 +76,15 @@ function mtTypoDraw() {
   const show = mtTypoOn() && mtx.eng && mtx.doc;
   wrap.hidden = !show;
   if (!show) { $("mtGiz").innerHTML = ""; $("mtGbar").innerHTML = ""; return; }
-  const k = $("previewFrame").clientWidth / mtx.doc.w;
+  // لو مقاس الكادر غير مقاس التايبوجرافي: الطبقة بتتصغّر وتتحط في النص (زي التصدير)
+  const fw = $("previewFrame").clientWidth, fh = $("previewFrame").clientHeight;
+  const k = Math.min(fw / mtx.doc.w, fh / mtx.doc.h);
+  const ox = (fw - mtx.doc.w * k) / 2, oy = (fh - mtx.doc.h * k) / 2;
+  Object.assign(wrap.style, Math.abs(ox) + Math.abs(oy) > 0.5
+    ? { left: `${ox}px`, top: `${oy}px`, width: `${mtx.doc.w * k}px`, height: `${mtx.doc.h * k}px`, right: "auto", bottom: "auto" }
+    : { left: "", top: "", width: "", height: "", right: "", bottom: "" });
+  $("mtGiz").style.transform = `translate(${ox}px, ${oy}px)`;
+  $("mtGbar").style.transform = "";
   $("pvTypoStage").style.transform = `scale(${k})`;
   $("pvFxStage").style.transform = `scale(${k})`;
   mtx.eng.renderAt(mt.t);

@@ -2208,6 +2208,24 @@ def track_parts(t: dict) -> list[dict]:
     return [{"delay": t.get("delay", 0), "offset": t.get("offset", 0), "length": t.get("length"), "volume": t.get("volume", 1)}]
 
 
+# مقاسات الكادر (العرض × الطول عند 1080p) وإعدادات التصدير
+CANVAS_RATIOS = {"9:16": (1080, 1920), "1:1": (1080, 1080), "4:5": (1080, 1350), "16:9": (1920, 1080), "3:4": (1080, 1440)}
+EXPORT_RES = {"720": 720, "1080": 1080, "1440": 1440, "2160": 2160}  # الضلع الأصغر
+EXPORT_QUALITY = {"small": 26, "normal": 20, "high": 16}
+EXPORT_FPS = (24, 25, 30, 50, 60)
+
+
+def export_settings(data: dict) -> tuple[int, int, int, int]:
+    ratio = (data.get("canvas") or {}).get("ratio") or "9:16"
+    w, h = CANVAS_RATIOS.get(ratio, CANVAS_RATIOS["9:16"])
+    ex = data.get("export") or {}
+    short = EXPORT_RES.get(str(ex.get("res") or "1080"), 1080)
+    k = short / min(w, h)
+    fps = int(ex.get("fps") or 30)
+    return (round(w * k / 2) * 2, round(h * k / 2) * 2, fps if fps in EXPORT_FPS else 30,
+            EXPORT_QUALITY.get(ex.get("quality") or "normal", 20))
+
+
 def track_flag(data: dict, trk: str, flag: str) -> bool:
     """قفل/إخفاء/كتم التراك من التايم لاين."""
     return bool(((data.get("tracks") or {}).get(trk) or {}).get(flag))
@@ -2350,7 +2368,7 @@ def project_captions(conn: sqlite3.Connection, data: dict, total: float, export_
         ]
     words.sort(key=lambda w: w["s"])
     ass = TMP_DIR / f"{export_id}.ass"
-    ass.write_text(captions.build_ass(words, cfg, total), encoding="utf-8")
+    ass.write_text(captions.build_ass(words, cfg, total, montage.canvas_size()), encoding="utf-8")
     return montage.Subtitles(ass, FONTS_DIR)
 
 
@@ -2709,22 +2727,28 @@ def render_project(project_id: str, request: Request):
         if row["render_status"] == "rendering":
             raise HTTPException(400, "المشروع بيتصدّر بالفعل")
         data = json.loads(row["data"])
-        segments, voice, music, outro_len = build_montage(conn, data)
-        export_id = uuid.uuid4().hex[:12]
-        total = sum(sg.duration for sg in segments)
-        subs = project_captions(conn, data, total, export_id)
-        work_dir = render_work_dir(export_id, total)
-        cmd, total = montage.build_commands(
-            ffmpeg_exe(), segments, EXPORTS_DIR / f"{export_id}.mp4", work_dir, voice, music,
-            logo=project_logo(data, total, outro_len), subtitles=subs,
-            low_memory=(system_info()["memory_limit_mb"] or 99999) < 1500,
-            sounds=project_sounds(conn, data), audio_fx=project_mix(data),
-        )
-        RENDER_ACTIVE[project_id] = "بيبدأ…"
-        conn.execute(
-            "UPDATE projects SET render_status = 'rendering', render_error = NULL, updated_at = ? WHERE id = ?",
-            (now(), project_id),
-        )
+        cw, ch, fps, crf = export_settings(data)
+        with montage.canvas(cw, ch, fps, crf):
+            return start_render(conn, row, project_id, data, request)
+
+
+def start_render(conn: sqlite3.Connection, row: sqlite3.Row, project_id: str, data: dict, request: Request):
+    segments, voice, music, outro_len = build_montage(conn, data)
+    export_id = uuid.uuid4().hex[:12]
+    total = sum(sg.duration for sg in segments)
+    subs = project_captions(conn, data, total, export_id)
+    work_dir = render_work_dir(export_id, total)
+    cmd, total = montage.build_commands(
+        ffmpeg_exe(), segments, EXPORTS_DIR / f"{export_id}.mp4", work_dir, voice, music,
+        logo=project_logo(data, total, outro_len), subtitles=subs,
+        low_memory=(system_info()["memory_limit_mb"] or 99999) < 1500,
+        sounds=project_sounds(conn, data), audio_fx=project_mix(data),
+    )
+    RENDER_ACTIVE[project_id] = "بيبدأ…"
+    conn.execute(
+        "UPDATE projects SET render_status = 'rendering', render_error = NULL, updated_at = ? WHERE id = ?",
+        (now(), project_id),
+    )
     tid = data.get("typo_id") if data.get("typo_on", True) else None
     if tid and not (TYPO_PROJ / Path(tid).name / "typo.json").exists():
         tid = None
@@ -2732,8 +2756,41 @@ def render_project(project_id: str, request: Request):
     ts = data.get("typo_sfx") or {}
     click = float(ts.get("volume", 1.0)) if tid and ts.get("on", True) else 0.0
     sid = data.get("typo_id") if data.get("typo_id") and (TYPO_PROJ / Path(data["typo_id"]).name / "typo.json").exists() else None
+    if montage.canvas_size() != (montage.WIDTH, montage.HEIGHT):
+        sid = None  # المشهد (الخلفية الجديدة والحاجات اللي اتشالت) معمول على 9:16 بس
     render_executor.submit(run_render, project_id, export_id, cmd, total, row["name"], work_dir, tid, f"http://127.0.0.1:{port}", click, sid)
     return {"ok": True, "duration": total}
+
+
+@app.post("/api/projects/{project_id}/render-audio")
+def render_project_audio(project_id: str):
+    """🎧 الصوت بس (MP3): التعليق والموسيقى والمؤثرات وصوت الفيديوهات، بنفس الظبط بتاع الفيديو."""
+    with closing(db()) as conn:
+        row = get_project(conn, project_id)
+        data = json.loads(row["data"])
+        segments, voice, music, _ = build_montage(conn, data)
+        sounds = project_sounds(conn, data)
+    aid = uuid.uuid4().hex[:12]
+    work = TMP_DIR / f"aud_{aid}"
+    out = EXPORTS_DIR / f"audio_{aid}.mp3"
+    cmds, total = montage.build_audio_commands(ffmpeg_exe(), segments, out, work, voice, music, sounds, project_mix(data))
+    try:
+        for c in cmds:
+            r = subprocess.run(c, capture_output=True, text=True, timeout=1800)
+            if r.returncode != 0:
+                raise HTTPException(500, f"تصدير الصوت فشل: {r.stderr.strip()[-300:]}")
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+    name = re.sub(r'[\\/:*?"<>|\x00-\x1f]+', " ", row["name"]).strip(" .") or "audio"
+    return {"url": f"/media/export-audio/{aid}/{quote(name[:120])}.mp3", "duration": round(total, 2), "size": out.stat().st_size}
+
+
+@app.get("/media/export-audio/{aid}/{filename}")
+def export_audio_file(aid: str, filename: str):
+    path = EXPORTS_DIR / f"audio_{Path(aid).name}.mp3"
+    if not path.exists():
+        raise HTTPException(404, "الملف مش موجود")
+    return FileResponse(path, media_type="audio/mpeg", filename=filename, content_disposition_type="attachment")
 
 
 def export_file_name(name: str) -> str:
@@ -14167,11 +14224,15 @@ def typo_overlay(tid: str, base: Path, out: Path, base_url: str, progress=None) 
     d = typo_load(tid)
     doc = typo_doc(tid, d)
     W, H = doc["w"], doc["h"]
-    dur = media_info(base).duration
+    info = media_info(base)
+    dur = info.duration
     n = int(dur * TYPO_FPS)
+    # لو مقاس المونتاج غير مقاس التايبوجرافي: الطبقة بتتصغّر عشان تبان كلها في نص الكادر
+    bw, bh = info.width or W, info.height or H
+    fit = f"scale={W}:{H}" if (bw, bh) == (W, H) else f"scale=w={bw}:h={bh}:force_original_aspect_ratio=decrease"
     cmd = [ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(base),
            "-f", "image2pipe", "-framerate", str(TYPO_FPS), "-c:v", "png", "-i", "-",
-           "-filter_complex", f"[1:v]scale={W}:{H}[ov];[0:v][ov]overlay=0:0:eof_action=pass,format=yuv420p[v]", "-map", "[v]",
+           "-filter_complex", f"[1:v]{fit}[ov];[0:v][ov]overlay=(W-w)/2:(H-h)/2:eof_action=pass,format=yuv420p[v]", "-map", "[v]",
            "-an", "-c:v", "libx264", "-preset", "veryfast", "-crf", "19", "-t", f"{dur:.3f}", str(out)]
     proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
     base_url = base_url or f"http://127.0.0.1:{os.environ.get('PORT', '8000')}"

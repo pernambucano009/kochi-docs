@@ -1,7 +1,7 @@
 // StudioMania — الخطوة 6: المونتاج (محرر بتايم لاين زي كاب كات)
 
 const FPS = 30;
-const PV_W = 252, PV_H = 448; // حجم كادر المعاينة (9:16)
+let PV_W = 252, PV_H = 448; // حجم كادر المعاينة (بيتغير مع مقاس الكادر)
 const MIN_CLIP = 1 / 30; // أقل طول لقطعة: فريم واحد
 const PPS_MIN = 8, PPS_MAX = 600; // حدود زووم التايم لاين (بكسل لكل ثانية)
 // كل قسم ليه مونتاج لوحده: مشاريعه ومشروعه المفتوح (فيديوهات المدربين / المسلسلات / الإعلانات)
@@ -170,6 +170,8 @@ function migrateOutro(d) {
 function renderAll() {
   normalizeTracks(mt.project.data);
   if (migrateOutro(mt.project.data)) scheduleSave();
+  applyCanvas();
+  renderCanvasPane();
   fixSelection();
   renderBin();
   renderTimeline();
@@ -1431,7 +1433,7 @@ function drawBlurBg() {
   const on = !!(v && it?.c && it.c.fit === "blur" && v.videoWidth);
   cv.hidden = !on;
   if (!on) return;
-  cv.width = 63; cv.height = 112;
+  cv.width = 63; cv.height = Math.round((63 * OUT_H) / OUT_W);
   cv.style.filter = `blur(10px) brightness(.9) ${clipCss(it.c)}`;
   cv.style.transform = `scale(${it.c.flip_h ? -1.08 : 1.08}, ${it.c.flip_v ? -1.08 : 1.08})`;
   const g = cv.getContext("2d");
@@ -1495,7 +1497,7 @@ function drawGrain(cv, amt) {
 }
 
 // ---------- الحركة: نفس معادلات FFmpeg بالظبط (montage.py: kf_value / motion_exprs / post_fx) ----------
-const OUT_W = 1080, OUT_H = 1920;
+let OUT_W = 1080, OUT_H = 1920;
 const ANIMS = [["", "بدون"], ["fade", "ظهور"], ["zoomin", "زووم إن"], ["zoomout", "زووم أوت"], ["pop", "بوب"], ["spin", "لفّة"],
   ["slidel", "من اليمين"], ["slider", "من الشمال"], ["slideu", "من تحت"], ["slided", "من فوق"]];
 const ANIM_FADES = new Set(["fade", "zoomin", "zoomout", "pop", "spin"]);
@@ -2580,6 +2582,88 @@ $("mixDuckOn").addEventListener("change", () => setMix({ duck: $("mixDuckOn").ch
 $("mixDuck").addEventListener("input", () => setMix({ duck: Number($("mixDuck").value) / 100 }));
 $("mixEnhance").addEventListener("change", () => setMix({ enhance: $("mixEnhance").checked }));
 $("mixNormalize").addEventListener("change", () => setMix({ normalize: $("mixNormalize").checked }));
+
+// ---------- مقاس الكادر ولون الخلفية وإعدادات التصدير ----------
+const RATIOS = { "9:16": [1080, 1920], "4:5": [1080, 1350], "3:4": [1080, 1440], "1:1": [1080, 1080], "16:9": [1920, 1080] };
+const RATIO_LABEL = { "9:16": "9:16 ريلز وتيك توك", "4:5": "4:5 بوست إنستا", "3:4": "3:4", "1:1": "1:1 مربع", "16:9": "16:9 يوتيوب" };
+const BG_SWATCHES = ["#000000", "#ffffff", "#111827", "#1d3557", "#e63946", "#f4a261", "#2a9d8f", "#7b2cbf"];
+const EXPORT_RES = { 720: "720p", 1080: "1080p (Full HD)", 1440: "2K", 2160: "4K" };
+const EXPORT_Q = { small: "حجم صغير", normal: "عادي", high: "جودة عالية" };
+const canvasRatio = () => (RATIOS[mt.project?.data.canvas?.ratio] ? mt.project.data.canvas.ratio : "9:16");
+function applyCanvas() {
+  const [w, h] = RATIOS[canvasRatio()];
+  OUT_W = w; OUT_H = h;
+  const s = Math.min(448 / h, 640 / w);
+  PV_W = Math.round(w * s); PV_H = Math.round(h * s);
+  const fr = $("previewFrame");
+  fr.style.width = `${PV_W}px`;
+  fr.style.height = `${PV_H}px`;
+  fr.classList.toggle("not-916", canvasRatio() !== "9:16");
+  $("rgbDefsReset")?.remove();
+  $("pvRgbDefs")?.remove();  // الفلاتر بتتعمل تاني بمقاس الكادر الجديد
+}
+function exportCfg() {
+  const ex = mt.project?.data.export || {};
+  return { res: EXPORT_RES[ex.res] ? Number(ex.res) : 1080, fps: [24, 25, 30, 50, 60].includes(Number(ex.fps)) ? Number(ex.fps) : 30,
+    quality: EXPORT_Q[ex.quality] ? ex.quality : "normal" };
+}
+// تقدير حجم الملف (MB) من الطول والمقاس والجودة
+function sizeEstimate() {
+  const { res, fps, quality } = exportCfg();
+  const [w, h] = RATIOS[canvasRatio()], k = res / Math.min(w, h);
+  const px = w * k * h * k;
+  const base = { small: 2.6, normal: 5.5, high: 10 }[quality];  // ميجابت في الثانية لـ 1080×1920 على 30 فريم
+  const mbps = base * (px / (1080 * 1920)) ** 0.85 * (fps / 30) ** 0.6 + 0.19;
+  return (mbps * totalLength()) / 8;
+}
+function renderCanvasPane() {
+  if (!mt.project) return;
+  const r = canvasRatio(), bg = mt.project.data.canvas?.bg || "#000000", ex = exportCfg();
+  $("cvRatio").innerHTML = Object.keys(RATIOS).map((k) => `<button class="chip ${k === r ? "on" : ""}" data-ratio="${k}">${RATIO_LABEL[k]}</button>`).join("");
+  $("cvBg").innerHTML = BG_SWATCHES.map((c) => `<button class="sw ${c === bg ? "on" : ""}" data-bg="${c}" style="background:${c}" title="${c}"></button>`).join("") +
+    `<label class="sw pick" title="لون تاني"><input type="color" id="cvBgPick" value="${bg}"></label>`;
+  $("exRes").innerHTML = Object.entries(EXPORT_RES).map(([k, l]) => `<option value="${k}" ${Number(k) === ex.res ? "selected" : ""}>${l}</option>`).join("");
+  $("exFps").innerHTML = [24, 25, 30, 50, 60].map((f) => `<option value="${f}" ${f === ex.fps ? "selected" : ""}>${f} فريم/ث</option>`).join("");
+  $("exQuality").innerHTML = Object.entries(EXPORT_Q).map(([k, l]) => `<option value="${k}" ${k === ex.quality ? "selected" : ""}>${l}</option>`).join("");
+  const [w, h] = RATIOS[r], k = ex.res / Math.min(w, h);
+  $("exInfo").textContent = `${Math.round(w * k / 2) * 2}×${Math.round(h * k / 2) * 2} · ${ex.fps} فريم · ${fmtTC(totalLength()).slice(0, 5)} · الحجم حوالي ${sizeEstimate().toFixed(sizeEstimate() < 10 ? 1 : 0)} ميجا`;
+  $("cvNote").hidden = r === "9:16";
+}
+function setCanvas(patch) {
+  pushHistory("canvas");
+  mt.project.data.canvas = { ...(mt.project.data.canvas || {}), ...patch };
+  applyCanvas();
+  renderCanvasPane();
+  syncPreview();
+  if (typeof mtTypoDraw === "function") mtTypoDraw();
+  scheduleSave();
+}
+function setExport(patch) {
+  pushHistory("export");
+  mt.project.data.export = { ...(mt.project.data.export || {}), ...patch };
+  renderCanvasPane();
+  scheduleSave();
+}
+$("cvRatio").addEventListener("click", (e) => { const b = e.target.closest("[data-ratio]"); if (b) setCanvas({ ratio: b.dataset.ratio }); });
+$("cvBg").addEventListener("click", (e) => { const b = e.target.closest("[data-bg]"); if (b) setCanvas({ bg: b.dataset.bg }); });
+$("cvBg").addEventListener("input", (e) => { if (e.target.id === "cvBgPick") setCanvas({ bg: e.target.value }); });
+$("exRes").addEventListener("change", () => setExport({ res: Number($("exRes").value) }));
+$("exFps").addEventListener("change", () => setExport({ fps: Number($("exFps").value) }));
+$("exQuality").addEventListener("change", () => setExport({ quality: $("exQuality").value }));
+$("exAudio").onclick = async () => {
+  if (!mt.project) return;
+  await saveProject();
+  $("exAudio").disabled = true;
+  $("exAudio").textContent = "⏳ بيجهّز الصوت…";
+  try {
+    const r = await api(`/api/projects/${mt.project.id}/render-audio`, { method: "POST" });
+    $("exAudioLink").href = r.url;
+    $("exAudioLink").hidden = false;
+    $("exAudioLink").textContent = `⬇ حمّل الصوت (MP3 · ${(r.size / 1e6).toFixed(1)} ميجا)`;
+    toast("🎧 الصوت جاهز");
+  } catch (err) { toast(err.message, true); }
+  finally { $("exAudio").disabled = false; $("exAudio").textContent = "🎧 صدّر الصوت بس (MP3)"; }
+};
 
 // ---------- القطعة المختارة من التعليق أو الموسيقى: ظهور واختفاء بالتدريج ----------
 function selPart() {

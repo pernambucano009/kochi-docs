@@ -642,6 +642,19 @@
                 </div>
 
                 <div class="pane" data-pane="export" hidden>
+                  <h3 class="pane-h">🖼️ مقاس الكادر</h3>
+                  <div class="chips" id="cvRatio"></div>
+                  <p class="hint" id="cvNote" hidden>💡 التايبوجرافي معمولة على 9:16، فبتتصغّر عشان تبان كلها جوه الكادر. والمشهد (تغيير الخلفية) بيشتغل على 9:16 بس.</p>
+                  <h3 class="pane-h">🎨 لون الخلفية</h3>
+                  <p class="hint">بيبان لما الصورة متملاش الكادر (لما تصغّرها أو تلفّها أو تختار «كامل + أسود»).</p>
+                  <div class="swatches" id="cvBg"></div>
+                  <h3 class="pane-h">⚙️ إعدادات التصدير</h3>
+                  <div class="ex-grid">
+                    <label class="field">الدقة <select id="exRes"></select></label>
+                    <label class="field">الفريمات <select id="exFps"></select></label>
+                    <label class="field">الجودة <select id="exQuality"></select></label>
+                  </div>
+                  <p class="muted" id="exInfo"></p>
                   <button class="btn primary wide gap-top" id="renderBtn">🎬 صدّر الفيديو</button>
                   <button class="btn sm danger gap-top" id="renderCancel" hidden>⏹ وقّف التصدير</button>
               <p class="err" id="renderError" hidden></p>
@@ -649,6 +662,10 @@
                 <video id="resultVideo" controls playsinline></video>
                 <div class="row"><a class="btn sm" id="resultDownload" download>⬇ تحميل</a>
                 <span class="muted">اتحفظ في فولدر الفيديوهات الجاهزة</span></div>
+              </div>
+              <div class="row wrap gap-top">
+                <button class="btn sm" id="exAudio" title="التعليق والموسيقى والمؤثرات وصوت الفيديوهات في ملف MP3">🎧 صدّر الصوت بس (MP3)</button>
+                <a class="btn sm" id="exAudioLink" hidden download>⬇ حمّل الصوت</a>
               </div>
                 </div>
               </section>

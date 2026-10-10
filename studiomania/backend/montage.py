@@ -4,13 +4,40 @@
 وبعدها أوترو المدرب، وفوقهم التعليق الصوتي والموسيقى.
 """
 
+import contextlib
 import os
 import re
 import subprocess
+import threading
 from dataclasses import dataclass
 from pathlib import Path
 
 WIDTH, HEIGHT, FPS = 1080, 1920, 30
+_canvas = threading.local()
+
+
+def canvas_size() -> tuple[int, int]:
+    """مقاس الكادر للتصدير الحالي (9:16 افتراضي، أو اللي اتحدد بـ with canvas(w, h))."""
+    return (getattr(_canvas, "size", None) or (WIDTH, HEIGHT, FPS, 20))[:2]
+
+
+def canvas_fps() -> int:
+    return (getattr(_canvas, "size", None) or (WIDTH, HEIGHT, FPS, 20))[2]
+
+
+def canvas_crf() -> int:
+    return (getattr(_canvas, "size", None) or (WIDTH, HEIGHT, FPS, 20))[3]
+
+
+@contextlib.contextmanager
+def canvas(w: int, h: int, fps: int = FPS, crf: int = 20):
+    """إعدادات التصدير: المقاس وعدد الفريمات في الثانية والجودة (crf: أقل = أحسن وأتقل)."""
+    old = getattr(_canvas, "size", None)
+    _canvas.size = (int(w) // 2 * 2, int(h) // 2 * 2, int(fps), int(crf))
+    try:
+        yield
+    finally:
+        _canvas.size = old
 MUSIC_FADE_SECONDS = 1.5
 # عدد الـ threads ثابت: FFmpeg لوحده بيفتح thread لكل core في السيرفر، وعلى Railway
 # ده ممكن يبقى عشرات، وكل واحد بيحجز فريمات في الذاكرة لحد ما الذاكرة تخلص
@@ -214,6 +241,7 @@ def kf_value(kf: list, key: str, default: float, t: float) -> float:
 def motion_exprs(seg: "Segment", tl: str, fx_tl: str | None = None) -> dict:
     """معادلات FFmpeg لحركة القطعة في الوقت tl (من أول القطعة): z مضاعف الزووم، x/y من -1 لـ 1،
     dx/dy إزاحة زيادة بالبكسل، a زاوية بالدرجات."""
+    WIDTH, HEIGHT = canvas_size()
     dur = seg.duration
     kf = seg.kf or []
     z = [kf_expr(kf, "zoom", seg.zoom, tl) if kf else _f(seg.zoom)]
@@ -294,12 +322,14 @@ def segment_command(ffmpeg: str, seg: Segment, output: Path, low_memory: bool = 
     """المرحلة الأولى: قطعة واحدة بس، مقصوصة ومتظبطة على 1080×1920 وصوتها موحّد، وعليها تأثيراتها
     (سرعة، عكس، قلب، لف، ألوان، فلتر، ظهور/اختفاء، ملء الكادر أو كاملة بخلفية).
     pre/post: ثواني زيادة (بوقت الفيديو النهائي) قبلها وبعدها للترانزيشن (من الفيديو الأصلي، واللي مش موجود بيثبت على أول/آخر فريم)."""
+    WIDTH, HEIGHT = canvas_size()
+    FPS = canvas_fps()
     if seg.blank:
         total = seg.duration + pre + post
         bgc = ("0x" + seg.bg.lstrip("#")) if re.fullmatch(r"#[0-9a-fA-F]{6}", seg.bg or "") else "black"
         return [ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
                 "-f", "lavfi", "-i", f"color=c={bgc}:s={WIDTH}x{HEIGHT}:r={FPS}:d={total:.3f}",
-                "-f", "lavfi", "-i", f"anullsrc=r=48000:cl=stereo", "-t", f"{total:.3f}",
+                "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo", "-t", f"{total:.3f}",
                 "-map", "0:v", "-map", "1:a", "-pix_fmt", "yuv420p", *encoder_args("veryfast", 16, low_memory),
                 "-c:a", "flac", "-sample_fmt", "s16", str(output)]
     sp = max(0.25, min(4.0, seg.speed or 1.0))
@@ -453,90 +483,10 @@ def segment_command(ffmpeg: str, seg: Segment, output: Path, low_memory: bool = 
     ]
 
 
-def build_commands(
-    ffmpeg: str,
-    segments: list[Segment],
-    output: Path,
-    work_dir: Path,
-    voice: AudioTrack | list[AudioTrack] | None = None,
-    music: AudioTrack | list[AudioTrack] | None = None,
-    logo: Logo | None = None,
-    subtitles: Subtitles | None = None,
-    low_memory: bool = False,
-    sounds: list[AudioTrack] | None = None,
-    audio_fx: dict | None = None,
-) -> tuple[list[list[str]], float]:
-    """يبني أوامر FFmpeg بالترتيب ويرجّعها مع الطول النهائي للفيديو.
-
-    كل قطعة بتتجهّز لوحدها الأول، وبعدين أمر أخير بيلزقهم ويحط اللوجو والكابشن
-    والصوت. كده الذاكرة ثابتة مهما كان عدد القطع (لو كله في أمر واحد، كل قطعة
-    بتفتح فيديو في نفس الوقت والذاكرة بتخلص على السيرفر).
-    """
-    if not segments:
-        raise ValueError("مفيش فيديوهات في المونتاج")
-    total = sum(s.duration for s in segments)
-    work_dir.mkdir(parents=True, exist_ok=True)
-    commands, parts = [], []
-    # مدة كل ترانزيشن (بين القطعة k-1 وk)، مش أطول من 80٪ من أقصر القطعتين ومن غير ما نص الترانزيشنين يكلوا القطعة كلها
-    tr = [0.0] * len(segments)
-    for k in range(1, len(segments)):
-        seg = segments[k]
-        if seg.trans_in in TRANSITIONS and seg.trans_dur > 0:
-            tr[k] = round(min(seg.trans_dur, 2.0, segments[k - 1].duration * 0.8, seg.duration * 0.8), 3)
-    for k in range(len(segments)):   # القطعة مايتاكلش منها أكتر من 90٪ (ترانزيشن قبل + بعد)
-        nxt = tr[k + 1] if k + 1 < len(segments) else 0.0
-        over = (tr[k] + nxt) / 2 - segments[k].duration * 0.9
-        if over > 0:
-            if tr[k]: tr[k] = max(0.0, tr[k] - over)
-            elif nxt: tr[k + 1] = max(0.0, nxt - over)
-    if not any(tr):
-        for n, seg in enumerate(segments):
-            part = work_dir / f"seg{n:03d}.mkv"
-            commands.append(segment_command(ffmpeg, seg, part, low_memory))
-            parts.append(part)
-    else:
-        # كل قطعة بتتعمل ممدودة، وبعدين بتتقطع لجسم + نصين ترانزيشن، والترانزيشن بيتعمل من نص القطعتين
-        ext = []
-        for n, seg in enumerate(segments):
-            pre, post = tr[n] / 2, (tr[n + 1] / 2 if n + 1 < len(segments) else 0.0)
-            part = work_dir / f"ext{n:03d}.mkv"
-            commands.append(segment_command(ffmpeg, seg, part, low_memory, pre, post))
-            ext.append((part, pre, post, seg.duration))
-        enc = [*encoder_args("veryfast", 16, low_memory), "-c:a", "flac", "-sample_fmt", "s16"]
-        cut = [ffmpeg, "-hide_banner", "-loglevel", "error", "-y", "-threads", "1"]
-        for n, (part, pre, post, dur) in enumerate(ext):
-            body_from, body_len = 2 * pre, dur - pre - post
-            if body_len >= 1 / FPS:
-                body = work_dir / f"body{n:03d}.mkv"
-                commands.append(cut + ["-ss", f"{body_from:.3f}", "-t", f"{body_len:.3f}", "-i", str(part), "-map", "0:v", "-map", "0:a",
-                                       "-t", f"{body_len:.3f}", *enc, str(body)])
-                parts.append(body)
-            if n + 1 < len(ext) and tr[n + 1] > 0:
-                d = tr[n + 1]
-                b_part = ext[n + 1][0]
-                chunk = work_dir / f"tr{n:03d}.mkv"
-                a_from = pre + dur - post
-                kind = segments[n + 1].trans_in
-                commands.append(cut + ["-ss", f"{a_from:.3f}", "-t", f"{d:.3f}", "-i", str(part), "-ss", "0", "-t", f"{d:.3f}", "-i", str(b_part),
-                                       "-filter_complex",
-                                       # xfade محتاج القطعة الأولى أطول شوية من الترانزيشن، فبنثبّت آخر فريم شوية وبنقص الناتج
-                                       f"[0:v]setpts=PTS-STARTPTS,fps={FPS},settb=AVTB,tpad=stop_mode=clone:stop_duration=0.3[a];"
-                                       f"[1:v]setpts=PTS-STARTPTS,fps={FPS},settb=AVTB,tpad=stop_mode=clone:stop_duration=0.3[b];"
-                                       f"[a][b]xfade=transition={kind}:duration={d:.3f}:offset=0,trim=0:{d:.3f},setpts=PTS-STARTPTS,format=yuv420p[v];"
-                                       f"[0:a]asetpts=PTS-STARTPTS,afade=t=out:d={d:.3f}[x];[1:a]asetpts=PTS-STARTPTS,afade=t=in:d={d:.3f}[y];"
-                                       f"[x][y]amix=inputs=2:normalize=0,atrim=0:{d:.3f}[au]",
-                                       "-map", "[v]", "-map", "[au]", "-t", f"{d:.3f}", *enc, str(chunk)])
-                parts.append(chunk)
-    concat_list = work_dir / "list.txt"
-    concat_list.write_text("".join(f"file '{p.as_posix()}'\n" for p in parts), encoding="utf-8")
-
-    base_args = [ffmpeg, "-hide_banner", "-loglevel", "error", "-y", "-filter_complex_threads", "1"]
-    concat_in = ["-f", "concat", "-safe", "0", "-i", str(concat_list)]
-    mixed, video = work_dir / "mix.flac", work_dir / "video.mp4"
-
-    # (أ) الصوت لوحده: صوت الفيديوهات + قطع التعليق والموسيقى
-    # كل ملف صوت بيتفتح مرة واحدة بس، وبنقسمه جوه لقطعه — FFmpeg 7.0 ممكن يعلّق لما
-    # يبقى فيه مدخلات كتير ماشية بسرعات مختلفة في نفس الأمر
+def audio_mix_command(base_args: list[str], concat_in: list[str], total: float, voice, music, sounds, audio_fx: dict | None, out: Path) -> list[str]:
+    """أمر الصوت: صوت الفيديوهات (من concat_in) + قطع التعليق والموسيقى والأصوات الزيادة، مع التنضيف والتوطية وتوحيد العلو.
+    كل ملف صوت بيتفتح مرة واحدة بس، وبنقسمه جوه لقطعه — FFmpeg 7.0 ممكن يعلّق لما
+    يبقى فيه مدخلات كتير ماشية بسرعات مختلفة في نفس الأمر"""
     def as_list(t):
         return [x for x in t if x] if isinstance(t, list) else ([t] if t else [])
 
@@ -606,10 +556,99 @@ def build_commands(
         filters.append(f"{''.join(mix)}amix=inputs={len(mix)}:duration=first:normalize=0{tail}[aout]")
     else:
         filters.append(f"[base]anull{tail}[aout]")
-    commands.append(args + [
+    return args + [
         "-filter_complex", ";".join(filters), "-map", "[aout]", "-t", f"{total:.3f}",
-        "-c:a", "flac", "-sample_fmt", "s16", str(mixed),
-    ])
+        "-c:a", "flac", "-sample_fmt", "s16", str(out),
+    ]
+
+
+def build_commands(
+    ffmpeg: str,
+    segments: list[Segment],
+    output: Path,
+    work_dir: Path,
+    voice: AudioTrack | list[AudioTrack] | None = None,
+    music: AudioTrack | list[AudioTrack] | None = None,
+    logo: Logo | None = None,
+    subtitles: Subtitles | None = None,
+    low_memory: bool = False,
+    sounds: list[AudioTrack] | None = None,
+    audio_fx: dict | None = None,
+) -> tuple[list[list[str]], float]:
+    """يبني أوامر FFmpeg بالترتيب ويرجّعها مع الطول النهائي للفيديو.
+
+    كل قطعة بتتجهّز لوحدها الأول، وبعدين أمر أخير بيلزقهم ويحط اللوجو والكابشن
+    والصوت. كده الذاكرة ثابتة مهما كان عدد القطع (لو كله في أمر واحد، كل قطعة
+    بتفتح فيديو في نفس الوقت والذاكرة بتخلص على السيرفر).
+    """
+    WIDTH, HEIGHT = canvas_size()
+    FPS = canvas_fps()
+    if not segments:
+        raise ValueError("مفيش فيديوهات في المونتاج")
+    total = sum(s.duration for s in segments)
+    work_dir.mkdir(parents=True, exist_ok=True)
+    commands, parts = [], []
+    # مدة كل ترانزيشن (بين القطعة k-1 وk)، مش أطول من 80٪ من أقصر القطعتين ومن غير ما نص الترانزيشنين يكلوا القطعة كلها
+    tr = [0.0] * len(segments)
+    for k in range(1, len(segments)):
+        seg = segments[k]
+        if seg.trans_in in TRANSITIONS and seg.trans_dur > 0:
+            tr[k] = round(min(seg.trans_dur, 2.0, segments[k - 1].duration * 0.8, seg.duration * 0.8), 3)
+    for k in range(len(segments)):   # القطعة مايتاكلش منها أكتر من 90٪ (ترانزيشن قبل + بعد)
+        nxt = tr[k + 1] if k + 1 < len(segments) else 0.0
+        over = (tr[k] + nxt) / 2 - segments[k].duration * 0.9
+        if over > 0:
+            if tr[k]: tr[k] = max(0.0, tr[k] - over)
+            elif nxt: tr[k + 1] = max(0.0, nxt - over)
+    if not any(tr):
+        for n, seg in enumerate(segments):
+            part = work_dir / f"seg{n:03d}.mkv"
+            commands.append(segment_command(ffmpeg, seg, part, low_memory))
+            parts.append(part)
+    else:
+        # كل قطعة بتتعمل ممدودة، وبعدين بتتقطع لجسم + نصين ترانزيشن، والترانزيشن بيتعمل من نص القطعتين
+        ext = []
+        for n, seg in enumerate(segments):
+            pre, post = tr[n] / 2, (tr[n + 1] / 2 if n + 1 < len(segments) else 0.0)
+            part = work_dir / f"ext{n:03d}.mkv"
+            commands.append(segment_command(ffmpeg, seg, part, low_memory, pre, post))
+            ext.append((part, pre, post, seg.duration))
+        enc = [*encoder_args("veryfast", 16, low_memory), "-c:a", "flac", "-sample_fmt", "s16"]
+        cut = [ffmpeg, "-hide_banner", "-loglevel", "error", "-y", "-threads", "1"]
+        for n, (part, pre, post, dur) in enumerate(ext):
+            body_from, body_len = 2 * pre, dur - pre - post
+            if body_len >= 1 / FPS:
+                body = work_dir / f"body{n:03d}.mkv"
+                commands.append(cut + ["-ss", f"{body_from:.3f}", "-t", f"{body_len:.3f}", "-i", str(part), "-map", "0:v", "-map", "0:a",
+                                       "-t", f"{body_len:.3f}", *enc, str(body)])
+                parts.append(body)
+            if n + 1 < len(ext) and tr[n + 1] > 0:
+                d = tr[n + 1]
+                b_part = ext[n + 1][0]
+                chunk = work_dir / f"tr{n:03d}.mkv"
+                a_from = pre + dur - post
+                kind = segments[n + 1].trans_in
+                commands.append(cut + ["-ss", f"{a_from:.3f}", "-t", f"{d:.3f}", "-i", str(part), "-ss", "0", "-t", f"{d:.3f}", "-i", str(b_part),
+                                       "-filter_complex",
+                                       # xfade محتاج القطعة الأولى أطول شوية من الترانزيشن، فبنثبّت آخر فريم شوية وبنقص الناتج
+                                       f"[0:v]setpts=PTS-STARTPTS,fps={FPS},settb=AVTB,tpad=stop_mode=clone:stop_duration=0.3[a];"
+                                       f"[1:v]setpts=PTS-STARTPTS,fps={FPS},settb=AVTB,tpad=stop_mode=clone:stop_duration=0.3[b];"
+                                       f"[a][b]xfade=transition={kind}:duration={d:.3f}:offset=0,trim=0:{d:.3f},setpts=PTS-STARTPTS,format=yuv420p[v];"
+                                       f"[0:a]asetpts=PTS-STARTPTS,afade=t=out:d={d:.3f}[x];[1:a]asetpts=PTS-STARTPTS,afade=t=in:d={d:.3f}[y];"
+                                       f"[x][y]amix=inputs=2:normalize=0,atrim=0:{d:.3f}[au]",
+                                       "-map", "[v]", "-map", "[au]", "-t", f"{d:.3f}", *enc, str(chunk)])
+                parts.append(chunk)
+    concat_list = work_dir / "list.txt"
+    concat_list.write_text("".join(f"file '{p.as_posix()}'\n" for p in parts), encoding="utf-8")
+
+    base_args = [ffmpeg, "-hide_banner", "-loglevel", "error", "-y", "-filter_complex_threads", "1"]
+    concat_in = ["-f", "concat", "-safe", "0", "-i", str(concat_list)]
+    mixed, video = work_dir / "mix.flac", work_dir / "video.mp4"
+
+    # (أ) الصوت لوحده: صوت الفيديوهات + قطع التعليق والموسيقى
+    # كل ملف صوت بيتفتح مرة واحدة بس، وبنقسمه جوه لقطعه — FFmpeg 7.0 ممكن يعلّق لما
+    # يبقى فيه مدخلات كتير ماشية بسرعات مختلفة في نفس الأمر
+    commands.append(audio_mix_command(base_args, concat_in, total, voice, music, sounds, audio_fx, mixed))
 
     # (ب) الصورة لوحدها: الفيديوهات + اللوجو + الكابشن
     args = base_args + ["-an"] + concat_in
@@ -639,7 +678,7 @@ def build_commands(
     filters.append(f"{video_label}format=yuv420p[vout]")
     commands.append(args + [
         "-filter_complex", ";".join(filters), "-map", "[vout]", "-t", f"{total:.3f}",
-        *encoder_args("veryfast", 20, low_memory), str(video),
+        *encoder_args("veryfast", canvas_crf(), low_memory), str(video),
     ])
 
     # (ج) نركّب الصوت على الصورة من غير ما نضغط الصورة تاني
@@ -647,4 +686,42 @@ def build_commands(
         "-i", str(video), "-i", str(mixed), "-map", "0:v", "-map", "1:a", "-t", f"{total:.3f}",
         "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", str(output),
     ])
+    return commands, total
+
+
+def build_audio_commands(ffmpeg: str, segments: list[Segment], output: Path, work_dir: Path, voice=None, music=None,
+                         sounds=None, audio_fx: dict | None = None) -> tuple[list[list[str]], float]:
+    """🎧 تصدير الصوت بس (MP3): صوت كل قطعة لوحده (من غير صورة، فهو سريع) + التعليق والموسيقى والأصوات."""
+    if not segments:
+        raise ValueError("مفيش فيديوهات في المونتاج")
+    total = sum(s.duration for s in segments)
+    work_dir.mkdir(parents=True, exist_ok=True)
+    commands, parts = [], []
+    base = [ffmpeg, "-hide_banner", "-loglevel", "error", "-y"]
+    for n, seg in enumerate(segments):
+        part = work_dir / f"aud{n:03d}.flac"
+        d = seg.duration
+        if seg.blank or not seg.has_audio:
+            commands.append(base + ["-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo", "-t", f"{d:.3f}", "-c:a", "flac", "-sample_fmt", "s16", str(part)])
+        else:
+            sp = max(0.25, min(4.0, seg.speed or 1.0))
+            chain = "aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo"
+            if seg.reverse:
+                chain += ",areverse"
+            if abs(sp - 1) > 1e-3:
+                chain += "," + atempo_chain(sp)
+            chain += f",volume={seg.volume:.3f},apad,atrim=0:{d:.3f}"
+            if seg.fade_in > 0.01:
+                chain += f",afade=t=in:st=0:d={min(seg.fade_in, d):.3f}"
+            if seg.fade_out > 0.01:
+                chain += f",afade=t=out:st={max(0.0, d - seg.fade_out):.3f}:d={min(seg.fade_out, d):.3f}"
+            commands.append(base + ["-ss", f"{seg.start:.3f}", "-t", f"{seg.end - seg.start:.3f}", "-i", str(seg.path), "-vn",
+                                    "-af", chain, "-t", f"{d:.3f}", "-c:a", "flac", "-sample_fmt", "s16", str(part)])
+        parts.append(part)
+    concat_list = work_dir / "alist.txt"
+    concat_list.write_text("".join(f"file '{p.as_posix()}'\n" for p in parts), encoding="utf-8")
+    mixed = work_dir / "mix.flac"
+    commands.append(audio_mix_command(base + ["-filter_complex_threads", "1"], ["-f", "concat", "-safe", "0", "-i", str(concat_list)],
+                                      total, voice, music, sounds, audio_fx, mixed))
+    commands.append(base + ["-i", str(mixed), "-c:a", "libmp3lame", "-b:a", "192k", str(output)])
     return commands, total

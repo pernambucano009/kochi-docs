@@ -2049,3 +2049,10 @@ a.btn.disabled { opacity: .45; pointer-events: none; }
 .sfx-item button { border: 0; background: none; cursor: pointer; font-size: 12px; padding: 2px 4px; border-radius: 6px; color: inherit; }
 .sfx-item button.add { background: var(--accent); color: #fff; }
 #micRec.rec { background: #c0392b; color: #fff; border-color: #c0392b; }
+.swatches { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.swatches .sw { width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--line); cursor: pointer; padding: 0; }
+.swatches .sw.on { outline: 2px solid var(--accent); outline-offset: 2px; }
+.swatches .sw.pick { position: relative; overflow: hidden; background: conic-gradient(red, yellow, lime, cyan, blue, magenta, red); }
+.swatches .sw.pick input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.ex-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.ex-grid select { width: 100%; }

@@ -74,7 +74,8 @@ function mscDraw() {
   const wrap = $("pvScene");
   if (!wrap) return;
   const d = msc.doc;
-  const show = !!(d && d.w && (scBgOn() || d.removals.length));
+  // المشهد معمول على 9:16 بس (زي التصدير)
+  const show = !!(d && d.w && (scBgOn() || d.removals.length)) && (typeof canvasRatio !== "function" || canvasRatio() === "9:16");
   wrap.hidden = !show;
   mscPickDraw();
   if (!show) return;
