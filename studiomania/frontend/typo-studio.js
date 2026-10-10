@@ -22,7 +22,7 @@
   const FACES = [["TY Anton", "TY-Anton.ttf", "400"], ["TY Pen", "TY-DawningPen.ttf", "400"], ["TY PlexAr", "TY-PlexArabic-700.ttf", "700"],
     ["TY PlexAr", "TY-PlexArabic-400.ttf", "400"], ["TY Ruqaa", "TY-ArefRuqaa-700.ttf", "400 900"], ["TY Outfit", "TY-Outfit-800.ttf", "800 900"],
     ["TY Serif", "TY-InstrumentSerif.ttf", "400"], ["TY SerifI", "TY-InstrumentSerif-Italic.ttf", "400"], ["TY Pixel", "TY-VT323.ttf", "400"],
-    ["TY Type", "TY-SpecialElite.ttf", "400"], ["TY Rock", "TY-RockSalt.ttf", "400"], ["TY Mono", "TY-PlexMono-500.ttf", "500"], ["TY Amiri", "TY-Amiri-700.ttf", "700"], ["TY Lite", "TY-Alexandria-500.ttf", "100 600"]];
+    ["TY Type", "TY-SpecialElite.ttf", "400"], ["TY Rock", "TY-RockSalt.ttf", "400"], ["TY Mono", "TY-PlexMono-500.ttf", "500"], ["TY Amiri", "TY-Amiri-700.ttf", "700"], ["TY Lite", "TY-Alexandria-500.ttf", "100 600"], ["TY Cond", "TY-BarlowCond-400.ttf", "100 500"], ["TY Cond", "TY-BarlowCond-700.ttf", "600 900"], ["TY CondI", "TY-BarlowCond-700i.ttf", "100 900"]];
   let facesP = null;
   E.studioFonts = () => facesP || (facesP = Promise.all([...FACES.map(([fam, file, w]) =>
     new FontFace(fam, `url(/fonts/${file})`, { weight: w }).load().then((f) => document.fonts.add(f)).catch(() => {})),
@@ -55,7 +55,7 @@
     "qr", "codetag", "toolbar", "terminal", "scan",
     "toasts", "footer", "marquee", "datestrip",
     "fileicon", "chaos",
-    "gradword", "meshprompt", "orbsplit", "bento", "figdays", "figcurve", "figplay", "figequal", "figwords", "figphone", "figdrop", "figcount", "figgears", "figbar", "figcheck", "figcta", "goldcap", "iconbelt", "glowsweep", "namepill", "kashida", "molecule", "weightstack", "stretch", "desatpop", "arcs", "chrome", "inkverse", "poemfade", "hashend", "flipverb"]);
+    "gradword", "meshprompt", "orbsplit", "bento", "figdays", "figcurve", "figplay", "figequal", "figwords", "figphone", "figdrop", "figcount", "figgears", "figbar", "figcheck", "figcta", "goldcap", "iconbelt", "glowsweep", "namepill", "kashida", "molecule", "weightstack", "stretch", "desatpop", "arcs", "chrome", "inkverse", "poemfade", "hashend", "flipverb", "strobe", "duoline", "capstack", "pillword"]);
   E.TYPING = new Set(["type", "artype"]);
   const MC = document.createElement("canvas").getContext("2d");
   const measure = (s, font) => { MC.font = font; return MC.measureText(s).width; };
@@ -2779,7 +2779,7 @@
   //   whip سحبة سريعة بموشن بلير · zoom زووم داخل · glitch جلتش ألوان · flash فلاش أبيض · iris دايرة بتفتح
   //   leak تسريب نور برتقاني · burn حرق فيلم · rise طالع من تحت
   // =====================================================================
-  const TRANS_DUR = { whip: 0.28, zoom: 0.32, glitch: 0.3, flash: 0.25, iris: 0.4, leak: 0.7, burn: 0.6, rise: 0.35, wipe: 0.45, blur: 0.4, pop: 0.35, slab: 0.6 };
+  const TRANS_DUR = { whip: 0.28, zoom: 0.32, glitch: 0.3, flash: 0.25, iris: 0.4, leak: 0.7, burn: 0.6, rise: 0.35, wipe: 0.45, blur: 0.4, pop: 0.35, slab: 0.6, bars: 0.5 };
   P.applyTrans = function (b, t, bi) {
     const tr = b?.trans;
     if (!tr || !TRANS_DUR[tr]) return;
@@ -2801,6 +2801,13 @@
       const px = lerp(-1.05, 1.05, eOut(q));
       over = `<div style="position:absolute;top:0;bottom:0;left:0;width:100%;background:${c};transform:translateX(${(px * w).toFixed(1)}px)"></div>`;
       wrap.style.clipPath = `inset(0 ${(clamp(1 - px) * 100).toFixed(1)}% 0 0)`;
+    }
+    else if (tr === "bars") {
+      // شرايح طولية بألوان قريبة من بعض بتعدّي ورا بعض بسرعات مختلفة وتكشف اللقطة الجديدة
+      const C = ["#F4EE4A", "#EDEDED", "#EBDF20", "#F7F07A"], n = 4;
+      for (let i = 0; i < n; i++) { const qq = clamp(q * 1.35 - i * 0.09), px = lerp(-0.3, 1.3, eOut(qq));
+        over += `<div style="position:absolute;top:0;bottom:0;left:${((px - 0.12 - i * 0.04) * w).toFixed(1)}px;width:${(w * (0.12 + i * 0.05)).toFixed(1)}px;background:${C[(i + bi) % C.length]}"></div>`; }
+      wrap.style.clipPath = `inset(0 ${(clamp(1 - lerp(-0.3, 1.3, eOut(clamp(q * 1.35 - 0.27))) + 0.1) * 100).toFixed(1)}% 0 0)`;
     }
     else if (tr === "slab") {
       // لوح غامق قريب من الكاميرا بيعدّي قدام الكادر (زي عمود أو كتف معدّي) ويكشف اللقطة الجديدة وراه
@@ -6607,5 +6614,70 @@
       <div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:${(w * 0.12).toFixed(1)}px;right:${(w * 0.12).toFixed(1)}px;top:${(y - z * 1.1).toFixed(1)}px;text-align:${al};white-space:nowrap">
         <div style="font:400 ${z.toFixed(1)}px ${AR.test(ps) ? ff : "'TY Lite', 'SM Tajawal'"};color:${fg};letter-spacing:-0.01em">${esc(ps)}</div>
         <div style="font:700 ${z.toFixed(1)}px ${ff};color:${acc};letter-spacing:-0.01em;min-height:${(z * 1.2).toFixed(1)}px">${esc(flip ? word : typedW)}</div></div>`;
+  };
+  // ======== r05 «ستروب» — كل كلمة كادر لوحدها، والخلفية والكلام بيبدّلوا لونين كل كلمة (قطع حاد) ========
+  const STROBE = [["#FFFFFF", "#B00006"], ["#050505", "#F2B42A"], ["#F4F1EA", "#1D3FD6"], ["#111111", "#FFFFFF"]];
+  P.k_strobe = function (b, t, k, th, bi) {
+    const it = this.items(b); if (!it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h);
+    // الكلمات القصيرة (We're / To / في / و) بتتلم مع اللي بعدها في نفس الكادر
+    const g = []; let pend = [];
+    const short = (s) => AR.test(s) ? SMALLW.has(s) : [...s.replace(/[’'.,!?]/g, "")].length <= 3 || /[’'](re|m|s|ll)$/i.test(s);
+    for (const x of it) { pend.push(x); if (!short(this.text(x.w))) { g.push(pend); pend = []; } }
+    if (pend.length) { if (g.length) g[g.length - 1].push(...pend); else g.push(pend); }
+    let ci = -1; g.forEach((q, i) => { if (t >= q[0].t0 - 0.02) ci = i; });
+    const [A, B] = STROBE[bi % STROBE.length];
+    if (ci < 0) return `<div style="position:absolute;inset:0;background:#000"></div>`;
+    const inv = ci % 2 === 1, bg = inv ? B : A, fg = inv ? A : B;
+    const s = g[ci].map((x) => this.text(x.w)).join(" "), ff = AR.test(s) ? famOf(s) : "'TY Lite', 'SM Tajawal'";
+    const z = fitSize(s, `500 {}px ${ff}`, w * 0.82, mn * 0.085 * this.ts);
+    return `<div style="position:absolute;inset:0;background:${bg}"></div><div dir="${this.dir(s)}" style="position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);text-align:center;white-space:nowrap;font:500 ${z.toFixed(1)}px ${ff};color:${fg};letter-spacing:.01em">${esc(s)}</div>`;
+  };
+  // ======== r06 «كوندنسد» — خط مضغوط سطرين (رفيع/تقيل) أصفر وأسود، سطور بتطلع من ماسك، كبسولة صفرا ورا الكلمة ========
+  const condOf = (s) => (AR.test(s) ? famOf(s) : "'TY Cond', 'TY Outfit', 'SM Tajawal'");
+  const YEL = "#EBDF20", CINK = "#100E0B";
+  // سطر بيطلع من تحت ماسك (وبيطلع لفوق في الآخر)
+  const maskLine = (html, z, t, t0, t1, out = true, ar = false) => { const a = eOut(seg(t, t0, t0 + 0.35)), o = out ? eOut(seg(t, t1 - 0.3, t1)) : 0, lh = ar ? 1.6 : 1.15;
+    return `<div style="overflow:hidden;line-height:${lh};height:${(z * lh).toFixed(1)}px"><div style="transform:translateY(${(((1 - a) - o) * z * lh * 1.05).toFixed(1)}px)">${html}</div></div>`; };
+  // ---------- duoline: سطرين خط مضغوط — واحد رفيع وواحد تقيل — بيطلعوا من ماسك، والخلفية أصفر أو أسود بالتبادل
+  P.k_duoline = function (b, t, k, th, bi) {
+    const it = this.items(b); if (!it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h);
+    const half = b.focus > 0 && b.focus < it.length ? b.focus : Math.max(1, Math.ceil(it.length / 2));
+    const A = it.slice(0, half), B = it.slice(half), J = (a) => a.map((x) => this.text(x.w)).join(" ");
+    const dark = bi % 2 === 1, bg = dark ? CINK : YEL, c1 = dark ? "#fff" : CINK, c2 = dark ? YEL : CINK;
+    const boldFirst = bi % 3 === 1, ff = condOf(J(it)), z = Math.min(fitSize(J(A), `700 {}px ${ff}`, w * 0.84, mn * 0.11 * this.ts), B.length ? fitSize(J(B), `700 {}px ${ff}`, w * 0.84, mn * 0.11 * this.ts) : 1e9);
+    const line = (a, bold, col) => a.length ? maskLine(`<span style="font:${bold ? 700 : 400} ${z.toFixed(1)}px ${ff};color:${col};white-space:nowrap">${esc(J(a))}</span>`, z, t, a[0].t0 - 0.05, b.t1, true, AR.test(J(a))) : "";
+    return `<div style="position:absolute;inset:0;background:${bg}"></div>
+      <div dir="${this.dir(J(it))}" style="position:absolute;left:0;right:0;top:${(h * 0.42 - z * 1.15).toFixed(1)}px;text-align:center">${line(A, boldFirst, boldFirst ? c2 : c1)}${line(B, !boldFirst, boldFirst ? c1 : c2)}</div>`;
+  };
+  // ---------- capstack: سؤال كبير كابيتال مضغوط سطر تحت سطر، وآخر كلمة مايلة، وقبله مربع أسود بيجري ويسيب خط متقطع
+  P.k_capstack = function (b, t, k, th, bi) {
+    const it = this.items(b); if (!it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h);
+    const per = it.length > 6 ? 3 : 2, rows = [];
+    for (let i = 0; i < it.length; i += per) rows.push(it.slice(i, i + per));
+    const J = (a) => a.map((x) => this.text(x.w)).join(" "), ff = condOf(J(it)), dark = bi % 2 === 1;
+    const z = Math.min(...rows.map((r) => fitSize(J(r).toUpperCase(), `700 {}px ${ff}`, w * 0.8, mn * 0.1 * this.ts)));
+    const y0 = h * 0.42 - rows.length * z * 0.58;
+    let html = `<div style="position:absolute;inset:0;background:${dark ? CINK : YEL}"></div>`;
+    const cp = seg(t, b.t0, it[0].t0), cx = lerp(w * 0.2, w * 0.36, eOut(cp));
+    if (cp < 1) html += `<i style="position:absolute;left:${(w * 0.2).toFixed(1)}px;top:${(y0 + z * 1.3).toFixed(1)}px;width:${(cx - w * 0.2).toFixed(1)}px;border-top:3px dashed ${dark ? "#fff" : CINK}"></i><i style="position:absolute;left:${(cx - z * 0.25).toFixed(1)}px;top:${(y0 + z * 1.05).toFixed(1)}px;width:${(z * 0.5).toFixed(1)}px;height:${(z * 0.6).toFixed(1)}px;background:${dark ? "#fff" : CINK}"></i>`;
+    html += `<div dir="${this.dir(J(it))}" style="position:absolute;left:0;right:0;top:${y0.toFixed(1)}px;text-align:center">${rows.map((r, j) => { const last = j === rows.length - 1;
+      return maskLine(`<span style="font:700 ${z.toFixed(1)}px ${last && !AR.test(J(r)) ? "'TY CondI', 'TY Cond'" : ff};color:${dark ? (last ? "#fff" : YEL) : CINK};text-transform:uppercase;white-space:nowrap">${esc(J(r))}</span>`, z, t, r[0].t0 - 0.05, b.t1, true, AR.test(J(r))); }).join("")}</div>`;
+    return html;
+  };
+  // ---------- pillword: كلام رفيع وآخر كلمة تقيلة وكبسولة صفرا بتتزحلق وراها، وفي الآخر الكبسولة بتتمد تملا الكادر
+  P.k_pillword = function (b, t, k, th, bi) {
+    const P = figParts(this, { ...b, focus: b.focus >= 0 ? b.focus : this.items(b).length - 1 }); if (!P.it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h);
+    const lead = P.J(P.kick.filter((x) => t >= x.t0 - 0.05)), main = this.text(P.main.w), ff = condOf(lead + main);
+    const z = Math.min(fitSize(P.J(P.it), `700 {}px ${ff}`, w * 0.8, mn * 0.1 * this.ts));
+    const gs = Math.max(b.t1 - 0.45, P.main.t0 + 0.7), pp = eOut(seg(t, P.main.t0 + 0.1, P.main.t0 + 0.45)), grow = gs < b.t1 - 0.1 ? eOut(seg(t, gs, b.t1)) : 0;
+    const on = t >= P.main.t0 - 0.05;
+    let html = `<div style="position:absolute;inset:0;background:#EDEDED"></div>`;
+    html += `<div dir="${this.dir(lead + main)}" style="position:absolute;left:0;right:0;top:${(h * 0.42).toFixed(1)}px;text-align:center;white-space:nowrap;font:400 ${z.toFixed(1)}px ${ff};color:${CINK}">${esc(lead)} <span style="position:relative;display:inline-block;font-weight:700;opacity:${on ? 1 : 0};transform:translateY(${on ? 0 : z * 0.3}px)"><i style="position:absolute;left:${(-z * 0.12).toFixed(1)}px;right:${(-z * 0.12).toFixed(1)}px;top:8%;bottom:4%;background:${YEL};border-radius:${(z * 0.18).toFixed(1)}px;transform-origin:${AR.test(main) ? "right" : "left"};transform:scaleX(${pp.toFixed(3)})"></i><span style="position:relative">${esc(main)}</span></span></div>`;
+    if (grow > 0) html += `<div style="position:absolute;left:50%;top:${(h * 0.42 + z * 0.55).toFixed(1)}px;width:${lerp(z * 2, w * 2.2, grow).toFixed(1)}px;height:${lerp(z * 0.9, h * 2.2, grow).toFixed(1)}px;transform:translate(-50%,-50%);border-radius:${lerp(z * 0.18, 0, grow).toFixed(1)}px;background:${YEL}"></div>`;
+    return html;
   };
 })();
