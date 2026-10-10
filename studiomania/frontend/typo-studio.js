@@ -55,7 +55,7 @@
     "qr", "codetag", "toolbar", "terminal", "scan",
     "toasts", "footer", "marquee", "datestrip",
     "fileicon", "chaos",
-    "gradword", "meshprompt", "orbsplit", "bento", "figdays", "figcurve", "figplay", "figequal", "figwords", "figphone", "figdrop", "figcount", "figgears", "figbar", "figcheck", "figcta", "goldcap", "iconbelt", "glowsweep", "namepill", "kashida", "molecule", "weightstack", "stretch", "desatpop", "arcs", "chrome", "inkverse", "poemfade", "hashend", "flipverb", "strobe", "duoline", "capstack", "pillword", "blurduo", "tagstack", "underbars", "contactcard", "iconorbit", "blurstrobe", "kinstack", "incall", "cineband", "scriptover", "tricolor", "drumpicker", "redmix", "headbubble", "pincard", "emojifloat", "slotreel", "posterwall", "quoteline", "medallion", "clockhand", "roadtext", "markpan", "objectquote", "racechart", "calflip", "glosscards", "dropword", "tasklens", "monostack", "dashbox", "sparklist", "followbtn", "silhouette", "petalstack", "followcount", "twopillars", "cutmat", "labelbox", "stampcard", "lcdtype", "genpanel", "holopulse", "coverflow", "featuretag", "luxmix", "goldframes", "goldrows", "tilegrid", "goldpill", "holoclock", "curvewall", "newsscan", "neonvenn", "wavebelt", "cardarc", "shadowquote", "haloring", "noirtitle", "stickerstack", "graphhop", "podium", "hudcallout", "termbar", "glowtoggle", "pinkdoodle", "lensfind", "echostack", "dofwords", "portalchat", "cardframe", "wordvoid", "facecam", "spreadcaps", "tinysub", "ringword", "handcap", "blobcam", "brushbar", "beforeafter", "pillcarousel"]);
+    "gradword", "meshprompt", "orbsplit", "bento", "figdays", "figcurve", "figplay", "figequal", "figwords", "figphone", "figdrop", "figcount", "figgears", "figbar", "figcheck", "figcta", "goldcap", "iconbelt", "glowsweep", "namepill", "kashida", "molecule", "weightstack", "stretch", "desatpop", "arcs", "chrome", "inkverse", "poemfade", "hashend", "flipverb", "strobe", "duoline", "capstack", "pillword", "blurduo", "tagstack", "underbars", "contactcard", "iconorbit", "blurstrobe", "kinstack", "incall", "cineband", "scriptover", "tricolor", "drumpicker", "redmix", "headbubble", "pincard", "emojifloat", "slotreel", "posterwall", "quoteline", "medallion", "clockhand", "roadtext", "markpan", "objectquote", "racechart", "calflip", "glosscards", "dropword", "tasklens", "monostack", "dashbox", "sparklist", "followbtn", "silhouette", "petalstack", "followcount", "twopillars", "cutmat", "labelbox", "stampcard", "lcdtype", "genpanel", "holopulse", "coverflow", "featuretag", "luxmix", "goldframes", "goldrows", "tilegrid", "goldpill", "holoclock", "curvewall", "newsscan", "neonvenn", "wavebelt", "cardarc", "shadowquote", "haloring", "noirtitle", "stickerstack", "graphhop", "podium", "hudcallout", "termbar", "glowtoggle", "pinkdoodle", "lensfind", "echostack", "dofwords", "portalchat", "cardframe", "wordvoid", "facecam", "spreadcaps", "tinysub", "ringword", "handcap", "blobcam", "brushbar", "beforeafter", "pillcarousel", "namescript", "stackrepeat", "vertword"]);
   E.TYPING = new Set(["type", "artype"]);
   const MC = document.createElement("canvas").getContext("2d");
   const measure = (s, font) => { MC.font = font; return MC.measureText(s).width; };
@@ -7958,6 +7958,43 @@
         html += vert ? `<div dir="${this.dir(s)}" style="position:absolute;left:0;right:0;top:${(y - z * 0.6).toFixed(1)}px;text-align:center;font:500 ${z.toFixed(1)}px ${ff};color:#fff;text-transform:uppercase;letter-spacing:.02em;text-shadow:0 2px 10px rgba(0,0,0,.75),0 0 2px rgba(0,0,0,.8);opacity:${a.toFixed(2)}">${esc(s)}</div>`
           : `<div dir="${this.dir(s)}" style="position:absolute;left:0;right:0;top:${(cy + ch * 0.68).toFixed(1)}px;text-align:center;font:600 ${(z * 0.5).toFixed(1)}px ${ff};color:#222;text-transform:uppercase;letter-spacing:.12em;opacity:${a.toFixed(2)}">${esc(s)}</div>`; }
       html += `<div style="position:absolute;left:${(x - (vert ? cw * 0.75 : cw * 0.5)).toFixed(1)}px;top:${(y - ch * (vert ? 0.62 : 0.66)).toFixed(1)}px;font:500 ${(mn * 0.014).toFixed(1)}px 'TY Mono';color:${vert ? "rgba(255,255,255,.5)" : "#888"};letter-spacing:.1em">DAY ${ii + 1}</div>`; }
+    return html;
+  };
+  // ======== r43 «قبل وبعد 2» — اسم أصفر منوّر بخط تقيل وتحته كلمة سيريف مايلة متداخلة، الكلمة متكررة عمود (المتكررين كونتور أصفر والنص أبيض)، وكلمة طولية عملاقة على طرف الكادر ========
+  const YEL43 = "#FFE14D";
+  // ---------- namescript: كلمة صغيرة فوق، والاسم/الكلمة المهمة (focus) أصفر تقيل منوّر، والكلمة اللي بعدها سيريف مايل رفيع متداخل تحته
+  P.k_namescript = function (b, t, k, th, bi) {
+    const P = figParts(this, { ...b, focus: b.focus >= 0 ? b.focus : Math.max(0, this.items(b).length - 2) }); if (!P.it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h), top = P.J(P.kick.filter((x) => t >= x.t0 - 0.05)), main = this.text(P.main.w), scr = P.J(P.tail.filter((x) => t >= x.t0 - 0.05));
+    const hd = this.headAt(t), y = hd.has ? clamp(hd.y + hd.r * 1.4, h * 0.3, h * 0.72) : h * 0.5, ff = famOf(main), z = fitSize(main, `800 {}px ${ff}`, w * 0.7, mn * 0.12 * this.ts), on = t >= P.main.t0 - 0.05;
+    const q = eBack(seg(t, P.main.t0 - 0.05, P.main.t0 + 0.25)), sf = AR.test(scr) ? "'TY Ruqaa', 'TY Amiri'" : "'TY SerifI', 'TY Serif'";
+    return `<div dir="${this.dir(main)}" style="position:absolute;left:0;right:0;top:${(y - z * 0.9).toFixed(1)}px;text-align:center;line-height:1">
+      <div style="font:500 ${(z * 0.28).toFixed(1)}px ${famOf(top)};color:#fff;text-shadow:0 2px 8px rgba(0,0,0,.6);height:${(z * 0.34).toFixed(1)}px">${esc(top)}</div>
+      ${on ? `<div style="font:800 ${z.toFixed(1)}px ${ff};color:${YEL43};letter-spacing:-0.02em;text-shadow:0 0 ${(z * 0.25).toFixed(0)}px rgba(255,225,77,.85),0 0 ${(z * 0.6).toFixed(0)}px rgba(255,200,40,.45);transform:scale(${clamp(q, 0, 1.2).toFixed(3)})">${esc(main)}</div>` : ""}
+      ${scr ? `<div style="font:400 ${(z * 0.62).toFixed(1)}px ${sf};color:#fff;margin-top:${(-z * 0.3).toFixed(1)}px;transform:translateX(${(z * 0.4).toFixed(1)}px) rotate(-4deg);text-shadow:0 2px 10px rgba(0,0,0,.6);${blurIn(t, P.tail[0].t0 - 0.05)}">${esc(scr)}</div>` : ""}</div>`;
+  };
+  // ---------- stackrepeat: الكلمة المهمة متكررة عمود من فوق لتحت، المتكررين كونتور أصفر مفرّغ والنسخة اللي في النص بيضا تقيلة، والعمود بيتزحلق ببطء
+  P.k_stackrepeat = function (b, t, k, th, bi) {
+    const it = this.items(b); if (!it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h), fi = b.focus >= 0 && b.focus < it.length ? b.focus : it.length - 1, s = this.text(it[fi].w), ff = famOf(s);
+    const z = fitSize(s, `800 {}px ${ff}`, w * 0.6, mn * 0.13 * this.ts), lh = z * (AR.test(s) ? 1.3 : 0.92), n = Math.ceil(h / lh) + 2, off = ((t - b.t0) * lh * 0.6) % lh, a = eOut(seg(t, it[fi].t0 - 0.2, it[fi].t0 + 0.3)), mid = Math.floor(n / 2);
+    let rows = ""; for (let i = 0; i < n; i++) { const isM = i === mid;
+      rows += `<div style="position:absolute;left:0;right:0;top:${(i * lh - off - lh).toFixed(1)}px;text-align:center;font:800 ${z.toFixed(1)}px ${ff};letter-spacing:-0.02em;${isM ? `color:#fff;text-shadow:0 2px 14px rgba(0,0,0,.5)` : `color:transparent;-webkit-text-stroke:${Math.max(2, z * 0.025).toFixed(1)}px ${YEL43};opacity:${(0.85 - Math.abs(i - mid) * 0.08).toFixed(2)}`};transform:translateX(${((1 - a) * (i % 2 ? 1 : -1) * w * 0.4).toFixed(1)}px)">${esc(s)}</div>`; }
+    const lead = it.slice(0, fi).filter((x) => t >= x.t0 - 0.05).map((x) => this.text(x.w)).join(" ");
+    return `<div style="position:absolute;inset:0;overflow:hidden">${rows}</div>${lead ? `<div dir="${this.dir(lead)}" style="position:absolute;left:0;right:0;top:${(mid * lh - off - lh - z * 0.35).toFixed(1)}px;text-align:center;font:500 ${(z * 0.25).toFixed(1)}px ${famOf(lead)};color:#fff;text-shadow:0 2px 8px rgba(0,0,0,.6)">${esc(lead)}</div>` : ""}`;
+  };
+  // ---------- vertword: كلمة عملاقة طولية حرف تحت حرف على طرف الكادر (الحروف بتنزل واحد واحد) بلونين، والباقي كابشن صغير
+  P.k_vertword = function (b, t, k, th, bi) {
+    const P = figParts(this, { ...b, focus: b.focus >= 0 ? b.focus : this.items(b).length - 1 }); if (!P.it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h), s = this.text(P.main.w), ar = AR.test(s), ch = ar ? [s] : [...s.toUpperCase()], ff = ar ? famOf(s) : "'TY Anton', 'TY Cond'";
+    const z = ar ? Math.min(h * 0.8 / Math.max(1, [...s].length) * 1.4, mn * 0.4) : Math.min(h * 0.86 / ch.length, mn * 0.36), side = bi % 2 ? "right" : "left", C = ["#2EA3C9", "#E2541E"];
+    let html = "";
+    if (ar) { const az = Math.min(mn * 0.34, fitSize(s, `800 {}px ${ff}`, h * 0.8, mn * 0.34)), cx = side === "left" ? az * 0.75 : w - az * 0.75;
+      html += `<div style="position:absolute;left:${cx.toFixed(1)}px;top:${(h / 2).toFixed(1)}px;transform:translate(-50%,-50%) rotate(${side === "left" ? -90 : 90}deg);white-space:nowrap;font:800 ${az.toFixed(1)}px ${ff};line-height:1.2;${blurIn(t, P.main.t0 - 0.05)}"><span style="background:linear-gradient(90deg,${C[0]} 50%,${C[1]} 50%);-webkit-background-clip:text;background-clip:text;color:transparent">${esc(s)}</span></div>`; }
+    else ch.forEach((c, i) => { const q = eOut(seg(t, P.main.t0 - 0.1 + i * 0.05, P.main.t0 + 0.15 + i * 0.05));
+      html += `<div style="position:absolute;${side}:${(mn * 0.03).toFixed(1)}px;top:${(h * 0.07 + i * z).toFixed(1)}px;width:${(z * 0.7).toFixed(1)}px;text-align:center;font:400 ${z.toFixed(1)}px ${ff};line-height:${z.toFixed(1)}px;color:${i < ch.length / 2 ? C[0] : C[1]};opacity:${q.toFixed(2)};transform:translateY(${((1 - q) * -z * 0.5).toFixed(1)}px)">${esc(c)}</div>`; });
+    const cap = P.J([...P.kick, ...P.tail].filter((x) => t >= x.t0 - 0.05));
+    if (cap) html += `<div dir="${this.dir(cap)}" style="position:absolute;${side === "left" ? "right" : "left"}:${(w * 0.06).toFixed(1)}px;left:${side === "left" ? (w * 0.3).toFixed(1) + "px" : "auto"};bottom:${(h * 0.12).toFixed(1)}px;text-align:center;font:600 ${(mn * 0.04 * this.ts).toFixed(1)}px ${famOf(cap)};color:#fff;text-shadow:0 2px 8px rgba(0,0,0,.6)">${esc(cap)}</div>`;
     return html;
   };
 })();
