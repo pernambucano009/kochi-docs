@@ -12465,8 +12465,8 @@ def tvideo_create(body: TvIn):
         # 🎯 قوالب الإعلانات: الشخصية والمنتج الأول، وبعدين السكريبت (مفيش حاجة بتشتغل لوحدها في الأول)
         lang = d["lang"]
         d.update(mode="ad", status="filled", step=None, model=body.model if body.model in TRIAL_MODELS and body.model != "seedance-mini" else "seedance-fast",
-                 ad={"kind": t["ad_cfg"]["kind"], "look": "narrative", "spoken": adtpl.SPOKEN.get(lang) or dub.DIALECTS[lang].get("language") or "Arabic",
-                     "script": d["script"] if d["script_mode"] == "own" else "", "place": "", "length": 15, "end_on": True,
+                 ad={"kind": t["ad_cfg"]["kind"], "look": {"skeleton": "bare", "talking": "pixar", "song": "pixar"}.get(t["ad_cfg"]["kind"], "narrative"), "spoken": adtpl.SPOKEN.get(lang) or dub.DIALECTS[lang].get("language") or "Arabic",
+                     "script": d["script"] if d["script_mode"] == "own" else "", "place": "", "length": 15, "end_on": t["ad_cfg"]["kind"] == "cinema",
                      "hero": {}, "product": {}, "files": {}, "gens": {}, "plan": None})
     elif body.section == "templates" and t.get("mode") == "still":
         # 📦 استوديو المنتج: صور بس (من غير فيديو)
@@ -16221,7 +16221,8 @@ def scenes_assemble(vid: str) -> None:
 # ---------------------------------------------------------------- 🎯 قوالب الإعلانات (UGC / سينمائي): شخصية ← منتج ← سكريبت ← توليد
 import adtpl  # noqa: E402
 
-AD_REF_SLOTS = ("head", "body", "product", "place")
+AD_REF_SLOTS = ("head", "body", "product", "place", "plate")
+AD_PLATE_KINDS = ("skeleton", "talking", "song")   # شخصية واحدة (plate) واللقطات بتتجمع في توليدات لحد ١٥ ثانية
 AD_LENGTHS = (6, 10, 15, 20, 30)
 
 
@@ -16258,10 +16259,16 @@ def ad_lang(d: dict) -> tuple[str, str]:
     return txt, dub.GUIDES.get(d["lang"], "")
 
 
+AD_SONG_COST = 0.15
+AD_SONG_MODEL = "minimax/music-2.6"
+
+
 def ad_total(d: dict) -> float:
     a = d["ad"]
     if a["kind"] == "ugc":
         return 15.0
+    if a["kind"] in AD_PLATE_KINDS:
+        return round(sum(s["dur"] for s in (a.get("plan") or {}).get("shots") or []), 2)
     shots = (a.get("plan") or {}).get("shots") or []
     return round(sum(s["dur"] for s in shots) + (AD_END_SEC if a.get("end_on", True) and shots else 0), 2)
 
@@ -16285,6 +16292,9 @@ def ad_jobs(d: dict) -> list[dict]:
         return []
     if a["kind"] == "ugc":
         return [{"key": "g0", "secs": 15, "dur": 15.0, "label": "الإعلان كله (١٥ ثانية)"}]
+    if a["kind"] in AD_PLATE_KINDS:
+        return [{"key": f"b{k}", "secs": ad_gen_secs(sum(shots[i]["dur"] for i in g)), "dur": round(sum(shots[i]["dur"] for i in g), 2), "idx": g,
+                 "label": f"لقطة {g[0] + 1}" + (f"–{g[-1] + 1}" if len(g) > 1 else "")} for k, g in enumerate(adtpl.group_beats(shots))]
     out = [{"key": f"s{i}", "secs": ad_gen_secs(s["dur"]), "dur": s["dur"], "label": f"لقطة {i + 1} · {adtpl.CINEMA_BEATS.get(s['beat'], s['beat'])}"}
            for i, s in enumerate(shots)]
     if a.get("end_on", True):
@@ -16299,13 +16309,16 @@ def ad_refs(d: dict, job: str) -> tuple[list[str], list[Path]]:
     have = lambda s: files.get(s) and (folder / files[s]).exists()  # noqa: E731
     if job == "g0":
         roles = ["head", "body", "product"]
+    elif job.startswith("b"):
+        idx = next(j["idx"] for j in ad_jobs(d) if j["key"] == job)
+        roles = ["plate"] + (["product"] if any("product" in (a["plan"]["shots"][i].get("with") or []) for i in idx) else [])
     elif job == "end":
         roles = ["product"]
     else:
         w = a["plan"]["shots"][int(job[1:])].get("with") or []
         roles = (["head", "body"] if "hero" in w else []) + (["product"] if "product" in w else []) + (["place"] if "place" in w else [])
     roles = [r for r in roles if have(r)]
-    names = {"head": "hero_head", "body": "hero_body", "product": "product", "place": "place"}
+    names = {"head": "hero_head", "body": "hero_body", "product": "product", "place": "place", "plate": "plate"}
     return [names[r] for r in roles], [folder / files[r] for r in roles]
 
 
@@ -16314,6 +16327,8 @@ def ad_prompt(d: dict, job: str, roles: list[str]) -> str:
         return adtpl.ugc_prompt(d)
     if job == "end":
         return adtpl.end_card_prompt(d)
+    if job.startswith("b"):
+        return adtpl.batch_prompt(d, next(j["idx"] for j in ad_jobs(d) if j["key"] == job), roles)
     return adtpl.cinema_shot_prompt(d, int(job[1:]), roles)
 
 
@@ -16328,7 +16343,9 @@ def ad_to_dict(vid: str, d: dict) -> dict:
     return {"ref_urls": {s: url((a.get("files") or {}).get(s)) for s in AD_REF_SLOTS},
             "jobs": [{**j, "url": url((gens.get(j["key"]) or {}).get("file")), "cost": round(j["secs"] * per, 2),
                       "prompt": ad_prompt({**d, "_id": vid}, j["key"], ad_refs({**d, "_id": vid}, j["key"])[0]) if a.get("plan") else ""} for j in jobs],
-            "total": ad_total(d), "places": adtpl.UGC_PLACES, "looks": {k: v[0] for k, v in adtpl.CINEMA_LOOKS.items()},
+            "total": ad_total(d), "places": adtpl.UGC_PLACES,
+            "looks": {k: v[0] for k, v in (adtpl.LOOKS.get(a.get("kind")) or adtpl.CINEMA_LOOKS).items()},
+            "song_url": url(a.get("song")), "song_cost": AD_SONG_COST, "plate_kind": a.get("kind") in AD_PLATE_KINDS,
             "beat_names": adtpl.CINEMA_BEATS, "lengths": AD_LENGTHS,
             "hero_cost": round(TV_IMAGE_MODELS[tv_img(d)][0] * 2, 2), "plate_cost": TV_IMAGE_MODELS[tv_img(d)][0]}
 
@@ -16380,6 +16397,8 @@ def run_ad_hero(vid: str, only: str | None) -> None:
         d = tv_load(vid)
         a, folder = d["ad"], tv_dir(vid)
         hero = a.get("hero") or {}
+        if a["kind"] in AD_PLATE_KINDS:
+            return run_ad_plate(vid, d)
         if not only or not hero.get("identity"):
             if atlas.mock_mode():
                 res = {"gender": "female", "identity": "Soft oval face, warm olive skin, dark brown eyes.", "outfit": "a loose beige shirt, wide jeans, white sneakers",
@@ -16403,6 +16422,28 @@ def run_ad_hero(vid: str, only: str | None) -> None:
         tv_update(vid, lambda x: x.update(status=tv_idle(x), step=None, error=None))
     except Exception as exc:  # noqa: BLE001
         tv_fail(vid, exc)
+
+
+def run_ad_plate(vid: str, d: dict) -> None:
+    """🦴/🗣️/🎵 الشخصية الرئيسية: صورة واحدة (plate) بالستايل المختار، وبتتبعت مع كل توليدة."""
+    a, folder = d["ad"], tv_dir(vid)
+    hero = a.get("hero") or {}
+    prod = (a.get("files") or {}).get("product")
+    if atlas.mock_mode():
+        res = {"character": "A friendly serum bottle with big eyes.", "is_product": bool(prod), "theme": "1940s small town", "palette": "amber",
+               "wardrobe": "a tweed suit", "handle": "the skeleton" if a["kind"] == "skeleton" else "the serum bottle character", "summary_ar": "شخصية تجريبية"}
+    else:
+        look = (adtpl.LOOKS[a["kind"]].get(a.get("look") or "") or next(iter(adtpl.LOOKS[a["kind"]].values())))[0]
+        res = ad_json(series_chat(adtpl.plate_messages(a["kind"], look, hero.get("desc") or "", d.get("brief") or "", p_name(a)), json_mode=True), "الشخصية")
+    hero = {**hero, **{k: adtpl._txt(res.get(k), 1500) for k in ("character", "theme", "palette", "wardrobe", "handle", "summary_ar")},
+            "is_product": bool(res.get("is_product")) and bool(prod)}
+    tv_update(vid, lambda x: x["ad"].update(hero=hero))
+    tv_set(vid, step="🎨 بيرسم الشخصية")
+    name = f"plate-{uuid.uuid4().hex[:4]}.png"
+    ad_image(d, adtpl.plate_prompt(a["kind"], a.get("look") or "", hero, bool(prod)), folder / name,
+             [folder / prod] if prod and hero["is_product"] else [], "1024x1536")
+    ad_put_file(vid, "plate", name)
+    tv_update(vid, lambda x: x.update(status=tv_idle(x), step=None, error=None))
 
 
 @app.post("/api/tvideos/{vid}/ad/upload/{slot}")
@@ -16446,7 +16487,7 @@ def ad_set(vid: str, body: AdSetIn):
             p["kind"] = body.product_kind.strip()[:120]
         if body.place is not None:
             a["place"] = body.place.strip()[:400]
-        if body.look in adtpl.CINEMA_LOOKS:
+        if body.look in (adtpl.LOOKS.get(a["kind"]) or adtpl.CINEMA_LOOKS):
             a["look"] = body.look
         if body.script is not None:
             a["script"] = body.script.strip()[:3000]
@@ -16528,16 +16569,36 @@ def run_ad_plan(vid: str) -> None:
                                "audio": "footsteps", "with": ["hero", "product"], "line": "" if k else "كل يوم بداية"} for k, b in enumerate(["HOOK", "PROBLEM", "REVEAL", "PAYOFF"])]})
         else:
             brain_txt = az.brain_text(tv_brain(d))
-            msgs = adtpl.ugc_messages(d, lang_txt, guide, brain_txt) if a["kind"] == "ugc" else adtpl.cinema_messages(d, lang_txt, guide, brain_txt, total)
+            msgs = (adtpl.ugc_messages(d, lang_txt, guide, brain_txt) if a["kind"] == "ugc"
+                    else adtpl.beats_messages(d, lang_txt, guide, brain_txt) if a["kind"] in AD_PLATE_KINDS
+                    else adtpl.cinema_messages(d, lang_txt, guide, brain_txt, total))
             res = ad_json(series_chat(msgs, json_mode=True), "السكريبت")
-        shots = adtpl.clean_plan_shots(a["kind"], res, total)
+        if atlas.mock_mode() and a["kind"] in AD_PLATE_KINDS:
+            res = {"title": "تجربة", "angle": "تحوّل · وقت", "style": "upbeat Arabic pop, female lead, 110 BPM, warm, modern polished",
+                   "lyrics": "[Verse]\nسطر أول\n[Chorus]\nسطر تاني",
+                   "shots": [{"line": f"جملة {k + 1} تجريبية", "lyric": f"سطر {k + 1}", "sing": k == 0, "emotion": "warm", "visual": "The hero waves.",
+                              "camera": "slow push-in", "with": ["hero", "product"] if k == 2 else ["hero"]} for k in range(5)]}
+        shots = (adtpl.clean_beats(a["kind"], res) if a["kind"] in AD_PLATE_KINDS else adtpl.clean_plan_shots(a["kind"], res, total))
         if not shots:
             raise RuntimeError("الموديل مرجعش لقطات، جرّب تاني")
         end = res.get("end") if isinstance(res.get("end"), dict) else {}
         plan = {"title": adtpl._txt(res.get("title"), 80), "world": adtpl._txt(res.get("world"), 800), "lighting": adtpl._txt(res.get("lighting"), 200),
-                "shots": shots, "end": {"brand": adtpl._txt(end.get("brand"), 60) or p_name(a), "slogan": adtpl._txt(end.get("slogan"), 120)}}
+                "shots": shots, "end": {"brand": adtpl._txt(end.get("brand"), 60) or p_name(a), "slogan": adtpl._txt(end.get("slogan"), 120)},
+                "angle": adtpl._txt(res.get("angle"), 300), "style": adtpl._txt(res.get("style"), 300), "lyrics": str(res.get("lyrics") or "").strip()[:3000]}
+        if a["kind"] == "skeleton" and d.get("voice_on", True):   # 🎙️ الصوت الأول: كل نبضة على قد جملتها المتسجلة
+            for k, sh in enumerate(shots):
+                if sh["line"]:
+                    tv_set(vid, step=f"🎙️ بيسجّل الراوي ({k + 1} من {len(shots)})")
+                    f = vo_say(sh["line"], d["voice"], d["lang"], tv_dir(vid) / f"vo-b{k}-{uuid.uuid4().hex[:4]}.wav")
+                    sh.update(vo=f.name, dur=round(max(2.0, min(8.0, probe_duration(f) + 0.35)), 2))
 
         def fn(x):
+            for sh in (x["ad"].get("plan") or {}).get("shots") or []:
+                if sh.get("vo"):
+                    (tv_dir(vid) / sh["vo"]).unlink(missing_ok=True)
+            if x["ad"].get("song"):   # الأغنية القديمة كانت على كلام تاني
+                (tv_dir(vid) / x["ad"]["song"]).unlink(missing_ok=True)
+                x["ad"]["song"] = None
             x["ad"]["plan"] = plan
             x["ad"]["gens"] = {}
             x["final"] = None
@@ -16562,6 +16623,8 @@ class AdShotIn(BaseModel):
     dur: float | None = None
     with_: list[str] | None = None
     world: str | None = None
+    emotion: str | None = None
+    sing: bool | None = None
 
 
 @app.put("/api/tvideos/{vid}/ad/shots/{i}")
@@ -16575,7 +16638,11 @@ def ad_shot_edit(vid: str, i: int, body: AdShotIn):
             if body.world is None:
                 raise HTTPException(404, "اللقطة دي مش موجودة")
             return
-        for k in ("line", "action", "visual", "camera", "audio"):
+        if body.sing is not None:
+            sh[i]["sing"] = body.sing
+        if body.line is not None and sh[i].get("vo") and body.line.strip() != sh[i].get("line"):
+            (tv_dir(vid) / sh[i].pop("vo")).unlink(missing_ok=True)   # الجملة اتغيرت: بتتسجل تاني وقت التجميع
+        for k in ("line", "action", "visual", "camera", "audio", "emotion"):
             v = getattr(body, k)
             if v is not None:
                 sh[i][k] = v.strip()[:1500]
@@ -16583,8 +16650,60 @@ def ad_shot_edit(vid: str, i: int, body: AdShotIn):
             sh[i]["dur"] = round(max(1.5, min(8.0, body.dur)), 1)
         if body.with_ is not None:
             sh[i]["with"] = [x for x in body.with_ if x in ("hero", "product", "place")]
+        if body.dur is not None or body.with_ is not None:
+            d["ad"]["gens"] = {}   # التوليدات بتتجمع بالمدد: لو اتغيرت بتتعمل تاني
         d["final"] = None
     return tv_to_dict(vid, tv_update(vid, fn))
+
+
+class AdSongIn(BaseModel):
+    lyrics: str | None = None
+    style: str | None = None
+
+
+@app.post("/api/tvideos/{vid}/ad/song")
+def ad_song(vid: str, body: AdSongIn):
+    """🎵 الأغنية الأول (هي اللي بتحدد وقت كل لقطة): الكلمات + الستايل ← موديل الموسيقى."""
+    def fn(d):
+        plan = d["ad"].get("plan") or {}
+        if body.lyrics is not None:
+            plan["lyrics"] = body.lyrics.strip()[:3000]
+        if body.style is not None:
+            plan["style"] = body.style.strip()[:300]
+    d = tv_update(vid, fn)
+    if not ((d["ad"].get("plan") or {}).get("lyrics") or "").strip():
+        raise HTTPException(400, "اكتب الكلمات الأول")
+    return ad_start(vid, "working", "🎵 بيعمل الأغنية", run_ad_song)
+
+
+def run_ad_song(vid: str) -> None:
+    try:
+        d = tv_load(vid)
+        plan, folder = d["ad"]["plan"], tv_dir(vid)
+        name = f"song-{uuid.uuid4().hex[:4]}.mp3"
+        if atlas.mock_mode():
+            subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "sine=frequency=440:duration=24", str(folder / name)],
+                           check=True, capture_output=True, timeout=60)
+        else:
+            atlas.download(atlas.run_model("Audio", {"model": AD_SONG_MODEL, "prompt": plan.get("style") or "modern pop, upbeat",
+                                                     "lyrics": plan["lyrics"]}, "الأغنية", max_seconds=600, interval=4), folder / name)
+        total = probe_duration(folder / name)
+
+        def fn(x):
+            a = x["ad"]
+            if a.get("song") and a["song"] != name:
+                (folder / a["song"]).unlink(missing_ok=True)
+            a["song"], a["song_dur"] = name, round(total, 2)
+            shots = a["plan"]["shots"]   # كل لقطة على قد سطورها من وقت الأغنية
+            w = [max(4, len(sh.get("line") or "")) for sh in shots]
+            for sh, k in zip(shots, w):
+                sh["dur"] = round(total * k / sum(w), 2)
+            a["gens"] = {}
+            x["final"] = None
+            x.update(status=tv_idle(x), step=None, error=None)
+        tv_update(vid, fn)
+    except Exception as exc:  # noqa: BLE001
+        tv_fail(vid, exc)
 
 
 class AdRunIn(BaseModel):
@@ -16597,10 +16716,14 @@ def ad_run(vid: str, body: AdRunIn):
     d = {**tv_load(vid), "_id": vid}
     if not (d["ad"].get("plan") or {}).get("shots"):
         raise HTTPException(400, "اكتب السكريبت الأول")
-    if not (d["ad"].get("files") or {}).get("product"):
+    if not (d["ad"].get("files") or {}).get("product") and d["ad"]["kind"] in ("ugc", "cinema", "talking"):
         raise HTTPException(400, "ارفع صورة المنتج الأول")
     if d["ad"]["kind"] == "ugc" and not (d["ad"].get("files") or {}).get("head"):
         raise HTTPException(400, "اعمل الشخصية الأول")
+    if d["ad"]["kind"] in AD_PLATE_KINDS and not (d["ad"].get("files") or {}).get("plate"):
+        raise HTTPException(400, "اعمل الشخصية الأول")
+    if d["ad"]["kind"] == "song" and not d["ad"].get("song"):
+        raise HTTPException(400, "اعمل الأغنية الأول")
     if body.key and body.key not in [j["key"] for j in ad_jobs(d)]:
         raise HTTPException(404, "الحتة دي مش موجودة")
     return ad_start(vid, "working", "🎬 بيبدأ", run_ad_gen, body.key)
@@ -16612,7 +16735,7 @@ def run_ad_gen(vid: str, only: str | None) -> None:
         folder = tv_dir(vid)
         ratio = az.ASPECTS.get(d["ratio"], az.ASPECTS["9:16"])[1]
         W, H = RATIO_VIDEO.get(d["ratio"], RATIO_VIDEO["9:16"])
-        speak = d["ad"]["kind"] == "ugc"
+        speak = d["ad"]["kind"] in ("ugc", "talking")
         for j in ad_jobs(d):
             have = ((d["ad"].get("gens") or {}).get(j["key"]) or {}).get("file")
             if (only and only != j["key"]) or (not only and have and (folder / have).exists()):
@@ -16680,17 +16803,19 @@ def ad_assemble(vid: str, speak: bool) -> None:
                     (work / "end.ass").write_text(ass, encoding="utf-8")
                     vf += f",subtitles=filename='{captions.filter_path(work / 'end.ass')}':fontsdir='{captions.filter_path(FONTS_DIR)}'"
             vf += ",format=yuv420p[v]"
-            vol = 1.0 if speak else 0.35
+            vol = 1.0 if speak else 0.0 if d["ad"]["kind"] == "song" else 0.25 if d["ad"]["kind"] == "skeleton" else 0.35
             a = (f"[0:a]aresample=48000,aformat=channel_layouts=stereo,volume={vol},apad[a]" if has_audio(clip) else "anullsrc=r=48000:cl=stereo[a]")
             out = work / f"{j['key']}.mp4"
             subprocess.run(ff + ["-i", str(clip), "-filter_complex", f"{vf};{a}", "-map", "[v]", "-map", "[a]", "-t", f"{j['dur']:.3f}",
                                  "-c:v", "libx264", "-preset", "veryfast", "-crf", "19", "-c:a", "aac", "-ar", "48000", "-b:a", "160k", str(out)],
                            check=True, capture_output=True, timeout=600)
             segs.append(out)
-            if j["key"].startswith("s") and d.get("voice_on", True):
-                line = shots[int(j["key"][1:])].get("line") or ""
-                if line.strip():
-                    vo_items.append((t, line))
+            if d.get("voice_on", True) and d["ad"]["kind"] in ("cinema", "skeleton"):
+                tt = t
+                for i in (j.get("idx") or ([int(j["key"][1:])] if j["key"].startswith("s") else [])):
+                    if (shots[i].get("line") or "").strip():
+                        vo_items.append((tt, shots[i]["line"], shots[i].get("vo")))
+                    tt += shots[i]["dur"]
             t += j["dur"]
         lst = work / "list.txt"
         lst.write_text("".join(f"file '{p.name}'\n" for p in segs), encoding="utf-8")
@@ -16699,15 +16824,23 @@ def ad_assemble(vid: str, speak: bool) -> None:
         name = f"final-{uuid.uuid4().hex[:4]}.mp4"
         if vo_items and not speak:   # 🎙️ الفويس أوفر: كل جملة في أول لقطتها
             ins, flt = ["-i", str(joined)], []
-            for k, (t0, line) in enumerate(vo_items):
-                tv_set(vid, step=f"🎙️ بيسجّل الفويس أوفر ({k + 1} من {len(vo_items)})")
-                f = vo_say(line, d["voice"], d["lang"], work / f"vo{k}.wav")
+            for k, (t0, line, pre) in enumerate(vo_items):
+                if pre and (folder / pre).exists():
+                    f = folder / pre
+                else:
+                    tv_set(vid, step=f"🎙️ بيسجّل الفويس أوفر ({k + 1} من {len(vo_items)})")
+                    f = vo_say(line, d["voice"], d["lang"], work / f"vo{k}.wav")
                 ins += ["-i", str(f)]
                 flt.append(f"[{k + 1}:a]aresample=48000,aformat=channel_layouts=stereo,adelay={int((t0 + 0.15) * 1000)}:all=1[v{k}]")
             mix = "[0:a]" + "".join(f"[v{k}]" for k in range(len(vo_items)))
             flt.append(f"{mix}amix=inputs={len(vo_items) + 1}:duration=first:normalize=0[a]")
             subprocess.run(ff + ins + ["-filter_complex", ";".join(flt), "-map", "0:v", "-map", "[a]", "-c:v", "copy", "-c:a", "aac", "-b:a", "160k",
                                        "-movflags", "+faststart", str(folder / name)], check=True, capture_output=True, timeout=600)
+        elif d["ad"]["kind"] == "song" and d["ad"].get("song") and (folder / d["ad"]["song"]).exists():   # 🎵 الأغنية تحت الفيديو كله
+            subprocess.run(ff + ["-i", str(joined), "-i", str(folder / d["ad"]["song"]), "-filter_complex",
+                                 "[1:a]aresample=48000,aformat=channel_layouts=stereo,apad[s];[0:a][s]amix=inputs=2:duration=first:normalize=0[a]",
+                                 "-map", "0:v", "-map", "[a]", "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", str(folder / name)],
+                           check=True, capture_output=True, timeout=600)
         else:
             shutil.move(str(joined), folder / name)
 

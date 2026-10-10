@@ -338,6 +338,25 @@ ADS = {
         "voice_tone": "calm, confident commercial voiceover, few words",
         "sample": "إعلان قهوة باردة: واحدة بتجري الصبح، تتعب فوق التل، تشرب وتكمّل",
     },
+    # skeleton = راوي + هيكل عظمي ثابت بيتصاعد (يوم ١ ← يوم ٣٦٥) · talking = شخصية أنيميشن بتتكلم بصوتها · song = أغنية والفيديو ماشي عليها
+    "sk-skeleton": {
+        "name": "إيه اللي يحصل لو…؟ (هيكل عظمي)", "icon": "💀", "kind": "skeleton", "hero": "plate", "needs_product": False,
+        "uses": "إعلان بيتصاعد: هيكل عظمي كرتون بيعيش رحلة يوم ١ ← يوم ٣٠ ← يوم ٣٦٥ وراوي بيحكي (فضول وانتصار أو كارثة)",
+        "voice_tone": "calm, dramatic documentary narrator",
+        "sample": "إيه اللي يحصل لو شربت مية كفاية كل يوم لمدة سنة؟",
+    },
+    "sk-talking": {
+        "name": "المنتج بيتكلم (أنيميشن)", "icon": "🗣️", "kind": "talking", "hero": "plate", "needs_product": True,
+        "uses": "شخصية أنيميشن (المنتج نفسه أو مكوّن أو حيوان) بتكلم الكاميرا: «أنا X، بعمل Y، فـ Z بيحصلك»",
+        "voice_tone": "expressive animated character voice",
+        "sample": "علبة كريم بتعرّف نفسها وبتشرح ليه بتحمي بشرة البيبي",
+    },
+    "sk-song": {
+        "name": "إعلان أغنية (ميوزك فيديو)", "icon": "🎵", "kind": "song", "hero": "plate", "needs_product": False,
+        "uses": "أغنية حقيقية بتحكي نتيجة العميل، وفيديو أنيميشن ماشي عليها والبطل بيغني في الهوك والكورس",
+        "voice_tone": "sung",
+        "sample": "أغنية خفيفة عن إن الشاي ده بيصحّيك من غير ما يتعبك",
+    },
 }
 
 

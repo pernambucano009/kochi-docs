@@ -244,3 +244,159 @@ def clean_plan_shots(kind: str, res: dict, total: int) -> list[dict]:
 
 def _txt(v, n: int) -> str:
     return re.sub(r"\s+", " ", str(v or "")).strip()[:n]
+
+
+# ---------------------------------------------------------------- 🦴 هيكل عظمي · 🗣️ المنتج بيتكلم · 🎵 إعلان أغنية (skills «skeleton-ads» / «talking-object» / «song-style-ad»)
+# شخصية واحدة (plate) بتتعمل مرة وبتتبعت مع كل توليدة، واللقطات بتتجمع في توليدات لحد ١٥ ثانية (كل لقطة ليها وقتها جوه البرومت).
+
+LOOKS = {
+    "skeleton": {
+        "bare": ("سينمائي: هيكل عاجي وعيون كرتون كبيرة", "A full anatomical skeleton with natural adult human proportions, tall and lanky, smooth ivory-cream "
+                 "bones with realistic bone detail (not toy-smooth, not chibi, not scary), and large expressive cartoon eyes with white sclera and dark "
+                 "pupils set in the eye sockets, giving an emotive, lovable face. No clothing.",
+                 "cinematic 3D animated render, photoreal {theme} environment, warm {palette} color grade, soft volumetric light with drifting "
+                 "atmosphere, shallow depth of field"),
+        "dressed": ("لابس: نفس الهيكل بلبس على الموضوع", "The same friendly skeleton (ivory bones, large expressive cartoon eyes with white sclera and dark "
+                    "pupils) wearing a complete outfit that fits the theme ({wardrobe}); skull, hands and any exposed bones still visible.",
+                    "cinematic 3D animated render, photoreal {theme} environment, warm {palette} color grade, soft volumetric light, shallow depth of field"),
+        "xray": ("أشعة: جسم شفاف والأعضاء منورة (صحة ومكملات)", "A translucent glowing anatomical human body revealing the full white skeleton plus visible "
+                 "internal organs (heart, lungs, intestines) glowing red and orange through a blue-tinted translucent skin outline, with large "
+                 "expressive cartoon eyes.",
+                 "clean sci-fi medical 3D render, cool blue translucent body with warm organ glow, {theme} setting with x-ray glow, soft rim light"),
+        "cute": ("كيوت: هيكل صغير شكل اللعبة (للبراندات الهزارية بس)", "A cute chibi cartoon skeleton with an oversized round skull, big adorable eyes, a "
+                 "small rounded body, and smooth toy-like bones; bright, friendly, non-scary.",
+                 "playful 3D animated feature-film render, simple clean {palette} background, soft even studio lighting"),
+    },
+    "talking": {
+        "pixar": ("3D كرتون (زي أفلام الأنيميشن)", "", "Pixar-style 3D animated render, soft cinematic lighting, rich saturated colors"),
+        "clay": ("صلصال ستوب موشن", "", "handmade stop-motion claymation, matte plasticine with visible fingerprints and tool marks, real miniature-set lighting"),
+        "watercolor": ("ألوان مية", "", "hand-painted watercolor animation, soft paper texture, gentle washes and ink outlines"),
+        "paper": ("ورق مقصوص", "", "layered papercraft animation, stacked cardstock with visible paper thickness and soft cast shadows"),
+        "toy": ("لعبة مكعبات", "", "toy brick-built animated world, glossy plastic bricks and minifigure-like characters, playful macro lighting"),
+    },
+}
+LOOKS["song"] = LOOKS["talking"]
+
+
+def plate_messages(kind: str, look: str, desc: str, brief: str, product: str) -> list[dict]:
+    """وصف الشخصية الرئيسية (اللي بتتعمل plate) بالإنجليزي."""
+    if kind == "skeleton":
+        task = ("The hero is the skeleton (its design is locked). Choose the ad's world: theme (a recurring setting that dramatizes the angle, e.g. "
+                "1940s small town / modern office / the product's industry), palette (a warm color grade in a few words) and wardrobe (only used by "
+                "the dressed look: a full outfit that fits the theme).")
+    else:
+        task = ("Design ONE character that talks to camera. If the brief points to the product itself, the character IS the product "
+                "(anthropomorphized: large expressive eyes on the upper part, a mouth below, short stylized arms, the label and colours kept from the "
+                "product photo). Otherwise an animated person, animal or ingredient that carries the message. Write it in layers: subject + 2-3 "
+                "defining adjectives, body form, colour/texture, face, limbs, a pose of active intent. Brand palette and mood are brand signal, not defaults.")
+    sys = (f"{task}\nReturn JSON only: {{\"character\": \"English character description (empty for the skeleton)\", \"is_product\": true/false, "
+           "\"theme\": \"...\", \"palette\": \"...\", \"wardrobe\": \"...\", \"handle\": \"short English descriptor used in prompts\", "
+           "\"summary_ar\": \"ملخص الشخصية في سطر بالعامية\"}")
+    return [{"role": "system", "content": sys}, {"role": "user", "content": f"Look: {look}\nUser description (Arabic): {desc or '-'}\nAd brief (Arabic): {brief}\nProduct: {product or '-'}"}]
+
+
+def look_style(kind: str, look: str, hero: dict) -> tuple[str, str]:
+    """(وصف الشخصية، سطر الستايل) بعد ما الموضوع والألوان اتملوا."""
+    L = LOOKS[kind].get(look) or next(iter(LOOKS[kind].values()))
+    fill = {"theme": hero.get("theme") or "warm cinematic", "palette": hero.get("palette") or "amber", "wardrobe": hero.get("wardrobe") or "a themed outfit"}
+    char = (L[1].format(**fill) if L[1] else hero.get("character") or "")
+    return char, L[2].format(**fill)
+
+
+def plate_prompt(kind: str, look: str, hero: dict, with_product: bool) -> str:
+    char, style = look_style(kind, look, hero)
+    prod = (" The character is the product from the attached image - same silhouette, colours and label - brought to life with a face and limbs."
+            if with_product and hero.get("is_product") else "")
+    return (f"{style}. Character plate: {char}{prod} The character alone, full body visible, a pose of active intent, centred on a plain soft "
+            "neutral background. Same character in every later shot. No text, no letters, no logos added.")
+
+
+def beats_messages(d: dict, lang_txt: str, guide: str, brain_txt: str) -> list[dict]:
+    a = d["ad"]
+    kind, hero = a["kind"], a.get("hero") or {}
+    p = a.get("product") or {}
+    common = ("- visual (English): what the camera sees in this beat: the character's situation, action and emotion, the setting, props and the product "
+              "(when it appears), and a framing that varies across beats (wide, medium, close product handling, hero). Never describe the product's "
+              "looks or the character's design (the references carry them).\n"
+              "- camera (English): one camera move.\n- with: which references appear in the beat: hero, product.\n"
+              "- ممنوع تخترع أرقام أو إثباتات مش في ملف العميل، وممنوع أسامي ناس حقيقيين أو شعارات تانية.\n")
+    if kind == "skeleton":
+        sys = ("إنت كاتب إعلانات Direct Response بفورمات «إيه اللي يحصل لو...؟»: هيكل عظمي كرتون ثابت بيعيش رحلة بتتصاعد (يوم ١ ← يوم ٣٠ ← يوم ٣٦٥) "
+               "وصوت راوي واحد بيحكي.\n"
+               "- اختار الزاوية: تحوّل بالاستخدام اليومي / تمن إنك ماتعملش حاجة / الطريقة القديمة لحد ما تبوظ / المنتج في عالم غريب. والسلم: وقت أو كمية أو مراحل.\n"
+               f"- السكريبت بلغة: {lang_txt}. {guide} سؤال فضول في الأول ← ٥-٧ نبضات بتتصاعد (جملة واحدة لكل نبضة ولكل درجة في السلم) ← النتيجة "
+               "(انتصار أو كارثة) + دعوة خفيفة. المجموع حوالي ٧٠-١١٠ كلمة. المنتج بيدخل في نبضة واحدة واضحة (اللفة).\n"
+               "- line: جملة الراوي للنبضة دي.\n" + common +
+               'رجّع JSON بس: {"title": "...", "angle": "الزاوية والسلم في سطر", "shots": [{"line": "...", "visual": "...", "camera": "...", "with": ["hero"]}]}')
+    elif kind == "talking":
+        sys = ("إنت كاتب ومخرج إعلانات «الشخصية اللي بتتكلم»: شخصية أنيميشن بتكلم الكاميرا وتقول السكريبت، والصورة هي دليل الجملة.\n"
+               "- الشكل: «أنا X. بعمل Y. فـ Z بيحصلك». اختار: تعريف مباشر / مشكلة بعدين حل / شرير بعدين بطل، واختار نبرة واحدة وثبّتها.\n"
+               f"- الكلام بلغة: {lang_txt}. {guide} ٤-٧ نبضات، كل نبضة جملة قصيرة سهلة النطق (٥-١٢ كلمة)، والمجموع يتقال في ٢٠-٣٥ ثانية. "
+               "أول فريم لازم يشد من غير صوت، وأول جملة بتنادي على مشكلة المشاهد بالظبط.\n"
+               "- line: الجملة اللي الشخصية بتقولها. emotion (English): نبرة الصوت (warm, reassuring / frustrated / proud...).\n"
+               "- كل نبضة فيها حركتين على الأقل من: الكاميرا بتتحرك، الشخصية بتتحرك وبتعمل اللي بتقوله، المكان بيتفاعل.\n" + common +
+               'رجّع JSON بس: {"title": "...", "angle": "الشكل والنبرة في سطر", "shots": [{"line": "...", "emotion": "...", "visual": "...", "camera": "...", "with": ["hero"]}]}')
+    else:
+        sys = ("إنت كاتب أغاني إعلانات: أغنية حقيقية (مش جينجل) بتحكي نتيجة العميل، فوق فيديو أنيميشن والبطل بيغني في لقطة أو اتنين.\n"
+               f"- الكلمات بلغة: {lang_txt}. {guide} الهوك في أول ٥ ثواني، والكلمات عن النتيجة اللي العميل بيوصلها مش اسم البراند. "
+               "سطور قصيرة تتغني (٤-٨ مقاطع). ٣٠ ثانية = كوبليه، كورس، كوبليه، كورس. استخدم [Verse] و[Chorus] في الكلمات.\n"
+               "- style (English, under 25 words): genre, vocal, tempo/BPM, mood, production. Genre from the audience. No artist names.\n"
+               "- shots: لقطة لكل سطر أو سطرين بالترتيب: lyric = السطور اللي بتتغنى في اللقطة دي بالظبط، sing = true للقطات اللي البطل بيغني فيها "
+               "قدام الكاميرا (الهوك والكورس الأخير غالبًا)، والباقي صورة بتوضح الكلام.\n" + common +
+               'رجّع JSON بس: {"title": "...", "angle": "الفكرة في سطر", "style": "...", "lyrics": "...", '
+               '"shots": [{"lyric": "...", "sing": false, "visual": "...", "camera": "...", "with": ["hero"]}]}')
+    return [{"role": "system", "content": sys}, {"role": "user", "content":
+            f"ملف العميل:\n{brain_txt or '(مفيش)'}\n\nالمنتج: {p.get('name') or '-'} ({p.get('kind') or '-'})\nالشخصية: {hero.get('handle') or '-'}\n"
+            f"الإعلان: {(a.get('script') or '').strip() or d.get('brief') or ''}"}]
+
+
+def clean_beats(kind: str, res: dict) -> list[dict]:
+    out = []
+    for s in (res.get("shots") or [])[:12]:
+        if not isinstance(s, dict):
+            continue
+        line = _txt(s.get("lyric") if kind == "song" else s.get("line"), 300)
+        out.append({"line": line, "emotion": _txt(s.get("emotion"), 80), "sing": bool(s.get("sing")), "visual": _txt(s.get("visual"), 1500),
+                    "camera": _txt(s.get("camera"), 300), "with": [x for x in (s.get("with") or ["hero"]) if x in ("hero", "product")],
+                    "dur": max(2.5, min(6.0, len(line) / 14.0 + 0.6))})
+    return out
+
+
+def group_beats(shots: list[dict], cap: float = 15.0) -> list[list[int]]:
+    """لقطات ورا بعض في توليدة واحدة لحد ١٥ ثانية."""
+    groups, cur, t = [], [], 0.0
+    for i, s in enumerate(shots):
+        if cur and t + s["dur"] > cap:
+            groups.append(cur)
+            cur, t = [], 0.0
+        cur.append(i)
+        t += s["dur"]
+    if cur:
+        groups.append(cur)
+    return groups
+
+
+def batch_prompt(d: dict, idx: list[int], roles: list[str]) -> str:
+    a = d["ad"]
+    kind, hero, shots = a["kind"], a.get("hero") or {}, a["plan"]["shots"]
+    char, style = look_style(kind, a.get("look") or "", hero)
+    who = hero.get("handle") or "the character"
+    desc = {"plate": f"{who} - the hero character; keep its design exactly as in this image in every beat ({char[:900]})",
+            "product": f"the {(a.get('product') or {}).get('name') or 'product'} - identical shape, label, colours and packaging"}
+    refs = " ".join(f"@image{k + 1} is {desc[r]}." for k, r in enumerate(roles))
+    lines, t = [], 0.0
+    for n, i in enumerate(idx):
+        s = shots[i]
+        t1 = t + s["dur"]
+        talk = ""
+        if kind == "talking" and s.get("line"):
+            talk = f' {who} talks to camera in a {s.get("emotion") or "warm, confident"} voice, saying in {a.get("spoken") or "Arabic"}: "{s["line"]}"'
+        elif kind == "song" and s.get("sing"):
+            talk = f" {who} sings this line on camera with expressive mouth movement and performance energy."
+        lines.append(f"[{t:.1f}-{t1:.1f}s] Beat {n + 1}: {s.get('visual') or ''} Camera: {s.get('camera') or 'slow push-in'}.{talk}"
+                     + (" Cut to -" if n < len(idx) - 1 else ""))
+        t = t1
+    sound = ("Natural voice for the spoken lines, light diegetic sound. No captions, no background music." if kind == "talking"
+             else "No dialogue, no voice, no singing audio, no music (the voiceover / song is added in the edit); light diegetic sound only.")
+    return (f"{style}.\nReferences: {refs}\n" + "\n".join(lines) + f"\n{sound} No on-screen text, no captions, no letters anywhere. "
+            "The hero character stays the exact same design in every beat.")
