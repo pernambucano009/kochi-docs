@@ -155,3 +155,57 @@ BUILTIN = {
         },
     },
 }
+
+
+# ---------------------------------------------------------------- 🎬 قوالب «مشاهد» (فيديوهات شرح زي Vox)
+# كل مشهد ١٠ ثواني بالظبط، وصورة «مفتاح ستايل» واحدة بتتبعت مع كل مشهد، والفويس أوفر جملة لكل مشهد،
+# وكل مشهد حركة كاميرا واحدة بتبدأ وتخلص بموشن بلر فالقطع بين المشاهد مايبانش. (الطريقة مستوحاة من skill «vox-animation»)
+
+SCENES = {
+    "sk-vox": {
+        "name": "كولاج تحريري (Vox)", "icon": "📰", "uses": "فيديوهات شرح بالمعلومات: ليه وإزاي، أرقام، قصة موضوع", "transition": "cut",
+        "voice_tone": "curious, precise, a little wry documentary narrator; explains, never hypes",
+        "sample": "ليه الأكل اللي بيترمي مشكلة مواصلات أكتر ما هي مشكلة مطبخ",
+        "allow_label": False,
+        "tokens": "editorial mixed-media collage, archival photo cutouts with rough white paper borders, flat bold color fields, halftone dots and paper grain, "
+                  "torn paper edges and tape strips, hand-drawn black marker circles and arrows, snappy motion-graphics animation, non-photorealistic, no live-action",
+        "negative": "readable text, letters, words, numbers, captions, subtitles, watermark, logo, photorealism, live-action footage, 3D render, lip-sync, "
+                    "talking characters, color drift",
+        "key": "A style swatch for an editorial mixed-media collage explainer: {palette} paper background with halftone dot texture, archival photo cutouts "
+               "with rough white paper borders, torn edges and tape strips, hand-drawn black marker circles and arrows, bold flat color blocks, subtle "
+               "paper grain and soft drop shadows. Abstract composition only: no people with faces, no letters, no words, no numbers. Non-photorealistic, "
+               "no live-action, no 3D render.",
+        "variants": [("classic", "كلاسيك: أصفر دافي وكريمي وكحلي وكورال", "warm yellow and off-white, with navy and coral blocks"),
+                     ("night", "ليلي: كحلي غامق ولمسات كورال وأصفر", "deep navy with coral and mustard accents"),
+                     ("paper", "ورقي هادي: كريمي وأخضر مطفي وأحمر طوبي", "cream paper with muted sage and brick red accents")],
+        "devices": "archival cutouts drifting or snapping in; one dominant flat color field per scene; paper and print textures; hand-drawn marker "
+                   "annotations (circles drawing themselves, sweeping underlines, arrows) with no letters; abstract unlabeled data graphics (bars growing, "
+                   "lines drawing upward); flat stylized maps with routes and pulsing dots; redaction/highlight bars and spotlight vignettes; scale comparisons "
+                   "(one object multiplying into rows, stacks growing). Combine two or three per scene.",
+        "motion": "snappy ease-out entrances with slight overshoot, slow push-in on 'listen to this' moments, whip-pans or page-flips between ideas, "
+                  "parallax between collage layers; something always moves but only one thing is loud at a time",
+    },
+    "sk-diorama": {
+        "name": "ديوراما ورقي وثائقي", "icon": "🗞️", "uses": "فيديوهات وثائقية درامية: فلوس، اقتصاد، سلطة، تحقيقات", "transition": "cut",
+        "voice_tone": "serious, cinematic documentary narrator, measured and tense",
+        "sample": "إزاي شركة واحدة بقت مسيطرة على سوق المكملات الغذائية في كام سنة",
+        "allow_label": True,
+        "tokens": "cinematic vintage paper diorama, aged sepia newsprint world, monochrome halftone print, monochrome archival cutout figures with black "
+                  "censor bars over their eyes, single burnt-orange accent, distressed letterpress, warm tungsten light, macro tilt-shift shallow depth of "
+                  "field, film grain, handcrafted stop-motion paper feel, non-photorealistic, no live-action",
+        "negative": "gibberish letters, captions, subtitles, watermark, logo, photorealism, live-action footage, recognizable real faces, lip-sync, talking characters, color drift",
+        "key": "A style swatch for a cinematic vintage paper-diorama documentary: a miniature three-dimensional landscape built from aged sepia newspaper "
+               "and cardboard, torn edges, layered paper walls of old newsprint, monochrome archival cutouts of anonymous suited figures with black "
+               "censor bars over their eyes, one dominant {palette} paper prop as the single color accent, distressed letterpress texture, warm tungsten "
+               "light with deep shadows, macro tilt-shift shallow depth of field, film grain and dust. Physical paper craft only: no letters, no words, "
+               "no numbers, no logos, no live-action people.",
+        "variants": [("classic", "كلاسيك: سيبيا ولمسة برتقالي محروق", "burnt-orange"),
+                     ("crimson", "أحمر: سيبيا ولمسة أحمر نبيذي", "deep crimson red"),
+                     ("teal", "تركواز: سيبيا ولمسة تركواز باهت", "faded teal")],
+        "devices": "paper canyons and newsprint landscapes, archival cutout figures with censor bars (mid-shot or full body, never close-up faces), "
+                   "torn front pages, stamps punching onto documents, paper props as the single color accent, one short distressed letterpress label "
+                   "(1-2 words or a number) on a torn colored paper element per scene",
+        "motion": "ONE continuous high-energy FPV camera move with aggressive speed ramps; an impact every ~3 seconds (slam, stamp, shockwave, snap, rip); "
+                  "the scene emerges from motion blur and ends fully motion-blurred mid-dive/whip/fall",
+    },
+}

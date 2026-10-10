@@ -12039,6 +12039,9 @@ def tv_to_dict(vid: str, d: dict) -> dict:
             "seg_files": [url((segs.get(str(i)) or {}).get("file")) for i in range(len(beats))],
             "final_url": url(d.get("final")),
             "vo_url": url((d.get("vo") or {}).get("full")),
+            "stylekey_url": url(d.get("stylekey")),
+            "scene_urls": [url(((d.get("scene_files") or {}).get(str(i)) or {}).get("file")) for i in range(len(d.get("scenes") or []))],
+            "scene_cost": round(SCENE_SEC * TRIAL_MODELS.get(d.get("model"), TRIAL_MODELS["seedance-mini"])["per_sec"] * (2 if d.get("resolution") == "720p" else 1), 2),
             "vo_line_urls": [url(f) for f in (d.get("vo") or {}).get("files") or []],
             "image_models": [{"key": k, "label": v[2]} for k, v in TV_IMAGE_MODELS.items()], "image_model": tv_img(d),
             "costs": {"sheets": round(len(sheets) * TV_IMAGE_MODELS[tv_img(d)][0], 2), "panel": TV_IMAGE_MODELS[tv_img(d)][1],
@@ -12082,6 +12085,7 @@ class TvIn(BaseModel):
     lang: str = "ar-eg-cairo"
     voice: str = ""
     voice_on: bool = True
+    length: int = 60             # قوالب المشاهد: طول الفيديو (كل ١٠ ثواني = مشهد)
     brief: str = ""
     text_mode: str = "blank"
     model: str = "seedance-mini"
@@ -12116,9 +12120,17 @@ def tvideo_create(body: TvIn):
                  transition=(t["schema"].get("transition") or t.get("transition") or ""))
         if body.image_model not in TV_IMAGE_MODELS:
             d["image_model"] = "sunburst"
+        if t.get("mode") == "scenes":   # 🎬 Vox: مشاهد ١٠ ثواني ثابتة
+            n = max(3, min(12, round(body.length / SCENE_SEC)))
+            d.update(mode="scenes", scene_cfg=t["scene"], scenes=[], scene_files={}, transition="cut", voice_tone=t.get("voice_tone"),
+                     schema={**t["schema"], "beats": [{**t["schema"]["beats"][0], "t0": i * SCENE_SEC, "t1": (i + 1) * SCENE_SEC,
+                                                       "role": "hook" if i == 0 else "cta" if i == n - 1 else "proof", "what": f"مشهد {i + 1}"} for i in range(n)]})
+        else:
+            d["voice_tone"] = t.get("voice_tone")
     with TV_LOCK:
         (tv_dir(vid) / "tv.json").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
-    threading.Thread(target=run_tv_script if d.get("section") == "templates" else run_tv_fill, args=(vid,), daemon=True).start()
+    job = run_tv_scenes_script if d.get("mode") == "scenes" else run_tv_script if d.get("section") == "templates" else run_tv_fill
+    threading.Thread(target=job, args=(vid,), daemon=True).start()
     return tv_to_dict(vid, d)
 
 
@@ -12196,6 +12208,10 @@ def tv_start(vid: str, status: str, step: str, target, *args) -> dict:
 
 
 def tv_idle(d: dict) -> str:
+    if d.get("mode") == "scenes":
+        if d.get("final"):
+            return "done"
+        return "cut" if d.get("stylekey") else "filled" if d.get("scenes") else "failed"
     n = len((d.get("fill") or {}).get("panels") or [])
     if d.get("final"):
         return "done"
@@ -12207,6 +12223,14 @@ def tv_idle(d: dict) -> str:
 @app.post("/api/tvideos/{vid}/refill")
 def tvideo_refill(vid: str):
     """✍️ يملا الخانات من جديد (الشيتات واللوحات والفيديوهات القديمة بتتمسح)."""
+    if tv_load(vid).get("mode") == "scenes":
+        def fn(d):
+            if d.get("status") in TV_BUSY:
+                raise HTTPException(400, "استنى لما الشغل اللي شغال يخلص")
+            d.update(status="filling", step="✍️ بيكتب السكريبت من جديد", error=None, scene_files={}, final=None)
+        tv_update(vid, fn)
+        threading.Thread(target=run_tv_scenes_script, args=(vid,), daemon=True).start()
+        return tv_to_dict(vid, tv_load(vid))
     if tv_load(vid).get("section") == "templates":   # قسم القوالب: السكريبت والفويس أوفر من الأول
         return tv_start(vid, "filling", "✍️ بيكتب السكريبت من جديد", run_tv_script)
     return tv_start(vid, "filling", "بيملا الخانات بمحتوى العميل", run_tv_fill)
@@ -12632,7 +12656,11 @@ def tvideo_to_editor(vid: str):
     beats, segs = d["schema"]["beats"], d.get("segs") or {}
     ready = [(i, b) for i, b in enumerate(beats) if (segs.get(str(i)) or {}).get("file") and (folder / segs[str(i)]["file"]).exists()]
     once = d.get("final_kind") == "once" and d.get("final") and (folder / d["final"]).exists()
-    if once:   # الفيديو اللي اتولّد مرة واحدة بيتنقل حتة واحدة زي ما هو
+    if d.get("mode") == "scenes":   # 🎬 المشاهد: كل مشهد ١٠ ثواني بصوت مؤثراته (واطي) والفويس أوفر في خط الصوت
+        ready = [(i, {"t0": i * SCENE_SEC, "t1": (i + 1) * SCENE_SEC, "file": f["file"]}) for i, f in sorted(((int(k), v) for k, v in (d.get("scene_files") or {}).items()))
+                 if (folder / f["file"]).exists()]
+        once = False
+    elif once:   # الفيديو اللي اتولّد مرة واحدة بيتنقل حتة واحدة زي ما هو
         ready = [(0, {"t0": 0, "t1": probe_duration(folder / d["final"]), "file": d["final"]})]
     if not ready:
         raise HTTPException(400, "لسه مفيش ولا جزء اتولد")
@@ -12650,7 +12678,7 @@ def tvideo_to_editor(vid: str):
                 (gid, f"ad:tv-{vid}", src, f"📐 {label}" + ("" if once else f" · جزء {i + 1}"), f"{gid}.mp4", now(), now()))
             tr = d.get("transition") or d["schema"].get("transition") or ""
             clips.append({"gen_id": gid, "start": 0.0, "end": round(probe_duration(GENERATED_DIR / f"{gid}.mp4"), 3),
-                          "zoom": 1.0, "x": 0.0, "y": 0.0, "volume": 0.0,
+                          "zoom": 1.0, "x": 0.0, "y": 0.0, "volume": 0.22 if d.get("mode") == "scenes" else 0.0,
                           # 🎞️ الترانزيشن اللي على روح القالب بين الأجزاء
                           "trans": {"type": tr, "dur": 0.4} if clips and tr in montage.TRANSITIONS else None})
         voice = None
@@ -15275,6 +15303,8 @@ seed_templates()
 
 
 def tpl_sample_cost(d: dict) -> float:
+    if d.get("mode") == "scenes":   # عينة ٣ مشاهد (٣٠ ثانية) + مفتاح الستايل
+        return round(TV_IMAGE_MODELS["sunburst"][0] + 3 * 10 * TRIAL_MODELS["seedance-mini"]["per_sec"], 2)
     beats = (d.get("schema") or {}).get("beats") or []
     sheets = -(-(len(beats) + 1) // SHEET_MAX) if beats else 0
     per = TRIAL_MODELS["seedance-mini"]["per_sec"]
@@ -15432,12 +15462,334 @@ def tvideo_voice(vid: str, body: TvVoiceIn):
 
     def job(vid):
         try:
-            tv_voice(vid, lines)
+            if tv_load(vid).get("mode") == "scenes":
+                tv_voice_scenes(vid, lines)
+            else:
+                tv_voice(vid, lines)
             tv_update(vid, lambda x: x.update(status=tv_idle(x), step=None, error=None))
         except Exception as exc:  # noqa: BLE001
             tv_fail(vid, exc)
     threading.Thread(target=job, args=(vid,), daemon=True).start()
     return tv_to_dict(vid, tv_load(vid))
+
+
+# ---------------------------------------------------------------- 🎬 قوالب «مشاهد» (Vox): ١٠ ثواني لكل مشهد + مفتاح ستايل
+SCENE_SEC = 10.0
+SCENE_VO_MAX, SCENE_VO_MIN = 9.7, 7.5   # الجملة لو أطول/أقصر من كده بتتكتب تاني وتتسجّل تاني
+
+
+def seed_scene_templates() -> None:
+    for tid, t in tplseed.SCENES.items():
+        f = TPL_DIR / tid / "tpl.json"
+        old = None
+        if f.exists():
+            try:
+                old = json.loads(f.read_text(encoding="utf-8"))
+            except ValueError:
+                old = None
+            if old and old.get("seed_v", 0) >= TPL_SEED_V:
+                continue
+        beats = [{"t0": i * SCENE_SEC, "t1": (i + 1) * SCENE_SEC, "role": "hook" if i == 0 else "cta" if i == 5 else "proof", "what": f"مشهد {i + 1}",
+                  "layout": "", "slots": [], "camera": "", "into_next": "", "keeps": "", "sfx": ""} for i in range(6)]
+        schema = {"title": t["name"], "summary": t["uses"], "style": t["tokens"], "negative": t["negative"], "transition": "cut", "beats": beats,
+                  "palette": "", "spine": "", "camera": t["motion"], "text_style": "", "music": "", "background": "", "last_frame": "", "beat_sec": 0.0}
+        keep = {k: old[k] for k in ("sample", "cover", "sample_vid", "sample_status", "sample_error") if old and k in old}
+        with TPL_LOCK:
+            tpl_save(tid, {"name": t["name"], "icon": t["icon"], "uses": t["uses"], "voice_tone": t["voice_tone"], "sample_brief": t["sample"],
+                           "mode": "scenes", "scene": {k: t[k] for k in ("tokens", "negative", "key", "variants", "devices", "motion", "allow_label")},
+                           "schema": schema, "builtin": True, "ratio": "9:16", "source": None, "lab_name": "مكتبة القوالب الجاهزة",
+                           "seed_v": TPL_SEED_V, "created_at": (old or {}).get("created_at") or now(), **keep})
+
+
+seed_scene_templates()
+
+
+def scenes_messages(d: dict, brain_txt: str) -> list[dict]:
+    cfg, n = d["scene_cfg"], len(d["schema"]["beats"])
+    dl = dub.DIALECTS[d["lang"]]
+    lang_txt = dl.get("language") or (dl["label"].split(" ", 1)[1] + " عامي طبيعي" if d["lang"] != "ar-msa" else "عربية فصحى سهلة")
+    own = d.get("script_mode") == "own" and d.get("script")
+    label_rule = ("- label: كلمة أو رقم واحد قصير جدًا (١-٢ كلمة، إنجليزي بحروف كبيرة) مطبوع على حاجة ورق ملونة في المشهد، أو فاضي.\n"
+                  if cfg.get("allow_label") else "- label: فاضي دايمًا (الستايل ده ممنوع فيه أي كلام مكتوب).\n")
+    sys = (
+        "إنت كاتب ومخرج فيديوهات شرح قصيرة بأسلوب Vox: معلومة بمعلومة، فضولي ودقيق وفيه خفة دم، بيشرح ومش بيهوّل.\n"
+        f"الفيديو {n} مشاهد، كل مشهد ١٠ ثواني بالظبط وليه جملة فويس أوفر واحدة. اللغة: {lang_txt}. {dub.GUIDES.get(d['lang'], '')}\n"
+        "شكل السكريبت: أول مشهد أغرب معلومة من غير أي مقدمة أو تحية ← ليه ده مهم ← مشاهد دليل (فكرة واحدة لكل مشهد، بتتصاعد) ← التحوّل ← "
+        "الخاتمة بجملة بترجع لأول مشهد بمعنى جديد. فيه سؤال في الأول بيتجاوب في الآخر.\n"
+        "- كل جملة حوالي ١٨-٢٠ كلمة (بتتقال في ٨-٩ ثواني)، والأرقام مكتوبة بالحروف زي ما بتتنطق.\n"
+        "- ممنوع تخترع أرقام أو اقتباسات: استخدم بس الأرقام اللي في الفكرة أو ملف العميل، وغير كده قول المعنى بشكل عام.\n"
+        "- اختار «عنصر واحد» (through_line) بيظهر في كل المشاهد وبيكبر/بيتغير مع القصة.\n"
+        "- scene (English): التكوين اللي بيشرح فكرة الجملة نفسها (مش حد بيقولها) بمفردات الستايل: " + cfg["devices"] + "\n"
+        "- motion (English): حركة كاميرا واحدة متصلة بتبدأ من موشن بلر وبتخلص في موشن بلر، وفيها لحظة قوية كل ٣ ثواني تقريبًا. " + cfg["motion"] + "\n"
+        "- audio (English): ٣-٥ أصوات مؤثرات حقيقية في المشهد (ورق، ووش، تكات، خبطات...) من غير أي كلام.\n"
+        + label_rule
+        + "- ممنوع أسامي أو وشوش أشخاص حقيقيين في scene (يتوصفوا من بعيد ومن غير اسم، وعلى عينيهم شريط أسود)، وممنوع شعارات حقيقية، "
+        "وممنوع صور انفجارات/دم: بدّلها بفكرة رمزية بنفس المعنى.\n"
+        'رجّع JSON بس: {"title": "اسم قصير", "through_line": "English: the recurring object", "lines": ["..."], '
+        '"scenes": [{"scene": "...", "motion": "...", "audio": "...", "label": ""}]} بنفس العدد بالظبط.')
+    task = (f"العميل كتب السكريبت ده: «{d['script']}». وزّعه على {n} مشاهد بالترتيب وظبّط طول كل جملة من غير ما المعنى يتغير." if own
+            else f"الفكرة: {d.get('brief') or 'المنتج'}")
+    return [{"role": "system", "content": sys}, {"role": "user", "content": f"ملف العميل:\n{brain_txt or '(مفيش)'}\n\n{task}"}]
+
+
+def scenes_fit(d: dict, lines: list[str], durs: list[float]) -> list[str]:
+    """الجمل اللي أطول من ٩.٧ ثانية بتتقصّر، واللي أقصر من ٧.٥ بتتطوّل (بنفس المعنى)، عشان كل مشهد ياخد العشر ثواني بتوعه."""
+    bad = [i for i, (ln, dv) in enumerate(zip(lines, durs)) if ln.strip() and (dv > SCENE_VO_MAX or dv < SCENE_VO_MIN)]
+    if not bad or atlas.mock_mode():
+        return lines
+    rows = [{"i": i, "line": lines[i], "seconds_now": round(durs[i], 1),
+             "words_target": max(6, round(len(lines[i].split()) * 8.6 / max(0.5, durs[i])))} for i in bad]
+    res = ad_json(series_chat([{"role": "system", "content": "عدّل طول الجمل دي عشان كل واحدة تتقال في حوالي ٨.٥ ثانية: نفس المعنى ونفس اللغة واللهجة "
+                                                              "بالظبط، وعدد الكلمات قريب من words_target. رجّع JSON بس: {\"lines\": {\"i\": \"الجملة\"}}"},
+                               {"role": "user", "content": json.dumps(rows, ensure_ascii=False)}], json_mode=True), "ظبط الجمل")
+    out = list(lines)
+    for k, v in (res.get("lines") or {}).items():
+        if str(k).isdigit() and int(k) in bad and str(v).strip():
+            out[int(k)] = str(v).strip()[:400]
+    return out
+
+
+def tv_voice_scenes(vid: str, lines: list[str]) -> None:
+    """🎙️ جملة لكل مشهد ← لو مش على قد العشر ثواني بتتكتب تاني وتتسجل تاني (لحد مرتين) ← تراك واحد: كل جملة بعد ربع ثانية من أول مشهدها."""
+    d = tv_load(vid)
+    folder = tv_dir(vid)
+    files, durs = [None] * len(lines), [0.0] * len(lines)
+
+    def say(idx):
+        for i in idx:
+            if not lines[i].strip() or not d.get("voice_on", True):
+                files[i], durs[i] = None, 0.0
+                continue
+            tv_set(vid, step=f"🎙️ بيسجّل الفويس أوفر ({i + 1} من {len(lines)})")
+            f = vo_say(lines[i], d["voice"], d["lang"], folder / f"vo{i:02d}.wav")
+            files[i], durs[i] = f.name, probe_duration(f)
+    say(range(len(lines)))
+    for _ in range(2):
+        fixed = scenes_fit(d, lines, durs)
+        redo = [i for i in range(len(lines)) if fixed[i] != lines[i]]
+        if not redo:
+            break
+        lines = fixed
+        tv_set(vid, step="✂️ بيظبط طول الجمل على العشر ثواني")
+        say(redo)
+    full = None
+    parts = [(i, folder / f) for i, f in enumerate(files) if f]
+    if parts:
+        full = "vo.m4a"
+        ins, flt = [], []
+        for k, (i, f) in enumerate(parts):
+            ins += ["-i", str(f)]
+            tempo = f"atempo={min(1.25, durs[i] / SCENE_VO_MAX):.3f}," if durs[i] > SCENE_VO_MAX else ""
+            flt.append(f"[{k}:a]{tempo}adelay={int((i * SCENE_SEC + 0.25) * 1000)}:all=1[a{k}]")
+        total = len(lines) * SCENE_SEC
+        flt.append("".join(f"[a{k}]" for k in range(len(parts))) + f"amix=inputs={len(parts)}:normalize=0,apad=whole_dur={total:.3f},atrim=0:{total:.3f}[o]")
+        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", *ins, "-filter_complex", ";".join(flt), "-map", "[o]",
+                        "-c:a", "aac", "-b:a", "160k", str(folder / full)], check=True, capture_output=True, timeout=300)
+    tv_update(vid, lambda x: x.update(vo={"lines": lines, "files": files, "full": full, "durs": [round(v, 2) for v in durs]}, script_lines=lines, final=None))
+
+
+def run_tv_scenes_script(vid: str) -> None:
+    try:
+        d = tv_load(vid)
+        brain = tv_brain(d)
+        n = len(d["schema"]["beats"])
+        if atlas.mock_mode():
+            res = {"title": "شرح تجريبي", "through_line": "a paper coin", "lines": [f"جملة المشهد {i + 1} تجريبية" for i in range(n)],
+                   "scenes": [{"scene": f"Scene {i + 1}: cutouts snap in.", "motion": "slow push in", "audio": "paper rustle", "label": ""} for i in range(n)]}
+        else:
+            res = ad_json(series_chat(scenes_messages(d, az.brain_text(brain)), json_mode=True), "سكريبت المشاهد")
+        lines = [str(x or "").strip()[:400] for x in (res.get("lines") or [])][:n]
+        lines += [""] * (n - len(lines))
+        sc = [{"scene": lab._plain(x.get("scene"))[:1500], "motion": lab._plain(x.get("motion"))[:800], "audio": lab._plain(x.get("audio"))[:400],
+               "label": (str(x.get("label") or "").strip()[:24] if d["scene_cfg"].get("allow_label") else "")}
+              for x in (res.get("scenes") or []) if isinstance(x, dict)][:n]
+        while len(sc) < n:
+            sc.append({"scene": "Collage elements snap into place illustrating the narration.", "motion": "slow push in", "audio": "paper rustle", "label": ""})
+        tv_update(vid, lambda x: x.update(scenes=sc, through_line=lab._plain(res.get("through_line"))[:300], name=f"🎬 {res.get('title') or x['name']}"[:120]))
+        tv_voice_scenes(vid, lines)
+        tv_update(vid, lambda x: x.update(status=tv_idle(x), step=None, error=None))
+    except Exception as exc:  # noqa: BLE001
+        tv_fail(vid, exc)
+
+
+def scene_prompt(d: dict, i: int) -> str:
+    cfg, s = d["scene_cfg"], d["scenes"][i]
+    lab_ = s.get("label") if cfg.get("allow_label") else ""
+    neg = (f'No text anywhere except "{lab_}". ' if lab_ else "No text, letters or numbers anywhere. ") + f"Avoid: {cfg['negative']}."
+    return (f"STYLE REFERENCE: Match the attached style key image EXACTLY: {cfg['tokens']}.\n"
+            f"RECURRING ELEMENT (appears in every scene): {d.get('through_line') or 'unspecified'}.\n"
+            f"SCENE: {s['scene']}" + (f' A torn colored paper element carries the distressed letterpress word "{lab_}".' if lab_ else "") + "\n"
+            f"MOTION: {s['motion']} One continuous camera move that starts from motion blur and ends in motion blur.\n"
+            f"AUDIO: {s['audio']}. No voice, no narration, no speech.\n"
+            f"NEGATIVE: {neg}")
+
+
+def scenes_start(vid: str, status: str, step: str, target, *args) -> dict:
+    def fn(d):
+        if d.get("status") in TV_BUSY:
+            raise HTTPException(400, "استنى لما الشغل اللي شغال يخلص")
+        if d.get("mode") != "scenes" or not d.get("scenes"):
+            raise HTTPException(400, "السكريبت لسه ما اتكتبش")
+        d.update(status=status, step=step, error=None)
+    d = tv_update(vid, fn)
+    threading.Thread(target=target, args=(vid, *args), daemon=True).start()
+    return tv_to_dict(vid, d)
+
+
+class StyleKeyIn(BaseModel):
+    variant: str = "classic"
+
+
+@app.post("/api/tvideos/{vid}/stylekey")
+def tvideo_stylekey(vid: str, body: StyleKeyIn):
+    """🎨 مفتاح الستايل: صورة واحدة بتقفل شكل الفيديو كله، وبتتبعت مع كل مشهد."""
+    return scenes_start(vid, "sheeting", "🎨 بيرسم مفتاح الستايل", run_stylekey, body.variant)
+
+
+def run_stylekey(vid: str, variant: str) -> None:
+    try:
+        d = tv_load(vid)
+        cfg = d["scene_cfg"]
+        v = next((x for x in cfg["variants"] if x[0] == variant), cfg["variants"][0])
+        prompt = cfg["key"].format(palette=v[2])
+        folder = tv_dir(vid)
+        name = f"stylekey-{uuid.uuid4().hex[:4]}.png"
+        size = {"9:16": "1024x1536", "16:9": "1536x1024"}.get(d["ratio"], "1024x1024")
+        if atlas.mock_mode():
+            subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "testsrc2=s=360x640", "-frames:v", "1",
+                            str(folder / name)], check=True, capture_output=True, timeout=60)
+        else:
+            atlas.download(atlas.generate_image(tv_img(d), prompt, size, "high"), folder / name)
+        conform_image(folder / name, d["ratio"])
+
+        def fn(x):
+            if x.get("stylekey") and x["stylekey"] != name:
+                (folder / x["stylekey"]).unlink(missing_ok=True)
+            x.update(stylekey=name, style_variant=v[0])
+            x.update(status=tv_idle(x), step=None, error=None)
+        tv_update(vid, fn)
+    except Exception as exc:  # noqa: BLE001
+        tv_fail(vid, exc)
+
+
+class SceneEditIn(BaseModel):
+    scene: str | None = None
+    motion: str | None = None
+    audio: str | None = None
+    label: str | None = None
+
+
+@app.put("/api/tvideos/{vid}/scenes/{i}")
+def tvideo_scene_edit(vid: str, i: int, body: SceneEditIn):
+    def fn(d):
+        sc = d.get("scenes") or []
+        if not 0 <= i < len(sc):
+            raise HTTPException(404, "المشهد ده مش موجود")
+        for k in ("scene", "motion", "audio", "label"):
+            v = getattr(body, k)
+            if v is not None:
+                sc[i][k] = v.strip()[:1500 if k == "scene" else 800]
+    return tv_to_dict(vid, tv_update(vid, fn))
+
+
+class ScenesRunIn(BaseModel):
+    i: int | None = None
+
+
+@app.post("/api/tvideos/{vid}/scenes/run")
+def tvideo_scenes_run(vid: str, body: ScenesRunIn):
+    """🎬 المشاهد (الناقص بس، أو مشهد واحد تاني): Seedance بمفتاح الستايل، ١٠ ثواني، وصوت المؤثرات بتاعه."""
+    d = tv_load(vid)
+    if not d.get("stylekey"):
+        raise HTTPException(400, "اعمل مفتاح الستايل الأول")
+    return scenes_start(vid, "working", "🎬 بيبدأ", run_scenes_gen, body.i)
+
+
+def run_scenes_gen(vid: str, only: int | None) -> None:
+    try:
+        d = tv_load(vid)
+        folder = tv_dir(vid)
+        n = len(d["scenes"])
+        ratio = az.ASPECTS.get(d["ratio"], az.ASPECTS["9:16"])[1]
+        W, H = RATIO_VIDEO.get(d["ratio"], RATIO_VIDEO["9:16"])
+        key = folder / d["stylekey"]
+        for i in range(n):
+            have = ((d.get("scene_files") or {}).get(str(i)) or {}).get("file")
+            if (only is not None and only != i) or (only is None and have):
+                continue
+            tv_set(vid, step=f"🎬 بيولّد المشهد {i + 1} من {n} (١٠ ثواني بصوته)")
+            name = f"scene{i + 1}-{uuid.uuid4().hex[:4]}.mp4"
+            if atlas.mock_mode():
+                gen_motion(d["model"], d["resolution"], ratio, "", key, key, int(SCENE_SEC), folder / name, W, H)
+            else:
+                body = {"model": tv_r2v(d.get("model")), "prompt": scene_prompt(d, i), "reference_images": [atlas.reference_url(key)],
+                        "duration": int(SCENE_SEC), "resolution": d.get("resolution") or "480p", "ratio": ratio,
+                        "generate_audio": True, "watermark": False}
+                atlas.download(atlas.run_model("Video", body, f"المشهد {i + 1}", max_seconds=1800, interval=6), folder / name)
+
+            def fn(x, i=i, name=name):
+                old = (x.setdefault("scene_files", {}).get(str(i)) or {}).get("file")
+                if old and old != name:
+                    (folder / old).unlink(missing_ok=True)
+                x["scene_files"][str(i)] = {"file": name}
+                x["final"] = None
+            tv_update(vid, fn)
+        d = tv_load(vid)
+        if all(((d.get("scene_files") or {}).get(str(i)) or {}).get("file") for i in range(n)):
+            tv_set(vid, step="🎞️ بيجمّع الفيديو بالفويس أوفر")
+            scenes_assemble(vid)
+        tv_update(vid, lambda x: x.update(status=tv_idle(x), step=None, error=None))
+    except Exception as exc:  # noqa: BLE001
+        tv_fail(vid, exc)
+
+
+def has_audio(p: Path) -> bool:
+    r = subprocess.run([ffmpeg_exe(), "-hide_banner", "-i", str(p)], capture_output=True, text=True)
+    return "Audio:" in r.stderr
+
+
+def scenes_assemble(vid: str) -> None:
+    """كل مشهد ١٠ ثواني بالظبط: صورته + صوت مؤثراته واطي (٢٢٪) + الفويس أوفر بتاعه، وبعدين ورا بعض."""
+    d = tv_load(vid)
+    folder = tv_dir(vid)
+    W, H = RATIO_VIDEO.get(d["ratio"], RATIO_VIDEO["9:16"])
+    vo = d.get("vo") or {}
+    work = folder / ".asm"
+    shutil.rmtree(work, ignore_errors=True)
+    work.mkdir()
+    ff = [ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y"]
+    try:
+        segs = []
+        for i in range(len(d["scenes"])):
+            clip = folder / d["scene_files"][str(i)]["file"]
+            vf = (vo.get("files") or [None] * 99)[i] if i < len(vo.get("files") or []) else None
+            dv = (vo.get("durs") or [0] * 99)[i] if i < len(vo.get("durs") or []) else 0
+            ins = ["-i", str(clip)] + (["-i", str(folder / vf)] if vf and (folder / vf).exists() else [])
+            v = f"[0:v]setpts=PTS-STARTPTS,scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},setsar=1,fps=30,tpad=stop_mode=clone:stop_duration=2,format=yuv420p[v]"
+            amb = "[0:a]aresample=48000,aformat=channel_layouts=stereo,volume=0.22[amb]" if has_audio(clip) else "anullsrc=r=48000:cl=stereo[amb]"
+            if len(ins) > 2:
+                tempo = f"atempo={min(1.25, dv / SCENE_VO_MAX):.3f}," if dv > SCENE_VO_MAX else ""
+                a = f"{amb};[1:a]aresample=48000,aformat=channel_layouts=stereo,{tempo}adelay=250:all=1[vo];[amb][vo]amix=inputs=2:duration=longest:normalize=0,apad[a]"
+            else:
+                a = f"{amb};[amb]apad[a]"
+            out = work / f"s{i:02d}.mp4"
+            subprocess.run(ff + ins + ["-filter_complex", f"{v};{a}", "-map", "[v]", "-map", "[a]", "-t", f"{SCENE_SEC:.3f}",
+                                       "-c:v", "libx264", "-preset", "veryfast", "-crf", "19", "-c:a", "aac", "-ar", "48000", "-b:a", "160k", str(out)],
+                           check=True, capture_output=True, timeout=600)
+            segs.append(out)
+        lst = work / "list.txt"
+        lst.write_text("".join(f"file '{p.name}'\n" for p in segs), encoding="utf-8")
+        name = f"final-{uuid.uuid4().hex[:4]}.mp4"
+        subprocess.run(ff + ["-f", "concat", "-safe", "0", "-i", str(lst), "-c", "copy", "-movflags", "+faststart", str(folder / name)],
+                       check=True, capture_output=True, timeout=600)
+
+        def fin(x):
+            if x.get("final"):
+                (folder / x["final"]).unlink(missing_ok=True)
+            x.update(final=name, final_kind="scenes")
+        tv_update(vid, fin)
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
 
 
 @app.get("/api/tpl-studio")
@@ -15476,6 +15828,8 @@ def tpl_mark(tid: str, **kw) -> None:
 def run_tpl_sample(tid: str) -> None:
     try:
         t = tpl_load(tid)
+        if t.get("mode") == "scenes":
+            return run_tpl_sample_scenes(tid, t)
         old = t.get("sample_vid")
         if old and (tv_dir(old) / "tv.json").exists() and tv_load(old).get("fill"):
             # 🔁 العينة اللي وقفت بتكمّل من مكانها (الشيتات واللقطات اللي اتعملت ما بتتدفعش تاني)
@@ -15494,6 +15848,50 @@ def run_tpl_sample(tid: str) -> None:
         tpl_mark(tid, sample_vid=vid, sample_step="✍️ بيملا القالب بفكرة العينة")
         run_tv_fill(vid)
         tpl_sample_steps(tid, vid)
+    except Exception as exc:  # noqa: BLE001
+        tpl_mark(tid, sample_status="failed", sample_step=None, sample_error=str(getattr(exc, "detail", None) or exc)[:300])
+
+
+def run_tpl_sample_scenes(tid: str, t: dict) -> None:
+    """عينة قالب المشاهد: ٣ مشاهد (٣٠ ثانية) بصوت المؤثرات بتاع الموديل، من غير فويس أوفر."""
+    try:
+        vid = t.get("sample_vid") if t.get("sample_vid") and (tv_dir(t["sample_vid"]) / "tv.json").exists() else None
+        if not vid:
+            vid = uuid.uuid4().hex[:10]
+            tv_dir(vid).mkdir(parents=True, exist_ok=True)
+            beats = [{**t["schema"]["beats"][0], "t0": i * SCENE_SEC, "t1": (i + 1) * SCENE_SEC, "what": f"مشهد {i + 1}"} for i in range(3)]
+            d = {"name": f"🎞️ عينة {t['name']}", "client_id": None, "template": tid, "template_name": t["name"], "schema": {**t["schema"], "beats": beats},
+                 "ratio": t.get("ratio") or "9:16", "brief": t.get("sample_brief") or t["name"], "text_mode": "blank", "image_model": "sunburst",
+                 "model": "seedance-mini", "resolution": "480p", "status": "filling", "step": None, "error": None, "fill": None, "sheets": {}, "panels": {},
+                 "segs": {}, "sample_of": tid, "section": "templates", "mode": "scenes", "scene_cfg": t["scene"], "scenes": [], "scene_files": {},
+                 "lang": "en", "voice": "eleven_liam", "voice_on": False, "script_mode": "ai", "script": "", "voice_tone": t.get("voice_tone"),
+                 "transition": "cut", "created_at": now()}
+            with TV_LOCK:
+                (tv_dir(vid) / "tv.json").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+            tpl_mark(tid, sample_vid=vid)
+        x = tv_load(vid)
+        if not x.get("scenes"):
+            tpl_mark(tid, sample_step="✍️ بيكتب مشاهد العينة")
+            run_tv_scenes_script(vid)
+            x = tv_load(vid)
+            if x.get("status") == "failed":
+                raise RuntimeError(x.get("error"))
+        if not x.get("stylekey"):
+            tpl_mark(tid, sample_step="🎨 بيرسم مفتاح الستايل")
+            run_stylekey(vid, "classic")
+            x = tv_load(vid)
+            if x.get("status") == "failed":
+                raise RuntimeError(x.get("error"))
+        tpl_mark(tid, sample_step="🎬 بيولّد المشاهد بصوتها")
+        tv_set(vid, status="working")
+        run_scenes_gen(vid, None)
+        x = tv_load(vid)
+        if x.get("status") == "failed" or not x.get("final"):
+            raise RuntimeError(x.get("error") or "الفيديو ماتجمّعش")
+        folder = TPL_DIR / tid
+        shutil.copyfile(tv_dir(vid) / x["final"], folder / "sample.mp4")
+        shutil.copyfile(tv_dir(vid) / x["stylekey"], folder / "cover.png")
+        tpl_mark(tid, sample="sample.mp4", cover="cover.png", sample_status="done", sample_step=None, sample_error=None)
     except Exception as exc:  # noqa: BLE001
         tpl_mark(tid, sample_status="failed", sample_step=None, sample_error=str(getattr(exc, "detail", None) or exc)[:300])
 

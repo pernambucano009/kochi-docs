@@ -238,6 +238,7 @@ function tvDetail(v) {
       <button type="button" class="btn sm" data-tvrefill ${busy ? "disabled" : ""}>✍️ املاه من جديد</button>
     </div>
     ${v.section === "templates" ? tvVoiceBlock(v) : ""}
+    ${v.mode === "scenes" ? tvScenesBlock(v) : ""}
     ${fill ? `
     <details class="panel tv-step" data-dk="s1" ${open("s1", !cutAll)}><summary>١. 📝 السكريبت والخانات <small class="muted">التعديلات بتتحفظ لوحدها</small></summary>
       <p class="hint" dir="ltr" data-no-i18n>${le(fill.world)}</p>
