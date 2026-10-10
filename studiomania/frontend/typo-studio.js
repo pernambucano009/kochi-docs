@@ -22,7 +22,7 @@
   const FACES = [["TY Anton", "TY-Anton.ttf", "400"], ["TY Pen", "TY-DawningPen.ttf", "400"], ["TY PlexAr", "TY-PlexArabic-700.ttf", "700"],
     ["TY PlexAr", "TY-PlexArabic-400.ttf", "400"], ["TY Ruqaa", "TY-ArefRuqaa-700.ttf", "400 900"], ["TY Outfit", "TY-Outfit-800.ttf", "800 900"],
     ["TY Serif", "TY-InstrumentSerif.ttf", "400"], ["TY SerifI", "TY-InstrumentSerif-Italic.ttf", "400"], ["TY Pixel", "TY-VT323.ttf", "400"],
-    ["TY Type", "TY-SpecialElite.ttf", "400"], ["TY Rock", "TY-RockSalt.ttf", "400"], ["TY Mono", "TY-PlexMono-500.ttf", "500"], ["TY Amiri", "TY-Amiri-700.ttf", "700"]];
+    ["TY Type", "TY-SpecialElite.ttf", "400"], ["TY Rock", "TY-RockSalt.ttf", "400"], ["TY Mono", "TY-PlexMono-500.ttf", "500"], ["TY Amiri", "TY-Amiri-700.ttf", "700"], ["TY Lite", "TY-Alexandria-500.ttf", "100 600"]];
   let facesP = null;
   E.studioFonts = () => facesP || (facesP = Promise.all([...FACES.map(([fam, file, w]) =>
     new FontFace(fam, `url(/fonts/${file})`, { weight: w }).load().then((f) => document.fonts.add(f)).catch(() => {})),
@@ -55,7 +55,7 @@
     "qr", "codetag", "toolbar", "terminal", "scan",
     "toasts", "footer", "marquee", "datestrip",
     "fileicon", "chaos",
-    "gradword", "meshprompt", "orbsplit", "bento", "figdays", "figcurve", "figplay", "figequal", "figwords", "figphone", "figdrop", "figcount", "figgears", "figbar", "figcheck", "figcta", "goldcap", "iconbelt", "glowsweep", "namepill", "kashida", "molecule", "weightstack", "stretch", "desatpop", "arcs", "chrome", "inkverse", "poemfade", "hashend"]);
+    "gradword", "meshprompt", "orbsplit", "bento", "figdays", "figcurve", "figplay", "figequal", "figwords", "figphone", "figdrop", "figcount", "figgears", "figbar", "figcheck", "figcta", "goldcap", "iconbelt", "glowsweep", "namepill", "kashida", "molecule", "weightstack", "stretch", "desatpop", "arcs", "chrome", "inkverse", "poemfade", "hashend", "flipverb"]);
   E.TYPING = new Set(["type", "artype"]);
   const MC = document.createElement("canvas").getContext("2d");
   const measure = (s, font) => { MC.font = font; return MC.measureText(s).width; };
@@ -6583,5 +6583,29 @@
     return `<div style="position:absolute;inset:0;background:#000"></div>
       <div dir="${this.dir(tag)}" style="position:absolute;left:0;right:0;top:${(h * 0.5 - z).toFixed(1)}px;text-align:center;font:700 ${z.toFixed(1)}px ${ff};color:#fff;opacity:${a.toFixed(2)};filter:blur(${((1 - a) * 6).toFixed(1)}px);white-space:nowrap">${esc(tag)}</div>
       ${sub ? `<div dir="${this.dir(sub)}" style="position:absolute;left:0;right:0;top:${(h * 0.5 + z * 0.4).toFixed(1)}px;text-align:center;font:400 ${(z * 0.36).toFixed(1)}px ${AR.test(sub) ? famOf(sub) : "'TY SerifI', 'TY Serif'"};letter-spacing:.06em;color:rgba(255,255,255,.75);opacity:${a2.toFixed(2)}">${esc(sub)}</div>` : ""}`;
+  };
+  // ======== r04 «فلِب» — جملة ثابتة رفيعة وكلمة بتتكتب تحتها تقيل، والخلفية بتنقلب أسود والكلمة دهبي ========
+  // ---------- flipverb: «إحنا بنساعدك» ثابتة، وكل فعل بيتكتب حرف حرف أسود على رمادي فاتح وبعدين الكادر بيقلب أسود والفعل أصفر
+  P.k_flipverb = function (b, t, k, th, bi) {
+    const it = this.items(b); if (!it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h);
+    const np = b.focus > 0 && b.focus < it.length ? b.focus : it.length > 4 ? 3 : 1;
+    const pre = it.slice(0, Math.min(np, it.length - 1)), rest = it.slice(pre.length);
+    // كل كلمة بعد الجملة الثابتة = خانة؛ الكلمة اللي جاية بعدها على طول (زي «be different») بتتلم معاها لو أقصر من ٣ حروف
+    const slots = []; rest.forEach((x) => { const s = this.text(x.w), last = slots[slots.length - 1];
+      if (last && [...this.text(last[0].w)].length <= 3 && last.length === 1) last.push(x); else slots.push([x]); });
+    let cur = slots[0]; for (const sl of slots) if (t >= sl[0].t0 - 0.02) cur = sl;
+    const tn = slots.indexOf(cur) + 1 < slots.length ? slots[slots.indexOf(cur) + 1][0].t0 : b.t1;
+    const word = cur.map((x) => this.text(x.w)).join(" "), dur = Math.max(0.3, tn - cur[0].t0);
+    const tf = cur[0].t0 + Math.min(0.45, dur * 0.45), flip = t >= tf;
+    const typedW = typed(word, t, cur[0].t0, Math.max(14, [...word].length / Math.max(0.12, (tf - cur[0].t0) * 0.8)));
+    const ps = pre.map((x) => this.text(x.w)).join(" "), ff = famOf(ps + word), ar = AR.test(ps + word);
+    const z = Math.min(fitSize(ps || "a", `400 {}px ${ff}`, w * 0.8, mn * 0.075 * this.ts), fitSize(word, `700 {}px ${ff}`, w * 0.8, mn * 0.075 * this.ts));
+    const bg = flip ? "#050505" : "#E7E5E6", fg = flip ? "#fff" : "#151515", acc = flip ? "#F2B42A" : "#151515";
+    const al = ar ? "right" : "left", y = h * 0.42;
+    return `<div style="position:absolute;inset:0;background:${bg}"></div>
+      <div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:${(w * 0.12).toFixed(1)}px;right:${(w * 0.12).toFixed(1)}px;top:${(y - z * 1.1).toFixed(1)}px;text-align:${al};white-space:nowrap">
+        <div style="font:400 ${z.toFixed(1)}px ${AR.test(ps) ? ff : "'TY Lite', 'SM Tajawal'"};color:${fg};letter-spacing:-0.01em">${esc(ps)}</div>
+        <div style="font:700 ${z.toFixed(1)}px ${ff};color:${acc};letter-spacing:-0.01em;min-height:${(z * 1.2).toFixed(1)}px">${esc(flip ? word : typedW)}</div></div>`;
   };
 })();
