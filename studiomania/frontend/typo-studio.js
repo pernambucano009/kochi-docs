@@ -55,7 +55,7 @@
     "qr", "codetag", "toolbar", "terminal", "scan",
     "toasts", "footer", "marquee", "datestrip",
     "fileicon", "chaos",
-    "gradword", "meshprompt", "orbsplit", "bento", "figdays", "figcurve", "figplay", "figequal", "figwords", "figphone", "figdrop", "figcount", "figgears", "figbar", "figcheck", "figcta", "goldcap", "iconbelt", "glowsweep", "namepill", "kashida", "molecule", "weightstack", "stretch", "desatpop", "arcs", "chrome", "inkverse", "poemfade", "hashend", "flipverb", "strobe", "duoline", "capstack", "pillword", "blurduo", "tagstack", "underbars", "contactcard", "iconorbit", "blurstrobe", "kinstack", "incall", "cineband", "scriptover", "tricolor", "drumpicker", "redmix", "headbubble", "pincard", "emojifloat", "slotreel", "posterwall", "quoteline", "medallion", "clockhand", "roadtext", "markpan", "objectquote"]);
+    "gradword", "meshprompt", "orbsplit", "bento", "figdays", "figcurve", "figplay", "figequal", "figwords", "figphone", "figdrop", "figcount", "figgears", "figbar", "figcheck", "figcta", "goldcap", "iconbelt", "glowsweep", "namepill", "kashida", "molecule", "weightstack", "stretch", "desatpop", "arcs", "chrome", "inkverse", "poemfade", "hashend", "flipverb", "strobe", "duoline", "capstack", "pillword", "blurduo", "tagstack", "underbars", "contactcard", "iconorbit", "blurstrobe", "kinstack", "incall", "cineband", "scriptover", "tricolor", "drumpicker", "redmix", "headbubble", "pincard", "emojifloat", "slotreel", "posterwall", "quoteline", "medallion", "clockhand", "roadtext", "markpan", "objectquote", "racechart", "calflip", "glosscards", "dropword", "tasklens"]);
   E.TYPING = new Set(["type", "artype"]);
   const MC = document.createElement("canvas").getContext("2d");
   const measure = (s, font) => { MC.font = font; return MC.measureText(s).width; };
@@ -7093,5 +7093,85 @@
     if (last && small.length) { const s = this.text(last.w), z = fitSize(s, `400 {}px ${sf}`, w * 0.8, mn * 0.2 * this.ts * 0.8), q = seg(t, last.t0 - 0.05, last.t0 + 0.3);
       html += `<div dir="${this.dir(s)}" style="position:absolute;left:0;right:0;top:${(h * 0.45 - z * 0.2).toFixed(1)}px;text-align:center;font:400 ${z.toFixed(1)}px ${sf};${ar ? "" : "font-style:italic;"}color:${GOLD};mix-blend-mode:multiply;opacity:${clamp(q * 2).toFixed(2)};transform:scale(${lerp(1.3, 1, eOut(q)).toFixed(3)})">${esc(s)}</div>`; }
     return html;
+  };
+  // ======== r20 «أزرق 3D» — تدرّج أزرق ناعم: خطين بيتسابقوا، نتيجة مكتب بتقلب سنين، كروت لامعة مايلة، نقطة بتنزل في بركة، وقايمة مهام تحت عدسة ========
+  const BLUEBG = `radial-gradient(ellipse at 70% 55%,#3D5BE0,#7F95F0 45%,#C9D3FA 100%)`, NAVY20 = "#0D1236";
+  const capTop = (eng, s, t, t0, w, h, mn, dark) => s ? `<div dir="${eng.dir(s)}" style="position:absolute;left:0;right:0;top:${(h * 0.14).toFixed(1)}px;text-align:center;font:500 ${(mn * 0.045 * eng.ts * 0.8).toFixed(1)}px ${famOf(s)};color:${dark ? "#E8ECFF" : "#1A2050"};${blurIn(t, t0)}">${esc(s)}</div>` : "";
+  // ---------- racechart: خطين بيتسابقوا على شبكة باهتة — الأول (focus) طالع بنقطة واسمه، والتاني متعرج تحت باسمه، وأرقام كبيرة باهتة
+  P.k_racechart = function (b, t, k, th, bi) {
+    const P = figParts(this, { ...b, focus: b.focus >= 0 ? b.focus : Math.min(1, this.items(b).length - 1) }); if (!P.it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h);
+    const A = P.J(P.it.slice(0, P.fi + 1)), B = P.J(P.tail), p = eOut(seg(t, b.t0 + 0.1, b.t0 + 1.6)), q = eOut(seg(t, (P.tail[0]?.t0 ?? b.t1) - 0.2, (P.tail[0]?.t0 ?? b.t1) + 1.2));
+    const x0 = w * 0.05, x1 = w * 0.92, yA0 = h * 0.62, yA1 = h * 0.3, yB = h * 0.68;
+    const ax = lerp(x0, x1, p), ay = lerp(yA0, yA1, p), r = rng(3 + bi);
+    let pb = `M${x0} ${yB}`; for (let i = 1; i <= 24; i++) { const xx = lerp(x0, x1, i / 24 * q); pb += ` L${xx.toFixed(1)} ${(yB + (r() - 0.5) * h * 0.04).toFixed(1)}`; }
+    let grid = ""; for (let i = 0; i < 5; i++) grid += `<line x1="0" y1="${(h * (0.25 + i * 0.12)).toFixed(0)}" x2="${w}" y2="${(h * (0.22 + i * 0.12)).toFixed(0)}" stroke="rgba(255,255,255,.18)" stroke-width="1"/>`;
+    const fa = famOf(A), za = fitSize(A, `800 {}px ${fa}`, w * 0.6, mn * 0.05 * this.ts);
+    let html = `<div style="position:absolute;inset:0;background:${BLUEBG}"></div><svg style="position:absolute;inset:0" width="${w}" height="${h}">${grid}
+      <path d="M${x0} ${yA0} L${ax.toFixed(1)} ${ay.toFixed(1)}" stroke="${NAVY20}" stroke-width="${(mn * 0.006).toFixed(1)}" stroke-linecap="round"/><circle cx="${ax.toFixed(1)}" cy="${ay.toFixed(1)}" r="${(mn * 0.014).toFixed(1)}" fill="${NAVY20}"/>
+      ${q > 0 ? `<path d="${pb}" stroke="#fff" stroke-width="${(mn * 0.004).toFixed(1)}" fill="none" stroke-linejoin="round"/>` : ""}</svg>
+      <div dir="${this.dir(A)}" style="position:absolute;left:${Math.min(ax - za * 2, w * 0.4).toFixed(1)}px;top:${(ay - za * 1.9).toFixed(1)}px;font:800 ${za.toFixed(1)}px ${fa};color:${NAVY20};white-space:nowrap">${esc(A)}</div>
+      <div style="position:absolute;left:${(w * 0.1).toFixed(1)}px;top:${(h * 0.78).toFixed(1)}px;font:300 ${(mn * 0.1).toFixed(1)}px 'TY Lite';color:rgba(255,255,255,.35);transform:perspective(600px) rotateX(25deg)">${(40256 * (0.6 + 0.4 * p)).toFixed(0).replace(/(\d{2})(\d{3})$/, "$1.$2")}</div>`;
+    if (B && q > 0) { const fb = famOf(B), zb = fitSize(B, `800 {}px ${fb}`, w * 0.6, mn * 0.06 * this.ts);
+      html += `<div dir="${this.dir(B)}" style="position:absolute;right:${(w * 0.06).toFixed(1)}px;top:${(yB - zb * 1.6).toFixed(1)}px;font:800 ${zb.toFixed(1)}px ${fb};color:#fff;white-space:nowrap;${blurIn(t, P.tail[0].t0 - 0.1)}">${esc(B)}</div>`; }
+    return html;
+  };
+  // ---------- calflip: نتيجة مكتب سودا «سنة» بتقلب صفحاتها لحد السنة اللي بعدها والورق القديم بيطير مايل، والكلام كابشن فوق
+  P.k_calflip = function (b, t, k, th, bi) {
+    const it = this.items(b); if (!it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h), all = it.map((x) => this.text(x.w)).join(" ");
+    const ys = (all.match(/(19|20)\d\d/g) || []).map(Number), y0 = ys[0] || 2018, y1 = ys[1] || (ys[0] ? ys[0] + 7 : 2025);
+    const words = it.filter((x) => !/^(19|20)\d\d$/.test(this.text(x.w))), cap = words.filter((x) => t >= x.t0 - 0.05).slice(-4).map((x) => this.text(x.w)).join(" ");
+    const D = b.t1 - b.t0, f = clamp((t - b.t0 - 0.4) / Math.max(0.5, D - 0.9)), cur = Math.round(lerp(y0, y1, f)), frac = lerp(y0, y1, f) - Math.floor(lerp(y0, y1, f));
+    const cw = mn * 0.56, chh = cw * 0.62, cx = w * 0.55, cy = h * 0.42, lab = AR.test(all) ? "نتيجة" : "Calendar";
+    const page = (yr, extra) => `<div style="position:absolute;left:${(cx - cw / 2).toFixed(1)}px;top:${(cy - chh / 2).toFixed(1)}px;width:${cw.toFixed(1)}px;height:${chh.toFixed(1)}px;${extra}">
+      <div style="height:22%;background:linear-gradient(90deg,#fff,#C9D3FA);display:flex;align-items:center;justify-content:center;font:700 ${(chh * 0.12).toFixed(1)}px ${famOf(lab)};color:${NAVY20}">${lab}</div>
+      <div style="height:78%;background:linear-gradient(160deg,#20264D,#05081C);display:flex;align-items:center;justify-content:center;font:800 ${(chh * 0.42).toFixed(1)}px 'TY Outfit';color:#fff">${yr}</div></div>`;
+    let html = `<div style="position:absolute;inset:0;background:linear-gradient(180deg,#5B76E6,#98AAF2 45%,#F3F5FE 60%,#FFFFFF)"></div>`;
+    html += page(cur, `box-shadow:0 ${(mn * 0.03).toFixed(0)}px ${(mn * 0.05).toFixed(0)}px rgba(13,18,54,.35)`);
+    if (cur < y1 && f > 0) { const fl = eOut(frac);
+      html += page(cur - 1 < y0 ? y0 : cur, `transform-origin:0 0;transform:translate(${(-fl * cw * 1.4).toFixed(1)}px,${(-fl * chh * 0.6).toFixed(1)}px) rotate(${(-fl * 160).toFixed(1)}deg);opacity:${(1 - fl).toFixed(2)}`); }
+    html += capTop(this, cap, t, words[0]?.t0 ?? b.t0, w, h, mn, false);
+    return html;
+  };
+  // ---------- glosscards: كروت كبسولة كحلي لامعة بتدخل مايلة 3D واحدة فوق التانية، كل كارت فيه جزء من الكلام
+  P.k_glosscards = function (b, t, k, th, bi) {
+    const it = this.items(b); if (!it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h), per = it.length > 6 ? 3 : 2, cards = [];
+    for (let i = 0; i < it.length; i += per) cards.push(it.slice(i, i + per));
+    const n = cards.length, tilt = eOut(seg(t, cards[n - 1][0].t0, cards[n - 1][0].t0 + 0.6));
+    let html = `<div style="position:absolute;inset:0;background:${BLUEBG}"></div><div style="position:absolute;inset:0;transform:perspective(${(mn * 2).toFixed(0)}px) rotateX(${(tilt * 18).toFixed(1)}deg) rotateZ(${(tilt * 8).toFixed(1)}deg)">`;
+    cards.forEach((c, i) => { const s = c.map((x) => this.text(x.w)).join(" "), a = eOut(seg(t, c[0].t0 - 0.15, c[0].t0 + 0.3)), cw = Math.min(w * 0.7, mn * 0.8), chh = mn * 0.17 * this.ts * 0.8, ff = famOf(s);
+      const z = Math.min(chh * 0.32, fitSize(s, `700 {}px ${ff}`, cw * 0.8, chh * 0.32)), x = w / 2 - cw / 2 + (i % 2 ? w * 0.05 : -w * 0.05), y = h * 0.42 - n * chh * 0.6 + i * chh * 1.2;
+      html += `<div dir="${this.dir(s)}" style="position:absolute;left:${(x + (1 - a) * w * 0.6).toFixed(1)}px;top:${y.toFixed(1)}px;width:${cw.toFixed(1)}px;height:${chh.toFixed(1)}px;border-radius:${(chh * 0.2).toFixed(1)}px;background:linear-gradient(120deg,#2A3170,#0A0D26 55%,#3A4BB8);box-shadow:0 ${(chh * 0.15).toFixed(0)}px ${(chh * 0.35).toFixed(0)}px rgba(10,13,38,.45),inset 0 1px 0 rgba(255,255,255,.25);transform:rotate(${(-6 + i * 3).toFixed(1)}deg);opacity:${a.toFixed(2)};display:flex;align-items:center;justify-content:center;font:700 ${z.toFixed(1)}px ${ff};color:#fff;text-align:center;line-height:1.1;padding:0 6%">${esc(s)}</div>`; });
+    return html + `</div>`;
+  };
+  // ---------- dropword: قطرة زرقا بتنزل من فوق في بركة كحلي وبتعمل موجة، وبعدين كلمة كوندنسد عملاقة بيضا بتطلع وفوقها كلمة صغيرة
+  P.k_dropword = function (b, t, k, th, bi) {
+    const P = figParts(this, { ...b, focus: b.focus >= 0 ? b.focus : this.items(b).length - 1 }); if (!P.it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h);
+    const fall = eOut(seg(t, b.t0, b.t0 + 0.9)), hit = seg(t, b.t0 + 0.9, b.t0 + 1.6), pool = h * 0.62;
+    const dy = lerp(h * 0.05, pool - mn * 0.03, fall * fall), small = P.J(P.kick), main = this.text(P.main.w), ar = AR.test(small + main);
+    const ff = ar ? famOf(main) : "'TY Cond', 'TY Outfit'", z = fitSize(main, `700 {}px ${ff}`, w * 0.8, mn * 0.24 * this.ts * 0.8), on = t >= P.main.t0 - 0.05;
+    let html = `<div style="position:absolute;inset:0;background:linear-gradient(180deg,#B9C6F7,#6F87EC 40%,#2B3FB0 60%,${NAVY20} 61%,#03040F)"></div>
+      <svg style="position:absolute;inset:0" width="${w}" height="${h}"><path d="M${(w / 2 - mn * 0.07).toFixed(0)} 0 C ${(w / 2 - mn * 0.02).toFixed(0)} ${(dy * 0.6).toFixed(0)}, ${(w / 2 - mn * 0.01).toFixed(0)} ${(dy * 0.9).toFixed(0)}, ${w / 2} ${dy.toFixed(0)} C ${(w / 2 + mn * 0.01).toFixed(0)} ${(dy * 0.9).toFixed(0)}, ${(w / 2 + mn * 0.02).toFixed(0)} ${(dy * 0.6).toFixed(0)}, ${(w / 2 + mn * 0.07).toFixed(0)} 0z" fill="url(#dg)" opacity="${(1 - hit).toFixed(2)}"/>
+      <defs><linearGradient id="dg" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#0D1236"/><stop offset="1" stop-color="#4F6CF0"/></linearGradient></defs>
+      <circle cx="${w / 2}" cy="${dy.toFixed(0)}" r="${(mn * 0.018).toFixed(1)}" fill="${hit > 0 ? "#fff" : NAVY20}"/>
+      ${[0, 1, 2].map((i) => { const hh = seg(hit, i * 0.2, 1); return hh > 0 ? `<ellipse cx="${w / 2}" cy="${pool.toFixed(0)}" rx="${(hh * w * 0.6).toFixed(1)}" ry="${(hh * mn * 0.06).toFixed(1)}" fill="none" stroke="rgba(160,180,255,${(0.6 * (1 - hh)).toFixed(2)})" stroke-width="2"/>` : ""; }).join("")}</svg>`;
+    if (on) html += `<div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:0;right:0;top:${(pool + mn * 0.06).toFixed(1)}px;text-align:center;line-height:.95;${blurIn(t, P.main.t0 - 0.05, 0.5)}"><div style="font:500 ${(z * 0.2).toFixed(1)}px ${famOf(small)};color:#fff">${esc(small)}</div><div style="font:700 ${z.toFixed(1)}px ${ff};color:#fff;letter-spacing:-0.01em;white-space:nowrap">${esc(main)}</div></div>`;
+    return html;
+  };
+  // ---------- tasklens: قايمة مهام مايلة 3D بتتعلّم واحدة واحدة، وعدسة مكبّرة دايرة بتعدّي عليها، وكابشن فوق
+  P.k_tasklens = function (b, t, k, th, bi) {
+    const P = figParts(this, { ...b, focus: b.focus >= 0 ? b.focus : Math.min(2, this.items(b).length - 1) }); if (!P.it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h), cap = P.J(P.it.slice(0, P.fi + 1)), ar = AR.test(cap);
+    const lab = ar ? "مهمة" : "Task", n = 5, rz = mn * 0.075 * this.ts * 0.8, D = b.t1 - b.t0;
+    let rows = ""; for (let i = 0; i < n; i++) { const done = t >= b.t0 + 0.4 + i * (D * 0.7 / n);
+      rows += `<div dir="${ar ? "rtl" : "ltr"}" style="display:flex;align-items:center;gap:${(rz * 0.6).toFixed(1)}px;height:${(rz * 1.6).toFixed(1)}px;font:700 ${rz.toFixed(1)}px ${famOf(lab)};color:#fff;filter:blur(${(i > 2 ? (i - 2) * 2 : 0).toFixed(1)}px)"><svg width="${(rz * 0.9).toFixed(0)}" height="${(rz * 0.9).toFixed(0)}" viewBox="0 0 10 10"><rect x=".6" y=".6" width="8.8" height="8.8" rx="1" fill="none" stroke="#fff" stroke-width=".9"/>${done ? `<path d="M1.6 5.4l2.3 2.2L9.8 1" stroke="#1D2A8A" stroke-width="1.3" fill="none"/>` : ""}</svg>${lab} ${i + 1}</div>`; }
+    const lx = lerp(w * 0.3, w * 0.62, (Math.sin((t - b.t0) * 1.2) + 1) / 2), ly = h * 0.5, LR = mn * 0.3;
+    const list = `<div style="position:absolute;left:${(w * 0.16).toFixed(1)}px;top:${(h * 0.32).toFixed(1)}px;transform:perspective(${(mn * 1.6).toFixed(0)}px) rotateX(28deg) rotateZ(-6deg)">${rows}</div>`;
+    return `<div style="position:absolute;inset:0;background:${BLUEBG}"></div>${list}
+      <div style="position:absolute;left:${(lx - LR).toFixed(1)}px;top:${(ly - LR).toFixed(1)}px;width:${(LR * 2).toFixed(1)}px;height:${(LR * 2).toFixed(1)}px;border-radius:50%;overflow:hidden;border:${(mn * 0.01).toFixed(1)}px solid #1A2050;box-shadow:0 0 0 ${(mn * 0.004).toFixed(1)}px rgba(255,255,255,.6),0 ${(mn * 0.02).toFixed(0)}px ${(mn * 0.05).toFixed(0)}px rgba(13,18,54,.4);background:rgba(255,255,255,.08)"><div style="position:absolute;left:${(-(lx - LR) * 1.25 - LR * 0.25).toFixed(1)}px;top:${(-(ly - LR) * 1.25 - LR * 0.25).toFixed(1)}px;width:${w}px;height:${h}px;transform:scale(1.25);transform-origin:0 0">${list}</div></div>
+      ${capTop(this, cap, t, b.t0, w, h, mn, false)}`;
   };
 })();
