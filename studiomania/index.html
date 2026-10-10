@@ -120,16 +120,17 @@ button,input,select,textarea{font:inherit;color:inherit}
 /* ---------- tiles ---------- */
 .tile{display:flex;flex-direction:column;justify-content:space-between;gap:10px;padding:clamp(12px,1.1vw,18px);cursor:pointer;overflow:hidden;min-width:0;min-height:0;outline:none;transition:background-color .35s,transform .45s cubic-bezier(.2,.8,.2,1)}
 .tile:is(:hover,:focus-visible){background:var(--pane-2);transform:translateY(-2px)}
-.t-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.t-top{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .t-label{font-size:clamp(11px,.8vw,13px);letter-spacing:.24em;text-transform:uppercase;white-space:nowrap;transition:letter-spacing .5s cubic-bezier(.2,.7,.2,1)}
 .tile:is(:hover,:focus-visible) .t-label{letter-spacing:.32em}
 .t-go{width:14px;height:14px;flex:none;opacity:0;transform:translate(-4px,4px);transition:opacity .35s,transform .35s}
 .t-go path{fill:none;stroke:var(--fg);stroke-width:1.5}
 .tile:is(:hover,:focus-visible) .t-go{opacity:1;transform:none}
 .t-meta{font-family:var(--font-mono);font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.t-ico{width:clamp(22px,2.1vw,30px);height:clamp(22px,2.1vw,30px);color:var(--muted);transition:color .35s,transform .5s}
-.t-ico svg{width:100%;height:100%;display:block}
-.tile:is(:hover,:focus-visible) .t-ico{color:var(--fg);transform:scale(1.08)}
+.t-head{display:flex;align-items:center;gap:10px;min-width:0}
+.t-badge{width:clamp(28px,2.3vw,36px);aspect-ratio:1;flex:none;margin:-4px 0 -4px -4px;transition:transform .5s cubic-bezier(.2,.8,.2,1)}
+.t-badge svg{width:100%;height:100%;display:block;overflow:visible}
+.tile:is(:hover,:focus-visible) .t-badge{transform:scale(1.14) rotate(-5deg)}
 .subs{display:grid;gap:8px;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);min-height:0;flex:1}
 .sub{border-radius:10px;padding:8px 10px;background:transparent;display:flex;flex-direction:column;justify-content:space-between;gap:4px;min-width:0;overflow:hidden}
 .sub .n{font-size:clamp(16px,1.5vw,24px);font-weight:300;line-height:1}
@@ -179,18 +180,13 @@ button,input,select,textarea{font:inherit;color:inherit}
 .s-cap.swap>*:nth-child(2){animation-delay:.05s}
 .s-cap.swap>*:nth-child(3){animation-delay:.1s}
 @keyframes capIn{from{opacity:0;transform:translateY(8px)}}
-.portal{position:absolute;left:50%;top:44%;width:18%;aspect-ratio:16/10;transform:translate(-50%,-50%);border-radius:8px;background:transparent;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;pointer-events:none;--r:8px}
-.portal::after{display:none}
-.stage .portal{background:transparent;box-shadow:none}
-.portal.drawn>.snake .sd{animation:portalTrace .3s ease-out both}
-@keyframes portalTrace{from{stroke-dashoffset:100;opacity:1}to{stroke-dashoffset:0;opacity:1}}
 
 /* ---------- zoomed panel ---------- */
 .zoom{position:fixed;inset:0;z-index:20;background:var(--veil);-webkit-backdrop-filter:blur(34px) saturate(150%);backdrop-filter:blur(34px) saturate(150%);display:flex;flex-direction:column;gap:14px;padding-block:18px 20px;padding-inline:22px}
 .zhead{display:flex;align-items:center;gap:18px;flex:none}
 .zslot{width:64px;height:64px;flex:none}
 .crumb{font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted)}
-.zhead h1{margin:2px 0 0;font-weight:400;font-size:clamp(22px,2.2vw,30px);letter-spacing:.24em;text-transform:uppercase;line-height:1.15}
+.zhead h1{width:fit-content;transform-origin:0 0;margin:2px 0 0;font-weight:400;font-size:clamp(22px,2.2vw,30px);letter-spacing:.24em;text-transform:uppercase;line-height:1.15}
 .close{all:unset;margin-inline-start:auto;cursor:pointer;display:flex;align-items:center;gap:10px;font-size:12px;letter-spacing:.2em;text-transform:uppercase;padding:10px 16px;border-radius:999px;background:var(--pane-2);box-shadow:inset 0 1px 0 var(--edge-hi);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px)}
 .close:hover{background:var(--pane-sub)}
 .zbody{flex:1;min-height:0}
@@ -384,43 +380,40 @@ input[type=range]{accent-color:var(--accent);width:140px}
 
   <main class="grid" id="grid">
     <div class="box tile" data-key="editor" style="grid-area:editor" tabindex="0" role="button">
-      <div class="t-top"><span class="t-label">Open Editor</span><svg class="t-go" viewBox="0 0 14 14"><path d="M3 11L11 3M5 3h6v6"/></svg></div>
+      <div class="t-top"><span class="t-head"><span class="t-badge" data-badge="editor"></span><span class="t-label">Open Editor</span></span><svg class="t-go" viewBox="0 0 14 14"><path d="M3 11L11 3M5 3h6v6"/></svg></div>
       <div class="chips"><span class="box sub">9:16</span><span class="box sub">1:1</span><span class="box sub">16:9</span><span class="box sub">4:5</span></div>
       <div class="t-meta">New project · last opened 2h ago</div>
     </div>
 
     <div class="box tile" data-key="brand" style="grid-area:brand" tabindex="0" role="button">
-      <div class="t-top"><span class="t-label">Your Brand</span><svg class="t-go" viewBox="0 0 14 14"><path d="M3 11L11 3M5 3h6v6"/></svg></div>
+      <div class="t-top"><span class="t-head"><span class="t-badge" data-badge="brand"></span><span class="t-label">Your Brand</span></span><svg class="t-go" viewBox="0 0 14 14"><path d="M3 11L11 3M5 3h6v6"/></svg></div>
       <div class="bmini" id="brandMini"></div>
       <div class="t-meta">Logo · colors · fonts</div>
     </div>
 
     <div class="box tile" data-key="settings" style="grid-area:settings" tabindex="0" role="button">
-      <div class="t-top"><span class="t-label">Settings</span><svg class="t-go" viewBox="0 0 14 14"><path d="M3 11L11 3M5 3h6v6"/></svg></div>
-      <span class="t-ico" data-ico="settings"></span>
+      <div class="t-top"><span class="t-head"><span class="t-badge" data-badge="settings"></span><span class="t-label">Settings</span></span><svg class="t-go" viewBox="0 0 14 14"><path d="M3 11L11 3M5 3h6v6"/></svg></div>
       <div class="t-meta">1080p · 30fps · autosave on</div>
     </div>
 
     <div class="box tile" data-key="ai" style="grid-area:ai" tabindex="0" role="button">
-      <div class="t-top"><span class="t-label">AI Script</span><svg class="t-go" viewBox="0 0 14 14"><path d="M3 11L11 3M5 3h6v6"/></svg></div>
-      <span class="t-ico" data-ico="ai"></span>
+      <div class="t-top"><span class="t-head"><span class="t-badge" data-badge="ai"></span><span class="t-label">AI Script</span></span><svg class="t-go" viewBox="0 0 14 14"><path d="M3 11L11 3M5 3h6v6"/></svg></div>
       <div class="typed">Protein before or after training</div>
     </div>
 
     <div class="box tile" data-key="templates" style="grid-area:tmpl" tabindex="0" role="button">
-      <div class="t-top"><span class="t-label">Templates</span><svg class="t-go" viewBox="0 0 14 14"><path d="M3 11L11 3M5 3h6v6"/></svg></div>
-      <span class="t-ico" data-ico="templates"></span>
+      <div class="t-top"><span class="t-head"><span class="t-badge" data-badge="templates"></span><span class="t-label">Templates</span></span><svg class="t-go" viewBox="0 0 14 14"><path d="M3 11L11 3M5 3h6v6"/></svg></div>
       <div class="t-meta">48 layouts</div>
     </div>
 
     <div class="box tile" data-key="captions" style="grid-area:cap" tabindex="0" role="button">
-      <div class="t-top"><span class="t-label">Captions</span><svg class="t-go" viewBox="0 0 14 14"><path d="M3 11L11 3M5 3h6v6"/></svg></div>
+      <div class="t-top"><span class="t-head"><span class="t-badge" data-badge="captions"></span><span class="t-label">Captions</span></span><svg class="t-go" viewBox="0 0 14 14"><path d="M3 11L11 3M5 3h6v6"/></svg></div>
       <span class="cap-sample" dir="rtl">معلومة مع <mark>KOCHI</mark></span>
       <div class="t-meta">Arabic · English</div>
     </div>
 
     <div class="box tile" data-key="voice" style="grid-area:voice" tabindex="0" role="button">
-      <div class="t-top"><span class="t-label">Voiceover</span><svg class="t-go" viewBox="0 0 14 14"><path d="M3 11L11 3M5 3h6v6"/></svg></div>
+      <div class="t-top"><span class="t-head"><span class="t-badge" data-badge="voice"></span><span class="t-label">Voiceover</span></span><svg class="t-go" viewBox="0 0 14 14"><path d="M3 11L11 3M5 3h6v6"/></svg></div>
       <div class="wave" id="tileWave"></div>
       <div class="t-meta">4 voices · 1 cloned</div>
     </div>
@@ -432,11 +425,10 @@ input[type=range]{accent-color:var(--accent);width:140px}
         <div class="s-blurb" id="sBlurb"></div>
         <div class="s-hint" id="sHint"></div>
       </div>
-      <div class="box portal" id="portal" aria-hidden="true"></div>
     </div>
 
     <div class="box tile" data-key="library" style="grid-area:lib" tabindex="0" role="button">
-      <div class="t-top"><span class="t-label">Media Library</span><svg class="t-go" viewBox="0 0 14 14"><path d="M3 11L11 3M5 3h6v6"/></svg></div>
+      <div class="t-top"><span class="t-head"><span class="t-badge" data-badge="library"></span><span class="t-label">Media Library</span></span><svg class="t-go" viewBox="0 0 14 14"><path d="M3 11L11 3M5 3h6v6"/></svg></div>
       <div class="subs">
         <div class="box sub"><span class="n mono">124</span><span class="k">Video</span></div>
         <div class="box sub"><span class="n mono">38</span><span class="k">Audio</span></div>
@@ -445,7 +437,7 @@ input[type=range]{accent-color:var(--accent);width:140px}
     </div>
 
     <div class="box tile" data-key="export" style="grid-area:export" tabindex="0" role="button">
-      <div class="t-top"><span class="t-label">Export</span><svg class="t-go" viewBox="0 0 14 14"><path d="M3 11L11 3M5 3h6v6"/></svg></div>
+      <div class="t-top"><span class="t-head"><span class="t-badge" data-badge="export"></span><span class="t-label">Export</span></span><svg class="t-go" viewBox="0 0 14 14"><path d="M3 11L11 3M5 3h6v6"/></svg></div>
       <div class="subs">
         <div class="box sub"><span class="k">TikTok</span><span class="t-meta">1080×1920</span></div>
         <div class="box sub"><span class="k">Reels</span><span class="t-meta">1080×1920</span></div>
@@ -455,7 +447,7 @@ input[type=range]{accent-color:var(--accent);width:140px}
     </div>
 
     <div class="box tile" data-key="recent" style="grid-area:recent" tabindex="0" role="button">
-      <div class="t-top"><span class="t-label">Recent Projects</span><svg class="t-go" viewBox="0 0 14 14"><path d="M3 11L11 3M5 3h6v6"/></svg></div>
+      <div class="t-top"><span class="t-head"><span class="t-badge" data-badge="recent"></span><span class="t-label">Recent Projects</span></span><svg class="t-go" viewBox="0 0 14 14"><path d="M3 11L11 3M5 3h6v6"/></svg></div>
       <div class="subs rec">
         <div class="box sub"><div class="th g1"></div><span class="nm">Protein myths · ep.12</span><span class="t-meta">00:48 · Draft</span></div>
         <div class="box sub"><div class="th g2"></div><span class="nm">Creatine vs whey</span><span class="t-meta">01:05 · Exported</span></div>
@@ -465,7 +457,7 @@ input[type=range]{accent-color:var(--accent);width:140px}
     </div>
 
     <div class="box tile" data-key="analytics" style="grid-area:analytics" tabindex="0" role="button">
-      <div class="t-top"><span class="t-label">Analytics</span><svg class="t-go" viewBox="0 0 14 14"><path d="M3 11L11 3M5 3h6v6"/></svg></div>
+      <div class="t-top"><span class="t-head"><span class="t-badge" data-badge="analytics"></span><span class="t-label">Analytics</span></span><svg class="t-go" viewBox="0 0 14 14"><path d="M3 11L11 3M5 3h6v6"/></svg></div>
       <svg class="spark" id="spark" viewBox="0 0 120 40" preserveAspectRatio="none" aria-hidden="true"></svg>
       <div class="t-meta">Avg. retention 71% · sample data</div>
     </div>
@@ -545,7 +537,6 @@ function glass(key) {
     + `<path d="${s.d}" fill="none" style="stroke:var(--glass-hi)" stroke-opacity=".45" stroke-width="12" filter="url(#fSoft)"/></g>`
     + `<path d="${s.d}" fill="none" stroke="url(#gEdge)" stroke-width="1.5" stroke-linejoin="round"/></g></svg>`;
 }
-const lineIcon = key => `<svg viewBox="0 0 200 200" aria-hidden="true"><path d="${SHAPES[key].d}" fill="none" stroke="currentColor" stroke-width="8" stroke-linejoin="round"/></svg>`;
 
 const ITEMS = {
   idle:      { name: 'STUDIOMANIA', blurb: 'Hover a box to preview it. Click to open it.' },
@@ -595,7 +586,8 @@ function attachSnakes(scope) {
 }
 
 /* ---------- tile decorations ---------- */
-$$('[data-ico]').forEach(el => el.innerHTML = lineIcon(el.dataset.ico));
+const renderBadges = () => $$('[data-badge]').forEach(el => el.innerHTML = glass(el.dataset.badge));
+renderBadges();
 $('#tileWave').innerHTML = [10,18,26,14,22,8,20,26,12,18,24,10,16,22,8].map((h, i) => `<i style="--h:${h}px;--d:${(i % 5) * -.18}s"></i>`).join('');
 const RET = [100, 92, 84, 78, 74, 70, 67, 64, 62, 60, 58, 56, 55];
 (() => {
@@ -633,7 +625,7 @@ matchMedia('(prefers-color-scheme: light)').addEventListener('change', syncToggl
 syncToggle();
 
 /* ---------- stage ---------- */
-const stageIcon = $('#sIcon'), grid = $('#grid'), portal = $('#portal'), stage = $('#stage');
+const stageIcon = $('#sIcon'), grid = $('#grid'), stage = $('#stage');
 let stageKey = null, idleT;
 function setStage(key, force) {
   if (key === stageKey && !force) return;
@@ -672,50 +664,62 @@ grid.addEventListener('keydown', e => {
 
 /* ---------- zoom into the hidden box ---------- */
 const zoom = $('#zoom'), zBody = $('#zBody'), zslot = $('#zslot'), flyer = $('#flyer');
-let open = null, busy = false, anims = [], opener = null;
+let open = null, busy = false, anims = [], opener = null, hiddenSrc = [];
+const sq = r => { const m = Math.min(r.width, r.height); return { left: r.left + (r.width - m) / 2, top: r.top + (r.height - m) / 2, size: m }; };
 function openPanel(key, fromEl) {
   if (busy || open) return;
   busy = true; open = key; opener = fromEl; clearTimeout(idleT);
-  if (stageKey !== key) {
+  const isStage = fromEl === stage;
+  if (isStage && stageKey !== key) {
     setStage(key);
     const l = stageIcon.lastElementChild; l.style.transition = 'none'; l.classList.add('cur');
   }
   const it = ITEMS[key];
-  $('#zTitle').textContent = it.name;
+  const h1 = $('#zTitle');
+  h1.textContent = it.name;
   $('#zCrumb').textContent = it.crumb || 'Workspace';
   zBody.innerHTML = PANELS[key]();
   zoom.hidden = false;
   attachSnakes(zBody);
   INIT[key] && INIT[key]();
 
-  const vw = innerWidth, vh = innerHeight, p = portal.getBoundingClientRect();
-  const from = `inset(${p.top}px ${vw - p.right}px ${vh - p.bottom}px ${p.left}px round 8px)`;
-  const to = 'inset(0px 0px 0px 0px round 0px)';
-  const lay = stageIcon.querySelector('.layer.cur') || stageIcon.lastElementChild;
-  const fr = lay.getBoundingClientRect();
-  const s = Math.min(fr.width, fr.height), fx = fr.left + (fr.width - s) / 2, fy = fr.top + (fr.height - s) / 2;
-  const sl = zslot.getBoundingClientRect();
+  // where things start (inside the box) and where they land (full screen)
+  const vw = innerWidth, vh = innerHeight, r = fromEl.getBoundingClientRect();
+  const iconEl = isStage ? (stageIcon.querySelector('.layer.cur') || stageIcon.lastElementChild) : fromEl.querySelector('.t-badge');
+  const labelEl = isStage ? $('#sName') : fromEl.querySelector('.t-label');
+  const ic = sq(iconEl.getBoundingClientRect()), lr = labelEl.getBoundingClientRect();
+  const sl = zslot.getBoundingClientRect(), hr = h1.getBoundingClientRect();
+  const g = grid.getBoundingClientRect(), zb = zBody.getBoundingClientRect();
+
   flyer.innerHTML = glass(key);
   Object.assign(flyer.style, { left: sl.left + 'px', top: sl.top + 'px', width: sl.width + 'px', height: sl.height + 'px' });
   flyer.hidden = false;
-  stageIcon.style.visibility = 'hidden';
+  hiddenSrc = [isStage ? stageIcon : iconEl, labelEl];
+  hiddenSrc.forEach(el => el.style.visibility = 'hidden');
 
-  const g = grid.getBoundingClientRect(), zb = zBody.getBoundingClientRect();
-  const pcx = (p.left + p.right) / 2, pcy = (p.top + p.bottom) / 2;
-  grid.style.transformOrigin = `${pcx - g.left}px ${pcy - g.top}px`;
-  zBody.style.transformOrigin = `${pcx - zb.left}px ${pcy - zb.top}px`;
-  portal.classList.add('drawn');
+  // camera: scale the whole grid so the clicked box fills the view
+  const s = Math.min(vw / r.width, vh / r.height);
+  const tx = vw / 2 - g.left - (r.left + r.width / 2 - g.left) * s;
+  const ty = vh / 2 - g.top - (r.top + r.height / 2 - g.top) * s;
+  grid.style.transformOrigin = '0 0';
+  zBody.style.transformOrigin = '0 0';
+  const rad = parseFloat(getComputedStyle(fromEl).borderTopLeftRadius) || 18;
+  const from = `inset(${r.top}px ${vw - r.right}px ${vh - r.bottom}px ${r.left}px round ${rad}px)`;
+  const to = 'inset(0px 0px 0px 0px round 0px)';
+  const fsRatio = parseFloat(getComputedStyle(labelEl).fontSize) / parseFloat(getComputedStyle(h1).fontSize);
 
-  const E = 'cubic-bezier(.76,0,.24,1)';
+  const E = 'cubic-bezier(.62,0,.14,1)', T = D(1100), o = { duration: T, easing: E, fill: 'both' };
   anims = [
-    flyer.animate([{ transform: `translate(${fx - sl.left}px,${fy - sl.top}px) scale(${s / sl.width})` }, { transform: 'none' }], { duration: D(860), easing: E, fill: 'both' }),
-    zoom.animate([{ clipPath: from }, { clipPath: to }], { duration: D(760), delay: D(200), easing: E, fill: 'both' }),
-    grid.animate([{ transform: 'scale(1)', opacity: 1, filter: 'blur(0px)' }, { transform: 'scale(2.4)', opacity: 0, filter: 'blur(10px)' }], { duration: D(760), delay: D(200), easing: E, fill: 'both' }),
-    zBody.animate([{ transform: 'scale(.4)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: D(760), delay: D(200), easing: E, fill: 'both' }),
-    $('.top').animate([{ opacity: 1 }, { opacity: 0 }], { duration: D(500), delay: D(200), easing: 'ease-out', fill: 'both' }),
-    $('#zText').animate([{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none' }], { duration: D(420), delay: D(640), easing: 'ease-out', fill: 'both' }),
+    grid.animate([{ transform: 'translate(0px,0px) scale(1)', opacity: 1 }, { opacity: 1, offset: .25 }, { transform: `translate(${tx}px,${ty}px) scale(${s})`, opacity: 0 }], o),
+    $('.top').animate([{ opacity: 1 }, { opacity: 0 }], { duration: D(450), fill: 'both' }),
+    zoom.animate([{ clipPath: from, opacity: 0 }, { opacity: 1, offset: .3 }, { clipPath: to, opacity: 1 }], o),
+    zBody.animate([{ transform: `translate(${r.left - zb.left}px,${r.top - zb.top}px) scale(${r.width / zb.width})`, opacity: 0 }, { opacity: 0, offset: .35 }, { transform: 'none', opacity: 1 }], o),
+    flyer.animate([{ transform: `translate(${ic.left - sl.left}px,${ic.top - sl.top}px) scale(${ic.size / sl.width})` }, { transform: 'none' }], o),
+    h1.animate([{ transform: `translate(${lr.left - hr.left}px,${lr.top - hr.top}px) scale(${fsRatio})` }, { transform: 'none' }], o),
+    $('.crumb', zoom).animate([{ opacity: 0 }, { opacity: 0, offset: .6 }, { opacity: 1 }], { duration: T, fill: 'both' }),
+    $('#zClose').animate([{ opacity: 0 }, { opacity: 0, offset: .6 }, { opacity: 1 }], { duration: T, fill: 'both' }),
   ];
-  setTimeout(() => $$('.pbox', zBody).forEach((b, i) => { b.style.setProperty('--dd', (i * 70) + 'ms'); b.classList.add('drawn'); }), D(620));
+  setTimeout(() => $$('.pbox', zBody).forEach((b, i) => { b.style.setProperty('--dd', (i * 70) + 'ms'); b.classList.add('drawn'); }), D(750));
   Promise.all(anims.map(a => a.finished)).then(() => { busy = false; $('#zClose').focus({ preventScroll: true }); }).catch(() => { busy = false; });
 }
 function closePanel() {
@@ -726,7 +730,7 @@ function closePanel() {
   function done() {
     anims.forEach(a => a.cancel()); anims = [];
     zoom.hidden = true; flyer.hidden = true; flyer.innerHTML = ''; zBody.innerHTML = '';
-    stageIcon.style.visibility = ''; portal.classList.remove('drawn');
+    hiddenSrc.forEach(el => el.style.visibility = ''); hiddenSrc = [];
     const k = open; open = null; busy = false;
     if (k === 'brand') setStage('brand', true);
     opener && opener.focus({ preventScroll: true });
@@ -879,6 +883,7 @@ function renderHooks(list) {
 }
 function refreshBrand() {
   renderBrandMini(); save();
+  const bb = $('[data-badge="brand"]'); if (bb) bb.innerHTML = glass('brand');
   const dm = $('#bDropMark');
   if (dm) dm.innerHTML = state.logo ? `<img src="${esc(state.logo)}" alt="Your logo">` : `<span class="lg">${esc((state.name || 'Your logo').toUpperCase())}</span>`;
   const phone = $('#bPhone');
