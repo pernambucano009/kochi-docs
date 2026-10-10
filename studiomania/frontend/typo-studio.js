@@ -55,7 +55,7 @@
     "qr", "codetag", "toolbar", "terminal", "scan",
     "toasts", "footer", "marquee", "datestrip",
     "fileicon", "chaos",
-    "gradword", "meshprompt", "orbsplit", "bento", "figdays", "figcurve", "figplay", "figequal", "figwords", "figphone", "figdrop", "figcount", "figgears", "figbar", "figcheck", "figcta", "goldcap", "iconbelt", "glowsweep", "namepill", "kashida", "molecule", "weightstack", "stretch", "desatpop", "arcs", "chrome", "inkverse", "poemfade", "hashend", "flipverb", "strobe", "duoline", "capstack", "pillword", "blurduo", "tagstack", "underbars", "contactcard", "iconorbit", "blurstrobe", "kinstack", "incall", "cineband", "scriptover", "tricolor", "drumpicker", "redmix", "headbubble", "pincard", "emojifloat", "slotreel", "posterwall", "quoteline", "medallion", "clockhand", "roadtext", "markpan", "objectquote", "racechart", "calflip", "glosscards", "dropword", "tasklens", "monostack", "dashbox", "sparklist", "followbtn", "silhouette", "petalstack", "followcount", "twopillars", "cutmat", "labelbox", "stampcard", "lcdtype", "genpanel", "holopulse", "coverflow", "featuretag", "luxmix", "goldframes", "goldrows", "tilegrid", "goldpill", "holoclock", "curvewall", "newsscan", "neonvenn", "wavebelt", "cardarc", "shadowquote", "haloring", "noirtitle", "stickerstack", "graphhop", "podium", "hudcallout", "termbar", "glowtoggle", "pinkdoodle", "lensfind", "echostack", "dofwords", "portalchat", "cardframe", "wordvoid", "facecam"]);
+    "gradword", "meshprompt", "orbsplit", "bento", "figdays", "figcurve", "figplay", "figequal", "figwords", "figphone", "figdrop", "figcount", "figgears", "figbar", "figcheck", "figcta", "goldcap", "iconbelt", "glowsweep", "namepill", "kashida", "molecule", "weightstack", "stretch", "desatpop", "arcs", "chrome", "inkverse", "poemfade", "hashend", "flipverb", "strobe", "duoline", "capstack", "pillword", "blurduo", "tagstack", "underbars", "contactcard", "iconorbit", "blurstrobe", "kinstack", "incall", "cineband", "scriptover", "tricolor", "drumpicker", "redmix", "headbubble", "pincard", "emojifloat", "slotreel", "posterwall", "quoteline", "medallion", "clockhand", "roadtext", "markpan", "objectquote", "racechart", "calflip", "glosscards", "dropword", "tasklens", "monostack", "dashbox", "sparklist", "followbtn", "silhouette", "petalstack", "followcount", "twopillars", "cutmat", "labelbox", "stampcard", "lcdtype", "genpanel", "holopulse", "coverflow", "featuretag", "luxmix", "goldframes", "goldrows", "tilegrid", "goldpill", "holoclock", "curvewall", "newsscan", "neonvenn", "wavebelt", "cardarc", "shadowquote", "haloring", "noirtitle", "stickerstack", "graphhop", "podium", "hudcallout", "termbar", "glowtoggle", "pinkdoodle", "lensfind", "echostack", "dofwords", "portalchat", "cardframe", "wordvoid", "facecam", "spreadcaps", "tinysub"]);
   E.TYPING = new Set(["type", "artype"]);
   const MC = document.createElement("canvas").getContext("2d");
   const measure = (s, font) => { MC.font = font; return MC.measureText(s).width; };
@@ -7843,5 +7843,31 @@
       <rect width="${w}" height="${h}" fill="#1E1E1E" mask="url(#fc${bi})"/>
       <circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${Rr.toFixed(1)}" fill="none" stroke="url(#fg${bi})" stroke-width="${(mn * 0.008).toFixed(1)}" style="filter:drop-shadow(0 0 ${(mn * 0.015).toFixed(0)}px #FF7A1A) drop-shadow(0 0 ${(mn * 0.03).toFixed(0)}px rgba(255,120,30,.6))" opacity="${p.toFixed(2)}"/></svg>${panel}
       <div dir="${this.dir(s)}" style="position:absolute;left:0;right:0;top:${capY.toFixed(1)}px;text-align:center;font:800 ${z.toFixed(1)}px ${ff};${AR.test(s) ? "" : "font-style:italic;"}color:#fff;text-shadow:0 2px 6px rgba(0,0,0,.7)">${esc(s)}</div>`;
+  };
+  // ======== r39 «فخم هادي» — كلمات كابيتال صغيرة متفرّقة على عرض الكادر، وبعدها الكلمة المهمة سيريف تقيل كبير على سطرين مزقوقين وتاج صغير لازق فيها ========
+  P.k_spreadcaps = function (b, t, k, th, bi) {
+    const it = this.items(b); if (!it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h), n = it.length, fi = b.focus >= 0 && b.focus < n ? b.focus : -1, ar = AR.test(it.map((x) => this.text(x.w)).join(" "));
+    const hd = this.headAt((b.t0 + b.t1) / 2), y = hd.has ? clamp(hd.y + hd.r * 1.6, h * 0.25, h * 0.8) : h * 0.45;
+    const small = fi >= 0 ? it.slice(0, fi) : it, big = fi >= 0 ? it.slice(fi) : [], cz = mn * 0.034 * this.ts, cf = AR.test(it.map((x) => this.text(x.w)).join("")) ? famOf("ع") : "'TY Outfit', 'SM Tajawal'";
+    const showBig = big.length && t >= big[0].t0 - 0.05;
+    let html = "";
+    if (!showBig) { const vis = small.filter((x) => t >= x.t0 - 0.05).slice(-3);
+      html += `<div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:${(w * 0.08).toFixed(1)}px;right:${(w * 0.08).toFixed(1)}px;top:${(y - cz).toFixed(1)}px;display:flex;justify-content:space-between;font:600 ${cz.toFixed(1)}px ${cf};letter-spacing:.14em;color:#F4F1EC;text-transform:uppercase;text-shadow:0 1px 8px rgba(0,0,0,.6)">${vis.map((x) => `<span style="${blurIn(t, x.t0 - 0.05, 0.25)}">${esc(this.text(x.w))}</span>`).join("")}</div>`; }
+    else { const s1 = this.text(big[0].w), rest = big.slice(1).map((x) => this.text(x.w)).join(" "), sf = AR.test(s1) ? "'TY Amiri', 'TY PlexAr'" : "'TY Amiri', 'TY Serif'";
+      const z = Math.min(mn * 0.11 * this.ts, fitSize(s1, `700 {}px ${sf}`, w * 0.6, mn * 0.11 * this.ts), rest ? fitSize(rest, `700 {}px ${sf}`, w * 0.6, mn * 0.11 * this.ts) : 1e9), q = eOut(seg(t, big[0].t0 - 0.05, big[0].t0 + 0.3));
+      const tag = small.length ? this.text(small[small.length - 1].w) : "";
+      html += `<div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:0;right:0;top:${(y - z * 0.8).toFixed(1)}px;text-align:center;font:700 ${z.toFixed(1)}px ${sf};line-height:.92;color:#F7F4EE;text-shadow:0 2px 14px rgba(0,0,0,.45);opacity:${clamp(q * 2).toFixed(2)};transform:translateY(${((1 - q) * z * 0.2).toFixed(1)}px)">
+        <div style="transform:translateX(${(ar ? 1 : -1) * w * 0.06}px)">${esc(s1)}${tag && !rest ? `<span style="font:600 ${(cz * 0.95).toFixed(1)}px ${cf};letter-spacing:.14em;text-transform:uppercase;vertical-align:${(z * 0.5).toFixed(0)}px;margin:0 ${(cz * 0.5).toFixed(1)}px">${esc(tag)}</span>` : ""}</div>
+        ${rest ? `<div style="transform:translateX(${(ar ? -1 : 1) * w * 0.07}px);opacity:${t >= big[1].t0 - 0.05 ? 1 : 0}">${esc(rest)}</div>` : ""}</div>`; }
+    return html;
+  };
+  // ---------- tinysub: سطر ترجمة صغير جدًا كابيتال متباعد تحت (زي ترجمة أفلام فخمة)، وبيتبدّل جملة جملة
+  P.k_tinysub = function (b, t, k, th, bi) {
+    const it = this.items(b); if (!it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h), per = 6, grp = []; for (let i = 0; i < it.length; i += per) grp.push(it.slice(i, i + per));
+    let g = grp[0]; for (const x of grp) if (t >= x[0].t0 - 0.05) g = x;
+    const s = g.map((x) => this.text(x.w)).join(" "), ff = AR.test(s) ? famOf(s) : "'TY Outfit', 'SM Tajawal'", z = mn * 0.022 * this.ts;
+    return `<div dir="${this.dir(s)}" style="position:absolute;left:${(w * 0.08).toFixed(1)}px;right:${(w * 0.08).toFixed(1)}px;top:${(h * 0.8).toFixed(1)}px;text-align:center;font:600 ${z.toFixed(1)}px ${ff};letter-spacing:.12em;text-transform:uppercase;color:#F4F1EC;text-shadow:0 1px 6px rgba(0,0,0,.7);${blurIn(t, g[0].t0 - 0.05, 0.25)}">${esc(s)}</div>`;
   };
 })();
