@@ -55,7 +55,7 @@
     "qr", "codetag", "toolbar", "terminal", "scan",
     "toasts", "footer", "marquee", "datestrip",
     "fileicon", "chaos",
-    "gradword", "meshprompt", "orbsplit", "bento", "figdays", "figcurve", "figplay", "figequal", "figwords", "figphone", "figdrop", "figcount", "figgears", "figbar", "figcheck", "figcta", "goldcap", "iconbelt", "glowsweep", "namepill", "kashida", "molecule", "weightstack", "stretch", "desatpop", "arcs", "chrome", "inkverse", "poemfade", "hashend", "flipverb", "strobe", "duoline", "capstack", "pillword", "blurduo", "tagstack", "underbars", "contactcard", "iconorbit", "blurstrobe", "kinstack", "incall", "cineband", "scriptover", "tricolor", "drumpicker", "redmix", "headbubble", "pincard", "emojifloat", "slotreel", "posterwall", "quoteline", "medallion", "clockhand", "roadtext", "markpan", "objectquote", "racechart", "calflip", "glosscards", "dropword", "tasklens", "monostack", "dashbox", "sparklist", "followbtn", "silhouette"]);
+    "gradword", "meshprompt", "orbsplit", "bento", "figdays", "figcurve", "figplay", "figequal", "figwords", "figphone", "figdrop", "figcount", "figgears", "figbar", "figcheck", "figcta", "goldcap", "iconbelt", "glowsweep", "namepill", "kashida", "molecule", "weightstack", "stretch", "desatpop", "arcs", "chrome", "inkverse", "poemfade", "hashend", "flipverb", "strobe", "duoline", "capstack", "pillword", "blurduo", "tagstack", "underbars", "contactcard", "iconorbit", "blurstrobe", "kinstack", "incall", "cineband", "scriptover", "tricolor", "drumpicker", "redmix", "headbubble", "pincard", "emojifloat", "slotreel", "posterwall", "quoteline", "medallion", "clockhand", "roadtext", "markpan", "objectquote", "racechart", "calflip", "glosscards", "dropword", "tasklens", "monostack", "dashbox", "sparklist", "followbtn", "silhouette", "petalstack", "followcount", "twopillars"]);
   E.TYPING = new Set(["type", "artype"]);
   const MC = document.createElement("canvas").getContext("2d");
   const measure = (s, font) => { MC.font = font; return MC.measureText(s).width; };
@@ -7242,5 +7242,51 @@
     return MONOBG + `<svg style="position:absolute;inset:0" width="${w}" height="${h}"><path d="M${(-w * 0.1).toFixed(0)} ${(h * 0.92).toFixed(0)} Q ${(w * 0.5).toFixed(0)} ${(h * 0.78).toFixed(0)} ${(w * 1.1).toFixed(0)} ${(h * 0.84).toFixed(0)}" stroke="#C9C9C9" stroke-width="${(mn * 0.08).toFixed(0)}" fill="none"/></svg>${man}
       <div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:${(w * 0.06).toFixed(1)}px;right:${(w * 0.06).toFixed(1)}px;top:${(h * 0.2).toFixed(1)}px;text-align:center;font:500 ${z.toFixed(1)}px ${ff};color:#555;line-height:1.5">${it.map((x, i) => { const s = this.text(x.w), hv = i === b.focus || [...s].length >= 7, q = seg(t, x.t0 - 0.05, x.t0 + 0.25);
         return `<span style="display:inline-block;font-weight:${hv ? 800 : 500};color:${hv ? "#111" : "#555"};opacity:${clamp(q * 2).toFixed(2)}">${esc(s)}</span>`; }).join(" ")}</div>`;
+  };
+  // ======== r22 «بتلات» — ورق كريمي بمربعات باهتة وورد أسود ببتلات في الأركان، كلمة صغيرة + كلمة سودا تقيلة + كلمة رمادي تقيلة ========
+  const PETALBG = (w, h, mn, t) => { const pet = (x, y, s, r) => `<g transform="translate(${x.toFixed(0)} ${y.toFixed(0)}) rotate(${r.toFixed(1)}) scale(${s.toFixed(2)})">${[0, 72, 144, 216, 288].map((a) => `<path d="M0 0 C -34 -24, -30 -64, 0 -72 C 30 -64, 34 -24, 0 0z" fill="#121212" transform="rotate(${a})"/>`).join("")}</g>`;
+    let g = ""; for (let i = 0; i < 9; i++) g += `<line x1="${(w * i / 8).toFixed(0)}" y1="0" x2="${(w * i / 8).toFixed(0)}" y2="${h}" stroke="rgba(0,0,0,.035)"/>`; for (let i = 0; i < 15; i++) g += `<line x1="0" y1="${(h * i / 14).toFixed(0)}" x2="${w}" y2="${(h * i / 14).toFixed(0)}" stroke="rgba(0,0,0,.035)"/>`;
+    const sw = Math.sin(t * 0.7) * 3;
+    return `<div style="position:absolute;inset:0;background:#FBFAF6"></div><svg style="position:absolute;inset:0" width="${w}" height="${h}">${g}${pet(-mn * 0.02, -mn * 0.02, mn / 420, 20 + sw)}${pet(w + mn * 0.02, h + mn * 0.02, mn / 380, 200 - sw)}</svg>`; };
+  // ---------- petalstack: كلمة صغيرة فوق، كلمة سودا تقيلة، وتحتها كلمة رمادي تقيلة أكبر (الأخيرة/focus) بتطلع من البلير
+  P.k_petalstack = function (b, t, k, th, bi) {
+    const P = figParts(this, { ...b, focus: b.focus >= 0 ? b.focus : this.items(b).length - 1 }); if (!P.it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h), it = P.it, n = it.length, fi = P.fi;
+    const small = it.slice(0, Math.max(0, fi - 1)), black = fi > 0 ? [it[fi - 1]] : [], grey = [it[fi], ...P.tail];
+    const J = (a) => a.map((x) => this.text(x.w)).join(" "), all = J(it), ar = AR.test(all), ff = famOf(all);
+    const zB = Math.min(fitSize(J(grey), `800 {}px ${ff}`, w * 0.8, mn * 0.12 * this.ts), fitSize(J(black) || "a", `800 {}px ${ff}`, w * 0.8, mn * 0.12 * this.ts)), zs = Math.min(zB * 0.42, fitSize(J(small) || "a", `500 {}px ${ff}`, w * 0.8, zB * 0.42)), y = h * 0.4;
+    const ln = (arr, z, wt, col) => arr.length ? `<div style="font:${wt} ${z.toFixed(1)}px ${ff};color:${col};white-space:nowrap">${arr.map((x) => `<span style="display:inline-block;${blurIn(t, x.t0 - 0.05, 0.35)}">${esc(this.text(x.w))}</span>`).join(" ")}</div>` : "";
+    return PETALBG(w, h, mn, t - b.t0) + `<div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:0;right:0;top:${(y - zB).toFixed(1)}px;text-align:center;line-height:${ar ? 1.35 : 1.02}">${ln(small, zs, 500, "#2A2A2A")}${ln(black, zB * 0.85, 800, "#141414")}${ln(grey, zB, 800, "#8E8E8E")}</div>`;
+  };
+  // ---------- followcount: دايرة صورة بروفايل وجنبها رقم متابعين بيجري لحد رقم كبير بـ k، وتحت كلام صغير، وناس صغيرة سودا ورمادي بتنط حواليه
+  P.k_followcount = function (b, t, k, th, bi) {
+    const it = this.items(b); if (!it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h), all = it.map((x) => this.text(x.w)).join(" "), m = all.match(/\d[\d,.]*/), N = m ? +m[0].replace(/[,]/g, "") : 10000;
+    const words = it.filter((x) => !/^\d[\d,.]*k?$/i.test(this.text(x.w))), D = b.t1 - b.t0, p = eOut(seg(t, b.t0, b.t0 + D * 0.45)), v = Math.round(N * p);
+    const z = mn * 0.11 * this.ts * 0.8, cy = h * 0.32, num = v.toLocaleString("en-US") + "k", ar = AR.test(all), ff = famOf(all);
+    let html = PETALBG(w, h, mn, t - b.t0) + `<div dir="ltr" style="position:absolute;left:0;right:0;top:${(cy - z * 0.6).toFixed(1)}px;display:flex;justify-content:center;align-items:center;gap:${(z * 0.25).toFixed(1)}px">
+      <svg width="${(z * 0.9).toFixed(0)}" height="${(z * 0.9).toFixed(0)}" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#E9E9E9" stroke="#9A9A9A" stroke-width="1.4"/><circle cx="12" cy="10" r="4" fill="#BDBDBD"/><path d="M5 19c2-4 12-4 14 0" fill="#BDBDBD"/></svg>
+      <span style="font:800 ${z.toFixed(1)}px 'TY Outfit';color:#5A5A5A;letter-spacing:-0.02em;font-variant-numeric:tabular-nums">${num}</span></div>`;
+    html += `<div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:0;right:0;top:${(cy + z * 0.8).toFixed(1)}px;text-align:center;font:500 ${(z * 0.26).toFixed(1)}px ${ff};color:#333;word-spacing:${(z * 0.4).toFixed(0)}px">${words.map((x) => `<span style="opacity:${t >= x.t0 - 0.05 ? 1 : 0}">${esc(this.text(x.w))}</span>`).join(" ")}</div>`;
+    const r = rng(11 + bi), last = words[words.length - 1];
+    if (last && t >= last.t0 - 0.1) for (let i = 0; i < 9; i++) { const px = r() * w * 0.9 + w * 0.05, py = h * (0.5 + r() * 0.42), s = mn * (0.05 + r() * 0.05), q = eBack(seg(t, last.t0 + i * 0.06, last.t0 + 0.3 + i * 0.06)), grey = r() < 0.4;
+      html += `<svg style="position:absolute;left:${(px - s / 2).toFixed(0)}px;top:${(py - s).toFixed(0)}px;transform:scale(${q.toFixed(3)});transform-origin:50% 100%;filter:blur(${(r() < 0.25 ? 3 : 0)}px)" width="${s.toFixed(0)}" height="${(s * 2).toFixed(0)}" viewBox="0 0 20 40"><circle cx="10" cy="5" r="4.5" fill="${grey ? "#9A9A9A" : "#141414"}"/><path d="M3 12h14l-1 14h-3l-1 14h-4l-1-14H4z" fill="${grey ? "#9A9A9A" : "#141414"}"/></svg>`; }
+    return html;
+  };
+  // ---------- twopillars: عمودين رمادي بيطلعوا من تحت، فوق واحد زحمة ناس وفوق التاني كراتين متراصة، وفجوة بينهم، وعنوان فوق وكل عمود له اسم (للفجوة بين الجمهور والمنتج)
+  P.k_twopillars = function (b, t, k, th, bi) {
+    const it = this.items(b); if (!it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h), n = it.length, J = (a) => a.map((x) => this.text(x.w)).join(" "), ar = AR.test(J(it)), ff = famOf(J(it));
+    const th3 = Math.ceil(n / 3), head = it.slice(0, th3), la = it.slice(th3, th3 * 2), lb = it.slice(th3 * 2);
+    const ra = eOut(seg(t, b.t0, b.t0 + 0.9)), rb = eOut(seg(t, b.t0 + 0.2, b.t0 + 1.1)), base = h, hA = h * 0.42 * ra, hB = h * 0.32 * rb;
+    const ax0 = 0, ax1 = w * 0.44, bx0 = w * 0.58, bx1 = w;
+    let crowd = ""; const r = rng(5); for (let i = 0; i < 40; i++) { const x = ax0 + w * 0.05 + r() * (ax1 - ax0 - w * 0.1), s = mn * (0.018 + r() * 0.01); crowd += `<rect x="${x.toFixed(0)}" y="${(base - hA - s * 2.2).toFixed(0)}" width="${(s * 0.7).toFixed(0)}" height="${(s * 2.2).toFixed(0)}" rx="${(s * 0.3).toFixed(0)}" fill="#2A2A2A"/><circle cx="${(x + s * 0.35).toFixed(0)}" cy="${(base - hA - s * 2.5).toFixed(0)}" r="${(s * 0.35).toFixed(0)}" fill="#2A2A2A"/>`; }
+    let boxes = ""; const bw = mn * 0.07, cx = (bx0 + bx1) / 2; [[0, 0], [-1, 0], [1, 0], [-0.5, 1], [0.5, 1], [0, 2]].forEach(([dx, dy]) => { boxes += `<rect x="${(cx + dx * bw - bw / 2).toFixed(0)}" y="${(base - hB - (dy + 1) * bw * 0.8).toFixed(0)}" width="${bw.toFixed(0)}" height="${(bw * 0.8).toFixed(0)}" fill="#8A8A8A" stroke="#5A5A5A" stroke-width="1.5"/>`; });
+    let html = PETALBG(w, h, mn, t - b.t0) + `<svg style="position:absolute;inset:0" width="${w}" height="${h}"><rect x="${ax0}" y="${(base - hA).toFixed(0)}" width="${(ax1 - ax0).toFixed(0)}" height="${hA.toFixed(0)}" fill="#7A7A7A"/><rect x="${bx0.toFixed(0)}" y="${(base - hB).toFixed(0)}" width="${(bx1 - bx0).toFixed(0)}" height="${hB.toFixed(0)}" fill="#7A7A7A"/>${ra > 0.9 ? crowd : ""}${rb > 0.9 ? boxes : ""}</svg>`;
+    const hz = fitSize(J(head), `800 {}px ${ff}`, w * 0.8, mn * 0.09 * this.ts), lz = Math.min(hz * 0.62, fitSize(J(la.length > lb.length ? la : lb) || "a", `800 {}px ${ff}`, w * 0.42, hz * 0.62));
+    html += `<div dir="${this.dir(J(head))}" style="position:absolute;left:0;right:0;top:${(h * 0.16).toFixed(1)}px;text-align:center;font:800 ${hz.toFixed(1)}px ${ff};color:#141414">${head.map((x) => `<span style="display:inline-block;${blurIn(t, x.t0 - 0.05)}">${esc(this.text(x.w))}</span>`).join(" ")}</div>`;
+    if (la.length) html += `<div dir="${this.dir(J(la))}" style="position:absolute;left:${(w * 0.04).toFixed(1)}px;top:${(base - hA - mn * 0.18).toFixed(1)}px;font:800 ${lz.toFixed(1)}px ${ff};color:#141414;${blurIn(t, la[0].t0 - 0.05)}">${esc(J(la))}</div>`;
+    if (lb.length) html += `<div dir="${this.dir(J(lb))}" style="position:absolute;right:${(w * 0.04).toFixed(1)}px;top:${(base - hB - mn * 0.3).toFixed(1)}px;font:800 ${lz.toFixed(1)}px ${ff};color:#141414;${blurIn(t, lb[0].t0 - 0.05)}">${esc(J(lb))}</div>`;
+    return html;
   };
 })();
