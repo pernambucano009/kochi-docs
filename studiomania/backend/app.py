@@ -14671,6 +14671,20 @@ def typo_browser(p):
     raise RuntimeError("المتصفح اللي بيرسم التايبوجرافي مش متثبت على السيرفر (playwright install chromium)")
 
 
+# عناصر بتغيّر الفيديو اللي تحتها نفسه (مش بس الكلام اللي فوقه): بتتعمل هنا على الخلفية في وقت البلوك بس
+TYPO_BG_GRADE = {"desatpop": "hue=s=0:enable='between(t,{a},{b})',boxblur=12:enable='between(t,{a},{b})',"
+                             "colorchannelmixer=rr=.85:gg=.85:bb=.85:enable='between(t,{a},{b})'"}
+
+
+def typo_bg_grade(doc: dict) -> str:
+    out = ""
+    for b in doc.get("blocks") or []:
+        g = TYPO_BG_GRADE.get(b.get("kind"))
+        if g and b.get("t1", 0) > b.get("t0", 0):
+            out += "," + g.format(a=f"{float(b['t0']):.3f}", b=f"{float(b['t1']):.3f}")
+    return out
+
+
 def run_typo_render(pid: str, base: str, quality: str) -> None:
     folder = TYPO_PROJ / pid
     tmp_v = folder / f".render_{uuid.uuid4().hex[:6]}.mp4"
@@ -14710,7 +14724,7 @@ def run_typo_render(pid: str, base: str, quality: str) -> None:
             dim = float(bg.get("dim") or 0)
             grain = float(typo_style(d.get("style")).get("grain") or 0)
             fl = (f"[0:v]{bg_pts}scale={vw}:{vh}:force_original_aspect_ratio=increase,crop={vw}:{vh},setsar=1,fps={TYPO_FPS}"
-                  + (f",colorchannelmixer=rr={1 - dim}:gg={1 - dim}:bb={1 - dim}" if dim else "") + "[bg];"
+                  + (f",colorchannelmixer=rr={1 - dim}:gg={1 - dim}:bb={1 - dim}" if dim else "") + typo_bg_grade(doc) + "[bg];"
                   + (f"[1:v]scale={vw}:{vh}[ov];[bg][ov]" if scale != 1 else "[bg][1:v]") + "overlay=0:0:shortest=1" + (f",noise=alls={int(grain * 35)}:allf=t" if grain else "") + ",format=yuv420p[v]")
         audio_in, audio_path = None, None
         nxt = inputs + 1
@@ -15270,6 +15284,23 @@ import tplseed  # noqa: E402
 TPL_SEED_V = 1
 
 
+def seed_media_hash(tid: str) -> str:
+    """بصمة العينة اللي جوه الكود — لو اتغيرت (عينة أحدث) بتتنسخ تاني مكان القديمة."""
+    f = ROOT / "backend" / "tplseed_media" / tid / "sample.mp4"
+    return hashlib.md5(f.read_bytes()).hexdigest()[:12] if f.exists() else ""
+
+
+def seed_media_copy(tid: str, old: dict | None) -> dict | None:
+    seed_dir, hv = ROOT / "backend" / "tplseed_media" / tid, seed_media_hash(tid)
+    if not hv or (old or {}).get("seed_media") == hv:
+        return old
+    for name in ("sample.mp4", "cover.png"):
+        if (seed_dir / name).exists():
+            shutil.copyfile(seed_dir / name, TPL_DIR / tid / name)
+    return {**(old or {}), "sample": "sample.mp4", "cover": "cover.png" if (seed_dir / "cover.png").exists() else (old or {}).get("cover"),
+            "sample_status": "done", "sample_error": None, "sample_kind": "scenes", "seed_media": hv}
+
+
 def seed_templates() -> None:
     """القوالب الجاهزة بتتحط في المكتبة أول مرة (والعينات اللي اتعملت بتفضل لو القالب اتحدّث)."""
     for tid, t in tplseed.BUILTIN.items():
@@ -15280,17 +15311,13 @@ def seed_templates() -> None:
                 old = json.loads(f.read_text(encoding="utf-8"))
             except ValueError:
                 old = None
-            if old and old.get("seed_v", 0) >= TPL_SEED_V and (old.get("sample") or not (ROOT / "backend" / "tplseed_media" / tid / "sample.mp4").exists()):
+            if old and old.get("seed_v", 0) >= TPL_SEED_V and old.get("seed_media") == seed_media_hash(tid):
                 continue
         schema = lab.clean_schema({**t["schema"], "transition": t["transition"]}, 999)
         # عينات جاهزة جوه الكود (لو اتعملت قبل كده): بتتنسخ أول مرة عشان المعرض يبان على طول
-        seed_dir = ROOT / "backend" / "tplseed_media" / tid
         (TPL_DIR / tid).mkdir(parents=True, exist_ok=True)
-        for name in ("sample.mp4", "cover.png"):
-            if (seed_dir / name).exists() and not (TPL_DIR / tid / name).exists():
-                shutil.copyfile(seed_dir / name, TPL_DIR / tid / name)
-                old = {**(old or {}), name.split(".")[0]: name, **({"sample_status": "done"} if name == "sample.mp4" else {})}
-        keep = {k: old[k] for k in ("sample", "cover", "sample_vid", "sample_status", "sample_error") if old and k in old}
+        old = seed_media_copy(tid, old)
+        keep = {k: old[k] for k in ("sample", "cover", "sample_vid", "sample_status", "sample_error", "sample_kind", "seed_media") if old and k in old}
         with TPL_LOCK:
             tpl_save(tid, {"name": t["name"], "icon": t["icon"], "uses": t["uses"], "voice_tone": t["voice_tone"],
                            "sample_brief": t["sample"], "schema": schema, "builtin": True, "ratio": "9:16", "source": None,
@@ -15470,7 +15497,7 @@ def tvideo_voice(vid: str, body: TvVoiceIn):
 # ---------------------------------------------------------------- 🎬 قوالب «مشاهد» (Vox): ١٠ ثواني لكل مشهد + مفتاح ستايل
 SCENE_SEC = 10.0
 SCENE_VO_MAX, SCENE_VO_MIN = 9.7, 7.5   # الجملة لو أطول/أقصر من كده بتتكتب تاني وتتسجّل تاني
-SCENE_NEG = "readable text, gibberish letters, words, numbers, captions, subtitles, watermark, logo, lip-sync, talking characters, color drift"
+SCENE_NEG = "readable text, gibberish letters, Chinese characters, kanji, words, numbers, titles, captions, subtitles, watermark, logo, lip-sync, talking characters, color drift"
 
 
 def scene_cfg_for(t: dict) -> dict:
@@ -15482,8 +15509,8 @@ def scene_cfg_for(t: dict) -> dict:
     style, bg, pal = sch.get("style") or "", sch.get("background") or "", sch.get("palette") or "unspecified"
     rhythm = "; ".join(f"{b.get('what') or ''} ({round(b['t1'] - b['t0'], 1)}s): {b.get('layout') or ''}" for b in sch.get("beats") or [])[:2500]
     return {
-        "tokens": " ".join(x for x in (style, f"Persistent background: {bg}." if bg else "", f"Locked palette: {pal}.",
-                                       f"Text look (not actual text): {sch.get('text_style')}." if sch.get("text_style") else "") if x),
+        # شكل الكلام مش بيتبعت للموديل (كان بيخليه يكتب كلام غلط/صيني): الكلام بتاعنا بيتحط بعدين من التايبوجرافي
+        "tokens": " ".join(x for x in (style, f"Persistent background: {bg}." if bg else "", f"Locked palette: {pal}.") if x),
         "negative": ", ".join(x for x in (SCENE_NEG, sch.get("negative") or "") if x),
         "key": ("A style swatch image that locks the look of a video: " + style + (f" Persistent background: {bg}." if bg else "")
                 + " Palette: {palette}. Abstract composition of the style's typical elements only: no letters, no words, no numbers, no logos, no real people."),
@@ -15505,19 +15532,15 @@ def seed_scene_templates() -> None:
                 old = json.loads(f.read_text(encoding="utf-8"))
             except ValueError:
                 old = None
-            if old and old.get("seed_v", 0) >= TPL_SEED_V and (old.get("sample") or not (ROOT / "backend" / "tplseed_media" / tid / "sample.mp4").exists()):
+            if old and old.get("seed_v", 0) >= TPL_SEED_V and old.get("seed_media") == seed_media_hash(tid):
                 continue
         beats = [{"t0": i * SCENE_SEC, "t1": (i + 1) * SCENE_SEC, "role": "hook" if i == 0 else "cta" if i == 5 else "proof", "what": f"مشهد {i + 1}",
                   "layout": "", "slots": [], "camera": "", "into_next": "", "keeps": "", "sfx": ""} for i in range(6)]
         schema = {"title": t["name"], "summary": t["uses"], "style": t["tokens"], "negative": t["negative"], "transition": "cut", "beats": beats,
                   "palette": "", "spine": "", "camera": t["motion"], "text_style": "", "music": "", "background": "", "last_frame": "", "beat_sec": 0.0}
-        seed_dir = ROOT / "backend" / "tplseed_media" / tid
         (TPL_DIR / tid).mkdir(parents=True, exist_ok=True)
-        for name in ("sample.mp4", "cover.png"):   # العينات اللي جوه الكود
-            if (seed_dir / name).exists() and not (TPL_DIR / tid / name).exists():
-                shutil.copyfile(seed_dir / name, TPL_DIR / tid / name)
-                old = {**(old or {}), name.split(".")[0]: name, **({"sample_status": "done"} if name == "sample.mp4" else {})}
-        keep = {k: old[k] for k in ("sample", "cover", "sample_vid", "sample_status", "sample_error") if old and k in old}
+        old = seed_media_copy(tid, old)
+        keep = {k: old[k] for k in ("sample", "cover", "sample_vid", "sample_status", "sample_error", "sample_kind", "seed_media") if old and k in old}
         with TPL_LOCK:
             tpl_save(tid, {"name": t["name"], "icon": t["icon"], "uses": t["uses"], "voice_tone": t["voice_tone"], "sample_brief": t["sample"],
                            "mode": "scenes", "scene": {k: t[k] for k in ("tokens", "negative", "key", "variants", "devices", "motion", "allow_label")},
@@ -15639,7 +15662,8 @@ def run_tv_scenes_script(vid: str) -> None:
 def scene_prompt(d: dict, i: int) -> str:
     cfg, s = d["scene_cfg"], d["scenes"][i]
     lab_ = s.get("label") if cfg.get("allow_label") else ""
-    neg = (f'No text anywhere except "{lab_}". ' if lab_ else "No text, letters or numbers anywhere. ") + f"Avoid: {cfg['negative']}."
+    neg = (f'No text anywhere except "{lab_}". ' if lab_ else "Absolutely no writing in any language anywhere: no English, no Chinese or Japanese characters, "
+           "no letters, numbers, titles, signs or captions — every card, page, screen and sign stays blank. ") + f"Avoid: {cfg['negative']}."
     return (f"STYLE REFERENCE: Match the attached style key image EXACTLY: {cfg['tokens']}.\n"
             f"RECURRING ELEMENT (appears in every scene): {d.get('through_line') or 'unspecified'}.\n"
             f"SCENE: {s['scene']}" + (f' A torn colored paper element carries the distressed letterpress word "{lab_}".' if lab_ else "") + "\n"
