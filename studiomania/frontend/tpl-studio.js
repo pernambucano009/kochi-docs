@@ -45,10 +45,10 @@ function tsHome() {
         ${busy ? `<span class="ts-badge"><span class="spin-inline"></span> ${tse(t.sample_step || "بيعمل العينة")}</span>` : ""}</div>
       <div class="ts-info"><b data-no-i18n>${tse(t.icon || "")} ${tse(t.name)}</b>
         ${t.uses ? `<small class="muted">مناسب لـ: ${tse(t.uses)}</small>` : ""}
-        <small class="muted">${t.mode === "ad" ? "🎯 شخصية ثابتة · صورة المنتج · سكريبت ← فيديو بالمراجع" : "🎬 مشاهد ١٠ ثواني · مفتاح ستايل · صوت المؤثرات"}</small>
+        <small class="muted">${t.mode === "still" ? "📦 صور ثابتة · صورة المنتج هي المرجع" : t.mode === "ad" ? "🎯 شخصية ثابتة · صورة المنتج · سكريبت ← فيديو بالمراجع" : "🎬 مشاهد ١٠ ثواني · مفتاح ستايل · صوت المؤثرات"}</small>
         ${t.sample_error ? `<small class="err">⚠️ ${tse(t.sample_error)}</small>` : ""}
         <div class="row wrap"><button class="btn sm primary" data-tsuse="${t.id}">✨ استخدم القالب</button>
-          ${t.mode === "ad" ? "" : !t.sample_url || t.sample_status === "failed" || t.sample_old ? `<button class="btn sm" data-tssample="${t.id}" ${busy ? "disabled" : ""}>🎞️ اعمل عينة (~$${t.sample_cost})</button>`
+          ${t.mode === "ad" || t.mode === "still" ? "" : !t.sample_url || t.sample_status === "failed" || t.sample_old ? `<button class="btn sm" data-tssample="${t.id}" ${busy ? "disabled" : ""}>🎞️ اعمل عينة (~$${t.sample_cost})</button>`
             : `<button class="btn sm" data-tssample="${t.id}" ${busy ? "disabled" : ""} title="عينة جديدة">↻</button>`}</div></div></article>`;
   };
   const t = D.templates.find((x) => x.id === tsx.pick);
@@ -66,7 +66,7 @@ function tsHome() {
         <label>🎙️ الصوت <select id="tsVoice"></select></label>
         <label class="check"><input type="checkbox" id="tsVoiceOn" checked> فويس أوفر (بيحدد مدة كل لقطة)</label>
       </div>
-      ${t.mode === "ad" ? `<small class="muted">${t.ad_cfg?.kind === "ugc" ? "📱 ١٥ ثانية: الشخصية بتتكلم بصوتها جوه الفيديو." : "🎬 الطول وعدد اللقطات بتختارهم جوه."} الخطوات: الشخصية ← صورة المنتج ← السكريبت ← التوليد.</small>` : `
+      ${t.mode === "still" ? `<small class="muted">📦 صور بس (من غير فيديو). ارفع صورة المنتج جوه، وكل صورة بتوريك تمنها قبل ما تترسم.</small>` : t.mode === "ad" ? `<small class="muted">${t.ad_cfg?.kind === "ugc" ? "📱 ١٥ ثانية: الشخصية بتتكلم بصوتها جوه الفيديو." : "🎬 الطول وعدد اللقطات بتختارهم جوه."} الخطوات: الشخصية ← صورة المنتج ← السكريبت ← التوليد.</small>` : `
       <div class="row wrap"><label>⏱️ الطول <select id="tsLen">${[30, 60, 90, 120].map((x) => `<option value="${x}" ${x === 60 ? "selected" : ""}>${x} ثانية (${x / 10} مشاهد)</option>`).join("")}</select></label>
         <small class="muted">كل مشهد ١٠ ثواني وليه جملة فويس أوفر. الأرقام اللي عايزها في الفيديو اكتبها في الفكرة (البرنامج مش بيخترع أرقام).</small></div>`}
       <div class="row wrap">
@@ -133,7 +133,8 @@ $("tsGallery").addEventListener("click", async (e) => {
   if (b.id === "tsGo") {
     const mode = document.querySelector('input[name="tsMode"]:checked').value;
     const brief = $("tsBrief").value.trim(), script = $("tsScript").value.trim();
-    if (mode === "ai" && !brief) { toast("اكتب الفيديو عن إيه الأول", true); return; }
+    const still = tsx.data.templates.find((x) => x.id === tsx.pick)?.mode === "still";
+    if (mode === "ai" && !brief && !still) { toast("اكتب الفيديو عن إيه الأول", true); return; }
     if (mode === "own" && !script) { toast("اكتب السكريبت الأول", true); return; }
     return busyButton(b, "⏳", async () => {
       tplx.user = {};

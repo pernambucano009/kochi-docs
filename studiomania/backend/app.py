@@ -12389,7 +12389,7 @@ def tv_to_dict(vid: str, d: dict) -> dict:
                       "seg": [round(trial_gen_seconds(b["t1"] - b["t0"]) * per, 2) for b in beats],
                       "once": tv_once_cost(d, per), "once_parts": len(tv_chunks(beats, tv_once_max(d))), "once_max": tv_once_max(d)},
             "models": [{"key": k, "label": v["label"], "per_sec": v["per_sec"]} for k, v in TRIAL_MODELS.items()],
-            **(ad_to_dict(vid, d) if d.get("mode") == "ad" else {})}
+            **(ad_to_dict(vid, d) if d.get("mode") == "ad" else still_to_dict(vid, d) if d.get("mode") == "still" else {})}
 
 
 @app.get("/api/tvideos")
@@ -12403,7 +12403,8 @@ def tvideos_list():
         if not owned(d.get("client_id")) or d.get("sample_of"):
             continue
         p0 = (d.get("panels") or {}).get("0") or {}
-        th = p0.get("full") or p0.get("cell") or ((d.get("ad") or {}).get("files") or {}).get("head") or ((d.get("ad") or {}).get("files") or {}).get("product")
+        th = p0.get("full") or p0.get("cell") or next((x["file"] for x in (d.get("still") or {}).get("items") or [] if x.get("file")), None) \
+            or ((d.get("still") or {}).get("files") or {}).get("product") or ((d.get("ad") or {}).get("files") or {}).get("head") or ((d.get("ad") or {}).get("files") or {}).get("product")
         out.append({"id": f.parent.name, "name": d.get("name"), "status": d.get("status"), "beats": len(d["schema"]["beats"]),
                     "template_name": d.get("template_name"), "section": d.get("section"),
                     "thumb": f"/media/tvideos/{f.parent.name}/{th}" if th else None})
@@ -12467,6 +12468,11 @@ def tvideo_create(body: TvIn):
                  ad={"kind": t["ad_cfg"]["kind"], "look": "narrative", "spoken": adtpl.SPOKEN.get(lang) or dub.DIALECTS[lang].get("language") or "Arabic",
                      "script": d["script"] if d["script_mode"] == "own" else "", "place": "", "length": 15, "end_on": True,
                      "hero": {}, "product": {}, "files": {}, "gens": {}, "plan": None})
+    elif body.section == "templates" and t.get("mode") == "still":
+        # 📦 استوديو المنتج: صور بس (من غير فيديو)
+        d.update(mode="still", status="filled", step=None, image_model=body.image_model if body.image_model in TV_IMAGE_MODELS else "sunburst",
+                 still={"kind": t["still_cfg"]["kind"], "files": {}, "bg": "clean white", "fmt": "1:1" if t["still_cfg"]["kind"] != "scene" else "3:4",
+                        "how": "recreate", "note": "", "picks": [], "copy_lang": "ar", "product": "", "offer": body.brief.strip()[:1500], "items": []})
     elif body.section == "templates":
         # 🎬 كل القوالب: مشاهد ١٠ ثواني ثابتة بمفتاح ستايل (خدعة اللقطة الواحدة)
         n = max(3, min(12, round(body.length / SCENE_SEC)))
@@ -12475,7 +12481,7 @@ def tvideo_create(body: TvIn):
                                                    "role": "hook" if i == 0 else "cta" if i == n - 1 else "proof", "what": f"مشهد {i + 1}"} for i in range(n)]})
     with TV_LOCK:
         (tv_dir(vid) / "tv.json").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
-    job = None if d.get("mode") == "ad" else run_tv_scenes_script if d.get("mode") == "scenes" else run_tv_script if d.get("section") == "templates" else run_tv_fill
+    job = None if d.get("mode") in ("ad", "still") else run_tv_scenes_script if d.get("mode") == "scenes" else run_tv_script if d.get("section") == "templates" else run_tv_fill
     if job:
         threading.Thread(target=job, args=(vid,), daemon=True).start()
     return tv_to_dict(vid, d)
@@ -12557,6 +12563,9 @@ def tv_start(vid: str, status: str, step: str, target, *args) -> dict:
 
 
 def tv_idle(d: dict) -> str:
+    if d.get("mode") == "still":
+        items = (d.get("still") or {}).get("items") or []
+        return "done" if any(x.get("file") for x in items) else "cut" if items else "filled"
     if d.get("mode") == "ad":
         return "done" if d.get("final") else "cut" if (d.get("ad") or {}).get("plan") else "filled"
     if d.get("mode") == "scenes":
@@ -16709,6 +16718,233 @@ def ad_assemble(vid: str, speak: bool) -> None:
         tv_update(vid, fin)
     finally:
         shutil.rmtree(work, ignore_errors=True)
+
+
+# ---------------------------------------------------------------- 📦 استوديو المنتج: صورة استوديو، المنتج في مشهد، إعلانات ثابتة
+import stilltpl  # noqa: E402
+
+RATIO_WH.setdefault("3:4", (3, 4))
+
+
+def seed_still_templates() -> None:
+    for tid, t in tplseed.STILLS.items():
+        f = TPL_DIR / tid / "tpl.json"
+        old = None
+        if f.exists():
+            try:
+                old = json.loads(f.read_text(encoding="utf-8"))
+            except ValueError:
+                old = None
+            if old and old.get("seed_v", 0) >= TPL_SEED_V:
+                continue
+        beats = [{"t0": 0.0, "t1": 1.0, "role": "hook", "what": "صورة", "layout": "", "slots": [], "camera": "", "into_next": "", "keeps": "", "sfx": ""}]
+        schema = {"title": t["name"], "summary": t["uses"], "style": "", "negative": "", "transition": "cut", "beats": beats, "palette": "", "spine": "",
+                  "camera": "", "text_style": "", "music": "", "background": "", "last_frame": "", "beat_sec": 0.0}
+        (TPL_DIR / tid).mkdir(parents=True, exist_ok=True)
+        with TPL_LOCK:
+            tpl_save(tid, {"name": t["name"], "icon": t["icon"], "uses": t["uses"], "voice_tone": "", "sample_brief": t["sample"], "mode": "still",
+                           "still_cfg": {"kind": t["kind"]}, "schema": schema, "builtin": True, "ratio": "1:1", "source": None,
+                           "lab_name": "مكتبة القوالب الجاهزة", "seed_v": TPL_SEED_V, "created_at": (old or {}).get("created_at") or now()})
+
+
+seed_still_templates()
+
+
+def still_items_cost(d: dict, items: list[dict]) -> float:
+    return round(len(items) * TV_IMAGE_MODELS[tv_img(d)][0], 2)
+
+
+def still_to_dict(vid: str, d: dict) -> dict:
+    st, folder = d.get("still") or {}, tv_dir(vid)
+
+    def url(name):
+        return f"/media/tvideos/{vid}/{name}?v={int((folder / name).stat().st_mtime)}" if name and (folder / name).exists() else None
+    items = st.get("items") or []
+    return {"ref_urls": {s: url((st.get("files") or {}).get(s)) for s in ("product", "scene")},
+            "item_urls": [url(x.get("file")) for x in items], "item_cost": TV_IMAGE_MODELS[tv_img(d)][0],
+            "missing_cost": still_items_cost(d, [x for x in items if not url(x.get("file"))]),
+            "formats": list(stilltpl.FORMATS), "bgs": stilltpl.STUDIO_BGS,
+            "adgen": [{k: t[k] for k in ("n", "name", "ar", "tag", "ratio")} for t in stilltpl.ADGEN]}
+
+
+def still_start(vid: str, status: str, step: str, target, *args) -> dict:
+    def fn(d):
+        if d.get("status") in TV_BUSY:
+            raise HTTPException(400, "استنى لما الشغل اللي شغال يخلص")
+        if d.get("mode") != "still":
+            raise HTTPException(400, "ده مش استوديو منتج")
+        d.update(status=status, step=step, error=None)
+    d = tv_update(vid, fn)
+    threading.Thread(target=target, args=(vid, *args), daemon=True).start()
+    return tv_to_dict(vid, d)
+
+
+@app.post("/api/tvideos/{vid}/still/upload/{slot}")
+def still_upload(vid: str, slot: str, file: UploadFile = File(...)):
+    if slot not in ("product", "scene"):
+        raise HTTPException(404, "الخانة دي مش موجودة")
+    d = tv_load(vid)
+    if d.get("status") in TV_BUSY:
+        raise HTTPException(400, "استنى لما الشغل اللي شغال يخلص")
+    name = save_upload(file, IMAGE_EXTENSIONS, tv_dir(vid), slot)
+
+    def fn(x):
+        files = x["still"].setdefault("files", {})
+        if files.get(slot) and files[slot] != name:
+            (tv_dir(vid) / files[slot]).unlink(missing_ok=True)
+        files[slot] = name
+    return tv_to_dict(vid, tv_update(vid, fn))
+
+
+class StillSetIn(BaseModel):
+    bg: str | None = None
+    fmt: str | None = None
+    how: str | None = None        # recreate / recompose
+    note: str | None = None
+    picks: list[int] | None = None
+    copy_lang: str | None = None  # ar / en
+    product: str | None = None
+    offer: str | None = None
+
+
+@app.put("/api/tvideos/{vid}/still")
+def still_set(vid: str, body: StillSetIn):
+    def fn(d):
+        st = d["still"]
+        if body.bg is not None:
+            st["bg"] = body.bg.strip()[:80] or "clean white"
+        if body.fmt in stilltpl.FORMATS:
+            st["fmt"] = body.fmt
+        if body.how in ("recreate", "recompose"):
+            st["how"] = body.how
+        if body.note is not None:
+            st["note"] = body.note.strip()[:400]
+        if body.picks is not None:
+            st["picks"] = [n for n in dict.fromkeys(body.picks) if n in stilltpl.ADGEN_BY_N][:10]
+        if body.copy_lang in ("ar", "en"):
+            st["copy_lang"] = body.copy_lang
+        if body.product is not None:
+            st["product"] = body.product.strip()[:120]
+        if body.offer is not None:
+            st["offer"] = body.offer.strip()[:1500]
+    return tv_to_dict(vid, tv_update(vid, fn))
+
+
+@app.post("/api/tvideos/{vid}/still/prepare")
+def still_prepare(vid: str):
+    """✍️ البرومتات: الاستوديو والنسخ بيتكتبوا على طول، وإعادة البناء والإعلانات الثابتة بيكتبهم الموديل."""
+    d = tv_load(vid)
+    st = d["still"]
+    if not (st.get("files") or {}).get("product"):
+        raise HTTPException(400, "ارفع صورة المنتج الأول")
+    if st["kind"] == "scene" and not st["files"].get("scene"):
+        raise HTTPException(400, "ارفع صورة المشهد الأول")
+    if st["kind"] == "adgen" and not st.get("picks"):
+        raise HTTPException(400, "اختار قالب واحد على الأقل")
+    return still_start(vid, "filling", "✍️ بيكتب البرومتات", run_still_prepare)
+
+
+def run_still_prepare(vid: str) -> None:
+    try:
+        d = tv_load(vid)
+        st, folder = d["still"], tv_dir(vid)
+        kind, note = st["kind"], st.get("note") or ""
+        items = []
+        if kind == "studio":
+            items = [{"label": f"صورة استوديو · {st.get('bg') or 'clean white'}", "prompt": stilltpl.studio_prompt(st.get("bg"), note),
+                      "ratio": st.get("fmt") or "1:1", "refs": ["product"]}]
+        elif kind == "scene" and st.get("how") != "recompose":
+            items = [{"label": "نسخ المشهد زي ما هو", "prompt": stilltpl.with_note(stilltpl.RECREATE, note), "ratio": st.get("fmt") or "3:4",
+                      "refs": ["scene", "product"]}]
+        elif kind == "scene":
+            if atlas.mock_mode():
+                res = {"style": "Soft morning light on a travertine counter.", "label": "GLOWDROP Vitamin C"}
+            else:
+                parts = [{"type": "text", "text": stilltpl.recompose_messages(note)}]
+                for s in ("scene", "product"):
+                    parts.append({"type": "image_url", "image_url": {"url": data_url(model_image(folder / st["files"][s], 1024), "image/jpeg")}})
+                res = ad_json(ad_media_chat([{"role": "user", "content": parts}], 4000), "قراءة المشهد")
+            items = [{"label": "بناء المشهد حوالين المنتج", "prompt": stilltpl.recompose_prompt(str(res.get("style") or ""), str(res.get("label") or ""), note),
+                      "ratio": st.get("fmt") or "3:4", "refs": ["product"]}]
+        else:
+            lang_txt, guide = ad_lang(d) if st.get("copy_lang") != "en" else ("English", "")
+            if atlas.mock_mode():
+                res = {"ads": [{"n": n, "prompt": stilltpl.ADGEN_BY_N[n]["prompt"].split("Create:", 1)[-1], "copy": ["عنوان تجريبي"], "invented": []}
+                               for n in st["picks"]]}
+            else:
+                msgs = stilltpl.adgen_messages(st["picks"], az.brain_text(tv_brain(d)), st.get("product") or "", st.get("offer") or d.get("brief") or "",
+                                               lang_txt, guide)
+                res = ad_json(series_chat(msgs, json_mode=True), "الإعلانات الثابتة")
+            got = {int(x.get("n")): x for x in res.get("ads") or [] if isinstance(x, dict) and str(x.get("n", "")).isdigit()}
+            for n in st["picks"]:
+                x, t = got.get(n), stilltpl.ADGEN_BY_N[n]
+                if not x:
+                    continue
+                items.append({"label": f"#{n} · {t['ar']}", "prompt": stilltpl.with_note(stilltpl.adgen_prompt(str(x.get("prompt") or ""), st.get("copy_lang") != "en"), note),
+                              "ratio": t["ratio"], "refs": ["product"], "copy": [str(c)[:200] for c in x.get("copy") or []][:12],
+                              "invented": [str(c)[:200] for c in x.get("invented") or []][:8]})
+            if not items:
+                raise RuntimeError("الموديل مرجعش برومتات، جرّب تاني")
+
+        def fn(x):
+            for it in x["still"].get("items") or []:
+                if it.get("file"):
+                    (folder / it["file"]).unlink(missing_ok=True)
+            x["still"]["items"] = items
+            x.update(status=tv_idle(x), step=None, error=None)
+        tv_update(vid, fn)
+    except Exception as exc:  # noqa: BLE001
+        tv_fail(vid, exc)
+
+
+class StillItemIn(BaseModel):
+    prompt: str
+
+
+@app.put("/api/tvideos/{vid}/still/items/{i}")
+def still_item_edit(vid: str, i: int, body: StillItemIn):
+    def fn(d):
+        items = d["still"].get("items") or []
+        if not 0 <= i < len(items):
+            raise HTTPException(404, "الصورة دي مش موجودة")
+        items[i]["prompt"] = body.prompt.strip()[:12000]
+    return tv_to_dict(vid, tv_update(vid, fn))
+
+
+class StillRunIn(BaseModel):
+    i: int | None = None
+
+
+@app.post("/api/tvideos/{vid}/still/run")
+def still_run(vid: str, body: StillRunIn):
+    d = tv_load(vid)
+    if not (d["still"].get("items") or []):
+        raise HTTPException(400, "اكتب البرومتات الأول")
+    return still_start(vid, "working", "🖼️ بيرسم", run_still_gen, body.i)
+
+
+def run_still_gen(vid: str, only: int | None) -> None:
+    try:
+        d = tv_load(vid)
+        st, folder = d["still"], tv_dir(vid)
+        for i, it in enumerate(st["items"]):
+            if (only is not None and only != i) or (only is None and it.get("file") and (folder / it["file"]).exists()):
+                continue
+            tv_set(vid, step=f"🖼️ بيرسم: {it['label']} ({i + 1} من {len(st['items'])})")
+            name = f"img{i + 1}-{uuid.uuid4().hex[:4]}.png"
+            refs = [folder / st["files"][r] for r in it["refs"] if (st.get("files") or {}).get(r)]
+            ad_image(d, it["prompt"], folder / name, refs, stilltpl.FORMATS.get(it["ratio"], "1024x1024"))
+            conform_image(folder / name, it["ratio"])
+
+            def fn(x, i=i, name=name):
+                cur = x["still"]["items"][i]
+                if cur.get("file") and cur["file"] != name:
+                    (folder / cur["file"]).unlink(missing_ok=True)
+                cur["file"] = name
+            tv_update(vid, fn)
+        tv_update(vid, lambda x: x.update(status=tv_idle(x), step=None, error=None))
+    except Exception as exc:  # noqa: BLE001
+        tv_fail(vid, exc)
 
 
 @app.get("/api/tpl-studio")
