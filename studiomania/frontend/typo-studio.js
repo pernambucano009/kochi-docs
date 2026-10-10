@@ -55,7 +55,7 @@
     "qr", "codetag", "toolbar", "terminal", "scan",
     "toasts", "footer", "marquee", "datestrip",
     "fileicon", "chaos",
-    "gradword", "meshprompt", "orbsplit", "bento", "figdays", "figcurve", "figplay", "figequal", "figwords", "figphone", "figdrop", "figcount", "figgears", "figbar", "figcheck", "figcta", "goldcap", "iconbelt", "glowsweep", "namepill", "kashida", "molecule", "weightstack", "stretch", "desatpop", "arcs", "chrome", "inkverse", "poemfade", "hashend", "flipverb", "strobe", "duoline", "capstack", "pillword", "blurduo", "tagstack", "underbars", "contactcard", "iconorbit", "blurstrobe", "kinstack", "incall", "cineband", "scriptover", "tricolor", "drumpicker", "redmix", "headbubble", "pincard", "emojifloat", "slotreel", "posterwall", "quoteline", "medallion", "clockhand", "roadtext", "markpan", "objectquote", "racechart", "calflip", "glosscards", "dropword", "tasklens"]);
+    "gradword", "meshprompt", "orbsplit", "bento", "figdays", "figcurve", "figplay", "figequal", "figwords", "figphone", "figdrop", "figcount", "figgears", "figbar", "figcheck", "figcta", "goldcap", "iconbelt", "glowsweep", "namepill", "kashida", "molecule", "weightstack", "stretch", "desatpop", "arcs", "chrome", "inkverse", "poemfade", "hashend", "flipverb", "strobe", "duoline", "capstack", "pillword", "blurduo", "tagstack", "underbars", "contactcard", "iconorbit", "blurstrobe", "kinstack", "incall", "cineband", "scriptover", "tricolor", "drumpicker", "redmix", "headbubble", "pincard", "emojifloat", "slotreel", "posterwall", "quoteline", "medallion", "clockhand", "roadtext", "markpan", "objectquote", "racechart", "calflip", "glosscards", "dropword", "tasklens", "monostack", "dashbox", "sparklist", "followbtn", "silhouette"]);
   E.TYPING = new Set(["type", "artype"]);
   const MC = document.createElement("canvas").getContext("2d");
   const measure = (s, font) => { MC.font = font; return MC.measureText(s).width; };
@@ -7173,5 +7173,74 @@
     return `<div style="position:absolute;inset:0;background:${BLUEBG}"></div>${list}
       <div style="position:absolute;left:${(lx - LR).toFixed(1)}px;top:${(ly - LR).toFixed(1)}px;width:${(LR * 2).toFixed(1)}px;height:${(LR * 2).toFixed(1)}px;border-radius:50%;overflow:hidden;border:${(mn * 0.01).toFixed(1)}px solid #1A2050;box-shadow:0 0 0 ${(mn * 0.004).toFixed(1)}px rgba(255,255,255,.6),0 ${(mn * 0.02).toFixed(0)}px ${(mn * 0.05).toFixed(0)}px rgba(13,18,54,.4);background:rgba(255,255,255,.08)"><div style="position:absolute;left:${(-(lx - LR) * 1.25 - LR * 0.25).toFixed(1)}px;top:${(-(ly - LR) * 1.25 - LR * 0.25).toFixed(1)}px;width:${w}px;height:${h}px;transform:scale(1.25);transform-origin:0 0">${list}</div></div>
       ${capTop(this, cap, t, b.t0, w, h, mn, false)}`;
+  };
+  // ======== r21 «مونو» — أبيض ورمادي: كلام رمادي فيه كلمات سودا تقيلة، شبكة نقط دايرية ورا، نجوم سودا حادة طايرة في الأركان، مربع متقطع بماوس، قايمة بنجوم، زرار متابعة ========
+  const MONOBG = `<div style="position:absolute;inset:0;background:radial-gradient(ellipse at 50% 45%,#FFFFFF,#ECECEC 90%)"></div>`;
+  const dotGrid = (w, h, mn, cy) => { let d = ""; const R = mn * 0.36, st = mn * 0.03; for (let y = -R; y <= R; y += st) for (let x = -R; x <= R; x += st) { const r = Math.hypot(x, y) / R; if (r < 1) d += `<circle cx="${(w / 2 + x).toFixed(0)}" cy="${(cy + y).toFixed(0)}" r="${(1.6 * (1 - r * 0.6)).toFixed(1)}" fill="rgba(0,0,0,${(0.22 * (1 - r)).toFixed(2)})"/>`; } return `<svg style="position:absolute;inset:0" width="${w}" height="${h}">${d}</svg>`; };
+  // نجمة سودا حادة بتطير من ركن (زينة/انتقال)
+  const shard = (w, h, mn, t, t0, corner) => { const p = eOut(seg(t, t0, t0 + 0.7)), [sx, sy] = [[0, 0], [w, h], [w, 0], [0, h]][corner % 4], s = mn * 0.45;
+    return `<svg style="position:absolute;left:${(sx - s / 2).toFixed(0)}px;top:${(sy - s / 2).toFixed(0)}px;filter:blur(${((1 - p) * 6 + 1).toFixed(1)}px)" width="${s.toFixed(0)}" height="${s.toFixed(0)}" viewBox="-50 -50 100 100"><path transform="rotate(${(corner * 37 + p * 25).toFixed(0)}) scale(${lerp(0.4, 1, p).toFixed(3)})" d="M0 -50 L6 -6 L50 0 L6 6 L0 50 L-6 6 L-50 0 L-6 -6z" fill="#0A0A0A"/></svg>`; };
+  // ---------- monostack: سطور رمادي فاتح في النص فيها كلمات سودا تقيلة (المهمة أو الطويلة)، كل كلمة بتطلع من البلير، وورا شبكة نقط ونجوم سودا في الأركان
+  P.k_monostack = function (b, t, k, th, bi) {
+    const it = this.items(b); if (!it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h), J = (a) => a.map((x) => this.text(x.w)).join(" "), all = J(it), ar = AR.test(all), ff = famOf(all);
+    const per = it.length > 8 ? 4 : 3, rows = []; for (let i = 0; i < it.length; i += per) rows.push(it.slice(i, i + per));
+    const heavy = new Set(); it.forEach((x, i) => { const s = this.text(x.w); if (i === b.focus || (!SMALLW.has(s.toLowerCase()) && [...s].length >= 7)) heavy.add(i); });
+    const z = Math.min(...rows.map((r) => fitSize(J(r), `700 {}px ${ff}`, w * 0.8, mn * 0.06 * this.ts))), lh = z * (ar ? 1.55 : 1.3), cy = h * 0.42;
+    let html = MONOBG + dotGrid(w, h, mn, cy) + shard(w, h, mn, t, b.t0, bi) + shard(w, h, mn, t, b.t0 + 0.15, bi + 1);
+    rows.forEach((r, j) => { html += `<div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:0;right:0;top:${(cy - rows.length * lh / 2 + j * lh).toFixed(1)}px;text-align:center;white-space:nowrap;font:500 ${z.toFixed(1)}px ${ff}">${r.map((x) => { const i = it.indexOf(x), hv = heavy.has(i), q = seg(t, x.t0 - 0.05, x.t0 + 0.3);
+      return `<span style="display:inline-block;font-weight:${hv ? 800 : 500};color:${hv ? "#121212" : "#5E5E5E"};opacity:${clamp(q * 2).toFixed(2)};filter:blur(${((1 - eOut(q)) * 6).toFixed(1)}px)">${esc(this.text(x.w))}</span>`; }).join(" ")}</div>`; });
+    return html;
+  };
+  // ---------- dashbox: الكلام جوه مربع متقطع زي التحديد، وماوس بيدخل ويضغط، وآخر كلمتين (من focus) تقال
+  P.k_dashbox = function (b, t, k, th, bi) {
+    const it = this.items(b); if (!it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h), n = it.length, fi = b.focus >= 0 && b.focus < n ? b.focus : Math.max(0, n - 2);
+    const J = (a) => a.map((x) => this.text(x.w)).join(" "), A = it.slice(0, fi), B = it.slice(fi), ar = AR.test(J(it)), ff = famOf(J(it));
+    const z = Math.min(fitSize(J(A) || "a", `500 {}px ${ff}`, w * 0.66, mn * 0.055 * this.ts), fitSize(J(B), `800 {}px ${ff}`, w * 0.66, mn * 0.055 * this.ts));
+    const bw = Math.max(measure(J(A), `500 ${z}px ${ff}`), measure(J(B), `800 ${z}px ${ff}`)) + z * 1.4, bh = z * (ar ? 3.6 : 3), cy = h * 0.42, bp = eOut(seg(t, b.t0, b.t0 + 0.4));
+    const mx = lerp(w * 0.85, w / 2 + bw * 0.35, eOut(seg(t, b.t0 + 0.2, b.t0 + 0.8))), my = lerp(h * 0.75, cy + bh * 0.4, eOut(seg(t, b.t0 + 0.2, b.t0 + 0.8))), click = Math.sin(seg(t, b.t0 + 0.85, b.t0 + 1.05) * Math.PI);
+    return MONOBG + shard(w, h, mn, t, b.t0, bi + 2) + `<div style="position:absolute;left:${(w / 2 - bw / 2).toFixed(1)}px;top:${(cy - bh / 2).toFixed(1)}px;width:${bw.toFixed(1)}px;height:${bh.toFixed(1)}px;border:2px dashed rgba(0,0,0,${(0.55 * bp).toFixed(2)});box-sizing:border-box;transform:scale(${lerp(0.9, 1, bp).toFixed(3)})"></div>
+      <div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:0;right:0;top:${(cy - z * (ar ? 1.5 : 1.2)).toFixed(1)}px;text-align:center;line-height:${ar ? 1.5 : 1.2};font:500 ${z.toFixed(1)}px ${ff};color:#3A3A3A">
+        <div>${A.map((x) => `<span style="opacity:${t >= x.t0 - 0.05 ? 1 : 0}">${esc(this.text(x.w))}</span>`).join(" ")}</div><div style="font-weight:800;color:#121212">${B.map((x) => `<span style="opacity:${t >= x.t0 - 0.05 ? 1 : 0}">${esc(this.text(x.w))}</span>`).join(" ")}</div></div>
+      <svg style="position:absolute;left:${mx.toFixed(1)}px;top:${my.toFixed(1)}px;transform:scale(${(1 - click * 0.15).toFixed(3)})" width="${(mn * 0.05).toFixed(0)}" height="${(mn * 0.05).toFixed(0)}" viewBox="0 0 24 24"><path d="M3 2l17 9-7 2 4 8-3 1-4-8-5 5z" fill="#fff" stroke="#111" stroke-width="1.5" stroke-linejoin="round"/></svg>`;
+  };
+  // ---------- sparklist: قايمة كلمات رمادي قبل كل واحدة نجمة صغيرة ✦، بتطلع واحدة واحدة، والكلمة الأخيرة بتغمق
+  P.k_sparklist = function (b, t, k, th, bi) {
+    const P = figParts(this, { ...b, focus: b.focus >= 0 ? b.focus : -1 }); const it = this.items(b); if (!it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h), head = b.focus >= 0 ? P.J(P.it.slice(0, P.fi + 1)) : "", items = b.focus >= 0 ? P.tail : it;
+    const ar = AR.test(it.map((x) => this.text(x.w)).join(" ")), z = mn * 0.05 * this.ts, lh = z * (ar ? 1.8 : 1.6), y0 = h * 0.42 - items.length * lh / 2;
+    let html = MONOBG + shard(w, h, mn, t, b.t0, bi + 3);
+    if (head) html += `<div dir="${this.dir(head)}" style="position:absolute;left:0;right:0;top:${(y0 - lh * 1.4).toFixed(1)}px;text-align:center;font:500 ${(z * 1.1).toFixed(1)}px ${famOf(head)};color:#3A3A3A;${blurIn(t, b.t0)}">${esc(head)}</div>`;
+    items.forEach((x, i) => { const s = this.text(x.w), q = seg(t, x.t0 - 0.05, x.t0 + 0.3), last = i === items.length - 1 && t >= x.t0 + 0.4;
+      html += `<div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;${ar ? "right" : "left"}:${(w * 0.32).toFixed(1)}px;top:${(y0 + i * lh).toFixed(1)}px;display:flex;align-items:center;gap:${(z * 0.5).toFixed(1)}px;font:500 ${z.toFixed(1)}px ${famOf(s)};color:${last ? "#111" : "#444"};opacity:${clamp(q * 2).toFixed(2)};filter:blur(${((1 - eOut(q)) * 5).toFixed(1)}px)"><svg width="${(z * 0.7).toFixed(0)}" height="${(z * 0.7).toFixed(0)}" viewBox="-10 -10 20 20"><path d="M0 -10 L2 -2 L10 0 L2 2 L0 10 L-2 2 L-10 0 L-2 -2z" fill="#222"/></svg>${esc(s)}</div>`; });
+    return html;
+  };
+  // ---------- followbtn: سطر صغير بيتكتب وتحته زرار كبسولة 3D «تابِع» والماوس بيدوس عليه فبيتزق لتحت
+  P.k_followbtn = function (b, t, k, th, bi) {
+    const it = this.items(b); if (!it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h), s = it.map((x) => this.text(x.w)).join(" "), ar = AR.test(s), ff = famOf(s);
+    const z = Math.min(mn * 0.05 * this.ts, fitSize(s, `500 {}px ${ff}`, w * 1.6, mn * 0.05 * this.ts)), lab = ar ? "تابِع" : "FOLLOW", bw = mn * 0.5, bh = mn * 0.14, cy = h * 0.5;
+    const tc = b.t0 + Math.min(1.6, (b.t1 - b.t0) * 0.6), press = Math.sin(seg(t, tc, tc + 0.25) * Math.PI), done = t > tc + 0.12;
+    const mx = lerp(w * 0.85, w / 2 + bw * 0.12, eOut(seg(t, tc - 0.7, tc))), my = lerp(h * 0.8, cy + bh * 0.2, eOut(seg(t, tc - 0.7, tc)));
+    return MONOBG + `<div dir="${this.dir(s)}" style="position:absolute;left:${(w * 0.08).toFixed(1)}px;right:${(w * 0.08).toFixed(1)}px;top:${(cy - bh * 1.8).toFixed(1)}px;text-align:center;font:500 ${z.toFixed(1)}px ${ff};color:#3A3A3A;line-height:1.5">${esc(typed(s, t, b.t0, 30))}</div>
+      <div style="position:absolute;left:${(w / 2 - bw / 2).toFixed(1)}px;top:${(cy - bh / 2 + bh * 0.12).toFixed(1)}px;width:${bw.toFixed(1)}px;height:${bh.toFixed(1)}px;border-radius:${(bh / 2).toFixed(1)}px;background:#BDBDBD"></div>
+      <div style="position:absolute;left:${(w / 2 - bw / 2).toFixed(1)}px;top:${(cy - bh / 2 + press * bh * 0.1).toFixed(1)}px;width:${bw.toFixed(1)}px;height:${bh.toFixed(1)}px;border-radius:${(bh / 2).toFixed(1)}px;background:${done ? "#111" : "#FFFFFF"};border:2px solid #111;box-sizing:border-box;display:flex;align-items:center;justify-content:center;font:700 ${(bh * 0.36).toFixed(1)}px ${famOf(lab)};letter-spacing:.06em;color:${done ? "#fff" : "#111"}">${lab}</div>
+      <svg style="position:absolute;left:${mx.toFixed(1)}px;top:${my.toFixed(1)}px" width="${(mn * 0.05).toFixed(0)}" height="${(mn * 0.05).toFixed(0)}" viewBox="0 0 24 24"><path d="M3 2l17 9-7 2 4 8-3 1-4-8-5 5z" fill="#fff" stroke="#111" stroke-width="1.5" stroke-linejoin="round"/></svg>`;
+  };
+  // ---------- silhouette: راجل ببدلة سودا مرسوم فلات (من غير وش) واقف على شريط رمادي مقوّس، والكلام فوقه رمادي بكلمات تقيلة
+  P.k_silhouette = function (b, t, k, th, bi) {
+    const it = this.items(b); if (!it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h), J = (a) => a.map((x) => this.text(x.w)).join(" "), all = J(it), ar = AR.test(all), ff = famOf(all);
+    const S = mn * 0.95, x = w / 2 - S * 0.25, y = h * 0.4, rise = eOut(seg(t, b.t0, b.t0 + 0.6)), pose = bi % 2;
+    const man = `<svg style="position:absolute;left:${x.toFixed(1)}px;top:${(y + (1 - rise) * h * 0.1).toFixed(1)}px;opacity:${rise.toFixed(2)};filter:drop-shadow(${(S * 0.02).toFixed(0)}px ${(S * 0.02).toFixed(0)}px ${(S * 0.02).toFixed(0)}px rgba(0,0,0,.35))" width="${(S * 0.5).toFixed(0)}" height="${(S * 0.95).toFixed(0)}" viewBox="0 0 100 190">
+      <path d="M38 6 L60 4 L62 30 L40 32z" fill="#0A0A0A"/><path d="M45 32h10v8H45z" fill="#0A0A0A"/>
+      <path d="M22 44 Q50 34 78 44 L84 110 L70 112 L68 190 L54 190 L50 120 L46 190 L32 190 L30 112 L16 110z" fill="#0A0A0A"/>
+      <path d="M46 40 L50 44 L54 40 L52 52 L50 92 L48 52z" fill="#fff"/><path d="M48 46 L52 46 L53 86 L50 92 L47 86z" fill="#0A0A0A"/>
+      ${pose ? `<path d="M78 44 L92 70 L86 74 L72 56z" fill="#0A0A0A"/><path d="M22 44 L6 74 L14 78 L28 58z" fill="#0A0A0A"/>` : `<path d="M78 44 L96 30 L100 36 L84 56z" fill="#0A0A0A"/><path d="M96 24 l4 -14 l4 2 l-3 14z" fill="#0A0A0A"/>`}</svg>`;
+    const z = mn * 0.05 * this.ts;
+    return MONOBG + `<svg style="position:absolute;inset:0" width="${w}" height="${h}"><path d="M${(-w * 0.1).toFixed(0)} ${(h * 0.92).toFixed(0)} Q ${(w * 0.5).toFixed(0)} ${(h * 0.78).toFixed(0)} ${(w * 1.1).toFixed(0)} ${(h * 0.84).toFixed(0)}" stroke="#C9C9C9" stroke-width="${(mn * 0.08).toFixed(0)}" fill="none"/></svg>${man}
+      <div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:${(w * 0.06).toFixed(1)}px;right:${(w * 0.06).toFixed(1)}px;top:${(h * 0.2).toFixed(1)}px;text-align:center;font:500 ${z.toFixed(1)}px ${ff};color:#555;line-height:1.5">${it.map((x, i) => { const s = this.text(x.w), hv = i === b.focus || [...s].length >= 7, q = seg(t, x.t0 - 0.05, x.t0 + 0.25);
+        return `<span style="display:inline-block;font-weight:${hv ? 800 : 500};color:${hv ? "#111" : "#555"};opacity:${clamp(q * 2).toFixed(2)}">${esc(s)}</span>`; }).join(" ")}</div>`;
   };
 })();
