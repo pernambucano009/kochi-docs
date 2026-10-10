@@ -214,6 +214,7 @@ document.addEventListener("pointerdown", (e) => {
 });
 
 function tvDetail(v) {
+  if (v.mode === "ad") return tvAdDetail(v);   // 🎯 قوالب الإعلانات (tpl-ad.js)
   const sch = v.schema, fill = v.fill, c = v.costs || {}, busy = v.busy, beats = sch.beats;
   // كل خطوة بتفتح لوحدها لما ييجي دورها، إلا لو انت فتحتها أو قفلتها بإيدك
   const open = (k, def) => ((tplx.user?.[k] ?? def) ? "open" : "");

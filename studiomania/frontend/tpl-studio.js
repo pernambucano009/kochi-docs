@@ -45,10 +45,10 @@ function tsHome() {
         ${busy ? `<span class="ts-badge"><span class="spin-inline"></span> ${tse(t.sample_step || "بيعمل العينة")}</span>` : ""}</div>
       <div class="ts-info"><b data-no-i18n>${tse(t.icon || "")} ${tse(t.name)}</b>
         ${t.uses ? `<small class="muted">مناسب لـ: ${tse(t.uses)}</small>` : ""}
-        <small class="muted">🎬 مشاهد ١٠ ثواني · مفتاح ستايل · صوت المؤثرات</small>
+        <small class="muted">${t.mode === "ad" ? "🎯 شخصية ثابتة · صورة المنتج · سكريبت ← فيديو بالمراجع" : "🎬 مشاهد ١٠ ثواني · مفتاح ستايل · صوت المؤثرات"}</small>
         ${t.sample_error ? `<small class="err">⚠️ ${tse(t.sample_error)}</small>` : ""}
         <div class="row wrap"><button class="btn sm primary" data-tsuse="${t.id}">✨ استخدم القالب</button>
-          ${!t.sample_url || t.sample_status === "failed" || t.sample_old ? `<button class="btn sm" data-tssample="${t.id}" ${busy ? "disabled" : ""}>🎞️ اعمل عينة (~$${t.sample_cost})</button>`
+          ${t.mode === "ad" ? "" : !t.sample_url || t.sample_status === "failed" || t.sample_old ? `<button class="btn sm" data-tssample="${t.id}" ${busy ? "disabled" : ""}>🎞️ اعمل عينة (~$${t.sample_cost})</button>`
             : `<button class="btn sm" data-tssample="${t.id}" ${busy ? "disabled" : ""} title="عينة جديدة">↻</button>`}</div></div></article>`;
   };
   const t = D.templates.find((x) => x.id === tsx.pick);
@@ -66,8 +66,9 @@ function tsHome() {
         <label>🎙️ الصوت <select id="tsVoice"></select></label>
         <label class="check"><input type="checkbox" id="tsVoiceOn" checked> فويس أوفر (بيحدد مدة كل لقطة)</label>
       </div>
+      ${t.mode === "ad" ? `<small class="muted">${t.ad_cfg?.kind === "ugc" ? "📱 ١٥ ثانية: الشخصية بتتكلم بصوتها جوه الفيديو." : "🎬 الطول وعدد اللقطات بتختارهم جوه."} الخطوات: الشخصية ← صورة المنتج ← السكريبت ← التوليد.</small>` : `
       <div class="row wrap"><label>⏱️ الطول <select id="tsLen">${[30, 60, 90, 120].map((x) => `<option value="${x}" ${x === 60 ? "selected" : ""}>${x} ثانية (${x / 10} مشاهد)</option>`).join("")}</select></label>
-        <small class="muted">كل مشهد ١٠ ثواني وليه جملة فويس أوفر. الأرقام اللي عايزها في الفيديو اكتبها في الفكرة (البرنامج مش بيخترع أرقام).</small></div>
+        <small class="muted">كل مشهد ١٠ ثواني وليه جملة فويس أوفر. الأرقام اللي عايزها في الفيديو اكتبها في الفكرة (البرنامج مش بيخترع أرقام).</small></div>`}
       <div class="row wrap">
         <label>المقاس <select id="tsRatio">${Object.entries(TV_RATIOS).map(([k, l]) => `<option value="${k}" ${k === (t.ratio || "9:16") ? "selected" : ""}>${l}</option>`).join("")}</select></label>
         <label>موديل الصور <select id="tsImg"><option value="sunburst">GPT Image 2.5 (زي ChatGPT)</option><option value="nano2">Nano Banana 2 (أرخص)</option><option value="nanopro">Nano Banana Pro</option></select></label>
@@ -138,12 +139,13 @@ $("tsGallery").addEventListener("click", async (e) => {
       tplx.user = {};
       const v = await api("/api/tvideos", { method: "POST", ...jsonBody({ template: tsx.pick, section: "templates", brief: brief || script.slice(0, 300),
         script, script_mode: mode, lang: $("tsLang").value, voice: $("tsVoice").value, voice_on: $("tsVoiceOn").checked,
-        ratio: $("tsRatio").value, image_model: $("tsImg").value, text_mode: $("tsText").value, model: "seedance-mini", resolution: "480p",
+        ratio: $("tsRatio").value, image_model: $("tsImg").value, text_mode: $("tsText").value,
+        model: tsx.data.templates.find((x) => x.id === tsx.pick)?.mode === "ad" ? "seedance-fast" : "seedance-mini", resolution: "480p",
         length: Number($("tsLen")?.value || 60) }) });
       tsx.pick = null;
       tsx.data = await api("/api/tpl-studio");
       tsOpenVideo(v.id);
-      toast("✍️ بيكتب السكريبت ويسجّل الفويس أوفر…");
+      if (tplx.cur?.mode !== "ad") toast("✍️ بيكتب السكريبت ويسجّل الفويس أوفر…");
     });
   }
   if (b.dataset.tspick && !e.target.closest("button")) { tsx.pick = b.dataset.tspick; tsHome(); }

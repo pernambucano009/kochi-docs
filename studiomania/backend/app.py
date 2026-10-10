@@ -12388,7 +12388,8 @@ def tv_to_dict(vid: str, d: dict) -> dict:
                       "video": round(sum(trial_gen_seconds(b["t1"] - b["t0"]) * per for i, b in enumerate(beats) if not (segs.get(str(i)) or {}).get("file")), 2),
                       "seg": [round(trial_gen_seconds(b["t1"] - b["t0"]) * per, 2) for b in beats],
                       "once": tv_once_cost(d, per), "once_parts": len(tv_chunks(beats, tv_once_max(d))), "once_max": tv_once_max(d)},
-            "models": [{"key": k, "label": v["label"], "per_sec": v["per_sec"]} for k, v in TRIAL_MODELS.items()]}
+            "models": [{"key": k, "label": v["label"], "per_sec": v["per_sec"]} for k, v in TRIAL_MODELS.items()],
+            **(ad_to_dict(vid, d) if d.get("mode") == "ad" else {})}
 
 
 @app.get("/api/tvideos")
@@ -12402,7 +12403,7 @@ def tvideos_list():
         if not owned(d.get("client_id")) or d.get("sample_of"):
             continue
         p0 = (d.get("panels") or {}).get("0") or {}
-        th = p0.get("full") or p0.get("cell")
+        th = p0.get("full") or p0.get("cell") or ((d.get("ad") or {}).get("files") or {}).get("head") or ((d.get("ad") or {}).get("files") or {}).get("product")
         out.append({"id": f.parent.name, "name": d.get("name"), "status": d.get("status"), "beats": len(d["schema"]["beats"]),
                     "template_name": d.get("template_name"), "section": d.get("section"),
                     "thumb": f"/media/tvideos/{f.parent.name}/{th}" if th else None})
@@ -12459,6 +12460,14 @@ def tvideo_create(body: TvIn):
                  transition=(t["schema"].get("transition") or t.get("transition") or ""))
         if body.image_model not in TV_IMAGE_MODELS:
             d["image_model"] = "sunburst"
+    if body.section == "templates" and t.get("mode") == "ad":
+        # 🎯 قوالب الإعلانات: الشخصية والمنتج الأول، وبعدين السكريبت (مفيش حاجة بتشتغل لوحدها في الأول)
+        lang = d["lang"]
+        d.update(mode="ad", status="filled", step=None, model=body.model if body.model in TRIAL_MODELS and body.model != "seedance-mini" else "seedance-fast",
+                 ad={"kind": t["ad_cfg"]["kind"], "look": "narrative", "spoken": adtpl.SPOKEN.get(lang) or dub.DIALECTS[lang].get("language") or "Arabic",
+                     "script": d["script"] if d["script_mode"] == "own" else "", "place": "", "length": 15, "end_on": True,
+                     "hero": {}, "product": {}, "files": {}, "gens": {}, "plan": None})
+    elif body.section == "templates":
         # 🎬 كل القوالب: مشاهد ١٠ ثواني ثابتة بمفتاح ستايل (خدعة اللقطة الواحدة)
         n = max(3, min(12, round(body.length / SCENE_SEC)))
         d.update(mode="scenes", scene_cfg=scene_cfg_for(t), scenes=[], scene_files={}, transition="cut", voice_tone=t.get("voice_tone"),
@@ -12466,8 +12475,9 @@ def tvideo_create(body: TvIn):
                                                    "role": "hook" if i == 0 else "cta" if i == n - 1 else "proof", "what": f"مشهد {i + 1}"} for i in range(n)]})
     with TV_LOCK:
         (tv_dir(vid) / "tv.json").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
-    job = run_tv_scenes_script if d.get("mode") == "scenes" else run_tv_script if d.get("section") == "templates" else run_tv_fill
-    threading.Thread(target=job, args=(vid,), daemon=True).start()
+    job = None if d.get("mode") == "ad" else run_tv_scenes_script if d.get("mode") == "scenes" else run_tv_script if d.get("section") == "templates" else run_tv_fill
+    if job:
+        threading.Thread(target=job, args=(vid,), daemon=True).start()
     return tv_to_dict(vid, d)
 
 
@@ -12514,6 +12524,8 @@ def tvideo_patch(vid: str, body: TvPatchIn):
                 raise HTTPException(400, "استنى لما الشغل اللي شغال يخلص")
             d["ratio"] = body.ratio   # الشيتات واللوحات القديمة بمقاس تاني: لازم تترسم تاني
             d.update(sheets={}, panels={}, segs={}, final=None, status="filled" if d.get("fill") else d.get("status"))
+            if d.get("mode") == "ad":
+                d["ad"]["gens"] = {}
         if body.model in TRIAL_MODELS:
             d["model"] = body.model
         if body.resolution in ("480p", "720p"):
@@ -12545,6 +12557,8 @@ def tv_start(vid: str, status: str, step: str, target, *args) -> dict:
 
 
 def tv_idle(d: dict) -> str:
+    if d.get("mode") == "ad":
+        return "done" if d.get("final") else "cut" if (d.get("ad") or {}).get("plan") else "filled"
     if d.get("mode") == "scenes":
         if d.get("final"):
             return "done"
@@ -12997,6 +13011,9 @@ def tvideo_to_editor(vid: str):
         ready = [(i, {"t0": i * SCENE_SEC, "t1": (i + 1) * SCENE_SEC, "file": f["file"]}) for i, f in sorted(((int(k), v) for k, v in (d.get("scene_files") or {}).items()))
                  if (folder / f["file"]).exists()]
         once = False
+    elif d.get("mode") == "ad":   # 🎯 الإعلان المتجمّع (بصوته) حتة واحدة
+        once = bool(d.get("final") and (folder / d["final"]).exists())
+        ready = [(0, {"t0": 0, "t1": probe_duration(folder / d["final"]), "file": d["final"]})] if once else []
     elif once:   # الفيديو اللي اتولّد مرة واحدة بيتنقل حتة واحدة زي ما هو
         ready = [(0, {"t0": 0, "t1": probe_duration(folder / d["final"]), "file": d["final"]})]
     if not ready:
@@ -13015,7 +13032,7 @@ def tvideo_to_editor(vid: str):
                 (gid, f"ad:tv-{vid}", src, f"📐 {label}" + ("" if once else f" · جزء {i + 1}"), f"{gid}.mp4", now(), now()))
             tr = d.get("transition") or d["schema"].get("transition") or ""
             clips.append({"gen_id": gid, "start": 0.0, "end": round(probe_duration(GENERATED_DIR / f"{gid}.mp4"), 3),
-                          "zoom": 1.0, "x": 0.0, "y": 0.0, "volume": 0.22 if d.get("mode") == "scenes" else 0.0,
+                          "zoom": 1.0, "x": 0.0, "y": 0.0, "volume": 0.22 if d.get("mode") == "scenes" else 1.0 if d.get("mode") == "ad" else 0.0,
                           # 🎞️ الترانزيشن اللي على روح القالب بين الأجزاء
                           "trans": {"type": tr, "dur": 0.4} if clips and tr in montage.TRANSITIONS else None})
         voice = None
@@ -16187,6 +16204,508 @@ def scenes_assemble(vid: str) -> None:
             if x.get("final"):
                 (folder / x["final"]).unlink(missing_ok=True)
             x.update(final=name, final_kind="scenes")
+        tv_update(vid, fin)
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
+# ---------------------------------------------------------------- 🎯 قوالب الإعلانات (UGC / سينمائي): شخصية ← منتج ← سكريبت ← توليد
+import adtpl  # noqa: E402
+
+AD_REF_SLOTS = ("head", "body", "product", "place")
+AD_LENGTHS = (6, 10, 15, 20, 30)
+
+
+def seed_ad_templates() -> None:
+    for tid, t in tplseed.ADS.items():
+        f = TPL_DIR / tid / "tpl.json"
+        old = None
+        if f.exists():
+            try:
+                old = json.loads(f.read_text(encoding="utf-8"))
+            except ValueError:
+                old = None
+            if old and old.get("seed_v", 0) >= TPL_SEED_V and old.get("seed_media") == seed_media_hash(tid):
+                continue
+        beats = [{"t0": 0.0, "t1": 15.0, "role": "hook", "what": "الإعلان", "layout": "", "slots": [], "camera": "", "into_next": "", "keeps": "", "sfx": ""}]
+        schema = {"title": t["name"], "summary": t["uses"], "style": "", "negative": "", "transition": "cut", "beats": beats, "palette": "", "spine": "",
+                  "camera": "", "text_style": "", "music": "", "background": "", "last_frame": "", "beat_sec": 0.0}
+        (TPL_DIR / tid).mkdir(parents=True, exist_ok=True)
+        old = seed_media_copy(tid, old)
+        keep = {k: old[k] for k in ("sample", "cover", "sample_vid", "sample_status", "sample_error", "sample_kind", "seed_media") if old and k in old}
+        with TPL_LOCK:
+            tpl_save(tid, {"name": t["name"], "icon": t["icon"], "uses": t["uses"], "voice_tone": t["voice_tone"], "sample_brief": t["sample"],
+                           "mode": "ad", "ad_cfg": {k: t[k] for k in ("kind", "hero", "needs_product")}, "schema": schema, "builtin": True,
+                           "ratio": "9:16", "source": None, "lab_name": "مكتبة القوالب الجاهزة", "seed_v": TPL_SEED_V,
+                           "created_at": (old or {}).get("created_at") or now(), **keep})
+
+
+seed_ad_templates()
+
+
+def ad_lang(d: dict) -> tuple[str, str]:
+    dl = dub.DIALECTS[d["lang"]]
+    txt = dl.get("language") or (dl["label"].split(" ", 1)[1] + " عامي طبيعي" if d["lang"] != "ar-msa" else "عربية فصحى سهلة")
+    return txt, dub.GUIDES.get(d["lang"], "")
+
+
+def ad_total(d: dict) -> float:
+    a = d["ad"]
+    if a["kind"] == "ugc":
+        return 15.0
+    shots = (a.get("plan") or {}).get("shots") or []
+    return round(sum(s["dur"] for s in shots) + (AD_END_SEC if a.get("end_on", True) and shots else 0), 2)
+
+
+AD_END_SEC = 3.0
+
+
+def ad_gen_secs(dur: float) -> int:
+    return max(4, min(atlas.MAX_DURATION, math.ceil(dur)))
+
+
+def ad_per_sec(d: dict) -> float:
+    return TRIAL_MODELS.get(d.get("model"), TRIAL_MODELS["seedance-fast"])["per_sec"] * (2 if d.get("resolution") == "720p" else 1)
+
+
+def ad_jobs(d: dict) -> list[dict]:
+    """التوليدات المطلوبة: UGC = توليدة واحدة ١٥ ثانية، السينمائي = توليدة لكل لقطة + الكارت الأخير."""
+    a = d["ad"]
+    shots = (a.get("plan") or {}).get("shots") or []
+    if not shots:
+        return []
+    if a["kind"] == "ugc":
+        return [{"key": "g0", "secs": 15, "dur": 15.0, "label": "الإعلان كله (١٥ ثانية)"}]
+    out = [{"key": f"s{i}", "secs": ad_gen_secs(s["dur"]), "dur": s["dur"], "label": f"لقطة {i + 1} · {adtpl.CINEMA_BEATS.get(s['beat'], s['beat'])}"}
+           for i, s in enumerate(shots)]
+    if a.get("end_on", True):
+        out.append({"key": "end", "secs": 4, "dur": AD_END_SEC, "label": "الكارت الأخير"})
+    return out
+
+
+def ad_refs(d: dict, job: str) -> tuple[list[str], list[Path]]:
+    """المراجع اللي بتتبعت مع التوليدة بالترتيب (الترتيب هو @image1، @image2...)."""
+    a, folder = d["ad"], tv_dir(d["_id"])
+    files = a.get("files") or {}
+    have = lambda s: files.get(s) and (folder / files[s]).exists()  # noqa: E731
+    if job == "g0":
+        roles = ["head", "body", "product"]
+    elif job == "end":
+        roles = ["product"]
+    else:
+        w = a["plan"]["shots"][int(job[1:])].get("with") or []
+        roles = (["head", "body"] if "hero" in w else []) + (["product"] if "product" in w else []) + (["place"] if "place" in w else [])
+    roles = [r for r in roles if have(r)]
+    names = {"head": "hero_head", "body": "hero_body", "product": "product", "place": "place"}
+    return [names[r] for r in roles], [folder / files[r] for r in roles]
+
+
+def ad_prompt(d: dict, job: str, roles: list[str]) -> str:
+    if job == "g0":
+        return adtpl.ugc_prompt(d)
+    if job == "end":
+        return adtpl.end_card_prompt(d)
+    return adtpl.cinema_shot_prompt(d, int(job[1:]), roles)
+
+
+def ad_to_dict(vid: str, d: dict) -> dict:
+    a, folder = d.get("ad") or {}, tv_dir(vid)
+
+    def url(name):
+        return f"/media/tvideos/{vid}/{name}?v={int((folder / name).stat().st_mtime)}" if name and (folder / name).exists() else None
+    per = ad_per_sec(d)
+    jobs = ad_jobs({**d, "_id": vid})
+    gens = a.get("gens") or {}
+    return {"ref_urls": {s: url((a.get("files") or {}).get(s)) for s in AD_REF_SLOTS},
+            "jobs": [{**j, "url": url((gens.get(j["key"]) or {}).get("file")), "cost": round(j["secs"] * per, 2),
+                      "prompt": ad_prompt({**d, "_id": vid}, j["key"], ad_refs({**d, "_id": vid}, j["key"])[0]) if a.get("plan") else ""} for j in jobs],
+            "total": ad_total(d), "places": adtpl.UGC_PLACES, "looks": {k: v[0] for k, v in adtpl.CINEMA_LOOKS.items()},
+            "beat_names": adtpl.CINEMA_BEATS, "lengths": AD_LENGTHS,
+            "hero_cost": round(TV_IMAGE_MODELS[tv_img(d)][0] * 2, 2), "plate_cost": TV_IMAGE_MODELS[tv_img(d)][0]}
+
+
+def ad_start(vid: str, status: str, step: str, target, *args) -> dict:
+    def fn(d):
+        if d.get("status") in TV_BUSY:
+            raise HTTPException(400, "استنى لما الشغل اللي شغال يخلص")
+        if d.get("mode") != "ad":
+            raise HTTPException(400, "ده مش فيديو إعلان")
+        d.update(status=status, step=step, error=None)
+    d = tv_update(vid, fn)
+    threading.Thread(target=target, args=(vid, *args), daemon=True).start()
+    return tv_to_dict(vid, d)
+
+
+def ad_image(d: dict, prompt: str, out: Path, refs: list[Path], size: str) -> None:
+    if atlas.mock_mode():
+        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "testsrc2=s=360x480", "-frames:v", "1", str(out)],
+                       check=True, capture_output=True, timeout=60)
+        return
+    atlas.download(atlas.generate_image(tv_img(d), prompt, size, "high", [atlas.reference_url(p) for p in refs] or None), out)
+
+
+def ad_put_file(vid: str, slot: str, name: str) -> None:
+    def fn(x):
+        files = x["ad"].setdefault("files", {})
+        if files.get(slot) and files[slot] != name:
+            (tv_dir(vid) / files[slot]).unlink(missing_ok=True)
+        files[slot] = name
+        x["final"] = None
+    tv_update(vid, fn)
+
+
+class AdHeroIn(BaseModel):
+    desc: str = ""
+    only: str | None = None   # head / body = ارسم واحدة بس تاني
+
+
+@app.post("/api/tvideos/{vid}/ad/hero")
+def ad_hero(vid: str, body: AdHeroIn):
+    """👤 الشخصية: وصفك ← مواصفات ثابتة ← صورة وش ← صورة جسم كامل بنفس الوش (مرجع الوش متبعت معاها)."""
+    tv_update(vid, lambda x: x["ad"].update(hero={**(x["ad"].get("hero") or {}), "desc": body.desc.strip()[:1500]}))
+    return ad_start(vid, "sheeting", "👤 بيكتب مواصفات الشخصية", run_ad_hero, body.only)
+
+
+def run_ad_hero(vid: str, only: str | None) -> None:
+    try:
+        d = tv_load(vid)
+        a, folder = d["ad"], tv_dir(vid)
+        hero = a.get("hero") or {}
+        if not only or not hero.get("identity"):
+            if atlas.mock_mode():
+                res = {"gender": "female", "identity": "Soft oval face, warm olive skin, dark brown eyes.", "outfit": "a loose beige shirt, wide jeans, white sneakers",
+                       "handle": "the woman with the beige hijab", "summary_ar": "بنت دمها خفيف بطرحة بيج"}
+            else:
+                res = ad_json(series_chat(adtpl.hero_messages(hero.get("desc") or "", d.get("brief") or "", a["kind"]), json_mode=True), "مواصفات الشخصية")
+            hero = {**hero, **{k: adtpl._txt(res.get(k), 1500) for k in ("gender", "identity", "outfit", "handle", "summary_ar")}}
+            tv_update(vid, lambda x: x["ad"].update(hero=hero))
+        if only in (None, "head"):
+            tv_set(vid, step="👤 بيرسم صورة الوش (المرجع الأساسي)")
+            name = f"head-{uuid.uuid4().hex[:4]}.png"
+            ad_image(d, adtpl.head_prompt(hero), folder / name, [], "1024x1536")
+            ad_put_file(vid, "head", name)
+        if only in (None, "body"):
+            d = tv_load(vid)
+            head = (d["ad"].get("files") or {}).get("head")
+            tv_set(vid, step="🧍 بيرسم الجسم كامل بنفس الوش")
+            name = f"body-{uuid.uuid4().hex[:4]}.png"
+            ad_image(d, adtpl.body_prompt(hero), folder / name, [folder / head] if head else [], "1024x1536")
+            ad_put_file(vid, "body", name)
+        tv_update(vid, lambda x: x.update(status=tv_idle(x), step=None, error=None))
+    except Exception as exc:  # noqa: BLE001
+        tv_fail(vid, exc)
+
+
+@app.post("/api/tvideos/{vid}/ad/upload/{slot}")
+def ad_upload(vid: str, slot: str, file: UploadFile = File(...)):
+    """⬆ صورة من عندك: الوش / الجسم / المنتج (لازم) / المكان."""
+    if slot not in AD_REF_SLOTS:
+        raise HTTPException(404, "الخانة دي مش موجودة")
+    d = tv_load(vid)
+    if d.get("status") in TV_BUSY:
+        raise HTTPException(400, "استنى لما الشغل اللي شغال يخلص")
+    name = save_upload(file, IMAGE_EXTENSIONS, tv_dir(vid), slot)
+    ad_put_file(vid, slot, name)
+    return tv_to_dict(vid, tv_update(vid, lambda x: x.update(status=tv_idle(x))))
+
+
+class AdSetIn(BaseModel):
+    product_name: str | None = None
+    product_kind: str | None = None
+    place: str | None = None
+    look: str | None = None
+    script: str | None = None
+    length: int | None = None
+    end_on: bool | None = None
+    brand: str | None = None
+    slogan: str | None = None
+    voice_on: bool | None = None
+    lang: str | None = None
+    voice: str | None = None
+
+
+@app.put("/api/tvideos/{vid}/ad")
+def ad_set(vid: str, body: AdSetIn):
+    def fn(d):
+        if d.get("mode") != "ad":
+            raise HTTPException(400, "ده مش فيديو إعلان")
+        a = d["ad"]
+        p = a.setdefault("product", {})
+        if body.product_name is not None:
+            p["name"] = body.product_name.strip()[:120]
+        if body.product_kind is not None:
+            p["kind"] = body.product_kind.strip()[:120]
+        if body.place is not None:
+            a["place"] = body.place.strip()[:400]
+        if body.look in adtpl.CINEMA_LOOKS:
+            a["look"] = body.look
+        if body.script is not None:
+            a["script"] = body.script.strip()[:3000]
+        if body.length in AD_LENGTHS:
+            a["length"] = body.length
+        if body.end_on is not None:
+            a["end_on"] = body.end_on
+        end = (a.get("plan") or {}).get("end")
+        if end is not None:
+            if body.brand is not None:
+                end["brand"] = body.brand.strip()[:60]
+            if body.slogan is not None:
+                end["slogan"] = body.slogan.strip()[:120]
+        if body.voice_on is not None:
+            d["voice_on"] = body.voice_on
+        if body.lang in dub.DIALECTS:
+            d["lang"] = body.lang
+            a["spoken"] = adtpl.SPOKEN.get(body.lang) or dub.DIALECTS[body.lang].get("language") or "Arabic"
+            if d.get("voice") not in dub.DIALECTS[body.lang]["voices"]:
+                d["voice"] = dub.DIALECTS[body.lang]["voices"][0]
+        if body.voice and body.voice in dub.DIALECTS[d["lang"]]["voices"]:
+            d["voice"] = body.voice
+        d["final"] = None
+    return tv_to_dict(vid, tv_update(vid, fn))
+
+
+@app.post("/api/tvideos/{vid}/ad/place")
+def ad_place(vid: str):
+    """🏙️ صورة المكان (من غير ناس) بتتبعت مرجع مع اللقطات اللي فيها المكان."""
+    d = tv_load(vid)
+    if not (d["ad"].get("place") or "").strip():
+        raise HTTPException(400, "اكتب المكان الأول")
+    return ad_start(vid, "sheeting", "🏙️ بيكتب ويرسم صورة المكان", run_ad_place)
+
+
+def run_ad_place(vid: str) -> None:
+    try:
+        d = tv_load(vid)
+        if atlas.mock_mode():
+            prompt = "A sunny street at dawn."
+        else:
+            prompt = adtpl._txt(ad_json(series_chat(adtpl.plate_messages(d["ad"]["place"], d.get("brief") or ""), json_mode=True), "صورة المكان").get("prompt"), 4000)
+        prompt += adtpl.PLATE_CLOSE
+        size = {"9:16": "1024x1536", "16:9": "1536x1024"}.get(d["ratio"], "1024x1024")
+        name = f"place-{uuid.uuid4().hex[:4]}.png"
+        ad_image(d, prompt, tv_dir(vid) / name, [], size)
+        conform_image(tv_dir(vid) / name, d["ratio"])
+        ad_put_file(vid, "place", name)
+        def fn(x):
+            x["ad"]["place_prompt"] = prompt
+            x.update(status=tv_idle(x), step=None, error=None)
+        tv_update(vid, fn)
+    except Exception as exc:  # noqa: BLE001
+        tv_fail(vid, exc)
+
+
+@app.post("/api/tvideos/{vid}/ad/plan")
+def ad_plan(vid: str):
+    """✍️ السكريبت واللقطات (من الفكرة أو من سكريبتك)."""
+    d = tv_load(vid)
+    p = d["ad"].get("product") or {}
+    if d["ad"]["kind"] == "ugc" and not (p.get("name") or "").strip():
+        raise HTTPException(400, "اكتب اسم المنتج الأول")
+    return ad_start(vid, "filling", "✍️ بيكتب السكريبت واللقطات", run_ad_plan)
+
+
+def run_ad_plan(vid: str) -> None:
+    try:
+        d = tv_load(vid)
+        a = d["ad"]
+        lang_txt, guide = ad_lang(d)
+        total = int(a.get("length") or 15)
+        if atlas.mock_mode():
+            res = ({"title": "ريفيو تجريبي", "world": "A bright bathroom counter.", "lighting": "soft window light",
+                    "beats": [{"line": f"جملة تجريبية {k + 1}", "action": "she holds the product near the lens"} for k in range(4)]}
+                   if a["kind"] == "ugc" else
+                   {"title": "إعلان تجريبي", "world": "dawn city street, cool light", "end": {"brand": p_name(a), "slogan": "صحصح بجد"},
+                    "shots": [{"beat": b, "dur": 3, "what": f"لقطة {k + 1}", "visual": "The runner pauses.", "camera": "50mm, slow push-in",
+                               "audio": "footsteps", "with": ["hero", "product"], "line": "" if k else "كل يوم بداية"} for k, b in enumerate(["HOOK", "PROBLEM", "REVEAL", "PAYOFF"])]})
+        else:
+            brain_txt = az.brain_text(tv_brain(d))
+            msgs = adtpl.ugc_messages(d, lang_txt, guide, brain_txt) if a["kind"] == "ugc" else adtpl.cinema_messages(d, lang_txt, guide, brain_txt, total)
+            res = ad_json(series_chat(msgs, json_mode=True), "السكريبت")
+        shots = adtpl.clean_plan_shots(a["kind"], res, total)
+        if not shots:
+            raise RuntimeError("الموديل مرجعش لقطات، جرّب تاني")
+        end = res.get("end") if isinstance(res.get("end"), dict) else {}
+        plan = {"title": adtpl._txt(res.get("title"), 80), "world": adtpl._txt(res.get("world"), 800), "lighting": adtpl._txt(res.get("lighting"), 200),
+                "shots": shots, "end": {"brand": adtpl._txt(end.get("brand"), 60) or p_name(a), "slogan": adtpl._txt(end.get("slogan"), 120)}}
+
+        def fn(x):
+            x["ad"]["plan"] = plan
+            x["ad"]["gens"] = {}
+            x["final"] = None
+            if plan["title"]:
+                x["name"] = f"{x['name'].split(' · ')[0]} · {plan['title']}"[:120]
+            x.update(status=tv_idle(x), step=None, error=None)
+        tv_update(vid, fn)
+    except Exception as exc:  # noqa: BLE001
+        tv_fail(vid, exc)
+
+
+def p_name(a: dict) -> str:
+    return ((a.get("product") or {}).get("name") or "").strip()
+
+
+class AdShotIn(BaseModel):
+    line: str | None = None
+    action: str | None = None
+    visual: str | None = None
+    camera: str | None = None
+    audio: str | None = None
+    dur: float | None = None
+    with_: list[str] | None = None
+    world: str | None = None
+
+
+@app.put("/api/tvideos/{vid}/ad/shots/{i}")
+def ad_shot_edit(vid: str, i: int, body: AdShotIn):
+    def fn(d):
+        plan = d["ad"].get("plan") or {}
+        sh = plan.get("shots") or []
+        if body.world is not None:
+            plan["world"] = body.world.strip()[:800]
+        if not 0 <= i < len(sh):
+            if body.world is None:
+                raise HTTPException(404, "اللقطة دي مش موجودة")
+            return
+        for k in ("line", "action", "visual", "camera", "audio"):
+            v = getattr(body, k)
+            if v is not None:
+                sh[i][k] = v.strip()[:1500]
+        if body.dur is not None and d["ad"]["kind"] != "ugc":
+            sh[i]["dur"] = round(max(1.5, min(8.0, body.dur)), 1)
+        if body.with_ is not None:
+            sh[i]["with"] = [x for x in body.with_ if x in ("hero", "product", "place")]
+        d["final"] = None
+    return tv_to_dict(vid, tv_update(vid, fn))
+
+
+class AdRunIn(BaseModel):
+    key: str | None = None   # g0 / s3 / end، أو فاضي = الناقص كله
+
+
+@app.post("/api/tvideos/{vid}/ad/run")
+def ad_run(vid: str, body: AdRunIn):
+    """🎬 التوليد (الناقص بس، أو حتة واحدة تاني) ← التجميع."""
+    d = {**tv_load(vid), "_id": vid}
+    if not (d["ad"].get("plan") or {}).get("shots"):
+        raise HTTPException(400, "اكتب السكريبت الأول")
+    if not (d["ad"].get("files") or {}).get("product"):
+        raise HTTPException(400, "ارفع صورة المنتج الأول")
+    if d["ad"]["kind"] == "ugc" and not (d["ad"].get("files") or {}).get("head"):
+        raise HTTPException(400, "اعمل الشخصية الأول")
+    if body.key and body.key not in [j["key"] for j in ad_jobs(d)]:
+        raise HTTPException(404, "الحتة دي مش موجودة")
+    return ad_start(vid, "working", "🎬 بيبدأ", run_ad_gen, body.key)
+
+
+def run_ad_gen(vid: str, only: str | None) -> None:
+    try:
+        d = {**tv_load(vid), "_id": vid}
+        folder = tv_dir(vid)
+        ratio = az.ASPECTS.get(d["ratio"], az.ASPECTS["9:16"])[1]
+        W, H = RATIO_VIDEO.get(d["ratio"], RATIO_VIDEO["9:16"])
+        speak = d["ad"]["kind"] == "ugc"
+        for j in ad_jobs(d):
+            have = ((d["ad"].get("gens") or {}).get(j["key"]) or {}).get("file")
+            if (only and only != j["key"]) or (not only and have and (folder / have).exists()):
+                continue
+            tv_set(vid, step=f"🎬 بيولّد: {j['label']}")
+            roles, refs = ad_refs(d, j["key"])
+            name = f"{j['key']}-{uuid.uuid4().hex[:4]}.mp4"
+            if atlas.mock_mode():
+                gen_motion(d.get("model") or "seedance-fast", d.get("resolution") or "480p", ratio, "", refs[0], refs[-1], j["secs"], folder / name, W, H)
+            else:
+                req = {"model": tv_r2v(d.get("model") or "seedance-fast"), "prompt": ad_prompt(d, j["key"], roles),
+                       "reference_images": [atlas.reference_url(p) for p in refs], "duration": j["secs"],
+                       "resolution": d.get("resolution") or "480p", "ratio": ratio, "generate_audio": True, "watermark": False}
+                atlas.download(atlas.run_model("Video", req, j["label"], max_seconds=1800, interval=6), folder / name)
+
+            def fn(x, key=j["key"], name=name):
+                g = x["ad"].setdefault("gens", {})
+                old = (g.get(key) or {}).get("file")
+                if old and old != name:
+                    (folder / old).unlink(missing_ok=True)
+                g[key] = {"file": name}
+                x["final"] = None
+            tv_update(vid, fn)
+            d = {**tv_load(vid), "_id": vid}
+        if all(((d["ad"].get("gens") or {}).get(j["key"]) or {}).get("file") for j in ad_jobs(d)):
+            tv_set(vid, step="🎞️ بيجمّع الإعلان")
+            ad_assemble(vid, speak)
+        tv_update(vid, lambda x: x.update(status=tv_idle(x), step=None, error=None))
+    except Exception as exc:  # noqa: BLE001
+        tv_fail(vid, exc)
+
+
+def ad_end_ass(d: dict, W: int, H: int) -> str | None:
+    """الكارت الأخير: اسم البراند والجملة بخطوطنا (مش من الموديل)، فالحروف مظبوطة."""
+    end = (d["ad"].get("plan") or {}).get("end") or {}
+    items = []
+    if end.get("brand"):
+        items.append({"text": end["brand"], "t0": 0.25, "dur": AD_END_SEC, "font": "SM Cairo", "size": 120, "bold": True, "x": 0.5, "y": 0.3,
+                      "color": "#ffffff", "shadow": True, "stroke": {"w": 3, "color": "#000000"}, "anim_in": {"type": "pop", "dur": 0.45}})
+    if end.get("slogan"):
+        items.append({"text": end["slogan"], "t0": 0.6, "dur": AD_END_SEC, "font": "SM Tajawal", "size": 62, "x": 0.5, "y": 0.4,
+                      "color": "#ffffff", "shadow": True, "stroke": {"w": 2, "color": "#000000"}, "anim_in": {"type": "fade", "dur": 0.4}})
+    return textlayer.build_ass(items, AD_END_SEC, W, H) if items else None
+
+
+def ad_assemble(vid: str, speak: bool) -> None:
+    """كل حتة على طولها في الخطة ← صوتها (UGC: كلام الشخصية كامل، السينمائي: صوت المكان واطي + الفويس أوفر) ← ورا بعض ← الكارت الأخير بالكلام."""
+    d = {**tv_load(vid), "_id": vid}
+    folder = tv_dir(vid)
+    W, H = RATIO_VIDEO.get(d["ratio"], RATIO_VIDEO["9:16"])
+    work = folder / ".asm"
+    shutil.rmtree(work, ignore_errors=True)
+    work.mkdir()
+    ff = [ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y"]
+    try:
+        segs, t = [], 0.0
+        shots = d["ad"]["plan"]["shots"]
+        vo_items = []
+        for j in ad_jobs(d):
+            clip = folder / d["ad"]["gens"][j["key"]]["file"]
+            vf = f"[0:v]setpts=PTS-STARTPTS,scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},setsar=1,fps=30,tpad=stop_mode=clone:stop_duration=2"
+            if j["key"] == "end":
+                ass = ad_end_ass(d, W, H)
+                if ass:
+                    (work / "end.ass").write_text(ass, encoding="utf-8")
+                    vf += f",subtitles=filename='{captions.filter_path(work / 'end.ass')}':fontsdir='{captions.filter_path(FONTS_DIR)}'"
+            vf += ",format=yuv420p[v]"
+            vol = 1.0 if speak else 0.35
+            a = (f"[0:a]aresample=48000,aformat=channel_layouts=stereo,volume={vol},apad[a]" if has_audio(clip) else "anullsrc=r=48000:cl=stereo[a]")
+            out = work / f"{j['key']}.mp4"
+            subprocess.run(ff + ["-i", str(clip), "-filter_complex", f"{vf};{a}", "-map", "[v]", "-map", "[a]", "-t", f"{j['dur']:.3f}",
+                                 "-c:v", "libx264", "-preset", "veryfast", "-crf", "19", "-c:a", "aac", "-ar", "48000", "-b:a", "160k", str(out)],
+                           check=True, capture_output=True, timeout=600)
+            segs.append(out)
+            if j["key"].startswith("s") and d.get("voice_on", True):
+                line = shots[int(j["key"][1:])].get("line") or ""
+                if line.strip():
+                    vo_items.append((t, line))
+            t += j["dur"]
+        lst = work / "list.txt"
+        lst.write_text("".join(f"file '{p.name}'\n" for p in segs), encoding="utf-8")
+        joined = work / "joined.mp4"
+        subprocess.run(ff + ["-f", "concat", "-safe", "0", "-i", str(lst), "-c", "copy", str(joined)], check=True, capture_output=True, timeout=600)
+        name = f"final-{uuid.uuid4().hex[:4]}.mp4"
+        if vo_items and not speak:   # 🎙️ الفويس أوفر: كل جملة في أول لقطتها
+            ins, flt = ["-i", str(joined)], []
+            for k, (t0, line) in enumerate(vo_items):
+                tv_set(vid, step=f"🎙️ بيسجّل الفويس أوفر ({k + 1} من {len(vo_items)})")
+                f = vo_say(line, d["voice"], d["lang"], work / f"vo{k}.wav")
+                ins += ["-i", str(f)]
+                flt.append(f"[{k + 1}:a]aresample=48000,aformat=channel_layouts=stereo,adelay={int((t0 + 0.15) * 1000)}:all=1[v{k}]")
+            mix = "[0:a]" + "".join(f"[v{k}]" for k in range(len(vo_items)))
+            flt.append(f"{mix}amix=inputs={len(vo_items) + 1}:duration=first:normalize=0[a]")
+            subprocess.run(ff + ins + ["-filter_complex", ";".join(flt), "-map", "0:v", "-map", "[a]", "-c:v", "copy", "-c:a", "aac", "-b:a", "160k",
+                                       "-movflags", "+faststart", str(folder / name)], check=True, capture_output=True, timeout=600)
+        else:
+            shutil.move(str(joined), folder / name)
+
+        def fin(x):
+            if x.get("final"):
+                (folder / x["final"]).unlink(missing_ok=True)
+            x.update(final=name, final_kind="ad")
         tv_update(vid, fin)
     finally:
         shutil.rmtree(work, ignore_errors=True)

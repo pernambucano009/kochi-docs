@@ -320,3 +320,22 @@ SCENES = {
                  "Animation must start at the first frame.",
     },
 }
+
+
+# ---------------------------------------------------------------- 🎯 قوالب «إعلانات» (شخصية ثابتة + صورة المنتج + سكريبت ← Seedance)
+# kind: ugc = ١٥ ثانية بتوليدة واحدة والشخصية بتتكلم بصوتها · cinema = لقطات بتوقيتها + كارت أخير بخطوطنا + فويس أوفر اختياري
+
+ADS = {
+    "sk-ugc": {
+        "name": "UGC ريفيو بالموبايل", "icon": "📱", "kind": "ugc", "hero": "person", "needs_product": True,
+        "uses": "ريفيو منتج ١٥ ثانية: حد حقيقي ماسك الموبايل وبيتكلم عن المنتج (تيك توك وريلز)",
+        "voice_tone": "casual, warm, real creator talking to a friend",
+        "sample": "ريفيو سريع لسيروم فيتامين سي من حد جربه أسبوعين",
+    },
+    "sk-cinema-ad": {
+        "name": "إعلان سينمائي باللقطات", "icon": "🎬", "kind": "cinema", "hero": "person", "needs_product": True,
+        "uses": "إعلان تلفزيوني/سوشيال متصوّر: لقطات بتوقيتها، المنتج بطل، وكارت أخير باسم البراند",
+        "voice_tone": "calm, confident commercial voiceover, few words",
+        "sample": "إعلان قهوة باردة: واحدة بتجري الصبح، تتعب فوق التل، تشرب وتكمّل",
+    },
+}
