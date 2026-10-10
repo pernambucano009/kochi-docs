@@ -55,7 +55,7 @@
     "qr", "codetag", "toolbar", "terminal", "scan",
     "toasts", "footer", "marquee", "datestrip",
     "fileicon", "chaos",
-    "gradword", "meshprompt", "orbsplit", "bento", "figdays", "figcurve", "figplay", "figequal", "figwords", "figphone", "figdrop", "figcount", "figgears", "figbar", "figcheck", "figcta", "goldcap", "iconbelt", "glowsweep", "namepill", "kashida", "molecule", "weightstack", "stretch", "desatpop", "arcs", "chrome", "inkverse", "poemfade", "hashend", "flipverb", "strobe", "duoline", "capstack", "pillword", "blurduo", "tagstack", "underbars", "contactcard", "iconorbit", "blurstrobe", "kinstack", "incall", "cineband", "scriptover", "tricolor", "drumpicker", "redmix", "headbubble", "pincard", "emojifloat", "slotreel", "posterwall", "quoteline", "medallion", "clockhand", "roadtext", "markpan", "objectquote", "racechart", "calflip", "glosscards", "dropword", "tasklens", "monostack", "dashbox", "sparklist", "followbtn", "silhouette", "petalstack", "followcount", "twopillars", "cutmat", "labelbox", "stampcard", "lcdtype", "genpanel"]);
+    "gradword", "meshprompt", "orbsplit", "bento", "figdays", "figcurve", "figplay", "figequal", "figwords", "figphone", "figdrop", "figcount", "figgears", "figbar", "figcheck", "figcta", "goldcap", "iconbelt", "glowsweep", "namepill", "kashida", "molecule", "weightstack", "stretch", "desatpop", "arcs", "chrome", "inkverse", "poemfade", "hashend", "flipverb", "strobe", "duoline", "capstack", "pillword", "blurduo", "tagstack", "underbars", "contactcard", "iconorbit", "blurstrobe", "kinstack", "incall", "cineband", "scriptover", "tricolor", "drumpicker", "redmix", "headbubble", "pincard", "emojifloat", "slotreel", "posterwall", "quoteline", "medallion", "clockhand", "roadtext", "markpan", "objectquote", "racechart", "calflip", "glosscards", "dropword", "tasklens", "monostack", "dashbox", "sparklist", "followbtn", "silhouette", "petalstack", "followcount", "twopillars", "cutmat", "labelbox", "stampcard", "lcdtype", "genpanel", "holopulse", "coverflow", "featuretag"]);
   E.TYPING = new Set(["type", "artype"]);
   const MC = document.createElement("canvas").getContext("2d");
   const measure = (s, font) => { MC.font = font; return MC.measureText(s).width; };
@@ -7372,5 +7372,50 @@
       for (let r = 0; r < 3; r++) for (let c = 0; c < 10 - r; c++) { const lit = Math.floor((t - b.t0) * 9) % 27 === r * 10 + c; keys += `<div style="position:absolute;left:${((c + r * 0.5) * kw / 10 + 2).toFixed(1)}px;top:${(r * kh / 3.4 + 4).toFixed(1)}px;width:${(kw / 10 - 4).toFixed(1)}px;height:${(kh / 3.4 - 4).toFixed(1)}px;border-radius:4px;background:${lit ? "rgba(255,255,255,.7)" : "rgba(255,255,255,.18)"}"></div>`; }
       html += `<div style="position:absolute;left:${kx.toFixed(1)}px;top:${ky.toFixed(1)}px;width:${kw.toFixed(1)}px;height:${kh.toFixed(1)}px;border-radius:${(kw * 0.04).toFixed(1)}px;background:rgba(40,40,46,.55);border:1px solid rgba(255,255,255,.35);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);transform:perspective(600px) rotateX(35deg);opacity:${(eOut(seg(t, b.t0 + 0.2, b.t0 + 0.5)) * (1 - seg(t, tGen - 0.3, tGen))).toFixed(2)}">${keys}</div>`; }
     return html;
+  };
+  // ======== r26 «إعلان جهاز» — حلقات نيون ليموني بتنبض حوالين المنتج، أيقونة هولوجرام طايرة، كاروسيل كروت 3D، وعنوان ميزة أخضر بحالة بتتقلب OFF/ON ========
+  const LIME26 = "#B6F23A";
+  // ---------- holopulse: حلقات نيون بتنبض من نقطة تحت (مكان المنتج في الإيد) وفوقها رمز هولوجرام منوّر بيرعش، والكلمة الحالية نيون فوقه
+  P.k_holopulse = function (b, t, k, th, bi) {
+    const it = this.items(b); if (!it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h), cx = w / 2, cy = h * 0.62;
+    let ci = 0; it.forEach((x, i) => { if (t >= x.t0 - 0.05) ci = i; });
+    const s = this.text(it[ci].w), em = emojiOf(s) || ["🎧", "🔊", "🎵", "📶"][(ci + bi) % 4], q = seg(t, it[ci].t0 - 0.05, it[ci].t0 + 0.3);
+    let rings = ""; for (let i = 0; i < 4; i++) { const ph = ((t - b.t0) * 0.9 + i / 4) % 1, R = mn * (0.12 + ph * 0.32);
+      rings += `<ellipse cx="${cx}" cy="${cy}" rx="${R.toFixed(1)}" ry="${(R * 0.42).toFixed(1)}" fill="none" stroke="${LIME26}" stroke-width="${(mn * 0.008 * (1 - ph) + 1).toFixed(1)}" opacity="${(0.9 * (1 - ph)).toFixed(2)}"/>`; }
+    const flick = 0.88 + 0.12 * Math.sin(t * 37) * Math.sin(t * 13), ff = famOf(s), z = fitSize(s, `700 {}px ${ff}`, w * 0.7, mn * 0.09 * this.ts);
+    return `<svg style="position:absolute;inset:0;filter:drop-shadow(0 0 ${(mn * 0.012).toFixed(0)}px ${LIME26})" width="${w}" height="${h}">${rings}<ellipse cx="${cx}" cy="${cy}" rx="${(mn * 0.12).toFixed(1)}" ry="${(mn * 0.05).toFixed(1)}" fill="none" stroke="${LIME26}" stroke-width="${(mn * 0.012).toFixed(1)}"/></svg>
+      <div style="position:absolute;left:50%;top:${(cy - mn * 0.42).toFixed(1)}px;transform:translateX(-50%) scale(${lerp(0.6, 1, eBack(q)).toFixed(3)});font-size:${(mn * 0.2).toFixed(0)}px;line-height:1;font-family:'Noto Color Emoji',sans-serif;opacity:${(clamp(q * 2) * flick).toFixed(2)};filter:drop-shadow(0 0 ${(mn * 0.03).toFixed(0)}px rgba(120,220,255,.9)) brightness(1.15);-webkit-mask:repeating-linear-gradient(0deg,#000 0 4px,rgba(0,0,0,.8) 4px 6px);mask:repeating-linear-gradient(0deg,#000 0 4px,rgba(0,0,0,.8) 4px 6px)">${em}</div>
+      <div dir="${this.dir(s)}" style="position:absolute;left:0;right:0;top:${(cy - mn * 0.62).toFixed(1)}px;text-align:center;font:700 ${z.toFixed(1)}px ${ff};color:${LIME26};text-shadow:0 0 ${(z * 0.3).toFixed(0)}px ${LIME26};opacity:${clamp(q * 2).toFixed(2)};white-space:nowrap">${esc(s)}</div>`;
+  };
+  // ---------- coverflow: كاروسيل كروت 3D (زي ألبومات) بيلف، كل كلمة كارت بلون مختلف وعليه اسمها، والكارت اللي قدام واضح والجناب مايلين
+  P.k_coverflow = function (b, t, k, th, bi) {
+    const it = this.items(b); if (!it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h), n = it.length;
+    let pos = 0; it.forEach((x, i) => { if (t >= x.t0 - 0.25) pos = i - 1 + eOut(seg(t, x.t0 - 0.25, x.t0 + 0.1)); }); pos = Math.max(0, pos);
+    const C = [["#1E3A5F", "#3E7CB1"], ["#7A0E12", "#D0262E"], ["#B85C10", "#F2A33A"], ["#2A1B47", "#7B4BD1"], ["#0E4D3A", "#21A179"], ["#4A4A4A", "#9A9A9A"]];
+    const cw = mn * 0.5, ch = cw * 1.5, cy = h * 0.4;
+    let cards = "";
+    for (let i = 0; i < n; i++) { const d = i - pos; if (Math.abs(d) > 2.6) continue; const [c1, c2] = C[(i + bi) % C.length], s = this.text(it[i].w), ff = famOf(s), z = fitSize(s, `800 {}px ${ff}`, cw * 0.8, cw * 0.14);
+      const x = w / 2 + d * cw * 0.62, ry = clamp(-d * 55, -70, 70), sc = 1 - Math.min(1, Math.abs(d)) * 0.18, zi = 10 - Math.round(Math.abs(d) * 2);
+      cards += `<div style="position:absolute;left:${(x - cw / 2).toFixed(1)}px;top:${(cy - ch / 2).toFixed(1)}px;width:${cw.toFixed(1)}px;height:${ch.toFixed(1)}px;z-index:${zi};transform:perspective(${(mn * 2).toFixed(0)}px) rotateY(${ry.toFixed(1)}deg) scale(${sc.toFixed(3)});border-radius:${(cw * 0.06).toFixed(1)}px;background:linear-gradient(160deg,${c2},${c1});box-shadow:0 ${(mn * 0.03).toFixed(0)}px ${(mn * 0.06).toFixed(0)}px rgba(0,0,0,.45);overflow:hidden;filter:brightness(${(1 - Math.min(1, Math.abs(d)) * 0.25).toFixed(2)})">
+        <div style="position:absolute;left:10%;right:10%;top:8%;height:52%;border-radius:${(cw * 0.04).toFixed(1)}px;background:radial-gradient(circle at 50% 40%,rgba(255,255,255,.35),rgba(0,0,0,.25))"></div>
+        <div dir="${this.dir(s)}" style="position:absolute;left:10%;right:10%;top:64%;font:800 ${z.toFixed(1)}px ${ff};color:#fff;white-space:nowrap">${esc(s)}</div>
+        <div style="position:absolute;left:10%;right:10%;top:76%;height:3px;background:rgba(255,255,255,.35)"><i style="display:block;height:100%;width:${(Math.abs(d) < 0.5 ? ((t - b.t0) * 20) % 100 : 30).toFixed(0)}%;background:#fff"></i></div>
+        <div style="position:absolute;left:0;right:0;top:82%;display:flex;justify-content:center;gap:${(cw * 0.1).toFixed(0)}px;color:#fff;font:700 ${(cw * 0.08).toFixed(0)}px 'TY Outfit'"><span>⏮</span><span>${Math.abs(d) < 0.5 ? "⏸" : "▶"}</span><span>⏭</span></div></div>`; }
+    return `<div style="position:absolute;inset:0;transform-style:preserve-3d">${cards}</div>`;
+  };
+  // ---------- featuretag: عنوان ميزة أخضر نيون تخين فوق الفيديو، وتحته الحالة (آخر كلمة) بتتقلب: OFF حمرا ← ON خضرا، أو سطر وصف أبيض صغير
+  P.k_featuretag = function (b, t, k, th, bi) {
+    const P = figParts(this, { ...b, focus: b.focus >= 0 ? b.focus : Math.min(1, this.items(b).length - 1) }); if (!P.it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h), title = P.J(P.it.slice(0, P.fi + 1)), rest = P.tail, ar = AR.test(title), ff = famOf(title);
+    const z = fitSize(title.toUpperCase(), `800 {}px ${ff}`, w * 0.86, mn * 0.07 * this.ts), y = h * 0.07;
+    const st = rest.length === 1 ? this.text(rest[0].w) : "", desc = rest.length > 1 ? P.J(rest.filter((x) => t >= x.t0 - 0.05)) : "";
+    const OFF = /^(off|مقفول|قافل|لا)$/i, ON = /^(on|شغال|مفتوح|أيوه|ايوه)$/i, flipT = b.t0 + (b.t1 - b.t0) * 0.5;
+    let state = st, col = LIME26; if (st && (OFF.test(st) || ON.test(st))) { const on = t >= flipT; state = ar ? (on ? "شغّال" : "مقفول") : on ? "ON" : "OFF"; col = on ? LIME26 : "#FF3B3B"; }
+    return `<div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:0;right:0;top:${y.toFixed(1)}px;text-align:center;line-height:1.15">
+      <div style="font:800 ${z.toFixed(1)}px ${ff};color:${LIME26};text-transform:uppercase;letter-spacing:.02em;text-shadow:0 2px 10px rgba(0,0,0,.45),0 0 ${(z * 0.2).toFixed(0)}px rgba(182,242,58,.5);${blurIn(t, b.t0)}">${esc(title)}</div>
+      ${state ? `<div style="font:800 ${(z * 1.05).toFixed(1)}px ${famOf(state)};color:${col};text-shadow:0 2px 10px rgba(0,0,0,.45);transform:scale(${lerp(1.3, 1, eOut(seg(t, Math.max(rest[0].t0, t >= flipT ? flipT : 0) - 0.05, Math.max(rest[0].t0, t >= flipT ? flipT : 0) + 0.2))).toFixed(3)})">${esc(state)}</div>` : ""}
+      ${desc ? `<div style="font:600 ${(z * 0.45).toFixed(1)}px ${famOf(desc)};color:#fff;text-shadow:0 2px 8px rgba(0,0,0,.55);padding:0 8%">${esc(desc)}</div>` : ""}</div>`;
   };
 })();
