@@ -55,7 +55,7 @@
     "qr", "codetag", "toolbar", "terminal", "scan",
     "toasts", "footer", "marquee", "datestrip",
     "fileicon", "chaos",
-    "gradword", "meshprompt", "orbsplit", "bento", "figdays", "figcurve", "figplay", "figequal", "figwords", "figphone", "figdrop", "figcount", "figgears", "figbar", "figcheck", "figcta", "goldcap", "iconbelt", "glowsweep", "namepill", "kashida", "molecule", "weightstack", "stretch", "desatpop", "arcs", "chrome", "inkverse", "poemfade", "hashend", "flipverb", "strobe", "duoline", "capstack", "pillword", "blurduo", "tagstack", "underbars", "contactcard", "iconorbit", "blurstrobe", "kinstack", "incall", "cineband", "scriptover", "tricolor", "drumpicker", "redmix", "headbubble", "pincard", "emojifloat", "slotreel", "posterwall", "quoteline", "medallion", "clockhand", "roadtext", "markpan", "objectquote", "racechart", "calflip", "glosscards", "dropword", "tasklens", "monostack", "dashbox", "sparklist", "followbtn", "silhouette", "petalstack", "followcount", "twopillars", "cutmat", "labelbox", "stampcard", "lcdtype", "genpanel", "holopulse", "coverflow", "featuretag", "luxmix", "goldframes", "goldrows", "tilegrid", "goldpill", "holoclock", "curvewall"]);
+    "gradword", "meshprompt", "orbsplit", "bento", "figdays", "figcurve", "figplay", "figequal", "figwords", "figphone", "figdrop", "figcount", "figgears", "figbar", "figcheck", "figcta", "goldcap", "iconbelt", "glowsweep", "namepill", "kashida", "molecule", "weightstack", "stretch", "desatpop", "arcs", "chrome", "inkverse", "poemfade", "hashend", "flipverb", "strobe", "duoline", "capstack", "pillword", "blurduo", "tagstack", "underbars", "contactcard", "iconorbit", "blurstrobe", "kinstack", "incall", "cineband", "scriptover", "tricolor", "drumpicker", "redmix", "headbubble", "pincard", "emojifloat", "slotreel", "posterwall", "quoteline", "medallion", "clockhand", "roadtext", "markpan", "objectquote", "racechart", "calflip", "glosscards", "dropword", "tasklens", "monostack", "dashbox", "sparklist", "followbtn", "silhouette", "petalstack", "followcount", "twopillars", "cutmat", "labelbox", "stampcard", "lcdtype", "genpanel", "holopulse", "coverflow", "featuretag", "luxmix", "goldframes", "goldrows", "tilegrid", "goldpill", "holoclock", "curvewall", "newsscan", "neonvenn", "wavebelt"]);
   E.TYPING = new Set(["type", "artype"]);
   const MC = document.createElement("canvas").getContext("2d");
   const measure = (s, font) => { MC.font = font; return MC.measureText(s).width; };
@@ -7514,5 +7514,48 @@
         <div style="position:absolute;inset:0;background:repeating-linear-gradient(115deg,rgba(255,255,255,.06) 0 6px,transparent 6px 18px)"></div>
         <div dir="${this.dir(s)}" style="position:absolute;left:8%;right:8%;bottom:8%;font:800 ${fz.toFixed(1)}px ${ff};color:#fff;text-shadow:0 2px 8px rgba(0,0,0,.5);white-space:nowrap">${esc(s)}</div></div>`; }
     return `<div style="position:absolute;inset:0;background:${onVideo(this) ? "rgba(0,0,0,.35)" : "radial-gradient(ellipse at 50% 40%,#2A2622,#0C0B0A 75%)"}"></div>${cards}`;
+  };
+  // ======== r29 «تحليل براند» — جرنال مايل والكاميرا بتمشي على جملة متعلّمة بماركر أصفر، حلقات نور بيضا على كحلي، وخط موجة بيشيل حاجات ========
+  // ---------- newsscan: صفحة جرنال مايلة مليانة سطور باهتة والكاميرا بتقرب وتمشي، وجملة الكلام وسطها تقيلة والماركر الأصفر بيمسح عليها
+  P.k_newsscan = function (b, t, k, th, bi) {
+    const it = this.items(b); if (!it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h), s = it.map((x) => this.text(x.w)).join(" "), ar = AR.test(s), sf = serifOf(s);
+    const z = mn * 0.075 * this.ts, lh = z * (ar ? 1.7 : 1.35), D = b.t1 - b.t0, zoom = lerp(1.1, 1.45, seg(t, b.t0, b.t1)), pan = lerp(w * 0.08, -w * 0.08, seg(t, b.t0, b.t1));
+    const FILL = ar ? ["كان من أوائل اللي اتكلموا عن الفكرة دي في السوق", "وبدأ يشرحها للناس وأصحاب المشاريع بطريقة بسيطة", "وقال إن المنافسة الحقيقية مش في المحل", "وده اللي غيّر طريقة تفكير البراندات كلها", "ولحد النهارده الكتاب ده بيتدرّس في كل مكان", "وكل شركة كبيرة ماشية على نفس القاعدة"]
+      : ["was an early voice of a revolutionary idea that reshaped", "the way founders and marketers think about competition", "and began distilling this idea into simple truths", "that resonated with entrepreneurs and marketers alike", "his best-known book fundamentally altered how brands", "are built and taught all over the world today"];
+    const mid = 3, hp = eOut(seg(t, b.t0 + 0.4, b.t0 + Math.min(1.6, D * 0.6)));
+    let rows = ""; for (let i = 0; i < 7; i++) { const isM = i === mid, txt = isM ? s : FILL[(i + bi) % FILL.length];
+      rows += `<div style="position:relative;white-space:nowrap;font:${isM ? 700 : 400} ${z.toFixed(1)}px ${sf};line-height:${lh.toFixed(1)}px;color:${isM ? "#111" : "rgba(30,30,30,.55)"}">${isM ? `<span style="position:relative;display:inline-block"><i style="position:absolute;${ar ? "right" : "left"}:-2%;top:12%;bottom:6%;width:${(hp * 104).toFixed(1)}%;background:#E8F03A;z-index:0;mix-blend-mode:multiply;border-radius:3px"></i><span style="position:relative">${esc(txt)}</span></span>` : esc(txt)}</div>`; }
+    return `<div style="position:absolute;inset:0;background:#2A2A2A"></div>
+      <div style="position:absolute;inset:0;overflow:hidden"><div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:50%;top:50%;width:${(w * 1.6).toFixed(0)}px;padding:${(z * 1.2).toFixed(0)}px ${(z * 1.5).toFixed(0)}px;background:linear-gradient(180deg,#EDEBE6,#DAD7D0);box-shadow:0 0 ${(mn * 0.1).toFixed(0)}px rgba(0,0,0,.6);transform:translate(-50%,-50%) translateX(${pan.toFixed(1)}px) perspective(${(mn * 2).toFixed(0)}px) rotateX(18deg) rotateZ(-7deg) scale(${zoom.toFixed(3)});text-align:${ar ? "right" : "left"}">${rows}</div></div>
+      <div style="position:absolute;inset:0;background:radial-gradient(ellipse at 50% 50%,transparent 45%,rgba(0,0,0,.65))"></div>`;
+  };
+  // ---------- neonvenn: حلقات نور بيضا بتترسم على كحلي غامق (دايرة أو تلاتة متداخلين)، وكلام رفيع أبيض فوقها أو تحتها بيطلع من البلير
+  P.k_neonvenn = function (b, t, k, th, bi) {
+    const it = this.items(b); if (!it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h), J = (a) => a.map((x) => this.text(x.w)).join(" "), s = J(it), ar = AR.test(s), ff = ar ? famOf(s) : "'TY Lite', 'SM Tajawal'";
+    const three = bi % 2 === 0, cx = w / 2, cy = h * 0.42, R = mn * (three ? 0.13 : 0.15), pulse = three ? 0 : Math.max(0, Math.sin((t - b.t0) * 3)) ;
+    const C = three ? [[-0.55, -0.3], [0.55, -0.3], [0, 0.5]] : [[0, 0]];
+    const D = Math.max(0.6, b.t1 - b.t0);
+    let rings = C.map(([dx, dy], i) => { const p = eOut(seg(t, b.t0 + 0.05 + i * D * 0.12, b.t0 + 0.05 + i * D * 0.12 + D * 0.4));
+      return `<circle cx="${(cx + dx * R).toFixed(1)}" cy="${(cy + dy * R).toFixed(1)}" r="${R.toFixed(1)}" fill="none" stroke="#fff" stroke-width="${(mn * 0.006).toFixed(1)}" pathLength="1" stroke-dasharray="1" stroke-dashoffset="${(1 - p).toFixed(3)}" transform="rotate(${-90 + i * 40} ${(cx + dx * R).toFixed(1)} ${(cy + dy * R).toFixed(1)})"/>`; }).join("");
+    if (!three && pulse > 0) rings += `<circle cx="${cx}" cy="${cy}" r="${(R * (1.12 + pulse * 0.12)).toFixed(1)}" fill="none" stroke="rgba(255,255,255,${(0.5 * pulse).toFixed(2)})" stroke-width="${(mn * 0.012).toFixed(1)}"/>`;
+    const z = fitSize(s, `300 {}px ${ff}`, w * 0.84, mn * 0.06 * this.ts), ty = three ? cy - R * 1.6 - z * 1.2 : cy + R * 1.5;
+    return `<div style="position:absolute;inset:0;background:radial-gradient(ellipse at 50% 40%,#1B1C2C,#0B0B14 75%)"></div>
+      <svg style="position:absolute;inset:0;filter:drop-shadow(0 0 ${(mn * 0.012).toFixed(0)}px rgba(255,255,255,.85))" width="${w}" height="${h}">${rings}</svg>
+      <div dir="${this.dir(s)}" style="position:absolute;left:0;right:0;top:${ty.toFixed(1)}px;text-align:center;white-space:nowrap;font:300 ${z.toFixed(1)}px ${ff};color:#F2F2F6">${it.map((x) => `<span style="display:inline-block;${blurIn(t, x.t0 - 0.05, 0.45)}">${esc(this.text(x.w))}</span>`).join(" ")}</div>`;
+  };
+  // ---------- wavebelt: خط موجة أبيض رفيع بيعدّي الكادر على كحلي، وعليه حاجات (رمز على قد الكلمة) بتتزحلق واحدة ورا التانية وفوق/تحت كل واحدة «- اسمها -»
+  P.k_wavebelt = function (b, t, k, th, bi) {
+    const it = this.items(b); if (!it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h), n = it.length, cy = h * 0.45, A = mn * 0.03, ph = (t - b.t0) * 1.6;
+    const yAt = (x) => cy + Math.sin(x / w * Math.PI * 2 + ph) * A;
+    let d = ""; for (let x = -10; x <= w + 10; x += 10) d += `${x === -10 ? "M" : "L"}${x} ${yAt(x).toFixed(1)}`;
+    let pos = 0; it.forEach((x, i) => { if (t >= x.t0 - 0.3) pos = i - 1 + eOut(seg(t, x.t0 - 0.3, x.t0 + 0.15)); }); pos = Math.max(0, pos);
+    let html = `<div style="position:absolute;inset:0;background:radial-gradient(ellipse at 50% 40%,#1B1C2C,#0B0B14 75%)"></div><svg style="position:absolute;inset:0" width="${w}" height="${h}"><path d="${d}" stroke="#fff" stroke-width="${(mn * 0.004).toFixed(1)}" fill="none" stroke-dasharray="${(w * 1.2 * eOut(seg(t, b.t0, b.t0 + 0.6))).toFixed(0)} ${w * 2}"/></svg>`;
+    it.forEach((x, i) => { const dd = i - pos; if (Math.abs(dd) > 1.4) return; const xx = w / 2 + dd * w * 0.62, yy = yAt(xx), s = this.text(x.w), em = emojiOf(s) || ["🥤", "🚚", "👟", "📦", "🎧", "☕"][(i + bi) % 6], up = i % 2 === 0;
+      html += `<div style="position:absolute;left:${xx.toFixed(1)}px;top:${yy.toFixed(1)}px;transform:translate(-50%,-62%) rotate(${(Math.cos(xx / w * Math.PI * 2 + ph) * 8).toFixed(1)}deg);font-size:${(mn * 0.24).toFixed(0)}px;line-height:1;font-family:'Noto Color Emoji',sans-serif;filter:drop-shadow(0 ${(mn * 0.02).toFixed(0)}px ${(mn * 0.03).toFixed(0)}px rgba(0,0,0,.6))">${em}</div>
+        <div dir="${this.dir(s)}" style="position:absolute;left:${(xx - w * 0.3).toFixed(1)}px;width:${(w * 0.6).toFixed(1)}px;top:${(yy + (up ? -mn * 0.24 : mn * 0.13)).toFixed(1)}px;text-align:center;font:400 ${(mn * 0.035 * this.ts).toFixed(1)}px ${famOf(s)};color:#E6E6EE;white-space:nowrap">- ${esc(s)} -</div>`; });
+    return html;
   };
 })();
