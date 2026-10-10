@@ -88,6 +88,26 @@ textarea[dir=ltr]{text-align:left}
 .msg .err{background:var(--badbg);color:var(--bad);border-color:#F4C7C7}
 .progress{height:8px;background:var(--line);border-radius:99px;overflow:hidden;margin-top:10px}
 .progress i{display:block;height:100%;width:0;background:var(--teal);transition:width .2s}
+.tpl{max-width:1180px;margin:14px auto 0;padding:0 16px}
+.tpl>div{background:#fff;border:1px solid var(--line);border-radius:16px;padding:14px;box-shadow:0 4px 14px rgba(31,36,55,.05)}
+.tpl.on>div{border-color:var(--teal);box-shadow:0 0 0 3px rgba(79,179,170,.15)}
+.tpl-head{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-bottom:8px}
+.tpl-head b{font-size:15px}
+.switch{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:700;cursor:pointer;user-select:none}
+.switch input{width:18px;height:18px;accent-color:var(--teal-d)}
+.tpl-tabs{display:flex;gap:6px;margin-bottom:6px}
+.tpl-tabs button{border:1px solid var(--line);background:#fff;border-radius:8px;padding:4px 12px;font-size:12.5px;font-weight:700;cursor:pointer;color:var(--muted)}
+.tpl-tabs button.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+#tplText{width:100%;min-height:150px;border:1px solid var(--line);border-radius:12px;padding:10px;font-size:13.5px;line-height:1.8;resize:vertical;color:var(--ink);background:#FAFBFA}
+#tplText:focus{outline:none;border-color:var(--teal);background:#fff}
+.tpl-tools{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:8px;font-size:12.5px;color:var(--muted)}
+.tpl-tools .ins{border:1px dashed var(--teal);background:var(--mint);color:var(--teal-d);border-radius:8px;padding:3px 9px;font-size:12px;font-weight:700;cursor:pointer}
+.tpl-tools .clear{margin-inline-start:auto;border:0;background:none;color:var(--bad);font-size:12px;font-weight:700;cursor:pointer;text-decoration:underline}
+.tpl-hint{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.7}
+.tpl-preview{margin-top:10px;border-top:1px dashed var(--line);padding-top:10px}
+.tpl-preview .pv-head{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12.5px;color:var(--muted);margin-bottom:6px}
+.tpl-preview select{border:1px solid var(--line);border-radius:8px;padding:3px 6px;font-size:12.5px;background:#fff;color:var(--ink);max-width:100%}
+.tpl-preview pre{margin:0;white-space:pre-wrap;font:inherit;font-size:13px;line-height:1.8;background:#F3FAF8;border-radius:10px;padding:10px;color:var(--ink)}
 .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:10px 16px;border-radius:12px;font-size:13.5px;font-weight:700;opacity:0;transition:opacity .2s;pointer-events:none;z-index:9;max-width:calc(100% - 32px);text-align:center}
 .toast.show{opacity:1}
 .empty{grid-column:1/-1;text-align:center;color:var(--muted);padding:30px}
@@ -116,6 +136,27 @@ textarea[dir=ltr]{text-align:left}
 <div id="app" hidden>
   <div class="stats" id="stats"></div>
   <div class="site" id="site" hidden></div>
+  <section class="tpl" id="tpl"><div>
+    <div class="tpl-head">
+      <b>✍️ رسالتي الجاهزة</b>
+      <label class="switch"><input type="checkbox" id="tplOn"> ابعت رسالتي دي لكل المدربين بدل الرسالة الأوتوماتيك</label>
+    </div>
+    <div class="tpl-tabs"><button data-tl="ar" class="on">عربي</button><button data-tl="en">English (للمدربين الإنجليزي)</button></div>
+    <textarea id="tplText" placeholder="اكتب رسالتك هنا… مثال:&#10;أهلاً يا كوتش {الاسم} 🌹&#10;بروفايلك ناقصه:&#10;{الناقص}&#10;كمّله من هنا: {رابط_الدخول}"></textarea>
+    <div class="tpl-tools">ضيف للرسالة:
+      <button class="ins" data-ins="{الاسم}">اسم المدرب</button>
+      <button class="ins" data-ins="{الاسم_كامل}">الاسم كامل</button>
+      <button class="ins" data-ins="{الناقص}">الحاجات الناقصة عنده</button>
+      <button class="ins" data-ins="{رابط_الدخول}">رابط تسجيل الدخول</button>
+      <button class="ins" data-ins="{رابط_البروفايل}">رابط بروفايله</button>
+      <button class="clear" id="tplClear">رجّع للرسالة الأوتوماتيك</button>
+    </div>
+    <div class="tpl-hint" id="tplHint"></div>
+    <div class="tpl-preview" id="tplPreview" hidden>
+      <div class="pv-head">👀 هتوصل كده لـ <select id="pvWho"></select></div>
+      <pre id="pvText"></pre>
+    </div>
+  </div></section>
   <div class="chips" id="chips"></div>
   <div class="bar">
     <input type="search" id="q" placeholder="دوّر باسم المدرب أو الرقم أو الإنستجرام…">
@@ -193,29 +234,60 @@ textarea[dir=ltr]{text-align:left}
     return d === 1 ? 'امبارح' : 'من ' + d + ' يوم';
   }
 
+  // ---------- رسالتي الجاهزة ----------
+  var TPL_STORE = 'kochi-message-template-v1';
+  var tpl = (function () { try { return JSON.parse(localStorage.getItem(TPL_STORE)) || {}; } catch (e) { return {}; } })();
+  tpl = { on: !!tpl.on, ar: tpl.ar || '', en: tpl.en || '' };
+  function saveTpl() { try { localStorage.setItem(TPL_STORE, JSON.stringify(tpl)); } catch (e) {} }
+  function tplFor(lang) { return tpl.on ? (lang === 'en' && tpl.en.trim() ? tpl.en : tpl.ar) : ''; }
+
+  function fillTemplate(text, r, lang) {
+    var list = missingLines(r, lang);
+    var vals = {
+      'الاسم': firstName(r, lang),
+      'الاسم_كامل': lang === 'en' && r.nameEn ? r.nameEn : r.name,
+      'الناقص': list || (lang === 'en' ? '✅ Nothing missing — your profile is complete 👏' : '✅ مفيش حاجة ناقصة — بروفايلك مكتمل 👏'),
+      'رابط_الدخول': SIGNIN,
+      'رابط_البروفايل': r.url
+    };
+    return text.replace(/\{\s*([^{}]+?)\s*\}/g, function (m, k) {
+      k = k.replace(/\s+/g, '_');
+      return Object.prototype.hasOwnProperty.call(vals, k) ? vals[k] : m;
+    });
+  }
+
   // ---------- الرسالة ----------
   function firstName(r, lang) {
     var full = lang === 'en' && r.nameEn ? r.nameEn : r.name;
     return full.replace(/["“”]/g, '').trim().split(/\s+/)[0] || full;
   }
 
-  function buildMessage(r, lang) {
-    var name = firstName(r, lang);
-    var items = ITEMS[lang];
+  function missingKeys(r) {
     var missing = CHECKS.filter(function (c) { return !r.checks[c.key].ok; }).map(function (c) { return c.key; });
     var fixHours = r.reversed.length > 0 && missing.indexOf('hours') < 0;
-    var badDays = r.reversed.map(function (x) { return KochiCoachAudit.describeBadDay(x, lang); }).join(lang === 'ar' ? '، ' : ', ');
+    return { missing: missing, fixHours: fixHours, all: missing.concat(fixHours ? ['hours'] : []) };
+  }
 
-    var lines = function (keys) {
-      return keys.map(function (k) {
-        if (k === 'hours' && r.reversed.length) {
-          return lang === 'ar'
-            ? '🗓️ مواعيدك المتاحة: فيه أيام متسجلة بشكل العملاء مش قادرين يحجزوا فيه مكالمة الزووم: ' + badDays
-            : '🗓️ Your available times: clients can’t book the intro Zoom call on some days: ' + badDays;
-        }
-        return items[k];
-      }).join('\n');
-    };
+  function missingLines(r, lang) {
+    var items = ITEMS[lang];
+    var badDays = r.reversed.map(function (x) { return KochiCoachAudit.describeBadDay(x, lang); }).join(lang === 'ar' ? '، ' : ', ');
+    return missingKeys(r).all.map(function (k) {
+      if (k === 'hours' && r.reversed.length) {
+        return lang === 'ar'
+          ? '🗓️ مواعيدك المتاحة: فيه أيام متسجلة بشكل العملاء مش قادرين يحجزوا فيه مكالمة الزووم: ' + badDays
+          : '🗓️ Your available times: clients can’t book the intro Zoom call on some days: ' + badDays;
+      }
+      return items[k];
+    }).join('\n');
+  }
+
+  function buildMessage(r, lang) {
+    var own = tplFor(lang);
+    // مفيش نسخة English؟ المدرب الإنجليزي بياخد الرسالة العربي كلها بالعربي
+    if (own.trim()) return fillTemplate(own, r, lang === 'en' && !tpl.en.trim() ? 'ar' : lang);
+    var name = firstName(r, lang);
+    var mk = missingKeys(r), missing = mk.missing, fixHours = mk.fixHours;
+    var lines = function () { return missingLines(r, lang); };
 
     if (lang === 'en') {
       if (!missing.length && !fixHours) {
@@ -339,7 +411,7 @@ textarea[dir=ltr]{text-align:left}
       '</div>' +
       '<div class="meter"><i style="width:' + Math.round(pct * 100) + '%;background:' + color + '"></i></div>' +
       '<div class="checks">' + checks + '</div>' + alert + hours +
-      '<details><summary><span>✏️ ' + (r.reversed.length ? 'رسالة بالتعديل المطلوب' : isReady(r) ? 'رسالة شكر' : 'رسالة بالناقص') + ' — اعرض / عدّل</span>' +
+      '<details><summary><span>✏️ ' + (tplFor(lang).trim() ? 'رسالتك الجاهزة' : r.reversed.length ? 'رسالة بالتعديل المطلوب' : isReady(r) ? 'رسالة شكر' : 'رسالة بالناقص') + ' — اعرض / عدّل</span>' +
         '<span class="lang"><button data-lang="ar" class="' + (lang === 'ar' ? 'on' : '') + '">AR</button><button data-lang="en" class="' + (lang === 'en' ? 'on' : '') + '">EN</button></span></summary>' +
         '<textarea dir="' + (lang === 'en' ? 'ltr' : 'rtl') + '">' + esc(buildMessage(r, lang)) + '</textarea></details>' +
       '<div class="btnrow">' +
@@ -370,9 +442,14 @@ textarea[dir=ltr]{text-align:left}
   }
 
   function renderGrid() {
+    var openIds = [].map.call(document.querySelectorAll('.card details[open]'), function (d) { return d.closest('.card').getAttribute('data-id'); });
     var list = visible();
     document.getElementById('grid').innerHTML = list.length ? list.map(cardHtml).join('') : '<div class="empty">مفيش مدربين بالفلتر ده</div>';
     document.getElementById('count').textContent = list.length + ' من ' + rows.length + ' مدرب';
+    openIds.forEach(function (id) {
+      var c = document.querySelector('.card[data-id="' + CSS.escape(id) + '"] details');
+      if (c) c.open = true;
+    });
   }
 
   function renderAll() { renderStats(); renderGrid(); }
@@ -440,6 +517,75 @@ textarea[dir=ltr]{text-align:left}
   });
   document.getElementById('refresh').addEventListener('click', load);
 
+  // ---------- مربع رسالتي ----------
+  var tplLang = 'ar';
+  var tplText = document.getElementById('tplText');
+  var tplOn = document.getElementById('tplOn');
+  var tplTimer;
+
+  function renderTpl() {
+    tplText.value = tpl[tplLang];
+    tplText.dir = tplLang === 'en' ? 'ltr' : 'rtl';
+    tplOn.checked = tpl.on;
+    document.getElementById('tpl').classList.toggle('on', tpl.on && !!tpl.ar.trim());
+    [].forEach.call(document.querySelectorAll('[data-tl]'), function (b) { b.classList.toggle('on', b.getAttribute('data-tl') === tplLang); });
+    document.getElementById('tplHint').textContent = tpl.on && tpl.ar.trim()
+      ? '✅ شغّالة: أي ضغطة على واتساب أو إنستجرام هتبعت رسالتك دي. الكلام اللي بين { } بيتغير لوحده لكل مدرب.' +
+        (tpl.en.trim() ? '' : ' (المدربين الإنجليزي هيوصلهم نفس الرسالة العربي لحد ما تكتب نسخة English.)')
+      : 'اكتب رسالتك، وفعّل الاختيار اللي فوق. لو قفلته، كل مدرب هيوصله الرسالة الأوتوماتيك اللي فيها الناقص عنده. رسالتك بتتحفظ على المتصفح ده.';
+    renderPreview();
+  }
+
+  function renderPreview() {
+    var box = document.getElementById('tplPreview');
+    var sel = document.getElementById('pvWho');
+    var text = tpl[tplLang].trim() ? tpl[tplLang] : (tplLang === 'en' ? tpl.ar : '');
+    box.hidden = !rows.length || !text.trim();
+    if (box.hidden) return;
+    if (sel.options.length !== rows.length) {
+      var cur = sel.value;
+      sel.innerHTML = rows.map(function (r) { return '<option value="' + esc(r.id) + '">' + esc(r.name) + ' (' + r.score + '/' + CHECKS.length + ')</option>'; }).join('');
+      if (cur) sel.value = cur;
+    }
+    var r = rows.find(function (x) { return x.id === sel.value; }) || rows[0];
+    var pre = document.getElementById('pvText');
+    pre.textContent = fillTemplate(text, r, tplLang);
+    pre.dir = tplLang === 'en' ? 'ltr' : 'rtl';
+  }
+
+  tplText.addEventListener('input', function () {
+    tpl[tplLang] = tplText.value;
+    if (tplLang === 'ar' && tplText.value.trim() && !tpl.on) tpl.on = true;
+    saveTpl();
+    renderTpl();
+    clearTimeout(tplTimer);
+    tplTimer = setTimeout(renderGrid, 300);
+  });
+  tplOn.addEventListener('change', function () {
+    tpl.on = tplOn.checked;
+    saveTpl(); renderTpl(); renderGrid();
+    if (tpl.on && !tpl.ar.trim()) { tplText.focus(); toast('اكتب رسالتك في المربع الأول (عربي)'); }
+  });
+  [].forEach.call(document.querySelectorAll('[data-tl]'), function (b) {
+    b.addEventListener('click', function () { tplLang = b.getAttribute('data-tl'); renderTpl(); });
+  });
+  [].forEach.call(document.querySelectorAll('[data-ins]'), function (b) {
+    b.addEventListener('click', function () {
+      var token = b.getAttribute('data-ins');
+      var s = tplText.selectionStart, e = tplText.selectionEnd, v = tplText.value;
+      tplText.value = v.slice(0, s) + token + v.slice(e);
+      tplText.focus();
+      tplText.selectionStart = tplText.selectionEnd = s + token.length;
+      tplText.dispatchEvent(new Event('input'));
+    });
+  });
+  document.getElementById('tplClear').addEventListener('click', function () {
+    tpl.on = false; saveTpl(); renderTpl(); renderGrid();
+    toast('رجعت للرسالة الأوتوماتيك — رسالتك لسه محفوظة في المربع');
+  });
+  document.getElementById('pvWho').addEventListener('change', renderPreview);
+  renderTpl();
+
   // ---------- التحميل ----------
   function prepare(list) {
     list.forEach(function (r) {
@@ -478,6 +624,7 @@ textarea[dir=ltr]{text-align:left}
       document.getElementById('app').hidden = false;
       document.getElementById('csv').hidden = false;
       renderAll();
+      renderTpl();
     }).catch(function (err) {
       ptext.innerHTML = '<b style="color:var(--bad)">مقدرتش أجيب بيانات المدربين:</b> ' + esc(err && err.message) +
         '<br>اتأكد إن النت شغال واضغط 🔄 تحديث.';
