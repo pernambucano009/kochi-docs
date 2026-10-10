@@ -55,7 +55,7 @@
     "qr", "codetag", "toolbar", "terminal", "scan",
     "toasts", "footer", "marquee", "datestrip",
     "fileicon", "chaos",
-    "gradword", "meshprompt", "orbsplit", "bento", "figdays", "figcurve", "figplay", "figequal", "figwords", "figphone", "figdrop", "figcount", "figgears", "figbar", "figcheck", "figcta", "goldcap", "iconbelt", "glowsweep", "namepill", "kashida", "molecule", "weightstack", "stretch", "desatpop", "arcs", "chrome", "inkverse", "poemfade", "hashend", "flipverb", "strobe", "duoline", "capstack", "pillword", "blurduo", "tagstack", "underbars", "contactcard", "iconorbit", "blurstrobe", "kinstack", "incall", "cineband", "scriptover"]);
+    "gradword", "meshprompt", "orbsplit", "bento", "figdays", "figcurve", "figplay", "figequal", "figwords", "figphone", "figdrop", "figcount", "figgears", "figbar", "figcheck", "figcta", "goldcap", "iconbelt", "glowsweep", "namepill", "kashida", "molecule", "weightstack", "stretch", "desatpop", "arcs", "chrome", "inkverse", "poemfade", "hashend", "flipverb", "strobe", "duoline", "capstack", "pillword", "blurduo", "tagstack", "underbars", "contactcard", "iconorbit", "blurstrobe", "kinstack", "incall", "cineband", "scriptover", "tricolor", "drumpicker"]);
   E.TYPING = new Set(["type", "artype"]);
   const MC = document.createElement("canvas").getContext("2d");
   const measure = (s, font) => { MC.font = font; return MC.measureText(s).width; };
@@ -6850,5 +6850,43 @@
     const p = seg(t, P.main.t0 - 0.05, P.main.t0 + 0.8), m = `linear-gradient(${ar ? 270 : 90}deg,#000 ${(p * 120 - 15).toFixed(0)}%,transparent ${(p * 120).toFixed(0)}%)`;
     return `<div dir="${this.dir(cap)}" style="position:absolute;left:0;right:0;top:${(y - cz * 1.3).toFixed(1)}px;text-align:center;font:600 ${cz.toFixed(1)}px ${famOf(cap)};letter-spacing:.1em;color:#fff;text-transform:uppercase;text-shadow:0 2px 10px rgba(0,0,0,.35);${blurIn(t, b.t0)}">${esc(cap)}</div>
       <div dir="${this.dir(main)}" style="position:absolute;left:0;right:0;top:${(y - z * 0.15).toFixed(1)}px;text-align:center;white-space:nowrap;font:400 ${z.toFixed(1)}px ${sf};line-height:1.3;color:#fff;text-shadow:0 2px 14px rgba(0,0,0,.4);-webkit-mask:${m};mask:${m}">${esc(main)}</div>`;
+  };
+  // ======== r12 «تلات ألوان» — ليموني/فحمي/لافندر بيتبدلوا بسرعة على نفس الكلام، وتراكينج بيتلم، وسطر تقيل فوق سطور رفيعة ========
+  const TRI = [["#D8E632", "#161616"], ["#161616", "#D8E632"], ["#A08ADB", "#FFFFFF"], ["#161616", "#A08ADB"]];
+  P.k_tricolor = function (b, t, k, th, bi) {
+    const it = this.items(b); if (!it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h);
+    const J = (a) => a.map((x) => this.text(x.w)).join(" "), ar = AR.test(J(it)), ffB = famOf(J(it)), ffL = ar ? ffB : "'TY Lite', 'SM Tajawal'";
+    const first = it.slice(0, Math.min(2, Math.ceil(it.length / 3))), rest = it.slice(first.length), rows = [first];
+    for (let i = 0; i < rest.length; i += 2) rows.push(rest.slice(i, i + 2));
+    // اللون بيتنطط مع كل كلمة: ٣ فلاشات سريعة وبعدين بيستقر
+    let last = it[0]; for (const x of it) if (t >= x.t0 - 0.02) last = x;
+    const dt = t - last.t0, idx = it.indexOf(last), ci = dt < 0.25 ? (idx + Math.floor(Math.max(0, dt) / 0.083)) % TRI.length : idx % 2 ? 0 : (bi % 2 ? 1 : 0);
+    const [bg, fg] = TRI[ci];
+    const zB = Math.min(fitSize(J(first), `800 {}px ${ffB}`, w * 0.78, mn * 0.11 * this.ts), mn * 0.11 * this.ts), zL = zB * 0.78;
+    const lhB = zB * (ar ? 1.45 : 1.05), lhL = zL * (ar ? 1.45 : 1.02), y0 = h * 0.42 - (lhB + (rows.length - 1) * lhL) / 2;
+    let html = `<div style="position:absolute;inset:0;background:${bg}"></div>`, y = y0;
+    rows.forEach((r, j) => { const bold = j === 0, z = bold ? zB : Math.min(zL, fitSize(J(r), `400 {}px ${ffL}`, w * 0.84, zL));
+      const q = seg(t, r[0].t0 - 0.05, r[0].t0 + 0.35), e = eOut(q), tr = ar ? 0 : (1 - e) * 0.5;
+      html += `<div dir="${this.dir(J(r))}" style="position:absolute;left:0;right:0;top:${y.toFixed(1)}px;text-align:center;white-space:nowrap;font:${bold ? 800 : 400} ${z.toFixed(1)}px ${bold ? ffB : ffL};line-height:${(bold ? lhB : lhL).toFixed(1)}px;color:${fg};letter-spacing:${tr.toFixed(3)}em;opacity:${clamp(q * 2).toFixed(2)};transform:scale(${lerp(0.92, 1, e).toFixed(3)})">${esc(J(r))}</div>`;
+      y += bold ? lhB : lhL; });
+    return html;
+  };
+  // ======== r13 «بكرة» — لستة كلام مايلة بتلف زي بكرة الاختيار، الكلمة الحالية بيضا حادة بسهم، والباقي باهت ومتغبّش وبيلف دايري ========
+  P.k_drumpicker = function (b, t, k, th, bi) {
+    const it = this.items(b); if (!it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h), n = it.length;
+    // مكان البكرة: بيتحرك ناعم بين الكلمات (مش قفزة)
+    let pos = 0; for (let i = 0; i < n; i++) { const a = it[i].t0; if (t >= a - 0.12) pos = i - 1 + eOut(seg(t, a - 0.12, a + 0.08)); }
+    pos = Math.max(0, pos);
+    const J = it.map((x) => this.text(x.w)).join(" "), ff = famOf(J), ar = AR.test(J);
+    const z = Math.min(...it.map((x) => fitSize(this.text(x.w), `800 {}px ${ff}`, w * 0.74, mn * 0.12 * this.ts))), gap = z * (ar ? 1.5 : 1.22);
+    const cy = h * 0.45, rot = bi % 2 ? 7 : -7, PAL = ["#FFFFFF", "#C8F03C", "#FF8A3D"], col = PAL[bi % PAL.length], hx = col.slice(1).match(/../g).map((c) => parseInt(c, 16)).join(",");
+    let rows = "";
+    for (let d = -4; d <= 4; d++) { const ii = Math.round(pos) + d, frac = ii - pos, idx = ((ii % n) + n) % n, s = this.text(it[idx].w), ad = Math.abs(frac);
+      const y = frac * gap * lerp(1, 0.94, clamp(ad / 4)), sc = lerp(1, 0.86, clamp(ad / 4)), cur = ad < 0.5;
+      rows += `<div dir="${this.dir(s)}" style="position:absolute;${ar ? "right" : "left"}:${(w * 0.12).toFixed(1)}px;top:${(cy + y - z * 0.6).toFixed(1)}px;white-space:nowrap;font:800 ${z.toFixed(1)}px ${ff};line-height:1.2;color:${cur ? col : `rgba(${hx},.55)`};filter:blur(${(cur ? 0 : 1.5 + ad * 1.4).toFixed(1)}px);transform:scale(${sc.toFixed(3)});transform-origin:${ar ? "right" : "left"} center;opacity:${clamp(1.2 - ad / 4).toFixed(2)}">${esc(s)}</div>`; }
+    return `<div style="position:absolute;inset:0;background:#030303"></div><div style="position:absolute;inset:0;transform:rotate(${rot}deg)">${rows}</div>
+      <svg style="position:absolute;${ar ? "right" : "left"}:${(w * 0.04).toFixed(1)}px;top:${(cy - z * 0.18).toFixed(1)}px" width="${(z * 0.36).toFixed(0)}" height="${(z * 0.36).toFixed(0)}" viewBox="0 0 10 10">${bi % PAL.length ? `<path d="${ar ? "M9 5H1M5 1L1 5l4 4" : "M1 5h8M5 1l4 4-4 4"}" stroke="${col}" stroke-width="1.4" fill="none"/>` : `<path d="${ar ? "M8 1L2 5l6 4z" : "M2 1l6 4-6 4z"}" fill="${col}"/>`}</svg>`;
   };
 })();
