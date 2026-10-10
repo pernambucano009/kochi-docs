@@ -454,6 +454,7 @@
                 <div class="tabs" id="inspTabs">
                   <button data-tab="clip" class="active">🎞️ القطعة</button>
                   <button data-tab="audio">🔊 الصوت</button>
+                  <button data-tab="text">🔠 نص</button>
                   <button data-tab="caps">✍️ الكابشن</button>
                   <button data-tab="typo">🔤 تايبوجرافي</button>
                   <button data-tab="scene">🪄 المشهد</button>
@@ -538,6 +539,51 @@
                   <div id="outroProps" hidden>
                     <h3>🎬 الأوترو</h3>
                     <p class="hint">الأوترو بيتحط أوتوماتيك في آخر الفيديو من المدرب المختار. تقدر تشيله أو تغيّر صوته من تاب 🔊 الصوت.</p>
+                  </div>
+                </div>
+
+                <div class="pane" data-pane="text" hidden>
+                  <div class="row wrap"><button class="btn primary sm" id="txAdd">＋ ضيف نص عند المؤشر</button></div>
+                  <h3 class="pane-h">🎨 ستايلات جاهزة</h3>
+                  <div class="tx-presets" id="txPresets"></div>
+                  <p class="hint" id="txNone">دوس على ستايل أو «ضيف نص»، أو اختار نص من التايم لاين أو من المعاينة.</p>
+                  <div class="tx-editor" id="txEditor" hidden>
+                    <p class="muted" id="txTimes"></p>
+                    <textarea id="txText" rows="2" dir="auto" placeholder="اكتب النص… (Enter = سطر جديد)"></textarea>
+                    <div class="tx-row">
+                      <label class="field">الخط <select id="txFont"></select></label>
+                      <button class="btn sm" id="txBold" title="تقيل"><b>B</b></button>
+                      <button class="btn sm" id="txItalic" title="مايل"><i>I</i></button>
+                    </div>
+                    <label class="field slider-field">الحجم <b id="txSizeVal"></b><input type="range" id="txSize" min="20" max="300" step="1" dir="ltr"></label>
+                    <div class="tx-row">
+                      <label class="tx-color">اللون <input type="color" id="txColor"></label>
+                      <label class="tx-color">الحدود <input type="color" id="txStrokeC"></label>
+                      <label class="field slider-field grow">سُمك الحدود <b id="txStrokeVal"></b><input type="range" id="txStrokeW" min="0" max="20" step="0.5" dir="ltr"></label>
+                    </div>
+                    <div class="tx-row">
+                      <label class="check"><input type="checkbox" id="txShadow"> ظل</label>
+                      <label class="check"><input type="checkbox" id="txBgOn"> بوكس ورا النص</label>
+                      <label class="tx-color">لون البوكس <input type="color" id="txBgC"></label>
+                    </div>
+                    <label class="field slider-field">الشفافية <b id="txOpacityVal"></b><input type="range" id="txOpacity" min="5" max="100" step="1" dir="ltr"></label>
+                    <label class="field slider-field">اللف <b id="txAngleVal"></b><input type="range" id="txAngle" min="-180" max="180" step="1" dir="ltr"></label>
+                    <label class="field slider-field">المسافة بين الحروف<input type="range" id="txSpacing" min="-5" max="30" step="0.5" dir="ltr"></label>
+                    <div class="tx-row">
+                      <label class="field">حركة الدخول <select id="txAnimIn"></select></label>
+                      <label class="field">حركة الخروج <select id="txAnimOut"></select></label>
+                    </div>
+                    <div class="tx-row">
+                      <input type="range" id="txAnimInDur" min="10" max="300" step="5" dir="ltr" title="مدة الدخول">
+                      <input type="range" id="txAnimOutDur" min="10" max="300" step="5" dir="ltr" title="مدة الخروج">
+                    </div>
+                    <div class="row wrap">
+                      <button class="btn sm" id="txCenter">⊕ في النص</button>
+                      <button class="btn sm" id="txSplit">✂ قسّم</button>
+                      <button class="btn sm" id="txDup">⧉ كرّر بعده</button>
+                      <button class="btn sm danger" id="txDelete">🗑 احذف</button>
+                    </div>
+                    <p class="hint">💡 حرّك النص بالسحب على المعاينة، وعجلة الماوس بتكبّر وتصغّر، والمقبض اللي فوق بيلف. دبل كليك تكتب.</p>
                   </div>
                 </div>
 
@@ -699,6 +745,7 @@
                   <div class="h-voice">🎙️ تعليق</div>
                   <div class="h-music">🎵 موسيقى</div>
                   <div class="h-snd" id="hSnd">🔉 أصوات</div>
+                  <div class="h-text" id="hText">🔠 نصوص</div>
                   <div class="h-caps">✍️ كابشن</div>
                   <div class="h-typo">🔤 تايبوجرافي</div>
                   <div class="h-fx">✨ عناصر <button class="ic" id="fxAddQuick" title="ضيف عنصر عند المؤشر">＋</button></div>
@@ -711,6 +758,7 @@
                     <div class="tl-track t-voice" id="trkVoice"></div>
                     <div class="tl-track t-music" id="trkMusic"></div>
                     <div class="tl-track t-snd" id="trkSnd"></div>
+                    <div class="tl-track t-text" id="trkText"></div>
                     <div class="tl-track t-caps" id="trkCaps"></div>
                     <div class="tl-track t-typo" id="trkTypo"></div>
                     <div class="tl-track t-fx" id="trkFx"></div>
@@ -1761,6 +1809,7 @@
 <script src="/typo-studio.js"></script>
 <script src="/typo.js"></script>
 <script src="/montage-typo.js"></script>
+<script src="/montage-text.js"></script>
   <script src="/montage-scene.js"></script>
 <script src="/dub.js"></script>
 <script src="/clients.js"></script>

@@ -667,14 +667,15 @@ def build_commands(
             f":eof_action=repeat{enable}[vlogo]"
         )
         video_label = "[vlogo]"
-    if subtitles:
+    # الكابشن والنصوص الحرة (كل واحد ملف ASS)، بالترتيب: اللي بعده فوقه
+    for si, sub in enumerate(subtitles if isinstance(subtitles, list) else [subtitles] if subtitles else []):
         from captions import filter_path
 
         filters.append(
-            f"{video_label}subtitles=filename='{filter_path(subtitles.ass_path)}'"
-            f":fontsdir='{filter_path(subtitles.fonts_dir)}'[vsub]"
+            f"{video_label}subtitles=filename='{filter_path(sub.ass_path)}'"
+            f":fontsdir='{filter_path(sub.fonts_dir)}'[vsub{si}]"
         )
-        video_label = "[vsub]"
+        video_label = f"[vsub{si}]"
     filters.append(f"{video_label}format=yuv420p[vout]")
     commands.append(args + [
         "-filter_complex", ";".join(filters), "-map", "[vout]", "-t", f"{total:.3f}",

@@ -68,6 +68,7 @@ import concepts  # noqa: E402  (قاموس المعاني: كلمة ← أيقو
 import stt_local  # noqa: E402  (تفريغ على السيرفر من غير خدمة برّه)
 import sfx  # noqa: E402  (الأصوات الرسمية: كليكات وكيبورد)
 import sfxlib  # noqa: E402  (مكتبة المؤثرات الصوتية للمونتاج)
+import textlayer  # noqa: E402  (النصوص الحرة في المونتاج)
 import person  # noqa: E402  (قراءة الشخص في الفيديو: فصله ومكان راسه)
 import scene  # noqa: E402  (🪄 تغيير الخلفية وشيل الحاجات من الفيديو)
 import numpy as np  # noqa: E402
@@ -2372,6 +2373,19 @@ def project_captions(conn: sqlite3.Connection, data: dict, total: float, export_
     return montage.Subtitles(ass, FONTS_DIR)
 
 
+def project_texts(data: dict, total: float, export_id: str) -> montage.Subtitles | None:
+    """🔠 النصوص الحرة: ملف ASS بمقاس الكادر."""
+    if track_flag(data, "text", "hide"):
+        return None
+    w, h = montage.canvas_size()
+    ass = textlayer.build_ass(data.get("texts") or [], total, w, h)
+    if not ass:
+        return None
+    path = TMP_DIR / f"{export_id}_t.ass"
+    path.write_text(ass, encoding="utf-8")
+    return montage.Subtitles(path, FONTS_DIR)
+
+
 def memory_note() -> str:
     limit = system_info()["memory_limit_mb"]
     return f" — الذاكرة المتاحة للسيرفر {limit} ميجا" if limit else ""
@@ -2681,6 +2695,7 @@ def run_render(project_id: str, export_id: str, cmds: list[list[str]], total: fl
         log_render(f"النهاية: {error or 'تمام ✓'}")
         shutil.rmtree(work_dir, ignore_errors=True)
         (TMP_DIR / f"{export_id}.ass").unlink(missing_ok=True)
+        (TMP_DIR / f"{export_id}_t.ass").unlink(missing_ok=True)
         with closing(db()) as conn, conn:
             if error:
                 (EXPORTS_DIR / filename).unlink(missing_ok=True)
@@ -2736,7 +2751,7 @@ def start_render(conn: sqlite3.Connection, row: sqlite3.Row, project_id: str, da
     segments, voice, music, outro_len = build_montage(conn, data)
     export_id = uuid.uuid4().hex[:12]
     total = sum(sg.duration for sg in segments)
-    subs = project_captions(conn, data, total, export_id)
+    subs = [x for x in (project_captions(conn, data, total, export_id), project_texts(data, total, export_id)) if x]
     work_dir = render_work_dir(export_id, total)
     cmd, total = montage.build_commands(
         ffmpeg_exe(), segments, EXPORTS_DIR / f"{export_id}.mp4", work_dir, voice, music,

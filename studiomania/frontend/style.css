@@ -2056,3 +2056,27 @@ a.btn.disabled { opacity: .45; pointer-events: none; }
 .swatches .sw.pick input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 .ex-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
 .ex-grid select { width: 100%; }
+/* 🔠 النصوص الحرة */
+.frame .pv-text { position: absolute; inset: 0; z-index: 4; pointer-events: none; overflow: hidden; }
+.frame .pv-tx { position: absolute; white-space: pre; line-height: 1.15; pointer-events: auto; cursor: move; user-select: none; transform-origin: center; text-align: center; }
+.frame .pv-tx.sel { outline: 1px dashed #fff; outline-offset: 3px; }
+.frame .pv-tx .tx-rot { position: absolute; left: 50%; top: -22px; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%; background: #fff; border: 1px solid #0009; cursor: grab; -webkit-text-stroke: 0; }
+.frame .pv-tx .tx-sz { position: absolute; right: -9px; bottom: -9px; width: 10px; height: 10px; background: #fff; border: 1px solid #0009; border-radius: 2px; cursor: nwse-resize; }
+.h-text, .t-text { height: 28px; }
+.t-text { position: relative; }
+.tl-text { position: absolute; background: #5b3d0e; border: 1px solid #a8741f; border-radius: 5px; overflow: hidden; cursor: grab; box-sizing: border-box; }
+.tl-text.selected { border-color: #fff; box-shadow: 0 0 0 1px #fff; }
+.tl-text .nm { position: absolute; top: 2px; left: 6px; right: 6px; font-size: 11px; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
+.tl-text .h { position: absolute; top: 0; bottom: 0; width: 7px; cursor: ew-resize; }
+.tl-text .h.l { left: 0; } .tl-text .h.r { right: 0; }
+.tl-text.selected .h, .tl-text:hover .h { background: rgba(255,255,255,.8); }
+.tx-presets { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.tx-preset { border: 1px solid var(--line); background: #2b3140; border-radius: 8px; padding: 8px 6px; font-size: 16px; cursor: pointer; }
+.tx-editor { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.tx-editor textarea { width: 100%; box-sizing: border-box; font: inherit; font-size: 15px; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: inherit; }
+.tx-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.tx-row .grow { flex: 1; min-width: 120px; }
+.tx-row input[type=range] { flex: 1; min-width: 0; }
+.tx-color { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; }
+.tx-color input[type=color] { width: 30px; height: 26px; padding: 0; border: 1px solid var(--line); border-radius: 6px; background: none; }
+#txBold.on, #txItalic.on { border-color: var(--accent); background: var(--accent-soft); }

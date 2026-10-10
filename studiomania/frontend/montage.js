@@ -284,7 +284,7 @@ function fixSelection() {
   if (!s) { mt.extra = []; return; }
   const nCaps = captionBlocks().length;
   const valid = (s) => !((s.kind === "cap" && s.i >= nCaps) || (s.kind === "clip" && !d.clips[s.i]) || (isAudKind(s.kind) && !partsOf(s.kind)?.[s.p]) ||
-      (s.kind === "outro" && !currentOutro()));
+      (s.kind === "outro" && !currentOutro()) || (s.kind === "text" && !(d.texts || [])[s.i]));
   mt.extra = mt.extra.filter(valid);
   if (!valid(s)) { mt.sel = null; return; }
   if ((s.kind === "clip" && !d.clips[s.i]) || (isAudKind(s.kind) && !partsOf(s.kind)?.[s.p]) ||
@@ -688,6 +688,7 @@ function renderTimeline() {
   }
 
   renderSoundRow();
+  if (typeof renderTextRow === "function") renderTextRow();
   $("trkCaps").innerHTML = captionBlocks()
     .map((g, n) => `<div class="tl-cap ${isSel({ kind: "cap", i: n }) ? "selected" : ""}" data-c="${n}" data-t="${g.t0}" title="دوسة تختاره · Delete تمسحه" style="left:${g.t0 * mt.pps}px;width:${Math.max(2, (g.t1 - g.t0) * mt.pps)}px">${escapeHtml(g.text)}</div>`)
     .join("");
@@ -708,6 +709,7 @@ const TRACKS = {
   fx: { row: "trkFx", head: "h-fx", can: ["lock"] },
   click: { row: "trkClick", head: "h-click", can: ["mute"] },
   snd: { row: "trkSnd", head: "h-snd", can: ["lock", "mute"] },
+  text: { row: "trkText", head: "h-text", can: ["lock", "hide"] },
 };
 const FLAG_ICON = { lock: ["🔓", "🔒", "اقفل التراك (متقدرش تحرّك أو تمسح حاجة فيه)", "افتح التراك"],
   hide: ["👁", "🙈", "خبّي التراك من المعاينة والفيديو", "رجّع التراك يظهر"],
@@ -963,6 +965,7 @@ function kfWindow(c, a, b) {
 }
 function splitAt(t, target) {
   const s = target || mt.sel;
+  if (s?.kind === "text" && typeof splitText === "function") return splitText(s.i, t);
   if (s?.kind === "voice" || s?.kind === "music") {
     const x = trackParts(s.kind)[s.p];
     if (x && t > x.t0 && t < x.t1) return splitPart(x, t);
@@ -997,6 +1000,7 @@ function deleteSelected() {
   // من الآخر للأول عشان الأرقام متتلخبطش
   const desc = (k) => list.filter((x) => x.kind === k).map((x) => x.i ?? x.p).sort((a, b) => b - a);
   for (const i of desc("clip")) d.clips.splice(i, 1);
+  for (const i of desc("text")) (d.texts || []).splice(i, 1);
   for (const kind of ["voice", "music", "snd"]) {
     for (const k of desc(kind)) partsOf(kind).splice(k, 1);
     if (kind !== "snd" && d[kind] && !d[kind].parts.length) d[kind] = null;
@@ -1660,6 +1664,7 @@ function syncPreview() {
   if (!mt.active) applyFx();
   drawPlayhead();
   updatePreviewOverlays();
+  if (typeof drawTextLayer === "function") drawTextLayer();
 }
 
 function seek(t) {
@@ -1765,6 +1770,7 @@ function tick() {
   if (!mt.active) applyFx();
   drawPlayhead();
   updatePreviewOverlays();
+  if (typeof drawTextLayer === "function") drawTextLayer();
   followPlayhead();
   mt.raf = requestAnimationFrame(tick);
 }
@@ -2121,6 +2127,7 @@ $("inspTabs").addEventListener("click", (e) => {
 
 function renderInspector() {
   renderPartProps();
+  if (typeof renderTextPane === "function") renderTextPane();
   const c = selectedClip();
   const s = c && clipSource(c);
   $("clipProps").hidden = !s;
