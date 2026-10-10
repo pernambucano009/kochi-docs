@@ -55,7 +55,7 @@
     "qr", "codetag", "toolbar", "terminal", "scan",
     "toasts", "footer", "marquee", "datestrip",
     "fileicon", "chaos",
-    "gradword", "meshprompt", "orbsplit", "bento", "figdays", "figcurve", "figplay", "figequal", "figwords", "figphone", "figdrop", "figcount", "figgears", "figbar", "figcheck", "figcta", "goldcap", "iconbelt", "glowsweep", "namepill", "kashida", "molecule", "weightstack", "stretch", "desatpop", "arcs", "chrome", "inkverse", "poemfade", "hashend", "flipverb", "strobe", "duoline", "capstack", "pillword", "blurduo", "tagstack", "underbars", "contactcard", "iconorbit", "blurstrobe", "kinstack", "incall", "cineband", "scriptover", "tricolor", "drumpicker", "redmix", "headbubble", "pincard", "emojifloat", "slotreel", "posterwall", "quoteline", "medallion", "clockhand", "roadtext", "markpan", "objectquote", "racechart", "calflip", "glosscards", "dropword", "tasklens", "monostack", "dashbox", "sparklist", "followbtn", "silhouette", "petalstack", "followcount", "twopillars", "cutmat", "labelbox", "stampcard", "lcdtype", "genpanel", "holopulse", "coverflow", "featuretag", "luxmix", "goldframes", "goldrows", "tilegrid", "goldpill"]);
+    "gradword", "meshprompt", "orbsplit", "bento", "figdays", "figcurve", "figplay", "figequal", "figwords", "figphone", "figdrop", "figcount", "figgears", "figbar", "figcheck", "figcta", "goldcap", "iconbelt", "glowsweep", "namepill", "kashida", "molecule", "weightstack", "stretch", "desatpop", "arcs", "chrome", "inkverse", "poemfade", "hashend", "flipverb", "strobe", "duoline", "capstack", "pillword", "blurduo", "tagstack", "underbars", "contactcard", "iconorbit", "blurstrobe", "kinstack", "incall", "cineband", "scriptover", "tricolor", "drumpicker", "redmix", "headbubble", "pincard", "emojifloat", "slotreel", "posterwall", "quoteline", "medallion", "clockhand", "roadtext", "markpan", "objectquote", "racechart", "calflip", "glosscards", "dropword", "tasklens", "monostack", "dashbox", "sparklist", "followbtn", "silhouette", "petalstack", "followcount", "twopillars", "cutmat", "labelbox", "stampcard", "lcdtype", "genpanel", "holopulse", "coverflow", "featuretag", "luxmix", "goldframes", "goldrows", "tilegrid", "goldpill", "holoclock", "curvewall"]);
   E.TYPING = new Set(["type", "artype"]);
   const MC = document.createElement("canvas").getContext("2d");
   const measure = (s, font) => { MC.font = font; return MC.measureText(s).width; };
@@ -7483,5 +7483,36 @@
     const z = fitSize(q, `500 {}px ${famOf(word)}`, w * 0.5, mn * 0.05 * this.ts), pw = measure(q, `500 ${z}px ${famOf(word)}`) + z * 1.6, ph = z * 1.9, cy = h * 0.55, a = eOut(seg(t, b.t0, b.t0 + 0.5));
     return LUXBG + `<div style="position:absolute;left:${(w / 2 - pw / 2).toFixed(1)}px;top:${(cy - ph / 2).toFixed(1)}px;width:${pw.toFixed(1)}px;height:${ph.toFixed(1)}px;border-radius:${(ph * 0.18).toFixed(1)}px;border:${(mn * 0.003).toFixed(1)}px solid ${GLD};box-shadow:${gglow(mn * 0.02)};display:flex;align-items:center;justify-content:center;font:500 ${z.toFixed(1)}px ${famOf(word)};color:#F4EBD8;opacity:${a.toFixed(2)};filter:blur(${((1 - a) * 6).toFixed(1)}px)">${esc(q)}</div>
       ${sub ? `<div dir="${this.dir(sub)}" style="position:absolute;left:0;right:0;top:${(cy + ph * 0.75).toFixed(1)}px;text-align:center;font:500 ${(z * 0.62).toFixed(1)}px ${famOf(sub)};color:#F4EBD8">${esc(typed(sub, t, P.tail[0].t0 - 0.05, 22))}</div>` : ""}`;
+  };
+  // ======== r28 «واجهة طايرة» — ساعة كبيرة شفافة فوق، شباك ملفات إزاز بفولدرات زرقا بتظهر، وحيطة كروت مقوّسة حوالين المشاهد بتلف ========
+  // ---------- holoclock: ساعة رقمية كبيرة مايلة شفافة وتحتها التاريخ وأيقونات حالة، وتحتها شباك ملفات إزاز فيه فولدرات زرقا بأسامي الكلام بتطلع واحد واحد
+  P.k_holoclock = function (b, t, k, th, bi) {
+    const it = this.items(b);
+    const { w, h } = this.doc, mn = Math.min(w, h), ar = AR.test(it.map((x) => this.text(x.w)).join(" "));
+    const p = eOut(seg(t, b.t0, b.t0 + 0.5)), cz = mn * 0.2, clock = "11:11", date = ar ? "الخميس، ٢٢ فبراير" : "Thursday, 22 February";
+    let html = `<div style="position:absolute;left:0;right:0;top:${(h * 0.08).toFixed(1)}px;text-align:center;opacity:${(p * 0.85).toFixed(2)}">
+      <div style="font:400 ${(cz * 0.12).toFixed(1)}px ${famOf(date)};color:rgba(255,255,255,.75)">${date}</div>
+      <div style="font:700 ${cz.toFixed(1)}px 'TY CondI', 'TY Cond';color:rgba(255,255,255,.55);letter-spacing:-0.02em;line-height:1;text-shadow:0 0 ${(cz * 0.1).toFixed(0)}px rgba(255,255,255,.3)">${clock}</div>
+      <div style="font:500 ${(cz * 0.11).toFixed(1)}px 'TY Mono';color:rgba(255,255,255,.65);letter-spacing:.3em">▮▮ ᯤ ⌕ ▣</div></div>`;
+    if (it.length) { const ww = Math.min(w * 0.86, mn * 0.95), wh = ww * 0.55, wx = (w - ww) / 2, wy = h * 0.38, wp = eOut(seg(t, b.t0 + 0.2, b.t0 + 0.7)), n = it.length, cols = Math.min(4, n), fz = ww / (cols + 1);
+      html += `<div style="position:absolute;left:${wx.toFixed(1)}px;top:${wy.toFixed(1)}px;width:${ww.toFixed(1)}px;height:${wh.toFixed(1)}px;border-radius:${(ww * 0.025).toFixed(1)}px;background:rgba(28,30,36,.6);border:1px solid rgba(255,255,255,.25);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);transform:perspective(${(mn * 2).toFixed(0)}px) rotateY(${(lerp(25, 6, wp)).toFixed(1)}deg) scale(${wp.toFixed(3)});overflow:hidden">
+        <div style="height:${(wh * 0.1).toFixed(1)}px;display:flex;align-items:center;gap:5px;padding:0 3%;background:rgba(255,255,255,.06)">${["#FF5F57", "#FEBC2E", "#28C840"].map((c) => `<i style="width:${(wh * 0.04).toFixed(1)}px;height:${(wh * 0.04).toFixed(1)}px;border-radius:50%;background:${c}"></i>`).join("")}</div>
+        <div dir="${ar ? "rtl" : "ltr"}" style="display:flex;flex-wrap:wrap;gap:${(fz * 0.15).toFixed(1)}px;padding:${(fz * 0.2).toFixed(1)}px ${(fz * 0.3).toFixed(1)}px">${it.map((x, i) => { const s = this.text(x.w), a = eBack(seg(t, Math.max(x.t0, b.t0 + 0.6 + i * 0.1) - 0.05, Math.max(x.t0, b.t0 + 0.6 + i * 0.1) + 0.25));
+          return `<div style="width:${(fz * 0.95).toFixed(1)}px;text-align:center;transform:scale(${clamp(a, 0, 1.2).toFixed(3)})"><svg width="${(fz * 0.7).toFixed(0)}" height="${(fz * 0.55).toFixed(0)}" viewBox="0 0 28 22"><path d="M1 4a2 2 0 0 1 2-2h7l3 3h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2z" fill="#4FB3F5"/><path d="M1 8h26v11a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2z" fill="#6CC6FA"/></svg><div style="font:500 ${(fz * 0.15).toFixed(1)}px ${famOf(s)};color:#E8ECF2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(s)}</div></div>`; }).join("")}</div></div>`; }
+    return html;
+  };
+  // ---------- curvewall: حيطة كروت طولية مقوّسة حوالين المشاهد (زي بانوراما) بتلف ببطء، كل كارت بتدرّج مختلف وعليه كلمة، واللي في النص أكبر وأوضح
+  P.k_curvewall = function (b, t, k, th, bi) {
+    const it = this.items(b); if (!it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h), n = Math.max(5, it.length), rot = (t - b.t0) * 14 + eOut(seg(t, b.t0, b.t0 + 0.6)) * 20;
+    const C = [["#1B2A33", "#5B7480"], ["#2B1A10", "#E08A3C"], ["#14181C", "#6E7A84"], ["#3A2416", "#F2B26B"], ["#10161A", "#4C6470"]];
+    const cw = mn * 0.3, ch = cw * 1.9, R = mn * 0.62, cy = h * 0.42;
+    let cards = "";
+    for (let i = 0; i < n * 2; i++) { const a = (i * (360 / (n * 2)) - rot) * Math.PI / 180, z = Math.cos(a), x = Math.sin(a) * R; if (z < 0.1) continue;
+      const [c1, c2] = C[(i + bi) % C.length], s = this.text(it[i % it.length].w), ff = famOf(s), fz = fitSize(s, `800 {}px ${ff}`, cw * 0.8, cw * 0.16), sc = 0.7 + z * 0.3;
+      cards += `<div style="position:absolute;left:${(w / 2 + x - cw / 2).toFixed(1)}px;top:${(cy - ch / 2).toFixed(1)}px;width:${cw.toFixed(1)}px;height:${ch.toFixed(1)}px;z-index:${Math.round(z * 100)};border-radius:${(cw * 0.08).toFixed(1)}px;background:linear-gradient(160deg,${c2},${c1});border:1px solid rgba(255,255,255,.35);transform:perspective(${(mn * 1.5).toFixed(0)}px) rotateY(${(-Math.asin(Math.sin(a)) * 57).toFixed(1)}deg) scale(${sc.toFixed(3)});filter:brightness(${(0.55 + z * 0.45).toFixed(2)});box-shadow:0 ${(mn * 0.02).toFixed(0)}px ${(mn * 0.04).toFixed(0)}px rgba(0,0,0,.4);overflow:hidden">
+        <div style="position:absolute;inset:0;background:repeating-linear-gradient(115deg,rgba(255,255,255,.06) 0 6px,transparent 6px 18px)"></div>
+        <div dir="${this.dir(s)}" style="position:absolute;left:8%;right:8%;bottom:8%;font:800 ${fz.toFixed(1)}px ${ff};color:#fff;text-shadow:0 2px 8px rgba(0,0,0,.5);white-space:nowrap">${esc(s)}</div></div>`; }
+    return `<div style="position:absolute;inset:0;background:${onVideo(this) ? "rgba(0,0,0,.35)" : "radial-gradient(ellipse at 50% 40%,#2A2622,#0C0B0A 75%)"}"></div>${cards}`;
   };
 })();
