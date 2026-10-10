@@ -55,7 +55,7 @@
     "qr", "codetag", "toolbar", "terminal", "scan",
     "toasts", "footer", "marquee", "datestrip",
     "fileicon", "chaos",
-    "gradword", "meshprompt", "orbsplit", "bento", "figdays", "figcurve", "figplay", "figequal", "figwords", "figphone", "figdrop", "figcount", "figgears", "figbar", "figcheck", "figcta", "goldcap", "iconbelt", "glowsweep", "namepill", "kashida", "molecule", "weightstack", "stretch", "desatpop", "arcs", "chrome", "inkverse", "poemfade", "hashend", "flipverb", "strobe", "duoline", "capstack", "pillword", "blurduo", "tagstack", "underbars", "contactcard", "iconorbit", "blurstrobe", "kinstack"]);
+    "gradword", "meshprompt", "orbsplit", "bento", "figdays", "figcurve", "figplay", "figequal", "figwords", "figphone", "figdrop", "figcount", "figgears", "figbar", "figcheck", "figcta", "goldcap", "iconbelt", "glowsweep", "namepill", "kashida", "molecule", "weightstack", "stretch", "desatpop", "arcs", "chrome", "inkverse", "poemfade", "hashend", "flipverb", "strobe", "duoline", "capstack", "pillword", "blurduo", "tagstack", "underbars", "contactcard", "iconorbit", "blurstrobe", "kinstack", "incall", "cineband", "scriptover"]);
   E.TYPING = new Set(["type", "artype"]);
   const MC = document.createElement("canvas").getContext("2d");
   const measure = (s, font) => { MC.font = font; return MC.measureText(s).width; };
@@ -6807,5 +6807,48 @@
       html += `<div dir="${this.dir(s)}" style="position:absolute;left:0;right:0;top:${y.toFixed(1)}px;text-align:center;white-space:nowrap;font:800 ${zz.toFixed(1)}px ${ff};line-height:1;letter-spacing:-0.03em;color:${dark ? "#F5E512" : "#141414"};transform:translateX(${(off + (1 - e) * (j % 2 ? 1 : -1) * w * 0.2).toFixed(1)}px) skewX(${((1 - e) * 18).toFixed(1)}deg);filter:blur(${((1 - e) * zz * 0.1).toFixed(1)}px);opacity:${clamp(q * 3).toFixed(2)}">${esc(s)}</div>`;
       y += isB ? big * 0.95 : sm * 1.05; });
     return html;
+  };
+  // ======== r11 «مكالمة» — «مشروع جديد بيتصل…» واسحب للرد، شريط سينما بكلمة بتومض، وكلام بخط الإيد فوق الفيديو ========
+  // ---------- incall: شاشة مكالمة واردة سودا: اسم المتصل (focus) و«بيتصل…» وكبسولة «اسحب للرد» زرارها الأخضر بينبض، وفي الآخر بيتسحب أو بيتقفل أحمر
+  P.k_incall = function (b, t, k, th, bi) {
+    const P = figParts(this, { ...b, focus: b.focus >= 0 ? b.focus : Math.min(1, this.items(b).length - 1) }); if (!P.it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h);
+    const name = P.J(P.it.slice(0, P.fi + 1)), sub = P.J(P.tail) || (AR.test(name) ? "بيتصل…" : "is calling…"), ar = AR.test(name + sub);
+    const ff = AR.test(name) ? famOf(name) : "'TY Cond', 'TY Outfit'", z = fitSize(name.toUpperCase(), `700 {}px ${ff}`, w * 0.7, mn * 0.07 * this.ts);
+    const blink = 0.55 + 0.45 * Math.abs(Math.sin((t - b.t0) * 3.2)), D = b.t1 - b.t0, decline = bi % 2 === 1;
+    const sl = eOut(seg(t, b.t0 + D * 0.72, b.t0 + D * 0.85)), y = h * 0.4, pw = Math.min(w * 0.62, mn * 0.75), ph = mn * 0.11 * this.ts * 0.8;
+    const lab = ar ? "اسحب للرد" : "slide to answer", end = t >= b.t0 + D * 0.85;
+    let html = `<div style="position:absolute;inset:0;background:${onVideo(this) ? "rgba(0,0,0,.85)" : "#030203"}"></div>`;
+    html += `<div dir="${this.dir(name)}" style="position:absolute;left:0;right:0;top:${(y - z * 2).toFixed(1)}px;text-align:center;font:700 ${z.toFixed(1)}px ${ff};color:#fff;text-transform:uppercase;letter-spacing:.02em;opacity:${(end ? 0.3 : blink).toFixed(2)}">${esc(name)}</div>
+      <div dir="${this.dir(sub)}" style="position:absolute;left:0;right:0;top:${(y - z * 0.75).toFixed(1)}px;text-align:center;font:400 ${(z * 0.36).toFixed(1)}px ${famOf(sub)};color:rgba(255,255,255,.75)">${esc(sub)}</div>`;
+    if (end && decline) html += `<div style="position:absolute;left:50%;top:${(y + ph * 0.5).toFixed(1)}px;width:${ph.toFixed(1)}px;height:${ph.toFixed(1)}px;transform:translate(-50%,-50%) scale(${eBack(seg(t, b.t0 + D * 0.85, b.t0 + D * 0.95)).toFixed(3)});border-radius:50%;background:#E5262E;display:flex;align-items:center;justify-content:center"><svg width="${(ph * 0.5).toFixed(0)}" height="${(ph * 0.5).toFixed(0)}" viewBox="0 0 24 24"><path d="M3 15c5-5 13-5 18 0l-2 3-4-1v-3a10 10 0 0 0-6 0v3l-4 1z" fill="#fff"/></svg></div>`;
+    else { const kx = lerp(ph * 0.5, pw - ph * 0.5, decline ? 0 : sl);
+      html += `<div style="position:absolute;left:${((w - pw) / 2).toFixed(1)}px;top:${y.toFixed(1)}px;width:${pw.toFixed(1)}px;height:${ph.toFixed(1)}px;border-radius:${(ph / 2).toFixed(1)}px;background:linear-gradient(90deg,rgba(150,130,160,.55),rgba(190,170,200,.75));overflow:hidden">
+        <div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding-left:${(ph * 0.9).toFixed(0)}px;font:400 ${(ph * 0.26).toFixed(1)}px ${famOf(lab)};color:transparent;background:linear-gradient(90deg,rgba(255,255,255,.35) ${(((t - b.t0) * 60) % 160 - 30).toFixed(0)}%,#fff ${(((t - b.t0) * 60) % 160 - 10).toFixed(0)}%,rgba(255,255,255,.35) ${(((t - b.t0) * 60) % 160 + 10).toFixed(0)}%);-webkit-background-clip:text;background-clip:text;opacity:${(1 - sl).toFixed(2)}">${esc(lab)}</div>
+        <div style="position:absolute;left:${(kx - ph * 0.42).toFixed(1)}px;top:${(ph * 0.08).toFixed(1)}px;width:${(ph * 0.84).toFixed(1)}px;height:${(ph * 0.84).toFixed(1)}px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 ${(ph * 0.08 * blink).toFixed(1)}px rgba(255,255,255,.25)"><svg width="${(ph * 0.42).toFixed(0)}" height="${(ph * 0.42).toFixed(0)}" viewBox="0 0 24 24"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2" fill="#2DBE4E"/></svg></div></div>`; }
+    return html;
+  };
+  // ---------- cineband: شريط عريض في نص الكادر الأسود (زي سينما) فيه كلمة واحدة، والشريط بيقلب أبيض/أسود مع كل كلمة وبيرعش لحظة
+  P.k_cineband = function (b, t, k, th, bi) {
+    const it = this.items(b); if (!it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h);
+    let ci = 0; it.forEach((x, i) => { if (t >= x.t0 - 0.03) ci = i; });
+    const x = it[ci], s = this.text(x.w), white = ci % 2 === 0, q = seg(t, x.t0 - 0.03, x.t0 + 0.15);
+    const fl = ci === it.length - 1 ? 0 : (Math.floor((t - x.t0) * 20) % 7 === 3 && t > x.t0 + 0.3 ? 1 : 0);
+    const bh = Math.min(h * 0.32, w * 0.56), ff = famOf(s), z = fitSize(s.toUpperCase(), `800 {}px ${ff}`, w * 0.7, mn * 0.075 * this.ts);
+    const bg = white ? (fl ? "#3A3A3A" : "#FFFFFF") : "#050505", fg = white ? (fl ? "#111" : "#1C1C1C") : "#F2F2F2";
+    return `<div style="position:absolute;inset:0;background:#000"></div><div style="position:absolute;left:0;right:0;top:${(h * 0.42 - bh / 2).toFixed(1)}px;height:${bh.toFixed(1)}px;background:${bg}"></div>
+      <div dir="${this.dir(s)}" style="position:absolute;left:0;right:0;top:${(h * 0.42).toFixed(1)}px;transform:translateY(-50%);text-align:center;white-space:nowrap;font:800 ${z.toFixed(1)}px ${ff};letter-spacing:.02em;text-transform:uppercase;color:${fg};opacity:${clamp(q * 2).toFixed(2)};${white ? "" : "text-shadow:0 0 1px #fff"};-webkit-mask:linear-gradient(90deg,#000 ${(q * 130 - 30).toFixed(0)}%,rgba(0,0,0,.25) ${(q * 130).toFixed(0)}%);mask:linear-gradient(90deg,#000 ${(q * 130 - 30).toFixed(0)}%,rgba(0,0,0,.25) ${(q * 130).toFixed(0)}%)">${esc(s)}</div>`;
+  };
+  // ---------- scriptover: سطر كابيتال صغير متباعد وتحته كلمة كبيرة بخط إيد بتتكتب بمسحة، أبيض فوق الفيديو
+  P.k_scriptover = function (b, t, k, th, bi) {
+    const P = figParts(this, { ...b, focus: b.focus >= 0 ? b.focus : this.items(b).length - 1 }); if (!P.it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h);
+    const cap = P.J(P.kick), main = P.J([P.main, ...P.tail]), ar = AR.test(main);
+    const sf = ar ? "'TY Ruqaa', 'SM Tajawal'" : "'TY Pen', 'TY SerifI'", z = fitSize(main, `400 {}px ${sf}`, w * 0.72, mn * 0.16 * this.ts * 0.8);
+    const cz = Math.min(z * 0.3, fitSize(cap.toUpperCase(), `600 {}px ${famOf(cap)}`, w * 0.6, z * 0.3)), y = h * 0.36;
+    const p = seg(t, P.main.t0 - 0.05, P.main.t0 + 0.8), m = `linear-gradient(${ar ? 270 : 90}deg,#000 ${(p * 120 - 15).toFixed(0)}%,transparent ${(p * 120).toFixed(0)}%)`;
+    return `<div dir="${this.dir(cap)}" style="position:absolute;left:0;right:0;top:${(y - cz * 1.3).toFixed(1)}px;text-align:center;font:600 ${cz.toFixed(1)}px ${famOf(cap)};letter-spacing:.1em;color:#fff;text-transform:uppercase;text-shadow:0 2px 10px rgba(0,0,0,.35);${blurIn(t, b.t0)}">${esc(cap)}</div>
+      <div dir="${this.dir(main)}" style="position:absolute;left:0;right:0;top:${(y - z * 0.15).toFixed(1)}px;text-align:center;white-space:nowrap;font:400 ${z.toFixed(1)}px ${sf};line-height:1.3;color:#fff;text-shadow:0 2px 14px rgba(0,0,0,.4);-webkit-mask:${m};mask:${m}">${esc(main)}</div>`;
   };
 })();
