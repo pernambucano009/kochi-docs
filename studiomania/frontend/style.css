@@ -2080,3 +2080,25 @@ a.btn.disabled { opacity: .45; pointer-events: none; }
 .tx-color { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; }
 .tx-color input[type=color] { width: 30px; height: 26px; padding: 0; border: 1px solid var(--line); border-radius: 6px; background: none; }
 #txBold.on, #txItalic.on { border-color: var(--accent); background: var(--accent-soft); }
+/* 🖼️ الطبقات فوق الفيديو */
+.frame .pv-over { position: absolute; inset: 0; z-index: 1; pointer-events: none; overflow: hidden; }
+.frame .pv-ov { position: absolute; pointer-events: auto; cursor: move; transform-origin: center; }
+.frame .pv-ov .ov-media, .frame .pv-ov .ov-key { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; max-width: none; user-select: none; -webkit-user-drag: none; }
+.frame .pv-ov.sel { outline: 1.5px solid #fff; outline-offset: 1px; }
+.frame .pv-ov .ov-rot, .frame .pv-ov .ov-sz { display: none; }
+.frame .pv-ov.sel .ov-rot { display: block; position: absolute; left: 50%; top: -22px; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%; background: #fff; border: 1px solid #0009; cursor: grab; }
+.frame .pv-ov.sel .ov-sz { display: block; position: absolute; right: -6px; bottom: -6px; width: 10px; height: 10px; background: #fff; border: 1px solid #0009; border-radius: 2px; cursor: nwse-resize; }
+.h-over, .t-over { height: 34px; }
+.t-over { position: relative; }
+.tl-over { position: absolute; background: #213f5e; border: 1px solid #3f74ab; border-radius: 5px; overflow: hidden; cursor: grab; box-sizing: border-box; }
+.tl-over.selected { border-color: #fff; box-shadow: 0 0 0 1px #fff; }
+.tl-over.disabled { opacity: .45; }
+.tl-over img, .tl-over video { position: absolute; left: 0; top: 0; height: 100%; width: auto; opacity: .55; pointer-events: none; }
+.tl-over .nm { position: absolute; top: 3px; left: 6px; right: 6px; font-size: 11px; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; text-shadow: 0 1px 2px #000; }
+.tl-over .h { position: absolute; top: 0; bottom: 0; width: 7px; cursor: ew-resize; z-index: 2; }
+.tl-over .h.l { left: 0; } .tl-over .h.r { right: 0; }
+.tl-over.selected .h, .tl-over:hover .h { background: rgba(255,255,255,.8); }
+.bin-item .ovadd { position: absolute; top: 38px; right: 5px; width: 28px; height: 28px; border-radius: 50%; border: none; background: #2f6fb3; color: #fff; font-size: 14px; line-height: 1; cursor: pointer; }
+.ov-editor { display: flex; flex-direction: column; gap: 6px; }
+.ov-chroma { display: flex; flex-direction: column; gap: 4px; padding-inline-start: 18px; }
+#ovFlip.on { border-color: var(--accent); background: var(--accent-soft); }

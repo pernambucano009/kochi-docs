@@ -137,6 +137,139 @@ class AudioTrack:
 
 
 @dataclass
+class Overlay:
+    """🖼️ فيديو أو صورة فوق الفيديو الأساسي (صورة جوه صورة)."""
+    path: Path
+    is_image: bool = False
+    start: float = 0.0          # من ثانية كام في الملف
+    t0: float = 0.0             # بيظهر في ثانية كام من الفيديو النهائي
+    dur: float = 3.0
+    x: float = 0.5              # نص الطبقة (نسبة من الكادر)
+    y: float = 0.5
+    w: float = 0.5              # العرض (نسبة من عرض الكادر)
+    src_w: int = 0
+    src_h: int = 0
+    angle: float = 0.0
+    opacity: float = 1.0
+    blend: str = "normal"       # normal / screen / multiply / overlay / lighten / darken / addition
+    mask: str = ""              # "" / circle / rounded / heart / diamond
+    chroma: tuple | None = None  # (لون "#rrggbb", similarity, blend) لشيل الشاشة الخضرا
+    flip_h: bool = False
+    anim_in: tuple = ("", 0.0)  # (fade/zoom/pop/slideup/slidedown/slideleft/slideright, المدة)
+    anim_out: tuple = ("", 0.0)
+    speed: float = 1.0
+
+
+# أوضاع الدمج: اسم FFmpeg + اللون اللي مبيغيّرش حاجة (عشان برّه الطبقة يفضل زي ما هو)
+BLENDS = {"screen": ("screen", "black"), "lighten": ("lighten", "black"), "addition": ("addition", "black"),
+          "multiply": ("multiply", "white"), "darken": ("darken", "white"), "overlay": ("overlay", "0x808080"),
+          "softlight": ("softlight", "0x808080")}
+MASKS = {
+    "circle": "255*lte(pow((X-W/2)/(W/2),2)+pow((Y-H/2)/(H/2),2),1)",
+    "rounded": "255*lte(hypot(max(0,abs(X-W/2)-(W/2-min(W,H)*0.12)),max(0,abs(Y-H/2)-(H/2-min(W,H)*0.12))),min(W,H)*0.12)",
+    "diamond": "255*lte(abs((X-W/2)/(W/2))+abs((Y-H/2)/(H/2)),1)",
+    "heart": "255*lte(pow(pow((X-W/2)/(W/2)*1.15,2)+pow(-(Y-H/2)/(H/2)*1.15+0.25,2)-1,3)-pow((X-W/2)/(W/2)*1.15,2)*pow(-(Y-H/2)/(H/2)*1.15+0.25,3),0)",
+}
+
+
+def overlay_anim_exprs(o: Overlay, W: int, H: int) -> tuple[str, str, str]:
+    """حركة دخول وخروج الطبقة: (مضاعف الحجم، إزاحة x، إزاحة y) بدلالة t — خطي زي المعاينة."""
+    z, dx, dy = ["1"], ["0"], ["0"]
+    for kind, (typ, d) in (("in", o.anim_in), ("out", o.anim_out)):
+        if not typ or d <= 0.01:
+            continue
+        d = min(d, o.dur / 2)
+        p = f"clip((t-{o.t0:.3f})/{d:.3f},0,1)" if kind == "in" else f"clip(({o.t0 + o.dur:.3f}-t)/{d:.3f},0,1)"
+        sign = 1 if kind == "in" else -1
+        q = f"(1-{p})"
+        if typ == "zoom":
+            z.append(f"(0.6+0.4*{p})")
+        elif typ == "pop":
+            z.append(f"max(0.02,if(lt({p},0.7),{p}/0.7*1.12,1.12-0.12*({p}-0.7)/0.3))")
+        elif typ == "slideup":
+            dy.append(f"({sign * 0.12 * H:.1f}*{q})")
+        elif typ == "slidedown":
+            dy.append(f"({-sign * 0.12 * H:.1f}*{q})")
+        elif typ == "slideleft":
+            dx.append(f"({sign * 0.15 * W:.1f}*{q})")
+        elif typ == "slideright":
+            dx.append(f"({-sign * 0.15 * W:.1f}*{q})")
+    return "*".join(z), "+".join(dx), "+".join(dy)
+
+
+def overlay_filters(ffmpeg: str, overlays: list[Overlay], video_label: str, first_input: int, work_dir: Path,
+                    W: int, H: int, fps: int) -> tuple[list[str], list[str], str]:
+    """بيرجّع (مدخلات زيادة، فلاتر، اسم آخر صورة). كل طبقة بتتظبط لوحدها وبعدين بتتركّب في مكانها ووقتها."""
+    args, filters = [], []
+    idx = first_input
+    for n, o in enumerate(overlays):
+        if o.is_image:
+            args += ["-loop", "1", "-framerate", str(fps), "-t", f"{o.dur:.3f}", "-i", str(o.path)]
+        else:
+            sp = max(0.25, min(4.0, o.speed or 1.0))
+            args += ["-ss", f"{max(0.0, o.start):.3f}", "-t", f"{o.dur * sp:.3f}", "-i", str(o.path)]
+        src = idx
+        idx += 1
+        ow = max(4, round(W * max(0.02, o.w) / 2) * 2)
+        oh = max(4, round(ow * (o.src_h or 1) / max(1, o.src_w or 1) / 2) * 2)
+        sp = max(0.25, min(4.0, o.speed or 1.0))
+        chain = [f"setpts=(PTS-STARTPTS)/{sp:.4f}+{o.t0:.3f}/TB" if not o.is_image else f"setpts=PTS-STARTPTS+{o.t0:.3f}/TB",
+                 f"fps={fps}", f"scale={ow}:{oh}", "setsar=1"]
+        if o.flip_h:
+            chain.append("hflip")
+        chain.append("format=rgba")
+        if o.chroma:
+            col, sim, bl = o.chroma
+            chain.append(f"colorkey=color=0x{col.lstrip('#')}:similarity={sim:.3f}:blend={bl:.3f}")
+        if o.opacity < 0.999:
+            chain.append(f"colorchannelmixer=aa={max(0.0, o.opacity):.3f}")
+        label = f"[ov{n}]"
+        if o.mask in MASKS:
+            # الشكل: صورة أبيض وأسود مرة واحدة، وبتتضرب في شفافية الطبقة
+            mask_png = work_dir / f"mask{n}.png"
+            subprocess.run([ffmpeg, "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i", f"color=c=black:s={ow}x{oh}",
+                            "-vf", f"format=gray,geq=lum='{MASKS[o.mask]}'", "-frames:v", "1", str(mask_png)], check=True, capture_output=True)
+            # لازم مدة للصورة اللي بتتكرر، وإلا FFmpeg بيفضل مستنيها وبيعلّق
+            args += ["-loop", "1", "-framerate", str(fps), "-t", f"{o.dur + 0.1:.3f}", "-i", str(mask_png)]
+            midx = idx
+            idx += 1
+            filters.append(f"[{src}:v]{','.join(chain)},split=2[ovc{n}][ova{n}]")
+            filters.append(f"[ova{n}]alphaextract[ovaa{n}]")
+            filters.append(f"[{midx}:v]format=gray,setpts=PTS-STARTPTS+{o.t0:.3f}/TB[ovm{n}]")
+            filters.append(f"[ovaa{n}][ovm{n}]blend=all_mode=multiply:shortest=1[ovam{n}]")
+            filters.append(f"[ovc{n}][ovam{n}]alphamerge{label}")
+        else:
+            filters.append(f"[{src}:v]{','.join(chain)}{label}")
+        post = []
+        if abs(o.angle) > 0.05:
+            post.append(f"rotate=a={o.angle * 3.14159265 / 180:.5f}:ow='hypot(iw,ih)':oh='hypot(iw,ih)':c=black@0")
+        zexpr, dxe, dye = overlay_anim_exprs(o, W, H)
+        if zexpr != "1":
+            post.append(f"scale=w='max(2,trunc(iw*({zexpr})/2)*2)':h='max(2,trunc(ih*({zexpr})/2)*2)':eval=frame")
+        for kind, (typ, d) in (("in", o.anim_in), ("out", o.anim_out)):
+            if typ in ("fade", "zoom", "slideup", "slidedown", "slideleft", "slideright", "pop") and d > 0.01:
+                d = min(d, o.dur / 2)
+                st = o.t0 if kind == "in" else o.t0 + o.dur - d
+                post.append(f"fade=t={kind}:st={st:.3f}:d={(min(d, 0.3 * d / 0.3) if typ != 'pop' else d * 0.3):.3f}:alpha=1")
+        if post:
+            filters.append(f"{label}{','.join(post)}[ovp{n}]")
+            label = f"[ovp{n}]"
+        enable = f"between(t,{o.t0:.3f},{o.t0 + o.dur:.3f})"
+        ox, oy = f"{o.x * W:.1f}+({dxe})-w/2", f"{o.y * H:.1f}+({dye})-h/2"
+        out = f"[vo{n}]"
+        if o.blend in BLENDS:
+            mode, neutral = BLENDS[o.blend]
+            filters.append(f"color=c={neutral}:s={W}x{H}:r={fps},format=rgba[bgn{n}]")
+            filters.append(f"[bgn{n}]{label}overlay=x='{ox}':y='{oy}':eval=frame:eof_action=pass,format=gbrp[lay{n}]")
+            filters.append(f"{video_label}format=gbrp[base{n}]")
+            filters.append(f"[base{n}][lay{n}]blend=all_mode={mode}:shortest=1:enable='{enable}',format=yuv420p{out}")
+        else:
+            filters.append(f"{video_label}{label}overlay=x='{ox}':y='{oy}':eval=frame:eof_action=pass:enable='{enable}'{out}")
+        video_label = out
+    return args, filters, video_label
+
+
+@dataclass
 class Logo:
     path: Path
     size: float = 18.0  # عرض اللوجو كنسبة من عرض الفيديو
@@ -312,7 +445,9 @@ def post_fx(seg: "Segment", tl: str) -> str:
 
 
 def encoder_args(preset: str, crf: int, low_memory: bool) -> list[str]:
-    args = ["-c:v", "libx264", "-preset", preset, "-crf", str(crf), "-threads", "1" if low_memory else str(THREADS)]
+    args = ["-c:v", "libx264", "-preset", preset, "-crf", str(crf), "-threads", "1" if low_memory else str(THREADS),
+            # كل القطع بنفس بيانات الألوان: لو اختلفت، FFmpeg بيعيد بناء الفلاتر في نص الفيديو والطبقات اللي خلصت بتعلّقه
+            "-color_range", "tv", "-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709"]
     if low_memory:
         args += ["-x264-params", "rc-lookahead=5"]  # فريمات أقل في الذاكرة
     return args
@@ -574,6 +709,7 @@ def build_commands(
     low_memory: bool = False,
     sounds: list[AudioTrack] | None = None,
     audio_fx: dict | None = None,
+    overlays: list[Overlay] | None = None,
 ) -> tuple[list[list[str]], float]:
     """يبني أوامر FFmpeg بالترتيب ويرجّعها مع الطول النهائي للفيديو.
 
@@ -642,7 +778,7 @@ def build_commands(
     concat_list.write_text("".join(f"file '{p.as_posix()}'\n" for p in parts), encoding="utf-8")
 
     base_args = [ffmpeg, "-hide_banner", "-loglevel", "error", "-y", "-filter_complex_threads", "1"]
-    concat_in = ["-f", "concat", "-safe", "0", "-i", str(concat_list)]
+    concat_in = ["-reinit_filter", "0", "-f", "concat", "-safe", "0", "-i", str(concat_list)]
     mixed, video = work_dir / "mix.flac", work_dir / "video.mp4"
 
     # (أ) الصوت لوحده: صوت الفيديوهات + قطع التعليق والموسيقى
@@ -654,12 +790,18 @@ def build_commands(
     args = base_args + ["-an"] + concat_in
     filters = ["[0:v]null[vcat]"]
     video_label = "[vcat]"
+    n_in = 1
+    if overlays:
+        o_args, o_filters, video_label = overlay_filters(ffmpeg, overlays, video_label, n_in, work_dir, WIDTH, HEIGHT, FPS)
+        args += o_args
+        filters += o_filters
+        n_in += o_args.count("-i")
     if logo:
         # صورة واحدة بس (من غير -loop): الـ overlay بيكرّر آخر فريم لوحده لآخر الفيديو
         args += ["-i", str(logo.path)]
         lw = max(2, int(WIDTH * logo.size / 100) // 2 * 2)
         filters.append(
-            f"[1:v]scale={lw}:-2,format=rgba,colorchannelmixer=aa={max(0.0, min(1.0, logo.opacity)):.2f}[logo]"
+            f"[{n_in}:v]scale={lw}:-2,format=rgba,colorchannelmixer=aa={max(0.0, min(1.0, logo.opacity)):.2f}[logo]"
         )
         enable = f":enable='lt(t,{logo.until:.3f})'" if logo.until else ""
         filters.append(

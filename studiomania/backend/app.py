@@ -11,6 +11,7 @@ import hashlib
 import hmac
 import wave
 import zipfile
+import io
 import json
 import math
 import os
@@ -89,6 +90,7 @@ COACHES_DIR = DATA_DIR / "coaches"
 GENERATED_DIR = DATA_DIR / "generated"
 AUDIO_DIR = DATA_DIR / "audio"
 SFXLIB_DIR = DATA_DIR / "sfxlib"  # المؤثرات المتولّدة (sfxlib.py)
+OVERLAY_DIR = DATA_DIR / "overlays"  # الصور اللي بتترفع كطبقات فوق الفيديو
 EXPORTS_DIR = DATA_DIR / "exports"  # فولدر الفيديوهات الجاهزة للنشر
 BRAND_DIR = DATA_DIR / "brand"  # اللوجو
 TMP_DIR = DATA_DIR / "tmp"
@@ -1802,6 +1804,94 @@ def project_sounds(conn: sqlite3.Connection, data: dict) -> list[montage.AudioTr
     return out
 
 
+OVERLAY_BLENDS = {"normal", *montage.BLENDS}
+OVERLAY_ANIMS = {"fade", "zoom", "pop", "slideup", "slidedown", "slideleft", "slideright"}
+
+
+def overlay_source(conn: sqlite3.Connection, src: str) -> tuple[Path | None, bool]:
+    """ملف الطبقة: صورة مرفوعة (img:…) أو فيديو من المكتبة."""
+    if src.startswith("img:"):
+        path = OVERLAY_DIR / Path(src[4:]).name
+        return (path if path.exists() else None), True
+    return clip_source(conn, src), False
+
+
+def project_overlays(conn: sqlite3.Connection, data: dict, total: float) -> tuple[list[montage.Overlay], list[montage.AudioTrack]]:
+    """🖼️ الطبقات فوق الفيديو + صوت الفيديوهات اللي فيها."""
+    if track_flag(data, "over", "hide"):
+        return [], []
+    out, sounds = [], []
+    for x in (data.get("overlays") or [])[:30]:
+        if not isinstance(x, dict) or x.get("disabled"):
+            continue
+        path, is_image = overlay_source(conn, str(x.get("src") or ""))
+        if not path:
+            continue
+        info = media_info(path) if not is_image else None
+        if is_image:
+            from PIL import Image  # noqa: PLC0415
+            with Image.open(path) as im:
+                sw, sh = im.size
+        else:
+            sw, sh = info.width, info.height
+        t0 = max(0.0, float(x.get("t0") or 0))
+        if t0 >= total:
+            continue
+        speed = clamp(float(x.get("speed") or 1), 0.25, 4)
+        start = clamp(float(x.get("start") or 0), 0, (info.duration if info else 0))
+        dur = clamp(float(x.get("dur") or 3), 0.1, total - t0)
+        if info:
+            dur = min(dur, max(0.1, (info.duration - start) / speed))
+        ch = x.get("chroma") or {}
+        def anim(a):
+            return (a["type"], clamp(float(a.get("dur") or 0.4), 0.05, 3)) if isinstance(a, dict) and a.get("type") in OVERLAY_ANIMS else ("", 0.0)
+        out.append(montage.Overlay(
+            path, is_image=is_image, start=start, t0=t0, dur=dur, speed=speed,
+            x=clamp(float(x.get("x", 0.5)), -1, 2), y=clamp(float(x.get("y", 0.5)), -1, 2), w=clamp(float(x.get("w", 0.5)), 0.02, 3),
+            src_w=sw, src_h=sh, angle=clamp(float(x.get("angle") or 0), -360, 360), opacity=clamp(float(x.get("opacity", 1)), 0, 1),
+            blend=x.get("blend") if x.get("blend") in OVERLAY_BLENDS else "normal",
+            mask=x.get("mask") if x.get("mask") in montage.MASKS else "",
+            chroma=(ch.get("color") if re.fullmatch(r"#[0-9a-fA-F]{6}", str(ch.get("color") or "")) else "#00ff00",
+                    clamp(float(ch.get("sim", 0.3)), 0.01, 1), clamp(float(ch.get("blend", 0.1)), 0, 1)) if ch.get("on") else None,
+            flip_h=bool(x.get("flip_h")), anim_in=anim(x.get("anim_in")), anim_out=anim(x.get("anim_out")),
+        ))
+        vol = clamp(float(x.get("volume", 1)), 0, 3)
+        if info and info.has_audio and vol > 0.001 and abs(speed - 1) < 1e-3 and not track_flag(data, "over", "mute"):
+            sounds.append(montage.AudioTrack(path, volume=vol, delay=t0, offset=start, length=dur))
+    return out, sounds
+
+
+@app.post("/api/montage/overlay-image")
+async def overlay_image_upload(file: UploadFile = File(...)):
+    """⬆ صورة (PNG شفافة أو JPG) تتحط كطبقة فوق الفيديو."""
+    from PIL import Image  # noqa: PLC0415
+    OVERLAY_DIR.mkdir(parents=True, exist_ok=True)
+    data = await file.read()
+    if len(data) > 25 * 1024 * 1024:
+        raise HTTPException(400, "الصورة أكبر من 25 ميجا")
+    try:
+        im = Image.open(io.BytesIO(data))
+        im.load()
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(400, "الملف ده مش صورة") from exc
+    # بنحفظها PNG (عشان الشفافية) وبحد أقصى 2160 بكسل
+    im.thumbnail((2160, 2160))
+    if im.mode not in ("RGBA", "RGB"):
+        im = im.convert("RGBA")
+    name = f"{uuid.uuid4().hex[:12]}.png"
+    im.save(OVERLAY_DIR / name, "PNG")
+    return {"src": f"img:{name}", "url": f"/media/overlay/{name}", "w": im.width, "h": im.height,
+            "name": Path(file.filename or "صورة").stem[:60]}
+
+
+@app.get("/media/overlay/{name}")
+def overlay_image_file(name: str):
+    path = OVERLAY_DIR / Path(name).name
+    if not path.exists():
+        raise HTTPException(404, "الصورة مش موجودة")
+    return FileResponse(path, media_type="image/png")
+
+
 def project_mix(data: dict) -> dict:
     m = data.get("mix") or {}
     return {"duck": clamp(float(m.get("duck") or 0), 0, 1), "normalize": bool(m.get("normalize")), "enhance": bool(m.get("enhance"))}
@@ -2752,12 +2842,13 @@ def start_render(conn: sqlite3.Connection, row: sqlite3.Row, project_id: str, da
     export_id = uuid.uuid4().hex[:12]
     total = sum(sg.duration for sg in segments)
     subs = [x for x in (project_captions(conn, data, total, export_id), project_texts(data, total, export_id)) if x]
+    overlays, ov_sounds = project_overlays(conn, data, total)
     work_dir = render_work_dir(export_id, total)
     cmd, total = montage.build_commands(
         ffmpeg_exe(), segments, EXPORTS_DIR / f"{export_id}.mp4", work_dir, voice, music,
         logo=project_logo(data, total, outro_len), subtitles=subs,
         low_memory=(system_info()["memory_limit_mb"] or 99999) < 1500,
-        sounds=project_sounds(conn, data), audio_fx=project_mix(data),
+        sounds=project_sounds(conn, data) + ov_sounds, audio_fx=project_mix(data), overlays=overlays,
     )
     RENDER_ACTIVE[project_id] = "بيبدأ…"
     conn.execute(

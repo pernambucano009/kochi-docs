@@ -284,7 +284,7 @@ function fixSelection() {
   if (!s) { mt.extra = []; return; }
   const nCaps = captionBlocks().length;
   const valid = (s) => !((s.kind === "cap" && s.i >= nCaps) || (s.kind === "clip" && !d.clips[s.i]) || (isAudKind(s.kind) && !partsOf(s.kind)?.[s.p]) ||
-      (s.kind === "outro" && !currentOutro()) || (s.kind === "text" && !(d.texts || [])[s.i]));
+      (s.kind === "outro" && !currentOutro()) || (s.kind === "text" && !(d.texts || [])[s.i]) || (s.kind === "over" && !(d.overlays || [])[s.i]));
   mt.extra = mt.extra.filter(valid);
   if (!valid(s)) { mt.sel = null; return; }
   if ((s.kind === "clip" && !d.clips[s.i]) || (isAudKind(s.kind) && !partsOf(s.kind)?.[s.p]) ||
@@ -344,6 +344,7 @@ function renderBin() {
         ${lightVideo(s.url, "muted playsinline")}
         <button class="add" title="${rep ? "حطه مكان القطعة" : "ضيف عند المؤشر"}">${rep ? "🔁" : "＋"}</button>
         <button class="fav ${favs.has(s.id) ? "on" : ""}" title="مفضلة">${favs.has(s.id) ? "★" : "☆"}</button>
+        ${rep ? "" : `<button class="ovadd" title="ضيفه طبقة فوق الفيديو عند المؤشر">⧉</button>`}
         ${s.extra ? `<button class="del" title="امسح الأوترو ده">✕</button>` : ""}
         <span class="tag">${escapeHtml(s.label)} · ${s.duration.toFixed(1)}ث</span>
       </div>`
@@ -412,6 +413,7 @@ function replaceClip(i, genId) {
 $("binGrid").addEventListener("click", async (e) => {
   const item = e.target.closest(".bin-item");
   if (item && e.target.closest(".fav")) { toggleFav(item.dataset.id); renderBin(); return; }
+  if (item && e.target.closest(".ovadd")) { addOverlay(item.dataset.id); return; }
   if (item && mt.replacing != null && !e.target.closest(".del")) { replaceClip(mt.replacing, item.dataset.id); return; }
   if (item && e.target.closest(".add")) insertClip(item.dataset.id, insertIndexAt(mt.t));
   if (item && e.target.closest(".del")) {
@@ -626,7 +628,8 @@ function renderTimeline() {
   const d = mt.project.data;
   const { items, total } = seq();
   const view = $("tlScroll").clientWidth || 800;
-  const end = Math.max(total, trackEnd("voice"), trackEnd("music"), trackEnd("snd"));
+  const end = Math.max(total, trackEnd("voice"), trackEnd("music"), trackEnd("snd"),
+    ...(d.texts || []).map((x) => x.t0 + x.dur), ...(d.overlays || []).map((x) => x.t0 + x.dur));
   const width = Math.max(view, (end + 4) * mt.pps);
   const canvas = $("tlCanvas");
   canvas.style.width = `${width}px`;
@@ -689,6 +692,7 @@ function renderTimeline() {
 
   renderSoundRow();
   if (typeof renderTextRow === "function") renderTextRow();
+  if (typeof renderOverRow === "function") renderOverRow();
   $("trkCaps").innerHTML = captionBlocks()
     .map((g, n) => `<div class="tl-cap ${isSel({ kind: "cap", i: n }) ? "selected" : ""}" data-c="${n}" data-t="${g.t0}" title="دوسة تختاره · Delete تمسحه" style="left:${g.t0 * mt.pps}px;width:${Math.max(2, (g.t1 - g.t0) * mt.pps)}px">${escapeHtml(g.text)}</div>`)
     .join("");
@@ -710,6 +714,7 @@ const TRACKS = {
   click: { row: "trkClick", head: "h-click", can: ["mute"] },
   snd: { row: "trkSnd", head: "h-snd", can: ["lock", "mute"] },
   text: { row: "trkText", head: "h-text", can: ["lock", "hide"] },
+  over: { row: "trkOver", head: "h-over", can: ["lock", "hide", "mute"] },
 };
 const FLAG_ICON = { lock: ["🔓", "🔒", "اقفل التراك (متقدرش تحرّك أو تمسح حاجة فيه)", "افتح التراك"],
   hide: ["👁", "🙈", "خبّي التراك من المعاينة والفيديو", "رجّع التراك يظهر"],
@@ -966,6 +971,7 @@ function kfWindow(c, a, b) {
 function splitAt(t, target) {
   const s = target || mt.sel;
   if (s?.kind === "text" && typeof splitText === "function") return splitText(s.i, t);
+  if (s?.kind === "over" && typeof splitOver === "function") return splitOver(s.i, t);
   if (s?.kind === "voice" || s?.kind === "music") {
     const x = trackParts(s.kind)[s.p];
     if (x && t > x.t0 && t < x.t1) return splitPart(x, t);
@@ -1001,6 +1007,7 @@ function deleteSelected() {
   const desc = (k) => list.filter((x) => x.kind === k).map((x) => x.i ?? x.p).sort((a, b) => b - a);
   for (const i of desc("clip")) d.clips.splice(i, 1);
   for (const i of desc("text")) (d.texts || []).splice(i, 1);
+  for (const i of desc("over")) (d.overlays || []).splice(i, 1);
   for (const kind of ["voice", "music", "snd"]) {
     for (const k of desc(kind)) partsOf(kind).splice(k, 1);
     if (kind !== "snd" && d[kind] && !d[kind].parts.length) d[kind] = null;
@@ -1665,6 +1672,7 @@ function syncPreview() {
   drawPlayhead();
   updatePreviewOverlays();
   if (typeof drawTextLayer === "function") drawTextLayer();
+  if (typeof drawOverlayLayer === "function") drawOverlayLayer();
 }
 
 function seek(t) {
@@ -1771,6 +1779,7 @@ function tick() {
   drawPlayhead();
   updatePreviewOverlays();
   if (typeof drawTextLayer === "function") drawTextLayer();
+  if (typeof drawOverlayLayer === "function") drawOverlayLayer();
   followPlayhead();
   mt.raf = requestAnimationFrame(tick);
 }
@@ -2024,6 +2033,7 @@ const CTX_ACTS = {
   del: () => deleteSelected(),
   resetFx: () => $("fxReset").click(),
   kf: () => $("kfToggle").click(),
+  toOver: () => clipToOverlay(),
 };
 $("tlCanvas").addEventListener("contextmenu", (e) => {
   const clipEl = e.target.closest(".tl-clip[data-i]"), audEl = e.target.closest(".tl-audio[data-track]");
@@ -2055,6 +2065,7 @@ $("tlCanvas").addEventListener("contextmenu", (e) => {
     ["kf", "◇ كي فريم عند المؤشر", ""],
     "-",
     ["replace", "🔁 استبدل الفيديو", ""],
+    ["toOver", "⤴ خليها طبقة فوق الفيديو", ""],
     ["disable", c?.disabled ? "✓ فعّل القطعة" : "⊘ عطّل القطعة", ""],
     ["resetFx", "↺ شيل كل التأثيرات", ""],
     ["del", "🗑 احذف", k("Delete")],
@@ -2128,6 +2139,7 @@ $("inspTabs").addEventListener("click", (e) => {
 function renderInspector() {
   renderPartProps();
   if (typeof renderTextPane === "function") renderTextPane();
+  if (typeof renderOverPane === "function") renderOverPane();
   const c = selectedClip();
   const s = c && clipSource(c);
   $("clipProps").hidden = !s;
@@ -2260,6 +2272,7 @@ $("fxReset").onclick = fxInput(null, (c) => Object.assign(c, {
   angle: 0, crop: null, kf: null, anim_in: null, anim_out: null, fx: [],
 }));
 $("edDisable").onclick = fxInput(null, (c) => (c.disabled = !c.disabled));
+$("edToOver").onclick = () => clipToOverlay();
 // اللف بأي زاوية والمحاذاة
 $("fxAngle").addEventListener("input", editorInput("angle", (c) => setTransform(c, { angle: Number($("fxAngle").value) })));
 $("fxAngle").addEventListener("dblclick", editorInput(null, (c) => setTransform(c, { angle: 0 })));
