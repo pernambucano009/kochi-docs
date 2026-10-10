@@ -330,12 +330,16 @@
     doc.head.appendChild(st);
   }
 
-  function toCsv(rows) {
-    var head = ['الاسم', 'الإيميل', 'الموبايل', 'حالة الحساب', 'الرابط', 'النتيجة'].concat(CHECKS.map(function (c) { return c.label; })).concat(['الناقص']);
+  // extra: أعمدة إضافية اختيارية [{ label, value: function (row) }]
+  function toCsv(rows, extra) {
+    extra = extra || [];
+    var head = ['الاسم', 'الإيميل', 'الموبايل', 'حالة الحساب', 'الرابط', 'النتيجة'].concat(CHECKS.map(function (c) { return c.label; })).concat(['الناقص'])
+      .concat(extra.map(function (x) { return x.label; }));
     var lines = [head].concat(rows.map(function (r) {
       return [r.name, r.email, r.phone, r.status || 'موثّق', r.url, r.score + '/' + CHECKS.length]
         .concat(CHECKS.map(function (c) { return (r.checks[c.key].ok ? '✅ ' : '❌ ') + r.checks[c.key].note; }))
-        .concat([r.missing.join('، ') || 'جاهز']);
+        .concat([r.missing.join('، ') || 'جاهز'])
+        .concat(extra.map(function (x) { return x.value(r) || ''; }));
     }));
     return '﻿' + lines.map(function (l) {
       return l.map(function (v) { return '"' + String(v).replace(/"/g, '""') + '"'; }).join(',');

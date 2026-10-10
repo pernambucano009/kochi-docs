@@ -71,8 +71,8 @@ summary::-webkit-details-marker{display:none}
 .lang{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
 .lang button{border:0;background:#fff;padding:2px 9px;font-size:11.5px;font-weight:700;cursor:pointer;color:var(--muted)}
 .lang button.on{background:var(--navy);color:#fff}
-textarea{width:100%;border:0;border-top:1px solid var(--line);background:#fff;padding:10px;min-height:190px;resize:vertical;font-size:13px;line-height:1.7;border-radius:0 0 12px 12px;color:var(--ink)}
-textarea[dir=ltr]{text-align:left}
+textarea.msgtxt{width:100%;border:0;border-top:1px solid var(--line);background:#fff;padding:10px;min-height:190px;resize:vertical;font-size:13px;line-height:1.7;border-radius:0 0 12px 12px;color:var(--ink)}
+textarea.msgtxt[dir=ltr]{text-align:left}
 .btnrow{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .btn{border:0;border-radius:10px;padding:10px;font-size:13.5px;font-weight:700;cursor:pointer;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:6px;color:#fff}
 .btn.wa{background:var(--wa)}.btn.ig{background:var(--ig)}
@@ -108,6 +108,18 @@ textarea[dir=ltr]{text-align:left}
 .tpl-preview .pv-head{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12.5px;color:var(--muted);margin-bottom:6px}
 .tpl-preview select{border:1px solid var(--line);border-radius:8px;padding:3px 6px;font-size:12.5px;background:#fff;color:var(--ink);max-width:100%}
 .tpl-preview pre{margin:0;white-space:pre-wrap;font:inherit;font-size:13px;line-height:1.8;background:#F3FAF8;border-radius:10px;padding:10px;color:var(--ink)}
+.msgbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:8px 10px;border-top:1px solid var(--line);font-size:12px;color:var(--muted)}
+.tbtn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:3px 10px;font-size:12px;font-weight:700;cursor:pointer;color:var(--teal-d)}
+.tbtn:hover{border-color:var(--teal)}
+.tbtn.ghost{color:var(--muted)}
+.tbtn[disabled]{opacity:.5;cursor:wait}
+.sendlang{font-size:11.5px;color:var(--muted);text-align:center;margin-top:-4px}
+.note{width:100%;border:1px dashed #D9DDE1;border-radius:10px;padding:8px 10px;font-size:13px;line-height:1.7;min-height:44px;resize:vertical;background:#FFFDF5;color:var(--ink)}
+.note:focus{outline:none;border-style:solid;border-color:#E8C76A;background:#FFFBEA}
+.note-wrap{position:relative}
+.note-saved{position:absolute;bottom:6px;left:10px;font-size:11px;color:var(--ok);opacity:0;transition:opacity .2s}
+.note-saved.show{opacity:1}
+.tag.hasnote{background:#FFF4CC;color:#8A6200}
 .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:10px 16px;border-radius:12px;font-size:13.5px;font-weight:700;opacity:0;transition:opacity .2s;pointer-events:none;z-index:9;max-width:calc(100% - 32px);text-align:center}
 .toast.show{opacity:1}
 .empty{grid-column:1/-1;text-align:center;color:var(--muted);padding:30px}
@@ -141,7 +153,8 @@ textarea[dir=ltr]{text-align:left}
       <b>✍️ رسالتي الجاهزة</b>
       <label class="switch"><input type="checkbox" id="tplOn"> ابعت رسالتي دي لكل المدربين بدل الرسالة الأوتوماتيك</label>
     </div>
-    <div class="tpl-tabs"><button data-tl="ar" class="on">عربي</button><button data-tl="en">English (للمدربين الإنجليزي)</button></div>
+    <div class="tpl-tabs"><button data-tl="ar" class="on">عربي (للمدربين العرب)</button><button data-tl="en">English (للمدربين الإنجليزي)</button>
+      <button class="tbtn" id="tplTr" style="margin-inline-start:auto">🌐 ترجم</button></div>
     <textarea id="tplText" placeholder="اكتب رسالتك هنا… مثال:&#10;أهلاً يا كوتش {الاسم} 🌹&#10;بروفايلك ناقصه:&#10;{الناقص}&#10;كمّله من هنا: {رابط_الدخول}"></textarea>
     <div class="tpl-tools">ضيف للرسالة:
       <button class="ins" data-ins="{الاسم}">اسم المدرب</button>
@@ -166,6 +179,7 @@ textarea[dir=ltr]{text-align:left}
       <option value="ready">الجاهزين بس</option>
       <option value="notcontacted">الناقصين اللي لسه متواصلتش معاهم</option>
       <option value="contacted">اللي اتواصلت معاهم</option>
+      <option value="notes">اللي كاتب عليهم ملاحظات</option>
     </select>
     <span class="count" id="count"></span>
   </div>
@@ -234,12 +248,54 @@ textarea[dir=ltr]{text-align:left}
     return d === 1 ? 'امبارح' : 'من ' + d + ' يوم';
   }
 
+  // ---------- الترجمة (Google Translate المجاني) ----------
+  // الـ {placeholders} والروابط بتتحمي بعلامات [[n]] عشان المترجم ميغيرهاش
+  function translate(text, from, to) {
+    var keep = [];
+    var safe = text.replace(/\{[^{}]+\}|https?:\/\/\S+/g, function (m) { keep.push(m); return '[[' + keep.length + ']]'; });
+    if (!safe.trim()) return Promise.resolve(text);
+    return fetch('https://translate.googleapis.com/translate_a/single?client=gtx&dt=t&sl=' + from + '&tl=' + to, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+      body: 'q=' + encodeURIComponent(safe)
+    }).then(function (res) {
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return res.json();
+    }).then(function (d) {
+      var out = (d && d[0] || []).map(function (s) { return s && s[0] || ''; }).join('');
+      return out.replace(/\[\[\s*(\d+)\s*\]\]/g, function (m, n) { return keep[n - 1] || m; });
+    });
+  }
+  function other(lang) { return lang === 'en' ? 'ar' : 'en'; }
+
+  // ---------- الملاحظات (على نفس المتصفح) ----------
+  var NOTES_STORE = 'kochi-coach-notes-v1';
+  var notes = (function () { try { return JSON.parse(localStorage.getItem(NOTES_STORE)) || {}; } catch (e) { return {}; } })();
+  function saveNotes() { try { localStorage.setItem(NOTES_STORE, JSON.stringify(notes)); } catch (e) {} }
+
+  // تعديلات/ترجمات الرسالة جوه كارت مدرب (بتفضل لحد ما تغيّر اللغة أو تدوس رجّع)
+  var drafts = {};
+
   // ---------- رسالتي الجاهزة ----------
   var TPL_STORE = 'kochi-message-template-v1';
   var tpl = (function () { try { return JSON.parse(localStorage.getItem(TPL_STORE)) || {}; } catch (e) { return {}; } })();
-  tpl = { on: !!tpl.on, ar: tpl.ar || '', en: tpl.en || '' };
+  tpl = { on: !!tpl.on, ar: tpl.ar || '', en: tpl.en || '', enAuto: !!tpl.enAuto };
   function saveTpl() { try { localStorage.setItem(TPL_STORE, JSON.stringify(tpl)); } catch (e) {} }
   function tplFor(lang) { return tpl.on ? (lang === 'en' && tpl.en.trim() ? tpl.en : tpl.ar) : ''; }
+  var autoTimer;
+  // النسخة الإنجليزي بتتعمل لوحدها بالترجمة لحد ما تعدّلها بإيدك
+  function scheduleAutoEn() {
+    if (tpl.en.trim() && !tpl.enAuto) return;
+    clearTimeout(autoTimer);
+    autoTimer = setTimeout(function () {
+      if (!tpl.ar.trim()) { if (tpl.enAuto) { tpl.en = ''; saveTpl(); renderTpl(); renderGrid(); } return; }
+      var src = tpl.ar;
+      translate(src, 'ar', 'en').then(function (out) {
+        if (tpl.ar !== src || (tpl.en.trim() && !tpl.enAuto)) return;
+        tpl.en = out; tpl.enAuto = true; saveTpl(); renderTpl(); renderGrid();
+      }, function () {});
+    }, 1500);
+  }
 
   function fillTemplate(text, r, lang) {
     var list = missingLines(r, lang);
@@ -374,7 +430,9 @@ textarea[dir=ltr]{text-align:left}
     var entry = log[r.id];
     var pct = r.score / CHECKS.length;
     var color = isReady(r) ? 'var(--ok)' : r.score >= 3 ? 'var(--warn)' : 'var(--bad)';
-    var waHref = r.phoneDigits ? 'https://wa.me/' + r.phoneDigits + '?text=' + encodeURIComponent(buildMessage(r, lang)) : null;
+    var msg = drafts[r.id] != null ? drafts[r.id] : buildMessage(r, lang);
+    var waHref = r.phoneDigits ? 'https://wa.me/' + r.phoneDigits + '?text=' + encodeURIComponent(msg) : null;
+    var note = notes[r.id] || '';
 
     var checks = CHECKS.map(function (c) {
       var ch = r.checks[c.key];
@@ -404,6 +462,7 @@ textarea[dir=ltr]{text-align:left}
         (r.photoUrl ? '<img class="av" src="' + esc(r.photoUrl) + '" alt="" loading="lazy" onerror="this.removeAttribute(\'src\')">' : '<span class="av"></span>') +
         '<div class="who"><a class="name" href="' + esc(r.url) + '" target="_blank" rel="noopener">' + esc(r.name) + '</a>' +
           (r.status ? '<span class="tag pend">قيد التوثيق</span>' : '') +
+          (note.trim() ? '<span class="tag hasnote" title="' + esc(note) + '">📝 ملاحظة</span>' : '') +
           (r.dupInstagram ? '<span class="tag dup" title="نفس حساب الإنستجرام متسجل لمدرب تاني: ' + esc(r.dupInstagram) + '">⚠️ إنستجرام مكرر</span>' : '') +
           '<div class="meta"><span>' + (r.phoneDigits ? '📞 <bdi>+' + esc(r.phoneDigits) + '</bdi>' : 'مفيش رقم') + '</span>' +
           (r.instagram ? '<span>📷 <bdi>@' + esc(r.instagram) + '</bdi></span>' : '') + '</div></div>' +
@@ -412,8 +471,11 @@ textarea[dir=ltr]{text-align:left}
       '<div class="meter"><i style="width:' + Math.round(pct * 100) + '%;background:' + color + '"></i></div>' +
       '<div class="checks">' + checks + '</div>' + alert + hours +
       '<details><summary><span>✏️ ' + (tplFor(lang).trim() ? 'رسالتك الجاهزة' : r.reversed.length ? 'رسالة بالتعديل المطلوب' : isReady(r) ? 'رسالة شكر' : 'رسالة بالناقص') + ' — اعرض / عدّل</span>' +
-        '<span class="lang"><button data-lang="ar" class="' + (lang === 'ar' ? 'on' : '') + '">AR</button><button data-lang="en" class="' + (lang === 'en' ? 'on' : '') + '">EN</button></span></summary>' +
-        '<textarea dir="' + (lang === 'en' ? 'ltr' : 'rtl') + '">' + esc(buildMessage(r, lang)) + '</textarea></details>' +
+        '<span class="lang" title="لغة الرسالة"><button data-lang="ar" class="' + (lang === 'ar' ? 'on' : '') + '">عربي</button><button data-lang="en" class="' + (lang === 'en' ? 'on' : '') + '">English</button></span></summary>' +
+        '<div class="msgbar"><button class="tbtn" data-act="translate">🌐 ' + (lang === 'ar' ? 'ترجم الرسالة دي للإنجليزي' : 'ترجم الرسالة دي للعربي') + '</button>' +
+          (drafts[r.id] != null ? '<button class="tbtn ghost" data-act="undo">↩️ رجّع الرسالة الأصلية</button>' : '') + '</div>' +
+        '<textarea class="msgtxt" dir="' + (lang === 'en' ? 'ltr' : 'rtl') + '">' + esc(msg) + '</textarea></details>' +
+      '<div class="sendlang">هتتبعت ' + (lang === 'en' ? 'بالإنجليزي 🇬🇧' : 'بالعربي') + (lang !== r.lang ? ' (غيّرتها)' : '') + '</div>' +
       '<div class="btnrow">' +
         '<a class="btn wa" data-act="wa" target="_blank" rel="noopener" ' + (waHref ? 'href="' + esc(waHref) + '"' : 'aria-disabled="true"') + '>💬 واتساب</a>' +
         '<a class="btn ig" data-act="ig" target="_blank" rel="noopener" ' + (r.instagram ? 'href="https://ig.me/m/' + esc(encodeURIComponent(r.instagram)) + '"' : 'aria-disabled="true"') + '>📷 رسالة إنستجرام</a>' +
@@ -422,13 +484,14 @@ textarea[dir=ltr]{text-align:left}
         '<a href="' + esc(r.url) + '" target="_blank" rel="noopener">🔗 بروفايله على كوتشي</a>' +
         (r.instagram ? '<a href="https://instagram.com/' + esc(encodeURIComponent(r.instagram)) + '" target="_blank" rel="noopener">📷 حسابه على إنستجرام</a>' : '') +
       '</div>' + logLine +
+      '<div class="note-wrap"><textarea class="note" placeholder="📝 ملاحظاتك عن المدرب ده… (بتتحفظ لوحدها)">' + esc(note) + '</textarea><span class="note-saved">✓ اتحفظت</span></div>' +
     '</article>';
   }
 
   function visible() {
     var q = filter.q.trim().toLowerCase();
     return rows.filter(function (r) {
-      if (q && (r.name + ' ' + r.phoneDigits + ' ' + r.instagram + ' ' + r.email).toLowerCase().indexOf(q.replace(/^[@+]/, '')) < 0) return false;
+      if (q && (r.name + ' ' + r.phoneDigits + ' ' + r.instagram + ' ' + r.email + ' ' + (notes[r.id] || '')).toLowerCase().indexOf(q.replace(/^[@+]/, '')) < 0) return false;
       if (filter.miss && r.checks[filter.miss].ok) return false;
       var contacted = !!(log[r.id] && log[r.id].last);
       switch (filter.show) {
@@ -436,6 +499,7 @@ textarea[dir=ltr]{text-align:left}
         case 'incomplete': return !isReady(r);
         case 'notcontacted': return !isReady(r) && !contacted;
         case 'contacted': return contacted;
+        case 'notes': return !!(notes[r.id] || '').trim();
       }
       return true;
     });
@@ -454,7 +518,7 @@ textarea[dir=ltr]{text-align:left}
 
   function renderAll() { renderStats(); renderGrid(); }
 
-  function refreshCard(id) {
+  function refreshCard(id, openMsg) {
     var r = rows.find(function (x) { return x.id === id; });
     var old = document.querySelector('.card[data-id="' + CSS.escape(id) + '"]');
     if (!r || !old) return;
@@ -462,7 +526,7 @@ textarea[dir=ltr]{text-align:left}
     var tmp = document.createElement('div');
     tmp.innerHTML = cardHtml(r);
     var card = tmp.firstChild;
-    card.querySelector('details').open = open;
+    card.querySelector('details').open = open || !!openMsg;
     old.replaceWith(card);
   }
 
@@ -472,13 +536,14 @@ textarea[dir=ltr]{text-align:left}
     if (!card) return;
     var id = card.getAttribute('data-id');
     var r = rows.find(function (x) { return x.id === id; });
-    var text = card.querySelector('textarea').value;
+    var text = card.querySelector('textarea.msgtxt').value;
 
     var langBtn = e.target.closest('[data-lang]');
     if (langBtn) {
       e.preventDefault();
       langs[id] = langBtn.getAttribute('data-lang');
       log.__langs = langs; saveLog(log);
+      delete drafts[id];
       refreshCard(id);
       return;
     }
@@ -493,9 +558,57 @@ textarea[dir=ltr]{text-align:left}
       copy(text).then(function () { toast('✅ الرسالة اتنسخت — الصقها في الشات اللي هيفتح'); }, function () { toast('افتح الرسالة وانسخها يدويًا'); });
       markContact(id, 'ig');
       setTimeout(function () { refreshCard(id); renderStats(); }, 50);
+    } else if (a === 'translate') {
+      var from = langOf(r), to = other(from);
+      act.disabled = true; act.textContent = '⏳ بيترجم…';
+      translate(text, from, to).then(function (out) {
+        langs[id] = to; log.__langs = langs; saveLog(log);
+        drafts[id] = out;
+        refreshCard(id, true);
+        toast(to === 'en' ? '✅ اتترجمت للإنجليزي — راجعها قبل ما تبعت' : '✅ اتترجمت للعربي — راجعها قبل ما تبعت');
+      }, function () {
+        act.disabled = false; act.textContent = '🌐 جرّب تاني';
+        toast('الترجمة مش شغالة دلوقتي — اتأكد من النت وجرّب تاني');
+      });
+    } else if (a === 'undo') {
+      delete drafts[id];
+      refreshCard(id, true);
     } else if (a === 'reset') {
       delete log[id]; saveLog(log);
       refreshCard(id); renderStats();
+    }
+  });
+
+  var noteTimers = {};
+  document.getElementById('grid').addEventListener('input', function (e) {
+    var card = e.target.closest('.card');
+    if (!card) return;
+    var id = card.getAttribute('data-id');
+    if (e.target.classList.contains('msgtxt')) {
+      drafts[id] = e.target.value;
+      var wa = card.querySelector('[data-act=wa]');
+      var r = rows.find(function (x) { return x.id === id; });
+      if (wa && r && r.phoneDigits) wa.href = 'https://wa.me/' + r.phoneDigits + '?text=' + encodeURIComponent(e.target.value);
+    } else if (e.target.classList.contains('note')) {
+      notes[id] = e.target.value;
+      if (!e.target.value.trim()) delete notes[id];
+      clearTimeout(noteTimers[id]);
+      var flag = card.querySelector('.note-saved');
+      noteTimers[id] = setTimeout(function () {
+        saveNotes();
+        flag.classList.add('show');
+        setTimeout(function () { flag.classList.remove('show'); }, 1200);
+      }, 400);
+    }
+  });
+  document.getElementById('grid').addEventListener('focusout', function (e) {
+    if (!e.target.classList || !e.target.classList.contains('note')) return;
+    saveNotes();
+    var card = e.target.closest('.card');
+    if (card) {
+      var id = card.getAttribute('data-id');
+      var tag = card.querySelector('.tag.hasnote');
+      if (!!(notes[id] || '').trim() !== !!tag) setTimeout(function () { refreshCard(id); }, 0);
     }
   });
 
@@ -510,7 +623,10 @@ textarea[dir=ltr]{text-align:left}
   document.getElementById('show').addEventListener('change', function (e) { filter.show = e.target.value; renderGrid(); });
   document.getElementById('csv').addEventListener('click', function () {
     var a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([KochiCoachAudit.toCsv(rows)], { type: 'text/csv;charset=utf-8' }));
+    a.href = URL.createObjectURL(new Blob([KochiCoachAudit.toCsv(rows, [
+      { label: 'ملاحظاتي', value: function (r) { return notes[r.id]; } },
+      { label: 'آخر تواصل', value: function (r) { var e = log[r.id]; return e && e.last ? new Date(e.last).toLocaleString('ar-EG') + ' (' + (e.lastChannel === 'wa' ? 'واتساب' : 'إنستجرام') + ')' : ''; } }
+    ])], { type: 'text/csv;charset=utf-8' }));
     a.download = 'kochi-coaches-' + new Date().toISOString().slice(0, 10) + '.csv';
     document.body.appendChild(a); a.click();
     setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500);
@@ -529,9 +645,10 @@ textarea[dir=ltr]{text-align:left}
     tplOn.checked = tpl.on;
     document.getElementById('tpl').classList.toggle('on', tpl.on && !!tpl.ar.trim());
     [].forEach.call(document.querySelectorAll('[data-tl]'), function (b) { b.classList.toggle('on', b.getAttribute('data-tl') === tplLang); });
+    document.getElementById('tplTr').textContent = tplLang === 'ar' ? '🌐 ترجم للإنجليزي' : '🌐 ترجم للعربي';
     document.getElementById('tplHint').textContent = tpl.on && tpl.ar.trim()
-      ? '✅ شغّالة: أي ضغطة على واتساب أو إنستجرام هتبعت رسالتك دي. الكلام اللي بين { } بيتغير لوحده لكل مدرب.' +
-        (tpl.en.trim() ? '' : ' (المدربين الإنجليزي هيوصلهم نفس الرسالة العربي لحد ما تكتب نسخة English.)')
+      ? '✅ شغّالة: أي ضغطة على واتساب أو إنستجرام هتبعت رسالتك دي. الكلام اللي بين { } بيتغير لوحده لكل مدرب. المدربين العرب بيوصلهم العربي والإنجليزي بيوصلهم English.' +
+        (tpl.en.trim() ? (tpl.enAuto ? ' النسخة الإنجليزي اتعملت بالترجمة الأوتوماتيك — بص عليها في تاب English.' : '') : ' النسخة الإنجليزي بتتعمل لوحدها بالترجمة…')
       : 'اكتب رسالتك، وفعّل الاختيار اللي فوق. لو قفلته، كل مدرب هيوصله الرسالة الأوتوماتيك اللي فيها الناقص عنده. رسالتك بتتحفظ على المتصفح ده.';
     renderPreview();
   }
@@ -555,6 +672,7 @@ textarea[dir=ltr]{text-align:left}
 
   tplText.addEventListener('input', function () {
     tpl[tplLang] = tplText.value;
+    if (tplLang === 'en') tpl.enAuto = false; else scheduleAutoEn();
     if (tplLang === 'ar' && tplText.value.trim() && !tpl.on) tpl.on = true;
     saveTpl();
     renderTpl();
@@ -577,6 +695,21 @@ textarea[dir=ltr]{text-align:left}
       tplText.focus();
       tplText.selectionStart = tplText.selectionEnd = s + token.length;
       tplText.dispatchEvent(new Event('input'));
+    });
+  });
+  document.getElementById('tplTr').addEventListener('click', function () {
+    var btn = this, from = tplLang, to = other(tplLang);
+    if (!tpl[from].trim()) { toast('اكتب الرسالة الأول'); return; }
+    btn.disabled = true; btn.textContent = '⏳ بيترجم…';
+    translate(tpl[from], from, to).then(function (out) {
+      tpl[to] = out;
+      if (to === 'en') tpl.enAuto = false;
+      if (to === 'ar' && !tpl.on) tpl.on = true;
+      saveTpl(); tplLang = to; btn.disabled = false; renderTpl(); renderGrid();
+      toast('✅ اتترجمت — راجعها قبل ما تبعت');
+    }, function () {
+      btn.disabled = false; renderTpl();
+      toast('الترجمة مش شغالة دلوقتي — اتأكد من النت وجرّب تاني');
     });
   });
   document.getElementById('tplClear').addEventListener('click', function () {
