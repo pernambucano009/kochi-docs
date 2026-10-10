@@ -805,7 +805,11 @@ SCHEMA_FORMAT = """{
   "summary": "الفيديو ده ماشي إزاي في سطرين (بالعربي)",
   "beat_sec": 0.5,
   "style": "English: the single visual world of the whole video (render style, materials, lighting, background, depth, typography look) so it can be recreated",
-  "palette": "English: main colors",
+  "palette": "English: ONLY the locked colors, each with name + approximate HEX, e.g. sage green (#9CAF88)",
+  "background": "English: the persistent background/texture that repeats through the whole video",
+  "negative": "English: what this style never has (colors outside the palette, elements that break it)",
+  "last_frame": "English: a precise description of the final held frame (it stays in the viewer's eye and becomes the screenshot)",
+  "transition": "one of: cut | fade | fadeblack | fadewhite | dissolve | wipeleft | slideleft | smoothleft | circleopen | zoomin | pixelize | hblur (the cut style between parts that matches this video)",
   "spine": "English: the element(s) that stay on screen and carry the eye through the whole video (or how continuity is kept)",
   "camera": "English: the overall camera language (always moving? push-ins? orbit? speed and easing)",
   "text_style": "English: how on-screen text looks and where it sits",
@@ -838,6 +842,11 @@ def schema_messages(d: dict) -> list[dict]:
         "عشان التيمبليت ينفع لأي عميل.\n"
         "- into_next أهم حاجة: إزاي الجزء ده بيتحوّل للي بعده قدام العين من غير قطع (زووم جوه حاجة، عنصر بيكبر ويبقى الخلفية، الكاميرا بتلف...).\n"
         "- beat_sec = طول البيت في الموسيقى (لو مش واضح اكتب 0).\n"
+        "- الأجزاء بتوصف «النمط» بس (نوع النبضة ومدتها ووظيفتها) مش محتوى الفيديو ده، عشان القالب ينفع لأي فكرة.\n"
+        "- الألوان المقفولة بس، كل لون باسمه وكود HEX تقريبي. الخطوط بأدوارها (عنوان / ثانوي / توقيع) من غير ما تخترع خط مش موجود.\n"
+        "- أي حاجة مش واضحة في الفيديو اكتبها «غير محدد» (unspecified) بدل ما تخمّن. وفي الصوت فرّق بين اللي متأكد منه واللي مستنتج.\n"
+        "- negative = قايمة الممنوعات بتاعة الستايل ده، و last_frame = وصف دقيق للكادر الأخير الثابت.\n"
+        "- ممنوع تنقل أسامي أو شعارات أو حسابات صاحب الفيديو الأصلي أو وشوش أشخاص حقيقيين: كله يتوصف بشكل عام.\n"
         "رجّع JSON بس بالشكل ده:\n" + SCHEMA_FORMAT
     )
     return [{"role": "user", "content": text}]
@@ -869,7 +878,10 @@ def clean_schema(data: dict, duration: float) -> dict:
     beats = beats[:16]
     if beats:
         beats[-1]["into_next"] = ""
-    return {k: _plain(d.get(k))[:1500] for k in ("title", "summary", "style", "palette", "spine", "camera", "text_style", "music")} | {
+    tr = str(d.get("transition") or "").strip().lower()
+    return {k: _plain(d.get(k))[:1500] for k in ("title", "summary", "style", "palette", "spine", "camera", "text_style", "music",
+                                                 "background", "negative", "last_frame")} | {
+        "transition": tr if tr in TRANSITION_KEYS else "",
         "beat_sec": round(max(0.0, _f(d.get("beat_sec"))), 3), "beats": beats}
 
 
@@ -887,6 +899,9 @@ def mock_schema(d: dict) -> dict:
                        "keeps": "the phone", "sfx": ""} for i in range(n)]}
 
 
+TRANSITION_KEYS = {"cut", "fade", "fadeblack", "fadewhite", "dissolve", "wipeleft", "slideleft", "smoothleft", "circleopen", "zoomin",
+                   "pixelize", "hblur", "radial", "squeezeh", "diagtl", "slideup"}
+
 TEXT_MODES = {"blank": "مساحات فاضية (الكلام العربي في المونتاج)", "en": "كلام إنجليزي جوه الصور"}
 
 FILL_FORMAT = """{
@@ -901,7 +916,7 @@ FILL_FORMAT = """{
 def fill_messages(brain_txt: str, schema: dict, brief: str, text_mode: str) -> str:
     n = len(schema["beats"])
     beats = [{k: b[k] for k in ("t0", "t1", "role", "what", "layout", "slots", "camera", "into_next", "keeps")} for b in schema["beats"]]
-    glob = {k: schema.get(k) for k in ("style", "palette", "spine", "camera", "text_style")}
+    glob = {k: schema.get(k) for k in ("style", "palette", "background", "spine", "camera", "text_style", "negative", "last_frame") if schema.get(k)}
     text_rule = ("الكلام اللي على الشاشة بالإنجليزي (قصير جدًا، ٢-٥ كلمات) وهيترسم جوه الصور." if text_mode == "en" else
                  "الكلام اللي على الشاشة بلغة ولهجة العميل (قصير جدًا) ومش هيترسم في الصور: الصور بتسيب مكانه فاضي "
                  "(مساحة نضيفة في مكان خانة الكلام) وهيتضاف في المونتاج.")
@@ -995,8 +1010,10 @@ def sheet_prompt(schema: dict, fill: dict, cells: list[int], ratio: str, text_mo
         + "All panels are frames of ONE continuous video shot in ONE world: identical style, lighting, background, colors, materials and the "
         "same recurring elements in every panel, so that consecutive panels look like moments of the same take.\n"
         f"WORLD: {fill.get('world') or schema.get('style')}\n"
-        f"STYLE: {schema.get('style')}\nPALETTE: {schema.get('palette')}\n"
-        f"CONTINUITY (an idea about how the shot stays one piece; do NOT draw it as lines, guides, arrows or marks): {schema.get('spine')}\n"
+        f"STYLE: {schema.get('style')}\nPALETTE (use only these colors): {schema.get('palette')}\n"
+        + (f"PERSISTENT BACKGROUND (identical in every panel): {schema.get('background')}\n" if schema.get("background") else "")
+        + (f"NEVER: {schema.get('negative')}\n" if schema.get("negative") else "")
+        + f"CONTINUITY (an idea about how the shot stays one piece; do NOT draw it as lines, guides, arrows or marks): {schema.get('spine')}\n"
         + ("No text or letters anywhere except inside real brand assets.\n" if text_mode != "en" else
            f"TEXT STYLE: {schema.get('text_style')} Spell English text exactly as given.\n")
         + ("The previous storyboard sheet is attached: match its world and style exactly.\n" if style_from_prev else "")

@@ -96,6 +96,7 @@ function renderLab() {
   $("labLib").hidden = labx.view !== "lib";
   $("labFilm").hidden = labx.view !== "film";
   $("labTplBtn").classList.toggle("active", labx.view === "tpl");
+  if (tplx.host === "studio") tsReturnTpl();   // اللوحة كانت في قسم القوالب: ترجع للمعمل
   $("labTpl").hidden = labx.view !== "tpl";
   $("labMain").hidden = !d || lib;
   $("labEmpty").hidden = !!d || lib;

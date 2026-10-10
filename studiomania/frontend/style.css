@@ -1938,3 +1938,24 @@ a.btn.disabled { opacity: .45; pointer-events: none; }
 .db-out .ok { color: var(--ok); margin: 0; }
 .db-add { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 .db-add select { min-width: 200px; }
+
+/* 🎬 قسم القوالب */
+.ts-wrap { display: flex; flex-direction: column; gap: 16px; }
+#tsGallery { display: flex; flex-direction: column; gap: 16px; }
+.ts-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; margin-top: 12px; }
+.ts-card { display: flex; flex-direction: column; border-radius: var(--radius-sm); background: var(--surface); border: 1px solid var(--line); overflow: hidden; cursor: pointer; transition: transform .18s, box-shadow .18s, border-color .18s; }
+.ts-card:hover { transform: translateY(-3px); box-shadow: 0 16px 30px -18px rgba(0,0,0,.35); }
+.ts-card.on { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.ts-media { position: relative; aspect-ratio: 9 / 16; max-height: 340px; background: #111; display: flex; align-items: center; justify-content: center; }
+.ts-media video, .ts-media img { width: 100%; height: 100%; object-fit: cover; }
+.ts-ph { font-size: 56px; }
+.ts-badge { position: absolute; inset-inline: 8px; bottom: 8px; background: rgba(0,0,0,.7); color: #fff; font-size: 12px; padding: 6px 8px; border-radius: 10px; }
+.ts-info { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px 12px; }
+.ts-new { display: flex; flex-direction: column; gap: 10px; }
+.ts-new textarea { width: 100%; box-sizing: border-box; font: inherit; border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; background: #fff; }
+.ts-mode { display: flex; gap: 16px; flex-wrap: wrap; }
+.ts-lines { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; }
+.ts-line { display: grid; grid-template-columns: 120px 1fr 220px; gap: 8px; align-items: center; }
+@media (max-width: 800px) { .ts-line { grid-template-columns: 1fr; } }
+.ts-line textarea { width: 100%; box-sizing: border-box; font: inherit; border: 1px solid var(--line); border-radius: 10px; padding: 6px 8px; background: #fff; }
+.ts-line audio, .ts-vo { width: 100%; height: 34px; }

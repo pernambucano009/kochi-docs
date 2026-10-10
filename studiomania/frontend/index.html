@@ -48,6 +48,7 @@
     <button class="rail-btn" data-goto="10" title="الإعلانات"><svg><use href="#i-spark"/></svg><span>الإعلانات</span></button>
     <button class="rail-btn" data-goto="11" title="معمل التفكيك"><svg><use href="#i-lab"/></svg><span>معمل التفكيك</span></button>
     <button class="rail-btn" data-goto="12" title="التايبوجرافي"><svg><use href="#i-type"/></svg><span>التايبوجرافي</span></button>
+    <button class="rail-btn" data-goto="14" title="القوالب"><svg><use href="#i-slides"/></svg><span>القوالب</span></button>
     <button class="rail-btn" data-goto="13" title="الدبلجة باللهجات"><svg><use href="#i-globe"/></svg><span>الدبلجة</span></button>
     <a class="rail-btn" href="/refs.html" title="أرشيف المراجع"><svg><use href="#i-box"/></svg><span>الأرشيف</span></a>
     <span class="rail-sep"></span>
@@ -1003,9 +1004,13 @@
             </section>
             <section class="car-main" id="labLib" hidden></section>
             <section class="car-main" id="labFilm" hidden></section>
-            <section class="car-main" id="labTpl" hidden></section>
+            <span id="labTplHome" hidden></span><section class="car-main" id="labTpl" hidden></section>
             <div class="panel muted" id="labEmpty" hidden>ارفع فيديو من «＋ فيديو للتقسيم» عشان نبدأ.</div>
           </div>
+        </main>
+
+        <main class="view" data-view="14" hidden>
+          <div class="ts-wrap"><div id="tsGallery"></div><div id="tsHost"></div></div>
         </main>
 
         <main class="view" data-view="13" hidden>
@@ -1637,6 +1642,7 @@
 <script src="/assets.js"></script>
 <script src="/films.js"></script>
 <script src="/templates.js"></script>
+<script src="/tpl-studio.js"></script>
 <script src="/typo-engine.js"></script>
 <script src="/typo-moments.js"></script>
 <script src="/typo-studio.js"></script>

@@ -119,7 +119,7 @@ async function openTpl(vid) {
 
 function scheduleTplPoll() {
   clearTimeout(tplx.timer);
-  if (!tplx.cur?.busy || labx.view !== "tpl") return;
+  if (!tplx.cur?.busy || (labx.view !== "tpl" && tplx.host !== "studio")) return;
   tplx.timer = setTimeout(async () => {
     try {
       tplx.cur = await api(`/api/tvideos/${tplx.cur.id}`);
@@ -133,8 +133,11 @@ function scheduleTplPoll() {
 
 function renderTpl() {
   const box = $("labTpl");
+  if (tplx.host === "studio" && !tplx.cur) return tsHome();   // 🎬 قسم القوالب: المعرض بتاعه
+  if (tplx.host === "studio") box.hidden = false;
   box.innerHTML = tplx.cur ? tvDetail(tplx.cur) : tplHome();
 }
+const tplBack = () => (tplx.host === "studio" ? tsHome() : openTpl());
 
 function tplHome() {
   const L = tplx.list;
@@ -234,6 +237,7 @@ function tvDetail(v) {
       <label>الجودة <select data-tvopt="resolution"><option value="480p" ${v.resolution === "480p" ? "selected" : ""}>480p</option><option value="720p" ${v.resolution === "720p" ? "selected" : ""}>720p</option></select></label>
       <button type="button" class="btn sm" data-tvrefill ${busy ? "disabled" : ""}>✍️ املاه من جديد</button>
     </div>
+    ${v.section === "templates" ? tvVoiceBlock(v) : ""}
     ${fill ? `
     <details class="panel tv-step" data-dk="s1" ${open("s1", !cutAll)}><summary>١. 📝 السكريبت والخانات <small class="muted">التعديلات بتتحفظ لوحدها</small></summary>
       <p class="hint" dir="ltr" data-no-i18n>${le(fill.world)}</p>
@@ -326,8 +330,8 @@ $("labTpl").addEventListener("click", async (e) => {
   const t = e.target, V = (path, opts) => api(`/api/tvideos/${tplx.cur.id}${path}`, opts);
   const go = (btn, fn) => busyButton(btn, "⏳", async () => { tplx.cur = await fn(); renderTpl(); scheduleTplPoll(); });
   const op = t.closest("[data-tvopen]");
-  if (op) { tplx.user = {}; return openTpl(op.dataset.tvopen); }
-  if (t.closest("[data-tvback]")) { tplx.cur = null; return openTpl(); }
+  if (op) { tplx.user = {}; return tplx.host === "studio" ? tsOpenVideo(op.dataset.tvopen) : openTpl(op.dataset.tvopen); }
+  if (t.closest("[data-tvback]")) { tplx.cur = null; return tplBack(); }
   const del = t.closest("[data-tpdel]");
   if (del) {
     if (!confirm("تمسح التيمبليت ده؟ (الفيديوهات اللي اتعملت منه بتفضل)")) return;
@@ -348,7 +352,7 @@ $("labTpl").addEventListener("click", async (e) => {
   if (!tplx.cur) return;
   if (t.closest("[data-tvdel]")) {
     if (!confirm("تمسح الفيديو ده بكل لوحاته؟")) return;
-    await V("", { method: "DELETE" }); tplx.cur = null; return openTpl();
+    await V("", { method: "DELETE" }); tplx.cur = null; return tplBack();
   }
   const rf = t.closest("[data-tvrefill]");
   if (rf) {
