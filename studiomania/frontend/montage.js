@@ -209,7 +209,7 @@ function seq() {
   d.clips.forEach((c, i) => {
     const s = clipSource(c);
     const len = clipLength(c);
-    items.push({ key: `c${i}`, kind: "clip", i, c, s, url: s?.url, t0: t, t1: t + len, in: c.start, out: clipOut(c), speed: clipSpeed(c), rev: !!c.reverse,
+    items.push({ key: `c${i}`, kind: "clip", i, c, s, url: c.disabled ? null : s?.url, t0: t, t1: t + len, in: c.start, out: clipOut(c), speed: clipSpeed(c), rev: !!c.reverse,
       zoom: c.zoom, x: c.x, y: c.y, volume: c.volume });
     t += len;
   });
@@ -302,13 +302,22 @@ $("tlRedo").onclick = redoEdit;
 function renderBin() {
   const d = mt.project.data;
   const onlyCoach = $("binCoachOnly").checked && d.coach_id;
-  const list = mt.sources.filter((s) => !onlyCoach || s.coach_id === d.coach_id || (s.extra && !s.coach_id));
+  const q = $("binSearch").value.trim().toLowerCase(), favs = binFavs(), favOnly = $("binFavOnly").classList.contains("on");
+  const list = mt.sources.filter((s) => (!onlyCoach || s.coach_id === d.coach_id || (s.extra && !s.coach_id))
+    && (!q || `${s.label} ${s.coach_name || ""}`.toLowerCase().includes(q)) && (!favOnly || favs.has(s.id)))
+    .sort((a, b) => favs.has(b.id) - favs.has(a.id));
   $("binEmpty").hidden = list.length > 0;
+  $("binEmpty").textContent = q || favOnly ? "مفيش فيديوهات بالبحث ده." : $("binEmpty").textContent;
+  const rep = mt.replacing != null;
+  $("replaceBar").hidden = !rep;
+  if (rep) $("replaceWhich").textContent = `رقم ${mt.replacing + 1}`;
+  $("binGrid").classList.toggle("replacing", rep);
   $("binGrid").innerHTML = list
     .map(
       (s) => `<div class="bin-item" data-id="${s.id}" draggable="true">
         ${lightVideo(s.url, "muted playsinline")}
-        <button class="add" title="ضيف عند المؤشر">＋</button>
+        <button class="add" title="${rep ? "حطه مكان القطعة" : "ضيف عند المؤشر"}">${rep ? "🔁" : "＋"}</button>
+        <button class="fav ${favs.has(s.id) ? "on" : ""}" title="مفضلة">${favs.has(s.id) ? "★" : "☆"}</button>
         ${s.extra ? `<button class="del" title="امسح الأوترو ده">✕</button>` : ""}
         <span class="tag">${escapeHtml(s.label)} · ${s.duration.toFixed(1)}ث</span>
       </div>`
@@ -336,8 +345,48 @@ function insertClip(genId, index) {
   changed();
 }
 
+// المفضلة في المكتبة (على الجهاز ده)
+const FAV_KEY = "studiomania.binFavs";
+function binFavs() {
+  try { return new Set(JSON.parse(localStorage.getItem(FAV_KEY) || "[]")); } catch { return new Set(); }
+}
+function toggleFav(id) {
+  const f = binFavs();
+  f.has(id) ? f.delete(id) : f.add(id);
+  try { localStorage.setItem(FAV_KEY, JSON.stringify([...f])); } catch { /* المتصفح مانع الحفظ */ }
+}
+$("binSearch").addEventListener("input", () => renderBin());
+$("binFavOnly").onclick = () => { $("binFavOnly").classList.toggle("on"); renderBin(); };
+// استبدال الفيديو مع الحفاظ على تعديلات القطعة
+$("edReplace").onclick = () => {
+  if (mt.sel?.kind !== "clip") return;
+  mt.replacing = mt.sel.i;
+  renderBin();
+  $("binSearch").focus();
+  toast("اختار من المكتبة الفيديو اللي هيتحط مكانها");
+};
+$("replaceCancel").onclick = () => { mt.replacing = null; renderBin(); };
+function replaceClip(i, genId) {
+  const c = mt.project.data.clips[i], src = mt.sources.find((s) => s.id === genId);
+  if (!c || !src) return;
+  pushHistory();
+  // نفس الطول من نفس المكان لو ينفع، وإلا من الأول
+  const len = clipOut(c) - c.start;
+  let start = c.start;
+  if (start + len > src.duration) start = Math.max(0, src.duration - len);
+  const end = Math.min(src.duration, start + len);
+  Object.assign(c, { gen_id: src.id, start, end: end >= src.duration - 0.001 ? null : end });
+  if (c.reverse && end - start > 60) c.reverse = false;
+  mt.replacing = null;
+  mt.sel = { kind: "clip", i };
+  changed();
+  renderBin();
+  toast("اتبدّل الفيديو والتعديلات زي ما هي");
+}
 $("binGrid").addEventListener("click", async (e) => {
   const item = e.target.closest(".bin-item");
+  if (item && e.target.closest(".fav")) { toggleFav(item.dataset.id); renderBin(); return; }
+  if (item && mt.replacing != null && !e.target.closest(".del")) { replaceClip(mt.replacing, item.dataset.id); return; }
   if (item && e.target.closest(".add")) insertClip(item.dataset.id, insertIndexAt(mt.t));
   if (item && e.target.closest(".del")) {
     const src = mt.sources.find((s) => s.id === item.dataset.id);
@@ -564,14 +613,15 @@ function renderTimeline() {
           const sel = isSel(it.kind === "clip" ? { kind: "clip", i: it.i } : { kind: "outro" });
           const strip = it.kind === "clip" ? clipStrip(it.s, it.in, w, it.speed) : stripHtml("outro", it.coach.id, 0, w);
           const label = it.kind === "clip" ? (it.s ? escapeHtml(it.s.label) : "⚠️ الفيديو اتمسح") : `🎬 أوترو ${escapeHtml(it.coach.name)}`;
-          return `<div class="tl-clip ${it.kind} ${sel ? "selected" : ""} ${it.s || it.kind === "outro" ? "" : "missing"}"
+          const kfd = hasKf(it.c) ? it.c.kf.map((k) => `<i class="kfd" style="left:${k.t * mt.pps}px"></i>`).join("") : "";
+          return `<div class="tl-clip ${it.kind} ${sel ? "selected" : ""} ${it.s || it.kind === "outro" ? "" : "missing"} ${it.c?.disabled ? "disabled" : ""}"
               ${it.kind === "clip" ? `data-i="${it.i}"` : `data-outro="1"`} style="left:${it.t0 * mt.pps}px;width:${w}px">
             ${strip}
             ${hasSound(it) ? `<canvas class="cw"></canvas>` : ""}
             <span class="nm" dir="auto">${label}</span><span class="du">${fxBadges(it.c)}${(it.t1 - it.t0).toFixed(1)}s</span>
             ${soundBadge(it)}
             ${hasSound(it) ? volLine(it.volume) : ""}
-            ${it.kind === "clip" ? `<b class="h l" data-h="l"></b><b class="h r" data-h="r"></b>` : ""}
+            ${it.kind === "clip" ? `<b class="h l" data-h="l"></b><b class="h r" data-h="r"></b>` : ""}${kfd}
           </div>`;
         })
         .join("")
@@ -614,9 +664,67 @@ function renderTimeline() {
     .map((g, n) => `<div class="tl-cap ${isSel({ kind: "cap", i: n }) ? "selected" : ""}" data-c="${n}" data-t="${g.t0}" title="دوسة تختاره · Delete تمسحه" style="left:${g.t0 * mt.pps}px;width:${Math.max(2, (g.t1 - g.t0) * mt.pps)}px">${escapeHtml(g.text)}</div>`)
     .join("");
 
+  renderTrackHeads();
   const nSel = allSelected().length;
   $("totalLabel").textContent = total ? `${d.clips.length} قطعة${nSel > 1 ? ` · ✔ ${nSel} مختارين` : ""}` : "";
   drawPlayhead();
+}
+
+// ---------- قفل وإخفاء وكتم كل تراك (زي كاب كات) ----------
+const TRACKS = {
+  video: { row: "trkVideo", head: "h-video", can: ["lock", "hide"] },
+  voice: { row: "trkVoice", head: "h-voice", can: ["lock", "mute"] },
+  music: { row: "trkMusic", head: "h-music", can: ["lock", "mute"] },
+  caps: { row: "trkCaps", head: "h-caps", can: ["lock", "hide"] },
+  typo: { row: "trkTypo", head: "h-typo", can: ["lock", "hide"] },
+  fx: { row: "trkFx", head: "h-fx", can: ["lock"] },
+  click: { row: "trkClick", head: "h-click", can: ["mute"] },
+};
+const FLAG_ICON = { lock: ["🔓", "🔒", "اقفل التراك (متقدرش تحرّك أو تمسح حاجة فيه)", "افتح التراك"],
+  hide: ["👁", "🙈", "خبّي التراك من المعاينة والفيديو", "رجّع التراك يظهر"],
+  mute: ["🔊", "🔇", "اكتم التراك", "رجّع صوت التراك"] };
+function trackFlag(trk, flag) {
+  const d = mt.project?.data;
+  if (!d) return false;
+  if (trk === "typo" && flag === "hide") return d.typo_on === false;
+  if (trk === "click" && flag === "mute") return d.typo_sfx?.on === false;
+  return !!d.tracks?.[trk]?.[flag];
+}
+function setTrackFlag(trk, flag, on) {
+  const d = mt.project.data;
+  if (trk === "typo" && flag === "hide") d.typo_on = !on;
+  else if (trk === "click" && flag === "mute") d.typo_sfx = { ...(d.typo_sfx || {}), on: !on };
+  else d.tracks = { ...(d.tracks || {}), [trk]: { ...(d.tracks?.[trk] || {}), [flag]: on } };
+}
+function renderTrackHeads() {
+  for (const [trk, t] of Object.entries(TRACKS)) {
+    const head = document.querySelector(`.tl-heads .${t.head}`);
+    if (!head) continue;
+    let box = head.querySelector(".trk-flags");
+    if (!box) { box = document.createElement("span"); box.className = "trk-flags"; head.append(box); }
+    box.innerHTML = t.can.map((f) => {
+      const on = trackFlag(trk, f), ic = FLAG_ICON[f];
+      return `<button class="ic tf ${on ? "on" : ""}" data-trk="${trk}" data-flag="${f}" title="${on ? ic[3] : ic[2]}">${on ? ic[1] : ic[0]}</button>`;
+    }).join("");
+    const row = $(t.row);
+    row?.classList.toggle("locked", trackFlag(trk, "lock"));
+    row?.classList.toggle("hidden-trk", trackFlag(trk, "hide") || trackFlag(trk, "mute"));
+  }
+  $("pvStage").style.visibility = trackFlag("video", "hide") ? "hidden" : "";
+}
+document.querySelector(".tl-heads").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-flag]");
+  if (!b || !mt.project) return;
+  pushHistory();
+  setTrackFlag(b.dataset.trk, b.dataset.flag, !trackFlag(b.dataset.trk, b.dataset.flag));
+  // اللي متقفل ميفضلش مختار
+  if (b.dataset.flag === "lock") setSelection(allSelected().filter((x) => !kindLocked(x.kind)));
+  changed();
+  if (typeof mtTypoDraw === "function") mtTypoDraw();
+});
+function kindLocked(kind) {
+  const trk = kind === "clip" || kind === "outro" ? "video" : kind === "cap" ? "caps" : kind;
+  return trackFlag(trk, "lock");
 }
 
 // ---------- الصوت اللي جوه الفيديو ----------
@@ -815,6 +923,14 @@ function splitPart(x, t) {
 }
 
 // target: قطعة صوت معيّنة (من أداة القطع)، وإلا بيقسم المختار أو الفيديو اللي عند المؤشر
+// الكي فريمز لجزء من القطعة [a, b] (بوقت القطعة): بنحط كي فريم محسوب على الطرفين ونشيل اللي برّه، والوقت يبدأ من a
+function kfWindow(c, a, b) {
+  if (!hasKf(c)) return c.kf || null;
+  const at = (t) => ({ t, ...transformNow({ ...c, kf: c.kf, _t: t }, t) });
+  const inner = c.kf.filter((k) => k.t > a + 0.5 / FPS && k.t < b - 0.5 / FPS);
+  const out = [at(a), ...inner.map((k) => ({ ...k })), at(b)].map((k) => ({ ...k, t: Math.max(0, Math.round((k.t - a) * FPS) / FPS) }));
+  return out;
+}
 function splitAt(t, target) {
   const s = target || mt.sel;
   if (s?.kind === "voice" || s?.kind === "music") {
@@ -830,15 +946,17 @@ function splitAt(t, target) {
   const clips = mt.project.data.clips;
   // القطعة اللي بالعكس: الجزء الأول على التايم لاين هو آخر الفيديو الأصلي
   const first = it.rev ? { start: at } : { end: at }, second = it.rev ? { end: at } : { start: at };
-  clips.splice(it.i + 1, 0, { ...JSON.parse(JSON.stringify(it.c)), ...second, fade_in: 0 });
-  Object.assign(clips[it.i], first, { fade_out: 0 });
+  const cut = t - it.t0, len = it.t1 - it.t0;
+  const kfA = kfWindow(it.c, 0, cut), kfB = kfWindow(it.c, cut, len);
+  clips.splice(it.i + 1, 0, { ...JSON.parse(JSON.stringify(it.c)), ...second, fade_in: 0, anim_in: null, kf: kfB, trans: null });
+  Object.assign(clips[it.i], first, { fade_out: 0, anim_out: null, kf: kfA });
   mt.sel = { kind: "clip", i: it.i + 1 };
   changed();
 }
 $("tlSplit").onclick = $("edSplit").onclick = () => splitAt(mt.t);
 
 function deleteSelected() {
-  const list = allSelected();
+  const list = allSelected().filter((x) => !kindLocked(x.kind));
   if (!list.length) return;
   pushHistory();
   const d = mt.project.data;
@@ -886,10 +1004,24 @@ function drag(e, onMove, onUp) {
   window.addEventListener("pointercancel", up);
 }
 
+// اللوحة بتتنقل لوحدها للي اخترته (زي كاب كات): القطعة، الصوت (وبتنزل لقسمه)، الكابشن...
+function focusPane(sel) {
+  if (!sel) return;
+  if (sel.kind === "clip" || sel.kind === "outro") return showTab("clip");
+  if (sel.kind === "cap") return showTab("caps");
+  const tab = TAB_OF_KIND[sel.kind];
+  if (tab) return showTab(tab);
+  showTab("audio");
+  const h = $(sel.kind === "music" ? "secMusic" : "secVoice");
+  if (h) {
+    h.scrollIntoView({ block: "start", behavior: "smooth" });
+    h.classList.remove("flash"); void h.offsetWidth; h.classList.add("flash");
+  }
+}
+const TAB_OF_KIND = {};  // التراكات الجديدة بتسجّل التاب بتاعها هنا
 function selectItem(sel, seekInto) {
   mt.sel = sel;
-  if (sel?.kind === "clip" || sel?.kind === "outro") showTab("clip");
-  else if (sel) showTab("audio");
+  focusPane(sel);
   if (seekInto) {
     const it = seq().items.find((x) => (sel.kind === "clip" ? x.i === sel.i : x.kind === "outro"));
     if (it && (mt.t < it.t0 || mt.t >= it.t1)) seek(it.t0);
@@ -991,7 +1123,7 @@ function marquee(e, t) {
       const x1 = Math.min(e.clientX, ev.clientX), x2 = Math.max(e.clientX, ev.clientX);
       const y1 = Math.min(e.clientY, ev.clientY), y2 = Math.max(e.clientY, ev.clientY);
       Object.assign(box.style, { left: `${x1 - cr.left}px`, top: `${y1 - cr.top}px`, width: `${x2 - x1}px`, height: `${y2 - y1}px` });
-      const hit = [...canvas.querySelectorAll(".tl-clip, .tl-audio, .tl-cap")]
+      const hit = [...canvas.querySelectorAll(".tl-track:not(.locked) .tl-clip, .tl-track:not(.locked) .tl-audio, .tl-track:not(.locked) .tl-cap")]
         .filter((el) => { const r = el.getBoundingClientRect(); return r.right > x1 && r.left < x2 && r.bottom > y1 && r.top < y2; })
         .map(selOfEl);
       const keys = new Set(base.map(selKey));
@@ -1014,7 +1146,7 @@ function trimClip(e, i, side) {
   pushHistory();
   const c = mt.project.data.clips[i];
   const s = clipSource(c);
-  const start0 = c.start, out0 = clipOut(c);
+  const start0 = c.start, out0 = clipOut(c), kf0 = hasKf(c) ? JSON.parse(JSON.stringify(c.kf)) : null;
   mt.sel = { kind: "clip", i };
   renderTimeline();
   renderInspector();
@@ -1036,6 +1168,10 @@ function trimClip(e, i, side) {
       if (side === "l") {
         c.start = clamp(snap(start0 + ds), 0, out0 - MIN_CLIP);
         left = it0.t0 + (c.start - start0) / clipSpeed(c);
+        if (kf0) {
+          const sh = (c.start - start0) / clipSpeed(c);
+          c.kf = kfWindow({ ...c, kf: kf0 }, sh, sh + clipLength(c)).filter(Boolean);
+        }
       } else {
         const out = clamp(snap(out0 + ds), c.start + MIN_CLIP, s.duration);
         c.end = out >= s.duration - 0.001 ? null : out;
@@ -1241,13 +1377,17 @@ function fxBadges(c) {
   if (c.reverse) b.push("⏪");
   if (c.look || Object.values(c.adj || {}).some((v) => v)) b.push("🎨");
   if (c.fade_in > 0.01 || c.fade_out > 0.01) b.push("◐");
+  if (c.anim_in?.type || c.anim_out?.type) b.push("🎬");
+  if (c.fx?.length) b.push("✨");
+  if (c.angle || hasKf(c)) b.push("◆");
+  if (c.disabled) b.push("⊘");
   return b.length ? `<em class="fxb">${b.join(" ")}</em> ` : "";
 }
 // طبقات المعاينة الإضافية: خلفية مغبّشة (للصورة الكاملة) + فينييت + غمقان الظهور/الاختفاء
 function pvLayer(id, z) {
   let el = $(id);
   if (!el) {
-    el = document.createElement(id === "pvBlur" ? "canvas" : "div");
+    el = document.createElement(id === "pvBlur" || id === "pvGrain" ? "canvas" : "div");
     el.id = id;
     el.className = "pv-layer";
     el.style.zIndex = z;
@@ -1272,35 +1412,162 @@ function drawBlurBg() {
   try { g.drawImage(v, -v.videoWidth * sc / 2, -v.videoHeight * sc / 2, v.videoWidth * sc, v.videoHeight * sc); } catch (e) { /* لسه مفيش فريم */ }
   g.setTransform(1, 0, 0, 1, 0, 0);
 }
-function applyFx() {
+function applyFx(post) {
   const it = mt.activeItem, c = it?.kind === "clip" ? it.c : null;
-  const vig = pvLayer("pvVig", 2), fade = pvLayer("pvFadeBlack", 2);
+  const vig = pvLayer("pvVig", 2), fade = pvLayer("pvFadeBlack", 2), flash = pvLayer("pvFlash", 2), grain = pvLayer("pvGrain", 2);
   const vv = (c?.adj?.vignette || 0) / 100;
   vig.style.opacity = vv > 0 ? vv.toFixed(2) : 0;
   fade.style.opacity = c ? (1 - fadeGain(it, mt.t)).toFixed(3) : 0;
-  $("pvStage").style.background = c && c.fit === "black" ? "#000" : "";
+  flash.style.opacity = c && post?.flash ? post.flash.toFixed(3) : 0;
+  drawGrain(grain, c && post?.grain ? post.grain : 0);
+  $("pvStage").style.background = canvasBg();
   drawBlurBg();
 }
+// لون الخلفية لما الصورة مش مالية الكادر (من إعدادات الكادر)
+// فلاتر SVG للألوان المفصولة (نفس rgbashift في FFmpeg)، واحد لكل قوة
+function makeRgbFilters() {
+  if ($("pvRgbDefs")) return;
+  const r = PV_W / OUT_W;
+  let defs = "";
+  for (let n = 1; n <= 12; n++) {
+    const d = (n * r).toFixed(2);
+    defs += `<filter id="pvRgb${n}" color-interpolation-filters="sRGB" x="-5%" y="0" width="110%" height="100%">
+      <feColorMatrix in="SourceGraphic" values="1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0" result="r"/><feOffset in="r" dx="-${d}" result="r2"/>
+      <feColorMatrix in="SourceGraphic" values="0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 1 0" result="g"/>
+      <feColorMatrix in="SourceGraphic" values="0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 1 0" result="b"/><feOffset in="b" dx="${d}" result="b2"/>
+      <feBlend in="r2" in2="g" mode="screen" result="rg"/><feBlend in="rg" in2="b2" mode="screen"/></filter>`;
+  }
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.id = "pvRgbDefs";
+  svg.setAttribute("width", "0"); svg.setAttribute("height", "0");
+  svg.style.position = "absolute";
+  svg.innerHTML = defs;
+  document.body.append(svg);
+}
+function canvasBg() {
+  const bg = mt.project?.data.canvas?.bg;
+  return /^#[0-9a-f]{6}$/i.test(bg || "") ? bg : "#000";
+}
+function drawGrain(cv, amt) {
+  cv.hidden = !amt;
+  if (!amt) return;
+  if (cv.tagName !== "CANVAS") return;
+  cv.width = 126; cv.height = 224;
+  const g = cv.getContext("2d"), img = g.createImageData(cv.width, cv.height);
+  for (let n = 0; n < img.data.length; n += 4) {
+    const v = Math.random() * 255;
+    img.data[n] = img.data[n + 1] = img.data[n + 2] = v;
+    img.data[n + 3] = 255;
+  }
+  g.putImageData(img, 0, 0);
+  cv.style.opacity = (amt * 0.3).toFixed(3);
+}
 
-// نفس حسبة FFmpeg: اللف والقلب، وبعدين الصورة تملا الكادر (أو تبقى كاملة جوه)، وبعدين زووم وتحريك
+// ---------- الحركة: نفس معادلات FFmpeg بالظبط (montage.py: kf_value / motion_exprs / post_fx) ----------
+const OUT_W = 1080, OUT_H = 1920;
+const ANIMS = [["", "بدون"], ["fade", "ظهور"], ["zoomin", "زووم إن"], ["zoomout", "زووم أوت"], ["pop", "بوب"], ["spin", "لفّة"],
+  ["slidel", "من اليمين"], ["slider", "من الشمال"], ["slideu", "من تحت"], ["slided", "من فوق"]];
+const ANIM_FADES = new Set(["fade", "zoomin", "zoomout", "pop", "spin"]);
+const EFFECTS = [["shake", "اهتزاز"], ["pulse", "نبض"], ["flash", "فلاش"], ["glitch", "جليتش"], ["rgb", "ألوان مفصولة"], ["blur", "بلور"], ["grain", "حبيبات"]];
+const clipCrop = (c) => {
+  const k = c?.crop || {};
+  return { l: clamp(+k.l || 0, 0, 0.9), t: clamp(+k.t || 0, 0, 0.9), r: clamp(+k.r || 0, 0, 0.9), b: clamp(+k.b || 0, 0, 0.9) };
+};
+function kfValue(kf, key, def, t) {
+  const pts = (kf || []).filter((k) => k[key] != null).map((k) => [+k.t, +k[key]]).sort((a, b) => a[0] - b[0]);
+  if (!pts.length) return def;
+  if (t <= pts[0][0]) return pts[0][1];
+  for (let n = 0; n + 1 < pts.length; n++) {
+    const [t0, v0] = pts[n], [t1, v1] = pts[n + 1];
+    if (t < t1 && t1 - t0 >= 1e-3) { const p = (t - t0) / (t1 - t0); return v0 + (v1 - v0) * p * p * (3 - 2 * p); }
+  }
+  return pts[pts.length - 1][1];
+}
+const hasKf = (c) => (c?.kf?.length || 0) >= 2;
+// حالة القطعة في الوقت tl (من أولها): z مضاعف زووم، x/y من -1 لـ 1، dx/dy بالبكسل (على مقاس 1080×1920)، a درجات، alpha
+function clipMotion(c, tl, dur, tf) {
+  const kf = hasKf(c) ? c.kf : null;
+  let z = kf ? kfValue(kf, "zoom", c.zoom ?? 1, tl) : (c.zoom ?? 1);
+  const x = kf ? kfValue(kf, "x", c.x || 0, tl) : (c.x || 0);
+  const y = kf ? kfValue(kf, "y", c.y || 0, tl) : (c.y || 0);
+  let a = kf ? kfValue(kf, "angle", c.angle || 0, tl) : (c.angle || 0);
+  let dx = 0, dy = 0, alpha = 1;
+  for (const [kind, an, sign] of [["in", c.anim_in, 1], ["out", c.anim_out, -1]]) {
+    if (!an?.type || !(an.dur > 0.01)) continue;
+    const d = Math.min(an.dur, dur);
+    const p = clamp(kind === "in" ? tl / d : (dur - tl) / d, 0, 1), e = 1 - (1 - p) ** 3;
+    if (ANIM_FADES.has(an.type)) alpha = Math.min(alpha, p);
+    if (an.type === "zoomin") z *= 0.5 + 0.5 * e;
+    else if (an.type === "zoomout") z *= 1.5 - 0.5 * e;
+    else if (an.type === "pop") z *= 0.3 + 0.7 * (1 + 2.70158 * (p - 1) ** 3 + 1.70158 * (p - 1) ** 2);
+    else if (an.type === "spin") { z *= 0.4 + 0.6 * e; a += -sign * 180 * (1 - e); }
+    else if (an.type === "slidel") dx += sign * OUT_W * (1 - e);
+    else if (an.type === "slider") dx += -sign * OUT_W * (1 - e);
+    else if (an.type === "slideu") dy += sign * OUT_H * (1 - e);
+    else if (an.type === "slided") dy += -sign * OUT_H * (1 - e);
+  }
+  const post = { flash: 0, hue: 0, rgb: 0, blur: 0, grain: 0 };
+  for (const f of c.fx || []) {
+    const amt = clamp((f.amt ?? 50) / 100, 0, 1);
+    if (f.type === "shake") {
+      dx += amt * OUT_W * 0.015 * (Math.sin(tf * 47) + Math.sin(tf * 31.7));
+      dy += amt * OUT_H * 0.01 * (Math.sin(tf * 39) + Math.sin(tf * 27.3));
+    } else if (f.type === "pulse") z *= 1 + amt * 0.08 * Math.max(0, Math.sin(tf * 12.566)) ** 4;
+    else if (f.type === "glitch") {
+      const burst = ((tf % 0.9) + 0.9) % 0.9 > 0.78 ? 1 : 0;
+      dx += burst * amt * OUT_W * 0.04 * Math.sin(tf * 90);
+      post.hue = burst * amt * 90;
+    } else if (f.type === "flash") post.flash = amt * 0.5 * Math.max(0, Math.sin(tf * 9.4248)) ** 8;
+    else if (f.type === "rgb") post.rgb = Math.max(1, Math.round(amt * 12));
+    else if (f.type === "blur") post.blur = Math.max(0.5, amt * 12);
+    else if (f.type === "grain") post.grain = amt;
+  }
+  return { z, x, y, a, dx, dy, alpha, post };
+}
+// مكان القطعة على الكادر (بالبكسل على مقاس 1080×1920): نص الصورة، مقاسها، زاويتها
+function clipGeom(c, v, tl, dur, tf) {
+  const rot = ((Number(c.rotate) || 0) % 360 + 360) % 360, side = rot === 90 || rot === 270;
+  const cr = clipCrop(c), cw = Math.max(0.1, 1 - cr.l - cr.r), ch = Math.max(0.1, 1 - cr.t - cr.b);
+  let sw = v.videoWidth * cw, sh = v.videoHeight * ch;
+  if (side) [sw, sh] = [sh, sw];
+  const fit = c.fit === "blur" || c.fit === "black";
+  const k = fit ? Math.min(OUT_W / sw, OUT_H / sh) : Math.max(OUT_W / sw, OUT_H / sh);
+  const m = clipMotion(c, tl, dur, tf);
+  const w = sw * k * m.z, h = sh * k * m.z;
+  const cx = (fit ? OUT_W / 2 + m.x * OUT_W / 2 : OUT_W / 2 - m.x * Math.max(0, w - OUT_W) / 2) + m.dx;
+  const cy = (fit ? OUT_H / 2 + m.y * OUT_H / 2 : OUT_H / 2 - m.y * Math.max(0, h - OUT_H) / 2) + m.dy;
+  return { rot, cr, cw, ch, k, fit, m, w, h, cx, cy, scale: k * m.z };
+}
+function itemTimes(it, t = mt.t) {
+  const dur = it.t1 - it.t0;
+  return { dur, tl: clamp(t - it.t0, 0, dur), tf: t - it.t0 };
+}
+
 function layoutActive() {
   const v = mt.active, it = mt.activeItem;
   if (!v || !it || !v.videoWidth) return;
   const c = it.kind === "clip" ? it.c : { zoom: 1, x: 0, y: 0 };
-  const rot = ((Number(c.rotate) || 0) % 360 + 360) % 360, side = rot === 90 || rot === 270;
-  const ew = side ? v.videoHeight : v.videoWidth, eh = side ? v.videoWidth : v.videoHeight;
-  const fit = c.fit === "blur" || c.fit === "black";
-  const sc = (fit ? Math.min(PV_W / ew, PV_H / eh) : Math.max(PV_W / ew, PV_H / eh)) * (c.zoom || 1);
-  const dw = ew * sc, dh = eh * sc;
-  const cx = fit ? PV_W / 2 + (c.x || 0) * PV_W * 0.5 : -((dw - PV_W) / 2) * (1 + (c.x || 0)) + dw / 2;
-  const cy = fit ? PV_H / 2 + (c.y || 0) * PV_H * 0.5 : -((dh - PV_H) / 2) * (1 + (c.y || 0)) + dh / 2;
-  const w = v.videoWidth * sc, h = v.videoHeight * sc;
+  const { dur, tl, tf } = itemTimes(it);
+  const g = clipGeom(c, v, tl, dur, tf), r = PV_W / OUT_W;
+  // الفيديو كله (قبل القص) بنفس المقياس، والجزء المقصوص بيتشال بـ clip-path ويتحط نصه في مكانه
+  const s = g.scale * r, ew = v.videoWidth * s, eh = v.videoHeight * s;
+  const ox = (g.cr.l + g.cw / 2) * ew, oy = (g.cr.t + g.ch / 2) * eh;
+  const cropped = g.cr.l + g.cr.r + g.cr.t + g.cr.b > 0.001;
+  const p = g.m.post, f = [it.kind === "clip" ? clipCss(c) : ""];
+  if (p.blur) f.push(`blur(${(p.blur * r).toFixed(2)}px)`);
+  if (p.hue) f.push(`hue-rotate(${p.hue.toFixed(1)}deg)`);
+  if (p.rgb) { makeRgbFilters(); f.push(`url(#pvRgb${Math.min(12, p.rgb)})`); }
   Object.assign(v.style, {
-    width: `${w}px`, height: `${h}px`, left: `${cx - w / 2}px`, top: `${cy - h / 2}px`,
-    transform: `scale(${c.flip_h ? -1 : 1},${c.flip_v ? -1 : 1}) rotate(${rot}deg)`,
-    filter: it.kind === "clip" ? clipCss(c) : "",
+    width: `${ew}px`, height: `${eh}px`, left: `${g.cx * r - ox}px`, top: `${g.cy * r - oy}px`,
+    transformOrigin: `${ox}px ${oy}px`,
+    transform: `rotate(${g.m.a}deg) scale(${c.flip_h ? -1 : 1},${c.flip_v ? -1 : 1}) rotate(${g.rot}deg)`,
+    clipPath: cropped ? `inset(${g.cr.t * 100}% ${g.cr.r * 100}% ${g.cr.b * 100}% ${g.cr.l * 100}%)` : "",
+    filter: f.join(" ").trim(),
   });
-  applyFx();
+  v.style.setProperty("--a", g.m.alpha.toFixed(3));
+  mt.geom = { it, g };
+  applyFx(p);
+  drawClipBox();
 }
 
 function itemAt(items, t, total) {
@@ -1357,7 +1624,7 @@ function syncPreview() {
   $("pvEmpty").hidden = !!it;
   showItem(it, mt.t, false);
   if (it) preloadNext(items, it);
-  applyFx();
+  if (!mt.active) applyFx();
   drawPlayhead();
   updatePreviewOverlays();
 }
@@ -1370,7 +1637,10 @@ function seek(t) {
     mt.clockT = mt.t;
     mt.activeKey = null;
     pauseAudio();
-  } else syncPreview();
+  } else {
+    syncPreview();
+    if (hasKf(selectedClip())) renderInspector();
+  }
   followPlayhead();
 }
 
@@ -1435,6 +1705,7 @@ function tick() {
   }
   const live = new Set();
   for (const kind of ["voice", "music"]) {
+    if (trackFlag(kind, "mute")) continue;
     const parts = trackParts(kind);
     const last = parts.reduce((m, x) => (!m || x.t0 > m.t0 ? x : m), null);
     for (const x of parts) {
@@ -1444,7 +1715,7 @@ function tick() {
     }
   }
   for (const [key, el] of audioEls) if (!live.has(key) && !el.paused) el.pause();
-  applyFx();
+  if (!mt.active) applyFx();
   drawPlayhead();
   updatePreviewOverlays();
   followPlayhead();
@@ -1465,10 +1736,39 @@ $("tpNext").onclick = $("tlNextFrame").onclick = () => step(1);
 $("tpStart").onclick = () => { pause(); seek(0); };
 $("tpEnd").onclick = () => { pause(); seek(totalLength()); };
 
-// تحريك وزووم الصورة بالماوس على المعاينة
-$("previewFrame").addEventListener("pointerdown", (e) => {
+// تحريك وزووم ولف الصورة بالماوس على المعاينة (ومقابض زي كاب كات)
+function clipBox() {
+  let el = $("pvBox");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "pvBox";
+    el.className = "pv-box";
+    el.innerHTML = `<i data-bh="nw"></i><i data-bh="ne"></i><i data-bh="sw"></i><i data-bh="se"></i><b data-bh="rot" title="اسحب عشان تلف · Shift = كل 15°"></b>`;
+    $("previewFrame").closest(".ed-player").append(el);
+    el.addEventListener("pointerdown", (e) => { if (e.target.closest("[data-bh]")) startClipDrag(e); });
+  }
+  return el;
+}
+function drawClipBox() {
+  const el = clipBox(), gm = mt.geom;
+  const c = selectedClip();
+  const show = !!(gm && c && gm.it.c === c && !mt.playing && !$("clipProps").hidden && document.querySelector('[data-pane="clip"]:not([hidden])'));
+  el.hidden = !show;
+  if (!show) return;
+  // المربع برّه الكادر عشان المقابض تبان حتى لو الصورة أكبر منه (زي كاب كات)
+  const fr = $("previewFrame").getBoundingClientRect(), pr = el.parentElement.getBoundingClientRect();
+  const r = (PV_W / OUT_W) * (fr.width / PV_W), g = gm.g;
+  Object.assign(el.style, {
+    width: `${g.w * r}px`, height: `${g.h * r}px`,
+    left: `${fr.left - pr.left + g.cx * r - (g.w * r) / 2}px`, top: `${fr.top - pr.top + g.cy * r - (g.h * r) / 2}px`,
+    transform: `rotate(${g.m.a}deg)`,
+  });
+}
+$("previewFrame").addEventListener("pointerdown", (e) => startClipDrag(e));
+function startClipDrag(e) {
   const it = mt.activeItem, v = mt.active;
   if (e.button !== 0 || it?.kind !== "clip" || !v?.videoWidth) return;
+  if (e.target.closest(".pv-typo [data-gz], .sc-pick")) return;
   e.preventDefault();
   pause();
   mt.sel = { kind: "clip", i: it.i };
@@ -1476,22 +1776,41 @@ $("previewFrame").addEventListener("pointerdown", (e) => {
   renderTimeline();
   renderInspector();
   pushHistory();
-  const c = it.c;
-  const x0 = c.x, y0 = c.y;
+  const c = it.c, fr = $("previewFrame").getBoundingClientRect(), r = (PV_W / OUT_W) * (fr.width / PV_W);
+  const t0 = transformNow(c);
+  const { dur, tl, tf } = itemTimes(it);
+  const g0 = clipGeom(c, v, tl, dur, tf);
+  const ccx = fr.left + g0.cx * r, ccy = fr.top + g0.cy * r;
+  const hnd = e.target.closest("[data-bh]")?.dataset.bh;
   $("previewFrame").classList.add("panning");
+  const d0 = Math.hypot(e.clientX - ccx, e.clientY - ccy) || 1, a0 = Math.atan2(e.clientY - ccy, e.clientX - ccx);
   drag(
     e,
-    (dx, dy) => {
-      const cover = Math.max(PV_W / v.videoWidth, PV_H / v.videoHeight) * c.zoom;
-      const mx = (v.videoWidth * cover - PV_W) / 2, my = (v.videoHeight * cover - PV_H) / 2;
-      if (mx > 0.5) c.x = clamp(x0 - dx / mx, -1, 1);
-      if (my > 0.5) c.y = clamp(y0 - dy / my, -1, 1);
+    (dx, dy, ev) => {
+      if (hnd === "rot") {
+        let a = t0.angle + ((Math.atan2(ev.clientY - ccy, ev.clientX - ccx) - a0) * 180) / Math.PI;
+        a = ((a + 540) % 360) - 180;
+        if (ev.shiftKey) a = Math.round(a / 15) * 15;
+        setTransform(c, { angle: Math.round(a * 10) / 10 });
+      } else if (hnd) {
+        const d = Math.hypot(ev.clientX - ccx, ev.clientY - ccy);
+        setTransform(c, { zoom: clamp(Math.round(t0.zoom * (d / d0) * 100) / 100, 0.1, 4) });
+      } else {
+        // نفس معادلة المكان في FFmpeg: «يملا الكادر» بيتحرك جوه الزيادة، و«كامل» بنسبة من الكادر
+        const pdx = dx / r, pdy = dy / r;
+        if (g0.fit) setTransform(c, { x: clamp(t0.x + pdx / (OUT_W / 2), -3, 3), y: clamp(t0.y + pdy / (OUT_H / 2), -3, 3) });
+        else {
+          const mx = Math.max(0, g0.w - OUT_W) / 2, my = Math.max(0, g0.h - OUT_H) / 2;
+          setTransform(c, { ...(mx > 1 ? { x: clamp(t0.x - pdx / mx, -1, 1) } : {}), ...(my > 1 ? { y: clamp(t0.y - pdy / my, -1, 1) } : {}) });
+        }
+      }
       layoutActive();
+      drawClipBox();
       renderInspector();
     },
-    () => { $("previewFrame").classList.remove("panning"); scheduleSave(); }
+    () => { $("previewFrame").classList.remove("panning"); if (hasKf(c)) renderTimeline(); scheduleSave(); }
   );
-});
+}
 $("previewFrame").addEventListener(
   "wheel",
   (e) => {
@@ -1499,9 +1818,11 @@ $("previewFrame").addEventListener(
     if (it?.kind !== "clip") return;
     e.preventDefault();
     pushHistory("wheel-zoom");
-    it.c.zoom = clamp(it.c.zoom * (e.deltaY < 0 ? 1.05 : 1 / 1.05), 1, 3);
+    const z = transformNow(it.c).zoom;
+    setTransform(it.c, { zoom: clamp(z * (e.deltaY < 0 ? 1.05 : 1 / 1.05), 0.1, 4) });
     mt.sel = { kind: "clip", i: it.i };
     layoutActive();
+    drawClipBox();
     renderInspector();
     scheduleSave();
   },
@@ -1556,6 +1877,7 @@ $("inspTabs").addEventListener("click", (e) => {
 });
 
 function renderInspector() {
+  renderPartProps();
   const c = selectedClip();
   const s = c && clipSource(c);
   $("clipProps").hidden = !s;
@@ -1564,27 +1886,61 @@ function renderInspector() {
   if (!s) return;
   $("editorLabel").textContent = `${mt.sel.i + 1}. ${s.label}`;
   $("clipTimes").textContent = `المدة ${clipLength(c).toFixed(2)}ث · من ${fmtTC(c.start)} لـ ${fmtTC(clipOut(c))} في الفيديو الأصلي`;
-  $("edZoom").value = Math.round(c.zoom * 100);
-  $("edX").value = Math.round(c.x * 100);
-  $("edY").value = Math.round(c.y * 100);
+  const tv = transformNow(c);
+  $("edZoom").value = Math.round(tv.zoom * 100);
+  $("edX").value = Math.round(tv.x * 100);
+  $("edY").value = Math.round(tv.y * 100);
   $("edVol").value = Math.round(c.volume * 100);
-  $("zoomVal").textContent = `${Math.round(c.zoom * 100)}%`;
-  $("xVal").textContent = c.x.toFixed(2);
-  $("yVal").textContent = c.y.toFixed(2);
+  $("zoomVal").textContent = `${Math.round(tv.zoom * 100)}%`;
+  $("xVal").textContent = tv.x.toFixed(2);
+  $("yVal").textContent = tv.y.toFixed(2);
   $("volVal").textContent = s.has_audio ? `${Math.round(c.volume * 100)}%` : "";
   $("edVol").disabled = !s.has_audio;
   $("edMute").hidden = !s.has_audio;
   $("edMute").textContent = c.volume === 0 ? "🔊 رجّع الصوت" : "🔇 اكتم صوت الفيديو ده";
   $("noAudio").hidden = !!s.has_audio;
   renderFx(c);
+  $("edDisable").textContent = c.disabled ? "✓ فعّل القطعة" : "⊘ عطّل";
 }
 
+// الحجم والمكان والزاوية: لو القطعة فيها كي فريمز، التعديل بيتحط في كي فريم عند المؤشر (زي كاب كات)
+const TKEYS = ["zoom", "x", "y", "angle"];
+function selItem() {
+  return mt.sel?.kind === "clip" ? seq().items[mt.sel.i] : null;
+}
+function clipLocalT(c) {
+  const it = seq().items.find((x) => x.c === c);
+  return it ? clamp(mt.t - it.t0, 0, it.t1 - it.t0) : 0;
+}
+function transformNow(c, at) {
+  const kf = hasKf(c) ? c.kf : null;
+  const t = at ?? (kf ? clipLocalT(c) : 0);
+  const base = { zoom: c.zoom ?? 1, x: c.x || 0, y: c.y || 0, angle: c.angle || 0 };
+  if (!kf) return base;
+  return Object.fromEntries(TKEYS.map((k) => [k, kfValue(kf, k, base[k], t)]));
+}
+function kfAt(c, t) {
+  return (c.kf || []).findIndex((k) => Math.abs(k.t - t) < 0.5 / FPS);
+}
+function setTransform(c, patch) {
+  if (!hasKf(c)) { Object.assign(c, patch); return; }
+  const t = clipLocalT(c);
+  let n = kfAt(c, t);
+  if (n < 0) {
+    c.kf.push({ t: Math.round(t * FPS) / FPS, ...transformNow(c) });
+    c.kf.sort((a, b) => a.t - b.t);
+    n = kfAt(c, t);
+  }
+  Object.assign(c.kf[n], patch);
+}
 function editorInput(key, apply) {
   return () => {
     const c = selectedClip();
     if (!c) return;
     pushHistory(key);
+    const nk = c.kf?.length || 0;
     apply(c);
+    if ((c.kf?.length || 0) !== nk) renderTimeline();
     renderInspector();
     // لو القطعة المختارة مش هي اللي في المعاينة، نروح لها
     const it = seq().items[mt.sel.i];
@@ -1593,9 +1949,9 @@ function editorInput(key, apply) {
     scheduleSave();
   };
 }
-$("edZoom").addEventListener("input", editorInput("zoom", (c) => (c.zoom = Number($("edZoom").value) / 100)));
-$("edX").addEventListener("input", editorInput("x", (c) => (c.x = Number($("edX").value) / 100)));
-$("edY").addEventListener("input", editorInput("y", (c) => (c.y = Number($("edY").value) / 100)));
+$("edZoom").addEventListener("input", editorInput("zoom", (c) => setTransform(c, { zoom: Number($("edZoom").value) / 100 })));
+$("edX").addEventListener("input", editorInput("x", (c) => setTransform(c, { x: Number($("edX").value) / 100 })));
+$("edY").addEventListener("input", editorInput("y", (c) => setTransform(c, { y: Number($("edY").value) / 100 })));
 $("edVol").addEventListener("input", editorInput("vol", (c) => (c.volume = Number($("edVol").value) / 100)));
 $("edMute").onclick = () => { const c = selectedClip(); if (c) toggleMute(c); };
 $("edReset").onclick = editorInput(null, (c) => Object.assign(c, { zoom: 1, x: 0, y: 0, volume: 1 }));
@@ -1651,9 +2007,124 @@ $("fxFadeIn").addEventListener("input", fxInput("fadein", (c) => (c.fade_in = Nu
 $("fxFadeOut").addEventListener("input", fxInput("fadeout", (c) => (c.fade_out = Number($("fxFadeOut").value) / 100)));
 $("fxReset").onclick = fxInput(null, (c) => Object.assign(c, {
   speed: 1, reverse: false, flip_h: false, flip_v: false, rotate: 0, adj: {}, look: "", fade_in: 0, fade_out: 0, fit: "",
+  angle: 0, crop: null, kf: null, anim_in: null, anim_out: null, fx: [],
 }));
+$("edDisable").onclick = fxInput(null, (c) => (c.disabled = !c.disabled));
+// اللف بأي زاوية والمحاذاة
+$("fxAngle").addEventListener("input", editorInput("angle", (c) => setTransform(c, { angle: Number($("fxAngle").value) })));
+$("fxAngle").addEventListener("dblclick", editorInput(null, (c) => setTransform(c, { angle: 0 })));
+$("fxAlign").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-align]");
+  if (!b) return;
+  editorInput(null, (c) => {
+    const v = mt.active, it = selItem();
+    const fit = c.fit === "blur" || c.fit === "black";
+    let ex = 1, ey = 1;  // في «كامل»: المكان اللي حرف الصورة فيه بيلزق في حرف الكادر
+    if (fit && v?.videoWidth && it) {
+      const { dur, tl, tf } = itemTimes(it), g = clipGeom(c, v, tl, dur, tf);
+      ex = g.w / OUT_W - 1; ey = g.h / OUT_H - 1;
+    }
+    const a = b.dataset.align;
+    const p = a === "l" ? { x: fit ? ex : -1 } : a === "r" ? { x: fit ? -ex : 1 } : a === "ch" ? { x: 0 }
+      : a === "t" ? { y: fit ? ey : -1 } : a === "b" ? { y: fit ? -ey : 1 } : { y: 0 };
+    setTransform(c, p);
+  })();
+});
+// قص الكادر
+$("clipFx").addEventListener("input", (e) => {
+  const k = e.target.dataset.crop;
+  if (k) fxInput("crop-" + k, (c) => (c.crop = { ...clipCrop(c), [k]: Number(e.target.value) / 100 }))();
+});
+// حركات الدخول والخروج
+$("fxAnimIn").innerHTML = ANIMS.map(([k, l]) => `<button class="chip" data-anim="${k}">${l}</button>`).join("");
+$("fxAnimOut").innerHTML = ANIMS.map(([k, l]) => `<button class="chip" data-anim="${k}">${l}</button>`).join("")
+  .replace("من اليمين", "لليمين").replace("من الشمال", "للشمال").replace("من تحت", "لتحت").replace("من فوق", "لفوق");
+for (const [box, key, dur] of [["fxAnimIn", "anim_in", "fxAnimInDur"], ["fxAnimOut", "anim_out", "fxAnimOutDur"]]) {
+  $(box).addEventListener("click", (e) => {
+    const b = e.target.closest("[data-anim]");
+    if (b) fxInput(null, (c) => (c[key] = b.dataset.anim ? { type: b.dataset.anim, dur: c[key]?.dur || 0.5 } : null))();
+  });
+  $(dur).addEventListener("input", editorInput(key, (c) => {
+    if (c[key]?.type) c[key].dur = Number($(dur).value) / 100;
+  }));
+}
+// التأثيرات
+$("fxEffects").innerHTML = EFFECTS.map(([k, l]) => `<button class="chip" data-eff="${k}">${l}</button>`).join("");
+$("fxEffects").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-eff]");
+  if (!b) return;
+  fxInput(null, (c) => {
+    const fx = c.fx || [];
+    c.fx = fx.some((f) => f.type === b.dataset.eff) ? fx.filter((f) => f.type !== b.dataset.eff) : [...fx, { type: b.dataset.eff, amt: 50 }];
+  })();
+});
+$("fxEffectAmts").addEventListener("input", (e) => {
+  const k = e.target.dataset.effamt;
+  if (k) editorInput("eff-" + k, (c) => { const f = (c.fx || []).find((x) => x.type === k); if (f) f.amt = Number(e.target.value); })();
+});
+// الكي فريمز
+$("kfToggle").onclick = fxInput(null, (c) => {
+  const t = clipLocalT(c), cur = transformNow(c);
+  if (!hasKf(c)) {
+    // أول كي فريم: بنحط واحد في أول القطعة وواحد عند المؤشر (بنفس القيم)، وبعدها أي تعديل بيتحط عند المؤشر
+    const it = seq().items.find((x) => x.c === c), end = it ? it.t1 - it.t0 : t;
+    const at = t > 0.05 ? t : end;
+    c.kf = [{ t: 0, ...cur }, { t: Math.round(at * FPS) / FPS, ...cur }];
+    return;
+  }
+  const n = kfAt(c, t);
+  if (n >= 0) c.kf.splice(n, 1);
+  else { c.kf.push({ t: Math.round(t * FPS) / FPS, ...cur }); c.kf.sort((a, b) => a.t - b.t); }
+  if (c.kf.length < 2) { Object.assign(c, transformNow({ ...c, kf: null })); c.kf = null; }
+});
+$("kfClear").onclick = fxInput(null, (c) => { Object.assign(c, transformNow(c)); c.kf = null; });
+function jumpKf(dir) {
+  const c = selectedClip(), it = selItem();
+  if (!c || !it || !hasKf(c)) return;
+  const t = mt.t - it.t0;
+  const list = c.kf.map((k) => k.t).sort((a, b) => a - b);
+  const next = dir > 0 ? list.find((x) => x > t + 0.5 / FPS) : [...list].reverse().find((x) => x < t - 0.5 / FPS);
+  if (next != null) seek(it.t0 + next);
+}
+$("kfPrev").onclick = () => jumpKf(-1);
+$("kfNext").onclick = () => jumpKf(1);
 function renderFx(c) {
   const sp = clipSpeed(c), a = c.adj || {}, fit = c.fit || "fill";
+  const tv = transformNow(c);
+  $("fxAngle").value = Math.round(tv.angle);
+  $("angleVal").textContent = Math.round(tv.angle) ? `${Math.round(tv.angle)}°` : "";
+  const cr = clipCrop(c);
+  for (const k of ["l", "t", "r", "b"]) {
+    document.querySelector(`[data-crop="${k}"]`).value = Math.round(cr[k] * 100);
+    document.querySelector(`[data-cropval="${k}"]`).textContent = cr[k] ? `${Math.round(cr[k] * 100)}%` : "";
+  }
+  for (const [box, key, dur, lab] of [["fxAnimIn", "anim_in", "fxAnimInDur", "animInVal"], ["fxAnimOut", "anim_out", "fxAnimOutDur", "animOutVal"]]) {
+    const an = c[key]?.type ? c[key] : null;
+    $(box).querySelectorAll("[data-anim]").forEach((b) => b.classList.toggle("on", b.dataset.anim === (an?.type || "")));
+    $(dur).hidden = !an;
+    $(dur).value = Math.round((an?.dur || 0.5) * 100);
+    $(lab).textContent = an ? `${an.dur.toFixed(2)}ث` : "";
+  }
+  const fxs = c.fx || [];
+  $("fxEffects").querySelectorAll("[data-eff]").forEach((b) => b.classList.toggle("on", fxs.some((f) => f.type === b.dataset.eff)));
+  const want = fxs.map((f) => f.type).join(",");
+  if ($("fxEffectAmts").dataset.k !== want) {
+    $("fxEffectAmts").dataset.k = want;
+    $("fxEffectAmts").innerHTML = fxs.map((f) => `<label>قوة ${EFFECTS.find((x) => x[0] === f.type)?.[1] || f.type} <b data-effval="${f.type}"></b>
+      <input type="range" dir="ltr" data-effamt="${f.type}" min="5" max="100" step="1"></label>`).join("");
+  }
+  for (const f of fxs) {
+    const r = document.querySelector(`[data-effamt="${f.type}"]`);
+    if (r && document.activeElement !== r) r.value = f.amt ?? 50;
+    const l = document.querySelector(`[data-effval="${f.type}"]`);
+    if (l) l.textContent = `${f.amt ?? 50}%`;
+  }
+  const kfOn = hasKf(c), here = kfOn && kfAt(c, clipLocalT(c)) >= 0;
+  $("kfToggle").classList.toggle("on", here);
+  $("kfToggle").textContent = here ? "◆ شيل الكي فريم" : "◇ كي فريم";
+  $("kfInfo").textContent = kfOn ? `${c.kf.length} كي فريم` : "";
+  $("kfClear").hidden = !kfOn;
+  $("kfPrev").disabled = $("kfNext").disabled = !kfOn;
   $("speedVal").textContent = `${sp}x`;
   $("fxSpeed").value = Math.round(Math.log2(sp) * 100);
   document.querySelectorAll("#fxSpeedChips [data-speed]").forEach((b) => b.classList.toggle("on", Number(b.dataset.speed) === sp));
@@ -1675,6 +2146,83 @@ function renderFx(c) {
   $("fxFadeOut").value = Math.round((c.fade_out || 0) * 100);
   $("fadeInVal").textContent = c.fade_in ? `${c.fade_in.toFixed(2)}ث` : "";
   $("fadeOutVal").textContent = c.fade_out ? `${c.fade_out.toFixed(2)}ث` : "";
+}
+
+// ---------- تحويل الكلام لصوت من جوه المونتاج ----------
+let ttsInfo = null;
+$("ttsBox").addEventListener("toggle", async () => {
+  if (!$("ttsBox").open || ttsInfo) return;
+  try {
+    ttsInfo = await api("/api/montage/tts");
+    $("ttsVoice").innerHTML = ttsInfo.voices.map((v) => `<option value="${v.id}">${escapeHtml(v.label)}</option>`).join("");
+    ttsCost();
+  } catch (err) { toast(err.message, true); }
+});
+function ttsCost() {
+  const n = $("ttsText").value.trim().length;
+  $("ttsCost").textContent = n && ttsInfo ? `حوالي ${Math.max(0.001, (n / 1000) * ttsInfo.per_1k).toFixed(3)}$` : "";
+}
+$("ttsText").addEventListener("input", ttsCost);
+$("ttsGo").onclick = async () => {
+  const text = $("ttsText").value.trim();
+  if (!text || !mt.project) return toast("اكتب الكلام الأول", true);
+  $("ttsGo").disabled = true;
+  $("ttsGo").textContent = "⏳ بيحوّل…";
+  try {
+    const a = await api("/api/montage/tts", { method: "POST", ...jsonBody({ text, voice_id: $("ttsVoice").value }) });
+    mt.voices = await api("/api/audio?kind=voice");
+    fillSelects();
+    placeNewAudio(a);
+    $("ttsText").value = "";
+    ttsCost();
+    toast(`🗣️ الصوت جاهز (${a.duration.toFixed(1)}ث) واتحط عند المؤشر`);
+  } catch (err) {
+    toast(err.message, true);
+  } finally {
+    $("ttsGo").disabled = false;
+    $("ttsGo").textContent = "🗣️ حوّل لصوت";
+  }
+};
+// صوت جديد: لو مفيش تعليق بيبقى هو التعليق، وإلا بيتحط في تراك صوت زيادة عند المؤشر
+function placeNewAudio(a) {
+  const d = mt.project.data;
+  pushHistory();
+  if (!d.voice) {
+    d.voice = { id: a.id, volume: 1, delay: 0, offset: 0, length: null, fade_out: false, parts: [{ delay: snap(mt.t), offset: 0, length: null, volume: 1 }] };
+    mt.sel = { kind: "voice", p: 0 };
+  } else if (typeof addSound === "function") {
+    addSound(a, snap(mt.t));
+  } else {
+    d.voice = { ...d.voice, id: a.id, parts: [{ delay: snap(mt.t), offset: 0, length: null, volume: 1 }] };
+  }
+  changed();
+}
+
+// ---------- القطعة المختارة من التعليق أو الموسيقى: ظهور واختفاء بالتدريج ----------
+function selPart() {
+  const x = mt.sel;
+  if (x?.kind !== "voice" && x?.kind !== "music") return null;
+  return mt.project.data[x.kind]?.parts?.[x.p] || null;
+}
+function renderPartProps() {
+  const p = selPart();
+  $("partProps").hidden = !p;
+  if (!p) return;
+  $("partLabel").textContent = `🎚️ قطعة ${mt.sel.kind === "voice" ? "التعليق" : "الموسيقى"} المختارة`;
+  $("pFadeIn").value = Math.round((p.fade_in || 0) * 100);
+  $("pFadeOut").value = Math.round((p.fade_out || 0) * 100);
+  $("pFadeInVal").textContent = p.fade_in ? `${p.fade_in.toFixed(1)}ث` : "";
+  $("pFadeOutVal").textContent = p.fade_out ? `${p.fade_out.toFixed(1)}ث` : "";
+}
+for (const [id, key] of [["pFadeIn", "fade_in"], ["pFadeOut", "fade_out"]]) {
+  $(id).addEventListener("input", () => {
+    const p = selPart();
+    if (!p) return;
+    pushHistory("part-" + key);
+    p[key] = Number($(id).value) / 100;
+    renderPartProps();
+    scheduleSave();
+  });
 }
 
 // ---------- المدرب والصوت ----------

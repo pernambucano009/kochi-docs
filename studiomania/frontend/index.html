@@ -414,7 +414,12 @@
                 <div class="panel-head"><h2>الفيديوهات المولَّدة</h2>
                   <span class="row"><label class="btn sm" title="لو فيه قطعة متحددة في التايم لاين الفيديو بيبدّلها، غير كده بيتحط عند المؤشر">⬆ ارفع فيديو<input type="file" id="clipUpload" accept="video/*,.mkv,.mov" hidden></label>
                   <label class="btn sm" title="ارفع فيديو أوترو تاني غير أوترو المدرب، ويتحط في آخر المونتاج">🎬 ＋ أوترو تاني<input type="file" id="outroUpload" accept="video/*,.mkv" hidden></label></span></div>
+                <div class="bin-tools">
+                  <input type="search" id="binSearch" placeholder="🔍 دوّر بالاسم" dir="auto">
+                  <button class="btn sm" id="binFavOnly" title="المفضلة بس">☆ المفضلة</button>
+                </div>
                 <label class="check"><input type="checkbox" id="binCoachOnly" checked> المدرب المختار بس</label>
+                <div class="replace-bar" id="replaceBar" hidden>🔁 اختار الفيديو اللي هيتحط مكان القطعة <b id="replaceWhich"></b> (التعديلات بتفضل زي ما هي) <button class="btn sm" id="replaceCancel">إلغاء</button></div>
                 <div class="bin-grid" id="binGrid"></div>
                 <p class="empty" id="binEmpty" hidden>مفيش فيديوهات مولَّدة جاهزة. ولّد من <a href="#" data-goto="2">الخطوة 2</a>.</p>
                 <p class="hint">دوس ＋ أو اسحب الفيديو للتايم لاين.</p>
@@ -462,7 +467,14 @@
                   <div class="sliders" id="clipProps" dir="ltr" hidden>
                     <h3 dir="rtl" id="editorLabel"></h3>
                     <p class="clip-times" dir="rtl" id="clipTimes"></p>
-                    <label dir="rtl">زووم <b id="zoomVal"></b><input type="range" dir="ltr" id="edZoom" min="100" max="300" step="5"></label>
+                    <div class="kf-bar" dir="rtl" id="kfBar">
+                      <button class="btn sm" id="kfPrev" title="الكي فريم اللي قبل">◀︎</button>
+                      <button class="btn sm" id="kfToggle" title="ضيف أو شيل كي فريم عند المؤشر: الحجم والمكان والزاوية بيتحركوا لوحدهم بين الكي فريمز">◇ كي فريم</button>
+                      <button class="btn sm" id="kfNext" title="الكي فريم اللي بعد">▶︎</button>
+                      <span class="muted" id="kfInfo"></span>
+                      <button class="btn sm" id="kfClear" hidden>شيل الكل</button>
+                    </div>
+                    <label dir="rtl">زووم <b id="zoomVal"></b><input type="range" dir="ltr" id="edZoom" min="10" max="300" step="5"></label>
                     <label dir="rtl">شمال ⟷ يمين <b id="xVal"></b><input type="range" dir="ltr" id="edX" min="-100" max="100" step="1"></label>
                     <label dir="rtl">فوق ⟷ تحت <b id="yVal"></b><input type="range" dir="ltr" id="edY" min="-100" max="100" step="1"></label>
                     <label dir="rtl">الصوت <b id="volVal"></b><input type="range" dir="ltr" id="edVol" min="0" max="200" step="5"></label>
@@ -473,6 +485,19 @@
                       <div class="chips" id="fxSpeedChips"></div>
                       <input type="range" dir="ltr" id="fxSpeed" min="-200" max="200" step="1" title="من 0.25x لـ 4x">
                       <label class="check"><input type="checkbox" id="fxReverse"> ⏪ شغّل بالعكس <span class="muted" id="revNote"></span></label>
+                      <h4>📐 اللف والمحاذاة <b id="angleVal"></b></h4>
+                      <input type="range" dir="ltr" id="fxAngle" min="-180" max="180" step="1" title="لف بأي زاوية · دبل كليك يرجّعه صفر">
+                      <div class="chips" id="fxAlign">
+                        <button class="chip" data-align="l" title="على الشمال">⇤</button><button class="chip" data-align="ch" title="في النص بالعرض">↔</button><button class="chip" data-align="r" title="على اليمين">⇥</button>
+                        <button class="chip" data-align="t" title="فوق">⤒</button><button class="chip" data-align="cv" title="في النص بالطول">↕</button><button class="chip" data-align="b" title="تحت">⤓</button>
+                      </div>
+                      <h4>✂️ قص الكادر</h4>
+                      <div class="crop-grid">
+                        <label>من الشمال <b data-cropval="l"></b><input type="range" dir="ltr" data-crop="l" min="0" max="90" step="1"></label>
+                        <label>من اليمين <b data-cropval="r"></b><input type="range" dir="ltr" data-crop="r" min="0" max="90" step="1"></label>
+                        <label>من فوق <b data-cropval="t"></b><input type="range" dir="ltr" data-crop="t" min="0" max="90" step="1"></label>
+                        <label>من تحت <b data-cropval="b"></b><input type="range" dir="ltr" data-crop="b" min="0" max="90" step="1"></label>
+                      </div>
                       <h4>🖼️ الشكل</h4>
                       <div class="chips" id="fxFit"></div>
                       <div class="row wrap">
@@ -484,6 +509,15 @@
                       <div class="chips" id="fxLooks"></div>
                       <h4>🌈 الألوان</h4>
                       <div id="fxAdj"></div>
+                      <h4>🎬 حركة الدخول <b id="animInVal"></b></h4>
+                      <div class="chips" id="fxAnimIn"></div>
+                      <input type="range" dir="ltr" id="fxAnimInDur" min="10" max="300" step="5" title="مدة حركة الدخول">
+                      <h4>🎬 حركة الخروج <b id="animOutVal"></b></h4>
+                      <div class="chips" id="fxAnimOut"></div>
+                      <input type="range" dir="ltr" id="fxAnimOutDur" min="10" max="300" step="5" title="مدة حركة الخروج">
+                      <h4>✨ تأثيرات</h4>
+                      <div class="chips" id="fxEffects"></div>
+                      <div id="fxEffectAmts"></div>
                       <h4>◐ ظهور واختفاء</h4>
                       <label>ظهور من الأسود <b id="fadeInVal"></b><input type="range" dir="ltr" id="fxFadeIn" min="0" max="200" step="5"></label>
                       <label>اختفاء للأسود <b id="fadeOutVal"></b><input type="range" dir="ltr" id="fxFadeOut" min="0" max="200" step="5"></label>
@@ -493,6 +527,8 @@
                     <div class="row wrap" dir="rtl">
                       <button class="btn sm" id="edSplit">✂ قسّم عند المؤشر</button>
                       <button class="btn sm" id="edDup">⧉ كرّر</button>
+                      <button class="btn sm" id="edDisable" title="القطعة بتفضل مكانها بس مش بتظهر في الفيديو (ومكانها بيبقى فاضي)">⊘ عطّل</button>
+                      <button class="btn sm" id="edReplace" title="بدّل الفيديو بفيديو تاني من المكتبة، والقص والتأثيرات والحركة بيفضلوا زي ما هم">🔁 استبدل</button>
                       <button class="btn sm" id="edReset">↺ رجّع الإعدادات</button>
                       <button class="btn sm danger" id="edDelete">🗑 احذف</button>
                     </div>
@@ -504,21 +540,33 @@
                 </div>
 
                 <div class="pane" data-pane="audio" hidden>
+                  <div class="part-props" id="partProps" hidden>
+                    <h3 class="pane-h" id="partLabel"></h3>
+                    <label class="field slider-field">ظهور بالتدريج <b id="pFadeInVal"></b><input type="range" id="pFadeIn" min="0" max="500" step="10" dir="ltr"></label>
+                    <label class="field slider-field">اختفاء بالتدريج <b id="pFadeOutVal"></b><input type="range" id="pFadeOut" min="0" max="500" step="10" dir="ltr"></label>
+                  </div>
                   <h3 class="pane-h">🧑‍🏫 المدرب والأوترو</h3>
                   <label class="field">المدرب <select id="mCoach"></select></label>
               <label class="check"><input type="checkbox" id="mOutro"> ضيف الأوترو في الآخر <span class="muted" id="outroInfo"></span></label>
               <label class="field slider-field">صوت الأوترو <b id="outroVolVal"></b><input type="range" id="mOutroVol" min="0" max="200" step="5" dir="ltr"></label>
 
-              <h3 class="pane-h">🎙️ التعليق الصوتي</h3>
+              <h3 class="pane-h" id="secVoice">🎙️ التعليق الصوتي</h3>
               <div class="voice-sync" id="voiceSync" hidden></div>
               <div class="sel-up"><label class="field" title="اختار تعليق صوتي تاني من المكتبة ويتحط مكان الحالي"><select id="mVoice"></select></label>
                 <label class="btn sm" title="ارفع ملف تعليق صوتي من عندك، ويتحط في المونتاج على طول (وبيتحفظ في مكتبة الصوت)">⬆ ارفع<input type="file" data-audio-up="voice" accept="audio/*,video/*,.mp3,.wav,.m4a,.aac,.ogg,.opus,.flac,.amr,.caf,.aif,.aiff,.wma,.3gp,.webm,.mp4,.mov" hidden></label></div>
+              <details class="tts-box" id="ttsBox">
+                <summary>🗣️ اكتب كلام ويتحوّل لصوت</summary>
+                <textarea id="ttsText" rows="3" dir="auto" placeholder="اكتب الجملة اللي عايزها تتقال…"></textarea>
+                <div class="row wrap"><select id="ttsVoice"></select>
+                  <button class="btn sm primary" id="ttsGo">🗣️ حوّل لصوت</button>
+                  <span class="muted" id="ttsCost"></span></div>
+              </details>
               <div id="voiceOpts">
                 <label class="field slider-field">الصوت <b id="voiceVolVal"></b><input type="range" id="mVoiceVol" min="0" max="200" step="5" dir="ltr"></label>
                 <p class="hint">حرّكه وقصّه وقسّمه من التايم لاين تحت.</p>
               </div>
 
-              <h3 class="pane-h">🎵 الموسيقى</h3>
+              <h3 class="pane-h" id="secMusic">🎵 الموسيقى</h3>
               <div class="sel-up"><label class="field"><select id="mMusic"></select></label>
                 <label class="btn sm" title="ارفع ملف موسيقى من عندك، ويتحط في المونتاج على طول (وبيتحفظ في مكتبة الصوت)">⬆ ارفع<input type="file" data-audio-up="music" accept="audio/*,video/*,.mp3,.wav,.m4a,.aac,.ogg,.opus,.flac,.amr,.caf,.aif,.aiff,.wma,.3gp,.webm,.mp4,.mov" hidden></label></div>
               <div id="musicOpts">

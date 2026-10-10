@@ -1986,3 +1986,40 @@ a.btn.disabled { opacity: .45; pointer-events: none; }
 .clip-fx label { display: flex; flex-direction: column; font-size: 12px; }
 .clip-fx label.check { flex-direction: row; align-items: center; gap: 6px; }
 .tl-clip .fxb { font-style: normal; font-size: 10px; opacity: .9; }
+.pv-stage video.on { opacity: var(--a, 1); }
+.pv-stage #pvFlash { background: #fff; opacity: 0; }
+.pv-stage #pvGrain { width: 100%; height: 100%; mix-blend-mode: overlay; image-rendering: pixelated; }
+.clip-fx .crop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px; }
+.kf-bar { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin: 4px 0 6px; }
+.kf-bar #kfToggle.on { border-color: var(--accent); background: var(--accent-soft); }
+.tl-clip .kfd { position: absolute; bottom: 2px; width: 7px; height: 7px; margin-inline-start: -3.5px; background: #ffd166; transform: rotate(45deg); border: 1px solid #0006; z-index: 3; pointer-events: none; }
+.tl-clip.disabled { opacity: .45; filter: grayscale(1); }
+.ed-player .pv-box { position: absolute; z-index: 5; border: 1.5px solid #fff; box-shadow: 0 0 0 1px #0008; pointer-events: none; transform-origin: center; }
+.ed-player .pv-box i { position: absolute; width: 10px; height: 10px; background: #fff; border: 1px solid #0009; border-radius: 2px; pointer-events: auto; }
+.ed-player .pv-box i[data-bh="nw"] { left: -6px; top: -6px; cursor: nwse-resize; }
+.ed-player .pv-box i[data-bh="ne"] { right: -6px; top: -6px; cursor: nesw-resize; }
+.ed-player .pv-box i[data-bh="sw"] { left: -6px; bottom: -6px; cursor: nesw-resize; }
+.ed-player .pv-box i[data-bh="se"] { right: -6px; bottom: -6px; cursor: nwse-resize; }
+.ed-player .pv-box b { position: absolute; left: 50%; top: -26px; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; background: #fff; border: 1px solid #0009; pointer-events: auto; cursor: grab; }
+.ed-player .pv-box b::after { content: ""; position: absolute; left: 6px; top: 14px; width: 1.5px; height: 12px; background: #fff; }
+.ed-player { position: relative; overflow: hidden; }
+.pane-h.flash { animation: paneFlash 1.2s ease; } @keyframes paneFlash { 0%,40% { color: var(--accent); } 100% { color: inherit; } }
+.tl-heads .trk-flags { display: inline-flex; gap: 1px; margin-inline-start: auto; }
+.tl-heads .trk-flags .tf { font-size: 11px; padding: 0 3px; min-width: 0; opacity: .55; }
+.tl-heads .trk-flags .tf.on, .tl-heads .trk-flags .tf:hover { opacity: 1; }
+.tl-track.locked { background-image: repeating-linear-gradient(135deg, #ffffff08 0 6px, transparent 6px 12px); }
+.tl-track.locked > * { pointer-events: none; }
+.tl-track.hidden-trk > * { opacity: .35; }
+.bin-tools { display: flex; gap: 6px; margin-bottom: 6px; }
+.bin-tools input[type=search] { flex: 1; min-width: 0; padding: 4px 8px; border: 1px solid var(--line); border-radius: 8px; font: inherit; font-size: 13px; background: var(--surface); color: inherit; }
+#binFavOnly.on { border-color: var(--accent); background: var(--accent-soft); }
+.bin-item .fav { position: absolute; bottom: 22px; left: 5px; border: 0; background: #0008; color: #ffd166; border-radius: 6px; font-size: 13px; line-height: 1; padding: 3px 5px; cursor: pointer; opacity: 0; }
+.bin-item:hover .fav, .bin-item .fav.on { opacity: 1; }
+.replace-bar { background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 8px; padding: 6px 8px; font-size: 13px; margin: 6px 0; }
+.bin-grid.replacing .bin-item { outline: 2px dashed var(--accent); outline-offset: -2px; cursor: pointer; }
+.tts-box { border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; margin: 6px 0; }
+.tts-box summary { cursor: pointer; font-size: 13px; }
+.tts-box textarea { width: 100%; box-sizing: border-box; margin: 6px 0; font: inherit; font-size: 13px; padding: 6px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); color: inherit; }
+.tl-heads { width: 138px; }
+.tl-heads > div { white-space: nowrap; gap: 4px; }
+.tl-heads .trk-flags .tf { width: 20px; height: 20px; padding: 0; font-size: 11px; }

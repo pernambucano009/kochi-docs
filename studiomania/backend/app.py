@@ -1749,6 +1749,54 @@ def montage_upload(file: UploadFile = File(...), coach_id: str = Form(""), repla
     return {"id": gid, "duration": info.duration, "synced_shot": synced}
 
 
+class MontageTtsIn(BaseModel):
+    text: str
+    voice_id: str = "Arabic_FriendlyGuy"
+    name: str = ""
+
+
+MONTAGE_TTS_PER_1K = 0.1  # تقريبًا بالدولار لكل 1000 حرف (MiniMax HD على Atlas)
+
+
+@app.get("/api/montage/tts")
+def montage_tts_info():
+    return {"voices": [{"id": k, "label": v} for k, v in AR_VOICES.items()], "per_1k": MONTAGE_TTS_PER_1K}
+
+
+@app.post("/api/montage/tts")
+def montage_tts(body: MontageTtsIn):
+    """🗣️ من جوه المونتاج: تكتب الكلام ويتحول لصوت ويتحفظ في مكتبة الصوت."""
+    text = body.text.strip()[:1500]
+    if not text:
+        raise HTTPException(400, "اكتب الكلام الأول")
+    voice = body.voice_id if body.voice_id in AR_VOICES else "Arabic_FriendlyGuy"
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل. حطه من الإعدادات")
+    aid = uuid.uuid4().hex[:12]
+    fname = f"voice_{aid}.mp3"
+    out = AUDIO_DIR / fname
+    try:
+        if atlas.mock_mode():
+            subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i",
+                            f"sine=frequency=220:duration={max(1.0, 0.45 * len(text.split())):.2f}", "-c:a", "libmp3lame", str(out)],
+                           check=True, capture_output=True, timeout=60)
+        else:
+            url = atlas.run_model("Audio", {"model": TTS_MODEL, "text": text, "voice_id": voice, "language_boost": "Arabic"},
+                                  "تحويل الكلام لصوت", max_seconds=300, interval=2)
+            atlas.download(url, out)
+    except HTTPException:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        out.unlink(missing_ok=True)
+        raise HTTPException(502, f"معرفناش نحوّل الكلام لصوت: {exc}") from exc
+    name = (body.name.strip() or f"🗣️ {text[:40]}")[:80]
+    dur = probe_duration(out)
+    with closing(db()) as conn, conn:
+        conn.execute("INSERT INTO audio (id, kind, name, filename, duration, created_at) VALUES (?, 'voice', ?, ?, ?, ?)",
+                     (aid, name, fname, dur, now()))
+    return {"id": aid, "name": name, "duration": dur, "kind": "voice", "cost": round(len(text) / 1000 * MONTAGE_TTS_PER_1K, 3)}
+
+
 @app.get("/api/montage/sources")
 def montage_sources():
     """الفيديوهات المولَّدة الجاهزة اللي ينفع تدخل المونتاج."""
@@ -1950,6 +1998,13 @@ class ClipEdit(BaseModel):
     fade_in: float = 0.0
     fade_out: float = 0.0
     fit: str = "fill"           # fill / blur / black
+    angle: float = 0.0          # لف بأي زاوية
+    crop: dict | None = None    # {l, t, r, b} نسبة من 0 لـ 0.9
+    kf: list | None = None      # كي فريمز [{t, zoom, x, y, angle}]
+    anim_in: dict | None = None   # {type, dur}
+    anim_out: dict | None = None
+    fx: list | None = None      # [{type, amt}] amt من 0 لـ 100
+    disabled: bool = False      # متعطّلة: بتفضل في التايم لاين بس مش بتطلع في الفيديو
 
 
 class TrackPart(BaseModel):
@@ -1957,6 +2012,8 @@ class TrackPart(BaseModel):
     offset: float = 0.0
     length: float | None = None
     volume: float = 1.0
+    fade_in: float = 0.0
+    fade_out: float = 0.0
 
 
 class TrackEdit(BaseModel):
@@ -1984,6 +2041,13 @@ class ProjectIn(BaseModel):
     typo_id: str | None = None  # مشروع التايبوجرافي اللي مربوط بالمونتاج (طبقة الكلام والعناصر فوق الفيديو)
     typo_on: bool = True        # التايبوجرافي ظاهرة في المعاينة والتصدير
     typo_sfx: dict = {}         # كليكات التايبوجرافي في المونتاج: {on, volume}
+    canvas: dict = {}           # الكادر: {bg: "#rrggbb", ratio: "9:16"}
+    tracks: dict = {}           # حالة كل تراك: {video: {lock, hide, mute}, voice: {...}, ...}
+    markers: list = []          # علامات على التايم لاين [{t, label}]
+    texts: list = []            # النصوص الحرة
+    overlays: list = []         # فيديوهات وصور فوق الفيديو (صورة جوه صورة)
+    sounds: list = []           # تراكات صوت زيادة ومؤثرات
+    export: dict = {}           # إعدادات التصدير {res, fps, quality}
 
 
 PROJECT_SECTIONS = ("coach", "series", "ads")
@@ -2086,6 +2150,33 @@ def track_parts(t: dict) -> list[dict]:
     return [{"delay": t.get("delay", 0), "offset": t.get("offset", 0), "length": t.get("length"), "volume": t.get("volume", 1)}]
 
 
+def track_flag(data: dict, trk: str, flag: str) -> bool:
+    """قفل/إخفاء/كتم التراك من التايم لاين."""
+    return bool(((data.get("tracks") or {}).get(trk) or {}).get(flag))
+
+
+def clip_keyframes(kf, dur: float) -> list | None:
+    out = []
+    for k in (kf or [])[:60]:
+        if not isinstance(k, dict):
+            continue
+        out.append({"t": clamp(float(k.get("t") or 0), 0, dur), "zoom": clamp(float(k.get("zoom", 1)), 0.1, 4),
+                    "x": clamp(float(k.get("x", 0)), -3, 3), "y": clamp(float(k.get("y", 0)), -3, 3),
+                    "angle": clamp(float(k.get("angle", 0)), -720, 720)})
+    return sorted(out, key=lambda k: k["t"]) if len(out) >= 2 else None
+
+
+def clip_anim(a) -> tuple:
+    if not isinstance(a, dict) or a.get("type") not in montage.ANIMS:
+        return ("", 0.0)
+    return (a["type"], clamp(float(a.get("dur") or 0.5), 0.1, 3))
+
+
+def project_bg(data: dict) -> str:
+    bg = str((data.get("canvas") or {}).get("bg") or "")
+    return bg if re.fullmatch(r"#[0-9a-fA-F]{6}", bg) else "black"
+
+
 def build_montage(conn: sqlite3.Connection, data: dict):
     """يحوّل بيانات المشروع لقطع ومسارات صوت جاهزة لـ FFmpeg، ويتأكد إن كل حاجة موجودة."""
     ff = ffmpeg_exe()
@@ -2104,7 +2195,7 @@ def build_montage(conn: sqlite3.Connection, data: dict):
         segments.append(
             montage.Segment(
                 path, start, end,
-                zoom=clamp(c["zoom"], 1, 4), x=clamp(c["x"], -1, 1), y=clamp(c["y"], -1, 1),
+                zoom=clamp(c["zoom"], 0.1, 4), x=clamp(c["x"], -1, 1), y=clamp(c["y"], -1, 1),
                 volume=clamp(c["volume"], 0, 3), has_audio=info.has_audio, src_duration=info.duration,
                 trans_in=tr.get("type") if tr.get("type") in montage.TRANSITIONS and i > 1 else "",
                 trans_dur=clamp(float(tr.get("dur") or 0.5), 0.1, 2.0),
@@ -2114,6 +2205,14 @@ def build_montage(conn: sqlite3.Connection, data: dict):
                 look=c.get("look") if c.get("look") in montage.LOOKS else "",
                 fade_in=clamp(float(c.get("fade_in") or 0), 0, 3), fade_out=clamp(float(c.get("fade_out") or 0), 0, 3),
                 fit=c.get("fit") if c.get("fit") in ("fill", "blur", "black") else "fill",
+                src_w=info.width, src_h=info.height,
+                angle=clamp(float(c.get("angle") or 0), -360, 360),
+                crop=tuple(clamp(float((c.get("crop") or {}).get(k) or 0), 0, 0.9) for k in ("l", "t", "r", "b")),
+                kf=clip_keyframes(c.get("kf"), (end - start) / clamp(float(c.get("speed") or 1), 0.25, 4)),
+                anim_in=clip_anim(c.get("anim_in")), anim_out=clip_anim(c.get("anim_out")),
+                fx=[(f["type"], clamp(float(f.get("amt") or 50), 0, 100) / 100) for f in (c.get("fx") or [])[:6]
+                    if isinstance(f, dict) and f.get("type") in montage.EFFECTS],
+                bg=project_bg(data), blank=bool(c.get("disabled")), hide_video=track_flag(data, "video", "hide"),
             )
         )
     if not segments:
@@ -2135,7 +2234,7 @@ def build_montage(conn: sqlite3.Connection, data: dict):
             outro_len = info.duration
 
     def track(t: dict | None, kind: str) -> list[montage.AudioTrack]:
-        if not t:
+        if not t or track_flag(data, kind, "mute"):
             return []
         row = conn.execute("SELECT filename FROM audio WHERE id = ? AND kind = ?", (t["id"], kind)).fetchone()
         if row is None:
@@ -2149,6 +2248,7 @@ def build_montage(conn: sqlite3.Connection, data: dict):
                 delay=max(0, p["delay"]), offset=max(0, p["offset"]),
                 length=p["length"] if p.get("length") and p["length"] > 0.01 else None,
                 fade_out=bool(t.get("fade_out")) and n == last,
+                fade_in_s=clamp(float(p.get("fade_in") or 0), 0, 10), fade_out_s=clamp(float(p.get("fade_out") or 0), 0, 10),
             )
             for n, p in enumerate(parts)
         ]
@@ -2170,7 +2270,7 @@ def project_logo(data: dict, total: float, outro_len: float) -> montage.Logo | N
 
 def project_captions(conn: sqlite3.Connection, data: dict, total: float, export_id: str) -> montage.Subtitles | None:
     cfg = data.get("captions") or {}
-    if not cfg.get("enabled"):
+    if not cfg.get("enabled") or track_flag(data, "caps", "hide"):
         return None
     voice = data.get("voice")
     if not voice:

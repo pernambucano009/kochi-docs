@@ -139,7 +139,7 @@ function updatePreviewOverlays() {
   }
   const c = capCfg();
   const cap = $("pvCap");
-  const live = c.enabled && liveCaption(c);
+  const live = c.enabled && !trackFlag("caps", "hide") && liveCaption(c);
   cap.hidden = !live;
   if (cap.hidden) return;
   const { words, hl: hlIndex } = live;

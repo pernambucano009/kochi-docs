@@ -71,6 +71,18 @@ class Segment:
     fade_in: float = 0.0        # ظهور من الأسود (ثواني)
     fade_out: float = 0.0       # اختفاء للأسود
     fit: str = "fill"           # fill = يملا الكادر / blur = كامل بخلفية مغبّشة / black = كامل بخلفية سودا
+    # الحركة (زي كاب كات): مقاس الملف الأصلي عشان نحسب كل حاجة بالبكسل
+    src_w: int = 0
+    src_h: int = 0
+    angle: float = 0.0          # لف بأي زاوية (درجات) حوالين نص الكادر
+    crop: tuple = (0.0, 0.0, 0.0, 0.0)  # قص من الشمال/فوق/اليمين/تحت (نسبة من 0 لـ 0.9)
+    kf: list | None = None      # كي فريمز [{t, zoom, x, y, angle}] (t بالثواني من أول القطعة)
+    anim_in: tuple = ("", 0.0)  # حركة دخول (النوع، المدة)
+    anim_out: tuple = ("", 0.0)
+    fx: list | None = None      # تأثيرات [(النوع، القوة من 0 لـ 1)]
+    bg: str = "black"           # لون الخلفية لما الصورة مش مالية الكادر
+    hide_video: bool = False    # تراك الفيديو مستخبي: الصورة بلون الخلفية والصوت زي ما هو
+    blank: bool = False         # قطعة متعطّلة: مكانها بيفضل (بلون الخلفية ومن غير صوت) عشان المواعيد متتغيرش
 
     @property
     def duration(self) -> float:
@@ -92,6 +104,9 @@ class AudioTrack:
     offset: float = 0.0  # يبدأ من ثانية كام جوه الملف
     length: float | None = None  # ياخد كام ثانية من الملف (None = لحد آخره)
     fade_out: bool = False
+    fade_in_s: float = 0.0   # ظهور بالتدريج للقطعة دي (ثواني)
+    fade_out_s: float = 0.0  # اختفاء بالتدريج للقطعة دي
+    duck: float = 0.0        # بيوطّى قد إيه وقت الكلام (0 = لأ)
 
 
 @dataclass
@@ -157,6 +172,117 @@ def color_filters(seg: "Segment") -> str:
     return ("," + ",".join(f)) if f else ""
 
 
+# ---------- الحركة: كي فريمز + حركات دخول وخروج + تأثيرات (نفس المعادلات بالظبط في المعاينة montage.js) ----------
+ANIMS = {"fade", "zoomin", "zoomout", "slidel", "slider", "slideu", "slided", "pop", "spin"}
+ANIM_FADES = {"fade", "zoomin", "zoomout", "pop", "spin"}  # الحركات اللي بتظهر بالتدريج كمان
+MOTION_FX = {"shake", "pulse", "glitch"}  # بتحرّك الصورة
+POST_FX = {"flash", "rgb", "blur", "grain"}  # بتتحط على الصورة بعد ما تتركّب
+EFFECTS = MOTION_FX | POST_FX
+
+
+def _f(v: float) -> str:
+    return f"{v:.5f}"
+
+
+def kf_expr(kf: list, key: str, default: float, tl: str) -> str:
+    """قيمة خاصية في وقت tl من الكي فريمز: بين كل اتنين انتقال ناعم (smoothstep)، وقبل الأول وبعد الآخر ثابتة."""
+    pts = sorted((float(k["t"]), float(k.get(key, default))) for k in kf or [] if k.get(key) is not None)
+    if not pts:
+        return _f(default)
+    expr = _f(pts[-1][1])
+    for (t0, v0), (t1, v1) in reversed(list(zip(pts, pts[1:]))):
+        if t1 - t0 < 1e-3:
+            continue
+        p = f"(({tl})-{t0:.4f})/{t1 - t0:.4f}"
+        expr = f"if(lt({tl},{t1:.4f}),{_f(v0)}+({_f(v1 - v0)})*{p}*{p}*(3-2*{p}),{expr})"
+    return f"if(lt({tl},{pts[0][0]:.4f}),{_f(pts[0][1])},{expr})"
+
+
+def kf_value(kf: list, key: str, default: float, t: float) -> float:
+    pts = sorted((float(k["t"]), float(k.get(key, default))) for k in kf or [] if k.get(key) is not None)
+    if not pts:
+        return default
+    if t <= pts[0][0]:
+        return pts[0][1]
+    for (t0, v0), (t1, v1) in zip(pts, pts[1:]):
+        if t < t1 and t1 - t0 >= 1e-3:
+            p = (t - t0) / (t1 - t0)
+            return v0 + (v1 - v0) * p * p * (3 - 2 * p)
+    return pts[-1][1]
+
+
+def motion_exprs(seg: "Segment", tl: str, fx_tl: str | None = None) -> dict:
+    """معادلات FFmpeg لحركة القطعة في الوقت tl (من أول القطعة): z مضاعف الزووم، x/y من -1 لـ 1،
+    dx/dy إزاحة زيادة بالبكسل، a زاوية بالدرجات."""
+    dur = seg.duration
+    kf = seg.kf or []
+    z = [kf_expr(kf, "zoom", seg.zoom, tl) if kf else _f(seg.zoom)]
+    x = kf_expr(kf, "x", seg.x, tl) if kf else _f(seg.x)
+    y = kf_expr(kf, "y", seg.y, tl) if kf else _f(seg.y)
+    a = [kf_expr(kf, "angle", seg.angle, tl) if kf else _f(seg.angle)]
+    dx, dy = ["0"], ["0"]
+    for kind, (typ, d), sign in (("in", seg.anim_in, 1), ("out", seg.anim_out, -1)):
+        if typ not in ANIMS or d <= 0.01:
+            continue
+        d = min(d, dur)
+        p = f"clip(({tl})/{d:.4f},0,1)" if kind == "in" else f"clip(({dur:.4f}-({tl}))/{d:.4f},0,1)"
+        e = f"(1-pow(1-{p},3))"
+        if typ == "zoomin":
+            z.append(f"(0.5+0.5*{e})")
+        elif typ == "zoomout":
+            z.append(f"(1.5-0.5*{e})")
+        elif typ == "pop":
+            z.append(f"(0.3+0.7*(1+2.70158*pow({p}-1,3)+1.70158*pow({p}-1,2)))")
+        elif typ == "spin":
+            z.append(f"(0.4+0.6*{e})")
+            a.append(f"({-sign * 180}*(1-{e}))")
+        elif typ == "slidel":
+            dx.append(f"({sign * WIDTH}*(1-{e}))")
+        elif typ == "slider":
+            dx.append(f"({-sign * WIDTH}*(1-{e}))")
+        elif typ == "slideu":
+            dy.append(f"({sign * HEIGHT}*(1-{e}))")
+        elif typ == "slided":
+            dy.append(f"({-sign * HEIGHT}*(1-{e}))")
+    tl = fx_tl or tl  # التأثيرات المستمرة بتمشي حتى في فريمات الترانزيشن
+    for typ, amt in seg.fx or []:
+        if typ == "shake":
+            dx.append(f"({amt * WIDTH * 0.015:.3f}*(sin(({tl})*47)+sin(({tl})*31.7)))")
+            dy.append(f"({amt * HEIGHT * 0.01:.3f}*(sin(({tl})*39)+sin(({tl})*27.3)))")
+        elif typ == "pulse":
+            z.append(f"(1+{amt * 0.08:.4f}*pow(max(0,sin(({tl})*12.566)),4))")
+        elif typ == "glitch":
+            dx.append(f"(gt(mod(({tl}),0.9),0.78)*{amt * WIDTH * 0.04:.2f}*sin(({tl})*90))")
+    return {"z": "*".join(z), "x": x, "y": y, "a": "+".join(a), "dx": "+".join(dx), "dy": "+".join(dy)}
+
+
+def needs_motion(seg: "Segment") -> bool:
+    """القطعة محتاجة طريقة التركيب الكاملة (أبطأ شوية) بدل القص السريع."""
+    return bool(
+        seg.kf or abs(seg.angle) > 0.01 or seg.zoom < 0.999
+        or (seg.anim_in[0] in ANIMS and seg.anim_in[1] > 0.01) or (seg.anim_out[0] in ANIMS and seg.anim_out[1] > 0.01)
+        or any(t in MOTION_FX for t, _ in seg.fx or [])
+    )
+
+
+def post_fx(seg: "Segment", tl: str) -> str:
+    """التأثيرات اللي بتتحط على الكادر بعد التركيب (فلاش، ألوان مفصولة، بلور، حبيبات، وألوان الجليتش)."""
+    f = []
+    for typ, amt in seg.fx or []:
+        if typ == "flash":
+            f.append(f"eq=brightness='{amt * 0.5:.3f}*pow(max(0,sin(({tl})*9.4248)),8)':eval=frame")
+        elif typ == "rgb":
+            n = max(1, round(amt * 12))
+            f.append(f"rgbashift=rh=-{n}:bh={n}")
+        elif typ == "blur":
+            f.append(f"gblur=sigma={max(0.5, amt * 12):.2f}")
+        elif typ == "grain":
+            f.append(f"noise=alls={max(1, round(amt * 35))}:allf=t+u")
+        elif typ == "glitch":
+            f.append(f"hue=h='gt(mod(({tl}),0.9),0.78)*{amt * 90:.1f}'")
+    return ("," + ",".join(f)) if f else ""
+
+
 def encoder_args(preset: str, crf: int, low_memory: bool) -> list[str]:
     args = ["-c:v", "libx264", "-preset", preset, "-crf", str(crf), "-threads", "1" if low_memory else str(THREADS)]
     if low_memory:
@@ -168,6 +294,14 @@ def segment_command(ffmpeg: str, seg: Segment, output: Path, low_memory: bool = 
     """المرحلة الأولى: قطعة واحدة بس، مقصوصة ومتظبطة على 1080×1920 وصوتها موحّد، وعليها تأثيراتها
     (سرعة، عكس، قلب، لف، ألوان، فلتر، ظهور/اختفاء، ملء الكادر أو كاملة بخلفية).
     pre/post: ثواني زيادة (بوقت الفيديو النهائي) قبلها وبعدها للترانزيشن (من الفيديو الأصلي، واللي مش موجود بيثبت على أول/آخر فريم)."""
+    if seg.blank:
+        total = seg.duration + pre + post
+        bgc = ("0x" + seg.bg.lstrip("#")) if re.fullmatch(r"#[0-9a-fA-F]{6}", seg.bg or "") else "black"
+        return [ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
+                "-f", "lavfi", "-i", f"color=c={bgc}:s={WIDTH}x{HEIGHT}:r={FPS}:d={total:.3f}",
+                "-f", "lavfi", "-i", f"anullsrc=r=48000:cl=stereo", "-t", f"{total:.3f}",
+                "-map", "0:v", "-map", "1:a", "-pix_fmt", "yuv420p", *encoder_args("veryfast", 16, low_memory),
+                "-c:a", "flac", "-sample_fmt", "s16", str(output)]
     sp = max(0.25, min(4.0, seg.speed or 1.0))
     start = max(0.0, seg.start - pre * sp)
     lack_pre = pre - (seg.start - start) / sp
@@ -181,8 +315,12 @@ def segment_command(ffmpeg: str, seg: Segment, output: Path, low_memory: bool = 
             "-threads", "1", "-ss", f"{start:.3f}", "-t", f"{take:.3f}", "-i", str(seg.path)]
     pad = (f",tpad=start_mode=clone:start_duration={lack_pre:.3f}" if lack_pre > 0.001 else "") + \
           (f",tpad=stop_mode=clone:stop_duration={lack_post:.3f}" if lack_post > 0.001 else "")
-    # قبل أي حاجة: عكس + لف + قلب + سرعة (على الفيديو الأصلي)
+    # قبل أي حاجة: قص الكادر + عكس + لف + قلب + سرعة (على الفيديو الأصلي)
     pre_f = []
+    cl, ct, cr, cb = (max(0.0, min(0.9, float(v or 0))) for v in (seg.crop or (0, 0, 0, 0)))
+    if cl + cr > 0.001 or ct + cb > 0.001:
+        cw, ch = max(0.1, 1 - cl - cr), max(0.1, 1 - ct - cb)
+        pre_f.append(f"crop=w='trunc(iw*{cw:.4f}/2)*2':h='trunc(ih*{ch:.4f}/2)*2':x='iw*{cl:.4f}':y='ih*{ct:.4f}'")
     if seg.reverse:
         pre_f.append("reverse")
     rot = int(seg.rotate or 0) % 360
@@ -205,9 +343,65 @@ def segment_command(ffmpeg: str, seg: Segment, output: Path, low_memory: bool = 
         fades += f",fade=t=in:st={pre:.3f}:d={min(seg.fade_in, seg.duration):.3f}"
     if seg.fade_out > 0.01:
         fades += f",fade=t=out:st={max(0.0, pre + seg.duration - seg.fade_out):.3f}:d={min(seg.fade_out, seg.duration):.3f}"
-    look = color_filters(seg)
-    if seg.fit in ("blur", "black"):
-        # الصورة كاملة جوه الكادر، والفاضي حواليها خلفية مغبّشة من نفس الفيديو أو سودا
+    # الوقت جوه القطعة (قبل ما نزوّد فريمات الترانزيشن الناقصة): t + (اللي اتزوّد قدام) − pre
+    off = lack_pre - pre
+    tl = f"(t{off:+.4f})"
+    look = color_filters(seg) + post_fx(seg, tl)
+    bg_color = seg.bg if re.fullmatch(r"#?[0-9a-fA-F]{6}", seg.bg or "") else "black"
+    bg_color = ("0x" + bg_color.lstrip("#")) if bg_color != "black" else "black"
+    if needs_motion(seg) and seg.src_w and seg.src_h:
+        # التركيب الكامل: الصورة بمقاسها الأساسي، بتتلف وتتكبّر وتتحرك فريم بفريم فوق الخلفية
+        sw, sh = seg.src_w * max(0.1, 1 - cl - cr), seg.src_h * max(0.1, 1 - ct - cb)
+        if rot in (90, 270):
+            sw, sh = sh, sw
+        fit = seg.fit in ("blur", "black")
+        k = min(WIDTH / sw, HEIGHT / sh) if fit else max(WIDTH / sw, HEIGHT / sh)
+        bw, bh = max(2, round(sw * k / 2) * 2), max(2, round(sh * k / 2) * 2)
+        m = motion_exprs(seg, f"clip({tl},0,{seg.duration:.4f})", tl)
+        zexpr, aexpr, dxe, dye = m["z"], m["a"], m["dx"], m["dy"]
+        fg = [f"scale={bw}:{bh},setsar=1"]
+        # تسريع اللف: لو الصورة مالية الكادر ومفيش حركة بتغيّر الزووم أو المكان، بنشيل اللي عمره ما هيظهر
+        # (قص متماثل حوالين نص الصورة، فنص اللف ومكان الصورة مبيتغيروش)
+        slides = any(t.startswith("slide") or t in ("zoomin", "pop", "spin") for t, _ in (seg.anim_in, seg.anim_out))
+        if aexpr != _f(0.0) and not fit and not seg.kf and not slides and seg.zoom >= 1:
+            zz = seg.zoom * (1.1 if any(t == "pulse" for t, _ in seg.fx or []) else 1.0)
+            reach = (WIDTH * WIDTH + HEIGHT * HEIGHT) ** 0.5 / 2 + WIDTH * 0.06
+            px, py = abs(seg.x) * max(0, bw * seg.zoom - WIDTH) / 2, abs(seg.y) * max(0, bh * seg.zoom - HEIGHT) / 2
+            kw = min(bw, round((px + reach) / zz) * 2 + 2) // 2 * 2
+            kh = min(bh, round((py + reach) / zz) * 2 + 2) // 2 * 2
+            if kw < bw or kh < bh:
+                fg.append(f"crop={kw}:{kh}")
+        fg.append("format=yuva420p")
+        # ظهور واختفاء الصورة نفسها مع الحركة (لازم قبل اللف والتكبير عشان الشفافية متبوظش)
+        st0 = pre - lack_pre
+        for kind, (typ, d) in (("in", seg.anim_in), ("out", seg.anim_out)):
+            if typ in ANIM_FADES and d > 0.01:
+                d = min(d, seg.duration)
+                st = st0 if kind == "in" else st0 + seg.duration - d
+                fg.append(f"fade=t={kind}:st={max(0.0, st):.3f}:d={d:.3f}:alpha=1")
+        if aexpr != _f(0.0):
+            fg.append(f"rotate=a='({aexpr})*PI/180':ow='hypot(iw,ih)':oh='hypot(iw,ih)':c=black@0")
+        fg.append(f"scale=w='max(2,trunc(iw*({zexpr})/2)*2)':h='max(2,trunc(ih*({zexpr})/2)*2)':eval=frame")
+        # مكان نص الصورة: «يملا الكادر» بيتحرك جوه الزيادة، و«كامل» بيتحرك بنسبة من الكادر
+        cwz = f"({bw}*({zexpr}))"
+        chz = f"({bh}*({zexpr}))"
+        if fit:
+            cx, cy = f"{WIDTH / 2}+({m['x']})*{WIDTH / 2}", f"{HEIGHT / 2}+({m['y']})*{HEIGHT / 2}"
+        else:
+            cx = f"{WIDTH / 2}-({m['x']})*max(0,{cwz}-{WIDTH})/2"
+            cy = f"{HEIGHT / 2}-({m['y']})*max(0,{chz}-{HEIGHT})/2"
+        ox, oy = f"{cx}+({dxe})-w/2", f"{cy}+({dye})-h/2"
+        if seg.fit == "blur":
+            filters = [
+                f"{head}split=2[bgs][fgs]",
+                f"[bgs]scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=increase,crop={WIDTH}:{HEIGHT},boxblur=24:3,eq=brightness=-0.06,setsar=1[bg]",
+                f"[fgs]{','.join(fg)}[fg]",
+            ]
+        else:
+            filters = [f"{head}{','.join(fg)}[fg]", f"color=c={bg_color}:s={WIDTH}x{HEIGHT}:r={FPS}[bg]"]
+        filters.append(f"[bg][fg]overlay=x='{ox}':y='{oy}':eval=frame:shortest=1,setsar=1,fps={FPS}{look}{pad}{fades},format=yuv420p[v]")
+    elif seg.fit in ("blur", "black"):
+        # الصورة كاملة جوه الكادر، والفاضي حواليها خلفية مغبّشة من نفس الفيديو أو لون
         fg_w, fg_h = f"{WIDTH}*{z:.4f}", f"{HEIGHT}*{z:.4f}"
         fg = f"scale=w='{fg_w}':h='{fg_h}':force_original_aspect_ratio=decrease:force_divisible_by=2,setsar=1"
         ox, oy = f"(W-w)/2+{seg.x * WIDTH * 0.5:.1f}", f"(H-h)/2+{seg.y * HEIGHT * 0.5:.1f}"
@@ -221,7 +415,7 @@ def segment_command(ffmpeg: str, seg: Segment, output: Path, low_memory: bool = 
         else:
             filters = [
                 f"{head}{fg}[fg]",
-                f"color=c=black:s={WIDTH}x{HEIGHT}:r={FPS}[bg]",
+                f"color=c={bg_color}:s={WIDTH}x{HEIGHT}:r={FPS}[bg]",
                 f"[bg][fg]overlay=x='{ox}':y='{oy}':shortest=1,setsar=1,fps={FPS}{look}{pad}{fades},format=yuv420p[v]",
             ]
     else:
@@ -232,6 +426,8 @@ def segment_command(ffmpeg: str, seg: Segment, output: Path, low_memory: bool = 
             f":x='(iw-ow)/2*(1+({seg.x:.4f}))':y='(ih-oh)/2*(1+({seg.y:.4f}))',"
             f"scale={WIDTH}:{HEIGHT},setsar=1,fps={FPS}{look}{pad}{fades},format=yuv420p[v]"
         ]
+    if seg.hide_video:
+        filters[-1] = filters[-1].replace(",format=yuv420p[v]", f",drawbox=x=0:y=0:w=iw:h=ih:color={bg_color}:t=fill,format=yuv420p[v]")
     if seg.has_audio:
         audio_in = "[0:a]"
     else:
@@ -367,7 +563,13 @@ def build_commands(
                 f"{outs[k]}{trim},asetpts=PTS-STARTPTS+{delay:.3f}/TB,aresample=async=1:first_pts=0,"
                 f"volume={track.volume:.3f},apad,atrim=0:{total:.3f}"
             )
-            if track.fade_out:
+            end_p = min(total, delay + track.length) if track.length else total
+            if track.fade_in_s > 0.01:
+                chain += f",afade=t=in:st={delay:.3f}:d={min(track.fade_in_s, max(0.01, end_p - delay)):.3f}"
+            if track.fade_out_s > 0.01:
+                d = min(track.fade_out_s, max(0.01, end_p - delay))
+                chain += f",afade=t=out:st={max(delay, end_p - d):.3f}:d={d:.3f}"
+            elif track.fade_out:
                 # يختفي بالتدريج في آخره، أو في آخر الفيديو لو هو أطول منه
                 end = min(total, delay + track.length) if track.length else total
                 if end - delay > MUSIC_FADE_SECONDS:
