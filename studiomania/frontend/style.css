@@ -2023,3 +2023,29 @@ a.btn.disabled { opacity: .45; pointer-events: none; }
 .tl-heads { width: 138px; }
 .tl-heads > div { white-space: nowrap; gap: 4px; }
 .tl-heads .trk-flags .tf { width: 20px; height: 20px; padding: 0; font-size: 11px; }
+.tl-markers { position: absolute; left: 0; top: 0; height: 0; z-index: 6; }
+.tl-mark { position: absolute; top: 0; width: 0; height: 22px; cursor: pointer; }
+.tl-mark::before { content: ""; position: absolute; left: -5px; top: 2px; width: 10px; height: 12px; background: #ffb347; clip-path: polygon(0 0, 100% 0, 100% 70%, 50% 100%, 0 70%); }
+.tl-mark em { position: absolute; left: 7px; top: 1px; font-style: normal; font-size: 10px; color: #ffb347; white-space: nowrap; pointer-events: none; }
+.ctx-menu { position: fixed; z-index: 1000; min-width: 220px; background: #1b1e25; color: #e8eaef; border: 1px solid #2f3440; border-radius: 10px; padding: 5px; box-shadow: 0 10px 30px #0008; font-size: 13px; }
+.ctx-menu button { display: flex; width: 100%; justify-content: space-between; gap: 16px; align-items: center; background: none; border: 0; color: inherit; font: inherit; padding: 6px 10px; border-radius: 6px; cursor: pointer; text-align: start; }
+.ctx-menu button:hover:not(:disabled) { background: #2a2f3a; }
+.ctx-menu button:disabled { opacity: .4; cursor: default; }
+.ctx-menu kbd { font-family: ui-monospace, monospace; font-size: 11px; color: #9aa1ae; }
+.ctx-menu hr { border: 0; border-top: 1px solid #2f3440; margin: 4px 0; }
+#tpLoop.on { color: var(--accent); }
+.ed-player.full { background: #000; justify-content: center; }
+.ed-player.full .frame { transform-origin: center; }
+.h-snd, .t-snd { height: 30px; }
+.t-snd { position: relative; }
+.tl-audio.snd { background: #4a2140; top: 2px; bottom: auto; }
+.tl-audio.snd.off { opacity: .4; }
+.tl-audio.snd .nm { font-size: 10px; }
+.snd-tools { display: flex; flex-direction: column; gap: 6px; }
+.snd-tools input[type=search] { padding: 4px 8px; border: 1px solid var(--line); border-radius: 8px; font: inherit; font-size: 13px; background: var(--surface); color: inherit; }
+.sfx-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; max-height: 210px; overflow: auto; }
+.sfx-item { display: flex; align-items: center; gap: 4px; border: 1px solid var(--line); border-radius: 8px; padding: 2px 4px; font-size: 12px; min-width: 0; }
+.sfx-item span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sfx-item button { border: 0; background: none; cursor: pointer; font-size: 12px; padding: 2px 4px; border-radius: 6px; color: inherit; }
+.sfx-item button.add { background: var(--accent); color: #fff; }
+#micRec.rec { background: #c0392b; color: #fff; border-color: #c0392b; }

@@ -443,6 +443,8 @@
                   <button class="ic play" id="tpPlay" title="تشغيل / إيقاف (Space)">▶︎</button>
                   <button class="ic" id="tpNext" title="فريم لقدّام (→)">|▶︎</button>
                   <button class="ic" id="tpEnd" title="للآخر (End)">⏭</button>
+                  <button class="ic" id="tpLoop" title="تشغيل متكرر (L)">🔁</button>
+                  <button class="ic" id="tpFull" title="المعاينة على الشاشة كلها (F)">⛶</button>
                   <span class="spacer"></span>
                   <span class="tc muted" id="totalLabel"></span>
                 </div>
@@ -542,6 +544,7 @@
                 <div class="pane" data-pane="audio" hidden>
                   <div class="part-props" id="partProps" hidden>
                     <h3 class="pane-h" id="partLabel"></h3>
+                    <label class="field slider-field">العلو <b id="pVolVal"></b><input type="range" id="pVol" min="0" max="200" step="5" dir="ltr"></label>
                     <label class="field slider-field">ظهور بالتدريج <b id="pFadeInVal"></b><input type="range" id="pFadeIn" min="0" max="500" step="10" dir="ltr"></label>
                     <label class="field slider-field">اختفاء بالتدريج <b id="pFadeOutVal"></b><input type="range" id="pFadeOut" min="0" max="500" step="10" dir="ltr"></label>
                   </div>
@@ -565,6 +568,24 @@
                 <label class="field slider-field">الصوت <b id="voiceVolVal"></b><input type="range" id="mVoiceVol" min="0" max="200" step="5" dir="ltr"></label>
                 <p class="hint">حرّكه وقصّه وقسّمه من التايم لاين تحت.</p>
               </div>
+
+              <h3 class="pane-h" id="secSounds">🔉 مؤثرات وأصوات زيادة</h3>
+              <div class="snd-tools">
+                <input type="search" id="sfxSearch" placeholder="🔍 دوّر على مؤثر" dir="auto">
+                <div class="sfx-grid" id="sfxGrid"></div>
+                <div class="row wrap">
+                  <label class="field" title="أي صوت من المكتبة (تعليق أو موسيقى) يتحط في تراك الأصوات عند المؤشر"><select id="sndFromLib"></select></label>
+                  <label class="btn sm" title="ارفع مؤثر صوتي من عندك ويتحفظ في المكتبة">⬆ ارفع مؤثر<input type="file" id="sfxUpload" accept="audio/*,.wav,.mp3,.m4a,.ogg" hidden></label>
+                  <button class="btn sm" id="micRec" title="سجّل بصوتك من المايك ويتحط عند المؤشر">🎙️ سجّل</button>
+                  <span class="muted" id="micInfo"></span>
+                </div>
+              </div>
+              <h3 class="pane-h" id="secMix">🎚️ ظبط الصوت كله</h3>
+              <label class="check" title="الموسيقى بتوطى لوحدها وقت ما فيه كلام، وترجع تعلى بعده"><input type="checkbox" id="mixDuckOn"> توطية الموسيقى وقت الكلام</label>
+              <label class="field slider-field" id="mixDuckRow">قد إيه <b id="mixDuckVal"></b><input type="range" id="mixDuck" min="10" max="100" step="5" dir="ltr"></label>
+              <label class="check" title="بيشيل الزنّة والوشّ ويخلي الكلام أوضح"><input type="checkbox" id="mixEnhance"> تنضيف صوت التعليق</label>
+              <label class="check" title="الفيديو يطلع بنفس العلو المناسب للسوشيال (‎-14 LUFS)"><input type="checkbox" id="mixNormalize"> توحيد علو الصوت</label>
+              <p class="hint">التنضيف والتوطية وتوحيد العلو بيبانوا في الفيديو المتصدّر.</p>
 
               <h3 class="pane-h" id="secMusic">🎵 الموسيقى</h3>
               <div class="sel-up"><label class="field"><select id="mMusic"></select></label>
@@ -642,6 +663,9 @@
                 <button class="ic tool" data-tool="blade" title="أداة القطع: دوس على القطعة مكان ما عايز تقطع (B)">✂ أداة القطع</button>
                 <button class="ic" id="tlSplit" title="قسّم عند المؤشر (S)">⫿ قسّم</button>
                 <button class="ic" id="tlDelete" title="احذف المختار (Delete)">🗑</button>
+                <button class="ic" id="tlDelLeft" title="امسح اللي قبل المؤشر في القطعة المختارة (Q)">⇤✂</button>
+                <button class="ic" id="tlDelRight" title="امسح اللي بعد المؤشر في القطعة المختارة (W)">✂⇥</button>
+                <button class="ic" id="tlMarker" title="علامة عند المؤشر (M)">🚩</button>
                 <span class="sep"></span>
                 <button class="ic" id="tlPrevFrame" title="فريم لورا (←)">◀︎|</button>
                 <button class="ic" id="tlNextFrame" title="فريم لقدّام (→)">|▶︎</button>
@@ -657,6 +681,7 @@
                   <div class="h-video">🎞️ فيديو <button class="ic mute-all" id="muteAll" hidden></button></div>
                   <div class="h-voice">🎙️ تعليق</div>
                   <div class="h-music">🎵 موسيقى</div>
+                  <div class="h-snd" id="hSnd">🔉 أصوات</div>
                   <div class="h-caps">✍️ كابشن</div>
                   <div class="h-typo">🔤 تايبوجرافي</div>
                   <div class="h-fx">✨ عناصر <button class="ic" id="fxAddQuick" title="ضيف عنصر عند المؤشر">＋</button></div>
@@ -668,16 +693,18 @@
                     <div class="tl-track t-video" id="trkVideo"></div>
                     <div class="tl-track t-voice" id="trkVoice"></div>
                     <div class="tl-track t-music" id="trkMusic"></div>
+                    <div class="tl-track t-snd" id="trkSnd"></div>
                     <div class="tl-track t-caps" id="trkCaps"></div>
                     <div class="tl-track t-typo" id="trkTypo"></div>
                     <div class="tl-track t-fx" id="trkFx"></div>
                     <div class="tl-track t-click" id="trkClick"></div>
                     <div class="tl-hover" id="tlHover" hidden></div>
+                    <div class="tl-markers" id="tlMarkers"></div>
                     <div class="tl-playhead" id="tlPlayhead"><span></span></div>
                   </div>
                 </div>
               </div>
-              <p class="tl-keys" dir="rtl">Space تشغيل · ← → فريم فريم (Shift = ثانية) · S قسّم · B أداة القطع · V اختيار · Delete حذف · Ctrl+Z رجوع · Ctrl + عجلة الماوس زووم · Ctrl + دوسة أو اسحب مربع = اختيار كذا قطعة · Ctrl+A الكل</p>
+              <p class="tl-keys" dir="rtl">Space تشغيل · ← → فريم فريم (Shift = ثانية) · S قسّم · B أداة القطع · V اختيار · Delete حذف · Q/W امسح قبل/بعد المؤشر · M علامة · L تكرار · F شاشة كاملة · Ctrl+Shift+C/V نسخ/لصق الإعدادات · كليك يمين = قايمة · Ctrl+Z رجوع · Ctrl + عجلة الماوس زووم · Ctrl + دوسة أو اسحب مربع = اختيار كذا قطعة · Ctrl+A الكل</p>
             </section>
           </div>
         </main>

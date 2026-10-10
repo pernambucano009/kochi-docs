@@ -463,6 +463,8 @@ def build_commands(
     logo: Logo | None = None,
     subtitles: Subtitles | None = None,
     low_memory: bool = False,
+    sounds: list[AudioTrack] | None = None,
+    audio_fx: dict | None = None,
 ) -> tuple[list[list[str]], float]:
     """يبني أوامر FFmpeg بالترتيب ويرجّعها مع الطول النهائي للفيديو.
 
@@ -538,13 +540,14 @@ def build_commands(
     def as_list(t):
         return [x for x in t if x] if isinstance(t, list) else ([t] if t else [])
 
-    tracks = [("voice", t) for t in as_list(voice)] + [("music", t) for t in as_list(music)]
+    tracks = [("voice", t) for t in as_list(voice)] + [("music", t) for t in as_list(music)] + [("sound", t) for t in as_list(sounds)]
+    afx = audio_fx or {}
     args = base_args + ["-vn"] + concat_in
     filters = ["[0:a]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo[base]"]
-    mix = ["[base]"]
-    files: dict[Path, list[AudioTrack]] = {}
-    for _, t in tracks:
-        files.setdefault(t.path, []).append(t)
+    groups: dict[str, list[str]] = {"voice": [], "music": [], "sound": []}
+    files: dict[Path, list[tuple[str, AudioTrack]]] = {}
+    for kind, t in tracks:
+        files.setdefault(t.path, []).append((kind, t))
     for fi, (path, parts_of_file) in enumerate(files.items(), start=1):
         args += ["-i", str(path)]
         outs = [f"[f{fi}p{k}]" for k in range(len(parts_of_file))]
@@ -553,14 +556,18 @@ def build_commands(
             f"asplit={len(outs)}{''.join(outs)}" if len(outs) > 1 else
             f"[{fi}:a]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo{outs[0]}"
         )
-        for k, track in enumerate(parts_of_file):
+        for k, (kind, track) in enumerate(parts_of_file):
             offset = max(0.0, track.offset)
             trim = f"atrim=start={offset:.3f}" + (f":duration={track.length:.3f}" if track.length else "")
             delay = max(0.0, track.delay)
             # بنأخّر القطعة بتغيير وقتها وaresample بيملا اللي قبلها سكوت.
             # adelay بيتجاهل التأخير لو جه بعد قص الصوت (في FFmpeg 7.0)، فالقطع كانت بتبدأ من أول الفيديو
+            clean = ""
+            if kind == "voice" and afx.get("enhance"):
+                # تنضيف الصوت: شيل الزنّة الواطية والوشّ، وضغط خفيف يخلي الكلام واضح
+                clean = "highpass=f=80,afftdn=nf=-25,acompressor=threshold=-20dB:ratio=3:attack=5:release=120:makeup=2,equalizer=f=3200:t=q:w=1.2:g=2.5,"
             chain = (
-                f"{outs[k]}{trim},asetpts=PTS-STARTPTS+{delay:.3f}/TB,aresample=async=1:first_pts=0,"
+                f"{outs[k]}{trim},asetpts=PTS-STARTPTS+{delay:.3f}/TB,aresample=async=1:first_pts=0,{clean}"
                 f"volume={track.volume:.3f},apad,atrim=0:{total:.3f}"
             )
             end_p = min(total, delay + track.length) if track.length else total
@@ -576,11 +583,29 @@ def build_commands(
                     chain += f",afade=t=out:st={end - MUSIC_FADE_SECONDS:.3f}:d={MUSIC_FADE_SECONDS}"
             label = f"[a{fi}_{k}]"
             filters.append(chain + label)
-            mix.append(label)
+            groups[kind].append(label)
+
+    def bus(labels: list[str], name: str) -> str | None:
+        if not labels:
+            return None
+        if len(labels) == 1:
+            return labels[0]
+        filters.append(f"{''.join(labels)}amix=inputs={len(labels)}:duration=first:normalize=0[{name}]")
+        return f"[{name}]"
+
+    vbus, mbus, sbus = bus(groups["voice"], "vbus"), bus(groups["music"], "mbus"), bus(groups["sound"], "sbus")
+    duck = max(0.0, min(1.0, float(afx.get("duck") or 0)))
+    if vbus and mbus and duck > 0.01:
+        # الموسيقى بتوطى لوحدها وقت الكلام (sidechain)
+        filters.append(f"{vbus}asplit=2[vmain][vside]")
+        filters.append(f"{mbus}[vside]sidechaincompress=threshold=0.02:ratio={1 + duck * 11:.2f}:attack=15:release=450:makeup=1[mduck]")
+        vbus, mbus = "[vmain]", "[mduck]"
+    mix = ["[base]"] + [b for b in (vbus, mbus, sbus) if b]
+    tail = ",loudnorm=I=-14:TP=-1.5:LRA=11,aresample=48000" if afx.get("normalize") else ""
     if len(mix) > 1:
-        filters.append(f"{''.join(mix)}amix=inputs={len(mix)}:duration=first:normalize=0[aout]")
+        filters.append(f"{''.join(mix)}amix=inputs={len(mix)}:duration=first:normalize=0{tail}[aout]")
     else:
-        filters.append("[base]anull[aout]")
+        filters.append(f"[base]anull{tail}[aout]")
     commands.append(args + [
         "-filter_complex", ";".join(filters), "-map", "[aout]", "-t", f"{total:.3f}",
         "-c:a", "flac", "-sample_fmt", "s16", str(mixed),

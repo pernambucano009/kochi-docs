@@ -82,9 +82,10 @@ async function initMontage() {
   if (back) { $("montageBack").dataset.goto = back[0]; $("montageBack").textContent = back[1]; }
   $("newFromVideo").hidden = section !== "coach";
   let all;
-  [all, mt.sources, mt.coaches, mt.voices, mt.music, mt.videos] = await Promise.all([
+  [all, mt.sources, mt.coaches, mt.voices, mt.music, mt.videos, mt.sfx] = await Promise.all([
     api("/api/projects"), api("/api/montage/sources"), api("/api/coaches"),
     api("/api/audio?kind=voice"), api("/api/audio?kind=music"), api("/api/videos"),
+    api("/api/montage/sfx").catch(() => []),
   ]);
   mt.projects = all.filter((p) => (p.section || "coach") === section);
   fillSelects();
@@ -235,7 +236,30 @@ function normalizeTracks(d) {
 }
 
 // كل قطعة صوت ومكانها على التايم لاين
+// تراكات الصوت: التعليق والموسيقى (ملف واحد مقسوم قطع) والأصوات الزيادة (كل قطعة ملفها لوحدها، وليها سطر)
+const isAudKind = (k) => k === "voice" || k === "music" || k === "snd";
+function partsOf(kind) {
+  const d = mt.project?.data;
+  if (!d) return [];
+  if (kind === "snd") return d.sounds || (d.sounds = []);
+  return d[kind]?.parts || [];
+}
+function soundSource(src) {
+  return (mt.sfx || []).find((x) => x.id === src) || mt.voices.find((x) => x.id === src) || mt.music.find((x) => x.id === src) || null;
+}
+function soundParts() {
+  const list = partsOf("snd"), t = { parts: list };
+  return list.map((p, k) => {
+    const a = soundSource(p.src);
+    if (!a) return null;
+    const offset = clamp(p.offset || 0, 0, Math.max(0, a.duration - MIN_CLIP));
+    const len = Math.max(MIN_CLIP, Math.min(p.length || Infinity, a.duration - offset));
+    const t0 = Math.max(0, p.delay || 0);
+    return { kind: "snd", k, p, t, a, dur: a.duration, offset, len, t0, t1: t0 + len, url: a.url, volume: p.volume ?? 1, lane: clamp(p.lane | 0, 0, 7) };
+  }).filter(Boolean);
+}
 function trackParts(kind) {
+  if (kind === "snd") return soundParts();
   const t = mt.project?.data[kind];
   if (!t?.parts?.length) return [];
   const a = (kind === "voice" ? mt.voices : mt.music).find((x) => x.id === t.id);
@@ -257,11 +281,11 @@ function fixSelection() {
   const d = mt.project.data;
   if (!s) { mt.extra = []; return; }
   const nCaps = captionBlocks().length;
-  const valid = (s) => !((s.kind === "cap" && s.i >= nCaps) || (s.kind === "clip" && !d.clips[s.i]) || ((s.kind === "voice" || s.kind === "music") && !d[s.kind]?.parts?.[s.p]) ||
+  const valid = (s) => !((s.kind === "cap" && s.i >= nCaps) || (s.kind === "clip" && !d.clips[s.i]) || (isAudKind(s.kind) && !partsOf(s.kind)?.[s.p]) ||
       (s.kind === "outro" && !currentOutro()));
   mt.extra = mt.extra.filter(valid);
   if (!valid(s)) { mt.sel = null; return; }
-  if ((s.kind === "clip" && !d.clips[s.i]) || ((s.kind === "voice" || s.kind === "music") && !d[s.kind]?.parts?.[s.p]) ||
+  if ((s.kind === "clip" && !d.clips[s.i]) || (isAudKind(s.kind) && !partsOf(s.kind)?.[s.p]) ||
       (s.kind === "outro" && !currentOutro())) mt.sel = null;
 }
 function selectedClip() {
@@ -590,6 +614,7 @@ function renderRuler(width) {
   }
   const r = $("tlRuler");
   r.innerHTML = html;
+  renderMarkers();
   r.style.setProperty("--minor", `${minor * mt.pps}px`);
   r.style.setProperty("--major", `${major * mt.pps}px`);
 }
@@ -599,7 +624,7 @@ function renderTimeline() {
   const d = mt.project.data;
   const { items, total } = seq();
   const view = $("tlScroll").clientWidth || 800;
-  const end = Math.max(total, trackEnd("voice"), trackEnd("music"));
+  const end = Math.max(total, trackEnd("voice"), trackEnd("music"), trackEnd("snd"));
   const width = Math.max(view, (end + 4) * mt.pps);
   const canvas = $("tlCanvas");
   canvas.style.width = `${width}px`;
@@ -660,6 +685,7 @@ function renderTimeline() {
     });
   }
 
+  renderSoundRow();
   $("trkCaps").innerHTML = captionBlocks()
     .map((g, n) => `<div class="tl-cap ${isSel({ kind: "cap", i: n }) ? "selected" : ""}" data-c="${n}" data-t="${g.t0}" title="دوسة تختاره · Delete تمسحه" style="left:${g.t0 * mt.pps}px;width:${Math.max(2, (g.t1 - g.t0) * mt.pps)}px">${escapeHtml(g.text)}</div>`)
     .join("");
@@ -679,6 +705,7 @@ const TRACKS = {
   typo: { row: "trkTypo", head: "h-typo", can: ["lock", "hide"] },
   fx: { row: "trkFx", head: "h-fx", can: ["lock"] },
   click: { row: "trkClick", head: "h-click", can: ["mute"] },
+  snd: { row: "trkSnd", head: "h-snd", can: ["lock", "mute"] },
 };
 const FLAG_ICON = { lock: ["🔓", "🔒", "اقفل التراك (متقدرش تحرّك أو تمسح حاجة فيه)", "افتح التراك"],
   hide: ["👁", "🙈", "خبّي التراك من المعاينة والفيديو", "رجّع التراك يظهر"],
@@ -747,7 +774,7 @@ function volLine(vol) {
 function volTarget(el) {
   const d = mt.project.data;
   if (el.dataset.track) {
-    const part = d[el.dataset.track].parts[Number(el.dataset.p)];
+    const part = partsOf(el.dataset.track)[Number(el.dataset.p)];
     return { get: () => part.volume ?? 1, set: (v) => (part.volume = v) };
   }
   if (el.dataset.outro) return { get: () => d.outro_volume, set: (v) => (d.outro_volume = v) };
@@ -756,8 +783,8 @@ function volTarget(el) {
 }
 function volTargetOf(x) {
   const d = mt.project.data;
-  if (x.kind === "voice" || x.kind === "music") {
-    const part = d[x.kind].parts[x.p];
+  if (isAudKind(x.kind)) {
+    const part = partsOf(x.kind)[x.p];
     return { get: () => part.volume ?? 1, set: (v) => (part.volume = v) };
   }
   if (x.kind === "outro") return { get: () => d.outro_volume, set: (v) => (d.outro_volume = v) };
@@ -916,8 +943,9 @@ function splitPart(x, t) {
   pushHistory();
   const parts = x.t.parts;
   const rest = x.p.length == null ? null : snap(x.len - cut);
+  parts.splice(x.k + 1, 0, { ...JSON.parse(JSON.stringify(parts[x.k])), delay: snap(x.t0 + cut), offset: snap(x.offset + cut), length: rest, volume: x.volume, fade_in: 0 });
   parts[x.k].length = cut;
-  parts.splice(x.k + 1, 0, { delay: snap(x.t0 + cut), offset: snap(x.offset + cut), length: rest, volume: x.volume });
+  parts[x.k].fade_out = 0;
   mt.sel = { kind: x.kind, p: x.k + 1 };
   changed();
 }
@@ -967,9 +995,9 @@ function deleteSelected() {
   // من الآخر للأول عشان الأرقام متتلخبطش
   const desc = (k) => list.filter((x) => x.kind === k).map((x) => x.i ?? x.p).sort((a, b) => b - a);
   for (const i of desc("clip")) d.clips.splice(i, 1);
-  for (const kind of ["voice", "music"]) {
-    for (const k of desc(kind)) d[kind].parts.splice(k, 1);
-    if (d[kind] && !d[kind].parts.length) d[kind] = null;
+  for (const kind of ["voice", "music", "snd"]) {
+    for (const k of desc(kind)) partsOf(kind).splice(k, 1);
+    if (kind !== "snd" && d[kind] && !d[kind].parts.length) d[kind] = null;
   }
   if (list.some((x) => x.kind === "outro")) d.outro = false;
   mt.sel = null;
@@ -1012,7 +1040,7 @@ function focusPane(sel) {
   const tab = TAB_OF_KIND[sel.kind];
   if (tab) return showTab(tab);
   showTab("audio");
-  const h = $(sel.kind === "music" ? "secMusic" : "secVoice");
+  const h = $(sel.kind === "music" ? "secMusic" : sel.kind === "snd" ? "secSounds" : "secVoice");
   if (h) {
     h.scrollIntoView({ block: "start", behavior: "smooth" });
     h.classList.remove("flash"); void h.offsetWidth; h.classList.add("flash");
@@ -1251,12 +1279,15 @@ function moveTrack(e, kind, k, side) {
   const { offset: off0, t0: delay0, len: len0 } = info;
   // أطراف القطع التانية عشان القطعة تلزق فيها
   const edges = [0, mt.t, ...trackParts(kind).filter((x) => x.k !== k).flatMap((x) => [x.t0, x.t1])];
+  if (kind === "snd") edges.push(...seq().items.flatMap((x) => [x.t0, x.t1]), ...markers().map((m) => m.t));
+  const lane0 = info.lane || 0;
   let moved = false;
   drag(
     e,
-    (dx) => {
+    (dx, dy) => {
       moved = true;
       let ds = snap(dx / mt.pps);
+      if (kind === "snd" && !side) p.lane = clamp(lane0 + Math.round(dy / SND_LANE_H), 0, 7);
       if (!side) {
         let delay = Math.max(0, delay0 + ds);
         for (const edge of edges) {
@@ -1680,6 +1711,9 @@ function syncAudio(el, info, t, total, fade) {
   let vol = clamp(info.volume, 0, 1);
   const end = Math.min(total, info.t1);
   if (fade && info.t.fade_out && end - t < 1.5) vol *= clamp((end - t) / 1.5, 0, 1);
+  const fi = info.p?.fade_in || 0, fo = info.p?.fade_out || 0;
+  if (fi > 0.01) vol *= clamp((t - info.t0) / fi, 0, 1);
+  if (fo > 0.01) vol *= clamp((end - t) / fo, 0, 1);
   el.volume = vol;
   const want = info.offset + (t - info.t0);
   if (el.paused) { el.currentTime = want; el.play().catch(() => {}); }
@@ -1691,7 +1725,10 @@ function tick() {
   if (!isMontage()) return pause();
   const { items, total } = seq();
   mt.t = mt.clockT + (performance.now() - mt.clock) / 1000;
-  if (mt.t >= total) { mt.t = total; return pause(); }
+  if (mt.t >= total) {
+    if (mt.loop && total > 0.1) { seek(0); mt.raf = requestAnimationFrame(tick); return; }
+    mt.t = total; return pause();
+  }
   const it = itemAt(items, mt.t, total);
   showItem(it, mt.t, true);
   if (it && mt.activeKey !== mt.preloadedFor) { mt.preloadedFor = mt.activeKey; preloadNext(items, it); }
@@ -1712,6 +1749,14 @@ function tick() {
       const key = `${kind}${x.k}`;
       live.add(key);
       syncAudio(audioFor(key), x, mt.t, total, kind === "music" && x === last);
+    }
+  }
+  if (!trackFlag("snd", "mute")) {
+    for (const x of soundParts()) {
+      if (x.p.mute) continue;
+      const key = `snd${x.k}`;
+      live.add(key);
+      syncAudio(audioFor(key), x, mt.t, total, false);
     }
   }
   for (const [key, el] of audioEls) if (!live.has(key) && !el.paused) el.pause();
@@ -1829,6 +1874,195 @@ $("previewFrame").addEventListener(
   { passive: false }
 );
 
+// ---------- أدوات زي كاب كات: كليك يمين، نسخ/لصق الإعدادات، مسح قبل/بعد المؤشر، علامات، تكرار، شاشة كاملة ----------
+// الإعدادات اللي بتتنسخ من قطعة لقطعة (كل حاجة غير الفيديو نفسه والقص والمكان على التايم لاين)
+const ATTR_KEYS = ["zoom", "x", "y", "angle", "rotate", "flip_h", "flip_v", "fit", "crop", "speed", "adj", "look",
+  "fade_in", "fade_out", "anim_in", "anim_out", "fx", "volume"];
+function copyAttrs(c = selectedClip()) {
+  if (!c) return toast("اختار قطعة فيديو الأول", true);
+  mt.attrs = JSON.parse(JSON.stringify(Object.fromEntries(ATTR_KEYS.map((k) => [k, c[k] ?? null]))));
+  toast("📋 اتنسخت إعدادات القطعة · Ctrl+Shift+V تلصقها");
+}
+function applyAttrs(c) {
+  const a = JSON.parse(JSON.stringify(mt.attrs));
+  if (c.reverse && clipOut(c) - c.start > 60) a.speed = a.speed ?? 1;
+  Object.assign(c, a);
+}
+function pasteAttrs(all = false) {
+  if (!mt.attrs) return toast("انسخ إعدادات قطعة الأول (كليك يمين ← انسخ الإعدادات)", true);
+  const d = mt.project.data;
+  const targets = all ? d.clips.filter((c) => !isOutroClip(c))
+    : allSelected().filter((x) => x.kind === "clip").map((x) => d.clips[x.i]).filter(Boolean);
+  if (!targets.length) return toast("اختار القطعة اللي هتلصق عليها", true);
+  pushHistory();
+  targets.forEach(applyAttrs);
+  changed();
+  toast(`✓ اتلصقت على ${targets.length} قطعة`);
+}
+// امسح الجزء اللي قبل أو بعد المؤشر من القطعة اللي تحته (أو المختارة)
+function deleteSide(side) {
+  const items = seq().items;
+  const it = (mt.sel?.kind === "clip" && items[mt.sel.i] && mt.t > items[mt.sel.i].t0 && mt.t < items[mt.sel.i].t1)
+    ? items[mt.sel.i] : items.find((x) => x.kind === "clip" && mt.t > x.t0 && mt.t < x.t1);
+  if (!it) return toast("حط المؤشر جوه قطعة فيديو", true);
+  const at = snap(srcTimeAt(it, mt.t));
+  const c = it.c;
+  if ((side === "left") !== !!it.rev ? at - c.start < MIN_CLIP : clipOut(c) - at < MIN_CLIP) return toast("مفيش ولا فريم يتمسح", true);
+  pushHistory();
+  const len = it.t1 - it.t0, cut = mt.t - it.t0;
+  if (side === "left") {
+    c.kf = kfWindow(c, cut, len); c.anim_in = null; c.fade_in = 0;
+    if (it.rev) c.end = at; else c.start = at;
+    mt.t = it.t0;
+  } else {
+    c.kf = kfWindow(c, 0, cut); c.anim_out = null; c.fade_out = 0;
+    if (it.rev) c.start = at; else c.end = at;
+  }
+  mt.sel = { kind: "clip", i: it.i };
+  changed();
+}
+$("tlDelLeft").onclick = () => deleteSide("left");
+$("tlDelRight").onclick = () => deleteSide("right");
+
+// العلامات
+function markers() { return mt.project?.data.markers || (mt.project.data.markers = []); }
+function addMarker() {
+  if (!mt.project) return;
+  const t = snap(mt.t);
+  const list = markers();
+  const n = list.findIndex((m) => Math.abs(m.t - t) < 0.5 / FPS);
+  pushHistory();
+  if (n >= 0) list.splice(n, 1);
+  else list.push({ t, label: "" }), list.sort((a, b) => a.t - b.t);
+  renderMarkers();
+  scheduleSave();
+}
+$("tlMarker").onclick = addMarker;
+function renderMarkers() {
+  const box = $("tlMarkers");
+  if (!box || !mt.project) return;
+  box.innerHTML = markers().map((m, n) => `<i class="tl-mark" data-m="${n}" style="left:${m.t * mt.pps}px" title="${escapeHtml(m.label || "علامة")} · ${fmtTC(m.t)} · دوسة تروحلها · دبل كليك تكتب اسم · كليك يمين تمسحها"><em>${escapeHtml(m.label || "")}</em></i>`).join("");
+}
+$("tlMarkers").addEventListener("pointerdown", (e) => {
+  const el = e.target.closest(".tl-mark");
+  if (!el || e.button !== 0) return;
+  e.stopPropagation();
+  seek(markers()[Number(el.dataset.m)].t);
+});
+$("tlMarkers").addEventListener("dblclick", (e) => {
+  const el = e.target.closest(".tl-mark");
+  if (!el) return;
+  const m = markers()[Number(el.dataset.m)];
+  const name = prompt("اسم العلامة", m.label || "");
+  if (name == null) return;
+  pushHistory();
+  m.label = name.trim().slice(0, 40);
+  renderMarkers();
+  scheduleSave();
+});
+
+// التشغيل المتكرر والشاشة الكاملة
+function toggleLoop() {
+  mt.loop = !mt.loop;
+  $("tpLoop").classList.toggle("on", mt.loop);
+  toast(mt.loop ? "🔁 التشغيل المتكرر شغال" : "التشغيل المتكرر اتقفل");
+}
+$("tpLoop").onclick = toggleLoop;
+function toggleFull() {
+  const el = $("previewFrame").closest(".ed-player");
+  if (document.fullscreenElement) document.exitFullscreen?.();
+  else el.requestFullscreen?.().catch(() => toast("المتصفح مش سامح بالشاشة الكاملة", true));
+}
+$("tpFull").onclick = toggleFull;
+document.addEventListener("fullscreenchange", () => {
+  const full = !!document.fullscreenElement;
+  $("previewFrame").closest(".ed-player").classList.toggle("full", full);
+  // الكادر بيكبر على قد الشاشة (المعاينة بنفس الحسبة، بس بتتكبّر بـ CSS)
+  const fr = $("previewFrame");
+  fr.style.transform = full ? `scale(${Math.min((innerHeight - 90) / PV_H, (innerWidth - 40) / PV_W).toFixed(3)})` : "";
+  drawClipBox();
+});
+
+// قايمة الكليك يمين
+function ctxMenu() {
+  let m = $("ctxMenu");
+  if (!m) {
+    m = document.createElement("div");
+    m.id = "ctxMenu";
+    m.className = "ctx-menu";
+    m.hidden = true;
+    document.body.append(m);
+    m.addEventListener("click", (e) => {
+      const b = e.target.closest("[data-act]");
+      if (!b || b.disabled) return;
+      m.hidden = true;
+      CTX_ACTS[b.dataset.act]?.();
+    });
+    document.addEventListener("pointerdown", (e) => { if (!e.target.closest("#ctxMenu")) m.hidden = true; }, true);
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape") m.hidden = true; });
+  }
+  return m;
+}
+const CTX_ACTS = {
+  copy: () => copyAttrs(),
+  paste: () => pasteAttrs(),
+  pasteAll: () => pasteAttrs(true),
+  dup: () => $("edDup").click(),
+  split: () => splitAt(mt.t),
+  delLeft: () => deleteSide("left"),
+  delRight: () => deleteSide("right"),
+  disable: () => $("edDisable").click(),
+  replace: () => $("edReplace").click(),
+  del: () => deleteSelected(),
+  resetFx: () => $("fxReset").click(),
+  kf: () => $("kfToggle").click(),
+};
+$("tlCanvas").addEventListener("contextmenu", (e) => {
+  const clipEl = e.target.closest(".tl-clip[data-i]"), audEl = e.target.closest(".tl-audio[data-track]");
+  const mk = e.target.closest(".tl-mark");
+  if (mk) {
+    e.preventDefault();
+    pushHistory();
+    markers().splice(Number(mk.dataset.m), 1);
+    renderMarkers();
+    scheduleSave();
+    return;
+  }
+  if (!clipEl && !audEl) return;
+  e.preventDefault();
+  const x = selOfEl(clipEl || audEl);
+  if (kindLocked(x.kind)) return toast("التراك ده مقفول 🔒", true);
+  if (!isSel(x)) selectItem(x);
+  const c = clipEl ? mt.project.data.clips[x.i] : null;
+  const k = (key) => `<kbd>${key}</kbd>`;
+  const rows = clipEl ? [
+    ["copy", "📋 انسخ الإعدادات", k("Ctrl+Shift+C")],
+    ["paste", "📥 الصق الإعدادات", k("Ctrl+Shift+V"), !mt.attrs],
+    ["pasteAll", "📥 الصق الإعدادات على كل القطع", "", !mt.attrs],
+    "-",
+    ["split", "✂ قسّم عند المؤشر", k("S")],
+    ["delLeft", "⇤ امسح اللي قبل المؤشر", k("Q")],
+    ["delRight", "⇥ امسح اللي بعد المؤشر", k("W")],
+    ["dup", "⧉ كرّر", ""],
+    ["kf", "◇ كي فريم عند المؤشر", ""],
+    "-",
+    ["replace", "🔁 استبدل الفيديو", ""],
+    ["disable", c?.disabled ? "✓ فعّل القطعة" : "⊘ عطّل القطعة", ""],
+    ["resetFx", "↺ شيل كل التأثيرات", ""],
+    ["del", "🗑 احذف", k("Delete")],
+  ] : [
+    ["split", "✂ قسّم عند المؤشر", k("S")],
+    ["del", "🗑 احذف", k("Delete")],
+  ];
+  const m = ctxMenu();
+  m.innerHTML = rows.map((r) => r === "-" ? "<hr>" :
+    `<button data-act="${r[0]}" ${r[3] ? "disabled" : ""}><span>${r[1]}</span>${r[2]}</button>`).join("");
+  m.hidden = false;
+  const w = m.offsetWidth, h = m.offsetHeight;
+  m.style.left = `${Math.min(e.clientX, innerWidth - w - 8)}px`;
+  m.style.top = `${Math.min(e.clientY, innerHeight - h - 8)}px`;
+});
+
 // ---------- الكيبورد ----------
 document.addEventListener("keydown", (e) => {
   if (!mt.project || !isMontage() || document.querySelector("dialog[open]")) return;
@@ -1850,7 +2084,14 @@ document.addEventListener("keydown", (e) => {
     renderInspector();
   }
   else if (ctrl && code === "KeyB") splitAt(mt.t);
+  else if (ctrl && e.shiftKey && code === "KeyC") copyAttrs();
+  else if (ctrl && e.shiftKey && code === "KeyV") pasteAttrs();
   else if (ctrl) done = false;
+  else if (code === "KeyQ") deleteSide("left");
+  else if (code === "KeyW") deleteSide("right");
+  else if (code === "KeyM") addMarker();
+  else if (code === "KeyL") toggleLoop();
+  else if (code === "KeyF") toggleFull();
   else if (code === "KeyS") splitAt(mt.t);
   else if (code === "KeyB" || code === "KeyC") setTool("blade");
   else if (e.key === "Escape") { setTool("select"); mt.sel = null; renderTimeline(); renderInspector(); }
@@ -2198,29 +2439,175 @@ function placeNewAudio(a) {
   changed();
 }
 
+// ---------- تراك الأصوات الزيادة والمؤثرات ----------
+const SND_LANE_H = 26;
+function renderSoundRow() {
+  const parts = soundParts();
+  const lanes = Math.max(1, ...parts.map((x) => x.lane + 1)) + (parts.length ? 1 : 0);
+  const h = Math.min(8, lanes) * SND_LANE_H + 4;
+  $("trkSnd").style.height = $("hSnd").style.height = `${h}px`;
+  if (!parts.length) {
+    $("trkSnd").innerHTML = `<div class="tl-empty-track">مؤثرات وأصوات زيادة: ضيفها من تاب 🔊 الصوت</div>`;
+    return;
+  }
+  $("trkSnd").innerHTML = parts.map((x) => {
+    const sel = isSel({ kind: "snd", p: x.k });
+    return `<div class="tl-audio snd ${sel ? "selected" : ""} ${x.p.mute ? "off" : ""}" data-track="snd" data-p="${x.k}"
+        style="left:${x.t0 * mt.pps}px;width:${x.len * mt.pps}px;top:${2 + x.lane * SND_LANE_H}px;height:${SND_LANE_H - 3}px">
+      <canvas></canvas><span class="nm" dir="auto">${escapeHtml(x.a.name)}${x.volume !== 1 ? ` · ${Math.round(x.volume * 100)}%` : ""}</span>
+      <b class="h l" data-h="l"></b><b class="h r" data-h="r"></b></div>`;
+  }).join("");
+  $("trkSnd").querySelectorAll(".tl-audio").forEach((box, n) => {
+    const x = parts[n];
+    drawWave(box.querySelector("canvas"), x.url, x.offset, x.len, "#f7a8d8", x.volume);
+  });
+}
+// صوت جديد في أول سطر فاضي عند الوقت ده
+function addSound(a, t, extra = {}) {
+  const list = partsOf("snd");
+  const busy = (lane) => soundParts().some((x) => x.lane === lane && x.t0 < t + a.duration && x.t1 > t);
+  let lane = 0;
+  while (lane < 7 && busy(lane)) lane++;
+  list.push({ src: a.id, delay: snap(t), offset: 0, length: null, volume: 1, fade_in: 0, fade_out: 0, lane, ...extra });
+  mt.sel = { kind: "snd", p: list.length - 1 };
+}
+function renderSfx() {
+  const q = $("sfxSearch").value.trim().toLowerCase();
+  const list = (mt.sfx || []).filter((x) => !q || x.name.toLowerCase().includes(q) || x.id.includes(q));
+  $("sfxGrid").innerHTML = list.map((x) => `<div class="sfx-item" data-sfx="${x.id}" title="${escapeHtml(x.name)} · ${x.duration.toFixed(1)}ث">
+      <button class="play" data-play="${x.id}" title="اسمعه">▶</button><span dir="auto">${escapeHtml(x.name)}</span>
+      <button class="add" data-addsfx="${x.id}" title="ضيفه عند المؤشر">＋</button></div>`).join("") || `<p class="muted">مفيش مؤثرات بالاسم ده</p>`;
+  $("sndFromLib").innerHTML = `<option value="">＋ صوت من المكتبة…</option>` +
+    [...mt.voices.map((a) => [a, "🎙️"]), ...mt.music.map((a) => [a, "🎵"])].map(([a, ic]) => `<option value="${a.id}">${ic} ${escapeHtml(a.name)} (${fmtDuration(a.duration)})</option>`).join("");
+}
+$("sfxSearch").addEventListener("input", renderSfx);
+let sfxPreview = null;
+$("sfxGrid").addEventListener("click", (e) => {
+  const pl = e.target.closest("[data-play]"), ad = e.target.closest("[data-addsfx]");
+  if (pl) {
+    const a = soundSource(pl.dataset.play);
+    sfxPreview?.pause();
+    sfxPreview = new Audio(a.url);
+    sfxPreview.play().catch(() => {});
+  }
+  if (ad && mt.project) {
+    if (kindLocked("snd")) return toast("تراك الأصوات مقفول 🔒", true);
+    pushHistory();
+    addSound(soundSource(ad.dataset.addsfx), mt.t);
+    changed();
+  }
+});
+$("sndFromLib").addEventListener("change", () => {
+  const a = soundSource($("sndFromLib").value);
+  $("sndFromLib").value = "";
+  if (!a || !mt.project) return;
+  pushHistory();
+  addSound(a, mt.t);
+  changed();
+});
+$("sfxUpload").addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  e.target.value = "";
+  if (!file) return;
+  const form = new FormData();
+  form.append("kind", "sfx");
+  form.append("file", file);
+  try {
+    const a = await api("/api/audio", { method: "POST", body: form });
+    mt.sfx = await api("/api/montage/sfx");
+    renderSfx();
+    pushHistory();
+    addSound(soundSource(a.id), mt.t);
+    changed();
+    toast("⬆ اتحفظ في المكتبة واتحط عند المؤشر");
+  } catch (err) { toast(err.message, true); }
+});
+// تسجيل من المايك
+let rec = null;
+$("micRec").onclick = async () => {
+  if (rec) { rec.stop(); return; }
+  if (!navigator.mediaDevices?.getUserMedia) return toast("المتصفح ده مش بيدعم التسجيل", true);
+  let stream;
+  try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+  catch { return toast("محتاج تسمح للبرنامج يستخدم المايك", true); }
+  const chunks = [], t0 = mt.t, started = Date.now();
+  rec = new MediaRecorder(stream);
+  rec.ondataavailable = (ev) => ev.data.size && chunks.push(ev.data);
+  const timer = setInterval(() => ($("micInfo").textContent = `⏺ ${((Date.now() - started) / 1000).toFixed(1)}ث`), 200);
+  rec.onstop = async () => {
+    clearInterval(timer);
+    stream.getTracks().forEach((t) => t.stop());
+    rec = null;
+    $("micRec").textContent = "🎙️ سجّل";
+    $("micRec").classList.remove("rec");
+    $("micInfo").textContent = "⬆ بيرفع…";
+    const blob = new Blob(chunks, { type: chunks[0]?.type || "audio/webm" });
+    const form = new FormData();
+    form.append("kind", "voice");
+    form.append("file", blob, `تسجيل ${new Date().toLocaleTimeString("ar-EG")}.webm`);
+    try {
+      const a = await api("/api/audio", { method: "POST", body: form });
+      mt.voices = await api("/api/audio?kind=voice");
+      fillSelects();
+      mt.t = t0;
+      placeNewAudio(a);
+      $("micInfo").textContent = "";
+      toast("🎙️ التسجيل اتحط عند المؤشر");
+    } catch (err) { $("micInfo").textContent = ""; toast(err.message, true); }
+  };
+  rec.start();
+  if (!mt.playing) togglePlayback();  // بتسمع الفيديو وانت بتسجّل (زي كاب كات)
+  $("micRec").textContent = "⏹ وقّف التسجيل";
+  $("micRec").classList.add("rec");
+};
+// ظبط الصوت كله
+function renderMix() {
+  const m = mt.project?.data.mix || {};
+  $("mixDuckOn").checked = (m.duck || 0) > 0;
+  $("mixDuckRow").hidden = !((m.duck || 0) > 0);
+  $("mixDuck").value = Math.round((m.duck || 0.6) * 100);
+  $("mixDuckVal").textContent = m.duck ? `${Math.round(m.duck * 100)}%` : "";
+  $("mixEnhance").checked = !!m.enhance;
+  $("mixNormalize").checked = !!m.normalize;
+}
+function setMix(patch) {
+  pushHistory("mix");
+  mt.project.data.mix = { ...(mt.project.data.mix || {}), ...patch };
+  renderMix();
+  scheduleSave();
+}
+$("mixDuckOn").addEventListener("change", () => setMix({ duck: $("mixDuckOn").checked ? 0.6 : 0 }));
+$("mixDuck").addEventListener("input", () => setMix({ duck: Number($("mixDuck").value) / 100 }));
+$("mixEnhance").addEventListener("change", () => setMix({ enhance: $("mixEnhance").checked }));
+$("mixNormalize").addEventListener("change", () => setMix({ normalize: $("mixNormalize").checked }));
+
 // ---------- القطعة المختارة من التعليق أو الموسيقى: ظهور واختفاء بالتدريج ----------
 function selPart() {
   const x = mt.sel;
-  if (x?.kind !== "voice" && x?.kind !== "music") return null;
-  return mt.project.data[x.kind]?.parts?.[x.p] || null;
+  if (!isAudKind(x?.kind)) return null;
+  return partsOf(x.kind)?.[x.p] || null;
 }
 function renderPartProps() {
   const p = selPart();
   $("partProps").hidden = !p;
   if (!p) return;
-  $("partLabel").textContent = `🎚️ قطعة ${mt.sel.kind === "voice" ? "التعليق" : "الموسيقى"} المختارة`;
+  const nm = mt.sel.kind === "snd" ? `«${soundSource(p.src)?.name || "صوت"}»` : mt.sel.kind === "voice" ? "التعليق" : "الموسيقى";
+  $("partLabel").textContent = `🎚️ قطعة ${nm} المختارة`;
+  $("pVol").value = Math.round((p.volume ?? 1) * 100);
+  $("pVolVal").textContent = `${Math.round((p.volume ?? 1) * 100)}%`;
   $("pFadeIn").value = Math.round((p.fade_in || 0) * 100);
   $("pFadeOut").value = Math.round((p.fade_out || 0) * 100);
   $("pFadeInVal").textContent = p.fade_in ? `${p.fade_in.toFixed(1)}ث` : "";
   $("pFadeOutVal").textContent = p.fade_out ? `${p.fade_out.toFixed(1)}ث` : "";
 }
-for (const [id, key] of [["pFadeIn", "fade_in"], ["pFadeOut", "fade_out"]]) {
+for (const [id, key] of [["pFadeIn", "fade_in"], ["pFadeOut", "fade_out"], ["pVol", "volume"]]) {
   $(id).addEventListener("input", () => {
     const p = selPart();
     if (!p) return;
     pushHistory("part-" + key);
     p[key] = Number($(id).value) / 100;
     renderPartProps();
+    if (key === "volume") renderTimeline();
     scheduleSave();
   });
 }
@@ -2228,6 +2615,8 @@ for (const [id, key] of [["pFadeIn", "fade_in"], ["pFadeOut", "fade_out"]]) {
 // ---------- المدرب والصوت ----------
 function renderSide() {
   const d = mt.project.data;
+  renderSfx();
+  renderMix();
   const coach = mt.coaches.find((c) => c.id === d.coach_id);
   $("mCoach").value = d.coach_id || "";
   const outros = d.clips.filter(isOutroClip);

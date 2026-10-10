@@ -67,6 +67,7 @@ import typo  # noqa: E402  (التايبوجرافي)
 import concepts  # noqa: E402  (قاموس المعاني: كلمة ← أيقونة)
 import stt_local  # noqa: E402  (تفريغ على السيرفر من غير خدمة برّه)
 import sfx  # noqa: E402  (الأصوات الرسمية: كليكات وكيبورد)
+import sfxlib  # noqa: E402  (مكتبة المؤثرات الصوتية للمونتاج)
 import person  # noqa: E402  (قراءة الشخص في الفيديو: فصله ومكان راسه)
 import scene  # noqa: E402  (🪄 تغيير الخلفية وشيل الحاجات من الفيديو)
 import numpy as np  # noqa: E402
@@ -78,7 +79,7 @@ MIN_REFERENCE_SECONDS = 2.0  # Seedance مش بيقبل فيديو مرجعي أ
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".m4v", ".webm", ".mkv"}
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
 AUDIO_EXTENSIONS = {".mp3", ".wav", ".m4a", ".aac", ".ogg", ".opus", ".flac"}
-AUDIO_KINDS = {"voice", "music"}  # التعليق الصوتي (الخطوة 3) والموسيقى (الخطوة 5)
+AUDIO_KINDS = {"voice", "music", "sfx"}  # التعليق الصوتي (الخطوة 3) والموسيقى (الخطوة 5) والمؤثرات الصوتية (المونتاج)
 
 DATA_DIR = Path(os.environ.get("STUDIOMANIA_DATA") or ROOT / "data")
 RAW_DIR = DATA_DIR / "raw"
@@ -86,6 +87,7 @@ CLIPS_DIR = DATA_DIR / "clips"
 COACHES_DIR = DATA_DIR / "coaches"
 GENERATED_DIR = DATA_DIR / "generated"
 AUDIO_DIR = DATA_DIR / "audio"
+SFXLIB_DIR = DATA_DIR / "sfxlib"  # المؤثرات المتولّدة (sfxlib.py)
 EXPORTS_DIR = DATA_DIR / "exports"  # فولدر الفيديوهات الجاهزة للنشر
 BRAND_DIR = DATA_DIR / "brand"  # اللوجو
 TMP_DIR = DATA_DIR / "tmp"
@@ -1749,6 +1751,61 @@ def montage_upload(file: UploadFile = File(...), coach_id: str = Form(""), repla
     return {"id": gid, "duration": info.duration, "synced_shot": synced}
 
 
+@app.get("/api/montage/sfx")
+def montage_sfx():
+    """🔉 مكتبة المؤثرات: المتولّدة + اللي رفعتها."""
+    out = []
+    for key, (label, _) in sfxlib.SOUNDS.items():
+        path = sfxlib.ensure(SFXLIB_DIR, key)
+        out.append({"id": f"lib:{key}", "name": label, "duration": round(sfxlib.duration(path), 2), "url": f"/api/montage/sfx/{key}.wav", "lib": True})
+    with closing(db()) as conn:
+        out += [{**audio_to_dict(r), "lib": False} for r in conn.execute("SELECT * FROM audio WHERE kind = 'sfx' ORDER BY created_at DESC")]
+    return out
+
+
+@app.get("/api/montage/sfx/{name}.wav")
+def montage_sfx_file(name: str):
+    try:
+        return FileResponse(sfxlib.ensure(SFXLIB_DIR, name), media_type="audio/wav")
+    except KeyError:
+        raise HTTPException(404, "المؤثر مش موجود") from None
+
+
+def sound_source(conn: sqlite3.Connection, src: str) -> Path | None:
+    """ملف صوت لعنصر في تراكات الصوت الزيادة: مؤثر من المكتبة (lib:…) أو أي صوت من المكتبة بالـ id."""
+    if src.startswith("lib:"):
+        try:
+            return sfxlib.ensure(SFXLIB_DIR, src[4:])
+        except KeyError:
+            return None
+    row = conn.execute("SELECT filename FROM audio WHERE id = ?", (src,)).fetchone()
+    return AUDIO_DIR / row["filename"] if row and (AUDIO_DIR / row["filename"]).exists() else None
+
+
+def project_sounds(conn: sqlite3.Connection, data: dict) -> list[montage.AudioTrack]:
+    out = []
+    if track_flag(data, "snd", "mute"):
+        return []
+    for x in (data.get("sounds") or [])[:200]:
+        if not isinstance(x, dict) or x.get("mute"):
+            continue
+        path = sound_source(conn, str(x.get("src") or ""))
+        if not path:
+            continue
+        length = x.get("length")
+        out.append(montage.AudioTrack(
+            path, volume=clamp(float(x.get("volume", 1)), 0, 3), delay=max(0.0, float(x.get("delay") or 0)),
+            offset=max(0.0, float(x.get("offset") or 0)), length=float(length) if length and float(length) > 0.01 else None,
+            fade_in_s=clamp(float(x.get("fade_in") or 0), 0, 10), fade_out_s=clamp(float(x.get("fade_out") or 0), 0, 10),
+        ))
+    return out
+
+
+def project_mix(data: dict) -> dict:
+    m = data.get("mix") or {}
+    return {"duck": clamp(float(m.get("duck") or 0), 0, 1), "normalize": bool(m.get("normalize")), "enhance": bool(m.get("enhance"))}
+
+
 class MontageTtsIn(BaseModel):
     text: str
     voice_id: str = "Arabic_FriendlyGuy"
@@ -2048,6 +2105,7 @@ class ProjectIn(BaseModel):
     overlays: list = []         # فيديوهات وصور فوق الفيديو (صورة جوه صورة)
     sounds: list = []           # تراكات صوت زيادة ومؤثرات
     export: dict = {}           # إعدادات التصدير {res, fps, quality}
+    mix: dict = {}              # الصوت: {duck: 0..1 توطية الموسيقى وقت الكلام، normalize: توحيد العلو، enhance: تنضيف التعليق}
 
 
 PROJECT_SECTIONS = ("coach", "series", "ads")
@@ -2660,6 +2718,7 @@ def render_project(project_id: str, request: Request):
             ffmpeg_exe(), segments, EXPORTS_DIR / f"{export_id}.mp4", work_dir, voice, music,
             logo=project_logo(data, total, outro_len), subtitles=subs,
             low_memory=(system_info()["memory_limit_mb"] or 99999) < 1500,
+            sounds=project_sounds(conn, data), audio_fx=project_mix(data),
         )
         RENDER_ACTIVE[project_id] = "بيبدأ…"
         conn.execute(
