@@ -55,7 +55,7 @@
     "qr", "codetag", "toolbar", "terminal", "scan",
     "toasts", "footer", "marquee", "datestrip",
     "fileicon", "chaos",
-    "gradword", "meshprompt", "orbsplit", "bento", "figdays", "figcurve", "figplay", "figequal", "figwords", "figphone", "figdrop", "figcount", "figgears", "figbar", "figcheck", "figcta", "goldcap", "iconbelt", "glowsweep", "namepill", "kashida", "molecule", "weightstack", "stretch", "desatpop", "arcs", "chrome", "inkverse", "poemfade", "hashend", "flipverb", "strobe", "duoline", "capstack", "pillword", "blurduo", "tagstack", "underbars", "contactcard", "iconorbit", "blurstrobe", "kinstack", "incall", "cineband", "scriptover", "tricolor", "drumpicker", "redmix", "headbubble", "pincard", "emojifloat", "slotreel", "posterwall", "quoteline", "medallion", "clockhand", "roadtext", "markpan", "objectquote", "racechart", "calflip", "glosscards", "dropword", "tasklens", "monostack", "dashbox", "sparklist", "followbtn", "silhouette", "petalstack", "followcount", "twopillars", "cutmat", "labelbox", "stampcard", "lcdtype", "genpanel", "holopulse", "coverflow", "featuretag", "luxmix", "goldframes", "goldrows", "tilegrid", "goldpill", "holoclock", "curvewall", "newsscan", "neonvenn", "wavebelt", "cardarc", "shadowquote", "haloring", "noirtitle", "stickerstack", "graphhop", "podium", "hudcallout", "termbar", "glowtoggle"]);
+    "gradword", "meshprompt", "orbsplit", "bento", "figdays", "figcurve", "figplay", "figequal", "figwords", "figphone", "figdrop", "figcount", "figgears", "figbar", "figcheck", "figcta", "goldcap", "iconbelt", "glowsweep", "namepill", "kashida", "molecule", "weightstack", "stretch", "desatpop", "arcs", "chrome", "inkverse", "poemfade", "hashend", "flipverb", "strobe", "duoline", "capstack", "pillword", "blurduo", "tagstack", "underbars", "contactcard", "iconorbit", "blurstrobe", "kinstack", "incall", "cineband", "scriptover", "tricolor", "drumpicker", "redmix", "headbubble", "pincard", "emojifloat", "slotreel", "posterwall", "quoteline", "medallion", "clockhand", "roadtext", "markpan", "objectquote", "racechart", "calflip", "glosscards", "dropword", "tasklens", "monostack", "dashbox", "sparklist", "followbtn", "silhouette", "petalstack", "followcount", "twopillars", "cutmat", "labelbox", "stampcard", "lcdtype", "genpanel", "holopulse", "coverflow", "featuretag", "luxmix", "goldframes", "goldrows", "tilegrid", "goldpill", "holoclock", "curvewall", "newsscan", "neonvenn", "wavebelt", "cardarc", "shadowquote", "haloring", "noirtitle", "stickerstack", "graphhop", "podium", "hudcallout", "termbar", "glowtoggle", "pinkdoodle", "lensfind", "echostack"]);
   E.TYPING = new Set(["type", "artype"]);
   const MC = document.createElement("canvas").getContext("2d");
   const measure = (s, font) => { MC.font = font; return MC.measureText(s).width; };
@@ -7714,5 +7714,54 @@
       <div style="position:absolute;left:${(cx + kx - th2 * 0.42).toFixed(1)}px;top:${(cy - th2 * 0.42).toFixed(1)}px;width:${(th2 * 0.84).toFixed(1)}px;height:${(th2 * 0.84).toFixed(1)}px;border-radius:50%;background:${on ? "#0B0B10" : "radial-gradient(circle at 35% 30%,#fff,#DADADA)"};box-shadow:0 2px 8px rgba(0,0,0,.5)"></div>
       <div dir="${this.dir(lab)}" style="position:absolute;left:0;right:0;top:${(cy - th2 / 2 - z * 1.5).toFixed(1)}px;text-align:center;font:800 ${z.toFixed(1)}px ${ff};color:#fff;letter-spacing:.04em;text-transform:uppercase">${esc(lab)}</div>
       ${sub && on ? `<div dir="${this.dir(sub)}" style="position:absolute;left:0;right:0;top:${(cy + th2 * 0.75).toFixed(1)}px;text-align:center;font:600 ${(z * 0.38).toFixed(1)}px ${famOf(sub)};color:rgba(255,255,255,.55);letter-spacing:.2em;text-transform:uppercase;opacity:${q.toFixed(2)}">${esc(sub)}</div>` : ""}`;
+  };
+  // ======== r35 «بنفسجي وبينك» — بنفسجي مصمت، نجمة بينك مسننة بتلف بين الكلام، دايرة إيد حوالين كلمة، سهم بينك بيكبر، عدسة مكبّرة بتدور على الكلام، وكلام بيتكرر صدى ========
+  const PURP = "#6553CC", PINK35 = "#F28C8C";
+  const burst = (x, y, r, a) => { let d = ""; for (let i = 0; i < 24; i++) { const an = (i / 24) * Math.PI * 2 + a, R = i % 2 ? r * 0.55 : r; d += `${i ? "L" : "M"}${(x + Math.cos(an) * R).toFixed(1)} ${(y + Math.sin(an) * R).toFixed(1)}`; } return d + "Z"; };
+  // ---------- pinkdoodle: كلام أبيض صغير ونجمة بينك مسننة بتلف في النص، ودايرة إيد بتترسم حوالين أول كلمة، وفي الآخر سهم بينك بيكبر وكلمة كابيتال كبيرة بتتكتب (focus)
+  P.k_pinkdoodle = function (b, t, k, th, bi) {
+    const P = figParts(this, { ...b, focus: b.focus >= 0 ? b.focus : -1 }); const it = this.items(b); if (!it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h), hasBig = b.focus >= 0, small = hasBig ? P.it.slice(0, P.fi) : it, big = hasBig ? P.J([P.main, ...P.tail]) : "";
+    const ar = AR.test(it.map((x) => this.text(x.w)).join(" ")), ff = famOf(it.map((x) => this.text(x.w)).join(" ")), z = Math.min(mn * 0.065 * this.ts, fitSize(it.map((x) => this.text(x.w)).join(" "), `600 {}px ${ff}`, w * 0.72, mn * 0.065 * this.ts)), cy = h * 0.42;
+    const half = Math.ceil(small.length / 2), A = small.slice(0, half), B = small.slice(half), J = (a) => a.map((x) => this.text(x.w)).join(" ");
+    const tBig = hasBig ? P.main.t0 - 0.35 : 1e9, gone = seg(t, tBig - 0.1, tBig + 0.2);
+    let html = `<div style="position:absolute;inset:0;background:${PURP}"></div>`;
+    if (gone < 1) { const aw = measure(J(A), `600 ${z}px ${ff}`), rp = eOut(seg(t, (A[0]?.t0 ?? b.t0) + 0.2, (A[0]?.t0 ?? b.t0) + 0.7)), sa = (t - b.t0) * 2;
+      html += `<div style="position:absolute;inset:0;opacity:${(1 - gone).toFixed(2)}"><svg style="position:absolute;inset:0" width="${w}" height="${h}"><path d="${burst(w / 2, cy, mn * 0.035 * eBack(seg(t, b.t0, b.t0 + 0.4)), sa)}" fill="${PINK35}"/>
+        <ellipse cx="${(ar ? w / 2 + mn * 0.06 + aw / 2 : w / 2 - mn * 0.06 - aw / 2).toFixed(1)}" cy="${cy.toFixed(1)}" rx="${(aw * 0.62).toFixed(1)}" ry="${(z * 0.9).toFixed(1)}" fill="none" stroke="#fff" stroke-width="2" pathLength="1" stroke-dasharray="1" stroke-dashoffset="${(1 - rp).toFixed(3)}" transform="rotate(-6 ${w / 2} ${cy})"/></svg>
+        <div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;${ar ? "left" : "right"}:${(w / 2 + mn * 0.06).toFixed(1)}px;top:${(cy - z * 0.65).toFixed(1)}px;font:600 ${z.toFixed(1)}px ${ff};color:#fff;white-space:nowrap">${A.map((x) => `<span style="${blurIn(t, x.t0 - 0.05, 0.3)};display:inline-block">${esc(this.text(x.w))}</span>`).join(" ")}</div>
+        <div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;${ar ? "right" : "left"}:${(w / 2 + mn * 0.06).toFixed(1)}px;top:${(cy - z * 0.65).toFixed(1)}px;font:600 ${z.toFixed(1)}px ${ff};color:#fff;white-space:nowrap">${B.map((x) => `<span style="${blurIn(t, x.t0 - 0.05, 0.3)};display:inline-block">${esc(this.text(x.w))}</span>`).join(" ")}<svg style="vertical-align:middle;margin:0 ${(z * 0.3).toFixed(1)}px;opacity:${B.length && t > B[B.length - 1].t0 ? 1 : 0}" width="${(z * 0.9).toFixed(0)}" height="${(z * 0.9).toFixed(0)}" viewBox="0 0 10 10"><path d="${ar ? "M8 2 L2 8 M2 3 V8 H7" : "M2 8 L8 2 M3 2 H8 V7"}" stroke="${PINK35}" stroke-width="1.6" fill="none"/></svg></div></div>`; }
+    if (hasBig && t >= tBig) { const g = eOut(seg(t, tBig, tBig + 0.4)), bz = fitSize(big.toUpperCase(), `800 {}px ${ff}`, w * 0.84, mn * 0.12 * this.ts), ax = w * 0.5, ay = h * 0.5, L = mn * lerp(0.05, 0.4, g);
+      html += `<svg style="position:absolute;inset:0" width="${w}" height="${h}"><path d="M${(ax - L * 0.6).toFixed(1)} ${(ay + L * 0.6).toFixed(1)} L${(ax + L * 0.4).toFixed(1)} ${(ay - L * 0.4).toFixed(1)} M${(ax - L * 0.1).toFixed(1)} ${(ay - L * 0.4).toFixed(1)} H${(ax + L * 0.4).toFixed(1)} V${(ay + L * 0.1).toFixed(1)}" stroke="${PINK35}" stroke-width="${(mn * 0.03 * g + 2).toFixed(1)}" fill="none" opacity="${(1 - seg(t, P.main.t0 + 0.3, P.main.t0 + 0.6)).toFixed(2)}" stroke-linecap="square"/></svg>
+        <div dir="${this.dir(big)}" style="position:absolute;left:0;right:0;top:${(h * 0.3).toFixed(1)}px;text-align:center;font:800 ${bz.toFixed(1)}px ${ff};color:#fff;text-transform:uppercase;white-space:nowrap">${esc(typed(big.toUpperCase(), t, P.main.t0 - 0.05, 18))}</div>`; }
+    return html;
+  };
+  // ---------- lensfind: عدسة مكبّرة بخط أبيض بتلف في الكادر، وجوه العدسة دايرة بينك فيها الكلمة الحالية؛ مع كل كلمة العدسة بتروح مكان جديد
+  P.k_lensfind = function (b, t, k, th, bi) {
+    const it = this.items(b); if (!it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h), n = it.length;
+    let ci = 0; it.forEach((x, i) => { if (t >= x.t0 - 0.25) ci = i; });
+    const spot = (i) => [w * [0.28, 0.7, 0.5, 0.32, 0.66][(i + bi) % 5], h * [0.4, 0.32, 0.55, 0.62, 0.48][(i + bi) % 5]];
+    const q = eOut(seg(t, it[ci].t0 - 0.25, it[ci].t0 + 0.1)), [x0, y0] = ci > 0 ? spot(ci - 1) : [w * 0.1, h * 0.3], [x1, y1] = spot(ci);
+    const x = lerp(x0, x1, q), y = lerp(y0, y1, q) + Math.sin((t - b.t0) * 2) * mn * 0.01, R = mn * 0.17, rot = lerp(-30, 25, (Math.sin((t - b.t0) * 1.4) + 1) / 2), s = this.text(it[ci].w), ff = famOf(s);
+    const fill = eOut(seg(t, it[ci].t0 - 0.05, it[ci].t0 + 0.25)), z = Math.min(R * 0.36, fitSize(s, `600 {}px ${ff}`, R * 1.6, R * 0.36));
+    return `<div style="position:absolute;inset:0;background:${PURP}"></div>
+      <div style="position:absolute;left:${(x - R).toFixed(1)}px;top:${(y - R).toFixed(1)}px;width:${(R * 2).toFixed(1)}px;height:${(R * 2).toFixed(1)}px">
+        <svg style="position:absolute;left:0;top:0;overflow:visible" width="${(R * 2).toFixed(0)}" height="${(R * 2).toFixed(0)}"><g transform="rotate(${rot.toFixed(1)} ${R} ${R})"><rect x="${(R * 1.62).toFixed(1)}" y="${(R * 0.86).toFixed(1)}" width="${(R * 1.3).toFixed(1)}" height="${(R * 0.28).toFixed(1)}" rx="${(R * 0.14).toFixed(1)}" fill="none" stroke="#fff" stroke-width="2.5" transform="rotate(35 ${R} ${R})"/></g>
+          <circle cx="${R}" cy="${R}" r="${(R * 0.92).toFixed(1)}" fill="${PINK35}" clip-path="inset(0 ${((1 - fill) * 100).toFixed(0)}% 0 0)"/><circle cx="${R}" cy="${R}" r="${(R * 0.98).toFixed(1)}" fill="none" stroke="#fff" stroke-width="3"/></svg>
+        <div dir="${this.dir(s)}" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:600 ${z.toFixed(1)}px ${ff};color:#fff;opacity:${fill.toFixed(2)}">${esc(s)}</div></div>`;
+  };
+  // ---------- echostack: الجملة بتتكرر صدى في سطور فوق بعض، كل سطر أصغر وأبهت من اللي تحته، والسطور بتطلع من تحت وبتتزحلق لفوق
+  P.k_echostack = function (b, t, k, th, bi) {
+    const it = this.items(b); if (!it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h), s = it.map((x) => this.text(x.w)).join(" "), ff = famOf(s), ar = AR.test(s);
+    const z = fitSize(s, `600 {}px ${ff}`, w * 0.84, mn * 0.08 * this.ts), D = b.t1 - b.t0, n = 7, up = bi % 2 === 0;
+    let html = `<div style="position:absolute;inset:0;background:${PURP}"></div>`, y = h * 0.5;
+    const shownS = it.filter((x) => t >= x.t0 - 0.05).map((x) => this.text(x.w)).join(" ");
+    for (let i = 0; i < n; i++) { const a = seg(t, b.t0 + 0.15 + i * D * 0.07, b.t0 + 0.4 + i * D * 0.07), sc = Math.pow(0.86, i), zz = z * sc;
+      if (a <= 0) continue;
+      html += `<div dir="${this.dir(s)}" style="position:absolute;left:0;right:0;top:${(y - zz).toFixed(1)}px;text-align:center;white-space:nowrap;font:600 ${zz.toFixed(1)}px ${ff};color:rgba(255,255,255,${(Math.pow(0.78, i) * clamp(a * 2)).toFixed(2)});transform:translateY(${((1 - eOut(a)) * zz * 0.6).toFixed(1)}px)">${esc(i === 0 ? shownS : s)}</div>`;
+      y += (up ? -1 : 1) * zz * (ar ? 1.25 : 1.02); }
+    return html;
   };
 })();
