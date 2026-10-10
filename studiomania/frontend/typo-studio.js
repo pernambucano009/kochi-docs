@@ -55,7 +55,7 @@
     "qr", "codetag", "toolbar", "terminal", "scan",
     "toasts", "footer", "marquee", "datestrip",
     "fileicon", "chaos",
-    "gradword", "meshprompt", "orbsplit", "bento", "figdays", "figcurve", "figplay", "figequal", "figwords", "figphone", "figdrop", "figcount", "figgears", "figbar", "figcheck", "figcta", "goldcap", "iconbelt", "glowsweep", "namepill", "kashida", "molecule", "weightstack", "stretch", "desatpop", "arcs", "chrome", "inkverse", "poemfade", "hashend", "flipverb", "strobe", "duoline", "capstack", "pillword"]);
+    "gradword", "meshprompt", "orbsplit", "bento", "figdays", "figcurve", "figplay", "figequal", "figwords", "figphone", "figdrop", "figcount", "figgears", "figbar", "figcheck", "figcta", "goldcap", "iconbelt", "glowsweep", "namepill", "kashida", "molecule", "weightstack", "stretch", "desatpop", "arcs", "chrome", "inkverse", "poemfade", "hashend", "flipverb", "strobe", "duoline", "capstack", "pillword", "blurduo", "tagstack", "underbars", "contactcard", "iconorbit", "blurstrobe", "kinstack"]);
   E.TYPING = new Set(["type", "artype"]);
   const MC = document.createElement("canvas").getContext("2d");
   const measure = (s, font) => { MC.font = font; return MC.measureText(s).width; };
@@ -2779,7 +2779,7 @@
   //   whip سحبة سريعة بموشن بلير · zoom زووم داخل · glitch جلتش ألوان · flash فلاش أبيض · iris دايرة بتفتح
   //   leak تسريب نور برتقاني · burn حرق فيلم · rise طالع من تحت
   // =====================================================================
-  const TRANS_DUR = { whip: 0.28, zoom: 0.32, glitch: 0.3, flash: 0.25, iris: 0.4, leak: 0.7, burn: 0.6, rise: 0.35, wipe: 0.45, blur: 0.4, pop: 0.35, slab: 0.6, bars: 0.5 };
+  const TRANS_DUR = { whip: 0.28, zoom: 0.32, glitch: 0.3, flash: 0.25, iris: 0.4, leak: 0.7, burn: 0.6, rise: 0.35, wipe: 0.45, blur: 0.4, pop: 0.35, slab: 0.6, bars: 0.5, orb: 0.55 };
   P.applyTrans = function (b, t, bi) {
     const tr = b?.trans;
     if (!tr || !TRANS_DUR[tr]) return;
@@ -2801,6 +2801,14 @@
       const px = lerp(-1.05, 1.05, eOut(q));
       over = `<div style="position:absolute;top:0;bottom:0;left:0;width:100%;background:${c};transform:translateX(${(px * w).toFixed(1)}px)"></div>`;
       wrap.style.clipPath = `inset(0 ${(clamp(1 - px) * 100).toFixed(1)}% 0 0)`;
+    }
+    else if (tr === "orb") {
+      // دايرة لون بتكبر من النص لحد ما تغطي الكادر، وجواها بتنفتح دايرة تانية بتكشف اللقطة الجديدة (ومعاها حلقة بتنبض)
+      const C = ["#165E06", "#8BF02A", "#FFFFFF", "#050505"][bi % 4], D = Math.hypot(w, h) * 0.56;
+      const r1 = D * eOut(clamp(q / 0.55)), r2 = D * eOut(clamp((q - 0.45) / 0.55)), ring = Math.sin(clamp(q / 0.5) * Math.PI);
+      over = `<div style="position:absolute;inset:0;pointer-events:none;background:${C};clip-path:circle(${r1.toFixed(1)}px at 50% 50%);-webkit-mask:radial-gradient(circle at 50% 50%,transparent ${r2.toFixed(1)}px,#000 ${(r2 + 1).toFixed(1)}px);mask:radial-gradient(circle at 50% 50%,transparent ${r2.toFixed(1)}px,#000 ${(r2 + 1).toFixed(1)}px)"></div>`
+        + (ring > 0.01 ? `<div style="position:absolute;left:50%;top:50%;width:${(r1 * 0.5).toFixed(1)}px;height:${(r1 * 0.5).toFixed(1)}px;transform:translate(-50%,-50%);border-radius:50%;border:${(mn * 0.04 * ring).toFixed(1)}px solid rgba(0,0,0,.25)"></div>` : "");
+      wrap.style.clipPath = `circle(${r2.toFixed(1)}px at 50% 50%)`;
     }
     else if (tr === "bars") {
       // شرايح طولية بألوان قريبة من بعض بتعدّي ورا بعض بسرعات مختلفة وتكشف اللقطة الجديدة
@@ -6678,6 +6686,126 @@
     let html = `<div style="position:absolute;inset:0;background:#EDEDED"></div>`;
     html += `<div dir="${this.dir(lead + main)}" style="position:absolute;left:0;right:0;top:${(h * 0.42).toFixed(1)}px;text-align:center;white-space:nowrap;font:400 ${z.toFixed(1)}px ${ff};color:${CINK}">${esc(lead)} <span style="position:relative;display:inline-block;font-weight:700;opacity:${on ? 1 : 0};transform:translateY(${on ? 0 : z * 0.3}px)"><i style="position:absolute;left:${(-z * 0.12).toFixed(1)}px;right:${(-z * 0.12).toFixed(1)}px;top:8%;bottom:4%;background:${YEL};border-radius:${(z * 0.18).toFixed(1)}px;transform-origin:${AR.test(main) ? "right" : "left"};transform:scaleX(${pp.toFixed(3)})"></i><span style="position:relative">${esc(main)}</span></span></div>`;
     if (grow > 0) html += `<div style="position:absolute;left:50%;top:${(h * 0.42 + z * 0.55).toFixed(1)}px;width:${lerp(z * 2, w * 2.2, grow).toFixed(1)}px;height:${lerp(z * 0.9, h * 2.2, grow).toFixed(1)}px;transform:translate(-50%,-50%);border-radius:${lerp(z * 0.18, 0, grow).toFixed(1)}px;background:${YEL}"></div>`;
+    return html;
+  };
+  // ======== r07 «دواير» — كلام بيوضح من بلير طولي، ألوان أخضر/أسود/أبيض بالتبادل، والكادر بيتقفل بدايرة على الكلام ========
+  const ORBPAL = [["#165E06", "#FFFFFF", "#8BF02A"], ["#050505", "#FFFFFF", "#8BF02A"], ["#FFFFFF", "#111111", "#111111"], ["#050505", "#8BF02A", "#FFFFFF"]];
+  // ---------- blurduo: سطر رفيع وسطر تقيل، كل كلمة بتنزل وتوضح من بلير طولي، وفي آخر البلوك دايرة بتقفل على الكلام
+  P.k_blurduo = function (b, t, k, th, bi) {
+    const it = this.items(b); if (!it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h);
+    const half = b.focus > 0 && b.focus < it.length ? b.focus : Math.max(1, Math.floor(it.length / 2));
+    const A = it.slice(0, half), B = it.slice(half), J = (a) => a.map((x) => this.text(x.w)).join(" ");
+    const [bg, c1, c2] = ORBPAL[bi % ORBPAL.length], ar = AR.test(J(it));
+    const ffL = ar ? famOf(J(it)) : "'TY Lite', 'SM Tajawal'", ffB = famOf(J(it));
+    const z = Math.min(fitSize(J(A), `500 {}px ${ffL}`, w * 0.8, mn * 0.085 * this.ts), B.length ? fitSize(J(B), `800 {}px ${ffB}`, w * 0.8, mn * 0.1 * this.ts) / 1.15 : 1e9);
+    const word = (x, f, wt, zz, col) => { const q = seg(t, x.t0 - 0.05, x.t0 + 0.3), e = eOut(q);
+      return `<span style="display:inline-block;font:${wt} ${zz.toFixed(1)}px ${f};color:${col};opacity:${clamp(q * 2).toFixed(2)};filter:blur(${((1 - e) * zz * 0.08).toFixed(1)}px);transform:translateY(${((1 - e) * -zz * 0.35).toFixed(1)}px) scaleY(${lerp(1.5, 1, e).toFixed(3)})">${esc(this.text(x.w))}</span>`; };
+    const close = eOut(seg(t, b.t1 - 0.4, b.t1)), R = Math.hypot(w, h) * 0.6 * (1 - close) + mn * 0.25 * close * (1 - seg(t, b.t1 - 0.12, b.t1));
+    return `<div style="position:absolute;inset:0;background:#050505"></div><div style="position:absolute;inset:0;background:${bg};clip-path:circle(${R.toFixed(1)}px at 50% 42%)">
+      <div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:0;right:0;top:${(h * 0.42 - z * 1.1).toFixed(1)}px;text-align:center;white-space:nowrap;line-height:1.15">
+        <div style="font:400 ${z.toFixed(1)}px ${ffL}">${A.map((x) => word(x, ffL, 400, z, c1)).join(" ")}</div><div style="font:800 ${(z * 1.15).toFixed(1)}px ${ffB}">${B.map((x) => word(x, ffB, 800, z * 1.15, c2)).join(" ")}</div></div></div>`;
+  };
+  // ======== r08 «تاج» — كابيتال تقيل سطر تحت سطر بيتنطط من فوق، وآخر سطر جوه تاج بنفسجي طالع من خط، وكارت تواصل ========
+  const TAGPAL = [["#F3F5FE", "#0A0A0A", "#5A50F0", "#FFFFFF"], ["#050505", "#FFFFFF", "#5A50F0", "#FFFFFF"], ["#5A50F0", "#FFFFFF", "#0A0A0A", "#FFFFFF"]];
+  function stackRows(eng, it) { const rows = []; let cur = [];
+    for (const x of it) { cur.push(x); if (cur.length >= 2 || [...eng.text(x.w)].length > 6) { rows.push(cur); cur = []; } }
+    if (cur.length) rows.push(cur); return rows; }
+  // ---------- tagstack: سطور كابيتال بتنزل بنطة، وآخر سطر بيطلع وراه تاج لونه مختلف من خط رفيع تحته
+  P.k_tagstack = function (b, t, k, th, bi) {
+    const it = this.items(b); if (!it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h);
+    const rows = stackRows(this, it), J = (a) => a.map((x) => this.text(x.w)).join(" "), ff = famOf(J(it)), ar = AR.test(J(it));
+    const [bg, fg, tag, tfg] = TAGPAL[bi % TAGPAL.length];
+    const z = Math.min(...rows.map((r) => fitSize(J(r).toUpperCase(), `800 {}px ${ff}`, w * 0.84, mn * 0.12 * this.ts)));
+    const lh = z * (ar ? 1.5 : 1.12), y0 = h * 0.4 - rows.length * lh / 2, out = eOut(seg(t, b.t1 - 0.3, b.t1));
+    let html = `<div style="position:absolute;inset:0;background:${bg}"></div>`;
+    rows.forEach((r, j) => { const last = j === rows.length - 1 && rows.length > 1, a = seg(t, r[0].t0 - 0.05, r[0].t0 + 0.3), e = eBack(a), s = J(r);
+      const zz = last ? z * 0.95 : z, sw = measure(s.toUpperCase(), `800 ${zz}px ${ff}`);
+      const bar = last ? eOut(seg(t, r[0].t0 - 0.15, r[0].t0 + 0.05)) : 0, box = last ? eOut(seg(t, r[0].t0 + 0.05, r[0].t0 + 0.3)) : 0;
+      html += `<div style="position:absolute;left:0;right:0;top:${(y0 + j * lh).toFixed(1)}px;height:${lh.toFixed(1)}px;overflow:hidden;text-align:center">
+        ${last ? `<i style="position:absolute;left:50%;bottom:${(lh * 0.06).toFixed(1)}px;width:${((sw + zz * 0.4) * bar).toFixed(1)}px;height:${lerp(zz * 0.08, lh * 0.88, box).toFixed(1)}px;transform:translateX(-50%);background:${tag};border-radius:${(zz * 0.14).toFixed(1)}px"></i>` : ""}
+        <div dir="${this.dir(s)}" style="position:relative;font:800 ${zz.toFixed(1)}px ${ff};line-height:${lh.toFixed(1)}px;color:${last ? tfg : fg};text-transform:uppercase;white-space:nowrap;opacity:${clamp(a * 3).toFixed(2)};transform:translateY(${(((1 - e) * -lh) - out * lh).toFixed(1)}px)">${esc(s)}</div></div>`; });
+    return html;
+  };
+  // ---------- underbars: سطور كابيتال وتحت كل سطر خط تقيل بيترسم، والخطوط بتتزق لفوق في الخروج
+  P.k_underbars = function (b, t, k, th, bi) {
+    const it = this.items(b); if (!it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h);
+    const rows = it.map((x) => [x]), J = (a) => a.map((x) => this.text(x.w)).join(" "), ff = famOf(J(it)), ar = AR.test(J(it));
+    const [bg, fg, bar] = [["#5A50F0", "#FFFFFF", "#0A0A0A"], ["#0A0A0A", "#FFFFFF", "#5A50F0"], ["#F3F5FE", "#0A0A0A", "#5A50F0"]][bi % 3];
+    const z = Math.min(...rows.map((r) => fitSize(J(r).toUpperCase(), `800 {}px ${ff}`, w * 0.6, mn * 0.11 * this.ts)));
+    const lh = z * (ar ? 1.6 : 1.28), y0 = h * 0.42 - rows.length * lh / 2, out = eOut(seg(t, b.t1 - 0.35, b.t1));
+    let html = `<div style="position:absolute;inset:0;background:${bg}"></div>`;
+    rows.forEach((r, j) => { const s = J(r), a = seg(t, r[0].t0 - 0.05, r[0].t0 + 0.25), sw = measure(s.toUpperCase(), `800 ${z}px ${ff}`), bp = eOut(seg(t, r[0].t0 + 0.1, r[0].t0 + 0.4));
+      const yy = y0 + j * lh - out * (j + 1) * lh * 0.6;
+      html += `<div dir="${this.dir(s)}" style="position:absolute;left:0;right:0;top:${yy.toFixed(1)}px;text-align:center;font:800 ${z.toFixed(1)}px ${ff};line-height:${(lh * 0.8).toFixed(1)}px;color:${fg};text-transform:uppercase;white-space:nowrap;opacity:${(clamp(a * 2.5) * (1 - out)).toFixed(2)}">${esc(s)}</div>
+        <i style="position:absolute;left:50%;top:${(yy + lh * 0.82).toFixed(1)}px;width:${(sw * bp).toFixed(1)}px;height:${(z * 0.12).toFixed(1)}px;transform:translateX(-50%);border-radius:${(z * 0.06).toFixed(1)}px;background:${bar};opacity:${(1 - out).toFixed(2)}"></i>`; });
+    return html;
+  };
+  // ---------- contactcard: «تواصل معانا» بخط تحته وصفوف (موقع/تليفون/إيميل) بأيقونات صغيرة بتطلع واحد واحد
+  P.k_contactcard = function (b, t, k, th, bi) {
+    const P = figParts(this, { ...b, focus: b.focus >= 0 ? b.focus : Math.min(2, this.items(b).length - 1) }); if (!P.it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h);
+    const head = P.J(P.it.slice(0, P.fi + 1)), rows = P.tail, ff = famOf(head);
+    const z = fitSize(head.toUpperCase(), `800 {}px ${ff}`, w * 0.7, mn * 0.075 * this.ts);
+    const hp = seg(t, b.t0, b.t0 + 0.3), ul = eOut(seg(t, b.t0 + 0.2, b.t0 + 0.6)), hw = measure(head.toUpperCase(), `800 ${z}px ${ff}`), y = h * 0.4;
+    const ICO = [`<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/>`, `<path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/>`, `<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>`, `<path d="M12 21s-7-6-7-11a7 7 0 0 1 14 0c0 5-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/>`];
+    let html = `<div style="position:absolute;inset:0;background:#050505"></div>
+      <div dir="${this.dir(head)}" style="position:absolute;left:0;right:0;top:${y.toFixed(1)}px;text-align:center;font:800 ${z.toFixed(1)}px ${ff};color:#fff;text-transform:uppercase;white-space:nowrap;${blurIn(t, b.t0)}">${esc(head)}</div>
+      <i style="position:absolute;left:50%;top:${(y + z * 1.45).toFixed(1)}px;width:${(hw * 1.05 * ul).toFixed(1)}px;height:${(z * 0.14).toFixed(1)}px;transform:translateX(-50%);border-radius:${(z * 0.07).toFixed(1)}px;background:#5A50F0"></i>`;
+    rows.forEach((x, i) => { const s = this.text(x.w), a = eOut(seg(t, Math.max(x.t0, b.t0 + 0.4 + i * 0.15) - 0.05, Math.max(x.t0, b.t0 + 0.4 + i * 0.15) + 0.3)), rz = z * 0.6;
+      html += `<div dir="ltr" style="position:absolute;left:0;right:0;top:${(y + z * 2 + i * rz * 1.9).toFixed(1)}px;display:flex;justify-content:center;align-items:center;gap:${(rz * 0.5).toFixed(1)}px;opacity:${a.toFixed(2)};transform:translateY(${((1 - a) * rz * 0.6).toFixed(1)}px)">
+        <svg width="${(rz * 1.1).toFixed(0)}" height="${(rz * 1.1).toFixed(0)}" viewBox="0 0 24 24" fill="none" stroke="#8C84FF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICO[i % ICO.length]}</svg>
+        <span dir="${this.dir(s)}" style="font:600 ${rz.toFixed(1)}px ${famOf(s)};color:#E9E9F2;letter-spacing:.06em;white-space:nowrap">${esc(s)}</span></div>`; });
+    return html;
+  };
+  // ======== r09 «مدار أيقونات» — سؤال ثابت فوق، واسم الخدمة بيتغير، وكروت أيقونات منوّرة طايرة في قوس بتلف مع كل خدمة ========
+  P.k_iconorbit = function (b, t, k, th, bi) {
+    const P = figParts(this, { ...b, focus: b.focus >= 0 ? b.focus : Math.min(3, this.items(b).length - 1) }); if (!P.it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h);
+    const head = P.J(P.it.slice(0, P.fi + 1)), tail = P.tail, g = tail.length > 5 ? 2 : 1, labs = [];
+    for (let i = 0; i < tail.length; i += g) labs.push(tail.slice(i, i + g));
+    let li = -1; labs.forEach((l, i) => { if (t >= l[0].t0 - 0.05) li = i; });
+    const sw = li >= 0 ? seg(t, labs[li][0].t0 - 0.05, labs[li][0].t0 + 0.3) : 1, whoosh = Math.sin(sw * Math.PI) * (li >= 0 ? 1 : 0);
+    const hf = famOf(head), hz = fitSize(head.toUpperCase(), `800 {}px ${hf}`, w * 0.8, mn * 0.065 * this.ts);
+    let html = onVideo(this) ? "" : `<div style="position:absolute;inset:0;background:radial-gradient(ellipse at 50% 40%,#5B5136,#1E1A12 75%)"></div>`;
+    html += `<div dir="${this.dir(head)}" style="position:absolute;left:0;right:0;top:${(h * 0.1).toFixed(1)}px;text-align:center;font:800 ${hz.toFixed(1)}px ${hf};color:#fff;text-transform:uppercase;white-space:nowrap;text-shadow:0 2px 14px rgba(0,0,0,.5);${blurIn(t, b.t0)}">${esc(head)}</div>`;
+    if (li >= 0) { const s = P.J(labs[li]), f = famOf(s), z = fitSize(s.toUpperCase(), `600 {}px ${f}`, w * 0.84, mn * 0.05 * this.ts);
+      html += `<div dir="${this.dir(s)}" style="position:absolute;left:0;right:0;top:${(h * 0.1 + hz * 1.9).toFixed(1)}px;text-align:center;font:600 ${z.toFixed(1)}px ${f};letter-spacing:.12em;color:#F6EFD8;text-transform:uppercase;white-space:nowrap;text-shadow:0 0 18px rgba(255,236,190,.65);opacity:${clamp(sw * 2).toFixed(2)};filter:blur(${((1 - eOut(sw)) * 6).toFixed(1)}px)">${esc(s)}</div>`; }
+    const C = ["#F7B5A5", "#9FD4F2", "#F6D36B", "#B9E4A8", "#D7B8F2", "#F59AB8"], cx = w / 2, cy = h * 0.56, R = w * 0.38, base = (li + 1) * 0.55 + sw * 0.55;
+    for (let i = 0; i < 5; i++) { const a = -Math.PI / 2 + (i - 2) * 0.62 + Math.sin(base + i) * 0.04, ts = mn * (i === 2 ? 0.2 : 0.15), x = cx + Math.cos(a) * R, y = cy + Math.sin(a) * R * 0.9 + R * 0.5;
+      const fl = Math.sin((t - b.t0) * 2 + i) * mn * 0.008, gl = GLY[GKEYS[(i + li + 1 + bi) % GKEYS.length]];
+      html += `<div style="position:absolute;left:${(x - ts / 2).toFixed(1)}px;top:${(y - ts / 2 + fl).toFixed(1)}px;width:${ts.toFixed(1)}px;height:${ts.toFixed(1)}px;border-radius:${(ts * 0.2).toFixed(1)}px;background:linear-gradient(150deg,#FFF8EA,${C[(i + li + 6) % C.length]});box-shadow:0 0 ${(ts * 0.35).toFixed(0)}px rgba(255,230,180,.7);display:flex;align-items:center;justify-content:center;transform:rotate(${(whoosh * (i - 2) * 25).toFixed(1)}deg) scale(${lerp(1, 0.8, whoosh).toFixed(3)});filter:blur(${(whoosh * mn * 0.012).toFixed(1)}px);opacity:${eOut(seg(t, b.t0 + i * 0.06, b.t0 + 0.3 + i * 0.06)).toFixed(2)}"><svg width="${(ts * 0.55).toFixed(0)}" height="${(ts * 0.55).toFixed(0)}" viewBox="0 0 24 24" fill="none" stroke="#5A3A2A" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${gl}</svg></div>`; }
+    return html;
+  };
+  // ======== r10 «كينتك أصفر» — كلمة بتخبط بموشن بلير، أصفر وأسود بالتبادل، نور أبيض بيعدّي على الأصفر، وتوهج على الأسود ========
+  // ---------- blurstrobe: كلمة واحدة في الكادر بتدخل بسحبة وبلير أفقي؛ على الأصفر بيعدّي موج نور أبيض، وعلى الأسود الكلمة منوّرة
+  P.k_blurstrobe = function (b, t, k, th, bi) {
+    const it = this.items(b); if (!it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h);
+    let ci = 0; it.forEach((x, i) => { if (t >= x.t0 - 0.03) ci = i; });
+    const x = it[ci], s = this.text(x.w), dark = (ci + bi) % 2 === 1, q = seg(t, x.t0 - 0.03, x.t0 + 0.18), e = eOut(q);
+    const ff = famOf(s), z = fitSize(s, `800 {}px ${ff}`, w * 0.8, mn * 0.11 * this.ts), dir = ci % 2 ? 1 : -1;
+    const wave = ((t - b.t0) * 0.9) % 1.4 - 0.2;
+    let html = `<div style="position:absolute;inset:0;background:${dark ? "#000" : "#F5E512"}"></div>`;
+    if (!dark) html += `<div style="position:absolute;top:-10%;bottom:-10%;left:${(wave * w - w * 0.2).toFixed(1)}px;width:${(w * 0.35).toFixed(1)}px;background:radial-gradient(ellipse at 50% 50%,rgba(255,255,255,.95),rgba(255,255,255,0) 70%);filter:blur(${(mn * 0.03).toFixed(0)}px);transform:skewX(-12deg)"></div>`;
+    html += `<div dir="${this.dir(s)}" style="position:absolute;left:0;right:0;top:50%;text-align:center;white-space:nowrap;font:800 ${z.toFixed(1)}px ${ff};letter-spacing:-0.03em;color:${dark ? "#F5E512" : "#141414"};${dark ? `text-shadow:0 0 ${(z * 0.25).toFixed(0)}px rgba(245,229,18,.65)` : ""};transform:translate(${((1 - e) * dir * w * 0.25).toFixed(1)}px,-50%) skewX(${((1 - e) * dir * -20).toFixed(1)}deg);filter:blur(${((1 - e) * z * 0.12).toFixed(1)}px);opacity:${clamp(q * 3).toFixed(2)}">${esc(s)}</div>`;
+    return html;
+  };
+  // ---------- kinstack: تلات كلمات متدرّجة — صغيرة شمال، كبيرة في النص، صغيرة يمين — كل واحدة بتخبط بسحبة
+  P.k_kinstack = function (b, t, k, th, bi) {
+    const it = this.items(b); if (!it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h);
+    const fi = b.focus >= 0 && b.focus < it.length ? b.focus : Math.min(1, it.length - 1), dark = bi % 2 === 0;
+    const J = (a) => a.map((x) => this.text(x.w)).join(" "), ff = famOf(J(it)), ar = AR.test(J(it));
+    const big = fitSize(this.text(it[fi].w), `800 {}px ${ff}`, w * 0.66, mn * 0.17 * this.ts), sm = Math.min(big * 0.5, fitSize(J(it.filter((_, i) => i !== fi)), `800 {}px ${ff}`, w * 0.8, big * 0.5));
+    const rows = [it.slice(0, fi), [it[fi]], it.slice(fi + 1)].filter((r) => r.length);
+    let html = `<div style="position:absolute;inset:0;background:${dark ? "#000" : "#F5E512"}"></div>`, y = h * 0.42 - (big * 0.95 + (rows.length - 1) * sm * 1.05) / 2;
+    rows.forEach((r, j) => { const isB = r.includes(it[fi]), zz = isB ? big : sm, s = J(r), q = seg(t, r[0].t0 - 0.03, r[0].t0 + 0.18), e = eOut(q);
+      const sw = measure(s, `800 ${zz}px ${ff}`), off = isB ? 0 : (j === 0 ? -1 : 1) * (ar ? -1 : 1) * Math.max(0, Math.min(big * 0.55, (w - sw) / 2 - w * 0.06));
+      html += `<div dir="${this.dir(s)}" style="position:absolute;left:0;right:0;top:${y.toFixed(1)}px;text-align:center;white-space:nowrap;font:800 ${zz.toFixed(1)}px ${ff};line-height:1;letter-spacing:-0.03em;color:${dark ? "#F5E512" : "#141414"};transform:translateX(${(off + (1 - e) * (j % 2 ? 1 : -1) * w * 0.2).toFixed(1)}px) skewX(${((1 - e) * 18).toFixed(1)}deg);filter:blur(${((1 - e) * zz * 0.1).toFixed(1)}px);opacity:${clamp(q * 3).toFixed(2)}">${esc(s)}</div>`;
+      y += isB ? big * 0.95 : sm * 1.05; });
     return html;
   };
 })();
