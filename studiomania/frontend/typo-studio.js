@@ -55,7 +55,7 @@
     "qr", "codetag", "toolbar", "terminal", "scan",
     "toasts", "footer", "marquee", "datestrip",
     "fileicon", "chaos",
-    "gradword", "meshprompt", "orbsplit", "bento", "figdays", "figcurve", "figplay", "figequal", "figwords", "figphone", "figdrop", "figcount", "figgears", "figbar", "figcheck", "figcta", "goldcap", "iconbelt", "glowsweep", "namepill", "kashida", "molecule", "weightstack", "stretch", "desatpop", "arcs", "chrome", "inkverse", "poemfade", "hashend", "flipverb", "strobe", "duoline", "capstack", "pillword", "blurduo", "tagstack", "underbars", "contactcard", "iconorbit", "blurstrobe", "kinstack", "incall", "cineband", "scriptover", "tricolor", "drumpicker", "redmix", "headbubble", "pincard", "emojifloat", "slotreel"]);
+    "gradword", "meshprompt", "orbsplit", "bento", "figdays", "figcurve", "figplay", "figequal", "figwords", "figphone", "figdrop", "figcount", "figgears", "figbar", "figcheck", "figcta", "goldcap", "iconbelt", "glowsweep", "namepill", "kashida", "molecule", "weightstack", "stretch", "desatpop", "arcs", "chrome", "inkverse", "poemfade", "hashend", "flipverb", "strobe", "duoline", "capstack", "pillword", "blurduo", "tagstack", "underbars", "contactcard", "iconorbit", "blurstrobe", "kinstack", "incall", "cineband", "scriptover", "tricolor", "drumpicker", "redmix", "headbubble", "pincard", "emojifloat", "slotreel", "posterwall", "quoteline", "medallion"]);
   E.TYPING = new Set(["type", "artype"]);
   const MC = document.createElement("canvas").getContext("2d");
   const measure = (s, font) => { MC.font = font; return MC.measureText(s).width; };
@@ -6969,6 +6969,62 @@
       for (let d = -2; d <= 2; d++) { const ii = Math.round(pos) + d; if (ii < 0 || ii >= items.length) continue; const fr = ii - pos, s = items[ii];
         reel += `<div dir="${this.dir(s)}" style="position:absolute;${ar ? "right" : "left"}:0;top:${(row * 1.5 + fr * row - iz * 0.6).toFixed(1)}px;font:600 ${iz.toFixed(1)}px ${famOf(s)};color:#fff;white-space:nowrap;opacity:${clamp(1 - Math.abs(fr) * 0.55).toFixed(2)};filter:blur(${(spin ? iz * 0.08 : Math.abs(fr) * 1.5).toFixed(1)}px)">${esc(s)}</div>`; }
       html += `<div style="position:absolute;${ar ? "right" : "left"}:${(x0 + pw + gap).toFixed(1)}px;top:${(cy - row * 1.5).toFixed(1)}px;width:${(w * 0.6).toFixed(1)}px;height:${(row * 3).toFixed(1)}px;overflow:hidden;-webkit-mask:linear-gradient(transparent,#000 30%,#000 70%,transparent);mask:linear-gradient(transparent,#000 30%,#000 70%,transparent)">${reel}</div>`; }
+    return html;
+  };
+  // ======== r17 «حيطة بوسترات» — تلات كروت ورق على حيطة بيج عليها ظل فرع شجر، كل كارت فيه تكوين صغير (فتحة مفتاح حمرا، نص دايرة، نجوم) وكلام سيريف ========
+  const BRANCH = (w, h, t) => { const sw = Math.sin(t * 0.8) * 1.5; let s = `<g transform="translate(${(w * 0.62).toFixed(0)} ${(-h * 0.02).toFixed(0)}) rotate(${(12 + sw).toFixed(2)})" fill="rgba(70,62,52,.55)" filter="url(#bb)"><path d="M0 0 C ${w * 0.1} ${h * 0.04}, ${w * 0.25} ${h * 0.03}, ${w * 0.45} ${h * 0.09}" stroke="rgba(70,62,52,.55)" stroke-width="${(w * 0.012).toFixed(1)}" fill="none"/>`;
+    const r = rng(7); for (let i = 0; i < 26; i++) { const u = r(); s += `<ellipse cx="${(u * w * 0.42).toFixed(0)}" cy="${(h * (0.01 + u * 0.08) + (r() - 0.5) * h * 0.06).toFixed(0)}" rx="${(w * (0.012 + r() * 0.018)).toFixed(0)}" ry="${(w * (0.008 + r() * 0.012)).toFixed(0)}" transform="rotate(${(r() * 180).toFixed(0)})"/>`; }
+    return `<svg style="position:absolute;inset:0" width="${w}" height="${h}"><defs><filter id="bb"><feGaussianBlur stdDeviation="${(w * 0.004).toFixed(1)}"/></filter></defs>${s}</g></svg>`; };
+  P.k_posterwall = function (b, t, k, th, bi) {
+    const it = this.items(b); if (!it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h), ar = AR.test(it.map((x) => this.text(x.w)).join(" "));
+    const cw = Math.min(w * 0.38, h * 0.21), ch = cw * 1.75, g = cw * 0.06;
+    const cards = [[w / 2 - cw - g / 2, h * 0.2], [w / 2 + g / 2, h * 0.2], [w / 2 - cw / 2, h * 0.2 + ch + g]];
+    const groups = [[], [], []], per = Math.ceil(it.length / 3); it.forEach((x, i) => groups[Math.min(2, Math.floor(i / per))].push(x));
+    const fz = cw * 0.11, serif = ar ? "'TY Amiri', 'TY PlexAr'" : "'TY Serif', 'TY Outfit'";
+    let html = `<div style="position:absolute;inset:0;background:radial-gradient(ellipse at 50% 40%,#E7DCCB,#BDB2A3 85%)"></div>` + BRANCH(w, h, t - b.t0);
+    cards.forEach(([x, y], ci) => { const ws = groups[ci], a = eOut(seg(t, b.t0 + ci * 0.12, b.t0 + 0.45 + ci * 0.12)), fl = Math.sin((t - b.t0) * 1.3 + ci) * 0.6;
+      const shown = ws.filter((q) => t >= q.t0 - 0.05), cur = shown[shown.length - 1], s = shown.map((q) => this.text(q.w)).join(" "), gk = (ci + bi + shown.length) % 4;
+      let art = "";
+      if (gk === 0) art = `<svg viewBox="0 0 100 140" width="${(cw * 0.8).toFixed(0)}" height="${(cw * 1.12).toFixed(0)}"><path d="M50 18a26 26 0 0 1 14 48l14 66H22l14-66a26 26 0 0 1 14-48z" fill="#A90C14"/></svg>`;
+      else if (gk === 1) art = `<svg viewBox="0 0 100 100" width="${(cw * 0.7).toFixed(0)}" height="${(cw * 0.7).toFixed(0)}"><path d="M15 50a35 35 0 1 1 35 35" stroke="url(#gr${ci})" stroke-width="20" fill="none"/><defs><linearGradient id="gr${ci}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8E8A84"/><stop offset="1" stop-color="#EDE6DA"/></linearGradient></defs></svg>`;
+      else if (gk === 2) art = `<svg viewBox="0 0 100 100" width="${(cw * 0.75).toFixed(0)}" height="${(cw * 0.75).toFixed(0)}">${[[30, 35, 1], [72, 70, 0.7], [80, 15, 0.45]].map(([sx, sy, sc]) => `<path transform="translate(${sx} ${sy}) scale(${(sc * (0.9 + 0.1 * Math.sin((t - b.t0) * 4 + sx))).toFixed(3)})" d="M0 -16 C2 -3 3 -2 16 0 C3 2 2 3 0 16 C-2 3 -3 2 -16 0 C-3 -2 -2 -3 0 -16z" fill="#B3121B"/>`).join("")}</svg>`;
+      else art = `<svg viewBox="0 0 100 100" width="${(cw * 0.7).toFixed(0)}" height="${(cw * 0.7).toFixed(0)}"><rect x="22" y="18" width="46" height="62" rx="3" fill="#F6F3EE" stroke="#9A948B" stroke-width="1.5" transform="rotate(-12 45 50)"/><path d="M30 34h26M30 44h22M30 54h24" stroke="#C9C2B6" stroke-width="2" transform="rotate(-12 45 50)"/><path d="M70 22 L52 78" stroke="#2A2622" stroke-width="3.5" stroke-linecap="round"/></svg>`;
+      html += `<div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:${x.toFixed(1)}px;top:${(y + (1 - a) * h * 0.05).toFixed(1)}px;width:${cw.toFixed(1)}px;height:${ch.toFixed(1)}px;background:linear-gradient(180deg,#EFE6D8,#E6DCCB);box-shadow:0 ${(mn * 0.012).toFixed(0)}px ${(mn * 0.03).toFixed(0)}px rgba(60,48,36,.28);opacity:${a.toFixed(2)};transform:rotate(${fl.toFixed(2)}deg)">
+        <div style="position:absolute;left:10%;right:10%;top:9%;font:400 ${fz.toFixed(1)}px ${serif};color:#3A332C;line-height:1.15;${ar ? "" : "font-style:italic;"}">${esc(s)}</div>
+        <div style="position:absolute;left:0;right:0;top:${(ch * 0.32).toFixed(1)}px;display:flex;justify-content:center;transform:scale(${cur ? eBack(seg(t, cur.t0 - 0.05, cur.t0 + 0.3)).toFixed(3) : 0})">${art}</div></div>`; });
+    return html;
+  };
+  // ---------- quoteline: سطر رفيع باهت في نص الكادر بيتكتب: اسم اللي بيتكلم تقيل وبعده «:-» والكلام رفيع (للاقتباس أو طلب عميل)
+  P.k_quoteline = function (b, t, k, th, bi) {
+    const P = figParts(this, { ...b, focus: b.focus >= 0 ? b.focus : 0 }); if (!P.it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h);
+    const who = P.J(P.it.slice(0, P.fi + 1)), said = P.J(P.tail), ar = AR.test(who + said), ff = ar ? famOf(who) : "'TY Lite', 'SM Tajawal'";
+    const z = fitSize(`${who} :- ${said}`, `400 {}px ${ff}`, w * 0.84, mn * 0.04 * this.ts), sh = typed(said, t, P.tail[0]?.t0 ?? b.t1, 22);
+    return `<div style="position:absolute;inset:0;background:radial-gradient(ellipse at 50% 40%,#E7DCCB,#BDB2A3 85%)"></div>${BRANCH(w, h, t - b.t0)}
+      <div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:0;right:0;top:${(h * 0.45).toFixed(1)}px;text-align:center;white-space:nowrap;font:400 ${z.toFixed(1)}px ${ff};color:rgba(70,62,52,.75)"><b style="font-weight:700;${blurIn(t, b.t0)}">${esc(who)}</b> :- ${esc(sh)}</div>`;
+  };
+  // ======== r18 «ميدالية» — عنوان بيتكتب حرف حرف وتحته شريط أسود فيه سطر سيريف، دايرة سودا بحلقة متقطعة بتلف وجواها رمز بيلف 3D، وتحت كلمة تقيلة وفقرة صغيرة ========
+  P.k_medallion = function (b, t, k, th, bi) {
+    const it = this.items(b); if (!it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h), n = it.length, J = (a) => a.map((x) => this.text(x.w)).join(" ");
+    const fi = b.focus > 0 && b.focus < n ? b.focus : Math.min(3, n - 1);
+    const title = this.text(it[0].w), sub = it.slice(1, fi), bottom = fi > 0 ? this.text(it[fi].w) : "", para = it.slice(fi + 1);
+    const all = J(it), ar = AR.test(all), ff = famOf(all), serif = ar ? "'TY Amiri', 'TY PlexAr'" : "'TY Serif', 'TY Outfit'";
+    const tz = fitSize(title, `800 {}px ${ff}`, w * 0.8, mn * 0.12 * this.ts), y0 = h * 0.08;
+    const em = emojiOf(all) || ["🧠", "💡", "🎯", "🚀"][bi % 4], R = Math.min(w * 0.36, h * 0.16), cy = h * 0.4, rot = (t - b.t0) * 30, spinY = Math.sin((t - b.t0) * 1.2) * 35;
+    const pc = eBack(seg(t, b.t0 + 0.2, b.t0 + 0.7));
+    let html = `<div style="position:absolute;inset:0;background:linear-gradient(180deg,#BDBDBD,#FFFFFF 18%,#FFFFFF 82%,#BDBDBD)"></div>
+      <svg style="position:absolute;inset:0" width="${w}" height="${h}"><path d="M${(-w * 0.05).toFixed(0)} ${(h * 0.78).toFixed(0)} C ${(w * 0.3).toFixed(0)} ${(h * 0.7).toFixed(0)}, ${(w * 0.25).toFixed(0)} ${(h * 0.95).toFixed(0)}, ${(w * 0.6).toFixed(0)} ${(h * 0.88).toFixed(0)} M${(w * 0.98).toFixed(0)} ${(h * 0.2).toFixed(0)} C ${(w * 0.85).toFixed(0)} ${(h * 0.35).toFixed(0)}, ${(w * 1.05).toFixed(0)} ${(h * 0.5).toFixed(0)}, ${(w * 0.9).toFixed(0)} ${(h * 0.62).toFixed(0)}" stroke="#9A9A9A" stroke-width="1.5" fill="none" pathLength="1" stroke-dasharray="1" stroke-dashoffset="${(1 - eOut(seg(t, b.t0, b.t0 + 1.5))).toFixed(3)}"/></svg>`;
+    html += `<div dir="${this.dir(title)}" style="position:absolute;left:0;right:0;top:${y0.toFixed(1)}px;text-align:center;font:800 ${tz.toFixed(1)}px ${ff};color:#141414;white-space:nowrap;letter-spacing:-0.01em">${esc(typed(title, t, it[0].t0 - 0.05, 22))}</div>`;
+    if (sub.length) { const ss = J(sub), sz = tz * 0.32, bw = measure(ss, `700 ${sz}px ${serif}`) + sz * 1.2, bp = eOut(seg(t, sub[0].t0 - 0.25, sub[0].t0 + 0.05));
+      html += `<div style="position:absolute;left:50%;top:${(y0 + tz * (ar ? 1.45 : 1.08)).toFixed(1)}px;width:${(bw * bp).toFixed(1)}px;height:${(sz * 1.45).toFixed(1)}px;transform:translateX(-50%);background:#111;overflow:hidden"><div dir="${this.dir(ss)}" style="position:absolute;left:0;right:0;top:0;text-align:center;font:700 ${sz.toFixed(1)}px ${serif};line-height:${(sz * 1.45).toFixed(1)}px;color:#fff;white-space:nowrap">${esc(typed(ss, t, sub[0].t0, 20))}</div></div>`; }
+    html += `<svg style="position:absolute;left:${(w / 2 - R * 1.18).toFixed(1)}px;top:${(cy - R * 1.18).toFixed(1)}px;transform:scale(${pc.toFixed(3)})" width="${(R * 2.36).toFixed(0)}" height="${(R * 2.36).toFixed(0)}"><circle cx="${(R * 1.18).toFixed(1)}" cy="${(R * 1.18).toFixed(1)}" r="${(R * 1.12).toFixed(1)}" fill="none" stroke="#141414" stroke-width="${(R * 0.025).toFixed(1)}" stroke-dasharray="${(R * 0.08).toFixed(1)} ${(R * 0.06).toFixed(1)}" transform="rotate(${rot.toFixed(1)} ${(R * 1.18).toFixed(1)} ${(R * 1.18).toFixed(1)})"/><circle cx="${(R * 1.18).toFixed(1)}" cy="${(R * 1.18).toFixed(1)}" r="${R.toFixed(1)}" fill="#141414"/></svg>
+      <div style="position:absolute;left:50%;top:${cy.toFixed(1)}px;transform:translate(-50%,-50%) perspective(${(R * 6).toFixed(0)}px) rotateY(${spinY.toFixed(1)}deg) scale(${pc.toFixed(3)});font-size:${(R * 1.15).toFixed(0)}px;line-height:1;font-family:'Noto Color Emoji',sans-serif;filter:grayscale(1) contrast(1.15) drop-shadow(0 ${(R * 0.05).toFixed(0)}px ${(R * 0.08).toFixed(0)}px rgba(0,0,0,.6))">${em}</div>`;
+    if (bottom && t >= it[fi].t0 - 0.05) { const bz = tz * 0.62;
+      html += `<div dir="${this.dir(bottom)}" style="position:absolute;left:0;right:0;top:${(cy + R * 1.35).toFixed(1)}px;text-align:center;font:800 ${bz.toFixed(1)}px ${ff};color:#2A2A2A;white-space:nowrap">${esc(typed(bottom, t, it[fi].t0 - 0.05, 20))}</div>`;
+      if (para.length) { const ps = J(para), pz = tz * 0.2, shp = typed(ps, t, para[0].t0 - 0.05, 30);
+        html += `<div dir="${this.dir(ps)}" style="position:absolute;left:${(w * 0.12).toFixed(1)}px;right:${(w * 0.12).toFixed(1)}px;top:${(cy + R * 1.35 + bz * 1.35).toFixed(1)}px;text-align:center;font:700 ${pz.toFixed(1)}px ${ff};color:#1A1A1A;line-height:1.45">${esc(shp)}</div>`; } }
     return html;
   };
 })();
