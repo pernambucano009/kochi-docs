@@ -38,6 +38,41 @@ h1{margin:0;font-size:22px;font-weight:800}
 .grid{max-width:1180px;margin:14px auto 0;padding:0 16px 40px;display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;box-shadow:0 4px 14px rgba(31,36,55,.05);display:flex;flex-direction:column;gap:10px;min-width:0}
 .card.ready{border-color:#BFE6D3}
+.card.sel{border-color:var(--teal-d);box-shadow:0 0 0 3px rgba(79,179,170,.25)}
+.pick{flex:none;width:22px;height:22px;accent-color:var(--teal-d);cursor:pointer;margin:0}
+.selbtn{border:1px solid var(--line);background:#fff;border-radius:10px;padding:7px 12px;font-weight:700;font-size:13px;cursor:pointer;color:var(--teal-d)}
+.selbar{position:fixed;bottom:0;left:0;right:0;z-index:8;background:var(--navy);color:#fff;padding:10px 16px;box-shadow:0 -6px 20px rgba(0,0,0,.15)}
+.selbar .wrap{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.selbar b{font-size:15px}
+.selbar button{border:0;border-radius:10px;padding:8px 14px;font-weight:700;font-size:13px;cursor:pointer}
+.selbar .go-wa{background:var(--wa);color:#fff}.selbar .go-ig{background:var(--ig);color:#fff}
+.selbar .lite{background:rgba(255,255,255,.12);color:#fff}
+.selbar .grow{flex:1}
+body.has-sel{padding-bottom:70px}
+body.has-sel .toast{bottom:86px}
+.modal{position:fixed;inset:0;z-index:20;background:rgba(31,36,55,.55);display:flex;align-items:center;justify-content:center;padding:16px}
+.modal[hidden]{display:none}
+.mbox{background:#fff;border-radius:18px;width:100%;max-width:560px;max-height:calc(100vh - 32px);overflow:auto;padding:18px;display:flex;flex-direction:column;gap:12px}
+.mhead{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.mhead h3{margin:0;font-size:17px}
+.mx{border:0;background:#EEF0F3;border-radius:10px;width:34px;height:34px;font-size:16px;cursor:pointer}
+.qbar{height:8px;background:var(--line);border-radius:99px;overflow:hidden}
+.qbar i{display:block;height:100%;background:var(--teal);transition:width .2s}
+.qwho{display:flex;gap:10px;align-items:center}
+.qwho .av{width:54px;height:54px}
+.qwho .nm{font-weight:800;font-size:16px}
+.mbox textarea{width:100%;min-height:180px;border:1px solid var(--line);border-radius:12px;padding:10px;font-size:13.5px;line-height:1.8;resize:vertical;color:var(--ink)}
+.qbtns{display:grid;grid-template-columns:2fr 1fr;gap:8px}
+.qbtns .btn{font-size:15px;padding:13px}
+.skip{border:1px solid var(--line);background:#fff;border-radius:10px;font-weight:700;cursor:pointer;color:var(--muted)}
+.qlist{display:flex;flex-wrap:wrap;gap:5px}
+.qlist span{font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:999px;background:#EEF0F3;color:var(--muted)}
+.qlist span.now{background:var(--navy);color:#fff}
+.qlist span.sent{background:var(--okbg);color:var(--ok)}
+.qlist span.skipped{background:var(--warnbg);color:var(--warn)}
+.qtip{font-size:12.5px;color:var(--muted);line-height:1.7;background:#F3FAF8;border-radius:10px;padding:8px 10px}
+.qdone{text-align:center;padding:10px 0}
+.qdone b{font-size:20px;display:block;margin-bottom:6px}
 .chead{display:flex;gap:10px;align-items:center}
 .av{width:48px;height:48px;border-radius:50%;object-fit:cover;background:#EEF0F3;flex:none;border:2px solid #fff;box-shadow:0 0 0 1px var(--line)}
 .who{min-width:0;flex:1}
@@ -190,10 +225,23 @@ textarea.msgtxt[dir=ltr]{text-align:left}
       <option value="contacted">اللي اتواصلت معاهم</option>
       <option value="notes">اللي كاتب عليهم ملاحظات</option>
     </select>
+    <button class="selbtn" id="selAll">☑️ اختار كل اللي ظاهرين</button>
     <span class="count" id="count"></span>
   </div>
   <div class="grid" id="grid"></div>
 </div>
+<div class="selbar" id="selbar" hidden><div class="wrap">
+  <b id="selCount"></b><span class="grow"></span>
+  <button class="go-wa" data-send="wa">💬 ابعتلهم واتساب</button>
+  <button class="go-ig" data-send="ig">📷 ابعتلهم إنستجرام</button>
+  <button class="lite" id="selClear">✕ الغي الاختيار</button>
+</div></div>
+<div class="modal" id="queue" hidden><div class="mbox" role="dialog" aria-modal="true" aria-labelledby="qTitle">
+  <div class="mhead"><h3 id="qTitle"></h3><button class="mx" id="qClose" aria-label="إقفل">✕</button></div>
+  <div class="qbar"><i id="qBar"></i></div>
+  <div id="qBody"></div>
+  <div class="qlist" id="qList"></div>
+</div></div>
 <div class="toast" id="toast"></div>
 
 <script src="coach-audit.js"></script>
@@ -484,8 +532,9 @@ textarea.msgtxt[dir=ltr]{text-align:left}
         ' · واتساب ' + (entry.wa || 0) + ' · إنستجرام ' + (entry.ig || 0) + '</span><button data-act="reset">تصفير</button></div>'
       : '<div class="log"><span>لسه متواصلتش معاه من هنا</span></div>';
 
-    return '<article class="card' + (isReady(r) ? ' ready' : '') + '" data-id="' + esc(r.id) + '">' +
+    return '<article class="card' + (isReady(r) ? ' ready' : '') + (selected[r.id] ? ' sel' : '') + '" data-id="' + esc(r.id) + '">' +
       '<div class="chead">' +
+        '<input type="checkbox" class="pick" title="اختار المدرب ده" aria-label="اختار ' + esc(r.name) + '"' + (selected[r.id] ? ' checked' : '') + '>' +
         (r.photoUrl ? '<img class="av" src="' + esc(r.photoUrl) + '" alt="" loading="lazy" onerror="this.removeAttribute(\'src\')">' : '<span class="av"></span>') +
         '<div class="who"><a class="name" href="' + esc(r.url) + '" target="_blank" rel="noopener">' + esc(r.name) + '</a>' +
           (r.status ? '<span class="tag pend">قيد التوثيق</span>' : '') +
@@ -759,6 +808,127 @@ textarea.msgtxt[dir=ltr]{text-align:left}
   document.getElementById('pvWho').addEventListener('change', renderPreview);
   renderTpl();
   if (tpl.ar.trim() && tpl.enAuto && !tpl.en.trim()) scheduleAutoEn(true);
+
+  // ---------- اختيار أكتر من مدرب + الإرسال ورا بعض ----------
+  // الواتساب مش بيسمح بإرسال أوتوماتيك لأكتر من رقم من المتصفح، فبنفتح محادثة ورا التانية:
+  // كل ضغطة = محادثة مدرب واحد جاهزة بالرسالة، وبعدها المدرب اللي بعده بيجهز لوحده.
+  var selected = {};
+  var queue = null;
+
+  function selectedRows() { return rows.filter(function (r) { return selected[r.id]; }); }
+
+  function renderSelbar() {
+    var n = selectedRows().length;
+    document.getElementById('selbar').hidden = !n;
+    document.body.classList.toggle('has-sel', !!n);
+    document.getElementById('selCount').textContent = '✔️ ' + n + (n === 1 ? ' مدرب مختار' : ' مدربين مختارين');
+  }
+
+  function setSelected(id, on) {
+    if (on) selected[id] = true; else delete selected[id];
+    var card = document.querySelector('.card[data-id="' + CSS.escape(id) + '"]');
+    if (card) { card.classList.toggle('sel', on); card.querySelector('.pick').checked = on; }
+    renderSelbar();
+  }
+
+  function messageFor(r) { return drafts[r.id] != null ? drafts[r.id] : buildMessage(r, langOf(r)); }
+
+  function startQueue(channel) {
+    var list = selectedRows();
+    if (!list.length) return;
+    queue = {
+      channel: channel,
+      items: list.map(function (r) {
+        var can = channel === 'wa' ? !!r.phoneDigits : !!r.instagram;
+        return { r: r, status: can ? 'todo' : 'skipped', why: can ? '' : (channel === 'wa' ? 'مفيش رقم' : 'مفيش إنستجرام') };
+      }),
+      i: 0
+    };
+    advance();
+    document.getElementById('queue').hidden = false;
+    renderQueue();
+  }
+
+  function advance() {
+    while (queue.i < queue.items.length && queue.items[queue.i].status !== 'todo') queue.i++;
+  }
+
+  function renderQueue() {
+    var q = queue, total = q.items.length;
+    var done = q.items.filter(function (x) { return x.status !== 'todo'; }).length;
+    var wa = q.channel === 'wa';
+    document.getElementById('qTitle').textContent = (wa ? '💬 إرسال واتساب' : '📷 إرسال إنستجرام') + ' لـ ' + total + ' مدربين';
+    document.getElementById('qBar').style.width = Math.round(done / total * 100) + '%';
+    document.getElementById('qList').innerHTML = q.items.map(function (x, k) {
+      var cls = k === q.i && x.status === 'todo' ? 'now' : x.status === 'sent' ? 'sent' : x.status === 'skipped' ? 'skipped' : '';
+      return '<span class="' + cls + '" title="' + esc(x.why) + '">' + (x.status === 'sent' ? '✓ ' : x.status === 'skipped' ? '⏭ ' : '') + esc(x.r.name.replace(/["“”]/g, '').trim().split(/\s+/).slice(0, 2).join(' ')) + '</span>';
+    }).join('');
+    var body = document.getElementById('qBody');
+    if (q.i >= total) {
+      var sent = q.items.filter(function (x) { return x.status === 'sent'; }).length;
+      var skipped = q.items.filter(function (x) { return x.status === 'skipped'; });
+      body.innerHTML = '<div class="qdone"><b>✅ خلصت!</b>اتفتحت ' + sent + ' محادثة' +
+        (skipped.length ? '<br><span style="color:var(--warn)">اتخطّى ' + skipped.length + ': ' + esc(skipped.map(function (x) { return x.r.name + (x.why ? ' (' + x.why + ')' : ''); }).join('، ')) + '</span>' : '') +
+        '<br><br><button class="selbtn" id="qFinish">تمام، الغي الاختيار</button></div>';
+      document.getElementById('qFinish').onclick = function () { closeQueue(true); };
+      return;
+    }
+    var r = q.items[q.i].r, lang = langOf(r), msg = messageFor(r);
+    var href = wa ? 'https://wa.me/' + r.phoneDigits + '?text=' + encodeURIComponent(msg) : 'https://ig.me/m/' + encodeURIComponent(r.instagram);
+    var pos = q.items.slice(0, q.i + 1).length;
+    body.innerHTML =
+      '<div class="qwho">' + (r.photoUrl ? '<img class="av" src="' + esc(r.photoUrl) + '" alt="">' : '<span class="av"></span>') +
+        '<div><div class="nm">' + esc(r.name) + '</div><div class="meta">' + pos + ' من ' + total +
+        ' · هتتبعت ' + (lang === 'en' ? 'بالإنجليزي 🇬🇧' : 'بالعربي') + ' · ' + (wa ? '📞 <bdi>+' + esc(r.phoneDigits) + '</bdi>' : '📷 <bdi>@' + esc(r.instagram) + '</bdi>') + '</div></div></div>' +
+      '<textarea id="qMsg" dir="' + (lang === 'en' ? 'ltr' : 'rtl') + '">' + esc(msg) + '</textarea>' +
+      '<div class="qbtns"><a class="btn ' + (wa ? 'wa' : 'ig') + '" id="qSend" target="_blank" rel="noopener" href="' + esc(href) + '">' +
+        (wa ? '💬 افتح واتساب ' + esc(firstName(r, 'ar')) : '📷 انسخ وافتح إنستجرام ' + esc(firstName(r, 'ar'))) + '</a>' +
+        '<button class="skip" id="qSkip">⏭️ تخطّى</button></div>' +
+      '<div class="qtip">' + (wa
+        ? 'دوس الزرار الأخضر ← المحادثة هتفتح والرسالة مكتوبة ← دوس إرسال في واتساب ← ارجع هنا وهتلاقي المدرب اللي بعده جاهز.'
+        : 'دوس الزرار ← الرسالة بتتنسخ وشات المدرب بيفتح ← الصق وابعت ← ارجع هنا وهتلاقي المدرب اللي بعده جاهز.') +
+      ' تقدر تعدّل الرسالة فوق قبل ما تبعت.</div>';
+    var ta = document.getElementById('qMsg'), send = document.getElementById('qSend');
+    ta.addEventListener('input', function () {
+      drafts[r.id] = ta.value;
+      if (wa) send.href = 'https://wa.me/' + r.phoneDigits + '?text=' + encodeURIComponent(ta.value);
+    });
+    send.addEventListener('click', function () {
+      var text = ta.value;
+      if (!wa) copy(text).then(function () { toast('✅ الرسالة اتنسخت — الصقها في الشات'); });
+      markContact(r.id, q.channel);
+      q.items[q.i].status = 'sent';
+      setTimeout(function () { q.i++; advance(); renderQueue(); refreshCard(r.id); renderStats(); }, 150);
+    });
+    document.getElementById('qSkip').onclick = function () {
+      q.items[q.i].status = 'skipped'; q.items[q.i].why = 'انت تخطّيته';
+      q.i++; advance(); renderQueue();
+    };
+  }
+
+  function closeQueue(clearSel) {
+    document.getElementById('queue').hidden = true;
+    queue = null;
+    if (clearSel) { selected = {}; renderGrid(); renderSelbar(); }
+  }
+
+  document.getElementById('grid').addEventListener('change', function (e) {
+    if (!e.target.classList.contains('pick')) return;
+    setSelected(e.target.closest('.card').getAttribute('data-id'), e.target.checked);
+  });
+  document.getElementById('selAll').addEventListener('click', function () {
+    var list = visible();
+    var all = list.length && list.every(function (r) { return selected[r.id]; });
+    list.forEach(function (r) { setSelected(r.id, !all); });
+    toast(all ? 'اتلغى اختيار ' + list.length + ' مدرب' : '✔️ اتختار ' + list.length + ' مدرب');
+  });
+  document.getElementById('selClear').addEventListener('click', function () { selected = {}; renderGrid(); renderSelbar(); });
+  [].forEach.call(document.querySelectorAll('[data-send]'), function (b) {
+    b.addEventListener('click', function () { startQueue(b.getAttribute('data-send')); });
+  });
+  document.getElementById('qClose').addEventListener('click', function () { closeQueue(false); });
+  document.getElementById('queue').addEventListener('click', function (e) { if (e.target.id === 'queue') closeQueue(false); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && queue) closeQueue(false); });
 
   // ---------- التحميل ----------
   function prepare(list) {
