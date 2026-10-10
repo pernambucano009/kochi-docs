@@ -55,7 +55,7 @@
     "qr", "codetag", "toolbar", "terminal", "scan",
     "toasts", "footer", "marquee", "datestrip",
     "fileicon", "chaos",
-    "gradword", "meshprompt", "orbsplit", "bento", "figdays", "figcurve", "figplay", "figequal", "figwords", "figphone", "figdrop", "figcount", "figgears", "figbar", "figcheck", "figcta", "goldcap", "iconbelt", "glowsweep", "namepill", "kashida", "molecule", "weightstack", "stretch", "desatpop", "arcs", "chrome", "inkverse", "poemfade", "hashend", "flipverb", "strobe", "duoline", "capstack", "pillword", "blurduo", "tagstack", "underbars", "contactcard", "iconorbit", "blurstrobe", "kinstack", "incall", "cineband", "scriptover", "tricolor", "drumpicker", "redmix", "headbubble", "pincard", "emojifloat", "slotreel", "posterwall", "quoteline", "medallion", "clockhand", "roadtext", "markpan", "objectquote", "racechart", "calflip", "glosscards", "dropword", "tasklens", "monostack", "dashbox", "sparklist", "followbtn", "silhouette", "petalstack", "followcount", "twopillars", "cutmat", "labelbox", "stampcard", "lcdtype", "genpanel", "holopulse", "coverflow", "featuretag"]);
+    "gradword", "meshprompt", "orbsplit", "bento", "figdays", "figcurve", "figplay", "figequal", "figwords", "figphone", "figdrop", "figcount", "figgears", "figbar", "figcheck", "figcta", "goldcap", "iconbelt", "glowsweep", "namepill", "kashida", "molecule", "weightstack", "stretch", "desatpop", "arcs", "chrome", "inkverse", "poemfade", "hashend", "flipverb", "strobe", "duoline", "capstack", "pillword", "blurduo", "tagstack", "underbars", "contactcard", "iconorbit", "blurstrobe", "kinstack", "incall", "cineband", "scriptover", "tricolor", "drumpicker", "redmix", "headbubble", "pincard", "emojifloat", "slotreel", "posterwall", "quoteline", "medallion", "clockhand", "roadtext", "markpan", "objectquote", "racechart", "calflip", "glosscards", "dropword", "tasklens", "monostack", "dashbox", "sparklist", "followbtn", "silhouette", "petalstack", "followcount", "twopillars", "cutmat", "labelbox", "stampcard", "lcdtype", "genpanel", "holopulse", "coverflow", "featuretag", "luxmix", "goldframes", "goldrows", "tilegrid", "goldpill"]);
   E.TYPING = new Set(["type", "artype"]);
   const MC = document.createElement("canvas").getContext("2d");
   const measure = (s, font) => { MC.font = font; return MC.measureText(s).width; };
@@ -2792,9 +2792,11 @@
     wrap.style.cssText = "position:absolute;inset:0";
     let over = "";
     const dir = bi % 2 ? -1 : 1;
+    // على خلفية مصمتة (مش فوق فيديو) الشفافية بتبيّن لون المسرح الفاضي (فلاش أبيض)، فبنكتفي بالحركة والبلير
+    const fadeOK = !!this.doc.transparent;
     if (tr === "whip") { wrap.style.transform = `translateX(${(dir * inv * w * 0.7).toFixed(1)}px) skewX(${(dir * -inv * 18).toFixed(1)}deg)`; wrap.style.filter = `blur(${(inv * mn * 0.025).toFixed(1)}px)`; }
-    else if (tr === "zoom") { wrap.style.transform = `scale(${lerp(1.7, 1, e).toFixed(4)})`; wrap.style.filter = `blur(${(inv * mn * 0.02).toFixed(1)}px)`; wrap.style.opacity = clamp(q * 3).toFixed(3); }
-    else if (tr === "rise") { wrap.style.transform = `translateY(${(inv * h * 0.18).toFixed(1)}px)`; wrap.style.opacity = clamp(q * 2.5).toFixed(3); wrap.style.filter = `blur(${(inv * mn * 0.012).toFixed(1)}px)`; }
+    else if (tr === "zoom") { wrap.style.transform = `scale(${lerp(1.7, 1, e).toFixed(4)})`; wrap.style.filter = `blur(${(inv * mn * 0.02).toFixed(1)}px)`; if (fadeOK) wrap.style.opacity = clamp(q * 3).toFixed(3); }
+    else if (tr === "rise") { wrap.style.transform = `translateY(${(inv * h * 0.18).toFixed(1)}px)`; if (fadeOK) wrap.style.opacity = clamp(q * 2.5).toFixed(3); wrap.style.filter = `blur(${(inv * mn * 0.012).toFixed(1)}px)`; }
     else if (tr === "wipe") {
       // لوح لون بيعدّي الكادر ويكشف اللقطة الجديدة وراه
       const c = ["#F2602A", "#2F7CF6", "#151515"][bi % 3];
@@ -2823,7 +2825,7 @@
       over = `<div style="position:absolute;top:-5%;bottom:-5%;left:${(px * w - sw).toFixed(1)}px;width:${sw.toFixed(1)}px;background:linear-gradient(90deg,transparent,#0b0908 22%,#16110e 70%,transparent);filter:blur(${(mn * 0.012).toFixed(1)}px)"></div>`;
       wrap.style.clipPath = `inset(0 ${(clamp(1 - (px * w - sw * 0.5) / w) * 100).toFixed(1)}% 0 0)`;
     }
-    else if (tr === "blur") { wrap.style.filter = `blur(${(inv * mn * 0.04).toFixed(1)}px)`; wrap.style.opacity = clamp(q * 1.6).toFixed(3); }
+    else if (tr === "blur") { wrap.style.filter = `blur(${(inv * mn * 0.04).toFixed(1)}px)`; if (fadeOK) wrap.style.opacity = clamp(q * 1.6).toFixed(3); }
     else if (tr === "pop") { wrap.style.transform = `scale(${lerp(0.82, 1, eBack(q)).toFixed(4)})`; wrap.style.clipPath = `inset(${(inv * 8).toFixed(2)}% round ${(inv * mn * 0.05).toFixed(0)}px)`; }
     else if (tr === "iris") { const R = Math.hypot(w, h) * 0.55 * eOut(q); wrap.style.clipPath = `circle(${R.toFixed(1)}px at 50% 50%)`; }
     else if (tr === "glitch") {
@@ -2837,7 +2839,7 @@
       const a = Math.sin(q * Math.PI);
       over = `<div style="position:absolute;inset:0;mix-blend-mode:screen;opacity:${(a * 0.85).toFixed(3)};background:radial-gradient(ellipse ${(w * 0.7).toFixed(0)}px ${(h * 0.6).toFixed(0)}px at ${lerp(-10, 110, q).toFixed(0)}% 30%,rgba(255,140,40,.95),rgba(255,60,90,.5) 45%,transparent 70%),
         radial-gradient(ellipse ${(w * 0.5).toFixed(0)}px ${(h * 0.4).toFixed(0)}px at ${lerp(110, 20, q).toFixed(0)}% 80%,rgba(255,210,120,.8),transparent 70%)"></div>`;
-      wrap.style.opacity = clamp(q * 2).toFixed(3);
+      if (fadeOK) wrap.style.opacity = clamp(q * 2).toFixed(3);
     } else if (tr === "burn") {
       const a = Math.sin(q * Math.PI), fl = 0.8 + 0.2 * Math.sin(t * 50);
       over = `<div style="position:absolute;inset:0;mix-blend-mode:screen;opacity:${(a * fl).toFixed(3)};background:radial-gradient(ellipse ${(w * 0.9).toFixed(0)}px ${(h * 0.7).toFixed(0)}px at ${dir > 0 ? "0%" : "100%"} 0%,#FFF2C8,#FF9A2E 30%,#C2240E 55%,transparent 75%)"></div>`;
@@ -7417,5 +7419,69 @@
       <div style="font:800 ${z.toFixed(1)}px ${ff};color:${LIME26};text-transform:uppercase;letter-spacing:.02em;text-shadow:0 2px 10px rgba(0,0,0,.45),0 0 ${(z * 0.2).toFixed(0)}px rgba(182,242,58,.5);${blurIn(t, b.t0)}">${esc(title)}</div>
       ${state ? `<div style="font:800 ${(z * 1.05).toFixed(1)}px ${famOf(state)};color:${col};text-shadow:0 2px 10px rgba(0,0,0,.45);transform:scale(${lerp(1.3, 1, eOut(seg(t, Math.max(rest[0].t0, t >= flipT ? flipT : 0) - 0.05, Math.max(rest[0].t0, t >= flipT ? flipT : 0) + 0.2))).toFixed(3)})">${esc(state)}</div>` : ""}
       ${desc ? `<div style="font:600 ${(z * 0.45).toFixed(1)}px ${famOf(desc)};color:#fff;text-shadow:0 2px 8px rgba(0,0,0,.55);padding:0 8%">${esc(desc)}</div>` : ""}</div>`;
+  };
+  // ======== r27 «ذهب فاخر» — تدرّج بني دهبي غامق، إطارات دهبي رفيعة منوّرة بتلف، صفوف بإطار دهبي، كارت موقع بشبكة أيقونات، وكلام سانس + سيريف ========
+  const LUXBG = `<div style="position:absolute;inset:0;background:radial-gradient(ellipse at 10% 0%,#B08A4A,#4A3A1E 35%,#1C160C 70%,#120E07)"></div>`, GLD = "#E9CD8C";
+  const gglow = (px) => `0 0 ${px}px rgba(233,205,140,.55),inset 0 0 ${px}px rgba(233,205,140,.25)`;
+  // ---------- luxmix: كلام صغير سانس، والكلمة المهمة سيريف رفيع كبير، وكلمة تقيلة — متدرّجين يمين وشمال بشياكة
+  P.k_luxmix = function (b, t, k, th, bi) {
+    const it = this.items(b); if (!it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h), n = it.length, J = (a) => a.map((x) => this.text(x.w)).join(" "), ar = AR.test(J(it));
+    const fi = b.focus >= 0 && b.focus < n ? b.focus : Math.min(n - 1, Math.floor(n / 2));
+    const rows = [it.slice(0, fi), [it[fi]], it.slice(fi + 1)].filter((r) => r.length), ss = ar ? famOf(J(it)) : "'TY Lite', 'SM Tajawal'", sf = serifOf(J(it));
+    const big = Math.min(mn * 0.13 * this.ts, fitSize(this.text(it[fi].w), `400 {}px ${sf}`, w * 0.7, mn * 0.13 * this.ts));
+    let html = LUXBG, y = h * 0.42 - big;
+    rows.forEach((r, j) => { const isF = r.includes(it[fi]), z = isF ? big : Math.min(big * 0.46, fitSize(J(r), `600 {}px ${ss}`, w * 0.8, big * 0.46)), s = J(r), off = isF ? 0 : (j === 0 ? -1 : 1) * w * 0.08 * (ar ? -1 : 1);
+      html += `<div dir="${this.dir(s)}" style="position:absolute;left:0;right:0;top:${y.toFixed(1)}px;text-align:center;white-space:nowrap;transform:translateX(${off.toFixed(1)}px);font:${isF ? 400 : 600} ${z.toFixed(1)}px ${isF ? sf : ss};color:${isF ? GLD : "#F4EBD8"};line-height:1.05">${r.map((x) => `<span style="display:inline-block;${blurIn(t, x.t0 - 0.05, 0.4)}">${esc(this.text(x.w))}</span>`).join(" ")}</div>`;
+      y += isF ? big * 1.0 : z * 1.4; });
+    return html;
+  };
+  // ---------- goldframes: إطارات دهبي رفيعة منوّرة جوه بعض بتلف وتبقى معيّن، وجواها عنوان سانس صغير + سيريف كبير
+  P.k_goldframes = function (b, t, k, th, bi) {
+    const it = this.items(b); if (!it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h), J = (a) => a.map((x) => this.text(x.w)).join(" "), ar = AR.test(J(it));
+    const top = it.length > 1 ? it.slice(0, -1) : [], main = it[it.length - 1], sf = serifOf(J(it)), ms = this.text(main.w);
+    const R = mn * 0.36, cy = h * 0.42, p = eOut(seg(t, b.t0, b.t0 + 1.2));
+    let fr = ""; for (let i = 0; i < 3; i++) { const a = lerp(8 + i * 9, 45, p) + Math.sin((t - b.t0) * 0.7 + i) * 2, s = R * (1 - i * 0.12);
+      fr += `<div style="position:absolute;left:${(w / 2 - s).toFixed(1)}px;top:${(cy - s).toFixed(1)}px;width:${(s * 2).toFixed(1)}px;height:${(s * 2).toFixed(1)}px;border:${(mn * 0.004).toFixed(1)}px solid ${GLD};box-shadow:${gglow(mn * 0.02)};transform:rotate(${a.toFixed(1)}deg) scale(${lerp(1.25, 1, p).toFixed(3)});opacity:${(0.9 - i * 0.2).toFixed(2)}"></div>`; }
+    const z = fitSize(ms, `400 {}px ${sf}`, R * 1.5, mn * 0.12 * this.ts * 0.8);
+    return LUXBG + fr + `<div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:0;right:0;top:${(cy - z * 0.75).toFixed(1)}px;text-align:center;line-height:1.05">
+      <div style="font:500 ${(z * 0.3).toFixed(1)}px ${famOf(J(top))};color:#F4EBD8;${blurIn(t, top[0]?.t0 ?? b.t0)}">${esc(J(top))}</div>
+      <div style="font:400 ${z.toFixed(1)}px ${sf};color:${GLD};text-shadow:0 0 ${(z * 0.2).toFixed(0)}px rgba(233,205,140,.5);${blurIn(t, main.t0 - 0.05, 0.5)}">${esc(ms)}</div></div>`;
+  };
+  // ---------- goldrows: صفوف إطار دهبي منوّر واحد تحت التاني بيدخلوا من الجناب، كل صف فيه أيقونة مدوّرة واسم
+  P.k_goldrows = function (b, t, k, th, bi) {
+    const P = figParts(this, { ...b, focus: b.focus >= 0 ? b.focus : -1 }); const it = this.items(b); if (!it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h), head = b.focus >= 0 ? P.J(P.it.slice(0, P.fi + 1)) : "", rows = b.focus >= 0 ? P.tail : it, ar = AR.test(it.map((x) => this.text(x.w)).join(" "));
+    const rw = Math.min(w * 0.72, mn * 0.8), rh = mn * 0.1 * this.ts * 0.8, gap = rh * 0.25, y0 = h * 0.42 - rows.length * (rh + gap) / 2;
+    let html = LUXBG;
+    if (head) html += `<div dir="${this.dir(head)}" style="position:absolute;left:0;right:0;top:${(y0 - rh * 1.4).toFixed(1)}px;text-align:center;font:700 ${(rh * 0.38).toFixed(1)}px ${famOf(head)};color:#F4EBD8;${blurIn(t, b.t0)}">${esc(head)}</div>`;
+    rows.forEach((x, i) => { const s = this.text(x.w), a = eOut(seg(t, Math.max(b.t0 + i * 0.12, x.t0 - 0.2), Math.max(b.t0 + i * 0.12, x.t0 - 0.2) + 0.4)), dx = (1 - a) * (i % 2 ? 1 : -1) * w * 0.4;
+      html += `<div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:${((w - rw) / 2 + dx).toFixed(1)}px;top:${(y0 + i * (rh + gap)).toFixed(1)}px;width:${rw.toFixed(1)}px;height:${rh.toFixed(1)}px;border:${(mn * 0.003).toFixed(1)}px solid ${GLD};box-shadow:${gglow(mn * 0.018)};display:flex;align-items:center;gap:${(rh * 0.3).toFixed(1)}px;padding:0 ${(rh * 0.25).toFixed(1)}px;box-sizing:border-box;opacity:${a.toFixed(2)};filter:blur(${((1 - a) * 6).toFixed(1)}px)">
+        <span style="flex:none;width:${(rh * 0.62).toFixed(1)}px;height:${(rh * 0.62).toFixed(1)}px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#F6E2B0,#B08A4A);display:flex;align-items:center;justify-content:center"><svg width="${(rh * 0.36).toFixed(0)}" height="${(rh * 0.36).toFixed(0)}" viewBox="0 0 24 24" fill="none" stroke="#3A2A10" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${GLY[GKEYS[(i + bi) % GKEYS.length]]}</svg></span>
+        <span style="font:600 ${(rh * 0.36).toFixed(1)}px ${famOf(s)};color:#F4EBD8;white-space:nowrap;letter-spacing:.04em">${esc(s)}</span></div>`; });
+    return html;
+  };
+  // ---------- tilegrid: كارت زي موقع: خانة بحث فيها الاسم بيتكتب، وتحتها شبكة بلاطات بيضا بأيقونات بتطلع وتملا والكارت بيتزحلق، وعنوان فوق
+  P.k_tilegrid = function (b, t, k, th, bi) {
+    const P = figParts(this, { ...b, focus: b.focus >= 0 ? b.focus : 0 }); if (!P.it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h), site = P.J(P.it.slice(0, P.fi + 1)), head = P.J(P.tail.filter((x) => t >= x.t0 - 0.05)), ar = AR.test(site + head);
+    const cw = Math.min(w * 0.8, mn * 0.9), ch = cw * 1.05, cx = (w - cw) / 2, cy = h * 0.32, D = b.t1 - b.t0, fill = seg(t, b.t0 + 0.6, b.t0 + D * 0.8);
+    const cols = 4, rows = 5, ts = (cw - cw * 0.08) / cols, scroll = fill * ts * 1.2;
+    let tiles = ""; for (let r = 0; r < rows + 1; r++) for (let c = 0; c < cols; c++) { const i = r * cols + c, on = i / (cols * rows) < fill * 1.2, g = GLY[GKEYS[(i * 3 + bi) % GKEYS.length]];
+      tiles += `<div style="position:absolute;left:${(cw * 0.04 + c * ts).toFixed(1)}px;top:${(r * ts - scroll).toFixed(1)}px;width:${(ts - 2).toFixed(1)}px;height:${(ts - 2).toFixed(1)}px;background:#FBF8F1;display:flex;align-items:center;justify-content:center;transform:scale(${on ? 1 : 0});transition:none"><svg width="${(ts * 0.45).toFixed(0)}" height="${(ts * 0.45).toFixed(0)}" viewBox="0 0 24 24" fill="none" stroke="#222" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${g}</svg></div>`; }
+    const sb = ch * 0.07;
+    return LUXBG + (head ? `<div dir="${this.dir(head)}" style="position:absolute;left:0;right:0;top:${(cy - mn * 0.12).toFixed(1)}px;text-align:center;font:700 ${(mn * 0.05 * this.ts * 0.8).toFixed(1)}px ${famOf(head)};color:#F4EBD8">${esc(head)}</div>` : "") +
+      `<div style="position:absolute;left:${cx.toFixed(1)}px;top:${cy.toFixed(1)}px;width:${cw.toFixed(1)}px;height:${ch.toFixed(1)}px;border-radius:${(cw * 0.05).toFixed(1)}px;background:linear-gradient(180deg,rgba(120,100,60,.55),rgba(60,48,26,.55));box-shadow:0 ${(mn * 0.03).toFixed(0)}px ${(mn * 0.05).toFixed(0)}px rgba(0,0,0,.4);overflow:hidden;transform:scale(${eOut(seg(t, b.t0, b.t0 + 0.4)).toFixed(3)})">
+        <div style="position:absolute;left:0;right:0;top:${(sb * 1.5).toFixed(1)}px;bottom:0;overflow:hidden">${tiles}</div>
+        <div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:3%;right:3%;top:${(sb * 0.25).toFixed(1)}px;height:${sb.toFixed(1)}px;border-radius:${(sb / 2).toFixed(1)}px;background:#F1ECE2;display:flex;align-items:center;padding:0 ${(sb * 0.4).toFixed(1)}px;font:600 ${(sb * 0.45).toFixed(1)}px ${famOf(site)};color:#333;text-transform:uppercase">${esc(typed(site, t, b.t0 + 0.1, 14))}</div></div>`;
+  };
+  // ---------- goldpill: كلمة بين علامات تنصيص جوه كبسولة بإطار دهبي منوّر، وتحتها سطر صغير بيتكتب (للدعوة «اكتب كلمة … وشوف الرسايل»)
+  P.k_goldpill = function (b, t, k, th, bi) {
+    const P = figParts(this, { ...b, focus: b.focus >= 0 ? b.focus : 0 }); if (!P.it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h), word = P.J(P.it.slice(0, P.fi + 1)), ar = AR.test(word), q = ar ? `«${word}»` : `“${word}”`, sub = P.J(P.tail);
+    const z = fitSize(q, `500 {}px ${famOf(word)}`, w * 0.5, mn * 0.05 * this.ts), pw = measure(q, `500 ${z}px ${famOf(word)}`) + z * 1.6, ph = z * 1.9, cy = h * 0.55, a = eOut(seg(t, b.t0, b.t0 + 0.5));
+    return LUXBG + `<div style="position:absolute;left:${(w / 2 - pw / 2).toFixed(1)}px;top:${(cy - ph / 2).toFixed(1)}px;width:${pw.toFixed(1)}px;height:${ph.toFixed(1)}px;border-radius:${(ph * 0.18).toFixed(1)}px;border:${(mn * 0.003).toFixed(1)}px solid ${GLD};box-shadow:${gglow(mn * 0.02)};display:flex;align-items:center;justify-content:center;font:500 ${z.toFixed(1)}px ${famOf(word)};color:#F4EBD8;opacity:${a.toFixed(2)};filter:blur(${((1 - a) * 6).toFixed(1)}px)">${esc(q)}</div>
+      ${sub ? `<div dir="${this.dir(sub)}" style="position:absolute;left:0;right:0;top:${(cy + ph * 0.75).toFixed(1)}px;text-align:center;font:500 ${(z * 0.62).toFixed(1)}px ${famOf(sub)};color:#F4EBD8">${esc(typed(sub, t, P.tail[0].t0 - 0.05, 22))}</div>` : ""}`;
   };
 })();
