@@ -98,6 +98,12 @@ textarea.msgtxt[dir=ltr]{text-align:left}
 .tpl-tabs{display:flex;gap:6px;margin-bottom:6px}
 .tpl-tabs button{border:1px solid var(--line);background:#fff;border-radius:8px;padding:4px 12px;font-size:12.5px;font-weight:700;cursor:pointer;color:var(--muted)}
 .tpl-tabs button.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+.tpl .state{font-size:12.5px;font-weight:700;color:var(--muted)}
+.tpl .state.ok{color:var(--ok)}.tpl .state.busy{color:var(--teal-d)}.tpl .state.bad{color:var(--bad)}
+.tpl-en{margin-top:10px;border:1px solid var(--line);border-radius:12px;background:#FAFBFA}
+.tpl-en summary{font-size:13px}
+.tpl-en .tpl-tools{padding:0 10px 10px}
+#tplEn{width:calc(100% - 20px);margin:0 10px;min-height:120px;border:1px solid var(--line);border-radius:10px;padding:10px;font-size:13.5px;line-height:1.8;resize:vertical;color:var(--ink);background:#fff;text-align:left}
 #tplText{width:100%;min-height:150px;border:1px solid var(--line);border-radius:12px;padding:10px;font-size:13.5px;line-height:1.8;resize:vertical;color:var(--ink);background:#FAFBFA}
 #tplText:focus{outline:none;border-color:var(--teal);background:#fff}
 .tpl-tools{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:8px;font-size:12.5px;color:var(--muted)}
@@ -150,21 +156,24 @@ textarea.msgtxt[dir=ltr]{text-align:left}
   <div class="site" id="site" hidden></div>
   <section class="tpl" id="tpl"><div>
     <div class="tpl-head">
-      <b>✍️ رسالتي الجاهزة</b>
-      <label class="switch"><input type="checkbox" id="tplOn"> ابعت رسالتي دي لكل المدربين بدل الرسالة الأوتوماتيك</label>
+      <b>✍️ الرسالة الديفولت لكل المدربين</b>
+      <span class="state" id="tplState"></span>
     </div>
-    <div class="tpl-tabs"><button data-tl="ar" class="on">عربي (للمدربين العرب)</button><button data-tl="en">English (للمدربين الإنجليزي)</button>
-      <button class="tbtn" id="tplTr" style="margin-inline-start:auto">🌐 ترجم</button></div>
-    <textarea id="tplText" placeholder="اكتب رسالتك هنا… مثال:&#10;أهلاً يا كوتش {الاسم} 🌹&#10;بروفايلك ناقصه:&#10;{الناقص}&#10;كمّله من هنا: {رابط_الدخول}"></textarea>
-    <div class="tpl-tools">ضيف للرسالة:
+    <textarea id="tplText" placeholder="اكتب هنا الرسالة اللي عايز تبعتها… وهتتحط لوحدها في كارت كل مدرب، وتقدر تغيّرها لأي مدرب براحتك."></textarea>
+    <div class="tpl-tools">ضيف للرسالة (اختياري، بيتغير لوحده لكل مدرب):
       <button class="ins" data-ins="{الاسم}">اسم المدرب</button>
       <button class="ins" data-ins="{الاسم_كامل}">الاسم كامل</button>
       <button class="ins" data-ins="{الناقص}">الحاجات الناقصة عنده</button>
       <button class="ins" data-ins="{رابط_الدخول}">رابط تسجيل الدخول</button>
       <button class="ins" data-ins="{رابط_البروفايل}">رابط بروفايله</button>
-      <button class="clear" id="tplClear">رجّع للرسالة الأوتوماتيك</button>
+      <button class="clear" id="tplClear">🗑 امسح الرسالة</button>
     </div>
-    <div class="tpl-hint" id="tplHint"></div>
+    <details class="tpl-en" id="tplEnBox">
+      <summary>🇬🇧 النسخة اللي هتروح للمدربين اللي بيتكلموا إنجليزي <span class="state" id="tplEnState"></span></summary>
+      <textarea id="tplEn" dir="ltr" placeholder="الترجمة الإنجليزي هتظهر هنا لوحدها…"></textarea>
+      <div class="tpl-tools"><button class="tbtn" id="tplRetr">🔄 ترجمها تاني من رسالتي</button>
+        <span>تقدر تعدّل الترجمة هنا، ومش هتتغير تاني لوحدها غير لو دوست الزرار ده.</span></div>
+    </details>
     <div class="tpl-preview" id="tplPreview" hidden>
       <div class="pv-head">👀 هتوصل كده لـ <select id="pvWho"></select></div>
       <pre id="pvText"></pre>
@@ -250,21 +259,35 @@ textarea.msgtxt[dir=ltr]{text-align:left}
 
   // ---------- الترجمة (Google Translate المجاني) ----------
   // الـ {placeholders} والروابط بتتحمي بعلامات [[n]] عشان المترجم ميغيرهاش
-  function translate(text, from, to) {
-    var keep = [];
-    var safe = text.replace(/\{[^{}]+\}|https?:\/\/\S+/g, function (m) { keep.push(m); return '[[' + keep.length + ']]'; });
-    if (!safe.trim()) return Promise.resolve(text);
+  var trCache = {};
+  function translateOnce(safe, from, to) {
     return fetch('https://translate.googleapis.com/translate_a/single?client=gtx&dt=t&sl=' + from + '&tl=' + to, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
       body: 'q=' + encodeURIComponent(safe)
     }).then(function (res) {
       if (!res.ok) throw new Error('HTTP ' + res.status);
-      return res.json();
+      return res.json(); // لو جوجل رجّع صفحة "حاول تاني" بدل JSON، ده بيفشل وبنعيد
     }).then(function (d) {
-      var out = (d && d[0] || []).map(function (s) { return s && s[0] || ''; }).join('');
-      return out.replace(/\[\[\s*(\d+)\s*\]\]/g, function (m, n) { return keep[n - 1] || m; });
+      if (!d || !Array.isArray(d[0])) throw new Error('bad response');
+      return d[0].map(function (s) { return s && s[0] || ''; }).join('');
     });
+  }
+  function translate(text, from, to) {
+    var keep = [];
+    var safe = text.replace(/\{[^{}]+\}|https?:\/\/\S+/g, function (m) { keep.push(m); return '[[' + keep.length + ']]'; });
+    if (!safe.trim()) return Promise.resolve(text);
+    var key = from + '>' + to + ':' + safe;
+    var restore = function (out) { return out.replace(/\[\[\s*(\d+)\s*\]\]/g, function (m, n) { return keep[n - 1] || m; }); };
+    if (trCache[key]) return Promise.resolve(restore(trCache[key]));
+    var wait = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
+    var attempt = function (n) {
+      return translateOnce(safe, from, to).catch(function (err) {
+        if (n >= 2) throw err;
+        return wait(n ? 4000 : 1500).then(function () { return attempt(n + 1); });
+      });
+    };
+    return attempt(0).then(function (out) { trCache[key] = out; return restore(out); });
   }
   function other(lang) { return lang === 'en' ? 'ar' : 'en'; }
 
@@ -276,25 +299,29 @@ textarea.msgtxt[dir=ltr]{text-align:left}
   // تعديلات/ترجمات الرسالة جوه كارت مدرب (بتفضل لحد ما تغيّر اللغة أو تدوس رجّع)
   var drafts = {};
 
-  // ---------- رسالتي الجاهزة ----------
+  // ---------- الرسالة الديفولت ----------
+  // مكتوب فيها حاجة = بتتحط لكل المدربين. فاضية = كل مدرب بياخد الرسالة الأوتوماتيك بالناقص عنده.
+  // النسخة الإنجليزي بتتعمل لوحدها بالترجمة لحد ما تعدّلها بإيدك (enAuto=false).
   var TPL_STORE = 'kochi-message-template-v1';
   var tpl = (function () { try { return JSON.parse(localStorage.getItem(TPL_STORE)) || {}; } catch (e) { return {}; } })();
-  tpl = { on: !!tpl.on, ar: tpl.ar || '', en: tpl.en || '', enAuto: !!tpl.enAuto };
+  tpl = { ar: tpl.ar || '', en: tpl.en || '', enAuto: tpl.en ? tpl.enAuto !== false : true };
+  var trState = '';
   function saveTpl() { try { localStorage.setItem(TPL_STORE, JSON.stringify(tpl)); } catch (e) {} }
-  function tplFor(lang) { return tpl.on ? (lang === 'en' && tpl.en.trim() ? tpl.en : tpl.ar) : ''; }
+  function tplFor(lang) { return tpl.ar.trim() ? (lang === 'en' && tpl.en.trim() ? tpl.en : tpl.ar) : ''; }
   var autoTimer;
-  // النسخة الإنجليزي بتتعمل لوحدها بالترجمة لحد ما تعدّلها بإيدك
-  function scheduleAutoEn() {
-    if (tpl.en.trim() && !tpl.enAuto) return;
+  function scheduleAutoEn(force) {
+    if (!force && !tpl.enAuto) return;
     clearTimeout(autoTimer);
+    if (!tpl.ar.trim()) { tpl.en = ''; tpl.enAuto = true; trState = ''; saveTpl(); renderTpl(); return; }
+    trState = 'busy'; renderTplState();
     autoTimer = setTimeout(function () {
-      if (!tpl.ar.trim()) { if (tpl.enAuto) { tpl.en = ''; saveTpl(); renderTpl(); renderGrid(); } return; }
       var src = tpl.ar;
-      translate(src, 'ar', 'en').then(function (out) {
-        if (tpl.ar !== src || (tpl.en.trim() && !tpl.enAuto)) return;
-        tpl.en = out; tpl.enAuto = true; saveTpl(); renderTpl(); renderGrid();
-      }, function () {});
-    }, 1500);
+      translate(src, 'auto', 'en').then(function (out) {
+        if (tpl.ar !== src || (!force && !tpl.enAuto)) return;
+        tpl.en = out; tpl.enAuto = true; trState = 'ok';
+        saveTpl(); renderTpl(); renderGrid();
+      }, function () { trState = 'fail'; renderTplState(); });
+    }, force ? 0 : 1200);
   }
 
   function fillTemplate(text, r, lang) {
@@ -470,7 +497,7 @@ textarea.msgtxt[dir=ltr]{text-align:left}
       '</div>' +
       '<div class="meter"><i style="width:' + Math.round(pct * 100) + '%;background:' + color + '"></i></div>' +
       '<div class="checks">' + checks + '</div>' + alert + hours +
-      '<details><summary><span>✏️ ' + (tplFor(lang).trim() ? 'رسالتك الجاهزة' : r.reversed.length ? 'رسالة بالتعديل المطلوب' : isReady(r) ? 'رسالة شكر' : 'رسالة بالناقص') + ' — اعرض / عدّل</span>' +
+      '<details><summary><span>✏️ ' + (tplFor(lang).trim() ? 'رسالتك الديفولت' : r.reversed.length ? 'رسالة بالتعديل المطلوب' : isReady(r) ? 'رسالة شكر' : 'رسالة بالناقص') + ' — اعرض / عدّل</span>' +
         '<span class="lang" title="لغة الرسالة"><button data-lang="ar" class="' + (lang === 'ar' ? 'on' : '') + '">عربي</button><button data-lang="en" class="' + (lang === 'en' ? 'on' : '') + '">English</button></span></summary>' +
         '<div class="msgbar"><button class="tbtn" data-act="translate">🌐 ' + (lang === 'ar' ? 'ترجم الرسالة دي للإنجليزي' : 'ترجم الرسالة دي للعربي') + '</button>' +
           (drafts[r.id] != null ? '<button class="tbtn ghost" data-act="undo">↩️ رجّع الرسالة الأصلية</button>' : '') + '</div>' +
@@ -545,6 +572,8 @@ textarea.msgtxt[dir=ltr]{text-align:left}
       log.__langs = langs; saveLog(log);
       delete drafts[id];
       refreshCard(id);
+      renderTplState();
+      document.getElementById('pvWho').innerHTML = ''; renderPreview();
       return;
     }
     var act = e.target.closest('[data-act]');
@@ -633,59 +662,84 @@ textarea.msgtxt[dir=ltr]{text-align:left}
   });
   document.getElementById('refresh').addEventListener('click', load);
 
-  // ---------- مربع رسالتي ----------
-  var tplLang = 'ar';
+  // ---------- مربع الرسالة الديفولت ----------
   var tplText = document.getElementById('tplText');
-  var tplOn = document.getElementById('tplOn');
+  var tplEn = document.getElementById('tplEn');
   var tplTimer;
 
+  function countLangs() {
+    var en = rows.filter(function (r) { return langOf(r) === 'en'; }).length;
+    return { en: en, ar: rows.length - en };
+  }
+
+  function renderTplState() {
+    var st = document.getElementById('tplState');
+    var has = !!tpl.ar.trim();
+    document.getElementById('tpl').classList.toggle('on', has);
+    if (has) {
+      var c = countLangs();
+      st.className = 'state ok';
+      st.textContent = '✅ متحطة لكل المدربين' + (rows.length ? ' (' + c.ar + ' عربي · ' + c.en + ' إنجليزي)' : '');
+    } else {
+      st.className = 'state';
+      st.textContent = 'فاضية: كل مدرب بيوصله الرسالة الأوتوماتيك بالناقص عنده';
+    }
+    var en = document.getElementById('tplEnState');
+    var map = {
+      busy: ['busy', '⏳ بتترجم…'],
+      fail: ['bad', '⚠️ الترجمة مش شغالة دلوقتي، دوس «🔄 ترجمها تاني» كمان شوية'],
+      ok: ['ok', '✓ اتترجمت لوحدها']
+    };
+    var m = !has ? ['', ''] : !tpl.enAuto ? ['ok', '✏️ انت عدّلتها'] : map[trState] || (tpl.en.trim() ? map.ok : ['', '']);
+    en.className = 'state ' + m[0];
+    en.textContent = m[1] ? '— ' + m[1] : '';
+  }
+
   function renderTpl() {
-    tplText.value = tpl[tplLang];
-    tplText.dir = tplLang === 'en' ? 'ltr' : 'rtl';
-    tplOn.checked = tpl.on;
-    document.getElementById('tpl').classList.toggle('on', tpl.on && !!tpl.ar.trim());
-    [].forEach.call(document.querySelectorAll('[data-tl]'), function (b) { b.classList.toggle('on', b.getAttribute('data-tl') === tplLang); });
-    document.getElementById('tplTr').textContent = tplLang === 'ar' ? '🌐 ترجم للإنجليزي' : '🌐 ترجم للعربي';
-    document.getElementById('tplHint').textContent = tpl.on && tpl.ar.trim()
-      ? '✅ شغّالة: أي ضغطة على واتساب أو إنستجرام هتبعت رسالتك دي. الكلام اللي بين { } بيتغير لوحده لكل مدرب. المدربين العرب بيوصلهم العربي والإنجليزي بيوصلهم English.' +
-        (tpl.en.trim() ? (tpl.enAuto ? ' النسخة الإنجليزي اتعملت بالترجمة الأوتوماتيك — بص عليها في تاب English.' : '') : ' النسخة الإنجليزي بتتعمل لوحدها بالترجمة…')
-      : 'اكتب رسالتك، وفعّل الاختيار اللي فوق. لو قفلته، كل مدرب هيوصله الرسالة الأوتوماتيك اللي فيها الناقص عنده. رسالتك بتتحفظ على المتصفح ده.';
+    if (document.activeElement !== tplText) tplText.value = tpl.ar;
+    if (document.activeElement !== tplEn) tplEn.value = tpl.en;
+    document.getElementById('tplEnBox').hidden = !tpl.ar.trim();
+    renderTplState();
     renderPreview();
   }
 
   function renderPreview() {
     var box = document.getElementById('tplPreview');
     var sel = document.getElementById('pvWho');
-    var text = tpl[tplLang].trim() ? tpl[tplLang] : (tplLang === 'en' ? tpl.ar : '');
-    box.hidden = !rows.length || !text.trim();
+    box.hidden = !rows.length || !tpl.ar.trim();
     if (box.hidden) return;
     if (sel.options.length !== rows.length) {
       var cur = sel.value;
-      sel.innerHTML = rows.map(function (r) { return '<option value="' + esc(r.id) + '">' + esc(r.name) + ' (' + r.score + '/' + CHECKS.length + ')</option>'; }).join('');
+      sel.innerHTML = rows.map(function (r) {
+        return '<option value="' + esc(r.id) + '">' + esc(r.name) + (langOf(r) === 'en' ? ' 🇬🇧' : '') + ' (' + r.score + '/' + CHECKS.length + ')</option>';
+      }).join('');
       if (cur) sel.value = cur;
     }
     var r = rows.find(function (x) { return x.id === sel.value; }) || rows[0];
+    var lang = langOf(r);
     var pre = document.getElementById('pvText');
-    pre.textContent = fillTemplate(text, r, tplLang);
-    pre.dir = tplLang === 'en' ? 'ltr' : 'rtl';
+    pre.textContent = drafts[r.id] != null ? drafts[r.id] : buildMessage(r, lang);
+    pre.dir = lang === 'en' ? 'ltr' : 'rtl';
   }
 
   tplText.addEventListener('input', function () {
-    tpl[tplLang] = tplText.value;
-    if (tplLang === 'en') tpl.enAuto = false; else scheduleAutoEn();
-    if (tplLang === 'ar' && tplText.value.trim() && !tpl.on) tpl.on = true;
+    tpl.ar = tplText.value;
     saveTpl();
+    scheduleAutoEn();
     renderTpl();
     clearTimeout(tplTimer);
     tplTimer = setTimeout(renderGrid, 300);
   });
-  tplOn.addEventListener('change', function () {
-    tpl.on = tplOn.checked;
-    saveTpl(); renderTpl(); renderGrid();
-    if (tpl.on && !tpl.ar.trim()) { tplText.focus(); toast('اكتب رسالتك في المربع الأول (عربي)'); }
+  tplEn.addEventListener('input', function () {
+    tpl.en = tplEn.value;
+    tpl.enAuto = !tplEn.value.trim();
+    saveTpl(); renderTplState(); renderPreview();
+    clearTimeout(tplTimer);
+    tplTimer = setTimeout(renderGrid, 300);
   });
-  [].forEach.call(document.querySelectorAll('[data-tl]'), function (b) {
-    b.addEventListener('click', function () { tplLang = b.getAttribute('data-tl'); renderTpl(); });
+  document.getElementById('tplRetr').addEventListener('click', function () {
+    tpl.enAuto = true;
+    scheduleAutoEn(true);
   });
   [].forEach.call(document.querySelectorAll('[data-ins]'), function (b) {
     b.addEventListener('click', function () {
@@ -697,27 +751,14 @@ textarea.msgtxt[dir=ltr]{text-align:left}
       tplText.dispatchEvent(new Event('input'));
     });
   });
-  document.getElementById('tplTr').addEventListener('click', function () {
-    var btn = this, from = tplLang, to = other(tplLang);
-    if (!tpl[from].trim()) { toast('اكتب الرسالة الأول'); return; }
-    btn.disabled = true; btn.textContent = '⏳ بيترجم…';
-    translate(tpl[from], from, to).then(function (out) {
-      tpl[to] = out;
-      if (to === 'en') tpl.enAuto = false;
-      if (to === 'ar' && !tpl.on) tpl.on = true;
-      saveTpl(); tplLang = to; btn.disabled = false; renderTpl(); renderGrid();
-      toast('✅ اتترجمت — راجعها قبل ما تبعت');
-    }, function () {
-      btn.disabled = false; renderTpl();
-      toast('الترجمة مش شغالة دلوقتي — اتأكد من النت وجرّب تاني');
-    });
-  });
   document.getElementById('tplClear').addEventListener('click', function () {
-    tpl.on = false; saveTpl(); renderTpl(); renderGrid();
-    toast('رجعت للرسالة الأوتوماتيك — رسالتك لسه محفوظة في المربع');
+    if (!tpl.ar.trim() || !confirm('تمسح الرسالة الديفولت؟ كل مدرب هيرجع يوصله الرسالة الأوتوماتيك.')) return;
+    tpl = { ar: '', en: '', enAuto: true }; trState = '';
+    saveTpl(); renderTpl(); renderGrid();
   });
   document.getElementById('pvWho').addEventListener('change', renderPreview);
   renderTpl();
+  if (tpl.ar.trim() && tpl.enAuto && !tpl.en.trim()) scheduleAutoEn(true);
 
   // ---------- التحميل ----------
   function prepare(list) {
