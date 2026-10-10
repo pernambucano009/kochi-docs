@@ -15624,7 +15624,7 @@ reset_stuck_dub()
 
 import tplseed  # noqa: E402
 
-TPL_SEED_V = 1
+TPL_SEED_V = 2
 
 
 def seed_media_hash(tid: str) -> str:
@@ -15886,7 +15886,8 @@ def seed_scene_templates() -> None:
         keep = {k: old[k] for k in ("sample", "cover", "sample_vid", "sample_status", "sample_error", "sample_kind", "seed_media") if old and k in old}
         with TPL_LOCK:
             tpl_save(tid, {"name": t["name"], "icon": t["icon"], "uses": t["uses"], "voice_tone": t["voice_tone"], "sample_brief": t["sample"],
-                           "mode": "scenes", "scene": {k: t[k] for k in ("tokens", "negative", "key", "variants", "devices", "motion", "allow_label")},
+                           "mode": "scenes", "scene": {k: t[k] for k in ("tokens", "negative", "key", "variants", "devices", "motion", "allow_label", "writer", "motion_rule",
+                                                       "audio", "guard", "variant_motion") if k in t},
                            "schema": schema, "builtin": True, "ratio": "9:16", "source": None, "lab_name": "مكتبة القوالب الجاهزة",
                            "seed_v": TPL_SEED_V, "created_at": (old or {}).get("created_at") or now(), **keep})
 
@@ -15902,18 +15903,21 @@ def scenes_messages(d: dict, brain_txt: str) -> list[dict]:
     label_rule = ("- label: كلمة أو رقم واحد قصير جدًا (١-٢ كلمة، إنجليزي بحروف كبيرة) مطبوع على حاجة ورق ملونة في المشهد، أو فاضي.\n"
                   if cfg.get("allow_label") else "- label: فاضي دايمًا (الستايل ده ممنوع فيه أي كلام مكتوب).\n")
     sys = (
-        "إنت كاتب ومخرج فيديوهات شرح قصيرة بأسلوب Vox: معلومة بمعلومة، فضولي ودقيق وفيه خفة دم، بيشرح ومش بيهوّل.\n"
-        f"الفيديو {n} مشاهد، كل مشهد ١٠ ثواني بالظبط وليه جملة فويس أوفر واحدة. اللغة: {lang_txt}. {dub.GUIDES.get(d['lang'], '')}\n"
-        "شكل السكريبت: أول مشهد أغرب معلومة من غير أي مقدمة أو تحية ← ليه ده مهم ← مشاهد دليل (فكرة واحدة لكل مشهد، بتتصاعد) ← التحوّل ← "
-        "الخاتمة بجملة بترجع لأول مشهد بمعنى جديد. فيه سؤال في الأول بيتجاوب في الآخر.\n"
+        (cfg.get("writer") or (
+            "إنت كاتب ومخرج فيديوهات شرح قصيرة بأسلوب Vox: معلومة بمعلومة، فضولي ودقيق وفيه خفة دم، بيشرح ومش بيهوّل.\n"
+            "شكل السكريبت: أول مشهد أغرب معلومة من غير أي مقدمة أو تحية ← ليه ده مهم ← مشاهد دليل (فكرة واحدة لكل مشهد، بتتصاعد) ← التحوّل ← "
+            "الخاتمة بجملة بترجع لأول مشهد بمعنى جديد. فيه سؤال في الأول بيتجاوب في الآخر.\n"))
+        + f"الفيديو {n} مشاهد، كل مشهد ١٠ ثواني بالظبط وليه جملة فويس أوفر واحدة. اللغة: {lang_txt}. {dub.GUIDES.get(d['lang'], '')}\n"
         "- كل جملة حوالي ١٨-٢٠ كلمة (بتتقال في ٨-٩ ثواني)، والأرقام مكتوبة بالحروف زي ما بتتنطق.\n"
         "- ممنوع تخترع أرقام أو اقتباسات: استخدم بس الأرقام اللي في الفكرة أو ملف العميل، وغير كده قول المعنى بشكل عام.\n"
         "- اختار «عنصر واحد» (through_line) بيظهر في كل المشاهد وبيكبر/بيتغير مع القصة.\n"
         "- scene (English): التكوين اللي بيشرح فكرة الجملة نفسها (مش حد بيقولها) بمفردات الستايل: " + cfg["devices"] + "\n"
-        "- motion (English): حركة كاميرا واحدة متصلة بتبدأ من موشن بلر وبتخلص في موشن بلر، وفيها لحظة قوية كل ٣ ثواني تقريبًا. " + cfg["motion"] + "\n"
-        "- audio (English): ٣-٥ أصوات مؤثرات حقيقية في المشهد (ورق، ووش، تكات، خبطات...) من غير أي كلام.\n"
+        "- motion (English): " + (cfg.get("motion_rule") or "حركة كاميرا واحدة متصلة بتبدأ من موشن بلر وبتخلص في موشن بلر، وفيها لحظة قوية كل ٣ ثواني تقريبًا.")
+        + " " + cfg["motion"] + "\n"
+        "- audio (English): " + (cfg.get("audio") or "٣-٥ أصوات مؤثرات حقيقية في المشهد (ورق، ووش، تكات، خبطات...) من غير أي كلام.") + "\n"
         + label_rule
-        + "- ممنوع أسامي أو وشوش أشخاص حقيقيين في scene (يتوصفوا من بعيد ومن غير اسم، وعلى عينيهم شريط أسود)، وممنوع شعارات حقيقية، "
+        + "- ممنوع أسامي أو وشوش أشخاص حقيقيين في scene (يتوصفوا من بعيد ومن غير اسم" + ("" if cfg.get("writer") else "، وعلى عينيهم شريط أسود")
+        + ")، وممنوع شعارات حقيقية، "
         "وممنوع صور انفجارات/دم: بدّلها بفكرة رمزية بنفس المعنى.\n"
         'رجّع JSON بس: {"title": "اسم قصير", "through_line": "English: the recurring object", "lines": ["..."], '
         '"scenes": [{"scene": "...", "motion": "...", "audio": "...", "label": ""}]} بنفس العدد بالظبط.')
@@ -16007,10 +16011,15 @@ def scene_prompt(d: dict, i: int) -> str:
     lab_ = s.get("label") if cfg.get("allow_label") else ""
     neg = (f'No text anywhere except "{lab_}". ' if lab_ else "Absolutely no writing in any language anywhere: no English, no Chinese or Japanese characters, "
            "no letters, numbers, titles, signs or captions — every card, page, screen and sign stays blank. ") + f"Avoid: {cfg['negative']}."
-    return (f"STYLE REFERENCE: Match the attached style key image EXACTLY: {cfg['tokens']}.\n"
+    # الشكل الفرعي المختار (صلصال/ورق...) ليه بلوك ستايل ثابت بيفتح كل برومت
+    var = next((x for x in cfg.get("variants") or [] if x[0] == d.get("style_variant")), None)
+    style = (var[3] + " " if var and len(var) > 3 else "") + cfg["tokens"]
+    extra = (cfg.get("variant_motion") or {}).get((var or [""])[0], "")
+    move = cfg.get("guard") or "One continuous camera move that starts from motion blur and ends in motion blur."
+    return (f"STYLE REFERENCE: Match the attached style key image EXACTLY: {style}.\n"
             f"RECURRING ELEMENT (appears in every scene): {d.get('through_line') or 'unspecified'}.\n"
             f"SCENE: {s['scene']}" + (f' A torn colored paper element carries the distressed letterpress word "{lab_}".' if lab_ else "") + "\n"
-            f"MOTION: {s['motion']} One continuous camera move that starts from motion blur and ends in motion blur.\n"
+            f"MOTION: {s['motion'].strip().rstrip('.')}." + (f" {extra}" if extra else "") + f" {move}\n"
             f"AUDIO: {s['audio']}. No voice, no narration, no speech.\n"
             f"NEGATIVE: {neg}")
 
@@ -16042,7 +16051,7 @@ def run_stylekey(vid: str, variant: str) -> None:
         d = tv_load(vid)
         cfg = d["scene_cfg"]
         v = next((x for x in cfg["variants"] if x[0] == variant), cfg["variants"][0])
-        prompt = cfg["key"].format(palette=v[2])
+        prompt = cfg["key"].format(palette=v[2], style=v[3] if len(v) > 3 else "")
         folder = tv_dir(vid)
         name = f"stylekey-{uuid.uuid4().hex[:4]}.png"
         size = {"9:16": "1024x1536", "16:9": "1536x1024"}.get(d["ratio"], "1024x1024")

@@ -208,4 +208,115 @@ SCENES = {
         "motion": "ONE continuous high-energy FPV camera move with aggressive speed ramps; an impact every ~3 seconds (slam, stamp, shockwave, snap, rip); "
                   "the scene emerges from motion blur and ends fully motion-blurred mid-dive/whip/fall",
     },
+    # ---------------------------------------------------------------- من skill «claymation»: ٤ أشكال صلصال، كل شكل ليه بلوك ستايل ثابت
+    # (variant رابع عنصر فيه = بلوك الستايل بتاع الشكل ده، وبيتحط في أول برومت مفتاح الستايل وكل مشهد)
+    "sk-clay": {
+        "name": "صلصال ستوب موشن", "icon": "🧱", "uses": "إعلانات وفيديوهات شرح لطيفة بفويس أوفر: منتجات، روتين يومي، قصص قصيرة", "transition": "cut",
+        "voice_tone": "warm, playful, friendly narrator with a light smile in the voice; simple and clear",
+        "sample": "إزاي فنجان قهوة الصبح بيبدأ رحلته من حبة بن صغيرة لحد إيدك",
+        "allow_label": False,
+        "writer": "إنت كاتب ومخرج إعلانات وفيديوهات قصيرة بستايل الصلصال (ستوب موشن): دافي وخفيف الدم وبسيط، كل مشهد فكرة واحدة واضحة بتتشاف.\n"
+                  "شكل السكريبت: أول مشهد لقطة بتشد (موقف أو سؤال) من غير مقدمة ← المشكلة أو الفكرة ← المنتج/الحل بيظهر ← بيشتغل قدامنا ← "
+                  "النتيجة ← جملة ختام قصيرة بترجع لأول مشهد.\n",
+        "tokens": "photographed physical modeling clay, handmade stop-motion claymation, visible making-marks on every surface, soft matte plasticine "
+                  "sheen with slight subsurface warmth, handmade geometry, real cast shadows, lit like a real miniature film set, camera inside the clay world",
+        "negative": "readable text, letters, words, numbers, captions, subtitles, watermark, logo, smooth CGI render, glossy plastic, 3D game render, "
+                    "photorealism, live-action footage, motion blur, lip-sync, talking characters, set edges, workbench, color drift",
+        "key": "A style swatch image that locks the look of a claymation video. {style} Palette: {palette}. A small busy corner of the clay world with a few "
+               "typical sculpted props (thumb-pressed plants, a coiled clay towel, a clay imitation of a glass bottle) and one clay character in the lane's "
+               "design language, mid-shot. Everything in frame is real modeling clay, photographed, real cast shadows, the clay scene filling the entire "
+               "frame. No letters, no words, no numbers, no logos, no real people.",
+        "variants": [
+            ("classic", "كلاسيك بريميوم: بلاستيسين مطفي وتفاصيل نضيفة", "rich harmonious sage, cream and terracotta",
+             "Premium studio claymation scene - everything sculpted from matte plasticine with refined intentional craftsmanship: subtle tool marks, "
+             "controlled texture, soft rounded geometry, slight subsurface warmth, macro lens feel with shallow depth of field, soft diffused studio "
+             "lighting with a gentle rim glow, the scene filling the entire frame with the camera inside the miniature clay world. Characters: natural "
+             "proportions, neatly sculpted hair showing fine comb grooves, bright friendly eyes with white sclera and colored clay irises, softly "
+             "sculpted lips in a warm smile."),
+            ("goofy", "كوميدي: عيون كبيرة مدوّرة وبصمات صوابع", "saturated teal and terracotta",
+             "Goofy claymation scene - everything sculpted from plasticine with visible fingerprints and thumb smudges, wonky handmade geometry where "
+             "nothing is perfectly straight, busy cluttered sets, the scene filling the entire frame with the camera inside the clay world. Characters: "
+             "oversized heads, huge round googly cartoon eyes with white sclera, small dark pupils and thick sculpted lids, bold sculpted eyebrows, "
+             "round blush-pink clay cheeks, wide open-mouthed grins, hand-sculpted clay hair neatly shaped with a few playful strands out of place."),
+            ("simple", "بسيط وهادي: أشكال مدوّرة وعيون نقط", "soft pastel mint, butter yellow and coral",
+             "Matte claymation scene - everything sculpted from matte modeling clay, clean rounded forms with soft even surfaces and subtle tool marks, "
+             "gently exaggerated cartoon proportions, simple dot eyes, tidy compositions, refined handcrafted stop-motion feel, the scene filling the "
+             "entire frame with the camera inside the clay world."),
+            ("puppet", "عرايس سينمائي: خيوط وقماش وإضاءة دراما", "cinematic deep teal shadows with warm amber practical light",
+             "Stop-motion clay puppet scene - clay characters detailed with tiny craft materials: thread-wrapped hair, fabric details, wire accents, "
+             "button details, on a fully sculpted clay set, cinematic stop-motion film lighting with gentle shadows, the scene filling the entire frame "
+             "with the camera inside the puppet world."),
+        ],
+        "devices": "everything sculpted from clay with the material named on each object (thumb-pressed leaves, coiled clay towels, a clay imitation of "
+                   "a glass bottle / pouring water / a brass kettle); clay shot types: macro texture close-up, worm's-eye miniature at clay-ankle height, "
+                   "tilt-shift tabletop, fingerprint insert, through a sculpted clay window or arch; one clay character per scene at most, mid-shot; "
+                   "the product as a clay imitation of its real form; one simple action per scene",
+        "motion": "ONE simple action or ONE camera move per scene (slow push-in, gentle orbit, pull-back reveal); stepped 12fps stop-motion cadence, "
+                  "no motion blur; clay may squash, knead or morph as the natural way things change",
+        "motion_rule": "حركة واحدة بسيطة بس في المشهد (إيماءة واحدة أو حركة كاميرا واحدة)، بإيقاع ستوب موشن متقطع ١٢ فريم ومن غير موشن بلر، "
+                       "والحاجات بتتغير بإن الصلصال يتعجن أو يتشكل من جديد.",
+        "audio": "٣-٥ أصوات حقيقية للصلصال والمكان (عجن صلصال، طقطقة خفيفة، حاجات بتتحط على ترابيزة...) من غير أي كلام.",
+        "guard": "Handmade stop-motion claymation throughout - matte plasticine, visible fingerprints and tool marks, slightly stuttery 12fps stop-motion "
+                 "cadence, no motion blur. Non CGI. Non cartoon. Animation must start at the first frame.",
+    },
+    # ---------------------------------------------------------------- من skill «paper-animation» + «motion-design» (المشهد بيتجمّع من الورق)
+    "sk-papercut": {
+        "name": "عالم ورق ستوب موشن", "icon": "✂️", "uses": "إعلانات منتجات دافية، فيديوهات شرح وقصص، ومشاهد بتتجمع حتة حتة من الورق", "transition": "cut",
+        "voice_tone": "warm storyteller narrator, gentle and curious, like reading a beautiful picture book",
+        "sample": "حكاية زرعة صغيرة على شباك بيت في مدينة زحمة",
+        "allow_label": False,
+        "writer": "إنت كاتب ومخرج فيديوهات قصيرة بستايل عالم الورق (ستوب موشن): حكاية دافية بتتحكي صورة بصورة، كل مشهد فكرة واحدة بتتشاف.\n"
+                  "شكل السكريبت: أول مشهد صورة بتشد من غير مقدمة ← الحكاية أو المشكلة ← الحل/المنتج ← بيشتغل قدامنا ← النتيجة ← "
+                  "جملة ختام بترجع لأول مشهد بمعنى جديد.\n",
+        "tokens": "real physical handmade paper world photographed, visible paper grain and fibre texture, imperfect cut edges, real cast shadows "
+                  "between the paper layers, stop-motion paper animation, the camera inside the paper world and the world extending past every edge of the frame",
+        "negative": "readable text, letters, words, numbers, captions, subtitles, watermark, logo, smooth digital animation, smooth gradients, glossy 3D, "
+                    "photorealism, live-action footage, motion blur, morphing, lip-sync, talking characters, visible table or room around the set, color drift",
+        "key": "A style swatch image that locks the look of a paper stop-motion video. {style} Palette: {palette}, with clear contrast between "
+               "adjacent paper layers. A small corner of the paper world with a few typical papercraft props and one papercraft figure, mid-shot. Real "
+               "physical paper, photographed, real cast shadows. No letters, no words, no numbers, no logos, no real people.",
+        "variants": [
+            ("classic", "طبقات كارتون: عمق وظلال وتفاصيل كويلينج", "saturated greens stepping from lime to deep forest with a vivid orange sun",
+             "Layered papercraft world - everything built from stacked cardstock with visible paper thickness, deep layered depth between foreground, "
+             "midground and background paper planes, layered cast shadows, paper quilling details, the camera inside the scene and the paper world "
+             "extending past every edge of the frame."),
+            ("assembly", "بيتجمّع: كل حتة ورق مقطوع بتدخل وتركب مكانها", "muted tactile slightly desaturated colors",
+             "Handcrafted torn-paper collage built entirely from layered cut-and-torn paper pieces: every shape is a separate flat paper cutout with "
+             "rough torn edges, visible paper grain and fibre texture, and a hard drop shadow beneath it, small rough white negative-space slivers "
+             "between the pieces, a mosaic of overlapping paper facets photographed under soft directional light."),
+            ("flat", "ورق ملون مسطح: عرايس ورق بمفاصل (كوميدي)", "bold flat primary colors",
+             "Flat construction-paper cutout scene - simple layered flat card shapes, snipped edges, visible paper grain, jointed paper puppet "
+             "characters, soft drop shadows between the layers, bold flat colors, the scene filling the entire frame with the camera inside the paper world."),
+            ("handmade", "يدوي: حواف مقطوعة وصمغ وورق متكرمش", "warm kraft brown, mustard and tomato red",
+             "Handmade paper stop-motion scene - torn paper edges, visible glue seams, construction-paper grain, finger-crumpled textures, "
+             "hand-placed imperfection, soft practical lighting with visible falloff, the scene filling the entire frame."),
+            ("collage", "كولاج: قصاصات مجلات وطوابع وشريط لاصق", "rich saturated collage colors against newsprint neutrals",
+             "Mixed-media paper collage world - the entire scene built from cutouts composed into one deep coherent scene: black-and-white "
+             "photographic cutout faces on hand-drawn paper bodies, clothing collaged from colorful patterned paper, structures built from cardboard "
+             "and newspaper fragments, vintage magazine clippings, washi tape strips and vintage stamps, hand-drawn ink details over the paper, "
+             "the camera inside the scene."),
+            ("origami", "أوريجامي: ورق متطبّق وألوان باستيل", "soft pastels - blush, sage and cream",
+             "Origami world scene - everything folded from paper with clean geometric creases: delicate origami figures, crisp angular folds on every "
+             "object, pleated paper details, soft pastel-colored papers, soft diffused lighting casting gentle shadows that reveal the dimensional "
+             "paper folds, folded edges showing paper thickness, the scene filling the entire frame with the camera inside the paper world."),
+        ],
+        "devices": "every object named with its paper treatment (pleated paper towels, a bottle snipped from green card, shelves layered from magazine "
+                   "clippings); say 'papercraft' (never 'paper cut') near faces and products; a stated camera position inside the world (eye level with "
+                   "the paper figure, worm's-eye up at cardstock towers, overhead straight down on a paper street); figures mid-shot; one simple action",
+        "motion": "ONE move per scene: slow parallax push-in through the layered paper planes (the strongest move), paper elements sliding or pivoting "
+                  "at one corner, a jointed paper puppet raising one arm, pieces sliding in from outside the frame and settling with their shadows; "
+                  "stop-motion cadence, 12 fps judder, slight frame-to-frame jitter, no motion blur",
+        "motion_rule": "حركة واحدة بس في المشهد: دخول بالراحة بين طبقات الورق، أو حتة ورق بتتزحلق أو تلف من ركن، أو عروسة ورق بترفع إيدها، "
+                       "أو حتت الورق بتدخل من برّه الكادر وتركب مكانها بظلها، بإيقاع ستوب موشن متقطع ١٢ فريم ومن غير موشن بلر.",
+        # حركة زيادة لشكل معيّن (بتتضاف لبرومت كل مشهد لما الشكل ده هو المختار)
+        "variant_motion": {"assembly": "The scene assembles itself far-to-near as flat pre-cut torn paper pieces pushed in from outside the frame: the back "
+                                       "layer slides in from above and the sides, the ground rises in from below in layered strips, set pieces slide in, "
+                                       "props settle, and figures assemble last part by part, each piece with a hard paper shadow sliding in beneath it; "
+                                       "then all pieces settle and lock into place with tiny staggered adjustments."},
+        "audio": "٣-٥ أصوات ورق حقيقية بس (ورق بيتزحلق، تكات، خشخشة، حتت بتقع) من غير أي كلام أو موسيقى.",
+        "guard": "Motion should feel tactile, slightly imperfect and stop-motion realistic, with tiny misalignments, staggered timing, hard shadows, "
+                 "overlapping paper layers and visible paper texture; stop-motion cadence, 12 fps judder, no motion blur. No folding, no morphing, "
+                 "no in-place drawing, no smooth digital animation: every piece is a pre-made paper piece sliding, rotating or dropping into place. "
+                 "Animation must start at the first frame.",
+    },
 }
