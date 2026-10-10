@@ -60,10 +60,21 @@ class Segment:
     src_duration: float | None = None  # طول الملف الأصلي (عشان نعرف نمدّ القطعة قد إيه للترانزيشن)
     trans_in: str = ""  # ترانزيشن من القطعة اللي قبلها (اسم xfade في FFmpeg)
     trans_dur: float = 0.0
+    # تأثيرات القطعة (زي كاب كات)
+    speed: float = 1.0          # 0.25 لـ 4
+    reverse: bool = False       # بالعكس
+    flip_h: bool = False
+    flip_v: bool = False
+    rotate: int = 0             # 0 / 90 / 180 / 270
+    adj: dict | None = None     # {bright, contrast, sat, temp, vignette, sharp} من -100 لـ 100
+    look: str = ""              # فلتر جاهز (LOOKS)
+    fade_in: float = 0.0        # ظهور من الأسود (ثواني)
+    fade_out: float = 0.0       # اختفاء للأسود
+    fit: str = "fill"           # fill = يملا الكادر / blur = كامل بخلفية مغبّشة / black = كامل بخلفية سودا
 
     @property
     def duration(self) -> float:
-        return self.end - self.start
+        return (self.end - self.start) / max(0.25, min(4.0, self.speed or 1.0))
 
 
 # ترانزيشنز بين اللقطات (FFmpeg xfade). الطول الكلي للفيديو مبيتغيرش: كل قطعة بتتمد نص مدة الترانزيشن من الفيديو الأصلي
@@ -99,6 +110,53 @@ class Subtitles:
     fonts_dir: Path
 
 
+# فلاتر جاهزة (نفس الأسامي في المعاينة)
+LOOKS = {
+    "bw": "hue=s=0",
+    "noir": "hue=s=0,eq=contrast=1.35:brightness=-0.03",
+    "warm": "colortemperature=temperature=4800,eq=saturation=1.1",
+    "cool": "colortemperature=temperature=8500",
+    "vintage": "curves=preset=vintage,eq=saturation=0.85",
+    "vivid": "eq=saturation=1.45:contrast=1.08",
+    "fade": "eq=contrast=0.82:brightness=0.05:saturation=0.8",
+    "teal": "colorbalance=rs=-0.12:bs=0.12:rh=0.12:bh=-0.1",
+    "film": "curves=preset=strong_contrast,eq=saturation=0.9,noise=alls=8:allf=t",
+    "pink": "colorbalance=rm=0.12:bm=0.06:gm=-0.05,eq=saturation=1.1",
+}
+
+
+def atempo_chain(speed: float) -> str:
+    """atempo بيقبل من 0.5 لـ 2 بس، فالسرعات التانية بنعملها كذا مرة ورا بعض."""
+    parts, s = [], speed
+    while s > 2.0:
+        parts.append("atempo=2.0"); s /= 2.0
+    while s < 0.5:
+        parts.append("atempo=0.5"); s /= 0.5
+    parts.append(f"atempo={s:.4f}")
+    return ",".join(parts)
+
+
+def color_filters(seg: "Segment") -> str:
+    """الألوان والفلتر الجاهز والفينييت: سلسلة فلاتر بتتحط بعد ما الصورة تبقى على مقاس الكادر."""
+    a = seg.adj or {}
+    f = []
+    b, c, s = float(a.get("bright") or 0) / 100, float(a.get("contrast") or 0) / 100, float(a.get("sat") or 0) / 100
+    if b or c or s:
+        f.append(f"eq=brightness={b * 0.3:.3f}:contrast={1 + c * 0.6:.3f}:saturation={max(0.0, 1 + s):.3f}")
+    temp = float(a.get("temp") or 0) / 100
+    if temp:
+        f.append(f"colortemperature=temperature={6500 - temp * 2500:.0f}")
+    if seg.look in LOOKS:
+        f.append(LOOKS[seg.look])
+    sharp = float(a.get("sharp") or 0) / 100
+    if sharp > 0:
+        f.append(f"unsharp=5:5:{sharp * 1.5:.2f}")
+    vig = float(a.get("vignette") or 0) / 100
+    if vig > 0:
+        f.append(f"vignette=angle={0.2 + vig * 0.6:.3f}")
+    return ("," + ",".join(f)) if f else ""
+
+
 def encoder_args(preset: str, crf: int, low_memory: bool) -> list[str]:
     args = ["-c:v", "libx264", "-preset", preset, "-crf", str(crf), "-threads", "1" if low_memory else str(THREADS)]
     if low_memory:
@@ -107,28 +165,73 @@ def encoder_args(preset: str, crf: int, low_memory: bool) -> list[str]:
 
 
 def segment_command(ffmpeg: str, seg: Segment, output: Path, low_memory: bool = False, pre: float = 0.0, post: float = 0.0) -> list[str]:
-    """المرحلة الأولى: قطعة واحدة بس، مقصوصة ومتظبطة على 1080×1920 وصوتها موحّد.
-    pre/post: ثواني زيادة قبلها وبعدها للترانزيشن (من الفيديو الأصلي، واللي مش موجود بيثبت على أول/آخر فريم)."""
-    start = max(0.0, seg.start - pre)
-    lack_pre = pre - (seg.start - start)
-    end = seg.end + post
+    """المرحلة الأولى: قطعة واحدة بس، مقصوصة ومتظبطة على 1080×1920 وصوتها موحّد، وعليها تأثيراتها
+    (سرعة، عكس، قلب، لف، ألوان، فلتر، ظهور/اختفاء، ملء الكادر أو كاملة بخلفية).
+    pre/post: ثواني زيادة (بوقت الفيديو النهائي) قبلها وبعدها للترانزيشن (من الفيديو الأصلي، واللي مش موجود بيثبت على أول/آخر فريم)."""
+    sp = max(0.25, min(4.0, seg.speed or 1.0))
+    start = max(0.0, seg.start - pre * sp)
+    lack_pre = pre - (seg.start - start) / sp
+    end = seg.end + post * sp
     lack_post = 0.0
     if seg.src_duration is not None and end > seg.src_duration:
-        lack_post, end = end - seg.src_duration, seg.src_duration
+        lack_post, end = (end - seg.src_duration) / sp, seg.src_duration
     take = max(1 / FPS, end - start)
     total = seg.duration + pre + post
     args = [ffmpeg, "-hide_banner", "-loglevel", "error", "-y", "-filter_complex_threads", "1",
             "-threads", "1", "-ss", f"{start:.3f}", "-t", f"{take:.3f}", "-i", str(seg.path)]
     pad = (f",tpad=start_mode=clone:start_duration={lack_pre:.3f}" if lack_pre > 0.001 else "") + \
           (f",tpad=stop_mode=clone:stop_duration={lack_post:.3f}" if lack_post > 0.001 else "")
-    # بنقص الجزء اللي هيظهر من الفيديو الأصلي الأول وبعدين نكبّره، بدل ما نكبّر
-    # الفيديو كله (لحد 3 أضعاف 1080×1920) ونقص منه — نفس النتيجة بذاكرة أقل بكتير
+    # قبل أي حاجة: عكس + لف + قلب + سرعة (على الفيديو الأصلي)
+    pre_f = []
+    if seg.reverse:
+        pre_f.append("reverse")
+    rot = int(seg.rotate or 0) % 360
+    if rot == 90:
+        pre_f.append("transpose=1")
+    elif rot == 180:
+        pre_f.append("hflip,vflip")
+    elif rot == 270:
+        pre_f.append("transpose=2")
+    if seg.flip_h:
+        pre_f.append("hflip")
+    if seg.flip_v:
+        pre_f.append("vflip")
+    if abs(sp - 1) > 1e-3:
+        pre_f.append(f"setpts=PTS/{sp:.4f}")
+    head = "[0:v]" + (",".join(pre_f) + "," if pre_f else "")
     z = max(1.0, seg.zoom)
-    filters = [
-        f"[0:v]crop=w='min(iw,ih*{WIDTH}/{HEIGHT})/{z:.4f}':h='min(ih,iw*{HEIGHT}/{WIDTH})/{z:.4f}'"
-        f":x='(iw-ow)/2*(1+({seg.x:.4f}))':y='(ih-oh)/2*(1+({seg.y:.4f}))',"
-        f"scale={WIDTH}:{HEIGHT},setsar=1,fps={FPS}{pad},format=yuv420p[v]"
-    ]
+    fades = ""
+    if seg.fade_in > 0.01:
+        fades += f",fade=t=in:st={pre:.3f}:d={min(seg.fade_in, seg.duration):.3f}"
+    if seg.fade_out > 0.01:
+        fades += f",fade=t=out:st={max(0.0, pre + seg.duration - seg.fade_out):.3f}:d={min(seg.fade_out, seg.duration):.3f}"
+    look = color_filters(seg)
+    if seg.fit in ("blur", "black"):
+        # الصورة كاملة جوه الكادر، والفاضي حواليها خلفية مغبّشة من نفس الفيديو أو سودا
+        fg_w, fg_h = f"{WIDTH}*{z:.4f}", f"{HEIGHT}*{z:.4f}"
+        fg = f"scale=w='{fg_w}':h='{fg_h}':force_original_aspect_ratio=decrease:force_divisible_by=2,setsar=1"
+        ox, oy = f"(W-w)/2+{seg.x * WIDTH * 0.5:.1f}", f"(H-h)/2+{seg.y * HEIGHT * 0.5:.1f}"
+        if seg.fit == "blur":
+            filters = [
+                f"{head}split=2[bgs][fgs]",
+                f"[bgs]scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=increase,crop={WIDTH}:{HEIGHT},boxblur=24:3,eq=brightness=-0.06[bg]",
+                f"[fgs]{fg}[fg]",
+                f"[bg][fg]overlay=x='{ox}':y='{oy}',setsar=1,fps={FPS}{look}{pad}{fades},format=yuv420p[v]",
+            ]
+        else:
+            filters = [
+                f"{head}{fg}[fg]",
+                f"color=c=black:s={WIDTH}x{HEIGHT}:r={FPS}[bg]",
+                f"[bg][fg]overlay=x='{ox}':y='{oy}':shortest=1,setsar=1,fps={FPS}{look}{pad}{fades},format=yuv420p[v]",
+            ]
+    else:
+        # بنقص الجزء اللي هيظهر من الفيديو الأصلي الأول وبعدين نكبّره، بدل ما نكبّر
+        # الفيديو كله (لحد 3 أضعاف 1080×1920) ونقص منه — نفس النتيجة بذاكرة أقل بكتير
+        filters = [
+            f"{head}crop=w='min(iw,ih*{WIDTH}/{HEIGHT})/{z:.4f}':h='min(ih,iw*{HEIGHT}/{WIDTH})/{z:.4f}'"
+            f":x='(iw-ow)/2*(1+({seg.x:.4f}))':y='(ih-oh)/2*(1+({seg.y:.4f}))',"
+            f"scale={WIDTH}:{HEIGHT},setsar=1,fps={FPS}{look}{pad}{fades},format=yuv420p[v]"
+        ]
     if seg.has_audio:
         audio_in = "[0:a]"
     else:
@@ -136,9 +239,15 @@ def segment_command(ffmpeg: str, seg: Segment, output: Path, low_memory: bool = 
         args += ["-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo"]
         audio_in = "[1:a]"
     delay = f"adelay={int(lack_pre * 1000)}:all=1," if lack_pre > 0.001 else ""
+    a_pre = ("areverse," if seg.reverse and seg.has_audio else "") + (f"{atempo_chain(sp)}," if abs(sp - 1) > 1e-3 and seg.has_audio else "")
+    a_fade = ""
+    if seg.fade_in > 0.01:
+        a_fade += f",afade=t=in:st={pre:.3f}:d={min(seg.fade_in, seg.duration):.3f}"
+    if seg.fade_out > 0.01:
+        a_fade += f",afade=t=out:st={max(0.0, pre + seg.duration - seg.fade_out):.3f}:d={min(seg.fade_out, seg.duration):.3f}"
     filters.append(
-        f"{audio_in}aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,{delay}"
-        f"volume={seg.volume:.3f},apad,atrim=0:{total:.3f}[a]"
+        f"{audio_in}aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,{a_pre}{delay}"
+        f"volume={seg.volume:.3f},apad,atrim=0:{total:.3f}{a_fade}[a]"
     )
     return args + [
         "-filter_complex", ";".join(filters), "-map", "[v]", "-map", "[a]", "-t", f"{total:.3f}",

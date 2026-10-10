@@ -1969,3 +1969,20 @@ a.btn.disabled { opacity: .45; pointer-events: none; }
 .ts-sbody video, .ts-sbody .fm-ph { width: 100%; aspect-ratio: 9 / 16; border-radius: 10px; background: #111; object-fit: cover; }
 .ts-sf { display: flex; flex-direction: column; gap: 6px; }
 .ts-sf textarea, .ts-sf input { width: 100%; box-sizing: border-box; font: inherit; font-size: 13px; border: 1px solid var(--line); border-radius: 10px; padding: 6px 8px; background: #fff; }
+
+/* تأثيرات القطعة في المعاينة واللوحة */
+.frame .pv-stage { position: absolute; inset: 0; z-index: 1; overflow: hidden; }
+.pv-stage .pv-layer { position: absolute; inset: 0; pointer-events: none; }
+.pv-stage #pvBlur { width: 100%; height: 100%; filter: blur(10px) brightness(.9); transform: scale(1.08); }
+.pv-stage #pvVig { background: radial-gradient(ellipse at center, transparent 45%, #000 100%); opacity: 0; }
+.pv-stage #pvFadeBlack { background: #000; opacity: 0; }
+.clip-fx { border-top: 1px solid var(--line); margin-top: 10px; padding-top: 6px; display: flex; flex-direction: column; gap: 6px; }
+.clip-fx h4 { margin: 8px 0 0; font-size: 13px; }
+.clip-fx h4 b { color: var(--accent); font-weight: 600; margin-inline-start: 4px; }
+.clip-fx .chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.clip-fx .chip { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 3px 10px; font: inherit; font-size: 12px; cursor: pointer; }
+.clip-fx .chip:hover { border-color: var(--accent); }
+.clip-fx .chip.on, .clip-fx .btn.on { border-color: var(--accent); background: var(--accent-soft); }
+.clip-fx label { display: flex; flex-direction: column; font-size: 12px; }
+.clip-fx label.check { flex-direction: row; align-items: center; gap: 6px; }
+.tl-clip .fxb { font-style: normal; font-size: 10px; opacity: .9; }

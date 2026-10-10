@@ -1939,6 +1939,17 @@ class ClipEdit(BaseModel):
     y: float = 0.0
     volume: float = 1.0
     trans: dict | None = None  # الترانزيشن من القطعة اللي قبلها: {type, dur}
+    # تأثيرات القطعة (زي كاب كات)
+    speed: float = 1.0
+    reverse: bool = False
+    flip_h: bool = False
+    flip_v: bool = False
+    rotate: int = 0
+    adj: dict | None = None     # {bright, contrast, sat, temp, vignette, sharp} من -100 لـ 100
+    look: str = ""
+    fade_in: float = 0.0
+    fade_out: float = 0.0
+    fit: str = "fill"           # fill / blur / black
 
 
 class TrackPart(BaseModel):
@@ -2097,6 +2108,12 @@ def build_montage(conn: sqlite3.Connection, data: dict):
                 volume=clamp(c["volume"], 0, 3), has_audio=info.has_audio, src_duration=info.duration,
                 trans_in=tr.get("type") if tr.get("type") in montage.TRANSITIONS and i > 1 else "",
                 trans_dur=clamp(float(tr.get("dur") or 0.5), 0.1, 2.0),
+                speed=clamp(float(c.get("speed") or 1), 0.25, 4), reverse=bool(c.get("reverse")) and end - start <= 60,
+                flip_h=bool(c.get("flip_h")), flip_v=bool(c.get("flip_v")), rotate=int(c.get("rotate") or 0) % 360 // 90 * 90,
+                adj={k: clamp(float(v or 0), -100, 100) for k, v in (c.get("adj") or {}).items() if k in ("bright", "contrast", "sat", "temp", "vignette", "sharp")},
+                look=c.get("look") if c.get("look") in montage.LOOKS else "",
+                fade_in=clamp(float(c.get("fade_in") or 0), 0, 3), fade_out=clamp(float(c.get("fade_out") or 0), 0, 3),
+                fit=c.get("fit") if c.get("fit") in ("fill", "blur", "black") else "fill",
             )
         )
     if not segments:

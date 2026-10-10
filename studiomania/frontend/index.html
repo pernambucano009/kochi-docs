@@ -468,6 +468,27 @@
                     <label dir="rtl">الصوت <b id="volVal"></b><input type="range" dir="ltr" id="edVol" min="0" max="200" step="5"></label>
                     <div class="row" dir="rtl"><button class="btn sm" id="edMute"></button>
                       <span class="muted" id="noAudio" hidden>🔈 الفيديو ده مفيهوش صوت</span></div>
+                    <div class="clip-fx" id="clipFx" dir="rtl">
+                      <h4>⚡ السرعة <b id="speedVal"></b></h4>
+                      <div class="chips" id="fxSpeedChips"></div>
+                      <input type="range" dir="ltr" id="fxSpeed" min="-200" max="200" step="1" title="من 0.25x لـ 4x">
+                      <label class="check"><input type="checkbox" id="fxReverse"> ⏪ شغّل بالعكس <span class="muted" id="revNote"></span></label>
+                      <h4>🖼️ الشكل</h4>
+                      <div class="chips" id="fxFit"></div>
+                      <div class="row wrap">
+                        <button class="btn sm" id="fxRotate" title="لف 90 درجة">⟳ لف 90°</button>
+                        <button class="btn sm" id="fxFlipH" title="اقلب شمال ويمين">↔ اقلب أفقي</button>
+                        <button class="btn sm" id="fxFlipV" title="اقلب فوق وتحت">↕ اقلب رأسي</button>
+                      </div>
+                      <h4>🎨 فلتر</h4>
+                      <div class="chips" id="fxLooks"></div>
+                      <h4>🌈 الألوان</h4>
+                      <div id="fxAdj"></div>
+                      <h4>◐ ظهور واختفاء</h4>
+                      <label>ظهور من الأسود <b id="fadeInVal"></b><input type="range" dir="ltr" id="fxFadeIn" min="0" max="200" step="5"></label>
+                      <label>اختفاء للأسود <b id="fadeOutVal"></b><input type="range" dir="ltr" id="fxFadeOut" min="0" max="200" step="5"></label>
+                      <button class="btn sm" id="fxReset">↺ شيل كل التأثيرات</button>
+                    </div>
                     <p class="hint" dir="rtl">💡 اسحب الصورة في المعاينة عشان تحرّكها، وعجلة الماوس عليها بتعمل زووم.</p>
                     <div class="row wrap" dir="rtl">
                       <button class="btn sm" id="edSplit">✂ قسّم عند المؤشر</button>

@@ -185,8 +185,15 @@ function clipSource(c) {
 function clipOut(c) {
   return c.end ?? clipSource(c)?.duration ?? c.start;
 }
+const clipSpeed = (c) => clamp(Number(c?.speed) || 1, 0.25, 4);
+// طول القطعة على التايم لاين = طولها في الفيديو الأصلي ÷ السرعة
 function clipLength(c) {
-  return Math.max(0, clipOut(c) - c.start);
+  return Math.max(0, clipOut(c) - c.start) / clipSpeed(c);
+}
+// الثانية جوه الفيديو الأصلي اللي بتظهر عند نقطة معيّنة من القطعة (بالسرعة والعكس)
+function srcTimeAt(it, t) {
+  const sp = it.speed || 1, rel = clamp(t - it.t0, 0, it.t1 - it.t0) * sp;
+  return it.rev ? it.out - rel : it.in + rel;
 }
 function currentOutro() {
   const d = mt.project.data;
@@ -202,7 +209,8 @@ function seq() {
   d.clips.forEach((c, i) => {
     const s = clipSource(c);
     const len = clipLength(c);
-    items.push({ key: `c${i}`, kind: "clip", i, c, s, url: s?.url, t0: t, t1: t + len, in: c.start, zoom: c.zoom, x: c.x, y: c.y, volume: c.volume });
+    items.push({ key: `c${i}`, kind: "clip", i, c, s, url: s?.url, t0: t, t1: t + len, in: c.start, out: clipOut(c), speed: clipSpeed(c), rev: !!c.reverse,
+      zoom: c.zoom, x: c.x, y: c.y, volume: c.volume });
     t += len;
   });
   const o = currentOutro();
@@ -435,13 +443,13 @@ function stripInfo(kind, id) {
   return null;
 }
 
-function clipStrip(s, inSec, width) {
+function clipStrip(s, inSec, width, speed = 1) {
   if (!s) return "";
-  if (s.extra) return stripHtml("xoutro", s.id, inSec, width);
-  return s.kind === "outro" ? stripHtml("outro", s.coach_id, inSec, width) : stripHtml("gen", s.id, inSec, width);
+  if (s.extra) return stripHtml("xoutro", s.id, inSec, width, speed);
+  return s.kind === "outro" ? stripHtml("outro", s.coach_id, inSec, width, speed) : stripHtml("gen", s.id, inSec, width, speed);
 }
 
-function stripHtml(kind, id, inSec, width) {
+function stripHtml(kind, id, inSec, width, speed = 1) {
   const info = id && stripInfo(kind, id);
   if (!info) return "";
   const h = 56;
@@ -449,7 +457,7 @@ function stripHtml(kind, id, inSec, width) {
   const n = Math.min(400, Math.ceil(width / tw));
   let html = "";
   for (let k = 0; k < n; k++) {
-    const t = inSec + (k * tw + tw / 2) / mt.pps;
+    const t = inSec + (k * tw + tw / 2) / mt.pps * speed;
     const fi = clamp(Math.floor(t * info.fps), 0, info.frames - 1);
     html += `<i style="width:${tw}px;background-position:${-fi * tw}px 0;background-size:${info.frames * tw}px 100%"></i>`;
   }
@@ -554,13 +562,13 @@ function renderTimeline() {
         .map((it) => {
           const w = (it.t1 - it.t0) * mt.pps;
           const sel = isSel(it.kind === "clip" ? { kind: "clip", i: it.i } : { kind: "outro" });
-          const strip = it.kind === "clip" ? clipStrip(it.s, it.in, w) : stripHtml("outro", it.coach.id, 0, w);
+          const strip = it.kind === "clip" ? clipStrip(it.s, it.in, w, it.speed) : stripHtml("outro", it.coach.id, 0, w);
           const label = it.kind === "clip" ? (it.s ? escapeHtml(it.s.label) : "⚠️ الفيديو اتمسح") : `🎬 أوترو ${escapeHtml(it.coach.name)}`;
           return `<div class="tl-clip ${it.kind} ${sel ? "selected" : ""} ${it.s || it.kind === "outro" ? "" : "missing"}"
               ${it.kind === "clip" ? `data-i="${it.i}"` : `data-outro="1"`} style="left:${it.t0 * mt.pps}px;width:${w}px">
             ${strip}
             ${hasSound(it) ? `<canvas class="cw"></canvas>` : ""}
-            <span class="nm" dir="auto">${label}</span><span class="du">${(it.t1 - it.t0).toFixed(1)}s</span>
+            <span class="nm" dir="auto">${label}</span><span class="du">${fxBadges(it.c)}${(it.t1 - it.t0).toFixed(1)}s</span>
             ${soundBadge(it)}
             ${hasSound(it) ? volLine(it.volume) : ""}
             ${it.kind === "clip" ? `<b class="h l" data-h="l"></b><b class="h r" data-h="r"></b>` : ""}
@@ -572,7 +580,7 @@ function renderTimeline() {
   $("trkVideo").querySelectorAll(".tl-clip").forEach((el) => {
     const cv = el.querySelector("canvas.cw");
     const it = el.dataset.outro ? items.find((x) => x.kind === "outro") : items[Number(el.dataset.i)];
-    if (cv && it) drawWave(cv, it.url, it.in, it.t1 - it.t0, it.volume > 0 ? "#9fe3a8" : "#6b7180", it.volume);
+    if (cv && it) drawWave(cv, it.url, it.in, (it.t1 - it.t0) * (it.speed || 1), it.volume > 0 ? "#9fe3a8" : "#6b7180", it.volume);
   });
   const clips = d.clips.filter((c) => clipSource(c)?.has_audio);
   const allMuted = clips.length > 0 && clips.every((c) => c.volume === 0);
@@ -816,12 +824,14 @@ function splitAt(t, target) {
   }
   const it = seq().items.find((x) => x.kind === "clip" && t > x.t0 && t < x.t1);
   if (!it) return toast("حط المؤشر على قطعة فيديو عشان تقسمها", true);
-  const at = snap(it.in + (t - it.t0));
+  const at = snap(srcTimeAt(it, t));
   if (at - it.in < MIN_CLIP - 1e-6 || clipOut(it.c) - at < MIN_CLIP - 1e-6) return toast("مفيش ولا فريم بين المؤشر وطرف القطعة", true);
   pushHistory();
   const clips = mt.project.data.clips;
-  clips.splice(it.i + 1, 0, { ...it.c, start: at });
-  clips[it.i].end = at;
+  // القطعة اللي بالعكس: الجزء الأول على التايم لاين هو آخر الفيديو الأصلي
+  const first = it.rev ? { start: at } : { end: at }, second = it.rev ? { end: at } : { start: at };
+  clips.splice(it.i + 1, 0, { ...JSON.parse(JSON.stringify(it.c)), ...second, fade_in: 0 });
+  Object.assign(clips[it.i], first, { fade_out: 0 });
   mt.sel = { kind: "clip", i: it.i + 1 };
   changed();
 }
@@ -1020,25 +1030,25 @@ function trimClip(e, i, side) {
     e,
     (dx) => {
       moved = true;
-      const ds = snap(dx / mt.pps);
+      const ds = snap(dx / mt.pps * clipSpeed(c));
       // وإنت بتسحب: الطرف اللي ماسكه بيمشي مع الماوس، والباقي بيتظبط لما تسيب
       let left = it0.t0;
       if (side === "l") {
         c.start = clamp(snap(start0 + ds), 0, out0 - MIN_CLIP);
-        left = it0.t0 + (c.start - start0);
+        left = it0.t0 + (c.start - start0) / clipSpeed(c);
       } else {
         const out = clamp(snap(out0 + ds), c.start + MIN_CLIP, s.duration);
         c.end = out >= s.duration - 0.001 ? null : out;
       }
-      const len = clipOut(c) - c.start;
+      const len = clipLength(c);
       el.style.left = `${left * mt.pps}px`;
       el.style.width = `${len * mt.pps}px`;
       el.querySelector(".strip")?.remove();
-      el.insertAdjacentHTML("afterbegin", clipStrip(s, c.start, len * mt.pps));
+      el.insertAdjacentHTML("afterbegin", clipStrip(s, c.start, len * mt.pps, clipSpeed(c)));
       const cv = el.querySelector("canvas.cw");
-      if (cv) drawWave(cv, s.url, c.start, len, c.volume > 0 ? "#9fe3a8" : "#6b7180", c.volume);
+      if (cv) drawWave(cv, s.url, c.start, len * clipSpeed(c), c.volume > 0 ? "#9fe3a8" : "#6b7180", c.volume);
       el.querySelector(".du").textContent = `${len.toFixed(1)}s`;
-      const diff = len - (out0 - start0);
+      const diff = len - (out0 - start0) / clipSpeed(c);
       tip.textContent = `${len.toFixed(2)}s (${diff >= 0 ? "+" : "−"}${Math.abs(diff).toFixed(2)})`;
       const edgeX = (side === "l" ? left : left + len) * mt.pps;
       tip.style.left = `${Math.max(tip.offsetWidth / 2 + 2, edgeX)}px`;
@@ -1198,17 +1208,99 @@ function videoFor(url) {
   return v;
 }
 
-// نفس حسبة FFmpeg: الصورة تملا الكادر، وبعدين زووم، وبعدين تحريك
+// ---------- تأثيرات القطعة (زي كاب كات): نفس حسبة FFmpeg في المعاينة ----------
+const LOOKS = [["", "بدون"], ["vivid", "حيوي"], ["warm", "دافي"], ["cool", "بارد"], ["teal", "سينما"], ["vintage", "قديم"],
+  ["fade", "باهت"], ["film", "فيلم"], ["pink", "وردي"], ["bw", "أبيض وأسود"], ["noir", "نوار"]];
+const LOOK_CSS = { bw: "grayscale(1)", noir: "grayscale(1) contrast(1.35) brightness(.97)", warm: "sepia(.25) saturate(1.1)",
+  cool: "hue-rotate(-10deg) saturate(.9) brightness(1.03)", vintage: "sepia(.35) contrast(.9) saturate(.85)", vivid: "saturate(1.45) contrast(1.08)",
+  fade: "contrast(.82) brightness(1.05) saturate(.8)", teal: "hue-rotate(-8deg) saturate(1.1) contrast(1.05)", film: "contrast(1.2) saturate(.9)",
+  pink: "hue-rotate(-12deg) saturate(1.15)" };
+function clipCss(c) {
+  const a = c.adj || {}, f = [];
+  const b = (a.bright || 0) / 100, ct = (a.contrast || 0) / 100, sa = (a.sat || 0) / 100, tp = (a.temp || 0) / 100;
+  if (b) f.push(`brightness(${(1 + b * 0.45).toFixed(3)})`);
+  if (ct) f.push(`contrast(${(1 + ct * 0.6).toFixed(3)})`);
+  if (sa) f.push(`saturate(${Math.max(0, 1 + sa).toFixed(3)})`);
+  if (tp > 0) f.push(`sepia(${(tp * 0.3).toFixed(3)}) saturate(${(1 + tp * 0.2).toFixed(3)})`);
+  if (tp < 0) f.push(`hue-rotate(${(tp * 18).toFixed(1)}deg) saturate(${(1 + tp * 0.1).toFixed(3)})`);
+  if (LOOK_CSS[c.look]) f.push(LOOK_CSS[c.look]);
+  return f.join(" ");
+}
+function fadeGain(it, t) {
+  const c = it?.c;
+  if (!c) return 1;
+  let g = 1;
+  if (c.fade_in > 0.01) g = Math.min(g, (t - it.t0) / c.fade_in);
+  if (c.fade_out > 0.01) g = Math.min(g, (it.t1 - t) / c.fade_out);
+  return clamp(g, 0, 1);
+}
+function fxBadges(c) {
+  if (!c) return "";
+  const b = [];
+  if (clipSpeed(c) !== 1) b.push(`⚡${clipSpeed(c)}x`);
+  if (c.reverse) b.push("⏪");
+  if (c.look || Object.values(c.adj || {}).some((v) => v)) b.push("🎨");
+  if (c.fade_in > 0.01 || c.fade_out > 0.01) b.push("◐");
+  return b.length ? `<em class="fxb">${b.join(" ")}</em> ` : "";
+}
+// طبقات المعاينة الإضافية: خلفية مغبّشة (للصورة الكاملة) + فينييت + غمقان الظهور/الاختفاء
+function pvLayer(id, z) {
+  let el = $(id);
+  if (!el) {
+    el = document.createElement(id === "pvBlur" ? "canvas" : "div");
+    el.id = id;
+    el.className = "pv-layer";
+    el.style.zIndex = z;
+    $("pvStage").append(el);
+  }
+  return el;
+}
+function drawBlurBg() {
+  const v = mt.active, it = mt.activeItem, cv = pvLayer("pvBlur", 0);
+  const on = !!(v && it?.c && it.c.fit === "blur" && v.videoWidth);
+  cv.hidden = !on;
+  if (!on) return;
+  cv.width = 63; cv.height = 112;
+  cv.style.filter = `blur(10px) brightness(.9) ${clipCss(it.c)}`;
+  cv.style.transform = `scale(${it.c.flip_h ? -1.08 : 1.08}, ${it.c.flip_v ? -1.08 : 1.08})`;
+  const g = cv.getContext("2d");
+  const rot = ((it.c.rotate || 0) % 360 + 360) % 360, side = rot === 90 || rot === 270;
+  const vw = side ? v.videoHeight : v.videoWidth, vh = side ? v.videoWidth : v.videoHeight;
+  const sc = Math.max(cv.width / vw, cv.height / vh);
+  g.setTransform(1, 0, 0, 1, cv.width / 2, cv.height / 2);
+  g.rotate((rot * Math.PI) / 180);
+  try { g.drawImage(v, -v.videoWidth * sc / 2, -v.videoHeight * sc / 2, v.videoWidth * sc, v.videoHeight * sc); } catch (e) { /* لسه مفيش فريم */ }
+  g.setTransform(1, 0, 0, 1, 0, 0);
+}
+function applyFx() {
+  const it = mt.activeItem, c = it?.kind === "clip" ? it.c : null;
+  const vig = pvLayer("pvVig", 2), fade = pvLayer("pvFadeBlack", 2);
+  const vv = (c?.adj?.vignette || 0) / 100;
+  vig.style.opacity = vv > 0 ? vv.toFixed(2) : 0;
+  fade.style.opacity = c ? (1 - fadeGain(it, mt.t)).toFixed(3) : 0;
+  $("pvStage").style.background = c && c.fit === "black" ? "#000" : "";
+  drawBlurBg();
+}
+
+// نفس حسبة FFmpeg: اللف والقلب، وبعدين الصورة تملا الكادر (أو تبقى كاملة جوه)، وبعدين زووم وتحريك
 function layoutActive() {
   const v = mt.active, it = mt.activeItem;
   if (!v || !it || !v.videoWidth) return;
   const c = it.kind === "clip" ? it.c : { zoom: 1, x: 0, y: 0 };
-  const cover = Math.max(PV_W / v.videoWidth, PV_H / v.videoHeight) * c.zoom;
-  const dw = v.videoWidth * cover, dh = v.videoHeight * cover;
+  const rot = ((Number(c.rotate) || 0) % 360 + 360) % 360, side = rot === 90 || rot === 270;
+  const ew = side ? v.videoHeight : v.videoWidth, eh = side ? v.videoWidth : v.videoHeight;
+  const fit = c.fit === "blur" || c.fit === "black";
+  const sc = (fit ? Math.min(PV_W / ew, PV_H / eh) : Math.max(PV_W / ew, PV_H / eh)) * (c.zoom || 1);
+  const dw = ew * sc, dh = eh * sc;
+  const cx = fit ? PV_W / 2 + (c.x || 0) * PV_W * 0.5 : -((dw - PV_W) / 2) * (1 + (c.x || 0)) + dw / 2;
+  const cy = fit ? PV_H / 2 + (c.y || 0) * PV_H * 0.5 : -((dh - PV_H) / 2) * (1 + (c.y || 0)) + dh / 2;
+  const w = v.videoWidth * sc, h = v.videoHeight * sc;
   Object.assign(v.style, {
-    width: `${dw}px`, height: `${dh}px`,
-    left: `${-((dw - PV_W) / 2) * (1 + c.x)}px`, top: `${-((dh - PV_H) / 2) * (1 + c.y)}px`,
+    width: `${w}px`, height: `${h}px`, left: `${cx - w / 2}px`, top: `${cy - h / 2}px`,
+    transform: `scale(${c.flip_h ? -1 : 1},${c.flip_v ? -1 : 1}) rotate(${rot}deg)`,
+    filter: it.kind === "clip" ? clipCss(c) : "",
   });
+  applyFx();
 }
 
 function itemAt(items, t, total) {
@@ -1225,13 +1317,14 @@ function preloadNext(items, it) {
     if (!x.url) continue;
     const n = videoFor(x.url);
     if (n === mt.active || n.seeking) continue;
-    if (Math.abs(n.currentTime - (x.in + 0.001)) > 0.05) n.currentTime = x.in + 0.001;
+    const first = x.rev ? x.out - 0.05 : x.in + 0.001;
+    if (Math.abs(n.currentTime - first) > 0.05) n.currentTime = first;
   }
 }
 
 function showItem(it, t, playing) {
   const v = it?.url ? videoFor(it.url) : null;
-  const want = v ? it.in + clamp(t - it.t0, 0, it.t1 - it.t0 - 0.5 / FPS) : 0;
+  const want = v ? (it.kind === "clip" ? srcTimeAt(it, Math.min(t, it.t1 - 0.5 / FPS)) : it.in + clamp(t - it.t0, 0, it.t1 - it.t0 - 0.5 / FPS)) : 0;
   if (v !== mt.active) {
     mt.active?.pause();
     // اللقطة اللي فاتت تفضل ظاهرة لحد ما الجديدة يبقى عندها فريم جاهز (بدل ما الشاشة تسود)
@@ -1249,6 +1342,7 @@ function showItem(it, t, playing) {
   if (!v) return;
   // أول ما الفيديو يظهر لازم نطلب الفريم من جديد، وإلا ممكن يفضل أسود
   if (changedItem) v.currentTime = want + 0.001;
+  else if (it.rev && playing) { if (Math.abs(v.currentTime - want) > 0.06) v.currentTime = want; }  // العكس: بنسحب الفيديو لورا فريم فريم
   else if (!playing || Math.abs(v.currentTime - want) > 0.3) {
     if (Math.abs(v.currentTime - want) > 0.0005) v.currentTime = want + 0.001;
   }
@@ -1263,6 +1357,7 @@ function syncPreview() {
   $("pvEmpty").hidden = !!it;
   showItem(it, mt.t, false);
   if (it) preloadNext(items, it);
+  applyFx();
   drawPlayhead();
   updatePreviewOverlays();
 }
@@ -1332,9 +1427,11 @@ function tick() {
   if (it && mt.activeKey !== mt.preloadedFor) { mt.preloadedFor = mt.activeKey; preloadNext(items, it); }
   const v = mt.active;
   if (v) {
-    v.muted = false;
-    v.volume = clamp(it.volume, 0, 1);
-    if (v.paused) v.play().catch(() => {});
+    v.muted = !!it.rev;
+    v.volume = clamp(it.volume * fadeGain(it, mt.t), 0, 1);
+    v.playbackRate = it.speed || 1;
+    if (it.rev) { if (!v.paused) v.pause(); }
+    else if (v.paused) v.play().catch(() => {});
   }
   const live = new Set();
   for (const kind of ["voice", "music"]) {
@@ -1347,6 +1444,7 @@ function tick() {
     }
   }
   for (const [key, el] of audioEls) if (!live.has(key) && !el.paused) el.pause();
+  applyFx();
   drawPlayhead();
   updatePreviewOverlays();
   followPlayhead();
@@ -1478,6 +1576,7 @@ function renderInspector() {
   $("edMute").hidden = !s.has_audio;
   $("edMute").textContent = c.volume === 0 ? "🔊 رجّع الصوت" : "🔇 اكتم صوت الفيديو ده";
   $("noAudio").hidden = !!s.has_audio;
+  renderFx(c);
 }
 
 function editorInput(key, apply) {
@@ -1500,6 +1599,83 @@ $("edY").addEventListener("input", editorInput("y", (c) => (c.y = Number($("edY"
 $("edVol").addEventListener("input", editorInput("vol", (c) => (c.volume = Number($("edVol").value) / 100)));
 $("edMute").onclick = () => { const c = selectedClip(); if (c) toggleMute(c); };
 $("edReset").onclick = editorInput(null, (c) => Object.assign(c, { zoom: 1, x: 0, y: 0, volume: 1 }));
+
+// ---------- لوحة التأثيرات (سرعة/عكس/شكل/فلتر/ألوان/ظهور) ----------
+const SPEEDS = [0.25, 0.5, 1, 1.5, 2, 3, 4];
+const FITS = [["fill", "يملا الكادر"], ["blur", "كامل + خلفية مغبّشة"], ["black", "كامل + أسود"]];
+const ADJ = [["bright", "الإضاءة"], ["contrast", "التباين"], ["sat", "التشبّع"], ["temp", "دافي ⟷ بارد"], ["vignette", "إطار غامق"], ["sharp", "الحدّة"]];
+const REV_MAX = 60;
+$("fxSpeedChips").innerHTML = SPEEDS.map((v) => `<button class="chip" data-speed="${v}">${v}x</button>`).join("");
+$("fxFit").innerHTML = FITS.map(([k, l]) => `<button class="chip" data-fit="${k}">${l}</button>`).join("");
+$("fxLooks").innerHTML = LOOKS.map(([k, l]) => `<button class="chip" data-look="${k}">${l}</button>`).join("");
+$("fxAdj").innerHTML = ADJ.map(([k, l]) =>
+  `<label>${l} <b data-adjval="${k}"></b><input type="range" dir="ltr" data-adj="${k}" min="-100" max="100" step="1"></label>`).join("");
+// التغييرات اللي بتغيّر طول القطعة أو علاماتها لازم ترسم التايم لاين تاني
+const fxInput = (key, apply) => {
+  const run = editorInput(key, apply);
+  return (e) => { run(e); renderTimeline(); };
+};
+const setSpeed = (c, v) => {
+  v = clamp(Math.round(v * 100) / 100, 0.25, 4);
+  if (c.reverse && (clipOut(c) - c.start) > REV_MAX) c.reverse = false;
+  c.speed = v;
+};
+$("fxSpeedChips").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-speed]");
+  if (b) fxInput("speed", (c) => setSpeed(c, Number(b.dataset.speed)))();
+});
+$("fxSpeed").addEventListener("input", fxInput("speed", (c) => setSpeed(c, 2 ** (Number($("fxSpeed").value) / 100))));
+$("fxReverse").addEventListener("change", fxInput("rev", (c) => {
+  c.reverse = $("fxReverse").checked && (clipOut(c) - c.start) <= REV_MAX;
+}));
+$("fxFit").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-fit]");
+  if (b) editorInput(null, (c) => (c.fit = b.dataset.fit === "fill" ? "" : b.dataset.fit))();
+});
+$("fxLooks").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-look]");
+  if (b) fxInput(null, (c) => (c.look = b.dataset.look))();
+});
+$("fxAdj").addEventListener("input", (e) => {
+  const k = e.target.dataset.adj;
+  if (k) fxInput("adj-" + k, (c) => (c.adj = { ...(c.adj || {}), [k]: Number(e.target.value) }))();
+});
+$("fxAdj").addEventListener("dblclick", (e) => {
+  const k = e.target.dataset.adj;
+  if (k) fxInput(null, (c) => (c.adj = { ...(c.adj || {}), [k]: 0 }))();
+});
+$("fxRotate").onclick = editorInput(null, (c) => (c.rotate = ((c.rotate || 0) + 90) % 360));
+$("fxFlipH").onclick = editorInput(null, (c) => (c.flip_h = !c.flip_h));
+$("fxFlipV").onclick = editorInput(null, (c) => (c.flip_v = !c.flip_v));
+$("fxFadeIn").addEventListener("input", fxInput("fadein", (c) => (c.fade_in = Number($("fxFadeIn").value) / 100)));
+$("fxFadeOut").addEventListener("input", fxInput("fadeout", (c) => (c.fade_out = Number($("fxFadeOut").value) / 100)));
+$("fxReset").onclick = fxInput(null, (c) => Object.assign(c, {
+  speed: 1, reverse: false, flip_h: false, flip_v: false, rotate: 0, adj: {}, look: "", fade_in: 0, fade_out: 0, fit: "",
+}));
+function renderFx(c) {
+  const sp = clipSpeed(c), a = c.adj || {}, fit = c.fit || "fill";
+  $("speedVal").textContent = `${sp}x`;
+  $("fxSpeed").value = Math.round(Math.log2(sp) * 100);
+  document.querySelectorAll("#fxSpeedChips [data-speed]").forEach((b) => b.classList.toggle("on", Number(b.dataset.speed) === sp));
+  const longSrc = clipOut(c) - c.start > REV_MAX;
+  $("fxReverse").checked = !!c.reverse;
+  $("fxReverse").disabled = longSrc && !c.reverse;
+  $("revNote").textContent = longSrc ? `(للقطع الأقصر من ${REV_MAX} ثانية بس)` : "";
+  document.querySelectorAll("#fxFit [data-fit]").forEach((b) => b.classList.toggle("on", b.dataset.fit === fit));
+  document.querySelectorAll("#fxLooks [data-look]").forEach((b) => b.classList.toggle("on", b.dataset.look === (c.look || "")));
+  $("fxRotate").textContent = `⟳ لف 90°${c.rotate ? ` (${c.rotate}°)` : ""}`;
+  $("fxFlipH").classList.toggle("on", !!c.flip_h);
+  $("fxFlipV").classList.toggle("on", !!c.flip_v);
+  ADJ.forEach(([k]) => {
+    const v = a[k] || 0;
+    document.querySelector(`[data-adj="${k}"]`).value = v;
+    document.querySelector(`[data-adjval="${k}"]`).textContent = v ? (v > 0 ? `+${v}` : v) : "";
+  });
+  $("fxFadeIn").value = Math.round((c.fade_in || 0) * 100);
+  $("fxFadeOut").value = Math.round((c.fade_out || 0) * 100);
+  $("fadeInVal").textContent = c.fade_in ? `${c.fade_in.toFixed(2)}ث` : "";
+  $("fadeOutVal").textContent = c.fade_out ? `${c.fade_out.toFixed(2)}ث` : "";
+}
 
 // ---------- المدرب والصوت ----------
 function renderSide() {
