@@ -55,7 +55,7 @@
     "qr", "codetag", "toolbar", "terminal", "scan",
     "toasts", "footer", "marquee", "datestrip",
     "fileicon", "chaos",
-    "gradword", "meshprompt", "orbsplit", "bento", "figdays", "figcurve", "figplay", "figequal", "figwords", "figphone", "figdrop", "figcount", "figgears", "figbar", "figcheck", "figcta", "goldcap", "iconbelt", "glowsweep", "namepill", "kashida", "molecule", "weightstack", "stretch", "desatpop", "arcs", "chrome", "inkverse", "poemfade", "hashend", "flipverb", "strobe", "duoline", "capstack", "pillword", "blurduo", "tagstack", "underbars", "contactcard", "iconorbit", "blurstrobe", "kinstack", "incall", "cineband", "scriptover", "tricolor", "drumpicker", "redmix", "headbubble", "pincard", "emojifloat", "slotreel", "posterwall", "quoteline", "medallion", "clockhand", "roadtext", "markpan", "objectquote", "racechart", "calflip", "glosscards", "dropword", "tasklens", "monostack", "dashbox", "sparklist", "followbtn", "silhouette", "petalstack", "followcount", "twopillars", "cutmat", "labelbox", "stampcard", "lcdtype", "genpanel", "holopulse", "coverflow", "featuretag", "luxmix", "goldframes", "goldrows", "tilegrid", "goldpill", "holoclock", "curvewall", "newsscan", "neonvenn", "wavebelt", "cardarc", "shadowquote", "haloring", "noirtitle", "stickerstack", "graphhop", "podium", "hudcallout", "termbar", "glowtoggle", "pinkdoodle", "lensfind", "echostack", "dofwords", "portalchat", "cardframe", "wordvoid", "facecam", "spreadcaps", "tinysub"]);
+    "gradword", "meshprompt", "orbsplit", "bento", "figdays", "figcurve", "figplay", "figequal", "figwords", "figphone", "figdrop", "figcount", "figgears", "figbar", "figcheck", "figcta", "goldcap", "iconbelt", "glowsweep", "namepill", "kashida", "molecule", "weightstack", "stretch", "desatpop", "arcs", "chrome", "inkverse", "poemfade", "hashend", "flipverb", "strobe", "duoline", "capstack", "pillword", "blurduo", "tagstack", "underbars", "contactcard", "iconorbit", "blurstrobe", "kinstack", "incall", "cineband", "scriptover", "tricolor", "drumpicker", "redmix", "headbubble", "pincard", "emojifloat", "slotreel", "posterwall", "quoteline", "medallion", "clockhand", "roadtext", "markpan", "objectquote", "racechart", "calflip", "glosscards", "dropword", "tasklens", "monostack", "dashbox", "sparklist", "followbtn", "silhouette", "petalstack", "followcount", "twopillars", "cutmat", "labelbox", "stampcard", "lcdtype", "genpanel", "holopulse", "coverflow", "featuretag", "luxmix", "goldframes", "goldrows", "tilegrid", "goldpill", "holoclock", "curvewall", "newsscan", "neonvenn", "wavebelt", "cardarc", "shadowquote", "haloring", "noirtitle", "stickerstack", "graphhop", "podium", "hudcallout", "termbar", "glowtoggle", "pinkdoodle", "lensfind", "echostack", "dofwords", "portalchat", "cardframe", "wordvoid", "facecam", "spreadcaps", "tinysub", "ringword", "handcap", "blobcam", "brushbar"]);
   E.TYPING = new Set(["type", "artype"]);
   const MC = document.createElement("canvas").getContext("2d");
   const measure = (s, font) => { MC.font = font; return MC.measureText(s).width; };
@@ -7869,5 +7869,50 @@
     let g = grp[0]; for (const x of grp) if (t >= x[0].t0 - 0.05) g = x;
     const s = g.map((x) => this.text(x.w)).join(" "), ff = AR.test(s) ? famOf(s) : "'TY Outfit', 'SM Tajawal'", z = mn * 0.022 * this.ts;
     return `<div dir="${this.dir(s)}" style="position:absolute;left:${(w * 0.08).toFixed(1)}px;right:${(w * 0.08).toFixed(1)}px;top:${(h * 0.8).toFixed(1)}px;text-align:center;font:600 ${z.toFixed(1)}px ${ff};letter-spacing:.12em;text-transform:uppercase;color:#F4F1EC;text-shadow:0 1px 6px rgba(0,0,0,.7);${blurIn(t, g[0].t0 - 0.05, 0.25)}">${esc(s)}</div>`;
+  };
+  // ======== r40 «علم نفس دافي» — كلمة بيضا تقيلة وحلقة إيد بتلف حواليها، كابشن بخط إيد، الفيديو جوه بقعة على ورق كريمي وكلام أزرق تقيل، وضربة فرشة زرقا عليها كلام ========
+  const BLUE40 = "#2E6FC4", CREAM40 = "#F8F5EC";
+  const handOf = (s) => (AR.test(s) ? "'TY Ruqaa', 'SM Tajawal'" : "'TY Rock', 'TY Pen'");
+  // ---------- ringword: كلمة كابيتال بيضا تقيلة (focus) قدام الشخص وحلقة إيد بيضا بتلف حواليها (نص الحلقة ورا الكلمة)، والباقي كابشن بخط إيد تحت بيتكتب
+  P.k_ringword = function (b, t, k, th, bi) {
+    const P = figParts(this, { ...b, focus: b.focus >= 0 ? b.focus : 0 }); if (!P.it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h), main = this.text(P.main.w), cap = P.J([...P.kick, ...P.tail].filter((x) => t >= x.t0 - 0.05)), ff = famOf(main);
+    const hd = this.headAt(t), y = hd.has ? clamp(hd.y + hd.r * 1.5, h * 0.3, h * 0.7) : h * 0.45, z = fitSize(main.toUpperCase(), `800 {}px ${ff}`, w * 0.5, mn * 0.11 * this.ts);
+    const mw = measure(main.toUpperCase(), `800 ${z}px ${ff}`), rx = mw * 0.72 + z * 0.55, ry = z * 0.8, sp = (t - b.t0) * 1.6, rp = eOut(seg(t, P.main.t0, P.main.t0 + 0.6));
+    const path = (front) => { const pts = []; for (let i = 0; i <= 64; i++) { const a = (i / 64) * Math.PI * 2 * rp + sp; pts.push([w / 2 + Math.cos(a) * rx, y + Math.sin(a) * ry * (1 + 0.08 * Math.sin(a * 3)), Math.sin(a) > 0]); }
+      let d = "", on = false; pts.forEach(([x, yy, f]) => { if (f === front) { d += `${on ? "L" : "M"}${x.toFixed(1)} ${yy.toFixed(1)} `; on = true; } else on = false; }); return d; };
+    const sv = (front) => `<svg style="position:absolute;inset:0" width="${w}" height="${h}"><path d="${path(front)}" stroke="rgba(255,255,255,.92)" stroke-width="${(mn * 0.006).toFixed(1)}" fill="none" stroke-linecap="round"/><path d="${path(front)}" stroke="rgba(255,255,255,.5)" stroke-width="${(mn * 0.003).toFixed(1)}" fill="none" transform="translate(0 ${(mn * 0.01).toFixed(1)})"/></svg>`;
+    const q = eBack(seg(t, P.main.t0 - 0.05, P.main.t0 + 0.25)), cz = mn * 0.045 * this.ts;
+    return sv(false) + `<div dir="${this.dir(main)}" style="position:absolute;left:0;right:0;top:${(y - z * 0.6).toFixed(1)}px;text-align:center;font:800 ${z.toFixed(1)}px ${ff};color:#fff;text-transform:uppercase;text-shadow:0 3px 14px rgba(0,0,0,.4);transform:scale(${clamp(q, 0, 1.2).toFixed(3)})">${esc(main)}</div>` + sv(true) +
+      (cap ? `<div dir="${this.dir(cap)}" style="position:absolute;left:${(w * 0.08).toFixed(1)}px;right:${(w * 0.08).toFixed(1)}px;top:${(y + z * 1.1).toFixed(1)}px;text-align:center;font:400 ${cz.toFixed(1)}px ${handOf(cap)};color:#fff;line-height:1.4;text-shadow:0 2px 8px rgba(0,0,0,.55)">${esc(cap)}</div>` : "");
+  };
+  // ---------- handcap: كابشن بخط إيد أبيض تحت (أو فوق لو الشخص تحت)، الكلام بيتجمّع سطرين سطرين وبيتمسح لما الجملة تخلص
+  P.k_handcap = function (b, t, k, th, bi) {
+    const it = this.items(b); if (!it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h), per = 5, grp = []; for (let i = 0; i < it.length; i += per) grp.push(it.slice(i, i + per));
+    let g = grp[0]; for (const x of grp) if (t >= x[0].t0 - 0.05) g = x;
+    const s = g.filter((x) => t >= x.t0 - 0.05).map((x) => this.text(x.w)).join(" "), z = mn * (AR.test(g.map((x) => this.text(x.w)).join("")) ? 0.065 : 0.05) * this.ts, hd = this.headAt(t), y = hd.has && hd.y > h * 0.55 ? h * 0.18 : h * 0.72;
+    return `<div dir="${this.dir(s)}" style="position:absolute;left:${(w * 0.08).toFixed(1)}px;right:${(w * 0.08).toFixed(1)}px;top:${y.toFixed(1)}px;text-align:center;font:400 ${z.toFixed(1)}px ${handOf(s)};color:#fff;line-height:1.4;text-shadow:0 2px 8px rgba(0,0,0,.6)">${esc(s)}</div>`;
+  };
+  // ---------- blobcam: ورق كريمي والفيديو باين جوه بقعة شكلها بيتغير ببطء فوق، وتحتها الكلام أزرق تقيل بيتجمّع كلمة كلمة سطرين
+  P.k_blobcam = function (b, t, k, th, bi) {
+    const it = this.items(b); if (!it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h), cx = w / 2, cy = h * 0.36, R = Math.min(w * 0.36, h * 0.2) * lerp(1.6, 1, eOut(seg(t, b.t0, b.t0 + 0.5))), ph = (t - b.t0) * 1.2;
+    let d = ""; for (let i = 0; i <= 48; i++) { const a = (i / 48) * Math.PI * 2, rr = R * (1 + 0.06 * Math.sin(a * 3 + ph) + 0.04 * Math.cos(a * 2 - ph * 0.7)); d += `${i ? "L" : "M"}${(cx + Math.cos(a) * rr * 0.92).toFixed(1)} ${(cy + Math.sin(a) * rr * 1.1).toFixed(1)}`; }
+    const shown = it.filter((x) => t >= x.t0 - 0.05).slice(-4), half = Math.ceil(shown.length / 2), L1 = shown.slice(0, half).map((x) => this.text(x.w)).join(" "), L2 = shown.slice(half).map((x) => this.text(x.w)).join(" ");
+    const ff = famOf(L1 + L2), z = Math.min(mn * 0.085 * this.ts, fitSize(L1 || "a", `800 {}px ${ff}`, w * 0.84, mn * 0.085 * this.ts), L2 ? fitSize(L2, `800 {}px ${ff}`, w * 0.84, mn * 0.085 * this.ts) : 1e9);
+    return `<svg style="position:absolute;inset:0" width="${w}" height="${h}"><defs><mask id="bc${bi}"><rect width="${w}" height="${h}" fill="#fff"/><path d="${d}Z" fill="#000"/></mask></defs><rect width="${w}" height="${h}" fill="${onVideo(this) ? CREAM40 : CREAM40}" mask="url(#bc${bi})"/>${onVideo(this) ? "" : `<path d="${d}Z" fill="#8A9BB0"/>`}</svg>
+      <div dir="${this.dir(L1 + L2)}" style="position:absolute;left:0;right:0;top:${(cy + R * 1.25).toFixed(1)}px;text-align:center;font:800 ${z.toFixed(1)}px ${ff};color:${BLUE40};line-height:${AR.test(L1) ? 1.35 : 1.02};letter-spacing:-0.01em"><div>${esc(L1)}</div><div>${esc(L2)}</div></div>`;
+  };
+  // ---------- brushbar: ورق كريمي وضربة فرشة زرقا بحواف خشنة بتتمسح من الشمال، وعليها كلام أبيض تقيل سطرين بيظهر مع الكلام
+  P.k_brushbar = function (b, t, k, th, bi) {
+    const it = this.items(b); if (!it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h), y = h * (0.38 + (bi % 3) * 0.06), bh = mn * 0.34, p = eOut(seg(t, b.t0, b.t0 + 0.45)), out = eOut(seg(t, b.t1 - 0.3, b.t1));
+    const r = rng(9 + bi); let edge = `M0 ${(y - bh / 2).toFixed(1)}`; for (let x = 0; x <= w * 1.05; x += w / 30) edge += ` L${x.toFixed(1)} ${(y - bh / 2 + (r() - 0.5) * bh * 0.08).toFixed(1)}`;
+    for (let x = w * 1.05; x >= 0; x -= w / 30) edge += ` L${x.toFixed(1)} ${(y + bh / 2 + (r() - 0.5) * bh * 0.1).toFixed(1)}`;
+    const shown = it.filter((x) => t >= x.t0 - 0.05).slice(-4), half = Math.ceil(shown.length / 2), L1 = shown.slice(0, half).map((x) => this.text(x.w)).join(" "), L2 = shown.slice(half).map((x) => this.text(x.w)).join(" ");
+    const ff = famOf(L1 + L2), z = Math.min(bh * 0.32, fitSize(L1 || "a", `800 {}px ${ff}`, w * 0.8, bh * 0.32), L2 ? fitSize(L2, `800 {}px ${ff}`, w * 0.8, bh * 0.32) : 1e9);
+    return `<div style="position:absolute;inset:0;background:${CREAM40}"></div><svg style="position:absolute;inset:0" width="${w}" height="${h}"><defs><clipPath id="bb${bi}"><rect x="${(w * 0.04 + out * w).toFixed(1)}" y="0" width="${(w * p).toFixed(1)}" height="${h}"/></clipPath></defs><g clip-path="url(#bb${bi})"><path d="${edge}Z" fill="${BLUE40}"/><path d="M${(w * 0.5).toFixed(0)} ${(y + bh * 0.05).toFixed(0)} H${w}" stroke="rgba(255,255,255,.18)" stroke-width="2"/></g></svg>
+      <div dir="${this.dir(L1 + L2)}" style="position:absolute;left:0;right:0;top:${(y - z * 1.1).toFixed(1)}px;text-align:center;font:800 ${z.toFixed(1)}px ${ff};color:#fff;line-height:1.05;opacity:${(1 - out).toFixed(2)}"><div>${esc(L1)}</div><div>${esc(L2)}</div></div>`;
   };
 })();
