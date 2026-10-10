@@ -55,7 +55,7 @@
     "qr", "codetag", "toolbar", "terminal", "scan",
     "toasts", "footer", "marquee", "datestrip",
     "fileicon", "chaos",
-    "gradword", "meshprompt", "orbsplit", "bento", "figdays", "figcurve", "figplay", "figequal", "figwords", "figphone", "figdrop", "figcount", "figgears", "figbar", "figcheck", "figcta", "goldcap", "iconbelt", "glowsweep", "namepill", "kashida", "molecule", "weightstack", "stretch", "desatpop", "arcs", "chrome", "inkverse", "poemfade", "hashend", "flipverb", "strobe", "duoline", "capstack", "pillword", "blurduo", "tagstack", "underbars", "contactcard", "iconorbit", "blurstrobe", "kinstack", "incall", "cineband", "scriptover", "tricolor", "drumpicker"]);
+    "gradword", "meshprompt", "orbsplit", "bento", "figdays", "figcurve", "figplay", "figequal", "figwords", "figphone", "figdrop", "figcount", "figgears", "figbar", "figcheck", "figcta", "goldcap", "iconbelt", "glowsweep", "namepill", "kashida", "molecule", "weightstack", "stretch", "desatpop", "arcs", "chrome", "inkverse", "poemfade", "hashend", "flipverb", "strobe", "duoline", "capstack", "pillword", "blurduo", "tagstack", "underbars", "contactcard", "iconorbit", "blurstrobe", "kinstack", "incall", "cineband", "scriptover", "tricolor", "drumpicker", "redmix", "headbubble", "pincard", "emojifloat", "slotreel"]);
   E.TYPING = new Set(["type", "artype"]);
   const MC = document.createElement("canvas").getContext("2d");
   const measure = (s, font) => { MC.font = font; return MC.measureText(s).width; };
@@ -6888,5 +6888,87 @@
       rows += `<div dir="${this.dir(s)}" style="position:absolute;${ar ? "right" : "left"}:${(w * 0.12).toFixed(1)}px;top:${(cy + y - z * 0.6).toFixed(1)}px;white-space:nowrap;font:800 ${z.toFixed(1)}px ${ff};line-height:1.2;color:${cur ? col : `rgba(${hx},.55)`};filter:blur(${(cur ? 0 : 1.5 + ad * 1.4).toFixed(1)}px);transform:scale(${sc.toFixed(3)});transform-origin:${ar ? "right" : "left"} center;opacity:${clamp(1.2 - ad / 4).toFixed(2)}">${esc(s)}</div>`; }
     return `<div style="position:absolute;inset:0;background:#030303"></div><div style="position:absolute;inset:0;transform:rotate(${rot}deg)">${rows}</div>
       <svg style="position:absolute;${ar ? "right" : "left"}:${(w * 0.04).toFixed(1)}px;top:${(cy - z * 0.18).toFixed(1)}px" width="${(z * 0.36).toFixed(0)}" height="${(z * 0.36).toFixed(0)}" viewBox="0 0 10 10">${bi % PAL.length ? `<path d="${ar ? "M9 5H1M5 1L1 5l4 4" : "M1 5h8M5 1l4 4-4 4"}" stroke="${col}" stroke-width="1.4" fill="none"/>` : `<path d="${ar ? "M8 1L2 5l6 4z" : "M2 1l6 4-6 4z"}" fill="${col}"/>`}</svg>`;
+  };
+  // ======== r15 «أحمر وكريمي» — كلام صغير أسود وكلمات كبيرة حمرا متدرّجة، دايرة نور مكان الراس، كارت متعلّق بدبوس، وإيموجي كبير طافي ========
+  const RED15 = "#E0141E";
+  // ---------- redmix: الكلام متدرّج لتحت ولليمين؛ كلمات الربط صغيرة والكلمات المهمة كبيرة حمرا (منوّرة لو الخلفية غامقة)
+  P.k_redmix = function (b, t, k, th, bi) {
+    const it = this.items(b); if (!it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h), dark = bi % 2 === 1, ar = AR.test(it.map((x) => this.text(x.w)).join(" "));
+    const lines = []; let cur = [];
+    for (const x of it) { const s = this.text(x.w), sm = SMALLW.has(s.toLowerCase().replace(/[.,!?؟،]/g, "")); cur.push({ x, s, sm }); if (!sm) { lines.push(cur); cur = []; } }
+    if (cur.length) { if (lines.length) lines[lines.length - 1].push(...cur); else lines.push(cur); }
+    const big = mn * 0.11 * this.ts * 0.85, ff = famOf(ar ? "ع" : "a");
+    let html = onVideo(this) ? `<div style="position:absolute;inset:0;background:radial-gradient(ellipse at 50% 45%,rgba(0,0,0,.25),rgba(0,0,0,.75))"></div>` : `<div style="position:absolute;inset:0;background:${dark ? "radial-gradient(ellipse at 50% 45%,#1A1A1A,#000 70%)" : "#FBF6F1"}"></div>`;
+    const lh = big * (ar ? 1.45 : 1.08), hd = this.headAt((b.t0 + b.t1) / 2), cyy = (hd.has && hd.y < h * 0.5) || (!hd.has && onVideo(this)) ? h * 0.66 : h * 0.4;
+    const ink = dark || onVideo(this) ? "#fff" : "#141414", y0 = cyy - lines.length * lh / 2;
+    lines.forEach((ln, j) => { const sh = (j - (lines.length - 1) / 2) * w * 0.07 * (ar ? -1 : 1);
+      html += `<div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:0;right:0;top:${(y0 + j * lh).toFixed(1)}px;text-align:center;white-space:nowrap;transform:translateX(${sh.toFixed(1)}px);font:800 ${big.toFixed(1)}px ${ff};line-height:1.1">${ln.map(({ x, s, sm }) => { const q = seg(t, x.t0 - 0.05, x.t0 + 0.25), e = eOut(q);
+        return sm ? `<span style="display:inline-block;font:500 ${(big * 0.42).toFixed(1)}px ${famOf(s)};color:${ink};opacity:${clamp(q * 2).toFixed(2)};vertical-align:${(big * 0.12).toFixed(0)}px">${esc(s)}</span>`
+          : `<span style="display:inline-block;color:${RED15};letter-spacing:-0.02em;opacity:${clamp(q * 2).toFixed(2)};filter:blur(${((1 - e) * 6).toFixed(1)}px);transform:scale(${lerp(1.15, 1, e).toFixed(3)});${dark || onVideo(this) ? `text-shadow:0 0 ${(big * 0.25).toFixed(0)}px rgba(224,20,30,.75)` : ""}">${esc(s)}</span>`; }).join(" ")}</div>`; });
+    return html;
+  };
+  // ---------- headbubble: دايرة نور بيضا بتغطي راس الشخص وجواها سؤال (سطر صغير أسود وكلمة حمرا كبيرة)، والكادر حواليها بيغمق
+  P.k_headbubble = function (b, t, k, th, bi) {
+    const P = figParts(this, { ...b, focus: b.focus >= 0 ? b.focus : this.items(b).length - 1 }); if (!P.it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h), hd = this.headAt(t);
+    const R = Math.max(hd.r * 1.9, mn * 0.2), cx = hd.x, cy = hd.has ? hd.y - hd.r * 0.15 : h * 0.3, p = eBack(seg(t, b.t0, b.t0 + 0.35));
+    const top = P.J(P.kick.filter((x) => t >= x.t0 - 0.05)), main = t >= P.main.t0 - 0.05 ? this.text(P.main.w) : "", ff = famOf(top + main);
+    const z = Math.min(fitSize(main || "a", `800 {}px ${ff}`, R * 1.6, R * 0.42), R * 0.42), z2 = Math.min(z * 0.6, fitSize(top || "a", `400 {}px ${ff}`, R * 1.5, z * 0.6));
+    return `<div style="position:absolute;inset:0;background:radial-gradient(circle at ${cx.toFixed(0)}px ${cy.toFixed(0)}px,transparent ${(R * 1.1).toFixed(0)}px,rgba(0,0,0,.7) ${(R * 2.4).toFixed(0)}px)"></div>
+      <div style="position:absolute;left:${(cx - R).toFixed(1)}px;top:${(cy - R).toFixed(1)}px;width:${(R * 2).toFixed(1)}px;height:${(R * 2).toFixed(1)}px;border-radius:50%;background:radial-gradient(circle at 45% 40%,#fff,#F3F3F3 70%,#E8E8E8);box-shadow:0 0 ${(R * 0.5).toFixed(0)}px rgba(255,255,255,.75);transform:scale(${p.toFixed(3)});display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.05" dir="${this.dir(top + main)}">
+        <div style="font:400 ${z2.toFixed(1)}px ${ff};color:#222;white-space:nowrap">${esc(top)}</div><div style="font:800 ${z.toFixed(1)}px ${ff};color:${RED15};white-space:nowrap;${blurIn(t, P.main.t0 - 0.05)}">${esc(main)}</div></div>`;
+  };
+  // ---------- pincard: كارت رمادي متعلّق بدبوس أحمر وبيتمرجح، عنوانه كبير بخط تحته، والبنود بأيقونات بتطلع واحد واحد
+  P.k_pincard = function (b, t, k, th, bi) {
+    const P = figParts(this, { ...b, focus: b.focus >= 0 ? b.focus : 0 }); if (!P.it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h);
+    const title = P.J(P.it.slice(0, P.fi + 1)), items = P.tail, ar = AR.test(title + P.J(items)), ff = famOf(title);
+    const cw = Math.min(w * 0.56, mn * 0.62), ch = cw * 1.3, cx = w / 2, cy = h * 0.45, sw = Math.sin((t - b.t0) * 2.4) * 2.5 * (1 - seg(t, b.t0 + 1.5, b.t0 + 3));
+    const drop = eBack(seg(t, b.t0, b.t0 + 0.4)), z = fitSize(title, `600 {}px ${ff}`, cw * 0.8, cw * 0.2), iz = cw * 0.1;
+    const ICO = [`<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><path d="M3 3l18 18"/>`, `<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><path d="M3 3l18 18"/>`, `<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M3 3l18 18"/>`, `<circle cx="12" cy="12" r="9"/><path d="M8 12h8"/>`];
+    let html = `<div style="position:absolute;inset:0;background:#FBF6F1"></div><svg style="position:absolute;inset:0" width="${w}" height="${h}"><path d="M${(w * 0.25).toFixed(0)} -20 C ${(w * 0.05).toFixed(0)} ${(h * 0.35).toFixed(0)}, ${(w * 1.1).toFixed(0)} ${(h * 0.55).toFixed(0)}, ${(w * 0.6).toFixed(0)} ${(h + 20).toFixed(0)}" stroke="#CFCFCF" stroke-width="${(mn * 0.11).toFixed(0)}" fill="none"/></svg>`;
+    html += `<div style="position:absolute;left:${(cx - cw / 2).toFixed(1)}px;top:${(cy - ch / 2).toFixed(1)}px;width:${cw.toFixed(1)}px;height:${ch.toFixed(1)}px;background:linear-gradient(180deg,#9E9E9E,#8A8A8A);box-shadow:0 ${(mn * 0.02).toFixed(0)}px ${(mn * 0.04).toFixed(0)}px rgba(0,0,0,.25);transform-origin:50% 0;transform:translateY(${((1 - drop) * -h * 0.3).toFixed(1)}px) rotate(${sw.toFixed(2)}deg)" dir="${ar ? "rtl" : "ltr"}">
+      <i style="position:absolute;left:50%;top:${(-cw * 0.04).toFixed(1)}px;width:${(cw * 0.1).toFixed(1)}px;height:${(cw * 0.1).toFixed(1)}px;margin-left:${(-cw * 0.05).toFixed(1)}px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#FF6B6B,#C3121B 60%,#7A0A10);box-shadow:0 3px 6px rgba(0,0,0,.35)"></i>
+      <div style="position:absolute;left:8%;right:8%;top:12%;text-align:center;font:600 ${z.toFixed(1)}px ${ff};color:#fff;white-space:nowrap">${esc(title)}</div>
+      <i style="position:absolute;left:10%;right:10%;top:${(ch * 0.12 + z * 1.3).toFixed(1)}px;height:2px;background:rgba(255,255,255,.85)"></i>
+      ${items.map((x, i) => { const a = eOut(seg(t, Math.max(x.t0, b.t0 + 0.5 + i * 0.12) - 0.05, Math.max(x.t0, b.t0 + 0.5 + i * 0.12) + 0.25)), s = this.text(x.w);
+        return `<div style="position:absolute;${ar ? "right" : "left"}:10%;top:${(ch * 0.12 + z * 1.6 + i * iz * 2.1).toFixed(1)}px;display:flex;align-items:center;gap:${(iz * 0.5).toFixed(1)}px;opacity:${a.toFixed(2)};font:500 ${iz.toFixed(1)}px ${famOf(s)};color:#F4F4F4;white-space:nowrap"><svg width="${(iz * 1.2).toFixed(0)}" height="${(iz * 1.2).toFixed(0)}" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round">${ICO[i % ICO.length]}</svg>${esc(s)}</div>`; }).join("")}</div>`;
+    return html;
+  };
+  // ---------- emojifloat: إيموجي كبير بينط في النص ونسخ مغبّشة منه طايرة في الأركان، وطريق رمادي مقوّس وراه، والكلام فوقه مايل وآخر كلمة حمرا
+  P.k_emojifloat = function (b, t, k, th, bi) {
+    const it = this.items(b); if (!it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h);
+    const all = it.map((x) => this.text(x.w)).join(" "), em = emojiOf(all) || ["🤡", "😎", "🤯", "🫠"][bi % 4];
+    const ez = mn * 0.45, bob = Math.sin((t - b.t0) * 3) * mn * 0.012, pop = eBack(seg(t, b.t0, b.t0 + 0.4)), rot = Math.sin((t - b.t0) * 1.6) * 6;
+    let html = `<div style="position:absolute;inset:0;background:#FBF6F1"></div><svg style="position:absolute;inset:0" width="${w}" height="${h}"><path d="M${(w * 0.7).toFixed(0)} -20 C ${(w * 0.1).toFixed(0)} ${(h * 0.3).toFixed(0)}, ${(w * 0.2).toFixed(0)} ${(h * 0.7).toFixed(0)}, ${(w * 0.9).toFixed(0)} ${(h + 20).toFixed(0)}" stroke="#C9C9C9" stroke-width="${(mn * 0.1).toFixed(0)}" fill="none"/></svg>`;
+    [[0.92, 0.08, 1.1], [0.1, 0.88, 1.3], [0.05, 0.12, 0.8]].forEach(([x, y, s], i) => { html += `<div style="position:absolute;left:${(x * w).toFixed(0)}px;top:${(y * h).toFixed(0)}px;transform:translate(-50%,-50%) rotate(${(rot * (i + 1)).toFixed(1)}deg);font-size:${(ez * s).toFixed(0)}px;filter:blur(${(mn * 0.012).toFixed(0)}px);opacity:.6;font-family:'Noto Color Emoji',sans-serif">${em}</div>`; });
+    html += `<div style="position:absolute;left:50%;top:${(h * 0.5 + bob).toFixed(1)}px;transform:translate(-50%,-50%) scale(${pop.toFixed(3)}) rotate(${rot.toFixed(1)}deg);font-size:${ez.toFixed(0)}px;line-height:1;font-family:'Noto Color Emoji',sans-serif;filter:drop-shadow(0 ${(mn * 0.02).toFixed(0)}px ${(mn * 0.03).toFixed(0)}px rgba(0,0,0,.25))">${em}</div>`;
+    const ff = famOf(all), z = fitSize(all, `800 {}px ${ff}`, w * 0.84, mn * 0.11 * this.ts), tilt = (bi % 2 ? 1 : -1) * 8 * eOut(seg(t, it[it.length - 1].t0, it[it.length - 1].t0 + 0.3));
+    html += `<div dir="${this.dir(all)}" style="position:absolute;left:0;right:0;top:${(h * 0.5 - ez * 0.75 - z).toFixed(1)}px;text-align:center;white-space:nowrap;font:800 ${z.toFixed(1)}px ${ff};transform:rotate(${tilt.toFixed(1)}deg)">${it.map((x, i) => { const last = i === it.length - 1 && it.length > 1, q = seg(t, x.t0 - 0.05, x.t0 + 0.2);
+      return `<span style="display:inline-block;color:${last ? RED15 : "#141414"};font-weight:${last ? 800 : 500};${last ? "" : `font-size:${(z * 0.62).toFixed(1)}px;`}opacity:${clamp(q * 2).toFixed(2)};transform:scale(${lerp(1.3, 1, eOut(q)).toFixed(3)})">${esc(this.text(x.w))}</span>`; }).join(" ")}</div>`;
+    return html;
+  };
+  // ======== r16 «سلوت» — جملة بتتكتب بمؤشر أحمر، وجنبها عمود خدمات بيلف زي ماكينة السلوت وبيقف على خدمة خدمة ========
+  P.k_slotreel = function (b, t, k, th, bi) {
+    const P = figParts(this, { ...b, focus: b.focus >= 0 ? b.focus : Math.min(1, this.items(b).length - 1) }); if (!P.it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h);
+    const pre = P.J(P.it.slice(0, P.fi + 1)), items = P.tail.map((x) => this.text(x.w)), ar = AR.test(pre + items.join(" "));
+    const ff = famOf(pre), iw = Math.max(...items.map((s) => measure(s, `600 100px ${famOf(s)}`)), 1) / 100, pw0 = measure(pre, `800 100px ${ff}`) / 100;
+    const z = Math.min(mn * 0.085 * this.ts, (w * 0.86) / (pw0 + 0.35 + iw * 0.7)), iz = z * 0.7;
+    const typedS = typed(pre, t, b.t0, 14), caret = typedS.length < [...pre].length || (Math.floor(t * 2.5) % 2 === 0 && t < (P.tail[0]?.t0 ?? b.t1));
+    // مكان البكرة: بتلف بسرعة قبل كل خدمة وبتقف عليها بنطة صغيرة
+    let pos = -1; P.tail.forEach((x, i) => { if (t >= x.t0 - 0.35) { const q = seg(t, x.t0 - 0.35, x.t0 + 0.05); pos = i - 1 + eBack(q) + 0 * q; } });
+    const spin = P.tail.some((x) => t > x.t0 - 0.35 && t < x.t0 - 0.02);
+    const pw = measure(pre, `800 ${z}px ${ff}`), gap = z * 0.35, total = pw + gap + Math.max(...items.map((s) => measure(s, `600 ${iz}px ${famOf(s)}`)), 0);
+    const x0 = (w - total) / 2, cy = h * 0.4, row = iz * 1.35;
+    let html = `<div style="position:absolute;inset:0;background:radial-gradient(ellipse at 85% 95%,#2A0508,#050505 55%)"></div>`;
+    html += `<div dir="${this.dir(pre)}" style="position:absolute;${ar ? "right" : "left"}:${x0.toFixed(1)}px;top:${(cy - z * 0.6).toFixed(1)}px;font:800 ${z.toFixed(1)}px ${ff};color:#fff;white-space:nowrap">${esc(typedS)}<span style="display:inline-block;width:${(z * 0.08).toFixed(1)}px;height:${(z * 0.9).toFixed(1)}px;margin:0 ${(z * 0.05).toFixed(1)}px;background:#E0141E;vertical-align:middle;opacity:${caret ? 1 : 0}"></span></div>`;
+    if (items.length && pos > -1) { let reel = "";
+      for (let d = -2; d <= 2; d++) { const ii = Math.round(pos) + d; if (ii < 0 || ii >= items.length) continue; const fr = ii - pos, s = items[ii];
+        reel += `<div dir="${this.dir(s)}" style="position:absolute;${ar ? "right" : "left"}:0;top:${(row * 1.5 + fr * row - iz * 0.6).toFixed(1)}px;font:600 ${iz.toFixed(1)}px ${famOf(s)};color:#fff;white-space:nowrap;opacity:${clamp(1 - Math.abs(fr) * 0.55).toFixed(2)};filter:blur(${(spin ? iz * 0.08 : Math.abs(fr) * 1.5).toFixed(1)}px)">${esc(s)}</div>`; }
+      html += `<div style="position:absolute;${ar ? "right" : "left"}:${(x0 + pw + gap).toFixed(1)}px;top:${(cy - row * 1.5).toFixed(1)}px;width:${(w * 0.6).toFixed(1)}px;height:${(row * 3).toFixed(1)}px;overflow:hidden;-webkit-mask:linear-gradient(transparent,#000 30%,#000 70%,transparent);mask:linear-gradient(transparent,#000 30%,#000 70%,transparent)">${reel}</div>`; }
+    return html;
   };
 })();
