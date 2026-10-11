@@ -183,14 +183,21 @@ const NH = (() => {
   }
   slots[0].innerHTML = stageHTML("");
   GL?.show("app");
-  let leaveT;
+  // الماوس لما يعدّي على مربع في طريقه لمربع تاني مش بيغيّر المجسّم (عشان ميبقاش فيه تقطيع)
+  let leaveT, hoverT;
   bento.addEventListener("pointerover", (e) => {
     const line = e.target.closest(".nh-line"), tile = e.target.closest(".nh-tile");
     if (!tile && !line) return;
     clearTimeout(leaveT);
-    setStage(line ? "f:" + line.dataset.folder : tile.dataset.id);
+    clearTimeout(hoverT);
+    const key = line ? "f:" + line.dataset.folder : tile.dataset.id;
+    hoverT = setTimeout(() => setStage(key), 110);
   });
-  bento.addEventListener("pointerout", (e) => { if (!e.relatedTarget?.closest?.(".nh-tile, .nh-line")) leaveT = setTimeout(() => setStage(""), 260); });
+  bento.addEventListener("pointerout", (e) => {
+    if (e.relatedTarget?.closest?.(".nh-tile, .nh-line")) return;
+    clearTimeout(hoverT);
+    leaveT = setTimeout(() => setStage(""), 500);
+  });
   bento.addEventListener("focusin", (e) => { const l = e.target.closest(".nh-line"), t = e.target.closest(".nh-tile"); if (l || t) setStage(l ? "f:" + l.dataset.folder : t.dataset.id); });
 
   // ---------- اللايت والدارك ----------
