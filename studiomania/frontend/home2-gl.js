@@ -77,9 +77,11 @@ window.NHGL = (stage, getClient) => {
 
   let dark = true, tint = "#b9bcc8";
   const glass = () => new THREE.MeshPhysicalMaterial({
-    color: 0xffffff, metalness: 0, roughness: .02, transmission: 1, thickness: 2, ior: 1.5,
-    clearcoat: 1, clearcoatRoughness: .02, specularIntensity: 1, envMapIntensity: 2.1,
-    attenuationColor: new THREE.Color(tint), attenuationDistance: 5.5, transparent: true, opacity: 1,
+    color: 0xffffff, metalness: 0, roughness: 0, transmission: 1, thickness: 1.2, ior: 1.33,
+    clearcoat: 1, clearcoatRoughness: 0, specularIntensity: 1, envMapIntensity: 2.6,
+    // لمعة قوس قزح خفيفة على السطح (زي جلد الجيليفيش) + لون خفيف جدًا جوه الأجزاء التخينة
+    iridescence: .55, iridescenceIOR: 1.3, iridescenceThicknessRange: [180, 520],
+    attenuationColor: new THREE.Color(tint), attenuationDistance: 1.6, transparent: true, opacity: 1,
   });
 
   // ---------- shapes
@@ -155,98 +157,48 @@ window.NHGL = (stage, getClient) => {
     return plane;
   }
 
-  // ---------- the brain: dark fibres bursting from a core, grown inside the glass (like the jellyfish)
-  function pip(poly, x, y) {
-    let c = false;
-    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-      const a = poly[i], b = poly[j];
-      if ((a.y > y) !== (b.y > y) && x < ((b.x - a.x) * (y - a.y)) / (b.y - a.y) + a.x) c = !c;
+  // ---------- الهيكل: خط رفيع بيمشي جوه الزجاج على شكل المجسّم نفسه (زي الهيكل اللي بيبان جوه الجيليفيش)
+  const coreMat = new THREE.MeshStandardMaterial({ color: 0xf2f4fa, roughness: .3, metalness: 0, emissive: 0x8a93a8, emissiveIntensity: .25 });   // معتم عشان يبان من ورا الزجاج
+  function inset(poly, d, hole) {   // يزق كل نقطة لجوه المادة بمسافة d (للفتحة: لبرّه الفتحة)
+    let area = 0;
+    for (let i = 0; i < poly.length; i++) { const p = poly[i], q = poly[(i + 1) % poly.length]; area += p.x * q.y - q.x * p.y; }
+    const sgn = (area > 0 ? 1 : -1) * (hole ? -1 : 1), n = poly.length, out = [];
+    for (let i = 0; i < n; i++) {
+      const p = poly[(i - 1 + n) % n], c = poly[i], q = poly[(i + 1) % n];
+      const e1 = new THREE.Vector2(c.x - p.x, c.y - p.y).normalize(), e2 = new THREE.Vector2(q.x - c.x, q.y - c.y).normalize();
+      const nrm = new THREE.Vector2(-(e1.y + e2.y), e1.x + e2.x).normalize().multiplyScalar(sgn);
+      const k = Math.min(2.2, 1 / Math.max(.35, (1 + e1.dot(e2)) / 2) ** .5);
+      out.push(new THREE.Vector3(c.x + nrm.x * d * k, c.y + nrm.y * d * k, 0));
     }
-    return c;
+    return out;
   }
-  const RING = [[1, 0], [.7, .7], [0, 1], [-.7, .7], [-1, 0], [-.7, -.7], [0, -1], [.7, -.7]];
-  function inside(S, p, m) {
-    if (S.kind === "sphere") return p.length() < S.r - m;
-    if (S.kind === "capsule") return Math.hypot(p.x, p.y - Math.max(-S.h, Math.min(S.h, p.y)), p.z) < S.r - m;
-    if (Math.abs(p.z) > S.z - m * .6) return false;
-    const x = p.x + S.ox, y = p.y + S.oy;
-    const ok = (u, v) => pip(S.outer, u, v) && !S.holes.some((h) => pip(h, u, v));
-    return ok(x, y) && RING.every(([dx, dy]) => ok(x + dx * m, y + dy * m));
-  }
-  function rng(seed) { return () => { seed |= 0; seed = (seed + 0x6d2b79f5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
-  const BRAIN_A = new THREE.Color("#000000"), BRAIN_B = new THREE.Color("#d9dee8");
-  const coreMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .42, metalness: .2, envMapIntensity: 1.1 });
-  function brain(geo, budget, seed) {
-    const S = geo.userData.solid;
-    geo.computeBoundingBox();
-    const bb = geo.boundingBox, size = bb.getSize(new THREE.Vector3()), R = rng(seed);
-    const at = () => new THREE.Vector3(bb.min.x + R() * size.x, bb.min.y + R() * size.y, bb.min.z + R() * size.z);
-    const pts = [];
-    for (let i = 0; i < 3000 && pts.length < 260; i++) { const p = at(); if (inside(S, p, .15)) pts.push(p); }
-    if (pts.length < 6) return null;
-    const mid = bb.getCenter(new THREE.Vector3());
-    pts.sort((a, b) => a.distanceTo(mid) - b.distanceTo(mid));
-    const centers = [pts[0]];
-    while (centers.length < 6) {   // مراكز متباعدة: في الحلقة والشكل الطويل المخ بيتوزّع على طوله
-      let best = null, bd = 0;
-      for (const p of pts) { const d = Math.min(...centers.map((c) => c.distanceTo(p))); if (d > bd) { bd = d; best = p; } }
-      if (bd < .8) break;
-      centers.push(best);
+  function skeleton(geo) {
+    const S = geo.userData.solid, curves = [];
+    if (S.kind === "shape") {
+      const thick = Math.min(.16, S.z * .4);
+      [[S.outer, false], ...S.holes.map((h) => [h, true])].forEach(([poly, hole]) => {
+        const pts = inset(poly, thick, hole).map((v) => v.set(v.x - S.ox, v.y - S.oy, 0));
+        if (pts.length > 2) { const path = new THREE.CurvePath(); pts.forEach((v, i) => path.add(new THREE.LineCurve3(v, pts[(i + 1) % pts.length]))); path.closed = true; curves.push(path); }   // خطوط مستقيمة بين النقط: من غير لفّات عند الزوايا
+      });
+    } else if (S.kind === "sphere") {
+      const r = S.r * .62;
+      [0, Math.PI / 2].forEach((rot) => curves.push(new THREE.CatmullRomCurve3(Array.from({ length: 24 }, (_, i) => { const a = i / 24 * Math.PI * 2; return new THREE.Vector3(Math.cos(a) * r * Math.cos(rot), Math.sin(a) * r, Math.cos(a) * r * Math.sin(rot)); }), true)));
+    } else if (S.kind === "capsule") {
+      curves.push(new THREE.CatmullRomCurve3([new THREE.Vector3(0, -S.h, 0), new THREE.Vector3(0, S.h, 0)], false));
     }
-    const segs = [], STEP = .036;
-    function grow(p, dir, key, len, r0, depth, c) {
-      for (let i = 0; i < len; i++) {
-        dir.x += (R() - .5) * .5; dir.y += (R() - .5) * .5; dir.z += (R() - .5) * .3;
-        dir.addScaledVector(p.clone().sub(c).normalize(), .12).normalize();
-        const q = p.clone().addScaledVector(dir, STEP);
-        if (!inside(S, q, .06)) return;
-        const f = i / len, r = r0 * Math.pow(1 - f, .9) + .004;
-        segs.push({ a: p, b: q, ra: r, rb: r0 * Math.pow(1 - (i + 1) / len, .9) + .004, k: key + i });
-        if (depth < 2 && R() < .07) grow(q.clone(), dir.clone().add(new THREE.Vector3(R() - .5, R() - .5, (R() - .5) * .5)).normalize(), key + i + 1, Math.floor((len - i) * .7), r * .8, depth + 1, c);
-        p = q;
-      }
-    }
-    const per = Math.max(14, Math.round(budget / centers.length));
-    centers.forEach((c) => {
-      for (let n = 0; n < per; n++) {
-        const d = new THREE.Vector3(R() - .5, R() - .5, (R() - .5) * .5).normalize();
-        grow(c.clone().addScaledVector(d, R() * .05), d, 0, 16 + Math.floor(R() * 26), .036 + R() * .016, 0, c);
-      }
-    });
-    if (!segs.length) return null;
-    segs.sort((a, b) => a.k - b.k);
-    const maxK = segs[segs.length - 1].k, n = segs.length;
-    const pos = new Float32Array(n * 18), nor = new Float32Array(n * 18), col = new Float32Array(n * 18), idx = new Uint32Array(n * 18), ends = new Uint32Array(maxK + 2);
-    const u = new THREE.Vector3(), v = new THREE.Vector3(), w = new THREE.Vector3(), ax = new THREE.Vector3(), tmp = new THREE.Color();
-    segs.forEach((sg, i) => {
-      ax.subVectors(sg.b, sg.a).normalize();
-      u.set(Math.abs(ax.y) < .9 ? 0 : 1, Math.abs(ax.y) < .9 ? 1 : 0, 0).cross(ax).normalize();
-      v.crossVectors(ax, u);
-      for (let e = 0; e < 2; e++) {
-        const c = e ? sg.b : sg.a, r = e ? sg.rb : sg.ra, t = Math.min(1, (sg.k + e) / Math.max(18, maxK * .8));
-        tmp.copy(BRAIN_A).lerp(BRAIN_B, Math.pow(t, 1.6));
-        for (let s = 0; s < 3; s++) {
-          const an = (s / 3) * Math.PI * 2;
-          w.copy(u).multiplyScalar(Math.cos(an)).addScaledVector(v, Math.sin(an));
-          const o = (i * 6 + e * 3 + s) * 3;
-          pos[o] = c.x + w.x * r; pos[o + 1] = c.y + w.y * r; pos[o + 2] = c.z + w.z * r;
-          nor[o] = w.x; nor[o + 1] = w.y; nor[o + 2] = w.z;
-          col[o] = tmp.r; col[o + 1] = tmp.g; col[o + 2] = tmp.b;
-        }
-      }
-      for (let s = 0; s < 3; s++) {
-        const a0 = i * 6 + s, a1 = i * 6 + ((s + 1) % 3), b0 = a0 + 3, b1 = a1 + 3, o = i * 18 + s * 6;
-        idx[o] = a0; idx[o + 1] = b0; idx[o + 2] = a1; idx[o + 3] = a1; idx[o + 4] = b0; idx[o + 5] = b1;
-      }
-      ends[sg.k + 1] = (i + 1) * 18;
-    });
-    for (let k = 1; k < ends.length; k++) ends[k] = Math.max(ends[k], ends[k - 1]);
+    if (!curves.length) return null;
+    const geos = curves.map((c) => new THREE.TubeGeometry(c, Math.max(24, Math.round(c.getLength() * 40)), .022, 6, !!c.closed));
+    // دمج الأنابيب في جيومتري واحد، والرسم بيكبر على طولها (نفس حركة «بيكبر» بتاعة الدخول)
+    let nIdx = 0, nPos = 0; geos.forEach((g) => { nIdx += g.index.count; nPos += g.attributes.position.count; });
+    const pos = new Float32Array(nPos * 3), nor = new Float32Array(nPos * 3), idx = new Uint32Array(nIdx);
+    let po = 0, io = 0;
+    geos.forEach((g) => { pos.set(g.attributes.position.array, po * 3); nor.set(g.attributes.normal.array, po * 3); for (let i = 0; i < g.index.count; i++) idx[io + i] = g.index.array[i] + po; po += g.attributes.position.count; io += g.index.count; g.dispose(); });
     const g = new THREE.BufferGeometry();
-    g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
-    g.setAttribute("normal", new THREE.BufferAttribute(nor, 3));
-    g.setAttribute("color", new THREE.BufferAttribute(col, 3));
-    g.setIndex(new THREE.BufferAttribute(idx, 1));
+    g.setAttribute("position", new THREE.BufferAttribute(pos, 3)); g.setAttribute("normal", new THREE.BufferAttribute(nor, 3)); g.setIndex(new THREE.BufferAttribute(idx, 1));
+    const STEPS = 48, ends = new Uint32Array(STEPS);
+    for (let i = 0; i < STEPS; i++) ends[i] = Math.floor((nIdx / 3) * (i / (STEPS - 1))) * 3;
     const mesh = new THREE.Mesh(g, coreMat);
+    mesh.renderOrder = -1;
     mesh.userData.ends = ends;
     return mesh;
   }
@@ -345,7 +297,6 @@ window.NHGL = (stage, getClient) => {
   });
   const RIM = () => (dark ? .6 : .38);
   const cache = {};
-  const BRAINS = 320;   // عدد الألياف في كل أيقونة (بتتقسم على أجزائها حسب حجمها)
   function group(key) {
     if (cache[key]) return cache[key];
     const m = glass(), g = new THREE.Group();
@@ -360,11 +311,8 @@ window.NHGL = (stage, getClient) => {
     g.children.filter((o) => o.isMesh && o.material === m).forEach((o) => o.add(new THREE.Mesh(o.geometry, rim)));
     g.userData.cores = [];
     if (key !== "brand") {
-      const solids = g.children.filter((o) => o.geometry?.userData.solid);
-      const vol = solids.map((o) => { o.geometry.computeBoundingBox(); const s3 = o.geometry.boundingBox.getSize(new THREE.Vector3()); return s3.x * s3.y * s3.z; });
-      const all = vol.reduce((a, b) => a + b, 0) || 1;
-      solids.forEach((o, i) => {
-        const b = brain(o.geometry, BRAINS * vol[i] / all, key.length * 97 + i * 13);
+      g.children.filter((o) => o.geometry?.userData.solid).forEach((o) => {
+        const b = skeleton(o.geometry);
         if (b) { o.add(b); g.userData.cores.push(b); }
       });
     }
@@ -418,10 +366,11 @@ window.NHGL = (stage, getClient) => {
 
   function theme(isDark) {
     dark = isDark;
-    tint = isDark ? "#b9bcc8" : "#b8c8f0";   // دارك: زجاج مدخّن · لايت: زجاج أبيض مزرق (زي الجيليفيش في المرجع)
+    tint = isDark ? "#aebce0" : "#7fa2ec";   // دارك: زجاج مدخّن · لايت: زجاج أبيض مزرق (زي الجيليفيش في المرجع)
     scene.environment = envMap(isDark);
     paintBackdrop(isDark);
     Object.values(cache).forEach((g) => { g.userData.mats.forEach((m) => { if (m.attenuationColor) m.attenuationColor.set(tint); }); g.userData.rim.uniforms.c.value.set(isDark ? "#ffffff" : "#1b2233"); });
+    coreMat.color.set(isDark ? "#eef1f8" : "#55607a"); coreMat.emissive.set(isDark ? "#8a93a8" : "#000000");
     resize();
     frame();
   }
