@@ -640,6 +640,9 @@
                   <label class="field">المدرب <select id="mCoach"></select></label>
               <label class="check"><input type="checkbox" id="mOutro"> ضيف الأوترو في الآخر <span class="muted" id="outroInfo"></span></label>
               <label class="field slider-field">صوت الأوترو <b id="outroVolVal"></b><input type="range" id="mOutroVol" min="0" max="200" step="5" dir="ltr"></label>
+              <h3 class="pane-h">🏷️ إنترو وأوترو البراند</h3>
+              <label class="check"><input type="checkbox" id="mBrandIntro"> إنترو البراند في الأول <span class="muted" id="brandIntroInfo"></span></label>
+              <label class="check"><input type="checkbox" id="mBrandOutro"> أوترو البراند في الآخر <span class="muted" id="brandOutroInfo"></span></label>
 
               <h3 class="pane-h" id="secVoice">🎙️ التعليق الصوتي</h3>
               <div class="voice-sync" id="voiceSync" hidden></div>
@@ -837,7 +840,7 @@
                 <div class="post-video" id="postVideo"><span class="muted">اختار فيديو من الفولدر (دوس 📅 جدول)</span></div>
                 <label class="field">الكابشن
                   <textarea id="postCaption" rows="4" placeholder="الكلام اللي هينزل مع الفيديو، والهاشتاجات"></textarea></label>
-                <div class="loc-row"><button type="button" class="btn sm" id="addRiyadh" title="Zernio مش بيدعم تحديد مكان البوست، فبنكتبه في الكابشن">📍 ضيف «الرياض» للكابشن</button></div>
+                <div class="loc-row"><button type="button" class="btn sm" id="brandCaption" title="الكابشن الافتراضي من عقل البراند (مع الـ CTA واللينك)">✨ كابشن البراند</button> <button type="button" class="btn sm" id="addRiyadh" title="Zernio مش بيدعم تحديد مكان البوست، فبنكتبه في الكابشن">📍 ضيف «الرياض» للكابشن</button></div>
                 <div class="field">المنصات <div class="platforms" id="postPlatforms"></div></div>
 
                 <div class="post-extra" id="igOpts" hidden>
@@ -1485,20 +1488,25 @@
                   <span class="muted" id="adBrainState"></span>
                 </div>
                 <div id="adBrainBody">
+                  <div class="tabs" id="brainTabs">
+                    <button type="button" data-btab="id" class="active">🪪 الهوية</button>
+                    <button type="button" data-btab="style">🎨 الستايل</button>
+                    <button type="button" data-btab="rules">📜 قواعد المحتوى</button>
+                    <button type="button" data-btab="deliver">📦 التسليم</button>
+                  </div>
+                  <div data-bpane="id">
                   <div class="ad-set-grid">
                     <label class="field">الاسم <input type="text" data-bn="name"></label>
                     <label class="field">نوع المنتج
                       <select data-bf="type"><option value="app">📱 تطبيق موبايل</option><option value="physical">📦 منتج ملموس</option><option value="service">🤝 خدمة</option></select></label>
-                    <label class="field">المجال <input type="text" data-bf="domain" placeholder="مثلًا: لياقة، مطاعم، عقارات"></label>
+                    <label class="field">المجال (النيش) <input type="text" data-bf="domain" placeholder="مثلًا: لياقة، مطاعم، عقارات"></label>
                   </div>
                   <label class="field">عن المنتج <textarea rows="2" data-bf="about"></textarea></label>
                   <label class="field">الجمهور <textarea rows="2" data-bf="audience"></textarea></label>
                   <div class="ad-set-grid">
                     <label class="field">السوق <input type="text" data-bf="market" placeholder="مثلًا: السعودية والخليج"></label>
                     <label class="field">اللغة واللهجة <input type="text" data-bf="language" placeholder="مثلًا: اللهجة السعودية البيضاء"></label>
-                    <label class="field">لبس محتشم دايمًا <select data-bf="modest"><option value="">لأ</option><option value="1">أيوه</option></select></label>
                   </div>
-                  <label class="field">قواعد لازم تتراعى في أي محتوى <textarea rows="2" data-bf="rules" placeholder="مثلًا: اللوجو دايمًا في الآخر، من غير وعود مبالغ فيها"></textarea></label>
 
                   <h3 class="pane-h">🏷️ اللوجو</h3>
                   <div class="row wrap"><label class="btn sm primary">⬆ ارفع اللوجو<input type="file" accept="image/*" multiple data-bup="logos" hidden></label></div>
@@ -1535,6 +1543,50 @@
                   <label class="field">مكان اللوجو <input type="text" data-bf="logo_rule" placeholder="مثلًا: اللوجو صغير في نفس الركن في كل السلايدات"></label>
                   <label class="field">شكل الواجهة (بالإنجليزي للبرومبتات) <textarea rows="3" data-bf="ui_style" dir="ltr"></textarea></label>
                   <label class="field">وصف اللوجو <textarea rows="2" data-bf="logo_description" dir="ltr"></textarea></label>
+                  </div>
+
+                  <div data-bpane="style" hidden>
+                    <p class="hint">اختار الستايلات اللي البراند بيشتغل بيها (واحد أو أكتر). اللي عليه ⭐ هو الافتراضي في صفحة «اعمل»، والباقي بيظهر في الأول قبل كل الستايلات.</p>
+                    <div class="brain-styles" id="brainStyles"></div>
+                  </div>
+
+                  <div data-bpane="rules" hidden>
+                    <p class="hint">اكتب بكلامك أي قاعدة لازم تتراعى في كل حاجة البرنامج بيعملها للبراند ده: السكريبتات، الصور، الفيديوهات، والصوت. مثلًا: «البنات محجبات ولبسهم واسع»، «من غير مزيكا»، «من غير وعود مبالغ فيها».</p>
+                    <label class="field">قواعد المحتوى <textarea rows="8" data-bf="rules" placeholder="اكتب القواعد هنا، كل قاعدة في سطر"></textarea></label>
+                  </div>
+
+                  <div data-bpane="deliver" hidden>
+                    <div class="ad-set-grid">
+                      <label class="field">اللوجو على الفيديو <select data-bf="logo_on"><option value="">✅ أيوه</option><option value="0">لأ</option></select></label>
+                    </div>
+                    <div class="brain-vids">
+                      <div class="brain-vid" data-bvid="intro">
+                        <h3 class="pane-h">🎬 إنترو البراند</h3>
+                        <p class="hint">بيتحط في أول كل فيديو لو متفعّل.</p>
+                        <div class="brain-vid-box"></div>
+                        <div class="row wrap">
+                          <label class="btn sm primary">⬆ ارفع فيديو<input type="file" accept="video/*" data-bvup="intro" hidden></label>
+                          <label class="field inline">مفعّل <select data-bf="intro_on"><option value="1">✅ أيوه</option><option value="">لأ</option></select></label>
+                          <button class="btn sm danger" type="button" data-bvdel="intro">🗑️ شيله</button>
+                        </div>
+                      </div>
+                      <div class="brain-vid" data-bvid="outro">
+                        <h3 class="pane-h">🏁 أوترو البراند</h3>
+                        <p class="hint">بيتحط في آخر كل فيديو لو متفعّل (بعد أوترو الشخصية لو فيه).</p>
+                        <div class="brain-vid-box"></div>
+                        <div class="row wrap">
+                          <label class="btn sm primary">⬆ ارفع فيديو<input type="file" accept="video/*" data-bvup="outro" hidden></label>
+                          <label class="field inline">مفعّل <select data-bf="outro_on"><option value="1">✅ أيوه</option><option value="">لأ</option></select></label>
+                          <button class="btn sm danger" type="button" data-bvdel="outro">🗑️ شيله</button>
+                        </div>
+                      </div>
+                    </div>
+                    <p class="hint">تقدر تشيل الإنترو أو الأوترو من أي مشروع لوحده من المونتاج.</p>
+                    <label class="field">الـ CTA الافتراضي <input type="text" data-bf="cta" placeholder="مثلًا: حمّل التطبيق دلوقتي"></label>
+                    <label class="field">اللينك <input type="text" data-bf="link" dir="ltr" placeholder="https://..."></label>
+                    <label class="field">الكابشن الافتراضي <textarea rows="4" data-bf="caption" placeholder="{caption}&#10;&#10;{cta} 👇&#10;{link}&#10;#هاشتاج"></textarea></label>
+                    <p class="hint">{caption} = كابشن الفيديو نفسه · {cta} = الـ CTA · {link} = اللينك. الكابشن ده بيتحط لوحده وقت النشر.</p>
+                  </div>
                 </div>
               </div>
             </section>
@@ -1638,8 +1690,7 @@
       <label class="field">مكان اللوجو <input type="text" data-b="logo_rule"></label>
       <label class="field">السوق <input type="text" data-b="market" placeholder="مثلًا: السعودية والخليج، أو مصر"></label>
       <label class="field">اللغة واللهجة <input type="text" data-b="language" placeholder="مثلًا: اللهجة السعودية البيضاء، أو العامية المصرية"></label>
-      <label class="field">لبس محتشم في كل الصور والفيديوهات <select data-b="modest"><option value="">لأ</option><option value="1">أيوه</option></select></label>
-      <label class="field">قواعد لازم تتراعى <textarea rows="2" data-b="rules"></textarea></label>
+      <label class="field">قواعد المحتوى (بتتطبق على كل السكريبتات والصور والفيديوهات والصوت) <textarea rows="4" data-b="rules" placeholder="مثلًا: البنات محجبات، من غير مزيكا"></textarea></label>
     </div>
     <div>
       <div class="field">اللوجو <div class="brand-logo" id="brandLogo"></div><span class="hint">أول لوجو في ملف العميل (وهو نفسه لوجو المونتاج).</span></div>

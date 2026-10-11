@@ -2731,6 +2731,13 @@ function renderSide() {
   $("mOutroVol").value = Math.round(ov * 100);
   $("outroVolVal").textContent = `${Math.round(ov * 100)}%`;
 
+  for (const [k, id] of [["intro", "mBrandIntro"], ["outro", "mBrandOutro"]]) {
+    const has = !!clientx.cur?.[`${k}_url`];
+    $(id).disabled = !has;
+    $(id).checked = has && d[`brand_${k}`] !== false;
+    $(`brand${k[0].toUpperCase()}${k.slice(1)}Info`).textContent = has ? "" : "(البراند مالوش، أو مقفول من عقل البراند)";
+  }
+
   $("mVoice").value = d.voice?.id || "";
   $("voiceOpts").hidden = !d.voice;
   renderVoiceSync();
@@ -2772,6 +2779,8 @@ $("mOutro").addEventListener("change", sideInput(null, (d) => {
   else d.clips = d.clips.filter((c) => !isOutroClip(c));
   d.outro = false;
 }));
+$("mBrandIntro").addEventListener("change", sideInput(null, (d) => { d.brand_intro = $("mBrandIntro").checked; }));
+$("mBrandOutro").addEventListener("change", sideInput(null, (d) => { d.brand_outro = $("mBrandOutro").checked; }));
 $("mOutroVol").addEventListener("input", sideInput("outroVol", (d) => {
   d.outro_volume = $("mOutroVol").value / 100;
   d.clips.filter(isOutroClip).forEach((c) => (c.volume = d.outro_volume));

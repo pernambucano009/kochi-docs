@@ -2183,6 +2183,8 @@ class ProjectIn(BaseModel):
     music: TrackEdit | None = None
     outro: bool = True
     outro_volume: float = 1.0
+    brand_intro: bool = True    # إنترو البراند (من عقل البراند) في أول الفيديو
+    brand_outro: bool = True    # أوترو البراند في آخر الفيديو
     captions: dict = {}  # {enabled, template, font, size, y, words, color, highlight, ...}
     logo: dict = {}  # {enabled, size, x, y, opacity, on_outro}
     section: str | None = None  # المونتاج بتاع أنهي قسم: coach (فيديوهات المدربين) / series / ads
@@ -2399,6 +2401,12 @@ def build_montage(conn: sqlite3.Connection, data: dict):
                 montage.Segment(path, 0, info.duration, volume=clamp(data.get("outro_volume", 1), 0, 3), has_audio=info.has_audio)
             )
             outro_len = info.duration
+    # 🎬 أوترو البراند (من عقل البراند): بينزل لوحده في الآخر لو متفعّل، والمشروع يقدر يشيله.
+    # (إنترو البراند بيتركّب قدّام الفيديو بعد التصدير، عشان الصوت والكابشن والعناصر مايتزحزحوش)
+    if data.get("brand_outro", True) and (p := brand_video("outro")):
+        info = media_info(p)
+        segments.append(montage.Segment(p, 0, info.duration, has_audio=info.has_audio, bg=project_bg(data)))
+        outro_len += info.duration
 
     def track(t: dict | None, kind: str) -> list[montage.AudioTrack]:
         if not t or track_flag(data, kind, "mute"):
@@ -2425,6 +2433,8 @@ def build_montage(conn: sqlite3.Connection, data: dict):
 
 def project_logo(data: dict, total: float, outro_len: float) -> montage.Logo | None:
     cfg = {**LOGO_DEFAULTS, **(data.get("logo") or {})}
+    if "enabled" not in (data.get("logo") or {}):   # الديفولت من عقل البراند (اللوجو على كل الفيديوهات ولا لأ)
+        cfg["enabled"] = (active_client() or {}).get("logo_on") != "0"
     path = logo_path()
     if not cfg["enabled"] or not path:
         return None
@@ -2721,7 +2731,26 @@ def run_ffmpeg(cmd: list[str], project_id: str, length: float, pct: tuple[int, i
     return proc.returncode, stderr
 
 
-def run_render(project_id: str, export_id: str, cmds: list[list[str]], total: float, name: str, work_dir: Path, typo_id: str | None = None, base_url: str = "", typo_click_vol: float = 0.0, scene_id: str | None = None) -> None:
+def prepend_intro(main: Path, intro: Path) -> float:
+    """🎬 إنترو البراند قدّام الفيديو المتصدّر (بنفس المقاس والسرعة). بيرجّع طول الإنترو."""
+    mi, ii = media_info(main), media_info(intro)
+    W, H = mi.width // 2 * 2, mi.height // 2 * 2
+    tmp = main.with_name(main.stem + "_i.mp4")
+    a0 = "[0:a]aresample=48000,aformat=channel_layouts=stereo[a0];" if ii.has_audio else f"anullsrc=r=48000:cl=stereo,atrim=0:{ii.duration:.3f}[a0];"
+    a1 = "[1:a]aresample=48000,aformat=channel_layouts=stereo[a1];" if mi.has_audio else f"anullsrc=r=48000:cl=stereo,atrim=0:{mi.duration:.3f}[a1];"
+    fl = (f"[0:v]scale={W}:{H}:force_original_aspect_ratio=decrease,pad={W}:{H}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30,format=yuv420p[v0];"
+          f"[1:v]scale={W}:{H},setsar=1,fps=30,format=yuv420p[v1];{a0}{a1}[v0][a0][v1][a1]concat=n=2:v=1:a=1[v][a]")
+    r = subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(intro), "-i", str(main), "-filter_complex", fl,
+                        "-map", "[v]", "-map", "[a]", "-c:v", "libx264", "-preset", "veryfast", "-crf", "19", "-c:a", "aac", "-b:a", "192k",
+                        "-movflags", "+faststart", str(tmp)], capture_output=True, text=True, timeout=1800)
+    if r.returncode != 0:
+        tmp.unlink(missing_ok=True)
+        raise RuntimeError(f"تركيب إنترو البراند فشل: {r.stderr.strip()[-300:]}")
+    tmp.replace(main)
+    return ii.duration
+
+
+def run_render(project_id: str, export_id: str, cmds: list[list[str]], total: float, name: str, work_dir: Path, typo_id: str | None = None, base_url: str = "", typo_click_vol: float = 0.0, scene_id: str | None = None, intro: Path | None = None) -> None:
     filename = f"{export_id}.mp4"
     error = None
     RENDER_LOG.write_text("", encoding="utf-8")
@@ -2777,6 +2806,9 @@ def run_render(project_id: str, export_id: str, cmds: list[list[str]], total: fl
                     vid.with_name("video_t.mp4").replace(vid)
         if project_id in RENDER_CANCELLED:
             error = "إنت لغيت التصدير."
+        elif intro is not None and intro.exists():
+            RENDER_ACTIVE[project_id] = "🎬 بيحط إنترو البراند"
+            total += prepend_intro(EXPORTS_DIR / filename, intro)
     except Exception as exc:  # أي مشكلة غير متوقعة لازم تظهر، مش يفضل «بيصدّر» على طول
         error = f"حصلت مشكلة أثناء التصدير: {exc}"
         log_render(f"مشكلة: {exc!r}")
@@ -2864,7 +2896,8 @@ def start_render(conn: sqlite3.Connection, row: sqlite3.Row, project_id: str, da
     sid = data.get("typo_id") if data.get("typo_id") and (TYPO_PROJ / Path(data["typo_id"]).name / "typo.json").exists() else None
     if montage.canvas_size() != (montage.WIDTH, montage.HEIGHT):
         sid = None  # المشهد (الخلفية الجديدة والحاجات اللي اتشالت) معمول على 9:16 بس
-    render_executor.submit(run_render, project_id, export_id, cmd, total, row["name"], work_dir, tid, f"http://127.0.0.1:{port}", click, sid)
+    intro = brand_video("intro") if data.get("brand_intro", True) else None
+    render_executor.submit(run_render, project_id, export_id, cmd, total, row["name"], work_dir, tid, f"http://127.0.0.1:{port}", click, sid, intro)
     return {"ok": True, "duration": total}
 
 
@@ -6782,7 +6815,10 @@ def run_ad_adapt(aid: str) -> None:
 
 BRAIN_KINDS = ("screens", "logos", "products", "characters", "sets", "props")
 BRAIN_FIELDS = ("type", "domain", "about", "audience", "rules", "palette", "theme", "typography", "ui_style", "logo_description",
-                "style", "market", "language", "logo_rule", "modest")
+                "style", "market", "language", "logo_rule", "modest",
+                # 🧠 عقل البراند: الستايلات (أول واحد هو الديفولت) والتسليم (اللوجو، الإنترو والأوترو، الـ CTA، الكابشن الثابت واللينك)
+                "styles", "logo_on", "intro_on", "outro_on", "cta", "caption", "link")
+BRAND_VIDEOS = ("intro", "outro")
 BRAIN_LOCK = threading.Lock()
 
 
@@ -6813,6 +6849,9 @@ def brain_to_dict(b: dict) -> dict:
     base = f"/media/ads/brains/{b['id']}"
     out = {k: b.get(k, "") for k in ("id", "name", "created_at", *BRAIN_FIELDS)}
     out.update(status=b.get("status", "idle"), error=b.get("error"))
+    for kind in BRAND_VIDEOS:   # إنترو وأوترو البراند (فيديو)
+        f = b.get(f"{kind}_file")
+        out[f"{kind}_url"] = f"{base}/{f}" if f and (brain_dir(b["id"]) / f).exists() else None
     for kind in BRAIN_KINDS:
         out[kind] = [{**a, "url": f"{base}/{a['file']}"} for a in b.get(kind) or []]
     return out
@@ -6876,6 +6915,7 @@ def first_client_id() -> str | None:
 
 def active_client_id() -> str | None:
     seed_brain()
+    migrate_rules()
     cid = auth.get_setting("active_client")
     if cid and brain_row(cid):
         return cid
@@ -6902,7 +6942,78 @@ def ad_brain(settings: dict | None) -> dict | None:
     return (brain_row(bid) if bid else None) or active_client()
 
 
-atlas.modesty_on = lambda: bool((active_client() or {}).get("modest"))  # اللبس المحتشم حسب ملف العميل
+atlas.modesty_on = lambda: bool((active_client() or {}).get("modest"))  # اللبس المحتشم حسب ملف العميل (قديم: بقى جوه قواعد المحتوى)
+atlas.brand_rules = lambda: str((active_client() or {}).get("rules") or "").strip()[:1500]   # قواعد المحتوى في كل برومبت
+atlas.brand_cta = lambda: str((active_client() or {}).get("cta") or "").strip()[:300]
+
+
+def migrate_rules() -> None:
+    """«لبس محتشم» كان اختيار لوحده: بقى جملة جوه «قواعد المحتوى» (مربع الكلام الحر) عشان المستخدم يكتب اللي يناسبه."""
+    if auth.get_setting("rules_v2"):
+        return
+    with closing(db()) as conn:
+        ids = [r["id"] for r in conn.execute("SELECT id FROM ad_brains")]
+    for bid in ids:
+        def fn(d):
+            if d.get("modest"):
+                line = "اللبس محتشم دايمًا: البنات لبس واسع طويل مع حجاب، والرجالة تيشيرت وبنطلون أو شورت تحت الركبة."
+                if "محتشم" not in (d.get("rules") or ""):
+                    d["rules"] = (line + " " + (d.get("rules") or "")).strip()
+                d["modest"] = ""
+        update_brain(bid, fn)
+    auth.set_setting("rules_v2", "1")
+
+
+@app.post("/api/ad-brains/{bid}/brand-video")
+def upload_brand_video(bid: str, kind: str = Form("outro"), file: UploadFile = File(...)):
+    """🎬 إنترو / أوترو البراند: بينزل لوحده في أول/آخر كل مونتاج لو متفعّل."""
+    if kind not in BRAND_VIDEOS:
+        raise HTTPException(400, "النوع لازم intro أو outro")
+    if not brain_row(bid):
+        raise HTTPException(404, "العميل ده مش موجود")
+    ext = Path(file.filename or "").suffix.lower()
+    if ext not in (".mp4", ".mov", ".webm", ".m4v"):
+        raise HTTPException(400, "ارفع فيديو (MP4 / MOV / WEBM)")
+    name = f"brand-{kind}-{uuid.uuid4().hex[:6]}{ext}"
+    dest = brain_dir(bid) / name
+    with dest.open("wb") as f:
+        shutil.copyfileobj(file.file, f)
+    try:
+        media_info(dest)
+    except Exception:
+        dest.unlink(missing_ok=True)
+        raise HTTPException(400, "الملف ده مش فيديو سليم")
+    def fn(d):
+        old = d.get(f"{kind}_file")
+        if old:
+            (brain_dir(bid) / old).unlink(missing_ok=True)
+        d[f"{kind}_file"] = name
+        d[f"{kind}_on"] = "1"
+    update_brain(bid, fn)
+    return brain_to_dict(brain_row(bid))
+
+
+@app.delete("/api/ad-brains/{bid}/brand-video/{kind}")
+def delete_brand_video(bid: str, kind: str):
+    if kind not in BRAND_VIDEOS:
+        raise HTTPException(400, "النوع لازم intro أو outro")
+    def fn(d):
+        old = d.pop(f"{kind}_file", None)
+        if old:
+            (brain_dir(bid) / old).unlink(missing_ok=True)
+        d[f"{kind}_on"] = ""
+    update_brain(bid, fn)
+    return brain_to_dict(brain_row(bid))
+
+
+def brand_video(kind: str) -> Path | None:
+    """إنترو/أوترو البراند المختار، لو متفعّل وموجود."""
+    c = active_client() or {}
+    f = c.get(f"{kind}_file")
+    if not f or not c.get(f"{kind}_on"):
+        return None
+    p = brain_dir(c["id"]) / f
+    return p if p.exists() else None
 
 
 @app.get("/api/clients")
@@ -6912,7 +7023,9 @@ def list_clients():
     out = []
     for b in list_brains():
         out.append({"id": b["id"], "name": b["name"], "domain": b.get("domain", ""),
-                    "logo": (b.get("logos") or [{}])[0].get("url"), "active": b["id"] == active})
+                    "logo": (b.get("logos") or [{}])[0].get("url"), "active": b["id"] == active,
+                    **{f"{k}_url": b.get(f"{k}_url") if b.get(f"{k}_on") else None for k in BRAND_VIDEOS},
+                    "caption": b.get("caption", ""), "cta": b.get("cta", ""), "link": b.get("link", "")})
     return {"clients": out, "active": active}
 
 

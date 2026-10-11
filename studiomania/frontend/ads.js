@@ -1336,7 +1336,47 @@ function renderBrain() {
         <button class="btn sm danger" type="button" data-bdel title="احذف">✕</button></div>`).join("")
       || `<p class="muted">لسه مفيش ${BRAIN_KIND_TITLE[kind]}.</p>`;
   }
+  for (const kind of ["intro", "outro"]) {
+    const url = b[`${kind}_url`];
+    document.querySelector(`[data-bvid="${kind}"] .brain-vid-box`).innerHTML = url
+      ? `<video src="${url}" controls preload="metadata" playsinline></video>` : `<p class="muted">لسه مفيش فيديو.</p>`;
+    document.querySelector(`[data-bvdel="${kind}"]`).hidden = !url;
+    document.querySelector(`[data-bf="${kind}_on"]`).disabled = !url;
+  }
+  renderBrainStyles(b);
 }
+
+// 🎨 ستايلات البراند: قايمة IDs بفاصلة، والأول هو الافتراضي
+const brainStyleIds = (b) => String(b.styles || "").split(",").map((x) => x.trim()).filter(Boolean);
+async function renderBrainStyles(b) {
+  const box = $("brainStyles");
+  if (!adx.tpls) {
+    box.innerHTML = `<p class="muted"><span class="spin-inline"></span> بيحمّل الستايلات...</p>`;
+    try { adx.tpls = await api("/api/templates"); } catch { adx.tpls = []; }
+    if (curBrain()?.id !== b.id) return;
+  }
+  const ids = brainStyleIds(b);
+  const pos = (t) => (ids.includes(t.id) ? ids.indexOf(t.id) : 1e9);
+  const list = [...adx.tpls].sort((x, y) => pos(x) - pos(y));
+  box.innerHTML = list.map((t) => {
+    const on = ids.includes(t.id), def = ids[0] === t.id;
+    return `<div class="brain-style${on ? " on" : ""}" data-bstyle="${adEsc(t.id)}">
+      ${t.cover_url ? `<img src="${t.cover_url}" alt="" loading="lazy">` : `<div class="brain-style-ico">${adEsc(t.icon || "🎞️")}</div>`}
+      <b data-no-i18n>${adEsc(t.icon || "")} ${adEsc(t.name)}</b>
+      <div class="row">${on ? `<button type="button" class="btn sm${def ? " primary" : ""}" data-bstar title="خليه الافتراضي">${def ? "⭐ الافتراضي" : "☆ افتراضي"}</button>` : ""}
+        <button type="button" class="btn sm" data-btoggle>${on ? "✕ شيله" : "＋ اختاره"}</button></div></div>`;
+  }).join("") || `<p class="muted">مفيش ستايلات لسه.</p>`;
+}
+function setBrainStyles(ids) {
+  return brainSave(() => bAPI("", { method: "PATCH", ...jsonBody({ fields: { styles: ids.join(",") } }) }));
+}
+$("brainTabs").addEventListener("click", (e) => {
+  const t = e.target.closest("[data-btab]");
+  if (!t) return;
+  adx.brainTab = t.dataset.btab;
+  document.querySelectorAll("#brainTabs [data-btab]").forEach((x) => x.classList.toggle("active", x === t));
+  document.querySelectorAll("#adBrainBody [data-bpane]").forEach((x) => (x.hidden = x.dataset.bpane !== adx.brainTab));
+});
 const bAPI = (path, opts) => api(`/api/ad-brains/${adx.brainId}${path}`, opts);
 async function brainSave(fn) {
   try {
@@ -1377,6 +1417,16 @@ $("adBrainBody").addEventListener("change", async (e) => {
   if (el.dataset.bn) return brainSave(() => bAPI("", { method: "PATCH", ...jsonBody({ name: el.value, fields: {} }) }));
   const item = el.closest("[data-bfile]");
   if (item && el.dataset.ba) return brainSave(() => bAPI(`/assets/${encodeURIComponent(item.dataset.bfile)}`, { method: "PATCH", ...jsonBody({ [el.dataset.ba]: el.value }) }));
+  if (el.dataset.bvup) {
+    const f = el.files[0];
+    el.value = "";
+    if (!f) return;
+    const form = new FormData();
+    form.append("kind", el.dataset.bvup);
+    form.append("file", f);
+    toast("⏳ بيرفع الفيديو...");
+    return brainSave(() => bAPI("/brand-video", { method: "POST", body: form }));
+  }
   if (el.dataset.bup) {
     const files = [...el.files].filter((f) => /\.(png|jpe?g|webp)$/i.test(f.name));
     el.value = "";
@@ -1390,6 +1440,18 @@ $("adBrainBody").addEventListener("change", async (e) => {
   }
 });
 $("adBrainBody").addEventListener("click", (e) => {
+  const vdel = e.target.closest("[data-bvdel]");
+  if (vdel) {
+    if (confirm("تشيل الفيديو ده من البراند؟")) brainSave(() => bAPI(`/brand-video/${vdel.dataset.bvdel}`, { method: "DELETE" }));
+    return;
+  }
+  const st = e.target.closest("[data-bstyle]");
+  if (st) {
+    const ids = brainStyleIds(curBrain()), id = st.dataset.bstyle;
+    if (e.target.closest("[data-bstar]")) return setBrainStyles([id, ...ids.filter((x) => x !== id)]);
+    if (e.target.closest("[data-btoggle]")) return setBrainStyles(ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]);
+    return;
+  }
   const item = e.target.closest("[data-bfile]");
   if (!item || !e.target.closest("[data-bdel]") || !confirm("تحذف الصورة دي من ملف العميل؟")) return;
   brainSave(() => bAPI(`/assets/${encodeURIComponent(item.dataset.bfile)}`, { method: "DELETE" }));

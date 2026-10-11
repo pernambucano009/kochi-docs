@@ -2117,3 +2117,12 @@ a.btn.disabled { opacity: .45; pointer-events: none; }
 .st-tpl.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--surface)); }
 .st-tpl b { font-size: 13px; }
 .st-out { width: 220px; max-width: 100%; border-radius: 12px; border: 1px solid var(--line); }
+/* 🧠 عقل البراند: ستايلات وإنترو/أوترو */
+.brain-styles { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; margin: 8px 0; }
+.brain-style { border: 1px solid var(--border, rgba(127,127,127,.25)); border-radius: 12px; padding: 8px; display: flex; flex-direction: column; gap: 6px; background: var(--surface-2); }
+.brain-style.on { outline: 2px solid var(--accent, #7fa2ec); }
+.brain-style img, .brain-style-ico { width: 100%; aspect-ratio: 9/12; object-fit: cover; border-radius: 8px; background: var(--surface); display: grid; place-items: center; font-size: 34px; }
+.brain-style b { font-size: 13px; }
+.brain-vids { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+.brain-vid-box video { width: 100%; max-height: 300px; border-radius: 10px; background: #000; }
+.field.inline { display: inline-flex; align-items: center; gap: 6px; margin: 0; }

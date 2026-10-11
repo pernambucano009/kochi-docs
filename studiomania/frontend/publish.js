@@ -79,6 +79,7 @@ $("readyGrid").addEventListener("click", async (e) => {
       pub.videoId = ex.id;
       renderReady();
       renderPostVideo();
+      if (!pub.editing && !$("postCaption").value.trim()) $("postCaption").value = brandCaption("") || "";
       $("postCaption").focus();
     }
     if (btn.dataset.act === "rename") {
@@ -189,6 +190,21 @@ $("addRiyadh").onclick = () => {
   const c = $("postCaption");
   if (!c.value.includes("📍")) c.value = `${c.value.trimEnd()}${c.value.trim() ? "\n\n" : ""}📍 الرياض`;
   c.focus();
+};
+
+// ✨ كابشن البراند: القالب بتاع عقل البراند ({caption} {cta} {link})، واللي مكتوب يتحط مكان {caption}
+function brandCaption(text) {
+  const c = clientx.cur || {};
+  const tpl = (c.caption || "").trim() || (c.cta || c.link ? "{caption}\n\n{cta}\n{link}" : "");
+  if (!tpl) return null;
+  return tpl.replaceAll("{caption}", text.trim()).replaceAll("{cta}", c.cta || "").replaceAll("{link}", c.link || "")
+    .split("\n").map((l) => l.trimEnd()).join("\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+$("brandCaption").onclick = () => {
+  const out = brandCaption($("postCaption").value);
+  if (out === null) return toast("مفيش كابشن افتراضي في عقل البراند (تاب «التسليم»)", true);
+  $("postCaption").value = out;
+  $("postCaption").focus();
 };
 
 async function loadHandles() {

@@ -99,9 +99,29 @@ def with_modesty(prompt: str) -> str:
     return prompt if MODESTY_RULE in prompt else f"{prompt.rstrip()}\n{MODESTY_RULE}"
 
 
+def brand_rules() -> str:  # البرنامج بيبدّلها بـ«قواعد المحتوى» بتاعة العميل المختار
+    return ""
+
+
+def brand_cta() -> str:  # بيتبدّل من app بالـ CTA الافتراضي للعميل
+    return ""
+
+
+RULES_HEAD = "BRAND CONTENT RULES (always follow):"
+
+
+def with_rules(prompt: str) -> str:
+    """قواعد المحتوى بتاعة البراند (اللبس، المزيكا، الممنوعات...) بتتحط في آخر أي برومبت صورة أو فيديو."""
+    prompt = with_modesty(prompt)
+    rules = (brand_rules() or "").strip()
+    if not rules or RULES_HEAD in prompt:
+        return prompt
+    return f"{prompt.rstrip()}\n{RULES_HEAD} {rules}"
+
+
 def submit_video(body: dict) -> str:
     if body.get("prompt") is not None:
-        body = {**body, "prompt": with_modesty(body["prompt"])}
+        body = {**body, "prompt": with_rules(body["prompt"])}
     with httpx.Client(timeout=60) as client:
         resp = client.post(f"{BASE_URL}/api/v1/model/generateVideo", headers=_headers(), json=body)
     data = _check(resp, "طلب التوليد")
@@ -352,6 +372,13 @@ def vision_candidates(preferred: str) -> list[str]:
 
 
 def chat(messages: list[dict], model: str, temperature: float = 0.8, max_tokens: int = 4000, json_mode: bool = False) -> str:
+    rules, cta = (brand_rules() or "").strip(), (brand_cta() or "").strip()
+    if (rules or cta) and not any(RULES_HEAD in str(m.get("content") or "") for m in messages):
+        # أي كلام بيتكتب (سكريبت، تعليق صوتي، كابشن، برومبتات مشاهد) لازم يمشي على قواعد محتوى البراند
+        sys_txt = f"{RULES_HEAD} {rules or '-'}\nApply these rules to any content you write (scripts, voice-over, captions, scene and image prompts). They do not change the requested output format."
+        if cta:
+            sys_txt += f"\nDefault call to action for this brand (use it when a CTA is needed and none is given): {cta}"
+        messages = [{"role": "system", "content": sys_txt}, *messages]
     body = {"model": model, "messages": messages, "temperature": temperature, "max_tokens": max_tokens, "stream": False}
     if json_mode:
         body["response_format"] = {"type": "json_object"}
@@ -396,11 +423,11 @@ def generate_image(family: str, prompt: str, size: str, quality: str, images: li
     """يرسم صورة ويرجّع لينكها. لو فيه صور مرجعية بيستخدم نسخة الـ edit (لحد 16 صورة)."""
     if family in ASPECT_IMAGE_MODELS:
         t2i, edit, _ = ASPECT_IMAGE_MODELS[family]
-        body = {"model": edit if images else t2i, "prompt": with_modesty(prompt[:31000]), "aspect_ratio": size_ratio(size),
+        body = {"model": edit if images else t2i, "prompt": with_rules(prompt[:30000]), "aspect_ratio": size_ratio(size),
                 "resolution": "2k" if quality == "high" else "1k"}
     else:
         t2i, edit, _ = IMAGE_MODELS.get(family) or IMAGE_MODELS["sunburst"]
-        body = {"model": edit if images else t2i, "prompt": with_modesty(prompt[:31000]), "size": size, "quality": quality, "output_format": "png"}
+        body = {"model": edit if images else t2i, "prompt": with_rules(prompt[:30000]), "size": size, "quality": quality, "output_format": "png"}
     if images:
         body["images"] = images[:14]
     with httpx.Client(timeout=90) as client:
@@ -433,6 +460,8 @@ def reference_url(path: Path) -> str:
 
 def run_model(kind: str, body: dict, what: str, max_seconds: int = 1800, interval: float = 4) -> str:
     """أي موديل على Atlas (Video / Audio / Image): يبعت الطلب ويستنى ويرجّع لينك أول ناتج."""
+    if kind in ("Video", "Image") and isinstance(body.get("prompt"), str):
+        body = {**body, "prompt": with_rules(body["prompt"])}
     with httpx.Client(timeout=90) as client:
         resp = client.post(f"{BASE_URL}/api/v1/model/generate{kind}", headers=_headers(), json=body)
     data = _check(resp, what)
