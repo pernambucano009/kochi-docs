@@ -62,7 +62,7 @@ const NH = (() => {
   const CREATE_KIDS = ["reel", "raw", "series", "carousel"];
   const CREATE_ALL = ["reel", "raw", "series", "carousel", "ad", "typo", "dub", "edit"];
   const STEPS5 = ["المشروع", "التقطيع", "التوليد", "المونتاج", "النشر"];
-  const D = { motion: [], cats: [], brand: null, folders: [], money: null, publisher: null, posts: [], coaches: [], voices: 0, music: 0 };
+  const D = { cats: [], brand: null, folders: [], money: null, publisher: null, posts: [], coaches: [], voices: 0, music: 0 };
 
   const brandMark = () => {
     const c = clientx?.cur;
@@ -94,7 +94,7 @@ const NH = (() => {
         <div class="nh-lines-txt">${b?.audience ? `<span><b>الجمهور:</b> ${esc(b.audience)}</span>` : ""}${styleNames(b) ? `<span><b>الستايل:</b> ${esc(styleNames(b))}</span>` : ""}${b?.language ? `<span><b>اللهجة:</b> ${esc(b.language)}</span>` : ""}</div>
         <div class="nh-meter"><small><span>العقل مكتمل</span><span class="num">${pct}%</span></small><div class="bar"><i style="width:${pct}%"></i></div></div>`;
     },
-    assets: () => `${head("assets")}<div class="nh-kids mini" style="grid-template-rows:repeat(4,minmax(0,1fr))">${["coaches", "voice", "music", "motion"].map(kid).join("")}</div>`,
+    assets: () => `${head("assets")}<div class="nh-kids mini" style="grid-template-rows:repeat(3,minmax(0,1fr))">${["coaches", "voice", "music"].map(kid).join("")}</div>`,
     settings: () => `${head("settings")}<div class="nh-credit">${D.money ? `<span class="num">$${D.money.balance.toFixed(2)}</span><small>رصيد Atlas</small>` : `<small>الرصيد بيظهر لما مفتاح Atlas يتسجّل</small>`}</div>`,
     progress: () => `${head("progress")}<div class="nh-lines">${D.folders.length ? D.folders.slice(0, 4).map(lineHTML).join("") : `<div class="nh-empty">مفيش مشاريع لسه. ابدأ من «اعمل جديد».</div>`}</div>`,
     publish: () => {
@@ -263,11 +263,10 @@ const NH = (() => {
   const panel = (c, r, inner, attrs = "") => `<div class="nh-tile nh-panel" ${attrs} style="grid-column:span ${c};grid-row:span ${r}">${inner}</div>`;
   const PAGES = {
     create: () => CREATE_ALL.map((k) => panel(3, 3, `${head(k)}<div class="nh-body">${esc(T[k].desc)}</div>`, `data-id="${k}" tabindex="0" role="button"`)).join(""),
-    assets: () => panel(3, 6, `${head("coaches")}<div class="nh-body">${D.coaches.length} شخصية</div><div class="nh-avs">${D.coaches.slice(0, 12).map((c) => `<img src="${esc(c.image_url)}" alt="">`).join("")}</div>`, `data-id="coaches" tabindex="0" role="button"`)
-      + panel(3, 6, `${head("voice")}<div class="nh-body">${D.voices} تسجيل</div>`, `data-id="voice" tabindex="0" role="button"`)
-      + panel(3, 6, `${head("music")}<div class="nh-body">${D.music} تراك</div>`, `data-id="music" tabindex="0" role="button"`)
-      + panel(3, 6, `${head("motion")}<div class="nh-mosaic">${D.motion.filter((m) => m.poster_url).slice(0, 6).map((m) => `<img src="${esc(m.poster_url)}" alt="" loading="lazy">`).join("")}</div>
-        <div class="nh-body">${D.motion.length} أنيميشن · ${D.motion.filter((m) => m.asset).length} في الأصول</div>`, `data-id="motion" tabindex="0" role="button"`),
+    // (مكتبة الموشن اتشالت من الأصول، ومكانها هيبقى في «اعمل جديد»)
+    assets: () => panel(4, 6, `${head("coaches")}<div class="nh-body">${D.coaches.length} شخصية</div><div class="nh-avs">${D.coaches.slice(0, 12).map((c) => `<img src="${esc(c.image_url)}" alt="">`).join("")}</div>`, `data-id="coaches" tabindex="0" role="button"`)
+      + panel(4, 6, `${head("voice")}<div class="nh-body">${D.voices} تسجيل</div>`, `data-id="voice" tabindex="0" role="button"`)
+      + panel(4, 6, `${head("music")}<div class="nh-body">${D.music} تراك</div>`, `data-id="music" tabindex="0" role="button"`),
     progress: () => panel(8, 6, `${head("progress")}<div class="nh-lines" style="align-content:start">${D.folders.map(lineHTML).join("") || `<div class="nh-empty">مفيش مشاريع لسه.</div>`}</div>`)
       + panel(4, 3, `${head("create")}<div class="nh-body">ابدأ شغل جديد من أي نوع.</div>`, `data-id="create" tabindex="0" role="button"`)
       + panel(4, 3, `${head("publish")}<div class="nh-body">${D.posts.filter((p) => p.status === "scheduled").length} بوست متجدول</div>`, `data-id="publish" tabindex="0" role="button"`),
@@ -384,12 +383,12 @@ const NH = (() => {
 
   // ---------- الداتا الحقيقية ----------
   async function refresh() {
-    const [folders, publisher, posts, coaches, voices, music, brains, cats, motion] = await Promise.all([
+    const [folders, publisher, posts, coaches, voices, music, brains, cats] = await Promise.all([
       shellFolders(true), api("/api/publisher").catch(() => null), api("/api/posts").catch(() => []), api("/api/coaches").catch(() => []),
       api("/api/audio?kind=voice").catch(() => []), api("/api/audio?kind=music").catch(() => []), api("/api/ad-brains").catch(() => []),
-      D.cats.length ? D.cats : api("/api/style-cats").catch(() => []), api("/api/motion-library").catch(() => []),
+      D.cats.length ? D.cats : api("/api/style-cats").catch(() => []),
     ]);
-    Object.assign(D, { motion, cats, folders, publisher, posts, coaches, voices: voices.length, music: music.length, money: window.money?.last || D.money,
+    Object.assign(D, { cats, folders, publisher, posts, coaches, voices: voices.length, music: music.length, money: window.money?.last || D.money,
       brand: brains.find((b) => b.id === clientx?.active) || brains[0] || null });
     renderTiles();
     GL?.brand?.();
