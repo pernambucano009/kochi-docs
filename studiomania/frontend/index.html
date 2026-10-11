@@ -54,7 +54,7 @@
     <button class="rail-btn" data-goto="13" title="الدبلجة باللهجات"><svg><use href="#i-globe"/></svg><span>الدبلجة</span></button>
     <a class="rail-btn" href="/refs.html" title="أرشيف المراجع"><svg><use href="#i-box"/></svg><span>الأرشيف</span></a>
     <span class="rail-sep"></span>
-    <button class="rail-btn" data-goto="4" title="المدربين"><svg><use href="#i-users"/></svg><span>المدربين</span></button>
+    <button class="rail-btn" data-goto="4" title="الشخصيات"><svg><use href="#i-users"/></svg><span>الشخصيات</span></button>
     <button class="rail-btn" data-goto="3" title="التعليق الصوتي"><svg><use href="#i-mic"/></svg><span>التعليق الصوتي</span></button>
     <button class="rail-btn" data-goto="5" title="الموسيقى"><svg><use href="#i-music"/></svg><span>الموسيقى</span></button>
     <span class="spacer"></span>
@@ -94,7 +94,7 @@
       <article class="tile t-projects glass" data-open="0">
         <header><span class="tile-num">01</span><span class="tile-ic"><svg><use href="#i-folder"/></svg></span><button class="tile-exp" tabindex="-1"><svg><use href="#i-max"/></svg></button></header>
         <h2>المشاريع</h2>
-        <p class="tile-sub">كل مشروع فيه الفيديو الخام والتعليق والمدرب</p>
+        <p class="tile-sub">كل مشروع فيه الفيديو الخام والتعليق والشخصية</p>
         <ul class="proj-list" id="tileProjects"></ul>
       </article>
 
@@ -141,7 +141,7 @@
       <article class="tile t-libs glass">
         <header><span class="tile-ic"><svg><use href="#i-box"/></svg></span><div><h2>المكتبات</h2><p class="tile-sub">حاجات بتختار منها جوه المشروع</p></div></header>
         <div class="libs">
-          <button class="lib-card" data-open="4"><span class="tile-ic"><svg><use href="#i-users"/></svg></span><b>المدربين</b><small id="tileCoachSub"></small><div class="avatars" id="tileAvatars"></div></button>
+          <button class="lib-card" data-open="4"><span class="tile-ic"><svg><use href="#i-users"/></svg></span><b>الشخصيات</b><small id="tileCoachSub"></small><div class="avatars" id="tileAvatars"></div></button>
           <button class="lib-card" data-open="3"><span class="tile-ic"><svg><use href="#i-mic"/></svg></span><b>التعليق الصوتي</b><small id="tileVoiceSub"></small><div class="bars"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></button>
           <button class="lib-card" data-open="5"><span class="tile-ic"><svg><use href="#i-music"/></svg></span><b>الموسيقى</b><small id="tileMusicSub"></small><div class="bars b2"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></button>
         </div>
@@ -235,7 +235,7 @@
               <span class="muted" id="voiceInfo"></span>
             </div>
             <div class="voice-link">
-              <span>🧑‍🏫 المدرب بتاع الفيديو ده:</span>
+              <span>🧍 الشخصية بتاعة الفيديو ده:</span>
               <img class="coach-mini" id="coachLinkImg" alt="" hidden>
               <select id="coachLinkSelect"></select>
               <span class="muted" id="coachLinkInfo"></span>
@@ -309,7 +309,7 @@
             <section class="panel">
               <div class="panel-head"><h2>1. اختار القطع</h2>
                 <span class="muted" id="clipPickCount"></span></div>
-              <p class="hint">المدرب بييجي من المشروع نفسه. لو عايز تغيّره، غيّره من صفحة المشاريع.</p>
+              <p class="hint">الشخصية بتيجي من المشروع نفسه. لو عايز تغيّره، غيّره من صفحة المشاريع.</p>
               <div id="clipPicker"></div>
               <p class="empty" id="clipPickerEmpty" hidden>مفيش قطع جاهزة. قطّع فيديو الأول من <a href="#" data-goto="1">الخطوة 1</a>.</p>
             </section>
@@ -323,7 +323,7 @@
                 <label class="field">الاسم <input type="text" id="promptName" placeholder="مثلًا: نفس حركة التمرين" required></label>
                 <label class="field">النص
                   <textarea id="promptText" rows="7" required></textarea></label>
-                <p class="hint"><code>@image1</code> = صورة المدرب · <code>@video1</code> = القطعة. الكتابة بالإنجليزي بتدّي نتايج أدق.</p>
+                <p class="hint"><code>@image1</code> = صورة الشخصية · <code>@video1</code> = القطعة. الكتابة بالإنجليزي بتدّي نتايج أدق.</p>
                 <label class="check"><input type="checkbox" id="promptDefault"> يبقى البرومبت الافتراضي</label>
                 <div class="row">
                   <button class="btn primary sm" type="submit">حفظ</button>
@@ -354,19 +354,19 @@
           </div>
         </main>
 
-        <!-- الخطوة 4: المدربين -->
+        <!-- الخطوة 4: الشخصيات -->
         <main class="view" data-view="4" hidden>
           <div class="gen-layout">
             <section class="panel">
-              <div class="panel-head"><h2>المدربين <span class="muted" id="coachCount"></span></h2>
+              <div class="panel-head"><h2>الشخصيات <span class="muted" id="coachCount"></span></h2>
                 <span class="row">
-                  <label class="btn sm" title="ملف Excel أو CSV فيه اسم المدرب وحساب إنستجرام وتيك توك">📥 استورد الحسابات من ملف<input type="file" id="handlesFile" accept=".xlsx,.csv" hidden></label>
+                  <label class="btn sm" title="ملف Excel أو CSV فيه اسم الشخصية وحساب إنستجرام وتيك توك">📥 استورد الحسابات من ملف<input type="file" id="handlesFile" accept=".xlsx,.csv" hidden></label>
                   <button class="btn sm primary" id="bulkOpen">📦 رفع جماعي</button></span></div>
               <div class="coaches" id="coachesGrid"></div>
-              <p class="empty" id="coachesEmpty">لسه مفيش مدربين.</p>
+              <p class="empty" id="coachesEmpty">لسه مفيش شخصيات.</p>
             </section>
             <section class="panel settings">
-              <div class="panel-head"><h2 id="coachFormTitle">إضافة مدرب</h2></div>
+              <div class="panel-head"><h2 id="coachFormTitle">إضافة شخصية</h2></div>
               <form id="coachForm">
                 <label class="field">الاسم <input type="text" id="coachName" required></label>
                 <label class="field">الصورة (PNG أو JPG أو WebP)
@@ -415,12 +415,12 @@
               <section class="panel ed-media">
                 <div class="panel-head"><h2>الفيديوهات المولَّدة</h2>
                   <span class="row"><label class="btn sm" title="لو فيه قطعة متحددة في التايم لاين الفيديو بيبدّلها، غير كده بيتحط عند المؤشر">⬆ ارفع فيديو<input type="file" id="clipUpload" accept="video/*,.mkv,.mov" hidden></label>
-                  <label class="btn sm" title="ارفع فيديو أوترو تاني غير أوترو المدرب، ويتحط في آخر المونتاج">🎬 ＋ أوترو تاني<input type="file" id="outroUpload" accept="video/*,.mkv" hidden></label></span></div>
+                  <label class="btn sm" title="ارفع فيديو أوترو تاني غير أوترو الشخصية، ويتحط في آخر المونتاج">🎬 ＋ أوترو تاني<input type="file" id="outroUpload" accept="video/*,.mkv" hidden></label></span></div>
                 <div class="bin-tools">
                   <input type="search" id="binSearch" placeholder="🔍 دوّر بالاسم" dir="auto">
                   <button class="btn sm" id="binFavOnly" title="المفضلة بس">☆ المفضلة</button>
                 </div>
-                <label class="check"><input type="checkbox" id="binCoachOnly" checked> المدرب المختار بس</label>
+                <label class="check"><input type="checkbox" id="binCoachOnly" checked> الشخصية المختارة بس</label>
                 <div class="replace-bar" id="replaceBar" hidden>🔁 اختار الفيديو اللي هيتحط مكان القطعة <b id="replaceWhich"></b> (التعديلات بتفضل زي ما هي) <button class="btn sm" id="replaceCancel">إلغاء</button></div>
                 <div class="bin-grid" id="binGrid"></div>
                 <p class="empty" id="binEmpty" hidden>مفيش فيديوهات مولَّدة جاهزة. ولّد من <a href="#" data-goto="2">الخطوة 2</a>.</p>
@@ -542,7 +542,7 @@
                   </div>
                   <div id="outroProps" hidden>
                     <h3>🎬 الأوترو</h3>
-                    <p class="hint">الأوترو بيتحط أوتوماتيك في آخر الفيديو من المدرب المختار. تقدر تشيله أو تغيّر صوته من تاب 🔊 الصوت.</p>
+                    <p class="hint">الأوترو بيتحط أوتوماتيك في آخر الفيديو من الشخصية المختارة. تقدر تشيله أو تغيّر صوته من تاب 🔊 الصوت.</p>
                   </div>
                 </div>
 
@@ -636,8 +636,8 @@
                     <label class="field slider-field">ظهور بالتدريج <b id="pFadeInVal"></b><input type="range" id="pFadeIn" min="0" max="500" step="10" dir="ltr"></label>
                     <label class="field slider-field">اختفاء بالتدريج <b id="pFadeOutVal"></b><input type="range" id="pFadeOut" min="0" max="500" step="10" dir="ltr"></label>
                   </div>
-                  <h3 class="pane-h">🧑‍🏫 المدرب والأوترو</h3>
-                  <label class="field">المدرب <select id="mCoach"></select></label>
+                  <h3 class="pane-h">🧍 الشخصية والأوترو</h3>
+                  <label class="field">الشخصية <select id="mCoach"></select></label>
               <label class="check"><input type="checkbox" id="mOutro"> ضيف الأوترو في الآخر <span class="muted" id="outroInfo"></span></label>
               <label class="field slider-field">صوت الأوترو <b id="outroVolVal"></b><input type="range" id="mOutroVol" min="0" max="200" step="5" dir="ltr"></label>
               <h3 class="pane-h">🏷️ إنترو وأوترو البراند</h3>
@@ -847,7 +847,7 @@
                   <div class="extra-title">📸 إنستجرام</div>
                   <label class="field">🏷️ تاج لحسابات <input type="text" id="igTags" dir="ltr" list="handlesList" placeholder="@coach_name, @another" autocomplete="off"></label>
                   <datalist id="handlesList"></datalist>
-                  <p class="hint" id="igTagsHint">حساب المدرب بيتحط لوحده من مشروع الفيديو.</p>
+                  <p class="hint" id="igTagsHint">حساب الشخصية بيتحط لوحده من مشروع الفيديو.</p>
                   <label class="check"><input type="checkbox" id="igCollab"> 🤝 كولاب: البوست يظهر كمان في حسابات التاج (لحد 3، بعد ما يوافقوا على الدعوة)</label>
                 </div>
 
@@ -938,7 +938,7 @@
                   <button class="btn sm" data-q="اختار أقوى فكرة وقولي ليه، واقترح هوك أقوى لأول سلايد">🎯 أقوى فكرة</button>
                 </div>
                 <div class="car-setup">
-                  <p class="hint car-mix-hint">اختار اللي يعجبك من كل حاجة وجمّعهم مع بعض (تيمبليت + ستايل + شخصيات + مدرب). كلهم اختياري، ودوسة تانية على أي حاجة تلغيها. من غير اختيار البرنامج بيرسم بستايل العميل.</p>
+                  <p class="hint car-mix-hint">اختار اللي يعجبك من كل حاجة وجمّعهم مع بعض (تيمبليت + ستايل + شخصيات + شخصية). كلهم اختياري، ودوسة تانية على أي حاجة تلغيها. من غير اختيار البرنامج بيرسم بستايل العميل.</p>
                   <div class="car-pick" id="carPickTemplate">
                     <div class="car-setup-title">🧩 التصميم (تيمبليت) <a href="#" class="lib-link" data-lib="template">📚 المكتبة</a></div>
                     <div class="car-assets" id="carTemplates"></div>
@@ -952,7 +952,7 @@
                     <div class="car-assets" id="carChars"></div>
                   </div>
                   <div class="car-pick" id="carPickCoach">
-                    <div class="car-setup-title">🏋️ المدرب (من مكتبة المدربين)</div>
+                    <div class="car-setup-title">🏋️ الشخصية (من مكتبة الشخصيات)</div>
                     <div class="car-assets" id="carCoaches"></div>
                     <span class="hint" id="carCoachNote"></span>
                   </div>
@@ -1023,9 +1023,9 @@
                 </div>
                 <label class="field">الكابشن <textarea id="carPubCaption" rows="4" data-no-i18n></textarea></label>
                 <div class="car-pub-tags">
-                  <label class="field">تاج على إنستجرام (حساب المدرب وأي حد تاني، افصل بمسافة) <input type="text" id="carPubTags" dir="ltr" placeholder="@coach_name"></label>
+                  <label class="field">تاج على إنستجرام (حساب الشخصية وأي حد تاني، افصل بمسافة) <input type="text" id="carPubTags" dir="ltr" placeholder="@coach_name"></label>
                   <label id="carPubSlideWrap">التاج على سلايد <select id="carPubSlide"></select></label>
-                  <label class="check"><input type="checkbox" id="carPubCollab"> 🤝 كولاب (يظهر في حساب المدرب كمان)</label>
+                  <label class="check"><input type="checkbox" id="carPubCollab"> 🤝 كولاب (يظهر في حساب الشخصية كمان)</label>
                 </div>
                 <div class="row wrap car-pub-when">
                   <label>الميعاد <input type="datetime-local" id="carPubWhen"></label>
@@ -1645,21 +1645,21 @@
   <div class="row gap-top"><button class="btn primary" id="trSave">💾 حفظ</button><button class="btn" id="trCancel">إلغاء</button></div>
 </dialog>
 <dialog class="bulk-dlg" id="bulkDialog">
-  <div class="panel-head"><h2>📦 رفع مدربين كتير مرة واحدة</h2><button class="btn sm" id="bulkClose">✕</button></div>
+  <div class="panel-head"><h2>📦 رفع شخصيات كتير مرة واحدة</h2><button class="btn sm" id="bulkClose">✕</button></div>
   <div class="bulk-pick">
     <label class="btn">🖼️ اختار الصور <input type="file" id="bulkImages" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp" multiple hidden></label>
     <label class="btn">🎬 اختار الأوتروهات <input type="file" id="bulkOutros" accept="video/*,.mkv" multiple hidden></label>
     <span class="muted" id="bulkCounts"></span>
   </div>
-  <p class="hint">سمّي الملفات باسم المدرب، زي <code>ahmed.png</code> و <code>ahmed_outro.mp4</code>، والبرنامج بيطابقهم لوحده. واسم المدرب بيتاخد من اسم الصورة، وتقدر تعدّله هنا.</p>
+  <p class="hint">سمّي الملفات باسم الشخصية، زي <code>ahmed.png</code> و <code>ahmed_outro.mp4</code>، والبرنامج بيطابقهم لوحده. واسم الشخصية بيتاخد من اسم الصورة، وتقدر تعدّله هنا.</p>
   <div class="alert warn" id="bulkWarn" hidden></div>
   <section class="unmatched" id="bulkUnmatched" hidden>
-    <h3>🔗 الأوتروهات دي ماعرفتش بتاعة مين. شغّل الأوترو ودوس على صورة المدرب بتاعه:</h3>
+    <h3>🔗 الأوتروهات دي ماعرفتش بتاعة مين. شغّل الأوترو ودوس على صورة الشخصية بتاعةه:</h3>
     <div id="unmatchedList"></div>
   </section>
   <div class="bulk-table-wrap">
     <table class="bulk-table">
-      <thead><tr><th></th><th>اسم المدرب</th><th>الأوترو</th><th>هيحصل إيه</th><th></th></tr></thead>
+      <thead><tr><th></th><th>اسم الشخصية</th><th>الأوترو</th><th>هيحصل إيه</th><th></th></tr></thead>
       <tbody id="bulkRows"></tbody>
     </table>
   </div>
@@ -1697,7 +1697,7 @@
       <div class="field">أنواع الدعوة (CTA)
         <div class="cta-list" id="ctaList"></div>
         <div class="row"><button type="button" class="btn sm" id="ctaAdd">＋ دعوة جديدة</button><button type="button" class="btn sm" id="ctaReset">↺ رجّع الأصلي</button></div>
-        <span class="hint">في النص: {keyword} = الكلمة اللي يكتبوها، {reward} = هياخدوا إيه، {coach} = اسم المدرب.</span></div>
+        <span class="hint">في النص: {keyword} = الكلمة اللي يكتبوها، {reward} = هياخدوا إيه، {coach} = اسم الشخصية.</span></div>
       <label class="field">موديل الكلام (من Atlas) <input type="text" id="brandTextModel" dir="ltr"></label>
       <div class="row"><button class="btn sm" id="brandTest">🧪 جرّب الموديل</button><span class="muted" id="brandTestOut"></span></div>
       <label class="field">موديل قراءة الصور (بيكتب وصف التيمبليتس والستايلات) <input type="text" id="brandVisionModel" dir="ltr"></label>
@@ -1852,17 +1852,17 @@
   <div class="lib-grid" id="libItems"></div>
 </dialog>
 <dialog class="bulk-dlg" id="handlesDialog">
-  <div class="panel-head"><h2>📥 حسابات المدربين من الملف</h2><button class="btn sm" id="handlesClose">إغلاق</button></div>
-  <p class="hint">راجع: كل صف اتربط بالمدرب اللي اسمه شبهه. غيّر الربط لو غلط. الحسابات كلها بتتحفظ، وأي مدرب تضيفه بعدين بنفس الاسم بياخد حساباته لوحده.</p>
+  <div class="panel-head"><h2>📥 حسابات الشخصيات من الملف</h2><button class="btn sm" id="handlesClose">إغلاق</button></div>
+  <p class="hint">راجع: كل صف اتربط بالشخصية اللي اسمه شبهه. غيّر الربط لو غلط. الحسابات كلها بتتحفظ، وأي شخصية تضيفه بعدين بنفس الاسم بياخد حساباته لوحده.</p>
   <div class="handles-wrap"><table class="segments handles-table">
-    <thead><tr><th>الاسم في الملف</th><th>إنستجرام</th><th>تيك توك</th><th>المدرب في البرنامج</th></tr></thead>
+    <thead><tr><th>الاسم في الملف</th><th>إنستجرام</th><th>تيك توك</th><th>الشخصية في البرنامج</th></tr></thead>
     <tbody id="handlesRows"></tbody>
   </table></div>
   <div class="row gap-top"><button class="btn primary" id="handlesApply">💾 احفظ الحسابات</button><span class="muted" id="handlesInfo"></span></div>
 </dialog>
 <dialog class="bulk-dlg" id="fupDialog">
   <div class="panel-head"><h2>📂 رفع مشاريع من فولدرات</h2><button class="btn sm" id="fupClose">✕</button></div>
-  <p class="hint">كل فولدر = مشروع باسمه. جوّه: الفيديو الخام، والتعليق الصوتي، وصورة المدرب، وملف السكريبت (.txt). الأوترو بييجي من المدرب اللي تختاره. راجع وعدّل قبل الرفع.</p>
+  <p class="hint">كل فولدر = مشروع باسمه. جوّه: الفيديو الخام، والتعليق الصوتي، وصورة الشخصية، وملف السكريبت (.txt). الأوترو بييجي من الشخصية اللي تختاره. راجع وعدّل قبل الرفع.</p>
   <div class="row wrap fup-add">
     <label class="btn sm" id="fupAddDrop">＋ ضيف فولدرات كمان (أو اسحبها هنا)
       <input type="file" id="fupAdd" webkitdirectory directory multiple hidden></label>
@@ -1870,7 +1870,7 @@
   </div>
   <div class="bulk-table-wrap">
     <table class="bulk-table fup-table">
-      <thead><tr><th>اسم المشروع</th><th>🎬 الفيديو</th><th>🎙️ الصوت والسكريبت</th><th>🧑‍🏫 المدرب</th><th></th></tr></thead>
+      <thead><tr><th>اسم المشروع</th><th>🎬 الفيديو</th><th>🎙️ الصوت والسكريبت</th><th>🧍 الشخصية</th><th></th></tr></thead>
       <tbody id="fupRows"></tbody>
     </table>
   </div>
@@ -1914,6 +1914,7 @@
 <script src="/shell.js"></script>
 <script src="/three.min.js"></script>
 <script src="/brand.js"></script>
+<script src="/motion.js"></script>
 <script src="/home2-gl.js"></script>
 <script src="/home2.js"></script>
 </body>

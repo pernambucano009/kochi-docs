@@ -59,7 +59,7 @@ viewHooks["settings"] = loadSettings;
 
 // ---------- المساحة ----------
 const STORAGE_LABELS = {
-  raw: "الفيديوهات الخام", clips: "القطع", generated: "فيديوهات Seedance", coaches: "المدربين",
+  raw: "الفيديوهات الخام", clips: "القطع", generated: "فيديوهات Seedance", coaches: "الشخصيات",
   audio: "الصوت والموسيقى", exports: "الفيديوهات الجاهزة", tmp: "ملفات مؤقتة",
   lab: "معمل التفكيك (تقسيم الفيديوهات)", typo: "فيديوهات التايبوجرافي", refs: "📦 أرشيف المراجع", ads: "الإعلانات",
   series: "المسلسلات", films: "الأفلام", carousels: "الكاروسيل", assets: "مكتبة العناصر", tvideos: "فيديوهات التيمبليتس",

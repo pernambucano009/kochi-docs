@@ -1,4 +1,4 @@
-// StudioMania — الخطوة 4: مكتبة المدربين
+// StudioMania — الخطوة 4: مكتبة الشخصيات
 
 const coachState = { list: [], editing: null };
 
@@ -36,7 +36,7 @@ function renderCoaches() {
 function resetCoachForm() {
   coachState.editing = null;
   $("coachForm").reset();
-  $("coachFormTitle").textContent = "إضافة مدرب";
+  $("coachFormTitle").textContent = "إضافة شخصية";
   $("coachCancel").hidden = true;
   $("removeOutroWrap").hidden = true;
   $("coachImagePreview").hidden = true;
@@ -74,7 +74,7 @@ $("coachForm").addEventListener("submit", async (e) => {
   form.append("name", $("coachName").value.trim());
   const image = $("coachImage").files[0];
   const outro = $("coachOutro").files[0];
-  if (!editing && !image) return toast("اختار صورة المدرب", true);
+  if (!editing && !image) return toast("اختار صورة الشخصية", true);
   if (image) form.append("image", image);
   if (outro) form.append("outro", outro);
   if (editing && $("removeOutro").checked) form.append("remove_outro", "true");
@@ -89,7 +89,7 @@ $("coachForm").addEventListener("submit", async (e) => {
       method: editing ? "PATCH" : "POST",
       body: form,
     });
-    toast(editing ? "✅ اتعدّل" : "✅ المدرب اتضاف");
+    toast(editing ? "✅ اتعدّل" : "✅ الشخصية اتضافت");
     resetCoachForm();
     await loadCoaches();
   } catch (err) {
@@ -107,7 +107,7 @@ $("coachesGrid").addEventListener("click", async (e) => {
   if (!c) return;
   if (btn.dataset.act === "edit") editCoach(c);
   if (btn.dataset.act === "delete") {
-    if (!confirm(`حذف المدرب "${c.name}"؟`)) return;
+    if (!confirm(`حذف الشخصية "${c.name}"؟`)) return;
     await api(`/api/coaches/${c.id}`, { method: "DELETE" });
     if (coachState.editing?.id === c.id) resetCoachForm();
     await loadCoaches();
@@ -166,7 +166,7 @@ function buildBulkRows() {
     const row = findByKey(rows.filter((r) => r.outro === null), o.key, (r) => r.key);
     if (row) { row.outro = o.i; used.add(o.i); }
   }
-  // أو على مدرب موجود قبل كده (رفع أوتروهات بس)
+  // أو على شخصية موجودة قبل كده (رفع أوتروهات بس)
   for (const o of outros) {
     if (used.has(o.i)) continue;
     const c = findByKey(coaches, o.key, (x) => matchKey(x.name));
@@ -187,7 +187,7 @@ function renderBulk() {
   renderUnmatched(unmatched);
   const noOutro = rows.filter((r) => r.outro === null).length;
   const warn = [];
-  if (noOutro && outros.length) warn.push(`${noOutro} مدرب من غير أوترو.`);
+  if (noOutro && outros.length) warn.push(`${noOutro} شخصية من غير أوترو.`);
   if (bulk.ignored.size) warn.push(`${bulk.ignored.size} أوترو اتجاهل ومش هيترفع.`);
   $("bulkWarn").hidden = !warn.length;
   $("bulkWarn").innerHTML = warn.map(escapeHtml).join("<br>");
@@ -199,8 +199,8 @@ function renderBulk() {
         .map((f, i) => `<option value="${i}" ${r.outro === i ? "selected" : ""}>${assigned.has(i) && r.outro !== i ? "✓ " : ""}${escapeHtml(f.name)}</option>`)
         .join("");
       const action = r.existingId
-        ? `<span class="pill scheduled">تحديث مدرب موجود${r.image ? " (صورة" + (r.outro !== null ? " + أوترو)" : ")") : r.outro !== null ? " (أوترو)" : ""}</span>`
-        : `<span class="pill published">مدرب جديد</span>`;
+        ? `<span class="pill scheduled">تحديث شخصية موجودة${r.image ? " (صورة" + (r.outro !== null ? " + أوترو)" : ")") : r.outro !== null ? " (أوترو)" : ""}</span>`
+        : `<span class="pill published">شخصية جديدة</span>`;
       const dup = names.get(r.name.trim()) > 1 ? `<div class="err">الاسم ده متكرر</div>` : "";
       return `<tr data-i="${ri}">
         <td>${r.preview ? `<img src="${r.preview}" alt="">` : ""}</td>
@@ -225,7 +225,7 @@ function outroUrl(i) {
 }
 
 function coachChoices() {
-  // المدربين اللي بيترفعوا دلوقتي + المدربين الموجودين قبل كده
+  // الشخصيات اللي بيترفعوا دلوقتي + الشخصيات الموجودين قبل كده
   const fromRows = bulk.rows.map((r, ri) => ({ key: `r${ri}`, name: r.name, img: r.preview, hasOutro: r.outro !== null }));
   const inRows = new Set(bulk.rows.map((r) => r.existingId).filter(Boolean));
   const existing = coachState.list
@@ -252,7 +252,7 @@ function renderUnmatched(unmatched) {
           <span>${escapeHtml(c.name)}</span>
           ${c.hasOutro ? `<small>عنده أوترو</small>` : ""}${c.existing ? `<small>موجود قبل كده</small>` : ""}
         </button>`)
-        .join("") || `<p class="muted">مفيش مدربين. ارفع صورهم الأول.</p>`}</div>
+        .join("") || `<p class="muted">مفيش شخصيات. ارفع صورها الأول.</p>`}</div>
     </div>`)
     .join("");
 }
@@ -308,7 +308,7 @@ $("bulkRows").addEventListener("input", (e) => {
   if (e.target.dataset.f !== "name") return;
   const row = bulk.rows[Number(e.target.closest("tr").dataset.i)];
   row.name = e.target.value;
-  // لو الاسم بقى زي مدرب موجود، نحدّثه بدل ما نكرره
+  // لو الاسم بقى زي شخصية موجودة، نحدّثه بدل ما نكرره
   const c = coachState.list.find((x) => x.name.trim() === row.name.trim());
   if (row.image) row.existingId = c?.id || null;
   const pos = e.target.selectionStart;
@@ -320,7 +320,7 @@ $("bulkRows").addEventListener("change", (e) => {
   if (e.target.dataset.f !== "outro") return;
   const row = bulk.rows[Number(e.target.closest("tr").dataset.i)];
   const v = e.target.value === "" ? null : Number(e.target.value);
-  // الأوترو يروح لمدرب واحد بس
+  // الأوترو يروح لشخصية واحدة بس
   if (v !== null) bulk.rows.forEach((r) => { if (r !== row && r.outro === v) r.outro = null; });
   row.outro = v;
   renderBulk();
@@ -365,11 +365,11 @@ $("bulkUpload").onclick = async () => {
     renderBulk();
   } else {
     $("bulkDialog").close();
-    toast(`✅ اترفع ${ok} مدرب`);
+    toast(`✅ اترفع ${ok} شخصية`);
   }
 };
 
-// ---------- حسابات المدربين من ملف Excel ----------
+// ---------- حسابات الشخصيات من ملف Excel ----------
 const handlesState = { rows: [], coaches: [] };
 
 $("handlesFile").addEventListener("change", async (e) => {
@@ -402,7 +402,7 @@ function renderHandles() {
     </tr>`)
     .join("");
   const linked = handlesState.rows.filter((r) => r.coach_id).length;
-  $("handlesInfo").textContent = `${handlesState.rows.length} حساب · ${linked} مربوطين بمدربين`;
+  $("handlesInfo").textContent = `${handlesState.rows.length} حساب · ${linked} مربوطين بشخصيات`;
 }
 
 $("handlesRows").addEventListener("change", (e) => {
@@ -418,7 +418,7 @@ $("handlesApply").onclick = async () => {
       body: JSON.stringify({ rows: handlesState.rows }),
     });
     $("handlesDialog").close();
-    toast(`✅ اتحفظ · ${res.coaches_updated} مدرب اتحدّث`);
+    toast(`✅ اتحفظ · ${res.coaches_updated} شخصية اتحدّثت`);
     await loadCoaches();
   } catch (err) {
     toast(err.message, true);

@@ -79,7 +79,7 @@ function renderLibrary() {
           : "";
       return `<li data-id="${v.id}" class="${state.current?.id === v.id ? "active" : ""}">
         <div class="name">${escapeHtml(v.name)}</div>
-        <div class="meta"><span>${fmt(v.duration)}</span><span>${v.cuts.length} نقطة قطع</span>${v.voice ? `<span class="badge ok" title="${escapeHtml(v.voice.name)}">🎙️ صوت مربوط</span>` : ""}${v.coach ? `<span class="badge ok">🧑‍🏫 ${escapeHtml(v.coach.name)}</span>` : ""}${badge}</div>
+        <div class="meta"><span>${fmt(v.duration)}</span><span>${v.cuts.length} نقطة قطع</span>${v.voice ? `<span class="badge ok" title="${escapeHtml(v.voice.name)}">🎙️ صوت مربوط</span>` : ""}${v.coach ? `<span class="badge ok">🧍 ${escapeHtml(v.coach.name)}</span>` : ""}${badge}</div>
       </li>`;
     })
     .join("");
@@ -170,7 +170,7 @@ function openVideo(id) {
   loadCoachLink();
 }
 
-// ---------- ربط المدرب بالفيديو ----------
+// ---------- ربط الشخصية بالفيديو ----------
 async function loadCoachLink() {
   const v = state.current;
   if (!v) return;
@@ -187,7 +187,7 @@ function renderCoachLink() {
   if (c) $("coachLinkImg").src = c.image_url;
   $("coachLinkInfo").textContent = !c
     ? "اربطه عشان صورته تتبعت لـ Seedance والأوترو بتاعه يتحط في الآخر لوحدهم"
-    : c.has_outro ? "✓ صورته للتوليد والأوترو بتاعه في الآخر" : "⚠️ المدرب ده مالوش أوترو، ضيفه من صفحة المدربين";
+    : c.has_outro ? "✓ صورته للتوليد والأوترو بتاعه في الآخر" : "⚠️ الشخصية دي مالهاش أوترو، ضيفه من صفحة الشخصيات";
 }
 
 $("coachLinkSelect").addEventListener("change", async () => {
@@ -761,7 +761,7 @@ $("clipsGrid").addEventListener("click", async (e) => {
 // ---------- التنقل بين الخطوات ----------
 const viewHooks = {}; // كل صفحة بتسجّل هنا اللي يحصل لما تفتح
 // "home" = الرئيسية (المربعات). أي خطوة تانية بتفتح في الشاشة الكبيرة (shell.js)
-// خطوات بتفتح نفس الصفحة بس لقسم تاني: مونتاج المسلسلات والإعلانات منفصل عن مونتاج فيديوهات المدربين
+// خطوات بتفتح نفس الصفحة بس لقسم تاني: مونتاج المسلسلات والإعلانات منفصل عن مونتاج فيديوهات الشخصيات
 const VIEW_OF = { "6s": "6", "6a": "6" };
 function showStep(step) {
   const view = VIEW_OF[step] || step;

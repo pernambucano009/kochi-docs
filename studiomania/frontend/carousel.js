@@ -184,13 +184,13 @@ function renderSetup() {
   $("carStyles").innerHTML = car.lib.filter((a) => a.kind === "style").map((a) => assetThumb(a, a.id === st.style_id)).join("") || empty("ستايلات");
   $("carChars").innerHTML = car.lib.filter((a) => a.kind === "character").map((a) => assetThumb(a, picked.has(a.id))).join("") || empty("شخصيات");
   $("carCoaches").innerHTML = car.coaches.map((c) => coachThumb(c, c.id === st.coach_id)).join("")
-    || `<span class="muted">مفيش مدربين لسه. ضيفهم من صفحة المدربين.</span>`;
+    || `<span class="muted">مفيش شخصيات لسه. ضيفها من صفحة الشخصيات.</span>`;
   const coach = currentCoach();
-  $("carCoachNote").textContent = coach ? (coach.handle ? `@${coach.handle} هيتكتب جنب صورته ويتعمله تاج في النشر` : "⚠️ المدرب ده مالوش حساب إنستجرام متسجل (ضيفه من صفحة المدربين)") : "";
+  $("carCoachNote").textContent = coach ? (coach.handle ? `@${coach.handle} هيتكتب جنب صورته ويتعمله تاج في النشر` : "⚠️ الشخصية دي مالهاش حساب إنستجرام متسجل (ضيفه من صفحة الشخصيات)") : "";
   // الـ CTA
   const cta = st.cta || { type: "auto" };
   $("carCta").innerHTML = `<option value="auto">🤖 خليه يختار الأنسب</option>` +
-    // دعوات فيها اسم المدرب بتظهر بس لو فيه مدرب متختار
+    // دعوات فيها اسم الشخصية بتظهر بس لو فيه شخصية متختار
     car.cfg.ctas.filter((c) => coach || !c.text.includes("{coach}"))
       .map((c) => `<option value="${c.id}">${escapeHtml(c.label)}</option>`).join("") +
     `<option value="custom">✍️ اكتبها بنفسك</option>`;
@@ -206,7 +206,7 @@ function renderSetup() {
   $("carCtaPreview").textContent = ctaPreview();
 }
 
-// المدرب المختار (من مكتبة الكاروسيل، أو من مدربين التوليد في الكاروسيلات القديمة)
+// الشخصية المختارة (من مكتبة الكاروسيل، أو من شخصيات التوليد في الكاروسيلات القديمة)
 function currentCoach() {
   const st = car.cur.settings;
   const c = car.coaches.find((x) => x.id === st.coach_id);
@@ -590,9 +590,9 @@ const LIB_HINTS = {
   template: "دوس على التصميم اللي عاجبك يتختار للكاروسيل (ودوسة تانية تلغيه). البرنامج بياخد التقسيم والشكل ويلوّنه بألوان العميل ويحط كلامنا.",
   style: "دوس على الستايل يتختار (ودوسة تانية تلغيه). البرنامج بياخد طريقة الرسم بس ويرسم شخصيات جديدة بألوان العميل.",
   character: "دوس على الشخصيات اللي عايزها في الكاروسيل (لحد 4).",
-  coach: "دوس على المدرب يتختار لكاروسيل «معلومات من مدرب».",
+  coach: "دوس على الشخصية يتختار لكاروسيل «معلومات من شخصية».",
 };
-const LIB_NEW = { template: "ضيف تصميم", style: "ضيف ستايل", character: "ضيف شخصية", coach: "ضيف مدرب" };
+const LIB_NEW = { template: "ضيف تصميم", style: "ضيف ستايل", character: "ضيف شخصية", coach: "ضيف شخصية" };
 // المختار في الكاروسيل المفتوح
 function libSelected(a) {
   const st = car.cur?.settings;
@@ -805,14 +805,14 @@ async function renderPublish() {
   $("carPubHint").textContent = reel
     ? "البرنامج هيعمل فيديو من السلايدات بالموسيقى، ويتحفظ كمان في الفيديوهات الجاهزة. التاج في الريل بيبقى على الفيديو كله."
     : "الكاروسيل بيتنشر صور بمقاس 1080×1350 على إنستجرام. تيك توك مش بيقبل كاروسيل صور من هنا، استخدم الريل.";
-  // أول ما تفتح النشر للكاروسيل ده: الكابشن من النص، والتاج حساب المدرب
+  // أول ما تفتح النشر للكاروسيل ده: الكابشن من النص، والتاج حساب الشخصية
   if (car.pubFor !== c.id) {
     car.pubFor = c.id;
     const plan = c.plan || {};
     $("carPubCaption").value = [plan.caption, (plan.hashtags || []).join(" ")].filter(Boolean).join("\n\n");
     const coach = currentCoach();
     $("carPubTags").value = coach?.handle ? `@${coach.handle}` : "";
-    $("carPubCollab").checked = !!coach?.handle; // الكاروسيل عن مدرب ليه حساب: كولاب تلقائي
+    $("carPubCollab").checked = !!coach?.handle; // الكاروسيل عن شخصية ليها حساب: كولاب تلقائي
     $("carPubWhen").value = localInput(new Date(Date.now() + 3600e3));
     $("carPubDone").innerHTML = "";
     $("carPubSlide").innerHTML = c.slides.map((_, i) => `<option value="${i + 1}">${i + 1}</option>`).join("");

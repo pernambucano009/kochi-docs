@@ -41,7 +41,7 @@ const NH = (() => {
   const T = {
     create: { en: "Create", ar: "اعمل جديد", icon: "create", page: "create", desc: "كل أنواع الشغل من هنا: اختار النوع، والخطوات بتمشي معاك لحد التصدير." },
     brand: { en: "Your Brand", ar: "عقل البراند", icon: "brand", page: "brand", desc: "كل تفاصيل البراند وتفضيلاته وستايله. أي شغل بيتعمل بيبني عليه." },
-    assets: { en: "Assets", ar: "الأصول", icon: "box", page: "assets", desc: "المدربين والأصوات والموسيقى اللي بتستخدمها في أي شغل." },
+    assets: { en: "Assets", ar: "الأصول", icon: "box", page: "assets", desc: "الشخصيات والأصوات والموسيقى اللي بتستخدمها في أي شغل." },
     settings: { en: "Settings", ar: "الحساب والإعدادات", icon: "gear", go: "settings", desc: "المفاتيح والرصيد والعملاء." },
     progress: { en: "In Progress", ar: "شغّال عليه", icon: "pulse", page: "progress", desc: "كل خط مشروع، وكل نقطة خطوة. دوس على أي خط يكمّل من مكان ما وقفت." },
     publish: { en: "Publish", ar: "النشر", icon: "send", go: "7", desc: "الحسابات المربوطة والجدولة واللي اتنشر." },
@@ -54,15 +54,15 @@ const NH = (() => {
     typo: { en: "Typography", ar: "تايبوجرافي", icon: "type", go: "12", desc: "كلام متحرك من صوت أو سكريبت." },
     dub: { en: "Dubbing", ar: "دبلجة فيديو", icon: "globe", go: "13", desc: "نفس الفيديو بلهجة تانية." },
     edit: { en: "Edit", ar: "مونتاج حر", icon: "film", go: "6", desc: "المحرر الكامل: تراكات ونص وطبقات وصوت." },
-    coaches: { en: "Coaches", ar: "المدربين", icon: "users", go: "4", desc: "صور المدربين والأوترو." },
+    coaches: { en: "Characters", ar: "الشخصيات", icon: "users", go: "4", desc: "صور الشخصيات والأوترو." },
     voice: { en: "Voices", ar: "التعليق الصوتي", icon: "mic", go: "3", desc: "مكتبة التعليق." },
     music: { en: "Music", ar: "الموسيقى", icon: "music", go: "5", desc: "مكتبة الموسيقى." },
-    motion: { en: "Motion", ar: "مكتبة الموشن", icon: "clapper", fn: () => { showStep("11"); openLib(); }, desc: "أنيميشنات مكتوبة بالكود، كل واحدة تتضاف للأصول بضغطة." },
+    motion: { en: "Motion", ar: "مكتبة الموشن", icon: "clapper", page: "motion", desc: "أنيميشنات مكتوبة بالكود، كل واحدة تتضاف للأصول بضغطة." },
   };
   const CREATE_KIDS = ["reel", "raw", "series", "carousel"];
   const CREATE_ALL = ["reel", "raw", "series", "carousel", "ad", "typo", "dub", "edit"];
   const STEPS5 = ["المشروع", "التقطيع", "التوليد", "المونتاج", "النشر"];
-  const D = { cats: [], brand: null, folders: [], money: null, publisher: null, posts: [], coaches: [], voices: 0, music: 0 };
+  const D = { motion: [], cats: [], brand: null, folders: [], money: null, publisher: null, posts: [], coaches: [], voices: 0, music: 0 };
 
   const brandMark = () => {
     const c = clientx?.cur;
@@ -263,27 +263,46 @@ const NH = (() => {
   const panel = (c, r, inner, attrs = "") => `<div class="nh-tile nh-panel" ${attrs} style="grid-column:span ${c};grid-row:span ${r}">${inner}</div>`;
   const PAGES = {
     create: () => CREATE_ALL.map((k) => panel(3, 3, `${head(k)}<div class="nh-body">${esc(T[k].desc)}</div>`, `data-id="${k}" tabindex="0" role="button"`)).join(""),
-    assets: () => panel(4, 6, `${head("coaches")}<div class="nh-body">${D.coaches.length} مدرب</div><div class="nh-avs">${D.coaches.slice(0, 12).map((c) => `<img src="${esc(c.image_url)}" alt="">`).join("")}</div>`, `data-id="coaches" tabindex="0" role="button"`)
-      + panel(4, 6, `${head("voice")}<div class="nh-body">${D.voices} تسجيل</div>`, `data-id="voice" tabindex="0" role="button"`)
-      + panel(4, 6, `${head("music")}<div class="nh-body">${D.music} تراك</div>`, `data-id="music" tabindex="0" role="button"`)
-      + panel(4, 6, `${head("motion")}<div class="nh-body">${esc(T.motion.desc)}</div>`, `data-id="motion" tabindex="0" role="button"`),
+    assets: () => panel(3, 6, `${head("coaches")}<div class="nh-body">${D.coaches.length} شخصية</div><div class="nh-avs">${D.coaches.slice(0, 12).map((c) => `<img src="${esc(c.image_url)}" alt="">`).join("")}</div>`, `data-id="coaches" tabindex="0" role="button"`)
+      + panel(3, 6, `${head("voice")}<div class="nh-body">${D.voices} تسجيل</div>`, `data-id="voice" tabindex="0" role="button"`)
+      + panel(3, 6, `${head("music")}<div class="nh-body">${D.music} تراك</div>`, `data-id="music" tabindex="0" role="button"`)
+      + panel(3, 6, `${head("motion")}<div class="nh-mosaic">${D.motion.filter((m) => m.poster_url).slice(0, 6).map((m) => `<img src="${esc(m.poster_url)}" alt="" loading="lazy">`).join("")}</div>
+        <div class="nh-body">${D.motion.length} أنيميشن · ${D.motion.filter((m) => m.asset).length} في الأصول</div>`, `data-id="motion" tabindex="0" role="button"`),
     progress: () => panel(8, 6, `${head("progress")}<div class="nh-lines" style="align-content:start">${D.folders.map(lineHTML).join("") || `<div class="nh-empty">مفيش مشاريع لسه.</div>`}</div>`)
       + panel(4, 3, `${head("create")}<div class="nh-body">ابدأ شغل جديد من أي نوع.</div>`, `data-id="create" tabindex="0" role="button"`)
       + panel(4, 3, `${head("publish")}<div class="nh-body">${D.posts.filter((p) => p.status === "scheduled").length} بوست متجدول</div>`, `data-id="publish" tabindex="0" role="button"`),
   };
-  PAGES.brand = () => BrandPage.html();
-  let pageArg = null;
+  // صفحات كاملة بتنزل لتحت (عقل البراند، مكتبة الموشن): كل واحدة ليها موديول بيرسمها
+  const MODS = { brand: BrandPage, motion: MotionPage };
+  let pageArg = null, pStack = [];
+  const titleHTML = (t) => `<div class="nh-name"><span class="latin">${t.en}</span><b>${esc(t.ar)}</b></div>${iconOf(t.icon)}`;
+  function fillPage(key) {
+    MotionPage.close();
+    pGrid.dataset.key = key;
+    pGrid.classList.toggle("nh-scroll", !!MODS[key]);
+    pGrid.innerHTML = MODS[key] ? MODS[key].html() : PAGES[key]();
+    if (MODS[key]) MODS[key].mount(pGrid, pageArg);
+    else pGrid.querySelectorAll(".nh-tile").forEach(addSnake);
+    pageArg = null;
+  }
+  // صفحة جوه صفحة (زي مكتبة الموشن من جوه الأصول): بتتبدّل مكانها، و«رجوع» بيرجّع اللي قبلها
+  function swapPage(key, back = false) {
+    const prev = pGrid.dataset.key;
+    if (back) pTitle.replaceChildren(...pStack.pop().title);
+    else { pStack.push({ key: prev, title: [...pTitle.childNodes] }); pTitle.innerHTML = titleHTML(T[key]); }
+    fillPage(key);
+    pGrid.animate([{ opacity: 0, transform: `translateX(${back ? -24 : 24}px)` }, { opacity: 1, transform: "none" }], { duration: reduce.matches ? 1 : 450, easing: EASE });
+    pTitle.animate([{ opacity: 0 }, { opacity: 1 }], { duration: reduce.matches ? 1 : 450, easing: EASE });
+    if (!MODS[key]) pGrid.querySelectorAll(":scope > .nh-tile").forEach((p, i) => setTimeout(() => { p.classList.add("nh-sweep"); setTimeout(() => p.classList.add("done"), 1100); }, i * 70));
+  }
   function openPage(tile, key) {
     if (busy || zoom) return;
-    pGrid.classList.toggle("nh-scroll", key === "brand");
     busy = true;
+    pStack = [];
     const t = T[key];
-    pTitle.innerHTML = `<div class="nh-name"><span class="latin">${t.en}</span><b>${esc(t.ar)}</b></div>${iconOf(t.icon)}`;
-    pGrid.innerHTML = PAGES[key]();
+    pTitle.innerHTML = titleHTML(t);
     page.hidden = false;
-    if (key !== "brand") pGrid.querySelectorAll(".nh-tile").forEach(addSnake);
-    else BrandPage.mount(pGrid, pageArg);
-    pageArg = null;
+    fillPage(key);
     const z = zoomIn(tile);
     const sIcon = tile.querySelector(":scope > .nh-head > .gi, :scope > .nh-head > .nh-plate"), sName = tile.querySelector(":scope > .nh-head > .nh-name");
     const tIcon = pTitle.querySelector(".gi, .nh-plate"), tName = pTitle.querySelector(".nh-name");
@@ -311,11 +330,13 @@ const NH = (() => {
       tIcon.style.opacity = tName.style.opacity = 1;
       busy = false;
       document.getElementById("nhBack").focus({ preventScroll: true });
-      if (key !== "brand") pGrid.querySelectorAll(":scope > .nh-tile").forEach((p, i) => setTimeout(() => { p.classList.add("nh-sweep"); setTimeout(() => p.classList.add("done"), 1100); }, i * 70));
+      if (!MODS[key]) pGrid.querySelectorAll(":scope > .nh-tile").forEach((p, i) => setTimeout(() => { p.classList.add("nh-sweep"); setTimeout(() => p.classList.add("done"), 1100); }, i * 70));
     });
   }
   function closePage() {
     if (busy || !zoom?.page) return;
+    if (pStack.length) return swapPage(pStack[pStack.length - 1].key, true);
+    MotionPage.close();
     busy = true;
     const p = zoom.page;
     p.fIcon.style.opacity = p.fName.style.opacity = 1;
@@ -350,24 +371,24 @@ const NH = (() => {
     const tile = e.target.closest(".nh-tile[data-id]");
     if (!tile) return;
     const id = tile.dataset.id, t = T[id];
-    if (t.page) return zoom?.page ? null : openPage(tile, t.page);
+    if (t.page) return zoom?.page ? (busy || pGrid.dataset.key === t.page ? null : swapPage(t.page)) : openPage(tile, t.page);
     const a = act(id);
     if (a) openSection(tile, a);
   }
   host.addEventListener("click", onActivate);
   host.addEventListener("keydown", (e) => {
     if ((e.key === "Enter" || e.key === " ") && e.target.matches(".nh-tile[data-id], .nh-line")) { e.preventDefault(); onActivate(e); }
-    if (e.key === "Escape" && zoom?.page && $("stage").hidden) closePage();
+    if (e.key === "Escape" && zoom?.page && $("stage").hidden && !document.querySelector(".ml-view")) closePage();
   });
 
   // ---------- الداتا الحقيقية ----------
   async function refresh() {
-    const [folders, publisher, posts, coaches, voices, music, brains, cats] = await Promise.all([
+    const [folders, publisher, posts, coaches, voices, music, brains, cats, motion] = await Promise.all([
       shellFolders(true), api("/api/publisher").catch(() => null), api("/api/posts").catch(() => []), api("/api/coaches").catch(() => []),
       api("/api/audio?kind=voice").catch(() => []), api("/api/audio?kind=music").catch(() => []), api("/api/ad-brains").catch(() => []),
-      D.cats.length ? D.cats : api("/api/style-cats").catch(() => []),
+      D.cats.length ? D.cats : api("/api/style-cats").catch(() => []), api("/api/motion-library").catch(() => []),
     ]);
-    Object.assign(D, { cats, folders, publisher, posts, coaches, voices: voices.length, music: music.length, money: window.money?.last || D.money,
+    Object.assign(D, { motion, cats, folders, publisher, posts, coaches, voices: voices.length, music: music.length, money: window.money?.last || D.money,
       brand: brains.find((b) => b.id === clientx?.active) || brains[0] || null });
     renderTiles();
     GL?.brand?.();
@@ -382,7 +403,7 @@ const NH = (() => {
     openBrand(id) {
       const go = () => {
         if (zoom?.page) {
-          if (pGrid.classList.contains("nh-scroll")) return BrandPage.mount(pGrid, id);
+          if (pGrid.dataset.key === "brand") return BrandPage.mount(pGrid, id);
           closePage();
           return setTimeout(go, 1100);
         }

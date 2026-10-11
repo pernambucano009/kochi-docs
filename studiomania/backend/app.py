@@ -986,7 +986,7 @@ def coach_to_dict(row: sqlite3.Row) -> dict:
 def get_coach(conn: sqlite3.Connection, coach_id: str) -> sqlite3.Row:
     row = conn.execute("SELECT * FROM coaches WHERE id = ?", (coach_id,)).fetchone()
     if row is None:
-        raise HTTPException(404, "المدرب غير موجود")
+        raise HTTPException(404, "الشخصية مش موجودة")
     return row
 
 
@@ -1028,7 +1028,7 @@ def create_coach(
 ):
     name = name.strip()
     if not name:
-        raise HTTPException(400, "اكتب اسم المدرب")
+        raise HTTPException(400, "اكتب اسم الشخصية")
     handles = coach_handles(instagram, tiktok)
     coach_id = uuid.uuid4().hex[:12]
     image_filename = save_upload(image, IMAGE_EXTENSIONS, COACHES_DIR, f"{coach_id}_image")
@@ -1255,7 +1255,7 @@ def _run_generation(gen_id: str) -> None:
         if not clip_path.exists():
             raise atlas.AtlasError("ملف القطعة اتمسح (غالبًا الفيديو اتقطّع تاني). اختار القطعة الجديدة وولّد من الأول")
         if not image_path.exists():
-            raise atlas.AtlasError("صورة المدرب اتمسحت")
+            raise atlas.AtlasError("صورة الشخصية اتمسحت")
         set_generation(gen_id, status="uploading", error=None)
         clip_url = atlas.upload_media(clip_path)
         image_url = atlas.upload_media(image_path)
@@ -1444,7 +1444,7 @@ def create_generations(body: GenerationIn):
         if not forced:
             missing = sorted({r["video_name"] for r in rows if not r["video_coach_id"]})
             if missing:
-                raise HTTPException(400, f"مفيش مدرب للمشروع: {'، '.join(missing)}. اختاره من صفحة المشاريع")
+                raise HTTPException(400, f"مفيش شخصية للمشروع: {'، '.join(missing)}. اختاره من صفحة المشاريع")
         coaches = {}
         ids = []
         for r in rows:
@@ -3873,7 +3873,7 @@ def test_text_model():
 
 
 # ---------- مكتبة الكاروسيل: تيمبليتس وشخصيات ----------
-ASSET_KINDS = {"template": "تيمبليت", "character": "شخصية", "coach": "مدرب", "style": "ستايل رسم"}
+ASSET_KINDS = {"template": "تيمبليت", "character": "شخصية", "coach": "شخصية", "style": "ستايل رسم"}
 ASSET_MAX_FILES = 12
 # صيغ تانية بتتحول PNG لوحدها (صور الآيفون وصور المواقع)
 CONVERT_EXTENSIONS = {".heic", ".heif", ".avif", ".gif", ".bmp", ".tif", ".tiff", ".jfif"}
@@ -10499,6 +10499,7 @@ def asset_get(aid: str):
 MOTION_DIR = ROOT / "library" / "motion"
 MOTION_FPS = 30
 MOTION_JOBS: dict[str, dict] = {}   # id → {"status": "working"|"error", "progress": 0..1, "error": str}
+app.mount("/media/motion", StaticFiles(directory=MOTION_DIR, check_dir=False), name="motion")   # المعاينة الحية والصور
 
 
 def motion_manifest() -> list[dict]:
@@ -10518,7 +10519,13 @@ def motion_asset_id(mid: str) -> str | None:
 
 @app.get("/api/motion-library")
 def motion_library():
-    return [{**m, "asset": motion_asset_id(m["id"]), "job": MOTION_JOBS.get(m["id"])} for m in motion_manifest()]
+    out = []
+    for m in motion_manifest():
+        aid = motion_asset_id(m["id"])
+        out.append({**m, "asset": aid, "job": MOTION_JOBS.get(m["id"]), "preview_url": f"/media/motion/r/{m['id']}/reel.html",
+                    "poster_url": f"/media/motion/r/{m['id']}/poster.jpg" if (MOTION_DIR / "r" / m["id"] / "poster.jpg").exists() else None,
+                    "video_url": f"/media/assets/{aid}/clip.mp4" if aid else None})
+    return out
 
 
 def run_motion_import(mid: str, meta: dict) -> None:

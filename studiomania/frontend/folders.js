@@ -1,4 +1,4 @@
-// StudioMania — المشاريع: كل مشروع فولدر فيه الفيديو الخام والتعليق الصوتي والمدرب
+// StudioMania — المشاريع: كل مشروع فولدر فيه الفيديو الخام والتعليق الصوتي والشخصية
 
 const fol = { list: [], current: null, voices: [], coaches: [], query: "" };
 
@@ -29,7 +29,7 @@ function renderFolders() {
       <div class="fparts">
         <span class="${f.video ? "ok" : "miss"}">🎬 ${f.video ? "فيديو" : "مفيش فيديو"}</span>
         <span class="${f.voice ? "ok" : "miss"}">🎙️ ${f.voice ? "صوت" : "مفيش صوت"}</span>
-        <span class="${f.coach ? "ok" : "miss"}">🧑‍🏫 ${f.coach ? escapeHtml(f.coach.name) : "مفيش مدرب"}</span>
+        <span class="${f.coach ? "ok" : "miss"}">🧍 ${f.coach ? escapeHtml(f.coach.name) : "مفيش شخصية"}</span>
       </div>
       ${folderBadges(f).length ? `<div class="fbadges">${folderBadges(f).map((x) => `<span class="badge">${x}</span>`).join("")}</div>` : ""}
     </li>`)
@@ -55,7 +55,7 @@ $("newFolderForm").addEventListener("submit", async (e) => {
     $("newFolderName").value = "";
     fol.current = f;
     await loadFolders();
-    toast("✅ المشروع اتعمل. ارفع الفيديو والتعليق الصوتي واختار المدرب");
+    toast("✅ المشروع اتعمل. ارفع الفيديو والتعليق الصوتي واختار الشخصية");
   } catch (err) {
     toast(err.message, true);
   }
@@ -69,7 +69,7 @@ function renderFolderDetail() {
   if (!f) return;
   if (document.activeElement !== $("folderName")) $("folderName").value = f.name;
   const steps = [
-    ["الفيديو", !!f.video], ["الصوت", !!f.voice], ["المدرب", !!f.coach],
+    ["الفيديو", !!f.video], ["الصوت", !!f.voice], ["الشخصية", !!f.coach],
     ["التقطيع", !!f.video?.clips], ["التوليد", f.video?.clips > 0 && f.video.generated === f.video.clips], ["التصدير", !!f.exported],
   ];
   $("folderProgress").innerHTML = steps.map(([t, ok]) => `<span class="${ok ? "ok" : ""}">${ok ? "✓" : "○"} ${t}</span>`).join("");
@@ -101,19 +101,19 @@ function renderFolderDetail() {
        <select data-pick="voice">${voiceOpts}</select>
        <div class="bar el-bar" hidden><i></i></div>`;
 
-  // المدرب
-  const coachOpts = `<option value="">— اختار مدرب —</option>` + fol.coaches
+  // الشخصية
+  const coachOpts = `<option value="">— اختار شخصية —</option>` + fol.coaches
     .map((c) => `<option value="${c.id}" ${f.coach?.id === c.id ? "selected" : ""}>${escapeHtml(c.name)}${c.outro_url ? "" : " (من غير أوترو)"}</option>`).join("");
-  $("elCoach").innerHTML = `<h3>🧑‍🏫 المدرب</h3>` + (f.coach
+  $("elCoach").innerHTML = `<h3>🧍 الشخصية</h3>` + (f.coach
     ? `<img class="el-coach" src="${f.coach.image_url}" alt="">
        <div class="el-title">${escapeHtml(f.coach.name)}</div>
        <div class="${f.coach.outro_url ? "muted" : "warn-text"}">${f.coach.outro_url ? `🎬 أوترو ${fmtDuration(f.coach.outro_duration)}` : "⚠️ مالوش أوترو"}</div>
        ${f.coach.outro_url ? `<details><summary>شوف الأوترو</summary><video src="${f.coach.outro_url}" controls preload="none" playsinline></video></details>` : ""}`
-    : `<div class="el-empty">مفيش مدرب لسه</div>`)
+    : `<div class="el-empty">مفيش شخصية لسه</div>`)
     + `<select data-pick="coach">${coachOpts}</select>
        <div class="row wrap">
          ${f.coach ? `<button class="btn sm danger" data-del="coach">✕ شيله</button>` : ""}
-         <a href="#" class="btn sm" data-goto="4">＋ ضيف مدرب جديد</a>
+         <a href="#" class="btn sm" data-goto="4">＋ ضيف شخصية جديدة</a>
        </div>`;
 
   renderScript(f);
@@ -314,7 +314,7 @@ $("folderDetail").addEventListener("change", async (e) => {
     }
   }
   if (pick === "voice") patchFolder({ voice_id: e.target.value || null }, "✅ التعليق الصوتي اتغيّر");
-  if (pick === "coach") patchFolder({ coach_id: e.target.value || null }, "✅ المدرب اتغيّر");
+  if (pick === "coach") patchFolder({ coach_id: e.target.value || null }, "✅ الشخصية اتغيّرت");
 });
 
 $("folderDetail").addEventListener("click", async (e) => {
@@ -329,12 +329,12 @@ $("folderDetail").addEventListener("click", async (e) => {
     } catch (err) { toast(err.message, true); }
   }
   if (del === "voice") patchFolder({ voice_id: null }, "اتشال من المشروع (لسه موجود في مكتبة التعليق الصوتي)");
-  if (del === "coach") patchFolder({ coach_id: null }, "اتشال من المشروع (لسه موجود في المدربين)");
+  if (del === "coach") patchFolder({ coach_id: null }, "اتشال من المشروع (لسه موجود في الشخصيات)");
 });
 
 $("folderDelete").onclick = async () => {
   const f = fol.current;
-  if (!confirm(`حذف المشروع "${f.name}" والفيديو الخام بتاعه؟\nالتعليق الصوتي والمدرب هيفضلوا في مكتباتهم، والفيديوهات اللي اتصدّرت هتفضل في فولدر الجاهز.`)) return;
+  if (!confirm(`حذف المشروع "${f.name}" والفيديو الخام بتاعه؟\nالتعليق الصوتي والشخصية هيفضلوا في مكتباتهم، والفيديوهات اللي اتصدّرت هتفضل في فولدر الجاهز.`)) return;
   await api(`/api/folders/${f.id}`, { method: "DELETE" });
   fol.current = null;
   await loadFolders();
@@ -350,7 +350,7 @@ $("goCut").onclick = async () => {
 $("goGenerate").onclick = () => openGenerateWith(fol.current.video.id, fol.current.coach?.id || null);
 $("goMontage").onclick = async () => {
   try {
-    await openMontageForVideo(fol.current.video.id);   // لو اتولّد بأكتر من مدرب بيسأل أنهي واحد
+    await openMontageForVideo(fol.current.video.id);   // لو اتولّد بأكتر من شخصية بيسأل أنهي واحد
   } catch (err) {
     toast(err.message, true);
   }
@@ -407,9 +407,9 @@ function groupIntoProjects(items) {
         image: images,
         script: texts,
       },
-      // coach: "" = من غير مدرب، "new" = مدرب جديد من الصورة، أو id مدرب موجود
+      // coach: "" = من غير شخصية، "new" = شخصية جديدة من الصورة، أو id شخصية موجودة
       coach: existingCoach ? existingCoach.id : image ? "new" : "",
-      newCoachName: image ? (key ? niceName(image.name) : `مدرب ${name}`) : "",
+      newCoachName: image ? (key ? niceName(image.name) : `شخصية ${name}`) : "",
       existingFolderId: existingFolder?.id || null,
       preview: image ? URL.createObjectURL(image) : null,
       status: "",
@@ -418,7 +418,7 @@ function groupIntoProjects(items) {
   return rows;
 }
 
-const SLOT_LABEL = { video: "الفيديو الخام", voice: "التعليق الصوتي", image: "صورة المدرب", script: "السكريبت" };
+const SLOT_LABEL = { video: "الفيديو الخام", voice: "التعليق الصوتي", image: "صورة الشخصية", script: "السكريبت" };
 
 async function loadRowScript(r) {
   try { r.scriptText = r.script ? await readTextFile(r.script) : ""; }
@@ -439,7 +439,7 @@ function slotSelect(r, slot) {
 function coachOutroNote(r) {
   if (!r.coach || r.coach === "new") return "";
   const c = fol.coaches.find((x) => x.id === r.coach);
-  return c?.outro_url ? `<div class="muted">🎬 الأوترو: بتاع ${escapeHtml(c.name)}</div>` : `<div class="warn-text">⚠️ المدرب ده مالوش أوترو</div>`;
+  return c?.outro_url ? `<div class="muted">🎬 الأوترو: بتاع ${escapeHtml(c.name)}</div>` : `<div class="warn-text">⚠️ الشخصية دي مالهاش أوترو</div>`;
 }
 
 function renderFup() {
@@ -447,8 +447,8 @@ function renderFup() {
   const coaches = fol.coaches;
   $("fupRows").innerHTML = fup.rows
     .map((r, i) => {
-      const coachOpts = `<option value="">— من غير مدرب —</option>` +
-        (r.image ? `<option value="new" ${r.coach === "new" ? "selected" : ""}>＋ مدرب جديد من الصورة</option>` : "") +
+      const coachOpts = `<option value="">— من غير شخصية —</option>` +
+        (r.image ? `<option value="new" ${r.coach === "new" ? "selected" : ""}>＋ شخصية جديدة من الصورة</option>` : "") +
         coaches.map((c) => `<option value="${c.id}" ${r.coach === c.id ? "selected" : ""}>${escapeHtml(c.name)}</option>`).join("");
       return `<tr data-i="${i}" class="${r.status === "done" ? "done" : ""}">
         <td><input type="text" data-f="name" value="${escapeHtml(r.name)}">
@@ -462,9 +462,9 @@ function renderFup() {
         <td class="fup-coach">
           ${r.preview ? `<img src="${r.preview}" alt="">` : ""}
           <div class="slot-label">🖼️ الصورة</div>${slotSelect(r, "image")}
-          <div class="slot-label">🧑‍🏫 المدرب</div><select data-f="coach">${coachOpts}</select>
-          ${r.coach === "new" ? `<input type="text" data-f="newCoachName" value="${escapeHtml(r.newCoachName)}" placeholder="اسم المدرب">
-            <div class="muted">مدرب جديد من غير أوترو. ضيفه بعدين من صفحة المدربين</div>` : ""}
+          <div class="slot-label">🧍 الشخصية</div><select data-f="coach">${coachOpts}</select>
+          ${r.coach === "new" ? `<input type="text" data-f="newCoachName" value="${escapeHtml(r.newCoachName)}" placeholder="اسم الشخصية">
+            <div class="muted">شخصية جديدة من غير أوترو. ضيفه بعدين من صفحة الشخصيات</div>` : ""}
           ${coachOutroNote(r)}</td>
         <td>${r.status === "done" ? "✅" : `<button class="btn sm danger" data-f="remove" title="متترفعش">✕</button>`}</td>
       </tr>`;
@@ -566,7 +566,7 @@ $("fupRows").addEventListener("change", async (e) => {
       const match = key ? fol.coaches.find((c) => matchKey(c.name) === key) : null;
       if (match) r.coach = match.id;
       else if (!file && r.coach === "new") r.coach = "";
-      else if (file && !r.coach) { r.coach = "new"; r.newCoachName = key ? niceName(file.name) : `مدرب ${r.name}`; }
+      else if (file && !r.coach) { r.coach = "new"; r.newCoachName = key ? niceName(file.name) : `شخصية ${r.name}`; }
     }
   }
   if (e.target.dataset.f === "coach") r.coach = e.target.value;
@@ -606,7 +606,7 @@ $("fupUpload").onclick = async () => {
   renderFup();
   const bar = $("fupBar");
   const rows = fup.rows.filter((r) => r.status !== "done");
-  const newCoaches = new Map(); // نفس المدرب الجديد لو اتكرر في كذا فولدر يتعمل مرة واحدة
+  const newCoaches = new Map(); // نفس الشخصية الجديدة لو اتكرر في كذا فولدر يتعمل مرة واحدة
   for (const [n, r] of rows.entries()) {
     const label = `${n + 1} من ${rows.length}: ${r.name}`;
     const step = (s) => { r.status = s; $("fupProgress").textContent = `⏳ ${label} · ${s}`; renderFup(); };
@@ -636,7 +636,7 @@ $("fupUpload").onclick = async () => {
         const cname = r.newCoachName.trim();
         coachId = newCoaches.get(cname) || fol.coaches.find((c) => c.name.trim() === cname)?.id || null;
         if (!coachId) {
-          step("بيعمل المدرب...");
+          step("بيعمل الشخصية...");
           const form = new FormData();
           form.append("name", cname);
           form.append("image", r.image);

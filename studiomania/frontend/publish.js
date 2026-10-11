@@ -144,15 +144,15 @@ function renderPostVideo() {
   $("postVideo").innerHTML = ex
     ? `🎬 ${escapeHtml(ex.name)} <span class="muted">(${fmtDuration(ex.duration)})</span>`
     : `<span class="muted">اختار فيديو من الفولدر (دوس 📅 جدول)</span>`;
-  // التاج: حساب مدرب المشروع بيتحط لوحده (إلا لو انت كتبت حاجة بإيدك)
+  // التاج: حساب شخصية المشروع بيتحط لوحده (إلا لو انت كتبت حاجة بإيدك)
   const coachTag = ex?.coach?.instagram ? `@${ex.coach.instagram}` : "";
   if (!pub.tagsTouched && !pub.editing) {
     $("igTags").value = coachTag;
-    // الفيديو عن مدرب ليه حساب: كولاب معاه تلقائي (تقدر تشيله)
+    // الفيديو عن شخصية ليها حساب: كولاب معاه تلقائي (تقدر تشيله)
     $("igCollab").checked = !!coachTag;
   }
   $("igTagsHint").textContent = ex?.coach
-    ? (ex.coach.instagram ? `المدرب: ${ex.coach.name} (@${ex.coach.instagram})` : `⚠️ المدرب ${ex.coach.name} مالوش حساب إنستجرام متسجل. ضيفه من صفحة المدربين`)
+    ? (ex.coach.instagram ? `الشخصية: ${ex.coach.name} (@${ex.coach.instagram})` : `⚠️ الشخصية ${ex.coach.name} مالهاش حساب إنستجرام متسجل. ضيفه من صفحة الشخصيات`)
     : "اكتب الحسابات اللي عايز تعملها تاج، وافصل بينهم بفاصلة.";
   // الغلاف بيتختار من نفس الفيديو
   const v = $("coverVideo");

@@ -8,7 +8,7 @@ const STEP_INFO = {
   2: { num: "03", title: "التوليد بـ Seedance" },
   6: { num: "04", title: "المونتاج" },
   7: { num: "05", title: "النشر على السوشيال" },
-  4: { num: "", title: "مكتبة المدربين" },
+  4: { num: "", title: "مكتبة الشخصيات" },
   3: { num: "", title: "مكتبة التعليق الصوتي" },
   5: { num: "", title: "مكتبة الموسيقى" },
   8: { num: "", title: "صناعة الكاروسيل" },
@@ -145,7 +145,7 @@ $("flowNav").addEventListener("click", (e) => {
   showStep(b.dataset.step);
 });
 
-// المونتاج من شريط الخطوات: لو المشروع اللي شغال عليه اتولّد بأكتر من مدرب، يسأل أنهي مدرب
+// المونتاج من شريط الخطوات: لو المشروع اللي شغال عليه اتولّد بأكتر من شخصية، يسأل أنهي شخصية
 async function openFlowMontage() {
   const f = await flowFolder();
   if (f?.video?.generated && (await api(`/api/videos/${f.video.id}/coaches`)).length > 1) return openMontageForVideo(f.video.id);
@@ -300,7 +300,7 @@ async function loadHome() {
   $("tilePubSub").textContent = upcoming.length ? `${upcoming.length} بوست متجدول` : "مفيش بوستات متجدولة";
 
   // المكتبات
-  $("tileCoachSub").textContent = `${coaches.length} مدرب`;
+  $("tileCoachSub").textContent = `${coaches.length} شخصية`;
   $("tileAvatars").innerHTML = coaches.slice(0, 4).map((c) => `<img src="${c.image_url}" alt="">`).join("");
   $("tileVoiceSub").textContent = `${voices.length} تسجيل`;
   $("tileMusicSub").textContent = `${music.length} تراك`;

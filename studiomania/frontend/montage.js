@@ -4,7 +4,7 @@ const FPS = 30;
 let PV_W = 252, PV_H = 448; // حجم كادر المعاينة (بيتغير مع مقاس الكادر)
 const MIN_CLIP = 1 / 30; // أقل طول لقطعة: فريم واحد
 const PPS_MIN = 8, PPS_MAX = 600; // حدود زووم التايم لاين (بكسل لكل ثانية)
-// كل قسم ليه مونتاج لوحده: مشاريعه ومشروعه المفتوح (فيديوهات المدربين / المسلسلات / الإعلانات)
+// كل قسم ليه مونتاج لوحده: مشاريعه ومشروعه المفتوح (فيديوهات الشخصيات / المسلسلات / الإعلانات)
 const SECTION_OF_STEP = { "6": "coach", "6s": "series", "6a": "ads" };
 const SECTION_BACK = { series: ["9", "↩ رجوع للمسلسلات"], ads: ["10", "↩ رجوع للإعلانات"] };
 const projectKey = (section) => section === "coach" ? "studiomania.projectId" : `studiomania.projectId.${section}`;
@@ -161,7 +161,7 @@ function addOutroClip(d) {
 // المشاريع القديمة (والجديدة) فيها «ضيف الأوترو» كإعداد: بنحوّله لقطعة في آخر الفيديو مرة واحدة
 function migrateOutro(d) {
   if (!d.outro) return false;
-  if (!d.coach_id) return false; // لسه مفيش مدرب، الأوترو هيتضاف أول ما يتختار
+  if (!d.coach_id) return false; // لسه مفيش شخصية، الأوترو هيتضاف أول ما يتختار
   addOutroClip(d);
   d.outro = false;
   return true;
@@ -2716,7 +2716,7 @@ for (const [id, key] of [["pFadeIn", "fade_in"], ["pFadeOut", "fade_out"], ["pVo
   });
 }
 
-// ---------- المدرب والصوت ----------
+// ---------- الشخصية والصوت ----------
 function renderSide() {
   const d = mt.project.data;
   renderSfx();
@@ -2726,7 +2726,7 @@ function renderSide() {
   const outros = d.clips.filter(isOutroClip);
   $("mOutro").checked = outros.length > 0;
   $("mOutro").disabled = !coach?.outro_url;
-  $("outroInfo").textContent = !coach ? "" : coach.outro_url ? `(${fmtDuration(coach.outro_duration)})` : "(المدرب ده مالوش أوترو)";
+  $("outroInfo").textContent = !coach ? "" : coach.outro_url ? `(${fmtDuration(coach.outro_duration)})` : "(الشخصية دي مالهاش أوترو)";
   const ov = outros[0]?.volume ?? d.outro_volume ?? 1;
   $("mOutroVol").value = Math.round(ov * 100);
   $("outroVolVal").textContent = `${Math.round(ov * 100)}%`;
@@ -2768,7 +2768,7 @@ function sideInput(key, apply) {
 }
 $("mCoach").addEventListener("change", sideInput(null, (d) => {
   d.coach_id = $("mCoach").value || null;
-  // الأوترو بيتبدّل بأوترو المدرب الجديد (أو بيتشال لو مالوش أوترو)
+  // الأوترو بيتبدّل بأوترو الشخصية الجديدة (أو بيتشال لو مالوش أوترو)
   const had = d.clips.some(isOutroClip);
   d.clips = d.clips.filter((c) => !isOutroClip(c));
   if (had) addOutroClip(d);
@@ -2911,15 +2911,15 @@ $("newProject").onclick = async () => {
   openProject(p);
   $("projectName").select();
 };
-// لو المشروع اتولّد بأكتر من مدرب: يسأل أنهي مدرب (null = لغى). مدرب واحد أو مفيش: من غير سؤال
+// لو المشروع اتولّد بأكتر من شخصية: يسأل أنهي شخصية (null = لغى). شخصية واحدة أو مفيش: من غير سؤال
 async function pickVideoCoach(videoId) {
   const list = await api(`/api/videos/${videoId}/coaches`);
   if (list.length < 2) return { coach: list[0] || null, many: false };
   return new Promise((resolve) => {
     const dlg = document.createElement("dialog");
     dlg.className = "bulk-dlg coach-pick-dlg";
-    dlg.innerHTML = `<div class="panel-head"><h2>🎬 عايز مونتاج أنهي مدرب؟</h2><button class="btn sm" data-x>إلغاء</button></div>
-      <p class="hint">المشروع ده اتولّد بأكتر من مدرب. كل مدرب ليه مونتاج لوحده.</p>
+    dlg.innerHTML = `<div class="panel-head"><h2>🎬 عايز مونتاج أنهي شخصية؟</h2><button class="btn sm" data-x>إلغاء</button></div>
+      <p class="hint">المشروع ده اتولّد بأكتر من شخصية. كل شخصية ليها مونتاج لوحده.</p>
       <div class="coach-pick">${list.map((c, i) => `<button type="button" class="coach-pick-item" data-i="${i}">
         <img src="${c.image_url}" alt=""><b data-no-i18n>${escapeHtml(c.name)}</b>
         <small class="muted">${c.ready} / ${c.total} جاهز</small></button>`).join("")}</div>`;
@@ -2935,7 +2935,7 @@ async function pickVideoCoach(videoId) {
   });
 }
 
-// يفتح مونتاج الفيديو ده بآخر الفيديوهات المولَّدة للمدرب المختار (أو يعمل له مشروع لو مفيش)
+// يفتح مونتاج الفيديو ده بآخر الفيديوهات المولَّدة للشخصية المختارة (أو يعمل له مشروع لو مفيش)
 async function openMontageForVideo(videoId) {
   const pick = await pickVideoCoach(videoId);
   if (!pick) return;

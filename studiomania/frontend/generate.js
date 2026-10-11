@@ -51,7 +51,7 @@ async function initGenerate() {
     const mine = clips.filter((c) => c.video_id === videoId && c.duration >= MIN_REF);
     const coach = gen.coaches.get(mine[0]?.video_coach_id);
     if (coach) mine.forEach((c) => gen.selected.add(c.id));
-    toast(coach ? `✅ اتعلّم على ${mine.length} قطعة · المدرب: ${coach.name}` : "⚠️ المشروع ده مفيهوش مدرب. اختاره من صفحة المشاريع", !coach);
+    toast(coach ? `✅ اتعلّم على ${mine.length} قطعة · الشخصية: ${coach.name}` : "⚠️ المشروع ده مفيهوش شخصية. اختاره من صفحة المشاريع", !coach);
     setTimeout(() => document.querySelector(`.clip-group[data-vid="${videoId}"]`)?.scrollIntoView({ block: "center", behavior: "smooth" }), 200);
   }
   renderClipPicker();
@@ -150,7 +150,7 @@ $("promptList").addEventListener("click", async (e) => {
   renderPrompts();
 });
 
-// يفتح صفحة التوليد وقطع فيديو معيّن متعلّم عليها (المدرب بييجي من المشروع)
+// يفتح صفحة التوليد وقطع فيديو معيّن متعلّم عليها (الشخصية بتيجي من المشروع)
 function openGenerateWith(videoId) {
   gen.pending = { videoId };
   showStep("2");
@@ -222,7 +222,7 @@ function coachChip(coachId) {
   const c = gen.coaches.get(coachId);
   return c
     ? `<span class="coach-chip"><img src="${c.image_url}" alt="">${escapeHtml(c.name)}</span>`
-    : `<span class="coach-chip missing">⚠️ مفيش مدرب</span>`;
+    : `<span class="coach-chip missing">⚠️ مفيش شخصية</span>`;
 }
 
 function renderClipPicker() {
@@ -245,7 +245,7 @@ function renderClipPicker() {
           <span class="spacer"></span>
           ${hasCoach
             ? `<button class="btn sm" data-all="${vid}">${all ? "إلغاء الكل" : "اختار الكل"}</button>`
-            : `<button class="btn sm primary" data-pick-coach="${vid}">🧑‍🏫 اختار المدرب من المشروع</button>`}
+            : `<button class="btn sm primary" data-pick-coach="${vid}">🧍 اختار الشخصية من المشروع</button>`}
           <button class="btn sm" data-archive="${vid}" title="انقل المشروع ده للأرشيف">🗄️</button>
         </div>
         <div class="clip-picks">${g.clips
@@ -253,7 +253,7 @@ function renderClipPicker() {
             const short = c.duration < MIN_REF;
             const off = short || !hasCoach;
             return `<div class="clip-pick ${gen.selected.has(c.id) ? "selected" : ""} ${off ? "too-short" : ""}"
-              data-id="${c.id}" title="${short ? `أقصر من ${MIN_REF} ثانية، Seedance مش هيقبلها` : !hasCoach ? "اختار مدرب للمشروع الأول" : ""}">
+              data-id="${c.id}" title="${short ? `أقصر من ${MIN_REF} ثانية، Seedance مش هيقبلها` : !hasCoach ? "اختار شخصية للمشروع الأول" : ""}">
               ${lightVideo(c.url, "muted playsinline")}
               <span class="tick">✓</span>
               <span class="tag"><span>#${c.index}</span><span>${c.duration.toFixed(1)}ث</span></span>
@@ -284,7 +284,7 @@ $("clipPicker").addEventListener("click", async (e) => {
   const pick = e.target.closest(".clip-pick");
   if (!pick) return;
   if (pick.classList.contains("too-short")) {
-    if (pick.closest(".no-coach")) toast("المشروع ده مفيهوش مدرب. دوس «اختار المدرب من المشروع»", true);
+    if (pick.closest(".no-coach")) toast("المشروع ده مفيهوش شخصية. دوس «اختار الشخصية من المشروع»", true);
     return;
   }
   const id = pick.dataset.id;
@@ -302,7 +302,7 @@ function updateGenerateBtn() {
   const n = gen.selected.size;
   const coaches = new Set(gen.clips.filter((c) => gen.selected.has(c.id)).map((c) => c.video_coach_id));
   $("clipPickCount").textContent = n
-    ? `${n} مختارة` + (coaches.size > 1 ? ` · ${coaches.size} مدربين` : "")
+    ? `${n} مختارة` + (coaches.size > 1 ? ` · ${coaches.size} شخصيات` : "")
     : "";
   const btn = $("generateBtn");
   btn.disabled = !n || !gen.promptId;
@@ -429,7 +429,7 @@ function genCard(g) {
         <a class="btn sm" href="${g.clip_url}" target="_blank">القطعة الأصلية</a>
         ${g.output_url ? `<a class="btn sm" href="${g.output_url}" download>⬇ تحميل</a>` : ""}
         ${g.status === "failed" ? `<button class="btn sm" data-act="retry">↻ إعادة المحاولة</button>` : ""}
-        ${isActive ? "" : `<button class="btn sm" data-act="again" title="فيديو جديد لنفس القطعة بنفس المدرب والبرومبت، مكان القديم">🔄 ولّد تاني</button>`}
+        ${isActive ? "" : `<button class="btn sm" data-act="again" title="فيديو جديد لنفس القطعة بنفس الشخصية والبرومبت، مكان القديم">🔄 ولّد تاني</button>`}
         ${isActive ? "" : `<button class="btn sm danger" data-act="delete">حذف</button>`}
       </div>
     </div>`;
