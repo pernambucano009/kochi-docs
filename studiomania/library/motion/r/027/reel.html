@@ -1,23 +1,30 @@
 <!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
 <script>
-// #27 History of AI — 2 min editorial timeline. One typeface (Inter). The camera travels along one line;
+// #27 (عنصر: خط زمني) Editorial timeline, any events. One typeface (Inter). The camera travels along one line;
 // each moment has the same rhythm: year lands (hit) → event → why it mattered. Illustrations are drawn in code.
-const MOM = [
-  [1950, "Alan Turing publishes “Computing Machinery and Intelligence”", "It reframed “can machines think?” as a test you could actually run.", "turing"],
-  [1956, "The Dartmouth workshop names the field “artificial intelligence”", "AI became a research discipline with a name, a goal and funding.", "dartmouth"],
-  [1958, "Frank Rosenblatt builds the Perceptron", "The first machine that learned from examples instead of rules.", "perceptron"],
-  [1966, "Joseph Weizenbaum's ELIZA holds a conversation", "People confided in a script — a first look at how we treat chatbots.", "eliza"],
-  [1974, "The first “AI winter” sets in", "Promises outran results, and funding dried up for years.", "winter"],
-  [1986, "Rumelhart, Hinton and Williams popularise backpropagation", "Multi-layer networks could finally be trained.", "backprop"],
-  [1997, "IBM's Deep Blue beats Garry Kasparov at chess", "A machine beat the world champion under tournament conditions.", "chess"],
-  [2012, "AlexNet wins the ImageNet challenge", "GPUs + data + deep nets: the start of the deep-learning boom.", "imagenet"],
-  [2016, "DeepMind's AlphaGo defeats Lee Sedol at Go", "Learning beat intuition in a game long thought too hard for computers.", "go"],
-  [2017, "Google researchers introduce the Transformer", "“Attention Is All You Need” — the architecture behind today's models.", "transformer"],
-  [2020, "OpenAI releases GPT-3", "Scale alone unlocked writing, translation and code from a prompt.", "gpt3"],
-  [2022, "ChatGPT launches to the public", "AI went from labs to a hundred million people in about two months.", "chat"],
-  [2025, "Models see, speak, write code and act as agents", "AI is now a tool people use every day — and the questions are bigger.", "now"],
-];
-const HOOK = 6, PER = 8.4, SPACE = 1500, INK = "#111214", PAPER = "#f4f2ed", ACC = "#2f5cff", MUTE = "#8b8a86";
+const PR = M.params({
+  title: { label: "العنوان", kind: "text", def: "75 years of AI" },
+  subtitle: { label: "تحت العنوان", kind: "text", def: "in thirteen moments that changed its course." },
+  events: { label: "المحطات (كل سطر: السنة | الحدث | ليه مهم)", kind: "lines", def: [
+    "1950 | Alan Turing publishes “Computing Machinery and Intelligence” | It reframed “can machines think?” as a test you could actually run.",
+    "1956 | The Dartmouth workshop names the field “artificial intelligence” | AI became a research discipline with a name, a goal and funding.",
+    "1958 | Frank Rosenblatt builds the Perceptron | The first machine that learned from examples instead of rules.",
+    "1986 | Rumelhart, Hinton and Williams popularise backpropagation | Multi-layer networks could finally be trained.",
+    "1997 | IBM's Deep Blue beats Garry Kasparov at chess | A machine beat the world champion under tournament conditions.",
+    "2012 | AlexNet wins the ImageNet challenge | GPUs + data + deep nets: the start of the deep-learning boom.",
+    "2017 | Google researchers introduce the Transformer | “Attention Is All You Need” — the architecture behind today's models.",
+    "2022 | ChatGPT launches to the public | AI went from labs to a hundred million people in about two months.",
+    "2025 | Models see, speak, write code and act as agents | AI is now a tool people use every day — and the questions are bigger."] },
+  ending: { label: "الجملة في الآخر", kind: "text", def: "And it's still being written." },
+  ink: { label: "لون الكلام", kind: "color", role: "ink", def: "#111214" },
+  accent: { label: "اللون المميز", kind: "color", role: "accent", def: "#2f5cff" },
+  bg: { label: "الخلفية", kind: "color", role: "bg", def: "#f4f2ed" },
+});
+const ARTS = ["perceptron", "backprop", "imagenet", "transformer", "chat", "now", "dartmouth", "winter"];
+const MOM = PR.events.slice(0, 14).map((l, i) => { const [y = "", w = "", why = ""] = String(l).split("|").map((z) => z.trim()); return [y, w, why, ARTS[i % ARTS.length]]; });
+if (!MOM.length) MOM.push(["", "", "", "now"]);
+const RTL = M.isAr(PR.title + MOM.map((m) => m[1]).join(""));
+const HOOK = 5, PER = MOM.length > 8 ? 7 : 7.6, SPACE = 1500, INK = PR.ink, PAPER = PR.bg, ACC = PR.accent, MUTE = "#8b8a86";
 const DUR = HOOK + MOM.length * PER + 4.8;
 M.reel({
   W: 1920, H: 1080, DUR, bg: PAPER,
@@ -32,22 +39,17 @@ M.reel({
     let camX;
     if (t < HOOK) camX = lerp(-1400, 0, expoIO(seg(t, 3.2, HOOK)));
     else { const move = expoIO(seg(f, 1 - 1.4 / PER, 1)); camX = (Math.min(i0, MOM.length - 1) + (i0 < MOM.length - 1 ? move : 0)) * SPACE; }
-    const toS = (wx) => wx - camX + 560;
+    const toS = (wx) => wx - camX + (RTL ? 1360 : 560);
     // the line itself, with decade ticks
     x.strokeStyle = INK; x.lineWidth = 3; x.beginPath(); x.moveTo(0, LY); x.lineTo(1920, LY); x.stroke();
-    const yearX = (y) => { // piecewise between moments so every moment sits at i*SPACE
-      for (let i = 0; i < MOM.length - 1; i++) if (y <= MOM[i + 1][0]) return (i + (y - MOM[i][0]) / (MOM[i + 1][0] - MOM[i][0])) * SPACE;
-      return (MOM.length - 1) * SPACE + (y - MOM[MOM.length - 1][0]) * 200;
-    };
-    x.fillStyle = MUTE; x.font = "400 22px I4"; x.textAlign = "center";
-    for (let y = 1950; y <= 2025; y++) { const sx = toS(yearX(y)); if (sx < -50 || sx > 1970) continue; const big = y % 10 === 0; x.fillRect(sx - 1, LY - (big ? 18 : 8), 2, big ? 36 : 16); if (big) x.fillText(y + "", sx, LY + 50); }
-    x.textAlign = "left";
+    x.fillStyle = MUTE;   // شرط صغيرة بين كل محطة والتانية
+    for (let k = -2; k < MOM.length * 6 + 6; k++) { const sx = toS(k * SPACE / 6); if (sx < -50 || sx > 1970) continue; const big = k % 6 === 0; x.fillRect(sx - 1, LY - (big ? 18 : 8), 2, big ? 36 : 16); }
     // ---- hook
     if (t < HOOK + .5) {
       const a = 1 - expoIO(seg(t, 3.2, 4.4));
       x.globalAlpha = a;
-      x.fillStyle = INK; x.font = "800 120px I8"; x.fillText("75 years of AI", 160, 330 - (1 - expo(seg(t, .2, .8))) * 40);
-      x.fillStyle = MUTE; x.font = "400 44px I4"; x.fillText("in thirteen moments that changed its course.", 166, 420 - (1 - expo(seg(t, .9, 1.5))) * 30);
+      x.fillStyle = INK; x.font = `800 ${M.fit(PR.title, "I8", 1600, 120, 40, "800")}px I8`; side(x, PR.title, 160, 330 - (1 - expo(seg(t, .2, .8))) * 40, 1600);
+      x.fillStyle = MUTE; x.font = `400 ${M.fit(PR.subtitle, "I4", 1600, 44, 20, "400")}px I4`; side(x, PR.subtitle, 166, 420 - (1 - expo(seg(t, .9, 1.5))) * 30, 1600);
       x.globalAlpha = 1;
     }
     // ---- moments
@@ -60,17 +62,17 @@ M.reel({
       // marker on the line
       x.fillStyle = past ? INK : ACC; x.beginPath(); x.arc(sx, LY, 12 * spring(t - t0 + .2, 14), 0, 7); x.fill();
       // year
-      x.save(); x.beginPath(); x.rect(sx - 20, 380, 900, 200); x.clip();
-      x.fillStyle = past ? MUTE : INK; x.font = "800 190px I8"; x.fillText(year + "", sx - 12, 560 + (1 - yIn) * 200);
+      x.save(); x.beginPath(); x.rect(RTL ? sx - 880 : sx - 20, 380, 900, 200); x.clip();
+      x.fillStyle = past ? MUTE : INK; x.font = `800 ${M.fit(year, "I8", 860, 190, 50, "800")}px I8`; side(x, year, sx - 12, 560 + (1 - yIn) * 200, 860, sx + 16);
       x.restore();
       // event + why
       x.globalAlpha = eIn; x.fillStyle = INK; x.font = "600 46px I6";
-      wrap(x, what, sx, 740 + (1 - eIn) * 30, 820, 58);
+      wrap(x, what, sx, 740 + (1 - eIn) * 30, 820, 58, sx + 16);
       x.globalAlpha = wIn; x.fillStyle = ACC; x.font = "400 34px I4";
-      wrap(x, why, sx, 890 + (1 - wIn) * 24, 820, 44);
+      wrap(x, why, sx, 890 + (1 - wIn) * 24, 820, 44, sx + 16);
       x.globalAlpha = 1;
       // illustration, top right of the moment
-      drawArt(x, M, art, sx + 1000, 300, t - t0);
+      drawArt(x, M, art, RTL ? sx - 1000 : sx + 1000, 300, t - t0);
     });
     // ---- end: pull back to see the whole line
     const end = HOOK + MOM.length * PER;
@@ -80,12 +82,12 @@ M.reel({
       // whole timeline, compressed
       x.strokeStyle = INK; x.lineWidth = 3; x.beginPath(); x.moveTo(160, 600); x.lineTo(160 + 1600 * k, 600); x.stroke();
       MOM.forEach(([year], i) => {
-        const px = 160 + (year - 1950) / 75 * 1600, a = expo(seg(t, end + .3 + i * .1, end + .6 + i * .1));
+        const px = 160 + (MOM.length > 1 ? i / (MOM.length - 1) : .5) * 1600, a = expo(seg(t, end + .3 + i * .1, end + .6 + i * .1));
         x.globalAlpha = a; x.fillStyle = i === MOM.length - 1 ? ACC : INK; x.beginPath(); x.arc(px, 600, 9, 0, 7); x.fill();
-        x.font = "600 22px I6"; x.textAlign = "center"; x.fillText(year + "", px, i % 2 ? 650 : 570); x.textAlign = "left"; x.globalAlpha = 1;
+        x.font = `600 ${M.fit(year, "I6", 1500 / MOM.length, 22, 10, "600")}px I6`; x.textAlign = "center"; x.direction = M.isAr(year) ? "rtl" : "ltr"; x.fillText(year + "", px, i % 2 ? 650 : 570); x.textAlign = "left"; x.direction = "ltr"; x.globalAlpha = 1;
       });
       const fin = expo(seg(t, end + 2, end + 2.6));
-      x.globalAlpha = fin; x.fillStyle = INK; x.font = "800 90px I8"; x.fillText("And it's still being written.", 160, 400); x.globalAlpha = 1;
+      x.globalAlpha = fin; x.fillStyle = INK; x.font = `800 ${M.fit(PR.ending, "I8", 1600, 90, 30, "800")}px I8`; side(x, PR.ending, 160, 400, 1600); x.globalAlpha = 1;
     }
   },
   sound(A) {
@@ -105,10 +107,16 @@ M.reel({
     A.pad(end, [m(45), m(52), m(57), m(61), m(64)], 5, .04); A.hit(end, .4);
   },
 });
-function wrap(x, s, px, py, maxW, lh) {
-  const words = s.split(" "); let line = "", y = py;
-  for (const w of words) { const test = line ? line + " " + w : w; if (x.measureText(test).width > maxW && line) { x.fillText(line, px, y); line = w; y += lh; } else line = test; }
-  if (line) x.fillText(line, px, y);
+// كلام من الشمال للإنجليزي، ومن اليمين (آخر المساحة) للعربي
+function side(x, s, px, py, maxW, rx) {   // rx: الحافة اليمين للعربي (لو مش محددة: آخر المساحة)
+  s = String(s || ""); const ar = M.isAr(s);
+  x.direction = ar ? "rtl" : "ltr"; x.textAlign = ar ? "right" : "left"; x.fillText(s, ar ? (rx ?? px + maxW) : px, py);
+  x.direction = "ltr"; x.textAlign = "left";
+}
+function wrap(x, s, px, py, maxW, lh, rx) {
+  const words = String(s || "").split(" "); let line = "", y = py;
+  for (const w of words) { const test = line ? line + " " + w : w; if (x.measureText(test).width > maxW && line) { side(x, line, px, y, maxW, rx); line = w; y += lh; } else line = test; }
+  if (line) side(x, line, px, y, maxW, rx);
 }
 // small code-drawn illustrations, one per moment (black, white, one blue)
 function drawArt(x, M, art, cx, cy, lt) {

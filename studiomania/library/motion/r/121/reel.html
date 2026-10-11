@@ -1,10 +1,19 @@
 <!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
 <script>
-// #121 UK dubstep at 140 BPM, 30 s, written in code; every visual move is computed from the same note schedule as the audio.
+// #121 (عنصر: كلمات على الدروب) UK dubstep at 140 BPM, 30 s, written in code; every visual move is computed from the same note schedule as the audio.
 // Arrangement: intro (bars 1–4) · build (5–8, snare roll tightening) · DROP on the downbeat of bar 9 (strongest) · outro (bars 15–17).
 // Two colours: black + acid yellow. Kick → the big disc punches; snare → the bars slam down; wobble → the wide shape stretches with the LFO.
 const BPM = 140, BEAT = 60 / BPM, BAR = BEAT * 4, DUR = 30;
-const YEL = "#e9ff3b", BLK = "#0b0b0b";
+const PR = M.params({
+  intro: { label: "كلمة البداية", kind: "text", def: "BASS" },
+  build: { label: "٣ كلمات قبل الدروب", kind: "lines", def: ["WAIT", "FOR", "IT"] },
+  drop: { label: "كلمة الدروب (أقوى لحظة)", kind: "text", role: "brand", def: "DROP" },
+  outro: { label: "كلمة النهاية", kind: "text", def: "OUT" },
+  corner: { label: "كلام صغير في الركن (فاضي = مفيش)", kind: "text", def: "140 BPM" },
+  yel: { label: "اللون المنوّر", kind: "color", role: "accent", def: "#e9ff3b" },
+  blk: { label: "اللون الغامق", kind: "color", role: "dark", def: "#0b0b0b" },
+});
+const YEL = PR.yel, BLK = PR.blk, BW = [0, 1, 2].map((i) => PR.build[i] ?? "");
 // schedule (seconds)
 const INTRO = 0, BUILD = BAR * 4, DROP = BAR * 8, OUTRO = BAR * 14;
 const kicks = [], snares = [], hats = [], wob = [];   // wob: [start, dur, rate(Hz), note]
@@ -61,13 +70,14 @@ M.reel({
       x.fillStyle = bg; x.fillRect(960 - ww / 2 + (w.n - 30) * 40, 760 - hh / 2, 18, hh);
     }
     // ---- type: hit by the bass
-    const word = t < BUILD ? "BASS" : t < DROP ? (prog < .5 ? "WAIT" : prog < .85 ? "FOR" : "IT") : t < OUTRO ? "DROP" : "OUT";
-    const sz = 220 + kick * 60 + (w ? w.lfo * 80 : 0);
-    x.font = `400 ${sz}px AN`; x.textAlign = "center"; x.textBaseline = "middle";
+    const word = String(t < BUILD ? PR.intro : t < DROP ? (prog < .5 ? BW[0] : prog < .85 ? BW[1] : BW[2]) : t < OUTRO ? PR.drop : PR.outro);
+    const sz = Math.min(220, M.fit(word, "AN", 1500, 220, 60)) + kick * 60 + (w ? w.lfo * 80 : 0);
+    x.font = `400 ${sz}px AN`; x.direction = M.isAr(word) ? "rtl" : "ltr"; x.textAlign = "center"; x.textBaseline = "middle";
     x.fillStyle = fg; x.fillText(word, 960, 475);                       // outside the disc: fg
     x.save(); x.beginPath(); x.arc(960, 470, R, 0, 7); x.clip(); x.fillStyle = bg; x.fillText(word, 960, 475); x.restore();   // inside: knocked out
-    x.font = "500 26px MO"; x.fillStyle = fg; x.textAlign = "left"; x.fillText(`140 BPM  BAR ${Math.floor(t / BAR) + 1}`, 120, 940);
-    x.textAlign = "right"; x.fillText(t < BUILD ? "INTRO" : t < DROP ? "BUILD" : t < OUTRO ? "DROP" : "OUTRO", 1800, 940);
+    x.direction = "ltr";
+    if (PR.corner) { x.font = "500 26px MO"; x.fillStyle = fg; x.textAlign = "left"; x.fillText(`${PR.corner}  BAR ${Math.floor(t / BAR) + 1}`, 120, 940);
+      x.textAlign = "right"; x.fillText(t < BUILD ? "INTRO" : t < DROP ? "BUILD" : t < OUTRO ? "DROP" : "OUTRO", 1800, 940); }
   },
   sound(A) {
     const ctx = A.ctx;

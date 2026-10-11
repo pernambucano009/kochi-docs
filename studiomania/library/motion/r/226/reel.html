@@ -1,9 +1,18 @@
 <!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script><script src="sim.js"></script></head><body>
 <script>
-// #226 "Can it escape all 12?" — 20 s vertical. A ball with eyes wants OUT of twelve spinning rings.
+// #226 (عنصر: هوك الكورة والـ ١٢ دايرة) "Can it escape all 12?" — 20 s vertical. A ball with eyes wants OUT of twelve spinning rings.
 // Physics is simulated once (fixed step, seeded), so every frame is a lookup — the film is exactly reproducible.
 // Story: hook (0–1 s) · three escalating fails (it slams the first ring again and again, faster each time) · the turn (a gap lines up, 4.7 s)
 // · a chain of escapes, each ring shattering, music rising · FREE (17.1 s) · gag: the camera pulls back… there's a 13th ring.
+const PR = M.params({
+  hook1: { label: "السؤال (سطر ١)", kind: "text", def: "CAN IT ESCAPE" },
+  hook2: { label: "السؤال (سطر ٢، ملوّن)", kind: "text", def: "ALL 12?" },
+  left: { label: "تحت العدّاد", kind: "text", def: "RINGS LEFT" },
+  tries: { label: "كلمة المحاولة", kind: "text", def: "try" },
+  free: { label: "لما يخرج", kind: "text", def: "FREE!" },
+  gag: { label: "الإفيه في الآخر", kind: "text", def: "…oh no." },
+  accent: { label: "لون السؤال", kind: "color", role: "accent", def: "#ffcf3a" },
+});
 const W = 1080, H = 1920;
 const SIM = simulate({ e: 1.04, GAP: .55, v0: [260, 50], hold: 1.2, T: 20 });
 const PASS = SIM.events.filter((e) => e[0] === "pass").map((e) => e[1]);
@@ -58,12 +67,12 @@ M.reel({
     x.restore();
     // ---- type (screen space): hook, ring counter, the payoff
     x.setTransform(1, 0, 0, 1, 0, 0);
-    const T = (s, px, Y, col, font = "AN") => { x.font = `${font === "AN" ? 400 : 800} ${px}px ${font}`; x.fillStyle = col; x.textAlign = "center"; x.textBaseline = "middle"; x.fillText(s, W / 2, Y); };
-    if (t < 3.5) { const a2 = expo(seg(t, 0, .25)) * (1 - expo(seg(t, 3.0, 3.5))); x.globalAlpha = a2; T("CAN IT ESCAPE", 110, 250, "#fff"); T("ALL 12?", 150, 390, "#ffcf3a"); x.globalAlpha = 1; }
-    if (t >= 3.5 && !free) { T(`${12 - k}`, 220, 300 * 1 + 0, "#fff"); T("RINGS LEFT", 46, 440, "rgba(255,255,255,.6)", "I8"); }
-    if (t > 1.2 && t < 4.6) { const fails = HITS.filter((h) => h[1] <= t && h[2] === 0).length; T(fails ? `try #${Math.min(3, fails)}` : "", 50, 1620, "rgba(255,255,255,.55)", "I8"); }
-    if (free && t < FREE + 1.6) { const k2 = spring(t - FREE, 14); x.save(); x.translate(W / 2, 330); x.scale(k2, k2); x.translate(-W / 2, -330); T("FREE!", 230, 330, "#111018"); x.restore(); }
-    if (t > FREE + 1.9) { const a3 = expo(seg(t, FREE + 1.9, FREE + 2.3)); x.globalAlpha = a3; T("…oh no.", 130, 1700, "#111018"); x.globalAlpha = 1; }
+    const T = (s, px, Y, col, font = "AN") => { s = String(s ?? ""); px = M.fit(s, font, 980, px, 20, font === "AN" ? "" : "800"); x.font = `${font === "AN" ? 400 : 800} ${px}px ${font}`; x.fillStyle = col; x.textAlign = "center"; x.direction = M.isAr(s) ? "rtl" : "ltr"; x.textBaseline = "middle"; x.fillText(s, W / 2, Y); x.direction = "ltr"; };
+    if (t < 3.5) { const a2 = expo(seg(t, 0, .25)) * (1 - expo(seg(t, 3.0, 3.5))); x.globalAlpha = a2; T(PR.hook1, 110, 250, "#fff"); T(PR.hook2, 150, 390, PR.accent); x.globalAlpha = 1; }
+    if (t >= 3.5 && !free) { T(`${12 - k}`, 220, 300 * 1 + 0, "#fff"); T(PR.left, 46, 440, "rgba(255,255,255,.6)", "I8"); }
+    if (t > 1.2 && t < 4.6 && PR.tries) { const fails = HITS.filter((h) => h[1] <= t && h[2] === 0).length; T(fails ? `${PR.tries} #${Math.min(3, fails)}` : "", 50, 1620, "rgba(255,255,255,.55)", "I8"); }
+    if (free && t < FREE + 1.6) { const k2 = spring(t - FREE, 14); x.save(); x.translate(W / 2, 330); x.scale(k2, k2); x.translate(-W / 2, -330); T(PR.free, 230, 330, "#111018"); x.restore(); }
+    if (t > FREE + 1.9) { const a3 = expo(seg(t, FREE + 1.9, FREE + 2.3)); x.globalAlpha = a3; T(PR.gag, 130, 1700, "#111018"); x.globalAlpha = 1; }
   },
   sound(A) {
     const m = A.midi;

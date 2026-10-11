@@ -1,32 +1,27 @@
 <!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
 <script>
-// #52 Chaotic POV — "POV: you're the AI someone opens 47 times a day". 30 s, 1080×1920, 140 BPM.
+// #52 (عنصر: ميم POV طولي) Chaotic POV — "POV: you're the AI someone opens 47 times a day". 30 s, 1080×1920, 140 BPM.
 // Fast cuts on the beat, stacked captions, zoom punches; running joke: "make it pop" (the blob inflates more each time
 // until it literally pops). Payoff loops to the start: "ok perfect. now the same for tomorrow".
-const W = 1080, H = 1920, BPM = 140, B = 60 / BPM, DUR = 30;
+const PR = M.params({
+  pov: { label: "سطر الـ POV فوق", kind: "text", def: "POV: you're the AI they open all day" },
+  counter: { label: "العدّاد (مثلًا: requests today)", kind: "text", def: "requests today" },
+  events: { label: "اللقطات (كل سطر: الطلب | رد الفعل الكبير | التعليق | درجة النفخ 0-9 اختياري)", kind: "lines", def: [
+    "write me a poem | SURE! | me: finally, art", "shorter | OK | me: cut 3 lines", "longer | OK?? | me: put them back",
+    "make it pop | POP | me: what is pop | 1", "more pop | POPPP | me: adding pop | 2", "less pop | pop | me: removing pop | .5",
+    "make it sound like me | HI ME | me: who are you", "but smarter | BIG BRAIN | me: rude but ok", "now in Arabic | حاضر | me: يلا",
+    "as a spreadsheet | =POEM() | me: cells. so many cells", "make it pop | POP!! | me: again?? | 3", "MORE | POP!!!! | me: it's getting big | 4.5",
+    "MORE POP | pls | me: please | 6", " | *POP* |  | 9", "ok perfect | THANK YOU | me: …i made a thing", "now the same for tomorrow | SURE! | me: (loads poem.exe)"] },
+  bubble: { label: "لون فقاعة الشات", kind: "color", role: "accent", def: "#0a84ff" },
+});
+const W = 1080, H = 1920, BPM = 140, B = 60 / BPM;
 const C = ["#ff3b30", "#ffd60a", "#30d158", "#0a84ff", "#bf5af2", "#ff9f0a", "#111111", "#f2f2f2"];
-// [beat, user request, my reaction (huge), my inner caption, pop level]
-const EV = [
-  [0, "write me a poem", "SURE!", "me: finally, art", 0],
-  [4, "shorter", "OK", "me: cut 3 lines", 0],
-  [7, "longer", "OK??", "me: put them back", 0],
-  [10, "make it pop", "POP", "me: what is pop", 1],
-  [14, "more pop", "POPPP", "me: adding pop", 2],
-  [17, "less pop", "pop", "me: removing pop", .5],
-  [20, "make it sound like me", "HI ME", "me: who are you", 0],
-  [24, "but smarter", "BIG BRAIN", "me: rude but ok", 0],
-  [28, "now in Arabic", "حاضر", "me: يلا", 0],
-  [31, "now like a pirate", "ARRR", "me: ahoy, poem", 0],
-  [34, "as a spreadsheet", "=POEM()", "me: cells. so many cells", 0],
-  [38, "the spreadsheet but a song", "♪ A1 B2 ♪", "me: this is my life now", 0],
-  [42, "make it pop", "POP!!", "me: again??", 3],
-  [46, "MORE", "POP!!!!", "me: it's getting big", 4.5],
-  [50, "MORE POP", "pls", "me: please", 6],
-  [53, "", "*POP*", "", 9],
-  [56, "ok perfect", "THANK YOU", "me: …i made a thing", 0],
-  [60, "now the same for tomorrow", "SURE!", "me: (loads poem.exe)", 0],
-  [66, "write me a poem", "SURE!", "me: finally, art", 0],
-];
+// [beat, user request, my reaction (huge), my inner caption, pop level] — كل لقطة ٣ أو ٤ بيتس على حسب طول الكلام
+const EV = []; let _b = 0;
+PR.events.slice(0, 24).forEach((l) => { const [req = "", big = "", cap = "", pop = "0"] = String(l).split("|").map((z) => z.trim()); EV.push([_b, req, big, cap, parseFloat(pop) || 0]); _b += (req + cap).length > 26 ? 4 : 3; });
+if (!EV.length) EV.push([0, "", "", "", 0]);
+const DUR = Math.min(60, Math.max(6, (_b + 2) * B));
+const ar = (s) => M.isAr(s);
 M.reel({
   W, H, DUR, bg: "#111",
   fonts: { AN: "anton.ttf", I8: ["inter800.ttf", "800"], I5: ["inter500.ttf", "500"] },
@@ -44,17 +39,21 @@ M.reel({
     const punch = 1 + .14 * (1 - spring(since, 18)) + .03 * (1 - spring(bt, 22));
     x.translate(W / 2, H / 2); x.scale(punch, punch); x.rotate((hash(ei) - .5) * .06 * (1 - spring(since, 10))); x.translate(-W / 2, -H / 2);
     // counter: requests today
-    const reqs = Math.min(47, 1 + ei * 3 + Math.floor(since / B));
-    x.fillStyle = fg; x.font = "800 40px I8"; x.textAlign = "left"; x.fillText(`requests today: ${reqs}`, 60, 110);
-    x.font = "500 30px I5"; x.globalAlpha = .7; x.fillText("POV: you're the AI they open all day", 60, 160); x.globalAlpha = 1;
+    const reqs = Math.min(99, 1 + ei * 3 + Math.floor(since / B)), RT = ar(PR.counter + PR.pov);
+    x.direction = RT ? "rtl" : "ltr"; x.textAlign = RT ? "right" : "left"; const tx = RT ? W - 60 : 60;
+    if (PR.counter) { x.fillStyle = fg; x.font = "800 40px I8"; x.fillText(`${PR.counter}: ${reqs}`, tx, 110); }
+    x.font = `500 ${M.fit(PR.pov, "I5", W - 120, 30, 18, "500")}px I5`; x.globalAlpha = .7; x.fillText(PR.pov, tx, 160); x.globalAlpha = 1; x.direction = "ltr";
     // the user's message as a chat bubble (drops in)
     if (e[1]) {
       const k = expo(seg(since, 0, .18));
       x.font = "800 56px I8"; const tw = Math.min(900, x.measureText(e[1]).width);
       const bx = W - 70 - tw - 60, by = 250 - (1 - k) * 80;
-      const bub = bg === "#0a84ff" ? "#ffffff" : "#0a84ff";
+      const bub = bg.toLowerCase() === PR.bubble.toLowerCase() ? "#ffffff" : PR.bubble;
       x.globalAlpha = k; x.fillStyle = bub; x.beginPath(); x.roundRect(bx, by, tw + 60, 110, 50); x.fill();
-      x.fillStyle = bub === "#ffffff" ? "#0a84ff" : "#fff"; x.textAlign = "left"; x.fillText(e[1], bx + 30, by + 74, 900); x.globalAlpha = 1;
+      x.fillStyle = bub === "#ffffff" ? PR.bubble : "#fff";
+      if (ar(e[1])) { x.direction = "rtl"; x.textAlign = "right"; x.fillText(e[1], bx + tw + 30, by + 74, 900); x.direction = "ltr"; }
+      else { x.textAlign = "left"; x.fillText(e[1], bx + 30, by + 74, 900); }
+      x.globalAlpha = 1;
     }
     // me: a blob with eyes; inflates with the pop level (running joke), pops at level 9
     const popLv = e[4], infl = lerp(1, 1 + popLv * .18, springO(since, 10, .5));
@@ -75,7 +74,7 @@ M.reel({
     }
     // the huge reaction word, stacked with an outline copy behind (caption stack)
     const rk = springO(since - .05, 16, .55);
-    x.textAlign = "center"; x.font = `400 ${popped ? 240 : 200}px AN`;
+    x.textAlign = "center"; x.direction = ar(e[2]) ? "rtl" : "ltr"; x.font = `400 ${M.fit(e[2], "AN", 1000, popped ? 240 : 200, 60)}px AN`;
     x.save(); x.translate(W / 2, 1440); x.scale(rk, rk); x.rotate((hash(ei + 3) - .5) * .12);
     x.lineWidth = 16; x.strokeStyle = fg === "#111" ? "#fff" : "#111"; x.strokeText(e[2], 10, 10);
     x.fillStyle = fg; x.fillText(e[2], 0, 0, 1000); x.restore();
@@ -83,18 +82,18 @@ M.reel({
     if (e[3]) {
       const words = e[3].split(" "), n = Math.min(words.length, 1 + Math.floor(since / (B * .5)));
       const chunk = words.slice(Math.max(0, n - 2), n).join(" ");
-      x.font = "800 64px I8"; x.fillStyle = fg; x.fillText(chunk, W / 2, 1690);
+      x.font = `800 ${M.fit(chunk, "I8", 1000, 64, 30, "800")}px I8`; x.fillStyle = fg; x.direction = ar(chunk) ? "rtl" : "ltr"; x.fillText(chunk, W / 2, 1690); x.direction = "ltr";
     }
     // loop marker at the very end: the frame matches the start
   },
   sound(A) {
     const m = A.midi;
     // 140 BPM: kick each beat, snare on 2 & 4, a cheeky square-lead stab on each event
-    for (let k = 0; k < 70; k++) { const t0 = k * B; A.kick(t0, .9); A.hat(t0 + B / 2, .09); if (k % 2) A.snare(t0, .25); }
+    for (let k = 0; k < DUR / B; k++) { const t0 = k * B; A.kick(t0, .9); A.hat(t0 + B / 2, .09); if (k % 2) A.snare(t0, .25); }
     EV.forEach(([b, , , , pop], i) => { const t0 = b * B; A.tone(t0, m(72 + (i % 5) * 2), .12, "square", .07); A.click(t0, .2); if (pop) for (let k = 0; k < pop; k++) A.tone(t0 + k * .05, m(84 + k), .05, "square", .04); });
-    A.riser(46 * B, 53 * B, .35);
-    A.nz(53 * B, .6, "highpass", 1500, .7); A.hit(53 * B, .6);   // the POP
-    A.tone(56 * B, m(72), .6, "sine", .08); A.tone(56 * B + .1, m(76), .6, "sine", .08); A.tone(56 * B + .2, m(79), .8, "sine", .08);
+    const pe = EV.find((e) => e[4] >= 9);   // لو فيه لقطة «انفجار»: صوت بيعلى قبلها وفرقعة
+    if (pe) { const tp = pe[0] * B; A.riser(Math.max(0, tp - 7 * B), tp, .35); A.nz(tp, .6, "highpass", 1500, .7); A.hit(tp, .6); }
+    const te = EV[EV.length - 1][0] * B; A.tone(te, m(72), .6, "sine", .08); A.tone(te + .1, m(76), .6, "sine", .08); A.tone(te + .2, m(79), .8, "sine", .08);
   },
 });
 </script></body></html>

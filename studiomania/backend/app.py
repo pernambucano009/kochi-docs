@@ -6,6 +6,7 @@
 """
 
 import base64
+import mimetypes
 import gzip
 import hashlib
 import hmac
@@ -10584,28 +10585,62 @@ def motion_manifest() -> list[dict]:
     return json.loads(f.read_text(encoding="utf-8")) if f.exists() else []
 
 
-def motion_asset_id(mid: str) -> str | None:
+def motion_assets() -> dict[str, list[str]]:
+    """الأصول اللي اتعملت من كل عنصر (كل نسخة بتعديلاتها أصل لوحده)، الأحدث الأول."""
+    out: dict[str, list[tuple[str, str]]] = {}
     for f in ASSETS_DIR.glob("*/asset.json"):
         try:
-            if (json.loads(f.read_text(encoding="utf-8")).get("source") or {}).get("motion") == mid:
-                return f.parent.name
+            d = json.loads(f.read_text(encoding="utf-8"))
         except ValueError:
             continue
-    return None
+        mid = (d.get("source") or {}).get("motion")
+        if mid:
+            out.setdefault(mid, []).append((d.get("created_at") or "", f.parent.name))
+    return {k: [a for _, a in sorted(v, reverse=True)] for k, v in out.items()}
 
 
 @app.get("/api/motion-library")
 def motion_library():
+    made = motion_assets()
     out = []
     for m in motion_manifest():
-        aid = motion_asset_id(m["id"])
-        out.append({**m, "asset": aid, "job": MOTION_JOBS.get(m["id"]), "preview_url": f"/media/motion/r/{m['id']}/reel.html",
-                    "poster_url": f"/media/motion/r/{m['id']}/poster.jpg" if (MOTION_DIR / "r" / m["id"] / "poster.jpg").exists() else None,
-                    "video_url": f"/media/assets/{aid}/clip.mp4" if aid else None})
+        ids = made.get(m["id"], [])
+        out.append({**m, "asset": ids[0] if ids else None, "assets": len(ids), "job": MOTION_JOBS.get(m["id"]),
+                    "preview_url": f"/media/motion/r/{m['id']}/reel.html",
+                    "poster_url": f"/media/motion/r/{m['id']}/poster.jpg" if (MOTION_DIR / "r" / m["id"] / "poster.jpg").exists() else None})
     return out
 
 
-def run_motion_import(mid: str, meta: dict) -> None:
+# صور العنصر (لوجو مثلًا) بتتبعت للمتصفح اللي بيرسم كـ data: عشان الصفحة بتتفتح من ملف (file://)
+MEDIA_ROOTS = {"/media/ads/": lambda: ADS_DIR, "/media/brand/": lambda: BRAND_DIR, "/media/coaches/": lambda: COACHES_DIR, "/media/assets/": lambda: ASSETS_DIR}
+
+
+def motion_params(params: dict) -> dict:
+    out = {}
+    for k, v in (params or {}).items():
+        if not isinstance(k, str) or len(k) > 40:
+            continue
+        if isinstance(v, str) and v.startswith("/media/"):
+            path = next(((root() / v[len(pre):].split("?")[0]).resolve() for pre, root in MEDIA_ROOTS.items() if v.startswith(pre)), None)
+            roots = [root().resolve() for root in MEDIA_ROOTS.values()]
+            if path and path.is_file() and any(str(path).startswith(str(r)) for r in roots):
+                mime = mimetypes.guess_type(path.name)[0] or "image/png"
+                v = f"data:{mime};base64," + base64.b64encode(path.read_bytes()).decode()
+            else:
+                v = ""
+        elif isinstance(v, list):
+            v = [str(z)[:400] for z in v[:40]]
+        elif isinstance(v, (int, float)):
+            v = str(v)
+        elif not isinstance(v, str):
+            continue
+        elif not v.startswith("data:"):
+            v = v[:2000]
+        out[k] = v
+    return out
+
+
+def run_motion_import(mid: str, meta: dict, params: dict | None = None, name: str = "") -> None:
     """بيفتح الأنيميشن في المتصفح، يرسم كل فريم من الوقت (seek)، وياخد الصوت اللي مكتوب بالكود، ويعمل منهم فيديو + أصل."""
     aid = uuid.uuid4().hex[:12]
     folder = clip_dir(aid)
@@ -10618,6 +10653,7 @@ def run_motion_import(mid: str, meta: dict) -> None:
             browser = typo_browser(p)
             try:
                 page = browser.new_page(viewport={"width": 1920, "height": 1080})
+                page.add_init_script("window.PARAMS = " + json.dumps(motion_params(params or {}), ensure_ascii=False) + ";")
                 page.goto((MOTION_DIR / "r" / mid / "reel.html").as_uri())
                 page.evaluate("() => window.ready")
                 W, H, dur = page.evaluate("() => [window.W, window.H, window.DUR]")
@@ -10641,10 +10677,10 @@ def run_motion_import(mid: str, meta: dict) -> None:
         subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{dur / 2:.3f}", "-i", str(folder / "clip.mp4"),
                         "-frames:v", "1", "-vf", "scale=480:-2", "-q:v", "3", str(folder / "thumb.jpg")], check=True, capture_output=True, timeout=60)
         info = media_info(folder / "clip.mp4")
-        data = {"name": meta["name"], "category": meta.get("category") if meta.get("category") in CLIP_CATS else "motion_graphics",
+        data = {"name": (name or "").strip()[:120] or meta["name"], "category": meta.get("category") if meta.get("category") in CLIP_CATS else "motion_graphics",
                 "tags": meta.get("tags") or [], "notes": "", "description": "", "use": "", "controls": [], "connector": None,
                 "file": "clip.mp4", "thumb": "thumb.jpg", "duration": round(info.duration, 2), "width": info.width, "height": info.height,
-                "source": {"motion": mid}, "scene_type": None, "summary": meta["name"], "background": None,
+                "source": {"motion": mid, "params": {k: v for k, v in (params or {}).items() if not (isinstance(v, str) and v.startswith("data:"))}}, "scene_type": None, "summary": meta["name"], "background": None,
                 "elements": [], "sfx": [], "variants": [], "keyframes": [], "created_at": now(), "updated_at": now()}
         (folder / "asset.json").write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
         MOTION_JOBS.pop(mid, None)
@@ -10653,17 +10689,22 @@ def run_motion_import(mid: str, meta: dict) -> None:
         job.update(status="error", error=str(e)[:300])
 
 
+class MotionImportIn(BaseModel):
+    params: dict = {}
+    name: str = ""
+
+
 @app.post("/api/motion-library/{mid}/import")
-def motion_import(mid: str):
+def motion_import(mid: str, body: MotionImportIn | None = None):
+    """🎞️ العنصر بتعديلاته (كلام، ألوان، لوجو) بيترسم فيديو ويدخل الأصول. كل نسخة أصل لوحده."""
     meta = next((m for m in motion_manifest() if m["id"] == mid), None)
     if meta is None:
-        raise HTTPException(404, "الأنيميشن ده مش موجود")
-    if motion_asset_id(mid):
-        raise HTTPException(400, "ده موجود في المكتبة بالفعل")
+        raise HTTPException(404, "العنصر ده مش موجود")
     if (MOTION_JOBS.get(mid) or {}).get("status") == "working":
-        raise HTTPException(400, "بيترسم دلوقتي")
+        raise HTTPException(400, "بيترسم دلوقتي، استنى لما يخلص")
+    body = body or MotionImportIn()
     MOTION_JOBS[mid] = {"status": "working", "progress": 0.0, "error": ""}
-    threading.Thread(target=run_motion_import, args=(mid, meta), daemon=True).start()
+    threading.Thread(target=run_motion_import, args=(mid, meta, body.params, body.name), daemon=True).start()
     return {"ok": True}
 
 

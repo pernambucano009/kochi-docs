@@ -61,23 +61,9 @@ function assetGrid() {
       <small class="muted">${ASSET_CATS[a.category] || ""} · ${a.duration} ث · ${a.elements} عنصر${a.variants ? ` · ${a.variants} نسخة` : ""}</small>
       ${(a.tags || []).length ? `<small class="as-tags" data-no-i18n>${a.tags.map((t) => `#${le(t)}`).join(" ")}</small>` : ""}
     </article>`).join("")}</div>`
-    : `<p class="panel muted">${asx.list.length ? "مفيش أصول بالبحث ده." : "المكتبة لسه فاضية. افتح أي فيديو في المعمل، وفي أي لقطة دوس «📚 احفظ كأصل في المكتبة»."}</p>`}
-    ${motionShelf()}`;
+    : `<p class="panel muted">${asx.list.length ? "مفيش أصول بالبحث ده." : "المكتبة لسه فاضية. افتح أي فيديو في المعمل، وفي أي لقطة دوس «📚 احفظ كأصل في المكتبة»."}</p>`}`;
 }
 
-// 🎞️ أنيميشنات مكتوبة بالكود: كل واحدة بتترسم فيديو على السيرفر (ببلاش، من غير AI) وتدخل المكتبة كأصل
-function motionShelf() {
-  const left = asx.motion.filter((m) => !m.asset);
-  if (!asx.motion.length) return "";
-  return `<details class="panel lab-sec" ${asx.motion.some((m) => m.job) ? "open" : ""}><summary><b>🎞️ مكتبة الموشن</b>
-      <small class="muted">${asx.motion.length - left.length} من ${asx.motion.length} في المكتبة · الرسم على السيرفر ببلاش ومن غير AI</small></summary>
-    ${left.length ? `<div class="as-motion">${left.map((m) => `<div class="lab-row"><b class="grow" data-no-i18n>${le(m.name)}</b>
-      <small class="muted">${ASSET_CATS[m.category] || ""}</small>
-      ${m.job?.status === "working" ? `<small>⏳ بيترسم ${Math.round((m.job.progress || 0) * 100)}%</small>`
-        : `${m.job?.status === "error" ? `<small class="muted" title="${le(m.job.error)}">⚠️ فشل</small>` : ""}<button type="button" class="btn sm" data-asmotion="${m.id}">➕ ضيفه</button>`}
-    </div>`).join("")}</div>` : `<p class="muted">كلهم في المكتبة.</p>`}
-  </details>`;
-}
 
 function assetDetail(a) {
   const vs = a.variants || [], done = vs.filter((v) => v.status === "done"), src = a.source || {};
@@ -269,14 +255,6 @@ $("labLib").addEventListener("click", async (e) => {
   if (cat) { asx.cat = cat.dataset.ascat; return renderLib(); }
   const open = t.closest("[data-asopen]");
   if (open) return openLib(open.dataset.asopen);
-  const mo = t.closest("[data-asmotion]");
-  if (mo) {
-    return busyButton(mo, "⏳", async () => {
-      await api(`/api/motion-library/${mo.dataset.asmotion}/import`, { method: "POST" });
-      asx.motion = await api("/api/motion-library");
-      renderLib(); scheduleAssetPoll();
-    });
-  }
   if (t.closest("[data-asback]")) { asx.cur = null; return openLib(); }
   const clear = t.closest("[data-asclear]");
   if (clear) {

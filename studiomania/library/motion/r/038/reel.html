@@ -1,9 +1,23 @@
 <!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
 <script>
-// #38 Showreel — concept: "Everything is one sheet of paper." 15 s, 120 BPM.
+// #38 (عنصر: شوريل ورق بيتطوي) Showreel — concept: "Everything is one sheet of paper." 15 s, 120 BPM.
 // 0–4 split-flap words on a folding card · 4–6 the card folds into a crane (shape morph) · 6–8 a cube net folds up (2D→3D)
 // 8–10 the cube unfolds into a bar chart · 10–14 an accordion of panels carrying one word (strongest at 12–14) · 14–15 end title, back to a blank sheet.
-const B = .5, PAPER = "#f6f4ef", BG = "#d8d4cb", INK = "#141416", RED = "#e63b2e", BLUE = "#2f4bff";
+const PR = M.params({
+  words: { label: "٧ كلمات بتتقلب (لوحة مطار)", kind: "lines", def: ["EVERY", "IDEA", "STARTS", "AS", "ONE", "FLAT", "SHEET."] },
+  big: { label: "الكلمة الكبيرة على الأكورديون", kind: "text", role: "brand", def: "FOLD" },
+  end: { label: "العنوان في الآخر", kind: "text", role: "brand", def: "FOLD." },
+  endSub: { label: "تحت العنوان", kind: "text", role: "tagline", def: "A STUDIO OF PAPER MOTION" },
+  labels: { label: "عناوين صغيرة فوق (٥، فاضي = مفيش)", kind: "lines", def: ["01 — FLAP", "02 — FOLD", "03 — DEPTH", "04 — DATA", "05 — ACCORDION"] },
+  paper: { label: "الورق", kind: "color", role: "bg", def: "#f6f4ef" },
+  bg: { label: "الخلفية", kind: "color", def: "#d8d4cb" },
+  ink: { label: "الغامق", kind: "color", role: "ink", def: "#141416" },
+  red: { label: "اللون الأساسي", kind: "color", role: "accent", def: "#e63b2e" },
+  blue: { label: "اللون التاني", kind: "color", role: "accent2", def: "#2f4bff" },
+});
+const esc = (v) => String(v ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const LB = Array.from({ length: 5 }, (_, i) => PR.labels[i] ?? "");
+const B = .5, PAPER = PR.paper, BG = PR.bg, INK = PR.ink, RED = PR.red, BLUE = PR.blue;
 const F = (px) => `900 ${px}px I9`;
 M.reel({
   W: 1920, H: 1080, DUR: 15, bg: BG,
@@ -31,7 +45,7 @@ M.reel({
     // accordion: 8 panels, each shows a slice of one huge word
     const NP = 8, PW = 1920 / NP;
     const acc = M.el("div", "", "position:absolute;left:0;top:0;transform-style:preserve-3d;", "", world);
-    const panels = Array.from({ length: NP }, (_, i) => { const p = M.el("div", "", `position:absolute;left:0;top:${-540}px;width:${PW}px;height:1080px;overflow:hidden;transform-origin:0 50%;backface-visibility:hidden;`, "", acc); const s = M.el("div", "", `position:absolute;left:${-i * PW}px;top:0;width:1920px;height:1080px;display:grid;place-items:center;font:${F(560)};letter-spacing:-.05em;`, "FOLD", p); return { p, s }; });
+    const panels = Array.from({ length: NP }, (_, i) => { const p = M.el("div", "", `position:absolute;left:0;top:${-540}px;width:${PW}px;height:1080px;overflow:hidden;transform-origin:0 50%;backface-visibility:hidden;`, "", acc); const s = M.el("div", "", `position:absolute;left:${-i * PW}px;top:0;width:1920px;height:1080px;display:grid;place-items:center;font:${F(M.fit(PR.big, "I9", 1800, 560, 120, "900"))};letter-spacing:${M.isAr(PR.big) ? 0 : -.05}em;direction:auto;unicode-bidi:plaintext;`, esc(PR.big), p); return { p, s }; });
     const endT = M.el("div", "", `position:absolute;left:0;top:0;width:1920px;height:1080px;display:grid;place-items:center;font:${F(120)};color:${INK};`, "", M.stage);
     const label = M.el("div", "", `position:absolute;left:80px;top:60px;font:500 22px I5;letter-spacing:.2em;color:${INK};`, "", M.stage);
     return { world, card, CW, CH, top, bot, flapF, flapB, svg, path, crease, bars, nums, cube, cf, S, acc, panels, PW, endT, label };
@@ -41,14 +55,14 @@ M.reel({
     const beat = Math.floor(t / B), bt = t - beat * B;
     M.stage.style.background = (t >= 6 && t < 10) ? INK : BG;
     P.label.style.color = (t >= 6 && t < 10) ? PAPER : INK;
-    P.label.textContent = t < 4 ? "01 — FLAP" : t < 6 ? "02 — FOLD" : t < 8 ? "03 — DEPTH" : t < 10 ? "04 — DATA" : t < 14 ? "05 — ACCORDION" : "";
+    P.label.textContent = t < 4 ? LB[0] : t < 6 ? LB[1] : t < 8 ? LB[2] : t < 10 ? LB[3] : t < 14 ? LB[4] : "";
     // camera language: one slow dolly-in per scene, slight constant tilt
     const sceneT = t < 4 ? t / 4 : t < 6 ? (t - 4) / 2 : t < 8 ? (t - 6) / 2 : t < 10 ? (t - 8) / 2 : t < 14 ? (t - 10) / 4 : (t - 14);
     const dolly = 1 + .04 * M.sine(sceneT);
     P.world.style.transform = `scale(${dolly}) rotateX(${t >= 6 && t < 8 ? 0 : 4}deg)`;
 
     // ---------- 0–4: split-flap words, one per beat
-    const WORDS = ["", "EVERY", "IDEA", "STARTS", "AS", "ONE", "FLAT", "SHEET."];
+    const WORDS = ["", ...Array.from({ length: 7 }, (_, i) => PR.words[i] ?? "")];
     const cardOn = t < 4.6;
     M.show(P.card, cardOn);
     if (cardOn) {
@@ -153,7 +167,7 @@ M.reel({
 
     // ---------- 14–15: end title on the flat sheet, then it lifts off and the blank sheet (frame one) remains
     const endIn = expo(seg(t, 14.1, 14.4)), endOut = expoIn(seg(t, 14.65, 14.95));
-    P.endT.innerHTML = t >= 14 ? `<div style="text-align:center;transform:translateY(${(1 - endIn) * 60 - endOut * 80}px);opacity:${endIn * (1 - endOut)}">FOLD.<div style="font:500 30px I5;letter-spacing:.24em;margin-top:18px">A STUDIO OF PAPER MOTION</div></div>` : "";
+    P.endT.innerHTML = t >= 14 ? `<div style="text-align:center;transform:translateY(${(1 - endIn) * 60 - endOut * 80}px);opacity:${endIn * (1 - endOut)};direction:${M.isAr(PR.end) ? "rtl" : "ltr"};font-size:${M.fit(PR.end, "I9", 1700, 120, 40, "900")}px">${esc(PR.end)}<div style="font:500 30px I5;letter-spacing:${M.isAr(PR.endSub) ? 0 : .24}em;margin-top:18px">${esc(PR.endSub)}</div></div>` : "";
     // frame one = the blank card on the grey table: show it again at the very end
     if (t >= 14.9) { M.show(P.card, true); P.card.style.transform = ""; [P.top, P.bot].forEach((o) => { o.s.textContent = ""; o.s.style.opacity = 1; o.h.style.background = PAPER; }); M.show(P.flapF.h, false); M.show(P.flapB.h, false); }
   },

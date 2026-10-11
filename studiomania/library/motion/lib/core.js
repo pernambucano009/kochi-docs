@@ -34,13 +34,38 @@
   M.op = (e, a) => { e.style.opacity = a; };
   M.canvas = (w, h, css = "", parent) => { const c = M.el("canvas", "", `position:absolute;left:0;top:0;${css}`, null, parent); c.width = w; c.height = h; return c; };
 
+  // ---------- params: كل عنصر بيعلن الحاجات اللي بتتعدّل فيه (كلام، ألوان، لوجو...) وقيمها الأصلية.
+  // القيم الجديدة بتيجي في اللينك (#p=JSON) أو window.PARAMS. لازم M.params تتنادى في أول الصفحة قبل أي حاجة بتستخدمها.
+  let given = {};
+  try { const h = location.hash.match(/[#&]p=([^&]*)/); if (h) given = JSON.parse(decodeURIComponent(h[1])); } catch (e) { given = {}; }
+  M.params = (schema) => {
+    window.PARAM_SCHEMA = schema;
+    const extra = window.PARAMS || {}, out = {};
+    for (const k in schema) {
+      const v = k in extra ? extra[k] : given[k];
+      out[k] = v === undefined || v === null ? schema[k].def : v;   // فاضي = فاضي (مش القيمة الأصلية)
+      if (schema[k].kind === "color" && !/^#[0-9a-f]{3,8}$/i.test(String(out[k]))) out[k] = schema[k].def;
+      if (Array.isArray(schema[k].def) && !Array.isArray(out[k])) out[k] = String(out[k]).split("\n").map((x) => x.trim()).filter(Boolean);
+    }
+    M.P = out;
+    return out;
+  };
+  M.img = (src) => new Promise((res) => { if (!src) return res(null); const i = new Image(); i.onload = () => res(i); i.onerror = () => res(null); i.src = src; });
+  M.isAr = (s) => /[\u0600-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF]/.test(String(s || ""));
+  // أكبر مقاس يخلّي الكلام في العرض ده (بين min و max)
+  M.fit = (text, fam, maxW, max, min = 12, weight = "") => { let s = max; while (s > min && M.measure(text, `${weight} ${s}px ${fam}`.trim()) > maxW) s -= 2; return s; };
+
   // ---------- fonts (files live in pm/fonts; pages are pm/r/NNN/reel.html)
+  // كل خط بياخد الحروف العربي من Alexandria (unicode-range)، فأي كلام عربي بيظهر صح في أي عنصر
+  const AR_RANGE = "U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF, U+200C-200F";
   M.fonts = async (map) => {
-    const all = Object.entries(map).map(([fam, spec]) => {
+    const all = Object.entries(map).flatMap(([fam, spec]) => {
       const [file, weight = "400", style = "normal"] = Array.isArray(spec) ? spec : [spec];
       const f = new FontFace(fam, `url(../../fonts/${file})`, { weight, style });
+      const ar = new FontFace(fam, `url(../../fonts/${+weight >= 600 ? "TY-Alexandria-800.ttf" : "TY-Alexandria-500.ttf"})`, { weight, style, unicodeRange: AR_RANGE });
       document.fonts.add(f);
-      return f.load().catch((e) => console.error('font failed: ' + file + ' ' + e));
+      document.fonts.add(ar);
+      return [f.load().catch((e) => console.error('font failed: ' + file + ' ' + e)), ar.load().catch(() => {})];
     });
     await Promise.all(all);
     await document.fonts.ready;
@@ -49,9 +74,25 @@
   M.measure = (text, font, spacing = 0) => { mc.font = font; return mc.measureText(text).width + spacing * Math.max(0, [...text].length - 1); };
 
   // split text into absolutely positioned glyph spans inside a container; returns [{s, x, w, ch}]
+  // العربي مينفعش يتقطع حروف (الحروف بتتشبك)، فبيتقطع كلمات ويتحط من اليمين للشمال
   M.glyphs = (parent, text, font, opts = {}) => {
     const sp = opts.spacing || 0, out = [];
     let x = 0;
+    if (M.isAr(text)) {
+      const words = String(text).split(/(\s+)/).filter((w) => w.length);
+      const ws = words.map((w) => M.measure(w, font));
+      const total = ws.reduce((a, b) => a + b, 0);
+      let r = total;
+      words.forEach((w, i) => {
+        r -= ws[i];
+        if (/^\s+$/.test(w)) return;
+        const s = M.el("span", "", `position:absolute;left:0;top:0;font:${font};white-space:pre;direction:rtl;${opts.css || ""}`, null, parent);
+        s.textContent = w;
+        out.push({ s, x: r, w: ws[i], ch: w });
+      });
+      out.width = total;
+      return out;
+    }
     for (const ch of [...text]) {
       const w = M.measure(ch, font);
       const s = M.el("span", "", `position:absolute;left:0;top:0;font:${font};white-space:pre;${opts.css || ""}`, null, parent);

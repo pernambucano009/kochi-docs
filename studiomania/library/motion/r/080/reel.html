@@ -1,13 +1,22 @@
 <!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
 <script>
-// #80 "FULL STOP" — 15 s. Concept: everything is made of one full stop. The dot never leaves the screen and every scene is made from it.
+// #80 (عنصر: كل حاجة من نقطة) "FULL STOP" — 15 s. Concept: everything is made of one full stop. The dot never leaves the screen and every scene is made from it.
 // 0–3 kinetic type: the dot drops in and becomes the period of a word that keeps changing · 3–6 shape morph: the dot swells and morphs
 // circle→square→triangle→star→circle · 6–9 2D→3D: it flips like a coin, becomes a sphere, lands on a floor and rolls
 // · 9–12 data/UI: the floor flattens into a chart; the ball is the first point, the line grows, then it becomes a slider knob
 // · 12–15 end title: the knob is the period of FULL STOP.  One typeface (Inter Tight 800). Palette: cream, red, black (+ white).
-const W = 1920, H = 1080, CREAM = "#f1ece2", INK = "#111111", RED = "#ff3b2f";
+const PR = M.params({
+  words: { label: "٦ كلمات ورا بعض (النقطة جنبهم)", kind: "lines", def: ["MOTION", "DESIGN", "MADE", "OF", "ONE", "DOT"] },
+  stat: { label: "الرقم على الشارت", kind: "text", def: "+411%" },
+  end: { label: "الكلمة في الآخر (النقطة جنبها)", kind: "text", role: "brand", def: "FULL STOP" },
+  cream: { label: "الخلفية", kind: "color", role: "bg", def: "#f1ece2" },
+  ink: { label: "لون الكلام", kind: "color", role: "ink", def: "#111111" },
+  red: { label: "لون النقطة", kind: "color", role: "accent", def: "#ff3b2f" },
+});
+const W = 1920, H = 1080, CREAM = PR.cream, INK = PR.ink, RED = PR.red;
 const BASE = 640, PX = 1260, DR = 30;
-const WORDS = [[.55, "MOTION"], [1.15, "DESIGN"], [1.65, "MADE"], [2.05, "OF"], [2.38, "ONE"], [2.68, "DOT"]];
+const WORDS = [.55, 1.15, 1.65, 2.05, 2.38, 2.68].map((t0, i) => [t0, String(PR.words[i] ?? "")]).filter((w) => w[1]);
+const STAT = String(PR.stat), STATV = parseFloat(STAT.replace(/[^0-9.]/g, "")) || 0;
 const MORPH = [[3.75, "square"], [4.4, "tri"], [5.05, "star"], [5.65, "circle"]];
 const DATA = [.18, .34, .3, .52, .47, .74, .92];
 const N = 160;
@@ -34,11 +43,13 @@ M.reel({
     const cz = 1 + t * .006; x.translate(W / 2, H / 2); x.scale(cz, cz); x.translate(-W / 2, -H / 2);
     const dot = (X, Y, r, col = RED, sx = 1, sy = 1) => { x.fillStyle = col; x.beginPath(); x.ellipse(X, Y, r * sx, r * sy, 0, 0, 7); x.fill(); };
     const word = (s, right, base, px, kin, kout) => {   // letters rise from / sink below the baseline (clipped there)
-      x.save(); x.beginPath(); x.rect(0, 0, W, base + 4); x.clip();
+      px = M.fit(s, "IT", right - 80, px, 30, "800");
+      x.save(); x.beginPath(); x.rect(0, 0, W, base + (M.isAr(s) ? px * .55 : 4)); x.clip();   // العربي له حروف تحت السطر
       x.font = `800 ${px}px IT`; x.textBaseline = "alphabetic"; x.textAlign = "left"; x.fillStyle = INK;
-      const ws = [...s].map((c) => (c === " " ? px * .3 : x.measureText(c).width)), tot = ws.reduce((a, b) => a + b, 0) - px * .02 * (s.length - 1);
+      const U = M.isAr(s) ? [s] : [...s];   // العربي بيطلع كله مع بعض
+      const ws = U.map((c) => (c === " " ? px * .3 : x.measureText(c).width)), tot = ws.reduce((a, b) => a + b, 0) - px * .02 * (U.length - 1);
       let cx = right - tot;
-      [...s].forEach((c, i) => { const ki = kin(i), ko = kout(i); const y = base + (1 - ki) * px * 1.05 + ko * px * 1.05; x.fillText(c, cx, y); cx += ws[i] - px * .02; });
+      U.forEach((c, i) => { const ki = kin(i), ko = kout(i), ar = U.length === 1 && M.isAr(c); const y = base + (1 - ki) * px * (ar ? .5 : 1.05) + (ar ? 0 : ko * px * 1.05); x.globalAlpha = ar ? Math.max(0, Math.min(1, ki * 1.5)) * (1 - Math.min(1, ko * 2)) : 1; x.fillText(c, cx, y); x.globalAlpha = 1; cx += ws[i] - px * .02; });
       x.restore(); return tot;
     };
     // ================= A · kinetic type (0–3)
@@ -126,7 +137,7 @@ M.reel({
         pts.forEach((p, i) => { if (p[2] > 0) dot(lerp(p[0], lerp(420, 1500, expoIO(seg(t, 11.45, 11.95))), toSlider), p[1], lerp(22, 34, toSlider), i === 0 || toSlider > 0 ? RED : INK); });
         // the number counts on the chart, then reads 100% on the slider
         x.font = "800 120px IT"; x.fillStyle = INK; x.textAlign = "right"; x.textBaseline = "alphabetic";
-        if (t < 11.0) { const n = Math.round(lerp(0, 411, M.cubic(seg(t, 9.6, 10.9)))); x.fillText(`+${n}%`, 1700, 260); }
+        if (t < 11.0) { const n = Math.round(lerp(0, 411, M.cubic(seg(t, 9.6, 10.9)))); x.fillText(STAT.replace(/[0-9.]+/, String(Math.round(lerp(0, STATV, M.cubic(seg(t, 9.6, 10.9)))))), 1700, 260); void n; }
         else { const n = Math.round(lerp(0, 100, expoIO(seg(t, 11.45, 11.95)))); x.fillText(`${n}%`, 1500, 690); }
       }
     }
@@ -135,7 +146,7 @@ M.reel({
       const k = expoIO(seg(t, 12.0, 12.5));
       const tx = 1420, ty = 620;
       const dx = lerp(1500, tx, k), dy = lerp(760, ty - DR, k), r = lerp(34, DR + 6, k);
-      word("FULL STOP", tx - DR - 18, ty, 200, (j) => springO(t - 12.35 - j * .035, 20, .72), () => 0);
+      word(String(PR.end), tx - DR - 18, ty, 200, (j) => springO(t - 12.35 - j * .035, 20, .72), () => 0);
       const pulse = 1 + .12 * Math.exp(-Math.max(0, t - 13.6) * 6) * Math.sin(Math.max(0, t - 13.6) * 20);
       dot(dx, dy, r * pulse);
     }

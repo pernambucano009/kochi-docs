@@ -1,11 +1,26 @@
 <!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
 <script>
-// #61 Self-intro, 10 s, 120 BPM — concept: "Everything I say is one token at a time."
+// #61 (عنصر: تعريف بكلمات بتتبني) Self-intro, 10 s, 120 BPM — concept: "Everything I say is one token at a time."
 // 0–2 a single token block blinks, then splits "hello" into sub-word chips · 2–4 chips stream into a sentence (kinetic type)
 // 4–6 the token block morphs: chip → speech bubble → bulb → circle · 6–8 the circle becomes a 3D sphere of tokens turning
 // 8–9.5 data: next-token probabilities, the winner lands on each beat · 9.5–10 end title, back to the single block.
 // No frames, no corner labels, no timecodes. Palette: warm paper, ink, coral, sage. One typeface (Inter).
-const B = .5, PAPER = "#f3efe8", INK = "#1b1a17", CORAL = "#e2674a", SAGE = "#7d9b84";
+const PR = M.params({
+  hello: { label: "الكلمة الأولى", kind: "text", def: "hello" },
+  sentence: { label: "الجملة (بتظهر كلمة كلمة)", kind: "text", def: "I think in tiny pieces, one at a time." },
+  cloud: { label: "كلمات الكورة (كل كلمة في سطر)", kind: "lines", def: ["why", "how", "draft", "code", "plan", "poem", "fix", "idea", "test", "map", "sum", "ask", "yes", "data", "song", "list"] },
+  question: { label: "سؤال الاختيارات", kind: "text", def: "I can help you" },
+  options: { label: "٣ اختيارات (الاختيار | النسبة)", kind: "lines", def: ["help | 62", "think | 21", "write | 17"] },
+  ending: { label: "الجملة في الآخر", kind: "text", role: "brand", def: "Hi, I'm Claude." },
+  paper: { label: "الخلفية", kind: "color", role: "bg", def: "#f3efe8" },
+  ink: { label: "لون الكلام", kind: "color", role: "ink", def: "#1b1a17" },
+  coral: { label: "اللون المميز", kind: "color", role: "accent", def: "#e2674a" },
+  sage: { label: "اللون التاني", kind: "color", role: "accent2", def: "#7d9b84" },
+});
+const B = .5, PAPER = PR.paper, INK = PR.ink, CORAL = PR.coral, SAGE = PR.sage;
+const RTL = M.isAr(PR.sentence + PR.hello);
+const HW = String(PR.hello).trim(), HP = HW.includes(" ") ? [HW.split(" ")[0], HW.split(" ").slice(1).join(" ")] : M.isAr(HW) ? [HW] : [HW.slice(0, Math.ceil(HW.length / 2)), HW.slice(Math.ceil(HW.length / 2))];
+const OPTS = PR.options.slice(0, 3).map((l) => { const [w = "", p = "0"] = String(l).split("|").map((z) => z.trim()); return [w, Math.max(0, Math.min(100, parseFloat(p) || 0)) / 100]; });
 M.reel({
   W: 1920, H: 1080, DUR: 10, bg: PAPER,
   fonts: { I5: ["inter500.ttf", "500"], I8: ["inter800.ttf", "800"] },
@@ -15,24 +30,25 @@ M.reel({
     const beat = Math.floor(t / B), bt = t - beat * B, pulse = 1 - spring(bt, 16);
     x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = PAPER; x.fillRect(0, 0, 1920, 1080);
     const z = 1 + .03 * (t / 10); x.translate(960, 540); x.scale(z, z); x.translate(-960, -540);
-    const chip = (s, X, Y, col, txt = PAPER, px = 64, sc = 1) => { x.save(); x.translate(X, Y); x.scale(sc, sc); x.font = `800 ${px}px I8`; const w = x.measureText(s).width + px * .7, h = px * 1.45; x.fillStyle = col; x.beginPath(); x.roundRect(-w / 2, -h / 2, w, h, h * .28); x.fill(); x.fillStyle = txt; x.textAlign = "center"; x.textBaseline = "middle"; x.fillText(s, 0, 2); x.restore(); return w * sc; };
+    const chip = (s, X, Y, col, txt = PAPER, px = 64, sc = 1) => { x.save(); x.translate(X, Y); x.scale(sc, sc); x.font = `800 ${px}px I8`; const w = x.measureText(s).width + px * .7, h = px * 1.45; x.fillStyle = col; x.beginPath(); x.roundRect(-w / 2, -h / 2, w, h, h * .28); x.fill(); x.fillStyle = txt; x.textAlign = "center"; x.textBaseline = "middle"; x.direction = M.isAr(s) ? "rtl" : "ltr"; x.fillText(s, 0, 2); x.direction = "ltr"; x.restore(); return w * sc; };
     // ---------- 0–2: one block, then "hello" splits into tokens
     if (t < 2.1) {
       if (t < .9) { x.fillStyle = INK; x.beginPath(); x.roundRect(930, 470, 60, 140, 10); x.fill(); }
       else {
-        const k = expo(seg(t, 1, 1.4)), parts = ["hel", "lo"];
-        parts.forEach((p, i) => chip(p, 960 + (i - .5) * 220 * k, 540, i ? CORAL : INK, PAPER, 96, .6 + .4 * k));
+        const k = expo(seg(t, 1, 1.4)), parts = RTL ? [...HP].reverse() : HP, sp = parts.length > 1 ? Math.max(220, M.measure(HW, "800 96px I8") * .7) : 0;
+        parts.forEach((p, i) => chip(p, 960 + (parts.length > 1 ? (i - .5) * sp * k : 0), 540, (RTL ? parts.length - 1 - i : i) ? CORAL : INK, PAPER, 96, .6 + .4 * k));
       }
     }
     // ---------- 2–4: tokens stream in, one per half-beat, into a sentence
     if (t >= 2 && t < 4.2) {
-      const toks = [["I", INK], [" think", INK], [" in", INK], [" tiny", CORAL], [" pieces", INK], [",", INK], [" one", SAGE], [" at", INK], [" a", INK], [" time", CORAL], [".", INK]];
-      x.font = "800 82px I8"; let X = 220, Y = 470;
+      const words = String(PR.sentence).trim().split(/\s+/), step = Math.min(.17, 1.8 / Math.max(1, words.length));
+      const toks = words.map((w, i) => [(i ? " " : "") + w, i % 4 === 3 ? CORAL : i % 7 === 6 ? SAGE : INK]);
+      const fs = words.length > 14 ? 64 : 82; x.font = `800 ${fs}px I8`; let X = RTL ? 1700 : 220, Y = 470;
       toks.forEach(([s, col], i) => {
-        const k = expo(seg(t, 2 + i * .17, 2.25 + i * .17)); const w = x.measureText(s).width;
-        if (X + w > 1700) { X = 220; Y += 140; }
-        if (k > 0) { x.fillStyle = col; x.globalAlpha = k; x.textAlign = "left"; x.textBaseline = "middle"; x.fillText(s, X, Y + (1 - k) * 60); x.globalAlpha = 1; x.fillStyle = "rgba(27,26,23,.08)"; x.fillRect(X + 4, Y + 52, w - 8, 6); }
-        X += w;
+        const k = expo(seg(t, 2 + i * step, 2.25 + i * step)); const w = x.measureText(s).width;
+        if (RTL ? X - w < 220 : X + w > 1700) { X = RTL ? 1700 : 220; Y += fs * 1.7; }
+        if (k > 0) { x.fillStyle = col; x.globalAlpha = k; x.direction = RTL ? "rtl" : "ltr"; x.textAlign = RTL ? "right" : "left"; x.textBaseline = "middle"; x.fillText(s, X, Y + (1 - k) * 60); x.globalAlpha = 1; x.direction = "ltr"; x.fillStyle = "rgba(27,26,23,.08)"; x.fillRect(RTL ? X - w + 4 : X + 4, Y + fs * .63, w - 8, 6); }
+        X += RTL ? -w : w;
       });
     }
     // ---------- 4–6: morph — chip → bubble → bulb → circle (one 120-pt path)
@@ -47,11 +63,11 @@ M.reel({
       const k = clamp(Math.floor((t - 4) / .66), 0, 2), m = expoIO(seg(t, 4 + k * .66 + .15, 4 + k * .66 + .55));
       x.beginPath(); for (let i = 0; i <= N; i++) { const u = i / N, p = shp[k](u), q = shp[k + 1](u); const X = cx + lerp(p[0], q[0], m), Y = cy + lerp(p[1], q[1], m); i ? x.lineTo(X, Y) : x.moveTo(X, Y); } x.closePath();
       x.fillStyle = [INK, CORAL, SAGE][m > .5 ? Math.min(2, k + 1) : k]; x.fill();
-      if (k === 0 && m < .3) { x.font = "800 90px I8"; x.fillStyle = PAPER; x.textAlign = "center"; x.textBaseline = "middle"; x.fillText("hello", cx, cy); }
+      if (k === 0 && m < .3) { x.font = `800 ${M.fit(HW, "I8", 440, 90, 30, "800")}px I8`; x.fillStyle = PAPER; x.textAlign = "center"; x.textBaseline = "middle"; x.direction = RTL ? "rtl" : "ltr"; x.fillText(HW, cx, cy); x.direction = "ltr"; }
     }
     // ---------- 6–8: the circle becomes a sphere of tokens turning in 3D
     if (t >= 6 && t < 8.2) {
-      const words = ["why", "how", "draft", "code", "plan", "poem", "fix", "idea", "test", "map", "sum", "ask", "yes", "data", "song", "list"];
+      const words = PR.cloud.length ? PR.cloud : ["•"];
       const rot = (t - 6) * 1.1, into = expo(seg(t, 6, 6.4)), out = expoIO(seg(t, 7.7, 8.2));
       const pts = [];
       for (let i = 0; i < 48; i++) { const yy = 1 - (i + .5) / 48 * 2, r = Math.sqrt(1 - yy * yy), th = i * 2.399; const X0 = Math.cos(th) * r, Z0 = Math.sin(th) * r; const X = X0 * Math.cos(rot) + Z0 * Math.sin(rot), Z = -X0 * Math.sin(rot) + Z0 * Math.cos(rot); pts.push({ X, Y: yy, Z, w: words[i % words.length], i }); }
@@ -60,17 +76,22 @@ M.reel({
     }
     // ---------- 8–9.5: next-token probabilities; the winner is chosen on each beat
     if (t >= 8 && t < 9.6) {
-      const rounds = [["help", .62, "think", .21, "write", .17], ["you", .71, "the", .18, "with", .11], ["!", .55, ".", .38, "?", .07]];
-      const r = clamp(Math.floor((t - 8) / B), 0, 2), g = expo(seg(bt, 0, .3));
-      x.font = "800 70px I8"; x.fillStyle = INK; x.textAlign = "left"; x.textBaseline = "middle";
-      const said = ["I can", "I can help", "I can help you"][r]; x.fillText(said, 260, 300);
-      const opts = rounds[r];
-      for (let i = 0; i < 3; i++) { const w = opts[i * 2], p = opts[i * 2 + 1]; const Y = 480 + i * 150; x.fillStyle = "rgba(27,26,23,.08)"; x.fillRect(260, Y - 40, 1100, 80); x.fillStyle = i === 0 ? CORAL : i === 1 ? SAGE : "#b9b2a6"; x.fillRect(260, Y - 40, 1100 * p * g, 80); x.font = "800 52px I8"; x.fillStyle = INK; x.fillText(w, 1400, Y); x.font = "500 40px I5"; x.fillText(Math.round(p * 100 * g) + "%", 1620, Y); }
+      const g = expo(seg(t, 8.05, 8.9));
+      x.font = `800 ${M.fit(PR.question, "I8", 1400, 70, 30, "800")}px I8`; x.fillStyle = INK; x.textBaseline = "middle";
+      x.direction = RTL ? "rtl" : "ltr"; x.textAlign = RTL ? "right" : "left"; x.fillText(PR.question, RTL ? 1660 : 260, 300);
+      OPTS.forEach(([w, p], i) => {
+        const Y = 480 + i * 150, bx = RTL ? 560 : 260, k = expo(seg(t, 8.05 + i * .15, 8.9 + i * .15));
+        x.fillStyle = "rgba(27,26,23,.08)"; x.fillRect(bx, Y - 40, 1100, 80); x.fillStyle = i === 0 ? CORAL : i === 1 ? SAGE : "#b9b2a6";
+        if (RTL) x.fillRect(bx + 1100 - 1100 * p * k, Y - 40, 1100 * p * k, 80); else x.fillRect(bx, Y - 40, 1100 * p * k, 80);
+        x.font = `800 ${M.fit(w, "I8", 200, 52, 20, "800")}px I8`; x.fillStyle = INK; x.textAlign = RTL ? "right" : "left"; x.fillText(w, RTL ? 520 : 1400, Y);
+        x.font = "500 40px I5"; x.textAlign = "left"; x.direction = "ltr"; x.fillText(Math.round(p * 100 * k) + "%", RTL ? 220 : 1620, Y); x.direction = RTL ? "rtl" : "ltr";
+      });
+      x.direction = "ltr"; void g;
     }
     // ---------- 9.5–10: end title, then the single block of frame one
     if (t >= 9.5) {
       const a = expo(seg(t, 9.5, 9.7)), o = expoIn(seg(t, 9.78, 9.92));
-      x.globalAlpha = a * (1 - o); x.font = "800 150px I8"; x.fillStyle = INK; x.textAlign = "center"; x.textBaseline = "middle"; x.fillText("Hi, I'm Claude.", 960, 540); x.globalAlpha = 1;
+      x.globalAlpha = a * (1 - o); x.font = `800 ${M.fit(PR.ending, "I8", 1700, 150, 40, "800")}px I8`; x.fillStyle = INK; x.textAlign = "center"; x.textBaseline = "middle"; x.direction = M.isAr(PR.ending) ? "rtl" : "ltr"; x.fillText(PR.ending, 960, 540); x.direction = "ltr"; x.globalAlpha = 1;
       if (t > 9.92) { x.fillStyle = INK; x.beginPath(); x.roundRect(930, 470, 60, 140, 10); x.fill(); }
     }
   },

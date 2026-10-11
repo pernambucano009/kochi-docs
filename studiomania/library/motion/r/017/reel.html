@@ -1,15 +1,37 @@
 <!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
 <script>
-// #17 Animated business explainer — StudioMania, Arabic copy. 30 s, 120 BPM, 5 scenes × 6 s.
+// #17 (عنصر: شرح البراند في ٣٠ ثانية) Animated business explainer, Arabic copy, every line editable. 30 s, 120 BPM, 5 scenes × 6 s.
 // Through-line: the red ring (the O of the logo). Problem → what we do → 3 steps → proof → name.
-const B = .5, INK = "#121214", PAPER = "#ffffff", RED = "#e8402f", GREY = "#8a8a90";
+const PR = M.params({
+  prob1: { label: "المشكلة (السطر الأول)", kind: "text", def: "كل يوم محتاج" },
+  prob1hl: { label: "الكلمة الملوّنة", kind: "text", def: "فيديو" },
+  prob2: { label: "المشكلة (السطر التاني)", kind: "text", def: "والمونتير" },
+  prob2hl: { label: "آخر السطر (ملوّن)", kind: "text", def: "مش فاضي." },
+  name: { label: "اسم البراند", kind: "text", role: "brand", def: "ستوديومانيا" },
+  what: { label: "بيعمل إيه", kind: "text", role: "about", def: "بيعمل فيديوهات البراند بتاعك" },
+  what2: { label: "وبعدها (ملوّن)", kind: "text", def: "من الفكرة لحد النشر." },
+  stepsTitle: { label: "عنوان الخطوات", kind: "text", def: "٣ خطوات بس" },
+  steps: { label: "الخطوات (٣، كل واحدة في سطر)", kind: "lines", def: ["اكتب فكرتك", "اختار الستايل", "استلم الفيديو"] },
+  kindsTitle: { label: "عنوان المميزات", kind: "text", def: "أنواع شغل" },
+  kindsTitle2: { label: "وبعده", kind: "text", def: "في مكان واحد." },
+  kinds: { label: "المميزات أو الخدمات (لحد ٨، كل واحدة في سطر)", kind: "lines", def: ["ريلز", "فيلم", "مسلسل", "كاروسيل", "إعلان", "تايبوجرافي", "دبلجة", "مونتاج"] },
+  logo: { label: "اللوجو", kind: "image", role: "logo", def: "" },
+  tagline: { label: "الجملة تحت الاسم", kind: "text", role: "tagline", def: "استوديو المحتوى والفيديو" },
+  cta: { label: "الدعوة (CTA)", kind: "text", role: "cta", def: "ابدأ أول فيديو النهارده" },
+  ink: { label: "لون الكلام", kind: "color", role: "ink", def: "#121214" },
+  accent: { label: "اللون المميز", kind: "color", role: "accent", def: "#e8402f" },
+  bg: { label: "الخلفية", kind: "color", role: "bg", def: "#ffffff" },
+});
+const B = .5, INK = PR.ink, PAPER = PR.bg, RED = PR.accent, GREY = "#8a8a90";
+const AD = (n) => String(n).replace(/[0-9]/g, (d) => "٠١٢٣٤٥٦٧٨٩"[d]);
 const AR = "800 1px AX", F = (px, fam = "AX", wt = 800) => `${wt} ${px}px ${fam}`;
 M.reel({
   W: 1920, H: 1080, DUR: 30, bg: PAPER,
   fonts: { AX: ["TY-Alexandria-800.ttf", "800"], AM: ["TY-Alexandria-500.ttf", "500"], JO: "Jost.ttf" },
-  init(M) {
+  async init(M) {
     const cam = M.el("div", "", "position:absolute;left:0;top:0;width:1920px;height:1080px;transform-origin:960px 540px;");
-    const w = (txt, px, col = INK, fam = "AX", wt = 800) => {
+    const w = (txt, px, col = INK, fam = "AX", wt = 800, maxW = 1640) => {
+      txt = String(txt || ""); px = M.fit(txt, fam, maxW, px, 24, String(wt));
       const box = M.el("div", "", `position:absolute;left:0;top:0;overflow:hidden;height:${px * 1.5}px;direction:rtl;`, "", cam);
       const s = M.el("div", "", `position:absolute;right:0;top:${px * .12}px;font:${F(px, fam, wt)};color:${col};white-space:pre;line-height:1.2;`, txt, box);
       const width = M.measure(txt, F(px, fam, wt)) + 8;
@@ -17,35 +39,44 @@ M.reel({
       return { box, s, w: width, h: px * 1.5, px };
     };
     // scene 1: words + a pile of video cards
-    const s1 = [w("كل يوم", 150), w("محتاج", 150), w("فيديو", 150, RED)];
+    const s1 = [w(PR.prob1, 150), w("", 150), w(PR.prob1hl, 150, RED)];
     const cards = Array.from({ length: 7 }, (_, i) => {
       const c = M.el("div", "", `position:absolute;left:0;top:0;width:220px;height:390px;border-radius:26px;background:${INK};`, "", cam);
       M.el("div", "", `position:absolute;left:50%;top:50%;width:0;height:0;margin:-26px 0 0 -14px;border-left:44px solid ${PAPER};border-top:26px solid transparent;border-bottom:26px solid transparent;`, "", c);
       return c;
     });
-    const s1b = [w("والمونتير", 130), w("مش فاضي.", 130, RED)];
+    const s1b = [w(PR.prob2, 130, INK, "AX", 800, 800), w(PR.prob2hl, 130, RED, "AX", 800, 800)];
     // the ring
     const ringSvg = M.svg("svg", { width: 1920, height: 1080, style: "position:absolute;left:0;top:0;overflow:visible" }); cam.appendChild(ringSvg);
     const ring = M.svg("circle", { cx: 0, cy: 0, r: 100, fill: "none", stroke: RED, "stroke-width": 40 }, ringSvg);
     const ringNum = M.el("div", "", `position:absolute;left:0;top:0;width:200px;text-align:center;font:${F(110)};color:${INK};line-height:1;`, "", cam);
     // scene 2
-    const s2 = [w("ستوديومانيا", 140), w("بيعمل فيديوهات البراند بتاعك", 78, INK, "AM", 500), w("من الفكرة لحد النشر.", 78, RED, "AM", 500)];
+    const s2 = [w(PR.name, 140), w(PR.what, 78, INK, "AM", 500), w(PR.what2, 78, RED, "AM", 500)];
     // scene 3: three steps
-    const steps = ["اكتب فكرتك", "اختار الستايل", "استلم الفيديو"].map((t) => w(t, 54));
+    const steps = [0, 1, 2].map((i) => w(PR.steps[i] || "", 54, INK, "AX", 800, 470));
     const stepRings = [0, 1, 2].map(() => M.svg("circle", { cx: 0, cy: 0, r: 70, fill: "none", stroke: INK, "stroke-width": 10 }, ringSvg));
     const stepNums = ["١", "٢", "٣"].map((n) => M.el("div", "", `position:absolute;left:0;top:0;width:140px;text-align:center;font:${F(80)};color:${INK};line-height:1;`, n, cam));
-    const s3title = w("٣ خطوات بس", 64, GREY, "AM", 500);
+    const s3title = w(PR.stepsTitle, 64, GREY, "AM", 500, 1200);
     // scene 4: proof — eight kinds of work in one place
-    const KINDS = ["ريلز", "فيلم", "مسلسل", "كاروسيل", "إعلان", "تايبوجرافي", "دبلجة", "مونتاج"];
-    const tiles = KINDS.map((k) => { const t = M.el("div", "", `position:absolute;left:0;top:0;width:250px;height:150px;border-radius:24px;background:#f2f2f3;display:grid;place-items:center;font:${F(46, "AM", 500)};color:${INK};direction:rtl;`, k, cam); return t; });
+    const KINDS = PR.kinds.slice(0, 8);
+    const tiles = KINDS.map((k) => { const t = M.el("div", "", `position:absolute;left:0;top:0;width:250px;height:150px;border-radius:24px;background:#f2f2f3;display:grid;place-items:center;text-align:center;padding:0 14px;box-sizing:border-box;font:${F(M.fit(k, "AM", 220, 46, 22, "500"), "AM", 500)};color:${INK};direction:rtl;`, k, cam); return t; });
     const bigN = M.el("div", "", `position:absolute;left:0;top:0;font:${F(330)};color:${RED};line-height:1;width:300px;text-align:center;`, "", cam);
-    const s4 = [w("أنواع شغل", 96), w("في مكان واحد.", 96, GREY)];
+    const s4 = [w(PR.kindsTitle, 96, INK, "AX", 800, 700), w(PR.kindsTitle2, 96, GREY, "AX", 800, 700)];
     // scene 5: logo
-    const logo = M.el("div", "", `position:absolute;left:0;top:0;font:400 150px JO;letter-spacing:.24em;color:${INK};white-space:pre;line-height:150px;`, "", cam);
-    const logoA = M.el("span", "", "", "STUDI", logo), logoGap = M.el("span", "", "display:inline-block;width:150px;", "", logo), logoB = M.el("span", "", "", "MANIA", logo);
-    const tag = w("استوديو المحتوى والفيديو", 64, GREY, "AM", 500);
-    const cta = w("ابدأ أول فيديو النهارده", 64, RED, "AM", 500);
-    return { cam, s1, cards, s1b, ring, ringNum, s2, steps, stepRings, stepNums, s3title, tiles, bigN, s4, logo, logoA, logoGap, logoB, tag, cta };
+    // اللوجو: الصورة لو موجودة، وإلا اسم البراند
+    const img = await M.img(PR.logo);
+    let logo, LW, LH;
+    if (img) {
+      const k = Math.min(1100 / img.width, 300 / img.height); LW = img.width * k; LH = img.height * k;
+      logo = M.el("img", "", `position:absolute;left:0;top:0;width:${LW}px;height:${LH}px;`, null, cam); logo.src = img.src;
+    } else {
+      const nm = String(PR.name || ""), ar = M.isAr(nm), fam = ar ? "AX" : "JO", wt = ar ? 800 : 400, px = M.fit(nm, fam, 1400, 150, 40, String(wt));
+      LW = M.measure(nm, `${wt} ${px}px ${fam}`) * (ar ? 1 : 1.24) + 10; LH = px * 1.3;
+      logo = M.el("div", "", `position:absolute;left:0;top:0;width:${LW}px;font:${wt} ${px}px ${fam};letter-spacing:${ar ? 0 : .24}em;color:${INK};white-space:pre;line-height:${LH}px;text-align:center;direction:${ar ? "rtl" : "ltr"};`, nm, cam);
+    }
+    const tag = w(PR.tagline, 64, GREY, "AM", 500, 1500);
+    const cta = w(PR.cta, 64, RED, "AM", 500, 1500);
+    return { cam, s1, cards, s1b, ring, ringNum, s2, steps, stepRings, stepNums, s3title, tiles, bigN, s4, logo, LW, LH, tag, cta, nK: KINDS.length };
   },
   seek(t, P, M) {
     const { seg, lerp, expo, expoIn, expoIO, spring, springO, clamp } = M;
@@ -63,7 +94,7 @@ M.reel({
       M.X(o.s, 0, (1 - i) * o.h - u * o.h);
     };
     // ---------- 1 · the problem (0–6)
-    word(P.s1[0], 1720, 250, 0, 3.75); word(P.s1[1], 1720 - P.s1[0].w - 40, 250, .5, 3.75); word(P.s1[2], 1720, 470, 1, 3.75);
+    word(P.s1[0], 1720, 250, 0, 3.75); word(P.s1[2], 1720, 470, 1, 3.75);
     P.cards.forEach((c, i) => {
       const tin = 1.5 + i * .3;   // stacking on the beat (two per beat after the first)
       const vis = t >= tin && t < 6;
@@ -77,7 +108,7 @@ M.reel({
       c.style.background = gather > .5 ? RED : INK;
       M.X(c, x, y, s, s, rot * (1 - gather));
     });
-    word(P.s1b[0], 1720, 640, 4, 5.15); word(P.s1b[1], 1720 - P.s1b[0].w - 40, 640, 4.5, 5.15);
+    word(P.s1b[0], 1720, 640, 4, 5.15); word(P.s1b[1], P.s1b[0].w + P.s1b[1].w + 40 > 1500 ? 1720 : 1720 - P.s1b[0].w - 40, P.s1b[0].w + P.s1b[1].w + 40 > 1500 ? 820 : 640, 4.5, 5.15);
 
     // ---------- the ring: born from the pile at 6, travels through every scene
     let rx = 960, ry = 540, rr = 0, rw = 40, ringOn = t >= 5.9 && t < 30;
@@ -96,12 +127,9 @@ M.reel({
     // 4 · proof: the ring becomes the big number's halo, then sweeps into the grid
     if (t >= 18 && t < 24) { const k = expoIO(seg(t, 18, 18.5)); rx = lerp(stepX[2], 380, k); ry = lerp(stepY, 560, k); rr = lerp(92, 220, k); rw = lerp(22, 30, k); }
     // 5 · the logo's O
-    if (t >= 24) {
-      const lw = M.measure("STUDI", "400 150px JO") + 5 * 36, total = lw + 136 + M.measure("MANIA", "400 150px JO") + 4 * 36;
-      const lx = (1920 - total) / 2, ox = lx + lw + 68 - 18;
+    if (t >= 24) {   // الحلقة بتبقى نقطة مميزة تحت الاسم
       const k = expoIO(seg(t, 23.6, 24.4));
-      rx = lerp(380, ox, k); ry = lerp(560, 470, k); rr = lerp(220, 56, k); rw = lerp(30, 17, k);
-      P.logoX = lx;
+      rx = lerp(380, 960, k); ry = lerp(560, 470 + P.LH / 2 + 34, k); rr = lerp(220, 7, k); rw = lerp(30, 14, k);
     }
     M.show(P.ring, ringOn);
     P.ring.setAttribute("cx", rx); P.ring.setAttribute("cy", ry); P.ring.setAttribute("r", Math.max(1, rr)); P.ring.setAttribute("stroke-width", rw);
@@ -124,9 +152,9 @@ M.reel({
     });
 
     // ---------- 4 · proof (18–24): eight kinds, one per beat
-    const n = clamp(Math.floor((t - 18.5) / B) + 1, 0, 8);
+    const n = clamp(Math.floor((t - 18.5) / B) + 1, 0, P.nK);
     M.show(P.bigN, t >= 18.3 && t < 23.6);
-    P.bigN.textContent = "٠١٢٣٤٥٦٧٨"[Math.max(1, n)];
+    P.bigN.textContent = AD(Math.max(1, n));
     M.X(P.bigN, 380 - 150, 560 - 190, 1 + .08 * (1 - spring((t - 18.5) % B, 20)));
     word(P.s4[0], 1720, 170, 19, 23.4); word(P.s4[1], 1720 - P.s4[0].w - 30, 170, 19.5, 23.4);
     P.tiles.forEach((tl, i) => {
@@ -144,11 +172,9 @@ M.reel({
     const lv = t >= 24;
     M.show(P.logo, lv);
     if (lv) {
-      M.X(P.logo, P.logoX, 470 - 75);
-      const a = expo(seg(t, 24.2, 24.7)), b = expo(seg(t, 24.4, 24.9));
-      P.logoA.style.cssText = `display:inline-block;transform:translateX(${(1 - a) * 120}px);opacity:${a}`;
-      P.logoB.style.cssText = `display:inline-block;transform:translateX(${-(1 - b) * 120}px);opacity:${b}`;
-      P.logoGap.style.width = "136px";
+      const a = expo(seg(t, 24.2, 24.8));
+      M.X(P.logo, 960 - P.LW / 2, 470 - P.LH / 2 + (1 - a) * 60, .9 + .1 * a);
+      P.logo.style.opacity = a;
     }
     word(P.tag, 960 + P.tag.w / 2, 640, 25.5); word(P.cta, 960 + P.cta.w / 2, 760, 27);
   },

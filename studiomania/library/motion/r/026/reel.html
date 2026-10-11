@@ -1,10 +1,27 @@
 <!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
 <script>
-// #26 Branding agency showreel — fictional agency "Northbound", brands for startup founders. 30 s, 120 BPM.
+// #26 (عنصر: شوريل براند) Brand showreel — any agency/brand, client names, stat and name editable. 30 s, 120 BPM.
 // Concept: "One stamp makes every mark" — a cobalt square stamp presses the words, morphs into client marks,
 // gets depth as business cards, becomes a brand-guide UI, tiles a wall of marks, and stamps the end title.
 // Palette: cobalt, tangerine, cream + black/white. One typeface (Gabarito).
-const B = .5, CREAM = "#f3eee4", INK = "#101014", COB = "#2440ff", TAN = "#ff6a2b", WHITE = "#ffffff";
+const PR = M.params({
+  hook: { label: "٤ كلمات في الأول (الختم بيطبعها)", kind: "lines", def: ["FOUNDERS", "NEED", "BRANDS", "THAT"] },
+  column: { label: "كلمات العمود (كل كلمة في سطر، اللي عليها * ملوّنة)", kind: "lines", def: ["THAT", "MOVE", "AS", "*FAST", "AS", "THEY", "DO", "."] },
+  marks: { label: "٦ أسامي (عملاء أو منتجات)", kind: "lines", def: ["NORTH", "ORBIT", "PEAK", "ARCADE", "PLUS", "LEAF"] },
+  marksLabel: { label: "عنوان الأسامي", kind: "text", def: "CLIENT MARKS" },
+  guide: { label: "عنوان صفحة الدليل", kind: "text", def: "BRAND GUIDE — NORTHBOUND" },
+  font: { label: "اسم الخط في الدليل", kind: "text", def: "Gabarito 800" },
+  stat: { label: "الرقم", kind: "text", def: "42" },
+  statLabel: { label: "بعد الرقم", kind: "text", def: "brands launched" },
+  name: { label: "الاسم في الآخر", kind: "text", role: "brand", def: "NORTHBOUND®" },
+  tagline: { label: "تحت الاسم", kind: "text", role: "tagline", def: "Brands for founders." },
+  cob: { label: "اللون الأساسي", kind: "color", role: "accent", def: "#2440ff" },
+  tan: { label: "اللون التاني", kind: "color", role: "accent2", def: "#ff6a2b" },
+  cream: { label: "الخلفية", kind: "color", role: "bg", def: "#f3eee4" },
+  ink: { label: "الغامق", kind: "color", role: "ink", def: "#101014" },
+});
+const B = .5, CREAM = PR.cream, INK = PR.ink, COB = PR.cob, TAN = PR.tan, WHITE = "#ffffff";
+const MK = Array.from({ length: 6 }, (_, i) => PR.marks[i] ?? "");
 const F = (px) => `800 ${px}px GB`;
 M.reel({
   W: 1920, H: 1080, DUR: 30, bg: CREAM,
@@ -14,7 +31,7 @@ M.reel({
     // CSS 3D layer for the business-card moment
     const sc3 = M.el("div", "", "position:absolute;left:0;top:0;width:1920px;height:1080px;perspective:1800px;pointer-events:none;");
     const deck = M.el("div", "", "position:absolute;left:960px;top:540px;width:0;height:0;transform-style:preserve-3d;", "", sc3);
-    const cards = Array.from({ length: 7 }, (_, i) => M.el("div", "", `position:absolute;left:-280px;top:-160px;width:560px;height:320px;border-radius:18px;background:${i % 2 ? CREAM : COB};color:${i % 2 ? INK : WHITE};font:${F(48)};display:flex;align-items:flex-end;padding:30px;box-sizing:border-box;backface-visibility:hidden;box-shadow:0 30px 60px rgba(0,0,0,.18);`, "", deck));
+    const cards = Array.from({ length: 7 }, (_, i) => M.el("div", "", `position:absolute;left:-280px;top:-160px;width:560px;height:320px;border-radius:18px;background:${i % 2 ? CREAM : COB};color:${i % 2 ? INK : WHITE};font:${F(48)};display:flex;align-items:flex-end;padding:30px;box-sizing:border-box;backface-visibility:hidden;box-shadow:0 30px 60px rgba(0,0,0,.18);direction:auto;unicode-bidi:plaintext;overflow:hidden;white-space:nowrap;`, "", deck));
     return { x, sc3, deck, cards };
   },
   seek(t, P, M) {
@@ -29,13 +46,13 @@ M.reel({
     if (t >= 22 && t < 28) bg = beat % 2 ? COB : INK;
     x.fillStyle = bg; x.fillRect(0, 0, 1920, 1080);
     x.translate(960, 540); x.scale(cz, cz); x.translate(-960, -540);
-    const txt = (s, px, cx, cy, col, al = "center") => { x.font = F(px); x.fillStyle = col; x.textAlign = al; x.textBaseline = "middle"; x.fillText(s, cx, cy); };
+    const txt = (s, px, cx, cy, col, al = "center", maxW = 1760) => { s = String(s ?? ""); px = M.fit(s, "GB", maxW, px, 14, "800"); x.font = F(px); x.fillStyle = col; x.textAlign = al; x.direction = M.isAr(s) ? "rtl" : "ltr"; if (al === "left" && M.isAr(s)) x.textAlign = "right", cx += 0; x.textBaseline = "middle"; x.fillText(s, cx, cy); x.direction = "ltr"; };
     const sq = (cx, cy, s, col, r = 0, rad = 0) => { x.save(); x.translate(cx, cy); x.rotate(r); x.fillStyle = col; x.beginPath(); x.roundRect(-s / 2, -s / 2, s, s, rad); x.fill(); x.restore(); };
     M.show(P.sc3, t >= 12 && t < 17.2);
 
     // ---------- HOOK (0–2): the stamp hits on every beat, leaving a word
     if (t < 2) {
-      const words = ["FOUNDERS", "NEED", "BRANDS", "THAT"];
+      const words = [0, 1, 2, 3].map((i) => PR.hook[i] ?? "");
       const k = Math.min(3, beat), hit = spring(bt, 22);
       const lift = bt > .38 ? expoIn(seg(bt, .38, .5)) : 0;
       const s = lerp(1.35, 1, hit) + lift * .25;
@@ -47,13 +64,13 @@ M.reel({
     }
     // ---------- KINETIC TYPE (2–7): words pile into a column, two per beat
     if (t >= 2 && t < 7) {
-      const lines = ["THAT", "MOVE", "AS", "FAST", "AS", "THEY", "DO", "."];
+      const lines = PR.column.slice(0, 8);
       const off = expoIO(seg(t, 4.4, 6.6)) * 520;
       const gone = expoIO(seg(t, 6.45, 6.8));
-      lines.forEach((l, i) => {
+      lines.forEach((l, i) => {   // eslint-disable-line
         const tin = 2 + i * .25, g = expo(seg(t, tin, tin + .3));
         if (g <= 0) return;
-        const y = 220 + i * 150 - off, col = l === "FAST" ? TAN : l === "." ? COB : INK;
+        const hl = String(l).startsWith("*"), y = 220 + i * 150 - off, col = hl ? TAN : l === "." ? COB : INK; l = hl ? String(l).slice(1) : l;
         x.save(); x.beginPath(); x.rect(0, y - 75, 1920, 150); x.clip();
         txt(l, 170, 960 + (i % 2 ? 1 : -1) * 220 * (1 - g), y + 150 * (1 - g) - gone * 160, col);
         x.restore();
@@ -65,12 +82,12 @@ M.reel({
     // ---------- MORPH (7–12): one shape becomes each client's mark, one per beat
     if (t >= 7 && t < 12) {
       const marks = [
-        ["NORTH", (k) => sq(960, 500, 520, COB, 0, 40)],
-        ["ORBIT", (k) => { x.fillStyle = TAN; x.beginPath(); x.arc(960, 500, 260, 0, 7); x.fill(); x.fillStyle = INK; x.beginPath(); x.arc(1040, 440, 90, 0, 7); x.fill(); }],
-        ["PEAK", (k) => { x.fillStyle = WHITE; x.beginPath(); x.moveTo(960, 240); x.lineTo(1220, 760); x.lineTo(700, 760); x.fill(); x.fillStyle = INK; x.beginPath(); x.moveTo(960, 470); x.lineTo(1060, 650); x.lineTo(860, 650); x.fill(); }],
-        ["ARCADE", (k) => { x.fillStyle = COB; x.beginPath(); x.moveTo(700, 760); x.lineTo(700, 500); x.arc(960, 500, 260, Math.PI, 0); x.lineTo(1220, 760); x.lineTo(1100, 760); x.lineTo(1100, 500); x.arc(960, 500, 140, 0, Math.PI, true); x.lineTo(820, 760); x.fill(); }],
-        ["PLUS", (k) => { x.fillStyle = TAN; x.beginPath(); x.roundRect(890, 240, 140, 520, 30); x.fill(); x.beginPath(); x.roundRect(700, 430, 520, 140, 30); x.fill(); }],
-        ["LEAF", (k) => { x.fillStyle = WHITE; x.beginPath(); x.moveTo(960, 240); x.quadraticCurveTo(1260, 500, 960, 760); x.quadraticCurveTo(660, 500, 960, 240); x.fill(); x.strokeStyle = INK; x.lineWidth = 16; x.beginPath(); x.moveTo(960, 300); x.lineTo(960, 740); x.stroke(); }],
+        [MK[0], (k) => sq(960, 500, 520, COB, 0, 40)],
+        [MK[1], (k) => { x.fillStyle = TAN; x.beginPath(); x.arc(960, 500, 260, 0, 7); x.fill(); x.fillStyle = INK; x.beginPath(); x.arc(1040, 440, 90, 0, 7); x.fill(); }],
+        [MK[2], (k) => { x.fillStyle = WHITE; x.beginPath(); x.moveTo(960, 240); x.lineTo(1220, 760); x.lineTo(700, 760); x.fill(); x.fillStyle = INK; x.beginPath(); x.moveTo(960, 470); x.lineTo(1060, 650); x.lineTo(860, 650); x.fill(); }],
+        [MK[3], (k) => { x.fillStyle = COB; x.beginPath(); x.moveTo(700, 760); x.lineTo(700, 500); x.arc(960, 500, 260, Math.PI, 0); x.lineTo(1220, 760); x.lineTo(1100, 760); x.lineTo(1100, 500); x.arc(960, 500, 140, 0, Math.PI, true); x.lineTo(820, 760); x.fill(); }],
+        [MK[4], (k) => { x.fillStyle = TAN; x.beginPath(); x.roundRect(890, 240, 140, 520, 30); x.fill(); x.beginPath(); x.roundRect(700, 430, 520, 140, 30); x.fill(); }],
+        [MK[5], (k) => { x.fillStyle = WHITE; x.beginPath(); x.moveTo(960, 240); x.quadraticCurveTo(1260, 500, 960, 760); x.quadraticCurveTo(660, 500, 960, 240); x.fill(); x.strokeStyle = INK; x.lineWidth = 16; x.beginPath(); x.moveTo(960, 300); x.lineTo(960, 740); x.stroke(); }],
       ];
       // squash-and-swap on every beat: the outgoing mark shrinks to a point while turning, the next grows out of it
       const i = clamp(Math.floor((t - 7) / 1), 0, 4), local = (t - 7) - i, half = .5;
@@ -79,12 +96,12 @@ M.reel({
       const sIn = local < half ? 1 - expoIn(seg(local, .3, half)) : expo(seg(local, half, half + .3));
       draw(m, Math.max(.001, sIn), (1 - sIn) * (local < half ? 1.2 : -1.2));
       txt(marks[m][0], 46, 960, 900, local < half ? WHITE : TAN);
-      txt("CLIENT MARKS", 22, 140, 120, "#7d7d86", "left");
+      txt(PR.marksLabel, 22, M.isAr(PR.marksLabel) ? 1780 : 140, 120, "#7d7d86", "left");
     }
     // ---------- 2D → 3D (12–17): the last mark becomes a deck of business cards that fans out in space
     if (t >= 12 && t < 17.2) {
       const fan = expo(seg(t, 12.2, 13.4)), spin = expoIO(seg(t, 14, 15.6)), fold = expoIO(seg(t, 16.5, 17.2));
-      const names = ["Northbound", "Orbit", "Peak", "Arcade", "Plus", "Leaf", "Northbound"];
+      const names = [PR.name, ...MK, PR.name].slice(0, 7);
       P.deck.style.transform = `rotateX(${lerp(0, 52, fan) * (1 - fold)}deg) rotateZ(${lerp(0, -18, fan) * (1 - fold) + spin * 360}deg) scale(${lerp(1, .6, fold)})`;
       P.cards.forEach((c, i) => {
         c.textContent = names[i];
@@ -99,12 +116,12 @@ M.reel({
       // grid lines
       x.strokeStyle = "#e7e7ec"; x.lineWidth = 2;
       for (let k = 0; k < 12; k++) { const a = m(0); x.beginPath(); x.moveTo(140 + k * 140, 120); x.lineTo(140 + k * 140, 120 + 840 * a); x.stroke(); }
-      txt("BRAND GUIDE — NORTHBOUND", 26, 140, 90, INK, "left");
+      txt(PR.guide, 26, M.isAr(PR.guide) ? 1780 : 140, 90, INK, "left");
       // palette swatches
-      [COB, TAN, CREAM, INK].forEach((col, i) => { const g = m(1 + i * .5); x.fillStyle = col; x.fillRect(140 + i * 210, 160, 190, 260 * g); if (g > .8) txt(["COBALT", "TANGERINE", "CREAM", "INK"][i], 22, 150 + i * 210, 440, INK, "left"); });
+      [COB, TAN, CREAM, INK].forEach((col, i) => { const g = m(1 + i * .5); x.fillStyle = col; x.fillRect(140 + i * 210, 160, 190, 260 * g); if (g > .8) txt(String(col).toUpperCase(), 22, 150 + i * 210, 440, INK, "left"); });
       // type specimen
       const g2 = m(3.5); x.save(); x.beginPath(); x.rect(1000, 150, 800, 300); x.clip(); txt("Aa", 260, 1000, 300 + (1 - g2) * 300, COB, "left"); x.restore();
-      txt("Gabarito 800", 30, 1380, 300, INK, "left");
+      txt(PR.font, 30, 1380, 300, INK, "left", 420);
       // growth line: launches per quarter
       const g3 = seg(t, 19.5, 21.4), pts = [[140, 900], [400, 860], [660, 840], [920, 760], [1180, 700], [1440, 560], [1780, 480]];
       x.strokeStyle = TAN; x.lineWidth = 10; x.lineCap = "round"; x.lineJoin = "round"; x.beginPath();
@@ -112,7 +129,8 @@ M.reel({
       pts.slice(0, L + 1).forEach((p, i) => (i ? x.lineTo(...p) : x.moveTo(...p)));
       if (L < pts.length - 1) x.lineTo(lerp(pts[L][0], pts[L + 1][0], f), lerp(pts[L][1], pts[L + 1][1], f));
       x.stroke();
-      txt(Math.round(42 * expo(seg(t, 19.5, 21.6))) + " brands launched", 56, 140, 560, INK, "left");
+      { const sv = parseFloat(String(PR.stat).replace(/[^0-9.]/g, "")), k = expo(seg(t, 19.5, 21.6)), n = isFinite(sv) ? String(PR.stat).replace(/[0-9.]+/, String(Math.round(sv * k))) : PR.stat;
+        txt(`${n} ${PR.statLabel}`, 56, M.isAr(PR.statLabel) ? 1780 : 140, 560, INK, "left", 1600); }
     }
     // ---------- STRONGEST (22–28): a wall of marks that flips in waves on every beat, then folds into one square
     if (t >= 22 && t < 28) {
@@ -143,7 +161,7 @@ M.reel({
       x.fillStyle = CREAM; x.fillRect(0, 0, 1920, 1080);
       const press = spring(t - 28, 18), lift = expoIO(seg(t, 29.35, 29.85));
       const nameA = expo(seg(t, 28.1, 28.4)) * (1 - expoIn(seg(t, 29.2, 29.6)));
-      if (nameA > 0) { x.globalAlpha = nameA; txt("NORTHBOUND®", 150, 960, 500, INK); txt("Brands for founders.", 46, 960, 640, COB); x.globalAlpha = 1; }
+      if (nameA > 0) { x.globalAlpha = nameA; txt(PR.name, 150, 960, 500, INK); txt(PR.tagline, 46, 960, 640, COB); x.globalAlpha = 1; }
       // the stamp presses down (covers), then lifts away up out of frame
       const cover = 1 - expo(seg(t, 28.05, 28.25));
       if (cover > 0) sq(960, 540, lerp(420, 1300, press) , COB, 0, 30);

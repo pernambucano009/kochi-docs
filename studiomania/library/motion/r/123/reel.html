@@ -1,14 +1,37 @@
 <!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
 <script>
-// #123 Paper-style launch film — product filled in as StudioMania (the template's {{PRODUCT}}). 15 s, no voice, no footage.
+// #123 (عنصر: فيلم إطلاق ورقي) Paper-style launch film — any product (the template's {{PRODUCT}}). 15 s, no voice, no footage.
 // Paper canvas, marker notes that draw on (Caveat, stroke reveal), a red ball with real bounce physics, huge Anton type,
 // hard light/dark switches, a new idea every ~1.8 s, a sound on every hit. No invented results, no numbers.
-const PAPER = "#f5f1e8", INK = "#161616", RED = "#e8402f", BLUE = "#2f5bff", CHAR = "#1d1c1a";
+const PR = M.params({
+  hook: { label: "الجملة الأولى", kind: "text", def: "ONE IDEA." },
+  hookNote: { label: "ملاحظة بخط الإيد تحتها", kind: "text", def: "that's all you bring" },
+  word: { label: "الكلمة اللي الكورة بتنط عليها", kind: "text", def: "IDEA." },
+  l1: { label: "مشهد غامق (سطر ١)", kind: "text", def: "IT LEARNS" },
+  l2: { label: "مشهد غامق (سطر ٢، ملوّن)", kind: "text", def: "YOUR BRAND." },
+  notes: { label: "٣ ملاحظات بخط الإيد", kind: "lines", def: ["your colours", "your voice", "your audience"] },
+  cards: { label: "٤ كروت (المميزات أو المنتجات)", kind: "lines", def: ["REELS", "ADS", "CAROUSELS", "DUBBING"] },
+  cardsNote: { label: "ملاحظة تحت الكروت", kind: "text", def: "every format, one place" },
+  b1: { label: "كلمة كبيرة (سطر ١)", kind: "text", def: "ARABIC" },
+  b2: { label: "كلمة كبيرة (سطر ٢، ملوّن)", kind: "text", def: "FIRST." },
+  bNote: { label: "ملاحظة جنبها", kind: "text", def: "and English too" },
+  steps: { label: "الخطوات (٥)", kind: "lines", def: ["SCRIPT", "VOICE", "SCENES", "EDIT", "EXPORT"] },
+  slam: { label: "٤ كلمات بتخبط (آخر واحدة ملوّنة)", kind: "lines", def: ["ALL", "IN", "ONE", "STUDIO."] },
+  logo: { label: "اللوجو", kind: "image", role: "logo", def: "" },
+  name: { label: "اسم البراند", kind: "text", role: "brand", def: "STUDIOMANIA" },
+  endNote: { label: "ملاحظة في الآخر", kind: "text", role: "cta", def: "start with one idea." },
+  paper: { label: "الورق", kind: "color", role: "bg", def: "#f5f1e8" },
+  ink: { label: "لون الكلام", kind: "color", role: "ink", def: "#161616" },
+  red: { label: "لون الكورة", kind: "color", role: "accent", def: "#e8402f" },
+  blue: { label: "لون الملاحظات", kind: "color", role: "accent2", def: "#2f5bff" },
+});
+const PAPER = PR.paper, INK = PR.ink, RED = PR.red, BLUE = PR.blue, CHAR = "#1d1c1a";
+const L = (arr, n) => Array.from({ length: n }, (_, i) => arr[i] ?? "");
 const G = 3200;   // gravity, px/s²
 M.reel({
   W: 1920, H: 1080, DUR: 15, bg: PAPER,
   fonts: { AN: "anton.ttf", CV: ["Caveat_wght_500.ttf", "500"], JO: "Jost.ttf" },
-  init(M) { const c = M.canvas(1920, 1080); return { x: c.getContext("2d") }; },
+  async init(M) { const c = M.canvas(1920, 1080); return { x: c.getContext("2d"), img: await M.img(PR.logo) }; },
   seek(t, P, M) {
     const { x } = P, { seg, lerp, expo, expoIn, expoIO, spring, springO, clamp } = M;
     const S = [0, 1.8, 3.6, 5.4, 7.2, 9.0, 10.8, 12.6, 15];
@@ -18,9 +41,10 @@ M.reel({
     // paper grain
     if (!dark) for (let i = 0; i < 300; i++) { x.fillStyle = `rgba(120,100,70,${.05 * M.hash(i)})`; x.fillRect(M.hash(i * 3.1) * 1920, M.hash(i * 7.3) * 1080, 2, 2); }
     const fg = dark ? PAPER : INK;
-    const big = (s, px, X, Y, col, sx = 1, sy = 1) => { x.save(); x.translate(X, Y); x.scale(sx, sy); x.font = `400 ${px}px AN`; x.fillStyle = col; x.textAlign = "center"; x.textBaseline = "alphabetic"; x.fillText(s, 0, 0); x.restore(); };
+    const big = (s, px, X, Y, col, sx = 1, sy = 1, maxW = 1760) => { s = String(s ?? ""); px = M.fit(s, "AN", maxW, px, 20); x.save(); x.translate(X, Y); x.scale(sx, sy); x.direction = M.isAr(s) ? "rtl" : "ltr"; x.font = `400 ${px}px AN`; x.fillStyle = col; x.textAlign = "center"; x.textBaseline = "alphabetic"; x.fillText(s, 0, 0); x.direction = "ltr"; x.restore(); };
     // marker note: handwriting revealed left→right like a pen stroke, with a drawn underline
-    const note = (s, px, X, Y, col, tin, dur = .6, rot = -.04) => { const k = clamp((t - tin) / dur); if (k <= 0) return; x.save(); x.translate(X, Y); x.rotate(rot); x.font = `500 ${px}px CV`; const w = x.measureText(s).width; x.beginPath(); x.rect(-10, -px, (w + 20) * k, px * 1.6); x.clip(); x.fillStyle = col; x.textAlign = "left"; x.textBaseline = "alphabetic"; x.fillText(s, 0, 0); x.restore(); };
+    // العربي بيتكتب من اليمين للشمال (القلم بيمشي في الاتجاه الصح)
+    const note = (s, px, X, Y, col, tin, dur = .6, rot = -.04) => { s = String(s ?? ""); const k = clamp((t - tin) / dur); if (k <= 0 || !s) return; x.save(); x.translate(X, Y); x.rotate(rot); x.font = `500 ${px}px CV`; const w = x.measureText(s).width, ar = M.isAr(s); x.beginPath(); if (ar) x.rect(w + 10 - (w + 20) * k, -px, (w + 20) * k, px * 1.6); else x.rect(-10, -px, (w + 20) * k, px * 1.6); x.clip(); x.fillStyle = col; x.direction = ar ? "rtl" : "ltr"; x.textAlign = ar ? "right" : "left"; x.textBaseline = "alphabetic"; x.fillText(s, ar ? w : 0, 0); x.restore(); };
     const scribble = (X, Y, w, col, tin, dur = .4) => { const k = clamp((t - tin) / dur); if (k <= 0) return; x.strokeStyle = col; x.lineWidth = 9; x.lineCap = "round"; x.beginPath(); for (let i = 0; i <= 40 * k; i++) { const u = i / 40; x.lineTo(X + u * w, Y + Math.sin(u * 18) * 5); } x.stroke(); };
     const ball = (X, Y, sq) => { x.save(); x.translate(X, Y); x.scale(1 + sq, 1 - sq); x.fillStyle = RED; x.beginPath(); x.arc(0, 0, 46, 0, 7); x.fill(); x.restore(); };
     // physics helper: a ball dropped from y0 onto floor yF, restitution e; returns {y, sq} at time s
@@ -32,56 +56,58 @@ M.reel({
       return { y: yF, sq: 0 };
     };
     // ---------- 0–1.8: "ONE IDEA." + underline
-    if (sc === 0) { const k = spring(lt, 14); big("ONE IDEA.", 300, 960, 620, INK, lerp(1.3, 1, k), lerp(.7, 1, k)); scribble(560, 680, 800, RED, .5); note("that's all you bring", 70, 1180, 820, BLUE, .9); }
+    if (sc === 0) { const k = spring(lt, 14); big(PR.hook, 300, 960, 620, INK, lerp(1.3, 1, k), lerp(.7, 1, k)); scribble(560, 680, 800, RED, .5); note(PR.hookNote, 70, M.isAr(PR.hookNote) ? 1000 : 1180, 820, BLUE, .9); }
     // ---------- 1.8–3.6: the ball drops onto IDEA and squashes it; leaves the floor at 3.2 → dark switch while airborne
     if (sc === 1) {
       const b = bounce(lt, -80, 470); const hit = lt > Math.sqrt(2 * 550 / G);
       const squash = hit ? Math.exp(-(lt - Math.sqrt(2 * 550 / G)) * 7) : 0;
-      big("IDEA.", 300, 960, 620, INK, 1 + squash * .25, 1 - squash * .35);
+      big(PR.word, 300, 960, 620, INK, 1 + squash * .25, 1 - squash * .35);
       const fly = seg(lt, 1.4, 1.8); const y = lt < 1.4 ? b.y : lerp(470, -200, fly * fly);
       ball(960, y, lt < 1.4 ? b.sq : -.15);
     }
     // ---------- 3.6–5.4 (dark): it learns your brand — marker notes in the accents
     if (sc === 2) {
-      big("IT LEARNS", 210, 960, 420, PAPER); big("YOUR BRAND.", 210, 960, 660, RED);
-      note("your colours", 64, 300, 860, BLUE, 3.9); note("your voice", 64, 820, 900, PAPER, 4.3); note("your audience", 64, 1300, 860, BLUE, 4.7);
+      big(PR.l1, 210, 960, 420, PAPER); big(PR.l2, 210, 960, 660, RED);
+      const NT = L(PR.notes, 3); note(NT[0], 64, 300, 860, BLUE, 3.9); note(NT[1], 64, 820, 900, PAPER, 4.3); note(NT[2], 64, 1300, 860, BLUE, 4.7);
       const b = bounce(lt, -200, 760, .5); ball(1700, b.y, b.sq);
     }
     // ---------- 5.4–7.2 (light): the ball hops across format cards, each one flips up as it lands
     if (sc === 3) {
-      const cards = ["REELS", "ADS", "CAROUSELS", "DUBBING"];
-      cards.forEach((c, i) => { const land = .25 + i * .38, k = spring(lt - land, 16); const X = 330 + i * 420; x.save(); x.translate(X, 640); x.scale(1, Math.max(.05, k)); x.fillStyle = i % 2 ? BLUE : INK; x.beginPath(); x.roundRect(-180, -120, 360, 240, 26); x.fill(); x.font = "400 70px AN"; x.fillStyle = PAPER; x.textAlign = "center"; x.textBaseline = "middle"; x.fillText(c, 0, 0); x.restore(); });
+      const cards = L(PR.cards, 4);
+      cards.forEach((c, i) => { const land = .25 + i * .38, k = spring(lt - land, 16); const X = 330 + i * 420; x.save(); x.translate(X, 640); x.scale(1, Math.max(.05, k)); x.fillStyle = i % 2 ? BLUE : INK; x.beginPath(); x.roundRect(-180, -120, 360, 240, 26); x.fill(); x.font = `400 ${M.fit(c, "AN", 320, 70, 20)}px AN`; x.fillStyle = PAPER; x.textAlign = "center"; x.textBaseline = "middle"; x.direction = M.isAr(c) ? "rtl" : "ltr"; x.fillText(c, 0, 0); x.direction = "ltr"; x.restore(); });
       // hop: parabola between card tops
       const seg2 = .38, k = Math.min(3, Math.floor(Math.max(0, lt - .25) / seg2)), u = clamp((lt - .25 - k * seg2) / seg2);
       const X0 = 330 + k * 420, X1 = 330 + Math.min(3, k + 1) * 420; const bx = lt < .25 ? 330 : lerp(X0, X1, u), by = lt < .25 ? lerp(-100, 470, (lt / .25) ** 2) : 470 - Math.sin(u * Math.PI) * 220;
       ball(bx, by, u < .08 ? .2 : 0);
-      note("every format, one place", 60, 640, 920, RED, 6.2, .7, .02);
+      note(PR.cardsNote, 60, 640, 920, RED, 6.2, .7, .02);
     }
     // ---------- 7.2–9.0 (dark): Arabic first
-    if (sc === 4) { const k = springO(lt, 12, .6); big("ARABIC", 280, 960, 520, PAPER, k, k); big("FIRST.", 280, 960, 820, RED, k, k); x.strokeStyle = BLUE; x.lineWidth = 10; const r = clamp((lt - .6) / .5); x.beginPath(); x.ellipse(960, 720, 380, 150, -.05, -1.2, -1.2 + r * 6.6); x.stroke(); note("and English too", 60, 1340, 960, BLUE, 8.0); }
+    if (sc === 4) { const k = springO(lt, 12, .6); big(PR.b1, 280, 960, 520, PAPER, k, k); big(PR.b2, 280, 960, 820, RED, k, k); x.strokeStyle = BLUE; x.lineWidth = 10; const r = clamp((lt - .6) / .5); x.beginPath(); x.ellipse(960, 720, 380, 150, -.05, -1.2, -1.2 + r * 6.6); x.stroke(); note(PR.bNote, 60, 1340, 960, BLUE, 8.0); }
     // ---------- 9.0–10.8 (light): from script to export — the ball rolls along the steps
     if (sc === 5) {
-      const steps = ["SCRIPT", "VOICE", "SCENES", "EDIT", "EXPORT"];
+      const steps = L(PR.steps, 5), RS = M.isAr(steps.join(""));
       x.strokeStyle = INK; x.lineWidth = 6; x.beginPath(); x.moveTo(200, 600); x.lineTo(lerp(200, 1720, expo(seg(lt, 0, .5))), 600); x.stroke();
-      steps.forEach((s, i) => { const X = 200 + i * 380, k = expo(seg(lt, .2 + i * .2, .4 + i * .2)); x.fillStyle = INK; x.beginPath(); x.arc(X, 600, 18 * k, 0, 7); x.fill(); x.globalAlpha = k; big(s, 90, X, 520, INK); x.globalAlpha = 1; });
-      const roll = expoIO(seg(lt, .2, 1.6)); ball(lerp(200, 1720, roll), 554, 0);
+      steps.forEach((s, i) => { const X = 200 + (RS ? 4 - i : i) * 380, k = expo(seg(lt, .2 + i * .2, .4 + i * .2)); x.fillStyle = INK; x.beginPath(); x.arc(X, 600, 18 * k, 0, 7); x.fill(); x.globalAlpha = k; big(s, 90, X, 520, INK, 1, 1, 360); x.globalAlpha = 1; });
+      const roll = expoIO(seg(lt, .2, 1.6)); ball(RS ? lerp(1720, 200, roll) : lerp(200, 1720, roll), 554, 0);
     }
     // ---------- 10.8–12.6 (dark): airborne ball, type slams on each hit
     if (sc === 6) {
-      const words = ["ALL", "IN", "ONE", "STUDIO."];
+      const words = L(PR.slam, 4);
       words.forEach((w, i) => { const tin = .1 + i * .35; const k = spring(lt - tin, 22); if (lt < tin) return; big(w, 230, 960, 260 + i * 230, i === 3 ? RED : PAPER, lerp(1.5, 1, k), lerp(1.5, 1, k)); });
       ball(lerp(200, 1720, lt / 1.8), 900 - Math.sin(lt / 1.8 * Math.PI) * 820, 0);
     }
     // ---------- 12.6–15 (light): the logo — the ball lands into the O; sub-hit
     if (sc === 7) {
-      const font = "400 130px JO"; x.font = font; const sp = 32, wA = M.measure("STUDI", font) + 5 * sp, gap = 120, wB = M.measure("MANIA", font) + 4 * sp, lx = 960 - (wA + gap + wB) / 2;
-      const ox = lx + wA + gap / 2 - sp / 2, oy = 520;
-      const land = Math.min(1, lt / .45), by = lerp(-120, oy, land * land);
-      const ringK = lt > .45 ? spring(lt - .45, 14) : 0;
-      x.fillStyle = INK; x.textBaseline = "middle"; x.textAlign = "left";
-      const a = expo(seg(lt, .4, .9)); x.globalAlpha = a; let px = lx; for (const ch of "STUDI") { x.fillText(ch, px, oy + 4); px += M.measure(ch, font) + sp; } px = lx + wA + gap; for (const ch of "MANIA") { x.fillText(ch, px, oy + 4); px += M.measure(ch, font) + sp; } x.globalAlpha = 1;
-      if (ringK > 0) { x.strokeStyle = RED; x.lineWidth = 14; x.beginPath(); x.arc(ox, oy, lerp(46, 48, ringK), 0, 7); x.stroke(); } else ball(ox, by, 0);
-      note("start with one idea.", 66, 820, 720, BLUE, 13.6, .8, -.02);
+      // اللوجو (صورة) أو الاسم، والكورة بتنزل وتقعد نقطة تحته
+      const oy = 500, a = expo(seg(lt, .4, .9)), img = P.img;
+      let bottom = oy + 70;
+      x.globalAlpha = a;
+      if (img) { const k = Math.min(1100 / img.width, 300 / img.height); x.drawImage(img, 960 - img.width * k / 2, oy - img.height * k / 2, img.width * k, img.height * k); bottom = oy + img.height * k / 2; }
+      else { const nm = String(PR.name || ""), ar = M.isAr(nm); x.fillStyle = INK; x.textBaseline = "middle"; x.textAlign = "center"; x.direction = ar ? "rtl" : "ltr"; x.font = `${ar ? 800 : 400} ${M.fit(nm, ar ? "AN" : "JO", 1500, 130, 40)}px ${ar ? "AN" : "JO"}`; if (!ar) x.letterSpacing = "32px"; x.fillText(nm, 960, oy + 4); x.letterSpacing = "0px"; x.direction = "ltr"; }
+      x.globalAlpha = 1;
+      const land = Math.min(1, lt / .45), by = lerp(-120, bottom + 70, land * land), sq = lt > .45 ? .25 * Math.exp(-(lt - .45) * 9) : 0;
+      ball(960, by, sq);
+      note(PR.endNote, 66, M.isAr(PR.endNote) ? 700 : 820, bottom + 230, BLUE, 13.6, .8, -.02);
     }
   },
   sound(A) {

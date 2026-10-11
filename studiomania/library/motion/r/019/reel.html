@@ -1,65 +1,83 @@
 <!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
 <script>
-// #19 Logo reveal — StudioMania. 10 s, 90 BPM (beat .667 s). The logo is cut into shards; the camera starts
+// #19 Logo reveal (عنصر: ظهور لوجو من شظايا) — any logo image or brand name. 10 s, 90 BPM (beat .667 s). The logo is cut into shards; the camera starts
 // deep inside them (unreadable shapes), pulls back faster each bar, the logo lands on beat 11 (7.33 s) and holds a bar.
 const BPM = 90, B = 60 / BPM, LAND = 11 * B;
-const INK = "#141416", RED = "#e8402f", BG = "#ffffff";
+const P = M.params({
+  logo: { label: "اللوجو", kind: "image", role: "logo", def: "" },
+  name: { label: "اسم البراند (لو مفيش لوجو)", kind: "text", role: "brand", def: "STUDIOMANIA" },
+  tagline: { label: "الجملة تحت اللوجو", kind: "text", role: "tagline", def: "" },
+  ink: { label: "لون اللوجو", kind: "color", role: "ink", def: "#141416" },
+  accent: { label: "اللون المميز", kind: "color", role: "accent", def: "#e8402f" },
+  bg: { label: "الخلفية", kind: "color", role: "bg", def: "#ffffff" },
+});
+const INK = P.ink, RED = P.accent, BG = P.bg;
 M.reel({
   W: 1920, H: 1080, DUR: 10, bg: BG,
-  fonts: { JO: "Jost.ttf" },
-  init(M) {
+  fonts: { JO: "Jost.ttf", J8: ["TY-Outfit-800.ttf", "800"] },
+  async init(M) {
     const c = M.canvas(1920, 1080); const x = c.getContext("2d");
-    // the logo, drawn once at full size into an offscreen canvas (letters only; the ring is built separately)
-    const FS = 200, SP = .24 * FS, font = `400 ${FS}px JO`;
-    const wA = M.measure("STUDI", font) + 5 * SP, ringD = FS * .74, gap = ringD + SP, wB = M.measure("MANIA", font) + 4 * SP;
-    const LW = Math.ceil(wA + gap + wB), LH = Math.ceil(FS * 1.1);
-    const L = document.createElement("canvas"); L.width = LW; L.height = LH; const lx = L.getContext("2d");
-    lx.font = font; lx.fillStyle = INK; lx.textBaseline = "alphabetic";
-    let px = 0; for (const ch of "STUDI") { lx.fillText(ch, px, FS * .9); px += M.measure(ch, font) + SP; }
-    px = wA + gap; for (const ch of "MANIA") { lx.fillText(ch, px, FS * .9); px += M.measure(ch, font) + SP; }
-    const capMid = FS * .9 - FS * .7 / 2;   // vertical centre of the capitals
-    const ring = { cx: wA + gap / 2 - SP / 2, cy: capMid, r: ringD / 2 - FS * .04, w: FS * .08 };
-    // cut the letters into shards (random kd-splits), keep the ones with ink in them
+    // اللوجو (صورة) أو اسم البراند (كلام) بيترسم مرة في كانفاس لوحده، وبعدين بيتكسر شظايا
+    const img = await M.img(P.logo);
+    let L, LW, LH;
+    if (img) {
+      const k = Math.min(1500 / img.width, 560 / img.height);
+      LW = Math.ceil(img.width * k); LH = Math.ceil(img.height * k);
+      L = document.createElement("canvas"); L.width = LW; L.height = LH;
+      L.getContext("2d").drawImage(img, 0, 0, LW, LH);
+    } else {
+      const text = String(P.name || " "), ar = M.isAr(text);
+      const fam = ar ? "J8" : "JO", wt = ar ? "800" : "400";
+      const SP = ar ? 0 : 0.24;
+      const FS = Math.min(220, M.fit(text, fam, 1500 / (1 + SP * .9), 220, 60, wt));
+      const font = `${wt} ${FS}px ${fam}`;
+      LW = Math.ceil(ar ? M.measure(text, font) : [...text].reduce((a, ch) => a + M.measure(ch, font) + SP * FS, -SP * FS)) + 8;
+      LH = Math.ceil(FS * 1.35);
+      L = document.createElement("canvas"); L.width = LW; L.height = LH;
+      const lx = L.getContext("2d"); lx.font = font; lx.fillStyle = INK; lx.textBaseline = "alphabetic";
+      if (ar) { lx.direction = "rtl"; lx.textAlign = "right"; lx.fillText(text, LW - 4, FS * 1.0); }
+      else { let px = 4; for (const ch of text) { lx.fillText(ch, px, FS * .95); px += M.measure(ch, font) + SP * FS; } }
+    }
+    const lx = L.getContext("2d");
+    // cut the logo into shards (random kd-splits), keep the ones with ink in them
     const R = M.rng(42), pieces = [];
     const data = lx.getImageData(0, 0, LW, LH).data;
     const inked = (x0, y0, w, h) => { for (let y = y0; y < y0 + h; y += 3) for (let xx = x0; xx < x0 + w; xx += 3) if (data[(y * LW + xx) * 4 + 3] > 40) return true; return false; };
     const split = (x0, y0, w, h, d) => {
-      if (!inked(Math.floor(x0), Math.floor(y0), Math.floor(w), Math.floor(h))) return;
+      if (!inked(Math.floor(x0), Math.floor(y0), Math.max(1, Math.floor(w)), Math.max(1, Math.floor(h)))) return;
       if (d > 6 || (w < 70 && h < 70)) { pieces.push([x0, y0, w, h]); return; }
       if (w > h * (0.8 + R() * .6)) { const k = w * (.3 + R() * .4); split(x0, y0, k, h, d + 1); split(x0 + k, y0, w - k, h, d + 1); }
       else { const k = h * (.3 + R() * .4); split(x0, y0, w, k, d + 1); split(x0, y0 + k, w, h - k, d + 1); }
     };
     split(0, 0, LW, LH, 0);
-    // landing order: early pieces arrive slowly, later ones faster (each bar busier than the last)
-    const n = pieces.length;
+    const n = Math.max(2, pieces.length);
     const order = pieces.map((p, i) => i).sort(() => R() - .5);
-    const P = pieces.map((p, i) => {
+    const PS = pieces.map((p, i) => {
       const rank = order.indexOf(i) / (n - 1);
       const land = LAND * (.22 + .78 * Math.pow(rank, .6));
       const dur = M.lerp(2.6, .55, rank);
       const ang = R() * Math.PI * 2, dist = M.lerp(120, 1100, rank) * (.6 + R() * .6);
       return { p, land, dur, sx: Math.cos(ang) * dist, sy: Math.sin(ang) * dist * .7, rot: (R() - .5) * 3, sc: 1.6 + R() * 2.5 };
     });
-    // the ring in six arcs
-    const arcs = Array.from({ length: 6 }, (_, i) => ({ a0: i * Math.PI / 3, land: LAND - .2 - (5 - i) * .16, dur: .9 + (5 - i) * .15, spin: (R() - .5) * 6, dx: (R() - .5) * 900, dy: (R() - .5) * 600 }));
-    return { x, L, LW, LH, P, arcs, ring };
+    // خط اللون المميز تحت اللوجو، ٦ حتت بتيجي من بره
+    const bars = Array.from({ length: 6 }, (_, i) => ({ i, land: LAND - .2 - (5 - i) * .16, dur: .9 + (5 - i) * .15, spin: (R() - .5) * 6, dx: (R() - .5) * 900, dy: (R() - .5) * 600 }));
+    return { x, L, LW, LH, P: PS, bars, focus: { cx: LW * .5, cy: LH * .5 } };
   },
   seek(t, S, M) {
-    const { x, L, LW, LH, P, arcs, ring } = S, { seg, lerp, expo, expoIO, cubicIO, clamp, spring } = M;
+    const { x, L, LW, LH, P: PS, bars, focus } = S, { seg, lerp, expo, expoIO, clamp } = M;
     x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = BG; x.fillRect(0, 0, 1920, 1080);
-    // logo placement at rest
-    const fit = 1500 / LW, ox = (1920 - LW * fit) / 2, oy = (1080 - LH * fit) / 2;
-    // camera: starts deep (6×) near the ring and pulls back, accelerating each bar, reaching 1× exactly on the landing beat
+    const tag = String(P.tagline || "").trim();
+    const fit = Math.min(1500 / LW, 600 / LH, 1.6), ox = (1920 - LW * fit) / 2, oy = (1080 - LH * fit) / 2 - (tag ? 60 : 0);
     const k = clamp(t / LAND), cz = lerp(5.2, 1, Math.pow(k, 2.1));
-    const fx = lerp(ring.cx * fit + ox + 120, 960, Math.pow(k, 1.6)), fy = lerp(ring.cy * fit + oy - 20, 540, Math.pow(k, 1.6));
-    const settle = t > LAND ? 1 + .012 * M.sine(seg(t, LAND, 10)) : 1;   // the held bar still breathes
+    const fx = lerp(focus.cx * fit + ox + 120, 960, Math.pow(k, 1.6)), fy = lerp(focus.cy * fit + oy - 20, 540, Math.pow(k, 1.6));
+    const settle = t > LAND ? 1 + .012 * M.sine(seg(t, LAND, 10)) : 1;
+    x.save();
     x.translate(960, 540); x.scale(cz * settle, cz * settle); x.translate(-fx, -fy);
     x.translate(ox, oy); x.scale(fit, fit);
-    // shards
-    for (const s of P) {
+    for (const s of PS) {
       const a = s.land - s.dur;
       const g = expoIO(seg(t, a, s.land));
-      const appear = M.smooth(seg(t, a - .9, a + .2));   // grows in, never pops
+      const appear = M.smooth(seg(t, a - .9, a + .2));
       if (appear <= 0) continue;
       const [px, py, pw, ph] = s.p;
       const cx = px + pw / 2, cy = py + ph / 2;
@@ -71,21 +89,30 @@ M.reel({
       x.drawImage(L, px, py, pw, ph, -pw / 2, -ph / 2, pw, ph);
       x.restore();
     }
-    // ring arcs
-    arcs.forEach((r) => {
+    // accent bar under the logo, in six pieces
+    const bw = Math.min(LW, 900 / fit) * .5, by = LH + 40 / fit, bh = 10 / fit, seg6 = bw / 6;
+    bars.forEach((r) => {
       const g = expoIO(seg(t, r.land - r.dur, r.land)), appear = M.smooth(seg(t, r.land - r.dur - .6, r.land - r.dur + .2));
       if (appear <= 0) return;
-      x.save(); x.translate(ring.cx + r.dx * (1 - g), ring.cy + r.dy * (1 - g)); x.rotate(r.spin * (1 - g));
-      x.strokeStyle = RED; x.lineWidth = ring.w * appear; x.lineCap = "butt";
-      x.beginPath(); x.arc(0, 0, ring.r, r.a0, r.a0 + Math.PI / 3 + .01); x.stroke();
+      const cx = (LW - bw) / 2 + seg6 * (r.i + .5);
+      x.save(); x.translate(cx + r.dx * (1 - g), by + r.dy * (1 - g)); x.rotate(r.spin * (1 - g));
+      x.fillStyle = RED; x.fillRect(-seg6 / 2 - .5, -bh / 2 * appear, seg6 + 1, bh * appear);
       x.restore();
     });
-    // after the landing: the orbit dash starts circling the O
+    x.restore();
+    // after the landing: the tagline rises in, the accent dot sweeps once along the bar
     if (t > LAND) {
-      const o = expo(seg(t, LAND, LAND + .5));
-      x.strokeStyle = RED; x.lineWidth = ring.w * .3 * o; x.lineCap = "round";
-      const a = (t - LAND) * 2.4 - 1.2;
-      x.beginPath(); x.arc(ring.cx, ring.cy, ring.r * 1.55, a, a + .9 * o); x.stroke();
+      const o = expo(seg(t, LAND, LAND + .7));
+      if (tag) {
+        const fam = M.isAr(tag) ? "J8" : "JO", fs = M.fit(tag, fam, 1300, 66, 24);
+        x.globalAlpha = o; x.fillStyle = INK; x.textAlign = "center"; x.textBaseline = "middle"; x.direction = M.isAr(tag) ? "rtl" : "ltr";
+        x.font = `${M.isAr(tag) ? 500 : 400} ${fs}px ${fam}`;
+        x.fillText(tag, 960, oy + (LH + 40 / fit) * fit + 90 + (1 - o) * 24);
+        x.globalAlpha = 1;
+      }
+      const sweep = expoIO(seg(t, LAND + .3, LAND + 1.6));
+      const x0 = ox + ((LW - bw) / 2) * fit, x1 = x0 + bw * fit, yb = oy + by * fit;
+      if (sweep > 0 && sweep < 1) { x.fillStyle = BG; x.beginPath(); x.arc(lerp(x0, x1, sweep), yb, 5, 0, Math.PI * 2); x.fill(); }
     }
   },
   sound(A) {

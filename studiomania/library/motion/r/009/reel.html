@@ -1,15 +1,30 @@
 <!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
 <script>
-// #9 Negroni recipe — 30 s, 100 BPM, 1080×1080. Gin 30 ml, Campari 30 ml, sweet vermouth 30 ml, ice, stir, orange peel.
+// #9 (عنصر: وصفة مشروب خطوة بخطوة) Drink recipe — 30 s, 100 BPM, 1080×1080. Gin 30 ml, Campari 30 ml, sweet vermouth 30 ml, ice, stir, orange peel.
 const BPM = 100, B = 60 / BPM, BAR = B * 4;
+const PR = M.params({
+  title: { label: "اسم المشروب", kind: "text", role: "product", def: "Negroni" },
+  sub: { label: "سطر تحت الاسم", kind: "text", def: "Equal parts · stirred · on the rocks" },
+  subEnd: { label: "السطر في الآخر", kind: "text", def: "Gin · Campari · Sweet vermouth — 1 : 1 : 1" },
+  ice: { label: "التلج (الاسم | الكمية | الوحدة)", kind: "text", def: "Ice | 3 | cubes" },
+  liquids: { label: "٣ سوايل (الاسم | الكمية | الوحدة | اللون | الشفافية 0-1)", kind: "lines", def: ["Gin | 30 | ml | #ecf0ec | .22", "Campari | 30 | ml | #c41c16 | .9", "Sweet vermouth | 30 | ml | #6e1e0c | .92"] },
+  stir: { label: "التقليب (الاسم | الكمية | الوحدة)", kind: "text", def: "Stir | 20 | sec" },
+  garnish: { label: "الزينة (الاسم | الكمية | الوحدة)", kind: "text", def: "Orange peel | 1 | twist" },
+  garnishColor: { label: "لون الزينة", kind: "color", def: "#f28a1e" },
+  unit: { label: "وحدة القياس جنب الكوباية", kind: "text", def: "ml" },
+});
+const esc = (v) => String(v ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const part = (l) => String(l || "").split("|").map((z) => z.trim());
+const hex = (h, a) => { const m = String(h || "").replace("#", ""); const n = parseInt(m.length === 3 ? m.replace(/./g, "$&$&") : m, 16) || 0; return [(n >> 16) & 255, (n >> 8) & 255, n & 255, a]; };
+const st = (l, t0, t1, extra = {}) => { const [name = "", amt = "", unit = ""] = part(l); return { name, amt, unit, t0, t1, ...extra }; };
 const STEPS = [
-  { name: "Ice", amt: "3", unit: "cubes", t0: BAR * 1, t1: BAR * 2 },
-  { name: "Gin", amt: "30", unit: "ml", t0: BAR * 2, t1: BAR * 4, col: [236, 240, 236, .22], vol: 30 },
-  { name: "Campari", amt: "30", unit: "ml", t0: BAR * 4, t1: BAR * 6, col: [196, 28, 22, .9], vol: 30 },
-  { name: "Sweet vermouth", amt: "30", unit: "ml", t0: BAR * 6, t1: BAR * 8, col: [110, 30, 12, .92], vol: 30 },
-  { name: "Stir", amt: "20", unit: "sec", t0: BAR * 8, t1: BAR * 10 },
-  { name: "Orange peel", amt: "1", unit: "twist", t0: BAR * 10, t1: BAR * 11 },
+  st(PR.ice, BAR * 1, BAR * 2),
+  ...[0, 1, 2].map((i) => { const [n, a, u, c, o] = part(PR.liquids[i]); const v = parseFloat(a) || 30; return st(`${n || ""} | ${a || ""} | ${u || ""}`, BAR * (2 + i * 2), BAR * (4 + i * 2), { col: hex(c || "#cccccc", Math.max(.05, Math.min(1, parseFloat(o) || .85))), vol: v }); }),
+  st(PR.stir, BAR * 8, BAR * 10),
+  st(PR.garnish, BAR * 10, BAR * 11),
 ];
+// الكوباية مصممة على ٩٠ وحدة: كل سايل بياخد نصيبه من المجموع
+{ const tot = STEPS.reduce((a, s) => a + (s.vol || 0), 0) || 90; STEPS.forEach((s) => { if (s.vol) { s.shown = s.vol; s.vol = s.vol / tot * 90; } }); }
 M.reel({
   W: 1080, H: 1080, DUR: 30, bg: "#eee5da",
   fonts: { SE: "Instrument_Serif.ttf", I8: ["inter800.ttf", "800"], I5: ["inter500.ttf", "500"] },
@@ -20,9 +35,9 @@ M.reel({
     const bigNum = M.el("div", "", "position:absolute;left:0;top:0;font:800 150px I8;letter-spacing:-.04em;color:#1b1512;line-height:1;white-space:pre;", "", big);
     const bigUnit = M.el("div", "", "position:absolute;left:0;top:0;font:500 30px I5;color:#1b1512;letter-spacing:.02em;", "", big);
     const bigName = M.el("div", "", "position:absolute;left:0;top:168px;font:400 64px SE;color:#1b1512;line-height:1;white-space:pre;", "", big);
-    const list = STEPS.map((s) => M.el("div", "", `position:absolute;left:640px;top:0;font:500 24px I5;color:#1b1512;white-space:pre;`, `<b style="font:800 24px I8">${s.amt}</b> ${s.unit} &nbsp;<span style="font:400 30px SE">${s.name}</span>`, lab));
-    const title = M.el("div", "", "position:absolute;left:72px;top:64px;font:400 120px SE;color:#1b1512;line-height:1;white-space:pre;", "Negroni", lab);
-    const sub = M.el("div", "", "position:absolute;left:78px;top:196px;font:500 22px I5;letter-spacing:.14em;text-transform:uppercase;color:#6c5a4c;white-space:pre;", "Equal parts · stirred · on the rocks", lab);
+    const list = STEPS.map((s) => M.el("div", "", `position:absolute;left:640px;top:0;font:500 24px I5;color:#1b1512;white-space:pre;`, `<b style="font:800 24px I8">${esc(s.amt)}</b> ${esc(s.unit)} &nbsp;<span style="font:400 30px SE">${esc(s.name)}</span>`, lab));
+    const title = M.el("div", "", `position:absolute;left:72px;top:64px;font:400 ${M.fit(PR.title, "SE", 940, 120, 40)}px SE;direction:auto;unicode-bidi:plaintext;`+"color:#1b1512;line-height:1;white-space:pre;", PR.title, lab);
+    const sub = M.el("div", "", "position:absolute;left:78px;top:196px;font:500 22px I5;letter-spacing:.14em;text-transform:uppercase;color:#6c5a4c;white-space:pre;", PR.sub, lab);
     const meas = M.el("div", "", "position:absolute;left:0;top:0;font:800 22px I8;color:#1b1512;white-space:pre;", "", lab);
     return { x, big, bigNum, bigUnit, bigName, list, title, sub, meas };
   },
@@ -183,7 +198,7 @@ M.reel({
       const f = spring(t - pe.t0 - .1, 11);
       const px = lerp(gx + 60, gx + 120, f), py = lerp(-120, TOP - 6, f), rot = lerp(-1.2, -.25, f);
       x.save(); x.translate(px, py); x.rotate(rot);
-      x.fillStyle = "#f28a1e"; x.beginPath(); x.moveTo(-90, 0); x.bezierCurveTo(-60, -34, 50, -38, 92, -6); x.bezierCurveTo(56, 14, -50, 22, -90, 0); x.fill();
+      x.fillStyle = PR.garnishColor; x.beginPath(); x.moveTo(-90, 0); x.bezierCurveTo(-60, -34, 50, -38, 92, -6); x.bezierCurveTo(56, 14, -50, 22, -90, 0); x.fill();
       x.fillStyle = "#ffd29a"; x.beginPath(); x.moveTo(-84, 2); x.bezierCurveTo(-50, 12, 40, 10, 86, -4); x.bezierCurveTo(50, 6, -40, 8, -84, 2); x.fill();
       x.fillStyle = "rgba(170,70,0,.35)"; for (let k = 0; k < 26; k++) { const u = (k * 37 % 160) - 80, v = -10 - ((k * 13) % 14); x.beginPath(); x.arc(u, v * (1 - Math.abs(u) / 110), 1.6, 0, 7); x.fill(); }
       x.restore();
@@ -196,7 +211,7 @@ M.reel({
     if (cur >= 0) {
       const s = STEPS[cur];
       const inK = expo(seg(t, s.t0, s.t0 + .45)), outK = M.expoIn(seg(t, s.t1 - .3, s.t1));
-      P.bigNum.textContent = s.amt; P.bigUnit.textContent = s.unit; P.bigName.textContent = s.name;
+      P.bigNum.textContent = s.amt; P.bigUnit.textContent = s.unit; P.bigName.textContent = s.name; P.bigName.style.fontSize = M.fit(s.name, "SE", 420, 64, 22) + "px";
       const nw = M.measure(s.amt, "800 150px I8") * .97 + 6;
       M.X(P.bigNum, 0, (1 - inK) * 170 - outK * 170);
       M.X(P.bigUnit, nw + 14, 26 + (1 - inK) * 200 - outK * 200);
@@ -212,7 +227,7 @@ M.reel({
     // live measure beside the glass (only while pouring)
     const pouring = liq.find((s) => t > s.t0 + .5 && t < s.t1);
     if (pouring && vol > 0) {
-      M.show(P.meas, true); P.meas.textContent = Math.round(vol) + " ml";
+      M.show(P.meas, true); { const tot = STEPS.reduce((a, s) => a + (s.shown || 0), 0) || 90; P.meas.textContent = Math.round(vol / 90 * tot) + (PR.unit ? " " + PR.unit : ""); }
       M.X(P.meas, 130, (surfY - CY) * CS + CY - 12);
     } else M.show(P.meas, false);
     // title: on at the start, back for the finish
@@ -221,7 +236,7 @@ M.reel({
     const tk = Math.max(tIn, tFin);
     P.title.style.opacity = tk; P.sub.style.opacity = tk;
     M.X(P.title, 0, (1 - tk) * 40); M.X(P.sub, 0, (1 - tk) * 30);
-    P.sub.textContent = tFin > 0 ? "Gin · Campari · Sweet vermouth — 1 : 1 : 1" : "Equal parts · stirred · on the rocks";
+    P.sub.textContent = tFin > 0 ? PR.subEnd : PR.sub;
   },
   sound(A, M) {
     // light music: soft pulse, pad chords, a plucked line; foley on each step
