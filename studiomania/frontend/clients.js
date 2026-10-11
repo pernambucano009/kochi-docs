@@ -34,6 +34,7 @@ async function switchClient(id) {
 
 function openClientProfile(id) {
   $("clientDialog").open && $("clientDialog").close();
+  if (typeof NH !== "undefined" && NH) return NH.openBrand(id);
   adx.wantBrain = id || clientx.active;
   if (shell.step === "10") initAds(); else showStep("10");
 }

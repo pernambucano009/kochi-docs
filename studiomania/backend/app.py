@@ -7041,12 +7041,53 @@ def set_active_client(body: ActiveClientIn):
     return list_clients()
 
 
+# 🎨 فئات الستايل: البراند بيختار منها (واحدة أو أكتر، والأولى هي الافتراضية)، وصفحة «اعمل» بتجمّع القوالب تحتها
+STYLE_CATS = [
+    {"id": "cartoon2d", "icon": "🖍️", "ar": "كارتون 2D", "en": "2D Cartoon", "templates": [],
+     "prompt": "flat 2D cartoon animation, clean bold outlines, simple shapes, bright friendly colors"},
+    {"id": "anim3d", "icon": "🧸", "ar": "أنيميشن 3D", "en": "3D Animation", "templates": ["sk-talking", "sk-skeleton", "sk-song"],
+     "prompt": "polished 3D animated film look, soft global illumination, appealing stylized characters"},
+    {"id": "paper", "icon": "✂️", "ar": "ورق", "en": "Paper", "templates": ["sk-papercut", "sk-diorama", "sk-paper"],
+     "prompt": "handmade paper-craft look, layered cut paper, visible paper texture and soft shadows, stop-motion feel"},
+    {"id": "clay", "icon": "🧱", "ar": "صلصال", "en": "Clay", "templates": ["sk-clay"],
+     "prompt": "claymation stop-motion look, sculpted plasticine with fingerprints, miniature set, warm light"},
+    {"id": "collage", "icon": "📰", "ar": "كولاج وتحريري", "en": "Collage", "templates": ["sk-vox", "sk-archive", "sk-engraved"],
+     "prompt": "editorial mixed-media collage, cut-out photos, halftone, archival paper and bold annotations"},
+    {"id": "motion", "icon": "🔷", "ar": "موشن جرافيك", "en": "Motion Graphics", "templates": ["sk-glass", "sk-glitch"],
+     "prompt": "clean motion-graphics look, glossy 3D shapes, kinetic typography, smooth camera moves"},
+    {"id": "ugc", "icon": "📱", "ar": "UGC بالموبايل", "en": "UGC", "templates": ["sk-ugc"],
+     "prompt": "authentic handheld smartphone footage, natural light, real person talking to camera"},
+    {"id": "cinematic", "icon": "🎬", "ar": "سينمائي واقعي", "en": "Cinematic", "templates": ["sk-cinema-ad"],
+     "prompt": "photoreal cinematic commercial, shallow depth of field, dramatic lighting, film color grade"},
+    {"id": "product", "icon": "📸", "ar": "صور منتج", "en": "Product Shots", "templates": ["sk-studio-shot", "sk-product-scene", "sk-static-ads"],
+     "prompt": "premium product photography, studio lighting, crisp detail, clean composition"},
+]
+STYLE_CAT_IDS = {c["id"] for c in STYLE_CATS}
+
+
+@app.get("/api/style-cats")
+def style_cats():
+    tpls = {}
+    for f in TPL_DIR.glob("*/tpl.json"):
+        try:
+            tpls[f.parent.name] = tpl_to_dict(f.parent.name, json.loads(f.read_text(encoding="utf-8")))
+        except (ValueError, KeyError):
+            continue
+    return [{**c, "templates": [{"id": t["id"], "name": t["name"], "icon": t.get("icon", ""), "cover_url": t.get("cover_url")}
+                                for tid in c["templates"] if (t := tpls.get(tid))]} for c in STYLE_CATS]
+
+
 @app.get("/api/ad-brains")
 def list_brains():
     seed_brain()
     with closing(db()) as conn:
         ids = [r["id"] for r in conn.execute("SELECT id FROM ad_brains ORDER BY created_at")]
     return [brain_to_dict(brain_row(i)) for i in ids]
+
+
+@app.get("/api/ad-brains/{bid}")
+def get_brain(bid: str):
+    return brain_to_dict(brain_row(bid))
 
 
 class BrainIn(BaseModel):
@@ -7078,6 +7119,13 @@ def patch_brain(bid: str, body: BrainIn):
                 d[k] = v[:8000]
                 if k in ("palette", "theme", "typography", "ui_style", "logo_description") and k not in d.setdefault("edited", []):
                     d["edited"].append(k)  # الاستنباط بعد كده ميغيّرش اللي كتبته بإيدك
+        if "styles" in body.fields:   # الستايل الافتراضي بيكتب «ستايل الرسم» لو انت مكتبتهوش بإيدك
+            d["styles"] = ",".join(x for x in d.get("styles", "").split(",") if x in STYLE_CAT_IDS)
+            first = next((c for c in STYLE_CATS if c["id"] == d["styles"].split(",")[0]), None)
+            if first and "style" not in d.get("edited", []):
+                d["style"] = first["prompt"]
+        if "style" in body.fields and "styles" not in body.fields and "style" not in d.setdefault("edited", []):
+            d["edited"].append("style")
         return (body.name or "").strip()[:80] or None
     update_brain(bid, fn)
     return brain_to_dict(brain_row(bid))

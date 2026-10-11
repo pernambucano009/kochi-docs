@@ -1387,6 +1387,7 @@ async function brainSave(fn) {
   } catch (err) { toast(err.message, true); }
 }
 $("adBrainGo").onclick = $("adBrainGo2").onclick = async () => {
+  if (typeof NH !== "undefined" && NH) return NH.openBrand(adx.cur?.settings?.brain_id && adx.cur.settings.brain_id !== "none" ? adx.cur.settings.brain_id : null);
   adx.view = "brain";
   adx.brainId = adx.cur?.settings?.brain_id && adx.cur.settings.brain_id !== "none" ? adx.cur.settings.brain_id : clientx.active;
   adx.brains = await api("/api/ad-brains");

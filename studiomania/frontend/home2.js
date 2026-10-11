@@ -40,7 +40,7 @@ const NH = (() => {
   // go = خطوة في البرنامج (showStep) · page = صفحة جوه الرئيسية · fn = حاجة خاصة
   const T = {
     create: { en: "Create", ar: "اعمل جديد", icon: "create", page: "create", desc: "كل أنواع الشغل من هنا: اختار النوع، والخطوات بتمشي معاك لحد التصدير." },
-    brand: { en: "Your Brand", ar: "عقل البراند", icon: "brand", fn: () => openClientProfile(), desc: "كل تفاصيل البراند وتفضيلاته وستايله. أي شغل بيتعمل بيبني عليه." },
+    brand: { en: "Your Brand", ar: "عقل البراند", icon: "brand", page: "brand", desc: "كل تفاصيل البراند وتفضيلاته وستايله. أي شغل بيتعمل بيبني عليه." },
     assets: { en: "Assets", ar: "الأصول", icon: "box", page: "assets", desc: "المدربين والأصوات والموسيقى اللي بتستخدمها في أي شغل." },
     settings: { en: "Settings", ar: "الحساب والإعدادات", icon: "gear", go: "settings", desc: "المفاتيح والرصيد والعملاء." },
     progress: { en: "In Progress", ar: "شغّال عليه", icon: "pulse", page: "progress", desc: "كل خط مشروع، وكل نقطة خطوة. دوس على أي خط يكمّل من مكان ما وقفت." },
@@ -62,7 +62,7 @@ const NH = (() => {
   const CREATE_KIDS = ["reel", "raw", "series", "carousel"];
   const CREATE_ALL = ["reel", "raw", "series", "carousel", "ad", "typo", "dub", "edit"];
   const STEPS5 = ["المشروع", "التقطيع", "التوليد", "المونتاج", "النشر"];
-  const D = { brand: null, folders: [], money: null, publisher: null, posts: [], coaches: [], voices: 0, music: 0 };
+  const D = { cats: [], brand: null, folders: [], money: null, publisher: null, posts: [], coaches: [], voices: 0, music: 0 };
 
   const brandMark = () => {
     const c = clientx?.cur;
@@ -75,10 +75,12 @@ const NH = (() => {
   const hexes = (txt) => [...String(txt || "").matchAll(/#[0-9a-fA-F]{6}\b/g)].map((m) => m[0]).slice(0, 5);
   function brainPct(b) {
     if (!b) return 0;
-    const keys = ["about", "audience", "rules", "palette", "theme", "typography", "style", "market", "language"];
+    const keys = ["about", "audience", "rules", "palette", "typography", "styles", "market", "language", "cta"];
     const have = keys.filter((k) => String(b[k] || "").trim()).length + ((b.logos || []).length ? 1 : 0);
     return Math.round((have / (keys.length + 1)) * 100);
   }
+  const styleNames = (b) => String(b?.styles || "").split(",").map((id) => D.cats.find((c) => c.id === id)).filter(Boolean)
+    .map((c, i) => (i ? c.ar : `⭐ ${c.ar}`)).join("، ");
   function lineHTML(f) {
     const s = folderStage(f);
     return `<div class="nh-line" data-folder="${esc(f.id)}" tabindex="0" role="button"><b>${esc(f.name)}</b>${dots(5, s.done)}<span class="step">${STEPS5[s.done] || ""}</span></div>`;
@@ -89,7 +91,7 @@ const NH = (() => {
     brand: () => {
       const b = D.brand, c = clientx?.cur, pct = brainPct(b);
       return `${head("brand")}<div class="nh-brandrow"><div><b>${esc(c?.name || "اختار عميل")}</b><div class="nh-sw">${hexes(b?.palette).map((h) => `<i style="background:${h}"></i>`).join("")}</div></div></div>
-        <div class="nh-lines-txt">${b?.audience ? `<span><b>الجمهور:</b> ${esc(b.audience)}</span>` : ""}${b?.style ? `<span><b>الستايل:</b> ${esc(b.style)}</span>` : ""}${b?.theme ? `<span><b>الثيم:</b> ${esc(b.theme)}</span>` : ""}</div>
+        <div class="nh-lines-txt">${b?.audience ? `<span><b>الجمهور:</b> ${esc(b.audience)}</span>` : ""}${styleNames(b) ? `<span><b>الستايل:</b> ${esc(styleNames(b))}</span>` : ""}${b?.language ? `<span><b>اللهجة:</b> ${esc(b.language)}</span>` : ""}</div>
         <div class="nh-meter"><small><span>العقل مكتمل</span><span class="num">${pct}%</span></small><div class="bar"><i style="width:${pct}%"></i></div></div>`;
     },
     assets: () => `${head("assets")}<div class="nh-kids mini" style="grid-template-rows:repeat(4,minmax(0,1fr))">${["coaches", "voice", "music", "motion"].map(kid).join("")}</div>`,
@@ -269,14 +271,19 @@ const NH = (() => {
       + panel(4, 3, `${head("create")}<div class="nh-body">ابدأ شغل جديد من أي نوع.</div>`, `data-id="create" tabindex="0" role="button"`)
       + panel(4, 3, `${head("publish")}<div class="nh-body">${D.posts.filter((p) => p.status === "scheduled").length} بوست متجدول</div>`, `data-id="publish" tabindex="0" role="button"`),
   };
+  PAGES.brand = () => BrandPage.html();
+  let pageArg = null;
   function openPage(tile, key) {
     if (busy || zoom) return;
+    pGrid.classList.toggle("nh-scroll", key === "brand");
     busy = true;
     const t = T[key];
     pTitle.innerHTML = `<div class="nh-name"><span class="latin">${t.en}</span><b>${esc(t.ar)}</b></div>${iconOf(t.icon)}`;
     pGrid.innerHTML = PAGES[key]();
     page.hidden = false;
-    pGrid.querySelectorAll(".nh-tile").forEach(addSnake);
+    if (key !== "brand") pGrid.querySelectorAll(".nh-tile").forEach(addSnake);
+    else BrandPage.mount(pGrid, pageArg);
+    pageArg = null;
     const z = zoomIn(tile);
     const sIcon = tile.querySelector(":scope > .nh-head > .gi, :scope > .nh-head > .nh-plate"), sName = tile.querySelector(":scope > .nh-head > .nh-name");
     const tIcon = pTitle.querySelector(".gi, .nh-plate"), tName = pTitle.querySelector(".nh-name");
@@ -304,7 +311,7 @@ const NH = (() => {
       tIcon.style.opacity = tName.style.opacity = 1;
       busy = false;
       document.getElementById("nhBack").focus({ preventScroll: true });
-      pGrid.querySelectorAll(":scope > .nh-tile").forEach((p, i) => setTimeout(() => { p.classList.add("nh-sweep"); setTimeout(() => p.classList.add("done"), 1100); }, i * 70));
+      if (key !== "brand") pGrid.querySelectorAll(":scope > .nh-tile").forEach((p, i) => setTimeout(() => { p.classList.add("nh-sweep"); setTimeout(() => p.classList.add("done"), 1100); }, i * 70));
     });
   }
   function closePage() {
@@ -313,7 +320,7 @@ const NH = (() => {
     const p = zoom.page;
     p.fIcon.style.opacity = p.fName.style.opacity = 1;
     p.parts[2].style.opacity = p.parts[3].style.opacity = 0;
-    zoomOut().then(() => { busy = false; });
+    zoomOut().then(() => { busy = false; refresh(); });
   }
   document.getElementById("nhBack").onclick = closePage;
 
@@ -355,11 +362,12 @@ const NH = (() => {
 
   // ---------- الداتا الحقيقية ----------
   async function refresh() {
-    const [folders, publisher, posts, coaches, voices, music, brains] = await Promise.all([
+    const [folders, publisher, posts, coaches, voices, music, brains, cats] = await Promise.all([
       shellFolders(true), api("/api/publisher").catch(() => null), api("/api/posts").catch(() => []), api("/api/coaches").catch(() => []),
       api("/api/audio?kind=voice").catch(() => []), api("/api/audio?kind=music").catch(() => []), api("/api/ad-brains").catch(() => []),
+      D.cats.length ? D.cats : api("/api/style-cats").catch(() => []),
     ]);
-    Object.assign(D, { folders, publisher, posts, coaches, voices: voices.length, music: music.length, money: window.money?.last || D.money,
+    Object.assign(D, { cats, folders, publisher, posts, coaches, voices: voices.length, music: music.length, money: window.money?.last || D.money,
       brand: brains.find((b) => b.id === clientx?.active) || brains[0] || null });
     renderTiles();
     GL?.brand?.();
@@ -370,6 +378,20 @@ const NH = (() => {
   // لما القسم يتقفل: الكاميرا بترجع لورا للرئيسية
   return {
     refresh,
+    // عقل البراند من أي مكان في البرنامج: لو فيه قسم مفتوح بيتقفل الأول، والصفحة بتفتح من مربع البراند
+    openBrand(id) {
+      const go = () => {
+        if (zoom?.page) {
+          if (pGrid.classList.contains("nh-scroll")) return BrandPage.mount(pGrid, id);
+          closePage();
+          return setTimeout(go, 1100);
+        }
+        pageArg = id || null;
+        const tile = bento.querySelector('.nh-tile[data-id="brand"]');
+        if (tile) openPage(tile, "brand");
+      };
+      if (!$("stage").hidden) { closeStage(); setTimeout(go, 1100); } else go();
+    },
     sectionClosed() {
       if (sectionZoom) { sectionZoom = false; zoomOut(); }
       refresh();
