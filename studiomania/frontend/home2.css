@@ -316,3 +316,39 @@ body.stage-settled #nh { visibility: hidden; }
 .ml-stage iframe { border: 0; transform-origin: center; flex: none; position: absolute; left: 50%; top: 50%; translate: -50% -50%; background: #000; }
 .nh-mosaic { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 14px; }
 .nh-mosaic img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 10px; background: var(--nh-fill); }
+
+/* 🧍 الشخصيات */
+.ch-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: var(--nh-gap); margin-top: var(--nh-gap); }
+.ch-card { border-radius: 20px; background: var(--nh-fill); padding: 8px 8px 12px; display: grid; gap: 6px; cursor: pointer; outline: 1.5px solid transparent;
+  transition: transform .45s var(--nh-ease), background .3s var(--nh-ease), outline-color .3s var(--nh-ease); }
+.ch-card:hover { transform: translateY(-3px); background: var(--nh-fill-hi); }
+.ch-card.on { outline-color: var(--nh-accent); }
+.ch-card img { width: 100%; aspect-ratio: 3 / 4; object-fit: cover; border-radius: 14px; background: var(--nh-bg); }
+.ch-card b { font-weight: 500; font-size: 14px; padding-inline: 4px; }
+.ch-tags { display: flex; gap: 4px; flex-wrap: wrap; padding-inline: 4px; min-height: 20px; }
+.ch-tags span { font-size: 10.5px; padding: 2px 8px; border-radius: 99px; background: var(--nh-bg); color: var(--nh-muted); }
+.ch-new { margin-bottom: var(--nh-gap); }
+.ch-detail { gap: 18px; animation: ml-in .4s var(--nh-ease); }
+.ch-top { display: grid; grid-template-columns: 200px 1fr; gap: 20px; align-items: start; }
+.ch-face { display: grid; gap: 8px; justify-items: center; }
+.ch-face img { width: 200px; aspect-ratio: 3 / 4; object-fit: cover; border-radius: 20px; background: var(--nh-bg); }
+.ch-info { display: grid; gap: 12px; }
+.ch-sec { display: grid; gap: 8px; border-top: 1px solid var(--nh-fill-hi); padding-top: 14px; }
+.ch-sec audio { flex: 1; min-width: 200px; height: 38px; }
+
+/* 🎙️ 🎵 الصوت والموسيقى */
+.au-q { flex: 1; max-width: 320px; }
+#nh .nb-wrap .au-q, #nh .nb-wrap .au-name { border: 1px solid transparent; border-radius: 12px; background: var(--nh-bg); color: var(--nh-ink); font: 13px var(--nh-arabic); padding: 8px 12px; }
+#nh .nb-wrap .au-name { background: transparent; flex: 1; min-width: 0; }
+#nh .nb-wrap .au-name:focus, #nh .nb-wrap .au-q:focus { outline: none; border-color: var(--nh-line); background: var(--nh-bg); }
+.au-hint { padding: 0 6px 12px; }
+.au-drop { border-radius: 24px; background: var(--nh-fill); padding: 8px; transition: outline-color .3s; outline: 2px dashed transparent; outline-offset: -6px; }
+.au-over .au-drop { outline-color: var(--nh-accent); }
+.au-list { display: grid; gap: 2px; }
+.au-row { display: flex; align-items: center; gap: 12px; padding: 6px 10px; border-radius: 14px; transition: background .3s var(--nh-ease); }
+.au-row:hover { background: var(--nh-bg); }
+.au-play { width: 36px; height: 36px; border-radius: 50%; border: 0; background: var(--nh-ink); color: var(--nh-bg); cursor: pointer; flex: none; font-size: 12px; }
+.au-dur { color: var(--nh-muted); font-size: 12px; min-width: 42px; text-align: end; }
+.au-row .nb-btn { opacity: 0; transition: opacity .2s; }
+.au-row:hover .nb-btn, .au-row:focus-within .nb-btn { opacity: 1; }
+@media (max-width: 820px) { .ch-top { grid-template-columns: 1fr; } .au-row .nb-btn { opacity: 1; } }

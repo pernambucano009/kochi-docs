@@ -353,6 +353,10 @@ with closing(db()) as _conn, _conn:
     for _col in ("instagram", "tiktok"):
         if _col not in {c[1] for c in _conn.execute("PRAGMA table_info(coaches)")}:
             _conn.execute(f"ALTER TABLE coaches ADD COLUMN {_col} TEXT")
+    # الشخصية: وصف، إنترو، صوت، وصور كاركتر شيت (JSON لستة أسماء ملفات)
+    for _col, _typ in (("about", "TEXT"), ("intro_filename", "TEXT"), ("intro_duration", "REAL"), ("voice_filename", "TEXT"), ("sheet", "TEXT")):
+        if _col not in {c[1] for c in _conn.execute("PRAGMA table_info(coaches)")}:
+            _conn.execute(f"ALTER TABLE coaches ADD COLUMN {_col} {_typ}")
     # دليل الحسابات اللي اتستوردت من ملف (حتى لو المدرب لسه مش في البرنامج)
     _conn.execute(
         """CREATE TABLE IF NOT EXISTS social_handles (
@@ -979,8 +983,20 @@ def coach_to_dict(row: sqlite3.Row) -> dict:
         "outro_duration": row["outro_duration"],
         "instagram": row["instagram"],
         "tiktok": row["tiktok"],
+        "about": row["about"] or "",
+        "intro_url": f"/media/coaches/{row['intro_filename']}" if row["intro_filename"] else None,
+        "intro_duration": row["intro_duration"],
+        "voice_url": f"/media/coaches/{row['voice_filename']}" if row["voice_filename"] else None,
+        "sheet": [{"file": f, "url": f"/media/coaches/{f}"} for f in coach_sheet(row)],
         "created_at": row["created_at"],
     }
+
+
+def coach_sheet(row: sqlite3.Row) -> list[str]:
+    try:
+        return [f for f in json.loads(row["sheet"] or "[]") if (COACHES_DIR / f).exists()]
+    except ValueError:
+        return []
 
 
 def get_coach(conn: sqlite3.Connection, coach_id: str) -> sqlite3.Row:
@@ -990,13 +1006,13 @@ def get_coach(conn: sqlite3.Connection, coach_id: str) -> sqlite3.Row:
     return row
 
 
-def save_outro(outro: UploadFile, coach_id: str) -> tuple[str, float]:
-    filename = save_upload(outro, VIDEO_EXTENSIONS, COACHES_DIR, f"{coach_id}_outro")
+def save_outro(outro: UploadFile, coach_id: str, kind: str = "outro") -> tuple[str, float]:
+    filename = save_upload(outro, VIDEO_EXTENSIONS, COACHES_DIR, f"{coach_id}_{kind}")
     try:
         return filename, probe_duration(COACHES_DIR / filename)
     except ValueError as exc:
         (COACHES_DIR / filename).unlink(missing_ok=True)
-        raise HTTPException(400, f"الأوترو: {exc}") from exc
+        raise HTTPException(400, f"{'الإنترو' if kind == 'intro' else 'الأوترو'}: {exc}") from exc
 
 
 @app.get("/api/coaches")
@@ -1055,10 +1071,31 @@ def update_coach(
     remove_outro: bool = Form(False),
     instagram: str | None = Form(None),
     tiktok: str | None = Form(None),
+    about: str | None = Form(None),
+    intro: UploadFile | None = File(None),
+    remove_intro: bool = Form(False),
+    voice: UploadFile | None = File(None),
+    remove_voice: bool = Form(False),
 ):
     with closing(db()) as conn, conn:
         row = get_coach(conn, coach_id)
         old_files = []
+        if about is not None:
+            conn.execute("UPDATE coaches SET about = ? WHERE id = ?", (about.strip()[:2000], coach_id))
+        if intro and intro.filename:
+            filename, duration = save_outro(intro, coach_id, "intro")
+            conn.execute("UPDATE coaches SET intro_filename = ?, intro_duration = ? WHERE id = ?", (filename, duration, coach_id))
+            old_files.append(row["intro_filename"])
+        elif remove_intro:
+            conn.execute("UPDATE coaches SET intro_filename = NULL, intro_duration = NULL WHERE id = ?", (coach_id,))
+            old_files.append(row["intro_filename"])
+        if voice and voice.filename:
+            filename = save_audio_upload(voice, COACHES_DIR, f"{coach_id}_voice")
+            conn.execute("UPDATE coaches SET voice_filename = ? WHERE id = ?", (filename, coach_id))
+            old_files.append(row["voice_filename"])
+        elif remove_voice:
+            conn.execute("UPDATE coaches SET voice_filename = NULL WHERE id = ?", (coach_id,))
+            old_files.append(row["voice_filename"])
         for col, handle in coach_handles(instagram, tiktok).items():
             conn.execute(f"UPDATE coaches SET {col} = ? WHERE id = ?", (handle, coach_id))
         if name is not None and name.strip():
@@ -1193,9 +1230,35 @@ def delete_coach(coach_id: str):
         in_use = {r[0] for r in conn.execute("SELECT coach_image FROM generations")}
     if row["image_filename"] not in in_use:
         (COACHES_DIR / row["image_filename"]).unlink(missing_ok=True)
-    if row["outro_filename"]:
-        (COACHES_DIR / row["outro_filename"]).unlink(missing_ok=True)
+    for f in [row["outro_filename"], row["intro_filename"], row["voice_filename"], *coach_sheet(row)]:
+        if f:
+            (COACHES_DIR / f).unlink(missing_ok=True)
     return {"ok": True}
+
+
+@app.post("/api/coaches/{coach_id}/sheet")
+def coach_sheet_add(coach_id: str, files: list[UploadFile] = File(...)):
+    """🧍 صور كاركتر شيت للشخصية (زوايا وتعبيرات)، عشان التوليد يحافظ على شكلها."""
+    with closing(db()) as conn, conn:
+        row = get_coach(conn, coach_id)
+        sheet = coach_sheet(row)
+        for f in files[:24]:
+            sheet.append(save_upload(f, IMAGE_EXTENSIONS, COACHES_DIR, f"{coach_id}_sheet"))
+        conn.execute("UPDATE coaches SET sheet = ? WHERE id = ?", (json.dumps(sheet[-24:]), coach_id))
+        return coach_to_dict(get_coach(conn, coach_id))
+
+
+@app.delete("/api/coaches/{coach_id}/sheet/{file}")
+def coach_sheet_del(coach_id: str, file: str):
+    with closing(db()) as conn, conn:
+        row = get_coach(conn, coach_id)
+        sheet = coach_sheet(row)
+        if file not in sheet:
+            raise HTTPException(404, "الصورة مش موجودة")
+        sheet.remove(file)
+        conn.execute("UPDATE coaches SET sheet = ? WHERE id = ?", (json.dumps(sheet), coach_id))
+        (COACHES_DIR / Path(file).name).unlink(missing_ok=True)
+        return coach_to_dict(get_coach(conn, coach_id))
 
 
 # ---------------------------------------------------------------- التوليد بـ Seedance
@@ -2184,6 +2247,7 @@ class ProjectIn(BaseModel):
     outro: bool = True
     outro_volume: float = 1.0
     brand_intro: bool = True    # إنترو البراند (من عقل البراند) في أول الفيديو
+    char_intro: bool = True     # إنترو الشخصية قبل الفيديو لو ليها
     brand_outro: bool = True    # أوترو البراند في آخر الفيديو
     captions: dict = {}  # {enabled, template, font, size, y, words, color, highlight, ...}
     logo: dict = {}  # {enabled, size, x, y, opacity, on_outro}
@@ -2750,7 +2814,7 @@ def prepend_intro(main: Path, intro: Path) -> float:
     return ii.duration
 
 
-def run_render(project_id: str, export_id: str, cmds: list[list[str]], total: float, name: str, work_dir: Path, typo_id: str | None = None, base_url: str = "", typo_click_vol: float = 0.0, scene_id: str | None = None, intro: Path | None = None) -> None:
+def run_render(project_id: str, export_id: str, cmds: list[list[str]], total: float, name: str, work_dir: Path, typo_id: str | None = None, base_url: str = "", typo_click_vol: float = 0.0, scene_id: str | None = None, intro: list[Path] | None = None) -> None:
     filename = f"{export_id}.mp4"
     error = None
     RENDER_LOG.write_text("", encoding="utf-8")
@@ -2806,9 +2870,11 @@ def run_render(project_id: str, export_id: str, cmds: list[list[str]], total: fl
                     vid.with_name("video_t.mp4").replace(vid)
         if project_id in RENDER_CANCELLED:
             error = "إنت لغيت التصدير."
-        elif intro is not None and intro.exists():
-            RENDER_ACTIVE[project_id] = "🎬 بيحط إنترو البراند"
-            total += prepend_intro(EXPORTS_DIR / filename, intro)
+        elif intro:   # الأقرب للفيديو الأول (إنترو الشخصية) وبعده إنترو البراند في أول خالص
+            RENDER_ACTIVE[project_id] = "🎬 بيحط الإنترو"
+            for p in intro:
+                if p.exists():
+                    total += prepend_intro(EXPORTS_DIR / filename, p)
     except Exception as exc:  # أي مشكلة غير متوقعة لازم تظهر، مش يفضل «بيصدّر» على طول
         error = f"حصلت مشكلة أثناء التصدير: {exc}"
         log_render(f"مشكلة: {exc!r}")
@@ -2896,7 +2962,8 @@ def start_render(conn: sqlite3.Connection, row: sqlite3.Row, project_id: str, da
     sid = data.get("typo_id") if data.get("typo_id") and (TYPO_PROJ / Path(data["typo_id"]).name / "typo.json").exists() else None
     if montage.canvas_size() != (montage.WIDTH, montage.HEIGHT):
         sid = None  # المشهد (الخلفية الجديدة والحاجات اللي اتشالت) معمول على 9:16 بس
-    intro = brand_video("intro") if data.get("brand_intro", True) else None
+    intro = [p for p in (coach_intro(data) if data.get("char_intro", True) else None,
+                         brand_video("intro") if data.get("brand_intro", True) else None) if p]
     render_executor.submit(run_render, project_id, export_id, cmd, total, row["name"], work_dir, tid, f"http://127.0.0.1:{port}", click, sid, intro)
     return {"ok": True, "duration": total}
 
@@ -7004,6 +7071,16 @@ def delete_brand_video(bid: str, kind: str):
         d[f"{kind}_on"] = ""
     update_brain(bid, fn)
     return brain_to_dict(brain_row(bid))
+
+
+def coach_intro(data: dict) -> Path | None:
+    """إنترو الشخصية بتاعة المشروع لو ليها."""
+    if not data.get("coach_id"):
+        return None
+    with closing(db()) as conn:
+        r = conn.execute("SELECT intro_filename FROM coaches WHERE id = ?", (data["coach_id"],)).fetchone()
+    p = COACHES_DIR / r["intro_filename"] if r and r["intro_filename"] else None
+    return p if p and p.exists() else None
 
 
 def brand_video(kind: str) -> Path | None:

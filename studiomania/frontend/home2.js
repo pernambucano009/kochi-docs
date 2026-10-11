@@ -54,9 +54,9 @@ const NH = (() => {
     typo: { en: "Typography", ar: "تايبوجرافي", icon: "type", go: "12", desc: "كلام متحرك من صوت أو سكريبت." },
     dub: { en: "Dubbing", ar: "دبلجة فيديو", icon: "globe", go: "13", desc: "نفس الفيديو بلهجة تانية." },
     edit: { en: "Edit", ar: "مونتاج حر", icon: "film", go: "6", desc: "المحرر الكامل: تراكات ونص وطبقات وصوت." },
-    coaches: { en: "Characters", ar: "الشخصيات", icon: "users", go: "4", desc: "صور الشخصيات والأوترو." },
-    voice: { en: "Voices", ar: "التعليق الصوتي", icon: "mic", go: "3", desc: "مكتبة التعليق." },
-    music: { en: "Music", ar: "الموسيقى", icon: "music", go: "5", desc: "مكتبة الموسيقى." },
+    coaches: { en: "Characters", ar: "الشخصيات", icon: "users", page: "coaches", desc: "كل شخصية بصورتها والكاركتر شيت وصوتها والإنترو والأوترو." },
+    voice: { en: "Voices", ar: "التعليق الصوتي", icon: "mic", page: "voice", desc: "مكتبة التعليق." },
+    music: { en: "Music", ar: "الموسيقى", icon: "music", page: "music", desc: "مكتبة الموسيقى." },
     motion: { en: "Motion", ar: "مكتبة الموشن", icon: "clapper", page: "motion", desc: "أنيميشنات مكتوبة بالكود، كل واحدة تتضاف للأصول بضغطة." },
   };
   const CREATE_KIDS = ["reel", "raw", "series", "carousel"];
@@ -273,11 +273,12 @@ const NH = (() => {
       + panel(4, 3, `${head("publish")}<div class="nh-body">${D.posts.filter((p) => p.status === "scheduled").length} بوست متجدول</div>`, `data-id="publish" tabindex="0" role="button"`),
   };
   // صفحات كاملة بتنزل لتحت (عقل البراند، مكتبة الموشن): كل واحدة ليها موديول بيرسمها
-  const MODS = { brand: BrandPage, motion: MotionPage };
+  const MODS = { brand: BrandPage, motion: MotionPage, coaches: CharactersPage, voice: VoicesPage, music: MusicPage };
+  const stopMedia = () => { MotionPage.close(); VoicesPage.close(); MusicPage.close(); };
   let pageArg = null, pStack = [];
   const titleHTML = (t) => `<div class="nh-name"><span class="latin">${t.en}</span><b>${esc(t.ar)}</b></div>${iconOf(t.icon)}`;
   function fillPage(key) {
-    MotionPage.close();
+    stopMedia();
     pGrid.dataset.key = key;
     pGrid.classList.toggle("nh-scroll", !!MODS[key]);
     pGrid.innerHTML = MODS[key] ? MODS[key].html() : PAGES[key]();
@@ -336,7 +337,7 @@ const NH = (() => {
   function closePage() {
     if (busy || !zoom?.page) return;
     if (pStack.length) return swapPage(pStack[pStack.length - 1].key, true);
-    MotionPage.close();
+    stopMedia();
     busy = true;
     const p = zoom.page;
     p.fIcon.style.opacity = p.fName.style.opacity = 1;

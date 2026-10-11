@@ -2731,6 +2731,9 @@ function renderSide() {
   $("mOutroVol").value = Math.round(ov * 100);
   $("outroVolVal").textContent = `${Math.round(ov * 100)}%`;
 
+  $("mCharIntro").disabled = !coach?.intro_url;
+  $("mCharIntro").checked = !!coach?.intro_url && d.char_intro !== false;
+  $("charIntroInfo").textContent = !coach ? "(مفيش شخصية)" : coach.intro_url ? `(${fmtDuration(coach.intro_duration)})` : "(الشخصية دي مالهاش إنترو)";
   for (const [k, id] of [["intro", "mBrandIntro"], ["outro", "mBrandOutro"]]) {
     const has = !!clientx.cur?.[`${k}_url`];
     $(id).disabled = !has;
@@ -2779,6 +2782,7 @@ $("mOutro").addEventListener("change", sideInput(null, (d) => {
   else d.clips = d.clips.filter((c) => !isOutroClip(c));
   d.outro = false;
 }));
+$("mCharIntro").addEventListener("change", sideInput(null, (d) => { d.char_intro = $("mCharIntro").checked; }));
 $("mBrandIntro").addEventListener("change", sideInput(null, (d) => { d.brand_intro = $("mBrandIntro").checked; }));
 $("mBrandOutro").addEventListener("change", sideInput(null, (d) => { d.brand_outro = $("mBrandOutro").checked; }));
 $("mOutroVol").addEventListener("input", sideInput("outroVol", (d) => {
