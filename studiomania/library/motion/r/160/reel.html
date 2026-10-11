@@ -1,0 +1,88 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// #160 A deliberately terrible showreel — 60 s of every beginner mistake, on purpose, escalating.
+// 1 rainbow WordArt intro, linear spins · 2 skills list, every easing at once, drop shadows · 3 "3D" (fake extrusion, wrong perspective)
+// 4 logo reveal: star wipe, checkerboard, a lens flare · 5 data: an exploding 3D pie that adds up to 140% · 6 the most tragic title card.
+M.reel({
+  W: 1920, H: 1080, DUR: 60, bg: "#ff00ff",
+  fonts: { CS: "Gochi_Hand.ttf", WA: "Knewave.ttf", WP: "Rubik_Wet_Paint.ttf", PM: "Permanent_Marker.ttf" },
+  init(M) { const c = M.canvas(1920, 1080); return { x: c.getContext("2d") }; },
+  seek(t, P, M) {
+    const { x } = P, { seg, lerp, clamp, springO, hash } = M;
+    const sec = Math.floor(t / 10), lt = t - sec * 10;
+    x.setTransform(1, 0, 0, 1, 0, 0);
+    const rainbow = (y0, y1) => { const g = x.createLinearGradient(0, y0, 0, y1); ["#ff0000", "#ff9900", "#ffff00", "#00ff00", "#00ffff", "#0000ff", "#ff00ff"].forEach((c, i) => g.addColorStop(i / 6, c)); return g; };
+    const wordart = (s, px, X, Y, fill, rot = 0, font = "WA") => { x.save(); x.translate(X, Y); x.rotate(rot); x.font = `400 ${px}px ${font}`; x.textAlign = "center"; x.textBaseline = "middle"; for (let k = 12; k > 0; k--) { x.fillStyle = "#333333"; x.fillText(s, k * 2, k * 2); } x.fillStyle = fill; x.fillText(s, 0, 0); x.lineWidth = 6; x.strokeStyle = "#000"; x.strokeText(s, 0, 0); x.restore(); };
+    const comic = (s, px, X, Y, col, al = "left") => { x.font = `400 ${px}px CS`; x.fillStyle = "#000"; x.textAlign = al; x.fillText(s, X + 5, Y + 5); x.fillStyle = col; x.fillText(s, X, Y); };
+    // ---------- 1: intro
+    if (sec === 0) {
+      const g = x.createLinearGradient(0, 0, 1920, 1080); g.addColorStop(0, "#ff00ff"); g.addColorStop(1, "#00ffcc"); x.fillStyle = g; x.fillRect(0, 0, 1920, 1080);
+      wordart("MY SHOWREEL!!!", 170, 960, 460, rainbow(380, 540), lt * 2.1);   // a linear spin, forever
+      comic("by a Motion Designer (me)", 64, 960, 760, "#ffff00", "center");
+      if (lt > 7) { const k = (lt - 7) / 3; x.fillStyle = "#000"; x.beginPath(); const R = k * 2400; for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2 - Math.PI / 2, r = i % 2 ? R * .4 : R; x.lineTo(960 + Math.cos(a) * r, 540 + Math.sin(a) * r); } x.fill(); }   // star wipe
+    }
+    // ---------- 2: skills, every easing at once
+    if (sec === 1) {
+      x.fillStyle = "#00ff00"; x.fillRect(0, 0, 1920, 1080);
+      wordart("MY SKILLZ", 140, 960, 150, "#ff0000", Math.sin(t * 8) * .1);
+      const items = ["• After Effects (expert)", "• Photoshop (expert)", "• Every Font (expert)", "• Transitions (ALL of them)", "• Comic Sans (favorite)"];
+      const eases = [(k) => k, (k) => springO(k, 9, .2), (k) => 1 - Math.abs(Math.cos(k * 12)) * (1 - k), (k) => k * k * k, (k) => Math.min(1, k * 3)];
+      items.forEach((s, i) => { const k = clamp((lt - i * .7) / 1.6); const e = eases[i](k); x.save(); x.translate(lerp(-900, 260, e), 330 + i * 140); x.rotate((1 - k) * (i % 2 ? 3 : -3)); comic(s, 78, 0, 0, ["#ff00ff", "#0000ff", "#ff9900", "#ff0000", "#00ffff"][i]); x.restore(); });
+      if (lt > 8) { const k = (lt - 8) / 2; for (let r = 0; r < 9; r++) for (let c = 0; c < 16; c++) if ((r + c) % 2 === 0 || k > .5) { x.fillStyle = "#000"; x.fillRect(c * 120, r * 120, 120 * Math.min(1, k * 2), 120 * Math.min(1, k * 2)); } }   // checkerboard
+    }
+    // ---------- 3: "3D"
+    if (sec === 2) {
+      x.fillStyle = "#ffff00"; x.fillRect(0, 0, 1920, 1080);
+      // extrude by stacking 40 copies, then rotate the whole thing like a flat card (wrong perspective)
+      x.save(); x.translate(960, 420); x.transform(Math.cos(lt * 1.5), .3, -.2, 1, 0, 0);
+      x.font = "400 260px WP"; x.textAlign = "center"; x.textBaseline = "middle";
+      for (let k = 40; k > 0; k--) { x.fillStyle = `hsl(${k * 9 + t * 200},100%,40%)`; x.fillText("3D!!", k * 3, k * 3); }
+      x.fillStyle = "#ff0000"; x.fillText("3D!!", 0, 0); x.restore();
+      // a "cube": three parallelograms that don't agree with each other
+      const a = lt; x.fillStyle = "#0000ff"; x.fillRect(700 + Math.sin(a) * 40, 700, 200, 200); x.fillStyle = "#00ffff"; x.beginPath(); x.moveTo(700, 700); x.lineTo(800 + Math.cos(a * 2) * 80, 620); x.lineTo(1000, 620); x.lineTo(900, 700); x.fill(); x.fillStyle = "#ff00ff"; x.beginPath(); x.moveTo(900, 700); x.lineTo(1000, 610); x.lineTo(1020, 820); x.lineTo(900, 900); x.fill();
+      comic("(cube)", 60, 1100, 800, "#000");
+    }
+    // ---------- 4: logo reveal
+    if (sec === 3) {
+      x.fillStyle = "#000"; x.fillRect(0, 0, 1920, 1080);
+      for (let i = 0; i < 200; i++) { x.fillStyle = "#fff"; x.fillRect(hash(i) * 1920, hash(i + 1) * 1080, 3, 3); }   // "space"
+      const k = clamp(lt / 3); wordart("LOGO", 260 * (.2 + k * .8), 960, 540, rainbow(400, 680), (1 - k) * 12, "PM");
+      // lens flare, obviously
+      const fx = lerp(200, 1700, clamp((lt - 2) / 6)); x.fillStyle = "rgba(255,255,200,.9)"; x.beginPath(); x.arc(fx, 300, 60, 0, 7); x.fill(); [[.3, 30, "rgba(255,0,255,.4)"], [.55, 50, "rgba(0,255,255,.35)"], [.8, 20, "rgba(255,255,0,.5)"], [1.1, 70, "rgba(0,255,0,.25)"]].forEach(([d, r, c]) => { x.fillStyle = c; x.beginPath(); x.arc(fx + (960 - fx) * d * 2, 300 + (540 - 300) * d * 2, r, 0, 7); x.fill(); });
+      comic("(insert logo here)", 50, 960, 900, "#888", "center");
+    }
+    // ---------- 5: data
+    if (sec === 4) {
+      x.fillStyle = "#ff9900"; x.fillRect(0, 0, 1920, 1080);
+      wordart("STATISTICS", 120, 960, 130, "#00ff00");
+      const parts = [40, 35, 30, 20, 15];   // = 140%
+      const cols = ["#ff0000", "#0000ff", "#00ff00", "#ff00ff", "#ffff00"];
+      let a0 = lt * 1.3;
+      x.save(); x.translate(760, 600); x.scale(1, .45);
+      for (let depth = 40; depth >= 0; depth -= 4) { let a = a0; parts.forEach((p, i) => { const da = p / 100 * Math.PI * 2, mid = a + da / 2, ex = Math.sin(lt * 3 + i) * 30 + 30; x.fillStyle = depth ? "#552200" : cols[i]; x.beginPath(); x.moveTo(Math.cos(mid) * ex, Math.sin(mid) * ex + depth); x.arc(Math.cos(mid) * ex, Math.sin(mid) * ex + depth, 380, a, a + da); x.fill(); a += da; }); }
+      x.restore();
+      parts.forEach((p, i) => comic(`${["Skill", "Passion", "Talent", "Fonts", "Coffee"][i]}: ${p}%`, 54, 1380, 400 + i * 90, cols[i]));
+      comic("TOTAL: 140% !!!", 60, 1380, 880, "#000");
+    }
+    // ---------- 6: the tragic title card
+    if (sec === 5) {
+      const g = x.createRadialGradient(960, 540, 10, 960, 540, 1100); g.addColorStop(0, "#ffff00"); g.addColorStop(.5, "#ff00ff"); g.addColorStop(1, "#0000ff"); x.fillStyle = g; x.fillRect(0, 0, 1920, 1080);
+      wordart("THANK U FOR", 150, 960, 300, rainbow(240, 360), Math.sin(t * 3) * .05);
+      wordart("WATCHING!!!!!", 170, 960, 480, rainbow(400, 560), -Math.sin(t * 3) * .05, "WP");
+      comic("hire me plz", 90, 960, 680, "#00ff00", "center");
+      comic("© 2026 All Rites Reserved. Music: random.mp3", 36, 960, 1000, "#ffffff", "center");
+      // the freeze: a loading spinner that never finishes
+      if (lt > 6) { x.fillStyle = "rgba(0,0,0,.55)"; x.fillRect(0, 0, 1920, 1080); for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2 + Math.floor(t * 8) * Math.PI / 6; x.fillStyle = `rgba(255,255,255,${i / 12})`; x.fillRect(960 + Math.cos(a) * 60 - 6, 540 + Math.sin(a) * 60 - 6, 12, 12); } comic("Rendering… (2%)", 50, 960, 680, "#fff", "center"); }
+    }
+  },
+  sound(A) {
+    const m = A.midi;
+    // a cheesy stock loop: square lead, slightly off the beat, a "ding" on everything, a whoosh on every transition
+    const mel = [72, 76, 79, 76, 74, 77, 81, 77];
+    for (let k = 0; k < 116; k++) { const t0 = k * .52 + (k % 3 ? .03 : -.02); A.tone(t0, m(mel[k % 8]), .25, "square", .05); if (k % 2 === 0) A.tone(t0, m(48 + (k % 4)), .4, "sawtooth", .05); }
+    for (let s = 0; s < 6; s++) { A.whoosh(s * 10 - .3, .6, .25); A.tone(s * 10, 1760, .5, "sine", .1); A.tone(s * 10 + .1, 2637, .5, "sine", .08); }
+    for (let k = 0; k < 5; k++) A.tone(10 + k * .7, 1200, .3, "sine", .08);
+    A.tone(56, m(60), 4, "sine", .04);   // the spinner hum
+  },
+});
+</script></body></html>

@@ -1,0 +1,92 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// #149 Thank-you to the first 100 users of @eyezonbot — 15 s. Concept: "100 dots, one eye": every user is a dot, and together they see.
+// 0–3 kinetic type: one dot splits into 100 that form "100", FIRST/USERS slide in · 3–6 shape morph: the dots become an eye that
+// looks around and blinks · 6–9 2D→3D: the eye becomes an eyeball, a sphere of 100 dots that turns · 9–12 data: the dots drop into a
+// 10×10 grid and light up one by one, 1→100 · 12–15 end title: the dots run into one line under THANK YOU.
+// One typeface (Gabarito 800). Palette: electric blue, yellow, black + white. Camera: one slow push-in.
+const W = 1920, H = 1080, BLUE = "#3d7bff", YEL = "#ffd23f", N = 100;
+let GLYPH = [];
+const fib = []; for (let i = 0; i < N; i++) { const y = 1 - (i + .5) / N * 2, r = Math.sqrt(1 - y * y), a = i * 2.39996; fib.push([Math.cos(a) * r, y, Math.sin(a) * r]); }
+function eyePts(blink, look) {   // 60 on the outline (upper lid closes with blink), 40 in the iris
+  const P = [];
+  for (let i = 0; i < 30; i++) { const u = i / 29, xx = (u - .5) * 760, yy = -Math.sin(u * Math.PI) * 230 * (1 - blink); P.push([960 + xx, 540 + yy]); }
+  for (let i = 0; i < 30; i++) { const u = i / 29, xx = (u - .5) * 760, yy = Math.sin(u * Math.PI) * 230 * (1 - blink * .15); P.push([960 + xx, 540 + yy]); }
+  for (let i = 0; i < 40; i++) { const ring = i < 26 ? 150 : i < 36 ? 92 : 38, k = i < 26 ? i / 26 : i < 36 ? (i - 26) / 10 : (i - 36) / 4, a = k * Math.PI * 2; P.push([960 + look * 120 + Math.cos(a) * ring, 540 + Math.sin(a) * ring * (1 - blink)]); }
+  return P;
+}
+M.reel({
+  W, H, DUR: 15, bg: "#000",
+  fonts: { GB: "TY-Gabarito-800.ttf" },
+  init(M) {
+    const c = M.canvas(W, H);
+    // sample "100" into exactly 100 points
+    const o = document.createElement("canvas"); o.width = 1200; o.height = 600; const g = o.getContext("2d");
+    g.font = "800 520px GB"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillStyle = "#fff"; g.fillText("100", 600, 320);
+    const d = g.getImageData(0, 0, 1200, 600).data, all = [];
+    for (let y = 0; y < 600; y += 14) for (let x = 0; x < 1200; x += 14) if (d[(y * 1200 + x) * 4 + 3] > 128) all.push([x + 360, y + 240]);
+    for (let i = 0; i < N; i++) GLYPH.push(all[Math.floor(i * all.length / N)]);
+    return { x: c.getContext("2d") };
+  },
+  seek(t, P, M) {
+    const { x } = P, { seg, lerp, clamp, expo, expoIO, springO, hash } = M;
+    x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = "#000"; x.fillRect(0, 0, W, H);
+    const cz = 1 + t * .006; x.translate(W / 2, H / 2); x.scale(cz, cz); x.translate(-W / 2, -H / 2);
+    // ---- per-section layouts: [x, y, r, color]
+    const blink = Math.max(0, 1 - Math.abs(t - 4.75) / .12) + Math.max(0, 1 - Math.abs(t - 5.35) / .1);
+    const look = t < 4.0 ? 0 : t < 4.4 ? -expoIO(seg(t, 4.0, 4.25)) : t < 5.0 ? lerp(-1, 1, expoIO(seg(t, 4.4, 4.65))) : lerp(1, 0, expoIO(seg(t, 5.5, 5.8)));
+    const E = eyePts(Math.min(1, blink), look);
+    const rotY = (t - 6) * 1.2 + expoIO(seg(t, 8.2, 9.0)) * 4, rotX = .35;
+    const L = {
+      one: (i) => [960, 540, i === 0 ? 18 : 0, BLUE],
+      glyph: (i) => [GLYPH[i][0], GLYPH[i][1], 11, i % 10 === 0 ? YEL : BLUE],
+      eye: (i) => [E[i][0], E[i][1], i >= 96 ? 16 : 10, i >= 60 ? (i >= 96 ? "#fff" : YEL) : BLUE],
+      ball: (i) => { let [a, b, c] = fib[i]; const ca = Math.cos(rotY), sa = Math.sin(rotY); [a, c] = [a * ca - c * sa, a * sa + c * ca]; const cx = Math.cos(rotX), sx = Math.sin(rotX); [b, c] = [b * cx - c * sx, b * sx + c * cx]; const p = 1 / (1 - c * .35); const front = c > 0; return [960 + a * 300 * p, 540 + b * 300 * p, (front ? 12 : 7) * p, c > .55 ? "#fff" : c > .1 ? YEL : BLUE]; },
+      grid: (i) => { const col = i % 10, row = Math.floor(i / 10), lit = t > 9.6 + i * .018; return [600 + col * 56, 300 + row * 56, lit ? 17 : 9, lit ? (i === 99 ? YEL : BLUE) : "#333"]; },
+      line: (i) => [460 + i * 10, 720, 5, i === 99 ? YEL : BLUE],
+    };
+    const SEQ = [[0, "one"], [.4, "glyph", .6], [3.0, "eye", .6], [6.0, "ball", .7], [9.0, "grid", .6], [12.0, "line", .6]];
+    let cur = 0; for (let s = 0; s < SEQ.length; s++) if (t >= SEQ[s][0]) cur = s;
+    for (let i = 0; i < N; i++) {
+      let p = L[SEQ[cur][1]](i);
+      if (cur > 0) {
+        const [t0, , d] = SEQ[cur], st = t0 + (i / N) * d * .5, k = expoIO(seg(t, st, st + d * .5));
+        if (k < 1) { const q = L[SEQ[cur - 1][1]](i); const arc = Math.sin(k * Math.PI) * 60 * (hash(i) - .5); p = [lerp(q[0], p[0], k) + arc, lerp(q[1], p[1], k) - arc, lerp(q[2], p[2], k) || .01, k < .5 ? q[3] : p[3]]; }
+      }
+      if (cur === 0 && i > 0) continue;
+      x.fillStyle = p[3]; x.beginPath(); x.arc(p[0], p[1], Math.max(.1, p[2]), 0, 7); x.fill();
+    }
+    // ---- type (one face). Letters enter/exit on separate timing so they never overlap.
+    const word = (s, X, Y, px, t0, t1, col = "#fff", al = "center") => {
+      if (t < t0 || t > t1 + .3) return;
+      x.font = `800 ${px}px GB`; x.textBaseline = "middle"; x.textAlign = "left"; x.fillStyle = col;
+      const ws = [...s].map((c) => (c === " " ? px * .28 : x.measureText(c).width)), tot = ws.reduce((a, b) => a + b, 0);
+      let cx = al === "center" ? X - tot / 2 : X;
+      x.save(); x.beginPath(); x.rect(0, Y - px * .62, W, px * 1.24); x.clip();
+      [...s].forEach((c, i) => { const ki = springO(t - t0 - i * .03, 20, .72), ko = expo(seg(t, t1 + i * .02, t1 + .2 + i * .02)); x.fillText(c, cx, Y + (1 - ki) * px * 1.1 - ko * px * 1.1); cx += ws[i]; });
+      x.restore();
+    };
+    word("FIRST", 960, 150, 110, 1.0, 2.75);
+    word("USERS", 960, 930, 110, 1.3, 2.8, YEL);
+    word("YOU SEE IT FIRST", 960, 900, 84, 4.0, 5.75);
+    if (t >= 9.5 && t < 12.1) {
+      const n = clamp(Math.floor((t - 9.6) / .018) + 1, 1, 100);
+      x.font = "800 220px GB"; x.textAlign = "left"; x.textBaseline = "middle"; x.fillStyle = "#fff"; x.fillText(String(n), 1240, 520);
+      x.font = "800 64px GB"; x.fillStyle = YEL; x.fillText("USERS", 1250, 650); x.textAlign = "start";
+    }
+    word("THANK YOU", 960, 560, 200, 12.35, 99);
+    word("@EYEZONBOT", 960, 820, 70, 12.9, 99, YEL);
+  },
+  sound(A) {
+    const m = A.midi;
+    A.tone(.1, 880, .1, "sine", .06); A.kick(.4, .8);
+    for (let i = 0; i < 20; i++) A.click(.4 + i * .025, .05);
+    A.groove(116, .4, 12, { hg: .05, kg: .6 });
+    A.pad(.4, [m(48), m(55), m(62)], 5.6, .03); A.pad(6, [m(45), m(52), m(60)], 6, .03); A.pad(12, [m(48), m(55), m(64), m(67)], 3, .04);
+    [3.0, 6.0, 9.0, 12.0].forEach((t0) => A.whoosh(t0 - .1, .5, .2));
+    [4.75, 5.35].forEach((t0) => A.tone(t0, 1600, .05, "sine", .05));
+    for (let i = 0; i < 100; i += 2) A.tone(9.6 + i * .018, m(60 + (i % 24)), .05, "square", .025);
+    A.hit(11.4, .3); A.hit(12.35, .45); [60, 64, 67, 72].forEach((n, i) => A.pluck(12.35 + i * .08, m(n + 12), .1, .5));
+  },
+});
+</script></body></html>

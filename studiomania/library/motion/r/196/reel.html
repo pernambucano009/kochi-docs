@@ -1,0 +1,211 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// #196 "What makes a place feel like home?" — 45 s, 1080×1920, paper shadow theatre (silhouettes on rods against a lit paper screen).
+// Story: a little paper bird has a new house, but it feels empty. WANT: make it feel like home.
+//  1 (7–12 s) furniture: a chair and a lamp. It sits. Still empty (a sigh).
+//  2 (12–17 s) decoration: a picture, bunting — a gust tears it all away, the chair blows off.
+//  3 (18–24 s) MORE house: it stacks room on room — the storm topples the tower and flattens the house.
+//  TURN (26–31 s) shivering in the rain, another bird comes with a leaf for an umbrella, then three chicks.
+//  END (32–40 s) together they pop the little house back up and go in; the window lights with four heads: HOME IS WHO'S INSIDE.
+//  GAG (40–45 s) the lost chair floats back on the wind, lands on the roof; a chick pops out of the chimney and sits in it.
+// Shots: SHOTS below (hard cuts on action). Every frame is a function of t.
+const W = 1080, H = 1920, GY = 1300;
+const ground = (x) => GY + (x - 540) ** 2 * .00035;
+const INK = "#1b120c";
+// ---------- hop paths: [t0, t1, "hop", x0, x1, n] | [t0, t1, "stay", x]
+function path(segs, t) {
+  let s = segs[0]; for (const q of segs) if (t >= q[0]) s = q;
+  if (t < segs[0][0]) return { x: segs[0][3], lift: 0, sq: 0, vis: false, dir: 1 };
+  if (s[2] === "stay" || t > s[1]) { const xx = s[2] === "stay" ? s[3] : s[4]; return { x: xx, lift: 0, sq: 0, vis: true, dir: 0 }; }
+  const n = s[5], u = (t - s[0]) / (s[1] - s[0]) * n, i = Math.min(n - 1, Math.floor(u)), f = u - i;
+  const xa = M.lerp(s[3], s[4], i / n), xb = M.lerp(s[3], s[4], (i + 1) / n);
+  let x = xa, lift = 0, sq = 0;
+  if (f < .18) sq = .22 * Math.sin(f / .18 * Math.PI / 2);                        // anticipation: crouch
+  else if (f < .8) { const k = (f - .18) / .62; x = M.lerp(xa, xb, M.sine(k)); lift = Math.sin(k * Math.PI) * 70; sq = -.15 * Math.sin(k * Math.PI); }   // airborne: stretch
+  else { x = xb; sq = .25 * Math.exp(-(f - .8) * 14) * Math.cos((f - .8) * 30); }   // land: squash + follow-through
+  return { x, lift, sq, vis: true, dir: Math.sign(s[4] - s[3]) };
+}
+const B1 = [[0, 3, "hop", -100, 380, 4], [3, 4, "stay", 380], [4, 5, "hop", 380, 470, 1], [5, 7, "stay", 470], [7, 8.5, "hop", 470, -140, 2], [8.5, 10.5, "hop", -140, 330, 3], [10.5, 12.6, "stay", 330], [12.6, 13.1, "hop", 330, 450, 1], [13.1, 14.2, "stay", 450], [14.2, 14.5, "hop", 450, 590, 1], [14.5, 16.8, "stay", 590], [16.8, 17.6, "hop", 590, 340, 2], [17.6, 33.6, "stay", 340], [33.6, 34.2, "hop", 340, 540, 1]];
+const B2 = [[26, 28.4, "hop", -160, 230, 3], [28.4, 34.0, "stay", 230], [34.0, 34.8, "hop", 230, 540, 1]];
+const CH = [[29.2, 70], [29.7, 120], [30.2, 170]].map(([t0, xx], i) => [[t0, t0 + .8, "hop", -80, xx, 2], [t0 + .8, 34.3 + i * .2, "stay", xx], [34.3 + i * .2, 34.9 + i * .2, "hop", xx, 540, 2]]);
+const INSIDE = (p, tIn) => p.vis && !(tIn !== null && p.x >= 538);
+// ---------- mood: the backlight's colour
+const MOOD = [[0, "#e7ae68"], [13.8, "#e2a862"], [14.6, "#c4b294"], [16.8, "#d8a86c"], [20.8, "#d6a66a"], [21.6, "#7d8fa0"], [30.8, "#7d8fa0"], [32.2, "#e7ae68"], [36, "#efb56c"]];
+const hex = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+function mood(t) { let a = MOOD[0], b = MOOD[MOOD.length - 1]; for (let i = 0; i < MOOD.length - 1; i++) if (t >= MOOD[i][0] && t < MOOD[i + 1][0]) { a = MOOD[i]; b = MOOD[i + 1]; } const k = M.smooth(M.seg(t, a[0], b[0])), A = hex(a[1]), B = hex(b[1]); return `rgb(${A.map((v, i) => Math.round(v + (B[i] - v) * k)).join(",")})`; }
+const SHOTS = [[0, 500, 1170, 1.35], [4.0, 500, 1170, 1.8], [7.0, 480, 1170, 1.35], [11.0, 360, 1210, 1.7], [12.6, 520, 1150, 1.3], [18.0, 540, 1050, 1.15], [24.4, 380, 1230, 2], [26.0, 400, 1170, 1.35], [28.4, 260, 1170, 1.6], [32.0, 400, 1170, 1.35], [35.0, 540, 1120, 1.5], [36.0, 540, 950, 1.05], [40.0, 540, 1000, 1.15], [43.3, 540, 1010, 1.7]];
+M.reel({
+  W, H, DUR: 45, bg: "#e7ae68",
+  fonts: { AB: "archivoblack.ttf" },
+  init(M) {
+    const c = M.canvas(W, H);
+    // paper fibre texture (static)
+    const tex = document.createElement("canvas"); tex.width = W; tex.height = H; const g = tex.getContext("2d"), r = M.rng(3);
+    for (let i = 0; i < 2600; i++) { g.strokeStyle = r() < .5 ? "rgba(90,50,20,.05)" : "rgba(255,240,210,.06)"; g.lineWidth = .6 + r(); g.beginPath(); const x0 = r() * W, y0 = r() * H, a = r() * 6.28, L = 6 + r() * 30; g.moveTo(x0, y0); g.quadraticCurveTo(x0 + Math.cos(a + 1) * L * .5, y0 + Math.sin(a + 1) * L * .5, x0 + Math.cos(a) * L, y0 + Math.sin(a) * L); g.stroke(); }
+    return { x: c.getContext("2d"), tex };
+  },
+  seek(t, P, M) {
+    const { x, tex } = P, { seg, lerp, clamp, expo, expoIO, spring, springO, hash, noise1 } = M;
+    let sh = SHOTS[0]; for (const s of SHOTS) if (t >= s[0]) sh = s;
+    const [, cx, cy, z] = sh;
+    let scr = mood(t);
+    const flash = [21.8, 23.4].some((a) => t > a && t < a + .07);
+    if (flash) scr = "#dfe6ec";
+    x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = scr; x.fillRect(0, 0, W, H);
+    x.setTransform(z, 0, 0, z, W / 2 - cx * z, H / 2 - cy * z);
+    const wind = seg(t, 14.2, 14.6) * (1 - seg(t, 16.4, 16.9)), storm = seg(t, 21.4, 22) * (1 - seg(t, 30.6, 31.2));
+    const flut = (k, amp = .12) => Math.sin(t * 23 + k * 3) * amp * (wind + storm * .6) + Math.sin(t * 2 + k) * .02;
+    const rod = (X, Y, ang = 0) => { x.strokeStyle = INK; x.lineWidth = 3; x.beginPath(); x.moveTo(X, Y); x.lineTo(X + Math.sin(ang) * 1400, Y + 1400); x.stroke(); };
+    // ---------- the hill
+    x.fillStyle = INK; x.beginPath(); x.moveTo(-400, 2400); for (let X = -400; X <= 1500; X += 20) x.lineTo(X, ground(X) + noise1(X * .03) * 4); x.lineTo(1500, 2400); x.fill();
+    // ---------- the house (and its fate)
+    const fall = expoIO(seg(t, 24.3, 24.75)), rise = expoIO(seg(t, 32.4, 33.2)), flatK = t < 32.4 ? fall : 1 - rise;
+    const house = (HX, HY, w, h, roof, ang, chimney, lit) => {
+      x.save(); x.translate(HX + w / 2, HY); x.rotate(ang); x.translate(-w / 2, 0);
+      x.fillStyle = INK; x.fillRect(0, -h, w, h);
+      x.beginPath(); x.moveTo(-20, -h); x.lineTo(w / 2, -h - roof); x.lineTo(w + 20, -h); x.fill();
+      if (chimney) x.fillRect(w * .7, -h - roof * .75, 30, roof * .5);
+      x.fillStyle = lit ? "#ffd98a" : scr; x.fillRect(w / 2 - 40, -h + 40, 80, 70);   // window (a hole in the paper)
+      if (lit) {   // four heads, shoulder to shoulder
+        x.fillStyle = INK; [[-26, 14], [-6, 16], [14, 10], [30, 9]].forEach(([dx, r], i) => { x.beginPath(); x.arc(w / 2 + dx, -h + 110 - r * .3, r, 0, 7); x.fill(); x.beginPath(); x.moveTo(w / 2 + dx + r * .8, -h + 108 - r * .4); x.lineTo(w / 2 + dx + r * 1.5, -h + 106 - r * .3); x.lineTo(w / 2 + dx + r * .8, -h + 102 - r * .4); x.fill(); });
+        x.fillStyle = "#ffd98a"; [[-26, 14], [-6, 16], [14, 10], [30, 9]].forEach(([dx, r]) => { x.beginPath(); x.arc(w / 2 + dx + r * .3, -h + 108 - r * .6, r * .22, 0, 7); x.fill(); });
+      }
+      x.strokeStyle = INK; x.lineWidth = 6; x.strokeRect(w / 2 - 40, -h + 40, 80, 70); x.fillStyle = INK; x.fillRect(w / 2 - 3, -h + 40, 6, 70); x.fillRect(w / 2 - 40, -h + 72, 80, 6);
+      x.fillStyle = scr; x.fillRect(w * .16, -78, 46, 78); x.fillStyle = INK; x.beginPath(); x.arc(w * .16 + 23, -78, 23, Math.PI, 0); x.fill();   // door
+      x.restore();
+    };
+    // the tower of extra rooms (attempt 3)
+    const rooms = [[18.6, 150], [19.4, 140], [20.2, 130]];
+    const sway = t > 22 && t < 23.6 ? Math.sin((t - 22) * 7) * .05 * seg(t, 22, 23.6) * 2 : 0, topple = expoIO(seg(t, 23.6, 24.4)) * 1.1 + Math.max(0, t - 24.4) * 2;
+    let stackY = GY - 220 - 150;
+    if (t < 24.9) rooms.forEach(([t0, h], i) => {
+      if (t < t0) return;
+      const pop = springO(t - t0, 16, .5), y0 = stackY;
+      x.save(); x.translate(540, GY - 220); x.rotate(sway * (i + 1) + topple * (i + 1) * .35); x.translate(-540, -(GY - 220));
+      const dropY = t > 23.6 ? 400 * (t - 23.6) ** 2 * (i + 1) : 0;
+      x.translate(0, dropY);
+      x.fillStyle = INK; x.fillRect(455, y0 - h * pop, 170, h * pop); x.fillStyle = scr; x.fillRect(510, y0 - h * pop + 40, 60, h * pop * .4);
+      x.restore(); stackY -= h;
+      if (i === 2 && t > 20.8) { x.fillStyle = INK; x.fillRect(538, stackY - 60, 4, 60); x.beginPath(); x.moveTo(542, stackY - 60); x.lineTo(590 + flut(4, 30) * 0, stackY - 46 + Math.sin(t * 9) * 4); x.lineTo(542, stackY - 32); x.fill(); }
+    });
+    if (t < 32.4 || t >= 32.4) {
+      if (flatK < 1) house(410, GY, 260, 220, 150, flatK * Math.PI / 2 * (t < 32.4 ? 1 : 1), t >= 32.4, t > 35.2 && t < 99);
+      else { x.fillStyle = INK; x.fillRect(410, GY - 18, 440, 22); }   // flattened
+    }
+    // ---------- props: chair, lamp, picture, bunting
+    const chair = (X, Y, ang = 0) => { x.save(); x.translate(X, Y); x.rotate(ang); x.fillStyle = INK; x.fillRect(-30, -50, 60, 9); x.fillRect(-30, -50, 7, 50); x.fillRect(23, -50, 7, 50); x.fillRect(16, -110, 9, 64); x.fillRect(-6, -110, 31, 8); x.restore(); };
+    const lamp = (X, Y, ang = 0) => { x.save(); x.translate(X, Y); x.rotate(ang); x.fillStyle = INK; x.fillRect(-4, -120, 8, 120); x.fillRect(-26, -4, 52, 6); x.beginPath(); x.moveTo(-34, -112); x.lineTo(34, -112); x.lineTo(20, -160); x.lineTo(-20, -160); x.fill(); x.restore(); };
+    const b1 = path(B1, t);
+    // chair: dragged in, sat on, blown off; returns in the gag
+    if (t > 8.5 && t < 10.5) chair(b1.x - 80, ground(b1.x - 80), -.15 + Math.sin(t * 12) * .05);
+    else if (t >= 10.5 && t < 14.6) chair(330, ground(330));
+    else if (t >= 14.6 && t < 16.4) { const u = t - 14.6; chair(330 + u * u * 500, ground(330) - u * u * 240, u * 2.5); }
+    else if (t >= 40 && t < 42.5) { const u = (t - 40) / 2.5, X = lerp(-120, 540, u), Y = lerp(500, GY - 220 - 150 + 6, M.sine(u)) + Math.sin(u * 9) * 30 * (1 - u); chair(X, Y, Math.sin(u * 7) * .6 * (1 - u)); }
+    else if (t >= 42.5) chair(540, GY - 220 - 150 + 6 + (t < 42.8 ? 6 * Math.sin((t - 42.5) * 30) : 0));
+    // lamp: carried on its back, stands, tips over, blows away
+    if (t > 8.5 && t < 10.5) lamp(b1.x - 6, ground(b1.x) - b1.lift - 96, .3);
+    else if (t >= 10.5 && t < 16.8) { const tip = expoIO(seg(t, 15.8, 16.1)) * 1.45, slide = t > 16.1 ? (t - 16.1) ** 2 * 900 : 0; lamp(230 + slide, ground(230), tip + flut(2, .05)); }
+    // picture on the wall
+    if (t > 12.85 && t < 16.4) { const pk = springO(t - 12.85, 18, .5), off = t > 15.6 ? (t - 15.6) : 0; x.save(); x.translate(640 + off * off * 700, 1160 - off * 260); x.rotate(flut(1, .25) + off * 6); x.scale(pk, pk); x.fillStyle = INK; x.fillRect(-34, -26, 68, 52); x.fillStyle = scr; x.fillRect(-24, -16, 48, 32); x.fillStyle = INK; x.beginPath(); x.moveTo(-24, 16); x.lineTo(-6, -6); x.lineTo(8, 8); x.lineTo(16, 0); x.lineTo(24, 16); x.fill(); x.restore(); }
+    // bunting from the roof peak to the lamp
+    if (t > 13.3 && t < 16.8) {
+      const dk = expo(seg(t, 13.3, 13.8)), tear = t > 15.2 ? t - 15.2 : 0;
+      const A = [540, GY - 370], Bp = [230, ground(230) - 160];
+      x.save(); x.translate(tear * tear * 600, -tear * 300); x.rotate(tear * .3);
+      x.strokeStyle = INK; x.lineWidth = 3; x.beginPath();
+      const NF = 8; for (let i = 0; i <= 20 * dk; i++) { const u = i / 20, X = lerp(A[0], Bp[0], u), Y = lerp(A[1], Bp[1], u) + Math.sin(u * Math.PI) * 60; i ? x.lineTo(X, Y) : x.moveTo(X, Y); } x.stroke();
+      for (let i = 1; i < NF; i++) { const u = i / NF; if (u > dk) break; const X = lerp(A[0], Bp[0], u), Y = lerp(A[1], Bp[1], u) + Math.sin(u * Math.PI) * 60; x.save(); x.translate(X, Y); x.rotate(flut(i, .6)); x.fillStyle = INK; x.beginPath(); x.moveTo(-14, 0); x.lineTo(14, 0); x.lineTo(0, 30); x.fill(); x.restore(); }
+      x.restore();
+    }
+    // ---------- birds
+    const bird = (p, o) => {
+      if (!p.vis) return;
+      const s = o.s || 1, X = p.x, Y = ground(p.x) - p.lift - (o.up || 0);
+      const f = o.f || (p.dir || 1), sq = p.sq + (o.sq || 0);
+      x.save(); x.translate(X, Y);
+      if (o.shiver) x.translate(Math.sin(t * 70) * 2.5, 0);
+      x.rotate(o.rot || 0); x.scale(s * (1 + sq) * f, s * (1 - sq));
+      if (o.rod !== false) { x.strokeStyle = INK; x.lineWidth = 3 / s; x.beginPath(); x.moveTo(-6, -30); x.lineTo(-20, 1400 / s); x.stroke(); }
+      x.fillStyle = INK;
+      // legs (feet locked to the ground on landing)
+      x.lineWidth = 4; x.strokeStyle = INK; x.beginPath(); x.moveTo(-8, -26); x.lineTo(-10, 0); x.moveTo(8, -26); x.lineTo(10, 0); x.stroke();
+      // tail flaps (paper flutter), body, head, beak
+      x.save(); x.translate(-52, -50); x.rotate(-.5 + flut(5, .5) + (o.droop ? .4 : 0)); x.beginPath(); x.moveTo(0, 0); x.lineTo(-48, -22); x.lineTo(-40, 6); x.fill(); x.restore();
+      x.beginPath(); x.ellipse(0, -56 + (o.droop ? 6 : 0), 58, 40 * (o.deflate ? 1 - o.deflate * .15 : 1), 0, 0, 7); x.fill();
+      const hy = -96 + (o.droop ? 16 : 0) + (o.stretch ? -o.stretch * 30 : 0);
+      x.beginPath(); x.arc(36, hy, 30, 0, 7); x.fill();
+      x.beginPath(); x.moveTo(60, hy - 8); x.lineTo(92, hy + 2); x.lineTo(60, hy + 10); x.fill();
+      x.save(); x.translate(-6, -60); x.rotate(-.2 + (o.wing || 0) + flut(7, .3)); x.beginPath(); x.ellipse(0, 0, 34, 16, -.3, 0, 7); x.fillStyle = INK; x.fill(); x.restore();
+      // the eye is a hole cut in the paper: the light shows through. Eyes lead: the pupil (a dot of paper) moves first.
+      const lk = o.look || [0, 0];
+      x.fillStyle = scr; x.beginPath(); x.arc(42, hy - 6, 9, 0, 7); x.fill();
+      x.fillStyle = INK; x.beginPath(); x.arc(42 + lk[0] * f * 4, hy - 6 + lk[1] * 4, 4.5, 0, 7); x.fill();
+      x.restore();
+    };
+    // bird 1's acting by phase
+    const o1 = { f: b1.dir || 1 };
+    if (t >= 3 && t < 4) o1.look = [1, -.6];
+    if (t >= 5 && t < 6.5) { o1.stretch = expo(seg(t, 5, 5.3)); o1.look = [1, 0]; }
+    if (t >= 6.5 && t < 7) { o1.droop = 1; o1.look = [0, 1]; }
+    if (t >= 7 && t < 8.5) o1.f = -1;
+    if (t >= 11 && t < 12.6) { o1.up = 50; o1.f = 1; o1.look = t < 12 ? [1, 0] : [0, 1]; o1.deflate = expo(seg(t, 12, 12.4)); o1.droop = t > 12.1 ? 1 : 0; }
+    if (t >= 14.5 && t < 16.8) { o1.rot = -.25 - wind * .3; o1.f = 1; o1.look = [-1, 0]; o1.wing = -.8 + Math.sin(t * 30) * .3; }
+    if (t >= 16.8 && t < 17.6) o1.f = -1;
+    if (t >= 17.6 && t < 24.4) { o1.f = 1; o1.look = t > 18.4 ? [.4, -1] : [1, 0]; if (t > 22) o1.shiver = 1; }
+    if (t >= 24.4 && t < 28.6) { o1.f = 1; o1.shiver = 1; o1.droop = 1; o1.look = [0, 1]; }
+    if (t >= 28.6 && t < 33.6) { o1.f = -1; o1.look = t < 28.8 ? [-1, -1] : [-1, -.4]; o1.shiver = t < 31 ? 1 : 0; o1.sq = t > 28.8 ? .1 * Math.exp(-(t - 28.8) * 8) : 0; }
+    if (t >= 33.6) o1.f = 1;
+    // bird 2 and the leaf umbrella; the chicks
+    const b2 = path(B2, t), o2 = { f: 1, s: 1.12, look: t > 28.4 && t < 34 ? [1, -.3] : [1, 0] };
+    const leafOn = t > 26 && t < 32.2;
+    if (leafOn) { const lx = b2.x + 40, ly = ground(b2.x) - b2.lift - 230; x.save(); x.translate(lx, ly); x.rotate(-.05 + flut(9, .08)); x.fillStyle = INK; x.beginPath(); x.moveTo(-200, 30); x.quadraticCurveTo(0, -120, 200, 30); x.quadraticCurveTo(0, -10, -200, 30); x.fill(); x.fillRect(-3, 20, 6, 160); x.restore(); }
+    // rain: paper strips (stopped under the leaf)
+    if (storm > 0) { x.strokeStyle = INK; x.lineWidth = 3; for (let i = 0; i < 90 * storm; i++) { const rx = hash(i) * 1400 - 160, ry = ((hash(i + 40) * 2200 + t * 1500) % 2200) - 200; if (leafOn && rx > 40 && rx < 470 && ry > ground(rx) - 300) continue; x.beginPath(); x.moveTo(rx, ry); x.lineTo(rx - 10, ry + 40); x.stroke(); } }
+    const tIn = t > 33.6 ? 1 : null;
+    if (INSIDE(b1, tIn)) bird(b1, o1);
+    if (INSIDE(b2, tIn)) bird(b2, o2);
+    CH.forEach((segs) => { const c = path(segs, t); if (INSIDE(c, tIn)) bird(c, { s: .48, f: 1, look: [1, -.5] }); });
+    // the gag: a chick pops out of the chimney and sits on the chair
+    if (t > 43.5) { const k = springO(t - 43.5, 16, .5); const X = 540 + 260 * .7 - 130 + 15, Y = GY - 220 - 150 * .75 + 40 - k * 60; x.save(); x.beginPath(); x.rect(-500, -2000, 3000, GY - 220 - 150 * .75 - 1 + 2000 + (t > 44 ? 400 : 0)); x.clip(); bird({ x: X, lift: 0, sq: 0, vis: true, dir: -1 }, { s: .4, f: -1, rod: false, up: ground(X) - Y, look: [-1, 0] }); x.restore(); }
+    // ---------- title: cut-paper letters lowered on strings
+    if (t > 36.2) {
+      const lines = [["HOME IS", 560], ["WHO'S INSIDE", 690]];
+      let li = 0;
+      lines.forEach(([s, Y], L) => {
+        x.font = "400 104px AB"; x.textBaseline = "alphabetic";
+        const ws = [...s].map((c) => (c === " " ? 34 : x.measureText(c).width)), tot = ws.reduce((a, b) => a + b, 0); let X = 540 - tot / 2;
+        [...s].forEach((c, i) => { const t0 = 36.2 + li++ * .07, k = springO(t - t0, 14, .55), yy = lerp(-200, Y, Math.min(1.08, k)) - 1100 * M.expoIn(seg(t, 39.6 + i * .03, 40.3 + i * .03)); if (c !== " ") { x.strokeStyle = INK; x.lineWidth = 2; x.beginPath(); x.moveTo(X + ws[i] / 2, -400); x.lineTo(X + ws[i] / 2, yy - 80); x.stroke(); x.save(); x.translate(X + ws[i] / 2, yy); x.rotate(Math.sin(t * 2 + i) * .03); x.fillStyle = INK; x.textAlign = "center"; x.fillText(c, 0, 0); x.restore(); } X += ws[i]; });
+      });
+    }
+    // texture over everything (it's all paper)
+    x.setTransform(1, 0, 0, 1, 0, 0); x.drawImage(tex, 0, 0);
+  },
+  sound(A) {
+    const m = A.midi;
+    const paper = (t0, g = .08) => A.nz(t0, .12, "bandpass", 2400, g, 1.5);
+    const hopS = (segs) => segs.forEach((s) => { if (s[2] !== "hop") return; for (let i = 0; i < s[5]; i++) { const t0 = s[0] + (i + .8) * (s[1] - s[0]) / s[5]; A.tone(t0, 180, .08, "sine", .12); paper(t0, .04); } });
+    hopS(B1); hopS(B2); CH.forEach((c) => c.forEach((s) => { if (s[2] === "hop") for (let i = 0; i < s[5]; i++) A.tone(s[0] + (i + .8) * (s[1] - s[0]) / s[5], 420, .06, "sine", .07); }));
+    // the bird's little theme (plucked, gentle), first hopeful, then lonely
+    [67, 71, 74, 72, 71, 67, 69, 71].forEach((n, i) => A.pluck(.2 + i * .45, m(n), .1, .6));
+    A.tone(6.6, m(64), .9, "triangle", .06); A.tone(7.0, m(60), 1.2, "triangle", .06);   // sad
+    for (let t0 = 11; t0 < 12.6; t0 += .5) A.click(t0, .06);   // a clock ticking in the empty room
+    A.nz(12.1, .9, "lowpass", 600, .08);   // sigh
+    A.pluck(12.85, m(76), .1, .3); A.pluck(13.3, m(79), .1, .3);
+    A.nz(14.2, 2.6, "bandpass", 500, .2, .5); for (let i = 0; i < 26; i++) paper(14.3 + i * .09, .05);   // the gust
+    A.tone(15.2, 1200, .05, "square", .05); A.nz(15.8, .3, "lowpass", 900, .2);
+    [[18.6, 60], [19.4, 64], [20.2, 67]].forEach(([t0, n]) => { A.pluck(t0, m(n), .14, .4); A.tone(t0, 90, .2, "sine", .15); });
+    A.nz(21.4, 9.6, "highpass", 2500, .06, .7);   // rain
+    [21.8, 23.4].forEach((t0) => { A.hit(t0 + .15, .45); A.nz(t0 + .15, 1.6, "lowpass", 220, .35); });
+    A.nz(24.2, .6, "lowpass", 1200, .3); A.tone(24.3, 70, .4, "sine", .25); paper(24.4, .2);
+    A.pad(24.4, [m(45), m(52)], 4, .04);
+    // the turn: warmth returns as each friend arrives
+    A.pad(28.4, [m(48), m(55), m(64)], 4, .035); [29.2, 29.7, 30.2].forEach((t0, i) => A.tone(t0 + .5, 1800 + i * 200, .08, "sine", .04));
+    [60, 64, 67, 72].forEach((n, i) => A.pluck(32.4 + i * .18, m(n), .12, .6));
+    A.pad(35.2, [m(48), m(55), m(64), m(67)], 6, .04); A.tone(35.2, m(84), 1.5, "sine", .04);
+    [67, 71, 74, 72, 71, 67, 69, 72].forEach((n, i) => A.pluck(36.2 + i * .45, m(n), .1, .7));
+    // the gag
+    A.nz(40, 2.4, "bandpass", 700, .06, .6); A.tone(42.5, 150, .15, "sine", .3); paper(42.5, .15);
+    A.tone(43.5, 2000, .06, "sine", .06); A.tone(43.6, 2400, .08, "sine", .06); A.tone(44.0, 2200, .06, "sine", .05);
+  },
+});
+</script></body></html>

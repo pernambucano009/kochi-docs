@@ -1,0 +1,130 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// #42 "Overthinking" — 15 s, 1080×1920, 120 BPM. Concept: "One thought, one thread": a single line that won't stop looping.
+// 0–2 a dot starts circling (hook) · 2–4 "WHAT IF" spirals inward, a new ending each beat · 4–6 the spiral morphs into a knot
+// 6–8 the knot becomes a 3D ball of thread · 8–10 a phone full of second-guessing (UI/data) · 10–12 the ball winds tighter
+// 12–14 strongest: the thread is pulled straight, one word per beat · 14–15 "JUST START." → back to the single dot.
+const W = 1080, H = 1920, B = .5, PAPER = "#f2efe8", INK = "#121214", VIO = "#6b4cff", YEL = "#ffd23f";
+const F = (px) => `400 ${px}px AB`;
+M.reel({
+  W, H, DUR: 15, bg: PAPER,
+  fonts: { AB: "archivoblack.ttf", I5: ["inter500.ttf", "500"] },
+  init(M) { const c = M.canvas(W, H); return { x: c.getContext("2d") }; },
+  seek(t, P, M) {
+    const { x } = P, { seg, lerp, expo, expoIn, expoIO, spring, clamp, smooth, hash } = M;
+    const beat = Math.floor(t / B), bt = t - beat * B, pulse = 1 - spring(bt, 16);
+    const dark = t >= 6 && t < 12;
+    x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = dark ? INK : PAPER; x.fillRect(0, 0, W, H);
+    const fg = dark ? PAPER : INK;
+    const cx = 540, cy = 900;
+    const txt = (s, px, X, Y, col, al = "center") => { x.font = F(px); x.fillStyle = col; x.textAlign = al; x.textBaseline = "middle"; x.fillText(s, X, Y); };
+    // camera: a slow constant push, re-starting each bar from where the last ended
+    const z = 1 + .03 * ((t % 2) / 2) + .006 * pulse;
+    x.translate(cx, cy); x.scale(z, z); x.translate(-cx, -cy);
+    // ---------- 0–2 the dot starts to circle; its trail is the thread
+    if (t < 2.2) {
+      const loops = expoIn(seg(t, .5, 2.2)) * 3;
+      x.strokeStyle = INK; x.lineWidth = 10; x.lineCap = "round"; x.beginPath();
+      const N = 200;
+      for (let i = 0; i <= N; i++) { const a = (i / N) * loops * Math.PI * 2, r = 30 + a * 16; const px = cx + Math.cos(a - Math.PI / 2) * r, py = cy + Math.sin(a - Math.PI / 2) * r; i ? x.lineTo(px, py) : x.moveTo(px, py); }
+      if (loops > 0) x.stroke();
+      const a = loops * Math.PI * 2, r = 30 + a * 16;
+      x.fillStyle = VIO; x.beginPath(); x.arc(cx + Math.cos(a - Math.PI / 2) * r, cy + Math.sin(a - Math.PI / 2) * r, 26 + 6 * pulse, 0, 7); x.fill();
+      if (t > .5) txt(["", "HM.", "WAIT.", "BUT—"][Math.min(3, beat)], 120, cx, 400, INK);
+    }
+    // ---------- 2–4 WHAT IF … a word spirals in on every beat
+    if (t >= 2 && t < 4.3) {
+      const ends = ["WHAT IF", "THEY SAW?", "I'M WRONG?", "IT'S TOO LATE?"];
+      for (let i = 0; i < 4; i++) {
+        const tin = 2 + i * B, k = expoIO(seg(t, tin, tin + .45));
+        if (k <= 0) continue;
+                x.save(); x.translate(cx + (1 - k) * (i % 2 ? 900 : -900), cy - 300 + i * 190); x.rotate((1 - k) * (i % 2 ? .35 : -.35) + (i % 2 ? .04 : -.04));
+        txt(ends[i], i === 0 ? 150 : 96, 0, 0, i === 0 ? VIO : INK); x.restore();
+      }
+      const out = expoIO(seg(t, 3.7, 4.2));
+      if (out > 0) { x.fillStyle = PAPER; x.beginPath(); x.arc(cx, cy, out * 1400, 0, 7); x.fill(); }
+    }
+    // ---------- 4–6 spiral → scribble → knot (one 300-point path, morphing on each beat)
+    const shape = (kind, i, n) => {
+      const u = i / n;
+      if (kind === 0) { const a = u * Math.PI * 10, r = 20 + u * 360; return [Math.cos(a) * r, Math.sin(a) * r]; }
+      if (kind === 1) { const a = u * Math.PI * 14; return [Math.cos(a) * 300 + Math.sin(a * 2.3) * 120, Math.sin(a * 1.3) * 360 + Math.cos(a * 3.1) * 80]; }
+      const a = u * Math.PI * 2; return [(Math.sin(a) + 2 * Math.sin(2 * a)) * 120, (Math.cos(a) - 2 * Math.cos(2 * a)) * 120];   // trefoil knot
+    };
+    if (t >= 4 && t < 6.3) {
+      const k = clamp(Math.floor((t - 4) / B), 0, 3), m = expoIO(seg(t, 4 + k * B + .1, 4 + k * B + .42));
+      const from = Math.min(2, Math.floor(k / 1.5)), to = Math.min(2, from + (k % 2 ? 1 : 0) + (k === 3 ? 0 : 0));
+      const A = Math.min(2, k), Bk = Math.min(2, k + 1);
+      x.strokeStyle = fg; x.lineWidth = 12; x.lineJoin = x.lineCap = "round"; x.beginPath();
+      const n = 300;
+      for (let i = 0; i <= n; i++) { const p = shape(A, i, n), q = shape(Bk, i, n); const px = cx + lerp(p[0], q[0], m), py = cy + lerp(p[1], q[1], m); i ? x.lineTo(px, py) : x.moveTo(px, py); }
+      x.stroke();
+      txt(["SPIRAL", "SCRIBBLE", "KNOT", "KNOT"][k], 30, cx, 1560, VIO);
+    }
+    // ---------- 6–12 the knot becomes a 3D ball of thread, rotating; 10–12 it winds tighter
+    if (t >= 6 && t < 12.2) {
+      const rot = (t - 6) * .9, tight = smooth(seg(t, 10, 12)), into = expo(seg(t, 6, 6.6));
+      const R0 = lerp(330, 220, tight) * into;
+      x.lineWidth = 4; x.lineCap = "round";
+      const strands = 22;
+      for (let s = 0; s < strands; s++) {
+        const tilt = hash(s) * Math.PI, phase = hash(s + 9) * 6.28, ry = rot + hash(s + 3) * 6;
+        let first = true; x.beginPath();
+        for (let i = 0; i <= 80; i++) {
+          const a = i / 80 * Math.PI * 2 + phase;
+          let X = Math.cos(a) * R0, Y = Math.sin(a) * R0, Z = 0;
+          // tilt the great circle, then spin the ball
+          let y2 = Y * Math.cos(tilt) - Z * Math.sin(tilt), z2 = Y * Math.sin(tilt) + Z * Math.cos(tilt);
+          let x3 = X * Math.cos(ry) + z2 * Math.sin(ry), z3 = -X * Math.sin(ry) + z2 * Math.cos(ry);
+          const f = 900 / (900 + z3);
+          const px = cx + x3 * f, py = cy + y2 * f;
+          first ? x.moveTo(px, py) : x.lineTo(px, py); first = false;
+        }
+        x.strokeStyle = s % 5 === 0 ? VIO : PAPER; x.globalAlpha = .85; x.stroke(); x.globalAlpha = 1;
+      }
+    }
+    // ---------- 8–10 the phone: messages you keep re-reading, a meter of hours spent
+    if (t >= 8 && t < 10.2) {
+      const pin = expo(seg(t, 8, 8.4)), pout = expoIO(seg(t, 9.75, 10.2));
+      const px = 140, py = lerp(1960, 260, pin) - pout * 1700, pw = 800, ph = 1400;
+      x.fillStyle = "#1e1e24"; x.beginPath(); x.roundRect(px, py, pw, ph, 80); x.fill();
+      x.fillStyle = PAPER; x.beginPath(); x.roundRect(px + 24, py + 24, pw - 48, ph - 48, 60); x.fill();
+      const msgs = ["Did they read it?", "Read 10:41", "Typing…", "…stopped typing", "Should I say sorry?", "Rewrite it (draft 7)"];
+      msgs.forEach((m, i) => { const g = expo(seg(t, 8.3 + i * .25, 8.6 + i * .25)); if (g <= 0) return; const mine = i % 2 === 0; x.fillStyle = mine ? VIO : "#e3dfd6"; const w = 420, mx = mine ? px + pw - 60 - w : px + 60, my = py + 160 + i * 150 + (1 - g) * 40; x.globalAlpha = g; x.beginPath(); x.roundRect(mx, my, w, 110, 40); x.fill(); x.font = "500 34px I5"; x.fillStyle = mine ? PAPER : INK; x.textAlign = "left"; x.fillText(m, mx + 32, my + 56); x.globalAlpha = 1; });
+      // meter
+      const hrs = 3.7 * expo(seg(t, 9, 9.7));
+      x.fillStyle = "#e3dfd6"; x.fillRect(px + 60, py + ph - 220, pw - 120, 40); x.fillStyle = YEL; x.fillRect(px + 60, py + ph - 220, (pw - 120) * hrs / 4, 40);
+      txt(hrs.toFixed(1) + " h thinking · 0 h doing", 34, px + pw / 2, py + ph - 130, INK);
+    }
+    // ---------- 12–14 strongest: the thread is yanked straight, one word per beat
+    if (t >= 12 && t < 14.2) {
+      const k = clamp(Math.floor((t - 12) / B), 0, 3), pull = expoIO(seg(t, 12, 12.4));
+      // the line: from a tangle (left) to dead straight, vibrating on each beat like a plucked string
+      x.strokeStyle = INK; x.lineWidth = 12; x.lineCap = "round"; x.beginPath();
+      for (let i = 0; i <= 200; i++) { const u = i / 200, y = 260 + u * 1400, wob = (1 - pull) * Math.sin(u * 60) * 160 + Math.sin(u * Math.PI) * Math.sin(bt * 60) * 26 * pulse; i ? x.lineTo(cx + wob, y) : x.moveTo(cx + wob, y); }
+      x.stroke();
+      const words = ["STOP.", "BREATHE.", "DECIDE.", "GO."];
+      const wk = expo(seg(bt, 0, .2));
+      x.fillStyle = [YEL, VIO, YEL, VIO][k]; x.fillRect(0, 860 - 120 * wk, W, 240 * wk);
+      txt(words[k], 170 * (1 + .08 * pulse), cx, 900, k % 2 ? PAPER : INK);
+    }
+    // ---------- 14–15 end title, then the line shrinks back into the single dot of frame one
+    if (t >= 14) {
+      const a = expo(seg(t, 14, 14.25)), out = expoIn(seg(t, 14.55, 14.85));
+      x.globalAlpha = a * (1 - out); txt("JUST", 200, cx, 760, INK); txt("START.", 200, cx, 980, VIO); x.globalAlpha = 1;
+      const d = expoIO(seg(t, 14.6, 14.98));
+      if (d > 0) { x.fillStyle = VIO; x.beginPath(); x.arc(cx, cy - 30, 26, 0, 7); x.fill(); }
+    }
+  },
+  sound(A) {
+    for (let k = 0; k < 30; k++) { const t0 = k * B; A.kick(t0, .8); A.hat(t0 + B / 2, .08); }
+    for (const t0 of [2, 4, 6, 8, 10, 12, 14]) A.hit(t0, .45);
+    // a nagging repeated note that speeds up (the loop in your head)
+    for (let k = 0; k < 24; k++) A.tone(.5 + k * (.25 - k * .006), A.midi(76 + (k % 2)), .08, "square", .03);
+    for (let k = 0; k < 6; k++) A.click(8.3 + k * .25, .12);    // message pops
+    A.riser(10, 12, .32);
+    ["C", "E", "G", "C"].forEach((_, i) => A.pluck(12 + i * B, A.midi([60, 64, 67, 72][i]), .14, .4));
+    A.pad(14, [60, 64, 67].map(A.midi), 1, .04);
+  },
+});
+</script></body></html>

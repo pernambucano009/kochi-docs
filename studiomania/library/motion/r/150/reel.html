@@ -1,0 +1,191 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// #150 Clay music video — 60 s at 112 BPM, stop-motion: animation steps on 12 fps ("on twos") and every frame the clay "boils".
+// Story: a clay guy in a kitchen wants the party to start. WANT: get everything moving to the beat.
+//  1 (8–18 s) he claps to start it — off the beat; his clay hands stick together.
+//  2 (18–28 s) he drums on the fruit — the banana peels and runs, the orange rolls off, the apple bites him.
+//  3 (28–38 s) a smart speaker on MAX — the bass blasts his face flat and splats him on the wall.
+//  TURN (38–42 s) peeled off the wall he just taps his foot… the teapot lid taps back. The toaster pops on the beat.
+//  END (42–55 s) everything comes alive: fruit conga, sneakers dance by themselves, the phone's face sings, the room spins.
+//  GAG (55–60 s) the music stops dead, everyone freezes; one last toast pops, lands on his head, and bows.
+const W = 1920, H = 1080, BPM = 112, B = 60 / BPM;
+const SKIN = "#e9b48a", SHIRT = "#3c6fd6", TABLE = "#c9783e";
+M.reel({
+  W, H, DUR: 60, SUB: 1, bg: "#f2d6a2",
+  init(M) { const c = M.canvas(W, H); return { x: c.getContext("2d") }; },
+  seek(T, P, M) {
+    const { x } = P, { seg, lerp, clamp, expo, spring, springO, hash, noise1 } = M;
+    const fr = Math.floor(T * 12), t = fr / 12;                 // stop-motion: 12 poses a second
+    const boil = (k, a = 1.6) => (hash(fr * 13 + k) - .5) * a;  // every pose is re-sculpted a tiny bit
+    const beat = t / B, bp = beat % 1, onBeat = Math.exp(-bp * 5);
+    // ---------- clay primitives: lumpy outlines, a shadow side, a thumb-smudge highlight
+    const lump = (cx, cy, rx, ry, col, k = 0, rot = 0) => {
+      x.save(); x.translate(cx + boil(k), cy + boil(k + 1)); x.rotate(rot);
+      x.fillStyle = col; x.beginPath();
+      for (let i = 0; i <= 28; i++) { const a = i / 28 * Math.PI * 2, n = 1 + noise1(i * .9 + k * 7.3) * .05 + boil(k + i, .025); const px = Math.cos(a) * rx * n, py = Math.sin(a) * ry * n; i ? x.lineTo(px, py) : x.moveTo(px, py); }
+      x.closePath(); x.fill();
+      x.save(); x.clip(); x.fillStyle = "rgba(60,20,0,.18)"; x.beginPath(); x.ellipse(rx * .35, ry * .4, rx * .9, ry * .8, 0, 0, 7); x.fill();
+      x.fillStyle = "rgba(255,255,255,.22)"; x.beginPath(); x.ellipse(-rx * .35, -ry * .4, rx * .28, ry * .18, -.5, 0, 7); x.fill();
+      x.strokeStyle = "rgba(60,20,0,.12)"; x.lineWidth = 1.5; for (let i = 0; i < 3; i++) { x.beginPath(); x.arc(-rx * .1 + i * 4, ry * .1, rx * .2 + i * 4, .3, 1.6); x.stroke(); }   // a fingerprint
+      x.restore(); x.restore();
+    };
+    const snake = (pts, w, col, k = 0) => { x.strokeStyle = col; x.lineWidth = w; x.lineCap = "round"; x.lineJoin = "round"; x.beginPath(); pts.forEach((p, i) => (i ? x.lineTo(p[0] + boil(k + i), p[1] + boil(k + i + 9)) : x.moveTo(p[0] + boil(k), p[1] + boil(k + 5)))); x.stroke(); };
+    const eye = (ex, ey, r, look = [0, 0], lid = 0, k = 0) => { lump(ex, ey, r, r * 1.1, "#fbf6ec", k); x.fillStyle = "#1d1410"; x.beginPath(); x.arc(ex + look[0] * r * .4, ey + look[1] * r * .4, r * .42, 0, 7); x.fill(); if (lid > 0) { x.fillStyle = SKIN; x.fillRect(ex - r - 2, ey - r * 1.1 - 2, r * 2 + 4, (r * 2.2 + 4) * lid); } };
+    // ---------- the room spins in the finale (Sledgehammer)
+    const spin = t > 46 && t < 52 ? Math.PI * 2 * M.cubicIO(seg(t, 46, 52)) : 0;
+    const frozen = t >= 55;
+    x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = "#1a120c"; x.fillRect(0, 0, W, H);
+    // close-ups: [t0, t1, cx, cy, z]
+    const CU = [[12, 14.5, 700, 420, 2.2], [20, 26, 960, 640, 1.8], [33, 35.5, 1220, 390, 2.0], [56.6, 60, 760, 470, 1.6]];
+    let cam = [960, 540, 1]; CU.forEach(([a, b, cx, cy, z]) => { if (t >= a && t < b) cam = [cx, cy, z]; });
+    const shake = t > 31.2 && t < 33 ? 12 * (1 - seg(t, 31.2, 33)) : 0;
+    x.translate(W / 2 + boil(99, shake * 2), H / 2 + boil(98, shake * 2)); x.rotate(spin); x.scale(cam[2] * (spin ? 1.25 : 1), cam[2] * (spin ? 1.25 : 1)); x.translate(-cam[0], -cam[1]);
+    // ---------- the kitchen: wallpaper, window, table, floor
+    x.fillStyle = "#f2d6a2"; x.fillRect(-400, -400, 2800, 1300);
+    for (let i = 0; i < 16; i++) { x.fillStyle = i % 2 ? "#ebc98e" : "#f2d6a2"; x.fillRect(-400 + i * 180, -400, 90, 1300); }
+    for (let i = 0; i < 24; i++) lump(-300 + (i % 8) * 300 + (Math.floor(i / 8) % 2) * 150, 60 + Math.floor(i / 8) * 220, 16, 16, "#e07b5a", 200 + i);
+    x.fillStyle = "#7fc4e8"; x.fillRect(120, 120, 300, 260); x.strokeStyle = "#fff6e8"; x.lineWidth = 14; x.strokeRect(120, 120, 300, 260); x.beginPath(); x.moveTo(270, 120); x.lineTo(270, 380); x.stroke();
+    lump(200, 200, 40, 40, "#ffd23f", 300);
+    x.fillStyle = "#6b4426"; x.fillRect(-400, 900, 2800, 600);
+    // the man splats here in attempt 3 (behind the table)
+    // ---------- props + characters
+    const tl = 700;   // table top
+    // sneakers on the floor (alive in the finale)
+    const dance = t > 42 && !frozen ? 1 : 0, ft = frozen ? 55 : t;
+    [[1560, 0], [1700, 1]].forEach(([sx, i]) => { const hop = dance ? Math.abs(Math.sin((ft / B + i * .5) * Math.PI)) * 40 : 0, sw = dance ? Math.sin(ft / B * Math.PI + i) * 60 : 0; lump(sx + sw, 960 - hop, 70, 26, "#f4f4f4", 400 + i); lump(sx + sw - 30, 945 - hop, 30, 20, "#e5484d", 410 + i); snake([[sx + sw - 10, 940 - hop], [sx + sw + 30, 935 - hop]], 5, "#1d1410", 420 + i); });
+    // ---------- the MAN (behind the table; stands on it for the finale)
+    let mx = 700, my = 520, sq = 0, face = 0, look = [0, 0], lid = 0, armsUp = 0, clap = 0, splat = 0, mouth = "flat";
+    if (t < 8) { lid = .45; look = [.3, .4]; sq = Math.sin(t * 1.4) * .02; mouth = "flat"; }
+    else if (t < 18) {   // claps: off the beat; hands stick
+      look = [0, 0]; mouth = t > 14.5 ? "o" : "smile";
+      clap = t < 14.5 ? Math.abs(Math.sin((t - 8) * Math.PI / B * .9)) : 1;   // .9 of the tempo: off the beat
+      if (t > 14.5 && t < 17) { armsUp = 1; mouth = "o"; }
+    } else if (t < 28) { look = [1, .6]; mouth = t > 25.3 ? "o" : "smile"; }
+    else if (t < 38) {
+      look = [1, 0]; mouth = "smile";
+      if (t > 31.2) { face = clamp((t - 31.2) / .3); mouth = "o"; }
+      if (t > 32.6) { splat = 1; }
+    } else if (t < 42) { look = [.6, .3]; mouth = "flat"; }
+    else { mouth = frozen ? "o" : "big"; look = frozen ? [0, -1] : [Math.sin(t * 2), 0]; }
+    // the finale: he hops up on the table and dances on every beat
+    if (t > 42 && t < 55) { my = 380 - onBeat * 30; mx = 760 + Math.sin(beat * Math.PI / 2) * 40; sq = -onBeat * .12; armsUp = bp < .5 ? 1 : .3; }
+    if (frozen) { my = 380; mx = 760; armsUp = 1; }
+    const drawMan = (X, Y) => {
+      if (splat) {   // flattened on the wall: a clay pancake with eyes, slowly peeling
+        const peel = seg(t, 37.0, 38.0);
+        lump(X + 520, 360 + peel * 160, 190 * (1 - peel * .4), 120 * (1 + peel * .3), SKIN, 500);
+        eye(X + 470, 330 + peel * 150, 26, [0, 0], 0, 510); eye(X + 570, 330 + peel * 150, 26, [0, 0], 0, 512);
+        lump(X + 520, 470 + peel * 160, 150 * (1 - peel * .4), 50, SHIRT, 520);
+        return;
+      }
+      const sx = 1 + sq, sy = 1 - sq;
+      x.save(); x.translate(X, Y); x.scale(sx, sy);
+      // body
+      lump(0, 150, 120, 140, SHIRT, 530);
+      // arms
+      const handL = clap ? [-30 + (1 - clap) * -90, 40] : armsUp ? [-150, -120] : [-130, 120], handR = clap ? [30 + (1 - clap) * 90, 40] : armsUp ? [150, -120] : [130, 120];
+      if (t > 14.5 && t < 17.2) { const pull = seg(t, 15.2, 16.6); handL[0] = -20 - pull * 120; handR[0] = 20 + pull * 120; snake([[handL[0], handL[1]], [handR[0], handR[1]]], 30 - pull * 20, SKIN, 540); }   // the clay stretches between them
+      snake([[-90, 90], [handL[0], handL[1]]], 34, SHIRT, 545); snake([[90, 90], [handR[0], handR[1]]], 34, SHIRT, 548);
+      lump(handL[0], handL[1], 30, 26, SKIN, 550); lump(handR[0], handR[1], 30, 26, SKIN, 552);
+      // head: the speaker blast flattens it sideways
+      const fw = 1 + face * 1.1, fh = 1 - face * .45;
+      lump(0, -30, 100 * fw, 110 * fh, SKIN, 560);
+      lump(0, -15, 22 * fw, 18 * fh, "#d9946a", 562);   // nose
+      eye(-38 * fw, -60 * fh, 24, look, lid, 564); eye(38 * fw, -60 * fh, 24, look, lid, 566);
+      x.strokeStyle = "#5a1d12"; x.lineWidth = 7; x.lineCap = "round"; x.beginPath();
+      if (mouth === "flat") { x.moveTo(-30, 30); x.lineTo(30, 30); x.stroke(); }
+      else if (mouth === "smile") { x.arc(0, 15, 34, .3, Math.PI - .3); x.stroke(); }
+      else if (mouth === "o") { x.fillStyle = "#5a1d12"; x.ellipse(0, 32 * fh, 16 * fw, 20, 0, 0, 7); x.fill(); }
+      else { x.fillStyle = "#5a1d12"; x.arc(0, 20, 40, 0, Math.PI); x.fill(); }
+      // hair: a little clay curl
+      snake([[-40, -130], [-10, -150], [20, -138], [10, -120]], 18, "#4a2a18", 570);
+      x.restore();
+      // the apple's bite mark on his hand (attempt 2)
+      if (t > 25.3 && t < 28) { x.fillStyle = "#f2d6a2"; x.beginPath(); x.arc(X + handR[0] + 20, Y + handR[1] - 10, 12, 0, 7); x.fill(); }
+    };
+    if (splat || t < 42) drawMan(mx, my);
+    // ---------- the table (in front of him until he climbs on it)
+    x.fillStyle = TABLE; x.fillRect(300, tl, 1400, 40); x.fillRect(360, tl + 40, 30, 200); x.fillRect(1610, tl + 40, 30, 200); x.fillStyle = "#b5672f"; x.fillRect(320, tl + 40, 1360, 120); for (let i = 0; i < 9; i++) lump(380 + i * 160, tl + 100, 30, 30, "#d98a4e", 860 + i);
+    x.fillStyle = "rgba(255,255,255,.18)"; x.fillRect(300, tl, 1400, 8);
+    if (!splat && t >= 42) drawMan(mx, my);
+    // teapot (its lid taps back at the turn, dances in the finale)
+    { const tpx = 1180, lidHop = (t > 39.5 && t < 55 ? onBeat * 20 : 0) * (frozen ? 0 : 1); const sway = dance ? Math.sin(beat * Math.PI) * .12 : 0;
+      x.save(); x.translate(tpx, tl); x.rotate(sway); lump(0, -70, 80, 64, "#4fae8f", 600); snake([[70, -80], [120, -110]], 20, "#4fae8f", 602); snake([[-70, -100], [-110, -70], [-74, -40]], 12, "#3d8a71", 604); lump(0, -138 - lidHop, 40, 14, "#3d8a71", 606); lump(0, -152 - lidHop, 10, 10, "#ffd23f", 608);
+      if (dance) { eye(-26, -78, 12, [0, 0], 0, 609); eye(26, -78, 12, [0, 0], 0, 610); }
+      x.restore(); }
+    // toaster + toast
+    { const tx2 = 1400; lump(tx2, tl - 60, 90, 60, "#c9ccd6", 620); x.fillStyle = "#3a3a44"; x.fillRect(tx2 - 50, tl - 122, 34, 10); x.fillRect(tx2 + 16, tl - 122, 34, 10);
+      const pops = [40.0, 41.6].concat(t > 42 ? [] : []);
+      pops.forEach((tp, i) => { const s = t - tp; if (s < 0 || s > 1.4) return; const y = tl - 120 - Math.max(0, 300 * s - 600 * s * s); lump(tx2 - 33 + i * 66, y, 26, 34, "#e6a85a", 630 + i); });
+      if (t > 56.0) {   // the gag toast: pops, flies, lands on his head, bows
+        const s = t - 56.0, land = 57.0, X0 = tx2, Y0 = tl - 120, X1 = 760, Y1 = 380 - 165;
+        let tx = X1, ty = Y1, rot = 0;
+        if (t < land) { const k = s / 1.0; tx = lerp(X0, X1, k); ty = lerp(Y0, Y1, k) - Math.sin(k * Math.PI) * 300; rot = k * Math.PI * 2; }
+        else if (t > 58.4) rot = Math.sin(clamp((t - 58.4) / .6) * Math.PI) * .5;   // the bow
+        x.save(); x.translate(tx, ty); x.rotate(rot); lump(0, 0, 40, 48, "#e6a85a", 640); lump(0, -4, 30, 36, "#f3d39a", 641); if (t > 57.6) { eye(-12, -8, 7, [0, 0], t > 58.1 && t < 58.25 ? 1 : 0, 642); eye(12, -8, 7, [0, 0], t > 58.1 && t < 58.25 ? 1 : 0, 643); } x.restore();
+      }
+    }
+    // the fruit: drums (attempt 2), then a conga line in the finale
+    { const F = [["banana", 900], ["apple", 1010], ["orange", 1090]];
+      F.forEach(([k, fx0], i) => {
+        let fx = fx0, fy = tl - 30, rot = 0, alive = 0;
+        if (t > 20 && t < 28) {
+          const hit = Math.floor((t - 20) / (B * 2)), hitT = 20 + hit * B * 2;
+          if (k === "banana" && t > 22.2) { fx = fx0 + (t - 22.2) * 420; alive = 1; }   // peels and runs off
+          if (k === "orange" && t > 23.8) { fx = fx0 + (t - 23.8) * 300; fy = tl - 30 + Math.max(0, (t - 24.6)) ** 2 * 1800 * (fx > 1700 ? 1 : 0); rot = (t - 23.8) * 6; }
+          if (k === "apple" && t > 25.0 && t < 25.6) { fy = tl - 30 - Math.sin((t - 25) / .6 * Math.PI) * 120; fx = fx0 - (t - 25) / .6 * 180; alive = 1; }
+          if (k === "apple" && t >= 25.6) { fx = fx0 - 180; alive = 1; }
+        }
+        if (t >= 28 && t < 42 && k !== "apple") return;   // the banana and orange are gone until the finale
+        if (t >= 28 && t < 42 && k === "apple") fx = fx0;
+        if (t >= 42) { const order = i; fx = 380 + ((ft - 42) * 140 + order * 140) % 1300; fy = tl - 30 - (dance ? Math.abs(Math.sin((ft / B + order * .33) * Math.PI)) * 40 : 0); alive = 1; rot = dance ? Math.sin(ft / B * Math.PI + order) * .2 : 0; }
+        x.save(); x.translate(fx, fy); x.rotate(rot);
+        if (k === "banana") { snake([[-60, 0], [-20, 18], [30, 14], [60, -10]], 34, "#ffd23f", 700); if (alive) { snake([[-20, 16], [-34, 50]], 7, "#c9a300", 701); snake([[20, 14], [34, 50 - (Math.floor(t * 12) % 2) * 12]], 7, "#c9a300", 702); } }
+        if (k === "apple") { lump(0, 0, 42, 40, "#d8302c", 710); snake([[0, -38], [6, -56]], 6, "#6b4426", 711); if (alive) { eye(-14, -6, 9, [-1, 0], 0, 712); eye(14, -6, 9, [-1, 0], 0, 713); if (t > 25 && t < 26) { x.fillStyle = "#fff"; x.fillRect(-14, 14, 28, 8); } } }
+        if (k === "orange") { lump(0, 0, 38, 38, "#ff8a1a", 720); }
+        if (alive && k !== "apple") { eye(-12, -4, 8, [1, 0], 0, 730 + i); eye(10, -4, 8, [1, 0], 0, 732 + i); }
+        x.restore();
+      });
+    }
+    // the phone (lying on the table; its screen face sings in the finale)
+    { const px = 520, py = tl - 14; lump(px, py, 70, 16, "#222", 800); if (dance || frozen) { x.save(); x.translate(px, py - 90); x.rotate(dance ? Math.sin(beat * Math.PI) * .15 : 0); lump(0, 0, 50, 90, "#222", 801); x.fillStyle = "#7fd0ff"; x.fillRect(-40, -76, 80, 152); eye(-16, -24, 10, [0, 0], 0, 802); eye(16, -24, 10, [0, 0], 0, 803); x.fillStyle = "#1d1410"; x.beginPath(); x.ellipse(0, 24, 18, 10 + onBeat * 16 * (frozen ? 0 : 1), 0, 0, 7); x.fill(); x.restore(); } }
+    // the smart speaker (attempt 3): dragged in, knob to MAX, the blast rings
+    if (t > 28 && t < 38) { const sx = lerp(2200, 1300, expo(seg(t, 28.2, 29.4))); lump(sx, tl - 150, 110, 150, "#2b2b33", 820); lump(sx, tl - 150, 70, 70, "#4a4a55", 821); lump(sx, tl - 150, 30, 30, "#1a1a20", 822); const kn = seg(t, 30.0, 31.0) * 2.6; x.save(); x.translate(sx, tl - 270); x.rotate(kn); lump(0, 0, 20, 20, "#e5484d", 823); x.fillStyle = "#fff"; x.fillRect(-2, -18, 4, 10); x.restore();
+      if (t > 31.2 && t < 32.8) for (let r = 0; r < 4; r++) { const u = ((t - 31.2) * 3 + r * .25) % 1; x.strokeStyle = `rgba(255,255,255,${1 - u})`; x.lineWidth = 10; x.beginPath(); x.arc(sx, tl - 150, 80 + u * 700, Math.PI * .6, Math.PI * 1.4); x.stroke(); } }
+    // the turn: his foot taps (under the table, in front)
+    if (t > 38.6 && t < 42) { const tap = onBeat > .6 ? -14 : 0; lump(720, 905 + tap, 50, 22, "#2b2b33", 840); }
+  },
+  sound(A) {
+    const m = A.midi;
+    // a funky groove: bass + drums from the start, horns join in the finale; it stops dead at 55 s
+    const bassLine = [40, 40, 52, 40, 43, 45, 47, 45];
+    for (let b = 0; b < 55 / B; b++) {
+      const t0 = b * B;
+      if (t0 >= 55) break;
+      A.bass(t0, m(bassLine[b % 8]), B * .9, t0 > 42 ? .32 : .24);
+      if (t0 < 28 || t0 > 38) { A.kick(t0, b % 2 ? .4 : .7); A.hat(t0 + B / 2, .06); if (b % 2) A.snare(t0, t0 > 42 ? .3 : .2); }
+    }
+    // attempt 1: claps off the beat
+    for (let t0 = 8; t0 < 14.5; t0 += B / .9) A.clap(t0, .25);
+    A.nz(14.6, .2, "lowpass", 600, .3); for (let i = 0; i < 6; i++) A.tone(15.2 + i * .23, 300 - i * 30, .2, "sine", .06);   // the clay stretch
+    // attempt 2: fruit drums, then chaos
+    for (let i = 0; i < 4; i++) A.tone(20 + i * B * 2, [180, 220, 160, 200][i], .15, "triangle", .2);
+    A.nz(22.2, .4, "bandpass", 2400, .2, 3); for (let i = 0; i < 8; i++) A.click(22.4 + i * .12, .08);
+    A.tone(23.8, 600, .6, "sine", .05); A.nz(24.8, .3, "lowpass", 800, .3); A.nz(25.3, .15, "highpass", 3000, .35); A.tone(25.35, 900, .2, "square", .06);
+    // attempt 3: the speaker blast (a huge low hit), splat
+    A.nz(28.2, 1.0, "lowpass", 300, .15); for (let i = 0; i < 10; i++) A.click(30 + i * .1, .1);
+    A.tone(31.2, 40, 1.6, "sine", .9); A.hit(31.2, .9); A.nz(31.2, 1.2, "lowpass", 160, .7);
+    A.nz(32.6, .3, "lowpass", 500, .6); A.tone(32.6, 80, .2, "sine", .4);   // SPLAT
+    for (let i = 0; i < 4; i++) A.nz(36.8 + i * .3, .2, "bandpass", 900, .08, 3);   // peeling
+    // turn: the foot tap, the lid tap, the toaster on the beat
+    for (let t0 = Math.ceil(38.6 / B) * B; t0 < 42; t0 += B) { A.tone(t0, 160, .08, "sine", .25); if (t0 > 39.5) A.tone(t0 + .01, 2600, .05, "triangle", .08); }
+    [40.0, 41.6].forEach((t0) => { A.tone(t0, 1200, .1, "square", .05); A.click(t0, .3); });
+    // finale horns
+    const horn = [64, 67, 69, 67, 71, 69, 67, 64];
+    for (let b = Math.ceil(42 / B); b * B < 55; b++) if (b % 2 === 0) A.tone(b * B, m(horn[(b / 2) % 8]), B * 1.6, "sawtooth", .05);
+    A.pad(46, [m(52), m(59), m(64)], 6, .03); A.riser(51, 52, .2);
+    // the gag: dead stop, a pop, a ding
+    A.tone(56.0, 1200, .1, "square", .06); A.click(56.0, .35); A.tone(57.0, 220, .15, "sine", .2); A.tone(58.4, m(84), .5, "sine", .08);
+  },
+});
+</script></body></html>

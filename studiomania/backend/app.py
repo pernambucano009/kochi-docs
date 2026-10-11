@@ -10334,6 +10334,94 @@ def asset_get(aid: str):
     return clip_to_dict(aid, clip_load(aid))
 
 
+# ---------------- 🎞️ مكتبة الموشن: أنيميشنات مكتوبة بالكود (library/motion) بتترسم فيديو وتدخل المكتبة كأصل عادي
+MOTION_DIR = ROOT / "library" / "motion"
+MOTION_FPS = 30
+MOTION_JOBS: dict[str, dict] = {}   # id → {"status": "working"|"error", "progress": 0..1, "error": str}
+
+
+def motion_manifest() -> list[dict]:
+    f = MOTION_DIR / "manifest.json"
+    return json.loads(f.read_text(encoding="utf-8")) if f.exists() else []
+
+
+def motion_asset_id(mid: str) -> str | None:
+    for f in ASSETS_DIR.glob("*/asset.json"):
+        try:
+            if (json.loads(f.read_text(encoding="utf-8")).get("source") or {}).get("motion") == mid:
+                return f.parent.name
+        except ValueError:
+            continue
+    return None
+
+
+@app.get("/api/motion-library")
+def motion_library():
+    return [{**m, "asset": motion_asset_id(m["id"]), "job": MOTION_JOBS.get(m["id"])} for m in motion_manifest()]
+
+
+def run_motion_import(mid: str, meta: dict) -> None:
+    """بيفتح الأنيميشن في المتصفح، يرسم كل فريم من الوقت (seek)، وياخد الصوت اللي مكتوب بالكود، ويعمل منهم فيديو + أصل."""
+    aid = uuid.uuid4().hex[:12]
+    folder = clip_dir(aid)
+    job = MOTION_JOBS[mid]
+    try:
+        from playwright.sync_api import sync_playwright
+
+        (folder / "variants").mkdir(parents=True, exist_ok=True)
+        with sync_playwright() as p:
+            browser = typo_browser(p)
+            try:
+                page = browser.new_page(viewport={"width": 1920, "height": 1080})
+                page.goto((MOTION_DIR / "r" / mid / "reel.html").as_uri())
+                page.evaluate("() => window.ready")
+                W, H, dur = page.evaluate("() => [window.W, window.H, window.DUR]")
+                page.set_viewport_size({"width": W, "height": H})
+                (folder / "track.wav").write_bytes(base64.b64decode(page.evaluate("() => soundtrack()")))
+                n = int(math.ceil(dur * MOTION_FPS))
+                cmd = [ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-f", "image2pipe", "-framerate", str(MOTION_FPS), "-c:v", "mjpeg", "-i", "-",
+                       "-i", str(folder / "track.wav"), "-c:v", "libx264", "-preset", "veryfast", "-crf", "19", "-pix_fmt", "yuv420p",
+                       "-c:a", "aac", "-b:a", "160k", "-shortest", "-movflags", "+faststart", str(folder / "clip.mp4")]
+                proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+                for i in range(n):
+                    page.evaluate(f"() => seek({i / MOTION_FPS})")
+                    proc.stdin.write(page.screenshot(type="jpeg", quality=90))
+                    job["progress"] = round((i + 1) / n, 3)
+                proc.stdin.close()
+                if proc.wait(timeout=600) != 0:
+                    raise RuntimeError((proc.stderr.read() or b"").decode(errors="ignore")[-300:] or "ffmpeg فشل")
+            finally:
+                browser.close()
+        (folder / "track.wav").unlink(missing_ok=True)
+        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{dur / 2:.3f}", "-i", str(folder / "clip.mp4"),
+                        "-frames:v", "1", "-vf", "scale=480:-2", "-q:v", "3", str(folder / "thumb.jpg")], check=True, capture_output=True, timeout=60)
+        info = media_info(folder / "clip.mp4")
+        data = {"name": meta["name"], "category": meta.get("category") if meta.get("category") in CLIP_CATS else "motion_graphics",
+                "tags": meta.get("tags") or [], "notes": "", "description": "", "use": "", "controls": [], "connector": None,
+                "file": "clip.mp4", "thumb": "thumb.jpg", "duration": round(info.duration, 2), "width": info.width, "height": info.height,
+                "source": {"motion": mid}, "scene_type": None, "summary": meta["name"], "background": None,
+                "elements": [], "sfx": [], "variants": [], "keyframes": [], "created_at": now(), "updated_at": now()}
+        (folder / "asset.json").write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+        MOTION_JOBS.pop(mid, None)
+    except Exception as e:  # noqa: BLE001
+        shutil.rmtree(folder, ignore_errors=True)
+        job.update(status="error", error=str(e)[:300])
+
+
+@app.post("/api/motion-library/{mid}/import")
+def motion_import(mid: str):
+    meta = next((m for m in motion_manifest() if m["id"] == mid), None)
+    if meta is None:
+        raise HTTPException(404, "الأنيميشن ده مش موجود")
+    if motion_asset_id(mid):
+        raise HTTPException(400, "ده موجود في المكتبة بالفعل")
+    if (MOTION_JOBS.get(mid) or {}).get("status") == "working":
+        raise HTTPException(400, "بيترسم دلوقتي")
+    MOTION_JOBS[mid] = {"status": "working", "progress": 0.0, "error": ""}
+    threading.Thread(target=run_motion_import, args=(mid, meta), daemon=True).start()
+    return {"ok": True}
+
+
 class AssetPatchIn(BaseModel):
     name: str | None = None
     category: str | None = None

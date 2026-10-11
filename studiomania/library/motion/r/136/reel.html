@@ -1,0 +1,177 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script><script src="../../lib/three.min.js"></script></head><body>
+<script>
+// #136 "Bip's Delivery" — 2 min, an 80s space-opera look in a 90s cartoon: cel shading, bold outlines, starfields, little ships. three.js.
+// Story: Bip, a tiny droid in a scrappy ship, has a birthday cake for its friend Zee on the moon. WANT: deliver the cake.
+//  1 (14–30 s) straight through the asteroid field — BONK; icing all over Bip's eye.
+//  2 (30–48 s) sneak past the dreadnought in its shadow — the tractor beam grabs the ship; Bip yanks free; the candles are lost.
+//  3 (48–64 s) hyperspace straight to the moon — it overshoots the whole loop and pops out right where it started.
+//  TURN (64–78 s) slumped over a squashed cake… a signal: Zee is coming to Bip instead.
+//  END (78–112 s) nose to nose, one candle stub relit with the engine's flame; two droids beep "happy birthday".
+//  GAG (112–120 s) the dreadnought's huge guard droid looms in the window… Bip hands it a crumb. Happy beep.
+const DUR = 120, W = 1920, H = 1080;
+M.reel({
+  W, H, DUR, SUB: 1, bg: "#0b0f24",
+  init(M) {
+    const T = THREE; T.ColorManagement.legacyMode = false;
+    const renderer = new T.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+    renderer.setSize(W, H); renderer.outputEncoding = T.sRGBEncoding; renderer.toneMapping = T.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.1;
+    renderer.domElement.style.cssText = "position:absolute;left:0;top:0"; M.stage.appendChild(renderer.domElement);
+    const scene = new T.Scene(); scene.background = new T.Color(0x0b0f24);
+    const cam = new T.PerspectiveCamera(40, W / H, .1, 3000);
+    const key = new T.DirectionalLight(0xfff2dc, 2.4); key.position.set(30, 40, 50); scene.add(key);
+    const fill = new T.HemisphereLight(0x8fa8ff, 0x2a1a3a, .7); scene.add(fill);
+    const rim = new T.DirectionalLight(0xff8a5a, 1.2); rim.position.set(-40, 10, -40); scene.add(rim);
+    const grad = new T.DataTexture(new Uint8Array([60, 60, 60, 255, 150, 150, 150, 255, 255, 255, 255, 255]), 3, 1, T.RGBAFormat); grad.minFilter = grad.magFilter = T.NearestFilter; grad.needsUpdate = true;
+    const toon = (c, e = 0) => new T.MeshToonMaterial({ color: c, gradientMap: grad, emissive: e ? c : 0x000000, emissiveIntensity: e });
+    const OL = new T.MeshBasicMaterial({ color: 0x07080f, side: T.BackSide });
+    const mesh = (g, m, parent, ol = 1.05) => { const o = new T.Mesh(g, m); if (ol) { const h = new T.Mesh(g, OL); h.scale.setScalar(ol); o.add(h); } (parent || scene).add(o); return o; };
+    // starfield (on a sphere that follows the camera)
+    const sg = new T.BufferGeometry(), sp = [], R = M.rng(3); for (let i = 0; i < 2500; i++) { const u = R() * 2 - 1, a = R() * Math.PI * 2, r = Math.sqrt(1 - u * u); sp.push(Math.cos(a) * r * 1500, u * 1500, Math.sin(a) * r * 1500); } sg.setAttribute("position", new T.Float32BufferAttribute(sp, 3));
+    const stars = new T.Points(sg, new T.PointsMaterial({ color: 0xffffff, size: 2.2, sizeAttenuation: false })); scene.add(stars);
+    // ---------- a ship (body colour, wing colour)
+    const ship = (body, wing) => {
+      const g = new T.Group(); scene.add(g);
+      const fus = mesh(new T.CapsuleGeometry ? new T.CapsuleGeometry(.7, 2.2, 6, 16) : new T.CylinderGeometry(.7, .7, 2.2, 16), toon(body), g); fus.rotation.z = Math.PI / 2;
+      const bub = mesh(new T.SphereGeometry(.62, 20, 14), new T.MeshToonMaterial({ color: 0x9fe0ff, gradientMap: grad, transparent: true, opacity: .55 }), g, 1.04); bub.position.set(.9, .45, 0);
+      [-1, 1].forEach((s) => { const w = mesh(new T.BoxGeometry(1.6, .14, 1.6), toon(wing), g); w.position.set(-.4, -.1, s * 1.2); w.rotation.y = s * .35; });
+      const eng = mesh(new T.CylinderGeometry(.42, .5, .6, 16), toon(0x3a3f4a), g); eng.rotation.z = Math.PI / 2; eng.position.x = -1.7;
+      const flame = mesh(new T.ConeGeometry(.34, 1.2, 12), toon(0xffa53a, 1), g, 0); flame.rotation.z = Math.PI / 2; flame.position.x = -2.5;
+      const pilot = mesh(new T.SphereGeometry(.3, 16, 12), toon(0xf2f2f2), g); pilot.position.set(.95, .5, 0);
+      return { g, flame, pilot };
+    };
+    const bipShip = ship(0xe8702a, 0xf2c230), zeeShip = ship(0x3aa86b, 0xd9e6f2);
+    // asteroids
+    const ast = []; const ar = M.rng(7);
+    for (let i = 0; i < 46; i++) { const a = mesh(new T.IcosahedronGeometry(1 + ar() * 2.5, 0), toon(0x8a7f78), null, 1.06); a.position.set(-20 + ar() * 60, (ar() - .5) * 18, (ar() - .5) * 22); a.userData = { s: ar() * 2, r: [ar(), ar(), ar()] }; ast.push(a); }
+    // the moon with Zee's dome
+    const moon = mesh(new T.SphereGeometry(30, 40, 30), toon(0xcfc6b8), null, 1.02); moon.position.set(260, 20, -120);
+    const dome = mesh(new T.SphereGeometry(6, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2), toon(0x9fe0ff), moon); dome.position.set(-20, 21, 10);
+    for (let i = 0; i < 9; i++) { const c = mesh(new T.CircleGeometry(2 + (i % 3) * 2, 16), toon(0xb5ab9c), moon, 0); const a = i * 1.3, b = i * .7; c.position.set(Math.cos(a) * Math.cos(b) * 30.05, Math.sin(b) * 30.05, Math.sin(a) * Math.cos(b) * 30.05); c.lookAt(moon.position.clone().multiplyScalar(2)); }
+    // the dreadnought: a long wedge with a tower and little windows
+    const sh = new T.Shape(); sh.moveTo(0, 0); sh.lineTo(-60, 14); sh.lineTo(-60, -14); sh.lineTo(0, 0);
+    const dg = new T.ExtrudeGeometry(sh, { depth: 4, bevelEnabled: false }); dg.translate(0, 0, -2);
+    const dread = new T.Group(); scene.add(dread); const hull = mesh(dg, toon(0x9aa3b4), dread, 0); hull.rotation.x = Math.PI / 2; const hullO = new T.Mesh(dg, OL); hullO.scale.set(1.01, 1.03, 1.15); hull.add(hullO);
+    const tower = mesh(new T.BoxGeometry(6, 5, 8), toon(0x9aa3b4), dread); tower.position.set(-48, 4, 0);
+    for (let i = 0; i < 20; i++) { const wdw = mesh(new T.BoxGeometry(.6, .3, .1), toon(0xffe08a, 1), dread, 0); wdw.position.set(-20 - i * 1.9, .6, 4.5 + (i % 2)); }
+    const beam = new T.Mesh(new T.CylinderGeometry(2.4, 2.4, 30, 20, 1, true), new T.MeshBasicMaterial({ color: 0x6dff9a, transparent: true, opacity: .22, side: T.DoubleSide, depthWrite: false })); scene.add(beam);
+    // ---------- the cockpit set (interior close-ups), far away from everything else
+    const CP = new T.Group(); CP.position.set(0, -800, 0); scene.add(CP);
+    const dash = mesh(new T.BoxGeometry(6, 1.2, 2), toon(0x4a5266), CP); dash.position.set(0, -1.2, -1.2);
+    const frame = mesh(new T.TorusGeometry(3.2, .18, 8, 40), toon(0x2b3140), CP); frame.position.set(0, .6, -2.4);
+    const screen = mesh(new T.PlaneGeometry(1.0, .6), toon(0x163a4a, .4), CP, 0); screen.position.set(1.6, -.55, -.19); screen.rotation.x = -.5;
+    const lever = mesh(new T.CylinderGeometry(.06, .06, .9, 8), toon(0xd8302c), CP); lever.position.set(-1.6, -.3, -.6);
+    const knob = mesh(new T.SphereGeometry(.14, 12, 8), toon(0xd8302c), lever); knob.position.y = .45;
+    const btn = mesh(new T.CylinderGeometry(.22, .22, .1, 16), toon(0x2f8fff), CP); btn.position.set(.6, -.55, -.4);
+    // droids: round head, one big eye (eye leads), antenna
+    const droid = (col, parent) => { const g = new T.Group(); parent.add(g); const head = mesh(new T.SphereGeometry(.55, 24, 18), toon(col), g); const eyeB = mesh(new T.CircleGeometry(.24, 24), new T.MeshBasicMaterial({ color: 0x0b0e18 }), g, 0); eyeB.position.set(0, .05, .54); const pup = mesh(new T.CircleGeometry(.08, 16), new T.MeshBasicMaterial({ color: 0xffffff }), g, 0); pup.position.set(0, .05, .56); const ant = mesh(new T.CylinderGeometry(.02, .02, .5, 6), toon(0x3a3f4a), g, 0); ant.position.set(.2, .7, 0); const tip = mesh(new T.SphereGeometry(.07, 8, 6), toon(0xd8302c, .6), g, 0); tip.position.set(.2, .97, 0); const icing = mesh(new T.CircleGeometry(.2, 12), toon(0xf7a8c8), g, 0); icing.position.set(.06, .1, .57); return { g, head, pup, eyeB, icing, tip }; };
+    const bip = droid(0xf2f2f2, CP); bip.g.position.set(-.4, 0, 0);
+    const zee = droid(0x8fe0a8, CP); zee.g.position.set(.9, 0, 0);
+    // the cake (on the dash)
+    const cake = new T.Group(); CP.add(cake); cake.position.set(1.2, -.4, .4);
+    mesh(new T.CylinderGeometry(.45, .45, .4, 24), toon(0xf7a8c8), cake); const top = mesh(new T.CylinderGeometry(.47, .47, .08, 24), toon(0xffffff), cake, 0); top.position.y = .22;
+    const candles = []; for (let i = 0; i < 3; i++) { const c = mesh(new T.CylinderGeometry(.035, .035, .3, 8), toon(0x5ab0ff), cake, 0); c.position.set(-.2 + i * .2, .4, 0); const f = mesh(new T.ConeGeometry(.05, .12, 8), toon(0xffc04a, 1), c, 0); f.position.y = .22; candles.push([c, f]); }
+    // the big guard droid (gag)
+    const guard = droid(0x9aa3b4, CP); guard.g.scale.setScalar(4); guard.g.position.set(0, 1.5, -6); zee.icing.visible = false; guard.icing.visible = false;
+    const moonView = mesh(new T.SphereGeometry(1.3, 24, 16), toon(0xcfc6b8), CP); moonView.position.set(2.8, 1.8, -11);
+    const ov = M.canvas(W, H, "z-index:2");
+    return { ox: ov.getContext("2d"), T, renderer, scene, cam, stars, bipShip, zeeShip, ast, moon, dread, beam, CP, bip, zee, cake, candles, lever, btn, screen, guard };
+  },
+  seek(t, P, M) {
+    const { T, cam, bipShip, zeeShip, ast, dread, beam, CP, bip, zee, cake, candles, lever, screen, guard } = P, { seg, lerp, clamp, expo, expoIO, springO, sine, cubicIO, hash } = M;
+    // ---------- the outside world
+    ast.forEach((a, i) => { const u = a.userData; a.rotation.set(t * .3 * u.r[0], t * .2 * u.r[1], t * .25 * u.r[2]); });
+    // Bip's ship path
+    const B = bipShip.g; let bp = [0, 0, 0], yaw = 0, roll = 0, flame = 1;
+    if (t < 14) { bp = [lerp(-70, -24, expoIO(seg(t, 0, 10))), 0, 0]; }
+    else if (t < 30) { const k = seg(t, 14, 26); bp = [lerp(-24, 34, k), Math.sin(k * 9) * 3, Math.cos(k * 7) * 4]; roll = Math.cos(k * 9) * .5; if (t > 20) { const s = t - 20; roll += s < 1.5 ? s * 9 : 13.5; bp[1] += s < 1.5 ? Math.sin(s * 4) * 2 : 0; } }
+    else if (t < 48) {   // creeps into the dreadnought's shadow, gets beamed up, yanks free
+      const k = seg(t, 30, 38); bp = [lerp(60, 110, k), lerp(-4, -6, k), lerp(8, 0, k)];
+      if (t > 38) { const lift = expo(seg(t, 38, 42)) * 9; bp[1] += lift; roll = Math.sin(t * 6) * .15; flame = .3; }
+      if (t > 44) { const esc = expo(seg(t, 44, 46)); bp = [lerp(110, 150, esc), -6 + 9 - esc * 14, esc * 10]; flame = 2; roll = 0; }
+    } else if (t < 64) {   // hyperspace: gone in a streak, back where it started
+      if (t < 50.2) bp = [150, -11, 10];
+      else if (t < 55.5) bp = [9999, 0, 0];
+      else bp = [-24 + Math.sin((t - 55.5) * 3) * .2 * (1 - seg(t, 55.5, 58)), 0, 0];
+      flame = t > 55.5 ? .3 : 1;
+    } else bp = [-24, 0, 0];
+    if (t >= 64) flame = t > 78 ? .4 : .2;
+    B.position.set(...bp); B.rotation.set(roll, yaw, 0); bipShip.flame.scale.set(1, flame * (1 + Math.sin(t * 40) * .1), 1);
+    // Zee's ship: from the moon toward Bip, then nose to nose
+    const Z = zeeShip.g; Z.visible = t > 73;
+    { const k = expoIO(seg(t, 73, 84)); Z.position.set(lerp(120, -20.2 + 4.6, k), lerp(15, 0, k), lerp(-60, 0, k)); Z.rotation.y = Math.PI; zeeShip.flame.scale.y = k < 1 ? 1.2 : .3; }
+    // the dreadnought: blocks the way to the moon; returns for the gag
+    dread.position.set(t < 112 ? 150 : lerp(60, -6, expo(seg(t, 112, 116))), t < 112 ? 3 : 8, t < 112 ? 0 : -10); dread.rotation.y = t < 112 ? 0 : -.3;
+    beam.visible = t > 37.5 && t < 44.3; beam.position.set(110, -3, 0);
+    // ---------- the cockpit set
+    const look = (d, x, y) => { d.pup.position.x = x * .1; d.pup.position.y = .05 + y * .1; };
+    let bl = [0, 0], bsq = 0;
+    if (t < 14) { bl = t > 9.5 ? [1, .2] : [0, 0]; bsq = t > 11 ? -.08 * expo(seg(t, 11, 11.3)) : 0; }   // looks to the moon, then sits up: determined
+    else if (t < 30) { bl = [Math.sin(t * 3), 0]; if (t > 22) { bl = [0, 0]; bsq = .1 * Math.sin(t * 20) * (t < 24 ? 1 : 0); } }
+    else if (t < 48) { bl = t < 41 ? [1, .3] : [-1, -.3]; bsq = t > 42 && t < 43 ? .15 : 0; }
+    else if (t < 64) { bl = t < 50 ? [.4, -.4] : t > 56 ? [Math.sin(t * 2), 0] : [0, 0]; bsq = t > 58 ? .12 : 0; }
+    else if (t < 78) { bl = t < 70 ? [.2, -.6] : [1, .1]; bsq = t < 70 ? .14 : -.05; }
+    else { bl = [.6, 0]; }
+    look(bip, ...bl); bip.g.scale.set(1 + bsq, 1 - bsq, 1 + bsq); bip.icing.visible = t > 22 && t < 27.5;
+    zee.g.visible = t > 84 && t < 112; look(zee, -.6, 0); zee.icing.visible = false; guard.icing.visible = false;
+    if (t > 92 && t < 100) { const bb = Math.max(0, Math.sin(t * 6)); bip.g.position.y = bb * .08; zee.g.position.y = Math.max(0, Math.sin(t * 6 + 1.5)) * .08; }
+    // cake state: candles lost in attempt 2; squashed after the hyperspace landing; one stub relit at 92
+    candles.forEach(([c, f], i) => { c.visible = t < 45.5 || (i === 1 && t > 64); f.visible = t < 20 || (i === 1 && t > 92); if (i === 1 && t > 64) c.scale.y = .4; });
+    cake.scale.set(1 + (t > 56 ? .25 : 0), t > 56 ? .6 : 1, 1 + (t > 56 ? .25 : 0)); cake.visible = t < 112 || t < 120;
+    lever.rotation.x = t > 42.6 && t < 47 ? -.9 * expo(seg(t, 42.6, 42.9)) : 0;
+    screen.material.emissiveIntensity = t > 70 && t < 78 ? (Math.floor(t * 4) % 2 ? 1.5 : .4) : .3;
+    guard.g.visible = t > 113.5; look(guard, .3, -.4); guard.g.position.set(lerp(-1, 0, expo(seg(t, 113.5, 114.5))), 1.3, -6);
+    // the crumb
+    // ---------- shots
+    let cp, lk, fov = 40;
+    const B3 = (v) => new T.Vector3(...v);
+    const cpw = (v) => B3(v).add(CP.position);   // cockpit-relative
+    if (t < 8) { const k = cubicIO(t / 8); cp = [lerp(-60, -50, k), lerp(4, 9, k), 30]; lk = [lerp(20, bp[0] + 30, k), 4, -20]; fov = 46; }                         // CRANE in on the establishing view
+    else if (t < 14) { cp = cpw([0, .2, 4.2 - (t - 8) * .05]); lk = cpw([0, 0, 0]); fov = 34; }                                         // cockpit CU
+    else if (t < 20) { cp = [bp[0] - 10, bp[1] + 3, bp[2] + 9]; lk = bp; }                                                              // chase
+    else if (t < 22) { cp = [bp[0] - 6, bp[1] + 2, bp[2] + 7]; lk = bp; }                                                               // the bonk
+    else if (t < 30) { cp = cpw([.2, .1, 3.0 - (t - 22) * .03]); lk = cpw([-.4, 0, 0]); fov = 34; }                                    // icing on the eye
+    else if (t < 38) { const k = sine(seg(t, 30, 38)); cp = [lerp(70, 90, k), lerp(-14, -12, k), 30]; lk = [110, -2, 0]; fov = 46; }   // under the dreadnought
+    else if (t < 42.5) { cp = [110 + 10, -12, 14]; lk = [110, -1, 0]; }                                                               // beamed up
+    else if (t < 44) { cp = cpw([-1.2, .4, 2.4]); lk = cpw([-1.4, -.2, -.6]); fov = 34; }                                              // the lever
+    else if (t < 48) { cp = cpw([1.4, .4, 2.6]); lk = cpw([1.2, -.3, .3]); fov = 34; }                                                  // the candles fly off
+    else if (t < 50.2) { cp = cpw([.4, .3, 2.6]); lk = cpw([.5, -.5, -.3]); fov = 34; }                                                 // the hyperspace button
+    else if (t < 55.5) { cp = [0, 400, 0]; lk = [1, 400, 0]; fov = 60; }                                                                    // hyperspace (streaks drawn by stars stretching)
+    else if (t < 58) { cp = [-34, 2, 10]; lk = [-24, 0, 0]; }
+    else if (t < 64) { cp = cpw([0, .3, 3.6]); lk = cpw([.3, -.2, 0]); fov = 34; }                                                     // back where it started; squashed cake
+    else if (t < 73) { cp = cpw([.1, .1, 3.0 - (t - 64) * .03]); lk = cpw([.2, -.2, 0]); fov = 34; }
+    else if (t < 84) { cp = [-30, 3, 16]; lk = [lerp(0, -18, seg(t, 73, 84)), 0, 0]; fov = 44; }                                        // Zee arrives
+    else if (t < 100) { cp = cpw([.25, .3, 3.4]); lk = cpw([.3, -.1, 0]); fov = 36; }                                                  // two droids, one candle
+    else if (t < 112) { const k = sine(seg(t, 100, 112)); cp = [lerp(-26, -40, k), lerp(2, 8, k), lerp(10, 30, k)]; lk = [-18, 0, 0]; fov = 42; }   // CRANE out
+    else if (t < 113.5) { cp = [-30, 4, 22]; lk = [-18, 3, -6]; fov = 46; }                                                           // the dreadnought returns
+    else { cp = cpw([.2, .3, 3.6]); lk = cpw([0, .6, -2]); fov = 40; }                                                                   // the guard at the window
+    const c3 = Array.isArray(cp) ? B3(cp) : cp, l3 = Array.isArray(lk) ? B3(lk) : lk;
+    cam.position.copy(c3); cam.fov = fov; cam.updateProjectionMatrix(); cam.lookAt(l3);
+    P.stars.position.copy(cam.position);
+    // hyperspace: stretch the star sphere along the view axis
+    const hyper = t > 50.2 && t < 55.5 ? Math.sin(clamp((t - 50.2) / 5.3) * Math.PI) : 0; P.stars.scale.set(1 + hyper * 30, 1, 1);
+    P.renderer.render(P.scene, cam);
+    const ox = P.ox; ox.clearRect(0, 0, W, H);
+    if (hyper > 0) { for (let i = 0; i < 260; i++) { const a = hash(i) * Math.PI * 2, r0 = 40 + hash(i + 7) * 500 + ((t * 2200 + i * 53) % 900), L = 60 + hyper * 700 * hash(i + 3); ox.strokeStyle = i % 7 ? "rgba(220,235,255,.9)" : "rgba(120,200,255,.9)"; ox.lineWidth = 1.5 + hash(i + 2) * 3; ox.beginPath(); ox.moveTo(W / 2 + Math.cos(a) * r0, H / 2 + Math.sin(a) * r0); ox.lineTo(W / 2 + Math.cos(a) * (r0 + L), H / 2 + Math.sin(a) * (r0 + L)); ox.stroke(); } }
+  },
+  sound(A) {
+    const m = A.midi;
+    // a jaunty space-opera march (brassy saws) in the opening and ending; tense pulses for each attempt
+    const march = (t0, tr = 0, g = .04) => [60, 67, 65, 64, 62, 72, 67, 65, 64, 65, 62].forEach((n, i) => A.tone(t0 + i * .4, m(n + tr), i === 5 ? .9 : .35, "sawtooth", g));
+    march(1); A.pad(0, [m(48), m(55), m(60)], 14, .03);
+    A.nz(0, 64, "lowpass", 200, .05, 1);   // engine rumble
+    [11, 13].forEach((t0) => A.tone(t0, 1320, .1, "sine", .06));
+    for (let t0 = 14; t0 < 30; t0 += .5) A.kick(t0, .3); A.hit(20, .7); A.tone(20.1, 2000, .05, "square", .05); A.nz(22, .3, "lowpass", 900, .25);   // BONK, splat
+    for (let i = 0; i < 6; i++) A.tone(24 + i * .3, 1500 - i * 150, .1, "sine", .05);
+    A.tone(30, 40, 18, "sine", .15); for (let t0 = 30; t0 < 38; t0 += 1) A.tone(t0, m(45), .6, "triangle", .06);
+    A.riser(37.5, 42, .2); A.tone(38, 220, 6, "sawtooth", .03); A.click(42.6, .4); A.hit(44, .6); A.whoosh(44, 1, .3); [0, 1, 2].forEach((i) => A.tone(45.5 + i * .15, 1800 + i * 200, .1, "sine", .05));
+    A.click(49.6, .3); A.riser(49.8, 50.2, .3); A.nz(50.2, 5.3, "bandpass", 1200, .1, 1); A.hit(55.5, .5); A.tone(56, m(60), .5, "square", .04); A.tone(56.5, m(55), .9, "square", .04);
+    A.pad(64, [m(45), m(52), m(57)], 14, .03); [70, 70.5, 71, 71.5].forEach((t0) => A.tone(t0, 1760, .08, "square", .04));
+    A.tone(72, 1320, .1, "sine", .07); A.tone(72.15, 1760, .12, "sine", .07);
+    march(78, 5, .035); A.pad(78, [m(53), m(60), m(65)], 34, .03); A.click(84, .3); A.tone(84, 300, .2, "sine", .15);
+    A.nz(92, .25, "bandpass", 2500, .1, 2);
+    // "happy birthday" in beeps (two droids, in thirds)
+    const hb = [[60, .5], [60, .25], [62, .75], [60, .75], [65, .75], [64, 1.5]]; let tt = 92.6; hb.forEach(([n, d]) => { A.tone(tt, m(n + 12), d * .9, "square", .035); A.tone(tt, m(n + 16), d * .9, "square", .025); tt += d * .9; });
+    A.tone(112, 50, 3, "sawtooth", .06); A.tone(113.5, 120, 1, "sawtooth", .05); A.tone(116.5, 300, .1, "sine", .08); A.tone(117.4, 880, .15, "sine", .07); A.tone(117.6, 1320, .2, "sine", .07);
+  },
+});
+</script></body></html>

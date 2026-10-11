@@ -1,0 +1,113 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// #72 "What day is it?" — 30 s, 120 BPM. Today is Sunday, 11 October 2026.
+// Concept: "The week is a slot machine, and today is the jackpot." One typeface (Bebas Neue); cream, ink, orange, blue.
+// 0–2 hook question · 2–6 kinetic type: day names spin on a reel, slowing · 6–10 morph: 7 dots → calendar grid → clock face
+// 10–14 2D→3D: a day-die (cube) rolls one face per beat · 14–18 UI: a calendar month builds, today ringed · 18–22 a sun arcs over the week strip
+// 22–28 strongest: SUNDAY lands letter by letter, one per beat · 28–30 end title → the question again (frame one).
+const B = .5, CREAM = "#f4efe4", INK = "#141414", ORA = "#ff6b2b", BLUE = "#2d5bff";
+const DAYS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
+M.reel({
+  W: 1920, H: 1080, DUR: 30, bg: CREAM,
+  fonts: { BB: "bebas.ttf" },
+  init(M) { const c = M.canvas(1920, 1080); return { x: c.getContext("2d") }; },
+  seek(t, P, M) {
+    const { x } = P, { seg, lerp, expo, expoIn, expoIO, spring, clamp, cubicIO } = M;
+    const beat = Math.floor(t / B), bt = t - beat * B, pulse = 1 - spring(bt, 16);
+    const dark = (t >= 10 && t < 14) || (t >= 22 && t < 28);
+    x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = dark ? INK : CREAM; x.fillRect(0, 0, 1920, 1080);
+    const fg = dark ? CREAM : INK;
+    const z = 1 + .03 * ((t % 4) / 4); x.translate(960, 540); x.scale(z, z); x.translate(-960, -540);
+    const T = (s, px, X, Y, col, al = "center") => { x.font = `400 ${px}px BB`; x.fillStyle = col; x.textAlign = al; x.textBaseline = "middle"; x.fillText(s, X, Y); };
+    const question = () => { T("WHAT DAY", 260, 960, 430, INK); T("IS IT?", 260, 960, 680, ORA); };
+    // ---------- 0–2 hook
+    if (t < 2) { const k = spring(t, 9); x.save(); x.translate(960, 540); x.scale(lerp(.8, 1, k), lerp(.8, 1, k)); x.translate(-960, -540); question(); x.restore(); const q = 1 + .06 * pulse; }
+    // ---------- 2–6 slot reel of day names, slowing down, settling on SUN... no: on "???" (the answer waits)
+    if (t >= 2 && t < 6.2) {
+      const speed = lerp(14, 2, cubicIO(seg(t, 2, 6))), pos = (t - 2) * speed * 1.4;
+      x.save(); x.beginPath(); x.rect(360, 300, 1200, 480); x.clip();
+      for (let k = -2; k <= 2; k++) { const i = Math.floor(pos) + k, f = pos - Math.floor(pos); const y = 540 + (k - f) * 260; const d = DAYS[((i % 7) + 7) % 7]; T(d, 300, 960, y, d === "SUN" ? ORA : INK); }
+      x.restore();
+      x.fillStyle = INK; x.fillRect(360, 290, 1200, 8); x.fillRect(360, 782, 1200, 8);
+      T("SPIN THE WEEK", 40, 960, 880, "#8a8478");
+    }
+    // ---------- 6–10 morph: seven dots → a 7-column calendar row → a clock face
+    if (t >= 6 && t < 10.2) {
+      const g = expoIO(seg(t, 6.6, 7.6)), c = expoIO(seg(t, 8.4, 9.4));
+      for (let i = 0; i < 7; i++) {
+        const lineX = 360 + i * 200, lineY = 540;
+        const a = -Math.PI / 2 + i / 7 * Math.PI * 2, clockX = 960 + Math.cos(a) * 320, clockY = 540 + Math.sin(a) * 320;
+        const X = lerp(lineX, clockX, c), Y = lerp(lineY, clockY, c);
+        const w = lerp(40, 170, g * (1 - c)) + c * 120, h = lerp(40, 220, g * (1 - c)) + c * 120, r = lerp(20, 18, g);
+        x.fillStyle = i === 6 ? ORA : INK; x.beginPath(); x.roundRect(X - w / 2, Y - h / 2, w, h, Math.min(r, w / 2)); x.fill();
+        if (g > .5) T(DAYS[i], lerp(70, 60, c), X, Y, CREAM);
+      }
+      if (c > 0) { x.strokeStyle = INK; x.lineWidth = 14; x.lineCap = "round"; const hand = c * (6 / 7) * Math.PI * 2 - Math.PI / 2; x.beginPath(); x.moveTo(960, 540); x.lineTo(960 + Math.cos(hand) * 220, 540 + Math.sin(hand) * 220); x.stroke(); }
+    }
+    // ---------- 10–14 2D→3D: a cube with day faces rolls one face per beat (fake perspective, painter's order)
+    if (t >= 10 && t < 14.2) {
+      const roll = (t - 10) / B, k = Math.floor(roll), f = expoIO(clamp((roll - k) / .45)), ang = (k + f) * Math.PI / 2;
+      const S = 230, faces = [];
+      for (let i = 0; i < 4; i++) {
+        const a = ang - i * Math.PI / 2, nz = Math.cos(a), nx = Math.sin(a);
+        if (nz <= 0.001) continue;
+        faces.push({ i, nz, nx });
+      }
+      faces.sort((a, b) => a.nz - b.nz).forEach(({ i, nz, nx }) => {
+        const w = S * 2 * nz, cx = 960 + nx * S;
+        x.save(); x.translate(cx, 540); x.transform(nz, 0, -.1 * nx, 1, 0, 0);
+        x.fillStyle = i % 2 ? BLUE : ORA; x.globalAlpha = .55 + .45 * nz; x.beginPath(); x.roundRect(-S, -S, S * 2, S * 2, 30); x.fill(); x.globalAlpha = 1;
+        T(DAYS[(i + Math.floor(k / 4) * 4 + 2) % 7], 200, 0, 10, CREAM); x.restore();
+      });
+      // top face
+      x.fillStyle = "#3a3a3a"; x.beginPath(); x.moveTo(960 - S, 540 - S); x.lineTo(960 + S, 540 - S); x.lineTo(960 + S * .7, 540 - S * 1.25); x.lineTo(960 - S * .7, 540 - S * 1.25); x.fill();
+    }
+    // ---------- 14–18 UI: October 2026 builds row by row, today (Sun 11) gets the ring
+    if (t >= 14 && t < 18.2) {
+      T("OCTOBER 2026", 110, 960, 150, INK);
+      const firstDow = 3; // 1 Oct 2026 is a Thursday → index 3 in MON-based week
+      DAYS.forEach((d, i) => T(d, 40, 520 + i * 147, 270, i === 6 ? ORA : "#8a8478"));
+      for (let dnum = 1; dnum <= 31; dnum++) {
+        const idx = firstDow + dnum - 1, c = idx % 7, r = Math.floor(idx / 7);
+        const g = expo(seg(t, 14.1 + r * .35, 14.4 + r * .35)); if (g <= 0) continue;
+        const X = 520 + c * 147, Y = 360 + r * 130 + (1 - g) * 40;
+        x.globalAlpha = g; T(dnum + "", 70, X, Y, dnum === 11 ? ORA : INK); x.globalAlpha = 1;
+        if (dnum === 11) { const rg = expo(seg(t, 16.2, 16.8)); x.strokeStyle = ORA; x.lineWidth = 8; x.beginPath(); x.arc(X, Y, 62, -Math.PI / 2, -Math.PI / 2 + rg * Math.PI * 2); x.stroke(); }
+      }
+    }
+    // ---------- 18–22 the sun arcs along a week strip and sets on Sunday
+    if (t >= 18 && t < 22.2) {
+      const p = cubicIO(seg(t, 18.3, 21.6));
+      DAYS.forEach((d, i) => { const X = 360 + i * 200; x.fillStyle = i === 6 && p > .95 ? ORA : "#e2dccd"; x.fillRect(X - 90, 760, 180, 120); T(d, 64, X, 822, i === 6 && p > .95 ? CREAM : INK); });
+      const sx = lerp(360, 1560, p), sy = 700 - Math.sin(p * Math.PI) * 420;
+      x.fillStyle = ORA; x.beginPath(); x.arc(sx, sy, 70 * (1 + .05 * pulse), 0, 7); x.fill();
+      x.strokeStyle = "rgba(20,20,20,.2)"; x.setLineDash([10, 14]); x.lineWidth = 4; x.beginPath(); for (let k = 0; k <= 60; k++) { const q = k / 60 * p; const X = lerp(360, 1560, q), Y = 700 - Math.sin(q * Math.PI) * 420; k ? x.lineTo(X, Y) : x.moveTo(X, Y); } x.stroke(); x.setLineDash([]);
+    }
+    // ---------- 22–28 strongest: S U N D A Y, one letter per beat, each punching in; background flips on the beat
+    if (t >= 22 && t < 28) {
+      const L = "SUNDAY", n = clamp(Math.floor((t - 22) / B) + 1, 1, 6), big = t > 25 ? 1 + .06 * pulse : 1;
+      x.font = "400 420px BB"; const widths = [...L].map((c) => x.measureText(c).width), tot = widths.reduce((a, b) => a + b, 0);
+      let X = 960 - tot / 2;
+      [...L].forEach((c, i) => { if (i < n) { const k = spring(t - 22 - i * B, 18); x.save(); x.translate(X + widths[i] / 2, 560); x.scale(lerp(1.6, 1, k) * big, lerp(1.6, 1, k) * big); x.font = "400 420px BB"; x.fillStyle = i === n - 1 && t < 25 ? ORA : (beat % 2 ? ORA : CREAM); x.textAlign = "center"; x.textBaseline = "middle"; x.fillText(c, 0, 0); x.restore(); } X += widths[i]; });
+      if (t > 25.5) T("ALL DAY. ALL OF IT.", 60, 960, 900, BLUE);
+    }
+    // ---------- 28–30 end title, then the question again
+    if (t >= 28) {
+      const a = expo(seg(t, 28, 28.3)), o = expoIn(seg(t, 29.2, 29.5));
+      x.globalAlpha = a * (1 - o); T("IT'S SUNDAY.", 280, 960, 470, INK); T("11 · 10 · 2026", 80, 960, 680, ORA); x.globalAlpha = 1;
+      if (t > 29.5) question();
+    }
+  },
+  sound(A) {
+    const m = A.midi;
+    for (let k = 0; k < 60; k++) { const t0 = k * B; A.kick(t0, .8); A.hat(t0 + B / 2, .07); if (k % 4 === 2) A.clap(t0, .14); }
+    for (const t0 of [2, 6, 10, 14, 18, 22, 28]) A.hit(t0, .4);
+    for (let k = 0; k < 40; k++) { const tt = 2 + Math.pow(k / 40, 1.8) * 4; A.click(tt, .08); }   // the reel ticking, slowing
+    for (let k = 0; k < 8; k++) A.nz(10 + k * B, .1, "lowpass", 600, .3);                          // the die landing
+    for (let r = 0; r < 6; r++) A.pluck(14.1 + r * .35, m(72 + r * 2), .08, .25);
+    A.pad(18, [60, 64, 67].map(m), 4, .03); A.riser(20, 22, .3);
+    for (let i = 0; i < 6; i++) A.tone(22 + i * B, m(72 + [0, 4, 7, 12, 16, 19][i]), .4, "square", .05);
+    A.pad(28, [60, 64, 67, 72].map(m), 2, .045);
+  },
+});
+</script></body></html>

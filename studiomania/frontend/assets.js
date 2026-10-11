@@ -1,6 +1,6 @@
 // 📚 مكتبة الأصول: مقاطع حقيقية من الفيديوهات بحركتها وخلفيتها وصوتها، ومعاها تفكيكها،
 // وكل أصل تقدر تطلع منه نسخ: تعديل جوه المشهد بالكلام، أو سرعة جزء منه.
-const asx = { list: [], cur: null, q: "", cat: "", timer: null, labs: null, shots: {}, tmode: "rebuild", tsel: {} };
+const asx = { list: [], motion: [], cur: null, q: "", cat: "", timer: null, labs: null, shots: {}, tmode: "rebuild", tsel: {} };
 
 async function labLibCount() {
   try {
@@ -12,7 +12,7 @@ async function labLibCount() {
 async function openLib(aid) {
   labx.view = "lib";
   renderLab();
-  asx.list = await api("/api/assets");
+  [asx.list, asx.motion] = await Promise.all([api("/api/assets"), api("/api/motion-library").catch(() => [])]);
   $("labLibCount").textContent = asx.list.length ? `(${asx.list.length})` : "";
   asx.cur = aid && asx.list.some((x) => x.id === aid) ? await api(`/api/assets/${aid}`) : null;
   renderLib();
@@ -21,9 +21,15 @@ async function openLib(aid) {
 
 function scheduleAssetPoll() {
   clearTimeout(asx.timer);
-  if (!asx.cur?.busy || labx.view !== "lib") return;
+  const rendering = !asx.cur && asx.motion.some((m) => m.job?.status === "working");
+  if ((!asx.cur?.busy && !rendering) || labx.view !== "lib") return;
   asx.timer = setTimeout(async () => {
     try {
+      if (!asx.cur) {
+        [asx.list, asx.motion] = await Promise.all([api("/api/assets"), api("/api/motion-library")]);
+        if (!$("labLib").contains(document.activeElement)) renderLib();
+        return scheduleAssetPoll();
+      }
       asx.cur = await api(`/api/assets/${asx.cur.id}`);
       const playing = [...$("labLib").querySelectorAll("video")].some((v) => !v.paused);
       const typing = $("labLib").contains(document.activeElement) && document.activeElement.matches("input, select, textarea");
@@ -55,7 +61,22 @@ function assetGrid() {
       <small class="muted">${ASSET_CATS[a.category] || ""} · ${a.duration} ث · ${a.elements} عنصر${a.variants ? ` · ${a.variants} نسخة` : ""}</small>
       ${(a.tags || []).length ? `<small class="as-tags" data-no-i18n>${a.tags.map((t) => `#${le(t)}`).join(" ")}</small>` : ""}
     </article>`).join("")}</div>`
-    : `<p class="panel muted">${asx.list.length ? "مفيش أصول بالبحث ده." : "المكتبة لسه فاضية. افتح أي فيديو في المعمل، وفي أي لقطة دوس «📚 احفظ كأصل في المكتبة»."}</p>`}`;
+    : `<p class="panel muted">${asx.list.length ? "مفيش أصول بالبحث ده." : "المكتبة لسه فاضية. افتح أي فيديو في المعمل، وفي أي لقطة دوس «📚 احفظ كأصل في المكتبة»."}</p>`}
+    ${motionShelf()}`;
+}
+
+// 🎞️ أنيميشنات مكتوبة بالكود: كل واحدة بتترسم فيديو على السيرفر (ببلاش، من غير AI) وتدخل المكتبة كأصل
+function motionShelf() {
+  const left = asx.motion.filter((m) => !m.asset);
+  if (!asx.motion.length) return "";
+  return `<details class="panel lab-sec" ${asx.motion.some((m) => m.job) ? "open" : ""}><summary><b>🎞️ مكتبة الموشن</b>
+      <small class="muted">${asx.motion.length - left.length} من ${asx.motion.length} في المكتبة · الرسم على السيرفر ببلاش ومن غير AI</small></summary>
+    ${left.length ? `<div class="as-motion">${left.map((m) => `<div class="lab-row"><b class="grow" data-no-i18n>${le(m.name)}</b>
+      <small class="muted">${ASSET_CATS[m.category] || ""}</small>
+      ${m.job?.status === "working" ? `<small>⏳ بيترسم ${Math.round((m.job.progress || 0) * 100)}%</small>`
+        : `${m.job?.status === "error" ? `<small class="muted" title="${le(m.job.error)}">⚠️ فشل</small>` : ""}<button type="button" class="btn sm" data-asmotion="${m.id}">➕ ضيفه</button>`}
+    </div>`).join("")}</div>` : `<p class="muted">كلهم في المكتبة.</p>`}
+  </details>`;
 }
 
 function assetDetail(a) {
@@ -71,8 +92,8 @@ function assetDetail(a) {
         <label>النوع <select data-asf="category">${labOpts(ASSET_CATS, a.category)}</select></label>
         <label>تاجز <input type="text" data-asf="tags" value="${le((a.tags || []).join("، "))}" placeholder="ماوس، سحب، فولدر" data-no-i18n></label>
         <label>ملاحظات <textarea rows="2" data-asf="notes" placeholder="هتستخدمه في إيه؟ إيه اللي حلو فيه؟" data-no-i18n>${le(a.notes)}</textarea></label>
-        <small class="muted">${a.duration} ث · ${a.width}×${a.height} · من
-          <a href="#" data-asgolab="${src.lab}" data-no-i18n>«${le(src.lab_name)}»</a> ${(src.shots || [src.shot]).length > 1 ? `لقطات ${(src.shots || []).join("، ")}` : `لقطة ${(src.shots || [src.shot])[0]}`} (${lt(src.t0)} ← ${lt(src.t1)})</small>
+        <small class="muted">${a.duration} ث · ${a.width}×${a.height} · ${src.motion ? "من 🎞️ مكتبة الموشن" : `من
+          <a href="#" data-asgolab="${src.lab}" data-no-i18n>«${le(src.lab_name)}»</a> ${(src.shots || [src.shot]).length > 1 ? `لقطات ${(src.shots || []).join("، ")}` : `لقطة ${(src.shots || [src.shot])[0]}`} (${lt(src.t0)} ← ${lt(src.t1)})`}</small>
         ${a.description || a.summary ? `<p data-no-i18n>${le(a.description || a.summary)}</p>` : ""}
         ${a.use ? `<small class="muted" data-no-i18n>💼 ${le(a.use)}</small>` : ""}
       </div>
@@ -248,6 +269,14 @@ $("labLib").addEventListener("click", async (e) => {
   if (cat) { asx.cat = cat.dataset.ascat; return renderLib(); }
   const open = t.closest("[data-asopen]");
   if (open) return openLib(open.dataset.asopen);
+  const mo = t.closest("[data-asmotion]");
+  if (mo) {
+    return busyButton(mo, "⏳", async () => {
+      await api(`/api/motion-library/${mo.dataset.asmotion}/import`, { method: "POST" });
+      asx.motion = await api("/api/motion-library");
+      renderLib(); scheduleAssetPoll();
+    });
+  }
   if (t.closest("[data-asback]")) { asx.cur = null; return openLib(); }
   const clear = t.closest("[data-asclear]");
   if (clear) {

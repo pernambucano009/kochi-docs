@@ -1,0 +1,100 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// #52 Chaotic POV — "POV: you're the AI someone opens 47 times a day". 30 s, 1080×1920, 140 BPM.
+// Fast cuts on the beat, stacked captions, zoom punches; running joke: "make it pop" (the blob inflates more each time
+// until it literally pops). Payoff loops to the start: "ok perfect. now the same for tomorrow".
+const W = 1080, H = 1920, BPM = 140, B = 60 / BPM, DUR = 30;
+const C = ["#ff3b30", "#ffd60a", "#30d158", "#0a84ff", "#bf5af2", "#ff9f0a", "#111111", "#f2f2f2"];
+// [beat, user request, my reaction (huge), my inner caption, pop level]
+const EV = [
+  [0, "write me a poem", "SURE!", "me: finally, art", 0],
+  [4, "shorter", "OK", "me: cut 3 lines", 0],
+  [7, "longer", "OK??", "me: put them back", 0],
+  [10, "make it pop", "POP", "me: what is pop", 1],
+  [14, "more pop", "POPPP", "me: adding pop", 2],
+  [17, "less pop", "pop", "me: removing pop", .5],
+  [20, "make it sound like me", "HI ME", "me: who are you", 0],
+  [24, "but smarter", "BIG BRAIN", "me: rude but ok", 0],
+  [28, "now in Arabic", "حاضر", "me: يلا", 0],
+  [31, "now like a pirate", "ARRR", "me: ahoy, poem", 0],
+  [34, "as a spreadsheet", "=POEM()", "me: cells. so many cells", 0],
+  [38, "the spreadsheet but a song", "♪ A1 B2 ♪", "me: this is my life now", 0],
+  [42, "make it pop", "POP!!", "me: again??", 3],
+  [46, "MORE", "POP!!!!", "me: it's getting big", 4.5],
+  [50, "MORE POP", "pls", "me: please", 6],
+  [53, "", "*POP*", "", 9],
+  [56, "ok perfect", "THANK YOU", "me: …i made a thing", 0],
+  [60, "now the same for tomorrow", "SURE!", "me: (loads poem.exe)", 0],
+  [66, "write me a poem", "SURE!", "me: finally, art", 0],
+];
+M.reel({
+  W, H, DUR, bg: "#111",
+  fonts: { AN: "anton.ttf", I8: ["inter800.ttf", "800"], I5: ["inter500.ttf", "500"] },
+  init(M) { const c = M.canvas(W, H); return { x: c.getContext("2d") }; },
+  seek(t, P, M) {
+    const { x } = P, { seg, lerp, clamp, expo, spring, springO, hash } = M;
+    const beat = Math.floor(t / B), bt = t - beat * B;
+    const ei = EV.findIndex((e, i) => beat >= e[0] && (i === EV.length - 1 || beat < EV[i + 1][0]));
+    const e = EV[ei], since = t - e[0] * B;
+    // background: hard colour cut on every beat (chaos), with a stripe pattern on even beats
+    const bg = C[(beat * 3 + ei) % 7], fg = bg === "#ffd60a" || bg === "#30d158" || bg === "#f2f2f2" || bg === "#ff9f0a" ? "#111" : "#fff";
+    x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = bg; x.fillRect(0, 0, W, H);
+    if (beat % 2 === 0) { x.fillStyle = "rgba(0,0,0,.08)"; for (let i = -4; i < 30; i++) { x.save(); x.translate(i * 120, 0); x.rotate(.3); x.fillRect(0, -200, 50, 2600); x.restore(); } }
+    // zoom punch on each event start + a tiny one per beat
+    const punch = 1 + .14 * (1 - spring(since, 18)) + .03 * (1 - spring(bt, 22));
+    x.translate(W / 2, H / 2); x.scale(punch, punch); x.rotate((hash(ei) - .5) * .06 * (1 - spring(since, 10))); x.translate(-W / 2, -H / 2);
+    // counter: requests today
+    const reqs = Math.min(47, 1 + ei * 3 + Math.floor(since / B));
+    x.fillStyle = fg; x.font = "800 40px I8"; x.textAlign = "left"; x.fillText(`requests today: ${reqs}`, 60, 110);
+    x.font = "500 30px I5"; x.globalAlpha = .7; x.fillText("POV: you're the AI they open all day", 60, 160); x.globalAlpha = 1;
+    // the user's message as a chat bubble (drops in)
+    if (e[1]) {
+      const k = expo(seg(since, 0, .18));
+      x.font = "800 56px I8"; const tw = Math.min(900, x.measureText(e[1]).width);
+      const bx = W - 70 - tw - 60, by = 250 - (1 - k) * 80;
+      const bub = bg === "#0a84ff" ? "#ffffff" : "#0a84ff";
+      x.globalAlpha = k; x.fillStyle = bub; x.beginPath(); x.roundRect(bx, by, tw + 60, 110, 50); x.fill();
+      x.fillStyle = bub === "#ffffff" ? "#0a84ff" : "#fff"; x.textAlign = "left"; x.fillText(e[1], bx + 30, by + 74, 900); x.globalAlpha = 1;
+    }
+    // me: a blob with eyes; inflates with the pop level (running joke), pops at level 9
+    const popLv = e[4], infl = lerp(1, 1 + popLv * .18, springO(since, 10, .5));
+    const popped = popLv >= 9;
+    const by0 = 980;
+    if (!popped) {
+      const wob = Math.sin(t * 9) * 6 * (popLv > 3 ? 1 : .3);
+      x.fillStyle = fg === "#111" ? "#111" : "#fff";
+      x.beginPath(); x.ellipse(W / 2, by0, 230 * infl + wob, 210 * infl - wob, 0, 0, 7); x.fill();
+      const look = (hash(beat) - .5) * 30;
+      x.fillStyle = bg; for (const s of [-1, 1]) { x.beginPath(); x.ellipse(W / 2 + s * 70 * infl + look, by0 - 30, 26, 38 * (1 - (beat % 7 === 0 ? .8 : 0)), 0, 0, 7); x.fill(); }
+      x.strokeStyle = bg; x.lineWidth = 12; x.lineCap = "round"; x.beginPath();
+      if (popLv > 2) x.arc(W / 2, by0 + 80, 40, Math.PI * 1.15, Math.PI * 1.85); else x.arc(W / 2, by0 + 40, 60, Math.PI * .15, Math.PI * .85);
+      x.stroke();
+    } else {
+      // the pop: shreds flying out, as a function of time since the pop
+      for (let i = 0; i < 40; i++) { const a = hash(i) * 6.28, v = 300 + hash(i + 7) * 900, s = since; x.fillStyle = i % 2 ? "#fff" : "#111"; x.save(); x.translate(W / 2 + Math.cos(a) * v * s, by0 + Math.sin(a) * v * s + 900 * s * s); x.rotate(a + s * 10); x.fillRect(-30, -10, 60, 20); x.restore(); }
+    }
+    // the huge reaction word, stacked with an outline copy behind (caption stack)
+    const rk = springO(since - .05, 16, .55);
+    x.textAlign = "center"; x.font = `400 ${popped ? 240 : 200}px AN`;
+    x.save(); x.translate(W / 2, 1440); x.scale(rk, rk); x.rotate((hash(ei + 3) - .5) * .12);
+    x.lineWidth = 16; x.strokeStyle = fg === "#111" ? "#fff" : "#111"; x.strokeText(e[2], 10, 10);
+    x.fillStyle = fg; x.fillText(e[2], 0, 0, 1000); x.restore();
+    // inner caption, word by word, bold, one or two words at a time
+    if (e[3]) {
+      const words = e[3].split(" "), n = Math.min(words.length, 1 + Math.floor(since / (B * .5)));
+      const chunk = words.slice(Math.max(0, n - 2), n).join(" ");
+      x.font = "800 64px I8"; x.fillStyle = fg; x.fillText(chunk, W / 2, 1690);
+    }
+    // loop marker at the very end: the frame matches the start
+  },
+  sound(A) {
+    const m = A.midi;
+    // 140 BPM: kick each beat, snare on 2 & 4, a cheeky square-lead stab on each event
+    for (let k = 0; k < 70; k++) { const t0 = k * B; A.kick(t0, .9); A.hat(t0 + B / 2, .09); if (k % 2) A.snare(t0, .25); }
+    EV.forEach(([b, , , , pop], i) => { const t0 = b * B; A.tone(t0, m(72 + (i % 5) * 2), .12, "square", .07); A.click(t0, .2); if (pop) for (let k = 0; k < pop; k++) A.tone(t0 + k * .05, m(84 + k), .05, "square", .04); });
+    A.riser(46 * B, 53 * B, .35);
+    A.nz(53 * B, .6, "highpass", 1500, .7); A.hit(53 * B, .6);   // the POP
+    A.tone(56 * B, m(72), .6, "sine", .08); A.tone(56 * B + .1, m(76), .6, "sine", .08); A.tone(56 * B + .2, m(79), .8, "sine", .08);
+  },
+});
+</script></body></html>

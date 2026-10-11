@@ -1491,6 +1491,7 @@ a.pl-link:hover { background: color-mix(in srgb, var(--ok) 24%, transparent); }
 .lab-chips .chip.on { border-color: var(--accent); background: var(--accent-soft); }
 .as-filter { gap: 8px; margin-bottom: 10px; }
 .as-filter input[type=search] { flex: 0 1 260px; }
+.as-motion { max-height: 420px; overflow: auto; }
 .as-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
 .as-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 6px; display: flex; flex-direction: column; gap: 4px; cursor: pointer; }
 .as-card:hover { border-color: var(--accent); }

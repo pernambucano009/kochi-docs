@@ -1,0 +1,126 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// #151 "كل حرف يبدأ بنقطة" — 30 s. Topic picked for an Arabic-first motion designer: the proportioned script of Ibn Muqla
+// (10th century): the rhombic dot made by the reed pen (qalam) is the unit; the alif is measured in dots; the circle whose
+// diameter is the alif governs the curves of the other letters. Everything is drawn with one simulated qalam: a nib cut at an
+// angle, so the stroke goes thick and thin by direction (no font for the strokes).
+// Banned honoured: no particles, glows, flares, shake, RGB split, crossfades, gradients, bouncy easing; nothing holds still >0.5 s
+// (a slow continuous drift + the pen is always moving).
+const W = 1920, H = 1080, PAPER = "#efe4cc", INK = "#1b1410", RED = "#b3261e";
+const NIB = 64, NA = -.72;   // nib width and angle
+const nib = [Math.cos(NA) * NIB / 2, Math.sin(NA) * NIB / 2];
+const bez = (p0, p1, p2, p3, n = 80) => { const o = []; for (let i = 0; i <= n; i++) { const u = i / n, a = (1 - u) ** 3, b = 3 * u * (1 - u) ** 2, c = 3 * u * u * (1 - u), d = u ** 3; o.push([a * p0[0] + b * p1[0] + c * p2[0] + d * p3[0], a * p0[1] + b * p1[1] + c * p2[1] + d * p3[1]]); } return o; };
+// strokes, in the order the pen writes them
+const CXc = 960, CYc = 560, AL = 7 * NIB * .78;   // alif height = 7 stacked dots (for this hand)
+const SEQ = [];
+// the stacked dots (beside the alif)
+for (let i = 0; i < 7; i++) { const y = 860 - i * NIB * .78; SEQ.push({ t0: 4.0 + i * .5, d: .32, pts: [[600, y], [600 + NIB * .55, y + NIB * .1]] }); }
+// the alif
+SEQ.push({ t0: 7.8, d: 1.0, pts: bez([780, 860 - AL + 10], [786, 860 - AL * .6], [780, 860 - AL * .3], [774, 860 + 20]) });
+// letters in the circle (after the alif turns into the diameter): nun, then ba
+const R = AL / 2;
+SEQ.push({ t0: 16.4, d: 1.4, pts: bez([CXc + R * .95, CYc - R * .15], [CXc + R * 1.05, CYc + R * 1.15], [CXc - R * 1.05, CYc + R * 1.15], [CXc - R * .9, CYc - R * .1]) });   // ن bowl
+SEQ.push({ t0: 18.0, d: .3, pts: [[CXc - 10, CYc - R * .55], [CXc - 10 + NIB * .55, CYc - R * .55 + NIB * .1]] });   // its dot
+SEQ.push({ t0: 19.4, d: 1.3, pts: bez([CXc + R * 1.0, CYc + R * .55], [CXc + R * .4, CYc + R * 1.02], [CXc - R * .6, CYc + R * 1.02], [CXc - R * 1.0, CYc + R * .5]) });   // ب body (shallow)
+SEQ.push({ t0: 20.9, d: .3, pts: [[CXc - 10, CYc + R * 1.35], [CXc - 10 + NIB * .55, CYc + R * 1.35 + NIB * .1]] });   // its dot
+SEQ.forEach((s) => { let L = 0; s.len = [0]; for (let i = 1; i < s.pts.length; i++) { L += Math.hypot(s.pts[i][0] - s.pts[i - 1][0], s.pts[i][1] - s.pts[i - 1][1]); s.len.push(L); } s.L = L; });
+M.reel({
+  W, H, DUR: 30, bg: PAPER,
+  fonts: { AM: ["amiri700.ttf", "700"] },
+  init(M) {
+    const c = M.canvas(W, H);
+    const tex = document.createElement("canvas"); tex.width = W; tex.height = H; const g = tex.getContext("2d"), r = M.rng(4);
+    for (let i = 0; i < 1800; i++) { g.fillStyle = r() < .5 ? "rgba(120,90,50,.05)" : "rgba(255,255,255,.08)"; g.fillRect(r() * W, r() * H, 1 + r() * 3, 1 + r() * 3); }
+    return { x: c.getContext("2d"), tex };
+  },
+  seek(t, P, M) {
+    const { x, tex } = P, { seg, lerp, clamp, expo, expoIO, sine, cubicIO } = M;
+    x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = PAPER; x.fillRect(0, 0, W, H); x.drawImage(tex, 0, 0);
+    // a continuous slow drift (nothing ever sits still); a push toward the circle mid-film
+    const z = 1 + t * .004 + .12 * sine(seg(t, 12, 22)) - .12 * sine(seg(t, 22, 26));
+    x.translate(W / 2, H / 2); x.scale(z, z); x.translate(-W / 2 - 40 * Math.sin(t * .2), -H / 2);
+    // the pen stroke: quads between nib positions → thick/thin by direction
+    let pen = null;
+    const stroke = (s, k, col = INK, xf = null) => {
+      const upto = s.L * k; x.fillStyle = col;
+      for (let i = 1; i < s.pts.length; i++) {
+        if (s.len[i - 1] > upto) break;
+        let a = s.pts[i - 1], b = s.pts[i];
+        if (s.len[i] > upto) { const f = (upto - s.len[i - 1]) / (s.len[i] - s.len[i - 1]); b = [lerp(a[0], b[0], f), lerp(a[1], b[1], f)]; }
+        if (xf) { a = xf(a); b = xf(b); }
+        x.beginPath(); x.moveTo(a[0] - nib[0], a[1] - nib[1]); x.lineTo(a[0] + nib[0], a[1] + nib[1]); x.lineTo(b[0] + nib[0], b[1] + nib[1]); x.lineTo(b[0] - nib[0], b[1] - nib[1]); x.fill();
+        if (k < 1) pen = b;
+      }
+    };
+    // ===== 0–4: the pen arrives and makes the first dot (the unit)
+    const first = { pts: [[960, 540], [960 + NIB * .55, 540 + NIB * .1]] }; first.len = [0, Math.hypot(NIB * .55, NIB * .1)]; first.L = first.len[1];
+    if (t < 4.2) {
+      const k = expoIO(seg(t, 1.2, 1.7)); stroke(first, k);
+      if (t < 1.2) pen = [lerp(1500, 960, expoIO(seg(t, 0, 1.2))), lerp(200, 540, expoIO(seg(t, 0, 1.2)))];
+      if (t > 1.7) pen = [960 + NIB * .55 + (t - 1.7) * 40, 540 - (t - 1.7) * 60];
+      // the dot travels to become the first of the stack
+      if (t > 3.4) { /* handed to the stack below */ }
+      const a = expo(seg(t, 2.0, 2.4)) * (1 - expo(seg(t, 3.6, 3.9)));
+      x.globalAlpha = a; x.font = "700 130px AM"; x.textAlign = "center"; x.textBaseline = "middle"; x.fillStyle = INK; x.fillText("النقطة", 960, 330 - (1 - a) * 20); x.globalAlpha = 1;
+    }
+    // ===== 4–12: dots stack; the alif is written beside them — it is measured in dots
+    const turn = expoIO(seg(t, 11.6, 13.2));   // the alif swings flat to become the circle's diameter
+    if (t >= 3.9 && t < 30) {
+      const fade = t > 13 ? 1 - seg(t, 13, 13.6) : 1;   // the dots slide away (not a fade): they drop off the page
+      SEQ.slice(0, 7).forEach((s, i) => { const k = clamp((t - s.t0) / s.d); if (k <= 0) return; const drop = t > 13 ? (t - 13 - i * .04) ** 2 * 1800 : 0; stroke(s, expoIO(k), INK, drop > 0 ? (p) => [p[0] - drop * .2, p[1] + drop] : null); });
+      // the alif: written, then rotated about its centre into the horizontal diameter of the circle, moved to the centre
+      const al = SEQ[7], ka = clamp((t - al.t0) / al.d);
+      if (ka > 0) {
+        const c0 = [778, 860 - AL / 2 + 15], ang = -Math.PI / 2 * turn, cx = lerp(c0[0], CXc, turn), cy = lerp(c0[1], CYc, turn);
+        stroke(al, expoIO(ka), t > 13.2 ? "rgba(27,20,16,.85)" : INK, (p) => { const dx = p[0] - c0[0], dy = p[1] - c0[1]; const dr = t > 22.8 ? (t - 22.8) ** 2 * 2400 : 0; return [cx + dx * Math.cos(ang) - dy * Math.sin(ang), cy + dx * Math.sin(ang) + dy * Math.cos(ang) - dr]; });
+      }
+      // measurement ticks between dots and alif
+      if (t > 8.9 && t < 11.6) { const k = expo(seg(t, 8.9, 9.4)); x.strokeStyle = RED; x.lineWidth = 3; for (let i = 0; i <= 7; i++) { const y = 860 + NIB * .4 - i * NIB * .78; x.beginPath(); x.moveTo(660, y); x.lineTo(660 + 70 * k, y); x.stroke(); } }
+      const a = expo(seg(t, 9.0, 9.4)) * (1 - expo(seg(t, 11.3, 11.6)));
+      x.globalAlpha = a; x.font = "700 110px AM"; x.textAlign = "right"; x.textBaseline = "middle"; x.fillStyle = INK; x.fillText("الألف يُقاس بالنقطة", 1760, 600); x.globalAlpha = 1;
+    }
+    // ===== 13–16: the circle whose diameter is the alif
+    if (t > 13.0 && t < 23.0) {
+      const k = expoIO(seg(t, 13.2, 15.0));
+      x.strokeStyle = RED; x.lineWidth = 3; x.setLineDash([12, 10]); x.beginPath(); x.arc(CXc, CYc, R + NIB * .2, Math.PI, Math.PI + Math.PI * 2 * k); x.stroke(); x.setLineDash([]);
+      const a = expo(seg(t, 14.0, 14.4)) * (1 - expo(seg(t, 16.0, 16.3)));
+      x.globalAlpha = a; x.font = "700 100px AM"; x.textAlign = "center"; x.fillStyle = INK; x.fillText("ودائرةٌ قطرُها الألف", CXc, CYc - R - 140); x.globalAlpha = 1;
+    }
+    // ===== 16–22: letters drawn inside the circle (ن then ب)
+    SEQ.slice(8).forEach((s) => { const k = clamp((t - s.t0) / s.d); if (k > 0 && t < 23.6) stroke(s, sine(k), INK, t > 22.8 ? (p) => [p[0], p[1] - (t - 22.8) ** 2 * 2400] : null); });
+    if (t > 21.4 && t < 23) { const a = expo(seg(t, 21.4, 21.8)) * (1 - expo(seg(t, 22.6, 22.9))); x.globalAlpha = a; x.font = "700 90px AM"; x.textAlign = "center"; x.fillStyle = RED; x.fillText("الحروف تأخذ مقاسها منهما", CXc, CYc + R + 230); x.globalAlpha = 1; }
+    // ===== 23–30: the line, written; the last thing the pen makes is the dot of «نقطة»
+    if (t > 23.0) {
+      const k = expo(seg(t, 23.2, 24.2));
+      x.save(); x.beginPath(); x.rect(0, 0, lerp(1960, 0, 0) , H); x.clip();
+      x.font = "700 190px AM"; x.textAlign = "center"; x.textBaseline = "middle"; x.fillStyle = INK;
+      // a reveal right-to-left, the way Arabic is written
+      const tw = x.measureText("كل حرف يبدأ بنقطة").width, right = 960 + tw / 2, rv = expoIO(seg(t, 23.4, 26.6));
+      x.save(); x.beginPath(); x.rect(right - tw * rv - 10, 300, tw * rv + 20, 400); x.clip(); x.fillText("كل حرف يبدأ بنقطة", 960, 500); x.restore();
+      pen = t < 26.6 ? [right - tw * rv, 470 + Math.sin(t * 22) * 30] : pen;
+      x.restore();
+      // the red dot at the very end: the pen's last touch
+      if (t > 27.0) { const d = { pts: [[560, 640], [560 + NIB * .55, 640 + NIB * .1]] }; d.len = [0, Math.hypot(NIB * .55, NIB * .1)]; d.L = d.len[1]; stroke(d, expoIO(seg(t, 27.0, 27.3)), RED); if (t < 27.3) pen = [700, 640]; }
+      const a2 = expo(seg(t, 27.6, 28.0)); x.globalAlpha = a2; x.font = "700 56px AM"; x.fillStyle = "#6b5a48"; x.fillText("ابن مقلة · القرن العاشر الميلادي", 960, 800); x.globalAlpha = 1;
+      if (t > 27.3) pen = [700 + (t - 27.3) * 260, 640 - (t - 27.3) * 340];
+    }
+    // the qalam itself: a reed held at the nib angle, always moving
+    if (pen) { x.save(); x.translate(pen[0], pen[1]); x.rotate(.5); x.fillStyle = "#b98b4e"; x.fillRect(-12, -470, 24, 450); x.fillStyle = "#8a6232"; x.beginPath(); x.moveTo(-9, -20); x.moveTo(-12, -20); x.lineTo(12, -20); x.lineTo(3, 0); x.lineTo(-5, 0); x.fill(); x.restore(); }
+  },
+  sound(A) {
+    const m = A.midi;
+    // the reed on paper: filtered noise scratches timed to each stroke; a low oud-like pluck marks each idea
+    const scratch = (t0, d) => A.nz(t0, d, "bandpass", 3200, .08, 2);
+    scratch(1.2, .5);
+    SEQ.forEach((s) => scratch(s.t0, s.d));
+    for (let t0 = 23.4; t0 < 26.6; t0 += .22) scratch(t0, .18);
+    scratch(27.0, .3);
+    const oud = (t0, n, g = .14) => { A.pluck(t0, m(n), g, 1.2); A.tone(t0, m(n) * 2, .5, "triangle", g * .2); };
+    // maqam-flavoured line (hijaz-ish: D Eb F# G A)
+    [[1.7, 62], [2.4, 63], [4.0, 66], [6.0, 67], [7.8, 69], [9.0, 67], [11.6, 66], [13.2, 63], [14.0, 62], [16.4, 62], [18.0, 66], [19.4, 67], [21.4, 69], [23.4, 74], [24.6, 72], [25.6, 70], [27.0, 74]].forEach(([t0, n]) => oud(t0, n));
+    A.pad(0, [m(50), m(57)], 30, .025);
+    for (let t0 = .5; t0 < 30; t0 += 1.07) A.tone(t0, m(38), .35, "sine", .1);   // a frame-drum pulse
+    A.tone(27.0, m(86), 1.5, "sine", .05);
+  },
+});
+</script></body></html>

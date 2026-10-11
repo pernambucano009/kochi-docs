@@ -1,0 +1,178 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// #152 "THE LAST LIGHT" — 4 minutes. At the end of time a small lamplighter robot tends the last star in the universe.
+// WANT: keep the last star burning.
+//  1 (50–90 s)  it feeds the star with rocks — a flare, then the rocks smother it.
+//  2 (90–135 s) it builds a shell of mirrors to keep the heat in — the star shrinks inside; a panel knocks the robot away.
+//  3 (135–175 s) it plugs its own battery into the star — the star brightens a moment, the robot almost goes dark.
+//  TURN (175–212 s) the star goes out. The only light left in the universe is the robot's own lamp. It opens the lamp and lets it go.
+//  END (212–236 s) the spark swells into a new beginning: rings, then galaxies. THE FIRST LIGHT.
+//  GAG (236–240 s) a newborn star ignites — and a brand-new little lamplighter zips in with a polishing cloth.
+// Light is drawn as hard-edged stepped rings (no glows, no gradients). Shots cut on action; colour follows the mood.
+const W = 1920, H = 1080, SX = 1180, SY = 520;   // the star's place
+const SHOTS = [
+  [0, 960, 540, 1], [25, 1050, 540, 1.15], [38, 760, 600, 2.2], [50, 1000, 560, 1.3], [64, 860, 580, 2.0], [74, 1100, 540, 1.25],
+  [90, 1050, 540, 1.2], [104, 960, 560, 1.6], [118, 820, 600, 1.0], [127, 560, 660, 1.8], [135, 1000, 580, 1.4], [150, 820, 600, 2.4],
+  [163, 1020, 560, 1.3], [175, 980, 560, 1.15], [188, 840, 620, 2.6], [200, 840, 620, 3.2], [212, 960, 540, 1], [236, 980, 520, 2.2],
+];
+M.reel({
+  W, H, DUR: 240, SUB: 1, bg: "#05060c",
+  fonts: { FR: ["Fraunces_ital_wght_1_400.ttf", "400"] },
+  init(M) {
+    const c = M.canvas(W, H), r = M.rng(9), stars = [];
+    for (let i = 0; i < 260; i++) stars.push([r() * W * 1.6 - W * .3, r() * H * 1.6 - H * .3, .6 + r() * 2.2, 25 + r() * 20, r()]);   // [x, y, size, death time, hue]
+    const rocks = []; for (let i = 0; i < 9; i++) rocks.push([r(), r(), 6 + r() * 14]);
+    return { x: c.getContext("2d"), stars, rocks };
+  },
+  seek(t, P, M) {
+    const { x, stars, rocks } = P, { seg, lerp, clamp, expo, expoIO, springO, sine, hash, noise1 } = M;
+    let sh = SHOTS[0]; for (const s of SHOTS) if (t >= s[0]) sh = s;
+    const [t0, cx, cy, z0] = sh, z = z0 * (1 + (t - t0) * .004);   // a slow push inside every shot
+    x.setTransform(1, 0, 0, 1, 0, 0);
+    // mood: deep blue-black; warmer while the star lives; pure black after it dies; new colour in the new universe
+    const after = seg(t, 212, 222);
+    x.fillStyle = t < 176 ? "#05060c" : t < 212 ? "#000000" : `rgb(${Math.round(lerp(0, 14, after))},${Math.round(lerp(0, 10, after))},${Math.round(lerp(0, 32, after))})`; x.fillRect(0, 0, W, H);
+    x.translate(W / 2, H / 2); x.scale(z, z); x.translate(-cx, -cy);
+    // light as stepped rings: no gradients
+    const rings = (X, Y, R, cols, steps = cols.length) => { for (let i = 0; i < steps; i++) { x.fillStyle = cols[i]; x.beginPath(); x.arc(X, Y, R * (1 - i / steps), 0, 7); x.fill(); } };
+    // ---------- the old universe: distant stars winking out one by one
+    if (t < 212) stars.forEach(([sx, sy, s, death, hh], i) => { const d = death + i * .02; if (t > d) return; const k = clamp((d - t) / 3); x.fillStyle = hh < .3 ? "#c45a3a" : hh < .6 ? "#8a6f5a" : "#5a6278"; x.beginPath(); x.arc(sx, sy, s * Math.min(1, k + .2), 0, 7); x.fill(); });
+    // ---------- the last star: its strength over time (the story's spine)
+    const S = (() => {
+      let v = 1 - t * .0015;                                                // slowly fading
+      v -= t > 25 && t < 50 ? Math.max(0, Math.sin(t * 2.7)) * .05 : 0;     // flickers
+      if (t > 66) v += .35 * Math.exp(-(t - 66) * 1.2) * (t < 70 ? 1 : 1);  // the rocks' flare…
+      if (t > 70) v -= .18 * clamp((t - 70) / 8);                          // …then they smother it
+      if (t > 104) v -= .25 * clamp((t - 104) / 14);                        // shrinking inside the shell
+      if (t > 150) v += .25 * Math.sin(clamp((t - 150) / 12) * Math.PI);  // the battery's gift
+      if (t > 165) v -= clamp((t - 165) / 11) * .6;
+      return clamp(v, 0, 1.2);
+    })();
+    const starAlive = t < 176.5;
+    if (starAlive) {
+      const R = 60 + 140 * S, fl = 1 + noise1(t * 3) * .03;
+      const hot = S > .9 ? ["#ffe9b0", "#ffc76a", "#ff9a3c", "#e2632a"] : S > .5 ? ["#ffc76a", "#ff9a3c", "#e2632a", "#a83a22"] : ["#e2632a", "#a83a22", "#6d2416", "#3a140c"];
+      rings(SX, SY, R * 1.5 * fl, ["#1a0d10", "#2a1210", ...hot], 6);
+      // surface spots (slow turbulence)
+      for (let i = 0; i < 7; i++) { const a = i * .9 + t * .05, d = R * .5 * (.4 + hash(i) * .5); x.fillStyle = "rgba(120,30,10,.35)"; x.beginPath(); x.ellipse(SX + Math.cos(a) * d, SY + Math.sin(a) * d * .8, R * .12, R * .08, a, 0, 7); x.fill(); }
+    } else if (t < 179) { const k = (t - 176.5) / 2.5; x.fillStyle = "#3a140c"; x.beginPath(); x.arc(SX, SY, 30 * (1 - k), 0, 7); x.fill(); }
+    // ---------- the mirror shell (attempt 2): panels arrive one by one, close, then burst open
+    if (t > 92 && t < 136) {
+      const NP = 10;
+      for (let i = 0; i < NP; i++) {
+        const ti = 92 + i * 1.1, k = expoIO(seg(t, ti, ti + 1)), a = i / NP * Math.PI * 2;
+        const burst = t > 118 ? expo(seg(t, 118, 119.2)) : 0;
+        const r0 = lerp(700, 250, k) + burst * (300 + hash(i) * 500), a2 = a + burst * (hash(i + 3) - .5) * 2;
+        if (k <= 0) continue;
+        x.save(); x.translate(SX + Math.cos(a2) * r0, SY + Math.sin(a2) * r0); x.rotate(a2 + Math.PI / 2 + burst * i);
+        x.fillStyle = "#b9c4d6"; x.fillRect(-80, -8, 160, 16); x.fillStyle = "#e9eef6"; x.fillRect(-80, -8, 160, 4); x.restore();
+      }
+    }
+    // ---------- the robot (feet = jet nozzle origin). Big round eye leads; lamp on a neck; squash on stops.
+    const robot = (X, Y, o = {}) => {
+      const s = o.s || 1, sq = o.sq || 0, look = o.look || [0, 0], lamp = o.lamp ?? 1;
+      x.save(); x.translate(X, Y); x.rotate(o.tilt || 0); x.scale(s * (1 + sq), s * (1 - sq));
+      // jet flame (stepped)
+      if (o.jet) rings(0, 40, 14 + Math.sin(t * 40) * 3, ["#ff9a3c", "#ffe9b0"], 2);
+      // body
+      x.fillStyle = "#8c96a8"; x.beginPath(); x.ellipse(0, 0, 46, 40, 0, 0, 7); x.fill(); x.fillStyle = "#b9c4d6"; x.beginPath(); x.ellipse(-8, -8, 34, 28, 0, 0, 7); x.fill();
+      // arm (holds things)
+      x.strokeStyle = "#5b6577"; x.lineWidth = 7; x.lineCap = "round"; const aa = o.arm ?? .6; x.beginPath(); x.moveTo(30, 10); x.lineTo(30 + Math.cos(aa) * 46, 10 + Math.sin(aa) * 46); x.stroke();
+      if (o.hold) o.hold(30 + Math.cos(aa) * 46, 10 + Math.sin(aa) * 46);
+      // eye screen
+      x.fillStyle = "#12141c"; x.beginPath(); x.ellipse(4, -6, 24, 20, 0, 0, 7); x.fill();
+      if (!o.dead) { x.fillStyle = o.eyeCol || "#e9eef6"; const blink = o.blink ? .15 : 1; x.beginPath(); x.ellipse(4 + look[0] * 10, -6 + look[1] * 8, 7, 7 * blink, 0, 0, 7); x.fill(); }
+      // neck + lamp
+      x.strokeStyle = "#5b6577"; x.lineWidth = 5; x.beginPath(); x.moveTo(-18, -34); x.quadraticCurveTo(-30, -80, -6, -96); x.stroke();
+      x.fillStyle = "#5b6577"; x.beginPath(); x.moveTo(-26, -96); x.lineTo(14, -96); x.lineTo(4, -112); x.lineTo(-16, -112); x.fill();
+      if (lamp > 0) rings(-6, -88, 10 + 8 * lamp, ["#ffc76a", "#ffe9b0", "#ffffff"].slice(0, 3), 3);
+      else { x.fillStyle = "#2a2e38"; x.beginPath(); x.arc(-6, -88, 9, 0, 7); x.fill(); }
+      x.restore();
+    };
+    // its acting, phase by phase
+    let rx = 760, ry = 600, ro = { look: [1, -.2], jet: true, lamp: 1 };
+    const bob = Math.sin(t * 1.6) * 6;
+    if (t < 25) { rx = lerp(-200, 520, expoIO(seg(t, 8, 22))); ry = 640 + bob; ro.look = [1, -.4]; }
+    else if (t < 50) { rx = lerp(520, 780, expoIO(seg(t, 25, 34))); ry = 610 + bob; ro.look = t > 40 && t < 44 ? [1, 0] : [1, -.2]; ro.arm = t > 44 ? .2 + Math.sin(t * 8) * .4 : .6;   // polishing the star's light (it rubs the air)
+      if (t > 46) { ro.look = [0, .6]; ro.sq = .06; } }
+    else if (t < 90) {   // rocks
+      const fetch = (t - 50) % 10, k = clamp(fetch / 4);
+      rx = t < 64 ? lerp(780, 380, expoIO(seg(t, 50, 54))) : 780; ry = 600 + bob;
+      ro.look = t < 64 ? [-1, .2] : [1, 0];
+      if (t > 54 && t < 64) { ro.arm = -1.2 + Math.sin(t * 2) * .3; ro.hold = (hx, hy) => { x.fillStyle = "#4a4038"; for (let i = 0; i < 3; i++) { x.beginPath(); x.arc(hx + i * 10 - 10, hy - 10 - i * 4, 12, 0, 7); x.fill(); } }; }
+      if (t >= 64 && t < 66) { rx = lerp(380, 780, expoIO(seg(t, 64, 65))); ro.arm = -1.6; ro.sq = .1; }
+      if (t >= 66 && t < 66.6) { ro.arm = .2; ro.sq = -.1; }   // the throw (follow-through)
+      if (t > 66) { ro.look = t < 70 ? [1, -.3] : [0, .8]; ro.eyeCol = t > 70 ? "#9aa4b6" : undefined; }
+      if (t > 78) { ro.sq = .08; ro.look = [-.4, .9]; }
+    } else if (t < 136) {   // the shell
+      rx = 640 + Math.sin(t * .8) * 40; ry = 620 + bob; ro.look = [1, -.1];
+      if (t > 92 && t < 104) { ro.arm = -.6 + Math.sin(t * 3) * .5; ro.look = [Math.cos(t * .6), -.2]; }
+      if (t > 104 && t < 118) { ro.look = [1, 0]; ro.sq = .04; }
+      if (t > 118) { const kk = clamp((t - 118.4) / 1.4); rx = lerp(700, 260, expo(kk)); ry = lerp(620, 760, expo(kk)) + Math.sin(kk * Math.PI) * -80; ro.tilt = expo(kk) * 5; ro.look = [0, 0]; ro.blink = t > 119.5 && t < 124; }
+      if (t > 125) { ro.tilt = 5 - expo(seg(t, 125, 127)) * 5 + Math.sin(t * 9) * .2 * (1 - seg(t, 125, 130)); rx = lerp(260, 700, expoIO(seg(t, 128, 134))); ry = 700 - expoIO(seg(t, 128, 134)) * 80 + bob; ro.look = [1, 0]; }
+    } else if (t < 176) {   // the battery
+      rx = lerp(700, 860, expoIO(seg(t, 136, 142))); ry = 600 + bob; ro.look = [1, 0];
+      const plugged = t > 147 && t < 168; ro.arm = t > 143 ? -.1 : .6;
+      ro.lamp = plugged ? Math.max(.08, 1 - (t - 147) / 18) : t >= 168 ? .12 : 1;
+      if (plugged) { x.strokeStyle = "#f2c230"; x.lineWidth = 4; x.setLineDash([10, 8]); x.lineDashOffset = -t * 120; x.beginPath(); x.moveTo(rx + 76, ry - 2); x.quadraticCurveTo((rx + SX) / 2, ry + 120, SX - 120, SY + 40); x.stroke(); x.setLineDash([]); }
+      if (t > 160 && t < 168) { ro.sq = .12 + Math.sin(t * 30) * .02; ro.look = [0, .5]; ro.tilt = Math.sin(t * 25) * .05; }
+      if (t >= 168) { ro.look = [1, -.2]; ro.sq = .1; }
+    } else if (t < 212) {   // darkness. the last light. letting it go.
+      rx = 860; ry = 610 + bob * .3; ro.jet = false; ro.lamp = t < 182 ? lerp(.12, 1, expo(seg(t, 180, 182))) : 1;   // it turns its own lamp back up: the only light left
+      ro.look = t < 188 ? [1, 0] : t < 196 ? [-.6, -1] : [0, -1];   // looks where the star was… then up at its lamp
+      if (t > 198) { ro.arm = -2.2 + expo(seg(t, 198, 200)) * .6; }
+      if (t > 202) { ro.lamp = 0; ro.look = [0, -1]; }
+      if (t > 206) { ro.sq = .14; ro.dead = t > 209; ro.tilt = -.2 * seg(t, 206, 209); ro.look = [0, .6]; }
+    } else if (t < 236) { rx = -400; }
+    if (t < 212) robot(rx, ry, ro);
+    // the freed spark: floats up and out, then swells into the first light
+    if (t > 202 && t < 236) {
+      const s = t - 202, ux = 860 - 6, uy = 610 - 88;
+      const fx = lerp(ux, 960, expoIO(seg(t, 202, 210))), fy = lerp(uy, 540, expoIO(seg(t, 202, 210))) - Math.sin(clamp(s / 8) * Math.PI) * 60;
+      if (t < 212) rings(fx, fy, 10 + Math.sin(t * 6) * 2, ["#ffc76a", "#ffe9b0", "#ffffff"], 3);
+      else {
+        const e = t - 212, R = 20 + e * e * 120;
+        const cols = ["#2a1f5a", "#4b3a9a", "#7a5ad0", "#c79bf2", "#ffe9b0", "#ffffff"];
+        for (let i = 0; i < 6; i++) { const rr = R * (1 - i * .15) - i * 10; if (rr > 0) { x.strokeStyle = cols[i]; x.lineWidth = 6 + i * 4; x.beginPath(); x.arc(960, 540, rr, 0, 7); x.stroke(); } }
+        // galaxies condense out of the expanding shell
+        const gk = clamp((e - 4) / 10);
+        if (gk > 0) for (let g = 0; g < 9; g++) { const gx = 960 + (hash(g) - .5) * 1700, gy = 540 + (hash(g + 9) - .5) * 900, rot = t * .1 + g; for (let i = 0; i < 70 * gk; i++) { const a = i * .35 + rot, d = i * 1.6; x.fillStyle = i % 5 ? "#c79bf2" : "#ffe9b0"; x.fillRect(gx + Math.cos(a) * d - 1, gy + Math.sin(a) * d * .5 - 1, 3, 3); x.fillRect(gx - Math.cos(a) * d - 1, gy - Math.sin(a) * d * .5 - 1, 3, 3); } }
+      }
+    }
+    // the gag: a newborn star and a new little lamplighter
+    if (t >= 236) {
+      for (let g = 0; g < 9; g++) { const gx = 960 + (hash(g) - .5) * 1700, gy = 540 + (hash(g + 9) - .5) * 900; for (let i = 0; i < 70; i++) { const a = i * .35 + t * .1 + g, d = i * 1.6; x.fillStyle = i % 5 ? "#c79bf2" : "#ffe9b0"; x.fillRect(gx + Math.cos(a) * d - 1, gy + Math.sin(a) * d * .5 - 1, 3, 3); } }
+      const ig = springO(t - 236.3, 14, .5); rings(1040, 520, 46 * Math.min(1.1, ig), ["#e2632a", "#ff9a3c", "#ffc76a", "#ffe9b0"], 4);
+      if (t > 237.4) { const k = expo(seg(t, 237.4, 238.0)); robot(lerp(700, 960, k), 545, { s: .45, jet: true, lamp: 1, look: [1, 0], sq: t > 238 ? .15 * Math.exp(-(t - 238) * 8) : 0, arm: t > 238.4 ? -.2 + Math.sin(t * 14) * .5 : .6, hold: (hx, hy) => { x.fillStyle = "#e2d6c0"; x.fillRect(hx - 8, hy - 6, 16, 12); } }); }
+    }
+    // titles (only two in the film)
+    x.setTransform(1, 0, 0, 1, 0, 0);
+    const title = (s, t0, t1) => { if (t < t0 || t > t1) return; const a = clamp((t - t0) / 1.2) * clamp((t1 - t) / 1.2); x.globalAlpha = a; x.font = "400 66px FR"; x.textAlign = "center"; x.textBaseline = "middle"; x.fillStyle = "#e9e2d0"; x.letterSpacing = "18px"; x.fillText(s, W / 2, H - 150); x.letterSpacing = "0px"; x.globalAlpha = 1; };
+    title("THE LAST LIGHT", 3, 9); title("THE FIRST LIGHT", 226, 234.5);
+  },
+  sound(A) {
+    const m = A.midi;
+    // score: a slow piano-like theme (plucks) over a drone that thins as the universe dies; silence when the star goes out
+    const theme = [64, 67, 71, 69, 67, 64, 62, 64];
+    const play = (t0, trans = 0, g = .1, step = 1.4) => theme.forEach((n, i) => A.pluck(t0 + i * step, m(n + trans), g, 2.4));
+    play(10); play(28, 0, .08); play(60, -2, .08); play(100, -5, .07); play(140, -7, .07, 1.6);
+    A.pad(0, [m(40), m(47), m(52)], 176, .03); A.pad(176, [m(28)], 26, .03);
+    // the robot's little sounds: a jet hiss, beeps for every reaction
+    A.nz(8, 168, "bandpass", 3000, .015, 2);
+    [[24, 880], [40, 990], [46, 660], [70, 520], [78, 440], [104, 700], [119.5, 300], [128, 880], [147, 990], [160, 330], [168, 440], [182, 880], [196, 1046], [209, 220]].forEach(([t0, f]) => { A.tone(t0, f, .12, "sine", .06); A.tone(t0 + .14, f * 1.5, .1, "sine", .04); });
+    for (let i = 0; i < 4; i++) { A.whoosh(55 + i * 2.5, .5, .06); } A.whoosh(65.8, .6, .2); A.hit(66.6, .4); A.nz(70, 6, "lowpass", 200, .15);   // rocks
+    for (let i = 0; i < 10; i++) { A.tone(93 + i * 1.1, 1400 + i * 40, .2, "triangle", .04); A.click(93 + i * 1.1, .1); }   // panels lock
+    A.tone(104, 60, 14, "sine", .1); A.hit(118.2, .7); A.nz(118.2, 2, "highpass", 2000, .2); A.tone(120, 120, .4, "sine", .2);   // the shell bursts, the robot is knocked away
+    A.tone(147, 70, 21, "sawtooth", .03); for (let i = 0; i < 20; i++) A.tone(147 + i, 1200 - i * 40, .1, "square", .02);   // battery draining
+    A.tone(176.5, 40, 3, "sine", .25); A.nz(176.5, 2.5, "lowpass", 120, .2);   // the star goes out
+    // silence… then the lamp clicks back on; then it is let go
+    A.click(181, .2); A.tone(181.2, 1046, 1.5, "sine", .05);
+    A.tone(202, m(76), 4, "sine", .06); A.tone(206, m(64), 3, "sine", .05);
+    // the first light
+    A.riser(208, 212, .2); A.hit(212, .9); A.tone(212, 32, 6, "sine", .5);
+    A.pad(213, [m(48), m(55), m(60), m(64), m(67)], 23, .05); play(216, 5, .1, 1.1);
+    // the gag
+    A.tone(236.3, m(84), .6, "sine", .07); A.whoosh(237.3, .5, .15); A.tone(238.0, 1320, .08, "sine", .08); A.tone(238.12, 1760, .1, "sine", .08); for (let i = 0; i < 6; i++) A.nz(238.4 + i * .15, .08, "bandpass", 3500, .05);
+  },
+});
+</script></body></html>

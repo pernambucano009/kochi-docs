@@ -57,6 +57,7 @@ const NH = (() => {
     coaches: { en: "Coaches", ar: "المدربين", icon: "users", go: "4", desc: "صور المدربين والأوترو." },
     voice: { en: "Voices", ar: "التعليق الصوتي", icon: "mic", go: "3", desc: "مكتبة التعليق." },
     music: { en: "Music", ar: "الموسيقى", icon: "music", go: "5", desc: "مكتبة الموسيقى." },
+    motion: { en: "Motion", ar: "مكتبة الموشن", icon: "clapper", fn: () => { showStep("11"); openLib(); }, desc: "أنيميشنات مكتوبة بالكود، كل واحدة تتضاف للأصول بضغطة." },
   };
   const CREATE_KIDS = ["reel", "raw", "series", "carousel"];
   const CREATE_ALL = ["reel", "raw", "series", "carousel", "ad", "typo", "dub", "edit"];
@@ -91,7 +92,7 @@ const NH = (() => {
         <div class="nh-lines-txt">${b?.audience ? `<span><b>الجمهور:</b> ${esc(b.audience)}</span>` : ""}${b?.style ? `<span><b>الستايل:</b> ${esc(b.style)}</span>` : ""}${b?.theme ? `<span><b>الثيم:</b> ${esc(b.theme)}</span>` : ""}</div>
         <div class="nh-meter"><small><span>العقل مكتمل</span><span class="num">${pct}%</span></small><div class="bar"><i style="width:${pct}%"></i></div></div>`;
     },
-    assets: () => `${head("assets")}<div class="nh-kids mini" style="grid-template-rows:repeat(3,minmax(0,1fr))">${["coaches", "voice", "music"].map(kid).join("")}</div>`,
+    assets: () => `${head("assets")}<div class="nh-kids mini" style="grid-template-rows:repeat(4,minmax(0,1fr))">${["coaches", "voice", "music", "motion"].map(kid).join("")}</div>`,
     settings: () => `${head("settings")}<div class="nh-credit">${D.money ? `<span class="num">$${D.money.balance.toFixed(2)}</span><small>رصيد Atlas</small>` : `<small>الرصيد بيظهر لما مفتاح Atlas يتسجّل</small>`}</div>`,
     progress: () => `${head("progress")}<div class="nh-lines">${D.folders.length ? D.folders.slice(0, 4).map(lineHTML).join("") : `<div class="nh-empty">مفيش مشاريع لسه. ابدأ من «اعمل جديد».</div>`}</div>`,
     publish: () => {
@@ -262,7 +263,8 @@ const NH = (() => {
     create: () => CREATE_ALL.map((k) => panel(3, 3, `${head(k)}<div class="nh-body">${esc(T[k].desc)}</div>`, `data-id="${k}" tabindex="0" role="button"`)).join(""),
     assets: () => panel(4, 6, `${head("coaches")}<div class="nh-body">${D.coaches.length} مدرب</div><div class="nh-avs">${D.coaches.slice(0, 12).map((c) => `<img src="${esc(c.image_url)}" alt="">`).join("")}</div>`, `data-id="coaches" tabindex="0" role="button"`)
       + panel(4, 6, `${head("voice")}<div class="nh-body">${D.voices} تسجيل</div>`, `data-id="voice" tabindex="0" role="button"`)
-      + panel(4, 6, `${head("music")}<div class="nh-body">${D.music} تراك</div>`, `data-id="music" tabindex="0" role="button"`),
+      + panel(4, 6, `${head("music")}<div class="nh-body">${D.music} تراك</div>`, `data-id="music" tabindex="0" role="button"`)
+      + panel(4, 6, `${head("motion")}<div class="nh-body">${esc(T.motion.desc)}</div>`, `data-id="motion" tabindex="0" role="button"`),
     progress: () => panel(8, 6, `${head("progress")}<div class="nh-lines" style="align-content:start">${D.folders.map(lineHTML).join("") || `<div class="nh-empty">مفيش مشاريع لسه.</div>`}</div>`)
       + panel(4, 3, `${head("create")}<div class="nh-body">ابدأ شغل جديد من أي نوع.</div>`, `data-id="create" tabindex="0" role="button"`)
       + panel(4, 3, `${head("publish")}<div class="nh-body">${D.posts.filter((p) => p.status === "scheduled").length} بوست متجدول</div>`, `data-id="publish" tabindex="0" role="button"`),

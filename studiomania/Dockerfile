@@ -22,6 +22,7 @@ RUN mkdir -p /opt/models && python -c "import urllib.request; urllib.request.url
 COPY backend backend
 COPY frontend frontend
 COPY fonts fonts
+COPY library library
 
 # الفيديوهات وقاعدة البيانات هنا. لازم يتربط بـ volume عشان متضيعش مع كل تحديث
 # (بيتعمل من إعدادات الاستضافة نفسها)

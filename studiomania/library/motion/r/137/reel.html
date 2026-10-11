@@ -1,0 +1,399 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// #137 "It's a feature" — a 90 s short about a bug that doesn't want to be fixed.
+// Story: a little bug sleeps in the gap before a semicolon on line 42. WANT: stay home.
+//  fail 1 (12–24 s) the caret comes; it hides behind the ";" (far too thin to hide it) — the ";" is lifted, it's exposed.
+//  fail 2 (24–34 s) it bolts for the gutter — a breakpoint drops in front of it. BONK.
+//  fail 3 (34–42 s) it disguises itself as a comment ("// feature" sign) — the linter squiggles it anyway.
+//  TURN (42–64 s) the dev selects the line and deletes it; the bug falls into the void… and the whole build collapses
+//   without it. Ctrl+Z. Everything rewinds, the bug flies home.
+//  END (64–84 s) the caret stares… then types above it: "// do not touch. it works." The bug sleeps. Build passes.
+//  GAG (86–90 s) baby bugs pop out around it, one, two, three — and all of them look at the caret.
+// Shots (hard cuts, cut on action): see SHOTS below. Every frame is a pure function of t.
+const W = 1920, H = 1080, X0 = 170, LH = 56, Y42 = 520;
+const KEYS = ["33", "34", "35", "36", "37", "38", "39", "40", "41", "ins", "42", "43", "44", "45", "46", "47", "48", "49"];
+const SRC = {
+  33: 'import { load } from "./scene.js";', 34: 'import { draw } from "./paint.js";', 35: "", 36: "// renders one frame", 37: "",
+  38: "function render(frame) {", 39: "  const scene = load(frame);", 40: "  let total = 0;", 41: "  for (const item of scene) {",
+  42: "    total += item.size", 43: "  }", 44: "  return draw(scene, total);", 45: "}", 46: "", 47: "export default render;", 48: "", 49: "",
+  ins: "    // do not touch. it works.",
+};
+const COL = { com: "#6a9955", str: "#ce9178", kw: "#c586c0", id: "#9cdcfe", num: "#b5cea8", p: "#d4d4d4" };
+const tok = (s) => { const out = []; const re = /(\/\/.*$)|("[^"]*")|(\b(?:function|const|let|for|of|return|export|default|import|from)\b)|([A-Za-z_]\w*)|(\d+)|(\s+)|(.)/g; let m; while ((m = re.exec(s))) { const ty = m[1] ? "com" : m[2] ? "str" : m[3] ? "kw" : m[4] ? "id" : m[5] ? "num" : "p"; for (const ch of m[0]) out.push([ch, COL[ty]]); } return out; };
+const TOK = {}; for (const k of KEYS) TOK[k] = tok(SRC[k]);
+let CW = 18;
+const G = 1500;
+// ---------- row layout: row 41 is the anchor; rows below it slide when 42 collapses or "ins" opens
+const h42 = (t) => (t < 46.45 ? 1 : t < 63 ? 1 - M.expo(M.seg(t, 46.45, 46.8)) : M.expo(M.seg(t, 63, 63.6)));
+const hIns = (t) => M.expo(M.seg(t, 67.5, 67.8));
+function rows(t) {
+  const r = {}; const i41 = KEYS.indexOf("41"); let top = Y42 - 1.5 * LH;
+  for (let i = i41 - 1; i >= 0; i--) r[KEYS[i]] = { top: top - (i41 - i) * LH, h: 1 };
+  for (let i = i41; i < KEYS.length; i++) { const k = KEYS[i], h = k === "42" ? h42(t) : k === "ins" ? hIns(t) : 1; r[k] = { top, h }; top += LH * h; }
+  for (const k in r) r[k].y = r[k].top + LH * r[k].h / 2;
+  return r;
+}
+// ---------- the bug's dash for the gutter, and the destruction clock (runs backwards during Ctrl+Z)
+let HX = 0, D = 0;
+const runX = (t) => { const u = M.clamp((t - 24.6) / 2.4); return HX - D * (.4 * u * u + .6 * u); };
+const IMPACT = 161, REST = () => X0 + 2 * CW;
+const destroyT = (t) => (t < 51.5 ? 0 : t < 59 ? t : t < 60.5 ? 59 : t < 64 ? M.lerp(59, 51.5, M.expoIO(M.seg(t, 60.5, 63.4))) : 0);
+// ---------- the caret: stepped keyframes [t, row, col]
+const CK = [[9.3, "38", 0]];
+[[14.4, "39"], [15.5, "40"], [16.6, "41"], [18.8, "42"]].forEach(([tt, r]) => CK.push([tt, r, 4]));
+function buildCaret() {
+  for (let c = 5; c <= 25; c++) CK.push([19.0 + (c - 5) * .09, "42", c]);
+  for (let tt = 24.7; tt < 26.3; tt += .08) CK.push([tt, "42", Math.max(0, Math.round((runX(tt) - X0) / CW) + 3)]);
+  CK.push([31, "42", 10], [32, "42", 9], [33, "42", 8], [36.2, "41", 8], [37.0, "43", 8], [37.8, "42", 8], [40.0, "42", 6], [42.4, "42", 0]);
+  for (let c = 1; c <= 26; c++) CK.push([43.0 + c * .023, "42", c]);
+  CK.push([46.0, "42", 0], [46.8, "43", 0], [63.6, "42", 0], [64.0, "42", 20], [67.0, "42", 0], [67.5, "ins", 0]);
+  for (let c = 1; c <= 30; c++) CK.push([68 + c * .13, "ins", c]);
+}
+function caret(t) {
+  let k = null; for (const c of CK) if (c[0] <= t) k = c; else break;
+  if (!k) return null;
+  const idle = t - k[0];
+  let on = idle < .5 || Math.floor((idle - .5) / .53) % 2 === 1;
+  if (t > 56.8 && t < 59) on = Math.floor(t / .12) % 2 === 0;
+  if (t >= 64 && t < 67) on = [64.6, 65.4, 66.2].some((a) => t >= a && t < a + .4);
+  if (t >= 47.2 && t < 51.5) on = false;
+  return { row: k[1], col: k[2], on, t0: k[0] };
+}
+// ---------- the bug's acting, phase by phase
+const AE = [12.25, 12.5, 18.15, 21.9, 24.05, 27.0, 33.8, 34.4, 41.5, 46.5, 63.8, 64.6, 65.4, 66.2, 67.8, 73.6, 74.1];
+const hop = (t, t0, d, h) => -h * Math.sin(Math.PI * M.seg(t, t0, t0 + d));
+const bump = (t, te, amp = .25, w = 16, k = 7) => (t > te ? amp * Math.exp(-(t - te) * k) * Math.cos((t - te) * w) : 0);
+function bug(t, R, C) {
+  const { seg, lerp, expo, springO, clamp } = M;
+  const b = { x: HX, y: R["42"].y + 12, f: 1, sq: 0, thin: 0, rot: 0, lid: 0, look: null, cam: 0, mouth: 0, ct: 0, dizzy: 0, vis: 1, run: 0, ghost: 0, sign: null, eye: 1 };
+  const caretPt = C ? [X0 + C.col * CW, R[C.row].y] : null;
+  if (t < 12) { b.lid = 1; b.sq = .05 * Math.sin(t * 2.2); }
+  else if (t < 17.5) {   // wakes: eyes first, then the body jolts
+    b.lid = 1 - seg(t, 12, 12.08); b.look = t < 14 ? [-1, -1.2] : caretPt;
+    b.y += hop(t, 12.25, .25, 12); b.sq = -bump(t, 12.25, .25, 14) * (t < 12.5 ? 1 : 0) + bump(t, 12.5, .22, 18);
+  } else if (t < 21.8) {   // fail 1: crouch, dive behind the semicolon, hold its breath
+    const SX = X0 + 25.5 * CW;
+    b.look = caretPt;
+    b.sq = .25 * seg(t, 17.5, 17.9) * (t < 17.9 ? 1 : 0) + bump(t, 18.15, .2, 20);
+    const k = expo(seg(t, 17.9, 18.15)); b.x = lerp(HX, SX, k); b.thin = k;
+    if (t > 18.3) b.x += Math.sin(t * 70) * .7;   // trembling
+  } else if (t < 24) {   // exposed: exhale, look up at the lifted ";", then at us
+    const SX = X0 + 25.5 * CW;
+    b.x = lerp(SX, HX, expo(seg(t, 21.9, 22.3))); b.thin = 1 - springO(t - 21.9, 18, .45);
+    b.look = t < 22.8 ? [.3, -1.4] : null; b.cam = t >= 22.8 ? 1 : 0; b.mouth = t > 22.9 ? 3 : 0;
+  } else if (t < 27) {   // fail 2: flip, wind up, sprint for the gutter
+    b.f = t < 24.05 ? 1 : -1; b.sq = t < 24.6 ? .2 * seg(t, 24.05, 24.4) : -.12;
+    b.rot = t < 24.6 ? .3 * expo(seg(t, 24.05, 24.35)) : -.16;
+    b.run = t > 24.3 ? 1 : 0; b.x = runX(t); b.mouth = t > 24.3 ? 2 : 0; b.ghost = t > 24.6 ? 1 : 0;
+    b.look = [-1, 0];
+  } else if (t < 34) {   // BONK into the breakpoint, bounce back, dazed, then the idea
+    b.f = -1;
+    const s = t - 27;
+    if (s < .12) { b.x = IMPACT; b.sq = .45 * Math.sin(s / .12 * Math.PI / 2); b.squashX = 1; }
+    else { b.x = lerp(IMPACT, REST(), expo(seg(t, 27.12, 27.6))); b.y += hop(t, 27.12, .45, 26); b.sq = bump(t, 27.57, .3, 16); }
+    b.dizzy = t < 30.2 ? 1 : 0; b.rot = t < 30 ? Math.sin(t * 5) * .08 * (1 - seg(t, 28, 30)) : 0;
+    if (t > 30.2) { b.f = 1; b.look = caretPt; }
+    if (t > 33.8) { b.eye = 1 + .25 * expo(seg(t, 33.8, 33.9)); b.cam = 1; b.look = null; }
+  } else if (t < 42.4) {   // fail 3: the "// feature" disguise, the eyes follow the caret, the body stays stiff
+    b.x = REST(); b.f = 1;
+    b.sq = t < 34.4 ? .2 * seg(t, 34, 34.4) : bump(t, 34.4, .25, 18) + bump(t, 41.5, .2, 22);
+    b.ct = t < 41.7 ? expo(seg(t, 34.4, 34.8)) : 1 - expo(seg(t, 41.7, 41.95));
+    b.sign = t < 41.7 ? { k: springO(t - 34.4, 16, .5), fall: 0 } : { k: 1, fall: t - 41.7 };
+    b.mouth = t < 41.6 ? 1 : 3;
+    b.look = t < 36.2 ? null : t < 41.3 ? caretPt : [0, 1.4]; b.cam = t < 36.2 ? 1 : 0;
+    if (t > 41.8) { b.look = null; b.cam = 1; }
+  } else if (t < 46.5) {   // the turn: the whole line is selected; it looks at us; delete
+    b.x = REST(); b.mouth = 3;
+    const selEdge = [X0 + Math.min(27, Math.max(0, (t - 43) / .023)) * CW, R["42"].y];
+    b.look = t < 43 ? caretPt : t < 43.9 ? selEdge : null; b.cam = t >= 43.9 ? 1 : 0;
+    b.sq = bump(t, 44.1, .14, 16);
+    if (t > 46) { b.look = t < 46.4 ? [0, 1.5] : null; b.cam = t >= 46.4 ? 1 : 0; b.mouth = 2; b.y = Y42 + 12; }
+  } else if (t < 51.5) {   // falls into the crack (then the void shot draws it in screen space)
+    b.x = REST(); b.y = Y42 + 12 + .5 * G * (t - 46.5) ** 2; b.sq = -.25 * seg(t, 46.5, 46.7); b.mouth = 2; b.cam = 1; b.eye = 1.2;
+    if (t > 47.2) b.vis = 0;
+  } else if (t < 62.8) b.vis = 0;
+  else if (t < 64) {   // Ctrl+Z flies it home
+    const k = expoIOk(seg(t, 62.8, 63.8)); b.x = HX; b.y = lerp(R["42"].y + 420, R["42"].y + 12, k); b.rot = (1 - k) * 6; b.sq = t > 63.8 ? 0 : -.2 * (1 - k) + bump(t, 63.8, .3, 18);
+    b.dizzy = 1; b.mouth = 2;
+  } else {
+    b.dizzy = t < 64.8 ? 1 : 0; b.look = caretPt;
+    b.sq = bump(t, 63.8, .3, 18) + [64.6, 65.4, 66.2].reduce((a, e) => a + bump(t, e, .22, 22, 9), 0) + bump(t, 67.8, .15, 18);
+    if (t > 73.6) { b.y += hop(t, 73.6, .45, 16); b.sq += bump(t, 74.05, .25, 18); b.mouth = 1; }
+    if (t > 72) b.mouth = 1;
+    if (t > 74.6) { b.lid = seg(t, 75, 76.5); b.look = [0, .6]; b.sq += .05 * Math.sin(t * 2.2) * seg(t, 76, 77); }
+  }
+  return b;
+}
+const expoIOk = (k) => M.expoIO(k);
+// ---------- draw one bug (origin at the feet; local +x = facing direction)
+function drawBug(x, b, o = {}) {
+  const s = (o.s || 1) * 1.4;
+  const body = b.ct ? mixHex("#e2503c", "#6a9955", b.ct) : "#e2503c", dark = b.ct ? mixHex("#2a2230", "#33402c", b.ct) : "#2a2230";
+  x.save(); x.translate(b.x, b.y); x.scale(s, s); x.rotate(b.rot);
+  const sx = (1 + b.sq) * (1 - .45 * b.thin), sy = 1 - b.sq;
+  if (b.squashX) { x.translate(-15 * b.f, -12); x.scale(1 - b.sq, 1 + b.sq * .7); x.translate(15 * b.f, 12); }
+  else x.scale(sx, sy);
+  x.scale(b.f, 1);
+  const ant = AE.reduce((a, e) => (o.t > e ? a + .5 * Math.exp(-(o.t - e) * 5) * Math.sin((o.t - e) * 22) : a), 0) - (b.dizzy ? .5 : 0);
+  // legs
+  x.strokeStyle = dark; x.lineWidth = 2.6; x.lineCap = "round";
+  for (let i = 0; i < 3; i++) { const ph = b.run ? Math.sin(o.t * 38 + i * 2.1) * 5 : 0; x.beginPath(); x.moveTo(-9 + i * 8, -6); x.lineTo(-10 + i * 8 + ph, 0); x.stroke(); }
+  // antennae
+  for (const [ax, sp] of [[0, 0], [5, .35]]) { const a = -1.15 + sp + ant; x.beginPath(); x.moveTo(12 + ax * .4, -17); x.quadraticCurveTo(16 + ax, -24, 12 + ax + Math.cos(a) * 14, -17 + Math.sin(a) * 14); x.stroke(); x.fillStyle = dark; x.beginPath(); x.arc(12 + ax + Math.cos(a) * 14, -17 + Math.sin(a) * 14, 2.2, 0, 7); x.fill(); }
+  // shell + spots + head
+  x.fillStyle = body; x.beginPath(); x.ellipse(-2, -12, 15, 11, 0, 0, 7); x.fill();
+  x.strokeStyle = "rgba(0,0,0,.25)"; x.lineWidth = 1.4; x.beginPath(); x.moveTo(8, -21); x.quadraticCurveTo(-2, -14, -14, -9); x.stroke();
+  x.fillStyle = dark; [[-6, -17, 2.6], [-9, -9, 2.2], [1, -10, 2]].forEach(([a, c, r]) => { x.beginPath(); x.arc(a, c, r, 0, 7); x.fill(); });
+  x.beginPath(); x.arc(13, -10, 7.5, 0, 7); x.fill();
+  // eyes: the eyes lead every move
+  const er = [4.6 * b.eye, 3.8 * b.eye], ep = [[12, -18], [18, -16.5]];
+  let dir = [0, 0];
+  if (b.look) { let [dx, dy] = b.look; if (o.target) { dx = b.look[0] - b.x; dy = b.look[1] - (b.y - 17); } const n = Math.hypot(dx, dy) || 1; dir = [dx / n * b.f, dy / n]; }
+  ep.forEach(([ex, ey], i) => {
+    x.fillStyle = "#fff"; x.beginPath(); x.arc(ex, ey, er[i], 0, 7); x.fill();
+    if (b.dizzy) { x.strokeStyle = "#111"; x.lineWidth = 1; x.beginPath(); for (let a = 0; a < 12; a += .4) { const r = a / 12 * er[i] * .85, aa = a + o.t * 9; x.lineTo(ex + Math.cos(aa) * r, ey + Math.sin(aa) * r); } x.stroke(); }
+    else { const pr = b.cam ? er[i] * .5 : er[i] * .42; x.fillStyle = "#111"; x.beginPath(); x.arc(ex + dir[0] * er[i] * .45, ey + dir[1] * er[i] * .45, pr, 0, 7); x.fill(); x.fillStyle = "#fff"; x.beginPath(); x.arc(ex + dir[0] * er[i] * .45 - pr * .35, ey + dir[1] * er[i] * .45 - pr * .35, pr * .3, 0, 7); x.fill(); }
+    if (b.lid > 0) { x.fillStyle = body; x.beginPath(); x.rect(ex - er[i] - 1, ey - er[i] - 1, er[i] * 2 + 2, (er[i] * 2 + 2) * b.lid); x.save(); x.clip(); x.beginPath(); x.arc(ex, ey, er[i] + .6, 0, 7); x.fill(); x.restore(); x.strokeStyle = dark; x.lineWidth = 1.2; x.beginPath(); x.moveTo(ex - er[i], ey - er[i] + (er[i] * 2) * b.lid); x.lineTo(ex + er[i], ey - er[i] + (er[i] * 2) * b.lid); x.stroke(); }
+  });
+  // mouth: 1 smile, 2 "o", 3 sheepish grin
+  x.strokeStyle = "#fff"; x.fillStyle = "#fff"; x.lineWidth = 1.4;
+  if (b.mouth === 1) { x.beginPath(); x.arc(16, -8, 3, .2, Math.PI - .2); x.stroke(); }
+  if (b.mouth === 2) { x.beginPath(); x.ellipse(17, -6.5, 1.8, 2.4, 0, 0, 7); x.fill(); }
+  if (b.mouth === 3) { x.beginPath(); x.moveTo(13, -7); x.lineTo(20, -7.5); x.stroke(); x.beginPath(); x.moveTo(15, -7.2); x.lineTo(15, -5.8); x.moveTo(18, -7.4); x.lineTo(18, -6); x.stroke(); }
+  x.restore();
+}
+function mixHex(a, b, k) { const p = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)); const A = p(a), B = p(b); return `rgb(${A.map((v, i) => Math.round(v + (B[i] - v) * k)).join(",")})`; }
+// ---------- shots (hard cuts). "bug" frames lock onto the bug's position at the cut.
+const SHOTS = [
+  [0, { cx: 960, cy: 540, z: 1, to: { cx: 640, cy: 500, z: 1.35 }, d: 5 }],
+  [5, { bug: 1, z: 5, oy: -14 }],
+  [9, { cx: 560, cy: 420, z: 1.7 }],
+  [12, { bug: 1, z: 5, oy: -14 }],
+  [14, { cx: 520, cy: 420, z: 2 }],
+  [20, { semi: 1, z: 4.4 }],
+  [24, { bug: 1, z: 3.4, oy: -14 }],
+  [24.6, { cx: 440, cy: 500, z: 1.8 }],
+  [26.5, { cx: 220, cy: Y42 - 14, z: 4 }],
+  [34, { cx: 260, cy: Y42 - 34, z: 3.2 }],
+  [36.2, { cx: 330, cy: Y42 - 20, z: 2.6 }],
+  [42.4, { cx: 560, cy: Y42, z: 2 }],
+  [44, { bug: 1, z: 4.6, oy: -14 }],
+  [46, { cx: 260, cy: Y42 + 20, z: 3 }],
+  [47.2, { void: 1 }],
+  [51.5, { cx: 960, cy: 540, z: 1, shake: 1 }],
+  [59, { keys: 1 }],
+  [60.5, { cx: 760, cy: 520, z: 1.4 }],
+  [64, { cx: 0, cy: 0, z: 3.6, home: 1 }],
+  [67, { cx: 520, cy: Y42 + 10, z: 2.3 }],
+  [76, { cx: 520, cy: Y42 + 10, z: 2.3, to: { cx: 960, cy: 540, z: 1 }, d: 3 }],
+  [84, { bug: 1, z: 5, oy: -20 }],
+  [89.9, { black: 1 }],
+];
+M.reel({
+  W, H, DUR: 90, bg: "#1d2130",
+  fonts: { MO: "mono.ttf", I5: ["inter500.ttf", "500"], I8: ["inter800.ttf", "800"] },
+  init(M) {
+    const c = M.canvas(W, H), x = c.getContext("2d");
+    x.font = "500 30px MO"; CW = x.measureText("m").width;
+    HX = X0 + 23.4 * CW; D = HX - IMPACT; buildCaret();
+    return { x };
+  },
+  seek(t, P, M) {
+    const { x } = P, { seg, lerp, clamp, expo, expoIO, springO, hash, noise1 } = M;
+    let sh = SHOTS[0]; for (const s of SHOTS) if (s[0] <= t) sh = s;
+    const [t0, S] = sh;
+    x.setTransform(1, 0, 0, 1, 0, 0);
+    if (S.black) { x.fillStyle = "#000"; x.fillRect(0, 0, W, H); return; }
+    const te = destroyT(t), red = seg(te, 53, 56);
+    // ---------- the void (screen space)
+    if (S.void) {
+      x.fillStyle = "#07070b"; x.fillRect(0, 0, W, H);
+      const u = t - 47.2, speed = Math.exp(-u * .6);
+      x.font = "500 34px MO"; x.textAlign = "center";
+      for (let i = 0; i < 46; i++) { const ch = SRC[38 + (i % 10)][(i * 7) % 20] || ";", px = hash(i) * W, py = ((hash(i + 9) * 3000 - u * (700 + hash(i + 3) * 900)) % 1400 + 1400) % 1400 - 160; x.fillStyle = `rgba(150,170,210,${.12 + hash(i + 5) * .25})`; x.fillText(ch, px, py); x.fillRect(px - 1, py + 8, 2, 90 * speed); }
+      if (u < 3.3) { const s = 6 * Math.exp(-u * 1.1), b = { x: W / 2, y: H / 2 + 60 * s, f: 1, sq: -.15, thin: 0, rot: u * 2.2, lid: 0, look: null, cam: 1, mouth: 2, ct: 0, dizzy: 0, run: 0, eye: 1.25 }; drawBug(x, b, { s, t }); }
+      return;
+    }
+    // ---------- Ctrl + Z (screen space)
+    if (S.keys) {
+      x.fillStyle = "#140c0e"; x.fillRect(0, 0, W, H);
+      [["Ctrl", 760, 59.35], ["Z", 1160, 59.75]].forEach(([s, kx, tp]) => {
+        const down = expo(seg(t, tp, tp + .06)) * 22 - 7 * Math.sin(Math.PI * seg(t, tp - .14, tp));
+        x.fillStyle = "#5c5560"; x.beginPath(); x.roundRect(kx - 150, 400, 300, 300, 34); x.fill();
+        x.fillStyle = "#e9e4e8"; x.beginPath(); x.roundRect(kx - 150, 372 + down, 300, 300 - 6 - down * .3, 34); x.fill();
+        x.fillStyle = "#2a2230"; x.font = `800 ${s.length > 1 ? 86 : 150}px I8`; x.textAlign = "center"; x.textBaseline = "middle"; x.fillText(s, kx, 518 + down);
+      });
+      x.fillStyle = "#e9e4e8"; x.font = "800 90px I8"; x.textAlign = "center"; x.textBaseline = "middle"; x.fillText("+", 960, 540);
+      return;
+    }
+    // ---------- world camera
+    const R = rows(t), C = t >= 9.3 ? caret(t) : null;
+    const B = bug(t, R, C);
+    let cx = S.cx, cy = S.cy, z = S.z;
+    if (S.bug) { const R0 = rows(t0 + .001), b0 = bug(t0 + .001, R0, caret(t0 + .001)); cx = b0.x; cy = b0.y + S.oy; }
+    if (S.semi) { cx = X0 + 25.5 * CW - 10; cy = R["42"].y - 24; }
+    if (S.home) { cx = HX - 30; cy = R["42"].y - 10; }
+    if (S.to) { const k = expoIO(seg(t, t0, t0 + S.d)); cx = lerp(cx, S.to.cx, k); cy = lerp(cy, S.to.cy, k); z = lerp(z, S.to.z, k); }
+    let shx = 0, shy = 0; if (S.shake) { const a = 7 * seg(te, 55, 57.5); shx = noise1(te * 31) * a; shy = noise1(te * 37 + 9) * a; }
+    // mood: calm blue-grey → tense violet (the hunt) → red (the build breaks) → warm amber (accepted)
+    const tense = seg(t, 14, 18) * (1 - seg(t, 44, 47.5));
+    let bgc = mixHex("#1d2130", "#271c2c", tense);
+    if (red > 0) bgc = mixHex("#1d2130", "#3b1517", red);
+    if (t > 72) bgc = mixHex("#1d2130", "#2a2219", seg(t, 72, 77));
+    x.fillStyle = bgc; x.fillRect(0, 0, W, H);
+    x.setTransform(z, 0, 0, z, W / 2 - cx * z + shx, H / 2 - cy * z + shy);
+    // chrome: gutter, tab bar
+    x.fillStyle = "rgba(0,0,0,.18)"; x.fillRect(-2000, -2000, 2000 + 150, 6000);
+    x.fillStyle = "rgba(0,0,0,.28)"; x.fillRect(-2000, -200, 6000, 246);
+    x.fillStyle = bgc; x.fillRect(160, 6, 200, 40); x.fillStyle = "#c9cbd6"; x.font = "500 19px I5"; x.textAlign = "left"; x.textBaseline = "middle"; x.fillText("render.js", 190, 27);
+    x.fillStyle = "#e2503c"; x.beginPath(); x.arc(340, 27, 4, 0, 7); x.fill();
+    // breakpoint (set during the chase)
+    if (t > 26.6) { const k = springO(t - 26.6, 18, .45); x.fillStyle = "#e5484d"; x.beginPath(); x.arc(135, lerp(R["42"].y - 160, R["42"].y, Math.min(1, k)) - (k > 1 ? 0 : 0), 11, 0, 7); x.fill(); }
+    // selection highlight
+    const sel = (row, c0, c1) => { x.fillStyle = "rgba(80,120,220,.42)"; x.fillRect(X0 + c0 * CW, R[row].y - LH / 2 + 6, (c1 - c0) * CW, LH - 12); };
+    if (t > 21.5 && t < 21.95) sel("42", 25, 26);
+    if (t >= 43 && t < 46) sel("42", 0, Math.min(27, Math.floor((t - 43) / .023)));
+    // rows
+    let num = 33;
+    const crack = t > 46.4 && t < 47.2;
+    x.font = "500 30px MO"; x.textBaseline = "middle";
+    for (const k of KEYS) {
+      const r = R[k]; if (r.h < .02) continue;
+      if (crack && KEYS.indexOf(k) > KEYS.indexOf("42")) { x.fillStyle = bgc; x.fillRect(150, r.top, 2000, LH * r.h + 1); }
+      if (r.h > .5) { x.fillStyle = k === "42" && t < 46 ? "#c9cbd6" : "#596079"; x.textAlign = "right"; x.fillText(String(num), 100, r.y); num++; }
+      x.textAlign = "left";
+      let chars = TOK[k];
+      if (k === "42" && t >= 46 && t < 63.6) chars = [];
+      if (k === "ins") chars = chars.slice(0, clamp(Math.floor((t - 68) / .13) + 1, 0, 30) * (t >= 68 ? 1 : 0));
+      chars.forEach(([ch, col], c) => {
+        if (ch === " ") return;
+        let dx = 0, dy = 0, rot = 0;
+        if (k === "42" && t > 24.6 && t < 28) { const cxp = X0 + (c + .5) * CW, q = (HX - cxp) / D; if (q > 0 && q < 1) { const u = (-.6 + Math.sqrt(.36 + 1.6 * q)) / .8, tc = 24.6 + u * 2.4, s = t - tc; if (s > 0) dy = 7 * Math.exp(-s * 8) * Math.sin(s * 30); } }
+        if (te > 0 && k !== "42" && k !== "ins") { const tf = 55.6 + hash(KEYS.indexOf(k) * 97 + c) * 3.2; if (te > tf) { const s = te - tf; dy = .5 * 1800 * s * s; rot = s * (hash(c + 3) - .5) * 8; dx = (hash(c * 7 + 1) - .5) * 80 * s; } }
+        const px = X0 + c * CW + dx, py = r.y + dy;
+        x.fillStyle = te > 0 && red > .3 && k !== "ins" ? mixHex(col.length === 7 ? col : "#d4d4d4", "#ff6b6b", red * .6) : col;
+        if (rot) { x.save(); x.translate(px + CW / 2, py); x.rotate(rot); x.fillText(ch, -CW / 2, 0); x.restore(); } else x.fillText(ch, px, py);
+      });
+      // the semicolon on line 42 is its own actor
+      if (k === "42" && (t < 46 || t >= 63.6) && r.h > .5) {
+        let sdy = 0, srot = 0;
+                let sdx = 0; if (t > 21.8 && t < 24.9) { const k = springO(t - 21.8, 14, .5); sdy = -70 * k + Math.sin(t * 3) * 3; sdx = 60 * k; }
+        else if (t >= 24.9 && t < 25.6) { const s = t - 24.9, fall = -70 + .5 * 2200 * s * s; sdy = Math.min(0, fall); if (fall >= 0) sdy = -12 * Math.abs(Math.sin((s - Math.sqrt(140 / 2200)) * 14)) * Math.exp(-(s - .25) * 9); srot = Math.sin(s * 30) * .2 * Math.exp(-s * 6); }
+        x.save(); x.translate(X0 + 25 * CW + CW / 2 + (typeof sdx === "number" ? sdx : 0), r.y + sdy); x.rotate(srot); x.fillStyle = "#d4d4d4"; x.font = "700 32px MO"; x.textAlign = "center"; x.fillText(";", 0, 0); x.restore(); x.font = "500 30px MO";
+        if (t > 18.3 && t < 21.8) { /* drawn after the bug, see below */ }
+      }
+      // destruction squiggles
+      if (te > 0 && k !== "42" && k !== "ins" && TOK[k].length) { const ord = Math.abs(KEYS.indexOf(k) - KEYS.indexOf("44")), ts = 52.6 + ord * .22; if (te > ts) { const len = TOK[k].length * CW * expo(seg(te, ts, ts + .35)); x.strokeStyle = "#ff5a5a"; x.lineWidth = 2.2; x.beginPath(); for (let px = 0; px <= len; px += 4) x.lineTo(X0 + px, r.y + 19 + Math.sin(px * .5) * 2.6); x.stroke(); } }
+    }
+    // ---------- the bug, with speed smears on the sprint
+    if (B.vis) {
+      if (B.ghost) for (let g = 3; g >= 1; g--) { x.globalAlpha = .12; drawBug(x, { ...B, x: B.x + g * 9 }, { t }); }
+      x.globalAlpha = 1;
+      drawBug(x, B, { t, target: !!(B.look && B.look.length && (Math.abs(B.look[0]) > 3 || Math.abs(B.look[1]) > 3)) });
+      // the "hiding" semicolon is drawn in front of the bug — far too thin to hide it
+      if (t > 17.9 && t < 21.8) { x.fillStyle = "#d4d4d4"; x.font = "700 32px MO"; x.textAlign = "center"; x.textBaseline = "middle"; x.fillText(";", X0 + 25 * CW + CW / 2, R["42"].y); x.font = "500 30px MO"; }
+      // the disguise sign
+      if (B.sign && B.sign.fall < 1.2) {
+        const f = B.sign.fall, k = B.sign.k;
+        x.save(); x.translate(B.x + f * 40, B.y - 34 + .5 * 1800 * f * f); x.rotate(f * 3.2); x.scale(Math.max(.01, k), Math.max(.01, k));
+        x.strokeStyle = "#8a6a44"; x.lineWidth = 3; x.beginPath(); x.moveTo(0, 0); x.lineTo(0, -26); x.stroke();
+        x.fillStyle = "#e8dcbf"; x.fillRect(-80, -74, 160, 46); x.strokeStyle = "#8a6a44"; x.lineWidth = 2; x.strokeRect(-80, -74, 160, 46); x.fillStyle = "#3f6b30"; x.font = "500 26px MO"; x.textAlign = "center"; x.textBaseline = "middle"; x.fillText("// feature", 0, -51);
+        x.restore(); x.font = "500 30px MO";
+      }
+      // the linter's squiggle + tooltip
+      if (t > 40.5 && t < 46) { const len = 48 * expo(seg(t, 40.5, 41.3)); x.strokeStyle = "#ff5a5a"; x.lineWidth = 2.4; x.beginPath(); for (let px = 0; px <= len; px += 3) x.lineTo(B.x - 24 + px, B.y + 6 + Math.sin(px * .55) * 2.6); x.stroke(); }
+      if (t > 41.4 && t < 42.4) { const a = expo(seg(t, 41.4, 41.55)); x.globalAlpha = a; x.fillStyle = "#2b2f3d"; x.fillRect(B.x + 30, B.y + 14, 190, 36); x.strokeStyle = "#ff5a5a"; x.lineWidth = 1.5; x.strokeRect(B.x + 30, B.y + 14, 190, 36); x.fillStyle = "#ff8a8a"; x.font = "500 17px I5"; x.textAlign = "left"; x.fillText("problem: it's a bug", B.x + 42, B.y + 32); x.globalAlpha = 1; x.font = "500 30px MO"; }
+    }
+    // ---------- the gag: babies
+    if (t > 86.5) {
+      const babies = [[86.5, HX + 26, 0], [88.2, HX - 30, 0], [88.8, HX + 2, -24]];
+      babies.forEach(([tb, bx, by]) => { if (t < tb) return; const k = springO(t - tb, 16, .45), blink = [87.2, 87.6].some((a) => t > a && t < a + .1) ? 1 : 0; const snap = t > 89.35; drawBug(x, { x: bx, y: R["42"].y + 12 + by + (1 - k) * 16, f: bx < HX ? 1 : -1, sq: bump(t, tb + .2, .2, 20), thin: 0, rot: 0, lid: blink, look: snap ? [1, -1.2] : null, cam: snap ? 0 : 1, mouth: 0, ct: 0, dizzy: 0, run: 0, eye: 1.15 }, { s: .45 * Math.min(1.2, k), t }); });
+    }
+    // ---------- the caret (the antagonist)
+    if (C && C.on && !(t >= 46 && t < 46.8 && false)) { x.fillStyle = te > 0 ? "#ff8a8a" : "#eef0f6"; x.fillRect(X0 + C.col * CW - 1.5, R[C.row].y - 19, 3, 38); }
+    // ---------- terminal + status bar (the build)
+    if (te > 0) {
+      const k = expo(seg(te, 54.4, 54.9)), ty = lerp(1100, 820, k);
+      x.fillStyle = "#121318"; x.fillRect(-2000, ty, 6000, 400); x.fillStyle = "#3a1416"; x.fillRect(-2000, ty, 6000, 3);
+      x.font = "500 26px MO"; x.textAlign = "left"; x.fillStyle = "#8b90a5"; x.fillText("> npm run build", 170, ty + 50);
+      const n = Math.round(1204 * M.cubic(seg(te, 54.9, 57.8)));
+      x.fillStyle = "#ff6b6b"; x.font = "800 52px I8"; x.fillText("BUILD FAILED", 170, ty + 120);
+      x.font = "500 30px MO"; x.fillText(`${n.toLocaleString("en-US")} errors`, 170, ty + 180);
+    }
+    if (t > 77) {
+      const a = expo(seg(t, 77, 77.4)); x.globalAlpha = a;
+      x.fillStyle = "#1f3a26"; x.fillRect(-2000, 1036, 6000, 60); x.strokeStyle = "#7bd88f"; x.lineWidth = 4; x.beginPath(); x.moveTo(176, 1058); x.lineTo(186, 1068); x.lineTo(204, 1048); x.stroke();
+      x.fillStyle = "#b6f0c2"; x.font = "500 24px I5"; x.textAlign = "left"; x.fillText("build passed", 218, 1059);
+      // the commit, typed
+      const msg = "it's a feature", n2 = clamp(Math.floor((t - 79) / .1), 0, msg.length);
+      if (t > 78.6) { x.fillStyle = "#2b2f3d"; x.fillRect(1440, 80, 420, 92); x.fillStyle = "#8b90a5"; x.font = "500 20px I5"; x.fillText("commit", 1466, 108); x.fillStyle = "#f2efe6"; x.font = "800 34px I8"; x.fillText(msg.slice(0, n2), 1466, 146); }
+      x.globalAlpha = 1;
+    }
+  },
+  sound(A, M) {
+    const { ctx, out } = A, m = A.midi;
+    const sweep = (t0, f0, f1, d, type = "sine", g0 = .15) => { const o = ctx.createOscillator(), g = ctx.createGain(); o.type = type; o.frequency.setValueAtTime(f0, t0); o.frequency.exponentialRampToValueAtTime(f1, t0 + d); g.gain.setValueAtTime(.0001, t0); g.gain.linearRampToValueAtTime(g0, t0 + .01); g.gain.setValueAtTime(g0, t0 + d * .8); g.gain.exponentialRampToValueAtTime(.0001, t0 + d); o.connect(g).connect(out); o.start(t0); o.stop(t0 + d + .05); };
+    const box = (t0, n, g = .09) => { A.tone(t0, m(n), 1.1, "sine", g); A.tone(t0, m(n) * 3, .25, "sine", g * .25); };
+    const tock = (t0, g = .2) => { A.click(t0, g * .8); A.tone(t0, 230, .07, "triangle", g * .5); };
+    // ---- opening: a music-box lullaby + snores
+    [72, 76, 79, 76, 77, 74, 71, 74, 72, 76, 79, 84].forEach((n, i) => box(.6 + i * .78, n));
+    A.pad(0, [m(48), m(55), m(64)], 11.5, .025);
+    for (let s = 1.3; s < 11.5; s += 2.86) { A.nz(s, 1.1, "bandpass", 320, .05, 3); A.tone(s + .1, 110, 1, "sine", .03); }
+    A.click(9.3, .15); A.tone(9.3, 1400, .05, "sine", .05);
+    // ---- wake + the hunt
+    A.tone(12.0, 1900, .06, "sine", .07); sweep(12.25, 300, 900, .22, "triangle", .14); A.tone(12.5, 160, .12, "sine", .2);
+    A.pad(14, [m(45), m(52)], 10, .035);
+    [14.4, 15.5, 16.6, 18.8].forEach((t0, i) => { tock(t0, .28); A.tone(t0, m(45 + i), .5, "sawtooth", .03); });
+    for (let c = 5; c <= 24; c++) tock(19.0 + (c - 5) * .09, .12);
+    A.whoosh(17.5, .35, .12); sweep(17.9, 900, 2400, .2, "sine", .06);
+    for (let t0 = 18.4; t0 < 21.5; t0 += .48) A.kick(t0, .25);   // heartbeat
+    A.nz(21.5, .2, "highpass", 4000, .1); sweep(21.8, 300, 1200, .35, "triangle", .1);
+    A.tone(22.9, m(64), .25, "square", .05); A.tone(23.2, m(60), .5, "square", .05);   // "uh-oh"
+    // ---- the sprint + BONK
+    A.whoosh(24.0, .25, .15); for (let t0 = 24.3; t0 < 24.6; t0 += .03) A.click(t0, .06);
+    A.whoosh(24.6, .5, .3);
+    for (let t0 = 24.6, k = 0; t0 < 27; t0 += 60 / 168 / 2, k++) { A.bass(t0, m([40, 40, 43, 40, 45, 43, 40, 47][k % 8]), .14, .2); A.hat(t0, .05); }
+    for (let t0 = 24.6; t0 < 27; t0 += .07) A.click(t0, .025);
+    sweep(26.6, 1500, 400, .15, "sine", .1); A.tone(26.75, 120, .1, "sine", .25);
+    A.hit(27.0, .45); A.tone(27.0, 780, .15, "triangle", .25); A.tone(27.0, 1170, .1, "triangle", .12);
+    for (let i = 0; i < 6; i++) sweep(27.6 + i * .4, i % 2 ? 2600 : 2100, i % 2 ? 2900 : 2400, .12, "sine", .05);   // birdies
+    [31, 32, 33].forEach((t0) => tock(t0, .24));
+    A.tone(33.8, 1568, 1.2, "sine", .12); A.tone(33.8, 3136, .6, "sine", .05);   // ding! (the idea)
+    // ---- the disguise + tiptoe
+    A.nz(34.4, .08, "bandpass", 1500, .2); [72, 76, 79, 84].forEach((n, i) => A.pluck(34.45 + i * .06, m(n), .1));
+    [36.2, 37.0, 37.8].forEach((t0, i) => { tock(t0, .24); A.pluck(t0 + .2, m([45, 48, 47][i]), .12, .25); });
+    tock(40.0, .26);
+    sweep(40.5, 90, 70, .8, "sawtooth", .07); A.nz(40.5, .8, "bandpass", 900, .05, 4);
+    A.tone(41.4, 880, .12, "sine", .1); A.tone(41.55, 660, .2, "sine", .1);
+    sweep(41.7, 1400, 300, .6, "sine", .08); A.nz(42.3, .2, "lowpass", 2000, .2);
+    // ---- the turn: select, look, DELETE, the long fall
+    A.whoosh(42.4, .25, .2); A.riser(43.0, 43.6, .15); A.tone(44.0, 1900, .05, "sine", .05);
+    A.kick(46.0, .9); A.click(46.0, .3);
+    sweep(46.5, 1800, 160, 4.0, "sine", .08); A.nz(46.6, 4, "lowpass", 700, .06, 1);
+    [50.5, 50.8, 51.1].forEach((t0, i) => A.tone(t0, 1250, .12, "sine", .06 / (i + 1)));
+    // ---- the build collapses
+    for (let i = 0; i < 10; i++) { const t0 = 52.6 + i * .22; sweep(t0, 140, 110, .2, "sawtooth", .05); }
+    A.whoosh(54.4, .4, .2); for (let t0 = 54.9; t0 < 57.8; t0 += .05) A.click(t0, .03);
+    for (let t0 = 55.5; t0 < 59.2; t0 += .25) A.tone(t0, Math.round((t0 - 55.5) / .25) % 2 ? 660 : 880, .22, "square", .05);
+    A.nz(55.6, 3.6, "lowpass", 300, .25, 1); for (let i = 0; i < 40; i++) A.click(55.6 + i * .09, .05);
+    // ---- Ctrl + Z, the rewind, home
+    [59.35, 59.75].forEach((t0) => { A.nz(t0, .07, "bandpass", 1800, .35); A.tone(t0, 140, .1, "sine", .3); });
+    sweep(60.5, 160, 1600, 3.0, "sawtooth", .04); A.riser(60.5, 63.4, .12);
+    sweep(63.8, 300, 1000, .25, "triangle", .14); A.tone(63.8, 150, .15, "sine", .3);
+    [64.6, 65.4, 66.2].forEach((t0) => { A.tone(t0, 1300, .04, "square", .04); A.tone(t0 + .05, 2300, .07, "sine", .05); });
+    A.nz(67.5, .06, "bandpass", 1600, .3); A.whoosh(67.5, .3, .1);
+    for (let c = 1; c <= 30; c++) A.nz(68 + c * .13, .03, "bandpass", 2400 + (c % 5) * 300, .1);
+    // ---- accepted: the lullaby returns, warmer
+    [[68, [48, 55, 64]], [72, [45, 52, 60]], [76, [41, 48, 57]], [80, [43, 50, 59]], [84, [48, 55, 64]]].forEach(([t0, ch]) => A.pad(t0, ch.map(m), 4.4, .03));
+    [72, 76, 79, 76, 77, 74, 72, 79, 76, 72].forEach((n, i) => box(72.4 + i * .9, n, .08));
+    sweep(73.6, 500, 950, .3, "sine", .1);
+    [72, 76, 79].forEach((n, i) => A.tone(77 + i * .09, m(n + 12), .6, "sine", .06));
+    for (let c = 0; c < 14; c++) A.nz(79 + c * .1, .02, "bandpass", 2600, .05);
+    for (let s = 85; s < 89; s += 2.86) A.nz(s, 1, "bandpass", 320, .04, 3);
+    // ---- the gag
+    [[86.5, 660], [88.2, 880], [88.8, 1100]].forEach(([t0, f]) => sweep(t0, f, f * 1.5, .12, "sine", .12));
+    [87.2, 87.6].forEach((t0) => A.tone(t0, 3000, .03, "sine", .03));
+    A.click(89.35, .2); A.pluck(89.4, 1760, .1, .3);
+  },
+});
+</script></body></html>

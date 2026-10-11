@@ -1,0 +1,113 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// #180 LLM history → recursive self-improvement → "line go up". 15 s forward, then the same 15 s backward (boomerang, 30 s file).
+// One diagram: a staircase in a 320×720 pixel world. Facts (public record): Transformer paper 2017; GPT-1 2018 (117M params);
+// GPT-2 2019 (1.5B); GPT-3 2020 (175B); ChatGPT launched Nov 2022. Everything after that is the joke, and labelled as a question.
+// Storyboard: 0–2 hook over the empty stairs · 2–4 zoom into the 2017 step (attention) · 4–6.5 GPT-1/2/3 rise one at a time
+// · 6.5–8 zoom on ChatGPT · 8–10.3 a robot on top builds the next step itself, faster each time · 10.3–13.4 the tower shoots
+// past the clouds to the moon: "FEEL THE AGI" · 13.4–15 pull back: the whole diagram, then it's on a laptop at 3 a.m.: "LINE GO UP."
+const WW = 320, WH = 720, GY = 690;
+const BARS = [   // [x, h, color, name, sub, t0]
+  [30, 8, "#7d6bd6", "", "", 0],
+  [80, 22, "#3d9be0", "GPT-1", "117M", 4.2],
+  [130, 44, "#2fc0a0", "GPT-2", "1.5B", 4.9],
+  [180, 82, "#f2b13a", "GPT-3", "175B", 5.6],
+  [230, 110, "#ef6a4c", "CHATGPT", "", 6.6],
+];
+const REC = [[8.5, .3, 8], [9.0, .3, 16], [9.4, .35, 32], [9.8, .45, 64], [10.3, .8, 128], [11.2, 1.3, 256]];
+const YEAR = { 1: "2018", 2: "2019", 3: "2020", 4: "2022" };
+M.reel({
+  W: 1920, H: 1080, DUR: 30, bg: "#14143a",
+  fonts: { SK: "Silkscreen_400.woff2" },
+  init(M) {
+    const c = M.canvas(1920, 1080), x = c.getContext("2d"); x.imageSmoothingEnabled = false;
+    const mk = (w, h) => { const k = document.createElement("canvas"); k.width = w; k.height = h; const g = k.getContext("2d"); g.imageSmoothingEnabled = false; return [k, g]; };
+    const [wc, w] = mk(WW, WH), [sc, s] = mk(64, 36), [rc, r] = mk(320, 180);
+    return { x, wc, w, sc, s, rc, r };
+  },
+  seek(T, P, M) {
+    const { x, wc, w, sc, s, rc, r } = P, { seg, lerp, clamp, expo, expoIO, spring, springO, hash } = M;
+    const t = T <= 15 ? T : 30 - T;   // boomerang
+    const R = (g, X, Y, ww, hh, c) => { g.fillStyle = c; g.fillRect(Math.round(X), Math.round(Y), Math.round(ww), Math.round(hh)); };
+    const TX = (g, str, X, Y, c, al = "center") => { g.font = "8px SK"; g.textAlign = al; g.textBaseline = "top"; g.fillStyle = "#0b0b22"; g.fillText(str, Math.round(X) + 1, Math.round(Y) + 1); g.fillStyle = c; g.fillText(str, Math.round(X), Math.round(Y)); };
+    // ---------------- the world (one diagram, never re-laid-out)
+    R(w, 0, 0, WW, WH, "#14143a"); R(w, 0, 300, WW, 240, "#1f2050"); R(w, 0, 540, WW, 150, "#2b2d5c");
+    for (let i = 0; i < 70; i++) R(w, hash(i) * WW, hash(i + 50) * 300, 1, 1, i % 7 ? "#8a8cc8" : "#fff");
+    R(w, 252, 46, 18, 18, "#e9e4c8"); R(w, 256, 50, 4, 4, "#cfc9a6"); R(w, 262, 56, 3, 3, "#cfc9a6");   // the moon
+    [[20, 420, 40], [150, 440, 56], [270, 410, 34]].forEach(([cx, cy, cw]) => { R(w, cx, cy, cw, 6, "#c9cbe8"); R(w, cx + 6, cy - 4, cw - 14, 4, "#c9cbe8"); R(w, cx + 2, cy + 6, cw - 4, 2, "#9a9cc8"); });
+    R(w, 0, GY, WW, WH - GY, "#2d3a26"); for (let gx = 0; gx < WW; gx += 3) R(w, gx, GY - (gx % 2), 1, 1 + (gx % 2), "#4f6b3a");
+    // bars
+    let topY = GY - 110, k5 = 0;
+    BARS.forEach(([bx, bh, col, name, sub, t0], i) => {
+      const k = i === 0 ? 1 : clamp(springO(t - t0, 16, .55), 0, 1.15); if (k <= 0) return;
+      const h = Math.round(bh * k);
+      R(w, bx, GY - h, 36, h, col); R(w, bx, GY - h, 36, 2, "rgba(255,255,255,.35)"); R(w, bx + 34, GY - h, 2, h, "rgba(0,0,0,.25)");
+      if (i === 4) k5 = k;
+      if (i > 0 && t > t0 + .25) { if (!(i === 4 && t > 8.45)) TX(w, name, bx + 18, GY - h - 11, "#fff"); TX(w, YEAR[i], bx + 18, GY - h + 4, "#0b0b22"); if (sub && h > 26) TX(w, sub, bx + 18, GY - h + 14, "#0b0b22"); }
+    });
+    // step 1 picture: attention — each word sends a dot into the eye
+    { const ex = 48, ey = 650; const vis = t > 2.3;
+      R(w, 30, GY - 8, 36, 8, "#7d6bd6");
+      if (vis) {
+        const words = [[33, 664], [44, 668], [55, 664]];
+        words.forEach(([wx, wy], i) => { R(w, wx, wy, 8, 3, "#e9e4c8"); const u = ((t - 2.4) * 1.4 + i * .33) % 1; const px = lerp(wx + 4, ex, u), py = lerp(wy, ey + 4, u); R(w, px, py, 1, 1, "#fff"); });
+        R(w, ex - 6, ey, 12, 8, "#fff"); R(w, ex - 5, ey - 1, 10, 1, "#fff"); R(w, ex - 5, ey + 8, 10, 1, "#fff"); R(w, ex - 2, ey + 2, 4, 4, "#2a1f6a");
+        if (t > 2.7 && t < 4.4) { TX(w, "TRANSFORMER", 48, 628, "#fff"); TX(w, "2017", 48, 638, "#e9e4c8"); }
+      }
+    }
+    // ChatGPT bubble
+    if (t > 7.0 && t < 8.6) { const k = springO(t - 7.0, 18, .5); const bw = Math.round(30 * clamp(k, 0, 1.1)); R(w, 248 - bw / 2 + 18, 548, bw, 14, "#fff"); R(w, 262, 562, 3, 3, "#fff"); if (k > .8) TX(w, "HI!", 266, 551, "#0b0b22"); }
+    // recursion: the robot builds the next step itself, each faster and bigger
+    REC.forEach(([t0, d, h]) => { const k = expo(seg(t, t0, t0 + d)); if (k <= 0) return; const hh = Math.round(h * k); R(w, 236, topY - hh, 24, hh, "#ef6a4c"); R(w, 236, topY - hh, 24, 1, "#ff9c84"); R(w, 258, topY - hh, 2, hh, "#b84a32"); topY -= hh; });
+    if (k5 > .9 && t > 8.2) {   // robot on the top
+      const rx = 242, ry = topY - 10 - Math.round(30 * (1 - expo(seg(t, 8.2, 8.4)))), ham = REC.some(([t0]) => t > t0 - .15 && t < t0) ? -2 : 0;
+      R(w, rx, ry, 12, 10, "#c9cbd6"); R(w, rx + 2, ry + 2, 3, 3, "#0b0b22"); R(w, rx + 7, ry + 2, 3, 3, "#0b0b22"); R(w, rx + 5, ry - 3, 2, 3, "#c9cbd6"); R(w, rx + 5, ry - 4, 2, 1, "#ef6a4c");
+      if (t > 8.3) { R(w, rx + 12, ry + 3 + ham, 4, 2, "#8a8cc8"); R(w, rx + 15, ry + 1 + ham, 3, 5, "#6a6c98"); }
+    }
+    if (t > 8.6 && t < 10.4) { TX(w, "IT TRAINS ITSELF?", 196, topY - 4, "#fff"); const a = t * 9; for (let i = 0; i < 10; i++) { const aa = a + i * .55; R(w, 282 + Math.cos(aa) * 9, topY + 6 + Math.sin(aa) * 9, 1, 1, i === 9 ? "#fff" : "#8a8cc8"); } }
+    if (t > 12.4 && t < 13.5) TX(w, "FEEL THE AGI", 196, topY - 4, "#ffe066");
+    // hook (sits in the sky above the stairs)
+    if (t > .2 && t < 2.05) { TX(w, "HOW DID CHATBOTS", 160, 556, "#fff"); TX(w, "GET SO SMART?", 160, 567, "#fff"); }
+    // ---------------- camera over the world [t, cx, cy, viewW]
+    const K = [[0, 160, 630, 320], [2.0, 160, 630, 320], [2.6, 48, 650, 110], [3.6, 48, 650, 110], [4.1, 160, 630, 320], [6.5, 160, 630, 320], [6.9, 250, 575, 130], [8.0, 250, 575, 130], [8.4, 200, 600, 260]];
+    let cam = K[K.length - 1].slice(1);
+    for (let i = 0; i < K.length - 1; i++) if (t >= K[i][0] && t < K[i + 1][0]) { const kk = expoIO(seg(t, K[i][0], K[i + 1][0])); cam = [1, 2, 3].map((j) => lerp(K[i][j], K[i + 1][j], kk)); }
+    if (t >= 8.4) { const kf = expoIO(seg(t, 8.4, 9.0)); cam = [lerp(200, 230, kf), lerp(600, topY + 25, kf), lerp(260, 230, kf)]; }
+    if (t >= 13.4) { const kb = expoIO(seg(t, 13.4, 13.9)); cam = [lerp(230, 160, kb), lerp(topY + 25, 360, kb), lerp(230, 1280, kb)]; }
+    const blit = (g, dw, dh, [cx, cy, vw]) => {
+      const vh = vw * 9 / 16, sx = cx - vw / 2, sy = cy - vh / 2;
+      g.fillStyle = "#14143a"; g.fillRect(0, 0, dw, dh);
+      const ix0 = Math.max(0, sx), iy0 = Math.max(0, sy), ix1 = Math.min(WW, sx + vw), iy1 = Math.min(WH, sy + vh);
+      if (ix1 > ix0 && iy1 > iy0) g.drawImage(wc, ix0, iy0, ix1 - ix0, iy1 - iy0, (ix0 - sx) / vw * dw, (iy0 - sy) / vh * dh, (ix1 - ix0) / vw * dw, (iy1 - iy0) / vh * dh);
+    };
+    x.imageSmoothingEnabled = false;
+    if (t < 13.9) { blit(x, 1920, 1080, cam); return; }
+    // ---------------- payoff: the whole diagram lives on a laptop at 3 a.m.
+    blit(s, 64, 36, [160, 360, 1280]);
+    R(r, 0, 0, 320, 180, "#0e0d1c"); R(r, 18, 18, 56, 44, "#1b1d40"); R(r, 45, 18, 2, 44, "#0e0d1c"); R(r, 18, 39, 56, 2, "#0e0d1c"); R(r, 56, 24, 7, 7, "#e9e4c8");
+    R(r, 0, 120, 320, 6, "#3a2c22"); R(r, 0, 126, 320, 54, "#1a1410");   // desk
+    R(r, 124, 66, 72, 44, "#2a2a34"); r.drawImage(sc, 128, 70); R(r, 112, 110, 96, 6, "#3c3c48");   // laptop
+    R(r, 230, 98, 10, 22, "#4fd1a0"); R(r, 230, 102, 10, 4, "#0e0d1c");   // energy drink
+    R(r, 66, 112, 40, 68, "#08080f"); R(r, 74, 92, 24, 24, "#08080f"); R(r, 58, 128, 56, 52, "#08080f");   // the person, from behind
+    R(r, 128, 70, 64, 36, "rgba(120,160,255,.06)");
+    if (t > 14.15) TX(r, "LINE GO UP.", 230, 40, "#ffe066");
+    const kr = expoIO(seg(t, 13.9, 14.6)), vw = lerp(64, 320, kr), cx = lerp(160, 160, kr), cy = lerp(88, 90, kr), vh = vw * 9 / 16;
+    x.drawImage(rc, cx - vw / 2, cy - vh / 2, vw, vh, 0, 0, 1920, 1080);
+  },
+  sound(A) {
+    const m = A.midi;
+    const ev = [];   // [t, fn] — played forward, then mirrored for the backward half
+    const blip = (t0, n, d = .12, g = .07) => ev.push([t0, (tt) => A.tone(tt, m(n), d, "square", g)]);
+    [0.2, .5, .8, 1.1].forEach((t0, i) => blip(t0, [60, 64, 67, 72][i], .1, .05));
+    for (let i = 0; i < 8; i++) blip(2.6 + i * .12, 76 + (i % 3) * 3, .06, .04);
+    [[4.2, 60], [4.9, 64], [5.6, 67], [6.6, 72]].forEach(([t0, n]) => { blip(t0, n, .25, .09); ev.push([t0, (tt) => A.tone(tt, m(n - 24), .3, "triangle", .15)]); });
+    blip(7.0, 84, .1, .06); blip(7.1, 88, .14, .06);
+    REC.forEach(([t0, d], i) => { for (let j = 0; j < 4 + i * 2; j++) blip(t0 + j * d / (4 + i * 2), 60 + i * 5 + j * 2, .05, .05); ev.push([t0, (tt) => A.kick(tt, .5)]); });
+    for (let i = 0; i < 40; i++) blip(10.4 + i * .05, 72 + ((i * 5) % 24), .04, .04);
+    blip(12.4, 96, .4, .07); blip(12.4, 91, .4, .05);
+    [60, 64, 67, 71].forEach((n) => blip(14.15, n, .8, .05));
+    for (let t0 = 0; t0 < 15; t0 += .5) ev.push([t0, (tt) => A.hat(tt, .03)]);
+    ev.forEach(([t0, fn]) => { fn(t0); fn(30 - t0 - .1); });
+  },
+});
+</script></body></html>

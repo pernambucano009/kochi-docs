@@ -1,0 +1,138 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script><script src="../../lib/three.min.js"></script></head><body>
+<script>
+// #43 Walking inside a swirling-night painting, spotting hidden cats (three.js, ?render-style: every frame from time).
+// Signature shot (11–15 s): low under the cypress, looking up at the swirling sky and moon; a cat sits on the church roof,
+// painted in the same strokes — it only reads when its eyes light up.
+// Shots: 0–4 crane down from the sky (wide) · 4–8 dolly along the lane, cat 1 on a wall · 8–11 orbit the cypress, cat 2 at its foot
+// · 11–15 signature push-in, cat 3 · 15–20 crane up to a wide: every window lights up, "3 / 3".
+const DUR = 20;
+M.reel({
+  W: 1920, H: 1080, DUR, bg: "#0b1a3a",
+  fonts: { CV: ["Caveat_wght_500.ttf", "500"] },
+  init(M) {
+    const T = THREE, R = M.rng(11);
+    const renderer = new T.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+    renderer.setSize(1920, 1080); renderer.outputEncoding = T.sRGBEncoding; renderer.toneMapping = T.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.15;
+    renderer.shadowMap.enabled = true; renderer.shadowMap.type = T.PCFSoftShadowMap;
+    renderer.domElement.style.cssText = "position:absolute;left:0;top:0"; M.stage.appendChild(renderer.domElement);
+    const scene = new T.Scene(), cam = new T.PerspectiveCamera(45, 1920 / 1080, .1, 400);
+    // ---------- brush textures: short curved strokes following a flow field
+    const strokes = (w, h, cols, flow, n, len, wid) => {
+      const c = document.createElement("canvas"); c.width = w; c.height = h; const x = c.getContext("2d");
+      x.fillStyle = cols[0]; x.fillRect(0, 0, w, h); x.lineCap = "round";
+      for (let i = 0; i < n; i++) {
+        let px = R() * w, py = R() * h; x.strokeStyle = cols[1 + Math.floor(R() * (cols.length - 1))]; x.lineWidth = wid * (.6 + R() * .8);
+        x.beginPath(); x.moveTo(px, py);
+        for (let k = 0; k < len; k++) { const a = flow(px / w, py / h); px += Math.cos(a) * 3; py += Math.sin(a) * 3; x.lineTo(px, py); }
+        x.stroke();
+      }
+      const t = new T.CanvasTexture(c); t.encoding = T.sRGBEncoding; t.wrapS = t.wrapT = T.RepeatWrapping; t.anisotropy = 4; return t;
+    };
+    // the sky: swirls (vortices) + star halos + a crescent moon, as an equirect painting
+    const vort = [[.42, .3, .12], [.55, .26, .08], [.32, .34, .07], [.7, .22, .06]];
+    const skyFlow = (u, v) => { let a = .15 * Math.sin(v * 12); for (const [cx, cy, r] of vort) { const dx = u - cx, dy = v - cy, d = Math.hypot(dx, dy); if (d < r * 2.2) a = Math.atan2(dy, dx) + Math.PI / 2 * (d < r ? 1 : (r * 2.2 - d) / (r * 1.2)); } return a; };
+    const skyTex = strokes(2048, 1024, ["#1b3b7a", "#2a55a5", "#3c6fc4", "#1f4590", "#6d93d8", "#a8c3e8", "#0f2a5c", "#e9d58a"], skyFlow, 9000, 12, 5);
+    { const x = skyTex.image.getContext("2d");
+      const halo = (cx, cy, r) => { for (let k = 0; k < 7; k++) { x.strokeStyle = ["#f6e7a1", "#fff3c4", "#e8d06a", "#cfe0f5"][k % 4]; x.lineWidth = 5; x.beginPath(); x.arc(cx, cy, r * (1 - k * .12), R() * 6, R() * 6 + 5.4); x.stroke(); } x.fillStyle = "#fff6cf"; x.beginPath(); x.arc(cx, cy, r * .25, 0, 7); x.fill(); };
+      for (let i = 0; i < 11; i++) halo(R() * 2048, 100 + R() * 350, 22 + R() * 26);
+      x.fillStyle = "#f3d35c"; x.beginPath(); x.arc(1300, 250, 60, 0, 7); x.fill(); x.fillStyle = "#e8b83a"; x.beginPath(); x.arc(1320, 235, 50, 0, 7); x.fill(); halo(1300, 250, 95);
+      skyTex.needsUpdate = true; }
+    skyTex.mapping = T.EquirectangularReflectionMapping;
+    scene.background = skyTex;
+    const pm = new T.PMREMGenerator(renderer); scene.environment = pm.fromEquirectangular(skyTex).texture;
+    scene.fog = new T.Fog(0x1a3570, 40, 220);
+    // ---------- lights: key = moonlight, fill = sky, rim = warm windows
+    const key = new T.DirectionalLight(0xdfe6ff, 1.4); key.position.set(40, 60, -40); key.castShadow = true; key.shadow.mapSize.set(1024, 1024); key.shadow.bias = -.0005; key.shadow.normalBias = .05;
+    Object.assign(key.shadow.camera, { left: -60, right: 60, top: 60, bottom: -60, near: 1, far: 200 }); scene.add(key);
+    scene.add(new T.HemisphereLight(0x5f84d8, 0x1d2a3a, .7));
+    const rim = new T.PointLight(0xffb85a, 1.2, 60); rim.position.set(0, 6, -8); scene.add(rim);
+    // ---------- ground: rolling hills in green-blue strokes
+    const groundTex = strokes(1024, 1024, ["#24405a", "#2f5a5e", "#3b6c5a", "#1d3448", "#4c7a63", "#2a4c6e"], (u, v) => Math.sin(u * 9 + v * 4) * .8, 5000, 12, 6); groundTex.repeat.set(8, 8);
+    const gGeo = new T.PlaneGeometry(400, 400, 80, 80); gGeo.rotateX(-Math.PI / 2);
+    const gp = gGeo.attributes.position; for (let i = 0; i < gp.count; i++) { const X = gp.getX(i), Z = gp.getZ(i); gp.setY(i, Math.max(0, (Math.abs(X) > 18 || Z < -50 ? 1 : 0)) * (Math.sin(X * .05) * 4 + Math.cos(Z * .04) * 5 + 4) * M.smooth(M.seg(Math.hypot(X, Z + 10), 18, 60))); }
+    gGeo.computeVertexNormals();
+    const ground = new T.Mesh(gGeo, new T.MeshPhysicalMaterial({ map: groundTex, roughness: .95 })); ground.receiveShadow = true; scene.add(ground);
+    // ---------- houses: walls, roofs, glowing windows (what's near lights up later)
+    const wallTex = strokes(512, 512, ["#3d5a8a", "#4c6fa3", "#2f4a78", "#6a86b8", "#5a78a8"], () => Math.PI / 2 + (R() - .5) * .4, 1800, 10, 7);
+    const roofTex = strokes(512, 512, ["#2b3a66", "#405a8c", "#1f2c52", "#556fa0"], () => .2, 1600, 12, 7);
+    const wallMat = new T.MeshPhysicalMaterial({ map: wallTex, roughness: .9 }), roofMat = new T.MeshPhysicalMaterial({ map: roofTex, roughness: .8 });
+    const winMats = [];
+    const house = (x0, z0, w, h, d, ry = 0) => {
+      const g = new T.Group(); g.position.set(x0, 0, z0); g.rotation.y = ry;
+      const b = new T.Mesh(new T.BoxGeometry(w, h, d), wallMat); b.position.y = h / 2; b.castShadow = b.receiveShadow = true; g.add(b);
+      const roof = new T.Mesh(new T.CylinderGeometry(0, w * .75, h * .5, 4, 1), roofMat); roof.position.y = h + h * .25; roof.rotation.y = Math.PI / 4; roof.scale.z = d / w; roof.castShadow = true; g.add(roof);
+      const wm = new T.MeshStandardMaterial({ color: 0x3a2a10, emissive: 0xffb347, emissiveIntensity: .2 + R() * .4, roughness: .6 }); winMats.push(wm);
+      for (let k = 0; k < 2; k++) { const win = new T.Mesh(new T.PlaneGeometry(w * .18, h * .22), wm); win.position.set((k - .5) * w * .45, h * .55, d / 2 + .02); g.add(win); }
+      scene.add(g); return g;
+    };
+    const lane = [];
+    for (let i = 0; i < 9; i++) { lane.push(house(-7 - R() * 2, -8 - i * 9, 5 + R() * 2, 4 + R() * 3, 5, Math.PI / 2)); lane.push(house(7 + R() * 2, -12 - i * 9, 5 + R() * 2, 4 + R() * 3, 5, -Math.PI / 2)); }
+    // church with a spire at the end of the lane
+    const church = house(0, -95, 10, 9, 14);
+    const spire = new T.Mesh(new T.ConeGeometry(1.6, 16, 8), roofMat); spire.position.set(0, 9 + 8, -101); spire.castShadow = true; scene.add(spire);
+    // the cypress: a tall dark flame (lathe), in dark green-black strokes
+    const cyTex = strokes(512, 1024, ["#13241c", "#1f3a2a", "#0b1510", "#2f4f33", "#3d5f3a"], (u, v) => -Math.PI / 2 + Math.sin(v * 30 + u * 10) * .7, 3000, 18, 6);
+    const pts = []; for (let i = 0; i <= 30; i++) { const v = i / 30; pts.push(new T.Vector2(2.5 * Math.pow(1 - v, .85) * (.75 + .25 * Math.sin(Math.min(1, v * 2.2) * Math.PI)) + .04, v * 22)); }
+    const cypress = new T.Mesh(new T.LatheGeometry(pts, 24), new T.MeshPhysicalMaterial({ map: cyTex, roughness: .9 })); cypress.position.set(-20, 0, -28); cypress.castShadow = true; scene.add(cypress);
+    // ---------- cats, painted in the same strokes as where they hide; eyes light up when spotted
+    const cat = (tex, px, py, pz, s, ry) => {
+      const g = new T.Group(); g.position.set(px, py, pz); g.scale.setScalar(s); g.rotation.y = ry;
+      const m = new T.MeshPhysicalMaterial({ map: tex, roughness: .9 });
+      const body = new T.Mesh(new T.SphereGeometry(.5, 24, 16), m); body.scale.set(.8, 1, .7); body.position.y = .5; g.add(body);
+      const head = new T.Mesh(new T.SphereGeometry(.32, 24, 16), m); head.position.y = 1.15; g.add(head);
+      for (const sx of [-1, 1]) { const ear = new T.Mesh(new T.ConeGeometry(.11, .25, 4), m); ear.position.set(sx * .17, 1.43, 0); g.add(ear); }
+      const tail = new T.Mesh(new T.TorusGeometry(.38, .06, 8, 24, Math.PI), m); tail.position.set(.35, .25, .1); tail.rotation.z = -.5; g.add(tail);
+      const eyeMat = new T.MeshStandardMaterial({ color: 0x223, emissive: 0xffc93a, emissiveIntensity: 0 });
+      for (const sx of [-1, 1]) { const e = new T.Mesh(new T.SphereGeometry(.06, 12, 8), eyeMat); e.position.set(sx * .12, 1.2, .28); g.add(e); }
+      g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+      scene.add(g); return { g, eyeMat };
+    };
+    const cats = [cat(wallTex, -7.4 + 2.6, 0, -26, 1.4, Math.PI / 2 - .5), cat(cyTex, -20 + 2.4, 0, -25.6, 1.3, .6), cat(roofTex, 0, 9 + 3.4, -95, 1.6, 0)];
+    // (cat 1 sits against the lane house wall, cat 2 at the foot of the cypress, cat 3 on the church roof)
+    const hud = M.el("div", "", "position:absolute;right:60px;top:40px;font:500 54px CV;color:#f6e7a1;text-shadow:0 2px 0 #0b1a3a;", "cats 0 / 3");
+    const win = M.el("div", "", "position:absolute;left:0;top:880px;width:1920px;text-align:center;font:500 64px CV;color:#f6e7a1;opacity:0;", "all three found.");
+    return { T, renderer, scene, cam, cats, hud, win, winMats, rim, cypress };
+  },
+  seek(t, P, M) {
+    const { T, cam } = P, { seg, lerp, cubicIO, sine, spring, springO, clamp } = M;
+    let pos, look, fov = 45;
+    const V = (a, b, c) => new T.Vector3(a, b, c);
+    if (t < 4) { const a = cubicIO(t / 4); pos = V(0, lerp(70, 6, a), lerp(40, 14, a)); look = V(0, lerp(40, 4, a), -40); fov = 55; }                          // crane down
+    else if (t < 8) { const a = cubicIO((t - 4) / 4); pos = V(lerp(1, 1.5, a), 1.7, lerp(6, -16, a)); look = V(lerp(-1, -3, a), 1.6, lerp(-20, -32, a)); fov = 48; } // dolly along the lane
+    else if (t < 11) { const a = lerp(.4, 1.9, cubicIO((t - 8) / 3)); pos = V(-20 - Math.cos(a) * 8, 2.2, -28 + Math.sin(a) * 8); look = V(-19, 2.5, -27); fov = 46; } // orbit the cypress
+    else if (t < 15) { const a = sine((t - 11) / 4); pos = V(lerp(-1.2, 0, a), lerp(1.1, 1.5, a), lerp(-60, -67, a)); look = V(0, lerp(22, 15, a), -95); fov = lerp(60, 44, a); } // signature: push in, looking up
+    else { const a = cubicIO((t - 15) / 5); pos = V(lerp(-9, 30, a), lerp(1.6, 46, a), lerp(-24, 30, a)); look = V(0, lerp(10, 0, a), -50); fov = 55; }   // crane up, wide
+    cam.position.copy(pos); cam.fov = fov; cam.updateProjectionMatrix(); cam.lookAt(look);
+    // spotting: each cat is found at its moment; its eyes light up and it does a little startled pop (springs)
+    const found = [7.0, 10.3, 13.6];
+    let n = 0;
+    P.cats.forEach((c, i) => {
+      const s = t - found[i];
+      if (s > 0) n++;
+      c.eyeMat.emissiveIntensity = s > 0 ? .9 * clamp(s * 6) : 0;
+      const pop = s > 0 ? springO(s, 14, .45) : 0;
+      const base = [1.4, 1.3, 1.6][i];
+      c.g.scale.set(base * (1 + .12 * (pop - 1) * -1 * (s < .6 ? 1 : 0)), base * (1 + .15 * Math.max(0, 1 - s * 2.5) * (s > 0 ? 1 : 0)), base);
+    });
+    P.hud.textContent = `cats ${n} / 3`;
+    P.hud.style.transform = `scale(${1 + .25 * found.reduce((a, f) => a + (t > f ? Math.max(0, 1 - (t - f) * 4) : 0), 0)})`;
+    // the quiet win: every window brightens in a wave, a line of text
+    const w = seg(t, 15.6, 18);
+    P.winMats.forEach((m, i) => { m.emissiveIntensity = lerp(.3, 2.4, clamp(w * 1.4 - (i % 9) * .05)); });
+    P.rim.intensity = lerp(1.2, 3, w);
+    P.win.style.opacity = clamp(seg(t, 16.4, 17.2)) * (1 - seg(t, 19.3, 19.9));
+    // the cypress sways like a brushstroke in wind
+    P.cypress.rotation.z = Math.sin(t * .9) * .03; P.cypress.rotation.x = Math.sin(t * .7 + 1) * .02;
+    P.renderer.render(P.scene, cam);
+  },
+  sound(A) {
+    const m = A.midi;
+    // night ambience + footsteps on the lane + a soft piano that adds a note per cat
+    { const b = A.ctx.createBufferSource(); b.buffer = A.noise; b.loop = true; const f = A.ctx.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = 350; const g = A.ctx.createGain(); g.gain.value = .05; b.connect(f).connect(g).connect(A.out); b.start(0); b.stop(DUR); }
+    for (let k = 0; k < 8; k++) A.nz(4.2 + k * .5, .08, "lowpass", 700, .12);
+    A.pad(0, [50, 57, 62, 66].map(m), 8, .03); A.pad(8, [47, 54, 59, 62].map(m), 7, .03); A.pad(15, [50, 57, 62, 66, 69].map(m), 5, .035);
+    [7.0, 10.3, 13.6].forEach((t0, i) => { A.tone(t0, m(78 + i * 2), 1.4, "sine", .08); A.tone(t0 + .12, m(85 + i * 2), 1, "sine", .05); A.tone(t0 + .05, 1100, .12, "triangle", .05); });
+    [74, 78, 81, 86, 85, 81].forEach((n, i) => A.pluck(15.8 + i * .35, m(n), .07, .9));
+  },
+});
+</script></body></html>

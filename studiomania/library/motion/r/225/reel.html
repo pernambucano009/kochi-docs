@@ -1,0 +1,175 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script><script src="../../lib/three.min.js"></script></head><body>
+<script>
+// #225 "Q" — 60 s, 1080×1920, three.js. A word-game short (no brand): a lonely Q tile wants to be part of a word.
+//  1 (4.5–13 s) squeezes into CAT → C and A slam back together, Q is popped out onto its back.
+//  2 (13–22 s) stands in front of EEN → "QEEN": a red X slams down and an E flicks it away.
+//  3 (22–31 s) tries to become an O by spinning — dizzy, topples over.
+//  TURN (31–38 s) alone and blue, a shy U hops in. Eyes meet. Click: QU.
+//  END (38–55 s) together they hop to EEN → QUEEN; a crown drops on Q; the board celebrates.
+//  GAG (55–60 s) a lone Z slides in, looks around… and looks at us.
+// Shots: one action each, cut on action (see CAMS). Values printed on tiles are the standard English ones (Q 10, Z 10, C 3, others 1).
+const DUR = 60, W = 1080, H = 1920;
+const VAL = { Q: 10, U: 1, C: 3, A: 1, T: 1, E: 1, N: 1, Z: 10 };
+M.reel({
+  W, H, DUR, bg: "#f3d9b0",
+  init(M) {
+    const T = THREE; T.ColorManagement.legacyMode = false;
+    const renderer = new T.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+    renderer.setSize(W, H); renderer.outputEncoding = T.sRGBEncoding; renderer.toneMapping = T.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
+    renderer.shadowMap.enabled = true; renderer.shadowMap.type = T.PCFSoftShadowMap;
+    renderer.domElement.style.cssText = "position:absolute;left:0;top:0"; M.stage.appendChild(renderer.domElement);
+    const scene = new T.Scene(), cam = new T.PerspectiveCamera(38, W / H, .1, 100);
+    scene.background = new T.Color(0xf3d9b0); scene.fog = new T.Fog(0xf3d9b0, 14, 30);
+    const hemi = new T.HemisphereLight(0xfff3e0, 0x8a7a66, .9); scene.add(hemi);
+    const key = new T.DirectionalLight(0xfff0dc, 2.2); key.position.set(4, 9, 6); key.castShadow = true; key.shadow.mapSize.set(1536, 1536); key.shadow.bias = -.0005; key.shadow.normalBias = .02; key.shadow.radius = 4;
+    Object.assign(key.shadow.camera, { left: -8, right: 8, top: 8, bottom: -8, near: 1, far: 30 }); scene.add(key);
+    const rim = new T.DirectionalLight(0xffd6b0, .8); rim.position.set(-5, 4, -6); scene.add(rim);
+    // ---------- the board: cream squares, a few bonus squares
+    const bc = document.createElement("canvas"); bc.width = bc.height = 1024; const g = bc.getContext("2d");
+    g.fillStyle = "#bfb08a"; g.fillRect(0, 0, 1024, 1024);
+    const N = 15, s = 1024 / N, bonus = { "0,0": "#d8483c", "7,0": "#d8483c", "14,0": "#d8483c", "0,7": "#d8483c", "3,3": "#f2a7a0", "11,3": "#f2a7a0", "5,5": "#3b7dc4", "9,5": "#3b7dc4", "7,7": "#f2a7a0", "3,7": "#a9d2ef", "11,7": "#a9d2ef", "6,9": "#a9d2ef", "8,9": "#a9d2ef", "5,9": "#3b7dc4", "3,11": "#f2a7a0", "11,11": "#f2a7a0", "14,14": "#d8483c", "7,14": "#d8483c" };
+    for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) { g.fillStyle = bonus[`${i},${j}`] || "#e8e2c8"; g.fillRect(i * s + 3, j * s + 3, s - 6, s - 6); }
+    const btex = new T.CanvasTexture(bc); btex.encoding = T.sRGBEncoding; btex.anisotropy = 8;
+    const board = new T.Mesh(new T.BoxGeometry(16.5, .4, 16.5), [new T.MeshStandardMaterial({ color: 0x9a6a3c, roughness: .7 }), new T.MeshStandardMaterial({ color: 0x9a6a3c, roughness: .7 }), new T.MeshStandardMaterial({ map: btex, roughness: .85 }), new T.MeshStandardMaterial({ color: 0x9a6a3c }), new T.MeshStandardMaterial({ color: 0x9a6a3c, roughness: .7 }), new T.MeshStandardMaterial({ color: 0x9a6a3c, roughness: .7 })]);
+    board.position.y = -.2; board.receiveShadow = true; scene.add(board);
+    // ---------- a tile character: rounded wooden block, letter + value on the front, 3D eyes that lead
+    const shape = new T.Shape(); const rr = .12, w = 1, h = 1.1; shape.moveTo(-w / 2 + rr, 0); shape.lineTo(w / 2 - rr, 0); shape.quadraticCurveTo(w / 2, 0, w / 2, rr); shape.lineTo(w / 2, h - rr); shape.quadraticCurveTo(w / 2, h, w / 2 - rr, h); shape.lineTo(-w / 2 + rr, h); shape.quadraticCurveTo(-w / 2, h, -w / 2, h - rr); shape.lineTo(-w / 2, rr); shape.quadraticCurveTo(-w / 2, 0, -w / 2 + rr, 0);
+    const geo = new T.ExtrudeGeometry(shape, { depth: .22, bevelEnabled: true, bevelThickness: .05, bevelSize: .05, bevelSegments: 4 }); geo.translate(0, 0, -.11);
+    const wood = new T.MeshStandardMaterial({ color: 0xf0d9a8, roughness: .55 });
+    const faceTex = (L) => { const c = document.createElement("canvas"); c.width = 256; c.height = 280; const q = c.getContext("2d"); q.fillStyle = "#f0d9a8"; q.fillRect(0, 0, 256, 280); q.fillStyle = "#3a2414"; q.font = "bold 150px Georgia, serif"; q.textAlign = "center"; q.textBaseline = "alphabetic"; q.fillText(L, 118, 250); q.font = "bold 44px Georgia, serif"; q.fillText(String(VAL[L]), 214, 262); const t = new T.CanvasTexture(c); t.encoding = T.sRGBEncoding; return t; };
+    const eyeW = new T.MeshStandardMaterial({ color: 0xffffff, roughness: .25 }), eyeB = new T.MeshStandardMaterial({ color: 0x141414, roughness: .2 });
+    const tiles = {};
+    const make = (id, L) => {
+      const grp = new T.Group(), body = new T.Group(); grp.add(body);
+      const m = new T.Mesh(geo, wood); m.castShadow = true; m.receiveShadow = true; body.add(m);
+      const face = new T.Mesh(new T.PlaneGeometry(.92, 1.0), new T.MeshStandardMaterial({ map: faceTex(L), roughness: .6 })); face.position.set(0, .53, .165); body.add(face);
+      const eyes = []; [-.2, .2].forEach((ex) => { const e = new T.Mesh(new T.SphereGeometry(.13, 20, 14), eyeW); e.scale.z = .55; e.position.set(ex, 1.2, .1); body.add(e); const p = new T.Mesh(new T.SphereGeometry(.065, 14, 10), eyeB); p.position.set(ex, 1.2, .17); body.add(p); eyes.push([e, p, ex]); });
+      scene.add(grp); tiles[id] = { grp, body, eyes }; return tiles[id];
+    };
+    [["Q", "Q"], ["U", "U"], ["C", "C"], ["A", "A"], ["T", "T"], ["E1", "E"], ["E2", "E"], ["N", "N"], ["Z", "Z"]].forEach(([id, L]) => make(id, L));
+    // the red X and the crown
+    const xm = new T.MeshStandardMaterial({ color: 0xd8483c, roughness: .5 }); const X = new T.Group(); [1, -1].forEach((sg) => { const b = new T.Mesh(new T.BoxGeometry(3.2, .3, .3), xm); b.rotation.z = sg * Math.PI / 4; b.castShadow = true; X.add(b); }); scene.add(X);
+    const gold = new T.MeshStandardMaterial({ color: 0xf2c230, metalness: .85, roughness: .3 }); const crown = new T.Group();
+    const band = new T.Mesh(new T.CylinderGeometry(.3, .3, .16, 24, 1, true), gold); band.material.side = T.DoubleSide; crown.add(band);
+    for (let i = 0; i < 5; i++) { const c = new T.Mesh(new T.ConeGeometry(.07, .2, 8), gold); const a = i / 5 * Math.PI * 2; c.position.set(Math.cos(a) * .3, .17, Math.sin(a) * .3); crown.add(c); } crown.traverse((o) => (o.castShadow = true)); scene.add(crown);
+    return { T, renderer, scene, cam, tiles, X, crown, key, hemi };
+  },
+  seek(t, P, M) {
+    const { T, cam, tiles, X, crown } = P, { seg, lerp, clamp, expo, expoIO, springO, sine } = M;
+    const hops = (t0, t1, from, to, n = 2, hgt = .8) => {
+      if (t < t0) return null; if (t > t1) return { x: to[0], z: to[1], y: 0, sq: .18 * Math.exp(-(t - t1) * 10) * Math.cos((t - t1) * 26) };
+      const u = (t - t0) / (t1 - t0) * n, i = Math.min(n - 1, Math.floor(u)), f = u - i;
+      const a = [lerp(from[0], to[0], i / n), lerp(from[1], to[1], i / n)], b = [lerp(from[0], to[0], (i + 1) / n), lerp(from[1], to[1], (i + 1) / n)];
+      if (f < .2) return { x: a[0], z: a[1], y: 0, sq: .22 * Math.sin(f / .2 * Math.PI / 2) };
+      if (f < .82) { const k = (f - .2) / .62; return { x: lerp(a[0], b[0], sine(k)), z: lerp(a[1], b[1], sine(k)), y: Math.sin(k * Math.PI) * hgt, sq: -.14 * Math.sin(k * Math.PI) }; }
+      return { x: b[0], z: b[1], y: 0, sq: .24 * Math.exp(-(f - .82) * 14) * Math.cos((f - .82) * 30) };
+    };
+    const pose = (id, p) => { const o = tiles[id]; o.grp.visible = p.vis !== false; o.grp.position.set(p.x, p.y || 0, p.z); o.grp.rotation.set(p.rx || 0, p.ry || 0, p.rz || 0); const sq = p.sq || 0; o.body.scale.set(1 + sq, 1 - sq, 1 + sq * .6); o.body.rotation.z = p.lean || 0;
+      const L = p.look || [0, 0]; o.eyes.forEach(([e, pu, ex]) => { pu.position.set(ex + L[0] * .055, 1.2 + L[1] * .055, .17); const bl = p.blink ? .15 : 1; e.scale.y = bl; pu.scale.y = bl; }); };
+    const breathe = (k) => Math.sin(t * 2.2 + k) * .02;
+    // one row on the board: [Z] [Q] [U] E E N  ·  C A T   (z = 0)
+    const CAT = { C: 2.4, A: 3.5, T: 4.6 }, EEN = { E1: -1.1, E2: 0, N: 1.1 }, QX = -3.3, UX = -2.2;
+    const wave = (i) => (t > 43.5 && t < 55 ? Math.max(0, Math.sin((t - 43.5 - i * .15) * 7)) * .35 * (t < 45 ? 1 : .6) : 0);
+    const spread = expo(seg(t, 7.3, 7.6)) * (1 - expo(seg(t, 8.55, 8.7)));
+    pose("C", { x: CAT.C - spread * .35, z: 0, sq: breathe(1) + (t > 8.55 && t < 9 ? .15 * Math.sin((t - 8.55) * 20) : 0), lean: t > 8.3 && t < 8.55 ? -.15 : 0, look: t > 5 && t < 9.5 ? [1, 0] : [0, 0] });
+    pose("A", { x: CAT.A + spread * .35, z: 0, sq: breathe(2), lean: t > 8.3 && t < 8.55 ? .15 : 0, look: t > 5 && t < 9.5 ? [-1, 0] : [0, 0] });
+    pose("T", { x: CAT.T, z: 0, sq: breathe(3), look: t > 5 && t < 9.5 ? [-1, 0] : [0, 0] });
+    ["E1", "E2", "N"].forEach((id, i) => {
+      const xs = t > 17.35 && t < 18 ? .25 * Math.exp(-(t - 17.35) * 8) : 0, wv = wave(i + 2);
+      pose(id, { x: EEN[id], z: 0, y: wv, sq: breathe(i + 4) + xs - wv * .2, lean: id === "E1" && t > 17.8 && t < 18.25 ? .6 * Math.sin((t - 17.8) / .45 * Math.PI) : 0, look: t > 16 && t < 19 ? [-1, 0] : t > 39 && t < 43.5 ? [-1, 0] : [0, -.3] });
+    });
+    // ---------- Q
+    const Q0 = [-4.6, 1.2], LIE1 = [2.95, 2.6], SAD = [-4.6, 1.0];
+    let q = { x: Q0[0], z: Q0[1], sq: breathe(0), look: [0, 0] };
+    if (t < 4.5) { q.look = t > 1.0 ? [1, -.2] : [0, 0]; q.ry = t > 1.4 ? expoIO(seg(t, 1.4, 1.8)) * .5 : 0; }
+    else if (t < 7.35) { const h = hops(4.5, 7.3, Q0, [2.95, .35], 4, .9); q = { ...q, ...h, look: [1, 0], ry: .3 }; }
+    else if (t < 8.65) { q = { x: 2.95, z: lerp(.35, 0, expo(seg(t, 7.3, 7.6))), sq: breathe(0) - .05, look: t > 8.0 ? [0, -.4] : [-.6, .2] }; }
+    else if (t < 13) {
+      const s = t - 8.65, fly = clamp(s / .75);
+      q = { x: 2.95, z: lerp(0, LIE1[1], fly), y: Math.sin(fly * Math.PI) * 1.6, rx: -Math.PI / 2 * expo(fly), look: [0, 0] };
+      if (s > .75) q.y = .12 * Math.abs(Math.sin((s - .75) * 12)) * Math.exp(-(s - .75) * 5);
+      if (t > 11.3) { const up = expoIO(seg(t, 11.3, 11.9)); q.rx = -Math.PI / 2 * (1 - up); q.sq = up >= 1 ? .2 * Math.exp(-(t - 11.9) * 8) : 0; }
+      if (t > 12.2) q.look = [Math.sin(t * 20) * .8, 0];
+    } else if (t < 17) { const h = hops(13, 15.6, LIE1, [QX + 1.1 * 0 + 1.1, 0].map((v, i) => (i ? 0 : -2.2)), 3, .9); q = { ...q, ...h, look: [-1, -.2] }; if (t > 15.8) { q.sq = -.12 * expo(seg(t, 15.8, 16.1)); q.look = [0, -.6]; } }
+    else if (t < 22) {
+      q = { x: -2.2, z: 0, sq: t < 17.35 ? -.12 : .3 * Math.exp(-(t - 17.35) * 7), look: t < 17.3 ? [0, .9] : [0, 0] };
+      if (t > 18.0) { const fly = clamp((t - 18.0) / .8); q = { x: lerp(-2.2, SAD[0], fly), z: lerp(0, SAD[1], fly), y: Math.sin(fly * Math.PI) * 1.8, rx: Math.PI / 2 * expo(fly), ry: 0, look: [0, 0] }; }
+      if (t > 20.6) { const up = expoIO(seg(t, 20.6, 21.3)); q.rx = Math.PI / 2 * (1 - up); }
+    } else if (t < 31) {
+      const sp = t < 26 ? Math.pow(seg(t, 22.5, 26), 2) * 60 : 60 + (t - 26) * 3;
+      q = { x: SAD[0], z: SAD[1], ry: sp, sq: t < 22.5 ? .2 * seg(t, 22, 22.5) : -.08, look: t < 22.4 ? [0, -1] : [0, 0] };
+      if (t > 26) { q.lean = Math.sin((t - 26) * 6) * .25 * seg(t, 26, 27.4); q.look = [Math.cos(t * 9), Math.sin(t * 9)]; }
+      if (t > 27.6) { q.rz = -Math.PI / 2 * expo(seg(t, 27.6, 27.9)); q.lean = 0; }
+      if (t > 29.6) { const up = expoIO(seg(t, 29.6, 30.4)); q.rz = -Math.PI / 2 * (1 - up); q.look = [0, .5]; }
+    } else if (t < 38.6) {
+      q = { x: SAD[0], z: SAD[1], sq: .1, look: t < 34.9 ? [0, .7] : [1, 0], ry: t > 35.2 ? expoIO(seg(t, 35.2, 35.6)) * .3 : 0 };
+      if (t > 37.6) q.sq = .2 * Math.exp(-(t - 37.6) * 9) * Math.cos((t - 37.6) * 26);
+    } else if (t < 43.5) { const h = hops(38.6, 42.6, SAD, [QX, 0], 3); q = { x: SAD[0], z: SAD[1], ...(h || {}), look: [1, 0] }; }
+    else { q = { x: QX, z: 0, y: wave(0), sq: .02, look: t > 45 ? [0, -.2] : [1, 0] }; if (t > 57.0) q.look = [-1, 0]; if (t > 58.4) q.look = [0, -.2]; }
+    pose("Q", q);
+    // ---------- U: enters from the right along the front, shy; clicks to Q
+    const U0 = [6.5, 1.8], UNEXT = [SAD[0] + 1.1, SAD[1]];
+    let u = { vis: t > 32, x: U0[0], z: U0[1], look: [-1, 0] };
+    if (t > 32 && t < 37.6) { const h = hops(32, 34.5, U0, [UNEXT[0] + .4, UNEXT[1]], 4, .6); u = { ...u, ...h, look: t > 34.6 ? [-1, -.1] : [-1, 0] }; if (t > 35.6 && t < 37.3) u.lean = .1; if (t > 37.3) u.x = lerp(UNEXT[0] + .4, UNEXT[0] - .1, expo(seg(t, 37.3, 37.6))); }
+    else if (t >= 37.6 && t < 43.5) { const h = hops(38.6, 42.6, [UNEXT[0] - .1, UNEXT[1]], [UX, 0], 3); u = { vis: true, x: UNEXT[0] - .1, z: UNEXT[1], ...(h || {}), look: [-.6, 0] }; if (!h) u.sq = .2 * Math.exp(-(t - 37.6) * 9) * Math.cos((t - 37.6) * 26); }
+    else if (t >= 43.5) u = { vis: true, x: UX, z: 0, y: wave(1), look: [-1, -.2] };
+    pose("U", u);
+    // ---------- Z: slides in from the left, ends up next to QUEEN
+    const zIn = expoIO(seg(t, 55.2, 56.5));
+    pose("Z", { vis: t > 55, x: lerp(-9, -4.4, zIn), z: 0, sq: t > 56.5 ? .15 * Math.exp(-(t - 56.5) * 9) : 0, look: t < 57 ? [1, 0] : t < 57.5 ? [-1, 0] : t < 58 ? [1, 0] : [0, -.1], blink: t > 59.1 && t < 59.25 });
+    // ---------- the X, the crown
+    X.visible = t > 16.6 && t < 19.5; const xd = clamp((t - 16.6) / .75); X.position.set(-.55, lerp(8, 1.45, xd * xd) - (t > 19 ? (t - 19) ** 2 * 10 : 0), .4); X.rotation.x = -.2;
+    crown.visible = t > 44.5; const ck = springO(t - 44.5, 14, .55); crown.position.set(QX, lerp(6, 1.5, Math.min(1.05, ck)) + wave(0), .02); crown.rotation.z = Math.sin(t * 2) * .05;
+    // ---------- mood
+    const cold = seg(t, 31, 32) * (1 - seg(t, 36.5, 38)), gold = seg(t, 43, 46);
+    const bg = new T.Color().setRGB(lerp(.95, .58, cold), lerp(.85, .68, cold), lerp(.69, .80, cold)).lerp(new T.Color(1, .82, .55), gold * .5);
+    P.scene.background.copy(bg); P.scene.fog.color.copy(bg);
+    P.key.color.setRGB(1, lerp(.94, .85, cold), lerp(.86, 1, cold)); P.key.intensity = lerp(2.2, 1.3, cold) + gold * .4;
+    // ---------- shots: [t0, camPos, lookAt] ("q"/"pair" = follow)
+    const qp = tiles.Q.grp.position, up = tiles.U.grp.position;
+    const CAMS = [
+      [0, [-4.0, 1.7, 5.4], [-4.3, .7, 1.2]], [2.4, [-2.2, 1.3, 3.6], [3.4, .6, 0]], [4.5, "q", 5.6], [7.3, [2.95, 1.5, 4.2], [2.95, .7, 0]],
+      [8.6, [2.95, 1.7, 6.0], [2.95, .7, .8]], [9.4, [3.6, .6, 4.8], [2.95, .2, 2.6]], [13.0, "q", 6.0], [15.8, [-.55, 2.4, 9.6], [-.55, .7, 0]],
+      [19.3, [-4.0, 1.0, 3.8], [-4.6, .2, 1.0]], [22.0, [-4.6, 1.4, 4.6], [-4.6, .7, 1.0]], [27.6, [-3.9, .8, 4.0], [-4.6, .3, 1.0]],
+      [31.0, [-2.8, 2.4, 8.4], [-2.8, .5, 1.0]], [34.6, [-4.05, 1.3, 4.0], [-4.05, .8, 1.0]], [38.4, "pair", 6.2], [43.4, [-1.1, 1.7, 11.5], [-1.1, .8, 0]],
+      [46.0, "crane", 0], [55.0, [-4.0, 1.1, 4.0], [-4.0, .8, 0]],
+    ];
+    let c = CAMS[0]; for (const cc of CAMS) if (t >= cc[0]) c = cc;
+    let cp, lk;
+    if (c[1] === "q") { cp = [qp.x, 1.9, qp.z + c[2]]; lk = [qp.x, .6, qp.z]; }
+    else if (c[1] === "pair") { const mx = (qp.x + up.x) / 2, mz = (qp.z + up.z) / 2; cp = [mx, 1.9, mz + c[2]]; lk = [mx, .6, mz]; }
+    else if (c[1] === "crane") { const k = sine(seg(t, 46, 55)); cp = [-1.1, lerp(1.7, 6.5, k), lerp(11.5, 15, k)]; lk = [-1.1, .6, 0]; }
+    else { cp = c[1].slice(); lk = c[2]; cp[2] -= (t - c[0]) * .05; }
+    cam.fov = 46; cam.updateProjectionMatrix(); cam.position.set(...cp); cam.lookAt(new T.Vector3(...lk));
+    P.renderer.render(P.scene, cam);
+  },
+  sound(A) {
+    const m = A.midi;
+    const hopS = (t0, t1, n, pitch = 1) => { for (let i = 0; i < n; i++) { const tl = t0 + (i + .82) * (t1 - t0) / n; A.tone(tl, 180 * pitch, .08, "sine", .18); A.click(tl, .06); } };
+    // score: a pizzicato theme (Q's motif), sadder in the blue section, full and warm at the end
+    const motif = [67, 72, 71, 67, 64, 67];
+    motif.forEach((n, i) => A.pluck(.4 + i * .45, m(n), .1, .5));
+    A.pad(0, [m(48), m(55), m(64)], 8, .025);
+    hopS(4.5, 7.3, 3); A.nz(7.3, .4, "bandpass", 900, .08, 2);
+    A.tone(8.55, 120, .15, "sine", .4); A.click(8.6, .3); A.whoosh(8.6, .6, .2); A.tone(9.4, 90, .2, "sine", .3);
+    for (let i = 0; i < 5; i++) A.tone(9.6 + i * .25, 2000 + (i % 2) * 400, .08, "sine", .03);   // dizzy birdies
+    hopS(13, 15.6, 3); [72, 76, 79].forEach((n, i) => A.pluck(15.8 + i * .1, m(n), .1, .4));
+    A.whoosh(16.6, .7, .15); A.hit(17.35, .6); A.tone(17.35, 70, .4, "sine", .4); A.tone(17.5, m(55), .5, "square", .05); A.tone(17.8, m(50), .7, "square", .05);   // wrong-answer buzz
+    A.click(18.0, .3); A.whoosh(18.0, .8, .2); A.tone(18.8, 100, .2, "sine", .3);
+    A.riser(22.5, 26, .15); for (let t0 = 22.5; t0 < 26; t0 += Math.max(.04, .3 - (t0 - 22.5) * .08)) A.click(t0, .05);
+    for (let i = 0; i < 6; i++) A.tone(26.2 + i * .22, 1400 - i * 120, .15, "triangle", .04); A.tone(27.9, 90, .25, "sine", .35); A.click(27.9, .25);
+    // alone: a slow, minor version of the motif; the U's tiny hops are higher-pitched
+    [64, 67, 66, 62].forEach((n, i) => A.tone(31.2 + i * 1.1, m(n), 1.0, "triangle", .05)); A.pad(31, [m(45), m(52), m(60)], 6, .03);
+    hopS(32, 34.5, 4, 1.6);
+    A.tone(34.7, 1600, .05, "sine", .05); A.tone(35.0, 1800, .05, "sine", .05);
+    A.click(37.6, .35); A.tone(37.6, m(76), .3, "sine", .08); A.tone(37.68, m(83), .4, "sine", .07);   // CLICK: QU
+    hopS(38.6, 42.6, 4, 1.2);
+    [[43.5, 72], [43.65, 76], [43.8, 79], [43.95, 84], [44.1, 88]].forEach(([t0, n]) => A.pluck(t0, m(n), .12, .5));
+    A.tone(44.5, m(96), .8, "sine", .05); A.tone(45.0, 300, .2, "sine", .15);   // the crown lands
+    for (let b = 0; b < 18; b++) { const t0 = 45.5 + b * .5; A.kick(t0, .35); if (b % 2) A.clap(t0, .12); A.pluck(t0, m(motif[b % 6] + 12), .08, .3); }
+    A.pad(45.5, [m(48), m(55), m(64), m(67)], 9.5, .035);
+    // the gag: silence, a slide, a boop
+    A.nz(55.2, 1.3, "bandpass", 500, .1, 1.2); A.tone(59.2, 880, .1, "sine", .07);
+  },
+});
+</script></body></html>
