@@ -3725,10 +3725,7 @@ def autopilot_step(job: dict, settings: dict) -> None:
                 "SELECT scheduled_at FROM posts WHERE status IN ('scheduled', 'sending', 'publishing', 'published')")}
     if step == "scheduling":
         when = autopilot_slot(settings, taken)
-        client = active_client() or {}
-        hook = (f["script"] or "").strip().split("\n")[0].strip()
-        tpl = (client.get("caption") or "").strip() or ("{caption}\n\n{cta}\n{link}" if client.get("cta") or client.get("link") else "{caption}")
-        caption = re.sub(r"\n{3,}", "\n\n", tpl.replace("{caption}", hook).replace("{cta}", client.get("cta") or "").replace("{link}", client.get("link") or "")).strip()
+        caption = f["name"].strip()   # الكابشن = اسم المشروع
         ig = coach["instagram"] if coach and coach["instagram"] else None
         post = create_post(PostIn(export_id=job["export_id"], caption=caption, platforms=settings.get("platforms") or ["instagram"],
                                   scheduled_at=when, options=PostOptions(ig_tags=[ig] if ig else [], ig_collab=bool(ig),

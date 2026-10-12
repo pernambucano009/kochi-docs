@@ -79,7 +79,9 @@ $("readyGrid").addEventListener("click", async (e) => {
       pub.videoId = ex.id;
       renderReady();
       renderPostVideo();
-      if (!pub.editing && !$("postCaption").value.trim()) $("postCaption").value = brandCaption("") || "";
+      // الكابشن = اسم المشروع (اسم الفيديو). لو كنت كاتب كابشن بإيدك مش بيتغيّر
+      const cap = $("postCaption").value.trim();
+      if (!pub.editing && (!cap || cap === pub.autoCaption)) $("postCaption").value = pub.autoCaption = ex.name;
       $("postCaption").focus();
     }
     if (btn.dataset.act === "rename") {
