@@ -36,10 +36,6 @@ window.NHGL = (stage, getClient) => {
     else { g.addColorStop(0, "#eef0f5"); g.addColorStop(.36, "#ffffff"); g.addColorStop(1, "#ffffff"); }
     x.fillStyle = g;
     x.fillRect(0, 0, 512, 512);
-    // بقع لون هادية ورا المجسّم: الزجاج بيكسرها ويلوّنها، فبيبان إنه زجاج شفاف مش بلاستيك
-    const blob = (cx, cy, r, rgb, al) => { const b = x.createRadialGradient(cx, cy, 0, cx, cy, r); b.addColorStop(0, `rgba(${rgb},${al})`); b.addColorStop(.55, `rgba(${rgb},${al * .45})`); b.addColorStop(1, `rgba(${rgb},0)`); x.fillStyle = b; x.fillRect(0, 0, 512, 512); };
-    if (dark) { blob(232, 236, 58, "90,120,255", .6); blob(284, 282, 52, "255,90,170", .45); blob(276, 214, 40, "80,230,220", .4); }
-    else { blob(234, 238, 56, "70,110,255", .55); blob(284, 282, 50, "255,80,160", .42); blob(276, 214, 38, "40,200,200", .42); }
     bdTex.needsUpdate = true;
   }
 
@@ -49,8 +45,8 @@ window.NHGL = (stage, getClient) => {
     c.width = 1024; c.height = 512;
     const x = c.getContext("2d"), g = x.createLinearGradient(0, 0, 0, 512);
     // استوديو غامق فيه شرايط نور حادة: الزجاج النضيف بيبان من الانعكاسات الحادة، مش من لونه
-    if (dark) { g.addColorStop(0, "#3a3a44"); g.addColorStop(.5, "#121216"); g.addColorStop(1, "#24242a"); }
-    else { g.addColorStop(0, "#c4c8d4"); g.addColorStop(.5, "#6d7385"); g.addColorStop(1, "#a9aebb"); }
+    if (dark) { g.addColorStop(0, "#3a4258"); g.addColorStop(.5, "#10131c"); g.addColorStop(1, "#232a3c"); }
+    else { g.addColorStop(0, "#ffffff"); g.addColorStop(.42, "#9fb6e6"); g.addColorStop(.5, "#2f55b0"); g.addColorStop(.58, "#9fb6e6"); g.addColorStop(1, "#eef3ff"); }
     x.fillStyle = g;
     x.fillRect(0, 0, 1024, 512);
     const box = (cx, cy, w, h, a) => {
@@ -80,17 +76,17 @@ window.NHGL = (stage, getClient) => {
     return rt.texture;
   }
 
-  let dark = true, tint = "#ffffff";
-  // زجاج نضيف: شفاف ١٠٠٪ من غير لون جوّاه (اللون كان بيخليه مغبّش)، انعكاسات حادة، ولمعة قوس قزح خفيفة زي الجيليفيش
+  let dark = true, tint = "#4f86ff";
+  // زجاج مصبوب نضيف (زي المرجع): شفاف، والأزرق بيغمق كل ما الزجاج يتخن (الحواف أزرق أغمق، النص فاتح)
   const glass = () => new THREE.MeshPhysicalMaterial({
-    color: 0xffffff, metalness: 0, roughness: 0, transmission: 1, thickness: .9, ior: 1.45,
-    clearcoat: 1, clearcoatRoughness: 0, specularIntensity: 1, specularColor: new THREE.Color(0xffffff), envMapIntensity: 1.6,
-    iridescence: .8, iridescenceIOR: 1.25, iridescenceThicknessRange: [260, 640],
-    attenuationColor: new THREE.Color(tint), attenuationDistance: 1e6, transparent: true, opacity: 1,
+    color: 0xffffff, metalness: 0, roughness: 0, transmission: 1, thickness: 1.1, ior: 1.5,
+    clearcoat: 1, clearcoatRoughness: 0, specularIntensity: 1, specularColor: new THREE.Color(0xffffff), envMapIntensity: 1.5,
+    attenuationColor: new THREE.Color(tint), attenuationDistance: 5.5, transparent: true, opacity: 1,
   });
 
   // ---------- shapes
-  const EX = { depth: .42, bevelEnabled: true, bevelThickness: .16, bevelSize: .11, bevelSegments: 10, curveSegments: 48 };
+  // حواف مدوّرة وتخينة زي الزجاج المصبوب (المرجع)
+  const EX = { depth: .26, bevelEnabled: true, bevelThickness: .32, bevelSize: .22, bevelSegments: 18, curveSegments: 64 };
   function extrude(shape, o = {}) {   // كل الأشكال أتخن من الأول عشان يبقى فيها حجم زجاج والمخ يتحط جواها
     const opt = { ...EX, ...o };
     opt.depth *= 1.7; opt.bevelThickness *= 1.5;
@@ -121,10 +117,13 @@ window.NHGL = (stage, getClient) => {
     s.quadraticCurveTo(cx - k, cy - k, cx - r, cy); s.quadraticCurveTo(cx - k, cy + k, cx, cy + r);
     return s;
   }
-  function gearShape(n = 8, ro = 1.3, ri = 1.02, hole = .42) {
-    const s = new THREE.Shape();
-    for (let i = 0; i < n * 4; i++) {
-      const a = (i / (n * 4)) * Math.PI * 2, r = (i % 4 === 1 || i % 4 === 2) ? ro : ri;
+  // ترس بـ ٦ سنان تخينة مدوّرة وفتحة كبيرة في النص (زي المرجع)
+  function gearShape(n = 6, ro = 1.32, ri = 1.0, hole = .56) {
+    const s = new THREE.Shape(), N = n * 48;
+    for (let i = 0; i < N; i++) {
+      const a = (i / N) * Math.PI * 2;
+      const c = Math.max(0, Math.min(1, .5 + Math.cos(n * a) * .95));
+      const k = c * c * (3 - 2 * c), r = ri + (ro - ri) * k;
       const p = [Math.cos(a) * r, Math.sin(a) * r];
       i ? s.lineTo(...p) : s.moveTo(...p);
     }
@@ -192,7 +191,7 @@ window.NHGL = (stage, getClient) => {
       curves.push(new THREE.CatmullRomCurve3([new THREE.Vector3(0, -S.h, 0), new THREE.Vector3(0, S.h, 0)], false));
     }
     if (!curves.length) return null;
-    const geos = curves.map((c) => new THREE.TubeGeometry(c, Math.max(24, Math.round(c.getLength() * 40)), .022, 6, !!c.closed));
+    const geos = curves.map((c) => new THREE.TubeGeometry(c, Math.max(24, Math.round(c.getLength() * 40)), .014, 6, !!c.closed));
     // دمج الأنابيب في جيومتري واحد، والرسم بيكبر على طولها (نفس حركة «بيكبر» بتاعة الدخول)
     let nIdx = 0, nPos = 0; geos.forEach((g) => { nIdx += g.index.count; nPos += g.attributes.position.count; });
     const pos = new Float32Array(nPos * 3), nor = new Float32Array(nPos * 3), idx = new Uint32Array(nIdx);
@@ -295,12 +294,12 @@ window.NHGL = (stage, getClient) => {
 
   // حافة منوّرة (فرينل) على كل جزء زجاج: هي اللي بتخلّي الزجاج الشفاف يبان زي راس الجيليفيش
   const rimMat = () => new THREE.ShaderMaterial({
-    uniforms: { c: { value: new THREE.Color(dark ? "#ffffff" : "#8fb4ff") }, a: { value: 1 } },
+    uniforms: { c: { value: new THREE.Color(dark ? "#cfe0ff" : "#2c5bd6") }, a: { value: 1 } },
     vertexShader: "varying vec3 vN; varying vec3 vV; void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz); gl_Position = projectionMatrix * mv; }",
     fragmentShader: "uniform vec3 c; uniform float a; varying vec3 vN; varying vec3 vV; void main(){ float f = pow(1.0 - abs(dot(normalize(vN), normalize(vV))), 3.2); gl_FragColor = vec4(c, f * a); }",
-    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+    transparent: true, depthWrite: false,
   });
-  const RIM = () => (dark ? .9 : .55);   // حافة منوّرة رفيعة زي حافة الجيليفيش
+  const RIM = () => (dark ? .55 : .75);   // حافة منوّرة رفيعة زي حافة الجيليفيش
   const cache = {};
   function group(key) {
     if (cache[key]) return cache[key];
@@ -371,14 +370,14 @@ window.NHGL = (stage, getClient) => {
 
   function theme(isDark) {
     dark = isDark;
-    tint = "#ffffff";
+    tint = isDark ? "#6c9bff" : "#4f86ff";
     // في اللايت: من غير tone mapping، عشان الأبيض اللي ورا الزجاج يفضل أبيض صافي (كان بيطلع رمادي فيبان مغبّش)
     renderer.toneMapping = isDark ? THREE.ACESFilmicToneMapping : THREE.NoToneMapping;
     scene.traverse((o) => { if (o.material) o.material.needsUpdate = true; });
     scene.environment = envMap(isDark);
     paintBackdrop(isDark);
-    Object.values(cache).forEach((g) => { g.userData.mats.forEach((m) => { if (m.attenuationColor) m.attenuationColor.set(tint); }); g.userData.rim.uniforms.c.value.set(isDark ? "#ffffff" : "#8fb4ff"); });
-    coreMat.color.set(isDark ? "#eef1f8" : "#55607a"); coreMat.emissive.set(isDark ? "#8a93a8" : "#000000");
+    Object.values(cache).forEach((g) => { g.userData.mats.forEach((m) => { if (m.attenuationColor) m.attenuationColor.set(tint); }); g.userData.rim.uniforms.c.value.set(isDark ? "#cfe0ff" : "#2c5bd6"); });
+    coreMat.color.set(isDark ? "#cfe0ff" : "#a9c3f5"); coreMat.emissive.set(isDark ? "#5d79b8" : "#6f93dc");
     resize();
     frame();
   }
@@ -411,8 +410,8 @@ window.NHGL = (stage, getClient) => {
       grow(g, Math.pow(e, 1.4));   // المخ بيطلع من النص لبرّه بعد ما الزجاج يبان
       g.scale.setScalar(u.k * (.88 + .12 * e));
       g.position.y = lift + (reduce.matches ? 0 : Math.sin(t * .8) * .1);
-      g.rotation.y = reduce.matches ? 0 : Math.sin(t * .45) * .38;
-      g.rotation.x = reduce.matches ? 0 : Math.sin(t * .3) * .08;
+      g.rotation.y = reduce.matches ? 0 : Math.sin(t * .45) * .22;
+      g.rotation.x = reduce.matches ? 0 : Math.sin(t * .3) * .06;
       g.children.forEach((c) => { if (c.userData.spin && !reduce.matches) c.rotation.z = t * .25; });
     }
     renderer.render(scene, camera);
