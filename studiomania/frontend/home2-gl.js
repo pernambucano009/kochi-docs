@@ -376,10 +376,10 @@ window.NHGL = (stage, getClient) => {
   });
   const RIM = () => 1;   // حافة منوّرة رفيعة زي حافة الجيليفيش
   // الأيقونات اللي ليها صورة زجاج جاهزة (icons3d/<key>.png على الأبيض، و<key>_d.png للغامق) بتتعرض هي نفسها بالظبط
-  const IMGS = ["settings", "app"], loader = new THREE.TextureLoader(), imgPlanes = [];
+  const IMGS = ["settings", "app", "brand", "assets", "progress", "publish", "reel", "film", "series", "carousel", "characters", "voices", "music", "backgrounds"], loader = new THREE.TextureLoader(), imgPlanes = [];
   function imgTex(plane) {
     const key = plane.userData.img;
-    loader.load(`/icons3d/${key}${dark ? "_d" : ""}.png?v=1`, (t) => {
+    loader.load(`/icons3d/${key}${dark ? "_d" : ""}.webp?v=2`, (t) => {
       t.encoding = THREE.sRGBEncoding;
       t.anisotropy = renderer.capabilities.getMaxAnisotropy();
       const old = plane.material.map;
@@ -406,6 +406,12 @@ window.NHGL = (stage, getClient) => {
       g.userData.img = true;
       g.userData.mats = [g.children[0].material];
       g.userData.marks = [];
+      if (key === "brand") {   // لوجو العميل (أو أول حرف من اسمه) جوه المربع اللي في النص
+        const mark = markPlane(.3);
+        mark.position.z = .02;
+        g.add(mark);
+        g.userData.marks.push(mark);
+      }
       g.userData.rim = rimMat();
       g.userData.a = 0; g.userData.to = 0; g.visible = false;
       scene.add(g);
