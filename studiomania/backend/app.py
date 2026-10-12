@@ -2956,6 +2956,7 @@ def run_render(project_id: str, export_id: str, cmds: list[list[str]], total: fl
         error = f"حصلت مشكلة أثناء التصدير: {exc}"
         log_render(f"مشكلة: {exc!r}")
     finally:
+        cancelled = project_id in RENDER_CANCELLED
         RENDER_CANCELLED.discard(project_id)
         log_render(f"النهاية: {error or 'تمام ✓'}")
         shutil.rmtree(work_dir, ignore_errors=True)
@@ -2978,6 +2979,11 @@ def run_render(project_id: str, export_id: str, cmds: list[list[str]], total: fl
                     (export_id, now(), project_id),
                 )
         RENDER_ACTIVE.pop(project_id, None)
+        if not cancelled:
+            if error:
+                notify("render", "bad", f"التصدير فشل: {name}", error, "0", project_id)
+            else:
+                notify("render", "ok", f"الفيديو اتصدّر: {name}", "جاهز في الفولدر للنشر", "7", export_id)
 
 
 @app.post("/api/projects/{project_id}/render/cancel")
@@ -3300,7 +3306,16 @@ def set_post(post_id: str, **fields) -> None:
     fields["updated_at"] = now()
     cols = ", ".join(f"{k} = ?" for k in fields)
     with closing(db()) as conn, conn:
+        old = conn.execute(POSTS_QUERY + " WHERE p.id = ?", (post_id,)).fetchone()
         conn.execute(f"UPDATE posts SET {cols} WHERE id = ?", (*fields.values(), post_id))
+    status = fields.get("status")
+    if old is not None and status in ("published", "failed") and status != old["status"]:
+        name = old["carousel_name"] or old["export_name"] or (old["caption"] or "").split("\n")[0][:60] or "بوست"
+        plats = "، ".join(publisher.PLATFORMS.get(k, (None, k))[1] for k in json.loads(old["platforms"] or "[]"))
+        if status == "published":
+            notify("post", "ok", f"اتنشر: {name}", plats, "7", post_id)
+        else:
+            notify("post", "bad", f"البوست مااتنشرش: {name}", fields.get("error") or old["error"] or "", "7", post_id)
 
 
 def send_post(post_id: str, old_remote_id: str | None = None) -> None:
@@ -3561,6 +3576,55 @@ def publish_due_posts() -> None:
         _publish_lock.release()
 
 
+# ---------------------------------------------------------------- 🔔 الإشعارات
+# حاجات بتحصل في الخلفية وانت مش فاتح صفحتها: تصدير خلص أو فشل، بوست اتنشر أو فشل، أوتوبايلوت خلص أو وقف.
+NOTIFY_KEEP = 200
+
+
+def notify(kind: str, level: str, title: str, body: str = "", link: str = "", ref: str = "") -> None:
+    try:
+        with closing(db()) as conn, conn:
+            conn.execute(
+                "INSERT INTO notifications (id, kind, level, title, body, link, ref, read, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)",
+                (uuid.uuid4().hex[:12], kind, level, title[:200], (body or "")[:500], link, ref, now()),
+            )
+            conn.execute(
+                "DELETE FROM notifications WHERE id NOT IN (SELECT id FROM notifications ORDER BY created_at DESC LIMIT ?)",
+                (NOTIFY_KEEP,),
+            )
+    except sqlite3.Error:
+        pass  # الإشعار مش أهم من الشغل نفسه
+
+
+@app.get("/api/notifications")
+def list_notifications(limit: int = 50):
+    with closing(db()) as conn:
+        rows = conn.execute("SELECT * FROM notifications ORDER BY created_at DESC LIMIT ?", (max(1, min(limit, NOTIFY_KEEP)),)).fetchall()
+        unread = conn.execute("SELECT COUNT(*) FROM notifications WHERE read = 0").fetchone()[0]
+    return {"unread": unread, "items": [{**dict(r), "read": bool(r["read"])} for r in rows]}
+
+
+class NotifyReadIn(BaseModel):
+    ids: list[str] | None = None  # فاضي = الكل
+
+
+@app.post("/api/notifications/read")
+def read_notifications(body: NotifyReadIn):
+    with closing(db()) as conn, conn:
+        if body.ids:
+            conn.executemany("UPDATE notifications SET read = 1 WHERE id = ?", [(i,) for i in body.ids])
+        else:
+            conn.execute("UPDATE notifications SET read = 1")
+    return {"ok": True}
+
+
+@app.delete("/api/notifications")
+def clear_notifications():
+    with closing(db()) as conn, conn:
+        conn.execute("DELETE FROM notifications")
+    return {"ok": True}
+
+
 def scheduler_loop() -> None:
     while True:
         try:
@@ -3577,6 +3641,12 @@ with closing(db()) as _conn, _conn:
         _conn.execute("ALTER TABLE posts ADD COLUMN remote_media TEXT")
     if "carousel_id" not in {c[1] for c in _conn.execute("PRAGMA table_info(posts)")}:
         _conn.execute("ALTER TABLE posts ADD COLUMN carousel_id TEXT")
+    _conn.execute(
+        """CREATE TABLE IF NOT EXISTS notifications (
+            id TEXT PRIMARY KEY, kind TEXT NOT NULL, level TEXT NOT NULL, title TEXT NOT NULL, body TEXT,
+            link TEXT, ref TEXT, read INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL
+        )"""
+    )
     # إعدادات إضافية للبوست: تاج إنستجرام، كولاب، الغلاف
     if "options" not in {c[1] for c in _conn.execute("PRAGMA table_info(posts)")}:
         _conn.execute("ALTER TABLE posts ADD COLUMN options TEXT")
@@ -3617,9 +3687,15 @@ def autopilot_update(job_id: str, **fields) -> None:
         d = autopilot_load()
         for j in d["jobs"]:
             if j["id"] == job_id:
-                if fields.get("step") and fields["step"] != j.get("step"):
+                changed = fields.get("step") and fields["step"] != j.get("step")
+                if changed:
                     fields["step_at"] = now()   # من إمتى في الخطوة دي (بيبان في الشاشة)
                 j.update(fields, updated_at=now())
+                if changed and j["step"] in ("done", "failed"):
+                    done = j["step"] == "done"
+                    nm = j.get("name") or "مشروع"
+                    notify("autopilot", "ok" if done else "bad", f"🤖 خلص: {nm}" if done else f"🤖 وقف: {nm}",
+                           "اتجدول" if done else (j.get("error") or ""), "7" if done else "0", job_id)
         autopilot_save(d)
 
 

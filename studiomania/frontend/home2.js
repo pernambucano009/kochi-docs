@@ -127,6 +127,7 @@ const NH = (() => {
           <button class="nh-switch" id="nhTheme" aria-label="Switch theme"><span class="track"><span class="knob"></span></span><span class="latin" id="nhMode">Dark Mode</span></button>
           <button class="nh-chip" id="nhClient" title="العميل اللي شغال عليه"><i id="nhClientAv"></i><span id="nhClientName" data-no-i18n></span></button>
           <button class="nh-chip latin" id="nhLang" style="padding:6px 10px;letter-spacing:.2em">EN</button>
+          <button class="nh-chip nh-bell" id="nhBell" title="الإشعارات" aria-label="الإشعارات"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15zM10 20.5a2 2 0 0 0 4 0"/></svg><b class="bell-n" hidden></b></button>
         </div>
         <div class="nh-logo" aria-label="${KOCHI ? "Kochi" : "StudioMania"}">${KOCHI ? "K" : "STUDI"}<span class="o" aria-hidden="true"><svg viewBox="0 0 100 100"><circle class="ring" cx="50" cy="50" r="44"/><circle class="orbit" cx="50" cy="50" r="70" pathLength="100"/></svg></span>${KOCHI ? "CHI" : "MANIA"}</div>
       </header>
