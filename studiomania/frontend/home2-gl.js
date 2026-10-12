@@ -375,10 +375,42 @@ window.NHGL = (stage, getClient) => {
     transparent: true, depthWrite: false,
   });
   const RIM = () => 1;   // حافة منوّرة رفيعة زي حافة الجيليفيش
+  // الأيقونات اللي ليها صورة زجاج جاهزة (icons3d/<key>.png على الأبيض، و<key>_d.png للغامق) بتتعرض هي نفسها بالظبط
+  const IMGS = ["settings", "app"], loader = new THREE.TextureLoader(), imgPlanes = [];
+  function imgTex(plane) {
+    const key = plane.userData.img;
+    loader.load(`/icons3d/${key}${dark ? "_d" : ""}.png?v=1`, (t) => {
+      t.encoding = THREE.sRGBEncoding;
+      t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+      const old = plane.material.map;
+      plane.material.map = t; plane.material.needsUpdate = true;
+      if (old) old.dispose();
+      const w = t.image.width, h = t.image.height, mx = Math.max(w, h);
+      plane.scale.set(w / mx, h / mx, 1);
+    });
+  }
+  function imgIcon(key) {
+    const plane = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ transparent: true, toneMapped: false, depthWrite: false, opacity: 0 }));
+    plane.userData.img = key;
+    imgPlanes.push(plane);
+    imgTex(plane);
+    return plane;
+  }
   const cache = {};
   function group(key) {
     if (cache[key]) return cache[key];
     const m = glass(), g = new THREE.Group();
+    if (IMGS.includes(key)) {
+      g.add(imgIcon(key));
+      g.userData.k = 2.9;
+      g.userData.img = true;
+      g.userData.mats = [g.children[0].material];
+      g.userData.marks = [];
+      g.userData.rim = rimMat();
+      g.userData.a = 0; g.userData.to = 0; g.visible = false;
+      scene.add(g);
+      return (cache[key] = g);
+    }
     // أي شكل مبثوق بيتحوّل لطبق زجاج مصبوب (نفس ستايل الترس والمثلث)
     (BUILD[key] || BUILD.app)(m).forEach((x) => g.add(x.geometry?.userData.solid?.kind === "shape" ? toDish(x, m) : x));
     const box = new THREE.Box3().setFromObject(g), size = box.getSize(new THREE.Vector3());
@@ -447,6 +479,7 @@ window.NHGL = (stage, getClient) => {
     scene.environment = envMap(isDark);
     paintBackdrop(isDark);
     paintCap(isDark);
+    imgPlanes.forEach(imgTex);
     Object.values(cache).forEach((g) => { g.userData.mats.forEach((m) => { if (m.attenuationColor) m.attenuationColor.set(tint); });  });
     resize();
     frame();
@@ -480,8 +513,9 @@ window.NHGL = (stage, getClient) => {
       grow(g, Math.pow(e, 1.4));   // اللوجو بيكبر جوه الزجاج بعد ما الزجاج يبان
       g.scale.setScalar(u.k * (.88 + .12 * e));
       g.position.y = lift + (reduce.matches ? 0 : Math.sin(t * .8) * .1);
-      g.rotation.y = reduce.matches ? 0 : Math.sin(t * .45) * .22;
-      g.rotation.x = reduce.matches ? 0 : Math.sin(t * .3) * .06;
+      const tilt = u.img ? .45 : 1;   // الصورة بتميل أقل عشان متبانش كارت مسطّح
+      g.rotation.y = reduce.matches ? 0 : Math.sin(t * .45) * .22 * tilt;
+      g.rotation.x = reduce.matches ? 0 : Math.sin(t * .3) * .06 * tilt;
       g.children.forEach((c) => { if (c.userData.spin && !reduce.matches) c.rotation.z = t * .25; });
     }
     renderer.render(scene, camera);
