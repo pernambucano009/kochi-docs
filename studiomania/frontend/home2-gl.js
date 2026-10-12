@@ -376,10 +376,10 @@ window.NHGL = (stage, getClient) => {
   });
   const RIM = () => 1;   // حافة منوّرة رفيعة زي حافة الجيليفيش
   // الأيقونات اللي ليها صورة زجاج جاهزة (icons3d/<key>.png على الأبيض، و<key>_d.png للغامق) بتتعرض هي نفسها بالظبط
-  const IMGS = ["settings", "app", "brand", "assets", "progress", "publish", "reel", "film", "series", "carousel", "characters", "voices", "music", "backgrounds"], loader = new THREE.TextureLoader(), imgPlanes = [];
+  const IMGS = ["create", "settings", "app", "brand", "assets", "progress", "publish", "reel", "film", "series", "carousel", "characters", "voices", "music", "backgrounds"], loader = new THREE.TextureLoader(), imgPlanes = [];
   function imgTex(plane) {
     const key = plane.userData.img;
-    loader.load(`/icons3d/${key}${dark ? "_d" : ""}.webp?v=2`, (t) => {
+    loader.load(`/icons3d/${key}${dark ? "_d" : ""}.webp?v=3`, (t) => {
       t.encoding = THREE.sRGBEncoding;
       t.anisotropy = renderer.capabilities.getMaxAnisotropy();
       const old = plane.material.map;
