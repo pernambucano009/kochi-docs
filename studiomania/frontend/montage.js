@@ -5,7 +5,7 @@ let PV_W = 252, PV_H = 448; // حجم كادر المعاينة (بيتغير م
 const MIN_CLIP = 1 / 30; // أقل طول لقطعة: فريم واحد
 const PPS_MIN = 8, PPS_MAX = 600; // حدود زووم التايم لاين (بكسل لكل ثانية)
 // كل قسم ليه مونتاج لوحده: مشاريعه ومشروعه المفتوح (فيديوهات الشخصيات / المسلسلات / الإعلانات)
-const SECTION_OF_STEP = { "6": "coach", "6s": "series", "6a": "ads" };
+const SECTION_OF_STEP = { "6": "coach", "6s": "series", "6a": "ads", "6f": "free" };
 const SECTION_BACK = { series: ["9", "↩ رجوع للمسلسلات"], ads: ["10", "↩ رجوع للإعلانات"] };
 const projectKey = (section) => section === "coach" ? "studiomania.projectId" : `studiomania.projectId.${section}`;
 let PROJECT_KEY = projectKey("coach");

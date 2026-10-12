@@ -33,7 +33,7 @@ document.getElementById("langToggle").onclick = () => I18N.setLang(I18N.lang ===
 const $ = (id) => document.getElementById(id);
 (async () => {
   const s = await (await fetch("/api/auth/state")).json();
-  if (s.logged_in) return location.replace("/");
+  if (s.logged_in) return location.replace(new URLSearchParams(location.search).get("next") === "/kochi" ? "/kochi" : "/");
   setup = s.needs_setup;
   if (setup) {
     $("hint").textContent = "أول مرة: اعمل باسورد للبرنامج (8 حروف أو أرقام على الأقل). احفظه كويس.";
@@ -57,7 +57,7 @@ $("form").addEventListener("submit", async (e) => {
     body: JSON.stringify({ password: $("pw").value }),
   });
   $("submit").disabled = false;
-  if (res.ok) return location.replace("/");
+  if (res.ok) return location.replace(new URLSearchParams(location.search).get("next") === "/kochi" ? "/kochi" : "/");
   const data = await res.json().catch(() => ({}));
   $("err").textContent = data.detail || "حصلت مشكلة";
   $("err").hidden = false;

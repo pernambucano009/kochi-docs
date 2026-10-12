@@ -1,6 +1,9 @@
 // StudioMania — الواجهة: الرئيسية (مربعات)، والشاشة الكبيرة اللي كل خطوة بتفتح فيها،
 // والتنقل بين خطوات الشغل بالترتيب ومعاك ناتج الخطوة اللي فاتت
 
+// برنامجين على نفس السيرفر: ستوديومانيا (/) وكوتشي (/kochi) — كوتشي فيه المشاريع (فيديو خام ← … ← نشر) بس
+const APP = /^\/kochi\/?$/.test(location.pathname) ? "kochi" : "studio";
+if (APP === "kochi") document.title = "Kochi Studio";
 const PROCESS = ["0", "1", "2", "6", "7"]; // المشاريع ← التقطيع ← التوليد ← المونتاج ← النشر
 const STEP_INFO = {
   0: { num: "01", title: "المشاريع" },
@@ -20,6 +23,7 @@ const STEP_INFO = {
   14: { num: "", title: "🎬 القوالب" },
   "6s": { num: "", title: "🎞️ مونتاج المسلسلات" },
   "6a": { num: "", title: "🎞️ مونتاج الإعلانات" },
+  "6f": { num: "", title: "🎞️ المونتاج" },
   settings: { num: "", title: "الإعدادات" },
 };
 const NEXT_LABEL = {
@@ -159,7 +163,7 @@ $("stagePrev").onclick = () => {
 $("stageNext").onclick = () => goNext(shell.step);
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && !$("stage").hidden && !document.querySelector("dialog[open]") &&
-      !e.target.matches("input, textarea, select") && !["6", "6s", "6a"].includes(shell.step)) showStep("home");
+      !e.target.matches("input, textarea, select") && !["6", "6s", "6a", "6f"].includes(shell.step)) showStep("home");
 });
 
 // ---------- الخطوة الجاية بناتج الخطوة دي ----------

@@ -10,6 +10,7 @@ const NH = (() => {
   const reduce = matchMedia("(prefers-reduced-motion: reduce)");
   const EASE = "cubic-bezier(.65,0,.35,1)";
   const esc = (s) => escapeHtml(String(s ?? ""));
+  const KOCHI = typeof APP !== "undefined" && APP === "kochi";
 
   // ---------- أيقونات زجاج صغيرة (SVG) ----------
   const ICON = {
@@ -39,7 +40,8 @@ const NH = (() => {
   // ---------- المربعات وإيه اللي بيفتح ----------
   // go = خطوة في البرنامج (showStep) · page = صفحة جوه الرئيسية · fn = حاجة خاصة
   const T = {
-    create: { en: "Create", ar: "اعمل جديد", icon: "create", page: "create", desc: "كل أنواع الشغل من هنا: اختار النوع، والخطوات بتمشي معاك لحد التصدير." },
+    create: KOCHI ? { en: "New Project", ar: "مشروع جديد", icon: "create", go: "0", desc: "الفيديو الخام ← التقطيع ← التوليد ← المونتاج ← النشر، خطوة خطوة." }
+      : { en: "Create", ar: "اعمل جديد", icon: "create", page: "create", desc: "كل أنواع الشغل من هنا: اختار النوع، والخطوات بتمشي معاك لحد التصدير." },
     brand: { en: "Your Brand", ar: "عقل البراند", icon: "brand", page: "brand", desc: "كل تفاصيل البراند وتفضيلاته وستايله. أي شغل بيتعمل بيبني عليه." },
     assets: { en: "Assets", ar: "الأصول", icon: "box", page: "assets", desc: "الشخصيات والأصوات والموسيقى اللي بتستخدمها في أي شغل." },
     settings: { en: "Settings", ar: "الحساب والإعدادات", icon: "gear", go: "settings", desc: "المفاتيح والرصيد والعملاء." },
@@ -53,16 +55,18 @@ const NH = (() => {
     ad: { en: "Ad", ar: "إعلان", icon: "megaphone", go: "10", desc: "إعلان من مرجع أو من الصفر على براند العميل." },
     typo: { en: "Typography", ar: "تايبوجرافي", icon: "type", go: "12", desc: "كلام متحرك من صوت أو سكريبت." },
     dub: { en: "Dubbing", ar: "دبلجة فيديو", icon: "globe", go: "13", desc: "نفس الفيديو بلهجة تانية." },
-    edit: { en: "Edit", ar: "مونتاج حر", icon: "film", go: "6", desc: "المحرر الكامل: تراكات ونص وطبقات وصوت." },
+    edit: { en: "Edit", ar: "مونتاج حر", icon: "film", go: KOCHI ? "6" : "6f", desc: "المحرر الكامل: تراكات ونص وطبقات وصوت." },
     coaches: { en: "Characters", ar: "الشخصيات", icon: "users", page: "coaches", desc: "كل شخصية بصورتها والكاركتر شيت وصوتها والإنترو والأوترو." },
     voice: { en: "Voices", ar: "التعليق الصوتي", icon: "mic", page: "voice", desc: "مكتبة التعليق." },
     music: { en: "Music", ar: "الموسيقى", icon: "music", page: "music", desc: "مكتبة الموسيقى." },
     motion: { en: "Motion", ar: "مكتبة الموشن", icon: "clapper", page: "motion", desc: "أنيميشنات مكتوبة بالكود، كل واحدة تتضاف للأصول بضغطة." },
   };
-  const CREATE_KIDS = ["reel", "raw", "series", "carousel"];
-  const CREATE_ALL = ["reel", "raw", "series", "carousel", "ad", "typo", "dub", "edit"];
+  // «فيديو من تصويرك» (المشاريع) بقى برنامج كوتشي لوحده على /kochi، فمش في ستوديومانيا
+  const CREATE_KIDS = ["reel", "series", "carousel", "ad"];
+  const CREATE_ALL = ["reel", "series", "carousel", "ad", "typo", "dub", "edit"];
+  const SEC = { series: ["مسلسل", "6s"], ads: ["إعلان", "6a"], free: ["مونتاج حر", "6f"] };
   const STEPS5 = ["المشروع", "التقطيع", "التوليد", "المونتاج", "النشر"];
-  const D = { cats: [], brand: null, folders: [], money: null, publisher: null, posts: [], coaches: [], voices: 0, music: 0 };
+  const D = { work: [], cats: [], brand: null, folders: [], money: null, publisher: null, posts: [], coaches: [], voices: 0, music: 0 };
 
   const brandMark = () => {
     const c = clientx?.cur;
@@ -82,12 +86,16 @@ const NH = (() => {
   const styleNames = (b) => String(b?.styles || "").split(",").map((id) => D.cats.find((c) => c.id === id)).filter(Boolean)
     .map((c, i) => (i ? c.ar : `⭐ ${c.ar}`)).join("، ");
   function lineHTML(f) {
+    if (f.section) {   // ستوديومانيا: مشروع مونتاج (مسلسل / إعلان / مونتاج حر)
+      return `<div class="nh-line" data-proj="${esc(f.id)}" tabindex="0" role="button"><b>${esc(f.name)}</b><span class="nh-sec">${esc(SEC[f.section]?.[0] || "")}</span><span class="step">${f.render_status === "done" ? "اتصدّر" : "مونتاج"}</span></div>`;
+    }
     const s = folderStage(f);
     return `<div class="nh-line" data-folder="${esc(f.id)}" tabindex="0" role="button"><b>${esc(f.name)}</b>${dots(5, s.done)}<span class="step">${STEPS5[s.done] || ""}</span></div>`;
   }
 
   const TILE = {
-    create: () => `${head("create")}<p class="nh-lead">اختار نوع الشغل وكمّل خطوة خطوة.</p><div class="nh-kids">${CREATE_KIDS.map(kid).join("")}</div>`,
+    create: () => KOCHI ? `${head("create")}<p class="nh-lead">${esc(T.create.desc)}</p><div class="nh-steps5">${STEPS5.map((x, i) => `<span><i class="num">${i + 1}</i>${esc(x)}</span>`).join("")}</div>`
+      : `${head("create")}<p class="nh-lead">اختار نوع الشغل وكمّل خطوة خطوة.</p><div class="nh-kids">${CREATE_KIDS.map(kid).join("")}</div>`,
     brand: () => {
       const b = D.brand, c = clientx?.cur, pct = brainPct(b);
       return `${head("brand")}<div class="nh-brandrow"><div><b>${esc(c?.name || "اختار عميل")}</b><div class="nh-sw">${hexes(b?.palette).map((h) => `<i style="background:${h}"></i>`).join("")}</div></div></div>
@@ -96,7 +104,7 @@ const NH = (() => {
     },
     assets: () => `${head("assets")}<div class="nh-kids mini" style="grid-template-rows:repeat(3,minmax(0,1fr))">${["coaches", "voice", "music"].map(kid).join("")}</div>`,
     settings: () => `${head("settings")}<div class="nh-credit">${D.money ? `<span class="num">$${D.money.balance.toFixed(2)}</span><small>رصيد Atlas</small>` : `<small>الرصيد بيظهر لما مفتاح Atlas يتسجّل</small>`}</div>`,
-    progress: () => `${head("progress")}<div class="nh-lines">${D.folders.length ? D.folders.slice(0, 4).map(lineHTML).join("") : `<div class="nh-empty">مفيش مشاريع لسه. ابدأ من «اعمل جديد».</div>`}</div>`,
+    progress: () => `${head("progress")}<div class="nh-lines">${D.work.length ? D.work.slice(0, 4).map(lineHTML).join("") : `<div class="nh-empty">مفيش مشاريع لسه. ابدأ من «${KOCHI ? "مشروع جديد" : "اعمل جديد"}».</div>`}</div>`,
     publish: () => {
       const P = D.publisher, acc = P?.accounts || {};
       const up = D.posts.filter((p) => p.status === "scheduled").length;
@@ -118,7 +126,7 @@ const NH = (() => {
           <button class="nh-chip" id="nhClient" title="العميل اللي شغال عليه"><i id="nhClientAv"></i><span id="nhClientName" data-no-i18n></span></button>
           <button class="nh-chip latin" id="nhLang" style="padding:6px 10px;letter-spacing:.2em">EN</button>
         </div>
-        <div class="nh-logo" aria-label="StudioMania">STUDI<span class="o" aria-hidden="true"><svg viewBox="0 0 100 100"><circle class="ring" cx="50" cy="50" r="44"/><circle class="orbit" cx="50" cy="50" r="70" pathLength="100"/></svg></span>MANIA</div>
+        <div class="nh-logo" aria-label="${KOCHI ? "Kochi" : "StudioMania"}">${KOCHI ? "K" : "STUDI"}<span class="o" aria-hidden="true"><svg viewBox="0 0 100 100"><circle class="ring" cx="50" cy="50" r="44"/><circle class="orbit" cx="50" cy="50" r="70" pathLength="100"/></svg></span>${KOCHI ? "CHI" : "MANIA"}</div>
       </header>
       <main class="nh-bento" id="nhBento"></main>
     </div>
@@ -163,6 +171,7 @@ const NH = (() => {
   let live = 0, shown = null;
   function stageHTML(key) {
     const big = (k) => (GL ? "" : `<div class="big">${iconOf(k)}</div>`);
+    if (!key && KOCHI) return `${big("app")}<h1 class="latin">Kochi Studio</h1><div class="ar">فيديوهات مدربين كوتشي</div><p>ابدأ من «مشروع جديد»، أو كمّل مشروع من «شغّال عليه».</p>`;
     if (!key) return `${big("app")}<h1 class="latin">StudioMania</h1><div class="ar">استوديو المحتوى والفيديو</div><p>ابدأ من «اعمل جديد»، أو كمّل مشروع من اللي تحت.</p>`;
     if (key.startsWith("f:")) {
       const f = D.folders.find((x) => x.id === key.slice(2)), s = folderStage(f);
@@ -193,7 +202,7 @@ const NH = (() => {
     if (!tile && !line) return;
     clearTimeout(leaveT);
     clearTimeout(hoverT);
-    const key = line ? "f:" + line.dataset.folder : tile.dataset.id;
+    const key = line ? (line.dataset.folder ? "f:" + line.dataset.folder : "") : tile.dataset.id;
     hoverT = setTimeout(() => setStage(key), 110);
   });
   bento.addEventListener("pointerout", (e) => {
@@ -201,7 +210,7 @@ const NH = (() => {
     clearTimeout(hoverT);
     leaveT = setTimeout(() => setStage(""), 500);
   });
-  bento.addEventListener("focusin", (e) => { const l = e.target.closest(".nh-line"), t = e.target.closest(".nh-tile"); if (l || t) setStage(l ? "f:" + l.dataset.folder : t.dataset.id); });
+  bento.addEventListener("focusin", (e) => { const l = e.target.closest(".nh-line"), t = e.target.closest(".nh-tile"); if (l || t) setStage(l ? (l.dataset.folder ? "f:" + l.dataset.folder : "") : t.dataset.id); });
 
   // ---------- اللايت والدارك ----------
   const THEME_KEY = "studiomania.theme";
@@ -267,7 +276,7 @@ const NH = (() => {
     assets: () => panel(4, 6, `${head("coaches")}<div class="nh-body">${D.coaches.length} شخصية</div><div class="nh-avs">${D.coaches.slice(0, 12).map((c) => `<img src="${esc(c.image_url)}" alt="">`).join("")}</div>`, `data-id="coaches" tabindex="0" role="button"`)
       + panel(4, 6, `${head("voice")}<div class="nh-body">${D.voices} تسجيل</div>`, `data-id="voice" tabindex="0" role="button"`)
       + panel(4, 6, `${head("music")}<div class="nh-body">${D.music} تراك</div>`, `data-id="music" tabindex="0" role="button"`),
-    progress: () => panel(8, 6, `${head("progress")}<div class="nh-lines" style="align-content:start">${D.folders.map(lineHTML).join("") || `<div class="nh-empty">مفيش مشاريع لسه.</div>`}</div>`)
+    progress: () => panel(8, 6, `${head("progress")}<div class="nh-lines" style="align-content:start">${D.work.map(lineHTML).join("") || `<div class="nh-empty">مفيش مشاريع لسه.</div>`}</div>`)
       + panel(4, 3, `${head("create")}<div class="nh-body">ابدأ شغل جديد من أي نوع.</div>`, `data-id="create" tabindex="0" role="button"`)
       + panel(4, 3, `${head("publish")}<div class="nh-body">${D.posts.filter((p) => p.status === "scheduled").length} بوست متجدول</div>`, `data-id="publish" tabindex="0" role="button"`),
   };
@@ -363,6 +372,11 @@ const NH = (() => {
   }
   function onActivate(e) {
     const line = e.target.closest(".nh-line");
+    if (line?.dataset.proj) {   // مشروع مونتاج في ستوديومانيا: يفتح في المونتاج بتاع قسمه
+      const p = D.work.find((x) => x.id === line.dataset.proj);
+      if (!p) return;
+      return openSection(line, () => { storageSet(projectKey(p.section), p.id); showStep(SEC[p.section]?.[1] || "6f"); });
+    }
     if (line) {
       const f = D.folders.find((x) => x.id === line.dataset.folder);
       if (!f) return;
@@ -383,11 +397,13 @@ const NH = (() => {
 
   // ---------- الداتا الحقيقية ----------
   async function refresh() {
-    const [folders, publisher, posts, coaches, voices, music, brains, cats] = await Promise.all([
-      shellFolders(true), api("/api/publisher").catch(() => null), api("/api/posts").catch(() => []), api("/api/coaches").catch(() => []),
+    const [folders, publisher, posts, coaches, voices, music, brains, cats, projects] = await Promise.all([
+      KOCHI ? shellFolders(true) : [], api("/api/publisher").catch(() => null), api("/api/posts").catch(() => []), api("/api/coaches").catch(() => []),
       api("/api/audio?kind=voice").catch(() => []), api("/api/audio?kind=music").catch(() => []), api("/api/ad-brains").catch(() => []),
       D.cats.length ? D.cats : api("/api/style-cats").catch(() => []),
+      KOCHI ? [] : api("/api/projects").catch(() => []),
     ]);
+    D.work = KOCHI ? folders : projects.filter((p) => SEC[p.section]);
     Object.assign(D, { cats, folders, publisher, posts, coaches, voices: voices.length, music: music.length, money: window.money?.last || D.money,
       brand: brains.find((b) => b.id === clientx?.active) || brains[0] || null });
     renderTiles();

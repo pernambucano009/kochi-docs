@@ -561,7 +561,14 @@ async def require_login(request: Request, call_next):
         return response
     if path.startswith("/api/"):
         return JSONResponse({"detail": "لازم تسجّل دخول"}, status_code=401)
-    return RedirectResponse("/login")
+    return RedirectResponse("/login?next=/kochi" if path.rstrip("/") == "/kochi" else "/login")
+
+
+@app.get("/kochi")
+@app.get("/kochi/")
+def kochi_page():
+    """🏋️ برنامج كوتشي: نفس السيرفر، رئيسية لوحدها فيها المشاريع (الفيديو الخام ← التقطيع ← التوليد ← المونتاج ← النشر)."""
+    return html_page("index.html")
 
 
 @app.get("/health")
@@ -2266,7 +2273,7 @@ class ProjectIn(BaseModel):
     mix: dict = {}              # الصوت: {duck: 0..1 توطية الموسيقى وقت الكلام، normalize: توحيد العلو، enhance: تنضيف التعليق}
 
 
-PROJECT_SECTIONS = ("coach", "series", "ads")
+PROJECT_SECTIONS = ("coach", "series", "ads", "free")   # coach = برنامج كوتشي · free = المونتاج الحر في ستوديومانيا
 
 
 def tag_project_sections() -> None:
