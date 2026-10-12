@@ -40,13 +40,50 @@ window.NHGL = (stage, getClient) => {
   }
 
   // environment: a dark (or white) studio with soft boxes, for reflections on the glass
+  // «ماتكاب» الزجاج: صورة دايرة بتتلزق على كل سطح حسب اتجاهه للكاميرا. النص شفاف، وعند الحافة خطوط زرقا غامقة
+  // ولمعات بيضا حادة (زي المرجع)، فكل حافة مدوّرة بتاخد نفس الشكل المصبوب
+  const CAP = { value: null };
+  function paintCap(dark) {
+    const S = 512, c = document.createElement("canvas");
+    c.width = c.height = S;
+    const x = c.getContext("2d"), R = S / 2;
+    const ringAt = (r, w, col, a, wob = 0) => {
+      for (let i = 0; i < 360; i++) {
+        const t0 = i / 360 * Math.PI * 2, t1 = (i + 1.5) / 360 * Math.PI * 2;
+        const m = 1 - wob * (.5 + .5 * Math.sin(t0 * 3 + r * 9) * Math.sin(t0 * 7 + 1.3));
+        x.strokeStyle = col; x.globalAlpha = a * m; x.lineWidth = w * R;
+        x.beginPath(); x.arc(R, R, r * R, -t1, -t0); x.stroke();
+      }
+      x.globalAlpha = 1;
+    };
+    const g = x.createRadialGradient(R, R, 0, R, R, R);
+    const tintA = dark ? "rgba(150,185,255," : "rgba(90,135,235,";
+    g.addColorStop(0, tintA + "0)"); g.addColorStop(.3, tintA + "0)"); g.addColorStop(.8, tintA + (dark ? ".25)" : ".35)")); g.addColorStop(1, tintA + (dark ? ".55)" : ".7)"));
+    x.fillStyle = g; x.fillRect(0, 0, S, S);
+    const deep = dark ? "#9db9ff" : "#1b3f9e", mid = dark ? "#cfe0ff" : "#3f6fd6";
+    // على أنبوبة مدوّرة، بُعد النقطة عن نص الصورة = بُعدها عن نص الأنبوبة، فالحلقات دي بتبان خطوط ماشية بطول الحافة
+    ringAt(.975, .05, deep, .95);
+    ringAt(.91, .035, "#ffffff", 1, .5);
+    ringAt(.84, .025, deep, .75, .6);
+    ringAt(.74, .04, "#ffffff", .85, .7);
+    ringAt(.6, .03, mid, .45, .8);
+    ringAt(.45, .05, "#ffffff", .55, .85);
+    const hl = (ang, r, w, h, a) => {   // لمعة بيضا
+      x.save(); x.translate(R + Math.cos(ang) * r * R, R - Math.sin(ang) * r * R); x.rotate(-ang + Math.PI / 2);
+      const q = x.createRadialGradient(0, 0, 0, 0, 0, w * R); q.addColorStop(0, `rgba(255,255,255,${a})`); q.addColorStop(1, "rgba(255,255,255,0)");
+      x.scale(1, h / w); x.fillStyle = q; x.beginPath(); x.arc(0, 0, w * R, 0, Math.PI * 2); x.fill(); x.restore();
+    };
+    hl(2.3, .55, .4, .1, 1); hl(2.0, .82, .3, .05, 1); hl(-.8, .66, .34, .07, .9); hl(.5, .88, .2, .04, .85); hl(3.6, .3, .2, .08, .7);
+    if (CAP.value) CAP.value.dispose();
+    CAP.value = new THREE.CanvasTexture(c);
+  }
   function envMap(dark) {
     const c = document.createElement("canvas");
     c.width = 1024; c.height = 512;
     const x = c.getContext("2d"), g = x.createLinearGradient(0, 0, 0, 512);
     // استوديو غامق فيه شرايط نور حادة: الزجاج النضيف بيبان من الانعكاسات الحادة، مش من لونه
     if (dark) { g.addColorStop(0, "#3a4258"); g.addColorStop(.5, "#10131c"); g.addColorStop(1, "#232a3c"); }
-    else { g.addColorStop(0, "#ffffff"); g.addColorStop(.42, "#9fb6e6"); g.addColorStop(.5, "#2f55b0"); g.addColorStop(.58, "#9fb6e6"); g.addColorStop(1, "#eef3ff"); }
+    else { g.addColorStop(0, "#ffffff"); g.addColorStop(.3, "#c4d3f3"); g.addColorStop(.5, "#1d3f9a"); g.addColorStop(.7, "#c4d3f3"); g.addColorStop(1, "#f4f7ff"); }
     x.fillStyle = g;
     x.fillRect(0, 0, 1024, 512);
     const box = (cx, cy, w, h, a) => {
@@ -67,6 +104,8 @@ window.NHGL = (stage, getClient) => {
     }
     // شرايط نور حادة (زي سوفت بوكس): هي اللي بتعمل اللمعة النضيفة على الحواف
     for (const [cx, w] of [[700, 16], [820, 8], [330, 12], [180, 6], [960, 10]]) { x.fillStyle = "rgba(255,255,255,1)"; x.fillRect(cx, 70, w, 360); }
+    // خطوط زرقا غامقة رفيعة: هي اللي بتعمل الخطوط الزرقا الحادة على حواف الزجاج (زي المرجع)
+    if (!dark) for (const [cx, w] of [[400, 7], [610, 5], [880, 6], [90, 8], [256, 4]]) { x.fillStyle = "#1c3c94"; x.fillRect(cx, 90, w, 320); }
     x.fillStyle = "rgba(255,255,255,1)"; x.fillRect(560, 40, 420, 10);
     const t = new THREE.CanvasTexture(c);
     t.mapping = THREE.EquirectangularReflectionMapping;
@@ -76,12 +115,12 @@ window.NHGL = (stage, getClient) => {
     return rt.texture;
   }
 
-  let dark = true, tint = "#4f86ff";
+  let dark = true, tint = "#3f78ff";
   // زجاج مصبوب نضيف (زي المرجع): شفاف، والأزرق بيغمق كل ما الزجاج يتخن (الحواف أزرق أغمق، النص فاتح)
   const glass = () => new THREE.MeshPhysicalMaterial({
-    color: 0xffffff, metalness: 0, roughness: 0, transmission: 1, thickness: 1.1, ior: 1.5,
-    clearcoat: 1, clearcoatRoughness: 0, specularIntensity: 1, specularColor: new THREE.Color(0xffffff), envMapIntensity: 1.5,
-    attenuationColor: new THREE.Color(tint), attenuationDistance: 5.5, transparent: true, opacity: 1,
+    color: 0xffffff, metalness: 0, roughness: 0, transmission: 1, thickness: .45, ior: 1.5,
+    clearcoat: 1, clearcoatRoughness: 0, specularIntensity: 1, specularColor: new THREE.Color(0xffffff), envMapIntensity: 2.6,
+    attenuationColor: new THREE.Color(tint), attenuationDistance: 4, transparent: true, opacity: 1,
   });
 
   // ---------- shapes
@@ -117,19 +156,77 @@ window.NHGL = (stage, getClient) => {
     s.quadraticCurveTo(cx - k, cy - k, cx - r, cy); s.quadraticCurveTo(cx - k, cy + k, cx, cy + r);
     return s;
   }
-  // ترس بـ ٦ سنان تخينة مدوّرة وفتحة كبيرة في النص (زي المرجع)
-  function gearShape(n = 6, ro = 1.32, ri = 1.0, hole = .56) {
-    const s = new THREE.Shape(), N = n * 48;
-    for (let i = 0; i < N; i++) {
-      const a = (i / N) * Math.PI * 2;
-      const c = Math.max(0, Math.min(1, .5 + Math.cos(n * a) * .95));
-      const k = c * c * (3 - 2 * c), r = ri + (ro - ri) * k;
-      const p = [Math.cos(a) * r, Math.sin(a) * r];
-      i ? s.lineTo(...p) : s.moveTo(...p);
+  // ---------- «طبق» زجاج مصبوب (زي المرجع): حافة مدوّرة تخينة ماشية على الحدود، وأرضية رفيعة غاطسة في النص
+  const V2 = (x, y) => new THREE.Vector2(x, y);
+  function chaikin(pts, n = 5) {   // يدوّر الزوايا (كل ما n يزيد، الزاوية أنعم)
+    for (let k = 0; k < n; k++) {
+      const o = [];
+      pts.forEach((p, i) => { const q = pts[(i + 1) % pts.length]; o.push(V2(p.x * .75 + q.x * .25, p.y * .75 + q.y * .25), V2(p.x * .25 + q.x * .75, p.y * .25 + q.y * .75)); });
+      pts = o;
     }
-    s.closePath();
-    s.holes.push(circle(hole, THREE.Path));
-    return s;
+    return pts;
+  }
+  function roundPoly(P, r, seg = 14) {   // مضلّع بزوايا مدوّرة بنص قطر r
+    const out = [];
+    P.forEach((c, i) => {
+      const a = P[(i - 1 + P.length) % P.length], b = P[(i + 1) % P.length];
+      const u = a.clone().sub(c).normalize(), w = b.clone().sub(c).normalize();
+      const half = Math.acos(Math.max(-1, Math.min(1, u.dot(w)))) / 2, d = Math.min(r / Math.tan(half), a.distanceTo(c) * .4, b.distanceTo(c) * .4);
+      const p1 = c.clone().add(u.clone().multiplyScalar(d)), p2 = c.clone().add(w.clone().multiplyScalar(d));
+      for (let k = 0; k <= seg; k++) { const t = k / seg, q = 1 - t; out.push(V2(q * q * p1.x + 2 * q * t * c.x + t * t * p2.x, q * q * p1.y + 2 * q * t * c.y + t * t * p2.y)); }
+    });
+    return out;
+  }
+  const ring = (r, n = 96) => Array.from({ length: n }, (_, i) => V2(Math.cos(i / n * Math.PI * 2) * r, Math.sin(i / n * Math.PI * 2) * r));
+  function rimTube(pts, r, m) {   // أنبوبة زجاج مقفولة على خط
+    const c = new THREE.CatmullRomCurve3(pts.map((p) => new THREE.Vector3(p.x, p.y, 0)), true, "centripetal");
+    return new THREE.Mesh(new THREE.TubeGeometry(c, pts.length * 2, r, 28, true), m);
+  }
+  function dish(m, outer, holes = [], o = {}) {
+    const rim = o.rim ?? .09, lip = o.lip ?? rim, out = [];
+    out.push(rimTube(inset(outer, rim, false), rim, m));
+    holes.forEach((h) => out.push(rimTube(inset(h, lip, true), lip, m)));
+    // الأرضية: لوح رفيع جوه الحافة، نازل لتحت شوية
+    const fl = (pts, d, hole) => inset(pts, d, hole).map((v) => V2(v.x, v.y));
+    const sh = new THREE.Shape(fl(outer, rim * 1.2, false));
+    holes.forEach((h) => sh.holes.push(new THREE.Path(fl(h, lip * 1.2, true))));
+    const fg = new THREE.ExtrudeGeometry(sh, { depth: o.floor ?? .03, bevelEnabled: true, bevelThickness: .025, bevelSize: rim * .9, bevelSegments: 8, curveSegments: 32 });
+    fg.translate(0, 0, -rim * .55);
+    const fm = m.clone(); fm.attenuationDistance = 2.5; fm.thickness = .3; fm.envMapIntensity = 1.6;   // الأرضية رفيعة: شبه شفافة خالص
+    out.push(new THREE.Mesh(fg, fm));
+    (o.lines || []).forEach(([a, b]) => {   // خطوط التقطيع الخفيفة اللي على الأرضية
+      const t = new THREE.TubeGeometry(new THREE.LineCurve3(new THREE.Vector3(a.x, a.y, -rim * .55 + .06), new THREE.Vector3(b.x, b.y, -rim * .55 + .06)), 8, .009, 6, false);
+      out.push(new THREE.Mesh(t, m));
+    });
+    return out;
+  }
+  function toDish(mesh, m) {   // شكل مبثوق ← طبق بنفس الحدود والفتحات
+    const S = mesh.geometry.userData.solid;
+    const clean = (P) => {
+      const o = [];
+      P.forEach((p) => { const q = V2(p.x - S.ox, p.y - S.oy), l = o[o.length - 1]; if (!l || l.distanceTo(q) > 1e-4) o.push(q); });
+      if (o.length > 2 && o[0].distanceTo(o[o.length - 1]) < 1e-4) o.pop();
+      return o;
+    };
+    let outer = clean(S.outer);
+    const sz = new THREE.Box2().setFromPoints(outer).getSize(V2());
+    const rim = Math.max(.035, Math.min(.11, Math.min(sz.x, sz.y) * .065));
+    if (outer.length <= 8) outer = roundPoly(outer, rim * 1.6);   // مضلّع بزوايا حادة (مثلث): ندوّر زواياه زي المصبوب
+    const d = new THREE.Group();
+    dish(m, outer, S.holes.map(clean), { rim }).forEach((o) => d.add(o));
+    d.position.copy(mesh.position); d.rotation.copy(mesh.rotation); d.scale.copy(mesh.scale);
+    Object.assign(d.userData, mesh.userData);
+    mesh.geometry.dispose();
+    return d;
+  }
+  // ترس: ٦ سنان مربّعة بزوايا مدوّرة، وفتحة كبيرة في النص
+  function gearPts(n = 6, ro = 1, rv = .74, tip = .3, base = .36) {
+    const P = [], A = (r, a) => V2(Math.cos(a) * r, Math.sin(a) * r);
+    for (let i = 0; i < n; i++) {
+      const c = i / n * Math.PI * 2 + Math.PI / 2, h = Math.PI / n;
+      P.push(A(rv, c - h), A(rv * 1.01, c - base), A(ro, c - tip), A(ro * 1.02, c), A(ro, c + tip), A(rv * 1.01, c + base));
+    }
+    return chaikin(P, 4);
   }
   const ACCENT = () => getComputedStyle(document.getElementById("nh") || document.documentElement).getPropertyValue("--nh-accent").trim() || "#ff4a3d";
   function markPlane(size) {   // the client's mark (logo, or the first letter of the name), floating inside the glass plate
@@ -161,8 +258,7 @@ window.NHGL = (stage, getClient) => {
     return plane;
   }
 
-  // ---------- الهيكل: خط رفيع بيمشي جوه الزجاج على شكل المجسّم نفسه (زي الهيكل اللي بيبان جوه الجيليفيش)
-  const coreMat = new THREE.MeshStandardMaterial({ color: 0xf2f4fa, roughness: .3, metalness: 0, emissive: 0x8a93a8, emissiveIntensity: .25 });   // معتم عشان يبان من ورا الزجاج
+  // ---------- أدوات الأشكال
   function inset(poly, d, hole) {   // يزق كل نقطة لجوه المادة بمسافة d (للفتحة: لبرّه الفتحة)
     let area = 0;
     for (let i = 0; i < poly.length; i++) { const p = poly[i], q = poly[(i + 1) % poly.length]; area += p.x * q.y - q.x * p.y; }
@@ -176,42 +272,9 @@ window.NHGL = (stage, getClient) => {
     }
     return out;
   }
-  function skeleton(geo) {
-    const S = geo.userData.solid, curves = [];
-    if (S.kind === "shape") {
-      const thick = Math.min(.16, S.z * .4);
-      [[S.outer, false], ...S.holes.map((h) => [h, true])].forEach(([poly, hole]) => {
-        const pts = inset(poly, thick, hole).map((v) => v.set(v.x - S.ox, v.y - S.oy, 0));
-        if (pts.length > 2) { const path = new THREE.CurvePath(); pts.forEach((v, i) => path.add(new THREE.LineCurve3(v, pts[(i + 1) % pts.length]))); path.closed = true; curves.push(path); }   // خطوط مستقيمة بين النقط: من غير لفّات عند الزوايا
-      });
-    } else if (S.kind === "sphere") {
-      const r = S.r * .62;
-      [0, Math.PI / 2].forEach((rot) => curves.push(new THREE.CatmullRomCurve3(Array.from({ length: 24 }, (_, i) => { const a = i / 24 * Math.PI * 2; return new THREE.Vector3(Math.cos(a) * r * Math.cos(rot), Math.sin(a) * r, Math.cos(a) * r * Math.sin(rot)); }), true)));
-    } else if (S.kind === "capsule") {
-      curves.push(new THREE.CatmullRomCurve3([new THREE.Vector3(0, -S.h, 0), new THREE.Vector3(0, S.h, 0)], false));
-    }
-    if (!curves.length) return null;
-    const geos = curves.map((c) => new THREE.TubeGeometry(c, Math.max(24, Math.round(c.getLength() * 40)), .014, 6, !!c.closed));
-    // دمج الأنابيب في جيومتري واحد، والرسم بيكبر على طولها (نفس حركة «بيكبر» بتاعة الدخول)
-    let nIdx = 0, nPos = 0; geos.forEach((g) => { nIdx += g.index.count; nPos += g.attributes.position.count; });
-    const pos = new Float32Array(nPos * 3), nor = new Float32Array(nPos * 3), idx = new Uint32Array(nIdx);
-    let po = 0, io = 0;
-    geos.forEach((g) => { pos.set(g.attributes.position.array, po * 3); nor.set(g.attributes.normal.array, po * 3); for (let i = 0; i < g.index.count; i++) idx[io + i] = g.index.array[i] + po; po += g.attributes.position.count; io += g.index.count; g.dispose(); });
-    const g = new THREE.BufferGeometry();
-    g.setAttribute("position", new THREE.BufferAttribute(pos, 3)); g.setAttribute("normal", new THREE.BufferAttribute(nor, 3)); g.setIndex(new THREE.BufferAttribute(idx, 1));
-    const STEPS = 48, ends = new Uint32Array(STEPS);
-    for (let i = 0; i < STEPS; i++) ends[i] = Math.floor((nIdx / 3) * (i / (STEPS - 1))) * 3;
-    const mesh = new THREE.Mesh(g, coreMat);
-    mesh.renderOrder = -1;
-    mesh.userData.ends = ends;
-    return mesh;
-  }
-
   const BUILD = {
-    app(m) {
-      const ring = circle(1.25); ring.holes.push(circle(.92, THREE.Path));
-      const play = tri([-.32, -.48], [.5, 0], [-.32, .48]);
-      return [new THREE.Mesh(extrude(ring, { depth: .5 }), m), new THREE.Mesh(extrude(play, { depth: .32, bevelSize: .08 }), m)];
+    app(m) {   // مثلث تشغيل: طبق بحافة تخينة (زي المرجع)
+      return dish(m, roundPoly([V2(-.62, -1), V2(1.05, 0), V2(-.62, 1)], .3), [], { rim: .13 });
     },
     create(m) {
       const a = new THREE.Mesh(extrude(star(1.35, .3), { depth: .4, bevelSize: .06 }), m);
@@ -230,16 +293,24 @@ window.NHGL = (stage, getClient) => {
       cube.rotation.set(.5, .7, 0);
       return [cube];
     },
-    settings(m) { return [Object.assign(new THREE.Mesh(extrude(gearShape(), { depth: .45 }), m), { userData: { spin: true } })]; },
+    settings(m) {
+      const outer = gearPts(), hole = ring(.37), lines = [];
+      for (let i = 0; i < 6; i++) {   // خط من الفتحة لكل وادي، وخط عند قاعدة كل سنّة
+        const a = (i + .5) / 6 * Math.PI * 2 + Math.PI / 2, b = i / 6 * Math.PI * 2 + Math.PI / 2;
+        lines.push([V2(Math.cos(a) * .5, Math.sin(a) * .5), V2(Math.cos(a) * .66, Math.sin(a) * .66)]);
+        lines.push([V2(Math.cos(b - .3) * .66, Math.sin(b - .3) * .66), V2(Math.cos(b + .3) * .66, Math.sin(b + .3) * .66)]);
+      }
+      return dish(m, outer, [hole], { rim: .085, lip: .12, lines }).map((o) => { o.userData.spin = true; return o; });
+    },
     progress(m) {
       const pts = [[-1.7, 0], [-.8, 0], [-.45, .95], [.1, -.95], [.5, .3], [.8, 0], [1.7, 0]].map(([x, y]) => new THREE.Vector3(x, y, 0));
       return [new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, false, "catmullrom", .15), 160, .16, 32, false), m)];
     },
-    publish(m) {
-      const A = new THREE.Mesh(extrude(tri([-1.45, .05], [1.45, .95], [-.15, -.3]), { depth: .16, bevelThickness: .08, bevelSize: .05 }), m);
-      const B = new THREE.Mesh(extrude(tri([-.15, -.3], [1.45, .95], [.15, -1.15]), { depth: .16, bevelThickness: .08, bevelSize: .05 }), m);
-      A.position.set(-.18, .22, 0); B.position.set(.4, -.2, -.18); B.rotation.x = .35;
-      return [A, B];
+    publish(m) {   // طيارة ورق: شكل واحد بحدود الجناحين
+      const s = new THREE.Shape();
+      [[-1.45, .05], [1.45, .95], [.15, -1.15], [-.15, -.3]].forEach((p, i) => (i ? s.lineTo(...p) : s.moveTo(...p)));
+      s.closePath();
+      return [new THREE.Mesh(extrude(s, { depth: .16 }), m)];
     },
     film(m) {
       const f = rr(2.5, 1.8, .26);
@@ -292,19 +363,24 @@ window.NHGL = (stage, getClient) => {
   };
   BUILD.pulse = BUILD.progress;
 
-  // حافة منوّرة (فرينل) على كل جزء زجاج: هي اللي بتخلّي الزجاج الشفاف يبان زي راس الجيليفيش
+  // طبقة لمعة فوق الزجاج (الماتكاب اللي فوق)، شغالة على أي شكل
   const rimMat = () => new THREE.ShaderMaterial({
-    uniforms: { c: { value: new THREE.Color(dark ? "#cfe0ff" : "#2c5bd6") }, a: { value: 1 } },
-    vertexShader: "varying vec3 vN; varying vec3 vV; void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz); gl_Position = projectionMatrix * mv; }",
-    fragmentShader: "uniform vec3 c; uniform float a; varying vec3 vN; varying vec3 vV; void main(){ float f = pow(1.0 - abs(dot(normalize(vN), normalize(vV))), 3.2); gl_FragColor = vec4(c, f * a); }",
+    uniforms: { a: { value: 1 }, cap: CAP },
+    vertexShader: "varying vec3 vN; varying vec3 vP; void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); vP = mv.xyz; vN = normalize(normalMatrix * normal); gl_Position = projectionMatrix * mv; }",
+    fragmentShader: `uniform float a; uniform sampler2D cap; varying vec3 vN; varying vec3 vP;
+      void main(){ vec3 V = normalize(-vP), N = normalize(vN); if (dot(N, V) < 0.) N = -N;
+        vec3 X = normalize(vec3(V.z, 0., -V.x)), Y = cross(V, X);
+        vec4 c = texture2D(cap, vec2(dot(X, N), dot(Y, N)) * .495 + .5);
+        gl_FragColor = vec4(c.rgb, c.a * a); }`,
     transparent: true, depthWrite: false,
   });
-  const RIM = () => (dark ? .55 : .75);   // حافة منوّرة رفيعة زي حافة الجيليفيش
+  const RIM = () => 1;   // حافة منوّرة رفيعة زي حافة الجيليفيش
   const cache = {};
   function group(key) {
     if (cache[key]) return cache[key];
     const m = glass(), g = new THREE.Group();
-    (BUILD[key] || BUILD.app)(m).forEach((x) => g.add(x));
+    // أي شكل مبثوق بيتحوّل لطبق زجاج مصبوب (نفس ستايل الترس والمثلث)
+    (BUILD[key] || BUILD.app)(m).forEach((x) => g.add(x.geometry?.userData.solid?.kind === "shape" ? toDish(x, m) : x));
     const box = new THREE.Box3().setFromObject(g), size = box.getSize(new THREE.Vector3());
     g.userData.k = 2.9 / Math.max(size.x, size.y);
     g.userData.mats = [];
@@ -312,14 +388,9 @@ window.NHGL = (stage, getClient) => {
     g.userData.marks = g.children.filter((o) => o.userData.mark);
     const rim = rimMat();
     g.userData.rim = rim;
-    g.children.filter((o) => o.isMesh && o.material === m).forEach((o) => o.add(new THREE.Mesh(o.geometry, rim)));
-    g.userData.cores = [];
-    if (key !== "brand") {
-      g.children.filter((o) => o.geometry?.userData.solid).forEach((o) => {
-        const b = skeleton(o.geometry);
-        if (b) { o.add(b); g.userData.cores.push(b); }
-      });
-    }
+    const glassy = [];
+    g.traverse((o) => { if (o.isMesh && o.material === m) glassy.push(o); });
+    glassy.forEach((o) => o.add(new THREE.Mesh(o.geometry, rim)));
     g.userData.a = 0;
     g.userData.to = 0;
     g.visible = false;
@@ -364,20 +435,19 @@ window.NHGL = (stage, getClient) => {
   }
   function setOpacity(g, a) { g.userData.mats.forEach((m) => { m.opacity = a; }); g.userData.rim.uniforms.a.value = a * RIM(); }
   function grow(g, a) {
-    g.userData.cores.forEach((c) => { const e = c.userData.ends; c.geometry.setDrawRange(0, e[Math.round(a * (e.length - 1))]); });
     g.userData.marks.forEach((m) => { m.scale.setScalar(Math.max(.001, a)); });
   }
 
   function theme(isDark) {
     dark = isDark;
-    tint = isDark ? "#6c9bff" : "#4f86ff";
+    tint = isDark ? "#6c9bff" : "#3f78ff";
     // في اللايت: من غير tone mapping، عشان الأبيض اللي ورا الزجاج يفضل أبيض صافي (كان بيطلع رمادي فيبان مغبّش)
     renderer.toneMapping = isDark ? THREE.ACESFilmicToneMapping : THREE.NoToneMapping;
     scene.traverse((o) => { if (o.material) o.material.needsUpdate = true; });
     scene.environment = envMap(isDark);
     paintBackdrop(isDark);
-    Object.values(cache).forEach((g) => { g.userData.mats.forEach((m) => { if (m.attenuationColor) m.attenuationColor.set(tint); }); g.userData.rim.uniforms.c.value.set(isDark ? "#cfe0ff" : "#2c5bd6"); });
-    coreMat.color.set(isDark ? "#cfe0ff" : "#a9c3f5"); coreMat.emissive.set(isDark ? "#5d79b8" : "#6f93dc");
+    paintCap(isDark);
+    Object.values(cache).forEach((g) => { g.userData.mats.forEach((m) => { if (m.attenuationColor) m.attenuationColor.set(tint); });  });
     resize();
     frame();
   }
@@ -407,7 +477,7 @@ window.NHGL = (stage, getClient) => {
       const e = smooth(u.a);
       setOpacity(g, e);
       u.mats.forEach((m) => { m.depthWrite = u.to === 1; });   // اللي خارج ميخبّيش اللي داخل
-      grow(g, Math.pow(e, 1.4));   // المخ بيطلع من النص لبرّه بعد ما الزجاج يبان
+      grow(g, Math.pow(e, 1.4));   // اللوجو بيكبر جوه الزجاج بعد ما الزجاج يبان
       g.scale.setScalar(u.k * (.88 + .12 * e));
       g.position.y = lift + (reduce.matches ? 0 : Math.sin(t * .8) * .1);
       g.rotation.y = reduce.matches ? 0 : Math.sin(t * .45) * .22;
