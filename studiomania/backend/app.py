@@ -2394,7 +2394,7 @@ def kochi_auto_montage(conn: sqlite3.Connection, data: dict, fps: int = 30) -> d
             video_end = t + ln
         t += ln
     total = t
-    if data.get("brand_outro", True) and (p := brand_video("outro")):
+    if data.get("brand_outro", True) and (p := brand_video("outro", data.get("client_id"))):
         total += media_info(p).duration
 
     report = {"sentences": 0, "overflow": 0.0, "music": False}
@@ -2544,7 +2544,7 @@ def build_montage(conn: sqlite3.Connection, data: dict):
             outro_len = info.duration
     # 🎬 أوترو البراند (من عقل البراند): بينزل لوحده في الآخر لو متفعّل، والمشروع يقدر يشيله.
     # (إنترو البراند بيتركّب قدّام الفيديو بعد التصدير، عشان الصوت والكابشن والعناصر مايتزحزحوش)
-    if data.get("brand_outro", True) and (p := brand_video("outro")):
+    if data.get("brand_outro", True) and (p := brand_video("outro", data.get("client_id"))):
         info = media_info(p)
         segments.append(montage.Segment(p, 0, info.duration, has_audio=info.has_audio, bg=project_bg(data)))
         outro_len += info.duration
@@ -2576,7 +2576,7 @@ def project_logo(data: dict, total: float, outro_len: float) -> montage.Logo | N
     cfg = {**LOGO_DEFAULTS, **(data.get("logo") or {})}
     if "enabled" not in (data.get("logo") or {}):   # الديفولت من عقل البراند (اللوجو على كل الفيديوهات ولا لأ)
         cfg["enabled"] = (active_client() or {}).get("logo_on") != "0"
-    path = logo_path()
+    path = logo_path(data.get("client_id"))
     if not cfg["enabled"] or not path:
         return None
     until = total - outro_len if not cfg["on_outro"] and outro_len > 0 else None
@@ -3040,7 +3040,7 @@ def start_render(conn: sqlite3.Connection, row: sqlite3.Row, project_id: str, da
     if montage.canvas_size() != (montage.WIDTH, montage.HEIGHT):
         sid = None  # المشهد (الخلفية الجديدة والحاجات اللي اتشالت) معمول على 9:16 بس
     intro = [p for p in (coach_intro(data) if data.get("char_intro", True) else None,
-                         brand_video("intro") if data.get("brand_intro", True) else None) if p]
+                         brand_video("intro", data.get("client_id")) if data.get("brand_intro", True) else None) if p]
     render_executor.submit(run_render, project_id, export_id, cmd, total, row["name"], work_dir, tid, f"http://127.0.0.1:{port}", click, sid, intro)
     return {"ok": True, "duration": total}
 
@@ -3704,6 +3704,15 @@ def autopilot_step(job: dict, settings: dict) -> None:
             draft = montage_draft(vid, f["coach_id"])
             if draft["missing"]:
                 return autopilot_update(jid, step="generating")
+            # الكابشن محتاج كلام التعليق مكتوب بتوقيته: بنستنى لحد ما يتكتب (لو فشل مرتين بيكمّل من غير كابشن)
+            tr = transcript_of(conn.execute("SELECT transcript FROM audio WHERE id = ?", (f["voice_id"],)).fetchone())
+            tr_tries = job.get("tr_tries", 0)
+            if tr.get("status") != "done" and tr_tries < 2:
+                if tr.get("status") != "working":
+                    start_transcribe(f["voice_id"])
+                    return autopilot_update(jid, tr_tries=tr_tries + 1, note="بيكتب كلام التعليق للكابشن")
+                return autopilot_update(jid, note="بيكتب كلام التعليق للكابشن")
+            captions_on = tr.get("status") == "done" and bool(tr.get("words"))
             music = next((r for r in conn.execute("SELECT id, name FROM audio WHERE kind = 'music' ORDER BY created_at DESC")
                           if DEFAULT_MUSIC_NAME in (r["name"] or "").lower()), None)
             body = ProjectIn(name=f["name"], video_id=vid, coach_id=f["coach_id"],
@@ -3714,8 +3723,15 @@ def autopilot_step(job: dict, settings: dict) -> None:
             with closing(db()) as c2, c2:
                 data = json.loads(get_project(c2, pid)["data"])
                 kochi_auto_montage(c2, data, export_settings(data)[2])
+                # نفس اللي شاشة المونتاج بتحطه لوحدها: الكابشن بالقالب الأساسي واللوجو
+                if captions_on:
+                    data["captions"] = {"enabled": True, "template": captions.DEFAULT_TEMPLATE, **captions.TEMPLATES[captions.DEFAULT_TEMPLATE]}
+                data["logo"] = dict(LOGO_DEFAULTS)
+                if job.get("client_id"):
+                    data["client_id"] = job["client_id"]
                 c2.execute("UPDATE projects SET data = ?, updated_at = ? WHERE id = ?", (json.dumps(data), now(), pid))
-            return autopilot_update(jid, step="rendering", project_id=pid, note="بيصدّر")
+            return autopilot_update(jid, step="rendering", project_id=pid,
+                                    note="بيصدّر" if captions_on else "بيصدّر (من غير كابشن: كلام التعليق مكتبش)")
 
         if step == "rendering":
             row = get_project(conn, job["project_id"])
@@ -3793,7 +3809,7 @@ def autopilot_start(body: AutopilotIn):
             if fid in running:
                 continue
             d["jobs"] = [j for j in d["jobs"] if j["folder_id"] != fid]
-            d["jobs"].append({"id": uuid.uuid4().hex[:10], "folder_id": fid, "step": "queued", "note": "في الطابور",
+            d["jobs"].append({"id": uuid.uuid4().hex[:10], "folder_id": fid, "client_id": active_client_id(), "step": "queued", "note": "في الطابور",
                               "error": None, "created_at": now(), "updated_at": now()})
         autopilot_save(d)
     return autopilot_state()
@@ -3937,9 +3953,9 @@ def legacy_logo_path() -> Path | None:
     return path if path and path.exists() else None
 
 
-def logo_path() -> Path | None:
-    """لوجو العميل المختار (أول لوجو في ملفه)."""
-    c = active_client()
+def logo_path(client_id: str | None = None) -> Path | None:
+    """لوجو العميل المختار (أول لوجو في ملفه)، أو لوجو عميل معيّن."""
+    c = (brain_row(client_id) if client_id else None) or active_client()
     for a in (c or {}).get("logos") or []:
         p = brain_dir(c["id"]) / a["file"]
         if p.exists():
@@ -7479,9 +7495,9 @@ def coach_intro(data: dict) -> Path | None:
     return p if p and p.exists() else None
 
 
-def brand_video(kind: str) -> Path | None:
-    """إنترو/أوترو البراند المختار، لو متفعّل وموجود."""
-    c = active_client() or {}
+def brand_video(kind: str, client_id: str | None = None) -> Path | None:
+    """إنترو/أوترو البراند المختار (أو عميل معيّن)، لو متفعّل وموجود."""
+    c = (brain_row(client_id) if client_id else None) or active_client() or {}
     f = c.get(f"{kind}_file")
     if not f or not c.get(f"{kind}_on"):
         return None
