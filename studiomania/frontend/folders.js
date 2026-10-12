@@ -685,70 +685,96 @@ async function openAutopilot() {
   const dlg = document.createElement("dialog");
   dlg.className = "bulk-dlg ap-dlg";
   document.body.appendChild(dlg);
-  let st = await api("/api/autopilot"), prompts = await api("/api/prompts").catch(() => []), timer = null;
+  let st = await api("/api/autopilot"), timer = null;
+  const prompts = await api("/api/prompts").catch(() => []);
   await loadFolders();
   const ready = (f) => f.video && f.voice && f.coach;
   const busy = () => new Set(st.jobs.filter((j) => !["done", "failed", "stopped"].includes(j.step)).map((j) => j.folder_id));
+  const manual = () => (st.settings.mode || "manual") === "manual";
+  const jobsHTML = () => [...st.jobs].reverse().map((j) => `<li>
+      <span class="grow"><b>${escapeHtml(j.name)}</b><br><small class="muted">${escapeHtml(j.step === "done" && j.scheduled_at ? `📅 ${apFmt(j.scheduled_at)}` : j.note || "")}</small>
+        ${["done", "failed", "stopped"].includes(j.step) ? "" : `<br><small class="muted">⏱️ في الخطوة دي ${apAgo(j.step_at || j.created_at)} · آخر تحديث ${apAgo(j.updated_at)}</small>`}
+        ${j.step === "done" ? "" : `<br><small class="muted">📅 ${j.at ? `هيتنشر: ${apLocal(j.at)}` : "هيتنشر في أول ميعاد فاضي"}</small>
+          <input type="datetime-local" class="ap-at" data-jat="${j.id}" value="${(j.at || "").slice(0, 16)}" title="غيّر ميعاد النشر">`}
+        ${j.error ? `<br><span class="ap-err">${escapeHtml(j.error)}</span>` : ""}</span>
+      <span class="ap-step ${j.step}">${AP_STEPS[j.step] || j.step}</span>
+      ${["failed", "stopped"].includes(j.step) ? `<button class="btn sm primary" data-resume="${j.id}" title="يكمّل من مكان ما وقف">▶ كمّل</button>` : ""}
+      ${["done", "failed", "stopped"].includes(j.step) ? `<button class="btn sm" data-del="${j.id}" title="شيله من القايمة">✕</button>` : `<button class="btn sm" data-stop="${j.id}">⏹</button>`}
+    </li>`).join("") || '<li class="off">لسه مفيش شغل</li>';
+  // التحديث كل شوية بيغيّر قايمة الشغل بس (من غير ما الصفحة تطلع لفوق)
+  const drawJobs = () => {
+    const ul = dlg.querySelector("[data-jobs]");
+    if (!ul || ul.contains(document.activeElement)) return;
+    const y = ul.scrollTop;
+    ul.innerHTML = jobsHTML();
+    ul.scrollTop = y;
+  };
   const draw = () => {
-    const s = st.settings, b = busy();
+    const s = st.settings, b = busy(), man = manual();
     const picked = new Set([...dlg.querySelectorAll("[data-pick]:checked")].map((x) => x.dataset.pick));
     const atVals = Object.fromEntries([...dlg.querySelectorAll("[data-at]")].map((x) => [x.dataset.at, x.value]));
     const days = new Set(s.days || [0, 1, 2, 3, 4, 5, 6]);
+    const y = dlg.scrollTop;
     dlg.innerHTML = `<div class="panel-head"><h2>🤖 أوتوبايلوت</h2><button class="btn sm" data-x>قفل</button></div>
-      <p class="hint">كل مشروع بيتقطّع لقطع أقل من 15 ثانية، ويتولّد، ويتعمله مونتاج كوتشي (الهوك في الأول، والموسيقى بتوطى وقت الكلام، والأوترو صامت)، ويتصدّر، ويتجدول في أول ميعاد فاضي (3 بوستات في اليوم) بكولاب مع المدرب والغلاف قبل الآخر بثانيتين.<br>⚠️ التوليد بيصرف من رصيد Atlas.</p>
+      <p class="hint">كل مشروع بيتقطّع لقطع أقل من 15 ثانية، ويتولّد، ويتعمله مونتاج كوتشي، ويتصدّر، ويتجدول بكولاب مع المدرب والغلاف قبل الآخر بثانيتين.<br>⚠️ التوليد بيصرف من رصيد Atlas.</p>
       <div class="ap-grid">
         <div>
-          <h3>مواعيد النشر كل يوم (بتوقيت السعودية)</h3>
-          <div class="ap-slots">${[0, 1, 2].map((i) => `<input type="time" data-slot="${i}" value="${(s.slots || [])[i] || ""}">`).join("")}</div>
-          <h3>أيام النشر</h3>
-          <div class="row wrap">${AP_DAYS.map(([k, n]) => `<label class="check"><input type="checkbox" data-day="${k}" ${days.has(k) ? "checked" : ""}> ${n}</label>`).join("")}</div>
-          <h3>ابدأ النشر من يوم <span class="muted">(فاضي = من النهارده)</span></h3>
-          <input type="date" data-start value="${s.start_date || ""}">
+          <h3>ميعاد النشر</h3>
+          <div class="row wrap">
+            <label class="check"><input type="radio" name="apmode" data-mode="manual" ${man ? "checked" : ""}> أنا هحدد يوم وساعة كل فيديو</label>
+            <label class="check"><input type="radio" name="apmode" data-mode="auto" ${man ? "" : "checked"}> وزّعهم لوحدهم على مواعيد ثابتة</label>
+          </div>
+          ${man ? `<p class="hint">حدد اليوم والساعة جنب كل مشروع (بتوقيت السعودية).</p>` : `
+            <div class="ap-auto">
+              <h3>المواعيد كل يوم (بتوقيت السعودية)</h3>
+              <div class="ap-slots">${[0, 1, 2].map((i) => `<input type="time" data-slot="${i}" value="${(s.slots || [])[i] || ""}">`).join("")}</div>
+              <h3>أيام النشر</h3>
+              <div class="row wrap">${AP_DAYS.map(([k, n]) => `<label class="check"><input type="checkbox" data-day="${k}" ${days.has(k) ? "checked" : ""}> ${n}</label>`).join("")}</div>
+              <h3>ابدأ من يوم <span class="muted">(فاضي = من النهارده)</span></h3>
+              <input type="date" data-start value="${s.start_date || ""}">
+            </div>`}
           <h3>المنصات</h3>
           <div class="row wrap">${AP_PLATFORMS.map(([k, n]) => `<label class="check"><input type="checkbox" data-plat="${k}" ${(s.platforms || []).includes(k) ? "checked" : ""}> ${n}</label>`).join("")}</div>
           <h3>برومت التوليد</h3>
           <select data-prompt><option value="">الأساسي (${escapeHtml(prompts[0]?.name || "—")})</option>${prompts.map((p) => `<option value="${p.id}" ${s.prompt_id === p.id ? "selected" : ""}>${escapeHtml(p.name)}</option>`).join("")}</select>
           <h3>المشاريع الجاهزة <span class="muted">(فيديو + تعليق + شخصية)</span></h3>
-          <p class="hint">جنب كل مشروع تقدر تحدد يوم وساعة النشر بالظبط (بتوقيت السعودية). لو سبته فاضي، بياخد أول ميعاد فاضي.</p>
           <ul class="ap-list">${fol.list.map((f) => {
             const ok = ready(f), on = b.has(f.id);
             return `<li class="${ok && !on ? "" : "off"}"><input type="checkbox" data-pick="${f.id}" ${ok && !on ? "" : "disabled"} ${picked.has(f.id) ? "checked" : ""}>
               <span class="grow">📁 ${escapeHtml(f.name)}${f.exported ? ' <span class="muted">· اتصدّر قبل كده</span>' : ""}</span>
-              ${ok && !on ? `<input type="datetime-local" data-at="${f.id}" value="${atVals[f.id] || ""}" title="ميعاد محدد للمشروع ده (اختياري). فاضي = أول ميعاد فاضي من المواعيد اللي فوق">` : ""}
+              ${man && ok && !on ? `<input type="datetime-local" data-at="${f.id}" value="${atVals[f.id] || ""}" title="يوم وساعة النشر (بتوقيت السعودية)">` : ""}
               <span class="muted">${on ? "شغّال" : ok ? "" : "ناقص"}</span></li>`;
           }).join("") || '<li class="off">مفيش مشاريع</li>'}</ul>
           <div class="row gap-top"><button class="btn sm" data-all>اختار كل الجاهز</button><span class="spacer"></span><button class="btn primary" data-go>🚀 شغّل الأوتوبايلوت</button></div>
         </div>
         <div>
           <h3>الشغل</h3>
-          <ul class="ap-list">${[...st.jobs].reverse().map((j) => `<li>
-            <span class="grow"><b>${escapeHtml(j.name)}</b><br><small class="muted">${escapeHtml(j.step === "done" && j.scheduled_at ? `📅 ${apFmt(j.scheduled_at)}` : j.note || "")}</small>
-              ${["done", "failed", "stopped"].includes(j.step) ? "" : `<br><small class="muted">⏱️ في الخطوة دي ${apAgo(j.step_at || j.created_at)} · آخر تحديث ${apAgo(j.updated_at)}</small>`}
-              ${j.step === "done" ? "" : `<br><small class="muted">📅 ${j.at ? `هيتنشر: ${apLocal(j.at)}` : "هيتنشر في أول ميعاد فاضي"}</small>
-                <input type="datetime-local" class="ap-at" data-jat="${j.id}" value="${(j.at || "").slice(0, 16)}" title="غيّر ميعاد النشر (فاضي = أول ميعاد فاضي)">`}
-              ${j.error ? `<br><span class="ap-err">${escapeHtml(j.error)}</span>` : ""}</span>
-            <span class="ap-step ${j.step}">${AP_STEPS[j.step] || j.step}</span>
-            ${["failed", "stopped"].includes(j.step) ? `<button class="btn sm primary" data-resume="${j.id}" title="يكمّل من مكان ما وقف">▶ كمّل</button>` : ""}
-            ${["done", "failed", "stopped"].includes(j.step) ? `<button class="btn sm" data-del="${j.id}" title="شيله من القايمة">✕</button>` : `<button class="btn sm" data-stop="${j.id}">⏹</button>`}
-          </li>`).join("") || '<li class="off">لسه مفيش شغل</li>'}</ul>
+          <ul class="ap-list" data-jobs>${jobsHTML()}</ul>
         </div>
       </div>`;
+    dlg.scrollTop = y;
   };
-  const saveSettings = async () => {
-    const slots = [...dlg.querySelectorAll("[data-slot]")].map((x) => x.value).filter(Boolean);
-    const platforms = [...dlg.querySelectorAll("[data-plat]:checked")].map((x) => x.dataset.plat);
-    const days = [...dlg.querySelectorAll("[data-day]:checked")].map((x) => Number(x.dataset.day));
-    st = await api("/api/autopilot/settings", { method: "PUT", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ slots, platforms, days, start_date: dlg.querySelector("[data-start]").value || null, prompt_id: dlg.querySelector("[data-prompt]").value || null }) });
+  const saveSettings = async (extra = {}) => {
+    const body = { platforms: [...dlg.querySelectorAll("[data-plat]:checked")].map((x) => x.dataset.plat),
+      prompt_id: dlg.querySelector("[data-prompt]").value || null, ...extra };
+    if (dlg.querySelector(".ap-auto")) {
+      body.slots = [...dlg.querySelectorAll("[data-slot]")].map((x) => x.value).filter(Boolean);
+      body.days = [...dlg.querySelectorAll("[data-day]:checked")].map((x) => Number(x.dataset.day));
+      body.start_date = dlg.querySelector("[data-start]").value || null;
+    }
+    st = await api("/api/autopilot/settings", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   };
   dlg.addEventListener("change", async (e) => {
     try {
+      const mode = e.target.closest("[data-mode]");
+      if (mode) { await saveSettings({ mode: mode.dataset.mode }); return draw(); }
       if (e.target.closest("[data-slot],[data-plat],[data-prompt],[data-day],[data-start]")) await saveSettings();
       const jat = e.target.closest("[data-jat]");
       if (jat) {
         st = await api(`/api/autopilot/${jat.dataset.jat}/at`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ at: jat.value || null }) });
         toast(jat.value ? `📅 هيتنشر ${apLocal(jat.value)}` : "📅 هياخد أول ميعاد فاضي");
-        draw();
+        jat.blur();
+        drawJobs();
       }
     } catch (err) {
       toast(err.message, true);
@@ -763,18 +789,19 @@ async function openAutopilot() {
         const ids = [...dlg.querySelectorAll("[data-pick]:checked")].map((x) => x.dataset.pick);
         if (!ids.length) return toast("اختار مشروع واحد على الأقل", true);
         if (!st.settings.platforms?.length) return toast("اختار منصة واحدة على الأقل", true);
+        const at = manual() ? Object.fromEntries(ids.map((id) => [id, dlg.querySelector(`[data-at="${id}"]`)?.value || ""])) : {};
+        if (manual() && Object.values(at).some((v) => !v)) return toast("حدد يوم وساعة لكل مشروع مختار", true);
         if (!confirm(`هيتولّد ويتنشر ${ids.length} مشروع لوحدهم، والتوليد بيصرف من رصيد Atlas. نكمّل؟`)) return;
         await saveSettings();
-        const at = Object.fromEntries(ids.map((id) => [id, dlg.querySelector(`[data-at="${id}"]`)?.value || ""]).filter(([, v]) => v));
         st = await api("/api/autopilot", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ folder_ids: ids, at }) });
         dlg.querySelectorAll("[data-pick]").forEach((x) => (x.checked = false));
         toast(`🤖 ${ids.length} مشروع دخلوا الطابور`);
         return draw();
       }
       const stop = t.closest("[data-stop]"), del = t.closest("[data-del]"), res = t.closest("[data-resume]");
-      if (res) { st = await api(`/api/autopilot/${res.dataset.resume}/resume`, { method: "POST" }); draw(); }
-      if (stop) { st = await api(`/api/autopilot/${stop.dataset.stop}/stop`, { method: "POST" }); draw(); }
-      if (del) { st = await api(`/api/autopilot/${del.dataset.del}`, { method: "DELETE" }); draw(); }
+      if (res) { st = await api(`/api/autopilot/${res.dataset.resume}/resume`, { method: "POST" }); drawJobs(); }
+      if (stop) { st = await api(`/api/autopilot/${stop.dataset.stop}/stop`, { method: "POST" }); drawJobs(); }
+      if (del) { st = await api(`/api/autopilot/${del.dataset.del}`, { method: "DELETE" }); drawJobs(); }
     } catch (err) {
       toast(err.message, true);
     }
@@ -783,9 +810,8 @@ async function openAutopilot() {
   draw();
   dlg.showModal();
   timer = setInterval(async () => {
-    if (dlg.querySelector("input:focus,select:focus")) return;
     st = await api("/api/autopilot").catch(() => st);
-    draw();
+    drawJobs();
   }, 6000);
 }
 $("autopilotOpen").onclick = () => openAutopilot().catch((err) => toast(err.message, true));

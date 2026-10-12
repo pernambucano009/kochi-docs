@@ -3851,6 +3851,8 @@ def autopilot_settings(body: dict):
         s["platforms"] = [p for p in body["platforms"] if p in publisher.PLATFORMS]
     if "prompt_id" in body:
         s["prompt_id"] = body["prompt_id"] or None
+    if body.get("mode") in ("manual", "auto"):
+        s["mode"] = body["mode"]   # manual: يوم وساعة لكل فيديو · auto: مواعيد ثابتة كل يوم
     if "start_date" in body:
         sd = str(body.get("start_date") or "")
         s["start_date"] = sd if re.fullmatch(r"\d{4}-\d{2}-\d{2}", sd) else None
