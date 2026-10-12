@@ -673,6 +673,10 @@ $("fupUpload").onclick = async () => {
 const AP_STEPS = { queued: "⏳ في الطابور", cutting: "✂️ بيقطّع", generating: "✨ بيولّد", montage: "🎞️ مونتاج", rendering: "🎬 بيصدّر",
   scheduling: "📅 بيجدول", done: "✅ اتجدول", failed: "⚠️ وقف", stopped: "⏹ اتوقف" };
 const AP_PLATFORMS = [["instagram", "إنستجرام"], ["tiktok", "تيك توك"], ["youtube", "يوتيوب شورتس"], ["facebook", "فيسبوك"], ["x", "X"]];
+const apAgo = (iso) => {
+  const m = Math.max(0, Math.round((Date.now() - new Date(iso)) / 60000));
+  return m < 1 ? "لسه حالًا" : m < 60 ? `من ${m} دقيقة` : `من ${Math.floor(m / 60)} ساعة و${m % 60} دقيقة`;
+};
 const apFmt = (iso) => new Date(iso).toLocaleString("ar-EG", { weekday: "long", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
 
 async function openAutopilot() {
@@ -709,8 +713,10 @@ async function openAutopilot() {
           <h3>الشغل</h3>
           <ul class="ap-list">${[...st.jobs].reverse().map((j) => `<li>
             <span class="grow"><b>${escapeHtml(j.name)}</b><br><small class="muted">${escapeHtml(j.step === "done" && j.scheduled_at ? `📅 ${apFmt(j.scheduled_at)}` : j.note || "")}</small>
+              ${["done", "failed", "stopped"].includes(j.step) ? "" : `<br><small class="muted">⏱️ في الخطوة دي ${apAgo(j.step_at || j.created_at)} · آخر تحديث ${apAgo(j.updated_at)}</small>`}
               ${j.error ? `<br><span class="ap-err">${escapeHtml(j.error)}</span>` : ""}</span>
             <span class="ap-step ${j.step}">${AP_STEPS[j.step] || j.step}</span>
+            ${["failed", "stopped"].includes(j.step) ? `<button class="btn sm primary" data-resume="${j.id}" title="يكمّل من مكان ما وقف">▶ كمّل</button>` : ""}
             ${["done", "failed", "stopped"].includes(j.step) ? `<button class="btn sm" data-del="${j.id}" title="شيله من القايمة">✕</button>` : `<button class="btn sm" data-stop="${j.id}">⏹</button>`}
           </li>`).join("") || '<li class="off">لسه مفيش شغل</li>'}</ul>
         </div>
@@ -739,7 +745,8 @@ async function openAutopilot() {
         toast(`🤖 ${ids.length} مشروع دخلوا الطابور`);
         return draw();
       }
-      const stop = t.closest("[data-stop]"), del = t.closest("[data-del]");
+      const stop = t.closest("[data-stop]"), del = t.closest("[data-del]"), res = t.closest("[data-resume]");
+      if (res) { st = await api(`/api/autopilot/${res.dataset.resume}/resume`, { method: "POST" }); draw(); }
       if (stop) { st = await api(`/api/autopilot/${stop.dataset.stop}/stop`, { method: "POST" }); draw(); }
       if (del) { st = await api(`/api/autopilot/${del.dataset.del}`, { method: "DELETE" }); draw(); }
     } catch (err) {

@@ -3615,6 +3615,8 @@ def autopilot_update(job_id: str, **fields) -> None:
         d = autopilot_load()
         for j in d["jobs"]:
             if j["id"] == job_id:
+                if fields.get("step") and fields["step"] != j.get("step"):
+                    fields["step_at"] = now()   # من إمتى في الخطوة دي (بيبان في الشاشة)
                 j.update(fields, updated_at=now())
         autopilot_save(d)
 
@@ -3623,7 +3625,7 @@ def autopilot_cut(conn: sqlite3.Connection, video_id: str) -> None:
     v = get_video(conn, video_id)
     src = RAW_DIR / v["filename"]
     try:
-        scenes = [s["start"] for s in lab.detect_shots(ffmpeg_exe(), src, v["duration"])][1:]
+        scenes = kochi_layout.scene_cuts(ffmpeg_exe(), src)
     except Exception:  # noqa: BLE001
         scenes = []
     cuts = kochi_layout.auto_cuts(v["duration"], scenes, MAX_CLIP_SECONDS - 0.5, MIN_REFERENCE_SECONDS)
@@ -3670,11 +3672,12 @@ def autopilot_step(job: dict, settings: dict) -> None:
             return autopilot_update(jid, step="generating", note="بيولّد")
 
         if step == "generating":
-            states = []
+            states, latest = [], []
             for c in clips:
-                gens = conn.execute("SELECT status FROM generations WHERE clip_id = ? AND coach_id = ? ORDER BY created_at DESC",
+                gens = conn.execute("SELECT id, status, error FROM generations WHERE clip_id = ? AND coach_id = ? ORDER BY created_at DESC",
                                     (c["id"], f["coach_id"])).fetchall()
                 states.append(gens[0]["status"] if gens else None)
+                latest.append(gens[0] if gens else None)
             todo = [c["id"] for c, st in zip(clips, states) if st is None]
             if todo:
                 prompt = settings.get("prompt_id") or (conn.execute("SELECT id FROM prompts ORDER BY is_default DESC, created_at DESC").fetchone() or {"id": None})["id"]
@@ -3682,12 +3685,19 @@ def autopilot_step(job: dict, settings: dict) -> None:
                     return autopilot_update(jid, step="failed", error="مفيش برومت توليد. ضيف واحد من صفحة التوليد")
                 create_generations(GenerationIn(clip_ids=todo, coach_id=f["coach_id"], prompt_id=prompt))
                 return autopilot_update(jid, note=f"بيولّد {len(clips)} قطعة")
-            failed = sum(1 for st in states if st == "failed")
+            retried = set(job.get("retried") or [])
+            again = [g["id"] for g in latest if g and g["status"] == "failed" and g["id"] not in retried]
+            if again:   # القطعة اللي فشلت بتتعاد مرة واحدة لوحدها
+                for gid in again:
+                    retry_generation(gid)
+                return autopilot_update(jid, retried=[*retried, *again], note=f"أعاد توليد {len(again)} قطعة فشلت")
+            failed = [g for g in latest if g and g["status"] == "failed"]
             if failed:
-                return autopilot_update(jid, step="failed", error=f"{failed} قطعة فشلت في التوليد. أعد توليدها من صفحة التوليد وشغّل الأوتوبايلوت تاني")
+                return autopilot_update(jid, step="failed", error=f"{len(failed)} قطعة فشلت في التوليد مرتين ({(failed[0]['error'] or '')[:120]}). أعد توليدها من صفحة التوليد ودوس «كمّل»")
             done = sum(1 for st in states if st == "completed")
             if done < len(clips):
-                return autopilot_update(jid, note=f"بيولّد: {done} / {len(clips)}")
+                working = sum(1 for st in states if st in ACTIVE_STATUSES)
+                return autopilot_update(jid, note=f"بيولّد: {done} من {len(clips)} جاهزين · {working} شغّالين دلوقتي (كل قطعة بتاخد كام دقيقة)")
             return autopilot_update(jid, step="montage", note="بيعمل المونتاج")
 
         if step == "montage":
@@ -3711,12 +3721,17 @@ def autopilot_step(job: dict, settings: dict) -> None:
             row = get_project(conn, job["project_id"])
             if row["render_status"] == "done" and row["export_id"]:
                 return autopilot_update(jid, step="scheduling", export_id=row["export_id"], note="بيجدول")
-            if row["render_status"] == "failed":
+            if row["render_status"] == "failed" and job.get("render_tries", 0) >= 2:
                 return autopilot_update(jid, step="failed", error=f"التصدير فشل: {row['render_error'] or ''}"[:300])
-            if row["render_status"] != "rendering":
+            if row["render_status"] != "rendering" or job["project_id"] not in RENDER_ACTIVE:
+                # أول مرة، أو التصدير وقع (السيرفر اتقفل في النص مثلًا): بيبدأ تاني لوحده
                 with closing(db()) as c2, c2:
-                    start_render(c2, row, job["project_id"], json.loads(row["data"]), _FakeRequest())
-            return
+                    fresh = get_project(c2, job["project_id"])
+                    if fresh["render_status"] == "done" or (fresh["render_status"] == "rendering" and job["project_id"] in RENDER_ACTIVE):
+                        return   # خلص (أو بدأ) في اللحظة دي
+                    start_render(c2, fresh, job["project_id"], json.loads(fresh["data"]), _FakeRequest())
+                return autopilot_update(jid, render_tries=job.get("render_tries", 0) + 1, note="بيصدّر")
+            return autopilot_update(jid, note=f"بيصدّر: {RENDER_ACTIVE.get(job['project_id']) or ''}".strip(" :"))
 
         if step == "scheduling":
             ex = conn.execute("SELECT * FROM exports WHERE id = ?", (job["export_id"],)).fetchone()
@@ -3806,6 +3821,19 @@ def autopilot_settings(body: dict):
 @app.post("/api/autopilot/{job_id}/stop")
 def autopilot_stop(job_id: str):
     autopilot_update(job_id, step="stopped", note="اتوقف")
+    return autopilot_state()
+
+
+@app.post("/api/autopilot/{job_id}/resume")
+def autopilot_resume(job_id: str):
+    """يكمّل من مكانه: لو اتصدّر بيجدول، لو اتعمله مونتاج بيصدّر، وإلا بيكمّل التوليد."""
+    with AUTOPILOT_LOCK:
+        d = autopilot_load()
+        j = next((x for x in d["jobs"] if x["id"] == job_id), None)
+    if j is None:
+        raise HTTPException(404, "مش موجود")
+    step = "scheduling" if j.get("export_id") else "rendering" if j.get("project_id") else "queued"
+    autopilot_update(job_id, step=step, error=None, retried=[], render_tries=0, note="بيكمّل")
     return autopilot_state()
 
 

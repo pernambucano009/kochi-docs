@@ -130,3 +130,11 @@ def auto_cuts(duration: float, scene_cuts: list[float], max_len: float = 14.5, m
         cuts.append(round(c, 3))
         pos = c
     return cuts
+
+
+def scene_cuts(ffmpeg: str, src: Path, threshold: float = 0.3) -> list[float]:
+    """أماكن تغيّر المشهد، على نسخة صغيرة من الفيديو (أسرع كتير من الحجم الكامل على السيرفر)."""
+    r = subprocess.run([ffmpeg, "-hide_banner", "-nostats", "-i", str(src), "-an", "-sn", "-vf",
+                        f"fps=10,scale=160:-2,select='gt(scene,{threshold})',showinfo", "-f", "null", "-"],
+                       capture_output=True, text=True, timeout=900)
+    return sorted({round(float(m), 2) for m in re.findall(r"pts_time:([0-9.]+)", r.stderr)})
