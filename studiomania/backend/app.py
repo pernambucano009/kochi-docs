@@ -3593,7 +3593,9 @@ threading.Thread(target=scheduler_loop, daemon=True).start()
 # التلقائي ← تصدير ← جدولة في أول ميعاد فاضي من مواعيد اليوم التلاتة.
 
 AUTOPILOT_FILE = DATA_DIR / "autopilot.json"
-AUTOPILOT_DEFAULTS = {"slots": ["12:00", "18:00", "21:00"], "tz_offset": 3, "platforms": ["instagram", "tiktok"], "prompt_id": None}
+AUTOPILOT_DEFAULTS = {"slots": ["12:00", "18:00", "21:00"], "tz_offset": 3, "platforms": ["instagram", "tiktok"], "prompt_id": None,
+                      "start_date": None,              # يبدأ النشر من يوم معيّن (YYYY-MM-DD)، فاضي = من النهارده
+                      "days": [0, 1, 2, 3, 4, 5, 6]}   # أيام النشر في الأسبوع (الاتنين = 0)
 AUTOPILOT_STEPS = ("queued", "cutting", "generating", "montage", "rendering", "scheduling", "done", "failed", "stopped")
 AUTOPILOT_LOCK = threading.Lock()
 
@@ -3638,15 +3640,37 @@ def autopilot_slot(settings: dict, taken: set[str]) -> datetime:
     tz = timezone(timedelta(hours=float(settings.get("tz_offset") or 0)))
     slots = sorted(settings.get("slots") or AUTOPILOT_DEFAULTS["slots"])
     soon = datetime.now(tz) + timedelta(hours=1)
-    for day in range(0, 120):
-        base = (soon + timedelta(days=day)).date()
+    days = set(settings.get("days") or range(7))
+    first = soon
+    if settings.get("start_date"):
+        try:
+            d0 = datetime.strptime(settings["start_date"], "%Y-%m-%d").replace(tzinfo=tz)
+            first = max(soon, d0)
+        except ValueError:
+            pass
+    for day in range(0, 180):
+        base = (first + timedelta(days=day)).date()
+        if base.weekday() not in days:
+            continue
         for sl in slots:
             h, m = (int(x) for x in sl.split(":"))
             at = datetime(base.year, base.month, base.day, h, m, tzinfo=tz)
             key = at.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M")
             if at >= soon and key not in taken:
                 return at.astimezone(timezone.utc)
-    raise RuntimeError("مفيش ميعاد فاضي في الـ 4 شهور الجايين")
+    raise RuntimeError("مفيش ميعاد فاضي في الـ 6 شهور الجايين")
+
+
+def autopilot_fixed_time(settings: dict, at: str | None) -> datetime | None:
+    """ميعاد محدد للمشروع ده (يوم وساعة بتوقيت السعودية). لو فات، بيرجع None ويتاخد أول ميعاد فاضي."""
+    if not at:
+        return None
+    try:
+        tz = timezone(timedelta(hours=float(settings.get("tz_offset") or 0)))
+        when = datetime.fromisoformat(at).replace(tzinfo=tz)
+    except ValueError:
+        return None
+    return when.astimezone(timezone.utc) if when > datetime.now(tz) + timedelta(minutes=10) else None
 
 
 class _FakeRequest:   # start_render محتاج بورت السيرفر (للتايبوجرافي)
@@ -3755,7 +3779,7 @@ def autopilot_step(job: dict, settings: dict) -> None:
             taken = {str(r["scheduled_at"])[:16] for r in conn.execute(
                 "SELECT scheduled_at FROM posts WHERE status IN ('scheduled', 'sending', 'publishing', 'published')")}
     if step == "scheduling":
-        when = autopilot_slot(settings, taken)
+        when = autopilot_fixed_time(settings, job.get("at")) or autopilot_slot(settings, taken)
         caption = f["name"].strip()   # الكابشن = اسم المشروع
         ig = coach["instagram"] if coach and coach["instagram"] else None
         post = create_post(PostIn(export_id=job["export_id"], caption=caption, platforms=settings.get("platforms") or ["instagram"],
@@ -3798,6 +3822,7 @@ def autopilot_state():
 
 class AutopilotIn(BaseModel):
     folder_ids: list[str]
+    at: dict[str, str] = {}   # ميعاد محدد لكل مشروع (اختياري): folder_id → "2026-10-20T18:30"
 
 
 @app.post("/api/autopilot")
@@ -3809,7 +3834,8 @@ def autopilot_start(body: AutopilotIn):
             if fid in running:
                 continue
             d["jobs"] = [j for j in d["jobs"] if j["folder_id"] != fid]
-            d["jobs"].append({"id": uuid.uuid4().hex[:10], "folder_id": fid, "client_id": active_client_id(), "step": "queued", "note": "في الطابور",
+            d["jobs"].append({"id": uuid.uuid4().hex[:10], "folder_id": fid, "client_id": active_client_id(), "at": body.at.get(fid) or None,
+                              "step": "queued", "note": "في الطابور",
                               "error": None, "created_at": now(), "updated_at": now()})
         autopilot_save(d)
     return autopilot_state()
@@ -3825,6 +3851,11 @@ def autopilot_settings(body: dict):
         s["platforms"] = [p for p in body["platforms"] if p in publisher.PLATFORMS]
     if "prompt_id" in body:
         s["prompt_id"] = body["prompt_id"] or None
+    if "start_date" in body:
+        sd = str(body.get("start_date") or "")
+        s["start_date"] = sd if re.fullmatch(r"\d{4}-\d{2}-\d{2}", sd) else None
+    if isinstance(body.get("days"), list):
+        s["days"] = sorted({int(x) for x in body["days"] if str(x).isdigit() and 0 <= int(x) <= 6}) or list(range(7))
     if "tz_offset" in body:
         s["tz_offset"] = clamp(float(body["tz_offset"] or 0), -12, 14)
     with AUTOPILOT_LOCK:
@@ -3837,6 +3868,16 @@ def autopilot_settings(body: dict):
 @app.post("/api/autopilot/{job_id}/stop")
 def autopilot_stop(job_id: str):
     autopilot_update(job_id, step="stopped", note="اتوقف")
+    return autopilot_state()
+
+
+@app.put("/api/autopilot/{job_id}/at")
+def autopilot_set_time(job_id: str, body: dict):
+    """يغيّر ميعاد نشر مشروع لسه متجدولش (فاضي = أول ميعاد فاضي)."""
+    at = str(body.get("at") or "") or None
+    if at and not re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?", at):
+        raise HTTPException(400, "الميعاد مش مظبوط")
+    autopilot_update(job_id, at=at)
     return autopilot_state()
 
 

@@ -673,6 +673,8 @@ $("fupUpload").onclick = async () => {
 const AP_STEPS = { queued: "⏳ في الطابور", cutting: "✂️ بيقطّع", generating: "✨ بيولّد", montage: "🎞️ مونتاج", rendering: "🎬 بيصدّر",
   scheduling: "📅 بيجدول", done: "✅ اتجدول", failed: "⚠️ وقف", stopped: "⏹ اتوقف" };
 const AP_PLATFORMS = [["instagram", "إنستجرام"], ["tiktok", "تيك توك"], ["youtube", "يوتيوب شورتس"], ["facebook", "فيسبوك"], ["x", "X"]];
+const AP_DAYS = [[5, "السبت"], [6, "الأحد"], [0, "الاتنين"], [1, "التلات"], [2, "الأربع"], [3, "الخميس"], [4, "الجمعة"]];
+const apLocal = (s) => new Date(`${s}+03:00`).toLocaleString("ar-EG", { weekday: "long", day: "numeric", month: "short", hour: "numeric", minute: "2-digit", timeZone: "Asia/Riyadh" });
 const apAgo = (iso) => {
   const m = Math.max(0, Math.round((Date.now() - new Date(iso)) / 60000));
   return m < 1 ? "لسه حالًا" : m < 60 ? `من ${m} دقيقة` : `من ${Math.floor(m / 60)} ساعة و${m % 60} دقيقة`;
@@ -690,21 +692,29 @@ async function openAutopilot() {
   const draw = () => {
     const s = st.settings, b = busy();
     const picked = new Set([...dlg.querySelectorAll("[data-pick]:checked")].map((x) => x.dataset.pick));
+    const atVals = Object.fromEntries([...dlg.querySelectorAll("[data-at]")].map((x) => [x.dataset.at, x.value]));
+    const days = new Set(s.days || [0, 1, 2, 3, 4, 5, 6]);
     dlg.innerHTML = `<div class="panel-head"><h2>🤖 أوتوبايلوت</h2><button class="btn sm" data-x>قفل</button></div>
       <p class="hint">كل مشروع بيتقطّع لقطع أقل من 15 ثانية، ويتولّد، ويتعمله مونتاج كوتشي (الهوك في الأول، والموسيقى بتوطى وقت الكلام، والأوترو صامت)، ويتصدّر، ويتجدول في أول ميعاد فاضي (3 بوستات في اليوم) بكولاب مع المدرب والغلاف قبل الآخر بثانيتين.<br>⚠️ التوليد بيصرف من رصيد Atlas.</p>
       <div class="ap-grid">
         <div>
           <h3>مواعيد النشر كل يوم (بتوقيت السعودية)</h3>
           <div class="ap-slots">${[0, 1, 2].map((i) => `<input type="time" data-slot="${i}" value="${(s.slots || [])[i] || ""}">`).join("")}</div>
+          <h3>أيام النشر</h3>
+          <div class="row wrap">${AP_DAYS.map(([k, n]) => `<label class="check"><input type="checkbox" data-day="${k}" ${days.has(k) ? "checked" : ""}> ${n}</label>`).join("")}</div>
+          <h3>ابدأ النشر من يوم <span class="muted">(فاضي = من النهارده)</span></h3>
+          <input type="date" data-start value="${s.start_date || ""}">
           <h3>المنصات</h3>
           <div class="row wrap">${AP_PLATFORMS.map(([k, n]) => `<label class="check"><input type="checkbox" data-plat="${k}" ${(s.platforms || []).includes(k) ? "checked" : ""}> ${n}</label>`).join("")}</div>
           <h3>برومت التوليد</h3>
           <select data-prompt><option value="">الأساسي (${escapeHtml(prompts[0]?.name || "—")})</option>${prompts.map((p) => `<option value="${p.id}" ${s.prompt_id === p.id ? "selected" : ""}>${escapeHtml(p.name)}</option>`).join("")}</select>
           <h3>المشاريع الجاهزة <span class="muted">(فيديو + تعليق + شخصية)</span></h3>
+          <p class="hint">جنب كل مشروع تقدر تحدد يوم وساعة النشر بالظبط (بتوقيت السعودية). لو سبته فاضي، بياخد أول ميعاد فاضي.</p>
           <ul class="ap-list">${fol.list.map((f) => {
             const ok = ready(f), on = b.has(f.id);
             return `<li class="${ok && !on ? "" : "off"}"><input type="checkbox" data-pick="${f.id}" ${ok && !on ? "" : "disabled"} ${picked.has(f.id) ? "checked" : ""}>
               <span class="grow">📁 ${escapeHtml(f.name)}${f.exported ? ' <span class="muted">· اتصدّر قبل كده</span>' : ""}</span>
+              ${ok && !on ? `<input type="datetime-local" data-at="${f.id}" value="${atVals[f.id] || ""}" title="ميعاد محدد للمشروع ده (اختياري). فاضي = أول ميعاد فاضي من المواعيد اللي فوق">` : ""}
               <span class="muted">${on ? "شغّال" : ok ? "" : "ناقص"}</span></li>`;
           }).join("") || '<li class="off">مفيش مشاريع</li>'}</ul>
           <div class="row gap-top"><button class="btn sm" data-all>اختار كل الجاهز</button><span class="spacer"></span><button class="btn primary" data-go>🚀 شغّل الأوتوبايلوت</button></div>
@@ -714,6 +724,8 @@ async function openAutopilot() {
           <ul class="ap-list">${[...st.jobs].reverse().map((j) => `<li>
             <span class="grow"><b>${escapeHtml(j.name)}</b><br><small class="muted">${escapeHtml(j.step === "done" && j.scheduled_at ? `📅 ${apFmt(j.scheduled_at)}` : j.note || "")}</small>
               ${["done", "failed", "stopped"].includes(j.step) ? "" : `<br><small class="muted">⏱️ في الخطوة دي ${apAgo(j.step_at || j.created_at)} · آخر تحديث ${apAgo(j.updated_at)}</small>`}
+              ${j.step === "done" ? "" : `<br><small class="muted">📅 ${j.at ? `هيتنشر: ${apLocal(j.at)}` : "هيتنشر في أول ميعاد فاضي"}</small>
+                <input type="datetime-local" class="ap-at" data-jat="${j.id}" value="${(j.at || "").slice(0, 16)}" title="غيّر ميعاد النشر (فاضي = أول ميعاد فاضي)">`}
               ${j.error ? `<br><span class="ap-err">${escapeHtml(j.error)}</span>` : ""}</span>
             <span class="ap-step ${j.step}">${AP_STEPS[j.step] || j.step}</span>
             ${["failed", "stopped"].includes(j.step) ? `<button class="btn sm primary" data-resume="${j.id}" title="يكمّل من مكان ما وقف">▶ كمّل</button>` : ""}
@@ -725,10 +737,23 @@ async function openAutopilot() {
   const saveSettings = async () => {
     const slots = [...dlg.querySelectorAll("[data-slot]")].map((x) => x.value).filter(Boolean);
     const platforms = [...dlg.querySelectorAll("[data-plat]:checked")].map((x) => x.dataset.plat);
+    const days = [...dlg.querySelectorAll("[data-day]:checked")].map((x) => Number(x.dataset.day));
     st = await api("/api/autopilot/settings", { method: "PUT", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ slots, platforms, prompt_id: dlg.querySelector("[data-prompt]").value || null }) });
+      body: JSON.stringify({ slots, platforms, days, start_date: dlg.querySelector("[data-start]").value || null, prompt_id: dlg.querySelector("[data-prompt]").value || null }) });
   };
-  dlg.addEventListener("change", (e) => { if (e.target.closest("[data-slot],[data-plat],[data-prompt]")) saveSettings().catch((err) => toast(err.message, true)); });
+  dlg.addEventListener("change", async (e) => {
+    try {
+      if (e.target.closest("[data-slot],[data-plat],[data-prompt],[data-day],[data-start]")) await saveSettings();
+      const jat = e.target.closest("[data-jat]");
+      if (jat) {
+        st = await api(`/api/autopilot/${jat.dataset.jat}/at`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ at: jat.value || null }) });
+        toast(jat.value ? `📅 هيتنشر ${apLocal(jat.value)}` : "📅 هياخد أول ميعاد فاضي");
+        draw();
+      }
+    } catch (err) {
+      toast(err.message, true);
+    }
+  });
   dlg.addEventListener("click", async (e) => {
     const t = e.target;
     try {
@@ -740,7 +765,8 @@ async function openAutopilot() {
         if (!st.settings.platforms?.length) return toast("اختار منصة واحدة على الأقل", true);
         if (!confirm(`هيتولّد ويتنشر ${ids.length} مشروع لوحدهم، والتوليد بيصرف من رصيد Atlas. نكمّل؟`)) return;
         await saveSettings();
-        st = await api("/api/autopilot", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ folder_ids: ids }) });
+        const at = Object.fromEntries(ids.map((id) => [id, dlg.querySelector(`[data-at="${id}"]`)?.value || ""]).filter(([, v]) => v));
+        st = await api("/api/autopilot", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ folder_ids: ids, at }) });
         dlg.querySelectorAll("[data-pick]").forEach((x) => (x.checked = false));
         toast(`🤖 ${ids.length} مشروع دخلوا الطابور`);
         return draw();

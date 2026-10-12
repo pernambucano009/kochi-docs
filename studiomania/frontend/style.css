@@ -2145,3 +2145,5 @@ a.btn.disabled { opacity: .45; pointer-events: none; }
 .ap-dlg .ap-step.done { background: rgba(47,143,107,.18); }
 .ap-dlg .ap-step.failed { background: rgba(232,64,47,.18); }
 .ap-dlg .ap-err { color: #e8402f; font-size: 12px; }
+.ap-dlg .ap-list input[type="datetime-local"] { font-size: 12px; padding: 3px 6px; max-width: 190px; }
+.ap-dlg .ap-at { margin-top: 4px; }
