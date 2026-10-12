@@ -379,7 +379,7 @@ window.NHGL = (stage, getClient) => {
   const IMGS = ["create", "settings", "app", "brand", "assets", "progress", "publish", "reel", "film", "series", "carousel", "characters", "voices", "music", "backgrounds"], loader = new THREE.TextureLoader(), imgPlanes = [];
   function imgTex(plane) {
     const key = plane.userData.img;
-    loader.load(`/icons3d/${key}${dark ? "_d" : ""}.webp?v=3`, (t) => {
+    loader.load(`/icons3d/${key}${dark ? "_d" : ""}.webp?v=4`, (t) => {
       t.encoding = THREE.sRGBEncoding;
       t.anisotropy = renderer.capabilities.getMaxAnisotropy();
       const old = plane.material.map;
