@@ -2257,3 +2257,65 @@ dialog.cal-dlg { width: min(720px, 94vw); max-height: 90vh; border: 1px solid va
 .nh-bell svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linejoin: round; }
 .nh-bell.has svg { color: var(--accent); animation: bell-ring 1.6s ease 1; transform-origin: 50% 10%; }
 .nh-bell .bell-n { inset-block-start: -6px; inset-inline-end: -8px; }
+
+/* ============ 💬 صندوق الردود ============ */
+.inbox-link { margin-bottom: 12px; display: inline-flex; align-items: center; gap: 6px; }
+.inbox-link svg { width: 18px; height: 18px; }
+.ib-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+.ib-bar .cal-views { margin-inline-start: 0; }
+.ib-note { font-size: 12px; }
+.ib-layout { display: grid; grid-template-columns: minmax(260px, 360px) 1fr; gap: 14px; align-items: start; }
+.ib-list-panel { max-height: calc(100vh - 230px); overflow-y: auto; padding: 8px; }
+.ib-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.ib-list li { display: flex; gap: 10px; align-items: center; padding: 8px; border-radius: 12px; cursor: pointer; position: relative; transition: background .15s; }
+.ib-list li:hover { background: var(--surface-2); }
+.ib-list li.on { background: var(--accent-soft); }
+.ib-list li.unread .ib-snip { color: var(--text); font-weight: 500; }
+.ib-thumb { width: 46px; height: 46px; flex: none; border-radius: 10px; object-fit: cover; background: var(--surface-2); display: grid; place-items: center; font-style: normal; }
+.ib-av { position: relative; width: 34px; height: 34px; flex: none; border-radius: 50%; overflow: hidden; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; font-style: normal; font-weight: 600; font-size: 14px; }
+.ib-av img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.ib-li { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.ib-top { display: flex; align-items: center; gap: 6px; min-width: 0; flex-wrap: wrap; }
+.ib-top b { font-weight: 500; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.ib-top small { color: var(--muted); font-size: 11.5px; }
+.ib-top a { font-size: 12px; margin-inline-start: auto; }
+.ib-pl { font-style: normal; font-size: 12px; opacity: .75; }
+.ib-snip { font-size: 12.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ib-count { font-size: 12px; color: var(--accent); }
+.ib-unread { position: absolute; inset-inline-end: 8px; inset-block-start: 8px; background: var(--accent); color: #fff; font-size: 11px; border-radius: 999px; padding: 0 6px; }
+.ib-req, .ib-wait { align-self: flex-start; font-size: 10.5px; border-radius: 999px; padding: 0 7px; background: var(--surface-2); color: var(--muted); }
+.ib-wait { background: color-mix(in srgb, var(--warn) 18%, transparent); color: color-mix(in srgb, var(--warn) 70%, var(--text)); }
+.ib-thread { min-height: 360px; max-height: calc(100vh - 200px); overflow-y: auto; }
+.ib-post { display: flex; gap: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--line); margin-bottom: 10px; }
+.ib-post img { width: 84px; height: 84px; object-fit: cover; border-radius: 12px; flex: none; }
+.ib-post > div { min-width: 0; flex: 1; }
+.ib-cap { margin: 6px 0 0; font-size: 13px; white-space: pre-wrap; max-height: 84px; overflow: auto; }
+.ib-filter { display: flex; align-items: center; gap: 10px; font-size: 13px; margin-bottom: 8px; }
+.ib-comments { display: flex; flex-direction: column; gap: 10px; }
+.ib-c { display: flex; gap: 10px; align-items: flex-start; }
+.ib-c.reply { margin-top: 8px; }
+.ib-c.reply .ib-av { width: 26px; height: 26px; font-size: 12px; }
+.ib-cb { flex: 1; min-width: 0; }
+.ib-cb > p { margin: 2px 0 2px; font-size: 13.5px; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--surface-2); padding: 7px 10px; border-radius: 12px; display: inline-block; max-width: 100%; }
+.ib-c.mine > .ib-cb > p { background: var(--accent-soft); }
+.ib-act { border: 0; background: none; color: var(--accent); font: inherit; font-size: 12.5px; cursor: pointer; padding: 0 4px; }
+.ib-compose { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; background: var(--surface-2); border-radius: 12px; padding: 8px; }
+.ib-compose textarea, .ib-compose input { width: 100%; font: inherit; font-size: 13.5px; border: 1px solid var(--line); border-radius: 10px; padding: 7px 9px; background: var(--surface); color: var(--text); resize: vertical; }
+.ib-compose .ib-hint { font-size: 12px; }
+.ib-compose .row { display: flex; gap: 6px; align-items: center; }
+.ib-compose .spacer { flex: 1; }
+.ib-chathead { display: flex; align-items: center; gap: 8px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+.ib-chathead a { margin-inline-start: auto; font-size: 12px; }
+.ib-chat { display: flex; flex-direction: column; gap: 6px; padding: 12px 0; max-height: calc(100vh - 420px); min-height: 160px; overflow-y: auto; }
+.ib-msg { align-self: flex-start; max-width: 78%; background: var(--surface-2); border-radius: 14px; padding: 7px 11px; }
+.ib-msg.mine { align-self: flex-end; background: var(--accent); color: #fff; }
+.ib-msg p { margin: 0; font-size: 13.5px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.ib-msg img { max-width: 220px; border-radius: 10px; display: block; margin-top: 4px; }
+.ib-msg small { display: block; font-size: 10.5px; opacity: .7; margin-top: 2px; }
+.ib-msg.mine a { color: #fff; }
+.ib-thread .err { color: var(--danger); }
+@media (max-width: 900px) {
+  .ib-layout { grid-template-columns: 1fr; }
+  .ib-list-panel { max-height: 300px; }
+  .ib-thread, .ib-chat { max-height: none; }
+}

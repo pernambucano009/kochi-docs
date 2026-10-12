@@ -3576,6 +3576,116 @@ def publish_due_posts() -> None:
         _publish_lock.release()
 
 
+# ---------------------------------------------------------------- 💬 صندوق الردود (كومنتات ورسايل)
+# كل اللي بيوصل على الحسابات المربوطة في Zernio: تقراه وترد عليه من هنا، والذكاء الاصطناعي يقترح الرد بصوت البراند.
+
+def _inbox_call(fn, *args):
+    if publisher.service_name() != "zernio":
+        raise HTTPException(400, "صندوق الردود شغال مع Zernio بس. حط مفتاح Zernio من ⚙️ الإعدادات")
+    try:
+        return fn(*args)
+    except (publisher.PublishError, httpx.HTTPError) as exc:
+        raise HTTPException(400, str(exc) if isinstance(exc, publisher.PublishError) else f"مقدرتش أوصل لـ Zernio: {exc}") from exc
+
+
+@app.get("/api/inbox/comments")
+def inbox_posts(cursor: str | None = None):
+    return _inbox_call(publisher.inbox_posts, 50, cursor)
+
+
+@app.get("/api/inbox/comments/{post_id}")
+def inbox_comments(post_id: str, account_id: str):
+    return _inbox_call(publisher.inbox_comments, post_id, account_id)
+
+
+class InboxReplyIn(BaseModel):
+    account_id: str
+    message: str
+    comment_id: str | None = None  # فاضي = كومنت جديد على البوست نفسه
+
+
+@app.post("/api/inbox/comments/{post_id}/reply")
+def inbox_reply(post_id: str, body: InboxReplyIn):
+    text = body.message.strip()
+    if not text:
+        raise HTTPException(400, "اكتب الرد الأول")
+    return {"id": _inbox_call(publisher.inbox_reply_comment, post_id, body.account_id, text, body.comment_id)}
+
+
+@app.get("/api/inbox/conversations")
+def inbox_conversations(cursor: str | None = None):
+    return _inbox_call(publisher.inbox_conversations, 50, cursor)
+
+
+@app.get("/api/inbox/conversations/{conv_id}/messages")
+def inbox_messages(conv_id: str, account_id: str):
+    msgs = _inbox_call(publisher.inbox_messages, conv_id, account_id)
+    threading.Thread(target=publisher.inbox_mark_read, args=(conv_id, account_id), daemon=True).start()
+    return msgs
+
+
+class InboxSendIn(BaseModel):
+    account_id: str
+    message: str
+
+
+@app.post("/api/inbox/conversations/{conv_id}/send")
+def inbox_send(conv_id: str, body: InboxSendIn):
+    text = body.message.strip()
+    if not text:
+        raise HTTPException(400, "اكتب الرسالة الأول")
+    return {"id": _inbox_call(publisher.inbox_send, conv_id, body.account_id, text)}
+
+
+class InboxSuggestIn(BaseModel):
+    kind: str = "comment"           # comment = كومنت، message = رسالة خاصة
+    text: str                       # الكومنت أو آخر رسالة
+    platform: str = ""
+    post: str = ""                  # كابشن البوست اللي عليه الكومنت
+    history: list[dict] = []        # آخر الرسايل في المحادثة: [{"mine": bool, "text": str}]
+    hint: str = ""                  # انت عايز الرد يقول إيه (اختياري)
+    previous: str = ""              # الاقتراح اللي فات (عشان يجيب واحد مختلف)
+
+
+def inbox_reply_prompt(body: InboxSuggestIn, brand: dict) -> list[dict]:
+    b = cz.full_brand(brand)
+    where = "كومنت على بوست" if body.kind == "comment" else "رسالة خاصة (DM)"
+    system = f"""انت مسؤول السوشيال ميديا لبراند {b['name'] or 'العميل'}، وبترد على {where}{f" على {body.platform}" if body.platform else ""}.
+{b['about']}
+الجمهور: {b['audience'] or b.get('market') or '—'}.
+
+قواعد الرد:
+- بنفس لغة ولهجة اللي كتب بالظبط: لو كتب مصري رد مصري، خليجي رد خليجي، فصحى رد فصحى، إنجليزي رد إنجليزي.
+- خاطب الشخص بنوعه لو باين من كلامه أو اسمه (ولد أو بنت)، ولو مش باين استخدم صيغة محايدة.
+- قصير وطبيعي زي إنسان: جملة أو اتنين، وإيموجي واحد بالكتير لو مناسب. من غير هاشتاجات.
+- ودود ومحترم حتى لو الكلام سلبي أو فيه شكوى: اعتذر باختصار واعرض المساعدة.
+- ماتخترعش أسعار ولا مواعيد ولا عروض ولا أي معلومة مش قدامك. لو بيسأل عن تفاصيل مش عندك{" ادعوه يبعت رسالة خاصة" if body.kind == "comment" else " قوله إنك هتبعتله التفاصيل حالًا"}.
+- لو الكومنت سبام أو إعلان، رد بكلمة شكر قصيرة جدًا.
+- اكتب الرد بس، من غير شرح ولا علامات تنصيص.""" + (f"\n- قواعد البراند: {b['rules']}" if b.get("rules") else "")
+    ctx = []
+    if body.post.strip():
+        ctx.append(f"البوست:\n{body.post.strip()[:1500]}")
+    if body.history:
+        lines = [f"{'احنا' if m.get('mine') else 'هو'}: {str(m.get('text') or '').strip()[:400]}" for m in body.history[-10:]]
+        ctx.append("آخر الكلام في المحادثة:\n" + "\n".join(lines))
+    ctx.append(f"{'الكومنت' if body.kind == 'comment' else 'الرسالة'} اللي هنرد عليها:\n{body.text.strip()[:1500]}")
+    if body.hint.strip():
+        ctx.append(f"المطلوب في الرد: {body.hint.strip()[:400]}")
+    if body.previous.strip():
+        ctx.append(f"ده اقتراح قبل كده، اكتب واحد مختلف عنه: {body.previous.strip()[:400]}")
+    return [{"role": "system", "content": system}, {"role": "user", "content": "\n\n".join(ctx)}]
+
+
+@app.post("/api/inbox/suggest")
+def inbox_suggest(body: InboxSuggestIn):
+    if not body.text.strip():
+        raise HTTPException(400, "مفيش كلام نرد عليه")
+    if atlas.mock_mode():
+        return {"reply": "شكرًا جدًا لكلامك الحلو 🙏 لو محتاج أي تفاصيل ابعتلنا رسالة"}
+    reply = llm(inbox_reply_prompt(body, brand_settings()), temperature=0.9 if body.previous else 0.7)
+    return {"reply": reply.strip().strip('"«»').strip()}
+
+
 # ---------------------------------------------------------------- 🔔 الإشعارات
 # حاجات بتحصل في الخلفية وانت مش فاتح صفحتها: تصدير خلص أو فشل، بوست اتنشر أو فشل، أوتوبايلوت خلص أو وقف.
 NOTIFY_KEEP = 200

@@ -34,6 +34,7 @@
   <symbol id="i-slides" viewBox="0 0 24 24"><rect x="7" y="3.5" width="10" height="17" rx="2"/><path d="M4 6v12M20 6v12"/></symbol>
   <symbol id="i-lab" viewBox="0 0 24 24"><path d="M9 3.5h6M10 3.5v5.2L4.6 18.2A1.6 1.6 0 0 0 6 20.5h12a1.6 1.6 0 0 0 1.4-2.3L14 8.7V3.5M7.2 14h9.6"/></symbol>
   <symbol id="i-type" viewBox="0 0 24 24"><path d="M5 6.5V5h14v1.5M12 5v14M9 19h6"/></symbol>
+  <symbol id="i-chat" viewBox="0 0 24 24"><path d="M4.5 6.5a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H10l-4.5 3.5V16.5h1a2 2 0 0 1-2-2z"/><path d="M8.5 9.5h7M8.5 12.5h4.5"/></symbol>
   <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15zM10 20.5a2 2 0 0 0 4 0"/></symbol>
   <symbol id="i-box" viewBox="0 0 24 24"><path d="M4 7.5 12 4l8 3.5v9L12 20l-8-3.5z"/><path d="M4 7.5l8 3.5 8-3.5M12 11v9"/></symbol>
 </svg>
@@ -55,6 +56,7 @@
     <button class="rail-btn studio-only" data-goto="13" title="الدبلجة باللهجات"><svg><use href="#i-globe"/></svg><span>الدبلجة</span></button>
     <a class="rail-btn studio-only" href="/refs.html" title="أرشيف المراجع"><svg><use href="#i-box"/></svg><span>الأرشيف</span></a>
     <span class="rail-sep"></span>
+    <button class="rail-btn" data-goto="15" title="الكومنتات والرسايل"><svg><use href="#i-chat"/></svg><span>الردود</span></button>
     <button class="rail-btn" data-goto="4" title="الشخصيات"><svg><use href="#i-users"/></svg><span>الشخصيات</span></button>
     <button class="rail-btn" data-goto="3" title="التعليق الصوتي"><svg><use href="#i-mic"/></svg><span>التعليق الصوتي</span></button>
     <button class="rail-btn" data-goto="5" title="الموسيقى"><svg><use href="#i-music"/></svg><span>الموسيقى</span></button>
@@ -834,6 +836,7 @@
         <!-- الخطوة 7: فولدر الفيديوهات الجاهزة والنشر -->
         <main class="view" data-view="7" hidden>
           <div class="alert warn" id="publisherAlert" hidden></div>
+          <button class="btn inbox-link" type="button" data-goto="15"><svg><use href="#i-chat"/></svg> الكومنتات والرسايل: رد عليهم من هنا</button>
           <div class="gen-layout">
             <section class="panel">
               <div class="panel-head"><h2>فولدر الفيديوهات الجاهزة <span class="muted" id="readyCount"></span></h2>
@@ -912,6 +915,25 @@
             <ul class="posts published-list" id="publishedList"></ul>
             <p class="empty" id="publishedEmpty">لسه مفيش بوستات اتنشرت.</p>
           </section>
+        </main>
+
+        <!-- 💬 صندوق الردود: الكومنتات والرسايل من الحسابات المربوطة في Zernio -->
+        <main class="view" data-view="15" hidden>
+          <div class="alert warn" id="inboxAlert" hidden></div>
+          <div class="ib-bar">
+            <div class="cal-views" id="ibTabs" role="tablist">
+              <button type="button" data-t="comments" class="on">💬 الكومنتات</button>
+              <button type="button" data-t="messages">✉️ الرسايل</button>
+            </div>
+            <button class="btn sm" type="button" id="ibRefresh">🔄 حدّث</button>
+            <span class="muted ib-note" id="ibNote"></span>
+          </div>
+          <div class="ib-layout">
+            <section class="panel ib-list-panel"><ul class="ib-list" id="ibList"></ul>
+              <button class="btn sm wide" type="button" id="ibMore" hidden>حمّل أكتر</button>
+              <p class="empty" id="ibEmpty" hidden></p></section>
+            <section class="panel ib-thread" id="ibThread"><p class="empty">اختار بوست أو محادثة من القايمة.</p></section>
+          </div>
         </main>
 
         <!-- الإعدادات -->
@@ -1908,6 +1930,7 @@
 <script src="/publish.js"></script>
 <script src="/calendar.js"></script>
 <script src="/notify.js"></script>
+<script src="/inbox.js"></script>
 <script src="/settings.js"></script>
 <script src="/carousel.js"></script>
 <script src="/series.js"></script>

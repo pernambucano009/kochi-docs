@@ -12,6 +12,7 @@
 import mimetypes
 import os
 import time
+import uuid
 from pathlib import Path
 
 import httpx
@@ -300,3 +301,120 @@ def remote_status(remote_id: str) -> tuple[str, str | None]:
     if status in ("failed", "partial", "partially_published"):
         return "failed", "، ".join(errors) or "فشل النشر"
     return "pending", None
+
+
+# ---------------------------------------------------------------- 💬 صندوق الكومنتات والرسايل (Inbox)
+# محتاج إضافة «Inbox» في اشتراك Zernio. الرسايل (DM): إنستجرام، فيسبوك، X وغيرهم، مش تيك توك.
+# قايمة البوستات اللي عليها كومنتات Zernio بيحدّثها كل 10 دقايق بالكتير.
+
+INBOX_ADDON_MSG = "صندوق الردود محتاج إضافة «Inbox» في اشتراك Zernio. فعّلها من لوحة Zernio وارجع هنا"
+
+
+def _inbox_check(resp: httpx.Response, what: str):
+    if resp.status_code == 403 and "inbox" in resp.text.lower():
+        raise PublishError(INBOX_ADDON_MSG)
+    return _check(resp, what)
+
+
+def _failed(meta: dict | None) -> list[str]:
+    """الحسابات اللي Zernio مقدرش يقرا منها (حد أقصى للطلبات أو الربط باظ)."""
+    out = []
+    for f in (meta or {}).get("failedAccounts") or []:
+        out.append(f"{f.get('platform') or ''} {('@' + f['accountUsername']) if f.get('accountUsername') else ''}: {f.get('error') or ''}".strip())
+    return out
+
+
+def inbox_posts(limit: int = 50, cursor: str | None = None) -> dict:
+    """البوستات اللي عليها كومنتات (من كل الحسابات)، الأحدث الأول."""
+    params = {"limit": limit, "minComments": 1, "sortBy": "date", "sortOrder": "desc"}
+    if cursor:
+        params["cursor"] = cursor
+    with _client() as c:
+        data = _inbox_check(c.get(f"{BASE_URL}/inbox/comments", params=params), "قراءة البوستات اللي عليها كومنتات")
+    posts = [{
+        "id": p.get("id"), "platform": p.get("platform"), "account_id": p.get("accountId"),
+        "account": p.get("accountUsername"), "content": p.get("content") or "", "picture": p.get("picture"),
+        "url": p.get("permalink"), "created_at": p.get("createdTime"), "comments": p.get("commentCount") or 0,
+        "likes": p.get("likeCount") or 0,
+    } for p in data.get("data") or []]
+    page = data.get("pagination") or {}
+    return {"posts": posts, "next": page.get("nextCursor") if page.get("hasMore") else None, "failed": _failed(data.get("meta"))}
+
+
+def _comment(x: dict) -> dict:
+    who = x.get("from") or {}
+    return {
+        "id": x.get("id"), "text": x.get("message") or "", "created_at": x.get("createdTime"),
+        "name": who.get("name") or who.get("username") or "", "username": who.get("username"),
+        "picture": who.get("picture"), "mine": bool(who.get("isOwner")), "likes": x.get("likeCount") or 0,
+        "can_reply": x.get("canReply", True), "hidden": bool(x.get("isHidden")), "url": x.get("url"),
+        "replies": [_comment(r) for r in x.get("replies") or []],
+    }
+
+
+def inbox_comments(post_id: str, account_id: str) -> list[dict]:
+    with _client() as c:
+        data = _inbox_check(c.get(f"{BASE_URL}/inbox/comments/{post_id}", params={"accountId": account_id, "limit": 100}),
+                            "قراءة الكومنتات")
+    return [_comment(x) for x in data.get("comments") or []]
+
+
+def inbox_reply_comment(post_id: str, account_id: str, message: str, comment_id: str | None) -> str:
+    body = {"accountId": account_id, "message": message}
+    if comment_id:
+        body["commentId"] = comment_id
+    with _client() as c:
+        # Idempotency-Key: لو الاتصال قطع وجربنا تاني، الرد مايتكررش
+        data = _inbox_check(c.post(f"{BASE_URL}/inbox/comments/{post_id}", json=body,
+                                   headers={"Idempotency-Key": uuid.uuid4().hex}), "إرسال الرد")
+    return ((data or {}).get("data") or {}).get("commentId") or ""
+
+
+def inbox_conversations(limit: int = 50, cursor: str | None = None) -> dict:
+    params = {"limit": limit, "status": "active", "sortOrder": "desc"}
+    if cursor:
+        params["cursor"] = cursor
+    with _client() as c:
+        data = _inbox_check(c.get(f"{BASE_URL}/inbox/conversations", params=params), "قراءة الرسايل")
+    convs = [{
+        "id": x.get("id"), "platform": x.get("platform"), "account_id": x.get("accountId"), "account": x.get("accountUsername"),
+        "name": x.get("participantName") or "", "picture": x.get("participantPicture"), "last": x.get("lastMessage") or "",
+        "updated_at": x.get("updatedTime"), "unread": x.get("unreadCount") or 0, "url": x.get("url"),
+        "request": x.get("folder") == "requests",
+    } for x in data.get("data") or []]
+    page = data.get("pagination") or {}
+    return {"conversations": convs, "next": page.get("nextCursor") if page.get("hasMore") else None, "failed": _failed(data.get("meta"))}
+
+
+def inbox_messages(conversation_id: str, account_id: str) -> list[dict]:
+    with _client() as c:
+        data = _inbox_check(c.get(f"{BASE_URL}/inbox/conversations/{conversation_id}/messages",
+                                  params={"accountId": account_id, "limit": 100, "sortOrder": "asc"}), "قراءة المحادثة")
+    out = []
+    for m in data.get("messages") or []:
+        if m.get("isDeleted"):
+            continue
+        out.append({
+            "id": m.get("id"), "text": m.get("message") or "", "mine": m.get("direction") == "outgoing",
+            "name": m.get("senderName") or "", "created_at": m.get("createdAt"),
+            "attachments": [{"type": a.get("type"), "url": a.get("previewUrl") or a.get("url")} for a in m.get("attachments") or []],
+            "status": m.get("deliveryStatus"),
+        })
+    out.sort(key=lambda m: m["created_at"] or "")
+    return out
+
+
+def inbox_send(conversation_id: str, account_id: str, message: str) -> str:
+    with _client() as c:
+        data = _inbox_check(c.post(f"{BASE_URL}/inbox/conversations/{conversation_id}/messages",
+                                   json={"accountId": account_id, "message": message},
+                                   headers={"Idempotency-Key": uuid.uuid4().hex}), "إرسال الرسالة")
+    return ((data or {}).get("data") or {}).get("messageId") or ""
+
+
+def inbox_mark_read(conversation_id: str, account_id: str) -> None:
+    with _client() as c:
+        try:
+            c.post(f"{BASE_URL}/inbox/conversations/{conversation_id}/read", json={"accountId": account_id})
+        except httpx.HTTPError:
+            pass  # مش مهم لو فشلت
