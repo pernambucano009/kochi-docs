@@ -4111,6 +4111,67 @@ def delete_folder(folder_id: str, delete_video: bool = True):
     return {"ok": True}
 
 
+class FoldersDeleteIn(BaseModel):
+    ids: list[str]
+    exports: bool = False  # كمان الفيديوهات النهائية اللي اتصدّرت (إلا اللي عليها بوست متجدول)
+
+
+def purge_folder(conn: sqlite3.Connection, folder_id: str, exports: bool) -> dict:
+    """يمسح المشروع بكل اللي اتعمل منه: الفيديو الخام والقطع والفيديوهات المولّدة ومشاريع المونتاج
+    (والفيديوهات المتصدّرة لو اخترت). التعليق والشخصية بيفضلوا في مكتباتهم."""
+    f = get_folder(conn, folder_id)
+    kept, files = 0, []
+    vid = f["video_id"]
+    if vid:
+        clip_ids = [r["id"] for r in conn.execute("SELECT id FROM clips WHERE video_id = ?", (vid,))]
+        for cid in clip_ids:
+            for g in conn.execute("SELECT id, output_filename, status FROM generations WHERE clip_id = ?", (cid,)).fetchall():
+                if g["status"] in ACTIVE_STATUSES:
+                    raise HTTPException(400, f"المشروع «{f['name']}» لسه بيتولّد. استنى لما يخلص")
+                if g["output_filename"]:
+                    files.append(GENERATED_DIR / g["output_filename"])
+            conn.execute("DELETE FROM generations WHERE clip_id = ?", (cid,))
+        for p in conn.execute("SELECT id, data, export_id, render_status FROM projects").fetchall():
+            if json.loads(p["data"]).get("video_id") != vid:
+                continue
+            if p["render_status"] == "rendering":
+                raise HTTPException(400, f"المشروع «{f['name']}» بيتصدّر دلوقتي. استنى لما يخلص")
+            if exports and p["export_id"]:
+                e = conn.execute("SELECT filename FROM exports WHERE id = ?", (p["export_id"],)).fetchone()
+                busy = conn.execute("SELECT COUNT(*) FROM posts WHERE export_id = ? AND status IN ('scheduled', 'sending', 'publishing')",
+                                    (p["export_id"],)).fetchone()[0]
+                if e and busy:
+                    kept += 1
+                elif e:
+                    conn.execute("DELETE FROM exports WHERE id = ?", (p["export_id"],))
+                    files.append(EXPORTS_DIR / e["filename"])
+            conn.execute("DELETE FROM projects WHERE id = ?", (p["id"],))
+        remove_video(conn, vid)
+    conn.execute("DELETE FROM folders WHERE id = ?", (folder_id,))
+    return {"files": files, "kept": kept}
+
+
+@app.post("/api/folders/delete")
+def delete_folders(body: FoldersDeleteIn):
+    """مسح كذا مشروع قديم مرة واحدة (عشان المساحة)."""
+    files, kept, done = [], 0, 0
+    with closing(db()) as conn, conn:
+        for fid in dict.fromkeys(body.ids):
+            if not conn.execute("SELECT 1 FROM folders WHERE id = ?", (fid,)).fetchone():
+                continue
+            r = purge_folder(conn, fid, body.exports)
+            files += r["files"]
+            kept += r["kept"]
+            done += 1
+    for p in files:
+        p.unlink(missing_ok=True)
+    with AUTOPILOT_LOCK:   # شغل الأوتوبايلوت بتاع المشاريع اللي اتمسحت بيتشال
+        d = autopilot_load()
+        d["jobs"] = [j for j in d["jobs"] if j["folder_id"] not in body.ids]
+        autopilot_save(d)
+    return {"deleted": done, "kept_exports": kept}
+
+
 app.mount("/media/raw", StaticFiles(directory=RAW_DIR), name="raw")
 app.mount("/media/clips", StaticFiles(directory=CLIPS_DIR), name="clips")
 app.mount("/media/coaches", StaticFiles(directory=COACHES_DIR), name="coaches")

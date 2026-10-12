@@ -334,8 +334,12 @@ $("folderDetail").addEventListener("click", async (e) => {
 
 $("folderDelete").onclick = async () => {
   const f = fol.current;
-  if (!confirm(`حذف المشروع "${f.name}" والفيديو الخام بتاعه؟\nالتعليق الصوتي والشخصية هيفضلوا في مكتباتهم، والفيديوهات اللي اتصدّرت هتفضل في فولدر الجاهز.`)) return;
-  await api(`/api/folders/${f.id}`, { method: "DELETE" });
+  if (!confirm(`حذف المشروع "${f.name}" والفيديو الخام والقطع والفيديوهات المولّدة ومونتاجه؟\nالتعليق الصوتي والشخصية هيفضلوا في مكتباتهم، والفيديوهات اللي اتصدّرت هتفضل في فولدر الجاهز.`)) return;
+  try {
+    await api("/api/folders/delete", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: [f.id] }) });
+  } catch (err) {
+    return toast(err.message, true);
+  }
   fol.current = null;
   await loadFolders();
 };
@@ -752,3 +756,49 @@ async function openAutopilot() {
   }, 6000);
 }
 $("autopilotOpen").onclick = () => openAutopilot().catch((err) => toast(err.message, true));
+
+
+// ---------- 🗑️ مسح مشاريع قديمة (كذا مشروع مرة واحدة) ----------
+async function openFoldersPurge() {
+  await loadFolders();
+  const dlg = document.createElement("dialog");
+  dlg.className = "bulk-dlg ap-dlg";
+  const age = (f) => Math.floor((Date.now() - new Date(f.created_at)) / 864e5);
+  const list = [...fol.list].sort((a, b) => (a.created_at || "").localeCompare(b.created_at || ""));
+  dlg.innerHTML = `<div class="panel-head"><h2>🗑️ امسح مشاريع قديمة</h2><button class="btn sm" data-x>قفل</button></div>
+    <p class="hint">بيتمسح المشروع والفيديو الخام والقطع والفيديوهات المولّدة ومشروع المونتاج بتاعه. التعليق الصوتي والشخصيات بيفضلوا في مكتباتهم.</p>
+    <div class="row wrap"><button class="btn sm" data-old="30">اختار الأقدم من شهر</button><button class="btn sm" data-old="7">الأقدم من أسبوع</button>
+      <button class="btn sm" data-old="0">اختار الكل</button><button class="btn sm" data-none>شيل الاختيار</button></div>
+    <ul class="ap-list gap-top">${list.map((f) => `<li><input type="checkbox" data-pick="${f.id}">
+      <span class="grow">📁 ${escapeHtml(f.name)} <small class="muted">· ${age(f) ? `من ${age(f)} يوم` : "النهارده"}${f.exported ? " · 🎬 اتصدّر" : ""}</small></span></li>`).join("") || '<li class="off">مفيش مشاريع</li>'}</ul>
+    <label class="check gap-top"><input type="checkbox" data-exp> امسح كمان الفيديوهات النهائية اللي اتصدّرت <span class="muted">(اللي عليها بوست متجدول بتفضل)</span></label>
+    <div class="row gap-top"><span class="muted" data-count></span><span class="spacer"></span><button class="btn danger" data-go>🗑️ امسح المختار</button></div>`;
+  const count = () => { dlg.querySelector("[data-count]").textContent = `${dlg.querySelectorAll("[data-pick]:checked").length} مختار`; };
+  dlg.addEventListener("change", count);
+  dlg.addEventListener("click", async (e) => {
+    const t = e.target;
+    if (t.closest("[data-x]")) return dlg.close();
+    const old = t.closest("[data-old]");
+    if (old) { const d = Number(old.dataset.old); list.forEach((f) => { dlg.querySelector(`[data-pick="${f.id}"]`).checked = age(f) >= d; }); return count(); }
+    if (t.closest("[data-none]")) { dlg.querySelectorAll("[data-pick]").forEach((x) => (x.checked = false)); return count(); }
+    if (t.closest("[data-go]")) {
+      const ids = [...dlg.querySelectorAll("[data-pick]:checked")].map((x) => x.dataset.pick);
+      if (!ids.length) return toast("اختار مشروع واحد على الأقل", true);
+      const exports = dlg.querySelector("[data-exp]").checked;
+      if (!confirm(`هيتمسح ${ids.length} مشروع${exports ? " ومعاهم الفيديوهات النهائية" : ""} ومش هينفع ترجّعهم. متأكد؟`)) return;
+      try {
+        const r = await api("/api/folders/delete", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids, exports }) });
+        toast(`🗑️ اتمسح ${r.deleted} مشروع${r.kept_exports ? ` (${r.kept_exports} فيديو فضل عشان عليه بوست متجدول)` : ""}`);
+        if (ids.includes(fol.current?.id)) fol.current = null;
+        dlg.close();
+      } catch (err) {
+        toast(err.message, true);
+      }
+    }
+  });
+  dlg.addEventListener("close", () => { dlg.remove(); loadFolders(); });
+  document.body.appendChild(dlg);
+  count();
+  dlg.showModal();
+}
+$("foldersPurgeOpen").onclick = () => openFoldersPurge().catch((err) => toast(err.message, true));
