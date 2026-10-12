@@ -3,7 +3,14 @@
 
 // برنامجين على نفس السيرفر: ستوديومانيا (/) وكوتشي (/kochi) — كوتشي فيه المشاريع (فيديو خام ← … ← نشر) بس
 const APP = /^\/kochi\/?$/.test(location.pathname) ? "kochi" : "studio";
-if (APP === "kochi") document.title = "Kochi Studio";
+if (APP === "kochi") {
+  document.title = "Kochi Studio";
+  document.documentElement.classList.add("app-kochi");   // بيخفي أقسام ستوديومانيا (.studio-only) من الرئيسية القديمة
+}
+document.addEventListener("DOMContentLoaded", () => {
+  const w = document.querySelector("#home .wordmark");
+  if (APP === "kochi" && w) w.innerHTML = "<b>Kochi</b><span>Studio</span>";
+});
 const PROCESS = ["0", "1", "2", "6", "7"]; // المشاريع ← التقطيع ← التوليد ← المونتاج ← النشر
 const STEP_INFO = {
   0: { num: "01", title: "المشاريع" },

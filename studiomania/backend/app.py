@@ -58,6 +58,7 @@ load_env_file(ROOT / ".env")
 import atlas  # noqa: E402  (لازم بعد قراءة .env)
 import captions  # noqa: E402
 import montage  # noqa: E402
+import kochi_layout  # noqa: E402  (ترتيب مونتاج كوتشي التلقائي)
 import lab  # noqa: E402  (معمل التفكيك)
 import audioshake  # noqa: E402  (فصل الكلام / الموسيقى / المؤثرات)
 import publisher  # noqa: E402
@@ -2362,6 +2363,74 @@ def delete_project(project_id: str):
     return {"ok": True}
 
 
+# ---------------------------------------------------------------- ترتيب مونتاج كوتشي التلقائي
+
+DEFAULT_MUSIC_NAME = "beat"
+
+
+def kochi_auto_montage(conn: sqlite3.Connection, data: dict, fps: int = 30) -> dict:
+    """بيرتّب مشروع مونتاج كوتشي: الأوترو صوته مقفول، والتعليق بيتقطع جمل ويتوزع على الفيديو،
+    والموسيقى بتبدأ بعد أول جملة بفريمين وبتوطى لـ 20% وقت الكلام. بيرجع تقرير صغير."""
+    coach_id = data.get("coach_id")
+    clips = [c for c in data.get("clips") or [] if not str(c.get("gen_id", "")).startswith(OUTRO_PREFIX)]
+    if coach_id and conn.execute("SELECT 1 FROM coaches WHERE id = ? AND outro_filename IS NOT NULL", (coach_id,)).fetchone():
+        clips.append({"gen_id": f"{OUTRO_PREFIX}{coach_id}", "start": 0, "end": None, "zoom": 1, "x": 0, "y": 0, "volume": 0})
+    for c in clips:
+        if str(c["gen_id"]).startswith(ANY_OUTRO):
+            c["volume"] = 0   # الأوترو دايمًا صوته مقفول
+    data["clips"], data["outro"], data["outro_volume"] = clips, False, 0
+
+    video_end, outro_start, t = 0.0, None, 0.0
+    for c in clips:
+        path = clip_source(conn, c["gen_id"])
+        if path is None:
+            continue
+        dur = media_info(path).duration
+        ln = max(0.0, clamp(c["end"] if c.get("end") is not None else dur, 0, dur) - clamp(c.get("start") or 0, 0, dur))
+        ln /= clamp(float(c.get("speed") or 1), 0.25, 4)
+        if str(c["gen_id"]).startswith(ANY_OUTRO):
+            outro_start = t if outro_start is None else outro_start
+        else:
+            video_end = t + ln
+        t += ln
+    total = t
+    if data.get("brand_outro", True) and (p := brand_video("outro")):
+        total += media_info(p).duration
+
+    report = {"sentences": 0, "overflow": 0.0, "music": False}
+    voice = data.get("voice") or {}
+    vrow = conn.execute("SELECT filename, duration FROM audio WHERE id = ? AND kind = 'voice'", (voice.get("id"),)).fetchone() if voice.get("id") else None
+    mid = (data.get("music") or {}).get("id")
+    mrow = conn.execute("SELECT id, filename, duration FROM audio WHERE id = ? AND kind = 'music'", (mid,)).fetchone() if mid else None
+    if mrow is None:
+        mrow = next((r for r in conn.execute("SELECT id, filename, duration, name FROM audio WHERE kind = 'music' ORDER BY created_at DESC")
+                     if DEFAULT_MUSIC_NAME in (r["name"] or "").lower()), None)
+    if vrow is None or video_end <= 0:
+        return report
+    vpath = AUDIO_DIR / vrow["filename"]
+    sents = kochi_layout.speech_segments(ffmpeg_exe(), vpath, vrow["duration"])
+    sents = kochi_layout.padded(sents, vrow["duration"])
+    lay = kochi_layout.layout(sents, video_end, outro_start, mrow["duration"] if mrow else None, total, fps)
+    data["voice"] = {"id": voice["id"], "volume": 1, "delay": 0, "offset": 0, "length": None, "fade_out": False, "parts": lay["voice"]}
+    if mrow and lay["music"]:
+        data["music"] = {"id": mrow["id"], "volume": kochi_layout.MUSIC_GAP_VOL, "delay": lay["music"][0]["delay"], "offset": 0,
+                         "length": None, "fade_out": True, "parts": lay["music"]}
+        report["music"] = True
+    data["mix"] = {**(data.get("mix") or {}), "duck": 0}   # التوطية متعملة في قطع الموسيقى نفسها
+    data["kochi_auto"] = True
+    report.update(sentences=lay["sentences"], overflow=lay["overflow"])
+    return report
+
+
+@app.post("/api/projects/{project_id}/kochi-layout")
+def kochi_layout_project(project_id: str):
+    with closing(db()) as conn, conn:
+        data = json.loads(get_project(conn, project_id)["data"])
+        report = kochi_auto_montage(conn, data, export_settings(data)[2])
+        conn.execute("UPDATE projects SET data = ?, updated_at = ? WHERE id = ?", (json.dumps(data), now(), project_id))
+        return {"project": project_to_dict(get_project(conn, project_id)), "report": report}
+
+
 def clamp(v: float, lo: float, hi: float) -> float:
     return max(lo, min(hi, v))
 
@@ -3517,6 +3586,239 @@ with closing(db()) as _conn, _conn:
         "WHERE status IN ('sending', 'publishing')"
     )
 threading.Thread(target=scheduler_loop, daemon=True).start()
+
+
+# ---------------------------------------------------------------- 🤖 أوتوبايلوت كوتشي
+# كل مشروع (فيديو خام + تعليق + شخصية) بيمشي لوحده: تقطيع (قطع أقل من 15 ثانية) ← توليد ← مونتاج كوتشي
+# التلقائي ← تصدير ← جدولة في أول ميعاد فاضي من مواعيد اليوم التلاتة.
+
+AUTOPILOT_FILE = DATA_DIR / "autopilot.json"
+AUTOPILOT_DEFAULTS = {"slots": ["12:00", "18:00", "21:00"], "tz_offset": 3, "platforms": ["instagram", "tiktok"], "prompt_id": None}
+AUTOPILOT_STEPS = ("queued", "cutting", "generating", "montage", "rendering", "scheduling", "done", "failed", "stopped")
+AUTOPILOT_LOCK = threading.Lock()
+
+
+def autopilot_load() -> dict:
+    try:
+        d = json.loads(AUTOPILOT_FILE.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        d = {}
+    return {"settings": {**AUTOPILOT_DEFAULTS, **(d.get("settings") or {})}, "jobs": d.get("jobs") or []}
+
+
+def autopilot_save(d: dict) -> None:
+    AUTOPILOT_FILE.write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+
+
+def autopilot_update(job_id: str, **fields) -> None:
+    with AUTOPILOT_LOCK:
+        d = autopilot_load()
+        for j in d["jobs"]:
+            if j["id"] == job_id:
+                j.update(fields, updated_at=now())
+        autopilot_save(d)
+
+
+def autopilot_cut(conn: sqlite3.Connection, video_id: str) -> None:
+    v = get_video(conn, video_id)
+    src = RAW_DIR / v["filename"]
+    try:
+        scenes = [s["start"] for s in lab.detect_shots(ffmpeg_exe(), src, v["duration"])][1:]
+    except Exception:  # noqa: BLE001
+        scenes = []
+    cuts = kochi_layout.auto_cuts(v["duration"], scenes, MAX_CLIP_SECONDS - 0.5, MIN_REFERENCE_SECONDS)
+    conn.execute("UPDATE videos SET cuts = ?, skipped = '[]' WHERE id = ?", (json.dumps(cuts), video_id))
+    conn.commit()
+
+
+def autopilot_slot(settings: dict, taken: set[str]) -> datetime:
+    """أول ميعاد فاضي (من مواعيد اليوم) بعد ساعة من دلوقتي. المواعيد بتوقيت السعودية، والراجع UTC."""
+    tz = timezone(timedelta(hours=float(settings.get("tz_offset") or 0)))
+    slots = sorted(settings.get("slots") or AUTOPILOT_DEFAULTS["slots"])
+    soon = datetime.now(tz) + timedelta(hours=1)
+    for day in range(0, 120):
+        base = (soon + timedelta(days=day)).date()
+        for sl in slots:
+            h, m = (int(x) for x in sl.split(":"))
+            at = datetime(base.year, base.month, base.day, h, m, tzinfo=tz)
+            key = at.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M")
+            if at >= soon and key not in taken:
+                return at.astimezone(timezone.utc)
+    raise RuntimeError("مفيش ميعاد فاضي في الـ 4 شهور الجايين")
+
+
+class _FakeRequest:   # start_render محتاج بورت السيرفر (للتايبوجرافي)
+    scope = {"server": ("127.0.0.1", int(os.environ.get("PORT") or 8000))}
+
+
+def autopilot_step(job: dict, settings: dict) -> None:
+    jid, step = job["id"], job["step"]
+    with closing(db()) as conn:
+        f = conn.execute("SELECT * FROM folders WHERE id = ?", (job["folder_id"],)).fetchone()
+        if f is None:
+            return autopilot_update(jid, step="failed", error="المشروع اتمسح")
+        if not (f["video_id"] and f["voice_id"] and f["coach_id"]):
+            return autopilot_update(jid, step="failed", error="المشروع ناقص: لازم فيديو خام وتعليق صوتي وشخصية")
+        vid = f["video_id"]
+        clips = conn.execute("SELECT id, start, end FROM clips WHERE video_id = ? ORDER BY idx", (vid,)).fetchall()
+
+        if step in ("queued", "cutting"):
+            if not clips:
+                autopilot_update(jid, step="cutting", note="بيقطّع")
+                autopilot_cut(conn, vid)
+                split_video(vid)
+            return autopilot_update(jid, step="generating", note="بيولّد")
+
+        if step == "generating":
+            states = []
+            for c in clips:
+                gens = conn.execute("SELECT status FROM generations WHERE clip_id = ? AND coach_id = ? ORDER BY created_at DESC",
+                                    (c["id"], f["coach_id"])).fetchall()
+                states.append(gens[0]["status"] if gens else None)
+            todo = [c["id"] for c, st in zip(clips, states) if st is None]
+            if todo:
+                prompt = settings.get("prompt_id") or (conn.execute("SELECT id FROM prompts ORDER BY is_default DESC, created_at DESC").fetchone() or {"id": None})["id"]
+                if not prompt:
+                    return autopilot_update(jid, step="failed", error="مفيش برومت توليد. ضيف واحد من صفحة التوليد")
+                create_generations(GenerationIn(clip_ids=todo, coach_id=f["coach_id"], prompt_id=prompt))
+                return autopilot_update(jid, note=f"بيولّد {len(clips)} قطعة")
+            failed = sum(1 for st in states if st == "failed")
+            if failed:
+                return autopilot_update(jid, step="failed", error=f"{failed} قطعة فشلت في التوليد. أعد توليدها من صفحة التوليد وشغّل الأوتوبايلوت تاني")
+            done = sum(1 for st in states if st == "completed")
+            if done < len(clips):
+                return autopilot_update(jid, note=f"بيولّد: {done} / {len(clips)}")
+            return autopilot_update(jid, step="montage", note="بيعمل المونتاج")
+
+        if step == "montage":
+            draft = montage_draft(vid, f["coach_id"])
+            if draft["missing"]:
+                return autopilot_update(jid, step="generating")
+            music = next((r for r in conn.execute("SELECT id, name FROM audio WHERE kind = 'music' ORDER BY created_at DESC")
+                          if DEFAULT_MUSIC_NAME in (r["name"] or "").lower()), None)
+            body = ProjectIn(name=f["name"], video_id=vid, coach_id=f["coach_id"],
+                             clips=[{"gen_id": g, "start": 0, "end": None, "zoom": 1, "x": 0, "y": 0, "volume": 1} for g in draft["gen_ids"]],
+                             voice={"id": f["voice_id"], "volume": 1, "delay": 0, "offset": 0, "length": None, "fade_out": False},
+                             music={"id": music["id"], "volume": 1, "delay": 0, "offset": 0, "length": None, "fade_out": True} if music else None)
+            pid = create_project(body)["id"]
+            with closing(db()) as c2, c2:
+                data = json.loads(get_project(c2, pid)["data"])
+                kochi_auto_montage(c2, data, export_settings(data)[2])
+                c2.execute("UPDATE projects SET data = ?, updated_at = ? WHERE id = ?", (json.dumps(data), now(), pid))
+            return autopilot_update(jid, step="rendering", project_id=pid, note="بيصدّر")
+
+        if step == "rendering":
+            row = get_project(conn, job["project_id"])
+            if row["render_status"] == "done" and row["export_id"]:
+                return autopilot_update(jid, step="scheduling", export_id=row["export_id"], note="بيجدول")
+            if row["render_status"] == "failed":
+                return autopilot_update(jid, step="failed", error=f"التصدير فشل: {row['render_error'] or ''}"[:300])
+            if row["render_status"] != "rendering":
+                with closing(db()) as c2, c2:
+                    start_render(c2, row, job["project_id"], json.loads(row["data"]), _FakeRequest())
+            return
+
+        if step == "scheduling":
+            ex = conn.execute("SELECT * FROM exports WHERE id = ?", (job["export_id"],)).fetchone()
+            coach = conn.execute("SELECT instagram FROM coaches WHERE id = ?", (f["coach_id"],)).fetchone()
+            taken = {str(r["scheduled_at"])[:16] for r in conn.execute(
+                "SELECT scheduled_at FROM posts WHERE status IN ('scheduled', 'sending', 'publishing', 'published')")}
+    if step == "scheduling":
+        when = autopilot_slot(settings, taken)
+        client = active_client() or {}
+        hook = (f["script"] or "").strip().split("\n")[0].strip()
+        tpl = (client.get("caption") or "").strip() or ("{caption}\n\n{cta}\n{link}" if client.get("cta") or client.get("link") else "{caption}")
+        caption = re.sub(r"\n{3,}", "\n\n", tpl.replace("{caption}", hook).replace("{cta}", client.get("cta") or "").replace("{link}", client.get("link") or "")).strip()
+        ig = coach["instagram"] if coach and coach["instagram"] else None
+        post = create_post(PostIn(export_id=job["export_id"], caption=caption, platforms=settings.get("platforms") or ["instagram"],
+                                  scheduled_at=when, options=PostOptions(ig_tags=[ig] if ig else [], ig_collab=bool(ig),
+                                                                         cover_ms=max(0, int((ex["duration"] - 2) * 1000)))))
+        return autopilot_update(jid, step="done", post_id=post["id"], scheduled_at=when.isoformat(), note="اتجدول")
+
+
+def autopilot_loop() -> None:
+    while True:
+        time.sleep(15)
+        try:
+            d = autopilot_load()
+            for job in d["jobs"]:
+                if job["step"] in ("done", "failed", "stopped"):
+                    continue
+                try:
+                    autopilot_step(job, d["settings"])
+                except HTTPException as exc:
+                    autopilot_update(job["id"], step="failed", error=str(exc.detail)[:300])
+                except Exception as exc:  # noqa: BLE001
+                    autopilot_update(job["id"], step="failed", error=str(exc)[:300])
+                    log_render(f"autopilot {job['id']}: {exc}")
+        except Exception:  # noqa: BLE001
+            pass
+
+
+threading.Thread(target=autopilot_loop, daemon=True).start()
+
+
+@app.get("/api/autopilot")
+def autopilot_state():
+    d = autopilot_load()
+    with closing(db()) as conn:
+        names = {r["id"]: r["name"] for r in conn.execute("SELECT id, name FROM folders")}
+    for j in d["jobs"]:
+        j["name"] = names.get(j["folder_id"], "—")
+    return d
+
+
+class AutopilotIn(BaseModel):
+    folder_ids: list[str]
+
+
+@app.post("/api/autopilot")
+def autopilot_start(body: AutopilotIn):
+    with AUTOPILOT_LOCK:
+        d = autopilot_load()
+        running = {j["folder_id"] for j in d["jobs"] if j["step"] not in ("done", "failed", "stopped")}
+        for fid in body.folder_ids:
+            if fid in running:
+                continue
+            d["jobs"] = [j for j in d["jobs"] if j["folder_id"] != fid]
+            d["jobs"].append({"id": uuid.uuid4().hex[:10], "folder_id": fid, "step": "queued", "note": "في الطابور",
+                              "error": None, "created_at": now(), "updated_at": now()})
+        autopilot_save(d)
+    return autopilot_state()
+
+
+@app.put("/api/autopilot/settings")
+def autopilot_settings(body: dict):
+    s = {}
+    slots = [str(x) for x in body.get("slots") or [] if re.fullmatch(r"([01]?\d|2[0-3]):[0-5]\d", str(x))]
+    if slots:
+        s["slots"] = sorted({f"{int(x.split(':')[0]):02d}:{x.split(':')[1]}" for x in slots})
+    if isinstance(body.get("platforms"), list):
+        s["platforms"] = [p for p in body["platforms"] if p in publisher.PLATFORMS]
+    if "prompt_id" in body:
+        s["prompt_id"] = body["prompt_id"] or None
+    if "tz_offset" in body:
+        s["tz_offset"] = clamp(float(body["tz_offset"] or 0), -12, 14)
+    with AUTOPILOT_LOCK:
+        d = autopilot_load()
+        d["settings"] = {**d["settings"], **s}
+        autopilot_save(d)
+    return autopilot_state()
+
+
+@app.post("/api/autopilot/{job_id}/stop")
+def autopilot_stop(job_id: str):
+    autopilot_update(job_id, step="stopped", note="اتوقف")
+    return autopilot_state()
+
+
+@app.delete("/api/autopilot/{job_id}")
+def autopilot_remove(job_id: str):
+    with AUTOPILOT_LOCK:
+        d = autopilot_load()
+        d["jobs"] = [j for j in d["jobs"] if j["id"] != job_id]
+        autopilot_save(d)
+    return autopilot_state()
 
 
 # ---------------------------------------------------------------- الكابشن واللوجو

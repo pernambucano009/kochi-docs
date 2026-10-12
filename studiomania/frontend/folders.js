@@ -663,3 +663,92 @@ $("fupUpload").onclick = async () => {
     toast(`✅ اترفع ${rows.length} مشروع`);
   }
 };
+
+
+// ---------- 🤖 أوتوبايلوت: كذا مشروع بيتجهزوا لوحدهم (تقطيع ← توليد ← مونتاج ← تصدير ← جدولة) ----------
+const AP_STEPS = { queued: "⏳ في الطابور", cutting: "✂️ بيقطّع", generating: "✨ بيولّد", montage: "🎞️ مونتاج", rendering: "🎬 بيصدّر",
+  scheduling: "📅 بيجدول", done: "✅ اتجدول", failed: "⚠️ وقف", stopped: "⏹ اتوقف" };
+const AP_PLATFORMS = [["instagram", "إنستجرام"], ["tiktok", "تيك توك"], ["youtube", "يوتيوب شورتس"], ["facebook", "فيسبوك"], ["x", "X"]];
+const apFmt = (iso) => new Date(iso).toLocaleString("ar-EG", { weekday: "long", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
+
+async function openAutopilot() {
+  const dlg = document.createElement("dialog");
+  dlg.className = "bulk-dlg ap-dlg";
+  document.body.appendChild(dlg);
+  let st = await api("/api/autopilot"), prompts = await api("/api/prompts").catch(() => []), timer = null;
+  await loadFolders();
+  const ready = (f) => f.video && f.voice && f.coach;
+  const busy = () => new Set(st.jobs.filter((j) => !["done", "failed", "stopped"].includes(j.step)).map((j) => j.folder_id));
+  const draw = () => {
+    const s = st.settings, b = busy();
+    const picked = new Set([...dlg.querySelectorAll("[data-pick]:checked")].map((x) => x.dataset.pick));
+    dlg.innerHTML = `<div class="panel-head"><h2>🤖 أوتوبايلوت</h2><button class="btn sm" data-x>قفل</button></div>
+      <p class="hint">كل مشروع بيتقطّع لقطع أقل من 15 ثانية، ويتولّد، ويتعمله مونتاج كوتشي (الهوك في الأول، والموسيقى بتوطى وقت الكلام، والأوترو صامت)، ويتصدّر، ويتجدول في أول ميعاد فاضي (3 بوستات في اليوم) بكولاب مع المدرب والغلاف قبل الآخر بثانيتين.<br>⚠️ التوليد بيصرف من رصيد Atlas.</p>
+      <div class="ap-grid">
+        <div>
+          <h3>مواعيد النشر كل يوم (بتوقيت السعودية)</h3>
+          <div class="ap-slots">${[0, 1, 2].map((i) => `<input type="time" data-slot="${i}" value="${(s.slots || [])[i] || ""}">`).join("")}</div>
+          <h3>المنصات</h3>
+          <div class="row wrap">${AP_PLATFORMS.map(([k, n]) => `<label class="check"><input type="checkbox" data-plat="${k}" ${(s.platforms || []).includes(k) ? "checked" : ""}> ${n}</label>`).join("")}</div>
+          <h3>برومت التوليد</h3>
+          <select data-prompt><option value="">الأساسي (${escapeHtml(prompts[0]?.name || "—")})</option>${prompts.map((p) => `<option value="${p.id}" ${s.prompt_id === p.id ? "selected" : ""}>${escapeHtml(p.name)}</option>`).join("")}</select>
+          <h3>المشاريع الجاهزة <span class="muted">(فيديو + تعليق + شخصية)</span></h3>
+          <ul class="ap-list">${fol.list.map((f) => {
+            const ok = ready(f), on = b.has(f.id);
+            return `<li class="${ok && !on ? "" : "off"}"><input type="checkbox" data-pick="${f.id}" ${ok && !on ? "" : "disabled"} ${picked.has(f.id) ? "checked" : ""}>
+              <span class="grow">📁 ${escapeHtml(f.name)}${f.exported ? ' <span class="muted">· اتصدّر قبل كده</span>' : ""}</span>
+              <span class="muted">${on ? "شغّال" : ok ? "" : "ناقص"}</span></li>`;
+          }).join("") || '<li class="off">مفيش مشاريع</li>'}</ul>
+          <div class="row gap-top"><button class="btn sm" data-all>اختار كل الجاهز</button><span class="spacer"></span><button class="btn primary" data-go>🚀 شغّل الأوتوبايلوت</button></div>
+        </div>
+        <div>
+          <h3>الشغل</h3>
+          <ul class="ap-list">${[...st.jobs].reverse().map((j) => `<li>
+            <span class="grow"><b>${escapeHtml(j.name)}</b><br><small class="muted">${escapeHtml(j.step === "done" && j.scheduled_at ? `📅 ${apFmt(j.scheduled_at)}` : j.note || "")}</small>
+              ${j.error ? `<br><span class="ap-err">${escapeHtml(j.error)}</span>` : ""}</span>
+            <span class="ap-step ${j.step}">${AP_STEPS[j.step] || j.step}</span>
+            ${["done", "failed", "stopped"].includes(j.step) ? `<button class="btn sm" data-del="${j.id}" title="شيله من القايمة">✕</button>` : `<button class="btn sm" data-stop="${j.id}">⏹</button>`}
+          </li>`).join("") || '<li class="off">لسه مفيش شغل</li>'}</ul>
+        </div>
+      </div>`;
+  };
+  const saveSettings = async () => {
+    const slots = [...dlg.querySelectorAll("[data-slot]")].map((x) => x.value).filter(Boolean);
+    const platforms = [...dlg.querySelectorAll("[data-plat]:checked")].map((x) => x.dataset.plat);
+    st = await api("/api/autopilot/settings", { method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ slots, platforms, prompt_id: dlg.querySelector("[data-prompt]").value || null }) });
+  };
+  dlg.addEventListener("change", (e) => { if (e.target.closest("[data-slot],[data-plat],[data-prompt]")) saveSettings().catch((err) => toast(err.message, true)); });
+  dlg.addEventListener("click", async (e) => {
+    const t = e.target;
+    try {
+      if (t.closest("[data-x]")) return dlg.close();
+      if (t.closest("[data-all]")) return dlg.querySelectorAll("[data-pick]:not(:disabled)").forEach((x) => (x.checked = true));
+      if (t.closest("[data-go]")) {
+        const ids = [...dlg.querySelectorAll("[data-pick]:checked")].map((x) => x.dataset.pick);
+        if (!ids.length) return toast("اختار مشروع واحد على الأقل", true);
+        if (!st.settings.platforms?.length) return toast("اختار منصة واحدة على الأقل", true);
+        if (!confirm(`هيتولّد ويتنشر ${ids.length} مشروع لوحدهم، والتوليد بيصرف من رصيد Atlas. نكمّل؟`)) return;
+        await saveSettings();
+        st = await api("/api/autopilot", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ folder_ids: ids }) });
+        dlg.querySelectorAll("[data-pick]").forEach((x) => (x.checked = false));
+        toast(`🤖 ${ids.length} مشروع دخلوا الطابور`);
+        return draw();
+      }
+      const stop = t.closest("[data-stop]"), del = t.closest("[data-del]");
+      if (stop) { st = await api(`/api/autopilot/${stop.dataset.stop}/stop`, { method: "POST" }); draw(); }
+      if (del) { st = await api(`/api/autopilot/${del.dataset.del}`, { method: "DELETE" }); draw(); }
+    } catch (err) {
+      toast(err.message, true);
+    }
+  });
+  dlg.addEventListener("close", () => { clearInterval(timer); dlg.remove(); loadFolders(); });
+  draw();
+  dlg.showModal();
+  timer = setInterval(async () => {
+    if (dlg.querySelector("input:focus,select:focus")) return;
+    st = await api("/api/autopilot").catch(() => st);
+    draw();
+  }, 6000);
+}
+$("autopilotOpen").onclick = () => openAutopilot().catch((err) => toast(err.message, true));

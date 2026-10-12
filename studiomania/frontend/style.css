@@ -2126,3 +2126,22 @@ a.btn.disabled { opacity: .45; pointer-events: none; }
 .brain-vids { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
 .brain-vid-box video { width: 100%; max-height: 300px; border-radius: 10px; background: #000; }
 .field.inline { display: inline-flex; align-items: center; gap: 6px; margin: 0; }
+
+/* كوتشي: المشاريع ومكتباتها بس */
+.app-kochi .studio-only { display: none !important; }
+
+/* 🤖 أوتوبايلوت كوتشي */
+.ap-open { margin-bottom: 8px; }
+.ap-dlg .ap-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 760px) { .ap-dlg .ap-grid { grid-template-columns: 1fr; } }
+.ap-dlg h3 { margin: 8px 0 6px; font-size: 14px; }
+.ap-dlg .ap-slots { display: flex; gap: 8px; flex-wrap: wrap; }
+.ap-dlg .ap-slots input { width: 110px; }
+.ap-dlg .ap-list { list-style: none; margin: 0; padding: 0; max-height: 40vh; overflow: auto; display: grid; gap: 6px; }
+.ap-dlg .ap-list li { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; }
+.ap-dlg .ap-list li.off { opacity: .55; }
+.ap-dlg .ap-list .grow { flex: 1; min-width: 0; }
+.ap-dlg .ap-step { font-size: 12px; padding: 2px 8px; border-radius: 99px; background: var(--line); white-space: nowrap; }
+.ap-dlg .ap-step.done { background: rgba(47,143,107,.18); }
+.ap-dlg .ap-step.failed { background: rgba(232,64,47,.18); }
+.ap-dlg .ap-err { color: #e8402f; font-size: 12px; }

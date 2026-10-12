@@ -160,11 +160,13 @@ function renderPostVideo() {
     v.dataset.src = ex.url;
     v.src = ex.url;
     $("coverRange").max = Math.round(ex.duration * 1000);
-    if (!pub.editing) { $("coverOn").checked = false; setCover(0); }
+    // الغلاف دايمًا قبل آخر فريم بثانيتين (تقدر تغيّره)
+    if (!pub.editing) { $("coverOn").checked = true; setCover(coverDefaultMs(ex.duration)); }
   }
   renderPostExtras();
 }
 
+const coverDefaultMs = (dur) => Math.max(0, Math.round((dur - 2) * 1000));
 // ---------- إنستجرام: التاج والكولاب · والغلاف لإنستجرام وتيك توك ----------
 function renderPostExtras() {
   const pl = checkedPlatforms();
@@ -263,9 +265,12 @@ function resetPostForm() {
   $("postCaption").value = "";
   pub.tagsTouched = false;
   $("igCollab").checked = false;
-  $("coverOn").checked = false;
   setWhen(nextSlot());
   renderPostVideo();
+  const ex = pub.exports.find((x) => x.id === pub.videoId);
+  $("coverOn").checked = !!ex;
+  if (ex) setCover(coverDefaultMs(ex.duration));
+  renderPostExtras();
 }
 $("postCancel").onclick = resetPostForm;
 

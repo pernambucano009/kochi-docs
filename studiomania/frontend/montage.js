@@ -2906,11 +2906,12 @@ $("newProject").onclick = async () => {
     };
     reportDraft(draft);
   }
-  const p = await api("/api/projects", {
+  let p = await api("/api/projects", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ ...data, section: mt.section || "coach" }),
   });
+  if (APP === "kochi" && data.voice) Object.assign(p, await kochiLayout(p.id, true).catch(() => p));
   mt.projects.unshift(p);
   openProject(p);
   $("projectName").select();
@@ -2960,6 +2961,7 @@ async function openMontageForVideo(videoId) {
       voice: draft.voice ? { id: draft.voice.id, volume: 1, delay: 0, offset: 0, length: null, fade_out: false } : null,
     };
     p = await api("/api/projects", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
+    if (APP === "kochi" && data.voice) p = await kochiLayout(p.id, true).catch(() => p);   // كوتشي: الترتيب التلقائي من أول مرة
     mt.handoff = { draft };
   }
   if (mt.project) await saveProject();
@@ -2967,6 +2969,31 @@ async function openMontageForVideo(videoId) {
   mt.project = null;
   showStep("6");
 }
+// ✨ ترتيب كوتشي: السيرفر بيقطّع التعليق جمل ويوزّعها ويقطّع الموسيقى عليها (kochi_layout.py)
+async function kochiLayout(projectId, quiet = false) {
+  const r = await api(`/api/projects/${projectId}/kochi-layout`, { method: "POST" });
+  if (!quiet) {
+    const s = r.report;
+    toast(!s.sentences ? "مفيش تعليق صوتي في المشروع ده" : `✨ اترتّب: ${s.sentences} جملة${s.music ? " والموسيقى متقطّعة عليها" : ""}${s.overflow ? ` (التعليق أطول من الفيديو بـ ${s.overflow} ث)` : ""}`, !s.sentences);
+  }
+  return r.project;
+}
+$("kochiLayoutBtn").onclick = async () => {
+  if (!mt.project) return;
+  const btn = $("kochiLayoutBtn");
+  btn.disabled = true;
+  try {
+    await saveProject();
+    pushHistory("kochi");
+    const p = await kochiLayout(mt.project.id);
+    mt.project.data = p.data;
+    renderAll();
+  } catch (err) {
+    toast(err.message, true);
+  } finally {
+    btn.disabled = false;
+  }
+};
 $("deleteProject").onclick = async () => {
   if (!confirm(`حذف المشروع "${mt.project.data.name}"؟ (الفيديوهات اللي اتصدّرت منه هتفضل موجودة)`)) return;
   try {

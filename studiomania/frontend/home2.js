@@ -5,6 +5,8 @@
 const NH = (() => {
   const root = document.documentElement;
   const host = document.getElementById("nh");
+  // كوتشي بيفضل بالرئيسية والتصميم القديم (عشان البرنامجين ميتلخبطوش في بعض)
+  if (typeof APP !== "undefined" && APP === "kochi") { host?.remove(); return null; }
   if (!host) return null;
   document.body.classList.add("nh");
   const reduce = matchMedia("(prefers-reduced-motion: reduce)");
