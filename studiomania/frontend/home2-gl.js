@@ -377,20 +377,38 @@ window.NHGL = (stage, getClient) => {
   const RIM = () => 1;   // حافة منوّرة رفيعة زي حافة الجيليفيش
   // الأيقونات اللي ليها صورة زجاج جاهزة (icons3d/<key>.png على الأبيض، و<key>_d.png للغامق) بتتعرض هي نفسها بالظبط
   const IMGS = ["create", "settings", "app", "brand", "assets", "progress", "publish", "reel", "film", "series", "carousel", "characters", "voices", "music", "backgrounds"], loader = new THREE.TextureLoader(), imgPlanes = [];
-  function imgTex(plane) {
-    const key = plane.userData.img;
-    loader.load(`/icons3d/${key}${dark ? "_d" : ""}.webp?v=4`, (t) => {
+  // الصور بتتحمّل مرة واحدة وتترفع على كارت الشاشة قبل ما تتعرض (عشان مفيش رعشة ولا مربع فاضي)
+  const texCache = {};
+  const texUrl = (key, d) => `/icons3d/${key}${d ? "_d" : ""}.webp?v=4`;
+  function loadTex(url, cb) {
+    const c = texCache[url] || (texCache[url] = { t: null, cbs: [] });
+    if (c.t) return cb && cb(c.t);
+    if (cb) c.cbs.push(cb);
+    if (c.cbs.length > 1 || c.loading) return;
+    c.loading = true;
+    loader.load(url, (t) => {
       t.encoding = THREE.sRGBEncoding;
       t.anisotropy = renderer.capabilities.getMaxAnisotropy();
-      const old = plane.material.map;
+      renderer.initTexture?.(t);
+      c.t = t;
+      c.cbs.splice(0).forEach((f) => f(t));
+    });
+  }
+  function imgTex(plane) {
+    const key = plane.userData.img;
+    const want = (plane.userData.want = dark);
+    loadTex(texUrl(key, dark), (t) => {
+      if (plane.userData.want !== want) return;   // الثيم اتغيّر تاني قبل ما الصورة توصل
       plane.material.map = t; plane.material.needsUpdate = true;
-      if (old) old.dispose();
+      plane.material.visible = true;
       const w = t.image.width, h = t.image.height, mx = Math.max(w, h);
       plane.scale.set(w / mx, h / mx, 1);
     });
+    loadTex(texUrl(key, !dark));   // نسخة الثيم التاني جاهزة كمان
   }
   function imgIcon(key) {
-    const plane = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ transparent: true, toneMapped: false, depthWrite: false, opacity: 0 }));
+    const plane = new THREE.Mesh(new THREE.PlaneGeometry(1, 1),
+      new THREE.MeshBasicMaterial({ transparent: true, toneMapped: false, depthWrite: false, depthTest: false, opacity: 0, visible: false }));
     plane.userData.img = key;
     imgPlanes.push(plane);
     imgTex(plane);
@@ -408,6 +426,8 @@ window.NHGL = (stage, getClient) => {
       g.userData.marks = [];
       if (key === "brand") {   // لوجو العميل (أو أول حرف من اسمه) جوه المربع اللي في النص
         const mark = markPlane(.3);
+        mark.userData.mark = true;
+        mark.material.depthTest = false;
         mark.position.z = .02;
         g.add(mark);
         g.userData.marks.push(mark);
@@ -438,9 +458,12 @@ window.NHGL = (stage, getClient) => {
 
   let cur = null;
   const clock = new THREE.Clock();
+  let order = 0;
   function show(key) {   // مفيش قطع: كل مجسّم بيكمّل من مكانه (اللي داخل بيكبر واللي خارج بيختفي في نفس الوقت)
     const g = group(key);
     cur = g;
+    order += 2;   // اللي داخل بيترسم فوق اللي خارج على طول (من غير ما الترتيب يتقلب كل فريم)
+    g.traverse((o) => { if (o.isMesh) o.renderOrder = order + (o.userData.mark ? 1 : 0); });
     Object.values(cache).forEach((o) => { o.userData.to = o === g ? 1 : 0; });
     g.visible = true;
     warm();
