@@ -324,6 +324,7 @@ async function pubLoadPosts() {
   }
   renderPosts();
   renderReady();
+  if (typeof renderCal === "function") renderCal();
   clearTimeout(pub.timer);
   // نحدّث كل شوية عشان نشوف البوستات اللي اتنشرت
   // لو فيه بوست جه ميعاده أو بيتنشر، نحدّث أسرع
@@ -358,7 +359,7 @@ function renderPosts() {
         </div>
         <span class="pill ${cls}">${label}</span>
         <span class="acts">
-          ${!p.carousel_id && (p.status === "scheduled" || (p.status === "failed" && !p.sent)) ? `<button class="btn sm" data-act="edit">✎ تعديل</button>` : ""}
+          ${postEditable(p) ? `<button class="btn sm" data-act="edit">✎ تعديل</button>` : ""}
           ${p.status === "failed" ? `<button class="btn sm" data-act="retry">↻ إعادة المحاولة</button>` : ""}
           ${p.status !== "publishing" && p.status !== "sending" ? `<button class="btn sm danger" data-act="delete">${p.status === "scheduled" ? "إلغاء" : "حذف"}</button>` : ""}
         </span>
@@ -368,45 +369,59 @@ function renderPosts() {
 }
 $("postFilter").addEventListener("change", renderPosts);
 
-$("postsList").addEventListener("click", async (e) => {
+$("postsList").addEventListener("click", (e) => {
   const btn = e.target.closest("button[data-act]");
   if (!btn) return;
-  const p = pub.posts.find((x) => x.id === btn.closest("li").dataset.id);
+  postAction(btn.dataset.act, pub.posts.find((x) => x.id === btn.closest("li").dataset.id));
+});
+
+// بيستخدمها كمان الكالندر (calendar.js)
+function postEditable(p) {
+  return !p.carousel_id && (p.status === "scheduled" || (p.status === "failed" && !p.sent));
+}
+
+function editPost(p) {
+  pub.editing = p.id;
+  pub.videoId = p.export_id;
+  $("postFormTitle").textContent = "تعديل البوست";
+  $("postSubmit").textContent = "💾 حفظ التعديل";
+  $("postCancel").hidden = false;
+  $("postCaption").value = p.caption;
+  $("postPlatforms").querySelectorAll("input").forEach((i) => (i.checked = p.platforms.includes(i.value)));
+  setWhen(new Date(p.scheduled_at));
+  const o = p.options || {};
+  $("igTags").value = (o.ig_tags || []).map((t) => `@${t}`).join(", ");
+  pub.tagsTouched = true;
+  $("igCollab").checked = !!o.ig_collab;
+  $("coverOn").checked = o.cover_ms != null;
+  renderReady();
+  renderPostVideo();
+  if (o.cover_ms != null) setCover(o.cover_ms);
+  $("postForm").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+// بيرجّع true لو اتعمل
+async function postAction(act, p) {
+  if (!p) return false;
   try {
-    if (btn.dataset.act === "edit") {
-      pub.editing = p.id;
-      pub.videoId = p.export_id;
-      $("postFormTitle").textContent = "تعديل البوست";
-      $("postSubmit").textContent = "💾 حفظ التعديل";
-      $("postCancel").hidden = false;
-      $("postCaption").value = p.caption;
-      $("postPlatforms").querySelectorAll("input").forEach((i) => (i.checked = p.platforms.includes(i.value)));
-      setWhen(new Date(p.scheduled_at));
-      const o = p.options || {};
-      $("igTags").value = (o.ig_tags || []).map((t) => `@${t}`).join(", ");
-      pub.tagsTouched = true;
-      $("igCollab").checked = !!o.ig_collab;
-      $("coverOn").checked = o.cover_ms != null;
-      renderReady();
-      renderPostVideo();
-      if (o.cover_ms != null) setCover(o.cover_ms);
-      $("postForm").scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-    if (btn.dataset.act === "retry") {
+    if (act === "edit") editPost(p);
+    if (act === "retry") {
       await api(`/api/posts/${p.id}/retry`, { method: "POST" });
       await pubLoadPosts();
     }
-    if (btn.dataset.act === "delete") {
-      if (!confirm(p.status === "scheduled" ? "إلغاء البوست ده؟" : "حذف البوست ده من القايمة؟")) return;
+    if (act === "delete") {
+      if (!confirm(p.status === "scheduled" ? "إلغاء البوست ده؟" : "حذف البوست ده من القايمة؟")) return false;
       await api(`/api/posts/${p.id}`, { method: "DELETE" });
       if (pub.editing === p.id) resetPostForm();
       await pubLoadPosts();
       if (pub.service === "zernio") loadRemoteOrphans();
     }
+    return true;
   } catch (err) {
     toast(err.message, true);
+    return false;
   }
-});
+}
 
 viewHooks["7"] = initPublish;
 

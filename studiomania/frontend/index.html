@@ -885,6 +885,11 @@
 
           <section class="panel gap-top">
             <div class="panel-head"><h2>المواعيد</h2>
+              <div class="cal-views" id="calViews" role="tablist">
+                <button type="button" data-v="list">📋 قايمة</button>
+                <button type="button" data-v="week">📅 أسبوع</button>
+                <button type="button" data-v="month">🗓️ شهر</button>
+              </div>
         <button class="btn sm" id="syncZernio" title="يشوف لو فيه بوستات متجدولة على Zernio ومش في القايمة هنا">🔄 قارن مع Zernio</button>
               <select id="postFilter">
                 <option value="upcoming">الجاية</option>
@@ -893,6 +898,7 @@
                 <option value="failed">فشلت</option>
               </select></div>
             <div class="orphans" id="remoteOrphans" hidden></div>
+            <div class="cal" id="postsCal" hidden></div>
       <ul class="posts" id="postsList"></ul>
             <p class="empty" id="postsEmpty">مفيش بوستات هنا.</p>
           </section>
@@ -1897,6 +1903,7 @@
 <script src="/montage.js"></script>
 <script src="/captions.js"></script>
 <script src="/publish.js"></script>
+<script src="/calendar.js"></script>
 <script src="/settings.js"></script>
 <script src="/carousel.js"></script>
 <script src="/series.js"></script>
