@@ -32,10 +32,14 @@ window.NHGL = (stage, getClient) => {
   function paintBackdrop(dark) {
     const x = bd.getContext("2d"), g = x.createRadialGradient(256, 236, 0, 256, 256, 256);
     // نفس لون الصفحة بالظبط عند الأطراف، ونور هادي ورا المجسّم بس (زي المرجع)
-    if (dark) { g.addColorStop(0, "#3c3c43"); g.addColorStop(.2, "#202025"); g.addColorStop(.34, "#0c0c0e"); g.addColorStop(1, "#0c0c0e"); }
-    else { g.addColorStop(0, "#d3d7e0"); g.addColorStop(.18, "#eceef3"); g.addColorStop(.34, "#ffffff"); g.addColorStop(1, "#ffffff"); }
+    if (dark) { g.addColorStop(0, "#2a2a31"); g.addColorStop(.22, "#16161a"); g.addColorStop(.36, "#0c0c0e"); g.addColorStop(1, "#0c0c0e"); }
+    else { g.addColorStop(0, "#eef0f5"); g.addColorStop(.36, "#ffffff"); g.addColorStop(1, "#ffffff"); }
     x.fillStyle = g;
     x.fillRect(0, 0, 512, 512);
+    // بقع لون هادية ورا المجسّم: الزجاج بيكسرها ويلوّنها، فبيبان إنه زجاج شفاف مش بلاستيك
+    const blob = (cx, cy, r, rgb, al) => { const b = x.createRadialGradient(cx, cy, 0, cx, cy, r); b.addColorStop(0, `rgba(${rgb},${al})`); b.addColorStop(.55, `rgba(${rgb},${al * .45})`); b.addColorStop(1, `rgba(${rgb},0)`); x.fillStyle = b; x.fillRect(0, 0, 512, 512); };
+    if (dark) { blob(232, 236, 58, "90,120,255", .6); blob(284, 282, 52, "255,90,170", .45); blob(276, 214, 40, "80,230,220", .4); }
+    else { blob(234, 238, 56, "70,110,255", .55); blob(284, 282, 50, "255,80,160", .42); blob(276, 214, 38, "40,200,200", .42); }
     bdTex.needsUpdate = true;
   }
 
@@ -44,8 +48,9 @@ window.NHGL = (stage, getClient) => {
     const c = document.createElement("canvas");
     c.width = 1024; c.height = 512;
     const x = c.getContext("2d"), g = x.createLinearGradient(0, 0, 0, 512);
-    if (dark) { g.addColorStop(0, "#6a6a74"); g.addColorStop(.5, "#2c2c33"); g.addColorStop(1, "#44444c"); }   // رمادي مش أسود: عشان حواف الزجاج تنوّر وتبان
-    else { g.addColorStop(0, "#ffffff"); g.addColorStop(.5, "#c9ccd6"); g.addColorStop(1, "#f2f3f6"); }
+    // استوديو غامق فيه شرايط نور حادة: الزجاج النضيف بيبان من الانعكاسات الحادة، مش من لونه
+    if (dark) { g.addColorStop(0, "#3a3a44"); g.addColorStop(.5, "#121216"); g.addColorStop(1, "#24242a"); }
+    else { g.addColorStop(0, "#c4c8d4"); g.addColorStop(.5, "#6d7385"); g.addColorStop(1, "#a9aebb"); }
     x.fillStyle = g;
     x.fillRect(0, 0, 1024, 512);
     const box = (cx, cy, w, h, a) => {
@@ -64,9 +69,9 @@ window.NHGL = (stage, getClient) => {
       r.addColorStop(0, "rgba(255,255,255,0)"); r.addColorStop(.5, `rgba(255,255,255,${a})`); r.addColorStop(1, "rgba(255,255,255,0)");
       x.fillStyle = r; x.fillRect(cx - w, 60, w * 2, 400);
     }
-    if (!dark) {   // في اللايت: شرايط غامقة عشان حواف الزجاج تبان على الأبيض
-      for (const [cx, w] of [[380, 26], [640, 18], [880, 30], [150, 20]]) { x.fillStyle = "rgba(40,48,70,.3)"; x.fillRect(cx, 120, w, 300); }
-    }
+    // شرايط نور حادة (زي سوفت بوكس): هي اللي بتعمل اللمعة النضيفة على الحواف
+    for (const [cx, w] of [[700, 16], [820, 8], [330, 12], [180, 6], [960, 10]]) { x.fillStyle = "rgba(255,255,255,1)"; x.fillRect(cx, 70, w, 360); }
+    x.fillStyle = "rgba(255,255,255,1)"; x.fillRect(560, 40, 420, 10);
     const t = new THREE.CanvasTexture(c);
     t.mapping = THREE.EquirectangularReflectionMapping;
     t.encoding = THREE.sRGBEncoding;
@@ -75,13 +80,13 @@ window.NHGL = (stage, getClient) => {
     return rt.texture;
   }
 
-  let dark = true, tint = "#b9bcc8";
+  let dark = true, tint = "#ffffff";
+  // زجاج نضيف: شفاف ١٠٠٪ من غير لون جوّاه (اللون كان بيخليه مغبّش)، انعكاسات حادة، ولمعة قوس قزح خفيفة زي الجيليفيش
   const glass = () => new THREE.MeshPhysicalMaterial({
-    color: 0xffffff, metalness: 0, roughness: 0, transmission: 1, thickness: 1.2, ior: 1.33,
-    clearcoat: 1, clearcoatRoughness: 0, specularIntensity: 1, envMapIntensity: 2.6,
-    // لمعة قوس قزح خفيفة على السطح (زي جلد الجيليفيش) + لون خفيف جدًا جوه الأجزاء التخينة
-    iridescence: .55, iridescenceIOR: 1.3, iridescenceThicknessRange: [180, 520],
-    attenuationColor: new THREE.Color(tint), attenuationDistance: 1.6, transparent: true, opacity: 1,
+    color: 0xffffff, metalness: 0, roughness: 0, transmission: 1, thickness: .9, ior: 1.45,
+    clearcoat: 1, clearcoatRoughness: 0, specularIntensity: 1, specularColor: new THREE.Color(0xffffff), envMapIntensity: 1.6,
+    iridescence: .8, iridescenceIOR: 1.25, iridescenceThicknessRange: [260, 640],
+    attenuationColor: new THREE.Color(tint), attenuationDistance: 1e6, transparent: true, opacity: 1,
   });
 
   // ---------- shapes
@@ -290,12 +295,12 @@ window.NHGL = (stage, getClient) => {
 
   // حافة منوّرة (فرينل) على كل جزء زجاج: هي اللي بتخلّي الزجاج الشفاف يبان زي راس الجيليفيش
   const rimMat = () => new THREE.ShaderMaterial({
-    uniforms: { c: { value: new THREE.Color(dark ? "#ffffff" : "#1b2233") }, a: { value: 1 } },
+    uniforms: { c: { value: new THREE.Color(dark ? "#ffffff" : "#8fb4ff") }, a: { value: 1 } },
     vertexShader: "varying vec3 vN; varying vec3 vV; void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz); gl_Position = projectionMatrix * mv; }",
-    fragmentShader: "uniform vec3 c; uniform float a; varying vec3 vN; varying vec3 vV; void main(){ float f = pow(1.0 - abs(dot(normalize(vN), normalize(vV))), 2.4); gl_FragColor = vec4(c, f * a); }",
-    transparent: true, depthWrite: false,
+    fragmentShader: "uniform vec3 c; uniform float a; varying vec3 vN; varying vec3 vV; void main(){ float f = pow(1.0 - abs(dot(normalize(vN), normalize(vV))), 3.2); gl_FragColor = vec4(c, f * a); }",
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
   });
-  const RIM = () => (dark ? .6 : .38);
+  const RIM = () => (dark ? .9 : .55);   // حافة منوّرة رفيعة زي حافة الجيليفيش
   const cache = {};
   function group(key) {
     if (cache[key]) return cache[key];
@@ -366,10 +371,13 @@ window.NHGL = (stage, getClient) => {
 
   function theme(isDark) {
     dark = isDark;
-    tint = isDark ? "#aebce0" : "#7fa2ec";   // دارك: زجاج مدخّن · لايت: زجاج أبيض مزرق (زي الجيليفيش في المرجع)
+    tint = "#ffffff";
+    // في اللايت: من غير tone mapping، عشان الأبيض اللي ورا الزجاج يفضل أبيض صافي (كان بيطلع رمادي فيبان مغبّش)
+    renderer.toneMapping = isDark ? THREE.ACESFilmicToneMapping : THREE.NoToneMapping;
+    scene.traverse((o) => { if (o.material) o.material.needsUpdate = true; });
     scene.environment = envMap(isDark);
     paintBackdrop(isDark);
-    Object.values(cache).forEach((g) => { g.userData.mats.forEach((m) => { if (m.attenuationColor) m.attenuationColor.set(tint); }); g.userData.rim.uniforms.c.value.set(isDark ? "#ffffff" : "#1b2233"); });
+    Object.values(cache).forEach((g) => { g.userData.mats.forEach((m) => { if (m.attenuationColor) m.attenuationColor.set(tint); }); g.userData.rim.uniforms.c.value.set(isDark ? "#ffffff" : "#8fb4ff"); });
     coreMat.color.set(isDark ? "#eef1f8" : "#55607a"); coreMat.emissive.set(isDark ? "#8a93a8" : "#000000");
     resize();
     frame();
