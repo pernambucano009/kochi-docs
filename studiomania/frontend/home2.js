@@ -73,8 +73,10 @@ const NH = (() => {
     const c = clientx?.cur;
     return c?.logo ? `<img src="${esc(c.logo)}" alt="">` : esc((c?.name || "B").trim().slice(0, 1).toUpperCase());
   };
+  const GLKEY = { create: "create", brand: "brand", assets: "assets", settings: "settings", progress: "progress", publish: "publish", reel: "reel", raw: "film",
+    series: "series", carousel: "carousel", ad: "publish", typo: "create", dub: "voices", edit: "film", coaches: "characters", voice: "voices", music: "music" };
   const iconOf = (k) => (k === "brand" ? `<div class="nh-plate">${brandMark()}</div>` : gi(k));
-  const head = (id) => `<div class="nh-head"><div class="nh-name"><span class="latin">${T[id].en}</span><b>${T[id].ar}</b></div>${iconOf(T[id].icon)}</div>`;
+  const head = (id) => `<div class="nh-head"><div class="nh-name"><span class="latin">${T[id].en}</span><b>${T[id].ar}</b></div>${GLKEY[id] ? `<span class="gi nh-glt">${glImg(GLKEY[id])}</span>` : iconOf(T[id].icon)}</div>`;
   const dots = (n, at) => `<div class="nh-dots">${Array.from({ length: n }, (_, i) => `<i class="${i < at ? "done" : i === at ? "now" : ""}"></i>`).join("")}</div>`;
   function brainPct(b) {
     if (!b) return 0;
@@ -135,7 +137,7 @@ const NH = (() => {
       <main class="nh-bento" id="nhBento"></main>
     </div>
     <section class="nh-page" id="nhPage" hidden role="dialog" aria-modal="true">
-      <header class="nh-ptop"><button class="nh-back" id="nhBack"><span aria-hidden="true">→</span><span class="latin">Back</span></button><div class="nh-ptitle" id="nhPTitle"></div></header>
+      <header class="nh-ptop"><button class="nh-back" id="nhBack"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg><span id="nhBackT">الرئيسية</span></button><div class="nh-ptitle" id="nhPTitle"></div></header>
       <div class="nh-pgrid" id="nhPGrid"></div>
     </section>`;
 
@@ -186,8 +188,6 @@ const NH = (() => {
     const t = T[key];
     return `${big(t.icon)}<h1 class="latin">${t.en}</h1><div class="ar">${esc(t.ar)}</div><p>${esc(t.desc)}</p>`;
   }
-  const GLKEY = { create: "create", brand: "brand", assets: "assets", settings: "settings", progress: "progress", publish: "publish", reel: "reel", raw: "film",
-    series: "series", carousel: "carousel", ad: "publish", typo: "create", dub: "voices", edit: "film", coaches: "characters", voice: "voices", music: "music" };
   function setStage(key) {
     key = key || "";
     if (key === shown) return;
@@ -275,7 +275,7 @@ const NH = (() => {
   }
 
   // صفحة جوه الرئيسية (اعمل جديد / الأصول / شغّال عليه): الأيقونة والاسم بيطيروا لحد ما يبقوا عنوان الصفحة
-  const glImg = (key) => `<img class="ic-l" src="/icons3d/${key}.webp?v=8" alt="" loading="lazy"><img class="ic-d" src="/icons3d/${key}_d.webp?v=8" alt="" loading="lazy">`;
+  function glImg(key) { return `<img class="ic-l" src="/icons3d/${key}.webp?v=8" alt="" loading="lazy"><img class="ic-d" src="/icons3d/${key}_d.webp?v=8" alt="" loading="lazy">`; }
   const panel = (c, r, inner, attrs = "") => `<div class="nh-tile nh-panel" ${attrs} style="grid-column:span ${c};grid-row:span ${r}">${inner}</div>`;
   const PAGES = {
     // كل نوع كارت فيه أيقونته الزجاج الـ 3D (فاتحة وغامقة)، واسمه، وسطر بيشرح هيعمل إيه
@@ -286,29 +286,80 @@ const NH = (() => {
     assets: () => panel(4, 6, `${head("coaches")}<div class="nh-body">${D.coaches.length} شخصية</div><div class="nh-avs">${D.coaches.slice(0, 12).map((c) => `<img src="${esc(c.image_url)}" alt="">`).join("")}</div>`, `data-id="coaches" tabindex="0" role="button"`)
       + panel(4, 6, `${head("voice")}<div class="nh-body">${D.voices} تسجيل</div>`, `data-id="voice" tabindex="0" role="button"`)
       + panel(4, 6, `${head("music")}<div class="nh-body">${D.music} تراك</div>`, `data-id="music" tabindex="0" role="button"`),
-    progress: () => panel(8, 6, `${head("progress")}<div class="nh-lines" style="align-content:start">${D.work.map(lineHTML).join("") || `<div class="nh-empty">مفيش مشاريع لسه.</div>`}</div>`)
-      + panel(4, 3, `${head("create")}<div class="nh-body">ابدأ شغل جديد من أي نوع.</div>`, `data-id="create" tabindex="0" role="button"`)
-      + panel(4, 3, `${head("publish")}<div class="nh-body">${D.posts.filter((p) => p.status === "scheduled").length} بوست متجدول</div>`, `data-id="publish" tabindex="0" role="button"`),
+    progress: () => KOCHI ? panel(12, 6, `${head("progress")}<div class="nh-lines" style="align-content:start">${D.work.map(lineHTML).join("") || `<div class="nh-empty">مفيش مشاريع لسه.</div>`}</div>`) : projectsBoard(),
   };
+  // شغّال عليه (من البروتوتايب): دوّر، وفلتر بالحالة، وكل مشروع كارت بأيقونة قسمه وحالته
+  const PJ_ICON = { series: "series", ads: "publish", free: "film" };
+  const pjState = (p) => p.render_status === "rendering" ? ["run", `بيتصدّر${p.render_progress != null ? ` · ${Math.round(p.render_progress)}%` : ""}`]
+    : p.render_status === "done" ? ["done", "اتصدّر"] : p.render_status === "failed" ? ["fail", "التصدير وقف"] : ["run", "في المونتاج"];
+  function projectsBoard() {
+    const n = (k) => D.work.filter((p) => pjState(p)[0] === k).length;
+    const cards = D.work.map((p) => {
+      const [k, label] = pjState(p);
+      const when = p.updated_at ? new Date(p.updated_at).toLocaleDateString(UI_LOCALE(), { day: "numeric", month: "short" }) : "";
+      return `<article class="nh-line nh-pj-card" data-proj="${esc(p.id)}" data-st="${k}" data-q="${esc(p.name.toLowerCase())}" tabindex="0" role="button">
+        <div class="nh-pj-art">${glImg(PJ_ICON[p.section] || "film")}<span class="nh-pj-sec">${esc(SEC[p.section]?.[0] || "")}</span></div>
+        <b>${esc(p.name)}</b><small class="st-${k}"><i></i>${label}${when ? ` · ${when}` : ""}</small></article>`;
+    }).join("");
+    return `<div class="nh-pj">
+      <div class="nh-pj-bar">
+        <label class="nh-pj-q"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4 4"/></svg><input type="search" placeholder="دوّر على مشروع" aria-label="دوّر على مشروع"></label>
+        <button type="button" class="on" data-pjf="">الكل · <span class="num">${D.work.length}</span></button>
+        <button type="button" data-pjf="run">شغّالة · <span class="num">${n("run")}</span></button>
+        <button type="button" data-pjf="done">اتصدّرت · <span class="num">${n("done")}</span></button>
+        ${n("fail") ? `<button type="button" data-pjf="fail">وقفت · <span class="num">${n("fail")}</span></button>` : ""}
+        <span class="nh-pj-fill"></span>
+        <button type="button" class="nh-pj-new nh-tile" data-id="create">＋ مشروع جديد</button>
+      </div>
+      <div class="nh-pj-grid">${cards || `<div class="nh-pj-empty">مفيش مشاريع لسه. ابدأ واحد من «اعمل جديد».</div>`}</div>
+    </div>`;
+  }
+  function pjFilter() {
+    const q = pGrid.querySelector(".nh-pj-q input")?.value.trim().toLowerCase() || "";
+    const f = pGrid.querySelector("[data-pjf].on")?.dataset.pjf || "";
+    pGrid.querySelectorAll(".nh-pj-card").forEach((c) => (c.hidden = (f && c.dataset.st !== f) || (q && !c.dataset.q.includes(q))));
+  }
+  pGrid.addEventListener("input", (e) => { if (e.target.closest(".nh-pj-q")) pjFilter(); });
+  pGrid.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-pjf]");
+    if (!b) return;
+    pGrid.querySelectorAll("[data-pjf]").forEach((x) => x.classList.toggle("on", x === b));
+    pjFilter();
+  });
   // صفحات كاملة بتنزل لتحت (عقل البراند، مكتبة الموشن): كل واحدة ليها موديول بيرسمها
   const MODS = { brand: BrandPage, motion: MotionPage, coaches: CharactersPage, voice: VoicesPage, music: MusicPage };
   const stopMedia = () => { MotionPage.close(); VoicesPage.close(); MusicPage.close(); };
   let pageArg = null, pStack = [];
-  const titleHTML = (t) => `<div class="nh-name"><span class="latin">${t.en}</span><b>${esc(t.ar)}</b></div>${iconOf(t.icon)}`;
+  // عنوان الصفحة (من البروتوتايب): الأيقونة الزجاج كبيرة، وفوق الاسم اسم القسم بالإنجليزي بالبرتقالي
+  const titleHTML = (t, key) => `<div class="nh-name"><span class="latin">${t.en}</span><b>${esc(t.ar)}</b></div><span class="gi nh-glt">${glImg(GLKEY[key] || GLKEY[t.icon] || "create")}</span>`;
+  const backLabel = () => { document.getElementById("nhBackT").textContent = pStack.length ? "رجوع" : "الرئيسية"; };
+  // الأصول: تابات بالأيقونات الزجاج بين الشخصيات والتعليق الصوتي والموسيقى، والشخصيات أول واحدة
+  const AS_TABS = [["coaches", "characters", "الشخصيات"], ["voice", "voices", "التعليق الصوتي"], ["music", "music", "الموسيقى"]];
+  const asTabs = (cur) => `<nav class="nh-astabs" aria-label="الأصول">${AS_TABS.map(([k, ic, ar]) =>
+    `<button type="button" data-astab="${k}"${k === cur ? ' class="on" aria-current="page"' : ""}>${glImg(ic)}<span>${ar}</span></button>`).join("")}</nav>`;
   function fillPage(key) {
     stopMedia();
+    if (key === "assets") key = "coaches";
+    const tabs = !KOCHI && pTitle.dataset.key === "assets" && AS_TABS.some((x) => x[0] === key);
     pGrid.dataset.key = key;
     pGrid.classList.toggle("nh-scroll", !!MODS[key]);
-    pGrid.innerHTML = MODS[key] ? MODS[key].html() : PAGES[key]();
+    pGrid.innerHTML = (tabs ? asTabs(key) : "") + (MODS[key] ? MODS[key].html() : PAGES[key]());
     if (MODS[key]) MODS[key].mount(pGrid, pageArg);
     else pGrid.querySelectorAll(".nh-tile").forEach(addSnake);
     pageArg = null;
   }
+  pGrid.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-astab]");
+    if (!b || b.classList.contains("on")) return;
+    fillPage(b.dataset.astab);
+    pGrid.animate([{ opacity: .4 }, { opacity: 1 }], { duration: reduce.matches ? 1 : 300, easing: EASE });
+  });
   // صفحة جوه صفحة (زي مكتبة الموشن من جوه الأصول): بتتبدّل مكانها، و«رجوع» بيرجّع اللي قبلها
   function swapPage(key, back = false) {
     const prev = pGrid.dataset.key;
-    if (back) pTitle.replaceChildren(...pStack.pop().title);
-    else { pStack.push({ key: prev, title: [...pTitle.childNodes] }); pTitle.innerHTML = titleHTML(T[key]); }
+    if (back) { const s = pStack.pop(); pTitle.replaceChildren(...s.title); pTitle.dataset.key = s.tkey; }
+    else { pStack.push({ key: prev, title: [...pTitle.childNodes], tkey: pTitle.dataset.key }); pTitle.innerHTML = titleHTML(T[key], key); pTitle.dataset.key = key; }
+    backLabel();
     fillPage(key);
     pGrid.animate([{ opacity: 0, transform: `translateX(${back ? -24 : 24}px)` }, { opacity: 1, transform: "none" }], { duration: reduce.matches ? 1 : 450, easing: EASE });
     pTitle.animate([{ opacity: 0 }, { opacity: 1 }], { duration: reduce.matches ? 1 : 450, easing: EASE });
@@ -319,7 +370,9 @@ const NH = (() => {
     busy = true;
     pStack = [];
     const t = T[key];
-    pTitle.innerHTML = titleHTML(t);
+    pTitle.innerHTML = titleHTML(t, key);
+    pTitle.dataset.key = key;
+    backLabel();
     page.hidden = false;
     fillPage(key);
     const z = zoomIn(tile);

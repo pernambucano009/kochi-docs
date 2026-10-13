@@ -3955,5 +3955,15 @@ window.I18N_EN = {
   "اتصرف النهارده {0}": "Spent today {0}",
   "اعرض سجل آخر تصدير": "Show last export log",
   "حط مفتاح Zernio عشان تربط الحسابات": "Add a Zernio key to link accounts",
-  "بيحمّل…": "Loading…"
+  "بيحمّل…": "Loading…",
+  "دوّر على مشروع": "Search projects",
+  "الكل · {0}": "All · {0}",
+  "شغّالة · {0}": "Active · {0}",
+  "اتصدّرت · {0}": "Exported · {0}",
+  "وقفت · {0}": "Stopped · {0}",
+  "في المونتاج": "In editing",
+  "التصدير وقف": "Export stopped",
+  "بيتصدّر": "Exporting",
+  "مفيش مشاريع لسه. ابدأ واحد من «اعمل جديد».": "No projects yet. Start one from “Create”.",
+  "رجوع": "Back"
 };
