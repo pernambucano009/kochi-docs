@@ -3947,5 +3947,13 @@ window.I18N_EN = {
   "ستايلات الرسم": "Drawing styles",
   "شخصيات 2D": "2D characters",
   "استورد حزمة": "Import pack",
-  "احفظ الحسابات": "Save accounts"
+  "احفظ الحسابات": "Save accounts",
+  "الحسابات المربوطة": "Linked accounts",
+  "عن طريق Zernio": "Through Zernio",
+  "اربط حساب ↗": "Link an account ↗",
+  "المفاتيح والرصيد": "Keys & credit",
+  "اتصرف النهارده {0}": "Spent today {0}",
+  "اعرض سجل آخر تصدير": "Show last export log",
+  "حط مفتاح Zernio عشان تربط الحسابات": "Add a Zernio key to link accounts",
+  "بيحمّل…": "Loading…"
 };

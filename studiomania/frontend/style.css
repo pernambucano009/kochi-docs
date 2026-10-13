@@ -2543,3 +2543,39 @@ dialog.cal-dlg { width: min(720px, 94vw); max-height: 90vh; border: 1px solid va
 .tp-art.light { background: linear-gradient(135deg, #FFFFFF 0 50%, #F3F2EF 50%); box-shadow: inset 0 0 0 1px rgba(0,0,0,.06); }
 .tp-art.dark { background: linear-gradient(135deg, #2A292A 0 50%, #1F1E1F 50%); }
 .lang-picks { display: inline-flex; }
+
+/* ============ الإعدادات (من البروتوتايب): 3 كروت جنب بعض، وتحتهم المساحة والباسورد ============ */
+.set-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; align-items: stretch; }
+.set-grid.set-row2 { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); margin-top: 20px; align-items: start; }
+.set-card { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.set-card h2 { margin: 0; font-size: 20px; font-weight: 500; }
+.set-card .hint { margin: 0; }
+.set-k { font-family: var(--display); font-size: 10.5px; letter-spacing: .24em; color: var(--label, var(--muted)); direction: ltr; text-align: start; }
+[dir="rtl"] .set-k { text-align: right; }
+.set-acc { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.set-acc li { display: flex; align-items: center; gap: 10px; background: var(--field, var(--surface-2)); border-radius: 14px; padding: 10px 12px; font-size: 14px; color: var(--muted); }
+.set-acc li.on { color: var(--text); }
+.set-acc li > i { width: 8px; height: 8px; border-radius: 50%; background: #D6D6D2; flex: none; }
+.set-acc li.on > i { background: #2EAF78; }
+.set-acc li svg { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.set-acc li span { flex: 1; }
+.set-acc li small { color: var(--muted); font-size: 12px; }
+.set-acc li.err { background: color-mix(in srgb, #E5483E 12%, transparent); color: #B53A2E; font-size: 12.5px; }
+.set-credit { display: flex; align-items: center; gap: 16px; background: var(--field, var(--surface-2)); border-radius: 18px; padding: 16px; }
+.set-credit[hidden] { display: none; }
+.set-credit svg { width: 64px; height: 64px; flex: none; transform: rotate(-90deg); }
+.set-credit circle { fill: none; stroke-width: 3; }
+.set-credit .trk { stroke: var(--line); }
+.set-credit .val { stroke: var(--accent); stroke-linecap: round; stroke-dasharray: 0 101; transition: stroke-dasharray .6s; }
+.set-credit span { display: flex; flex-direction: column; gap: 2px; }
+.set-credit small { font-size: 12.5px; color: var(--muted); }
+.set-credit b { font-family: var(--display); font-weight: 500; font-size: 26px; }
+.set-seg { display: flex; background: var(--field, var(--surface-2)); border-radius: 999px; padding: 4px; }
+.set-seg button { flex: 1; border: 0; background: transparent; border-radius: 999px; font: inherit; font-size: 13.5px; padding: 8px; cursor: pointer; color: var(--muted); }
+.set-seg button.on { background: var(--card, var(--surface)); color: var(--text); box-shadow: 0 2px 8px rgba(0, 0, 0, .06); }
+.set-fill { flex: 1; }
+:root .stage .set-card .btn.set-out { background: transparent; border: 1.5px solid var(--text); border-radius: 999px; justify-content: center; padding: 11px; }
+:root .stage .set-card .btn.set-out:hover:not(:disabled) { background: var(--text); color: var(--card, #fff); border-color: var(--text); }
+.set-card form { display: flex; flex-direction: column; gap: 8px; }
+.set-card form .btn { align-self: flex-start; }
+@media (max-width: 1000px) { .set-grid, .set-grid.set-row2 { grid-template-columns: 1fr; } }

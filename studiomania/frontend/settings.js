@@ -55,7 +55,39 @@ $("logout").onclick = async () => {
   location.href = "/login";
 };
 
-viewHooks["settings"] = () => { loadSettings(); markLook(); };
+viewHooks["settings"] = () => { loadSettings(); markLook(); loadSetAccounts(); loadSetCredit(); };
+
+// ---------- الحسابات المربوطة (من Zernio) ----------
+async function loadSetAccounts() {
+  const list = $("setAccList");
+  list.innerHTML = `<li class="muted">بيحمّل…</li>`;
+  try {
+    const p = await api("/api/publisher");
+    $("setAccHint").innerHTML = p.service === "zernio"
+      ? `عن طريق Zernio · <a href="${escapeHtml(p.dashboard_url || "https://zernio.com")}" target="_blank" rel="noopener">اربط حساب ↗</a>`
+      : "حط مفتاح Zernio عشان تربط الحسابات";
+    list.innerHTML = Object.entries(p.platforms).map(([k, label]) => {
+      const a = p.accounts?.[k];
+      return `<li class="${a ? "on" : ""}"><i></i><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${PLAT_SVG[k] || PLAT_SVG.x}"/></svg><span>${escapeHtml(label)}</span>
+        <small dir="ltr">${a ? escapeHtml(a.name || "") : ""}</small>${a ? "" : "<small>مش مربوط</small>"}</li>`;
+    }).join("") + (p.accounts_error ? `<li class="err">${escapeHtml(p.accounts_error)}</li>` : "");
+  } catch (err) {
+    list.innerHTML = `<li class="err">${escapeHtml(err.message)}</li>`;
+  }
+}
+
+// ---------- رصيد Atlas: نفس عداد الشريط الجانبي ----------
+async function loadSetCredit() {
+  const m = await api("/api/atlas/money").catch(() => null);
+  $("setCredit").hidden = !m;
+  if (!m) return;
+  $("setCreditVal").textContent = `$${m.balance.toFixed(2)}`;
+  $("setCreditSpent").textContent = `اتصرف النهارده $${m.spent_today.toFixed(2)}`;
+  const full = Math.max(m.balance + m.spent_week, 1);   // الدايرة: الرصيد من (الرصيد + صرف الأسبوع)
+  const c = 2 * Math.PI * 16;
+  $("setCreditRing").style.strokeDasharray = `${(c * Math.min(1, m.balance / full)).toFixed(1)} ${c.toFixed(1)}`;
+}
+$("setLogout")?.addEventListener("click", () => $("logout").click());
 
 // ---------- الشكل واللغة: نفس سويتش الرئيسية، من جوه الإعدادات ----------
 const lookTheme = () => document.documentElement.dataset.nhTheme || "light";
