@@ -4,7 +4,7 @@
 const Flow = (() => {
   const esc = (s) => escapeHtml(String(s ?? ""));
   const J = (o) => ({ headers: { "Content-Type": "application/json" }, body: JSON.stringify(o) });
-  const S = { el: null, d: null, timer: null, edit: null, own: false, hint: false, chat: null, cast: null, seasons: null, why: false };
+  const S = { seen: new Set(), html: {}, busyFrom: null, tickT: null, el: null, d: null, timer: null, edit: null, own: false, hint: false, chat: null, cast: null, seasons: null, why: false };
   const STEPS = [["idea", "الفكرة"], ["format", "نوع البوست"], ["scenario", "السيناريو"], ["cast", "الأبطال"], ["assets", "ملفاتك"], ["generate", "التوليد"]];
   const FMT = { reel: ["🎬", "ريل", "فيديو قصير رأسي"], carousel: ["🗂️", "كاروسيل", "صور ورا بعض بتتقلب"], series: ["📺", "مسلسل", "كذا حلقة بنفس الأبطال"] };
   const OUT = { tvideo: "قسم القوالب", carousel: "الكاروسيل", series: "المسلسلات", typo: "التايبوجرافي", motion: "الموشن" };
@@ -98,7 +98,9 @@ const Flow = (() => {
     return `<span class="flw-rate"><button type="button" class="${v === 1 ? "on" : ""}" data-rate="${stage}" data-rid="${esc(id || "")}" data-v="${v === 1 ? 0 : 1}" title="عجبني">👍</button>
       <button type="button" class="${v === -1 ? "on bad" : ""}" data-rate="${stage}" data-rid="${esc(id || "")}" data-v="${v === -1 ? 0 : -1}" title="مش عاجبني">👎</button></span>`;
   }
-  const working = (t) => `<div class="flw-work"><span class="flw-spin"></span><p>${t}</p></div>`;
+  const working = (t) => `<div class="flw-work"><span class="flw-spin"></span><p>${t} <small class="muted" data-secs></small></p></div>`;
+  const failed = (what) => (S.d.error && !S.d.busy ? `<div class="flw-empty bad">⚠️ ${esc(S.d.error)}
+    <div class="flw-acts"><button type="button" class="flw-btn pri" data-retry="${what}">↻ جرّب تاني</button></div></div>` : "");
   function chatBox(stage) {
     const log = S.d[stage === "idea" ? "idea_chat" : "scen_chat"] || [];
     return `<div class="flw-chat">
@@ -121,7 +123,7 @@ const Flow = (() => {
   // ---------------------------------------------------------------- 1) الفكرة
   function ideaCard(it) {
     if (S.edit === it.id) return ideaForm(it);
-    return `<article class="flw-card"><div class="flw-ch"><b>${esc(it.title)}</b>${rateBtns("idea", it.id)}</div>
+    return `<article class="flw-card${S.seen.has(it.id) ? "" : " in"}" data-cid="${esc(it.id)}"><div class="flw-ch"><b>${esc(it.title)}</b>${rateBtns("idea", it.id)}</div>
       ${it.hook ? `<p class="flw-hook">«${esc(it.hook)}»</p>` : ""}<p>${esc(it.idea)}</p>${it.fit ? `<small class="flw-fit">🎨 على القالب: ${esc(it.fit)}</small>` : ""}${it.why ? `<small class="muted">💡 ${esc(it.why)}</small>` : ""}
       <div class="flw-acts"><button type="button" class="flw-btn pri" data-pick-idea="${it.id}">اختار الفكرة دي</button>
         <button type="button" class="flw-link" data-edit="${it.id}">✏️ عدّل</button></div></article>`;
@@ -147,7 +149,7 @@ const Flow = (() => {
     return `<h2>اختار فكرة للبوست</h2><p class="flw-sub">المخ اقترح أفكار على قد البراند والقالب. اختار واحدة، أو عدّلها، أو اطلب غيرهم، أو اكتب فكرتك.</p>
       ${seasonsRow()}
       <div class="flw-cards">${(d.ideas || []).map(ideaCard).join("")}${S.own ? ideaForm() : ""}</div>
-      ${loading ? working("المخ بيفكّر في أفكار…") : ""}
+      ${loading ? working("المخ بيفكّر في أفكار على القالب…") : failed("idea")}
       <div class="flw-more">${S.hint ? `<div class="flw-chatrow"><input id="flwHint" placeholder="عايز أفكار عن إيه؟ (اختياري)"><button type="button" class="flw-btn" data-more="idea">اقترح</button></div>` : `
         <button type="button" class="flw-btn" data-more="idea" ${loading ? "disabled" : ""}>💡 اقترح أفكار تانية</button>
         <button type="button" class="flw-link" data-hint>🎯 وجّه المخ</button>`}
@@ -206,7 +208,7 @@ const Flow = (() => {
   }
   function scenCard(sc, fmt) {
     if (S.edit === sc.id) return scenForm(sc, fmt);
-    return `<article class="flw-card"><div class="flw-ch"><b>${esc(sc.title)}</b>${rateBtns("scenario", sc.id)}</div>
+    return `<article class="flw-card${S.seen.has(sc.id) ? "" : " in"}" data-cid="${esc(sc.id)}"><div class="flw-ch"><b>${esc(sc.title)}</b>${rateBtns("scenario", sc.id)}</div>
       ${sc.summary ? `<p>${esc(sc.summary)}</p>` : ""}${scenBody(sc, fmt)}${sc.caption ? `<small class="muted">✍️ ${esc(sc.caption)}</small>` : ""}
       <div class="flw-acts"><button type="button" class="flw-btn pri" data-pick-scen="${sc.id}">اختار السيناريو ده</button>
         <button type="button" class="flw-link" data-edit="${sc.id}">✏️ عدّل</button></div></article>`;
@@ -216,7 +218,7 @@ const Flow = (() => {
     const eps = d.format === "series" ? ` · ${d.episodes === "auto" ? "عدد الحلقات تلقائي" : `${d.episodes} حلقات`}` : "";
     return `${picked("idea")}<h2>اختار السيناريو</h2><p class="flw-sub">${FMT[d.format]?.[0] || ""} ${FMT[d.format]?.[1] || ""}${eps} — <button type="button" class="flw-link" data-go="format">غيّر النوع</button></p>
       <div class="flw-cards wide">${(d.scenarios || []).map((s) => scenCard(s, d.format)).join("")}${S.own ? scenForm({}, d.format) : ""}</div>
-      ${loading ? working("المخ بيكتب السيناريوهات…") : ""}
+      ${loading ? working("المخ بيكتب السيناريوهات…") : failed("scen")}
       <div class="flw-more">${S.hint ? `<div class="flw-chatrow"><input id="flwHint" placeholder="عايز السيناريو يبقى إزاي؟ (اختياري)"><button type="button" class="flw-btn" data-more="scen">اقترح</button></div>` : `
         <button type="button" class="flw-btn" data-more="scen" ${loading ? "disabled" : ""}>💡 اقترح سيناريوهات تانية</button>
         <button type="button" class="flw-link" data-hint>🎯 وجّه المخ</button>`}
@@ -286,20 +288,52 @@ const Flow = (() => {
   }
 
   // ---------------------------------------------------------------- الرسم
+  // الشاشة بتتبني مرة واحدة، وبعد كده بيتغير بس الجزء اللي اتغير فعلًا (من غير ما تختفي وتظهر كل شوية)
   function render() {
     const d = S.d;
     if (!d || !S.el) return;
     const st = d.stage === "generate" && (d.output || d.busy === "generate") ? "done" : d.stage;
     const body = { idea: stIdea, format: stFormat, scenario: stScenario, cast: stCast, assets: stAssets, generate: stGenerate, done: stDone }[st] || stIdea;
-    const scroll = S.el.querySelector(".flw-main")?.scrollTop || 0;
     if (S.stage && S.stage !== st) S.chat = null;   // النقاش بيتقفل لما تنتقل خطوة
-    S.el.innerHTML = `<div class="flw-box">
-      <header class="flw-head"><div class="flw-tpl"><small class="latin">Template</small><b>${esc(d.template.name)}</b>${d.brand_name ? `<small class="muted">لـ ${esc(d.brand_name)}</small>` : ""}</div>
-        ${stepper(d)}<div class="flw-hr">${meter(d.knowledge)}<button type="button" class="flw-x big" data-close aria-label="اقفل">✕</button></div></header>
-      <main class="flw-main">${body(d)}</main></div>`;
-    if (S.stage === st) S.el.querySelector(".flw-main").scrollTop = scroll;
+    if (!d.busy) S.busyFrom = null;
+    const head = `<div class="flw-tpl"><small class="latin">Template</small><b>${esc(d.template.name)}</b>${d.brand_name ? `<small class="muted">لـ ${esc(d.brand_name)}</small>` : ""}</div>
+        ${stepper(d)}<div class="flw-hr">${meter(d.knowledge)}<button type="button" class="flw-x big" data-close aria-label="اقفل">✕</button></div>`;
+    const main = body(d);
+    let box = S.el.querySelector(".flw-box[data-built]");
+    if (!box) {
+      S.el.innerHTML = `<div class="flw-box" data-built><header class="flw-head"></header><main class="flw-main"></main></div>`;
+      box = S.el.querySelector(".flw-box");
+      S.html = {};
+    }
+    if (S.html.head !== head) { box.querySelector(".flw-head").innerHTML = head; S.html.head = head; }
+    if (S.html.main !== main) {
+      const m = box.querySelector(".flw-main"), scroll = m.scrollTop;
+      // اللي بيكتبه العميل في خانة مفتوحة ميضيعش لو الشاشة اتحدثت
+      const keep = [...m.querySelectorAll("input[id], textarea[id]")].map((el) => [el.id, el.value]);
+      m.innerHTML = main;
+      keep.forEach(([id, v]) => { const el = m.querySelector(`#${id}`); if (el && !el.value) el.value = v; });
+      if (S.stage === st) m.scrollTop = scroll; else m.scrollTop = 0;
+      S.html.main = main;
+      m.querySelectorAll(".flw-card[data-cid]").forEach((c) => S.seen.add(c.dataset.cid));
+    }
     S.stage = st;
+    tick();
     if (st === "idea" && !S.seasons) loadSeasons();
+  }
+  // عدّاد «بقاله كام ثانية بيفكر» بيتحدث لوحده من غير ما يعيد رسم الشاشة
+  function tick() {
+    clearInterval(S.tickT);
+    const el = S.el?.querySelector("[data-secs]");
+    if (!el || !S.d?.busy) return;
+    S.busyFrom ??= Date.now() - (S.d.busy_for || 0) * 1000;
+    const up = () => {
+      const n = Math.round((Date.now() - S.busyFrom) / 1000);
+      const cur = S.el?.querySelector("[data-secs]");
+      if (!cur) return clearInterval(S.tickT);
+      cur.textContent = n < 3 ? "" : n < 45 ? `${n} ثانية` : `${n} ثانية · بياخد وقت أكتر من العادي، لو اتأخر أوي المخ هيجرّب موديل أسرع لوحده`;
+    };
+    up();
+    S.tickT = setInterval(up, 1000);
   }
   async function loadSeasons() {
     S.seasons = { status: "loading", items: [] };
@@ -345,6 +379,10 @@ const Flow = (() => {
     if (q("[data-cancel]")) { reset(); return render(); }
     if (q("[data-own]")) { S.own = true; S.edit = null; render(); return S.el.querySelector(".flw-form input")?.focus(); }
     if (q("[data-hint]")) { S.hint = true; render(); return S.el.querySelector("#flwHint")?.focus(); }
+    if ((b = q("[data-retry]"))) {
+      const idea = b.dataset.retry === "idea";
+      return call(idea ? "/ideas" : "/scenarios", { more: !!(idea ? S.d.ideas : S.d.scenarios)?.length });
+    }
     if ((b = q("[data-more]"))) {
       const hint = S.el.querySelector("#flwHint")?.value.trim() || "";
       S.hint = false;

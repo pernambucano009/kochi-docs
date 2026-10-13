@@ -371,7 +371,7 @@ def vision_candidates(preferred: str) -> list[str]:
     return out
 
 
-def chat(messages: list[dict], model: str, temperature: float = 0.8, max_tokens: int = 4000, json_mode: bool = False) -> str:
+def chat(messages: list[dict], model: str, temperature: float = 0.8, max_tokens: int = 4000, json_mode: bool = False, timeout: float = 180) -> str:
     rules, cta = (brand_rules() or "").strip(), (brand_cta() or "").strip()
     if (rules or cta) and not any(RULES_HEAD in str(m.get("content") or "") for m in messages):
         # أي كلام بيتكتب (سكريبت، تعليق صوتي، كابشن، برومبتات مشاهد) لازم يمشي على قواعد محتوى البراند
@@ -382,7 +382,7 @@ def chat(messages: list[dict], model: str, temperature: float = 0.8, max_tokens:
     body = {"model": model, "messages": messages, "temperature": temperature, "max_tokens": max_tokens, "stream": False}
     if json_mode:
         body["response_format"] = {"type": "json_object"}
-    with httpx.Client(timeout=180) as client:
+    with httpx.Client(timeout=timeout) as client:
         resp = client.post(f"{LLM_URL}/chat/completions", headers=_headers(), json=body)
         # بعض الموديلات مش بتقبل response_format، فنجرّب من غيره
         if json_mode and resp.status_code in (400, 422):

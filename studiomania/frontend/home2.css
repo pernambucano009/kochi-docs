@@ -1027,8 +1027,8 @@ body.nh-cl #nh .nh-ptop { grid-template-areas: "row row" "tabs head"; grid-templ
 .flw-sub { margin: 0 0 20px; color: var(--muted); font-size: 14px; line-height: 1.8; }
 .flw-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
 .flw-cards.wide { grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); }
-.flw-card { display: flex; flex-direction: column; gap: 10px; padding: 20px; border-radius: 22px; background: var(--card); box-shadow: 0 6px 24px rgba(24, 23, 24, .06);
-  animation: flw-card .5s cubic-bezier(.2, .8, .2, 1) both; }
+.flw-card { display: flex; flex-direction: column; gap: 10px; padding: 20px; border-radius: 22px; background: var(--card); box-shadow: 0 6px 24px rgba(24, 23, 24, .06); }
+.flw-card.in { animation: flw-card .5s cubic-bezier(.2, .8, .2, 1) both; }
 @keyframes flw-card { from { opacity: 0; transform: translateY(10px); } }
 .flw-card p { margin: 0; font-size: 14px; line-height: 1.8; }
 .flw-card small { font-size: 12.5px; line-height: 1.7; }

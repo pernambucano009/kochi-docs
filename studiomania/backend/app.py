@@ -18657,6 +18657,15 @@ import flow as fz  # noqa: E402
 FLOWS_DIR = ADS_DIR / "flows"   # تحت /media/ads عشان الملفات المرفوعة تتشاف
 FLOWS_DIR.mkdir(parents=True, exist_ok=True)
 FLOW_LOCK = threading.Lock()
+# الشغل اللي كان شغال قبل ما البرنامج يتقفل مش هيكمّل: نمسح «بيفكر» عشان المسار ميعلقش
+for _ff in FLOWS_DIR.glob("*/flow.json"):
+    try:
+        _fd = json.loads(_ff.read_text(encoding="utf-8"))
+        if _fd.get("busy"):
+            _fd.update(busy=None, error="البرنامج اتقفل والمخ بيفكر، دوس «جرّب تاني».")
+            _ff.write_text(json.dumps(_fd, ensure_ascii=False), encoding="utf-8")
+    except (OSError, ValueError):
+        pass
 
 
 def flow_path(fid: str) -> Path:
@@ -18697,6 +18706,10 @@ def flow_assets_list(d: dict) -> list[dict]:
 def flow_to_dict(fid: str, d: dict) -> dict:
     base = f"/media/ads/flows/{fid}"
     out = {**d, "id": fid, "assets": [{**a, "url": f"{base}/{a['file']}"} for a in d.get("assets") or []]}
+    if flow_stale(d):
+        out.update(busy=None, error="المخ اتأخر أو اتقطع (ممكن البرنامج اتقفل وهو بيفكر). دوس «جرّب تاني».")
+    elif d.get("busy"):
+        out["busy_for"] = round(time.time() - (d.get("busy_at") or time.time()))
     brain = flow_brain(d)
     out["knowledge"] = fz.knowledge(brain, BRAIN_FIELDS, BRAIN_KINDS)
     out["brand_name"] = (brain or {}).get("name") or ""
@@ -18805,8 +18818,24 @@ def flow_tpl(d: dict) -> dict:
     return tpl
 
 
+FLOW_FALLBACK = ("openai/gpt-5.4-mini", "deepseek-ai/deepseek-v4-flash")   # سريعين ومجرّبين على برومبتات المسار
+FLOW_STALE = 200   # ثانية: أي «بيفكر» أطول من كده يبقى اتقطع (السيرفر اتقفل مثلًا) ونسمح بالمحاولة تاني
+
+
 def flow_llm(messages: list[dict], what: str) -> dict:
-    return ad_json(series_chat(messages), what)
+    """رد المخ في المسار: كل موديل ليه دقيقة بالكتير، ولو الرد اتأخر أو جه بايظ بنجرّب موديل سريع تاني (مش بنستنى ربع ساعة)."""
+    errors = []
+    for model in dict.fromkeys([series_settings()["text_model"], *FLOW_FALLBACK]):
+        try:
+            reply = atlas.chat(messages, model, temperature=0.7, max_tokens=8000, json_mode=True, timeout=60)
+            return az.parse_json(reply, what)
+        except (atlas.AtlasError, httpx.HTTPError, ValueError) as exc:
+            errors.append(f"{model.split('/')[-1]}: {str(exc)[:90]}")
+    raise HTTPException(400, "المخ مقدرش يرد دلوقتي، جرّب تاني. (" + " | ".join(errors) + ")")
+
+
+def flow_brand(brain: dict | None, query: str) -> str:
+    return az.brain_text(brain, query)[:7000]   # ملف البراند الطويل جدًا بيبطّأ الرد من غير فايدة
 
 
 def flow_job(fid: str, what: str, fn) -> None:
@@ -18818,7 +18847,7 @@ def flow_job(fid: str, what: str, fn) -> None:
         except Exception as exc:  # noqa: BLE001
             msg = str(getattr(exc, "detail", None) or exc)[:300]
             flow_update(fid, lambda d: d.update(busy=None, error=msg))
-    flow_update(fid, lambda d: d.update(busy=what, error=None))
+    flow_update(fid, lambda d: d.update(busy=what, busy_at=time.time(), error=None))
     threading.Thread(target=run, daemon=True).start()
 
 
@@ -18830,7 +18859,7 @@ def flow_gen_ideas(fid: str, hint: str = "", more: bool = False) -> None:
     if atlas.mock_mode():
         raw = fz.mock_ideas(3, k, d["template"].get("name", ""))
     else:
-        raw = flow_llm(fz.ideas_messages(az.brain_text(brain, d["template"]["name"]), fz.prefs_text(brain), flow_tpl(d), flow_assets_list(d),
+        raw = flow_llm(fz.ideas_messages(flow_brand(brain, d["template"]["name"]), fz.prefs_text(brain), flow_tpl(d), flow_assets_list(d),
                                          3, avoid if more else [], hint, d.get("season") or ""), "الأفكار")
     items = [{"id": uuid.uuid4().hex[:8], **{x: str(i.get(x) or "")[:600] for x in ("title", "hook", "idea", "fit", "why")}}
              for i in (raw.get("ideas") or [])[:5] if isinstance(i, dict)]
@@ -18848,7 +18877,7 @@ def flow_gen_scenarios(fid: str, hint: str = "", more: bool = False) -> None:
     if atlas.mock_mode():
         raw = fz.mock_scenarios(d["format"], 2, d.get("episodes"))
     else:
-        raw = flow_llm(fz.scenarios_messages(az.brain_text(brain, idea_txt), fz.prefs_text(brain), flow_tpl(d), flow_assets_list(d), idea_txt,
+        raw = flow_llm(fz.scenarios_messages(flow_brand(brain, idea_txt), fz.prefs_text(brain), flow_tpl(d), flow_assets_list(d), idea_txt,
                                              d["format"], d.get("episodes") or "auto", [c["name"] for c in d.get("cast") or []], 2, avoid if more else [], hint),
                        "السيناريوهات")
     items = [{"id": uuid.uuid4().hex[:8], **s} for s in (raw.get("scenarios") or [])[:4] if isinstance(s, dict)]
@@ -18914,8 +18943,12 @@ class FlowGenIn(BaseModel):
     more: bool = False
 
 
+def flow_stale(d: dict) -> bool:
+    return bool(d.get("busy")) and time.time() - (d.get("busy_at") or 0) > FLOW_STALE
+
+
 def flow_idle(d: dict) -> None:
-    if d.get("busy"):
+    if d.get("busy") and not flow_stale(d):
         raise HTTPException(400, "المخ لسه شغال، استنى ثانية")
 
 
@@ -18969,7 +19002,7 @@ def flow_chat(fid: str, body: FlowChatIn):
     if atlas.mock_mode():
         raw = {"reply": "تمام، عدّلتها", "item": {**cur, "title": (cur.get("title") or "") + " ✓"}}
     else:
-        raw = flow_llm(fz.refine_messages(az.brain_text(brain, msg), fz.prefs_text(brain), flow_tpl(d), flow_assets_list(d), stage,
+        raw = flow_llm(fz.refine_messages(flow_brand(brain, msg), fz.prefs_text(brain), flow_tpl(d), flow_assets_list(d), stage,
                                           {k: v for k, v in cur.items() if k != "id"}, chat, d.get("format") or ""), "التعديل")
     item = raw.get("item") if isinstance(raw.get("item"), dict) else None
     reply = str(raw.get("reply") or "تمام")[:800]
@@ -19257,7 +19290,7 @@ def run_brain_seasons(bid: str) -> None:
         if atlas.mock_mode():
             raw = fz.mock_seasons(today)
         else:
-            raw = ad_json(series_chat(fz.seasons_messages(b.get("market", ""), b.get("audience", ""), b.get("domain", ""), today)), "المواسم")
+            raw = flow_llm(fz.seasons_messages(b.get("market", ""), b.get("audience", ""), b.get("domain", ""), today), "المواسم")
         data = {**fz.clean_seasons(raw), "for": f"{b.get('market', '')}|{b.get('audience', '')}", "made_at": now()}
         update_brain(bid, lambda d: d.update(seasons=data))
         SEASON_JOBS.pop(bid, None)
