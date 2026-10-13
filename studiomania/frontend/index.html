@@ -39,119 +39,16 @@
   <symbol id="i-box" viewBox="0 0 24 24"><path d="M4 7.5 12 4l8 3.5v9L12 20l-8-3.5z"/><path d="M4 7.5l8 3.5 8-3.5M12 11v9"/></symbol>
 </svg>
 <div id="nh"></div>
-<div class="bg-art" aria-hidden="true"><i class="blob b1"></i><i class="blob b2"></i><i class="blob b3"></i><i class="ring r1"></i><i class="ring r2"></i></div>
-
-<div class="app">
+<!-- أزرار مستخبية: الرئيسية الجديدة والصفحات بتدوس عليها (العميل، الإشعارات، الرصيد، اللغة، الإعدادات، الخروج) -->
+<div class="app" hidden>
   <aside class="rail">
     <button class="rail-btn client-btn" id="clientBtn" title="العميل اللي شغال عليه دلوقتي"><i class="client-av" id="clientAv">👤</i><span id="clientName" data-no-i18n>العميل</span></button>
-    <button class="rail-btn" data-goto="home" title="الرئيسية"><svg><use href="#i-home"/></svg><span>الرئيسية</span></button>
-    <span class="rail-sep"></span>
-    <p class="rail-label studio-only">المكتبات</p>
-    <button class="rail-btn studio-only" data-goto="8" title="صناعة الكاروسيل"><svg><use href="#i-slides"/></svg><span>الكاروسيل</span></button>
-    <button class="rail-btn studio-only" data-goto="9" title="المسلسلات"><svg><use href="#i-film"/></svg><span>المسلسلات</span></button>
-    <button class="rail-btn studio-only" data-goto="10" title="الإعلانات"><svg><use href="#i-spark"/></svg><span>الإعلانات</span></button>
-    <button class="rail-btn studio-only" data-goto="11" title="معمل التفكيك"><svg><use href="#i-lab"/></svg><span>معمل التفكيك</span></button>
-    <button class="rail-btn studio-only" data-goto="12" title="التايبوجرافي"><svg><use href="#i-type"/></svg><span>التايبوجرافي</span></button>
-    <button class="rail-btn studio-only" data-goto="14" title="القوالب"><svg><use href="#i-slides"/></svg><span>القوالب</span></button>
-    <button class="rail-btn studio-only" data-goto="13" title="الدبلجة باللهجات"><svg><use href="#i-globe"/></svg><span>الدبلجة</span></button>
-    <a class="rail-btn studio-only" href="/refs.html" title="أرشيف المراجع"><svg><use href="#i-box"/></svg><span>الأرشيف</span></a>
-    <span class="rail-sep"></span>
-    <button class="rail-btn" data-goto="15" title="الكومنتات والرسايل"><svg><use href="#i-chat"/></svg><span>الردود</span></button>
-    <button class="rail-btn" data-goto="4" title="الشخصيات"><svg><use href="#i-users"/></svg><span>الشخصيات</span></button>
-    <button class="rail-btn" data-goto="3" title="التعليق الصوتي"><svg><use href="#i-mic"/></svg><span>التعليق الصوتي</span></button>
-    <button class="rail-btn" data-goto="5" title="الموسيقى"><svg><use href="#i-music"/></svg><span>الموسيقى</span></button>
-    <span class="spacer"></span>
     <button class="rail-btn bell-btn" id="bellBtn" title="الإشعارات" aria-haspopup="true" aria-expanded="false"><svg><use href="#i-bell"/></svg><span>الإشعارات</span><b class="bell-n" hidden></b></button>
     <button class="rail-btn money-btn" id="moneyBtn" title="رصيد Atlas" hidden><b id="moneyVal">$—</b><span>Atlas</span></button>
     <button class="rail-btn" id="langToggle" title="English / عربي"><svg><use href="#i-globe"/></svg><span class="lang-code">EN</span></button>
     <button class="rail-btn" id="openSettings" title="الإعدادات"><svg><use href="#i-gear"/></svg><span>الإعدادات</span></button>
     <button class="rail-btn" id="logout" title="خروج"><svg><use href="#i-out"/></svg><span>خروج</span></button>
   </aside>
-
-  <div class="home" id="home">
-    <header class="top">
-      <div class="brand">
-        <svg class="logo-mark" viewBox="0 0 64 64" aria-hidden="true">
-          <circle cx="32" cy="32" r="31" fill="#111"/>
-          <path d="M24 19.5v25l20-12.5z" fill="#fff"/>
-          <circle cx="47" cy="17" r="4.5" fill="var(--accent)"/>
-        </svg>
-        <div class="wordmark"><b>Studio</b><span>Mania</span></div>
-      </div>
-      <span class="spacer"></span>
-      <div class="current-chip" id="currentChip" hidden></div>
-    </header>
-
-    <section class="hero">
-      <div class="date-badge"><b id="dateDay"></b></div>
-      <div class="date-text" id="dateText"></div>
-      <span class="hero-sep"></span>
-      <button class="btn pill primary" id="continueBtn"><span id="continueLabel">ابدأ مشروع</span><svg><use href="#i-arrow"/></svg></button>
-      <span class="spacer"></span>
-      <div class="greeting">
-        <h1 id="greetTitle">أهلاً، يللا نعمل فيديو 👋</h1>
-        <p id="greetSub">كل مربع خطوة. دوس عليه يفتح، وخلّص وكمّل للي بعده.</p>
-      </div>
-    </section>
-
-    <section class="bento" id="bento">
-      <article class="tile t-projects glass" data-open="0">
-        <header><span class="tile-num">01</span><span class="tile-ic"><svg><use href="#i-folder"/></svg></span><button class="tile-exp" tabindex="-1"><svg><use href="#i-max"/></svg></button></header>
-        <h2>المشاريع</h2>
-        <p class="tile-sub">كل مشروع فيه الفيديو الخام والتعليق والشخصية</p>
-        <ul class="proj-list" id="tileProjects"></ul>
-      </article>
-
-      <article class="tile t-cut glass" data-open="1">
-        <header><span class="tile-num">02</span><span class="tile-ic"><svg><use href="#i-cut"/></svg></span><button class="tile-exp" tabindex="-1"><svg><use href="#i-max"/></svg></button></header>
-        <h2>التقطيع</h2>
-        <p class="tile-big" id="tileCutBig">—</p>
-        <p class="tile-sub" id="tileCutSub"></p>
-      </article>
-
-      <article class="tile t-gen glass" data-open="2">
-        <header><span class="tile-num">03</span><span class="tile-ic"><svg><use href="#i-spark"/></svg></span><button class="tile-exp" tabindex="-1"><svg><use href="#i-max"/></svg></button></header>
-        <h2>التوليد بـ Seedance</h2>
-        <div class="dots" id="tileGenDots"></div>
-        <p class="tile-sub" id="tileGenSub"></p>
-      </article>
-
-      <article class="tile t-ring" data-open="current">
-        <svg class="ring-svg" viewBox="0 0 120 120"><circle cx="60" cy="60" r="59" class="ring-disc"/><circle cx="60" cy="60" r="47" class="ring-bg"/><circle cx="60" cy="60" r="47" class="ring-fg" id="ringFg"/></svg>
-        <div class="ring-text"><b id="ringPct">0%</b><span id="ringLabel">المشروع الحالي</span></div>
-      </article>
-
-      <article class="tile t-montage glass" data-open="6">
-        <header><span class="tile-num">04</span><span class="tile-ic"><svg><use href="#i-film"/></svg></span><button class="tile-exp" tabindex="-1"><svg><use href="#i-max"/></svg></button></header>
-        <h2><span class="emo">🎞️</span> المونتاج</h2>
-        <svg class="wave" viewBox="0 0 300 60" preserveAspectRatio="none"><path d="M0 40 C20 30 30 48 45 38 S70 20 85 34 S110 50 125 30 S150 8 165 30 S190 52 205 32 S230 12 245 36 S275 46 300 28"/></svg>
-        <p class="tile-sub" id="tileMontSub"></p>
-      </article>
-
-      <article class="tile t-publish glass" data-open="7">
-        <header><span class="tile-num">05</span><span class="tile-ic"><svg><use href="#i-send"/></svg></span><button class="tile-exp" tabindex="-1"><svg><use href="#i-max"/></svg></button></header>
-        <h2>النشر على السوشيال</h2>
-        <ul class="post-list" id="tilePosts"></ul>
-        <p class="tile-sub" id="tilePubSub"></p>
-      </article>
-
-      <article class="tile t-carousel glass studio-only" data-open="8">
-        <header><span class="tile-num new">جديد</span><span class="tile-ic"><svg><use href="#i-slides"/></svg></span><button class="tile-exp" tabindex="-1"><svg><use href="#i-max"/></svg></button></header>
-        <h2>صناعة الكاروسيل</h2>
-        <div class="car-stack" id="tileCarStack"><i></i><i></i><i></i></div>
-        <p class="tile-sub" id="tileCarSub">فكرة ← نص سعودي ← تصميم ← سلايدات</p>
-      </article>
-
-      <article class="tile t-libs glass">
-        <header><span class="tile-ic"><svg><use href="#i-box"/></svg></span><div><h2>المكتبات</h2><p class="tile-sub">حاجات بتختار منها جوه المشروع</p></div></header>
-        <div class="libs">
-          <button class="lib-card" data-open="4"><span class="tile-ic"><svg><use href="#i-users"/></svg></span><b>الشخصيات</b><small id="tileCoachSub"></small><div class="avatars" id="tileAvatars"></div></button>
-          <button class="lib-card" data-open="3"><span class="tile-ic"><svg><use href="#i-mic"/></svg></span><b>التعليق الصوتي</b><small id="tileVoiceSub"></small><div class="bars"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></button>
-          <button class="lib-card" data-open="5"><span class="tile-ic"><svg><use href="#i-music"/></svg></span><b>الموسيقى</b><small id="tileMusicSub"></small><div class="bars b2"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></button>
-        </div>
-      </article>
-    </section>
-  </div>
 </div>
 
 <div class="stage" id="stage" hidden>

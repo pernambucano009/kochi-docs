@@ -18,7 +18,7 @@
 :root[data-nh-theme="dark"] { color-scheme: dark; }
 :root[data-nh-theme="dark"] body.nh { background: #0c0c0e; }
 body.nh { background: #fff; overflow: hidden; }
-body.nh .app, body.nh .bg-art { display: none !important; }
+body.nh .app { display: none !important; }
 body.stage-settled #nh { visibility: hidden; }
 
 #nh { position: fixed; inset: 0; z-index: 1; background: var(--nh-bg); color: var(--nh-ink); font: 14px/1.5 var(--nh-arabic); -webkit-font-smoothing: antialiased; }

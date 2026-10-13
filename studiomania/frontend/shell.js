@@ -63,7 +63,7 @@ async function flowFolder(refresh = false) {
 // ---------- الشاشة الكبيرة ----------
 function tileFor(step) {
   step = { "6s": "9", "6a": "10" }[step] || step;
-  return document.querySelector(`#bento [data-open="${step}"]`) || document.querySelector(`.rail-btn[data-goto="${step}"]`);
+  return document.querySelector(`.rail-btn[data-goto="${step}"]`);
 }
 
 function openStage(step) {
@@ -95,7 +95,7 @@ function openStage(step) {
 }
 
 function closeStage() {
-  if ($("stage").hidden) { loadHome(); return; }
+  if ($("stage").hidden) return;
   const tile = tileFor(shell.step);
   shell.step = null;
   document.body.classList.remove("stage-open", "stage-settled");
@@ -103,7 +103,6 @@ function closeStage() {
     $("stage").hidden = true;
     document.querySelectorAll(".view").forEach((v) => (v.hidden = true));
   });
-  loadHome();
 }
 
 // المربع بيكبر من مكانه لحد ما يملا الشاشة، ولما تصغّره بيرجع مكانه
@@ -217,14 +216,6 @@ function nextFromMontage() {
   showStep("7");
 }
 
-// ---------- الرئيسية ----------
-function renderDate() {
-  const now = new Date();
-  const loc = document.documentElement.lang === "en" ? "en-US" : "ar-EG-u-nu-latn";
-  $("dateDay").textContent = now.toLocaleDateString(loc, { day: "numeric" });
-  $("dateText").innerHTML = `${now.toLocaleDateString(loc, { weekday: "short" })}${loc === "en-US" ? "," : "،"}<br>${now.toLocaleDateString(loc, { month: "long" })}`;
-}
-
 // الخطوة اللي المشروع وصلها (من 5)
 function folderStage(f) {
   if (!f) return { done: 0, next: "0" };
@@ -234,100 +225,6 @@ function folderStage(f) {
   if (!f.exported) return { done: 3, next: "6" };
   return { done: 4, next: "7" };
 }
-
-async function loadHome() {
-  renderDate();
-  const [folders, posts, videos, coaches, voices, music, projects] = await Promise.all([
-    shellFolders(true), api("/api/posts").catch(() => []), api("/api/videos").catch(() => []),
-    api("/api/coaches").catch(() => []), api("/api/audio?kind=voice").catch(() => []),
-    api("/api/audio?kind=music").catch(() => []), api("/api/projects").catch(() => []),
-  ]);
-  const cur = folders.find((f) => f.id === flowFolderId()) || folders[0] || null;
-  const st = folderStage(cur);
-
-  // الترحيب وزرار «كمّل»
-  $("greetTitle").textContent = cur ? `كمّل «${cur.name}»` : "أهلاً، يللا نعمل فيديو 👋";
-  $("greetSub").textContent = cur
-    ? `وصلت للخطوة ${st.done + 1} من 5 · الجاية: ${STEP_INFO[st.next].title}`
-    : "كل مربع خطوة. دوس عليه يفتح، وخلّص وكمّل للي بعده.";
-  $("continueLabel").textContent = cur ? `كمّل: ${STEP_INFO[st.next].title}` : "ابدأ مشروع";
-  $("continueBtn").onclick = () => {
-    if (cur) setFlowFolder(cur.id);
-    openFromTile(cur ? st.next : "0");
-  };
-  $("currentChip").hidden = !cur;
-  if (cur) $("currentChip").innerHTML = `<i></i>${escapeHtml(cur.name)}`;
-
-  // حلقة المشروع الحالي
-  const pct = Math.round((st.done / 5) * 100);
-  const C = 2 * Math.PI * 47;
-  $("ringFg").style.strokeDasharray = `${(C * pct) / 100} ${C}`;
-  $("ringPct").textContent = `${pct}%`;
-  $("ringLabel").textContent = cur ? cur.name : "مفيش مشروع لسه";
-  document.querySelector(".t-ring").dataset.open = cur ? st.next : "0";
-
-  // المشاريع
-  $("tileProjects").innerHTML = folders.length
-    ? folders.slice(0, 4).map((f) => {
-        const s = folderStage(f);
-        return `<li data-folder="${f.id}" class="${f.id === cur?.id ? "cur" : ""}"><span class="pname">${escapeHtml(f.name)}</span>
-          <span class="steps5">${[0, 1, 2, 3, 4].map((k) => `<i class="${k < s.done ? "on" : ""}"></i>`).join("")}</span></li>`;
-      }).join("") + (folders.length > 4 ? `<li class="more">+${folders.length - 4}</li>` : "")
-    : `<li class="empty-li">لسه مفيش مشاريع. افتح المربع واعمل أول مشروع</li>`;
-
-  // التقطيع
-  const clipsTotal = folders.reduce((n, f) => n + (f.video?.clips || 0), 0);
-  $("tileCutBig").textContent = `${videos.length}`;
-  $("tileCutSub").textContent = `فيديو خام · ${clipsTotal} قطعة`;
-
-  // التوليد: نقطة لكل قطعة، والملوّنة اتولّدت
-  const gens = folders.flatMap((f) => f.video ? Array.from({ length: f.video.clips }, (_, k) => k < f.video.generated) : []);
-  $("tileGenDots").innerHTML = gens.slice(0, 40).map((on) => `<i class="${on ? "on" : ""}"></i>`).join("") || `<i></i><i></i><i></i><i></i><i></i>`;
-  const genDone = gens.filter(Boolean).length;
-  $("tileGenSub").textContent = `${genDone} من ${gens.length} قطعة اتولّدت`;
-
-  // المونتاج
-  const exported = projects.filter((p) => p.export_id).length;
-  $("tileMontSub").textContent = `${projects.length} مشروع مونتاج · ${exported} اتصدّر`;
-  api("/api/carousels").then((list) => {
-    const done = list.filter((c) => c.slides && c.done === c.slides).length;
-    if (list.length) $("tileCarSub").textContent = `${list.length} كاروسيل · ${done} خلصان`;
-    const covers = list.filter((c) => c.cover).slice(0, 3);
-    document.querySelectorAll("#tileCarStack i").forEach((el, i) => {
-      el.style.background = covers[i] ? `center / cover url("${covers[i].cover}")` : "";
-    });
-  }).catch(() => {});
-
-  // النشر
-  const upcoming = posts.filter((p) => p.status === "scheduled").sort((a, b) => a.scheduled_at.localeCompare(b.scheduled_at));
-  const loc = document.documentElement.lang === "en" ? "en-US" : "ar-EG-u-nu-latn";
-  $("tilePosts").innerHTML = upcoming.slice(0, 3).map((p) => `<li><span>${escapeHtml(p.export_name || p.caption || "")}</span>
-    <b>${new Date(p.scheduled_at).toLocaleString(loc, { weekday: "short", hour: "numeric", minute: "2-digit" })}</b></li>`).join("");
-  $("tilePubSub").textContent = upcoming.length ? `${upcoming.length} بوست متجدول` : "مفيش بوستات متجدولة";
-
-  // المكتبات
-  $("tileCoachSub").textContent = `${coaches.length} شخصية`;
-  $("tileAvatars").innerHTML = coaches.slice(0, 4).map((c) => `<img src="${c.image_url}" alt="">`).join("");
-  $("tileVoiceSub").textContent = `${voices.length} تسجيل`;
-  $("tileMusicSub").textContent = `${music.length} تراك`;
-}
-
-function openFromTile(step) {
-  if (step === "current") step = "0";
-  showStep(step);
-}
-$("bento").addEventListener("click", (e) => {
-  const li = e.target.closest("[data-folder]");
-  if (li) {
-    // دوسة على مشروع في المربع: بيبقى المشروع الحالي ويفتح خطوته الجاية
-    const f = shell.folders.find((x) => x.id === li.dataset.folder);
-    setFlowFolder(f.id);
-    fol.current = f;
-    return openFromTile("0");
-  }
-  const tile = e.target.closest("[data-open]");
-  if (tile) openFromTile(tile.dataset.open);
-});
 
 // المشروع الحالي بيتعلّم لوحده في كل خطوة
 (() => {
