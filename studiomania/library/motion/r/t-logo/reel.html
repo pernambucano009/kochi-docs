@@ -1,0 +1,66 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// قالب «ظهور لوجو»: نقطة بتقع وتتنطط وتتمط، تتحول لدايرة بتترسم، أربع بتلات بتتفتح حواليها وتلف وتقف بنطة، الخلفية بتتقلب للون البراند
+// بدايرة بتكبر، الاسم بيظهر من ورا قناع، الجملة تحت، واللوجو بيلف لفة أخيرة. 1080×1920، 12 ثانية.
+const PR = M.params({
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "زهرة" },
+  tag: { label: "الجملة تحت الاسم", kind: "text", def: "ورد طازة لكل مناسبة" },
+  c1: { label: "اللون الأساسي", kind: "color", def: "#ff4f6d" },
+  c2: { label: "اللون التاني", kind: "color", def: "#ffb347" },
+  bg: { label: "لون الخلفية", kind: "color", def: "#fff6ec" },
+});
+const W = 1080, H = 1920, DUR = 12, CX = 540, CY = 820;
+const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
+
+M.reel({
+  W, H, DUR, bg: PR.bg,
+  async init(M) { await Promise.all([loadFont("LZ", "SM-Lalezar.ttf"), loadFont("TJ", "SM-Tajawal.ttf")]); const c = M.canvas(W, H); return { x: c.getContext("2d") }; },
+  seek(t, C, M) {
+    const { x } = C, { seg, cubicIO, clamp, springO, expo, smooth } = M, io = (k) => cubicIO(clamp(k));
+    x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = PR.bg; x.fillRect(0, 0, W, H);
+    // الخلفية بتتقلب للون البراند بدايرة بتكبر من نص اللوجو
+    const fl = io(seg(t, 4.2, 5.2)), dark = fl > .5;
+    if (fl > 0) { x.fillStyle = PR.c1; x.beginPath(); x.arc(CX, CY, 2300 * fl, 0, Math.PI * 2); x.fill(); }
+    const ink = fl > 0 ? "#fff" : PR.c1, ink2 = fl > 0 ? "#fff" : PR.c2;
+    // ١) النقطة بتقع وتتنطط
+    if (t < 1.4) {
+      const k = clamp(t / .7); let y, sx = 1, sy = 1;
+      if (t < .7) { y = -100 + (CY + 100) * (k * k); sy = 1 + k * .3; sx = 1 / sy; }
+      else { const b = (t - .7) / .7; y = CY - Math.sin(Math.PI * clamp(b)) * 180 * (1 - b * .3); const sq = Math.max(0, 1 - (t - .7) / .12); sx = 1 + .5 * sq; sy = 1 - .4 * sq; }
+      x.save(); x.translate(CX, y); x.scale(sx, sy); x.fillStyle = PR.c1; x.beginPath(); x.arc(0, 0, 40, 0, Math.PI * 2); x.fill(); x.restore();
+    } else {
+      // ٢) الدايرة بتترسم + البتلات بتتفتح وتلف
+      const rk = io(seg(t, 1.4, 2.2)), pk = springO(clamp((t - 2.0) / 1.1), 9, .55), rot = -Math.PI / 2 * (1 - io(seg(t, 2.0, 3.6))) + Math.PI / 4 * springO(clamp((t - 3.3) / .9), 10, .5) + Math.PI / 2 * springO(clamp((t - 8.6) / 1.0), 9, .5) + Math.sin(t * 1.2) * .03 * smooth(seg(t, 5, 6));
+      const lift = -120 * io(seg(t, 5.0, 6.0)), sc = 1 - .12 * io(seg(t, 5.0, 6.0));
+      x.save(); x.translate(CX, CY + lift); x.scale(sc, sc);
+      // البتلات (أربع أنصاص دواير بلونين)
+      x.save(); x.rotate(rot);
+      for (let i = 0; i < 4; i++) { x.save(); x.rotate(i * Math.PI / 2); x.translate(0, -150 * pk); x.scale(pk, pk);
+        x.fillStyle = i % 2 ? ink2 : ink; x.globalAlpha = fl > 0 ? (i % 2 ? .75 : 1) : 1; x.beginPath(); x.moveTo(-110, 40); x.arc(0, 40, 110, Math.PI, 0); x.closePath(); x.fill(); x.restore(); }
+      x.restore(); x.globalAlpha = 1;
+      // القلب: دايرة بحد بتترسم
+      x.lineWidth = 26; x.strokeStyle = ink; x.lineCap = "round"; x.beginPath(); x.arc(0, 0, 70, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * rk); x.stroke();
+      x.fillStyle = fl > 0 ? PR.c1 : PR.bg; x.beginPath(); x.arc(0, 0, 57 * rk, 0, Math.PI * 2); x.fill();
+      x.fillStyle = ink2; x.beginPath(); x.arc(0, 0, 22 * springO(clamp((t - 2.4) / .6), 14, .5), 0, Math.PI * 2); x.fill();
+      x.restore();
+      // حلقة نقط بتطير لحظة الوقفة
+      const pr = seg(t, 3.4, 4.4); if (pr > 0 && pr < 1) for (let i = 0; i < 16; i++) { const a = i / 16 * Math.PI * 2, r = 300 + 220 * expo(pr); x.globalAlpha = 1 - pr; x.fillStyle = i % 2 ? PR.c2 : PR.c1; x.beginPath(); x.arc(CX + Math.cos(a) * r, CY + Math.sin(a) * r, 12 * (1 - pr), 0, Math.PI * 2); x.fill(); } x.globalAlpha = 1;
+    }
+    // ٣) الاسم من ورا قناع
+    const nk = io(seg(t, 5.4, 6.3));
+    if (nk > 0) { x.save(); x.beginPath(); x.rect(0, 940, W, 330); x.clip(); x.fillStyle = dark ? "#fff" : PR.c1; x.font = `${M.fit(PR.brand, "LZ", 880, 260, 90)}px LZ`; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.brand, CX, 1180 + (1 - nk) * 280); x.restore(); }
+    const tk = io(seg(t, 6.2, 6.9)); if (tk > 0) { x.globalAlpha = tk; x.fillStyle = dark ? "rgba(255,255,255,.92)" : "#3a2a2a"; x.font = `400 ${M.fit(PR.tag, "TJ", 860, 60, 30)}px TJ`; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.tag, CX, 1340 + (1 - tk) * 20); x.globalAlpha = 1; }
+    // خط صغير ونفس هادي في الآخر
+    const lk = io(seg(t, 7.2, 8.0)); if (lk > 0) { x.fillStyle = dark ? "rgba(255,255,255,.6)" : PR.c2; x.fillRect(CX - 70 * lk, 1400, 140 * lk, 6); }
+  },
+  sound(A) {
+    const N = A.midi;
+    A.whoosh(0, .7, .05); A.kick(.7, .5); A.tone(.7, N(72), .15, "sine", .1); A.tone(1.3, N(79), .1, "sine", .05);
+    for (let i = 0; i < 8; i++) A.tone(1.4 + i * .1, N(72 + i * 2), .2, "sine", .03);
+    A.whoosh(2.0, 1.2, .07); A.hit(3.4, .4); A.pluck(3.4, N(84), .12, 1.4); A.pluck(3.45, N(91), .08, 1.4);
+    A.riser(3.5, .8, .05); A.kick(4.2, .7); A.nz(4.2, .6, "lowpass", 1200, .15, .8);
+    A.pad(4.2, [N(48), N(55), N(60), N(64), N(67)], 7.8, .035); A.pluck(5.4, N(76), .1, 1.6); A.pluck(6.2, N(79), .08, 1.6); A.whoosh(8.4, .5, .05); A.hit(8.7, .3); A.pluck(8.7, N(88), .08, 1.6);
+  },
+});
+</script>
+</body></html>

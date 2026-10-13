@@ -1,0 +1,109 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// قالب «رسم أيزومتري»: رسم تقني أبيض وأسود بخطوط رفيعة ولون واحد مميز، بيحكي رحلة الطلب: ضغطة على الموبايل، الكرتونة على السير،
+// العربية بتمشي وعجلها بيلف، والكرتونة بتنط لحد باب البيت وتتعلّم صح. الكاميرا ماشية مع الكرتونة. 1080×1920، 12 ثانية.
+const PR = M.params({
+  title: { label: "العنوان", kind: "text", role: "product", def: "من الضغطة لباب البيت" },
+  steps: { label: "الخطوات (٤ سطور)", kind: "lines", def: ["اطلب", "بنجهّز", "بنوصّل", "وصل"] },
+  end: { label: "الجملة الأخيرة", kind: "text", def: "توصيل في نفس اليوم" },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "شنطة" },
+  accent: { label: "لون التمييز", kind: "color", def: "#ff6b2c" },
+});
+const W = 1080, H = 1920, DUR = 12, S = 80, CS = .866;
+const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
+
+M.reel({
+  W, H, DUR, bg: "#060606",
+  async init(M) { await Promise.all([loadFont("PB", "TY-PlexArabic-700.ttf", "700"), loadFont("PX", "TY-PlexArabic-400.ttf")]); const c = M.canvas(W, H); return { x: c.getContext("2d") }; },
+  seek(t, C, M) {
+    const { x } = C, { seg, cubicIO, clamp, smooth, springO, expo } = M, io = (k) => cubicIO(clamp(k)), A = PR.accent;
+    x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = "#060606"; x.fillRect(0, 0, W, H);
+    // نقط شبكة خفيفة
+    // الكاميرا: بتتبع نقطة على محور u
+    const fu = t < 1.6 ? .5 : t < 4.6 ? .5 + 8.5 * io(seg(t, 1.6, 4.6)) : t < 8.2 ? 9 + 8 * io(seg(t, 4.8, 8.2)) : 17 + 3 * io(seg(t, 8.2, 9.4));
+    const ox = 540 - fu * CS * S, oy = 1150 - fu * .5 * S;
+    const P = (u, d, z) => [ox + (u - d) * CS * S, oy + (u + d) * .5 * S - z * S];
+    const poly = (pts, fill = "#060606", stroke = "#fff", lw = 2.5) => { x.beginPath(); pts.forEach((p, i) => (i ? x.lineTo(...p) : x.moveTo(...p))); x.closePath(); if (fill) { x.fillStyle = fill; x.fill(); } if (stroke) { x.strokeStyle = stroke; x.lineWidth = lw; x.lineJoin = "round"; x.stroke(); } };
+    const box = (u, d, z, w, l, h, o = {}) => {
+      poly([P(u + w, d, z), P(u + w, d + l, z), P(u + w, d + l, z + h), P(u + w, d, z + h)], o.fr || "#060606");
+      poly([P(u, d + l, z), P(u + w, d + l, z), P(u + w, d + l, z + h), P(u, d + l, z + h)], o.fl || "#060606");
+      poly([P(u, d, z + h), P(u + w, d, z + h), P(u + w, d + l, z + h), P(u, d + l, z + h)], o.top || "#060606");
+      if (o.glare) { poly([P(u + w * .15, d, z + h), P(u + w * .3, d, z + h), P(u + w * .3, d + l, z + h), P(u + w * .15, d + l, z + h)], "#fff", null); }
+    };
+    const grid = () => { x.fillStyle = "rgba(255,255,255,.14)"; for (let u = Math.floor(fu) - 14; u < fu + 14; u++) for (let d = -8; d < 8; d++) { const [px, py] = P(u, d, 0); if (px > -20 && px < W + 20 && py > 520 && py < 1620) x.fillRect(px - 1.5, py - 1.5, 3, 3); } };
+    grid();
+    // الطريق والسير
+    poly([P(-1, -.2, 0), P(9, -.2, 0), P(9, 1.4, 0), P(-1, 1.4, 0)], null, "rgba(255,255,255,.25)", 1.5);
+    poly([P(9.5, -.4, 0), P(26, -.4, 0), P(26, 2.2, 0), P(9.5, 2.2, 0)], null, "#fff", 2);
+    x.setLineDash([18, 16]); x.strokeStyle = "rgba(255,255,255,.45)"; x.lineWidth = 2; x.beginPath(); x.moveTo(...P(9.5, .9, 0)); x.lineTo(...P(26, .9, 0)); x.stroke(); x.setLineDash([]);
+    // البيت (ورا الطريق)
+    const hu = 19.5, hd = -4.4;
+    box(hu, hd, 0, 3, 3, 2.2);
+    poly([P(hu + 1.5, hd, 3.6), P(hu + 3, hd, 2.2), P(hu + 3, hd + 3, 2.2), P(hu + 1.5, hd + 3, 3.6)], "#060606");
+    poly([P(hu, hd + 3, 2.2), P(hu + 3, hd + 3, 2.2), P(hu + 1.5, hd + 3, 3.6)], "#060606");
+    poly([P(hu + 1.7, hd, 3.45), P(hu + 1.9, hd, 3.3), P(hu + 1.9, hd + 3, 3.3), P(hu + 1.7, hd + 3, 3.45)], "#fff", null);
+    const dl = clamp(seg(t, 9.0, 9.3));
+    poly([P(hu + 1.1, hd + 3, 0), P(hu + 1.9, hd + 3, 0), P(hu + 1.9, hd + 3, 1.4), P(hu + 1.1, hd + 3, 1.4)], dl > 0 ? A : "#060606");
+    poly([P(hu + .3, hd + 3, 1.2), P(hu + .8, hd + 3, 1.2), P(hu + .8, hd + 3, 1.8), P(hu + .3, hd + 3, 1.8)], "#060606"); poly([P(hu + 2.2, hd + 3, 1.2), P(hu + 2.7, hd + 3, 1.2), P(hu + 2.7, hd + 3, 1.8), P(hu + 2.2, hd + 3, 1.8)], "#060606");
+    // الموبايل
+    const pu = -.6, pd = -1.2;
+    box(pu, pd, 0, .35, 2, 3.6, { glare: false });
+    const sc = (a, b, c, e) => [P(pu + .35, pd + a, b), P(pu + .35, pd + c, b), P(pu + .35, pd + c, e), P(pu + .35, pd + a, e)];
+    poly(sc(.15, .3, 1.85, 3.3), "#060606", "rgba(255,255,255,.6)", 1.5);
+    const tap = seg(t, .7, 1.1), pressed = t > .9 && t < 1.2;
+    poly(sc(.4, .7, 1.6, 1.2), pressed ? "#fff" : A, null);
+    for (let k = 0; k < 3; k++) poly(sc(.4, 2.9 - k * .45, 1.6 - k * .3, 3.05 - k * .45), "rgba(255,255,255,.5)", null);
+    if (tap > 0 && tap < 1) { const [cx, cy] = P(pu + .35, pd + 1, .95); x.strokeStyle = A; x.lineWidth = 3; x.beginPath(); x.ellipse(cx, cy, 70 * tap, 50 * tap, 0, 0, Math.PI * 2); x.globalAlpha = 1 - tap; x.stroke(); x.globalAlpha = 1; }
+    // السير ببكراته
+    box(1, 0, 0, 8, 1.2, .5);
+    for (let k = 0; k < 9; k++) { const [cx, cy] = P(1.5 + k, 1.2, .25); x.strokeStyle = "#fff"; x.lineWidth = 2; x.beginPath(); x.ellipse(cx, cy, 10, 13, -.5, 0, Math.PI * 2); x.stroke(); const a = t * 8; x.beginPath(); x.moveTo(cx, cy); x.lineTo(cx + Math.cos(a) * 9, cy + Math.sin(a) * 11); x.stroke(); }
+    for (let k = 0; k < 16; k++) { const uu = 1 + ((k * .5 + t * 1.4) % 8); x.strokeStyle = "rgba(255,255,255,.4)"; x.lineWidth = 1.5; x.beginPath(); x.moveTo(...P(uu, .1, .5)); x.lineTo(...P(uu, 1.1, .5)); x.stroke(); }
+    // العربية
+    const vu = 10 + 6 * io(seg(t, 5.0, 8.0)) , vd = .1, wheel = (u, d) => { x.strokeStyle = "#fff"; x.lineWidth = 2.5; x.fillStyle = "#060606"; x.beginPath(); for (let k = 0; k <= 24; k++) { const a = k / 24 * Math.PI * 2; const [px, py] = P(u + Math.cos(a) * .42, d, .42 + Math.sin(a) * .42); k ? x.lineTo(px, py) : x.moveTo(px, py); } x.fill(); x.stroke();
+      const sp = -(vu - 10) / .42; for (let k = 0; k < 3; k++) { const a = sp + k * 2.09; x.beginPath(); x.moveTo(...P(u, d, .42)); x.lineTo(...P(u + Math.cos(a) * .36, d, .42 + Math.sin(a) * .36)); x.stroke(); } };
+    // الكرتونة (موقعها حسب الوقت)
+    let bu, bd2 = .2, bz = .5, show = true;
+    if (t < 1.0) show = false;
+    else if (t < 1.6) { const k = springO((t - 1.0) / .6, 12, .6); bu = pu + .4 + .9 * k; bz = .5 + Math.sin(Math.PI * clamp((t - 1) / .6)) * 1.2; bd2 = .2; }
+    else if (t < 4.6) { bu = 1.3 + 6.9 * io(seg(t, 1.6, 4.6)); }
+    else if (t < 5.0) { const k = seg(t, 4.6, 5.0); bu = 8.2 + 2.6 * k; bz = .5 + Math.sin(Math.PI * k) * 1.5 + (1.0 - .5) * k; }
+    else if (t < 8.2) show = false;
+    else { const k = seg(t, 8.2, 9.0); const su = vu + 1.5, sd = vd + .4, eu = hu + 1.1, ed = hd + 3.15; bu = su + (eu - su) * k; bd2 = sd + (ed - sd) * k; bz = 1.1 * (1 - k) + Math.abs(Math.sin(Math.PI * k * 2)) * 1.0; }
+    const pkg = () => { box(bu, bd2, bz, .8, .8, .7, { top: "#060606" }); poly([P(bu + .32, bd2, bz + .7), P(bu + .48, bd2, bz + .7), P(bu + .48, bd2 + .8, bz + .7), P(bu + .32, bd2 + .8, bz + .7)], A, null); };
+    // ترتيب الرسم: الكرتونة ورا العربية لو جوه
+    if (show && t < 5.0) pkg();
+    box(vu, vd, .3, 3, 1.6, 1.9, { glare: true });
+    box(vu + 3, vd, .3, 1.1, 1.6, 1.3);
+    poly([P(vu + 4.1, vd + .2, .9), P(vu + 4.1, vd + 1.4, .9), P(vu + 4.1, vd + 1.4, 1.45), P(vu + 4.1, vd + .2, 1.45)], "#fff", null);
+    wheel(vu + .7, vd + 1.6); wheel(vu + 3.5, vd + 1.6);
+    // اسم البراند على جنب العربية
+    { const [cx, cy] = P(vu + 1.5, vd + 1.6, 1.25); x.save(); x.setTransform(CS, .5, 0, 1, cx, cy); x.fillStyle = A; x.font = "700 50px PB"; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.brand, 0, 16); x.restore(); }
+    if (t > 5.0 && t < 8.2) { for (let k = 0; k < 4; k++) { const [px, py] = P(vu - .4 - k * .5, vd + .8 + (k % 2) * .4, .5 + (k % 2) * .4); x.strokeStyle = `rgba(255,255,255,${.5 - k * .1})`; x.lineWidth = 2; x.beginPath(); x.moveTo(px, py); x.lineTo(px - 40, py - 22); x.stroke(); } }
+    if (show && t >= 8.2) pkg();
+    // صح فوق الباب
+    const ck = springO(clamp((t - 9.0) / .6), 12, .55);
+    if (t > 9.0) { const [cx, cy] = P(hu + 1.5, hd + 3, 2.4); x.save(); x.translate(cx, cy - 40); x.scale(ck, ck); x.fillStyle = A; x.beginPath(); x.arc(0, 0, 46, 0, Math.PI * 2); x.fill(); x.strokeStyle = "#060606"; x.lineWidth = 10; x.lineCap = "round"; x.beginPath(); x.moveTo(-18, 0); x.lineTo(-4, 14); x.lineTo(20, -12); x.stroke(); x.restore(); }
+    // واجهة فوق: العنوان والخطوات
+    x.setTransform(1, 0, 0, 1, 0, 0);
+    const ta = io(seg(t, .1, .7)); x.globalAlpha = ta; x.fillStyle = "#fff"; x.font = `700 ${M.fit(PR.title, "PB", 900, 76, 40, "700")}px PB`; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.title, 540, 250);
+    const st = PR.steps.slice(0, 4), cur = t < 1.6 ? 0 : t < 4.8 ? 1 : t < 8.6 ? 2 : 3, sx = (i) => 900 - i * 240;
+    x.strokeStyle = "rgba(255,255,255,.35)"; x.lineWidth = 2; x.beginPath(); x.moveTo(sx(0), 370); x.lineTo(sx(3), 370); x.stroke();
+    x.strokeStyle = A; x.lineWidth = 4; x.beginPath(); x.moveTo(sx(0), 370); x.lineTo(sx(0) - 240 * Math.min(3, cur + 0), 370); x.stroke();
+    st.forEach((s, i) => { const on = i <= cur; x.fillStyle = on ? A : "#060606"; x.strokeStyle = on ? A : "rgba(255,255,255,.5)"; x.lineWidth = 3; x.beginPath(); x.arc(sx(i), 370, i === cur ? 18 : 13, 0, Math.PI * 2); x.fill(); x.stroke();
+      x.fillStyle = on ? "#fff" : "rgba(255,255,255,.45)"; x.font = `${i === cur ? 700 : 400} 38px ${i === cur ? "PB" : "PX"}`; x.textAlign = "center"; x.fillText(s, sx(i), 440); });
+    x.globalAlpha = 1;
+    const ea = io(seg(t, 9.8, 10.5)); if (ea > 0) { x.globalAlpha = ea; x.strokeStyle = "#fff"; x.lineWidth = 2.5; x.strokeRect(140, 1650 + (1 - ea) * 30, 800, 150); x.fillStyle = "#fff"; x.font = `700 ${M.fit(PR.end, "PB", 720, 72, 36, "700")}px PB`; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.end, 540, 1750 + (1 - ea) * 30);
+      x.fillStyle = A; x.fillRect(140, 1650 + (1 - ea) * 30, 14, 150); x.globalAlpha = 1; }
+  },
+  sound(A) {
+    const N = A.midi;
+    A.click(.9, .15); A.tone(.9, N(88), .1, "sine", .08); A.whoosh(1.0, .5, .06);
+    for (let i = 0; i < 24; i++) { A.hat(i * .5 + .25, .03); if (i % 2 === 0) A.kick(i * .5, .3); }
+    for (let k = 0; k < 12; k++) A.click(1.6 + k * .25, .04);
+    A.hit(5.0, .25); A.nz(5.0, 3.2, "lowpass", 300, .08, 1); A.bass(5.0, 55, 3.0, .08);
+    for (let b = 0; b < 6; b++) A.pluck(b * 2, N([62, 65, 60, 67, 62, 69][b]), .06, 1.2);
+    A.tone(8.4, N(84), .08, "sine", .06); A.tone(8.7, N(84), .08, "sine", .06); A.tone(9.0, N(91), .3, "sine", .08); A.pad(9.0, [N(50), N(57), N(62), N(66)], 3, .03);
+  },
+});
+</script>
+</body></html>

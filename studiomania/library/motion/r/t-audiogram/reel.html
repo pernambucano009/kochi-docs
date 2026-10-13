@@ -1,0 +1,95 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// قالب «أوديوجرام بودكاست»: كارت الحلقة بغلاف بيتنفّس، موجة صوت بتتحرك مع الكلام، والجملة بتظهر كلمة كلمة والكلمة الحالية متعلّمة،
+// وشريط تقدّم بالوقت، وفي الآخر "اسمع الحلقة كاملة" والبراند. 1080×1920، 12 ثانية.
+const PR = M.params({
+  show: { label: "اسم البودكاست", kind: "text", role: "brand", def: "فنجان الصبح" },
+  ep: { label: "عنوان الحلقة", kind: "text", role: "product", def: "الحلقة ١٢ · إزاي تبدأ مشروعك" },
+  lines: { label: "الجمل (كل سطر جملة)", kind: "lines", def: ["أول خطوة مش إنك تبقى جاهز", "أول خطوة إنك تبدأ بالموجود", "والباقي بيتعلّم وانت ماشي"] },
+  cta: { label: "الجملة الأخيرة", kind: "text", def: "اسمع الحلقة كاملة" },
+  color: { label: "لون التمييز", kind: "color", def: "#ff5a36" },
+  bg: { label: "لون الخلفية", kind: "color", def: "#171320" },
+});
+const W = 1080, H = 1920, DUR = 12, L0 = 1.2, LD = 2.8;
+const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
+const ar = (s) => String(s).replace(/\d/g, (d) => "٠١٢٣٤٥٦٧٨٩"[d]);
+const LINES = PR.lines.slice(0, 3);
+
+M.reel({
+  W, H, DUR, bg: PR.bg,
+  async init(M) {
+    await Promise.all([loadFont("PB", "TY-PlexArabic-700.ttf", "700"), loadFont("PX", "TY-PlexArabic-400.ttf"), loadFont("LZ", "SM-Lalezar.ttf")]);
+    const c = M.canvas(W, H), x = c.getContext("2d");
+    // توقيت كل كلمة + مكانها (من اليمين للشمال، بلفّ لسطرين لو طويلة)
+    x.font = "700 64px PB"; const sp = 36;
+    const L = LINES.map((s, li) => { const ws = s.split(/\s+/).filter(Boolean), t0 = L0 + li * LD, step = (LD - .7) / Math.max(1, ws.length);
+      const rows = [[]]; let w = 0; ws.forEach((wd) => { const ww = x.measureText(wd).width; if (w + ww > 900 && rows[rows.length - 1].length) { rows.push([]); w = 0; } rows[rows.length - 1].push({ wd, ww }); w += ww + sp; });
+      const out = []; let k = 0; rows.forEach((r, ri) => { const tot = r.reduce((a, b) => a + b.ww, 0) + sp * (r.length - 1); let px = 540 + tot / 2; r.forEach((o) => { out.push({ ...o, x: px, row: ri, nrow: rows.length, t: t0 + k * step, step }); px -= o.ww + sp; k++; }); });
+      return { t0, words: out }; });
+    return { x, L };
+  },
+  seek(t, C, M) {
+    const { x, L } = C, { seg, smooth, expo, cubicIO, springO, clamp, hash, noise1 } = M, A = PR.color, io = (k) => cubicIO(clamp(k));
+    x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = PR.bg; x.fillRect(0, 0, W, H);
+    // هالة لونية بتتحرك ببطء
+    const g = x.createRadialGradient(540 + Math.sin(t * .4) * 160, 640, 50, 540, 700, 900); g.addColorStop(0, A + "55"); g.addColorStop(1, A + "00"); x.fillStyle = g; x.fillRect(0, 0, W, H);
+    // صوت الكلام (تقريبي): نبضات مع كل كلمة
+    const env = (tt) => { let e = 0; for (const l of L) for (const w of l.words) { const d = tt - w.t; if (d > -.03 && d < w.step * .9) e = Math.max(e, Math.sin(Math.PI * clamp(d / (w.step * .9))) * (.7 + .3 * hash(w.t * 10))); } return e; };
+    const e0 = env(t);
+    // ١) الشارة فوق
+    const ka = io(seg(t, .1, .6)); x.globalAlpha = ka; x.font = "700 40px PB"; x.direction = "rtl"; x.textAlign = "center"; const sw = x.measureText(PR.show).width + 110;
+    x.fillStyle = "rgba(255,255,255,.08)"; x.beginPath(); x.roundRect(540 - sw / 2, 150, sw, 76, 38); x.fill(); x.fillStyle = A; x.beginPath(); x.arc(540 + sw / 2 - 40, 188, 10 + 3 * Math.sin(t * 6), 0, Math.PI * 2); x.fill();
+    x.fillStyle = "#f4f0f8"; x.fillText(PR.show, 540 - 14, 202); x.globalAlpha = 1;
+    // ٢) الغلاف: كارت مربع بيتنفّس مع الصوت
+    const ck = springO(clamp((t - .2) / 1.2), 9, .7), cs = 600 * (.8 + .2 * ck) * (1 + e0 * .015), cy = 640;
+    x.save(); x.globalAlpha = clamp(ck * 1.4); x.translate(540, cy); x.rotate(Math.sin(t * .6) * .015);
+    x.shadowColor = "rgba(0,0,0,.5)"; x.shadowBlur = 60; x.shadowOffsetY = 30; const cg = x.createLinearGradient(-cs / 2, -cs / 2, cs / 2, cs / 2); cg.addColorStop(0, A); cg.addColorStop(1, "#2b1e5a");
+    x.fillStyle = cg; x.beginPath(); x.roundRect(-cs / 2, -cs / 2, cs, cs, 44); x.fill(); x.shadowBlur = 0; x.shadowOffsetY = 0;
+    x.save(); x.clip(); for (let r = 0; r < 7; r++) { x.strokeStyle = `rgba(255,255,255,${.1 - r * .012})`; x.lineWidth = 3; x.beginPath(); x.arc(0, 0, 80 + r * 52 + ((t * 40) % 52) + e0 * 10, 0, Math.PI * 2); x.stroke(); } x.restore();
+    // مايك
+    x.fillStyle = "#fff"; x.beginPath(); x.roundRect(-48, -150, 96, 170, 48); x.fill(); x.strokeStyle = "#fff"; x.lineWidth = 14; x.lineCap = "round"; x.beginPath(); x.arc(0, -40, 86, .15, Math.PI - .15); x.stroke(); x.beginPath(); x.moveTo(0, 46); x.lineTo(0, 100); x.moveTo(-50, 104); x.lineTo(50, 104); x.stroke();
+    x.fillStyle = A; for (let k = 0; k < 4; k++) x.fillRect(-30, -120 + k * 26, 60, 8);
+    x.restore(); x.globalAlpha = 1;
+    // ٣) عنوان الحلقة
+    const ea = io(seg(t, .6, 1.1)); x.globalAlpha = ea; x.fillStyle = "#cfc8db"; x.font = `400 ${M.fit(PR.ep, "PX", 900, 44, 28)}px PX`; x.textAlign = "center"; x.direction = "rtl"; x.fillText(ar(PR.ep), 540, 1040); x.globalAlpha = 1;
+    // ٤) موجة الصوت
+    const NB = 46, bw = 12, gap = (880 - NB * bw) / (NB - 1), wy = 1190, wa = io(seg(t, .8, 1.3));
+    for (let i = 0; i < NB; i++) { const u = i / (NB - 1), prof = Math.pow(Math.sin(Math.PI * u), .7), e = env(t - Math.abs(u - .5) * .25);
+      const h = 8 + wa * (14 + 120 * prof * (e * (.55 + .45 * Math.abs(noise1(t * 9 + i * .7))) + .06 * (1 + Math.sin(t * 3 + i)))), px = 100 + i * (bw + gap);
+      x.fillStyle = (1 - u) <= clamp(seg(t, 0, DUR)) ? A : "rgba(255,255,255,.35)"; x.beginPath(); x.roundRect(px, wy - h / 2, bw, h, 6); x.fill(); }
+    // ٥) الكلام: كلمة كلمة، الحالية عليها كبسولة
+    L.forEach((l, li) => {
+      const la = io(seg(t, l.t0 - .15, l.t0 + .15)) * (1 - io(seg(t, l.t0 + LD - .25, l.t0 + LD))); if (la <= 0 && !(li === L.length - 1 && t > l.t0)) return;
+      const fa = li === L.length - 1 ? io(seg(t, l.t0 - .15, l.t0 + .15)) * (1 - io(seg(t, 9.6, 10.0))) : la; if (fa <= 0) return;
+      l.words.forEach((w) => {
+        const y = 1420 + (w.row - (w.nrow - 1) / 2) * 92, on = t >= w.t, cur = t >= w.t && t < w.t + w.step, k = springO(clamp((t - w.t) / .4), 16, .6);
+        x.globalAlpha = fa * (on ? 1 : .28);
+        if (cur) { x.fillStyle = A; x.beginPath(); x.roundRect(w.x - w.ww - 18, y - 60, w.ww + 36, 84, 20); x.fill(); }
+        x.save(); x.translate(w.x - w.ww / 2, y); const s = on ? 1 + .08 * Math.sin(Math.PI * clamp((t - w.t) / .3)) : 1; x.scale(s, s); x.fillStyle = "#fff"; x.font = "700 64px PB"; x.textAlign = "center"; x.direction = "rtl"; x.fillText(w.wd, 0, 0); x.restore();
+      });
+      x.globalAlpha = 1;
+    });
+    // ٦) شريط التقدم + الوقت
+    const pa = io(seg(t, .8, 1.3)), pk = clamp(t / DUR); x.globalAlpha = pa;
+    x.fillStyle = "rgba(255,255,255,.15)"; x.beginPath(); x.roundRect(100, 1610, 880, 10, 5); x.fill(); x.fillStyle = A; x.beginPath(); x.roundRect(980 - 880 * pk, 1610, 880 * pk, 10, 5); x.fill();
+    x.fillStyle = "#fff"; x.beginPath(); x.arc(980 - 880 * pk, 1615, 16, 0, Math.PI * 2); x.fill();
+    const tm = (s) => ar(`${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`); x.fillStyle = "#a59fb3"; x.font = "400 34px PX"; x.direction = "ltr"; x.textAlign = "right"; x.fillText(tm(754 + t), 980, 1676); x.textAlign = "left"; x.fillText(tm(2820), 100, 1676); x.globalAlpha = 1;
+    // ٧) الآخر
+    const ek = io(seg(t, 9.8, 10.5));
+    if (ek > 0) { x.save(); x.globalAlpha = ek; const bw2 = 760; x.fillStyle = A; x.beginPath(); x.roundRect(540 - bw2 / 2, 1360 + (1 - ek) * 40, bw2, 130, 65); x.fill();
+      x.fillStyle = "#fff"; x.font = `700 ${M.fit(PR.cta, "PB", 560, 58, 30, "700")}px PB`; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.cta, 500, 1446 + (1 - ek) * 40);
+      x.beginPath(); x.moveTo(540 + bw2 / 2 - 90, 1400 + (1 - ek) * 40); x.lineTo(540 + bw2 / 2 - 90, 1450 + (1 - ek) * 40); x.lineTo(540 + bw2 / 2 - 52, 1425 + (1 - ek) * 40); x.closePath(); x.fill();
+      x.restore(); }
+  },
+  sound(A) {
+    const N = A.midi;
+    // موسيقى خلفية هادية للبودكاست (لو-فاي)
+    const ch = [[57, 60, 64, 67], [53, 57, 60, 64], [55, 59, 62, 65], [52, 55, 59, 62]];
+    for (let b = 0; b < 6; b++) { const c = ch[b % 4], s = b * 2; A.pad(s, c.map(N), 2.1, .025); A.bass(s, A.midi(c[0] - 24), 1.6, .12); }
+    for (let i = 0; i < 24; i++) { const s = i * .5; if (i % 2 === 0) A.kick(s, .3); else A.snare(s, .06); A.hat(s + .25, .03); }
+    for (let i = 0; i < 12; i++) A.pluck(i * 1 + .5, N([76, 74, 72, 71][i % 4]), .04, .8);
+    A.whoosh(9.6, .7, .06); A.pluck(10.0, N(79), .1, 1.6);
+  },
+});
+</script>
+</body></html>

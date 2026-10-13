@@ -1,0 +1,71 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// قالب «جزيئات»: آلاف النقط المنوّرة بتلف زي مجرة، وبعدين بتتجمع وتكتب العنوان، تنفجر، وترجع تتجمع تاني وتكتب اسم البراند.
+// كل نقطة بتتحرك بدالة في الوقت بس، فأي فريم بيطلع زي ما هو. 1080×1920، 12 ثانية.
+const PR = M.params({
+  title: { label: "الكلمة الأولى", kind: "text", role: "product", def: "قريبًا جدًا" },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "مدار" },
+  sub: { label: "تحت الاسم", kind: "text", def: "تطبيق جديد · أول نوفمبر" },
+  c1: { label: "اللون الأول", kind: "color", def: "#5ee7ff" },
+  c2: { label: "اللون التاني", kind: "color", def: "#b36bff" },
+});
+const W = 1080, H = 1920, DUR = 12, N = 4200;
+const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
+const hex = (h) => { h = h.replace("#", ""); return [0, 2, 4].map((i) => parseInt(h.substr(i, 2), 16)); };
+
+M.reel({
+  W, H, DUR, bg: "#05060d",
+  async init(M) {
+    await Promise.all([loadFont("LZ", "SM-Lalezar.ttf"), loadFont("PX", "TY-PlexArabic-400.ttf")]);
+    const c = M.canvas(W, H), x = c.getContext("2d"), R = M.rng(5);
+    const pts = (txt, size, y) => { const k = document.createElement("canvas"); k.width = W; k.height = H; const q = k.getContext("2d", { willReadFrequently: true });
+      q.fillStyle = "#fff"; q.font = `${M.fit(txt, "LZ", 940, size, 80)}px LZ`; q.textAlign = "center"; q.textBaseline = "middle"; q.direction = "rtl"; q.fillText(txt, 540, y);
+      const d = q.getImageData(0, 0, W, H).data, out = []; for (let yy = 0; yy < H; yy += 5) for (let xx = 0; xx < W; xx += 5) if (d[(yy * W + xx) * 4 + 3] > 128) out.push([xx, yy]);
+      for (let i = out.length - 1; i > 0; i--) { const j = (R() * (i + 1)) | 0; [out[i], out[j]] = [out[j], out[i]]; } return out; };
+    const TA = pts(PR.title, 250, 900), TB = pts(PR.brand, 330, 880);
+    const P = []; for (let i = 0; i < N; i++) { const r = Math.pow(R(), .7) * 520, a = Math.floor(R() * 3) * 2.094 + r * .009 + (R() - .5) * (.9 - r / 1000);
+      P.push({ a, r, w: (.15 + R() * .25) * (R() < .5 ? 1 : 1) * (600 / (r + 200)), s: R(), A: TA[i % TA.length], B: TB[i % TB.length], vx: Math.cos(R() * 6.3), vy: Math.sin(R() * 6.3), vm: 300 + R() * 900, sz: 1.5 + R() * 2.5 }); }
+    const glow = document.createElement("canvas"); glow.width = W / 2; glow.height = H / 2;
+    return { x, P, g: glow.getContext("2d") };
+  },
+  seek(t, C, M) {
+    const { x, P, g } = C, { seg, cubicIO, clamp, noise1, expo, smooth } = M, io = (k) => cubicIO(clamp(k));
+    const [r1, g1, b1] = hex(PR.c1), [r2, g2, b2] = hex(PR.c2);
+    x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = "#05060d"; x.fillRect(0, 0, W, H);
+    const bgG = x.createRadialGradient(540, 900, 0, 540, 900, 900); bgG.addColorStop(0, `rgba(${r2},${g2},${b2},.12)`); bgG.addColorStop(1, "rgba(0,0,0,0)"); x.fillStyle = bgG; x.fillRect(0, 0, W, H);
+    x.globalCompositeOperation = "lighter";
+    const bt = 6.1, burst = t > bt ? (1 - Math.exp(-3.2 * (t - bt))) / 3.2 : 0;
+    for (let i = 0; i < N; i++) {
+      const p = P[i], tilt = .55;
+      // ١) مجرة بتلف + رعشة
+      const ang = p.a + t * p.w, fx = 540 + Math.cos(ang) * p.r + noise1(p.s * 50 + t * .4) * 40, fy = 900 + Math.sin(ang) * p.r * tilt + noise1(p.s * 70 + t * .5) * 40 + (1 - expo(seg(t, 0, 1.6))) * 600 * (p.s - .5);
+      const d = (1 - p.A[0] / W) * .7 + p.s * .4;
+      const e1 = io(seg(t, 2.3 + d, 3.9 + d));
+      let px = fx + (p.A[0] - fx) * e1, py = fy + (p.A[1] - fy) * e1;
+      if (t > bt) { const shx = p.A[0] + p.vx * p.vm * burst, shy = p.A[1] + p.vy * p.vm * burst + 80 * burst; const e2 = io(seg(t, 7.1 + d * .8, 8.7 + d * .8)); px = shx + (p.B[0] - shx) * e2; py = shy + (p.B[1] - shy) * e2; }
+      const hold = (t > 3.9 + d && t < bt) || t > 8.7 + d * .8; if (hold) { px += Math.sin(t * 3 + p.s * 40) * 1.2; py += Math.cos(t * 2.6 + p.s * 30) * 1.2; }
+      // لمعة بتعدّي من اليمين للشمال وقت الثبات
+      const sweep = Math.max(0, 1 - Math.abs((px - (1100 - (t - 4.6) * 900))) / 120) * (t > 4.6 && t < 6 ? 1 : 0) + Math.max(0, 1 - Math.abs((px - (1100 - (t - 9.4) * 900))) / 120) * (t > 9.4 && t < 11 ? 1 : 0);
+      const u = clamp((px - 100) / 880), cr = r1 + (r2 - r1) * u, cg = g1 + (g2 - g1) * u, cb = b1 + (b2 - b1) * u, al = .55 + .45 * Math.sin(t * 4 + p.s * 30) * .5 + sweep;
+      x.fillStyle = `rgba(${cr | 0},${cg | 0},${cb | 0},${Math.min(1, al)})`; const s = p.sz * (1 + sweep * .8); x.fillRect(px - s / 2, py - s / 2, s, s);
+    }
+    x.globalCompositeOperation = "source-over";
+    // توهج: نسخة مصغرة مغبشة
+    g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, W / 2, H / 2); g.drawImage(x.canvas, 0, 0, W / 2, H / 2);
+    x.globalCompositeOperation = "lighter"; x.filter = "blur(14px)"; x.globalAlpha = .9; x.drawImage(g.canvas, 0, 0, W, H); x.filter = "none"; x.globalAlpha = 1; x.globalCompositeOperation = "source-over";
+    // ومضة الانفجار
+    const fl = Math.max(0, 1 - Math.abs(t - bt) / .25); if (fl > 0) { x.fillStyle = `rgba(255,255,255,${fl * .25})`; x.fillRect(0, 0, W, H); }
+    const sa = io(seg(t, 9.2, 9.9)); if (sa > 0) { x.globalAlpha = sa; x.fillStyle = "#e9ecff"; x.font = `400 ${M.fit(PR.sub, "PX", 860, 52, 28)}px PX`; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.sub, 540, 1150 + (1 - sa) * 20); x.globalAlpha = 1; }
+  },
+  sound(A) {
+    const N2 = A.midi;
+    A.pad(0, [N2(45), N2(52), N2(57), N2(64)], 6.2, .035); A.riser(1.2, 2.6, .05);
+    for (let i = 0; i < 24; i++) A.tone(2.3 + i * .07, N2(76 + (i % 6) * 2), .3, "sine", .02);
+    A.hit(3.9, .25); A.riser(4.8, 1.3, .07); A.kick(6.1, .9); A.nz(6.1, 1.2, "lowpass", 900, .3, .5); A.hit(6.1, .5);
+    A.pad(6.3, [N2(43), N2(50), N2(55), N2(62)], 5.7, .035);
+    for (let i = 0; i < 20; i++) A.tone(7.1 + i * .08, N2(88 - (i % 5) * 2), .25, "sine", .02);
+    A.hit(8.8, .3); A.pluck(8.8, N2(81), .1, 2); A.pluck(9.3, N2(76), .08, 2);
+  },
+});
+</script>
+</body></html>

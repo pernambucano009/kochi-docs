@@ -1,0 +1,84 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// قالب «شرح رياضي»: العنوان بيترسم بخطه وبعدين يتملي، المعادلة بتظهر حرف حرف وكل رمز بياخد لونه واسمه،
+// المحاور بتترسم، منحنيين (عادي ومركّب) بيتسابقوا ونقطة بتمشي برقمها، والفرق بينهم بيتعلّم. ستايل فيديوهات الشرح الهادية. 1080×1920، 12 ثانية.
+const PR = M.params({
+  title: { label: "العنوان", kind: "text", role: "product", def: "سحر الفايدة المركّبة" },
+  p: { label: "المبلغ في الأول", kind: "text", def: "1000" },
+  rate: { label: "النسبة في السنة (رقم)", kind: "text", def: "10" },
+  years: { label: "عدد السنين", kind: "text", def: "20" },
+  gap: { label: "جملة الفرق", kind: "text", def: "الفرق ده كله فايدة على الفايدة" },
+  end: { label: "الجملة الأخيرة", kind: "text", def: "ابدأ بدري… والوقت يشتغل لك" },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "محفظتي" },
+  accent: { label: "لون المنحنى", kind: "color", def: "#58c4dd" },
+});
+const W = 1080, H = 1920, DUR = 12, GX0 = 150, GX1 = 950, GY0 = 1430, GY1 = 760;
+const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
+const ar = (s) => String(s).replace(/\d/g, (d) => "٠١٢٣٤٥٦٧٨٩"[d]);
+const P0 = parseFloat(PR.p) || 1000, RT = (parseFloat(PR.rate) || 10) / 100, NY = Math.max(2, Math.min(60, parseInt(PR.years) || 20));
+const YM = P0 * Math.pow(1 + RT, NY) * 1.08;
+
+M.reel({
+  W, H, DUR, bg: "#1b1b1f",
+  async init(M) { await Promise.all([loadFont("SR", "Instrument_Serif.ttf"), loadFont("PB", "TY-PlexArabic-700.ttf", "700"), loadFont("PX", "TY-PlexArabic-400.ttf")]); const c = M.canvas(W, H); return { x: c.getContext("2d") }; },
+  seek(t, C, M) {
+    const { x } = C, { seg, cubicIO, clamp, smooth, expo } = M, io = (k) => cubicIO(clamp(k)), A = PR.accent, YEL = "#f7d96b", GRN = "#83c167", GRY = "#8b8b94";
+    x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = "#1b1b1f"; x.fillRect(0, 0, W, H);
+    // ١) العنوان: بيترسم بحدوده وبعدين بيتملي
+    const tk = seg(t, .2, 1.4); if (tk > 0) { x.font = `700 ${M.fit(PR.title, "PB", 900, 88, 44, "700")}px PB`; x.textAlign = "center"; x.direction = "rtl";
+      x.save(); x.setLineDash([1400 * tk, 4000]); x.lineWidth = 2.5; x.strokeStyle = "#f2f2f2"; x.strokeText(PR.title, 540, 250); x.restore();
+      x.globalAlpha = io(seg(t, 1.0, 1.6)); x.fillStyle = "#f2f2f2"; x.fillText(PR.title, 540, 250); x.globalAlpha = 1; }
+    // ٢) المعادلة A = P(1 + r)ⁿ رمز رمز
+    const eq = [["A", "#f2f2f2"], [" = ", "#f2f2f2"], ["P", YEL], ["(1 + ", "#f2f2f2"], ["r", A], [")", "#f2f2f2"]];
+    x.font = "italic 120px SR"; x.direction = "ltr"; x.textAlign = "left";
+    const ws = eq.map(([s]) => x.measureText(s).width), nw = 60, tot = ws.reduce((a, b) => a + b, 0) + nw; let ex = 540 - tot / 2;
+    const em = io(seg(t, 7.4, 8.2)), ey = 450 - 0 * em;
+    const pos = {};
+    eq.forEach(([s, col], i) => { const k = io(seg(t, 1.6 + i * .12, 2.1 + i * .12)); x.globalAlpha = k; x.fillStyle = col; x.font = "italic 120px SR"; x.fillText(s, ex, ey + (1 - k) * 30); pos[s] = ex + ws[i] / 2; ex += ws[i]; });
+    { const k = io(seg(t, 2.4, 2.9)); x.globalAlpha = k; x.fillStyle = GRN; x.font = "italic 72px SR"; x.fillText("n", ex + 6, ey - 52 + (1 - k) * 30); pos.n = ex + 26; }
+    x.globalAlpha = 1;
+    // أسامي الرموز
+    const lab = [[pos.P, YEL, "المبلغ"], [pos.r, A, "النسبة"], [pos.n, GRN, "السنين"]];
+    lab.forEach(([lx, col, s], i) => { const k = io(seg(t, 2.9 + i * .2, 3.4 + i * .2)) * (1 - io(seg(t, 7.0, 7.4))); if (k <= 0) return; x.globalAlpha = k;
+      x.strokeStyle = col; x.lineWidth = 3; x.beginPath(); x.moveTo(lx, ey + 30); x.lineTo(lx, ey + 30 + 50 * k); x.stroke(); x.fillStyle = col; x.font = "400 40px PX"; x.textAlign = "center"; x.direction = "rtl"; x.fillText(s, lx, ey + 130); x.globalAlpha = 1; });
+    // ٣) المحاور
+    const ak = io(seg(t, 3.6, 4.6));
+    if (ak > 0) { x.strokeStyle = "rgba(255,255,255,.08)"; x.lineWidth = 2; for (let k = 1; k <= 4; k++) { const y = GY0 - (GY0 - GY1) * k / 4; x.beginPath(); x.moveTo(GX0, y); x.lineTo(GX0 + (GX1 - GX0) * ak, y); x.stroke(); }
+      x.strokeStyle = "#e8e8ea"; x.lineWidth = 4; x.beginPath(); x.moveTo(GX0, GY0); x.lineTo(GX0 + (GX1 - GX0 + 30) * ak, GY0); x.moveTo(GX0, GY0); x.lineTo(GX0, GY0 - (GY0 - GY1 + 40) * ak); x.stroke();
+      x.fillStyle = "#e8e8ea"; x.font = "400 30px PX"; x.textAlign = "center"; x.direction = "ltr"; for (let k = 0; k <= 4; k++) { const n = Math.round(NY * k / 4), xx = GX0 + (GX1 - GX0) * k / 4; x.globalAlpha = ak; x.fillRect(xx - 2, GY0, 4, 14); x.fillText(ar(n), xx, GY0 + 52); }
+      x.direction = "rtl"; x.font = "400 34px PX"; x.fillText("السنين", (GX0 + GX1) / 2, GY0 + 110); x.textAlign = "left"; x.fillText("الفلوس", GX0 - 10, GY1 - 70); x.globalAlpha = 1; }
+    const X = (n) => GX0 + (GX1 - GX0) * n / NY, Y = (v) => GY0 - (GY0 - GY1) * v / YM;
+    // ٤) المنحنيين
+    const ck = io(seg(t, 4.8, 7.2)), nn = NY * ck;
+    if (ck > 0) {
+      // فايدة عادية
+      x.strokeStyle = GRY; x.lineWidth = 6; x.setLineDash([16, 12]); x.beginPath(); x.moveTo(X(0), Y(P0)); x.lineTo(X(nn), Y(P0 * (1 + RT * nn))); x.stroke(); x.setLineDash([]);
+      // مركّبة + مساحة
+      x.beginPath(); x.moveTo(X(0), GY0); for (let k = 0; k <= 80; k++) { const n = nn * k / 80; x.lineTo(X(n), Y(P0 * Math.pow(1 + RT, n))); } x.lineTo(X(nn), GY0); x.closePath(); x.fillStyle = A + "22"; x.fill();
+      x.beginPath(); for (let k = 0; k <= 80; k++) { const n = nn * k / 80; const px = X(n), py = Y(P0 * Math.pow(1 + RT, n)); k ? x.lineTo(px, py) : x.moveTo(px, py); } x.strokeStyle = A; x.lineWidth = 8; x.lineCap = "round"; x.stroke();
+      const v = P0 * Math.pow(1 + RT, nn), dx = X(nn), dy = Y(v);
+      x.fillStyle = "#fff"; x.beginPath(); x.arc(dx, dy, 14, 0, Math.PI * 2); x.fill(); x.fillStyle = A; x.beginPath(); x.arc(dx, dy, 8, 0, Math.PI * 2); x.fill();
+      x.fillStyle = "#fff"; x.font = "700 46px PB"; x.textAlign = "right"; x.direction = "ltr"; x.fillText(ar(Math.round(v)), dx - 26, dy - 22);
+      x.fillStyle = GRY; x.font = "700 36px PB"; x.fillText(ar(Math.round(P0 * (1 + RT * nn))), X(nn) - 20, Y(P0 * (1 + RT * nn)) + 50);
+    }
+    // ٥) القوس اللي بيعلّم الفرق
+    const gk = io(seg(t, 7.6, 8.4));
+    if (gk > 0) { const xa = X(NY) + 40, y1 = Y(P0 * Math.pow(1 + RT, NY)), y2 = Y(P0 * (1 + RT * NY)), ym = (y1 + y2) / 2, hh = (y2 - y1) / 2 * gk;
+      x.strokeStyle = YEL; x.lineWidth = 5; x.beginPath(); x.moveTo(xa - 14, ym - hh); x.quadraticCurveTo(xa + 10, ym - hh, xa + 10, ym - hh + 30 * gk); x.lineTo(xa + 10, ym - 20 * gk); x.lineTo(xa + 30, ym); x.lineTo(xa + 10, ym + 20 * gk); x.lineTo(xa + 10, ym + hh - 30 * gk); x.quadraticCurveTo(xa + 10, ym + hh, xa - 14, ym + hh); x.stroke();
+      x.globalAlpha = io(seg(t, 8.2, 8.8)); x.fillStyle = YEL; x.font = `700 ${M.fit(PR.gap, "PB", 560, 44, 26, "700")}px PB`; x.textAlign = "right"; x.direction = "rtl"; x.fillText(PR.gap, 720, GY1 + 120); x.globalAlpha = 1; }
+    // ٦) الخلاصة + البراند
+    const fk = io(seg(t, 9.4, 10.1)); if (fk > 0) { x.globalAlpha = fk; x.fillStyle = "#f2f2f2"; x.font = `700 ${M.fit(PR.end, "PB", 900, 66, 36, "700")}px PB`; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.end, 540, 1660 + (1 - fk) * 20); x.globalAlpha = 1; }
+    const bk = io(seg(t, 10.2, 10.8)); if (bk > 0) { x.globalAlpha = bk; x.fillStyle = A; x.fillRect(540 - 160 * bk, 1730, 320 * bk, 3); x.fillStyle = "#f2f2f2"; x.font = "700 52px PB"; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.brand, 540, 1810); x.globalAlpha = 1; }
+  },
+  sound(A) {
+    const N = A.midi;
+    // بيانو هادي وتفكيري + نغمة مع كل رمز
+    const ch = [[50, 57, 62, 65], [48, 55, 60, 64], [46, 53, 58, 62], [45, 52, 57, 61]];
+    for (let b = 0; b < 6; b++) { A.pad(b * 2, ch[b % 4].map(N), 2.1, .025); for (let k = 0; k < 4; k++) A.pluck(b * 2 + k * .5, N(ch[b % 4][k] + 12), .05, 1); }
+    for (let i = 0; i < 7; i++) A.tone(1.6 + i * .12, N(74 + i * 2), .2, "sine", .04);
+    [2.9, 3.1, 3.3].forEach((s, i) => A.pluck(s, N(79 + i * 3), .08, .8));
+    A.riser(4.8, 2.4, .04); A.hit(7.6, .25); A.pluck(9.4, N(74), .1, 1.8); A.pluck(10.2, N(81), .08, 1.6);
+  },
+});
+</script>
+</body></html>
