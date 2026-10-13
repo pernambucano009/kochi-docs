@@ -1,0 +1,131 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// قالب «سبورة بيضا»: شرح بيترسم قدامك على سبورة لامعة بماركر طاير (من غير إيد)، الكاميرا بتمشي على السبورة من فكرة للتانية،
+// وفي الآخر بتبعد وتورّي الصورة كلها. 1080×1920، 12 ثانية.
+const PR = M.params({
+  title1: { label: "العنوان (السطر الأول)", kind: "text", role: "product", def: "إزاي تزوّد مبيعاتك" },
+  title2: { label: "العنوان (السطر التاني)", kind: "text", def: "في تلات خطوات" },
+  step1: { label: "الخطوة ١", kind: "text", def: "اعرف عميلك" },
+  step2: { label: "الخطوة ٢", kind: "text", def: "اعمل محتوى يشبهه" },
+  step3: { label: "الخطوة ٣", kind: "text", def: "قيس وطوّر" },
+  result: { label: "النتيجة", kind: "text", def: "مبيعات أكتر" },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "ستوديو نمو" },
+  ink: { label: "لون الحبر الأساسي", kind: "color", def: "#23262c" },
+  ink2: { label: "اللون التاني", kind: "color", def: "#2a5cb3" },
+  accent: { label: "لون التمييز", kind: "color", def: "#d97757" },
+});
+const W = 1080, H = 1920, DUR = 12, BW = 1600, BH = 3050;
+const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
+
+// خط إيد بيترعش: بنعيد تقسيم المسار ونزوّد رعشة بطيئة + رعشة صغيرة
+function wob(pts, seed, amp = 3) {
+  const out = [];
+  for (let i = 0; i < pts.length - 1; i++) { const [a, b] = [pts[i], pts[i + 1]], n = Math.max(2, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 6)); for (let k = 0; k < n; k++) out.push([a[0] + (b[0] - a[0]) * k / n, a[1] + (b[1] - a[1]) * k / n]); }
+  out.push(pts[pts.length - 1]);
+  let L = 0; return out.map((p, i) => { if (i) L += Math.hypot(p[0] - out[i - 1][0], p[1] - out[i - 1][1]); const o = Math.sin(L * .012 + seed) * amp + Math.sin(L * .09 + seed * 3) * amp * .25; const q = out[Math.min(out.length - 1, i + 1)], r = out[Math.max(0, i - 1)], dx = q[0] - r[0], dy = q[1] - r[1], l = Math.hypot(dx, dy) || 1; return [p[0] - dy / l * o, p[1] + dx / l * o, L]; });
+}
+const circ = (cx, cy, rx, ry, a0, turns, n = 80) => Array.from({ length: n + 1 }, (_, i) => { const a = a0 + Math.PI * 2 * turns * i / n; return [cx + Math.cos(a) * rx * (1 + .03 * i / n), cy + Math.sin(a) * ry]; });
+const rect = (x0, y0, w, h, s) => [[[x0 - 6, y0 + 2], [x0 + w + 10, y0 - 3]], [[x0 + w + 2, y0 - 8], [x0 + w - 3, y0 + h + 8]], [[x0 + w + 6, y0 + h + 2], [x0 - 8, y0 + h - 2]], [[x0 + 3, y0 + h + 6], [x0 - 2, y0 - 9]]].map((p, i) => wob(p, s + i));
+const ease = (u) => u - Math.sin(2 * Math.PI * u) / (2 * Math.PI) * .8;   // بطيء-سريع-بطيء زي الإيد
+
+M.reel({
+  W, H, DUR, bg: "#f4f3ef",
+  async init(M) {
+    await Promise.all([loadFont("RQ", "TY-ArefRuqaa-700.ttf", "700"), loadFont("TJ", "SM-Tajawal.ttf")]);
+    const c = M.canvas(W, H); const x = c.getContext("2d");
+    const ink = PR.ink, ink2 = PR.ink2, acc = PR.accent;
+    // السبورة: أبيض دافي + آثار كتابة قديمة باهتة + خدوش
+    const board = document.createElement("canvas"); board.width = BW; board.height = BH; const b = board.getContext("2d"), R = M.rng(4);
+    const g = b.createLinearGradient(0, 0, BW, BH); g.addColorStop(0, "#f7f6f2"); g.addColorStop(1, "#ecebe6"); b.fillStyle = g; b.fillRect(0, 0, BW, BH);
+    for (let i = 0; i < 40; i++) { b.strokeStyle = `rgba(${R() < .5 ? "120,120,130" : "90,120,180"},${.05 + R() * .06})`; b.lineWidth = 6 + R() * 6; b.beginPath(); const cx = R() * BW, cy = R() * BH; if (R() < .4) { b.arc(cx, cy, 30 + R() * 90, R() * 6, R() * 6 + 4); } else { b.moveTo(cx, cy); for (let k = 0; k < 4; k++) b.lineTo(cx + R() * 200 - 60, cy + R() * 40 - 20); } b.stroke(); }
+    for (let i = 0; i < 400; i++) { b.strokeStyle = `rgba(0,0,0,${R() * .04})`; b.lineWidth = .7; b.beginPath(); const cx = R() * BW, cy = R() * BH; b.moveTo(cx, cy); b.lineTo(cx + R() * 60 - 30, cy + R() * 10 - 5); b.stroke(); }
+    // كل حاجة بتترسم: نوع، وقت بداية ونهاية، لون، والنقط
+    const I = [];
+    const add = (o) => I.push(o);
+    add({ k: "text", txt: PR.title1, x: 800, y: 400, size: 132, t0: .4, t1: 1.7, col: ink });
+    add({ k: "text", txt: PR.title2, x: 800, y: 590, size: 120, t0: 1.7, t1: 2.5, col: acc });
+    add({ k: "line", p: wob([[1180, 640], [420, 652]], 9, 4), t0: 2.5, t1: 2.85, col: acc, w: 9 });
+    const steps = [[PR.step1, 1050, "person"], [PR.step2, 1600, "bulb"], [PR.step3, 2150, "chart"]];
+    steps.forEach(([txt, y, icon], i) => {
+      const T = 3.0 + i * 2;
+      rect(380, y - 190, 840, 380, 20 + i * 5).forEach((s, k) => add({ k: "line", p: s, t0: T + k * .14, t1: T + k * .14 + .16, col: ink, w: 8 }));
+      const ix = 1095, iy = y;
+      if (icon === "person") { add({ k: "line", p: wob(circ(ix, iy - 60, 52, 52, -1.2, 1.08), 31), t0: T + .55, t1: T + .8, col: ink2, w: 8 }); add({ k: "line", p: wob(circ(ix, iy + 110, 100, 90, Math.PI, .5, 30), 32), t0: T + .8, t1: T + 1.0, col: ink2, w: 8 }); }
+      if (icon === "bulb") { add({ k: "line", p: wob(circ(ix, iy - 40, 70, 78, 2.2, 1.0), 41), t0: T + .55, t1: T + .8, col: acc, w: 8 }); add({ k: "line", p: wob([[ix - 32, iy + 50], [ix + 32, iy + 50]], 42), t0: T + .8, t1: T + .86, col: ink, w: 8 }); add({ k: "line", p: wob([[ix - 26, iy + 76], [ix + 26, iy + 76]], 43), t0: T + .86, t1: T + .92, col: ink, w: 8 }); [[-1, -1], [0, -1.3], [1, -1]].forEach(([dx, dy], q) => add({ k: "line", p: wob([[ix + dx * 100, iy - 40 + dy * 90], [ix + dx * 135, iy - 40 + dy * 125]], 44 + q), t0: T + .92 + q * .05, t1: T + .97 + q * .05, col: acc, w: 7 })); }
+      if (icon === "chart") { add({ k: "line", p: wob([[ix - 110, iy - 120], [ix - 110, iy + 110], [ix + 120, iy + 110]], 51), t0: T + .55, t1: T + .75, col: ink, w: 8 }); add({ k: "line", p: wob([[ix - 90, iy + 70], [ix - 30, iy + 10], [ix + 10, iy + 40], [ix + 95, iy - 90]], 52), t0: T + .75, t1: T + .95, col: acc, w: 9 }); add({ k: "line", p: wob([[ix + 50, iy - 92], [ix + 98, iy - 94], [ix + 92, iy - 46]], 53), t0: T + .95, t1: T + 1.02, col: acc, w: 9 }); }
+      add({ k: "text", txt, x: 690, y: y + 30, size: 100, t0: T + .95, t1: T + 1.6, col: ink, maxw: 520 });
+      if (i < 2) add({ k: "line", p: wob([[800, y + 210], [790, y + 340]], 60 + i), t0: T + 1.6, t1: T + 1.75, col: ink2, w: 8 }), add({ k: "line", p: wob([[750, y + 290], [790, y + 345], [840, y + 292]], 70 + i), t0: T + 1.75, t1: T + 1.85, col: ink2, w: 8 });
+    });
+    add({ k: "line", p: wob([[800, 2360], [795, 2500]], 80), t0: 8.6, t1: 8.75, col: ink2, w: 8 }); add({ k: "line", p: wob([[752, 2445], [795, 2502], [842, 2447]], 81), t0: 8.75, t1: 8.85, col: ink2, w: 8 });
+    add({ k: "text", txt: PR.result, x: 800, y: 2690, size: 128, t0: 8.9, t1: 9.6, col: ink });
+    add({ k: "line", p: wob(circ(800, 2650, 380, 150, 3.6, 1.1), 90, 5), t0: 9.6, t1: 10.1, col: acc, w: 10 });
+    add({ k: "line", p: wob([[1150, 2520], [1195, 2575], [1290, 2440]], 91, 3), t0: 10.1, t1: 10.35, col: acc, w: 12 });
+    add({ k: "text", txt: PR.brand, x: 800, y: 2930, size: 84, t0: 10.6, t1: 11.3, col: ink2 });
+    I.forEach((o) => { if (o.k === "line") o.L = o.p[o.p.length - 1][2]; if (o.k === "text") { x.font = `700 ${o.size}px RQ`; o.size = Math.min(o.size, o.size * (o.maxw || 1300) / Math.max(1, x.measureText(o.txt).width)); x.font = `700 ${o.size}px RQ`; o.w = x.measureText(o.txt).width; } });
+    // ورقة الحبر: الحاجات اللي خلصت بتترسم مرة واحدة على طبقة ثابتة
+    const inkL = document.createElement("canvas"); inkL.width = BW; inkL.height = BH;
+    return { x, board, I, inkL, done: -1 };
+  },
+  seek(t, C, M) {
+    const { x, I } = C, { seg, smooth, clamp } = M;
+    // الكاميرا: مفاتيح (وقت، نص الكادر، زوم)، التنقل بالـ 1/زوم عشان يحس إنه «دولي»
+    const K = [[0, 800, 520, 1.1], [2.7, 800, 520, 1.1], [3.2, 800, 1050, 1.05], [4.8, 800, 1050, 1.05], [5.2, 800, 1600, 1.05], [6.8, 800, 1600, 1.05], [7.2, 800, 2150, 1.05], [8.6, 800, 2150, 1.05], [9.0, 800, 2700, 1.05], [10.4, 800, 2700, 1.05], [11.3, 800, 1600, .62], [12, 800, 1600, .62]];
+    let k = 0; while (k < K.length - 2 && t > K[k + 1][0]) k++;
+    const [ta, xa, ya, za] = K[k], [tb, xb, yb, zb] = K[k + 1], u = smooth(seg(t, ta, tb));
+    const iz = 1 / za + (1 / zb - 1 / za) * u, z = 1 / iz, cx = xa + (xb - xa) * u, hh = H / (2 * z), cy = hh * 2 < BH ? clamp(ya + (yb - ya) * u, hh, BH - hh) : BH / 2;
+    x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = "#d9d6cf"; x.fillRect(0, 0, W, H);
+    x.save(); x.translate(W / 2, H / 2); x.rotate(Math.sin(t * .4) * .004); x.scale(z, z); x.translate(-cx, -cy);
+    x.drawImage(C.board, 0, 0);
+    // إطار السبورة (بيبان بس لما الكاميرا تبعد)
+    x.lineWidth = 34; x.strokeStyle = "#b9b6ae"; x.strokeRect(-17, -17, BW + 34, BH + 34);
+    x.globalCompositeOperation = "multiply";
+    let pen = null, penCol = PR.ink;
+    I.forEach((o) => {
+      const p = ease(seg(t, o.t0, o.t1)); if (p <= 0) return;
+      if (o.k === "line") {
+        const lim = o.L * p, pts = o.p; x.beginPath(); let last = pts[0];
+        for (let i = 0; i < pts.length && pts[i][2] <= lim; i++) { x.lineTo(pts[i][0], pts[i][1]); last = pts[i]; }
+        x.lineCap = "round"; x.lineJoin = "round"; x.lineWidth = o.w; x.strokeStyle = o.col; x.globalAlpha = .94; x.stroke();
+        x.beginPath(); x.arc(pts[0][0], pts[0][1], o.w * .62, 0, Math.PI * 2); x.fillStyle = o.col; x.globalAlpha = .5; x.fill(); x.globalAlpha = 1;   // نقطة الحبر اللي اتجمعت أول ما القلم نزل
+        if (p < 1) { pen = last; penCol = o.col; }
+      } else {
+        x.save(); x.font = `700 ${o.size}px RQ`; x.direction = "rtl"; x.textAlign = "center";
+        const x1 = o.x + o.w / 2 + 10, edge = x1 - (o.w + 30) * p;   // العربي بيتكتب من اليمين للشمال
+        x.beginPath(); x.rect(edge, o.y - o.size * 1.3, x1 - edge + 20, o.size * 1.8); x.clip();
+        x.fillStyle = o.col; x.globalAlpha = .94; x.fillText(o.txt, o.x, o.y); x.restore();
+        if (p < 1) { pen = [edge, o.y - o.size * .25 + Math.sin(t * 40) * 10]; penCol = o.col; }
+      }
+    });
+    x.globalCompositeOperation = "source-over";
+    // الماركر: بيطير لمكان الكتابة وبيترفع شوية بين الضربات (ضله بيكبر)، ولما مفيش كتابة بيركن برّه
+    const park = [cx - W / z * .62, cy - H / z * .55];
+    const mp = pen || park, lift = pen ? 0 : 60;
+    C.mpos = C.mpos && Math.abs(C.lastT - t) < .1 ? [C.mpos[0] + (mp[0] - C.mpos[0]) * .5, C.mpos[1] + (mp[1] - C.mpos[1]) * .5] : mp; C.lastT = t;
+    const [mx, my] = C.mpos;
+    x.save(); x.translate(mx + 14 + lift * .4, my + 16 + lift * .6); x.rotate(-2.3); x.fillStyle = `rgba(0,0,0,${.18 - lift * .0015})`; x.beginPath(); x.roundRect(0, -16, 260, 32, 14); x.fill(); x.restore();
+    x.save(); x.translate(mx, my - lift); x.rotate(-2.3);
+    x.fillStyle = penCol; x.beginPath(); x.moveTo(0, 0); x.lineTo(18, -9); x.lineTo(18, 9); x.closePath(); x.fill();
+    x.fillStyle = "#f8f8f6"; x.strokeStyle = "rgba(0,0,0,.25)"; x.lineWidth = 2; x.beginPath(); x.roundRect(18, -17, 200, 34, 6); x.fill(); x.stroke();
+    x.fillStyle = penCol; x.fillRect(150, -17, 26, 34); x.beginPath(); x.roundRect(218, -19, 60, 38, 8); x.fill();
+    x.fillStyle = "rgba(255,255,255,.5)"; x.fillRect(24, -12, 120, 6);
+    x.restore();
+    x.restore();
+    // لمعة الشباك على السبورة (بتتحرك أبطأ من الكاميرا)
+    x.save(); x.globalCompositeOperation = "screen"; const sx = 300 - cy * .12 * .35;
+    const sg = x.createLinearGradient(sx, 0, sx + 500, 500); sg.addColorStop(0, "rgba(255,255,255,0)"); sg.addColorStop(.45, "rgba(255,255,255,.13)"); sg.addColorStop(.55, "rgba(255,255,255,.13)"); sg.addColorStop(1, "rgba(255,255,255,0)");
+    x.fillStyle = sg; x.translate(0, 0); x.fillRect(0, 0, W, H); x.restore();
+  },
+  sound(A) {
+    const N = A.midi;
+    // صرير الماركر على السبورة أثناء الكتابة (رشقات قصيرة)
+    const writes = [[.4, 2.85], [3.0, 4.85], [5.0, 6.85], [7.0, 8.85], [8.9, 10.35], [10.6, 11.3]];
+    writes.forEach(([a, b]) => { for (let s = a; s < b; s += .11 + (Math.sin(s * 13) + 1) * .04) A.nz(s, .07 + (Math.sin(s * 7) + 1) * .03, "bandpass", 2600 + Math.sin(s * 5) * 900, .05, 3); });
+    [2.9, 4.95, 6.95, 8.9, 10.5].forEach((s) => A.whoosh(s, .5, .12));
+    // موسيقى خفيفة: نقرات كيبورد وجيتار
+    const chords = [[60, 64, 67], [57, 60, 64], [62, 65, 69], [55, 59, 62]];
+    for (let i = 0; i < 24; i++) { const t = i * .5, ch = chords[Math.floor(i / 6) % 4]; A.pluck(t, N(ch[i % 3] + 12), .05, .45); if (i % 2 === 0) A.tone(t, N(ch[0] - 12), .45, "triangle", .07); }
+    A.pluck(10.1, N(84), .12, .8); A.pluck(10.25, N(88), .12, .9);
+  },
+});
+</script>
+</body></html>

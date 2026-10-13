@@ -1,0 +1,206 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// قالب «ألوان مية»: صفحة كراسة رسم بترسم نفسها بالفرشاة (الكوباية ← النعناع ← البخار) وملاحظات بخط اليد والاسم في الآخر.
+// كل حاجة دالة في الوقت t (ينفع يترسم أي فريم لوحده). 1080×1920، 12 ثانية.
+const PR = M.params({
+  title: { label: "العنوان", kind: "text", role: "product", def: "شاي بالنعناع" },
+  sub: { label: "السطر اللي تحته", kind: "text", def: "كوباية دافية تبدأ بيها يومك" },
+  note1: { label: "ملاحظة ١ (على الورق)", kind: "text", def: "نعناع طازة من الجنينة" },
+  note2: { label: "ملاحظة ٢ (على الكوباية)", kind: "text", def: "٣ دقايق وبس" },
+  stamp: { label: "الختم", kind: "text", def: "طبيعي تمامًا" },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "بيت الشاي" },
+  cup: { label: "لون الكوباية", kind: "color", def: "#3f7f93" },
+  leaf: { label: "لون الورق الأخضر", kind: "color", def: "#5f9a4a" },
+  accent: { label: "لون الختم", kind: "color", def: "#c8442a" },
+});
+const W = 1080, H = 1920, DUR = 12;
+const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
+const rgb = (h) => { const n = parseInt(String(h).slice(1).replace(/^(.)(.)(.)$/, "$1$1$2$2$3$3"), 16) || 0; return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+const rgba = (c, a) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+const dark = (c, k) => c.map((v) => Math.round(v * k));
+const INK = [58, 44, 36];
+
+// ---------- ضربة فرشاة: شريط عرضه بيتغير + شعيرات بتتقطع (الأبيض الطاير)
+function mkStroke(pts, w, prof, seed) {
+  const R = M.rng(seed), P = [];
+  let L = 0;
+  for (let i = 0; i < pts.length; i++) { if (i) L += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); P.push({ x: pts[i][0], y: pts[i][1], d: L }); }
+  P.forEach((p, i) => {
+    const a = P[Math.max(0, i - 1)], b = P[Math.min(P.length - 1, i + 1)], dx = b.x - a.x, dy = b.y - a.y, l = Math.hypot(dx, dy) || 1;
+    p.nx = -dy / l; p.ny = dx / l; const u = p.d / (L || 1);
+    const pf = prof === "leaf" ? Math.sin(Math.PI * u) : prof === "tip" ? Math.min(1, u * 6) * (1 - u * .7) : prof === "even" ? .9 : Math.min(1, u * 8) * Math.min(1, (1 - u) * 5);
+    p.w = w * (.35 + .65 * pf) * (1 + (M.hash(seed + i * .37) - .5) * .44);
+  });
+  const br = Array.from({ length: 3 + Math.floor(R() * 5) }, () => ({ o: (R() * 2 - 1) * .8, a: .3 + R() * .5, lw: 1 + R() * 2.2, end: .75 + R() * .25, dash: [8 + R() * 40, 3 + R() * 14] }));
+  return { P, L, br };
+}
+function drawStroke(x, s, prog, col, alpha = .58) {
+  if (prog <= 0) return;
+  const P = s.P, lim = s.L * Math.min(1, prog);
+  const n = P.findIndex((p) => p.d > lim); const N = n < 0 ? P.length : Math.max(2, n);
+  x.beginPath();
+  for (let i = 0; i < N; i++) x.lineTo(P[i].x + P[i].nx * P[i].w / 2, P[i].y + P[i].ny * P[i].w / 2);
+  for (let i = N - 1; i >= 0; i--) x.lineTo(P[i].x - P[i].nx * P[i].w / 2, P[i].y - P[i].ny * P[i].w / 2);
+  x.closePath(); x.fillStyle = rgba(col, alpha); x.fill();
+  s.br.forEach((b) => {
+    const M2 = Math.min(N, Math.floor(P.length * b.end)); if (M2 < 2) return;
+    x.beginPath(); for (let i = 0; i < M2; i++) x.lineTo(P[i].x + P[i].nx * P[i].w / 2 * b.o, P[i].y + P[i].ny * P[i].w / 2 * b.o);
+    x.setLineDash(b.dash); x.lineWidth = b.lw; x.strokeStyle = rgba(dark(col, .8), b.a); x.stroke(); x.setLineDash([]);
+  });
+}
+const ellipse = (cx, cy, rx, ry, a0 = 0, a1 = Math.PI * 2, n = 60) => Array.from({ length: n + 1 }, (_, i) => { const a = a0 + (a1 - a0) * i / n; return [cx + Math.cos(a) * rx, cy + Math.sin(a) * ry]; });
+// لون مية: نفس الشكل ٣ مرات باهتزاز بسيط، فالحواف بتغمق زي المية لما بتتجمع
+function wash(x, poly, col, a, seed, reveal = 1, box) {
+  if (reveal <= 0) return;
+  x.save();
+  if (reveal < 1 && box) { // مسحة بحافة متموجة من فوق لتحت
+    const [bx, by, bw, bh] = box, edge = by + (bh + 80) * reveal - 40;
+    x.beginPath(); x.moveTo(bx - 20, by - 20); x.lineTo(bx + bw + 20, by - 20);
+    for (let i = 0; i <= 20; i++) { const px = bx + bw + 20 - (bw + 40) * i / 20; x.lineTo(px, edge + Math.sin(px * .03 + seed) * 18 + Math.sin(px * .011) * 22); }
+    x.closePath(); x.clip();
+  }
+  for (let k = 0; k < 3; k++) {
+    const R = M.rng(seed * 7 + k);
+    x.beginPath(); poly.forEach(([px, py]) => x.lineTo(px + (R() - .5) * 14, py + (R() - .5) * 14)); x.closePath();
+    x.fillStyle = rgba(col, a / 3); x.fill();
+  }
+  x.restore();
+}
+
+M.reel({
+  W, H, DUR, bg: "#f3ead8",
+  async init(M) {
+    await Promise.all([loadFont("AM", "TY-Amiri-700.ttf", "700"), loadFont("RQ", "TY-ArefRuqaa-700.ttf", "700"), loadFont("TJ", "SM-Tajawal.ttf")]);
+    const c = M.canvas(W, H); const x = c.getContext("2d");
+    // الورق: لون دافي + بقع خفيفة + ألياف + تغميق الأطراف (بيترسم مرة واحدة)
+    const paper = document.createElement("canvas"); paper.width = W; paper.height = H; const p = paper.getContext("2d");
+    p.fillStyle = "#f3ead8"; p.fillRect(0, 0, W, H);
+    const R = M.rng(11);
+    for (let i = 0; i < 260; i++) { const r = 40 + R() * 220; const g = p.createRadialGradient(R() * W, R() * H, 0, R() * W, R() * H, r); }
+    for (let i = 0; i < 180; i++) { const cx = R() * W, cy = R() * H, r = 60 + R() * 260; const g = p.createRadialGradient(cx, cy, 0, cx, cy, r); const d = R() < .5; g.addColorStop(0, d ? "rgba(120,90,50,.035)" : "rgba(255,255,255,.05)"); g.addColorStop(1, "rgba(0,0,0,0)"); p.fillStyle = g; p.fillRect(cx - r, cy - r, r * 2, r * 2); }
+    for (let i = 0; i < 2600; i++) { const fx = R() * W, fy = R() * H, a = R() * Math.PI, l = 4 + R() * 16; p.strokeStyle = `rgba(110,85,55,${.04 + R() * .08})`; p.lineWidth = .6 + R() * .6; p.beginPath(); p.moveTo(fx, fy); p.quadraticCurveTo(fx + Math.cos(a) * l * .5 + R() * 4, fy + Math.sin(a) * l * .5, fx + Math.cos(a) * l, fy + Math.sin(a) * l); p.stroke(); }
+    const vg = p.createRadialGradient(W / 2, H / 2, H * .3, W / 2, H / 2, H * .75); vg.addColorStop(0, "rgba(0,0,0,0)"); vg.addColorStop(1, "rgba(90,60,30,.16)"); p.fillStyle = vg; p.fillRect(0, 0, W, H);
+
+    const cup = rgb(PR.cup), leaf = rgb(PR.leaf), acc = rgb(PR.accent), tea = [196, 128, 52], ochre = [214, 168, 92];
+    const S = {};
+    // الكوباية والطبق
+    S.bg = ellipse(560, 1100, 400, 380, 0, Math.PI * 2, 40);
+    S.saucer = ellipse(540, 1262, 340, 74);
+    S.saucerIn = ellipse(540, 1250, 220, 40);
+    const body = []; for (let i = 0; i <= 30; i++) { const u = i / 30, y = 965 + u * 265, hw = 232 - 70 * Math.pow(u, 1.6); body.push([540 + hw, y]); }
+    for (let i = 30; i >= 0; i--) { const u = i / 30, y = 965 + u * 265, hw = 232 - 70 * Math.pow(u, 1.6); body.push([540 - hw, y]); }
+    S.body = body;
+    S.rim = mkStroke(ellipse(540, 965, 232, 50, Math.PI, Math.PI * 3, 70), 9, "even", 3);
+    S.edgeR = mkStroke(body.slice(0, 31), 10, "brush", 4);
+    S.edgeL = mkStroke(body.slice(31), 10, "brush", 5);
+    S.tea = ellipse(540, 972, 210, 40);
+    S.handle = mkStroke(Array.from({ length: 40 }, (_, i) => { const a = -1.75 + 3.3 * i / 39; return [770 + Math.cos(a) * 95, 1085 + Math.sin(a) * 82]; }), 28, "brush", 6);
+    S.shadow = ellipse(560, 1300, 360, 50);
+    // النعناع: الساق الأول وبعدين الورق
+    const stem = []; for (let i = 0; i <= 24; i++) { const u = i / 24; stem.push([150 + u * 300, 1420 - u * 210 - Math.sin(u * Math.PI) * 40]); }
+    S.stem = mkStroke(stem, 12, "tip", 7);
+    S.leaves = [.12, .26, .38, .5, .62, .74, .88].map((u, i) => {
+      const [sx, sy] = stem[Math.round(u * 24)], side = i % 2 ? 1 : -1, ang = -0.6 + side * 0.95 + (i * .13), len = 120 - i * 7;
+      const pts = []; for (let k = 0; k <= 16; k++) { const v = k / 16; pts.push([sx + Math.cos(ang) * len * v, sy + Math.sin(ang) * len * v - Math.sin(v * Math.PI) * 6 * side]); }
+      return { s: mkStroke(pts, 58 - i * 3, "leaf", 20 + i), vein: mkStroke(pts.slice(0, 13), 3, "tip", 40 + i) };
+    });
+    S.steam = [0, 1, 2].map((k) => k);
+    S.lead1 = [[300, 860], [262, 1000], [250, 1215]];
+    S.lead2 = [[760, 1500], [700, 1420], [620, 1300]];
+    return { x, paper, S, cup, leaf, acc, tea, ochre };
+  },
+  seek(t, C, M) {
+    const { x, S } = C, { seg, cubic, smooth, sine } = M;
+    x.setTransform(1, 0, 0, 1, 0, 0); x.globalCompositeOperation = "source-over";
+    x.drawImage(C.paper, 0, 0);
+    // الكاميرا: دخلة بطيئة جدًا طول الوقت
+    const z = 1 + .07 * sine(seg(t, 0, DUR)), cx = 540, cy = 1060;
+    x.translate(cx, cy); x.scale(z, z); x.translate(-cx, -cy - 20 * seg(t, 0, DUR));
+    x.globalCompositeOperation = "multiply";
+    wash(x, S.bg, C.ochre, .32, 2, cubic(seg(t, .15, 1.5)), [160, 720, 800, 760]);
+    wash(x, S.shadow, [150, 120, 95], .25, 9, cubic(seg(t, 1.0, 1.8)), [200, 1250, 720, 100]);
+    wash(x, S.saucer, [214, 206, 192], .55, 3, cubic(seg(t, .9, 1.7)), [200, 1188, 680, 150]);
+    wash(x, S.saucerIn, [190, 182, 168], .35, 4, cubic(seg(t, 1.3, 1.9)), [320, 1210, 440, 80]);
+    wash(x, S.body, C.cup, .62, 5, cubic(seg(t, 1.3, 2.6)), [300, 915, 480, 320]);
+    // ضلمة على جنب واحد من الكوباية (طبقة تانية = لون أغمق)
+    if (t > 2.2) { x.save(); x.beginPath(); S.body.forEach((p) => x.lineTo(p[0], p[1])); x.clip(); const k = cubic(seg(t, 2.2, 2.9)); [[380, 150, .3], [430, 120, .22], [470, 90, .14]].forEach(([ex, rx, a], i) => wash(x, ellipse(ex, 1110, rx, 260), C.cup, a, 6 + i, k, [240, 830, 360, 540])); x.restore(); }
+    drawStroke(x, S.edgeR, cubic(seg(t, 2.3, 2.9)), dark(C.cup, .7), .5);
+    drawStroke(x, S.edgeL, cubic(seg(t, 2.4, 3.0)), dark(C.cup, .7), .5);
+    drawStroke(x, S.handle, cubic(seg(t, 2.6, 3.2)), C.cup, .62);
+    wash(x, S.tea, C.tea, .7, 7, cubic(seg(t, 2.7, 3.2)), [320, 925, 440, 90]);
+    drawStroke(x, S.rim, cubic(seg(t, 2.8, 3.4)), dark(C.cup, .55), .55);
+    // البخار: خطوط رفيعة بتطلع وتتمايل
+    if (t > 3.2) {
+      for (let k = 0; k < 3; k++) {
+        const a = seg(t, 3.2 + k * .35, 4.4 + k * .35), pts = [];
+        for (let i = 0; i <= 30; i++) { const u = i / 30, y = 930 - u * 330; pts.push([470 + k * 65 + Math.sin(u * 7 + t * 1.6 + k * 2) * 26 * u + Math.sin(t * .9 + k) * 8, y]); }
+        const sm = mkStroke(pts, 9, "tip", 60 + k); sm.br = []; drawStroke(x, sm, a, [160, 150, 140], .28 * (1 - .4 * Math.sin(t * 2 + k) ** 2));
+      }
+    }
+    // النعناع
+    drawStroke(x, S.stem, cubic(seg(t, 3.2, 3.8)), dark(C.leaf, .72), .7);
+    S.leaves.forEach((L, i) => {
+      const k0 = 3.5 + i * .17, sw = t > k0 + .6 ? Math.sin(1.15 * t + i) * .006 : 0;
+      x.save(); x.translate(300, 1300); x.transform(1, 0, sw, 1, 0, 0); x.translate(-300, -1300);
+      drawStroke(x, L.s, cubic(seg(t, k0, k0 + .55)), i % 3 === 1 ? dark(C.leaf, .85) : C.leaf, .6);
+      drawStroke(x, L.vein, cubic(seg(t, k0 + .35, k0 + .75)), dark(C.leaf, .5), .55);
+      x.restore();
+    });
+    // ملاحظات بخط اليد + خط قلم بيوصل للحاجة
+    x.globalCompositeOperation = "source-over";
+    const pen = (pts, k) => { if (k <= 0) return; let L = 0; const d = [0]; for (let i = 1; i < pts.length; i++) { L += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); d.push(L); } x.beginPath(); x.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) { const lim = L * k; if (d[i] <= lim) x.lineTo(pts[i][0], pts[i][1]); else { const f = (lim - d[i - 1]) / (d[i] - d[i - 1]); x.lineTo(pts[i - 1][0] + (pts[i][0] - pts[i - 1][0]) * f, pts[i - 1][1] + (pts[i][1] - pts[i - 1][1]) * f); break; } } x.lineWidth = 2.6; x.strokeStyle = rgba(INK, .8); x.lineCap = "round"; x.stroke(); };
+    const hand = (txt, px, py, size, k, align = "center", font = "RQ") => {
+      if (k <= 0) return; x.save(); x.font = `700 ${size}px ${font}`; x.direction = "rtl"; x.textAlign = align; x.textBaseline = "middle";
+      const w = x.measureText(txt).width, x0 = align === "center" ? px - w / 2 : align === "right" ? px - w : px;
+      x.beginPath(); x.rect(x0 + w * (1 - k) - 10, py - size, w * k + 30, size * 2); x.clip(); // بيتكتب من اليمين للشمال
+      x.lineJoin = "round"; x.strokeStyle = "rgba(243,234,216,.9)"; x.lineWidth = 10; x.strokeText(txt, px, py);
+      x.fillStyle = rgba(INK, .88); x.fillText(txt, px, py); x.restore();
+    };
+    hand(PR.note1, 300, 820, 52, cubic(seg(t, 4.6, 5.5)));
+    pen(S.lead1, cubic(seg(t, 5.0, 5.6)));
+    hand(PR.note2, 790, 1555, 54, cubic(seg(t, 5.6, 6.4)));
+    pen(S.lead2, cubic(seg(t, 5.9, 6.5)));
+    // الختم: دايرة لون واحد بتتختم
+    const st = seg(t, 6.6, 7.0);
+    if (st > 0) {
+      const sc = 1.25 - .25 * M.springO(st * .6, 18, .5), a = Math.min(1, st * 3);
+      x.save(); x.translate(860, 760); x.rotate(-.18); x.scale(sc, sc); x.globalCompositeOperation = "multiply";
+      x.strokeStyle = rgba(C.acc, .85 * a); x.lineWidth = 7; x.beginPath(); x.arc(0, 0, 112, 0, Math.PI * 2); x.stroke();
+      x.lineWidth = 2.5; x.beginPath(); x.arc(0, 0, 96, 0, Math.PI * 2); x.stroke();
+      x.fillStyle = rgba(C.acc, .9 * a); x.font = `700 ${M.fit(PR.stamp, "AM", 170, 46, 20, "700")}px AM`; x.textAlign = "center"; x.textBaseline = "middle"; x.direction = "rtl"; x.fillText(PR.stamp, 0, 4);
+      x.restore();
+    }
+    x.setTransform(1, 0, 0, 1, 0, 0);
+    // العنوان: بيتلوّن من اليمين للشمال بحافة فرشاة، وبعده السطر بخط اليد
+    const tk = cubic(seg(t, 7.2, 8.6));
+    if (tk > 0) {
+      const fs = M.fit(PR.title, "AM", 900, 150, 60, "700");
+      x.save(); x.font = `700 ${fs}px AM`; x.textAlign = "center"; x.direction = "rtl"; x.textBaseline = "alphabetic";
+      const w = x.measureText(PR.title).width, x1 = 540 + w / 2 + 30, edge = x1 - (w + 80) * tk;
+      x.beginPath(); x.moveTo(x1 + 40, 120); x.lineTo(x1 + 40, 470);
+      for (let i = 0; i <= 14; i++) { const yy = 470 - 350 * i / 14; x.lineTo(edge + Math.sin(yy * .05 + 1) * 16, yy); }
+      x.closePath(); x.clip();
+      x.globalCompositeOperation = "multiply"; x.fillStyle = rgba(dark(rgb(PR.cup), .62), .92); x.fillText(PR.title, 540, 380);
+      x.restore();
+    }
+    hand(PR.sub, 540, 490, M.fit(PR.sub, "RQ", 880, 60, 30, "700"), cubic(seg(t, 8.4, 9.6)));
+    // اسم البراند تحت + خط رفيع
+    const bk = smooth(seg(t, 9.6, 10.4));
+    if (bk > 0) {
+      x.save(); x.globalAlpha = bk; x.fillStyle = rgba(INK, .85); x.font = "500 38px TJ"; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.brand, 540, 1790 + (1 - bk) * 14);
+      x.strokeStyle = rgba(C.acc, .8); x.lineWidth = 3; x.beginPath(); x.moveTo(540 - 90 * bk, 1815); x.lineTo(540 + 90 * bk, 1815); x.stroke(); x.restore();
+    }
+  },
+  sound(A) {
+    // بيانو هادي (نغمات طويلة) + صوت فرشاة على الورق مع كل ضربة
+    const N = A.midi, chords = [[57, 60, 64], [53, 57, 60], [55, 59, 62], [52, 55, 60]];
+    chords.forEach((c, i) => { const t0 = i * 3; c.forEach((n, k) => A.tone(t0 + k * .12, N(n + 12), 2.8, "sine", .07)); A.tone(t0, N(c[0] - 12), 3, "triangle", .06); });
+    [.15, .9, 1.3, 2.3, 2.6, 2.8, 3.2, 3.5, 3.7, 3.9, 4.1, 4.2, 4.4, 4.6].forEach((t0) => A.nz(t0, .35, "bandpass", 2200, .045, .6));
+    [4.6, 5.6].forEach((t0) => { for (let i = 0; i < 6; i++) A.nz(t0 + i * .13, .08, "highpass", 5000, .03); });
+    A.nz(6.6, .12, "lowpass", 900, .25); A.tone(6.6, 70, .2, "sine", .2);
+    [7.2, 8.4].forEach((t0) => A.nz(t0, 1.2, "bandpass", 1600, .05, .5));
+    [9.6, 10.1, 10.6].forEach((t0, i) => A.pluck(t0, N(72 + [0, 4, 7][i]), .08, 1.2));
+  },
+});
+</script>
+</body></html>

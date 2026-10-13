@@ -1,0 +1,139 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// قالب «ريزوجراف»: ٣ أحبار شفافة بتتطبع فوق بعض على ورق دافي (كل لون لوح لوحده)، نقط طباعة، وألواح مش راكبة على بعض بالظبط.
+// الألواح بتوصل واحد ورا التاني بمسحة الرول، والعجلة ماشية على التل، والعنوان بيتطبع على لوحين. 1080×1920، 12 ثانية.
+const PR = M.params({
+  title: { label: "العنوان", kind: "text", role: "product", def: "صيف ملوّن" },
+  sub: { label: "السطر اللي تحته", kind: "text", def: "تخفيضات على كل التشكيلة" },
+  strip: { label: "الشريط اللي تحت", kind: "text", def: "من ١ لـ ١٥ يوليو · اطلب أونلاين" },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "دراجة" },
+  ink1: { label: "حبر ١ (الأساسي)", kind: "color", def: "#0078BF" },
+  ink2: { label: "حبر ٢", kind: "color", def: "#FF48B0" },
+  ink3: { label: "حبر ٣", kind: "color", def: "#FFE800" },
+});
+const W = 1080, H = 1920, DUR = 12, BPM = 112, B = 60 / BPM;
+const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
+const INKS = [PR.ink1, PR.ink2, PR.ink3];
+const ANG = [15, 75, 45];          // زاوية شبكة النقط لكل لوح
+const ARRIVE = [[1.0, 1.8], [1.9, 2.7], [0.1, 0.9]];   // إمتى كل لوح بيتطبع (أزرق، بمبي، أصفر)
+const REG = [[2, -1, .0015], [-2, 2, -.001], [1, 2, .0008]];   // إزاحة ثابتة لكل لوح
+
+M.reel({
+  W, H, DUR, bg: "#F4EEE2",
+  async init(M) {
+    await Promise.all([loadFont("LZ", "SM-Lalezar.ttf"), loadFont("CH", "SM-Changa.ttf")]);
+    const c = M.canvas(W, H); const x = c.getContext("2d");
+    const mk = () => { const k = document.createElement("canvas"); k.width = W; k.height = H; return k; };
+    const plates = [0, 1, 2].map(mk);
+    // نقط بنسب ثابتة (٢٠/٤٠/٦٠٪) لكل حبر، الشبكة مثبتة على الورق
+    const pats = INKS.map((ink, i) => {
+      const o = {};
+      [.2, .4, .6].forEach((lv) => {
+        const P = 9, t = document.createElement("canvas"); t.width = t.height = P; const g = t.getContext("2d");
+        g.fillStyle = ink; g.beginPath(); g.arc(P / 2, P / 2, Math.sqrt(lv / Math.PI) * P, 0, Math.PI * 2); g.fill();
+        const pat = x.createPattern(t, "repeat"); pat.setTransform(new DOMMatrix().rotateSelf(ANG[i])); o[lv] = pat;
+      });
+      return o;
+    });
+    // الورق + خشونة الحبر (ثقوب صغيرة وخطوط في اتجاه سحب الورق)
+    const paper = mk(), p = paper.getContext("2d"), R = M.rng(5);
+    p.fillStyle = "#F4EEE2"; p.fillRect(0, 0, W, H);
+    for (let i = 0; i < 1800; i++) { p.fillStyle = `rgba(120,100,70,${R() * .06})`; p.fillRect(R() * W, R() * H, 1 + R() * 2, 1 + R() * 2); }
+    const grains = [0, 1, 2].map((k) => {
+      const g = mk(), q = g.getContext("2d"), r = M.rng(30 + k);
+      for (let i = 0; i < 14000; i++) { q.fillStyle = `rgba(0,0,0,${.4 + r() * .6})`; const s = .8 + r() * 1.8; q.fillRect(r() * W, r() * H, s, s); }
+      for (let i = 0; i < 26; i++) { q.fillStyle = `rgba(0,0,0,${.05 + r() * .12})`; q.fillRect(r() * W, 0, 2 + r() * 12, H); }
+      for (let i = 0; i < 40; i++) { const cx = r() * W, cy = r() * H, rr = 40 + r() * 160, gr = q.createRadialGradient(cx, cy, 0, cx, cy, rr); gr.addColorStop(0, "rgba(0,0,0,.14)"); gr.addColorStop(1, "rgba(0,0,0,0)"); q.fillStyle = gr; q.fillRect(cx - rr, cy - rr, rr * 2, rr * 2); }
+      return g;
+    });
+    return { x, plates, pats, paper, grains };
+  },
+  seek(t, C, M) {
+    const { x, plates, pats } = C, { seg, cubic, clamp, springO, expo } = M;
+    const tq = Math.floor(t * 12) / 12;           // الشخصيات على «اتنين» (١٢ فريم)
+    const cam = t * 26;                            // الكاميرا ماشية بالراحة
+    const hill = (base, amp, f, ph, px) => base + Math.sin(px * f + ph) * amp + Math.sin(px * f * 2.3 + ph * 1.7) * amp * .35;
+    const P = plates.map((k) => { const g = k.getContext("2d"); g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = "source-over"; g.clearRect(0, 0, W, H); return g; });
+    const [bl, pk, ye] = P;
+    const fillPoly = (g, style, base, amp, f, ph, par, bottom = H) => { g.fillStyle = style; g.beginPath(); g.moveTo(0, bottom); for (let px = 0; px <= W; px += 12) g.lineTo(px, hill(base, amp, f, ph, px + cam * par)); g.lineTo(W, bottom); g.closePath(); g.fill(); };
+    // السما: بمبي ٢٠٪ فوق، أصفر ٢٠٪ في النص
+    pk.fillStyle = pats[1][.2]; pk.fillRect(0, 0, W, 560);
+    ye.fillStyle = pats[2][.2]; ye.fillRect(0, 380, W, 760);
+    // الشمس: دايرة أصفر كامل + بمبي ٤٠٪ عليها = برتقاني
+    const sunY = 780 - 60 * cubic(seg(t, 0, 6));
+    ye.fillStyle = INKS[2]; ye.beginPath(); ye.arc(540, sunY, 300, 0, Math.PI * 2); ye.fill();
+    pk.fillStyle = pats[1][.4]; pk.beginPath(); pk.arc(540, sunY, 300, 0, Math.PI * 2); pk.fill();
+    // التلال: بعيد أزرق ٤٠٪، قريب أزرق ٦٠٪ + أصفر كامل = أخضر، والأرض أزرق كامل
+    fillPoly(bl, pats[0][.4], 1080, 40, .006, 1, .3);
+    fillPoly(bl, pats[0][.6], 1260, 60, .004, 2.4, .6);
+    fillPoly(ye, INKS[2], 1260, 60, .004, 2.4, .6);
+    fillPoly(bl, INKS[0], 1560, 26, .005, .5, 1);
+    // الطريق: شريط ورق فاضي (من غير حبر)
+    P.forEach((g) => { g.save(); g.globalCompositeOperation = "destination-out"; g.lineWidth = 14; g.beginPath(); for (let px = 0; px <= W; px += 12) g.lineTo(px, hill(1600, 26, .005, .5, px + cam) + 6); g.stroke(); g.restore(); });
+    // العجلة: ماشية على التل القريب، سيلويت أزرق بهالة ورق حواليه
+    const bx = -180 + (W + 360) * seg(tq, 2.6, 10.6), by = (px) => hill(1600, 26, .005, .5, px + cam) + 2;
+    const gy = by(bx), slope = Math.atan2(by(bx + 40) - by(bx - 40), 80);
+    const bike = (g, lw) => {
+      g.save(); g.translate(bx, gy - 8); g.rotate(slope); g.lineCap = "round"; g.lineJoin = "round"; g.lineWidth = lw;
+      const wr = 62, cr = tq * 9;
+      [-80, 80].forEach((wx) => { g.beginPath(); g.arc(wx, -wr, wr, 0, Math.PI * 2); g.stroke(); for (let s = 0; s < 3; s++) { const a = cr + s * Math.PI / 3; g.beginPath(); g.moveTo(wx + Math.cos(a) * wr, -wr + Math.sin(a) * wr); g.lineTo(wx - Math.cos(a) * wr, -wr - Math.sin(a) * wr); g.stroke(); } });
+      g.beginPath(); g.moveTo(-80, -wr); g.lineTo(-10, -wr); g.lineTo(40, -150); g.lineTo(-40, -150); g.lineTo(-80, -wr); g.moveTo(-10, -wr); g.lineTo(-45, -165); g.moveTo(80, -wr); g.lineTo(52, -175); g.lineTo(30, -185); g.stroke();
+      const ph = tq * 9, fx = Math.cos(ph) * 24, fy = Math.sin(ph) * 24;
+      g.beginPath(); g.moveTo(-40, -175); g.lineTo(-10 + fx * .4, -120); g.lineTo(-10 + fx, -wr + fy); g.moveTo(-40, -175); g.lineTo(-10 - fx * .4, -115); g.lineTo(-10 - fx, -wr - fy); g.stroke();
+      g.beginPath(); g.moveTo(-40, -178); g.lineTo(10, -270); g.lineTo(45, -190); g.stroke();
+      g.beginPath(); g.arc(18, -305, 30, 0, Math.PI * 2); g.fill(); g.stroke();
+      const sc = Math.sin(tq * 6) * 10; g.beginPath(); g.moveTo(0, -282); g.quadraticCurveTo(-60, -280 + sc, -110, -262 - sc); g.stroke();
+      g.restore();
+    };
+    if (bx > -200 && bx < W + 200) {
+      P.forEach((g) => { g.save(); g.globalCompositeOperation = "destination-out"; g.strokeStyle = g.fillStyle = "#000"; bike(g, 32); g.restore(); });
+      bl.strokeStyle = bl.fillStyle = INKS[0]; bike(bl, 14);
+    }
+    // العنوان: مطبوع على لوحين (بمبي + أزرق بإزاحة) = «الخبطة المزدوجة»
+    const tk = seg(t, 3.0, 3.25);
+    if (tk > 0) {
+      const fs = M.fit(PR.title, "LZ", 960, 250, 90), kick = 26 * Math.exp(-6 * Math.max(0, t - 3.0)) * Math.cos(30 * Math.max(0, t - 3.0));
+      [pk, bl].forEach((g, i) => { g.save(); g.font = `${fs}px LZ`; g.textAlign = "center"; g.direction = "rtl"; g.fillStyle = INKS[i ? 0 : 1]; g.globalAlpha = i ? .55 : 1; g.fillText(PR.title, 540 + (i ? 10 + kick : 0), 340 + (i ? 8 : 0)); g.restore(); });
+    }
+    const sk = seg(t, 4.0, 4.2);
+    if (sk > 0) { bl.save(); bl.font = `700 ${M.fit(PR.sub, "CH", 900, 74, 30, "700")}px CH`; bl.textAlign = "center"; bl.direction = "rtl"; bl.fillStyle = INKS[0]; bl.fillText(PR.sub, 540, 470 + 30 * (1 - springO(sk * .5, 16, .55))); bl.restore(); }
+    // الشريط اللي تحت: شريط ورق (من غير حبر في كل الألواح) والكلام بالأزرق
+    const bk = seg(t, 6.0, 6.4);
+    if (bk > 0) {
+      const w = 900 * cubic(bk), y0 = 1700;
+      P.forEach((g) => { g.save(); g.globalCompositeOperation = "destination-out"; g.fillRect(540 - w / 2, y0, w, 110); g.restore(); });
+      pk.fillStyle = pats[1][.2]; pk.fillRect(540 - w / 2, y0, w, 110);
+      if (bk >= 1) { bl.save(); bl.font = `700 ${M.fit(PR.strip, "CH", 840, 52, 26, "700")}px CH`; bl.textAlign = "center"; bl.direction = "rtl"; bl.fillStyle = INKS[0]; bl.fillText(PR.strip, 540, y0 + 72); bl.restore(); }
+    }
+    const brk = seg(t, 7.0, 7.3);
+    if (brk > 0) { P.forEach((g) => { g.save(); g.globalCompositeOperation = "destination-out"; g.globalAlpha = brk; g.font = "76px LZ"; g.textAlign = "center"; g.direction = "rtl"; g.fillText(PR.brand, 540, 1650); g.restore(); }); }
+    // خشونة الحبر: ثقوب ونقط بتتغير كل ٣ فريمات
+    const boil = Math.floor(t * 30 / 3) % 3;
+    P.forEach((g, i) => { g.save(); g.globalCompositeOperation = "destination-out"; g.drawImage(C.grains[(i + boil) % 3], (boil - 1) * 3, 0); g.restore(); });
+    // الطباعة: ورق، وبعدين كل لوح بيتضرب (multiply) بإزاحته؛ اللوح بيوصل بمسحة رول من فوق لتحت
+    x.setTransform(1, 0, 0, 1, 0, 0); x.globalCompositeOperation = "source-over"; x.drawImage(C.paper, 0, 0);
+    const kickT = [3.0, 4.0, 6.0, 7.0].reduce((a, k) => (t >= k ? k : a), -9), kk = Math.exp(-8 * (t - kickT)) * Math.cos(26 * (t - kickT));
+    const order = [2, 1, 0];
+    order.forEach((i) => {
+      const [a0, a1] = ARRIVE[i], k = seg(t, a0, a1); if (k <= 0) return;
+      const [ox, oy, rot] = REG[i], drift = i === 1 ? 10 * kk : i === 0 ? -8 * kk : 0;
+      x.save(); x.globalCompositeOperation = "multiply";
+      if (k < 1) { const edge = H * cubic(k); x.beginPath(); x.rect(0, 0, W, edge); x.clip(); }
+      x.translate(W / 2 + ox + drift, H / 2 + oy); x.rotate(rot); x.translate(-W / 2, -H / 2);
+      x.drawImage(plates[i], 0, 0);
+      x.restore();
+      if (k > 0 && k < 1) { const edge = H * cubic(k); x.save(); x.globalCompositeOperation = "multiply"; x.globalAlpha = .25; x.fillStyle = INKS[i]; x.fillRect(0, edge - 26, W, 26); x.restore(); }
+    });
+  },
+  sound(A) {
+    const N = A.midi;
+    // صوت الطابعة مع كل لوح
+    [[.1, .9], [1.0, 1.8], [1.9, 2.7]].forEach(([a, b]) => { A.nz(a, b - a, "bandpass", 900, .12, 1.4); for (let s = a; s < b; s += .09) A.click(s, .05); });
+    A.groove(BPM, 3.0, 12, { snare: true, kg: .7, hg: .08, sg: .22 });
+    const bassL = [43, 43, 48, 46];
+    for (let i = 0, t = 3.0; t < 12; i++, t += B) { A.bass(t, N(bassL[Math.floor(i / 4) % 4]), B * .9, .2); if (i % 2 === 0) A.pluck(t + B / 2, N([67, 70, 72, 74][i / 2 % 4]), .1, .35); }
+    A.hit(3.0, .5); A.clap(4.0, .3); A.whoosh(5.8, .4, .2); A.hit(6.0, .35); A.hit(7.0, .3);
+  },
+});
+</script>
+</body></html>

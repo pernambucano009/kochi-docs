@@ -1,0 +1,141 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// قالب «كشف السعر»: كلام بيخبط على الإيقاع ← المنتج بيطلع ← السعر القديم بيتشطب ← الجديد بيعدّ لتحت ويخبط بكونفيتي
+// ← ستيكر التوفير ← عد تنازلي للعرض ← زرار «اطلب» بينبض واسم البراند. 1080×1920، 12 ثانية، 120 BPM.
+const PR = M.params({
+  hook: { label: "الجملة الأولى (٣ كلمات)", kind: "text", def: "عرض مش هيتكرر" },
+  product: { label: "اسم المنتج", kind: "text", role: "product", def: "عطر ليالي" },
+  oldPrice: { label: "السعر القديم", kind: "text", def: "450" },
+  newPrice: { label: "السعر الجديد", kind: "text", def: "270" },
+  currency: { label: "العملة", kind: "text", def: "جنيه" },
+  ends: { label: "سطر العد التنازلي", kind: "text", def: "العرض بيخلص خلال" },
+  cta: { label: "الزرار", kind: "text", def: "اطلب دلوقتي" },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "بيت العطور" },
+  color: { label: "اللون الأساسي", kind: "color", def: "#ff3d2e" },
+  color2: { label: "اللون التاني", kind: "color", def: "#ffd23f" },
+});
+const W = 1080, H = 1920, DUR = 12, BPM = 120, B = 60 / BPM;
+const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
+const esc = (v) => String(v ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const ar = (s) => String(s).replace(/\d/g, (d) => "٠١٢٣٤٥٦٧٨٩"[d]);
+const num = (s) => parseFloat(String(s).replace(/[٠-٩]/g, (d) => "٠١٢٣٤٥٦٧٨٩".indexOf(d))) || 0;
+const OLD = num(PR.oldPrice), NEW = num(PR.newPrice), SAVE = Math.max(0, Math.round(OLD - NEW));
+const T_HOOK = 0, T_PROD = 1.6, T_OLD = 2.6, T_STRIKE = 3.4, T_NEW = 4.0, T_SLAM = 5.0, T_BADGE = 5.6, T_CD = 6.6, T_CTA = 8.6;
+
+M.reel({
+  W, H, DUR, bg: PR.color,
+  async init(M) {
+    await Promise.all([loadFont("LZ", "SM-Lalezar.ttf"), loadFont("CH", "SM-Changa.ttf"), loadFont("TJ", "SM-Tajawal.ttf")]);
+    const st = M.stage; st.dir = "rtl";
+    const cv = M.canvas(W, H); const x = cv.getContext("2d");
+    const words = PR.hook.split(/\s+/).filter(Boolean).slice(0, 4);
+    const hook = words.map((w) => M.el("div", "", `position:absolute;left:0;top:0;width:1080px;text-align:center;font:${M.fit(w, "LZ", 980, 330, 120)}px/1 LZ;color:#fff;text-shadow:0 14px 0 rgba(0,0,0,.18);`, esc(w)));
+    // المنتج: زجاجة عطر مرسومة SVG (من غير أي لوجو)
+    const prod = M.el("div", "", "position:absolute;left:290px;top:0;width:500px;height:640px;",
+      `<svg width="500" height="640" viewBox="0 0 500 640"><defs><linearGradient id="g" x1="0" x2="1"><stop offset="0" stop-color="#ffe9b0"/><stop offset=".5" stop-color="#ffb347"/><stop offset="1" stop-color="#e07b1a"/></linearGradient><linearGradient id="c" x1="0" x2="1"><stop offset="0" stop-color="#333"/><stop offset=".5" stop-color="#777"/><stop offset="1" stop-color="#222"/></linearGradient></defs>
+      <ellipse cx="250" cy="610" rx="190" ry="22" fill="rgba(0,0,0,.22)"/>
+      <rect x="185" y="40" width="130" height="120" rx="18" fill="url(#c)"/><rect x="215" y="150" width="70" height="50" fill="#c9a24a"/>
+      <rect x="70" y="190" width="360" height="410" rx="70" fill="url(#g)" stroke="rgba(255,255,255,.7)" stroke-width="6"/>
+      <rect x="110" y="230" width="40" height="320" rx="20" fill="rgba(255,255,255,.45)"/>
+      <rect x="140" y="360" width="220" height="110" rx="14" fill="rgba(255,255,255,.85)"/><rect x="175" y="395" width="150" height="14" rx="7" fill="#e07b1a"/><rect x="205" y="425" width="90" height="10" rx="5" fill="#e0b080"/></svg>`);
+    const pname = M.el("div", "", `position:absolute;left:0;top:0;width:1080px;text-align:center;font:700 ${M.fit(PR.product, "CH", 900, 78, 40, "700")}px CH;color:#fff;`, esc(PR.product));
+    // السعر القديم + خط الشطب، والجديد
+    const old = M.el("div", "", "position:absolute;left:0;top:0;width:1080px;text-align:center;", `<span style="position:relative;display:inline-block;font:140px/1 LZ;color:rgba(255,255,255,.92);padding:0 20px;">${esc(ar(PR.oldPrice))} <span style="font-size:60px">${esc(PR.currency)}</span><i style="position:absolute;left:0;top:48%;height:16px;width:100%;background:${PR.color2};border-radius:8px;transform-origin:100% 50%;transform:rotate(-8deg) scaleX(0);box-shadow:0 4px 0 rgba(0,0,0,.2);"></i></span>`);
+    const strike = old.querySelector("i");
+    const neu = M.el("div", "", "position:absolute;left:0;top:0;width:1080px;text-align:center;", `<span style="display:inline-block;font:330px/1 LZ;color:${PR.color2};text-shadow:0 16px 0 rgba(0,0,0,.25);"><b style="font-weight:400"></b> <span style="font-size:110px;color:#fff">${esc(PR.currency)}</span></span>`);
+    const newN = neu.querySelector("b");
+    // ستيكر التوفير (نجمة بتلف)
+    const badge = M.el("div", "", "position:absolute;left:0;top:0;width:300px;height:300px;",
+      `<svg width="300" height="300" viewBox="-150 -150 300 300" style="position:absolute;inset:0"><path fill="#fff" d="${Array.from({ length: 32 }, (_, i) => { const a = i / 32 * Math.PI * 2, r = i % 2 ? 128 : 150; return `${i ? "L" : "M"}${(Math.cos(a) * r).toFixed(1)},${(Math.sin(a) * r).toFixed(1)}`; }).join("")}Z"/></svg>
+      <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:${PR.color};text-align:center;line-height:1;"><span style="font:700 46px CH">وفّر</span><span style="font:96px LZ;margin-top:6px">${esc(ar(SAVE))}</span><span style="font:700 34px CH">${esc(PR.currency)}</span></div>`);
+    // العد التنازلي
+    const cd = M.el("div", "", "position:absolute;left:90px;top:0;width:900px;text-align:center;color:#fff;");
+    M.el("div", "", "font:700 50px CH;margin-bottom:22px;", esc(PR.ends), cd);
+    const clock = M.el("div", "", "display:flex;justify-content:center;gap:20px;", "", cd);
+    const cells = [0, 1, 2].map((i) => { const c = M.el("div", "", "width:200px;height:190px;border-radius:30px;background:rgba(0,0,0,.22);display:flex;flex-direction:column;align-items:center;justify-content:center;", "", clock); const n = M.el("div", "", "font:120px/1 LZ;", "", c); M.el("div", "", "font:600 28px TJ;opacity:.8;margin-top:4px;", ["ساعة", "دقيقة", "ثانية"][i], c); return n; });
+    const barW = M.el("div", "", "margin:30px auto 0;width:760px;height:22px;border-radius:11px;background:rgba(0,0,0,.22);overflow:hidden;", "", cd);
+    const bar = M.el("div", "", `height:100%;width:100%;background:${PR.color2};border-radius:11px;transform-origin:100% 50%;`, "", barW);
+    // الزرار واسم البراند
+    const cta = M.el("div", "", `position:absolute;left:0;top:0;width:1080px;text-align:center;`, `<span style="display:inline-block;font:96px/1 LZ;color:${PR.color};background:#fff;padding:36px 90px 46px;border-radius:120px;box-shadow:0 18px 0 rgba(0,0,0,.2);">${esc(PR.cta)}</span>`);
+    const ctaB = cta.firstChild;
+    const tap = M.el("div", "", "position:absolute;left:0;top:0;width:80px;height:80px;border-radius:50%;border:8px solid #fff;");
+    const brand = M.el("div", "", "position:absolute;left:0;top:0;width:1080px;text-align:center;font:700 44px CH;color:rgba(255,255,255,.9);letter-spacing:.02em;", esc(PR.brand));
+    const conf = Array.from({ length: 140 }, (_, i) => { const r = M.rng(i * 9 + 3); return { a: r() * Math.PI * 2, v: 900 + r() * 1500, s: 10 + r() * 16, spin: (r() - .5) * 20, c: [PR.color2, "#fff", "#1d1d1d", "#7cf0c9"][i % 4], tw: r() * 6 }; });
+    return { x, hook, prod, pname, old, strike, neu, newN, badge, cd, cells, bar, cta, ctaB, tap, brand, conf };
+  },
+  seek(t, C, M) {
+    const { x } = C, { seg, springO, expo, cubic, clamp, X, op } = M;
+    // الخلفية: لون + أشعة بتلف + هزّة مع كل خبطة
+    const shakeAt = [0, B, 2 * B, T_SLAM].filter((k) => t >= k).pop() ?? -9, sh = Math.exp(-14 * (t - shakeAt)) * 18;
+    const sx = Math.sin(t * 80) * sh, sy = Math.cos(t * 67) * sh;
+    M.stage.style.transform = `translate(${sx}px,${sy}px)`;
+    x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = PR.color; x.fillRect(0, 0, W, H);
+    x.save(); x.translate(540, 900); x.rotate(t * .15); x.fillStyle = "rgba(255,255,255,.08)";
+    for (let i = 0; i < 18; i++) { x.rotate(Math.PI * 2 / 18); x.beginPath(); x.moveTo(0, 0); x.lineTo(-90, -2000); x.lineTo(90, -2000); x.closePath(); x.fill(); }
+    x.restore();
+    const vg = x.createRadialGradient(540, 900, 200, 540, 960, 1300); vg.addColorStop(0, "rgba(255,255,255,.12)"); vg.addColorStop(1, "rgba(0,0,0,.28)"); x.fillStyle = vg; x.fillRect(0, 0, W, H);
+    // ١) الجملة الأولى: كلمة على كل بيت، بتنزل من حجم كبير وتخبط
+    const hOut = expo(seg(t, T_PROD - .2, T_PROD + .3));
+    C.hook.forEach((e, i) => {
+      const k0 = T_HOOK + i * B * .9, k = seg(t, k0, k0 + .18);
+      op(e, k > 0 ? 1 - hOut : 0);
+      X(e, 0, 560 + i * 300 - hOut * 300, k > 0 ? 1 + 1.6 * (1 - expo(k)) : 1);
+    });
+    // ٢) المنتج بيطلع ويطفو
+    const pk = springO(Math.max(0, t - T_PROD), 11, .6), lift = Math.sin(t * 2.2) * 14;
+    op(C.prod, t > T_PROD ? 1 : 0); X(C.prod, 0, 300 + (1 - pk) * 1400 + lift, .9 + .1 * pk, .9 + .1 * pk, (1 - pk) * 18 + Math.sin(t * 1.4) * 2);
+    op(C.pname, clamp((t - T_PROD - .4) * 3)); X(C.pname, 0, 970 + (1 - expo(seg(t, T_PROD + .4, T_PROD + 1))) * 40);
+    // ٣) السعر القديم وبعدين الشطب، وبيطلع لفوق ويبهت
+    const ok = seg(t, T_OLD, T_OLD + .35), oUp = expo(seg(t, T_NEW, T_NEW + .6));
+    op(C.old, ok > 0 ? 1 - .45 * oUp : 0); X(C.old, 0, 1110 - oUp * 10, (ok > 0 ? .6 + .4 * springO(t - T_OLD, 16, .5) : .6) * (1 - .3 * oUp));
+    C.strike.style.transform = `rotate(-8deg) scaleX(${expo(seg(t, T_STRIKE, T_STRIKE + .35))})`;
+    // ٤) السعر الجديد: عداد بينزل من القديم للجديد وبعدين يخبط
+    const nk = seg(t, T_NEW, T_SLAM), cnt = t < T_NEW ? OLD : Math.round(OLD + (NEW - OLD) * cubic(nk));
+    C.newN.textContent = ar(cnt);
+    const slam = t >= T_SLAM ? springO(t - T_SLAM, 18, .35) : 0;
+    op(C.neu, t > T_NEW ? 1 : 0); X(C.neu, 0, 1240, t < T_SLAM ? .75 + .1 * Math.sin(t * 30) * 0 : 1.35 - .35 * slam);
+    // كونفيتي مع الخبطة
+    const ct = t - T_SLAM;
+    if (ct > 0 && ct < 3.5) conf_draw(x, C.conf, ct);
+    // ٥) ستيكر التوفير
+    const bk = t > T_BADGE ? springO(t - T_BADGE, 14, .45) : 0;
+    op(C.badge, bk > 0 ? 1 : 0); X(C.badge, 700, 220, bk, bk, -12 + Math.sin(t * 1.6) * 8);
+    // ٦) العد التنازلي (ساعات:دقايق:ثواني بتعد) + شريط بيخلص
+    const dk = expo(seg(t, T_CD, T_CD + .5)), secs = 2 * 3600 + 45 * 60 + 10 - Math.floor(Math.max(0, t - T_CD) * 3);
+    X(C.cd, 90, 1520 + (1 - dk) * 120);
+    [Math.floor(secs / 3600), Math.floor(secs / 60) % 60, secs % 60].forEach((v, i) => (C.cells[i].textContent = ar(String(v).padStart(2, "0"))));
+    C.bar.style.transform = `scaleX(${.62 - .3 * seg(t, T_CD, DUR)})`;
+    // ٧) كل اللي فوق بيطلع لفوق ويفضّي مكان للزرار
+    const up = expo(seg(t, T_CTA, T_CTA + .6));
+    op(C.cd, dk * (1 - up)); C.cd.style.marginTop = `${up * 160}px`;
+    const ck = t > T_CTA + .3 ? springO(t - T_CTA - .3, 13, .5) : 0, pulse = 1 + .05 * Math.max(0, Math.sin((t - T_CTA) * Math.PI * 2 / (B * 2)));
+    op(C.cta, ck > 0 ? 1 : 0); X(C.cta, 0, 1590, ck * pulse);
+    // نقرة على الزرار (دايرة بتكبر وتختفي)
+    const tp = seg(t, T_CTA + 1.6, T_CTA + 2.3);
+    op(C.tap, tp > 0 && tp < 1 ? 1 - tp : 0); X(C.tap, 500, 1640, .5 + tp * 2.5);
+    if (tp > 0 && tp < .25) C.ctaB.style.transform = "scale(.94)"; else C.ctaB.style.transform = "";
+    op(C.brand, expo(seg(t, T_CTA + .8, T_CTA + 1.4))); X(C.brand, 0, 1800);
+  },
+  sound(A) {
+    const N = A.midi;
+    [0, B, 2 * B].forEach((t, i) => { A.hit(t, .6); A.tone(t, N(40 - i * 2), .3, "square", .1); });
+    A.riser(B * 3, T_PROD, .25); A.whoosh(T_PROD, .45, .3); A.clap(T_OLD, .3);
+    A.nz(T_STRIKE, .3, "bandpass", 3000, .25, 2);   // صوت الشطب
+    for (let s = T_NEW; s < T_SLAM; s += .07) A.click(s, .12);   // العداد
+    A.riser(T_NEW, T_SLAM, .3); A.hit(T_SLAM, .9); A.nz(T_SLAM, 1.2, "highpass", 6000, .2);
+    A.pluck(T_BADGE, N(84), .2, .4); A.pluck(T_BADGE + .08, N(91), .2, .5);
+    A.groove(BPM, T_SLAM, 12, { snare: true, kg: .8, hg: .1, sg: .3 });
+    for (let i = 0, t = T_SLAM; t < 12; i++, t += B) A.bass(t, N([40, 40, 43, 45][Math.floor(i / 4) % 4]), B * .9, .26);
+    for (let s = T_CD; s < 12; s += 1 / 3) A.tone(s, N(96), .03, "square", .03);   // تكّة الساعة
+    A.whoosh(T_CTA, .5, .25); A.pluck(T_CTA + 1.6, N(79), .2, .3);
+  },
+});
+function conf_draw(x, P, ct) {
+  P.forEach((p) => {
+    const px = 540 + Math.cos(p.a) * p.v * ct * .6, py = 1240 + Math.sin(p.a) * p.v * ct * .6 - 0 + 900 * ct * ct;
+    if (py > 2000) return;
+    x.save(); x.translate(px, py); x.rotate(p.spin * ct); x.scale(1, Math.cos(ct * 8 + p.tw)); x.fillStyle = p.c; x.fillRect(-p.s / 2, -p.s / 4, p.s, p.s / 2); x.restore();
+  });
+}
+</script>
+</body></html>
