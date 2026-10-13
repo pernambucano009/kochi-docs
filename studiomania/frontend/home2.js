@@ -46,7 +46,7 @@ const NH = (() => {
       : { en: "Create", ar: "اعمل جديد", icon: "create", page: "create", desc: "كل أنواع الشغل من هنا: اختار النوع، والخطوات بتمشي معاك لحد التصدير." },
     brand: { en: "Your Brand", ar: "عقل البراند", icon: "brand", page: "brand", desc: "كل تفاصيل البراند وتفضيلاته وستايله. أي شغل بيتعمل بيبني عليه." },
     assets: { en: "Assets", ar: "الأصول", icon: "box", page: "assets", desc: "الشخصيات والأصوات والموسيقى اللي بتستخدمها في أي شغل." },
-    settings: { en: "Settings", ar: "الحساب والإعدادات", icon: "gear", go: "settings", desc: "المفاتيح والرصيد والعملاء." },
+    settings: { en: "Settings", ar: "الإعدادات", icon: "gear", go: "settings", desc: "المفاتيح والرصيد والعملاء." },
     progress: { en: "In Progress", ar: "شغّال عليه", icon: "pulse", page: "progress", desc: "كل خط مشروع، وكل نقطة خطوة. دوس على أي خط يكمّل من مكان ما وقفت." },
     publish: { en: "Publish", ar: "النشر", icon: "send", go: "7", desc: "الحسابات المربوطة والجدولة واللي اتنشر." },
     // جوه «اعمل جديد»: كل نوع بيفتح القسم اللي بيعمله النهارده
@@ -126,13 +126,13 @@ const NH = (() => {
       <filter id="nhGBlur" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="1.1"/></filter></defs></svg>
     <div class="nh-home" id="nhHome">
       <header class="nh-top">
+        <div class="nh-logo" aria-label="StudioMania">STUDIOMANIA</div>
         <div class="nh-tools">
-          <button class="nh-switch" id="nhTheme" aria-label="Switch theme"><span class="track"><span class="knob"></span></span><span class="latin" id="nhMode">Dark Mode</span></button>
-          <button class="nh-chip" id="nhClient" title="العميل اللي شغال عليه"><i id="nhClientAv"></i><span id="nhClientName" data-no-i18n></span></button>
-          <button class="nh-chip latin" id="nhLang" style="padding:6px 10px;letter-spacing:.2em">EN</button>
           <button class="nh-chip nh-bell" id="nhBell" title="الإشعارات" aria-label="الإشعارات"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15zM10 20.5a2 2 0 0 0 4 0"/></svg><b class="bell-n" hidden></b></button>
+          <button class="nh-chip latin nh-langb" id="nhLang">EN</button>
+          <button class="nh-chip" id="nhClient" title="العميل اللي شغال عليه"><i id="nhClientAv"></i><span id="nhClientName" data-no-i18n></span></button>
+          <button class="nh-switch" id="nhTheme" aria-label="Switch theme"><span class="track"><span class="knob"></span></span><span class="latin" id="nhMode">Dark</span></button>
         </div>
-        <div class="nh-logo" aria-label="${KOCHI ? "Kochi" : "StudioMania"}">${KOCHI ? "K" : "STUDI"}<span class="o" aria-hidden="true"><svg viewBox="0 0 100 100"><circle class="ring" cx="50" cy="50" r="44"/><circle class="orbit" cx="50" cy="50" r="70" pathLength="100"/></svg></span>${KOCHI ? "CHI" : "MANIA"}</div>
       </header>
       <main class="nh-bento" id="nhBento"></main>
     </div>
@@ -224,7 +224,7 @@ const NH = (() => {
   const mode = () => storageGet(THEME_KEY) || (sysDark.matches ? "dark" : "light");
   const sync = () => {
     root.dataset.nhTheme = mode();
-    document.getElementById("nhMode").textContent = mode() === "dark" ? "Dark Mode" : "Light Mode";
+    document.getElementById("nhMode").textContent = mode() === "dark" ? "Dark" : "Light";
     GL?.theme(mode() === "dark");
   };
   sync();
