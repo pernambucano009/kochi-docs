@@ -180,9 +180,40 @@ function buildCharacter(root, c = C) {
   el('ellipse', { cx: -77, cy: 22, rx: 17, ry: 24, fill: c.skin }, farmF);
   return R;
 }
-// pose: { joint: degrees } ; positive = clockwise. For the front (left-of-screen) arm,
-// positive uarmF swings the arm OUT and UP to the left, away from the head.
+// pose: { joint: degrees } ; positive = clockwise (SVG). In the rig's own (unmirrored) space:
+//   uarmF/farmF = arm on the LEFT of the character drawing (front, drawn over torso, child of torso)
+//   uarmB/farmB = arm on the RIGHT (back, shade colour, child of body, behind torso)
+//   uarmF +  -> swings out/up to the left.   uarmF - -> swings across the chest.
+//   uarmB -  -> swings out/up to the right.  uarmB + -> swings across the chest.
+//   farm* bends the elbow relative to the upper arm (curl: farmF -10 .. -105, farmB +10 .. +105).
+// The face/nose point to the rig's RIGHT, so the BACK arm is the one on the side the character faces:
+// use it (via reach) for pointing, handing over, high-fives.
 function pose(R, P) { for (const k in P) { const j = R[k]; if (j && j.g) j.g.setAttribute('transform', `rotate(${P[k].toFixed(3)} ${j.px} ${j.py})`); } }
+
+// Arm reach with 2-joint IK, in the rig's local units (hip = 0,0; y down; unmirrored space).
+// Returns joint angles to merge into pose(). Animate the TARGET point over time, not the angles.
+const ARM = {
+  F: { sx: -64, sy: -268, ex: -72, ey: -128, hx: -77, hy: 22, bend: 1 },
+  B: { sx: 62, sy: -268, ex: 70, ey: -128, hx: 75, hy: 22, bend: -1 },
+};
+function reach(side, tx, ty, bend) {
+  const a = ARM[side];
+  const l1 = Math.hypot(a.ex - a.sx, a.ey - a.sy), l2 = Math.hypot(a.hx - a.ex, a.hy - a.ey);
+  const rest1 = KM.deg(Math.atan2(a.ey - a.sy, a.ex - a.sx)), rest2 = KM.deg(Math.atan2(a.hy - a.ey, a.hx - a.ex));
+  const s = KM.ik2(a.sx, a.sy, tx, ty, l1, l2, bend ?? a.bend);
+  return { ['uarm' + side]: s.a1 - rest1, ['farm' + side]: (s.a2 - rest2) - (s.a1 - rest1) };
+}
+
+// Place a character. facing = 1 (faces screen-right) or -1 (mirrored, faces screen-left).
+// Mirroring with scale(-k, k) is ALLOWED (it's a flip, not a stretch). Reach targets stay in the
+// rig's unmirrored local space, so "in front of the face" is always +x.
+// To convert a screen point to rig-local: lx = (X - x) / (k * facing), ly = (Y - y) / k.
+function place(root, x, y, k, facing = 1) { root.setAttribute('transform', `translate(${x} ${y}) scale(${k * facing} ${k})`); }
+const toLocal = (X, Y, x, y, k, facing = 1) => [(X - x) / (k * facing), (Y - y) / k];
+
+// Props held in a hand: append them to the forearm group (R.farmF.g / R.farmB.g) at the hand point
+// (ARM.F.hx, ARM.F.hy). To keep a prop upright while the arm moves, counter-rotate it by
+// -(uarm + farm + torso + body) around the hand point.
 
 const heroRoot = el('g', {}, KM.$('#hero'));
 const hero = buildCharacter(heroRoot);
@@ -201,7 +232,7 @@ function render(t) {
   const enter = KM.spring(t, 0.15, { stiffness: 150, damping: 15 });
   const breath = KM.breathe(t, 3.2);
   const yIn = (1 - enter) * 260;
-  heroRoot.setAttribute('transform', `translate(${L.cx} ${hipY + yIn}) scale(${L.k})`);
+  place(heroRoot, L.cx, hipY + yIn, L.k, 1);
   // wave: anticipation down, big raise, two waves, settle (all timed in 12 fps frames)
   const raise = KM.keys(t, [[0.9, 0], [1.05, -6, 'inOutSine'], [1.45, 135, 'snappy'], [2.9, 135], [3.3, 8, 'inOutCubic']]);
   const wave = (t > 1.45 && t < 2.9) ? Math.sin((t - 1.45) * Math.PI * 2 * 1.4) * 22 : 0;

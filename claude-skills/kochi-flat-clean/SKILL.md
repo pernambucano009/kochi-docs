@@ -67,7 +67,8 @@ node scripts/contact-sheet.mjs <project>/scene.html --out <project>/review/sheet
 ```
 **Look at the sheet** (open the PNG) next to 2 or 3 images in `references/examples/`. Fix anything that is:
 off-style (outlines, black, gradients, realistic faces), cluttered (more than 5 floating items, under 35% empty space),
-cropped (limbs or text cut off by the frame edge or by the safe area), or unreadable (text over busy shapes, under 64 px).
+cropped (limbs or text cut off by the frame edge or by the safe area), unreadable (text over busy shapes, under 64 px),
+or awkward (crossed arms, props hitting faces, hands meeting over text, near-empty frames during transitions).
 Also do the Arabic check from `references/arabic-text.md` on one full-size still (`--times <t> --thumb-w 1080 --cols 1`).
 
 ### 4. Palette check
@@ -95,25 +96,54 @@ Look at the final sheet made **from the MP4**, not the HTML, before you say it's
 duration, frame count and fps, and anything you knowingly left imperfect.
 
 ## Building characters well (most common failure points)
-- Proportions: about 8 heads tall, legs about 52%. Keep the 960-unit rig and scale it with `scale(k)`. Don't stretch it with non-uniform scaling.
+- Proportions: about 8 heads tall, legs about 52%. Keep the 960-unit rig and scale it with `place(root, x, y, k, facing)`.
+  **Mirroring is allowed:** `facing = -1` flips the character to face screen-left (`scale(-k, k)`). Other
+  non-uniform scaling is not.
+- **Which arm does what.** The face points to the rig's right (+x). The **back arm** (`uarmB`/`farmB`, shade colour, behind the torso)
+  is on the side the character faces, so use it for pointing, handing over and high-fives. The front arm (`uarmF`/`farmF`)
+  is on the far side, for holding a phone or clipboard, waving outward and curls toward the viewer.
+  The sign conventions are in the comment above `pose()` in the template.
+- **Reaching a point: use `reach(side, x, y)`** (a two-joint solver, `KM.ik2`). Targets are in the rig's local units
+  (hip = 0,0, y down, unmirrored). Convert screen points with `toLocal(...)`. For two characters touching
+  (a high-five, handing over a phone), compute ONE shared screen point, convert it into each rig's local space and call `reach`
+  for both. For big moves, **animate the target point** with `KM.keys`/`KM.spring` and solve every frame.
+  Never blend joint angles between far-apart poses: the in-betweens swing through ugly poses.
+  Keep shared touch points below the text block, so arms never cover the copy.
+- **Holding props:** append the prop to the forearm group (`R.farmF.g` / `R.farmB.g`) at the hand point
+  (`ARM.F.hx, ARM.F.hy`) so it follows the hand. To keep it upright (a phone, a clipboard), counter-rotate it by
+  `-(uarm + farm + torso + body)` around the hand point. A dumbbell bar crosses the hand; the plates sit on each side of the fist.
+- **Curls:** `farmF` from −10° to about −105° (−140° hits the face) with `snappy`, holding 3 frames at the top. 2 or 3 reps per beat.
 - For two or more people, vary the silhouette as well as the colour: hair shape (bun, swoosh, short), trouser width,
   a jacket shape over the torso, height ±5%.
 - A **trainer** reads through props and pose: a whistle on a cord, a clipboard or phone, an upright posture,
   a pointing or high-five gesture. A **client** reads through workout props: a dumbbell, a mat, a water bottle.
   Use sporty garments: a tee, joggers, sneakers.
-- Women in KOCHI content: modest sportswear (long sleeves, long trousers). Hijab or abaya options are welcome and
-  are drawn as one flat shape with one shade tone, like any other garment.
-- Seated, bent or lifting poses: rotate `thighF`/`shinF` and `uarmF`/`farmF` (the joints are nested).
-  For a dumbbell curl, rotate `farmF` between −10° and −140° with `snappy`, holding at the top for 3 frames.
+- Women in KOCHI content: modest sportswear by default (long sleeves, long trousers). **Hijab:** draw it as one flat
+  shape that covers the hair and neck: a rounded hood path around the head (about 12 units outside the head ellipse) plus a drape
+  that ends on the upper chest, with the face left open as an ellipse. Use one garment colour and its shade for the inner fold.
+  An abaya is a long A-line shape over the torso and legs, with sneakers showing.
 - Faces stay simple: dot eyes, a line mouth. Show emotion through body pose and timing, not facial detail.
 
 ## Gym and fitness props (flat recipes)
 - **Dumbbell:** a bar `rect` with `rx` = half its height, plus two plates (rounded rects) in ink or an accent colour.
+  Make it at least 90 units wide on the 960-unit rig, or it reads as a blob at 1080 px.
+- **Whistle:** a small pill (20×12) in an accent colour on a thin cord (two lines in ink, 3 px) hanging from the collar.
+- **Clipboard:** a rounded rect (60×80, rx 8) in an accent colour, a white paper rect inset by 6, 3 grey lines, and a small
+  ink clip on top. Hold it at the side (it reads badly flat across the chest).
 - **Bench:** a pill-shaped top plus two trapezoid legs in a shade colour.
 - **Kettlebell:** a circle plus a handle drawn as a thick ring (a path with a hole, `fill-rule="evenodd"`).
 - **Phone UI:** a rounded rect (rx 48) in ink, a screen in `#FEFEFE` or a pale tone, pill buttons, a check mark, and counting numbers.
-- **Gym backdrop:** a few vertical rounded rects (mirrors or windows) in a background tint, a rack as pill lines.
-  Keep it sparse: this style does not draw full detailed rooms.
+- **Gym backdrop:** a few vertical rounded rects (mirrors or windows) and a rack as pill lines, kept sparse.
+  Backdrop shapes must be visibly different from the ground: use the halo or a shadow tone (e.g. `#F4CDAE` or `#FAF2EE` on peach),
+  never a tint that differs from the background by less than about 6 ΔE. `palette-check` can't catch invisible shapes, so look at the sheet.
+
+## End card
+- The brief wins. If it only asks for the logo, show the logo only. If it doesn't mention a call to action, add a short one
+  (e.g. «حمّل التطبيق») only if it fits the brief, and say you added it.
+- Layout (9:16): the background or halo colour fills the frame. The wordmark is centred at y ≈ 860, 140–180 px tall, in ink.
+  An optional line sits 120 px below it at 44–48 px. Leave one small accent (3 dots, a check) looping gently.
+- Hold it for at least 1.5 s (18 frames). The transition into it must never show an almost empty frame for more than 4 frames:
+  start the wordmark entering while the wipe is still finishing.
 
 ## Output checklist (all must be true)
 - [ ] 12 fps (`r_frame_rate=12/1`, or a container fps with 12 unique poses per second)

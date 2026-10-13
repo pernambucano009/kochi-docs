@@ -33,12 +33,13 @@ if (/\.html?$/i.test(src)) {
   const info = JSON.parse(probe.stdout); const st = info.streams[0];
   size = { width: st.width, height: st.height };
   const dur = +info.format.duration;
+  const [fn, fd] = String(st.r_frame_rate).split('/').map(Number); const lastT = dur - 1 / ((fn / (fd || 1)) || 12);
   console.log(`video: ${st.width}x${st.height}  ${st.r_frame_rate} fps  ${dur.toFixed(2)}s  ${st.nb_frames || '?'} frames`);
-  times = a.times ? String(a.times).split(',').map(Number) : Array.from({ length: Math.floor(dur / every) + 1 }, (_, i) => Math.min(i * every, dur - 0.05));
+  times = a.times ? String(a.times).split(',').map(Number) : Array.from({ length: Math.floor(dur / every) + 1 }, (_, i) => Math.min(i * every, lastT));
   times.forEach((t, i) => {
     const f = path.join(dir, String(i).padStart(5, '0') + '.png');
     spawnSync('ffmpeg', ['-v', 'error', '-y', '-ss', String(t), '-i', src, '-frames:v', '1', f]);
-    if (fs.existsSync(f)) frames.push(f);
+    if (fs.existsSync(f)) frames.push(f); else console.warn(`  no frame at ${t}s (skipped)`);
   });
 }
 

@@ -59,7 +59,8 @@ add them to `palette.json` and the theme, and put them in the style bible.
   Use 3 to 5 of them and keep them off the face.
 - Close-up match cuts: hands with a phone or laptop fill the frame, then cut wide to the full character.
 - Small confetti: dots, short pill dashes and plus signs in ink or accent, 5 to 12 px, sparse.
-- 9:16: keep the text block in y 250…620 and the hero between y 560…1500. The bottom 400 px stays decorative only.
+- 9:16 zones: **y 0–250** is platform UI (background only). **y 250–620** is the text block. **y 560–1520** holds the hero and action
+  (feet on a floor line at about y 1500). **y 1520–1920** is platform UI too: background and floor colour only, with nothing that needs to be seen.
 
 ## 5. Type
 - **Readex Pro** (Google Fonts, bundled in `templates/fonts/`) covers Arabic and Latin with

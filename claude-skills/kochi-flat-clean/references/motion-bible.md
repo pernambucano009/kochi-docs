@@ -34,6 +34,8 @@ Overshoot is friendly and bouncy but small: spring damping between 12 and 16. Ne
 - **Idle:** breathing via `KM.breathe(t, 3.2)` rotates the torso by about ±0.6° and the back arm by 2°.
   The head drifts with `KM.wiggle(t, 0.6, 3)`. Someone always moves a little. Never freeze a character for more than 1 s.
 - **Blink:** `KM.blink(t, seed)`. Closed for 2 frames, every 3 to 4 s. Give each character a different seed.
+- **Large arm moves** (reaching, pointing, high-fives): move the hand TARGET along an eased path and solve with `reach()` every frame.
+  Blending joint angles directly between distant poses gives broken in-betweens.
 - **Gestures:** anticipation (1–2 frames the other way), action (3–5 frames, `snappy`), overshoot (the spring),
   hold, then settle. The wave in the template shows all of this: down 6°, up 135°, waves, settle.
 - **Head turns:** swap between a front face and a 3/4 face on one frame (the style draws the 3/4 face by shifting
@@ -58,6 +60,8 @@ Overshoot is friendly and bouncy but small: spring damping between 12 and 16. Ne
 3. **Match cut on shape:** the shape of a card, a phone screen or a circle carries over and scales into the next scene.
 4. **Slide push:** the whole scene pushes out sideways as the next pushes in, 6 frames, `swoosh`. In RTL videos, push from right to left.
 5. **Pop-out:** elements scale to 0 one after another (staggered 1 frame each), then the new ones spring in.
+
+Whatever the transition, never show a nearly empty frame for more than 4 frames (0.33 s). Overlap the next scene's entrance with the end of the wipe.
 
 ## 5. Reel tempo (9:16, 10–30 s)
 - **Hook in the first 1.5 s:** by frame 18 the viewer has seen the hero and the first words. The first frame isn't empty:

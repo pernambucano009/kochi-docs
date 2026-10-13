@@ -112,6 +112,22 @@
   // Idle breathing: 0..1 sine, ~3.5 s cycle
   KM.breathe = (t, period = 3.6, phase = 0) => (Math.sin((t / period + phase) * Math.PI * 2) + 1) / 2;
 
+  // Two-joint IK (arm or leg). Shoulder (sx,sy) -> target (tx,ty), segment lengths l1,l2.
+  // bend = +1 or -1 picks which way the elbow/knee points. Returns absolute directions in degrees
+  // (SVG convention: 0 = +x, 90 = down, clockwise positive) for the upper and lower segment.
+  // For big reaches, animate the TARGET POINT over time and solve each frame; never blend the angles
+  // of two far-apart poses directly (the in-betweens swing through odd poses).
+  KM.ik2 = (sx, sy, tx, ty, l1, l2, bend = 1) => {
+    const dx = tx - sx, dy = ty - sy;
+    const d = KM.clamp(Math.hypot(dx, dy), Math.abs(l1 - l2) + 1e-3, l1 + l2 - 1e-3);
+    const base = Math.atan2(dy, dx);
+    const A = Math.acos(KM.clamp((l1 * l1 + d * d - l2 * l2) / (2 * l1 * d), -1, 1));
+    const a1 = base - bend * A;
+    const ex = sx + Math.cos(a1) * l1, ey = sy + Math.sin(a1) * l1;
+    const a2 = Math.atan2(ty - ey, tx - ex);
+    return { a1: KM.deg(a1), a2: KM.deg(a2), elbow: [ex, ey] };
+  };
+
   // ---------- SVG helpers ----------
   KM.$ = (sel, root = document) => root.querySelector(sel);
   KM.$$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
@@ -169,7 +185,8 @@
     width = +KM.param('w', width); height = +KM.param('h', height);
     global.SCENE = { duration, width, height, fps };
     global.seek = (t) => { render(KM.clamp(t, 0, duration)); return true; };
-    const fontLoads = fonts.map((f) => document.fonts.load(f).catch(() => null));
+    // load each face for BOTH Arabic and Latin subsets (sample text forces the right unicode-range files)
+    const fontLoads = fonts.map((f) => document.fonts.load(f, 'أبجد هوز KOCHI 0123').catch(() => null));
     global.sceneReady = Promise.all(fontLoads).then(() => document.fonts.ready).then(() => { global.seek(0); return true; });
     if (!KM.isRender) global.sceneReady.then(() => KM.player(duration, fps));
     return global.SCENE;
