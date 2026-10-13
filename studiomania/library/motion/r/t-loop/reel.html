@@ -1,0 +1,55 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// قالب «لوب هندسي»: شكل واحد بيتحول من دايرة لنجمة لمربع، والكاميرا بتبعد فيبان إنه بلاطة في شبكة مالهاش آخر بتتحرك بموجة،
+// وبعدين بترجع تغطس في نفس الشكل فاللوب بيقفل من غير ما يبان. ألوان طباعة ريزو وحبيبات. 1080×1920، 12 ثانية بالظبط.
+const PR = M.params({
+  title: { label: "العنوان", kind: "text", role: "product", def: "تصميم بيتكرر… ومابيتعادش" },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "ستوديو شكل" },
+  c1: { label: "لون ١", kind: "color", def: "#ff5c39" },
+  c2: { label: "لون ٢", kind: "color", def: "#2f5bea" },
+  c3: { label: "لون ٣", kind: "color", def: "#ffcf3f" },
+  paper: { label: "لون الورق", kind: "color", def: "#f3ead8" },
+});
+const W = 1080, H = 1920, DUR = 12, T = 420;
+const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
+
+M.reel({
+  W, H, DUR, bg: PR.paper,
+  async init(M) { await Promise.all([loadFont("LZ", "SM-Lalezar.ttf"), loadFont("PB", "TY-PlexArabic-700.ttf", "700")]); const c = M.canvas(W, H); return { x: c.getContext("2d") }; },
+  seek(t, C, M) {
+    const { x } = C, { clamp, hash, smooth } = M, P = Math.PI * 2, u = t / DUR;   // u من ٠ لـ ١ واللوب بيقفل
+    x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = PR.paper; x.fillRect(0, 0, W, H);
+    // شكل سوبر إليبس بيتحول: m = عدد السنون، k = قد إيه داخل (نجمة)
+    const shape = (r, m, k, rot) => { x.beginPath(); for (let i = 0; i <= 120; i++) { const a = i / 120 * P; const rr = r * (1 - k * (.5 + .5 * Math.cos(a * m))) ; x.lineTo(Math.cos(a + rot) * rr, Math.sin(a + rot) * rr); } x.closePath(); };
+    // زوم: بيبدأ ببلاطة واحدة، يبعد لحد ~٦ بلاطات، ويرجع (اللوب)
+    const zf = .5 - .5 * Math.cos(u * P), zoom = Math.exp(Math.log(2.3) - zf * Math.log(2.3 * 6)), rot = Math.sin(u * P) * .25;
+    x.save(); x.translate(540, 960); x.rotate(rot); x.scale(zoom, zoom);
+    const span = Math.ceil(1400 / (T * zoom)) + 1;
+    const cols = [PR.c1, PR.c2, PR.c3];
+    for (let i = -span; i <= span; i++) for (let j = -span; j <= span; j++) {
+      const d = Math.hypot(i, j), ph = u * P * 2 - d * .55, m = 4 + 4 * (.5 + .5 * Math.sin(ph)), k = .35 * (.5 + .5 * Math.sin(ph + 1.2)), ci = ((i + j) % 3 + 3) % 3;
+      x.save(); x.translate(i * T, j * T);
+      x.fillStyle = cols[(ci + 1) % 3]; x.fillRect(-T / 2, -T / 2, T, T);
+      // حلقات متداخلة
+      for (let r = 3; r >= 1; r--) { x.fillStyle = r % 2 ? cols[ci] : PR.paper; shape(T * .16 * r * (1 + .08 * Math.sin(ph + r)), m, k * (r / 3), ph * .25 + r * .2); x.fill(); }
+      x.restore();
+    }
+    x.restore();
+    // حبيبات ريزو + هالفتون خفيف
+    x.fillStyle = "rgba(40,30,20,.08)"; for (let i = 0; i < 1500; i++) x.fillRect(hash(i) * W, hash(i + 1500) * H, 2, 2);
+    // العنوان وقت الزوم آوت
+    const ta = clamp((zf - .55) / .25); if (ta > 0) { x.globalAlpha = ta; x.fillStyle = PR.paper; x.beginPath(); x.roundRect(80, 780, 920, 360, 40); x.fill(); x.strokeStyle = "#1c1a17"; x.lineWidth = 6; x.stroke();
+      x.fillStyle = "#1c1a17"; x.font = `${M.fit(PR.title, "LZ", 840, 96, 44)}px LZ`; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.title, 540, 940);
+      x.fillStyle = PR.c1; x.font = "700 56px PB"; x.fillText(PR.brand, 540, 1060); x.globalAlpha = 1; }
+  },
+  sound(A) {
+    const N = A.midi;
+    // أربيجيو بيلف ويرجع لنفس النوتة (عشان اللوب)
+    const ar = [60, 64, 67, 71, 72, 71, 67, 64];
+    for (let i = 0; i < 48; i++) A.pluck(i * .25, N(ar[i % 8] + (Math.floor(i / 16) % 2 ? 5 : 0)), .05, .5);
+    for (let b = 0; b < 12; b++) { A.kick(b, .35); A.hat(b + .5, .04); }
+    [[48, 55, 60, 64], [53, 57, 60, 65], [48, 55, 60, 64]].forEach((c, i) => A.pad(i * 4, c.map(N), 4.1, .03));
+  },
+});
+</script>
+</body></html>

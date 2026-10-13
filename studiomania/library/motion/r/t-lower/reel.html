@@ -1,0 +1,69 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// قالب «شريط الاسم»: تلات ستايلات لشريط اسم المتكلم (لور ثيرد) على مشهد مقابلة بخلفية بوكيه وضيف مرسوم كظل:
+// شريط بيتسحب بخط، كارت أبيض بخط ملوّن بيتمسح، وكبسولة باللوجو. وفوق شارة الموضوع. 1080×1920، 12 ثانية.
+const PR = M.params({
+  name: { label: "الاسم", kind: "text", role: "brand", def: "م. سارة عادل" },
+  role: { label: "الوظيفة", kind: "text", def: "مؤسسة ستوديو تصميم" },
+  topic: { label: "الموضوع", kind: "text", role: "product", def: "إزاي تبني براند من الصفر" },
+  quote: { label: "الجملة في الستايل التالت", kind: "text", def: "البراند هو الإحساس اللي بتسيبه" },
+  show: { label: "اسم البرنامج", kind: "text", def: "بودكاست صنعة" },
+  accent: { label: "لون التمييز", kind: "color", def: "#ffcc00" },
+  bg: { label: "لون المشهد", kind: "color", def: "#24304a" },
+});
+const W = 1080, H = 1920, DUR = 12;
+const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
+
+M.reel({
+  W, H, DUR, bg: PR.bg,
+  async init(M) { await Promise.all([loadFont("PB", "TY-PlexArabic-700.ttf", "700"), loadFont("PX", "TY-PlexArabic-400.ttf")]); const c = M.canvas(W, H); return { x: c.getContext("2d") }; },
+  seek(t, C, M) {
+    const { x } = C, { seg, cubicIO, clamp, expo, hash, smooth } = M, io = (k) => cubicIO(clamp(k)), A = PR.accent;
+    x.setTransform(1, 0, 0, 1, 0, 0);
+    // المشهد: خلفية بوكيه + ضيف كظل + حركة كاميرا بطيئة
+    const z = 1 + .04 * smooth(seg(t, 0, 12)); x.save(); x.translate(540, 900); x.scale(z, z); x.translate(-540, -900);
+    const g = x.createLinearGradient(0, 0, 0, H); g.addColorStop(0, PR.bg); g.addColorStop(1, "#0c1220"); x.fillStyle = g; x.fillRect(-60, -60, W + 120, H + 120);
+    for (let i = 0; i < 22; i++) { const r = 50 + hash(i) * 120, bx = hash(i + 4) * W, by = 200 + hash(i + 8) * 900; const gg = x.createRadialGradient(bx, by, 0, bx, by, r); const warm = hash(i + 2) > .5; gg.addColorStop(0, warm ? "rgba(255,190,120,.28)" : "rgba(140,190,255,.22)"); gg.addColorStop(1, "rgba(0,0,0,0)"); x.fillStyle = gg; x.fillRect(bx - r, by - r, r * 2, r * 2); }
+    // الضيف (ظل بسيط) + مايك
+    const br = Math.sin(t * 1.6) * 4; x.fillStyle = "#0a0f1a";
+    x.beginPath(); x.ellipse(560, 760 + br, 150, 180, 0, 0, Math.PI * 2); x.fill();
+    x.beginPath(); x.moveTo(250, 1500); x.bezierCurveTo(260, 1080, 380, 990, 560, 990 + br); x.bezierCurveTo(740, 990 + br, 860, 1080, 870, 1500); x.closePath(); x.fill();
+    x.fillStyle = "rgba(255,255,255,.06)"; x.beginPath(); x.ellipse(500, 700 + br, 60, 90, -.3, 0, Math.PI * 2); x.fill();
+    x.fillStyle = "#151b28"; x.beginPath(); x.roundRect(250, 1180, 70, 160, 34); x.fill(); x.fillRect(278, 1340, 14, 300); x.strokeStyle = "rgba(255,255,255,.15)"; x.lineWidth = 3; for (let k = 0; k < 5; k++) { x.beginPath(); x.moveTo(256, 1205 + k * 22); x.lineTo(314, 1205 + k * 22); x.stroke(); }
+    x.fillStyle = "#1a1410"; x.fillRect(-60, 1500, W + 120, 500); x.restore();
+    const vg = x.createLinearGradient(0, 1200, 0, H); vg.addColorStop(0, "rgba(0,0,0,0)"); vg.addColorStop(1, "rgba(0,0,0,.7)"); x.fillStyle = vg; x.fillRect(0, 1200, W, 720);
+    // شارة الموضوع + اسم البرنامج فوق
+    const tk = io(seg(t, .2, .8)); x.globalAlpha = tk; x.font = "700 40px PB"; x.direction = "rtl"; x.textAlign = "right"; const tw = x.measureText(PR.show).width;
+    x.fillStyle = "#e53935"; x.beginPath(); x.roundRect(1000 - tw - 110, 120, tw + 110, 72, 12); x.fill(); x.fillStyle = "#fff"; x.beginPath(); x.arc(970, 156, 9 * (.6 + .4 * Math.abs(Math.sin(t * 3))), 0, Math.PI * 2); x.fill(); x.fillText(PR.show, 945, 170);
+    x.font = "400 38px PX"; x.fillStyle = "rgba(255,255,255,.85)"; x.fillText(PR.topic, 1000, 250); x.globalAlpha = 1;
+    // ── ستايل ١: خط بيتمد وبعده شريط بيتسحب
+    const s1 = (k0, k1) => { const a = io(seg(t, k0, k0 + .5)), b = io(seg(t, k0 + .3, k0 + .9)), o = io(seg(t, k1, k1 + .5)); if (a <= 0 || o >= 1) return;
+      x.save(); x.globalAlpha = 1 - o; x.fillStyle = A; x.fillRect(1000 - 12, 1560 - 120 * a, 12, 240 * a);
+      x.save(); x.beginPath(); x.rect(80, 1430, 908, 280); x.clip(); x.translate((1 - b) * 900 + o * -40, 0);
+      x.fillStyle = "rgba(10,14,24,.88)"; x.fillRect(320, 1450, 668, 130); x.fillStyle = "#fff"; x.font = `700 ${M.fit(PR.name, "PB", 600, 70, 36, "700")}px PB`; x.textAlign = "right"; x.direction = "rtl"; x.fillText(PR.name, 960, 1540);
+      x.fillStyle = A; x.fillRect(420, 1590, 568, 76); x.fillStyle = "#111"; x.font = `400 ${M.fit(PR.role, "PX", 520, 44, 26)}px PX`; x.fillText(PR.role, 960, 1642); x.restore(); x.restore(); };
+    // ── ستايل ٢: كارت أبيض وخط ملوّن تحت بيتمسح
+    const s2 = (k0, k1) => { const a = io(seg(t, k0, k0 + .6)), o = io(seg(t, k1, k1 + .4)); if (a <= 0 || o >= 1) return; const lw = io(seg(t, k0 + .4, k0 + 1.0));
+      x.save(); x.globalAlpha = 1 - o; x.translate(0, (1 - a) * 60 + o * 30); x.shadowColor = "rgba(0,0,0,.4)"; x.shadowBlur = 30; x.fillStyle = "#fff"; x.beginPath(); x.roundRect(120, 1450, 840, 210, 24); x.fill(); x.shadowBlur = 0;
+      x.fillStyle = A; x.beginPath(); x.roundRect(960 - 840 * lw, 1640, 840 * lw, 20, [0, 0, 24, 24]); x.fill();
+      x.fillStyle = "#121212"; x.font = `700 ${M.fit(PR.name, "PB", 700, 74, 36, "700")}px PB`; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.name, 540, 1545); x.fillStyle = "#555"; x.font = `400 ${M.fit(PR.role, "PX", 700, 44, 26)}px PX`; x.fillText(PR.role, 540, 1610); x.restore(); };
+    // ── ستايل ٣: كبسولة بدايرة لوجو + الجملة فوقها
+    const s3 = (k0, k1) => { const a = expo(seg(t, k0, k0 + .5)), o = io(seg(t, k1, k1 + .4)); if (a <= 0 || o >= 1) return; const wv = io(seg(t, k0 + .2, k0 + .9));
+      x.save(); x.globalAlpha = 1 - o; const pw = 160 + 700 * wv; x.fillStyle = "rgba(255,255,255,.12)"; x.beginPath(); x.roundRect(1000 - pw, 1520, pw, 140, 70); x.fill();
+      x.fillStyle = A; x.beginPath(); x.arc(930, 1590, 56 * a, 0, Math.PI * 2); x.fill(); x.fillStyle = "#111"; x.font = "700 52px PB"; x.textAlign = "center"; x.direction = "rtl"; x.fillText([...PR.name.replace(/^م\.\s*/, "")][0] || "", 930, 1608);
+      x.save(); x.beginPath(); x.roundRect(1000 - pw, 1520, pw, 140, 70); x.clip(); x.fillStyle = "#fff"; x.textAlign = "right"; x.font = `700 ${M.fit(PR.name, "PB", 560, 56, 30, "700")}px PB`; x.fillText(PR.name, 850, 1584); x.fillStyle = "rgba(255,255,255,.75)"; x.font = `400 ${M.fit(PR.role, "PX", 560, 36, 22)}px PX`; x.fillText(PR.role, 850, 1632); x.restore();
+      const qk = io(seg(t, k0 + .7, k0 + 1.3)); x.globalAlpha = (1 - o) * qk; x.fillStyle = "#fff"; x.font = `700 ${M.fit("«" + PR.quote + "»", "PB", 880, 58, 30, "700")}px PB`; x.textAlign = "center"; x.fillText("«" + PR.quote + "»", 540, 1440 + (1 - qk) * 20); x.restore(); };
+    s1(.6, 3.6); s2(4.2, 7.4); s3(8.0, 12.5);
+    // رقم الستايل الصغير
+    const idx = t < 4 ? 1 : t < 7.8 ? 2 : 3; x.fillStyle = "rgba(255,255,255,.4)"; x.font = "400 30px PX"; x.textAlign = "left"; x.direction = "rtl"; x.fillText(`ستايل ${"١٢٣"[idx - 1]} من ٣`, 80, 1840);
+  },
+  sound(A) {
+    const N = A.midi;
+    [[50, 57, 62], [48, 55, 60], [46, 53, 58], [45, 52, 57]].forEach((c, i) => A.pad(i * 3, c.map(N), 3.1, .025));
+    for (let b = 0; b < 24; b++) { A.hat(b * .5 + .25, .025); if (b % 4 === 0) A.kick(b * .5, .25); }
+    [.6, 4.2, 8.0].forEach((s) => { A.whoosh(s, .5, .08); A.click(s + .3, .1); A.pluck(s + .5, N(79), .07, 1); });
+    [3.6, 7.4].forEach((s) => A.whoosh(s, .4, .05));
+  },
+});
+</script>
+</body></html>

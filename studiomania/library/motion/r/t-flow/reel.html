@@ -1,0 +1,64 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// قالب «رسم توضيحي للخطوات»: مخطط بيشرح "بيشتغل إزاي": كروت الخطوات بتظهر واحدة واحدة متعرّجة، الخطوط بينهم بتترسم،
+// ونقط بيانات بتجري عليها، وكل ما توصل لكارت يتنوّر ويطلع رقمه، وفي الآخر النتيجة في كارت كبير. شبكة نقط ورا زي لوحة رسم. 1080×1920، 12 ثانية.
+const PR = M.params({
+  title: { label: "العنوان", kind: "text", role: "product", def: "بيشتغل إزاي؟" },
+  steps: { label: "الخطوات (اسم|وصف في كل سطر)", kind: "lines", def: ["ارفع ملفك|صورة أو PDF", "بنحلّله|في ثواني", "بنظبطه|حسب البراند بتاعك", "يوصلك جاهز|على الإيميل"] },
+  result: { label: "النتيجة", kind: "text", def: "١٠ دقايق بدل يوم كامل" },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "سهل" },
+  accent: { label: "لون التمييز", kind: "color", def: "#6c5cff" },
+});
+const W = 1080, H = 1920, DUR = 12, S0 = 1.0, SD = 1.7;
+const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
+const ST = PR.steps.slice(0, 5).map((l) => { const [a, b] = String(l).split("|"); return { a: (a || "").trim(), b: (b || "").trim() }; });
+const NS = ST.length, POS = ST.map((s, i) => [i % 2 ? 360 : 720, 470 + i * (1000 / Math.max(1, NS - 1))]);
+
+M.reel({
+  W, H, DUR, bg: "#f6f5fb",
+  async init(M) { await Promise.all([loadFont("PB", "TY-PlexArabic-700.ttf", "700"), loadFont("PX", "TY-PlexArabic-400.ttf")]); const c = M.canvas(W, H); return { x: c.getContext("2d") }; },
+  seek(t, C, M) {
+    const { x } = C, { seg, cubicIO, clamp, springO, expo } = M, io = (k) => cubicIO(clamp(k)), A = PR.accent, ar = (n) => "١٢٣٤٥٦٧٨٩"[n];
+    x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = "#f6f5fb"; x.fillRect(0, 0, W, H);
+    x.fillStyle = "rgba(40,30,90,.12)"; for (let yy = 30; yy < H; yy += 40) for (let xx = 30; xx < W; xx += 40) x.fillRect(xx - 1.5, yy - 1.5, 3, 3);
+    // العنوان
+    const ta = io(seg(t, .1, .6)); x.globalAlpha = ta; x.fillStyle = "#1d1838"; x.font = `700 ${M.fit(PR.title, "PB", 900, 90, 44, "700")}px PB`; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.title, 540, 250 - (1 - ta) * 20); x.globalAlpha = 1;
+    // الوصلات (بتترسم ومنقّطة متحركة) + نقط بتجري
+    const curve = (i) => { const [x1, y1] = POS[i], [x2, y2] = POS[i + 1]; return [x1, y1 + 80, x1, (y1 + y2) / 2, x2, (y1 + y2) / 2, x2, y2 - 80]; };
+    const bez = (c, u) => { const v = 1 - u; return [v * v * v * c[0] + 3 * v * v * u * c[2] + 3 * v * u * u * c[4] + u * u * u * c[6], v * v * v * c[1] + 3 * v * v * u * c[3] + 3 * v * u * u * c[5] + u * u * u * c[7]]; };
+    for (let i = 0; i < NS - 1; i++) {
+      const c = curve(i), dk = io(seg(t, S0 + i * SD + .5, S0 + i * SD + 1.3)); if (dk <= 0) continue;
+      x.strokeStyle = "rgba(29,24,56,.25)"; x.lineWidth = 5; x.beginPath(); x.moveTo(c[0], c[1]); for (let k = 1; k <= 40 * dk; k++) x.lineTo(...bez(c, k / 40)); x.stroke();
+      if (dk >= 1) { x.setLineDash([14, 18]); x.lineDashOffset = -t * 60; x.strokeStyle = A; x.lineWidth = 5; x.beginPath(); x.moveTo(c[0], c[1]); x.bezierCurveTo(c[2], c[3], c[4], c[5], c[6], c[7]); x.stroke(); x.setLineDash([]);
+        for (let p = 0; p < 3; p++) { const u = ((t * .6 + p / 3) % 1); const [px, py] = bez(c, u); x.fillStyle = A; x.beginPath(); x.arc(px, py, 10, 0, Math.PI * 2); x.fill(); } }
+      // سهم صغير في الآخر
+      if (dk > .95) { const [ex, ey] = [c[6], c[7]]; x.fillStyle = A; x.beginPath(); x.moveTo(ex - 16, ey - 18); x.lineTo(ex + 16, ey - 18); x.lineTo(ex, ey + 2); x.fill(); }
+    }
+    // الكروت
+    ST.forEach((s, i) => {
+      const t0 = S0 + i * SD, k = springO(clamp((t - t0) / .7), 12, .62); if (t < t0) return;
+      const [cx, cy] = POS[i], lit = io(seg(t, t0 + .2, t0 + .6)), ww = 560, hh = 160;
+      x.save(); x.translate(cx, cy); x.scale(.7 + .3 * k, .7 + .3 * k); x.globalAlpha = clamp(k * 1.5);
+      x.shadowColor = "rgba(40,30,90,.18)"; x.shadowBlur = 40; x.shadowOffsetY = 14; x.fillStyle = "#fff"; x.beginPath(); x.roundRect(-ww / 2, -hh / 2, ww, hh, 30); x.fill(); x.shadowBlur = 0; x.shadowOffsetY = 0;
+      x.strokeStyle = A; x.globalAlpha *= lit; x.lineWidth = 4; x.stroke(); x.globalAlpha = clamp(k * 1.5);
+      x.fillStyle = A; x.beginPath(); x.arc(ww / 2 - 70, 0, 44, 0, Math.PI * 2); x.fill(); x.fillStyle = "#fff"; x.font = "700 48px PB"; x.textAlign = "center"; x.direction = "rtl"; x.fillText(ar(i), ww / 2 - 70, 17);
+      x.fillStyle = "#1d1838"; x.textAlign = "right"; x.font = `700 ${M.fit(s.a, "PB", 380, 46, 26, "700")}px PB`; x.fillText(s.a, ww / 2 - 140, -6); x.fillStyle = "#7a7596"; x.font = `400 ${M.fit(s.b, "PX", 380, 34, 20)}px PX`; x.fillText(s.b, ww / 2 - 140, 42);
+      x.restore();
+      // نبضة لما الكارت يتنوّر
+      const pr = seg(t, t0 + .2, t0 + .9); if (pr > 0 && pr < 1) { x.strokeStyle = A; x.globalAlpha = 1 - pr; x.lineWidth = 4; x.beginPath(); x.roundRect(cx - ww / 2 - 30 * pr, cy - hh / 2 - 30 * pr, ww + 60 * pr, hh + 60 * pr, 30 + 30 * pr); x.stroke(); x.globalAlpha = 1; }
+    });
+    // النتيجة
+    const rk = io(seg(t, S0 + NS * SD + .1, S0 + NS * SD + .8)); if (rk > 0) { x.save(); x.globalAlpha = rk; x.translate(0, (1 - rk) * 40); x.fillStyle = A; x.beginPath(); x.roundRect(100, 1590, 880, 150, 40); x.fill();
+      x.fillStyle = "#fff"; x.font = `700 ${M.fit(PR.result, "PB", 800, 64, 32, "700")}px PB`; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.result, 540, 1688); x.restore(); }
+    const bk = io(seg(t, 10.4, 11.0)); if (bk > 0) { x.globalAlpha = bk; x.fillStyle = "#1d1838"; x.font = "700 52px PB"; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.brand, 540, 1840); x.globalAlpha = 1; }
+  },
+  sound(A) {
+    const N = A.midi;
+    for (let b = 0; b < 24; b++) { A.hat(b * .5 + .25, .03); if (b % 2 === 0) A.kick(b * .5, .3); }
+    [[57, 60, 64], [53, 57, 60], [55, 59, 62], [57, 61, 64]].forEach((c, i) => A.pad(i * 3, c.map(N), 3.1, .025));
+    ST.forEach((s, i) => { const t0 = S0 + i * SD; A.pluck(t0, N(72 + i * 2), .1, .8); A.tone(t0 + .2, N(84 + i * 2), .15, "sine", .05); A.whoosh(t0 + .5, .6, .03); });
+    A.hit(S0 + NS * SD + .1, .3); A.pluck(S0 + NS * SD + .1, N(84), .1, 1.6);
+  },
+});
+</script>
+</body></html>

@@ -1,0 +1,75 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// قالب «عنوان مجسّم»: عنوان بحروف بارزة ليها عمق (طبقات ورا بعض بتغمق)، بيطلع من الأرض اللامعة وانعكاسه تحته، والكاميرا بتلف حواليه
+// فاتجاه العمق بيتغير، ولمعة نور بتعدّي على وش الحروف، وأشعة نور ورا. زي تترات الأفلام والمسلسلات. 1080×1920، 12 ثانية.
+const PR = M.params({
+  l1: { label: "السطر الأول", kind: "text", role: "product", def: "الموسم" },
+  l2: { label: "السطر التاني", kind: "text", def: "الجديد" },
+  sub: { label: "تحت العنوان", kind: "text", def: "أول حلقة الجمعة ٩ بالليل" },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "قناة حكاية" },
+  face: { label: "لون وش الحروف", kind: "color", def: "#ffd36b" },
+  side: { label: "لون جنب الحروف", kind: "color", def: "#b0461f" },
+  bg: { label: "لون الخلفية", kind: "color", def: "#140a24" },
+});
+const W = 1080, H = 1920, DUR = 12, FLOOR = 1300;
+const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
+const hex = (h) => { h = h.replace("#", ""); return [0, 2, 4].map((i) => parseInt(h.substr(i, 2), 16)); };
+
+M.reel({
+  W, H, DUR, bg: PR.bg,
+  async init(M) { await Promise.all([loadFont("LZ", "SM-Lalezar.ttf"), loadFont("PB", "TY-PlexArabic-700.ttf", "700")]); const c = M.canvas(W, H), o = document.createElement("canvas"); o.width = W; o.height = H; return { x: c.getContext("2d"), o: o.getContext("2d") }; },
+  seek(t, C, M) {
+    const { x, o } = C, { seg, cubicIO, clamp, springO, expo, smooth } = M, io = (k) => cubicIO(clamp(k));
+    const [sr, sg, sb] = hex(PR.side);
+    x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = PR.bg; x.fillRect(0, 0, W, H);
+    // أشعة نور من ورا
+    x.save(); x.translate(540, 900); x.globalCompositeOperation = "lighter";
+    for (let i = 0; i < 14; i++) { const a = i / 14 * Math.PI * 2 + t * .08; x.rotate(0); const g = x.createLinearGradient(0, 0, Math.cos(a) * 1300, Math.sin(a) * 1300); g.addColorStop(0, "rgba(255,190,120,.10)"); g.addColorStop(1, "rgba(255,190,120,0)"); x.fillStyle = g; x.beginPath(); x.moveTo(0, 0); x.lineTo(Math.cos(a - .06) * 1400, Math.sin(a - .06) * 1400); x.lineTo(Math.cos(a + .06) * 1400, Math.sin(a + .06) * 1400); x.fill(); }
+    x.restore();
+    // الأرضية اللامعة
+    const fg = x.createLinearGradient(0, FLOOR, 0, H); fg.addColorStop(0, "rgba(255,255,255,.06)"); fg.addColorStop(1, "rgba(0,0,0,.4)"); x.fillStyle = fg; x.fillRect(0, FLOOR, W, H - FLOOR);
+    x.strokeStyle = "rgba(255,255,255,.08)"; x.lineWidth = 2; for (let k = 0; k < 14; k++) { const xx = (k - 6.5) * 160; x.beginPath(); x.moveTo(540 + xx * .3, FLOOR); x.lineTo(540 + xx * 2.4, H); x.stroke(); }
+    // الكاميرا: اتجاه العمق بيلف
+    const ang = -2.3 + 1.6 * io(seg(t, 0, 3.0)) + .9 * io(seg(t, 4.0, 10.0)), depth = 34 - 6 * io(seg(t, 4, 10)), dx = Math.cos(ang), dy = Math.sin(ang) * .7 + .35;
+    const zoom = 1.15 - .15 * io(seg(t, 0, 3.0)) + .05 * io(seg(t, 6, 12));
+    // كتابة سطر مجسّم على طبقة لوحده
+    const extr = (q, s, y, size, rise, sweep) => {
+      q.font = `${size}px LZ`; q.textAlign = "center"; q.textBaseline = "alphabetic"; q.direction = "rtl";
+      for (let k = depth; k >= 1; k--) { const sh = .35 + .65 * (1 - k / depth); q.fillStyle = `rgb(${sr * sh | 0},${sg * sh | 0},${sb * sh | 0})`; q.fillText(s, 540 + dx * k * 1.6, y + rise + dy * k * 1.6); }
+      const g = q.createLinearGradient(0, y + rise - size * .8, 0, y + rise); g.addColorStop(0, "#fff7e0"); g.addColorStop(.5, PR.face); g.addColorStop(1, PR.face); q.fillStyle = g; q.fillText(s, 540, y + rise);
+      if (sweep > 0 && sweep < 1) { q.save(); q.globalCompositeOperation = "source-atop"; const sx = -200 + 1500 * sweep, sg2 = q.createLinearGradient(sx - 120, 0, sx + 120, 0); sg2.addColorStop(0, "rgba(255,255,255,0)"); sg2.addColorStop(.5, "rgba(255,255,255,.75)"); sg2.addColorStop(1, "rgba(255,255,255,0)"); q.fillStyle = sg2; q.fillRect(0, y + rise - size, W, size * 1.3); q.restore(); }
+    };
+    o.setTransform(1, 0, 0, 1, 0, 0); o.clearRect(0, 0, W, H);
+    const r1 = (1 - springO(clamp((t - .4) / 1.4), 8, .7)) * 700, r2 = (1 - springO(clamp((t - 1.6) / 1.4), 8, .7)) * -900;
+    const s1 = M.fit(PR.l1, "LZ", 880, 330, 120), s2 = M.fit(PR.l2, "LZ", 880, 330, 120);
+    o.save(); o.beginPath(); o.rect(0, 0, W, FLOOR); o.clip();
+    if (t > .4) extr(o, PR.l1, 900, s1, r1, seg(t, 6.0, 7.0));
+    if (t > 1.6) extr(o, PR.l2, 1220, s2, r2, seg(t, 6.3, 7.3));
+    o.restore();
+    x.save(); x.translate(540, 1000); x.scale(zoom, zoom); x.translate(-540, -1000);
+    x.drawImage(o.canvas, 0, 0);
+    // الانعكاس
+    x.save(); x.globalAlpha = .22; x.translate(0, FLOOR * 2); x.scale(1, -1); x.drawImage(o.canvas, 0, 0, W, FLOOR, 0, 0, W, FLOOR); x.restore();
+    x.restore();
+    const rf = x.createLinearGradient(0, FLOOR, 0, FLOOR + 280); rf.addColorStop(0, PR.bg + "00"); rf.addColorStop(1, PR.bg); x.fillStyle = rf; x.fillRect(0, FLOOR, W, 280); x.fillStyle = PR.bg; x.fillRect(0, FLOOR + 279, W, H);
+    x.strokeStyle = "rgba(255,255,255,.07)"; x.lineWidth = 2; for (let k = 0; k < 14; k++) { const xx = (k - 6.5) * 160; x.beginPath(); x.moveTo(540 + xx * .3, FLOOR); x.lineTo(540 + xx * 2.4, H); x.stroke(); }
+    // ترابي ونقط غبار
+    x.fillStyle = "rgba(255,220,170,.5)"; for (let i = 0; i < 40; i++) { const px = (M.hash(i) * W + t * 12 * (M.hash(i + 3) - .5) * 4 + W) % W, py = (M.hash(i + 7) * 1200 + 200 - t * 10 * M.hash(i + 2)); x.fillRect(px, py, 3, 3); }
+    // الجملة والبراند
+    const sa = io(seg(t, 8.0, 8.7)); if (sa > 0) { x.globalAlpha = sa; x.fillStyle = "#fff"; x.font = `700 ${M.fit(PR.sub, "PB", 880, 56, 30, "700")}px PB`; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.sub, 540, 1520 + (1 - sa) * 20); x.globalAlpha = 1; }
+    const ba = io(seg(t, 8.8, 9.5)); if (ba > 0) { x.globalAlpha = ba; x.strokeStyle = PR.face; x.lineWidth = 3; x.beginPath(); x.roundRect(340, 1620, 400, 100, 50); x.stroke(); x.fillStyle = PR.face; x.font = "700 48px PB"; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.brand, 540, 1688); x.globalAlpha = 1; }
+    // فيجنيت
+    const vg = x.createRadialGradient(540, 960, 500, 540, 960, 1200); vg.addColorStop(0, "rgba(0,0,0,0)"); vg.addColorStop(1, "rgba(0,0,0,.55)"); x.fillStyle = vg; x.fillRect(0, 0, W, H);
+  },
+  sound(A) {
+    const N = A.midi;
+    // تترات ملحمية: طبول وباد وبراس
+    A.pad(0, [N(38), N(45), N(50)], 12, .04); A.riser(0, 1.2, .05);
+    A.kick(1.2, 1); A.hit(1.2, .6); A.nz(1.2, .8, "lowpass", 400, .3, .6); A.kick(2.4, 1); A.hit(2.4, .6);
+    for (let b = 0; b < 16; b++) { const s = 3.2 + b * .5; A.kick(s, b % 4 === 0 ? .8 : .3); if (b % 4 === 2) A.snare(s, .15); }
+    [[50, 57, 62], [48, 55, 60], [46, 53, 58], [45, 52, 57]].forEach((c, i) => c.forEach((m) => A.tone(3.2 + i * 1.6, N(m + 12), 1.5, "sawtooth", .012)));
+    A.whoosh(6.0, 1.0, .06); A.tone(6.3, N(93), .8, "sine", .03); A.hit(8.0, .5); A.pad(8.0, [N(50), N(57), N(62), N(66), N(69)], 4, .04);
+  },
+});
+</script>
+</body></html>

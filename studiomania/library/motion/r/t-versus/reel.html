@@ -1,0 +1,77 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// قالب «مقارنة VS»: الشاشة بتتقسم بخط مايل، كل ناحية بلونها واسمها، علامة VS بتخبط في النص، وبعدين جولات: كل جولة سطر مقارنة
+// بأعمدة بتتملي من الناحيتين والفايز بياخد نقطة، والعدّاد فوق بيتحدّث، وفي الآخر الفايز بياخد الشاشة كلها. 1080×1920، 12 ثانية.
+const PR = M.params({
+  a: { label: "الاختيار الأول (يمين)", kind: "text", role: "product", def: "باقتنا" },
+  b: { label: "الاختيار التاني (شمال)", kind: "text", def: "الباقة العادية" },
+  rows: { label: "الجولات (اسم|يمين|شمال من ١٠)", kind: "lines", def: ["السرعة|9|5", "السعر|8|4", "الدعم|10|6", "المميزات|9|7"] },
+  win: { label: "جملة الفوز", kind: "text", def: "الاختيار واضح" },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "نت سريع" },
+  ca: { label: "لون اليمين", kind: "color", def: "#ff3d5a" },
+  cb: { label: "لون الشمال", kind: "color", def: "#3d7dff" },
+});
+const W = 1080, H = 1920, DUR = 12, R0 = 3.0, RD = 1.3;
+const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
+const ar = (s) => String(s).replace(/\d/g, (d) => "٠١٢٣٤٥٦٧٨٩"[d]);
+const RW = PR.rows.slice(0, 5).map((l) => { const [n, a, b] = String(l).split("|"); return { n: (n || "").trim(), a: Math.min(10, +a || 0), b: Math.min(10, +b || 0) }; });
+
+M.reel({
+  W, H, DUR, bg: "#0d0d12",
+  async init(M) { await Promise.all([loadFont("LZ", "SM-Lalezar.ttf"), loadFont("PB", "TY-PlexArabic-700.ttf", "700"), loadFont("AN", "anton.ttf")]); const c = M.canvas(W, H); return { x: c.getContext("2d") }; },
+  seek(t, C, M) {
+    const { x } = C, { seg, cubicIO, clamp, springO, expo, hash } = M, io = (k) => cubicIO(clamp(k)), A = PR.ca, B = PR.cb;
+    // هزة الشاشة عند الخبطة
+    const hit = Math.max(0, 1 - Math.abs(t - 1.5) / .25), sh = hit * 18;
+    x.setTransform(1, 0, 0, 1, Math.sin(t * 90) * sh, Math.cos(t * 70) * sh); x.fillStyle = "#0d0d12"; x.fillRect(-40, -40, W + 80, H + 80);
+    // ١) التقسيم المايل: كل ناحية بتدخل من جنبها
+    const ka = io(seg(t, .1, .8)), kb = io(seg(t, .3, 1.0)), endW = io(seg(t, 9.0, 9.8)), winA = RW.filter((r) => r.a > r.b).length >= RW.filter((r) => r.b > r.a).length;
+    let split = 540 + (winA ? -1 : 1) * 760 * endW;
+    const slant = 140;
+    x.fillStyle = A; x.beginPath(); x.moveTo(W + 40, -40); x.lineTo(split + slant, -40); x.lineTo(split - slant, H + 40); x.lineTo(W + 40, H + 40); x.closePath(); x.save(); x.translate((1 - ka) * 700, 0); x.fill(); x.restore();
+    x.fillStyle = B; x.beginPath(); x.moveTo(-40, -40); x.lineTo(split + slant, -40); x.lineTo(split - slant, H + 40); x.lineTo(-40, H + 40); x.closePath(); x.save(); x.translate(-(1 - kb) * 700, 0); x.fill(); x.restore();
+    // خطوط سرعة خفيفة
+    x.fillStyle = "rgba(255,255,255,.07)"; for (let i = 0; i < 14; i++) { const y = (hash(i) * H + t * 400 * (i % 2 ? 1 : -1)) % H; x.fillRect(0, (y + H) % H, W, 3); }
+    // ٢) الأسامي فوق
+    const nameA = io(seg(t, .7, 1.2)), nameB = io(seg(t, .9, 1.4));
+    x.fillStyle = "#fff"; x.textAlign = "center"; x.direction = "rtl";
+    x.globalAlpha = nameA * (1 - endW); x.font = `${M.fit(PR.a, "LZ", 420, 110, 50)}px LZ`; x.fillText(PR.a, 800, 330 - (1 - nameA) * 60);
+    x.globalAlpha = nameB * (1 - endW); x.font = `${M.fit(PR.b, "LZ", 420, 110, 50)}px LZ`; x.fillText(PR.b, 280, 330 - (1 - nameB) * 60); x.globalAlpha = 1;
+    // العداد
+    const done = (i) => t > R0 + i * RD + .9; let sa = 0, sb = 0; RW.forEach((r, i) => { if (done(i)) { if (r.a > r.b) sa++; else if (r.b > r.a) sb++; } });
+    const sk = io(seg(t, 2.4, 2.9)) * (1 - endW);
+    if (sk > 0) { x.globalAlpha = sk; x.font = "120px AN"; x.direction = "ltr"; x.fillText(String(sa), 800, 520); x.fillText(String(sb), 280, 520); x.globalAlpha = 1; }
+    // ٣) VS بتخبط
+    const vk = t < 1.5 ? 0 : springO((t - 1.5) / .7, 14, .45);
+    if (t > 1.2) { const sc = t < 1.5 ? 3 - 2 * (t - 1.2) / .3 : vk, va = t < 1.5 ? (t - 1.2) / .3 : 1; x.save(); x.globalAlpha = va * (1 - endW); x.translate(540, 470); x.scale(sc, sc); x.rotate(-.12);
+      x.fillStyle = "#0d0d12"; x.beginPath(); x.arc(0, 0, 118, 0, Math.PI * 2); x.fill(); x.strokeStyle = "#fff"; x.lineWidth = 8; x.stroke(); x.fillStyle = "#fff"; x.font = "130px AN"; x.textAlign = "center"; x.textBaseline = "middle"; x.direction = "ltr"; x.fillText("VS", 0, 6); x.restore(); x.textBaseline = "alphabetic"; }
+    if (hit > 0) { x.fillStyle = `rgba(255,255,255,${hit * .5})`; x.fillRect(-40, -40, W + 80, H + 80); }
+    // ٤) الجولات
+    RW.forEach((r, i) => {
+      const t0 = R0 + i * RD, k = io(seg(t, t0, t0 + .4)) * (1 - endW); if (k <= 0) return;
+      const y = 780 + i * 210, fa = io(seg(t, t0 + .25, t0 + .9)), w1 = 380 * r.a / 10 * fa, w2 = 380 * r.b / 10 * fa;
+      x.globalAlpha = k;
+      x.fillStyle = "rgba(13,13,18,.55)"; x.beginPath(); x.roundRect(60, y - 70, 960, 170, 30); x.fill();
+      x.fillStyle = "#fff"; x.font = "700 44px PB"; x.textAlign = "center"; x.direction = "rtl"; x.fillText(r.n, 540, y - 12);
+      x.fillStyle = "rgba(255,255,255,.15)"; x.fillRect(560, y + 20, 380, 36); x.fillRect(140, y + 20, 380, 36);
+      x.fillStyle = A; x.fillRect(560, y + 20, w1, 36); x.fillStyle = B; x.fillRect(520 - w2, y + 20, w2, 36);
+      x.fillStyle = "#fff"; x.font = "60px AN"; x.direction = "ltr"; x.textAlign = "left"; x.fillText(String(Math.round(r.a * fa)), 955, y + 60); x.textAlign = "right"; x.fillText(String(Math.round(r.b * fa)), 125, y + 60);
+      if (done(i) && r.a !== r.b) { const ck = springO((t - t0 - .9) / .5, 14, .5), wx = r.a > r.b ? 900 : 180; x.save(); x.translate(wx, y - 30); x.scale(ck, ck); x.fillStyle = "#ffd23f"; x.beginPath(); for (let s = 0; s < 10; s++) { const rr = s % 2 ? 16 : 36, a = -Math.PI / 2 + s * Math.PI / 5; x.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); } x.closePath(); x.fill(); x.restore(); }
+      x.globalAlpha = 1;
+    });
+    // ٥) الفايز بياخد الشاشة
+    if (endW > .5) { const k = io(seg(t, 9.6, 10.3)); x.globalAlpha = k; x.fillStyle = "#fff"; x.textAlign = "center"; x.direction = "rtl";
+      x.font = "700 56px PB"; x.fillText(PR.win, 540, 780); x.font = `${M.fit(winA ? PR.a : PR.b, "LZ", 900, 240, 90)}px LZ`; x.fillText(winA ? PR.a : PR.b, 540, 1010 + (1 - k) * 40);
+      x.font = "150px AN"; x.direction = "ltr"; x.fillText(`${winA ? sa : sb} - ${winA ? sb : sa}`, 540, 1260);
+      const bk = io(seg(t, 10.4, 11.0)); x.globalAlpha = bk; x.fillStyle = "#0d0d12"; x.beginPath(); x.roundRect(290, 1500, 500, 120, 60); x.fill(); x.fillStyle = "#fff"; x.font = "700 56px PB"; x.direction = "rtl"; x.fillText(PR.brand, 540, 1580); x.globalAlpha = 1; }
+  },
+  sound(A) {
+    const N = A.midi;
+    A.whoosh(.1, .6, .1); A.whoosh(.3, .6, .1); A.riser(.5, 1.0, .08); A.kick(1.5, 1); A.hit(1.5, .6); A.nz(1.5, .5, "lowpass", 800, .3, .8);
+    for (let b = 0; b < 18; b++) { const s = 2.4 + b * .5; A.kick(s, .5); A.hat(s + .25, .05); if (b % 2) A.snare(s, .1); }
+    for (let i = 0; i < 5; i++) { const s = 3.0 + i * 1.3; A.whoosh(s, .3, .05); A.riser(s + .25, .6, .03); A.tone(s + .9, N(84 + i * 2), .2, "square", .05); }
+    A.whoosh(9.0, .8, .1); A.hit(9.6, .5); A.pluck(9.6, N(76), .12, 1.6); A.pluck(9.7, N(83), .1, 1.6); A.pad(9.6, [N(52), N(59), N(64), N(68)], 2.4, .04);
+  },
+});
+</script>
+</body></html>
