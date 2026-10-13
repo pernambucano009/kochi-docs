@@ -40,6 +40,8 @@ Turn the request into a table before you build anything:
 | 0.0–1.5 s | Hook: hero on a halo, the first words | «…» | hero springs in, words rise | pop |
 
 - Each beat is 2 to 4 s, with one idea per beat. The hook comes within the first 1.5 s. The end card holds at least 1.5 s.
+- **Frame 0 is a real picture:** the background, the set and the hero are already visible (the hero can settle or turn,
+  but must not spring in from nothing). Text may start entering at frame 0.
 - Give every beat duration in frames as well (×12).
 - If the video is longer than 15 s, **show the beat sheet to the user and wait for an OK** before building.
 - If the brief has no Arabic copy, write short Gulf-friendly Arabic yourself and show it in the beat sheet.
@@ -48,7 +50,8 @@ Turn the request into a table before you build anything:
 1. Copy the whole `templates/` folder to a new project folder (e.g. `./kochi-<slug>/`). Keep `lib/` and `fonts/` next to the HTML.
 2. Edit `scene.html`:
    - Set `DURATION` and pick a theme (`peach`, `blue`, `teal`) or define a new one **using only palette colours**.
-   - Build characters with `buildCharacter(root, colours)`. Pass a different colour object per person,
+   - Build characters with `buildCharacter(root, colours, { hair: 'short'|'bun'|'hijab', sleeves: 'short'|'long' })`
+     and position them with `place(root, x, y, k, facing)`. Pass a different colour object per person (with `hijab`/`hijabShade` for a hijab),
      with different top colours, skin tones and hair shapes. Add props (dumbbell, phone, mat, bench) as flat shapes
      built from `seg()`, `rect` with big `rx`, and simple paths.
    - Organise beats as functions of `t` inside `render(t)`. Use `KM.keys`, `KM.tween`, `KM.spring` and `KM.progress` for every value.
@@ -65,7 +68,8 @@ Turn the request into a table before you build anything:
 ```bash
 node scripts/contact-sheet.mjs <project>/scene.html --out <project>/review/sheet.png --every 1
 ```
-**Look at the sheet** (open the PNG) next to 2 or 3 images in `references/examples/`. Fix anything that is:
+**Look at the sheet** (open the PNG) next to 2 or 3 images in `references/examples/`
+(if that folder has no images, ask the user for references or compare with `style-bible.md` sections 2–4 instead). Fix anything that is:
 off-style (outlines, black, gradients, realistic faces), cluttered (more than 5 floating items, under 35% empty space),
 cropped (limbs or text cut off by the frame edge or by the safe area), unreadable (text over busy shapes, under 64 px),
 or awkward (crossed arms, props hitting faces, hands meeting over text, near-empty frames during transitions).
@@ -73,7 +77,7 @@ Also do the Arabic check from `references/arabic-text.md` on one full-size still
 
 ### 4. Palette check
 ```bash
-node scripts/contact-sheet.mjs <project>/scene.html --out <project>/review/sheet.png --every 0.5 --frames-dir <project>/review/frames
+node scripts/contact-sheet.mjs <project>/scene.html --out <project>/review/sheet-palette.png --every 0.5 --frames-dir <project>/review/frames
 python3 scripts/palette-check.py <project>/review/frames --palette references/palette.json
 ```
 It must print `PASS`. If it fails, replace the reported colours with their nearest palette colours. Don't widen the palette to make it pass.
@@ -118,7 +122,8 @@ duration, frame count and fps, and anything you knowingly left imperfect.
 - A **trainer** reads through props and pose: a whistle on a cord, a clipboard or phone, an upright posture,
   a pointing or high-five gesture. A **client** reads through workout props: a dumbbell, a mat, a water bottle.
   Use sporty garments: a tee, joggers, sneakers.
-- Women in KOCHI content: modest sportswear by default (long sleeves, long trousers). **Hijab:** draw it as one flat
+- Women in KOCHI content: modest sportswear by default (long sleeves, long trousers). **Hijab:** use `{ hair: 'hijab' }`, which is built in
+  (it also turns on long sleeves). It is drawn as one flat
   shape that covers the hair and neck: a rounded hood path around the head (about 12 units outside the head ellipse) plus a drape
   that ends on the upper chest, with the face left open as an ellipse. Use one garment colour and its shade for the inner fold.
   An abaya is a long A-line shape over the torso and legs, with sneakers showing.
@@ -142,6 +147,10 @@ duration, frame count and fps, and anything you knowingly left imperfect.
   (e.g. «حمّل التطبيق») only if it fits the brief, and say you added it.
 - Layout (9:16): the background or halo colour fills the frame. The wordmark is centred at y ≈ 860, 140–180 px tall, in ink.
   An optional line sits 120 px below it at 44–48 px. Leave one small accent (3 dots, a check) looping gently.
+- Wordmark: `<div id="logo" dir="ltr">KOCHI</div>` in Readex Pro 700, positioned absolutely and centred; reveal it with `KM.wipeLine(el, p, false)` (Latin wipes left to right)
+  plus a spring scale from 0.9 to 1.
+- A wipe into the end card must contrast with what it covers: lead it with an accent or ink circle, then follow with the end-card colour.
+  A wipe in the halo colour is invisible over backdrop shapes that use the halo colour.
 - Hold it for at least 1.5 s (18 frames). The transition into it must never show an almost empty frame for more than 4 frames:
   start the wordmark entering while the wipe is still finishing.
 

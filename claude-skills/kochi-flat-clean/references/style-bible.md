@@ -18,6 +18,20 @@ The groups below are the same as in that file.
 | Ink | `#192D48` navy (text, eyes, dark trousers) · `#2A2C60` indigo · `#421783` deep violet · `#4E3858` plum · `#15324F` night | Text, hair, trousers, dark UI panels. There is **no pure black** except a few tiny details |
 | Shadow | `#C4665E` · `#ACA7D8` · `#87C3E0` · `#3176A3` · `#6665AA` · `#7E599A` | The single darker tone for back limbs, hems and under-objects |
 
+### Shade partners (use exactly these pairs)
+| Base | Shade | | Base | Shade |
+|---|---|---|---|---|
+| skin `#FBD8C3` | `#F9BA86` | | top `#8162E3` | `#421783` |
+| skin `#F9BA86` | `#D77B68` | | top `#B680FA` | `#8162E3` |
+| skin `#F99A7E` | `#D77B68` | | top `#F63F47` | `#C4665E` |
+| skin `#EDC397` | `#D77B68` | | top `#118EF6` | `#3176A3` |
+| skin `#DC8176` | `#AA5D5E` | | top `#3338F1` | `#2A2C60` |
+| skin `#AA5D5E` | `#7D414D` | | top `#4B98AC` | `#205776` |
+| skin `#7D414D` | `#4E3858` | | top `#3CAC71` | `#205776` |
+| white `#FEFEFE` | `#DDECFC` (cool) or `#F4CDAE` (warm) | | top `#FBA919` / `#F8CC58` | `#C4665E` |
+| navy `#192D48` | `#15324F` | | top `#EE7A86` | `#C4665E` |
+| indigo `#2A2C60` | `#192D48` | | lilac/lavender trousers `#ACA7D8` | `#6665AA` |
+
 ### Ready-made themes (the folder's three colour worlds)
 The template has them as `THEMES` (`?theme=peach|blue|teal`).
 - **peach** (default, most typical): peach-cream ground `#FCE3CA`, violet `#8162E3` with deep-violet shade `#421783`, yellow `#F8CC58` / amber `#FBA919`, pink `#EE7A86`, navy ink.

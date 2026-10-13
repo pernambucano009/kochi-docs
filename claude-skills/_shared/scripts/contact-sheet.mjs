@@ -17,6 +17,7 @@ const a = parseArgs(process.argv.slice(2));
 const src = a._[0];
 if (!src) { console.error('usage: node contact-sheet.mjs <scene.html|video.mp4> --out sheet.png [--every 1] [--times a,b,c] [--cols 5]'); process.exit(1); }
 const out = path.resolve(a.out || src.replace(/\.[^.]+$/, '') + '-sheet.png');
+fs.mkdirSync(path.dirname(out), { recursive: true });
 const dir = a['frames-dir'] ? path.resolve(a['frames-dir']) : fs.mkdtempSync(path.join(os.tmpdir(), 'kochi-sheet-'));
 fs.mkdirSync(dir, { recursive: true });
 const every = +(a.every || 1);

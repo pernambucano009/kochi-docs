@@ -89,6 +89,7 @@ async function main() {
   if (fps !== 12) console.warn(`WARNING: --fps ${fps}. KOCHI house rule is 12 poses per second; use --container-fps for delivery instead.`);
   const cfps = +(a['container-fps'] || fps);
   const out = path.resolve(a.out || html.replace(/\.html?$/, '') + '.mp4');
+  fs.mkdirSync(path.dirname(out), { recursive: true });
   const { browser, page, scene } = await openScene(html, { w: a.w, h: a.h });
   const size = { width: +(a.w || scene.width || 1080), height: +(a.h || scene.height || 1920) };
   const dur = +(a.duration || scene.duration);

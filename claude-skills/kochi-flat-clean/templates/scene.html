@@ -135,7 +135,11 @@ function seg(parent, x1, y1, x2, y2, w1, w2, fill) {
   const d = `M${a1} L${a2} A${w2 / 2} ${w2 / 2} 0 0 0 ${b2} L${b1} A${w1 / 2} ${w1 / 2} 0 0 0 ${a1} Z`;
   return el('path', { d, fill }, parent);
 }
-function buildCharacter(root, c = C) {
+// opts: { hair: 'short' | 'bun' | 'hijab', sleeves: 'short' | 'long' }
+// hijab: one flat garment shape (c.hijab, shade c.hijabShade) covering hair and neck, face open.
+// long sleeves: forearms in the top colour, hands stay skin.
+function buildCharacter(root, c = C, opts = {}) {
+  const hairKind = opts.hair || 'short', longSleeves = opts.sleeves === 'long' || hairKind === 'hijab';
   const R = {};
   const g = (name, parent, px = 0, py = 0) => { const n = el('g', {}, parent); R[name] = { g: n, px, py }; return n; };
   const shoe = (parent, x, col, sole) => {
@@ -149,7 +153,7 @@ function buildCharacter(root, c = C) {
   el('rect', { x: -6, y: 424, width: 60, height: 26, rx: 10, fill: c.skinShade }, shinB); // ankle
   shoe(shinB, 22, c.shoe, c.sole);
   const uarmB = g('uarmB', body, 62, -268); seg(uarmB, 62, -268, 70, -128, 50, 42, c.topShade);
-  const farmB = g('farmB', uarmB, 70, -128); seg(farmB, 70, -128, 74, 6, 30, 24, c.skinShade);
+  const farmB = g('farmB', uarmB, 70, -128); seg(farmB, 70, -128, 74, 6, longSleeves ? 36 : 30, 24, longSleeves ? c.topShade : c.skinShade);
   el('ellipse', { cx: 75, cy: 22, rx: 17, ry: 24, fill: c.skinShade }, farmB);
   // --- pelvis + torso
   el('path', { d: 'M-60 -30 L60 -30 L62 28 C36 40 -36 40 -62 28 Z', fill: c.pants }, body);
@@ -160,9 +164,16 @@ function buildCharacter(root, c = C) {
   // --- neck + head
   const head = g('head', torso, 0, -290);
   el('path', { d: 'M-17 -306 L17 -306 L15 -280 C8 -272 -8 -272 -15 -280 Z', fill: c.skinShade }, head);
-  el('ellipse', { cx: 2, cy: -358, rx: 46, ry: 56, fill: c.skin }, head);
-  el('ellipse', { cx: -42, cy: -352, rx: 10, ry: 14, fill: c.skinShade }, head);               // ear
-  el('path', { d: 'M-50 -350 C-66 -424 40 -446 56 -378 C52 -396 30 -408 8 -404 C-10 -400 -30 -394 -36 -360 C-40 -350 -44 -344 -50 -350 Z', fill: c.hair }, head);
+  if (hairKind === 'hijab') {
+    el('path', { d: 'M-62 -350 C-66 -430 66 -440 66 -350 C66 -300 54 -276 30 -262 C70 -250 84 -236 86 -214 C40 -192 -40 -192 -86 -214 C-84 -238 -70 -252 -30 -262 C-54 -278 -62 -306 -62 -350 Z', fill: c.hijab || c.hair }, head);
+    el('path', { d: 'M-62 -350 C-66 -430 66 -440 66 -350 C40 -414 -40 -414 -62 -350 Z', fill: c.hijabShade || c.ink }, head);       // crown fold
+    el('ellipse', { cx: 8, cy: -352, rx: 38, ry: 48, fill: c.skin }, head);                                                           // face opening
+  } else {
+    el('ellipse', { cx: 2, cy: -358, rx: 46, ry: 56, fill: c.skin }, head);
+    el('ellipse', { cx: -42, cy: -352, rx: 10, ry: 14, fill: c.skinShade }, head);               // ear
+    if (hairKind === 'bun') el('circle', { cx: -26, cy: -420, r: 26, fill: c.hair }, head);
+    el('path', { d: 'M-50 -350 C-66 -424 40 -446 56 -378 C52 -396 30 -408 8 -404 C-10 -400 -30 -394 -36 -360 C-40 -350 -44 -344 -50 -350 Z', fill: c.hair }, head);
+  }
   const eyes = el('g', {}, head);
   const eyeL = el('ellipse', { cx: 10, cy: -356, rx: 5.5, ry: 7, fill: c.ink }, eyes);
   const eyeR = el('ellipse', { cx: 34, cy: -356, rx: 5.5, ry: 7, fill: c.ink }, eyes);
@@ -176,7 +187,7 @@ function buildCharacter(root, c = C) {
   shoe(shinF, -26, c.shoe, c.sole);
   // --- front arm (drawn over the torso)
   const uarmF = g('uarmF', torso, -64, -268); seg(uarmF, -64, -268, -72, -128, 50, 42, c.top);
-  const farmF = g('farmF', uarmF, -72, -128); seg(farmF, -72, -128, -76, 6, 30, 24, c.skin);
+  const farmF = g('farmF', uarmF, -72, -128); seg(farmF, -72, -128, -76, 6, longSleeves ? 36 : 30, 24, longSleeves ? c.top : c.skin);
   el('ellipse', { cx: -77, cy: 22, rx: 17, ry: 24, fill: c.skin }, farmF);
   return R;
 }
@@ -226,12 +237,12 @@ function render(t) {
 
   // halo grows in with a spring
   const hs = KM.spring(t, 0.0, { stiffness: 120, damping: 14 });
-  KM.set('#halo', { r: (520 * L.k * hs).toFixed(2) });
+  KM.set('#halo', { r: (520 * L.k * (0.85 + 0.15 * hs)).toFixed(2) });
 
   // character enters: rises from below with overshoot, then idles
   const enter = KM.spring(t, 0.15, { stiffness: 150, damping: 15 });
   const breath = KM.breathe(t, 3.2);
-  const yIn = (1 - enter) * 260;
+  const yIn = (1 - enter) * 36; // frame 0 already shows the hero (hook rule); it only settles
   place(heroRoot, L.cx, hipY + yIn, L.k, 1);
   // wave: anticipation down, big raise, two waves, settle (all timed in 12 fps frames)
   const raise = KM.keys(t, [[0.9, 0], [1.05, -6, 'inOutSine'], [1.45, 135, 'snappy'], [2.9, 135], [3.3, 8, 'inOutCubic']]);
