@@ -3996,5 +3996,14 @@ window.I18N_EN = {
   "الستايلات اللي بيشتغل بيها، وصور حقيقية منه، والهوية اللي البرنامج استنبطها منها.": "The styles it uses, real images of it, and the identity derived from them.",
   "القواعد دي بتتطبق على كل السكريبتات والصور والفيديو والصوت اللي بتتعمل للبراند.": "These rules apply to every script, image, video and voice made for the brand.",
   "اللوجو والإنترو والأوترو، والدعوة واللينك والكابشن اللي بيتحطوا لوحدهم وقت النشر.": "Logo, intro and outro, plus the CTA, link and caption added automatically when posting.",
-  "✓ عقل البراند متحفظ": "✓ Brand brain saved"
+  "✓ عقل البراند متحفظ": "✓ Brand brain saved",
+  "كومنت واحد": "1 comment",
+  "كومنتين": "2 comments",
+  "{0} كومنتات": "{0} comments",
+  "اقترح رد": "Suggest a reply",
+  "اقتراح تاني": "Another suggestion",
+  "بيكتب…": "Writing…",
+  "رد": "Reply",
+  "اكتب الرد… أو دوس «اقترح رد»": "Write a reply… or press “Suggest a reply”",
+  "مقدرتش أقرا من: {0}": "Couldn't read from: {0}"
 };

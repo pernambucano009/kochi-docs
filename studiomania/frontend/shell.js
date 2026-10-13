@@ -28,6 +28,9 @@ const STEP_INFO = {
   settings: { num: "", title: "الإعدادات", en: "Settings" },
   cal: { num: "", title: "المواعيد", en: "Calendar" },
 };
+// صفحات جوه النشر (المواعيد والردود): الرجوع منها بيودّي للنشر مش للرئيسية
+const BACK_TO = { cal: "7", 15: "7" };
+STEP_INFO[7].back = "النشر";
 const NEXT_LABEL = {
   0: "التالي: التقطيع",
   1: "التالي: التوليد",
@@ -83,7 +86,7 @@ function openStage(step) {
   $("stage").classList.toggle("mt-mode", ["6", "6s", "6a", "6f"].includes(step));
   // المواعيد صفحة لوحدها جوه النشر: الرجوع بيودّي للنشر مش للرئيسية
   $("stage").classList.toggle("cal-mode", step === "cal");
-  $("stageMin").querySelector("span").textContent = step === "cal" ? "النشر" : "الرئيسية";
+  $("stageMin").querySelector("span").textContent = BACK_TO[step] ? STEP_INFO[BACK_TO[step]].back : "الرئيسية";
   const inFlow = PROCESS.includes(step);
   $("flowNav").hidden = !inFlow;
   $("stage").classList.toggle("library", !inFlow);
@@ -152,7 +155,7 @@ async function renderStageProject() {
   $("stageProject").hidden = !f || !PROCESS.includes(shell.step);
 }
 
-$("stageMin").onclick = () => showStep(shell.step === "cal" ? "7" : "home");
+$("stageMin").onclick = () => showStep(BACK_TO[shell.step] || "home");
 $("flowNav").addEventListener("click", (e) => {
   const b = e.target.closest("button[data-step]");
   if (!b) return;

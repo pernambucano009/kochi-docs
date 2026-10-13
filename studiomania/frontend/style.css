@@ -2825,3 +2825,73 @@ dialog.cal-dlg { width: min(720px, 94vw); max-height: 90vh; border: 1px solid va
 :root[data-nh-theme="dark"] .stage.cal-mode .cal-week .cal-day.today .cal-dn { color: #fff; }
 :root[data-nh-theme="dark"] .stage.cal-mode .cal-week .cal-add { background: #1F1E1F; color: #f1f1f3; border-color: rgba(255, 255, 255, .6); }
 :root[data-nh-theme="dark"] .stage.cal-mode #calViews button.on { background: #2a292a; color: #fff; }
+
+/* ===== الكومنتات والرسايل زي البروتوتايب: قايمة البوستات في كارت على اليمين، والكومنتات في كارت كبير ===== */
+:root:root .view[data-view="15"] .ib-bar { flex-direction: row-reverse; justify-content: flex-start; margin: 0 0 20px; }
+:root:root #ibTabs { display: inline-flex; gap: 2px; padding: 4px; border-radius: 999px; background: var(--field, #EFEEEB); }
+:root:root #ibTabs button { border: 0; background: none; border-radius: 999px; padding: 8px 20px; font: inherit; font-size: 14px; color: #8a857f; cursor: pointer; }
+:root:root #ibTabs button.on { background: var(--card, #fff); color: var(--ink, #181718); box-shadow: 0 1px 4px rgba(0, 0, 0, .08); }
+:root:root #ibTabs .ib-n { font-weight: 400; margin-inline-start: 4px; }
+:root:root #ibTabs button.on .ib-n { color: var(--accent, #E5613E); }
+:root:root #ibRefresh { border-radius: 999px; }
+:root:root .ib-layout { grid-template-columns: 360px minmax(0, 1fr); gap: 20px; align-items: stretch; }
+:root:root .ib-list-panel, :root:root .ib-thread { background: var(--card, #fff); border: 0; border-radius: 24px; box-shadow: var(--card-shadow, 0 4px 24px rgba(24, 23, 24, .06)); height: calc(100vh - 290px); min-height: 420px; max-height: none; margin: 0; }
+:root:root .ib-list-panel { padding: 12px; }
+:root:root .ib-list { gap: 6px; }
+:root:root .ib-list li { align-items: flex-start; gap: 12px; padding: 12px; border-radius: 16px; }
+:root:root .ib-list li:hover { background: var(--page-bg, #F7F7F5); }
+:root:root .ib-list li.on { background: #FDF1EC; }
+:root:root .ib-thumb { width: 54px; height: 54px; border-radius: 12px; background: linear-gradient(160deg, #4a4542, #221e1b); color: #fff; }
+:root:root .ib-list .ib-av { width: 44px; height: 44px; font-size: 16px; }
+:root:root .ib-list .ib-top { justify-content: space-between; flex-wrap: nowrap; }
+:root:root .ib-plat { font-size: 12px; color: #8a857f; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:root:root .ib-list .ib-top small { flex: none; font-size: 12px; color: #8a857f; }
+:root:root .ib-list .ib-snip { color: var(--ink, #181718); font-size: 14px; margin-top: 2px; }
+:root:root .ib-list .ib-name { font-weight: 500; font-size: 14px; margin-top: 2px; }
+:root:root .ib-list li .ib-name + .ib-snip { color: #8a857f; font-size: 12.5px; }
+:root:root .ib-count { font-size: 12.5px; color: #8a857f; margin-top: 2px; }
+:root:root .ib-list li.on .ib-count { color: var(--accent, #E5613E); }
+:root:root .ib-unread { inset-block-start: auto; inset-block-end: 14px; inset-inline-end: auto; inset-inline-start: 12px; }
+:root:root .ib-thread { padding: 26px 28px; }
+:root:root .ib-thread > .empty { margin-top: 30%; text-align: center; color: #8a857f; }
+:root:root .ib-post { align-items: center; gap: 14px; border: 0; margin: 0 0 18px; padding: 0; }
+:root:root .ib-post .ib-cap { flex: 1; min-width: 0; margin: 0; font-size: 17px; font-weight: 500; max-height: 3em; overflow: hidden; white-space: normal; }
+:root:root .ib-open { flex: none; font-size: 12.5px; color: #8a857f; }
+:root:root .ib-post .ib-filter { flex: none; margin: 0; font-size: 13px; color: #6B6A66; display: inline-flex; gap: 8px; align-items: center; cursor: pointer; }
+:root:root .ib-comments { gap: 22px; }
+:root:root .ib-c { gap: 14px; }
+:root:root .ib-c > .ib-av { width: 38px; height: 38px; font-size: 15px; background: #E8EEF8; color: #3B5B92; }
+:root:root .ib-c:nth-child(3n+2) > .ib-av { background: #E3F4EC; color: #2F8F6B; }
+:root:root .ib-c:nth-child(3n) > .ib-av { background: #FDF1EC; color: var(--accent, #E5613E); }
+:root:root .ib-cb > .ib-top b { font-size: 13px; }
+:root:root .ib-cb > .ib-top small { font-size: 11.5px; color: #8a857f; }
+:root:root .ib-wait { background: #FBEFD5; color: #B07A1E; padding: 1px 9px; font-size: 11px; }
+:root:root .ib-cb > p { margin: 8px 0 0; padding: 9px 14px; font-size: 14px; border-radius: 16px; background: var(--page-bg, #F7F7F5); }
+:root:root .ib-act { display: block; margin-top: 6px; padding: 0; color: #8a857f; font-size: 12.5px; }
+:root:root .ib-act:hover { color: var(--accent, #E5613E); }
+:root:root .ib-c.reply { margin-top: 12px; }
+:root:root .ib-c.reply.mine > .ib-av { display: none; }
+:root:root .ib-c.reply.mine > .ib-cb > .ib-top { display: none; }
+:root:root .ib-c.mine > .ib-cb > p { background: #FBE3D9; color: #4a2a1e; margin: 0; }
+:root:root .ib-compose { margin-top: 12px; padding: 14px; gap: 10px; border-radius: 20px; background: var(--page-bg, #F7F7F5); }
+:root:root .ib-compose textarea { border: 0; border-radius: 14px; padding: 12px 14px; font-size: 14px; background: var(--card, #fff); min-height: 52px; resize: none; }
+:root:root .ib-compose .ib-hint { border: 0; border-radius: 12px; padding: 8px 12px; background: transparent; font-size: 12.5px; }
+:root:root .ib-compose .ib-hint:focus { background: var(--card, #fff); }
+:root:root .ib-compose .row { gap: 8px; }
+:root:root .ib-sug { border-radius: 999px; background: var(--card, #fff); border: 0; padding: 7px 16px; }
+:root:root .ib-sug::before { content: "✲"; color: var(--accent, #E5613E); margin-inline-end: 6px; }
+:root:root .ib-cancel { border-radius: 999px; background: none; border: 0; color: #8a857f; }
+:root:root .ib-send { border-radius: 999px; padding: 9px 24px; box-shadow: 0 8px 20px rgba(229, 97, 62, .3); }
+:root:root .ib-chathead { border: 0; padding: 0 0 14px; gap: 12px; font-size: 16px; }
+:root:root .ib-chat { max-height: none; flex: 1; }
+:root:root .ib-thread:has(.ib-chat) { display: flex; flex-direction: column; }
+:root:root .ib-msg { background: var(--page-bg, #F7F7F5); border-radius: 16px; padding: 9px 14px; }
+:root:root .ib-msg.mine { background: #FBE3D9; color: #4a2a1e; }
+:root[data-nh-theme="dark"] .ib-list li.on { background: #3a2a24; }
+:root[data-nh-theme="dark"] .ib-list li:hover, :root[data-nh-theme="dark"] .ib-cb > p, :root[data-nh-theme="dark"] .ib-compose, :root[data-nh-theme="dark"] .ib-msg { background: rgba(255, 255, 255, .06); }
+:root[data-nh-theme="dark"] .ib-c.mine > .ib-cb > p, :root[data-nh-theme="dark"] .ib-msg.mine { background: #4A2E25; color: #fbe3d9; }
+:root[data-nh-theme="dark"] .ib-list .ib-snip, :root[data-nh-theme="dark"] #ibTabs button.on { color: #f1f1f3; }
+:root[data-nh-theme="dark"] #ibTabs button.on { background: #2a292a; }
+:root[data-nh-theme="dark"] .ib-wait { background: #4a3c1e; color: #f0c56a; }
+:root[data-nh-theme="dark"] .ib-c > .ib-av { background: rgba(255, 255, 255, .1); color: #f1f1f3; }
+@media (max-width: 900px) { :root:root .ib-layout { grid-template-columns: 1fr; } :root:root .ib-list-panel { height: auto; max-height: 320px; min-height: 0; } :root:root .ib-thread { height: auto; } }
