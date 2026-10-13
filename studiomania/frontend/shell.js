@@ -74,6 +74,10 @@ function openStage(step) {
   $("stageNum").textContent = [info.en, info.num && PROCESS.includes(step) ? `${Number(info.num)} / 5` : ""].filter(Boolean).join(" · ");
   $("stageNum").hidden = !info.en && !info.num;
   $("stageTitle").textContent = info.title;
+  // أيقونة القسم الزجاج جنب العنوان (البروتوتايب بيحطها في الإعدادات)
+  const ic = { settings: "settings" }[step];
+  $("stageIc").hidden = !ic;
+  $("stageIc").innerHTML = ic ? `<img class="ic-l" src="/icons3d/${ic}.webp?v=8" alt=""><img class="ic-d" src="/icons3d/${ic}_d.webp?v=8" alt="">` : "";
   // المونتاج شاشة شغل: راس صغير (رجوع + اسم المشروع + صدّر) بدل العنوان الكبير، زي البروتوتايب
   $("stage").classList.toggle("mt-mode", ["6", "6s", "6a", "6f"].includes(step));
   const inFlow = PROCESS.includes(step);

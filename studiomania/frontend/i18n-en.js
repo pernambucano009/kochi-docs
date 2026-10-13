@@ -3977,5 +3977,7 @@ window.I18N_EN = {
   "الغلاف": "Cover",
   "✓ الغلاف": "✓ Cover",
   "الميديا": "Media",
-  "معاينة": "Preview"
+  "معاينة": "Preview",
+  "مفتاح Atlas": "Atlas key",
+  "مفتاح Zernio": "Zernio key"
 };

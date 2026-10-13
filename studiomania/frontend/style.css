@@ -2739,3 +2739,40 @@ dialog.cal-dlg { width: min(720px, 94vw); max-height: 90vh; border: 1px solid va
 :root:root .stage #inspTabs button { padding: 8px 0; gap: 4px; }
 :root:root .stage .ed-inspector > .pane:not([hidden]) { min-height: 0; max-height: 600px; }
 :root:root .stage .ed-inspector > .pane:not([hidden]) { min-height: 460px; }
+
+/* ============ الإعدادات بمقاسات البروتوتايب ============ */
+/* الأيقونة الزجاج (96) جنب العنوان */
+:root:root .stage-head:has(#stageIc:not([hidden])) { grid-template-areas: "logo . money bell inbox cal client" "ic back back back back back back" "ic title title title title title title"; grid-template-columns: auto minmax(0, 1fr) auto auto auto auto auto; }
+.stage-ic { grid-area: ic; width: 96px; height: 96px; align-self: end; margin-inline-end: 8px; }
+.stage-ic[hidden] { display: none; }
+.stage-ic img { width: 100%; height: 100%; object-fit: contain; }
+.stage-ic .ic-d, :root[data-nh-theme="dark"] .stage-ic .ic-l { display: none; }
+:root[data-nh-theme="dark"] .stage-ic .ic-d { display: block; }
+.stage-head:has(#stageIc:not([hidden])) .stage-back { justify-self: start; }
+/* الكروت على قد محتواها */
+.set-grid { align-items: start; gap: 20px; }
+.set-card { padding: 24px !important; gap: 16px; }
+.set-card h2 { margin-top: -10px; }
+.set-fill { display: none; }
+/* الحسابات */
+.set-acc li { padding: 10px 12px; }
+.set-acc li small[dir="ltr"] { font-size: 12.5px; color: #6B6A66; }
+/* المفاتيح */
+.set-card form .field { font-size: 13px; color: #6B6A66; gap: 6px; }
+:root:root .stage .set-card form input[type=password] { border-radius: 14px; padding: 12px 14px; font-size: 14px; background: #F7F7F5 !important; }
+:root[data-nh-theme="dark"] .stage .set-card form input[type=password] { background: var(--field) !important; }
+.set-card form .hint:empty { display: none; }
+/* الوضع: الصورة على عرض الكارت وتحتها دايرة اختيار والاسم */
+.theme-picks button { padding: 0; gap: 0; overflow: hidden; border-radius: 16px; background: var(--card) !important; box-shadow: 0 0 0 1px #E3E2DE; text-align: start; }
+.theme-picks button.on { box-shadow: 0 0 0 2px var(--accent); }
+.tp-art { height: 70px; border-radius: 0; }
+.tp-art.light { background: #F7F7F5; box-shadow: none; }
+.tp-art.dark { background: #1F1E1F; }
+.tp-l { display: flex; align-items: center; gap: 8px; padding: 10px 12px; font-size: 13.5px; }
+.tp-l i { width: 15px; height: 15px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px #8C8C88; flex: none; }
+.theme-picks button.on .tp-l i { box-shadow: inset 0 0 0 1.5px var(--accent), inset 0 0 0 4px var(--card), inset 0 0 0 8px var(--accent); }
+:root[data-nh-theme="dark"] .theme-picks button { box-shadow: 0 0 0 1px var(--line); }
+:root[data-nh-theme="dark"] .theme-picks button.on { box-shadow: 0 0 0 2px var(--accent); }
+.set-seg { background: #EDECE8; }
+:root[data-nh-theme="dark"] .set-seg { background: var(--field); }
+:root .stage .set-card .btn.set-out { margin-top: 6px; }

@@ -61,6 +61,7 @@
       <button class="icon-btn stage-cal" id="stageCal" title="المواعيد" aria-label="المواعيد"><svg><use href="#i-cal"/></svg></button>
       <button class="stage-back" id="stageMin" title="ارجع للرئيسية"><svg><use href="#i-arrow"/></svg><span>الرئيسية</span></button>
       <div class="stage-title"><span class="stage-en" id="stageNum"></span><h2 id="stageTitle"></h2></div>
+      <span class="stage-ic" id="stageIc" hidden></span>
       <button class="icon-btn stage-bell" id="stageBell" title="الإشعارات" aria-label="الإشعارات"><svg><use href="#i-bell"/></svg><b class="bell-n" hidden></b></button>
       <button class="stage-client" id="stageClient" title="العميل اللي شغال عليه (دوس تغيّره)"><i class="client-av" id="stageClientAv">👤</i><span id="stageClientName" data-no-i18n></span></button>
       <nav class="flow" id="flowNav">
@@ -1561,14 +1562,13 @@
                 <span><small>رصيد Atlas</small><b id="setCreditVal"></b><small id="setCreditSpent"></small></span>
               </div>
               <form id="keysForm">
-                <label class="field">مفتاح Atlas Cloud (للتوليد بـ Seedance)
+                <label class="field" title="للتوليد بـ Seedance">مفتاح Atlas
                   <input type="password" id="atlasKey" autocomplete="off" placeholder="الصق المفتاح هنا"></label>
                 <p class="hint" id="atlasState"></p>
-                <label class="field">مفتاح Zernio (للنشر على السوشيال ميديا)
+                <label class="field" title="للنشر على السوشيال ميديا">مفتاح Zernio
                   <input type="password" id="zernioKey" autocomplete="off" placeholder="الصق المفتاح هنا"></label>
                 <p class="hint" id="zernioState"></p>
-                <p class="hint">المفاتيح بتتحفظ على السيرفر بتاعك بس. لو سبت الخانة فاضية المفتاح القديم بيفضل زي ما هو.</p>
-                <button class="btn primary" type="submit">حفظ المفاتيح</button>
+                <button class="btn primary" type="submit" title="المفاتيح بتتحفظ على السيرفر بتاعك بس. لو سبت الخانة فاضية المفتاح القديم بيفضل زي ما هو.">حفظ المفاتيح</button>
               </form>
             </section>
             <section class="panel set-card settings studio-only">
@@ -1580,8 +1580,8 @@
               </div>
               <p class="hint gap-top">الوضع</p>
               <div class="theme-picks" id="themePicks">
-                <button type="button" data-theme="light"><span class="tp-art light"></span>فاتح</button>
-                <button type="button" data-theme="dark"><span class="tp-art dark"></span>غامق</button>
+                <button type="button" data-theme="light"><span class="tp-art light"></span><span class="tp-l"><i></i>فاتح</span></button>
+                <button type="button" data-theme="dark"><span class="tp-art dark"></span><span class="tp-l"><i></i>غامق</span></button>
               </div>
               <span class="set-fill"></span>
               <button type="button" class="btn set-out" id="setLogout">خروج</button>

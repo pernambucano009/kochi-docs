@@ -4,8 +4,11 @@ async function loadSettings() {
   const s = await api("/api/settings");
   for (const name of ["atlas", "zernio"]) {
     const k = s.keys[name];
-    $(`${name}State`).textContent = k.set ? `✓ فيه مفتاح متسجل (${k.hint})` : "✕ مفيش مفتاح لسه";
-    $(`${name}State`).className = "hint " + (k.set ? "ok-text" : "");
+    // المفتاح المتسجل بيبان نقط جوه الخانة (زي البروتوتايب)، والحالة سطر صغير بس لو مفيش مفتاح
+    $(`${name}State`).textContent = k.set ? "" : "✕ مفيش مفتاح لسه";
+    $(`${name}State`).hidden = k.set;
+    $(`${name}State`).className = "hint";
+    $(`${name}Key`).placeholder = k.set ? `•••••••••••• (${k.hint})` : "الصق المفتاح هنا";
     $(`${name}Key`).value = "";
   }
   api("/api/system").then((x) => {
@@ -88,7 +91,7 @@ async function loadSetAccounts() {
       : "حط مفتاح Zernio عشان تربط الحسابات";
     list.innerHTML = Object.entries(p.platforms).map(([k, label]) => {
       const a = p.accounts?.[k];
-      return `<li class="${a ? "on" : ""}"><i></i><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${PLAT_SVG[k] || PLAT_SVG.x}"/></svg><span>${escapeHtml(label)}</span>
+      return `<li class="${a ? "on" : ""}"><i></i><span>${escapeHtml(label)}</span>
         <small dir="ltr">${a ? escapeHtml(a.name || "") : ""}</small>${a ? "" : "<small>مش مربوط</small>"}</li>`;
     }).join("") + (p.accounts_error ? `<li class="err">${escapeHtml(p.accounts_error)}</li>` : "");
   } catch (err) {
