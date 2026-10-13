@@ -7638,6 +7638,7 @@ def brain_to_dict(b: dict) -> dict:
     out["sources"] = [{k: s.get(k) for k in ("id", "kind", "name", "status", "error", "count", "created_at")} for s in b.get("sources") or []]
     out["pending"] = b.get("pending") or []
     out["notes"] = b.get("notes") or []
+    out["knowledge"] = fz.knowledge(b, BRAIN_FIELDS, BRAIN_KINDS)
     return out
 
 
@@ -7921,8 +7922,14 @@ def patch_brain(bid: str, body: BrainIn):
         if "style" in body.fields and "styles" not in body.fields and "style" not in d.setdefault("edited", []):
             d["edited"].append("style")
         return (body.name or "").strip()[:80] or None
+    old = brain_row(bid) or {}
     update_brain(bid, fn)
-    return brain_to_dict(brain_row(bid))
+    new = brain_row(bid) or {}
+    # 🗓️ البلد أو الجمهور اتغيروا: المخ بيولّد تقويم المناسبات من جديد لوحده
+    if (old.get("market"), old.get("audience")) != (new.get("market"), new.get("audience")) and (new.get("market") or new.get("audience")):
+        SEASON_JOBS.pop(bid, None)
+        start_brain_seasons(bid)
+    return brain_to_dict(new)
 
 
 @app.delete("/api/ad-brains/{bid}")
@@ -17369,7 +17376,11 @@ def run_stylekey(vid: str, variant: str) -> None:
             subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "testsrc2=s=360x640", "-frames:v", "1",
                             str(folder / name)], check=True, capture_output=True, timeout=60)
         else:
-            atlas.download(atlas.generate_image(tv_img(d), prompt, size, "high"), folder / name)
+            frefs = [atlas.reference_url(Path(r["path"])) for r in (d.get("flow_refs") or []) if Path(r["path"]).exists()][:4]
+            if frefs:   # ملفات العميل من مسار القالب (صور المنتج/الشخصية) بتدخل في مفتاح الستايل
+                prompt += (" Feature the items shown in the reference images (" + ", ".join(r["name"] for r in d["flow_refs"][:4])
+                           + ") faithfully, redrawn in this exact style.")
+            atlas.download(atlas.generate_image(tv_img(d), prompt, size, "high", frefs or None), folder / name)
         conform_image(folder / name, d["ratio"])
 
         def fn(x):
@@ -17432,7 +17443,8 @@ def run_scenes_gen(vid: str, only: int | None) -> None:
             if atlas.mock_mode():
                 gen_motion(d["model"], d["resolution"], ratio, "", key, key, int(SCENE_SEC), folder / name, W, H)
             else:
-                body = {"model": tv_r2v(d.get("model")), "prompt": scene_prompt(d, i), "reference_images": [atlas.reference_url(key)],
+                body = {"model": tv_r2v(d.get("model")), "prompt": scene_prompt(d, i), "reference_images": [atlas.reference_url(key)]
+                        + [atlas.reference_url(Path(r["path"])) for r in (d.get("flow_refs") or [])[:2] if Path(r["path"]).exists()],
                         "duration": int(SCENE_SEC), "resolution": d.get("resolution") or "480p", "ratio": ratio,
                         "generate_audio": True, "watermark": False}
                 atlas.download(atlas.run_model("Video", body, f"المشهد {i + 1}", max_seconds=1800, interval=6), folder / name)
@@ -18637,6 +18649,583 @@ def data_import(body: DataImportIn):
 @app.get("/api/admin/data-import")
 def data_import_status():
     return {**data_import_state, "empty": data_is_empty() if data_import_state.get("status") != "working" else False}
+
+
+# ---------------------------------------------------------------- 🧭 مسار القالب (flow.py): فكرة ← نوع ← سيناريو ← أبطال ← ملفات ← توليد
+import flow as fz  # noqa: E402
+
+FLOWS_DIR = ADS_DIR / "flows"   # تحت /media/ads عشان الملفات المرفوعة تتشاف
+FLOWS_DIR.mkdir(parents=True, exist_ok=True)
+FLOW_LOCK = threading.Lock()
+
+
+def flow_path(fid: str) -> Path:
+    return FLOWS_DIR / Path(fid).name / "flow.json"
+
+
+def flow_load(fid: str) -> dict:
+    f = flow_path(fid)
+    if not f.exists():
+        raise HTTPException(404, "المشروع ده مش موجود")
+    return json.loads(f.read_text(encoding="utf-8"))
+
+
+def flow_save(fid: str, d: dict) -> None:
+    f = flow_path(fid)
+    f.parent.mkdir(parents=True, exist_ok=True)
+    d["updated_at"] = now()
+    f.with_suffix(".tmp").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+    f.with_suffix(".tmp").replace(f)
+
+
+def flow_update(fid: str, fn) -> dict:
+    with FLOW_LOCK:
+        d = flow_load(fid)
+        fn(d)
+        flow_save(fid, d)
+        return d
+
+
+def flow_brain(d: dict) -> dict | None:
+    return brain_row(d.get("client_id")) if d.get("client_id") else active_client()
+
+
+def flow_assets_list(d: dict) -> list[dict]:
+    return [{"name": a["name"], "kind": a.get("kind", "صورة")} for a in d.get("assets") or []]
+
+
+def flow_to_dict(fid: str, d: dict) -> dict:
+    base = f"/media/ads/flows/{fid}"
+    out = {**d, "id": fid, "assets": [{**a, "url": f"{base}/{a['file']}"} for a in d.get("assets") or []]}
+    brain = flow_brain(d)
+    out["knowledge"] = fz.knowledge(brain, BRAIN_FIELDS, BRAIN_KINDS)
+    out["brand_name"] = (brain or {}).get("name") or ""
+    o = d.get("output") or {}
+    if o.get("kind") == "motion" and o.get("status") == "working":
+        job = MOTION_JOBS.get(o.get("mid")) or {}
+        if job.get("status") == "error":
+            out["output"] = {**o, "status": "failed", "error": job.get("error")}
+        elif not job:
+            aid = next((a for a in motion_assets().get(o.get("mid"), []) if a not in (o.get("before") or [])), None)
+            out["output"] = {**o, "status": "done" if aid else "failed", "asset": aid, "error": None if aid else "الرسم وقف"}
+            if aid:
+                flow_update(fid, lambda x: x.update(output=out["output"], stage="done"))
+                out["stage"] = "done"
+        else:
+            out["output"] = {**o, "progress": job.get("progress", 0)}
+    if (out.get("output") or {}).get("asset"):
+        aid = out["output"]["asset"]
+        out["output"]["video_url"] = f"/media/assets/{aid}/clip.mp4"
+    return out
+
+
+def flow_template(tid: str, name: str, cat: str, desc: str) -> dict:
+    """نوع القالب: موشن بالكود (t-*) / تايبوجرافي / قالب متولّد (مشاهد، إعلان، صور) / قالب من المعمل."""
+    if tid.startswith("t-") and (MOTION_DIR / "r" / Path(tid).name / "reel.html").exists():
+        return {"id": tid, "name": name, "cat": cat, "desc": desc, "kind": "motion"}
+    if tid == "typo":
+        return {"id": tid, "name": name or "تايبوجرافي", "cat": cat, "desc": desc, "kind": "typo"}
+    try:
+        t = tpl_load(tid)
+    except HTTPException:
+        raise HTTPException(404, "القالب ده مش موجود") from None
+    kind = {"scenes": "scene", "ad": "ad", "still": "still"}.get(t.get("mode"), "lab")
+    return {"id": tid, "name": name or t.get("name", ""), "cat": cat, "desc": desc or t.get("uses", ""), "kind": kind}
+
+
+def flow_llm(messages: list[dict], what: str) -> dict:
+    return ad_json(series_chat(messages), what)
+
+
+def flow_job(fid: str, what: str, fn) -> None:
+    """شغل في الخلفية: busy بيتعلّم، ولو حصل خطأ بيتكتب."""
+    def run():
+        try:
+            fn()
+            flow_update(fid, lambda d: d.update(busy=None, error=None))
+        except Exception as exc:  # noqa: BLE001
+            msg = str(getattr(exc, "detail", None) or exc)[:300]
+            flow_update(fid, lambda d: d.update(busy=None, error=msg))
+    flow_update(fid, lambda d: d.update(busy=what, error=None))
+    threading.Thread(target=run, daemon=True).start()
+
+
+def flow_gen_ideas(fid: str, hint: str = "", more: bool = False) -> None:
+    d = flow_load(fid)
+    brain = flow_brain(d)
+    avoid = [i.get("title", "") for i in d.get("ideas") or []]
+    k = len(avoid)
+    if atlas.mock_mode():
+        raw = fz.mock_ideas(3, k)
+    else:
+        raw = flow_llm(fz.ideas_messages(az.brain_text(brain, d["template"]["name"]), fz.prefs_text(brain), d["template"], flow_assets_list(d),
+                                         3, avoid if more else [], hint, d.get("season") or ""), "الأفكار")
+    items = [{"id": uuid.uuid4().hex[:8], **{x: str(i.get(x) or "")[:600] for x in ("title", "hook", "idea", "why")}}
+             for i in (raw.get("ideas") or [])[:5] if isinstance(i, dict)]
+    if not items:
+        raise HTTPException(400, "المخ مرجعش أفكار، جرّب تاني")
+    flow_update(fid, lambda x: x.update(ideas=(x.get("ideas") or []) + items if more else items))
+
+
+def flow_gen_scenarios(fid: str, hint: str = "", more: bool = False) -> None:
+    d = flow_load(fid)
+    brain = flow_brain(d)
+    idea = d.get("idea") or {}
+    idea_txt = "\n".join(str(idea.get(k) or "") for k in ("title", "hook", "idea") if idea.get(k))
+    avoid = [s.get("title", "") for s in d.get("scenarios") or []]
+    if atlas.mock_mode():
+        raw = fz.mock_scenarios(d["format"], 2, d.get("episodes"))
+    else:
+        raw = flow_llm(fz.scenarios_messages(az.brain_text(brain, idea_txt), fz.prefs_text(brain), d["template"], flow_assets_list(d), idea_txt,
+                                             d["format"], d.get("episodes") or "auto", [c["name"] for c in d.get("cast") or []], 2, avoid if more else [], hint),
+                       "السيناريوهات")
+    items = [{"id": uuid.uuid4().hex[:8], **s} for s in (raw.get("scenarios") or [])[:4] if isinstance(s, dict)]
+    if not items:
+        raise HTTPException(400, "المخ مرجعش سيناريوهات، جرّب تاني")
+    flow_update(fid, lambda x: x.update(scenarios=(x.get("scenarios") or []) + items if more else items))
+
+
+class FlowNewIn(BaseModel):
+    template: str
+    name: str = ""
+    cat: str = ""
+    desc: str = ""
+    season: str = ""
+
+
+@app.post("/api/flows")
+def flow_new(body: FlowNewIn):
+    """العميل داس على قالب: مشروع جديد والمخ بيبدأ يقترح أفكار على طول."""
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل")
+    tpl = flow_template(body.template, body.name.strip()[:120], body.cat.strip()[:40], body.desc.strip()[:400])
+    fid = uuid.uuid4().hex[:10]
+    d = {"client_id": active_client_id(), "template": tpl, "stage": "idea", "season": body.season.strip()[:200],
+         "ideas": [], "idea": None, "idea_chat": [], "format": None, "episodes": "auto", "scenarios": [], "scenario": None, "scen_chat": [],
+         "cast": [], "assets": [], "prompt": "", "output": None, "ratings": {}, "busy": None, "error": None, "created_at": now()}
+    with FLOW_LOCK:
+        flow_save(fid, d)
+    flow_job(fid, "ideas", lambda: flow_gen_ideas(fid))
+    return flow_to_dict(fid, flow_load(fid))
+
+
+@app.get("/api/flows")
+def flow_list():
+    cid = active_client_id()
+    out = []
+    for f in FLOWS_DIR.glob("*/flow.json"):
+        try:
+            d = json.loads(f.read_text(encoding="utf-8"))
+        except ValueError:
+            continue
+        if d.get("client_id") in (cid, None):
+            out.append({"id": f.parent.name, "template": d.get("template"), "stage": d.get("stage"), "title": (d.get("idea") or {}).get("title") or "",
+                        "format": d.get("format"), "updated_at": d.get("updated_at") or d.get("created_at")})
+    return sorted(out, key=lambda x: x["updated_at"] or "", reverse=True)[:40]
+
+
+@app.get("/api/flows/{fid}")
+def flow_get(fid: str):
+    return flow_to_dict(fid, flow_load(fid))
+
+
+@app.delete("/api/flows/{fid}")
+def flow_delete(fid: str):
+    flow_load(fid)
+    shutil.rmtree(FLOWS_DIR / Path(fid).name, ignore_errors=True)
+    return {"ok": True}
+
+
+class FlowGenIn(BaseModel):
+    hint: str = ""
+    more: bool = False
+
+
+def flow_idle(d: dict) -> None:
+    if d.get("busy"):
+        raise HTTPException(400, "المخ لسه شغال، استنى ثانية")
+
+
+@app.post("/api/flows/{fid}/ideas")
+def flow_ideas(fid: str, body: FlowGenIn):
+    flow_idle(flow_load(fid))
+    flow_job(fid, "ideas", lambda: flow_gen_ideas(fid, body.hint.strip()[:500], body.more))
+    return flow_to_dict(fid, flow_load(fid))
+
+
+class FlowPickIn(BaseModel):
+    id: str = ""          # اختار اقتراح
+    item: dict | None = None   # أو نسخة معدّلة / مكتوبة بإيده
+
+
+@app.post("/api/flows/{fid}/idea")
+def flow_pick_idea(fid: str, body: FlowPickIn):
+    def fn(d):
+        if body.item:
+            it = {"id": body.item.get("id") or uuid.uuid4().hex[:8], **{x: str(body.item.get(x) or "")[:1500] for x in ("title", "hook", "idea", "why")}, "own": True}
+            if not (it["title"] or it["idea"]):
+                raise HTTPException(400, "اكتب الفكرة")
+        else:
+            it = next((i for i in d.get("ideas") or [] if i["id"] == body.id), None)
+            if not it:
+                raise HTTPException(404, "الفكرة دي مش موجودة")
+        d.update(idea=it, stage="format", scenarios=[], scenario=None)
+    return flow_to_dict(fid, flow_update(fid, fn))
+
+
+class FlowChatIn(BaseModel):
+    stage: str
+    message: str
+
+
+@app.post("/api/flows/{fid}/chat")
+def flow_chat(fid: str, body: FlowChatIn):
+    """نقاش مع المخ لتعديل الفكرة أو السيناريو المختار: بيرد ويرجّع نسخة معدّلة."""
+    d = flow_load(fid)
+    flow_idle(d)
+    stage = "idea" if body.stage == "idea" else "scenario"
+    cur = d.get(stage)
+    if not cur:
+        raise HTTPException(400, "اختار الأول")
+    msg = body.message.strip()[:1500]
+    if not msg:
+        raise HTTPException(400, "اكتب طلبك")
+    key = "idea_chat" if stage == "idea" else "scen_chat"
+    chat = [*(d.get(key) or []), {"role": "user", "content": msg}]
+    brain = flow_brain(d)
+    if atlas.mock_mode():
+        raw = {"reply": "تمام، عدّلتها", "item": {**cur, "title": (cur.get("title") or "") + " ✓"}}
+    else:
+        raw = flow_llm(fz.refine_messages(az.brain_text(brain, msg), fz.prefs_text(brain), d["template"], flow_assets_list(d), stage,
+                                          {k: v for k, v in cur.items() if k != "id"}, chat, d.get("format") or ""), "التعديل")
+    item = raw.get("item") if isinstance(raw.get("item"), dict) else None
+    reply = str(raw.get("reply") or "تمام")[:800]
+
+    def fn(x):
+        x[key] = [*chat, {"role": "assistant", "content": reply}][-30:]
+        if item:
+            x[stage] = {**item, "id": cur.get("id") or uuid.uuid4().hex[:8], "edited": True}
+            # التعديل بيتسجل كمعلومة عن ذوق العميل
+            flow_pref(x, stage, f"طلب تعديل: {msg}", 1, "")
+    return flow_to_dict(fid, flow_update(fid, fn))
+
+
+class FlowFormatIn(BaseModel):
+    format: str
+    episodes: str = "auto"
+
+
+@app.post("/api/flows/{fid}/format")
+def flow_format(fid: str, body: FlowFormatIn):
+    if body.format not in fz.FORMATS:
+        raise HTTPException(400, "اختار ريل أو كاروسيل أو مسلسل")
+    ep = body.episodes if body.episodes == "auto" else str(max(2, min(10, int(body.episodes)))) if str(body.episodes).isdigit() else "auto"
+    d = flow_update(fid, lambda d: d.update(format=body.format, episodes=ep, stage="scenario", scenarios=[], scenario=None, scen_chat=[]))
+    flow_job(fid, "scenarios", lambda: flow_gen_scenarios(fid))
+    return flow_to_dict(fid, flow_load(fid))
+
+
+@app.post("/api/flows/{fid}/scenarios")
+def flow_scenarios(fid: str, body: FlowGenIn):
+    d = flow_load(fid)
+    flow_idle(d)
+    if not d.get("format"):
+        raise HTTPException(400, "اختار نوع البوست الأول")
+    flow_job(fid, "scenarios", lambda: flow_gen_scenarios(fid, body.hint.strip()[:500], body.more))
+    return flow_to_dict(fid, flow_load(fid))
+
+
+@app.post("/api/flows/{fid}/scenario")
+def flow_pick_scenario(fid: str, body: FlowPickIn):
+    def fn(d):
+        if body.item:
+            it = {**body.item, "id": body.item.get("id") or uuid.uuid4().hex[:8], "own": True}
+            if not (it.get("title") or it.get("summary") or it.get("text")):
+                raise HTTPException(400, "اكتب السيناريو")
+        else:
+            it = next((s for s in d.get("scenarios") or [] if s["id"] == body.id), None)
+            if not it:
+                raise HTTPException(404, "السيناريو ده مش موجود")
+        d.update(scenario=it, stage="cast")
+    return flow_to_dict(fid, flow_update(fid, fn))
+
+
+@app.get("/api/flows/{fid}/cast-options")
+def flow_cast_options(fid: str):
+    """الشخصيات المتاحة: شخصيات البراند في المخ + الشخصيات (الكوتشز سابقًا)."""
+    d = flow_load(fid)
+    brain = flow_brain(d) or {}
+    out = [{"id": f"b:{a['file']}", "name": a.get("name") or a["file"], "about": a.get("description", ""), "image_url": f"/media/ads/brains/{brain['id']}/{a['file']}"}
+           for a in brain.get("characters") or []]
+    with closing(db()) as conn:
+        out += [{"id": f"c:{r['id']}", "name": r["name"], "about": r["about"] or "", "image_url": f"/media/coaches/{r['image_filename']}"}
+                for r in conn.execute("SELECT * FROM coaches ORDER BY name")]
+    return out
+
+
+class FlowCastIn(BaseModel):
+    ids: list[str] = []
+
+
+@app.post("/api/flows/{fid}/cast")
+def flow_cast(fid: str, body: FlowCastIn):
+    opts = {o["id"]: o for o in flow_cast_options(fid)}
+    cast = [opts[i] for i in body.ids if i in opts][:6]
+    return flow_to_dict(fid, flow_update(fid, lambda d: d.update(cast=cast, stage="assets")))
+
+
+@app.post("/api/flows/{fid}/assets")
+def flow_assets_up(fid: str, files: list[UploadFile] = File(...)):
+    folder = FLOWS_DIR / Path(fid).name
+    flow_load(fid)
+    added = []
+    for up in files[:10]:
+        ext = Path(up.filename or "").suffix.lower()
+        if ext not in (".png", ".jpg", ".jpeg", ".webp", ".mp4", ".mov", ".webm"):
+            continue
+        f = f"a-{uuid.uuid4().hex[:8]}{ext}"
+        with open(folder / f, "wb") as out:
+            shutil.copyfileobj(up.file, out)
+        base = re.sub(r"[^\w؀-ۿ]+", "_", Path(up.filename or "ملف").stem)[:24].strip("_") or "ملف"
+        added.append({"file": f, "name": base, "kind": "فيديو" if ext in (".mp4", ".mov", ".webm") else "صورة"})
+
+    def fn(d):
+        names = {a["name"] for a in d.get("assets") or []}
+        for a in added:
+            n, k = a["name"], 2
+            while a["name"] in names:
+                a["name"] = f"{n}{k}"
+                k += 1
+            names.add(a["name"])
+        d["assets"] = [*(d.get("assets") or []), *added][:20]
+    return flow_to_dict(fid, flow_update(fid, fn))
+
+
+class FlowAssetPatch(BaseModel):
+    name: str
+
+
+@app.patch("/api/flows/{fid}/assets/{file}")
+def flow_asset_rename(fid: str, file: str, body: FlowAssetPatch):
+    nm = re.sub(r"[^\w؀-ۿ]+", "_", body.name.strip())[:24].strip("_")
+    if not nm:
+        raise HTTPException(400, "اكتب اسم")
+    def fn(d):
+        if any(a["name"] == nm and a["file"] != file for a in d.get("assets") or []):
+            raise HTTPException(400, "الاسم ده مستخدم")
+        for a in d.get("assets") or []:
+            if a["file"] == file:
+                a["name"] = nm
+    return flow_to_dict(fid, flow_update(fid, fn))
+
+
+@app.delete("/api/flows/{fid}/assets/{file}")
+def flow_asset_delete(fid: str, file: str):
+    (FLOWS_DIR / Path(fid).name / Path(file).name).unlink(missing_ok=True)
+    return flow_to_dict(fid, flow_update(fid, lambda d: d.update(assets=[a for a in d.get("assets") or [] if a["file"] != file])))
+
+
+def flow_pref(d: dict, kind: str, text: str, value: int, reason: str) -> None:
+    """معلومة عن ذوق العميل بتتحفظ في المخ (والمخ بيستخدمها في كل اقتراح جاي)."""
+    cid = d.get("client_id") or active_client_id()
+    if not cid or not text:
+        return
+    item = {"kind": kind, "text": text[:400], "value": value, "reason": reason[:300], "template": (d.get("template") or {}).get("name", ""), "at": now()}
+    def fn(b):
+        b["prefs"] = [*(b.get("prefs") or []), item][-300:]
+    try:
+        update_brain(cid, fn)
+    except HTTPException:
+        pass
+
+
+class FlowRateIn(BaseModel):
+    stage: str             # idea / scenario / output
+    item: str = ""         # id الاقتراح (الفكرة أو السيناريو)
+    value: int = 0         # 1 لايك، -1 ديسلايك، 0 شيل التقييم
+    reason: str = ""
+
+
+@app.post("/api/flows/{fid}/rate")
+def flow_rate(fid: str, body: FlowRateIn):
+    if body.stage not in ("idea", "scenario", "output") or body.value not in (-1, 0, 1):
+        raise HTTPException(400, "تقييم مش مظبوط")
+    def fn(d):
+        key = f"{body.stage}:{body.item or 'final'}"
+        old = (d.get("ratings") or {}).get(key)
+        d.setdefault("ratings", {})[key] = body.value
+        if body.value and body.value != old:
+            if body.stage == "idea":
+                it = next((i for i in d.get("ideas") or [] if i["id"] == body.item), None) or d.get("idea") or {}
+                text = f"{it.get('title', '')}: {it.get('idea', '')}"
+            elif body.stage == "scenario":
+                it = next((s for s in d.get("scenarios") or [] if s["id"] == body.item), None) or d.get("scenario") or {}
+                text = f"{it.get('title', '')}: {it.get('summary', '')}"
+            else:
+                text = f"البوست النهائي على قالب «{d['template']['name']}» ({fz.FORMATS.get(d.get('format'), '')}): {(d.get('idea') or {}).get('title', '')}"
+            flow_pref(d, body.stage, text, body.value, body.reason.strip())
+    return flow_to_dict(fid, flow_update(fid, fn))
+
+
+@app.get("/api/brain-knowledge")
+def brain_knowledge():
+    return fz.knowledge(active_client(), BRAIN_FIELDS, BRAIN_KINDS)
+
+
+class FlowGoIn(BaseModel):
+    prompt: str = ""
+    stage: str = ""
+
+
+@app.post("/api/flows/{fid}/stage")
+def flow_stage(fid: str, body: FlowGoIn):
+    """الرجوع لخطوة قبل كده (أو التنقل للأمام لو جاهزة)."""
+    if body.stage not in fz.STAGES:
+        raise HTTPException(400, "خطوة مش معروفة")
+    # الرجوع لأي خطوة قبل النتيجة بيفتح صفحة جديدة (المشروع اللي اتعمل بيفضل في قسمه)
+    return flow_to_dict(fid, flow_update(fid, lambda d: d.update(stage=body.stage, **({} if body.stage == "done" else {"output": None}))))
+
+
+def flow_refs(d: dict) -> list[dict]:
+    """صور العميل اللي اتعمل لها منشن في البرومبت (أو كلها لو مفيش منشن): بتتبعت كمرجع للتوليد."""
+    prompt = d.get("prompt") or ""
+    imgs = [a for a in d.get("assets") or [] if a.get("kind") == "صورة"]
+    ment = [a for a in imgs if f"@{a['name']}" in prompt]
+    use = ment or imgs
+    folder = FLOWS_DIR / Path(d["_id"]).name
+    return [{"path": str(folder / a["file"]), "name": a["name"]} for a in use[:4] if (folder / a["file"]).exists()]
+
+
+def flow_brief(d: dict) -> str:
+    idea, sc, fmt = d.get("idea") or {}, d.get("scenario") or {}, d.get("format") or "reel"
+    parts = [f"الفكرة: {idea.get('title', '')} — {idea.get('idea', '')}", "السيناريو:\n" + fz.scenario_text(sc, fmt)]
+    if d.get("cast"):
+        parts.append("الأبطال: " + "، ".join(f"{c['name']} ({c.get('about', '')[:120]})" for c in d["cast"]))
+    if d.get("assets"):
+        parts.append("ملفات العميل: " + "، ".join(f"@{a['name']}" for a in d["assets"]))
+    if (d.get("prompt") or "").strip():
+        parts.append("توجيهات العميل للتوليد: " + d["prompt"].strip())
+    return "\n".join(parts)
+
+
+@app.post("/api/flows/{fid}/generate")
+def flow_generate(fid: str, body: FlowGoIn):
+    """🚀 التوليد: كل اللي فات (الفكرة والسيناريو والأبطال والملفات والبرومبت) بيروح للقسم المناسب ويبدأ."""
+    d = flow_load(fid)
+    flow_idle(d)
+    if not (d.get("idea") and d.get("scenario") and d.get("format")):
+        raise HTTPException(400, "لسه ناقص الفكرة أو السيناريو")
+    d = flow_update(fid, lambda x: x.update(prompt=body.prompt.strip()[:3000], stage="generate", output=None))
+    d["_id"] = fid
+    tpl, fmt, sc = d["template"], d["format"], d["scenario"]
+    brief = flow_brief(d)
+    title = (d.get("idea") or {}).get("title") or tpl["name"]
+    if fmt == "carousel":
+        car = create_carousel(CarouselIn(name=f"🧭 {title}"[:80]))
+        out = {"kind": "carousel", "id": car["id"], "status": "working"}
+        flow_update(fid, lambda x: x.update(output=out))
+        def run_car():
+            carousel_chat(car["id"], ChatIn(message="اعمل الكاروسيل ده بالظبط على ستايل قالب «" + tpl["name"] + "»:\n" + brief))
+            flow_update(fid, lambda x: x.update(output={**out, "status": "done"}, stage="done"))
+        flow_job(fid, "generate", run_car)
+    elif fmt == "series":
+        sid = uuid.uuid4().hex[:12]
+        bible = f"{title}\n{sc.get('summary', '')}\nستايل القالب: {tpl['name']} — {tpl.get('desc', '')}\n" + brief
+        character = "، ".join(c["name"] for c in d.get("cast") or [])
+        with closing(db()) as conn, conn:
+            conn.execute("INSERT INTO series (id, name, data, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+                         (sid, f"🧭 {title}"[:80], json.dumps({**new_series_data(), "bible": bible[:8000], "character": character, "client_id": d.get("client_id")}), now(), now()))
+        eids = []
+        for i, ep in enumerate(sc.get("episodes") or [], 1):
+            e = create_episode(sid, EpisodeIn(name=str(ep.get("title") or f"الحلقة {i}")[:80], number=i))
+            patch_episode(e["id"], EpisodePatch(script=fz.episode_script(ep)))
+            eids.append(e["id"])
+        flow_update(fid, lambda x: x.update(output={"kind": "series", "id": sid, "episodes": eids, "status": "done"}, stage="done"))
+    elif tpl["kind"] == "motion":
+        mid = tpl["id"]
+        if (MOTION_JOBS.get(mid) or {}).get("status") == "working":
+            raise HTTPException(400, "القالب ده بيترسم لمشروع تاني دلوقتي، استنى لما يخلص")
+        schema = fz.motion_schema(MOTION_DIR / "r" / mid / "reel.html")
+        brain = flow_brain(d)
+        def run_motion():
+            if atlas.mock_mode():
+                params = {}
+            else:
+                raw = flow_llm(fz.params_messages(schema, {**sc, "brief": brief}, (brain or {}).get("name") or "", flow_assets_list(d)), "خانات القالب")
+                params = fz.clean_params(schema, raw)
+            before = motion_assets().get(mid, [])
+            MOTION_JOBS[mid] = {"status": "working", "progress": 0.0, "error": ""}
+            flow_update(fid, lambda x: x.update(output={"kind": "motion", "mid": mid, "params": params, "before": before, "status": "working"}))
+            run_motion_import(mid, {"name": f"🧭 {title}"[:100], "category": "motion_graphics", "tags": ["مسار القالب"]}, params, f"🧭 {title}")
+        flow_job(fid, "generate", run_motion)
+    elif tpl["kind"] == "typo":
+        script = " ".join(str(b.get("say") or b.get("text") or "") for b in sc.get("beats") or []).strip() or sc.get("summary", "")
+        r = typo_new(TypoNewIn(name=f"🧭 {title}"[:100], text=script))
+        flow_update(fid, lambda x: x.update(output={"kind": "typo", "id": r["id"], "status": "done"}, stage="done"))
+    else:
+        script = fz.scenario_script(sc, fmt)
+        tv = tvideo_create(TvIn(template=tpl["id"], section="templates", script=script, script_mode="own" if script else "ai",
+                                brief=brief[:3000], length=max(20, min(60, 10 * len(sc.get("beats") or [1, 2, 3])))))
+        refs = flow_refs(d)
+        if refs:
+            tv_update(tv["id"], lambda x: x.update(flow_refs=refs))
+        flow_update(fid, lambda x: x.update(output={"kind": "tvideo", "id": tv["id"], "status": "done"}, stage="done"))
+    return flow_to_dict(fid, flow_load(fid))
+
+
+# ---------------------------------------------------------------- 🗓️ دراع المواسم في المخ
+SEASON_JOBS: dict[str, str] = {}
+
+
+def run_brain_seasons(bid: str) -> None:
+    try:
+        b = brain_row(bid) or {}
+        today = datetime.now().strftime("%Y-%m-%d")
+        if atlas.mock_mode():
+            raw = fz.mock_seasons(today)
+        else:
+            raw = ad_json(series_chat(fz.seasons_messages(b.get("market", ""), b.get("audience", ""), b.get("domain", ""), today)), "المواسم")
+        data = {**fz.clean_seasons(raw), "for": f"{b.get('market', '')}|{b.get('audience', '')}", "made_at": now()}
+        update_brain(bid, lambda d: d.update(seasons=data))
+        SEASON_JOBS.pop(bid, None)
+    except Exception as exc:  # noqa: BLE001
+        SEASON_JOBS[bid] = f"error:{str(getattr(exc, 'detail', None) or exc)[:200]}"
+
+
+def start_brain_seasons(bid: str) -> None:
+    if SEASON_JOBS.get(bid) == "working" or not (atlas.api_key() or atlas.mock_mode()):
+        return
+    SEASON_JOBS[bid] = "working"
+    threading.Thread(target=run_brain_seasons, args=(bid,), daemon=True).start()
+
+
+@app.get("/api/brain-seasons")
+def brain_seasons():
+    """تقويم المناسبات لبلد/منطقة جمهور العميل. بيتولد لوحده أول مرة ولما السوق أو الجمهور يتغير."""
+    b = active_client() or {}
+    if not b:
+        return {"items": [], "status": "idle"}
+    s = b.get("seasons") or {}
+    key = f"{b.get('market', '')}|{b.get('audience', '')}"
+    if (not s or s.get("for") != key) and (b.get("market") or b.get("audience")) and SEASON_JOBS.get(b["id"]) is None:
+        start_brain_seasons(b["id"])
+    job = SEASON_JOBS.get(b["id"]) or ""
+    today = datetime.now().strftime("%Y-%m-%d")
+    items = [i for i in s.get("items") or [] if (i.get("end") or i["date"]) >= today]
+    return {**s, "items": items, "status": "working" if job == "working" else "failed" if job.startswith("error") else "idle",
+            "error": job[6:] if job.startswith("error") else None, "market": b.get("market", ""), "audience": b.get("audience", "")}
+
+
+@app.post("/api/brain-seasons")
+def brain_seasons_regen():
+    b = active_client()
+    if not b:
+        raise HTTPException(400, "مفيش عميل")
+    if not (b.get("market") or b.get("audience")):
+        raise HTTPException(400, "اكتب سوق البراند (البلد أو المنطقة) والجمهور في عقل البراند الأول")
+    SEASON_JOBS.pop(b["id"], None)
+    start_brain_seasons(b["id"])
+    return brain_seasons()
 
 
 @app.get("/")

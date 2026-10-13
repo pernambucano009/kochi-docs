@@ -147,7 +147,8 @@ const BrandPage = (() => {
         : reading ? `<small class="bm-st">بيقرا ${reading === 1 ? "مصدر" : `${reading} مصادر`}…</small>` : waiting ? `<small class="bm-st">${waiting} اقتراح مستني موافقتك</small>` : "";
       return `<button class="bm-n bm-center" data-n="c" title="بدّل البراند أو اعمل واحد جديد">
         <span class="bm-brain"><img class="ic-l" src="/icons3d/brand.webp?v=9" alt=""><img class="ic-d" src="/icons3d/brand_d.webp?v=9" alt=""></span>
-        <b>${esc(b?.name || "براند جديد")}</b>${st}</button>`;
+        <b>${esc(b?.name || "براند جديد")}</b>${st}
+        ${b?.knowledge ? `<small class="bm-kn" title="${esc((b.knowledge.tips || []).join(" · "))}">المخ يعرفك <span class="num">${b.knowledge.score}٪</span> · ${esc(b.knowledge.level)}</small>` : ""}</button>`;
     }
     if (n.kind === "add") {
       const reading = (b?.sources || []).some((s) => s.status === "working");

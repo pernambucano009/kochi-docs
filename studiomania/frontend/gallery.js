@@ -161,7 +161,14 @@ const Gallery = (() => {
     if (!S.pv) {
       S.pv = Object.assign(document.createElement("div"), { className: "nh-gal-pv", hidden: true });
       S.pv.setAttribute("role", "dialog");
-      S.pv.addEventListener("click", (e) => { if (e.target === S.pv || e.target.closest("[data-gclose]")) closePv(); });
+      S.pv.addEventListener("click", (e) => {
+        if (e.target.closest("[data-gstart]")) {   // 🧭 مسار القالب (flow.js)
+          const x = S.pvItem;
+          closePv();
+          return Flow.start({ id: x.id, name: x.name, cat: catName(x.cat), desc: DESC[x.id] || x.desc || x.description || "" });
+        }
+        if (e.target === S.pv || e.target.closest("[data-gclose]")) closePv();
+      });
       document.body.appendChild(S.pv);
     }
     return S.pv;
@@ -172,7 +179,10 @@ const Gallery = (() => {
       <button type="button" class="nh-gal-x" data-gclose aria-label="اقفل">✕</button>
       <div class="nh-gal-pvart">${x.sample_url ? `<video src="${esc(x.sample_url)}" ${x.cover_url ? `poster="${esc(x.cover_url)}"` : ""} autoplay loop playsinline controls></video>` : `<span class="nh-gal-ph big"><i>${x.icon || "✦"}</i><small>فيديو العرض جاي قريب</small></span>`}</div>
       <div class="nh-gal-pvt"><span class="latin">${esc(CAT_EN[x.cat] || x.cat)}</span><b>${esc(x.name)}</b>
-        <p>${esc(DESC[x.id] || x.desc || x.description || "")}</p><small class="muted">${esc(catName(x.cat))}</small></div></div>`;
+        <p>${esc(DESC[x.id] || x.desc || x.description || "")}</p><small class="muted">${esc(catName(x.cat))}</small>
+        <button type="button" class="nh-gal-go" data-gstart>✨ ابدأ بالقالب ده</button>
+        <small class="nh-gal-hint">المخ هيقترح عليك أفكار وسيناريوهات على قد البراند بتاعك، وانت تختار.</small></div></div>`;
+    S.pvItem = x;
     pv.hidden = false;
     pv.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 220 });
     pv.querySelector(".nh-gal-pvbox").animate([{ opacity: 0, scale: .96 }, { opacity: 1, scale: 1 }], { duration: 320, easing: "cubic-bezier(.2,.8,.2,1)" });
@@ -189,6 +199,8 @@ const Gallery = (() => {
     root.addEventListener("click", (e) => {
       const c = e.target.closest("[data-gcat]");
       if (c) { S.cat = c.dataset.gcat; render(); return; }
+      const fl = e.target.closest("[data-gflow]");
+      if (fl) return Flow.open(fl.dataset.gflow);
       const k = e.target.closest("[data-gi]");
       if (k) preview(S.items[+k.dataset.gi]);
     });
@@ -200,11 +212,21 @@ const Gallery = (() => {
   // Esc بيقفل المعاينة الأول (قبل ما يرجع من الصفحة)
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && closePv()) e.preventDefault(); }, true);
 
+  // 🧭 مشاريع بدأتها من قالب ولسه مخلصتش
+  const STAGE_AR = { idea: "الفكرة", format: "نوع البوست", scenario: "السيناريو", cast: "الأبطال", assets: "الملفات", generate: "التوليد" };
+  async function resume() {
+    const g = S.root.querySelector("#nhGal");
+    let box = g.querySelector(".nh-gal-resume");
+    if (!box) { box = Object.assign(document.createElement("div"), { className: "nh-gal-resume" }); g.querySelector(".nh-gal-chips").before(box); }
+    const list = await Flow.recent();
+    box.hidden = !list.length;
+    box.innerHTML = list.length ? `<small class="muted">كمّل اللي بدأته:</small>${list.map((f) => `<button type="button" class="nh-gal-chip" data-gflow="${esc(f.id)}">🧭 ${esc(f.title || f.template?.name || "مشروع")}<span class="num">${esc(STAGE_AR[f.stage] || "")}</span></button>`).join("")}` : "";
+  }
   async function mount(root) {
     S.root = root;
     S.cat = "all";
     if (!root._gal) { root._gal = true; bind(root); }   // نفس العنصر بيتعاد استخدامه لكل الصفحات: الأحداث مرة واحدة بس
-    try { await load(); render(); } catch (err) { root.querySelector(".nh-gal-grid").innerHTML = `<div class="nh-empty">${esc(err.message)}</div>`; }
+    try { await load(); render(); resume(); } catch (err) { root.querySelector(".nh-gal-grid").innerHTML = `<div class="nh-empty">${esc(err.message)}</div>`; }
   }
   return { mount };
 })();
