@@ -655,7 +655,7 @@ def brain_messages(brain: dict, files: list[str]) -> str:
     )
 
 
-def brain_text(brain: dict | None) -> str:
+def brain_text(brain: dict | None, query: str = "") -> str:
     """ملخص ملف العميل اللي بيدخل في كتابة الاقتراح."""
     if not brain:
         return ""
@@ -673,7 +673,7 @@ def brain_text(brain: dict | None) -> str:
             lines.append(f"{label} (استخدم الاسم بالظبط في asset):\n" + "\n".join(f"- {a.get('name') or a['file']}: {a.get('description', '')}" for a in items[:60]))
     # المعرفة اللي اتوافق عليها في عقل البراند (من الملفات واللينكات)
     import brainsrc  # noqa: PLC0415
-    if notes := brainsrc.notes_text(brain):
+    if notes := brainsrc.notes_text(brain, query):
         lines.append(notes)
     return "\n".join(lines)
 

@@ -907,3 +907,4 @@ body.nh-cl #nh .nh-ptop { grid-template-areas: "row row" "tabs head"; grid-templ
 #nh .bm-now { margin: 2px 0 0; font-size: 14px; color: var(--nh-muted); line-height: 1.7; text-decoration: line-through; text-decoration-color: rgba(217, 71, 58, .4); }
 :root[data-nh-theme="dark"] #nh .bm-add > i, :root[data-nh-theme="dark"] #nh .bm-leaf.pend.ask > i { background: #F1F1F3; color: #141416; }
 :root[data-nh-theme="dark"] #nh .bm-srcs { border-color: rgba(255, 255, 255, .08); }
+#nh .bm-why { color: var(--nh-accent); }

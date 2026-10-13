@@ -170,6 +170,7 @@ function tvVoiceBlock(v) {
     <div class="ts-lines">${beats.map((b, i) => `<div class="ts-line"><span class="muted">${i + 1} · ${(b.t1 - b.t0).toFixed(1)}ث${vo.durs?.[i] ? ` (الكلام ${vo.durs[i]}ث)` : ""}</span>
       <textarea data-voline="${i}" rows="2" dir="auto" ${busy ? "disabled" : ""}>${tse(lines[i] || "")}</textarea>
       ${v.vo_line_urls?.[i] ? `<audio src="${v.vo_line_urls[i]}" controls preload="none"></audio>` : ""}</div>`).join("")}</div>
+    ${lines.some((x) => x) && typeof BrainRate !== "undefined" ? BrainRate.html({ kind: "script", what: v.title || v.name || "سكريبت", ref: `tv:${v.id}:${lines.join("|").length}`, text: lines.filter(Boolean).join("\n") }) : ""}
     <button class="btn sm primary" data-vosave ${busy ? "disabled" : ""}>🎙️ سجّل الفويس أوفر تاني (والمدد تتظبط)</button>
     <small class="muted">لو المدد اتغيرت، اللقطات اللي اتولدت قبل كده هتتعمل من جديد.</small>
   </details>`;

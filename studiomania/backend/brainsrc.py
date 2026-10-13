@@ -196,13 +196,83 @@ def mock_out(name: str) -> dict:
             "questions": ["مين الجمهور الأساسي بالظبط؟"]}
 
 
-def notes_text(brain: dict) -> str:
-    """المعرفة اللي اتوافق عليها: بتدخل مع العقل في كل توليد."""
+# ---------- الاختيار وقت التوليد ----------
+_AR = str.maketrans({"أ": "ا", "إ": "ا", "آ": "ا", "ى": "ي", "ة": "ه", "ؤ": "و", "ئ": "ي", "ـ": ""})
+_STOP = {"في", "من", "علي", "على", "عن", "الي", "إلى", "مع", "دي", "ده", "اللي", "the", "and", "for", "with", "that", "this", "هو", "هي", "كل", "لو", "او", "أو", "بس"}
+
+
+def tokens(text: str) -> set[str]:
+    """كلمات للمقارنة: من غير تشكيل، والألف والياء والتاء المربوطة موحّدين، ومن غير «ال» في الأول."""
+    t = re.sub(r"[\u064B-\u0652\u0670]", "", str(text or "").lower()).translate(_AR)
+    out = set()
+    for w in re.findall(r"[\w]+", t):
+        if w.startswith("ال") and len(w) > 4:
+            w = w[2:]
+        if len(w) >= 3 and w not in _STOP and not w.isdigit():
+            out.add(w)
+    return out
+
+
+CORE = {"voice", "claims"}   # النبرة والادعاءات المسموحة بيدخلوا دايمًا (زي القواعد)
+
+
+def pick_notes(notes: list[dict], query: str = "", k: int = 8) -> list[dict]:
+    """من المعرفة كلها: الأساسيات دايمًا، وبعدين الأقرب للطلب (بالكلام المشترك)، ولو مفيش طلب الأحدث."""
+    core = [n for n in notes if n.get("section") in CORE][:6]
+    rest = [n for n in notes if n not in core]
+    q = tokens(query)
+    if q:
+        def hit(words: set[str]) -> int:   # نفس الكلمة أو أولها زي بعض (رمضان / رمضانيه)
+            return sum(1 for a in q if any(a == b or (min(len(a), len(b)) >= 4 and (a.startswith(b) or b.startswith(a))) for b in words))
+        def score(n):
+            return 2 * hit(tokens(n.get("title", ""))) + hit(tokens(f"{n.get('summary', '')} {n.get('body', '')}"))
+        ranked = sorted(((score(n), -i, n) for i, n in enumerate(rest)), key=lambda x: (x[0], x[1]), reverse=True)
+        hits = [n for s, _, n in ranked if s > 0][:k]
+        rest = hits + [n for n in reversed(rest) if n not in hits][: max(0, 3 - len(hits))]
+    else:
+        rest = list(reversed(rest))[:k]
+    return core + rest
+
+
+def notes_text(brain: dict, query: str = "") -> str:
+    """المعرفة اللي اتوافق عليها: الأنسب للطلب بس (مش كلها)، بحد أقصى للطول."""
     notes = brain.get("notes") or []
     if not notes:
         return ""
-    lines = []
-    for n in notes[:40]:
+    lines, size = [], 0
+    for n in pick_notes(notes, query):
         body = str(n.get("body") or "").strip()
-        lines.append(f"- [{SECTIONS.get(n.get('section'), '')}] {n.get('title')}: {n.get('summary') or ''}" + (f"\n  {body[:700]}" if body else ""))
-    return "معرفة عن البراند (اتوافق عليها):\n" + "\n".join(lines)
+        line = f"- [{SECTIONS.get(n.get('section'), '')}] {n.get('title')}: {n.get('summary') or ''}" + (f"\n  {body[:700]}" if body else "")
+        if size + len(line) > 5000:
+            break
+        lines.append(line)
+        size += len(line)
+    return "معرفة عن البراند (اتوافق عليها، الأنسب للطلب ده):\n" + "\n".join(lines)
+
+
+# ---------- التعلّم من التقييم ----------
+def similar(a: str, b: str) -> bool:
+    """ملاحظتين بيقولوا نفس الحاجة تقريبًا (كلمات مشتركة كفاية)."""
+    ta, tb = tokens(a), tokens(b)
+    if not ta or not tb:
+        return False
+    common = sum(1 for x in ta if any(x == y or (min(len(x), len(y)) >= 4 and (x.startswith(y) or y.startswith(x))) for y in tb))
+    return common >= 2 or common / min(len(ta), len(tb)) >= .6
+
+
+def learn(d: dict, fb: dict, repeat: int = 3) -> list[dict]:
+    """تقييم جديد ← اقتراحات (بتستنى موافقتك زي أي اقتراح):
+    ممتاز ← مثال حقيقي يتضاف للمعرفة (النبرة) · ملاحظة اتكررت 3 مرات ← قاعدة مقترحة."""
+    out = []
+    if fb["rating"] == "great" and (fb.get("text") or fb.get("note")):
+        out.append({"kind": "note", "section": "voice", "title": f"مثال ممتاز: {fb.get('what') or 'نتيجة'}"[:120],
+                    "summary": fb.get("note") or "نتيجة اتقيّمت ممتاز، استخدمها كمثال للنبرة والأسلوب",
+                    "value": (fb.get("text") or "")[:6000]})
+    elif fb["rating"] == "bad" and fb.get("note"):
+        same = [x for x in d.get("feedback") or [] if x.get("rating") == "bad" and x.get("note") and similar(x["note"], fb["note"])]
+        already = any(p.get("kind") == "rule" and p.get("source") == "feedback" and similar(p.get("value", ""), fb["note"]) for p in d.get("pending") or [])
+        if len(same) + 1 >= repeat and not already:   # + التقييم الجديد نفسه
+            out.append({"kind": "rule", "value": f"تجنّب: {fb['note']}"[:600], "why": f"الملاحظة دي اتكررت {len(same) + 1} مرات في تقييماتك"})
+    for it in out:
+        it.update(id=uuid.uuid4().hex[:10], source="feedback")
+    return out

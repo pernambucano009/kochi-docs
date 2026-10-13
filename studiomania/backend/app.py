@@ -8162,6 +8162,42 @@ def delete_brain_note(bid: str, nid: str):
     return brain_to_dict(brain_row(bid))
 
 
+# ---------- ⭐ تقييم النتايج: العقل بيتعلم منها (بعد موافقتك) ----------
+class FeedbackIn(BaseModel):
+    rating: str            # great | bad
+    note: str = ""
+    what: str = ""         # اسم الحاجة اللي اتقيّمت (فيديو، سكريبت…)
+    text: str = ""         # الكلام نفسه لو فيه (السكريبت مثلًا)
+    kind: str = ""         # video | script | image
+    ref: str = ""
+    client_id: str | None = None
+
+
+@app.post("/api/feedback")
+def add_feedback(body: FeedbackIn):
+    if body.rating not in ("great", "bad"):
+        raise HTTPException(400, "التقييم لازم يبقى ممتاز أو مش عاجبني")
+    bid = body.client_id or active_client_id()
+    if not bid or brain_row(bid) is None:
+        raise HTTPException(400, "اختار العميل الأول")
+    fb = {"id": uuid.uuid4().hex[:10], "rating": body.rating, "note": body.note.strip()[:600], "what": body.what.strip()[:120],
+          "text": body.text.strip()[:6000], "kind": body.kind[:20], "ref": body.ref[:80], "created_at": now()}
+    new = []
+    def fn(d):
+        new.extend(brainsrc.learn(d, fb))
+        d["feedback"] = [*(d.get("feedback") or []), fb][-200:]
+        d.setdefault("pending", []).extend(new)
+    update_brain(bid, fn)
+    return {"ok": True, "suggested": len(new)}
+
+
+@app.get("/api/feedback")
+def list_feedback(ref: str = "", client_id: str | None = None):
+    """تقييمات حاجة معينة (عشان الزرار يفتكر انت قيّمتها إزاي)."""
+    b = brain_row(client_id or active_client_id() or "") or {}
+    return [f for f in b.get("feedback") or [] if not ref or f.get("ref") == ref][-50:]
+
+
 def model_image(path: Path, size: int = 768) -> Path:
     """نسخة صغيرة من الصورة للموديل (أوفر في الحجم والتكلفة)."""
     out = TMP_DIR / "brain_view" / f"{path.parent.name}-{path.stem}-{int(path.stat().st_mtime)}.jpg"
@@ -12218,7 +12254,7 @@ def run_film_plan(fid: str) -> None:
         if atlas.mock_mode():
             raw = lab.mock_film_plan(conns, d["n_scenes"], (brain or {}).get("name") or "البراند")
         else:
-            parts: list[dict] = [{"type": "text", "text": lab.film_plan_messages(az.brain_text(brain), d["brief"], conns, d["n_scenes"])}]
+            parts: list[dict] = [{"type": "text", "text": lab.film_plan_messages(az.brain_text(brain, d["brief"]), d["brief"], conns, d["n_scenes"])}]
             for c in conns:
                 for k in (c.get("keyframes") or [])[:3]:
                     p = clip_dir(c["id"]) / k["file"]
@@ -12829,7 +12865,7 @@ def film_script_rewrite(fid: str, body: FilmRewriteIn):
         raw = {"scenes": [{"i": i, "voice": (s.get("voice") or "") + " (اتعدلت)", "text": s.get("text", "")} for i, s in enumerate(p["scenes"])]}
     else:
         brain = brain_row(d.get("client_id") or "") or active_client()
-        raw = ad_json(series_chat([{"role": "user", "content": lab.film_script_rewrite_messages(az.brain_text(brain), p, body.instruction.strip()[:2000])}],
+        raw = ad_json(series_chat([{"role": "user", "content": lab.film_script_rewrite_messages(az.brain_text(brain, body.instruction), p, body.instruction.strip()[:2000])}],
                                   ), "تعديل السكريبت")
     scenes = [dict(s) for s in p["scenes"]]
     for x in raw.get("scenes") or []:
@@ -13742,7 +13778,7 @@ def run_tv_fill(vid: str) -> None:
         if atlas.mock_mode():
             raw = lab.mock_fill(d["schema"], (brain or {}).get("name") or "البراند")
         else:
-            raw = ad_json(series_chat([{"role": "user", "content": lab.fill_messages(az.brain_text(brain), d["schema"], d["brief"], d["text_mode"])}]),
+            raw = ad_json(series_chat([{"role": "user", "content": lab.fill_messages(az.brain_text(brain, d["brief"]), d["schema"], d["brief"], d["text_mode"])}]),
                           "ملا التيمبليت")
         fill = lab.clean_fill(raw, len(d["schema"]["beats"]))
         def fn(x):
@@ -17046,7 +17082,7 @@ def run_tv_script(vid: str) -> None:
         if atlas.mock_mode():
             res = {"title": "فيديو تجريبي", "lines": [f"{dub.DIALECTS[d['lang']]['label']} — جملة {i + 1}" for i in range(n)]}
         else:
-            res = ad_json(series_chat(tv_script_messages(d, az.brain_text(brain)), json_mode=True), "السكريبت")
+            res = ad_json(series_chat(tv_script_messages(d, az.brain_text(brain, d.get("brief") or "")), json_mode=True), "السكريبت")
         lines = [str(x or "").strip()[:400] for x in (res.get("lines") or [])][:n]
         lines += [""] * (n - len(lines))
         tv_set(vid, script_lines=lines, name=f"🎬 {res.get('title') or d['name']}"[:120])
@@ -17057,7 +17093,7 @@ def run_tv_script(vid: str) -> None:
         if atlas.mock_mode():
             raw = lab.mock_fill(d["schema"], (brain or {}).get("name") or "البراند")
         else:
-            raw = ad_json(series_chat([{"role": "user", "content": lab.fill_messages(az.brain_text(brain), d["schema"], brief, d["text_mode"])}]),
+            raw = ad_json(series_chat([{"role": "user", "content": lab.fill_messages(az.brain_text(brain, brief), d["schema"], brief, d["text_mode"])}]),
                           "ملا القالب")
         fill = lab.clean_fill(raw, n)
         for i, ln in enumerate(lines):
@@ -17265,7 +17301,7 @@ def run_tv_scenes_script(vid: str) -> None:
             res = {"title": "شرح تجريبي", "through_line": "a paper coin", "lines": [f"جملة المشهد {i + 1} تجريبية" for i in range(n)],
                    "scenes": [{"scene": f"Scene {i + 1}: cutouts snap in.", "motion": "slow push in", "audio": "paper rustle", "label": ""} for i in range(n)]}
         else:
-            res = ad_json(series_chat(scenes_messages(d, az.brain_text(brain)), json_mode=True), "سكريبت المشاهد")
+            res = ad_json(series_chat(scenes_messages(d, az.brain_text(brain, d.get("brief") or "")), json_mode=True), "سكريبت المشاهد")
         lines = [str(x or "").strip()[:400] for x in (res.get("lines") or [])][:n]
         lines += [""] * (n - len(lines))
         sc = [{"scene": lab._plain(x.get("scene"))[:1500], "motion": lab._plain(x.get("motion"))[:800], "audio": lab._plain(x.get("audio"))[:400],
@@ -17816,7 +17852,7 @@ def run_ad_plan(vid: str) -> None:
                     "shots": [{"beat": b, "dur": 3, "what": f"لقطة {k + 1}", "visual": "The runner pauses.", "camera": "50mm, slow push-in",
                                "audio": "footsteps", "with": ["hero", "product"], "line": "" if k else "كل يوم بداية"} for k, b in enumerate(["HOOK", "PROBLEM", "REVEAL", "PAYOFF"])]})
         else:
-            brain_txt = az.brain_text(tv_brain(d))
+            brain_txt = az.brain_text(tv_brain(d), d.get("brief") or "")
             msgs = (adtpl.ugc_messages(d, lang_txt, guide, brain_txt) if a["kind"] == "ugc"
                     else adtpl.beats_messages(d, lang_txt, guide, brain_txt) if a["kind"] in AD_PLATE_KINDS
                     else adtpl.cinema_messages(d, lang_txt, guide, brain_txt, total))
@@ -18253,7 +18289,7 @@ def run_still_prepare(vid: str) -> None:
                 res = {"ads": [{"n": n, "prompt": stilltpl.ADGEN_BY_N[n]["prompt"].split("Create:", 1)[-1], "copy": ["عنوان تجريبي"], "invented": []}
                                for n in st["picks"]]}
             else:
-                msgs = stilltpl.adgen_messages(st["picks"], az.brain_text(tv_brain(d)), st.get("product") or "", st.get("offer") or d.get("brief") or "",
+                msgs = stilltpl.adgen_messages(st["picks"], az.brain_text(tv_brain(d), st.get("offer") or d.get("brief") or ""), st.get("product") or "", st.get("offer") or d.get("brief") or "",
                                                lang_txt, guide)
                 res = ad_json(series_chat(msgs, json_mode=True), "الإعلانات الثابتة")
             got = {int(x.get("n")): x for x in res.get("ads") or [] if isinstance(x, dict) and str(x.get("n", "")).isdigit()}

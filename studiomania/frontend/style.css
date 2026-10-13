@@ -2895,3 +2895,26 @@ dialog.cal-dlg { width: min(720px, 94vw); max-height: 90vh; border: 1px solid va
 :root[data-nh-theme="dark"] .ib-wait { background: #4a3c1e; color: #f0c56a; }
 :root[data-nh-theme="dark"] .ib-c > .ib-av { background: rgba(255, 255, 255, .1); color: #f1f1f3; }
 @media (max-width: 900px) { :root:root .ib-layout { grid-template-columns: 1fr; } :root:root .ib-list-panel { height: auto; max-height: 320px; min-height: 0; } :root:root .ib-thread { height: auto; } }
+
+/* ===== ⭐ تقييم النتايج (العقل بيتعلم منها) ===== */
+.br-rate { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.br-rate .br-q { font-size: 13px; color: var(--muted); margin-inline-end: 4px; }
+.br-rate > button { display: inline-flex; align-items: center; gap: 6px; border: 0; border-radius: 999px; padding: 6px 14px; font: inherit; font-size: 13px; cursor: pointer;
+  background: var(--field, #EFEEEB); color: var(--ink, #181718); transition: background .2s, color .2s; }
+.br-rate > button:hover { background: #FBE3D9; }
+.br-rate > button.on[data-rv="great"] { background: var(--accent, #E5613E); color: #fff; }
+.br-rate > button.on[data-rv="bad"] { background: #181718; color: #fff; }
+.br-why { display: flex; align-items: flex-end; gap: 8px; width: 100%; padding: 10px 12px; border-radius: 14px; background: var(--card, #fff); box-shadow: 0 6px 20px rgba(24, 23, 24, .1); }
+.br-why[hidden] { display: none; }
+.br-write { flex: 1; min-height: 24px; font-size: 14px; line-height: 1.7; outline: none; white-space: pre-wrap; caret-color: var(--accent, #E5613E); }
+.br-write:empty::before { content: attr(data-ph); color: #B5AFA8; }
+.br-why > button { border: 0; border-radius: 999px; padding: 6px 14px; background: var(--accent, #E5613E); color: #fff; font: inherit; font-size: 13px; cursor: pointer; }
+/* على كروت الفيديوهات الجاهزة: زرارين صغيرين فوق الفيديو بيبانوا مع الهوفر */
+.ready-art .br-rate.compact { position: absolute; top: 8px; inset-inline-start: 8px; margin: 0; gap: 4px; opacity: 0; transition: opacity .2s; z-index: 2; }
+.ready-art:hover .br-rate.compact, .ready-art .br-rate.compact:has(.on), .ready-art .br-rate.compact:has(.br-why:not([hidden])) { opacity: 1; }
+.br-rate.compact > button { width: 30px; height: 30px; padding: 0; justify-content: center; background: rgba(255, 255, 255, .92); box-shadow: 0 2px 8px rgba(0, 0, 0, .15); }
+.br-rate.compact .br-why { position: absolute; top: 36px; inset-inline-start: 0; width: 230px; }
+:root[data-nh-theme="dark"] .br-rate > button { background: rgba(255, 255, 255, .08); color: #f1f1f3; }
+:root[data-nh-theme="dark"] .br-rate.compact > button { background: rgba(30, 30, 32, .9); }
+:root[data-nh-theme="dark"] .br-rate > button.on[data-rv="bad"] { background: #f1f1f3; color: #141416; }
+:root[data-nh-theme="dark"] .br-why { background: #1F1E1F; }

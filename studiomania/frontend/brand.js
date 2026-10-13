@@ -72,7 +72,7 @@ const BrandPage = (() => {
     palette: "الألوان", cta: "الدعوة (CTA)", link: "اللينك", caption: "الكابشن الافتراضي" };
   const pendBranch = (p) => (p.kind === "field" ? FIELD_BR[p.field] || "identity" : p.kind === "rule" ? "rules" : "knowledge");
   const pendLabel = (p) => (p.kind === "field" ? `اقتراح: ${FIELD_T[p.field] || p.field}` : p.kind === "rule" ? "قاعدة مقترحة" : p.kind === "question" ? "سؤال" : p.title);
-  const srcName = (id) => cur()?.sources?.find((s) => s.id === id)?.name || "";
+  const srcName = (id) => (id === "feedback" ? "تقييماتك" : cur()?.sources?.find((s) => s.id === id)?.name || "");
   // النقطة مليانة ولا لسه ناقصة
   function filled(b, l) {
     if (!b) return false;
@@ -286,7 +286,7 @@ const BrandPage = (() => {
         const body = p.kind === "question" ? `<p class="bm-q">${esc(p.title)}</p>` + editable("@ans", "", "اكتب الإجابة…")
           : p.kind === "note" ? editable("@ttl", p.title, "العنوان") + (p.summary ? `<p class="bm-note">${esc(p.summary)}</p>` : "") + editable("@val", p.value, "التفاصيل")
           : (now ? `<div class="bm-sub"><small>دلوقتي</small><p class="bm-now">${esc(now)}</p></div><div class="bm-sub"><small>المقترح</small>` : "<div>") + editable("@val", p.value, "…", p.field === "link" || p.field === "palette") + "</div>";
-        return top + body + `<div class="bm-acts"><button class="bm-go" data-ok="${p.id}">${p.kind === "question" ? "احفظ الإجابة" : "موافق"}</button><button class="bm-pill" data-no="${p.id}">لأ</button></div>`;
+        return top + (p.why ? `<p class="bm-note bm-why">${esc(p.why)}</p>` : "") + body + `<div class="bm-acts"><button class="bm-go" data-ok="${p.id}">${p.kind === "question" ? "احفظ الإجابة" : "موافق"}</button><button class="bm-pill" data-no="${p.id}">لأ</button></div>`;
       }
       case "note": return head.replace(esc(l.t), "معلومة") + editable(`note:t:${l.i}`, l.note.title, "العنوان") + (l.note.summary ? `<p class="bm-note">${esc(l.note.summary)}</p>` : "")
         + editable(`note:b:${l.i}`, l.note.body, "التفاصيل") + (srcName(l.note.source) ? `<p class="bm-note">من «${esc(srcName(l.note.source))}»</p>` : "") + `<button class="bm-link bad" data-ndel="${l.i}">شيل المعلومة دي</button>`;
@@ -579,4 +579,48 @@ const BrandPage = (() => {
       { duration: 700, delay: n.kind === "center" ? 0 : n.kind === "branch" ? 120 : 260 + (i % 9) * 25, easing: "cubic-bezier(.2,.8,.2,1)", fill: "backwards" }));
   }
   return { html, mount, styleIds: (b) => styleIds(b), cats: () => S.cats };
+})();
+
+// ⭐ تقييم أي نتيجة (سكريبت، فيديو…): «ممتاز» بيبقى مثال في عقل البراند، والملاحظة اللي بتتكرر بتتحول لقاعدة مقترحة.
+// كل ده بيظهر نقط منوّرة على خريطة العقل ومحتاج موافقتك.
+const BrainRate = (() => {
+  const KEY = "studiomania.rated";
+  const seen = () => { try { return JSON.parse(localStorage.getItem(KEY) || "{}"); } catch { return {}; } };
+  const mark = (ref, v) => { try { const s = seen(); s[ref] = v; localStorage.setItem(KEY, JSON.stringify(s)); } catch {} };
+  const thumb = `<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  function html({ kind = "", what = "", ref = "", text = "", compact = false }) {
+    const v = ref ? seen()[ref] : "";
+    return `<div class="br-rate${compact ? " compact" : ""}" data-kind="${escapeHtml(kind)}" data-what="${escapeHtml(what)}" data-ref="${escapeHtml(ref)}" data-text="${escapeHtml(text)}">
+      ${compact ? "" : `<span class="br-q">النتيجة دي؟</span>`}
+      <button type="button" data-rv="great" class="${v === "great" ? "on" : ""}" title="ممتاز (يتعلم منها)">★${compact ? "" : " ممتاز"}</button>
+      <button type="button" data-rv="bad" class="${v === "bad" ? "on" : ""}" title="مش عاجبني (قول ليه)">${thumb}${compact ? "" : " مش عاجبني"}</button>
+      <div class="br-why" hidden><div class="br-write" contenteditable="plaintext-only" data-ph="إيه اللي مش عاجبك؟ مثلًا: الجمل طويلة"></div><button type="button" data-rsend>ابعت</button></div>
+    </div>`;
+  }
+  async function send(box, rating, note = "") {
+    try {
+      const r = await api("/api/feedback", { method: "POST", ...jsonBody({ rating, note, what: box.dataset.what, text: box.dataset.text, kind: box.dataset.kind, ref: box.dataset.ref }) });
+      if (box.dataset.ref) mark(box.dataset.ref, rating);
+      box.querySelectorAll("[data-rv]").forEach((b) => b.classList.toggle("on", b.dataset.rv === rating));
+      box.querySelector(".br-why").hidden = true;
+      toast(r.suggested ? "✓ اتسجّل، وفيه اقتراح جديد مستنيك في عقل البراند" : "✓ اتسجّل. العقل بيتعلم من تقييماتك");
+    } catch (err) { toast(err.message, true); }
+  }
+  // بيشتغل قبل أي دوسة تانية على الكارت (عشان التقييم ميختارش الفيديو مثلًا)
+  document.addEventListener("click", (e) => {
+    const box = e.target.closest?.(".br-rate");
+    if (!box) return;
+    e.stopPropagation();
+    e.preventDefault();
+    const rv = e.target.closest("[data-rv]");
+    if (rv?.dataset.rv === "great") return send(box, "great");
+    if (rv?.dataset.rv === "bad") { const w = box.querySelector(".br-why"); w.hidden = !w.hidden; if (!w.hidden) w.querySelector(".br-write").focus(); return; }
+    if (e.target.closest("[data-rsend]")) return send(box, "bad", box.querySelector(".br-write").innerText.trim());
+    if (e.target.closest(".br-write")) box.querySelector(".br-write").focus();
+  }, true);
+  document.addEventListener("keydown", (e) => {
+    const w = e.target.closest?.(".br-write");
+    if (w && e.key === "Enter" && !e.shiftKey) { e.preventDefault(); w.closest(".br-rate").querySelector("[data-rsend]").click(); }
+  }, true);
+  return { html };
 })();

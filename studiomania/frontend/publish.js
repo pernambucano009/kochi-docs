@@ -52,7 +52,7 @@ function renderReady() {
   $("readyGrid").innerHTML = pub.exports
     .map(
       (e) => `<div class="ready ${e.id === pub.videoId ? "selected" : ""}" data-id="${e.id}" title="دوس عشان تجدوله">
-        <div class="ready-art">${lightVideo(e.url, "muted playsinline loop")}<span class="ready-dur">${fmtDuration(e.duration)}</span><i class="ready-tick" aria-hidden="true"></i></div>
+        <div class="ready-art">${lightVideo(e.url, "muted playsinline loop")}<span class="ready-dur">${fmtDuration(e.duration)}</span><i class="ready-tick" aria-hidden="true"></i>${typeof BrainRate !== "undefined" ? BrainRate.html({ kind: "video", what: e.name, ref: `exp:${e.id}`, compact: true }) : ""}</div>
         <div class="body">
           <div class="name" title="${escapeHtml(e.name)}">${escapeHtml(e.name)}</div>
           <div class="meta">${e.id === pub.videoId ? `<span class="st-pick">مختار للجدولة</span>` : scheduled.has(e.id) ? `<span class="st-sched">متجدول</span>` : `<span>جاهز</span>`}
