@@ -1,0 +1,124 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// #65 (عنصر: بوستر حدث) Poster breaking its frame — concept: "The poster refuses to stay flat." 15 s, 120 BPM. Cream, red, black; one typeface (Archivo Black).
+// 0–2 hook: a still Swiss poster in its frame; the big letters start to twitch · 2–4 letters climb out over the frame edge (kinetic type)
+// 4–6 the red circle pushes through the border and morphs (circle → square → star) · 6–8 the poster peels off the wall in 3D, its back is the event info
+// 8–10 data/UI: the info builds as a table/timeline · 10–12 the grid modules start to slide out · 12–14 strongest: every module flies out on the beat
+// 14–15 end title "OUT OF FRAME" → modules snap back: the still poster of frame one.
+const PR = M.params({
+  header: { label: "اسم الحدث فوق البوستر", kind: "text", role: "brand", def: "POSTER CLUB" },
+  issue: { label: "الرقم جنبه", kind: "text", def: "NO. 07" },
+  big: { label: "الكلمة الكبيرة (بتخرج من البرواز)", kind: "text", def: "BREAK" },
+  info: { label: "معلومات الحدث (٣ سطور: العنوان | القيمة)", kind: "lines", def: ["WHAT | Poster Club", "WHEN | Fri 20:00", "WHERE | Hall 3"] },
+  seatsLabel: { label: "عنوان العدد", kind: "text", def: "SEATS" },
+  seats: { label: "المحجوز", kind: "text", def: "240" },
+  total: { label: "من", kind: "text", def: "300" },
+  end1: { label: "النهاية (سطر ١)", kind: "text", def: "OUT OF" },
+  end2: { label: "النهاية (سطر ٢، ملوّن)", kind: "text", def: "FRAME." },
+  cream: { label: "لون البوستر", kind: "color", role: "bg", def: "#f1ebde" },
+  red: { label: "اللون المميز", kind: "color", role: "accent", def: "#e2321f" },
+  ink: { label: "لون الكلام", kind: "color", role: "ink", def: "#121212" },
+  wall: { label: "الحيطة", kind: "color", role: "dark", def: "#2a2a2c" },
+});
+const B = .5, CREAM = PR.cream, RED = PR.red, INK = PR.ink, WALL = PR.wall;
+const BIG = String(PR.big).trim(), BAR = M.isAr(BIG), UNITS = (BAR ? BIG.split(/\s+/) : [...BIG.replace(/\s+/g, "")]).slice(0, 6);
+const INFO = PR.info.slice(0, 3).map((l) => String(l).split("|").map((z) => z.trim()));
+const SEATS = parseInt(PR.seats, 10) || 0, TOTAL = Math.max(1, parseInt(PR.total, 10) || 1);
+const PX = 660, PY = 120, PW = 600, PH = 840;   // the poster
+M.reel({
+  W: 1920, H: 1080, DUR: 15, bg: WALL,
+  fonts: { AB: "archivoblack.ttf" },
+  init(M) { const c = M.canvas(1920, 1080); return { x: c.getContext("2d") }; },
+  seek(t, P, M) {
+    const { x } = P, { seg, lerp, expo, expoIn, expoIO, spring, springO, clamp, hash } = M;
+    const beat = Math.floor(t / B), bt = t - beat * B, pulse = 1 - spring(bt, 16);
+    x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = WALL; x.fillRect(0, 0, 1920, 1080);
+    const z = 1 + .03 * ((t % 2) / 2); x.translate(960, 540); x.scale(z, z); x.translate(-960, -540);
+    const T = (s, px, X, Y, col, al = "left", maxW = 1800) => { s = String(s ?? ""); px = M.fit(s, "AB", maxW, px, 12); x.font = `400 ${px}px AB`; x.fillStyle = col; x.textAlign = al; x.direction = M.isAr(s) ? "rtl" : "ltr"; if (M.isAr(s) && al === "left") { x.textAlign = "right"; X += maxW < 1800 ? maxW : 0; } x.textBaseline = "alphabetic"; x.fillText(s, X, Y); x.direction = "ltr"; };
+    // module grid of the poster: 3×4 cells, each (dx, dy, rot) offset when breaking out
+    const fly = (i) => {
+      const a = expoIO(seg(t, 10 + (i % 4) * .25, 10.5 + (i % 4) * .25)) * .25;   // 10–12: start to slide
+      const b = t >= 12 ? expoIO(seg(t, 12 + Math.floor(i / 3) * B, 12.35 + Math.floor(i / 3) * B)) : 0;   // 12–14: fly out, a row per beat
+      const back = expoIO(seg(t, 14.6, 14.95));
+      const k = (a + b * .75) * (1 - back);
+      return [(hash(i) - .5) * 1700 * k, (hash(i + 5) - .5) * 900 * k, (hash(i + 9) - .5) * 1.4 * k];
+    };
+    // 6–8: peel (the poster turns in 3D around its left edge), 8–10 shows the back
+    const peel = expoIO(seg(t, 6, 7.2)) * (1 - expoIO(seg(t, 9.6, 10.1)));
+    const sx = Math.cos(peel * Math.PI), back = sx < 0;
+    // frame on the wall
+    x.strokeStyle = "#c9b98f"; x.lineWidth = 18; x.strokeRect(PX - 30, PY - 30, PW + 60, PH + 60);
+    x.save(); x.translate(PX, 540); x.transform(Math.abs(sx), -.18 * Math.sin(peel * Math.PI) * (back ? -1 : 1), 0, 1, 0, 0); if (back) x.translate(-PW, 0); x.translate(-PX, -540);
+    if (!back) {
+      // the front: cream ground, red circle, giant letters, small type — drawn per module so it can break apart
+      for (let i = 0; i < 12; i++) {
+        const c = i % 3, r = Math.floor(i / 3), cw = PW / 3, ch = PH / 4;
+        const [dx, dy, dr] = fly(i);
+        x.save(); x.translate(PX + c * cw + cw / 2 + dx, PY + r * ch + ch / 2 + dy); x.rotate(dr); x.translate(-(PX + c * cw + cw / 2), -(PY + r * ch + ch / 2));
+        x.beginPath(); x.rect(PX + c * cw, PY + r * ch, cw, ch); x.clip();
+        x.fillStyle = CREAM; x.fillRect(PX + c * cw, PY + r * ch, cw, ch);
+        drawFront(x, t, false);
+        x.restore();
+      }
+    } else {
+      // the back: event info as a UI table that builds itself (8–10)
+      x.fillStyle = INK; x.fillRect(PX, PY, PW, PH);
+      const rows = [...INFO, [PR.seatsLabel, ""]];
+      rows.forEach(([a = "", b2 = ""], i) => { const g = expo(seg(t, 8 + i * .35, 8.3 + i * .35)); x.globalAlpha = g; T(a, 30, PX + 40, PY + 140 + i * 150, RED, "left", PW - 80); if (b2) T(b2, 52, PX + 40, PY + 200 + i * 150, CREAM, "left", PW - 80); x.globalAlpha = 1; });
+      if (PR.seatsLabel) {
+        const seats = Math.round(SEATS * expo(seg(t, 9.1, 9.8)));
+        x.fillStyle = "#333"; x.fillRect(PX + 40, PY + 640, PW - 80, 24); x.fillStyle = RED; x.fillRect(PX + 40, PY + 640, (PW - 80) * Math.min(1, seats / TOTAL), 24);
+        T(`${seats} / ${TOTAL}`, 52, PX + 40, PY + 620, CREAM);
+      }
+    }
+    x.restore();
+    // letters and the circle that have climbed OUT of the frame are drawn on top, unclipped
+    if (!back) drawFront(x, t, true);
+    // end title (14–15)
+    if (t >= 14) { const a = expo(seg(t, 14, 14.2)), o = expoIn(seg(t, 14.45, 14.65)); x.globalAlpha = a * (1 - o); x.fillStyle = WALL; x.fillRect(0, 0, 1920, 1080); T(PR.end1, 200, 960, 470, CREAM, "center", 1700); T(PR.end2, 200, 960, 690, RED, "center", 1700); x.globalAlpha = 1; }
+    function drawFront(x, t, outside) {
+      // the red circle: twitches, then pushes out of the frame and morphs (4–6)
+      const home = expoIO(seg(t, 9.6, 10.2)); const push = expoIO(seg(t, 4, 4.6)) * (1 - home), morph = clamp((t - 4.6) / 1.4) * (1 - home), stage = Math.floor(morph * 3);
+      const ccx = lerp(PX + 380, PX + PW + 180, push), ccy = lerp(PY + 300, PY + 240, push), R = 170 * (1 + .04 * pulse);
+      const circleOut = push > .5;
+      if (outside === circleOut && (t < 6 || t > 9.9)) {
+        x.fillStyle = RED; x.beginPath();
+        const N = 64, sh = (k, u) => { const a = u * 6.283; if (k === 0) return [Math.cos(a), Math.sin(a)]; if (k === 1) { const m = Math.max(Math.abs(Math.cos(a)), Math.abs(Math.sin(a))); return [Math.cos(a) / m * .85, Math.sin(a) / m * .85]; } const r = (Math.floor(u * 16) % 2 ? .45 : 1.05); return [Math.cos(a) * (.45 + .6 * Math.abs(Math.cos(a * 4))), Math.sin(a) * (.45 + .6 * Math.abs(Math.cos(a * 4)))]; };
+        const A = Math.min(2, stage), Bk = Math.min(2, stage + 1), m = expoIO((morph * 3) % 1);
+        for (let i = 0; i <= N; i++) { const u = i / N, p = sh(A, u), q = sh(Bk, u); const X = ccx + lerp(p[0], q[0], m) * R, Y = ccy + lerp(p[1], q[1], m) * R; i ? x.lineTo(X, Y) : x.moveTo(X, Y); }
+        x.fill();
+      }
+      // giant letters B R E A K — they twitch, then climb out over the frame edge one per beat (2–4)
+      const L = UNITS, fs = M.fit(L.join(BAR ? " " : ""), "AB", PW - 80, 150, 40), sp = BAR ? fs * .3 : 0;
+      x.font = `400 ${fs}px AB`;
+      const ws = L.map((u) => x.measureText(u).width), xs = [];
+      let acc = 0; ws.forEach((w) => { xs.push(acc); acc += w + sp; });
+      if (BAR) xs.forEach((v, i) => (xs[i] = (PW - 80) - v - ws[i]));   // العربي من اليمين
+      L.forEach((ch, i) => {
+        const climb = expoIO(seg(t, 2 + i * .4, 2.35 + i * .4)) * (1 - home);
+        const out = climb > .5;
+        if (outside !== out) return;
+        const twitch = t < 2 ? Math.sin(t * 40 + i) * 3 * seg(t, 1, 2) : 0;
+        const bx = PX + 40 + xs[i], by = PY + 760;
+        const ox = [-260, -200, PW + 160, PW + 120, PW + 220, -240][i % 6] - (BAR && i % 6 < 2 ? ws[i] * 1.2 : 0), oy = [-60, 420, -40, 330, 620, 700][i % 6];
+        const X = lerp(bx, PX + ox, climb) + twitch, Y = lerp(by, PY + oy + 300, climb);
+        x.save(); x.translate(X, Y); x.rotate(lerp(0, [-.3, .2, .25, -.15, .1][i], climb)); x.scale(lerp(1, 2.1, climb), lerp(1, 2.1, climb));
+        x.font = `400 ${fs}px AB`; x.fillStyle = i % 2 ? RED : INK; if (out) x.fillStyle = i % 2 ? RED : CREAM; x.textBaseline = "alphabetic"; x.textAlign = "left"; x.direction = BAR ? "rtl" : "ltr"; if (BAR) x.textAlign = "right"; x.fillText(ch, BAR ? ws[i] : 0, 0); x.direction = "ltr"; x.textAlign = "left"; x.restore();
+      });
+      if (!outside) { T(PR.header, 28, PX + 40, PY + 70, INK, "left", 360); T(PR.issue, 28, PX + PW - 40, PY + 70, INK, "right", 160); x.fillStyle = INK; x.fillRect(PX + 40, PY + 90, PW - 80, 4); }
+    }
+  },
+  sound(A) {
+    const m = A.midi;
+    for (let k = 0; k < 30; k++) { const t0 = k * B; A.kick(t0, .8); A.hat(t0 + B / 2, .08); }
+    for (const t0 of [2, 4, 6, 8, 10, 12, 14]) A.hit(t0, .4);
+    for (let i = 0; i < 5; i++) A.whoosh(2 + i * .4, .35, .12);
+    A.nz(4.3, .2, "bandpass", 1500, .3);   // paper tearing as the circle pushes through
+    A.nz(6, 1.2, "highpass", 2000, .1);     // the peel
+    for (let i = 0; i < 4; i++) A.pluck(8 + i * .35, m(67 + i * 3), .1, .3);
+    A.riser(10, 12, .3);
+    for (let i = 0; i < 4; i++) A.nz(12 + i * B, .15, "lowpass", 1200, .35);
+    A.pad(14, [55, 62, 67].map(m), 1, .04);
+  },
+});
+</script></body></html>

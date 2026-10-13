@@ -1,0 +1,144 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// #27 (عنصر: خط زمني) Editorial timeline, any events. One typeface (Inter). The camera travels along one line;
+// each moment has the same rhythm: year lands (hit) → event → why it mattered. Illustrations are drawn in code.
+const PR = M.params({
+  title: { label: "العنوان", kind: "text", def: "75 years of AI" },
+  subtitle: { label: "تحت العنوان", kind: "text", def: "in thirteen moments that changed its course." },
+  events: { label: "المحطات (كل سطر: السنة | الحدث | ليه مهم)", kind: "lines", def: [
+    "1950 | Alan Turing publishes “Computing Machinery and Intelligence” | It reframed “can machines think?” as a test you could actually run.",
+    "1956 | The Dartmouth workshop names the field “artificial intelligence” | AI became a research discipline with a name, a goal and funding.",
+    "1958 | Frank Rosenblatt builds the Perceptron | The first machine that learned from examples instead of rules.",
+    "1986 | Rumelhart, Hinton and Williams popularise backpropagation | Multi-layer networks could finally be trained.",
+    "1997 | IBM's Deep Blue beats Garry Kasparov at chess | A machine beat the world champion under tournament conditions.",
+    "2012 | AlexNet wins the ImageNet challenge | GPUs + data + deep nets: the start of the deep-learning boom.",
+    "2017 | Google researchers introduce the Transformer | “Attention Is All You Need” — the architecture behind today's models.",
+    "2022 | ChatGPT launches to the public | AI went from labs to a hundred million people in about two months.",
+    "2025 | Models see, speak, write code and act as agents | AI is now a tool people use every day — and the questions are bigger."] },
+  ending: { label: "الجملة في الآخر", kind: "text", def: "And it's still being written." },
+  ink: { label: "لون الكلام", kind: "color", role: "ink", def: "#111214" },
+  accent: { label: "اللون المميز", kind: "color", role: "accent", def: "#2f5cff" },
+  bg: { label: "الخلفية", kind: "color", role: "bg", def: "#f4f2ed" },
+});
+const ARTS = ["perceptron", "backprop", "imagenet", "transformer", "chat", "now", "dartmouth", "winter"];
+const MOM = PR.events.slice(0, 14).map((l, i) => { const [y = "", w = "", why = ""] = String(l).split("|").map((z) => z.trim()); return [y, w, why, ARTS[i % ARTS.length]]; });
+if (!MOM.length) MOM.push(["", "", "", "now"]);
+const RTL = M.isAr(PR.title + MOM.map((m) => m[1]).join(""));
+const HOOK = 5, PER = MOM.length > 8 ? 7 : 7.6, SPACE = 1500, INK = PR.ink, PAPER = PR.bg, ACC = PR.accent, MUTE = "#8b8a86";
+const DUR = HOOK + MOM.length * PER + 4.8;
+M.reel({
+  W: 1920, H: 1080, DUR, bg: PAPER,
+  fonts: { I4: ["inter400.ttf", "400"], I6: ["inter600.ttf", "600"], I8: ["inter800.ttf", "800"] },
+  init(M) { const c = M.canvas(1920, 1080); return { x: c.getContext("2d") }; },
+  seek(t, P, M) {
+    const { x } = P, { seg, lerp, expo, expoIO, spring, clamp } = M;
+    x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = PAPER; x.fillRect(0, 0, 1920, 1080);
+    const LY = 640;   // the timeline
+    // camera x: travels from moment to moment in the last 1.4 s of each slot
+    const slot = (t - HOOK) / PER, i0 = Math.floor(slot), f = slot - i0;
+    let camX;
+    if (t < HOOK) camX = lerp(-1400, 0, expoIO(seg(t, 3.2, HOOK)));
+    else { const move = expoIO(seg(f, 1 - 1.4 / PER, 1)); camX = (Math.min(i0, MOM.length - 1) + (i0 < MOM.length - 1 ? move : 0)) * SPACE; }
+    const toS = (wx) => wx - camX + (RTL ? 1360 : 560);
+    // the line itself, with decade ticks
+    x.strokeStyle = INK; x.lineWidth = 3; x.beginPath(); x.moveTo(0, LY); x.lineTo(1920, LY); x.stroke();
+    x.fillStyle = MUTE;   // شرط صغيرة بين كل محطة والتانية
+    for (let k = -2; k < MOM.length * 6 + 6; k++) { const sx = toS(k * SPACE / 6); if (sx < -50 || sx > 1970) continue; const big = k % 6 === 0; x.fillRect(sx - 1, LY - (big ? 18 : 8), 2, big ? 36 : 16); }
+    // ---- hook
+    if (t < HOOK + .5) {
+      const a = 1 - expoIO(seg(t, 3.2, 4.4));
+      x.globalAlpha = a;
+      x.fillStyle = INK; x.font = `800 ${M.fit(PR.title, "I8", 1600, 120, 40, "800")}px I8`; side(x, PR.title, 160, 330 - (1 - expo(seg(t, .2, .8))) * 40, 1600);
+      x.fillStyle = MUTE; x.font = `400 ${M.fit(PR.subtitle, "I4", 1600, 44, 20, "400")}px I4`; side(x, PR.subtitle, 166, 420 - (1 - expo(seg(t, .9, 1.5))) * 30, 1600);
+      x.globalAlpha = 1;
+    }
+    // ---- moments
+    MOM.forEach(([year, what, why, art], i) => {
+      const wx = i * SPACE, sx = toS(wx);
+      if (sx < -900 || sx > 2600) return;
+      const t0 = HOOK + i * PER;
+      const yIn = expo(seg(t, t0 - .2, t0 + .35)), eIn = expo(seg(t, t0 + .9, t0 + 1.5)), wIn = expo(seg(t, t0 + 2.2, t0 + 2.8));
+      const past = t > t0 + PER - .2;
+      // marker on the line
+      x.fillStyle = past ? INK : ACC; x.beginPath(); x.arc(sx, LY, 12 * spring(t - t0 + .2, 14), 0, 7); x.fill();
+      // year
+      x.save(); x.beginPath(); x.rect(RTL ? sx - 880 : sx - 20, 380, 900, 200); x.clip();
+      x.fillStyle = past ? MUTE : INK; x.font = `800 ${M.fit(year, "I8", 860, 190, 50, "800")}px I8`; side(x, year, sx - 12, 560 + (1 - yIn) * 200, 860, sx + 16);
+      x.restore();
+      // event + why
+      x.globalAlpha = eIn; x.fillStyle = INK; x.font = "600 46px I6";
+      wrap(x, what, sx, 740 + (1 - eIn) * 30, 820, 58, sx + 16);
+      x.globalAlpha = wIn; x.fillStyle = ACC; x.font = "400 34px I4";
+      wrap(x, why, sx, 890 + (1 - wIn) * 24, 820, 44, sx + 16);
+      x.globalAlpha = 1;
+      // illustration, top right of the moment
+      drawArt(x, M, art, RTL ? sx - 1000 : sx + 1000, 300, t - t0);
+    });
+    // ---- end: pull back to see the whole line
+    const end = HOOK + MOM.length * PER;
+    if (t > end - .4) {
+      const k = expoIO(seg(t, end - .2, end + 1.6));
+      x.fillStyle = PAPER; x.globalAlpha = k; x.fillRect(0, 0, 1920, 1080); x.globalAlpha = 1;
+      // whole timeline, compressed
+      x.strokeStyle = INK; x.lineWidth = 3; x.beginPath(); x.moveTo(160, 600); x.lineTo(160 + 1600 * k, 600); x.stroke();
+      MOM.forEach(([year], i) => {
+        const px = 160 + (MOM.length > 1 ? i / (MOM.length - 1) : .5) * 1600, a = expo(seg(t, end + .3 + i * .1, end + .6 + i * .1));
+        x.globalAlpha = a; x.fillStyle = i === MOM.length - 1 ? ACC : INK; x.beginPath(); x.arc(px, 600, 9, 0, 7); x.fill();
+        x.font = `600 ${M.fit(year, "I6", 1500 / MOM.length, 22, 10, "600")}px I6`; x.textAlign = "center"; x.direction = M.isAr(year) ? "rtl" : "ltr"; x.fillText(year + "", px, i % 2 ? 650 : 570); x.textAlign = "left"; x.direction = "ltr"; x.globalAlpha = 1;
+      });
+      const fin = expo(seg(t, end + 2, end + 2.6));
+      x.globalAlpha = fin; x.fillStyle = INK; x.font = `800 ${M.fit(PR.ending, "I8", 1600, 90, 30, "800")}px I8`; side(x, PR.ending, 160, 400, 1600); x.globalAlpha = 1;
+    }
+  },
+  sound(A) {
+    const m = A.midi, end = HOOK + MOM.length * PER;
+    // music builds toward the present: pad layers + a pulse that gets busier each era
+    for (let i = 0; i < MOM.length; i++) {
+      const t0 = HOOK + i * PER;
+      A.kick(t0, .7); A.nz(t0, .3, "lowpass", 2400, .25);   // the year lands
+      A.tone(t0 + .9, m(76 + (i % 3) * 2), .4, "sine", .04);
+      const chord = [[45, 52, 57, 60], [41, 48, 53, 57], [43, 50, 55, 59], [40, 47, 52, 55]][i % 4];
+      A.pad(t0, chord.map(m), PER + .3, .02 + i * .002);
+      const pulse = i < 4 ? 0 : i < 8 ? 2 : 4;
+      for (let k = 0; k < PER * pulse; k++) A.hat(t0 + k / pulse + .2, .03 + i * .003);
+      if (i >= 7) for (let k = 0; k < PER * 2; k++) A.bass(t0 + k * .5, m(chord[0] - 12), .3, .08);
+    }
+    A.pad(0, [m(45), m(52)], HOOK, .03);
+    A.pad(end, [m(45), m(52), m(57), m(61), m(64)], 5, .04); A.hit(end, .4);
+  },
+});
+// كلام من الشمال للإنجليزي، ومن اليمين (آخر المساحة) للعربي
+function side(x, s, px, py, maxW, rx) {   // rx: الحافة اليمين للعربي (لو مش محددة: آخر المساحة)
+  s = String(s || ""); const ar = M.isAr(s);
+  x.direction = ar ? "rtl" : "ltr"; x.textAlign = ar ? "right" : "left"; x.fillText(s, ar ? (rx ?? px + maxW) : px, py);
+  x.direction = "ltr"; x.textAlign = "left";
+}
+function wrap(x, s, px, py, maxW, lh, rx) {
+  const words = String(s || "").split(" "); let line = "", y = py;
+  for (const w of words) { const test = line ? line + " " + w : w; if (x.measureText(test).width > maxW && line) { side(x, line, px, y, maxW, rx); line = w; y += lh; } else line = test; }
+  if (line) side(x, line, px, y, maxW, rx);
+}
+// small code-drawn illustrations, one per moment (black, white, one blue)
+function drawArt(x, M, art, cx, cy, lt) {
+  const g = M.expo(M.seg(lt, 1.1, 2)); if (g <= 0) return;
+  x.save(); x.translate(cx, cy); x.globalAlpha = g; x.lineWidth = 6; x.strokeStyle = INK; x.fillStyle = INK; x.lineCap = "round"; x.lineJoin = "round";
+  const S = (k) => x.scale(k, k);
+  S(.9 + .1 * g);
+  const A = { "turing": () => { x.strokeRect(-140, -90, 120, 180); x.strokeRect(20, -90, 120, 180); x.font = "800 90px I8"; x.textAlign = "center"; x.fillText("?", -80, 30); x.fillStyle = ACC; x.fillText("?", 80, 30); },
+    "dartmouth": () => { for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; x.beginPath(); x.arc(Math.cos(a) * 110, Math.sin(a) * 70, 22, 0, 7); x.fill(); } x.fillStyle = ACC; x.fillRect(-60, -10, 120, 20); },
+    "perceptron": () => { const ins = [-90, -30, 30, 90]; ins.forEach((y) => { x.beginPath(); x.arc(-140, y, 16, 0, 7); x.fill(); x.beginPath(); x.moveTo(-124, y); x.lineTo(80, 0); x.stroke(); }); x.fillStyle = ACC; x.beginPath(); x.arc(100, 0, 30, 0, 7); x.fill(); },
+    "eliza": () => { x.strokeRect(-150, -80, 300, 160); x.font = "600 26px I6"; x.fillText("> HOW DO YOU FEEL?", -130, -30); x.fillStyle = ACC; x.fillText("> tell me more…", -130, 20); },
+    "winter": () => { for (let i = 0; i < 3; i++) { x.save(); x.rotate(i * Math.PI / 3); x.beginPath(); x.moveTo(-110, 0); x.lineTo(110, 0); x.stroke(); x.restore(); } x.strokeStyle = ACC; x.beginPath(); x.arc(0, 0, 40, 0, 7); x.stroke(); },
+    "backprop": () => { const L = [[-130, [-70, 0, 70]], [0, [-90, -30, 30, 90]], [130, [-30, 30]]]; L.forEach(([lx, ys], li) => ys.forEach((y) => { if (li < 2) L[li + 1][1].forEach((y2) => { x.beginPath(); x.moveTo(lx, y); x.lineTo(L[li + 1][0], y2); x.globalAlpha = .3 * g; x.stroke(); x.globalAlpha = g; }); x.beginPath(); x.arc(lx, y, 14, 0, 7); x.fill(); })); const k = (lt * .8) % 1; x.fillStyle = ACC; x.beginPath(); x.arc(130 - k * 260, 0, 12, 0, 7); x.fill(); },
+    "chess": () => { for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) if ((r + c) % 2) x.fillRect(-120 + c * 60, -120 + r * 60, 60, 60); x.strokeRect(-120, -120, 240, 240); x.fillStyle = ACC; x.beginPath(); x.arc(30, -30, 18, 0, 7); x.fill(); x.fillRect(16, -14, 28, 40); },
+    "imagenet": () => { for (let r = 0; r < 4; r++) for (let c = 0; c < 5; c++) { x.fillStyle = (r * 5 + c) % 7 === 3 ? ACC : INK; x.globalAlpha = g * (.3 + .7 * M.hash(r * 9 + c)); x.fillRect(-150 + c * 62, -120 + r * 62, 54, 54); } },
+    "go": () => { x.lineWidth = 2; for (let k = 0; k < 7; k++) { x.beginPath(); x.moveTo(-120, -120 + k * 40); x.lineTo(120, -120 + k * 40); x.moveTo(-120 + k * 40, -120); x.lineTo(-120 + k * 40, 120); x.stroke(); } [[0, 0, 1], [40, 0, 0], [0, 40, 0], [-40, -40, 1], [40, -40, 1], [80, 40, 0]].forEach(([px, py, w]) => { x.fillStyle = w ? INK : "#fff"; x.beginPath(); x.arc(px, py, 17, 0, 7); x.fill(); x.lineWidth = 2; x.stroke(); }); x.strokeStyle = ACC; x.lineWidth = 5; x.beginPath(); x.arc(-40, 40, 22, 0, 7); x.stroke(); },
+    "transformer": () => { const words = 5; for (let a = 0; a < words; a++) for (let b = 0; b < words; b++) { x.globalAlpha = g * M.hash(a * 5 + b) * (a === 2 ? 1 : .5); x.strokeStyle = a === 2 ? ACC : INK; x.lineWidth = 3; x.beginPath(); x.moveTo(-120 + a * 60, -80); x.quadraticCurveTo(0, 0, -120 + b * 60, 80); x.stroke(); } x.globalAlpha = g; for (let a = 0; a < words; a++) { x.fillStyle = INK; x.fillRect(-135 + a * 60, -110, 30, 30); x.fillRect(-135 + a * 60, 80, 30, 30); } },
+    "gpt3": () => { x.font = "800 120px I8"; x.textAlign = "center"; x.fillText("175B", 0, 40); x.fillStyle = ACC; x.font = "600 30px I6"; x.fillText("parameters", 0, 90); },
+    "chat": () => { x.beginPath(); x.roundRect(-150, -100, 230, 80, 30); x.stroke(); x.fillStyle = ACC; x.beginPath(); x.roundRect(-60, 10, 220, 80, 30); x.fill(); },
+    "now": () => { ["eye", "mouth", "code", "hand"].forEach((k, i) => { const a = i / 4 * Math.PI * 2 + lt * .4; x.fillStyle = i === 0 ? ACC : INK; x.beginPath(); x.arc(Math.cos(a) * 100, Math.sin(a) * 100, 24, 0, 7); x.fill(); }); x.beginPath(); x.arc(0, 0, 40, 0, 7); x.stroke(); },
+  };
+  (A[art] || (() => {}))();
+  x.restore();
+}
+</script></body></html>

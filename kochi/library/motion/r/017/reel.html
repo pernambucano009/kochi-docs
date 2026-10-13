@@ -1,0 +1,192 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// #17 (عنصر: شرح البراند في ٣٠ ثانية) Animated business explainer, Arabic copy, every line editable. 30 s, 120 BPM, 5 scenes × 6 s.
+// Through-line: the red ring (the O of the logo). Problem → what we do → 3 steps → proof → name.
+const PR = M.params({
+  prob1: { label: "المشكلة (السطر الأول)", kind: "text", def: "كل يوم محتاج" },
+  prob1hl: { label: "الكلمة الملوّنة", kind: "text", def: "فيديو" },
+  prob2: { label: "المشكلة (السطر التاني)", kind: "text", def: "والمونتير" },
+  prob2hl: { label: "آخر السطر (ملوّن)", kind: "text", def: "مش فاضي." },
+  name: { label: "اسم البراند", kind: "text", role: "brand", def: "ستوديومانيا" },
+  what: { label: "بيعمل إيه", kind: "text", role: "about", def: "بيعمل فيديوهات البراند بتاعك" },
+  what2: { label: "وبعدها (ملوّن)", kind: "text", def: "من الفكرة لحد النشر." },
+  stepsTitle: { label: "عنوان الخطوات", kind: "text", def: "٣ خطوات بس" },
+  steps: { label: "الخطوات (٣، كل واحدة في سطر)", kind: "lines", def: ["اكتب فكرتك", "اختار الستايل", "استلم الفيديو"] },
+  kindsTitle: { label: "عنوان المميزات", kind: "text", def: "أنواع شغل" },
+  kindsTitle2: { label: "وبعده", kind: "text", def: "في مكان واحد." },
+  kinds: { label: "المميزات أو الخدمات (لحد ٨، كل واحدة في سطر)", kind: "lines", def: ["ريلز", "فيلم", "مسلسل", "كاروسيل", "إعلان", "تايبوجرافي", "دبلجة", "مونتاج"] },
+  logo: { label: "اللوجو", kind: "image", role: "logo", def: "" },
+  tagline: { label: "الجملة تحت الاسم", kind: "text", role: "tagline", def: "استوديو المحتوى والفيديو" },
+  cta: { label: "الدعوة (CTA)", kind: "text", role: "cta", def: "ابدأ أول فيديو النهارده" },
+  ink: { label: "لون الكلام", kind: "color", role: "ink", def: "#121214" },
+  accent: { label: "اللون المميز", kind: "color", role: "accent", def: "#e8402f" },
+  bg: { label: "الخلفية", kind: "color", role: "bg", def: "#ffffff" },
+});
+const B = .5, INK = PR.ink, PAPER = PR.bg, RED = PR.accent, GREY = "#8a8a90";
+const AD = (n) => String(n).replace(/[0-9]/g, (d) => "٠١٢٣٤٥٦٧٨٩"[d]);
+const AR = "800 1px AX", F = (px, fam = "AX", wt = 800) => `${wt} ${px}px ${fam}`;
+M.reel({
+  W: 1920, H: 1080, DUR: 30, bg: PAPER,
+  fonts: { AX: ["TY-Alexandria-800.ttf", "800"], AM: ["TY-Alexandria-500.ttf", "500"], JO: "Jost.ttf" },
+  async init(M) {
+    const cam = M.el("div", "", "position:absolute;left:0;top:0;width:1920px;height:1080px;transform-origin:960px 540px;");
+    const w = (txt, px, col = INK, fam = "AX", wt = 800, maxW = 1640) => {
+      txt = String(txt || ""); px = M.fit(txt, fam, maxW, px, 24, String(wt));
+      const box = M.el("div", "", `position:absolute;left:0;top:0;overflow:hidden;height:${px * 1.5}px;direction:rtl;`, "", cam);
+      const s = M.el("div", "", `position:absolute;right:0;top:${px * .12}px;font:${F(px, fam, wt)};color:${col};white-space:pre;line-height:1.2;`, txt, box);
+      const width = M.measure(txt, F(px, fam, wt)) + 8;
+      box.style.width = width + "px";
+      return { box, s, w: width, h: px * 1.5, px };
+    };
+    // scene 1: words + a pile of video cards
+    const s1 = [w(PR.prob1, 150), w("", 150), w(PR.prob1hl, 150, RED)];
+    const cards = Array.from({ length: 7 }, (_, i) => {
+      const c = M.el("div", "", `position:absolute;left:0;top:0;width:220px;height:390px;border-radius:26px;background:${INK};`, "", cam);
+      M.el("div", "", `position:absolute;left:50%;top:50%;width:0;height:0;margin:-26px 0 0 -14px;border-left:44px solid ${PAPER};border-top:26px solid transparent;border-bottom:26px solid transparent;`, "", c);
+      return c;
+    });
+    const s1b = [w(PR.prob2, 130, INK, "AX", 800, 800), w(PR.prob2hl, 130, RED, "AX", 800, 800)];
+    // the ring
+    const ringSvg = M.svg("svg", { width: 1920, height: 1080, style: "position:absolute;left:0;top:0;overflow:visible" }); cam.appendChild(ringSvg);
+    const ring = M.svg("circle", { cx: 0, cy: 0, r: 100, fill: "none", stroke: RED, "stroke-width": 40 }, ringSvg);
+    const ringNum = M.el("div", "", `position:absolute;left:0;top:0;width:200px;text-align:center;font:${F(110)};color:${INK};line-height:1;`, "", cam);
+    // scene 2
+    const s2 = [w(PR.name, 140), w(PR.what, 78, INK, "AM", 500), w(PR.what2, 78, RED, "AM", 500)];
+    // scene 3: three steps
+    const steps = [0, 1, 2].map((i) => w(PR.steps[i] || "", 54, INK, "AX", 800, 470));
+    const stepRings = [0, 1, 2].map(() => M.svg("circle", { cx: 0, cy: 0, r: 70, fill: "none", stroke: INK, "stroke-width": 10 }, ringSvg));
+    const stepNums = ["١", "٢", "٣"].map((n) => M.el("div", "", `position:absolute;left:0;top:0;width:140px;text-align:center;font:${F(80)};color:${INK};line-height:1;`, n, cam));
+    const s3title = w(PR.stepsTitle, 64, GREY, "AM", 500, 1200);
+    // scene 4: proof — eight kinds of work in one place
+    const KINDS = PR.kinds.slice(0, 8);
+    const tiles = KINDS.map((k) => { const t = M.el("div", "", `position:absolute;left:0;top:0;width:250px;height:150px;border-radius:24px;background:#f2f2f3;display:grid;place-items:center;text-align:center;padding:0 14px;box-sizing:border-box;font:${F(M.fit(k, "AM", 220, 46, 22, "500"), "AM", 500)};color:${INK};direction:rtl;`, k, cam); return t; });
+    const bigN = M.el("div", "", `position:absolute;left:0;top:0;font:${F(330)};color:${RED};line-height:1;width:300px;text-align:center;`, "", cam);
+    const s4 = [w(PR.kindsTitle, 96, INK, "AX", 800, 700), w(PR.kindsTitle2, 96, GREY, "AX", 800, 700)];
+    // scene 5: logo
+    // اللوجو: الصورة لو موجودة، وإلا اسم البراند
+    const img = await M.img(PR.logo);
+    let logo, LW, LH;
+    if (img) {
+      const k = Math.min(1100 / img.width, 300 / img.height); LW = img.width * k; LH = img.height * k;
+      logo = M.el("img", "", `position:absolute;left:0;top:0;width:${LW}px;height:${LH}px;`, null, cam); logo.src = img.src;
+    } else {
+      const nm = String(PR.name || ""), ar = M.isAr(nm), fam = ar ? "AX" : "JO", wt = ar ? 800 : 400, px = M.fit(nm, fam, 1400, 150, 40, String(wt));
+      LW = M.measure(nm, `${wt} ${px}px ${fam}`) * (ar ? 1 : 1.24) + 10; LH = px * 1.3;
+      logo = M.el("div", "", `position:absolute;left:0;top:0;width:${LW}px;font:${wt} ${px}px ${fam};letter-spacing:${ar ? 0 : .24}em;color:${INK};white-space:pre;line-height:${LH}px;text-align:center;direction:${ar ? "rtl" : "ltr"};`, nm, cam);
+    }
+    const tag = w(PR.tagline, 64, GREY, "AM", 500, 1500);
+    const cta = w(PR.cta, 64, RED, "AM", 500, 1500);
+    return { cam, s1, cards, s1b, ring, ringNum, s2, steps, stepRings, stepNums, s3title, tiles, bigN, s4, logo, LW, LH, tag, cta, nK: KINDS.length };
+  },
+  seek(t, P, M) {
+    const { seg, lerp, expo, expoIn, expoIO, spring, springO, clamp } = M;
+    // camera: never still — push 1.00 → 1.04 inside every scene, each scene starts where the last ended
+    const sc = Math.floor(t / 6), local = (t % 6) / 6;
+    const z = 1 + .04 * M.sine(local);
+    P.cam.style.transform = `scale(${z})`;
+    // word helper: rise in through its mask, drop out
+    const word = (o, x, y, tin, tout = 99) => {
+      const vis = t >= tin - .01 && t < tout + .3;
+      M.show(o.box, vis);
+      if (!vis) return;
+      const i = expo(seg(t, tin, tin + .32)), u = expoIn(seg(t, tout, tout + .25));
+      M.X(o.box, x - o.w, y);
+      M.X(o.s, 0, (1 - i) * o.h - u * o.h);
+    };
+    // ---------- 1 · the problem (0–6)
+    word(P.s1[0], 1720, 250, 0, 3.75); word(P.s1[2], 1720, 470, 1, 3.75);
+    P.cards.forEach((c, i) => {
+      const tin = 1.5 + i * .3;   // stacking on the beat (two per beat after the first)
+      const vis = t >= tin && t < 6;
+      M.show(c, vis); if (!vis) return;
+      const k = spring(t - tin, 15);
+      const rx = 50 + M.hash(i * 3.1) * 290, ry = 250 + M.hash(i * 7.7 + 2) * 330, rot = (M.hash(i * 5.3 + 9) - .5) * 34;
+      const gather = expoIO(seg(t, 5.4, 5.95));
+      const x = lerp(lerp(rx, rx + 180, 1 - k), 960 - 110, gather), y = lerp(lerp(ry + 400, ry, k), 540 - 195, gather);
+      const s = lerp(1, .2, gather);
+      c.style.borderRadius = lerp(26, 200, gather) + "px";
+      c.style.background = gather > .5 ? RED : INK;
+      M.X(c, x, y, s, s, rot * (1 - gather));
+    });
+    word(P.s1b[0], 1720, 640, 4, 5.15); word(P.s1b[1], P.s1b[0].w + P.s1b[1].w + 40 > 1500 ? 1720 : 1720 - P.s1b[0].w - 40, P.s1b[0].w + P.s1b[1].w + 40 > 1500 ? 820 : 640, 4.5, 5.15);
+
+    // ---------- the ring: born from the pile at 6, travels through every scene
+    let rx = 960, ry = 540, rr = 0, rw = 40, ringOn = t >= 5.9 && t < 30;
+    if (t < 12) { const g = spring(t - 5.9, 12); rr = lerp(30, 150, g); rx = lerp(960, 400, expoIO(seg(t, 6.3, 6.8))); rr += 8 * (1 - spring((t - 6) % B, 20)) * (t > 6.4 ? 1 : 0); }
+    // 3 · steps: the ring hops to each step on its beat
+    const stepX = [1480, 960, 440], stepY = 470;
+    if (t >= 11.5 && t < 18) {
+      const k = clamp(Math.floor((t - 12.5) / 2), -1, 2);
+      const from = k <= 0 ? [400, 540, 150] : [stepX[k - 1], stepY, 92];
+      const toI = Math.max(0, k);
+      const hop = k < 0 ? expoIO(seg(t, 11.5, 12.4)) : expoIO(seg(t, 12.5 + k * 2 - .35, 12.5 + k * 2));
+      const to = [stepX[toI], stepY, 92];
+      const f = k < 0 ? [400, 540, 150] : from;
+      rx = lerp(f[0], to[0], hop); ry = lerp(f[1], to[1], hop) - Math.sin(hop * Math.PI) * 120; rr = lerp(f[2], to[2], hop); rw = lerp(40, 22, expo(seg(t, 11.5, 12)));
+    }
+    // 4 · proof: the ring becomes the big number's halo, then sweeps into the grid
+    if (t >= 18 && t < 24) { const k = expoIO(seg(t, 18, 18.5)); rx = lerp(stepX[2], 380, k); ry = lerp(stepY, 560, k); rr = lerp(92, 220, k); rw = lerp(22, 30, k); }
+    // 5 · the logo's O
+    if (t >= 24) {   // الحلقة بتبقى نقطة مميزة تحت الاسم
+      const k = expoIO(seg(t, 23.6, 24.4));
+      rx = lerp(380, 960, k); ry = lerp(560, 470 + P.LH / 2 + 34, k); rr = lerp(220, 7, k); rw = lerp(30, 14, k);
+    }
+    M.show(P.ring, ringOn);
+    P.ring.setAttribute("cx", rx); P.ring.setAttribute("cy", ry); P.ring.setAttribute("r", Math.max(1, rr)); P.ring.setAttribute("stroke-width", rw);
+
+    // ---------- 2 · what we do (6–12)
+    word(P.s2[0], 1720, 300, 6.5, 11.4); word(P.s2[1], 1720, 520, 7.5, 11.4); word(P.s2[2], 1720, 640, 9, 11.4);
+
+    // ---------- 3 · how it works (12–18)
+    word(P.s3title, 1720 - 220, 200, 12, 17.4);
+    P.steps.forEach((s, i) => {
+      const tin = 12.5 + i * 2;
+      word(s, stepX[i] + s.w / 2, 600, tin, 17.4);
+      const on = t >= tin - .3 && t < 18;
+      M.show(P.stepRings[i], on); M.show(P.stepNums[i], on);
+      if (!on) return;
+      const g = spring(t - tin + .3, 14) * (1 - expoIO(seg(t, 17.5, 18)));
+      P.stepRings[i].setAttribute("cx", stepX[i]); P.stepRings[i].setAttribute("cy", stepY); P.stepRings[i].setAttribute("r", Math.max(1, 70 * g));
+      P.stepRings[i].setAttribute("stroke", t > tin ? INK : "#d6d6d8");
+      M.X(P.stepNums[i], stepX[i] - 70, stepY - 58 + (1 - g) * 40); P.stepNums[i].style.opacity = g;
+    });
+
+    // ---------- 4 · proof (18–24): eight kinds, one per beat
+    const n = clamp(Math.floor((t - 18.5) / B) + 1, 0, P.nK);
+    M.show(P.bigN, t >= 18.3 && t < 23.6);
+    P.bigN.textContent = AD(Math.max(1, n));
+    M.X(P.bigN, 380 - 150, 560 - 190, 1 + .08 * (1 - spring((t - 18.5) % B, 20)));
+    word(P.s4[0], 1720, 170, 19, 23.4); word(P.s4[1], 1720 - P.s4[0].w - 30, 170, 19.5, 23.4);
+    P.tiles.forEach((tl, i) => {
+      const tin = 18.5 + i * B, vis = t >= tin && t < 24;
+      M.show(tl, vis); if (!vis) return;
+      const col = i % 4, row = Math.floor(i / 4);
+      const x = 1720 - 250 - col * 270, y = 420 + row * 180;
+      const g = spring(t - tin, 16), out = expoIO(seg(t, 23.4, 23.9));
+      M.X(tl, lerp(x, 380 - 125, out), lerp(y + 60 * (1 - g), 560 - 75, out), lerp(.6 + .4 * g, .1, out));
+      tl.style.opacity = Math.min(1, g * 1.4) * (1 - out);
+      tl.style.background = i === n - 1 && t < 22.6 ? INK : "#f2f2f3"; tl.style.color = i === n - 1 && t < 22.6 ? PAPER : INK;
+    });
+
+    // ---------- 5 · the name (24–30)
+    const lv = t >= 24;
+    M.show(P.logo, lv);
+    if (lv) {
+      const a = expo(seg(t, 24.2, 24.8));
+      M.X(P.logo, 960 - P.LW / 2, 470 - P.LH / 2 + (1 - a) * 60, .9 + .1 * a);
+      P.logo.style.opacity = a;
+    }
+    word(P.tag, 960 + P.tag.w / 2, 640, 25.5); word(P.cta, 960 + P.cta.w / 2, 760, 27);
+  },
+  sound(A) {
+    for (let k = 0; k < 60; k++) { const t0 = k * B; A.kick(t0, .8); A.hat(t0 + B / 2, .09); if (k % 4 === 2) A.clap(t0, .18); }
+    for (const t0 of [6, 12, 18, 24]) A.hit(t0, .5);
+    const roots = [45, 41, 36, 43, 45];
+    for (let s = 0; s < 5; s++) for (let k = 0; k < 12; k++) A.bass(s * 6 + k * B, A.midi(roots[s] - 12 + (k % 4 === 3 ? 7 : 0)), .3, .16);
+    for (let k = 0; k < 7; k++) A.tone(1.5 + k * .3, 900 + k * 60, .08, "square", .04);   // cards stacking
+    for (let k = 0; k < 8; k++) A.pluck(18.5 + k * B, A.midi(69 + [0, 2, 4, 7, 9, 12, 14, 16][k]), .1, .3);
+    A.riser(22.5, 24, .3);
+    A.pad(24, [57, 61, 64, 69].map(A.midi), 6, .04);
+  },
+});
+</script></body></html>

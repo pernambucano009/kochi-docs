@@ -1,0 +1,89 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script><script src="sim.js"></script></head><body>
+<script>
+// #226 (عنصر: هوك الكورة والـ ١٢ دايرة) "Can it escape all 12?" — 20 s vertical. A ball with eyes wants OUT of twelve spinning rings.
+// Physics is simulated once (fixed step, seeded), so every frame is a lookup — the film is exactly reproducible.
+// Story: hook (0–1 s) · three escalating fails (it slams the first ring again and again, faster each time) · the turn (a gap lines up, 4.7 s)
+// · a chain of escapes, each ring shattering, music rising · FREE (17.1 s) · gag: the camera pulls back… there's a 13th ring.
+const PR = M.params({
+  hook1: { label: "السؤال (سطر ١)", kind: "text", def: "CAN IT ESCAPE" },
+  hook2: { label: "السؤال (سطر ٢، ملوّن)", kind: "text", def: "ALL 12?" },
+  left: { label: "تحت العدّاد", kind: "text", def: "RINGS LEFT" },
+  tries: { label: "كلمة المحاولة", kind: "text", def: "try" },
+  free: { label: "لما يخرج", kind: "text", def: "FREE!" },
+  gag: { label: "الإفيه في الآخر", kind: "text", def: "…oh no." },
+  accent: { label: "لون السؤال", kind: "color", role: "accent", def: "#ffcf3a" },
+});
+const W = 1080, H = 1920;
+const SIM = simulate({ e: 1.04, GAP: .55, v0: [260, 50], hold: 1.2, T: 20 });
+const PASS = SIM.events.filter((e) => e[0] === "pass").map((e) => e[1]);
+const HITS = SIM.events.filter((e) => e[0] === "hit");
+const FREE = (SIM.events.find((e) => e[0] === "free") || [0, 17.1])[1];
+const R0 = 70, DR = 30, GAP = .55;
+const ang = (i, t) => i * 1.3 + (i % 2 ? -1 : 1) * (.9 + i * .12) * t;
+M.reel({
+  W, H, DUR: 20, bg: "#111018",
+  fonts: { AN: "anton.ttf", I8: ["inter800.ttf", "800"] },
+  init(M) { const c = M.canvas(W, H); return { x: c.getContext("2d") }; },
+  seek(t, P, M) {
+    const { x } = P, { seg, lerp, clamp, expo, expoIO, spring, hash } = M;
+    const tq = Math.min(t, FREE);   // once free, the ball coasts to a stop just outside the last ring
+    const i = Math.min(SIM.samples.length - 2, Math.floor(tq / SIM.dt)), f = tq / SIM.dt - i;
+    const a = SIM.samples[i], b = SIM.samples[i + 1];
+    let bx = lerp(a[0], b[0], f), by = lerp(a[1], b[1], f); const k = t >= FREE ? 12 : a[2];
+    if (t > FREE) { const d = Math.hypot(bx, by), out = 90 * expo(seg(t, FREE, FREE + .7)); bx += bx / d * out; by += by / d * out; }
+    const free = t >= FREE;
+    // mood: dark and tense while trapped, brighter as rings fall, white light when free
+    const prog = k / 12;
+    x.setTransform(1, 0, 0, 1, 0, 0);
+    x.fillStyle = free ? "#f4f1ea" : `hsl(${250 - prog * 200}, ${30 + prog * 30}%, ${8 + prog * 10}%)`; x.fillRect(0, 0, W, H);
+    // camera: holds on the rings; after FREE it pulls back to reveal the 13th ring
+    const pull = expoIO(seg(t, FREE + 1.0, FREE + 2.3));
+    const zoom = lerp(1.25, .42, pull);
+    x.translate(W / 2, H / 2 + 60); x.scale(zoom, zoom);
+    // rings: intact ones spin with their gap; passed ones shatter outward
+    for (let r = 0; r < 12; r++) {
+      const R = R0 + r * DR, hue = 330 - r * 22;
+      const passed = PASS[r] !== undefined && t >= PASS[r];
+      if (!passed) {
+        const a0 = ang(r, Math.max(t, 1.2)) + GAP / 2;
+        x.strokeStyle = `hsl(${hue}, 85%, 62%)`; x.lineWidth = 9; x.lineCap = "round";
+        x.beginPath(); x.arc(0, 0, R, a0, a0 + Math.PI * 2 - GAP); x.stroke();
+      } else {
+        const s = t - PASS[r];
+        if (s < 1.6) for (let q = 0; q < 14; q++) { const qa = ang(r, PASS[r]) + q / 14 * Math.PI * 2, d = R + s * (380 + hash(q + r) * 300), fall = 500 * s * s; x.save(); x.translate(Math.cos(qa) * d, Math.sin(qa) * d + fall); x.rotate(qa + s * 6); x.strokeStyle = `hsla(${hue}, 85%, 62%, ${1 - s / 1.6})`; x.lineWidth = 9; x.beginPath(); x.arc(-R, 0, R, -.2, .2); x.stroke(); x.restore(); }
+      }
+    }
+    // the 13th ring (gag) — huge, dark, slowly turning; it was always there, just out of frame
+    if (t > FREE + .9) { x.strokeStyle = "#1a1a24"; x.lineWidth = 22; const a0 = t * .3; x.beginPath(); x.arc(0, 0, 1080, a0, a0 + Math.PI * 2 - .3); x.stroke(); }
+    // the ball: squash on each hit, eyes look toward the nearest gap first (the eyes lead)
+    const lastHit = HITS.filter((h) => h[1] <= t).pop(), since = lastHit ? t - lastHit[1] : 9;
+    const sq = .3 * Math.exp(-since * 14);
+    const dirA = Math.atan2(by, bx);
+    x.save(); x.translate(bx, by); x.rotate(dirA); x.scale(1 - sq, 1 + sq); x.rotate(-dirA);
+    x.fillStyle = free ? "#111018" : "#ffffff"; x.beginPath(); x.arc(0, 0, 12, 0, 7); x.fill();
+    const gapA = k < 12 ? ang(k, t) : -Math.PI / 2, look = t > FREE + 1.6 ? 0 : gapA;
+    x.fillStyle = free ? "#fff" : "#111018";
+    for (const s of [-1, 1]) { x.beginPath(); x.arc(s * 4.5 + Math.cos(look) * 2.2, -2 + Math.sin(look) * 2.2, 2.2, 0, 7); x.fill(); }
+    x.restore();
+    // ---- type (screen space): hook, ring counter, the payoff
+    x.setTransform(1, 0, 0, 1, 0, 0);
+    const T = (s, px, Y, col, font = "AN") => { s = String(s ?? ""); px = M.fit(s, font, 980, px, 20, font === "AN" ? "" : "800"); x.font = `${font === "AN" ? 400 : 800} ${px}px ${font}`; x.fillStyle = col; x.textAlign = "center"; x.direction = M.isAr(s) ? "rtl" : "ltr"; x.textBaseline = "middle"; x.fillText(s, W / 2, Y); x.direction = "ltr"; };
+    if (t < 3.5) { const a2 = expo(seg(t, 0, .25)) * (1 - expo(seg(t, 3.0, 3.5))); x.globalAlpha = a2; T(PR.hook1, 110, 250, "#fff"); T(PR.hook2, 150, 390, PR.accent); x.globalAlpha = 1; }
+    if (t >= 3.5 && !free) { T(`${12 - k}`, 220, 300 * 1 + 0, "#fff"); T(PR.left, 46, 440, "rgba(255,255,255,.6)", "I8"); }
+    if (t > 1.2 && t < 4.6 && PR.tries) { const fails = HITS.filter((h) => h[1] <= t && h[2] === 0).length; T(fails ? `${PR.tries} #${Math.min(3, fails)}` : "", 50, 1620, "rgba(255,255,255,.55)", "I8"); }
+    if (free && t < FREE + 1.6) { const k2 = spring(t - FREE, 14); x.save(); x.translate(W / 2, 330); x.scale(k2, k2); x.translate(-W / 2, -330); T(PR.free, 230, 330, "#111018"); x.restore(); }
+    if (t > FREE + 1.9) { const a3 = expo(seg(t, FREE + 1.9, FREE + 2.3)); x.globalAlpha = a3; T(PR.gag, 130, 1700, "#111018"); x.globalAlpha = 1; }
+  },
+  sound(A) {
+    const m = A.midi;
+    // bounces: a click whose pitch rises with the ring; passes: a pop climbing a scale; free: a chord; gag: a sad trombone
+    HITS.forEach(([, t0, r]) => { A.tone(t0, 300 + r * 60, .06, "square", .03); A.click(t0, .05); });
+    const scale = [60, 62, 64, 67, 69, 72, 74, 76, 79, 81, 84, 86];
+    PASS.forEach((t0, r) => { A.tone(t0, m(scale[r]), .4, "triangle", .15); A.nz(t0, .15, "highpass", 3000, .12); });
+    // a pulse that speeds up as rings fall
+    let tt = 1.2; while (tt < FREE) { const k = PASS.filter((p) => p <= tt).length; A.kick(tt, .35 + k * .03); tt += .6 - k * .03; }
+    [60, 64, 67, 72].forEach((n) => A.tone(FREE, m(n), 1.4, "sine", .08));
+    [[FREE + 1.9, 58], [FREE + 2.3, 57], [FREE + 2.7, 56], [FREE + 3.1, 55]].forEach(([t0, n], i) => A.tone(t0, m(n - 12), i === 3 ? .9 : .38, "sawtooth", .07));
+  },
+});
+</script></body></html>

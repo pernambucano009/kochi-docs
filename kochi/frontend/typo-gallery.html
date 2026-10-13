@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>🎨 معرض العناصر · StudioMania</title>
+<script src="/i18n-en.js"></script>
+<script src="/i18n.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@200;300;400;500;600;700&display=swap">
+<link rel="stylesheet" href="/style.css">
+<style>
+  /* 🎨 معرض العناصر: كل حركة شغالة لوحدها في كارت، بنفس المحرك اللي بيصوّر الفيديو */
+  .gal { max-width: 1280px; margin: 0 auto; padding: 22px 16px 60px; }
+  .gal h1 { font-size: 1.5rem; margin: 6px 0 4px; }
+  .gal-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 14px 0; }
+  .gal-bar .sep { flex: 1; }
+  .chip { border: 1px solid rgba(127, 127, 127, .35); background: transparent; color: inherit; border-radius: 999px; padding: 6px 13px; font: inherit; font-size: .9rem; cursor: pointer; }
+  .chip.on { background: var(--accent, #E5613E); border-color: var(--accent, #E5613E); color: #fff; }
+  .gal-note { margin: 0 0 12px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 16px; }
+  .grid.wide { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+  .tile { cursor: pointer; }
+  .tile .box { direction: ltr; position: relative; width: 100%; border-radius: 14px; overflow: hidden; background: #111; box-shadow: 0 6px 18px rgba(0, 0, 0, .12); }
+  .tile .box > div { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
+  .tile h3 { font-size: .95rem; margin: 8px 2px 2px; display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; }
+  .tile h3 code { font-size: .72rem; opacity: .55; direction: ltr; }
+  .tile p { margin: 0 2px; font-size: .8rem; line-height: 1.45; }
+  .tag { font-size: .7rem; border-radius: 6px; padding: 1px 6px; background: rgba(229, 97, 62, .14); color: var(--accent, #E5613E); }
+  .modal { position: fixed; inset: 0; background: rgba(0, 0, 0, .78); display: flex; align-items: center; justify-content: center; z-index: 50; padding: 16px; }
+  .modal[hidden] { display: none; }
+  .modal .box { direction: ltr; position: relative; border-radius: 16px; overflow: hidden; background: #111; }
+  .modal .box > div { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
+  .modal .cap { position: absolute; bottom: 14px; left: 0; right: 0; margin: 0; text-align: center; color: #fff; font-size: .95rem; text-shadow: 0 1px 6px rgba(0,0,0,.6); }
+</style>
+</head>
+<body>
+<div class="gal">
+  <a href="/" class="btn sm">→ رجوع للبرنامج</a>
+  <h1>🎨 معرض العناصر</h1>
+  <p class="hint">كل حركات «ستوديو» شغالة قدامك بكلام تجربة. البرنامج بيختار منهم لوحده لما تدوس «🧠 وزّع» (كوليكشن مخفية عشوائي كل مرة)، وتقدر تغيّر أي لقطة بإيدك من قايمة الحركة جوه مشروع التايبوجرافي. دوس على أي كارت عشان تشوفه كبير.</p>
+  <div class="gal-bar" id="cols"></div>
+  <div class="gal-bar">
+    <button type="button" class="chip on" data-lang="ar">عربي</button>
+    <button type="button" class="chip" data-lang="en">English</button>
+    <span class="sep"></span>
+    <button type="button" class="chip on" data-ratio="v">📱 طولي</button>
+    <button type="button" class="chip" data-ratio="h">🖥️ عرضي</button>
+  </div>
+  <p class="gal-note muted" id="note"></p>
+  <div class="grid" id="grid"></div>
+</div>
+<div class="modal" id="modal" hidden><div class="box" id="mbox"></div></div>
+<script src="/typo-engine.js"></script>
+<script src="/typo-moments.js"></script>
+<script src="/typo-studio.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const COL_NAMES = { editorial: "✒️ إديتوريال", pop: "💗 بوب", retro: "📰 ريترو", tech: "💻 تكنولوجيا", collage: "✂️ كولاج", screens: "📱 شاشات", print: "🎞️ طباعة وفيلم",
+  vintage: "🕰️ قديم ودافي", social: "💬 سوشيال", product: "🧩 إعلان منتج", cinema: "🎬 سينمائي" };
+const TRANS_NAMES = { whip: "💨 سحبة سريعة", zoom: "🔍 زووم داخل", glitch: "📺 جلتش", flash: "⚡ فلاش", iris: "⭕ دايرة بتفتح", leak: "🌅 تسريب نور", burn: "🔥 حرق فيلم",
+  rise: "⬆️ طالع من تحت", wipe: "🟧 مسحة لون", blur: "🌫️ بلير", pop: "🫧 نطة من جوه" };
+// كلام التجربة: عام لكل حركة، وخاص للحركات اللي محتاجة رقم أو مقارنة أو اسم
+const SAMPLE = {
+  ar: { _: "كده انت بتكسب بجد النهارده", counter: "وصلنا 230 عميل", digits: "فاضل 230 بس", years: "في سنة 1930 كل حاجة اتغيرت", dates: "نشوفك يوم 14",
+    progress: "30 خبير موافقين 84 في المية من العملا", split: "قبل التعديل ضد بعد التعديل", endcard: "ستوديو ابنيه بطريقتك", bigtype: "03 الأتمتة",
+    signature: "مع تحياتي", checks: "الدومين اتوصل اللينك اتظبط البراند جاهز", flow: "كل يوم الصبح شوف الحجوزات ابعت تذكير", notify: "جالك طلب جديد واتنين كمان اشتروا",
+    chat: "ازيك عامل ايه تمام الحمد لله", comments: "حلو جدا الفيديو ده عايز أعرف أكتر", steps: "خد فكرة عدّلها وخلّص أسرع", list: "صورة حوار موسيقى مؤثرات",
+    emoji: "ساعات القرب بيبقى خطر وفلوس", prompt: "اعمل فيديو طولي مقاسه مظبوط", search: "ملفات مشاريع جاهزة", chalk: "دي مش مجرد أداة جديدة", torn: "شركة جزم حطت سوستة" },
+  en: { _: "this is how you win today", counter: "we reached 230 clients", digits: "only 230 left", years: "back in 1930 everything changed", dates: "see you on the 14",
+    progress: "30 experts agree 84 percent of clients", split: "before editing vs after editing", endcard: "studio build it your way", bigtype: "03 automations",
+    signature: "best regards", checks: "domain is connected url is set brand is ready", flow: "every morning check bookings send a reminder", notify: "you got a new order and two more bought",
+    chat: "hey how are you doing great thanks", comments: "love this video want to know more", steps: "take an idea edit it finish faster", list: "visuals dialogue music sound effects",
+    emoji: "sometimes being close is a risk", prompt: "make the video vertical and sharp", search: "after effects project files", chalk: "it is not just another gadget", torn: "a boot company added a zipper" },
+};
+let G = null, lang = "ar", ratio = "v", col = "all";
+const tiles = [];
+const visible = new Set();
+const io = new IntersectionObserver((es) => es.forEach((e) => (e.isIntersecting ? visible.add(e.target._t) : visible.delete(e.target._t))), { rootMargin: "200px" });
+
+function size() { return ratio === "v" ? { w: 1080, h: 1920 } : { w: 1920, h: 1080 }; }
+function docFor(kind, trans) {
+  const { w, h } = size();
+  const text = (SAMPLE[lang][kind] || SAMPLE[lang]._);
+  const base = { theme: "light", focus: -1, mx: 0, my: 0, ms: 1, words: [], icons: [] };
+  const blocks = trans
+    ? [{ ...base, t0: 0, t1: 1.4, kind: "redword", text: lang === "ar" ? "قبل" : "before" }, { ...base, t0: 1.4, t1: 3.6, kind: "serif", text: SAMPLE[lang]._, trans }]
+    : [{ ...base, t0: 0, t1: 3.4, kind, text }];
+  return { w, h, duration: blocks[blocks.length - 1].t1, transparent: false, style: G.style, blocks };
+}
+function mount(box, kind, trans, width) {
+  const { w, h } = size();
+  const k = width / w;
+  box.style.width = `${width}px`;
+  box.style.height = `${(h * k).toFixed(0)}px`;
+  box.innerHTML = "";
+  const stage = document.createElement("div");
+  stage.style.transform = `scale(${k})`;
+  box.appendChild(stage);
+  const doc = docFor(kind, trans);
+  const eng = new TypoEngine(stage, doc);
+  return { eng, dur: doc.duration + 0.8, t0: performance.now() / 1000 - Math.random() * 2 };
+}
+function build() {
+  tiles.length = 0; visible.clear(); io.disconnect();
+  const grid = $("grid");
+  grid.className = ratio === "v" ? "grid" : "grid wide";
+  let list;
+  if (col === "trans") list = G.trans.map((t) => ({ kind: "serif", trans: t, title: TRANS_NAMES[t] || t, code: t, desc: "الترانزيشن في أول اللقطة التانية" }));
+  else {
+    const keys = col === "all" ? Object.keys(G.kinds) : G.collections[col].kinds.filter((k) => G.kinds[k]);
+    list = keys.map((k) => { const d = G.kinds[k]; const cut = d.indexOf("("); return { kind: k, title: (cut > 0 ? d.slice(0, cut) : d).trim(), code: k, desc: cut > 0 ? d.slice(cut + 1).replace(/\)$/, "") : "" }; });
+  }
+  $("note").textContent = col === "all" ? `${list.length} عنصر` : col === "trans" ? `${list.length} ترانزيشن` : `${G.collections[col].note} · ${list.length} عنصر`;
+  grid.innerHTML = list.map((x, i) => `<div class="tile" data-i="${i}"><div class="box"></div><h3>${esc(x.title)} <code>${esc(x.code)}</code>${G.person.includes(x.kind) && !x.trans ? ' <span class="tag">🧍 أحلى مع فيديو فيه شخص</span>' : ""}</h3><p class="muted">${esc(x.desc)}</p></div>`).join("");
+  const width = grid.querySelector(".box")?.clientWidth || 200;
+  grid.querySelectorAll(".tile").forEach((el, i) => {
+    const t = { ...list[i], ...mount(el.querySelector(".box"), list[i].kind, list[i].trans, width) };
+    el._t = t; tiles.push(t); io.observe(el);
+    el.onclick = () => openBig(list[i]);
+  });
+}
+let big = null;
+function openBig(x) {
+  const { w, h } = size();
+  const maxH = innerHeight * 0.86, maxW = innerWidth * 0.92;
+  const width = Math.min(maxW, (maxH * w) / h);
+  big = mount($("mbox"), x.kind, x.trans, width);
+  $("mbox").insertAdjacentHTML("beforeend", `<p class="cap">${esc(x.title)}</p>`);
+  $("modal").hidden = false;
+}
+$("modal").onclick = () => { $("modal").hidden = true; big = null; $("mbox").innerHTML = ""; };
+let last = 0;
+function loop(now) {
+  requestAnimationFrame(loop);
+  if (now - last < 40) return;   // حوالي 25 فريم في الثانية كفاية للمعاينة
+  last = now;
+  const s = now / 1000;
+  const draw = (t) => { try { t.eng.renderAt(((s - t.t0) % t.dur)); } catch (e) { /* حركة وقعت: نسيبها */ } };
+  if (big) { draw(big); return; }
+  visible.forEach(draw);
+}
+function chips() {
+  $("cols").innerHTML = [["all", "✨ الكل"], ...Object.keys(G.collections).map((k) => [k, COL_NAMES[k] || k]), ["trans", "🎞️ الترانزيشنز"]]
+    .map(([k, l]) => `<button type="button" class="chip ${k === col ? "on" : ""}" data-col="${k}">${l}</button>`).join("");
+}
+document.addEventListener("click", (e) => {
+  const c = e.target.closest("[data-col]"), l = e.target.closest("[data-lang]"), r = e.target.closest("[data-ratio]");
+  if (c) { col = c.dataset.col; chips(); build(); }
+  if (l) { lang = l.dataset.lang; document.querySelectorAll("[data-lang]").forEach((b) => b.classList.toggle("on", b === l)); build(); }
+  if (r) { ratio = r.dataset.ratio; document.querySelectorAll("[data-ratio]").forEach((b) => b.classList.toggle("on", b === r)); build(); }
+});
+(async () => {
+  const res = await fetch("/api/typo/gallery");
+  if (res.status === 401) { location.href = "/login"; return; }
+  G = await res.json();
+  await Promise.all([TypoEngine.font(G.style.font), TypoEngine.font("SM Tajawal"), TypoEngine.studioFonts ? TypoEngine.studioFonts() : null, TypoEngine.momentFonts ? TypoEngine.momentFonts() : null]);
+  chips(); build();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

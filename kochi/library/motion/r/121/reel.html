@@ -1,0 +1,105 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// #121 (عنصر: كلمات على الدروب) UK dubstep at 140 BPM, 30 s, written in code; every visual move is computed from the same note schedule as the audio.
+// Arrangement: intro (bars 1–4) · build (5–8, snare roll tightening) · DROP on the downbeat of bar 9 (strongest) · outro (bars 15–17).
+// Two colours: black + acid yellow. Kick → the big disc punches; snare → the bars slam down; wobble → the wide shape stretches with the LFO.
+const BPM = 140, BEAT = 60 / BPM, BAR = BEAT * 4, DUR = 30;
+const PR = M.params({
+  intro: { label: "كلمة البداية", kind: "text", def: "BASS" },
+  build: { label: "٣ كلمات قبل الدروب", kind: "lines", def: ["WAIT", "FOR", "IT"] },
+  drop: { label: "كلمة الدروب (أقوى لحظة)", kind: "text", role: "brand", def: "DROP" },
+  outro: { label: "كلمة النهاية", kind: "text", def: "OUT" },
+  corner: { label: "كلام صغير في الركن (فاضي = مفيش)", kind: "text", def: "140 BPM" },
+  yel: { label: "اللون المنوّر", kind: "color", role: "accent", def: "#e9ff3b" },
+  blk: { label: "اللون الغامق", kind: "color", role: "dark", def: "#0b0b0b" },
+});
+const YEL = PR.yel, BLK = PR.blk, BW = [0, 1, 2].map((i) => PR.build[i] ?? "");
+// schedule (seconds)
+const INTRO = 0, BUILD = BAR * 4, DROP = BAR * 8, OUTRO = BAR * 14;
+const kicks = [], snares = [], hats = [], wob = [];   // wob: [start, dur, rate(Hz), note]
+for (let b = 0; b < 17; b++) {
+  const t0 = b * BAR;
+  if (t0 >= DUR) break;
+  if (t0 < BUILD) { kicks.push(t0); if (b % 2 === 1) snares.push(t0 + BEAT * 2); for (let k = 0; k < 4; k++) hats.push(t0 + k * BEAT + BEAT / 2); }
+  else if (t0 < DROP) { kicks.push(t0); const step = b < 6 ? BEAT : b < 7 ? BEAT / 2 : BEAT / 4; for (let s = t0; s < t0 + BAR - 1e-6; s += step) snares.push(s); }
+  else if (t0 < OUTRO) {
+    // half-time: kick on 1, snare on 3, kick ghost on the "and of 3" every other bar
+    kicks.push(t0); snares.push(t0 + BEAT * 2); if (b % 2) kicks.push(t0 + BEAT * 2.5);
+    for (let k = 0; k < 8; k++) hats.push(t0 + k * BEAT / 2 + BEAT / 4);
+    const rates = [[BEAT * 2, 1 / (BEAT / 2)], [BEAT, 1 / (BEAT / 3)], [BEAT, 1 / (BEAT / 4)]];   // 1/8, 1/8T, 1/16 wobbles
+    const notes = [[36, 36, 39], [34, 34, 41], [36, 39, 31], [34, 36, 43]][b % 4];
+    let s = t0; rates.forEach(([d, r], i) => { wob.push([s, d, r, notes[i]]); s += d; });
+  } else { kicks.push(t0); if (t0 + BEAT * 2 < DUR) snares.push(t0 + BEAT * 2); }
+}
+const lastBefore = (arr, t) => { let v = -99; for (const a of arr) if (a <= t) v = a; else break; return v; };
+const wobAt = (t) => { for (const [s, d, r, n] of wob) if (t >= s && t < s + d) return { s, d, r, n, lfo: .5 - .5 * Math.cos((t - s) * r * Math.PI * 2) }; return null; };
+M.reel({
+  W: 1920, H: 1080, DUR, bg: BLK,
+  fonts: { AN: "anton.ttf", MO: "TY-PlexMono-500.ttf" },
+  init(M) { const c = M.canvas(1920, 1080); return { x: c.getContext("2d") }; },
+  seek(t, P, M) {
+    const { x } = P, { seg, lerp, clamp } = M;
+    const kSince = t - lastBefore(kicks, t), sSince = t - lastBefore(snares, t);
+    const kick = Math.exp(-kSince * 9), snare = Math.exp(-sSince * 12);
+    const w = wobAt(t);
+    const inDrop = t >= DROP && t < OUTRO;
+    // background flips to yellow on the drop downbeat and on each snare in the drop
+    const flip = inDrop && sSince < .09;
+    const bg = (t >= DROP && t < DROP + .12) || flip ? YEL : BLK, fg = bg === YEL ? BLK : YEL;
+    x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = bg; x.fillRect(0, 0, 1920, 1080);
+    // ---- intro: a single disc breathing on the kick; a thin beat grid
+    const prog = clamp((t - BUILD) / (DROP - BUILD));
+    x.strokeStyle = fg; x.globalAlpha = .25; x.lineWidth = 2;
+    for (let k = 0; k < 16; k++) { const X = 120 + k * 112; x.beginPath(); x.moveTo(X, 980); x.lineTo(X, 1000); x.stroke(); }
+    x.globalAlpha = 1;
+    // the playhead on the grid
+    const barPos = ((t % BAR) / BAR); x.fillStyle = fg; x.fillRect(120 + barPos * 1680, 970, 8, 40);
+    // ---- the disc: kicks punch it
+    const R = lerp(140, 230, t < DROP ? prog : 1) + kick * 90;
+    x.fillStyle = fg; x.beginPath(); x.arc(960, 470, R, 0, 7); x.fill();
+    // ---- snare bars: slam down from the top on every snare; during the build their count follows the roll
+    const nb = t < BUILD ? 2 : t < DROP ? 4 + Math.floor(prog * 8) : 6;
+    for (let i = 0; i < nb; i++) { const h = 360 * snare * (i % 2 ? .7 : 1); x.fillStyle = fg; x.fillRect(80 + i * (1760 / nb), 0, 1760 / nb * .55, h); }
+    // ---- the wobble: a wide shape stretched by the LFO, its height = filter opening
+    if (w) {
+      const open = w.lfo;
+      x.fillStyle = bg === YEL ? BLK : YEL;
+      const ww = lerp(300, 1800, open), hh = lerp(30, 260, open);
+      x.fillRect(960 - ww / 2, 760 - hh / 2, ww, hh);
+      // a notch for the note
+      x.fillStyle = bg; x.fillRect(960 - ww / 2 + (w.n - 30) * 40, 760 - hh / 2, 18, hh);
+    }
+    // ---- type: hit by the bass
+    const word = String(t < BUILD ? PR.intro : t < DROP ? (prog < .5 ? BW[0] : prog < .85 ? BW[1] : BW[2]) : t < OUTRO ? PR.drop : PR.outro);
+    const sz = Math.min(220, M.fit(word, "AN", 1500, 220, 60)) + kick * 60 + (w ? w.lfo * 80 : 0);
+    x.font = `400 ${sz}px AN`; x.direction = M.isAr(word) ? "rtl" : "ltr"; x.textAlign = "center"; x.textBaseline = "middle";
+    x.fillStyle = fg; x.fillText(word, 960, 475);                       // outside the disc: fg
+    x.save(); x.beginPath(); x.arc(960, 470, R, 0, 7); x.clip(); x.fillStyle = bg; x.fillText(word, 960, 475); x.restore();   // inside: knocked out
+    x.direction = "ltr";
+    if (PR.corner) { x.font = "500 26px MO"; x.fillStyle = fg; x.textAlign = "left"; x.fillText(`${PR.corner}  BAR ${Math.floor(t / BAR) + 1}`, 120, 940);
+      x.textAlign = "right"; x.fillText(t < BUILD ? "INTRO" : t < DROP ? "BUILD" : t < OUTRO ? "DROP" : "OUTRO", 1800, 940); }
+  },
+  sound(A) {
+    const ctx = A.ctx;
+    kicks.forEach((t0) => A.kick(t0, 1));
+    snares.forEach((t0) => { const roll = t0 >= BUILD && t0 < DROP; A.snare(t0, roll ? .18 + .2 * ((t0 - BUILD) / (DROP - BUILD)) : .42); if (!roll) A.clap(t0, .18); });
+    hats.forEach((t0) => A.hat(t0, .07));
+    // sub bass under the drop, and the wobble: saw + square through a resonant low-pass whose cutoff follows the same LFO as the picture
+    wob.forEach(([s, d, r, n]) => {
+      const f = A.midi(n);
+      const sub = ctx.createOscillator(), sg = ctx.createGain(); sub.frequency.value = f / 2; sg.gain.setValueAtTime(.38, s); sg.gain.setValueAtTime(.38, s + d - .02); sg.gain.linearRampToValueAtTime(0, s + d); sub.connect(sg).connect(A.out); sub.start(s); sub.stop(s + d);
+      const o1 = ctx.createOscillator(), o2 = ctx.createOscillator(); o1.type = "sawtooth"; o2.type = "square"; o1.frequency.value = f; o2.frequency.value = f * 1.005;
+      const fl = ctx.createBiquadFilter(); fl.type = "lowpass"; fl.Q.value = 9;
+      const g = ctx.createGain(); g.gain.setValueAtTime(.16, s); g.gain.setValueAtTime(.16, s + d - .02); g.gain.linearRampToValueAtTime(0, s + d);
+      // automate cutoff to match .5 - .5cos(2π r t)
+      for (let k = 0; k <= Math.ceil(d * 80); k++) { const tt = s + k / 80; if (tt > s + d) break; const lfo = .5 - .5 * Math.cos((tt - s) * r * Math.PI * 2); fl.frequency.setValueAtTime(120 + lfo * 2200, tt); }
+      o1.connect(fl); o2.connect(fl); fl.connect(g).connect(A.out); o1.start(s); o2.start(s); o1.stop(s + d); o2.stop(s + d);
+    });
+    // intro pad + a riser into the drop + an impact on the drop
+    A.pad(0, [48, 55, 58].map(A.midi), BUILD, .03);
+    A.riser(BUILD, DROP, .45);
+    A.hit(DROP, .8); A.nz(DROP, 1.2, "lowpass", 4000, .3);
+    A.pad(OUTRO, [48, 55, 63].map(A.midi), DUR - OUTRO, .035);
+  },
+});
+</script></body></html>

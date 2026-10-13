@@ -1,0 +1,18378 @@
+"""StudioMania backend.
+
+الخطوة 1: مكتبة الفيديوهات الخام وتقطيعها لقطع (كل قطعة 15 ثانية أو أقل).
+الخطوة 2: توليد فيديوهات بـ Seedance عن طريق Atlas Cloud.
+الخطوة 4: مكتبة المدربين (الصورة والأوترو).
+"""
+
+import base64
+import mimetypes
+import gzip
+import hashlib
+import hmac
+import wave
+import zipfile
+import io
+import json
+import math
+import os
+import re
+import shutil
+import sqlite3
+import subprocess
+import tempfile
+from xml.sax.saxutils import escape as xml_escape
+import threading
+import time
+import uuid
+from urllib.parse import quote
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import closing
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+import httpx
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import Request
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
+
+ROOT = Path(__file__).resolve().parent.parent
+
+
+def load_env_file(path: Path) -> None:
+    """يقرا ملف .env (سطور KEY=VALUE) من غير ما يغيّر متغيرات متسجلة قبل كده."""
+    if not path.exists():
+        return
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+
+
+load_env_file(ROOT / ".env")
+
+import atlas  # noqa: E402  (لازم بعد قراءة .env)
+import captions  # noqa: E402
+import montage  # noqa: E402
+import kochi_layout  # noqa: E402  (ترتيب مونتاج كوتشي التلقائي)
+import lab  # noqa: E402  (معمل التفكيك)
+import audioshake  # noqa: E402  (فصل الكلام / الموسيقى / المؤثرات)
+import publisher  # noqa: E402
+import sheets  # noqa: E402
+import carousel as cz  # noqa: E402
+import series as sz  # noqa: E402
+import ads as az  # noqa: E402
+import typo  # noqa: E402  (التايبوجرافي)
+import concepts  # noqa: E402  (قاموس المعاني: كلمة ← أيقونة)
+import stt_local  # noqa: E402  (تفريغ على السيرفر من غير خدمة برّه)
+import sfx  # noqa: E402  (الأصوات الرسمية: كليكات وكيبورد)
+import sfxlib  # noqa: E402  (مكتبة المؤثرات الصوتية للمونتاج)
+import textlayer  # noqa: E402  (النصوص الحرة في المونتاج)
+import person  # noqa: E402  (قراءة الشخص في الفيديو: فصله ومكان راسه)
+import scene  # noqa: E402  (🪄 تغيير الخلفية وشيل الحاجات من الفيديو)
+import numpy as np  # noqa: E402
+from auth import SESSION_COOKIE, SESSION_DAYS, Auth  # noqa: E402
+
+MAX_CLIP_SECONDS = 15.0
+MIN_CUT_GAP = 0.2  # أقل مسافة مسموحة بين نقطتين قطع
+MIN_REFERENCE_SECONDS = 2.0  # Seedance مش بيقبل فيديو مرجعي أقصر من كده
+VIDEO_EXTENSIONS = {".mp4", ".mov", ".m4v", ".webm", ".mkv"}
+IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
+AUDIO_EXTENSIONS = {".mp3", ".wav", ".m4a", ".aac", ".ogg", ".opus", ".flac"}
+AUDIO_KINDS = {"voice", "music", "sfx"}  # التعليق الصوتي (الخطوة 3) والموسيقى (الخطوة 5) والمؤثرات الصوتية (المونتاج)
+
+DATA_DIR = Path(os.environ.get("STUDIOMANIA_DATA") or ROOT / "data")
+RAW_DIR = DATA_DIR / "raw"
+CLIPS_DIR = DATA_DIR / "clips"
+COACHES_DIR = DATA_DIR / "coaches"
+GENERATED_DIR = DATA_DIR / "generated"
+AUDIO_DIR = DATA_DIR / "audio"
+SFXLIB_DIR = DATA_DIR / "sfxlib"  # المؤثرات المتولّدة (sfxlib.py)
+OVERLAY_DIR = DATA_DIR / "overlays"  # الصور اللي بتترفع كطبقات فوق الفيديو
+EXPORTS_DIR = DATA_DIR / "exports"  # فولدر الفيديوهات الجاهزة للنشر
+BRAND_DIR = DATA_DIR / "brand"  # اللوجو
+TMP_DIR = DATA_DIR / "tmp"
+CAROUSELS_DIR = DATA_DIR / "carousels"  # صور الكاروسيلات
+ADS_DIR = DATA_DIR / "ads"  # الإعلانات المرجعية وتحليلها، وصور الستايلات
+SERIES_DIR = DATA_DIR / "series"  # المسلسلات: صور الشخصية، وصوت ولقطات كل حلقة
+BRAND_REFS_DIR = DATA_DIR / "brand" / "refs"  # (قديم) صور الشخصيات، اتنقلت لمكتبة الكاروسيل
+LIBRARY_DIR = DATA_DIR / "brand" / "library"  # مكتبة الكاروسيل: تيمبليتس وشخصيات
+DB_PATH = DATA_DIR / "studiomania.db"
+FRONTEND_DIR = ROOT / "frontend"
+FONTS_DIR = ROOT / "fonts"
+
+for d in (RAW_DIR, CLIPS_DIR, COACHES_DIR, GENERATED_DIR, AUDIO_DIR, EXPORTS_DIR, BRAND_DIR, TMP_DIR, CAROUSELS_DIR, BRAND_REFS_DIR, LIBRARY_DIR, SERIES_DIR, ADS_DIR):
+    d.mkdir(parents=True, exist_ok=True)
+
+# الكابشن بيدوّر على الخطوط عن طريق fontconfig، والسيرفر (Railway) مفيهوش إعداداته خالص.
+# فبنعمل ملف إعدادات صغير يشاور على فولدر الخطوط بتاعنا، وكل أوامر FFmpeg بتستخدمه.
+FONTCONFIG_FILE = TMP_DIR / "fonts.conf"
+# خط الإيموجي الملوّن بتاع السيستم (عنصر الإيموجي في التايبوجرافي): فولدره بس، عشان باقي الخطوط تفضل بتاعتنا
+EMOJI_FONT_DIRS = sorted({str(f.parent) for d in ("/usr/share/fonts", "/usr/local/share/fonts") for f in Path(d).rglob("NotoColorEmoji*.ttf")}) if Path("/usr/share/fonts").exists() else []
+FONTCONFIG_FILE.write_text(
+    '<?xml version="1.0"?>\n<!DOCTYPE fontconfig SYSTEM "fonts.dtd">\n<fontconfig>\n'
+    f"  <dir>{xml_escape(str(FONTS_DIR))}</dir>\n"
+    + "".join(f"  <dir>{xml_escape(d)}</dir>\n" for d in EMOJI_FONT_DIRS) +
+    f"  <cachedir>{xml_escape(str(TMP_DIR / 'fontcache'))}</cachedir>\n"
+    "</fontconfig>\n",
+    encoding="utf-8",
+)
+os.environ["FONTCONFIG_FILE"] = str(FONTCONFIG_FILE)
+
+
+def ffmpeg_exe() -> str:
+    found = shutil.which("ffmpeg")
+    if found:
+        return found
+    try:
+        import imageio_ffmpeg
+
+        return imageio_ffmpeg.get_ffmpeg_exe()
+    except ImportError as exc:
+        raise RuntimeError("ffmpeg غير موجود. ثبّته أو ثبّت الحزمة imageio-ffmpeg") from exc
+
+
+def probe_duration(path: Path) -> float:
+    """يرجّع طول الفيديو بالثواني من مخرجات ffmpeg."""
+    result = subprocess.run(
+        [ffmpeg_exe(), "-hide_banner", "-i", str(path)],
+        capture_output=True,
+        text=True,
+    )
+    match = re.search(r"Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)", result.stderr)
+    if not match:
+        raise ValueError("تعذّر قراءة طول الفيديو")
+    h, m, s = match.groups()
+    return int(h) * 3600 + int(m) * 60 + float(s)
+
+
+def db() -> sqlite3.Connection:
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON")
+    return conn
+
+
+def init_db() -> None:
+    with closing(db()) as conn, conn:
+        conn.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS videos (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                filename TEXT NOT NULL,
+                duration REAL NOT NULL,
+                cuts TEXT NOT NULL DEFAULT '[]',
+                skipped TEXT NOT NULL DEFAULT '[]',
+                created_at TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS clips (
+                id TEXT PRIMARY KEY,
+                video_id TEXT NOT NULL REFERENCES videos(id) ON DELETE CASCADE,
+                idx INTEGER NOT NULL,
+                start REAL NOT NULL,
+                end REAL NOT NULL,
+                filename TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS prompts (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                text TEXT NOT NULL,
+                is_default INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS audio (
+                id TEXT PRIMARY KEY,
+                kind TEXT NOT NULL,
+                name TEXT NOT NULL,
+                filename TEXT NOT NULL,
+                duration REAL NOT NULL,
+                created_at TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS projects (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                data TEXT NOT NULL,
+                render_status TEXT NOT NULL DEFAULT 'idle',
+                render_error TEXT,
+                export_id TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS exports (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                filename TEXT NOT NULL,
+                duration REAL NOT NULL,
+                source TEXT NOT NULL,
+                project_id TEXT,
+                created_at TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS posts (
+                id TEXT PRIMARY KEY,
+                export_id TEXT NOT NULL,
+                caption TEXT NOT NULL,
+                platforms TEXT NOT NULL,
+                scheduled_at TEXT NOT NULL,
+                status TEXT NOT NULL,
+                error TEXT,
+                published_at TEXT,
+                remote_id TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS coaches (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                image_filename TEXT NOT NULL,
+                outro_filename TEXT,
+                outro_duration REAL,
+                created_at TEXT NOT NULL
+            );
+            -- بنحفظ نسخة من بيانات القطعة والمدرب عشان السجل يفضل لو اتمسحوا
+            CREATE TABLE IF NOT EXISTS generations (
+                id TEXT PRIMARY KEY,
+                clip_id TEXT NOT NULL,
+                clip_filename TEXT NOT NULL,
+                clip_label TEXT NOT NULL,
+                coach_id TEXT NOT NULL,
+                coach_name TEXT NOT NULL,
+                coach_image TEXT NOT NULL,
+                model TEXT NOT NULL,
+                prompt TEXT NOT NULL,
+                params TEXT NOT NULL,
+                status TEXT NOT NULL,
+                prediction_id TEXT,
+                error TEXT,
+                output_filename TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            """
+        )
+
+
+def now() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def segments_for(duration: float, cuts: list[float], skipped: list[float]) -> list[dict]:
+    """يحوّل نقط القطع لقائمة قطع. القطعة المستبعدة بتتعرف ببداية وقتها."""
+    points = [0.0, *sorted(cuts), duration]
+    skipped_keys = {round(s, 2) for s in skipped}
+    segs = []
+    for i in range(len(points) - 1):
+        start, end = points[i], points[i + 1]
+        segs.append(
+            {
+                "index": i,
+                "start": start,
+                "end": end,
+                "duration": end - start,
+                "skipped": round(start, 2) in skipped_keys,
+                "too_long": end - start > MAX_CLIP_SECONDS + 1e-6,
+            }
+        )
+    return segs
+
+
+def video_row_to_dict(row: sqlite3.Row, clips_count: int) -> dict:
+    cuts = json.loads(row["cuts"])
+    skipped = json.loads(row["skipped"])
+    return {
+        "id": row["id"],
+        "name": row["name"],
+        "url": f"/media/raw/{row['filename']}",
+        "duration": row["duration"],
+        "cuts": cuts,
+        "skipped": skipped,
+        "segments": segments_for(row["duration"], cuts, skipped),
+        "clips_count": clips_count,
+        "created_at": row["created_at"],
+        "voice": linked_voice(row["voice_id"]),
+        "coach": linked_coach(row["coach_id"]),
+    }
+
+
+def linked_coach(coach_id: str | None) -> dict | None:
+    if not coach_id:
+        return None
+    with closing(db()) as conn:
+        r = conn.execute("SELECT id, name, image_filename, outro_filename FROM coaches WHERE id = ?", (coach_id,)).fetchone()
+    if not r:
+        return None
+    return {"id": r["id"], "name": r["name"], "image_url": f"/media/coaches/{r['image_filename']}", "has_outro": bool(r["outro_filename"])}
+
+
+def linked_voice(voice_id: str | None) -> dict | None:
+    if not voice_id:
+        return None
+    with closing(db()) as conn:
+        r = conn.execute("SELECT id, name, duration FROM audio WHERE id = ? AND kind = 'voice'", (voice_id,)).fetchone()
+    return {"id": r["id"], "name": r["name"], "duration": r["duration"]} if r else None
+
+
+def get_video(conn: sqlite3.Connection, video_id: str) -> sqlite3.Row:
+    row = conn.execute("SELECT * FROM videos WHERE id = ?", (video_id,)).fetchone()
+    if row is None:
+        raise HTTPException(404, "الفيديو غير موجود")
+    return row
+
+
+def clips_count(conn: sqlite3.Connection, video_id: str) -> int:
+    return conn.execute("SELECT COUNT(*) FROM clips WHERE video_id = ?", (video_id,)).fetchone()[0]
+
+
+init_db()
+with closing(db()) as _conn, _conn:
+    if "voice_id" not in {c[1] for c in _conn.execute("PRAGMA table_info(videos)")}:
+        _conn.execute("ALTER TABLE videos ADD COLUMN voice_id TEXT")
+    _conn.execute(
+        """CREATE TABLE IF NOT EXISTS folders (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            video_id TEXT,
+            voice_id TEXT,
+            coach_id TEXT,
+            created_at TEXT NOT NULL
+        )"""
+    )
+    if "coach_id" not in {c[1] for c in _conn.execute("PRAGMA table_info(videos)")}:
+        _conn.execute("ALTER TABLE videos ADD COLUMN coach_id TEXT")
+    # كل فيديو متولّد بيفتكر هو من أنهي فيديو خام (عشان الأرشيف)
+    if "video_id" not in {c[1] for c in _conn.execute("PRAGMA table_info(generations)")}:
+        _conn.execute("ALTER TABLE generations ADD COLUMN video_id TEXT")
+        _conn.execute("UPDATE generations SET video_id = (SELECT video_id FROM clips WHERE clips.id = generations.clip_id)")
+    # الأرشيف: NULL = لوحده (بعد التصدير)، 1 = اتأرشف بإيدك، 0 = رجّعته بإيدك
+    if "archived" not in {c[1] for c in _conn.execute("PRAGMA table_info(videos)")}:
+        _conn.execute("ALTER TABLE videos ADD COLUMN archived INTEGER")
+    # حسابات المدرب على السوشيال (للتاج في النشر)
+    for _col in ("instagram", "tiktok"):
+        if _col not in {c[1] for c in _conn.execute("PRAGMA table_info(coaches)")}:
+            _conn.execute(f"ALTER TABLE coaches ADD COLUMN {_col} TEXT")
+    # الشخصية: وصف، إنترو، صوت، وصور كاركتر شيت (JSON لستة أسماء ملفات)
+    for _col, _typ in (("about", "TEXT"), ("intro_filename", "TEXT"), ("intro_duration", "REAL"), ("voice_filename", "TEXT"), ("sheet", "TEXT")):
+        if _col not in {c[1] for c in _conn.execute("PRAGMA table_info(coaches)")}:
+            _conn.execute(f"ALTER TABLE coaches ADD COLUMN {_col} {_typ}")
+    # دليل الحسابات اللي اتستوردت من ملف (حتى لو المدرب لسه مش في البرنامج)
+    _conn.execute(
+        """CREATE TABLE IF NOT EXISTS social_handles (
+            key TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            instagram TEXT,
+            tiktok TEXT
+        )"""
+    )
+    # الإعلانات المرجعية (التحليل والاقتراح للعميل) وستايلات الإعلانات
+    _conn.execute(
+        """CREATE TABLE IF NOT EXISTS ads (
+            id TEXT PRIMARY KEY, name TEXT NOT NULL, data TEXT NOT NULL,
+            created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+        )"""
+    )
+    _conn.execute(
+        """CREATE TABLE IF NOT EXISTS ad_brains (
+            id TEXT PRIMARY KEY, name TEXT NOT NULL, data TEXT NOT NULL, created_at TEXT NOT NULL
+        )"""
+    )
+    _conn.execute(
+        """CREATE TABLE IF NOT EXISTS ad_styles (
+            id TEXT PRIMARY KEY, name TEXT NOT NULL, data TEXT NOT NULL, created_at TEXT NOT NULL
+        )"""
+    )
+    # المسلسلات وحلقاتها (الحلقة: السكريبت والصوت وتوقيت الجمل واللقطات ونسخها)
+    _conn.execute(
+        """CREATE TABLE IF NOT EXISTS series (
+            id TEXT PRIMARY KEY, name TEXT NOT NULL, data TEXT NOT NULL,
+            created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+        )"""
+    )
+    _conn.execute(
+        """CREATE TABLE IF NOT EXISTS episodes (
+            id TEXT PRIMARY KEY, series_id TEXT NOT NULL, number INTEGER NOT NULL, name TEXT NOT NULL,
+            data TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+        )"""
+    )
+    # الكاروسيلات: كل واحد بالنقاش والخطة وحالة الصور
+    _conn.execute(
+        """CREATE TABLE IF NOT EXISTS carousels (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            data TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )"""
+    )
+    # مكتبة الكاروسيل: تيمبليتس (تصميمات نقلدها) وشخصيات 2D، كل واحد بصوره
+    _conn.execute(
+        """CREATE TABLE IF NOT EXISTS carousel_assets (
+            id TEXT PRIMARY KEY,
+            kind TEXT NOT NULL,
+            name TEXT NOT NULL,
+            notes TEXT NOT NULL DEFAULT '',
+            files TEXT NOT NULL DEFAULT '[]',
+            created_at TEXT NOT NULL
+        )"""
+    )
+    for _col in ("handle", "seed"):  # حساب إنستجرام (للمدربين) + مفتاح الحزمة اللي اتستورد منها
+        if _col not in {c[1] for c in _conn.execute("PRAGMA table_info(carousel_assets)")}:
+            _conn.execute(f"ALTER TABLE carousel_assets ADD COLUMN {_col} TEXT")
+    # صور الشخصيات القديمة (من الهوية) بتبقى شخصية في المكتبة
+    _old_refs = sorted(p for p in BRAND_REFS_DIR.iterdir() if p.is_file())
+    if _old_refs:
+        _aid = uuid.uuid4().hex[:12]
+        (LIBRARY_DIR / _aid).mkdir(parents=True, exist_ok=True)
+        for _p in _old_refs:
+            shutil.move(str(_p), LIBRARY_DIR / _aid / _p.name)
+        _conn.execute(
+            "INSERT INTO carousel_assets (id, kind, name, files, created_at) VALUES (?, 'character', ?, ?, ?)",
+            (_aid, "شخصيات كوتشي", json.dumps([p.name for p in _old_refs]), datetime.now(timezone.utc).isoformat()),
+        )
+    # لو البرنامج اتقفل وهو بيرسم كاروسيل، الرسم ده وقف
+    for _r in _conn.execute("SELECT id, data FROM carousels").fetchall():
+        _d = json.loads(_r["data"])
+        _changed = False
+        if _d["overview"].get("status") == "working":
+            _d["overview"].update(status="failed", error="البرنامج اتقفل وهو بيرسم. دوس ارسم تاني")
+            _changed = True
+        for _s in _d.get("slides", []):
+            if _s.get("status") in ("working", "queued"):
+                _s.update(status="idle", error=None)
+                _changed = True
+        if _changed:
+            _conn.execute("UPDATE carousels SET data = ? WHERE id = ?", (json.dumps(_d, ensure_ascii=False), _r["id"]))
+    # أوتروهات زيادة بتترفع من صفحة المونتاج (غير أوترو المدرب)
+    _conn.execute(
+        """CREATE TABLE IF NOT EXISTS outros (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            filename TEXT NOT NULL,
+            duration REAL NOT NULL,
+            coach_id TEXT,
+            created_at TEXT NOT NULL
+        )"""
+    )
+    # سكريبت التعليق الصوتي (النص اللي الراوي بيقراه)
+    if "script" not in {c[1] for c in _conn.execute("PRAGMA table_info(folders)")}:
+        _conn.execute("ALTER TABLE folders ADD COLUMN script TEXT")
+    if "transcript" not in {c[1] for c in _conn.execute("PRAGMA table_info(audio)")}:
+        _conn.execute("ALTER TABLE audio ADD COLUMN transcript TEXT")
+    # لو البرنامج اتقفل وهو بيكتب الكلام، نعلّمه كفاشل عشان تعيد
+    for _r in _conn.execute("""SELECT id FROM audio WHERE transcript LIKE '%"status": "working"%'""").fetchall():
+        _conn.execute(
+            "UPDATE audio SET transcript = ? WHERE id = ?",
+            (json.dumps({"status": "failed", "error": "البرنامج اتقفل أثناء الكتابة. جرّب تاني", "words": []}), _r[0]),
+        )
+with closing(db()) as _conn, _conn:
+    # أي فيديو خام مالوش فولدر بيبقى ليه فولدر بنفس اسمه
+    for _v in _conn.execute(
+        "SELECT * FROM videos WHERE id NOT IN (SELECT video_id FROM folders WHERE video_id IS NOT NULL)"
+    ).fetchall():
+        _conn.execute(
+            "INSERT INTO folders (id, name, video_id, voice_id, coach_id, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (uuid.uuid4().hex[:12], _v["name"], _v["id"], _v["voice_id"], _v["coach_id"], _v["created_at"]),
+        )
+auth = Auth(DB_PATH, DATA_DIR)
+app = FastAPI(title="StudioMania")
+
+# الصفحات والملفات اللي بتفتح من غير دخول
+PUBLIC_PATHS = {"/login", "/login.html", "/style.css", "/i18n.js", "/i18n-en.js", "/health", "/api/auth/state", "/api/auth/login", "/api/auth/setup"}
+
+
+# ملفات الواجهة: كل تحديث ليه رقم نسخة جديد عشان المتصفح ميفضلش شغال بالقديم
+_asset_versions: dict[str, tuple[float, str]] = {}
+
+
+def asset_version(name: str) -> str:
+    path = FRONTEND_DIR / name
+    try:
+        mtime = path.stat().st_mtime
+    except OSError:
+        return "0"
+    cached = _asset_versions.get(name)
+    if not cached or cached[0] != mtime:
+        cached = (mtime, hashlib.sha1(path.read_bytes()).hexdigest()[:10])
+        _asset_versions[name] = cached
+    return cached[1]
+
+
+def html_page(name: str) -> Response:
+    """الصفحة بروابط الملفات فيها رقم النسخة، ومن غير كاش."""
+    html = (FRONTEND_DIR / name).read_text(encoding="utf-8")
+    html = re.sub(
+        r'((?:src|href)=")/([\w.-]+\.(?:js|css))"',
+        lambda m: f'{m.group(1)}/{m.group(2)}?v={asset_version(m.group(2))}"',
+        html,
+    )
+    return Response(html, media_type="text/html; charset=utf-8", headers={"Cache-Control": "no-cache"})
+
+
+_gzip_cache: dict[str, tuple[float, bytes]] = {}
+
+
+def gzipped_asset(request: Request) -> Response | None:
+    """ملفات الـ JS والـ CSS مضغوطة (أصغر 4 مرات تقريبًا، فالصفحة بتفتح أسرع)."""
+    path = request.url.path
+    if not path.endswith((".js", ".css")) or "gzip" not in request.headers.get("accept-encoding", ""):
+        return None
+    file = (FRONTEND_DIR / path.lstrip("/")).resolve()
+    if file.parent != FRONTEND_DIR.resolve() or not file.is_file():
+        return None
+    mtime = file.stat().st_mtime
+    cached = _gzip_cache.get(path)
+    if not cached or cached[0] != mtime:
+        cached = (mtime, gzip.compress(file.read_bytes(), 6))
+        _gzip_cache[path] = cached
+    return Response(
+        cached[1],
+        media_type="text/css" if path.endswith(".css") else "text/javascript",
+        headers={
+            "Content-Encoding": "gzip", "Vary": "Accept-Encoding",
+            "Cache-Control": "public, max-age=31536000, immutable" if request.query_params.get("v") else "no-cache",
+        },
+    )
+
+
+def export_token_ok(request: Request) -> bool:
+    """مفتاح قراءة بس لنسخ «الصورة + المؤثرات» في المعمل (LAB_EXPORT_TOKEN على Railway)، عشان تتسحب من برا من غير باسورد."""
+    want = (os.environ.get("LAB_EXPORT_TOKEN") or "").strip()
+    got = request.headers.get("x-export-token") or ""
+    path = request.url.path
+    allowed = path.startswith("/api/lab/export/") or (path.startswith("/media/lab/") and path.endswith("/picture_fx.mp4"))
+    return bool(want) and len(want) >= 16 and allowed and request.method == "GET" and hmac.compare_digest(want, got)
+
+
+@app.middleware("http")
+async def require_login(request: Request, call_next):
+    path = request.url.path
+    if path in PUBLIC_PATHS or auth.valid_token(request.cookies.get(SESSION_COOKIE)) or export_token_ok(request):
+        if (fast := gzipped_asset(request)) is not None:
+            return fast
+        response = await call_next(request)
+        # ملفات الواجهة: اللي برقم نسخة تتخزن، والباقي يتأكد كل مرة إنه آخر نسخة
+        if not path.startswith(("/api/", "/media/", "/fonts/")) and "cache-control" not in response.headers:
+            response.headers["Cache-Control"] = (
+                "public, max-age=31536000, immutable" if request.query_params.get("v") else "no-cache"
+            )
+        return response
+    if path.startswith("/api/"):
+        return JSONResponse({"detail": "لازم تسجّل دخول"}, status_code=401)
+    return RedirectResponse("/login")
+
+
+@app.get("/kochi")
+@app.get("/kochi/")
+def kochi_page():
+    """اللينك القديم (/kochi) من أيام ما كان كوتشي جوه ستوديومانيا: بيروح للرئيسية."""
+    return RedirectResponse("/")
+
+
+@app.get("/health")
+def health():
+    # رقم النسخة (من Railway) وموديل قراءة الشخص: عشان نعرف التحديث نزل ولا لأ من غير ما ندخل السيرفر
+    return {"ok": True, "build": (os.environ.get("RAILWAY_GIT_COMMIT_SHA") or "")[:7],
+            "person": person.model_status(Path(os.environ.get("PERSON_MODELS") or (DATA_DIR / "models"))),
+            "sfx": {k: len(v) for k, v in sfx.library(TYPO_SFX).items()}}
+
+
+@app.get("/login")
+@app.get("/login.html")
+def login_page():
+    return html_page("login.html")
+
+
+class PasswordIn(BaseModel):
+    password: str
+
+
+def session_response(request: Request) -> JSONResponse:
+    resp = JSONResponse({"ok": True})
+    secure = request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https"
+    resp.set_cookie(
+        SESSION_COOKIE, auth.make_token(), max_age=SESSION_DAYS * 86400,
+        httponly=True, samesite="lax", secure=secure,
+    )
+    return resp
+
+
+@app.get("/api/auth/state")
+def auth_state(request: Request):
+    return {
+        "needs_setup": auth.needs_setup(),
+        "logged_in": auth.valid_token(request.cookies.get(SESSION_COOKIE)),
+    }
+
+
+@app.post("/api/auth/setup")
+def auth_setup(body: PasswordIn, request: Request):
+    if not auth.needs_setup():
+        raise HTTPException(400, "الباسورد متعمل قبل كده")
+    if len(body.password) < 8:
+        raise HTTPException(400, "الباسورد لازم يكون 8 حروف أو أرقام على الأقل")
+    auth.set_password(body.password)
+    return session_response(request)
+
+
+@app.post("/api/auth/login")
+def auth_login(body: PasswordIn, request: Request):
+    if auth.needs_setup():
+        raise HTTPException(400, "لسه مفيش باسورد، اعمل واحد الأول")
+    if not auth.check_password(body.password):
+        time.sleep(1)  # يبطّأ أي حد بيجرّب باسوردات كتير
+        raise HTTPException(401, "الباسورد غلط")
+    return session_response(request)
+
+
+@app.post("/api/auth/logout")
+def auth_logout():
+    resp = JSONResponse({"ok": True})
+    resp.delete_cookie(SESSION_COOKIE)
+    return resp
+
+
+class ChangePasswordIn(BaseModel):
+    current: str
+    new: str
+
+
+@app.post("/api/auth/password")
+def change_password(body: ChangePasswordIn, request: Request):
+    if auth.env_password():
+        raise HTTPException(400, "الباسورد متحدد من إعدادات السيرفر (APP_PASSWORD)، غيّره من هناك")
+    if not auth.check_password(body.current):
+        raise HTTPException(400, "الباسورد الحالي غلط")
+    if len(body.new) < 8:
+        raise HTTPException(400, "الباسورد الجديد لازم يكون 8 حروف أو أرقام على الأقل")
+    auth.set_password(body.new)
+    return session_response(request)
+
+
+# ---------------------------------------------------------------- الإعدادات
+
+
+@app.get("/api/settings")
+def get_settings():
+    return {"keys": auth.keys_state(), "password_from_env": bool(auth.env_password())}
+
+
+class SettingsIn(BaseModel):
+    atlas: str | None = None  # None = متغيرش، "" = امسح
+    zernio: str | None = None
+
+
+@app.put("/api/settings")
+def save_settings(body: SettingsIn):
+    for name in ("atlas", "zernio"):
+        value = getattr(body, name)
+        if value is not None:
+            auth.save_key(name, value)
+    return get_settings()
+
+
+@app.get("/api/config")
+def config():
+    return {"max_clip_seconds": MAX_CLIP_SECONDS, "min_cut_gap": MIN_CUT_GAP}
+
+
+@app.get("/api/videos")
+def list_videos():
+    with closing(db()) as conn:
+        rows = conn.execute("SELECT * FROM videos ORDER BY created_at DESC").fetchall()
+        return [video_row_to_dict(r, clips_count(conn, r["id"])) for r in rows]
+
+
+def store_video(file: UploadFile) -> str:
+    ext = Path(file.filename or "").suffix.lower()
+    if ext not in VIDEO_EXTENSIONS:
+        raise HTTPException(400, f"نوع الملف غير مدعوم: {ext or 'بدون امتداد'}")
+    video_id = uuid.uuid4().hex[:12]
+    filename = f"{video_id}{ext}"
+    dest = RAW_DIR / filename
+    with dest.open("wb") as out:
+        shutil.copyfileobj(file.file, out)
+    try:
+        duration = probe_duration(dest)
+    except ValueError as exc:
+        dest.unlink(missing_ok=True)
+        raise HTTPException(400, str(exc)) from exc
+    with closing(db()) as conn, conn:
+        conn.execute(
+            "INSERT INTO videos (id, name, filename, duration, created_at) VALUES (?, ?, ?, ?, ?)",
+            (video_id, Path(file.filename).stem, filename, duration, now()),
+        )
+    return video_id
+
+
+def remove_video(conn: sqlite3.Connection, video_id: str) -> None:
+    row = conn.execute("SELECT filename FROM videos WHERE id = ?", (video_id,)).fetchone()
+    if row is None:
+        return
+    for clip in conn.execute("SELECT filename FROM clips WHERE video_id = ?", (video_id,)):
+        (CLIPS_DIR / clip["filename"]).unlink(missing_ok=True)
+    conn.execute("DELETE FROM videos WHERE id = ?", (video_id,))
+    conn.execute("UPDATE folders SET video_id = NULL WHERE video_id = ?", (video_id,))
+    (RAW_DIR / row["filename"]).unlink(missing_ok=True)
+
+
+@app.post("/api/videos")
+def upload_video(file: UploadFile = File(...)):
+    video_id = store_video(file)
+    with closing(db()) as conn, conn:
+        v = get_video(conn, video_id)
+        conn.execute(
+            "INSERT INTO folders (id, name, video_id, created_at) VALUES (?, ?, ?, ?)",
+            (uuid.uuid4().hex[:12], v["name"], video_id, now()),
+        )
+        return video_row_to_dict(v, 0)
+
+
+class CutsIn(BaseModel):
+    cuts: list[float]
+    skipped: list[float] = []
+
+
+@app.put("/api/videos/{video_id}/cuts")
+def save_cuts(video_id: str, body: CutsIn):
+    with closing(db()) as conn, conn:
+        row = get_video(conn, video_id)
+        duration = row["duration"]
+        cuts: list[float] = []
+        for c in sorted(body.cuts):
+            if c < MIN_CUT_GAP or c > duration - MIN_CUT_GAP:
+                continue
+            if cuts and c - cuts[-1] < MIN_CUT_GAP:
+                continue
+            cuts.append(round(c, 3))
+        starts = {round(s["start"], 2) for s in segments_for(duration, cuts, [])}
+        skipped = sorted({round(s, 2) for s in body.skipped} & starts)
+        conn.execute(
+            "UPDATE videos SET cuts = ?, skipped = ? WHERE id = ?",
+            (json.dumps(cuts), json.dumps(skipped), video_id),
+        )
+        return video_row_to_dict(get_video(conn, video_id), clips_count(conn, video_id))
+
+
+class VoiceLinkIn(BaseModel):
+    voice_id: str | None = None
+
+
+@app.put("/api/videos/{video_id}/voice")
+def link_voice(video_id: str, body: VoiceLinkIn):
+    """يربط الفيديو الخام بتسجيل صوتي من المكتبة (أو يفك الربط لو فاضي)."""
+    with closing(db()) as conn, conn:
+        get_video(conn, video_id)
+        if body.voice_id and not conn.execute(
+            "SELECT 1 FROM audio WHERE id = ? AND kind = 'voice'", (body.voice_id,)
+        ).fetchone():
+            raise HTTPException(400, "التسجيل الصوتي مش موجود في المكتبة")
+        conn.execute("UPDATE videos SET voice_id = ? WHERE id = ?", (body.voice_id or None, video_id))
+        conn.execute("UPDATE folders SET voice_id = ? WHERE video_id = ?", (body.voice_id or None, video_id))
+        return video_row_to_dict(get_video(conn, video_id), clips_count(conn, video_id))
+
+
+class CoachLinkIn(BaseModel):
+    coach_id: str | None = None
+
+
+@app.put("/api/videos/{video_id}/coach")
+def link_coach(video_id: str, body: CoachLinkIn):
+    """يربط الفيديو الخام بمدرب: صورته للتوليد والأوترو بتاعه للمونتاج."""
+    with closing(db()) as conn, conn:
+        get_video(conn, video_id)
+        if body.coach_id:
+            get_coach(conn, body.coach_id)
+        conn.execute("UPDATE videos SET coach_id = ? WHERE id = ?", (body.coach_id or None, video_id))
+        conn.execute("UPDATE folders SET coach_id = ? WHERE video_id = ?", (body.coach_id or None, video_id))
+        return video_row_to_dict(get_video(conn, video_id), clips_count(conn, video_id))
+
+
+@app.get("/api/videos/{video_id}/montage-draft")
+def montage_draft(video_id: str, coach_id: str | None = None):
+    """يجمّع آخر فيديو مولَّد لكل قطعة من الفيديو ده بالترتيب، ومعاه الصوت المربوط."""
+    with closing(db()) as conn:
+        video = get_video(conn, video_id)
+        # المدرب المربوط بالفيديو هو الأساس، إلا لو اتحدد غيره
+        coach_id = coach_id or video["coach_id"]
+        clips = conn.execute("SELECT id, idx FROM clips WHERE video_id = ? ORDER BY idx", (video_id,)).fetchall()
+        chosen, missing = [], []
+        for c in clips:
+            query = "SELECT id, coach_id, output_filename FROM generations WHERE clip_id = ? AND status = 'completed'"
+            args: list = [c["id"]]
+            if coach_id:
+                query += " AND coach_id = ?"
+                args.append(coach_id)
+            gens = conn.execute(query + " ORDER BY created_at DESC", args).fetchall()
+            gen = next((g for g in gens if g["output_filename"] and (GENERATED_DIR / g["output_filename"]).exists()), None)
+            if gen:
+                chosen.append(gen)
+            else:
+                missing.append(c["idx"])
+    if not coach_id and chosen:
+        coach_id = chosen[-1]["coach_id"]
+    voice = linked_voice(video["voice_id"])
+    return {
+        "video_id": video_id,
+        "name": video["name"],
+        "coach_id": coach_id,
+        "gen_ids": [g["id"] for g in chosen],
+        "missing": missing,
+        "clips_total": len(clips),
+        "voice": voice,
+    }
+
+
+@app.get("/api/videos/{video_id}/coaches")
+def video_coaches(video_id: str):
+    """المدربين اللي اتولّد لهم فيديوهات من المشروع ده (عشان المونتاج يسأل أنهي مدرب)، وكام قطعة جاهزة لكل واحد."""
+    with closing(db()) as conn:
+        video = get_video(conn, video_id)
+        total = conn.execute("SELECT COUNT(*) FROM clips WHERE video_id = ?", (video_id,)).fetchone()[0]
+        rows = conn.execute(
+            "SELECT g.coach_id, g.clip_id, g.output_filename, MAX(g.created_at) AS at FROM generations g JOIN clips c ON c.id = g.clip_id "
+            "WHERE c.video_id = ? AND g.status = 'completed' AND g.coach_id != '' GROUP BY g.coach_id, g.clip_id, g.output_filename",
+            (video_id,)).fetchall()
+        ready: dict[str, set] = {}
+        last: dict[str, str] = {}
+        for r in rows:
+            if r["output_filename"] and (GENERATED_DIR / r["output_filename"]).exists():
+                ready.setdefault(r["coach_id"], set()).add(r["clip_id"])
+                last[r["coach_id"]] = max(last.get(r["coach_id"], ""), r["at"] or "")
+        out = []
+        for cid in sorted(ready, key=lambda k: last[k], reverse=True):
+            c = conn.execute("SELECT * FROM coaches WHERE id = ?", (cid,)).fetchone()
+            if c:
+                out.append({**coach_to_dict(c), "ready": len(ready[cid]), "total": total, "linked": cid == video["coach_id"]})
+    return out
+
+
+@app.delete("/api/videos/{video_id}")
+def delete_video(video_id: str):
+    with closing(db()) as conn, conn:
+        get_video(conn, video_id)
+        remove_video(conn, video_id)
+    return {"ok": True}
+
+
+@app.post("/api/videos/{video_id}/split")
+def split_video(video_id: str):
+    """يقطع الفيديو لقطع. يرفض لو فيه قطعة أطول من 15 ثانية."""
+    with closing(db()) as conn:
+        row = get_video(conn, video_id)
+        segs = [
+            s
+            for s in segments_for(row["duration"], json.loads(row["cuts"]), json.loads(row["skipped"]))
+            if not s["skipped"]
+        ]
+    if not segs:
+        raise HTTPException(400, "كل القطع مستبعدة، مفيش حاجة تتقطع")
+    too_long = [s["index"] + 1 for s in segs if s["too_long"]]
+    if too_long:
+        raise HTTPException(
+            400,
+            f"فيه قطع أطول من {MAX_CLIP_SECONDS:g} ثانية (رقم {', '.join(map(str, too_long))}). عدّلها الأول.",
+        )
+
+    source = RAW_DIR / row["filename"]
+    produced = []
+    try:
+        for n, seg in enumerate(segs, start=1):
+            clip_id = uuid.uuid4().hex[:12]
+            filename = f"{video_id}_{n:02d}_{clip_id}.mp4"
+            cmd = [
+                ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y",
+                "-ss", f"{seg['start']:.3f}", "-i", str(source), "-t", f"{seg['duration']:.3f}",
+                "-map", "0:v:0", "-map", "0:a:0?",
+                "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p",
+                "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart",
+                str(CLIPS_DIR / filename),
+            ]
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            if result.returncode != 0:
+                raise RuntimeError(result.stderr.strip()[-500:])
+            produced.append((clip_id, n, seg["start"], seg["end"], filename))
+    except RuntimeError as exc:
+        for p in produced:
+            (CLIPS_DIR / p[4]).unlink(missing_ok=True)
+        raise HTTPException(500, f"فشل التقطيع: {exc}") from exc
+
+    with closing(db()) as conn, conn:
+        # التقطيع الجديد بيستبدل القطع القديمة لنفس الفيديو
+        for old in conn.execute("SELECT filename FROM clips WHERE video_id = ?", (video_id,)):
+            (CLIPS_DIR / old["filename"]).unlink(missing_ok=True)
+        conn.execute("DELETE FROM clips WHERE video_id = ?", (video_id,))
+        conn.executemany(
+            "INSERT INTO clips (id, video_id, idx, start, end, filename, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            [(cid, video_id, n, s, e, f, now()) for cid, n, s, e, f in produced],
+        )
+    return {"clips_count": len(produced)}
+
+
+@app.get("/api/clips")
+def list_clips(video_id: str | None = None):
+    query = (
+        "SELECT c.*, v.name AS video_name, v.coach_id AS video_coach_id FROM clips c JOIN videos v ON v.id = c.video_id"
+        + (" WHERE c.video_id = ?" if video_id else "")
+        + " ORDER BY v.created_at DESC, c.idx"
+    )
+    with closing(db()) as conn:
+        rows = conn.execute(query, (video_id,) if video_id else ()).fetchall()
+    return [
+        {
+            "id": r["id"],
+            "video_id": r["video_id"],
+            "video_name": r["video_name"],
+            "video_coach_id": r["video_coach_id"],
+            "index": r["idx"],
+            "start": r["start"],
+            "end": r["end"],
+            "duration": r["end"] - r["start"],
+            "url": f"/media/clips/{r['filename']}",
+        }
+        for r in rows
+    ]
+
+
+@app.delete("/api/clips/{clip_id}")
+def delete_clip(clip_id: str):
+    with closing(db()) as conn, conn:
+        row = conn.execute("SELECT filename FROM clips WHERE id = ?", (clip_id,)).fetchone()
+        if row is None:
+            raise HTTPException(404, "القطعة غير موجودة")
+        conn.execute("DELETE FROM clips WHERE id = ?", (clip_id,))
+    (CLIPS_DIR / row["filename"]).unlink(missing_ok=True)
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------- المدربين
+
+
+def save_upload(upload: UploadFile, allowed: set[str], folder: Path, prefix: str) -> str:
+    ext = Path(upload.filename or "").suffix.lower()
+    if ext not in allowed:
+        raise HTTPException(400, f"نوع الملف غير مدعوم: {ext or 'بدون امتداد'}")
+    filename = f"{prefix}_{uuid.uuid4().hex[:8]}{ext}"
+    with (folder / filename).open("wb") as out:
+        shutil.copyfileobj(upload.file, out)
+    return filename
+
+
+def save_audio_upload(upload: UploadFile, folder: Path, prefix: str) -> str:
+    """أي ملف صوت (أو فيديو، بناخد صوته): المعروف بيتحفظ زي ما هو، والباقي (amr / caf / aiff / wma / 3gp / webm /
+    من غير امتداد...) بيتحول لـ m4a. لو FFmpeg ما عرفش يقراه كصوت بنقول كده بوضوح."""
+    ext = Path(upload.filename or "").suffix.lower()
+    if ext in AUDIO_EXTENSIONS:
+        return save_upload(upload, AUDIO_EXTENSIONS, folder, prefix)
+    safe_ext = ext if re.fullmatch(r"\.[a-z0-9]{1,6}", ext) else ""
+    raw = folder / f"{prefix}_{uuid.uuid4().hex[:8]}.upload{safe_ext}"
+    with raw.open("wb") as out:
+        shutil.copyfileobj(upload.file, out)
+    filename = f"{prefix}_{uuid.uuid4().hex[:8]}.m4a"
+    try:
+        r = subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(raw), "-vn", "-map", "0:a:0",
+                            "-c:a", "aac", "-b:a", "192k", str(folder / filename)], capture_output=True, text=True, timeout=600)
+        if r.returncode != 0 or not (folder / filename).exists() or (folder / filename).stat().st_size < 1000:
+            (folder / filename).unlink(missing_ok=True)
+            raise HTTPException(400, f"الملف ده ({ext or 'من غير امتداد'}) مفيهوش صوت أقدر أقراه. جرّب mp3 أو m4a أو wav")
+    finally:
+        raw.unlink(missing_ok=True)
+    return filename
+
+
+def coach_to_dict(row: sqlite3.Row) -> dict:
+    return {
+        "id": row["id"],
+        "name": row["name"],
+        "image_url": f"/media/coaches/{row['image_filename']}",
+        "outro_url": f"/media/coaches/{row['outro_filename']}" if row["outro_filename"] else None,
+        "outro_duration": row["outro_duration"],
+        "instagram": row["instagram"],
+        "tiktok": row["tiktok"],
+        "about": row["about"] or "",
+        "intro_url": f"/media/coaches/{row['intro_filename']}" if row["intro_filename"] else None,
+        "intro_duration": row["intro_duration"],
+        "voice_url": f"/media/coaches/{row['voice_filename']}" if row["voice_filename"] else None,
+        "sheet": [{"file": f, "url": f"/media/coaches/{f}"} for f in coach_sheet(row)],
+        "created_at": row["created_at"],
+    }
+
+
+def coach_sheet(row: sqlite3.Row) -> list[str]:
+    try:
+        return [f for f in json.loads(row["sheet"] or "[]") if (COACHES_DIR / f).exists()]
+    except ValueError:
+        return []
+
+
+def get_coach(conn: sqlite3.Connection, coach_id: str) -> sqlite3.Row:
+    row = conn.execute("SELECT * FROM coaches WHERE id = ?", (coach_id,)).fetchone()
+    if row is None:
+        raise HTTPException(404, "الشخصية مش موجودة")
+    return row
+
+
+def save_outro(outro: UploadFile, coach_id: str, kind: str = "outro") -> tuple[str, float]:
+    filename = save_upload(outro, VIDEO_EXTENSIONS, COACHES_DIR, f"{coach_id}_{kind}")
+    try:
+        return filename, probe_duration(COACHES_DIR / filename)
+    except ValueError as exc:
+        (COACHES_DIR / filename).unlink(missing_ok=True)
+        raise HTTPException(400, f"{'الإنترو' if kind == 'intro' else 'الأوترو'}: {exc}") from exc
+
+
+@app.get("/api/coaches")
+def list_coaches():
+    with closing(db()) as conn:
+        return [coach_to_dict(r) for r in conn.execute("SELECT * FROM coaches ORDER BY name")]
+
+
+def coach_handles(instagram: str | None, tiktok: str | None) -> dict[str, str | None]:
+    """الحسابات اللي اتكتبت (اللي مش مبعوت بيفضل زي ما هو)."""
+    out = {}
+    for col, value in (("instagram", instagram), ("tiktok", tiktok)):
+        if value is None:
+            continue
+        handle = sheets.clean_handle(value, col)
+        if value.strip() and not handle:
+            raise HTTPException(400, f"اسم حساب {'إنستجرام' if col == 'instagram' else 'تيك توك'} مش مظبوط: {value.strip()}")
+        out[col] = handle
+    return out
+
+
+@app.post("/api/coaches")
+def create_coach(
+    name: str = Form(...),
+    image: UploadFile = File(...),
+    outro: UploadFile | None = File(None),
+    instagram: str | None = Form(None),
+    tiktok: str | None = Form(None),
+):
+    name = name.strip()
+    if not name:
+        raise HTTPException(400, "اكتب اسم الشخصية")
+    handles = coach_handles(instagram, tiktok)
+    coach_id = uuid.uuid4().hex[:12]
+    image_filename = save_upload(image, IMAGE_EXTENSIONS, COACHES_DIR, f"{coach_id}_image")
+    outro_filename, outro_duration = save_outro(outro, coach_id) if outro and outro.filename else (None, None)
+    with closing(db()) as conn, conn:
+        conn.execute(
+            "INSERT INTO coaches (id, name, image_filename, outro_filename, outro_duration, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (coach_id, name, image_filename, outro_filename, outro_duration, now()),
+        )
+        # لو الاسم موجود في ملف الحسابات اللي اتستورد، حساباته بتتحط لوحدها
+        known = conn.execute("SELECT instagram, tiktok FROM social_handles WHERE key = ?", (sheets.norm_name(name),)).fetchone()
+        for col in ("instagram", "tiktok"):
+            value = handles.get(col) if col in handles else (known[col] if known else None)
+            conn.execute(f"UPDATE coaches SET {col} = ? WHERE id = ?", (value, coach_id))
+        return coach_to_dict(get_coach(conn, coach_id))
+
+
+@app.patch("/api/coaches/{coach_id}")
+def update_coach(
+    coach_id: str,
+    name: str | None = Form(None),
+    image: UploadFile | None = File(None),
+    outro: UploadFile | None = File(None),
+    remove_outro: bool = Form(False),
+    instagram: str | None = Form(None),
+    tiktok: str | None = Form(None),
+    about: str | None = Form(None),
+    intro: UploadFile | None = File(None),
+    remove_intro: bool = Form(False),
+    voice: UploadFile | None = File(None),
+    remove_voice: bool = Form(False),
+):
+    with closing(db()) as conn, conn:
+        row = get_coach(conn, coach_id)
+        old_files = []
+        if about is not None:
+            conn.execute("UPDATE coaches SET about = ? WHERE id = ?", (about.strip()[:2000], coach_id))
+        if intro and intro.filename:
+            filename, duration = save_outro(intro, coach_id, "intro")
+            conn.execute("UPDATE coaches SET intro_filename = ?, intro_duration = ? WHERE id = ?", (filename, duration, coach_id))
+            old_files.append(row["intro_filename"])
+        elif remove_intro:
+            conn.execute("UPDATE coaches SET intro_filename = NULL, intro_duration = NULL WHERE id = ?", (coach_id,))
+            old_files.append(row["intro_filename"])
+        if voice and voice.filename:
+            filename = save_audio_upload(voice, COACHES_DIR, f"{coach_id}_voice")
+            conn.execute("UPDATE coaches SET voice_filename = ? WHERE id = ?", (filename, coach_id))
+            old_files.append(row["voice_filename"])
+        elif remove_voice:
+            conn.execute("UPDATE coaches SET voice_filename = NULL WHERE id = ?", (coach_id,))
+            old_files.append(row["voice_filename"])
+        for col, handle in coach_handles(instagram, tiktok).items():
+            conn.execute(f"UPDATE coaches SET {col} = ? WHERE id = ?", (handle, coach_id))
+        if name is not None and name.strip():
+            conn.execute("UPDATE coaches SET name = ? WHERE id = ?", (name.strip(), coach_id))
+        if image and image.filename:
+            filename = save_upload(image, IMAGE_EXTENSIONS, COACHES_DIR, f"{coach_id}_image")
+            conn.execute("UPDATE coaches SET image_filename = ? WHERE id = ?", (filename, coach_id))
+            old_files.append(row["image_filename"])
+        if outro and outro.filename:
+            filename, duration = save_outro(outro, coach_id)
+            conn.execute(
+                "UPDATE coaches SET outro_filename = ?, outro_duration = ? WHERE id = ?",
+                (filename, duration, coach_id),
+            )
+            old_files.append(row["outro_filename"])
+        elif remove_outro:
+            conn.execute("UPDATE coaches SET outro_filename = NULL, outro_duration = NULL WHERE id = ?", (coach_id,))
+            old_files.append(row["outro_filename"])
+        result = coach_to_dict(get_coach(conn, coach_id))
+    # الصورة القديمة ممكن تكون مستخدمة في توليد لسه شغال، فبنسيبها لو كده
+    with closing(db()) as conn:
+        in_use = {r[0] for r in conn.execute("SELECT coach_image FROM generations")}
+    for f in old_files:
+        if f and f not in in_use:
+            (COACHES_DIR / f).unlink(missing_ok=True)
+    return result
+
+
+# ---------- حسابات المدربين على السوشيال (استيراد من ملف) ----------
+def _find_col(header: list[str], *words: str) -> int | None:
+    for i, h in enumerate(header):
+        h = (h or "").strip().lower()
+        if any(w in h for w in words):
+            return i
+    return None
+
+
+@app.post("/api/coaches/handles/preview")
+async def preview_handles(file: UploadFile = File(...)):
+    """بيقرا ملف Excel أو CSV فيه أسماء المدربين وحساباتهم، ويطابق كل اسم بمدرب في البرنامج."""
+    data = await file.read()
+    try:
+        rows = sheets.read_table(file.filename or "", data)
+    except Exception as exc:  # noqa: BLE001  (ملف بايظ أو مش Excel)
+        raise HTTPException(400, f"مش قادر أقرا الملف: {exc}") from exc
+    if not rows:
+        raise HTTPException(400, "الملف فاضي")
+    header = rows[0]
+    name_col = _find_col(header, "الاسم", "اسم", "name")
+    ig_col = _find_col(header, "إنستقرام", "انستقرام", "إنستجرام", "انستجرام", "instagram", "insta")
+    tt_col = _find_col(header, "تيك توك", "تيكتوك", "tiktok")
+    if name_col is None or (ig_col is None and tt_col is None):
+        raise HTTPException(400, "لازم الملف يبقى فيه عمود للاسم وعمود لإنستجرام أو تيك توك")
+    with closing(db()) as conn:
+        coaches = [dict(r) for r in conn.execute("SELECT id, name FROM coaches")]
+    by_name = {sheets.norm_name(c["name"]): c for c in coaches}
+    out = []
+    for r in rows[1:]:
+        r = r + [""] * (len(header) - len(r))
+        name = (r[name_col] or "").strip()
+        if not name:
+            continue
+        raw_ig = r[ig_col].strip() if ig_col is not None else ""
+        raw_tt = r[tt_col].strip() if tt_col is not None else ""
+        ig, tt = sheets.clean_handle(raw_ig, "instagram"), sheets.clean_handle(raw_tt, "tiktok")
+        key = sheets.norm_name(name)
+        coach = by_name.get(key) or next(
+            (c for k, c in by_name.items() if k and len(k) > 3 and (k in key or key in k)), None
+        )
+        out.append({
+            "name": name, "instagram": ig, "tiktok": tt,
+            "bad_instagram": raw_ig if raw_ig and not ig else None,
+            "bad_tiktok": raw_tt if raw_tt and not tt else None,
+            "coach_id": coach["id"] if coach else None,
+        })
+    return {"rows": out, "coaches": coaches}
+
+
+class HandleRow(BaseModel):
+    name: str
+    instagram: str | None = None
+    tiktok: str | None = None
+    coach_id: str | None = None
+
+
+class HandlesIn(BaseModel):
+    rows: list[HandleRow]
+
+
+@app.post("/api/coaches/handles/apply")
+def apply_handles(body: HandlesIn):
+    updated = 0
+    with closing(db()) as conn, conn:
+        for r in body.rows:
+            ig, tt = sheets.clean_handle(r.instagram, "instagram"), sheets.clean_handle(r.tiktok, "tiktok")
+            if not (ig or tt):
+                continue
+            conn.execute(
+                "INSERT INTO social_handles (key, name, instagram, tiktok) VALUES (?, ?, ?, ?) "
+                "ON CONFLICT(key) DO UPDATE SET name = excluded.name, "
+                "instagram = COALESCE(excluded.instagram, instagram), tiktok = COALESCE(excluded.tiktok, tiktok)",
+                (sheets.norm_name(r.name), r.name.strip(), ig, tt),
+            )
+            if r.coach_id and conn.execute("SELECT 1 FROM coaches WHERE id = ?", (r.coach_id,)).fetchone():
+                conn.execute(
+                    "UPDATE coaches SET instagram = COALESCE(?, instagram), tiktok = COALESCE(?, tiktok) WHERE id = ?",
+                    (ig, tt, r.coach_id),
+                )
+                updated += 1
+    return {"saved": len(body.rows), "coaches_updated": updated}
+
+
+@app.get("/api/handles")
+def list_handles():
+    """كل الحسابات المعروفة (المدربين + اللي اتستوردت) عشان الاقتراحات في خانة التاج."""
+    with closing(db()) as conn:
+        out = [{"name": r["name"], "instagram": r["instagram"], "tiktok": r["tiktok"]}
+               for r in conn.execute("SELECT name, instagram, tiktok FROM coaches WHERE instagram IS NOT NULL OR tiktok IS NOT NULL")]
+        seen = {h["instagram"] for h in out}
+        out += [{"name": r["name"], "instagram": r["instagram"], "tiktok": r["tiktok"]}
+                for r in conn.execute("SELECT name, instagram, tiktok FROM social_handles ORDER BY name") if r["instagram"] not in seen]
+    return out
+
+
+@app.delete("/api/coaches/{coach_id}")
+def delete_coach(coach_id: str):
+    with closing(db()) as conn, conn:
+        row = get_coach(conn, coach_id)
+        conn.execute("DELETE FROM coaches WHERE id = ?", (coach_id,))
+        conn.execute("UPDATE videos SET coach_id = NULL WHERE coach_id = ?", (coach_id,))
+        conn.execute("UPDATE folders SET coach_id = NULL WHERE coach_id = ?", (coach_id,))
+        in_use = {r[0] for r in conn.execute("SELECT coach_image FROM generations")}
+    if row["image_filename"] not in in_use:
+        (COACHES_DIR / row["image_filename"]).unlink(missing_ok=True)
+    for f in [row["outro_filename"], row["intro_filename"], row["voice_filename"], *coach_sheet(row)]:
+        if f:
+            (COACHES_DIR / f).unlink(missing_ok=True)
+    return {"ok": True}
+
+
+@app.post("/api/coaches/{coach_id}/sheet")
+def coach_sheet_add(coach_id: str, files: list[UploadFile] = File(...)):
+    """🧍 صور كاركتر شيت للشخصية (زوايا وتعبيرات)، عشان التوليد يحافظ على شكلها."""
+    with closing(db()) as conn, conn:
+        row = get_coach(conn, coach_id)
+        sheet = coach_sheet(row)
+        for f in files[:24]:
+            sheet.append(save_upload(f, IMAGE_EXTENSIONS, COACHES_DIR, f"{coach_id}_sheet"))
+        conn.execute("UPDATE coaches SET sheet = ? WHERE id = ?", (json.dumps(sheet[-24:]), coach_id))
+        return coach_to_dict(get_coach(conn, coach_id))
+
+
+@app.delete("/api/coaches/{coach_id}/sheet/{file}")
+def coach_sheet_del(coach_id: str, file: str):
+    with closing(db()) as conn, conn:
+        row = get_coach(conn, coach_id)
+        sheet = coach_sheet(row)
+        if file not in sheet:
+            raise HTTPException(404, "الصورة مش موجودة")
+        sheet.remove(file)
+        conn.execute("UPDATE coaches SET sheet = ? WHERE id = ?", (json.dumps(sheet), coach_id))
+        (COACHES_DIR / Path(file).name).unlink(missing_ok=True)
+        return coach_to_dict(get_coach(conn, coach_id))
+
+
+# ---------------------------------------------------------------- التوليد بـ Seedance
+
+ACTIVE_STATUSES = ("queued", "uploading", "submitted", "processing", "downloading")
+executor = ThreadPoolExecutor(max_workers=3)
+_running: set[str] = set()
+_running_lock = threading.Lock()
+
+
+def set_generation(gen_id: str, **fields) -> None:
+    fields["updated_at"] = now()
+    cols = ", ".join(f"{k} = ?" for k in fields)
+    with closing(db()) as conn, conn:
+        conn.execute(f"UPDATE generations SET {cols} WHERE id = ?", (*fields.values(), gen_id))
+
+
+def run_generation(gen_id: str) -> None:
+    with _running_lock:
+        if gen_id in _running:
+            return
+        _running.add(gen_id)
+    try:
+        _run_generation(gen_id)
+    except httpx.HTTPError as exc:
+        set_generation(gen_id, status="failed", error=f"مقدرتش أوصل لـ Atlas (مشكلة إنترنت أو اتصال): {exc}"[:500])
+    except Exception as exc:  # أي خطأ يتسجل على الطلب نفسه بدل ما يضيع
+        set_generation(gen_id, status="failed", error=str(exc)[:500])
+    finally:
+        with _running_lock:
+            _running.discard(gen_id)
+
+
+def _run_generation(gen_id: str) -> None:
+    with closing(db()) as conn:
+        g = conn.execute("SELECT * FROM generations WHERE id = ?", (gen_id,)).fetchone()
+    if g is None:
+        return
+    clip_path = CLIPS_DIR / g["clip_filename"]
+    image_path = COACHES_DIR / g["coach_image"]
+    output = f"{gen_id}.mp4"
+
+    def on_status(status: str) -> None:
+        set_generation(gen_id, status="processing" if status not in ("completed", "succeeded") else "downloading")
+
+    if atlas.mock_mode():
+        if not clip_path.exists():
+            raise atlas.AtlasError("ملف القطعة اتمسح")
+        set_generation(gen_id, status="submitted", prediction_id=f"mock-{gen_id}")
+        atlas.mock_generate(clip_path, GENERATED_DIR / output, on_status)
+        set_generation(gen_id, status="completed", output_filename=output, error=None)
+        return
+
+    prediction_id = g["prediction_id"]
+    if not prediction_id:
+        # لسه متبعتش: نرفع الملفات ونبعت الطلب
+        if not clip_path.exists():
+            raise atlas.AtlasError("ملف القطعة اتمسح (غالبًا الفيديو اتقطّع تاني). اختار القطعة الجديدة وولّد من الأول")
+        if not image_path.exists():
+            raise atlas.AtlasError("صورة الشخصية اتمسحت")
+        set_generation(gen_id, status="uploading", error=None)
+        clip_url = atlas.upload_media(clip_path)
+        image_url = atlas.upload_media(image_path)
+        params = json.loads(g["params"])
+        body = {
+            "model": g["model"],
+            "prompt": g["prompt"],
+            "reference_images": [image_url],
+            "reference_videos": [clip_url],
+            "duration": params["duration"],
+            "resolution": params["resolution"],
+            "ratio": params["ratio"],
+            "generate_audio": params["generate_audio"],
+            "watermark": False,
+        }
+        prediction_id = atlas.submit_video(body)
+        set_generation(gen_id, status="submitted", prediction_id=prediction_id)
+
+    video_url = atlas.wait_for(prediction_id, on_status)
+    set_generation(gen_id, status="downloading")
+    atlas.download(video_url, GENERATED_DIR / output)
+    set_generation(gen_id, status="completed", output_filename=output, error=None)
+
+
+def generation_to_dict(r: sqlite3.Row) -> dict:
+    return {
+        "id": r["id"],
+        "clip_id": r["clip_id"],
+        "video_id": r["video_id"],
+        "clip_label": r["clip_label"],
+        "clip_url": f"/media/clips/{r['clip_filename']}",
+        "coach_id": r["coach_id"],
+        "coach_name": r["coach_name"],
+        "coach_image_url": f"/media/coaches/{r['coach_image']}",
+        "model": r["model"],
+        "model_label": atlas.MODEL_LABEL if r["model"] == atlas.MODEL else (r["model"] or "").split("/")[-1],
+        "prompt": r["prompt"],
+        "params": json.loads(r["params"]),
+        "status": r["status"],
+        "error": r["error"],
+        # ?v= عشان لو الفيديو اتولد تاني بنفس الاسم المتصفح ما يعرضش القديم من الكاش
+        "output_url": f"/media/generated/{r['output_filename']}?v={re.sub(r'[^0-9]', '', r['updated_at'] or '')[-10:]}" if r["output_filename"] else None,
+        "created_at": r["created_at"],
+        "updated_at": r["updated_at"],
+    }
+
+
+@app.get("/api/atlas")
+def atlas_status():
+    return {
+        "configured": bool(atlas.api_key()),
+        "mock": atlas.mock_mode(),
+        "model_label": atlas.MODEL_LABEL,
+        "resolution": atlas.RESOLUTION,
+        "ratio": atlas.RATIO,
+        "min_duration": atlas.MIN_DURATION,
+        "max_duration": atlas.MAX_DURATION,
+    }
+
+
+# ---------------------------------------------------------------- مكتبة البرومبتات
+
+DEFAULT_PROMPT = (
+    "@image1 is the coach, a cartoon character. Recreate the exact exercise movement, body mechanics, "
+    "tempo and camera framing from @video1, performed by the character from @image1. Keep the character's "
+    "face, outfit and art style exactly as in @image1. Full body visible, clean gym background, smooth natural motion."
+)
+
+
+def seed_prompts() -> None:
+    with closing(db()) as conn, conn:
+        if conn.execute("SELECT COUNT(*) FROM prompts").fetchone()[0] == 0:
+            conn.execute(
+                "INSERT INTO prompts (id, name, text, is_default, created_at) VALUES (?, ?, ?, 1, ?)",
+                (uuid.uuid4().hex[:12], "نفس حركة التمرين", DEFAULT_PROMPT, now()),
+            )
+
+
+seed_prompts()
+
+
+def prompt_to_dict(r: sqlite3.Row) -> dict:
+    return {"id": r["id"], "name": r["name"], "text": r["text"], "is_default": bool(r["is_default"])}
+
+
+def get_prompt(conn: sqlite3.Connection, prompt_id: str) -> sqlite3.Row:
+    row = conn.execute("SELECT * FROM prompts WHERE id = ?", (prompt_id,)).fetchone()
+    if row is None:
+        raise HTTPException(404, "البرومبت غير موجود")
+    return row
+
+
+class PromptIn(BaseModel):
+    name: str
+    text: str
+    is_default: bool = False
+
+
+def clean_prompt(body: PromptIn) -> tuple[str, str]:
+    name, text = body.name.strip(), body.text.strip()
+    if not name or not text:
+        raise HTTPException(400, "اكتب اسم البرومبت ونصّه")
+    return name, text
+
+
+@app.get("/api/prompts")
+def list_prompts():
+    with closing(db()) as conn:
+        rows = conn.execute("SELECT * FROM prompts ORDER BY is_default DESC, created_at").fetchall()
+    return [prompt_to_dict(r) for r in rows]
+
+
+@app.post("/api/prompts")
+def create_prompt(body: PromptIn):
+    name, text = clean_prompt(body)
+    prompt_id = uuid.uuid4().hex[:12]
+    with closing(db()) as conn, conn:
+        if body.is_default:
+            conn.execute("UPDATE prompts SET is_default = 0")
+        conn.execute(
+            "INSERT INTO prompts (id, name, text, is_default, created_at) VALUES (?, ?, ?, ?, ?)",
+            (prompt_id, name, text, int(body.is_default), now()),
+        )
+        return prompt_to_dict(get_prompt(conn, prompt_id))
+
+
+@app.put("/api/prompts/{prompt_id}")
+def update_prompt(prompt_id: str, body: PromptIn):
+    name, text = clean_prompt(body)
+    with closing(db()) as conn, conn:
+        get_prompt(conn, prompt_id)
+        if body.is_default:
+            conn.execute("UPDATE prompts SET is_default = 0")
+        conn.execute(
+            "UPDATE prompts SET name = ?, text = ?, is_default = ? WHERE id = ?",
+            (name, text, int(body.is_default), prompt_id),
+        )
+        return prompt_to_dict(get_prompt(conn, prompt_id))
+
+
+@app.delete("/api/prompts/{prompt_id}")
+def delete_prompt(prompt_id: str):
+    with closing(db()) as conn, conn:
+        get_prompt(conn, prompt_id)
+        if conn.execute("SELECT COUNT(*) FROM prompts").fetchone()[0] <= 1:
+            raise HTTPException(400, "لازم يفضل برومبت واحد على الأقل")
+        conn.execute("DELETE FROM prompts WHERE id = ?", (prompt_id,))
+        if not conn.execute("SELECT 1 FROM prompts WHERE is_default = 1").fetchone():
+            conn.execute(
+                "UPDATE prompts SET is_default = 1 WHERE id = (SELECT id FROM prompts ORDER BY created_at LIMIT 1)"
+            )
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------- طلبات التوليد
+
+
+class GenerationIn(BaseModel):
+    clip_ids: list[str]
+    coach_id: str | None = None  # لو فاضي: كل قطعة بتاخد مدرب المشروع بتاعها
+    prompt_id: str
+    generate_audio: bool = False
+
+
+@app.post("/api/generations")
+def create_generations(body: GenerationIn):
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات")
+    if not body.clip_ids:
+        raise HTTPException(400, "اختار قطعة واحدة على الأقل")
+
+    with closing(db()) as conn, conn:
+        forced = get_coach(conn, body.coach_id) if body.coach_id else None
+        prompt_text = get_prompt(conn, body.prompt_id)["text"]
+        rows = conn.execute(
+            f"SELECT c.*, v.name AS video_name, v.coach_id AS video_coach_id FROM clips c JOIN videos v ON v.id = c.video_id "
+            f"WHERE c.id IN ({','.join('?' * len(body.clip_ids))})",
+            body.clip_ids,
+        ).fetchall()
+        if len(rows) != len(set(body.clip_ids)):
+            raise HTTPException(400, "فيه قطع مش موجودة. حدّث الصفحة")
+        short = [f"{r['video_name']} #{r['idx']}" for r in rows if r["end"] - r["start"] < MIN_REFERENCE_SECONDS]
+        if short:
+            raise HTTPException(400, f"قطع أقصر من {MIN_REFERENCE_SECONDS:g} ثانية ومينفعش تتبعت: {', '.join(short)}")
+
+        if not forced:
+            missing = sorted({r["video_name"] for r in rows if not r["video_coach_id"]})
+            if missing:
+                raise HTTPException(400, f"مفيش شخصية للمشروع: {'، '.join(missing)}. اختاره من صفحة المشاريع")
+        coaches = {}
+        ids = []
+        for r in rows:
+            coach = forced or coaches.get(r["video_coach_id"])
+            if coach is None:
+                coach = coaches[r["video_coach_id"]] = get_coach(conn, r["video_coach_id"])
+            # المدة على قد طول القطعة، في حدود اللي Seedance بيقبله (4 لـ 15 ثانية)
+            duration = max(atlas.MIN_DURATION, min(atlas.MAX_DURATION, int(r["end"] - r["start"] + 0.5)))
+            gen_id = uuid.uuid4().hex[:12]
+            params = {
+                "duration": duration,
+                "resolution": atlas.RESOLUTION,
+                "ratio": atlas.RATIO,
+                "generate_audio": body.generate_audio,
+            }
+            conn.execute(
+                "INSERT INTO generations (id, clip_id, clip_filename, clip_label, coach_id, coach_name, coach_image, "
+                "model, prompt, params, status, created_at, updated_at, video_id) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', ?, ?, ?)",
+                (
+                    gen_id, r["id"], r["filename"], f"{r['video_name']} #{r['idx']}",
+                    coach["id"], coach["name"], coach["image_filename"],
+                    atlas.MODEL, prompt_text, json.dumps(params), now(), now(), r["video_id"],
+                ),
+            )
+            ids.append(gen_id)
+    for gen_id in ids:
+        executor.submit(run_generation, gen_id)
+    return {"created": len(ids)}
+
+
+@app.get("/api/generations")
+def list_generations():
+    with closing(db()) as conn:
+        rows = conn.execute("SELECT * FROM generations WHERE clip_id NOT LIKE 'series:%' AND clip_id NOT LIKE 'ad:%' AND clip_id != 'upload' ORDER BY created_at DESC, clip_label").fetchall()
+    return [generation_to_dict(r) for r in rows]
+
+
+# ---------------------------------------------------------------- الأرشيف
+
+
+def exported_videos(conn: sqlite3.Connection) -> dict[str, str]:
+    """الفيديوهات الخام اللي اتعملها مونتاج واتصدّرت: video_id → رابط الفيديو النهائي."""
+    out: dict[str, str] = {}
+    for p in conn.execute(
+        "SELECT p.data, e.filename FROM projects p JOIN exports e ON e.id = p.export_id ORDER BY p.updated_at"
+    ).fetchall():
+        vid = json.loads(p["data"]).get("video_id")
+        if vid:
+            out[vid] = f"/media/exports/{p['filename']}"
+    return out
+
+
+@app.get("/api/archive")
+def archive_status():
+    """حالة كل فيديو: شغال عليه ولا في الأرشيف. اللي اتصدّر بيتأرشف لوحده إلا لو رجّعته."""
+    with closing(db()) as conn:
+        exported = exported_videos(conn)
+        rows = conn.execute("SELECT id, name, archived, created_at FROM videos ORDER BY created_at DESC").fetchall()
+    return [
+        {
+            "video_id": r["id"], "name": r["name"],
+            "archived": bool(r["archived"]) if r["archived"] is not None else r["id"] in exported,
+            "manual": r["archived"] is not None,
+            "exported_url": exported.get(r["id"]),
+        }
+        for r in rows
+    ]
+
+
+class ArchiveIn(BaseModel):
+    archived: bool | None = None  # null = يرجع للتلقائي
+
+
+@app.put("/api/videos/{video_id}/archive")
+def set_archive(video_id: str, body: ArchiveIn):
+    with closing(db()) as conn, conn:
+        if not conn.execute("SELECT 1 FROM videos WHERE id = ?", (video_id,)).fetchone():
+            raise HTTPException(404, "الفيديو غير موجود")
+        exported = video_id in exported_videos(conn)
+        # لو اللي اخترته هو نفس التلقائي، نسيبه تلقائي
+        value = None if body.archived is None or body.archived == exported else int(body.archived)
+        conn.execute("UPDATE videos SET archived = ? WHERE id = ?", (value, video_id))
+    return {"ok": True}
+
+
+@app.post("/api/generations/{gen_id}/retry")
+def retry_generation(gen_id: str):
+    with closing(db()) as conn:
+        row = conn.execute("SELECT status FROM generations WHERE id = ?", (gen_id,)).fetchone()
+    if row is None:
+        raise HTTPException(404, "الطلب غير موجود")
+    if row["status"] != "failed":
+        raise HTTPException(400, "الطلب ده مش فاشل")
+    # لو الطلب كان اتبعت لـ Atlas بنكمّل متابعته بدل ما ندفع تاني
+    set_generation(gen_id, status="queued", error=None)
+    executor.submit(run_generation, gen_id)
+    return {"ok": True}
+
+
+@app.post("/api/generations/{gen_id}/again")
+def generate_again(gen_id: str):
+    """توليد جديد لنفس القطعة (نفس المدرب والبرومبت والإعدادات) في نفس مكان القديم: الفيديو القديم بيتمسح
+    والطلب نفسه بيتولد من الأول، فالترتيب ما بيتغيرش."""
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات")
+    with closing(db()) as conn:
+        r = conn.execute("SELECT * FROM generations WHERE id = ?", (gen_id,)).fetchone()
+    if r is None:
+        raise HTTPException(404, "الطلب غير موجود")
+    if r["clip_id"].startswith("series:") or r["clip_id"] == "upload":
+        raise HTTPException(400, "الفيديو ده مش من قطعة مشروع")
+    if r["status"] not in ("completed", "failed"):
+        raise HTTPException(400, "الفيديو لسه بيتولد")
+    with _running_lock:
+        if gen_id in _running:
+            raise HTTPException(400, "الفيديو لسه بيتولد")
+    if r["output_filename"]:
+        (GENERATED_DIR / r["output_filename"]).unlink(missing_ok=True)
+    set_generation(gen_id, status="queued", prediction_id=None, output_filename=None, error=None)
+    executor.submit(run_generation, gen_id)
+    return {"id": gen_id}
+
+
+@app.delete("/api/generations/{gen_id}")
+def delete_generation(gen_id: str):
+    with closing(db()) as conn, conn:
+        row = conn.execute("SELECT output_filename, status FROM generations WHERE id = ?", (gen_id,)).fetchone()
+        if row is None:
+            raise HTTPException(404, "الطلب غير موجود")
+        if row["status"] in ACTIVE_STATUSES:
+            raise HTTPException(400, "الطلب لسه شغال، استنى لما يخلص")
+        conn.execute("DELETE FROM generations WHERE id = ?", (gen_id,))
+    if row["output_filename"]:
+        (GENERATED_DIR / row["output_filename"]).unlink(missing_ok=True)
+    return {"ok": True}
+
+
+def resume_generations() -> None:
+    """لو البرنامج اتقفل والطلبات شغالة، نكمّلها لما يفتح تاني."""
+    with closing(db()) as conn:
+        ids = [
+            r["id"]
+            for r in conn.execute(
+                f"SELECT id FROM generations WHERE status IN ({','.join('?' * len(ACTIVE_STATUSES))})",
+                ACTIVE_STATUSES,
+            )
+        ]
+    for gen_id in ids:
+        executor.submit(run_generation, gen_id)
+
+
+resume_generations()
+
+
+# ---------------------------------------------------------------- مكتبات الصوت (التعليق الصوتي والموسيقى)
+
+
+def audio_to_dict(r: sqlite3.Row) -> dict:
+    return {
+        "id": r["id"],
+        "kind": r["kind"],
+        "name": r["name"],
+        "url": f"/media/audio/{r['filename']}",
+        "duration": r["duration"],
+        "created_at": r["created_at"],
+    }
+
+
+def check_kind(kind: str) -> str:
+    if kind not in AUDIO_KINDS:
+        raise HTTPException(400, "نوع مكتبة غير معروف")
+    return kind
+
+
+@app.get("/api/audio")
+def list_audio(kind: str):
+    check_kind(kind)
+    with closing(db()) as conn:
+        rows = conn.execute("SELECT * FROM audio WHERE kind = ? ORDER BY created_at DESC", (kind,)).fetchall()
+    return [audio_to_dict(r) for r in rows]
+
+
+@app.post("/api/audio")
+def upload_audio(kind: str = Form(...), file: UploadFile = File(...)):
+    check_kind(kind)
+    audio_id = uuid.uuid4().hex[:12]
+    filename = save_audio_upload(file, AUDIO_DIR, f"{kind}_{audio_id}")
+    try:
+        duration = probe_duration(AUDIO_DIR / filename)
+    except ValueError as exc:
+        (AUDIO_DIR / filename).unlink(missing_ok=True)
+        raise HTTPException(400, str(exc)) from exc
+    with closing(db()) as conn, conn:
+        conn.execute(
+            "INSERT INTO audio (id, kind, name, filename, duration, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (audio_id, kind, Path(file.filename).stem, filename, duration, now()),
+        )
+        return audio_to_dict(conn.execute("SELECT * FROM audio WHERE id = ?", (audio_id,)).fetchone())
+
+
+class RenameIn(BaseModel):
+    name: str
+
+
+@app.patch("/api/audio/{audio_id}")
+def rename_audio(audio_id: str, body: RenameIn):
+    name = body.name.strip()
+    if not name:
+        raise HTTPException(400, "الاسم فاضي")
+    with closing(db()) as conn, conn:
+        if conn.execute("UPDATE audio SET name = ? WHERE id = ?", (name, audio_id)).rowcount == 0:
+            raise HTTPException(404, "الملف غير موجود")
+        return audio_to_dict(conn.execute("SELECT * FROM audio WHERE id = ?", (audio_id,)).fetchone())
+
+
+@app.delete("/api/audio/{audio_id}")
+def delete_audio(audio_id: str):
+    with closing(db()) as conn, conn:
+        row = conn.execute("SELECT filename FROM audio WHERE id = ?", (audio_id,)).fetchone()
+        if row is None:
+            raise HTTPException(404, "الملف غير موجود")
+        conn.execute("DELETE FROM audio WHERE id = ?", (audio_id,))
+        conn.execute("UPDATE videos SET voice_id = NULL WHERE voice_id = ?", (audio_id,))
+        conn.execute("UPDATE folders SET voice_id = NULL WHERE voice_id = ?", (audio_id,))
+    (AUDIO_DIR / row["filename"]).unlink(missing_ok=True)
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------- المونتاج (الخطوة 6)
+
+_probe_cache: dict[str, montage.MediaInfo] = {}
+
+
+def media_info(path: Path) -> montage.MediaInfo:
+    key = f"{path}:{path.stat().st_mtime}"
+    if key not in _probe_cache:
+        _probe_cache[key] = montage.probe(ffmpeg_exe(), path)
+    return _probe_cache[key]
+
+
+OUTRO_PREFIX = "outro:"  # قطعة في المونتاج من أوترو مدرب: gen_id = "outro:<coach id>"
+EXTRA_OUTRO_PREFIX = "xoutro:"  # أوترو زيادة اترفع من المونتاج: gen_id = "xoutro:<outro id>"
+ANY_OUTRO = (OUTRO_PREFIX, EXTRA_OUTRO_PREFIX)
+
+
+def clip_source(conn: sqlite3.Connection, gen_id: str) -> Path | None:
+    if gen_id.startswith(OUTRO_PREFIX):
+        row = conn.execute("SELECT outro_filename AS f FROM coaches WHERE id = ?", (gen_id[len(OUTRO_PREFIX):],)).fetchone()
+        base = COACHES_DIR
+    elif gen_id.startswith(EXTRA_OUTRO_PREFIX):
+        row = conn.execute("SELECT filename AS f FROM outros WHERE id = ?", (gen_id[len(EXTRA_OUTRO_PREFIX):],)).fetchone()
+        base = COACHES_DIR
+    else:
+        row = conn.execute("SELECT output_filename AS f FROM generations WHERE id = ?", (gen_id,)).fetchone()
+        base = GENERATED_DIR
+    if row is None or not row["f"] or not (base / row["f"]).exists():
+        return None
+    return base / row["f"]
+
+
+@app.post("/api/montage/upload")
+def montage_upload(file: UploadFile = File(...), coach_id: str = Form(""), replace: str = Form("")):
+    """فيديو من عندك للمونتاج. لو بيبدّل قطعة جاية من لقطة في مسلسل، بيتضاف كمان نسخة على اللقطة دي (موافق عليها)."""
+    name = save_upload(file, VIDEO_EXTENSIONS, GENERATED_DIR, "upload")
+    path = GENERATED_DIR / name
+    try:
+        info = media_info(path)
+    except Exception as exc:  # noqa: BLE001
+        path.unlink(missing_ok=True)
+        raise HTTPException(400, f"مقدرتش أقرا الفيديو: {exc}") from exc
+    gid = uuid.uuid4().hex[:12]
+    label = f"⬆ {Path(file.filename or 'video').stem}"
+    link = {}
+    with closing(db()) as conn, conn:
+        if replace:
+            row = conn.execute("SELECT clip_label, params FROM generations WHERE id = ?", (replace,)).fetchone()
+            if row:
+                try:
+                    link = json.loads(row["params"] or "{}")
+                except ValueError:
+                    link = {}
+                label = f"{row['clip_label']} ⬆"
+        conn.execute(
+            "INSERT INTO generations (id, clip_id, clip_filename, clip_label, coach_id, coach_name, coach_image, model, prompt, "
+            "params, status, output_filename, created_at, updated_at) VALUES (?, ?, ?, ?, ?, '', '', 'upload', '', ?, 'completed', ?, ?, ?)",
+            (gid, f"series:{link['episode']}" if link.get("episode") else "upload", file.filename or name, label, coach_id,
+             json.dumps(link), name, now(), now()),
+        )
+    synced = None
+    if link.get("episode") and link.get("shot"):
+        eid, sid = link["episode"], link["shot"]
+        try:
+            tname = f"take_{uuid.uuid4().hex[:10]}{path.suffix}"
+            shutil.copyfile(path, ep_dir(eid) / "takes" / tname)
+            tid = uuid.uuid4().hex[:10]
+            def fn(d):
+                sh = find_shot(d, sid)
+                d["takes"][tid] = {"id": tid, "file": tname, "source": "upload", "status": "done", "error": None, "approved": True,
+                                   "duration": round(info.duration, 2), "name": file.filename, "created_at": now()}
+                sh["takes"].append(tid)
+                sh["chosen"], sh["offset"] = tid, 0.0
+            update_episode(eid, fn)
+            synced = sid
+        except HTTPException:
+            synced = None
+    return {"id": gid, "duration": info.duration, "synced_shot": synced}
+
+
+@app.get("/api/montage/sfx")
+def montage_sfx():
+    """🔉 مكتبة المؤثرات: المتولّدة + اللي رفعتها."""
+    out = []
+    for key, (label, _) in sfxlib.SOUNDS.items():
+        path = sfxlib.ensure(SFXLIB_DIR, key)
+        out.append({"id": f"lib:{key}", "name": label, "duration": round(sfxlib.duration(path), 2), "url": f"/api/montage/sfx/{key}.wav", "lib": True})
+    with closing(db()) as conn:
+        out += [{**audio_to_dict(r), "lib": False} for r in conn.execute("SELECT * FROM audio WHERE kind = 'sfx' ORDER BY created_at DESC")]
+    return out
+
+
+@app.get("/api/montage/sfx/{name}.wav")
+def montage_sfx_file(name: str):
+    try:
+        return FileResponse(sfxlib.ensure(SFXLIB_DIR, name), media_type="audio/wav")
+    except KeyError:
+        raise HTTPException(404, "المؤثر مش موجود") from None
+
+
+def sound_source(conn: sqlite3.Connection, src: str) -> Path | None:
+    """ملف صوت لعنصر في تراكات الصوت الزيادة: مؤثر من المكتبة (lib:…) أو أي صوت من المكتبة بالـ id."""
+    if src.startswith("lib:"):
+        try:
+            return sfxlib.ensure(SFXLIB_DIR, src[4:])
+        except KeyError:
+            return None
+    row = conn.execute("SELECT filename FROM audio WHERE id = ?", (src,)).fetchone()
+    return AUDIO_DIR / row["filename"] if row and (AUDIO_DIR / row["filename"]).exists() else None
+
+
+def project_sounds(conn: sqlite3.Connection, data: dict) -> list[montage.AudioTrack]:
+    out = []
+    if track_flag(data, "snd", "mute"):
+        return []
+    for x in (data.get("sounds") or [])[:200]:
+        if not isinstance(x, dict) or x.get("mute"):
+            continue
+        path = sound_source(conn, str(x.get("src") or ""))
+        if not path:
+            continue
+        length = x.get("length")
+        out.append(montage.AudioTrack(
+            path, volume=clamp(float(x.get("volume", 1)), 0, 3), delay=max(0.0, float(x.get("delay") or 0)),
+            offset=max(0.0, float(x.get("offset") or 0)), length=float(length) if length and float(length) > 0.01 else None,
+            fade_in_s=clamp(float(x.get("fade_in") or 0), 0, 10), fade_out_s=clamp(float(x.get("fade_out") or 0), 0, 10),
+        ))
+    return out
+
+
+OVERLAY_BLENDS = {"normal", *montage.BLENDS}
+OVERLAY_ANIMS = {"fade", "zoom", "pop", "slideup", "slidedown", "slideleft", "slideright"}
+
+
+def overlay_source(conn: sqlite3.Connection, src: str) -> tuple[Path | None, bool]:
+    """ملف الطبقة: صورة مرفوعة (img:…) أو فيديو من المكتبة."""
+    if src.startswith("img:"):
+        path = OVERLAY_DIR / Path(src[4:]).name
+        return (path if path.exists() else None), True
+    return clip_source(conn, src), False
+
+
+def project_overlays(conn: sqlite3.Connection, data: dict, total: float) -> tuple[list[montage.Overlay], list[montage.AudioTrack]]:
+    """🖼️ الطبقات فوق الفيديو + صوت الفيديوهات اللي فيها."""
+    if track_flag(data, "over", "hide"):
+        return [], []
+    out, sounds = [], []
+    for x in (data.get("overlays") or [])[:30]:
+        if not isinstance(x, dict) or x.get("disabled"):
+            continue
+        path, is_image = overlay_source(conn, str(x.get("src") or ""))
+        if not path:
+            continue
+        info = media_info(path) if not is_image else None
+        if is_image:
+            from PIL import Image  # noqa: PLC0415
+            with Image.open(path) as im:
+                sw, sh = im.size
+        else:
+            sw, sh = info.width, info.height
+        t0 = max(0.0, float(x.get("t0") or 0))
+        if t0 >= total:
+            continue
+        speed = clamp(float(x.get("speed") or 1), 0.25, 4)
+        start = clamp(float(x.get("start") or 0), 0, (info.duration if info else 0))
+        dur = clamp(float(x.get("dur") or 3), 0.1, total - t0)
+        if info:
+            dur = min(dur, max(0.1, (info.duration - start) / speed))
+        ch = x.get("chroma") or {}
+        def anim(a):
+            return (a["type"], clamp(float(a.get("dur") or 0.4), 0.05, 3)) if isinstance(a, dict) and a.get("type") in OVERLAY_ANIMS else ("", 0.0)
+        out.append(montage.Overlay(
+            path, is_image=is_image, start=start, t0=t0, dur=dur, speed=speed,
+            x=clamp(float(x.get("x", 0.5)), -1, 2), y=clamp(float(x.get("y", 0.5)), -1, 2), w=clamp(float(x.get("w", 0.5)), 0.02, 3),
+            src_w=sw, src_h=sh, angle=clamp(float(x.get("angle") or 0), -360, 360), opacity=clamp(float(x.get("opacity", 1)), 0, 1),
+            blend=x.get("blend") if x.get("blend") in OVERLAY_BLENDS else "normal",
+            mask=x.get("mask") if x.get("mask") in montage.MASKS else "",
+            chroma=(ch.get("color") if re.fullmatch(r"#[0-9a-fA-F]{6}", str(ch.get("color") or "")) else "#00ff00",
+                    clamp(float(ch.get("sim", 0.3)), 0.01, 1), clamp(float(ch.get("blend", 0.1)), 0, 1)) if ch.get("on") else None,
+            flip_h=bool(x.get("flip_h")), anim_in=anim(x.get("anim_in")), anim_out=anim(x.get("anim_out")),
+        ))
+        vol = clamp(float(x.get("volume", 1)), 0, 3)
+        if info and info.has_audio and vol > 0.001 and abs(speed - 1) < 1e-3 and not track_flag(data, "over", "mute"):
+            sounds.append(montage.AudioTrack(path, volume=vol, delay=t0, offset=start, length=dur))
+    return out, sounds
+
+
+@app.post("/api/montage/overlay-image")
+async def overlay_image_upload(file: UploadFile = File(...)):
+    """⬆ صورة (PNG شفافة أو JPG) تتحط كطبقة فوق الفيديو."""
+    from PIL import Image  # noqa: PLC0415
+    OVERLAY_DIR.mkdir(parents=True, exist_ok=True)
+    data = await file.read()
+    if len(data) > 25 * 1024 * 1024:
+        raise HTTPException(400, "الصورة أكبر من 25 ميجا")
+    try:
+        im = Image.open(io.BytesIO(data))
+        im.load()
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(400, "الملف ده مش صورة") from exc
+    # بنحفظها PNG (عشان الشفافية) وبحد أقصى 2160 بكسل
+    im.thumbnail((2160, 2160))
+    if im.mode not in ("RGBA", "RGB"):
+        im = im.convert("RGBA")
+    name = f"{uuid.uuid4().hex[:12]}.png"
+    im.save(OVERLAY_DIR / name, "PNG")
+    return {"src": f"img:{name}", "url": f"/media/overlay/{name}", "w": im.width, "h": im.height,
+            "name": Path(file.filename or "صورة").stem[:60]}
+
+
+@app.get("/media/overlay/{name}")
+def overlay_image_file(name: str):
+    path = OVERLAY_DIR / Path(name).name
+    if not path.exists():
+        raise HTTPException(404, "الصورة مش موجودة")
+    return FileResponse(path, media_type="image/png")
+
+
+def project_mix(data: dict) -> dict:
+    m = data.get("mix") or {}
+    return {"duck": clamp(float(m.get("duck") or 0), 0, 1), "normalize": bool(m.get("normalize")), "enhance": bool(m.get("enhance"))}
+
+
+class MontageTtsIn(BaseModel):
+    text: str
+    voice_id: str = "Arabic_FriendlyGuy"
+    name: str = ""
+
+
+MONTAGE_TTS_PER_1K = 0.1  # تقريبًا بالدولار لكل 1000 حرف (MiniMax HD على Atlas)
+
+
+@app.get("/api/montage/tts")
+def montage_tts_info():
+    return {"voices": [{"id": k, "label": v} for k, v in AR_VOICES.items()], "per_1k": MONTAGE_TTS_PER_1K}
+
+
+@app.post("/api/montage/tts")
+def montage_tts(body: MontageTtsIn):
+    """🗣️ من جوه المونتاج: تكتب الكلام ويتحول لصوت ويتحفظ في مكتبة الصوت."""
+    text = body.text.strip()[:1500]
+    if not text:
+        raise HTTPException(400, "اكتب الكلام الأول")
+    voice = body.voice_id if body.voice_id in AR_VOICES else "Arabic_FriendlyGuy"
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل. حطه من الإعدادات")
+    aid = uuid.uuid4().hex[:12]
+    fname = f"voice_{aid}.mp3"
+    out = AUDIO_DIR / fname
+    try:
+        if atlas.mock_mode():
+            subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i",
+                            f"sine=frequency=220:duration={max(1.0, 0.45 * len(text.split())):.2f}", "-c:a", "libmp3lame", str(out)],
+                           check=True, capture_output=True, timeout=60)
+        else:
+            url = atlas.run_model("Audio", {"model": TTS_MODEL, "text": text, "voice_id": voice, "language_boost": "Arabic"},
+                                  "تحويل الكلام لصوت", max_seconds=300, interval=2)
+            atlas.download(url, out)
+    except HTTPException:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        out.unlink(missing_ok=True)
+        raise HTTPException(502, f"معرفناش نحوّل الكلام لصوت: {exc}") from exc
+    name = (body.name.strip() or f"🗣️ {text[:40]}")[:80]
+    dur = probe_duration(out)
+    with closing(db()) as conn, conn:
+        conn.execute("INSERT INTO audio (id, kind, name, filename, duration, created_at) VALUES (?, 'voice', ?, ?, ?, ?)",
+                     (aid, name, fname, dur, now()))
+    return {"id": aid, "name": name, "duration": dur, "kind": "voice", "cost": round(len(text) / 1000 * MONTAGE_TTS_PER_1K, 3)}
+
+
+@app.get("/api/montage/sources")
+def montage_sources():
+    """الفيديوهات المولَّدة الجاهزة اللي ينفع تدخل المونتاج."""
+    with closing(db()) as conn:
+        rows = conn.execute(
+            "SELECT * FROM generations WHERE status = 'completed' AND output_filename IS NOT NULL ORDER BY created_at DESC"
+        ).fetchall()
+    out = []
+    for r in rows:
+        path = GENERATED_DIR / r["output_filename"]
+        if not path.exists():
+            continue
+        out.append(
+            {
+                "id": r["id"],
+                "label": r["clip_label"],
+                "coach_id": r["coach_id"],
+                "coach_name": r["coach_name"],
+                "url": f"/media/generated/{r['output_filename']}",
+                "duration": media_info(path).duration,
+                "has_audio": media_info(path).has_audio,
+            }
+        )
+    # أوترو كل مدرب بيدخل المونتاج كقطعة عادية (تتقص وتتحرك وتتقسم)
+    with closing(db()) as conn:
+        for c in conn.execute("SELECT id, name, outro_filename FROM coaches WHERE outro_filename IS NOT NULL ORDER BY name"):
+            path = COACHES_DIR / c["outro_filename"]
+            if not path.exists():
+                continue
+            info = media_info(path)
+            out.append({
+                "id": f"{OUTRO_PREFIX}{c['id']}", "kind": "outro", "label": f"🎬 أوترو {c['name']}",
+                "coach_id": c["id"], "coach_name": c["name"], "url": f"/media/coaches/{c['outro_filename']}",
+                "duration": info.duration, "has_audio": info.has_audio,
+            })
+        for o in conn.execute("SELECT * FROM outros ORDER BY created_at DESC"):
+            path = COACHES_DIR / o["filename"]
+            if not path.exists():
+                continue
+            info = media_info(path)
+            out.append({
+                "id": f"{EXTRA_OUTRO_PREFIX}{o['id']}", "kind": "outro", "extra": True, "label": f"🎬 {o['name']}",
+                "coach_id": o["coach_id"], "url": f"/media/coaches/{o['filename']}",
+                "duration": info.duration, "has_audio": info.has_audio,
+            })
+    return out
+
+
+@app.post("/api/outros")
+def upload_outro(name: str = Form(""), coach_id: str = Form(""), file: UploadFile = File(...)):
+    """أوترو زيادة من صفحة المونتاج. بيظهر مع الفيديوهات ويتحط في التايم لاين زي أي قطعة."""
+    outro_id = uuid.uuid4().hex[:12]
+    filename = save_upload(file, VIDEO_EXTENSIONS, COACHES_DIR, f"{outro_id}_xoutro")
+    try:
+        duration = probe_duration(COACHES_DIR / filename)
+    except ValueError as exc:
+        (COACHES_DIR / filename).unlink(missing_ok=True)
+        raise HTTPException(400, f"الأوترو: {exc}") from exc
+    name = name.strip() or Path(file.filename or "").stem or "أوترو"
+    with closing(db()) as conn, conn:
+        if coach_id and not conn.execute("SELECT 1 FROM coaches WHERE id = ?", (coach_id,)).fetchone():
+            coach_id = ""
+        conn.execute(
+            "INSERT INTO outros (id, name, filename, duration, coach_id, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (outro_id, name, filename, duration, coach_id or None, now()),
+        )
+    return {"id": f"{EXTRA_OUTRO_PREFIX}{outro_id}", "name": name, "duration": duration}
+
+
+@app.delete("/api/outros/{outro_id}")
+def delete_outro(outro_id: str):
+    outro_id = outro_id.removeprefix(EXTRA_OUTRO_PREFIX)
+    gen_id = f"{EXTRA_OUTRO_PREFIX}{outro_id}"
+    with closing(db()) as conn, conn:
+        row = conn.execute("SELECT filename FROM outros WHERE id = ?", (outro_id,)).fetchone()
+        if row is None:
+            raise HTTPException(404, "الأوترو غير موجود")
+        used = [p["name"] for p in conn.execute("SELECT name, data FROM projects").fetchall()
+                if any(c.get("gen_id") == gen_id for c in json.loads(p["data"]).get("clips", []))]
+        if used:
+            raise HTTPException(400, f"الأوترو ده مستخدم في: {'، '.join(used)}. شيله من المونتاج الأول")
+        conn.execute("DELETE FROM outros WHERE id = ?", (outro_id,))
+    (COACHES_DIR / row["filename"]).unlink(missing_ok=True)
+    return {"ok": True}
+
+
+# صورة صغيرة من الفيديو بدل ما القوايم تحمّل الفيديوهات نفسها (أخف بكتير على الجهاز)
+THUMB_DIRS = {"raw": RAW_DIR, "clips": CLIPS_DIR, "generated": GENERATED_DIR, "exports": EXPORTS_DIR, "coaches": COACHES_DIR}
+
+
+@app.get("/api/thumb")
+def video_thumb(src: str):
+    parts = src.split("?")[0].split("#")[0].strip("/").split("/")
+    if len(parts) == 4 and parts[:2] == ["media", "export"]:
+        # رابط الفولدر الجاهز: /media/export/<id>/<اسم>
+        with closing(db()) as conn:
+            row = conn.execute("SELECT filename FROM exports WHERE id = ?", (parts[2],)).fetchone()
+        path = EXPORTS_DIR / row["filename"] if row else None
+    elif len(parts) == 3 and parts[0] == "media" and parts[1] in THUMB_DIRS and "/" not in parts[2] and ".." not in parts[2]:
+        path = THUMB_DIRS[parts[1]] / parts[2]
+    elif (len(parts) == 6 and parts[:3] == ["media", "series", "episodes"] and parts[4] == "takes"
+          and all(re.fullmatch(r"[\w.-]+", x) and ".." not in x for x in (parts[3], parts[5]))):
+        # نسخ لقطات المسلسل: /media/series/episodes/<الحلقة>/takes/<الملف>
+        path = SERIES_DIR / "episodes" / parts[3] / "takes" / parts[5]
+    else:
+        raise HTTPException(400, "رابط غلط")
+    if path is None or not path.is_file():
+        raise HTTPException(404, "الفيديو غير موجود")
+    out = TMP_DIR / "thumbs" / f"{path.parent.parent.name if path.parent.name == 'takes' else path.parent.name}-{path.stem}-{int(path.stat().st_mtime)}.jpg"
+    if not out.exists():
+        out.parent.mkdir(parents=True, exist_ok=True)
+        part = out.with_suffix(".part.jpg")
+        at = "0.5" if media_info(path).duration > 1 else "0"
+        result = subprocess.run(
+            [ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", at, "-i", str(path),
+             "-frames:v", "1", "-vf", "scale=-2:360", "-q:v", "6", str(part)],
+            capture_output=True, text=True,
+        )
+        if result.returncode != 0 or not part.exists():
+            raise HTTPException(500, "مش قادر أعمل صورة للفيديو")
+        part.replace(out)
+    return FileResponse(out, media_type="image/jpeg", headers={"Cache-Control": "max-age=604800"})
+
+
+THUMB_FPS = 2  # كام صورة في الثانية في شريط الصور بتاع التايم لاين
+THUMB_HEIGHT = 128
+
+
+@app.get("/api/montage/filmstrip")
+def montage_filmstrip(kind: str, id: str):
+    """شريط صور صغيرة من الفيديو (صورتين في الثانية) عشان التايم لاين."""
+    with closing(db()) as conn:
+        if kind == "gen":
+            row = conn.execute("SELECT output_filename AS f FROM generations WHERE id = ?", (id,)).fetchone()
+            base = GENERATED_DIR
+        elif kind == "outro":
+            row = conn.execute("SELECT outro_filename AS f FROM coaches WHERE id = ?", (id,)).fetchone()
+            base = COACHES_DIR
+        elif kind == "xoutro":
+            row = conn.execute("SELECT filename AS f FROM outros WHERE id = ?", (id.removeprefix(EXTRA_OUTRO_PREFIX),)).fetchone()
+            base = COACHES_DIR
+        elif kind == "raw":
+            row = conn.execute("SELECT filename AS f FROM videos WHERE id = ?", (id,)).fetchone()
+            base = RAW_DIR
+        else:
+            raise HTTPException(400, "نوع غلط")
+    if row is None or not row["f"] or not (base / row["f"]).exists():
+        raise HTTPException(404, "الفيديو غير موجود")
+    src = base / row["f"]
+    info = media_info(src)
+    # الفيديو الخام ممكن يبقى طويل: نقلل الصور عشان الصورة متعدّيش حدود الـ JPEG
+    thumb_fps, height = THUMB_FPS, THUMB_HEIGHT
+    if kind == "raw":
+        height = 80
+        width = max(1, round(height * (info.width or 9) / (info.height or 16)))
+        thumb_fps = min(THUMB_FPS, 60000 / (width * max(info.duration, 1)))
+    frames = max(1, int(info.duration * thumb_fps + 0.999))
+    out = TMP_DIR / "filmstrips" / f"{kind}-{id}-{int(src.stat().st_mtime)}.jpg"
+    if not out.exists():
+        out.parent.mkdir(parents=True, exist_ok=True)
+        part = out.with_suffix(".part.jpg")
+        result = subprocess.run(
+            [
+                ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src),
+                "-vf", f"fps={thumb_fps:.5f},scale=-2:{height},tile={frames}x1",
+                "-frames:v", "1", "-q:v", "5", str(part),
+            ],
+            capture_output=True, text=True,
+        )
+        if result.returncode != 0 or not part.exists():
+            raise HTTPException(500, "مش قادر أعمل صور التايم لاين")
+        part.replace(out)
+    return FileResponse(
+        out, media_type="image/jpeg",
+        headers={
+            "Cache-Control": "max-age=86400", "X-Frames": str(frames), "X-Fps": f"{thumb_fps:.5f}",
+            "X-Video-Fps": f"{info.fps:g}",
+        },
+    )
+
+
+class ClipEdit(BaseModel):
+    gen_id: str
+    start: float = 0
+    end: float | None = None
+    zoom: float = 1.0
+    x: float = 0.0
+    y: float = 0.0
+    volume: float = 1.0
+    trans: dict | None = None  # الترانزيشن من القطعة اللي قبلها: {type, dur}
+    # تأثيرات القطعة (زي كاب كات)
+    speed: float = 1.0
+    reverse: bool = False
+    flip_h: bool = False
+    flip_v: bool = False
+    rotate: int = 0
+    adj: dict | None = None     # {bright, contrast, sat, temp, vignette, sharp} من -100 لـ 100
+    look: str = ""
+    fade_in: float = 0.0
+    fade_out: float = 0.0
+    fit: str = "fill"           # fill / blur / black
+    angle: float = 0.0          # لف بأي زاوية
+    crop: dict | None = None    # {l, t, r, b} نسبة من 0 لـ 0.9
+    kf: list | None = None      # كي فريمز [{t, zoom, x, y, angle}]
+    anim_in: dict | None = None   # {type, dur}
+    anim_out: dict | None = None
+    fx: list | None = None      # [{type, amt}] amt من 0 لـ 100
+    disabled: bool = False      # متعطّلة: بتفضل في التايم لاين بس مش بتطلع في الفيديو
+
+
+class TrackPart(BaseModel):
+    delay: float = 0.0
+    offset: float = 0.0
+    length: float | None = None
+    volume: float = 1.0
+    fade_in: float = 0.0
+    fade_out: float = 0.0
+
+
+class TrackEdit(BaseModel):
+    id: str
+    volume: float = 1.0
+    delay: float = 0.0
+    offset: float = 0.0
+    length: float | None = None  # قصّ آخر الملف (None = لحد آخره)
+    fade_out: bool = True
+    parts: list[TrackPart] = []  # لو الصوت متقسّم: كل قطعة ومكانها
+
+
+class ProjectIn(BaseModel):
+    name: str
+    video_id: str | None = None  # الفيديو الخام اللي المشروع معمول منه
+    coach_id: str | None = None
+    clips: list[ClipEdit] = []
+    voice: TrackEdit | None = None
+    music: TrackEdit | None = None
+    outro: bool = True
+    outro_volume: float = 1.0
+    brand_intro: bool = True    # إنترو البراند (من عقل البراند) في أول الفيديو
+    char_intro: bool = True     # إنترو الشخصية قبل الفيديو لو ليها
+    brand_outro: bool = True    # أوترو البراند في آخر الفيديو
+    captions: dict = {}  # {enabled, template, font, size, y, words, color, highlight, ...}
+    logo: dict = {}  # {enabled, size, x, y, opacity, on_outro}
+    section: str | None = None  # المونتاج بتاع أنهي قسم: coach (فيديوهات المدربين) / series / ads
+    typo_id: str | None = None  # مشروع التايبوجرافي اللي مربوط بالمونتاج (طبقة الكلام والعناصر فوق الفيديو)
+    typo_on: bool = True        # التايبوجرافي ظاهرة في المعاينة والتصدير
+    typo_sfx: dict = {}         # كليكات التايبوجرافي في المونتاج: {on, volume}
+    canvas: dict = {}           # الكادر: {bg: "#rrggbb", ratio: "9:16"}
+    tracks: dict = {}           # حالة كل تراك: {video: {lock, hide, mute}, voice: {...}, ...}
+    markers: list = []          # علامات على التايم لاين [{t, label}]
+    texts: list = []            # النصوص الحرة
+    overlays: list = []         # فيديوهات وصور فوق الفيديو (صورة جوه صورة)
+    sounds: list = []           # تراكات صوت زيادة ومؤثرات
+    export: dict = {}           # إعدادات التصدير {res, fps, quality}
+    mix: dict = {}              # الصوت: {duck: 0..1 توطية الموسيقى وقت الكلام، normalize: توحيد العلو، enhance: تنضيف التعليق}
+
+
+PROJECT_SECTIONS = ("coach", "series", "ads", "free")   # coach = برنامج كوتشي · free = المونتاج الحر في ستوديومانيا
+
+
+def tag_project_sections() -> None:
+    """المشاريع القديمة: نعرف قسمها من الفيديوهات اللي فيها (ad: / series:) عشان كل قسم ليه مونتاج لوحده."""
+    with closing(db()) as conn, conn:
+        for r in conn.execute("SELECT id, data FROM projects").fetchall():
+            d = json.loads(r["data"])
+            if d.get("section"):
+                continue
+            ids = [c.get("gen_id") for c in d.get("clips") or [] if c.get("gen_id")]
+            kinds = {(g["clip_id"] or "").split(":")[0] for g in conn.execute(
+                f"SELECT clip_id FROM generations WHERE id IN ({','.join('?' * len(ids))})", ids).fetchall()} if ids else set()
+            d["section"] = "ads" if "ad" in kinds else "series" if "series" in kinds else "coach"
+            conn.execute("UPDATE projects SET data = ? WHERE id = ?", (json.dumps(d, ensure_ascii=False), r["id"]))
+
+
+def project_to_dict(r: sqlite3.Row) -> dict:
+    return {
+        "id": r["id"],
+        "name": r["name"],
+        "data": json.loads(r["data"]),
+        "section": json.loads(r["data"]).get("section") or "coach",
+        "render_status": r["render_status"],
+        "render_error": r["render_error"],
+        "render_progress": RENDER_ACTIVE.get(r["id"]),
+        "export_id": r["export_id"],
+        "updated_at": r["updated_at"],
+    }
+
+
+def get_project(conn: sqlite3.Connection, project_id: str) -> sqlite3.Row:
+    row = conn.execute("SELECT * FROM projects WHERE id = ?", (project_id,)).fetchone()
+    if row is None:
+        raise HTTPException(404, "المشروع غير موجود")
+    return row
+
+
+@app.get("/api/projects")
+def list_projects():
+    with closing(db()) as conn, conn:
+        # لو مكتوب «بيصدّر» والتصدير مش شغال فعلًا، يبقى وقف في النص
+        for r in conn.execute("SELECT id FROM projects WHERE render_status = 'rendering'").fetchall():
+            if r["id"] not in RENDER_ACTIVE:
+                conn.execute(
+                    "UPDATE projects SET render_status = 'failed', render_error = ? WHERE id = ?",
+                    (f"التصدير وقف في النص{memory_note()}. صدّر تاني.", r["id"]),
+                )
+        return [project_to_dict(r) for r in conn.execute("SELECT * FROM projects ORDER BY updated_at DESC")]
+
+
+@app.post("/api/projects")
+def create_project(body: ProjectIn):
+    project_id = uuid.uuid4().hex[:12]
+    data = body.model_dump()
+    data["name"] = body.name.strip() or "مشروع جديد"
+    data["section"] = body.section if body.section in PROJECT_SECTIONS else "coach"
+    with closing(db()) as conn, conn:
+        conn.execute(
+            "INSERT INTO projects (id, name, data, render_status, created_at, updated_at) VALUES (?, ?, ?, 'idle', ?, ?)",
+            (project_id, data["name"], json.dumps(data), now(), now()),
+        )
+        return project_to_dict(get_project(conn, project_id))
+
+
+@app.put("/api/projects/{project_id}")
+def save_project(project_id: str, body: ProjectIn):
+    data = body.model_dump()
+    data["name"] = body.name.strip() or "مشروع جديد"
+    with closing(db()) as conn, conn:
+        old = json.loads(get_project(conn, project_id)["data"])
+        data["section"] = old.get("section") or "coach"  # القسم مبيتغيرش من الحفظ
+        conn.execute(
+            "UPDATE projects SET name = ?, data = ?, updated_at = ? WHERE id = ?",
+            (data["name"], json.dumps(data), now(), project_id),
+        )
+        return project_to_dict(get_project(conn, project_id))
+
+
+@app.delete("/api/projects/{project_id}")
+def delete_project(project_id: str):
+    with closing(db()) as conn, conn:
+        row = get_project(conn, project_id)
+        if row["render_status"] == "rendering":
+            raise HTTPException(400, "المشروع بيتصدّر دلوقتي، استنى لما يخلص")
+        conn.execute("DELETE FROM projects WHERE id = ?", (project_id,))
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------- ترتيب مونتاج كوتشي التلقائي
+
+DEFAULT_MUSIC_NAME = "beat"
+
+
+def kochi_auto_montage(conn: sqlite3.Connection, data: dict, fps: int = 30) -> dict:
+    """بيرتّب مشروع مونتاج كوتشي: الأوترو صوته مقفول، والتعليق بيتقطع جمل ويتوزع على الفيديو،
+    والموسيقى بتبدأ بعد أول جملة بفريمين وبتوطى لـ 20% وقت الكلام. بيرجع تقرير صغير."""
+    coach_id = data.get("coach_id")
+    clips = [c for c in data.get("clips") or [] if not str(c.get("gen_id", "")).startswith(OUTRO_PREFIX)]
+    if coach_id and conn.execute("SELECT 1 FROM coaches WHERE id = ? AND outro_filename IS NOT NULL", (coach_id,)).fetchone():
+        clips.append({"gen_id": f"{OUTRO_PREFIX}{coach_id}", "start": 0, "end": None, "zoom": 1, "x": 0, "y": 0, "volume": 0})
+    for c in clips:
+        if str(c["gen_id"]).startswith(ANY_OUTRO):
+            c["volume"] = 0   # الأوترو دايمًا صوته مقفول
+    data["clips"], data["outro"], data["outro_volume"] = clips, False, 0
+
+    video_end, outro_start, t = 0.0, None, 0.0
+    for c in clips:
+        path = clip_source(conn, c["gen_id"])
+        if path is None:
+            continue
+        dur = media_info(path).duration
+        ln = max(0.0, clamp(c["end"] if c.get("end") is not None else dur, 0, dur) - clamp(c.get("start") or 0, 0, dur))
+        ln /= clamp(float(c.get("speed") or 1), 0.25, 4)
+        if str(c["gen_id"]).startswith(ANY_OUTRO):
+            outro_start = t if outro_start is None else outro_start
+        else:
+            video_end = t + ln
+        t += ln
+    total = t
+    if data.get("brand_outro", True) and (p := brand_video("outro", data.get("client_id"))):
+        total += media_info(p).duration
+
+    report = {"sentences": 0, "overflow": 0.0, "music": False}
+    voice = data.get("voice") or {}
+    vrow = conn.execute("SELECT filename, duration FROM audio WHERE id = ? AND kind = 'voice'", (voice.get("id"),)).fetchone() if voice.get("id") else None
+    mid = (data.get("music") or {}).get("id")
+    mrow = conn.execute("SELECT id, filename, duration FROM audio WHERE id = ? AND kind = 'music'", (mid,)).fetchone() if mid else None
+    if mrow is None:
+        mrow = next((r for r in conn.execute("SELECT id, filename, duration, name FROM audio WHERE kind = 'music' ORDER BY created_at DESC")
+                     if DEFAULT_MUSIC_NAME in (r["name"] or "").lower()), None)
+    if vrow is None or video_end <= 0:
+        return report
+    vpath = AUDIO_DIR / vrow["filename"]
+    sents = kochi_layout.speech_segments(ffmpeg_exe(), vpath, vrow["duration"])
+    sents = kochi_layout.padded(sents, vrow["duration"])
+    lay = kochi_layout.layout(sents, video_end, outro_start, mrow["duration"] if mrow else None, total, fps)
+    data["voice"] = {"id": voice["id"], "volume": 1, "delay": 0, "offset": 0, "length": None, "fade_out": False, "parts": lay["voice"]}
+    if mrow and lay["music"]:
+        data["music"] = {"id": mrow["id"], "volume": kochi_layout.MUSIC_GAP_VOL, "delay": lay["music"][0]["delay"], "offset": 0,
+                         "length": None, "fade_out": True, "parts": lay["music"]}
+        report["music"] = True
+    data["mix"] = {**(data.get("mix") or {}), "duck": 0}   # التوطية متعملة في قطع الموسيقى نفسها
+    data["kochi_auto"] = True
+    report.update(sentences=lay["sentences"], overflow=lay["overflow"])
+    return report
+
+
+@app.post("/api/projects/{project_id}/kochi-layout")
+def kochi_layout_project(project_id: str):
+    with closing(db()) as conn, conn:
+        data = json.loads(get_project(conn, project_id)["data"])
+        report = kochi_auto_montage(conn, data, export_settings(data)[2])
+        conn.execute("UPDATE projects SET data = ?, updated_at = ? WHERE id = ?", (json.dumps(data), now(), project_id))
+        return {"project": project_to_dict(get_project(conn, project_id)), "report": report}
+
+
+def clamp(v: float, lo: float, hi: float) -> float:
+    return max(lo, min(hi, v))
+
+
+def track_parts(t: dict) -> list[dict]:
+    """قطع التعليق أو الموسيقى. المشاريع القديمة فيها قطعة واحدة بس."""
+    if t.get("parts"):
+        return t["parts"]
+    return [{"delay": t.get("delay", 0), "offset": t.get("offset", 0), "length": t.get("length"), "volume": t.get("volume", 1)}]
+
+
+# مقاسات الكادر (العرض × الطول عند 1080p) وإعدادات التصدير
+CANVAS_RATIOS = {"9:16": (1080, 1920), "1:1": (1080, 1080), "4:5": (1080, 1350), "16:9": (1920, 1080), "3:4": (1080, 1440)}
+EXPORT_RES = {"720": 720, "1080": 1080, "1440": 1440, "2160": 2160}  # الضلع الأصغر
+EXPORT_QUALITY = {"small": 26, "normal": 20, "high": 16}
+EXPORT_FPS = (24, 25, 30, 50, 60)
+
+
+def export_settings(data: dict) -> tuple[int, int, int, int]:
+    ratio = (data.get("canvas") or {}).get("ratio") or "9:16"
+    w, h = CANVAS_RATIOS.get(ratio, CANVAS_RATIOS["9:16"])
+    ex = data.get("export") or {}
+    short = EXPORT_RES.get(str(ex.get("res") or "1080"), 1080)
+    k = short / min(w, h)
+    fps = int(ex.get("fps") or 30)
+    return (round(w * k / 2) * 2, round(h * k / 2) * 2, fps if fps in EXPORT_FPS else 30,
+            EXPORT_QUALITY.get(ex.get("quality") or "normal", 20))
+
+
+def track_flag(data: dict, trk: str, flag: str) -> bool:
+    """قفل/إخفاء/كتم التراك من التايم لاين."""
+    return bool(((data.get("tracks") or {}).get(trk) or {}).get(flag))
+
+
+def clip_keyframes(kf, dur: float) -> list | None:
+    out = []
+    for k in (kf or [])[:60]:
+        if not isinstance(k, dict):
+            continue
+        out.append({"t": clamp(float(k.get("t") or 0), 0, dur), "zoom": clamp(float(k.get("zoom", 1)), 0.1, 4),
+                    "x": clamp(float(k.get("x", 0)), -3, 3), "y": clamp(float(k.get("y", 0)), -3, 3),
+                    "angle": clamp(float(k.get("angle", 0)), -720, 720)})
+    return sorted(out, key=lambda k: k["t"]) if len(out) >= 2 else None
+
+
+def clip_anim(a) -> tuple:
+    if not isinstance(a, dict) or a.get("type") not in montage.ANIMS:
+        return ("", 0.0)
+    return (a["type"], clamp(float(a.get("dur") or 0.5), 0.1, 3))
+
+
+def project_bg(data: dict) -> str:
+    bg = str((data.get("canvas") or {}).get("bg") or "")
+    return bg if re.fullmatch(r"#[0-9a-fA-F]{6}", bg) else "black"
+
+
+def build_montage(conn: sqlite3.Connection, data: dict):
+    """يحوّل بيانات المشروع لقطع ومسارات صوت جاهزة لـ FFmpeg، ويتأكد إن كل حاجة موجودة."""
+    ff = ffmpeg_exe()
+    segments = []
+    outro_len = 0.0
+    for i, c in enumerate(data["clips"], start=1):
+        path = clip_source(conn, c["gen_id"])
+        if path is None:
+            raise HTTPException(400, f"الفيديو رقم {i} اتمسح. شيله من المونتاج")
+        info = media_info(path)
+        start = clamp(c["start"], 0, info.duration)
+        end = clamp(c["end"] if c["end"] is not None else info.duration, 0, info.duration)
+        if end - start < 1 / 30 - 0.001:
+            raise HTTPException(400, f"الفيديو رقم {i} مقصوص لدرجة إنه مفيهوش ولا فريم")
+        tr = c.get("trans") or {}
+        segments.append(
+            montage.Segment(
+                path, start, end,
+                zoom=clamp(c["zoom"], 0.1, 4), x=clamp(c["x"], -1, 1), y=clamp(c["y"], -1, 1),
+                volume=clamp(c["volume"], 0, 3), has_audio=info.has_audio, src_duration=info.duration,
+                trans_in=tr.get("type") if tr.get("type") in montage.TRANSITIONS and i > 1 else "",
+                trans_dur=clamp(float(tr.get("dur") or 0.5), 0.1, 2.0),
+                speed=clamp(float(c.get("speed") or 1), 0.25, 4), reverse=bool(c.get("reverse")) and end - start <= 60,
+                flip_h=bool(c.get("flip_h")), flip_v=bool(c.get("flip_v")), rotate=int(c.get("rotate") or 0) % 360 // 90 * 90,
+                adj={k: clamp(float(v or 0), -100, 100) for k, v in (c.get("adj") or {}).items() if k in ("bright", "contrast", "sat", "temp", "vignette", "sharp")},
+                look=c.get("look") if c.get("look") in montage.LOOKS else "",
+                fade_in=clamp(float(c.get("fade_in") or 0), 0, 3), fade_out=clamp(float(c.get("fade_out") or 0), 0, 3),
+                fit=c.get("fit") if c.get("fit") in ("fill", "blur", "black") else "fill",
+                src_w=info.width, src_h=info.height,
+                angle=clamp(float(c.get("angle") or 0), -360, 360),
+                crop=tuple(clamp(float((c.get("crop") or {}).get(k) or 0), 0, 0.9) for k in ("l", "t", "r", "b")),
+                kf=clip_keyframes(c.get("kf"), (end - start) / clamp(float(c.get("speed") or 1), 0.25, 4)),
+                anim_in=clip_anim(c.get("anim_in")), anim_out=clip_anim(c.get("anim_out")),
+                fx=[(f["type"], clamp(float(f.get("amt") or 50), 0, 100) / 100) for f in (c.get("fx") or [])[:6]
+                    if isinstance(f, dict) and f.get("type") in montage.EFFECTS],
+                bg=project_bg(data), blank=bool(c.get("disabled")), hide_video=track_flag(data, "video", "hide"),
+            )
+        )
+    if not segments:
+        raise HTTPException(400, "ضيف فيديو واحد على الأقل للمونتاج")
+    # الأوترو اللي في آخر المونتاج (عشان اللوجو يختفي وقته لو اخترت كده)
+    for c, seg in zip(reversed(data["clips"]), reversed(segments)):
+        if not c["gen_id"].startswith(ANY_OUTRO):
+            break
+        outro_len += seg.duration
+
+    if data.get("outro") and data.get("coach_id"):
+        coach = conn.execute("SELECT outro_filename FROM coaches WHERE id = ?", (data["coach_id"],)).fetchone()
+        if coach and coach["outro_filename"]:
+            path = COACHES_DIR / coach["outro_filename"]
+            info = media_info(path)
+            segments.append(
+                montage.Segment(path, 0, info.duration, volume=clamp(data.get("outro_volume", 1), 0, 3), has_audio=info.has_audio)
+            )
+            outro_len = info.duration
+    # 🎬 أوترو البراند (من عقل البراند): بينزل لوحده في الآخر لو متفعّل، والمشروع يقدر يشيله.
+    # (إنترو البراند بيتركّب قدّام الفيديو بعد التصدير، عشان الصوت والكابشن والعناصر مايتزحزحوش)
+    if data.get("brand_outro", True) and (p := brand_video("outro", data.get("client_id"))):
+        info = media_info(p)
+        segments.append(montage.Segment(p, 0, info.duration, has_audio=info.has_audio, bg=project_bg(data)))
+        outro_len += info.duration
+
+    def track(t: dict | None, kind: str) -> list[montage.AudioTrack]:
+        if not t or track_flag(data, kind, "mute"):
+            return []
+        row = conn.execute("SELECT filename FROM audio WHERE id = ? AND kind = ?", (t["id"], kind)).fetchone()
+        if row is None:
+            raise HTTPException(400, "ملف الصوت المختار اتمسح من المكتبة")
+        parts = track_parts(t)
+        # الاختفاء بالتدريج بيبقى في آخر قطعة بس
+        last = max(range(len(parts)), key=lambda n: parts[n]["delay"])
+        return [
+            montage.AudioTrack(
+                AUDIO_DIR / row["filename"], volume=clamp(p["volume"], 0, 3),
+                delay=max(0, p["delay"]), offset=max(0, p["offset"]),
+                length=p["length"] if p.get("length") and p["length"] > 0.01 else None,
+                fade_out=bool(t.get("fade_out")) and n == last,
+                fade_in_s=clamp(float(p.get("fade_in") or 0), 0, 10), fade_out_s=clamp(float(p.get("fade_out") or 0), 0, 10),
+            )
+            for n, p in enumerate(parts)
+        ]
+
+    return segments, track(data.get("voice"), "voice"), track(data.get("music"), "music"), outro_len
+
+
+def project_logo(data: dict, total: float, outro_len: float) -> montage.Logo | None:
+    cfg = {**LOGO_DEFAULTS, **(data.get("logo") or {})}
+    if "enabled" not in (data.get("logo") or {}):   # الديفولت من عقل البراند (اللوجو على كل الفيديوهات ولا لأ)
+        cfg["enabled"] = (active_client() or {}).get("logo_on") != "0"
+    path = logo_path(data.get("client_id"))
+    if not cfg["enabled"] or not path:
+        return None
+    until = total - outro_len if not cfg["on_outro"] and outro_len > 0 else None
+    return montage.Logo(
+        path, size=clamp(float(cfg["size"]), 3, 60), x=clamp(float(cfg["x"]), 0, 100),
+        y=clamp(float(cfg["y"]), 0, 100), opacity=clamp(float(cfg["opacity"]), 0.1, 1), until=until,
+    )
+
+
+def project_captions(conn: sqlite3.Connection, data: dict, total: float, export_id: str) -> montage.Subtitles | None:
+    cfg = data.get("captions") or {}
+    if not cfg.get("enabled") or track_flag(data, "caps", "hide"):
+        return None
+    voice = data.get("voice")
+    if not voice:
+        raise HTTPException(400, "الكابشن بيتعمل من التعليق الصوتي. اختار تعليق صوتي أو اقفل الكابشن")
+    row = conn.execute("SELECT transcript FROM audio WHERE id = ?", (voice["id"],)).fetchone()
+    tr = json.loads(row["transcript"]) if row and row["transcript"] else {}
+    if tr.get("status") != "done" or not tr.get("words"):
+        raise HTTPException(400, "لسه الكلام بتاع التعليق الصوتي متكتبش. دوس «اكتب الكلام» الأول أو اقفل الكابشن")
+    # الكلام اللي اتمسح من الكابشن في المشروع ده (بمعاد بدايته جوه ملف الصوت)
+    removed = {int(k) for k in cfg.get("removed") or []}
+    source = [w for w in tr["words"] if round(w["s"] * 100) not in removed]
+    words = []
+    for part in track_parts(voice):
+        offset, delay = max(0.0, part.get("offset") or 0), max(0.0, part.get("delay") or 0)
+        length = part.get("length") or float("inf")
+        words += [
+            {"w": w["w"], "s": w["s"] - offset + delay, "e": w["e"] - offset + delay}
+            for w in source if w["e"] - offset > 0 and w["s"] - offset < length
+        ]
+    words.sort(key=lambda w: w["s"])
+    ass = TMP_DIR / f"{export_id}.ass"
+    ass.write_text(captions.build_ass(words, cfg, total, montage.canvas_size()), encoding="utf-8")
+    return montage.Subtitles(ass, FONTS_DIR)
+
+
+def project_texts(data: dict, total: float, export_id: str) -> montage.Subtitles | None:
+    """🔠 النصوص الحرة: ملف ASS بمقاس الكادر."""
+    if track_flag(data, "text", "hide"):
+        return None
+    w, h = montage.canvas_size()
+    ass = textlayer.build_ass(data.get("texts") or [], total, w, h)
+    if not ass:
+        return None
+    path = TMP_DIR / f"{export_id}_t.ass"
+    path.write_text(ass, encoding="utf-8")
+    return montage.Subtitles(path, FONTS_DIR)
+
+
+def memory_note() -> str:
+    limit = system_info()["memory_limit_mb"]
+    return f" — الذاكرة المتاحة للسيرفر {limit} ميجا" if limit else ""
+
+
+def render_error(result: subprocess.CompletedProcess) -> str:
+    """رسالة الخطأ اللي بتظهر لما التصدير يفشل، من غير سطور التحذير اللي ملهاش لازمة."""
+    if result.returncode < 0:
+        return f"التصدير وقف فجأة (غالبًا ذاكرة السيرفر خلصت){memory_note()}. جرّب تاني."
+    if "No space left on device" in result.stderr:
+        return space_message(None, free_mb(EXPORTS_DIR))
+    noise = ("Fontconfig", "fonctconfig", "fontconfig", "memory font", "Loading font")
+    lines = [l for l in result.stderr.strip().splitlines() if l.strip() and not any(n in l for n in noise)]
+    return f"FFmpeg: {chr(10).join(lines)[-400:] or f'خطأ رقم {result.returncode}'}"
+
+
+# ---------- حالة السيرفر (عشان نعرف لو الذاكرة قليلة) ----------
+def _read_int(path: str) -> int | None:
+    try:
+        v = Path(path).read_text().strip()
+        return None if v == "max" else int(v)
+    except (OSError, ValueError):
+        return None
+
+
+def system_info() -> dict:
+    limit = _read_int("/sys/fs/cgroup/memory.max") or _read_int("/sys/fs/cgroup/memory/memory.limit_in_bytes")
+    used = _read_int("/sys/fs/cgroup/memory.current") or _read_int("/sys/fs/cgroup/memory/memory.usage_in_bytes")
+    if limit and limit > 1 << 50:  # رقم ضخم = مفيش حد
+        limit = None
+    return {
+        "memory_limit_mb": limit // 2**20 if limit else None,
+        "memory_used_mb": used // 2**20 if used else None,
+        "cpus": os.cpu_count(),
+    }
+
+
+@app.get("/api/system")
+def get_system():
+    return system_info()
+
+
+# ---------- المساحة ----------
+SYSTEM_TMP = Path(tempfile.gettempdir()) / "studiomania-render"
+
+
+def free_mb(path: Path) -> int:
+    path.mkdir(parents=True, exist_ok=True)
+    return shutil.disk_usage(path).free // 2**20
+
+
+def folder_mb(path: Path) -> float:
+    total = 0
+    for f in path.rglob("*"):
+        try:
+            if f.is_file():
+                total += f.stat().st_size
+        except OSError:
+            pass
+    return round(total / 2**20, 1)
+
+
+def render_work_dir(export_id: str, total: float) -> Path:
+    """الملفات المؤقتة للتصدير بتتحط في المكان اللي فيه مساحة أكتر، ولو مفيش مساحة كفاية بنقول بدري."""
+    need_tmp = int(total * 2.5) + 50  # تقريبًا: القطع المؤقتة
+    need_out = int(total * 1.2) + 20  # الفيديو النهائي
+    out_free = free_mb(EXPORTS_DIR)
+    if out_free < need_out:
+        raise HTTPException(400, space_message(need_out, out_free))
+    choices = sorted([(free_mb(TMP_DIR), TMP_DIR), (free_mb(SYSTEM_TMP), SYSTEM_TMP)], key=lambda c: c[0], reverse=True)
+    free, base = choices[0]
+    # لو الملفات المؤقتة والفيديو النهائي على نفس المساحة لازم يكفّوا الاتنين
+    same = base.stat().st_dev == EXPORTS_DIR.stat().st_dev
+    if free < need_tmp + (need_out if same else 0):
+        raise HTTPException(400, space_message(need_tmp + need_out, free))
+    return base / f"render-{export_id}"
+
+
+def space_message(need: int | None, free: int) -> str:
+    what = f"محتاج حوالي {need} ميجا والفاضي {free} ميجا بس" if need else f"الفاضي {free} ميجا بس"
+    return (
+        f"مساحة السيرفر مش كفاية للتصدير: {what}. "
+        "امسح فيديوهات جاهزة قديمة (الخطوة 7) أو فيديوهات خام خلصت منها، أو دوس «امسح الملفات المؤقتة» في ⚙️ الإعدادات، "
+        "أو كبّر مساحة الـ Volume من إعدادات Railway."
+    )
+
+
+@app.get("/api/storage")
+def get_storage():
+    usage = shutil.disk_usage(DATA_DIR)
+    folders = {
+        "raw": RAW_DIR, "clips": CLIPS_DIR, "generated": GENERATED_DIR, "coaches": COACHES_DIR,
+        "audio": AUDIO_DIR, "exports": EXPORTS_DIR, "tmp": TMP_DIR,
+    }
+    folders.update({"lab": LAB_DIR, "typo": TYPO_PROJ, "refs": REFS_DIR, "ads": ADS_DIR, "series": SERIES_DIR, "films": FILMS_DIR,
+                    "carousels": CAROUSELS_DIR, "assets": ASSETS_DIR, "tvideos": TV_DIR})
+    return {
+        "total_mb": usage.total // 2**20, "free_mb": usage.free // 2**20,
+        "folders": {k: folder_mb(v) for k, v in folders.items() if v.exists()},
+        "wipe": {k: storage_count(k) for k in WIPE_SECTIONS},
+    }
+
+
+# 🗑️ مسح كل الفيديوهات في قسم مرة واحدة (عشان تفضّي مساحة). اللي شغال دلوقتي بيفضل زي ما هو
+WIPE_SECTIONS = ("lab", "typo", "refs", "raw", "exports")
+
+
+def storage_count(section: str) -> int:
+    if section == "lab":
+        return len(list(LAB_DIR.glob("*/lab.json")))
+    if section == "typo":
+        return len(list(TYPO_PROJ.glob("*/typo.json")))
+    if section == "refs":
+        return len(list(REFS_DIR.glob("*.json")))
+    with closing(db()) as conn:
+        return conn.execute(f"SELECT COUNT(*) FROM {'videos' if section == 'raw' else 'exports'}").fetchone()[0]
+
+
+@app.post("/api/storage/wipe/{section}")
+def wipe_storage(section: str):
+    if section not in WIPE_SECTIONS:
+        raise HTTPException(400, "القسم ده مينفعش يتمسح كله")
+    if RENDER_ACTIVE and section in ("raw", "exports"):
+        raise HTTPException(400, "فيه تصدير شغال دلوقتي، استنى لما يخلص")
+    before = shutil.disk_usage(DATA_DIR).free
+    gone, kept = 0, 0
+    if section == "lab":
+        for f in list(LAB_DIR.glob("*/lab.json")):
+            try:
+                d = json.loads(f.read_text(encoding="utf-8"))
+            except ValueError:
+                d = {}
+            if any((v or {}).get("status") in ("working", "queued") for v in (d.get("steps") or {}).values()):
+                kept += 1
+                continue
+            shutil.rmtree(f.parent, ignore_errors=True)
+            gone += 1
+    elif section == "typo":
+        for f in list(TYPO_PROJ.glob("*/typo.json")):
+            try:
+                d = json.loads(f.read_text(encoding="utf-8"))
+            except ValueError:
+                d = {}
+            if d.get("status") in TYPO_BUSY:
+                kept += 1
+                continue
+            shutil.rmtree(f.parent, ignore_errors=True)
+            gone += 1
+    elif section == "refs":
+        for m in list(REFS_DIR.glob("*.json")):
+            for f in REFS_DIR.glob(f"{m.stem}.*"):
+                f.unlink(missing_ok=True)
+            gone += 1
+    elif section == "raw":
+        with closing(db()) as conn, conn:
+            for r in conn.execute("SELECT id FROM videos").fetchall():
+                remove_video(conn, r["id"])
+                gone += 1
+    else:
+        with closing(db()) as conn, conn:
+            for r in conn.execute("SELECT id, filename FROM exports").fetchall():
+                if conn.execute("SELECT COUNT(*) FROM posts WHERE export_id = ? AND status IN ('scheduled', 'sending', 'publishing')", (r["id"],)).fetchone()[0]:
+                    kept += 1
+                    continue
+                conn.execute("DELETE FROM exports WHERE id = ?", (r["id"],))
+                (EXPORTS_DIR / r["filename"]).unlink(missing_ok=True)
+                gone += 1
+    return {"deleted": gone, "kept": kept, "freed_mb": round(max(0, shutil.disk_usage(DATA_DIR).free - before) / 2**20, 1)}
+
+
+@app.post("/api/storage/clean")
+def clean_storage():
+    """بيمسح الملفات المؤقتة بس (صور التايم لاين وبقايا التصدير)، وهي بتتعمل تاني لوحدها لما تحتاجها."""
+    if RENDER_ACTIVE:
+        raise HTTPException(400, "فيه تصدير شغال دلوقتي، استنى لما يخلص")
+    before = folder_mb(TMP_DIR) + folder_mb(SYSTEM_TMP)
+    for item in list(TMP_DIR.iterdir()) + list(SYSTEM_TMP.glob("render-*")):
+        if item.name in ("fonts.conf", "fontcache", "render.log"):
+            continue
+        if item.is_dir():
+            shutil.rmtree(item, ignore_errors=True)
+        else:
+            item.unlink(missing_ok=True)
+    return {"freed_mb": round(before - folder_mb(TMP_DIR) - folder_mb(SYSTEM_TMP), 1)}
+
+
+# التصديرات اللي شغالة فعلًا دلوقتي، ووصلت لفين
+RENDER_ACTIVE: dict[str, str] = {}
+
+
+RENDER_PROCS: dict[str, subprocess.Popen] = {}  # أمر FFmpeg الشغال دلوقتي لكل تصدير (عشان الإلغاء)
+RENDER_CANCELLED: set[str] = set()
+STALL_SECONDS = int(os.environ.get("RENDER_STALL_SECONDS", "180"))  # لو التصدير موقف مكانه المدة دي، بنوقفه بدل ما يفضل معلّق
+RENDER_LOG = TMP_DIR / "render.log"
+
+
+def log_render(text: str) -> None:
+    with RENDER_LOG.open("a", encoding="utf-8") as f:
+        f.write(f"[{datetime.now(timezone.utc).strftime('%H:%M:%S')}] {text}\n")
+
+
+def run_ffmpeg(cmd: list[str], project_id: str, length: float, pct: tuple[int, int], label: str) -> tuple[int, str]:
+    """يشغّل أمر FFmpeg ويتابع وصل لفين. لو وقف مكانه كتير أو اتلغى، بيتقفل."""
+    cmd = cmd[:1] + ["-progress", "pipe:1", "-nostats"] + [a if a != "error" else "warning" for a in cmd[1:]]
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    RENDER_PROCS[project_id] = proc
+    err_lines: list[str] = []
+    state = {"last": time.time(), "done": -1.0, "stalled": False}
+    reader = threading.Thread(target=lambda: err_lines.extend(proc.stderr), daemon=True)
+    reader.start()
+
+    def watchdog() -> None:
+        while proc.poll() is None:
+            if time.time() - state["last"] > STALL_SECONDS:
+                state["stalled"] = True
+                log_render(f"{label}: وقف مكانه {STALL_SECONDS} ثانية عند {state['done']:.1f}ث — ذاكرة: {system_info()}")
+                proc.kill()
+                return
+            time.sleep(2)
+
+    threading.Thread(target=watchdog, daemon=True).start()
+    for line in proc.stdout:
+        if line.startswith("out_time_us="):
+            try:
+                done = int(line.split("=", 1)[1]) / 1e6
+            except ValueError:
+                continue
+            if done > state["done"]:
+                state["done"], state["last"] = done, time.time()
+                frac = min(1.0, done / length) if length > 0 else 0
+                RENDER_ACTIVE[project_id] = f"{label}… {int(pct[0] + (pct[1] - pct[0]) * frac)}%"
+        elif line.startswith("progress=end"):
+            state["last"] = time.time()
+    proc.wait()
+    reader.join(timeout=5)
+    RENDER_PROCS.pop(project_id, None)
+    stderr = "".join(err_lines)
+    log_render(f"{label}: خلص برقم {proc.returncode} عند {state['done']:.1f}ث من {length:.1f}ث")
+    if stderr.strip():
+        log_render("FFmpeg قال:\n" + stderr.strip()[-3000:])
+    if state["stalled"]:
+        return -999, stderr
+    return proc.returncode, stderr
+
+
+def prepend_intro(main: Path, intro: Path) -> float:
+    """🎬 إنترو البراند قدّام الفيديو المتصدّر (بنفس المقاس والسرعة). بيرجّع طول الإنترو."""
+    mi, ii = media_info(main), media_info(intro)
+    W, H = mi.width // 2 * 2, mi.height // 2 * 2
+    tmp = main.with_name(main.stem + "_i.mp4")
+    a0 = "[0:a]aresample=48000,aformat=channel_layouts=stereo[a0];" if ii.has_audio else f"anullsrc=r=48000:cl=stereo,atrim=0:{ii.duration:.3f}[a0];"
+    a1 = "[1:a]aresample=48000,aformat=channel_layouts=stereo[a1];" if mi.has_audio else f"anullsrc=r=48000:cl=stereo,atrim=0:{mi.duration:.3f}[a1];"
+    fl = (f"[0:v]scale={W}:{H}:force_original_aspect_ratio=decrease,pad={W}:{H}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30,format=yuv420p[v0];"
+          f"[1:v]scale={W}:{H},setsar=1,fps=30,format=yuv420p[v1];{a0}{a1}[v0][a0][v1][a1]concat=n=2:v=1:a=1[v][a]")
+    r = subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(intro), "-i", str(main), "-filter_complex", fl,
+                        "-map", "[v]", "-map", "[a]", "-c:v", "libx264", "-preset", "veryfast", "-crf", "19", "-c:a", "aac", "-b:a", "192k",
+                        "-movflags", "+faststart", str(tmp)], capture_output=True, text=True, timeout=1800)
+    if r.returncode != 0:
+        tmp.unlink(missing_ok=True)
+        raise RuntimeError(f"تركيب إنترو البراند فشل: {r.stderr.strip()[-300:]}")
+    tmp.replace(main)
+    return ii.duration
+
+
+def run_render(project_id: str, export_id: str, cmds: list[list[str]], total: float, name: str, work_dir: Path, typo_id: str | None = None, base_url: str = "", typo_click_vol: float = 0.0, scene_id: str | None = None, intro: list[Path] | None = None) -> None:
+    filename = f"{export_id}.mp4"
+    error = None
+    RENDER_LOG.write_text("", encoding="utf-8")
+    log_render(f"تصدير {name} ({total:.1f}ث، {len(cmds) - 3} قطعة) — السيرفر: {system_info()} — مساحة فاضية: {free_mb(EXPORTS_DIR)} ميجا")
+    try:
+        # الأوامر بتشتغل ورا بعض: كل قطعة لوحدها وبعدين التجميع النهائي
+        segs = cmds[:-3]
+        steps = [(c, f"بيجهّز القطعة {n} من {len(segs)}", (int((n - 1) / len(segs) * 40), int(n / len(segs) * 40)))
+                 for n, c in enumerate(segs, start=1)]
+        steps += [
+            (cmds[-3], "بيجهّز الصوت", (40, 48)),
+            (cmds[-2], "بيجمّع الفيديو النهائي", (48, 96)),
+            (cmds[-1], "بيحفظ الفيديو", (96, 99)),
+        ]
+        for cmd, label, pct in steps:
+            if project_id in RENDER_CANCELLED:
+                break
+            if cmd is cmds[-2] and scene_id:
+                # 🪄 الخلفية الجديدة والحاجات اللي اتشالت: على الصورة قبل اللوجو والكابشن
+                RENDER_ACTIVE[project_id] = "🪄 بيركّب المشهد"
+                if scene_export(scene_id, cmd, work_dir, lambda f: RENDER_ACTIVE.__setitem__(project_id, f"🪄 بيركّب المشهد {int(f * 100)}٪")):
+                    log_render("🪄 المشهد اتركّب (الخلفية / الحاجات اللي اتشالت)")
+            length = float(cmd[cmd.index("-t") + 1]) if cmd in segs else total
+            code, stderr = run_ffmpeg(cmd, project_id, length, pct, label)
+            if project_id in RENDER_CANCELLED:
+                break
+            if code == -999:
+                wait = f"{STALL_SECONDS // 60} دقايق" if STALL_SECONDS >= 120 else f"{STALL_SECONDS} ثانية"
+                error = (f"التصدير وقف مكانه أكتر من {wait} في «{label}» فوقّفته{memory_note()}. "
+                         "جرّب تاني، ولو اتكرر ابعت «سجل آخر تصدير» من ⚙️ الإعدادات.")
+                break
+            if code != 0:
+                error = render_error(subprocess.CompletedProcess(cmd, code, "", stderr))
+                break
+            if cmd is cmds[-3] and typo_id and typo_click_vol:
+                # 🔊 كليكات التايبوجرافي بتتخلط مع صوت المونتاج
+                mix = Path(cmd[-1])
+                wav = typo_sfx_wav(typo_id)
+                if wav:
+                    out = mix.with_name("mix_c.flac")
+                    r = subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(mix), "-i", str(wav), "-filter_complex",
+                                        f"[1:a]aresample=48000,aformat=channel_layouts=stereo,volume={typo_click_vol:.2f}[c];[0:a][c]amix=inputs=2:duration=first:normalize=0,alimiter=limit=0.95[a]",
+                                        "-map", "[a]", "-c:a", "flac", "-sample_fmt", "s16", str(out)], capture_output=True, timeout=600)
+                    if r.returncode == 0:
+                        out.replace(mix)
+            if cmd is cmds[-2] and typo_id:
+                # 🔤 طبقة التايبوجرافي (الكلام والعناصر) بتترسم فوق الصورة قبل ما الصوت يتركّب
+                vid = Path(cmd[-1])
+                if typo_has_layer(typo_id):
+                    RENDER_ACTIVE[project_id] = "🔤 بيرسم التايبوجرافي"
+                    typo_overlay(typo_id, vid, vid.with_name("video_t.mp4"), base_url,
+                                 lambda f: RENDER_ACTIVE.__setitem__(project_id, f"🔤 بيرسم التايبوجرافي {int(f * 100)}٪"))
+                    vid.with_name("video_t.mp4").replace(vid)
+        if project_id in RENDER_CANCELLED:
+            error = "إنت لغيت التصدير."
+        elif intro:   # الأقرب للفيديو الأول (إنترو الشخصية) وبعده إنترو البراند في أول خالص
+            RENDER_ACTIVE[project_id] = "🎬 بيحط الإنترو"
+            for p in intro:
+                if p.exists():
+                    total += prepend_intro(EXPORTS_DIR / filename, p)
+    except Exception as exc:  # أي مشكلة غير متوقعة لازم تظهر، مش يفضل «بيصدّر» على طول
+        error = f"حصلت مشكلة أثناء التصدير: {exc}"
+        log_render(f"مشكلة: {exc!r}")
+    finally:
+        cancelled = project_id in RENDER_CANCELLED
+        RENDER_CANCELLED.discard(project_id)
+        log_render(f"النهاية: {error or 'تمام ✓'}")
+        shutil.rmtree(work_dir, ignore_errors=True)
+        (TMP_DIR / f"{export_id}.ass").unlink(missing_ok=True)
+        (TMP_DIR / f"{export_id}_t.ass").unlink(missing_ok=True)
+        with closing(db()) as conn, conn:
+            if error:
+                (EXPORTS_DIR / filename).unlink(missing_ok=True)
+                conn.execute(
+                    "UPDATE projects SET render_status = 'failed', render_error = ?, updated_at = ? WHERE id = ?",
+                    (error, now(), project_id),
+                )
+            else:
+                conn.execute(
+                    "INSERT INTO exports (id, name, filename, duration, source, project_id, created_at) VALUES (?, ?, ?, ?, 'studio', ?, ?)",
+                    (export_id, name, filename, total, project_id, now()),
+                )
+                conn.execute(
+                    "UPDATE projects SET render_status = 'done', render_error = NULL, export_id = ?, updated_at = ? WHERE id = ?",
+                    (export_id, now(), project_id),
+                )
+        RENDER_ACTIVE.pop(project_id, None)
+        if not cancelled:
+            if error:
+                notify("render", "bad", f"التصدير فشل: {name}", error, "0", project_id)
+            else:
+                notify("render", "ok", f"الفيديو اتصدّر: {name}", "جاهز في الفولدر للنشر", "7", export_id)
+
+
+@app.post("/api/projects/{project_id}/render/cancel")
+def cancel_render(project_id: str):
+    if project_id not in RENDER_ACTIVE:
+        raise HTTPException(400, "مفيش تصدير شغال للمشروع ده")
+    RENDER_CANCELLED.add(project_id)
+    proc = RENDER_PROCS.get(project_id)
+    if proc and proc.poll() is None:
+        proc.kill()
+    return {"ok": True}
+
+
+@app.get("/api/render-log")
+def get_render_log():
+    text = RENDER_LOG.read_text(encoding="utf-8") if RENDER_LOG.exists() else ""
+    return JSONResponse({"log": text or "لسه مفيش تصدير اتعمل من ساعة ما السيرفر اشتغل."})
+
+
+render_executor = ThreadPoolExecutor(max_workers=1)
+
+
+@app.post("/api/projects/{project_id}/render")
+def render_project(project_id: str, request: Request):
+    with closing(db()) as conn, conn:
+        row = get_project(conn, project_id)
+        if row["render_status"] == "rendering":
+            raise HTTPException(400, "المشروع بيتصدّر بالفعل")
+        data = json.loads(row["data"])
+        cw, ch, fps, crf = export_settings(data)
+        with montage.canvas(cw, ch, fps, crf):
+            return start_render(conn, row, project_id, data, request)
+
+
+def start_render(conn: sqlite3.Connection, row: sqlite3.Row, project_id: str, data: dict, request: Request):
+    segments, voice, music, outro_len = build_montage(conn, data)
+    export_id = uuid.uuid4().hex[:12]
+    total = sum(sg.duration for sg in segments)
+    subs = [x for x in (project_captions(conn, data, total, export_id), project_texts(data, total, export_id)) if x]
+    overlays, ov_sounds = project_overlays(conn, data, total)
+    work_dir = render_work_dir(export_id, total)
+    cmd, total = montage.build_commands(
+        ffmpeg_exe(), segments, EXPORTS_DIR / f"{export_id}.mp4", work_dir, voice, music,
+        logo=project_logo(data, total, outro_len), subtitles=subs,
+        low_memory=(system_info()["memory_limit_mb"] or 99999) < 1500,
+        sounds=project_sounds(conn, data) + ov_sounds, audio_fx=project_mix(data), overlays=overlays,
+    )
+    RENDER_ACTIVE[project_id] = "بيبدأ…"
+    conn.execute(
+        "UPDATE projects SET render_status = 'rendering', render_error = NULL, updated_at = ? WHERE id = ?",
+        (now(), project_id),
+    )
+    tid = data.get("typo_id") if data.get("typo_on", True) else None
+    if tid and not (TYPO_PROJ / Path(tid).name / "typo.json").exists():
+        tid = None
+    port = (request.scope.get("server") or ("127.0.0.1", 8000))[1]
+    ts = data.get("typo_sfx") or {}
+    click = float(ts.get("volume", 1.0)) if tid and ts.get("on", True) else 0.0
+    sid = data.get("typo_id") if data.get("typo_id") and (TYPO_PROJ / Path(data["typo_id"]).name / "typo.json").exists() else None
+    if montage.canvas_size() != (montage.WIDTH, montage.HEIGHT):
+        sid = None  # المشهد (الخلفية الجديدة والحاجات اللي اتشالت) معمول على 9:16 بس
+    intro = [p for p in (coach_intro(data) if data.get("char_intro", True) else None,
+                         brand_video("intro", data.get("client_id")) if data.get("brand_intro", True) else None) if p]
+    render_executor.submit(run_render, project_id, export_id, cmd, total, row["name"], work_dir, tid, f"http://127.0.0.1:{port}", click, sid, intro)
+    return {"ok": True, "duration": total}
+
+
+@app.post("/api/projects/{project_id}/render-audio")
+def render_project_audio(project_id: str):
+    """🎧 الصوت بس (MP3): التعليق والموسيقى والمؤثرات وصوت الفيديوهات، بنفس الظبط بتاع الفيديو."""
+    with closing(db()) as conn:
+        row = get_project(conn, project_id)
+        data = json.loads(row["data"])
+        segments, voice, music, _ = build_montage(conn, data)
+        sounds = project_sounds(conn, data)
+    aid = uuid.uuid4().hex[:12]
+    work = TMP_DIR / f"aud_{aid}"
+    out = EXPORTS_DIR / f"audio_{aid}.mp3"
+    cmds, total = montage.build_audio_commands(ffmpeg_exe(), segments, out, work, voice, music, sounds, project_mix(data))
+    try:
+        for c in cmds:
+            r = subprocess.run(c, capture_output=True, text=True, timeout=1800)
+            if r.returncode != 0:
+                raise HTTPException(500, f"تصدير الصوت فشل: {r.stderr.strip()[-300:]}")
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+    name = re.sub(r'[\\/:*?"<>|\x00-\x1f]+', " ", row["name"]).strip(" .") or "audio"
+    return {"url": f"/media/export-audio/{aid}/{quote(name[:120])}.mp3", "duration": round(total, 2), "size": out.stat().st_size}
+
+
+@app.get("/media/export-audio/{aid}/{filename}")
+def export_audio_file(aid: str, filename: str):
+    path = EXPORTS_DIR / f"audio_{Path(aid).name}.mp3"
+    if not path.exists():
+        raise HTTPException(404, "الملف مش موجود")
+    return FileResponse(path, media_type="audio/mpeg", filename=filename, content_disposition_type="attachment")
+
+
+def export_file_name(name: str) -> str:
+    """اسم الملف اللي بيتحمّل: اسم المشروع، من غير الحروف اللي الأجهزة مبتقبلهاش في أسماء الملفات."""
+    clean = re.sub(r'[\\/:*?"<>|\x00-\x1f]+', " ", name).strip(" .") or "video"
+    return f"{clean[:120]}.mp4"
+
+
+def export_to_dict(r: sqlite3.Row) -> dict:
+    # الاسم جوه الرابط نفسه، عشان أي طريقة تحميل (حتى من قايمة مشغّل الفيديو) تحفظه باسم المشروع
+    url = f"/media/export/{r['id']}/{quote(export_file_name(r['name']))}"
+    return {
+        "id": r["id"],
+        "name": r["name"],
+        "url": url,
+        "download_url": f"{url}?download=1",
+        "duration": r["duration"],
+        "source": r["source"],
+        "project_id": r["project_id"],
+        "created_at": r["created_at"],
+    }
+
+
+@app.get("/media/export/{export_id}/{filename}")
+def export_file(export_id: str, filename: str, download: int = 0):
+    with closing(db()) as conn:
+        row = conn.execute("SELECT * FROM exports WHERE id = ?", (export_id,)).fetchone()
+    if row is None or not (EXPORTS_DIR / row["filename"]).exists():
+        raise HTTPException(404, "الفيديو غير موجود")
+    return FileResponse(
+        EXPORTS_DIR / row["filename"], media_type="video/mp4", filename=export_file_name(row["name"]),
+        content_disposition_type="attachment" if download else "inline",
+    )
+
+
+@app.get("/api/exports")
+def list_exports():
+    with closing(db()) as conn:
+        # مدرب كل فيديو (من مشروع المونتاج) عشان التاج بتاعه يتحط لوحده في النشر
+        coach_of = {}
+        for p in conn.execute("SELECT id, data FROM projects").fetchall():
+            cid = json.loads(p["data"]).get("coach_id")
+            if cid:
+                coach_of[p["id"]] = cid
+        coaches = {r["id"]: {"id": r["id"], "name": r["name"], "instagram": r["instagram"], "tiktok": r["tiktok"]}
+                   for r in conn.execute("SELECT id, name, instagram, tiktok FROM coaches")}
+        out = []
+        for r in conn.execute("SELECT * FROM exports ORDER BY created_at DESC"):
+            e = export_to_dict(r)
+            e["coach"] = coaches.get(coach_of.get(r["project_id"]))
+            out.append(e)
+        return out
+
+
+def reset_stuck_renders() -> None:
+    """التصدير بيضيع لو البرنامج اتقفل في النص، فنعلّمه كفاشل."""
+    for leftover in [*TMP_DIR.glob("render-*"), *SYSTEM_TMP.glob("render-*")]:
+        shutil.rmtree(leftover, ignore_errors=True)
+    with closing(db()) as conn, conn:
+        conn.execute(
+            "UPDATE projects SET render_status = 'failed', render_error = ? WHERE render_status = 'rendering'",
+            (f"السيرفر اتقفل وبدأ من جديد أثناء التصدير (غالبًا الذاكرة خلصت{memory_note()}). صدّر تاني.",),
+        )
+
+
+reset_stuck_renders()
+tag_project_sections()
+
+
+# ---------------------------------------------------------------- فولدر الفيديوهات الجاهزة والنشر (الخطوة 7)
+
+
+@app.post("/api/exports/upload")
+def upload_export(file: UploadFile = File(...)):
+    """فيديو جاهز من برا البرنامج بيدخل نفس الفولدر."""
+    export_id = uuid.uuid4().hex[:12]
+    filename = save_upload(file, VIDEO_EXTENSIONS, EXPORTS_DIR, f"upload_{export_id}")
+    try:
+        duration = probe_duration(EXPORTS_DIR / filename)
+    except ValueError as exc:
+        (EXPORTS_DIR / filename).unlink(missing_ok=True)
+        raise HTTPException(400, str(exc)) from exc
+    with closing(db()) as conn, conn:
+        conn.execute(
+            "INSERT INTO exports (id, name, filename, duration, source, project_id, created_at) VALUES (?, ?, ?, ?, 'upload', NULL, ?)",
+            (export_id, Path(file.filename).stem, filename, duration, now()),
+        )
+        return export_to_dict(conn.execute("SELECT * FROM exports WHERE id = ?", (export_id,)).fetchone())
+
+
+@app.patch("/api/exports/{export_id}")
+def rename_export(export_id: str, body: RenameIn):
+    name = body.name.strip()
+    if not name:
+        raise HTTPException(400, "الاسم فاضي")
+    with closing(db()) as conn, conn:
+        if conn.execute("UPDATE exports SET name = ? WHERE id = ?", (name, export_id)).rowcount == 0:
+            raise HTTPException(404, "الفيديو غير موجود")
+        return export_to_dict(conn.execute("SELECT * FROM exports WHERE id = ?", (export_id,)).fetchone())
+
+
+@app.delete("/api/exports/{export_id}")
+def delete_export(export_id: str):
+    with closing(db()) as conn, conn:
+        row = conn.execute("SELECT filename FROM exports WHERE id = ?", (export_id,)).fetchone()
+        if row is None:
+            raise HTTPException(404, "الفيديو غير موجود")
+        pending = conn.execute(
+            "SELECT COUNT(*) FROM posts WHERE export_id = ? AND status IN ('scheduled', 'sending', 'publishing')", (export_id,)
+        ).fetchone()[0]
+        if pending:
+            raise HTTPException(400, "الفيديو ده عليه بوستات متجدولة. الغيها الأول")
+        conn.execute("DELETE FROM exports WHERE id = ?", (export_id,))
+    (EXPORTS_DIR / row["filename"]).unlink(missing_ok=True)
+    return {"ok": True}
+
+
+def post_to_dict(r: sqlite3.Row) -> dict:
+    if r["carousel_id"]:
+        # كاروسيل صور: الصورة الأولى بدل الفيديو
+        first = CAROUSELS_DIR / r["carousel_id"] / "post" / "01.jpg"
+        return {**_post_dict(r), "carousel_id": r["carousel_id"],
+                "export_name": f"🖼️ {r['carousel_name']}" if r["carousel_name"] else "⚠️ الكاروسيل اتمسح",
+                "export_url": None, "image_url": f"/media/carousels/{r['carousel_id']}/post/01.jpg" if first.exists() else None}
+    return _post_dict(r)
+
+
+def _post_dict(r: sqlite3.Row) -> dict:
+    return {
+        "id": r["id"],
+        "export_id": r["export_id"],
+        "export_name": r["export_name"],
+        "export_url": f"/media/exports/{r['export_filename']}" if r["export_filename"] else r["remote_media"],
+        "from_zernio": not r["export_filename"] and bool(r["remote_media"]),
+        "caption": r["caption"],
+        "platforms": json.loads(r["platforms"]),
+        "scheduled_at": r["scheduled_at"],
+        "status": r["status"],
+        "error": r["error"],
+        "published_at": r["published_at"],
+        "sent": bool(r["remote_id"]),
+        "remote_id": r["remote_id"],
+        "options": json.loads(r["options"]) if r["options"] else {},
+    }
+
+
+POSTS_QUERY = (
+    "SELECT p.*, e.name AS export_name, e.filename AS export_filename, e.source AS export_source, "
+    "c.name AS carousel_name FROM posts p LEFT JOIN exports e ON e.id = p.export_id "
+    "LEFT JOIN carousels c ON c.id = p.carousel_id"
+)
+
+
+@app.get("/api/publisher")
+def publisher_status():
+    service = publisher.service_name()
+    linked, error = {}, None
+    if service == "zernio":
+        try:
+            linked = publisher.accounts(refresh=True)
+        except (publisher.PublishError, httpx.HTTPError) as exc:
+            error = f"مقدرتش أوصل لـ Zernio: {exc}"
+    return {
+        "service": service,
+        "platforms": {k: v[1] for k, v in publisher.PLATFORMS.items()},
+        "accounts": linked,
+        "accounts_error": error,
+        "dashboard_url": publisher.DASHBOARD_URL,
+    }
+
+
+@app.get("/api/posts")
+def list_posts():
+    with closing(db()) as conn:
+        return [post_to_dict(r) for r in conn.execute(POSTS_QUERY + " ORDER BY p.scheduled_at")]
+
+
+class PostOptions(BaseModel):
+    tag_slide: int = 1  # في الكاروسيل: التاج على أنهي سلايد
+    ig_tags: list[str] = []  # حسابات تتعمل تاج في إنستجرام
+    ig_collab: bool = False  # البوست يظهر كمان في حساب المدرب (كولاب) لو وافق
+    cover_ms: int | None = None  # الغلاف: فريم من الفيديو (بالملّي ثانية) لإنستجرام وتيك توك
+
+
+class PostIn(BaseModel):
+    export_id: str
+    caption: str = ""
+    platforms: list[str]
+    scheduled_at: datetime  # من المتصفح بتوقيت UTC
+    options: PostOptions = PostOptions()
+
+
+def clean_options(opts: PostOptions) -> str:
+    tags = []
+    for t in opts.ig_tags:
+        h = sheets.clean_handle(t, "instagram")
+        if t.strip() and not h:
+            raise HTTPException(400, f"اسم الحساب مش مظبوط: {t.strip()}")
+        if h and h not in tags:
+            tags.append(h)
+    if len(tags) > 20:
+        raise HTTPException(400, "إنستجرام بيقبل 20 تاج بالكتير")
+    if opts.ig_collab and not tags:
+        raise HTTPException(400, "الكولاب محتاج حساب واحد على الأقل في خانة التاج")
+    if opts.ig_collab and len(tags) > 3:
+        raise HTTPException(400, "الكولاب بيقبل 3 حسابات بالكتير")
+    cover = max(0, int(opts.cover_ms)) if opts.cover_ms is not None else None
+    return json.dumps({"ig_tags": tags, "ig_collab": opts.ig_collab, "cover_ms": cover, "tag_slide": max(1, int(opts.tag_slide or 1))})
+
+
+def clean_post(conn: sqlite3.Connection, body: PostIn) -> tuple[str, str, str]:
+    if not conn.execute("SELECT 1 FROM exports WHERE id = ?", (body.export_id,)).fetchone():
+        raise HTTPException(400, "الفيديو مش موجود في الفولدر")
+    platforms = [p for p in dict.fromkeys(body.platforms) if p in publisher.PLATFORMS]
+    if not platforms:
+        raise HTTPException(400, "اختار منصة واحدة على الأقل")
+    when = body.scheduled_at
+    if when.tzinfo is None:
+        raise HTTPException(400, "الميعاد لازم يكون فيه المنطقة الزمنية")
+    return json.dumps(platforms), when.astimezone(timezone.utc).isoformat(timespec="seconds"), body.caption.strip()
+
+
+def set_post(post_id: str, **fields) -> None:
+    fields["updated_at"] = now()
+    cols = ", ".join(f"{k} = ?" for k in fields)
+    with closing(db()) as conn, conn:
+        old = conn.execute(POSTS_QUERY + " WHERE p.id = ?", (post_id,)).fetchone()
+        conn.execute(f"UPDATE posts SET {cols} WHERE id = ?", (*fields.values(), post_id))
+    status = fields.get("status")
+    if old is not None and status in ("published", "failed") and status != old["status"]:
+        name = old["carousel_name"] or old["export_name"] or (old["caption"] or "").split("\n")[0][:60] or "بوست"
+        plats = "، ".join(publisher.PLATFORMS.get(k, (None, k))[1] for k in json.loads(old["platforms"] or "[]"))
+        if status == "published":
+            notify("post", "ok", f"اتنشر: {name}", plats, "7", post_id)
+        else:
+            notify("post", "bad", f"البوست مااتنشرش: {name}", fields.get("error") or old["error"] or "", "7", post_id)
+
+
+def send_post(post_id: str, old_remote_id: str | None = None) -> None:
+    """يرفع الفيديو ويسلّم البوست لـ Zernio (في الخلفية)."""
+    try:
+        if old_remote_id:
+            publisher.cancel(old_remote_id)
+        with closing(db()) as conn:
+            r = conn.execute(POSTS_QUERY + " WHERE p.id = ?", (post_id,)).fetchone()
+        if r is None or r["status"] != "sending":
+            return
+        if r["carousel_id"]:
+            with closing(db()) as conn:
+                _, cdata = load_carousel(conn, r["carousel_id"])
+            remote_id = publisher.schedule_carousel(
+                post_images(r["carousel_id"], cdata), r["caption"], r["scheduled_at"],
+                publish_now=r["scheduled_at"] <= now(), options=json.loads(r["options"]) if r["options"] else {},
+            )
+            set_post(post_id, status="scheduled", remote_id=remote_id, error=None)
+            return
+        if not r["export_filename"] or not (EXPORTS_DIR / r["export_filename"]).exists():
+            raise publisher.PublishError("الفيديو اتمسح من الفولدر")
+        remote_id = publisher.schedule(
+            EXPORTS_DIR / r["export_filename"],
+            r["caption"],
+            json.loads(r["platforms"]),
+            r["scheduled_at"],
+            title=r["caption"].split("\n")[0].strip() or r["export_name"],
+            ai_made=r["export_source"] == "studio",
+            publish_now=r["scheduled_at"] <= now(),
+            options=json.loads(r["options"]) if r["options"] else {},
+        )
+        set_post(post_id, status="scheduled", remote_id=remote_id, error=None)
+    except (publisher.PublishError, httpx.HTTPError, HTTPException, subprocess.SubprocessError) as exc:
+        detail = exc.detail if isinstance(exc, HTTPException) else exc
+        set_post(post_id, status="failed", remote_id=None, error=f"مقدرتش أسلّم البوست لـ Zernio: {detail}"[:500])
+
+
+def after_save(post_id: str, when: str, old_remote_id: str | None) -> None:
+    service = publisher.service_name()
+    if service == "zernio":
+        set_post(post_id, status="sending", remote_id=None)
+        threading.Thread(target=send_post, args=(post_id, old_remote_id), daemon=True).start()
+    elif when <= now():
+        threading.Thread(target=publish_due_posts, daemon=True).start()
+
+
+@app.post("/api/posts")
+def create_post(body: PostIn):
+    with closing(db()) as conn, conn:
+        platforms, when, caption = clean_post(conn, body)
+        options = clean_options(body.options)
+        post_id = uuid.uuid4().hex[:12]
+        # لو Zernio مربوط بيتسجّل «بيتبعت» على طول، عشان المجدول ميبعتهوش هو كمان (نسختين عند Zernio)
+        status = "sending" if publisher.service_name() == "zernio" else "scheduled"
+        conn.execute(
+            "INSERT INTO posts (id, export_id, caption, platforms, scheduled_at, status, options, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (post_id, body.export_id, caption, platforms, when, status, options, now(), now()),
+        )
+    after_save(post_id, when, None)
+    with closing(db()) as conn:
+        return post_to_dict(conn.execute(POSTS_QUERY + " WHERE p.id = ?", (post_id,)).fetchone())
+
+
+@app.put("/api/posts/{post_id}")
+def update_post(post_id: str, body: PostIn):
+    with closing(db()) as conn, conn:
+        row = conn.execute("SELECT status, remote_id, carousel_id FROM posts WHERE id = ?", (post_id,)).fetchone()
+        if row is None:
+            raise HTTPException(404, "البوست غير موجود")
+        if row["carousel_id"]:
+            raise HTTPException(400, "ده كاروسيل: الغيه من هنا وانشره تاني من صفحة الكاروسيل")
+        if row["status"] in ("sending", "publishing", "published"):
+            raise HTTPException(400, "البوست ده اتنشر أو بيتبعت دلوقتي")
+        if row["status"] == "failed" and row["remote_id"]:
+            raise HTTPException(400, "البوست ده اتبعت لـ Zernio وفشل. استخدم إعادة المحاولة، أو احذفه واعمل واحد جديد")
+        platforms, when, caption = clean_post(conn, body)
+        options = clean_options(body.options)
+        conn.execute(
+            "UPDATE posts SET export_id = ?, caption = ?, platforms = ?, scheduled_at = ?, status = 'scheduled', "
+            "options = ?, error = NULL, updated_at = ? WHERE id = ?",
+            (body.export_id, caption, platforms, when, options, now(), post_id),
+        )
+    after_save(post_id, when, row["remote_id"])
+    with closing(db()) as conn:
+        return post_to_dict(conn.execute(POSTS_QUERY + " WHERE p.id = ?", (post_id,)).fetchone())
+
+
+@app.delete("/api/posts/{post_id}")
+def delete_post(post_id: str):
+    with closing(db()) as conn:
+        row = conn.execute("SELECT status, remote_id FROM posts WHERE id = ?", (post_id,)).fetchone()
+    if row is None:
+        raise HTTPException(404, "البوست غير موجود")
+    if row["status"] in ("sending", "publishing"):
+        raise HTTPException(400, "البوست بيتبعت دلوقتي، استنى ثواني")
+    if row["remote_id"] and row["status"] in ("scheduled", "failed"):
+        # لازم نلغيه عند Zernio الأول، وإلا هيتنشر برضه (حتى الفاشل ممكن يكون لسه متجدول على منصات تانية)
+        try:
+            publisher.cancel(row["remote_id"])
+        except (publisher.PublishError, httpx.HTTPError) as exc:
+            if row["status"] == "scheduled":
+                raise HTTPException(400, f"مقدرتش ألغيه عند Zernio: {exc}") from exc
+    with closing(db()) as conn, conn:
+        conn.execute("DELETE FROM posts WHERE id = ?", (post_id,))
+    return {"ok": True}
+
+
+# ---------- البوستات اللي عند Zernio ومش في القايمة هنا ----------
+def _remote_orphans() -> list[dict]:
+    if publisher.service_name() != "zernio":
+        return []
+    try:
+        remote = publisher.list_scheduled()
+    except (publisher.PublishError, httpx.HTTPError) as exc:
+        raise HTTPException(400, f"مقدرتش أوصل لـ Zernio: {exc}") from exc
+    with closing(db()) as conn:
+        known = {r["remote_id"] for r in conn.execute("SELECT remote_id FROM posts WHERE remote_id IS NOT NULL")}
+    return [p for p in remote if p["id"] not in known]
+
+
+@app.get("/api/posts/published")
+def published_posts():
+    """اللي اتنشر: من Zernio (بلينك البوست على كل منصة)، ولو مفيش Zernio من القايمة هنا."""
+    with closing(db()) as conn:
+        local = [post_to_dict(r) for r in conn.execute(POSTS_QUERY + " WHERE p.status = 'published' ORDER BY p.published_at DESC")]
+    if publisher.service_name() != "zernio":
+        return [{"id": p["id"], "content": p["caption"], "published_at": p["published_at"] or p["scheduled_at"],
+                 "media_url": p["export_url"], "name": p["export_name"],
+                 "platforms": [{"key": k, "status": "published", "url": None, "error": None} for k in p["platforms"]]}
+                for p in local]
+    try:
+        remote = publisher.list_posts("published", 50)
+    except (publisher.PublishError, httpx.HTTPError) as exc:
+        raise HTTPException(400, f"مقدرتش أوصل لـ Zernio: {exc}") from exc
+    by_remote = {p.get("remote_id"): p for p in local}
+    with closing(db()) as conn:
+        names = {r["remote_id"]: r["export_name"] for r in conn.execute(POSTS_QUERY + " WHERE p.remote_id IS NOT NULL")}
+    out = []
+    for r in remote:
+        ours = by_remote.get(r["id"])
+        out.append({
+            "id": r["id"], "content": r["content"], "media_url": r["media_url"] or (ours or {}).get("export_url"),
+            "published_at": r["published_at"] or next((x["published_at"] for x in r["platforms"] if x.get("published_at")), None) or r["scheduled_for"],
+            "name": names.get(r["id"]), "platforms": r["platforms"],
+        })
+    out.sort(key=lambda x: x["published_at"] or "", reverse=True)
+    return out
+
+
+@app.get("/api/posts/remote")
+def remote_orphans():
+    return _remote_orphans()
+
+
+class AdoptIn(BaseModel):
+    remote_id: str
+
+
+@app.post("/api/posts/adopt")
+def adopt_remote_post(body: AdoptIn):
+    """بوست متجدول عند Zernio ومش هنا: نضيفه للقايمة عشان تتابعه وتلغيه من هنا."""
+    post = next((p for p in _remote_orphans() if p["id"] == body.remote_id), None)
+    if post is None:
+        raise HTTPException(404, "البوست ده مش لاقيه عند Zernio، أو موجود في القايمة بالفعل")
+    try:
+        when = datetime.fromisoformat(str(post["scheduled_for"]).replace("Z", "+00:00")).astimezone(timezone.utc)
+    except ValueError:
+        when = datetime.now(timezone.utc)
+    post_id = uuid.uuid4().hex[:12]
+    with closing(db()) as conn, conn:
+        conn.execute(
+            "INSERT INTO posts (id, export_id, caption, platforms, scheduled_at, status, remote_id, remote_media, created_at, updated_at) "
+            "VALUES (?, '', ?, ?, ?, 'scheduled', ?, ?, ?, ?)",
+            (post_id, post["content"], json.dumps(post["platforms"]), when.isoformat(timespec="seconds"),
+             post["id"], post["media_url"], now(), now()),
+        )
+    return {"ok": True}
+
+
+@app.post("/api/posts/remote/{remote_id}/cancel")
+def cancel_remote_post(remote_id: str):
+    if not any(p["id"] == remote_id for p in _remote_orphans()):
+        raise HTTPException(404, "البوست ده مش لاقيه عند Zernio، أو موجود في القايمة بالفعل")
+    try:
+        publisher.cancel(remote_id)
+    except (publisher.PublishError, httpx.HTTPError) as exc:
+        raise HTTPException(400, f"مقدرتش ألغيه عند Zernio: {exc}") from exc
+    return {"ok": True}
+
+
+@app.post("/api/posts/{post_id}/retry")
+def retry_post(post_id: str):
+    with closing(db()) as conn:
+        row = conn.execute("SELECT status, remote_id, scheduled_at FROM posts WHERE id = ?", (post_id,)).fetchone()
+    if row is None or row["status"] != "failed":
+        raise HTTPException(400, "البوست ده مش فاشل")
+    if row["remote_id"]:
+        # Zernio بتعيد المنصات اللي فشلت بس، فمفيش نشر مكرر
+        try:
+            publisher.retry(row["remote_id"])
+        except (publisher.PublishError, httpx.HTTPError) as exc:
+            raise HTTPException(400, str(exc)) from exc
+        set_post(post_id, status="scheduled", error=None)
+    else:
+        set_post(post_id, status="sending" if publisher.service_name() == "zernio" else "scheduled", error=None)
+        after_save(post_id, row["scheduled_at"], None)
+    return {"ok": True}
+
+
+_publish_lock = threading.Lock()
+
+
+def publish_due_posts() -> None:
+    if not _publish_lock.acquire(blocking=False):
+        return
+    try:
+        service = publisher.service_name()
+        with closing(db()) as conn:
+            if service == "zernio":
+                # بوستات اتجدولت قبل ما المفتاح يتضاف: نسلّمها دلوقتي
+                waiting = [r["id"] for r in conn.execute("SELECT id FROM posts WHERE status = 'scheduled' AND remote_id IS NULL")]
+                # بوستات ميعادها عدّى: نسأل Zernio اتنشرت ولا لأ
+                sent = conn.execute(
+                    "SELECT id, remote_id FROM posts WHERE status = 'scheduled' AND remote_id IS NOT NULL AND scheduled_at <= ?",
+                    (now(),),
+                ).fetchall()
+            else:
+                due = conn.execute(
+                    POSTS_QUERY + " WHERE p.status = 'scheduled' AND p.scheduled_at <= ? ORDER BY p.scheduled_at", (now(),)
+                ).fetchall()
+
+        if service == "zernio":
+            for post_id in waiting:
+                set_post(post_id, status="sending")
+                send_post(post_id)
+            for r in sent:
+                try:
+                    state, error = publisher.remote_status(r["remote_id"])
+                except (publisher.PublishError, httpx.HTTPError):
+                    continue  # نحاول تاني في اللفة الجاية
+                if state == "published":
+                    set_post(r["id"], status="published", published_at=now(), error=None)
+                elif state == "failed":
+                    set_post(r["id"], status="failed", error=error)
+            return
+
+        for r in due:
+            if service == "mock":
+                set_post(r["id"], status="published", published_at=now(), error=None)
+            else:
+                set_post(
+                    r["id"], status="failed",
+                    error="لسه مفيش خدمة نشر مربوطة، فالبوست متنشرش. حط مفتاح Zernio من ⚙️ الإعدادات ودوس إعادة المحاولة",
+                )
+    finally:
+        _publish_lock.release()
+
+
+# ---------------------------------------------------------------- 💬 صندوق الردود (كومنتات ورسايل)
+# كل اللي بيوصل على الحسابات المربوطة في Zernio: تقراه وترد عليه من هنا، والذكاء الاصطناعي يقترح الرد بصوت البراند.
+
+def _inbox_call(fn, *args):
+    if publisher.service_name() != "zernio":
+        raise HTTPException(400, "صندوق الردود شغال مع Zernio بس. حط مفتاح Zernio من ⚙️ الإعدادات")
+    try:
+        return fn(*args)
+    except (publisher.PublishError, httpx.HTTPError) as exc:
+        raise HTTPException(400, str(exc) if isinstance(exc, publisher.PublishError) else f"مقدرتش أوصل لـ Zernio: {exc}") from exc
+
+
+@app.get("/api/inbox/comments")
+def inbox_posts(cursor: str | None = None):
+    return _inbox_call(publisher.inbox_posts, 50, cursor)
+
+
+@app.get("/api/inbox/comments/{post_id}")
+def inbox_comments(post_id: str, account_id: str):
+    return _inbox_call(publisher.inbox_comments, post_id, account_id)
+
+
+class InboxReplyIn(BaseModel):
+    account_id: str
+    message: str
+    comment_id: str | None = None  # فاضي = كومنت جديد على البوست نفسه
+
+
+@app.post("/api/inbox/comments/{post_id}/reply")
+def inbox_reply(post_id: str, body: InboxReplyIn):
+    text = body.message.strip()
+    if not text:
+        raise HTTPException(400, "اكتب الرد الأول")
+    return {"id": _inbox_call(publisher.inbox_reply_comment, post_id, body.account_id, text, body.comment_id)}
+
+
+@app.get("/api/inbox/conversations")
+def inbox_conversations(cursor: str | None = None):
+    return _inbox_call(publisher.inbox_conversations, 50, cursor)
+
+
+@app.get("/api/inbox/conversations/{conv_id}/messages")
+def inbox_messages(conv_id: str, account_id: str):
+    msgs = _inbox_call(publisher.inbox_messages, conv_id, account_id)
+    threading.Thread(target=publisher.inbox_mark_read, args=(conv_id, account_id), daemon=True).start()
+    return msgs
+
+
+class InboxSendIn(BaseModel):
+    account_id: str
+    message: str
+
+
+@app.post("/api/inbox/conversations/{conv_id}/send")
+def inbox_send(conv_id: str, body: InboxSendIn):
+    text = body.message.strip()
+    if not text:
+        raise HTTPException(400, "اكتب الرسالة الأول")
+    return {"id": _inbox_call(publisher.inbox_send, conv_id, body.account_id, text)}
+
+
+class InboxSuggestIn(BaseModel):
+    kind: str = "comment"           # comment = كومنت، message = رسالة خاصة
+    text: str                       # الكومنت أو آخر رسالة
+    platform: str = ""
+    post: str = ""                  # كابشن البوست اللي عليه الكومنت
+    history: list[dict] = []        # آخر الرسايل في المحادثة: [{"mine": bool, "text": str}]
+    hint: str = ""                  # انت عايز الرد يقول إيه (اختياري)
+    previous: str = ""              # الاقتراح اللي فات (عشان يجيب واحد مختلف)
+
+
+def inbox_reply_prompt(body: InboxSuggestIn, brand: dict) -> list[dict]:
+    b = cz.full_brand(brand)
+    where = "كومنت على بوست" if body.kind == "comment" else "رسالة خاصة (DM)"
+    system = f"""انت مسؤول السوشيال ميديا لبراند {b['name'] or 'العميل'}، وبترد على {where}{f" على {body.platform}" if body.platform else ""}.
+{b['about']}
+الجمهور: {b['audience'] or b.get('market') or '—'}.
+
+قواعد الرد:
+- بنفس لغة ولهجة اللي كتب بالظبط: لو كتب مصري رد مصري، خليجي رد خليجي، فصحى رد فصحى، إنجليزي رد إنجليزي.
+- خاطب الشخص بنوعه لو باين من كلامه أو اسمه (ولد أو بنت)، ولو مش باين استخدم صيغة محايدة.
+- قصير وطبيعي زي إنسان: جملة أو اتنين، وإيموجي واحد بالكتير لو مناسب. من غير هاشتاجات.
+- ودود ومحترم حتى لو الكلام سلبي أو فيه شكوى: اعتذر باختصار واعرض المساعدة.
+- ماتخترعش أسعار ولا مواعيد ولا عروض ولا أي معلومة مش قدامك. لو بيسأل عن تفاصيل مش عندك{" ادعوه يبعت رسالة خاصة" if body.kind == "comment" else " قوله إنك هتبعتله التفاصيل حالًا"}.
+- لو الكومنت سبام أو إعلان، رد بكلمة شكر قصيرة جدًا.
+- اكتب الرد بس، من غير شرح ولا علامات تنصيص.""" + (f"\n- قواعد البراند: {b['rules']}" if b.get("rules") else "")
+    ctx = []
+    if body.post.strip():
+        ctx.append(f"البوست:\n{body.post.strip()[:1500]}")
+    if body.history:
+        lines = [f"{'احنا' if m.get('mine') else 'هو'}: {str(m.get('text') or '').strip()[:400]}" for m in body.history[-10:]]
+        ctx.append("آخر الكلام في المحادثة:\n" + "\n".join(lines))
+    ctx.append(f"{'الكومنت' if body.kind == 'comment' else 'الرسالة'} اللي هنرد عليها:\n{body.text.strip()[:1500]}")
+    if body.hint.strip():
+        ctx.append(f"المطلوب في الرد: {body.hint.strip()[:400]}")
+    if body.previous.strip():
+        ctx.append(f"ده اقتراح قبل كده، اكتب واحد مختلف عنه: {body.previous.strip()[:400]}")
+    return [{"role": "system", "content": system}, {"role": "user", "content": "\n\n".join(ctx)}]
+
+
+@app.post("/api/inbox/suggest")
+def inbox_suggest(body: InboxSuggestIn):
+    if not body.text.strip():
+        raise HTTPException(400, "مفيش كلام نرد عليه")
+    if atlas.mock_mode():
+        return {"reply": "شكرًا جدًا لكلامك الحلو 🙏 لو محتاج أي تفاصيل ابعتلنا رسالة"}
+    reply = llm(inbox_reply_prompt(body, brand_settings()), temperature=0.9 if body.previous else 0.7)
+    return {"reply": reply.strip().strip('"«»').strip()}
+
+
+# ---------------------------------------------------------------- 🔔 الإشعارات
+# حاجات بتحصل في الخلفية وانت مش فاتح صفحتها: تصدير خلص أو فشل، بوست اتنشر أو فشل، أوتوبايلوت خلص أو وقف.
+NOTIFY_KEEP = 200
+
+
+def notify(kind: str, level: str, title: str, body: str = "", link: str = "", ref: str = "") -> None:
+    try:
+        with closing(db()) as conn, conn:
+            conn.execute(
+                "INSERT INTO notifications (id, kind, level, title, body, link, ref, read, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)",
+                (uuid.uuid4().hex[:12], kind, level, title[:200], (body or "")[:500], link, ref, now()),
+            )
+            conn.execute(
+                "DELETE FROM notifications WHERE id NOT IN (SELECT id FROM notifications ORDER BY created_at DESC LIMIT ?)",
+                (NOTIFY_KEEP,),
+            )
+    except sqlite3.Error:
+        pass  # الإشعار مش أهم من الشغل نفسه
+
+
+@app.get("/api/notifications")
+def list_notifications(limit: int = 50):
+    with closing(db()) as conn:
+        rows = conn.execute("SELECT * FROM notifications ORDER BY created_at DESC LIMIT ?", (max(1, min(limit, NOTIFY_KEEP)),)).fetchall()
+        unread = conn.execute("SELECT COUNT(*) FROM notifications WHERE read = 0").fetchone()[0]
+    return {"unread": unread, "items": [{**dict(r), "read": bool(r["read"])} for r in rows]}
+
+
+class NotifyReadIn(BaseModel):
+    ids: list[str] | None = None  # فاضي = الكل
+
+
+@app.post("/api/notifications/read")
+def read_notifications(body: NotifyReadIn):
+    with closing(db()) as conn, conn:
+        if body.ids:
+            conn.executemany("UPDATE notifications SET read = 1 WHERE id = ?", [(i,) for i in body.ids])
+        else:
+            conn.execute("UPDATE notifications SET read = 1")
+    return {"ok": True}
+
+
+@app.delete("/api/notifications")
+def clear_notifications():
+    with closing(db()) as conn, conn:
+        conn.execute("DELETE FROM notifications")
+    return {"ok": True}
+
+
+def scheduler_loop() -> None:
+    while True:
+        try:
+            publish_due_posts()
+        except Exception:  # المجدول لازم يفضل شغال مهما حصل
+            pass
+        time.sleep(20)
+
+
+with closing(db()) as _conn, _conn:
+    if "remote_id" not in {c[1] for c in _conn.execute("PRAGMA table_info(posts)")}:
+        _conn.execute("ALTER TABLE posts ADD COLUMN remote_id TEXT")
+    if "remote_media" not in {c[1] for c in _conn.execute("PRAGMA table_info(posts)")}:
+        _conn.execute("ALTER TABLE posts ADD COLUMN remote_media TEXT")
+    if "carousel_id" not in {c[1] for c in _conn.execute("PRAGMA table_info(posts)")}:
+        _conn.execute("ALTER TABLE posts ADD COLUMN carousel_id TEXT")
+    _conn.execute(
+        """CREATE TABLE IF NOT EXISTS notifications (
+            id TEXT PRIMARY KEY, kind TEXT NOT NULL, level TEXT NOT NULL, title TEXT NOT NULL, body TEXT,
+            link TEXT, ref TEXT, read INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL
+        )"""
+    )
+    # إعدادات إضافية للبوست: تاج إنستجرام، كولاب، الغلاف
+    if "options" not in {c[1] for c in _conn.execute("PRAGMA table_info(posts)")}:
+        _conn.execute("ALTER TABLE posts ADD COLUMN options TEXT")
+    # لو البرنامج اتقفل وهو بيسلّم بوست، مش عارفين وصل ولا لأ، فنعلّمه عشان تتأكد بنفسك
+    _conn.execute(
+        "UPDATE posts SET status = 'failed', error = 'البرنامج اتقفل وهو بيبعت البوست. اتأكد من Zernio قبل ما تعيد المحاولة' "
+        "WHERE status IN ('sending', 'publishing')"
+    )
+threading.Thread(target=scheduler_loop, daemon=True).start()
+
+
+# ---------------------------------------------------------------- 🤖 أوتوبايلوت كوتشي
+# كل مشروع (فيديو خام + تعليق + شخصية) بيمشي لوحده: تقطيع (قطع أقل من 15 ثانية) ← توليد ← مونتاج كوتشي
+# التلقائي ← تصدير ← جدولة في أول ميعاد فاضي من مواعيد اليوم التلاتة.
+
+AUTOPILOT_FILE = DATA_DIR / "autopilot.json"
+AUTOPILOT_DEFAULTS = {"slots": ["12:00", "18:00", "21:00"], "tz_offset": 3, "platforms": ["instagram", "tiktok"], "prompt_id": None,
+                      "start_date": None,              # يبدأ النشر من يوم معيّن (YYYY-MM-DD)، فاضي = من النهارده
+                      "days": [0, 1, 2, 3, 4, 5, 6]}   # أيام النشر في الأسبوع (الاتنين = 0)
+AUTOPILOT_STEPS = ("queued", "cutting", "generating", "montage", "rendering", "scheduling", "done", "failed", "stopped")
+AUTOPILOT_LOCK = threading.Lock()
+
+
+def autopilot_load() -> dict:
+    try:
+        d = json.loads(AUTOPILOT_FILE.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        d = {}
+    return {"settings": {**AUTOPILOT_DEFAULTS, **(d.get("settings") or {})}, "jobs": d.get("jobs") or []}
+
+
+def autopilot_save(d: dict) -> None:
+    AUTOPILOT_FILE.write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+
+
+def autopilot_update(job_id: str, **fields) -> None:
+    with AUTOPILOT_LOCK:
+        d = autopilot_load()
+        for j in d["jobs"]:
+            if j["id"] == job_id:
+                changed = fields.get("step") and fields["step"] != j.get("step")
+                if changed:
+                    fields["step_at"] = now()   # من إمتى في الخطوة دي (بيبان في الشاشة)
+                j.update(fields, updated_at=now())
+                if changed and j["step"] in ("done", "failed"):
+                    done = j["step"] == "done"
+                    nm = j.get("name") or "مشروع"
+                    notify("autopilot", "ok" if done else "bad", f"🤖 خلص: {nm}" if done else f"🤖 وقف: {nm}",
+                           "اتجدول" if done else (j.get("error") or ""), "7" if done else "0", job_id)
+        autopilot_save(d)
+
+
+def autopilot_cut(conn: sqlite3.Connection, video_id: str) -> None:
+    v = get_video(conn, video_id)
+    src = RAW_DIR / v["filename"]
+    try:
+        scenes = kochi_layout.scene_cuts(ffmpeg_exe(), src)
+    except Exception:  # noqa: BLE001
+        scenes = []
+    cuts = kochi_layout.auto_cuts(v["duration"], scenes, MAX_CLIP_SECONDS - 0.5, MIN_REFERENCE_SECONDS)
+    conn.execute("UPDATE videos SET cuts = ?, skipped = '[]' WHERE id = ?", (json.dumps(cuts), video_id))
+    conn.commit()
+
+
+def autopilot_slot(settings: dict, taken: set[str]) -> datetime:
+    """أول ميعاد فاضي (من مواعيد اليوم) بعد ساعة من دلوقتي. المواعيد بتوقيت السعودية، والراجع UTC."""
+    tz = timezone(timedelta(hours=float(settings.get("tz_offset") or 0)))
+    slots = sorted(settings.get("slots") or AUTOPILOT_DEFAULTS["slots"])
+    soon = datetime.now(tz) + timedelta(hours=1)
+    days = set(settings.get("days") or range(7))
+    first = soon
+    if settings.get("start_date"):
+        try:
+            d0 = datetime.strptime(settings["start_date"], "%Y-%m-%d").replace(tzinfo=tz)
+            first = max(soon, d0)
+        except ValueError:
+            pass
+    for day in range(0, 180):
+        base = (first + timedelta(days=day)).date()
+        if base.weekday() not in days:
+            continue
+        for sl in slots:
+            h, m = (int(x) for x in sl.split(":"))
+            at = datetime(base.year, base.month, base.day, h, m, tzinfo=tz)
+            key = at.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M")
+            if at >= soon and key not in taken:
+                return at.astimezone(timezone.utc)
+    raise RuntimeError("مفيش ميعاد فاضي في الـ 6 شهور الجايين")
+
+
+def autopilot_fixed_time(settings: dict, at: str | None) -> datetime | None:
+    """ميعاد محدد للمشروع ده (يوم وساعة بتوقيت السعودية). لو فات، بيرجع None ويتاخد أول ميعاد فاضي."""
+    if not at:
+        return None
+    try:
+        tz = timezone(timedelta(hours=float(settings.get("tz_offset") or 0)))
+        when = datetime.fromisoformat(at).replace(tzinfo=tz)
+    except ValueError:
+        return None
+    return when.astimezone(timezone.utc) if when > datetime.now(tz) + timedelta(minutes=10) else None
+
+
+class _FakeRequest:   # start_render محتاج بورت السيرفر (للتايبوجرافي)
+    scope = {"server": ("127.0.0.1", int(os.environ.get("PORT") or 8000))}
+
+
+def autopilot_step(job: dict, settings: dict) -> None:
+    jid, step = job["id"], job["step"]
+    with closing(db()) as conn:
+        f = conn.execute("SELECT * FROM folders WHERE id = ?", (job["folder_id"],)).fetchone()
+        if f is None:
+            return autopilot_update(jid, step="failed", error="المشروع اتمسح")
+        if not (f["video_id"] and f["voice_id"] and f["coach_id"]):
+            return autopilot_update(jid, step="failed", error="المشروع ناقص: لازم فيديو خام وتعليق صوتي وشخصية")
+        vid = f["video_id"]
+        clips = conn.execute("SELECT id, start, end FROM clips WHERE video_id = ? ORDER BY idx", (vid,)).fetchall()
+
+        if step in ("queued", "cutting"):
+            if not clips:
+                autopilot_update(jid, step="cutting", note="بيقطّع")
+                autopilot_cut(conn, vid)
+                split_video(vid)
+            return autopilot_update(jid, step="generating", note="بيولّد")
+
+        if step == "generating":
+            states, latest = [], []
+            for c in clips:
+                gens = conn.execute("SELECT id, status, error FROM generations WHERE clip_id = ? AND coach_id = ? ORDER BY created_at DESC",
+                                    (c["id"], f["coach_id"])).fetchall()
+                states.append(gens[0]["status"] if gens else None)
+                latest.append(gens[0] if gens else None)
+            todo = [c["id"] for c, st in zip(clips, states) if st is None]
+            if todo:
+                prompt = settings.get("prompt_id") or (conn.execute("SELECT id FROM prompts ORDER BY is_default DESC, created_at DESC").fetchone() or {"id": None})["id"]
+                if not prompt:
+                    return autopilot_update(jid, step="failed", error="مفيش برومت توليد. ضيف واحد من صفحة التوليد")
+                create_generations(GenerationIn(clip_ids=todo, coach_id=f["coach_id"], prompt_id=prompt))
+                return autopilot_update(jid, note=f"بيولّد {len(clips)} قطعة")
+            retried = set(job.get("retried") or [])
+            again = [g["id"] for g in latest if g and g["status"] == "failed" and g["id"] not in retried]
+            if again:   # القطعة اللي فشلت بتتعاد مرة واحدة لوحدها
+                for gid in again:
+                    retry_generation(gid)
+                return autopilot_update(jid, retried=[*retried, *again], note=f"أعاد توليد {len(again)} قطعة فشلت")
+            failed = [g for g in latest if g and g["status"] == "failed"]
+            if failed:
+                return autopilot_update(jid, step="failed", error=f"{len(failed)} قطعة فشلت في التوليد مرتين ({(failed[0]['error'] or '')[:120]}). أعد توليدها من صفحة التوليد ودوس «كمّل»")
+            done = sum(1 for st in states if st == "completed")
+            if done < len(clips):
+                working = sum(1 for st in states if st in ACTIVE_STATUSES)
+                return autopilot_update(jid, note=f"بيولّد: {done} من {len(clips)} جاهزين · {working} شغّالين دلوقتي (كل قطعة بتاخد كام دقيقة)")
+            return autopilot_update(jid, step="montage", note="بيعمل المونتاج")
+
+        if step == "montage":
+            draft = montage_draft(vid, f["coach_id"])
+            if draft["missing"]:
+                return autopilot_update(jid, step="generating")
+            # الكابشن محتاج كلام التعليق مكتوب بتوقيته: بنستنى لحد ما يتكتب (لو فشل مرتين بيكمّل من غير كابشن)
+            tr = transcript_of(conn.execute("SELECT transcript FROM audio WHERE id = ?", (f["voice_id"],)).fetchone())
+            tr_tries = job.get("tr_tries", 0)
+            if tr.get("status") != "done" and tr_tries < 2:
+                if tr.get("status") != "working":
+                    start_transcribe(f["voice_id"])
+                    return autopilot_update(jid, tr_tries=tr_tries + 1, note="بيكتب كلام التعليق للكابشن")
+                return autopilot_update(jid, note="بيكتب كلام التعليق للكابشن")
+            captions_on = tr.get("status") == "done" and bool(tr.get("words"))
+            music = next((r for r in conn.execute("SELECT id, name FROM audio WHERE kind = 'music' ORDER BY created_at DESC")
+                          if DEFAULT_MUSIC_NAME in (r["name"] or "").lower()), None)
+            body = ProjectIn(name=f["name"], video_id=vid, coach_id=f["coach_id"],
+                             clips=[{"gen_id": g, "start": 0, "end": None, "zoom": 1, "x": 0, "y": 0, "volume": 1} for g in draft["gen_ids"]],
+                             voice={"id": f["voice_id"], "volume": 1, "delay": 0, "offset": 0, "length": None, "fade_out": False},
+                             music={"id": music["id"], "volume": 1, "delay": 0, "offset": 0, "length": None, "fade_out": True} if music else None)
+            pid = create_project(body)["id"]
+            with closing(db()) as c2, c2:
+                data = json.loads(get_project(c2, pid)["data"])
+                kochi_auto_montage(c2, data, export_settings(data)[2])
+                # نفس اللي شاشة المونتاج بتحطه لوحدها: الكابشن بالقالب الأساسي واللوجو
+                if captions_on:
+                    data["captions"] = {"enabled": True, "template": captions.DEFAULT_TEMPLATE, **captions.TEMPLATES[captions.DEFAULT_TEMPLATE]}
+                data["logo"] = dict(LOGO_DEFAULTS)
+                if job.get("client_id"):
+                    data["client_id"] = job["client_id"]
+                c2.execute("UPDATE projects SET data = ?, updated_at = ? WHERE id = ?", (json.dumps(data), now(), pid))
+            return autopilot_update(jid, step="rendering", project_id=pid,
+                                    note="بيصدّر" if captions_on else "بيصدّر (من غير كابشن: كلام التعليق مكتبش)")
+
+        if step == "rendering":
+            row = get_project(conn, job["project_id"])
+            if row["render_status"] == "done" and row["export_id"]:
+                return autopilot_update(jid, step="scheduling", export_id=row["export_id"], note="بيجدول")
+            if row["render_status"] == "failed" and job.get("render_tries", 0) >= 2:
+                return autopilot_update(jid, step="failed", error=f"التصدير فشل: {row['render_error'] or ''}"[:300])
+            if row["render_status"] != "rendering" or job["project_id"] not in RENDER_ACTIVE:
+                # أول مرة، أو التصدير وقع (السيرفر اتقفل في النص مثلًا): بيبدأ تاني لوحده
+                with closing(db()) as c2, c2:
+                    fresh = get_project(c2, job["project_id"])
+                    if fresh["render_status"] == "done" or (fresh["render_status"] == "rendering" and job["project_id"] in RENDER_ACTIVE):
+                        return   # خلص (أو بدأ) في اللحظة دي
+                    start_render(c2, fresh, job["project_id"], json.loads(fresh["data"]), _FakeRequest())
+                return autopilot_update(jid, render_tries=job.get("render_tries", 0) + 1, note="بيصدّر")
+            return autopilot_update(jid, note=f"بيصدّر: {RENDER_ACTIVE.get(job['project_id']) or ''}".strip(" :"))
+
+        if step == "scheduling":
+            ex = conn.execute("SELECT * FROM exports WHERE id = ?", (job["export_id"],)).fetchone()
+            coach = conn.execute("SELECT instagram FROM coaches WHERE id = ?", (f["coach_id"],)).fetchone()
+            taken = {str(r["scheduled_at"])[:16] for r in conn.execute(
+                "SELECT scheduled_at FROM posts WHERE status IN ('scheduled', 'sending', 'publishing', 'published')")}
+    if step == "scheduling":
+        when = autopilot_fixed_time(settings, job.get("at")) or autopilot_slot(settings, taken)
+        caption = f["name"].strip()   # الكابشن = اسم المشروع
+        ig = coach["instagram"] if coach and coach["instagram"] else None
+        post = create_post(PostIn(export_id=job["export_id"], caption=caption, platforms=settings.get("platforms") or ["instagram"],
+                                  scheduled_at=when, options=PostOptions(ig_tags=[ig] if ig else [], ig_collab=bool(ig),
+                                                                         cover_ms=max(0, int((ex["duration"] - 2) * 1000)))))
+        return autopilot_update(jid, step="done", post_id=post["id"], scheduled_at=when.isoformat(), note="اتجدول")
+
+
+def autopilot_loop() -> None:
+    while True:
+        time.sleep(15)
+        try:
+            d = autopilot_load()
+            for job in d["jobs"]:
+                if job["step"] in ("done", "failed", "stopped"):
+                    continue
+                try:
+                    autopilot_step(job, d["settings"])
+                except HTTPException as exc:
+                    autopilot_update(job["id"], step="failed", error=str(exc.detail)[:300])
+                except Exception as exc:  # noqa: BLE001
+                    autopilot_update(job["id"], step="failed", error=str(exc)[:300])
+                    log_render(f"autopilot {job['id']}: {exc}")
+        except Exception:  # noqa: BLE001
+            pass
+
+
+threading.Thread(target=autopilot_loop, daemon=True).start()
+
+
+@app.get("/api/autopilot")
+def autopilot_state():
+    d = autopilot_load()
+    with closing(db()) as conn:
+        names = {r["id"]: r["name"] for r in conn.execute("SELECT id, name FROM folders")}
+    for j in d["jobs"]:
+        j["name"] = names.get(j["folder_id"], "—")
+    return d
+
+
+class AutopilotIn(BaseModel):
+    folder_ids: list[str]
+    at: dict[str, str] = {}   # ميعاد محدد لكل مشروع (اختياري): folder_id → "2026-10-20T18:30"
+
+
+@app.post("/api/autopilot")
+def autopilot_start(body: AutopilotIn):
+    with AUTOPILOT_LOCK:
+        d = autopilot_load()
+        running = {j["folder_id"] for j in d["jobs"] if j["step"] not in ("done", "failed", "stopped")}
+        for fid in body.folder_ids:
+            if fid in running:
+                continue
+            d["jobs"] = [j for j in d["jobs"] if j["folder_id"] != fid]
+            d["jobs"].append({"id": uuid.uuid4().hex[:10], "folder_id": fid, "client_id": active_client_id(), "at": body.at.get(fid) or None,
+                              "step": "queued", "note": "في الطابور",
+                              "error": None, "created_at": now(), "updated_at": now()})
+        autopilot_save(d)
+    return autopilot_state()
+
+
+@app.put("/api/autopilot/settings")
+def autopilot_settings(body: dict):
+    s = {}
+    slots = [str(x) for x in body.get("slots") or [] if re.fullmatch(r"([01]?\d|2[0-3]):[0-5]\d", str(x))]
+    if slots:
+        s["slots"] = sorted({f"{int(x.split(':')[0]):02d}:{x.split(':')[1]}" for x in slots})
+    if isinstance(body.get("platforms"), list):
+        s["platforms"] = [p for p in body["platforms"] if p in publisher.PLATFORMS]
+    if "prompt_id" in body:
+        s["prompt_id"] = body["prompt_id"] or None
+    if body.get("mode") in ("manual", "auto"):
+        s["mode"] = body["mode"]   # manual: يوم وساعة لكل فيديو · auto: مواعيد ثابتة كل يوم
+    if "start_date" in body:
+        sd = str(body.get("start_date") or "")
+        s["start_date"] = sd if re.fullmatch(r"\d{4}-\d{2}-\d{2}", sd) else None
+    if isinstance(body.get("days"), list):
+        s["days"] = sorted({int(x) for x in body["days"] if str(x).isdigit() and 0 <= int(x) <= 6}) or list(range(7))
+    if "tz_offset" in body:
+        s["tz_offset"] = clamp(float(body["tz_offset"] or 0), -12, 14)
+    with AUTOPILOT_LOCK:
+        d = autopilot_load()
+        d["settings"] = {**d["settings"], **s}
+        autopilot_save(d)
+    return autopilot_state()
+
+
+@app.post("/api/autopilot/{job_id}/stop")
+def autopilot_stop(job_id: str):
+    autopilot_update(job_id, step="stopped", note="اتوقف")
+    return autopilot_state()
+
+
+@app.put("/api/autopilot/{job_id}/at")
+def autopilot_set_time(job_id: str, body: dict):
+    """يغيّر ميعاد نشر مشروع لسه متجدولش (فاضي = أول ميعاد فاضي)."""
+    at = str(body.get("at") or "") or None
+    if at and not re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?", at):
+        raise HTTPException(400, "الميعاد مش مظبوط")
+    autopilot_update(job_id, at=at)
+    return autopilot_state()
+
+
+@app.post("/api/autopilot/{job_id}/resume")
+def autopilot_resume(job_id: str):
+    """يكمّل من مكانه: لو اتصدّر بيجدول، لو اتعمله مونتاج بيصدّر، وإلا بيكمّل التوليد."""
+    with AUTOPILOT_LOCK:
+        d = autopilot_load()
+        j = next((x for x in d["jobs"] if x["id"] == job_id), None)
+    if j is None:
+        raise HTTPException(404, "مش موجود")
+    step = "scheduling" if j.get("export_id") else "rendering" if j.get("project_id") else "queued"
+    autopilot_update(job_id, step=step, error=None, retried=[], render_tries=0, note="بيكمّل")
+    return autopilot_state()
+
+
+@app.delete("/api/autopilot/{job_id}")
+def autopilot_remove(job_id: str):
+    with AUTOPILOT_LOCK:
+        d = autopilot_load()
+        d["jobs"] = [j for j in d["jobs"] if j["id"] != job_id]
+        autopilot_save(d)
+    return autopilot_state()
+
+
+# ---------------------------------------------------------------- الكابشن واللوجو
+
+LOGO_DEFAULTS = {"enabled": True, "size": 37, "x": 0, "y": 4, "opacity": 0.9, "on_outro": True}
+
+
+def transcript_of(row: sqlite3.Row) -> dict:
+    return json.loads(row["transcript"]) if row["transcript"] else {"status": "none", "words": []}
+
+
+@app.get("/api/captions/options")
+def caption_options():
+    return {
+        "fonts": [{"family": f["family"], "label": f["label"], "url": f"/fonts/{f['file']}"} for f in captions.FONTS],
+        "templates": {k: v for k, v in captions.TEMPLATES.items()},
+        "default_template": captions.DEFAULT_TEMPLATE,
+        "logo_defaults": LOGO_DEFAULTS,
+    }
+
+
+@app.get("/api/audio/{audio_id}/transcript")
+def get_transcript(audio_id: str):
+    with closing(db()) as conn:
+        row = conn.execute("SELECT transcript FROM audio WHERE id = ?", (audio_id,)).fetchone()
+    if row is None:
+        raise HTTPException(404, "الملف غير موجود")
+    return transcript_of(row)
+
+
+def set_transcript(audio_id: str, data: dict) -> None:
+    with closing(db()) as conn, conn:
+        conn.execute("UPDATE audio SET transcript = ? WHERE id = ?", (json.dumps(data, ensure_ascii=False), audio_id))
+
+
+def run_transcribe(audio_id: str) -> None:
+    with closing(db()) as conn:
+        row = conn.execute("SELECT filename, duration FROM audio WHERE id = ?", (audio_id,)).fetchone()
+    if row is None:
+        return
+    try:
+        words = atlas.transcribe(AUDIO_DIR / row["filename"], row["duration"])
+        set_transcript(audio_id, {"status": "done", "words": words, "edited": False})
+    except httpx.HTTPError as exc:
+        set_transcript(audio_id, {"status": "failed", "error": f"مقدرتش أوصل لـ Atlas: {exc}"[:400], "words": []})
+    except Exception as exc:  # الخطأ يبان للمستخدم بدل ما يضيع
+        set_transcript(audio_id, {"status": "failed", "error": str(exc)[:400], "words": []})
+
+
+@app.post("/api/audio/{audio_id}/transcribe")
+def start_transcribe(audio_id: str):
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "محتاج مفتاح Atlas عشان يكتب الكلام. حطه من ⚙️ الإعدادات")
+    with closing(db()) as conn:
+        row = conn.execute("SELECT transcript FROM audio WHERE id = ?", (audio_id,)).fetchone()
+    if row is None:
+        raise HTTPException(404, "الملف غير موجود")
+    if transcript_of(row).get("status") == "working":
+        return {"ok": True}
+    set_transcript(audio_id, {"status": "working", "words": []})
+    threading.Thread(target=run_transcribe, args=(audio_id,), daemon=True).start()
+    return {"ok": True}
+
+
+class WordIn(BaseModel):
+    w: str
+    s: float
+    e: float
+
+
+class TranscriptIn(BaseModel):
+    words: list[WordIn]
+
+
+@app.put("/api/audio/{audio_id}/transcript")
+def save_transcript(audio_id: str, body: TranscriptIn):
+    words = sorted(
+        ({"w": w.w.strip(), "s": round(max(0.0, w.s), 3), "e": round(max(w.s, w.e), 3)} for w in body.words if w.w.strip()),
+        key=lambda w: w["s"],
+    )
+    with closing(db()) as conn:
+        if not conn.execute("SELECT 1 FROM audio WHERE id = ?", (audio_id,)).fetchone():
+            raise HTTPException(404, "الملف غير موجود")
+    set_transcript(audio_id, {"status": "done", "words": words, "edited": True})
+    return {"status": "done", "words": words, "edited": True}
+
+
+def legacy_logo_path() -> Path | None:
+    name = auth.get_setting("logo")
+    path = BRAND_DIR / name if name else None
+    return path if path and path.exists() else None
+
+
+def logo_path(client_id: str | None = None) -> Path | None:
+    """لوجو العميل المختار (أول لوجو في ملفه)، أو لوجو عميل معيّن."""
+    c = (brain_row(client_id) if client_id else None) or active_client()
+    for a in (c or {}).get("logos") or []:
+        p = brain_dir(c["id"]) / a["file"]
+        if p.exists():
+            return p
+    return None
+
+
+@app.get("/api/logo")
+def get_logo():
+    path = logo_path()
+    return {"url": f"/media/ads/brains/{path.parent.name}/{path.name}" if path else None}
+
+
+@app.post("/api/logo")
+def upload_logo(file: UploadFile = File(...)):
+    """اللوجو الأساسي للعميل المختار (بيبقى أول لوجو في ملفه)."""
+    cid = active_client_id()
+    if not cid:
+        raise HTTPException(400, "اختار عميل الأول")
+    name = save_upload(file, IMAGE_EXTENSIONS, brain_dir(cid), "logo")
+    update_brain(cid, lambda d: d.update(logos=[{"file": name, "name": "اللوجو", "description": ""}] + (d.get("logos") or [])))
+    return get_logo()
+
+
+@app.delete("/api/logo")
+def delete_logo():
+    cid, old = active_client_id(), logo_path()
+    if cid and old:
+        update_brain(cid, lambda d: d.update(logos=[a for a in d.get("logos") or [] if a["file"] != old.name]))
+        old.unlink(missing_ok=True)
+    return get_logo()
+
+
+# ---------------------------------------------------------------- المشاريع (الفولدرات)
+
+
+def sync_folder(conn: sqlite3.Connection, folder_id: str) -> None:
+    """الفيديو الخام بياخد اسم الفولدر والصوت والمدرب بتوعه، ومشاريع المونتاج بتاخد الاسم."""
+    f = conn.execute("SELECT * FROM folders WHERE id = ?", (folder_id,)).fetchone()
+    if not f or not f["video_id"]:
+        return
+    conn.execute(
+        "UPDATE videos SET name = ?, voice_id = ?, coach_id = ? WHERE id = ?",
+        (f["name"], f["voice_id"], f["coach_id"], f["video_id"]),
+    )
+    for p in conn.execute("SELECT id, data FROM projects").fetchall():
+        data = json.loads(p["data"])
+        if data.get("video_id") == f["video_id"] and data.get("name") != f["name"]:
+            data["name"] = f["name"]
+            conn.execute("UPDATE projects SET name = ?, data = ? WHERE id = ?", (f["name"], json.dumps(data), p["id"]))
+
+
+def get_folder(conn: sqlite3.Connection, folder_id: str) -> sqlite3.Row:
+    row = conn.execute("SELECT * FROM folders WHERE id = ?", (folder_id,)).fetchone()
+    if row is None:
+        raise HTTPException(404, "المشروع غير موجود")
+    return row
+
+
+def folder_to_dict(conn: sqlite3.Connection, f: sqlite3.Row) -> dict:
+    video = None
+    if f["video_id"]:
+        v = conn.execute("SELECT * FROM videos WHERE id = ?", (f["video_id"],)).fetchone()
+        if v:
+            clip_ids = [r["id"] for r in conn.execute("SELECT id FROM clips WHERE video_id = ?", (v["id"],))]
+            done = 0
+            for cid in clip_ids:
+                if conn.execute(
+                    "SELECT 1 FROM generations WHERE clip_id = ? AND status = 'completed'", (cid,)
+                ).fetchone():
+                    done += 1
+            video = {
+                "id": v["id"], "url": f"/media/raw/{v['filename']}", "duration": v["duration"],
+                "file": v["filename"], "clips": len(clip_ids), "generated": done,
+            }
+    voice = None
+    if f["voice_id"]:
+        a = conn.execute("SELECT id, name, filename, duration FROM audio WHERE id = ?", (f["voice_id"],)).fetchone()
+        if a:
+            voice = {"id": a["id"], "name": a["name"], "url": f"/media/audio/{a['filename']}", "duration": a["duration"]}
+    coach = None
+    if f["coach_id"]:
+        c = conn.execute("SELECT * FROM coaches WHERE id = ?", (f["coach_id"],)).fetchone()
+        if c:
+            coach = coach_to_dict(c)
+    montage_project, exported = None, None
+    if f["video_id"]:
+        for p in conn.execute("SELECT id, data, export_id FROM projects ORDER BY updated_at DESC").fetchall():
+            if json.loads(p["data"]).get("video_id") == f["video_id"]:
+                montage_project = p["id"]
+                if p["export_id"]:
+                    e = conn.execute("SELECT filename FROM exports WHERE id = ?", (p["export_id"],)).fetchone()
+                    exported = f"/media/exports/{e['filename']}" if e else None
+                break
+    return {
+        "id": f["id"], "name": f["name"], "created_at": f["created_at"],
+        "video": video, "voice": voice, "coach": coach, "script": f["script"] or "",
+        "montage_project": montage_project, "exported": exported,
+    }
+
+
+@app.get("/api/folders")
+def list_folders():
+    with closing(db()) as conn:
+        rows = conn.execute("SELECT * FROM folders ORDER BY created_at DESC").fetchall()
+        return [folder_to_dict(conn, r) for r in rows]
+
+
+class FolderIn(BaseModel):
+    name: str
+
+
+@app.post("/api/folders")
+def create_folder(body: FolderIn):
+    name = body.name.strip()
+    if not name:
+        raise HTTPException(400, "اكتب اسم المشروع")
+    folder_id = uuid.uuid4().hex[:12]
+    with closing(db()) as conn, conn:
+        conn.execute("INSERT INTO folders (id, name, created_at) VALUES (?, ?, ?)", (folder_id, name, now()))
+        return folder_to_dict(conn, get_folder(conn, folder_id))
+
+
+@app.patch("/api/folders/{folder_id}")
+def update_folder(folder_id: str, body: dict):
+    """بيغيّر اللي اتبعت بس: name أو voice_id أو coach_id أو script (null = شيله)."""
+    with closing(db()) as conn, conn:
+        get_folder(conn, folder_id)
+        if "name" in body:
+            name = str(body["name"] or "").strip()
+            if not name:
+                raise HTTPException(400, "الاسم فاضي")
+            conn.execute("UPDATE folders SET name = ? WHERE id = ?", (name, folder_id))
+        if "voice_id" in body:
+            vid = body["voice_id"] or None
+            if vid and not conn.execute("SELECT 1 FROM audio WHERE id = ? AND kind = 'voice'", (vid,)).fetchone():
+                raise HTTPException(400, "التسجيل مش موجود في المكتبة")
+            conn.execute("UPDATE folders SET voice_id = ? WHERE id = ?", (vid, folder_id))
+        if "coach_id" in body:
+            cid = body["coach_id"] or None
+            if cid:
+                get_coach(conn, cid)
+            conn.execute("UPDATE folders SET coach_id = ? WHERE id = ?", (cid, folder_id))
+        if "script" in body:
+            script = str(body["script"] or "").replace("\r\n", "\n").strip()
+            if len(script) > 200_000:
+                raise HTTPException(400, "السكريبت طويل جدًا")
+            conn.execute("UPDATE folders SET script = ? WHERE id = ?", (script or None, folder_id))
+        sync_folder(conn, folder_id)
+        return folder_to_dict(conn, get_folder(conn, folder_id))
+
+
+@app.post("/api/folders/{folder_id}/video")
+def set_folder_video(folder_id: str, file: UploadFile = File(...)):
+    """يرفع الفيديو الخام للمشروع. لو فيه فيديو قديم، بيتمسح هو والتقطيع بتاعه."""
+    with closing(db()) as conn:
+        get_folder(conn, folder_id)
+    new_id = store_video(file)
+    with closing(db()) as conn, conn:
+        old = get_folder(conn, folder_id)["video_id"]
+        if old:
+            remove_video(conn, old)
+        conn.execute("UPDATE folders SET video_id = ? WHERE id = ?", (new_id, folder_id))
+        sync_folder(conn, folder_id)
+        return folder_to_dict(conn, get_folder(conn, folder_id))
+
+
+@app.post("/api/folders/{folder_id}/voice")
+def set_folder_voice(folder_id: str, file: UploadFile = File(...)):
+    """يرفع تسجيل جديد للمكتبة ويحطه في المشروع."""
+    with closing(db()) as conn:
+        get_folder(conn, folder_id)
+    audio = upload_audio(kind="voice", file=file)
+    return update_folder(folder_id, {"voice_id": audio["id"]})
+
+
+@app.delete("/api/folders/{folder_id}/video")
+def delete_folder_video(folder_id: str):
+    with closing(db()) as conn, conn:
+        f = get_folder(conn, folder_id)
+        if f["video_id"]:
+            remove_video(conn, f["video_id"])
+        return folder_to_dict(conn, get_folder(conn, folder_id))
+
+
+@app.delete("/api/folders/{folder_id}")
+def delete_folder(folder_id: str, delete_video: bool = True):
+    """يمسح المشروع والفيديو الخام بتاعه. التعليق الصوتي والمدرب بيفضلوا في مكتباتهم."""
+    with closing(db()) as conn, conn:
+        f = get_folder(conn, folder_id)
+        if delete_video and f["video_id"]:
+            remove_video(conn, f["video_id"])
+        conn.execute("DELETE FROM folders WHERE id = ?", (folder_id,))
+    return {"ok": True}
+
+
+class FoldersDeleteIn(BaseModel):
+    ids: list[str]
+    exports: bool = False  # كمان الفيديوهات النهائية اللي اتصدّرت (إلا اللي عليها بوست متجدول)
+
+
+def purge_folder(conn: sqlite3.Connection, folder_id: str, exports: bool) -> dict:
+    """يمسح المشروع بكل اللي اتعمل منه: الفيديو الخام والقطع والفيديوهات المولّدة ومشاريع المونتاج
+    (والفيديوهات المتصدّرة لو اخترت). التعليق والشخصية بيفضلوا في مكتباتهم."""
+    f = get_folder(conn, folder_id)
+    kept, files = 0, []
+    vid = f["video_id"]
+    if vid:
+        clip_ids = [r["id"] for r in conn.execute("SELECT id FROM clips WHERE video_id = ?", (vid,))]
+        for cid in clip_ids:
+            for g in conn.execute("SELECT id, output_filename, status FROM generations WHERE clip_id = ?", (cid,)).fetchall():
+                if g["status"] in ACTIVE_STATUSES:
+                    raise HTTPException(400, f"المشروع «{f['name']}» لسه بيتولّد. استنى لما يخلص")
+                if g["output_filename"]:
+                    files.append(GENERATED_DIR / g["output_filename"])
+            conn.execute("DELETE FROM generations WHERE clip_id = ?", (cid,))
+        for p in conn.execute("SELECT id, data, export_id, render_status FROM projects").fetchall():
+            if json.loads(p["data"]).get("video_id") != vid:
+                continue
+            if p["render_status"] == "rendering":
+                raise HTTPException(400, f"المشروع «{f['name']}» بيتصدّر دلوقتي. استنى لما يخلص")
+            if exports and p["export_id"]:
+                e = conn.execute("SELECT filename FROM exports WHERE id = ?", (p["export_id"],)).fetchone()
+                busy = conn.execute("SELECT COUNT(*) FROM posts WHERE export_id = ? AND status IN ('scheduled', 'sending', 'publishing')",
+                                    (p["export_id"],)).fetchone()[0]
+                if e and busy:
+                    kept += 1
+                elif e:
+                    conn.execute("DELETE FROM exports WHERE id = ?", (p["export_id"],))
+                    files.append(EXPORTS_DIR / e["filename"])
+            conn.execute("DELETE FROM projects WHERE id = ?", (p["id"],))
+        remove_video(conn, vid)
+    conn.execute("DELETE FROM folders WHERE id = ?", (folder_id,))
+    return {"files": files, "kept": kept}
+
+
+@app.post("/api/folders/delete")
+def delete_folders(body: FoldersDeleteIn):
+    """مسح كذا مشروع قديم مرة واحدة (عشان المساحة)."""
+    files, kept, done = [], 0, 0
+    with closing(db()) as conn, conn:
+        for fid in dict.fromkeys(body.ids):
+            if not conn.execute("SELECT 1 FROM folders WHERE id = ?", (fid,)).fetchone():
+                continue
+            r = purge_folder(conn, fid, body.exports)
+            files += r["files"]
+            kept += r["kept"]
+            done += 1
+    for p in files:
+        p.unlink(missing_ok=True)
+    with AUTOPILOT_LOCK:   # شغل الأوتوبايلوت بتاع المشاريع اللي اتمسحت بيتشال
+        d = autopilot_load()
+        d["jobs"] = [j for j in d["jobs"] if j["folder_id"] not in body.ids]
+        autopilot_save(d)
+    return {"deleted": done, "kept_exports": kept}
+
+
+app.mount("/media/raw", StaticFiles(directory=RAW_DIR), name="raw")
+app.mount("/media/clips", StaticFiles(directory=CLIPS_DIR), name="clips")
+app.mount("/media/coaches", StaticFiles(directory=COACHES_DIR), name="coaches")
+app.mount("/media/generated", StaticFiles(directory=GENERATED_DIR), name="generated")
+app.mount("/media/audio", StaticFiles(directory=AUDIO_DIR), name="audio")
+app.mount("/media/exports", StaticFiles(directory=EXPORTS_DIR), name="exports")
+app.mount("/media/carousels", StaticFiles(directory=CAROUSELS_DIR), name="carousels")
+app.mount("/media/series", StaticFiles(directory=SERIES_DIR), name="series")
+app.mount("/media/ads", StaticFiles(directory=ADS_DIR), name="ads")
+app.mount("/media/brand", StaticFiles(directory=BRAND_DIR), name="brand")
+app.mount("/media/lab", StaticFiles(directory=DATA_DIR / "lab", check_dir=False), name="lab")
+app.mount("/media/assets", StaticFiles(directory=DATA_DIR / "assets", check_dir=False), name="assets")
+app.mount("/media/films", StaticFiles(directory=DATA_DIR / "films", check_dir=False), name="films")
+app.mount("/media/templates", StaticFiles(directory=DATA_DIR / "templates", check_dir=False), name="templates")
+app.mount("/media/tvideos", StaticFiles(directory=DATA_DIR / "tvideos", check_dir=False), name="tvideos")
+app.mount("/fonts", StaticFiles(directory=FONTS_DIR), name="fonts")
+
+
+# ---------------------------------------------------------------- الكاروسيل
+
+CAROUSEL_LOCK = threading.Lock()
+CAROUSEL_JOBS: set[str] = set()  # كاروسيلات بترسم دلوقتي
+
+
+def carousel_settings() -> dict:
+    return {
+        "text_model": auth.get_setting("carousel_text_model") or atlas.DEFAULT_TEXT_MODEL,
+        "vision_model": auth.get_setting("carousel_vision_model") or atlas.DEFAULT_VISION_MODEL,
+        "image_family": auth.get_setting("carousel_image_family") or "sunburst",
+        "quality": auth.get_setting("carousel_quality") or "high",
+    }
+
+
+def legacy_brand() -> dict:
+    """الهوية القديمة (قبل العملاء): كانت إعداد واحد للبرنامج كله. بتتنقل لأول عميل مرة واحدة."""
+    try:
+        saved = json.loads(auth.get_setting("brand") or "{}")
+    except ValueError:
+        saved = {}
+    if saved.get("style") in cz.OLD_DEFAULT_STYLES:
+        saved.pop("style")
+    return {**cz.LEGACY_BRAND, **{k: v for k, v in saved.items() if k in cz.LEGACY_BRAND and v}}
+
+
+# حقول الهوية في ملف العميل ← أسمائها في البرومبتات
+CLIENT_BRAND_MAP = {"about": "about", "audience": "audience", "palette": "colors", "typography": "font", "style": "style",
+                    "logo_rule": "logo_rule", "market": "market", "language": "language", "modest": "modest", "rules": "rules",
+                    "domain": "domain"}
+
+
+def brand_settings() -> dict:
+    """👤 هوية العميل المختار (الاسم والجمهور والألوان والخط والستايل واللغة والسوق) لكل البرومبتات."""
+    c = active_client() or {}
+    b = {cz_key: str(c.get(k) or "") for k, cz_key in CLIENT_BRAND_MAP.items()}
+    return {**cz.DEFAULT_BRAND, **{k: v for k, v in b.items() if v}, "name": c.get("name") or ""}
+
+
+def cta_list() -> list[dict]:
+    ctas = (active_client() or {}).get("ctas")
+    return ctas if isinstance(ctas, list) and ctas else cz.DEFAULT_CTAS
+
+
+@app.get("/api/carousel/settings")
+def get_carousel_settings():
+    return {
+        **carousel_settings(),
+        "brand": brand_settings(),
+        "defaults": cz.DEFAULT_BRAND,
+        "ctas": cta_list(),
+        "default_ctas": cz.DEFAULT_CTAS,
+        "kinds": cz.KINDS,
+        "logo": get_logo()["url"],
+        "image_models": {k: v[2] for k, v in atlas.IMAGE_MODELS.items()},
+        "qualities": list(cz.QUALITIES),
+        "sizes": list(cz.SIZES),
+        "configured": bool(atlas.api_key()) or atlas.mock_mode(),
+    }
+
+
+class CarouselSettingsIn(BaseModel):
+    text_model: str | None = None
+    vision_model: str | None = None
+    image_family: str | None = None
+    quality: str | None = None
+    brand: dict | None = None
+    ctas: list[dict] | None = None
+
+
+@app.put("/api/carousel/settings")
+def save_carousel_settings(body: CarouselSettingsIn):
+    if body.text_model is not None:
+        auth.set_setting("carousel_text_model", body.text_model.strip() or None)
+    if body.vision_model is not None:
+        auth.set_setting("carousel_vision_model", body.vision_model.strip() or None)
+    if body.image_family is not None:
+        if body.image_family not in atlas.IMAGE_MODELS:
+            raise HTTPException(400, "موديل الصور غير معروف")
+        auth.set_setting("carousel_image_family", body.image_family)
+    if body.quality is not None:
+        if body.quality not in cz.QUALITIES:
+            raise HTTPException(400, "الجودة غير معروفة")
+        auth.set_setting("carousel_quality", body.quality)
+    if body.brand is not None and (cid := active_client_id()):
+        back = {v: k for k, v in CLIENT_BRAND_MAP.items()}
+        def fn(d):
+            for k, v in body.brand.items():
+                if k in back:
+                    d[back[k]] = str(v).strip()[:2000]
+            return str(body.brand.get("name") or "").strip()[:80] or None
+        update_brain(cid, fn)
+    if body.ctas is not None:
+        ctas, seen = [], set()
+        for c in body.ctas:
+            cid = re.sub(r"[^a-z0-9_]", "", str(c.get("id") or "").lower())[:20] or uuid.uuid4().hex[:6]
+            label, text = str(c.get("label") or "").strip()[:60], str(c.get("text") or "").strip()[:300]
+            if label and text and cid not in seen and cid not in ("auto", "custom"):
+                seen.add(cid)
+                ctas.append({"id": cid, "label": label, "text": text})
+        if cid := active_client_id():
+            update_brain(cid, lambda d: d.update(ctas=ctas or None))
+    return get_carousel_settings()
+
+
+@app.post("/api/carousel/test-model")
+def test_text_model():
+    """بيتأكد إن موديل الكلام شغال بمفتاح Atlas، وبيرجّع جملة تجريبية بلغة العميل."""
+    if atlas.mock_mode():
+        return {"ok": True, "reply": "أهلًا، أنا جاهز نشتغل على الكاروسيل 👌"}
+    try:
+        reply = atlas.chat(
+            [{"role": "user", "content": f"قل جملة ترحيب قصيرة بـ{brand_settings()['language']} لمتابعين حساب «{brand_settings()['name'] or 'البراند'}»."}],
+            carousel_settings()["text_model"], max_tokens=120,
+        )
+    except (atlas.AtlasError, httpx.HTTPError) as exc:
+        raise HTTPException(400, str(exc)) from exc
+    return {"ok": True, "reply": reply}
+
+
+# ---------- مكتبة الكاروسيل: تيمبليتس وشخصيات ----------
+ASSET_KINDS = {"template": "تيمبليت", "character": "شخصية", "coach": "شخصية", "style": "ستايل رسم"}
+ASSET_MAX_FILES = 12
+# صيغ تانية بتتحول PNG لوحدها (صور الآيفون وصور المواقع)
+CONVERT_EXTENSIONS = {".heic", ".heif", ".avif", ".gif", ".bmp", ".tif", ".tiff", ".jfif"}
+
+
+def asset_to_dict(r: sqlite3.Row) -> dict:
+    files = [f for f in json.loads(r["files"]) if (LIBRARY_DIR / r["id"] / f).exists()]
+    return {"id": r["id"], "kind": r["kind"], "name": r["name"], "notes": r["notes"], "handle": r["handle"],
+            "images": [{"name": f, "url": f"/media/brand/library/{r['id']}/{f}"} for f in files]}
+
+
+def get_asset(conn: sqlite3.Connection, aid: str) -> sqlite3.Row:
+    r = conn.execute("SELECT * FROM carousel_assets WHERE id = ?", (aid,)).fetchone()
+    if r is None:
+        raise HTTPException(404, "مش موجود في المكتبة")
+    return r
+
+
+@app.get("/api/carousel/library")
+def carousel_library():
+    with closing(db()) as conn:
+        return [asset_to_dict(r) for r in conn.execute("SELECT * FROM carousel_assets ORDER BY created_at")]
+
+
+def add_asset_files(aid: str, current: list[str], files: list[UploadFile]) -> tuple[list[str], int]:
+    """بيحفظ الصور (ولو أكتر من الحد بياخد الأول بس). بيرجّع الملفات وعدد اللي اتسابت."""
+    folder = LIBRARY_DIR / aid
+    folder.mkdir(parents=True, exist_ok=True)
+    out, added, skipped = list(current), [], 0
+    try:
+        for f in files:
+            if not f or not f.filename:
+                continue
+            if len(out) >= ASSET_MAX_FILES:
+                skipped += 1
+                continue
+            ext = Path(f.filename).suffix.lower()
+            if ext in IMAGE_EXTENSIONS:
+                name = save_upload(f, IMAGE_EXTENSIONS, folder, uuid.uuid4().hex[:8])
+            elif ext in CONVERT_EXTENSIONS:
+                name = convert_image(f, folder)
+            else:
+                raise HTTPException(400, f"«{f.filename}» نوعها مش مدعوم. ارفع صور PNG أو JPG")
+            out.append(name)
+            added.append(name)
+    except Exception:
+        for name in added:  # متسيبش ملفات نص نص
+            (folder / name).unlink(missing_ok=True)
+        raise
+    return out, skipped
+
+
+def convert_image(f: UploadFile, folder: Path) -> str:
+    src = folder / f"in_{uuid.uuid4().hex[:8]}{Path(f.filename).suffix.lower()}"
+    name = f"{uuid.uuid4().hex[:8]}.png"
+    try:
+        with src.open("wb") as out:
+            shutil.copyfileobj(f.file, out)
+        result = subprocess.run(
+            [ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src), "-frames:v", "1", str(folder / name)],
+            capture_output=True, text=True,
+        )
+    finally:
+        src.unlink(missing_ok=True)
+    if result.returncode != 0 or not (folder / name).exists():
+        raise HTTPException(400, f"مش قادر أفتح «{f.filename}». احفظها PNG أو JPG وارفعها تاني")
+    return name
+
+
+@app.post("/api/carousel/library")
+def create_asset(kind: str = Form(...), name: str = Form(""), notes: str = Form(""), files: list[UploadFile] = File(...)):
+    if kind not in ASSET_KINDS:
+        raise HTTPException(400, "النوع غلط")
+    aid = uuid.uuid4().hex[:12]
+    saved, skipped = add_asset_files(aid, [], files)
+    if not saved:
+        shutil.rmtree(LIBRARY_DIR / aid, ignore_errors=True)
+        raise HTTPException(400, "ارفع صورة واحدة على الأقل")
+    with closing(db()) as conn, conn:
+        if not name.strip():
+            # من غير اسم: «تيمبليت 3» مثلًا (تقدر تغيّره بعدين)
+            n = conn.execute("SELECT COUNT(*) FROM carousel_assets WHERE kind = ?", (kind,)).fetchone()[0] + 1
+            name = f"{ASSET_KINDS[kind]} {n}"
+        conn.execute("INSERT INTO carousel_assets (id, kind, name, notes, files, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                     (aid, kind, name.strip()[:80], notes.strip()[:1500], json.dumps(saved), now()))
+        return {**asset_to_dict(get_asset(conn, aid)), "skipped": skipped}
+
+
+@app.patch("/api/carousel/library/{aid}")
+def update_asset(aid: str, name: str | None = Form(None), notes: str | None = Form(None),
+                 files: list[UploadFile] | None = File(None), remove: str | None = Form(None),
+                 handle: str | None = Form(None)):
+    with closing(db()) as conn, conn:
+        r = get_asset(conn, aid)
+        current = json.loads(r["files"])
+        if remove:
+            gone = Path(remove).name
+            if gone in current:
+                if len(current) == 1:
+                    raise HTTPException(400, "لازم تفضل صورة واحدة على الأقل. امسحه كله لو مش عايزه")
+                current.remove(gone)
+                (LIBRARY_DIR / aid / gone).unlink(missing_ok=True)
+        skipped = 0
+        if files:
+            current, skipped = add_asset_files(aid, current, files)
+        if name is not None and name.strip():
+            conn.execute("UPDATE carousel_assets SET name = ? WHERE id = ?", (name.strip()[:80], aid))
+        if notes is not None:
+            conn.execute("UPDATE carousel_assets SET notes = ? WHERE id = ?", (notes.strip()[:1500], aid))
+        if handle is not None:
+            h = sheets.clean_handle(handle, "instagram")
+            if handle.strip() and not h:
+                raise HTTPException(400, f"اسم حساب إنستجرام مش مظبوط: {handle.strip()}")
+            conn.execute("UPDATE carousel_assets SET handle = ? WHERE id = ?", (h, aid))
+        conn.execute("UPDATE carousel_assets SET files = ? WHERE id = ?", (json.dumps(current), aid))
+        return {**asset_to_dict(get_asset(conn, aid)), "skipped": skipped}
+
+
+@app.post("/api/carousel/library/import")
+async def import_library_pack(file: UploadFile = File(...)):
+    """حزمة جاهزة (zip فيه manifest.json + الصور): بتضيف أو بتحدّث كل اللي فيها مرة واحدة."""
+    import io
+    import zipfile
+
+    raw = await file.read()
+    if len(raw) > 300 * 1024 * 1024:
+        raise HTTPException(400, "الحزمة أكبر من 300 ميجا")
+    try:
+        z = zipfile.ZipFile(io.BytesIO(raw))
+        names = {Path(n).name: n for n in z.namelist() if not n.endswith("/")}
+        manifest = json.loads(z.read(names["manifest.json"]).decode("utf-8"))
+    except (zipfile.BadZipFile, KeyError, ValueError) as exc:
+        raise HTTPException(400, "ده مش ملف حزمة مكتبة (لازم zip فيه manifest.json)") from exc
+    added = updated = 0
+    with closing(db()) as conn, conn:
+        for item in manifest.get("items", []):
+            kind, key = item.get("kind"), str(item.get("key") or "")[:80]
+            if kind not in ASSET_KINDS or not key or not item.get("files"):
+                continue
+            row = conn.execute("SELECT id FROM carousel_assets WHERE seed = ?", (key,)).fetchone()
+            aid = row["id"] if row else uuid.uuid4().hex[:12]
+            folder = LIBRARY_DIR / aid
+            if row:
+                shutil.rmtree(folder, ignore_errors=True)
+            folder.mkdir(parents=True, exist_ok=True)
+            saved = []
+            for fname in item["files"][:ASSET_MAX_FILES]:
+                src = names.get(Path(fname).name)
+                ext = Path(fname).suffix.lower()
+                if not src or ext not in IMAGE_EXTENSIONS:
+                    continue
+                out = f"{uuid.uuid4().hex[:8]}{ext}"
+                (folder / out).write_bytes(z.read(src))
+                saved.append(out)
+            if not saved:
+                continue
+            handle = sheets.clean_handle(item.get("handle") or "", "instagram")
+            values = (str(item.get("name") or key)[:80], str(item.get("notes") or "")[:1500], handle, json.dumps(saved))
+            if row:
+                conn.execute("UPDATE carousel_assets SET name = ?, notes = ?, handle = ?, files = ?, kind = ? WHERE id = ?",
+                             (*values, kind, aid))
+                updated += 1
+            else:
+                conn.execute("INSERT INTO carousel_assets (id, kind, name, notes, handle, files, seed, created_at) "
+                             "VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (aid, kind, values[0], values[1], values[2], values[3], key, now()))
+                added += 1
+    # الهوية (الألوان والستايل) بعد ما الإضافة تتقفل، عشان الإعدادات قاعدة بيانات تانية
+    if isinstance(manifest.get("brand"), dict) and (cid := active_client_id()):
+        back = {v: k for k, v in CLIENT_BRAND_MAP.items()}
+        update_brain(cid, lambda d: d.update({back[k]: str(v) for k, v in manifest["brand"].items() if k in back}))
+    return {"added": added, "updated": updated}
+
+
+@app.post("/api/carousel/library/{aid}/describe")
+def describe_asset(aid: str):
+    """موديل الرؤية بيبص على الصور ويكتب الملاحظات (الخطوط والألوان والتقسيم)، واسم لو الاسم تلقائي."""
+    with closing(db()) as conn:
+        r = get_asset(conn, aid)
+        images = asset_to_dict(r)["images"][:4]
+    if atlas.mock_mode():
+        d = cz.mock_description(r["kind"])
+    else:
+        if not atlas.api_key():
+            raise HTTPException(400, "حط مفتاح Atlas الأول عشان البرنامج يقرا الصور")
+        try:
+            urls = [atlas.reference_url(LIBRARY_DIR / aid / im["name"]) for im in images]
+        except (atlas.AtlasError, httpx.HTTPError) as exc:
+            raise HTTPException(400, f"ما قدرتش أرفع الصور لـ Atlas: {exc}") from exc
+        preferred = carousel_settings()["vision_model"]
+        d, errors = None, []
+        # لو الموديل مش موجود أو مش بيشوف صور نجرب اللي بعده، وأول واحد ينجح نحفظه
+        for model in atlas.vision_candidates(preferred)[:8]:
+            try:
+                reply = atlas.chat(cz.describe_messages(r["kind"], urls), model,
+                                   temperature=0.3, max_tokens=4000, json_mode=True)
+                d = cz.parse_description(reply)
+            except (atlas.AtlasError, httpx.HTTPError, ValueError) as exc:
+                errors.append(f"{model}: {str(exc)[:120]}")
+                continue
+            if model != preferred:
+                auth.set_setting("carousel_vision_model", model)
+            break
+        if d is None:
+            raise HTTPException(400, "ما قدرتش أقرا الصور بأي موديل: " + " | ".join(errors[:3]))
+    with closing(db()) as conn, conn:
+        # الاسم بيتغيّر بس لو لسه تلقائي («تيمبليت 3»)، واسم المدرب ما بيتغيّرش
+        auto = re.fullmatch(rf"{re.escape(ASSET_KINDS.get(r['kind'], ''))} \d+", r["name"] or "")
+        if d["name"] and auto and r["kind"] != "coach":
+            conn.execute("UPDATE carousel_assets SET name = ? WHERE id = ?", (d["name"], aid))
+        conn.execute("UPDATE carousel_assets SET notes = ? WHERE id = ?", (d["notes"], aid))
+        return asset_to_dict(get_asset(conn, aid))
+
+
+@app.delete("/api/carousel/library/{aid}")
+def delete_asset(aid: str):
+    with closing(db()) as conn, conn:
+        get_asset(conn, aid)
+        conn.execute("DELETE FROM carousel_assets WHERE id = ?", (aid,))
+    shutil.rmtree(LIBRARY_DIR / Path(aid).name, ignore_errors=True)
+    return {"ok": True}
+
+
+def new_carousel_data() -> dict:
+    return {
+        "chat": [], "plan": None,
+        "settings": {"slides": 6, "ratio": "4:5", "mix": True, "coach_id": None, "style_id": None,
+                     "template_id": None, "character_ids": [], "cta": {"type": "auto"}},
+        "overview": {"status": "idle", "file": None, "error": None, "approved": False},
+        "slides": [],
+    }
+
+
+def load_carousel(conn: sqlite3.Connection, cid: str) -> tuple[sqlite3.Row, dict]:
+    row = conn.execute("SELECT * FROM carousels WHERE id = ?", (cid,)).fetchone()
+    if row is None:
+        raise HTTPException(404, "الكاروسيل غير موجود")
+    data = json.loads(row["data"])
+    mix_settings(data["settings"])
+    init_versions(data)
+    return row, data
+
+
+def init_versions(data: dict) -> None:
+    """كل صورة اترسمت بتتحفظ: data["versions"] = {"overview": [...], "1": [...], "2": [...]}.
+    الكاروسيلات القديمة: الصور الحالية بتبقى أول نسخة."""
+    if "versions" in data:
+        return
+    v: dict = {}
+    if data["overview"].get("file"):
+        v["overview"] = [{"file": data["overview"]["file"], "at": None}]
+    for k, sl in enumerate(data.get("slides", []), 1):
+        if sl.get("file"):
+            v[str(k)] = [{"file": sl["file"], "at": None}]
+    data["versions"] = v
+
+
+def add_version(d: dict, key: str, name: str) -> None:
+    d.setdefault("versions", {}).setdefault(key, []).append({"file": name, "at": now()})
+
+
+def mix_settings(st: dict) -> None:
+    """الكاروسيلات القديمة كان ليها نوع واحد: نسيب بس الاختيارات اللي كانت شغالة فيه، والباقي يتشال."""
+    if st.get("mix"):
+        return
+    kind = st.get("kind", "characters")
+    if kind != "template":
+        st["template_id"] = None
+    if kind != "characters":
+        st["character_ids"] = []
+    if kind == "coach":
+        st["style_id"] = None
+    else:
+        st["coach_id"] = st["coach_asset_id"] = None
+    st["mix"] = True
+
+
+def save_carousel(conn: sqlite3.Connection, cid: str, data: dict, name: str | None = None) -> None:
+    if name is not None:
+        conn.execute("UPDATE carousels SET name = ?, data = ?, updated_at = ? WHERE id = ?",
+                     (name, json.dumps(data, ensure_ascii=False), now(), cid))
+    else:
+        conn.execute("UPDATE carousels SET data = ?, updated_at = ? WHERE id = ?",
+                     (json.dumps(data, ensure_ascii=False), now(), cid))
+
+
+def update_carousel(cid: str, fn) -> dict:
+    """تعديل آمن (السيرفر ممكن يكون بيرسم في نفس الوقت)."""
+    with CAROUSEL_LOCK, closing(db()) as conn, conn:
+        _, data = load_carousel(conn, cid)
+        fn(data)
+        save_carousel(conn, cid, data)
+        return data
+
+
+def media_file_url(cid: str, name: str | None) -> str | None:
+    if not name or not (CAROUSELS_DIR / cid / name).exists():
+        return None
+    return f"/media/carousels/{cid}/{name}?v={int((CAROUSELS_DIR / cid / name).stat().st_mtime)}"
+
+
+def carousel_to_dict(row: sqlite3.Row, data: dict | None = None) -> dict:
+    data = data or json.loads(row["data"])
+    cid = row["id"]
+    versions = data.get("versions", {})
+
+    def vlist(key: str) -> list[dict]:
+        return [{"file": v["file"], "url": u} for v in versions.get(key, []) if (u := media_file_url(cid, v["file"]))]
+
+    ov = dict(data["overview"], url=media_file_url(cid, data["overview"].get("file")), versions=vlist("overview"))
+    slides = [dict(s, url=media_file_url(cid, s.get("file")), versions=vlist(str(k)))
+              for k, s in enumerate(data.get("slides", []), 1)]
+    return {
+        "id": cid, "name": row["name"], "created_at": row["created_at"], "updated_at": row["updated_at"],
+        "chat": data["chat"], "plan": data["plan"], "settings": data["settings"],
+        "overview": ov, "slides": slides, "busy": cid in CAROUSEL_JOBS,
+    }
+
+
+@app.get("/api/carousels")
+def list_carousels():
+    with closing(db()) as conn:
+        out = []
+        for r in conn.execute("SELECT * FROM carousels ORDER BY updated_at DESC"):
+            if not owned(json.loads(r["data"]).get("client_id")):
+                continue  # كاروسيلات عميل تاني
+            d = carousel_to_dict(r)
+            done = [s for s in d["slides"] if s["url"]]
+            out.append({"id": d["id"], "name": d["name"], "updated_at": d["updated_at"], "busy": d["busy"],
+                        "slides": len(d["plan"]["slides"]) if d["plan"] else 0, "done": len(done),
+                        "cover": done[0]["url"] if done else d["overview"]["url"]})
+        return out
+
+
+class CarouselIn(BaseModel):
+    name: str
+
+
+@app.post("/api/carousels")
+def create_carousel(body: CarouselIn):
+    name = body.name.strip() or "كاروسيل جديد"
+    cid = uuid.uuid4().hex[:12]
+    with closing(db()) as conn, conn:
+        conn.execute("INSERT INTO carousels (id, name, data, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+                     (cid, name, json.dumps({**new_carousel_data(), "client_id": active_client_id()}), now(), now()))
+        row, data = load_carousel(conn, cid)
+        return carousel_to_dict(row, data)
+
+
+@app.get("/api/carousels/{cid}")
+def get_carousel(cid: str):
+    with closing(db()) as conn:
+        row, data = load_carousel(conn, cid)
+        return carousel_to_dict(row, data)
+
+
+class CarouselPatch(BaseModel):
+    name: str | None = None
+    plan: dict | None = None
+    settings: dict | None = None
+
+
+@app.patch("/api/carousels/{cid}")
+def patch_carousel(cid: str, body: CarouselPatch):
+    with CAROUSEL_LOCK, closing(db()) as conn, conn:
+        row, data = load_carousel(conn, cid)
+        if body.settings is not None:
+            st = data["settings"]
+            if "slides" in body.settings:
+                st["slides"] = max(2, min(10, int(body.settings["slides"] or 6)))
+            if "ratio" in body.settings and body.settings["ratio"] in cz.SIZES:
+                st["ratio"] = body.settings["ratio"]
+            if "coach_id" in body.settings:
+                st["coach_id"] = body.settings["coach_id"] or None
+            if "template_id" in body.settings:
+                st["template_id"] = body.settings["template_id"] or None
+            if "coach_asset_id" in body.settings:
+                st["coach_asset_id"] = body.settings["coach_asset_id"] or None
+            if "character_ids" in body.settings:
+                st["character_ids"] = [str(x) for x in (body.settings["character_ids"] or [])][:4]
+            if "style_id" in body.settings:
+                st["style_id"] = body.settings["style_id"] or None
+            if "cta" in body.settings and isinstance(body.settings["cta"], dict):
+                c = body.settings["cta"]
+                st["cta"] = {k: str(c.get(k) or "")[:300] for k in ("type", "keyword", "reward", "text")}
+        if body.plan is not None:
+            if cid in CAROUSEL_JOBS:
+                raise HTTPException(400, "استنى لحد ما الرسم يخلص")
+            plan = cz.parse_plan(json.dumps(body.plan, ensure_ascii=False))
+            data["plan"] = plan
+            sync_slides(data)
+        name = body.name.strip() if body.name and body.name.strip() else None
+        save_carousel(conn, cid, data, name)
+        row, data = load_carousel(conn, cid)
+        return carousel_to_dict(row, data)
+
+
+def sync_slides(data: dict) -> None:
+    """عدد خانات الصور على قد عدد السلايدات في الخطة."""
+    n = len(data["plan"]["slides"]) if data["plan"] else 0
+    slides = data.get("slides", [])[:n]
+    slides += [{"status": "idle", "file": None, "error": None} for _ in range(n - len(slides))]
+    data["slides"] = slides
+
+
+@app.delete("/api/carousels/{cid}")
+def delete_carousel(cid: str):
+    if cid in CAROUSEL_JOBS:
+        raise HTTPException(400, "استنى لحد ما الرسم يخلص")
+    with closing(db()) as conn, conn:
+        conn.execute("DELETE FROM carousels WHERE id = ?", (cid,))
+    shutil.rmtree(CAROUSELS_DIR / Path(cid).name, ignore_errors=True)
+    return {"ok": True}
+
+
+def llm(messages: list[dict], json_mode: bool = False, temperature: float = 0.8) -> str:
+    try:
+        return atlas.chat(messages, carousel_settings()["text_model"], temperature=temperature,
+                          max_tokens=4000, json_mode=json_mode)
+    except (atlas.AtlasError, httpx.HTTPError) as exc:
+        raise HTTPException(400, f"موديل الكلام: {exc}") from exc
+
+
+class ChatIn(BaseModel):
+    message: str
+
+
+@app.post("/api/carousels/{cid}/chat")
+def carousel_chat(cid: str, body: ChatIn):
+    text = body.message.strip()
+    if not text:
+        raise HTTPException(400, "اكتب حاجة")
+    with closing(db()) as conn:
+        _, data = load_carousel(conn, cid)
+    history = [*data["chat"], {"role": "user", "content": text}]
+    if atlas.mock_mode():
+        reply = cz.mock_reply(history)
+    else:
+        reply = llm([{"role": "system", "content": cz.chat_system(brand_settings())}, *history[-30:]])
+    def add(d):
+        d["chat"] += [{"role": "user", "content": text}, {"role": "assistant", "content": reply}]
+    return carousel_to_dict_by_id(cid, update_carousel(cid, add))
+
+
+def carousel_to_dict_by_id(cid: str, data: dict) -> dict:
+    with closing(db()) as conn:
+        row, _ = load_carousel(conn, cid)
+    return carousel_to_dict(row, data)
+
+
+def carousel_context(data: dict) -> tuple[dict, dict]:
+    """اختيارات الكاروسيل مع بعض (تيمبليت + ستايل + شخصيات + مدرب) للبرومبت، والصور المرجعية بتاعتها."""
+    st = {"template_id": None, "character_ids": [], "cta": {"type": "auto"}, **data["settings"]}
+    ctx: dict = {"characters": []}
+    assets: dict = {"template": None, "characters": [], "coach": None, "coach_asset": None, "style": None}
+    with closing(db()) as conn:
+        def asset(aid: str | None, kind: str) -> sqlite3.Row | None:
+            if not aid:
+                return None
+            return conn.execute("SELECT * FROM carousel_assets WHERE id = ? AND kind = ?", (aid, kind)).fetchone()
+
+        if r := asset(st.get("template_id"), "template"):
+            ctx["template"] = {"name": r["name"], "notes": r["notes"]}
+            assets["template"] = asset_to_dict(r)
+        for aid in st.get("character_ids") or []:
+            if r := asset(aid, "character"):
+                ctx["characters"].append({"name": r["name"], "notes": r["notes"]})
+                assets["characters"].append(asset_to_dict(r))
+        if r := asset(st.get("style_id"), "style"):
+            ctx["style"] = {"name": r["name"], "notes": r["notes"]}
+            assets["style"] = asset_to_dict(r)
+        # المدرب من مكتبة المدربين نفسها (صفحة المدربين)، والقديم من مكتبة الكاروسيل لو لسه متسجل
+        coach = conn.execute("SELECT * FROM coaches WHERE id = ?", (st["coach_id"],)).fetchone() if st.get("coach_id") else None
+        if coach:
+            ctx["coach"] = {"name": coach["name"], "instagram": coach["instagram"]}
+            assets["coach"] = coach
+        elif r := asset(st.get("coach_asset_id"), "coach"):
+            ctx["coach"] = {"name": r["name"], "instagram": r["handle"], "notes": r["notes"]}
+            assets["coach_asset"] = asset_to_dict(r)
+    ctx["cta_text"] = cz.cta_text(st.get("cta"), cta_list(), (ctx.get("coach") or {}).get("name"))
+    return ctx, assets
+
+
+def check_kind_ready(data: dict) -> None:
+    """كل الاختيارات اختيارية: من غير حاجة بيرسم بستايل العميل وشخصيات جديدة."""
+    return None
+
+
+@app.post("/api/carousels/{cid}/plan")
+def carousel_plan(cid: str):
+    """الموديل يكتب الكاروسيل النهائي (سلايد سلايد) من النقاش."""
+    with closing(db()) as conn:
+        _, data = load_carousel(conn, cid)
+    if not data["chat"]:
+        raise HTTPException(400, "اتكلم مع الموديل عن الفكرة الأول")
+    n = data["settings"]["slides"]
+    check_kind_ready(data)
+    ctx, _ = carousel_context(data)
+    if atlas.mock_mode():
+        text = cz.mock_plan(n, ctx.get("cta_text"))
+    else:
+        text = llm(cz.plan_messages(brand_settings(), data["chat"], n, ctx), json_mode=True, temperature=0.7)
+    try:
+        plan = cz.parse_plan(text, n)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    def put(d):
+        d["plan"] = plan
+        d["overview"] = {"status": "idle", "file": d["overview"].get("file"), "error": None, "approved": False}
+        sync_slides(d)
+    data = update_carousel(cid, put)
+    name = plan["title"] or None
+    if name:
+        with closing(db()) as conn, conn:
+            conn.execute("UPDATE carousels SET name = ? WHERE id = ?", (name, cid))
+    return carousel_to_dict_by_id(cid, data)
+
+
+@app.post("/api/carousels/{cid}/polish")
+def carousel_polish(cid: str):
+    """تنقيح: إملاء صح ولهجة سعودية، من غير ما يغيّر عدد السلايدات."""
+    with closing(db()) as conn:
+        _, data = load_carousel(conn, cid)
+    if not data["plan"]:
+        raise HTTPException(400, "اكتب الخطة الأول")
+    if atlas.mock_mode():
+        text = json.dumps(data["plan"], ensure_ascii=False)
+    else:
+        text = llm(cz.polish_messages(brand_settings(), data["plan"], carousel_context(data)[0]), json_mode=True, temperature=0.3)
+    try:
+        plan = cz.parse_plan(text)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    old = data["plan"]["slides"]
+    if len(plan["slides"]) != len(old):
+        raise HTTPException(400, "التنقيح غيّر عدد السلايدات، فمتحفظش. جرّب تاني")
+    for new, prev in zip(plan["slides"], old):
+        new["visual"] = prev.get("visual") or new["visual"]  # الرسمة متتغيرش
+    def put(d):
+        d["plan"] = plan
+    return carousel_to_dict_by_id(cid, update_carousel(cid, put))
+
+
+# ---------- الرسم ----------
+def mock_image(dest: Path, size: str, label: str, hue: int) -> None:
+    w, h = size.split("x")
+    colors = ["#E5613E", "#2B6CB0", "#2F855A", "#B7791F", "#6B46C1", "#C53030", "#2C7A7B", "#97266D", "#4A5568", "#DD6B20"]
+    time.sleep(1.2)
+    subprocess.run(
+        [ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi",
+         "-i", f"color=c={colors[hue % len(colors)]}:s={w}x{h}", "-frames:v", "1", str(dest)],
+        check=True, capture_output=True,
+    )
+
+
+def reference_list(first: list[Path], assets: dict) -> tuple[list[Path], dict]:
+    """ترتيب الصور المرجعية وأرقامها عشان البرومبت يقول «الصورة رقم كذا» (لحد 16 صورة).
+    لما الاختيارات تتجمع كل واحد بياخد نصيب: المدرب الأول، وبعده الستايل والتيمبليت، والباقي للشخصيات."""
+    files, refs = list(first), {}
+
+    def add(path: Path) -> int | None:
+        if len(files) >= 16 or not path.exists():
+            return None
+        files.append(path)
+        return len(files)
+
+    def add_asset(a: dict, limit: int) -> list[int]:
+        return [i for img in a["images"][:max(0, limit)] if (i := add(LIBRARY_DIR / a["id"] / img["name"]))]
+
+    logo = logo_path()
+    if logo and (i := add(logo)):
+        refs["logo"] = i
+    tpl, style, chars = assets.get("template"), assets.get("style"), assets.get("characters") or []
+    coach, coach_asset = assets.get("coach"), assets.get("coach_asset")
+    if coach and (i := add(COACHES_DIR / coach["image_filename"])):
+        refs["coach"], refs["coach_name"] = [i], coach["name"]
+    elif coach_asset and (idx := add_asset(coach_asset, 3)):
+        refs["coach"], refs["coach_name"] = idx, coach_asset["name"]
+    others = sum(1 for x in (tpl, style) if x) + (1 if chars else 0)
+    if style and (idx := add_asset(style, 6 if others == 1 else 3)):
+        refs["style"] = idx
+    if tpl and (idx := add_asset(tpl, 12 if others == 1 else 4)):
+        refs["template"] = idx
+    if chars:
+        per = max(1, (16 - len(files)) // len(chars))
+        refs["characters"] = [(ch["name"], idx) for ch in chars if (idx := add_asset(ch, per))]
+    return files, refs
+
+
+def draw(prompt: str, size: str, files: list[Path], dest: Path, mock_label: str, hue: int) -> None:
+    if atlas.mock_mode():
+        return mock_image(dest, size, mock_label, hue)
+    cfg = carousel_settings()
+    urls = [atlas.reference_url(p) for p in files if p.exists()]
+    url = atlas.generate_image(cfg["image_family"], prompt, size, cfg["quality"], urls or None)
+    part = dest.with_suffix(".part.png")
+    atlas.download(url, part)
+    part.replace(dest)
+
+
+def run_overview(cid: str) -> None:
+    try:
+        with closing(db()) as conn:
+            _, data = load_carousel(conn, cid)
+        plan, ratio = data["plan"], data["settings"]["ratio"]
+        ctx, assets = carousel_context(data)
+        files, refs = reference_list([], assets)
+        folder = CAROUSELS_DIR / cid
+        folder.mkdir(parents=True, exist_ok=True)
+        name = f"overview-{uuid.uuid4().hex[:6]}.png"
+        prompt = cz.overview_prompt(brand_settings(), plan, ratio, refs, ctx)
+        draw(prompt, cz.overview_size(len(plan["slides"]), ratio), files, folder / name, "overview", 0)
+        def done(d):
+            # القديم بيفضل محفوظ في النسخ، وتقدر ترجعله
+            add_version(d, "overview", name)
+            d["overview"] = {"status": "done", "file": name, "error": None, "approved": False}
+        update_carousel(cid, done)
+    except Exception as exc:  # noqa: BLE001  (أي خطأ يتسجّل على الكاروسيل بدل ما يضيع)
+        msg = str(exc)[:400]
+        update_carousel(cid, lambda d: d["overview"].update(status="failed", error=msg))
+    finally:
+        CAROUSEL_JOBS.discard(cid)
+
+
+def run_slides(cid: str, only: int | None, redo_all: bool = False) -> None:
+    """السلايدات بالترتيب، كل واحدة ومعاها الصورة الكاملة والسلايد اللي قبلها."""
+    try:
+        with closing(db()) as conn:
+            _, data = load_carousel(conn, cid)
+        plan, ratio = data["plan"], data["settings"]["ratio"]
+        folder = CAROUSELS_DIR / cid
+        overview = folder / data["overview"]["file"]
+        ctx, assets = carousel_context(data)
+        size = "x".join(map(str, cz.SIZES[ratio]))
+        todo = [only] if only else [k for k in range(1, len(plan["slides"]) + 1)
+                                    if redo_all or data["slides"][k - 1]["status"] != "done"]
+        for k in todo:
+            with closing(db()) as conn:
+                _, data = load_carousel(conn, cid)
+            update_carousel(cid, lambda d, k=k: d["slides"][k - 1].update(status="working", error=None))
+            prev = data["slides"][k - 2] if k > 1 else None
+            first = [overview]
+            if prev and prev.get("file") and (folder / prev["file"]).exists():
+                first.append(folder / prev["file"])
+            files, refs = reference_list(first, assets)
+            if len(first) > 1:
+                refs["previous"] = 2
+            name = f"slide-{k:02d}-{uuid.uuid4().hex[:6]}.png"
+            try:
+                draw(cz.slide_prompt(brand_settings(), plan, k, ratio, refs, ctx), size, files, folder / name, f"slide {k}", k)
+            except Exception as exc:  # noqa: BLE001
+                msg = str(exc)[:400]
+                update_carousel(cid, lambda d, k=k: d["slides"][k - 1].update(status="failed", error=msg))
+                break  # اللي بعدها محتاجة دي كمرجع
+            def done(d, k=k, name=name):
+                add_version(d, str(k), name)
+                d["slides"][k - 1] = {"status": "done", "file": name, "error": None}
+            update_carousel(cid, done)
+    finally:
+        CAROUSEL_JOBS.discard(cid)
+
+
+def start_job(cid: str, target, *args) -> None:
+    with CAROUSEL_LOCK:
+        if cid in CAROUSEL_JOBS:
+            raise HTTPException(400, "فيه رسم شغال للكاروسيل ده. استنى يخلص")
+        CAROUSEL_JOBS.add(cid)
+    threading.Thread(target=target, args=(cid, *args), daemon=True).start()
+
+
+def need_atlas() -> None:
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات")
+
+
+@app.post("/api/carousels/{cid}/overview")
+def carousel_overview(cid: str):
+    """الكاروسيل كله في صورة واحدة، عشان نشوف الشكل ونوافق قبل السلايدات."""
+    need_atlas()
+    with closing(db()) as conn:
+        _, data = load_carousel(conn, cid)
+    if not data["plan"]:
+        raise HTTPException(400, "اكتب الخطة الأول")
+    check_kind_ready(data)
+    if cid in CAROUSEL_JOBS:
+        raise HTTPException(400, "فيه رسم شغال للكاروسيل ده. استنى يخلص")
+    update_carousel(cid, lambda d: d["overview"].update(status="working", error=None))
+    start_job(cid, run_overview)
+    return get_carousel(cid)
+
+
+@app.post("/api/carousels/{cid}/approve")
+def carousel_approve(cid: str):
+    with closing(db()) as conn:
+        _, data = load_carousel(conn, cid)
+    if data["overview"]["status"] != "done":
+        raise HTTPException(400, "ارسم الشكل العام الأول")
+    update_carousel(cid, lambda d: d["overview"].update(approved=True))
+    return get_carousel(cid)
+
+
+@app.post("/api/carousels/{cid}/slides")
+def carousel_slides(cid: str, only: int | None = None, redo_all: bool = False):
+    """يرسم السلايدات اللي لسه (أو سلايد واحدة لو only، أو نسخة جديدة لكلهم لو redo_all).
+    النسخ القديمة بتفضل محفوظة."""
+    need_atlas()
+    with closing(db()) as conn:
+        _, data = load_carousel(conn, cid)
+    if not data["overview"].get("approved"):
+        raise HTTPException(400, "وافق على الشكل العام الأول")
+    n = len(data["plan"]["slides"])
+    if only is not None and not 1 <= only <= n:
+        raise HTTPException(400, "رقم السلايد غلط")
+    if cid in CAROUSEL_JOBS:
+        raise HTTPException(400, "فيه رسم شغال للكاروسيل ده. استنى يخلص")
+    def mark(d):
+        for k in ([only] if only else range(1, n + 1)):
+            if only or redo_all or d["slides"][k - 1]["status"] != "done":
+                d["slides"][k - 1].update(status="queued", error=None)
+    update_carousel(cid, mark)
+    start_job(cid, run_slides, only, redo_all)
+    return get_carousel(cid)
+
+
+class PickIn(BaseModel):
+    target: str  # "overview" أو رقم السلايد
+    file: str
+
+
+@app.post("/api/carousels/{cid}/pick")
+def carousel_pick(cid: str, body: PickIn):
+    """تختار نسخة قديمة لسلايد (أو للشكل العام) بدل اللي متختارة."""
+    if cid in CAROUSEL_JOBS:
+        raise HTTPException(400, "استنى لحد ما الرسم يخلص")
+    def pick(d):
+        if body.file not in [v["file"] for v in d.get("versions", {}).get(body.target, [])]:
+            raise HTTPException(404, "النسخة دي مش موجودة")
+        if body.target == "overview":
+            d["overview"].update(status="done", file=body.file, error=None)
+            return
+        k = int(body.target) if body.target.isdigit() else 0
+        if not 1 <= k <= len(d["slides"]):
+            raise HTTPException(400, "رقم السلايد غلط")
+        d["slides"][k - 1] = {"status": "done", "file": body.file, "error": None}
+    return carousel_to_dict_by_id(cid, update_carousel(cid, pick))
+
+
+@app.delete("/api/carousels/{cid}/versions")
+def carousel_delete_version(cid: str, target: str, file: str):
+    """مسح نسخة مش عايزها (المتختارة مش بتتمسح)."""
+    if cid in CAROUSEL_JOBS:
+        raise HTTPException(400, "استنى لحد ما الرسم يخلص")
+    def drop(d):
+        cur = d["overview"].get("file") if target == "overview" else (
+            d["slides"][int(target) - 1].get("file") if target.isdigit() and 1 <= int(target) <= len(d["slides"]) else None)
+        if file == cur:
+            raise HTTPException(400, "دي النسخة المتختارة. اختار غيرها الأول")
+        if file not in [v["file"] for v in d.get("versions", {}).get(target, [])]:
+            raise HTTPException(404, "النسخة دي مش موجودة")
+        d.get("versions", {})[target] = [v for v in d.get("versions", {}).get(target, []) if v["file"] != file]
+    data = update_carousel(cid, drop)
+    (CAROUSELS_DIR / cid / Path(file).name).unlink(missing_ok=True)
+    return carousel_to_dict_by_id(cid, data)
+
+
+def post_images(cid: str, data: dict) -> list[Path]:
+    """السلايدات بمقاس النشر (1080×1350 JPG)، بتتعمل مرة وبتتحدّث لو السلايد اتغيّر."""
+    w, h = cz.POST_SIZES.get(data["settings"].get("ratio"), cz.POST_SIZES["4:5"])
+    out_dir = CAROUSELS_DIR / cid / "post"
+    out_dir.mkdir(exist_ok=True)
+    out = []
+    for k, s in enumerate(data["slides"], 1):
+        src = CAROUSELS_DIR / cid / s["file"] if s.get("file") else None
+        if not src or not src.exists():
+            continue
+        dest = out_dir / f"{k:02d}.jpg"
+        # بنفتكر الصورة اتعملت من أنهي نسخة (لو اخترت نسخة أقدم لازم تتعمل تاني)
+        made_from = out_dir / f"{k:02d}.src"
+        if not dest.exists() or not made_from.exists() or made_from.read_text() != s["file"]:
+            subprocess.run(
+                [ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src),
+                 "-vf", f"scale={w}:{h}:force_original_aspect_ratio=increase,crop={w}:{h}", "-q:v", "2", str(dest)],
+                check=True, capture_output=True, timeout=60,
+            )
+            made_from.write_text(s["file"])
+        out.append(dest)
+    return out
+
+
+def ready_slides(cid: str) -> tuple[sqlite3.Row, dict, list[Path]]:
+    with closing(db()) as conn:
+        row, data = load_carousel(conn, cid)
+    if not data["slides"] or any(s.get("status") != "done" or not s.get("file") for s in data["slides"]):
+        raise HTTPException(400, "خلّص رسم كل السلايدات الأول")
+    if cid in CAROUSEL_JOBS:
+        raise HTTPException(400, "استنى لحد ما الرسم يخلص")
+    return row, data, post_images(cid, data)
+
+
+class CarouselPostIn(BaseModel):
+    caption: str = ""
+    scheduled_at: datetime
+    options: PostOptions = PostOptions()
+
+
+@app.post("/api/carousels/{cid}/publish")
+def publish_carousel(cid: str, body: CarouselPostIn):
+    """كاروسيل صور على إنستجرام عن طريق Zernio (فوري أو مجدول)، مع تاج المدرب على سلايد."""
+    _, _, images = ready_slides(cid)
+    if not 2 <= len(images) <= 10:
+        raise HTTPException(400, "إنستجرام بيقبل كاروسيل من 2 لـ 10 صور")
+    when = body.scheduled_at
+    if when.tzinfo is None:
+        raise HTTPException(400, "الميعاد لازم يكون فيه المنطقة الزمنية")
+    when = when.astimezone(timezone.utc).isoformat(timespec="seconds")
+    options = clean_options(body.options)
+    post_id = uuid.uuid4().hex[:12]
+    status = "sending" if publisher.service_name() == "zernio" else "scheduled"
+    with closing(db()) as conn, conn:
+        conn.execute(
+            "INSERT INTO posts (id, export_id, carousel_id, caption, platforms, scheduled_at, status, options, created_at, updated_at) "
+            "VALUES (?, '', ?, ?, ?, ?, ?, ?, ?, ?)",
+            (post_id, cid, body.caption.strip(), json.dumps(["instagram"]), when, status, options, now(), now()),
+        )
+    after_save(post_id, when, None)
+    with closing(db()) as conn:
+        return post_to_dict(conn.execute(POSTS_QUERY + " WHERE p.id = ?", (post_id,)).fetchone())
+
+
+class ReelIn(BaseModel):
+    music_id: str | None = None
+    seconds: float = 3.0  # مدة كل سلايد
+
+
+@app.post("/api/carousels/{cid}/reel")
+def carousel_reel(cid: str, body: ReelIn):
+    """ريل من السلايدات + موسيقى من المكتبة (إنستجرام مش بيقبل موسيقى على الكاروسيل من الـ API).
+    السلايد 4:5 في نص فيديو 9:16 على خلفية كريمي، وبيتحفظ في الفيديوهات الجاهزة عشان يتنشر زي أي فيديو."""
+    row, data, images = ready_slides(cid)
+    sec = max(1.5, min(8.0, float(body.seconds or 3)))
+    total = sec * len(images)
+    music = None
+    if body.music_id:
+        with closing(db()) as conn:
+            music = conn.execute("SELECT * FROM audio WHERE id = ? AND kind = 'music'", (body.music_id,)).fetchone()
+        if music is None:
+            raise HTTPException(400, "الموسيقى مش موجودة في المكتبة")
+    cmd = [ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y"]
+    for img in images:
+        cmd += ["-loop", "1", "-t", f"{sec:.2f}", "-i", str(img)]
+    if music:
+        cmd += ["-stream_loop", "-1", "-i", str(AUDIO_DIR / music["filename"])]
+    else:
+        cmd += ["-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo"]
+    n = len(images)
+    vf = "".join(f"[{i}:v]scale=1080:1350,pad=1080:1920:0:285:color=0xEEECDA,setsar=1,fps=30,format=yuv420p[v{i}];" for i in range(n))
+    vf += "".join(f"[v{i}]" for i in range(n)) + f"concat=n={n}:v=1:a=0[v];"
+    vf += f"[{n}:a]atrim=0:{total:.2f},afade=t=out:st={max(0, total - 1.5):.2f}:d=1.5,asetpts=N/SR/TB[a]"
+    export_id = uuid.uuid4().hex[:12]
+    filename = f"{export_id}.mp4"
+    cmd += ["-filter_complex", vf, "-map", "[v]", "-map", "[a]", "-c:v", "libx264", "-preset", "veryfast",
+            "-crf", "20", "-c:a", "aac", "-b:a", "192k", "-t", f"{total:.2f}", "-movflags", "+faststart",
+            str(EXPORTS_DIR / filename)]
+    try:
+        subprocess.run(cmd, check=True, capture_output=True, timeout=600)
+    except subprocess.CalledProcessError as exc:
+        (EXPORTS_DIR / filename).unlink(missing_ok=True)
+        raise HTTPException(500, f"مقدرتش أعمل الريل: {exc.stderr.decode(errors='ignore')[-300:]}") from exc
+    name = f"ريل {row['name']}"
+    with closing(db()) as conn, conn:
+        conn.execute("INSERT INTO exports (id, name, filename, duration, source, project_id, created_at) VALUES (?, ?, ?, ?, ?, NULL, ?)",
+                     (export_id, name, filename, total, "carousel", now()))
+    return {"id": export_id, "name": name, "url": f"/media/exports/{filename}", "duration": total}
+
+
+@app.get("/api/carousels/{cid}/zip")
+def carousel_zip(cid: str):
+    import io
+    import zipfile
+
+    with closing(db()) as conn:
+        row, data = load_carousel(conn, cid)
+    files = post_images(cid, data)
+    if not files:
+        raise HTTPException(400, "لسه مفيش سلايدات جاهزة")
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_STORED) as z:
+        for p in files:
+            z.write(p, p.name)
+        plan = data["plan"] or {}
+        caption = "\n\n".join(filter(None, [plan.get("caption"), " ".join(plan.get("hashtags") or [])]))
+        if caption:
+            z.writestr("caption.txt", caption)
+    name = export_file_name(row["name"]).rsplit(".", 1)[0] + ".zip"
+    return Response(buf.getvalue(), media_type="application/zip",
+                    headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(name)}"})
+
+
+# ---------- المسلسلات: سكريبت ← صوت مترقّم ← لقطات ببرومبتات ← نسخ لكل لقطة ← تجميع الحلقة ----------
+SERIES_LOCK = threading.Lock()
+SERIES_JOBS: set[str] = set()  # حلقات بيتجمّع فيها الفيديو دلوقتي
+series_executor = ThreadPoolExecutor(max_workers=2)
+prompt_executor = ThreadPoolExecutor(max_workers=4)  # برومبتات جديدة بعد تغيير الكلام
+REPROMPT_BATCH = 8
+SERIES_W, SERIES_H = 1080, 1920
+
+
+def series_settings() -> dict:
+    return {
+        "text_model": auth.get_setting("series_text_model") or atlas.DEFAULT_SERIES_MODEL,
+        "video_model": auth.get_setting("series_video_model") or atlas.MODEL,
+    }
+
+
+def new_series_data() -> dict:
+    return {"bible": "", "character": "", "refs": []}
+
+
+def series_row(conn: sqlite3.Connection, sid: str) -> tuple[sqlite3.Row, dict]:
+    r = conn.execute("SELECT * FROM series WHERE id = ?", (sid,)).fetchone()
+    if r is None:
+        raise HTTPException(404, "المسلسل غير موجود")
+    return r, {**new_series_data(), **json.loads(r["data"])}
+
+
+def series_to_dict(r: sqlite3.Row, data: dict, episodes: list[dict]) -> dict:
+    sid = r["id"]
+    return {
+        "id": sid, "name": r["name"], "bible": data["bible"], "character": data["character"],
+        "refs": [{"file": f, "url": f"/media/series/{sid}/refs/{f}"} for f in data["refs"] if (SERIES_DIR / sid / "refs" / f).exists()],
+        "episodes": episodes,
+    }
+
+
+def new_episode_data() -> dict:
+    return {"script": "", "notes": "", "chat": [], "script_approved": False, "audio": None, "scenes": [], "lines": [], "timing": None,
+            "shots": [], "takes": {}, "render": {"status": "idle", "export_id": None, "error": None}}
+
+
+def episode_row(conn: sqlite3.Connection, eid: str) -> tuple[sqlite3.Row, dict]:
+    r = conn.execute("SELECT * FROM episodes WHERE id = ?", (eid,)).fetchone()
+    if r is None:
+        raise HTTPException(404, "الحلقة غير موجودة")
+    return r, {**new_episode_data(), **json.loads(r["data"])}
+
+
+def update_episode(eid: str, fn) -> dict:
+    """تعديل آمن (التوليد والتجميع شغالين في الخلفية على نفس الحلقة)."""
+    with SERIES_LOCK, closing(db()) as conn, conn:
+        _, data = episode_row(conn, eid)
+        fn(data)
+        conn.execute("UPDATE episodes SET data = ?, updated_at = ? WHERE id = ?", (json.dumps(data, ensure_ascii=False), now(), eid))
+        return data
+
+
+def ep_dir(eid: str) -> Path:
+    d = SERIES_DIR / "episodes" / Path(eid).name
+    (d / "takes").mkdir(parents=True, exist_ok=True)
+    (d / "frames").mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def take_to_dict(eid: str, t: dict) -> dict:
+    f = ep_dir(eid) / "takes" / t["file"] if t.get("file") else None
+    return {**t, "url": f"/media/series/episodes/{eid}/takes/{t['file']}" if f and f.exists() else None}
+
+
+def frame_url(eid: str, name: str | None) -> str | None:
+    p = ep_dir(eid) / "frames" / name if name else None
+    return f"/media/series/episodes/{eid}/frames/{name}?v={int(p.stat().st_mtime)}" if p and p.exists() else None
+
+
+def episode_to_dict(r: sqlite3.Row, data: dict) -> dict:
+    eid = r["id"]
+    audio = data["audio"]
+    takes = {k: take_to_dict(eid, t) for k, t in data["takes"].items()}
+    used = {tid for s in data["shots"] for tid in s.get("takes", [])}
+    return {
+        "id": eid, "series_id": r["series_id"], "number": r["number"], "name": r["name"],
+        "script": data["script"], "notes": data["notes"], "scenes": data["scenes"], "lines": data["lines"],
+        "chat": data["chat"], "script_approved": data["script_approved"],
+        "heard": " ".join(str(w.get("w", "")) for w in data.get("words") or []),
+        "timing": data["timing"],
+        "audio": {**audio, "url": f"/media/series/episodes/{eid}/{audio['file']}"} if audio else None,
+        "shots": [{**s, "duration": round(s["end"] - s["start"], 2), "takes": [takes[t] for t in s.get("takes", []) if t in takes],
+                   "frames": [{"file": f, "url": frame_url(eid, f)} for f in s.get("frames", []) if frame_url(eid, f)],
+                   "frame_url": frame_url(eid, s.get("frame"))}
+                  for s in data["shots"]],
+        # نسخ من قوايم لقطات قديمة: محفوظة وتقدر تحطها على أي لقطة
+        "pool": [t for k, t in takes.items() if k not in used],
+        "render": data["render"], "busy": eid in SERIES_JOBS, "project_id": data.get("project_id"),
+        "export_url": None,
+        "rewrite": data.get("rewrite") or {"chat": [], "lines": []}, "copy_of": data.get("copy_of"),
+        "voice_pending": bool(data.get("voice_pending")), "retime": bool(data.get("retime")),
+        "retimed": data.get("retimed"),
+    }
+
+
+def episode_response(eid: str) -> dict:
+    with closing(db()) as conn:
+        r, data = episode_row(conn, eid)
+        out = episode_to_dict(r, data)
+        if data["render"].get("export_id"):
+            e = conn.execute("SELECT filename FROM exports WHERE id = ?", (data["render"]["export_id"],)).fetchone()
+            out["export_url"] = f"/media/exports/{e['filename']}" if e else None
+    return out
+
+
+@app.get("/api/series")
+def list_series():
+    with closing(db()) as conn:
+        out = []
+        for r in conn.execute("SELECT * FROM series ORDER BY created_at"):
+            data = {**new_series_data(), **json.loads(r["data"])}
+            if not owned(data.get("client_id")):
+                continue  # مسلسلات عميل تاني
+            eps = [{"id": e["id"], "number": e["number"], "name": e["name"]}
+                   for e in conn.execute("SELECT id, number, name FROM episodes WHERE series_id = ? ORDER BY number", (r["id"],))]
+            out.append(series_to_dict(r, data, eps))
+        return {"series": out, "settings": series_settings(), "configured": bool(atlas.api_key()) or atlas.mock_mode()}
+
+
+class NameIn(BaseModel):
+    name: str
+
+
+@app.post("/api/series")
+def create_series(body: NameIn):
+    sid = uuid.uuid4().hex[:12]
+    with closing(db()) as conn, conn:
+        conn.execute("INSERT INTO series (id, name, data, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+                     (sid, body.name.strip() or "مسلسل جديد", json.dumps({**new_series_data(), "client_id": active_client_id()}), now(), now()))
+    return list_series()
+
+
+class SeriesPatch(BaseModel):
+    name: str | None = None
+    bible: str | None = None
+    character: str | None = None
+
+
+@app.patch("/api/series/{sid}")
+def patch_series(sid: str, body: SeriesPatch):
+    with closing(db()) as conn, conn:
+        r, data = series_row(conn, sid)
+        for k in ("bible", "character"):
+            if getattr(body, k) is not None:
+                data[k] = getattr(body, k)[:20000]
+        name = body.name.strip() if body.name and body.name.strip() else r["name"]
+        conn.execute("UPDATE series SET name = ?, data = ?, updated_at = ? WHERE id = ?", (name, json.dumps(data, ensure_ascii=False), now(), sid))
+    return list_series()
+
+
+@app.post("/api/series/{sid}/refs")
+def add_series_refs(sid: str, files: list[UploadFile] = File(...)):
+    """صور الشخصية: بتتبعت مع كل لقطة عشان شكله يفضل ثابت."""
+    folder = SERIES_DIR / Path(sid).name / "refs"
+    folder.mkdir(parents=True, exist_ok=True)
+    with closing(db()) as conn, conn:
+        _, data = series_row(conn, sid)
+        for f in files:
+            data["refs"].append(save_upload(f, IMAGE_EXTENSIONS, folder, "ref"))
+        conn.execute("UPDATE series SET data = ?, updated_at = ? WHERE id = ?", (json.dumps(data, ensure_ascii=False), now(), sid))
+    return list_series()
+
+
+@app.delete("/api/series/{sid}/refs")
+def delete_series_ref(sid: str, file: str):
+    with closing(db()) as conn, conn:
+        _, data = series_row(conn, sid)
+        data["refs"] = [f for f in data["refs"] if f != file]
+        conn.execute("UPDATE series SET data = ?, updated_at = ? WHERE id = ?", (json.dumps(data, ensure_ascii=False), now(), sid))
+    (SERIES_DIR / Path(sid).name / "refs" / Path(file).name).unlink(missing_ok=True)
+    return list_series()
+
+
+class EpisodeIn(BaseModel):
+    name: str
+    number: int | None = None
+
+
+@app.post("/api/series/{sid}/episodes")
+def create_episode(sid: str, body: EpisodeIn):
+    eid = uuid.uuid4().hex[:12]
+    with closing(db()) as conn, conn:
+        series_row(conn, sid)
+        n = body.number or (conn.execute("SELECT COALESCE(MAX(number), 0) FROM episodes WHERE series_id = ?", (sid,)).fetchone()[0] + 1)
+        conn.execute("INSERT INTO episodes (id, series_id, number, name, data, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                     (eid, sid, n, body.name.strip() or f"الحلقة {n}", json.dumps(new_episode_data()), now(), now()))
+    return episode_response(eid)
+
+
+@app.post("/api/episodes/{eid}/duplicate")
+def duplicate_episode(eid: str):
+    """نسخة كاملة من الحلقة (السكريبت والصوت والستوري بورد والفيديوهات) تعدّل عليها من غير ما تلمس الأصلية."""
+    with closing(db()) as conn:
+        r, data = episode_row(conn, eid)
+    new_id = uuid.uuid4().hex[:12]
+    src, dst = ep_dir(eid), SERIES_DIR / "episodes" / new_id
+    need = sum(f.stat().st_size for f in src.rglob("*") if f.is_file())
+    if free_mb(SERIES_DIR) * 1024 * 1024 < need + 200 * 1024 * 1024:
+        raise HTTPException(400, space_message(None, free_mb(SERIES_DIR)))
+    shutil.copytree(src, dst)
+    data = json.loads(json.dumps(data))
+    # اللي كان شغال وقت النسخ بيكمل في الأصلية بس؛ هنا ↻ بيكمّله من غير دفع تاني
+    for t in data["takes"].values():
+        if t.get("status") in ("queued", "working"):
+            t.update(status="failed", error="كانت بتتولد وقت النسخ. دوس ↻ تكمّل (من غير دفع تاني لو الطلب كان اتبعت)")
+    for sh in data["shots"]:
+        if sh.get("frame_status") in ("queued", "working"):
+            sh.update(frame_status="failed", frame_error="كانت بتترسم وقت النسخ. ارسم تاني")
+    data.update(render={"status": "idle", "export_id": None, "error": None}, project_id=None, copy_of=eid)
+    with closing(db()) as conn, conn:
+        conn.execute("INSERT INTO episodes (id, series_id, number, name, data, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                     (new_id, r["series_id"], r["number"], f"{r['name']} (نسخة)", json.dumps(data, ensure_ascii=False), now(), now()))
+    return episode_response(new_id)
+
+
+@app.get("/api/episodes/{eid}")
+def get_episode(eid: str):
+    return episode_response(eid)
+
+
+@app.delete("/api/episodes/{eid}")
+def delete_episode(eid: str):
+    if eid in SERIES_JOBS:
+        raise HTTPException(400, "استنى لحد ما التجميع يخلص")
+    with closing(db()) as conn, conn:
+        conn.execute("DELETE FROM episodes WHERE id = ?", (eid,))
+    shutil.rmtree(SERIES_DIR / "episodes" / Path(eid).name, ignore_errors=True)
+    return {"ok": True}
+
+
+class EpisodePatch(BaseModel):
+    name: str | None = None
+    script: str | None = None
+    notes: str | None = None
+    lines: list[dict] | None = None  # تعديل توقيت الجمل بإيدك
+    shot: dict | None = None  # تعديل لقطة واحدة: {id, title, prompt, camera, ..., start, end}
+
+
+@app.patch("/api/episodes/{eid}")
+def patch_episode(eid: str, body: EpisodePatch):
+    def fn(d):
+        if body.script is not None:
+            d["script"] = body.script[:60000]
+            parsed = sz.parse_script(d["script"])
+            old = {ln["text"]: ln for ln in d["lines"]}
+            # الجمل اللي ما اتغيرتش بتحتفظ بتوقيتها
+            d["scenes"] = parsed["scenes"]
+            d["lines"] = [{**ln, "start": old.get(ln["text"], {}).get("start"), "end": old.get(ln["text"], {}).get("end")}
+                          for ln in parsed["lines"]]
+        if body.notes is not None:
+            d["notes"] = body.notes[:4000]
+        if body.lines is not None:
+            by_n = {int(x.get("n", 0)): x for x in body.lines}
+            for ln in d["lines"]:
+                x = by_n.get(ln["n"])
+                if x:
+                    ln["start"], ln["end"] = round(float(x["start"]), 2), round(float(x["end"]), 2)
+            d["timing"] = "manual"
+        if body.shot:
+            s = next((s for s in d["shots"] if s["id"] == body.shot.get("id")), None)
+            if s is None:
+                raise HTTPException(404, "اللقطة مش موجودة")
+            for k in ("title", "prompt", "camera", "shot", "location", "sfx", "transition"):
+                if k in body.shot:
+                    s[k] = str(body.shot[k] or "")[:3000]
+            if "offset" in body.shot:
+                s["offset"] = max(0.0, round(float(body.shot["offset"] or 0), 2))
+            if "approved" in body.shot:
+                s["approved"] = bool(body.shot["approved"])
+            if "end" in body.shot:
+                # تغيير نهاية لقطة بيحرّك بداية اللي بعدها (الحلقة تفضل متلاصقة على الصوت)
+                k = d["shots"].index(s)
+                nxt = d["shots"][k + 1] if k + 1 < len(d["shots"]) else None
+                hi = nxt["end"] - 0.3 if nxt else s["end"]
+                s["end"] = round(min(max(float(body.shot["end"]), s["start"] + 0.3), hi), 2)
+                if nxt:
+                    nxt["start"] = s["end"]
+    with closing(db()) as conn, conn:
+        if body.name and body.name.strip():
+            conn.execute("UPDATE episodes SET name = ? WHERE id = ?", (body.name.strip(), eid))
+    update_episode(eid, fn)
+    return episode_response(eid)
+
+
+@app.post("/api/episodes/{eid}/audio")
+def upload_episode_audio(eid: str, file: UploadFile = File(...)):
+    """الفويس أوفر: هو المرجع للتوقيت ومدة الحلقة."""
+    folder = ep_dir(eid)
+    name = save_audio_upload(file, folder, "voiceover")
+    try:
+        duration = probe_duration(folder / name)
+    except Exception as exc:  # noqa: BLE001
+        (folder / name).unlink(missing_ok=True)
+        raise HTTPException(400, f"مقدرتش أقرا الملف الصوتي: {exc}") from exc
+    def fn(d):
+        if d["shots"] and d["audio"] and not d.get("retime") and d["lines"] and all(ln.get("start") is not None for ln in d["lines"]):
+            d["retime"] = {"old": {str(ln["n"]): [ln["start"], ln["end"]] for ln in d["lines"]}, "total": d["audio"]["duration"]}
+        if d["audio"]:
+            (folder / d["audio"]["file"]).unlink(missing_ok=True)
+        d["audio"] = {"file": name, "duration": round(duration, 2), "name": file.filename}
+        d["voice_pending"] = False
+        d["timing"] = None
+        for ln in d["lines"]:
+            ln["start"] = ln["end"] = None
+    update_episode(eid, fn)
+    return episode_response(eid)
+
+
+def speech_segments(path: Path) -> list[tuple[float, float]]:
+    """أماكن الكلام في الصوت (بين السكتات)."""
+    out = subprocess.run([ffmpeg_exe(), "-hide_banner", "-i", str(path), "-af", "silencedetect=noise=-35dB:d=0.35", "-f", "null", "-"],
+                         capture_output=True, text=True, timeout=300).stderr
+    starts = [float(x) for x in re.findall(r"silence_start: ([\d.]+)", out)]
+    ends = [float(x) for x in re.findall(r"silence_end: ([\d.]+)", out)]
+    segs, t = [], 0.0
+    for a, b in zip(starts, ends):
+        if a - t > 0.12:
+            segs.append((t, a))
+        t = b
+    total = probe_duration(path)
+    if len(ends) == len(starts) and total - t > 0.12:
+        segs.append((t, total))
+    return [s for s in segs if s[1] - s[0] > 0.1]
+
+
+@app.post("/api/episodes/{eid}/timing")
+def episode_timing(eid: str, mode: str = "auto"):
+    """يرقّم كل جملة من السكريبت بوقتها في الصوت. auto: موديل الكلام (كل كلمة بوقتها)، ولو مش متاح: تقدير من السكتات."""
+    with closing(db()) as conn:
+        _, data = episode_row(conn, eid)
+    if not data["audio"]:
+        raise HTTPException(400, "ارفع الفويس أوفر الأول")
+    path = ep_dir(eid) / data["audio"]["file"]
+    if not data["lines"]:
+        # من غير سكريبت: الجمل بتتاخد من الصوت نفسه (محتاج موديل الكلام)
+        if atlas.mock_mode():
+            mode = "audio"
+        elif not atlas.api_key():
+            raise HTTPException(400, "من غير سكريبت لازم موديل الكلام يسمع الصوت: حط مفتاح Atlas من ⚙️ الإعدادات، أو الزق السكريبت في «كتابة الحلقة»")
+        else:
+            mode = "audio"
+    source, timed, words, heard_lines = "estimate", None, None, None
+    if mode != "estimate" and (atlas.api_key() and not atlas.mock_mode() or (atlas.mock_mode() and not data["lines"])):
+        try:
+            words = atlas.transcribe(path, data["audio"]["duration"])
+            timed, ratio = sz.align_with_ratio(words, data["lines"])
+            source = "stt"
+            # الصوت اتسجّل بكلام مختلف عن السكريبت: الصوت هو المرجع، فالجمل بتتاخد منه هو
+            if ratio < 0.6 or mode == "audio":
+                heard_lines, source = sz.sentences_from_words(words), "audio"
+        except (atlas.AtlasError, httpx.HTTPError) as exc:
+            if mode in ("stt", "audio"):
+                raise HTTPException(400, f"موديل الكلام: {exc}") from exc
+    if timed is None and heard_lines is None:
+        timed = sz.estimate(speech_segments(path), data["lines"])
+    def fn(d):
+        if words is not None:
+            d["words"] = words
+        if heard_lines is not None:
+            d["lines"] = heard_lines
+        else:
+            for ln, t in zip(d["lines"], timed):
+                ln["start"], ln["end"] = t["start"], t["end"]
+        d["timing"] = source
+        retime_shots(d, matched=heard_lines is None)
+    update_episode(eid, fn)
+    describe_new_shots(eid)
+    return episode_response(eid)
+
+
+def describe_new_shots(eid: str) -> None:
+    """اللقطات اللي اتعملت لجمل جديدة: الموديل يكتب وصفها وبرومبتها على أسلوب اللي جنبها (كلهم مع بعض)."""
+    with closing(db()) as conn:
+        r, data = episode_row(conn, eid)
+        _, sdata = series_for_episode(conn, r)
+    shots = data["shots"]
+    todo = [k for k, x in enumerate(shots) if x.get("needs_describe")]
+    if not todo:
+        return
+    def one(k: int) -> tuple[str, dict | None]:
+        x = shots[k]
+        prev = next((shots[i] for i in range(k - 1, -1, -1) if not shots[i].get("needs_describe")), None)
+        nxt = next((shots[i] for i in range(k + 1, len(shots)) if not shots[i].get("needs_describe")), None)
+        said = [ln["text"] for ln in data["lines"] if ln["n"] in (x.get("lines") or [])]
+        if atlas.mock_mode():
+            return x["id"], sz.mock_one_shot(prev, said[0] if said else "")
+        if not atlas.api_key():
+            return x["id"], None
+        try:
+            return x["id"], sz.parse_one_shot(series_chat(sz.insert_shot_messages(
+                sdata["bible"], sdata["character"], prev, nxt, said, x["end"] - x["start"], "")))
+        except (HTTPException, ValueError):
+            return x["id"], None
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        results = dict(pool.map(one, todo))
+    def fn(d):
+        for x in d["shots"]:
+            if x["id"] in results:
+                if results[x["id"]]:
+                    x.update(results[x["id"]])
+                x.pop("needs_describe", None)
+    update_episode(eid, fn)
+
+
+def retime_shots(d: dict, matched: bool) -> None:
+    """بعد صوت جديد: كل لقطة تتحرك وتتمط على مكان جملها في الصوت الجديد، والفيديوهات زي ما هي.
+    matched: الجمل هي هي بنفس أرقامها (اتقرت من السكريبت)، غير كده بنمط الحلقة كلها بالتناسب."""
+    rt = d.pop("retime", None)
+    if not rt or not d["shots"] or not d["audio"]:
+        return
+    total = d["audio"]["duration"]
+    added = set(rt.get("added") or []) if matched else set()
+    holes, prev_end, group = [], 0.0, []
+    for ln in d["lines"] + [None]:
+        if ln is not None and ln["n"] in added:
+            if ln.get("start") is not None:
+                group.append(ln)
+            continue
+        if group:
+            holes.append((prev_end, min(x["start"] for x in group), max(x["end"] for x in group)))
+            group = []
+        if ln is not None and str(ln["n"]) in rt["old"]:
+            prev_end = rt["old"][str(ln["n"])][1]
+    d["shots"] = sz.warp_shots(d["shots"], rt["old"] if matched else {}, rt["total"], d["lines"], total, holes)
+    if not matched:
+        for sh in d["shots"]:
+            sh["lines"] = sz.lines_in_shot(sh, d["lines"])
+    if added:
+        sz.carve_new_shots(d["shots"], d["lines"], sorted(added), total)
+    for ln in d["lines"]:
+        ln.pop("added", None)
+    short = []
+    for sh in d["shots"]:
+        t = d["takes"].get(sh.get("chosen") or "")
+        if t and t.get("duration") and t["duration"] - (sh.get("offset") or 0) < sh["end"] - sh["start"] - 0.05:
+            short.append(sh["n"])
+    d["retimed"] = {"at": now(), "short": short, "added": [sh["n"] for sh in d["shots"] if sh.get("needs_describe")]}
+
+
+def series_for_episode(conn: sqlite3.Connection, r: sqlite3.Row) -> tuple[sqlite3.Row, dict]:
+    return series_row(conn, r["series_id"])
+
+
+def series_chat(messages: list[dict], json_mode: bool = True) -> str:
+    """GPT 5.6 Luna (أو اللي متختار في الإعدادات). لو الاسم مش موجود في Atlas بندوّر على أقرب موديل ونحفظه."""
+    preferred = series_settings()["text_model"]
+    errors = []
+    for model in atlas.model_candidates(preferred, ("luna",), [carousel_settings()["text_model"]])[:5]:
+        try:
+            reply = atlas.chat(messages, model, temperature=0.6 if json_mode else 0.8, max_tokens=12000, json_mode=json_mode)
+        except (atlas.AtlasError, httpx.HTTPError) as exc:
+            errors.append(f"{model}: {str(exc)[:120]}")
+            continue
+        if model != preferred:
+            auth.set_setting("series_text_model", model)
+        return reply
+    raise HTTPException(400, "موديل اللقطات مش شغال: " + " | ".join(errors[:3]))
+
+
+@app.post("/api/episodes/{eid}/shots")
+def episode_shots(eid: str):
+    """الموديل يقسّم الحلقة للقطات على توقيت الصوت، ويكتب برومبت لكل لقطة. النسخ القديمة بتفضل محفوظة."""
+    with closing(db()) as conn:
+        r, data = episode_row(conn, eid)
+        _, sdata = series_for_episode(conn, r)
+    if not data["audio"] or not data["lines"] or any(ln.get("start") is None for ln in data["lines"]):
+        raise HTTPException(400, "رقّم جمل الفويس أوفر على الصوت الأول")
+    total = data["audio"]["duration"]
+    if atlas.mock_mode():
+        shots = sz.mock_shots(data["lines"], total)
+    else:
+        if not atlas.api_key():
+            raise HTTPException(400, "مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات")
+        reply = series_chat(sz.shots_messages(sdata["bible"], sdata["character"], data["script"], data["lines"], total, data["notes"]))
+        try:
+            shots = sz.parse_shots(reply, total)
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+    for s in shots:
+        s.update(id=uuid.uuid4().hex[:10], takes=[], chosen=None, offset=0.0, approved=False,
+                 frames=[], frame=None, frame_status="idle", frame_error=None)
+    def fn(d):
+        d["shots"] = shots
+    update_episode(eid, fn)
+    return episode_response(eid)
+
+
+def find_shot(d: dict, shot_id: str) -> dict:
+    s = next((s for s in d["shots"] if s["id"] == shot_id), None)
+    if s is None:
+        raise HTTPException(404, "اللقطة مش موجودة")
+    return s
+
+
+@app.post("/api/episodes/{eid}/shots/{shot_id}/takes")
+def upload_take(eid: str, shot_id: str, file: UploadFile = File(...)):
+    """فيديو جاهز (اتعمل برة البرنامج) كنسخة للقطة."""
+    folder = ep_dir(eid) / "takes"
+    name = save_upload(file, VIDEO_EXTENSIONS, folder, "take")
+    try:
+        duration = probe_duration(folder / name)
+    except Exception as exc:  # noqa: BLE001
+        (folder / name).unlink(missing_ok=True)
+        raise HTTPException(400, f"مقدرتش أقرا الفيديو: {exc}") from exc
+    tid = uuid.uuid4().hex[:10]
+    def fn(d):
+        s = find_shot(d, shot_id)
+        # الفيديو اللي بترفعه بنفسك معتمد على طول
+        d["takes"][tid] = {"id": tid, "file": name, "source": "upload", "status": "done", "error": None, "approved": True,
+                           "duration": round(duration, 2), "name": file.filename, "created_at": now()}
+        s["takes"].append(tid)
+        s["chosen"], s["offset"] = tid, 0.0
+    update_episode(eid, fn)
+    return episode_response(eid)
+
+
+class TakeIn(BaseModel):
+    take_id: str
+
+
+@app.post("/api/episodes/{eid}/shots/{shot_id}/pick")
+def pick_take(eid: str, shot_id: str, body: TakeIn):
+    """تختار نسخة للقطة (من نسخها، أو من النسخ المحفوظة من قوايم قديمة)."""
+    def fn(d):
+        s = find_shot(d, shot_id)
+        if body.take_id not in d["takes"]:
+            raise HTTPException(404, "النسخة مش موجودة")
+        if body.take_id not in s["takes"]:
+            for other in d["shots"]:
+                if body.take_id in other["takes"] and other is not s:
+                    other["takes"].remove(body.take_id)
+                    if other["chosen"] == body.take_id:
+                        other["chosen"] = other["takes"][-1] if other["takes"] else None
+            s["takes"].append(body.take_id)
+        s["chosen"], s["offset"] = body.take_id, 0.0
+    update_episode(eid, fn)
+    return episode_response(eid)
+
+
+@app.delete("/api/episodes/{eid}/takes/{take_id}")
+def delete_take(eid: str, take_id: str):
+    file = None
+    def fn(d):
+        nonlocal file
+        t = d["takes"].pop(take_id, None)
+        if t is None:
+            raise HTTPException(404, "النسخة مش موجودة")
+        if t["status"] in ("queued", "working"):
+            raise HTTPException(400, "النسخة دي لسه بتتولد")
+        file = t.get("file")
+        for s in d["shots"]:
+            if take_id in s["takes"]:
+                s["takes"].remove(take_id)
+                if s["chosen"] == take_id:
+                    s["chosen"] = s["takes"][-1] if s["takes"] else None
+    update_episode(eid, fn)
+    if file:
+        (ep_dir(eid) / "takes" / Path(file).name).unlink(missing_ok=True)
+    return episode_response(eid)
+
+
+def shot_prompt(s: dict, character: str) -> str:
+    parts = [s.get("prompt") or s.get("title") or ""]
+    if s.get("frame"):
+        parts.append("The first reference image is the approved storyboard frame: keep its composition, framing, setting and lighting.")
+    if character.strip():
+        parts.append(f"Character (keep identical to the reference images): {character.strip()}")
+    parts.append("Vertical 9:16, cinematic, realistic, natural light. The man never talks to the camera. No on-screen text, no subtitles, no logos.")
+    return "\n".join(p for p in parts if p)
+
+
+def seedance_ref(path: Path) -> Path:
+    """Seedance بيرفض الصور اللي ضلعها أقل من 300 أو أكتر من 6000 بكسل، أو نسبتها (العرض÷الطول) برة 0.4–2.5.
+    بنعمل نسخة متظبطة (JPG): هوامش للصور الطويلة أو العريضة أوي (من غير ما نقص منها)، وبعدين تكبير أو تصغير."""
+    probe = subprocess.run([ffmpeg_exe(), "-hide_banner", "-i", str(path)], capture_output=True, text=True, timeout=30).stderr
+    m = re.search(r"Video:.*?(\d{2,5})x(\d{2,5})", probe)
+    w, h = (int(m.group(1)), int(m.group(2))) if m else (0, 0)
+    ok_ratio = w and h and 0.45 <= w / h <= 2.2
+    if ok_ratio and 300 <= min(w, h) and max(w, h) <= 6000 and path.suffix.lower() in (".jpg", ".jpeg", ".png"):
+        return path
+    out = TMP_DIR / "seedance_refs" / f"{path.parent.name}-{path.stem}-{int(path.stat().st_mtime)}-v2.jpg"
+    if not out.exists():
+        out.parent.mkdir(parents=True, exist_ok=True)
+        steps = []
+        if w and h and w / h < 0.45:  # طويلة أوي: هوامش على الجنبين
+            steps.append("pad=ceil(ih*0.5/2)*2:ih:(ow-iw)/2:0:color=0x1a1a1a")
+        elif w and h and w / h > 2.2:  # عريضة أوي: هوامش فوق وتحت
+            steps.append("pad=iw:ceil(iw/2/2)*2:0:(oh-ih)/2:color=0x1a1a1a")
+        # أصغر ضلع 720 على الأقل، وأكبر ضلع 4096 بالكتير
+        steps.append("scale='if(lt(iw,ih),max(720,min(iw,4096)),-2)':'if(lt(iw,ih),-2,max(720,min(ih,4096)))'")
+        steps.append("scale='min(iw,4096)':'min(ih,4096)':force_original_aspect_ratio=decrease")
+        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(path), "-vf", ",".join(steps),
+                        "-q:v", "2", str(out)], check=True, capture_output=True, timeout=60)
+    return out
+
+
+def run_take(eid: str, tid: str) -> None:
+    """يولّد نسخة للقطة بـ Seedance، وصور الشخصية مراجع عشان شكله يفضل ثابت."""
+    def setp(**kw):
+        update_episode(eid, lambda d: d["takes"].get(tid, {}).update(**kw))
+    try:
+        with closing(db()) as conn:
+            r, data = episode_row(conn, eid)
+            _, sdata = series_for_episode(conn, r)
+        t = data["takes"][tid]
+        dest = ep_dir(eid) / "takes" / f"{tid}.mp4"
+        setp(status="working")
+        if atlas.mock_mode():
+            time.sleep(1.5)
+            subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i",
+                            f"color=c=0x{(hash(tid) & 0xFFFFFF):06x}:s=496x864:d={t['gen_duration']}:r=24",
+                            "-c:v", "libx264", "-pix_fmt", "yuv420p", str(dest)], check=True, capture_output=True, timeout=120)
+        else:
+            # لو الطلب اتبعت قبل كده (إعادة محاولة) بنكمّل متابعته من غير ما ندفع تاني
+            pid = t.get("prediction_id")
+            if not pid:
+                refs = [SERIES_DIR / r["series_id"] / "refs" / f for f in sdata["refs"]][:4]
+                if t.get("frame"):
+                    # صورة الستوري بورد أول مرجع: نفس الكادر والتكوين
+                    refs.insert(0, ep_dir(eid) / "frames" / t["frame"])
+                body = {
+                    "model": series_settings()["video_model"], "prompt": t["prompt"],
+                    "reference_images": [atlas.upload_media(seedance_ref(p)) for p in refs if p.exists()],
+                    "duration": t["gen_duration"], "resolution": atlas.RESOLUTION, "ratio": atlas.RATIO,
+                    "generate_audio": False, "watermark": False,
+                }
+                pid = atlas.submit_video(body)
+            setp(prediction_id=pid)
+            url = atlas.wait_for(pid, lambda _s: None)
+            atlas.download(url, dest)
+        setp(status="done", file=dest.name, duration=round(probe_duration(dest), 2), error=None)
+    except Exception as exc:  # noqa: BLE001
+        setp(status="failed", error=str(exc)[:400])
+
+
+@app.delete("/api/episodes/{eid}/shots/{shot_id}")
+def delete_shot(eid: str, shot_id: str, merge: str = "prev"):
+    """تشيل لقطة، ووقتها بيتضاف على اللي قبلها (prev) أو اللي بعدها (next) عشان الحلقة تفضل متلاصقة على الصوت.
+    نسخها (الفيديوهات) بتروح للنسخ المحفوظة."""
+    def fn(d):
+        shots = d["shots"]
+        s = find_shot(d, shot_id)
+        if len(shots) < 2:
+            raise HTTPException(400, "دي آخر لقطة في الحلقة")
+        k = shots.index(s)
+        if merge == "next" and k + 1 < len(shots) or k == 0:
+            other = shots[k + 1]
+            other["start"] = s["start"]
+        else:
+            other = shots[k - 1]
+            other["end"] = s["end"]
+        other["lines"] = sorted(set(other.get("lines") or []) | set(s.get("lines") or []))
+        shots.remove(s)
+        for n, x in enumerate(shots, 1):
+            x["n"] = n
+    update_episode(eid, fn)
+    return episode_response(eid)
+
+
+class InsertShotIn(BaseModel):
+    after: str  # اللقطة اللي الجديدة هتيجي بعدها
+    seconds: float = 2.0
+    take_from: str = "both"  # prev | next | both
+    idea: str = ""
+
+
+MIN_SHOT = 0.5
+
+
+def insert_times(shots: list[dict], after: str, seconds: float, take_from: str) -> tuple[int, float, float, float]:
+    """مكان اللقطة الجديدة ووقتها: بتاخد وقتها من اللي قبلها أو اللي بعدها أو الاتنين، والحلقة تفضل على طول الصوت."""
+    ids = [x["id"] for x in shots]
+    if after not in ids:
+        raise HTTPException(404, "اللقطة مش موجودة")
+    k = ids.index(after) + 1
+    prev, nxt = shots[k - 1], shots[k] if k < len(shots) else None
+    room_prev = max(0.0, prev["end"] - prev["start"] - MIN_SHOT)
+    room_next = max(0.0, nxt["end"] - nxt["start"] - MIN_SHOT) if nxt else 0.0
+    if take_from == "prev" or not nxt:
+        a, b = min(seconds, room_prev), 0.0
+    elif take_from == "next":
+        a, b = 0.0, min(seconds, room_next)
+    else:
+        a = min(seconds / 2, room_prev)
+        b = min(seconds - a, room_next)
+        a = min(seconds - b, room_prev)
+    if a + b < 0.3:
+        raise HTTPException(400, "مفيش وقت كفاية في اللقطات اللي جنبها (كل لقطة لازم تفضل نص ثانية على الأقل)")
+    start = prev["end"] - a
+    return k, start, start + a + b, a + b
+
+
+class ShotOrderIn(BaseModel):
+    order: list[str]
+
+
+@app.post("/api/episodes/{eid}/shots/order")
+def reorder_shots(eid: str, body: ShotOrderIn):
+    """ترتيب جديد للقطات. كل لقطة بتتنقل بالستوري بورد والفيديوهات والبرومبت ومدتها، والفويس أوفر ثابت مكانه:
+    الأوقات بتتحسب من جديد ورا بعض، والجمل اللي على كل لقطة بتتحدث حسب وقتها الجديد."""
+    def fn(d):
+        by_id = {x["id"]: x for x in d["shots"]}
+        if sorted(body.order) != sorted(by_id):
+            raise HTTPException(400, "اللقطات اتغيرت. اعمل ريفريش وجرّب تاني")
+        shots, t = [], 0.0
+        for i, sid in enumerate(body.order, 1):
+            x = by_id[sid]
+            dur = x["end"] - x["start"]
+            x.update(n=i, start=round(t, 2), end=round(t + dur, 2))
+            t += dur
+            shots.append(x)
+        if shots and d["audio"]:
+            shots[-1]["end"] = round(max(shots[-1]["start"] + 0.1, d["audio"]["duration"]), 2)
+        for x in shots:
+            x["lines"] = sz.lines_in_shot(x, d["lines"])
+        d["shots"] = shots
+    update_episode(eid, fn)
+    return episode_response(eid)
+
+
+def start_reprompt(eid: str, ids: list[str]) -> None:
+    """يعلّم اللقطات إنها بيتكتب لها برومبت جديد، ويبعتهم للموديل على دفعات في الخلفية."""
+    if not ids:
+        return
+    def mark(d):
+        for x in d["shots"]:
+            if x["id"] in ids:
+                x["prompt_status"], x["prompt_error"] = "working", None
+    update_episode(eid, mark)
+    for k in range(0, len(ids), REPROMPT_BATCH):
+        prompt_executor.submit(run_reprompt, eid, ids[k:k + REPROMPT_BATCH])
+
+
+def run_reprompt(eid: str, ids: list[str]) -> None:
+    try:
+        with closing(db()) as conn:
+            r, data = episode_row(conn, eid)
+            _, sdata = series_for_episode(conn, r)
+        shots = data["shots"]
+        text = {ln["n"]: ln["text"] for ln in data["lines"]}
+        items = []
+        for k, x in enumerate(shots):
+            if x["id"] in ids:
+                items.append({"id": x["id"], "n": x["n"], "seconds": x["end"] - x["start"],
+                              "said": [text[n] for n in x.get("lines") or [] if n in text], "shot": x,
+                              "prev": shots[k - 1] if k else None, "next": shots[k + 1] if k + 1 < len(shots) else None})
+        if atlas.mock_mode():
+            result = {it["id"]: sz.mock_one_shot(it["prev"], " ".join(it["said"])) for it in items}
+        else:
+            result = sz.parse_reprompt(series_chat(sz.reprompt_messages(sdata["bible"], sdata["character"], items)))
+        error = None
+    except Exception as exc:  # noqa: BLE001
+        result, error = {}, str(getattr(exc, "detail", exc))[:300]
+    def fn(d):
+        for x in d["shots"]:
+            if x["id"] not in ids:
+                continue
+            if x["id"] in result:
+                x.update(result[x["id"]])
+                x.update(prompt_status="done", prompt_error=None, prompt_new=True)
+            else:
+                x.update(prompt_status="failed", prompt_error=error or "الموديل ما رجعش برومبت للقطة دي")
+    update_episode(eid, fn)
+
+
+@app.post("/api/episodes/{eid}/reprompt")
+def reprompt_episode(eid: str, shot_id: str | None = None):
+    """برومبتات جديدة على الكلام الحالي: لقطة واحدة (shot_id) أو كل اللقطات. الستوري بورد والفيديوهات القديمة بيفضلوا."""
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات")
+    with closing(db()) as conn:
+        _, data = episode_row(conn, eid)
+    ids = [x["id"] for x in data["shots"] if (shot_id is None or x["id"] == shot_id) and x.get("prompt_status") != "working"]
+    if not ids:
+        raise HTTPException(400, "البرومبت بيتكتب بالفعل")
+    start_reprompt(eid, ids)
+    return episode_response(eid)
+
+
+@app.post("/api/episodes/{eid}/shots/{shot_id}/describe")
+def describe_shot(eid: str, shot_id: str):
+    """وصف وبرومبت جديد للقطة على الكلام الجديد (من المسودة لو فيه)، بنفس أسلوب اللي جنبها.
+    الستوري بورد والفيديوهات القديمة بيفضلوا كنسخ؛ ارسم وولّد تاني."""
+    with closing(db()) as conn:
+        r, data = episode_row(conn, eid)
+        _, sdata = series_for_episode(conn, r)
+    shots = data["shots"]
+    x = find_shot(data, shot_id)
+    k = shots.index(x)
+    draft = {d["n"]: d["text"] for d in (data.get("rewrite") or {}).get("lines") or [] if d.get("n") is not None}
+    said = [draft.get(ln["n"], ln["text"]) for ln in data["lines"] if ln["n"] in (x.get("lines") or [])
+            and (not draft or ln["n"] in draft)]
+    prev = shots[k - 1] if k else None
+    nxt = shots[k + 1] if k + 1 < len(shots) else None
+    idea = f"نفس فكرة اللقطة القديمة لو لسه مناسبة للكلام الجديد: {x.get('title') or ''}"
+    if atlas.mock_mode():
+        fields = sz.mock_one_shot(prev, " ".join(said))
+    else:
+        if not atlas.api_key():
+            raise HTTPException(400, "مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات")
+        try:
+            fields = sz.parse_one_shot(series_chat(sz.insert_shot_messages(
+                sdata["bible"], sdata["character"], prev, nxt, said, x["end"] - x["start"], idea)))
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+    def fn(d):
+        find_shot(d, shot_id).update(**fields, prompt_new=True, prompt_status="done", prompt_error=None)
+    update_episode(eid, fn)
+    return episode_response(eid)
+
+
+@app.post("/api/episodes/{eid}/shots/insert")
+def insert_shot(eid: str, body: InsertShotIn):
+    """لقطة جديدة بين لقطتين. وقتها بيتاخد من اللي جنبها، والموديل بيكتب وصفها وبرومبتها على نفس أسلوبهم
+    عشان تتولد ليها ستوري بورد وفيديو زي الباقي."""
+    with closing(db()) as conn:
+        r, data = episode_row(conn, eid)
+        _, sdata = series_for_episode(conn, r)
+    seconds = max(0.3, min(15.0, float(body.seconds or 2)))
+    k, start, end, _ = insert_times(data["shots"], body.after, seconds, body.take_from)
+    prev = data["shots"][k - 1]
+    nxt = data["shots"][k] if k < len(data["shots"]) else None
+    said = [ln["text"] for ln in data["lines"] if ln.get("start") is not None and ln["start"] < end and ln["end"] > start]
+    if atlas.mock_mode():
+        fields = sz.mock_one_shot(prev, body.idea)
+    elif atlas.api_key():
+        try:
+            fields = sz.parse_one_shot(series_chat(sz.insert_shot_messages(
+                sdata["bible"], sdata["character"], prev, nxt, said, end - start, body.idea)))
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+    else:
+        fields = {"title": body.idea.strip()[:80] or "لقطة جديدة", "shot": "", "camera": "", "location": prev.get("location") or "",
+                  "sfx": "", "transition": "cut", "prompt": body.idea.strip()}
+    new_id = uuid.uuid4().hex[:10]
+    def fn(d):
+        shots = d["shots"]
+        k, start, end, _ = insert_times(shots, body.after, seconds, body.take_from)
+        shots[k - 1]["end"] = round(start, 2)
+        if k < len(shots):
+            shots[k]["start"] = round(end, 2)
+        lines = [ln["n"] for ln in d["lines"] if ln.get("start") is not None and ln["start"] < end and ln["end"] > start]
+        shots.insert(k, {"id": new_id, "scene": shots[k - 1].get("scene") or 0, "start": round(start, 2), "end": round(end, 2),
+                         "lines": lines, **fields, "takes": [], "chosen": None, "offset": 0.0, "approved": False,
+                         "frames": [], "frame": None, "frame_status": "idle", "frame_error": None, "added": True})
+        for n, x in enumerate(shots, 1):
+            x["n"] = n
+    update_episode(eid, fn)
+    out = episode_response(eid)
+    out["new_shot"] = new_id
+    return out
+
+
+@app.post("/api/episodes/{eid}/takes/{take_id}/retry")
+def retry_take(eid: str, take_id: str):
+    """نسخة فشلت: لو الطلب كان اتبعت لـ Seedance بنكمّل متابعته وتحميله (من غير دفع تاني)، غير كده بيتبعت من الأول."""
+    def fn(d):
+        t = d["takes"].get(take_id)
+        if t is None:
+            raise HTTPException(404, "النسخة مش موجودة")
+        if t["status"] != "failed" or t.get("source") != "seedance":
+            raise HTTPException(400, "النسخة دي مش فاشلة")
+        t.update(status="queued", error=None)
+    update_episode(eid, fn)
+    series_executor.submit(run_take, eid, take_id)
+    return episode_response(eid)
+
+
+@app.post("/api/episodes/{eid}/shots/{shot_id}/generate")
+def generate_take(eid: str, shot_id: str):
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات")
+    tid = uuid.uuid4().hex[:10]
+    with closing(db()) as conn:
+        r, _ = episode_row(conn, eid)
+        _, sdata = series_for_episode(conn, r)
+    def fn(d):
+        s = find_shot(d, shot_id)
+        if not s.get("approved"):
+            raise HTTPException(400, f"اعتمد اللقطة {s['n']} الأول (راجع الستوري بورد والبرومبت)")
+        dur = s["end"] - s["start"]
+        # Seedance بيعمل من 4 لـ 15 ثانية: بنولّد أطول شوية من اللقطة ونقص منها
+        gen = int(min(atlas.MAX_DURATION, max(atlas.MIN_DURATION, math.ceil(dur + 0.5))))
+        d["takes"][tid] = {"id": tid, "file": None, "source": "seedance", "status": "queued", "error": None,
+                           "duration": None, "gen_duration": gen, "prompt": shot_prompt(s, sdata["character"]),
+                           "frame": s.get("frame"), "approved": False, "created_at": now()}
+        s["takes"].append(tid)
+        s.pop("prompt_new", None)
+        if not s["chosen"]:
+            s["chosen"] = tid
+    update_episode(eid, fn)
+    series_executor.submit(run_take, eid, tid)
+    return episode_response(eid)
+
+
+def run_episode_render(eid: str) -> None:
+    """يجمّع الحلقة: كل لقطة من نسختها المختارة بمدتها بالظبط من الصوت، وفوقهم الفويس أوفر."""
+    work = TMP_DIR / f"ep_{eid}_{uuid.uuid4().hex[:6]}"
+    work.mkdir(parents=True, exist_ok=True)
+    try:
+        with closing(db()) as conn:
+            r, data = episode_row(conn, eid)
+            sr, _ = series_for_episode(conn, r)
+        parts = []
+        for k, s in enumerate(data["shots"]):
+            dur = round(s["end"] - s["start"], 3)
+            t = data["takes"].get(s.get("chosen") or "")
+            src = ep_dir(eid) / "takes" / t["file"] if t and t.get("file") and t["status"] == "done" else None
+            part = work / f"{k:03d}.mp4"
+            vf = (f"scale={SERIES_W}:{SERIES_H}:force_original_aspect_ratio=increase,crop={SERIES_W}:{SERIES_H},"
+                  f"fps=30,setsar=1,format=yuv420p,tpad=stop_mode=clone:stop_duration={dur:.3f}")
+            if src and src.exists():
+                cmd = [ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{s.get('offset') or 0:.3f}",
+                       "-i", str(src), "-t", f"{dur:.3f}", "-an", "-vf", vf]
+            else:  # لقطة لسه من غير فيديو: أسود بمدتها
+                cmd = [ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi",
+                       "-i", f"color=c=black:s={SERIES_W}x{SERIES_H}:r=30:d={dur:.3f}"]
+            cmd += ["-t", f"{dur:.3f}", "-c:v", "libx264", "-preset", "veryfast", "-crf", "19", "-pix_fmt", "yuv420p", str(part)]
+            subprocess.run(cmd, check=True, capture_output=True, timeout=600)
+            parts.append(part)
+        (work / "list.txt").write_text("".join(f"file '{p.name}'\n" for p in parts))
+        export_id = uuid.uuid4().hex[:12]
+        filename = f"{export_id}.mp4"
+        total = data["audio"]["duration"]
+        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-f", "concat", "-safe", "0",
+                        "-i", str(work / "list.txt"), "-i", str(ep_dir(eid) / data["audio"]["file"]),
+                        "-map", "0:v", "-map", "1:a", "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-t", f"{total:.3f}",
+                        "-movflags", "+faststart", str(EXPORTS_DIR / filename)], check=True, capture_output=True, timeout=900)
+        name = f"{sr['name']} — {r['name']}"
+        with closing(db()) as conn, conn:
+            conn.execute("INSERT INTO exports (id, name, filename, duration, source, project_id, created_at) VALUES (?, ?, ?, ?, ?, NULL, ?)",
+                         (export_id, name, filename, total, "series", now()))
+        update_episode(eid, lambda d: d.update(render={"status": "done", "export_id": export_id, "error": None}))
+    except Exception as exc:  # noqa: BLE001
+        msg = exc.stderr.decode(errors="ignore")[-300:] if isinstance(exc, subprocess.CalledProcessError) and exc.stderr else str(exc)
+        update_episode(eid, lambda d: d.update(render={"status": "failed", "export_id": None, "error": msg[:400]}))
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+        SERIES_JOBS.discard(eid)
+
+
+@app.post("/api/episodes/{eid}/render")
+def render_episode(eid: str):
+    with closing(db()) as conn:
+        _, data = episode_row(conn, eid)
+    if not data["shots"] or not data["audio"]:
+        raise HTTPException(400, "جهّز اللقطات الأول")
+    with SERIES_LOCK:
+        if eid in SERIES_JOBS:
+            raise HTTPException(400, "التجميع شغال")
+        SERIES_JOBS.add(eid)
+    update_episode(eid, lambda d: d.update(render={"status": "working", "export_id": None, "error": None}))
+    render_executor.submit(run_episode_render, eid)
+    return episode_response(eid)
+
+
+class WriteIn(BaseModel):
+    message: str = ""
+
+
+@app.post("/api/episodes/{eid}/write")
+def write_episode(eid: str, body: WriteIn):
+    """الموديل يكتب سكريبت الحلقة استكمالًا للحلقات اللي فاتت. أي رسالة منك = توجيه، وهو بيرجّع السكريبت كامل متعدّل."""
+    with closing(db()) as conn:
+        r, data = episode_row(conn, eid)
+        _, sdata = series_for_episode(conn, r)
+        # لو فيه نسخ من نفس الحلقة: الأصلية هي اللي بتتحسب في القصة (أو أحدث نسخة لو الأصلية اتمسحت)
+        by_number: dict[int, dict] = {}
+        for e in conn.execute("SELECT number, name, data, updated_at FROM episodes WHERE series_id = ? AND number < ? ORDER BY updated_at",
+                              (r["series_id"], r["number"])):
+            ed = json.loads(e["data"])
+            cur = by_number.get(e["number"])
+            if cur is None or cur["copy"]:
+                by_number[e["number"]] = {"number": e["number"], "name": e["name"], "script": ed.get("script", ""),
+                                          "copy": bool(ed.get("copy_of"))}
+        previous = [by_number[n] for n in sorted(by_number)]
+    chat = list(data["chat"])
+    if body.message.strip():
+        chat.append({"role": "user", "content": body.message.strip()[:4000]})
+    elif not chat:
+        chat.append({"role": "user", "content": f"اكتب الحلقة رقم {r['number']} استكمالًا للي فات."})
+    if atlas.mock_mode():
+        reply = sz.mock_script(r["number"], chat)
+    else:
+        if not atlas.api_key():
+            raise HTTPException(400, "مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات")
+        reply = series_chat(sz.writer_messages(sdata["bible"], sdata["character"], previous, r["number"], chat), json_mode=False)
+    script = sz.clean_script(reply)
+    if not sz.parse_script(script)["lines"]:
+        raise HTTPException(400, "الموديل رجّع رد مش سكريبت. جرّب تاني أو وضّح طلبك")
+    def fn(d):
+        d["chat"] = chat + [{"role": "assistant", "content": script}]
+        d["script"] = script
+        d["script_approved"] = False
+        parsed = sz.parse_script(script)
+        old = {ln["text"]: ln for ln in d["lines"]}
+        d["scenes"] = parsed["scenes"]
+        d["lines"] = [{**ln, "start": old.get(ln["text"], {}).get("start"), "end": old.get(ln["text"], {}).get("end")}
+                      for ln in parsed["lines"]]
+    update_episode(eid, fn)
+    return episode_response(eid)
+
+
+class RewriteLinesIn(BaseModel):
+    lines: list[dict]
+
+
+def rewrite_rows(d: dict) -> list[dict]:
+    """المسودة الحالية (أو جمل الحلقة لو لسه مفيش)، ومع كل جملة قديمة مدتها في الصوت."""
+    old = {ln["n"]: ln for ln in d["lines"]}
+    base = (d.get("rewrite") or {}).get("lines") or [{"n": ln["n"], "k": f"n{ln['n']}", "text": ln["text"]} for ln in d["lines"]]
+    rows = []
+    for r in base:
+        o = old.get(r.get("n")) if r.get("n") is not None else None
+        rows.append({**r, "old": o["text"] if o else None,
+                     "dur": round((o.get("end") or 0) - (o.get("start") or 0), 2) if o and o.get("start") is not None else None})
+    return rows
+
+
+@app.post("/api/episodes/{eid}/rewrite")
+def rewrite_episode(eid: str, body: WriteIn):
+    """تعديل كلام الحلقة على نفس الفيديوهات بتوجيهك (مثلًا: أظرف، أو زوّد مشهد). الجمل القديمة بأرقامها،
+    والجديدة بيتعمل لها لقطات بعد ما تسجّل الصوت."""
+    with closing(db()) as conn:
+        r, data = episode_row(conn, eid)
+        _, sdata = series_for_episode(conn, r)
+    if not data["lines"] or any(ln.get("start") is None for ln in data["lines"]):
+        raise HTTPException(400, "الحلقة لسه مفيهاش جمل متوقتة على الصوت")
+    rows = rewrite_rows(data)
+    rw = data.get("rewrite") or {"chat": [], "lines": []}
+    chat = list(rw["chat"])
+    msg = body.message.strip()[:4000] or "اكتب كلام جديد للحلقة على نفس الفيديوهات."
+    chat.append({"role": "user", "content": msg})
+    if atlas.mock_mode():
+        reply = sz.mock_rewrite(rows, chat)
+    else:
+        if not atlas.api_key():
+            raise HTTPException(400, "مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات")
+        reply = series_chat(sz.rewrite_messages(sdata["bible"], sdata["character"], rows, data["shots"], chat))
+    try:
+        new = sz.parse_rewrite(reply, rows)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    def fn(d):
+        d["rewrite"] = {"chat": chat + [{"role": "assistant", "content": json.dumps(
+            {"lines": [{"n": x["n"], "text": x["text"]} for x in new]}, ensure_ascii=False)}], "lines": new}
+    update_episode(eid, fn)
+    return episode_response(eid)
+
+
+@app.put("/api/episodes/{eid}/rewrite")
+def save_rewrite(eid: str, body: RewriteLinesIn):
+    """المسودة زي ما هي عندك: تعديل بإيدك، جمل جديدة (من غير رقم)، أو جمل اتشالت."""
+    def fn(d):
+        known = {ln["n"] for ln in d["lines"]}
+        out, seen = [], set()
+        for x in body.lines[:400]:
+            n = int(x["n"]) if str(x.get("n", "")).isdigit() else None
+            text = str(x.get("text") or "").strip()[:500]
+            if n is not None and (n not in known or n in seen):
+                continue
+            if n is not None:
+                seen.add(n)
+            out.append({"n": n, "k": f"n{n}" if n is not None else (str(x.get("k") or "") or sz._new_key())[:20], "text": text})
+        rw = d.get("rewrite") or {"chat": [], "lines": []}
+        rw["lines"] = out
+        d["rewrite"] = rw
+    update_episode(eid, fn)
+    return episode_response(eid)
+
+
+@app.delete("/api/episodes/{eid}/rewrite")
+def discard_rewrite(eid: str):
+    update_episode(eid, lambda d: d.update(rewrite={"chat": [], "lines": []}))
+    return episode_response(eid)
+
+
+@app.post("/api/episodes/{eid}/rewrite/apply")
+def apply_rewrite(eid: str):
+    """المسودة تبقى هي سكريبت الحلقة. الجمل القديمة محتفظة بأوقاتها وبلقطاتها، والجديدة من غير وقت لحد ما ترفع
+    الصوت الجديد: ساعتها اللقطات القديمة بتتظبط عليه، والجمل الجديدة بيتعمل لها لقطات. القديم بيتحفظ في history."""
+    def fn(d):
+        draft = [x for x in (d.get("rewrite") or {}).get("lines") or [] if x["text"].strip()]
+        if not draft:
+            raise HTTPException(400, "اكتب الكلام الجديد الأول")
+        d.setdefault("history", []).append({"at": now(), "script": d["script"], "lines": d["lines"], "scenes": d["scenes"],
+                                            "audio": d["audio"], "timing": d["timing"]})
+        d["history"] = d["history"][-10:]
+        old = {ln["n"]: ln for ln in d["lines"]}
+        lines, remap, added, scene = [], {}, [], 0
+        for i, x in enumerate(draft, 1):
+            o = old.get(x["n"]) if x["n"] is not None else None
+            if o:
+                remap[o["n"]] = i
+                scene = o.get("scene") or 0
+                lines.append({**o, "n": i, "text": x["text"].strip()})
+            else:
+                added.append(i)
+                lines.append({"n": i, "text": x["text"].strip(), "scene": scene, "start": None, "end": None, "added": True})
+        timed = d["shots"] and d["audio"] and all(o.get("start") is not None for o in d["lines"])
+        retime = {"old": {str(remap[o["n"]]): [o["start"], o["end"]] for o in d["lines"] if o["n"] in remap},
+                  "total": d["audio"]["duration"], "added": added} if timed else None
+        for sh in d["shots"]:
+            sh["_old_lines"] = list(sh.get("lines") or [])
+            sh["lines"] = [remap[n] for n in sh.get("lines") or [] if n in remap]
+        d["lines"] = lines
+        titles = {sc["n"]: sc["title"] for sc in d["scenes"]}
+        out, cur = [], None
+        for ln in lines:
+            if ln.get("scene") and ln["scene"] != cur:
+                cur = ln["scene"]
+                out.append(f"المشهد {cur} — {titles.get(cur, '')}".rstrip(" —"))
+            out.append(f"«{ln['text']}»")
+        d["script"] = "\n".join(out)
+        d["script_approved"] = True
+        d["voice_pending"] = True
+        old_text = {o["n"]: o["text"] for o in old.values()}
+        new_by_old = {x["n"]: x["text"].strip() for x in draft if x["n"] is not None}
+        changed.extend(sh["id"] for sh in d["shots"]
+                       if any(new_by_old.get(o) != old_text[o] for o in sh.get("_old_lines") or []))
+        d["rewrite"] = {"chat": [], "lines": []}
+        d["retimed"] = None
+        d["retime"] = retime
+        for sh in d["shots"]:
+            sh.pop("_old_lines", None)
+    changed: list[str] = []
+    update_episode(eid, fn)
+    if changed and (atlas.api_key() or atlas.mock_mode()):
+        start_reprompt(eid, changed)
+    return episode_response(eid)
+
+
+@app.post("/api/episodes/{eid}/approve-script")
+def approve_script(eid: str, approved: bool = True):
+    update_episode(eid, lambda d: d.update(script_approved=bool(approved)))
+    return episode_response(eid)
+
+
+FRAME_SIZE = "1152x2048"  # 9:16
+
+
+def run_frame(eid: str, shot_id: str) -> None:
+    """صورة الستوري بورد للقطة بـ GPT Image، وصور الشخصية مراجع."""
+    def setp(**kw):
+        update_episode(eid, lambda d: next((s for s in d["shots"] if s["id"] == shot_id), {}).update(**kw))
+    try:
+        with closing(db()) as conn:
+            r, data = episode_row(conn, eid)
+            _, sdata = series_for_episode(conn, r)
+        s = next((s for s in data["shots"] if s["id"] == shot_id), None)
+        if s is None:
+            return
+        setp(frame_status="working", frame_error=None)
+        name = f"frame-{s['n']:02d}-{uuid.uuid4().hex[:6]}.png"
+        dest = ep_dir(eid) / "frames" / name
+        if atlas.mock_mode():
+            mock_image(dest, "576x1024", f"shot {s['n']}", s["n"])
+        else:
+            refs = [SERIES_DIR / r["series_id"] / "refs" / f for f in sdata["refs"]][:6]
+            urls = [atlas.reference_url(p) for p in refs if p.exists()]
+            cfg = carousel_settings()
+            url = atlas.generate_image(cfg["image_family"], sz.frame_prompt(s, sdata["character"]), FRAME_SIZE,
+                                       auth.get_setting("series_frame_quality") or "medium", urls or None)
+            atlas.download(url, dest)
+        def done(d):
+            sh = next((x for x in d["shots"] if x["id"] == shot_id), None)
+            if sh is not None:
+                sh.setdefault("frames", []).append(name)
+                sh.update(frame=name, frame_status="done", frame_error=None)
+        update_episode(eid, done)
+    except Exception as exc:  # noqa: BLE001
+        setp(frame_status="failed", frame_error=str(exc)[:400])
+
+
+def queue_frames(eid: str, ids: list[str]) -> None:
+    def fn(d):
+        for s in d["shots"]:
+            if s["id"] in ids:
+                s.update(frame_status="queued", frame_error=None)
+    update_episode(eid, fn)
+    for i in ids:
+        series_executor.submit(run_frame, eid, i)
+
+
+@app.post("/api/episodes/{eid}/frames")
+def episode_frames(eid: str, shot_id: str | None = None):
+    """يرسم الستوري بورد: لقطة واحدة (نسخة جديدة)، أو كل اللقطات اللي لسه ملهاش صورة."""
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات")
+    with closing(db()) as conn:
+        _, data = episode_row(conn, eid)
+    busy = {"queued", "working"}
+    if shot_id:
+        s = find_shot(data, shot_id)
+        if s.get("frame_status") in busy:
+            raise HTTPException(400, "الصورة دي بتترسم")
+        ids = [shot_id]
+    else:
+        ids = [s["id"] for s in data["shots"] if not s.get("frame") and s.get("frame_status") not in busy]
+    if not ids:
+        raise HTTPException(400, "كل اللقطات ليها ستوري بورد")
+    queue_frames(eid, ids)
+    return episode_response(eid)
+
+
+class FramePick(BaseModel):
+    file: str
+
+
+@app.post("/api/episodes/{eid}/shots/{shot_id}/frame")
+def pick_frame(eid: str, shot_id: str, body: FramePick):
+    def fn(d):
+        s = find_shot(d, shot_id)
+        if body.file not in s.get("frames", []):
+            raise HTTPException(404, "الصورة مش موجودة")
+        s["frame"] = body.file
+    update_episode(eid, fn)
+    return episode_response(eid)
+
+
+@app.post("/api/episodes/{eid}/approve-shots")
+def approve_all_shots(eid: str, approved: bool = True):
+    def fn(d):
+        for s in d["shots"]:
+            s["approved"] = bool(approved)
+    update_episode(eid, fn)
+    return episode_response(eid)
+
+
+@app.post("/api/episodes/{eid}/generate-approved")
+def generate_approved(eid: str):
+    """يولّد فيديو لكل لقطة معتمدة لسه ملهاش نسخة (أو نسخها كلها فشلت)."""
+    with closing(db()) as conn:
+        _, data = episode_row(conn, eid)
+    ok = {"queued", "working", "done"}
+    todo = [s["id"] for s in data["shots"] if s.get("approved")
+            and not any(data["takes"].get(t, {}).get("status") in ok for t in s.get("takes", []))]
+    if not todo:
+        raise HTTPException(400, "مفيش لقطات معتمدة محتاجة توليد. اعتمد اللقطات الأول")
+    for sid in todo:
+        generate_take(eid, sid)
+    return episode_response(eid)
+
+
+@app.post("/api/episodes/{eid}/takes/{take_id}/approve")
+def approve_take(eid: str, take_id: str, approved: bool = True):
+    """توافق على الفيديو: يبقى هو المختار للقطة."""
+    def fn(d):
+        t = d["takes"].get(take_id)
+        if t is None:
+            raise HTTPException(404, "النسخة مش موجودة")
+        if t["status"] != "done":
+            raise HTTPException(400, "النسخة لسه ما خلصتش")
+        t["approved"] = bool(approved)
+        if approved:
+            for s in d["shots"]:
+                if take_id in s["takes"]:
+                    s["chosen"] = take_id
+    update_episode(eid, fn)
+    return episode_response(eid)
+
+
+DEFAULT_MUSIC_NAME = "beat"  # الموسيقى اللي بتتحط في أي مونتاج جديد لو موجودة في المكتبة
+
+
+def default_music(conn: sqlite3.Connection) -> dict | None:
+    row = conn.execute("SELECT id FROM audio WHERE kind = 'music' AND lower(name) LIKE ? ORDER BY lower(name) = ? DESC, created_at DESC",
+                       (f"%{DEFAULT_MUSIC_NAME}%", DEFAULT_MUSIC_NAME)).fetchone()
+    if not row:
+        return None
+    return {"id": row["id"], "volume": 0.3, "delay": 0.0, "offset": 0.0, "length": None, "fade_out": True,
+            "parts": [{"delay": 0.0, "offset": 0.0, "length": None, "volume": 0.3}]}
+
+
+def stretch_take(src: Path, out: Path, start: float, have: float, need: float) -> None:
+    """الفيديو أقصر من وقت اللقطة (بعد صوت جديد): نبطّأه لحد 1.3x، والباقي آخر فريم واقف."""
+    k = min(1.3, need / max(have, 0.1))
+    freeze = max(0.0, need - have * k)
+    vf = f"setpts={k:.4f}*(PTS-STARTPTS),fps=30" + (f",tpad=stop_mode=clone:stop_duration={freeze + 0.1:.3f}" if freeze > 0.01 else "")
+    subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{start:.3f}", "-i", str(src),
+                    "-vf", vf, "-an", "-t", f"{need:.3f}", "-c:v", "libx264", "-preset", "veryfast", "-crf", "17",
+                    "-pix_fmt", "yuv420p", str(out)], check=True, capture_output=True, timeout=300)
+
+
+@app.post("/api/episodes/{eid}/to-editor")
+def episode_to_editor(eid: str):
+    """يحط الحلقة في محرر الفيديو: كل لقطة بنسختها المعتمدة ومقصوصة على مدتها، والفويس أوفر تحتهم."""
+    with closing(db()) as conn:
+        r, data = episode_row(conn, eid)
+        sr, _ = series_for_episode(conn, r)
+    if not data["shots"] or not data["audio"]:
+        raise HTTPException(400, "جهّز اللقطات والصوت الأول")
+    def ok(s: dict) -> bool:
+        t = data["takes"].get(s.get("chosen") or "", {})
+        return t.get("status") == "done" and bool(t.get("file")) and bool(t.get("approved"))
+    missing = [s["n"] for s in data["shots"] if not ok(s)]
+    if missing:
+        raise HTTPException(400, f"اللقطات دي لسه من غير فيديو موافق عليه: {', '.join(map(str, missing))}")
+    label = f"{sr['name']} — {r['name']}"
+    clips = []
+    with closing(db()) as conn, conn:
+        for s in data["shots"]:
+            t = data["takes"][s["chosen"]]
+            gid = uuid.uuid4().hex[:12]
+            out = f"{gid}.mp4"
+            src = ep_dir(eid) / "takes" / t["file"]
+            dur = s["end"] - s["start"]
+            start = float(s.get("offset") or 0)
+            have = (t.get("duration") or 0) - start
+            if t.get("duration") and have < dur - 0.05:
+                stretch_take(src, GENERATED_DIR / out, start, have, dur)
+                t = {**t, "duration": dur}
+                s = {**s, "offset": 0.0}
+            else:
+                shutil.copyfile(src, GENERATED_DIR / out)
+            conn.execute(
+                "INSERT INTO generations (id, clip_id, clip_filename, clip_label, coach_id, coach_name, coach_image, model, prompt, "
+                "params, status, output_filename, created_at, updated_at) VALUES (?, ?, ?, ?, '', '', '', ?, ?, ?, 'completed', ?, ?, ?)",
+                (gid, f"series:{eid}", t["file"], f"{label} · لقطة {s['n']}", t.get("source", ""), t.get("prompt") or "",
+                 json.dumps({"episode": eid, "shot": s["id"]}), out, now(), now()),
+            )
+            start = float(s.get("offset") or 0)
+            dur = s["end"] - s["start"]
+            clips.append({"gen_id": gid, "start": start, "end": min(start + dur, t.get("duration") or start + dur),
+                          "zoom": 1.0, "x": 0.0, "y": 0.0, "volume": 0.0})
+        # الفويس أوفر في مكتبة التعليق الصوتي عشان المحرر يقراه
+        vid = uuid.uuid4().hex[:12]
+        vfile = f"voice_{vid}{Path(data['audio']['file']).suffix}"
+        shutil.copyfile(ep_dir(eid) / data["audio"]["file"], AUDIO_DIR / vfile)
+        conn.execute("INSERT INTO audio (id, kind, name, filename, duration, created_at) VALUES (?, 'voice', ?, ?, ?, ?)",
+                     (vid, f"🎙️ {label}", vfile, data["audio"]["duration"], now()))
+        pid = uuid.uuid4().hex[:12]
+        pdata = {"name": label, "section": "series", "video_id": None, "coach_id": None, "clips": clips,
+                 "voice": {"id": vid, "volume": 1.0, "delay": 0.0, "offset": 0.0, "length": None, "fade_out": False, "parts": []},
+                 "music": default_music(conn), "outro": False, "outro_volume": 1.0, "captions": {}, "logo": {}}
+        conn.execute("INSERT INTO projects (id, name, data, render_status, created_at, updated_at) VALUES (?, ?, ?, 'idle', ?, ?)",
+                     (pid, label, json.dumps(pdata, ensure_ascii=False), now(), now()))
+    update_episode(eid, lambda d: d.update(project_id=pid))
+    return {"project_id": pid}
+
+
+def reset_stuck_series() -> None:
+    """بعد ما السيرفر يقوم: أي توليد أو تجميع كان شغال اتقطع."""
+    with closing(db()) as conn, conn:
+        for r in conn.execute("SELECT id, data FROM episodes").fetchall():
+            d = json.loads(r["data"])
+            changed = False
+            for t in (d.get("takes") or {}).values():
+                if t.get("status") in ("queued", "working"):
+                    t.update(status="failed", error="اتقطع لما السيرفر اتقفل. دوس ولّد تاني")
+                    changed = True
+            for sh in d.get("shots") or []:
+                if sh.get("prompt_status") == "working":
+                    sh.update(prompt_status="failed", prompt_error="اتقطع لما السيرفر اتقفل. دوس ✍️ تاني")
+                    changed = True
+                if sh.get("frame_status") in ("queued", "working"):
+                    sh.update(frame_status="failed", frame_error="اتقطع لما السيرفر اتقفل. ارسم تاني")
+                    changed = True
+            if (d.get("render") or {}).get("status") == "working":
+                d["render"] = {"status": "failed", "export_id": None, "error": "اتقطع لما السيرفر اتقفل. جمّع تاني"}
+                changed = True
+            if changed:
+                conn.execute("UPDATE episodes SET data = ? WHERE id = ?", (json.dumps(d, ensure_ascii=False), r["id"]))
+
+
+reset_stuck_series()
+
+
+# ================================================================ الإعلانات: تفصيص إعلان مرجعي واقتراح للعميل
+
+ADS_LOCK = threading.Lock()
+AD_MAX_SECONDS = 180  # أطول إعلان بنحلله (الموديل بيستقبل الفيديو كله مرة واحدة)
+DEFAULT_AD_VIDEO_MODEL = "google/gemini-2.5-pro"
+AD_VIDEO_FALLBACKS = ["google/gemini-2.5-pro", "google/gemini-2.5-flash", "google/gemini-3-flash-preview", "google/gemini-3.5-flash"]
+AD_SETTING_KEYS = ("style_id", "brain_id", "fidelity", "duration", "format", "language", "production", "notes",
+                   # 🎛️ التطبيق على البراند
+                   "angle", "tone", "setting", "hero", "feature", "palette_mode", "palette_custom", "brand_level", "variety", "direction")
+
+
+def ads_settings() -> dict:
+    return {"video_model": auth.get_setting("ads_video_model") or DEFAULT_AD_VIDEO_MODEL}
+
+
+class AdsSettingsIn(BaseModel):
+    video_model: str | None = None
+
+
+@app.get("/api/ads-settings")
+def get_ads_settings():
+    return ads_settings()
+
+
+@app.put("/api/ads-settings")
+def put_ads_settings(body: AdsSettingsIn):
+    if body.video_model is not None:
+        auth.set_setting("ads_video_model", body.video_model.strip())
+    return ads_settings()
+
+
+# ---------- 💰 عداد فلوس Atlas: الرصيد من Atlas، والصرف بنحسبه من نزول الرصيد
+
+ATLAS_PUBLIC = f"{atlas.BASE_URL}/public/v1"
+MONEY_TZ = timezone(timedelta(hours=3))  # توقيت السعودية
+
+
+def money_log() -> list[dict]:
+    try:
+        return json.loads(auth.get_setting("atlas_balance_log") or "[]")
+    except ValueError:
+        return []
+
+
+def spent_since(log: list[dict], since: datetime) -> float:
+    """مجموع النزول في الرصيد من وقت معين (الشحن بيتجاهل)."""
+    out, prev = 0.0, None
+    for x in log:
+        t = datetime.fromisoformat(x["t"])
+        if prev is not None and t >= since and x["v"] < prev:
+            out += prev - x["v"]
+        prev = x["v"]
+    return round(out, 4)
+
+
+@app.get("/api/atlas/money")
+def atlas_money():
+    """الرصيد دلوقتي، واتصرف قد إيه النهارده والأسبوع ده، وعدد الطلبات لكل موديل في آخر يومين."""
+    if atlas.mock_mode():
+        return {"balance": 10.5, "currency": "usd", "spent_today": 0.42, "spent_week": 3.1, "tracked_since": now(),
+                "models_recent": [{"name": "kwaivgi/kling-v2.6-pro/avatar", "type": "video", "requests": 2}]}
+    if not atlas.api_key():
+        raise HTTPException(400, "مفتاح Atlas مش متسجل")
+    try:
+        with httpx.Client(timeout=20) as client:
+            b = client.get(f"{ATLAS_PUBLIC}/balance", headers=atlas._headers()).json()
+            today = datetime.now(MONEY_TZ).date()
+            u = client.get(f"{ATLAS_PUBLIC}/usage", headers=atlas._headers(),
+                           params={"start_date": str(today - timedelta(days=1)), "end_date": str(today + timedelta(days=1)),
+                                   "group_by[]": "model"}).json()
+    except (httpx.HTTPError, ValueError) as exc:
+        raise HTTPException(502, f"Atlas مش بيرد: {exc}") from exc
+    bal = float(((b or {}).get("available") or {}).get("value") or 0)
+    log = money_log()
+    if not log or abs(log[-1]["v"] - bal) > 1e-6:
+        log.append({"t": datetime.now(MONEY_TZ).isoformat(timespec="seconds"), "v": bal})
+        auth.set_setting("atlas_balance_log", json.dumps(log[-2000:]))
+    midnight = datetime.now(MONEY_TZ).replace(hour=0, minute=0, second=0, microsecond=0)
+    models: dict[str, dict] = {}
+    for bucket in (u or {}).get("data") or []:  # إمبارح والنهارده (أيام Atlas بتوقيت UTC)
+        for r in bucket.get("results") or []:
+            m = r.get("model") or {}
+            x = models.setdefault(m.get("name") or "?", {"name": m.get("name") or "?", "type": m.get("type", ""), "requests": 0})
+            x["requests"] += int((r.get("usage") or {}).get("requests") or 0)
+    return {"balance": bal, "currency": ((b or {}).get("available") or {}).get("currency", "usd"),
+            "spent_today": spent_since(log, midnight), "spent_week": spent_since(log, midnight - timedelta(days=6)),
+            "tracked_since": log[0]["t"], "models_recent": sorted(models.values(), key=lambda x: -x["requests"])}
+
+
+def ad_dir(aid: str) -> Path:
+    d = ADS_DIR / Path(aid).name
+    (d / "frames").mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def ad_row(conn: sqlite3.Connection, aid: str) -> tuple[sqlite3.Row, dict]:
+    r = conn.execute("SELECT * FROM ads WHERE id = ?", (aid,)).fetchone()
+    if r is None:
+        raise HTTPException(404, "الإعلان غير موجود")
+    return r, json.loads(r["data"])
+
+
+def bump(d: dict, key: str) -> None:
+    """رقم نسخة الخطوة: بيزيد مع كل تغيير عشان الخطوة اللي بعدها تعرف إنها بقت قديمة."""
+    d[key] = int(d.get(key) or 0) + 1
+
+
+def update_ad(aid: str, fn) -> None:
+    with ADS_LOCK, closing(db()) as conn, conn:
+        r, data = ad_row(conn, aid)
+        fn(data)
+        conn.execute("UPDATE ads SET data = ?, updated_at = ? WHERE id = ?", (json.dumps(data, ensure_ascii=False), now(), aid))
+
+
+def ad_to_dict(r: sqlite3.Row, d: dict) -> dict:
+    aid = r["id"]
+    base = f"/media/ads/{aid}"
+    analysis = d.get("analysis") or {}
+    scenes = [{**s, "frame_url": f"{base}/frames/{s['frame']}" if s.get("frame") else None} for s in analysis.get("scenes") or []]
+    return {
+        "id": aid, "name": r["name"], "created_at": r["created_at"],
+        "source": d.get("source"), "source_url": f"{base}/{d['source']['file']}" if d.get("source") else None,
+        "original_url": f"{base}/{d['source'].get('original') or d['source']['file']}" if d.get("source") else None,
+        "status": d.get("status", "idle"), "step": d.get("step"), "error": d.get("error"),
+        "analysis": {**analysis, "scenes": scenes} if analysis else None,
+        "audio": d.get("audio"), "audio_error": d.get("audio_error"), "audio_tech": d.get("audio_tech"),
+        "audio_status": d.get("audio_status", "idle"), "has_audio": bool((d.get("source") or {}).get("has_audio")),
+        "analysis_ver": d.get("analysis_ver", 0), "adapt_ver": d.get("adapt_ver", 0),
+        "prod_history": [{"at": h.get("archived_at"), "shots": len(h.get("shots") or [])} for h in d.get("prod_history") or []],
+        "settings": d.get("settings") or {},
+        "adaptation": d.get("adaptation"), "adapt_status": d.get("adapt_status", "idle"), "adapt_error": d.get("adapt_error"),
+        "directions": d.get("directions") or [], "directions_status": d.get("directions_status", "idle"),
+        "directions_error": d.get("directions_error"),
+        "scomp_status": d.get("scomp_status", "idle"),
+        "chat": d.get("chat") or [],
+        "thumb": scenes[0]["frame_url"] if scenes and scenes[0].get("frame_url") else None,
+        "prod": with_ref_motion(prod_to_dict(aid, d.get("prod")), analysis),
+        "chain_prod": bool(d.get("chain_prod")),
+        "brain_db": ad_brain_db(d.get("settings")),
+        "video_models": [{"key": k, "label": v["label"]} for k, v in AD_VIDEO_MODELS.items()],
+        "ar_voices": [{"id": k, "label": v} for k, v in AR_VOICES.items()],
+    }
+
+
+def ad_brain_db(settings: dict | None) -> list[dict]:
+    """عناصر ملف العميل اللي ينفع يتعملها منشن (الاسم والنوع والصورة) عشان تظهر في الواجهة."""
+    brain = ad_brain(settings)
+    return [{"name": a["name"], "kind": a["kind"], "url": f"/media/ads/brains/{brain['id']}/{a['file']}"} for a in brain_db(brain)]
+
+
+def with_ref_motion(prod: dict | None, analysis: dict) -> dict | None:
+    """الموشن جرافيك بتاع المشهد الأصلي المقابل لكل لقطة (من آخر تحليل)، عشان يظهر جنب الموشن بتاع البراند."""
+    if not prod:
+        return prod
+    by_n = {s.get("n"): s for s in (analysis or {}).get("scenes") or []}
+    for s in prod["shots"]:
+        s["ref_motion"] = (by_n.get(s.get("ref_scene")) or {}).get("motion_graphics", "")
+    return prod
+
+
+def ad_response(aid: str) -> dict:
+    with closing(db()) as conn:
+        r, d = ad_row(conn, aid)
+    return ad_to_dict(r, d)
+
+
+def ad_progress(d: dict) -> dict:
+    """ملخص مراحل المشروع للقايمة الجانبية: وصل لفين."""
+    shots = (d.get("prod") or {}).get("shots") or []
+    def chosen_ok(s):
+        return any(t["id"] == s.get("chosen") and t.get("status") == "done" for t in s.get("takes") or [])
+    return {"analysis": bool(d.get("analysis")), "adapt": bool(d.get("adaptation")), "shots": len(shots),
+            "frames": sum(1 for s in shots if s.get("frame")), "videos": sum(1 for s in shots if chosen_ok(s)),
+            "editor": bool((d.get("prod") or {}).get("project_id")),
+            "mode": (d.get("settings") or {}).get("fidelity") or "copy"}
+
+
+@app.get("/api/ads")
+def list_ads():
+    with closing(db()) as conn:
+        rows = conn.execute("SELECT * FROM ads ORDER BY created_at DESC").fetchall()
+    out = []
+    for r in rows:
+        d = json.loads(r["data"])
+        if not owned((d.get("settings") or {}).get("brain_id") if (d.get("settings") or {}).get("brain_id") != "none" else None):
+            continue  # إعلانات عميل تاني
+        scenes = (d.get("analysis") or {}).get("scenes") or []
+        out.append({"id": r["id"], "name": r["name"], "created_at": r["created_at"], "status": d.get("status", "idle"),
+                    "step": d.get("step"), "adapt_status": d.get("adapt_status", "idle"), "progress": ad_progress(d),
+                    "thumb": f"/media/ads/{r['id']}/frames/{scenes[0]['frame']}" if scenes and scenes[0].get("frame") else None})
+    return out
+
+
+def parse_ad_edit(start: float | None, end: float | None, crop: str) -> dict | None:
+    """القص والكروب من المحرر الصغير: الكروب كسور من الصورة (x,y,w,h بين 0 و1)."""
+    edit = {}
+    if start is not None and start > 0.01:
+        edit["start"] = round(float(start), 3)
+    if end is not None and end > 0:
+        edit["end"] = round(float(end), 3)
+    if crop:
+        try:
+            x, y, w, h = (max(0.0, min(1.0, float(v))) for v in crop.split(","))
+        except ValueError as exc:
+            raise HTTPException(400, "الكروب مش مظبوط") from exc
+        if w < 0.999 or h < 0.999:
+            if w < 0.05 or h < 0.05:
+                raise HTTPException(400, "الكروب صغير أوي")
+            edit["crop"] = [round(x, 4), round(y, 4), round(min(w, 1 - x), 4), round(min(h, 1 - y), 4)]
+    return edit or None
+
+
+def apply_ad_edit(original: Path, out: Path, edit: dict | None) -> None:
+    """يطلّع نسخة مقصوصة ومعمولها كروب من الفيديو الأصلي (بجودة عالية)."""
+    if not edit:
+        shutil.copyfile(original, out)
+        return
+    args = [ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y"]
+    if edit.get("start"):
+        args += ["-ss", f"{edit['start']:.3f}"]
+    if edit.get("end"):
+        args += ["-to", f"{edit['end']:.3f}"]
+    args += ["-i", str(original)]
+    if edit.get("start") and edit.get("end"):
+        # -to بعد -ss قبل الـ input بيتحسب من أول الملف، فبنحوّله لمدة
+        i = args.index("-to")
+        args[i], args[i + 1] = "-t", f"{edit['end'] - edit['start']:.3f}"
+    vf = []
+    if edit.get("crop"):
+        x, y, w, h = edit["crop"]
+        vf.append(f"crop=trunc(iw*{w}/2)*2:trunc(ih*{h}/2)*2:trunc(iw*{x}):trunc(ih*{y})")
+    if vf:
+        args += ["-vf", ",".join(vf)]
+    args += ["-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k",
+             "-movflags", "+faststart", str(out)]
+    r = subprocess.run(args, capture_output=True, text=True, timeout=900)
+    if r.returncode != 0 or not out.exists():
+        raise HTTPException(400, f"مقدرتش أقص الفيديو: {r.stderr[-300:]}")
+
+
+def ad_source_from(folder: Path, original: str, edit: dict | None, display_name: str | None) -> dict:
+    src_name = original if not edit else "source-edit.mp4"
+    if edit:
+        apply_ad_edit(folder / original, folder / src_name, edit)
+    try:
+        info = media_info(folder / src_name)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(400, f"مقدرتش أقرا الفيديو: {exc}") from exc
+    return {"file": src_name, "original": original, "edit": edit, "name": display_name, "duration": round(info.duration, 2),
+            "width": info.width, "height": info.height, "has_audio": info.has_audio}
+
+
+@app.post("/api/ads")
+def create_ad(file: UploadFile = File(...), name: str = Form(""), trim_start: float | None = Form(None),
+              trim_end: float | None = Form(None), crop: str = Form("")):
+    """ترفع إعلان مرجعي (ولو عايز تقصه أو تعمله كروب قبلها) والتحليل بيبدأ لوحده، وبعده اقتراح للعميل."""
+    aid = uuid.uuid4().hex[:12]
+    folder = ad_dir(aid)
+    fname = save_upload(file, VIDEO_EXTENSIONS, folder, "original")
+    try:
+        source = ad_source_from(folder, fname, parse_ad_edit(trim_start, trim_end, crop), file.filename)
+    except HTTPException:
+        shutil.rmtree(folder, ignore_errors=True)
+        raise
+    info = source
+    data = {"source": source,
+            "status": "queued", "settings": {"duration": min(60, max(10, round(info["duration"]))), "format": "9:16 ريلز وتيك توك",
+                                             "language": brand_settings().get("language") or "", "brain_id": active_client_id()}}
+    with closing(db()) as conn, conn:
+        conn.execute("INSERT INTO ads (id, name, data, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+                     (aid, name.strip() or Path(file.filename or "إعلان").stem, json.dumps(data, ensure_ascii=False), now(), now()))
+    threading.Thread(target=run_ad_analysis, args=(aid,), daemon=True).start()
+    return ad_response(aid)
+
+
+@app.get("/api/ads/{aid}")
+def get_ad(aid: str):
+    return ad_response(aid)
+
+
+class AdPatchIn(BaseModel):
+    name: str | None = None
+    settings: dict | None = None
+    analysis: dict | None = None
+    audio: dict | None = None
+    adaptation: dict | None = None
+
+
+@app.patch("/api/ads/{aid}")
+def patch_ad(aid: str, body: AdPatchIn):
+    """مركز الإعدادات: تعديل الإعدادات أو أي حاجة في التحليل أو الاقتراح بإيدك."""
+    if body.name is not None and body.name.strip():
+        with closing(db()) as conn, conn:
+            conn.execute("UPDATE ads SET name = ? WHERE id = ?", (body.name.strip()[:120], aid))
+    def fn(d):
+        if body.settings is not None:
+            d["settings"] = {**(d.get("settings") or {}), **{k: body.settings[k] for k in AD_SETTING_KEYS if k in body.settings}}
+        if body.analysis is not None and d.get("analysis"):
+            # الفريمات بتفضل زي ما هي
+            frames = {s.get("n"): s.get("frame") for s in d["analysis"].get("scenes") or []}
+            scenes = [{k: v for k, v in s.items() if k != "frame_url"} for s in body.analysis.get("scenes") or d["analysis"].get("scenes") or []]
+            for s in scenes:
+                s["frame"] = frames.get(s.get("n"))
+            d["analysis"] = {**d["analysis"], **body.analysis, "scenes": scenes}
+            bump(d, "analysis_ver")
+        if body.audio is not None:
+            d["audio"] = body.audio
+        if body.adaptation is not None:
+            # التعديل بإيدك بيفضل على نفس التحليل اللي الاقتراح اتكتب عليه
+            based = (d.get("adaptation") or {}).get("based_on", d.get("analysis_ver", 0))
+            d["adaptation"] = {**body.adaptation, "based_on": based}
+            bump(d, "adapt_ver")
+    update_ad(aid, fn)
+    return ad_response(aid)
+
+
+@app.delete("/api/ads/{aid}")
+def delete_ad(aid: str):
+    with closing(db()) as conn, conn:
+        conn.execute("DELETE FROM ads WHERE id = ?", (aid,))
+    shutil.rmtree(ADS_DIR / Path(aid).name, ignore_errors=True)
+    return {"ok": True}
+
+
+class AdEditIn(BaseModel):
+    start: float | None = None
+    end: float | None = None
+    crop: str = ""
+
+
+@app.post("/api/ads/{aid}/edit")
+def edit_ad(aid: str, body: AdEditIn):
+    """قص وكروب جديد من الفيديو الأصلي، وبعدها التحليل والاقتراح بيتعملوا من الأول."""
+    with closing(db()) as conn:
+        _, d = ad_row(conn, aid)
+    if d.get("status") in ("queued", "working"):
+        raise HTTPException(400, "استنى لما التحليل اللي شغال يخلص")
+    folder = ad_dir(aid)
+    original = d["source"].get("original") or d["source"]["file"]
+    source = ad_source_from(folder, original, parse_ad_edit(body.start, body.end, body.crop), d["source"].get("name"))
+    for f in (folder / "frames").glob("*.jpg"):
+        f.unlink(missing_ok=True)
+    update_ad(aid, lambda d: d.update(source=source, status="queued", error=None, analysis=None, audio=None, audio_error=None,
+                                     audio_tech=None, audio_status="idle"))
+    threading.Thread(target=run_ad_analysis, args=(aid,), daemon=True).start()
+    return ad_response(aid)
+
+
+def run_scene_components(aid: str) -> None:
+    try:
+        with closing(db()) as conn:
+            _, d = ad_row(conn, aid)
+        scenes = d["analysis"]["scenes"]
+        if atlas.mock_mode():
+            sc = az.mock_scene_components(scenes)
+        else:
+            proxy = ad_dir(aid) / "proxy.mp4"
+            if not proxy.exists():
+                raise HTTPException(400, "نسخة الفيديو الصغيرة مش موجودة. دوس «حلّل تاني»")
+            sc = ad_json(ad_media_chat(az.with_media(az.scene_components_messages(scenes), data_url(proxy, "video/mp4"), "ad.mp4")),
+                         "مكونات المشاهد")
+        def fn(d):
+            az.merge_scene_components(d["analysis"]["scenes"], sc)
+            d["analysis"]["components_error"] = None
+            d["scomp_status"] = "done"
+            bump(d, "analysis_ver")
+        update_ad(aid, fn)
+    except Exception as exc:  # noqa: BLE001
+        msg = str(getattr(exc, "detail", None) or exc)[:300]
+        def fail(d):
+            d["scomp_status"] = "failed"
+            if d.get("analysis"):
+                d["analysis"]["components_error"] = msg
+        update_ad(aid, fail)
+
+
+@app.post("/api/ads/{aid}/scene-components")
+def scene_components(aid: str):
+    """تفصيص مكونات مشاهد الإعلان الأصلي (للإعلانات اللي اتحللت قبل الخطوة دي، أو لو عايز تعيده)."""
+    with closing(db()) as conn:
+        _, d = ad_row(conn, aid)
+    if not d.get("analysis"):
+        raise HTTPException(400, "استنى لما التحليل يخلص")
+    if d.get("scomp_status") == "working":
+        raise HTTPException(400, "التفصيص شغال بالفعل")
+    update_ad(aid, lambda d: d.update(scomp_status="working"))
+    threading.Thread(target=run_scene_components, args=(aid,), daemon=True).start()
+    return ad_response(aid)
+
+
+@app.post("/api/ads/{aid}/analyze")
+def reanalyze_ad(aid: str):
+    with closing(db()) as conn:
+        _, d = ad_row(conn, aid)
+    if d.get("status") in ("queued", "working"):
+        raise HTTPException(400, "التحليل شغال بالفعل")
+    update_ad(aid, lambda d: d.update(status="queued", error=None))
+    threading.Thread(target=run_ad_analysis, args=(aid,), daemon=True).start()
+    return ad_response(aid)
+
+
+class AdAdaptIn(BaseModel):
+    message: str = ""
+    then_prod: bool = False  # بعد ما الاقتراح يتكتب، التنفيذ يبدأ منه على طول
+
+
+@app.post("/api/ads/{aid}/adapt")
+def adapt_ad(aid: str, body: AdAdaptIn):
+    """الاقتراح من جديد (بالإعدادات والستايل الحاليين)، أو تعديله برسالة منك."""
+    with closing(db()) as conn:
+        _, d = ad_row(conn, aid)
+    if not d.get("analysis"):
+        raise HTTPException(400, "استنى لما التحليل يخلص")
+    if d.get("adapt_status") == "working":
+        raise HTTPException(400, "الاقتراح بيتكتب بالفعل")
+    msg = body.message.strip()[:3000]
+    def fn(d):
+        d["adapt_status"], d["adapt_error"] = "working", None
+        d["chain_prod"] = body.then_prod
+        if msg:
+            d.setdefault("chat", []).append({"role": "user", "content": msg})
+        else:
+            d["chat"] = []
+    update_ad(aid, fn)
+    threading.Thread(target=run_ad_adapt, args=(aid,), daemon=True).start()
+    return ad_response(aid)
+
+
+def ad_media_chat(messages: list[dict], max_tokens: int = 32000) -> str:
+    """موديل بيفهم الفيديو والصوت (Gemini). بيجرب المختار، ولو مش متاح اللي بعده."""
+    if atlas.mock_mode():
+        return "{}"
+    errors = []
+    for model in atlas.model_candidates(ads_settings()["video_model"], ("gemini-2.5-pro", "gemini-2.5-flash"), AD_VIDEO_FALLBACKS)[:4]:
+        try:
+            body = {"model": model, "messages": messages, "temperature": 0.3, "max_tokens": max_tokens,
+                    "response_format": {"type": "json_object"}}
+            with httpx.Client(timeout=600) as client:
+                resp = client.post(f"{atlas.LLM_URL}/chat/completions", headers=atlas._headers(), json=body)
+                if resp.status_code in (400, 422):  # موديل مش بيقبل JSON mode
+                    body.pop("response_format")
+                    resp = client.post(f"{atlas.LLM_URL}/chat/completions", headers=atlas._headers(), json=body)
+            data = atlas._check(resp, f"موديل الفيديو ({model})")
+            text = str(data["choices"][0]["message"]["content"] or "").strip()
+            if text:
+                return text
+            errors.append(f"{model}: رد فاضي")
+        except (atlas.AtlasError, httpx.HTTPError, KeyError, IndexError) as exc:
+            errors.append(f"{model}: {str(exc)[:150]}")
+    raise atlas.AtlasError("موديل الفيديو مش شغال: " + " | ".join(errors[:3]))
+
+
+def ad_json(text: str, what: str) -> dict:
+    """JSON من رد موديل الفيديو. لو بايظ ومعرفناش نصلّحه، موديل الكلام بيصلّحه (أرخص بكتير من إعادة التحليل)."""
+    try:
+        return az.parse_json(text, what)
+    except ValueError as first:
+        try:
+            fixed = series_chat([
+                {"role": "system", "content": "رجّع نفس البيانات دي كـ JSON صحيح بالظبط من غير أي تغيير في المحتوى ومن غير أي كلام تاني. "
+                                              "لو الرد مقطوع في الآخر اقفله بشكل صحيح."},
+                {"role": "user", "content": text[:60000]},
+            ], json_mode=True)
+            return az.parse_json(fixed, what)
+        except (HTTPException, ValueError):
+            raise first from None
+
+
+def data_url(path: Path, mime: str) -> str:
+    import base64
+    return f"data:{mime};base64," + base64.b64encode(path.read_bytes()).decode()
+
+
+def ad_loudness(path: Path) -> dict:
+    """قياس الصوت محليًا (من غير موديل): الارتفاع (LUFS) وأعلى نقطة."""
+    out = subprocess.run([ffmpeg_exe(), "-hide_banner", "-i", str(path), "-af", "ebur128=peak=true", "-f", "null", "-"],
+                         capture_output=True, text=True, timeout=300).stderr
+    tail = out[out.rfind("Summary:"):] if "Summary:" in out else out
+    lufs = re.search(r"I:\s*(-?[\d.]+) LUFS", tail)
+    peak = re.search(r"Peak:\s*(-?[\d.]+) dBFS", tail)
+    lra = re.search(r"LRA:\s*(-?[\d.]+) LU", tail)
+    return {"lufs": float(lufs.group(1)) if lufs else None, "true_peak": float(peak.group(1)) if peak else None,
+            "range_lu": float(lra.group(1)) if lra else None}
+
+
+def run_ad_audio(aid: str) -> None:
+    """خطوة جانبية: تفصيص الصوت (كلام، مزيكا، مؤثرات) + قياس الارتفاع."""
+    try:
+        with closing(db()) as conn:
+            _, d = ad_row(conn, aid)
+        folder = ad_dir(aid)
+        src = folder / d["source"]["file"]
+        dur = min(d["source"]["duration"], AD_MAX_SECONDS)
+        audio = folder / "audio.mp3"
+        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src), "-t", f"{dur:.2f}",
+                        "-vn", "-ac", "1", "-b:a", "96k", str(audio)], check=True, capture_output=True, timeout=300)
+        tech = ad_loudness(src)
+        data = az.mock_audio() if atlas.mock_mode() else ad_json(
+            ad_media_chat(az.with_media(az.audio_messages(dur), data_url(audio, "audio/mpeg"), "ad.mp3")), "تحليل الصوت")
+        update_ad(aid, lambda d: d.update(audio=data, audio_tech=tech, audio_error=None, audio_status="done"))
+    except Exception as exc:  # noqa: BLE001
+        msg = str(getattr(exc, "detail", None) or exc)[:400]
+        update_ad(aid, lambda d: d.update(audio_status="failed", audio_error=msg))
+
+
+@app.post("/api/ads/{aid}/audio-analyze")
+def audio_analyze(aid: str):
+    with closing(db()) as conn:
+        _, d = ad_row(conn, aid)
+    if not (d.get("source") or {}).get("has_audio"):
+        raise HTTPException(400, "الفيديو ده مفيهوش صوت")
+    if d.get("audio_status") == "working":
+        raise HTTPException(400, "الصوت بيتحلل بالفعل")
+    update_ad(aid, lambda d: d.update(audio_status="working", audio_error=None))
+    threading.Thread(target=run_ad_audio, args=(aid,), daemon=True).start()
+    return ad_response(aid)
+
+
+def run_ad_analysis(aid: str) -> None:
+    def step(label: str):
+        update_ad(aid, lambda d: d.update(status="working", step=label))
+    try:
+        with closing(db()) as conn:
+            _, d = ad_row(conn, aid)
+        folder = ad_dir(aid)
+        src = folder / d["source"]["file"]
+        dur = min(d["source"]["duration"], AD_MAX_SECONDS)
+        step("بيجهّز الفيديو")
+        proxy = folder / "proxy.mp4"
+        # نسخة صغيرة للموديل: الصورة والصوت كفاية للتحليل وحجمها صغير
+        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src), "-t", f"{dur:.2f}",
+                        "-vf", "scale='if(gt(iw,ih),min(640,iw),-2)':'if(gt(iw,ih),-2,min(640,ih))',fps=12",
+                        "-c:v", "libx264", "-preset", "veryfast", "-crf", "31", "-pix_fmt", "yuv420p",
+                        "-c:a", "aac", "-ac", "1", "-b:a", "64k", str(proxy)], check=True, capture_output=True, timeout=600)
+        step("بيتفرج على الإعلان (الصورة والصوت)")
+        if atlas.mock_mode():
+            analysis = az.mock_analysis(dur)
+        else:
+            analysis = ad_json(ad_media_chat(az.with_media(az.video_messages(dur, d.get("settings", {}).get("notes", "")),
+                                                           data_url(proxy, "video/mp4"), "ad.mp4")), "تحليل الإعلان")
+        analysis["scenes"] = az.clean_scenes(analysis.get("scenes"), dur)
+        step("بيطلّع صورة من كل مشهد")
+        for s in analysis["scenes"]:
+            fr = f"scene-{s['n']:02d}.jpg"
+            t = (s["start"] + s["end"]) / 2
+            subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{t:.2f}", "-i", str(src),
+                            "-frames:v", "1", "-vf", "scale=-2:480", "-q:v", "4", str(folder / "frames" / fr)],
+                           capture_output=True, timeout=60)
+            if (folder / "frames" / fr).exists():
+                s["frame"] = fr
+        step("بيفصّص مكونات كل مشهد والموشن جرافيك")
+        try:
+            sc = az.mock_scene_components(analysis["scenes"]) if atlas.mock_mode() else ad_json(
+                ad_media_chat(az.with_media(az.scene_components_messages(analysis["scenes"]), data_url(proxy, "video/mp4"), "ad.mp4")),
+                "مكونات المشاهد")
+            az.merge_scene_components(analysis["scenes"], sc)
+            analysis["components_error"] = None
+        except (atlas.AtlasError, ValueError, HTTPException) as exc:
+            analysis["components_error"] = str(getattr(exc, "detail", None) or exc)[:300]
+        if not analysis.get("title"):
+            analysis["title"] = ""
+        chain = []
+        def done(d):
+            d.update(analysis=analysis, status="done", step=None, error=None)
+            bump(d, "analysis_ver")
+            # أول مرة بس الاقتراح بيتكتب لوحده. بعد كده بزرار «التالي» عشان ميمسحش اقتراح اتعدل
+            if not d.get("adaptation") and d.get("adapt_status") != "working":
+                d.update(adapt_status="working", adapt_error=None, chat=[])
+                chain.append(True)
+        update_ad(aid, done)
+    except Exception as exc:  # noqa: BLE001
+        msg = str(getattr(exc, "detail", None) or exc)[:500]
+        if isinstance(exc, subprocess.CalledProcessError):
+            msg = f"FFmpeg: {(exc.stderr or b'').decode(errors='ignore')[-300:] if isinstance(exc.stderr, bytes) else exc.stderr}"
+        update_ad(aid, lambda d: d.update(status="failed", step=None, error=msg))
+        return
+    if chain:
+        run_ad_adapt(aid)
+
+
+def ad_style(style_id: str | None) -> dict | None:
+    if not style_id:
+        return None
+    with closing(db()) as conn:
+        r = conn.execute("SELECT * FROM ad_styles WHERE id = ?", (style_id,)).fetchone()
+    return {"name": r["name"], **json.loads(r["data"])} if r else None
+
+
+def other_ads(aid: str, limit: int = 8) -> list[dict]:
+    """ملخص الإعلانات التانية (الأحدث الأول) عشان الاقتراح الجديد ميطلعش شبههم."""
+    out = []
+    with closing(db()) as conn:
+        rows = conn.execute("SELECT id, data FROM ads WHERE id != ? ORDER BY created_at DESC", (aid,)).fetchall()
+    for r in rows:
+        a = (json.loads(r["data"]).get("adaptation") or {})
+        if a.get("title"):
+            out.append({**{k: str(a.get(k) or "")[:200] for k in ("title", "hook", "tone", "palette", "locations")},
+                        "angle": str(a.get("angle") or a.get("kochi_angle") or "")[:200]})
+        if len(out) >= limit:
+            break
+    return out
+
+
+def run_ad_directions(aid: str) -> None:
+    try:
+        with closing(db()) as conn:
+            _, d = ad_row(conn, aid)
+        settings = d.get("settings") or {}
+        if atlas.mock_mode():
+            result = az.mock_directions()
+        else:
+            result = ad_json(series_chat(az.directions_messages(brand_settings(), d.get("analysis") or {}, settings,
+                                                                ad_brain(settings), other_ads(aid))), "الاتجاهات")
+        dirs = [x for x in result.get("directions") or [] if isinstance(x, dict)][:4]
+        if not dirs:
+            raise RuntimeError("الموديل ما رجعش اتجاهات")
+        update_ad(aid, lambda d: d.update(directions=dirs, directions_status="done", directions_error=None))
+    except Exception as exc:  # noqa: BLE001
+        msg = str(getattr(exc, "detail", None) or exc)[:400]
+        update_ad(aid, lambda d: d.update(directions_status="failed", directions_error=msg))
+
+
+@app.post("/api/ads/{aid}/directions")
+def ad_directions(aid: str):
+    """🎲 3 اتجاهات مختلفة للتطبيق على البراند تختار منهم قبل ما الاقتراح يتكتب."""
+    with closing(db()) as conn:
+        _, d = ad_row(conn, aid)
+    if not d.get("analysis"):
+        raise HTTPException(400, "استنى لما التحليل يخلص")
+    if d.get("directions_status") == "working":
+        raise HTTPException(400, "بيفكر في الاتجاهات بالفعل")
+    update_ad(aid, lambda d: d.update(directions_status="working", directions_error=None))
+    threading.Thread(target=run_ad_directions, args=(aid,), daemon=True).start()
+    return ad_response(aid)
+
+
+def run_ad_adapt(aid: str) -> None:
+    try:
+        with closing(db()) as conn:
+            _, d = ad_row(conn, aid)
+        settings = d.get("settings") or {}
+        if atlas.mock_mode():
+            result = az.mock_adaptation(int(settings.get("duration") or 30))
+        else:
+            msgs = az.adapt_messages(brand_settings(), d.get("analysis") or {}, d.get("audio") or {}, settings,
+                                     ad_style(settings.get("style_id")), d.get("chat") or [], ad_brain(settings), other_ads(aid))
+            result = ad_json(series_chat(msgs), "اقتراح الإعلان")
+        def fn(d):
+            d["adaptation"] = {**result, "based_on": d.get("analysis_ver", 0)}
+            d["adapt_status"], d["adapt_error"] = "done", None
+            bump(d, "adapt_ver")
+            if d.get("chat"):
+                d["chat"].append({"role": "assistant", "content": json.dumps(result, ensure_ascii=False)[:6000]})
+        update_ad(aid, fn)
+    except Exception as exc:  # noqa: BLE001
+        msg = str(getattr(exc, "detail", None) or exc)[:500]
+        update_ad(aid, lambda d: d.update(adapt_status="failed", adapt_error=msg, chain_prod=False))
+        return
+    chain = []
+    update_ad(aid, lambda d: chain.append(d.pop("chain_prod", False)))
+    if chain and chain[0]:
+        try:
+            prod_start(aid)
+        except HTTPException as exc:
+            update_ad(aid, lambda d: d.update(adapt_error=f"الاقتراح اتكتب بس التنفيذ مبدأش: {exc.detail}"))
+
+
+# ---------- ملف العميل: المنتج (تطبيق / منتج ملموس / خدمة)، أصوله الحقيقية (شاشات، لوجو، صور منتج) وهويته
+
+BRAIN_KINDS = ("screens", "logos", "products", "characters", "sets", "props")
+BRAIN_FIELDS = ("type", "domain", "about", "audience", "rules", "palette", "theme", "typography", "ui_style", "logo_description",
+                "style", "market", "language", "logo_rule", "modest",
+                # 🧠 عقل البراند: الستايلات (أول واحد هو الديفولت) والتسليم (اللوجو، الإنترو والأوترو، الـ CTA، الكابشن الثابت واللينك)
+                "styles", "logo_on", "intro_on", "outro_on", "cta", "caption", "link")
+BRAND_VIDEOS = ("intro", "outro")
+BRAIN_LOCK = threading.Lock()
+
+
+def brain_dir(bid: str) -> Path:
+    d = ADS_DIR / "brains" / Path(bid).name
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def brain_row(bid: str) -> dict | None:
+    with closing(db()) as conn:
+        r = conn.execute("SELECT * FROM ad_brains WHERE id = ?", (bid,)).fetchone()
+    return {"id": r["id"], "name": r["name"], "created_at": r["created_at"], **json.loads(r["data"])} if r else None
+
+
+def update_brain(bid: str, fn) -> None:
+    with BRAIN_LOCK, closing(db()) as conn, conn:
+        r = conn.execute("SELECT * FROM ad_brains WHERE id = ?", (bid,)).fetchone()
+        if r is None:
+            raise HTTPException(404, "العميل ده مش موجود")
+        d = json.loads(r["data"])
+        name = fn(d)
+        conn.execute("UPDATE ad_brains SET data = ?" + (", name = ?" if name else "") + " WHERE id = ?",
+                     (json.dumps(d, ensure_ascii=False), *([name] if name else []), bid))
+
+
+def brain_to_dict(b: dict) -> dict:
+    base = f"/media/ads/brains/{b['id']}"
+    out = {k: b.get(k, "") for k in ("id", "name", "created_at", *BRAIN_FIELDS)}
+    out.update(status=b.get("status", "idle"), error=b.get("error"))
+    for kind in BRAND_VIDEOS:   # إنترو وأوترو البراند (فيديو)
+        f = b.get(f"{kind}_file")
+        out[f"{kind}_url"] = f"{base}/{f}" if f and (brain_dir(b["id"]) / f).exists() else None
+    for kind in BRAIN_KINDS:
+        out[kind] = [{**a, "url": f"{base}/{a['file']}"} for a in b.get(kind) or []]
+    return out
+
+
+def seed_brain() -> None:
+    """👤 العملاء: أول مرة بيتعمل عميل. لو البرنامج كان شغال لكوتشي قبل كده، هويتها ولوجوها وجملها بتتنقل لملف عميل كوتشي."""
+    if auth.get_setting("clients_v1"):
+        return
+    with CLIENTS_LOCK:
+        if auth.get_setting("clients_v1"):
+            return
+        with closing(db()) as conn:
+            first = conn.execute("SELECT id FROM ad_brains ORDER BY created_at LIMIT 1").fetchone()
+            used = any(conn.execute(f"SELECT 1 FROM {t} LIMIT 1").fetchone() for t in ("ads", "carousels", "series", "coaches"))
+        legacy = used or bool(first) or bool(auth.get_setting("brand")) or bool(legacy_logo_path())
+        lb = legacy_brand() if legacy else {}
+        fields = {"about": lb.get("about", ""), "audience": lb.get("audience", ""), "palette": lb.get("colors", ""),
+                  "typography": lb.get("font", ""), "style": lb.get("style", ""), "logo_rule": lb.get("logo_rule", ""),
+                  "market": lb.get("market", ""), "language": lb.get("language", ""), "modest": lb.get("modest", ""),
+                  "domain": "لياقة وتغذية وتدريب أونلاين" if legacy else "",
+                  "rules": ("اللبس محتشم دايمًا: البنات لبس واسع طويل مع حجاب، والرجالة تيشيرت وبنطلون أو شورت تحت الركبة. "
+                            + lb.get("rules", "")) if legacy else ""}
+        if first:
+            bid = first["id"]
+            update_brain(bid, lambda d: d.update({k: v for k, v in fields.items() if v and not d.get(k)}))
+        else:
+            bid = uuid.uuid4().hex[:12]
+            data = {"type": "app", **{k: "" for k in BRAIN_FIELDS if k != "type"}, **fields, "theme": "", "ui_style": "",
+                    "logo_description": "", "screens": [], "logos": [], "products": [], "status": "idle"}
+            with closing(db()) as conn, conn:
+                conn.execute("INSERT INTO ad_brains (id, name, data, created_at) VALUES (?, ?, ?, ?)",
+                             (bid, (lb.get("name") or "KOCHI") if legacy else "عميلي", json.dumps(data, ensure_ascii=False), now()))
+        if legacy:
+            try:
+                ctas = json.loads(auth.get_setting("carousel_ctas") or "null")
+            except ValueError:
+                ctas = None
+            logo = legacy_logo_path()
+            def move(d):
+                d.setdefault("ctas", ctas if isinstance(ctas, list) and ctas else cz.LEGACY_CTAS)
+                if logo and not d.get("logos"):
+                    f = f"logo-{uuid.uuid4().hex[:6]}{logo.suffix.lower()}"
+                    shutil.copyfile(logo, brain_dir(bid) / f)
+                    d["logos"] = [{"file": f, "name": "اللوجو", "description": ""}]
+            update_brain(bid, move)
+        auth.set_setting("active_client", auth.get_setting("active_client") or bid)
+        auth.set_setting("clients_v1", "1")
+
+
+CLIENTS_LOCK = threading.Lock()
+
+
+def first_client_id() -> str | None:
+    """أقدم عميل: الحاجات اللي اتعملت قبل العملاء (من غير عميل) بتاعته."""
+    seed_brain()
+    with closing(db()) as conn:
+        r = conn.execute("SELECT id FROM ad_brains ORDER BY created_at LIMIT 1").fetchone()
+    return r["id"] if r else None
+
+
+def active_client_id() -> str | None:
+    seed_brain()
+    migrate_rules()
+    cid = auth.get_setting("active_client")
+    if cid and brain_row(cid):
+        return cid
+    return first_client_id()
+
+
+def active_client() -> dict | None:
+    cid = active_client_id()
+    return brain_row(cid) if cid else None
+
+
+def owned(client_id: str | None) -> bool:
+    """الحاجة دي بتاعة العميل المختار؟ (اللي ملهاش عميل، أو عميلها اتمسح، بتاعة أقدم عميل)"""
+    if client_id and brain_row(client_id):
+        return client_id == active_client_id()
+    return first_client_id() == active_client_id()
+
+
+def ad_brain(settings: dict | None) -> dict | None:
+    """ملف العميل المختار للإعلان ده (ولو مش مختار: العميل الحالي)."""
+    bid = (settings or {}).get("brain_id")
+    if bid == "none":
+        return None
+    return (brain_row(bid) if bid else None) or active_client()
+
+
+atlas.modesty_on = lambda: bool((active_client() or {}).get("modest"))  # اللبس المحتشم حسب ملف العميل (قديم: بقى جوه قواعد المحتوى)
+atlas.brand_rules = lambda: str((active_client() or {}).get("rules") or "").strip()[:1500]   # قواعد المحتوى في كل برومبت
+atlas.brand_cta = lambda: str((active_client() or {}).get("cta") or "").strip()[:300]
+
+
+def migrate_rules() -> None:
+    """«لبس محتشم» كان اختيار لوحده: بقى جملة جوه «قواعد المحتوى» (مربع الكلام الحر) عشان المستخدم يكتب اللي يناسبه."""
+    if auth.get_setting("rules_v2"):
+        return
+    with closing(db()) as conn:
+        ids = [r["id"] for r in conn.execute("SELECT id FROM ad_brains")]
+    for bid in ids:
+        def fn(d):
+            if d.get("modest"):
+                line = "اللبس محتشم دايمًا: البنات لبس واسع طويل مع حجاب، والرجالة تيشيرت وبنطلون أو شورت تحت الركبة."
+                if "محتشم" not in (d.get("rules") or ""):
+                    d["rules"] = (line + " " + (d.get("rules") or "")).strip()
+                d["modest"] = ""
+        update_brain(bid, fn)
+    auth.set_setting("rules_v2", "1")
+
+
+@app.post("/api/ad-brains/{bid}/brand-video")
+def upload_brand_video(bid: str, kind: str = Form("outro"), file: UploadFile = File(...)):
+    """🎬 إنترو / أوترو البراند: بينزل لوحده في أول/آخر كل مونتاج لو متفعّل."""
+    if kind not in BRAND_VIDEOS:
+        raise HTTPException(400, "النوع لازم intro أو outro")
+    if not brain_row(bid):
+        raise HTTPException(404, "العميل ده مش موجود")
+    ext = Path(file.filename or "").suffix.lower()
+    if ext not in (".mp4", ".mov", ".webm", ".m4v"):
+        raise HTTPException(400, "ارفع فيديو (MP4 / MOV / WEBM)")
+    name = f"brand-{kind}-{uuid.uuid4().hex[:6]}{ext}"
+    dest = brain_dir(bid) / name
+    with dest.open("wb") as f:
+        shutil.copyfileobj(file.file, f)
+    try:
+        media_info(dest)
+    except Exception:
+        dest.unlink(missing_ok=True)
+        raise HTTPException(400, "الملف ده مش فيديو سليم")
+    def fn(d):
+        old = d.get(f"{kind}_file")
+        if old:
+            (brain_dir(bid) / old).unlink(missing_ok=True)
+        d[f"{kind}_file"] = name
+        d[f"{kind}_on"] = "1"
+    update_brain(bid, fn)
+    return brain_to_dict(brain_row(bid))
+
+
+@app.delete("/api/ad-brains/{bid}/brand-video/{kind}")
+def delete_brand_video(bid: str, kind: str):
+    if kind not in BRAND_VIDEOS:
+        raise HTTPException(400, "النوع لازم intro أو outro")
+    def fn(d):
+        old = d.pop(f"{kind}_file", None)
+        if old:
+            (brain_dir(bid) / old).unlink(missing_ok=True)
+        d[f"{kind}_on"] = ""
+    update_brain(bid, fn)
+    return brain_to_dict(brain_row(bid))
+
+
+def coach_intro(data: dict) -> Path | None:
+    """إنترو الشخصية بتاعة المشروع لو ليها."""
+    if not data.get("coach_id"):
+        return None
+    with closing(db()) as conn:
+        r = conn.execute("SELECT intro_filename FROM coaches WHERE id = ?", (data["coach_id"],)).fetchone()
+    p = COACHES_DIR / r["intro_filename"] if r and r["intro_filename"] else None
+    return p if p and p.exists() else None
+
+
+def brand_video(kind: str, client_id: str | None = None) -> Path | None:
+    """إنترو/أوترو البراند المختار (أو عميل معيّن)، لو متفعّل وموجود."""
+    c = (brain_row(client_id) if client_id else None) or active_client() or {}
+    f = c.get(f"{kind}_file")
+    if not f or not c.get(f"{kind}_on"):
+        return None
+    p = brain_dir(c["id"]) / f
+    return p if p.exists() else None
+
+
+@app.get("/api/clients")
+def list_clients():
+    """👤 العملاء (للاختيار من فوق) والعميل المختار."""
+    active = active_client_id()
+    out = []
+    for b in list_brains():
+        out.append({"id": b["id"], "name": b["name"], "domain": b.get("domain", ""),
+                    "logo": (b.get("logos") or [{}])[0].get("url"), "active": b["id"] == active,
+                    **{f"{k}_url": b.get(f"{k}_url") if b.get(f"{k}_on") else None for k in BRAND_VIDEOS},
+                    "caption": b.get("caption", ""), "cta": b.get("cta", ""), "link": b.get("link", "")})
+    return {"clients": out, "active": active}
+
+
+class ActiveClientIn(BaseModel):
+    id: str
+
+
+@app.put("/api/clients/active")
+def set_active_client(body: ActiveClientIn):
+    if not brain_row(body.id):
+        raise HTTPException(404, "العميل ده مش موجود")
+    auth.set_setting("active_client", body.id)
+    return list_clients()
+
+
+# 🎨 فئات الستايل: البراند بيختار منها (واحدة أو أكتر، والأولى هي الافتراضية)، وصفحة «اعمل» بتجمّع القوالب تحتها
+STYLE_CATS = [
+    {"id": "cartoon2d", "icon": "🖍️", "ar": "كارتون 2D", "en": "2D Cartoon", "templates": [],
+     "prompt": "flat 2D cartoon animation, clean bold outlines, simple shapes, bright friendly colors"},
+    {"id": "anim3d", "icon": "🧸", "ar": "أنيميشن 3D", "en": "3D Animation", "templates": ["sk-talking", "sk-skeleton", "sk-song"],
+     "prompt": "polished 3D animated film look, soft global illumination, appealing stylized characters"},
+    {"id": "paper", "icon": "✂️", "ar": "ورق", "en": "Paper", "templates": ["sk-papercut", "sk-diorama", "sk-paper"],
+     "prompt": "handmade paper-craft look, layered cut paper, visible paper texture and soft shadows, stop-motion feel"},
+    {"id": "clay", "icon": "🧱", "ar": "صلصال", "en": "Clay", "templates": ["sk-clay"],
+     "prompt": "claymation stop-motion look, sculpted plasticine with fingerprints, miniature set, warm light"},
+    {"id": "collage", "icon": "📰", "ar": "كولاج وتحريري", "en": "Collage", "templates": ["sk-vox", "sk-archive", "sk-engraved"],
+     "prompt": "editorial mixed-media collage, cut-out photos, halftone, archival paper and bold annotations"},
+    {"id": "motion", "icon": "🔷", "ar": "موشن جرافيك", "en": "Motion Graphics", "templates": ["sk-glass", "sk-glitch"],
+     "prompt": "clean motion-graphics look, glossy 3D shapes, kinetic typography, smooth camera moves"},
+    {"id": "ugc", "icon": "📱", "ar": "UGC بالموبايل", "en": "UGC", "templates": ["sk-ugc"],
+     "prompt": "authentic handheld smartphone footage, natural light, real person talking to camera"},
+    {"id": "cinematic", "icon": "🎬", "ar": "سينمائي واقعي", "en": "Cinematic", "templates": ["sk-cinema-ad"],
+     "prompt": "photoreal cinematic commercial, shallow depth of field, dramatic lighting, film color grade"},
+    {"id": "product", "icon": "📸", "ar": "صور منتج", "en": "Product Shots", "templates": ["sk-studio-shot", "sk-product-scene", "sk-static-ads"],
+     "prompt": "premium product photography, studio lighting, crisp detail, clean composition"},
+]
+STYLE_CAT_IDS = {c["id"] for c in STYLE_CATS}
+
+
+@app.get("/api/style-cats")
+def style_cats():
+    tpls = {}
+    for f in TPL_DIR.glob("*/tpl.json"):
+        try:
+            tpls[f.parent.name] = tpl_to_dict(f.parent.name, json.loads(f.read_text(encoding="utf-8")))
+        except (ValueError, KeyError):
+            continue
+    return [{**c, "templates": [{"id": t["id"], "name": t["name"], "icon": t.get("icon", ""), "cover_url": t.get("cover_url")}
+                                for tid in c["templates"] if (t := tpls.get(tid))]} for c in STYLE_CATS]
+
+
+@app.get("/api/ad-brains")
+def list_brains():
+    seed_brain()
+    with closing(db()) as conn:
+        ids = [r["id"] for r in conn.execute("SELECT id FROM ad_brains ORDER BY created_at")]
+    return [brain_to_dict(brain_row(i)) for i in ids]
+
+
+@app.get("/api/ad-brains/{bid}")
+def get_brain(bid: str):
+    return brain_to_dict(brain_row(bid))
+
+
+class BrainIn(BaseModel):
+    name: str | None = None
+    fields: dict = {}
+
+
+@app.post("/api/ad-brains")
+def create_brain(body: BrainIn):
+    bid = uuid.uuid4().hex[:12]
+    data = {"type": "app", **{k: str(body.fields.get(k) or "") for k in BRAIN_FIELDS if k != "type"},
+            "screens": [], "logos": [], "products": [], "status": "idle"}
+    if body.fields.get("type") in az.BRAIN_TYPES:
+        data["type"] = body.fields["type"]
+    with closing(db()) as conn, conn:
+        conn.execute("INSERT INTO ad_brains (id, name, data, created_at) VALUES (?, ?, ?, ?)",
+                     (bid, (body.name or "").strip()[:80] or "عميل جديد", json.dumps(data, ensure_ascii=False), now()))
+    return brain_to_dict(brain_row(bid))
+
+
+@app.patch("/api/ad-brains/{bid}")
+def patch_brain(bid: str, body: BrainIn):
+    def fn(d):
+        for k in BRAIN_FIELDS:
+            if k in body.fields:
+                v = str(body.fields[k] or "")
+                if k == "type" and v not in az.BRAIN_TYPES:
+                    continue
+                d[k] = v[:8000]
+                if k in ("palette", "theme", "typography", "ui_style", "logo_description") and k not in d.setdefault("edited", []):
+                    d["edited"].append(k)  # الاستنباط بعد كده ميغيّرش اللي كتبته بإيدك
+        if "styles" in body.fields:   # الستايل الافتراضي بيكتب «ستايل الرسم» لو انت مكتبتهوش بإيدك
+            d["styles"] = ",".join(x for x in d.get("styles", "").split(",") if x in STYLE_CAT_IDS)
+            first = next((c for c in STYLE_CATS if c["id"] == d["styles"].split(",")[0]), None)
+            if first and "style" not in d.get("edited", []):
+                d["style"] = first["prompt"]
+        if "style" in body.fields and "styles" not in body.fields and "style" not in d.setdefault("edited", []):
+            d["edited"].append("style")
+        return (body.name or "").strip()[:80] or None
+    update_brain(bid, fn)
+    return brain_to_dict(brain_row(bid))
+
+
+@app.delete("/api/ad-brains/{bid}")
+def delete_brain(bid: str):
+    with closing(db()) as conn:
+        if conn.execute("SELECT COUNT(*) FROM ad_brains").fetchone()[0] <= 1:
+            raise HTTPException(400, "ده آخر عميل. اعمل عميل تاني الأول")
+    with closing(db()) as conn, conn:
+        conn.execute("DELETE FROM ad_brains WHERE id = ?", (bid,))
+    shutil.rmtree(ADS_DIR / "brains" / Path(bid).name, ignore_errors=True)
+    return {"ok": True}
+
+
+@app.post("/api/ad-brains/{bid}/assets")
+def upload_brain_assets(bid: str, kind: str = Form("screens"), files: list[UploadFile] = File(...)):
+    """رفع شاشات التطبيق (فولدر كامل) أو اللوجو أو صور المنتج. بعدها البرنامج بيوصّفهم ويستنبط الهوية لوحده."""
+    if kind not in BRAIN_KINDS:
+        raise HTTPException(400, "نوع غير معروف")
+    if brain_row(bid) is None:
+        raise HTTPException(404, "العميل ده مش موجود")
+    folder = brain_dir(bid)
+    added = []
+    for f in files[:120]:
+        if Path(f.filename or "").suffix.lower() not in IMAGE_EXTENSIONS:
+            continue  # الفولدر ممكن يكون فيه ملفات تانية
+        name = save_upload(f, IMAGE_EXTENSIONS, folder, kind[:-1])
+        added.append({"file": name, "name": Path(f.filename or name).stem[:60], "description": ""})
+    if not added:
+        raise HTTPException(400, "مفيش صور في الملفات دي (PNG / JPG / WEBP)")
+    update_brain(bid, lambda d: d.setdefault(kind, []).extend(added) or d.update(status="working", error=None))
+    threading.Thread(target=run_brain_analyze, args=(bid,), daemon=True).start()
+    return brain_to_dict(brain_row(bid))
+
+
+class BrainAssetIn(BaseModel):
+    name: str | None = None
+    description: str | None = None
+
+
+def find_brain_asset(d: dict, file: str) -> tuple[str, dict]:
+    for kind in BRAIN_KINDS:
+        for a in d.get(kind) or []:
+            if a["file"] == file:
+                return kind, a
+    raise HTTPException(404, "الصورة دي مش موجودة")
+
+
+@app.patch("/api/ad-brains/{bid}/assets/{file}")
+def patch_brain_asset(bid: str, file: str, body: BrainAssetIn):
+    def fn(d):
+        _, a = find_brain_asset(d, file)
+        if body.name is not None:
+            a["name"], a["named"] = body.name.strip()[:80], True
+        if body.description is not None:
+            a["description"] = body.description.strip()[:2000]
+    update_brain(bid, fn)
+    return brain_to_dict(brain_row(bid))
+
+
+@app.delete("/api/ad-brains/{bid}/assets/{file}")
+def delete_brain_asset(bid: str, file: str):
+    def fn(d):
+        kind, a = find_brain_asset(d, file)
+        d[kind] = [x for x in d[kind] if x is not a]
+    update_brain(bid, fn)
+    (brain_dir(bid) / Path(file).name).unlink(missing_ok=True)
+    return brain_to_dict(brain_row(bid))
+
+
+@app.post("/api/ad-brains/{bid}/analyze")
+def analyze_brain(bid: str):
+    b = brain_row(bid)
+    if b is None:
+        raise HTTPException(404, "العميل ده مش موجود")
+    if not any(b.get(k) for k in BRAIN_KINDS):
+        raise HTTPException(400, "ارفع اللوجو أو شاشات التطبيق الأول")
+    update_brain(bid, lambda d: d.update(status="working", error=None))
+    threading.Thread(target=run_brain_analyze, args=(bid,), daemon=True).start()
+    return brain_to_dict(b)
+
+
+def model_image(path: Path, size: int = 768) -> Path:
+    """نسخة صغيرة من الصورة للموديل (أوفر في الحجم والتكلفة)."""
+    out = TMP_DIR / "brain_view" / f"{path.parent.name}-{path.stem}-{int(path.stat().st_mtime)}.jpg"
+    if not out.exists():
+        out.parent.mkdir(parents=True, exist_ok=True)
+        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(path),
+                        "-vf", f"scale='min({size},iw)':-2", "-q:v", "4", str(out)], capture_output=True, timeout=60)
+    return out if out.exists() else path
+
+
+def run_brain_analyze(bid: str) -> None:
+    """الموديل بيشوف اللوجو والشاشات وصور المنتج: يستنبط الألوان والثيم والخطوط وشكل الواجهة، ويوصّف كل صورة."""
+    try:
+        b = brain_row(bid)
+        folder = brain_dir(bid)
+        assets = [a for k in ("logos", "screens", "products") for a in b.get(k) or []][:24]
+        if atlas.mock_mode():
+            out = {"palette": "#57B8AF teal (accent), #EEECDA cream (background)", "theme": "فاتح وهادي", "typography": "خط عريض مستدير",
+                   "ui_style": "Clean light UI with teal accents and rounded cards.", "logo_description": "Teal wordmark.",
+                   "assets": [{"file": a["file"], "name": a["name"], "description": f"وصف تجريبي لـ {a['name']}"} for a in assets]}
+        else:
+            parts = [{"type": "text", "text": az.brain_messages(b, [a["file"] for a in assets])}]
+            for a in assets:
+                parts.append({"type": "image_url", "image_url": {"url": data_url(model_image(folder / a["file"]), "image/jpeg")}})
+            out = ad_json(ad_media_chat([{"role": "user", "content": parts}], 12000), "ملف العميل")
+        got = {str(x.get("file")): x for x in out.get("assets") or [] if isinstance(x, dict)}
+        def fn(d):
+            for k in ("palette", "theme", "typography", "ui_style", "logo_description"):
+                if out.get(k) and k not in (d.get("edited") or []):
+                    d[k] = str(out[k])[:4000]
+            for kind in BRAIN_KINDS:
+                for a in d.get(kind) or []:
+                    x = got.get(a["file"])
+                    if not x:
+                        continue
+                    if not a.get("description"):
+                        a["description"] = str(x.get("description") or "")[:2000]
+                    # الاسم اللي جاي من اسم الملف بيتبدل باسم أوضح، إلا لو انت سميته بإيدك
+                    if x.get("name") and not a.get("named"):
+                        a["name"] = str(x["name"])[:80]
+            d.update(status="done", error=None)
+        update_brain(bid, fn)
+    except Exception as exc:  # noqa: BLE001
+        msg = str(getattr(exc, "detail", None) or exc)[:300]
+        try:
+            update_brain(bid, lambda d: d.update(status="failed", error=msg))
+        except HTTPException:
+            pass
+
+
+def brain_assets(brain: dict | None, kinds: tuple[str, ...]) -> list[dict]:
+    return [{**a, "kind": k} for k in kinds for a in (brain or {}).get(k) or []]
+
+
+def apply_brain(aid: str, sids: list[str] | None = None, use_model: bool = True) -> int:
+    """يحط الأصول الحقيقية من ملف العميل مكان مكونات اللقطات: الشاشات للـ ui، اللوجو للـ logo، وصورة المنتج للمنتج.
+    الصور اللي انت رافعها بنفسك متتلمسش. بيرجّع عدد المكونات اللي اتطبّق عليها."""
+    with closing(db()) as conn:
+        _, d = ad_row(conn, aid)
+    p = d.get("prod")
+    brain = ad_brain(d.get("settings"))
+    if not p or not brain:
+        return 0
+    want = {"ui": ("screens",), "logo": ("logos",), "prop": ("products", "props"), "character": ("characters",), "background": ("sets",)}
+    todo = []
+    for s in p["shots"]:
+        if sids and s["id"] not in sids:
+            continue
+        for c in s.get("components") or []:
+            if c.get("use") is False or c.get("kind") not in want or (is_uploaded(c.get("image")) and not c.get("brain_asset")):
+                continue
+            pool = brain_assets(brain, want[c["kind"]])
+            if c["kind"] in ("character", "background", "prop"):
+                # الأبطال والأماكن والأدوات المتكررة: بالاسم بالظبط بس (مفيش تخمين)
+                pool = [a for a in pool if a.get("name") and (a["name"] == c.get("name") or a["name"] == c.get("asset")
+                                                              or (a.get("cast_id") and a.get("cast_id") == c.get("cast_id")))]
+                if c["kind"] == "prop" and not pool and brain.get("type") == "physical" and c.get("asset"):
+                    pool = brain_assets(brain, ("products",))
+                if not pool:
+                    continue
+            if pool:
+                todo.append((s["id"], c, pool))
+    if not todo:
+        return 0
+    def by_name(c, pool):
+        key = str(c.get("asset") or "").strip()
+        for a in pool:
+            if key and (a.get("name") == key or a["file"] == key):
+                return a
+        text = f"{c.get('name', '')} {c.get('description', '')}"
+        hits = [a for a in pool if a.get("name") and a["name"] in text]
+        return hits[0] if len(hits) == 1 else None
+    picks: dict[str, str] = {}
+    unsure = []
+    for sid, c, pool in todo:
+        a = by_name(c, pool) or (pool[0] if len(pool) == 1 or c.get("kind") in ("character", "background") else None)
+        if a:
+            picks[c["id"]] = a["file"]
+        else:
+            unsure.append((sid, c, pool))
+    if unsure:
+        try:
+            if not use_model or atlas.mock_mode():
+                raise ValueError
+            out = ad_json(series_chat(az.match_messages([c for _, c, _ in unsure], brain_assets(brain, BRAIN_KINDS))), "اختيار الأصول")
+            files = {a["file"] for a in brain_assets(brain, BRAIN_KINDS)}
+            for m in out.get("matches") or []:
+                if isinstance(m, dict) and m.get("file") in files:
+                    picks[str(m.get("id"))] = m["file"]
+        except (ValueError, HTTPException, atlas.AtlasError):
+            pass
+        for _, c, pool in unsure:
+            picks.setdefault(c["id"], pool[0]["file"])
+    folder, comp_dir = brain_dir(brain["id"]), prod_dir(aid, "comps")
+    copies = {}
+    for cid, f in picks.items():
+        src = folder / f
+        if src.exists():
+            name = f"{cid}-up_brain-{Path(f).stem[:40]}{src.suffix.lower()}"
+            if not (comp_dir / name).exists():
+                shutil.copyfile(src, comp_dir / name)
+            copies[cid] = (name, f)
+    count = []
+    def fn(d):
+        for s in (d.get("prod") or {}).get("shots") or []:
+            for c in s.get("components") or []:
+                if c["id"] in copies and not (is_uploaded(c.get("image")) and not c.get("brain_asset")):
+                    name, f = copies[c["id"]]
+                    if c.get("image") != name:
+                        c.setdefault("images", []).append(name)
+                    c.update(image=name, brain_asset=f, status="done", error=None)
+                    count.append(1)
+    update_ad(aid, fn)
+    return len(count)
+
+
+@app.post("/api/ads/{aid}/prod/apply-brain")
+def prod_apply_brain(aid: str, shot_id: str | None = None):
+    with closing(db()) as conn:
+        _, d = ad_row(conn, aid)
+    prod_of(d)
+    if not ad_brain(d.get("settings")):
+        raise HTTPException(400, "مفيش ملف عميل مختار. اعمله من «👤 ملف العميل»")
+    n = apply_brain(aid, [shot_id] if shot_id else None)
+    return {**ad_response(aid), "applied": n}
+
+
+# ---------- ستايلات الإعلانات: صور بتتحفظ وتتختار لأي إعلان
+
+def style_dir(sid: str) -> Path:
+    d = ADS_DIR / "styles" / Path(sid).name
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def style_to_dict(r: sqlite3.Row) -> dict:
+    d = json.loads(r["data"])
+    return {"id": r["id"], "name": r["name"], "notes": d.get("notes", ""), "status": d.get("status", "done"),
+            "error": d.get("error"), "from_ad": d.get("from_ad"), "created_at": r["created_at"],
+            "images": [f"/media/ads/styles/{r['id']}/{f}" for f in d.get("images") or []]}
+
+
+@app.get("/api/ad-styles")
+def list_ad_styles():
+    with closing(db()) as conn:
+        return [style_to_dict(r) for r in conn.execute("SELECT * FROM ad_styles ORDER BY created_at DESC")]
+
+
+def add_style(name: str, image_paths: list[Path], notes: str = "", from_ad: str | None = None) -> str:
+    sid = uuid.uuid4().hex[:12]
+    folder = style_dir(sid)
+    files = []
+    for i, p in enumerate(image_paths):
+        f = f"img-{i + 1:02d}{p.suffix.lower()}"
+        shutil.copyfile(p, folder / f)
+        files.append(f)
+    data = {"images": files, "notes": notes, "status": "working", "from_ad": from_ad}
+    with closing(db()) as conn, conn:
+        conn.execute("INSERT INTO ad_styles (id, name, data, created_at) VALUES (?, ?, ?, ?)",
+                     (sid, name.strip() or "ستايل جديد", json.dumps(data, ensure_ascii=False), now()))
+    threading.Thread(target=describe_style, args=(sid, not name.strip()), daemon=True).start()
+    return sid
+
+
+def describe_style(sid: str, rename: bool) -> None:
+    """الموديل بيشوف صور الستايل ويكتب وصفه (بالإنجليزي عشان البرومبتات)."""
+    with closing(db()) as conn:
+        r = conn.execute("SELECT * FROM ad_styles WHERE id = ?", (sid,)).fetchone()
+    if r is None:
+        return
+    d = json.loads(r["data"])
+    folder = style_dir(sid)
+    try:
+        if atlas.mock_mode():
+            out = {"name": "ستايل تجريبي", "notes": "Cinematic test style."}
+        else:
+            parts = [{"type": "text", "text": az.style_messages(", ".join(d["images"]))[0]["content"]}]
+            for f in d["images"][:6]:
+                mime = "image/png" if f.endswith(".png") else "image/webp" if f.endswith(".webp") else "image/jpeg"
+                parts.append({"type": "image_url", "image_url": {"url": data_url(folder / f, mime)}})
+            out = az.parse_json(ad_media_chat([{"role": "user", "content": parts}], 3000), "وصف الستايل")
+        notes = (d.get("notes") + "\n\n" if d.get("notes") else "") + str(out.get("notes") or "").strip()
+        d.update(notes=notes.strip(), status="done", error=None)
+        name = str(out.get("name") or "").strip()[:60] if rename else None
+    except Exception as exc:  # noqa: BLE001
+        d.update(status="failed", error=str(getattr(exc, "detail", None) or exc)[:300])
+        name = None
+    with closing(db()) as conn, conn:
+        conn.execute("UPDATE ad_styles SET data = ?" + (", name = ?" if name else "") + " WHERE id = ?",
+                     (json.dumps(d, ensure_ascii=False), *( [name] if name else []), sid))
+
+
+@app.post("/api/ad-styles")
+def create_ad_style(files: list[UploadFile] = File(...), name: str = Form(""), notes: str = Form("")):
+    tmp = Path(tempfile.mkdtemp(dir=TMP_DIR))
+    try:
+        paths = [tmp / save_upload(f, IMAGE_EXTENSIONS, tmp, f"s{i}") for i, f in enumerate(files[:12])]
+        if not paths:
+            raise HTTPException(400, "ارفع صورة واحدة على الأقل")
+        sid = add_style(name, paths, notes.strip())
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    with closing(db()) as conn:
+        return style_to_dict(conn.execute("SELECT * FROM ad_styles WHERE id = ?", (sid,)).fetchone())
+
+
+class StylePatchIn(BaseModel):
+    name: str | None = None
+    notes: str | None = None
+
+
+@app.patch("/api/ad-styles/{sid}")
+def patch_ad_style(sid: str, body: StylePatchIn):
+    with closing(db()) as conn, conn:
+        r = conn.execute("SELECT * FROM ad_styles WHERE id = ?", (sid,)).fetchone()
+        if r is None:
+            raise HTTPException(404, "الستايل غير موجود")
+        d = json.loads(r["data"])
+        if body.notes is not None:
+            d["notes"] = body.notes.strip()[:4000]
+        conn.execute("UPDATE ad_styles SET data = ?, name = ? WHERE id = ?",
+                     (json.dumps(d, ensure_ascii=False), (body.name or r["name"]).strip()[:60] or r["name"], sid))
+        return style_to_dict(conn.execute("SELECT * FROM ad_styles WHERE id = ?", (sid,)).fetchone())
+
+
+@app.delete("/api/ad-styles/{sid}")
+def delete_ad_style(sid: str):
+    with closing(db()) as conn, conn:
+        conn.execute("DELETE FROM ad_styles WHERE id = ?", (sid,))
+    shutil.rmtree(ADS_DIR / "styles" / Path(sid).name, ignore_errors=True)
+    return {"ok": True}
+
+
+class SaveStyleIn(BaseModel):
+    name: str = ""
+
+
+@app.post("/api/ads/{aid}/save-style")
+def save_ad_style(aid: str, body: SaveStyleIn):
+    """ستايل الإعلان نفسه (صور من مشاهده + وصف التصوير والألوان) بيتحفظ في المكتبة عشان تستخدمه بعدين."""
+    with closing(db()) as conn:
+        r, d = ad_row(conn, aid)
+    a = d.get("analysis") or {}
+    folder = ad_dir(aid)
+    frames = [folder / "frames" / s["frame"] for s in a.get("scenes") or [] if s.get("frame") and (folder / "frames" / s["frame"]).exists()]
+    if not frames:
+        raise HTTPException(400, "مفيش صور من الإعلان لسه. استنى لما التحليل يخلص")
+    step = max(1, len(frames) // 6)
+    notes = "\n".join(x for x in [a.get("cinematography"), a.get("colors"), a.get("editing")] if x)
+    sid = add_style(body.name.strip() or f"ستايل {r['name']}", frames[::step][:6], notes, from_ad=aid)
+    with closing(db()) as conn:
+        return style_to_dict(conn.execute("SELECT * FROM ad_styles WHERE id = ?", (sid,)).fetchone())
+
+
+def reset_stuck_ads() -> None:
+    with closing(db()) as conn, conn:
+        for r in conn.execute("SELECT id, data FROM ads").fetchall():
+            d = json.loads(r["data"])
+            changed = False
+            if d.get("status") in ("queued", "working"):
+                d.update(status="failed", step=None, error="اتقطع لما السيرفر اتقفل. دوس «حلّل تاني»")
+                changed = True
+            if d.get("adapt_status") == "working":
+                d.update(adapt_status="failed", adapt_error="اتقطع لما السيرفر اتقفل. دوس «اكتب الاقتراح تاني»")
+                changed = True
+            if d.get("audio_status") == "working":
+                d.update(audio_status="failed", audio_error="اتقطع لما السيرفر اتقفل. دوس «حلّل الصوت» تاني")
+                changed = True
+            if d.get("scomp_status") == "working":
+                d.update(scomp_status="failed")
+                changed = True
+            if d.get("directions_status") == "working":
+                d.update(directions_status="failed", directions_error="اتقطع لما السيرفر اتقفل. دوس تاني")
+                changed = True
+            if changed:
+                conn.execute("UPDATE ads SET data = ? WHERE id = ?", (json.dumps(d, ensure_ascii=False), r["id"]))
+        for r in conn.execute("SELECT id, data FROM ad_styles").fetchall():
+            d = json.loads(r["data"])
+            if d.get("status") == "working":
+                d.update(status="failed", error="اتقطع لما السيرفر اتقفل")
+                conn.execute("UPDATE ad_styles SET data = ? WHERE id = ?", (json.dumps(d, ensure_ascii=False), r["id"]))
+
+
+reset_stuck_ads()
+
+
+# ---------- تنفيذ الإعلان: راس ← ستوري بورد ← مكونات ← لقطات Seedance ← المونتاج
+
+ad_executor = ThreadPoolExecutor(max_workers=3)
+AD_MAX_REFS = 5  # صورة الستوري بورد + لحد 4 مكونات
+
+
+def prod_dir(aid: str, sub: str) -> Path:
+    d = ad_dir(aid) / "prod" / sub
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def prod_busy(p: dict | None) -> bool:
+    if ((p or {}).get("full_voice") or {}).get("status") == "working":
+        return True
+    if (p or {}).get("cast_status") == "working" or any(c.get("status") == "working" for c in (p or {}).get("cast") or []):
+        return True
+    for s in (p or {}).get("shots") or []:
+        if "working" in (s.get("frame_status"), s.get("comp_status"), s.get("voice_status")):
+            return True
+        if any(c.get("status") == "working" for c in s.get("components") or []):
+            return True
+        if any(t.get("status") in ("queued", "working") for t in s.get("takes") or []):
+            return True
+    return False
+
+
+def prod_of(d: dict) -> dict:
+    p = d.get("prod")
+    if not p:
+        raise HTTPException(400, "ابدأ التنفيذ الأول")
+    return p
+
+
+def find_pshot(p: dict, sid: str) -> dict:
+    s = next((x for x in p["shots"] if x["id"] == sid), None)
+    if s is None:
+        raise HTTPException(404, "اللقطة مش موجودة")
+    return s
+
+
+def find_comp(s: dict, cid: str) -> dict:
+    c = next((x for x in s.get("components") or [] if x["id"] == cid), None)
+    if c is None:
+        raise HTTPException(404, "المكون مش موجود")
+    return c
+
+
+def prod_to_dict(aid: str, p: dict | None) -> dict | None:
+    if not p:
+        return None
+    base = f"/media/ads/{aid}/prod"
+    shots = []
+    for s in p["shots"]:
+        shots.append({
+            **s,
+            "frame_url": f"{base}/frames/{s['frame']}" if s.get("frame") else None,
+            "frames": [{"file": f, "url": f"{base}/frames/{f}", "note": (s.get("frame_notes") or {}).get(f, "")}
+                       for f in s.get("frames") or []],
+            "frame_note": (s.get("frame_notes") or {}).get(s.get("frame") or "", ""),
+            "voice_url": f"{base}/voice/{s['voice_file']}" if s.get("voice_file") else None,
+            "components": [{**c, "image_url": f"{base}/comps/{c['image']}" if c.get("image") else None,
+                            "uploaded": is_uploaded(c.get("image")),
+                            "images": [{"file": f, "url": f"{base}/comps/{f}"} for f in c.get("images") or []]}
+                           for c in s.get("components") or []],
+            "takes": [{**t, "url": f"{base}/takes/{t['file']}" if t.get("file") else None,
+                       "ref_urls": [f"{base}/editrefs/{f}" for f in t.get("extra_refs") or []]} for t in s.get("takes") or []],
+        })
+    cast = [{**c, "image_url": f"{base}/cast/{c['image']}" if c.get("image") else None,
+             "images": [{"file": f, "url": f"{base}/cast/{f}", "note": (c.get("notes") or {}).get(f, "")} for f in c.get("images") or []]}
+            for c in p.get("cast") or []]
+    fv = p.get("full_voice")
+    if fv and fv.get("file"):
+        fv = {**fv, "url": f"{base}/voice/{fv['file']}"}
+    return {**p, "shots": shots, "cast": cast, "full_voice": fv}
+
+
+def ref_scene_for(analysis: dict, k: int, total: int) -> dict | None:
+    """اللقطة المقابلة في الإعلان الأصلي (بنفس الترتيب النسبي)."""
+    scenes = (analysis or {}).get("scenes") or []
+    if not scenes:
+        return None
+    return scenes[min(len(scenes) - 1, int(k * len(scenes) / max(1, total)))]
+
+
+@app.post("/api/ads/{aid}/prod/start")
+def prod_start(aid: str):
+    """يبدأ التنفيذ من الاقتراح: راس الإعلان (الستايل والكونسبت) ولقطة لكل مشهد."""
+    with closing(db()) as conn:
+        _, d = ad_row(conn, aid)
+    a = d.get("adaptation")
+    if not a or not a.get("scenes"):
+        raise HTTPException(400, "مفيش اقتراح للإعلان ده لسه")
+    if prod_busy(d.get("prod")):
+        raise HTTPException(400, "في توليد شغال في التنفيذ الحالي. استنى لما يخلص")
+    settings = d.get("settings") or {}
+    header = az.header_from(a, ad_style(settings.get("style_id")), brand_settings(), settings, ad_brain(settings))
+    scenes = a["scenes"]
+    shots = []
+    orig = {s.get("n"): s for s in (d.get("analysis") or {}).get("scenes") or []}
+    for k, sc in enumerate(scenes):
+        try:
+            ref = orig.get(int(sc.get("ref_scene")))
+        except (TypeError, ValueError):
+            ref = None
+        ref = ref or ref_scene_for(d.get("analysis"), k, len(scenes))
+        comps = [{"id": uuid.uuid4().hex[:8], "name": str(c.get("name") or "مكون")[:60], "kind": str(c.get("kind") or "prop")[:20],
+                  "from": str(c.get("from") or ""), "asset": str(c.get("asset") or ""), "description": str(c.get("description") or ""),
+                  "image_prompt": str(c.get("image_prompt") or ""), "animation": str(c.get("animation") or ""),
+                  "image": None, "images": [], "status": "idle", "error": None, "use": True}
+                 for c in sc.get("components") or [] if isinstance(c, dict) and (c.get("image_prompt") or c.get("description"))][:10]
+        shots.append({
+            "id": uuid.uuid4().hex[:10], "n": k + 1,
+            "seconds": float(sc.get("seconds") or 4) if str(sc.get("seconds") or "").replace(".", "", 1).isdigit() else 4.0,
+            **{f: str(sc.get(f) or "") for f in ("visual", "shot", "camera", "on_screen_text", "voice", "sfx", "music", "prompt")},
+            "ref_scene": ref.get("n") if ref else None, "ref_frame": ref.get("frame") if ref else None,
+            "frame": None, "frames": [], "frame_status": "idle", "frame_error": None,
+            "components": comps, "comp_status": "done" if comps else "idle", "comp_error": None,
+            # الموشن جرافيك المكتوب في الاقتراح، ولو مش موجود (اقتراح قديم) بتاع المشهد الأصلي
+            "motion_notes": str(sc.get("motion_graphics") or (ref or {}).get("motion_graphics", "")),
+            "motion_prompt": str(sc.get("motion_prompt") or ""), "assembly_prompt": "",
+            "approved": False, "takes": [], "chosen": None,
+        })
+    def fn(d):
+        old = d.get("prod")
+        if old and old.get("shots"):
+            # التنفيذ القديم بيتحفظ (ملفاته بأسماء مختلفة فمفيش حاجة بتتمسح)
+            d["prod_history"] = ([{**old, "archived_at": now()}] + (d.get("prod_history") or []))[:5]
+        d["prod"] = {"header": header, "shots": shots, "based_on": d.get("adapt_ver", 0)}
+    update_ad(aid, fn)
+    # شاشات التطبيق واللوجو وصور المنتج الحقيقية من ملف العميل بتتحط في المكونات لوحدها
+    threading.Thread(target=safe_apply_brain, args=(aid,), daemon=True).start()
+    return ad_response(aid)
+
+
+def safe_apply_brain(aid: str, sids: list[str] | None = None) -> None:
+    try:
+        apply_brain(aid, sids)
+    except Exception:  # noqa: BLE001 — تطبيق العقل تحسين، مش لازم يوقف حاجة
+        pass
+
+
+@app.post("/api/ads/{aid}/prod/restore")
+def prod_restore(aid: str, i: int = 0):
+    """يرجّع تنفيذ قديم من الأرشيف (والحالي بياخد مكانه في الأرشيف)."""
+    def fn(d):
+        hist = d.get("prod_history") or []
+        if not 0 <= i < len(hist):
+            raise HTTPException(404, "مفيش تنفيذ قديم بالرقم ده")
+        if prod_busy(d.get("prod")):
+            raise HTTPException(400, "في توليد شغال في التنفيذ الحالي. استنى لما يخلص")
+        old = {k: v for k, v in hist.pop(i).items() if k != "archived_at"}
+        if d.get("prod") and d["prod"].get("shots"):
+            hist.insert(0, {**d["prod"], "archived_at": now()})
+        d["prod"], d["prod_history"] = old, hist[:5]
+    update_ad(aid, fn)
+    return ad_response(aid)
+
+
+class ProdHeaderIn(BaseModel):
+    header: dict
+
+
+@app.patch("/api/ads/{aid}/prod/header")
+def prod_header(aid: str, body: ProdHeaderIn):
+    keys = ("title", "concept", "style", "style_id", "characters", "locations", "palette", "brand", "rules", "aspect", "market", "modest")
+    def fn(d):
+        p = prod_of(d)
+        h = {**p["header"], **{k: body.header[k] for k in keys if k in body.header}}
+        if "style_id" in body.header and body.header["style_id"] != p["header"].get("style_id"):
+            st = ad_style(body.header["style_id"])
+            h["style"] = (st or {}).get("notes", "")
+        if h.get("aspect") not in az.ASPECTS:
+            h["aspect"] = "9:16"
+        p["header"] = h
+    update_ad(aid, fn)
+    return ad_response(aid)
+
+
+class ProdShotIn(BaseModel):
+    fields: dict
+
+
+PSHOT_FIELDS = ("seconds", "visual", "shot", "camera", "on_screen_text", "voice", "sfx", "music", "prompt", "sb_prompt", "speaker", "talking",
+                "assembly_prompt", "motion_notes", "motion_prompt", "approved")
+
+
+@app.patch("/api/ads/{aid}/prod/shots/{sid}")
+def prod_shot_patch(aid: str, sid: str, body: ProdShotIn):
+    def fn(d):
+        s = find_pshot(prod_of(d), sid)
+        for k in PSHOT_FIELDS:
+            if k in body.fields:
+                v = body.fields[k]
+                s[k] = bool(v) if k in ("approved", "talking") else max(1.0, min(15.0, float(v or 4))) if k == "seconds" else str(v or "")
+        if "sb_prompt" in body.fields:  # المنشنز بتتقري من جديد من البرومبت اللي كتبته
+            s["mentions"] = az.find_mentions(s["sb_prompt"], [a["name"] for a in brain_db(ad_brain(d.get("settings")))])
+    update_ad(aid, fn)
+    return ad_response(aid)
+
+
+BRAIN_DB_KINDS = {"characters": "character", "sets": "background", "props": "prop", "screens": "screen", "logos": "logo", "products": "product"}
+
+
+def brain_db(brain: dict | None) -> list[dict]:
+    """ملف العميل كقاعدة بيانات: كل عنصر ليه اسم يتعمله منشن (@الاسم) وصورة مرجعية."""
+    out = []
+    for kind, label in BRAIN_DB_KINDS.items():
+        for a in (brain or {}).get(kind) or []:
+            if a.get("name"):
+                out.append({**a, "kind": label, "brain_kind": kind})
+    return out
+
+
+def mention_refs(brain: dict | None, names: list[str]) -> list[dict]:
+    """المنشنز ← صورها الحقيقية من العقل (الشخصيات الأول)."""
+    db = {a["name"]: a for a in brain_db(brain)}
+    items = [db[n] for n in names or [] if n in db and (brain_dir(brain["id"]) / db[n]["file"]).exists()]
+    order = {"character": 0, "background": 1, "prop": 2, "product": 2, "screen": 3, "logo": 4}
+    return sorted(items, key=lambda a: order.get(a["kind"], 5))
+
+
+@app.post("/api/ads/{aid}/prod/sb-prompts")
+def prod_sb_prompts(aid: str, shot_id: str | None = None, skip_approved: bool = False):
+    """✍️ يكتب برومبت الستوري بورد لكل لقطة ويعمل منشن (@الاسم) لعناصر ملف العميل اللي فيها."""
+    with closing(db()) as conn:
+        _, d = ad_row(conn, aid)
+    p = prod_of(d)
+    brain = ad_brain(d.get("settings"))
+    items = brain_db(brain)
+    shots = [s for s in p["shots"] if (not shot_id or s["id"] == shot_id) and not (skip_approved and s.get("approved"))]
+    if not shots:
+        raise HTTPException(400, "كل اللقطات معتمدة" if skip_approved else "اللقطة مش موجودة")
+    out = az.mock_sb(shots, items) if atlas.mock_mode() else ad_json(
+        series_chat(az.sb_messages(az.header_text(p["header"]), shots, items)), "برومبتات الستوري بورد")
+    got = {str(x.get("id")): str(x.get("prompt") or "").strip() for x in out.get("shots") or [] if isinstance(x, dict)}
+    names = [a["name"] for a in items]
+    def fn(d):
+        for s in d["prod"]["shots"]:
+            if got.get(s["id"]):
+                s["sb_prompt"] = got[s["id"]][:4000]
+                s["mentions"] = az.find_mentions(s["sb_prompt"], names)
+    update_ad(aid, fn)
+    return ad_response(aid)
+
+
+@app.post("/api/ads/{aid}/prod/approve-all")
+def prod_approve_all(aid: str, approved: bool = True):
+    """✅ اعتمد كل الستوري بورد: اللقطات اللي ليها صورة مرسومة بس (واللي بترسم دلوقتي لأ). الإلغاء بيشيل الاعتماد من الكل."""
+    def fn(d):
+        for s in prod_of(d)["shots"]:
+            if not approved:
+                s["approved"] = False
+            elif s.get("frame") and s.get("frame_status") not in ("queued", "working"):
+                s["approved"] = True
+    update_ad(aid, fn)
+    return ad_response(aid)
+
+
+def set_pshot(aid: str, sid: str, **kw) -> None:
+    def fn(d):
+        s = next((x for x in (d.get("prod") or {}).get("shots", []) if x["id"] == sid), None)
+        if s is not None:
+            s.update(**kw)
+    update_ad(aid, fn)
+
+
+def style_ref_urls(header: dict, limit: int) -> list[str]:
+    """صور الستايل المختار مراجع لموديل الصور عشان الشكل يفضل ثابت."""
+    sid = header.get("style_id")
+    if not sid:
+        return []
+    folder = ADS_DIR / "styles" / Path(sid).name
+    files = sorted(folder.glob("img-*"))[:limit]
+    return [atlas.reference_url(f) for f in files]
+
+
+AD_FRAME_REFS = 16  # أقصى عدد صور مرجعية لموديل الصور
+
+
+def ref_comps(shot: dict, limit: int) -> list[dict]:
+    """المكونات اللي ليها صورة وداخلة في اللقطة، بالترتيب اللي بيتبعت للموديل: اللي انت رافعها الأول."""
+    comps = [c for c in shot.get("components") or [] if c.get("use", True) and c.get("image")]
+    return sorted(comps, key=lambda c: not is_uploaded(c.get("image")))[:limit]
+
+
+def frame_gen(aid: str, sid: str) -> int | None:
+    """رقم محاولة الرسم الحالية (بيزيد لما تلغي)، أو None لو اللقطة مش مستنية رسم (اتلغت قبل ما تبدأ)."""
+    out: list = []
+    def fn(d):
+        x = next((y for y in (d.get("prod") or {}).get("shots", []) if y["id"] == sid), None)
+        if x is not None and x.get("frame_status") in ("queued", "working"):
+            x.update(frame_status="working", frame_error=None)
+            out.append(x.get("frame_gen", 0))
+    update_ad(aid, fn)
+    return out[0] if out else None
+
+
+def run_ad_frame(aid: str, sid: str, note: str = "", extra: list[str] | None = None, replace: bool = False) -> None:
+    gen = frame_gen(aid, sid)
+    if gen is None:
+        return
+    dest = None
+    try:
+        safe_apply_brain(aid, [sid])  # قبل الرسم: الشاشات واللوجو الحقيقيين من ملف العميل
+        with closing(db()) as conn:
+            _, d = ad_row(conn, aid)
+        p = d["prod"]
+        s = find_pshot(p, sid)
+        h = p["header"]
+        size = az.ASPECTS.get(h.get("aspect"), az.ASPECTS["9:16"])[0]
+        name = f"frame-{s['n']:02d}-{uuid.uuid4().hex[:6]}.png"
+        dest = prod_dir(aid, "frames") / name
+        if atlas.mock_mode():
+            w, hh = size.split("x")
+            mock_image(dest, f"{int(w) // 2}x{int(hh) // 2}", f"shot {s['n']}", s["n"])
+        else:
+            # صور المكونات نفسها (شاشات المنتج، اللوجو، الشخصيات...) مراجع أساسية، وبعدها صور الستايل للشكل العام
+            comp_dir = prod_dir(aid, "comps")
+            # المنشنز من ملف العميل: صورهم الحقيقية أول المراجع
+            brain = ad_brain(d.get("settings"))
+            ments = mention_refs(brain, s.get("mentions"))[:6]
+            m_files = {a["file"] for a in ments}
+            comps = [c for c in ref_comps(s, AD_FRAME_REFS - 3 - len(ments))
+                     if (comp_dir / c["image"]).exists() and c.get("brain_asset") not in m_files]
+            mention_comps = [{"id": f"m-{a['file']}", "name": f"@{a['name']}", "kind": a["kind"],
+                              "description": a.get("prompt") or a.get("description", ""), "_path": brain_dir(brain["id"]) / a["file"]}
+                             for a in ments]
+            # صورة المشهد الأصلي المقابل: عشان الكادر والتكوين ومكان الجرافيك يطلعوا زي الأصلي
+            orig = ad_dir(aid) / "frames" / s["ref_frame"] if s.get("ref_frame") else None
+            orig_refs = [atlas.reference_url(orig)] if orig and orig.exists() else []
+            styles = style_ref_urls(h, min(4, AD_FRAME_REFS - len(comps) - len(orig_refs)))
+            refs = ([atlas.reference_url(c["_path"]) for c in mention_comps] + [atlas.reference_url(comp_dir / c["image"]) for c in comps]
+                    + orig_refs + styles)
+            comps = mention_comps + comps
+            prompt = az.frame_prompt(h, s, comps, len(styles), len(comps) + 1 if orig_refs else 0)
+            cur = prod_dir(aid, "frames") / s["frame"] if note and s.get("frame") else None
+            extra_paths = [p for p in (prod_dir(aid, "editrefs") / f for f in extra or []) if p.exists()][:4]
+            if cur and cur.exists():
+                # تعديل بطلبك: الصورة الحالية أول مرجع، وبعدها الصور اللي بعتها، والموديل بيغيّر اللي طلبته بس
+                comps = comps[:AD_FRAME_REFS - 1 - len(extra_paths)]
+                refs = ([atlas.reference_url(cur)] + [atlas.reference_url(x) for x in extra_paths]
+                        + [atlas.reference_url(c["_path"] if c.get("_path") else comp_dir / c["image"]) for c in comps])
+                prompt = az.frame_edit_prompt(h, note, comps, len(extra_paths))
+            url = atlas.generate_image(carousel_settings()["image_family"], prompt, size,
+                                       auth.get_setting("series_frame_quality") or "medium", refs or None)
+            atlas.download(url, dest)
+        gone: list[str] = []
+        def done(d):
+            x = find_pshot(d["prod"], sid)
+            if x.get("frame_gen", 0) != gen:  # اتلغى وهو بيرسم: الصورة دي متتحطش
+                gone.append(name)
+                return
+            if replace and not x.get("approved"):  # الجديد بيمسح النسخ القديمة (اللقطة مش معتمدة)
+                gone.extend(f for f in x.get("frames") or [] if f != name)
+                x["frames"], x["frame_notes"] = [], {}
+            x.setdefault("frames", []).append(name)
+            if note:
+                x.setdefault("frame_notes", {})[name] = note + (f" (+{len(extra)} صورة مرجعية)" if extra else "")
+            x.update(frame=name, frame_status="done", frame_error=None)
+        update_ad(aid, done)
+        for f in gone:
+            (prod_dir(aid, "frames") / f).unlink(missing_ok=True)
+    except Exception as exc:  # noqa: BLE001
+        msg = str(getattr(exc, "detail", None) or exc)[:400]
+        def failed(d):
+            x = next((y for y in (d.get("prod") or {}).get("shots", []) if y["id"] == sid), None)
+            if x is not None and x.get("frame_gen", 0) == gen:
+                x.update(frame_status="failed", frame_error=msg)
+        update_ad(aid, failed)
+
+
+@app.post("/api/ads/{aid}/prod/shots/{sid}/frame-cancel")
+def prod_frame_cancel(aid: str, sid: str, redo: bool = False):
+    """✕ الغي الرسم اللي معلّق (ولو redo يبدأ رسم جديد على طول). الرسم القديم لو خلص بعدين نتيجته بتترمي."""
+    if redo and not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات")
+    def fn(d):
+        s = find_pshot(prod_of(d), sid)
+        s["frame_gen"] = s.get("frame_gen", 0) + 1
+        s.update(frame_status="queued" if redo else ("done" if s.get("frame") else "idle"), frame_error=None)
+    update_ad(aid, fn)
+    if redo:
+        # في Thread لوحده: لو الطابور مليان برسومات معلّقة ميستناش وراهم
+        threading.Thread(target=run_ad_frame, args=(aid, sid), daemon=True).start()
+    return ad_response(aid)
+
+
+@app.post("/api/ads/{aid}/prod/frames")
+def prod_frames(aid: str, shot_id: str | None = None, note: str = "", redo: bool = False):
+    """redo: كل اللقطات اللي مش معتمدة بتترسم من جديد والجديد بيمسح القديم (المعتمدة متتلمسش)."""
+    """الستوري بورد: لقطة واحدة (نسخة جديدة) أو كل اللقطات اللي لسه ملهاش صورة."""
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات")
+    with closing(db()) as conn:
+        _, d = ad_row(conn, aid)
+    p = prod_of(d)
+    busy = {"queued", "working"}
+    ids = [shot_id] if shot_id else [s["id"] for s in p["shots"] if s.get("frame_status") not in busy
+                                     and (not s.get("frame") or (redo and not s.get("approved")))]
+    if shot_id and find_pshot(p, shot_id).get("frame_status") in busy:
+        raise HTTPException(400, "الصورة دي بتترسم")
+    if not ids:
+        raise HTTPException(400, "كل اللقطات ليها ستوري بورد")
+    def fn(d):
+        for s in d["prod"]["shots"]:
+            if s["id"] in ids:
+                s.update(frame_status="queued", frame_error=None)
+    update_ad(aid, fn)
+    note = note.strip()[:1500] if shot_id else ""
+    for i in ids:
+        ad_executor.submit(run_ad_frame, aid, i, note, None, redo)
+    return ad_response(aid)
+
+
+def save_edit_refs(aid: str, files: list[UploadFile]) -> list[str]:
+    """الصور المرجعية اللي بتبعتها مع طلب التعديل (لحد 4)."""
+    out = []
+    for f in (files or [])[:4]:
+        if f and f.filename and Path(f.filename).suffix.lower() in IMAGE_EXTENSIONS:
+            out.append(save_upload(f, IMAGE_EXTENSIONS, prod_dir(aid, "editrefs"), "ref"))
+    return out
+
+
+@app.post("/api/ads/{aid}/prod/shots/{sid}/edit-frame")
+def prod_edit_frame(aid: str, sid: str, note: str = Form(""), files: list[UploadFile] = File(default=[])):
+    """✏️ تعديل الستوري بورد بطلبك، ومعاه صور مرجعية لو عايز."""
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات")
+    note = note.strip()[:1500]
+    if not note:
+        raise HTTPException(400, "اكتب عايز تعدّل إيه")
+    extra = save_edit_refs(aid, files)
+    def fn(d):
+        s = find_pshot(prod_of(d), sid)
+        if not s.get("frame"):
+            raise HTTPException(400, "اللقطة دي ملهاش ستوري بورد لسه")
+        if s.get("frame_status") in ("queued", "working"):
+            raise HTTPException(400, "الصورة دي بتترسم")
+        s.update(frame_status="queued", frame_error=None)
+    update_ad(aid, fn)
+    ad_executor.submit(run_ad_frame, aid, sid, note, extra)
+    return ad_response(aid)
+
+
+class FramePickIn(BaseModel):
+    file: str
+
+
+@app.post("/api/ads/{aid}/prod/shots/{sid}/frame")
+def prod_pick_frame(aid: str, sid: str, body: FramePickIn):
+    def fn(d):
+        s = find_pshot(prod_of(d), sid)
+        if body.file not in (s.get("frames") or []):
+            raise HTTPException(404, "النسخة مش موجودة")
+        s["frame"] = body.file
+    update_ad(aid, fn)
+    return ad_response(aid)
+
+
+def clear_frames(s: dict, only: str | None = None) -> list[str]:
+    """يشيل صورة ستوري بورد (نسخة واحدة أو كلها) من اللقطة ويرجّع أسامي الملفات عشان تتمسح."""
+    if s.get("frame_status") in ("queued", "working"):
+        raise HTTPException(400, f"اللقطة {s['n']} بترسم دلوقتي. استنى لما تخلص")
+    if any(t.get("status") in ("queued", "working") for t in s.get("takes") or []):
+        raise HTTPException(400, f"اللقطة {s['n']} بيتولد لها فيديو دلوقتي. استنى لما يخلص")
+    frames = s.get("frames") or []
+    gone = [f for f in frames if only is None or f == only]
+    s["frames"] = [f for f in frames if f not in gone]
+    if s.get("frame") in gone or s.get("frame") is None:
+        s["frame"] = s["frames"][-1] if s["frames"] else None
+    s.update(frame_status="idle" if not s["frame"] else s.get("frame_status"), frame_error=None)
+    return gone
+
+
+@app.delete("/api/ads/{aid}/prod/shots/{sid}/frame")
+def prod_delete_frame(aid: str, sid: str, file: str | None = None, all: bool = False):
+    """يمسح الستوري بورد المعروضة للقطة (أو كل نسخها)، والنسخة اللي قبلها بتظهر مكانها لو موجودة."""
+    gone: list[str] = []
+    def fn(d):
+        s = find_pshot(prod_of(d), sid)
+        target = None if all else (file or s.get("frame"))
+        if not all and not target:
+            raise HTTPException(400, "اللقطة دي ملهاش ستوري بورد")
+        gone.extend(clear_frames(s, target))
+    update_ad(aid, fn)
+    for f in gone:
+        (prod_dir(aid, "frames") / Path(f).name).unlink(missing_ok=True)
+    return ad_response(aid)
+
+
+@app.delete("/api/ads/{aid}/prod/frames")
+def prod_delete_all_frames(aid: str):
+    """يمسح الستوري بورد بتاعة كل اللقطات (كل النسخ)."""
+    gone: list[str] = []
+    def fn(d):
+        shots = prod_of(d)["shots"]
+        busy = [s["n"] for s in shots if s.get("frame_status") in ("queued", "working")
+                or any(t.get("status") in ("queued", "working") for t in s.get("takes") or [])]
+        if busy:
+            raise HTTPException(400, f"في لقطات شغالة دلوقتي ({', '.join(map(str, busy))}). استنى لما تخلص")
+        for s in shots:
+            gone.extend(clear_frames(s))
+    update_ad(aid, fn)
+    for f in gone:
+        (prod_dir(aid, "frames") / Path(f).name).unlink(missing_ok=True)
+    return ad_response(aid)
+
+
+def run_ad_components(aid: str, sid: str) -> None:
+    """يفصّص اللقطة لمكوناتها (من صورة الستوري بورد واللقطة المقابلة في الإعلان الأصلي)."""
+    try:
+        with closing(db()) as conn:
+            _, d = ad_row(conn, aid)
+        p = d["prod"]
+        s = find_pshot(p, sid)
+        set_pshot(aid, sid, comp_status="working", comp_error=None)
+        if atlas.mock_mode():
+            out = az.mock_components()
+        else:
+            ref = ad_dir(aid) / "frames" / s["ref_frame"] if s.get("ref_frame") else None
+            ref = ref if ref and ref.exists() else None
+            orig = next((x for x in (d.get("analysis") or {}).get("scenes") or [] if x.get("n") == s.get("ref_scene")), None)
+            msgs = az.components_messages(p["header"], {**s, "ref_components": (orig or {}).get("components") or [],
+                                                         "ref_motion": (orig or {}).get("motion_graphics", "")}, bool(ref))
+            parts = [{"type": "text", "text": msgs[0]["content"]}]
+            if s.get("frame"):
+                parts.append({"type": "image_url", "image_url": {"url": data_url(prod_dir(aid, "frames") / s["frame"], "image/png")}})
+            if ref:
+                parts.append({"type": "image_url", "image_url": {"url": data_url(ref, "image/jpeg")}})
+            out = ad_json(ad_media_chat([{"role": "user", "content": parts}], 8000), "مكونات اللقطة")
+        comps = []
+        for c in (out.get("components") or [])[:10]:
+            if isinstance(c, dict) and (c.get("image_prompt") or c.get("description")):
+                comps.append({"id": uuid.uuid4().hex[:8], "name": str(c.get("name") or "مكون")[:60],
+                              "kind": str(c.get("kind") or "prop")[:20], "description": str(c.get("description") or ""),
+                              "image_prompt": str(c.get("image_prompt") or ""), "animation": str(c.get("animation") or ""),
+                              "image": None, "images": [], "status": "idle", "error": None, "use": True})
+        def done(d):
+            x = find_pshot(d["prod"], sid)
+            old = {c["name"]: c for c in x.get("components") or [] if c.get("image")}
+            for c in comps:  # مكون ليه صورة قبل كده بنفس الاسم بيفضل بصورته
+                if c["name"] in old:
+                    o = old.pop(c["name"])
+                    c.update(image=o["image"], images=o.get("images", []), use=o.get("use", True),
+                             **({"uploaded_at": o["uploaded_at"]} if o.get("uploaded_at") else {}))
+            # الصور اللي رفعتها بإيدك متتمسحش أبدًا: لو الموديل ما رجعش المكون بنفس الاسم بيفضل زي ما هو
+            comps.extend(o for o in old.values() if is_uploaded(o.get("image")))
+            x.update(components=comps, comp_status="done", comp_error=None,
+                     motion_notes=x.get("motion_notes") or str(out.get("motion_notes") or ""), assembly_prompt=str(out.get("assembly_prompt") or x.get("assembly_prompt") or ""))
+        update_ad(aid, done)
+        safe_apply_brain(aid, [sid])
+    except Exception as exc:  # noqa: BLE001
+        set_pshot(aid, sid, comp_status="failed", comp_error=str(getattr(exc, "detail", None) or exc)[:400])
+
+
+@app.post("/api/ads/{aid}/prod/components")
+def prod_components(aid: str, shot_id: str | None = None):
+    """استخراج المكونات: لقطة واحدة أو كل اللقطات اللي ليها ستوري بورد ولسه ملهاش مكونات."""
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات")
+    with closing(db()) as conn:
+        _, d = ad_row(conn, aid)
+    p = prod_of(d)
+    if shot_id:
+        s = find_pshot(p, shot_id)
+        if not s.get("frame"):
+            raise HTTPException(400, "ارسم الستوري بورد للقطة دي الأول")
+        ids = [shot_id]
+    else:
+        ids = [s["id"] for s in p["shots"] if s.get("frame") and not s.get("components") and s.get("comp_status") != "working"]
+    if not ids:
+        raise HTTPException(400, "مفيش لقطات جاهزة (لازم الستوري بورد الأول)")
+    for i in ids:
+        set_pshot(aid, i, comp_status="working", comp_error=None)
+        ad_executor.submit(run_ad_components, aid, i)
+    return ad_response(aid)
+
+
+class CompIn(BaseModel):
+    fields: dict
+
+
+@app.patch("/api/ads/{aid}/prod/shots/{sid}/components/{cid}")
+def prod_comp_patch(aid: str, sid: str, cid: str, body: CompIn):
+    def fn(d):
+        c = find_comp(find_pshot(prod_of(d), sid), cid)
+        for k in ("name", "kind", "description", "image_prompt", "animation"):
+            if k in body.fields:
+                c[k] = str(body.fields[k] or "")
+        if "use" in body.fields:
+            c["use"] = bool(body.fields["use"])
+        if "image" in body.fields and body.fields["image"] in (c.get("images") or []):
+            c["image"] = body.fields["image"]
+    update_ad(aid, fn)
+    return ad_response(aid)
+
+
+@app.post("/api/ads/{aid}/prod/shots/{sid}/components")
+def prod_comp_add(aid: str, sid: str, body: CompIn):
+    """مكون جديد بإيدك."""
+    def fn(d):
+        s = find_pshot(prod_of(d), sid)
+        s.setdefault("components", []).append({
+            "id": uuid.uuid4().hex[:8], "name": str(body.fields.get("name") or "مكون جديد")[:60], "kind": "prop",
+            "description": "", "image_prompt": str(body.fields.get("image_prompt") or ""), "animation": "",
+            "image": None, "images": [], "status": "idle", "error": None, "use": True})
+    update_ad(aid, fn)
+    return ad_response(aid)
+
+
+@app.delete("/api/ads/{aid}/prod/shots/{sid}/components/{cid}")
+def prod_comp_delete(aid: str, sid: str, cid: str):
+    def fn(d):
+        s = find_pshot(prod_of(d), sid)
+        s["components"] = [c for c in s.get("components") or [] if c["id"] != cid]
+    update_ad(aid, fn)
+    return ad_response(aid)
+
+
+@app.post("/api/ads/{aid}/prod/shots/{sid}/components/{cid}/upload")
+def prod_comp_upload(aid: str, sid: str, cid: str, file: UploadFile = File(...)):
+    """صورة المكون من عندك بدل ما تتولد."""
+    name = save_upload(file, IMAGE_EXTENSIONS, prod_dir(aid, "comps"), f"{cid}-up")
+    def fn(d):
+        c = find_comp(find_pshot(prod_of(d), sid), cid)
+        c.setdefault("images", []).append(name)
+        c.update(image=name, status="done", error=None, uploaded_at=now())
+    update_ad(aid, fn)
+    return ad_response(aid)
+
+
+def is_uploaded(image: str | None) -> bool:
+    """صورة مكون رفعها المستخدم من عنده (اسمها فيه -up_)."""
+    return bool(image) and "-up_" in image
+
+
+def set_comp(aid: str, sid: str, cid: str, **kw) -> None:
+    def fn(d):
+        s = next((x for x in (d.get("prod") or {}).get("shots", []) if x["id"] == sid), None)
+        c = next((x for x in (s or {}).get("components") or [] if x["id"] == cid), None)
+        if c is not None:
+            c.update(**kw)
+    update_ad(aid, fn)
+
+
+def run_ad_comp_image(aid: str, sid: str, cid: str) -> None:
+    try:
+        with closing(db()) as conn:
+            _, d = ad_row(conn, aid)
+        p = d["prod"]
+        c = find_comp(find_pshot(p, sid), cid)
+        started = now()
+        set_comp(aid, sid, cid, status="working", error=None)
+        name = f"{cid}-{uuid.uuid4().hex[:6]}.png"
+        dest = prod_dir(aid, "comps") / name
+        if atlas.mock_mode():
+            mock_image(dest, "512x512", c["name"][:12], len(c["name"]))
+        else:
+            url = atlas.generate_image(carousel_settings()["image_family"], az.component_prompt(p["header"], c), "1024x1024",
+                                       auth.get_setting("series_frame_quality") or "medium", style_ref_urls(p["header"], 3) or None)
+            atlas.download(url, dest)
+        def done(d):
+            x = find_comp(find_pshot(d["prod"], sid), cid)
+            x.setdefault("images", []).append(name)
+            if x.get("uploaded_at", "") >= started:  # رفعت صورة وهو بيولّد: اللي رفعتها هي اللي بتفضل
+                x.update(status="done", error=None)
+            else:
+                x.update(image=name, status="done", error=None)
+        update_ad(aid, done)
+    except Exception as exc:  # noqa: BLE001
+        set_comp(aid, sid, cid, status="failed", error=str(getattr(exc, "detail", None) or exc)[:400])
+
+
+@app.post("/api/ads/{aid}/prod/comp-images")
+def prod_comp_images(aid: str, shot_id: str | None = None, comp_id: str | None = None):
+    """صور المكونات: مكون واحد (نسخة جديدة)، أو كل مكونات لقطة، أو كل المكونات اللي لسه ملهاش صورة."""
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات")
+    if not comp_id:
+        safe_apply_brain(aid, [shot_id] if shot_id else None)  # الشاشات واللوجو من ملف العميل بدل ما يتولدوا
+    with closing(db()) as conn:
+        _, d = ad_row(conn, aid)
+    p = prod_of(d)
+    jobs = []
+    for s in p["shots"]:
+        if shot_id and s["id"] != shot_id:
+            continue
+        for c in s.get("components") or []:
+            if comp_id and c["id"] != comp_id:
+                continue
+            if c.get("status") == "working" or (not comp_id and (c.get("image") or not c.get("use", True))):
+                continue
+            jobs.append((s["id"], c["id"]))
+    if not jobs:
+        raise HTTPException(400, "مفيش مكونات محتاجة صور")
+    for s_id, c_id in jobs:
+        set_comp(aid, s_id, c_id, status="working", error=None)
+        ad_executor.submit(run_ad_comp_image, aid, s_id, c_id)
+    return ad_response(aid)
+
+
+def run_ad_take(aid: str, sid: str, tid: str) -> None:
+    def setp(**kw):
+        def fn(d):
+            s = next((x for x in (d.get("prod") or {}).get("shots", []) if x["id"] == sid), None)
+            t = next((x for x in (s or {}).get("takes") or [] if x["id"] == tid), None)
+            if t is not None:
+                t.update(**kw)
+        update_ad(aid, fn)
+    try:
+        with closing(db()) as conn:
+            _, d = ad_row(conn, aid)
+        p = d["prod"]
+        s = find_pshot(p, sid)
+        t = next(x for x in s["takes"] if x["id"] == tid)
+        dest = prod_dir(aid, "takes") / f"{tid}.mp4"
+        setp(status="working")
+        aspect = az.ASPECTS.get(p["header"].get("aspect"), az.ASPECTS["9:16"])[1]
+        if atlas.mock_mode():
+            time.sleep(1.5)
+            size = {"9:16": "496x864", "16:9": "864x496", "1:1": "640x640"}[aspect]
+            subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i",
+                            f"color=c=0x{(hash(tid) & 0xFFFFFF):06x}:s={size}:d={t['gen_duration']}:r=24",
+                            "-c:v", "libx264", "-pix_fmt", "yuv420p", str(dest)], check=True, capture_output=True, timeout=120)
+        else:
+            pid = t.get("prediction_id")
+            if not pid and t.get("note") and not t.get("revised"):
+                t["prompt"] = revise_video_prompt(t["prompt"], t["note"])
+                if t.get("extra_refs"):
+                    n = len(t["extra_refs"][:AD_MAX_REFS - 1])
+                    t["prompt"] += (f"\nReference images 2-{n + 1} were provided by the director for this change: follow them "
+                                    "for what the change asks (look, object, pose or style).")
+                setp(prompt=t["prompt"], revised=True)
+            if not pid:
+                frames, comps = prod_dir(aid, "frames"), prod_dir(aid, "comps")
+                extra = [p for p in (prod_dir(aid, "editrefs") / f for f in t.get("extra_refs") or []) if p.exists()][:AD_MAX_REFS - 1]
+                brain = ad_brain(d.get("settings"))
+                ments = [brain_dir(brain["id"]) / a["file"] for a in mention_refs(brain, s.get("mentions"))][:max(0, AD_MAX_REFS - 1 - len(extra))]
+                refs = ([frames / s["frame"]] + extra + ments
+                        + [comps / c["image"] for c in ref_comps(s, AD_MAX_REFS - 1 - len(extra) - len(ments))])
+                vm = ad_video_model(t.get("video_model"))
+                if vm["kind"] == "i2v":
+                    img = atlas.reference_url(frames / s["frame"])
+                    body = {"model": vm["model"], "prompt": t["prompt"], "image": img, "image_url": img,
+                            "duration": t["gen_duration"], "aspect_ratio": aspect}
+                else:
+                    body = {
+                        "model": vm["model"], "prompt": t["prompt"],
+                        "reference_images": [atlas.upload_media(seedance_ref(x)) for x in refs if x.exists()],
+                        "duration": t["gen_duration"], "resolution": atlas.RESOLUTION, "ratio": aspect,
+                        "generate_audio": False, "watermark": False,
+                    }
+                pid = atlas.submit_video(body)
+                setp(prediction_id=pid)
+            url = atlas.wait_for(pid, lambda _s: None)
+            atlas.download(url, dest)
+        setp(status="done", file=dest.name, duration=round(probe_duration(dest), 2), error=None)
+    except Exception as exc:  # noqa: BLE001
+        setp(status="failed", error=str(getattr(exc, "detail", None) or exc)[:400])
+
+
+# ---------- 🎭 الأبطال والمكونات المتكررة: صورة مرجعية ثابتة لكل شخصية ومكان وأداة قبل الستوري بورد
+
+CAST_BRAIN = {"character": "characters", "background": "sets", "prop": "props"}
+
+
+def find_cast(p: dict, cid: str) -> dict:
+    c = next((x for x in p.get("cast") or [] if x["id"] == cid), None)
+    if c is None:
+        raise HTTPException(404, "العنصر ده مش موجود")
+    return c
+
+
+def set_cast(aid: str, cid: str, **kw) -> None:
+    def fn(d):
+        c = next((x for x in (d.get("prod") or {}).get("cast") or [] if x["id"] == cid), None)
+        if c is not None:
+            c.update(**kw)
+    update_ad(aid, fn)
+
+
+def run_cast_extract(aid: str) -> None:
+    try:
+        with closing(db()) as conn:
+            _, d = ad_row(conn, aid)
+        p = d["prod"]
+        if atlas.mock_mode():
+            out = az.mock_cast(p["shots"])
+        else:
+            brain = ad_brain(d.get("settings"))
+            known = [{**a, "kind": k} for k, kind in (("character", "characters"), ("background", "sets"), ("prop", "props"))
+                     for a in (brain or {}).get(kind) or []]
+            out = ad_json(series_chat(az.cast_messages(az.header_text(p["header"]), d.get("adaptation") or {}, p["shots"], known)), "الأبطال")
+        valid_n = {s.get("n") for s in p["shots"]}
+        items = []
+        for x in out.get("cast") or []:
+            if not isinstance(x, dict) or not str(x.get("name") or "").strip():
+                continue
+            shots_n = []
+            for n in x.get("shots") or []:
+                try:
+                    if int(n) in valid_n and int(n) not in shots_n:
+                        shots_n.append(int(n))
+                except (TypeError, ValueError):
+                    pass
+            items.append({"id": uuid.uuid4().hex[:8], "name": str(x["name"]).strip()[:40],
+                          "kind": x.get("kind") if x.get("kind") in az.CAST_KINDS else "character",
+                          "description": str(x.get("description") or "")[:1000], "image_prompt": str(x.get("image_prompt") or "")[:3000],
+                          "shots": shots_n, "image": None, "images": [], "notes": {}, "status": "idle", "error": None,
+                          "approved": False})
+        # اللي موجود قبل كده في ملف العميل بنفس الاسم: صورته بتتجاب (وبتستنى موافقتك)
+        brain = ad_brain(d.get("settings"))
+        for it in items:
+            a = next((a for a in (brain or {}).get(CAST_BRAIN[it["kind"]]) or [] if a.get("name") == it["name"]), None)
+            if a and (brain_dir(brain["id"]) / a["file"]).exists():
+                f = f"cast-{it['id']}-brain{Path(a['file']).suffix.lower()}"
+                shutil.copyfile(brain_dir(brain["id"]) / a["file"], prod_dir(aid, "cast") / f)
+                it.update(image=f, images=[f], status="done", image_prompt=a.get("prompt") or it["image_prompt"], from_brain=True)
+        def fn(d):
+            p = d["prod"]
+            # اللي وافقت عليهم قبل كده بيفضلوا، والجديد بيتضاف
+            keep = [c for c in p.get("cast") or [] if c.get("approved") or c.get("image")]
+            names = {c["name"] for c in keep}
+            p["cast"] = keep + [c for c in items if c["name"] not in names][:max(0, 10 - len(keep))]
+            p["cast_status"], p["cast_error"] = "done", None if items else "الموديل ما طلّعش أبطال أو مكونات متكررة"
+        update_ad(aid, fn)
+    except Exception as exc:  # noqa: BLE001
+        msg = str(getattr(exc, "detail", None) or exc)[:300]
+        update_ad(aid, lambda d: d["prod"].update(cast_status="failed", cast_error=msg))
+
+
+@app.post("/api/ads/{aid}/prod/cast/extract")
+def prod_cast_extract(aid: str):
+    def fn(d):
+        p = prod_of(d)
+        if p.get("cast_status") == "working":
+            raise HTTPException(400, "بيطلّع الأبطال بالفعل")
+        p.update(cast_status="working", cast_error=None)
+    update_ad(aid, fn)
+    threading.Thread(target=run_cast_extract, args=(aid,), daemon=True).start()
+    return ad_response(aid)
+
+
+class CastIn(BaseModel):
+    fields: dict
+
+
+@app.patch("/api/ads/{aid}/prod/cast/{cid}")
+def prod_cast_patch(aid: str, cid: str, body: CastIn):
+    def fn(d):
+        c = find_cast(prod_of(d), cid)
+        for k in ("name", "description", "image_prompt"):
+            if k in body.fields:
+                c[k] = str(body.fields[k] or "")[:3000]
+        if body.fields.get("kind") in az.CAST_KINDS:
+            c["kind"] = body.fields["kind"]
+        if "shots" in body.fields and isinstance(body.fields["shots"], list):
+            c["shots"] = [int(n) for n in body.fields["shots"] if str(n).isdigit()]
+    update_ad(aid, fn)
+    return ad_response(aid)
+
+
+@app.delete("/api/ads/{aid}/prod/cast/{cid}")
+def prod_cast_delete(aid: str, cid: str):
+    def fn(d):
+        p = prod_of(d)
+        p["cast"] = [c for c in p.get("cast") or [] if c["id"] != cid]
+    update_ad(aid, fn)
+    return ad_response(aid)
+
+
+def run_cast_image(aid: str, cid: str, note: str = "", extra: list[str] | None = None, replace: bool = False) -> None:
+    try:
+        set_cast(aid, cid, status="working", error=None)
+        with closing(db()) as conn:
+            _, d = ad_row(conn, aid)
+        p = d["prod"]
+        c = find_cast(p, cid)
+        h = p["header"]
+        size = {"character": "1024x1536", "background": az.ASPECTS.get(h.get("aspect"), az.ASPECTS["9:16"])[0]}.get(c["kind"], "1024x1024")
+        name = f"cast-{cid}-{uuid.uuid4().hex[:6]}.png"
+        dest = prod_dir(aid, "cast") / name
+        if atlas.mock_mode():
+            w, hh = size.split("x")
+            mock_image(dest, f"{int(w) // 3}x{int(hh) // 3}", c["name"][:10], len(c["name"]))
+        else:
+            cur = prod_dir(aid, "cast") / c["image"] if note and c.get("image") else None
+            extra_paths = [x for x in (prod_dir(aid, "editrefs") / f for f in extra or []) if x.exists()][:4]
+            if cur and cur.exists():
+                refs = [atlas.reference_url(cur)] + [atlas.reference_url(x) for x in extra_paths]
+                prompt = az.frame_edit_prompt(h, note, [], len(extra_paths)).replace("storyboard frame of a commercial", "reference image")
+            else:
+                refs = [atlas.reference_url(x) for x in extra_paths] + style_ref_urls(h, 3)
+                prompt = az.cast_prompt(h, c) + (f"\nThe first {len(extra_paths)} reference image(s) were given by the director: "
+                                                 f"follow them for the look. {note}" if extra_paths else (f"\n{note}" if note else ""))
+            url = atlas.generate_image(carousel_settings()["image_family"], prompt, size,
+                                       auth.get_setting("series_frame_quality") or "medium", refs or None)
+            atlas.download(url, dest)
+        gone: list[str] = []
+        def done(d):
+            x = find_cast(d["prod"], cid)
+            if replace and not x.get("approved"):  # الجديد بيمسح القديم (مش معتمد)
+                gone.extend(f for f in x.get("images") or [] if f != name)
+                x["images"], x["notes"] = [], {}
+            x.setdefault("images", []).append(name)
+            if note:
+                x.setdefault("notes", {})[name] = note
+            x.update(image=name, status="done", error=None, approved=False)
+        update_ad(aid, done)
+        for f in gone:
+            (prod_dir(aid, "cast") / f).unlink(missing_ok=True)
+    except Exception as exc:  # noqa: BLE001
+        set_cast(aid, cid, status="failed", error=str(getattr(exc, "detail", None) or exc)[:400])
+
+
+@app.post("/api/ads/{aid}/prod/cast/images")
+def prod_cast_images(aid: str, cast_id: str | None = None, redo: bool = False):
+    """🖼️ صورة مرجعية: عنصر واحد (نسخة جديدة)، أو كل اللي ملهمش صورة، أو (redo) كل اللي مش معتمدين والجديد بيمسح القديم."""
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات")
+    ids: list[str] = []
+    def fn(d):
+        for c in prod_of(d).get("cast") or []:
+            if c.get("status") == "working" or (cast_id and c["id"] != cast_id):
+                continue
+            if not cast_id and (c.get("approved") if redo else c.get("image")):
+                continue
+            c.update(status="working", error=None)
+            ids.append(c["id"])
+    update_ad(aid, fn)
+    if not ids:
+        raise HTTPException(400, "كلهم معتمدين" if redo else "كلهم ليهم صور")
+    for i in ids:
+        ad_executor.submit(run_cast_image, aid, i, "", None, redo and not cast_id)
+    return ad_response(aid)
+
+
+@app.post("/api/ads/{aid}/prod/cast/{cid}/edit")
+def prod_cast_edit(aid: str, cid: str, note: str = Form(""), files: list[UploadFile] = File(default=[])):
+    """✏️ تعديل الصورة المرجعية بطلبك (ومعاه صور مرجعية)."""
+    note = note.strip()[:1500]
+    if not note:
+        raise HTTPException(400, "اكتب عايز تعدّل إيه")
+    extra = save_edit_refs(aid, files)
+    set_cast(aid, cid, status="working", error=None)
+    ad_executor.submit(run_cast_image, aid, cid, note, extra)
+    return ad_response(aid)
+
+
+@app.post("/api/ads/{aid}/prod/cast/{cid}/upload")
+def prod_cast_upload(aid: str, cid: str, file: UploadFile = File(...)):
+    name = save_upload(file, IMAGE_EXTENSIONS, prod_dir(aid, "cast"), f"cast-{cid}-up")
+    def fn(d):
+        c = find_cast(prod_of(d), cid)
+        c.setdefault("images", []).append(name)
+        c.update(image=name, status="done", error=None, approved=False)
+    update_ad(aid, fn)
+    return ad_response(aid)
+
+
+class CastPickIn(BaseModel):
+    file: str
+
+
+@app.post("/api/ads/{aid}/prod/cast/{cid}/pick")
+def prod_cast_pick(aid: str, cid: str, body: CastPickIn):
+    def fn(d):
+        c = find_cast(prod_of(d), cid)
+        if body.file not in c.get("images") or []:
+            raise HTTPException(404, "النسخة مش موجودة")
+        c.update(image=body.file, approved=False)
+    update_ad(aid, fn)
+    return ad_response(aid)
+
+
+def approve_cast(aid: str, cid: str) -> None:
+    """الموافقة: الصورة بتتحفظ في ملف العميل، وبتتربط بكل لقطة العنصر ده فيها (مكون باسمه بالظبط)."""
+    with closing(db()) as conn:
+        _, d = ad_row(conn, aid)
+    c = find_cast(prod_of(d), cid)
+    if not c.get("image"):
+        raise HTTPException(400, f"«{c['name']}» ملوش صورة لسه")
+    brain = ad_brain(d.get("settings"))
+    if not brain:
+        raise HTTPException(400, "مفيش ملف عميل مختار. اعمله من «👤 ملف العميل»")
+    kind = CAST_BRAIN[c["kind"]]
+    src = prod_dir(aid, "cast") / c["image"]
+    bfile = f"{kind[:-1]}-{cid}-{uuid.uuid4().hex[:6]}{src.suffix.lower()}"
+    shutil.copyfile(src, brain_dir(brain["id"]) / bfile)
+    def bfn(b):
+        lst = b.setdefault(kind, [])
+        old = [a for a in lst if a.get("cast_id") == cid or a.get("name") == c["name"]]
+        for a in old:  # النسخة القديمة من نفس العنصر بتتشال من العقل
+            (brain_dir(brain["id"]) / a["file"]).unlink(missing_ok=True)
+        b[kind] = [a for a in lst if a not in old] + [
+            {"file": bfile, "name": c["name"], "description": c.get("description", ""), "prompt": c.get("image_prompt", ""),
+             "cast_id": cid, "from_ad": aid, "named": True}]
+    update_brain(brain["id"], bfn)
+    comp_kind = {"character": "character", "background": "background", "prop": "prop"}[c["kind"]]
+    def fn(d):
+        p = d["prod"]
+        x = find_cast(p, cid)
+        x.update(approved=True, brain_file=bfile)
+        for s in p["shots"]:
+            if s.get("n") not in x.get("shots") or []:
+                continue
+            comp = next((k for k in s.get("components") or [] if k.get("cast_id") == cid or k.get("name") == x["name"]), None)
+            if comp is None:
+                comp = {"id": uuid.uuid4().hex[:8], "name": x["name"], "kind": comp_kind, "from": "", "description": x.get("description", ""),
+                        "image_prompt": x.get("image_prompt", ""), "animation": "", "image": None, "images": [], "status": "idle",
+                        "error": None, "use": True}
+                s.setdefault("components", []).insert(0, comp)
+            comp.update(cast_id=cid, name=x["name"], kind=comp_kind, image_prompt=x.get("image_prompt", ""))
+        # الشخصيات اللي اتوافق عليها بتدخل في راس الإعلان بوصفها الثابت
+        chars = [k for k in p.get("cast") or [] if k.get("approved") and k["kind"] == "character"]
+        if chars:
+            p["header"]["characters"] = "; ".join(f"{k['name']}: {k.get('image_prompt') or k.get('description', '')}" for k in chars)
+    update_ad(aid, fn)
+    apply_brain(aid, use_model=False)  # صورته بتتنسخ لكل مكون باسمه
+
+
+@app.post("/api/ads/{aid}/prod/cast/{cid}/approve")
+def prod_cast_approve(aid: str, cid: str, undo: bool = False):
+    if undo:
+        set_cast(aid, cid, approved=False)
+    else:
+        approve_cast(aid, cid)
+    return ad_response(aid)
+
+
+@app.post("/api/ads/{aid}/prod/cast/approve-all")
+def prod_cast_approve_all(aid: str):
+    with closing(db()) as conn:
+        _, d = ad_row(conn, aid)
+    todo = [c["id"] for c in prod_of(d).get("cast") or [] if c.get("image") and not c.get("approved")]
+    if not todo:
+        raise HTTPException(400, "مفيش حاجة ليها صورة ومستنية موافقة")
+    for cid in todo:
+        approve_cast(aid, cid)
+    return ad_response(aid)
+
+
+def base_take(s: dict, tid: str | None = None) -> dict | None:
+    """الفيديو اللي الموشن هيتركب عليه: المختار (ولو هو نفسه متركب، الأصل بتاعه)، أو آخر فيديو خلص."""
+    takes = {t["id"]: t for t in s.get("takes") or []}
+    t = takes.get(tid or s.get("chosen") or "")
+    if t and t.get("composite"):
+        t = takes.get(t.get("base") or "")
+    if t and t.get("status") == "done" and t.get("file") and not t.get("composite"):
+        return t
+    done = [x for x in s.get("takes") or [] if x.get("status") == "done" and x.get("file") and not x.get("composite")]
+    return done[-1] if done else None
+
+
+# ---------- 🎬 موديلات الفيديو للإعلانات، 🎙️ الصوت (بيحدد مدة اللقطة)، 👄 الكلام على الوش (لب سينك)
+
+AD_VIDEO_MODELS = {
+    "seedance": {"label": "Seedance (من الإعدادات)", "kind": "ref"},
+    "seedance-2": {"label": "Seedance 2.0", "model": "bytedance/seedance-2.0/reference-to-video", "kind": "ref"},
+    "kling-3-std": {"label": "Kling 3.0 Std (تمثيل وحركة أحسن)", "model": "kwaivgi/kling-v3.0-std/image-to-video", "kind": "i2v"},
+    "kling-3-pro": {"label": "Kling 3.0 Pro (أعلى جودة)", "model": "kwaivgi/kling-v3.0-pro/image-to-video", "kind": "i2v"},
+}
+AR_VOICES = {"Arabic_FriendlyGuy": "راجل ودود", "Arabic_CalmWoman": "ست هادية"}
+TTS_MODEL = "minimax/speech-2.6-hd"
+LIPSYNC = {"video": "veed/lipsync", "image": "atlascloud/infinitetalk",
+           # بيعملوا الفيديو من الأول: صورة الستوري بورد + صوتنا + برومبت → شخصية بتتكلم بصوتنا
+           "omni": "bytedance/avatar-omni-human-v1.5", "kavatar": "kwaivgi/kling-v2.6-pro/avatar"}
+LIPSYNC_FROM_FRAME = ("image", "omni", "kavatar")
+
+
+def ad_video_model(key: str | None) -> dict:
+    vm = AD_VIDEO_MODELS.get(key or "") or AD_VIDEO_MODELS["seedance"]
+    return {**vm, "key": key if key in AD_VIDEO_MODELS else "seedance",
+            "model": vm.get("model") or series_settings()["video_model"]}
+
+
+def take_duration(vm: dict, seconds: float) -> int:
+    if vm["kind"] == "i2v":
+        return 5 if seconds <= 5 else 10  # Kling: 5 أو 10 ثواني
+    return int(min(atlas.MAX_DURATION, max(atlas.MIN_DURATION, math.ceil(seconds))))
+
+
+def shot_voice_id(p: dict, s: dict) -> str:
+    voices = p.get("voices") or {}
+    return voices.get(s.get("speaker") or "__narrator") or voices.get("__narrator") or "Arabic_FriendlyGuy"
+
+
+def set_voice_file(aid: str, sid: str, name: str, dur: float) -> None:
+    def fn(d):
+        s = find_pshot(d["prod"], sid)
+        old = s.get("voice_file")
+        s.update(voice_file=name, voice_dur=round(dur, 2), voice_status="done", voice_error=None,
+                 seconds=max(1.0, min(15.0, round(dur + 0.4, 1))))  # مدة اللقطة = طول الكلام + نفس صغير
+        if old and old != name:
+            (prod_dir(aid, "voice") / old).unlink(missing_ok=True)
+    update_ad(aid, fn)
+
+
+def run_ad_voice(aid: str, sid: str) -> None:
+    try:
+        set_pshot(aid, sid, voice_status="working", voice_error=None)
+        with closing(db()) as conn:
+            _, d = ad_row(conn, aid)
+        p = d["prod"]
+        s = find_pshot(p, sid)
+        text = (s.get("voice") or "").strip()
+        if not text:
+            raise RuntimeError("اللقطة دي ملهاش كلام. اكتب الكلام في خانة «الكلام» الأول")
+        name = f"{sid}-{uuid.uuid4().hex[:6]}.mp3"
+        dest = prod_dir(aid, "voice") / name
+        if atlas.mock_mode():
+            secs = max(1.0, 0.45 * len(text.split()))
+            subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i",
+                            f"sine=frequency=220:duration={secs:.2f}", "-c:a", "libmp3lame", str(dest)], check=True, capture_output=True)
+        else:
+            url = atlas.run_model("Audio", {"model": TTS_MODEL, "text": text[:1500], "voice_id": shot_voice_id(p, s),
+                                            "language_boost": "Arabic"}, "الصوت", max_seconds=300, interval=2)
+            atlas.download(url, dest)
+        set_voice_file(aid, sid, name, probe_duration(dest))
+    except Exception as exc:  # noqa: BLE001
+        set_pshot(aid, sid, voice_status="failed", voice_error=str(getattr(exc, "detail", None) or exc)[:300])
+
+
+@app.post("/api/ads/{aid}/prod/voice")
+def prod_voice(aid: str, shot_id: str | None = None):
+    """🎙️ الصوت: كلام كل لقطة بيتحول لصوت عربي، وطوله بيحدد مدة اللقطة (ومدة الفيديو اللي هيتولد)."""
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات")
+    ids: list[str] = []
+    def fn(d):
+        for s in prod_of(d)["shots"]:
+            if (shot_id and s["id"] != shot_id) or s.get("voice_status") == "working" or not (s.get("voice") or "").strip():
+                continue
+            if not shot_id and s.get("voice_file"):
+                continue  # الكل: اللي ليها صوت بالفعل متتلمسش
+            s.update(voice_status="working", voice_error=None)
+            ids.append(s["id"])
+    update_ad(aid, fn)
+    if not ids:
+        raise HTTPException(400, "مفيش لقطات محتاجة صوت (كلها ليها صوت أو ملهاش كلام)")
+    for i in ids:
+        ad_executor.submit(run_ad_voice, aid, i)
+    return ad_response(aid)
+
+
+@app.post("/api/ads/{aid}/prod/shots/{sid}/voice/upload")
+def prod_voice_upload(aid: str, sid: str, file: UploadFile = File(...)):
+    """صوتك انت (تسجيل) للقطة بدل الصوت المولّد."""
+    name = save_audio_upload(file, prod_dir(aid, "voice"), f"{sid}-up")
+    set_voice_file(aid, sid, name, probe_duration(prod_dir(aid, "voice") / name))
+    return ad_response(aid)
+
+
+@app.delete("/api/ads/{aid}/prod/shots/{sid}/voice")
+def prod_voice_delete(aid: str, sid: str):
+    def fn(d):
+        s = find_pshot(prod_of(d), sid)
+        if s.get("voice_file"):
+            (prod_dir(aid, "voice") / s["voice_file"]).unlink(missing_ok=True)
+        s.update(voice_file=None, voice_dur=None, voice_status="idle", voice_error=None)
+    update_ad(aid, fn)
+    return ad_response(aid)
+
+
+class VoicesIn(BaseModel):
+    voices: dict
+    video_model: str | None = None
+
+
+@app.put("/api/ads/{aid}/prod/voices")
+def prod_voices(aid: str, body: VoicesIn):
+    """الصوت لكل متكلم (الراوي وكل شخصية) وموديل الفيديو للإعلان."""
+    def fn(d):
+        p = prod_of(d)
+        p["voices"] = {str(k)[:60]: str(v)[:80] for k, v in (body.voices or {}).items() if v}
+        if body.video_model in AD_VIDEO_MODELS:
+            p["header"]["video_model"] = body.video_model
+    update_ad(aid, fn)
+    return ad_response(aid)
+
+
+# ---------- 🎙️ الصوت الكامل: سكريبت ← انت بتعمل الصوت بنفسك ← البرنامج بيقطّعه على اللقطات بتوقيت الكلام
+
+def shot_windows(shots: list[dict], spans: list[dict | None], total: float) -> list[tuple[float, float]]:
+    """كل لقطة من إمتى لإمتى على الصوت الكامل. spans = وقت كلام اللقطة (أو None لو ملهاش كلام).
+    الحدود بتقع في نص السكوت بين كلام لقطتين، واللقطات اللي من غير كلام بتاخد السكوت اللي بينهم بالتساوي.
+    اللقطات اللي بعد آخر كلام بتحتفظ بمدتها (زي لقطة اللوجو في الآخر)."""
+    n = len(shots)
+    voiced = [i for i in range(n) if spans[i]]
+    if not voiced:
+        return []
+    cuts = [0.0] * (n + 1)
+    first = voiced[0]
+    lead_end = max(0.0, spans[first]["start"] - 0.1)
+    for j in range(1, first + 1):  # لقطات قبل أول كلام
+        cuts[j] = lead_end * j / first if first else 0.0
+    for a, b in zip(voiced, voiced[1:]):
+        left, right = spans[a]["end"], spans[b]["start"]
+        if right < left:
+            left = right = (left + right) / 2
+        g = b - a - 1  # لقطات ساكتة بينهم
+        for t in range(g + 1):
+            cuts[a + 1 + t] = left + (right - left) * (t + 0.5) / (g + 1)
+    last = voiced[-1]
+    end = max(spans[last]["end"] + 0.35, min(total, spans[last]["end"] + 0.8))
+    cuts[last + 1] = end
+    for k in range(last + 1, n):  # لقطات بعد آخر كلام
+        cuts[k + 1] = cuts[k] + float(shots[k].get("seconds") or 2)
+    return [(round(cuts[i], 2), round(cuts[i + 1], 2)) for i in range(n)]
+
+
+def silences(src: Path, min_len: float = 0.25) -> list[tuple[float, float]]:
+    """أماكن السكوت الحقيقي في الصوت (موديل الكلام ساعات بيمد آخر كلمة جوه السكوت)."""
+    err = subprocess.run([ffmpeg_exe(), "-hide_banner", "-i", str(src), "-af", f"silencedetect=noise=-35dB:d={min_len}", "-f", "null", "-"],
+                         capture_output=True, text=True, timeout=120).stderr
+    starts = [float(x) for x in re.findall(r"silence_start: (-?[\d.]+)", err)]
+    ends = [float(x) for x in re.findall(r"silence_end: (-?[\d.]+)", err)]
+    return [(max(0.0, a), b) for a, b in zip(starts, ends)]
+
+
+def snap_spans(spans: list[dict | None], quiet: list[tuple[float, float]]) -> None:
+    """بداية ونهاية كلام كل لقطة بتتظبط على السكوت الحقيقي."""
+    for sp in spans:
+        if not sp:
+            continue
+        for a, b in quiet:
+            # سكوت في أول الجملة (أو قبلها بشوية): الكلام بيبدأ بعده
+            if a <= sp["start"] + 0.35 and sp["start"] < b < sp["end"]:
+                sp["start"] = b
+            # سكوت في آخر الجملة: الكلام بيخلص قبله
+            if b >= sp["end"] - 0.35 and sp["start"] < a < sp["end"]:
+                sp["end"] = a
+
+
+def min_silent(shots: list[dict], wins: list[tuple[float, float]], spans: list[dict | None], least: float = 1.0) -> list[tuple[float, float]]:
+    """لقطة من غير كلام لازم تاخد ثانية على الأقل: بتاخدها من اللقطة اللي قبلها أو بعدها (لو مش شخصية بتتكلم قدام الكاميرا)."""
+    w = [list(x) for x in wins]
+    for i, s in enumerate(shots[:len(w)]):
+        if spans[i] or w[i][1] - w[i][0] >= least:
+            continue
+        need = least - (w[i][1] - w[i][0])
+        for j, side in ((i - 1, "prev"), (i + 1, "next")):
+            if need <= 0 or not 0 <= j < len(w) or shots[j].get("talking"):
+                continue
+            room = (w[j][1] - w[j][0]) - 1.0
+            take = max(0.0, min(need, room))
+            if take <= 0:
+                continue
+            if side == "prev":
+                w[j][1] -= take
+                w[i][0] -= take
+            else:
+                w[j][0] += take
+                w[i][1] += take
+            need -= take
+    return [(round(a, 2), round(b, 2)) for a, b in w]
+
+
+def run_full_voice(aid: str) -> None:
+    try:
+        with closing(db()) as conn:
+            _, d = ad_row(conn, aid)
+        p = d["prod"]
+        fv = p["full_voice"]
+        src = prod_dir(aid, "voice") / fv["file"]
+        total = probe_duration(src)
+        words = atlas.transcribe(src, total)
+        shots = p["shots"]
+        lines = [{"text": s.get("voice") or ""} for s in shots]
+        voiced_idx = [i for i, ln in enumerate(lines) if ln["text"].strip()]
+        timed, ratio = sz.align_with_ratio(words, [lines[i] for i in voiced_idx]) if voiced_idx else ([], 0.0)
+        spans: list[dict | None] = [None] * len(shots)
+        for i, t in zip(voiced_idx, timed):
+            if t.get("start") is not None and t.get("end") is not None:
+                spans[i] = {"start": float(t["start"]), "end": float(t["end"])}
+        snap_spans(spans, silences(src))
+        wins = shot_windows(shots, spans, total)
+        wins = min_silent(shots, wins, spans) if wins else wins
+        if not wins:
+            raise RuntimeError("مقدرتش ألاقي كلام اللقطات في الصوت. اتأكد إن خانة «الكلام» في اللقطات هي نفس اللي في الصوت")
+        cuts = {}
+        for s, (a, b) in zip(shots, wins):
+            if a >= total:
+                continue  # لقطة بعد آخر الصوت (من غير كلام)
+            name = f"{s['id']}-cut-{uuid.uuid4().hex[:6]}.m4a"
+            subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{a:.2f}", "-i", str(src),
+                            "-t", f"{max(0.1, min(b, total) - a):.2f}", "-c:a", "aac", "-b:a", "160k", str(prod_dir(aid, "voice") / name)],
+                           check=True, capture_output=True, timeout=120)
+            cuts[s["id"]] = name
+        def fn(d):
+            p = d["prod"]
+            for s, (a, b), sp in zip(p["shots"], wins, spans):
+                old = s.get("voice_file")
+                if old and old != cuts.get(s["id"]):
+                    (prod_dir(aid, "voice") / old).unlink(missing_ok=True)
+                s.update(a_start=a, a_end=b, seconds=round(max(0.5, b - a), 2), voice_file=cuts.get(s["id"]),
+                         voice_dur=round(b - a, 2) if s["id"] in cuts else None, voice_status="done" if s["id"] in cuts else "idle",
+                         voice_error=None if sp or not (s.get("voice") or "").strip() else "الكلام ده ما اتلقطش في الصوت بالظبط (اتحط بالتقريب)")
+            p["full_voice"].update(status="done", error=None, duration=round(total, 2), ratio=round(ratio, 2))
+        update_ad(aid, fn)
+    except Exception as exc:  # noqa: BLE001
+        msg = str(getattr(exc, "detail", None) or exc)[:300]
+        update_ad(aid, lambda d: d["prod"]["full_voice"].update(status="failed", error=msg))
+
+
+@app.post("/api/ads/{aid}/prod/full-voice")
+def prod_full_voice(aid: str, file: UploadFile | None = File(default=None)):
+    """⬆ الصوت الكامل للإعلان (انت عامله بنفسك). من غير ملف = يقطّع الصوت الموجود تاني (بعد ما عدّلت الكلام مثلًا)."""
+    with closing(db()) as conn:
+        _, d = ad_row(conn, aid)
+    p = prod_of(d)
+    if file is not None and file.filename:
+        name = save_audio_upload(file, prod_dir(aid, "voice"), "full")
+        old = (p.get("full_voice") or {}).get("file")
+        if old and old != name:
+            (prod_dir(aid, "voice") / old).unlink(missing_ok=True)
+    elif (p.get("full_voice") or {}).get("file"):
+        name = p["full_voice"]["file"]
+    else:
+        raise HTTPException(400, "ارفع ملف الصوت الأول")
+    if (p.get("full_voice") or {}).get("status") == "working":
+        raise HTTPException(400, "بيقطّع الصوت بالفعل")
+    original = name == (p.get("full_voice") or {}).get("file") and (p.get("full_voice") or {}).get("original", False)
+    update_ad(aid, lambda d: d["prod"].update(full_voice={"file": name, "status": "working", "error": None, "original": original}))
+    threading.Thread(target=run_full_voice, args=(aid,), daemon=True).start()
+    return ad_response(aid)
+
+
+def run_ad_lipsync(aid: str, sid: str, tid: str) -> None:
+    """👄 الكلام على الوش: video = الفيديو المختار + الصوت (سريع)، image = الستوري بورد + الصوت بيتحول لفيديو بيتكلم (أبطأ)."""
+    def setp(**kw):
+        def fn(d):
+            s = next((x for x in (d.get("prod") or {}).get("shots", []) if x["id"] == sid), None)
+            t = next((x for x in (s or {}).get("takes") or [] if x["id"] == tid), None)
+            if t is not None:
+                t.update(**kw)
+        update_ad(aid, fn)
+    try:
+        setp(status="working", error=None)
+        with closing(db()) as conn:
+            _, d = ad_row(conn, aid)
+        s = find_pshot(d["prod"], sid)
+        t = next(x for x in s["takes"] if x["id"] == tid)
+        voice = prod_dir(aid, "voice") / (s.get("voice_file") or "")
+        if not s.get("voice_file") or not voice.exists():
+            raise RuntimeError("اللقطة ملهاش صوت. ولّد الصوت أو ارفعه الأول")
+        dest = prod_dir(aid, "takes") / f"{tid}.mp4"
+        if atlas.mock_mode():
+            src = prod_dir(aid, "takes") / next(x for x in s["takes"] if x["id"] == t["base"])["file"] if t.get("base") else None
+            if src and src.exists():
+                subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src), "-i", str(voice),
+                                "-map", "0:v", "-map", "1:a", "-c:v", "copy", "-shortest", str(dest)], check=True, capture_output=True)
+            else:
+                subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-loop", "1", "-i",
+                                str(prod_dir(aid, "frames") / s["frame"]), "-i", str(voice), "-vf", "scale=480:-2", "-c:v", "libx264",
+                                "-pix_fmt", "yuv420p", "-shortest", str(dest)], check=True, capture_output=True)
+        else:
+            audio_url = atlas.upload_media(voice)
+            if t["method"] == "video":
+                base = next(x for x in s["takes"] if x["id"] == t["base"])
+                body = {"model": LIPSYNC["video"], "video_url": atlas.upload_media(prod_dir(aid, "takes") / base["file"]), "audio_url": audio_url}
+            else:
+                img = atlas.reference_url(prod_dir(aid, "frames") / s["frame"])
+                scene = (s.get("sb_prompt") or s.get("visual") or "").strip()
+                body = {"model": LIPSYNC[t["method"]], "image": img, "audio": audio_url,
+                        "prompt": f"{scene}. The person speaks naturally to the camera in Arabic, lips perfectly synced to the audio, "
+                                  "natural blinking, subtle head movement and small hand gestures. Keep the face, outfit, "
+                                  "background and phone screen exactly as in the image."}
+                if t["method"] == "omni":  # OmniHuman بيطلب الأسماء دي كمان (اتجربت)
+                    body.update(image_url=img, audio_url=audio_url)
+            url = atlas.run_model("Video", body, "الكلام على الوش", max_seconds=2400, interval=6)
+            atlas.download(url, dest)
+        setp(status="done", file=dest.name, duration=round(probe_duration(dest), 2), error=None)
+    except Exception as exc:  # noqa: BLE001
+        setp(status="failed", error=str(getattr(exc, "detail", None) or exc)[:400])
+
+
+@app.post("/api/ads/{aid}/prod/shots/{sid}/lipsync")
+def prod_lipsync(aid: str, sid: str, method: str = "video", take_id: str | None = None):
+    if method not in LIPSYNC:
+        raise HTTPException(400, "طريقة غير معروفة")
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات")
+    tid = uuid.uuid4().hex[:10]
+    def fn(d):
+        s = find_pshot(prod_of(d), sid)
+        if not s.get("voice_file"):
+            raise HTTPException(400, "اللقطة ملهاش صوت. ولّد الصوت أو ارفعه الأول")
+        base = base_take(s, take_id) if method == "video" else None
+        if method == "video" and not base:
+            raise HTTPException(400, "مفيش فيديو للقطة دي يتركب عليه الكلام. ولّد الفيديو الأول (أو استخدم «من الستوري بورد»)")
+        if method in LIPSYNC_FROM_FRAME and not s.get("frame"):
+            raise HTTPException(400, "ارسم الستوري بورد الأول")
+        s["takes"].append({"id": tid, "file": None, "status": "queued", "error": None, "approved": False, "lipsync": True,
+                           "method": method, "base": base["id"] if base else None, "duration": None,
+                           "gen_duration": s.get("voice_dur"), "prompt": "👄 بيتكلم", "created_at": now()})
+        s["chosen"] = tid
+    update_ad(aid, fn)
+    ad_executor.submit(run_ad_lipsync, aid, sid, tid)
+    return ad_response(aid)
+
+
+def revise_video_prompt(prompt: str, note: str) -> str:
+    """موديل الكلام بيعدّل برومبت الفيديو (إنجليزي) على طلبك ويسيب الباقي زي ما هو."""
+    try:
+        out = series_chat([
+            {"role": "system", "content": "You edit prompts for a video model (Seedance). Apply the director's requested change "
+                                          "(given in Arabic) to the prompt and keep everything else as it is. Reply with JSON only: "
+                                          '{"prompt": "the full revised prompt in English"}'},
+            {"role": "user", "content": f"PROMPT:\n{prompt}\n\nREQUESTED CHANGE:\n{note}"},
+        ])
+        new = str(az.parse_json(out, "تعديل البرومبت").get("prompt") or "").strip()
+        if new:
+            return new
+    except (HTTPException, ValueError, atlas.AtlasError):
+        pass
+    return f"{prompt}\nDirector's change for this version (most important): {note}"
+
+
+def queue_ad_take(aid: str, sid: str, note: str = "", from_take: str | None = None, extra: list[str] | None = None) -> None:
+    tid = uuid.uuid4().hex[:10]
+    def fn(d):
+        p = prod_of(d)
+        s = find_pshot(p, sid)
+        if not s.get("frame"):
+            raise HTTPException(400, f"اللقطة {s['n']} ملهاش ستوري بورد")
+        vm = ad_video_model(p["header"].get("video_model"))
+        if vm["kind"] == "i2v":  # بيبدأ من صورة الستوري بورد بس (فيها الأبطال والمكونات)
+            prompt = az.video_prompt(p["header"], s, [])
+        else:
+            ments = [{"name": f"@{m['name']}"} for m in mention_refs(ad_brain(d.get("settings")), s.get("mentions"))][:AD_MAX_REFS - 1]
+            prompt = az.video_prompt(p["header"], s, ments + ref_comps(s, AD_MAX_REFS - 1 - len(ments)))
+        src = next((t for t in s.get("takes") or [] if t["id"] == from_take and not t.get("composite")), None)
+        if note and src and src.get("prompt"):
+            prompt = src["prompt"]  # التعديل بيتبني على برومبت النسخة اللي مش عاجباك
+        s.setdefault("takes", []).append({
+            "id": tid, "file": None, "status": "queued", "error": None, "approved": False, "duration": None,
+            "gen_duration": take_duration(vm, float(s.get("seconds") or 4)), "video_model": vm["key"],
+            "prompt": prompt, "note": note, "revised": not note, "extra_refs": extra or [], "created_at": now()})
+        if not s.get("chosen"):
+            s["chosen"] = tid
+    update_ad(aid, fn)
+    ad_executor.submit(run_ad_take, aid, sid, tid)
+
+
+@app.post("/api/ads/{aid}/prod/shots/{sid}/generate")
+def prod_generate(aid: str, sid: str, note: str = "", take_id: str | None = None):
+    """فيديو جديد للقطة. note = عايز تعدّل إيه في النسخة take_id (البرومبت بيتكتب من جديد بطلبك)."""
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات")
+    queue_ad_take(aid, sid, note.strip()[:1500], take_id)
+    return ad_response(aid)
+
+
+@app.post("/api/ads/{aid}/prod/generate-approved")
+def prod_generate_approved(aid: str):
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات")
+    with closing(db()) as conn:
+        _, d = ad_row(conn, aid)
+    todo = [s["id"] for s in prod_of(d)["shots"] if s.get("approved") and s.get("frame")
+            and not any(t["status"] != "failed" for t in s.get("takes") or [])]
+    if not todo:
+        raise HTTPException(400, "مفيش لقطات معتمدة ليها ستوري بورد ومن غير فيديو")
+    for sid in todo:
+        queue_ad_take(aid, sid)
+    return ad_response(aid)
+
+
+class TakeActIn(BaseModel):
+    take_id: str
+
+
+@app.post("/api/ads/{aid}/prod/shots/{sid}/take")
+def prod_take_act(aid: str, sid: str, body: TakeActIn, action: str = "pick"):
+    """pick: النسخة المختارة · approve / unapprove · delete · retry (بيكمّل الطلب من غير دفع تاني)."""
+    retry = False
+    def fn(d):
+        nonlocal retry
+        s = find_pshot(prod_of(d), sid)
+        t = next((x for x in s.get("takes") or [] if x["id"] == body.take_id), None)
+        if t is None:
+            raise HTTPException(404, "النسخة مش موجودة")
+        if action == "pick":
+            s["chosen"] = t["id"]
+        elif action in ("approve", "unapprove"):
+            if t["status"] != "done":
+                raise HTTPException(400, "النسخة لسه ما خلصتش")
+            t["approved"] = action == "approve"
+            if t["approved"]:
+                s["chosen"] = t["id"]
+        elif action == "delete":
+            s["takes"] = [x for x in s["takes"] if x["id"] != t["id"]]
+            if s.get("chosen") == t["id"]:
+                s["chosen"] = s["takes"][-1]["id"] if s["takes"] else None
+            if t.get("file"):
+                (prod_dir(aid, "takes") / t["file"]).unlink(missing_ok=True)
+        elif action == "retry":
+            if t["status"] != "failed":
+                raise HTTPException(400, "النسخة دي مش فاشلة")
+            t.update(status="queued", error=None)
+            retry = True
+    update_ad(aid, fn)
+    if retry:
+        with closing(db()) as conn:
+            _, d = ad_row(conn, aid)
+        t = next(x for x in find_pshot(d["prod"], sid)["takes"] if x["id"] == body.take_id)
+        if t.get("lipsync"):
+            ad_executor.submit(run_ad_lipsync, aid, sid, body.take_id)
+        else:
+            ad_executor.submit(run_ad_take, aid, sid, body.take_id)
+    return ad_response(aid)
+
+
+@app.post("/api/ads/{aid}/prod/shots/{sid}/edit-take")
+def prod_edit_take(aid: str, sid: str, note: str = Form(""), take_id: str = Form(""), files: list[UploadFile] = File(default=[])):
+    """✏️ نسخة جديدة من فيديو اللقطة بطلبك، ومعاه صور مرجعية لو عايز."""
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات")
+    note = note.strip()[:1500]
+    if not note:
+        raise HTTPException(400, "اكتب عايز تعدّل إيه")
+    queue_ad_take(aid, sid, note, take_id or None, save_edit_refs(aid, files))
+    return ad_response(aid)
+
+
+@app.post("/api/ads/{aid}/prod/upload-take")
+def prod_upload_take(aid: str, shot_id: str, file: UploadFile = File(...)):
+    """فيديو من عندك للقطة (بيتعتمد على طول)."""
+    tid = uuid.uuid4().hex[:10]
+    name = save_upload(file, VIDEO_EXTENSIONS, prod_dir(aid, "takes"), f"{tid}-up")
+    dur = probe_duration(prod_dir(aid, "takes") / name)
+    def fn(d):
+        s = find_pshot(prod_of(d), shot_id)
+        s.setdefault("takes", []).append({"id": tid, "file": name, "status": "done", "error": None, "approved": True,
+                                          "duration": round(dur, 2), "upload": True, "created_at": now()})
+        s["chosen"] = tid
+    update_ad(aid, fn)
+    return ad_response(aid)
+
+
+def ad_voice_track(aid: str, conn: sqlite3.Connection, shots: list[dict], label: str) -> dict | None:
+    """التعليق الصوتي للمونتاج: الصوت الكامل زي ما هو (لو موجود)، وإلا صوت كل لقطة في مكانه على التايم لاين."""
+    with closing(db()) as c2:
+        _, d = ad_row(c2, aid)
+    fv = (d.get("prod") or {}).get("full_voice") or {}
+    if fv.get("file") and fv.get("status") == "done" and (prod_dir(aid, "voice") / fv["file"]).exists():
+        vid = uuid.uuid4().hex[:12]
+        src = prod_dir(aid, "voice") / fv["file"]
+        vfile = f"voice_{vid}{src.suffix}"
+        shutil.copyfile(src, AUDIO_DIR / vfile)
+        conn.execute("INSERT INTO audio (id, kind, name, filename, duration, created_at) VALUES (?, 'voice', ?, ?, ?, ?)",
+                     (vid, f"🎙️ {label}", vfile, probe_duration(AUDIO_DIR / vfile), now()))
+        return {"id": vid, "volume": 1.0, "delay": 0.0, "offset": 0.0, "length": None, "fade_out": False, "parts": []}
+    parts, t = [], 0.0
+    for s in shots:
+        f = prod_dir(aid, "voice") / (s.get("voice_file") or "")
+        if s.get("voice_file") and f.exists():
+            parts.append((f, t))
+        t += float(s.get("seconds") or 4)
+    if not parts:
+        return None
+    vid = uuid.uuid4().hex[:12]
+    vfile = f"voice_{vid}.m4a"
+    inputs, chain = [], []
+    for k, (f, start) in enumerate(parts):
+        inputs += ["-i", str(f)]
+        chain.append(f"[{k}:a]adelay={int(start * 1000)}:all=1[a{k}]")
+    chain.append("".join(f"[a{k}]" for k in range(len(parts))) + f"amix=inputs={len(parts)}:normalize=0[out]")
+    subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", *inputs, "-filter_complex", ";".join(chain),
+                    "-map", "[out]", "-c:a", "aac", "-b:a", "160k", str(AUDIO_DIR / vfile)], check=True, capture_output=True, timeout=300)
+    conn.execute("INSERT INTO audio (id, kind, name, filename, duration, created_at) VALUES (?, 'voice', ?, ?, ?, ?)",
+                 (vid, f"🎙️ {label}", vfile, probe_duration(AUDIO_DIR / vfile), now()))
+    return {"id": vid, "volume": 1.0, "delay": 0.0, "offset": 0.0, "length": None, "fade_out": False, "parts": []}
+
+
+@app.post("/api/ads/{aid}/prod/to-editor")
+def prod_to_editor(aid: str):
+    """يجمع اللقطات الموافق عليها بالترتيب في مشروع مونتاج (والموسيقى الافتراضية)."""
+    with closing(db()) as conn:
+        r, d = ad_row(conn, aid)
+    p = prod_of(d)
+    missing = []
+    picks = []
+    for s in p["shots"]:
+        t = next((x for x in s.get("takes") or [] if x["id"] == s.get("chosen")), None)
+        if not t or t["status"] != "done" or not t.get("approved"):
+            missing.append(s["n"])
+        else:
+            picks.append((s, t))
+    if missing:
+        raise HTTPException(400, f"اللقطات دي لسه من غير فيديو موافق عليه: {', '.join(map(str, missing))}")
+    label = p["header"].get("title") or r["name"]
+    clips = []
+    with closing(db()) as conn, conn:
+        for s, t in picks:
+            gid = uuid.uuid4().hex[:12]
+            out = f"{gid}.mp4"
+            shutil.copyfile(prod_dir(aid, "takes") / t["file"], GENERATED_DIR / out)
+            conn.execute(
+                "INSERT INTO generations (id, clip_id, clip_filename, clip_label, coach_id, coach_name, coach_image, model, prompt, "
+                "params, status, output_filename, created_at, updated_at) VALUES (?, ?, ?, ?, '', '', '', 'seedance', ?, '{}', 'completed', ?, ?, ?)",
+                (gid, f"ad:{aid}", t["file"], f"📣 {label} · لقطة {s['n']}", t.get("prompt") or "", out, now(), now()),
+            )
+            dur = float(s.get("seconds") or t.get("duration") or 4)
+            clips.append({"gen_id": gid, "start": 0.0, "end": min(dur, t.get("duration") or dur),
+                          "zoom": 1.0, "x": 0.0, "y": 0.0, "volume": 0.0})
+        voice = ad_voice_track(aid, conn, [s for s, _ in picks], label)
+        pid = uuid.uuid4().hex[:12]
+        pdata = {"name": f"📣 {label}", "section": "ads", "video_id": None, "coach_id": None, "clips": clips, "voice": voice,
+                 "music": default_music(conn), "outro": False, "outro_volume": 1.0, "captions": {}, "logo": {}}
+        conn.execute("INSERT INTO projects (id, name, data, render_status, created_at, updated_at) VALUES (?, ?, ?, 'idle', ?, ?)",
+                     (pid, pdata["name"], json.dumps(pdata, ensure_ascii=False), now(), now()))
+    update_ad(aid, lambda d: d["prod"].update(project_id=pid))
+    return {"project_id": pid}
+
+
+def reset_stuck_prod() -> None:
+    with closing(db()) as conn, conn:
+        for r in conn.execute("SELECT id, data FROM ads").fetchall():
+            d = json.loads(r["data"])
+            p = d.get("prod")
+            if not p:
+                continue
+            if p.get("cast_status") == "working":
+                p.update(cast_status="failed", cast_error="اتقطع لما السيرفر اتقفل. دوس تاني")
+            if (p.get("full_voice") or {}).get("status") == "working":
+                p["full_voice"].update(status="failed", error="اتقطع لما السيرفر اتقفل. دوس «قطّع تاني»")
+            for c in p.get("cast") or []:
+                if c.get("status") == "working":
+                    c.update(status="failed", error="اتقطع لما السيرفر اتقفل")
+            for s in p["shots"]:
+                if s.get("frame_status") in ("queued", "working"):
+                    s.update(frame_status="failed", frame_error="اتقطع لما السيرفر اتقفل. ارسم تاني")
+                if s.get("comp_status") == "working":
+                    s.update(comp_status="failed", comp_error="اتقطع لما السيرفر اتقفل. استخرج تاني")
+                if s.get("voice_status") == "working":
+                    s.update(voice_status="failed", voice_error="اتقطع لما السيرفر اتقفل. ولّد الصوت تاني")
+                for c in s.get("components") or []:
+                    if c.get("status") == "working":
+                        c.update(status="failed", error="اتقطع لما السيرفر اتقفل")
+                for t in s.get("takes") or []:
+                    if t.get("status") in ("queued", "working"):
+                        t.update(status="failed", error="اتقطع لما السيرفر اتقفل. دوس ↻ (بيكمّل من غير دفع تاني)")
+            conn.execute("UPDATE ads SET data = ? WHERE id = ?", (json.dumps(d, ensure_ascii=False), r["id"]))
+
+
+reset_stuck_prod()
+
+
+# ================================================================ 🔬 معمل التفكيك
+
+LAB_DIR = DATA_DIR / "lab"
+LAB_DIR.mkdir(parents=True, exist_ok=True)
+LAB_LOCK = threading.Lock()
+LAB_STEPS = ("split", "shots", "stems", "audio", "elements", "components", "connectors")
+# التفكيك العادي: القطعات ← العناصر ← اقتراح الكومبوننتس. الصوت (فصل التراكات وتحليله) متوقف ومش بيشتغل غير لو طلبته
+LAB_DEFAULT = ("shots", "elements", "components", "connectors")
+# المعمل دلوقتي بيقسّم الفيديو لـ ٤ بس: صورة (من غير صوت) / كلام / موسيقى / مؤثرات.
+# باقي الخطوات (القطعات، العناصر، الكومبوننتس، الكونيكتورز، تحليل الصوت، المخطط) متأرشفة: الكود موجود بس مش ظاهرة
+LAB_UPLOAD = ("split",)
+LAB_NEEDS = {"components": "elements", "elements": "shots", "connectors": "shots", "audio": "shots", "stems": "shots"}
+LAB_PROXY_LOCK = threading.Lock()
+
+
+class LabStop(Exception):
+    """الشغل اتوقف بطلبك."""
+
+
+def lab_stopping(lid: str) -> bool:
+    try:
+        return bool(lab_load(lid).get("stop"))
+    except HTTPException:
+        return True
+
+
+def lab_dir(lid: str) -> Path:
+    return LAB_DIR / Path(lid).name
+
+
+def lab_load(lid: str) -> dict:
+    f = lab_dir(lid) / "lab.json"
+    if not f.exists():
+        raise HTTPException(404, "الفيديو ده مش موجود في المعمل")
+    return json.loads(f.read_text(encoding="utf-8"))
+
+
+def lab_update(lid: str, fn) -> dict:
+    with LAB_LOCK:
+        d = lab_load(lid)
+        fn(d)
+        d["updated_at"] = now()
+        tmp = lab_dir(lid) / "lab.json.tmp"
+        tmp.write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+        tmp.replace(lab_dir(lid) / "lab.json")
+        return d
+
+
+def lab_step(lid: str, step: str, **kw) -> None:
+    lab_update(lid, lambda d: d.setdefault("steps", {}).setdefault(step, {}).update(**kw))
+
+
+def lab_reviews(d: dict) -> dict:
+    """عدّاد المراجعة: كام حاجة اتوافق عليها / اترفضت / لسه، لكل نوع."""
+    groups: dict[str, list] = {"shots": [s for s in d.get("shots") or []],
+                               "stems": [v for v in (d.get("stems") or {}).values() if isinstance(v, dict) and v.get("file")],
+                               "sfx": (d.get("audio") or {}).get("sfx") or [],
+                               "music": (d.get("audio") or {}).get("music") or [],
+                               "speech": (d.get("audio") or {}).get("speech") or [],
+                               "elements": [e for s in d.get("shots") or [] for e in (s.get("analysis") or {}).get("elements") or []],
+                               "actions": [a for s in d.get("shots") or [] for e in (s.get("analysis") or {}).get("elements") or []
+                                           for a in e.get("actions") or []],
+                               "components": d.get("components") or [], "connectors": d.get("connectors") or []}
+    out = {}
+    for k, items in groups.items():
+        oks = [((x.get("review") or {}).get("ok")) for x in items]
+        out[k] = {"total": len(items), "ok": oks.count(True), "bad": oks.count(False)}
+    return out
+
+
+def lab_to_dict(lid: str, d: dict) -> dict:
+    base = f"/media/lab/{lid}"
+    shots = []
+    for s in d.get("shots") or []:
+        s = {k: v for k, v in s.items() if k not in ("layers", "vedits")}
+        shots.append({**s, "frames": [{**f, "url": f"{base}/frames/{f['file']}"} for f in s.get("frames") or []]})
+    comps = [{**c, "asset": c["asset"] if c.get("asset") and (clip_dir(c["asset"]) / "asset.json").exists() else None}
+             for c in d.get("components") or []]
+    conns = [{**c, "asset": c["asset"] if c.get("asset") and (clip_dir(c["asset"]) / "asset.json").exists() else None,
+              "keyframes": [{**k, "url": f"{base}/frames/{k['file']}"} for k in c.get("keyframes") or []]}
+             for c in d.get("connectors") or []]
+    audio = d.get("audio") or {}
+    audio = {**audio, "sfx": [{**x, "clip_url": f"{base}/sfx/{x['clip']}" if x.get("clip") else None} for x in audio.get("sfx") or []]}
+    stems = {k: {**v, "url": f"{base}/stems/{v['file']}" if v.get("file") else None}
+             for k, v in (d.get("stems") or {}).items() if isinstance(v, dict)}
+    sch = d.get("schema") or {}
+    if sch.get("data"):
+        sch = {**sch, "data": {**sch["data"], "beats": [{**b, "thumb_url": f"{base}/frames/{b['thumb']}" if b.get("thumb") else None}
+                                                     for b in sch["data"]["beats"]]}}
+    return {**d, "id": lid, "source_url": f"{base}/{d['source']['file']}", "shots": shots,
+            "picture_url": f"{base}/{d['picture']}" if d.get("picture") else None,
+            "picture_fx_url": f"{base}/{d['picture_fx']}" if d.get("picture_fx") else None, "audio": audio, "stems": stems, "schema": sch or None,
+            "schema_roles": lab.SCHEMA_ROLES,
+            "components": comps, "connectors": conns, "families": lab.CONNECTOR_FAMILIES,
+            "audioshake": bool(audioshake.api_key() or atlas.mock_mode()),
+            "reviews": lab_reviews(d), "busy": any((v or {}).get("status") in ("working", "queued") for v in (d.get("steps") or {}).values())
+            or sch.get("status") == "working" or (d.get("typo") or {}).get("status") == "working",
+            "typo": lab_typo_view(d.get("typo")),
+            "categories": list(lab.COMPONENT_CATS)}
+
+
+def lab_list_items() -> list[dict]:
+    out = []
+    for f in sorted(LAB_DIR.glob("*/lab.json"), key=lambda x: x.stat().st_mtime, reverse=True):
+        try:
+            d = json.loads(f.read_text(encoding="utf-8"))
+        except ValueError:
+            continue
+        lid = f.parent.name
+        thumb = next((f"frames/{fr['file']}" for s in d.get("shots") or [] for fr in (s.get("frames") or [])[:1]), None)
+        if not thumb and (f.parent / "poster.jpg").exists():
+            thumb = "poster.jpg"
+        out.append({"id": lid, "name": d.get("name"), "created_at": d.get("created_at"), "duration": d["source"]["duration"],
+                    "fx": bool(d.get("picture_fx")),
+                    "shots": len(d.get("shots") or []), "thumb": f"/media/lab/{lid}/{thumb}" if thumb else None,
+                    "busy": any((v or {}).get("status") == "working" for v in (d.get("steps") or {}).values())})
+    return out
+
+
+@app.get("/api/lab")
+def lab_list():
+    return lab_list_items()
+
+
+@app.post("/api/lab")
+def lab_create(file: UploadFile = File(...), name: str = Form("")):
+    """ترفع فيديو والتفكيك بيبدأ لوحده: القطعات ← الصوت ← عناصر كل لقطة."""
+    lid = uuid.uuid4().hex[:12]
+    folder = lab_dir(lid)
+    folder.mkdir(parents=True, exist_ok=True)
+    fname = save_upload(file, VIDEO_EXTENSIONS, folder, "source")
+    try:
+        info = media_info(folder / fname)
+    except Exception as exc:  # noqa: BLE001
+        shutil.rmtree(folder, ignore_errors=True)
+        raise HTTPException(400, f"مقدرتش أقرا الفيديو: {exc}") from exc
+    if info.duration > 300:
+        shutil.rmtree(folder, ignore_errors=True)
+        raise HTTPException(400, "الفيديو أطول من 5 دقايق. قصّه الأول")
+    d = {"name": name.strip() or Path(file.filename or "فيديو").stem, "created_at": now(), "updated_at": now(),
+         "source": {"file": fname, "duration": round(info.duration, 2), "width": info.width, "height": info.height,
+                    "has_audio": info.has_audio},
+         "steps": {k: {"status": "queued"} for k in LAB_UPLOAD}, "shots": [], "audio": {}, "components": []}
+    (folder / "lab.json").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+    threading.Thread(target=run_lab, args=(lid, list(LAB_UPLOAD)), daemon=True).start()
+    return lab_to_dict(lid, d)
+
+
+@app.get("/api/lab/export/list")
+def lab_export_list():
+    """قايمة الفيديوهات اللي ليها نسخة «الصورة + المؤثرات» (الاسم واللينك والحالة)."""
+    out = []
+    for f in sorted(LAB_DIR.glob("*/lab.json"), key=lambda x: x.stat().st_mtime):
+        try:
+            d = json.loads(f.read_text(encoding="utf-8"))
+        except ValueError:
+            continue
+        st = (d.get("steps") or {}).get("split") or {}
+        out.append({"id": f.parent.name, "name": d.get("name"), "duration": d["source"]["duration"], "status": st.get("status"),
+                    "error": st.get("error"), "updated_at": d.get("updated_at"),
+                    "url": f"/media/lab/{f.parent.name}/picture_fx.mp4" if d.get("picture_fx") else None,
+                    "source_url": f"/api/lab/export/source/{f.parent.name}", "has_audio": (d.get("source") or {}).get("has_audio")})
+    return out
+
+
+# ---------------------------------------------------------------- 📦 أرشيف المراجع
+# فيديوهات وصور مرجعية بتترفع زي ما هي (من غير تقسيم ولا تحليل ولا أي تكلفة)، عشان نطلّع منها ستايلات وعناصر جديدة.
+# بتتشاف من الصفحة (refs.html) وبتتسحب من برّه بنفس مفتاح القراءة بتاع المعمل.
+REFS_DIR = DATA_DIR / "refs"
+REFS_DIR.mkdir(parents=True, exist_ok=True)
+REFS_EXT = {".mp4", ".mov", ".m4v", ".webm", ".mkv", ".avi", ".gif", ".jpg", ".jpeg", ".png", ".webp", ".zip"}
+
+
+def refs_list() -> list[dict]:
+    out = []
+    for m in sorted(REFS_DIR.glob("*.json"), key=lambda x: x.stat().st_mtime, reverse=True):
+        try:
+            d = json.loads(m.read_text(encoding="utf-8"))
+        except ValueError:
+            continue
+        f = REFS_DIR / f"{m.stem}{d.get('ext', '')}"
+        if f.exists():
+            out.append({**d, "id": m.stem, "size": f.stat().st_size, "url": f"/api/refs/{m.stem}/file"})
+    return out
+
+
+@app.get("/api/refs")
+def refs_get():
+    return refs_list()
+
+
+@app.post("/api/refs")
+def refs_upload(file: UploadFile = File(...)):
+    ext = Path(file.filename or "").suffix.lower()
+    if ext not in REFS_EXT:
+        raise HTTPException(400, f"نوع الملف ده مش مدعوم في الأرشيف: {ext or 'من غير امتداد'}")
+    rid = uuid.uuid4().hex[:12]
+    with (REFS_DIR / f"{rid}{ext}").open("wb") as out:
+        shutil.copyfileobj(file.file, out)
+    (REFS_DIR / f"{rid}.json").write_text(json.dumps({"name": Path(file.filename or rid).name[:200], "ext": ext, "created_at": now()},
+                                                     ensure_ascii=False), encoding="utf-8")
+    return next((r for r in refs_list() if r["id"] == rid), {"id": rid})
+
+
+def refs_file(rid: str) -> tuple[Path, dict]:
+    rid = Path(rid).name
+    try:
+        d = json.loads((REFS_DIR / f"{rid}.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        raise HTTPException(404, "مش موجود") from None
+    f = REFS_DIR / f"{rid}{d.get('ext', '')}"
+    if not f.exists():
+        raise HTTPException(404, "مش موجود")
+    return f, d
+
+
+@app.get("/api/refs/{rid}/file")
+def refs_download(rid: str):
+    f, d = refs_file(rid)
+    return FileResponse(f, filename=d.get("name") or f.name)
+
+
+@app.delete("/api/refs/{rid}")
+def refs_delete(rid: str):
+    f, _ = refs_file(rid)
+    f.unlink(missing_ok=True)
+    (REFS_DIR / f"{Path(rid).name}.json").unlink(missing_ok=True)
+    return {"ok": True}
+
+
+@app.get("/api/lab/export/refs")
+def refs_export_list():
+    """قايمة الأرشيف (بمفتاح القراءة من برّه)."""
+    return [{**r, "url": f"/api/lab/export/refs/{r['id']}"} for r in refs_list()]
+
+
+@app.get("/api/lab/export/refs/{rid}")
+def refs_export_file(rid: str):
+    f, d = refs_file(rid)
+    return FileResponse(f, filename=d.get("name") or f.name)
+
+
+@app.get("/api/lab/export/source/{lid}")
+def lab_export_source(lid: str):
+    """⬇ الفيديو الأصلي زي ما اترفع (للفيديوهات المرجعية اللي محتاجين منها التايبوجرافي بس، من غير تقسيم الصوت)."""
+    folder = lab_dir(Path(lid).name)
+    try:
+        d = json.loads((folder / "lab.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        raise HTTPException(404, "مش موجود") from None
+    f = folder / d["source"]["file"]
+    if not f.exists():
+        raise HTTPException(404, "مش موجود")
+    return FileResponse(f, filename=export_file_name(d.get("name") or lid))
+
+
+@app.get("/api/lab/export/picture-fx.zip")
+def lab_export_fx():
+    """⬇ كل نسخ «الصورة + المؤثرات» في ملف zip واحد (الاسم = اسم الفيديو في المعمل)."""
+    import zipfile
+    files, used = [], set()
+    for f in sorted(LAB_DIR.glob("*/lab.json"), key=lambda x: x.stat().st_mtime):
+        try:
+            d = json.loads(f.read_text(encoding="utf-8"))
+        except ValueError:
+            continue
+        mp4 = f.parent / (d.get("picture_fx") or "-")
+        if d.get("picture_fx") and mp4.exists():
+            name = export_file_name(d.get("name") or f.parent.name)
+            stem, n = Path(name).stem, 2
+            while name in used:
+                name, n = f"{stem} ({n}).mp4", n + 1
+            used.add(name)
+            files.append((mp4, name))
+    if not files:
+        raise HTTPException(404, "لسه مفيش فيديوهات اتقسمت لصورة + مؤثرات")
+    # بيتبعت وهو بيتعمل (من غير ملف مؤقت على السيرفر، عشان المساحة)
+    class Sink:
+        def __init__(self):
+            self.parts = []
+        def write(self, b):
+            self.parts.append(bytes(b))
+            return len(b)
+        def flush(self):
+            pass
+        def take(self):
+            out, self.parts = b"".join(self.parts), []
+            return out
+
+    def gen():
+        sink = Sink()
+        with zipfile.ZipFile(sink, "w", zipfile.ZIP_STORED) as z:
+            for mp4, name in files:
+                with open(mp4, "rb") as r, z.open(name, "w", force_zip64=True) as w:
+                    while chunk := r.read(1 << 20):
+                        w.write(chunk)
+                        yield sink.take()
+                yield sink.take()
+        yield sink.take()
+    return StreamingResponse(gen(), media_type="application/zip",
+                             headers={"Content-Disposition": 'attachment; filename="studiomania-picture-fx.zip"'})
+
+
+@app.get("/api/lab/{lid}")
+def lab_get(lid: str):
+    return lab_to_dict(lid, lab_load(lid))
+
+
+class LabPatchIn(BaseModel):
+    name: str | None = None
+    split: str | None = None   # fine = كل تغيير جوه المشهد، cuts = القطعات بس
+
+
+@app.patch("/api/lab/{lid}")
+def lab_patch(lid: str, body: LabPatchIn):
+    def fn(d):
+        if body.name and body.name.strip():
+            d["name"] = body.name.strip()[:120]
+        if body.split in ("fine", "cuts"):
+            d["split"] = body.split
+    return lab_to_dict(lid, lab_update(lid, fn))
+
+
+@app.delete("/api/lab/{lid}")
+def lab_delete(lid: str):
+    lab_load(lid)
+    shutil.rmtree(lab_dir(lid), ignore_errors=True)
+    return {"ok": True}
+
+
+@app.post("/api/lab/{lid}/run")
+def lab_run(lid: str, step: str = "all", fresh: bool = False, steps: str = ""):
+    """يشغّل الخطوات اللي إنت اخترتها بس (steps = "elements,connectors" مثلًا، أو step واحدة).
+    الخطوة اللي محتاجة خطوة قبلها لسه ما اتعملتش (الكومبوننتس محتاجة العناصر) بتاخدها معاها.
+    fresh = يمسح كل اقتراحات الكومبوننتس (حتى اللي قبلتها أو رفضتها) ويقترح من الصفر."""
+    want = [x for x in steps.split(",") if x in LAB_STEPS] if steps else list(LAB_DEFAULT) if step == "all" else [step] if step in LAB_STEPS else []
+    if not want:
+        raise HTTPException(400, "اختار خطوة واحدة على الأقل")
+    d = lab_load(lid)
+    if any((d.get("steps") or {}).get(k, {}).get("status") in ("working", "queued") for k in LAB_STEPS):
+        raise HTTPException(400, "التفكيك شغال بالفعل. استنى لما يخلص أو دوس «⏹ وقّف»")
+    done = {k for k, v in (d.get("steps") or {}).items() if (v or {}).get("status") == "done"}
+    steps_ = set(want)
+    for k in list(want):
+        need = LAB_NEEDS.get(k)
+        while need and need not in done and need not in steps_:
+            steps_.add(need)
+            need = LAB_NEEDS.get(need)
+    if "stems" in steps_:
+        steps_.add("audio")
+    steps = sorted(steps_, key=LAB_STEPS.index)
+    def fn(d):
+        d["stop"] = False
+        for k in steps:
+            d.setdefault("steps", {})[k] = {"status": "queued"}
+        if fresh and "components" in steps:
+            # أسباب الرفض بتتحفظ عشان الموديل يفضل يتعلم منها، والاقتراحات نفسها بتتمسح (الأصول اللي في المكتبة بتفضل)
+            d["comp_lessons"] = ([{"name": c["name"], "t0": c["t0"], "t1": c["t1"], "note": (c.get("review") or {}).get("note")}
+                                  for c in d.get("components") or [] if (c.get("review") or {}).get("ok") is False]
+                                 + (d.get("comp_lessons") or []))[:40]
+            d["components"] = []
+        if fresh and "connectors" in steps:
+            d["conn_lessons"] = ([{"name": c["name"], "t0": c["t0"], "t1": c["t1"], "note": (c.get("review") or {}).get("note")}
+                                  for c in d.get("connectors") or [] if (c.get("review") or {}).get("ok") is False]
+                                 + (d.get("conn_lessons") or []))[:40]
+            d["connectors"] = []
+    lab_update(lid, fn)
+    threading.Thread(target=run_lab, args=(lid, steps), daemon=True).start()
+    return lab_to_dict(lid, lab_load(lid))
+
+
+@app.post("/api/lab/{lid}/stop")
+def lab_stop(lid: str):
+    """⏹ يوقّف التفكيك: الخطوات اللي مستنية بتتلغي، واللي شغالة بتقف عند أقرب نقطة (طلب اتبعت للموديل بيكمل وبيتحسب)."""
+    def fn(d):
+        d["stop"] = True
+        for k, v in (d.get("steps") or {}).items():
+            if (v or {}).get("status") == "queued":
+                v.update(status="stopped", error=None, progress="")
+            elif (v or {}).get("status") == "working":
+                v["progress"] = "⏹ بيوقف..."
+        sc = d.get("schema") or {}
+        if sc.get("status") == "working":
+            d["schema"] = {**sc, "status": "done", "error": None, "run": None} if sc.get("data") else None
+    return lab_to_dict(lid, lab_update(lid, fn))
+
+
+def lab_media_chat(messages: list[dict]) -> str:
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise atlas.AtlasError("مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات")
+    return ad_media_chat(messages)
+
+
+def run_lab(lid: str, steps: list[str]) -> None:
+    folder = lab_dir(lid)
+    for n, step in enumerate(steps):
+        if lab_stopping(lid):
+            for k in steps[n:]:
+                lab_step(lid, k, status="stopped", error=None, progress="")
+            return
+        try:
+            lab_step(lid, step, status="working", error=None, progress="")
+            d = lab_load(lid)
+            src = folder / d["source"]["file"]
+            dur = d["source"]["duration"]
+            if step == "split":
+                run_lab_split(lid, d, src)
+            elif step == "shots":
+                # فريمات اللقطات القديمة بس (صور المخطط والكونيكتورز بتفضل)
+                for f in (folder / "frames").glob("*"):
+                    if not f.name.startswith(("sch-", "cx")):
+                        f.unlink(missing_ok=True)
+                shots = lab.detect_shots(ffmpeg_exe(), src, dur)
+                if d.get("split", "cuts") == "fine":  # 🔀 لو اخترته: كمان كل تغيير جوه المشهد (الأساسي القطعات بس، وإنت بتقسم)
+                    lab_step(lid, step, progress="بيدور على التغييرات جوه كل لقطة")
+                    shots = lab.fine_shots(ffmpeg_exe(), src, shots)
+                for k, s in enumerate(shots):
+                    lab_step(lid, step, progress=f"فريمات اللقطة {k + 1} من {len(shots)}")
+                    s["frames"] = lab.extract_frames(ffmpeg_exe(), src, s["start"], s["end"], folder / "frames", shot_key(s))
+                    s["review"] = None
+                lab_update(lid, lambda d: d.update(shots=shots))
+            elif step == "stems":
+                run_lab_stems(lid, d, src)
+            elif step == "audio":
+                if not d["source"].get("has_audio"):
+                    lab_update(lid, lambda d: d.update(audio={"none": True}))
+                else:
+                    run_lab_audio(lid, d, src, dur)
+            elif step == "elements":
+                run_lab_elements(lid)
+            elif step == "components":
+                run_lab_components(lid)
+            elif step == "connectors":
+                run_lab_connectors(lid)
+            lab_step(lid, step, status="done", error=None, progress="", at=now())
+        except LabSkip as exc:
+            lab_step(lid, step, status="skipped", error=str(exc), progress="")
+        except LabStop:
+            lab_step(lid, step, status="stopped", error=None, progress="")
+            for k in steps[n + 1:]:
+                lab_step(lid, k, status="stopped", error=None, progress="")
+            return
+        except Exception as exc:  # noqa: BLE001
+            lab_step(lid, step, status="failed", error=str(getattr(exc, "detail", None) or exc)[:400], progress="")
+            if step == "shots":
+                return
+
+
+def run_lab_audio(lid: str, d: dict, src: Path, dur: float) -> None:
+    folder = lab_dir(lid)
+    lab_step(lid, "audio", progress="بيقيس بدايات الأصوات")
+    # لو التراكات اتفصلت: بدايات الأصوات وقص كل مؤثر بيتعملوا من تراك المؤثرات النضيف (من غير كلام وموسيقى)
+    fx_stem = (d.get("stems") or {}).get("effects", {}).get("file")
+    fx_src = folder / "stems" / fx_stem if fx_stem and (folder / "stems" / fx_stem).exists() else None
+    marks = lab.onsets(lab.pcm(ffmpeg_exe(), fx_src or src))
+    audio_mp3 = folder / "audio.mp3"
+    subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src), "-vn", "-ac", "1", "-b:a", "96k",
+                    str(audio_mp3)], check=True, capture_output=True, timeout=300)
+    lab_step(lid, "audio", progress="بيفرّغ الكلام")
+    try:
+        words = atlas.transcribe(audio_mp3, dur)
+    except Exception:  # noqa: BLE001  من غير كلام أو التفريغ فشل: نكمل بالموديل بس
+        words = []
+    speech = lab.speech_segments(words)
+    lab_step(lid, "audio", progress="بيسمع ويصنّف المؤثرات والموسيقى")
+    if atlas.mock_mode():
+        res = lab.mock_audio(dur, marks)
+    else:
+        proxy = lab_proxy(lid, d)
+        res = ad_json(lab_media_chat(az.with_media(lab.audio_messages(dur, marks, speech), data_url(proxy, "video/mp4"), "video.mp4")),
+                      "تفكيك الصوت")
+    shutil.rmtree(folder / "sfx", ignore_errors=True)
+    (folder / "sfx").mkdir(parents=True, exist_ok=True)
+    sfx = []
+    for i, x in enumerate(sorted((x for x in res.get("sfx") or [] if isinstance(x, dict)), key=lambda x: float(x.get("t") or 0))):
+        try:
+            t0 = float(x.get("t") or 0)
+        except (TypeError, ValueError):
+            continue
+        t, snapped = lab.snap(t0, marks)
+        if not 0 <= t < dur:
+            continue
+        try:
+            sd = min(2.0, max(0.08, float(x.get("dur") or 0.3)))
+        except (TypeError, ValueError):
+            sd = 0.3
+        sid = f"x{i + 1}"
+        clip = f"{sid}.mp3"
+        lab.cut_audio(ffmpeg_exe(), fx_src or src, t - 0.04, min(sd + 0.12, dur - t + 0.04), folder / "sfx" / clip)
+        sfx.append({"id": sid, "t": round(t, 3), "t_model": round(t0, 3), "snapped": snapped, "dur": round(sd, 2),
+                    "label": str(x.get("label") or "")[:80], "category": x.get("category") if x.get("category") in lab.SFX_CATEGORIES else "other",
+                    "what": str(x.get("what") or "")[:300], "clip": clip, "review": None})
+    gem_speech = [x for x in res.get("speech") or [] if isinstance(x, dict)]
+    if speech:  # التوقيت من التفريغ (أدق)، واسم المتكلم من الموديل
+        for s in speech:
+            hit = next((g for g in gem_speech if float(g.get("start") or 0) <= s["end"] and float(g.get("end") or 0) >= s["start"]), None)
+            s.update(speaker=str((hit or {}).get("speaker") or "")[:60], review=None)
+    else:
+        speech = [{"start": round(float(g.get("start") or 0), 2), "end": round(float(g.get("end") or 0), 2),
+                   "text": str(g.get("text") or "")[:500], "speaker": str(g.get("speaker") or "")[:60], "review": None} for g in gem_speech]
+    music = [{"start": round(float(m.get("start") or 0), 2), "end": round(float(m.get("end") or 0), 2),
+              "description": str(m.get("description") or "")[:300], "mood": str(m.get("mood") or "")[:80], "review": None}
+             for m in res.get("music") or [] if isinstance(m, dict)]
+    lab_update(lid, lambda d: d.update(audio={"sfx": sfx, "speech": speech, "music": music, "onsets": marks[:300],
+                                               "from_stem": bool(fx_src)}))
+
+
+def lab_typo_view(ty: dict | None) -> dict | None:
+    """نتيجة التايبوجرافي بلينكات الستيكرات."""
+    if not ty:
+        return None
+    if not ty.get("data"):
+        return ty
+    stk = {s["id"]: sticker_dict(s)["url"] for s in stickers_load()}
+    moments = [{**m, "icons": [{**ic, "url": stk.get(ic.get("sticker") or "")} for ic in m["icons"]]} for m in ty["data"]["moments"]]
+    return {**ty, "data": {**ty["data"], "moments": moments}}
+
+
+def lab_proxy(lid: str, d: dict) -> Path:
+    """نسخة صغيرة من الفيديو (بالصوت) عشان الموديل يتفرج عليه كله."""
+    proxy = lab_dir(lid) / "proxy.mp4"
+    with LAB_PROXY_LOCK:
+        if proxy.exists():
+            return proxy
+        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(lab_dir(lid) / d["source"]["file"]),
+                        "-vf", "scale='if(gt(iw,ih),min(640,iw),-2)':'if(gt(iw,ih),-2,min(640,ih))',fps=12",
+                        "-c:v", "libx264", "-preset", "veryfast", "-crf", "31", "-pix_fmt", "yuv420p",
+                        "-c:a", "aac", "-ac", "1", "-b:a", "96k", str(proxy)], check=True, capture_output=True, timeout=600)
+    return proxy
+
+
+LAB_SPLIT_SEM = threading.Semaphore(3)   # لو رفعت فيديوهات كتير مرة واحدة: ٣ بس بيتقسموا في نفس الوقت والباقي في الطابور
+
+
+def run_lab_split(lid: str, d: dict, src: Path) -> None:
+    lab_step(lid, "split", progress="مستني دوره في الطابور")
+    with LAB_SPLIT_SEM:
+        if lab_stopping(lid):
+            raise LabStop()
+        _run_lab_split(lid, lab_load(lid), src)
+
+
+def _run_lab_split(lid: str, d: dict, src: Path) -> None:
+    """✂️ يقسّم الفيديو لـ ٤: الصورة من غير صوت، والكلام والموسيقى والمؤثرات (AudioShake)."""
+    folder = lab_dir(lid)
+    lab_step(lid, "split", progress="بيفصل الصورة عن الصوت")
+    pic = folder / "picture.mp4"
+    base = [ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src), "-an"]
+    try:
+        subprocess.run(base + ["-c:v", "copy", "-movflags", "+faststart", str(pic)], check=True, capture_output=True, timeout=300)
+    except subprocess.CalledProcessError:  # الكوديك مينفعش يتنسخ في mp4: نحوّله
+        subprocess.run(base + ["-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p", "-movflags", "+faststart",
+                               str(pic)], check=True, capture_output=True, timeout=900)
+    subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", str(min(0.5, d["source"]["duration"] / 2)), "-i", str(src),
+                    "-frames:v", "1", "-vf", "scale=320:-2", str(folder / "poster.jpg")], capture_output=True, timeout=60)
+    lab_update(lid, lambda d: d.update(picture="picture.mp4", picture_fx=None))
+    run_lab_stems(lid, d, src, step="split")
+    lab_picture_fx(lid)
+
+
+def lab_picture_fx(lid: str) -> None:
+    """🎬🔊 نسخة الصورة + المؤثرات بس (من غير كلام ولا موسيقى): دي اللي بنفكك منها الموشن."""
+    folder, d = lab_dir(lid), lab_load(lid)
+    fx = ((d.get("stems") or {}).get("effects") or {}).get("file")
+    if not d.get("picture") or not fx or not (folder / "stems" / fx).exists():
+        return
+    lab_step(lid, "split", progress="بيركّب الصورة مع المؤثرات")
+    subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(folder / d["picture"]), "-i", str(folder / "stems" / fx),
+                    "-map", "0:v", "-map", "1:a", "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-shortest", "-movflags", "+faststart",
+                    str(folder / "picture_fx.mp4")], check=True, capture_output=True, timeout=600)
+    lab_update(lid, lambda d: d.update(picture_fx="picture_fx.mp4"))
+
+
+def run_lab_stems(lid: str, d: dict, src: Path, step: str = "stems") -> None:
+    """🎚️ فصل الصوت لكلام / موسيقى / مؤثرات (AudioShake). من غير مفتاح الخطوة بتتخطى والتحليل بيكمل على الصوت كله."""
+    folder = lab_dir(lid) / "stems"
+    if not d["source"].get("has_audio"):
+        lab_update(lid, lambda d: d.update(stems={}))
+        return
+    if not (audioshake.api_key() or atlas.mock_mode()):
+        lab_step(lid, step, status="skipped", progress="")
+        raise LabSkip("مفتاح AudioShake مش متسجل (AUDIOSHAKE_API_KEY)، فالصوت ما اتفصلش" + audioshake.missing_hint() if step == "split"
+                      else "مفتاح AudioShake مش متسجل (AUDIOSHAKE_API_KEY)، فالتحليل اشتغل على الصوت كله")
+    shutil.rmtree(folder, ignore_errors=True)
+    folder.mkdir(parents=True, exist_ok=True)
+    mix = folder / "mix.mp3"
+    subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src), "-vn", "-ac", "2", "-b:a", "192k",
+                    str(mix)], check=True, capture_output=True, timeout=300)
+    stems = {}
+    if atlas.mock_mode():  # تجربة: فلاتر بدل الفصل الحقيقي
+        for name, af in (("dialogue", "bandpass=f=1200:width_type=h:w=2400"), ("music", "lowpass=f=400"), ("effects", "highpass=f=3000")):
+            f = f"{name}.mp3"
+            subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(mix), "-af", af, str(folder / f)],
+                           check=True, capture_output=True, timeout=120)
+            stems[name] = {"file": f, "status": "done", "review": None}
+    else:
+        lab_step(lid, step, progress="بيرفع الصوت")
+        tid, plan = audioshake.create_task(atlas.upload_media(mix))
+        t0 = time.time()
+        def tick(out):
+            done = sum(v["status"] in ("completed", "complete", "done", "succeeded") for v in out.values())
+            lab_step(lid, step, progress=f"AudioShake بيفصل الكلام والموسيقى والمؤثرات ({done}/{len(out) or 3} خلص · {int(time.time() - t0)} ث)")
+        res = audioshake.wait(tid, on_status=tick)
+        lab_step(lid, step, progress="بيحمّل التراكات")
+        raw = folder / "raw"
+        raw.mkdir(exist_ok=True)
+        got, errs = {}, {}
+        for name, r in res.items():
+            if r.get("link") and r["status"] not in ("error", "failed"):
+                atlas.download(r["link"], raw / f"{name}.wav")
+                got[name] = raw / f"{name}.wav"
+            else:
+                errs[name] = str(r.get("error") or "مرجعش ملف")[:200]
+        ff = [ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y"]
+        wav = {}   # التراكات بتاعتنا (wav عشان الطرح يبقى مظبوط بالعينة)
+        for name in ("dialogue", "effects", "music"):
+            how = plan[name]
+            src_of = lambda n: wav.get(n) or got.get(n)  # noqa: E731
+            try:
+                if how[0] == "target":
+                    if how[1] not in got:
+                        raise RuntimeError(errs.get(how[1]) or "مرجعش ملف")
+                    wav[name] = got[how[1]]
+                else:   # طرح: a − b
+                    a, b = src_of(how[1]), src_of(how[2])
+                    if not a or not b:
+                        raise RuntimeError(f"ناقص {how[1] if not a else how[2]}")
+                    out = raw / f"{name}.wav"
+                    subprocess.run(ff + ["-i", str(a), "-i", str(b), "-filter_complex",
+                                         "[1:a]volume=-1[n];[0:a][n]amix=inputs=2:normalize=0:duration=first[o]", "-map", "[o]", str(out)],
+                                   check=True, capture_output=True, timeout=300)
+                    wav[name] = out
+                f = f"{name}.mp3"
+                subprocess.run(ff + ["-i", str(wav[name]), "-b:a", "192k", str(folder / f)], check=True, capture_output=True, timeout=300)
+                stems[name] = {"file": f, "status": "done", "review": None, "how": "/".join(how[1:]) if how[0] == "sub" else how[1]}
+            except Exception as exc:  # noqa: BLE001
+                stems[name] = {"file": None, "status": "failed", "error": str(exc)[:200], "review": None}
+        shutil.rmtree(raw, ignore_errors=True)
+        stems["_task"] = tid
+    lab_update(lid, lambda d: d.update(stems=stems))
+
+
+class LabSkip(Exception):
+    """خطوة اتخطت لسبب معروف (مش فشل)."""
+
+
+def shot_key(s: dict) -> str:
+    """مفتاح ثابت للحتة (رقمها بيتغير لما تتقسم أو تتدمج)."""
+    return s.get("uid") or f"s{s['n']:03d}"
+
+
+def run_lab_elements(lid: str, only: set[str] | None = None) -> None:
+    folder = lab_dir(lid)
+    d = lab_load(lid)
+    shots = [s for s in d.get("shots") or [] if only is None or shot_key(s) in only]
+    audio = d.get("audio") or {}
+    for k, s in enumerate(shots):
+        if lab_stopping(lid):
+            raise LabStop()
+        lab_step(lid, "elements", progress=f"بيفكك عناصر اللقطة {k + 1} من {len(shots)}")
+        sfx = [x for x in audio.get("sfx") or [] if s["start"] - 0.05 <= x["t"] < s["end"]]
+        speech = [x for x in audio.get("speech") or [] if x["start"] < s["end"] and x["end"] > s["start"]]
+        try:
+            if atlas.mock_mode():
+                raw = lab.mock_elements(s, sfx)
+            else:
+                frames = [{"t": f["t"], "data_url": data_url(folder / "frames" / f["file"], "image/jpeg")} for f in s.get("frames") or []]
+                raw = ad_json(lab_media_chat(lab.elements_messages(s, frames, sfx, speech)), f"عناصر اللقطة {s['n']}")
+            res = lab.clean_elements(raw, s, {x["id"] for x in sfx})
+            err = None
+        except Exception as exc:  # noqa: BLE001  لقطة فشلت متوقفش الباقي
+            res, err = None, str(getattr(exc, "detail", None) or exc)[:300]
+        def fn(d, key=shot_key(s), res=res, err=err):
+            x = next((y for y in d.get("shots") or [] if shot_key(y) == key), None)
+            if x is not None:
+                x["analysis"], x["analysis_error"] = res, err
+                # 🙈 تصوير عادي من غير موشن جرافيك بيتشال لوحده (إلا لو إنت اللي رجّعته أو شلته بإيدك)
+                if res and (x.get("ignored") or {}).get("by") != "user" and not x.get("keep"):
+                    x["ignored"] = None if res.get("motion_graphics") else {
+                        "by": "auto", "reason": res.get("mg_reason") or "مفيهاش موشن جرافيك", "at": now()}
+        lab_update(lid, fn)
+
+
+class LabReviewIn(BaseModel):
+    kind: str            # shot | stem | sfx | music | speech | background | element | action
+    ref: str             # رقم/id العنصر (الأكشن: elementId:index)
+    ok: bool | None = None
+    note: str = ""
+    fix: dict = {}       # تصحيح الاسم/النوع/التصنيف/الوقت
+
+
+LAB_FIX_KEYS = {"stem": (), "sfx": ("label", "category", "t"), "music": ("description", "mood"), "speech": ("speaker", "text"),
+                "background": ("name", "description"), "element": ("name", "type", "description"),
+                "action": ("action", "detail"), "shot": ()}
+
+
+@app.patch("/api/lab/{lid}/review")
+def lab_review(lid: str, body: LabReviewIn):
+    """👤 تقييمك: موافق ✅ / غلط ❌ / ملاحظة، والتصحيح بيتحفظ مع الأصل عشان نتعلم منه."""
+    if body.kind not in LAB_FIX_KEYS:
+        raise HTTPException(400, "نوع غير معروف")
+    def find(d):
+        shots = d.get("shots") or []
+        audio = d.get("audio") or {}
+        if body.kind == "shot":
+            return next((s for s in shots if str(s["n"]) == body.ref), None)
+        if body.kind == "sfx":
+            return next((x for x in audio.get("sfx") or [] if x["id"] == body.ref), None)
+        if body.kind == "stem":
+            x = (d.get("stems") or {}).get(body.ref)
+            return x if isinstance(x, dict) else None
+        if body.kind in ("music", "speech"):
+            lst = audio.get(body.kind) or []
+            return lst[int(body.ref)] if body.ref.isdigit() and int(body.ref) < len(lst) else None
+        if body.kind == "background":
+            s = next((s for s in shots if str(s["n"]) == body.ref), None)
+            return ((s or {}).get("analysis") or {}).get("background")
+        els = [e for s in shots for e in (s.get("analysis") or {}).get("elements") or []]
+        if body.kind == "element":
+            return next((e for e in els if e["id"] == body.ref), None)
+        if body.kind == "action":
+            eid, _, idx = body.ref.rpartition(":")
+            e = next((e for e in els if e["id"] == eid), None)
+            return (e or {}).get("actions", [])[int(idx)] if e and idx.isdigit() and int(idx) < len(e.get("actions") or []) else None
+        return None
+    def fn(d):
+        x = find(d)
+        if x is None:
+            raise HTTPException(404, "العنصر ده مش موجود")
+        fix = {k: body.fix[k] for k in LAB_FIX_KEYS[body.kind] if k in body.fix}
+        if fix:
+            x.setdefault("original", {k: x.get(k) for k in fix})  # الأصل بتاع الموديل بيتحفظ للمقارنة والتعلم
+            x.update(fix)
+        x["review"] = {"ok": body.ok, "note": body.note.strip()[:500], "at": now()}
+    return lab_to_dict(lid, lab_update(lid, fn))
+
+
+class ShotIn(BaseModel):
+    ignored: bool
+
+
+@app.patch("/api/lab/{lid}/shots/{n}")
+def lab_shot_patch(lid: str, n: int, body: ShotIn):
+    """🗑️ شيل لقطة (مش هتدخل في الكومبوننتس) أو ↩ رجّعها. اللقطة نفسها بتفضل عشان ترجعها وقت ما تحب."""
+    def fn(d):
+        s = lab_shot(d, n)
+        s["ignored"] = {"by": "user", "reason": "شلتها بإيدك", "at": now()} if body.ignored else None
+        s["keep"] = not body.ignored  # رجّعتها: التفكيك الجاي ميشيلهاش تاني
+    return lab_to_dict(lid, lab_update(lid, fn))
+
+
+@app.post("/api/lab/{lid}/shots/{n}/merge")
+def lab_shot_merge(lid: str, n: int):
+    """🔗 يدمج الحتة دي مع اللي بعدها (لو التقسيم فصل حركة واحدة)."""
+    def fn(d):
+        shots = d.get("shots") or []
+        i = next((k for k, x in enumerate(shots) if x["n"] == n), None)
+        if i is None or i + 1 >= len(shots):
+            raise HTTPException(400, "مفيش لقطة بعدها تتدمج معاها")
+        a, b = shots[i], shots[i + 1]
+        an, bn = a.get("analysis"), b.get("analysis")
+        if an or bn:
+            an, bn = an or {}, bn or {}
+            a["analysis"] = {**an, "summary": " ← ".join(x for x in (an.get("summary"), bn.get("summary")) if x),
+                             "motion_graphics": bool(an.get("motion_graphics") or bn.get("motion_graphics")),
+                             "elements": (an.get("elements") or []) + (bn.get("elements") or [])}
+        a.update(end=b["end"], frames=(a.get("frames") or []) + (b.get("frames") or []), review=None,
+                 ignored=a.get("ignored") if b.get("ignored") else None)
+        del shots[i + 1]
+        renumber(shots)
+    return lab_to_dict(lid, lab_update(lid, fn))
+
+
+def renumber(shots: list[dict]) -> None:
+    for k, x in enumerate(shots):
+        if not x.get("uid"):
+            x["uid"] = f"s{x['n']:03d}"   # المفتاح القديم بيفضل زي ما هو (أسامي الفريمات والعناصر)
+        x["n"] = k + 1
+
+
+class SplitIn(BaseModel):
+    t: float
+
+
+@app.post("/api/lab/{lid}/shots/{n}/split")
+def lab_shot_split(lid: str, n: int, body: SplitIn):
+    """✂️ يقسم الحتة عند وقت معيّن (لو البرنامج فوّت تغيير)، والعناصر بتتحلل للحتتين من جديد."""
+    d = lab_load(lid)
+    s = lab_shot(d, n)
+    t = round(body.t, 3)
+    if not (s["start"] + 0.25 <= t <= s["end"] - 0.25):
+        raise HTTPException(400, "اختار وقت جوه الحتة (مش في أولها أو آخرها بالظبط)")
+    if any((v or {}).get("status") in ("working", "queued") for v in (d.get("steps") or {}).values()):
+        raise HTTPException(400, "استنى لما التفكيك اللي شغال يخلص")
+    src, folder = lab_dir(lid) / d["source"]["file"], lab_dir(lid) / "frames"
+    keys = [uuid.uuid4().hex[:4], uuid.uuid4().hex[:4]]
+    parts = [{"start": s["start"], "end": t, "cut": s.get("cut") or "hard", "uid": keys[0]},
+             {"start": t, "end": s["end"], "cut": "change", "uid": keys[1]}]
+    for p in parts:
+        p["frames"] = lab.extract_frames(ffmpeg_exe(), src, p["start"], p["end"], folder, p["uid"])
+        p.update(review=None, analysis=None, ignored=None, keep=bool(s.get("keep")))
+    def fn(d):
+        shots = d["shots"]
+        i = next(k for k, x in enumerate(shots) if x["n"] == n)
+        shots[i:i + 1] = parts
+        renumber(shots)
+        d.setdefault("steps", {})["elements"] = {"status": "working", "progress": "بيفكك عناصر الحتتين الجداد"}
+        d["stop"] = False
+    d = lab_update(lid, fn)
+    def run():
+        try:
+            run_lab_elements(lid, set(keys))
+            lab_step(lid, "elements", status="done", error=None, progress="", at=now())
+        except LabStop:
+            lab_step(lid, "elements", status="stopped", error=None, progress="")
+        except Exception as exc:  # noqa: BLE001
+            lab_step(lid, "elements", status="failed", error=str(exc)[:300], progress="")
+    threading.Thread(target=run, daemon=True).start()
+    return lab_to_dict(lid, d)
+
+
+@app.post("/api/lab/{lid}/shots/prune")
+def lab_shots_prune(lid: str):
+    """🧹 يشيل كل اللقطات اللي ملهاش ولا كومبوننت (غير المرفوضة)."""
+    def fn(d):
+        live = [c for c in d.get("components") or [] if (c.get("review") or {}).get("ok") is not False]
+        gone = 0
+        for s in d.get("shots") or []:
+            if s.get("ignored") or any(c["t0"] < s["end"] and c["t1"] > s["start"] for c in live):
+                continue
+            s["ignored"], s["keep"] = {"by": "user", "reason": "ملهاش كومبوننتس", "at": now()}, False
+            gone += 1
+        if not gone:
+            raise HTTPException(400, "كل اللقطات اللي فاضلة فيها كومبوننتس")
+    return lab_to_dict(lid, lab_update(lid, fn))
+
+
+def lab_shot(d: dict, n: int) -> dict:
+    s = next((x for x in d.get("shots") or [] if x["n"] == n), None)
+    if not s:
+        raise HTTPException(404, "اللقطة مش موجودة")
+    return s
+
+
+# ---------- ✏️ التعديل جوه المشهد (للأصول في المكتبة): نفس الفيديو بحركته، وكل عنصر فيه يتغيّر بالكلام
+
+def vedit_render(v: dict, src: Path, out: Path, context: dict, setv) -> None:
+    """نسخة جديدة من مقطع: ⏩ سرعة جزء (بالكود) أو ✏️ تعديل جوه المشهد بموديل فيديو (الحركة زي ما هي).
+    context = {"analysis": ...} عشان التعليمات توصف العناصر بشكلها ومكانها."""
+    if v["kind"] == "speed":
+        lab.retime(ffmpeg_exe(), src, out, v["t0"], v["t1"], v["factor"], probe_duration(src))
+    elif atlas.mock_mode():
+        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src), "-vf", "hue=h=120",
+                        "-c:a", "copy", str(out)], check=True, capture_output=True, timeout=300)
+        setv(prompt="(تجربة) hue shift")
+    else:
+        setv(step="بيكتب التعليمات")
+        prompt = str(ad_json(series_chat(lab.vedit_messages(context, v["instruction"])), "تعليمات التعديل").get("prompt") or "").strip()
+        if not prompt:
+            raise RuntimeError("الموديل مكتبش تعليمات")
+        setv(prompt=prompt, step="موديل الفيديو بيعدّل المشهد")
+        m = lab.VEDIT_MODELS[v["model"]]
+        url = atlas.run_model("Video", {"model": m["model"], "video": atlas.upload_media(src), "prompt": prompt},
+                              "تعديل المشهد", max_seconds=1500, interval=6)
+        atlas.download(url, out)
+
+
+def vedit_item(body) -> dict:
+    """طلب نسخة (من اللقطة أو من أصل في المكتبة) بعد التأكد من القيم."""
+    if body.speed:
+        try:
+            t0, t1, f = float(body.speed["t0"]), float(body.speed["t1"]), float(body.speed["factor"])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise HTTPException(400, "حدد الجزء والسرعة") from exc
+        if not (0.2 <= f <= 5) or t1 - t0 < 0.05:
+            raise HTTPException(400, "السرعة من 0.2 لـ 5، والجزء لازم يبقى أطول من كده")
+        item = {"kind": "speed", "t0": t0, "t1": t1, "factor": f, "instruction": f"⏩ سرعة ×{f:g} من {t0:.2f} لـ {t1:.2f}"}
+    else:
+        text = body.instruction.strip()[:2000]
+        if not text:
+            raise HTTPException(400, "اكتب عايز تغيّر إيه")
+        if body.model not in lab.VEDIT_MODELS:
+            raise HTTPException(400, "موديل غير معروف")
+        if not (atlas.api_key() or atlas.mock_mode()):
+            raise HTTPException(400, "مفتاح Atlas مش متسجل")
+        item = {"kind": "ai", "instruction": text, "model": body.model}
+    return {**item, "id": uuid.uuid4().hex[:8], "base": body.base, "status": "working", "step": "بيجهّز", "file": None,
+            "error": None, "review": None, "created_at": now()}
+
+
+class VeditIn(BaseModel):
+    instruction: str = ""
+    model: str = "gemini"
+    base: str | None = None       # نكمّل على نسخة متعدلة
+    speed: dict | None = None     # {"t0", "t1", "factor"} = تسريع/تبطيء جزء (من غير AI)
+
+
+# ================================================================ 📚 مكتبة الأصول
+# الأصل = مقطع من فيديو بحركته وخلفيته وصوته (افيكت، موشن جرافيك، انتقال، حركة ماوس...) + كل اللي اتفهم عنه
+# (العناصر وحركاتها والأصوات). بيتحكم فيه بالتعديل جوه المشهد وبالسرعة، وكل تعديل بيبقى نسخة منه.
+
+ASSETS_DIR = DATA_DIR / "assets"
+ASSETS_DIR.mkdir(parents=True, exist_ok=True)
+CLIP_LOCK = threading.Lock()
+CLIP_CATS = ("connector", "motion_graphics", "effect", "transition", "text", "screen", "cursor", "character", "background", "product", "other")
+
+
+def clip_dir(aid: str) -> Path:
+    return ASSETS_DIR / Path(aid).name
+
+
+def clip_load(aid: str) -> dict:
+    f = clip_dir(aid) / "asset.json"
+    if not f.exists():
+        raise HTTPException(404, "الأصل ده مش موجود")
+    return json.loads(f.read_text(encoding="utf-8"))
+
+
+def clip_update(aid: str, fn) -> dict:
+    with CLIP_LOCK:
+        d = clip_load(aid)
+        fn(d)
+        d["updated_at"] = now()
+        tmp = clip_dir(aid) / "asset.json.tmp"
+        tmp.write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+        tmp.replace(clip_dir(aid) / "asset.json")
+        return d
+
+
+def clip_to_dict(aid: str, d: dict) -> dict:
+    base = f"/media/assets/{aid}"
+    return {**d, "id": aid, "url": f"{base}/{d['file']}", "thumb_url": f"{base}/{d['thumb']}",
+            "keyframes": [{**k, "url": f"{base}/{k['file']}"} for k in d.get("keyframes") or []],
+            "variants": [{**v, "url": f"{base}/variants/{v['file']}" if v.get("file") else None} for v in d.get("variants") or []],
+            "busy": any(v.get("status") == "working" for v in d.get("variants") or [])
+            or any(t.get("status") in ("planning", "working") for t in d.get("trials") or []),
+            "trials": [trial_to_dict(aid, t) for t in d.get("trials") or []],
+            "trial_models": [{"key": k, "label": v["label"], "per_sec": v["per_sec"]} for k, v in TRIAL_MODELS.items()],
+            "vedit_models": [{"key": k, "label": v["label"], "per_sec": v["per_sec"]} for k, v in lab.VEDIT_MODELS.items()]}
+
+
+def clip_from_lab(lid: str, d: dict, t0: float, t1: float, meta: dict) -> dict:
+    """📚 مقطع من الفيديو الأصلي (بحركته وخلفيته وصوته) بيتحفظ كأصل، ومعاه العناصر والحركات والأصوات اللي جواه."""
+    dur = d["source"]["duration"]
+    t0, t1 = max(0.0, t0), min(dur, t1)
+    if t1 - t0 < 0.15:
+        raise HTTPException(400, "المقطع قصير أوي")
+    aid = uuid.uuid4().hex[:12]
+    folder = clip_dir(aid)
+    (folder / "variants").mkdir(parents=True, exist_ok=True)
+    try:
+        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{t0:.3f}", "-i", str(lab_dir(lid) / d["source"]["file"]),
+                        "-t", f"{t1 - t0:.3f}", "-c:v", "libx264", "-preset", "veryfast", "-crf", "16", "-pix_fmt", "yuv420p",
+                        "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", str(folder / "clip.mp4")],
+                       check=True, capture_output=True, timeout=300)
+        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{(t1 - t0) / 2:.3f}", "-i", str(folder / "clip.mp4"),
+                        "-frames:v", "1", "-vf", "scale=480:-2", "-q:v", "3", str(folder / "thumb.jpg")], check=True, capture_output=True, timeout=60)
+        info = media_info(folder / "clip.mp4")
+    except Exception:
+        shutil.rmtree(folder, ignore_errors=True)
+        raise
+    shots = [s for s in d.get("shots") or [] if s["start"] < t1 and s["end"] > t0]
+    ans = [s.get("analysis") or {} for s in shots]
+    rb = lambda t: round(max(0.0, min(t1, t) - t0), 2)  # noqa: E731  الوقت من أول الأصل
+    elements = []
+    for an in ans:
+        for e in an.get("elements") or []:
+            if e["last_t"] < t0 or e["first_t"] > t1:
+                continue
+            acts = [{**{k: a.get(k) for k in ("action", "from", "to", "detail")}, "t0": rb(a["t0"]), "t1": rb(a["t1"])}
+                    for a in e.get("actions") or [] if a["t1"] >= t0 and a["t0"] <= t1]
+            elements.append({"id": e["id"], "name": e["name"], "type": e["type"], "description": e.get("description", ""), "box": e.get("box"),
+                             "first_t": rb(e["first_t"]), "last_t": rb(e["last_t"]), "actions": acts})
+    sfx = [{"t": rb(x["t"]), "label": x.get("label"), "category": x.get("category")}
+           for x in (d.get("audio") or {}).get("sfx") or [] if t0 <= x["t"] <= t1]
+    summary = " ← ".join(a.get("summary", "") for a in ans if a.get("summary"))
+    data = {"name": str(meta.get("name") or "").strip()[:120] or summary[:80] or f"أصل من {d.get('name', '')}",
+            "category": meta.get("category") if meta.get("category") in CLIP_CATS else "other",
+            "tags": [str(t).strip()[:30] for t in meta.get("tags") or [] if str(t).strip()][:12],
+            "notes": str(meta.get("notes") or "").strip()[:1000],
+            "description": str(meta.get("description") or "")[:600], "use": str(meta.get("use") or "")[:300],
+            "controls": meta.get("controls") or [],
+            "connector": meta.get("connector"),
+            "file": "clip.mp4", "thumb": "thumb.jpg", "duration": round(info.duration, 2), "width": info.width, "height": info.height,
+            "source": {"lab": lid, "lab_name": d.get("name"), "shots": [s["n"] for s in shots], "t0": round(t0, 3), "t1": round(t1, 3),
+                       "component": meta.get("component")},
+            "scene_type": (ans[0] if ans else {}).get("scene_type"), "summary": summary,
+            "background": (ans[0] if ans else {}).get("background"),
+            "elements": elements, "sfx": sfx, "variants": [], "created_at": now(), "updated_at": now()}
+    keys = []
+    for k in meta.get("keyframes") or []:  # فريمات الكونيكتور المفتاحية (بداية / نص / نهاية)
+        src_k = lab_dir(lid) / "frames" / k["file"]
+        if src_k.exists():
+            shutil.copyfile(src_k, folder / k["file"])
+            keys.append({"t": round(k["t"] - t0, 2), "file": k["file"], "label": k.get("label", "")})
+    data["keyframes"] = keys
+    (folder / "asset.json").write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+    return clip_to_dict(aid, data)
+
+
+class AssetIn(BaseModel):
+    name: str = ""
+    category: str = "other"
+    tags: list[str] = []
+    notes: str = ""
+    t0: float               # بالثواني من أول الفيديو
+    t1: float
+
+
+@app.post("/api/lab/{lid}/asset")
+def lab_save_asset(lid: str, body: AssetIn):
+    """📚 احفظ أي مقطع من الفيديو بإيدك كأصل (لو الاقتراحات فاتتها حاجة)."""
+    return clip_from_lab(lid, lab_load(lid), body.t0, body.t1, body.model_dump())
+
+
+# ---------- 💡 الكومبوننتس: الموديل بيقترح من التفكيك، وإنت بتقبل (بيدخل المكتبة) أو ترفض (وسببك بيعلّمه)
+
+def run_lab_components(lid: str) -> None:
+    d = lab_load(lid)
+    if not any(s.get("analysis") for s in d.get("shots") or []):
+        raise LabSkip("مفيش عناصر متفككة. فكّك العناصر الأول")
+    old = d.get("components") or []
+    keep = [c for c in old if (c.get("review") or {}).get("ok") is not None or c.get("asset")]
+    rejected = [{"name": c["name"], "t0": c["t0"], "t1": c["t1"], "note": (c.get("review") or {}).get("note")}
+                for c in keep if (c.get("review") or {}).get("ok") is False] + (d.get("comp_lessons") or [])
+    lab_step(lid, "components", progress="بيدور على الحتت اللي تنفع تتعاد")
+    raw = lab.mock_components(d) if atlas.mock_mode() else ad_json(series_chat(lab.components_messages(d, rejected)), "الكومبوننتس")
+    ids = {e["id"] for s in d.get("shots") or [] for e in (s.get("analysis") or {}).get("elements") or []}
+    bounds = sorted({x for s in d.get("shots") or [] if not s.get("ignored") for x in (s["start"], s["end"])})
+    new = [c for c in lab.clean_components(raw, d["source"]["duration"], ids, bounds)
+           if not any(abs(c["t0"] - k["t0"]) < 0.3 and abs(c["t1"] - k["t1"]) < 0.3 for k in keep)]  # نفس اللي اتراجع قبل كده
+    lab_update(lid, lambda d: d.update(components=sorted(keep + new, key=lambda c: c["t0"])))
+
+
+def run_lab_connectors(lid: str) -> None:
+    """🔗 الموديل بيتفرج على الفيديو كله ويطلّع الكونيكتورز بوصفتها، ولكل واحد 3 فريمات مفتاحية."""
+    d = lab_load(lid)
+    old = d.get("connectors") or []
+    keep = [c for c in old if (c.get("review") or {}).get("ok") is not None or c.get("asset")]
+    rejected = [{"name": c["name"], "t0": c["t0"], "t1": c["t1"], "note": (c.get("review") or {}).get("note")}
+                for c in keep if (c.get("review") or {}).get("ok") is False] + (d.get("conn_lessons") or [])
+    if atlas.mock_mode():
+        raw = lab.mock_connectors(d)
+    else:
+        lab_step(lid, "connectors", progress="بيجهّز الفيديو")
+        proxy = lab_proxy(lid, d)
+        lab_step(lid, "connectors", progress="بيتفرج على الفيديو كله ويدوّر على التحوّلات")
+        raw = ad_json(lab_media_chat(az.with_media(lab.connectors_messages(d, rejected), data_url(proxy, "video/mp4"), "video.mp4")),
+                      "الكونيكتورز")
+    new = [c for c in lab.clean_connectors(raw, d["source"]["duration"])
+           if not any(abs(c["t0"] - k["t0"]) < 0.3 and abs(c["t1"] - k["t1"]) < 0.3 for k in keep)]
+    for c in new:
+        lab_step(lid, "connectors", progress=f"فريمات «{c['name'][:30]}»")
+        c["keyframes"] = conn_keyframes(lid, d, c)
+    lab_update(lid, lambda d: d.update(connectors=sorted(keep + new, key=lambda c: c["t0"])))
+
+
+def conn_keyframes(lid: str, d: dict, c: dict) -> list[dict]:
+    """3 فريمات للكونيكتور: البداية والنص والنهاية (أسامي جديدة كل مرة عشان المتصفح ميعرضش القديمة)."""
+    src, folder = lab_dir(lid) / d["source"]["file"], lab_dir(lid) / "frames"
+    folder.mkdir(parents=True, exist_ok=True)
+    for k in c.get("keyframes") or []:
+        (folder / k["file"]).unlink(missing_ok=True)
+    tag, out = uuid.uuid4().hex[:4], []
+    for k, (t, label) in enumerate(((c["t0"], "البداية"), ((c["t0"] + c["t1"]) / 2, "النص"), (c["t1"], "النهاية"))):
+        name = f"cx{c['id']}-{tag}-{k}.jpg"
+        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{min(t, d['source']['duration'] - 0.05):.3f}",
+                        "-i", str(src), "-frames:v", "1", "-vf", "scale=360:-2", "-q:v", "4", str(folder / name)],
+                       capture_output=True, timeout=60)
+        if (folder / name).exists():
+            out.append({"t": round(t, 2), "file": name, "label": label})
+    return out
+
+
+CONN_TEXT = ("from_scene", "to_scene", "trigger", "camera", "rhythm", "story_role", "sound")
+
+
+class ConnectorIn(BaseModel):
+    name: str | None = None
+    family: str | None = None
+    t0: float | None = None
+    t1: float | None = None
+    recipe: list[str] | None = None
+    anchors: list[str] | None = None
+    transforms: list[dict] | None = None
+    from_scene: str | None = None
+    to_scene: str | None = None
+    trigger: str | None = None
+    camera: str | None = None
+    rhythm: str | None = None
+    story_role: str | None = None
+    sound: str | None = None
+    review: bool = False
+    ok: bool | None = None
+    note: str = ""
+
+
+def conn_fix(c: dict, fix: dict, dur: float) -> dict:
+    """يطبّق تعديل على الكونيكتور (والنسخة الأصلية من الموديل بتتحفظ مرة واحدة للمقارنة والتعلم)."""
+    if not fix:
+        return c
+    c.setdefault("original", {k: c.get(k) for k in lab.CONNECTOR_KEYS})
+    c.update(fix)
+    c["t0"], c["t1"] = round(min(dur, max(0.0, c["t0"])), 2), round(min(dur, max(0.0, c["t1"])), 2)
+    if c["t1"] - c["t0"] < 0.2:
+        raise HTTPException(400, "المقطع قصير أوي")
+    c["edited"] = True
+    return c
+
+
+def conn_sync(lid: str, cid: str, range_changed: bool) -> dict:
+    """بعد التعديل: الفريمات بتتعمل من جديد لو التوقيت اتغير، والنسخة اللي في المكتبة (لو اتقبل) بتتحدّث."""
+    d = lab_load(lid)
+    c = next(x for x in d["connectors"] if x["id"] == cid)
+    if range_changed:
+        keys = conn_keyframes(lid, d, c)
+        d = lab_update(lid, lambda d: next(x for x in d["connectors"] if x["id"] == cid).update(keyframes=keys))
+        c = next(x for x in d["connectors"] if x["id"] == cid)
+    aid = c.get("asset")
+    if aid and (clip_dir(aid) / "asset.json").exists():
+        if range_changed:  # المقطع نفسه اتغير: نسخة جديدة في المكتبة مكان القديمة
+            shutil.rmtree(clip_dir(aid), ignore_errors=True)
+            d = conn_to_library(lid, d, c)
+        else:
+            rec = conn_recipe(c)
+            clip_update(aid, lambda a: a.update(name=c["name"], description=c.get("story_role", ""), connector=rec))
+    return d
+
+
+def conn_recipe(c: dict) -> dict:
+    return {k: c.get(k) for k in ("family", "from_scene", "to_scene", "trigger", "anchors", "transforms", "camera",
+                                  "rhythm", "recipe", "story_role", "sound")}
+
+
+def conn_to_library(lid: str, d: dict, c: dict) -> dict:
+    a = clip_from_lab(lid, d, c["t0"], c["t1"], {
+        "name": c["name"], "category": "connector", "tags": [lab.CONNECTOR_FAMILIES.get(c["family"], "").split(" ", 1)[-1]],
+        "description": c.get("story_role", ""), "connector": conn_recipe(c), "keyframes": c.get("keyframes") or [],
+        "component": c["id"]})
+    def link(d):
+        x = next((y for y in d.get("connectors") or [] if y["id"] == c["id"]), None)
+        if x is not None:
+            x["asset"] = a["id"]
+    return lab_update(lid, link)
+
+
+@app.patch("/api/lab/{lid}/connectors/{cid}")
+def lab_connector(lid: str, cid: str, body: ConnectorIn):
+    """تعديل الكونيكتور (الاسم/العيلة/التوقيت/الشرح/الوصفة) أو تقييمه. ✅ بيحفظه في المكتبة بوصفته وفريماته."""
+    moved = []
+    def fn(d):
+        c = next((x for x in d.get("connectors") or [] if x["id"] == cid), None)
+        if c is None:
+            raise HTTPException(404, "الكونيكتور ده مش موجود")
+        fix = {}
+        if body.name is not None and body.name.strip():
+            fix["name"] = body.name.strip()[:100]
+        if body.family in lab.CONNECTOR_FAMILIES:
+            fix["family"] = body.family
+        for k in ("t0", "t1"):
+            v = getattr(body, k)
+            if v is not None and abs(v - c[k]) > 0.005:
+                fix[k] = v
+        for k in CONN_TEXT:
+            v = getattr(body, k)
+            if v is not None:
+                fix[k] = v.strip()[:500]
+        if body.recipe is not None:
+            fix["recipe"] = [x.strip()[:300] for x in body.recipe if x.strip()][:12]
+        if body.anchors is not None:
+            fix["anchors"] = [x.strip()[:200] for x in body.anchors if x.strip()][:8]
+        if body.transforms is not None:
+            fix["transforms"] = [{"t0": float(x.get("t0") or 0), "t1": float(x.get("t1") or 0), "from": str(x.get("from") or "")[:200],
+                                  "to": str(x.get("to") or "")[:200], "how": str(x.get("how") or "")[:300]}
+                                 for x in body.transforms if isinstance(x, dict) and (x.get("from") or x.get("to"))][:12]
+        moved.append("t0" in fix or "t1" in fix)
+        conn_fix(c, fix, d["source"]["duration"])
+        if body.review:
+            c["review"] = {"ok": body.ok, "note": body.note.strip()[:500], "at": now()}
+    d = lab_update(lid, fn)
+    if not body.review:
+        d = conn_sync(lid, cid, moved[0])
+    c = next(x for x in d["connectors"] if x["id"] == cid)
+    if body.review and body.ok and not (c.get("asset") and (clip_dir(c["asset"]) / "asset.json").exists()):
+        d = conn_to_library(lid, d, c)
+    return lab_to_dict(lid, d)
+
+
+class RefineIn(BaseModel):
+    message: str
+
+
+@app.post("/api/lab/{lid}/connectors/{cid}/refine")
+def lab_connector_refine(lid: str, cid: str, body: RefineIn):
+    """💬 تقول للشرح «عدّل كذا»: الموديل بيتفرج على الحتة دي تاني (ومعاها ثانية ونص قبلها وبعدها) ويعدّل."""
+    msg = body.message.strip()[:1500]
+    if not msg:
+        raise HTTPException(400, "اكتب عايز تعدّل إيه")
+    d = lab_load(lid)
+    c = next((x for x in d.get("connectors") or [] if x["id"] == cid), None)
+    if c is None:
+        raise HTTPException(404, "الكونيكتور ده مش موجود")
+    dur = d["source"]["duration"]
+    a0, a1 = max(0.0, c["t0"] - 1.5), min(dur, c["t1"] + 1.5)
+    if atlas.mock_mode():
+        res = {"reply": "تمام، عدّلت الشرح على كلامك (تجربة).",
+               "connector": {"story_role": f"{c.get('story_role', '')} — {msg}", "t0": c["t0"] - a0, "t1": c["t1"] - a0}}
+    else:
+        if not (atlas.api_key()):
+            raise HTTPException(400, "مفتاح Atlas مش متسجل")
+        clip = lab_dir(lid) / "tmp" / f"refine-{cid}.mp4"
+        clip.parent.mkdir(parents=True, exist_ok=True)
+        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{a0:.3f}", "-i", str(lab_dir(lid) / d["source"]["file"]),
+                        "-t", f"{a1 - a0:.3f}", "-vf", "scale='if(gt(iw,ih),min(720,iw),-2)':'if(gt(iw,ih),-2,min(720,ih))',fps=15",
+                        "-c:v", "libx264", "-preset", "veryfast", "-crf", "28", "-pix_fmt", "yuv420p", "-c:a", "aac", "-ac", "1",
+                        str(clip)], check=True, capture_output=True, timeout=300)
+        try:
+            res = ad_json(lab_media_chat(az.with_media(lab.connector_refine_messages(c, msg, a0, c.get("chat") or []),
+                                                       data_url(clip, "video/mp4"), "clip.mp4")), "تعديل الشرح")
+        finally:
+            clip.unlink(missing_ok=True)
+    fix = lab.apply_refine(c, res, a0, dur)
+    if not fix:
+        raise HTTPException(502, "الموديل ما رجعش شرح مفهوم. جرّب تاني بكلام أوضح")
+    moved = abs(fix["t0"] - c["t0"]) > 0.005 or abs(fix["t1"] - c["t1"]) > 0.005
+    reply = str(res.get("reply") or "اتعدّل")[:500]
+    def fn(d):
+        x = next(y for y in d["connectors"] if y["id"] == cid)
+        conn_fix(x, fix, dur)
+        x.setdefault("chat", []).extend([{"role": "user", "text": msg, "at": now()}, {"role": "model", "text": reply, "at": now()}])
+        x["chat"] = x["chat"][-20:]
+    lab_update(lid, fn)
+    return {**lab_to_dict(lid, conn_sync(lid, cid, moved)), "reply": reply}
+
+
+class ComponentIn(BaseModel):
+    name: str | None = None
+    category: str | None = None
+    t0: float | None = None
+    t1: float | None = None
+    review: bool = False      # true = ده تقييم (ok/note)
+    ok: bool | None = None    # ✅ = يدخل المكتبة على طول، ❌ = مرفوض
+    note: str = ""
+
+
+@app.patch("/api/lab/{lid}/components/{cid}")
+def lab_component(lid: str, cid: str, body: ComponentIn):
+    """تعديل الاقتراح (الاسم/النوع/البداية والنهاية) أو تقييمه. ✅ بيحفظه في المكتبة."""
+    def fn(d):
+        c = next((x for x in d.get("components") or [] if x["id"] == cid), None)
+        if c is None:
+            raise HTTPException(404, "الاقتراح ده مش موجود")
+        dur = d["source"]["duration"]
+        fix = {}
+        if body.name is not None and body.name.strip():
+            fix["name"] = body.name.strip()[:100]
+        if body.category in CLIP_CATS:
+            fix["category"] = body.category
+        if body.t0 is not None:
+            fix["t0"] = round(min(dur, max(0.0, body.t0)), 2)
+        if body.t1 is not None:
+            fix["t1"] = round(min(dur, max(0.0, body.t1)), 2)
+        if fix:
+            c.setdefault("original", {k: c.get(k) for k in fix})
+            c.update(fix)
+            if c["t1"] - c["t0"] < 0.15:
+                raise HTTPException(400, "المقطع قصير أوي")
+        if body.review:
+            c["review"] = {"ok": body.ok, "note": body.note.strip()[:500], "at": now()}
+    d = lab_update(lid, fn)
+    c = next(x for x in d["components"] if x["id"] == cid)
+    if body.review and body.ok and not (c.get("asset") and (clip_dir(c["asset"]) / "asset.json").exists()):
+        a = clip_from_lab(lid, d, c["t0"], c["t1"], {**c, "component": cid})
+        def link(d):
+            x = next((y for y in d.get("components") or [] if y["id"] == cid), None)
+            if x is not None:
+                x["asset"] = a["id"]
+        d = lab_update(lid, link)
+    return lab_to_dict(lid, d)
+
+
+@app.delete("/api/assets")
+def assets_clear():
+    """🗑️ يمسح المكتبة كلها (الأصول ونسخها). الكومبوننتس في المعمل بترجع «لسه» وتقدر تقبلها تاني."""
+    busy = [f.parent.name for f in ASSETS_DIR.glob("*/asset.json")
+            if any(v.get("status") == "working" for v in json.loads(f.read_text(encoding="utf-8")).get("variants") or [])]
+    if busy:
+        raise HTTPException(400, "فيه نسخة بتتعمل دلوقتي. استنى لما تخلص")
+    n = 0
+    for f in ASSETS_DIR.glob("*/asset.json"):
+        shutil.rmtree(f.parent, ignore_errors=True)
+        n += 1
+    for f in LAB_DIR.glob("*/lab.json"):  # الكومبوننتس المقبولة ترجع زي ما كانت قبل ما تتقبل
+        try:
+            lid = f.parent.name
+            def fn(d):
+                for c in d.get("components") or []:
+                    if c.get("asset"):
+                        c["asset"] = None
+                        if (c.get("review") or {}).get("ok"):
+                            c["review"] = None
+            lab_update(lid, fn)
+        except (ValueError, HTTPException):
+            continue
+    return {"deleted": n}
+
+
+@app.get("/api/assets")
+def assets_list():
+    out = []
+    for f in sorted(ASSETS_DIR.glob("*/asset.json"), key=lambda x: x.stat().st_mtime, reverse=True):
+        try:
+            d = json.loads(f.read_text(encoding="utf-8"))
+        except ValueError:
+            continue
+        aid = f.parent.name
+        out.append({"id": aid, "name": d["name"], "category": d["category"], "tags": d.get("tags") or [], "duration": d["duration"],
+                    "url": f"/media/assets/{aid}/{d['file']}", "thumb_url": f"/media/assets/{aid}/{d['thumb']}",
+                    "elements": len(d.get("elements") or []), "variants": len([v for v in d.get("variants") or [] if v.get("file")]),
+                    "summary": d.get("summary", ""), "created_at": d.get("created_at")})
+    return out
+
+
+@app.get("/api/assets/{aid}")
+def asset_get(aid: str):
+    return clip_to_dict(aid, clip_load(aid))
+
+
+# ---------------- 🎞️ مكتبة الموشن: أنيميشنات مكتوبة بالكود (library/motion) بتترسم فيديو وتدخل المكتبة كأصل عادي
+MOTION_DIR = ROOT / "library" / "motion"
+MOTION_FPS = 30
+MOTION_JOBS: dict[str, dict] = {}   # id → {"status": "working"|"error", "progress": 0..1, "error": str}
+app.mount("/media/motion", StaticFiles(directory=MOTION_DIR, check_dir=False), name="motion")   # المعاينة الحية والصور
+
+
+def motion_manifest() -> list[dict]:
+    f = MOTION_DIR / "manifest.json"
+    return json.loads(f.read_text(encoding="utf-8")) if f.exists() else []
+
+
+def motion_assets() -> dict[str, list[str]]:
+    """الأصول اللي اتعملت من كل عنصر (كل نسخة بتعديلاتها أصل لوحده)، الأحدث الأول."""
+    out: dict[str, list[tuple[str, str]]] = {}
+    for f in ASSETS_DIR.glob("*/asset.json"):
+        try:
+            d = json.loads(f.read_text(encoding="utf-8"))
+        except ValueError:
+            continue
+        mid = (d.get("source") or {}).get("motion")
+        if mid:
+            out.setdefault(mid, []).append((d.get("created_at") or "", f.parent.name))
+    return {k: [a for _, a in sorted(v, reverse=True)] for k, v in out.items()}
+
+
+@app.get("/api/motion-library")
+def motion_library():
+    made = motion_assets()
+    out = []
+    for m in motion_manifest():
+        ids = made.get(m["id"], [])
+        out.append({**m, "asset": ids[0] if ids else None, "assets": len(ids), "job": MOTION_JOBS.get(m["id"]),
+                    "preview_url": f"/media/motion/r/{m['id']}/reel.html",
+                    "poster_url": f"/media/motion/r/{m['id']}/poster.jpg" if (MOTION_DIR / "r" / m["id"] / "poster.jpg").exists() else None})
+    return out
+
+
+# صور العنصر (لوجو مثلًا) بتتبعت للمتصفح اللي بيرسم كـ data: عشان الصفحة بتتفتح من ملف (file://)
+MEDIA_ROOTS = {"/media/ads/": lambda: ADS_DIR, "/media/brand/": lambda: BRAND_DIR, "/media/coaches/": lambda: COACHES_DIR, "/media/assets/": lambda: ASSETS_DIR}
+
+
+def motion_params(params: dict) -> dict:
+    out = {}
+    for k, v in (params or {}).items():
+        if not isinstance(k, str) or len(k) > 40:
+            continue
+        if isinstance(v, str) and v.startswith("/media/"):
+            path = next(((root() / v[len(pre):].split("?")[0]).resolve() for pre, root in MEDIA_ROOTS.items() if v.startswith(pre)), None)
+            roots = [root().resolve() for root in MEDIA_ROOTS.values()]
+            if path and path.is_file() and any(str(path).startswith(str(r)) for r in roots):
+                mime = mimetypes.guess_type(path.name)[0] or "image/png"
+                v = f"data:{mime};base64," + base64.b64encode(path.read_bytes()).decode()
+            else:
+                v = ""
+        elif isinstance(v, list):
+            v = [str(z)[:400] for z in v[:40]]
+        elif isinstance(v, (int, float)):
+            v = str(v)
+        elif not isinstance(v, str):
+            continue
+        elif not v.startswith("data:"):
+            v = v[:2000]
+        out[k] = v
+    return out
+
+
+def run_motion_import(mid: str, meta: dict, params: dict | None = None, name: str = "") -> None:
+    """بيفتح الأنيميشن في المتصفح، يرسم كل فريم من الوقت (seek)، وياخد الصوت اللي مكتوب بالكود، ويعمل منهم فيديو + أصل."""
+    aid = uuid.uuid4().hex[:12]
+    folder = clip_dir(aid)
+    job = MOTION_JOBS[mid]
+    try:
+        from playwright.sync_api import sync_playwright
+
+        (folder / "variants").mkdir(parents=True, exist_ok=True)
+        with sync_playwright() as p:
+            browser = typo_browser(p)
+            try:
+                page = browser.new_page(viewport={"width": 1920, "height": 1080})
+                page.add_init_script("window.PARAMS = " + json.dumps(motion_params(params or {}), ensure_ascii=False) + ";")
+                page.goto((MOTION_DIR / "r" / mid / "reel.html").as_uri())
+                page.evaluate("() => window.ready")
+                W, H, dur = page.evaluate("() => [window.W, window.H, window.DUR]")
+                page.set_viewport_size({"width": W, "height": H})
+                (folder / "track.wav").write_bytes(base64.b64decode(page.evaluate("() => soundtrack()")))
+                n = int(math.ceil(dur * MOTION_FPS))
+                cmd = [ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-f", "image2pipe", "-framerate", str(MOTION_FPS), "-c:v", "mjpeg", "-i", "-",
+                       "-i", str(folder / "track.wav"), "-c:v", "libx264", "-preset", "veryfast", "-crf", "19", "-pix_fmt", "yuv420p",
+                       "-c:a", "aac", "-b:a", "160k", "-shortest", "-movflags", "+faststart", str(folder / "clip.mp4")]
+                proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+                for i in range(n):
+                    page.evaluate(f"() => seek({i / MOTION_FPS})")
+                    proc.stdin.write(page.screenshot(type="jpeg", quality=90))
+                    job["progress"] = round((i + 1) / n, 3)
+                proc.stdin.close()
+                if proc.wait(timeout=600) != 0:
+                    raise RuntimeError((proc.stderr.read() or b"").decode(errors="ignore")[-300:] or "ffmpeg فشل")
+            finally:
+                browser.close()
+        (folder / "track.wav").unlink(missing_ok=True)
+        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{dur / 2:.3f}", "-i", str(folder / "clip.mp4"),
+                        "-frames:v", "1", "-vf", "scale=480:-2", "-q:v", "3", str(folder / "thumb.jpg")], check=True, capture_output=True, timeout=60)
+        info = media_info(folder / "clip.mp4")
+        data = {"name": (name or "").strip()[:120] or meta["name"], "category": meta.get("category") if meta.get("category") in CLIP_CATS else "motion_graphics",
+                "tags": meta.get("tags") or [], "notes": "", "description": "", "use": "", "controls": [], "connector": None,
+                "file": "clip.mp4", "thumb": "thumb.jpg", "duration": round(info.duration, 2), "width": info.width, "height": info.height,
+                "source": {"motion": mid, "params": {k: v for k, v in (params or {}).items() if not (isinstance(v, str) and v.startswith("data:"))}}, "scene_type": None, "summary": meta["name"], "background": None,
+                "elements": [], "sfx": [], "variants": [], "keyframes": [], "created_at": now(), "updated_at": now()}
+        (folder / "asset.json").write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+        MOTION_JOBS.pop(mid, None)
+    except Exception as e:  # noqa: BLE001
+        shutil.rmtree(folder, ignore_errors=True)
+        job.update(status="error", error=str(e)[:300])
+
+
+class MotionImportIn(BaseModel):
+    params: dict = {}
+    name: str = ""
+
+
+@app.post("/api/motion-library/{mid}/import")
+def motion_import(mid: str, body: MotionImportIn | None = None):
+    """🎞️ العنصر بتعديلاته (كلام، ألوان، لوجو) بيترسم فيديو ويدخل الأصول. كل نسخة أصل لوحده."""
+    meta = next((m for m in motion_manifest() if m["id"] == mid), None)
+    if meta is None:
+        raise HTTPException(404, "العنصر ده مش موجود")
+    if (MOTION_JOBS.get(mid) or {}).get("status") == "working":
+        raise HTTPException(400, "بيترسم دلوقتي، استنى لما يخلص")
+    body = body or MotionImportIn()
+    MOTION_JOBS[mid] = {"status": "working", "progress": 0.0, "error": ""}
+    threading.Thread(target=run_motion_import, args=(mid, meta, body.params, body.name), daemon=True).start()
+    return {"ok": True}
+
+
+class AssetPatchIn(BaseModel):
+    name: str | None = None
+    category: str | None = None
+    tags: list[str] | None = None
+    notes: str | None = None
+
+
+@app.patch("/api/assets/{aid}")
+def asset_patch(aid: str, body: AssetPatchIn):
+    def fn(d):
+        if body.name is not None and body.name.strip():
+            d["name"] = body.name.strip()[:120]
+        if body.category in CLIP_CATS:
+            d["category"] = body.category
+        if body.tags is not None:
+            d["tags"] = [t.strip()[:30] for t in body.tags if t.strip()][:12]
+        if body.notes is not None:
+            d["notes"] = body.notes.strip()[:1000]
+    return clip_to_dict(aid, clip_update(aid, fn))
+
+
+@app.delete("/api/assets/{aid}")
+def asset_delete(aid: str):
+    clip_load(aid)
+    shutil.rmtree(clip_dir(aid), ignore_errors=True)
+    return {"ok": True}
+
+
+def run_asset_variant(aid: str, vid: str) -> None:
+    def setv(**kw):
+        def fn(d):
+            v = next((x for x in d.get("variants") or [] if x["id"] == vid), None)
+            if v is not None:
+                v.update(**kw)
+        clip_update(aid, fn)
+    try:
+        d = clip_load(aid)
+        v = next(x for x in d["variants"] if x["id"] == vid)
+        base = next((x for x in d["variants"] if x["id"] == v.get("base") and x.get("file")), None)
+        src = clip_dir(aid) / ("variants/" + base["file"] if base else d["file"])
+        out = clip_dir(aid) / "variants" / f"{vid}.mp4"
+        context = {"analysis": {"summary": d.get("summary"), "background": d.get("background"), "elements": d.get("elements")}}
+        vedit_render(v, src, out, context, setv)
+        setv(status="done", file=out.name, step=None, error=None, duration=round(probe_duration(out), 2))
+    except Exception as exc:  # noqa: BLE001
+        setv(status="failed", step=None, error=str(getattr(exc, "detail", None) or exc)[:400])
+
+
+@app.post("/api/assets/{aid}/variants")
+def asset_variant(aid: str, body: VeditIn):
+    """✏️ نسخة من الأصل: تعديل جوه المشهد (الحركة زي ما هي) أو ⏩ سرعة جزء."""
+    d = clip_load(aid)
+    item = vedit_item(body)
+    if item["kind"] == "ai" and d["duration"] > 10.5 and not body.base:
+        raise HTTPException(400, "الأصل أطول من 10 ثواني، وموديلات التعديل بتقبل لحد 10")
+    clip_update(aid, lambda d: d.setdefault("variants", []).append(item))
+    threading.Thread(target=run_asset_variant, args=(aid, item["id"]), daemon=True).start()
+    return clip_to_dict(aid, clip_load(aid))
+
+
+@app.delete("/api/assets/{aid}/variants/{vid}")
+def asset_variant_delete(aid: str, vid: str):
+    def fn(d):
+        for v in d.get("variants") or []:
+            if v["id"] == vid and v.get("file"):
+                (clip_dir(aid) / "variants" / v["file"]).unlink(missing_ok=True)
+        d["variants"] = [v for v in d.get("variants") or [] if v["id"] != vid]
+    return clip_to_dict(aid, clip_update(aid, fn))
+
+
+class AssetReviewIn(BaseModel):
+    variant: str
+    ok: bool | None = None
+    note: str = ""
+
+
+@app.patch("/api/assets/{aid}/review")
+def asset_review(aid: str, body: AssetReviewIn):
+    def fn(d):
+        v = next((x for x in d.get("variants") or [] if x["id"] == body.variant), None)
+        if v is None:
+            raise HTTPException(404, "النسخة مش موجودة")
+        v["review"] = {"ok": body.ok, "note": body.note.strip()[:500], "at": now()}
+    return clip_to_dict(aid, clip_update(aid, fn))
+
+
+# ---------- 🧪 تجربة كونيكتور: الوصفة بين لقطتين (خطة ← صور مفتاحية ← حركة بين كل صورتين ← تجميع)
+
+TRIAL_MODELS = {
+    "seedance-mini": {"label": "Seedance 2.0 Mini (الأرخص)", "model": "bytedance/seedance-2.0-mini/image-to-video", "per_sec": 0.011},
+    "seedance-fast": {"label": "Seedance 2.0 Fast", "model": "bytedance/seedance-2.0-fast/image-to-video", "per_sec": 0.027},
+    "seedance": {"label": "Seedance 2.0 (أجود)", "model": "bytedance/seedance-2.0/image-to-video", "per_sec": 0.09},
+    "seedance-2.5": {"label": "Seedance 2.5 (لحد 30 ثانية في توليدة واحدة، أغلى)", "model": "bytedance/seedance-2.5/image-to-video",
+                     "per_sec": 0.134, "max": 30},
+}
+TRIAL_KEY_COST = 0.06   # صورة مفتاحية واحدة (تقريبًا)
+TRIAL_CTX = 2.0         # ثواني من A قبل الكونيكتور ومن B بعده في الفيديو النهائي
+
+
+def trial_dir(aid: str, tid: str) -> Path:
+    return clip_dir(aid) / "trials" / Path(tid).name
+
+
+def trial_set(aid: str, tid: str, **kw) -> None:
+    def fn(a):
+        t = next((x for x in a.get("trials") or [] if x["id"] == tid), None)
+        if t is not None:
+            t.update(**kw)
+    clip_update(aid, fn)
+
+
+def trial_cost(t: dict) -> float:
+    plan = t.get("plan") or {}
+    secs = sum(trial_gen_seconds(x["seconds"]) for x in plan.get("segments") or [])
+    per = TRIAL_MODELS.get(t.get("model"), TRIAL_MODELS["seedance-mini"])["per_sec"] * (2 if t.get("resolution") == "720p" else 1)
+    return round(len(plan.get("keyframes") or []) * TRIAL_KEY_COST + secs * per, 2)
+
+
+def trial_gen_seconds(seconds: float) -> int:
+    return int(min(atlas.MAX_DURATION, max(atlas.MIN_DURATION, math.ceil(seconds))))
+
+
+def trial_to_dict(aid: str, t: dict) -> dict:
+    base = f"/media/assets/{aid}/trials/{t['id']}"
+    f = t.get("files") or {}
+    url = lambda name: f"{base}/{name}" if name else None  # noqa: E731
+    return {**t, "a_url": url(f.get("a")), "b_url": url(f.get("b")), "final_url": url(f.get("final")), "conn_url": url(f.get("conn")),
+            "key_urls": [url(x) for x in f.get("keys") or []], "seg_urls": [url(x) for x in f.get("segs") or []],
+            "cost": trial_cost(t)}
+
+
+def cut_clip(src: Path, a: float, b: float, out: Path) -> Path:
+    subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{a:.3f}", "-i", str(src), "-t", f"{max(0.1, b - a):.3f}",
+                    "-an", "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p", str(out)],
+                   check=True, capture_output=True, timeout=300)
+    return out
+
+
+def still_at(src: Path, t: float, out: Path) -> Path:
+    subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{max(0.0, t):.3f}", "-i", str(src), "-frames:v", "1",
+                    "-vf", "scale='if(gt(iw,ih),min(1280,iw),-2)':'if(gt(iw,ih),-2,min(1280,ih))'", "-q:v", "2", str(out)],
+                   check=True, capture_output=True, timeout=60)
+    if not out.exists():
+        raise HTTPException(400, "مقدرتش أطلّع الفريم ده")
+    return out
+
+
+def trial_side(lab_id: str, n: int | None, t: float | None, side: str) -> dict:
+    """نقطة A (آخر اللقطة) أو B (أول اللقطة) من فيديو في المعمل."""
+    d = lab_load(lab_id)
+    dur = d["source"]["duration"]
+    if n is not None:
+        s = lab_shot(d, n)
+        t = s["end"] - 0.04 if side == "a" else s["start"] + 0.04
+        label = f"«{d.get('name')}» لقطة {n}: {(s.get('analysis') or {}).get('summary', '')}"
+        lo, hi = s["start"], s["end"]
+    else:
+        label, lo, hi = f"«{d.get('name')}» عند {t:.2f}", 0.0, dur
+    t = min(dur - 0.04, max(0.0, float(t or 0)))
+    return {"lab": lab_id, "lab_name": d.get("name"), "n": n, "t": round(t, 3), "label": label[:300],
+            "ctx": [round(max(lo, t - TRIAL_CTX), 3), round(t, 3)] if side == "a" else [round(t, 3), round(min(hi, t + TRIAL_CTX), 3)],
+            "src": d["source"]["file"]}
+
+
+class TrialSideIn(BaseModel):
+    lab: str
+    n: int
+
+
+class TrialIn(BaseModel):
+    mode: str = "rebuild"            # rebuild = نفس النقطتين في الفيديو الأصلي، transfer = لقطتين تانيين
+    a: TrialSideIn | None = None
+    b: TrialSideIn | None = None
+    model: str = "seedance-mini"
+    resolution: str = "480p"
+
+
+@app.post("/api/assets/{aid}/trials")
+def asset_trial_create(aid: str, body: TrialIn):
+    """🧪 تجربة جديدة: بيطلّع فريم A وفريم B وبيكتب الخطة (رخيص). التوليد بيستنى موافقتك."""
+    asset = clip_load(aid)
+    if asset.get("category") != "connector" or not asset.get("connector"):
+        raise HTTPException(400, "التجربة للكونيكتورز بس")
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل")
+    src = asset.get("source") or {}
+    if body.mode == "rebuild":
+        if not src.get("lab") or not (lab_dir(src["lab"]) / "lab.json").exists():
+            raise HTTPException(400, "الفيديو الأصلي للكونيكتور ده اتمسح من المعمل")
+        a = trial_side(src["lab"], None, src["t0"], "a")
+        b = trial_side(src["lab"], None, src["t1"], "b")
+        a["label"], b["label"] = "قبل الكونيكتور الأصلي مباشرة", "بعد الكونيكتور الأصلي مباشرة"
+    else:
+        if not (body.a and body.b):
+            raise HTTPException(400, "اختار اللقطة A واللقطة B")
+        a, b = trial_side(body.a.lab, body.a.n, None, "a"), trial_side(body.b.lab, body.b.n, None, "b")
+    tid = uuid.uuid4().hex[:8]
+    folder = trial_dir(aid, tid)
+    folder.mkdir(parents=True, exist_ok=True)
+    still_at(lab_dir(a["lab"]) / a["src"], a["t"], folder / "a.jpg")
+    still_at(lab_dir(b["lab"]) / b["src"], b["t"], folder / "b.jpg")
+    t = {"id": tid, "mode": "rebuild" if body.mode == "rebuild" else "transfer", "a": a, "b": b,
+         "model": body.model if body.model in TRIAL_MODELS else "seedance-mini",
+         "resolution": body.resolution if body.resolution in ("480p", "720p") else "480p",
+         "status": "planning", "step": "بيكتب الخطة", "error": None, "plan": None,
+         "files": {"a": "a.jpg", "b": "b.jpg"}, "review": None, "created_at": now()}
+    clip_update(aid, lambda x: x.setdefault("trials", []).insert(0, t))
+    threading.Thread(target=run_trial_plan, args=(aid, tid), daemon=True).start()
+    return clip_to_dict(aid, clip_load(aid))
+
+
+def run_trial_plan(aid: str, tid: str, note: str = "") -> bool:
+    try:
+        asset = clip_load(aid)
+        t = next(x for x in asset["trials"] if x["id"] == tid)
+        folder = trial_dir(aid, tid)
+        if atlas.mock_mode():
+            raw = lab.mock_trial_plan()
+        else:
+            text = lab.trial_plan_messages(asset["connector"], t["mode"], t["a"]["label"], t["b"]["label"])
+            if note and t.get("plan"):
+                notes = [*(t.get("notes") or []), note][-5:]
+                text += ("\n\n⚠️ التجربة دي اتولّدت قبل كده بالخطة دي والمستخدم ما عجبهوش:\n"
+                         f"{json.dumps(t['plan'], ensure_ascii=False, indent=1)}\n"
+                         "ملاحظات المستخدم (الأخيرة هي الأهم، ولازم تتصلّح في الخطة الجديدة):\n" + "\n".join(f"- {x}" for x in notes))
+            parts: list[dict] = [{"type": "text", "text": text}]
+            imgs = [folder / "a.jpg", folder / "b.jpg"] + [clip_dir(aid) / k["file"] for k in asset.get("keyframes") or []]
+            for p in imgs:
+                if p.exists():
+                    parts.append({"type": "image_url", "image_url": {"url": data_url(model_image(p, 768), "image/jpeg")}})
+            raw = ad_json(ad_media_chat([{"role": "user", "content": parts}], 8000), "خطة الكونيكتور")
+        extra = {"notes": [*(t.get("notes") or []), note][-5:]} if note else {}
+        trial_set(aid, tid, plan=lab.clean_trial_plan(raw), status="planned", step=None, error=None, **extra)
+        return True
+    except Exception as exc:  # noqa: BLE001
+        trial_set(aid, tid, status="failed", step=None, error=str(getattr(exc, "detail", None) or exc)[:400])
+        return False
+
+
+class TrialRedoIn(BaseModel):
+    note: str = ""
+
+
+@app.post("/api/assets/{aid}/trials/{tid}/redo")
+def asset_trial_redo(aid: str, tid: str, body: TrialRedoIn):
+    """↻ التجربة ما عجبتكش: بملاحظة = خطة جديدة عليها وبعدين توليد، من غيرها = محاولة جديدة بنفس الخطة."""
+    note = body.note.strip()[:1000]
+    def fn(a):
+        t = next((x for x in a.get("trials") or [] if x["id"] == tid), None)
+        if t is None:
+            raise HTTPException(404, "التجربة دي مش موجودة")
+        if t["status"] in ("planning", "working") or not t.get("plan"):
+            raise HTTPException(400, "استنى لما الشغل اللي شغال يخلص")
+        t.update(status="planning" if note else "working", step="🧠 بيعدّل الخطة على ملاحظتك" if note else "بيبدأ", error=None, review=None)
+    clip_update(aid, fn)
+    def job():
+        if note and not run_trial_plan(aid, tid, note):
+            return
+        trial_set(aid, tid, status="working", step="بيبدأ")
+        run_trial_gen(aid, tid)
+    threading.Thread(target=job, daemon=True).start()
+    return clip_to_dict(aid, clip_load(aid))
+
+
+class TrialPatchIn(BaseModel):
+    plan: dict | None = None
+    model: str | None = None
+    resolution: str | None = None
+
+
+@app.patch("/api/assets/{aid}/trials/{tid}")
+def asset_trial_patch(aid: str, tid: str, body: TrialPatchIn):
+    """تعدّل الخطة (البرومبتات والأطوال) أو الموديل قبل التوليد."""
+    def fn(a):
+        t = next((x for x in a.get("trials") or [] if x["id"] == tid), None)
+        if t is None:
+            raise HTTPException(404, "التجربة دي مش موجودة")
+        if t["status"] in ("planning", "working"):
+            raise HTTPException(400, "استنى لما الشغل اللي شغال يخلص")
+        if body.plan is not None:
+            t["plan"] = lab.clean_trial_plan({**(t.get("plan") or {}), **body.plan})
+        if body.model in TRIAL_MODELS:
+            t["model"] = body.model
+        if body.resolution in ("480p", "720p"):
+            t["resolution"] = body.resolution
+    return clip_to_dict(aid, clip_update(aid, fn))
+
+
+@app.post("/api/assets/{aid}/trials/{tid}/run")
+def asset_trial_run(aid: str, tid: str):
+    """🎬 التوليد: الصور المفتاحية، والحركة بين كل صورتين، والتجميع. بيتحسب على Atlas."""
+    def fn(a):
+        t = next((x for x in a.get("trials") or [] if x["id"] == tid), None)
+        if t is None:
+            raise HTTPException(404, "التجربة دي مش موجودة")
+        if t["status"] in ("planning", "working") or not t.get("plan"):
+            raise HTTPException(400, "الخطة لسه مخلصتش")
+        t.update(status="working", step="بيبدأ", error=None, review=None)
+    clip_update(aid, fn)
+    threading.Thread(target=run_trial_gen, args=(aid, tid), daemon=True).start()
+    return clip_to_dict(aid, clip_load(aid))
+
+
+def nearest_ratio(w: int, h: int) -> str:
+    r = w / max(1, h)
+    return min(("9:16", "16:9", "1:1", "3:4", "4:3"), key=lambda k: abs(r - int(k.split(":")[0]) / int(k.split(":")[1])))
+
+
+def draw_key(prompt: str, base: Path, target: Path, out: Path, size: str, i: int = 0) -> Path:
+    """صورة مرحلة: تعديل على الصورة اللي قبلها، ومعاها الصورة اللي رايحين لها كمرجع."""
+    if atlas.mock_mode():
+        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(base), "-vf", f"hue=h={60 * (i + 1)}",
+                        str(out)], check=True, capture_output=True, timeout=60)
+        return out
+    prompt += ("\nIMAGE 1 is the current frame and the base to edit. IMAGE 2 is the final frame we are "
+               "heading to (reference only). Keep the same framing, aspect ratio, style and every on-screen text exactly as "
+               "written unless the instruction changes it.")
+    atlas.download(atlas.generate_image(carousel_settings()["image_family"], prompt, size, "medium",
+                                        [atlas.reference_url(base), atlas.reference_url(target)]), out)
+    return out
+
+
+def gen_motion(model_key: str, resolution: str, ratio: str, prompt: str, img_a: Path, img_b: Path, secs: int,
+               out: Path, W: int, H: int, what: str = "حركة الكونيكتور") -> Path:
+    """حركة بين صورة بداية وصورة نهاية (Seedance)."""
+    if atlas.mock_mode():
+        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-loop", "1", "-t", str(secs), "-i", str(img_a),
+                        "-loop", "1", "-t", str(secs), "-i", str(img_b), "-filter_complex",
+                        f"[0]scale={W}:{H},setsar=1,fps=30[a];[1]scale={W}:{H},setsar=1,fps=30[b];"
+                        f"[a][b]xfade=transition=fade:duration={secs - 0.5}:offset=0.25,format=yuv420p",
+                        "-t", str(secs), str(out)], check=True, capture_output=True, timeout=120)
+        return out
+    body = {"model": TRIAL_MODELS[model_key]["model"], "prompt": prompt + " One continuous shot, no cuts, no text changes.",
+            "image": atlas.reference_url(img_a), "last_image": atlas.reference_url(img_b),
+            "duration": secs, "resolution": resolution, "ratio": ratio, "generate_audio": False}
+    atlas.download(atlas.run_model("Video", body, what, max_seconds=1500, interval=6), out)
+    return out
+
+
+def chain_clips(items: list, out: Path, W: int, H: int) -> Path:
+    """يلزق المقاطع ورا بعض؛ كل عنصر (مسار، معامل الطول) عشان كل حتة تاخد الطول اللي في الخطة.
+    كل حتة بتتجهز لوحدها (نفس المقاس و30 فريم)، وبعدين بتتلزق من غير ما تتحسب تاني: أخف على الذاكرة مهما كانت الحتت كتير."""
+    tmp = out.parent / f".chain_{uuid.uuid4().hex[:8]}"
+    tmp.mkdir(parents=True, exist_ok=True)
+    def run(cmd: list, what: str) -> None:
+        try:
+            subprocess.run(cmd, check=True, capture_output=True, timeout=600)
+        except subprocess.CalledProcessError as e:
+            raise RuntimeError(f"{what}: {(e.stderr or b'').decode(errors='ignore').strip()[-300:]}") from None
+        except subprocess.TimeoutExpired:
+            raise RuntimeError(f"{what}: أخد وقت أطول من اللازم") from None
+    try:
+        names = []
+        for i, it in enumerate(items):
+            p, f = (it if isinstance(it, tuple) else (it, 1.0))
+            name = tmp / f"{i:03d}.mp4"
+            run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(p), "-an",
+                 "-vf", f"setpts={f:.4f}*(PTS-STARTPTS),scale={W}:{H}:force_original_aspect_ratio=decrease,"
+                        f"pad={W}:{H}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30,format=yuv420p",
+                 "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-video_track_timescale", "15360", str(name)],
+                f"تجهيز الحتة {i + 1} ({Path(p).name})")
+            names.append(name)
+        lst = tmp / "list.txt"
+        lst.write_text("".join(f"file '{n.name}'\n" for n in names), encoding="utf-8")
+        run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-f", "concat", "-safe", "0", "-i", str(lst),
+             "-c", "copy", "-movflags", "+faststart", str(out)], "لزق الحتت")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return out
+
+
+def timed(p: Path, seconds: float) -> tuple:
+    return (p, seconds / max(0.1, probe_duration(p)))
+
+
+def run_trial_gen(aid: str, tid: str) -> None:
+    def step(msg: str) -> None:
+        trial_set(aid, tid, step=msg)
+    try:
+        asset = clip_load(aid)
+        t = next(x for x in asset["trials"] if x["id"] == tid)
+        plan, folder = t["plan"], trial_dir(aid, tid)
+        info = media_info(folder / "a.jpg")
+        W, H = info.width // 2 * 2, info.height // 2 * 2
+        ratio = nearest_ratio(W, H)
+        size = az.ASPECTS.get(ratio, az.ASPECTS["9:16"])[0] if ratio in az.ASPECTS else "1024x1024"
+        # ١) الصور المفتاحية: كل مرحلة من اللي قبلها، ومعاها صورة النهاية عشان تعرف رايحة فين
+        chain, keys = [folder / "a.jpg"], []
+        for i, k in enumerate(plan["keyframes"]):
+            step(f"🖼️ بيرسم المرحلة {i + 1} من {len(plan['keyframes'])}: {k['label']}")
+            chain.append(draw_key(k["prompt"], chain[-1], folder / "b.jpg", folder / f"k{i + 1}.png", size, i))
+            keys.append(chain[-1].name)
+            trial_set(aid, tid, files={**t["files"], "keys": keys})
+        chain.append(folder / "b.jpg")
+        # ٢) الحركة بين كل صورتين (صورة بداية + صورة نهاية)
+        segs = []
+        for i, sg in enumerate(plan["segments"]):
+            step(f"🎬 بيولّد الحركة {i + 1} من {len(plan['segments'])}: {sg['label']}")
+            gen_motion(t["model"], t["resolution"], ratio, sg["prompt"], chain[i], chain[i + 1], trial_gen_seconds(sg["seconds"]),
+                       folder / f"s{i + 1}.mp4", W, H)
+            segs.append(f"s{i + 1}.mp4")
+            trial_set(aid, tid, files={**t["files"], "keys": keys, "segs": segs})
+        # ٣) التجميع: آخر A ← الحركات (كل واحدة على قد طولها في الخطة) ← أول B
+        step("🎞️ بيجمّع")
+        a_src, b_src = lab_dir(t["a"]["lab"]) / t["a"]["src"], lab_dir(t["b"]["lab"]) / t["b"]["src"]
+        parts = [cut_clip(a_src, *t["a"]["ctx"], folder / "a_ctx.mp4")]
+        parts += [timed(folder / name, sg["seconds"]) for name, sg in zip(segs, plan["segments"])]
+        parts.append(cut_clip(b_src, *t["b"]["ctx"], folder / "b_ctx.mp4"))
+        chain_clips(parts, folder / "final.mp4", W, H)
+        chain_clips(parts[1:-1], folder / "conn.mp4", W, H)
+        trial_set(aid, tid, status="done", step=None, error=None, done_at=now(),
+                  files={"a": "a.jpg", "b": "b.jpg", "keys": keys, "segs": segs, "final": "final.mp4", "conn": "conn.mp4"})
+    except Exception as exc:  # noqa: BLE001
+        trial_set(aid, tid, status="failed", step=None, error=str(getattr(exc, "detail", None) or exc)[:400])
+
+
+class TrialReviewIn(BaseModel):
+    ok: bool | None = None
+    note: str = ""
+
+
+@app.patch("/api/assets/{aid}/trials/{tid}/review")
+def asset_trial_review(aid: str, tid: str, body: TrialReviewIn):
+    def fn(a):
+        t = next((x for x in a.get("trials") or [] if x["id"] == tid), None)
+        if t is None:
+            raise HTTPException(404, "التجربة دي مش موجودة")
+        t["review"] = {"ok": body.ok, "note": body.note.strip()[:1000], "at": now()}
+    return clip_to_dict(aid, clip_update(aid, fn))
+
+
+@app.delete("/api/assets/{aid}/trials/{tid}")
+def asset_trial_delete(aid: str, tid: str):
+    def fn(a):
+        t = next((x for x in a.get("trials") or [] if x["id"] == tid), None)
+        if t and t["status"] in ("planning", "working"):
+            raise HTTPException(400, "استنى لما الشغل اللي شغال يخلص")
+        a["trials"] = [x for x in a.get("trials") or [] if x["id"] != tid]
+    d = clip_update(aid, fn)
+    shutil.rmtree(trial_dir(aid, tid), ignore_errors=True)
+    return clip_to_dict(aid, d)
+
+
+# ---------- 🎞️ فيديو بالكونيكتورز: سيناريو مكتوب على مقاس الكونيكتورز اللي في المكتبة
+# السيناريو ← فريم أول وآخر لكل مشهد ← خطة كل كونيكتور بين مشهدين ← حركة المشاهد والكونيكتورز ← تجميع
+
+FILMS_DIR = DATA_DIR / "films"
+FILMS_DIR.mkdir(parents=True, exist_ok=True)
+FILM_LOCK = threading.Lock()
+FILM_BUSY = ("planning", "drawing", "working", "voicing")
+
+
+def film_dir(fid: str) -> Path:
+    return FILMS_DIR / Path(fid).name
+
+
+def film_load(fid: str) -> dict:
+    f = film_dir(fid) / "film.json"
+    if not f.exists():
+        raise HTTPException(404, "الفيديو ده مش موجود")
+    return json.loads(f.read_text(encoding="utf-8"))
+
+
+def film_save(fid: str, d: dict) -> None:
+    d["updated_at"] = now()
+    tmp = film_dir(fid) / "film.json.tmp"
+    tmp.write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+    tmp.replace(film_dir(fid) / "film.json")
+
+
+def film_update(fid: str, fn) -> dict:
+    with FILM_LOCK:
+        d = film_load(fid)
+        fn(d)
+        film_save(fid, d)
+        return d
+
+
+def film_set(fid: str, **kw) -> dict:
+    return film_update(fid, lambda d: d.update(**kw))
+
+
+def film_files(d: dict) -> dict:
+    """ملفات كل مشهد وكل كونيكتور، على قد عدد المشاهد في السيناريو."""
+    n = len((d.get("plan") or {}).get("scenes") or [])
+    f = d.setdefault("files", {})
+    f["scenes"] = (f.get("scenes") or []) + [{} for _ in range(n - len(f.get("scenes") or []))]
+    f["scenes"] = f["scenes"][:n]
+    f["links"] = (f.get("links") or []) + [{} for _ in range(max(0, n - 1) - len(f.get("links") or []))]
+    f["links"] = f["links"][:max(0, n - 1)]
+    return f
+
+
+def film_conns(ids: list[str]) -> list[dict]:
+    out = []
+    for aid in ids:
+        try:
+            a = clip_load(aid)
+        except HTTPException:
+            continue
+        if a.get("category") == "connector" and a.get("connector"):
+            out.append({**a, "id": aid})
+    return out
+
+
+def film_link_cost(d: dict, i: int) -> float:
+    lp = (d["plan"]["links"][i].get("plan") or {})
+    per = TRIAL_MODELS.get(d.get("model"), TRIAL_MODELS["seedance-mini"])["per_sec"] * (2 if d.get("resolution") == "720p" else 1)
+    if not lp:
+        return 1 * TRIAL_KEY_COST + 2 * atlas.MIN_DURATION * per
+    return len(lp.get("keyframes") or []) * TRIAL_KEY_COST + sum(trial_gen_seconds(x["seconds"]) for x in lp.get("segments") or []) * per
+
+
+def film_costs(d: dict) -> dict:
+    """تمن الفريمات اللي لسه متترسمتش، وتمن الفيديو (المشاهد والكونيكتورز اللي لسه متولدتش)."""
+    p = d.get("plan") or {}
+    if not p.get("scenes"):
+        return {"frames": 0, "video": 0}
+    f = film_files(json.loads(json.dumps(d)))
+    per = TRIAL_MODELS.get(d.get("model"), TRIAL_MODELS["seedance-mini"])["per_sec"] * (2 if d.get("resolution") == "720p" else 1)
+    frames = sum((0 if x.get("a") else 1) + (0 if x.get("b") else 1) for x in f["scenes"]) * TRIAL_KEY_COST
+    video = sum(trial_gen_seconds(sc["seconds"]) * per for sc, x in zip(p["scenes"], f["scenes"]) if not x.get("video"))
+    video += sum(film_link_cost(d, i) for i, x in enumerate(f["links"]) if not x.get("segs"))
+    return {"frames": round(frames, 2), "video": round(video, 2),
+            "scenes": [round(trial_gen_seconds(sc["seconds"]) * per, 2) for sc in p["scenes"]],   # تمن كل حتة لوحدها
+            "links": [round(film_link_cost(d, i), 2) for i in range(len(p.get("links") or []))],
+            "todo_scenes": sum(1 for x in f["scenes"] if not x.get("video")), "todo_links": sum(1 for x in f["links"] if not x.get("segs"))}
+
+
+def film_to_dict(fid: str, d: dict) -> dict:
+    base = f"/media/films/{fid}"
+    folder = film_dir(fid)
+    def url(name):
+        if not name or not (folder / name).exists():
+            return None
+        return f"{base}/{name}?v={int((folder / name).stat().st_mtime)}"
+    f = film_files(json.loads(json.dumps(d)))
+    links = (d.get("plan") or {}).get("links") or []
+    brain = brain_row(d.get("client_id") or "") or active_client()
+    client_assets = [{"name": a.get("name") or a["file"], "kind": k, "url": f"/media/ads/brains/{brain['id']}/{a['file']}"}
+                     for k in ("logos", "screens", "products") for a in (brain or {}).get(k) or []]
+    v = d.get("voice") or {}
+    scenes = (d.get("plan") or {}).get("scenes") or []
+    voice = {**v, "full_url": url(v.get("full")),
+             "lines": [{**ln, "url": url(ln["file"]), "stale": ln.get("text", "") != (scenes[i].get("voice") or "").strip()} if ln else None
+                       for i, ln in enumerate(film_voice_lines(d))] if scenes else []} if v else None
+    return {**d, "id": fid, "busy": d.get("status") in FILM_BUSY, "costs": film_costs(d), "client_assets": client_assets,
+            "voice": voice, "voices": [{"id": k, "label": l} for k, l in AR_VOICES.items()],
+            "stale": [film_stale(d, i) for i in range(len(scenes))],
+            "link_lens": [film_link_len(d["plan"], i) for i in range(len(d["plan"]["links"]))] if scenes else [],
+            "ref_files": [{**r, "url": url(r["file"])} for r in d.get("refs") or [] if url(r["file"])],
+            "final_url": url((d.get("files") or {}).get("final")), "raw_url": url((d.get("files") or {}).get("raw")),
+            "scene_files": [{"a": url(x.get("a")), "b": url(x.get("b")), "video": url(x.get("video"))} for x in f["scenes"]],
+            "link_files": [{"keys": [url(k) for k in x.get("keys") or []], "video": url(x.get("video"))} for x in f["links"]],
+            "link_assets": [{"id": l.get("asset"), **({"name": a.get("name"), "url": f"/media/assets/{l['asset']}/{a['file']}",
+                             "thumb_url": f"/media/assets/{l['asset']}/{a['thumb']}"} if (a := film_asset_brief(l.get("asset"))) else {})}
+                            for l in links],
+            "models": [{"key": k, "label": v["label"], "per_sec": v["per_sec"]} for k, v in TRIAL_MODELS.items()]}
+
+
+def film_asset_brief(aid: str | None) -> dict | None:
+    if not aid or not (clip_dir(aid) / "asset.json").exists():
+        return None
+    try:
+        return clip_load(aid)
+    except (HTTPException, ValueError):
+        return None
+
+
+@app.get("/api/films")
+def films_list():
+    out = []
+    for f in sorted(FILMS_DIR.glob("*/film.json"), key=lambda x: x.stat().st_mtime, reverse=True):
+        try:
+            d = json.loads(f.read_text(encoding="utf-8"))
+        except ValueError:
+            continue
+        if not owned(d.get("client_id")):
+            continue
+        fid = f.parent.name
+        first = ((d.get("files") or {}).get("scenes") or [{}])[0].get("a")
+        out.append({"id": fid, "name": d.get("name"), "status": d.get("status"), "scenes": len((d.get("plan") or {}).get("scenes") or []),
+                    "thumb": f"/media/films/{fid}/{first}" if first else None, "created_at": d.get("created_at")})
+    return out
+
+
+@app.get("/api/films/{fid}")
+def film_get(fid: str):
+    return film_to_dict(fid, film_load(fid))
+
+
+class FilmIn(BaseModel):
+    name: str = ""
+    brief: str = ""
+    connectors: list[str] = []
+    scenes: int = 0
+    ratio: str = "9:16"
+    model: str = "seedance-mini"
+    resolution: str = "480p"
+
+
+@app.post("/api/films")
+def film_create(body: FilmIn):
+    """🎞️ فيديو جديد: البرنامج بيكتب سيناريو على مقاس الكونيكتورز اللي اخترتها (رخيص). الرسم والتوليد بيستنوا موافقتك."""
+    conns = film_conns(body.connectors)
+    if not conns:
+        raise HTTPException(400, "اختار كونيكتور واحد على الأقل من المكتبة")
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل")
+    client = active_client() or {}
+    fid = uuid.uuid4().hex[:10]
+    film_dir(fid).mkdir(parents=True, exist_ok=True)
+    n = body.scenes if 2 <= body.scenes <= 8 else min(8, max(3, len(conns) + 1))
+    d = {"name": body.name.strip()[:120] or f"🎞️ {client.get('name') or 'فيديو'}: المميزات", "client_id": client.get("id"),
+         "brief": body.brief.strip()[:3000] or f"فيديو قصير بيعرض أهم مميزات {client.get('name') or 'المنتج'}",
+         "connectors": [c["id"] for c in conns], "n_scenes": n,
+         "ratio": body.ratio if body.ratio in az.ASPECTS else "9:16",
+         "model": body.model if body.model in TRIAL_MODELS else "seedance-mini",
+         "resolution": body.resolution if body.resolution in ("480p", "720p") else "480p",
+         "status": "planning", "step": "بيكتب السيناريو", "error": None, "plan": None, "files": {}, "created_at": now()}
+    with FILM_LOCK:
+        film_save(fid, d)
+    threading.Thread(target=run_film_plan, args=(fid,), daemon=True).start()
+    return film_to_dict(fid, d)
+
+
+def run_film_plan(fid: str) -> None:
+    try:
+        d = film_load(fid)
+        conns = film_conns(d["connectors"])
+        brain = brain_row(d.get("client_id") or "") or active_client()
+        if not conns:
+            raise HTTPException(400, "الكونيكتورز اللي اخترتها اتمسحت من المكتبة")
+        if atlas.mock_mode():
+            raw = lab.mock_film_plan(conns, d["n_scenes"], (brain or {}).get("name") or "البراند")
+        else:
+            parts: list[dict] = [{"type": "text", "text": lab.film_plan_messages(az.brain_text(brain), d["brief"], conns, d["n_scenes"])}]
+            for c in conns:
+                for k in (c.get("keyframes") or [])[:3]:
+                    p = clip_dir(c["id"]) / k["file"]
+                    if p.exists():
+                        parts.append({"type": "image_url", "image_url": {"url": data_url(model_image(p, 512), "image/jpeg")}})
+            raw = ad_json(ad_media_chat([{"role": "user", "content": parts}], 12000), "سيناريو الفيديو")
+        plan = lab.clean_film_plan(raw, [c["id"] for c in conns])
+        if len(plan["scenes"]) < 2:
+            raise HTTPException(400, "السيناريو طلع أقل من مشهدين. جرّب تاني")
+        def fn(x):
+            for f in film_dir(fid).glob("*"):
+                if f.name != "film.json":
+                    f.unlink(missing_ok=True)
+            x.update(plan=plan, files={}, status="planned", step=None, error=None)
+            if plan.get("title") and x["name"].startswith("🎞️"):
+                x["name"] = "🎞️ " + plan["title"]
+        film_update(fid, fn)
+    except Exception as exc:  # noqa: BLE001
+        film_set(fid, status="failed", step=None, error=str(getattr(exc, "detail", None) or exc)[:400])
+
+
+class FilmPatchIn(BaseModel):
+    name: str | None = None
+    brief: str | None = None
+    plan: dict | None = None
+    model: str | None = None
+    resolution: str | None = None
+
+
+@app.patch("/api/films/{fid}")
+def film_patch(fid: str, body: FilmPatchIn):
+    """تعديل السيناريو (الكلام والبرومبتات والأطوال، والكونيكتور اللي بين كل مشهدين) أو الموديل."""
+    def fn(d):
+        if body.plan is not None and d.get("status") == "planning":
+            raise HTTPException(400, "استنى لما الشغل اللي شغال يخلص")
+        if body.name is not None and body.name.strip():
+            d["name"] = body.name.strip()[:120]
+        if body.brief is not None:
+            d["brief"] = body.brief.strip()[:3000]
+        if body.model in TRIAL_MODELS:
+            d["model"] = body.model
+        if body.resolution in ("480p", "720p"):
+            d["resolution"] = body.resolution
+        if body.plan is not None and d.get("plan"):
+            old = d["plan"]
+            new = lab.clean_film_plan({**old, **body.plan}, [l["asset"] for l in old["links"]] + d["connectors"])
+            if len(new["scenes"]) != len(old["scenes"]):
+                raise HTTPException(400, "عدد المشاهد مينفعش يتغير هنا. اكتب السيناريو من جديد")
+            f = film_files(d)
+            for i, (a, b) in enumerate(zip(old["scenes"], new["scenes"])):
+                if f["scenes"][i].get("a") and "drawn" not in f["scenes"][i]:   # فيديوهات قديمة: السكريبت قبل أول تعديل
+                    f["scenes"][i]["drawn"] = {"text": a.get("text", ""), "voice": a.get("voice", "")}
+                if a["motion"] != b["motion"] or a["seconds"] != b["seconds"]:
+                    f["scenes"][i].pop("video", None)
+            for i, (a, b) in enumerate(zip(old["links"], new["links"])):
+                lp = (body.plan.get("links") or [{}] * len(new["links"]))[i] if i < len(body.plan.get("links") or []) else {}
+                if a["asset"] != b["asset"]:
+                    f["links"][i] = {}      # كونيكتور تاني: الخطة بتتعمل من جديد
+                    b["plan"] = None
+                else:
+                    if a.get("notes"):
+                        b["notes"] = a["notes"]   # ملاحظاتك على المحاولات اللي فاتت
+                    b["plan"] = lab.clean_trial_plan(lp["plan"]) if isinstance(lp, dict) and lp.get("plan") else a.get("plan")
+                    if b["plan"] != a.get("plan"):
+                        f["links"][i] = {}
+            if new != old:
+                f.pop("final", None)
+            d["plan"] = new
+    d = film_update(fid, fn)
+    return film_to_dict(fid, d)
+
+
+def film_start(fid: str, status: str, step: str, target, *args) -> dict:
+    def fn(d):
+        if d.get("status") in FILM_BUSY:
+            raise HTTPException(400, "استنى لما الشغل اللي شغال يخلص")
+        if status != "planning" and not (d.get("plan") or {}).get("scenes"):
+            raise HTTPException(400, "السيناريو لسه مخلصش")
+        d.update(status=status, step=step, error=None)
+    d = film_update(fid, fn)
+    threading.Thread(target=target, args=(fid, *args), daemon=True).start()
+    return film_to_dict(fid, d)
+
+
+@app.post("/api/films/{fid}/replan")
+def film_replan(fid: str):
+    """✍️ سيناريو جديد من الأول (الفريمات والفيديوهات القديمة بتتمسح)."""
+    return film_start(fid, "planning", "بيكتب السيناريو", run_film_plan)
+
+
+class FilmFrameIn(BaseModel):
+    note: str = ""
+    refs: list[str] = []      # صور إنت رافعها للفيديو ده
+    client: list[str] = []    # أصول من ملف العميل (اللوجو، الشاشات...) بالاسم
+
+
+@app.post("/api/films/{fid}/frames")
+def film_frames(fid: str):
+    """🖼️ يرسم الفريمات اللي لسه متترسمتش (أول وآخر كل مشهد) ويكتب خطة كل كونيكتور."""
+    return film_start(fid, "drawing", "بيبدأ يرسم", run_film_frames, None, "")
+
+
+@app.post("/api/films/{fid}/scenes/{i}/{which}")
+def film_frame_redo(fid: str, i: int, which: str, body: FilmFrameIn):
+    """↻ يرسم فريم واحد تاني (ولو فيه ملاحظة بيعدّل عليه بيها). لو أول المشهد اترسم، آخره بيترسم معاه."""
+    if which not in ("a", "b"):
+        raise HTTPException(400, "a أو b")
+    d = film_load(fid)
+    if not 0 <= i < len((d.get("plan") or {}).get("scenes") or []):
+        raise HTTPException(404, "المشهد ده مش موجود")
+    brain = brain_row(d.get("client_id") or "") or active_client()
+    extra = [film_dir(fid) / Path(x).name for x in body.refs if Path(x).name.startswith("ref_")]
+    extra += [p for x in body.client if (p := film_brain_ref(brain, x))]
+    note, extra = body.note.strip()[:1000], extra[:6]
+    queued = []
+    def fn(x):   # والرسم شغال: التعديل بيستنى دوره
+        if x.get("status") == "drawing":
+            x.setdefault("queue", []).append({"only": [i, which], "note": note, "extra": [str(p) for p in extra]})
+            queued.append(1)
+    d = film_update(fid, fn)
+    if queued:
+        return film_to_dict(fid, d)
+    return film_start(fid, "drawing", "بيرسم", run_film_frames, (i, which), note, extra)
+
+
+def film_frame_prompt(d: dict, brain: dict | None, sc: dict, i: int, ref_notes: list[str]) -> str:
+    """ref_notes = وصف كل صورة مرجعية بنفس ترتيبها (IMAGE 1، IMAGE 2...)."""
+    p = d["plan"]
+    parts = [f"A {d['ratio']} frame (scene {i + 1} of {len(p['scenes'])}) of a short premium motion-graphics promo video"
+             + (f" for {brain['name']}" if brain and brain.get("name") else "") + ".",
+             az.brain_header(brain), f"Color palette: {brain['palette']}" if brain and brain.get("palette") else "",
+             f"Video concept: {p.get('idea')}" if p.get("idea") else "",
+             f"SCENE: {sc['start']}",
+             f'ON-SCREEN TEXT (write it exactly as given, correct Arabic letters joined right-to-left, nothing else written): "{sc["text"]}"'
+             if sc.get("text") else "No on-screen text except what the brand asset itself contains.",
+             *[f"IMAGE {n + 1} {x}" for n, x in enumerate(ref_notes)]]
+    return "\n".join(x for x in parts if x)
+
+
+REF_EXACT = "Use it exactly as it is (same shapes, letters, colors), never redraw or invent a different one."
+
+
+def film_brain_ref(brain: dict | None, name: str) -> Path | None:
+    if not brain or not name:
+        return None
+    for kind in ("screens", "logos", "products", "characters", "sets", "props"):
+        for a in brain.get(kind) or []:
+            if name in (a.get("name"), a.get("file")):
+                p = brain_dir(brain["id"]) / a["file"]
+                return p if p.exists() else None
+    return None
+
+
+def film_mock_image(out: Path, ratio: str, i: int) -> Path:
+    w, h = {"9:16": (576, 1024), "16:9": (1024, 576), "1:1": (768, 768)}.get(ratio, (576, 1024))
+    colors = ["0x57B8AF", "0xEEECDA", "0x2F3437", "0xE07A5F", "0x81B29A", "0xF2CC8F", "0x3D405B", "0x9C89B8"]
+    subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i", f"color=c={colors[i % 8]}:s={w}x{h}",
+                    "-frames:v", "1", str(out)], check=True, capture_output=True, timeout=60)
+    return out
+
+
+def film_plan_link(fid: str, i: int, note: str = "") -> None:
+    """خطة الكونيكتور بين آخر المشهد i وأول المشهد i+1 (بنفس طريقة تجارب الكونيكتور)."""
+    d = film_load(fid)
+    p, folder = d["plan"], film_dir(fid)
+    link = p["links"][i]
+    asset = film_asset_brief(link.get("asset"))
+    if not asset or not asset.get("connector"):
+        raise HTTPException(400, f"الكونيكتور اللي بين المشهد {i + 1} و{i + 2} اتمسح من المكتبة. اختار غيره")
+    a_img, b_img = folder / f"sc{i + 1}_b.png", folder / f"sc{i + 2}_a.png"
+    if atlas.mock_mode():
+        raw = lab.mock_trial_plan()
+    else:
+        sa, sb = p["scenes"][i], p["scenes"][i + 1]
+        text = lab.trial_plan_messages(asset["connector"], "transfer", f"آخر المشهد «{sa['label']}» ({sa['feature']})",
+                                       f"أول المشهد «{sb['label']}» ({sb['feature']})")
+        if link.get("why"):
+            text += f"\n\nليه الكونيكتور ده هنا: {link['why']}"
+        if note and link.get("plan"):
+            notes = [*(link.get("notes") or []), note][-5:]
+            text += ("\n\n⚠️ الكونيكتور ده اتولّد قبل كده بالخطة دي والمستخدم ما عجبهوش:\n"
+                     f"{json.dumps(link['plan'], ensure_ascii=False, indent=1)}\n"
+                     "ملاحظات المستخدم (الأخيرة هي الأهم، ولازم تتصلّح في الخطة الجديدة):\n" + "\n".join(f"- {x}" for x in notes))
+        parts: list[dict] = [{"type": "text", "text": text}]
+        imgs = [a_img, b_img] + [clip_dir(link["asset"]) / k["file"] for k in asset.get("keyframes") or []]
+        for x in imgs:
+            if x.exists():
+                parts.append({"type": "image_url", "image_url": {"url": data_url(model_image(x, 768), "image/jpeg")}})
+        raw = ad_json(ad_media_chat([{"role": "user", "content": parts}], 8000), "خطة الكونيكتور")
+    lp = lab.clean_trial_plan(raw)
+    def fn(x):
+        x["plan"]["links"][i]["plan"] = lp
+        film_files(x)["links"][i] = {}
+        (x.get("files") or {}).pop("final", None)
+    film_update(fid, fn)
+
+
+def film_draw(fid: str, only: tuple | None, note: str, extra: list | None) -> set:
+    """يرسم الفريمات. أول المشهد من البرومبت (ومعاه أصل العميل والمشهد اللي قبله كستايل)، وآخره تعديل على أوله.
+    بيرجّع أرقام المشاهد اللي اترسمت."""
+    d = film_load(fid)
+    p, folder = d["plan"], film_dir(fid)
+    brain = brain_row(d.get("client_id") or "") or active_client()
+    size = az.ASPECTS.get(d["ratio"], az.ASPECTS["9:16"])[0]
+    family = carousel_settings()["image_family"]
+    f = film_files(d)
+    todo = []
+    for i in range(len(p["scenes"])):
+        if only is None:
+            todo += [(i, w) for w in ("a", "b") if not f["scenes"][i].get(w)]
+        elif only[0] == i:
+            todo += [(i, "a"), (i, "b")] if only[1] == "a" else [(i, "b")]
+    extras = [x for x in extra or [] if x.exists()]
+    extra_txt = "".join(f"\nIMAGE {n + 2} is a correct reference the user attached (for example the real logo or the real app screen); "
+                        f"wherever the frame shows that element, replace it with this one. {REF_EXACT}" for n in range(len(extras)))
+    changed = set()
+    for n, (i, w) in enumerate(todo):
+        sc = p["scenes"][i]
+        film_set(fid, step=f"🖼️ بيرسم {'أول' if w == 'a' else 'آخر'} المشهد {i + 1} ({n + 1} من {len(todo)}): {sc['label']}")
+        out = folder / f"sc{i + 1}_{w}.png"
+        if atlas.mock_mode():
+            film_mock_image(out, d["ratio"], i * 2 + (w == "b"))
+        elif w == "a":
+            old = folder / f"sc{i + 1}_a.png"
+            if (note or extras) and only and old.exists():
+                refs = [old, *extras]
+                prompt = ("IMAGE 1 is the frame to edit." + extra_txt + (f"\nEdit: {note}" if note else "")
+                          + "\nKeep everything else identical (layout, style, framing, on-screen text).")
+            else:
+                refs, notes = [], []
+                ref = film_brain_ref(brain, sc.get("screen"))
+                if ref:
+                    refs.append(ref)
+                    notes.append("is the REAL brand asset: put it into the frame exactly as it is (same screen content, layout, logo, colors, text).")
+                for x in extras:
+                    refs.append(x)
+                    notes.append(f"is a reference the user attached for this scene. {REF_EXACT}")
+                logo = film_brain_ref(brain, ((brain or {}).get("logos") or [{}])[0].get("file", ""))
+                if logo and logo not in refs:
+                    refs.append(logo)
+                    notes.append(f"is the brand's REAL logo. If a logo appears in the frame it must be this one. {REF_EXACT}")
+                style = folder / f"sc{i}_a.png" if i > 0 else None
+                if style and style.exists():
+                    refs.append(style)
+                    notes.append("is the previous scene of the same video: match its visual style, rendering, colors and typography (not its content).")
+                prompt = film_frame_prompt(d, brain, sc, i, notes)
+            atlas.download(atlas.generate_image(family, prompt, size, "medium", [atlas.reference_url(x) for x in refs]), out)
+            conform_image(out, d["ratio"])
+        else:
+            own = only and only[1] == "b"
+            old = folder / f"sc{i + 1}_b.png"
+            if own and old.exists() and (note or extras):   # تعديل على آخر المشهد نفسه
+                refs = [old, *extras]
+                prompt = ("IMAGE 1 is the frame to edit." + extra_txt + (f"\nEdit: {note}" if note else "")
+                          + "\nKeep everything else identical (layout, style, framing, on-screen text).")
+            else:
+                refs = [folder / f"sc{i + 1}_a.png", *extras]
+                prompt = (f"IMAGE 1 is the FIRST frame of this scene. Draw the LAST frame of the same scene: {sc['end']}" + extra_txt
+                          + "\nKeep the exact same visual style, framing, aspect ratio, colors, logo and on-screen text unless the instruction changes them.")
+            atlas.download(atlas.generate_image(family, prompt, size, "medium", [atlas.reference_url(x) for x in refs]), out)
+            conform_image(out, d["ratio"])
+        changed.add(i)
+        def fn(x, i=i, w=w):
+            fx = film_files(x)
+            fx["scenes"][i][w] = f"sc{i + 1}_{w}.png"
+            fx["scenes"][i].pop("video", None)
+            cur = x["plan"]["scenes"][i]
+            fx["scenes"][i]["drawn"] = {"text": cur.get("text", ""), "voice": cur.get("voice", "")}   # السكريبت اللي الفريمات اترسمت عليه
+            x["files"].pop("final", None)
+        film_update(fid, fn)
+    return changed
+
+
+def film_next_job(fid: str, finish: bool = False) -> tuple | None:
+    """التعديل اللي عليه الدور (اتطلب والرسم شغال). لو مفيش وfinish: الرسم خلص."""
+    got = []
+    def fn(x):
+        q = x.get("queue") or []
+        if q:
+            got.append(q.pop(0))
+            x["queue"] = q
+        elif finish:
+            x.update(status="drawn", step=None, error=None)
+    film_update(fid, fn)
+    if not got:
+        return None
+    j = got[0]
+    return (tuple(j["only"]), j.get("note", ""), [Path(x) for x in j.get("extra") or []])
+
+
+def run_film_frames(fid: str, only: tuple | None, note: str, extra: list | None = None) -> None:
+    """الرسم، وبعده أي تعديلات اتطلبت وهو شغال (بالدور)، وبعدين خطط الكونيكتورز اللي فريماتها اتغيرت."""
+    try:
+        folder, job = film_dir(fid), (only, note, extra)
+        while job:
+            changed = set()
+            while job:
+                changed |= film_draw(fid, *job)
+                job = film_next_job(fid)
+            # الكونيكتورز اللي فريماتها اتغيرت (أو لسه ملهاش خطة) بتتخطط
+            d = film_load(fid)
+            for i, link in enumerate(d["plan"]["links"]):
+                ok = (folder / f"sc{i + 1}_b.png").exists() and (folder / f"sc{i + 2}_a.png").exists()
+                if ok and (i in changed or i + 1 in changed or not link.get("plan")):
+                    film_set(fid, step=f"🧠 بيخطط الكونيكتور {i + 1} من {len(d['plan']['links'])}")
+                    film_plan_link(fid, i)
+            job = film_next_job(fid, finish=True)
+    except Exception as exc:  # noqa: BLE001
+        film_set(fid, status="failed", step=None, queue=[], error=str(getattr(exc, "detail", None) or exc)[:400])
+
+
+@app.post("/api/films/{fid}/refs")
+def film_ref_upload(fid: str, file: UploadFile = File(...)):
+    """📎 صورة مرجعية (مثلًا اللوجو الصح) تبعتها مع تعديل فريم."""
+    film_load(fid)
+    name = save_upload(file, IMAGE_EXTENSIONS, film_dir(fid), "ref")
+    d = film_update(fid, lambda x: x.setdefault("refs", []).append({"file": name, "name": Path(file.filename or name).stem[:60]}))
+    return {**film_to_dict(fid, d), "uploaded": name}
+
+
+@app.delete("/api/films/{fid}/refs/{name}")
+def film_ref_delete(fid: str, name: str):
+    name = Path(name).name
+    (film_dir(fid) / name).unlink(missing_ok=True)
+    d = film_update(fid, lambda x: x.update(refs=[r for r in x.get("refs") or [] if r["file"] != name]))
+    return film_to_dict(fid, d)
+
+
+class FilmRedoIn(BaseModel):
+    note: str = ""
+
+
+@app.post("/api/films/{fid}/links/{i}/redo")
+def film_link_redo(fid: str, i: int, body: FilmRedoIn):
+    """↻ الكونيكتور ما عجبكش: من غير ملاحظة = نفس الخطة بمحاولة جديدة. بملاحظة = الخطة بتتعدّل عليها الأول وبعدين يتولّد."""
+    d = film_load(fid)
+    links = (d.get("plan") or {}).get("links") or []
+    if not 0 <= i < len(links) or not links[i].get("plan"):
+        raise HTTPException(400, "الكونيكتور ده لسه ملوش خطة")
+    note = body.note.strip()[:1000]
+    return film_start(fid, "working", "🧠 بيعدّل الخطة على ملاحظتك" if note else "بيبدأ", run_film_link_redo, i, note)
+
+
+def run_film_link_redo(fid: str, i: int, note: str) -> None:
+    try:
+        if note:
+            film_plan_link(fid, i, note)
+            film_update(fid, lambda x: x["plan"]["links"][i].update(notes=[*(x["plan"]["links"][i].get("notes") or []), note][-5:]))
+    except Exception as exc:  # noqa: BLE001
+        return film_fail(fid, exc)
+    run_film_gen(fid, ("link", i))
+
+
+@app.post("/api/films/{fid}/links/{i}/plan")
+def film_link_replan(fid: str, i: int):
+    """🧠 خطة جديدة للكونيكتور اللي بين مشهدين."""
+    d = film_load(fid)
+    if not 0 <= i < len((d.get("plan") or {}).get("links") or []):
+        raise HTTPException(404, "الكونيكتور ده مش موجود")
+    def job(fid, i):
+        try:
+            film_plan_link(fid, i)
+            film_set(fid, status="drawn", step=None, error=None)
+        except Exception as exc:  # noqa: BLE001
+            film_set(fid, status="failed", step=None, error=str(getattr(exc, "detail", None) or exc)[:400])
+    return film_start(fid, "drawing", f"🧠 بيخطط الكونيكتور {i + 1}", job, i)
+
+
+class FilmRunIn(BaseModel):
+    kind: str | None = None      # scene / link: يولّد الحتة دي تاني بس
+    i: int | None = None
+
+
+@app.post("/api/films/{fid}/run")
+def film_run(fid: str, body: FilmRunIn):
+    """🎬 يولّد اللي لسه متولدش (أو حتة واحدة تاني) ويجمّع الفيديو. بيتحسب على Atlas."""
+    d = film_load(fid)
+    f = film_files(d)
+    only = (body.kind, body.i) if body.kind in ("scene", "link") and body.i is not None else None
+    if only and only[0] == "scene":
+        if not 0 <= only[1] < len(f["scenes"]) or not (f["scenes"][only[1]].get("a") and f["scenes"][only[1]].get("b")):
+            raise HTTPException(400, "ارسم فريمات المشهد ده الأول")
+    elif only:
+        if not 0 <= only[1] < len(f["links"]) or not d["plan"]["links"][only[1]].get("plan"):
+            raise HTTPException(400, "الكونيكتور ده لسه ملوش خطة")
+    else:
+        if any(not (x.get("a") and x.get("b")) for x in f["scenes"]):
+            raise HTTPException(400, "ارسم الفريمات الأول")
+        if any(not l.get("plan") for l in d["plan"]["links"]):
+            raise HTTPException(400, "فيه كونيكتور لسه ملوش خطة")
+    return film_start(fid, "working", "بيبدأ", run_film_gen, only)
+
+
+def run_film_gen(fid: str, only: tuple | None) -> None:
+    try:
+        d = film_load(fid)
+        p, folder = d["plan"], film_dir(fid)
+        W, H = RATIO_VIDEO.get(d["ratio"], RATIO_VIDEO["9:16"])
+        for x in folder.glob("sc*_[ab].png"):   # الفريمات اللي طلعت بمقاس غلط بتتظبط قبل التوليد
+            conform_image(x, d["ratio"])
+        ratio = az.ASPECTS.get(d["ratio"], az.ASPECTS["9:16"])[1]
+        size = az.ASPECTS.get(d["ratio"], az.ASPECTS["9:16"])[0]
+        f = film_files(d)
+        n = len(p["scenes"])
+        for i, sc in enumerate(p["scenes"]):
+            # من غير اختيار: الناقص بس. حتة معيّنة: هي بس (حتى لو اتولدت قبل كده)
+            if (only and only != ("scene", i)) or (not only and f["scenes"][i].get("video")):
+                continue
+            film_set(fid, step=f"🎬 بيولّد المشهد {i + 1} من {n}: {sc['label']}")
+            gen_motion(d["model"], d["resolution"], ratio, sc["motion"], folder / f"sc{i + 1}_a.png", folder / f"sc{i + 1}_b.png",
+                       trial_gen_seconds(sc["seconds"]), folder / f"sc{i + 1}.mp4", W, H, "حركة المشهد")
+            film_update(fid, lambda x, i=i: film_files(x)["scenes"][i].update(video=f"sc{i + 1}.mp4"))
+        for i, link in enumerate(p["links"]):
+            if (only and only != ("link", i)) or (not only and f["links"][i].get("segs")):
+                continue
+            lp = link["plan"]
+            chain, keys = [folder / f"sc{i + 1}_b.png"], []
+            for j, k in enumerate(lp["keyframes"]):
+                film_set(fid, step=f"🖼️ الكونيكتور {i + 1}: بيرسم المرحلة {j + 1}: {k['label']}")
+                chain.append(draw_key(k["prompt"], chain[-1], folder / f"sc{i + 2}_a.png", folder / f"L{i + 1}_k{j + 1}.png", size, j))
+                keys.append(chain[-1].name)
+            chain.append(folder / f"sc{i + 2}_a.png")
+            segs = []
+            for j, sg in enumerate(lp["segments"]):
+                film_set(fid, step=f"🔗 الكونيكتور {i + 1}: بيولّد الحركة {j + 1} من {len(lp['segments'])}: {sg['label']}")
+                gen_motion(d["model"], d["resolution"], ratio, sg["prompt"], chain[j], chain[j + 1], trial_gen_seconds(sg["seconds"]),
+                           folder / f"L{i + 1}_s{j + 1}.mp4", W, H)
+                segs.append(f"L{i + 1}_s{j + 1}.mp4")
+            chain_clips([timed(folder / x, sg["seconds"]) for x, sg in zip(segs, lp["segments"])], folder / f"L{i + 1}.mp4", W, H)
+            film_update(fid, lambda x, i=i, keys=keys, segs=segs: film_files(x)["links"].__setitem__(
+                i, {"keys": keys, "segs": segs, "video": f"L{i + 1}.mp4"}))
+        # التجميع: مشهد ← كونيكتور ← مشهد ... (لو كل الحتت جاهزة)
+        d = film_load(fid)
+        fx = film_files(d)
+        if not all(x.get("video") for x in fx["scenes"]) or not all(x.get("video") for x in fx["links"]):
+            film_set(fid, status=film_idle_status(d), step=None, error=None)
+            return
+        film_set(fid, step="🎞️ بيجمّع الفيديو")
+        p = d["plan"]
+        parts = []
+        for i, sc in enumerate(p["scenes"]):
+            parts.append(timed(folder / f"sc{i + 1}.mp4", sc["seconds"]))
+            if i < n - 1:
+                parts.append(folder / f"L{i + 1}.mp4")
+        lines = film_voice_lines(d)
+        if any(lines):
+            chain_clips(parts, folder / "film_v.mp4", W, H)
+            film_set(fid, step="🎙️ بيركّب الفويس أوفر")
+            film_mix_voice(folder / "film_v.mp4", folder, d, lines, folder / "film.mp4")
+        else:
+            chain_clips(parts, folder / "film.mp4", W, H)
+        def fn(x):
+            film_files(x)
+            x["files"]["final"] = "film.mp4"
+            x.update(status="done", step=None, error=None, done_at=now())
+        film_update(fid, fn)
+    except Exception as exc:  # noqa: BLE001
+        film_set(fid, status="failed", step=None, error=str(getattr(exc, "detail", None) or exc)[:400])
+
+
+# ---------- 📜 السكريبت والفويس أوفر
+
+def film_stale(d: dict, i: int) -> bool:
+    """السكريبت بتاع المشهد ده اتغير بعد ما فريماته اترسمت؟"""
+    got = (d.get("files") or {}).get("scenes") or []
+    fs = got[i] if i < len(got) else {}
+    dr, sc = fs.get("drawn"), d["plan"]["scenes"][i]
+    return bool(fs.get("a") and dr and (dr.get("text", "") != sc.get("text", "") or dr.get("voice", "") != sc.get("voice", "")))
+
+
+def film_idle_status(x: dict) -> str:
+    f = film_files(x)
+    if f.get("final"):
+        return "done"
+    return "drawn" if f["scenes"] and all(s.get("a") and s.get("b") for s in f["scenes"]) else "planned"
+
+
+def film_link_len(p: dict, i: int) -> float:
+    lp = (p["links"][i].get("plan") if i < len(p["links"]) else None) or {}
+    return round(sum(x["seconds"] for x in lp.get("segments") or []), 2) if lp else 2.0
+
+
+def film_voice_lines(d: dict) -> list:
+    """صوت كل مشهد (ولا None)، على قد عدد المشاهد."""
+    n = len(d["plan"]["scenes"])
+    lines = list((d.get("voice") or {}).get("lines") or [])[:n]
+    return lines + [None] * (n - len(lines))
+
+
+def film_mix_voice(video: Path, folder: Path, d: dict, lines: list, out: Path) -> Path:
+    """كل جملة بتبدأ مع أول المشهد بتاعها (المشهد + الكونيكتور اللي بعده واخدين طولها)."""
+    p, t, starts = d["plan"], 0.0, []
+    for i, sc in enumerate(p["scenes"]):
+        starts.append(t)
+        t += sc["seconds"] + (film_link_len(p, i) if i < len(p["scenes"]) - 1 else 0)
+    inputs, fc, k = ["-i", str(video)], [], 0
+    for i, ln in enumerate(lines):
+        if not ln or not (folder / ln["file"]).exists():
+            continue
+        k += 1
+        inputs += ["-i", str(folder / ln["file"])]
+        ms = int(round((starts[i] + (0.1 if (d.get("voice") or {}).get("mode") == "tts" else 0)) * 1000))
+        fc.append(f"[{k}:a]aresample=44100,adelay={ms}|{ms}[a{k}]")
+    fc.append("".join(f"[a{j}]" for j in range(1, k + 1)) + f"amix=inputs={k}:normalize=0:duration=longest[aout]")
+    subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", *inputs, "-filter_complex", ";".join(fc),
+                    "-map", "0:v", "-map", "[aout]", "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-t", f"{probe_duration(video):.3f}",
+                    "-movflags", "+faststart", str(out)], check=True, capture_output=True, timeout=600)
+    return out
+
+
+def film_fit_voice(x: dict, fid: str) -> None:
+    """⏱️ كل مشهد بياخد طول جملته (ناقص الكونيكتور اللي بعده). الحركة اللي طولها بعيد قوي عن الجديد بتتولد تاني."""
+    p, f, folder = x["plan"], film_files(x), film_dir(fid)
+    n = len(p["scenes"])
+    for i, (sc, ln) in enumerate(zip(p["scenes"], film_voice_lines(x))):
+        if not ln:
+            continue
+        link = film_link_len(p, i) if i < n - 1 else 0.0
+        new = round(min(10.0, max(1.2, ln["unit"] - link)), 2)
+        if new == sc["seconds"]:
+            continue
+        sc["seconds"] = new
+        vid = folder / f"sc{i + 1}.mp4"
+        if f["scenes"][i].get("video") and vid.exists() and not 0.7 <= new / max(0.1, probe_duration(vid)) <= 1.4:
+            f["scenes"][i].pop("video", None)
+    f.pop("final", None)
+
+
+def film_voice_done(fid: str, **voice) -> None:
+    def fn(x):
+        x["voice"] = {**(x.get("voice") or {}), **voice, "status": "done", "error": None}
+        film_fit_voice(x, fid)
+        x.update(status=film_idle_status(x), step=None, error=None)
+    film_update(fid, fn)
+
+
+def film_fail(fid: str, exc: Exception, **kw) -> None:
+    film_set(fid, status="failed", step=None, error=str(getattr(exc, "detail", None) or exc)[:400], **kw)
+
+
+@app.post("/api/films/{fid}/script/apply")
+def film_script_apply(fid: str):
+    """✨ السكريبت اتعدّل: الموديل بيقرر كل مشهد اتغير يتعدّل إزاي (الكلام بس، ولا رسم من جديد)، وبيرسم."""
+    d = film_load(fid)
+    if not any(film_stale(d, i) for i in range(len((d.get("plan") or {}).get("scenes") or []))):
+        raise HTTPException(400, "مفيش مشاهد اتغير السكريبت بتاعها بعد ما اترسمت")
+    return film_start(fid, "drawing", "✨ بيقرا التعديلات", run_film_script_apply)
+
+
+def run_film_script_apply(fid: str) -> None:
+    try:
+        d = film_load(fid)
+        p, f = d["plan"], film_files(d)
+        stale = [i for i in range(len(p["scenes"])) if film_stale(d, i)]
+        if atlas.mock_mode():
+            raw = {"scenes": [{"i": i, "action": "text"} for i in stale]}
+        else:
+            changed = [{"i": i, "old": f["scenes"][i]["drawn"], "new": {"voice": p["scenes"][i].get("voice", ""), "text": p["scenes"][i].get("text", "")},
+                        "start": p["scenes"][i]["start"], "end": p["scenes"][i]["end"], "motion": p["scenes"][i]["motion"]} for i in stale]
+            raw = ad_json(series_chat([{"role": "user", "content": lab.film_script_apply_messages(p, changed)}]), "تطبيق السكريبت")
+        acts = {}
+        for x in raw.get("scenes") or []:
+            try:
+                acts[int(x.get("i"))] = x
+            except (TypeError, ValueError, AttributeError):
+                continue
+        jobs = []
+        def fn(x):
+            fx = film_files(x)
+            for i in stale:
+                a, sc = acts.get(i) or {}, x["plan"]["scenes"][i]
+                act = a.get("action") if a.get("action") in ("none", "text", "redraw") else "text"
+                if act == "redraw":
+                    for k in ("start", "end", "motion"):
+                        if str(a.get(k) or "").strip():
+                            sc[k] = str(a[k])[:3000]
+                    jobs.append({"only": [i, "a"], "note": "", "extra": []})
+                elif act == "text":
+                    note = (f'Replace the on-screen text with exactly this text: "{sc["text"]}" (same position, size and style).'
+                            if sc.get("text") else "Remove the on-screen text.")
+                    jobs.append({"only": [i, "a"], "note": note, "extra": []})
+                else:
+                    fx["scenes"][i]["drawn"] = {"text": sc.get("text", ""), "voice": sc.get("voice", "")}
+            x["queue"] = jobs[1:] + (x.get("queue") or [])
+            if not jobs:
+                x.update(status=film_idle_status(x), step=None)
+        film_update(fid, fn)
+        if jobs:
+            run_film_frames(fid, tuple(jobs[0]["only"]), jobs[0]["note"], [])
+    except Exception as exc:  # noqa: BLE001
+        film_fail(fid, exc, queue=[])
+
+
+class FilmRewriteIn(BaseModel):
+    instruction: str
+
+
+@app.post("/api/films/{fid}/script/rewrite")
+def film_script_rewrite(fid: str, body: FilmRewriteIn):
+    """✍️ تعديل السكريبت بالكلام (أقصر، هوك أقوى...). بيغيّر الفويس أوفر والكلام اللي على الشاشة بس."""
+    d = film_load(fid)
+    if d.get("status") == "planning" or not (d.get("plan") or {}).get("scenes"):
+        raise HTTPException(400, "استنى لما السيناريو يخلص")
+    if not body.instruction.strip():
+        raise HTTPException(400, "اكتب عايز تعدّل إيه")
+    p = d["plan"]
+    if atlas.mock_mode():
+        raw = {"scenes": [{"i": i, "voice": (s.get("voice") or "") + " (اتعدلت)", "text": s.get("text", "")} for i, s in enumerate(p["scenes"])]}
+    else:
+        brain = brain_row(d.get("client_id") or "") or active_client()
+        raw = ad_json(series_chat([{"role": "user", "content": lab.film_script_rewrite_messages(az.brain_text(brain), p, body.instruction.strip()[:2000])}],
+                                  ), "تعديل السكريبت")
+    scenes = [dict(s) for s in p["scenes"]]
+    for x in raw.get("scenes") or []:
+        try:
+            i = int(x.get("i"))
+        except (TypeError, ValueError, AttributeError):
+            continue
+        if 0 <= i < len(scenes):
+            for k in ("voice", "text"):
+                if isinstance(x.get(k), str):
+                    scenes[i][k] = x[k].strip()
+    return film_patch(fid, FilmPatchIn(plan={"scenes": scenes}))
+
+
+class FilmTtsIn(BaseModel):
+    voice_id: str = "Arabic_FriendlyGuy"
+    force: bool = False
+
+
+@app.post("/api/films/{fid}/voice/tts")
+def film_voice_tts(fid: str, body: FilmTtsIn):
+    """🎙️ فويس أوفر مولّد: كل جملة لوحدها (بنعرف طولها بالظبط)، والمشاهد بتتظبط عليها."""
+    d = film_load(fid)
+    if not any((s.get("voice") or "").strip() for s in (d.get("plan") or {}).get("scenes") or []):
+        raise HTTPException(400, "اكتب جمل الفويس أوفر في السكريبت الأول")
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل")
+    return film_start(fid, "voicing", "🎙️ بيولّد الفويس أوفر", run_film_tts, body.voice_id.strip()[:80] or "Arabic_FriendlyGuy", body.force)
+
+
+def run_film_tts(fid: str, voice_id: str, force: bool) -> None:
+    try:
+        d = film_load(fid)
+        p, folder, v = d["plan"], film_dir(fid), d.get("voice") or {}
+        same = v.get("mode") == "tts" and v.get("voice_id") == voice_id and not force
+        lines = film_voice_lines(d) if same else [None] * len(p["scenes"])
+        old_files = {ln["file"] for ln in film_voice_lines(d) if ln}
+        for i, sc in enumerate(p["scenes"]):
+            text = (sc.get("voice") or "").strip()
+            if not text:
+                lines[i] = None
+                continue
+            if lines[i] and lines[i].get("text") == text and (folder / lines[i]["file"]).exists():
+                continue
+            film_set(fid, step=f"🎙️ بيولّد جملة المشهد {i + 1} من {len(p['scenes'])}")
+            name = f"vo{i + 1}_{uuid.uuid4().hex[:6]}.mp3"
+            if atlas.mock_mode():
+                subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i",
+                                f"sine=frequency=220:duration={max(1.0, 0.45 * len(text.split())):.2f}", "-c:a", "libmp3lame", str(folder / name)],
+                               check=True, capture_output=True, timeout=60)
+            else:
+                url = atlas.run_model("Audio", {"model": TTS_MODEL, "text": text[:1500], "voice_id": voice_id, "language_boost": "Arabic"},
+                                      "الفويس أوفر", max_seconds=300, interval=2)
+                atlas.download(url, folder / name)
+            dur = probe_duration(folder / name)
+            lines[i] = {"file": name, "dur": round(dur, 2), "unit": round(dur + 0.35, 2), "text": text}
+        keep = {ln["file"] for ln in lines if ln}
+        for f in old_files - keep:
+            (folder / f).unlink(missing_ok=True)
+        film_voice_done(fid, mode="tts", voice_id=voice_id, lines=lines, file=None)
+    except Exception as exc:  # noqa: BLE001
+        film_fail(fid, exc)
+
+
+@app.post("/api/films/{fid}/voice/upload")
+def film_voice_upload(fid: str, file: UploadFile | None = File(default=None)):
+    """⬆ فويس أوفر كامل انت عامله: البرنامج بيسمعه ويلاقي جملة كل مشهد، ويقطّعه، والمشاهد بتتظبط عليه.
+    من غير ملف = يقطّع الملف اللي اترفع قبل كده تاني (بعد ما عدّلت السكريبت مثلًا)."""
+    d = film_load(fid)
+    if not (d.get("plan") or {}).get("scenes"):
+        raise HTTPException(400, "استنى لما السيناريو يخلص")
+    if d.get("status") in FILM_BUSY:
+        raise HTTPException(400, "استنى لما الشغل اللي شغال يخلص")
+    if file is not None and file.filename:
+        name = save_audio_upload(file, film_dir(fid), "full")
+    elif (d.get("voice") or {}).get("full"):
+        name = d["voice"]["full"]
+    else:
+        raise HTTPException(400, "ارفع ملف الصوت الأول")
+    return film_start(fid, "voicing", "🎙️ بيسمع الفويس أوفر", run_film_voice_upload, name)
+
+
+def run_film_voice_upload(fid: str, name: str) -> None:
+    try:
+        d = film_load(fid)
+        p, folder = d["plan"], film_dir(fid)
+        src = folder / name
+        total = probe_duration(src)
+        film_set(fid, step="🎧 بيسمع التسجيل ويكتب كلامه")
+        words = atlas.transcribe(src, total)
+        scenes = [{**s, "talking": False} for s in p["scenes"]]
+        texts = [{"text": s.get("voice") or ""} for s in scenes]
+        voiced = [i for i, t in enumerate(texts) if t["text"].strip()]
+        spans: list[dict | None] = [None] * len(scenes)
+        if voiced:
+            timed, ratio = sz.align_with_ratio(words, [texts[i] for i in voiced])
+            for i, t in zip(voiced, timed):
+                if t.get("start") is not None and t.get("end") is not None:
+                    spans[i] = {"start": float(t["start"]), "end": float(t["end"])}
+        else:
+            ratio = 0.0
+        filled = False
+        if not voiced or ratio < 0.3 or not any(spans):
+            # السكريبت فاضي أو مش شبه التسجيل: التسجيل بيتقسم على المشاهد عند أطول وقفات، وكلامه بيتكتب في السكريبت
+            chunks = film_split_words(words, len(scenes))
+            if not chunks:
+                raise HTTPException(400, "مقدرتش أسمع كلام في التسجيل ده. اتأكد إن فيه صوت واضح")
+            spans = [{"start": c[0]["s"], "end": c[-1]["e"]} if c else None for c in chunks]
+            texts = [{"text": " ".join(w["w"] for w in c)} for c in chunks]
+            filled = True
+        snap_spans(spans, silences(src))
+        wins = shot_windows(scenes, spans, total)
+        if not wins:
+            raise HTTPException(400, "مقدرتش أقسّم التسجيل على المشاهد")
+        wins = min_silent(scenes, wins, spans)
+        old = {ln["file"] for ln in film_voice_lines(d) if ln}
+        lines: list = []
+        for i, (a, b) in enumerate(wins):
+            if a >= total:
+                lines.append(None)
+                continue
+            b = min(b, total) if i < len(wins) - 1 else total
+            cut = f"vo{i + 1}_{uuid.uuid4().hex[:6]}.m4a"
+            subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{a:.2f}", "-i", str(src),
+                            "-t", f"{max(0.1, b - a):.2f}", "-c:a", "aac", "-b:a", "192k", str(folder / cut)],
+                           check=True, capture_output=True, timeout=120)
+            lines.append({"file": cut, "dur": round(b - a, 2), "unit": round(b - a, 2), "text": texts[i]["text"],
+                          "missed": bool(texts[i]["text"].strip() and not spans[i])})
+        for f in old:
+            (folder / f).unlink(missing_ok=True)
+        prev = (d.get("voice") or {}).get("full")
+        if prev and prev != name:
+            (folder / prev).unlink(missing_ok=True)
+        if filled:   # كلام التسجيل بقى هو جمل الفويس أوفر في السكريبت
+            def fill(x):
+                for sc, t in zip(x["plan"]["scenes"], texts):
+                    sc["voice"] = t["text"][:600]
+            film_update(fid, fill)
+        film_voice_done(fid, mode="upload", full=name, lines=lines, duration=round(total, 2), filled=filled)
+    except Exception as exc:  # noqa: BLE001
+        film_fail(fid, exc)
+
+
+def film_split_words(words: list[dict], n: int) -> list[list[dict]]:
+    """كلمات التسجيل على n مشهد: القطع عند أطول n-1 وقفة بين الكلمات (بالترتيب)."""
+    ws = [w for w in words if str(w.get("w", "")).strip()]
+    if not ws:
+        return []
+    if len(ws) < n:
+        return [[w] for w in ws] + [[] for _ in range(n - len(ws))]
+    # كل قطع حوالين مكانه لو الكلام اتقسم بالتساوي، وعند أطول وقفة في المنطقة دي
+    cuts, m = [0], len(ws)
+    for k in range(1, n):
+        lo = max(cuts[-1] + 1, round(m * (k - 0.45) / n))
+        hi = min(m - (n - k), round(m * (k + 0.45) / n))
+        cuts.append(max(range(lo, max(lo, hi) + 1), key=lambda j: ws[j]["s"] - ws[j - 1]["e"]))
+    cuts.append(m)
+    return [ws[a:b] for a, b in zip(cuts, cuts[1:])]
+
+
+def image_dims(path: Path) -> tuple[int, int]:
+    """مقاس صورة (أو فيديو) بالظبط، زوجي."""
+    err = subprocess.run([ffmpeg_exe(), "-hide_banner", "-i", str(path)], capture_output=True, text=True).stderr
+    m = re.search(r"Video:.*?(\d{2,5})x(\d{2,5})", err)
+    if not m:
+        raise HTTPException(400, f"مقدرتش أقرا مقاس {path.name}")
+    return int(m.group(1)) // 2 * 2, int(m.group(2)) // 2 * 2
+
+
+RATIO_WH = {"9:16": (9, 16), "16:9": (16, 9), "1:1": (1, 1)}
+RATIO_VIDEO = {"9:16": (720, 1280), "16:9": (1280, 720), "1:1": (1024, 1024)}   # مقاس الفيديو المتجمّع
+
+
+def conform_image(path: Path, ratio: str) -> Path:
+    """موديل الصور مش دايمًا بيلتزم بالمقاس (ChatGPT أطوله 2:3): الصورة بتتقص من النص على النسبة الصح بالظبط (من غير مط)."""
+    if not path.exists() or ratio not in RATIO_WH:
+        return path
+    w, h = image_dims(path)
+    pw, ph = RATIO_WH[ratio]
+    if abs(w / h - pw / ph) < 0.012:
+        return path
+    if w / h > pw / ph:
+        cw, ch = int(h * pw / ph) // 2 * 2, h // 2 * 2
+    else:
+        cw, ch = w // 2 * 2, int(w * ph / pw) // 2 * 2
+    tmp = path.with_name(f".conform-{path.name}")
+    subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(path), "-vf", f"crop={cw}:{ch}",
+                    "-frames:v", "1", str(tmp)], check=True, capture_output=True, timeout=60)
+    tmp.replace(path)
+    return path
+
+
+def film_dims(folder: Path) -> tuple[int, int]:
+    return image_dims(folder / "sc1_a.png")
+
+
+@app.post("/api/films/{fid}/raw")
+def film_raw(fid: str):
+    """▶️ معاينة خام: كل الحتت اللي اتولدت ورا بعض بطولها الأصلي (من غير فويس ولا تسريع ولا قص)."""
+    d = film_load(fid)
+    f = film_files(d)
+    if not any(x.get("video") for x in f["scenes"]) and not any(x.get("segs") for x in f["links"]):
+        raise HTTPException(400, "لسه مفيش ولا حتة اتولدت")
+    prev = d.get("status")
+    return film_start(fid, "working", "▶️ بيجمّع الخام", run_film_raw, prev)
+
+
+def run_film_raw(fid: str, prev: str) -> None:
+    try:
+        d = film_load(fid)
+        p, folder, f = d.get("plan") or {}, film_dir(fid), film_files(d)
+        parts, skipped = [], []
+        for i in range(len(p.get("scenes") or [])):
+            v = f["scenes"][i].get("video")
+            if v and (folder / v).exists():
+                parts.append(folder / v)
+            else:
+                skipped.append(f"المشهد {i + 1}")
+            if i < len(f["links"]):
+                segs = [folder / x for x in f["links"][i].get("segs") or [] if (folder / x).exists()]
+                if segs:
+                    parts += segs   # حركات الكونيكتور زي ما اتولدت، من غير ما تتظبط على الخطة
+                else:
+                    skipped.append(f"الكونيكتور {i + 1}")
+        if not parts:
+            raise HTTPException(400, "لسه مفيش ولا حتة اتولدت")
+        W, H = RATIO_VIDEO.get(d.get("ratio"), RATIO_VIDEO["9:16"])
+        chain_clips(parts, folder / "raw.mp4", W, H)
+        def fn(x):
+            film_files(x)["raw"] = "raw.mp4"
+            x.update(status=prev if prev not in FILM_BUSY and prev != "failed" else film_idle_status(x), step=None,
+                     error=f"لسه متولدش (مش في الخام): {'، '.join(skipped)}" if skipped else None)
+        film_update(fid, fn)
+    except Exception as exc:  # noqa: BLE001
+        film_set(fid, status=film_idle_status(film_load(fid)), step=None,
+                 error="الخام ما اتجمّعش: " + str(getattr(exc, "detail", None) or exc)[:350])
+
+
+@app.post("/api/films/{fid}/to-editor")
+def film_to_editor(fid: str):
+    """🎞️ المشاهد والكونيكتورز بالترتيب (كل واحد قطعة لوحده) في مشروع مونتاج، ومعاهم الفويس أوفر في مكانه."""
+    d = film_load(fid)
+    p, folder = d.get("plan") or {}, film_dir(fid)
+    if d.get("status") in FILM_BUSY:
+        raise HTTPException(400, "استنى لما الشغل اللي شغال يخلص")
+    f = film_files(d)
+    if not p.get("scenes") or not (folder / "sc1_a.png").exists():
+        raise HTTPException(400, "ارسم الفريمات الأول")
+    W, H = RATIO_VIDEO.get(d.get("ratio"), RATIO_VIDEO["9:16"])
+    label = d.get("name") or "فيديو"
+    # اللي اتولد بيتنقل؛ المشهد اللي لسه ملوش حركة بيدخل صورة أوله ثابتة على طوله، والكونيكتور اللي لسه متولدش بيتشال
+    pieces, skipped = [], []
+    has = lambda name: bool(name) and (folder / name).exists()  # noqa: E731
+    for i, sc in enumerate(p["scenes"]):
+        x = f["scenes"][i]
+        if has(x.get("video")):
+            pieces.append((folder / x["video"], sc["seconds"], f"🎬 مشهد {i + 1}: {sc['label']}", i))
+        elif has(x.get("a")):
+            pieces.append((folder / x["a"], sc["seconds"], f"🖼️ مشهد {i + 1} (صورة): {sc['label']}", i))
+            skipped.append(f"المشهد {i + 1} (دخل صورة)")
+        else:
+            skipped.append(f"المشهد {i + 1}")
+        if i < len(p["scenes"]) - 1:
+            if has(f["links"][i].get("video")):
+                pieces.append((folder / f["links"][i]["video"], None, f"🔗 كونيكتور {i + 1}", None))
+            else:
+                skipped.append(f"الكونيكتور {i + 1}")
+    lines = film_voice_lines(d)
+    full = (d.get("voice") or {}).get("full")
+    with closing(db()) as conn, conn:
+        clips, starts, t = [], {}, 0.0
+        for src, secs, name, si in pieces:
+            gid = uuid.uuid4().hex[:12]
+            out = GENERATED_DIR / f"{gid}.mp4"
+            if src.suffix == ".png":
+                subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-loop", "1", "-t", f"{secs:.2f}", "-i", str(src),
+                                "-vf", f"scale={W}:{H},setsar=1,fps=30,format=yuv420p", "-c:v", "libx264", "-preset", "veryfast",
+                                "-crf", "18", str(out)], check=True, capture_output=True, timeout=120)
+            elif secs:
+                chain_clips([timed(src, secs)], out, W, H)   # المشهد على الطول اللي في الخطة (طول جملته)
+            else:
+                shutil.copyfile(src, out)
+            dur = probe_duration(out)
+            if si is not None:
+                starts[si] = t
+            t += dur
+            conn.execute(
+                "INSERT INTO generations (id, clip_id, clip_filename, clip_label, coach_id, coach_name, coach_image, model, prompt, "
+                "params, status, output_filename, created_at, updated_at) VALUES (?, ?, ?, ?, '', '', '', 'seedance', '', '{}', 'completed', ?, ?, ?)",
+                (gid, f"ad:film-{fid}", src.name, f"🎞️ {label} · {name}", out.name, now(), now()))
+            clips.append({"gen_id": gid, "start": 0.0, "end": round(dur, 3), "zoom": 1.0, "x": 0.0, "y": 0.0, "volume": 0.0})
+        voice = None
+        vid = uuid.uuid4().hex[:12]
+        if any(ln and (folder / ln["file"]).exists() for ln in lines):
+            # كل جملة في أول المشهد بتاعها، زي الفيديو المتجمّع بالظبط
+            vfile = f"voice_{vid}.m4a"
+            inputs, chain, k = [], [], 0
+            for i, ln in enumerate(lines):
+                if ln and (folder / ln["file"]).exists() and i in starts:
+                    inputs += ["-i", str(folder / ln["file"])]
+                    ms = int(round((starts[i] + (0.1 if (d.get("voice") or {}).get("mode") == "tts" else 0)) * 1000))
+                    chain.append(f"[{k}:a]aresample=44100,adelay={ms}|{ms}[a{k}]")
+                    k += 1
+            chain.append("".join(f"[a{j}]" for j in range(k)) + f"amix=inputs={k}:normalize=0:duration=longest[out]")
+            subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", *inputs, "-filter_complex", ";".join(chain),
+                            "-map", "[out]", "-c:a", "aac", "-b:a", "192k", str(AUDIO_DIR / vfile)], check=True, capture_output=True, timeout=300)
+        elif full and (folder / full).exists():
+            vfile = f"voice_{vid}{Path(full).suffix}"
+            shutil.copyfile(folder / full, AUDIO_DIR / vfile)
+        else:
+            vfile = None
+        if vfile:
+            conn.execute("INSERT INTO audio (id, kind, name, filename, duration, created_at) VALUES (?, 'voice', ?, ?, ?, ?)",
+                         (vid, f"🎙️ {label}", vfile, probe_duration(AUDIO_DIR / vfile), now()))
+            voice = {"id": vid, "volume": 1.0, "delay": 0.0, "offset": 0.0, "length": None, "fade_out": False, "parts": []}
+        pid = uuid.uuid4().hex[:12]
+        pdata = {"name": label, "section": "ads", "video_id": None, "coach_id": None, "clips": clips, "voice": voice,
+                 "music": default_music(conn), "outro": False, "outro_volume": 1.0, "captions": {}, "logo": {}}
+        conn.execute("INSERT INTO projects (id, name, data, render_status, created_at, updated_at) VALUES (?, ?, ?, 'idle', ?, ?)",
+                     (pid, pdata["name"], json.dumps(pdata, ensure_ascii=False), now(), now()))
+    film_update(fid, lambda x: x.update(project_id=pid))
+    return {"project_id": pid, "skipped": skipped}
+
+
+@app.delete("/api/films/{fid}/voice")
+def film_voice_delete(fid: str):
+    def fn(x):
+        if x.get("status") in FILM_BUSY:
+            raise HTTPException(400, "استنى لما الشغل اللي شغال يخلص")
+        v = x.get("voice") or {}
+        for ln in v.get("lines") or []:
+            if ln:
+                (film_dir(fid) / ln["file"]).unlink(missing_ok=True)
+        if v.get("full"):
+            (film_dir(fid) / v["full"]).unlink(missing_ok=True)
+        x["voice"] = None
+        film_files(x).pop("final", None)
+        x["status"] = film_idle_status(x)
+    return film_to_dict(fid, film_update(fid, fn))
+
+
+@app.delete("/api/films/{fid}")
+def film_delete(fid: str):
+    d = film_load(fid)
+    if d.get("status") in FILM_BUSY:
+        raise HTTPException(400, "استنى لما الشغل اللي شغال يخلص")
+    shutil.rmtree(film_dir(fid), ignore_errors=True)
+    return {"ok": True}
+
+
+def reset_stuck_films() -> None:
+    for f in FILMS_DIR.glob("*/film.json"):
+        try:
+            d = json.loads(f.read_text(encoding="utf-8"))
+        except ValueError:
+            continue
+        if d.get("status") in FILM_BUSY:
+            d.update(status="failed", step=None, queue=[], error="اتقطع لما السيرفر اتقفل. دوس الزرار تاني")
+            f.write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+
+
+reset_stuck_films()
+
+
+# ---------- 🗺️ مخطط الفيديو: الفيديو الاحترافي كله كتيمبليت (الثوابت + الأجزاء بخاناتها + إزاي كل جزء بيدخل في اللي بعده)
+
+def schema_thumbs(lid: str, d: dict, beats: list[dict]) -> None:
+    """صورة من نص كل جزء (للعرض، وكمرجع للستايل بعدين)."""
+    src, folder = lab_dir(lid) / d["source"]["file"], lab_dir(lid) / "frames"
+    folder.mkdir(parents=True, exist_ok=True)
+    tag = uuid.uuid4().hex[:4]
+    for i, b in enumerate(beats):
+        if b.get("thumb"):
+            (folder / b["thumb"]).unlink(missing_ok=True)
+        name = f"sch-{tag}-{i}.jpg"
+        t = min((b["t0"] + b["t1"]) / 2, d["source"]["duration"] - 0.05)
+        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{t:.3f}", "-i", str(src), "-frames:v", "1",
+                        "-vf", "scale=480:-2", "-q:v", "3", str(folder / name)], capture_output=True, timeout=60)
+        b["thumb"] = name if (folder / name).exists() else None
+
+
+@app.post("/api/lab/{lid}/schema")
+def lab_schema(lid: str):
+    """🗺️ الموديل بيتفرج على الفيديو كله ويطلّع مخططه (رخيص)."""
+    d = lab_load(lid)
+    if (d.get("schema") or {}).get("status") == "working":
+        raise HTTPException(400, "بيطلّع المخطط بالفعل")
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل")
+    run = uuid.uuid4().hex[:8]
+    lab_update(lid, lambda x: x.update(schema={**(x.get("schema") or {}), "status": "working", "error": None, "run": run}))
+    threading.Thread(target=run_lab_schema, args=(lid, run), daemon=True).start()
+    return lab_to_dict(lid, lab_load(lid))
+
+
+def schema_mine(lid: str, run: str) -> bool:
+    """المحاولة دي لسه هي الشغالة؟ (لو اتوقفت أو اتمسحت، نتيجتها بتترمي)"""
+    sc = lab_load(lid).get("schema") or {}
+    return sc.get("status") == "working" and sc.get("run") == run
+
+
+def run_lab_schema(lid: str, run: str) -> None:
+    try:
+        d = lab_load(lid)
+        if atlas.mock_mode():
+            time.sleep(2)   # زي الموديل الحقيقي: بياخد وقت (عشان زرار «وقّف» يبان في التجربة)
+            raw = lab.mock_schema(d)
+        else:
+            proxy = lab_proxy(lid, d)
+            raw = ad_json(lab_media_chat(az.with_media(lab.schema_messages(d), data_url(proxy, "video/mp4"), "video.mp4")), "مخطط الفيديو")
+        if not schema_mine(lid, run):
+            return
+        data = lab.clean_schema(raw, d["source"]["duration"])
+        if not data["beats"]:
+            raise HTTPException(400, "الموديل ما طلّعش أجزاء. جرّب تاني")
+        old = ((d.get("schema") or {}).get("data") or {}).get("beats") or []
+        schema_thumbs(lid, d, data["beats"])
+        if not schema_mine(lid, run):
+            return
+        for b in old:   # صور المخطط القديم
+            if b.get("thumb"):
+                (lab_dir(lid) / "frames" / b["thumb"]).unlink(missing_ok=True)
+        lab_update(lid, lambda x: x.update(schema={"status": "done", "error": None, "data": data, "at": now()}))
+    except Exception as exc:  # noqa: BLE001
+        if not schema_mine(lid, run):
+            return
+        msg = str(getattr(exc, "detail", None) or exc)[:400]
+        lab_update(lid, lambda x: x.update(schema={**(x.get("schema") or {}), "status": "failed", "error": msg}))
+
+
+@app.post("/api/lab/{lid}/typo")
+def lab_typo(lid: str):
+    """🔤 يطلّع التايبوجرافي من الفيديو: كل لحظة الكلام اتحوّل فيها لكلمات/أشكال/أيقونات، والستايل، والأيقونات كستيكرات شفافة."""
+    d = lab_load(lid)
+    if (d.get("typo") or {}).get("status") == "working":
+        raise HTTPException(400, "بيطلّع التايبوجرافي بالفعل")
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل")
+    run = uuid.uuid4().hex[:8]
+    lab_update(lid, lambda x: x.update(typo={**(x.get("typo") or {}), "status": "working", "error": None, "run": run, "step": "بيتفرج على الفيديو"}))
+    threading.Thread(target=run_lab_typo, args=(lid, run), daemon=True).start()
+    return lab_to_dict(lid, lab_load(lid))
+
+
+def typo_mine(lid: str, run: str) -> bool:
+    ty = lab_load(lid).get("typo") or {}
+    return ty.get("status") == "working" and ty.get("run") == run
+
+
+def run_lab_typo(lid: str, run: str) -> None:
+    try:
+        d = lab_load(lid)
+        dur = d["source"]["duration"]
+        if atlas.mock_mode():
+            time.sleep(1.5)
+            data = typo.mock_extract(dur)
+        else:
+            proxy = lab_proxy(lid, d)
+            data = typo.clean_extract(ad_json(lab_media_chat(az.with_media(typo.extract_messages(dur), data_url(proxy, "video/mp4"), "video.mp4")),
+                                              "تايبوجرافي الفيديو"), dur)
+        if not typo_mine(lid, run):
+            return
+        if not data["moments"]:
+            raise HTTPException(400, "الموديل ملقاش تايبوجرافي في الفيديو ده")
+        # الأيقونات: فريم في وقتها ← قص على مكانها ← شيل الخلفية ← ستيكر في المكتبة
+        src = lab_dir(lid) / d["source"]["file"]
+        icons = [ic for m in data["moments"] for ic in m["icons"] if ic.get("box") or not atlas.mock_mode()]
+        done_n = [0]
+
+        def cut(ic):   # كل أيقونة لوحدها (4 مع بعض)
+            if not typo_mine(lid, run):
+                return
+            frames = [TMP_DIR / f"lt_{uuid.uuid4().hex[:8]}_{k}.png" for k in range(3)]
+            try:
+                from PIL import Image
+                for k, f in enumerate(frames):
+                    tt = min(dur - 0.05, max(0.0, ic["t"] + (k - 1) * 0.35))
+                    subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{tt:.2f}", "-i", str(src), "-frames:v", "1", str(f)],
+                                   check=True, capture_output=True, timeout=60)
+                pick = (1, ic["box"])
+                if not atlas.mock_mode():   # المكان الدقيق: من الصور الثابتة مش من الفيديو
+                    small = [data_url(model_image(f, 1024), "image/jpeg") for f in frames]
+                    pick = typo.clean_box(ad_json(lab_media_chat(typo.box_messages(ic["name"], ic.get("desc", ""), small)), "مكان الأيقونة"), 3, ic.get("box"))
+                if not pick:
+                    ic["sticker"] = None
+                    return
+                im = Image.open(frames[pick[0]])
+                W, H = im.size
+                x0, y0, x1, y1 = pick[1]
+                mx, my = (x1 - x0) * 0.06, (y1 - y0) * 0.06
+                crop = frames[pick[0]].with_suffix(".crop.png")
+                im.crop((int(max(0, x0 - mx) * W), int(max(0, y0 - my) * H), int(min(1, x1 + mx) * W), int(min(1, y1 + my) * H))).save(crop)
+                ic["box"] = pick[1]
+                ic["sticker"] = sticker_add(crop, ic["name"], f"lab:{lid}", True, ic.get("desc", ""), f"lab-{lid}")["id"]
+                crop.unlink(missing_ok=True)
+            except Exception:  # noqa: BLE001  (أيقونة واحدة باظت ما توقفش الباقي)
+                ic["sticker"] = None
+            finally:
+                for f in frames:
+                    f.unlink(missing_ok=True)
+                done_n[0] += 1
+                lab_update(lid, lambda x: x["typo"].update(step=f"✂️ بيقص الأيقونات ({done_n[0]} من {len(icons)})") if x.get("typo") else None)
+
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            list(pool.map(cut, icons))
+        if not typo_mine(lid, run):
+            return
+        style = {**data["style"], "source_lab": lid, "name": data["style"]["name"] or d.get("name") or "ستايل"}
+        sid = f"lab-{lid}"
+        lab_update(lid, lambda x: x["typo"].update(step="📖 بيضيف الأيقونات للقاموس") if x.get("typo") else None)
+        concepts_tag([ic["sticker"] for ic in icons if ic.get("sticker")])   # القاموس بيتملي لوحده من كل فيديو بيتحلل
+        (TYPO_STYLES / f"{sid}.json").write_text(json.dumps(style, ensure_ascii=False), encoding="utf-8")
+        if not typo_mine(lid, run):
+            return
+        lab_update(lid, lambda x: x.update(typo={"status": "done", "error": None, "data": data, "style_id": sid, "at": now()}))
+    except Exception as exc:  # noqa: BLE001
+        if not typo_mine(lid, run):
+            return
+        msg = str(getattr(exc, "detail", None) or exc)[:400]
+        lab_update(lid, lambda x: x.update(typo={**(x.get("typo") or {}), "status": "failed", "error": msg, "step": None}))
+
+
+@app.post("/api/lab/{lid}/typo/stop")
+def lab_typo_stop(lid: str):
+    def fn(x):
+        ty = x.get("typo") or {}
+        if ty.get("status") == "working":
+            x["typo"] = {**ty, "status": "done" if ty.get("data") else "stopped", "run": None, "step": None}
+    return lab_to_dict(lid, lab_update(lid, fn))
+
+
+@app.delete("/api/lab/{lid}/typo")
+def lab_typo_delete(lid: str):
+    """🗑️ يمسح نتيجة التايبوجرافي (الستايل والستيكرات اللي اتحفظت بيفضلوا في المكتبة)."""
+    return lab_to_dict(lid, lab_update(lid, lambda x: x.update(typo=None)))
+
+
+@app.post("/api/lab/{lid}/schema/stop")
+def lab_schema_stop(lid: str):
+    """⏹ يوقّف استخراج المخطط (لو فيه مخطط قديم بيفضل زي ما هو)."""
+    def fn(x):
+        sc = x.get("schema") or {}
+        if sc.get("status") != "working":
+            return
+        x["schema"] = {**sc, "status": "done" if sc.get("data") else "stopped", "error": None, "run": None}
+        if not sc.get("data"):
+            x["schema"] = None
+    return lab_to_dict(lid, lab_update(lid, fn))
+
+
+@app.delete("/api/lab/{lid}/schema")
+def lab_schema_delete(lid: str):
+    """🗑️ يمسح المخطط (التيمبليتس اللي اتحفظت منه بتفضل)."""
+    def fn(x):
+        for b in ((x.get("schema") or {}).get("data") or {}).get("beats") or []:
+            if b.get("thumb"):
+                (lab_dir(lid) / "frames" / b["thumb"]).unlink(missing_ok=True)
+        x["schema"] = None
+    return lab_to_dict(lid, lab_update(lid, fn))
+
+
+class SchemaIn(BaseModel):
+    data: dict
+
+
+@app.patch("/api/lab/{lid}/schema")
+def lab_schema_patch(lid: str, body: SchemaIn):
+    """✏️ تعديل المخطط بإيدك (الصور بتفضل زي ما هي لو الأجزاء ما اتغيرتش)."""
+    d = lab_load(lid)
+    old = ((d.get("schema") or {}).get("data") or {})
+    data = lab.clean_schema({**old, **body.data}, d["source"]["duration"])
+    thumbs = {(b["t0"], b["t1"]): b.get("thumb") for b in old.get("beats") or []}
+    missing = [b for b in data["beats"] if not thumbs.get((b["t0"], b["t1"]))]
+    for b in data["beats"]:
+        b["thumb"] = thumbs.get((b["t0"], b["t1"]))
+    if missing:
+        schema_thumbs(lid, d, missing)
+    return lab_to_dict(lid, lab_update(lid, lambda x: x["schema"].update(data=data)))
+
+
+# ---------- 📐 التيمبليتس (مخططات محفوظة)
+
+TPL_DIR = DATA_DIR / "templates"
+TPL_DIR.mkdir(parents=True, exist_ok=True)
+TPL_LOCK = threading.Lock()
+
+
+def tpl_load(tid: str) -> dict:
+    f = TPL_DIR / Path(tid).name / "tpl.json"
+    if not f.exists():
+        raise HTTPException(404, "التيمبليت ده مش موجود")
+    return json.loads(f.read_text(encoding="utf-8"))
+
+
+def tpl_save(tid: str, d: dict) -> None:
+    folder = TPL_DIR / Path(tid).name
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / "tpl.json.tmp").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+    (folder / "tpl.json.tmp").replace(folder / "tpl.json")
+
+
+def tpl_to_dict(tid: str, d: dict) -> dict:
+    base = f"/media/templates/{tid}"
+    sch = d["schema"]
+    folder = TPL_DIR / tid
+    def url(n):
+        return f"{base}/{n}?v={int((folder / n).stat().st_mtime)}" if n and (folder / n).exists() else None
+    return {**d, "id": tid, "duration": round(sch["beats"][-1]["t1"] - sch["beats"][0]["t0"], 2) if sch["beats"] else 0,
+            "schema": {**sch, "beats": [{**b, "thumb_url": f"{base}/{b['thumb']}" if b.get("thumb") else None} for b in sch["beats"]]},
+            "source_url": f"{base}/{d['source']}" if d.get("source") else None,
+            "sample_url": url(d.get("sample")), "cover_url": url(d.get("cover")) or next((f"{base}/{b['thumb']}" for b in sch["beats"] if b.get("thumb")), None),
+            "sample_cost": tpl_sample_cost(d), "sample_old": bool(d.get("sample")) and d.get("sample_kind") != "scenes" and d.get("mode") != "scenes"}
+
+
+class TplIn(BaseModel):
+    name: str = ""
+    ratio: str = ""
+
+
+@app.post("/api/lab/{lid}/schema/template")
+def lab_schema_template(lid: str, body: TplIn):
+    """💾 المخطط يتحفظ تيمبليت في المكتبة (معاه صور الأجزاء ونسخة صغيرة من الفيديو الأصلي للمقارنة)."""
+    d = lab_load(lid)
+    data = (d.get("schema") or {}).get("data")
+    if not data:
+        raise HTTPException(400, "طلّع المخطط الأول")
+    tid = uuid.uuid4().hex[:10]
+    folder = TPL_DIR / tid
+    folder.mkdir(parents=True, exist_ok=True)
+    data = json.loads(json.dumps(data))
+    for b in data["beats"]:
+        if b.get("thumb") and (lab_dir(lid) / "frames" / b["thumb"]).exists():
+            shutil.copyfile(lab_dir(lid) / "frames" / b["thumb"], folder / b["thumb"])
+    try:
+        shutil.copyfile(lab_proxy(lid, d), folder / "source.mp4")
+        src = "source.mp4"
+    except Exception:  # noqa: BLE001
+        src = None
+    with TPL_LOCK:
+        tpl_save(tid, {"name": body.name.strip()[:120] or data.get("title") or d.get("name") or "تيمبليت", "schema": data,
+                       "lab": lid, "lab_name": d.get("name"), "ratio": lab_ratio(d, lid), "source": src, "created_at": now()})
+    return tpl_to_dict(tid, tpl_load(tid))
+
+
+def lab_ratio(d: dict, lid: str | None = None) -> str:
+    w, h = d["source"].get("width") or 9, d["source"].get("height") or 16
+    if lid:   # المقاس بيتقري تاني (الفيديوهات القديمة اتسجلت بالعرض لو كانت ملفوفة)
+        try:
+            info = montage.probe(ffmpeg_exe(), lab_dir(lid) / d["source"]["file"])
+            w, h = info.width or w, info.height or h
+        except Exception:  # noqa: BLE001
+            pass
+    return nearest_ratio(int(w), int(h)) if nearest_ratio(int(w), int(h)) in az.ASPECTS else ("9:16" if h >= w else "16:9")
+
+
+@app.get("/api/templates")
+def templates_list():
+    out = []
+    for f in sorted(TPL_DIR.glob("*/tpl.json"), key=lambda x: x.stat().st_mtime, reverse=True):
+        try:
+            out.append(tpl_to_dict(f.parent.name, json.loads(f.read_text(encoding="utf-8"))))
+        except (ValueError, KeyError):
+            continue
+    return out
+
+
+@app.patch("/api/templates/{tid}")
+def template_patch(tid: str, body: TplIn):
+    d = tpl_load(tid)
+    if body.name.strip():
+        d["name"] = body.name.strip()[:120]
+    if body.ratio in az.ASPECTS:
+        d["ratio"] = body.ratio
+    with TPL_LOCK:
+        tpl_save(tid, d)
+    return tpl_to_dict(tid, d)
+
+
+@app.delete("/api/templates/{tid}")
+def template_delete(tid: str):
+    tpl_load(tid)
+    shutil.rmtree(TPL_DIR / Path(tid).name, ignore_errors=True)
+    return {"ok": True}
+
+
+# ---------- 🎞️ فيديو من تيمبليت: الخانات بتتملا بمحتوى العميل ← شيت ستوري بورد واحد فيه كل اللوحات ← تقطيع ← توضيح
+# ← كل لوحتين ورا بعض = جزء من الفيديو (نهاية كل جزء هي بداية اللي بعده، فالفيديو لقطة واحدة متصلة)
+
+TV_DIR = DATA_DIR / "tvideos"
+TV_DIR.mkdir(parents=True, exist_ok=True)
+TV_LOCK = threading.Lock()
+TV_BUSY = ("filling", "sheeting", "sharpening", "working")
+SHEET_MAX = 9
+SHEET_COST = 0.1
+# موديل الصور للشيت واللوحات: (تمن الشيت، تمن اللوحة، الاسم). Nano Banana بياخد المقاس كإعداد فبيلتزم بـ 9:16
+TV_IMAGE_MODELS = {"nano2": (0.045, 0.03, "Nano Banana 2 (بيلتزم بالمقاس، رخيص)"),
+                   "nanopro": (0.08, 0.05, "Nano Banana Pro (أجود)"),
+                   "sunburst": (0.1, 0.06, "GPT Image 2.5 (زي ChatGPT)")}
+
+
+def tv_img(d: dict) -> str:
+    return d.get("image_model") if d.get("image_model") in TV_IMAGE_MODELS else "nano2"
+
+
+def tv_brain(d: dict) -> dict | None:
+    """ملف العميل للفيديو ده (عينات المعرض من غير عميل: محتوى عام)."""
+    if d.get("sample_of"):
+        return None
+    return brain_row(d.get("client_id") or "") or active_client()
+
+
+def tv_dir(vid: str) -> Path:
+    return TV_DIR / Path(vid).name
+
+
+def tv_load(vid: str) -> dict:
+    f = tv_dir(vid) / "tv.json"
+    if not f.exists():
+        raise HTTPException(404, "الفيديو ده مش موجود")
+    return json.loads(f.read_text(encoding="utf-8"))
+
+
+def tv_update(vid: str, fn) -> dict:
+    with TV_LOCK:
+        d = tv_load(vid)
+        fn(d)
+        d["updated_at"] = now()
+        (tv_dir(vid) / "tv.json.tmp").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+        (tv_dir(vid) / "tv.json.tmp").replace(tv_dir(vid) / "tv.json")
+        return d
+
+
+def tv_set(vid: str, **kw) -> dict:
+    return tv_update(vid, lambda d: d.update(**kw))
+
+
+def tv_fail(vid: str, exc: Exception) -> None:
+    tv_set(vid, status="failed", step=None, error=str(getattr(exc, "detail", None) or exc)[:400])
+
+
+def tv_sheets(d: dict) -> list[list[int]]:
+    """اللوحات على شيتات (لحد 9 في الشيت)."""
+    n = len((d.get("fill") or {}).get("panels") or [])
+    k = -(-n // SHEET_MAX) if n else 0
+    size = -(-n // k) if k else 0
+    return [list(range(i, min(n, i + size))) for i in range(0, n, size)] if n else []
+
+
+def tv_refs(d: dict, brain: dict | None) -> list[tuple[Path, str]]:
+    """أصول العميل اللي الخانات طالباها (بالاسم) + اللوجو: بتتبعت مع الشيت والتوضيح."""
+    out, seen = [], set()
+    names = [p.get("asset") for p in (d.get("fill") or {}).get("panels") or [] if p.get("asset")]
+    # شاشات التطبيق الحقيقية بتتبعت دايمًا (لحد 4) عشان أي موبايل في اللوحات يعرضها هي مش شاشة متألفة
+    screens = [a.get("name") or a["file"] for a in ((brain or {}).get("screens") or [])[:4]]
+    logo = ((brain or {}).get("logos") or [{}])[0].get("file")
+    for nm in names + screens + ([logo] if logo else []):
+        pth = film_brain_ref(brain, nm)
+        if pth and str(pth) not in seen:
+            seen.add(str(pth))
+            out.append((pth, "the brand's real logo" if nm == logo else
+                        f"a real app screen «{nm}»: any phone showing the app displays this screen exactly" if nm in screens else
+                        f"the real brand asset «{nm}»"))
+    return out[:8]
+
+
+def tv_prompts(d: dict, brain: dict | None) -> list[str]:
+    sch, fill = d["schema"], d["fill"]
+    texts = [b.get("text", "") for b in fill["beats"]] + [""]
+    refs = [r[1] for r in tv_refs(d, brain)]
+    return [lab.sheet_prompt(sch, fill, cells, d["ratio"], d["text_mode"], texts, refs, k > 0) for k, cells in enumerate(tv_sheets(d))]
+
+
+def tv_to_dict(vid: str, d: dict) -> dict:
+    base, folder = f"/media/tvideos/{vid}", tv_dir(vid)
+    def url(name):
+        return f"{base}/{name}?v={int((folder / name).stat().st_mtime)}" if name and (folder / name).exists() else None
+    brain = tv_brain(d)
+    sheets = []
+    if d.get("fill"):
+        prompts = tv_prompts(d, brain)
+        for k, cells in enumerate(tv_sheets(d)):
+            cols, rows = lab.sheet_grid(len(cells))
+            sh = (d.get("sheets") or {}).get(str(k)) or {}
+            sheets.append({"k": k, "cells": cells, "cols": cols, "rows": rows, "prompt": prompts[k], "url": url(sh.get("file")),
+                           "boxes": sh.get("boxes") if sh.get("file") else None, "how": sh.get("how")})
+    panels = d.get("panels") or {}
+    per = TRIAL_MODELS.get(d.get("model"), TRIAL_MODELS["seedance-mini"])["per_sec"] * (2 if d.get("resolution") == "720p" else 1)
+    beats = d["schema"]["beats"]
+    segs = d.get("segs") or {}
+    n_p = len((d.get("fill") or {}).get("panels") or [])
+    return {**d, "id": vid, "busy": d.get("status") in TV_BUSY, "sheets": sheets, "text_modes": lab.TEXT_MODES,
+            "panel_files": [{"cell": url((panels.get(str(j)) or {}).get("cell")), "full": url((panels.get(str(j)) or {}).get("full"))}
+                            for j in range(n_p)],
+            "seg_files": [url((segs.get(str(i)) or {}).get("file")) for i in range(len(beats))],
+            "final_url": url(d.get("final")),
+            "vo_url": url((d.get("vo") or {}).get("full")),
+            "stylekey_url": url(d.get("stylekey")),
+            "scene_urls": [url(((d.get("scene_files") or {}).get(str(i)) or {}).get("file")) for i in range(len(d.get("scenes") or []))],
+            "scene_cost": round(SCENE_SEC * TRIAL_MODELS.get(d.get("model"), TRIAL_MODELS["seedance-mini"])["per_sec"] * (2 if d.get("resolution") == "720p" else 1), 2),
+            "vo_line_urls": [url(f) for f in (d.get("vo") or {}).get("files") or []],
+            "image_models": [{"key": k, "label": v[2]} for k, v in TV_IMAGE_MODELS.items()], "image_model": tv_img(d),
+            "costs": {"sheets": round(len(sheets) * TV_IMAGE_MODELS[tv_img(d)][0], 2), "panel": TV_IMAGE_MODELS[tv_img(d)][1],
+                      "sharpen": round(sum(1 for j in range(n_p) if not (panels.get(str(j)) or {}).get("full")) * TV_IMAGE_MODELS[tv_img(d)][1], 2),
+                      "video": round(sum(trial_gen_seconds(b["t1"] - b["t0"]) * per for i, b in enumerate(beats) if not (segs.get(str(i)) or {}).get("file")), 2),
+                      "seg": [round(trial_gen_seconds(b["t1"] - b["t0"]) * per, 2) for b in beats],
+                      "once": tv_once_cost(d, per), "once_parts": len(tv_chunks(beats, tv_once_max(d))), "once_max": tv_once_max(d)},
+            "models": [{"key": k, "label": v["label"], "per_sec": v["per_sec"]} for k, v in TRIAL_MODELS.items()],
+            **(ad_to_dict(vid, d) if d.get("mode") == "ad" else still_to_dict(vid, d) if d.get("mode") == "still" else {})}
+
+
+@app.get("/api/tvideos")
+def tvideos_list():
+    out = []
+    for f in sorted(TV_DIR.glob("*/tv.json"), key=lambda x: x.stat().st_mtime, reverse=True):
+        try:
+            d = json.loads(f.read_text(encoding="utf-8"))
+        except ValueError:
+            continue
+        if not owned(d.get("client_id")) or d.get("sample_of"):
+            continue
+        p0 = (d.get("panels") or {}).get("0") or {}
+        th = p0.get("full") or p0.get("cell") or next((x["file"] for x in (d.get("still") or {}).get("items") or [] if x.get("file")), None) \
+            or ((d.get("still") or {}).get("files") or {}).get("product") or ((d.get("ad") or {}).get("files") or {}).get("head") or ((d.get("ad") or {}).get("files") or {}).get("product")
+        out.append({"id": f.parent.name, "name": d.get("name"), "status": d.get("status"), "beats": len(d["schema"]["beats"]),
+                    "template_name": d.get("template_name"), "section": d.get("section"),
+                    "thumb": f"/media/tvideos/{f.parent.name}/{th}" if th else None})
+    return out
+
+
+@app.get("/api/tvideos/{vid}")
+def tvideo_get(vid: str):
+    return tv_to_dict(vid, tv_load(vid))
+
+
+class TvIn(BaseModel):
+    template: str
+    ratio: str = ""
+    image_model: str = "nano2"
+    section: str = ""            # templates = قسم القوالب (سكريبت ← فويس أوفر ← مدد اللقطات ← ستوري بورد ← لقطات متصلة)
+    script: str = ""
+    script_mode: str = "ai"      # ai = الموديل يكتبه، own = كتبته بنفسك
+    lang: str = "ar-eg-cairo"
+    voice: str = ""
+    voice_on: bool = True
+    length: int = 60             # قوالب المشاهد: طول الفيديو (كل ١٠ ثواني = مشهد)
+    brief: str = ""
+    text_mode: str = "blank"
+    model: str = "seedance-mini"
+    resolution: str = "480p"
+
+
+@app.post("/api/tvideos")
+def tvideo_create(body: TvIn):
+    """📝 فيديو جديد من تيمبليت: الموديل بيملا خانات كل جزء بمحتوى العميل (رخيص)."""
+    t = tpl_load(body.template)
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل")
+    client = active_client() or {}
+    vid = uuid.uuid4().hex[:10]
+    tv_dir(vid).mkdir(parents=True, exist_ok=True)
+    d = {"name": f"📐 {client.get('name') or 'فيديو'} · {t['name']}", "client_id": client.get("id"), "template": body.template,
+         "template_name": t["name"], "schema": t["schema"],
+         "ratio": body.ratio if body.ratio in az.ASPECTS else t.get("ratio") or "9:16",
+         "brief": body.brief.strip()[:3000] or f"فيديو بيعرض أهم مميزات {client.get('name') or 'المنتج'}",
+         "text_mode": body.text_mode if body.text_mode in lab.TEXT_MODES else "blank",
+         "image_model": body.image_model if body.image_model in TV_IMAGE_MODELS else "nano2",
+         "model": body.model if body.model in TRIAL_MODELS else "seedance-mini",
+         "resolution": body.resolution if body.resolution in ("480p", "720p") else "480p",
+         "status": "filling", "step": "بيملا الخانات بمحتوى العميل", "error": None, "fill": None, "sheets": {}, "panels": {}, "segs": {},
+         "created_at": now()}
+    if body.section == "templates":
+        lang = body.lang if body.lang in dub.DIALECTS else "ar-eg-cairo"
+        d.update(section="templates", chain=True, lang=lang, script=body.script.strip()[:6000],
+                 script_mode="own" if body.script_mode == "own" and body.script.strip() else "ai",
+                 voice=body.voice if body.voice in dub.DIALECTS[lang]["voices"] else dub.DIALECTS[lang]["voices"][0],
+                 voice_on=body.voice_on, step="✍️ بيكتب السكريبت على قد القالب",
+                 transition=(t["schema"].get("transition") or t.get("transition") or ""))
+        if body.image_model not in TV_IMAGE_MODELS:
+            d["image_model"] = "sunburst"
+    if body.section == "templates" and t.get("mode") == "ad":
+        # 🎯 قوالب الإعلانات: الشخصية والمنتج الأول، وبعدين السكريبت (مفيش حاجة بتشتغل لوحدها في الأول)
+        lang = d["lang"]
+        d.update(mode="ad", status="filled", step=None, model=body.model if body.model in TRIAL_MODELS and body.model != "seedance-mini" else "seedance-fast",
+                 ad={"kind": t["ad_cfg"]["kind"], "look": {"skeleton": "bare", "talking": "pixar", "song": "pixar"}.get(t["ad_cfg"]["kind"], "narrative"), "spoken": adtpl.SPOKEN.get(lang) or dub.DIALECTS[lang].get("language") or "Arabic",
+                     "script": d["script"] if d["script_mode"] == "own" else "", "place": "", "length": 15, "end_on": t["ad_cfg"]["kind"] == "cinema",
+                     "hero": {}, "product": {}, "files": {}, "gens": {}, "plan": None})
+    elif body.section == "templates" and t.get("mode") == "still":
+        # 📦 استوديو المنتج: صور بس (من غير فيديو)
+        d.update(mode="still", status="filled", step=None, image_model=body.image_model if body.image_model in TV_IMAGE_MODELS else "sunburst",
+                 still={"kind": t["still_cfg"]["kind"], "files": {}, "bg": "clean white", "fmt": "1:1" if t["still_cfg"]["kind"] != "scene" else "3:4",
+                        "how": "recreate", "note": "", "picks": [], "copy_lang": "ar", "product": "", "offer": body.brief.strip()[:1500], "items": []})
+    elif body.section == "templates":
+        # 🎬 كل القوالب: مشاهد ١٠ ثواني ثابتة بمفتاح ستايل (خدعة اللقطة الواحدة)
+        n = max(3, min(12, round(body.length / SCENE_SEC)))
+        d.update(mode="scenes", scene_cfg=scene_cfg_for(t), scenes=[], scene_files={}, transition="cut", voice_tone=t.get("voice_tone"),
+                 schema={**t["schema"], "beats": [{**t["schema"]["beats"][0], "t0": i * SCENE_SEC, "t1": (i + 1) * SCENE_SEC,
+                                                   "role": "hook" if i == 0 else "cta" if i == n - 1 else "proof", "what": f"مشهد {i + 1}"} for i in range(n)]})
+    with TV_LOCK:
+        (tv_dir(vid) / "tv.json").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+    job = None if d.get("mode") in ("ad", "still") else run_tv_scenes_script if d.get("mode") == "scenes" else run_tv_script if d.get("section") == "templates" else run_tv_fill
+    if job:
+        threading.Thread(target=job, args=(vid,), daemon=True).start()
+    return tv_to_dict(vid, d)
+
+
+def run_tv_fill(vid: str) -> None:
+    try:
+        d = tv_load(vid)
+        brain = tv_brain(d)
+        if atlas.mock_mode():
+            raw = lab.mock_fill(d["schema"], (brain or {}).get("name") or "البراند")
+        else:
+            raw = ad_json(series_chat([{"role": "user", "content": lab.fill_messages(az.brain_text(brain), d["schema"], d["brief"], d["text_mode"])}]),
+                          "ملا التيمبليت")
+        fill = lab.clean_fill(raw, len(d["schema"]["beats"]))
+        def fn(x):
+            x.update(fill=fill, status="filled", step=None, error=None, sheets={}, panels={}, segs={}, final=None)
+            if fill.get("title"):
+                x["name"] = f"📐 {fill['title']}"
+        tv_update(vid, fn)
+    except Exception as exc:  # noqa: BLE001
+        tv_fail(vid, exc)
+
+
+class TvPatchIn(BaseModel):
+    name: str | None = None
+    ratio: str | None = None
+    image_model: str | None = None
+    fill: dict | None = None
+    text_mode: str | None = None
+    model: str | None = None
+    resolution: str | None = None
+
+
+@app.patch("/api/tvideos/{vid}")
+def tvideo_patch(vid: str, body: TvPatchIn):
+    def fn(d):
+        if body.name and body.name.strip():
+            d["name"] = body.name.strip()[:120]
+        if body.text_mode in lab.TEXT_MODES:
+            d["text_mode"] = body.text_mode
+        if body.image_model in TV_IMAGE_MODELS:
+            d["image_model"] = body.image_model
+        if body.ratio in az.ASPECTS and body.ratio != d.get("ratio"):
+            if d.get("status") in TV_BUSY:
+                raise HTTPException(400, "استنى لما الشغل اللي شغال يخلص")
+            d["ratio"] = body.ratio   # الشيتات واللوحات القديمة بمقاس تاني: لازم تترسم تاني
+            d.update(sheets={}, panels={}, segs={}, final=None, status="filled" if d.get("fill") else d.get("status"))
+            if d.get("mode") == "ad":
+                d["ad"]["gens"] = {}
+        if body.model in TRIAL_MODELS:
+            d["model"] = body.model
+        if body.resolution in ("480p", "720p"):
+            d["resolution"] = body.resolution
+        if body.fill is not None and d.get("fill"):
+            if d.get("status") in TV_BUSY:
+                raise HTTPException(400, "استنى لما الشغل اللي شغال يخلص")
+            old = d["fill"]
+            new = lab.clean_fill({**old, **body.fill}, len(d["schema"]["beats"]))
+            for i, (a, b) in enumerate(zip(old["beats"], new["beats"])):
+                if a["motion"] != b["motion"]:
+                    (d.get("segs") or {}).pop(str(i), None)
+            if new != old:
+                d["final"] = None
+            d["fill"] = new
+    return tv_to_dict(vid, tv_update(vid, fn))
+
+
+def tv_start(vid: str, status: str, step: str, target, *args) -> dict:
+    def fn(d):
+        if d.get("status") in TV_BUSY:
+            raise HTTPException(400, "استنى لما الشغل اللي شغال يخلص")
+        if not d.get("fill"):
+            raise HTTPException(400, "الخانات لسه ما اتملتش")
+        d.update(status=status, step=step, error=None)
+    d = tv_update(vid, fn)
+    threading.Thread(target=target, args=(vid, *args), daemon=True).start()
+    return tv_to_dict(vid, d)
+
+
+def tv_idle(d: dict) -> str:
+    if d.get("mode") == "still":
+        items = (d.get("still") or {}).get("items") or []
+        return "done" if any(x.get("file") for x in items) else "cut" if items else "filled"
+    if d.get("mode") == "ad":
+        return "done" if d.get("final") else "cut" if (d.get("ad") or {}).get("plan") else "filled"
+    if d.get("mode") == "scenes":
+        if d.get("final"):
+            return "done"
+        return "cut" if d.get("stylekey") else "filled" if d.get("scenes") else "failed"
+    n = len((d.get("fill") or {}).get("panels") or [])
+    if d.get("final"):
+        return "done"
+    if n and all((d.get("panels") or {}).get(str(j), {}).get("cell") for j in range(n)):
+        return "cut"
+    return "filled" if d.get("fill") else "failed"
+
+
+@app.post("/api/tvideos/{vid}/refill")
+def tvideo_refill(vid: str):
+    """✍️ يملا الخانات من جديد (الشيتات واللوحات والفيديوهات القديمة بتتمسح)."""
+    if tv_load(vid).get("mode") == "scenes":
+        def fn(d):
+            if d.get("status") in TV_BUSY:
+                raise HTTPException(400, "استنى لما الشغل اللي شغال يخلص")
+            d.update(status="filling", step="✍️ بيكتب السكريبت من جديد", error=None, scene_files={}, final=None)
+        tv_update(vid, fn)
+        threading.Thread(target=run_tv_scenes_script, args=(vid,), daemon=True).start()
+        return tv_to_dict(vid, tv_load(vid))
+    if tv_load(vid).get("section") == "templates":   # قسم القوالب: السكريبت والفويس أوفر من الأول
+        return tv_start(vid, "filling", "✍️ بيكتب السكريبت من جديد", run_tv_script)
+    return tv_start(vid, "filling", "بيملا الخانات بمحتوى العميل", run_tv_fill)
+
+
+def tv_slice(vid: str, k: int, manual: list | None = None) -> None:
+    """✂️ تقطيع الشيت: البرنامج بيلاقي اللوحات زي ما اترسمت فعلًا (حتى لو مش شبكة منتظمة)، ولو ملقاش: خانات متساوية.
+    كل لوحة بتتكمّل للمقاس الصح (9:16) بخلفية مغبّشة من نفسها بدل ما تتقص، و«وضّح» بيكمّل الأطراف دي طبيعي."""
+    d = tv_load(vid)
+    folder = tv_dir(vid)
+    cells = tv_sheets(d)[k]
+    sh = (d.get("sheets") or {}).get(str(k)) or {}
+    src = folder / sh["file"]
+    W, H = image_dims(src)
+    cols, rows = lab.sheet_grid(len(cells))
+    sw = 240
+    sh_ = max(2, round(H * sw / W))
+    raw = subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-i", str(src), "-vf", f"scale={sw}:{sh_},format=gray",
+                          "-f", "rawvideo", "-frames:v", "1", "-"], capture_output=True, timeout=60).stdout
+    boxes = [tuple(min(1.0, max(0.0, float(v))) for v in b[:4]) for b in manual] if manual else lab.sheet_panels(raw, sw, sh_, len(cells))
+    how = "manual" if manual else "found"
+    if not boxes:   # الشبكة اللي طلبناها (بفواصلها لو واضحة، أو متساوية)
+        grid = lab.sheet_cells(raw, sw, sh_, rows, cols)
+        xs = grid[0] if grid else [(c / cols, (c + 1) / cols) for c in range(cols)]
+        ys = grid[1] if grid else [(r / rows, (r + 1) / rows) for r in range(rows)]
+        inset = 0.004 if grid else 0.012
+        boxes = [(xs[c][0] + inset, xs[c][1] - inset, ys[r][0] + inset, ys[r][1] - inset) for r in range(rows) for c in range(cols)]
+        how = "grid" if grid else "equal"
+    pw, ph = RATIO_WH.get(d["ratio"], (9, 16))
+    tag = uuid.uuid4().hex[:4]
+    made, padded = {}, {}
+    for idx, j in enumerate(cells):
+        fx0, fx1, fy0, fy1 = boxes[idx]
+        x0, y0 = int(fx0 * W), int(fy0 * H)
+        w, h = max(2, int((fx1 - fx0) * W) // 2 * 2), max(2, int((fy1 - fy0) * H) // 2 * 2)
+        if w / h > pw / ph:   # أعرض من اللازم: بتتكمّل من فوق وتحت
+            tw, th = w, int(w * ph / pw) // 2 * 2
+        else:                  # أطول من اللازم: بتتكمّل من الجناب
+            tw, th = int(h * pw / ph) // 2 * 2, h
+        name = f"cell{j + 1}-{tag}.png"
+        fc = (f"[0]crop={w}:{h}:{x0}:{y0},split[a][b];"
+              f"[b]scale={tw}:{th}:force_original_aspect_ratio=increase,crop={tw}:{th},boxblur=24:2,eq=brightness=-0.04[bg];"
+              f"[a]scale={tw}:{th}:force_original_aspect_ratio=decrease[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2")
+        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src), "-filter_complex", fc,
+                        "-frames:v", "1", str(folder / name)], check=True, capture_output=True, timeout=60)
+        made[str(j)] = name
+        padded[str(j)] = abs(w / h - pw / ph) > 0.02
+    def fn(x):
+        x.setdefault("sheets", {}).setdefault(str(k), {}).update(how=how, boxes=[[round(v, 4) for v in boxes[i]] for i in range(len(cells))])
+        for j, name in made.items():
+            old = (x.setdefault("panels", {}).get(j) or {})
+            for f in (old.get("cell"), old.get("full")):
+                if f:
+                    (folder / f).unlink(missing_ok=True)
+            x["panels"][j] = {"cell": name, "padded": padded[j]}
+            i = int(j)   # اللوحة دي بداية الجزء i ونهاية الجزء i-1
+            for s_ in (i - 1, i):
+                (x.get("segs") or {}).pop(str(s_), None)
+        x["final"] = None
+    tv_update(vid, fn)
+
+
+class TvSliceIn(BaseModel):
+    boxes: list | None = None   # [[x0, x1, y0, y1], ...] بالنسبة (0..1)، لكل لوحة بالترتيب. فاضي = يدوّر لوحده تاني
+
+
+@app.post("/api/tvideos/{vid}/sheets/{k}/slice")
+def tvideo_sheet_slice(vid: str, k: int, body: TvSliceIn):
+    """✂️ يقطّع الشيت تاني: بالمربعات اللي إنت ظبطتها بإيدك، أو يدوّر على اللوحات من جديد."""
+    d = tv_load(vid)
+    if not 0 <= k < len(tv_sheets(d)):
+        raise HTTPException(404, "الشيت ده مش موجود")
+    if not ((d.get("sheets") or {}).get(str(k)) or {}).get("file"):
+        raise HTTPException(400, "ارسم أو ارفع الشيت الأول")
+    if d.get("status") in TV_BUSY:
+        raise HTTPException(400, "استنى لما الشغل اللي شغال يخلص")
+    n = len(tv_sheets(d)[k])
+    boxes = body.boxes
+    if boxes is not None:
+        try:
+            boxes = [[float(v) for v in b[:4]] for b in boxes]
+        except (TypeError, ValueError):
+            raise HTTPException(400, "المربعات مش مظبوطة") from None
+        if len(boxes) != n or any(b[1] - b[0] < 0.02 or b[3] - b[2] < 0.02 for b in boxes):
+            raise HTTPException(400, f"لازم {n} مربع، وكل مربع ليه مساحة")
+    tv_slice(vid, k, boxes)
+    return tv_to_dict(vid, tv_update(vid, lambda x: x.update(status=tv_idle(x), step=None, error=None)))
+
+
+@app.post("/api/tvideos/{vid}/sheets/{k}/draw")
+def tvideo_sheet_draw(vid: str, k: int):
+    """🖼️ يرسم الشيت ده (كل اللوحات في صورة واحدة) ويقطّعه."""
+    d = tv_load(vid)
+    if not 0 <= k < len(tv_sheets(d)):
+        raise HTTPException(404, "الشيت ده مش موجود")
+    return tv_start(vid, "sheeting", f"🖼️ بيرسم الشيت {k + 1}", run_tv_sheet, k)
+
+
+def run_tv_sheet(vid: str, k: int) -> None:
+    try:
+        d = tv_load(vid)
+        folder = tv_dir(vid)
+        brain = tv_brain(d)
+        sr = lab.sheet_ratio(len(tv_sheets(d)[k]), d["ratio"])   # نسبة الشيت كله على قد الشبكة
+        a, b = (int(x) for x in sr.split(":"))
+        size = f"{a * 128}x{b * 128}" if tv_img(d) in atlas.ASPECT_IMAGE_MODELS else min(
+            (v[0] for v in az.ASPECTS.values()), key=lambda z: abs(int(z.split("x")[0]) / int(z.split("x")[1]) - a / b))
+        name = f"sheet{k + 1}-{uuid.uuid4().hex[:4]}.png"
+        if atlas.mock_mode():
+            w, h = (int(x) // 3 for x in size.split("x"))
+            subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i", f"testsrc2=s={w}x{h}",
+                            "-frames:v", "1", str(folder / name)], check=True, capture_output=True, timeout=60)
+        else:
+            refs = [r[0] for r in tv_refs(d, brain)]
+            prev = (d.get("sheets") or {}).get(str(k - 1)) if k > 0 else None
+            if prev and (folder / prev["file"]).exists():
+                refs.append(folder / prev["file"])
+            prompt = tv_prompts(d, brain)[k]
+            atlas.download(atlas.generate_image(tv_img(d), prompt, size, "high",
+                                                [atlas.reference_url(x) for x in refs]), folder / name)
+        def fn(x):
+            old = (x.setdefault("sheets", {}).get(str(k)) or {}).get("file")
+            if old and old != name:
+                (folder / old).unlink(missing_ok=True)
+            x["sheets"][str(k)] = {"file": name, "source": "drawn"}
+        tv_update(vid, fn)
+        tv_slice(vid, k)
+        tv_update(vid, lambda x: x.update(status=tv_idle(x), step=None, error=None))
+    except Exception as exc:  # noqa: BLE001
+        tv_fail(vid, exc)
+
+
+@app.post("/api/tvideos/{vid}/sheets/{k}/upload")
+def tvideo_sheet_upload(vid: str, k: int, file: UploadFile = File(...)):
+    """⬆ شيت عملته في ChatGPT بالبرومبت: بيتقطّع خانات."""
+    d = tv_load(vid)
+    if not 0 <= k < len(tv_sheets(d)):
+        raise HTTPException(404, "الشيت ده مش موجود")
+    if d.get("status") in TV_BUSY:
+        raise HTTPException(400, "استنى لما الشغل اللي شغال يخلص")
+    name = save_upload(file, IMAGE_EXTENSIONS, tv_dir(vid), f"sheet{k + 1}")
+    def fn(x):
+        old = (x.setdefault("sheets", {}).get(str(k)) or {}).get("file")
+        if old and old != name:
+            (tv_dir(vid) / old).unlink(missing_ok=True)
+        x["sheets"][str(k)] = {"file": name, "source": "upload"}
+    tv_update(vid, fn)
+    try:
+        tv_slice(vid, k)
+    except subprocess.CalledProcessError:
+        raise HTTPException(400, "مقدرتش أقطّع الصورة دي") from None
+    return tv_to_dict(vid, tv_update(vid, lambda x: x.update(status=tv_idle(x), step=None, error=None)))
+
+
+class TvSharpenIn(BaseModel):
+    j: int | None = None
+    note: str = ""
+
+
+@app.post("/api/tvideos/{vid}/sharpen")
+def tvideo_sharpen(vid: str, body: TvSharpenIn):
+    """✨ كل لوحة (أو لوحة واحدة) بتترسم بجودة كاملة بنفس شكلها بالظبط."""
+    d = tv_load(vid)
+    n = len((d.get("fill") or {}).get("panels") or [])
+    if body.j is not None and not 0 <= body.j < n:
+        raise HTTPException(404, "اللوحة دي مش موجودة")
+    if not all((d.get("panels") or {}).get(str(j), {}).get("cell") for j in ([body.j] if body.j is not None else range(n))):
+        raise HTTPException(400, "ارسم أو ارفع الشيت الأول")
+    return tv_start(vid, "sharpening", "✨ بيوضّح اللوحات", run_tv_sharpen, body.j, body.note.strip()[:1000])
+
+
+def run_tv_sharpen(vid: str, only: int | None, note: str) -> None:
+    try:
+        d = tv_load(vid)
+        folder = tv_dir(vid)
+        brain = tv_brain(d)
+        size = az.ASPECTS.get(d["ratio"], az.ASPECTS["9:16"])[0]
+        texts = [b.get("text", "") for b in d["fill"]["beats"]] + [""]
+        n = len(d["fill"]["panels"])
+        todo = [only] if only is not None else [j for j in range(n) if not d["panels"].get(str(j), {}).get("full")]
+        refs = [r[0] for r in tv_refs(d, brain)]
+        for c, j in enumerate(todo):
+            tv_set(vid, step=f"✨ بيوضّح اللوحة {j + 1} ({c + 1} من {len(todo)})")
+            pan = d["panels"][str(j)]
+            name = f"full{j + 1}-{uuid.uuid4().hex[:4]}.png"
+            base = folder / (pan.get("full") if note and pan.get("full") else pan["cell"])
+            if atlas.mock_mode():
+                w, h = (int(x) // 2 for x in size.split("x"))
+                subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(base), "-vf", f"scale={w}:{h}",
+                                str(folder / name)], check=True, capture_output=True, timeout=60)
+            else:
+                prompt = lab.panel_sharpen_prompt(d["fill"]["panels"][j]["desc"], d["text_mode"], texts[j], note,
+                                                  bool(pan.get("padded")) and not (note and pan.get("full")))
+                atlas.download(atlas.generate_image(tv_img(d), prompt, size, "medium" if tv_img(d) in atlas.ASPECT_IMAGE_MODELS else "high",
+                                                    [atlas.reference_url(x) for x in [base, *refs]]), folder / name)
+                conform_image(folder / name, d["ratio"])
+            def fn(x, j=j, name=name):
+                old = x["panels"][str(j)].get("full")
+                if old and old != name:
+                    (folder / old).unlink(missing_ok=True)
+                x["panels"][str(j)]["full"] = name
+                for s_ in (j - 1, j):
+                    (x.get("segs") or {}).pop(str(s_), None)
+                x["final"] = None
+            tv_update(vid, fn)
+        tv_update(vid, lambda x: x.update(status=tv_idle(x), step=None, error=None))
+    except Exception as exc:  # noqa: BLE001
+        tv_fail(vid, exc)
+
+
+@app.post("/api/tvideos/{vid}/panels/{j}/redraw")
+def tvideo_panel_redraw(vid: str, j: int, body: TvSharpenIn):
+    """🎨 لوحة واحدة من الأول (من وصفها، وبعالم اللوحات اللي جنبها) لو اللي اتقطعت من الشيت مش نافعة."""
+    d = tv_load(vid)
+    if not 0 <= j < len((d.get("fill") or {}).get("panels") or []):
+        raise HTTPException(404, "اللوحة دي مش موجودة")
+    return tv_start(vid, "sharpening", f"🎨 بيرسم اللوحة {j + 1} من الأول", run_tv_redraw, j, body.note.strip()[:1000])
+
+
+def run_tv_redraw(vid: str, j: int, note: str) -> None:
+    try:
+        d = tv_load(vid)
+        folder = tv_dir(vid)
+        brain = tv_brain(d)
+        size = az.ASPECTS.get(d["ratio"], az.ASPECTS["9:16"])[0]
+        texts = [b.get("text", "") for b in d["fill"]["beats"]] + [""]
+        name = f"full{j + 1}-{uuid.uuid4().hex[:4]}.png"
+        if atlas.mock_mode():
+            w, h = (int(x) // 2 for x in size.split("x"))
+            subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i", f"color=c=0x57B8AF:s={w}x{h}",
+                            "-frames:v", "1", str(folder / name)], check=True, capture_output=True, timeout=60)
+        else:
+            refs = [r[0] for r in tv_refs(d, brain)][:6]
+            style = [tv_panel(d, folder, k) for k in (j - 1, j + 1) if 0 <= k < len(d["fill"]["panels"])
+                     and (d.get("panels") or {}).get(str(k), {}).get("cell")]
+            prompt = lab.panel_redraw_prompt(d["schema"], d["fill"], j, d["ratio"], d["text_mode"], texts[j], note, len(refs), len(style))
+            atlas.download(atlas.generate_image(tv_img(d), prompt, size, "medium" if tv_img(d) in atlas.ASPECT_IMAGE_MODELS else "high",
+                                                [atlas.reference_url(x) for x in [*refs, *style]]), folder / name)
+            conform_image(folder / name, d["ratio"])
+        def fn(x):
+            old = x.setdefault("panels", {}).get(str(j)) or {}
+            for f in {old.get("cell"), old.get("full")} - {None}:
+                (folder / f).unlink(missing_ok=True)
+            x["panels"][str(j)] = {"cell": name, "full": name, "redrawn": True}
+            for s_ in (j - 1, j):
+                (x.get("segs") or {}).pop(str(s_), None)
+            x["final"] = None
+        tv_update(vid, fn)
+        tv_update(vid, lambda x: x.update(status=tv_idle(x), step=None, error=None))
+    except Exception as exc:  # noqa: BLE001
+        tv_fail(vid, exc)
+
+
+class TvRunIn(BaseModel):
+    i: int | None = None
+    once: bool = False
+
+
+@app.post("/api/tvideos/{vid}/run")
+def tvideo_run(vid: str, body: TvRunIn):
+    """🎬 كل جزء = حركة من لوحته للوحة اللي بعدها (الناقص بس، أو جزء واحد تاني)، والفيديو بيتجمّع لقطة واحدة."""
+    d = tv_load(vid)
+    n = len(d["schema"]["beats"])
+    if body.once:
+        miss = [sh["k"] + 1 for sh in tv_to_dict(vid, d)["sheets"] if not sh["url"]]
+        if miss:
+            raise HTTPException(400, f"ارسم الشيت الأول ({', '.join(map(str, miss))})")
+        return tv_start(vid, "working", "🎬 بيبدأ", run_tv_once)
+    need = [body.i, body.i + 1] if body.i is not None else list(range(n + 1))
+    if body.i is not None and not 0 <= body.i < n:
+        raise HTTPException(404, "الجزء ده مش موجود")
+    miss = [j + 1 for j in need if not ((d.get("panels") or {}).get(str(j)) or {}).get("cell")]
+    if miss:
+        raise HTTPException(400, f"اللوحات دي لسه ما اتعملتش: {', '.join(map(str, miss))}")
+    return tv_start(vid, "working", "🎬 بيبدأ", run_tv_gen, body.i)
+
+
+def tv_panel(d: dict, folder: Path, j: int) -> Path:
+    p = d["panels"][str(j)]
+    return folder / (p.get("full") or p["cell"])
+
+
+def run_tv_gen(vid: str, only: int | None) -> None:
+    try:
+        d = tv_load(vid)
+        folder = tv_dir(vid)
+        beats, fill = d["schema"]["beats"], d["fill"]
+        ratio = az.ASPECTS.get(d["ratio"], az.ASPECTS["9:16"])[1]
+        W, H = RATIO_VIDEO.get(d["ratio"], RATIO_VIDEO["9:16"])
+        for j in range(len(beats) + 1):   # اللوحات القديمة اللي طلعت بمقاس غلط بتتظبط قبل التوليد
+            if (d.get("panels") or {}).get(str(j), {}).get("cell"):
+                conform_image(tv_panel(d, folder, j), d["ratio"])
+        for i, b in enumerate(beats):
+            if (only is not None and only != i) or (only is None and (d.get("segs") or {}).get(str(i), {}).get("file")):
+                continue
+            tv_set(vid, step=f"🎬 بيولّد الجزء {i + 1} من {len(beats)}")
+            name = f"seg{i + 1}-{uuid.uuid4().hex[:4]}.mp4"
+            prompt = " ".join(x for x in (fill["beats"][i]["motion"], f"Camera: {b['camera']}." if b.get("camera") else "",
+                                          f"Transition into the next moment: {b['into_next']}." if b.get("into_next") else "",
+                                          f"Keep {b['keeps']} identical." if b.get("keeps") else "") if x)
+            start = tv_panel(d, folder, i)
+            prev = ((tv_load(vid).get("segs") or {}).get(str(i - 1)) or {}).get("file") if d.get("chain") and i > 0 else None
+            if prev and (folder / prev).exists():
+                # 🔗 اللقطة بتبدأ من آخر فريم في اللقطة اللي قبلها بالظبط (مش من اللوحة): الحركة متصلة ومفيش قفزة
+                start = folder / f".last{i}.png"
+                subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-sseof", "-0.08", "-i", str(folder / prev),
+                                "-frames:v", "1", "-update", "1", str(start)], check=True, capture_output=True, timeout=60)
+                conform_image(start, d["ratio"])
+            gen_motion(d["model"], d["resolution"], ratio, prompt, start, tv_panel(d, folder, i + 1),
+                       trial_gen_seconds(b["t1"] - b["t0"]), folder / name, W, H, "حركة الجزء")
+            def fn(x, i=i, name=name):
+                old = (x.setdefault("segs", {}).get(str(i)) or {}).get("file")
+                if old and old != name:
+                    (folder / old).unlink(missing_ok=True)
+                x["segs"][str(i)] = {"file": name}
+                x["final"] = None
+            tv_update(vid, fn)
+        d = tv_load(vid)
+        segs = d.get("segs") or {}
+        if all((segs.get(str(i)) or {}).get("file") for i in range(len(beats))):
+            tv_set(vid, step="🎞️ بيجمّع الفيديو")
+            parts = [timed(folder / segs[str(i)]["file"], b["t1"] - b["t0"]) for i, b in enumerate(beats)]   # كل جزء على طوله في الأصلي
+            name = f"final-{uuid.uuid4().hex[:4]}.mp4"
+            chain_clips(parts, folder / name, W, H)
+            def fin(x):
+                if x.get("final"):
+                    (folder / x["final"]).unlink(missing_ok=True)
+                x["final"] = name
+                x["final_kind"] = "segs"
+            tv_update(vid, fin)
+        tv_update(vid, lambda x: x.update(status=tv_idle(x), step=None, error=None))
+    except Exception as exc:  # noqa: BLE001
+        tv_fail(vid, exc)
+
+
+def tv_r2v(model_key: str) -> str:
+    return TRIAL_MODELS.get(model_key, TRIAL_MODELS["seedance-mini"])["model"].replace("image-to-video", "reference-to-video")
+
+
+def tv_once_max(d: dict) -> int:
+    return TRIAL_MODELS.get(d.get("model"), TRIAL_MODELS["seedance-mini"]).get("max", atlas.MAX_DURATION)
+
+
+def tv_chunks(beats: list, cap: float) -> list[list[int]]:
+    """الأجزاء على توليدات: كل توليدة لحد أقصى طول الموديل، والقطع دايمًا عند لوحة."""
+    out, cur, tot = [], [], 0.0
+    for i, b in enumerate(beats):
+        d = b["t1"] - b["t0"]
+        if cur and tot + d > cap + 0.25:
+            out.append(cur)
+            cur, tot = [], 0.0
+        cur.append(i)
+        tot += d
+    return out + ([cur] if cur else [])
+
+
+def tv_once_cost(d: dict, per: float) -> float:
+    cap = tv_once_max(d)
+    return round(sum(max(atlas.MIN_DURATION, min(cap, math.ceil(sum(d["schema"]["beats"][i]["t1"] - d["schema"]["beats"][i]["t0"] for i in g))))
+                     for g in tv_chunks(d["schema"]["beats"], cap)) * per, 2)
+
+
+def run_tv_once(vid: str) -> None:
+    """🎬 الفيديو كله لقطة واحدة: الشيت كله صورة مرجع، والموديل يمشي على اللوحات بالترتيب (مفيش أجزاء بتتلزق، فمفيش وقفة كل جزء).
+    لو الفيديو أطول من أقصى طول للموديل: التوليدة اللي بعدها بتكمّل على الفيديو اللي قبلها (extend) من آخر فريم فيه."""
+    try:
+        d = tv_load(vid)
+        folder = tv_dir(vid)
+        beats, fill = d["schema"]["beats"], d["fill"]
+        ratio = az.ASPECTS.get(d["ratio"], az.ASPECTS["9:16"])[1]
+        W, H = RATIO_VIDEO.get(d["ratio"], RATIO_VIDEO["9:16"])
+        brain = tv_brain(d)
+        refs = tv_refs(d, brain)
+        sheets = tv_sheets(d)
+        cap = tv_once_max(d)
+        chunks = tv_chunks(beats, cap)
+        parts, prev = [], None
+        for c, ids in enumerate(chunks):
+            span = sum(beats[i]["t1"] - beats[i]["t0"] for i in ids)
+            secs = int(max(atlas.MIN_DURATION, min(cap, math.ceil(span))))
+            what = "الفيديو كله" if len(chunks) == 1 else f"الحتة {c + 1} من {len(chunks)}"
+            tv_set(vid, step=f"🎬 بيولّد {what} مرة واحدة ({secs} ث)")
+            need = set(range(ids[0], ids[-1] + 2))
+            use = [k for k, cells in enumerate(sheets) if need & set(cells)]
+            name = f"once{c + 1}-{uuid.uuid4().hex[:4]}.mp4"
+            if atlas.mock_mode():
+                sheet = folder / d["sheets"][str(use[0])]["file"]
+                gen_motion(d["model"], d["resolution"], ratio, "", sheet, sheet, secs, folder / name, W, H)
+            else:
+                notes = [f"a storyboard sheet holding panels {sheets[k][0] + 1} to {sheets[k][-1] + 1} in reading order." for k in use]
+                brand = refs[:max(0, 9 - len(use))]
+                prompt = lab.once_prompt(d["schema"], fill, ids, secs, notes, [r[1] for r in brand], prev is not None)
+                body = {"model": tv_r2v(d.get("model")), "prompt": prompt,
+                        "reference_images": [atlas.reference_url(folder / d["sheets"][str(k)]["file"]) for k in use]
+                                            + [atlas.reference_url(r[0]) for r in brand],
+                        "duration": secs, "resolution": d.get("resolution") or "480p", "ratio": ratio,
+                        "generate_audio": False, "watermark": False}
+                if prev is not None:
+                    body["reference_videos"] = [atlas.upload_media(prev)]
+                atlas.download(atlas.run_model("Video", body, "توليد الفيديو كله", max_seconds=1800, interval=6), folder / name)
+            prev = folder / name
+            parts.append(prev)
+        tv_set(vid, step="🎞️ بيجهّز الفيديو")
+        name = f"final-{uuid.uuid4().hex[:4]}.mp4"
+        chain_clips(parts, folder / name, W, H)
+        def fin(x):
+            for f in {x.get("final"), *((x.get("once") or {}).get("parts") or [])} - {None}:
+                (folder / f).unlink(missing_ok=True)
+            x["final"] = name
+            x["final_kind"] = "once"
+            x["once"] = {"parts": [p.name for p in parts]}
+        tv_update(vid, fin)
+        tv_update(vid, lambda x: x.update(status=tv_idle(x), step=None, error=None))
+    except Exception as exc:  # noqa: BLE001
+        tv_fail(vid, exc)
+
+
+@app.post("/api/tvideos/{vid}/to-editor")
+def tvideo_to_editor(vid: str):
+    """🎞️ الأجزاء بالترتيب في مونتاج الإعلانات (على طولها في التيمبليت)، والكلام بيتكتب بنفسك في الكابشن/النص."""
+    d = tv_load(vid)
+    folder = tv_dir(vid)
+    beats, segs = d["schema"]["beats"], d.get("segs") or {}
+    ready = [(i, b) for i, b in enumerate(beats) if (segs.get(str(i)) or {}).get("file") and (folder / segs[str(i)]["file"]).exists()]
+    once = d.get("final_kind") == "once" and d.get("final") and (folder / d["final"]).exists()
+    if d.get("mode") == "scenes":   # 🎬 المشاهد: كل مشهد ١٠ ثواني بصوت مؤثراته (واطي) والفويس أوفر في خط الصوت
+        ready = [(i, {"t0": i * SCENE_SEC, "t1": (i + 1) * SCENE_SEC, "file": f["file"]}) for i, f in sorted(((int(k), v) for k, v in (d.get("scene_files") or {}).items()))
+                 if (folder / f["file"]).exists()]
+        once = False
+    elif d.get("mode") == "ad":   # 🎯 الإعلان المتجمّع (بصوته) حتة واحدة
+        once = bool(d.get("final") and (folder / d["final"]).exists())
+        ready = [(0, {"t0": 0, "t1": probe_duration(folder / d["final"]), "file": d["final"]})] if once else []
+    elif once:   # الفيديو اللي اتولّد مرة واحدة بيتنقل حتة واحدة زي ما هو
+        ready = [(0, {"t0": 0, "t1": probe_duration(folder / d["final"]), "file": d["final"]})]
+    if not ready:
+        raise HTTPException(400, "لسه مفيش ولا جزء اتولد")
+    W, H = RATIO_VIDEO.get(d["ratio"], RATIO_VIDEO["9:16"])
+    label = d.get("name") or "فيديو"
+    with closing(db()) as conn, conn:
+        clips = []
+        for i, b in ready:
+            gid = uuid.uuid4().hex[:12]
+            src = b.get("file") or segs[str(i)]["file"]
+            chain_clips([timed(folder / src, b["t1"] - b["t0"])], GENERATED_DIR / f"{gid}.mp4", W, H)
+            conn.execute(
+                "INSERT INTO generations (id, clip_id, clip_filename, clip_label, coach_id, coach_name, coach_image, model, prompt, "
+                "params, status, output_filename, created_at, updated_at) VALUES (?, ?, ?, ?, '', '', '', 'seedance', '', '{}', 'completed', ?, ?, ?)",
+                (gid, f"ad:tv-{vid}", src, f"📐 {label}" + ("" if once else f" · جزء {i + 1}"), f"{gid}.mp4", now(), now()))
+            tr = d.get("transition") or d["schema"].get("transition") or ""
+            clips.append({"gen_id": gid, "start": 0.0, "end": round(probe_duration(GENERATED_DIR / f"{gid}.mp4"), 3),
+                          "zoom": 1.0, "x": 0.0, "y": 0.0, "volume": 0.22 if d.get("mode") == "scenes" else 1.0 if d.get("mode") == "ad" else 0.0,
+                          # 🎞️ الترانزيشن اللي على روح القالب بين الأجزاء
+                          "trans": {"type": tr, "dur": 0.4} if clips and tr in montage.TRANSITIONS else None})
+        voice = None
+        vo = (d.get("vo") or {}).get("full")
+        if vo and (folder / vo).exists():   # 🎙️ الفويس أوفر (هو اللي حدد مدة كل لقطة)
+            aid = uuid.uuid4().hex[:12]
+            vfile = f"voice_{aid}{Path(vo).suffix}"
+            shutil.copyfile(folder / vo, AUDIO_DIR / vfile)
+            conn.execute("INSERT INTO audio (id, kind, name, filename, duration, created_at) VALUES (?, 'voice', ?, ?, ?, ?)",
+                         (aid, f"🎙️ {label}", vfile, probe_duration(AUDIO_DIR / vfile), now()))
+            voice = {"id": aid, "volume": 1.0, "delay": 0.0, "offset": 0.0, "length": None, "fade_out": False, "parts": []}
+        pid = uuid.uuid4().hex[:12]
+        pdata = {"name": label, "section": "ads", "video_id": None, "coach_id": None, "clips": clips, "voice": voice,
+                 "music": default_music(conn), "outro": False, "outro_volume": 1.0, "captions": {}, "logo": {}}
+        conn.execute("INSERT INTO projects (id, name, data, render_status, created_at, updated_at) VALUES (?, ?, ?, 'idle', ?, ?)",
+                     (pid, pdata["name"], json.dumps(pdata, ensure_ascii=False), now(), now()))
+    return {"project_id": pid, "skipped": [] if once else [i + 1 for i in range(len(beats)) if i not in dict(ready)]}
+
+
+@app.delete("/api/tvideos/{vid}")
+def tvideo_delete(vid: str):
+    d = tv_load(vid)
+    if d.get("status") in TV_BUSY:
+        raise HTTPException(400, "استنى لما الشغل اللي شغال يخلص")
+    shutil.rmtree(tv_dir(vid), ignore_errors=True)
+    return {"ok": True}
+
+
+def reset_stuck_tv() -> None:
+    for f in TV_DIR.glob("*/tv.json"):
+        try:
+            d = json.loads(f.read_text(encoding="utf-8"))
+        except ValueError:
+            continue
+        if d.get("status") in TV_BUSY:
+            d.update(status="failed", step=None, error="اتقطع لما السيرفر اتقفل. دوس الزرار تاني")
+            f.write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+    for f in LAB_DIR.glob("*/lab.json"):
+        try:
+            d = json.loads(f.read_text(encoding="utf-8"))
+        except ValueError:
+            continue
+        if (d.get("schema") or {}).get("status") == "working":
+            d["schema"].update(status="failed", error="اتقطع لما السيرفر اتقفل. دوس «🗺️ المخطط» تاني")
+            f.write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+        if (d.get("typo") or {}).get("status") == "working":
+            d["typo"].update(status="failed", step=None, error="اتقطع لما السيرفر اتقفل. دوس «🔤 التايبوجرافي» تاني")
+            f.write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+
+
+reset_stuck_tv()
+
+
+def reset_stuck_assets() -> None:
+    for f in ASSETS_DIR.glob("*/asset.json"):
+        try:
+            d = json.loads(f.read_text(encoding="utf-8"))
+        except ValueError:
+            continue
+        bad = [v for v in d.get("variants") or [] if v.get("status") == "working"]
+        bad += [t for t in d.get("trials") or [] if t.get("status") in ("planning", "working")]
+        for v in bad:
+            v.update(status="failed", step=None, error="اتقطع لما السيرفر اتقفل. اعمله تاني")
+        if bad:
+            f.write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+
+
+reset_stuck_assets()
+
+
+def reset_stuck_lab() -> None:
+    for f in LAB_DIR.glob("*/lab.json"):
+        try:
+            d = json.loads(f.read_text(encoding="utf-8"))
+        except ValueError:
+            continue
+        changed = False
+        for v in (d.get("steps") or {}).values():
+            if v.get("status") in ("working", "queued"):
+                v.update(status="failed", error="اتقطع لما السيرفر اتقفل. دوس «فكّك تاني»")
+                changed = True
+        if changed:
+            f.write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+
+
+reset_stuck_lab()
+
+
+class SeriesSettingsIn(BaseModel):
+    text_model: str | None = None
+    video_model: str | None = None
+
+
+@app.put("/api/series-settings")
+def save_series_settings(body: SeriesSettingsIn):
+    if body.text_model is not None:
+        auth.set_setting("series_text_model", body.text_model.strip() or None)
+    if body.video_model is not None:
+        auth.set_setting("series_video_model", body.video_model.strip() or None)
+    return series_settings()
+
+
+# ---------------------------------------------------------------- 🔤 التايبوجرافي
+# الكلام المتقال ← بلوكات (كل بلوك حركة: كتابة بمؤشر، كلمة وأيقونة، حروف بتتجمع...) ← المتصفح بيرسمها فريم فريم ← فيديو.
+# الرسم كله في frontend/typo-engine.js (نفس الملف للمعاينة وللفيديو النهائي)، والستيكرات صور شفافة في مكتبة مشتركة.
+
+TYPO_DIR = DATA_DIR / "typo"
+TYPO_PROJ = TYPO_DIR / "projects"
+TYPO_STK = TYPO_DIR / "stickers"
+TYPO_STYLES = TYPO_DIR / "styles"
+for _d in (TYPO_PROJ, TYPO_STK, TYPO_STYLES):
+    _d.mkdir(parents=True, exist_ok=True)
+TYPO_LOCK = threading.Lock()
+TYPO_BUSY = ("transcribing", "analyzing", "planning", "drawing", "rendering", "tracking", "scene")
+TYPO_RATIOS = {"9:16": (1080, 1920), "16:9": (1920, 1080), "1:1": (1080, 1080), "4:5": (1080, 1350)}
+TYPO_STICKER_COST = 0.03
+TYPO_DICT = TYPO_DIR / "concepts.json"
+TYPO_SFX = TYPO_DIR / "sfx"   # الأصوات الرسمية (بتترفع من البرنامج، مش في الكود)
+TYPO_DICT_LOCK = threading.Lock()
+TYPO_FPS = 30
+app.mount("/media/typo", StaticFiles(directory=TYPO_DIR), name="typo")
+
+
+def typo_load(pid: str) -> dict:
+    f = TYPO_PROJ / Path(pid).name / "typo.json"
+    if not f.exists():
+        raise HTTPException(404, "المشروع ده مش موجود")
+    return json.loads(f.read_text(encoding="utf-8"))
+
+
+def typo_update(pid: str, fn) -> dict:
+    with TYPO_LOCK:
+        d = typo_load(pid)
+        fn(d)
+        d["updated_at"] = now()
+        folder = TYPO_PROJ / Path(pid).name
+        (folder / "typo.json.tmp").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+        (folder / "typo.json.tmp").replace(folder / "typo.json")
+        return d
+
+
+def typo_set(pid: str, **kw) -> dict:
+    return typo_update(pid, lambda d: d.update(**kw))
+
+
+def typo_fail(pid: str, exc: Exception) -> None:
+    typo_set(pid, status="failed", step=None, error=str(getattr(exc, "detail", None) or exc)[:400])
+
+
+def typo_idle(d: dict) -> str:
+    return "done" if d.get("final") else "planned" if d.get("blocks") else "ready" if d.get("words") else "new"
+
+
+def typo_start(pid: str, status: str, step: str, target, *args) -> dict:
+    def fn(d):
+        if d.get("status") in TYPO_BUSY:
+            raise HTTPException(400, "استنى لما الشغل اللي شغال يخلص")
+        d.update(status=status, step=step, error=None)
+    typo_update(pid, fn)
+    threading.Thread(target=target, args=(pid, *args), daemon=True).start()
+    return typo_to_dict(pid, typo_load(pid))
+
+
+# ---- الستيكرات (مكتبة واحدة لكل العملاء، زي مكتبة الأصول)
+
+def stickers_load() -> list[dict]:
+    f = TYPO_STK / "stickers.json"
+    return json.loads(f.read_text(encoding="utf-8")) if f.exists() else []
+
+
+def stickers_save(items: list[dict]) -> None:
+    (TYPO_STK / "stickers.json.tmp").write_text(json.dumps(items, ensure_ascii=False), encoding="utf-8")
+    (TYPO_STK / "stickers.json.tmp").replace(TYPO_STK / "stickers.json")
+
+
+def sticker_dict(s: dict) -> dict:
+    f = TYPO_STK / s["file"]
+    return {**s, "url": f"/media/typo/stickers/{s['file']}?v={int(f.stat().st_mtime) if f.exists() else 0}"}
+
+
+def sticker_slug(name: str) -> str:
+    return re.sub(r"[^a-z0-9؀-ۿ-]+", "-", (name or "").lower()).strip("-")[:40] or "sticker"
+
+
+def sticker_add(src: Path, name: str, source: str, key: bool = True, desc: str = "", style: str = "", concept: str = "") -> dict:
+    """صورة ← ستيكر شفاف في المكتبة (الخلفية السادة بتتشال لوحدها)."""
+    sid = uuid.uuid4().hex[:10]
+    out = TYPO_STK / f"{sid}.png"
+    if key:
+        typo.key_background(src, out)
+    else:
+        from PIL import Image
+        Image.open(src).convert("RGBA").save(out, "PNG")
+    item = {"id": sid, "name": sticker_slug(name), "file": out.name, "source": source, "desc": desc[:200], "style": style,
+            "concept": concepts.slug(concept), "created_at": now()}
+    with TYPO_LOCK:
+        items = stickers_load()
+        items.insert(0, item)
+        stickers_save(items)
+    return item
+
+
+def dict_ai() -> bool:
+    return bool(atlas.api_key()) and not atlas.mock_mode()
+
+
+def dict_chat(messages: list[dict]) -> dict:
+    """الموديل الصغير بتاع القاموس (رخيص وسريع)، ولو مش شغال بنرجع لموديل الكتابة العادي."""
+    preferred = os.environ.get("TYPO_DICT_MODEL") or "google/gemini-3.1-flash-lite"
+    for model in atlas.model_candidates(preferred, ("flash-lite", "nano", "mini"), [atlas.DEFAULT_VISION_MODEL])[:3]:
+        try:
+            return ad_json(atlas.chat(messages, model, temperature=0.2, max_tokens=3000, json_mode=True), "القاموس")
+        except (atlas.AtlasError, httpx.HTTPError):
+            continue
+    return ad_json(series_chat(messages), "القاموس")
+
+
+def concepts_tag(ids: list[str]) -> int:
+    """ستيكرات من غير معنى ← معنى + كلماته عربي وإنجليزي (بالموديل الصغير، أو من اسمها لو مفيش موديل). بيرجّع عدد اللي اتعلّم."""
+    items = stickers_load()
+    todo = [s for s in items if s["id"] in set(ids) and not s.get("concept")]
+    if not todo:
+        return 0
+    tags = {}
+    if dict_ai():
+        try:
+            for k in range(0, len(todo), 40):
+                for t in (dict_chat(concepts.tag_messages(todo[k:k + 40])).get("icons") or []):
+                    if isinstance(t, dict) and t.get("id"):
+                        tags[t["id"]] = t
+        except Exception:  # noqa: BLE001  (القاموس ميوقفش الشغل)
+            tags = {}
+    with TYPO_DICT_LOCK:
+        d = concepts.load(TYPO_DICT)
+        for s in todo:
+            t = tags.get(s["id"]) or {}
+            c = concepts.learn(d, t.get("concept") or concepts.guess_concept(s["name"]), [*(t.get("en") or []), s["name"].replace("-", " ")], t.get("ar"))
+            s["concept"] = c
+        concepts.save(TYPO_DICT, d)
+    with TYPO_LOCK:
+        cur = stickers_load()
+        got = {s["id"]: s["concept"] for s in todo}
+        for s in cur:
+            if s["id"] in got and not s.get("concept"):
+                s["concept"] = got[s["id"]]
+        stickers_save(cur)
+    return len(todo)
+
+
+def dict_hits(words: list[str], ai: bool) -> dict[int, str]:
+    """كلام ← معاني. اللي القاموس ميعرفوش بيتسأل للموديل الصغير مرة واحدة (لو مسموح) وبيتحفظ."""
+    with TYPO_DICT_LOCK:
+        d = concepts.load(TYPO_DICT)
+    hits, unknown = concepts.lookup(words, d)
+    if unknown and ai and dict_ai():
+        try:
+            raw = dict_chat(concepts.ask_messages(unknown, list(d["concepts"])))
+        except Exception:  # noqa: BLE001
+            raw = None
+        if raw is not None:
+            with TYPO_DICT_LOCK:
+                d = concepts.load(TYPO_DICT)
+                concepts.apply_answer(d, unknown, raw)
+                concepts.save(TYPO_DICT, d)
+            hits, _ = concepts.lookup(words, d)
+    return hits
+
+
+def typo_resolve_icon(name: str, items: list[dict], style: str, idx: dict) -> str:
+    """اسم أيقونة من الخطة ← ستيكر: رقمه، أو معناه في القاموس بأيقونة الستايل، أو أقرب اسم. لو مفيش بيفضل اسم (يترسم)."""
+    stk = {s["id"]: s for s in items}
+    if name in stk:
+        return name
+    c = name if name in {s.get("concept") for s in items} else idx.get(concepts.norm(name.replace("-", " "))) or idx.get(concepts.norm(name))
+    if c:
+        return concepts.pick(c, items, style) or c
+    found = sticker_find(name, items)
+    return found["id"] if found else name
+
+
+def sticker_find(name: str, items: list[dict]) -> dict | None:
+    """اسم من الموديل ← ستيكر من المكتبة (بالاسم بالظبط، أو كلمة مشتركة)."""
+    slug = sticker_slug(name)
+    for s in items:
+        if s["name"] == slug or s["id"] == name:
+            return s
+    words = set(slug.split("-"))
+    best = max(items, key=lambda s: len(words & set(s["name"].split("-"))), default=None)
+    return best if best and words & set(best["name"].split("-")) else None
+
+
+def sticker_draw(desc: str, name: str, icon_style: str, source: str, ref: Path | None = None, style: str = "", concept: str = "") -> dict:
+    """يرسم أيقونة جديدة (أو ينضّف واحدة مقصوصة من فيديو) على خلفية بيضا، وبعدين بتتشال الخلفية."""
+    tmp = TMP_DIR / f"stk_{uuid.uuid4().hex[:8]}.png"
+    try:
+        if atlas.mock_mode():
+            from PIL import Image, ImageDraw
+            im = Image.new("RGB", (512, 512), "white")
+            dr = ImageDraw.Draw(im)
+            h = int(hashlib.md5(name.encode()).hexdigest()[:6], 16)
+            dr.ellipse((96, 96, 416, 416), fill=(h >> 16 & 255, h >> 8 & 255, h & 255), outline="black", width=14)
+            im.save(tmp)
+        else:
+            prompt = typo.sticker_prompt(desc or name, icon_style)
+            if ref:
+                prompt = ("Redraw ONLY the main object from the reference image as one clean isolated sticker, exactly the same look, "
+                          "colors and style, nothing cut off, other objects removed. " + prompt)
+            atlas.download(atlas.generate_image("nano2", prompt, "1024x1024", "medium", [atlas.reference_url(ref)] if ref else None), tmp)
+        item = sticker_add(tmp, name, source, True, desc, style, concept)
+        if not concept:
+            concepts_tag([item["id"]])
+        return item
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
+@app.get("/api/typo/stickers")
+def typo_stickers():
+    return [sticker_dict(s) for s in stickers_load() if (TYPO_STK / s["file"]).exists()]
+
+
+@app.post("/api/typo/stickers")
+def typo_sticker_upload(files: list[UploadFile] = File(...), key: str = Form("1")):
+    """⬆ صور ← ستيكرات (الخلفية السادة بتتشال، أو PNG شفاف زي ما هو)."""
+    out = []
+    for f in files:
+        name = save_upload(f, IMAGE_EXTENSIONS, TMP_DIR, "stk")
+        try:
+            out.append(sticker_dict(sticker_add(TMP_DIR / name, Path(f.filename or "sticker").stem, "upload", key == "1")))
+        finally:
+            (TMP_DIR / name).unlink(missing_ok=True)
+    return out
+
+
+class StickerDrawIn(BaseModel):
+    desc: str
+    name: str = ""
+    style: str = ""
+
+
+@app.post("/api/typo/stickers/draw")
+def typo_sticker_draw(body: StickerDrawIn):
+    """🎨 أيقونة جديدة بالوصف (حوالي 0.03$)."""
+    if not body.desc.strip():
+        raise HTTPException(400, "اكتب وصف الأيقونة")
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل")
+    st = typo_style(body.style) if body.style else {}
+    return sticker_dict(sticker_draw(body.desc.strip(), body.name or body.desc, st.get("icon_style", ""), "drawn", style=body.style or ""))
+
+
+@app.post("/api/typo/stickers/{sid}/clean")
+def typo_sticker_clean(sid: str):
+    """✨ ستيكر متقصوص من فيديو وفيه حتت من حاجات تانية: بيترسم نضيف لوحده (ستيكر جديد جنبه)."""
+    s = next((x for x in stickers_load() if x["id"] == sid), None)
+    if not s:
+        raise HTTPException(404, "الستيكر ده مش موجود")
+    flat = TMP_DIR / f"flat_{sid}.png"
+    from PIL import Image
+    im = Image.open(TYPO_STK / s["file"]).convert("RGBA")
+    bg = Image.new("RGBA", im.size, (255, 255, 255, 255))
+    bg.alpha_composite(im)
+    bg.convert("RGB").save(flat)
+    try:
+        return sticker_dict(sticker_draw(s.get("desc") or s["name"], s["name"], "", s.get("source", "lab"), flat, s.get("style", ""), s.get("concept", "")))
+    finally:
+        flat.unlink(missing_ok=True)
+
+
+class StickerIn(BaseModel):
+    name: str | None = None
+    concept: str | None = None
+
+
+@app.patch("/api/typo/stickers/{sid}")
+def typo_sticker_rename(sid: str, body: StickerIn):
+    with TYPO_LOCK:
+        items = stickers_load()
+        hit = next((x for x in items if x["id"] == sid), None)
+        if hit and body.name is not None:
+            hit["name"] = sticker_slug(body.name)
+        if hit and body.concept is not None:   # تصليح معنى الأيقونة بإيدك
+            hit["concept"] = concepts.slug(body.concept)
+        stickers_save(items)
+    if hit and hit.get("concept") and body.concept is not None:
+        with TYPO_DICT_LOCK:
+            d = concepts.load(TYPO_DICT)
+            concepts.learn(d, hit["concept"], [hit["concept"].replace("-", " ")])
+            concepts.save(TYPO_DICT, d)
+    return typo_stickers()
+
+
+@app.get("/api/typo/sfx")
+def typo_sfx_list():
+    lib = sfx.library(TYPO_SFX)
+    return {k: [{"name": f.name, "url": f"/api/typo/sfx/{f.name}"} for f in v] for k, v in lib.items()}
+
+
+@app.post("/api/typo/sfx")
+async def typo_sfx_add(files: list[UploadFile] = File(...)):
+    """⬆ ملفات wav أو zip. الاسم بيحدد النوع: click_… (ظهور/اختفاء) · key_… (ضغطة كيبورد) · typing_… (كتابة رسالة)."""
+    added = []
+    for f in files:
+        data = await f.read()
+        if len(data) > 30_000_000:
+            raise HTTPException(400, f"{f.filename}: الملف كبير")
+        try:
+            added += sfx.add_files(TYPO_SFX, f.filename or "", data)
+        except (ValueError, zipfile.BadZipFile, wave.Error) as exc:
+            raise HTTPException(400, f"{f.filename}: {exc}") from exc
+    if not added:
+        raise HTTPException(400, "مفيش ولا ملف اسمه بيبدأ بـ click_ أو key_ أو typing_")
+    return {"added": added, **typo_sfx_list()}
+
+
+@app.get("/api/typo/sfx/{name}")
+def typo_sfx_file(name: str):
+    f = TYPO_SFX / Path(name).name
+    if not sfx.kind_of(f.name) or not f.exists():
+        raise HTTPException(404, "الصوت مش موجود")
+    return FileResponse(f, media_type="audio/wav")
+
+
+@app.delete("/api/typo/sfx/{name}")
+def typo_sfx_delete(name: str):
+    f = TYPO_SFX / Path(name).name
+    if sfx.kind_of(f.name):
+        f.unlink(missing_ok=True)
+    return typo_sfx_list()
+
+
+@app.get("/api/typo/concepts")
+def typo_concepts():
+    """📖 القاموس: كل معنى وكلماته وأيقوناته في كل ستايل."""
+    d = concepts.load(TYPO_DICT)
+    items = stickers_load()
+    out = []
+    for c, e in sorted(d["concepts"].items()):
+        out.append({"concept": c, "en": e.get("en", []), "ar": e.get("ar", []),
+                    "stickers": [{"id": s["id"], "style": s.get("style", "")} for s in items if s.get("concept") == c]})
+    return {"concepts": out, "learned": sum(1 for v in d["words"].values() if v), "skipped": sum(1 for v in d["words"].values() if not v),
+            "untagged": sum(1 for s in items if not s.get("concept"))}
+
+
+@app.post("/api/typo/concepts/tag")
+def typo_concepts_tag():
+    """🏷️ الأيقونات القديمة اللي لسه ملهاش معنى تدخل القاموس."""
+    n = concepts_tag([s["id"] for s in stickers_load() if not s.get("concept")])
+    return {**typo_concepts(), "tagged": n}
+
+
+class ConceptIn(BaseModel):
+    concept: str
+    en: list[str] = []
+    ar: list[str] = []
+
+
+@app.post("/api/typo/concepts")
+def typo_concept_add(body: ConceptIn):
+    """كلمات زيادة لمعنى (أو معنى جديد) بإيدك."""
+    with TYPO_DICT_LOCK:
+        d = concepts.load(TYPO_DICT)
+        c = concepts.learn(d, body.concept, body.en, body.ar)
+        for w in [*body.en, *body.ar]:   # اللي اتكتب بإيدك بيكسب على أي تخمين قديم
+            for part in str(w).split():
+                if concepts.content(part):
+                    d["words"][concepts.norm(part)] = c
+        concepts.save(TYPO_DICT, d)
+    return typo_concepts()
+
+
+@app.delete("/api/typo/stickers/{sid}")
+def typo_sticker_delete(sid: str):
+    with TYPO_LOCK:
+        items = stickers_load()
+        for s in [x for x in items if x["id"] == sid]:
+            (TYPO_STK / s["file"]).unlink(missing_ok=True)
+        stickers_save([x for x in items if x["id"] != sid])
+    return {"ok": True}
+
+
+# ---- الستايلات: الجاهزة + اللي اتطلّعت من فيديوهات في المعمل
+
+def typo_styles() -> dict:
+    out = {k: {**v, "id": k, "builtin": True} for k, v in typo.BUILTIN_STYLES.items()}
+    for f in sorted(TYPO_STYLES.glob("*.json"), key=lambda x: x.stat().st_mtime, reverse=True):
+        try:
+            out[f.stem] = {**json.loads(f.read_text(encoding="utf-8")), "id": f.stem, "builtin": False}
+        except ValueError:
+            continue
+    return out
+
+
+def typo_style(sid: str | None) -> dict:
+    styles = typo_styles()
+    return styles.get(sid or "") or styles["mono-red"]
+
+
+@app.get("/api/typo/gallery")
+def typo_gallery():
+    """🎨 معرض العناصر: كل عناصر ستوديو ووصفها، والكوليكشنز المخفية، والترانزيشنز، وستايل ستوديو نفسه (عشان المعاينة في الصفحة)."""
+    return {"kinds": typo.STUDIO_KINDS, "person": sorted(typo.PERSON_KINDS), "trans": [t for t in typo.TRANS if t],
+            "collections": {k: {"note": v["note"], "kinds": list(v["kinds"])} for k, v in typo.COLLECTIONS.items()},
+            "style": typo.BUILTIN_STYLES["studio"]}
+
+
+@app.get("/api/typo/styles")
+def typo_styles_list():
+    return list(typo_styles().values())
+
+
+class TypoStyleIn(BaseModel):
+    name: str | None = None
+    font: str | None = None
+    case: str | None = None
+    grain: float | None = None
+    light: dict | None = None
+    dark: dict | None = None
+    accent: dict | None = None
+
+
+@app.patch("/api/typo/styles/{sid}")
+def typo_style_patch(sid: str, body: TypoStyleIn):
+    """تعديل ستايل (الجاهز بيتنسخ نسخة باسمك)."""
+    st = typo_style(sid)
+    if st.get("builtin"):
+        sid = uuid.uuid4().hex[:10]
+        st = {**st, "name": f"{st['name']} (نسختي)"}
+    st = {k: v for k, v in st.items() if k not in ("id", "builtin")}
+    for k, v in body.model_dump(exclude_none=True).items():
+        if k in ("light", "dark", "accent"):
+            st[k] = typo._theme(v, st[k])
+        elif k == "font":
+            st[k] = v if any(f["family"] == v for f in captions.FONTS) else st.get("font")
+        elif k == "case":
+            st[k] = v if v in ("lower", "upper", "none") else st.get("case")
+        elif k == "grain":
+            st[k] = min(0.4, max(0.0, v))
+        else:
+            st[k] = str(v)[:60]
+    (TYPO_STYLES / f"{Path(sid).name}.json").write_text(json.dumps(st, ensure_ascii=False), encoding="utf-8")
+    return {**st, "id": sid, "builtin": False}
+
+
+@app.delete("/api/typo/styles/{sid}")
+def typo_style_delete(sid: str):
+    (TYPO_STYLES / f"{Path(sid).name}.json").unlink(missing_ok=True)
+    return {"ok": True}
+
+
+# ---- المشاريع
+
+def typo_to_dict(pid: str, d: dict) -> dict:
+    base = f"/media/typo/projects/{pid}"
+    folder = TYPO_PROJ / pid
+    def url(name):
+        return f"{base}/{name}?v={int((folder / name).stat().st_mtime)}" if name and (folder / name).exists() else None
+    stk = {s["id"]: s for s in stickers_load()}
+    missing = sorted({n for b in d.get("blocks") or [] for n in typo_block_icons(b) if not typo_icon_id(n, stk)})
+    scene = d.get("scene")
+    if scene:
+        scene = {**scene, "anchors": [{**a, "thumb_url": url(a.get("thumb"))} for a in scene.get("anchors") or []]}
+    return {**d, "id": pid, "busy": d.get("status") in TYPO_BUSY, "source_url": url((d.get("source") or {}).get("file")), "scene": scene,
+            "bg_url": url((d.get("bg") or {}).get("file")), "final_url": url(d.get("final")), "alpha_url": url(d.get("alpha")),
+            "missing_icons": missing, "draw_cost": round(len(missing) * TYPO_STICKER_COST, 2),
+            "ratios": list(TYPO_RATIOS), "kinds": typo.KINDS, "fonts": [{"family": f["family"], "label": f["label"]} for f in captions.FONTS],
+            "sound": typo_sound(folder, d)}
+
+
+def typo_sfx_level(d: dict) -> int:
+    """عداد الكليكات (0..100). المشاريع القديمة: «من غير» = 0، وغير كده كل كلمة."""
+    if d.get("sfx") == "off":
+        return 0
+    try:
+        return max(0, min(100, int(d.get("sfx_level", 100))))
+    except (TypeError, ValueError):
+        return 100
+
+
+def typo_sfx_gain(f: Path) -> float:
+    """قد إيه نعلّي الكليكات: على قد علو الكلام (RMS) في أول دقيقة. الكلام العادي ≈ 0.03، والعالي جدًا ≈ 0.25."""
+    try:
+        raw = subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-i", str(f), "-t", "60", "-vn", "-ac", "1", "-ar", "8000", "-f", "s16le", "-"],
+                             capture_output=True, timeout=120).stdout
+        import numpy as np
+        a = np.frombuffer(raw, np.int16).astype(np.float32) / 32768
+        rms = float(np.sqrt((a ** 2).mean())) if len(a) else 0.03
+    except Exception:  # noqa: BLE001
+        rms = 0.03
+    return max(1.0, min(4.0, rms / 0.035))
+
+
+_has_audio_cache: dict[str, bool] = {}
+
+
+def typo_has_audio(f: Path) -> bool:
+    if not f.exists():
+        return False
+    key = f"{f}:{f.stat().st_mtime}"
+    if key not in _has_audio_cache:
+        try:
+            _has_audio_cache[key] = bool(media_info(f).has_audio)
+        except Exception:  # noqa: BLE001
+            _has_audio_cache[key] = False
+    return _has_audio_cache[key]
+
+
+def typo_sound(folder: Path, d: dict) -> dict:
+    """🔊 الصوت اللي هيبقى في الفيديو النهائي: صوت المصدر (أو صوت فيديو الخلفية) والأصوات الرسمية."""
+    srcd, bg = d.get("source") or {}, d.get("bg") or {}
+    voice = ""
+    if srcd.get("kind") in ("audio", "video") and srcd.get("file"):
+        voice = "source" if typo_has_audio(folder / srcd["file"]) else "silent"
+    elif bg.get("kind") == "video" and bg.get("file"):
+        voice = "bg" if typo_has_audio(folder / bg["file"]) else "silent"
+    lib = {k: len(v) for k, v in sfx.library(TYPO_SFX).items()}
+    return {"voice": voice, "sfx_on": typo_sfx_level(d) > 0, "sfx_level": typo_sfx_level(d), "sfx": lib}
+
+
+def typo_block_icons(b: dict) -> list[str]:
+    return [x for x in [b.get("icon"), b.get("side"), *(b.get("icons") or [])] if x]
+
+
+def typo_icon_id(name: str, stk: dict) -> str | None:
+    """الأيقونة في البلوك: رقم ستيكر من المكتبة (اتحطت من الموديل أو بإيدك)، أو اسم لسه محتاج يترسم."""
+    if name in stk:
+        return name
+    found = sticker_find(name, list(stk.values()))
+    return found["id"] if found else None
+
+
+@app.get("/api/typo")
+def typo_list():
+    out = []
+    for f in sorted(TYPO_PROJ.glob("*/typo.json"), key=lambda x: x.stat().st_mtime, reverse=True):
+        try:
+            d = json.loads(f.read_text(encoding="utf-8"))
+        except ValueError:
+            continue
+        if owned(d.get("client_id")):
+            out.append({"id": f.parent.name, "name": d.get("name"), "status": d.get("status"), "ratio": d.get("ratio"),
+                        "updated_at": d.get("updated_at"), "busy": d.get("status") in TYPO_BUSY})
+    return out
+
+
+class TypoNewIn(BaseModel):
+    name: str = ""
+    ratio: str = "9:16"
+    text: str = ""
+    style: str = "mono-red"
+
+
+def typo_text_words(text: str) -> list[dict]:
+    """كلام مكتوب من غير صوت: كل كلمة ليها وقت تقريبي (وقفة أطول بعد علامات الوقف)."""
+    out, t = [], 0.3
+    for w in text.split():
+        d = 0.32 + 0.035 * len(w)
+        out.append({"w": w, "s": round(t, 3), "e": round(t + d, 3)})
+        t += d + (0.35 if re.search(r"[.!?؟،,:]$", w) else 0.05)
+    return out
+
+
+@app.post("/api/typo")
+def typo_new(body: TypoNewIn):
+    pid = uuid.uuid4().hex[:10]
+    (TYPO_PROJ / pid).mkdir(parents=True)
+    words = typo_text_words(body.text) if body.text.strip() else []
+    d = {"name": body.name.strip()[:120] or "تايبوجرافي", "client_id": active_client_id(), "ratio": body.ratio if body.ratio in TYPO_RATIOS else "9:16",
+         "style": body.style, "source": {"kind": "text"} if words else None, "script": body.text.strip(), "words": words,
+         "duration": round(words[-1]["e"] + 0.6, 3) if words else 0, "bg": {"kind": "theme", "color": "#101010"},
+         "blocks": [], "brief": "", "status": "ready" if words else "new", "step": None, "error": None, "final": None,
+         "created_at": now(), "updated_at": now()}
+    (TYPO_PROJ / pid / "typo.json").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+    return typo_to_dict(pid, d)
+
+
+@app.get("/api/typo/{pid}")
+def typo_get(pid: str):
+    return typo_to_dict(pid, typo_load(pid))
+
+
+class TypoPatchIn(BaseModel):
+    name: str | None = None
+    ratio: str | None = None
+    style: str | None = None
+    brief: str | None = None
+    text: str | None = None
+    bg: dict | None = None
+    blocks: list | None = None
+    words: list | None = None
+    fx: list | None = None
+    fonts: dict | None = None
+    ai: str | None = None
+    sfx: str | None = None
+    sfx_level: int | None = None
+
+
+TYPO_FONT_OK = re.compile(r"^(TY|SM) [A-Za-z]{2,20}$")
+
+
+@app.patch("/api/typo/{pid}")
+def typo_patch(pid: str, body: TypoPatchIn):
+    def fn(d):
+        if body.name is not None:
+            d["name"] = body.name.strip()[:120] or d["name"]
+        if body.ratio in TYPO_RATIOS:
+            d["ratio"] = body.ratio
+        if body.style is not None:
+            d["style"] = body.style
+        if body.brief is not None:
+            d["brief"] = body.brief[:1000]
+        if body.ai in ("smart", "off"):   # «من غير ذكاء اصطناعي»: قواعد + قاموس + تفريغ على السيرفر
+            d["ai"] = body.ai
+        if body.sfx in ("on", "off"):   # 🔊 الأصوات الرسمية على الفيديو
+            d["sfx"] = body.sfx
+        if body.sfx_level is not None:   # 🔊 عداد الكليكات: 0 مفيش، 100 كل كلمة
+            d["sfx_level"] = max(0, min(100, int(body.sfx_level)))
+            d["sfx"] = "on" if d["sfx_level"] > 0 else "off"
+            d["final"] = None
+        if body.fonts is not None:   # خط الكلام في الحركات الاحترافية (إنجليزي / عربي)
+            d["fonts"] = {k: v for k, v in body.fonts.items() if k in ("sans", "sansAr") and isinstance(v, str) and TYPO_FONT_OK.match(v)}
+        if body.bg is not None:
+            bg = {**(d.get("bg") or {}), **{k: v for k, v in body.bg.items() if k in ("kind", "color", "dim")}}
+            if bg.get("kind") not in ("theme", "solid", "image", "video", "source", "none"):
+                bg["kind"] = "theme"
+            d["bg"] = bg
+        if body.text is not None and (d.get("source") or {}).get("kind") in (None, "text"):
+            d["script"] = body.text.strip()
+            d["words"] = typo_text_words(d["script"])
+            d["source"] = {"kind": "text"}
+            d["duration"] = round(d["words"][-1]["e"] + 0.6, 3) if d["words"] else 0
+            d["blocks"] = []
+        if body.words is not None:   # تصليح كلمة اتفهمت غلط (نفس العدد والأوقات)
+            ws = d.get("words") or []
+            for i, w in enumerate(body.words[:len(ws)]):
+                if isinstance(w, str) and w.strip():
+                    ws[i]["w"] = w.strip()
+            # اللقطات شايلة نسخة من كلامها: بتتحدّث، والكلام المكتوب لو كان هو نفس اللي اتقال بيتحدّث معاه
+            for b in d.get("blocks") or []:
+                if "from" not in b or not b.get("words"):
+                    continue
+                old = " ".join(x["w"] for x in b["words"])
+                part = ws[b["from"]: b["to"] + 1]
+                b["words"] = [{"w": x["w"], "t0": x["s"], "t1": x["e"]} for x in part]
+                if (b.get("text") or "").strip() in ("", old):
+                    b["text"] = " ".join(x["w"] for x in part)
+        if body.blocks is not None:
+            d["blocks"] = typo_clean_blocks(body.blocks, d)
+        if body.fx is not None:
+            d["fx"] = typo.clean_fx(body.fx)
+        if body.blocks is not None or body.fx is not None or body.words is not None or body.bg is not None or body.style is not None or body.ratio or body.fonts is not None:
+            d["final"] = None
+        if d.get("status") not in TYPO_BUSY:
+            d["status"] = typo_idle(d)
+    return typo_to_dict(pid, typo_update(pid, fn))
+
+
+def typo_clean_blocks(blocks: list, d: dict) -> list[dict]:
+    """تعديلات البلوكات من الصفحة: الحركة والكلام والأيقونات والخلفية (الأوقات جاية من الكلمات)."""
+    words = d.get("words") or []
+    raw = []
+    for b in blocks:
+        if isinstance(b, dict):
+            raw.append({**b, "from": typo._i(b.get("from")), "to": typo._i(b.get("to"))})
+    out = typo.clean_plan({"blocks": raw}, words, d.get("duration") or 0) if words else []
+    # الأيقونات اللي اتختارت بإيدك (رقم ستيكر) بتفضل زي ما هي
+    return out
+
+
+@app.delete("/api/typo/{pid}")
+def typo_delete(pid: str):
+    d = typo_load(pid)
+    if d.get("status") in TYPO_BUSY:
+        raise HTTPException(400, "استنى لما الشغل اللي شغال يخلص")
+    shutil.rmtree(TYPO_PROJ / Path(pid).name, ignore_errors=True)
+    return {"ok": True}
+
+
+@app.post("/api/typo/{pid}/source")
+def typo_source(pid: str, file: UploadFile = File(...)):
+    """🎙️/🎬 صوت أو فيديو: الكلام بيتفرّغ بتوقيته، والفيديو ممكن يبقى الخلفية والصوت بتاعه هو صوت الفيديو."""
+    d = typo_load(pid)
+    if d.get("status") in TYPO_BUSY:
+        raise HTTPException(400, "استنى لما الشغل اللي شغال يخلص")
+    folder = TYPO_PROJ / pid
+    ext = Path(file.filename or "").suffix.lower()
+    kind = "video" if ext in VIDEO_EXTENSIONS else "audio"
+    name = save_upload(file, VIDEO_EXTENSIONS, folder, "src") if kind == "video" else save_audio_upload(file, folder, "src")
+    info = media_info(folder / name)
+    dur = info.duration
+    if dur > 180:
+        (folder / name).unlink(missing_ok=True)
+        raise HTTPException(400, "الملف أطول من 3 دقايق. قصّه الأول")
+    old = (d.get("source") or {}).get("file")
+    if old and old != name:
+        (folder / old).unlink(missing_ok=True)
+    def fn(x):
+        x["source"] = {"kind": kind, "file": name, "name": file.filename, "duration": round(dur, 3), "w": info.width, "h": info.height}
+        x["duration"] = round(dur, 3)
+        x.update(words=[], blocks=[], final=None, scene=None)
+        if kind == "video":
+            x["bg"] = {**(x.get("bg") or {}), "kind": "source"}
+    typo_update(pid, fn)
+    return typo_start(pid, "transcribing", "🎧 بيسمع الكلام ويكتبه بتوقيته", run_typo_transcribe)
+
+
+def run_typo_transcribe(pid: str) -> None:
+    try:
+        d = typo_load(pid)
+        folder = TYPO_PROJ / pid
+        src = folder / d["source"]["file"]
+        if not typo_has_audio(src):
+            raise RuntimeError("الفيديو ده مفيهوش صوت، فمش هقدر أسمع الكلام. لو ده «الصورة بس» من المعمل ارفع الفيديو الأصلي، "
+                               "أو اكتب الكلام بنفسك وحط الفيديو خلفية")
+        audio = TMP_DIR / f"typo_{pid}.m4a"
+        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src), "-vn", "-ac", "1", "-c:a", "aac", "-b:a", "96k", str(audio)],
+                       check=True, capture_output=True, timeout=300)
+        try:
+            local = stt_local.enabled() and (d.get("ai") == "off" or os.environ.get("STT_LOCAL_ALWAYS") == "1" or not atlas.api_key())
+            words = stt_local.transcribe(audio) if local else atlas.transcribe(audio, d["duration"])
+        finally:
+            audio.unlink(missing_ok=True)
+        if not words:
+            raise RuntimeError("مقدرتش أسمع كلام في الملف ده")
+        typo_update(pid, lambda x: x.update(words=words, script=" ".join(w["w"] for w in words), status="ready", step=None, error=None))
+    except Exception as exc:  # noqa: BLE001
+        typo_fail(pid, exc)
+
+
+@app.post("/api/typo/{pid}/bg")
+def typo_bg(pid: str, file: UploadFile = File(...)):
+    """🖼️ صورة أو فيديو للخلفية."""
+    folder = TYPO_PROJ / pid
+    d = typo_load(pid)
+    ext = Path(file.filename or "").suffix.lower()
+    kind = "video" if ext in VIDEO_EXTENSIONS else "image"
+    name = save_upload(file, VIDEO_EXTENSIONS | IMAGE_EXTENSIONS, folder, "bg")
+    old = (d.get("bg") or {}).get("file")
+    if old and old != name:
+        (folder / old).unlink(missing_ok=True)
+    return typo_to_dict(pid, typo_update(pid, lambda x: x.update(bg={**(x.get("bg") or {}), "kind": kind, "file": name}, final=None)))
+
+
+class TypoPlanIn(BaseModel):
+    brief: str | None = None
+
+
+@app.post("/api/typo/{pid}/plan")
+def typo_plan(pid: str, body: TypoPlanIn):
+    """🧠 الموديل بيقسم الكلام على حركات ويختار الأيقونات."""
+    d = typo_load(pid)
+    if not d.get("words"):
+        raise HTTPException(400, "مفيش كلام لسه: اكتبه أو ارفع صوت/فيديو")
+    if body.brief is not None:
+        typo_set(pid, brief=body.brief[:1000])
+    return typo_start(pid, "planning", "🧠 بيوزّع الكلام على الحركات", run_typo_plan)
+
+
+def run_typo_plan(pid: str) -> None:
+    try:
+        d = typo_load(pid)
+        words, dur = d["words"], d.get("duration") or d["words"][-1]["e"] + 0.5
+        items = stickers_load()
+        anchors = None
+        if (d.get("source") or {}).get("kind") == "video":   # فوق فيديو: الموديل لازم يشوف اللي في الكادر الأول
+            anchors = (d.get("scene") or {}).get("anchors")
+            if anchors is None:
+                typo_set(pid, step="👁️ بيحلل الفيديو: إيه اللي في الكادر وفين")
+                anchors = typo_analyze(pid)
+            typo_set(pid, step="🧠 بيوزّع الكلام على الحركات والمشهد")
+        pro = bool(typo_style(d.get("style")).get("pro"))
+        smart = d.get("ai", "smart") != "off" and atlas.api_key() and not atlas.mock_mode()
+        style = d.get("style") or ""
+        typo_set(pid, step="📖 بيدوّر في القاموس على أيقونات للكلام")
+        hits = dict_hits([w["w"] for w in words], bool(smart))
+        studio = bool(typo_style(d.get("style")).get("studio"))
+        # 🎲 كوليكشن عشوائية (غير آخر واحدة) لكل توزيع جديد، عشان الفيديوهات ماتطلعش شبه بعض
+        collection = typo.pick_collection(d.get("collection")) if studio else None
+        if collection:
+            typo_update(pid, lambda x: x.update(collection=collection))
+        if not smart and studio:
+            blocks = typo.studio_plan(words, dur, (d.get("scene") or {}).get("person"), collection)
+        elif not smart and pro:
+            blocks = typo.pro_plan(words, dur, [x["id"] for x in items[:4]],
+                                   pick=lambda idxs: concepts.icons_for(idxs, hits, items, style))
+        elif not smart:
+            blocks = typo.mock_plan(words, dur)
+            spot = next((a for a in anchors or [] if a["kind"] != "face"), None)
+            if spot and len(blocks) > 1:   # التجربة: بلوك بيندمج مع أول حاجة في الكادر وآخر كلمة فيه بتبقى هي
+                blocks[1].update(kind="anchor", anchor=spot["id"], place="auto", skip=len(blocks[1]["words"]) - 1)
+        else:
+            st = typo_style(d.get("style"))
+            raw = ad_json(series_chat(typo.plan_messages(words, st, [s["name"] for s in items], d.get("brief") or "", anchors,
+                                                         (d.get("scene") or {}).get("person"), collection)), "خطة التايبوجرافي")
+            blocks = typo.clean_plan(raw, words, dur, pro)
+        ids = {a["id"] for a in anchors or []}
+        for b in blocks:
+            if b["kind"] in ("pop", "ring", "letters", "scatter", *(set(typo.STUDIO_KINDS) - typo.ANCHOR_STUDIO)):   # دول ملو الشاشة أو على الشخص: مش جنب حاجة
+                b["anchor"] = ""
+            if b.get("anchor") not in ids:
+                b["anchor"] = ""
+                if b["kind"] == "anchor":
+                    b["kind"] = "build"
+            elif 0 <= b.get("skip", -1) < len(b["words"]):   # كلمة هي الحاجة نفسها ← الحركة المندمجة
+                b["kind"] = "anchor"
+        idx = concepts.index(concepts.load(TYPO_DICT))
+        for b in blocks:   # الأسماء ← ستيكرات بروح الستايل (القاموس الأول)، والحركة اللي محتاجة أيقونات وملهاش تاخد من معاني كلامها
+            for k in ("icon", "side"):
+                if b.get(k):
+                    b[k] = typo_resolve_icon(b[k], items, style, idx)
+            b["icons"] = list(dict.fromkeys(typo_resolve_icon(x, items, style, idx) for x in b.get("icons") or []))
+            span = list(range(b.get("from", 0), b.get("to", -1) + 1))
+            if b["kind"] in ("spot", "icon", "scatter") and not b["icons"] and not b.get("icon"):
+                found = concepts.icons_for(span, hits, items, style)
+                if b["kind"] == "icon":
+                    b["icon"] = found[0] if found else ""
+                else:
+                    b["icons"] = found
+        typo_update(pid, lambda x: x.update(blocks=blocks, final=None, status="planned", step=None, error=None))
+    except Exception as exc:  # noqa: BLE001
+        typo_fail(pid, exc)
+
+
+def typo_frame(src: Path, t: float, out: Path, width: int = 768) -> Path:
+    subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{max(0.0, t):.2f}", "-i", str(src), "-frames:v", "1",
+                    "-vf", f"scale={width}:-2", str(out)], check=True, capture_output=True, timeout=60)
+    return out
+
+
+def typo_analyze(pid: str) -> list[dict]:
+    """👁️ الحاجات اللي في الكادر (المراسي): الموديل بيتفرج على الفيديو كله ويطلّعها، وبعدين على فريمات ثابتة
+    بيحدد مكان كل واحدة بالظبط في كذا لحظة (عشان الكلام يتحرك معاها)."""
+    d = typo_load(pid)
+    folder = TYPO_PROJ / pid
+    src = folder / d["source"]["file"]
+    dur = d["duration"]
+    if atlas.mock_mode() or not atlas.api_key():
+        anchors = typo.mock_scene(dur)
+    else:
+        proxy = TMP_DIR / f"typo_proxy_{pid}.mp4"
+        try:
+            subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src),
+                            "-vf", "scale='if(gt(iw,ih),min(640,iw),-2)':'if(gt(iw,ih),-2,min(640,ih))',fps=8",
+                            "-c:v", "libx264", "-preset", "veryfast", "-crf", "30", "-pix_fmt", "yuv420p", "-c:a", "aac", "-ac", "1", "-b:a", "64k",
+                            str(proxy)], check=True, capture_output=True, timeout=600)
+            anchors = typo.clean_scene(ad_json(lab_media_chat(az.with_media(typo.scene_messages(dur, d.get("words") or []),
+                                                                            data_url(proxy, "video/mp4"), "video.mp4")), "تحليل الفيديو"), dur)
+        finally:
+            proxy.unlink(missing_ok=True)
+
+    def track(a):
+        # 1) مكانها بالظبط في فريم ثابت من نص وقتها (الموديل على الصور الثابتة أدق بكتير)
+        # 2) تتبّعها في باقي الفريمات (4 في الثانية) بمطابقة الصورة نفسها، فالكلام يمشي معاها لو الكاميرا أو الحاجة اتحركت
+        import numpy as np
+        tm = (a["t0"] + a["t1"]) / 2
+        still = TMP_DIR / f"tya_{uuid.uuid4().hex[:8]}.jpg"
+        try:
+            typo_frame(src, tm, still)
+            box = a["keys"][0]["box"]
+            if not (atlas.mock_mode() or not atlas.api_key()):
+                pick = typo.clean_box(ad_json(lab_media_chat(typo.box_messages(a["label"], a.get("note") or a["kind"], [data_url(still, "image/jpeg")])),
+                                              "مكان المرساة"), 1, box)
+                if pick:
+                    box = pick[1]
+            fps, tw = 4, 270
+            raw = subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-ss", f"{a['t0']:.2f}", "-t", f"{a['t1'] - a['t0']:.2f}",
+                                  "-i", str(src), "-vf", f"fps={fps},scale={tw}:-2,format=gray", "-f", "rawvideo", "-"],
+                                 check=True, capture_output=True, timeout=120).stdout
+            from PIL import Image
+            th = Image.open(still).size
+            th = int(round(tw * th[1] / th[0] / 2) * 2)
+            n = len(raw) // (tw * th)
+            keys = [{"t": round(tm, 2), "box": box}]
+            if n >= 2:
+                frames = list(np.frombuffer(raw[: n * tw * th], dtype=np.uint8).reshape(n, th, tw))
+                mid = min(n - 1, max(0, int(round((tm - a["t0"]) * fps))))
+                boxes = typo.track_template(frames, mid, box)
+                keys = [{"t": round(a["t0"] + i / fps, 2), "box": [round(v, 4) for v in b]} for i, b in enumerate(boxes) if b]
+            a["keys"] = keys or [{"t": round(tm, 2), "box": box}]
+            # صورة صغيرة للمرساة (عشان تعرفها في الصفحة)
+            im = Image.open(still)
+            W, H = im.size
+            x0, y0, x1, y1 = box
+            im.crop((int(x0 * W), int(y0 * H), max(int(x0 * W) + 2, int(x1 * W)), max(int(y0 * H) + 2, int(y1 * H)))).convert("RGB").save(folder / f"anc_{a['id']}.jpg")
+            a["thumb"] = f"anc_{a['id']}.jpg"
+        except Exception:  # noqa: BLE001  (مرساة واحدة باظت: تفضل بالمكان التقريبي)
+            pass
+        finally:
+            still.unlink(missing_ok=True)
+
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        list(pool.map(track, anchors))
+    # الفيديو فاتح ولا غامق؟ (لون الكلام اللي فوقه بيتحدد على كده)
+    bright = 100.0
+    try:
+        raw = subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-i", str(src), "-vf", "fps=1,scale=32:32,format=gray",
+                              "-frames:v", "12", "-f", "rawvideo", "-"], check=True, capture_output=True, timeout=120).stdout
+        bright = sum(raw) / max(1, len(raw))
+    except Exception:  # noqa: BLE001
+        pass
+    pinfo = typo_person(pid, src, dur)
+    typo_update(pid, lambda x: x.update(scene={"anchors": anchors, "bright": round(bright, 1), "at": now(),
+                                               "person": person.summary(pinfo)}))
+    return anchors
+
+
+def typo_person(pid: str, src: Path, dur: float) -> dict | None:
+    """🧍 الشخص في كل فريم: صورة شفافة ليه لوحده ومكان راسه (للكلام اللي ورا الشخص أو حوالين راسه). من غير المكتبة بيتخطى."""
+    if not person.available():
+        return None
+    folder = TYPO_PROJ / pid / "person"
+    try:
+        typo_set(pid, step="🧍 بيقرا الشخص اللي في الفيديو (بيفصله عن الخلفية)")
+        return person.analyze(ffmpeg_exe(), src, folder, Path(os.environ.get("PERSON_MODELS") or (DATA_DIR / "models")), TYPO_FPS, dur,
+                              on_step=lambda a, b: typo_set(pid, step=f"🧍 بيقرا الشخص: {a} من {b} ثانية"))
+    except Exception as exc:  # noqa: BLE001  (من غير الشخص الحركات بتشتغل في نص الكادر)
+        print(f"typo person {pid}: {exc}", flush=True)
+        shutil.rmtree(folder, ignore_errors=True)
+        return None
+
+
+@app.post("/api/typo/{pid}/scene")
+def typo_scene(pid: str):
+    """👁️ يحلل الفيديو من جديد (إيه اللي في الكادر وفين)."""
+    d = typo_load(pid)
+    if (d.get("source") or {}).get("kind") != "video":
+        raise HTTPException(400, "ارفع فيديو الأول")
+    return typo_start(pid, "analyzing", "👁️ بيحلل الفيديو: إيه اللي في الكادر وفين", run_typo_scene)
+
+
+def run_typo_scene(pid: str) -> None:
+    try:
+        typo_analyze(pid)
+        typo_update(pid, lambda x: x.update(status=typo_idle(x), step=None, error=None, final=None))
+    except Exception as exc:  # noqa: BLE001
+        typo_fail(pid, exc)
+
+
+@app.post("/api/typo/{pid}/icons")
+def typo_draw_icons(pid: str):
+    """🎨 يرسم الأيقونات اللي في الخطة ومش في المكتبة (حوالي 0.03$ للواحدة)."""
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل")
+    if not typo_to_dict(pid, typo_load(pid))["missing_icons"]:
+        raise HTTPException(400, "كل الأيقونات موجودة في المكتبة")
+    return typo_start(pid, "drawing", "🎨 بيرسم الأيقونات", run_typo_icons)
+
+
+def run_typo_icons(pid: str) -> None:
+    try:
+        d = typo_to_dict(pid, typo_load(pid))
+        st = typo_style(d.get("style"))
+        made = {}
+        for n, name in enumerate(d["missing_icons"]):
+            typo_set(pid, step=f"🎨 بيرسم الأيقونة {n + 1} من {len(d['missing_icons'])}: {name}")
+            known = name if name in concepts.load(TYPO_DICT)["concepts"] else ""
+            made[name] = sticker_draw(name, name, st.get("icon_style", ""), "drawn", style=d.get("style") or "", concept=known)["id"]
+        def fn(x):
+            for b in x.get("blocks") or []:
+                for k in ("icon", "side"):
+                    if b.get(k) in made:
+                        b[k] = made[b[k]]
+                b["icons"] = [made.get(i, i) for i in b.get("icons") or []]
+            x["final"] = None
+        typo_update(pid, fn)
+        typo_update(pid, lambda x: x.update(status=typo_idle(x), step=None, error=None))
+    except Exception as exc:  # noqa: BLE001
+        typo_fail(pid, exc)
+
+
+def typo_still(pid: str, src: Path, t: float) -> str | None:
+    """لقطة واحدة من الفيديو المرفوع (بتتعمل مرة وتتحفظ)."""
+    folder = TYPO_PROJ / pid / "stills"
+    name = f"s_{int(round(t * 10)):06d}.jpg"
+    out = folder / name
+    if not out.exists():
+        try:
+            folder.mkdir(parents=True, exist_ok=True)
+            subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{max(0.0, t):.2f}", "-i", str(src), "-frames:v", "1",
+                            "-vf", "scale=720:-2", "-q:v", "4", str(out)], check=True, capture_output=True, timeout=60)
+        except (OSError, subprocess.SubprocessError):
+            return None
+    return f"/media/typo/projects/{pid}/stills/{name}" if out.exists() else None
+
+
+def typo_doc(pid: str, d: dict) -> dict:
+    """الخطة بالشكل اللي المحرّك بيرسمه: المقاس والستايل والبلوكات بلينكات الصور."""
+    W, H = TYPO_RATIOS.get(d.get("ratio"), TYPO_RATIOS["9:16"])
+    st = typo_style(d.get("style"))
+    items = {s["id"]: s for s in stickers_load()}
+    stk = {k: sticker_dict(s)["url"] for k, s in items.items()}
+    def img(n):
+        return stk.get(typo_icon_id(n, items) or "") if n else None
+    blocks = []
+    words = d.get("words") or []
+    sents = typo.sentences(words) if words else []   # الحركات الاحترافية بتعرض الجملة كلها (اللي اتقال منها قبل البلوك ظاهر)
+    for b in d.get("blocks") or []:
+        sent = next(([{"w": words[i]["w"], "t0": words[i]["s"], "t1": words[i]["e"]} for i in range(sn[0], sn[-1] + 1)]
+                     for sn in sents if sn[0] <= b.get("from", 0) <= sn[-1]), None)
+        blocks.append({**{k: b.get(k) for k in ("t0", "t1", "kind", "theme", "text", "words", "focus", "letter", "anchor", "place", "skip",
+                                                 "intro", "outro", "sign", "box", "redact", "marks", "mx", "my", "ms", "trans", "xf", "xk", *typo.VARIANTS)}, "sent": sent,
+                       "icon": img(b.get("icon")), "side": img(b.get("side")), "icons": [u for u in (img(i) for i in b.get("icons") or []) if u]})
+    # الحركات اللي محتاجة صورة من الفيديو نفسه (الصورة جوه الحروف، البولارويد، الكروت): لقطة من نص البلوك
+    srcf = (d.get("source") or {})
+    if srcf.get("kind") == "video" and srcf.get("file"):
+        for bl in blocks:
+            if bl.get("kind") in typo.STILL_KINDS:
+                bl["img"] = typo_still(pid, TYPO_PROJ / pid / srcf["file"], ((bl.get("t0") or 0) + (bl.get("t1") or 0)) / 2)
+    kind = (d.get("bg") or {}).get("kind", "theme")
+    if kind != "theme":
+        # فوق خلفية بتاعتك: لون الكلام على قد الخلفية (فاتحة ← كلام غامق، غامقة/صورة/فيديو ← كلام فاتح)، والكارت الملون زي ما هو
+        c = (d.get("bg") or {}).get("color") or "#101010"
+        try:
+            lum = sum(int(c[i:i + 2], 16) * k for i, k in ((1, 0.299), (3, 0.587), (5, 0.114))) if kind in ("solid", "none") else 0
+        except ValueError:
+            lum = 0
+        if kind == "source":   # الفيديو المرفوع: على قد نوره (بيتقاس وقت التحليل)، والتغميق بيخليه أغمق
+            lum = float((d.get("scene") or {}).get("bright") or 0) * (1 - float((d.get("bg") or {}).get("dim") or 0))
+        side = "light" if lum > (120 if kind == "source" else 150) else "dark"   # الفيديو: الدرجات المتوسطة بتتقري أحسن بكلام غامق
+        for b in blocks:
+            if b.get("theme") != "accent" or kind == "source":   # فوق الفيديو: حتى الملوّن لونه على قد نور الفيديو
+                b["theme"] = side
+    # المراسي بس لو الخلفية هي الفيديو المرفوع نفسه: أماكنها بتتحوّل من كادر الفيديو لكادر الفيديو النهائي (المقصوص على المقاس)
+    anchors = {}
+    srcd = d.get("source") or {}
+    if kind == "source" and srcd.get("w") and srcd.get("h"):
+        sw, sh = srcd["w"], srcd["h"]
+        k = max(W / sw, H / sh)
+        ox, oy = (sw * k - W) / 2, (sh * k - H) / 2
+        for a in (d.get("scene") or {}).get("anchors") or []:
+            anchors[a["id"]] = {"kind": a["kind"], "t0": a["t0"], "t1": a["t1"], "keys": [
+                {"t": kk["t"], "box": [round((kk["box"][0] * sw * k - ox) / W, 4), round((kk["box"][1] * sh * k - oy) / H, 4),
+                                       round((kk["box"][2] * sw * k - ox) / W, 4), round((kk["box"][3] * sh * k - oy) / H, 4)]}
+                for kk in a["keys"]]}
+    # التراك: أركان الحاجة اللي البرنامج تابعها فريم فريم (محفوظة بكسور من الفيديو الأصلي) بتتحوّل لكادر الفيديو النهائي
+    tracks = {}
+    if kind == "source" and srcd.get("w") and srcd.get("h"):
+        sw, sh = srcd["w"], srcd["h"]
+        k = max(W / sw, H / sh)
+        ox, oy = (sw * k - W) / 2, (sh * k - H) / 2
+        for tid, tr in (d.get("tracks") or {}).items():
+            tracks[tid] = {"t0": tr["t0"], "fps": tr["fps"], "mode": tr.get("mode", "follow"),
+                           "q": [[round(((q[j] * sw * k - ox) / W) if j % 2 == 0 else ((q[j] * sh * k - oy) / H), 4) for j in range(8)] for q in tr["q"]]}
+    pdoc = None
+    pj = TYPO_PROJ / pid / "person" / "person.json"
+    if kind == "source" and pj.exists():
+        try:
+            pi = json.loads(pj.read_text(encoding="utf-8"))
+            sw, sh = pi["sw"], pi["sh"]
+            k = max(W / sw, H / sh)
+            ox, oy = (sw * k - W) / 2, (sh * k - H) / 2
+            fx = lambda v: round(v * sw * k - ox, 1)  # noqa: E731
+            fy = lambda v: round(v * sh * k - oy, 1)  # noqa: E731
+
+            def seen(c):   # قد إيه من الشخص ده باين في الكادر بعد القص (والراس جوه الكادر بيكسب)
+                x0, y0, x1, y1 = fx(c["box"][0]), fy(c["box"][1]), fx(c["box"][2]), fy(c["box"][3])
+                area = max(0, min(x1, W) - max(x0, 0)) * max(0, min(y1, H) - max(y0, 0))
+                hx, hy = fx(c["head"][0]), fy(c["head"][1])
+                return area * (1.0 if 0 <= hx <= W and 0 <= hy <= H else 0.1)
+
+            def pick(f):
+                if not f:
+                    return None
+                best = max([f, *(f.get("others") or [])], key=seen)
+                return best if seen(best) > W * H * 0.01 else None
+            pdoc = {"fps": pi["fps"], "n": pi["n"], "base": f"/media/typo/projects/{pid}/person/p_",
+                    # شكل الشخص بدقة الفيديو (للكلام اللي وراه)، لو التحليل اتعمل بالنسخة الجديدة
+                    "mbase": f"/media/typo/projects/{pid}/person/m_" if (pj.parent / "m_00000.webp").exists() else "",
+                    "img": {"x": -ox, "y": -oy, "w": sw * k, "h": sh * k},
+                    "frames": [{"box": [fx(f["box"][0]), fy(f["box"][1]), fx(f["box"][2]), fy(f["box"][3])],
+                                "head": [fx(f["head"][0]), fy(f["head"][1]), round(f["head"][2] * sw * k, 1)],
+                                "solid": f.get("solid", 1)} if f else None
+                               for f in map(pick, pi["frames"])]}
+        except (OSError, ValueError, KeyError):
+            pdoc = None
+    # ✨ العناصر الحرة: الكلام المكتوب بيتوزّع على أول جزء من وقت العنصر (كأنه بيتقال)
+    fx = []
+    for q in d.get("fx") or []:
+        toks = q["text"].split() or ["…"]
+        span = (q["t1"] - q["t0"]) * 0.6 / len(toks)
+        fx.append({**q, "words": [{"w": w, "t0": round(q["t0"] + 0.15 + j * span, 3), "t1": round(q["t0"] + 0.15 + (j + 1) * span, 3)} for j, w in enumerate(toks)],
+                   "icon": None, "side": None, "icons": []})
+    return {"w": W, "h": H, "fps": TYPO_FPS, "anchors": anchors, "tracks": tracks, "person": pdoc, "fx": fx, "dim": float((d.get("bg") or {}).get("dim") or 0),
+            "duration": max(d.get("duration") or (blocks[-1]["t1"] if blocks else 1), *[q["t1"] for q in fx]) if fx else (d.get("duration") or (blocks[-1]["t1"] if blocks else 1)),
+            "style": {**{k: st.get(k) for k in ("font", "case", "grain", "weight", "light", "dark", "accent")},
+                      "moments": {**(st.get("moments") or {}), **(d.get("fonts") or {})}},
+            "transparent": kind != "theme", "blocks": blocks}
+
+
+@app.get("/api/typo/{pid}/doc")
+def typo_doc_get(pid: str):
+    return typo_doc(pid, typo_load(pid))
+
+
+# ---------------------------------------------------------------- 🔤 التايبوجرافي جوه المونتاج
+# المونتاج بيبقى مربوط بمشروع تايبوجرافي مخفي، والفيديو بتاعه هو المونتاج نفسه (اللقطات بعد القص من غير كابشن ولوجو).
+# كده كل اللي في التايبوجرافي بيشتغل على المونتاج: سماع الكلام، العناصر، ورا الشخص، التراك، والتحكم، والتصدير بيرسمها فوقه.
+
+class MontageTypoIn(BaseModel):
+    brief: str | None = None
+    run: bool = True   # False: بس اربط مشروع فاضي (عشان العناصر الحرة) من غير ما يسمع ويوزّع
+
+
+@app.post("/api/projects/{project_id}/typo")
+def montage_typo(project_id: str, body: MontageTypoIn):
+    """🧠 يجهّز فيديو المونتاج ويسمع الكلام ويوزّع عليه التايبوجرافي."""
+    with closing(db()) as conn, conn:
+        row = get_project(conn, project_id)
+        data = json.loads(row["data"])
+        segments, voice, music, _ = build_montage(conn, data)
+        tid = data.get("typo_id")
+        if not tid or not (TYPO_PROJ / Path(tid).name / "typo.json").exists():
+            tid = uuid.uuid4().hex[:10]
+            (TYPO_PROJ / tid).mkdir(parents=True)
+            d = {"name": f"🎬 {row['name']}", "client_id": active_client_id(), "ratio": "9:16", "style": "studio", "montage": project_id,
+                 "source": None, "script": "", "words": [], "duration": 0, "bg": {"kind": "source", "color": "#101010"},
+                 "blocks": [], "brief": "", "status": "new", "step": None, "error": None, "final": None, "created_at": now(), "updated_at": now()}
+            (TYPO_PROJ / tid / "typo.json").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+            data["typo_id"] = tid
+            conn.execute("UPDATE projects SET data = ?, updated_at = ? WHERE id = ?", (json.dumps(data), now(), project_id))
+    if body.brief is not None:
+        typo_set(tid, brief=body.brief[:1000])
+    if not body.run:
+        return typo_to_dict(tid, typo_load(tid))
+    return typo_start(tid, "transcribing", "🎬 بيجهّز فيديو المونتاج", run_montage_typo, segments, voice, music)
+
+
+def montage_source(tid: str, segments, voice, music, keep: bool = False) -> None:
+    """فيديو المونتاج (اللقطات بعد القص من غير كابشن ولوجو) بيبقى الفيديو بتاع مشروع التايبوجرافي/المشهد.
+    keep: الكلام والعناصر بيفضلوا (تجهيز المشهد بس)؛ من غيره بيتمسحوا عشان هيتوزعوا من جديد."""
+    folder = TYPO_PROJ / tid
+    work = TMP_DIR / f"mtypo-{tid}"
+    name = f"src_{uuid.uuid4().hex[:8]}.mp4"
+    cmds, total = montage.build_commands(ffmpeg_exe(), segments, folder / name, work, voice, music,
+                                         low_memory=(system_info()["memory_limit_mb"] or 99999) < 1500)
+    try:
+        for n, c in enumerate(cmds, start=1):
+            typo_set(tid, step=f"🎬 بيجهّز فيديو المونتاج ({n} من {len(cmds)})")
+            r = subprocess.run(c, capture_output=True, timeout=1800)
+            if r.returncode != 0:
+                raise RuntimeError(f"تجهيز فيديو المونتاج فشل: {r.stderr.decode(errors='ignore')[-300:]}")
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+    info = media_info(folder / name)
+    old = (typo_load(tid).get("source") or {}).get("file")
+
+    def fn(x):
+        x["source"] = {"kind": "video", "file": name, "name": "المونتاج", "duration": round(info.duration, 3), "w": info.width, "h": info.height}
+        x.update(duration=round(info.duration, 3), final=None, bg={"kind": "source", "color": "#101010"}, removals=[])
+        if not keep:
+            x.update(words=[], blocks=[], scene=None, tracks={})
+    typo_update(tid, fn)
+    if old and old != name:
+        (folder / old).unlink(missing_ok=True)
+    # الفيديو اتغيّر: الشخص وحركة الكاميرا والحاجات اللي اتشالت بتتحسب من جديد
+    shutil.rmtree(folder / "person", ignore_errors=True)
+    (folder / "scene_cam.json").unlink(missing_ok=True)
+    for f in folder.glob("rm_*.mp4"):
+        f.unlink(missing_ok=True)
+
+
+def run_montage_typo(tid: str, segments, voice, music) -> None:
+    try:
+        montage_source(tid, segments, voice, music)
+        typo_set(tid, step="🎧 بيسمع الكلام ويكتبه بتوقيته")
+        run_typo_transcribe(tid)
+        if typo_load(tid).get("status") == "failed":
+            return
+        typo_set(tid, status="planning", step="🧠 بيوزّع التايبوجرافي على المونتاج")
+        run_typo_plan(tid)
+    except Exception as exc:  # noqa: BLE001
+        typo_fail(tid, exc)
+
+
+def typo_sfx_wav(tid: str) -> Path | None:
+    """تراك كليكات التايبوجرافي (نفس اللي في فيديو التايبوجرافي) كملف صوت لوحده، بيتعمل من جديد لو المشروع اتغيّر."""
+    d = typo_load(tid)
+    out = TYPO_PROJ / Path(tid).name / ".clicks.wav"
+    stamp = out.with_suffix(".stamp")
+    key = f"{d.get('updated_at')}|{typo_sfx_level(d)}"
+    if out.exists() and stamp.exists() and stamp.read_text() == key:
+        return out
+    doc = typo_doc(tid, d)
+    allb = sorted(doc["blocks"] + doc.get("fx", []), key=lambda b: b["t0"])
+    dur = max([doc["duration"], *[b["t1"] for b in allb]] or [0])
+    if not allb or not sfx.render(TYPO_SFX, allb, dur, out, seed=sum(map(ord, tid)), level=typo_sfx_level(d)):
+        out.unlink(missing_ok=True)
+        return None
+    stamp.write_text(key)
+    return out
+
+
+@app.get("/api/typo/{pid}/clicks.wav")
+def typo_clicks(pid: str):
+    f = typo_sfx_wav(pid)
+    if not f:
+        raise HTTPException(404, "مفيش كليكات")
+    return FileResponse(f, media_type="audio/wav")
+
+
+def typo_has_layer(tid: str) -> bool:
+    try:
+        d = typo_load(tid)
+    except HTTPException:
+        return False
+    return bool(d.get("blocks") or d.get("fx"))  # الكلام أو العناصر الحرة
+
+
+def typo_overlay(tid: str, base: Path, out: Path, base_url: str, progress=None) -> None:
+    """الكلام والعناصر بتترسم فريم فريم (شفافة) وبتتركّب فوق فيديو المونتاج من غير صوت."""
+    from playwright.sync_api import sync_playwright
+    d = typo_load(tid)
+    doc = typo_doc(tid, d)
+    W, H = doc["w"], doc["h"]
+    info = media_info(base)
+    dur = info.duration
+    n = int(dur * TYPO_FPS)
+    # لو مقاس المونتاج غير مقاس التايبوجرافي: الطبقة بتتصغّر عشان تبان كلها في نص الكادر
+    bw, bh = info.width or W, info.height or H
+    fit = f"scale={W}:{H}" if (bw, bh) == (W, H) else f"scale=w={bw}:h={bh}:force_original_aspect_ratio=decrease"
+    cmd = [ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(base),
+           "-f", "image2pipe", "-framerate", str(TYPO_FPS), "-c:v", "png", "-i", "-",
+           "-filter_complex", f"[1:v]{fit}[ov];[0:v][ov]overlay=(W-w)/2:(H-h)/2:eof_action=pass,format=yuv420p[v]", "-map", "[v]",
+           "-an", "-c:v", "libx264", "-preset", "veryfast", "-crf", "19", "-t", f"{dur:.3f}", str(out)]
+    proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+    base_url = base_url or f"http://127.0.0.1:{os.environ.get('PORT', '8000')}"
+    try:
+        with sync_playwright() as p:
+            browser = typo_browser(p)
+            try:
+                ctx = browser.new_context(viewport={"width": W, "height": H}, device_scale_factor=1)
+                ctx.add_cookies([{"name": SESSION_COOKIE, "value": auth.make_token(), "url": base_url}])
+                page = ctx.new_page()
+                page.goto(f"{base_url}/typo-render.html?id={tid}", wait_until="load", timeout=60000)
+                page.evaluate("window.typoReady")
+                cdp = ctx.new_cdp_session(page)
+                cdp.send("Emulation.setDefaultBackgroundColorOverride", {"color": {"r": 0, "g": 0, "b": 0, "a": 0}})
+                for i in range(n):
+                    page.evaluate(f"renderAt({i / TYPO_FPS:.4f})")
+                    proc.stdin.write(base64.b64decode(cdp.send("Page.captureScreenshot", {"format": "png", "optimizeForSpeed": True})["data"]))
+                    if progress and i % TYPO_FPS == 0:
+                        progress(i / max(1, n))
+            finally:
+                browser.close()
+    finally:
+        proc.stdin.close()
+    err = proc.stderr.read().decode(errors="ignore")
+    if proc.wait(timeout=600) != 0:
+        raise RuntimeError(f"تركيب التايبوجرافي فشل: {err.strip()[-300:]}")
+
+
+# 📦 قراءة بس من برّه (بنفس مفتاح المعمل): مشاريع التايبوجرافي عشان نراجع مشكلة في مشروع بعينه
+@app.get("/api/lab/export/typo")
+def typo_export_list():
+    out = []
+    for f in sorted(TYPO_PROJ.glob("*/typo.json"), key=lambda x: x.stat().st_mtime):
+        try:
+            d = json.loads(f.read_text(encoding="utf-8"))
+        except ValueError:
+            continue
+        out.append({"id": f.parent.name, "name": d.get("name"), "status": d.get("status"), "kind": (d.get("source") or {}).get("kind"),
+                    "blocks": len(d.get("blocks") or []), "final": d.get("final"), "updated": f.stat().st_mtime})
+    return out
+
+
+@app.get("/api/lab/export/typo/{pid}")
+def typo_export_one(pid: str):
+    d = typo_load(pid)
+    return {"project": d, "doc": typo_doc(pid, d), "files": sorted(p.name for p in (TYPO_PROJ / Path(pid).name).iterdir() if p.is_file())}
+
+
+@app.get("/api/lab/export/typo/{pid}/file/{name}")
+def typo_export_file(pid: str, name: str):
+    f = TYPO_PROJ / Path(pid).name / Path(name).name
+    if not f.is_file():
+        raise HTTPException(404, "مش موجود")
+    return FileResponse(f)
+
+
+class TypoTrackIn(BaseModel):
+    block: int
+    t: float
+    box: list[float] = []     # [x0, y0, x1, y1] بكسور من كادر الفيديو النهائي (لو المستخدم رسم مربع)
+    point: list[float] = []   # [x, y]: دوسة على الحاجة، والبرنامج بيلاقي حدودها لوحده
+    quad: list[float] = []    # 8 أرقام: حدود الحاجة اللي نوّرت تحت الماوس (من /regions) بكسور من الكادر
+    mode: str = "auto"        # auto: البرنامج بيختار · follow: حاجة بتتحرك · surface: ورقة/شاشة (بالمنظور)
+    fx: bool = False          # التراك لعنصر حر (مش لقطة كلام)
+
+
+def typo_frame_map(d: dict):
+    """تحويل من كادر الفيديو الأصلي لكادر الفيديو النهائي (المقصوص على المقاس) والعكس."""
+    W, H = TYPO_RATIOS.get(d.get("ratio"), TYPO_RATIOS["9:16"])
+    src = d.get("source") or {}
+    sw, sh = src.get("w"), src.get("h")
+    if not sw or not sh:
+        raise HTTPException(400, "مقاس الفيديو مش معروف: ارفعه تاني")
+    k = max(W / sw, H / sh)
+    ox, oy = (sw * k - W) / 2, (sh * k - H) / 2
+    to_src = lambda x, y: ((x * W + ox) / (sw * k), (y * H + oy) / (sh * k))  # noqa: E731
+    return to_src
+
+
+@app.post("/api/typo/{pid}/track")
+def typo_track(pid: str, body: TypoTrackIn):
+    """🎯 تراك: الكلام يمشي مع حاجة في الفيديو (المستخدم رسم مربع عليها في الثانية t)."""
+    d = typo_load(pid)
+    src = d.get("source") or {}
+    if src.get("kind") != "video" or (d.get("bg") or {}).get("kind") != "source":
+        raise HTTPException(400, "التراك بيشتغل لما الخلفية هي الفيديو اللي رفعته")
+    lst = d.get("fx" if body.fx else "blocks") or []
+    if not 0 <= body.block < len(lst):
+        raise HTTPException(400, "اختار اللقطة تاني")
+    box = None
+    if len(body.quad) == 8:
+        pt = None
+        box = [float(v) for v in body.quad]
+    elif len(body.point) == 2:
+        pt = [min(1.0, max(0.0, float(v))) for v in body.point]
+    elif len(body.box) == 4:
+        pt = None
+        box = [min(1.2, max(-0.2, float(v))) for v in body.box]
+        if box[2] - box[0] < 0.01 or box[3] - box[1] < 0.01:
+            raise HTTPException(400, "المربع صغير قوي: ارسمه على الحاجة كلها")
+    else:
+        raise HTTPException(400, "دوس على الحاجة اللي عايز تتابعها")
+    mode = body.mode if body.mode in ("follow", "surface") else "auto"
+    return typo_start(pid, "tracking", "🎯 بيدوّر على الحاجة ويتابعها فريم فريم", run_typo_track, body.block, float(body.t), box, mode, pt, body.fx)
+
+
+def run_typo_track(pid: str, bi: int, t: float, box: list[float] | None, mode: str, pt: list[float] | None = None, is_fx: bool = False) -> None:
+    try:
+        import tracker
+        d = typo_load(pid)
+        to_src = typo_frame_map(d)
+        key = "fx" if is_fx else "blocks"
+        lst = d[key]
+        b = lst[bi]
+        src = TYPO_PROJ / pid / d["source"]["file"]
+        if is_fx:
+            bt0, bt1 = b["t0"], b["t1"]
+        else:
+            words = d.get("words") or []
+            bt0 = words[b["from"]]["s"] if words and b.get("from") is not None else 0
+            nxt = lst[bi + 1] if bi + 1 < len(lst) else None
+            bt1 = words[nxt["from"]]["s"] if nxt and words else (d.get("duration") or bt0 + 5)
+        quad = None
+        if box and len(box) == 8:   # الحاجة اللي نوّرت تحت الماوس: حدودها جاهزة
+            quad = [v for j in range(4) for v in to_src(box[j * 2], box[j * 2 + 1])]
+            if mode == "auto":
+                mode = "follow"
+            box = [0.0, 0.0, 0.0, 0.0]
+        if pt:   # دوسة: البرنامج بيلاقي حدود الحاجة في الفريم ده (وبيعرف هي ورقة/شاشة ولا حاجة بتتحرك)
+            typo_set(pid, step="🎯 بيدوّر على حدود الحاجة اللي دوست عليها")
+            spt = to_src(pt[0], pt[1])
+            pm = TYPO_PROJ / pid / "person" / f"m_{int(round(t * TYPO_FPS)):05d}.webp"
+            quad, kind = tracker.detect(str(src), t, list(spt), str(pm) if pm.exists() else None)
+            if mode == "auto":
+                mode = kind
+            sx0 = sy0 = sx1 = sy1 = 0.0
+        elif quad is None:
+            (sx0, sy0), (sx1, sy1) = to_src(box[0], box[1]), to_src(box[2], box[3])
+            if mode == "auto":
+                mode = "follow"
+        else:
+            sx0 = sy0 = sx1 = sy1 = 0.0
+        res = tracker.track(str(src), max(0.0, bt0 - 0.2), bt1 + 0.2, t, [sx0, sy0, sx1, sy1], mode,
+                            progress=lambda f: typo_set(pid, step=f"🎯 بيتابع الحاجة: {int(f * 100)}٪"), quad=quad)
+        tid = f"tr{uuid.uuid4().hex[:6]}"
+
+        def fn(x):
+            tr = x.setdefault("tracks", {})
+            old = ((x[key][bi].get("xf") or {}).get("tr"))
+            tr[tid] = res
+            xf = {**(x[key][bi].get("xf") or {}), "tr": tid, "tref": round(t, 3)}
+            x[key][bi]["xf"] = xf
+            used = {(bb.get("xf") or {}).get("tr") for bb in [*x.get("blocks", []), *x.get("fx", [])]}
+            if old and old not in used:
+                tr.pop(old, None)
+            x.update(status=typo_idle(x), step=None, error=None, final=None)
+        typo_update(pid, fn)
+    except Exception as exc:  # noqa: BLE001
+        typo_fail(pid, exc)
+
+
+TYPO_REGIONS: dict = {}
+
+
+@app.get("/api/typo/{pid}/regions")
+def typo_regions(pid: str, t: float):
+    """🖱️ الحاجات اللي في الفريم ده وحدودها (بكسور من كادر الفيديو النهائي)، وخريطة صغيرة للماوس."""
+    import tracker
+    d = typo_load(pid)
+    src = d.get("source") or {}
+    if src.get("kind") != "video" or not src.get("file"):
+        raise HTTPException(400, "التراك بيشتغل على الفيديو اللي رفعته")
+    fi = int(round(t * TYPO_FPS))
+    key = (pid, src["file"], fi, d.get("ratio"))
+    if key in TYPO_REGIONS:
+        return TYPO_REGIONS[key]
+    W, H = TYPO_RATIOS.get(d.get("ratio"), TYPO_RATIOS["9:16"])
+    sw, sh = src["w"], src["h"]
+    k = max(W / sw, H / sh)
+    ox, oy = (sw * k - W) / 2, (sh * k - H) / 2
+    fx = lambda x: (x * sw * k - ox) / W  # noqa: E731
+    fy = lambda y: (y * sh * k - oy) / H  # noqa: E731
+    pm = TYPO_PROJ / pid / "person" / f"m_{fi:05d}.webp"
+    head = None
+    pj = TYPO_PROJ / pid / "person" / "person.json"
+    if pj.exists():
+        try:
+            pf = json.loads(pj.read_text(encoding="utf-8"))["frames"]
+            f0 = pf[min(fi, len(pf) - 1)] if pf else None
+            head = f0["head"] if f0 else None
+        except (OSError, ValueError, KeyError, TypeError):
+            head = None
+    regs, grid = tracker.regions(str(TYPO_PROJ / pid / src["file"]), t, str(pm) if pm.exists() else None, head)
+    out = [{"kind": r["kind"], "name": r["name"], "poly": [[round(fx(x), 4), round(fy(y), 4)] for x, y in r["poly"]],
+            "quad": [round(fx(r["quad"][j]) if j % 2 == 0 else fy(r["quad"][j]), 5) for j in range(8)]} for r in regs]
+    gw = 72
+    gh = max(1, round(gw * H / W))
+    gh_s, gw_s = grid.shape
+    cells = []
+    for gy in range(gh):
+        for gx in range(gw):
+            X, Y = (gx + 0.5) / gw, (gy + 0.5) / gh   # كادر الفيديو النهائي ← الفيديو الأصلي
+            sx, sy = (X * W + ox) / (sw * k), (Y * H + oy) / (sh * k)
+            cells.append(int(grid[min(gh_s - 1, max(0, int(sy * gh_s))), min(gw_s - 1, max(0, int(sx * gw_s)))]) if 0 <= sx < 1 and 0 <= sy < 1 else -1)
+    res = {"t": t, "regions": out, "grid": {"w": gw, "h": gh, "cells": cells}}
+    if len(TYPO_REGIONS) > 200:
+        TYPO_REGIONS.clear()
+    TYPO_REGIONS[key] = res
+    return res
+
+
+# ---------------------------------------------------------------- 🪄 المشهد: تغيير الخلفية ورا الشخص وشيل الحاجات
+# بيشتغل على فيديو المونتاج (مشروع التايبوجرافي المخفي): ماسك الشخص فريم فريم + حركة الكاميرا في كل لقطة.
+# المعاينة بتتعمل في المتصفح (طبقة فوق الفيديو)، والتصدير بيتركّب في السيرفر قبل الكابشن واللوجو.
+
+BGX_KINDS = ("off", "color", "image", "video", "blur")
+BG_AI_COST = 0.05   # تقريبًا: صورة واحدة Nano Banana 2
+
+
+def scene_cam(pid: str, d: dict, make: bool = False) -> dict | None:
+    """حركة الكاميرا واللقطات (بتتحسب مرة واحدة لكل فيديو)."""
+    src = (d.get("source") or {}).get("file")
+    if not src:
+        return None
+    f = TYPO_PROJ / pid / "scene_cam.json"
+    if f.exists():
+        try:
+            c = json.loads(f.read_text(encoding="utf-8"))
+            if c.get("src") == src:
+                return c
+        except ValueError:
+            pass
+    if not make:
+        return None
+    pd = TYPO_PROJ / pid / "person"
+    c = scene.camera(str(TYPO_PROJ / pid / src), pd if pd.exists() else None,
+                     progress=lambda x: typo_set(pid, step=f"🎥 بيحسب حركة الكاميرا: {int(x * 100)}٪"))
+    c["src"] = src
+    f.write_text(json.dumps(c), encoding="utf-8")
+    return c
+
+
+def scene_person(pid: str) -> dict | None:
+    pj = TYPO_PROJ / pid / "person" / "person.json"
+    try:
+        return json.loads(pj.read_text(encoding="utf-8")) if pj.exists() else None
+    except ValueError:
+        return None
+
+
+def scene_shots(d: dict, cam: dict | None, pinfo: dict | None) -> list[list]:
+    """[[f0, f1, on]]: الخلفية بتتغير في اللقطات اللي فيها الشخص (أو اللي المستخدم اختارها بنفسه)."""
+    if not cam:
+        return []
+    auto = scene.shots_on(cam["shots"], (pinfo or {}).get("frames") or [])
+    pick = ((d.get("bgx") or {}).get("shots")) or {}
+    return [[f0, f1, bool(pick.get(str(j), auto[j]))] for j, (f0, f1) in enumerate(cam["shots"])]
+
+
+def scene_active(d: dict) -> bool:
+    return (d.get("bgx") or {}).get("kind", "off") != "off" or bool(d.get("removals"))
+
+
+@app.get("/api/typo/{pid}/scene/doc")
+def typo_scene_get(pid: str):
+    """المعاينة: ماسك الشخص، الخلفية الجديدة، حركة الكاميرا (بكسل الكادر)، والحاجات اللي اتشالت."""
+    d = typo_load(pid)
+    src = d.get("source") or {}
+    base = f"/media/typo/projects/{pid}"
+    pinfo = scene_person(pid)
+    cam = scene_cam(pid, d)
+    bgx = {"kind": "off", "color": "#101010", "blur": 24, "dim": 0.0, "follow": True, **(d.get("bgx") or {})}
+    if bgx.get("file") and (TYPO_PROJ / pid / bgx["file"]).exists():
+        bgx["url"] = f"{base}/{bgx['file']}"
+    out = {"w": None, "h": None, "fps": TYPO_FPS, "person": None, "bgx": bgx, "shots": scene_shots(d, cam, pinfo), "cam": None,
+           "removals": [], "src": f"{base}/{src['file']}" if src.get("file") else None, "duration": src.get("duration"),
+           "ready": {"source": bool(src.get("file")), "person": bool(pinfo), "camera": bool(cam)}, "busy": d.get("status") in TYPO_BUSY,
+           "step": d.get("step"), "status": d.get("status"), "error": d.get("error")}
+    if src.get("file"):
+        doc = typo_doc(pid, d)
+        out.update(w=doc["w"], h=doc["h"], person=doc["person"])
+        if cam and bgx.get("follow"):
+            W, H = doc["w"], doc["h"]
+            k = max(W / src["w"], H / src["h"])
+            ox, oy = (src["w"] * k - W) / 2, (src["h"] * k - H) / 2
+            A = np.array([[k, 0, -ox], [0, k, -oy], [0, 0, 1]])
+            Ai = np.linalg.inv(A)
+            out["cam"] = [[round(float(v), 4) for v in (A @ scene.cam_mat(c) @ Ai)[:2].reshape(-1)] for c in cam["cam"]]
+    for r in d.get("removals") or []:
+        f = TYPO_PROJ / pid / f"rm_{r['id']}.mp4"
+        if f.exists():
+            out["removals"].append({**{k: r.get(k) for k in ("id", "name", "f0", "f1", "t", "holes", "ai")},
+                                    "url": f"{base}/rm_{r['id']}.mp4?v={int(f.stat().st_mtime)}"})
+    return out
+
+
+class SceneBgIn(BaseModel):
+    kind: str | None = None
+    color: str | None = None
+    blur: float | None = None
+    dim: float | None = None
+    follow: bool | None = None
+    shots: dict[str, bool] | None = None
+    prompt: str | None = None
+
+
+@app.patch("/api/typo/{pid}/bgx")
+def typo_bgx(pid: str, body: SceneBgIn):
+    def fn(x):
+        g = {"kind": "off", "color": "#101010", "blur": 24, "dim": 0.0, "follow": True, **(x.get("bgx") or {})}
+        if body.kind is not None:
+            if body.kind not in BGX_KINDS:
+                raise HTTPException(400, "نوع خلفية مش معروف")
+            if body.kind in ("image", "video") and not (g.get("file") and Path(g["file"]).suffix.lower() in (IMAGE_EXTENSIONS if body.kind == "image" else {".mp4"})):
+                raise HTTPException(400, "ارفع الصورة أو الفيديو الأول")
+            g["kind"] = body.kind
+        if body.color is not None and re.fullmatch(r"#[0-9a-fA-F]{6}", body.color):
+            g["color"] = body.color
+        if body.blur is not None:
+            g["blur"] = max(2.0, min(80.0, float(body.blur)))
+        if body.dim is not None:
+            g["dim"] = max(0.0, min(0.8, float(body.dim)))
+        if body.follow is not None:
+            g["follow"] = bool(body.follow)
+        if body.shots is not None:
+            g["shots"] = {str(k): bool(v) for k, v in body.shots.items() if str(k).isdigit()}
+        x["bgx"] = g
+        x["final"] = None
+    typo_update(pid, fn)
+    return typo_scene_get(pid)
+
+
+def bgx_set_file(pid: str, name: str, kind: str) -> None:
+    old = (typo_load(pid).get("bgx") or {}).get("file")
+
+    def fn(x):
+        x["bgx"] = {"color": "#101010", "blur": 24, "dim": 0.0, "follow": True, **(x.get("bgx") or {})}
+        x["bgx"].update(file=name, kind=kind)
+        x["final"] = None
+    typo_update(pid, fn)
+    if old and old != name:
+        (TYPO_PROJ / pid / Path(old).name).unlink(missing_ok=True)
+
+
+@app.post("/api/typo/{pid}/bgx/file")
+def typo_bgx_file(pid: str, file: UploadFile = File(...)):
+    """🖼️ خلفية من عندك: صورة أو فيديو (الفيديو بيتحوّل لـ mp4 عشان يشتغل في المعاينة والتصدير)."""
+    typo_load(pid)
+    folder = TYPO_PROJ / Path(pid).name
+    ext = Path(file.filename or "").suffix.lower()
+    if ext in IMAGE_EXTENSIONS:
+        bgx_set_file(pid, save_upload(file, IMAGE_EXTENSIONS, folder, "bgx"), "image")
+    elif ext in VIDEO_EXTENSIONS:
+        raw = save_upload(file, VIDEO_EXTENSIONS, folder, "bgxraw")
+        name = f"bgx_{uuid.uuid4().hex[:8]}.mp4"
+        try:
+            r = subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(folder / raw), "-t", "120", "-an",
+                                "-vf", "scale='if(gt(iw,ih),-2,min(1080,iw))':'if(gt(iw,ih),min(1080,ih),-2)',fps=30", "-c:v", "libx264",
+                                "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(folder / name)],
+                               capture_output=True, text=True, timeout=900)
+        finally:
+            (folder / raw).unlink(missing_ok=True)
+        if r.returncode != 0:
+            (folder / name).unlink(missing_ok=True)
+            raise HTTPException(400, f"مش قادر أقرا الفيديو ده: {r.stderr[-200:]}")
+        bgx_set_file(pid, name, "video")
+    else:
+        raise HTTPException(400, "ارفع صورة (png / jpg / webp) أو فيديو (mp4 / mov)")
+    return typo_scene_get(pid)
+
+
+def scene_frame(pid: str, d: dict, fi: int, out: Path) -> Path:
+    src = TYPO_PROJ / pid / d["source"]["file"]
+    subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{fi / TYPO_FPS:.3f}", "-i", str(src),
+                    "-frames:v", "1", "-q:v", "2", str(out)], check=True, capture_output=True, timeout=120)
+    return out
+
+
+def scene_ref_frame(pid: str, d: dict) -> int:
+    """فريم فيه الشخص باين (نص أول لقطة فيها شخص) عشان الـ AI يفهم المكان والزاوية."""
+    cam = scene_cam(pid, d)
+    pinfo = scene_person(pid)
+    for f0, f1, on in scene_shots(d, cam, pinfo):
+        if on:
+            return (f0 + f1) // 2
+    return int((d.get("duration") or 1) * TYPO_FPS / 2)
+
+
+@app.post("/api/typo/{pid}/bgx/ai")
+def typo_bgx_ai(pid: str, body: SceneBgIn):
+    """✨ خلفية بالـ AI: صورة واحدة بنفس زاوية الكاميرا (من فريم من الفيديو) والمكان اللي اتوصف."""
+    if not (body.prompt or "").strip():
+        raise HTTPException(400, "اكتب وصف للخلفية اللي عايزها")
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل")
+    d = typo_load(pid)
+    if not (d.get("source") or {}).get("file"):
+        raise HTTPException(400, "جهّز المشهد الأول")
+    return typo_start(pid, "scene", "✨ بيعمل الخلفية بالـ AI", run_bgx_ai, body.prompt.strip()[:600])
+
+
+def run_bgx_ai(pid: str, prompt: str) -> None:
+    try:
+        d = typo_load(pid)
+        folder = TYPO_PROJ / pid
+        ref = scene_frame(pid, d, scene_ref_frame(pid, d), folder / ".bgx_ref.jpg")
+        name = f"bgx_{uuid.uuid4().hex[:8]}.png"
+        w, h = d["source"]["w"], d["source"]["h"]
+        if atlas.mock_mode():
+            from PIL import Image, ImageDraw
+            im = Image.new("RGB", (w, h), (40, 70, 110))
+            dr = ImageDraw.Draw(im)
+            for j in range(0, h, 40):
+                dr.rectangle([0, j, w, j + 18], fill=(60 + j % 120, 90, 140))
+            im.save(folder / name)
+        else:
+            full = (f"Using IMAGE 1 only for the camera angle, framing, perspective and lighting direction: create an empty background plate "
+                    f"of this place: {prompt}. Remove the person and everything in front of the camera completely; no people, no hands, "
+                    "no text, no logos. Photorealistic, same eye-level camera height and lens as IMAGE 1, natural light, slightly soft focus "
+                    "like a real background behind a person talking to camera.")
+            atlas.download(atlas.generate_image("nano2", full, f"{w}x{h}", "medium", [atlas.reference_url(ref)]), folder / name)
+        ref.unlink(missing_ok=True)
+        bgx_set_file(pid, name, "image")
+        typo_update(pid, lambda x: (x["bgx"].update(prompt=prompt), x.update(status=typo_idle(x), step=None, error=None)))
+    except Exception as exc:  # noqa: BLE001
+        typo_fail(pid, exc)
+
+
+class SceneRemoveIn(BaseModel):
+    t: float
+    polys: list[list[list[float]]]   # حدود الحاجة (أو أكتر من حتة) بكسور من كادر الفيديو النهائي
+    name: str = "حاجة"
+    ai: bool = False
+
+
+@app.post("/api/projects/{project_id}/scene")
+def montage_scene(project_id: str):
+    """🪄 تجهيز المشهد: فيديو المونتاج + فصل الشخص + حركة الكاميرا (مرة واحدة، والتايبوجرافي لو موجودة بتفضل زي ما هي)."""
+    res = montage_typo(project_id, MontageTypoIn(run=False))
+    tid = res["id"]
+    with closing(db()) as conn:
+        data = json.loads(get_project(conn, project_id)["data"])
+        segments, voice, music, _ = build_montage(conn, data)
+    total = sum(sg.duration for sg in segments)
+    return typo_start(tid, "scene", "🪄 بيجهّز المشهد", run_scene_prep, segments, voice, music, total)
+
+
+def run_scene_prep(tid: str, segments, voice, music, total: float) -> None:
+    try:
+        d = typo_load(tid)
+        src = d.get("source") or {}
+        if not src.get("file") or abs(float(src.get("duration") or 0) - total) > 0.25:
+            montage_source(tid, segments, voice, music, keep=True)
+            d = typo_load(tid)
+        if not scene_person(tid):
+            if not person.available():
+                raise RuntimeError("فصل الشخص مش متاح على السيرفر ده")
+            typo_person(tid, TYPO_PROJ / tid / d["source"]["file"], float(d["source"]["duration"]))
+            if not scene_person(tid):
+                raise RuntimeError("مالقيتش شخص في الفيديو أفصله عن الخلفية")
+        typo_set(tid, step="🎥 بيحسب حركة الكاميرا")
+        scene_cam(tid, typo_load(tid), make=True)
+        typo_update(tid, lambda x: x.update(status=typo_idle(x), step=None, error=None))
+    except Exception as exc:  # noqa: BLE001
+        typo_fail(tid, exc)
+
+
+@app.post("/api/typo/{pid}/remove")
+def typo_remove(pid: str, body: SceneRemoveIn):
+    """🧽 شيل حاجة: الحدود اللي اتحددت في الثانية t بتتتبع طول اللقطة، والمكان بيتملا من الفريمات التانية."""
+    d = typo_load(pid)
+    if not (d.get("source") or {}).get("file"):
+        raise HTTPException(400, "جهّز المشهد الأول")
+    polys = [p for p in body.polys if len(p) >= 3]
+    if not polys:
+        raise HTTPException(400, "حدد الحاجة اللي عايز تشيلها")
+    if body.ai and not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل")
+    to_src = typo_frame_map(d)
+    rid = uuid.uuid4().hex[:8]
+    spec = {"id": rid, "t": round(body.t, 3), "name": body.name[:30] or "حاجة", "ai": body.ai,
+            "polys": [[[round(v, 5) for v in to_src(x, y)] for x, y in p] for p in polys]}
+    return typo_start(pid, "scene", f"🧽 بيشيل {spec['name']}", run_scene_remove, spec)
+
+
+@app.post("/api/typo/{pid}/remove/{rid}/ai")
+def typo_remove_ai(pid: str, rid: str):
+    """✨ المكان اللي عمره ما ظهر يتملا بالـ AI (صورة واحدة) بدل الملء التقريبي."""
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل")
+    d = typo_load(pid)
+    r = next((x for x in d.get("removals") or [] if x["id"] == rid), None)
+    if not r:
+        raise HTTPException(404, "مش موجودة")
+    return typo_start(pid, "scene", f"✨ بيملا مكان {r['name']} بالـ AI", run_scene_remove, {**r, "ai": True})
+
+
+@app.delete("/api/typo/{pid}/remove/{rid}")
+def typo_remove_del(pid: str, rid: str):
+    def fn(x):
+        x["removals"] = [r for r in x.get("removals") or [] if r["id"] != rid]
+        x["final"] = None
+    typo_update(pid, fn)
+    for f in (f"rm_{rid}.mp4", f"rm_{rid}_m.mp4"):
+        (TYPO_PROJ / Path(pid).name / f).unlink(missing_ok=True)
+    return typo_scene_get(pid)
+
+
+def scene_ai_plate(pid: str, d: dict, fi: int, mask: np.ndarray, name: str) -> np.ndarray:
+    """صورة الفريم من غير الحاجة (Nano Banana 2): الصورة نفسها + نسخة عليها المكان بالأحمر."""
+    import cv2
+    folder = TYPO_PROJ / pid
+    ref = scene_frame(pid, d, fi, folder / ".rm_ref.jpg")
+    img = cv2.imread(str(ref))
+    if atlas.mock_mode():
+        out = cv2.inpaint(img, (cv2.resize(mask, (img.shape[1], img.shape[0])) > 0).astype(np.uint8) * 255, 9, cv2.INPAINT_NS)
+        ref.unlink(missing_ok=True)
+        return out
+    red = img.copy()
+    mm = cv2.resize(mask, (img.shape[1], img.shape[0])) > 0
+    red[mm] = (red[mm] * 0.35 + np.array([0, 0, 255]) * 0.65).astype(np.uint8)
+    marked = folder / ".rm_mark.jpg"
+    cv2.imwrite(str(marked), red)
+    what = "the person" if name == "الشخص" else "the object"
+    prompt = (f"IMAGE 1 is a frame from a video. IMAGE 2 is the same frame with {what} to remove highlighted in red. "
+              f"Remove {what} that is under the red area completely and fill that area with the background that would naturally be "
+              "behind it (continue walls, floor, furniture, lines and lighting). Keep every other pixel exactly the same as IMAGE 1: "
+              "same framing, crop, colors, people and text. Do not add anything new. Output the cleaned IMAGE 1 only, with no red.")
+    h, w = img.shape[:2]
+    out_p = folder / ".rm_ai.png"
+    atlas.download(atlas.generate_image("nano2", prompt, f"{w}x{h}", "medium", [atlas.reference_url(ref), atlas.reference_url(marked)]), out_p)
+    out = cv2.imread(str(out_p))
+    for f in (ref, marked, out_p):
+        f.unlink(missing_ok=True)
+    if out is None:
+        raise RuntimeError("صورة الـ AI مارجعتش")
+    return cv2.resize(out, (w, h), interpolation=cv2.INTER_AREA)
+
+
+def run_scene_remove(pid: str, spec: dict) -> None:
+    try:
+        import tracker
+        d = typo_load(pid)
+        src = TYPO_PROJ / pid / d["source"]["file"]
+        W, H = int(d["source"]["w"]), int(d["source"]["h"])
+        typo_set(pid, step="🎥 بيحسب حركة الكاميرا")
+        cam = scene_cam(pid, d, make=True)
+        fi = int(round(spec["t"] * TYPO_FPS))
+        f0, f1 = next(((a, b) for a, b in cam["shots"] if a <= fi <= b), (fi, fi))
+        polys = spec["polys"]
+        if spec["name"] == "الشخص" and (TYPO_PROJ / pid / "person").exists():
+            mask_fn = scene.person_masks(TYPO_PROJ / pid / "person", W, H)
+        else:
+            # الحاجة بتتتبع (أركان مستطيل حوالين كل الحتت) والحدود بتتحرك معاها
+            pts = np.array([p for poly in polys for p in poly], np.float32)
+            q = tracker._order(cv2_box(pts * [W, H])) / [W, H]
+            typo_set(pid, step=f"🎯 بيتابع {spec['name']}")
+            tr = tracker.track(str(src), f0 / TYPO_FPS, f1 / TYPO_FPS, spec["t"], [0, 0, 0, 0], "follow",
+                               progress=lambda f: typo_set(pid, step=f"🎯 بيتابع {spec['name']}: {int(f * 100)}٪"), quad=q.reshape(-1).tolist())
+            per = [scene.polys_from_track(tr, p, fi, f0, f1) for p in polys]
+            mask_fn = scene.poly_masks({i: [pp[i] for pp in per] for i in range(f0, f1 + 1)}, W, H)
+        plate = None
+        if spec.get("ai"):
+            typo_set(pid, step="✨ الـ AI بيرسم اللي ورا الحاجة")
+            plate = scene_ai_plate(pid, d, fi, mask_fn(fi), spec["name"])
+        rid = spec["id"]
+        typo_set(pid, step=f"🧽 بيشيل {spec['name']}")
+        res = scene.removal(ffmpeg_exe(), str(src), TYPO_PROJ / pid / f"rm_{rid}.tmp.mp4", TYPO_PROJ / pid / f"rm_{rid}_m.tmp.mp4",
+                            f0, f1, fi, mask_fn, cam["cam"], plate,
+                            progress=lambda f: typo_set(pid, step=f"🧽 بيشيل {spec['name']}: {int(f * 100)}٪"))
+        (TYPO_PROJ / pid / f"rm_{rid}.tmp.mp4").replace(TYPO_PROJ / pid / f"rm_{rid}.mp4")
+        (TYPO_PROJ / pid / f"rm_{rid}_m.tmp.mp4").replace(TYPO_PROJ / pid / f"rm_{rid}_m.mp4")
+        item = {**spec, "f0": f0, "f1": f1, "holes": res["holes"], "bbox": res["bbox"]}
+
+        def fn(x):
+            lst = [r for r in x.get("removals") or [] if r["id"] != rid]
+            x["removals"] = [*lst, item]
+            x.update(status=typo_idle(x), step=None, error=None, final=None)
+        typo_update(pid, fn)
+    except Exception as exc:  # noqa: BLE001
+        typo_fail(pid, exc)
+
+
+def cv2_box(pts: np.ndarray) -> np.ndarray:
+    import cv2
+    return cv2.boxPoints(cv2.minAreaRect(pts.astype(np.float32)))
+
+
+def scene_export(tid: str, cmd: list[str], work_dir: Path, progress=None) -> bool:
+    """التصدير: الحاجات اللي اتشالت والخلفية الجديدة بيتركّبوا على فيديو المونتاج (قبل اللوجو والكابشن).
+    بيبدّل دخل أمر التجميع النهائي بالفيديو الجديد. False لو مفيش حاجة تتعمل أو الفيديو اتغيّر بعد التجهيز."""
+    try:
+        d = typo_load(tid)
+    except HTTPException:
+        return False
+    if not scene_active(d) or not (d.get("source") or {}).get("file"):
+        return False
+    try:
+        i = cmd.index("concat") - 1
+    except ValueError:
+        return False
+    total = float(cmd[cmd.index("-t") + 1])
+    if abs(float(d["source"].get("duration") or 0) - total) > 0.25:
+        log_render("🪄 المشهد اتخطّى: المونتاج اتغيّر بعد ما اتجهّز (جهّزه تاني من تاب 🪄)")
+        return False
+    folder = TYPO_PROJ / tid
+    rms = [{"f0": r["f0"], "f1": r["f1"], "clean": str(folder / f"rm_{r['id']}.mp4"), "mask": str(folder / f"rm_{r['id']}_m.mp4")}
+           for r in d.get("removals") or [] if (folder / f"rm_{r['id']}.mp4").exists() and (folder / f"rm_{r['id']}_m.mp4").exists()]
+    bg = None
+    g = d.get("bgx") or {}
+    pinfo = scene_person(tid)
+    cam = scene_cam(tid, d)
+    if g.get("kind", "off") != "off" and pinfo and cam:
+        on = [False] * cam["n"]
+        for f0, f1, o in scene_shots(d, cam, pinfo):
+            for j in range(f0, min(f1 + 1, len(on))):
+                on[j] = o
+        fp = str(folder / g["file"]) if g.get("file") else None
+        bg = {"kind": g["kind"], "color": g.get("color"), "blur": g.get("blur", 24), "dim": g.get("dim", 0), "follow": g.get("follow", True),
+              "image": fp if g["kind"] == "image" else None, "video": fp if g["kind"] == "video" else None,
+              "cam": cam["cam"], "on": on, "person_dir": folder / "person", "n": int(pinfo["n"])}
+    if not rms and not bg:
+        return False
+    out = work_dir / "scene.mp4"
+    scene.composite(ffmpeg_exe(), cmd[i:i + 6], out, montage.WIDTH, montage.HEIGHT, montage.FPS, total, rms, bg, progress)
+    cmd[i:i + 6] = ["-i", str(out)]
+    return True
+
+
+class TypoTrackFixIn(BaseModel):
+    q: list[list[float]]      # الأركان فريم فريم بكسور من كادر الفيديو النهائي (بعد التصليح بالإيد)
+
+
+@app.put("/api/typo/{pid}/tracks/{tid}")
+def typo_track_fix(pid: str, tid: str, body: TypoTrackFixIn):
+    """✋ تصليح التراك بالإيد: الأركان اللي المستخدم سحبها بتتحفظ مكان اللي البرنامج حسبه."""
+    d = typo_load(pid)
+    to_src = typo_frame_map(d)
+    if tid not in (d.get("tracks") or {}):
+        raise HTTPException(404, "التراك ده مش موجود")
+    if len(body.q) != len(d["tracks"][tid]["q"]) or any(len(q) != 8 for q in body.q):
+        raise HTTPException(400, "بيانات التراك ناقصة")
+    qs = [[round(v, 5) for j in range(4) for v in to_src(q[j * 2], q[j * 2 + 1])] for q in body.q]
+
+    def fn(x):
+        x["tracks"][tid]["q"] = qs
+        x["final"] = None
+    typo_update(pid, fn)
+    return {"ok": True}
+
+
+class TypoRenderIn(BaseModel):
+    quality: str = "high"
+
+
+@app.post("/api/typo/{pid}/render")
+def typo_render(pid: str, body: TypoRenderIn, request: Request):
+    """🎬 يرسم الفيديو: المتصفح بيرسم كل فريم، وFFmpeg بيركّبه على الخلفية ومعاه الصوت."""
+    d = typo_load(pid)
+    if not d.get("blocks"):
+        raise HTTPException(400, "وزّع الكلام على الحركات الأول (🧠)")
+    host, port = request.scope.get("server") or ("127.0.0.1", 8000)
+    return typo_start(pid, "rendering", "🎬 بيجهّز", run_typo_render, f"http://127.0.0.1:{port}", body.quality)
+
+
+def typo_browser(p):
+    """Chromium اللي اتثبت مع playwright، ولو مش موجود (على جهاز التطوير) اللي في TYPO_CHROMIUM أو /opt/pw-browsers."""
+    for path in (os.environ.get("TYPO_CHROMIUM"), None, "/opt/pw-browsers/chromium"):
+        try:
+            return p.chromium.launch(executable_path=path) if path else p.chromium.launch()
+        except Exception:  # noqa: BLE001
+            continue
+    raise RuntimeError("المتصفح اللي بيرسم التايبوجرافي مش متثبت على السيرفر (playwright install chromium)")
+
+
+# عناصر بتغيّر الفيديو اللي تحتها نفسه (مش بس الكلام اللي فوقه): بتتعمل هنا على الخلفية في وقت البلوك بس
+TYPO_BG_GRADE = {"desatpop": "hue=s=0:enable='between(t,{a},{b})',boxblur=12:enable='between(t,{a},{b})',"
+                             "colorchannelmixer=rr=.85:gg=.85:bb=.85:enable='between(t,{a},{b})'"}
+
+
+def typo_bg_grade(doc: dict) -> str:
+    out = ""
+    for b in doc.get("blocks") or []:
+        g = TYPO_BG_GRADE.get(b.get("kind"))
+        if g and b.get("t1", 0) > b.get("t0", 0):
+            out += "," + g.format(a=f"{float(b['t0']):.3f}", b=f"{float(b['t1']):.3f}")
+    return out
+
+
+def run_typo_render(pid: str, base: str, quality: str) -> None:
+    folder = TYPO_PROJ / pid
+    tmp_v = folder / f".render_{uuid.uuid4().hex[:6]}.mp4"
+    try:
+        from playwright.sync_api import sync_playwright
+
+        d = typo_load(pid)
+        doc = typo_doc(pid, d)
+        W, H = doc["w"], doc["h"]
+        scale = 1.0 if quality == "high" else 2 / 3
+        vw, vh = int(W * scale) // 2 * 2, int(H * scale) // 2 * 2
+        dur = float(doc["duration"])
+        n = max(1, int(math.ceil(dur * TYPO_FPS)))
+        bg = d.get("bg") or {}
+        kind = bg.get("kind", "theme")
+        src = (d.get("source") or {}).get("file")
+        cmd = [ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y"]
+        inputs, fl, bg_pts = 0, "", ""
+        # المتصفح بيصوّر الفريم بمقاسه الكامل حتى في الجودة الأسرع، فبيتصغّر هنا على مقاس الفيديو
+        rs = f"scale={vw}:{vh}," if scale != 1 else ""
+        if kind == "solid" or kind == "none":
+            cmd += ["-f", "lavfi", "-i", f"color=c={bg.get('color') or '#101010'}:s={vw}x{vh}:r={TYPO_FPS}:d={dur:.3f}"]
+            inputs = 1
+        elif kind in ("image", "video", "source") and (bg.get("file") or src):
+            f = folder / (src if kind == "source" else bg["file"])
+            cmd += (["-loop", "1", "-framerate", str(TYPO_FPS), "-t", f"{dur:.3f}", "-i", str(f)] if kind == "image"
+                    else ["-stream_loop", "-1", "-t", f"{dur:.3f}", "-i", str(f)])
+            # الفيديو اللي بيعيد نفسه (stream_loop) توقيته بيقفز عند كل لفة، والكلام اللي فوقه كان بيتأخر ثانية ويقف:
+            # بنعدّ فريمات الخلفية من الأول بسرعتها الأصلية عشان التوقيت يمشي مستقيم
+            # (فيديو الخلفية المرفوع بس: الفيديو الأصلي بتاع الكلام مربوط بالصوت ومش بيلف)
+            if kind == "video":
+                bg_pts = f"setpts=N/{media_info(f).fps or 30:g}/TB,"
+            inputs = 1
+        # من غير خلفية تحت: الفريم كامل JPEG (أسرع بكتير)، وفوق خلفية: PNG شفاف والحبيبات بتتحط هنا
+        cmd += ["-f", "image2pipe", "-framerate", str(TYPO_FPS), "-c:v", "png" if inputs else "mjpeg", "-i", "-"]
+        if inputs:
+            dim = float(bg.get("dim") or 0)
+            grain = float(typo_style(d.get("style")).get("grain") or 0)
+            fl = (f"[0:v]{bg_pts}scale={vw}:{vh}:force_original_aspect_ratio=increase,crop={vw}:{vh},setsar=1,fps={TYPO_FPS}"
+                  + (f",colorchannelmixer=rr={1 - dim}:gg={1 - dim}:bb={1 - dim}" if dim else "") + typo_bg_grade(doc) + "[bg];"
+                  + (f"[1:v]scale={vw}:{vh}[ov];[bg][ov]" if scale != 1 else "[bg][1:v]") + "overlay=0:0:shortest=1" + (f",noise=alls={int(grain * 35)}:allf=t" if grain else "") + ",format=yuv420p[v]")
+        audio_in, audio_path = None, None
+        nxt = inputs + 1
+        if src and (d.get("source") or {}).get("kind") in ("audio", "video"):
+            cmd += ["-i", str(folder / src)]
+            audio_in, audio_path, nxt = nxt, folder / src, nxt + 1
+        elif kind == "video" and bg.get("file") and media_info(folder / bg["file"]).has_audio:
+            # الكلام مكتوب والفيديو خلفية: صوت الفيديو نفسه بيفضل في الفيديو النهائي
+            cmd += ["-stream_loop", "-1", "-t", f"{dur:.3f}", "-i", str(folder / bg["file"])]
+            audio_in, audio_path, nxt = nxt, folder / bg["file"], nxt + 1
+        # 🔊 الأصوات الرسمية: كليك على كل ظهور/اختفاء، وكيبورد على كتابة الرسايل
+        sfx_in = None
+        sfx_wav = folder / ".sfx.wav"
+        if d.get("sfx", "on") != "off" and sfx.render(TYPO_SFX, doc["blocks"], dur, sfx_wav, seed=sum(map(ord, pid)), level=typo_sfx_level(d)):
+            cmd += ["-i", str(sfx_wav)]
+            sfx_in = nxt
+        if audio_in is not None and sfx_in is not None:
+            has_a = media_info(audio_path).has_audio
+            # الكليك على قد علو الفيديو: لو الكلام عالي (بودكاست/ريلز) الكليك بيعلى معاه، والكلام بيوطى شوية،
+            # وفي الآخر ليميتر عشان الصوت مايتكسرش (من غيره الكليك كان بيضيع تحت الكلام العالي)
+            g = typo_sfx_gain(audio_path) if has_a else 1.0
+            fl = (fl + ";" if fl else f"[{inputs}:v]{rs}format=yuv420p[v];") + (
+                f"[{audio_in}:a]volume=0.8[va];[{sfx_in}:a]volume={g:.2f}[fa];[va][fa]amix=inputs=2:duration=longest:normalize=0,alimiter=limit=0.95[a]"
+                if has_a else f"[{sfx_in}:a]anull[a]")
+            cmd += ["-filter_complex", fl, "-map", "[v]", "-map", "[a]", "-c:a", "aac", "-b:a", "160k"]
+        else:
+            if fl:
+                cmd += ["-filter_complex", fl, "-map", "[v]"]
+            else:
+                cmd += ["-map", f"{inputs}:v", "-vf", f"{rs}format=yuv420p"]
+            if audio_in is not None:
+                cmd += ["-map", f"{audio_in}:a?", "-c:a", "aac", "-b:a", "160k", "-shortest"]
+            elif sfx_in is not None:
+                cmd += ["-map", f"{sfx_in}:a", "-c:a", "aac", "-b:a", "160k"]
+        # سقف للحجم: الحبيبات بتخلّي الملف يكبر جدًا من غير حد
+        cmd += ["-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-maxrate", "12M", "-bufsize", "24M",
+                "-r", str(TYPO_FPS), "-t", f"{dur:.3f}", "-movflags", "+faststart", str(tmp_v)]
+        proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+        with sync_playwright() as p:
+            browser = typo_browser(p)
+            try:
+                ctx = browser.new_context(viewport={"width": W, "height": H}, device_scale_factor=scale)
+                ctx.add_cookies([{"name": SESSION_COOKIE, "value": auth.make_token(), "url": base}])
+                page = ctx.new_page()
+                page.goto(f"{base}/typo-render.html?id={pid}", wait_until="load", timeout=60000)
+                page.evaluate("window.typoReady")
+                cdp = ctx.new_cdp_session(page)
+                if inputs:
+                    cdp.send("Emulation.setDefaultBackgroundColorOverride", {"color": {"r": 0, "g": 0, "b": 0, "a": 0}})
+                shot = {"format": "png", "optimizeForSpeed": True} if inputs else {"format": "jpeg", "quality": 93, "optimizeForSpeed": True}
+                for i in range(n):
+                    page.evaluate(f"renderAt({i / TYPO_FPS:.4f})")
+                    proc.stdin.write(base64.b64decode(cdp.send("Page.captureScreenshot", shot)["data"]))
+                    if i % TYPO_FPS == 0:
+                        typo_set(pid, step=f"🎬 بيرسم {i // TYPO_FPS} من {int(dur)} ثانية")
+            finally:
+                browser.close()
+        proc.stdin.close()
+        err = proc.stderr.read().decode(errors="ignore")
+        if proc.wait(timeout=600) != 0:
+            raise RuntimeError(f"FFmpeg: {err.strip()[-300:]}")
+        (folder / ".sfx.wav").unlink(missing_ok=True)
+        name = f"typo-{uuid.uuid4().hex[:4]}.mp4"
+        tmp_v.replace(folder / name)
+        def fin(x):
+            if x.get("final"):
+                (folder / x["final"]).unlink(missing_ok=True)
+            x["final"] = name
+        typo_update(pid, fin)
+        typo_update(pid, lambda x: x.update(status="done", step=None, error=None))
+    except Exception as exc:  # noqa: BLE001
+        tmp_v.unlink(missing_ok=True)
+        typo_fail(pid, exc)
+
+
+@app.post("/api/typo/{pid}/to-editor")
+def typo_to_editor(pid: str):
+    """🎞️ الفيديو في مونتاج الإعلانات (بصوته)."""
+    d = typo_load(pid)
+    src = d.get("source") or {}
+    # الكلام فوق الفيديو بتاعك: الفيديو الأصلي بيروح للمونتاج والتايبوجرافي بتفضل طبقة تتعدّل هناك (خط «🔤 تايبوجرافي»)
+    linked = src.get("kind") == "video" and (d.get("bg") or {}).get("kind") == "source" and bool(d.get("blocks"))
+    f = TYPO_PROJ / pid / (src.get("file") if linked else (d.get("final") or ""))
+    if not linked and (not d.get("final") or not f.exists()):
+        raise HTTPException(400, "اعمل الفيديو الأول (🎬)")
+    gid = uuid.uuid4().hex[:12]
+    shutil.copy(f, GENERATED_DIR / f"{gid}.mp4")
+    label = d.get("name") or "تايبوجرافي"
+    with closing(db()) as conn, conn:
+        conn.execute(
+            "INSERT INTO generations (id, clip_id, clip_filename, clip_label, coach_id, coach_name, coach_image, model, prompt, "
+            "params, status, output_filename, created_at, updated_at) VALUES (?, ?, ?, ?, '', '', '', 'typo', '', '{}', 'completed', ?, ?, ?)",
+            (gid, f"ad:typo-{pid}", f.name, f"🔤 {label}", f"{gid}.mp4", now(), now()))
+        clips = [{"gen_id": gid, "start": 0.0, "end": round(probe_duration(GENERATED_DIR / f"{gid}.mp4"), 3), "zoom": 1.0, "x": 0.0, "y": 0.0, "volume": 1.0}]
+        prj = uuid.uuid4().hex[:12]
+        pdata = {"name": label, "section": "ads", "video_id": None, "coach_id": None, "clips": clips, "voice": None,
+                 "music": None, "outro": False, "outro_volume": 1.0, "captions": {}, "logo": {},
+                 **({"typo_id": pid, "typo_on": True, "typo_sfx": {"on": True, "volume": 1.0}} if linked else {})}
+        conn.execute("INSERT INTO projects (id, name, data, render_status, created_at, updated_at) VALUES (?, ?, ?, 'idle', ?, ?)",
+                     (prj, label, json.dumps(pdata, ensure_ascii=False), now(), now()))
+    return {"project_id": prj}
+
+
+def reset_stuck_typo() -> None:
+    for f in TYPO_PROJ.glob("*/typo.json"):
+        try:
+            d = json.loads(f.read_text(encoding="utf-8"))
+        except ValueError:
+            continue
+        if d.get("status") in TYPO_BUSY:
+            d.update(status="failed", step=None, error="اتقطع لما السيرفر اتقفل. دوس الزرار تاني")
+            f.write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+
+
+reset_stuck_typo()
+
+
+# ---------------------------------------------------------------- 🌍 الدبلجة باللهجات العامية
+# فيديو (من برّه أو من الفيديوهات الجاهزة) ← الكلام بيتسمع ← يتحوّل للهجة (تقدر تعدّله) ← كل جملة بصوت جاهز في مكانها
+# ← الموسيقى والمؤثرات بتفضل (AudioShake) ← ليب سينك (اختياري) ← نسخة في الفيديوهات الجاهزة للنشر لكل لهجة.
+
+import dub  # noqa: E402
+import fasih  # noqa: E402
+
+DUB_DIR = DATA_DIR / "dub"
+DUB_DIR.mkdir(parents=True, exist_ok=True)
+DUB_LOCK = threading.Lock()
+app.mount("/media/dub", StaticFiles(directory=DUB_DIR), name="dub")
+
+
+def dub_load(did: str) -> dict:
+    f = DUB_DIR / Path(did).name / "dub.json"
+    if not f.exists():
+        raise HTTPException(404, "مشروع الدبلجة ده مش موجود")
+    return json.loads(f.read_text(encoding="utf-8"))
+
+
+def dub_update(did: str, fn) -> dict:
+    with DUB_LOCK:
+        d = dub_load(did)
+        fn(d)
+        d["updated_at"] = now()
+        folder = DUB_DIR / Path(did).name
+        (folder / "dub.json.tmp").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+        (folder / "dub.json.tmp").replace(folder / "dub.json")
+        return d
+
+
+def dub_busy(d: dict) -> bool:
+    return bool(d.get("busy")) or any(t.get("busy") for t in (d.get("targets") or {}).values())
+
+
+def dub_to_dict(did: str, d: dict) -> dict:
+    base = f"/media/dub/{did}"
+    folder = DUB_DIR / did
+    def url(n):
+        return f"{base}/{n}?v={int((folder / n).stat().st_mtime)}" if n and (folder / n).exists() else None
+    targets = {}
+    for k, t in (d.get("targets") or {}).items():
+        if k not in dub.DIALECTS:   # لهجة من نسخة قديمة
+            continue
+        texts = [x["text"] for x in t.get("lines") or []]
+        targets[k] = {**t, "video_url": url(t.get("video")), "audio_url": url(t.get("audio")),
+                      "cost": {v: dub.estimate(texts, v, d["source"].get("duration") or 0, None) for v in dub.DIALECTS[k]["voices"]},
+                      "lip_cost": {m: round((d["source"].get("duration") or 0) * x["per_sec"], 2) for m, x in dub.LIPSYNC.items()}}
+    return {**d, "id": did, "busy": dub_busy(d), "source": {**d["source"], "url": url(d["source"].get("file"))}, "targets": targets}
+
+
+def dub_info() -> dict:
+    return {"dialects": {k: {"label": v["label"], "voices": v["voices"], "group": v["group"]} for k, v in dub.DIALECTS.items()},
+            "voices": {k: v["label"] for k, v in dub.VOICES.items()},
+            "fasih": bool(fasih.api_key() or atlas.mock_mode()),
+            "lipsync": {k: v["label"] for k, v in dub.LIPSYNC.items()},
+            "separate": bool(audioshake.api_key() or atlas.mock_mode())}
+
+
+@app.get("/api/dub")
+def dub_list():
+    out = []
+    for f in sorted(DUB_DIR.glob("*/dub.json"), key=lambda x: x.stat().st_mtime, reverse=True):
+        try:
+            d = json.loads(f.read_text(encoding="utf-8"))
+        except ValueError:
+            continue
+        if d.get("client_id") and d["client_id"] != active_client_id():
+            continue
+        out.append({"id": f.parent.name, "name": d.get("name"), "busy": dub_busy(d), "targets": list((d.get("targets") or {}).keys()),
+                    "duration": (d.get("source") or {}).get("duration"), "updated_at": d.get("updated_at")})
+    return {"items": out, **dub_info()}
+
+
+def dub_create(src: Path, name: str) -> dict:
+    did = uuid.uuid4().hex[:10]
+    folder = DUB_DIR / did
+    folder.mkdir(parents=True)
+    file = f"src{src.suffix.lower() or '.mp4'}"
+    shutil.move(str(src), folder / file)
+    try:
+        info = media_info(folder / file)
+    except Exception as exc:  # noqa: BLE001
+        shutil.rmtree(folder, ignore_errors=True)
+        raise HTTPException(400, f"مش قادر أقرا الفيديو ده: {exc}") from exc
+    d = {"name": name[:120] or "دبلجة", "client_id": active_client_id(), "brief": "",
+         "source": {"file": file, "duration": round(info.duration, 3), "w": info.width, "h": info.height},
+         "words": [], "lines": [], "bg": None, "targets": {}, "busy": True, "step": "🎧 بيسمع الكلام", "error": None,
+         "created_at": now(), "updated_at": now()}
+    (folder / "dub.json").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+    threading.Thread(target=run_dub_transcribe, args=(did,), daemon=True).start()
+    return dub_to_dict(did, d)
+
+
+@app.post("/api/dub")
+def dub_upload(file: UploadFile = File(...)):
+    """🌍 دبلجة جديدة من فيديو من برّه."""
+    tmp = save_upload(file, VIDEO_EXTENSIONS, TMP_DIR, "dubup")
+    return dub_create(TMP_DIR / tmp, Path(file.filename or "فيديو").stem)
+
+
+class DubFromExportIn(BaseModel):
+    export_id: str
+
+
+@app.post("/api/dub/from-export")
+def dub_from_export(body: DubFromExportIn):
+    """🌍 دبلجة لفيديو من الفيديوهات الجاهزة (اللي اتصدّرت من عندنا)."""
+    with closing(db()) as conn:
+        r = conn.execute("SELECT * FROM exports WHERE id = ?", (body.export_id,)).fetchone()
+    if not r or not (EXPORTS_DIR / r["filename"]).exists():
+        raise HTTPException(404, "الفيديو ده مش موجود")
+    tmp = TMP_DIR / f"dubexp_{uuid.uuid4().hex[:8]}{Path(r['filename']).suffix}"
+    shutil.copy(EXPORTS_DIR / r["filename"], tmp)
+    return dub_create(tmp, r["name"])
+
+
+@app.get("/api/dub/{did}")
+def dub_get(did: str):
+    return {**dub_to_dict(did, dub_load(did)), "info": dub_info()}
+
+
+@app.delete("/api/dub/{did}")
+def dub_delete(did: str):
+    d = dub_load(did)
+    if dub_busy(d):
+        raise HTTPException(400, "استنى لما الشغل اللي شغال يخلص")
+    shutil.rmtree(DUB_DIR / Path(did).name, ignore_errors=True)
+    return {"ok": True}
+
+
+def dub_fail(did: str, exc: Exception, target: str | None = None) -> None:
+    msg = str(getattr(exc, "detail", None) or exc)[:400]
+    def fn(d):
+        if target:
+            d["targets"][target].update(busy=False, step=None, error=msg)
+        else:
+            d.update(busy=False, step=None, error=msg)
+    dub_update(did, fn)
+
+
+def run_dub_transcribe(did: str) -> None:
+    try:
+        d = dub_load(did)
+        folder = DUB_DIR / did
+        src = folder / d["source"]["file"]
+        if not typo_has_audio(src):
+            raise RuntimeError("الفيديو ده مفيهوش صوت")
+        audio = TMP_DIR / f"dub_{did}.m4a"
+        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src), "-vn", "-ac", "1", "-c:a", "aac", "-b:a", "96k", str(audio)],
+                       check=True, capture_output=True, timeout=300)
+        try:
+            words = atlas.transcribe(audio, d["source"]["duration"])
+        finally:
+            audio.unlink(missing_ok=True)
+        if not words:
+            raise RuntimeError("مقدرتش أسمع كلام في الفيديو ده")
+        lines = dub.lines_from_words(words, typo.sentences(words))
+        dub_update(did, lambda x: x.update(words=words, lines=lines, busy=False, step=None, error=None))
+    except Exception as exc:  # noqa: BLE001
+        dub_fail(did, exc)
+
+
+class DubTargetIn(BaseModel):
+    dialect: str
+    voice: str | None = None
+    brief: str | None = None
+
+
+@app.post("/api/dub/{did}/target")
+def dub_target(did: str, body: DubTargetIn):
+    """🗣️ لهجة جديدة (أو من جديد): الكلام بيتحوّل للهجة على قد وقت كل جملة، وتقدر تعدّله قبل الصوت."""
+    if body.dialect not in dub.DIALECTS:
+        raise HTTPException(400, "اللهجة دي مش موجودة")
+    voice = body.voice if body.voice in dub.DIALECTS[body.dialect]["voices"] else dub.DIALECTS[body.dialect]["voices"][0]
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل")
+    if dub.DIALECTS[body.dialect]["group"] == "ar" and not (fasih.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "اللهجات العربية بتتقال بأصوات فصيح: ضيف مفتاحه FASIH_API_KEY في متغيرات Railway الأول")
+
+    def fn(d):
+        if not d.get("lines"):
+            raise HTTPException(400, "استنى لما الكلام يتسمع الأول")
+        if dub_busy(d):
+            raise HTTPException(400, "استنى لما الشغل اللي شغال يخلص")
+        if body.brief is not None:
+            d["brief"] = body.brief[:600]
+        old = d["targets"].get(body.dialect) or {}
+        d["targets"][body.dialect] = {**old, "voice": voice, "lines": [], "busy": True, "step": "✍️ بيكتب الكلام باللهجة", "error": None}
+    d = dub_update(did, fn)
+    threading.Thread(target=run_dub_adapt, args=(did, body.dialect), daemon=True).start()
+    return dub_to_dict(did, d)
+
+
+def run_dub_adapt(did: str, dialect: str) -> None:
+    try:
+        d = dub_load(did)
+        lines = d["lines"]
+        if atlas.mock_mode():
+            out = [f"{dub.DIALECTS[dialect]['label']} — جملة تجريبية {i + 1}" for i in range(len(lines))]
+        else:
+            res = ad_json(series_chat(dub.adapt_messages(dialect, lines, d["source"]["duration"], d.get("brief") or ""), json_mode=True), "الدبلجة")
+            out = [dub.clean_line(x) for x in (res.get("lines") or [])]
+            if len(out) != len(lines):   # الموديل غيّر عدد الجمل: نكمّل بالأصل عشان المواعيد ماتبوظش
+                out = (out + [ln["src"] for ln in lines[len(out):]])[: len(lines)]
+        dub_update(did, lambda x: x["targets"][dialect].update(lines=[{"text": t} for t in out], busy=False, step=None, error=None))
+    except Exception as exc:  # noqa: BLE001
+        dub_fail(did, exc, dialect)
+
+
+class DubLinesIn(BaseModel):
+    texts: list[str] | None = None
+    voice: str | None = None
+
+
+@app.put("/api/dub/{did}/target/{dialect}")
+def dub_target_edit(did: str, dialect: str, body: DubLinesIn):
+    """✏️ تعديل الكلام أو الصوت."""
+    if dialect not in dub.DIALECTS:
+        raise HTTPException(400, "اللهجة دي مش موجودة")
+
+    def fn(d):
+        t = d["targets"].get(dialect)
+        if not t:
+            raise HTTPException(404, "اللهجة دي لسه ما اتعملتش")
+        if body.texts is not None:
+            if len(body.texts) != len(d["lines"]):
+                raise HTTPException(400, "عدد الجمل اتغيّر")
+            t["lines"] = [{"text": dub.clean_line(x)} for x in body.texts]
+        if body.voice in dub.DIALECTS[dialect]["voices"]:
+            t["voice"] = body.voice
+    return dub_to_dict(did, dub_update(did, fn))
+
+
+class DubRenderIn(BaseModel):
+    lipsync: str | None = None      # None / sync / veed
+    background: str = "auto"        # auto / separate / low / none
+
+
+@app.post("/api/dub/{did}/target/{dialect}/render")
+def dub_render(did: str, dialect: str, body: DubRenderIn):
+    if dialect not in dub.DIALECTS:
+        raise HTTPException(400, "اللهجة دي مش موجودة")
+    if dub.DIALECTS[dialect]["group"] == "ar" and not (fasih.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "اللهجات العربية بتتقال بأصوات فصيح: ضيف مفتاحه FASIH_API_KEY في متغيرات Railway الأول")
+    """🎙️ الصوت باللهجة في مكانه + الموسيقى والمؤثرات + ليب سينك (اختياري) ← فيديو جاهز للنشر."""
+    if body.lipsync and body.lipsync not in dub.LIPSYNC:
+        raise HTTPException(400, "نوع الليب سينك مش معروف")
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل")
+
+    def fn(d):
+        t = d["targets"].get(dialect)
+        if not t or not t.get("lines"):
+            raise HTTPException(400, "اكتب الكلام باللهجة الأول")
+        if dub_busy(d):
+            raise HTTPException(400, "استنى لما الشغل اللي شغال يخلص")
+        t.update(busy=True, step="🎙️ بيسجّل الجمل", error=None, lipsync=body.lipsync)
+    d = dub_update(did, fn)
+    threading.Thread(target=run_dub_render, args=(did, dialect, body.lipsync, body.background), daemon=True).start()
+    return dub_to_dict(did, d)
+
+
+def dub_background(did: str, d: dict, mode: str) -> Path | None:
+    """الموسيقى والمؤثرات من غير الكلام (AudioShake)، أو الصوت الأصلي واطي، أو ولا حاجة."""
+    folder = DUB_DIR / did
+    src = folder / d["source"]["file"]
+    if mode == "auto":
+        mode = "separate" if (audioshake.api_key() or atlas.mock_mode()) else "none"
+    ff = [ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y"]
+    if mode == "none":
+        return None
+    if mode == "low":
+        out = folder / "bg_low.wav"
+        subprocess.run(ff + ["-i", str(src), "-vn", "-ac", "2", "-ar", "48000", "-af", "volume=0.12", str(out)], check=True, capture_output=True, timeout=600)
+        return out
+    out = folder / "bg.wav"
+    if out.exists():
+        return out
+    mix = folder / "mix.wav"
+    subprocess.run(ff + ["-i", str(src), "-vn", "-ac", "2", "-ar", "48000", str(mix)], check=True, capture_output=True, timeout=600)
+    if atlas.mock_mode():
+        subprocess.run(ff + ["-i", str(mix), "-af", "lowpass=f=300", str(out)], check=True, capture_output=True, timeout=300)
+        return out
+    if not audioshake.api_key():
+        raise RuntimeError("فصل الموسيقى عن الكلام محتاج مفتاح AudioShake" + audioshake.missing_hint())
+    mp3 = folder / "mix.mp3"
+    subprocess.run(ff + ["-i", str(mix), "-b:a", "192k", str(mp3)], check=True, capture_output=True, timeout=300)
+    tid, plan = audioshake.create_task(atlas.upload_media(mp3))
+    res = audioshake.wait(tid)
+    raw = folder / "stems"
+    raw.mkdir(exist_ok=True)
+    got = {}
+    for name, r in res.items():
+        if r.get("link") and r["status"] not in ("error", "failed"):
+            atlas.download(r["link"], raw / f"{name}.wav")
+            got[name] = raw / f"{name}.wav"
+    keep = [got[n] for n in got if n not in ("dialogue", "vocals", "speech")]
+    if keep:   # موسيقى + مؤثرات
+        cmd = ff + sum([["-i", str(p)] for p in keep], []) + ["-filter_complex",
+                                                              "".join(f"[{i}:a]" for i in range(len(keep))) + f"amix=inputs={len(keep)}:normalize=0[o]",
+                                                              "-map", "[o]", "-ac", "2", "-ar", "48000", str(out)]
+    elif "dialogue" in got:   # الأصل − الكلام
+        cmd = ff + ["-i", str(mix), "-i", str(got["dialogue"]), "-filter_complex",
+                    "[1:a]aresample=48000,volume=-1[n];[0:a][n]amix=inputs=2:normalize=0:duration=first[o]", "-map", "[o]", str(out)]
+    else:
+        raise RuntimeError("AudioShake مرجعش تراكات")
+    subprocess.run(cmd, check=True, capture_output=True, timeout=600)
+    for f in (mix, mp3):
+        f.unlink(missing_ok=True)
+    return out
+
+
+def run_dub_render(did: str, dialect: str, lipsync: str | None, background: str) -> None:
+    from concurrent.futures import ThreadPoolExecutor
+    step = lambda s: dub_update(did, lambda x: x["targets"][dialect].update(step=s))  # noqa: E731
+    try:
+        d = dub_load(did)
+        t = d["targets"][dialect]
+        if t.get("voice") not in dub.DIALECTS[dialect]["voices"]:
+            t["voice"] = dub.DIALECTS[dialect]["voices"][0]
+        folder = DUB_DIR / did
+        work = folder / f"work_{dialect}"
+        shutil.rmtree(work, ignore_errors=True)
+        work.mkdir()
+        lines, texts, total = d["lines"], [x["text"] for x in t["lines"]], float(d["source"]["duration"])
+        ff = [ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y"]
+        done = [0]
+
+        def say(i):
+            out = work / f"l{i:03d}.wav"
+            if not texts[i].strip():
+                return None
+            if atlas.mock_mode():
+                dur = max(0.4, len(texts[i]) / dub.CHARS_PER_SEC)
+                subprocess.run(ff + ["-f", "lavfi", "-i", f"sine=frequency={300 + 40 * (i % 5)}:duration={dur:.2f}", "-ar", "48000", str(out)],
+                               check=True, capture_output=True, timeout=60)
+            else:
+                raw = work / f"l{i:03d}.src"
+                v = dub.VOICES[t["voice"]]
+                if v["provider"] == "fasih":
+                    fasih.speak(texts[i], v["voice"], v["dialect"], raw)
+                else:
+                    atlas.download(atlas.run_model("Audio", dub.tts_body(t["voice"], dialect, texts[i]), "صوت الجملة", max_seconds=300, interval=2), raw)
+                subprocess.run(ff + ["-i", str(raw), "-ac", "1", "-ar", "48000", str(out)], check=True, capture_output=True, timeout=60)
+                raw.unlink(missing_ok=True)
+            done[0] += 1
+            step(f"🎙️ بيسجّل الجمل ({done[0]} من {len(texts)})")
+            return out
+        with ThreadPoolExecutor(4) as pool:
+            files = list(pool.map(say, range(len(lines))))
+        durs = [probe_duration(f) if f else 0.0 for f in files]
+        spots = dub.place(lines, durs, total)
+        # الكلام لوحده (للليب سينك) والكلام + الخلفية (للفيديو النهائي)
+        step("🎚️ بيركّب الصوت في مكانه")
+        parts = [(f, sp) for f, sp in zip(files, spots) if f]
+        voice = work / "voice.wav"
+        flt, ins = [], []
+        for j, (f, sp) in enumerate(parts):
+            ins += ["-i", str(f)]
+            tempo = f"atempo={sp['speed']:.3f}," if sp["speed"] > 1.001 else ""
+            ms = int(sp["start"] * 1000)
+            flt.append(f"[{j}:a]{tempo}adelay={ms}:all=1[a{j}]")
+        flt.append("".join(f"[a{j}]" for j in range(len(parts))) + f"amix=inputs={len(parts)}:normalize=0,apad=whole_dur={total:.3f},atrim=0:{total:.3f}[v]")
+        subprocess.run(ff + ins + ["-filter_complex", ";".join(flt), "-map", "[v]", "-ac", "1", "-ar", "48000", str(voice)],
+                       check=True, capture_output=True, timeout=600)
+        step("🎵 بيفصل الموسيقى والمؤثرات عن الكلام" if background in ("auto", "separate") else "🎚️ بيجهّز الخلفية")
+        bg = dub_background(did, d, background)
+        audio = folder / f"{dialect}.m4a"
+        if bg:
+            subprocess.run(ff + ["-i", str(voice), "-i", str(bg), "-filter_complex",
+                                 "[0:a]aformat=channel_layouts=stereo,volume=1.0[v];[1:a]aformat=channel_layouts=stereo[b];"
+                                 "[v][b]amix=inputs=2:normalize=0:duration=first,alimiter=limit=0.95[o]",
+                                 "-map", "[o]", "-c:a", "aac", "-b:a", "192k", str(audio)], check=True, capture_output=True, timeout=600)
+        else:
+            subprocess.run(ff + ["-i", str(voice), "-ac", "2", "-c:a", "aac", "-b:a", "192k", str(audio)], check=True, capture_output=True, timeout=600)
+        src = folder / d["source"]["file"]
+        video_in = src
+        if lipsync:
+            step(f"👄 ليب سينك ({dub.LIPSYNC[lipsync]['label']}) — بياخد دقايق")
+            lip = work / "lip.mp4"
+            if atlas.mock_mode():
+                shutil.copy(src, lip)
+            else:
+                vurl, aurl = atlas.upload_media(src), atlas.upload_media(voice)
+                body = {"model": dub.LIPSYNC[lipsync]["model"], "video_url": vurl, "audio_url": aurl, "video": vurl, "audio": aurl}
+                if lipsync == "sync":
+                    body["sync_mode"] = "cut_off"
+                atlas.download(atlas.run_model("Video", body, "الليب سينك", max_seconds=3600, interval=6), lip)
+            video_in = lip
+        step("🎬 بيحفظ الفيديو")
+        out = folder / f"{dialect}.mp4"
+        subprocess.run(ff + ["-i", str(video_in), "-i", str(audio), "-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy", "-c:a", "copy",
+                             "-t", f"{total:.3f}", "-movflags", "+faststart", str(out)], check=True, capture_output=True, timeout=900)
+        # نسخة في الفيديوهات الجاهزة (للنشر)
+        export_id = uuid.uuid4().hex[:12]
+        filename = f"dub_{export_id}.mp4"
+        shutil.copy(out, EXPORTS_DIR / filename)
+        name = f"{d['name']} — {dub.DIALECTS[dialect]['label']}"
+        with closing(db()) as conn, conn:
+            old = t.get("export_id")
+            if old:   # النسخة القديمة من نفس اللهجة بتتبدل
+                r = conn.execute("SELECT filename FROM exports WHERE id = ?", (old,)).fetchone()
+                if r:
+                    (EXPORTS_DIR / r["filename"]).unlink(missing_ok=True)
+                    conn.execute("DELETE FROM exports WHERE id = ?", (old,))
+            conn.execute("INSERT INTO exports (id, name, filename, duration, source, project_id, created_at) VALUES (?, ?, ?, ?, 'dub', NULL, ?)",
+                         (export_id, name, filename, total, now()))
+        shutil.rmtree(work, ignore_errors=True)
+        dub_update(did, lambda x: x["targets"][dialect].update(busy=False, step=None, error=None, video=out.name, audio=audio.name,
+                                                               export_id=export_id, rendered_at=now(), spots=spots))
+    except Exception as exc:  # noqa: BLE001
+        dub_fail(did, exc, dialect)
+
+
+def reset_stuck_dub() -> None:
+    for f in DUB_DIR.glob("*/dub.json"):
+        try:
+            d = json.loads(f.read_text(encoding="utf-8"))
+        except ValueError:
+            continue
+        if dub_busy(d):
+            d.update(busy=False, step=None)
+            for t in (d.get("targets") or {}).values():
+                if t.get("busy"):
+                    t.update(busy=False, step=None, error="اتقطع لما السيرفر اتقفل. دوس الزرار تاني")
+            f.write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+
+
+reset_stuck_dub()
+
+
+# ---------------------------------------------------------------- 🎬 قسم القوالب
+# العميل بيختار قالب ← السكريبت (بيكتبه أو الموديل يكتبه على قد نبضات القالب) ← الفويس أوفر (فصيح للعربي، ElevenLabs للأجنبي)
+# بيحدد مدة كل لقطة ← ستوري بورد بنفس ستايل القالب ← تقطيع وتوضيح ← كل لقطة بتبدأ من آخر فريم في اللي قبلها
+# ← المونتاج بالترانزيشن اللي على روح القالب والفويس أوفر.
+
+import tplseed  # noqa: E402
+
+TPL_SEED_V = 2
+
+
+def seed_media_hash(tid: str) -> str:
+    """بصمة العينة اللي جوه الكود — لو اتغيرت (عينة أحدث) بتتنسخ تاني مكان القديمة."""
+    f = ROOT / "backend" / "tplseed_media" / tid / "sample.mp4"
+    return hashlib.md5(f.read_bytes()).hexdigest()[:12] if f.exists() else ""
+
+
+def seed_media_copy(tid: str, old: dict | None) -> dict | None:
+    seed_dir, hv = ROOT / "backend" / "tplseed_media" / tid, seed_media_hash(tid)
+    if not hv or (old or {}).get("seed_media") == hv:
+        return old
+    for name in ("sample.mp4", "cover.png"):
+        if (seed_dir / name).exists():
+            shutil.copyfile(seed_dir / name, TPL_DIR / tid / name)
+    return {**(old or {}), "sample": "sample.mp4", "cover": "cover.png" if (seed_dir / "cover.png").exists() else (old or {}).get("cover"),
+            "sample_status": "done", "sample_error": None, "sample_kind": "scenes", "seed_media": hv}
+
+
+def seed_templates() -> None:
+    """القوالب الجاهزة بتتحط في المكتبة أول مرة (والعينات اللي اتعملت بتفضل لو القالب اتحدّث)."""
+    for tid, t in tplseed.BUILTIN.items():
+        f = TPL_DIR / tid / "tpl.json"
+        old = None
+        if f.exists():
+            try:
+                old = json.loads(f.read_text(encoding="utf-8"))
+            except ValueError:
+                old = None
+            if old and old.get("seed_v", 0) >= TPL_SEED_V and old.get("seed_media") == seed_media_hash(tid):
+                continue
+        schema = lab.clean_schema({**t["schema"], "transition": t["transition"]}, 999)
+        # عينات جاهزة جوه الكود (لو اتعملت قبل كده): بتتنسخ أول مرة عشان المعرض يبان على طول
+        (TPL_DIR / tid).mkdir(parents=True, exist_ok=True)
+        old = seed_media_copy(tid, old)
+        keep = {k: old[k] for k in ("sample", "cover", "sample_vid", "sample_status", "sample_error", "sample_kind", "seed_media") if old and k in old}
+        with TPL_LOCK:
+            tpl_save(tid, {"name": t["name"], "icon": t["icon"], "uses": t["uses"], "voice_tone": t["voice_tone"],
+                           "sample_brief": t["sample"], "schema": schema, "builtin": True, "ratio": "9:16", "source": None,
+                           "lab_name": "مكتبة القوالب الجاهزة", "seed_v": TPL_SEED_V, "created_at": (old or {}).get("created_at") or now(), **keep})
+
+
+seed_templates()
+
+
+def tpl_sample_cost(d: dict) -> float:
+    """عينة ٣ مشاهد (٣٠ ثانية) + مفتاح الستايل."""
+    return round(TV_IMAGE_MODELS["sunburst"][0] + 3 * 10 * TRIAL_MODELS["seedance-mini"]["per_sec"], 2)
+
+
+def vo_say(text: str, voice: str, lang: str, out: Path) -> Path:
+    """جملة فويس أوفر (wav 48k): فصيح للهجات العربية، وElevenLabs للأجنبي."""
+    ff = [ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y"]
+    if atlas.mock_mode():
+        dur = max(0.6, len(text) / dub.CHARS_PER_SEC)
+        subprocess.run(ff + ["-f", "lavfi", "-i", f"sine=frequency=330:duration={dur:.2f}", "-ar", "48000", str(out)], check=True, capture_output=True, timeout=60)
+        return out
+    raw = out.with_suffix(".src")
+    v = dub.VOICES[voice]
+    if v["provider"] == "fasih":
+        fasih.speak(text, v["voice"], v["dialect"], raw)
+    else:
+        atlas.download(atlas.run_model("Audio", dub.tts_body(voice, lang, text), "الفويس أوفر", max_seconds=300, interval=2), raw)
+    subprocess.run(ff + ["-i", str(raw), "-ac", "1", "-ar", "48000", str(out)], check=True, capture_output=True, timeout=60)
+    raw.unlink(missing_ok=True)
+    return out
+
+
+def tv_script_messages(d: dict, brain_txt: str) -> list[dict]:
+    """السكريبت جملة لكل نبضة في القالب، باللهجة/اللغة المختارة، على قد وقت النبضة تقريبًا."""
+    sch = d["schema"]
+    dl = dub.DIALECTS[d["lang"]]
+    lang_txt = dl.get("language") or (dl["label"].split(" ", 1)[1] + " عامي طبيعي" if d["lang"] != "ar-msa" else "عربية فصحى سهلة")
+    guide = dub.GUIDES.get(d["lang"], "")
+    beats = [{"i": i, "role": b["role"], "what": b["what"], "seconds": round(b["t1"] - b["t0"], 1)} for i, b in enumerate(sch["beats"])]
+    own = d.get("script_mode") == "own" and d.get("script")
+    task = (f"العميل كتب السكريبت ده بنفسه:\n«{d['script']}»\nوزّعه على النبضات بالترتيب من غير ما تغيّر كلامه (ممكن تقسّم أو تدمج جمل بس). "
+            "لو اللغة/اللهجة المطلوبة غير لغة السكريبت، حوّله لها بنفس المعنى." if own else
+            f"اكتب سكريبت فويس أوفر جديد عن: {d.get('brief') or 'المنتج'}.")
+    sys = (f"إنت كاتب سكريبتات فيديوهات قصيرة محترف. القالب «{sch.get('title')}»: {sch.get('summary')}\n"
+           f"نبرة الصوت: {d.get('voice_tone') or 'natural'}.\nاللغة: {lang_txt}. {guide}\n"
+           "كل نبضة ليها جملة واحدة قصيرة بتتقال في وقتها تقريبًا (حوالي 13 حرف في الثانية)، وبتخدم وظيفة النبضة (هوك، مشكلة، ميزة، دليل، دعوة). "
+           "الهوك لازم يشد من أول ثانية. لو النبضة مش محتاجة كلام (فلاش أو انتقال) سيبها فاضية.\n"
+           "ممنوع أسامي أشخاص حقيقيين أو شعارات حقيقية غير بتوع العميل، وأي رقم مش متأكد منه اكتبه بشكل عام.\n"
+           'رجّع JSON بس: {"title": "اسم قصير للفيديو", "lines": ["جملة النبضة 1", ...]} بنفس عدد النبضات بالظبط.')
+    user = f"ملف العميل:\n{brain_txt or '(مفيش)'}\n\n{task}\n\nالنبضات:\n{json.dumps(beats, ensure_ascii=False)}"
+    return [{"role": "system", "content": sys}, {"role": "user", "content": user}]
+
+
+def tv_voice(vid: str, lines: list[str]) -> None:
+    """🎙️ الفويس أوفر لكل نبضة ← مدة كل لقطة على قد كلامها ← تراك صوت واحد."""
+    d = tv_load(vid)
+    folder = tv_dir(vid)
+    beats = d["schema"]["beats"]
+    tpl_beats = d.get("tpl_beats") or [{"t0": b["t0"], "t1": b["t1"]} for b in beats]
+    files, durs = [], []
+    for i, line in enumerate(lines):
+        if not line.strip() or not d.get("voice_on", True):
+            files.append(None)
+            durs.append(0.0)
+            continue
+        tv_set(vid, step=f"🎙️ بيسجّل الفويس أوفر ({i + 1} من {len(lines)})")
+        f = vo_say(line, d["voice"], d["lang"], folder / f"vo{i:02d}.wav")
+        files.append(f.name)
+        durs.append(probe_duration(f))
+    # كل لقطة: على قد كلامها + نفس (ومش أقصر من ٦٠٪ من طولها في القالب، ولا أقل من ثانية)
+    t, new = 0.0, []
+    for b, tb, dv in zip(beats, tpl_beats, durs):
+        base = tb["t1"] - tb["t0"]
+        dur = max(1.0, base * 0.6, dv + 0.35) if dv else base
+        new.append({**b, "t0": round(t, 2), "t1": round(t + dur, 2)})
+        t += dur
+    full = None
+    parts = [(folder / f, nb["t0"] + 0.12) for f, nb in zip(files, new) if f]
+    if parts:
+        full = "vo.m4a"
+        ins, flt = [], []
+        for k, (f, at) in enumerate(parts):
+            ins += ["-i", str(f)]
+            flt.append(f"[{k}:a]adelay={int(at * 1000)}:all=1[a{k}]")
+        flt.append("".join(f"[a{k}]" for k in range(len(parts))) + f"amix=inputs={len(parts)}:normalize=0,apad=whole_dur={t:.3f},atrim=0:{t:.3f}[o]")
+        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", *ins, "-filter_complex", ";".join(flt), "-map", "[o]",
+                        "-c:a", "aac", "-b:a", "160k", str(folder / full)], check=True, capture_output=True, timeout=300)
+
+    def fn(x):
+        changed = [round(a["t1"] - a["t0"], 2) for a in x["schema"]["beats"]] != [round(b["t1"] - b["t0"], 2) for b in new]
+        x.setdefault("tpl_beats", tpl_beats)
+        x["schema"] = {**x["schema"], "beats": new}
+        x["vo"] = {"lines": lines, "files": files, "full": full, "durs": [round(v, 2) for v in durs]}
+        if changed:   # المدد اتغيرت: اللقطات المتولدة مش على قدها
+            x.update(segs={}, final=None)
+        if x.get("fill"):
+            for i, ln in enumerate(lines):
+                if i < len(x["fill"]["beats"]):
+                    x["fill"]["beats"][i]["voice"] = ln
+    tv_update(vid, fn)
+
+
+def run_tv_script(vid: str) -> None:
+    """✍️ السكريبت ← 🎙️ الفويس أوفر (المدد) ← 📝 الخانات (اللوحات والحركة) على نفس الكلام."""
+    try:
+        d = tv_load(vid)
+        brain = tv_brain(d)
+        n = len(d["schema"]["beats"])
+        if atlas.mock_mode():
+            res = {"title": "فيديو تجريبي", "lines": [f"{dub.DIALECTS[d['lang']]['label']} — جملة {i + 1}" for i in range(n)]}
+        else:
+            res = ad_json(series_chat(tv_script_messages(d, az.brain_text(brain)), json_mode=True), "السكريبت")
+        lines = [str(x or "").strip()[:400] for x in (res.get("lines") or [])][:n]
+        lines += [""] * (n - len(lines))
+        tv_set(vid, script_lines=lines, name=f"🎬 {res.get('title') or d['name']}"[:120])
+        tv_voice(vid, lines)
+        d = tv_load(vid)
+        tv_set(vid, step="📝 بيرسم الخانات على الكلام")
+        brief = d["brief"] + "\n\nالفويس أوفر (جملة لكل جزء بالترتيب، اللوحات والحركة لازم تمشي معاه):\n" + "\n".join(f"{i + 1}. {x}" for i, x in enumerate(lines))
+        if atlas.mock_mode():
+            raw = lab.mock_fill(d["schema"], (brain or {}).get("name") or "البراند")
+        else:
+            raw = ad_json(series_chat([{"role": "user", "content": lab.fill_messages(az.brain_text(brain), d["schema"], brief, d["text_mode"])}]),
+                          "ملا القالب")
+        fill = lab.clean_fill(raw, n)
+        for i, ln in enumerate(lines):
+            fill["beats"][i]["voice"] = ln
+        tv_update(vid, lambda x: x.update(fill=fill, status="filled", step=None, error=None, sheets={}, panels={}, segs={}, final=None))
+    except Exception as exc:  # noqa: BLE001
+        tv_fail(vid, exc)
+
+
+class TvVoiceIn(BaseModel):
+    lines: list[str] | None = None
+    voice: str | None = None
+    lang: str | None = None
+    voice_on: bool | None = None
+
+
+@app.post("/api/tvideos/{vid}/voice")
+def tvideo_voice(vid: str, body: TvVoiceIn):
+    """🎙️ الفويس أوفر من جديد بعد ما عدّلت الكلام أو الصوت (مدد اللقطات بتتظبط عليه)."""
+    d = tv_load(vid)
+    if d.get("section") != "templates":
+        raise HTTPException(400, "الفويس أوفر في قسم القوالب بس")
+    n = len(d["schema"]["beats"])
+    lines = [str(x or "").strip()[:400] for x in (body.lines if body.lines is not None else (d.get("vo") or {}).get("lines") or [])][:n]
+    lines += [""] * (n - len(lines))
+
+    def fn(x):
+        if x.get("status") in TV_BUSY:
+            raise HTTPException(400, "استنى لما الشغل اللي شغال يخلص")
+        if body.lang in dub.DIALECTS:
+            x["lang"] = body.lang
+        if body.voice in dub.DIALECTS[x["lang"]]["voices"]:
+            x["voice"] = body.voice
+        elif x.get("voice") not in dub.DIALECTS[x["lang"]]["voices"]:
+            x["voice"] = dub.DIALECTS[x["lang"]]["voices"][0]
+        if body.voice_on is not None:
+            x["voice_on"] = body.voice_on
+        x.update(status="filling", step="🎙️ بيسجّل الفويس أوفر", error=None)
+    tv_update(vid, fn)
+
+    def job(vid):
+        try:
+            if tv_load(vid).get("mode") == "scenes":
+                tv_voice_scenes(vid, lines)
+            else:
+                tv_voice(vid, lines)
+            tv_update(vid, lambda x: x.update(status=tv_idle(x), step=None, error=None))
+        except Exception as exc:  # noqa: BLE001
+            tv_fail(vid, exc)
+    threading.Thread(target=job, args=(vid,), daemon=True).start()
+    return tv_to_dict(vid, tv_load(vid))
+
+
+# ---------------------------------------------------------------- 🎬 قوالب «مشاهد» (Vox): ١٠ ثواني لكل مشهد + مفتاح ستايل
+SCENE_SEC = 10.0
+SCENE_VO_MAX, SCENE_VO_MIN = 9.7, 7.5   # الجملة لو أطول/أقصر من كده بتتكتب تاني وتتسجّل تاني
+SCENE_NEG = "readable text, gibberish letters, Chinese characters, kanji, words, numbers, titles, captions, subtitles, watermark, logo, lip-sync, talking characters, color drift"
+
+
+def scene_cfg_for(t: dict) -> dict:
+    """كل القوالب بقت بطريقة المشاهد: القوالب اللي اتطلّعت من فيديو (أو الجاهزة القديمة) بيتعملها مفتاح ستايل وبرومتات مشاهد
+    من الـ Style DNA بتاعها، وشكل النبضات بتاعها بيبقى إيقاع المشاهد."""
+    if t.get("scene"):
+        return t["scene"]
+    sch = t.get("schema") or {}
+    style, bg, pal = sch.get("style") or "", sch.get("background") or "", sch.get("palette") or "unspecified"
+    rhythm = "; ".join(f"{b.get('what') or ''} ({round(b['t1'] - b['t0'], 1)}s): {b.get('layout') or ''}" for b in sch.get("beats") or [])[:2500]
+    return {
+        # شكل الكلام مش بيتبعت للموديل (كان بيخليه يكتب كلام غلط/صيني): الكلام بتاعنا بيتحط بعدين من التايبوجرافي
+        "tokens": " ".join(x for x in (style, f"Persistent background: {bg}." if bg else "", f"Locked palette: {pal}.") if x),
+        "negative": ", ".join(x for x in (SCENE_NEG, sch.get("negative") or "") if x),
+        "key": ("A style swatch image that locks the look of a video: " + style + (f" Persistent background: {bg}." if bg else "")
+                + " Palette: {palette}. Abstract composition of the style's typical elements only: no letters, no words, no numbers, no logos, no real people."),
+        "variants": [("classic", "زي القالب بالظبط", pal), ("bold", "ألوان أقوى وتباين أعلى", f"{pal}, more saturated and higher contrast"),
+                     ("soft", "أهدى وألوان أنعم", f"{pal}, softer and lighter")],
+        "devices": f"the visual devices of this style; the original video's beat shape (use it as the rhythm inside the scenes): {rhythm}",
+        "motion": f"{sch.get('camera') or 'smooth camera movement'}; ONE continuous camera move per scene, starting from motion blur and ending fully "
+                  "motion-blurred mid-move, an impact moment every ~3 seconds",
+        "allow_label": False,
+    }
+
+
+def seed_scene_templates() -> None:
+    for tid, t in tplseed.SCENES.items():
+        f = TPL_DIR / tid / "tpl.json"
+        old = None
+        if f.exists():
+            try:
+                old = json.loads(f.read_text(encoding="utf-8"))
+            except ValueError:
+                old = None
+            if old and old.get("seed_v", 0) >= TPL_SEED_V and old.get("seed_media") == seed_media_hash(tid):
+                continue
+        beats = [{"t0": i * SCENE_SEC, "t1": (i + 1) * SCENE_SEC, "role": "hook" if i == 0 else "cta" if i == 5 else "proof", "what": f"مشهد {i + 1}",
+                  "layout": "", "slots": [], "camera": "", "into_next": "", "keeps": "", "sfx": ""} for i in range(6)]
+        schema = {"title": t["name"], "summary": t["uses"], "style": t["tokens"], "negative": t["negative"], "transition": "cut", "beats": beats,
+                  "palette": "", "spine": "", "camera": t["motion"], "text_style": "", "music": "", "background": "", "last_frame": "", "beat_sec": 0.0}
+        (TPL_DIR / tid).mkdir(parents=True, exist_ok=True)
+        old = seed_media_copy(tid, old)
+        keep = {k: old[k] for k in ("sample", "cover", "sample_vid", "sample_status", "sample_error", "sample_kind", "seed_media") if old and k in old}
+        with TPL_LOCK:
+            tpl_save(tid, {"name": t["name"], "icon": t["icon"], "uses": t["uses"], "voice_tone": t["voice_tone"], "sample_brief": t["sample"],
+                           "mode": "scenes", "scene": {k: t[k] for k in ("tokens", "negative", "key", "variants", "devices", "motion", "allow_label", "writer", "motion_rule",
+                                                       "audio", "guard", "variant_motion") if k in t},
+                           "schema": schema, "builtin": True, "ratio": "9:16", "source": None, "lab_name": "مكتبة القوالب الجاهزة",
+                           "seed_v": TPL_SEED_V, "created_at": (old or {}).get("created_at") or now(), **keep})
+
+
+seed_scene_templates()
+
+
+def scenes_messages(d: dict, brain_txt: str) -> list[dict]:
+    cfg, n = d["scene_cfg"], len(d["schema"]["beats"])
+    dl = dub.DIALECTS[d["lang"]]
+    lang_txt = dl.get("language") or (dl["label"].split(" ", 1)[1] + " عامي طبيعي" if d["lang"] != "ar-msa" else "عربية فصحى سهلة")
+    own = d.get("script_mode") == "own" and d.get("script")
+    label_rule = ("- label: كلمة أو رقم واحد قصير جدًا (١-٢ كلمة، إنجليزي بحروف كبيرة) مطبوع على حاجة ورق ملونة في المشهد، أو فاضي.\n"
+                  if cfg.get("allow_label") else "- label: فاضي دايمًا (الستايل ده ممنوع فيه أي كلام مكتوب).\n")
+    sys = (
+        (cfg.get("writer") or (
+            "إنت كاتب ومخرج فيديوهات شرح قصيرة بأسلوب Vox: معلومة بمعلومة، فضولي ودقيق وفيه خفة دم، بيشرح ومش بيهوّل.\n"
+            "شكل السكريبت: أول مشهد أغرب معلومة من غير أي مقدمة أو تحية ← ليه ده مهم ← مشاهد دليل (فكرة واحدة لكل مشهد، بتتصاعد) ← التحوّل ← "
+            "الخاتمة بجملة بترجع لأول مشهد بمعنى جديد. فيه سؤال في الأول بيتجاوب في الآخر.\n"))
+        + f"الفيديو {n} مشاهد، كل مشهد ١٠ ثواني بالظبط وليه جملة فويس أوفر واحدة. اللغة: {lang_txt}. {dub.GUIDES.get(d['lang'], '')}\n"
+        "- كل جملة حوالي ١٨-٢٠ كلمة (بتتقال في ٨-٩ ثواني)، والأرقام مكتوبة بالحروف زي ما بتتنطق.\n"
+        "- ممنوع تخترع أرقام أو اقتباسات: استخدم بس الأرقام اللي في الفكرة أو ملف العميل، وغير كده قول المعنى بشكل عام.\n"
+        "- اختار «عنصر واحد» (through_line) بيظهر في كل المشاهد وبيكبر/بيتغير مع القصة.\n"
+        "- scene (English): التكوين اللي بيشرح فكرة الجملة نفسها (مش حد بيقولها) بمفردات الستايل: " + cfg["devices"] + "\n"
+        "- motion (English): " + (cfg.get("motion_rule") or "حركة كاميرا واحدة متصلة بتبدأ من موشن بلر وبتخلص في موشن بلر، وفيها لحظة قوية كل ٣ ثواني تقريبًا.")
+        + " " + cfg["motion"] + "\n"
+        "- audio (English): " + (cfg.get("audio") or "٣-٥ أصوات مؤثرات حقيقية في المشهد (ورق، ووش، تكات، خبطات...) من غير أي كلام.") + "\n"
+        + label_rule
+        + "- ممنوع أسامي أو وشوش أشخاص حقيقيين في scene (يتوصفوا من بعيد ومن غير اسم" + ("" if cfg.get("writer") else "، وعلى عينيهم شريط أسود")
+        + ")، وممنوع شعارات حقيقية، "
+        "وممنوع صور انفجارات/دم: بدّلها بفكرة رمزية بنفس المعنى.\n"
+        'رجّع JSON بس: {"title": "اسم قصير", "through_line": "English: the recurring object", "lines": ["..."], '
+        '"scenes": [{"scene": "...", "motion": "...", "audio": "...", "label": ""}]} بنفس العدد بالظبط.')
+    task = (f"العميل كتب السكريبت ده: «{d['script']}». وزّعه على {n} مشاهد بالترتيب وظبّط طول كل جملة من غير ما المعنى يتغير." if own
+            else f"الفكرة: {d.get('brief') or 'المنتج'}")
+    return [{"role": "system", "content": sys}, {"role": "user", "content": f"ملف العميل:\n{brain_txt or '(مفيش)'}\n\n{task}"}]
+
+
+def scenes_fit(d: dict, lines: list[str], durs: list[float]) -> list[str]:
+    """الجمل اللي أطول من ٩.٧ ثانية بتتقصّر، واللي أقصر من ٧.٥ بتتطوّل (بنفس المعنى)، عشان كل مشهد ياخد العشر ثواني بتوعه."""
+    bad = [i for i, (ln, dv) in enumerate(zip(lines, durs)) if ln.strip() and (dv > SCENE_VO_MAX or dv < SCENE_VO_MIN)]
+    if not bad or atlas.mock_mode():
+        return lines
+    rows = [{"i": i, "line": lines[i], "seconds_now": round(durs[i], 1),
+             "words_target": max(6, round(len(lines[i].split()) * 8.6 / max(0.5, durs[i])))} for i in bad]
+    res = ad_json(series_chat([{"role": "system", "content": "عدّل طول الجمل دي عشان كل واحدة تتقال في حوالي ٨.٥ ثانية: نفس المعنى ونفس اللغة واللهجة "
+                                                              "بالظبط، وعدد الكلمات قريب من words_target. رجّع JSON بس: {\"lines\": {\"i\": \"الجملة\"}}"},
+                               {"role": "user", "content": json.dumps(rows, ensure_ascii=False)}], json_mode=True), "ظبط الجمل")
+    out = list(lines)
+    for k, v in (res.get("lines") or {}).items():
+        if str(k).isdigit() and int(k) in bad and str(v).strip():
+            out[int(k)] = str(v).strip()[:400]
+    return out
+
+
+def tv_voice_scenes(vid: str, lines: list[str]) -> None:
+    """🎙️ جملة لكل مشهد ← لو مش على قد العشر ثواني بتتكتب تاني وتتسجل تاني (لحد مرتين) ← تراك واحد: كل جملة بعد ربع ثانية من أول مشهدها."""
+    d = tv_load(vid)
+    folder = tv_dir(vid)
+    files, durs = [None] * len(lines), [0.0] * len(lines)
+
+    def say(idx):
+        for i in idx:
+            if not lines[i].strip() or not d.get("voice_on", True):
+                files[i], durs[i] = None, 0.0
+                continue
+            tv_set(vid, step=f"🎙️ بيسجّل الفويس أوفر ({i + 1} من {len(lines)})")
+            f = vo_say(lines[i], d["voice"], d["lang"], folder / f"vo{i:02d}.wav")
+            files[i], durs[i] = f.name, probe_duration(f)
+    say(range(len(lines)))
+    for _ in range(2):
+        fixed = scenes_fit(d, lines, durs)
+        redo = [i for i in range(len(lines)) if fixed[i] != lines[i]]
+        if not redo:
+            break
+        lines = fixed
+        tv_set(vid, step="✂️ بيظبط طول الجمل على العشر ثواني")
+        say(redo)
+    full = None
+    parts = [(i, folder / f) for i, f in enumerate(files) if f]
+    if parts:
+        full = "vo.m4a"
+        ins, flt = [], []
+        for k, (i, f) in enumerate(parts):
+            ins += ["-i", str(f)]
+            tempo = f"atempo={min(1.25, durs[i] / SCENE_VO_MAX):.3f}," if durs[i] > SCENE_VO_MAX else ""
+            flt.append(f"[{k}:a]{tempo}adelay={int((i * SCENE_SEC + 0.25) * 1000)}:all=1[a{k}]")
+        total = len(lines) * SCENE_SEC
+        flt.append("".join(f"[a{k}]" for k in range(len(parts))) + f"amix=inputs={len(parts)}:normalize=0,apad=whole_dur={total:.3f},atrim=0:{total:.3f}[o]")
+        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", *ins, "-filter_complex", ";".join(flt), "-map", "[o]",
+                        "-c:a", "aac", "-b:a", "160k", str(folder / full)], check=True, capture_output=True, timeout=300)
+    tv_update(vid, lambda x: x.update(vo={"lines": lines, "files": files, "full": full, "durs": [round(v, 2) for v in durs]}, script_lines=lines, final=None))
+
+
+def run_tv_scenes_script(vid: str) -> None:
+    try:
+        d = tv_load(vid)
+        brain = tv_brain(d)
+        n = len(d["schema"]["beats"])
+        if atlas.mock_mode():
+            res = {"title": "شرح تجريبي", "through_line": "a paper coin", "lines": [f"جملة المشهد {i + 1} تجريبية" for i in range(n)],
+                   "scenes": [{"scene": f"Scene {i + 1}: cutouts snap in.", "motion": "slow push in", "audio": "paper rustle", "label": ""} for i in range(n)]}
+        else:
+            res = ad_json(series_chat(scenes_messages(d, az.brain_text(brain)), json_mode=True), "سكريبت المشاهد")
+        lines = [str(x or "").strip()[:400] for x in (res.get("lines") or [])][:n]
+        lines += [""] * (n - len(lines))
+        sc = [{"scene": lab._plain(x.get("scene"))[:1500], "motion": lab._plain(x.get("motion"))[:800], "audio": lab._plain(x.get("audio"))[:400],
+               "label": (str(x.get("label") or "").strip()[:24] if d["scene_cfg"].get("allow_label") else "")}
+              for x in (res.get("scenes") or []) if isinstance(x, dict)][:n]
+        while len(sc) < n:
+            sc.append({"scene": "Collage elements snap into place illustrating the narration.", "motion": "slow push in", "audio": "paper rustle", "label": ""})
+        tv_update(vid, lambda x: x.update(scenes=sc, through_line=lab._plain(res.get("through_line"))[:300], name=f"🎬 {res.get('title') or x['name']}"[:120]))
+        tv_voice_scenes(vid, lines)
+        tv_update(vid, lambda x: x.update(status=tv_idle(x), step=None, error=None))
+    except Exception as exc:  # noqa: BLE001
+        tv_fail(vid, exc)
+
+
+def scene_prompt(d: dict, i: int) -> str:
+    cfg, s = d["scene_cfg"], d["scenes"][i]
+    lab_ = s.get("label") if cfg.get("allow_label") else ""
+    neg = (f'No text anywhere except "{lab_}". ' if lab_ else "Absolutely no writing in any language anywhere: no English, no Chinese or Japanese characters, "
+           "no letters, numbers, titles, signs or captions — every card, page, screen and sign stays blank. ") + f"Avoid: {cfg['negative']}."
+    # الشكل الفرعي المختار (صلصال/ورق...) ليه بلوك ستايل ثابت بيفتح كل برومت
+    var = next((x for x in cfg.get("variants") or [] if x[0] == d.get("style_variant")), None)
+    style = (var[3] + " " if var and len(var) > 3 else "") + cfg["tokens"]
+    extra = (cfg.get("variant_motion") or {}).get((var or [""])[0], "")
+    move = cfg.get("guard") or "One continuous camera move that starts from motion blur and ends in motion blur."
+    return (f"STYLE REFERENCE: Match the attached style key image EXACTLY: {style}.\n"
+            f"RECURRING ELEMENT (appears in every scene): {d.get('through_line') or 'unspecified'}.\n"
+            f"SCENE: {s['scene']}" + (f' A torn colored paper element carries the distressed letterpress word "{lab_}".' if lab_ else "") + "\n"
+            f"MOTION: {s['motion'].strip().rstrip('.')}." + (f" {extra}" if extra else "") + f" {move}\n"
+            f"AUDIO: {s['audio']}. No voice, no narration, no speech.\n"
+            f"NEGATIVE: {neg}")
+
+
+def scenes_start(vid: str, status: str, step: str, target, *args) -> dict:
+    def fn(d):
+        if d.get("status") in TV_BUSY:
+            raise HTTPException(400, "استنى لما الشغل اللي شغال يخلص")
+        if d.get("mode") != "scenes" or not d.get("scenes"):
+            raise HTTPException(400, "السكريبت لسه ما اتكتبش")
+        d.update(status=status, step=step, error=None)
+    d = tv_update(vid, fn)
+    threading.Thread(target=target, args=(vid, *args), daemon=True).start()
+    return tv_to_dict(vid, d)
+
+
+class StyleKeyIn(BaseModel):
+    variant: str = "classic"
+
+
+@app.post("/api/tvideos/{vid}/stylekey")
+def tvideo_stylekey(vid: str, body: StyleKeyIn):
+    """🎨 مفتاح الستايل: صورة واحدة بتقفل شكل الفيديو كله، وبتتبعت مع كل مشهد."""
+    return scenes_start(vid, "sheeting", "🎨 بيرسم مفتاح الستايل", run_stylekey, body.variant)
+
+
+def run_stylekey(vid: str, variant: str) -> None:
+    try:
+        d = tv_load(vid)
+        cfg = d["scene_cfg"]
+        v = next((x for x in cfg["variants"] if x[0] == variant), cfg["variants"][0])
+        prompt = cfg["key"].format(palette=v[2], style=v[3] if len(v) > 3 else "")
+        folder = tv_dir(vid)
+        name = f"stylekey-{uuid.uuid4().hex[:4]}.png"
+        size = {"9:16": "1024x1536", "16:9": "1536x1024"}.get(d["ratio"], "1024x1024")
+        if atlas.mock_mode():
+            subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "testsrc2=s=360x640", "-frames:v", "1",
+                            str(folder / name)], check=True, capture_output=True, timeout=60)
+        else:
+            atlas.download(atlas.generate_image(tv_img(d), prompt, size, "high"), folder / name)
+        conform_image(folder / name, d["ratio"])
+
+        def fn(x):
+            if x.get("stylekey") and x["stylekey"] != name:
+                (folder / x["stylekey"]).unlink(missing_ok=True)
+            x.update(stylekey=name, style_variant=v[0])
+            x.update(status=tv_idle(x), step=None, error=None)
+        tv_update(vid, fn)
+    except Exception as exc:  # noqa: BLE001
+        tv_fail(vid, exc)
+
+
+class SceneEditIn(BaseModel):
+    scene: str | None = None
+    motion: str | None = None
+    audio: str | None = None
+    label: str | None = None
+
+
+@app.put("/api/tvideos/{vid}/scenes/{i}")
+def tvideo_scene_edit(vid: str, i: int, body: SceneEditIn):
+    def fn(d):
+        sc = d.get("scenes") or []
+        if not 0 <= i < len(sc):
+            raise HTTPException(404, "المشهد ده مش موجود")
+        for k in ("scene", "motion", "audio", "label"):
+            v = getattr(body, k)
+            if v is not None:
+                sc[i][k] = v.strip()[:1500 if k == "scene" else 800]
+    return tv_to_dict(vid, tv_update(vid, fn))
+
+
+class ScenesRunIn(BaseModel):
+    i: int | None = None
+
+
+@app.post("/api/tvideos/{vid}/scenes/run")
+def tvideo_scenes_run(vid: str, body: ScenesRunIn):
+    """🎬 المشاهد (الناقص بس، أو مشهد واحد تاني): Seedance بمفتاح الستايل، ١٠ ثواني، وصوت المؤثرات بتاعه."""
+    d = tv_load(vid)
+    if not d.get("stylekey"):
+        raise HTTPException(400, "اعمل مفتاح الستايل الأول")
+    return scenes_start(vid, "working", "🎬 بيبدأ", run_scenes_gen, body.i)
+
+
+def run_scenes_gen(vid: str, only: int | None) -> None:
+    try:
+        d = tv_load(vid)
+        folder = tv_dir(vid)
+        n = len(d["scenes"])
+        ratio = az.ASPECTS.get(d["ratio"], az.ASPECTS["9:16"])[1]
+        W, H = RATIO_VIDEO.get(d["ratio"], RATIO_VIDEO["9:16"])
+        key = folder / d["stylekey"]
+        for i in range(n):
+            have = ((d.get("scene_files") or {}).get(str(i)) or {}).get("file")
+            if (only is not None and only != i) or (only is None and have):
+                continue
+            tv_set(vid, step=f"🎬 بيولّد المشهد {i + 1} من {n} (١٠ ثواني بصوته)")
+            name = f"scene{i + 1}-{uuid.uuid4().hex[:4]}.mp4"
+            if atlas.mock_mode():
+                gen_motion(d["model"], d["resolution"], ratio, "", key, key, int(SCENE_SEC), folder / name, W, H)
+            else:
+                body = {"model": tv_r2v(d.get("model")), "prompt": scene_prompt(d, i), "reference_images": [atlas.reference_url(key)],
+                        "duration": int(SCENE_SEC), "resolution": d.get("resolution") or "480p", "ratio": ratio,
+                        "generate_audio": True, "watermark": False}
+                atlas.download(atlas.run_model("Video", body, f"المشهد {i + 1}", max_seconds=1800, interval=6), folder / name)
+
+            def fn(x, i=i, name=name):
+                old = (x.setdefault("scene_files", {}).get(str(i)) or {}).get("file")
+                if old and old != name:
+                    (folder / old).unlink(missing_ok=True)
+                x["scene_files"][str(i)] = {"file": name}
+                x["final"] = None
+            tv_update(vid, fn)
+        d = tv_load(vid)
+        if all(((d.get("scene_files") or {}).get(str(i)) or {}).get("file") for i in range(n)):
+            tv_set(vid, step="🎞️ بيجمّع الفيديو بالفويس أوفر")
+            scenes_assemble(vid)
+        tv_update(vid, lambda x: x.update(status=tv_idle(x), step=None, error=None))
+    except Exception as exc:  # noqa: BLE001
+        tv_fail(vid, exc)
+
+
+def has_audio(p: Path) -> bool:
+    r = subprocess.run([ffmpeg_exe(), "-hide_banner", "-i", str(p)], capture_output=True, text=True)
+    return "Audio:" in r.stderr
+
+
+def scenes_assemble(vid: str) -> None:
+    """كل مشهد ١٠ ثواني بالظبط: صورته + صوت مؤثراته واطي (٢٢٪) + الفويس أوفر بتاعه، وبعدين ورا بعض."""
+    d = tv_load(vid)
+    folder = tv_dir(vid)
+    W, H = RATIO_VIDEO.get(d["ratio"], RATIO_VIDEO["9:16"])
+    vo = d.get("vo") or {}
+    work = folder / ".asm"
+    shutil.rmtree(work, ignore_errors=True)
+    work.mkdir()
+    ff = [ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y"]
+    try:
+        segs = []
+        for i in range(len(d["scenes"])):
+            clip = folder / d["scene_files"][str(i)]["file"]
+            vf = (vo.get("files") or [None] * 99)[i] if i < len(vo.get("files") or []) else None
+            dv = (vo.get("durs") or [0] * 99)[i] if i < len(vo.get("durs") or []) else 0
+            ins = ["-i", str(clip)] + (["-i", str(folder / vf)] if vf and (folder / vf).exists() else [])
+            v = f"[0:v]setpts=PTS-STARTPTS,scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},setsar=1,fps=30,tpad=stop_mode=clone:stop_duration=2,format=yuv420p[v]"
+            amb = "[0:a]aresample=48000,aformat=channel_layouts=stereo,volume=0.22[amb]" if has_audio(clip) else "anullsrc=r=48000:cl=stereo[amb]"
+            if len(ins) > 2:
+                tempo = f"atempo={min(1.25, dv / SCENE_VO_MAX):.3f}," if dv > SCENE_VO_MAX else ""
+                a = f"{amb};[1:a]aresample=48000,aformat=channel_layouts=stereo,{tempo}adelay=250:all=1[vo];[amb][vo]amix=inputs=2:duration=longest:normalize=0,apad[a]"
+            else:
+                a = f"{amb};[amb]apad[a]"
+            out = work / f"s{i:02d}.mp4"
+            subprocess.run(ff + ins + ["-filter_complex", f"{v};{a}", "-map", "[v]", "-map", "[a]", "-t", f"{SCENE_SEC:.3f}",
+                                       "-c:v", "libx264", "-preset", "veryfast", "-crf", "19", "-c:a", "aac", "-ar", "48000", "-b:a", "160k", str(out)],
+                           check=True, capture_output=True, timeout=600)
+            segs.append(out)
+        lst = work / "list.txt"
+        lst.write_text("".join(f"file '{p.name}'\n" for p in segs), encoding="utf-8")
+        name = f"final-{uuid.uuid4().hex[:4]}.mp4"
+        subprocess.run(ff + ["-f", "concat", "-safe", "0", "-i", str(lst), "-c", "copy", "-movflags", "+faststart", str(folder / name)],
+                       check=True, capture_output=True, timeout=600)
+
+        def fin(x):
+            if x.get("final"):
+                (folder / x["final"]).unlink(missing_ok=True)
+            x.update(final=name, final_kind="scenes")
+        tv_update(vid, fin)
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
+# ---------------------------------------------------------------- 🎯 قوالب الإعلانات (UGC / سينمائي): شخصية ← منتج ← سكريبت ← توليد
+import adtpl  # noqa: E402
+
+AD_REF_SLOTS = ("head", "body", "product", "place", "plate")
+AD_PLATE_KINDS = ("skeleton", "talking", "song")   # شخصية واحدة (plate) واللقطات بتتجمع في توليدات لحد ١٥ ثانية
+AD_LENGTHS = (6, 10, 15, 20, 30)
+
+
+def seed_ad_templates() -> None:
+    for tid, t in tplseed.ADS.items():
+        f = TPL_DIR / tid / "tpl.json"
+        old = None
+        if f.exists():
+            try:
+                old = json.loads(f.read_text(encoding="utf-8"))
+            except ValueError:
+                old = None
+            if old and old.get("seed_v", 0) >= TPL_SEED_V and old.get("seed_media") == seed_media_hash(tid):
+                continue
+        beats = [{"t0": 0.0, "t1": 15.0, "role": "hook", "what": "الإعلان", "layout": "", "slots": [], "camera": "", "into_next": "", "keeps": "", "sfx": ""}]
+        schema = {"title": t["name"], "summary": t["uses"], "style": "", "negative": "", "transition": "cut", "beats": beats, "palette": "", "spine": "",
+                  "camera": "", "text_style": "", "music": "", "background": "", "last_frame": "", "beat_sec": 0.0}
+        (TPL_DIR / tid).mkdir(parents=True, exist_ok=True)
+        old = seed_media_copy(tid, old)
+        keep = {k: old[k] for k in ("sample", "cover", "sample_vid", "sample_status", "sample_error", "sample_kind", "seed_media") if old and k in old}
+        with TPL_LOCK:
+            tpl_save(tid, {"name": t["name"], "icon": t["icon"], "uses": t["uses"], "voice_tone": t["voice_tone"], "sample_brief": t["sample"],
+                           "mode": "ad", "ad_cfg": {k: t[k] for k in ("kind", "hero", "needs_product")}, "schema": schema, "builtin": True,
+                           "ratio": "9:16", "source": None, "lab_name": "مكتبة القوالب الجاهزة", "seed_v": TPL_SEED_V,
+                           "created_at": (old or {}).get("created_at") or now(), **keep})
+
+
+seed_ad_templates()
+
+
+def ad_lang(d: dict) -> tuple[str, str]:
+    dl = dub.DIALECTS[d["lang"]]
+    txt = dl.get("language") or (dl["label"].split(" ", 1)[1] + " عامي طبيعي" if d["lang"] != "ar-msa" else "عربية فصحى سهلة")
+    return txt, dub.GUIDES.get(d["lang"], "")
+
+
+AD_SONG_COST = 0.15
+AD_SONG_MODEL = "minimax/music-2.6"
+
+
+def ad_total(d: dict) -> float:
+    a = d["ad"]
+    if a["kind"] == "ugc":
+        return 15.0
+    if a["kind"] in AD_PLATE_KINDS:
+        return round(sum(s["dur"] for s in (a.get("plan") or {}).get("shots") or []), 2)
+    shots = (a.get("plan") or {}).get("shots") or []
+    return round(sum(s["dur"] for s in shots) + (AD_END_SEC if a.get("end_on", True) and shots else 0), 2)
+
+
+AD_END_SEC = 3.0
+
+
+def ad_gen_secs(dur: float) -> int:
+    return max(4, min(atlas.MAX_DURATION, math.ceil(dur)))
+
+
+def ad_per_sec(d: dict) -> float:
+    return TRIAL_MODELS.get(d.get("model"), TRIAL_MODELS["seedance-fast"])["per_sec"] * (2 if d.get("resolution") == "720p" else 1)
+
+
+def ad_jobs(d: dict) -> list[dict]:
+    """التوليدات المطلوبة: UGC = توليدة واحدة ١٥ ثانية، السينمائي = توليدة لكل لقطة + الكارت الأخير."""
+    a = d["ad"]
+    shots = (a.get("plan") or {}).get("shots") or []
+    if not shots:
+        return []
+    if a["kind"] == "ugc":
+        return [{"key": "g0", "secs": 15, "dur": 15.0, "label": "الإعلان كله (١٥ ثانية)"}]
+    if a["kind"] in AD_PLATE_KINDS:
+        return [{"key": f"b{k}", "secs": ad_gen_secs(sum(shots[i]["dur"] for i in g)), "dur": round(sum(shots[i]["dur"] for i in g), 2), "idx": g,
+                 "label": f"لقطة {g[0] + 1}" + (f"–{g[-1] + 1}" if len(g) > 1 else "")} for k, g in enumerate(adtpl.group_beats(shots))]
+    out = [{"key": f"s{i}", "secs": ad_gen_secs(s["dur"]), "dur": s["dur"], "label": f"لقطة {i + 1} · {adtpl.CINEMA_BEATS.get(s['beat'], s['beat'])}"}
+           for i, s in enumerate(shots)]
+    if a.get("end_on", True):
+        out.append({"key": "end", "secs": 4, "dur": AD_END_SEC, "label": "الكارت الأخير"})
+    return out
+
+
+def ad_refs(d: dict, job: str) -> tuple[list[str], list[Path]]:
+    """المراجع اللي بتتبعت مع التوليدة بالترتيب (الترتيب هو @image1، @image2...)."""
+    a, folder = d["ad"], tv_dir(d["_id"])
+    files = a.get("files") or {}
+    have = lambda s: files.get(s) and (folder / files[s]).exists()  # noqa: E731
+    if job == "g0":
+        roles = ["head", "body", "product"]
+    elif job.startswith("b"):
+        idx = next(j["idx"] for j in ad_jobs(d) if j["key"] == job)
+        roles = ["plate"] + (["product"] if any("product" in (a["plan"]["shots"][i].get("with") or []) for i in idx) else [])
+    elif job == "end":
+        roles = ["product"]
+    else:
+        w = a["plan"]["shots"][int(job[1:])].get("with") or []
+        roles = (["head", "body"] if "hero" in w else []) + (["product"] if "product" in w else []) + (["place"] if "place" in w else [])
+    roles = [r for r in roles if have(r)]
+    names = {"head": "hero_head", "body": "hero_body", "product": "product", "place": "place", "plate": "plate"}
+    return [names[r] for r in roles], [folder / files[r] for r in roles]
+
+
+def ad_prompt(d: dict, job: str, roles: list[str]) -> str:
+    if job == "g0":
+        return adtpl.ugc_prompt(d)
+    if job == "end":
+        return adtpl.end_card_prompt(d)
+    if job.startswith("b"):
+        return adtpl.batch_prompt(d, next(j["idx"] for j in ad_jobs(d) if j["key"] == job), roles)
+    return adtpl.cinema_shot_prompt(d, int(job[1:]), roles)
+
+
+def ad_to_dict(vid: str, d: dict) -> dict:
+    a, folder = d.get("ad") or {}, tv_dir(vid)
+
+    def url(name):
+        return f"/media/tvideos/{vid}/{name}?v={int((folder / name).stat().st_mtime)}" if name and (folder / name).exists() else None
+    per = ad_per_sec(d)
+    jobs = ad_jobs({**d, "_id": vid})
+    gens = a.get("gens") or {}
+    return {"ref_urls": {s: url((a.get("files") or {}).get(s)) for s in AD_REF_SLOTS},
+            "jobs": [{**j, "url": url((gens.get(j["key"]) or {}).get("file")), "cost": round(j["secs"] * per, 2),
+                      "prompt": ad_prompt({**d, "_id": vid}, j["key"], ad_refs({**d, "_id": vid}, j["key"])[0]) if a.get("plan") else ""} for j in jobs],
+            "total": ad_total(d), "places": adtpl.UGC_PLACES,
+            "looks": {k: v[0] for k, v in (adtpl.LOOKS.get(a.get("kind")) or adtpl.CINEMA_LOOKS).items()},
+            "song_url": url(a.get("song")), "song_cost": AD_SONG_COST, "plate_kind": a.get("kind") in AD_PLATE_KINDS,
+            "beat_names": adtpl.CINEMA_BEATS, "lengths": AD_LENGTHS,
+            "hero_cost": round(TV_IMAGE_MODELS[tv_img(d)][0] * 2, 2), "plate_cost": TV_IMAGE_MODELS[tv_img(d)][0]}
+
+
+def ad_start(vid: str, status: str, step: str, target, *args) -> dict:
+    def fn(d):
+        if d.get("status") in TV_BUSY:
+            raise HTTPException(400, "استنى لما الشغل اللي شغال يخلص")
+        if d.get("mode") != "ad":
+            raise HTTPException(400, "ده مش فيديو إعلان")
+        d.update(status=status, step=step, error=None)
+    d = tv_update(vid, fn)
+    threading.Thread(target=target, args=(vid, *args), daemon=True).start()
+    return tv_to_dict(vid, d)
+
+
+def ad_image(d: dict, prompt: str, out: Path, refs: list[Path], size: str) -> None:
+    if atlas.mock_mode():
+        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "testsrc2=s=360x480", "-frames:v", "1", str(out)],
+                       check=True, capture_output=True, timeout=60)
+        return
+    atlas.download(atlas.generate_image(tv_img(d), prompt, size, "high", [atlas.reference_url(p) for p in refs] or None), out)
+
+
+def ad_put_file(vid: str, slot: str, name: str) -> None:
+    def fn(x):
+        files = x["ad"].setdefault("files", {})
+        if files.get(slot) and files[slot] != name:
+            (tv_dir(vid) / files[slot]).unlink(missing_ok=True)
+        files[slot] = name
+        x["final"] = None
+    tv_update(vid, fn)
+
+
+class AdHeroIn(BaseModel):
+    desc: str = ""
+    only: str | None = None   # head / body = ارسم واحدة بس تاني
+
+
+@app.post("/api/tvideos/{vid}/ad/hero")
+def ad_hero(vid: str, body: AdHeroIn):
+    """👤 الشخصية: وصفك ← مواصفات ثابتة ← صورة وش ← صورة جسم كامل بنفس الوش (مرجع الوش متبعت معاها)."""
+    tv_update(vid, lambda x: x["ad"].update(hero={**(x["ad"].get("hero") or {}), "desc": body.desc.strip()[:1500]}))
+    return ad_start(vid, "sheeting", "👤 بيكتب مواصفات الشخصية", run_ad_hero, body.only)
+
+
+def run_ad_hero(vid: str, only: str | None) -> None:
+    try:
+        d = tv_load(vid)
+        a, folder = d["ad"], tv_dir(vid)
+        hero = a.get("hero") or {}
+        if a["kind"] in AD_PLATE_KINDS:
+            return run_ad_plate(vid, d)
+        if not only or not hero.get("identity"):
+            if atlas.mock_mode():
+                res = {"gender": "female", "identity": "Soft oval face, warm olive skin, dark brown eyes.", "outfit": "a loose beige shirt, wide jeans, white sneakers",
+                       "handle": "the woman with the beige hijab", "summary_ar": "بنت دمها خفيف بطرحة بيج"}
+            else:
+                res = ad_json(series_chat(adtpl.hero_messages(hero.get("desc") or "", d.get("brief") or "", a["kind"]), json_mode=True), "مواصفات الشخصية")
+            hero = {**hero, **{k: adtpl._txt(res.get(k), 1500) for k in ("gender", "identity", "outfit", "handle", "summary_ar")}}
+            tv_update(vid, lambda x: x["ad"].update(hero=hero))
+        if only in (None, "head"):
+            tv_set(vid, step="👤 بيرسم صورة الوش (المرجع الأساسي)")
+            name = f"head-{uuid.uuid4().hex[:4]}.png"
+            ad_image(d, adtpl.head_prompt(hero), folder / name, [], "1024x1536")
+            ad_put_file(vid, "head", name)
+        if only in (None, "body"):
+            d = tv_load(vid)
+            head = (d["ad"].get("files") or {}).get("head")
+            tv_set(vid, step="🧍 بيرسم الجسم كامل بنفس الوش")
+            name = f"body-{uuid.uuid4().hex[:4]}.png"
+            ad_image(d, adtpl.body_prompt(hero), folder / name, [folder / head] if head else [], "1024x1536")
+            ad_put_file(vid, "body", name)
+        tv_update(vid, lambda x: x.update(status=tv_idle(x), step=None, error=None))
+    except Exception as exc:  # noqa: BLE001
+        tv_fail(vid, exc)
+
+
+def run_ad_plate(vid: str, d: dict) -> None:
+    """🦴/🗣️/🎵 الشخصية الرئيسية: صورة واحدة (plate) بالستايل المختار، وبتتبعت مع كل توليدة."""
+    a, folder = d["ad"], tv_dir(vid)
+    hero = a.get("hero") or {}
+    prod = (a.get("files") or {}).get("product")
+    if atlas.mock_mode():
+        res = {"character": "A friendly serum bottle with big eyes.", "is_product": bool(prod), "theme": "1940s small town", "palette": "amber",
+               "wardrobe": "a tweed suit", "handle": "the skeleton" if a["kind"] == "skeleton" else "the serum bottle character", "summary_ar": "شخصية تجريبية"}
+    else:
+        look = (adtpl.LOOKS[a["kind"]].get(a.get("look") or "") or next(iter(adtpl.LOOKS[a["kind"]].values())))[0]
+        res = ad_json(series_chat(adtpl.plate_messages(a["kind"], look, hero.get("desc") or "", d.get("brief") or "", p_name(a)), json_mode=True), "الشخصية")
+    hero = {**hero, **{k: adtpl._txt(res.get(k), 1500) for k in ("character", "theme", "palette", "wardrobe", "handle", "summary_ar")},
+            "is_product": bool(res.get("is_product")) and bool(prod)}
+    tv_update(vid, lambda x: x["ad"].update(hero=hero))
+    tv_set(vid, step="🎨 بيرسم الشخصية")
+    name = f"plate-{uuid.uuid4().hex[:4]}.png"
+    ad_image(d, adtpl.plate_prompt(a["kind"], a.get("look") or "", hero, bool(prod)), folder / name,
+             [folder / prod] if prod and hero["is_product"] else [], "1024x1536")
+    ad_put_file(vid, "plate", name)
+    tv_update(vid, lambda x: x.update(status=tv_idle(x), step=None, error=None))
+
+
+@app.post("/api/tvideos/{vid}/ad/upload/{slot}")
+def ad_upload(vid: str, slot: str, file: UploadFile = File(...)):
+    """⬆ صورة من عندك: الوش / الجسم / المنتج (لازم) / المكان."""
+    if slot not in AD_REF_SLOTS:
+        raise HTTPException(404, "الخانة دي مش موجودة")
+    d = tv_load(vid)
+    if d.get("status") in TV_BUSY:
+        raise HTTPException(400, "استنى لما الشغل اللي شغال يخلص")
+    name = save_upload(file, IMAGE_EXTENSIONS, tv_dir(vid), slot)
+    ad_put_file(vid, slot, name)
+    return tv_to_dict(vid, tv_update(vid, lambda x: x.update(status=tv_idle(x))))
+
+
+class AdSetIn(BaseModel):
+    product_name: str | None = None
+    product_kind: str | None = None
+    place: str | None = None
+    look: str | None = None
+    script: str | None = None
+    length: int | None = None
+    end_on: bool | None = None
+    brand: str | None = None
+    slogan: str | None = None
+    voice_on: bool | None = None
+    lang: str | None = None
+    voice: str | None = None
+
+
+@app.put("/api/tvideos/{vid}/ad")
+def ad_set(vid: str, body: AdSetIn):
+    def fn(d):
+        if d.get("mode") != "ad":
+            raise HTTPException(400, "ده مش فيديو إعلان")
+        a = d["ad"]
+        p = a.setdefault("product", {})
+        if body.product_name is not None:
+            p["name"] = body.product_name.strip()[:120]
+        if body.product_kind is not None:
+            p["kind"] = body.product_kind.strip()[:120]
+        if body.place is not None:
+            a["place"] = body.place.strip()[:400]
+        if body.look in (adtpl.LOOKS.get(a["kind"]) or adtpl.CINEMA_LOOKS):
+            a["look"] = body.look
+        if body.script is not None:
+            a["script"] = body.script.strip()[:3000]
+        if body.length in AD_LENGTHS:
+            a["length"] = body.length
+        if body.end_on is not None:
+            a["end_on"] = body.end_on
+        end = (a.get("plan") or {}).get("end")
+        if end is not None:
+            if body.brand is not None:
+                end["brand"] = body.brand.strip()[:60]
+            if body.slogan is not None:
+                end["slogan"] = body.slogan.strip()[:120]
+        if body.voice_on is not None:
+            d["voice_on"] = body.voice_on
+        if body.lang in dub.DIALECTS:
+            d["lang"] = body.lang
+            a["spoken"] = adtpl.SPOKEN.get(body.lang) or dub.DIALECTS[body.lang].get("language") or "Arabic"
+            if d.get("voice") not in dub.DIALECTS[body.lang]["voices"]:
+                d["voice"] = dub.DIALECTS[body.lang]["voices"][0]
+        if body.voice and body.voice in dub.DIALECTS[d["lang"]]["voices"]:
+            d["voice"] = body.voice
+        d["final"] = None
+    return tv_to_dict(vid, tv_update(vid, fn))
+
+
+@app.post("/api/tvideos/{vid}/ad/place")
+def ad_place(vid: str):
+    """🏙️ صورة المكان (من غير ناس) بتتبعت مرجع مع اللقطات اللي فيها المكان."""
+    d = tv_load(vid)
+    if not (d["ad"].get("place") or "").strip():
+        raise HTTPException(400, "اكتب المكان الأول")
+    return ad_start(vid, "sheeting", "🏙️ بيكتب ويرسم صورة المكان", run_ad_place)
+
+
+def run_ad_place(vid: str) -> None:
+    try:
+        d = tv_load(vid)
+        if atlas.mock_mode():
+            prompt = "A sunny street at dawn."
+        else:
+            prompt = adtpl._txt(ad_json(series_chat(adtpl.plate_messages(d["ad"]["place"], d.get("brief") or ""), json_mode=True), "صورة المكان").get("prompt"), 4000)
+        prompt += adtpl.PLATE_CLOSE
+        size = {"9:16": "1024x1536", "16:9": "1536x1024"}.get(d["ratio"], "1024x1024")
+        name = f"place-{uuid.uuid4().hex[:4]}.png"
+        ad_image(d, prompt, tv_dir(vid) / name, [], size)
+        conform_image(tv_dir(vid) / name, d["ratio"])
+        ad_put_file(vid, "place", name)
+        def fn(x):
+            x["ad"]["place_prompt"] = prompt
+            x.update(status=tv_idle(x), step=None, error=None)
+        tv_update(vid, fn)
+    except Exception as exc:  # noqa: BLE001
+        tv_fail(vid, exc)
+
+
+@app.post("/api/tvideos/{vid}/ad/plan")
+def ad_plan(vid: str):
+    """✍️ السكريبت واللقطات (من الفكرة أو من سكريبتك)."""
+    d = tv_load(vid)
+    p = d["ad"].get("product") or {}
+    if d["ad"]["kind"] == "ugc" and not (p.get("name") or "").strip():
+        raise HTTPException(400, "اكتب اسم المنتج الأول")
+    return ad_start(vid, "filling", "✍️ بيكتب السكريبت واللقطات", run_ad_plan)
+
+
+def run_ad_plan(vid: str) -> None:
+    try:
+        d = tv_load(vid)
+        a = d["ad"]
+        lang_txt, guide = ad_lang(d)
+        total = int(a.get("length") or 15)
+        if atlas.mock_mode():
+            res = ({"title": "ريفيو تجريبي", "world": "A bright bathroom counter.", "lighting": "soft window light",
+                    "beats": [{"line": f"جملة تجريبية {k + 1}", "action": "she holds the product near the lens"} for k in range(4)]}
+                   if a["kind"] == "ugc" else
+                   {"title": "إعلان تجريبي", "world": "dawn city street, cool light", "end": {"brand": p_name(a), "slogan": "صحصح بجد"},
+                    "shots": [{"beat": b, "dur": 3, "what": f"لقطة {k + 1}", "visual": "The runner pauses.", "camera": "50mm, slow push-in",
+                               "audio": "footsteps", "with": ["hero", "product"], "line": "" if k else "كل يوم بداية"} for k, b in enumerate(["HOOK", "PROBLEM", "REVEAL", "PAYOFF"])]})
+        else:
+            brain_txt = az.brain_text(tv_brain(d))
+            msgs = (adtpl.ugc_messages(d, lang_txt, guide, brain_txt) if a["kind"] == "ugc"
+                    else adtpl.beats_messages(d, lang_txt, guide, brain_txt) if a["kind"] in AD_PLATE_KINDS
+                    else adtpl.cinema_messages(d, lang_txt, guide, brain_txt, total))
+            res = ad_json(series_chat(msgs, json_mode=True), "السكريبت")
+        if atlas.mock_mode() and a["kind"] in AD_PLATE_KINDS:
+            res = {"title": "تجربة", "angle": "تحوّل · وقت", "style": "upbeat Arabic pop, female lead, 110 BPM, warm, modern polished",
+                   "lyrics": "[Verse]\nسطر أول\n[Chorus]\nسطر تاني",
+                   "shots": [{"line": f"جملة {k + 1} تجريبية", "lyric": f"سطر {k + 1}", "sing": k == 0, "emotion": "warm", "visual": "The hero waves.",
+                              "camera": "slow push-in", "with": ["hero", "product"] if k == 2 else ["hero"]} for k in range(5)]}
+        shots = (adtpl.clean_beats(a["kind"], res) if a["kind"] in AD_PLATE_KINDS else adtpl.clean_plan_shots(a["kind"], res, total))
+        if not shots:
+            raise RuntimeError("الموديل مرجعش لقطات، جرّب تاني")
+        end = res.get("end") if isinstance(res.get("end"), dict) else {}
+        plan = {"title": adtpl._txt(res.get("title"), 80), "world": adtpl._txt(res.get("world"), 800), "lighting": adtpl._txt(res.get("lighting"), 200),
+                "shots": shots, "end": {"brand": adtpl._txt(end.get("brand"), 60) or p_name(a), "slogan": adtpl._txt(end.get("slogan"), 120)},
+                "angle": adtpl._txt(res.get("angle"), 300), "style": adtpl._txt(res.get("style"), 300), "lyrics": str(res.get("lyrics") or "").strip()[:3000]}
+        if a["kind"] == "skeleton" and d.get("voice_on", True):   # 🎙️ الصوت الأول: كل نبضة على قد جملتها المتسجلة
+            for k, sh in enumerate(shots):
+                if sh["line"]:
+                    tv_set(vid, step=f"🎙️ بيسجّل الراوي ({k + 1} من {len(shots)})")
+                    f = vo_say(sh["line"], d["voice"], d["lang"], tv_dir(vid) / f"vo-b{k}-{uuid.uuid4().hex[:4]}.wav")
+                    sh.update(vo=f.name, dur=round(max(2.0, min(8.0, probe_duration(f) + 0.35)), 2))
+
+        def fn(x):
+            for sh in (x["ad"].get("plan") or {}).get("shots") or []:
+                if sh.get("vo"):
+                    (tv_dir(vid) / sh["vo"]).unlink(missing_ok=True)
+            if x["ad"].get("song"):   # الأغنية القديمة كانت على كلام تاني
+                (tv_dir(vid) / x["ad"]["song"]).unlink(missing_ok=True)
+                x["ad"]["song"] = None
+            x["ad"]["plan"] = plan
+            x["ad"]["gens"] = {}
+            x["final"] = None
+            if plan["title"]:
+                x["name"] = f"{x['name'].split(' · ')[0]} · {plan['title']}"[:120]
+            x.update(status=tv_idle(x), step=None, error=None)
+        tv_update(vid, fn)
+    except Exception as exc:  # noqa: BLE001
+        tv_fail(vid, exc)
+
+
+def p_name(a: dict) -> str:
+    return ((a.get("product") or {}).get("name") or "").strip()
+
+
+class AdShotIn(BaseModel):
+    line: str | None = None
+    action: str | None = None
+    visual: str | None = None
+    camera: str | None = None
+    audio: str | None = None
+    dur: float | None = None
+    with_: list[str] | None = None
+    world: str | None = None
+    emotion: str | None = None
+    sing: bool | None = None
+
+
+@app.put("/api/tvideos/{vid}/ad/shots/{i}")
+def ad_shot_edit(vid: str, i: int, body: AdShotIn):
+    def fn(d):
+        plan = d["ad"].get("plan") or {}
+        sh = plan.get("shots") or []
+        if body.world is not None:
+            plan["world"] = body.world.strip()[:800]
+        if not 0 <= i < len(sh):
+            if body.world is None:
+                raise HTTPException(404, "اللقطة دي مش موجودة")
+            return
+        if body.sing is not None:
+            sh[i]["sing"] = body.sing
+        if body.line is not None and sh[i].get("vo") and body.line.strip() != sh[i].get("line"):
+            (tv_dir(vid) / sh[i].pop("vo")).unlink(missing_ok=True)   # الجملة اتغيرت: بتتسجل تاني وقت التجميع
+        for k in ("line", "action", "visual", "camera", "audio", "emotion"):
+            v = getattr(body, k)
+            if v is not None:
+                sh[i][k] = v.strip()[:1500]
+        if body.dur is not None and d["ad"]["kind"] != "ugc":
+            sh[i]["dur"] = round(max(1.5, min(8.0, body.dur)), 1)
+        if body.with_ is not None:
+            sh[i]["with"] = [x for x in body.with_ if x in ("hero", "product", "place")]
+        if body.dur is not None or body.with_ is not None:
+            d["ad"]["gens"] = {}   # التوليدات بتتجمع بالمدد: لو اتغيرت بتتعمل تاني
+        d["final"] = None
+    return tv_to_dict(vid, tv_update(vid, fn))
+
+
+class AdSongIn(BaseModel):
+    lyrics: str | None = None
+    style: str | None = None
+
+
+@app.post("/api/tvideos/{vid}/ad/song")
+def ad_song(vid: str, body: AdSongIn):
+    """🎵 الأغنية الأول (هي اللي بتحدد وقت كل لقطة): الكلمات + الستايل ← موديل الموسيقى."""
+    def fn(d):
+        plan = d["ad"].get("plan") or {}
+        if body.lyrics is not None:
+            plan["lyrics"] = body.lyrics.strip()[:3000]
+        if body.style is not None:
+            plan["style"] = body.style.strip()[:300]
+    d = tv_update(vid, fn)
+    if not ((d["ad"].get("plan") or {}).get("lyrics") or "").strip():
+        raise HTTPException(400, "اكتب الكلمات الأول")
+    return ad_start(vid, "working", "🎵 بيعمل الأغنية", run_ad_song)
+
+
+def run_ad_song(vid: str) -> None:
+    try:
+        d = tv_load(vid)
+        plan, folder = d["ad"]["plan"], tv_dir(vid)
+        name = f"song-{uuid.uuid4().hex[:4]}.mp3"
+        if atlas.mock_mode():
+            subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "sine=frequency=440:duration=24", str(folder / name)],
+                           check=True, capture_output=True, timeout=60)
+        else:
+            atlas.download(atlas.run_model("Audio", {"model": AD_SONG_MODEL, "prompt": plan.get("style") or "modern pop, upbeat",
+                                                     "lyrics": plan["lyrics"]}, "الأغنية", max_seconds=600, interval=4), folder / name)
+        total = probe_duration(folder / name)
+
+        def fn(x):
+            a = x["ad"]
+            if a.get("song") and a["song"] != name:
+                (folder / a["song"]).unlink(missing_ok=True)
+            a["song"], a["song_dur"] = name, round(total, 2)
+            shots = a["plan"]["shots"]   # كل لقطة على قد سطورها من وقت الأغنية
+            w = [max(4, len(sh.get("line") or "")) for sh in shots]
+            for sh, k in zip(shots, w):
+                sh["dur"] = round(total * k / sum(w), 2)
+            a["gens"] = {}
+            x["final"] = None
+            x.update(status=tv_idle(x), step=None, error=None)
+        tv_update(vid, fn)
+    except Exception as exc:  # noqa: BLE001
+        tv_fail(vid, exc)
+
+
+class AdRunIn(BaseModel):
+    key: str | None = None   # g0 / s3 / end، أو فاضي = الناقص كله
+
+
+@app.post("/api/tvideos/{vid}/ad/run")
+def ad_run(vid: str, body: AdRunIn):
+    """🎬 التوليد (الناقص بس، أو حتة واحدة تاني) ← التجميع."""
+    d = {**tv_load(vid), "_id": vid}
+    if not (d["ad"].get("plan") or {}).get("shots"):
+        raise HTTPException(400, "اكتب السكريبت الأول")
+    if not (d["ad"].get("files") or {}).get("product") and d["ad"]["kind"] in ("ugc", "cinema", "talking"):
+        raise HTTPException(400, "ارفع صورة المنتج الأول")
+    if d["ad"]["kind"] == "ugc" and not (d["ad"].get("files") or {}).get("head"):
+        raise HTTPException(400, "اعمل الشخصية الأول")
+    if d["ad"]["kind"] in AD_PLATE_KINDS and not (d["ad"].get("files") or {}).get("plate"):
+        raise HTTPException(400, "اعمل الشخصية الأول")
+    if d["ad"]["kind"] == "song" and not d["ad"].get("song"):
+        raise HTTPException(400, "اعمل الأغنية الأول")
+    if body.key and body.key not in [j["key"] for j in ad_jobs(d)]:
+        raise HTTPException(404, "الحتة دي مش موجودة")
+    return ad_start(vid, "working", "🎬 بيبدأ", run_ad_gen, body.key)
+
+
+def run_ad_gen(vid: str, only: str | None) -> None:
+    try:
+        d = {**tv_load(vid), "_id": vid}
+        folder = tv_dir(vid)
+        ratio = az.ASPECTS.get(d["ratio"], az.ASPECTS["9:16"])[1]
+        W, H = RATIO_VIDEO.get(d["ratio"], RATIO_VIDEO["9:16"])
+        speak = d["ad"]["kind"] in ("ugc", "talking")
+        for j in ad_jobs(d):
+            have = ((d["ad"].get("gens") or {}).get(j["key"]) or {}).get("file")
+            if (only and only != j["key"]) or (not only and have and (folder / have).exists()):
+                continue
+            tv_set(vid, step=f"🎬 بيولّد: {j['label']}")
+            roles, refs = ad_refs(d, j["key"])
+            name = f"{j['key']}-{uuid.uuid4().hex[:4]}.mp4"
+            if atlas.mock_mode():
+                gen_motion(d.get("model") or "seedance-fast", d.get("resolution") or "480p", ratio, "", refs[0], refs[-1], j["secs"], folder / name, W, H)
+            else:
+                req = {"model": tv_r2v(d.get("model") or "seedance-fast"), "prompt": ad_prompt(d, j["key"], roles),
+                       "reference_images": [atlas.reference_url(p) for p in refs], "duration": j["secs"],
+                       "resolution": d.get("resolution") or "480p", "ratio": ratio, "generate_audio": True, "watermark": False}
+                atlas.download(atlas.run_model("Video", req, j["label"], max_seconds=1800, interval=6), folder / name)
+
+            def fn(x, key=j["key"], name=name):
+                g = x["ad"].setdefault("gens", {})
+                old = (g.get(key) or {}).get("file")
+                if old and old != name:
+                    (folder / old).unlink(missing_ok=True)
+                g[key] = {"file": name}
+                x["final"] = None
+            tv_update(vid, fn)
+            d = {**tv_load(vid), "_id": vid}
+        if all(((d["ad"].get("gens") or {}).get(j["key"]) or {}).get("file") for j in ad_jobs(d)):
+            tv_set(vid, step="🎞️ بيجمّع الإعلان")
+            ad_assemble(vid, speak)
+        tv_update(vid, lambda x: x.update(status=tv_idle(x), step=None, error=None))
+    except Exception as exc:  # noqa: BLE001
+        tv_fail(vid, exc)
+
+
+def ad_end_ass(d: dict, W: int, H: int) -> str | None:
+    """الكارت الأخير: اسم البراند والجملة بخطوطنا (مش من الموديل)، فالحروف مظبوطة."""
+    end = (d["ad"].get("plan") or {}).get("end") or {}
+    items = []
+    if end.get("brand"):
+        items.append({"text": end["brand"], "t0": 0.25, "dur": AD_END_SEC, "font": "SM Cairo", "size": 120, "bold": True, "x": 0.5, "y": 0.3,
+                      "color": "#ffffff", "shadow": True, "stroke": {"w": 3, "color": "#000000"}, "anim_in": {"type": "pop", "dur": 0.45}})
+    if end.get("slogan"):
+        items.append({"text": end["slogan"], "t0": 0.6, "dur": AD_END_SEC, "font": "SM Tajawal", "size": 62, "x": 0.5, "y": 0.4,
+                      "color": "#ffffff", "shadow": True, "stroke": {"w": 2, "color": "#000000"}, "anim_in": {"type": "fade", "dur": 0.4}})
+    return textlayer.build_ass(items, AD_END_SEC, W, H) if items else None
+
+
+def ad_assemble(vid: str, speak: bool) -> None:
+    """كل حتة على طولها في الخطة ← صوتها (UGC: كلام الشخصية كامل، السينمائي: صوت المكان واطي + الفويس أوفر) ← ورا بعض ← الكارت الأخير بالكلام."""
+    d = {**tv_load(vid), "_id": vid}
+    folder = tv_dir(vid)
+    W, H = RATIO_VIDEO.get(d["ratio"], RATIO_VIDEO["9:16"])
+    work = folder / ".asm"
+    shutil.rmtree(work, ignore_errors=True)
+    work.mkdir()
+    ff = [ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y"]
+    try:
+        segs, t = [], 0.0
+        shots = d["ad"]["plan"]["shots"]
+        vo_items = []
+        for j in ad_jobs(d):
+            clip = folder / d["ad"]["gens"][j["key"]]["file"]
+            vf = f"[0:v]setpts=PTS-STARTPTS,scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},setsar=1,fps=30,tpad=stop_mode=clone:stop_duration=2"
+            if j["key"] == "end":
+                ass = ad_end_ass(d, W, H)
+                if ass:
+                    (work / "end.ass").write_text(ass, encoding="utf-8")
+                    vf += f",subtitles=filename='{captions.filter_path(work / 'end.ass')}':fontsdir='{captions.filter_path(FONTS_DIR)}'"
+            vf += ",format=yuv420p[v]"
+            vol = 1.0 if speak else 0.0 if d["ad"]["kind"] == "song" else 0.25 if d["ad"]["kind"] == "skeleton" else 0.35
+            a = (f"[0:a]aresample=48000,aformat=channel_layouts=stereo,volume={vol},apad[a]" if has_audio(clip) else "anullsrc=r=48000:cl=stereo[a]")
+            out = work / f"{j['key']}.mp4"
+            subprocess.run(ff + ["-i", str(clip), "-filter_complex", f"{vf};{a}", "-map", "[v]", "-map", "[a]", "-t", f"{j['dur']:.3f}",
+                                 "-c:v", "libx264", "-preset", "veryfast", "-crf", "19", "-c:a", "aac", "-ar", "48000", "-b:a", "160k", str(out)],
+                           check=True, capture_output=True, timeout=600)
+            segs.append(out)
+            if d.get("voice_on", True) and d["ad"]["kind"] in ("cinema", "skeleton"):
+                tt = t
+                for i in (j.get("idx") or ([int(j["key"][1:])] if j["key"].startswith("s") else [])):
+                    if (shots[i].get("line") or "").strip():
+                        vo_items.append((tt, shots[i]["line"], shots[i].get("vo")))
+                    tt += shots[i]["dur"]
+            t += j["dur"]
+        lst = work / "list.txt"
+        lst.write_text("".join(f"file '{p.name}'\n" for p in segs), encoding="utf-8")
+        joined = work / "joined.mp4"
+        subprocess.run(ff + ["-f", "concat", "-safe", "0", "-i", str(lst), "-c", "copy", str(joined)], check=True, capture_output=True, timeout=600)
+        name = f"final-{uuid.uuid4().hex[:4]}.mp4"
+        if vo_items and not speak:   # 🎙️ الفويس أوفر: كل جملة في أول لقطتها
+            ins, flt = ["-i", str(joined)], []
+            for k, (t0, line, pre) in enumerate(vo_items):
+                if pre and (folder / pre).exists():
+                    f = folder / pre
+                else:
+                    tv_set(vid, step=f"🎙️ بيسجّل الفويس أوفر ({k + 1} من {len(vo_items)})")
+                    f = vo_say(line, d["voice"], d["lang"], work / f"vo{k}.wav")
+                ins += ["-i", str(f)]
+                flt.append(f"[{k + 1}:a]aresample=48000,aformat=channel_layouts=stereo,adelay={int((t0 + 0.15) * 1000)}:all=1[v{k}]")
+            mix = "[0:a]" + "".join(f"[v{k}]" for k in range(len(vo_items)))
+            flt.append(f"{mix}amix=inputs={len(vo_items) + 1}:duration=first:normalize=0[a]")
+            subprocess.run(ff + ins + ["-filter_complex", ";".join(flt), "-map", "0:v", "-map", "[a]", "-c:v", "copy", "-c:a", "aac", "-b:a", "160k",
+                                       "-movflags", "+faststart", str(folder / name)], check=True, capture_output=True, timeout=600)
+        elif d["ad"]["kind"] == "song" and d["ad"].get("song") and (folder / d["ad"]["song"]).exists():   # 🎵 الأغنية تحت الفيديو كله
+            subprocess.run(ff + ["-i", str(joined), "-i", str(folder / d["ad"]["song"]), "-filter_complex",
+                                 "[1:a]aresample=48000,aformat=channel_layouts=stereo,apad[s];[0:a][s]amix=inputs=2:duration=first:normalize=0[a]",
+                                 "-map", "0:v", "-map", "[a]", "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", str(folder / name)],
+                           check=True, capture_output=True, timeout=600)
+        else:
+            shutil.move(str(joined), folder / name)
+
+        def fin(x):
+            if x.get("final"):
+                (folder / x["final"]).unlink(missing_ok=True)
+            x.update(final=name, final_kind="ad")
+        tv_update(vid, fin)
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
+# ---------------------------------------------------------------- 📦 استوديو المنتج: صورة استوديو، المنتج في مشهد، إعلانات ثابتة
+import stilltpl  # noqa: E402
+
+RATIO_WH.setdefault("3:4", (3, 4))
+
+
+def seed_still_templates() -> None:
+    for tid, t in tplseed.STILLS.items():
+        f = TPL_DIR / tid / "tpl.json"
+        old = None
+        if f.exists():
+            try:
+                old = json.loads(f.read_text(encoding="utf-8"))
+            except ValueError:
+                old = None
+            if old and old.get("seed_v", 0) >= TPL_SEED_V:
+                continue
+        beats = [{"t0": 0.0, "t1": 1.0, "role": "hook", "what": "صورة", "layout": "", "slots": [], "camera": "", "into_next": "", "keeps": "", "sfx": ""}]
+        schema = {"title": t["name"], "summary": t["uses"], "style": "", "negative": "", "transition": "cut", "beats": beats, "palette": "", "spine": "",
+                  "camera": "", "text_style": "", "music": "", "background": "", "last_frame": "", "beat_sec": 0.0}
+        (TPL_DIR / tid).mkdir(parents=True, exist_ok=True)
+        with TPL_LOCK:
+            tpl_save(tid, {"name": t["name"], "icon": t["icon"], "uses": t["uses"], "voice_tone": "", "sample_brief": t["sample"], "mode": "still",
+                           "still_cfg": {"kind": t["kind"]}, "schema": schema, "builtin": True, "ratio": "1:1", "source": None,
+                           "lab_name": "مكتبة القوالب الجاهزة", "seed_v": TPL_SEED_V, "created_at": (old or {}).get("created_at") or now()})
+
+
+seed_still_templates()
+
+
+def still_items_cost(d: dict, items: list[dict]) -> float:
+    return round(len(items) * TV_IMAGE_MODELS[tv_img(d)][0], 2)
+
+
+def still_to_dict(vid: str, d: dict) -> dict:
+    st, folder = d.get("still") or {}, tv_dir(vid)
+
+    def url(name):
+        return f"/media/tvideos/{vid}/{name}?v={int((folder / name).stat().st_mtime)}" if name and (folder / name).exists() else None
+    items = st.get("items") or []
+    return {"ref_urls": {s: url((st.get("files") or {}).get(s)) for s in ("product", "scene")},
+            "item_urls": [url(x.get("file")) for x in items], "item_cost": TV_IMAGE_MODELS[tv_img(d)][0],
+            "missing_cost": still_items_cost(d, [x for x in items if not url(x.get("file"))]),
+            "formats": list(stilltpl.FORMATS), "bgs": stilltpl.STUDIO_BGS,
+            "adgen": [{k: t[k] for k in ("n", "name", "ar", "tag", "ratio")} for t in stilltpl.ADGEN]}
+
+
+def still_start(vid: str, status: str, step: str, target, *args) -> dict:
+    def fn(d):
+        if d.get("status") in TV_BUSY:
+            raise HTTPException(400, "استنى لما الشغل اللي شغال يخلص")
+        if d.get("mode") != "still":
+            raise HTTPException(400, "ده مش استوديو منتج")
+        d.update(status=status, step=step, error=None)
+    d = tv_update(vid, fn)
+    threading.Thread(target=target, args=(vid, *args), daemon=True).start()
+    return tv_to_dict(vid, d)
+
+
+@app.post("/api/tvideos/{vid}/still/upload/{slot}")
+def still_upload(vid: str, slot: str, file: UploadFile = File(...)):
+    if slot not in ("product", "scene"):
+        raise HTTPException(404, "الخانة دي مش موجودة")
+    d = tv_load(vid)
+    if d.get("status") in TV_BUSY:
+        raise HTTPException(400, "استنى لما الشغل اللي شغال يخلص")
+    name = save_upload(file, IMAGE_EXTENSIONS, tv_dir(vid), slot)
+
+    def fn(x):
+        files = x["still"].setdefault("files", {})
+        if files.get(slot) and files[slot] != name:
+            (tv_dir(vid) / files[slot]).unlink(missing_ok=True)
+        files[slot] = name
+    return tv_to_dict(vid, tv_update(vid, fn))
+
+
+class StillSetIn(BaseModel):
+    bg: str | None = None
+    fmt: str | None = None
+    how: str | None = None        # recreate / recompose
+    note: str | None = None
+    picks: list[int] | None = None
+    copy_lang: str | None = None  # ar / en
+    product: str | None = None
+    offer: str | None = None
+
+
+@app.put("/api/tvideos/{vid}/still")
+def still_set(vid: str, body: StillSetIn):
+    def fn(d):
+        st = d["still"]
+        if body.bg is not None:
+            st["bg"] = body.bg.strip()[:80] or "clean white"
+        if body.fmt in stilltpl.FORMATS:
+            st["fmt"] = body.fmt
+        if body.how in ("recreate", "recompose"):
+            st["how"] = body.how
+        if body.note is not None:
+            st["note"] = body.note.strip()[:400]
+        if body.picks is not None:
+            st["picks"] = [n for n in dict.fromkeys(body.picks) if n in stilltpl.ADGEN_BY_N][:10]
+        if body.copy_lang in ("ar", "en"):
+            st["copy_lang"] = body.copy_lang
+        if body.product is not None:
+            st["product"] = body.product.strip()[:120]
+        if body.offer is not None:
+            st["offer"] = body.offer.strip()[:1500]
+    return tv_to_dict(vid, tv_update(vid, fn))
+
+
+@app.post("/api/tvideos/{vid}/still/prepare")
+def still_prepare(vid: str):
+    """✍️ البرومتات: الاستوديو والنسخ بيتكتبوا على طول، وإعادة البناء والإعلانات الثابتة بيكتبهم الموديل."""
+    d = tv_load(vid)
+    st = d["still"]
+    if not (st.get("files") or {}).get("product"):
+        raise HTTPException(400, "ارفع صورة المنتج الأول")
+    if st["kind"] == "scene" and not st["files"].get("scene"):
+        raise HTTPException(400, "ارفع صورة المشهد الأول")
+    if st["kind"] == "adgen" and not st.get("picks"):
+        raise HTTPException(400, "اختار قالب واحد على الأقل")
+    return still_start(vid, "filling", "✍️ بيكتب البرومتات", run_still_prepare)
+
+
+def run_still_prepare(vid: str) -> None:
+    try:
+        d = tv_load(vid)
+        st, folder = d["still"], tv_dir(vid)
+        kind, note = st["kind"], st.get("note") or ""
+        items = []
+        if kind == "studio":
+            items = [{"label": f"صورة استوديو · {st.get('bg') or 'clean white'}", "prompt": stilltpl.studio_prompt(st.get("bg"), note),
+                      "ratio": st.get("fmt") or "1:1", "refs": ["product"]}]
+        elif kind == "scene" and st.get("how") != "recompose":
+            items = [{"label": "نسخ المشهد زي ما هو", "prompt": stilltpl.with_note(stilltpl.RECREATE, note), "ratio": st.get("fmt") or "3:4",
+                      "refs": ["scene", "product"]}]
+        elif kind == "scene":
+            if atlas.mock_mode():
+                res = {"style": "Soft morning light on a travertine counter.", "label": "GLOWDROP Vitamin C"}
+            else:
+                parts = [{"type": "text", "text": stilltpl.recompose_messages(note)}]
+                for s in ("scene", "product"):
+                    parts.append({"type": "image_url", "image_url": {"url": data_url(model_image(folder / st["files"][s], 1024), "image/jpeg")}})
+                res = ad_json(ad_media_chat([{"role": "user", "content": parts}], 4000), "قراءة المشهد")
+            items = [{"label": "بناء المشهد حوالين المنتج", "prompt": stilltpl.recompose_prompt(str(res.get("style") or ""), str(res.get("label") or ""), note),
+                      "ratio": st.get("fmt") or "3:4", "refs": ["product"]}]
+        else:
+            lang_txt, guide = ad_lang(d) if st.get("copy_lang") != "en" else ("English", "")
+            if atlas.mock_mode():
+                res = {"ads": [{"n": n, "prompt": stilltpl.ADGEN_BY_N[n]["prompt"].split("Create:", 1)[-1], "copy": ["عنوان تجريبي"], "invented": []}
+                               for n in st["picks"]]}
+            else:
+                msgs = stilltpl.adgen_messages(st["picks"], az.brain_text(tv_brain(d)), st.get("product") or "", st.get("offer") or d.get("brief") or "",
+                                               lang_txt, guide)
+                res = ad_json(series_chat(msgs, json_mode=True), "الإعلانات الثابتة")
+            got = {int(x.get("n")): x for x in res.get("ads") or [] if isinstance(x, dict) and str(x.get("n", "")).isdigit()}
+            for n in st["picks"]:
+                x, t = got.get(n), stilltpl.ADGEN_BY_N[n]
+                if not x:
+                    continue
+                items.append({"label": f"#{n} · {t['ar']}", "prompt": stilltpl.with_note(stilltpl.adgen_prompt(str(x.get("prompt") or ""), st.get("copy_lang") != "en"), note),
+                              "ratio": t["ratio"], "refs": ["product"], "copy": [str(c)[:200] for c in x.get("copy") or []][:12],
+                              "invented": [str(c)[:200] for c in x.get("invented") or []][:8]})
+            if not items:
+                raise RuntimeError("الموديل مرجعش برومتات، جرّب تاني")
+
+        def fn(x):
+            for it in x["still"].get("items") or []:
+                if it.get("file"):
+                    (folder / it["file"]).unlink(missing_ok=True)
+            x["still"]["items"] = items
+            x.update(status=tv_idle(x), step=None, error=None)
+        tv_update(vid, fn)
+    except Exception as exc:  # noqa: BLE001
+        tv_fail(vid, exc)
+
+
+class StillItemIn(BaseModel):
+    prompt: str
+
+
+@app.put("/api/tvideos/{vid}/still/items/{i}")
+def still_item_edit(vid: str, i: int, body: StillItemIn):
+    def fn(d):
+        items = d["still"].get("items") or []
+        if not 0 <= i < len(items):
+            raise HTTPException(404, "الصورة دي مش موجودة")
+        items[i]["prompt"] = body.prompt.strip()[:12000]
+    return tv_to_dict(vid, tv_update(vid, fn))
+
+
+class StillRunIn(BaseModel):
+    i: int | None = None
+
+
+@app.post("/api/tvideos/{vid}/still/run")
+def still_run(vid: str, body: StillRunIn):
+    d = tv_load(vid)
+    if not (d["still"].get("items") or []):
+        raise HTTPException(400, "اكتب البرومتات الأول")
+    return still_start(vid, "working", "🖼️ بيرسم", run_still_gen, body.i)
+
+
+def run_still_gen(vid: str, only: int | None) -> None:
+    try:
+        d = tv_load(vid)
+        st, folder = d["still"], tv_dir(vid)
+        for i, it in enumerate(st["items"]):
+            if (only is not None and only != i) or (only is None and it.get("file") and (folder / it["file"]).exists()):
+                continue
+            tv_set(vid, step=f"🖼️ بيرسم: {it['label']} ({i + 1} من {len(st['items'])})")
+            name = f"img{i + 1}-{uuid.uuid4().hex[:4]}.png"
+            refs = [folder / st["files"][r] for r in it["refs"] if (st.get("files") or {}).get(r)]
+            ad_image(d, it["prompt"], folder / name, refs, stilltpl.FORMATS.get(it["ratio"], "1024x1024"))
+            conform_image(folder / name, it["ratio"])
+
+            def fn(x, i=i, name=name):
+                cur = x["still"]["items"][i]
+                if cur.get("file") and cur["file"] != name:
+                    (folder / cur["file"]).unlink(missing_ok=True)
+                cur["file"] = name
+            tv_update(vid, fn)
+        tv_update(vid, lambda x: x.update(status=tv_idle(x), step=None, error=None))
+    except Exception as exc:  # noqa: BLE001
+        tv_fail(vid, exc)
+
+
+@app.get("/api/tpl-studio")
+def tpl_studio():
+    """المعرض: كل القوالب (الجاهزة واللي اتطلّعت من المعمل) + اللغات والأصوات + فيديوهات العميل من القوالب."""
+    tpls = templates_list()
+    tpls.sort(key=lambda t: (not t.get("builtin"), t.get("name") or ""))
+    vids = [v for v in tvideos_list() if v.get("section") == "templates"]
+    return {"templates": tpls, "videos": vids, "dialects": {k: {"label": v["label"], "voices": v["voices"], "group": v["group"]} for k, v in dub.DIALECTS.items()},
+            "voices": {k: v["label"] for k, v in dub.VOICES.items()}, "fasih": bool(fasih.api_key() or atlas.mock_mode())}
+
+
+@app.post("/api/templates/{tid}/sample")
+def template_sample(tid: str):
+    """🎞️ عينة قصيرة للقالب (للمعرض): ستوري بورد بنفس الستايل ← لقطات متصلة (Seedance Mini 480p) ← من غير صوت."""
+    d = tpl_load(tid)
+    if d.get("sample_status") == "working":
+        raise HTTPException(400, "العينة بتتعمل بالفعل")
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل")
+    with TPL_LOCK:
+        d = tpl_load(tid)
+        d.update(sample_status="working", sample_error=None, sample_step="✍️ بيجهّز")
+        tpl_save(tid, d)
+    threading.Thread(target=run_tpl_sample, args=(tid,), daemon=True).start()
+    return tpl_to_dict(tid, tpl_load(tid))
+
+
+def tpl_mark(tid: str, **kw) -> None:
+    with TPL_LOCK:
+        d = tpl_load(tid)
+        d.update(**kw)
+        tpl_save(tid, d)
+
+
+def run_tpl_sample(tid: str) -> None:
+    try:
+        t = tpl_load(tid)
+        if t.get("sample_kind") != "scenes" and t.get("sample_vid") and (tv_dir(t["sample_vid"]) / "tv.json").exists() \
+                and tv_load(t["sample_vid"]).get("mode") != "scenes":
+            t["sample_vid"] = None   # العينة القديمة كانت بالطريقة التانية: بنبدأ عينة مشاهد جديدة
+            tpl_mark(tid, sample_vid=None)
+        return run_tpl_sample_scenes(tid, t)
+        old = t.get("sample_vid")
+        if old and (tv_dir(old) / "tv.json").exists() and tv_load(old).get("fill"):
+            # 🔁 العينة اللي وقفت بتكمّل من مكانها (الشيتات واللقطات اللي اتعملت ما بتتدفعش تاني)
+            vid = old
+            x = tv_load(vid)
+            tv_set(vid, status=tv_idle(x) if x.get("status") == "failed" else x.get("status"), error=None)
+            return tpl_sample_steps(tid, vid)
+        vid = uuid.uuid4().hex[:10]
+        tv_dir(vid).mkdir(parents=True, exist_ok=True)
+        d = {"name": f"🎞️ عينة {t['name']}", "client_id": None, "template": tid, "template_name": t["name"], "schema": t["schema"],
+             "ratio": t.get("ratio") or "9:16", "brief": t.get("sample_brief") or t["name"], "text_mode": "blank", "image_model": "sunburst",
+             "model": "seedance-mini", "resolution": "480p", "status": "filling", "step": None, "error": None, "fill": None,
+             "sheets": {}, "panels": {}, "segs": {}, "chain": True, "sample_of": tid, "transition": t["schema"].get("transition"), "created_at": now()}
+        with TV_LOCK:
+            (tv_dir(vid) / "tv.json").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+        tpl_mark(tid, sample_vid=vid, sample_step="✍️ بيملا القالب بفكرة العينة")
+        run_tv_fill(vid)
+        tpl_sample_steps(tid, vid)
+    except Exception as exc:  # noqa: BLE001
+        tpl_mark(tid, sample_status="failed", sample_step=None, sample_error=str(getattr(exc, "detail", None) or exc)[:300])
+
+
+def run_tpl_sample_scenes(tid: str, t: dict) -> None:
+    """عينة قالب المشاهد: ٣ مشاهد (٣٠ ثانية) بصوت المؤثرات بتاع الموديل، من غير فويس أوفر."""
+    try:
+        vid = t.get("sample_vid") if t.get("sample_vid") and (tv_dir(t["sample_vid"]) / "tv.json").exists() else None
+        if not vid:
+            vid = uuid.uuid4().hex[:10]
+            tv_dir(vid).mkdir(parents=True, exist_ok=True)
+            beats = [{**t["schema"]["beats"][0], "t0": i * SCENE_SEC, "t1": (i + 1) * SCENE_SEC, "what": f"مشهد {i + 1}"} for i in range(3)]
+            d = {"name": f"🎞️ عينة {t['name']}", "client_id": None, "template": tid, "template_name": t["name"], "schema": {**t["schema"], "beats": beats},
+                 "ratio": t.get("ratio") or "9:16", "brief": t.get("sample_brief") or t["name"], "text_mode": "blank", "image_model": "sunburst",
+                 "model": "seedance-mini", "resolution": "480p", "status": "filling", "step": None, "error": None, "fill": None, "sheets": {}, "panels": {},
+                 "segs": {}, "sample_of": tid, "section": "templates", "mode": "scenes", "scene_cfg": scene_cfg_for(t), "scenes": [], "scene_files": {},
+                 "lang": "en", "voice": "eleven_liam", "voice_on": False, "script_mode": "ai", "script": "", "voice_tone": t.get("voice_tone"),
+                 "transition": "cut", "created_at": now()}
+            with TV_LOCK:
+                (tv_dir(vid) / "tv.json").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+            tpl_mark(tid, sample_vid=vid)
+        x = tv_load(vid)
+        if not x.get("scenes"):
+            tpl_mark(tid, sample_step="✍️ بيكتب مشاهد العينة")
+            run_tv_scenes_script(vid)
+            x = tv_load(vid)
+            if x.get("status") == "failed":
+                raise RuntimeError(x.get("error"))
+        if not x.get("stylekey"):
+            tpl_mark(tid, sample_step="🎨 بيرسم مفتاح الستايل")
+            run_stylekey(vid, "classic")
+            x = tv_load(vid)
+            if x.get("status") == "failed":
+                raise RuntimeError(x.get("error"))
+        tpl_mark(tid, sample_step="🎬 بيولّد المشاهد بصوتها")
+        tv_set(vid, status="working")
+        run_scenes_gen(vid, None)
+        x = tv_load(vid)
+        if x.get("status") == "failed" or not x.get("final"):
+            raise RuntimeError(x.get("error") or "الفيديو ماتجمّعش")
+        folder = TPL_DIR / tid
+        shutil.copyfile(tv_dir(vid) / x["final"], folder / "sample.mp4")
+        shutil.copyfile(tv_dir(vid) / x["stylekey"], folder / "cover.png")
+        tpl_mark(tid, sample="sample.mp4", cover="cover.png", sample_status="done", sample_step=None, sample_error=None, sample_kind="scenes")
+    except Exception as exc:  # noqa: BLE001
+        tpl_mark(tid, sample_status="failed", sample_step=None, sample_error=str(getattr(exc, "detail", None) or exc)[:300])
+
+
+def tpl_sample_steps(tid: str, vid: str) -> None:
+    try:
+        def check(what):
+            x = tv_load(vid)
+            if x.get("status") == "failed":
+                raise RuntimeError(f"{what}: {x.get('error')}")
+            return x
+        x = check("ملا القالب")
+        for k in range(len(tv_sheets(x))):
+            if ((x.get("sheets") or {}).get(str(k)) or {}).get("file") and all((x.get("panels") or {}).get(str(j), {}).get("cell") for j in tv_sheets(x)[k]):
+                continue
+            tpl_mark(tid, sample_step=f"🖼️ بيرسم الستوري بورد ({k + 1} من {len(tv_sheets(x))})")
+            tv_set(vid, status="sheeting")
+            run_tv_sheet(vid, k)
+            check("الستوري بورد")
+        tpl_mark(tid, sample_step="🎬 بيولّد اللقطات المتصلة")
+        tv_set(vid, status="working")
+        run_tv_gen(vid, None)
+        x = check("اللقطات")
+        if not x.get("final"):
+            raise RuntimeError("الفيديو ماتجمّعش")
+        folder = TPL_DIR / tid
+        shutil.copyfile(tv_dir(vid) / x["final"], folder / "sample.mp4")
+        p0 = (x.get("panels") or {}).get("0") or {}
+        if p0.get("cell"):
+            shutil.copyfile(tv_dir(vid) / (p0.get("full") or p0["cell"]), folder / "cover.png")
+        tpl_mark(tid, sample="sample.mp4", cover="cover.png" if p0.get("cell") else None, sample_status="done", sample_step=None, sample_error=None)
+    except Exception as exc:  # noqa: BLE001
+        tpl_mark(tid, sample_status="failed", sample_step=None, sample_error=str(getattr(exc, "detail", None) or exc)[:300])
+
+
+def reset_stuck_tpl() -> None:
+    for f in TPL_DIR.glob("*/tpl.json"):
+        try:
+            d = json.loads(f.read_text(encoding="utf-8"))
+        except ValueError:
+            continue
+        if d.get("sample_status") == "working":
+            d.update(sample_status="failed", sample_step=None, sample_error="اتقطع لما السيرفر اتقفل. دوس الزرار تاني")
+            f.write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+
+
+reset_stuck_tpl()
+
+
+# ---------- نقل الداتا من برنامج للتاني (كوتشي اتفصل عن ستوديومانيا) ----------
+# البرنامج القديم بيطلّع كل الداتا ملف tar واحد بيتبعت على طول (قاعدة البيانات نسخة سليمة من غير ما توقف الشغل)،
+# والبرنامج الجديد (لسه فاضي) بيسحبه بالباسورد بتاع القديم ويفكّه عنده. مرة واحدة بس.
+DATA_SKIP = {"tmp", "models"}
+
+
+@app.get("/api/admin/data-export")
+def data_export():
+    import tarfile
+    snap = TMP_DIR / f"db-export-{uuid.uuid4().hex[:8]}.db"
+    TMP_DIR.mkdir(parents=True, exist_ok=True)
+    with closing(sqlite3.connect(DB_PATH)) as src, closing(sqlite3.connect(snap)) as dst:
+        src.backup(dst)
+    rfd, wfd = os.pipe()
+
+    def write():
+        try:
+            with os.fdopen(wfd, "wb") as w, tarfile.open(fileobj=w, mode="w|") as tar:
+                tar.add(snap, arcname=DB_PATH.name)
+                for item in sorted(DATA_DIR.iterdir()):
+                    if item.name in DATA_SKIP or item.name.startswith(DB_PATH.name):
+                        continue
+                    tar.add(item, arcname=item.name)
+        except (BrokenPipeError, OSError):
+            pass  # اللي بيسحب قفل في النص
+        finally:
+            snap.unlink(missing_ok=True)
+
+    threading.Thread(target=write, daemon=True).start()
+
+    def read():
+        with os.fdopen(rfd, "rb") as r:
+            while chunk := r.read(1 << 20):
+                yield chunk
+
+    return StreamingResponse(read(), media_type="application/x-tar",
+                             headers={"Content-Disposition": 'attachment; filename="data.tar"'})
+
+
+data_import_state: dict = {"status": "idle"}
+
+
+class DataImportIn(BaseModel):
+    url: str
+    password: str
+
+
+def data_is_empty() -> bool:
+    with closing(db()) as conn:
+        return not any(conn.execute(f"SELECT 1 FROM {t} LIMIT 1").fetchone() for t in ("projects", "videos"))
+
+
+def run_data_import(url: str, password: str) -> None:
+    import tarfile
+    st = data_import_state
+    st.update(status="working", done=0, error=None, started=time.time())
+    stage = DATA_DIR / "tmp" / "import"
+    try:
+        shutil.rmtree(stage, ignore_errors=True)
+        stage.mkdir(parents=True)
+        with httpx.Client(base_url=url.rstrip("/"), timeout=httpx.Timeout(60, read=600), follow_redirects=True) as cl:
+            r = cl.post("/api/auth/login", json={"password": password})
+            if r.status_code != 200:
+                raise RuntimeError("الباسورد أو اللينك غلط")
+            with cl.stream("GET", "/api/admin/data-export") as resp:
+                if resp.status_code != 200:
+                    raise RuntimeError(f"البرنامج التاني رد بـ {resp.status_code}")
+
+                class Src:  # tarfile بيقرا من الستريم على طول ومن غير ما يتخزن كله
+                    def __init__(self):
+                        self.it, self.buf = resp.iter_bytes(1 << 20), b""
+
+                    def read(self, n=-1):
+                        while n < 0 or len(self.buf) < n:
+                            try:
+                                c = next(self.it)
+                            except StopIteration:
+                                break
+                            st["done"] += len(c)
+                            self.buf += c
+                        out, self.buf = (self.buf, b"") if n < 0 else (self.buf[:n], self.buf[n:])
+                        return out
+
+                with tarfile.open(fileobj=Src(), mode="r|") as tar:
+                    tar.extractall(stage, filter="data")
+        # كله وصل سليم: نحطه مكانه، وقاعدة البيانات آخر حاجة
+        for item in stage.iterdir():
+            if item.name in (DB_PATH.name, "secret.key"):  # مفتاح الجلسات بتاع البرنامج ده بيفضل، عشان محدش يخرج
+                continue
+            dest = DATA_DIR / item.name
+            if dest.is_dir():
+                shutil.rmtree(dest)
+            elif dest.exists():
+                dest.unlink()
+            shutil.move(str(item), dest)
+        if (stage / DB_PATH.name).exists():
+            os.replace(stage / DB_PATH.name, DB_PATH)
+        shutil.rmtree(stage, ignore_errors=True)
+        init_db()  # لو القديم كان أقدم شوية، الجداول الناقصة تتعمل
+        auth.load_keys_into_env()  # مفاتيح Atlas وZernio اللي جت معاه
+        st.update(status="done")
+    except Exception as exc:  # noqa: BLE001
+        shutil.rmtree(stage, ignore_errors=True)
+        st.update(status="failed", error=str(exc)[:300])
+
+
+@app.post("/api/admin/data-import")
+def data_import(body: DataImportIn):
+    if data_import_state.get("status") == "working":
+        raise HTTPException(409, "النقل شغال بالفعل")
+    if not data_is_empty():
+        raise HTTPException(400, "البرنامج ده فيه مشاريع أو فيديوهات بالفعل. النقل بيتعمل مرة واحدة في برنامج فاضي بس")
+    if not body.url.startswith(("http://", "https://")):
+        raise HTTPException(400, "حط لينك البرنامج كامل (https://...)")
+    threading.Thread(target=run_data_import, args=(body.url.strip(), body.password), daemon=True).start()
+    return {"ok": True}
+
+
+@app.get("/api/admin/data-import")
+def data_import_status():
+    return {**data_import_state, "empty": data_is_empty() if data_import_state.get("status") != "working" else False}
+
+
+@app.get("/")
+@app.get("/index.html")
+def index():
+    return html_page("index.html")
+
+
+app.mount("/", StaticFiles(directory=FRONTEND_DIR), name="frontend")

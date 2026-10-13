@@ -18246,6 +18246,129 @@ def reset_stuck_tpl() -> None:
 reset_stuck_tpl()
 
 
+# ---------- نقل الداتا من برنامج للتاني (كوتشي اتفصل عن ستوديومانيا) ----------
+# البرنامج القديم بيطلّع كل الداتا ملف tar واحد بيتبعت على طول (قاعدة البيانات نسخة سليمة من غير ما توقف الشغل)،
+# والبرنامج الجديد (لسه فاضي) بيسحبه بالباسورد بتاع القديم ويفكّه عنده. مرة واحدة بس.
+DATA_SKIP = {"tmp", "models"}
+
+
+@app.get("/api/admin/data-export")
+def data_export():
+    import tarfile
+    snap = TMP_DIR / f"db-export-{uuid.uuid4().hex[:8]}.db"
+    TMP_DIR.mkdir(parents=True, exist_ok=True)
+    with closing(sqlite3.connect(DB_PATH)) as src, closing(sqlite3.connect(snap)) as dst:
+        src.backup(dst)
+    rfd, wfd = os.pipe()
+
+    def write():
+        try:
+            with os.fdopen(wfd, "wb") as w, tarfile.open(fileobj=w, mode="w|") as tar:
+                tar.add(snap, arcname=DB_PATH.name)
+                for item in sorted(DATA_DIR.iterdir()):
+                    if item.name in DATA_SKIP or item.name.startswith(DB_PATH.name):
+                        continue
+                    tar.add(item, arcname=item.name)
+        except (BrokenPipeError, OSError):
+            pass  # اللي بيسحب قفل في النص
+        finally:
+            snap.unlink(missing_ok=True)
+
+    threading.Thread(target=write, daemon=True).start()
+
+    def read():
+        with os.fdopen(rfd, "rb") as r:
+            while chunk := r.read(1 << 20):
+                yield chunk
+
+    return StreamingResponse(read(), media_type="application/x-tar",
+                             headers={"Content-Disposition": 'attachment; filename="data.tar"'})
+
+
+data_import_state: dict = {"status": "idle"}
+
+
+class DataImportIn(BaseModel):
+    url: str
+    password: str
+
+
+def data_is_empty() -> bool:
+    with closing(db()) as conn:
+        return not any(conn.execute(f"SELECT 1 FROM {t} LIMIT 1").fetchone() for t in ("projects", "videos"))
+
+
+def run_data_import(url: str, password: str) -> None:
+    import tarfile
+    st = data_import_state
+    st.update(status="working", done=0, error=None, started=time.time())
+    stage = DATA_DIR / "tmp" / "import"
+    try:
+        shutil.rmtree(stage, ignore_errors=True)
+        stage.mkdir(parents=True)
+        with httpx.Client(base_url=url.rstrip("/"), timeout=httpx.Timeout(60, read=600), follow_redirects=True) as cl:
+            r = cl.post("/api/auth/login", json={"password": password})
+            if r.status_code != 200:
+                raise RuntimeError("الباسورد أو اللينك غلط")
+            with cl.stream("GET", "/api/admin/data-export") as resp:
+                if resp.status_code != 200:
+                    raise RuntimeError(f"البرنامج التاني رد بـ {resp.status_code}")
+
+                class Src:  # tarfile بيقرا من الستريم على طول ومن غير ما يتخزن كله
+                    def __init__(self):
+                        self.it, self.buf = resp.iter_bytes(1 << 20), b""
+
+                    def read(self, n=-1):
+                        while n < 0 or len(self.buf) < n:
+                            try:
+                                c = next(self.it)
+                            except StopIteration:
+                                break
+                            st["done"] += len(c)
+                            self.buf += c
+                        out, self.buf = (self.buf, b"") if n < 0 else (self.buf[:n], self.buf[n:])
+                        return out
+
+                with tarfile.open(fileobj=Src(), mode="r|") as tar:
+                    tar.extractall(stage, filter="data")
+        # كله وصل سليم: نحطه مكانه، وقاعدة البيانات آخر حاجة
+        for item in stage.iterdir():
+            if item.name in (DB_PATH.name, "secret.key"):  # مفتاح الجلسات بتاع البرنامج ده بيفضل، عشان محدش يخرج
+                continue
+            dest = DATA_DIR / item.name
+            if dest.is_dir():
+                shutil.rmtree(dest)
+            elif dest.exists():
+                dest.unlink()
+            shutil.move(str(item), dest)
+        if (stage / DB_PATH.name).exists():
+            os.replace(stage / DB_PATH.name, DB_PATH)
+        shutil.rmtree(stage, ignore_errors=True)
+        init_db()  # لو القديم كان أقدم شوية، الجداول الناقصة تتعمل
+        auth.load_keys_into_env()  # مفاتيح Atlas وZernio اللي جت معاه
+        st.update(status="done")
+    except Exception as exc:  # noqa: BLE001
+        shutil.rmtree(stage, ignore_errors=True)
+        st.update(status="failed", error=str(exc)[:300])
+
+
+@app.post("/api/admin/data-import")
+def data_import(body: DataImportIn):
+    if data_import_state.get("status") == "working":
+        raise HTTPException(409, "النقل شغال بالفعل")
+    if not data_is_empty():
+        raise HTTPException(400, "البرنامج ده فيه مشاريع أو فيديوهات بالفعل. النقل بيتعمل مرة واحدة في برنامج فاضي بس")
+    if not body.url.startswith(("http://", "https://")):
+        raise HTTPException(400, "حط لينك البرنامج كامل (https://...)")
+    threading.Thread(target=run_data_import, args=(body.url.strip(), body.password), daemon=True).start()
+    return {"ok": True}
+
+
+@app.get("/api/admin/data-import")
+def data_import_status():
+    return {**data_import_state, "empty": data_is_empty() if data_import_state.get("status") != "working" else False}
+
+
 @app.get("/")
 @app.get("/index.html")
 def index():

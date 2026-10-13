@@ -1,0 +1,182 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// #26 (عنصر: شوريل براند) Brand showreel — any agency/brand, client names, stat and name editable. 30 s, 120 BPM.
+// Concept: "One stamp makes every mark" — a cobalt square stamp presses the words, morphs into client marks,
+// gets depth as business cards, becomes a brand-guide UI, tiles a wall of marks, and stamps the end title.
+// Palette: cobalt, tangerine, cream + black/white. One typeface (Gabarito).
+const PR = M.params({
+  hook: { label: "٤ كلمات في الأول (الختم بيطبعها)", kind: "lines", def: ["FOUNDERS", "NEED", "BRANDS", "THAT"] },
+  column: { label: "كلمات العمود (كل كلمة في سطر، اللي عليها * ملوّنة)", kind: "lines", def: ["THAT", "MOVE", "AS", "*FAST", "AS", "THEY", "DO", "."] },
+  marks: { label: "٦ أسامي (عملاء أو منتجات)", kind: "lines", def: ["NORTH", "ORBIT", "PEAK", "ARCADE", "PLUS", "LEAF"] },
+  marksLabel: { label: "عنوان الأسامي", kind: "text", def: "CLIENT MARKS" },
+  guide: { label: "عنوان صفحة الدليل", kind: "text", def: "BRAND GUIDE — NORTHBOUND" },
+  font: { label: "اسم الخط في الدليل", kind: "text", def: "Gabarito 800" },
+  stat: { label: "الرقم", kind: "text", def: "42" },
+  statLabel: { label: "بعد الرقم", kind: "text", def: "brands launched" },
+  name: { label: "الاسم في الآخر", kind: "text", role: "brand", def: "NORTHBOUND®" },
+  tagline: { label: "تحت الاسم", kind: "text", role: "tagline", def: "Brands for founders." },
+  cob: { label: "اللون الأساسي", kind: "color", role: "accent", def: "#2440ff" },
+  tan: { label: "اللون التاني", kind: "color", role: "accent2", def: "#ff6a2b" },
+  cream: { label: "الخلفية", kind: "color", role: "bg", def: "#f3eee4" },
+  ink: { label: "الغامق", kind: "color", role: "ink", def: "#101014" },
+});
+const B = .5, CREAM = PR.cream, INK = PR.ink, COB = PR.cob, TAN = PR.tan, WHITE = "#ffffff";
+const MK = Array.from({ length: 6 }, (_, i) => PR.marks[i] ?? "");
+const F = (px) => `800 ${px}px GB`;
+M.reel({
+  W: 1920, H: 1080, DUR: 30, bg: CREAM,
+  fonts: { GB: ["TY-Gabarito-800.ttf", "800"] },
+  init(M) {
+    const c = M.canvas(1920, 1080); const x = c.getContext("2d");
+    // CSS 3D layer for the business-card moment
+    const sc3 = M.el("div", "", "position:absolute;left:0;top:0;width:1920px;height:1080px;perspective:1800px;pointer-events:none;");
+    const deck = M.el("div", "", "position:absolute;left:960px;top:540px;width:0;height:0;transform-style:preserve-3d;", "", sc3);
+    const cards = Array.from({ length: 7 }, (_, i) => M.el("div", "", `position:absolute;left:-280px;top:-160px;width:560px;height:320px;border-radius:18px;background:${i % 2 ? CREAM : COB};color:${i % 2 ? INK : WHITE};font:${F(48)};display:flex;align-items:flex-end;padding:30px;box-sizing:border-box;backface-visibility:hidden;box-shadow:0 30px 60px rgba(0,0,0,.18);direction:auto;unicode-bidi:plaintext;overflow:hidden;white-space:nowrap;`, "", deck));
+    return { x, sc3, deck, cards };
+  },
+  seek(t, P, M) {
+    const { x } = P, { seg, lerp, expo, expoIn, expoIO, spring, clamp, smooth } = M;
+    const beat = Math.floor(t / B), bt = t - beat * B;   // beat index and time since it
+    x.setTransform(1, 0, 0, 1, 0, 0);
+    // camera: a slow push across each bar, starting where the last ended
+    const cz = 1 + .03 * ((t % 2) / 2);
+    let bg = CREAM;
+    if (t >= 7 && t < 12) bg = INK;
+    if (t >= 17 && t < 22) bg = WHITE;
+    if (t >= 22 && t < 28) bg = beat % 2 ? COB : INK;
+    x.fillStyle = bg; x.fillRect(0, 0, 1920, 1080);
+    x.translate(960, 540); x.scale(cz, cz); x.translate(-960, -540);
+    const txt = (s, px, cx, cy, col, al = "center", maxW = 1760) => { s = String(s ?? ""); px = M.fit(s, "GB", maxW, px, 14, "800"); x.font = F(px); x.fillStyle = col; x.textAlign = al; x.direction = M.isAr(s) ? "rtl" : "ltr"; if (al === "left" && M.isAr(s)) x.textAlign = "right", cx += 0; x.textBaseline = "middle"; x.fillText(s, cx, cy); x.direction = "ltr"; };
+    const sq = (cx, cy, s, col, r = 0, rad = 0) => { x.save(); x.translate(cx, cy); x.rotate(r); x.fillStyle = col; x.beginPath(); x.roundRect(-s / 2, -s / 2, s, s, rad); x.fill(); x.restore(); };
+    M.show(P.sc3, t >= 12 && t < 17.2);
+
+    // ---------- HOOK (0–2): the stamp hits on every beat, leaving a word
+    if (t < 2) {
+      const words = [0, 1, 2, 3].map((i) => PR.hook[i] ?? "");
+      const k = Math.min(3, beat), hit = spring(bt, 22);
+      const lift = bt > .38 ? expoIn(seg(bt, .38, .5)) : 0;
+      const s = lerp(1.35, 1, hit) + lift * .25;
+      if (t > .02) txt(words[k], 220, 960, 540, INK);
+      // the stamp itself, pressing, slightly transparent while down so the word shows the moment it lands
+      x.globalAlpha = bt < .1 ? 1 : lift;
+      sq(960, 540, 900 * s, COB, 0, 30);
+      x.globalAlpha = 1;
+    }
+    // ---------- KINETIC TYPE (2–7): words pile into a column, two per beat
+    if (t >= 2 && t < 7) {
+      const lines = PR.column.slice(0, 8);
+      const off = expoIO(seg(t, 4.4, 6.6)) * 520;
+      const gone = expoIO(seg(t, 6.45, 6.8));
+      lines.forEach((l, i) => {   // eslint-disable-line
+        const tin = 2 + i * .25, g = expo(seg(t, tin, tin + .3));
+        if (g <= 0) return;
+        const hl = String(l).startsWith("*"), y = 220 + i * 150 - off, col = hl ? TAN : l === "." ? COB : INK; l = hl ? String(l).slice(1) : l;
+        x.save(); x.beginPath(); x.rect(0, y - 75, 1920, 150); x.clip();
+        txt(l, 170, 960 + (i % 2 ? 1 : -1) * 220 * (1 - g), y + 150 * (1 - g) - gone * 160, col);
+        x.restore();
+      });
+      // the period grows into the stamp again on the last beat of the scene
+      const grow = expoIO(seg(t, 6.5, 7));
+      if (grow > 0) sq(960, 540, lerp(60, 520, grow), COB, 0, lerp(30, 40, grow));
+    }
+    // ---------- MORPH (7–12): one shape becomes each client's mark, one per beat
+    if (t >= 7 && t < 12) {
+      const marks = [
+        [MK[0], (k) => sq(960, 500, 520, COB, 0, 40)],
+        [MK[1], (k) => { x.fillStyle = TAN; x.beginPath(); x.arc(960, 500, 260, 0, 7); x.fill(); x.fillStyle = INK; x.beginPath(); x.arc(1040, 440, 90, 0, 7); x.fill(); }],
+        [MK[2], (k) => { x.fillStyle = WHITE; x.beginPath(); x.moveTo(960, 240); x.lineTo(1220, 760); x.lineTo(700, 760); x.fill(); x.fillStyle = INK; x.beginPath(); x.moveTo(960, 470); x.lineTo(1060, 650); x.lineTo(860, 650); x.fill(); }],
+        [MK[3], (k) => { x.fillStyle = COB; x.beginPath(); x.moveTo(700, 760); x.lineTo(700, 500); x.arc(960, 500, 260, Math.PI, 0); x.lineTo(1220, 760); x.lineTo(1100, 760); x.lineTo(1100, 500); x.arc(960, 500, 140, 0, Math.PI, true); x.lineTo(820, 760); x.fill(); }],
+        [MK[4], (k) => { x.fillStyle = TAN; x.beginPath(); x.roundRect(890, 240, 140, 520, 30); x.fill(); x.beginPath(); x.roundRect(700, 430, 520, 140, 30); x.fill(); }],
+        [MK[5], (k) => { x.fillStyle = WHITE; x.beginPath(); x.moveTo(960, 240); x.quadraticCurveTo(1260, 500, 960, 760); x.quadraticCurveTo(660, 500, 960, 240); x.fill(); x.strokeStyle = INK; x.lineWidth = 16; x.beginPath(); x.moveTo(960, 300); x.lineTo(960, 740); x.stroke(); }],
+      ];
+      // squash-and-swap on every beat: the outgoing mark shrinks to a point while turning, the next grows out of it
+      const i = clamp(Math.floor((t - 7) / 1), 0, 4), local = (t - 7) - i, half = .5;
+      const draw = (k, s, r) => { x.save(); x.translate(960, 500); x.rotate(r); x.scale(s, s); x.translate(-960, -500); marks[k][1](); x.restore(); };
+      const m = local < half ? i : Math.min(5, i + 1);
+      const sIn = local < half ? 1 - expoIn(seg(local, .3, half)) : expo(seg(local, half, half + .3));
+      draw(m, Math.max(.001, sIn), (1 - sIn) * (local < half ? 1.2 : -1.2));
+      txt(marks[m][0], 46, 960, 900, local < half ? WHITE : TAN);
+      txt(PR.marksLabel, 22, M.isAr(PR.marksLabel) ? 1780 : 140, 120, "#7d7d86", "left");
+    }
+    // ---------- 2D → 3D (12–17): the last mark becomes a deck of business cards that fans out in space
+    if (t >= 12 && t < 17.2) {
+      const fan = expo(seg(t, 12.2, 13.4)), spin = expoIO(seg(t, 14, 15.6)), fold = expoIO(seg(t, 16.5, 17.2));
+      const names = [PR.name, ...MK, PR.name].slice(0, 7);
+      P.deck.style.transform = `rotateX(${lerp(0, 52, fan) * (1 - fold)}deg) rotateZ(${lerp(0, -18, fan) * (1 - fold) + spin * 360}deg) scale(${lerp(1, .6, fold)})`;
+      P.cards.forEach((c, i) => {
+        c.textContent = names[i];
+        const k = i - 3, z = k * 70 * fan * (1 - fold), rot = k * 9 * fan * (1 - fold), dx = k * 90 * fan * (1 - fold);
+        const tin = 12 + Math.abs(k) * .25, g = expo(seg(t, tin - .2, tin + .2));
+        c.style.transform = `translate3d(${dx}px,${-z * .6}px,${z}px) rotateZ(${rot}deg) scale(${g})`;
+      });
+    }
+    // ---------- DATA / UI (17–22): the brand guide builds itself, one module per beat
+    if (t >= 17 && t < 22) {
+      const m = (i) => expo(seg(t, 17 + i * .5, 17.4 + i * .5));
+      // grid lines
+      x.strokeStyle = "#e7e7ec"; x.lineWidth = 2;
+      for (let k = 0; k < 12; k++) { const a = m(0); x.beginPath(); x.moveTo(140 + k * 140, 120); x.lineTo(140 + k * 140, 120 + 840 * a); x.stroke(); }
+      txt(PR.guide, 26, M.isAr(PR.guide) ? 1780 : 140, 90, INK, "left");
+      // palette swatches
+      [COB, TAN, CREAM, INK].forEach((col, i) => { const g = m(1 + i * .5); x.fillStyle = col; x.fillRect(140 + i * 210, 160, 190, 260 * g); if (g > .8) txt(String(col).toUpperCase(), 22, 150 + i * 210, 440, INK, "left"); });
+      // type specimen
+      const g2 = m(3.5); x.save(); x.beginPath(); x.rect(1000, 150, 800, 300); x.clip(); txt("Aa", 260, 1000, 300 + (1 - g2) * 300, COB, "left"); x.restore();
+      txt(PR.font, 30, 1380, 300, INK, "left", 420);
+      // growth line: launches per quarter
+      const g3 = seg(t, 19.5, 21.4), pts = [[140, 900], [400, 860], [660, 840], [920, 760], [1180, 700], [1440, 560], [1780, 480]];
+      x.strokeStyle = TAN; x.lineWidth = 10; x.lineCap = "round"; x.lineJoin = "round"; x.beginPath();
+      const L = Math.floor(g3 * (pts.length - 1)), f = g3 * (pts.length - 1) - L;
+      pts.slice(0, L + 1).forEach((p, i) => (i ? x.lineTo(...p) : x.moveTo(...p)));
+      if (L < pts.length - 1) x.lineTo(lerp(pts[L][0], pts[L + 1][0], f), lerp(pts[L][1], pts[L + 1][1], f));
+      x.stroke();
+      { const sv = parseFloat(String(PR.stat).replace(/[^0-9.]/g, "")), k = expo(seg(t, 19.5, 21.6)), n = isFinite(sv) ? String(PR.stat).replace(/[0-9.]+/, String(Math.round(sv * k))) : PR.stat;
+        txt(`${n} ${PR.statLabel}`, 56, M.isAr(PR.statLabel) ? 1780 : 140, 560, INK, "left", 1600); }
+    }
+    // ---------- STRONGEST (22–28): a wall of marks that flips in waves on every beat, then folds into one square
+    if (t >= 22 && t < 28) {
+      const cols = 8, rows = 4, cw = 1920 / cols, ch = 1080 / rows;
+      const into = expo(seg(t, 22, 22.4)), fold = expoIO(seg(t, 27.4, 28));
+      for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+        const id = r * cols + c, d = (c + r) * .04;
+        const w = expoIO(seg(bt, d, d + .25));
+        const flip = (beat + (w > .5 ? 1 : 0)) % 2;
+        const cx = c * cw + cw / 2, cy = r * ch + ch / 2;
+        const tx = lerp(cx, 960, fold), ty = lerp(cy, 540, fold);
+        const s = Math.abs(Math.cos(w * Math.PI)) * into * (1 - fold * .7);
+        x.save(); x.translate(tx, ty); x.scale(s, 1 * into);
+        const pal = [[COB, WHITE], [TAN, INK], [CREAM, COB], [INK, TAN]][(id + flip * 2) % 4];
+        x.fillStyle = pal[0]; x.fillRect(-cw / 2 + 6, -ch / 2 + 6, cw - 12, ch - 12);
+        x.fillStyle = pal[1];
+        const kind = (id * 7 + flip) % 4;
+        if (kind === 0) { x.beginPath(); x.arc(0, 0, 60, 0, 7); x.fill(); }
+        if (kind === 1) { x.fillRect(-55, -55, 110, 110); }
+        if (kind === 2) { x.beginPath(); x.moveTo(0, -65); x.lineTo(60, 50); x.lineTo(-60, 50); x.fill(); }
+        if (kind === 3) { x.fillRect(-15, -60, 30, 120); x.fillRect(-60, -15, 120, 30); }
+        x.restore();
+      }
+      if (fold > 0) sq(960, 540, lerp(0, 420, fold), COB, 0, 30);
+    }
+    // ---------- END (28–30): the stamp presses the name, lifts, and leaves the empty cream page of frame one
+    if (t >= 28) {
+      x.fillStyle = CREAM; x.fillRect(0, 0, 1920, 1080);
+      const press = spring(t - 28, 18), lift = expoIO(seg(t, 29.35, 29.85));
+      const nameA = expo(seg(t, 28.1, 28.4)) * (1 - expoIn(seg(t, 29.2, 29.6)));
+      if (nameA > 0) { x.globalAlpha = nameA; txt(PR.name, 150, 960, 500, INK); txt(PR.tagline, 46, 960, 640, COB); x.globalAlpha = 1; }
+      // the stamp presses down (covers), then lifts away up out of frame
+      const cover = 1 - expo(seg(t, 28.05, 28.25));
+      if (cover > 0) sq(960, 540, lerp(420, 1300, press) , COB, 0, 30);
+      if (lift > 0 && lift < 1) sq(960, 540 - lift * 1400, 1300, COB, 0, 30);
+    }
+  },
+  sound(A) {
+    for (let k = 0; k < 60; k++) { const t0 = k * B; A.kick(t0, .85); A.hat(t0 + B / 2, .08); if (k % 4 === 2) A.clap(t0, .16); }
+    for (const t0 of [2, 7, 12, 17, 22, 28]) A.hit(t0, .5);
+    for (let k = 0; k < 4; k++) A.nz(k * B, .12, "lowpass", 900, .5);           // the stamp
+    const roots = [40, 40, 36, 38, 43, 45, 40];
+    for (let b = 0; b < 15; b++) { const r = roots[Math.floor(b / 2.2) % 7]; for (let k = 0; k < 4; k++) A.bass(b * 2 + k * B, A.midi(r + (k === 3 ? 7 : 0)), .35, .14); }
+    A.riser(20, 22, .3);
+    for (let k = 0; k < 12; k++) A.tone(22 + k * B, A.midi(76 + [0, 3, 7, 10, 12, 10][k % 6]), .2, "square", .035);
+    A.nz(28.05, .2, "lowpass", 900, .55); A.pad(28, [52, 59, 64, 68].map(A.midi), 2, .04);
+  },
+});
+</script></body></html>

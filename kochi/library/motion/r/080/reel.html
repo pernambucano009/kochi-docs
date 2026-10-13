@@ -1,0 +1,171 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// #80 (عنصر: كل حاجة من نقطة) "FULL STOP" — 15 s. Concept: everything is made of one full stop. The dot never leaves the screen and every scene is made from it.
+// 0–3 kinetic type: the dot drops in and becomes the period of a word that keeps changing · 3–6 shape morph: the dot swells and morphs
+// circle→square→triangle→star→circle · 6–9 2D→3D: it flips like a coin, becomes a sphere, lands on a floor and rolls
+// · 9–12 data/UI: the floor flattens into a chart; the ball is the first point, the line grows, then it becomes a slider knob
+// · 12–15 end title: the knob is the period of FULL STOP.  One typeface (Inter Tight 800). Palette: cream, red, black (+ white).
+const PR = M.params({
+  words: { label: "٦ كلمات ورا بعض (النقطة جنبهم)", kind: "lines", def: ["MOTION", "DESIGN", "MADE", "OF", "ONE", "DOT"] },
+  stat: { label: "الرقم على الشارت", kind: "text", def: "+411%" },
+  end: { label: "الكلمة في الآخر (النقطة جنبها)", kind: "text", role: "brand", def: "FULL STOP" },
+  cream: { label: "الخلفية", kind: "color", role: "bg", def: "#f1ece2" },
+  ink: { label: "لون الكلام", kind: "color", role: "ink", def: "#111111" },
+  red: { label: "لون النقطة", kind: "color", role: "accent", def: "#ff3b2f" },
+});
+const W = 1920, H = 1080, CREAM = PR.cream, INK = PR.ink, RED = PR.red;
+const BASE = 640, PX = 1260, DR = 30;
+const WORDS = [.55, 1.15, 1.65, 2.05, 2.38, 2.68].map((t0, i) => [t0, String(PR.words[i] ?? "")]).filter((w) => w[1]);
+const STAT = String(PR.stat), STATV = parseFloat(STAT.replace(/[^0-9.]/g, "")) || 0;
+const MORPH = [[3.75, "square"], [4.4, "tri"], [5.05, "star"], [5.65, "circle"]];
+const DATA = [.18, .34, .3, .52, .47, .74, .92];
+const N = 160;
+function shape(kind, R) {
+  const pts = [];
+  for (let i = 0; i < N; i++) {
+    const a = i / N * Math.PI * 2 - Math.PI / 2;
+    let r = R;
+    if (kind === "square") { const c = Math.cos(a), s = Math.sin(a); r = R * .86 / Math.max(Math.abs(c), Math.abs(s)); }
+    if (kind === "tri") { const k = 3, seg = Math.PI * 2 / k, aa = ((a + Math.PI / 2) % seg + seg) % seg - seg / 2; r = R * .62 / Math.cos(aa); }
+    if (kind === "star") { const k = 5, seg = Math.PI * 2 / k, aa = ((a + Math.PI / 2) % seg + seg) % seg, u = Math.abs(aa / seg - .5) * 2; r = R * (.45 + .6 * u * u); }
+    pts.push([Math.cos(a) * r, Math.sin(a) * r]);
+  }
+  return pts;
+}
+M.reel({
+  W, H, DUR: 15, bg: CREAM,
+  fonts: { IT: ["Inter_Tight_wght_800.ttf", "800"] },
+  init(M) { const c = M.canvas(W, H); return { x: c.getContext("2d") }; },
+  seek(t, P, M) {
+    const { x } = P, { seg, lerp, clamp, expo, expoIO, expoIn, spring, springO, cubicIO } = M;
+    x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = CREAM; x.fillRect(0, 0, W, H);
+    // one camera language: a slow, constant push-in for the whole film
+    const cz = 1 + t * .006; x.translate(W / 2, H / 2); x.scale(cz, cz); x.translate(-W / 2, -H / 2);
+    const dot = (X, Y, r, col = RED, sx = 1, sy = 1) => { x.fillStyle = col; x.beginPath(); x.ellipse(X, Y, r * sx, r * sy, 0, 0, 7); x.fill(); };
+    const word = (s, right, base, px, kin, kout) => {   // letters rise from / sink below the baseline (clipped there)
+      px = M.fit(s, "IT", right - 80, px, 30, "800");
+      x.save(); x.beginPath(); x.rect(0, 0, W, base + (M.isAr(s) ? px * .55 : 4)); x.clip();   // العربي له حروف تحت السطر
+      x.font = `800 ${px}px IT`; x.textBaseline = "alphabetic"; x.textAlign = "left"; x.fillStyle = INK;
+      const U = M.isAr(s) ? [s] : [...s];   // العربي بيطلع كله مع بعض
+      const ws = U.map((c) => (c === " " ? px * .3 : x.measureText(c).width)), tot = ws.reduce((a, b) => a + b, 0) - px * .02 * (U.length - 1);
+      let cx = right - tot;
+      U.forEach((c, i) => { const ki = kin(i), ko = kout(i), ar = U.length === 1 && M.isAr(c); const y = base + (1 - ki) * px * (ar ? .5 : 1.05) + (ar ? 0 : ko * px * 1.05); x.globalAlpha = ar ? Math.max(0, Math.min(1, ki * 1.5)) * (1 - Math.min(1, ko * 2)) : 1; x.fillText(c, cx, y); x.globalAlpha = 1; cx += ws[i] - px * .02; });
+      x.restore(); return tot;
+    };
+    // ================= A · kinetic type (0–3)
+    if (t < 3.05) {
+      // the dot falls, squashes on the baseline, settles: it's the period
+      let y, sx = 1, sy = 1;
+      if (t < .5) y = lerp(-80, BASE - DR, expoIn(seg(t, 0, .5)));
+      else { const s = t - .5; y = BASE - DR - 60 * Math.abs(Math.sin(s * 9)) * Math.exp(-s * 9); const sq = .35 * Math.exp(-s * 14) * Math.cos(s * 22); sx = 1 + sq; sy = 1 - sq; y += DR * (1 - sy); }
+      WORDS.forEach(([t0, s], i) => {
+        const t1 = i < WORDS.length - 1 ? WORDS[i + 1][0] : 2.95;
+        if (t < t0 || t > t1 + .2) return;
+        word(s, PX - DR - 14, BASE, 250, (j) => springO(t - t0 - j * .025, 22, .7), (j) => expoIn(seg(t, t1 - .1 + j * .012, t1 + .06 + j * .012)));
+      });
+      dot(PX, y, DR, t > 2.7 ? RED : INK, sx, sy);
+      if (t > 2.95) { /* handed over to B */ }
+    }
+    // ================= B · shape morph (3–6)
+    let R = 0;
+    if (t >= 2.95 && t < 6.0) {
+      const k = expoIO(seg(t, 2.95, 3.5)); const cx = lerp(PX, W / 2, k), cy = lerp(BASE - DR, H / 2, k); R = lerp(DR, 250, springO(t - 2.95, 10, .62));
+      let cur = shape("circle", R), prev = "circle";
+      MORPH.forEach(([t0, kind]) => { if (t >= t0) { const a = shape(prev, R), b = shape(kind, R), kk = expoIO(seg(t, t0, t0 + .32)); cur = a.map((p, i) => [lerp(p[0], b[i][0], kk), lerp(p[1], b[i][1], kk)]); prev = kind; } });
+      const rot = expoIO(seg(t, 3.75, 5.95)) * Math.PI * 2 / 5 * 2;
+      x.save(); x.translate(cx, cy); x.rotate(rot); x.fillStyle = RED; x.beginPath(); cur.forEach((p, i) => (i ? x.lineTo(p[0], p[1]) : x.moveTo(p[0], p[1]))); x.closePath(); x.fill(); x.restore();
+    }
+    // ================= C · 2D → 3D (6–9)
+    const HZ = 560, FY = 860;   // horizon, the floor line the ball rolls on
+    const floorK = expoIO(seg(t, 6.8, 7.5)) * (1 - expoIO(seg(t, 9.0, 9.6)));
+    const flat = expoIO(seg(t, 9.0, 9.6));
+    if (t >= 6.8 && t < 12.2) {
+      // the floor: lines draw outward from the vanishing point; at 9 s they flatten into a chart grid
+      x.strokeStyle = INK; x.lineWidth = 3;
+      const vx = 960, rows = 7, cols = 13;
+      const gridK = expo(seg(t, 6.8, 7.4)), gone = expo(seg(t, 11.0, 11.4));
+      for (let i = 0; i < cols; i++) {
+        const fx = (i - (cols - 1) / 2) * 260;
+        const x0 = lerp(vx + fx * .06, 240 + i * (1440 / (cols - 1)), flat), y0 = lerp(HZ, 300, flat), x1 = lerp(vx + fx * 2.4, 240 + i * (1440 / (cols - 1)), flat), y1 = lerp(H + 40, FY, flat);
+        const k = gridK * (1 - gone); if (k <= 0) continue;
+        x.globalAlpha = 1; x.beginPath(); x.moveTo(x0, y0); x.lineTo(lerp(x0, x1, k), lerp(y0, y1, k)); x.stroke();
+      }
+      for (let j = 0; j < rows; j++) {
+        const u = j / (rows - 1), py = lerp(HZ + Math.pow(u, 2.2) * (H + 40 - HZ), lerp(300, FY, u), flat), half = lerp(30 + Math.pow(u, 2.2) * 1500, 720, flat);
+        const k = gridK * (1 - gone); if (k <= 0) continue;
+        x.beginPath(); x.moveTo(960 - half * k, py); x.lineTo(960 + half * k, py); x.stroke();
+      }
+    }
+    if (t >= 6.0 && t < 9.6) {
+      // coin flip: the disc turns edge-on (a thickness appears), then it's a sphere with hard-edged shading bands
+      const fk = seg(t, 6.0, 6.8), ang = expoIO(fk) * Math.PI;
+      const shrink = expoIO(seg(t, 7.0, 7.6)), r = lerp(250, 70, shrink);
+      const roll = cubicIO(seg(t, 7.6, 9.0));
+      const bx = lerp(960, 300, roll), by = lerp(H / 2, FY - 70, shrink) - (t > 7.0 && t < 7.6 ? 0 : 0);
+      if (t < 6.8) {
+        const sxk = Math.abs(Math.cos(ang)), th = 40 * Math.sin(ang);
+        x.fillStyle = "#b8261d"; x.beginPath(); x.ellipse(960 + th * .5, H / 2, Math.max(2, 250 * sxk) + Math.abs(th) * .5, 250, 0, 0, 7); x.fill();
+        dot(960 - th * .5, H / 2, 250, RED, Math.max(.01, sxk), 1);
+      } else {
+        // shadow on the floor
+        x.fillStyle = "rgba(17,17,17,.18)"; x.beginPath(); x.ellipse(bx + 10, FY + 2, r * 1.1, r * .22, 0, 0, 7); x.fill();
+        dot(bx, by, r, RED);
+        x.save(); x.beginPath(); x.arc(bx, by, r, 0, 7); x.clip();
+        x.fillStyle = "#b8261d"; x.beginPath(); x.arc(bx + r * .45, by + r * .45, r * 1.05, 0, 7); x.fill();   // terminator band
+        x.fillStyle = RED; x.beginPath(); x.arc(bx - r * .12, by - r * .12, r * .82, 0, 7); x.fill();
+        x.fillStyle = "#fff"; x.beginPath(); x.ellipse(bx - r * .38, by - r * .4, r * .16, r * .1, -.6, 0, 7); x.fill();
+        // a stripe shows it rolling (it rolls left, so it turns counter-clockwise)
+        const spin = -(960 - bx) / r;
+        x.strokeStyle = CREAM; x.lineWidth = r * .14; x.beginPath(); x.ellipse(bx, by, r * Math.abs(Math.cos(spin)), r, 0, -Math.PI / 2, Math.PI / 2); x.stroke();
+        x.restore();
+      }
+    }
+    // ================= D · data / UI (9–12)
+    const cxp = (i) => 240 + i * 240, cyp = (v) => FY - v * 560;
+    if (t >= 9.0 && t < 12.2) {
+      const toSlider = expoIO(seg(t, 11.0, 11.5));
+      // the ball settles onto the first point
+      const pts = DATA.map((v, i) => { const appear = 9.55 + i * .2; const k = expo(seg(t, appear, appear + .25)); const sx = lerp(cxp(0), cxp(i), k), sy = lerp(cyp(DATA[0]), cyp(v), k); return [lerp(sx, lerp(420, 1500, i / 6), toSlider), lerp(sy, 760, toSlider), k]; });
+      // the line grows left → right, behind its dots
+      const shown = clamp((t - 9.6) / .2 / 1, 0, 6.5);
+      x.strokeStyle = INK; x.lineWidth = 8; x.lineJoin = "round"; x.lineCap = "round";
+      if (toSlider < 1) { x.globalAlpha = 1 - toSlider; x.beginPath(); pts.forEach((p, i) => { if (i <= shown) (i ? x.lineTo(p[0], p[1]) : x.moveTo(p[0], p[1])); }); x.stroke(); x.globalAlpha = 1; }
+      if (t < 9.6) { const k = expoIO(seg(t, 9.0, 9.5)); dot(lerp(300, cxp(0), k), lerp(FY - 70, cyp(DATA[0]), k), lerp(70, 22, k)); }
+      else {
+        // the slider: the dots collapse into the knob, which slides to 100%
+        if (toSlider > 0) { x.fillStyle = INK; x.fillRect(420, 754, 1080, 12); const knob = lerp(420, 1500, expoIO(seg(t, 11.45, 11.95))); x.fillStyle = RED; x.fillRect(420, 754, knob - 420, 12); }
+        pts.forEach((p, i) => { if (p[2] > 0) dot(lerp(p[0], lerp(420, 1500, expoIO(seg(t, 11.45, 11.95))), toSlider), p[1], lerp(22, 34, toSlider), i === 0 || toSlider > 0 ? RED : INK); });
+        // the number counts on the chart, then reads 100% on the slider
+        x.font = "800 120px IT"; x.fillStyle = INK; x.textAlign = "right"; x.textBaseline = "alphabetic";
+        if (t < 11.0) { const n = Math.round(lerp(0, 411, M.cubic(seg(t, 9.6, 10.9)))); x.fillText(STAT.replace(/[0-9.]+/, String(Math.round(lerp(0, STATV, M.cubic(seg(t, 9.6, 10.9)))))), 1700, 260); void n; }
+        else { const n = Math.round(lerp(0, 100, expoIO(seg(t, 11.45, 11.95)))); x.fillText(`${n}%`, 1500, 690); }
+      }
+    }
+    // ================= E · end title (12–15)
+    if (t >= 11.95) {
+      const k = expoIO(seg(t, 12.0, 12.5));
+      const tx = 1420, ty = 620;
+      const dx = lerp(1500, tx, k), dy = lerp(760, ty - DR, k), r = lerp(34, DR + 6, k);
+      word(String(PR.end), tx - DR - 18, ty, 200, (j) => springO(t - 12.35 - j * .035, 20, .72), () => 0);
+      const pulse = 1 + .12 * Math.exp(-Math.max(0, t - 13.6) * 6) * Math.sin(Math.max(0, t - 13.6) * 20);
+      dot(dx, dy, r * pulse);
+    }
+  },
+  sound(A) {
+    const m = A.midi;
+    A.tone(.35, 900, .15, "sine", .05); A.kick(.5, .9); A.click(.5, .2);
+    WORDS.forEach(([t0], i) => { A.kick(t0, .6); A.pluck(t0, m([60, 63, 67, 70, 72, 75][i]), .12, .25); A.nz(t0, .05, "highpass", 6000, .06); });
+    A.hit(2.95, .3); A.whoosh(2.7, .3, .2);
+    MORPH.forEach(([t0], i) => { A.pluck(t0, m([67, 70, 74, 79][i]), .16, .5); A.kick(t0, .4); });
+    A.whoosh(6.0, .8, .25); A.tone(6.8, 220, .3, "triangle", .15); A.kick(7.6, .7);
+    A.nz(7.6, 1.4, "lowpass", 300, .12, 1);   // rolling
+    DATA.forEach((_, i) => A.tone(9.55 + i * .2, m(72 + [0, 2, 4, 7, 9, 12, 14][i]), .15, "square", .04));
+    for (let t0 = 9.6; t0 < 10.9; t0 += .06) A.click(t0, .04);
+    A.whoosh(11.0, .45, .2); A.riser(11.45, 11.95, .15);
+    A.kick(12.0, .8); "FULLSTOP".split("").forEach((_, i) => A.click(12.35 + i * .035, .1));
+    A.hit(12.5, .4); [60, 64, 67, 72].forEach((n) => A.tone(12.5, m(n), 2.2, "sine", .06));
+    A.tone(13.6, 1200, .12, "sine", .06);
+    A.groove(120, .5, 12, { kick: false, hg: .04 });
+  },
+});
+</script></body></html>

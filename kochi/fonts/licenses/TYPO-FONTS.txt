@@ -1,0 +1,17 @@
+Typography section fonts (from Google Fonts):
+- TY-Alexandria-*.ttf: Alexandria, SIL Open Font License 1.1
+- TY-ArefRuqaa-700.ttf: Aref Ruqaa, SIL Open Font License 1.1
+- TY-Jakarta-*.ttf: Plus Jakarta Sans, SIL Open Font License 1.1
+- TY-MrsSaintDelafield.ttf: Mrs Saint Delafield, SIL Open Font License 1.1
+- TY-RockSalt.ttf: Rock Salt, Apache License 2.0
+- TY-Outfit-*.ttf: Outfit, SIL Open Font License 1.1
+- TY-Urbanist-800.ttf: Urbanist, SIL Open Font License 1.1
+- TY-Gabarito-*.ttf: Gabarito, SIL Open Font License 1.1
+- TY-ReadexPro-700.ttf: Readex Pro, SIL Open Font License 1.1
+
+TY-Anton.ttf — Anton by Vernon Adams, SIL Open Font License 1.1 (Google Fonts)
+TY-DawningPen.ttf — Dawning of a New Day by Kimberly Geswein, SIL Open Font License 1.1 (Google Fonts)
+TY-PlexArabic-400/700.ttf — IBM Plex Sans Arabic by IBM, SIL Open Font License 1.1 (Google Fonts)
+TY-InstrumentSerif(-Italic).ttf — Instrument Serif by Instrument, SIL Open Font License 1.1 (Google Fonts)
+TY-VT323.ttf — VT323 by Peter Hull, SIL Open Font License 1.1 (Google Fonts)
+TY-SpecialElite.ttf — Special Elite by Astigmatic, Apache License 2.0 (Google Fonts)
