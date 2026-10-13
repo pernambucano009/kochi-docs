@@ -2326,64 +2326,64 @@ dialog.cal-dlg { width: min(720px, 94vw); max-height: 90vh; border: 1px solid va
 :root { --page-bg: #F7F7F5; --card: #FFFFFF; --card-shadow: 0 4px 24px rgba(24, 23, 24, .06); --field: #F3F2EF; --label: #8C8C88; }
 
 /* الشاشة نفسها: صفحة كاملة بدل الكارت الزجاج */
-.stage { padding: 0; background: var(--page-bg); }
-.stage-card, body.stage-settled .stage-card { border-radius: 0; border: 0; box-shadow: none; background: var(--page-bg); backdrop-filter: none; -webkit-backdrop-filter: none; }
-.stage-head {
+:root:not(.app-kochi) .stage { padding: 0; background: var(--page-bg); }
+:root:not(.app-kochi) .stage-card, :root:not(.app-kochi) body.stage-settled .stage-card { border-radius: 0; border: 0; box-shadow: none; background: var(--page-bg); backdrop-filter: none; -webkit-backdrop-filter: none; }
+:root:not(.app-kochi) .stage-head {
   display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto auto auto auto; align-items: center; column-gap: 12px; row-gap: 6px;
   grid-template-areas: "back . proj prev next bell client" "title title title flow flow flow flow";
   padding: 18px 40px 14px; border-bottom: 0;
 }
-.stage-head > .spacer { display: none; }
+:root:not(.app-kochi) .stage-head > .spacer { display: none; }
 .stage-back { grid-area: back; justify-self: start; display: inline-flex; align-items: center; gap: 6px; border: 0; background: none; padding: 6px 2px; color: #6B6A66; font: inherit; font-size: 14px; cursor: pointer; }
 .stage-back svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; }
 [dir="ltr"] .stage-back svg { transform: scaleX(-1); }
 .stage-back:hover { color: var(--accent); }
-.stage-title { grid-area: title; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; }
+:root:not(.app-kochi) .stage-title { grid-area: title; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; }
 .stage-en { font-family: var(--display); font-size: 11.5px; letter-spacing: .36em; text-transform: uppercase; color: var(--accent); direction: ltr; unicode-bidi: isolate; }
-.stage-title h2 { font-size: clamp(26px, 2.6vw, 38px); font-weight: 500; line-height: 1.2; }
-.stage-project { grid-area: proj; justify-self: end; background: var(--card); box-shadow: var(--card-shadow); }
-#stagePrev { grid-area: prev; } #stageNext { grid-area: next; }
-.stage-bell { grid-area: bell; width: 44px; height: 44px; border: 0; background: var(--card); box-shadow: 0 4px 18px rgba(24, 23, 24, .08); }
-.stage-client { grid-area: client; height: 44px; border: 0; background: var(--card); box-shadow: 0 4px 18px rgba(24, 23, 24, .08); padding: 0 14px 0 6px; }
-[dir="rtl"] .stage-client { padding: 0 6px 0 14px; }
-.stage-head .btn.pill { padding: 10px 20px; font-size: 14px; gap: 10px; }
-.stage-head .btn.pill svg { width: 16px; height: 16px; }
+:root:not(.app-kochi) .stage-title h2 { font-size: clamp(26px, 2.6vw, 38px); font-weight: 500; line-height: 1.2; }
+:root:not(.app-kochi) .stage-project { grid-area: proj; justify-self: end; background: var(--card); box-shadow: var(--card-shadow); }
+:root:not(.app-kochi) #stagePrev { grid-area: prev; } :root:not(.app-kochi) #stageNext { grid-area: next; }
+:root:not(.app-kochi) .stage-bell { grid-area: bell; width: 44px; height: 44px; border: 0; background: var(--card); box-shadow: 0 4px 18px rgba(24, 23, 24, .08); }
+:root:not(.app-kochi) .stage-client { grid-area: client; height: 44px; border: 0; background: var(--card); box-shadow: 0 4px 18px rgba(24, 23, 24, .08); padding: 0 14px 0 6px; }
+:root:not(.app-kochi) [dir="rtl"] .stage-client { padding: 0 6px 0 14px; }
+:root:not(.app-kochi) .stage-head .btn.pill { padding: 10px 20px; font-size: 14px; gap: 10px; }
+:root:not(.app-kochi) .stage-head .btn.pill svg { width: 16px; height: 16px; }
 
 /* خطوات المشروع: دواير بأرقام متوصلة بخط */
-.flow { grid-area: flow; justify-self: end; align-self: end; gap: 0; padding: 0; border: 0; background: none; border-radius: 0; }
-.flow button { position: relative; flex-direction: column; gap: 6px; width: 78px; padding: 0; background: none !important; color: #8C8C88; font-size: 12px; }
-.flow button + button::before { content: ""; position: absolute; top: 17px; inset-inline-start: calc(-50% + 17px); width: calc(100% - 34px); height: 2px; background: #E3E2DE; }
-.flow button i { width: 34px; height: 34px; font-size: 13px; background: #E3E2DE; color: #6B6A66; transition: box-shadow .3s; }
-.flow button.done i, .flow button.active i { background: var(--accent); color: #fff; }
-.flow button.done + button::before, .flow button.done + button.active::before { background: var(--accent); }
-.flow button.active { color: var(--text); font-weight: 500; }
-.flow button.active i { box-shadow: 0 0 0 6px var(--accent-soft), 0 8px 22px rgba(229, 97, 62, .45); }
-.flow button:hover:not(.active) i { box-shadow: 0 0 0 4px #EDECE8; }
-.stage-body { padding: 8px 40px 32px; }
+:root:not(.app-kochi) .flow { grid-area: flow; justify-self: end; align-self: end; gap: 0; padding: 0; border: 0; background: none; border-radius: 0; }
+:root:not(.app-kochi) .flow button { position: relative; flex-direction: column; gap: 6px; width: 78px; padding: 0; background: none !important; color: #8C8C88; font-size: 12px; }
+:root:not(.app-kochi) .flow button + button::before { content: ""; position: absolute; top: 17px; inset-inline-start: calc(-50% + 17px); width: calc(100% - 34px); height: 2px; background: #E3E2DE; }
+:root:not(.app-kochi) .flow button i { width: 34px; height: 34px; font-size: 13px; background: #E3E2DE; color: #6B6A66; transition: box-shadow .3s; }
+:root:not(.app-kochi) .flow button.done i, :root:not(.app-kochi) .flow button.active i { background: var(--accent); color: #fff; }
+:root:not(.app-kochi) .flow button.done + button::before, :root:not(.app-kochi) .flow button.done + button.active::before { background: var(--accent); }
+:root:not(.app-kochi) .flow button.active { color: var(--text); font-weight: 500; }
+:root:not(.app-kochi) .flow button.active i { box-shadow: 0 0 0 6px var(--accent-soft), 0 8px 22px rgba(229, 97, 62, .45); }
+:root:not(.app-kochi) .flow button:hover:not(.active) i { box-shadow: 0 0 0 4px #EDECE8; }
+:root:not(.app-kochi) .stage-body { padding: 8px 40px 32px; }
 
 /* الكروت */
-.stage .panel { background: var(--card); border: 0; border-radius: 24px; box-shadow: var(--card-shadow); padding: 22px 24px; }
-.stage .panel h2 { font-size: 19px; }
+:root:not(.app-kochi) .stage .panel { background: var(--card); border: 0; border-radius: 24px; box-shadow: var(--card-shadow); padding: 22px 24px; }
+:root:not(.app-kochi) .stage .panel h2 { font-size: 19px; }
 
 /* الأزرار: كبسولات، والأساسي متوهج */
-.stage .btn { border-color: transparent; background: var(--field); }
-.stage .btn:hover:not(:disabled) { border-color: transparent; background: #EBEAE6; }
-.stage .btn.primary { background: var(--accent); color: #fff; box-shadow: 0 10px 26px -8px rgba(229, 97, 62, .55); }
-.stage .btn.primary:hover:not(:disabled) { background: #D8552F; }
-.stage .btn.ink { background: var(--ink); color: #fff; }
-.stage .btn.danger { background: transparent; }
+:root:not(.app-kochi) .stage .btn { border-color: transparent; background: var(--field); }
+:root:not(.app-kochi) .stage .btn:hover:not(:disabled) { border-color: transparent; background: #EBEAE6; }
+:root:not(.app-kochi) .stage .btn.primary { background: var(--accent); color: #fff; box-shadow: 0 10px 26px -8px rgba(229, 97, 62, .55); }
+:root:not(.app-kochi) .stage .btn.primary:hover:not(:disabled) { background: #D8552F; }
+:root:not(.app-kochi) .stage .btn.ink { background: var(--ink); color: #fff; }
+:root:not(.app-kochi) .stage .btn.danger { background: transparent; }
 
 /* الحقول: مليانة من غير خط حواليها */
-.stage :where(input[type=text], input[type=search], input[type=password], input[type=number], input[type=datetime-local], select, textarea) {
+:root:not(.app-kochi) .stage :where(input[type=text], input[type=search], input[type=password], input[type=number], input[type=datetime-local], select, textarea) {
   background: var(--field) !important; border-color: transparent !important; }
 
 @media (max-width: 900px) {
-  .stage-head { padding: 12px 16px 10px; grid-template-columns: auto minmax(0, 1fr) auto auto; grid-template-areas: "back . bell client" "title title title title" "flow flow flow flow" "proj proj prev next"; }
-  .stage-project { justify-self: start; }
-  .flow { justify-self: stretch; justify-content: space-between; }
-  .flow button { width: auto; flex: 1; }
-  .flow span { display: inline; font-size: 11px; }
-  .stage-body { padding: 8px 16px 24px; }
+  :root:not(.app-kochi) .stage-head { padding: 12px 16px 10px; grid-template-columns: auto minmax(0, 1fr) auto auto; grid-template-areas: "back . bell client" "title title title title" "flow flow flow flow" "proj proj prev next"; }
+  :root:not(.app-kochi) .stage-project { justify-self: start; }
+  :root:not(.app-kochi) .flow { justify-self: stretch; justify-content: space-between; }
+  :root:not(.app-kochi) .flow button { width: auto; flex: 1; }
+  :root:not(.app-kochi) .flow span { display: inline; font-size: 11px; }
+  :root:not(.app-kochi) .stage-body { padding: 8px 16px 24px; }
 }
 
 /* ============ الدارك مود للصفحات ============
@@ -2478,16 +2478,18 @@ dialog.cal-dlg { width: min(720px, 94vw); max-height: 90vh; border: 1px solid va
 :root[data-nh-theme="dark"] .ts-sf input { background: var(--surface-2); }
 
 /* النشر: المنصات مربعات بأيقونات، وكروت الفيديوهات من غير براويز */
-.stage .platforms { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px; }
-.stage .platforms label.plat { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; min-height: 72px;
+:root:not(.app-kochi) .stage .platforms { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px; }
+:root:not(.app-kochi) .stage .platforms label.plat { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; min-height: 72px;
   border: 0; border-radius: 18px; background: var(--field); color: #8C8C88; font-size: 11.5px; text-align: center; padding: 8px 6px; cursor: pointer; transition: background .2s, color .2s, transform .15s; }
-.stage .platforms label.plat input { position: absolute; opacity: 0; pointer-events: none; }
-.stage .platforms label.plat svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
-.stage .platforms label.plat:has(input:checked) { background: var(--text); color: var(--page-bg); }
-.stage .platforms label.plat:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
-.stage .platforms label.plat:active { transform: scale(.97); }
-.stage .ready { background: transparent; border: 0; border-radius: 18px; }
-.stage .ready video { border-radius: 18px; }
-.stage .ready.selected video { box-shadow: 0 0 0 3px var(--accent); }
-.stage .ready .body { padding: 8px 4px; }
-.stage .ready .name { font-weight: 500; }
+:root:not(.app-kochi) .stage .platforms label.plat input { position: absolute; opacity: 0; pointer-events: none; }
+:root:not(.app-kochi) .stage .platforms label.plat svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+:root:not(.app-kochi) .stage .platforms label.plat:has(input:checked) { background: var(--text); color: var(--page-bg); }
+:root:not(.app-kochi) .stage .platforms label.plat:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+:root:not(.app-kochi) .stage .platforms label.plat:active { transform: scale(.97); }
+:root:not(.app-kochi) .stage .ready { background: transparent; border: 0; border-radius: 18px; }
+:root:not(.app-kochi) .stage .ready video { border-radius: 18px; }
+:root:not(.app-kochi) .stage .ready.selected video { box-shadow: 0 0 0 3px var(--accent); }
+:root:not(.app-kochi) .stage .ready .body { padding: 8px 4px; }
+:root:not(.app-kochi) .stage .ready .name { font-weight: 500; }
+/* أيقونة المنصة في كوتشي (الشكل القديم): صغيرة جنب الاسم */
+.platforms label.plat svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; flex: none; }
