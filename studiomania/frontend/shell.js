@@ -79,7 +79,7 @@ function openStage(step) {
   const ic = { settings: "settings", 7: "publish", cal: "publish", 15: "publish", 8: "carousel", 9: "series", 10: "publish", 12: "create", 13: "voices", 14: "reel",
     6: "film", "6f": "film", "6s": "series", "6a": "publish", 3: "voices", 4: "characters", 5: "music" }[step];
   $("stageIc").hidden = !ic;
-  $("stageIc").innerHTML = ic ? `<img class="ic-l" src="/icons3d/${ic}.webp?v=8" alt=""><img class="ic-d" src="/icons3d/${ic}_d.webp?v=8" alt="">` : "";
+  $("stageIc").innerHTML = ic ? `<img class="ic-l" src="/icons3d/${ic}.webp?v=9" alt=""><img class="ic-d" src="/icons3d/${ic}_d.webp?v=9" alt="">` : "";
   // المونتاج شاشة شغل: راس صغير (رجوع + اسم المشروع + صدّر) بدل العنوان الكبير، زي البروتوتايب
   $("stage").classList.toggle("mt-mode", ["6", "6s", "6a", "6f"].includes(step));
   // المواعيد صفحة لوحدها جوه النشر: الرجوع بيودّي للنشر مش للرئيسية

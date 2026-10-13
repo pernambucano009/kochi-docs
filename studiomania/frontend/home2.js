@@ -73,7 +73,7 @@ const NH = (() => {
     const c = clientx?.cur;
     return c?.logo ? `<img src="${esc(c.logo)}" alt="">` : esc((c?.name || "B").trim().slice(0, 1).toUpperCase());
   };
-  const GLKEY = { create: "create", brand: "brand", assets: "assets", settings: "settings", progress: "progress", publish: "publish", reel: "reel", raw: "film",
+  const GLKEY = { create: "app", brand: "brand", assets: "assets", settings: "settings", progress: "progress", publish: "publish", reel: "reel", raw: "film",
     series: "series", carousel: "carousel", ad: "publish", typo: "create", dub: "voices", edit: "film", coaches: "characters", voice: "voices", music: "music" };
   const iconOf = (k) => (k === "brand" ? `<div class="nh-plate">${brandMark()}</div>` : gi(k));
   const head = (id) => `<div class="nh-head"><div class="nh-name"><span class="latin">${T[id].en}</span><b>${T[id].ar}</b></div>${GLKEY[id] ? `<span class="gi nh-glt">${glImg(GLKEY[id])}</span>` : iconOf(T[id].icon)}</div>`;
@@ -245,8 +245,10 @@ const NH = (() => {
   let stageLock = false, pendingKey = null;
   function setStage(key) {
     key = key || "";
+    if (!key) return;   // مفيش «فراغ»: آخر مجسّم بيفضل
     if (stageLock || zoom) { pendingKey = key; return; }
     if (key === shown) return;
+    if (T[key]) storageSet(STAGE_KEY, key);
 
     shown = key;
     GL?.show(!key ? "app" : key.startsWith("f:") ? "progress" : GLKEY[key] || "app");
@@ -256,8 +258,12 @@ const NH = (() => {
     slots[live].classList.add("out");
     live = 1 - live;
   }
-  slots[0].innerHTML = stageHTML("");
-  GL?.show("app");
+  // المسرح بيبدأ بآخر مربع وقفت عليه (أو عقل البراند أول مرة)، ومبيرجعش لحاجة تانية لما الماوس يطلع في الفراغ
+  const STAGE_KEY = "studiomania.stage";
+  const firstKey = (() => { const k = storageGet(STAGE_KEY); return T[k] && !KOCHI ? k : "brand"; })();
+  shown = firstKey;
+  slots[0].innerHTML = stageHTML(firstKey);
+  GL?.show(GLKEY[firstKey] || "app");
   // الماوس لما يعدّي على مربع في طريقه لمربع تاني مش بيغيّر المجسّم (عشان ميبقاش فيه تقطيع)
   let leaveT, hoverT;
   bento.addEventListener("pointerover", (e) => {
@@ -268,10 +274,10 @@ const NH = (() => {
     const key = line ? (line.dataset.folder ? "f:" + line.dataset.folder : "") : tile.dataset.id;
     hoverT = setTimeout(() => setStage(key), 110);
   });
+  // الماوس طلع في الفراغ: آخر مجسّم بيفضل زي ما هو
   bento.addEventListener("pointerout", (e) => {
     if (e.relatedTarget?.closest?.(".nh-tile, .nh-line")) return;
     clearTimeout(hoverT);
-    leaveT = setTimeout(() => setStage(""), 500);
   });
   bento.addEventListener("focusin", (e) => { const l = e.target.closest(".nh-line"), t = e.target.closest(".nh-tile"); if (l || t) setStage(l ? (l.dataset.folder ? "f:" + l.dataset.folder : "") : t.dataset.id); });
 
@@ -402,7 +408,7 @@ const NH = (() => {
   const zooming = (on) => document.body.classList.toggle("nh-zooming", on);
 
   // صفحة جوه الرئيسية (اعمل جديد / الأصول / شغّال عليه): الأيقونة والاسم بيطيروا لحد ما يبقوا عنوان الصفحة
-  function glImg(key) { return `<img class="ic-l" src="/icons3d/${key}.webp?v=8" alt="" loading="lazy"><img class="ic-d" src="/icons3d/${key}_d.webp?v=8" alt="" loading="lazy">`; }
+  function glImg(key) { return `<img class="ic-l" src="/icons3d/${key}.webp?v=9" alt="" loading="lazy"><img class="ic-d" src="/icons3d/${key}_d.webp?v=9" alt="" loading="lazy">`; }
   const panel = (c, r, inner, attrs = "") => `<div class="nh-tile nh-panel" ${attrs} style="grid-column:span ${c};grid-row:span ${r}">${inner}</div>`;
   const PAGES = {
     // كل نوع كارت فيه أيقونته الزجاج الـ 3D (فاتحة وغامقة)، واسمه، وسطر بيشرح هيعمل إيه

@@ -380,7 +380,7 @@ window.NHGL = (stage, getClient) => {
   const IMGS = ["create", "settings", "app", "brand", "assets", "progress", "publish", "reel", "film", "series", "carousel", "characters", "voices", "music", "backgrounds"], loader = new THREE.TextureLoader(), imgPlanes = [];
   // الصور بتتحمّل مرة واحدة وتترفع على كارت الشاشة قبل ما تتعرض (عشان مفيش رعشة ولا مربع فاضي)
   const texCache = {};
-  const texUrl = (key, d) => `/icons3d/${key}${d ? "_d" : ""}.webp?v=8`;
+  const texUrl = (key, d) => `/icons3d/${key}${d ? "_d" : ""}.webp?v=9`;
   function loadTex(url, cb) {
     const c = texCache[url] || (texCache[url] = { t: null, cbs: [] });
     if (c.t) return cb && cb(c.t);
@@ -425,14 +425,6 @@ window.NHGL = (stage, getClient) => {
       g.userData.img = true;
       g.userData.mats = [g.children[0].material];
       g.userData.marks = [];
-      if (key === "brand") {   // لوجو العميل (أو أول حرف من اسمه) جوه المربع اللي في النص
-        const mark = markPlane(.3);
-        mark.userData.mark = true;
-        mark.material.depthTest = false;
-        mark.position.z = .02;
-        g.add(mark);
-        g.userData.marks.push(mark);
-      }
       g.userData.rim = rimMat();
       g.userData.a = 0; g.userData.to = 0; g.visible = false;
       scene.add(g);

@@ -34,7 +34,7 @@ const BrandPage = (() => {
       <div class="bw-k latin" id="bwK"></div>
       <h1 id="bwQ"></h1>
       <p id="bwD"></p>
-      <div class="bw-ic"><img class="ic-l" src="/icons3d/brand.webp?v=8" alt=""><img class="ic-d" src="/icons3d/brand_d.webp?v=8" alt=""></div>
+      <div class="bw-ic"><img class="ic-l" src="/icons3d/brand.webp?v=9" alt=""><img class="ic-d" src="/icons3d/brand_d.webp?v=9" alt=""></div>
     </aside>
     <div class="bw-main">
     <div class="nb-bar">
