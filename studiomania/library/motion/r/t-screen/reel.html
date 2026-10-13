@@ -1,0 +1,104 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// قالب «بوستر طباعة شاشة» (سيلك سكرين): بوستر بيتطبع قدام الكاميرا، كل لون حبر سادة لوحده بمسّاحة (سكويجي) بتسحب من فوق لتحت،
+// الحبر بيغطي اللي تحته، الألواح مش راكبة بالظبط، لمعة الحبر المبلول بتختفي، وشريط بيانات غامق تحت. 1080×1920، 12 ثانية.
+const PR = M.params({
+  name: { label: "الاسم الكبير", kind: "text", role: "product", def: "سيوة" },
+  num: { label: "الرقم", kind: "text", def: "٠٧" },
+  stats: { label: "سطر البيانات", kind: "text", def: "٣ أيام · ٢ ليالي · من ٤٥٠٠ جنيه" },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "رحلات الواحة" },
+  i1: { label: "حبر السما الفاتح", kind: "color", def: "#f6d7a7" },
+  i2: { label: "حبر السما الغامق", kind: "color", def: "#eba26a" },
+  i3: { label: "حبر الكثبان", kind: "color", def: "#c9724a" },
+  i4: { label: "حبر النخل", kind: "color", def: "#2f6b5a" },
+  i5: { label: "الحبر الغامق", kind: "color", def: "#2b2140" },
+  acc: { label: "حبر التمييز (الشمس)", kind: "color", def: "#ff5a3c" },
+});
+const W = 1080, H = 1920, DUR = 12, PX = 70, PY = 150, PW = 940, PH = 1410;
+const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
+const PAPER = "#f1e8d6";
+const u = (v) => v * PW / 1000;   // وحدات البوستر (١٠٠٠×١٥٠٠)
+const palm = (q, x0, y0, s) => { q.rect(x0 - 3 * s, y0 - 70 * s, 6 * s, 70 * s); for (let k = 0; k < 7; k++) { const a = -Math.PI / 2 + (k - 3) * .45; q.moveTo(x0, y0 - 70 * s); q.quadraticCurveTo(x0 + Math.cos(a) * 30 * s, y0 - 70 * s + Math.sin(a) * 30 * s - 6 * s, x0 + Math.cos(a) * 48 * s, y0 - 70 * s + Math.sin(a) * 48 * s + 14 * s); q.lineTo(x0 + Math.cos(a) * 40 * s, y0 - 70 * s + Math.sin(a) * 40 * s + 18 * s); q.closePath(); } };
+// الطبقات بالترتيب: كل طبقة = لون + مسار + إزاحة صغيرة
+const LAYERS = [
+  ["i1", [2, -1], (q) => q.rect(0, 0, u(1000), u(1220))],
+  ["i2", [-1.5, 2], (q) => { [[140, 60], [300, 40], [420, 30]].forEach(([y, h]) => q.rect(0, u(y), u(1000), u(h))); }],
+  ["acc", [1.8, 1.5], (q) => q.arc(u(640), u(470), u(150), 0, Math.PI * 2)],
+  ["i3", [-2, -1.2], (q) => { q.moveTo(0, u(760)); for (let xx = 0; xx <= 1000; xx += 20) q.lineTo(u(xx), u(720 - Math.sin(xx * .006 + .6) * 90 - Math.sin(xx * .019) * 20)); q.lineTo(u(1000), u(1220)); q.lineTo(0, u(1220)); q.closePath(); }],
+  ["i4", [1.4, 2], (q) => { q.moveTo(0, u(930)); q.lineTo(u(1000), u(910)); q.lineTo(u(1000), u(1000)); q.lineTo(0, u(1010)); q.closePath(); [[120, 930, 1.6], [190, 935, 1.2], [790, 915, 1.8], [870, 918, 1.3], [700, 920, 1]].forEach(([a, b, s]) => palm(q, u(a), u(b), s)); }],
+  ["i5", [-1.6, -1.8], (q) => { q.moveTo(0, u(1080)); for (let xx = 0; xx <= 1000; xx += 20) q.lineTo(u(xx), u(1060 + Math.sin(xx * .008) * 40)); q.lineTo(u(1000), u(1500)); q.lineTo(0, u(1500)); q.closePath(); }],
+];
+const PULL = (i) => [.4 + i * 1.05, 1.25 + i * 1.05];   // وقت سحب كل لون
+
+M.reel({
+  W, H, DUR, bg: "#d8d2c6",
+  async init(M) {
+    await Promise.all([loadFont("LZ", "SM-Lalezar.ttf"), loadFont("CH", "SM-Changa.ttf")]);
+    const c = M.canvas(W, H); const x = c.getContext("2d");
+    const mk = (w, h) => { const k = document.createElement("canvas"); k.width = w; k.height = h; return k; };
+    const paper = mk(PW, PH), p = paper.getContext("2d"), R = M.rng(6);
+    p.fillStyle = PAPER; p.fillRect(0, 0, PW, PH); for (let i = 0; i < 1500; i++) { p.strokeStyle = `rgba(120,100,70,${R() * .08})`; p.lineWidth = .6; p.beginPath(); const fx = R() * PW, fy = R() * PH; p.moveTo(fx, fy); p.lineTo(fx + R() * 14 - 7, fy + R() * 6 - 3); p.stroke(); }
+    const mottle = mk(PW, PH), m = mottle.getContext("2d");
+    for (let i = 0; i < 80; i++) { const cx = R() * PW, cy = R() * PH, r = 40 + R() * 160, g = m.createRadialGradient(cx, cy, 0, cx, cy, r); g.addColorStop(0, `rgba(255,255,255,${R() * .12})`); g.addColorStop(1, "rgba(255,255,255,0)"); m.fillStyle = g; m.fillRect(cx - r, cy - r, r * 2, r * 2); }
+    for (let i = 0; i < 1500; i++) { m.fillStyle = `rgba(241,232,214,${.5 + R() * .5})`; m.fillRect(R() * PW, R() * PH, 1.4, 1.4); }
+    return { x, paper, mottle, lay: mk(PW, PH) };
+  },
+  seek(t, C, M) {
+    const { x } = C, { seg, smooth, cubic, expo } = M;
+    x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = "#d8d2c6"; x.fillRect(0, 0, W, H);
+    // الكاميرا: قريبة على البوستر وبعدين بتبعد وتلف شوية
+    const out = smooth(seg(t, 8.6, 10.2)), z = 1.08 - .2 * out, rot = -.025 * out;
+    x.translate(540, 900); x.rotate(rot); x.scale(z, z); x.translate(-540, -900);
+    x.fillStyle = "rgba(0,0,0,.25)"; x.filter = "blur(18px)"; x.fillRect(PX + 14, PY + 24, PW, PH); x.filter = "none";
+    x.drawImage(C.paper, PX, PY);
+    const L = C.lay.getContext("2d");
+    const pullTo = (i) => { const [a, b] = PULL(i); return { k: seg(t, a, b), wet: 1 - seg(t, b, b + 1.2) }; };
+    const ink = (col, off, draw, k, wet) => {
+      if (k <= 0) return;
+      L.setTransform(1, 0, 0, 1, 0, 0); L.clearRect(0, 0, PW, PH); L.beginPath(); draw(L); L.fillStyle = col; L.fill("evenodd");
+      // سُمك الحبر: حافة فاتحة فوق-شمال وغامقة تحت-يمين
+      L.globalCompositeOperation = "source-atop"; L.globalAlpha = .5; L.drawImage(C.mottle, 0, 0); L.globalAlpha = 1;
+      if (wet > 0) { const g = L.createLinearGradient(0, 0, PW, PH); g.addColorStop(0, `rgba(255,255,255,${.25 * wet})`); g.addColorStop(.5, "rgba(255,255,255,0)"); L.fillStyle = g; L.fillRect(0, 0, PW, PH); }
+      L.globalCompositeOperation = "source-over";
+      x.save(); x.beginPath(); x.rect(PX - 10, PY - 10, PW + 20, (PH + 20) * k + 30 * Math.sin(k * 9) * (1 - k)); x.clip();
+      x.globalAlpha = .18; x.globalCompositeOperation = "multiply"; x.drawImage(C.lay, PX + off[0] + 2, PY + off[1] + 2); x.globalAlpha = 1; x.globalCompositeOperation = "source-over";   // ضل الحبر اللي تحت
+      x.drawImage(C.lay, PX + off[0], PY + off[1]); x.restore();
+    };
+    LAYERS.forEach(([key, off, draw], i) => { const { k, wet } = pullTo(i); ink(PR[key], off, draw, k, wet); });
+    // آخر سحبة: كلام بلون الورق على الغامق (الاسم، الرقم، سطر البيانات)
+    const tk = seg(t, 6.9, 7.8), twet = 1 - seg(t, 7.8, 9);
+    ink(PAPER, [1, 1], (q) => {}, 0, 0);
+    if (tk > 0) {
+      x.save(); x.beginPath(); x.rect(PX - 10, PY - 10, PW + 20, (PH + 20) * tk); x.clip();
+      x.fillStyle = PAPER; x.direction = "rtl"; x.textBaseline = "alphabetic";
+      x.font = `${M.fit(PR.name, "LZ", u(760), u(300), 80)}px LZ`; x.textAlign = "right"; x.fillText(PR.name, PX + u(940), PY + u(1370));
+      x.font = `${u(120)}px LZ`; x.textAlign = "left"; x.fillStyle = PR.acc; x.fillText(PR.num, PX + u(50), PY + u(1240));
+      x.fillStyle = PR.i1; x.fillRect(PX + u(60), PY + u(1400), u(880), 3);
+      x.font = `700 ${M.fit(PR.stats, "CH", u(860), u(46), 20, "700")}px CH`; x.textAlign = "center"; x.fillText(PR.stats, PX + u(500), PY + u(1460));
+      x.restore();
+    }
+    // المسّاحة (السكويجي) + حبة الحبر الملفوفة ماشية مع حد السحب
+    const cur = LAYERS.findIndex((_, i) => { const [a, b] = PULL(i); return t >= a - .3 && t < b + .15; });
+    let sk = -1, sc = null; if (cur >= 0) { const [a, b] = PULL(cur); sk = seg(t, a, b); sc = PR[LAYERS[cur][0]]; } else if (t >= 6.6 && t < 7.95) { sk = seg(t, 6.9, 7.8); sc = PAPER; }
+    if (sk >= 0) {
+      const y = PY + (PH + 20) * sk;
+      x.fillStyle = sc; x.beginPath(); x.roundRect(PX - 30, y + 2, PW + 60, 30, 15); x.fill(); x.fillStyle = "rgba(255,255,255,.35)"; x.fillRect(PX - 20, y + 6, PW + 40, 6);
+      x.fillStyle = "#333"; x.fillRect(PX - 40, y - 10, PW + 80, 16); x.fillStyle = "#8b6b46"; x.fillRect(PX - 40, y - 70, PW + 80, 60); x.fillStyle = "rgba(255,255,255,.15)"; x.fillRect(PX - 40, y - 70, PW + 80, 10);
+      x.fillStyle = "rgba(0,0,0,.18)"; x.fillRect(PX - 40, y + 32, PW + 80, 18);
+    }
+    // اسم البراند على ورقة لاصقة برّه البوستر
+    x.setTransform(1, 0, 0, 1, 0, 0);
+    const bk = expo(seg(t, 10.2, 10.8)); if (bk > 0) { x.save(); x.translate(540, 1780); x.rotate(.03); x.scale(bk, bk); x.fillStyle = "#fff8e8"; x.fillRect(-230, -55, 460, 110); x.fillStyle = "rgba(255,255,255,.6)"; x.fillRect(-60, -70, 120, 30); x.fillStyle = PR.i5; x.font = "700 50px CH"; x.textAlign = "center"; x.textBaseline = "middle"; x.direction = "rtl"; x.fillText(PR.brand, 0, 4); x.restore(); }
+  },
+  sound(A) {
+    const N = A.midi;
+    // صوت المسّاحة على الشبكة مع كل سحبة + بيت لو-فاي
+    for (let i = 0; i < 7; i++) { const a = .4 + i * 1.05; A.nz(a, .8, "bandpass", 700, .14, 1.2); A.nz(a + .82, .1, "lowpass", 900, .2); }
+    A.groove(90, 0, 12, { kg: .5, hg: .06, snare: true, sg: .18 });
+    const ch = [[57, 60, 64], [53, 57, 60], [55, 59, 62], [52, 55, 59]];
+    for (let i = 0; i < 18; i++) { const t = i * (60 / 90) * 1; ch[Math.floor(i / 4) % 4].forEach((n) => A.tone(t, N(n + 12), .5, "triangle", .025)); A.tone(t, N(ch[Math.floor(i / 4) % 4][0] - 12), .6, "sine", .08); }
+    A.pluck(10.2, N(76), .12, 1);
+  },
+});
+</script>
+</body></html>

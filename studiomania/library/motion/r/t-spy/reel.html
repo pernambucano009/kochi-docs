@@ -1,0 +1,108 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// قالب «تترات جاسوسية» (ستايل الستينات): ورق مقصوص بالمقص بأربع ألوان سادة، سيلويت راجل ببرنيطة وكرافتة حمرا بيجري ورا شنطة،
+// الكلام هو المباني والأسطح، النحاس بيقطع المشاهد، وفي الآخر الشنطة بتتفتح على «العرض السري». 1080×1920، 12 ثانية.
+const PR = M.params({
+  presents: { label: "الكلام الأول", kind: "text", def: "تقدّم" },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "ستوديو البلد" },
+  starring: { label: "سطر البطولة", kind: "text", def: "بطولة: إنت" },
+  title: { label: "اسم العرض", kind: "text", role: "product", def: "العرض السري" },
+  code: { label: "جوه الشنطة", kind: "text", def: "كود: صيف٤٠" },
+  date: { label: "التاريخ", kind: "text", def: "الخميس الجاي الساعة ٩" },
+  ink: { label: "الحبر الغامق", kind: "color", def: "#1b1714" },
+  cream: { label: "الورق", kind: "color", def: "#efe4c9" },
+  hot: { label: "اللون السخن", kind: "color", def: "#d23a22" },
+  warm: { label: "اللون الدافي", kind: "color", def: "#e2a52a" },
+});
+const W = 1080, H = 1920, DUR = 12;
+const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
+// قص بالمقص: الحواف بتتقسم وبتتهز شوية (ثابتة لكل قطعة)
+const cut = (pts, seed, amp = 1.8) => { const out = []; for (let i = 0; i < pts.length; i++) { const a = pts[i], b = pts[(i + 1) % pts.length], n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 10)); for (let k = 0; k < n; k++) { const u = k / n, h = M.hash(seed + i * 7.1 + k * .37); out.push([a[0] + (b[0] - a[0]) * u + (h - .5) * amp * 2, a[1] + (b[1] - a[1]) * u + (M.hash(seed * 3 + i + k * .91) - .5) * amp * 2]); } } return out; };
+const SC = [[0, 3.0, "warm"], [3.0, 6.0, "hot"], [6.0, 9.0, "ink"], [9.0, 12, "cream"]];
+
+M.reel({
+  W, H, DUR, bg: PR.warm,
+  async init(M) {
+    await Promise.all([loadFont("LZ", "SM-Lalezar.ttf"), loadFont("CH", "SM-Changa.ttf")]);
+    const c = M.canvas(W, H); const x = c.getContext("2d");
+    const tex = document.createElement("canvas"); tex.width = W; tex.height = H; const g = tex.getContext("2d"), R = M.rng(9);
+    for (let i = 0; i < 120; i++) { const cx = R() * W, cy = R() * H, r = 60 + R() * 260, gr = g.createRadialGradient(cx, cy, 0, cx, cy, r); gr.addColorStop(0, `rgba(${R() < .5 ? "255,250,235" : "60,40,20"},${R() * .07})`); gr.addColorStop(1, "rgba(0,0,0,0)"); g.fillStyle = gr; g.fillRect(cx - r, cy - r, r * 2, r * 2); }
+    for (let i = 0; i < 1500; i++) { g.strokeStyle = `rgba(80,60,40,${R() * .07})`; g.lineWidth = .7; g.beginPath(); const fx = R() * W, fy = R() * H; g.moveTo(fx, fy); g.lineTo(fx + R() * 20 - 10, fy + R() * 6 - 3); g.stroke(); }
+    return { x, tex };
+  },
+  seek(t, C, M) {
+    const { x } = C, { seg, smooth, expo, springO, clamp } = M;
+    const tq = Math.floor(t * 12) / 12;
+    const sc = SC.findIndex(([a, b]) => t >= a && t < b), [s0, , gk] = SC[sc], lt = t - s0, ground = PR[gk];
+    x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = ground; x.fillRect(0, 0, W, H);
+    // قطعة ورق: فجوة بلون الأرضية + ضل صغير + الحبر
+    const piece = (pts, col, seed, sh = true) => { const P = cut(pts, seed); const path = () => { x.beginPath(); P.forEach((p) => x.lineTo(p[0], p[1])); x.closePath(); };
+      if (sh) { x.save(); x.translate(5, 6); x.filter = "blur(4px)"; path(); x.fillStyle = "rgba(0,0,0,.28)"; x.fill(); x.restore(); x.filter = "none"; }
+      path(); x.strokeStyle = ground; x.lineWidth = 5; x.stroke(); path(); x.fillStyle = col; x.fill(); };
+    const rect = (x0, y0, w, h) => [[x0, y0], [x0 + w, y0], [x0 + w, y0 + h], [x0, y0 + h]];
+    const word = (txt, cx, cy, size, col, font = "LZ", rot = 0, k = 1) => { if (k <= 0) return; x.save(); x.translate(cx, cy); x.rotate(rot); x.scale(1, k); x.font = `${font === "CH" ? "700 " : ""}${size}px ${font}`; x.textAlign = "center"; x.textBaseline = "middle"; x.direction = "rtl"; x.fillStyle = "rgba(0,0,0,.25)"; x.fillText(txt, 4, 5); x.lineWidth = 5; x.strokeStyle = ground; x.strokeText(txt, 0, 0); x.fillStyle = col; x.fillText(txt, 0, 0); x.restore(); };
+    // السيلويت: راجل ببرنيطة وجاكيت وكرافتة حمرا (الكرافتة بتطير وراه لما بيجري)
+    const man = (mx, my, s, pose) => {
+      const f = Math.floor(t * 12) % 4, run = pose === "run", leg = run ? [[-30, 10], [25, -10], [30, 10], [-25, -10]][f] : [0, 0];
+      const ink = PR.ink;
+      x.save(); x.translate(mx, my); x.scale(s, s);
+      piece([[-14, -10], [14, -10], [14 + leg[0] * .6, 150], [0 + leg[0], 260], [-14 + leg[0], 260]], ink, 11);
+      piece([[-14, -10], [14, -10], [-14 - leg[0] * .6, 150], [0 - leg[0], 260], [14 - leg[0], 260]], ink, 12);
+      piece([[-48, -200], [48, -200], [62, 10], [-62, 10]], ink, 13);
+      piece(run ? [[30, -180], [110, -130], [100, -110], [30, -150]] : [[40, -180], [60, -40], [42, -40], [26, -170]], ink, 14);
+      piece(run ? [[-30, -180], [-100, -230], [-110, -212], [-30, -150]] : [[-40, -180], [-60, -40], [-42, -40], [-26, -170]], ink, 15);
+      piece(Array.from({ length: 16 }, (_, i) => [Math.cos(i / 16 * Math.PI * 2) * 34, -240 + Math.sin(i / 16 * Math.PI * 2) * 40]), ink, 16);
+      piece([[-58, -268], [58, -268], [40, -280], [30, -320], [-30, -320], [-40, -280]], ink, 17);
+      const fl = run ? Math.sin(t * 20) * 14 : 0;
+      piece(run ? [[-6, -196], [6, -196], [-70, -150 + fl], [-90, -160 + fl]] : [[-8, -196], [8, -196], [6, -100], [0, -88], [-6, -100]], PR.hot, 18, false);
+      x.restore();
+    };
+    const brief = (bx, by, s, open = 0) => { x.save(); x.translate(bx, by); x.scale(s, s); piece(rect(-70, -50, 140, 100), PR.ink, 30); piece(rect(-62, -42, 124, 84), PR.warm, 31, false); piece(rect(-22, -70, 44, 22), PR.ink, 32, false); x.restore(); };
+    if (sc === 0) {
+      // مشهد ١: الكلام مباني، والراجل بيجري ورا الشنطة
+      [[60, 900, 160, 820], [250, 700, 130, 1020], [420, 1050, 180, 670], [640, 820, 150, 900], [830, 980, 190, 740]].forEach(([a, b, w2, h2], i) => piece(rect(a, b, w2, h2), i % 2 ? PR.cream : "#b5821f", 40 + i));
+      word(PR.presents, 540, 420, 130, PR.ink, "LZ", -.04, expo(seg(lt, .1, .4)));
+      word(PR.brand, 540, 600, M.fit(PR.brand, "LZ", 900, 160, 60), PR.cream, "LZ", .03, expo(seg(lt, .7, 1.0)));
+      const mxp = -150 + 1400 * seg(lt, .8, 3.0); man(mxp, 1630, 1.1, "run"); brief(mxp + 260, 1560 - Math.abs(Math.sin(t * 9)) * 30, .9);
+    } else if (sc === 1) {
+      // مشهد ٢: أسطح وراجل بينط بينهم + سطر البطولة
+      [[0, 1300, 420], [560, 1180, 520]].forEach(([a, b, w2], i) => { piece(rect(a, b, w2, 800), PR.ink, 50 + i); for (let k = 0; k < 4; k++) piece(rect(a + 40 + k * 95, b + 80, 50, 70), PR.warm, 60 + i * 9 + k, false); });
+      piece([[620, 1180], [640, 1100], [680, 1100], [700, 1180]], PR.ink, 70);
+      const jk = seg(lt, .6, 1.8), mxp = 150 + 620 * jk, myp = 1300 - Math.sin(Math.PI * jk) * 300 - (jk > .5 ? 120 * (jk - .5) * 2 : 0) - 1;
+      man(mxp, (jk < 1 ? myp : 1180), 1, jk > 0 && jk < 1 ? "run" : "stand");
+      word(PR.starring, 540, 480, M.fit(PR.starring, "LZ", 900, 150, 60), PR.cream, "LZ", -.06, expo(seg(lt, .2, .5)));
+      piece(Array.from({ length: 20 }, (_, i) => [820 + Math.cos(i / 20 * Math.PI * 2) * 110, 280 + Math.sin(i / 20 * Math.PI * 2) * 110]), PR.cream, 71);
+    } else if (sc === 2) {
+      // مشهد ٣: ضلمة + بقعة نور، الشنطة بتتفتح على الكود
+      piece(Array.from({ length: 30 }, (_, i) => [520 + Math.cos(i / 30 * Math.PI * 2) * 470, 1250 + Math.sin(i / 30 * Math.PI * 2) * 240]), PR.cream, 80);
+      man(320, 1220, .82, "stand");
+      const ok = seg(lt, .8, 1.4);
+      brief(660, 1330, 1.3 * (1 + .1 * ok));
+      if (ok > 0) { const sk = springO(lt - 1.2, 12, .5); x.save(); x.translate(640, 900); x.scale(sk, sk); piece(rect(-300, -110, 600, 220), PR.ink, 81); piece(rect(-284, -94, 568, 188), PR.warm, 82, false); x.restore(); if (lt > 1.3) word(PR.code, 640, 900, M.fit(PR.code, "LZ", 520, 110, 40), PR.ink, "LZ", 0, expo(seg(lt, 1.3, 1.6))); }
+      for (let i = 0; i < 6; i++) { const a = -Math.PI / 2 + (i - 2.5) * .35, r0 = 160, r1 = 260 + Math.sin(t * 6 + i) * 20; if (ok >= 1) piece([[640 + Math.cos(a) * r0, 900 + Math.sin(a) * r0], [640 + Math.cos(a + .06) * r1, 900 + Math.sin(a + .06) * r1], [640 + Math.cos(a - .06) * r1, 900 + Math.sin(a - .06) * r1]], PR.warm, 90 + i, false); }
+    } else {
+      // مشهد ٤: اسم العرض بحروف مقصوصة + التاريخ والبراند
+      piece(rect(80, 560, 920, 640), PR.hot, 100);
+      word(PR.title, 540, 820, M.fit(PR.title, "LZ", 860, 220, 80), PR.cream, "LZ", -.03, expo(seg(lt, .1, .5)));
+      word(PR.date, 540, 1050, M.fit(PR.date, "CH", 820, 60, 30, "700"), PR.ink, "CH", 0, expo(seg(lt, .5, .8)));
+      piece(rect(330, 1340, 420, 110), PR.ink, 101); word(PR.brand, 540, 1395, 56, PR.cream, "CH", 0, expo(seg(lt, .9, 1.2)));
+      man(170, 1720, .7, "stand"); brief(900, 1690, .7);
+    }
+    // مسحة القطع بين المشاهد (خطين مايلين)
+    const nx = SC[sc + 1]; if (nx && t > nx[0] - .25) { const k = seg(t, nx[0] - .25, nx[0]); piece([[-50, H * (1 - k) - 300], [W + 50, H * (1 - k) - 500], [W + 50, H + 50], [-50, H + 50]], PR[nx[2]], 200 + sc, false); }
+    // ملمس الورق فوق الكل
+    x.globalCompositeOperation = "multiply"; x.drawImage(C.tex, 0, 0); x.globalCompositeOperation = "source-over";
+  },
+  sound(A) {
+    const N = A.midi;
+    // جاز تجسس: باص ماشي + بونجو + نحاس بيقطع المشاهد
+    const B = 60 / 128;
+    const walk = [40, 43, 45, 46, 47, 46, 45, 43];
+    for (let i = 0, t = 0; t < 12; i++, t += B / 2) { A.tone(t, N(walk[i % 8]), B * .45, "triangle", .16); if (i % 2) A.nz(t, .06, "bandpass", 900 + (i % 4) * 300, .12, 3); else A.nz(t, .03, "highpass", 7000, .05); }
+    const brass = (t, ch) => ch.forEach((n) => { A.tone(t, N(n), .35, "sawtooth", .045, .01); A.tone(t, N(n), .35, "square", .02, .01); });
+    [0, 1.0, 3.0, 6.0, 7.2, 9.0, 9.6].forEach((t, i) => brass(t, [[64, 67, 70, 74], [62, 65, 69, 72]][i % 2]));
+    A.hit(3.0, .4); A.hit(6.0, .4); A.hit(9.0, .5); A.riser(7.6, 9.0, .15);
+  },
+});
+</script>
+</body></html>

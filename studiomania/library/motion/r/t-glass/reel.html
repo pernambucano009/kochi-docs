@@ -1,0 +1,106 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// قالب «زجاج معشق»: شباك مقوّس في حيطة حجر، قطع زجاج ملوّنة بين خطوط رصاص غامقة، الزجاج مالوش نور من نفسه:
+// بينوّر بس لما الشمس تعدّي من وراه (شريط نور بيمشي)، وبيرمي نسخة ملونة على أرضية الحجر مع أشعة وتراب. 1080×1920، 12 ثانية.
+const PR = M.params({
+  ribbon: { label: "الكلام على الشريط", kind: "text", role: "brand", def: "إضاءة نور" },
+  tag: { label: "المحفور تحت", kind: "text", def: "النور بيغيّر كل حاجة" },
+  sky: { label: "لون السما", kind: "color", def: "#2a5db0" },
+  sun: { label: "لون الشمس", kind: "color", def: "#f2b134" },
+});
+const W = 1080, H = 1920, DUR = 12, WX0 = 200, WX1 = 880, WY0 = 250, WY1 = 1380, AR = (WX1 - WX0) / 2;
+const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
+const hex = (h) => { const n = parseInt(String(h).slice(1).replace(/^(.)(.)(.)$/, "$1$1$2$2$3$3"), 16) || 0; return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+const inWin = (x, y) => x > WX0 && x < WX1 && y < WY1 && (y > WY0 + AR || Math.hypot(x - (WX0 + AR), y - (WY0 + AR)) < AR);
+
+M.reel({
+  W, H, DUR, bg: "#1a1714",
+  async init(M) {
+    await Promise.all([loadFont("AM", "TY-Amiri-700.ttf", "700"), loadFont("RQ", "TY-ArefRuqaa-700.ttf", "700")]);
+    const c = M.canvas(W, H); const x = c.getContext("2d");
+    const R = M.rng(4);
+    // الصورة اللي في الزجاج: سما، شمس، تلال، شجرة، شريط تحت
+    const sky = hex(PR.sky), sun = hex(PR.sun);
+    const pic = (px, py) => {
+      const cx = WX0 + AR;
+      if (Math.hypot(px - cx, py - 560) < 130) return sun;                                         // الشمس
+      if (Math.hypot(px - cx, py - 560) < 200) return [245, 205, 110];
+      if (px > 280 && px < 330 && py > 820 && py < 1180) return [110, 70, 40];                      // جذع الشجرة
+      if (Math.hypot(px - 305, py - 790) < 120) return [60, 140, 70];                              // الشجرة
+      const hill = 930 - Math.sin(px * .008) * 70, hill2 = 1040 - Math.sin(px * .011 + 2) * 50;
+      if (py > hill2) return [70, 120, 50]; if (py > hill) return [120, 170, 70];
+      return py < 420 ? sky.map((v) => v * .75) : sky;
+    };
+    // تقسيم الشباك لقطع: شبكة رؤوس مهزوزة متشاركة، وكل خانة مثلثين
+    const cols = 8, rows = 13, V = [];
+    for (let j = 0; j <= rows; j++) { V.push([]); for (let i = 0; i <= cols; i++) { const edge = i === 0 || i === cols || j === 0 || j === rows; V[j].push([WX0 - 10 + (WX1 - WX0 + 20) * i / cols + (edge ? 0 : (R() - .5) * 50), WY0 - 10 + (WY1 - WY0 + 20) * j / rows + (edge ? 0 : (R() - .5) * 50)]); } }
+    const P = [];
+    for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) { const a = V[j][i], b = V[j][i + 1], cc = V[j + 1][i + 1], d = V[j + 1][i]; const tris = (i + j) % 2 ? [[a, b, cc], [a, cc, d]] : [[a, b, d], [b, cc, d]];
+      tris.forEach((tr) => { const mx = (tr[0][0] + tr[1][0] + tr[2][0]) / 3, my = (tr[0][1] + tr[1][1] + tr[2][1]) / 3; if (!inWin(mx, my)) return; const base = pic(mx, my), dv = 1 + (R() - .5) * .2; P.push({ pts: tr, mx, my, col: base.map((v) => Math.min(255, v * dv)), ang: R() * Math.PI, ph: R() * 6 }); }); }
+    // الحيطة الحجر (مرة واحدة)
+    const wall = document.createElement("canvas"); wall.width = W; wall.height = H; const w = wall.getContext("2d");
+    w.fillStyle = "#4a443c"; w.fillRect(0, 0, W, H);
+    for (let y = 0, r = 0; y < 1500; y += 90, r++) for (let xx = (r % 2) * -70; xx < W; xx += 140) { const v = 70 + R() * 18; w.fillStyle = `rgb(${v},${v - 6},${v - 14})`; w.fillRect(xx + 4, y + 4, 132, 82); }
+    // الأرضية بمنظور
+    for (let r = 0; r < 8; r++) { const y0 = 1500 + Math.pow(r / 8, 1.5) * 420, y1 = 1500 + Math.pow((r + 1) / 8, 1.5) * 420; for (let k = -6; k < 7; k++) { const s0 = .5 + .5 * r / 8, s1 = .5 + .5 * (r + 1) / 8, tw = 160, v = 60 + ((r + k) % 2 ? 12 : 0) + R() * 8; w.fillStyle = `rgb(${v},${v - 5},${v - 12})`; w.beginPath(); w.moveTo(540 + k * tw * s0 + 3, y0 + 2); w.lineTo(540 + (k + 1) * tw * s0 - 3, y0 + 2); w.lineTo(540 + (k + 1) * tw * s1 - 3, y1 - 2); w.lineTo(540 + k * tw * s1 + 3, y1 - 2); w.fill(); } }
+    w.fillStyle = "#2e2a25"; w.fillRect(0, 1480, W, 24);
+    // فتحة الشباك المشطوفة
+    w.fillStyle = "#38332c"; w.beginPath(); w.moveTo(WX0 - 60, WY1 + 50); w.lineTo(WX0 - 60, WY0 + AR); w.arc(WX0 + AR, WY0 + AR, AR + 60, Math.PI, 0); w.lineTo(WX1 + 60, WY1 + 50); w.closePath(); w.fill();
+    const vg = w.createRadialGradient(540, 900, 300, 540, 900, 1200); vg.addColorStop(0, "rgba(0,0,0,0)"); vg.addColorStop(1, "rgba(0,0,0,.6)"); w.fillStyle = vg; w.fillRect(0, 0, W, H);
+    const floorC = document.createElement("canvas"); floorC.width = W / 4; floorC.height = H / 4;
+    return { x, P, wall, floorC, dust: Array.from({ length: 140 }, () => [R(), R(), R()]) };
+  },
+  seek(t, C, M) {
+    const { x } = C, { seg, smooth, expo } = M;
+    x.setTransform(1, 0, 0, 1, 0, 0); x.globalCompositeOperation = "source-over"; x.filter = "none";
+    x.drawImage(C.wall, 0, 0);
+    // النور: شريط بيمشي من الشمال لليمين، وبعدين الشباك كله منوّر
+    const sweep = -300 + 1600 * smooth(seg(t, 1.6, 6.4)), full = smooth(seg(t, 5.6, 7.2)), pulse = 1 + .06 * Math.sin(t * 2.2);
+    const lit = (mx, my) => Math.max(Math.exp(-Math.pow((mx - sweep + (my - 800) * .25) / 220, 2)), full) * pulse;
+    // الزجاج: غامق ولبني لما مفيش نور، ألوان جواهر لما النور يعدّي
+    C.P.forEach((p) => {
+      const L = lit(p.mx, p.my), dark = .22, k = dark + (1.15 - dark) * L;
+      const [r, g, b] = p.col.map((v) => v / 255);
+      const tm = (v) => 1 - Math.exp(-v * k * 2.2);
+      x.fillStyle = `rgb(${Math.round(tm(r) * 255 + 18 * (1 - L))},${Math.round(tm(g) * 255 + 18 * (1 - L))},${Math.round(tm(b) * 255 + 22 * (1 - L))})`;
+      x.beginPath(); p.pts.forEach((q) => x.lineTo(q[0], q[1])); x.closePath(); x.fill();
+      // ملمس: خطوط خفيفة في اتجاه القطعة
+      x.save(); x.clip(); x.strokeStyle = `rgba(255,255,255,${.05 + .07 * L})`; x.lineWidth = 2; const ca = Math.cos(p.ang), sa = Math.sin(p.ang); for (let d = -60; d < 60; d += 14) { x.beginPath(); x.moveTo(p.mx + ca * -80 - sa * d, p.my + sa * -80 + ca * d); x.lineTo(p.mx + ca * 80 - sa * d, p.my + sa * 80 + ca * d); x.stroke(); } x.restore();
+    });
+    // خطوط الرصاص: شبكة واحدة غامقة + حديد عرضي
+    x.strokeStyle = "#141210"; x.lineWidth = 9; x.lineJoin = "round"; C.P.forEach((p) => { x.beginPath(); p.pts.forEach((q) => x.lineTo(q[0], q[1])); x.closePath(); x.stroke(); });
+    x.strokeStyle = "rgba(120,120,120,.25)"; x.lineWidth = 2; C.P.forEach((p) => { x.beginPath(); p.pts.forEach((q) => x.lineTo(q[0] + 1, q[1] - 1)); x.closePath(); x.stroke(); });
+    x.fillStyle = "#1c1916"; [520, 800, 1080].forEach((y) => x.fillRect(WX0 - 10, y, WX1 - WX0 + 20, 12));
+    // الشريط: قطعة زجاج كريمي لوحدها بإطار رصاص والكلام عليها بالجريزاي البني
+    { const L = lit(540, 1235), v = Math.round(150 + 95 * L); x.fillStyle = `rgb(${v},${v - 8},${v - 30})`; x.beginPath(); x.moveTo(WX0 + 30, 1180); x.quadraticCurveTo(540, 1150, WX1 - 30, 1180); x.lineTo(WX1 - 30, 1290); x.quadraticCurveTo(540, 1260, WX0 + 30, 1290); x.closePath(); x.fill(); x.lineWidth = 12; x.strokeStyle = "#141210"; x.stroke();
+      const rk = smooth(seg(t, 6.8, 7.8)); if (rk > 0) { x.save(); x.globalAlpha = rk; x.fillStyle = "rgba(70,40,20,.92)"; x.font = `700 ${M.fit(PR.ribbon, "RQ", 520, 88, 40, "700")}px RQ`; x.textAlign = "center"; x.textBaseline = "middle"; x.direction = "rtl"; x.fillText(PR.ribbon, 540, 1228); x.restore(); } }
+    // حدود الشباك (حجر)
+    x.save(); x.beginPath(); x.rect(0, 0, W, H); x.moveTo(WX0, WY1); x.lineTo(WX0, WY0 + AR); x.arc(WX0 + AR, WY0 + AR, AR, Math.PI, 0); x.lineTo(WX1, WY1); x.closePath(); x.clip("evenodd"); x.drawImage(C.wall, 0, 0); x.restore();
+    x.strokeStyle = "#5e574d"; x.lineWidth = 14; x.beginPath(); x.moveTo(WX0, WY1); x.lineTo(WX0, WY0 + AR); x.arc(WX0 + AR, WY0 + AR, AR, Math.PI, 0); x.lineTo(WX1, WY1); x.closePath(); x.stroke();
+    // الأرضية: نسخة ملونة ممسوحة من الشباك بمنظور + أشعة + تراب
+    const glow = Math.max(full, seg(t, 2, 6) * .6);
+    if (glow > 0) {
+      const f = C.floorC.getContext("2d"); f.setTransform(1, 0, 0, 1, 0, 0); f.clearRect(0, 0, W / 4, H / 4); f.drawImage(x.canvas, WX0, WY0, WX1 - WX0, WY1 - WY0, 0, 0, (WX1 - WX0) / 4, (WY1 - WY0) / 4);
+      x.save(); x.globalCompositeOperation = "lighter"; x.globalAlpha = .42 * glow; x.filter = "blur(30px)";
+      x.drawImage(C.floorC, 0, 0, (WX1 - WX0) / 4, (WY1 - WY0) / 4, 200, 1560, 760, 320);
+      x.restore(); x.filter = "none";
+      x.save(); x.globalCompositeOperation = "lighter";
+      const g = x.createLinearGradient(0, WY0, 0, 1900); g.addColorStop(0, `rgba(255,220,160,${.0})`); g.addColorStop(.5, `rgba(255,220,160,${.07 * glow})`); g.addColorStop(1, "rgba(255,220,160,0)");
+      x.fillStyle = g; x.beginPath(); x.moveTo(WX0 + 60, WY0 + 200); x.lineTo(WX1 - 60, WY0 + 200); x.lineTo(WX1 + 260, 1900); x.lineTo(WX0 + 120, 1900); x.closePath(); x.fill();
+      C.dust.forEach(([a, b, c2]) => { const px = WX0 + 100 + a * 700 + Math.sin(t * .5 + c2 * 9) * 20 + b * 200 * ((b * 1600 + t * 30) % 1600) / 1600, py = WY0 + 300 + ((b * 1600 + t * 30 * (.5 + c2)) % 1500); x.fillStyle = `rgba(255,235,200,${.5 * glow * c2})`; x.fillRect(px, py, 2.5, 2.5); });
+      x.restore();
+    }
+    // المحفور تحت في الحجر
+    const tk = smooth(seg(t, 8.4, 9.4));
+    if (tk > 0) { x.save(); x.globalAlpha = tk; x.font = `700 ${M.fit(PR.tag, "AM", 860, 66, 30, "700")}px AM`; x.textAlign = "center"; x.direction = "rtl"; x.fillStyle = "rgba(0,0,0,.6)"; x.fillText(PR.tag, 542, 1455); x.fillStyle = "#c9b98f"; x.fillText(PR.tag, 540, 1452); x.restore(); }
+  },
+  sound(A) {
+    const N = A.midi;
+    // أورج/كورال هادي + أجراس صغيرة لما النور يعدّي
+    A.pad(0, [N(48), N(55), N(60), N(64)], 6, .03); A.pad(6, [N(45), N(52), N(57), N(64)], 6, .035);
+    for (let i = 0; i < 14; i++) A.pluck(1.6 + i * .34, N([79, 83, 86, 88, 91][i % 5]), .05, 2);
+    A.tone(7.0, N(76), 4, "sine", .05); A.tone(7.0, N(83), 4, "sine", .04);
+  },
+});
+</script>
+</body></html>

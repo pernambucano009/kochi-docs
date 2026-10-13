@@ -1,0 +1,106 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// قالب «أوكييو-إي» (طباعة خشب يابانية): لوحة على ورق واشي بإطار، كل لون بيتطبع من لوح خشب لوحده (مش راكب بالظبط على الخط الأسود)،
+// سما متدرجة «بوكاشي»، جبل وموج بخطوط متوازية، قارب صغير، شمس حمرا، والعنوان في خانة بختم أحمر. 1080×1920، 12 ثانية.
+const PR = M.params({
+  title: { label: "العنوان", kind: "text", role: "product", def: "طازة من البحر" },
+  sub: { label: "تحت العنوان", kind: "text", def: "سمك اليوم… على سفرتك الليلة" },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "مطعم الموجة" },
+  seal: { label: "حرف الختم", kind: "text", def: "م" },
+  sky: { label: "لون السما والمية", kind: "color", def: "#1f3f78" },
+  red: { label: "اللون الأحمر", kind: "color", def: "#c8402c" },
+});
+const W = 1080, H = 1920, DUR = 12;
+const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
+const KEY = "#1d1b1a", PAPER = "#efe3c8";
+// الألواح: كل لوح ليه إزاحة صغيرة ثابتة عن الخط الأسود
+const BLOCKS = { sky: [2, -1.5], blue: [-1.8, 2], green: [2.2, 1.5], red: [-1.5, -2], key: [0, 0] };
+
+M.reel({
+  W, H, DUR, bg: "#d9cbaa",
+  async init(M) {
+    await Promise.all([loadFont("RQ", "TY-ArefRuqaa-700.ttf", "700"), loadFont("AM", "TY-Amiri-700.ttf", "700")]);
+    const c = M.canvas(W, H); const x = c.getContext("2d");
+    const mk = () => { const k = document.createElement("canvas"); k.width = W; k.height = H; return k; };
+    // ورق واشي + ملمس خشب لكل لون (مرة واحدة)
+    const paper = mk(), p = paper.getContext("2d"), R = M.rng(2);
+    p.fillStyle = PAPER; p.fillRect(0, 0, W, H);
+    for (let i = 0; i < 2600; i++) { p.strokeStyle = `rgba(140,110,70,${.04 + R() * .08})`; p.lineWidth = .6; p.beginPath(); const fx = R() * W, fy = R() * H, a = R() * 6, l = 10 + R() * 30; p.moveTo(fx, fy); p.quadraticCurveTo(fx + Math.cos(a) * l / 2 + R() * 6, fy + Math.sin(a) * l / 2, fx + Math.cos(a) * l, fy + Math.sin(a) * l); p.stroke(); }
+    const vg = p.createRadialGradient(540, 960, 500, 540, 960, 1200); vg.addColorStop(0, "rgba(0,0,0,0)"); vg.addColorStop(1, "rgba(120,80,30,.18)"); p.fillStyle = vg; p.fillRect(0, 0, W, H);
+    const grain = mk(), g = grain.getContext("2d");
+    for (let y = 0; y < H; y += 3) { g.fillStyle = `rgba(0,0,0,${.05 + .05 * Math.sin(y * .05 + Math.sin(y * .011) * 3)})`; g.fillRect(0, y, W, 2); }
+    for (let i = 0; i < 6000; i++) { g.fillStyle = "rgba(0,0,0,.6)"; g.fillRect(R() * W, R() * H, 1.5, 1.5); }
+    // الأشكال (دوال بترسم المسار)
+    const fuji = (q) => { q.beginPath(); q.moveTo(60, 1160); q.lineTo(430, 700); q.quadraticCurveTo(470, 662, 520, 668); q.quadraticCurveTo(570, 660, 610, 700); q.lineTo(1020, 1160); q.closePath(); };
+    const snow = (q) => { q.beginPath(); q.moveTo(430, 700); q.quadraticCurveTo(470, 662, 520, 668); q.quadraticCurveTo(570, 660, 610, 700); q.lineTo(650, 745); q.lineTo(610, 760); q.lineTo(585, 735); q.lineTo(555, 770); q.lineTo(520, 740); q.lineTo(490, 772); q.lineTo(460, 738); q.lineTo(420, 760); q.lineTo(395, 745); q.closePath(); };
+    const hills = (q) => { q.beginPath(); q.moveTo(0, 1180); for (let xx = 0; xx <= W; xx += 20) q.lineTo(xx, 1100 - Math.sin(xx * .006 + 1) * 50 - Math.sin(xx * .017) * 14); q.lineTo(W, 1180); q.closePath(); };
+    return { x, paper, grain, fuji, snow, hills, lay: mk() };
+  },
+  seek(t, C, M) {
+    const { x } = C, { seg, cubic, smooth, sine } = M;
+    const tq = Math.floor(t * 12) / 12;
+    x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = "#cbbd9c"; x.fillRect(0, 0, W, H);
+    // الكاميرا: بتنزل على اللوحة زي لفّة بتتفرد + زوم خفيف
+    const z = 1.06 - .06 * sine(seg(t, 0, DUR)), pan = -90 + 90 * sine(seg(t, 0, 9));
+    x.translate(540, 960); x.scale(z, z); x.translate(-540, -960 + pan);
+    x.drawImage(C.paper, 0, 0);
+    // كل لوح بيتطبع بمسحة من فوق لتحت (البارين)
+    const L = C.lay.getContext("2d");
+    const print = (key, k, draw) => {
+      if (k <= 0) return; const [ox, oy] = BLOCKS[key];
+      L.setTransform(1, 0, 0, 1, 0, 0); L.clearRect(0, 0, W, H); L.globalCompositeOperation = "source-over"; L.save(); if (key !== "key") { L.beginPath(); L.rect(96, 136, W - 192, 1618); L.clip(); } draw(L); L.restore();
+      L.globalCompositeOperation = "destination-out"; L.globalAlpha = key === "key" ? .25 : .45; L.drawImage(C.grain, 0, 0); L.globalAlpha = 1; L.globalCompositeOperation = "source-over";
+      x.save(); if (k < 1) { x.beginPath(); x.rect(0, 0, W, H * k + 40); x.clip(); } x.globalCompositeOperation = "multiply"; x.drawImage(C.lay, ox, oy); x.restore();
+    };
+    const sky = PR.sky;
+    // سما «بوكاشي»: تدرج ممسوح بحافة متموجة
+    print("sky", cubic(seg(t, .2, 1.4)), (q) => { for (let y = 120; y < 1100; y += 4) { const a = Math.max(0, 1 - (y - 120) / 520); q.fillStyle = sky; q.globalAlpha = a * .95; q.fillRect(80, y + Math.sin(y * .1) * 0, W - 160, 4); } q.globalAlpha = 1; });
+    print("red", cubic(seg(t, 1.4, 2.2)), (q) => { q.fillStyle = PR.red; q.beginPath(); q.arc(330, 420, 110, 0, Math.PI * 2); q.fill(); });
+    print("blue", cubic(seg(t, 2.2, 3.2)), (q) => { q.fillStyle = "#6f8fb0"; C.fuji(q); q.fill(); q.fillStyle = sky; q.fillRect(80, 1170, W - 160, 600); });
+    print("green", cubic(seg(t, 3.2, 4.0)), (q) => { q.fillStyle = "#4f7a52"; C.hills(q); q.fill(); });
+    // الخط الأسود (اللوح الأساسي): حدود الجبل، الموج بخطوط متوازية، القارب
+    const kk = cubic(seg(t, 4.0, 5.2));
+    print("key", kk, (q) => {
+      q.strokeStyle = KEY; q.lineJoin = "round"; q.lineCap = "round";
+      q.lineWidth = 5; q.save(); q.beginPath(); q.moveTo(W, 0); q.lineTo(0, 0); for (let xx = 0; xx <= W; xx += 20) q.lineTo(xx, 1100 - Math.sin(xx * .006 + 1) * 50 - Math.sin(xx * .017) * 14); q.closePath(); q.clip(); C.fuji(q); q.stroke(); q.restore(); q.lineWidth = 3; C.snow(q); q.fillStyle = PAPER; q.fill(); q.stroke();
+      q.lineWidth = 4; q.save(); q.beginPath(); q.rect(96, 136, W - 192, 1618); q.clip(); q.beginPath(); for (let xx = 0; xx <= W; xx += 20) q.lineTo(xx, 1100 - Math.sin(xx * .006 + 1) * 50 - Math.sin(xx * .017) * 14); q.stroke(); q.restore();
+      q.lineWidth = 7; q.strokeRect(80, 120, W - 160, 1650); q.lineWidth = 2.5; q.strokeRect(96, 136, W - 192, 1618);
+      // موج بيتحرك: خطوط متوازية وأطراف «مخالب» ورق
+      for (let r = 0; r < 9; r++) { const y0 = 1230 + r * 58, ph = tq * 1.5 + r * .8; q.lineWidth = 3.4 - r * .15; q.beginPath(); for (let xx = 96; xx <= W - 96; xx += 10) q.lineTo(xx, y0 + Math.sin(xx * .02 + ph) * 12 + Math.sin(xx * .05 - ph) * 4); q.stroke();
+        if (r % 3 === 0) for (let xx = 160 + (r * 53) % 140; xx < W - 140; xx += 260) { const yy = y0 + Math.sin(xx * .02 + ph) * 12; q.fillStyle = PAPER; q.beginPath(); q.ellipse(xx, yy - 3, 18, 5, 0, 0, Math.PI * 2); q.fill(); } }
+      // قارب صغير وراجل
+      const bx = 330 + Math.sin(tq * .8) * 20, by = 1300 + Math.sin(tq * 1.5) * 6;
+      q.fillStyle = "#6b4a2e"; q.beginPath(); q.moveTo(bx - 70, by); q.lineTo(bx + 80, by); q.lineTo(bx + 55, by + 22); q.lineTo(bx - 50, by + 22); q.closePath(); q.fill(); q.lineWidth = 3; q.stroke();
+      q.beginPath(); q.moveTo(bx, by); q.lineTo(bx, by - 46); q.stroke(); q.fillStyle = "#d8c08a"; q.beginPath(); q.moveTo(bx - 22, by - 44); q.lineTo(bx, by - 62); q.lineTo(bx + 22, by - 44); q.closePath(); q.fill(); q.stroke();
+      // مطر في الآخر: خطوط مايلة رفيعة
+      const rk = seg(t, 9.2, 10.2); if (rk > 0) { q.lineWidth = 1.4; q.globalAlpha = rk * .6; for (let i = 0; i < 90; i++) { const rx = 100 + (i * 97 + tq * 260) % (W - 200), ry = 140 + (i * 211 + tq * 900) % 1600; q.beginPath(); q.moveTo(rx, ry); q.lineTo(rx - 14, ry + 50); q.stroke(); } q.globalAlpha = 1; }
+    });
+    // الخانة الطويلة فيها العنوان + ختم
+    x.globalCompositeOperation = "source-over";
+    const ck = seg(t, 5.4, 6.2);
+    if (ck > 0) {
+      x.save(); x.beginPath(); x.rect(700, 170, 300 * 0 + 300, 820 * cubic(ck)); x.clip();
+      x.fillStyle = "#f3ead3"; x.fillRect(840, 180, 140, 520); x.strokeStyle = KEY; x.lineWidth = 5; x.strokeRect(840, 180, 140, 520); x.lineWidth = 2; x.strokeRect(850, 190, 120, 500);
+      x.fillStyle = "#c9b98f"; x.fillRect(850, 190, 120, 70);
+      x.save(); x.translate(910, 450); x.rotate(-Math.PI / 2); x.fillStyle = KEY; x.font = `700 ${M.fit(PR.title, "RQ", 400, 76, 36, "700")}px RQ`; x.textAlign = "center"; x.textBaseline = "middle"; x.direction = "rtl"; x.fillText(PR.title, 0, 0); x.restore();
+      x.restore();
+    }
+    const sk = seg(t, 6.6, 6.8);
+    if (sk > 0) { x.save(); x.translate(910, 760); x.scale(1.3 - .3 * sk, 1.3 - .3 * sk); x.globalAlpha = sk; x.fillStyle = PR.red; x.fillRect(-48, -48, 96, 96); x.globalCompositeOperation = "destination-out"; x.font = "700 70px RQ"; x.textAlign = "center"; x.textBaseline = "middle"; x.fillText(PR.seal, 0, 6); x.lineWidth = 3; x.strokeRect(-38, -38, 76, 76); x.restore(); }
+    // سطر تحت اللوحة + اسم البراند
+    x.setTransform(1, 0, 0, 1, 0, 0); x.globalCompositeOperation = "source-over";
+    const lk = smooth(seg(t, 7.4, 8.2)); if (lk > 0) { x.globalAlpha = lk; x.fillStyle = KEY; x.font = "700 46px AM"; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.sub, 540, 1845 - 26 * 0); x.globalAlpha = 1; }
+    const bk = smooth(seg(t, 10.4, 11.2)); if (bk > 0) { x.fillStyle = "rgba(29,27,26,.85)"; x.globalAlpha = bk; x.fillRect(340, 40, 400, 74); x.fillStyle = PAPER; x.font = "700 44px AM"; x.textAlign = "center"; x.fillText(PR.brand, 540, 92); x.globalAlpha = 1; }
+  },
+  sound(A) {
+    const N = A.midi;
+    // كوتو (بنتاتونيك ياباني) + طبلة تايكو خفيفة + صوت البارين على الورق
+    const scale = [62, 63, 67, 69, 70, 74, 75, 79];
+    for (let i = 0; i < 26; i++) { const t = .2 + i * .44 + (i % 4 === 3 ? .1 : 0); A.pluck(t, N(scale[(i * 5) % 8]), .1, 1.4); if (i % 4 === 0) A.pluck(t, N(scale[i % 8] - 12), .08, 2); }
+    [.2, 1.4, 2.2, 3.2, 4.0].forEach((t) => A.nz(t, .8, "bandpass", 900, .07, .7));
+    [2, 4, 6, 8, 10].forEach((t) => { A.tone(t, 70, .5, "sine", .25); A.nz(t, .1, "lowpass", 500, .2); });
+    A.nz(6.6, .1, "lowpass", 600, .3); A.nz(9.2, 2.6, "highpass", 4000, .05);
+  },
+});
+</script>
+</body></html>

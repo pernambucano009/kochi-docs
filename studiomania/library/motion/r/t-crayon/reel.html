@@ -1,0 +1,115 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// قالب «ألوان شمع» (كتاب أطفال): صفحة بتترسم قدامك بألوان شمع على ورق خشن: الشمع بيمسك في نتوءات الورق بس، التلوين خطوط رايحة جاية
+// بتطلع برّه الخط شوية، كل خط بيرتعش (بيترسم تاني كل شوية)، وفي الآخر لون مية أزرق للسما والشمع بيرفضه. 1080×1920، 12 ثانية.
+const PR = M.params({
+  title: { label: "العنوان", kind: "text", role: "product", def: "ارسم يومك بألوانك" },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "مكتبة ألوان" },
+  line: { label: "لون الخط", kind: "color", def: "#2d2a6e" },
+  balloon: { label: "لون البالونة", kind: "color", def: "#e5423b" },
+});
+const W = 1080, H = 1920, DUR = 12;
+const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
+const BOX = { yellow: "#f6c431", orange: "#f08a2c", green: "#5aa83c", dgreen: "#2f7a3a", brown: "#8a5a34", blue: "#3b8fd6", pink: "#f2a1b4", skin: "#f3c9a2", sky: "#7cc4ef" };
+
+M.reel({
+  W, H, DUR, bg: "#f4efe3",
+  async init(M) {
+    await Promise.all([loadFont("LZ", "SM-Lalezar.ttf"), loadFont("CH", "SM-Changa.ttf")]);
+    const c = M.canvas(W, H); const x = c.getContext("2d");
+    const mk = () => { const k = document.createElement("canvas"); k.width = W; k.height = H; return k; };
+    // الورق وملمسه (النتوءات ثابتة على الصفحة)
+    const paper = mk(), p = paper.getContext("2d"), R = M.rng(3);
+    p.fillStyle = "#f4efe3"; p.fillRect(0, 0, W, H);
+    for (let i = 0; i < 9000; i++) { p.fillStyle = `rgba(150,130,100,${R() * .07})`; p.fillRect(R() * W, R() * H, 2, 2); }
+    const tooth = mk(), q = tooth.getContext("2d");
+    for (let i = 0; i < 60000; i++) { q.fillStyle = `rgba(0,0,0,${.5 + R() * .5})`; const s = 1 + R() * 2.2; q.fillRect(R() * W, R() * H, s, s * (.6 + R() * .8)); }
+    for (let y = 0; y < H; y += 5) { q.fillStyle = "rgba(0,0,0,.12)"; q.fillRect(0, y, W, 1); }
+    return { x, paper, tooth, wax: mk(), wash: mk() };
+  },
+  seek(t, C, M) {
+    const { x } = C, { seg, smooth, cubic } = M;
+    const boil = Math.floor(t * 8);                         // الخط بيرتعش ٨ مرات في الثانية
+    const w = C.wax.getContext("2d"); w.setTransform(1, 0, 0, 1, 0, 0); w.clearRect(0, 0, W, H);
+    // خط شمع: شريط بيتهز شوية + تخانة بتتغير، بيترسم لحد k
+    const line = (pts, col, k, lw = 11, seed = 0) => {
+      if (k <= 0) return; const r = M.rng(seed * 97 + boil * 13 + 1), seg2 = []; let L = 0;
+      for (let i = 1; i < pts.length; i++) { const d = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); seg2.push(d); L += d; }
+      let lim = L * k; w.strokeStyle = col; w.lineCap = "round"; w.lineJoin = "round";
+      for (let pass = 0; pass < 2; pass++) { w.lineWidth = lw * (pass ? .55 : 1); w.globalAlpha = pass ? .7 : .95; w.beginPath(); let rem = lim;
+        for (let i = 1; i < pts.length && rem > 0; i++) { const [a, b] = [pts[i - 1], pts[i]], d = seg2[i - 1], f = Math.min(1, rem / d), n = Math.max(1, Math.ceil(d * f / 10));
+          for (let s = 0; s <= n; s++) { const u = s / n * f; w.lineTo(a[0] + (b[0] - a[0]) * u + (r() - .5) * 2.4 + pass * 2, a[1] + (b[1] - a[1]) * u + (r() - .5) * 2.4 - pass); } rem -= d; }
+        w.stroke(); } w.globalAlpha = 1;
+    };
+    // تلوين: خطوط رايحة جاية مايلة جوه الشكل، بتطلع برّه شوية
+    const fill = (path, col, k, seed = 0, gap = 13) => {
+      if (k <= 0) return; w.save(); w.beginPath(); path(w); w.lineWidth = 14; w.strokeStyle = "rgba(0,0,0,0)"; w.clip();
+      const r = M.rng(seed * 31 + boil * 7 + 3); w.strokeStyle = col; w.lineWidth = gap * .95; w.globalAlpha = .82; w.beginPath();
+      const n = Math.floor(170 * k); for (let i = 0; i < n; i++) { const y = -200 + i * gap; w.moveTo(-50 + (r() - .5) * 8, y + (r() - .5) * 4); w.lineTo(W + 50, y + 300 + (r() - .5) * 8); }
+      w.stroke(); w.restore(); w.globalAlpha = 1;
+    };
+    const P = (arr) => (q) => { q.moveTo(arr[0][0], arr[0][1]); arr.slice(1).forEach((p) => q.lineTo(p[0], p[1])); q.closePath(); };
+    const circle = (cx, cy, r, n = 40) => Array.from({ length: n + 1 }, (_, i) => [cx + Math.cos(i / n * Math.PI * 2 - 1.4) * r, cy + Math.sin(i / n * Math.PI * 2 - 1.4) * r]);
+    const ln = PR.line;
+    // الأرض والحشيش
+    const ground = [[40, 1430], [300, 1418], [560, 1432], [820, 1415], [1040, 1428]];
+    fill(P([[0, 1420], [W, 1415], [W, 1600], [0, 1600]]), BOX.green, seg(t, .4, 1.2), 1, 15);
+    line(ground, BOX.dgreen, seg(t, .1, .7), 12, 2);
+    for (let i = 0; i < 22; i++) line([[60 + i * 45, 1430], [70 + i * 45, 1395], [80 + i * 45, 1430]], BOX.dgreen, seg(t, .7 + i * .02, .9 + i * .02), 7, 3 + i);
+    // البيت: حيطة + سقف + باب + شباك (منظور طفل: السقف أكبر من البيت)
+    const house = [[220, 1420], [220, 1080], [600, 1080], [600, 1420]], roof = [[180, 1090], [410, 880], [640, 1090]];
+    fill(P(house), BOX.orange, seg(t, 1.6, 2.4), 4); fill(P(roof), BOX.balloon || "#c33", 0, 5);
+    fill(P(roof), "#c9473b", seg(t, 1.8, 2.5), 5);
+    line([...house, house[0]], ln, seg(t, 1.0, 1.7), 12, 6); line([...roof, roof[0]], ln, seg(t, 1.2, 1.8), 12, 7);
+    const door = [[350, 1420], [350, 1270], [460, 1270], [460, 1420]]; fill(P(door), BOX.brown, seg(t, 2.4, 2.8), 8); line(door, ln, seg(t, 2.2, 2.6), 10, 9);
+    const win = [[270, 1130], [340, 1130], [340, 1200], [270, 1200], [270, 1130]]; fill(P(win), BOX.yellow, seg(t, 2.6, 2.9), 10); line(win, ln, seg(t, 2.4, 2.8), 9, 11); line([[305, 1130], [305, 1200]], ln, seg(t, 2.8, 2.9), 7, 12); line([[270, 1165], [340, 1165]], ln, seg(t, 2.85, 2.95), 7, 13);
+    // الشمس بوش
+    const sc = [830, 560]; fill(P(circle(sc[0], sc[1], 120)), BOX.yellow, seg(t, 3.4, 4.0), 14);
+    line(circle(sc[0], sc[1], 120), BOX.orange, seg(t, 3.0, 3.5), 12, 15);
+    for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2; line([[sc[0] + Math.cos(a) * 150, sc[1] + Math.sin(a) * 150], [sc[0] + Math.cos(a) * 205, sc[1] + Math.sin(a) * 205]], BOX.orange, seg(t, 3.6 + i * .05, 3.75 + i * .05), 11, 16 + i); }
+    line(circle(sc[0] - 40, sc[1] - 20, 9, 10), ln, seg(t, 4.1, 4.2), 9, 27); line(circle(sc[0] + 40, sc[1] - 20, 9, 10), ln, seg(t, 4.2, 4.3), 9, 28);
+    line(Array.from({ length: 10 }, (_, i) => [sc[0] - 45 + i * 10, sc[1] + 30 + Math.sin(i / 9 * Math.PI) * 26]), ln, seg(t, 4.3, 4.5), 9, 29);
+    // الشجرة
+    const trunk = [[770, 1420], [770, 1180], [830, 1180], [830, 1420]]; fill(P(trunk), BOX.brown, seg(t, 4.8, 5.1), 30); line([...trunk, trunk[0]], ln, seg(t, 4.6, 4.9), 11, 31);
+    const crown = Array.from({ length: 41 }, (_, i) => { const a = i / 40 * Math.PI * 2; return [800 + Math.cos(a) * (150 + Math.sin(a * 5) * 18), 1080 + Math.sin(a) * (130 + Math.sin(a * 5) * 16)]; });
+    fill(P(crown), BOX.green, seg(t, 5.1, 5.7), 32); line(crown, BOX.dgreen, seg(t, 4.9, 5.4), 12, 33);
+    [[760, 1040], [850, 1010], [820, 1120], [730, 1110], [880, 1100]].forEach(([a, b], i) => { fill(P(circle(a, b, 18, 12)), "#e5423b", seg(t, 5.7 + i * .08, 5.8 + i * .08), 34 + i, 8); });
+    // الطفل بالبالونة (البالونة طالعة شوية لفوق)
+    const kx = 560, ky = 1300, bob = Math.sin(Math.floor(t * 8) / 8 * 2) * 8;
+    fill(P(circle(kx, ky - 140, 46, 24)), BOX.skin, seg(t, 6.4, 6.6), 40); line(circle(kx, ky - 140, 46, 24), ln, seg(t, 6.2, 6.5), 10, 41);
+    fill(P([[kx - 40, ky - 92], [kx + 40, ky - 92], [kx + 50, ky + 10], [kx - 50, ky + 10]]), BOX.blue, seg(t, 6.6, 6.9), 42); line([[kx - 40, ky - 92], [kx + 40, ky - 92], [kx + 50, ky + 10], [kx - 50, ky + 10], [kx - 40, ky - 92]], ln, seg(t, 6.5, 6.8), 10, 43);
+    line([[kx - 20, ky + 10], [kx - 26, ky + 110]], ln, seg(t, 6.8, 6.9), 12, 44); line([[kx + 20, ky + 10], [kx + 26, ky + 110]], ln, seg(t, 6.85, 6.95), 12, 45);
+    line([[kx - 45, ky - 70], [kx - 90, ky - 10]], ln, seg(t, 6.9, 7.0), 11, 46); line([[kx + 45, ky - 70], [kx + 100, ky - 160]], ln, seg(t, 6.95, 7.05), 11, 47);
+    w.fillStyle = ln; [[-15, -148], [15, -148]].forEach(([a, b]) => { w.beginPath(); w.arc(kx + a, ky + b, 6, 0, Math.PI * 2); w.fill(); });
+    fill(P(circle(kx - 26, ky - 126, 10, 10)), BOX.pink, seg(t, 7.0, 7.1), 48, 7); fill(P(circle(kx + 26, ky - 126, 10, 10)), BOX.pink, seg(t, 7.0, 7.1), 49, 7);
+    line([[kx + 100, ky - 160], [kx + 130, ky - 300 + bob], [kx + 140, ky - 420 + bob]], ln, seg(t, 7.1, 7.3), 5, 50);
+    const bl = Array.from({ length: 31 }, (_, i) => { const a = i / 30 * Math.PI * 2; return [kx + 140 + Math.cos(a) * 70, ky - 500 + bob + Math.sin(a) * 85]; });
+    fill(P(bl), PR.balloon, seg(t, 7.4, 7.8), 51); line(bl, ln, seg(t, 7.2, 7.5), 10, 52);
+    // سحاب
+    [[260, 470], [560, 340]].forEach(([a, b], i) => { const cl = Array.from({ length: 41 }, (_, k) => { const ang = k / 40 * Math.PI * 2; return [a + Math.cos(ang) * (110 + Math.abs(Math.sin(ang * 3)) * 30), b + Math.sin(ang) * (50 + Math.abs(Math.sin(ang * 3)) * 18)]; }); line(cl, BOX.blue, seg(t, 7.8 + i * .2, 8.2 + i * .2), 9, 60 + i); });
+    // العنوان بالشمع (حروف بخط تخين متلوّنة بالخطوط)
+    const tk = seg(t, 8.6, 9.8);
+    if (tk > 0) { w.save(); w.font = `${M.fit(PR.title, "LZ", 940, 150, 60)}px LZ`; w.textAlign = "center"; w.direction = "rtl"; w.textBaseline = "middle"; const tw = w.measureText(PR.title).width; w.beginPath(); w.rect(540 + tw / 2 + 20 - (tw + 40) * tk, 120, (tw + 40) * tk, 220); w.clip(); w.lineWidth = 10; w.strokeStyle = ln; w.lineJoin = "round"; w.strokeText(PR.title, 540, 230); w.fillStyle = BOX.orange; w.fillText(PR.title, 540, 230); w.restore(); }
+    // الشمع بيمسك في النتوءات بس: نشيل الشمع من «الحفر»
+    w.globalCompositeOperation = "destination-out"; w.globalAlpha = .55; w.drawImage(C.tooth, 0, 0); w.globalAlpha = 1; w.globalCompositeOperation = "source-over";
+    // التجميع: ورق ← لون مية (السما) ← الشمع فوقه
+    x.setTransform(1, 0, 0, 1, 0, 0); x.drawImage(C.paper, 0, 0);
+    const wk = smooth(seg(t, 9.6, 10.8));
+    if (wk > 0) { const ws = C.wash.getContext("2d"); ws.setTransform(1, 0, 0, 1, 0, 0); ws.clearRect(0, 0, W, H); const g = ws.createLinearGradient(0, 0, 0, 1400); g.addColorStop(0, BOX.sky); g.addColorStop(1, "rgba(124,196,239,.25)"); ws.fillStyle = g; ws.beginPath(); ws.rect(0, 0, W, 1400 * wk); ws.fill(); ws.globalCompositeOperation = "destination-out"; ws.drawImage(C.wax, 0, 0); ws.globalCompositeOperation = "source-over";
+      x.globalCompositeOperation = "multiply"; x.globalAlpha = .55; x.drawImage(C.wash, 0, 0); x.globalAlpha = 1; x.globalCompositeOperation = "source-over"; }
+    x.drawImage(C.wax, 0, 0);
+    const bk = smooth(seg(t, 10.6, 11.3)); if (bk > 0) { x.globalAlpha = bk; x.fillStyle = PR.line; x.font = "700 58px CH"; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.brand, 540, 1760); x.globalAlpha = 1; }
+    // ظل لمبة دافي على الصفحة
+    const vg = x.createRadialGradient(540, 900, 400, 540, 900, 1300); vg.addColorStop(0, "rgba(0,0,0,0)"); vg.addColorStop(1, "rgba(90,60,20,.22)"); x.fillStyle = vg; x.fillRect(0, 0, W, H);
+  },
+  sound(A) {
+    const N = A.midi;
+    // جلوكنشبيل وأوكوليلي لطيف + خربشة الشمع على الورق
+    const mel = [72, 76, 79, 76, 74, 77, 81, 77, 72, 76, 79, 84, 81, 79, 76, 72];
+    for (let i = 0; i < 24; i++) { const t = i * .5; A.pluck(t, N(mel[i % 16]), .07, .6); A.tone(t, N(mel[i % 16] + 12), .3, "sine", .03); if (i % 2 === 0) A.pluck(t, N([60, 55, 57, 53][Math.floor(i / 4) % 4]), .07, .8); }
+    for (let s = .1; s < 9.8; s += .07 + (Math.sin(s * 11) + 1) * .03) A.nz(s, .06, "bandpass", 1800 + Math.sin(s * 5) * 600, .045, 1.4);
+    A.nz(9.6, 1.2, "lowpass", 900, .06); A.pluck(10.6, N(84), .12, 1.2);
+  },
+});
+</script>
+</body></html>
