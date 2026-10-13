@@ -83,6 +83,12 @@ const Gallery = (() => {
     "sk-miniature": "الدنيا الحقيقية شكلها لعب صغيرة بتصوير تيلت شيفت.",
     "sk-noir": "فيلم أبيض وأسود غامض بظلال قوية ومطر وراوي.",
     "sk-lowpoly": "عالم 3D بأشكال مضلّعة بسيطة وألوان باستيل زي الألعاب.",
+    "sk-vhs": "فيديو بيتي قديم من التسعينات بألوان باهتة ودفا العيلة.",
+    "sk-chalk": "رسومات طباشير بتترسم خط خط على سبورة لشرح الأفكار.",
+    "sk-sand": "رسم بالرمل على ترابيزة منوّرة، والصور بتتحول لبعضها.",
+    "sk-foodslow": "إعلان أكل بالتصوير البطيء جدًا: رشات وقطرات وإضاءة شهية.",
+    "sk-surreal": "عالم أحلام سريالي: حاجات عملاقة وأشياء طايرة وسما ناعمة.",
+    "sk-toy": "عالم لعب بلاستيك لامعة وألوان حلويات وحركة مرحة.",
   };
   const CAT_EN = { cartoon2d: "2D Cartoon", anim3d: "3D Animation", paper: "Paper", clay: "Clay", collage: "Collage", motion: "Motion", ugc: "UGC", cinematic: "Cinematic", product: "Product", art: "Art & Print", explain: "Explainer", social: "Social Ads", retro: "Retro Games", other: "My Templates" };
 
