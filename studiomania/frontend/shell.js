@@ -269,6 +269,12 @@ async function loadMoney() {
     $("moneyBtn").hidden = false;
     $("moneyVal").textContent = `$${money.last.balance.toFixed(2)}`;
     $("moneyBtn").title = `رصيد Atlas · اتصرف النهارده $${money.last.spent_today.toFixed(2)}`;
+    // نفس الرصيد في راس الصفحات: رقم صحيح جوه دايرة، والدايرة = الرصيد من (الرصيد + صرف الأسبوع)
+    const m = money.last, c = 2 * Math.PI * 16;
+    $("stageMoney").hidden = false;
+    $("stageMoneyTxt").textContent = `$${Math.round(m.balance)}`;
+    $("stageMoney").title = $("moneyBtn").title;
+    $("stageMoneyRing").style.strokeDasharray = `${(c * Math.min(1, m.balance / Math.max(m.balance + m.spent_week, 1))).toFixed(1)} ${c.toFixed(1)}`;
     if ($("moneyDialog").open) renderMoney();
   } catch { /* من غير مفتاح أو Atlas مش بيرد: العداد بيستخبى */ }
 }
@@ -289,3 +295,13 @@ $("moneyClose").onclick = () => $("moneyDialog").close();
 $("moneyRefresh").onclick = loadMoney;
 loadMoney();
 setInterval(() => { if (!document.hidden) loadMoney(); }, 60000);
+
+// راس الصفحات: الرصيد بيفتح تفاصيله، والكالندر بيفتح المواعيد في صفحة النشر بالأسبوع
+$("stageMoney").onclick = () => $("moneyBtn").click();
+$("stageCal").onclick = () => {
+  if (shell.step !== "7") showStep("7");
+  setTimeout(() => {
+    document.querySelector('#calViews [data-v="week"]')?.click();
+    $("calViews")?.closest(".panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, 350);
+};

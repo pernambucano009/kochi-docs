@@ -279,8 +279,11 @@ function atHour(daysAhead, hour) {
 $("quickTimes").innerHTML = QUICK.map(([label], i) => `<button type="button" class="btn sm" data-q="${i}">${label}</button>`).join("");
 $("quickTimes").addEventListener("click", (e) => {
   const b = e.target.closest("[data-q]");
-  if (b) setWhen(QUICK[Number(b.dataset.q)][1]());
+  if (!b) return;
+  setWhen(QUICK[Number(b.dataset.q)][1]());
+  $("quickTimes").querySelectorAll("[data-q]").forEach((x) => x.classList.toggle("on", x === b));   // الميعاد اللي اتختار بيبان غامق
 });
+$("postWhen").addEventListener("input", () => $("quickTimes").querySelectorAll(".on").forEach((x) => x.classList.remove("on")));
 
 function resetPostForm() {
   pub.editing = null;
