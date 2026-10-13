@@ -13,26 +13,26 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 const PROCESS = ["0", "1", "2", "6", "7"]; // المشاريع ← التقطيع ← التوليد ← المونتاج ← النشر
 const STEP_INFO = {
-  0: { num: "01", title: "المشاريع" },
-  1: { num: "02", title: "التقطيع" },
-  2: { num: "03", title: "التوليد بـ Seedance" },
-  6: { num: "04", title: "المونتاج" },
-  7: { num: "05", title: "النشر على السوشيال" },
-  4: { num: "", title: "مكتبة الشخصيات" },
-  3: { num: "", title: "مكتبة التعليق الصوتي" },
-  5: { num: "", title: "مكتبة الموسيقى" },
-  8: { num: "", title: "صناعة الكاروسيل" },
-  9: { num: "", title: "المسلسلات" },
-  10: { num: "", title: "الإعلانات" },
-  11: { num: "", title: "🔬 معمل التفكيك" },
-  12: { num: "", title: "🔤 التايبوجرافي" },
-  13: { num: "", title: "🌍 الدبلجة باللهجات" },
-  14: { num: "", title: "🎬 القوالب" },
-  15: { num: "", title: "💬 الكومنتات والرسايل" },
-  "6s": { num: "", title: "🎞️ مونتاج المسلسلات" },
-  "6a": { num: "", title: "🎞️ مونتاج الإعلانات" },
-  "6f": { num: "", title: "🎞️ المونتاج" },
-  settings: { num: "", title: "الإعدادات" },
+  0: { num: "01", title: "المشاريع", en: "Projects" },
+  1: { num: "02", title: "التقطيع", en: "Cut" },
+  2: { num: "03", title: "التوليد بـ Seedance", en: "Generate" },
+  6: { num: "04", title: "المونتاج", en: "Montage" },
+  7: { num: "05", title: "النشر على السوشيال", en: "Publish" },
+  4: { num: "", title: "مكتبة الشخصيات", en: "Characters" },
+  3: { num: "", title: "مكتبة التعليق الصوتي", en: "Voices" },
+  5: { num: "", title: "مكتبة الموسيقى", en: "Music" },
+  8: { num: "", title: "صناعة الكاروسيل", en: "Carousel" },
+  9: { num: "", title: "المسلسلات", en: "Series" },
+  10: { num: "", title: "الإعلانات", en: "Ads" },
+  11: { num: "", title: "معمل التفكيك", en: "Lab" },
+  12: { num: "", title: "التايبوجرافي", en: "Typography" },
+  13: { num: "", title: "الدبلجة باللهجات", en: "Dubbing" },
+  14: { num: "", title: "القوالب", en: "Templates" },
+  15: { num: "", title: "الكومنتات والرسايل", en: "Inbox" },
+  "6s": { num: "", title: "مونتاج المسلسلات", en: "Series montage" },
+  "6a": { num: "", title: "مونتاج الإعلانات", en: "Ad montage" },
+  "6f": { num: "", title: "المونتاج", en: "Montage" },
+  settings: { num: "", title: "الإعدادات", en: "Settings" },
 };
 const NEXT_LABEL = {
   0: "التالي: التقطيع",
@@ -77,8 +77,9 @@ function openStage(step) {
   const first = shell.step === null || $("stage").hidden;
   shell.step = step;
   const info = STEP_INFO[step] || { num: "", title: "" };
-  $("stageNum").textContent = info.num;
-  $("stageNum").hidden = !info.num;
+  // فوق العنوان: اسم القسم بالإنجليزي بحروف متباعدة، ورقم الخطوة لو جوه خطوات المشروع
+  $("stageNum").textContent = [info.en, info.num ? `${Number(info.num)} / 5` : ""].filter(Boolean).join(" · ");
+  $("stageNum").hidden = !info.en && !info.num;
   $("stageTitle").textContent = info.title;
   const inFlow = PROCESS.includes(step);
   $("flowNav").hidden = !inFlow;
