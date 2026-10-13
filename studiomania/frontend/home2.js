@@ -413,19 +413,9 @@ const NH = (() => {
   const PAGES = {
     // كل نوع كارت فيه أيقونته الزجاج الـ 3D (فاتحة وغامقة)، واسمه، وسطر بيشرح هيعمل إيه
     // زي البروتوتايب: تختار نوع الشغل الأول (كارت باختيار)، وبعدين «التالي» يفتحه. دبل كليك على الكارت بيفتحه على طول
-    create: () => `<div class="nh-cr">
-      <p class="nh-cr-sub">اختار نوع الشغل، وبعدين هنمشي خطوة خطوة.</p>
-      <section class="nh-cr-card">
-        <div class="nh-cr-k"><span class="latin">CHOOSE TYPE</span> · نوع الشغل</div>
-        <div class="nh-cr-grid" role="radiogroup" aria-label="نوع الشغل">${CREATE_ALL.map((k, i) => `<button type="button" class="nh-cr-type${i === 0 ? " on" : ""}" data-pick="${k}" role="radio" aria-checked="${i === 0}">
-          <span class="nh-cr-art">${glImg(GLKEY[k] || "create")}</span>
-          <span class="nh-cr-t"><i></i>${esc(T[k].ar)}</span><span class="nh-cr-d">${esc(T[k].desc)}</span></button>`).join("")}</div>
-      </section>
-      <div class="nh-cr-foot">
-        <button type="button" class="nh-cr-back" data-crback><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 12h14M13 6l6 6-6 6"/></svg>رجوع</button>
-        <span class="nh-cr-fill"></span>
-        <button type="button" class="nh-tile nh-cr-next" data-id="${CREATE_ALL[0]}">التالي<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></button>
-      </div></div>`,
+    // 🎬 معرض القوالب: كل قالب ستايل بفيديو بيعبّر عنه (بيشتغل لما تقف عليه)، متقسّمين بالستايل
+    create: () => `<div class="nh-gal" id="nhGal"><nav class="nh-gal-chips" aria-label="الستايلات"></nav><div class="nh-gal-grid"><div class="nh-empty">بيحمّل القوالب…</div></div></div>
+`,
     // (مكتبة الموشن اتشالت من الأصول، ومكانها هيبقى في «اعمل جديد»)
     assets: () => panel(4, 6, `${head("coaches")}<div class="nh-body">${D.coaches.length} شخصية</div><div class="nh-avs">${D.coaches.slice(0, 12).map((c) => `<img src="${esc(c.image_url)}" alt="">`).join("")}</div>`, `data-id="coaches" tabindex="0" role="button"`)
       + panel(4, 6, `${head("voice")}<div class="nh-body">${D.voices} تسجيل</div>`, `data-id="voice" tabindex="0" role="button"`)
@@ -496,6 +486,7 @@ const NH = (() => {
     pGrid.innerHTML = MODS[key] ? MODS[key].html() : PAGES[key]();
     if (MODS[key]) MODS[key].mount(pGrid, pageArg);
     else pGrid.querySelectorAll(".nh-tile").forEach(addSnake);
+    if (key === "create") Gallery.mount(pGrid);
     pageArg = null;
   }
   document.getElementById("nhPClient").onclick = () => document.getElementById("nhClient").click();
