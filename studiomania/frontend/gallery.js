@@ -77,12 +77,18 @@ const Gallery = (() => {
     "sk-studio-shot": "صور استوديو احترافية للمنتج بإضاءة نضيفة.",
     "sk-product-scene": "المنتج جوه مشهد حقيقي يناسبه.",
     "sk-static-ads": "إعلانات ثابتة جاهزة للنشر من أكتر من 40 تصميم.",
+    "sk-felt": "عالم وعرايس من الصوف والفِلت بخيوط وزراير، ستوب موشن دافي.",
+    "sk-anime": "أنيمي مرسوم باليد بسما كبيرة ونور حنين ولحظات يومية.",
+    "sk-watercolor": "لوحة ألوان مية بتتفتح على الورق وبتتحرك بهدوء.",
+    "sk-miniature": "الدنيا الحقيقية شكلها لعب صغيرة بتصوير تيلت شيفت.",
+    "sk-noir": "فيلم أبيض وأسود غامض بظلال قوية ومطر وراوي.",
+    "sk-lowpoly": "عالم 3D بأشكال مضلّعة بسيطة وألوان باستيل زي الألعاب.",
   };
   const CAT_EN = { cartoon2d: "2D Cartoon", anim3d: "3D Animation", paper: "Paper", clay: "Clay", collage: "Collage", motion: "Motion", ugc: "UGC", cinematic: "Cinematic", product: "Product", art: "Art & Print", explain: "Explainer", social: "Social Ads", retro: "Retro Games", other: "My Templates" };
 
   // فيديوهات عرض جاهزة للقوالب (متعمولة مرة واحدة ومحفوظة في frontend/gallery)
   const SHOW = ["sk-clay", "sk-papercut", "sk-ugc", "sk-cinema-ad", "sk-skeleton", "sk-talking", "sk-song",
-    "sk-studio-shot", "sk-product-scene", "sk-static-ads"];
+    "sk-studio-shot", "sk-product-scene", "sk-static-ads", "sk-felt", "sk-anime", "sk-watercolor", "sk-miniature", "sk-noir", "sk-lowpoly"];
   async function load() {
     const [tpls, cats] = await Promise.all([api("/api/templates"), api("/api/style-cats").catch(() => [])]);
     const catOf = {};
