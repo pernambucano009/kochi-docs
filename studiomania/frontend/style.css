@@ -2385,3 +2385,94 @@ dialog.cal-dlg { width: min(720px, 94vw); max-height: 90vh; border: 1px solid va
   .flow span { display: inline; font-size: 11px; }
   .stage-body { padding: 8px 16px 24px; }
 }
+
+/* ============ الدارك مود للصفحات ============
+   نفس اختيار الرئيسية (اللايت والدارك). الألوان الأساسية بتتقلب من المتغيرات، وتحت قواعد اتعملت لوحدها
+   (tools/gendark_css.py) لكل حاجة خلفيتها فاتحة مكتوبة بالإيد: الرمادي بيبقى رمادي غامق، والملوّن (حالات) بيبقى نفس اللون شفاف. */
+:root[data-nh-theme="dark"] {
+  color-scheme: dark;
+  --bg: #161516; --page: #1F1E1F;
+  --glass: rgba(42, 41, 42, .72); --glass-strong: rgba(52, 51, 52, .92); --glass-line: rgba(255, 255, 255, .06);
+  --surface: #2A292A; --surface-2: #343334; --line: rgba(255, 255, 255, .1);
+  --text: #F2F1EE; --muted: #A3A29E; --accent-soft: #4A2E25; --ink: #3D3C3D; --skip: #4A494A;
+  --shadow: 0 18px 40px -22px rgba(0, 0, 0, .6);
+  --page-bg: #1F1E1F; --card: #2A292A; --field: #343334; --label: #8E8D89; --card-shadow: 0 4px 24px rgba(0, 0, 0, .28);
+}
+:root[data-nh-theme="dark"] body { background: var(--page-bg); color: var(--text); }
+:root[data-nh-theme="dark"] .stage .btn:hover:not(:disabled) { background: #3D3C3D; }
+:root[data-nh-theme="dark"] .stage .btn.ink { background: #F2F1EE; color: #1F1E1F; }
+:root[data-nh-theme="dark"] .flow button i { background: #3D3C3D; color: #A3A29E; }
+:root[data-nh-theme="dark"] .flow button + button::before { background: #3D3C3D; }
+:root[data-nh-theme="dark"] .flow button.done i, :root[data-nh-theme="dark"] .flow button.active i { background: var(--accent); color: #fff; }
+:root[data-nh-theme="dark"] .flow button.done + button::before { background: var(--accent); }
+:root[data-nh-theme="dark"] .flow button.active i { box-shadow: 0 0 0 6px var(--accent-soft), 0 8px 22px rgba(229, 97, 62, .5); }
+:root[data-nh-theme="dark"] .stage-back { color: var(--muted); }
+:root[data-nh-theme="dark"] :where(input[type=text], input[type=search], input[type=password], input[type=number], input[type=datetime-local], select, textarea) { background: var(--field) !important; color: var(--text) !important; border-color: transparent !important; }
+:root[data-nh-theme="dark"] dialog { background: #2A292A; color: var(--text); border-color: var(--line); }
+:root[data-nh-theme="dark"] .toast { background: #F2F1EE !important; color: #1F1E1F !important; }
+:root[data-nh-theme="dark"] .toast.error { background: var(--danger) !important; color: #fff !important; }
+:root[data-nh-theme="dark"] .alert { background: var(--surface-2); color: var(--text); }
+:root[data-nh-theme="dark"] .empty, :root[data-nh-theme="dark"] .muted { color: var(--muted); }
+:root[data-nh-theme="dark"] .icon-btn:hover { background: var(--surface-2); }
+:root[data-nh-theme="dark"] .tile-ic { background: var(--surface-2); }
+:root[data-nh-theme="dark"] .proj-list li { background: var(--surface-2); }
+:root[data-nh-theme="dark"] .proj-list li:hover { background: var(--surface-2); }
+:root[data-nh-theme="dark"] .steps5 i { background: var(--surface-2); }
+:root[data-nh-theme="dark"] .t-gen .dots i { background: var(--surface-2); }
+:root[data-nh-theme="dark"] .post-list li { background: var(--surface-2); }
+:root[data-nh-theme="dark"] .lib-card { background: var(--surface-2); }
+:root[data-nh-theme="dark"] .lib-card:hover { background: var(--surface-2); }
+:root[data-nh-theme="dark"] .post-extra { background: var(--surface-2); }
+:root[data-nh-theme="dark"] dialog { background: var(--surface-2); }
+:root[data-nh-theme="dark"] .car-stack i { background: var(--surface-2); }
+:root[data-nh-theme="dark"] .car-steps button.active { background: var(--surface-2); }
+:root[data-nh-theme="dark"] .car-card .img { background: var(--surface-2); }
+:root[data-nh-theme="dark"] .car-card .img .car-wait.over { background: var(--surface-2); }
+:root[data-nh-theme="dark"] .brand-logo img { background: var(--surface-2); }
+:root[data-nh-theme="dark"] .lib-card2 .lc-edit { background: var(--surface-2); }
+:root[data-nh-theme="dark"] .lib-big img { background: var(--surface-2); }
+:root[data-nh-theme="dark"] .lib-status.err { background: color-mix(in srgb, #fde2e2 16%, transparent); }
+:root[data-nh-theme="dark"] .car-versions .ver { background: var(--surface-2); }
+:root[data-nh-theme="dark"] .shot .frame .car-wait.over { background: var(--surface-2); }
+:root[data-nh-theme="dark"] .take .retry { background: var(--surface-2); }
+:root[data-nh-theme="dark"] .ser-missing { background: color-mix(in srgb, #FFF5E6 16%, transparent); }
+:root[data-nh-theme="dark"] .ser-missing .chip { background: var(--surface-2); }
+:root[data-nh-theme="dark"] .ser-banner { background: color-mix(in srgb, #EBF8FF 16%, transparent); }
+:root[data-nh-theme="dark"] .prompt-new { background: color-mix(in srgb, #F0FFF4 16%, transparent); }
+:root[data-nh-theme="dark"] .ad-status.err { background: color-mix(in srgb, #FFF0F0 16%, transparent); }
+:root[data-nh-theme="dark"] .ad-style-card img,
+:root[data-nh-theme="dark"] .ad-style-card .ph { background: var(--surface-2); }
+:root[data-nh-theme="dark"] .ad-ed-crop i { background: var(--surface-2); }
+:root[data-nh-theme="dark"] .ad-comp .img { background: var(--surface-2); }
+:root[data-nh-theme="dark"] .ad-next { border: 1px dashed var(--line, var(--line)); }
+:root[data-nh-theme="dark"] .ad-stale { background: color-mix(in srgb, #FFF7E6 16%, transparent); }
+:root[data-nh-theme="dark"] .ad-activity.busy { background: color-mix(in srgb, #EAF6F4 16%, transparent); }
+:root[data-nh-theme="dark"] .ad-activity .ad-act { background: var(--surface-2); }
+:root[data-nh-theme="dark"] .ad-activity .ad-act:hover { background: color-mix(in srgb, #D6EFEB 16%, transparent); }
+:root[data-nh-theme="dark"] .ad-fix-thumbs .th { background: var(--surface-2); }
+:root[data-nh-theme="dark"] .ad-cast-card .img { background: var(--surface-2); }
+:root[data-nh-theme="dark"] .ad-cast-card .img img { background: var(--surface-2); }
+:root[data-nh-theme="dark"] .ad-ments .ment { background: color-mix(in srgb, #EAF6F4 16%, transparent); }
+:root[data-nh-theme="dark"] .ad-ments .ment img { background: var(--surface-2); }
+:root[data-nh-theme="dark"] .ad-lip { background: color-mix(in srgb, #EAF6F4 16%, transparent); }
+:root[data-nh-theme="dark"] .lab-st.failed { background: color-mix(in srgb, #fde6e3 16%, transparent); }
+:root[data-nh-theme="dark"] .lab-st.done { background: color-mix(in srgb, #e4f5ec 16%, transparent); }
+:root[data-nh-theme="dark"] .lab-rv button.on.ok { background: color-mix(in srgb, #e4f5ec 16%, transparent); }
+:root[data-nh-theme="dark"] .lab-rv button.on.bad { background: color-mix(in srgb, #fde6e3 16%, transparent); }
+:root[data-nh-theme="dark"] .lab-st.skipped { background: color-mix(in srgb, #f3efe2 16%, transparent); }
+:root[data-nh-theme="dark"] .lab-comp.ok { background: color-mix(in srgb, #f1faf5 16%, transparent); }
+:root[data-nh-theme="dark"] .client-av img { background: var(--surface-2); }
+:root[data-nh-theme="dark"] .lab-conn.ok { background: color-mix(in srgb, #f1faf5 16%, transparent); }
+:root[data-nh-theme="dark"] .voice-sync { background: color-mix(in srgb, #fff4e0 16%, transparent); border: 1px solid var(--line); }
+:root[data-nh-theme="dark"] .btn.warn-btn { background: color-mix(in srgb, #fff4e0 16%, transparent); border-color: var(--line); }
+:root[data-nh-theme="dark"] .fm-sline.stale { border-color: var(--line); background: color-mix(in srgb, #fff8ea 16%, transparent); }
+:root[data-nh-theme="dark"] .tr-x { background: rgba(255,255,255,.06); }
+:root[data-nh-theme="dark"] .tr-opt { background: rgba(255,255,255,.06); }
+:root[data-nh-theme="dark"] .tr-opt:hover { background: rgba(255,255,255,.06); }
+:root[data-nh-theme="dark"] .tr-ic { background: rgba(255,255,255,.06); }
+:root[data-nh-theme="dark"] .db-meta input { background: var(--surface-2); }
+:root[data-nh-theme="dark"] .db-line textarea { background: var(--surface-2); }
+:root[data-nh-theme="dark"] .ts-new textarea { background: var(--surface-2); }
+:root[data-nh-theme="dark"] .ts-line textarea { background: var(--surface-2); }
+:root[data-nh-theme="dark"] .ts-sf textarea,
+:root[data-nh-theme="dark"] .ts-sf input { background: var(--surface-2); }
