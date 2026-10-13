@@ -2579,3 +2579,29 @@ dialog.cal-dlg { width: min(720px, 94vw); max-height: 90vh; border: 1px solid va
 .set-card form { display: flex; flex-direction: column; gap: 8px; }
 .set-card form .btn { align-self: flex-start; }
 @media (max-width: 1000px) { .set-grid, .set-grid.set-row2 { grid-template-columns: 1fr; } }
+
+/* ============ الأصول (من البروتوتايب): تابات بالأيقونات الزجاج بين الشخصيات والتعليق الصوتي والموسيقى ============ */
+.as-tabs { display: inline-flex; gap: 6px; background: var(--field, var(--surface-2)); border-radius: 999px; padding: 5px; margin-bottom: 18px; max-width: 100%; overflow-x: auto; }
+.as-tabs button { display: inline-flex; align-items: center; gap: 8px; border: 0; background: transparent; border-radius: 999px; padding: 6px 16px 6px 8px; font: inherit; font-size: 14px; color: var(--muted); cursor: pointer; white-space: nowrap; transition: background .15s, color .15s; }
+[dir="rtl"] .as-tabs button { padding: 6px 8px 6px 16px; }
+.as-tabs button:hover { color: var(--text); }
+.as-tabs button.on { background: var(--card, var(--surface)); color: var(--text); box-shadow: 0 2px 10px rgba(24, 23, 24, .08); }
+.as-tabs img { width: 30px; height: 30px; object-fit: contain; }
+.as-tabs .ic-d, :root[data-nh-theme="dark"] .as-tabs .ic-l { display: none; }
+:root[data-nh-theme="dark"] .as-tabs .ic-d { display: inline; }
+/* كروت الشخصيات: الصورة مربعة جوه كارت ناعم */
+:root:not(.app-kochi) .stage .coaches { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; }
+:root:not(.app-kochi) .stage .coach { background: var(--field); border-radius: 20px; padding: 8px; display: flex; flex-direction: column; }
+:root:not(.app-kochi) .stage .coach > img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 14px; background: var(--card); }
+:root:not(.app-kochi) .stage .coach .body { padding: 10px 6px 4px; display: flex; flex-direction: column; gap: 4px; }
+:root:not(.app-kochi) .stage .coach .name { font-weight: 500; font-size: 15px; }
+/* التعليق الصوتي والموسيقى: صف فيه زرار تشغيل مدوّر وخط تقدّم بالبرتقالي */
+:root:not(.app-kochi) .stage .audio-list { gap: 10px; }
+:root:not(.app-kochi) .stage .audio-list li { background: var(--field); border: 0; border-radius: 18px; padding: 12px 14px; gap: 12px; }
+:root:not(.app-kochi) .stage .audio-list li.playing { box-shadow: 0 0 0 2px var(--accent); }
+:root:not(.app-kochi) .stage .audio-list .play { width: 40px; height: 40px; padding: 0; border-radius: 50%; background: var(--ink); color: #fff; }
+:root:not(.app-kochi) .stage .audio-list li.playing .play { background: var(--accent); }
+:root:not(.app-kochi) .stage .audio-list .name { font-weight: 500; }
+:root:not(.app-kochi) .stage .audio-list .dur { background: none; font-family: var(--display); font-weight: 400; font-size: 12.5px; color: var(--muted); }
+:root:not(.app-kochi) .stage .audio-list .progress { height: 4px; background: var(--line); }
+:root:not(.app-kochi) .stage .audio-tools input, :root:not(.app-kochi) .stage .audio-tools select { border-radius: 999px; padding: 10px 16px; }
