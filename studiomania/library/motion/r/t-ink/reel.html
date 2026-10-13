@@ -1,0 +1,129 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// قالب «حبر صيني»: لوحة حبر بتترسم قدامك على ورق رز دافي: جبال بعيدة بتدوب في الضباب، صخرة وشجرة صنوبر بضربات فرشاة محمّلة،
+// مية فاضية عليها قارب صغير، طيور، والعنوان مكتوب في الفراغ، وختم أحمر واحد بس. 1080×1920، 12 ثانية.
+const PR = M.params({
+  title: { label: "العنوان", kind: "text", role: "product", def: "صفاء" },
+  line: { label: "السطر (زي البيت الشعر)", kind: "text", def: "الهدوء… بداية كل حاجة حلوة" },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "شاي الجبل" },
+  seal: { label: "حرف الختم", kind: "text", def: "ج" },
+  red: { label: "لون الختم", kind: "color", def: "#b02e22" },
+});
+const W = 1080, H = 1920, DUR = 12;
+const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
+const INK = [24, 20, 18];
+const TONE = { jiao: .96, nong: .82, zhong: .6, dan: .34, qing: .16 };
+
+function mkStroke(pts, w, prof, seed, dry = .3) {
+  const R = M.rng(seed), P = []; let L = 0;
+  for (let i = 0; i < pts.length; i++) { if (i) L += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); P.push({ x: pts[i][0], y: pts[i][1], d: L }); }
+  P.forEach((p, i) => { const a = P[Math.max(0, i - 1)], b = P[Math.min(P.length - 1, i + 1)], dx = b.x - a.x, dy = b.y - a.y, l = Math.hypot(dx, dy) || 1; p.nx = -dy / l; p.ny = dx / l; const u = p.d / (L || 1);
+    const pf = prof === "leaf" ? Math.sin(Math.PI * u) : prof === "tip" ? Math.min(1, u * 6) * (1 - u * .8) : prof === "press" ? Math.min(1, u * 10) * (1 - .5 * u) : Math.min(1, u * 8) * Math.min(1, (1 - u) * 5);
+    p.w = w * (.3 + .7 * pf) * (1 + (M.hash(seed + i * .41) - .5) * .5); });
+  const br = Array.from({ length: 4 + Math.floor(R() * 8) }, () => ({ o: (R() * 2 - 1) * .9, a: .3 + R() * .6, lw: .8 + R() * 2, end: .6 + R() * .4, dash: [10 + R() * 50, 2 + R() * 18 * (1 + dry * 3)] }));
+  return { P, L, br, dry };
+}
+function drawStroke(x, s, prog, tone, loaded = true) {
+  if (prog <= 0) return;
+  const P = s.P, lim = s.L * Math.min(1, prog), n = P.findIndex((p) => p.d > lim), N = n < 0 ? P.length : Math.max(2, n);
+  if (s.dry < .8) { x.beginPath(); for (let i = 0; i < N; i++) x.lineTo(P[i].x + P[i].nx * P[i].w / 2, P[i].y + P[i].ny * P[i].w / 2); for (let i = N - 1; i >= 0; i--) x.lineTo(P[i].x - P[i].nx * P[i].w / 2, P[i].y - P[i].ny * P[i].w / 2); x.closePath(); x.fillStyle = `rgba(${INK},${tone * (1 - s.dry * .6)})`; x.fill(); }
+  // الشعيرات: الحبر بيخلص على طول الضربة، ولو «محمّلة» جنب واحد أغمق (هو اللي بيعمل الحد)
+  s.br.forEach((b) => { const M2 = Math.min(N, Math.floor(P.length * b.end)); if (M2 < 2) return; x.beginPath(); for (let i = 0; i < M2; i++) x.lineTo(P[i].x + P[i].nx * P[i].w / 2 * b.o, P[i].y + P[i].ny * P[i].w / 2 * b.o); x.setLineDash(b.dash); x.lineWidth = b.lw; x.strokeStyle = `rgba(${INK},${tone * b.a * (loaded && b.o > .3 ? 1.3 : .8)})`; x.stroke(); x.setLineDash([]); });
+}
+const ridge = (y0, amp, seed, x0 = -100, x1 = 1180, fade = 0) => { const out = []; for (let xx = x0; xx <= x1; xx += 14) { const tp = fade ? Math.min(1, (x1 - xx) / fade) : 1; out.push([xx, y0 + (1 - tp) * 260 - tp * (Math.abs(Math.sin(xx * .006 + seed)) * amp + Math.sin(xx * .021 + seed * 2) * amp * .2 + Math.max(0, Math.sin(xx * .003 + seed * 3)) * amp * .6)]); } return out; };
+
+M.reel({
+  W, H, DUR, bg: "#f2ecde",
+  async init(M) {
+    await Promise.all([loadFont("RQ", "TY-ArefRuqaa-700.ttf", "700"), loadFont("AM", "TY-Amiri-700.ttf", "700")]);
+    const c = M.canvas(W, H); const x = c.getContext("2d");
+    const paper = document.createElement("canvas"); paper.width = W; paper.height = H * 1.15; const p = paper.getContext("2d"), R = M.rng(9);
+    p.fillStyle = "#f2ecde"; p.fillRect(0, 0, W, paper.height);
+    for (let i = 0; i < 160; i++) { const cx = R() * W, cy = R() * paper.height, r = 80 + R() * 300, g = p.createRadialGradient(cx, cy, 0, cx, cy, r); g.addColorStop(0, R() < .5 ? "rgba(150,120,80,.04)" : "rgba(255,255,250,.06)"); g.addColorStop(1, "rgba(0,0,0,0)"); p.fillStyle = g; p.fillRect(cx - r, cy - r, r * 2, r * 2); }
+    for (let i = 0; i < 3000; i++) { p.strokeStyle = `rgba(120,95,60,${.03 + R() * .07})`; p.lineWidth = .5 + R() * .6; p.beginPath(); const fx = R() * W, fy = R() * paper.height, a = R() * 6, l = 6 + R() * 26; p.moveTo(fx, fy); p.quadraticCurveTo(fx + Math.cos(a) * l / 2 + R() * 5, fy + Math.sin(a) * l / 2, fx + Math.cos(a) * l, fy + Math.sin(a) * l); p.stroke(); }
+    for (let i = 0; i < 500; i++) { p.fillStyle = `rgba(90,70,40,${R() * .12})`; p.fillRect(R() * W, R() * paper.height, 1.5, 1.5); }
+    const S = {};
+    S.far = ridge(760, 260, 1.3); S.mid = ridge(1020, 300, 4.1, -100, 860, 260);
+    S.farL = mkStroke(S.far, 7, "even", 51, .6); S.midL = mkStroke(S.mid, 10, "even", 52, .5);
+    S.tex = Array.from({ length: 26 }, (_, i) => { const h = (k) => M.hash(i * 13.7 + k * 3.1), x0 = -20 + h(1) * 640, y0 = 800 + h(2) * 260, r = () => h(3); return mkStroke(Array.from({ length: 12 }, (_, k) => [x0 + k * 4 + Math.sin(k + i) * 3, y0 + k * 14]), 4 + r() * 3, "tip", 200 + i, .7); });
+    // صخرة قريبة يمين تحت + شجرة صنوبر طالعة منها
+    S.rock = [[1180, 1500], [980, 1500], [900, 1440], [860, 1360], [900, 1300], [960, 1260], [1040, 1230], [1180, 1210]];
+    S.rockEdge = mkStroke(S.rock.slice(1, 7), 22, "press", 7, .2);
+    S.trunk = mkStroke([[1000, 1270], [970, 1150], [930, 1060], [900, 980], [880, 900], [850, 830]], 46, "press", 11, .15);
+    S.branches = [[[935, 1060], [820, 1030], [720, 1040]], [[892, 940], [1000, 900], [1080, 880]], [[870, 860], [760, 820], [680, 830]]].map((b, i) => mkStroke(b, 18, "tip", 20 + i, .3));
+    S.needles = [];
+    [[720, 1040], [790, 1030], [1080, 880], [1010, 895], [680, 830], [750, 818], [850, 830]].forEach(([nx, ny], i) => { for (let k = 0; k < 9; k++) { const a = -Math.PI * .95 + k * Math.PI / 8.5; S.needles.push({ s: mkStroke([[nx, ny], [nx + Math.cos(a) * 46, ny + Math.sin(a) * 30]], 5, "tip", 300 + i * 10 + k, .4), i }); } });
+    S.moss = Array.from({ length: 30 }, (_, i) => { const h = (k) => M.hash(i * 7.3 + k * 11.9); return [890 + h(1) * 270, 1240 + h(2) * 240, 3 + h(3) * 5]; });
+    // القارب والصياد (ضربتين وجسم باهت)
+    S.boat = mkStroke([[380, 1380], [440, 1398], [540, 1400], [610, 1382]], 16, "press", 41, .2);
+    S.man = mkStroke([[500, 1388], [496, 1350], [492, 1322]], 14, "press", 42, .1);
+    S.rod = mkStroke([[496, 1340], [580, 1250], [660, 1200]], 3, "tip", 43, .1);
+    S.streaks = Array.from({ length: 10 }, (_, i) => { const r = ((k) => () => M.hash(i * 5.1 + (k++) * 2.3))(1), y = 1300 + r() * 380, x0 = 80 + r() * 700; return mkStroke([[x0, y], [x0 + 90 + r() * 160, y + r() * 4]], 3, "tip", 700 + i, .85); });
+    return { x, paper, S };
+  },
+  seek(t, C, M) {
+    const { x, S } = C, { seg, cubic, smooth, sine } = M;
+    const tq = Math.floor(t * 12) / 12;
+    x.setTransform(1, 0, 0, 1, 0, 0);
+    // الكاميرا: بتنزل بالراحة زي لفّة بتتفرد + دخلة خفيفة
+    const pan = -260 * (1 - sine(seg(t, 0, 9))), z = 1 + .04 * sine(seg(t, 0, DUR));
+    x.translate(540, 960); x.scale(z, z); x.translate(-540, -960 + pan);
+    x.drawImage(C.paper, 0, -150);
+    x.globalCompositeOperation = "multiply";
+    // جبل بيدوب لتحت في الضباب
+    const mount = (pts, tone, k, bottom) => { if (k <= 0) return; x.save(); x.beginPath(); x.moveTo(pts[0][0], bottom); pts.forEach(([a, b]) => x.lineTo(a, b)); x.lineTo(pts[pts.length - 1][0], bottom); x.closePath(); x.clip();
+      const top = Math.min(...pts.map((q) => q[1])), g = x.createLinearGradient(0, top, 0, bottom); g.addColorStop(0, `rgba(${INK},${tone * k})`); g.addColorStop(.45, `rgba(${INK},${tone * .55 * k})`); g.addColorStop(1, `rgba(${INK},0)`); x.fillStyle = g; x.fillRect(-100, top, W + 200, bottom - top); x.restore();
+      };
+    mount(S.far, TONE.qing, cubic(seg(t, .2, 1.8)), 1080); drawStroke(x, S.farL, cubic(seg(t, .1, 1.4)), TONE.dan, false);
+    mount(S.mid, TONE.dan, cubic(seg(t, 1.4, 2.8)), 1260); drawStroke(x, S.midL, cubic(seg(t, 1.3, 2.4)), TONE.zhong);
+    S.tex.forEach((s, i) => drawStroke(x, s, cubic(seg(t, 2.2 + i * .04, 2.6 + i * .04)), TONE.zhong * .7, false));
+    // الصخرة: غسلة باهتة + حد محمّل + نقط طحالب
+    const rk = cubic(seg(t, 3.0, 3.7)); if (rk > 0) { x.beginPath(); S.rock.forEach(([a, b]) => x.lineTo(a, b)); x.closePath(); x.fillStyle = `rgba(${INK},${TONE.dan * .7 * rk})`; x.fill(); }
+    drawStroke(x, S.rockEdge, cubic(seg(t, 3.2, 3.8)), TONE.nong);
+    drawStroke(x, S.trunk, cubic(seg(t, 3.7, 4.5)), TONE.nong);
+    S.branches.forEach((b, i) => drawStroke(x, b, cubic(seg(t, 4.4 + i * .15, 4.8 + i * .15)), TONE.nong));
+    S.needles.forEach((n, i) => drawStroke(x, n.s, cubic(seg(t, 4.9 + n.i * .1 + (i % 9) * .02, 5.1 + n.i * .1 + (i % 9) * .02)), TONE.jiao));
+    S.moss.forEach(([a, b, r], i) => { const k = seg(t, 5.6 + i * .02, 5.7 + i * .02); if (k > 0) { x.fillStyle = `rgba(${INK},${TONE.jiao * k})`; x.beginPath(); x.ellipse(a, b, r, r * .7, i, 0, Math.PI * 2); x.fill(); } });
+    // المية: فاضية + خطوط ناشفة باهتة + دواير بتتفتح حوالين القارب
+    S.streaks.forEach((s, i) => drawStroke(x, s, cubic(seg(t, 5.8 + i * .05, 6.3 + i * .05)), TONE.qing * 1.5, false));
+    const bob = Math.sin(tq * 1.6) * 3;
+    x.save(); x.translate(Math.sin(t * .3) * 10, bob);
+    drawStroke(x, S.boat, cubic(seg(t, 6.0, 6.5)), TONE.nong); drawStroke(x, S.man, cubic(seg(t, 6.4, 6.7)), TONE.jiao);
+    if (t > 6.6) { x.fillStyle = `rgba(${INK},${TONE.jiao})`; x.beginPath(); x.ellipse(492, 1312, 11, 9, 0, 0, Math.PI * 2); x.fill(); x.fillStyle = `rgba(${INK},${TONE.zhong})`; x.beginPath(); x.moveTo(470, 1306); x.lineTo(492, 1290); x.lineTo(514, 1306); x.fill(); }
+    drawStroke(x, S.rod, cubic(seg(t, 6.7, 7.0)), TONE.nong);
+    x.restore();
+    for (let k = 0; k < 3; k++) { const u = ((t - 6.6) / 3 + k / 3) % 1; if (t < 6.6) break; x.strokeStyle = `rgba(${INK},${.3 * (1 - u)})`; x.lineWidth = 2; x.beginPath(); x.ellipse(495, 1404, 60 + u * 220, 8 + u * 30, 0, 0, Math.PI * 2); x.stroke(); }
+    // طيور: ٣ ضربات صغيرة بتتحرك على «اتنين»
+    if (t > 6.0) for (let k = 0; k < 4; k++) { const bx = 180 + (tq - 6) * 70 + k * 70, by = 620 + k * 26 + Math.sin(tq * 3 + k) * 10, f = Math.sin(tq * 9 + k) * 10; x.strokeStyle = `rgba(${INK},${TONE.nong})`; x.lineWidth = 3.5; x.lineCap = "round"; x.beginPath(); x.moveTo(bx - 16, by - f); x.quadraticCurveTo(bx - 6, by - 6, bx, by); x.quadraticCurveTo(bx + 6, by - 6, bx + 16, by - f); x.stroke(); }
+    // ضباب بيعدّي (لون الورق)
+    x.globalCompositeOperation = "source-over";
+    [[900, .5], [1150, .35], [1260, .45]].forEach(([y, a], i) => { const g = x.createLinearGradient(0, y - 60, 0, y + 60); g.addColorStop(0, "rgba(242,236,222,0)"); g.addColorStop(.5, `rgba(242,236,222,${a})`); g.addColorStop(1, "rgba(242,236,222,0)"); x.fillStyle = g; const off = Math.sin(t * .25 + i * 2) * 120; x.fillRect(-200 + off, y - 60, W + 400, 120); });
+    // العنوان مكتوب في الفراغ فوق شمال + سطر تحته بمربع أحمر صغير، وفي الآخر الختم
+    x.setTransform(1, 0, 0, 1, 0, 0);
+    const wr = (s, xx, y, font, size, k, tone) => { if (k <= 0) return; x.save(); x.font = `700 ${size}px ${font}`; x.direction = "rtl"; x.textAlign = "right"; const w = x.measureText(s).width; x.beginPath(); x.rect(xx - w * k - 10, y - size * 1.2, w * k + 20, size * 1.8); x.clip(); x.globalCompositeOperation = "multiply"; x.fillStyle = `rgba(${INK},${tone})`; x.fillText(s, xx, y); x.restore(); };
+    wr(PR.title, 940, 300, "RQ", 210, smooth(seg(t, 7.2, 8.4)), TONE.jiao);
+    const lk = smooth(seg(t, 8.4, 9.4)); wr(PR.line, 900, 400, "AM", 46, lk, TONE.nong);
+    if (lk > 0) { x.fillStyle = PR.red; x.globalAlpha = Math.min(1, lk * 3); x.fillRect(916, 372, 16, 16); x.globalAlpha = 1; }
+    const sk = seg(t, 9.8, 10.0);
+    if (sk > 0) {
+      x.save(); x.translate(230, 330); x.rotate(.03); x.scale(1.3 - .3 * sk, 1.3 - .3 * sk); x.globalAlpha = sk;
+      x.fillStyle = PR.red; x.beginPath(); x.moveTo(-70, -72); x.lineTo(72, -68); x.lineTo(70, 72); x.lineTo(-72, 69); x.closePath(); x.fill();
+      x.globalCompositeOperation = "destination-out"; x.font = "700 92px RQ"; x.textAlign = "center"; x.textBaseline = "middle"; x.fillText(PR.seal, 0, 6);
+      x.lineWidth = 5; x.strokeRect(-56, -56, 112, 112); const r = M.rng(3); for (let i = 0; i < 120; i++) x.fillRect(-72 + r() * 144, -72 + r() * 144, 1.5 + r() * 2, 1.5 + r() * 2);
+      x.restore();
+    }
+    const bk = smooth(seg(t, 10.3, 11.2)); wr(PR.brand, 540 + 140, 1800, "AM", 54, bk, TONE.nong);
+  },
+  sound(A) {
+    const N = A.midi;
+    // جو هادي: زيتر/جوكين (بنتاتونيك) + ناي (موجة جيبية مع رعشة) + صوت فرشاة
+    const pent = [62, 64, 67, 69, 71, 74, 76, 79];
+    for (let i = 0; i < 22; i++) { const t = .3 + i * .52 + (i % 3) * .07; A.pluck(t, N(pent[(i * 3) % 8]), .09, 1.8); }
+    [[1.2, 74, 2.5], [4.5, 71, 2.2], [7.4, 76, 3]].forEach(([t, n, d]) => { const o = A.tone(t, N(n), d, "sine", .06, .4); });
+    A.pad(0, [N(50), N(57), N(62)], 12, .018);
+    [.2, 1.4, 3.0, 3.7, 4.4, 6.0, 7.2, 8.4].forEach((t) => A.nz(t, .6, "bandpass", 1800, .04, .5));
+    A.nz(9.8, .1, "lowpass", 700, .3); A.tone(9.8, 80, .2, "sine", .2);
+  },
+});
+</script>
+</body></html>

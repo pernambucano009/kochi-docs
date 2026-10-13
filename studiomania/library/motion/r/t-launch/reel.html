@@ -1,0 +1,95 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// قالب «إطلاق منتج»: جملة واحدة متقسمة على المشاهد، شاشة المنتج «زجاج» عايمة بدخلة بطيئة، طلب بيتكتب جوه خانة الكتابة بس،
+// النتيجة بتظهر، علامات صح، مميزات، رقم بيعدّ، وفي الآخر الاسم والزرار. من غير نطّ ولا توهج. 1080×1920، 12 ثانية.
+const PR = M.params({
+  s1: { label: "الجملة (الجزء ١)", kind: "text", def: "وصفتك الجاية" },
+  s2: { label: "الجملة (الجزء ٢)", kind: "text", def: "من اللي في تلاجتك" },
+  prompt: { label: "اللي بيتكتب في الخانة", kind: "text", def: "عندي فراخ ورز وطماطم" },
+  result: { label: "النتيجة", kind: "text", def: "كبسة فراخ سريعة" },
+  steps: { label: "خطوات النتيجة (٣)", kind: "lines", def: ["حمّر الفراخ بالبهارات", "ضيف الطماطم والرز", "سيبها ٢٠ دقيقة على نار هادية"] },
+  checks: { label: "علامات الصح (٣)", kind: "lines", def: ["بمكونات عندك", "خطوات بسيطة", "سعرات محسوبة"] },
+  count: { label: "الرقم", kind: "text", def: "12000" },
+  countLabel: { label: "بعد الرقم", kind: "text", def: "وصفة جاهزة" },
+  name: { label: "اسم المنتج", kind: "text", role: "product", def: "طبختي" },
+  cta: { label: "الزرار", kind: "text", def: "نزّل التطبيق" },
+  color: { label: "اللون الأساسي", kind: "color", def: "#6a3df0" },
+  color2: { label: "اللون التاني", kind: "color", def: "#ff7a59" },
+});
+const W = 1080, H = 1920, DUR = 12;
+const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
+const esc = (v) => String(v ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const ar = (s) => String(s).replace(/\d/g, (d) => "٠١٢٣٤٥٦٧٨٩"[d]);
+const GLASS = "background:rgba(255,255,255,.58);border:2px solid rgba(255,255,255,.85);box-shadow:0 40px 90px rgba(60,30,140,.18), inset 0 1px 0 rgba(255,255,255,.9);backdrop-filter:blur(24px);";
+
+M.reel({
+  W, H, DUR, bg: "#f3f1fb",
+  async init(M) {
+    await Promise.all([loadFont("PB", "TY-PlexArabic-700.ttf", "700"), loadFont("PX", "TY-PlexArabic-400.ttf"), loadFont("LZ", "SM-Lalezar.ttf")]);
+    const st = M.stage; st.dir = "rtl"; const col = PR.color;
+    const blobs = [[col, 680], [PR.color2, 560], ["#3fc6ff", 500]].map(([c, s]) => M.el("div", "", `position:absolute;left:0;top:0;width:${s}px;height:${s}px;border-radius:50%;background:${c};opacity:.32;filter:blur(90px);`));
+    const words = (txt, top, size) => { const w = M.el("div", "", `position:absolute;left:0;top:${top}px;width:1080px;text-align:center;font:700 ${size}px/1.15 PB;color:#16112e;`); return txt.split(" ").map((s) => { const c = M.el("span", "", "display:inline-block;overflow:hidden;vertical-align:bottom;margin:0 10px;padding-bottom:16px;", "", w); const i = M.el("span", "", "display:inline-block;", esc(s), c); return i; }); };
+    const w1 = words(PR.s1, 260, 116), w2 = words(PR.s2, 400, 116);
+    // شاشة المنتج: لوح زجاج فيه خانة كتابة ونتيجة
+    const panel = M.el("div", "", `position:absolute;left:90px;top:0;width:900px;height:900px;border-radius:64px;${GLASS}padding:56px;box-sizing:border-box;`);
+    const bar = M.el("div", "", "display:flex;align-items:center;gap:18px;margin-bottom:40px;", `<div style="width:64px;height:64px;border-radius:20px;background:${col};"></div><div style="font:700 40px PB;color:#16112e;">${esc(PR.name)}</div>`, panel);
+    const input = M.el("div", "", "display:flex;align-items:center;gap:18px;height:120px;border-radius:40px;background:rgba(255,255,255,.9);border:2px solid #e6e1f7;padding:0 26px 0 30px;", "", panel);
+    const typed = M.el("div", "", "flex:1;font:400 44px PX;color:#16112e;white-space:nowrap;overflow:hidden;", "", input);
+    const caret = M.el("span", "", `display:inline-block;width:4px;height:50px;background:${col};vertical-align:middle;margin-inline-start:4px;`, "");
+    const send = M.el("div", "", `width:84px;height:84px;border-radius:50%;background:${col};display:flex;align-items:center;justify-content:center;flex:none;`, '<svg width="40" height="40" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7" stroke="#fff" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>', input);
+    const out = M.el("div", "", "margin-top:40px;border-radius:40px;background:rgba(255,255,255,.92);padding:40px 44px;", "", panel);
+    const head = M.el("div", "", "display:flex;justify-content:space-between;align-items:center;", `<div style="font:700 56px PB;color:#16112e;">${esc(PR.result)}</div><div style="font:700 32px PB;color:${col};background:#efeaff;padding:8px 22px 14px;border-radius:24px;">${ar(30)} دقيقة</div>`, out);
+    const steps = PR.steps.slice(0, 3).map((s, i) => M.el("div", "", "display:flex;align-items:center;gap:22px;margin-top:30px;", `<div style="width:56px;height:56px;border-radius:50%;background:${PR.color2};color:#fff;font:700 32px PB;display:flex;align-items:center;justify-content:center;flex:none;">${ar(i + 1)}</div><div style="font:400 40px PX;color:#3a345a;">${esc(s)}</div>`, out));
+    // علامات الصح
+    const checks = PR.checks.slice(0, 3).map((s) => M.el("div", "", `position:absolute;right:120px;top:0;display:flex;align-items:center;gap:22px;font:700 52px PB;color:#16112e;`, `<svg width="66" height="66" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#22c55e"/><path d="M7 12.5l3.2 3.2L17 9" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>${esc(s)}`));
+    // الرقم
+    const num = M.el("div", "", "position:absolute;left:0;top:0;width:1080px;text-align:center;");
+    const nBig = M.el("div", "", `font:300px/1 LZ;color:${col};`, "", num);
+    M.el("div", "", "font:700 60px PB;color:#16112e;margin-top:10px;", esc(PR.countLabel), num);
+    // الاسم والزرار
+    const end = M.el("div", "", "position:absolute;left:0;top:0;width:1080px;text-align:center;");
+    M.el("div", "", `width:200px;height:200px;border-radius:56px;background:linear-gradient(135deg,${col},${PR.color2});margin:0 auto 40px;box-shadow:0 30px 60px rgba(60,30,140,.25);`, "", end);
+    M.el("div", "", `font:${M.fit(PR.name, "LZ", 900, 200, 80)}px/1 LZ;color:#16112e;`, esc(PR.name), end);
+    const ctaB = M.el("div", "", `display:inline-block;margin-top:60px;font:700 60px PB;color:#fff;background:#16112e;padding:30px 80px 40px;border-radius:100px;`, esc(PR.cta), end);
+    return { blobs, w1, w2, panel, typed, caret, send, out, head, steps, checks, num, nBig, end, ctaB };
+  },
+  seek(t, C, M) {
+    const { seg, expo, cubic, cubicIO, X, op, clamp } = M;
+    const io = (k) => cubicIO(clamp(k));
+    C.blobs.forEach((b, i) => X(b, [-120, 620, 300][i] + Math.sin(t * .35 + i * 2) * 120, [200, 900, 1500][i] + Math.cos(t * .3 + i) * 140));
+    // الجملة: كل كلمة بتطلع من تحت قناع (مش كتابة حرف حرف)
+    const rise = (arr, t0, outT) => arr.forEach((w, i) => { const k = io(seg(t, t0 + i * .12, t0 + .5 + i * .12)), o = io(seg(t, outT, outT + .4)); w.style.transform = `translateY(${(1 - k) * 140 - o * 140}px)`; w.parentNode.parentNode.style.opacity = 1 - o; });
+    rise(C.w1, .2, 6.0); rise(C.w2, 1.4, 6.0);
+    // اللوح الزجاجي: بيطلع ويدخل بالراحة
+    const pk = io(seg(t, 2.0, 3.0)), pOut = io(seg(t, 6.0, 6.6));
+    op(C.panel, pk * (1 - pOut)); C.panel.style.transform = `translateY(${640 + (1 - pk) * 220 - pOut * 120}px) scale(${.96 + .06 * seg(t, 2, 6)})`;
+    // الكتابة جوه الخانة بس
+    const chars = [...PR.prompt], n = Math.floor(chars.length * seg(t, 3.0, 4.3));
+    C.typed.textContent = chars.slice(0, n).join(""); C.typed.appendChild(C.caret); C.caret.style.opacity = (Math.floor(t * 2.5) % 2 || t < 4.3) ? 1 : 0;
+    const press = seg(t, 4.4, 4.6); C.send.style.transform = `scale(${press > 0 && press < 1 ? .88 : 1})`;
+    const ok = io(seg(t, 4.7, 5.2)); op(C.out, ok); C.out.style.transform = `translateY(${(1 - ok) * 40}px)`;
+    C.steps.forEach((s, i) => { const k = io(seg(t, 5.0 + i * .2, 5.4 + i * .2)); op(s, k); s.style.transform = `translateX(${(1 - k) * -30}px)`; });
+    // علامات الصح بتظهر واحدة ورا التانية
+    C.checks.forEach((c, i) => { const k = io(seg(t, 6.5 + i * .3, 6.9 + i * .3)), o = io(seg(t, 8.3, 8.7)); op(c, k * (1 - o)); c.style.transform = `translateY(${700 + i * 150 + (1 - k) * 40}px)`; });
+    // الرقم بيعدّ (من غير فواصل)
+    const nk = io(seg(t, 8.6, 9.0)), no = io(seg(t, 10.0, 10.4)), target = parseInt(String(PR.count).replace(/[٠-٩]/g, (d) => "٠١٢٣٤٥٦٧٨٩".indexOf(d)).replace(/\D/g, "")) || 0;
+    op(C.num, nk * (1 - no)); X(C.num, 0, 720 + (1 - nk) * 40); C.nBig.textContent = "+" + ar(Math.round(target * cubic(seg(t, 8.6, 9.8))));
+    // الاسم والزرار
+    const ek = io(seg(t, 10.3, 10.9)); op(C.end, ek); X(C.end, 0, 620 + (1 - ek) * 40);
+    C.ctaB.style.transform = `scale(${1 + .03 * Math.max(0, Math.sin((t - 11) * 4)) * (t > 11 ? 1 : 0)})`;
+  },
+  sound(A) {
+    const N = A.midi;
+    // إلكتروني هادي وفخم: باد + بيانو + نقرات كيبورد وقت الكتابة + صح لكل علامة
+    A.pad(0, [N(48), N(55), N(62), N(67)], 6, .022); A.pad(6, [N(45), N(52), N(60), N(64)], 6, .022);
+    for (let i = 0; i < 24; i++) { const t = i * .5; if (i % 2 === 0) A.kick(t, .35); A.hat(t + .25, .05); }
+    [.2, 1.4, 2.0].forEach((t, i) => A.pluck(t, N([72, 76, 79][i]), .1, 1));
+    for (let t = 3.0; t < 4.3; t += .085) A.click(t, .08);
+    A.tone(4.45, N(84), .08, "sine", .1); A.whoosh(4.6, .4, .12);
+    [6.5, 6.8, 7.1].forEach((t, i) => { A.tone(t, N(79 + i * 2), .12, "sine", .12); A.tone(t + .06, N(86 + i * 2), .14, "sine", .08); });
+    for (let t = 8.6; t < 9.8; t += .06) A.click(t, .04);
+    A.hit(10.3, .35); A.pluck(10.3, N(72), .14, 1.6); A.pluck(10.45, N(79), .12, 1.6);
+  },
+});
+</script>
+</body></html>

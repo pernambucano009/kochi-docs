@@ -1,0 +1,91 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// قالب «عد تنازلي»: رقم بيقلب زي ساعات المطارات القديمة، والرقم محسوب من الوقت نفسه (عشان يوصل صفر بالظبط)،
+// حلقة بتخلص، آخر ٣ ثواني بتحمر وتنبض، وعند الصفر: فلاش ونور ويتكشف العرض والزرار واسم البراند. 1080×1920، 12 ثانية.
+const PR = M.params({
+  label: { label: "فوق العداد", kind: "text", def: "العرض الكبير بيبدأ بعد" },
+  from: { label: "يعد من كام", kind: "text", def: "7" },
+  reveal: { label: "جملة الكشف", kind: "text", role: "product", def: "العرض بدأ!" },
+  offer: { label: "العرض", kind: "text", def: "خصومات لحد النص على كل حاجة" },
+  cta: { label: "الزرار", kind: "text", def: "الحق دلوقتي" },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "سوق البلد" },
+  color: { label: "اللون الأساسي", kind: "color", def: "#5b2bff" },
+  hot: { label: "لون آخر ثواني", kind: "color", def: "#ff2d55" },
+});
+const W = 1080, H = 1920, DUR = 12, T0 = .6;
+const FROM = Math.max(3, Math.min(9, parseInt(String(PR.from).replace(/[٠-٩]/g, (d) => "٠١٢٣٤٥٦٧٨٩".indexOf(d))) || 7)), TZ = T0 + FROM;
+const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
+const esc = (v) => String(v ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const ar = (n) => String(n).replace(/\d/g, (d) => "٠١٢٣٤٥٦٧٨٩"[d]);
+
+M.reel({
+  W, H, DUR, bg: "#0c0820",
+  async init(M) {
+    await Promise.all([loadFont("LZ", "SM-Lalezar.ttf"), loadFont("CH", "SM-Changa.ttf")]);
+    const st = M.stage; st.dir = "rtl";
+    const cv = M.canvas(W, H); const x = cv.getContext("2d");
+    const label = M.el("div", "", "position:absolute;left:0;top:330px;width:1080px;text-align:center;font:700 64px CH;color:#fff;");
+    label.textContent = PR.label;
+    // كارت القلب: نصين ثابتين + نصين بيقلبوا
+    const CW = 560, CH2 = 700, box = M.el("div", "", `position:absolute;left:${540 - CW / 2}px;top:600px;width:${CW}px;height:${CH2}px;perspective:1600px;direction:ltr;`);
+    const half = (top, cls) => { const h = M.el("div", "", `position:absolute;left:0;width:${CW}px;height:${CH2 / 2}px;top:${top ? 0 : CH2 / 2}px;overflow:hidden;background:linear-gradient(${top ? "#2b2450,#221c42" : "#1d1838,#17132e"});border-radius:${top ? "40px 40px 0 0" : "0 0 40px 40px"};transform-origin:50% ${top ? "100%" : "0%"};backface-visibility:hidden;`, "", box); const n = M.el("div", "", `position:absolute;left:0;width:${CW}px;height:${CH2}px;top:${top ? 0 : -CH2 / 2}px;display:flex;align-items:center;justify-content:center;font:560px/1 LZ;color:#fff;padding-top:60px;box-sizing:border-box;`, "", h); return { h, n }; };
+    const sT = half(true), sB = half(false), fT = half(true), fB = half(false);
+    M.el("div", "", `position:absolute;left:-6px;right:-6px;top:${CH2 / 2 - 3}px;height:6px;background:#0c0820;z-index:5;`, "", box);
+    [-1, 1].forEach((s) => M.el("div", "", `position:absolute;${s < 0 ? "left:-14px" : "right:-14px"};top:${CH2 / 2 - 30}px;width:28px;height:60px;border-radius:8px;background:#3a3168;z-index:6;`, "", box));
+    // الكشف
+    const rev = M.el("div", "", "position:absolute;left:0;top:0;width:1080px;text-align:center;");
+    const big = M.el("div", "", `font:${M.fit(PR.reveal, "LZ", 980, 230, 90)}px/1.05 LZ;color:#fff;text-shadow:0 14px 0 rgba(0,0,0,.25);`, esc(PR.reveal), rev);
+    const off = M.el("div", "", `display:inline-block;margin-top:40px;font:700 ${M.fit(PR.offer, "CH", 880, 64, 34, "700")}px CH;color:#0c0820;background:#ffe14a;padding:14px 40px 22px;border-radius:24px;transform:rotate(-2deg);`, esc(PR.offer), rev);
+    const cta = M.el("div", "", "position:absolute;left:0;top:0;width:1080px;text-align:center;", `<span style="display:inline-block;font:92px/1 LZ;color:${PR.color};background:#fff;padding:34px 90px 44px;border-radius:110px;box-shadow:0 18px 0 rgba(0,0,0,.25);">${esc(PR.cta)}</span>`);
+    const brand = M.el("div", "", "position:absolute;left:0;top:0;width:1080px;text-align:center;font:700 46px CH;color:rgba(255,255,255,.9);", esc(PR.brand));
+    return { x, label, box, sT, sB, fT, fB, rev, big, off, cta, brand };
+  },
+  seek(t, C, M) {
+    const { x } = C, { seg, springO, expo, cubic, clamp, X, op } = M;
+    // الرقم من الوقت مباشرة: اللي باقي = FROM − (t − T0)
+    const el = t - T0, v = Math.max(0, Math.ceil(FROM - el)), prev = Math.min(FROM, v + 1), ph = el - Math.floor(el);
+    const hot = v <= 3 && t < TZ, k3 = hot ? Math.exp(-6 * ph) : 0;
+    const base = hot ? PR.hot : PR.color;
+    // الخلفية + شعاع + حلقة الوقت
+    x.setTransform(1, 0, 0, 1, 0, 0);
+    const bg = x.createRadialGradient(540, 950, 100, 540, 950, 1300); bg.addColorStop(0, base); bg.addColorStop(1, "#0c0820"); x.fillStyle = bg; x.globalAlpha = 1; x.fillRect(0, 0, W, H);
+    const flash = t >= TZ ? Math.exp(-5 * (t - TZ)) : 0;
+    x.save(); x.translate(540, 950); x.rotate(t * .1); x.fillStyle = `rgba(255,255,255,${.05 + .25 * flash})`; for (let i = 0; i < 16; i++) { x.rotate(Math.PI / 8); x.beginPath(); x.moveTo(0, 0); x.lineTo(-70, -1600); x.lineTo(70, -1600); x.fill(); } x.restore();
+    if (t < TZ + .2) { const rem = clamp(1 - el / FROM); x.lineWidth = 22; x.strokeStyle = "rgba(255,255,255,.12)"; x.beginPath(); x.arc(540, 950, 470, 0, Math.PI * 2); x.stroke(); x.strokeStyle = "#ffe14a"; x.lineCap = "round"; x.beginPath(); x.arc(540, 950, 470, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * rem); x.stroke();
+      for (let i = 0; i < 60; i++) { const a = i / 60 * Math.PI * 2; x.fillStyle = i % 5 ? "rgba(255,255,255,.25)" : "rgba(255,255,255,.7)"; x.fillRect(540 + Math.cos(a) * 520 - 2, 950 + Math.sin(a) * 520 - 2, 4, i % 5 ? 4 : 12); } }
+    if (flash > 0) { x.fillStyle = `rgba(255,255,255,${flash})`; x.fillRect(0, 0, W, H); }
+    // كارت القلب: النص اللي فوق بيقع لتحت ويكشف الرقم الجديد
+    const showCard = t < TZ + .15;
+    op(C.box, showCard ? 1 : 0); op(C.label, t < TZ ? expo(seg(t, 0, .5)) : 0);
+    const sc = (showCard ? .9 + .1 * expo(seg(t, 0, .5)) : 1) * (1 + .06 * k3), shake = hot ? Math.sin(t * 90) * 10 * k3 : 0;
+    C.box.style.transform = `translate(${shake}px,0) scale(${sc})`;
+    const fl = clamp(ph / .35), flipping = el > 0 && el < FROM + .01 && fl < 1;
+    C.sT.n.textContent = ar(v); C.sB.n.textContent = ar(flipping ? prev : v);
+    C.fT.n.textContent = ar(prev); C.fB.n.textContent = ar(v);
+    const a1 = fl < .5 ? fl * 2 : 1, a2 = fl < .5 ? 0 : (fl - .5) * 2;
+    op(C.fT.h, flipping && fl < .5 ? 1 : 0); C.fT.h.style.transform = `rotateX(${-90 * a1}deg)`;
+    op(C.fB.h, flipping && fl >= .5 ? 1 : 0); C.fB.h.style.transform = `rotateX(${90 - 90 * a2}deg)`;
+    [C.sT.n, C.sB.n, C.fT.n, C.fB.n].forEach((n) => (n.style.color = hot ? "#ffd0da" : "#fff"));
+    // الكشف بعد الصفر
+    const rk = t > TZ ? springO(t - TZ, 13, .5) : 0;
+    op(C.rev, rk > 0 ? 1 : 0); X(C.rev, 0, 520, rk);
+    C.off.style.opacity = expo(seg(t, TZ + .5, TZ + .9));
+    const ck = t > TZ + 1 ? springO(t - TZ - 1, 13, .5) : 0, pulse = 1 + .05 * Math.max(0, Math.sin((t - TZ) * 6));
+    op(C.cta, ck > 0 ? 1 : 0); X(C.cta, 0, 1250, ck * pulse);
+    op(C.brand, expo(seg(t, TZ + 1.6, TZ + 2.2))); X(C.brand, 0, 1560);
+    // كونفيتي بعد الصفر
+    if (t > TZ) { const ct = t - TZ; for (let i = 0; i < 120; i++) { const r = M.rng(i * 13 + 5), a = r() * Math.PI * 2, sp = 700 + r() * 1300, px = 540 + Math.cos(a) * sp * ct * .55, py = 950 + Math.sin(a) * sp * ct * .55 + 800 * ct * ct; if (py > H + 40) continue; x.save(); x.translate(px, py); x.rotate(ct * (r() - .5) * 20); x.scale(1, Math.cos(ct * 9 + i)); x.fillStyle = ["#ffe14a", "#fff", "#ff2d55", "#3ff0ff"][i % 4]; x.fillRect(-10, -5, 20, 10); x.restore(); } }
+  },
+  sound(A) {
+    const N = A.midi;
+    // تكّة مع كل ثانية (بتعلى في آخر ٣)، نبض قلب، وبعد الصفر انفجار وموسيقى
+    for (let s = 0; s <= FROM; s++) { const t = T0 + s; if (s < FROM) { const last = FROM - s <= 3; A.tone(t, N(last ? 88 : 81), .09, "square", last ? .08 : .05); A.click(t + .02, .15); A.kick(t, last ? .7 : .45); } }
+    A.riser(TZ - 3, TZ, .3);
+    A.hit(TZ, .9); A.nz(TZ, 1.5, "highpass", 5000, .25); A.clap(TZ + .25, .3);
+    A.groove(124, TZ + .5, 12, { snare: true, kg: .8, hg: .1, sg: .3 });
+    for (let i = 0, t = TZ + .5; t < 12; i++, t += 60 / 124) A.bass(t, N([45, 45, 48, 50][Math.floor(i / 4) % 4]), .4, .26);
+    [76, 79, 84].forEach((n, i) => A.pluck(TZ + i * .1, N(n), .14, .8));
+  },
+});
+</script>
+</body></html>
