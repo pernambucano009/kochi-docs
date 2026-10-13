@@ -1,0 +1,130 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// قالب «مخطط هندسي» (بلوبرنت): ورقة زرقا على ترابيزة رسم، المنتج بيترسم بخطوط بيضا بترتيب الرسّام
+// (خط النص ← الحدود ← التفاصيل ← التظليل ← المقاسات ← الأرقام والملاحظات ← جدول البيانات) وختم أحمر واحد في الآخر. 12 ثانية.
+const PR = M.params({
+  title: { label: "اسم المنتج", kind: "text", role: "product", def: "زمزمية برو" },
+  sub: { label: "تحت الاسم", kind: "text", def: "مخطط رقم ٠٧ · نسخة نهائية" },
+  n1: { label: "ملاحظة ١", kind: "text", def: "غطا محكم ضد التسريب" },
+  n2: { label: "ملاحظة ٢", kind: "text", def: "ستانلس ستيل بطبقتين" },
+  n3: { label: "ملاحظة ٣", kind: "text", def: "بيفضل ساقع ٢٤ ساعة" },
+  h: { label: "الطول", kind: "text", def: "٢٨ سم" },
+  w: { label: "العرض", kind: "text", def: "٨ سم" },
+  brand: { label: "اسم البراند (الرسّام)", kind: "text", role: "brand", def: "ورشة ميزان" },
+  stamp: { label: "الختم", kind: "text", def: "معتمد" },
+  stampColor: { label: "لون الختم", kind: "color", def: "#e0343a" },
+});
+const W = 1080, H = 1920, DUR = 12, SW = 1080, SH = 1920;
+const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
+const LINE = "rgba(231,240,249,.95)";
+const pathLen = (p) => { let L = 0; const out = [[p[0][0], p[0][1], 0]]; for (let i = 1; i < p.length; i++) { L += Math.hypot(p[i][0] - p[i - 1][0], p[i][1] - p[i - 1][1]); out.push([p[i][0], p[i][1], L]); } out.L = L; return out; };
+const arc = (cx, cy, r, a0, a1, n = 10) => Array.from({ length: n + 1 }, (_, i) => { const a = a0 + (a1 - a0) * i / n; return [cx + Math.cos(a) * r, cy + Math.sin(a) * r]; });
+
+M.reel({
+  W, H, DUR, bg: "#0d1116",
+  async init(M) {
+    await Promise.all([loadFont("RQ", "TY-ArefRuqaa-700.ttf", "700"), loadFont("PX", "TY-PlexArabic-400.ttf"), loadFont("PB", "TY-PlexArabic-700.ttf", "700")]);
+    const c = M.canvas(W, H); const x = c.getContext("2d");
+    // الورقة: أزرقين بيتلخبطوا + خطوط طلا + ألياف + تنية ورقة + حواف باهتة (بتترسم مرة)
+    const sh = document.createElement("canvas"); sh.width = SW; sh.height = SH; const s = sh.getContext("2d"), R = M.rng(7);
+    s.fillStyle = "#21468a"; s.fillRect(0, 0, SW, SH);
+    for (let i = 0; i < 120; i++) { const cx = R() * SW, cy = R() * SH, r = 80 + R() * 340, g = s.createRadialGradient(cx, cy, 0, cx, cy, r); g.addColorStop(0, R() < .5 ? "rgba(42,88,166,.35)" : "rgba(18,40,90,.35)"); g.addColorStop(1, "rgba(0,0,0,0)"); s.fillStyle = g; s.fillRect(cx - r, cy - r, r * 2, r * 2); }
+    for (let i = 0; i < 30; i++) { s.fillStyle = `rgba(${R() < .5 ? "255,255,255" : "0,10,40"},${.006 + R() * .01})`; s.fillRect(0, R() * SH, SW, 4 + R() * 30); }
+    for (let i = 0; i < 1800; i++) { s.strokeStyle = `rgba(200,220,255,${R() * .06})`; s.lineWidth = .7; s.beginPath(); const fx = R() * SW, fy = R() * SH, a = R() * 6; s.moveTo(fx, fy); s.lineTo(fx + Math.cos(a) * 12, fy + Math.sin(a) * 12); s.stroke(); }
+    s.strokeStyle = "rgba(200,220,255,.07)"; s.lineWidth = 1; for (let gx = 60; gx < SW; gx += 40) { s.beginPath(); s.moveTo(gx, 0); s.lineTo(gx, SH); s.stroke(); } for (let gy = 60; gy < SH; gy += 40) { s.beginPath(); s.moveTo(0, gy); s.lineTo(SW, gy); s.stroke(); }
+    [[SW / 2, 0, SW / 2, SH], [0, SH * .52, SW, SH * .52]].forEach(([a, b, c2, d]) => { s.strokeStyle = "rgba(255,255,255,.12)"; s.lineWidth = 3; s.beginPath(); s.moveTo(a + 2, b + 2); s.lineTo(c2 + 2, d + 2); s.stroke(); s.strokeStyle = "rgba(0,10,40,.25)"; s.lineWidth = 4; s.beginPath(); s.moveTo(a - 2, b - 2); s.lineTo(c2 - 2, d - 2); s.stroke(); });
+    const eg = s.createRadialGradient(SW / 2, SH / 2, SH * .35, SW / 2, SH / 2, SH * .72); eg.addColorStop(0, "rgba(255,255,255,0)"); eg.addColorStop(1, "rgba(200,220,255,.18)"); s.fillStyle = eg; s.fillRect(0, 0, SW, SH);
+    s.strokeStyle = LINE; s.lineWidth = 3; s.strokeRect(40, 40, SW - 80, SH - 80); s.lineWidth = 1.2; s.strokeRect(54, 54, SW - 108, SH - 108);
+    // الرسمة: كل خط ليه وقت ووزن ونوع (متصل/نص/مخفي)
+    const L = [];
+    const add = (pts, t0, t1, w = 5, dash = null) => L.push({ p: pathLen(pts), t0, t1, w, dash });
+    const cx = 620;
+    add([[cx, 330], [cx, 1440]], .8, 1.4, 1.6, [34, 8, 6, 8]);
+    const out = [[cx - 85, 330], [cx + 85, 330], [cx + 85, 440], [cx + 70, 440], [cx + 70, 520], ...arc(cx + 70 + 0, 600, 80, -Math.PI / 2, 0).map(([a, b]) => [a + 0, b]), [cx + 150, 1330], ...arc(cx + 110, 1330, 40, 0, Math.PI / 2), [cx - 110, 1370], ...arc(cx - 110, 1330, 40, Math.PI / 2, Math.PI), [cx - 150, 600], ...arc(cx - 70, 600, 80, Math.PI, Math.PI * 1.5), [cx - 70, 440], [cx - 85, 440], [cx - 85, 330]];
+    add(out, 1.3, 2.7, 5);
+    for (let k = -3; k <= 3; k++) add([[cx + k * 22, 342], [cx + k * 22, 428]], 2.6 + (k + 3) * .04, 2.75 + (k + 3) * .04, 2.2);
+    add([[cx - 150, 720], [cx + 150, 720]], 2.9, 3.1, 3); add([[cx - 150, 1240], [cx + 150, 1240]], 3.0, 3.2, 3);
+    add([[cx - 132, 620], [cx - 132, 1330]], 3.1, 3.4, 2, [14, 10]); add([[cx + 132, 620], [cx + 132, 1330]], 3.15, 3.45, 2, [14, 10]);
+    for (let i = 0; i < 12; i++) { const x0 = cx - 150 + i * 26; add([[x0, 1370], [x0 + 40, 1330]], 3.5 + i * .03, 3.6 + i * .03, 1.6); }
+    // المقاسات: خطوط امتداد + خط بسهمين
+    add([[cx + 95, 330], [cx + 290, 330]], 4.0, 4.15, 1.6); add([[cx + 160, 1370], [cx + 290, 1370]], 4.05, 4.2, 1.6);
+    add([[cx + 260, 345], [cx + 260, 1355]], 4.2, 4.6, 2); add([[cx + 248, 372], [cx + 260, 345], [cx + 272, 372]], 4.55, 4.62, 2); add([[cx + 248, 1328], [cx + 260, 1355], [cx + 272, 1328]], 4.58, 4.66, 2);
+    add([[cx - 150, 1390], [cx - 150, 1490]], 4.6, 4.7, 1.6); add([[cx + 150, 1390], [cx + 150, 1490]], 4.62, 4.72, 1.6);
+    add([[cx - 138, 1465], [cx + 138, 1465]], 4.7, 5.0, 2); add([[cx - 112, 1453], [cx - 138, 1465], [cx - 112, 1477]], 4.95, 5.02, 2); add([[cx + 112, 1453], [cx + 138, 1465], [cx + 112, 1477]], 4.97, 5.05, 2);
+    // الأرقام (بالونات) وخطوط بتوصلها للأجزاء
+    const balloons = [[cx - 85, 390, 380, 300, "١", PR.n1], [cx - 150, 900, 350, 760, "٢", PR.n2], [cx - 150, 1180, 350, 1100, "٣", PR.n3]];
+    balloons.forEach(([px, py, bx, by], i) => { const T = 5.2 + i * .65; add([[px, py], [bx + 30, by + 14]], T, T + .2, 1.6); add(arc(bx, by, 30, -Math.PI / 2, Math.PI * 1.5, 30), T + .2, T + .38, 2.4); });
+    // جدول البيانات تحت
+    const tb = [90, 1560, 900, 270];
+    add([[tb[0], tb[1]], [tb[0] + tb[2], tb[1]], [tb[0] + tb[2], tb[1] + tb[3]], [tb[0], tb[1] + tb[3]], [tb[0], tb[1]]], 7.2, 7.6, 3.2);
+    add([[tb[0], tb[1] + 135], [tb[0] + tb[2], tb[1] + 135]], 7.55, 7.7, 2); add([[tb[0] + 560, tb[1]], [tb[0] + 560, tb[1] + tb[3]]], 7.6, 7.75, 2); add([[tb[0] + 280, tb[1] + 135], [tb[0] + 280, tb[1] + tb[3]]], 7.65, 7.8, 2);
+    // النصوص (بتتكتب من اليمين للشمال بسن قلم منوّر)
+    const T = [];
+    const txt = (s, x2, y2, size, t0, t1, font = "RQ", align = "right", col = LINE) => T.push({ s, x: x2, y: y2, size, t0, t1, font, align, col });
+    txt(PR.h, cx + 280, 860, 36, 4.6, 4.9, "PB", "left"); txt(PR.w, cx, 1530, 44, 5.0, 5.3, "PB", "center");
+    balloons.forEach(([, , bx, by, n, note], i) => { const T0 = 5.2 + i * .65; txt(n, bx, by + 4, 34, T0 + .3, T0 + .4, "PB", "center"); txt(note, bx - 46, by + 4, 36, T0 + .38, T0 + .7, "RQ", "right"); });
+    txt("المشروع", tb[0] + tb[2] - 24, tb[1] + 40, 26, 7.8, 7.9, "PX"); txt(PR.title, tb[0] + tb[2] - 24, tb[1] + 95, 54, 7.9, 8.3, "RQ");
+    txt("المقياس", tb[0] + 536, tb[1] + 175, 26, 8.0, 8.1, "PX"); txt("١ : ٢", tb[0] + 536, tb[1] + 225, 40, 8.1, 8.2, "PB");
+    txt("الرسّام", tb[0] + 256, tb[1] + 175, 26, 8.1, 8.2, "PX"); txt(PR.brand, tb[0] + 256, tb[1] + 228, 38, 8.2, 8.5, "RQ");
+    txt("التاريخ", tb[0] + tb[2] - 24, tb[1] + 175, 26, 8.2, 8.3, "PX"); txt("٢٠٢٦", tb[0] + tb[2] - 24, tb[1] + 228, 40, 8.3, 8.4, "PB");
+    txt(PR.title, 1000, 170, 92, 8.7, 9.4, "RQ"); txt(PR.sub, 1000, 250, 32, 9.3, 9.7, "PX");
+    T.forEach((o) => { x.font = `${o.font === "PB" || o.font === "RQ" ? "700 " : ""}${o.size}px ${o.font}`; o.w = x.measureText(o.s).width; });
+    return { x, sh, L, T, tb };
+  },
+  seek(t, C, M) {
+    const { x } = C, { seg, smooth, clamp, springO } = M;
+    const K = [[0, 620, 760, 1.5], [1.2, 620, 760, 1.35], [2.8, 620, 900, 1.2], [4.0, 640, 1000, 1.05], [5.1, 520, 900, 1.1], [7.1, 540, 1150, 1.0], [7.4, 540, 1600, 1.25], [8.55, 540, 1600, 1.25], [8.9, 600, 300, 1.25], [9.7, 600, 300, 1.25], [10.1, 700, 1680, 1.5], [10.9, 700, 1680, 1.5], [11.7, 540, 960, .94], [12, 540, 960, .94]];
+    let k = 0; while (k < K.length - 2 && t > K[k + 1][0]) k++;
+    const [ta, xa, ya, za] = K[k], [tb, xb, yb, zb] = K[k + 1], u = smooth(seg(t, ta, tb));
+    const z = 1 / (1 / za + (1 / zb - 1 / za) * u); let cx = xa + (xb - xa) * u, cy = ya + (yb - ya) * u;
+    const hw = W / (2 * z), hh = H / (2 * z); if (hw * 2 < SW) cx = clamp(cx, hw, SW - hw); if (hh * 2 < SH) cy = clamp(cy, hh, SH - hh);
+    const bumpT = 10.35, bump = t > bumpT ? Math.exp(-10 * (t - bumpT)) * Math.sin((t - bumpT) * 60) * 6 : 0;
+    const slap = 1 + .06 * (1 - springO(t, 14, .6));
+    x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = "#0d1116"; x.fillRect(0, 0, W, H);
+    x.translate(W / 2, H / 2 + bump); x.scale(z * slap, z * slap); x.translate(-cx, -cy);
+    x.shadowColor = "rgba(0,0,0,.6)"; x.shadowBlur = 50; x.shadowOffsetY = 20; x.drawImage(C.sh, 0, 0); x.shadowColor = "transparent";
+    // الخطوط: سُمك الخط على الشاشة = السُمك × الزوم^0.65 (عشان ما يتخنش في القرب)
+    const wk = Math.pow(z, .65) / z;
+    let nib = null;
+    x.lineCap = "round"; x.lineJoin = "round"; x.strokeStyle = LINE;
+    C.L.forEach((o) => {
+      const p = seg(t, o.t0, o.t1); if (p <= 0) return;
+      const lim = o.p.L * p, P = o.p; x.beginPath(); x.moveTo(P[0][0], P[0][1]); let last = P[0];
+      for (let i = 1; i < P.length; i++) { if (P[i][2] <= lim) { x.lineTo(P[i][0], P[i][1]); last = P[i]; } else { const f = (lim - P[i - 1][2]) / (P[i][2] - P[i - 1][2] || 1); last = [P[i - 1][0] + (P[i][0] - P[i - 1][0]) * f, P[i - 1][1] + (P[i][1] - P[i - 1][1]) * f]; x.lineTo(last[0], last[1]); break; } }
+      x.setLineDash(o.dash ? o.dash.map((d) => d) : []); x.lineWidth = o.w * wk * 1.6; x.stroke(); x.setLineDash([]);
+      if (p < 1) nib = last;
+    });
+    C.T.forEach((o) => {
+      const p = seg(t, o.t0, o.t1); if (p <= 0) return;
+      x.save(); x.font = `${o.font === "PB" || o.font === "RQ" ? "700 " : ""}${o.size}px ${o.font}`; x.direction = "rtl"; x.textAlign = o.align; x.textBaseline = "middle";
+      const x0 = o.align === "right" ? o.x - o.w : o.align === "center" ? o.x - o.w / 2 : o.x, x1 = x0 + o.w, edge = x1 - (o.w + 10) * p;
+      x.beginPath(); x.rect(edge, o.y - o.size, x1 - edge + 12, o.size * 2); x.clip(); x.fillStyle = o.col; x.fillText(o.s, o.x, o.y); x.restore();
+      if (p < 1) nib = [edge, o.y];
+    });
+    // سن القلم المنوّر عند آخر نقطة بتترسم
+    if (nib) { const g = x.createRadialGradient(nib[0], nib[1], 0, nib[0], nib[1], 40); g.addColorStop(0, "rgba(255,255,255,.95)"); g.addColorStop(.25, "rgba(190,220,255,.5)"); g.addColorStop(1, "rgba(190,220,255,0)"); x.fillStyle = g; x.beginPath(); x.arc(nib[0], nib[1], 40, 0, Math.PI * 2); x.fill(); }
+    // الختم: اللون الوحيد اللي مش أزرق، بينزل مرة واحدة
+    const st = seg(t, bumpT - .12, bumpT);
+    if (st > 0) {
+      const sc = 1.4 - .4 * st, [bx, by] = [C.tb[0] + 240, C.tb[1] + 28];
+      x.save(); x.translate(bx + 40, by + 40); x.rotate(-.12); x.scale(sc * .85, sc * .85); x.globalAlpha = st;
+      x.strokeStyle = PR.stampColor; x.lineWidth = 7; x.strokeRect(-150, -58, 300, 116); x.lineWidth = 2.5; x.strokeRect(-138, -46, 276, 92);
+      x.fillStyle = PR.stampColor; x.font = `700 ${M.fit(PR.stamp, "PB", 250, 68, 30, "700")}px PB`; x.textAlign = "center"; x.textBaseline = "middle"; x.direction = "rtl"; x.fillText(PR.stamp, 0, 4);
+      // خشونة الحبر في الختم
+      x.globalCompositeOperation = "destination-out"; const r = M.rng(5); for (let i = 0; i < 260; i++) { x.fillRect(-150 + r() * 300, -58 + r() * 116, 2 + r() * 3, 2 + r() * 2); }
+      x.restore();
+    }
+  },
+  sound(A) {
+    const N = A.midi;
+    A.nz(0, .25, "lowpass", 900, .45); A.tone(0, 70, .2, "sine", .25);   // الورقة بتتحط
+    // خربشة القلم على الورق
+    [[.8, 3.7], [4.0, 5.3], [5.2, 7.1], [7.2, 8.5], [8.7, 9.7]].forEach(([a, b]) => { for (let s = a; s < b; s += .06 + (Math.sin(s * 9) + 1) * .02) A.nz(s, .05, "bandpass", 4200 + Math.sin(s * 3) * 1500, .03, 2.5); });
+    A.pad(0, [N(50), N(57), N(62), N(66)], 12, .022);
+    [1.3, 4.0, 5.2, 7.2, 8.7].forEach((s, i) => A.pluck(s, N([74, 76, 79, 81, 83][i]), .07, 1.2));
+    A.hit(10.35, .6); A.nz(10.35, .15, "lowpass", 600, .4);   // الختم
+    A.pluck(11.0, N(86), .06, 1.5);
+  },
+});
+</script>
+</body></html>

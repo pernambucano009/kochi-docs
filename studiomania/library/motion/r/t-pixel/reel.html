@@ -1,0 +1,146 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// قالب «بكسل» (ألعاب زمان): كل حاجة مرسومة على شاشة صغيرة ١٨٠×٣٢٠ بكسل ومكبّرة ×٦ من غير تنعيم، ألوان محدودة،
+// البطل بيمشي للمحل، صندوق كلام بصورة البيّاع، «حصلت على…» بفانفار، قايمة اختيار بإيد بتشاور، وفي الآخر اسم البراند. 12 ثانية.
+const PR = M.params({
+  title: { label: "العنوان", kind: "text", def: "مغامرة التسوّق" },
+  line1: { label: "كلام البيّاع", kind: "text", def: "أهلاً يا بطل! عندنا عرض النهارده" },
+  item: { label: "الجايزة", kind: "text", role: "product", def: "هدية مجانية مع أول طلب" },
+  opt1: { label: "الاختيار الأول", kind: "text", def: "اطلب دلوقتي" },
+  opt2: { label: "الاختيار التاني", kind: "text", def: "شوف العروض" },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "متجر النجمة" },
+  press: { label: "السطر اللي بيرمش", kind: "text", def: "اضغط وابدأ" },
+});
+const W = 1080, H = 1920, DUR = 12, NW = 180, NH = 320, TS = 2;   // الكلام على شبكة أنعم بمرتين
+const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
+const C = { K: "#181425", D: "#262b44", B: "#3a4466", S: "#5a6988", L: "#8b9bb4", W: "#ffffff", sky: "#0099db", sky2: "#2ce8f5", G0: "#265c42", G1: "#3e8948", G2: "#63c74d", br: "#733e39", br2: "#b86f50", tan: "#e4a672", tan2: "#ead4aa", red: "#e43b44", red2: "#a22633", or: "#f77622", ye: "#feae34", ye2: "#fee761", pk: "#f6757a", pu: "#68386c", bl: "#124e89" };
+const BAYER = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]];
+const T_TYPE = [1.6, 4.4], T_CHEST = 4.8, T_GET = 5.7, T_MENU = 7.6, T_PICK = 9.0, T_END = 9.6;
+
+M.reel({
+  W, H, DUR, bg: C.K,
+  async init(M) {
+    await Promise.all([loadFont("CH", "SM-Changa.ttf"), loadFont("LZ", "SM-Lalezar.ttf")]);
+    const out = M.canvas(W, H); const o = out.getContext("2d"); o.imageSmoothingEnabled = false;
+    const mk = (w, h) => { const c = document.createElement("canvas"); c.width = w; c.height = h; return c; };
+    const art = mk(NW, NH), tl = mk(NW * TS, NH * TS);
+    return { o, art, a: art.getContext("2d"), tl, t: tl.getContext("2d", { willReadFrequently: true }) };
+  },
+  seek(t, X, M) {
+    const { a } = X, { seg, clamp } = M;
+    const px = (x, y, w, h, c) => { a.fillStyle = c; a.fillRect(Math.round(x), Math.round(y), w, h); };
+    const f8 = Math.floor(t * 8), f12 = Math.floor(t * 12);
+    // كاميرا بتتحرك بالبكسل الصحيح + هزة وقت الجايزة
+    const shake = t > T_GET && t < T_GET + .35 ? [3, -2, 2, -1, 1, 0][Math.floor((t - T_GET) * 20) % 6] : 0;
+    a.setTransform(1, 0, 0, 1, shake, 0);
+    // السما: تدرج بنقط «باير» بدل تنعيم
+    for (let y = 0; y < 230; y++) for (let x = 0; x < NW; x += 1) { const k = y / 230 * 16; a.fillStyle = BAYER[y % 4][x % 4] < k ? C.sky : C.sky2; if (x % 4 === 0 || true) a.fillRect(x, y, 1, 1); }
+    // سحاب بيتحرك (بارالاكس)
+    const cloud = (cx, cy) => { [[0, 2, 22, 5], [4, 0, 12, 3], [-3, 4, 28, 3]].forEach(([dx, dy, w, h]) => px(cx + dx, cy + dy, w, h, C.W)); px(cx - 3, cy + 7, 28, 1, C.L); };
+    [[20, 40, .12], [120, 70, .2], [70, 20, .08], [160, 110, .15]].forEach(([cx, cy, s]) => cloud(((cx - Math.floor(t * 60 * s)) % 220 + 220) % 220 - 30, cy));
+    // تلال بعيدة
+    for (let x = 0; x < NW; x++) { const h = 175 + Math.round(Math.sin((x + 40) * .05) * 9 + Math.sin(x * .13) * 3); px(x, h, 1, 230 - h, C.G0); }
+    // الأرض: حشيش + طريق
+    px(0, 228, NW, NH - 228, C.G1); px(0, 228, NW, 2, C.G2);
+    for (let x = 0; x < NW; x += 6) px(x + ((x / 6) % 2) * 2, 234 + (x % 5), 1, 2, C.G2);
+    px(0, 240, NW, 14, C.tan); px(0, 240, NW, 1, C.tan2); for (let x = 3; x < NW; x += 11) px(x, 246, 4, 1, C.br2);
+    // تحت: سور خشب وورد وبركة صغيرة
+    for (let x = 2; x < NW; x += 10) { px(x, 262, 3, 14, C.br2); px(x, 262, 3, 1, C.tan2); } px(0, 266, NW, 2, C.br2); px(0, 272, NW, 2, C.br2);
+    [[14, 290], [40, 300], [70, 286], [150, 296], [168, 284], [100, 306]].forEach(([fx, fy], i) => { px(fx, fy + 2, 1, 4, C.G0); px(fx - 1, fy, 3, 3, [C.pk, C.ye, C.W][i % 3]); px(fx, fy + 1, 1, 1, C.ye2); });
+    px(112, 284, 40, 12, C.bl); px(114, 285, 36, 10, C.sky); px(118, 287, 8, 1, C.sky2); px(136, 291, 10, 1, C.sky2);
+    // شجرة
+    px(16, 196, 6, 34, C.br); px(16, 196, 2, 34, C.br2);
+    [[8, 172, 22, 18], [4, 180, 30, 14], [10, 166, 18, 8]].forEach(([x, y, w, h]) => px(x, y, w, h, C.G1)); px(10, 168, 8, 4, C.G2); px(6, 182, 6, 4, C.G2);
+    // المحل: حيطة، سقف مخطط، باب، يافطة فيها شنطة
+    px(104, 168, 70, 62, C.tan2); px(104, 168, 70, 2, C.W); px(172, 168, 2, 62, C.br2);
+    for (let i = 0; i < 9; i++) px(98 + i * 9, 150, 9, 18, i % 2 ? C.W : C.red); px(96, 166, 82, 3, C.red2);
+    px(130, 200, 18, 30, C.br); px(132, 202, 14, 28, C.br2); px(143, 214, 2, 2, C.ye);
+    px(110, 180, 14, 12, C.bl); px(111, 181, 12, 10, C.sky2); px(156, 180, 14, 12, C.bl); px(157, 181, 12, 10, C.sky2);
+    px(122, 134, 34, 14, C.K); px(123, 135, 32, 12, C.ye); px(134, 137, 10, 8, C.or); px(136, 136, 6, 2, C.K);
+    // البطل: بيمشي بـ٨ فريمات في الثانية، والكوفية الحمرا علامته
+    const hx = Math.round(-10 + 98 * seg(t, .6, 3.2)), walking = t > .6 && t < 3.2, fr = walking ? f8 % 4 : 0;
+    const arms = t > T_GET && t < T_MENU;
+    const hero = (x, y) => {
+      const leg = [0, 1, 0, -1][fr];
+      px(x + 3, y + 16, 3, 6 + (leg > 0 ? -1 : 0), C.D); px(x + 8, y + 16, 3, 6 + (leg < 0 ? -1 : 0), C.D);
+      px(x + 2 + leg, y + 21, 4, 2, C.K); px(x + 8 - leg, y + 21, 4, 2, C.K);
+      px(x + 2, y + 8, 10, 9, C.bl); px(x + 2, y + 8, 2, 9, C.sky);
+      if (arms) { px(x, y + 1, 2, 8, C.tan); px(x + 12, y + 1, 2, 8, C.tan); } else { px(x, y + 9, 2, 6, C.tan); px(x + 12, y + 9, 2, 6, C.tan); }
+      px(x + 3, y + 1, 8, 7, C.tan); px(x + 2, y, 10, 3, C.br); px(x + 2, y + 2, 2, 3, C.br); px(x + 9, y + 4, 1, 1, C.K);
+      const sw = walking ? (f8 % 2) : 0; px(x + 2, y + 7, 10, 2, C.red); px(x - 3 - sw, y + 8 + sw, 5, 2, C.red); px(x - 5 - sw, y + 9, 3, 2, C.red2);
+    };
+    hero(hx, 216 - (walking && fr % 2 ? 1 : 0));
+    // الصندوق بيظهر وبيتفتح، والجايزة بتطلع فوق راس البطل بشعاع منقّط
+    if (t > T_CHEST) {
+      const open = t > T_GET - .3;
+      px(110, 226, 14, 10, C.K); px(111, 227, 12, 8, C.br2); px(111, 230, 12, 1, C.ye); px(116, 229, 2, 3, C.ye2);
+      if (!open) { px(110, 221, 14, 6, C.K); px(111, 222, 12, 4, C.br); } else { px(108, 218, 4, 9, C.K); px(109, 219, 2, 7, C.br); }
+    }
+    if (t > T_GET && t < T_MENU + .3) {
+      const gy = 196 - Math.min(8, Math.floor((t - T_GET) * 30)), gx = hx + 1;
+      for (let r = 0; r < 8; r++) { const ang = r / 8 * Math.PI * 2 + t * 2; for (let d = 8; d < 22; d += 2) { const xx = Math.round(gx + 6 + Math.cos(ang) * d), yy = Math.round(gy + 5 + Math.sin(ang) * d); if (BAYER[yy & 3][xx & 3] < 10 - d * .4) px(xx, yy, 1, 1, C.ye2); } }
+      px(gx, gy, 12, 10, C.K); px(gx + 1, gy + 1, 10, 8, C.pk); px(gx + 5, gy + 1, 2, 8, C.ye); px(gx + 1, gy + 4, 10, 2, C.ye); px(gx + 3, gy - 2, 3, 3, C.ye); px(gx + 7, gy - 2, 3, 3, C.ye);
+    }
+    // شريط اللعبة فوق: قلوب + عملات (بتزيد مع الجايزة)
+    for (let i = 0; i < 3; i++) { const hx2 = 6 + i * 11; px(hx2 + 1, 6, 3, 2, C.red); px(hx2 + 5, 6, 3, 2, C.red); px(hx2, 7, 9, 3, C.red); px(hx2 + 1, 10, 7, 2, C.red); px(hx2 + 3, 12, 3, 1, C.red); px(hx2 + 1, 7, 2, 1, C.pk); }
+    px(150, 6, 8, 8, C.ye); px(151, 7, 6, 6, C.ye2); px(153, 8, 2, 4, C.ye);
+    X.coins = t > T_GET ? 120 + Math.min(100, Math.floor((t - T_GET) * 120)) : 120;
+    // صناديق الكلام (مرسومة في نفس الشاشة الصغيرة): إطار بطبقات + خلفية زرقا منقّطة
+    const box = (x, y, w, h) => { px(x, y, w, h, C.K); px(x + 1, y + 1, w - 2, h - 2, C.W); px(x + 2, y + 2, w - 4, h - 4, C.L); px(x + 3, y + 3, w - 6, h - 6, C.K); for (let yy = y + 4; yy < y + h - 4; yy++) for (let xx = x + 4; xx < x + w - 4; xx++) { a.fillStyle = BAYER[yy & 3][xx & 3] < 4 + (yy - y) / h * 6 ? C.B : C.bl; a.fillRect(xx, yy, 1, 1); } };
+    const slide = (k0) => Math.round(40 * (1 - Math.min(1, Math.max(0, (t - k0) / .3)) ** .4));
+    const showDlg = t > T_TYPE[0] && t < T_CHEST + .6, showGet = t > T_GET + .2 && t < T_MENU, showMenu = t > T_MENU && t < T_END;
+    if (showDlg) { const sy = slide(T_TYPE[0]); box(4, 252 + sy, 172, 62); px(138, 260 + sy, 32, 32, C.K);
+      // صورة البيّاع ٣٢×٣٢
+      const pxp = 139, py = 261 + sy; px(pxp, py, 30, 30, C.sky); px(pxp + 6, py + 6, 18, 18, C.tan); px(pxp + 4, py + 2, 22, 7, C.pu); px(pxp + 10, py + 13, 3, 3, C.K); px(pxp + 18, py + 13, 3, 3, C.K);
+      const talk = t < T_TYPE[1] && f12 % 2; px(pxp + 12, py + 19, 7, talk ? 3 : 1, C.red2); px(pxp + 4, py + 24, 22, 6, C.ye); }
+    if (showGet) { const sy = -slide(T_GET + .2); box(6, 22 + sy, 168, 34); }
+    if (showMenu) { box(60, 252 + slide(T_MENU), 116, 54); }
+    // نهاية: الشاشة بتتقفل بنقط «باير» لسواد واسم البراند بيطلع
+    const endK = seg(t, T_END, T_END + .6);
+    if (endK > 0) for (let y = 0; y < NH; y++) for (let x = 0; x < NW; x++) if (BAYER[y & 3][x & 3] < endK * 16) px(x, y, 1, 1, C.K);
+    const inK = seg(t, 0, .7);
+    if (inK < 1) for (let y = 0; y < NH; y++) for (let x = 0; x < NW; x++) if (BAYER[y & 3][x & 3] >= inK * 16) px(x, y, 1, 1, C.K);
+    // ---- الكلام: بيترسم على شبكة ٣٦٠×٦٤٠ ويتحوّل لأبيض/أسود حاد (من غير تنعيم) قبل ما يتكبّر
+    const T = X.t; T.setTransform(1, 0, 0, 1, 0, 0); T.clearRect(0, 0, NW * TS, NH * TS); T.direction = "rtl"; T.textBaseline = "middle";
+    const txt = (s, x, y, size, col, font = "CH", align = "right", outline = true) => {
+      T.font = `${font === "CH" ? "700 " : ""}${size}px ${font}`; T.textAlign = align;
+      if (outline) { T.fillStyle = C.K; for (const [dx, dy] of [[-2, 0], [2, 0], [0, -2], [0, 2], [-2, -2], [2, 2], [-2, 2], [2, -2]]) T.fillText(s, x + dx, y + dy); }
+      T.fillStyle = col; T.fillText(s, x, y);
+    };
+    if (t < T_END + .3) txt("× " + X.coins, 322, 20, 16, C.W, "CH", "left");
+    if (t < 1.6) { const k = seg(t, .3, .6); if (k > 0) { txt(PR.title, 180, 120, M.fit(PR.title, "LZ", 330, 52, 24), C.ye2, "LZ", "center"); txt("★ ★ ★", 180, 168, 20, C.W, "CH", "center"); } }
+    if (showDlg) { const sy = slide(T_TYPE[0]) * TS, n = Math.floor([...PR.line1].length * seg(t, T_TYPE[0] + .2, T_TYPE[1])); const s = [...PR.line1].slice(0, n).join("");
+      txt("البيّاع", 262, 532 + sy, 18, C.ye, "CH"); T.font = "700 22px CH"; wrap(T, s, 262, 566 + sy, 240, 30, (l, x, y) => txt(l, x, y, 22, C.W));
+      if (t > T_TYPE[1] && f8 % 2) txt("▼", 30, 610 + sy, 16, C.W, "CH", "center", false); }
+    if (showGet) { const sy = -slide(T_GET + .2) * TS; txt("حصلت على:", 332, 64 + sy, 18, C.ye, "CH"); txt(PR.item, 332, 90 + sy, M.fit(PR.item, "CH", 300, 22, 12, "700"), C.W, "CH"); }
+    if (showMenu) { const sy = slide(T_MENU) * TS, sel = t > T_PICK && f12 % 2;
+      txt(PR.opt1, 320, 532 + sy, 22, sel ? C.ye2 : C.W); txt(PR.opt2, 320, 574 + sy, 22, C.L);
+      const bob = (Math.floor(t * 4) % 2) * 2; if (!(t > T_PICK)) { T.fillStyle = C.W; T.fillRect(136 + bob, 526 + sy, 14, 8); T.fillStyle = C.K; T.fillRect(136 + bob, 534 + sy, 14, 2); } else { T.fillStyle = C.ye2; T.fillRect(136, 526 + sy, 14, 8); } }
+    if (t > T_END + .4) { const k = seg(t, T_END + .4, T_END + .8);
+      if (k > 0) txt(PR.brand, 180, 280, M.fit(PR.brand, "LZ", 320, 60, 24), C.ye2, "LZ", "center");
+      if (t > T_END + 1 && Math.floor(t * 2.5) % 2) txt(PR.press, 180, 360, 22, C.W, "CH", "center");
+      txt("© 2026", 180, 600, 14, C.L, "CH", "center", false); }
+    // تحويل الكلام لحاد
+    const id = T.getImageData(0, 0, NW * TS, NH * TS), d = id.data; for (let i = 3; i < d.length; i += 4) d[i] = d[i] >= 120 ? 255 : 0; T.putImageData(id, 0, 0);
+    // الشاشة النهائية: كل حاجة بتتكبّر من غير تنعيم
+    const o = X.o; o.imageSmoothingEnabled = false; o.drawImage(X.art, 0, 0, W, H); o.drawImage(X.tl, 0, 0, W, H);
+  },
+  sound(A) {
+    const N = A.midi, ctx = A.ctx;
+    const sq = (t0, n, d, g = .06) => A.tone(t0, N(n), d, "square", g, .002);
+    // لحن ٨-بت + باص مثلث + طبلة نويز
+    const mel = [72, 76, 79, 76, 77, 81, 84, 81, 79, 76, 72, 74, 76, 74, 72, 67];
+    for (let i = 0; i < 32; i++) { const t = .7 + i * .25; if (t > T_END) break; sq(t, mel[i % 16], .2, .045); if (i % 2 === 0) A.tone(t, N([48, 53, 55, 48][Math.floor(i / 8) % 4]), .24, "triangle", .14); if (i % 2 === 1) A.nz(t, .04, "highpass", 6000, .05); }
+    // صوت الحروف وهي بتتكتب
+    for (let t = T_TYPE[0] + .2; t < T_TYPE[1]; t += .07) sq(t, 84, .025, .03);
+    sq(T_CHEST, 60, .08, .08); sq(T_CHEST + .08, 67, .1, .08);
+    // فانفار الجايزة
+    [72, 76, 79, 84, 79, 84].forEach((n, i) => sq(T_GET + i * .12, n, i === 5 ? .6 : .11, .09)); A.nz(T_GET, .3, "lowpass", 800, .3);
+    sq(T_MENU, 79, .05, .06); [8.2, 8.6].forEach((t) => sq(t, 76, .04, .05)); sq(T_PICK, 84, .08, .09); sq(T_PICK + .1, 91, .15, .09);
+    // نهاية: نغمة «جيم أوفر» سعيدة
+    [72, 76, 79, 84].forEach((n, i) => sq(T_END + .4 + i * .18, n, .3, .07)); A.tone(T_END + 1.2, N(48), 1.2, "triangle", .15);
+  },
+});
+function wrap(T, s, x, y, maxW, lh, draw) { const words = s.split(" "); let line = "", yy = y; for (const w of words) { const test = line ? line + " " + w : w; if (T.measureText(test).width > maxW && line) { draw(line, x, yy); line = w; yy += lh; } else line = test; } if (line) draw(line, x, yy); }
+</script>
+</body></html>

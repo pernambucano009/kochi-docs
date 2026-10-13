@@ -1,0 +1,97 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// قالب «تصميم سويسري»: شبكة صارمة، حبر أسود وورق ورمادي فاتح ولون إشارة واحد بس، كل حاجة بتنزل على الإيقاع بمنحنى واحد دقيق
+// (من غير نطّ)، الدخول بالمسح مش بالبهتان، والحذف بقطعة سكينة… والدايرة الحمرا هي الاستثناء: بتتحرك حرّة برّه الشبكة. 12 ثانية.
+const PR = M.params({
+  num: { label: "الرقم الكبير", kind: "text", def: "01" },
+  l1: { label: "السطر ١", kind: "text", def: "أقل كلام." },
+  l2: { label: "السطر ٢", kind: "text", def: "أوضح فكرة." },
+  l3: { label: "السطر ٣ (اللي بيفضل)", kind: "text", def: "أقوى براند." },
+  note: { label: "ملاحظة صغيرة", kind: "text", def: "إصدار ٣ · ٢٠٢٦" },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "ستوديو أثر" },
+  tag: { label: "تحت الاسم", kind: "text", def: "تصميم هويات · القاهرة" },
+  signal: { label: "لون الإشارة", kind: "color", def: "#E30613" },
+});
+const W = 1080, H = 1920, DUR = 12, BPM = 100, B = 60 / BPM;
+const MX = 72, GUT = 24, COLS = 6, CW = (W - 2 * MX - GUT * (COLS - 1)) / COLS;   // ٦ أعمدة
+const colX = (i) => W - MX - (i + 1) * CW - i * GUT;                                 // العمود ٠ على اليمين (عربي)
+const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
+const esc = (v) => String(v ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const ar = (s) => String(s).replace(/\d/g, (d) => "٠١٢٣٤٥٦٧٨٩"[d]);
+// المنحنى الوحيد: cubic-bezier(.7,0,.2,1)
+function bez(k) { k = Math.max(0, Math.min(1, k)); const [x1, y1, x2, y2] = [.7, 0, .2, 1]; let lo = 0, hi = 1, u = k; for (let i = 0; i < 24; i++) { u = (lo + hi) / 2; const xx = 3 * (1 - u) ** 2 * u * x1 + 3 * (1 - u) * u * u * x2 + u ** 3; if (xx < k) lo = u; else hi = u; } return 3 * (1 - u) ** 2 * u * y1 + 3 * (1 - u) * u * u * y2 + u ** 3; }
+const at = (b) => b * B;                                // البيت → ثواني
+const snap = (t, b, len = .5) => bez((t - (at(b) - len * B)) / (len * B));   // بيبدأ بدري بنص بيت ويخلص على البيت
+
+M.reel({
+  W, H, DUR, bg: "#EAE9E5",
+  async init(M) {
+    await Promise.all([loadFont("PB", "TY-PlexArabic-700.ttf", "700"), loadFont("PX", "TY-PlexArabic-400.ttf"), loadFont("I9", "inter900.ttf", "900"), loadFont("PM", "TY-PlexMono-500.ttf", "500")]);
+    const st = M.stage; st.dir = "rtl";
+    const cv = M.canvas(W, H); const x = cv.getContext("2d");
+    const clip = (txt, top, size, font = "PB", col = "#111") => { const w = M.el("div", "", `position:absolute;right:${MX}px;top:${top}px;height:${size * 1.25}px;overflow:hidden;`); const i = M.el("div", "", `font:${font === "PB" ? 700 : 400} ${size}px/1.25 ${font};color:${col};white-space:nowrap;letter-spacing:-.01em;`, esc(txt), w); return { w, i }; };
+    const num = M.el("div", "", `position:absolute;right:${MX - 14}px;top:0;font:900 560px/1 I9;color:#111;letter-spacing:-.05em;direction:ltr;`, esc(PR.num));
+    const numClip = M.el("div", "", `position:absolute;left:0;right:0;top:110px;height:560px;overflow:hidden;`); numClip.appendChild(num);
+    const note = clip(PR.note, 640, 26, "PX", "#111");
+    const lines = [PR.l1, PR.l2, PR.l3].map((s, i) => clip(s, 760 + i * 150, 116));
+    const brand = clip(PR.brand, 1560, 120);
+    const tag = clip(PR.tag, 1720, 30, "PX", "#111");
+    const read = M.el("div", "", "position:absolute;left:0;top:0;font:500 20px PM;color:#111;white-space:nowrap;direction:ltr;");
+    return { x, num, note, lines, brand, tag, read };
+  },
+  seek(t, C, M) {
+    const { x } = C, { seg, clamp, X } = M;
+    x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = "#EAE9E5"; x.fillRect(0, 0, W, H);
+    // الشبكة: الأعمدة بتترسم خطيًا من فوق لتحت، كل عمود بعد التاني
+    x.strokeStyle = "#cfcdc7"; x.lineWidth = 1;
+    for (let i = 0; i < COLS; i++) { const k = seg(t, i * .12, i * .12 + 1.0); if (k <= 0) continue; [colX(i), colX(i) + CW].forEach((xx) => { x.beginPath(); x.moveTo(xx + .5, 0); x.lineTo(xx + .5, H * k); x.stroke(); }); }
+    for (let y = 120; y < H; y += 120) { const k = seg(t, .3 + y / H * .6, .9 + y / H * .6); if (k > 0) { x.strokeStyle = "#dedcd6"; x.beginPath(); x.moveTo(W - MX, y + .5); x.lineTo(W - MX - (W - 2 * MX) * k, y + .5); x.stroke(); } }
+    // الرقم الكبير بيطلع خطوة خطوة (موديول ورا موديول)
+    const steps = 4;
+    const nk = bez(seg(t, at(2), at(4)));
+    X(C.num, 0, 560 * (1 - Math.round(nk * steps) / steps));
+    // سطر الملاحظة بخط فوقه
+    const nok = snap(t, 4); X(C.note.i, 0, 40 * (1 - nok));
+    x.fillStyle = "#111"; x.fillRect(W - MX - 340 * snap(t, 3.5), 630, 340 * snap(t, 3.5), 1.5);
+    // الـ٣ سطور: كل سطر بيطلع من تحت خط القاعدة على بيت
+    C.lines.forEach((L, i) => { const k = snap(t, 5 + i); X(L.i, 0, 150 * (1 - k)); });
+    // قطعة السكينة: خط رفيع بيعدّي على السطرين الأولانيين وبعدين بيتقفلوا على النص
+    [0, 1].forEach((i) => {
+      const cutB = 13 + i * .5, ck = seg(t, at(cutB) - B * .5, at(cutB)), col = bez(seg(t, at(cutB), at(cutB) + B * .5));
+      if (ck > 0 && col < 1) { x.fillStyle = "#111"; const yy = 760 + i * 150 + 74; x.fillRect(W - MX - (W - 2 * MX) * ck, yy, (W - 2 * MX) * ck, 2); }
+      C.lines[i].w.style.transform = `scaleY(${1 - col})`;
+    });
+    // السطر التالت بيطلع لمكان الأول (على البيت)
+    const up = snap(t, 15); C.lines[2].w.style.transform = `translateY(${-300 * up}px)`;
+    // البلوكات السودا تحت: كل بلوك بيكبر بطوله وبيرسى على بيت
+    const bars = [[0, 1290, 2, 70, 8], [2, 1290, 1, 210, 8.5], [3, 1380, 3, 70, 9], [0, 1390, 1, 110, 9.5], [1, 1480, 2, 40, 10], [4, 1290, 2, 130, 10.5], [3, 1470, 1, 60, 11]];
+    const barK = (b) => snap(t, b) * (1 - bez(seg(t, at(14), at(15))));
+    bars.forEach(([c0, y0, span, h, b], i) => { const k = barK(b); if (k <= 0) return; const w = span * CW + (span - 1) * GUT, xr = colX(c0) + CW; x.fillStyle = i % 3 === 2 ? "#c4c2bc" : "#111"; x.fillRect(xr - w * k, y0, w * k + 1, h); });
+    // الاستثناء: دايرة لون الإشارة بتتحرك خطي ومن غير شبكة، بتقف شوية، وفي الآخر بترسى على الشبكة جنب الاسم
+    const p1 = seg(t, at(9), at(12)), p2 = seg(t, at(12.6), at(14.5)), land = snap(t, 17);
+    let cx = -80 + 700 * p1 + 140 * p2, cy = 1520 - 180 * p1 + 60 * Math.sin(p1 * 4) * (1 - p1);
+    const tx = colX(5) + CW / 2, ty = 1620;
+    if (t > at(16.5)) { cx = cx + (tx - cx) * land; cy = cy + (ty - cy) * land; }
+    if (t > at(9)) { x.fillStyle = PR.signal; x.beginPath(); x.arc(cx, cy, 64, 0, Math.PI * 2); x.fill(); }
+    const onGrid = land >= .999;
+    C.read.textContent = t > at(9) ? `x ${Math.round(cx)}  y ${Math.round(cy)}  ${onGrid ? "— on grid" : "— off grid"}` : "";
+    C.read.style.color = onGrid ? "#111" : PR.signal; X(C.read, Math.round(cx + 78), Math.round(cy - 10));
+    // الاسم والسطر اللي تحته
+    X(C.brand.i, 0, 150 * (1 - snap(t, 17))); X(C.tag.i, 0, 40 * (1 - snap(t, 18)));
+    x.fillStyle = "#111"; const rk = snap(t, 16.5); x.fillRect(W - MX - (W - 2 * MX) * rk, 1540, (W - 2 * MX) * rk, 3);
+    // عدّاد تقني صغير في الركن
+    x.font = "500 18px PM"; x.fillStyle = "#8a8780"; x.textAlign = "left"; x.direction = "ltr";
+    x.fillText(`${String(Math.min(20, Math.floor(t / B) + 1)).padStart(2, "0")} / 20   ·   ${COLS} col · ${Math.round(CW)} px · ${GUT} gut`, MX, 60);
+  },
+  sound(A) {
+    const N = A.midi;
+    // مينيمال: نقرة عالية على كل بيت + نغمة بيانو جافة مع كل دخول + باص ناعم
+    for (let b = 0; b < 20; b++) { A.click(at(b), b % 4 === 0 ? .12 : .06); if (b % 2 === 0) A.tone(at(b), N(b % 8 < 4 ? 45 : 43), B * 1.8, "sine", .1); }
+    [[2, 76], [4, 79], [5, 81], [6, 83], [7, 84]].forEach(([b, n]) => A.pluck(at(b), N(n), .1, .5));
+    [8, 8.5, 9, 9.5, 10, 10.5, 11].forEach((b) => A.tone(at(b), N(64), .08, "square", .025));
+    A.nz(at(13) - .1, .12, "highpass", 5000, .12); A.nz(at(13.5) - .1, .12, "highpass", 5000, .12);
+    A.pluck(at(17), N(88), .14, .9); A.tone(at(17), N(40), 2, "sine", .14);
+  },
+});
+</script>
+</body></html>

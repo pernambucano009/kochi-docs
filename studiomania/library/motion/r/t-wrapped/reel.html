@@ -1,0 +1,96 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// قالب «ملخص السنة»: شرايح سريعة بألوان صريحة (زي ملخصات آخر السنة)، كل شريحة رقم أو معلومة عن العميل، بتدخل بمسحة مايلة،
+// وأشكال بتتنطط على الإيقاع، والآخر شكر واسم البراند. 1080×1920، 12 ثانية، 128 BPM.
+const PR = M.params({
+  year: { label: "السنة", kind: "text", def: "٢٠٢٦" },
+  intro: { label: "سطر البداية", kind: "text", def: "سنتك معانا" },
+  s1a: { label: "شريحة ١ فوق", kind: "text", def: "طلبت" }, s1n: { label: "شريحة ١ الرقم", kind: "text", def: "48" }, s1b: { label: "شريحة ١ تحت", kind: "text", def: "مرة" },
+  s2a: { label: "شريحة ٢ العنوان", kind: "text", def: "أكتر حاجات حبيتها" },
+  top: { label: "شريحة ٢ القايمة (٣ سطور)", kind: "lines", def: ["لاتيه بالكراميل", "كرواسون زبدة", "موكا ساقعة"] },
+  s3a: { label: "شريحة ٣ فوق", kind: "text", def: "وفّرت" }, s3n: { label: "شريحة ٣ الرقم", kind: "text", def: "1200" }, s3b: { label: "شريحة ٣ تحت", kind: "text", def: "جنيه" },
+  s4: { label: "شريحة ٤", kind: "text", def: "إنت من أوفى عملائنا" },
+  outro: { label: "الشكر", kind: "text", def: "شكرًا… نكمل السنة الجاية سوا" },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "قهوة الركن" },
+});
+const W = 1080, H = 1920, DUR = 12, BPM = 128, B = 60 / BPM;
+const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
+const esc = (v) => String(v ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const ar = (s) => String(s).replace(/\d/g, (d) => "٠١٢٣٤٥٦٧٨٩"[d]);
+const num = (s) => parseInt(String(s).replace(/[٠-٩]/g, (d) => "٠١٢٣٤٥٦٧٨٩".indexOf(d)).replace(/\D/g, "")) || 0;
+// الشرايح: وقت البداية، الخلفية، لون الكلام، لون الأشكال، نوع الأشكال
+const SL = [[0, "#6c3bff", "#ffffff", "#c6ff3d", "dots"], [2.0, "#c6ff3d", "#121212", "#6c3bff", "stars"], [4.2, "#ff4fa3", "#ffffff", "#ffe14a", "rings"], [6.4, "#ff7a1a", "#121212", "#ffe14a", "coins"], [8.4, "#29d3ff", "#121212", "#ff4fa3", "hearts"], [10.2, "#121212", "#ffffff", "#c6ff3d", "dots"]];
+
+M.reel({
+  W, H, DUR, bg: SL[0][1],
+  async init(M) {
+    await Promise.all([loadFont("LZ", "SM-Lalezar.ttf"), loadFont("CH", "SM-Changa.ttf")]);
+    const st = M.stage; st.dir = "rtl";
+    const cv = M.canvas(W, H); const x = cv.getContext("2d");
+    const wrap = () => M.el("div", "", "position:absolute;left:0;top:0;width:1080px;height:1920px;");
+    const T = (p, txt, css) => M.el("div", "", `position:absolute;left:0;width:1080px;text-align:center;${css}`, esc(txt), p);
+    const S = SL.map(() => wrap());
+    const c = SL.map((s) => s[2]);
+    const s0 = { y: T(S[0], PR.year, `top:520px;font:330px/1 LZ;color:${c[0]};`), a: T(S[0], PR.intro, `top:960px;font:120px/1.2 LZ;color:${SL[0][3]};`) };
+    const s1 = { a: T(S[1], PR.s1a, `top:420px;font:700 90px CH;color:${c[1]};`), n: T(S[1], "", `top:560px;font:520px/1 LZ;color:${c[1]};`), b: T(S[1], PR.s1b, `top:1180px;font:700 110px CH;color:${c[1]};`) };
+    const s2 = { a: T(S[2], PR.s2a, `top:300px;font:110px/1.15 LZ;color:${c[2]};padding:0 80px;box-sizing:border-box;`),
+      items: PR.top.slice(0, 3).map((it, i) => M.el("div", "", `position:absolute;right:90px;left:90px;top:${720 + i * 250}px;height:200px;border-radius:40px;background:${i ? "rgba(255,255,255,.18)" : "#fff"};display:flex;align-items:center;gap:40px;padding:0 50px;box-sizing:border-box;`,
+        `<span style="font:150px/1 LZ;color:${i ? "#fff" : SL[2][1]}">${ar(i + 1)}</span><span style="font:700 70px CH;color:${i ? "#fff" : "#121212"}">${esc(it)}</span>`, S[2])) };
+    const s3 = { a: T(S[3], PR.s3a, `top:440px;font:700 100px CH;color:${c[3]};`), n: T(S[3], "", `top:600px;font:400px/1 LZ;color:${c[3]};`), b: T(S[3], PR.s3b, `top:1080px;font:700 110px CH;color:${c[3]};`) };
+    const s4 = { a: T(S[4], PR.s4, `top:640px;font:170px/1.15 LZ;color:${c[4]};padding:0 70px;box-sizing:border-box;`) };
+    const s5 = { a: T(S[5], PR.outro, `top:600px;font:120px/1.2 LZ;color:#fff;padding:0 80px;box-sizing:border-box;`), b: M.el("div", "", "position:absolute;left:0;width:1080px;text-align:center;top:1180px;", `<span style="display:inline-block;font:700 64px CH;color:#121212;background:${SL[5][3]};padding:20px 70px 30px;border-radius:80px;">${esc(PR.brand)}</span>`, S[5]) };
+    return { x, S, s0, s1, s2, s3, s4, s5 };
+  },
+  seek(t, C, M) {
+    const { x } = C, { seg, springO, expo, cubic, X, op, clamp } = M;
+    const beat = (t / B) % 1, pump = Math.exp(-6 * beat);
+    // أي شريحة شغالة + مسحة الدخول المايلة للي بعدها
+    let cur = 0; SL.forEach((s, i) => { if (t >= s[0]) cur = i; });
+    x.setTransform(1, 0, 0, 1, 0, 0);
+    const drawSlide = (i, clipK) => {
+      const [t0, bg, , sc, kind] = SL[i], lt = t - t0;
+      x.save();
+      if (clipK < 1) { const e = H * (1 - clipK); x.beginPath(); x.moveTo(0, e + 220); x.lineTo(W, e - 120); x.lineTo(W, H + 400); x.lineTo(0, H + 400); x.closePath(); x.clip(); }
+      x.fillStyle = bg; x.fillRect(0, 0, W, H);
+      // الأشكال: بتتنطط على البيت
+      x.fillStyle = sc; x.strokeStyle = sc;
+      const R = M.rng(i * 31 + 5);
+      for (let k = 0; k < 14; k++) {
+        const bx = R() * W, by = R() * H, s = 40 + R() * 90, ph = R() * 6, sp = (R() - .5) * 60;
+        const px = bx + Math.sin(lt * 1.3 + ph) * 40, py = (by - lt * sp * 2 + H * 2) % (H + 200) - 100, sz = s * (1 + .18 * pump * (k % 2));
+        if (Math.abs(py - 900) < 260 && Math.abs(px - 540) < 380 && kind !== "coins") continue;   // متغطيش على الكلام
+        x.save(); x.translate(px, py); x.rotate(lt * (k % 2 ? .8 : -.6) + ph);
+        if (kind === "dots") { x.beginPath(); x.arc(0, 0, sz / 2, 0, Math.PI * 2); x.fill(); }
+        if (kind === "stars") { x.beginPath(); for (let j = 0; j < 10; j++) { const a = j / 10 * Math.PI * 2, r = j % 2 ? sz * .22 : sz * .55; x.lineTo(Math.cos(a) * r, Math.sin(a) * r); } x.closePath(); x.fill(); }
+        if (kind === "rings") { x.lineWidth = sz * .16; x.beginPath(); x.arc(0, 0, sz / 2, 0, Math.PI * 2); x.stroke(); }
+        if (kind === "coins") { const fy = ((by + lt * 700 * (.6 + R() * .6)) % (H + 300)) - 150; x.setTransform(1, 0, 0, 1, px, fy); x.scale(Math.cos(lt * 6 + ph), 1); x.beginPath(); x.arc(0, 0, sz / 2, 0, Math.PI * 2); x.fill(); x.fillStyle = "rgba(0,0,0,.15)"; x.beginPath(); x.arc(0, 0, sz / 3, 0, Math.PI * 2); x.fill(); x.fillStyle = sc; }
+        if (kind === "hearts") { const h = sz / 2; x.beginPath(); x.moveTo(0, h * .7); x.bezierCurveTo(-h * 1.3, -h * .2, -h * .5, -h * 1.1, 0, -h * .4); x.bezierCurveTo(h * .5, -h * 1.1, h * 1.3, -h * .2, 0, h * .7); x.fill(); }
+        x.restore();
+      }
+      if (kind === "hearts") { const h = 260 * (1 + .1 * pump); x.save(); x.translate(540, 1420); x.fillStyle = "rgba(255,255,255,.9)"; x.beginPath(); x.moveTo(0, h * .7); x.bezierCurveTo(-h * 1.3, -h * .2, -h * .5, -h * 1.1, 0, -h * .4); x.bezierCurveTo(h * .5, -h * 1.1, h * 1.3, -h * .2, 0, h * .7); x.fill(); x.restore(); }
+      x.restore();
+    };
+    drawSlide(cur, 1);
+    const next = SL[cur + 1]; if (next && t > next[0] - .35) drawSlide(cur + 1, cubic(seg(t, next[0] - .35, next[0])));
+    const leave = next ? seg(t, next[0] - .3, next[0] - .1) : 0; C.S.forEach((s, i) => op(s, i === cur ? 1 - leave : 0));
+    // الكلام في كل شريحة
+    const lt = t - SL[cur][0], pop = (d) => springO(Math.max(0, lt - d), 14, .55), rise = (el, d, dy = 120) => { const k = expo(seg(lt, d, d + .4)); op(el, k); el.style.transform = `translateY(${(1 - k) * dy}px)`; };
+    if (cur === 0) { C.s0.y.style.transform = `scale(${pop(.1) * (1 + .03 * pump)})`; rise(C.s0.a, .5); }
+    if (cur === 1) { rise(C.s1.a, .1); C.s1.n.textContent = ar(Math.round(num(PR.s1n) * cubic(seg(lt, .3, 1.3)))); C.s1.n.style.transform = `scale(${pop(.3) * (1 + .04 * pump)})`; rise(C.s1.b, 1.0); }
+    if (cur === 2) { rise(C.s2.a, .1); C.s2.items.forEach((it, i) => { const k = pop(.45 + i * .25); it.style.transform = `translateX(${(1 - k) * -1100}px) rotate(${(1 - k) * -6}deg)`; }); }
+    if (cur === 3) { rise(C.s3.a, .1); C.s3.n.textContent = ar(Math.round(num(PR.s3n) * cubic(seg(lt, .3, 1.3)))); C.s3.n.style.transform = `scale(${pop(.3)})`; rise(C.s3.b, 1.0); }
+    if (cur === 4) { const k = pop(.15); C.s4.a.style.transform = `scale(${k}) rotate(${(1 - k) * 8}deg)`; }
+    if (cur === 5) { rise(C.s5.a, .1); C.s5.b.style.transform = `scale(${pop(.7)})`; }
+  },
+  sound(A) {
+    const N = A.midi;
+    // بوب راقص ١٢٨: كيك + سنير + هاي هات + باص + كوردات، و«ووش» مع كل شريحة
+    A.groove(BPM, 0, 12, { snare: true, kg: .85, hg: .1, sg: .3 });
+    const prog = [[45, [69, 72, 76]], [41, [69, 72, 77]], [48, [67, 72, 76]], [43, [67, 71, 74]]];
+    for (let i = 0, t = 0; t < 12; i++, t += B) { const [r, ch] = prog[Math.floor(i / 4) % 4]; A.bass(t, N(r), B * .8, .24); if (i % 2 === 1) ch.forEach((n) => A.tone(t, N(n), B * .7, "sawtooth", .018)); A.pluck(t + B / 2, N(ch[i % 3] + 12), .06, .25); }
+    SL.slice(1).forEach(([s]) => { A.whoosh(s - .35, .4, .25); A.hit(s, .35); });
+    for (let s = 2.3; s < 3.3; s += .06) A.click(s, .05); for (let s = 6.7; s < 7.7; s += .06) A.click(s, .05);
+  },
+});
+</script>
+</body></html>

@@ -1,0 +1,96 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// قالب «رأي عميل»: علامة اقتباس بتترسم، الكلام بيطلع كلمة كلمة، ٥ نجوم بتنور واحدة ورا التانية، صاحب الرأي بعلامة «موثّق»،
+// كارت تاني بيدخل مكانه، وفي الآخر متوسط التقييم بيعدّ لفوق وزرار «جرّبه» واسم البراند. 1080×1920، 12 ثانية.
+const PR = M.params({
+  q1: { label: "الرأي الأول", kind: "text", def: "من أول استخدام حسيت بالفرق، والتوصيل كان أسرع من المتوقع" },
+  n1: { label: "صاحب الرأي الأول", kind: "text", def: "سارة م." },
+  c1: { label: "مدينته", kind: "text", def: "عميلة من الرياض" },
+  q2: { label: "الرأي التاني", kind: "text", def: "أحسن قرار خدته السنة دي" },
+  n2: { label: "صاحب الرأي التاني", kind: "text", def: "أحمد ع." },
+  c2: { label: "مدينته", kind: "text", def: "عميل من القاهرة" },
+  head: { label: "العنوان فوق", kind: "text", def: "آراء عملائنا" },
+  rating: { label: "متوسط التقييم", kind: "text", def: "4.9" },
+  count: { label: "عدد التقييمات", kind: "text", def: "2000" },
+  cta: { label: "الزرار", kind: "text", def: "جرّبه بنفسك" },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "نقاء للعناية" },
+  color: { label: "اللون الأساسي", kind: "color", def: "#1f4d3a" },
+  gold: { label: "لون النجوم", kind: "color", def: "#e0a63a" },
+  bg: { label: "الخلفية", kind: "color", def: "#f6f1e8" },
+});
+const W = 1080, H = 1920, DUR = 12;
+const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
+const esc = (v) => String(v ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const ar = (s) => String(s).replace(/\d/g, (d) => "٠١٢٣٤٥٦٧٨٩"[d]).replace(".", "٫");
+const STAR = (c, s = 64) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24"><path d="M12 2.5l2.9 6.2 6.6.7-4.9 4.5 1.4 6.6L12 17.2l-5.9 3.3 1.3-6.6L2.5 9.4l6.6-.7z" fill="${c}"/></svg>`;
+const T1 = .6, STARS = 3.3, WHO = 4.3, SWAP = 5.9, SUM = 8.6, CTA = 10.2;
+
+M.reel({
+  W, H, DUR, bg: PR.bg,
+  async init(M) {
+    await Promise.all([loadFont("AM", "TY-Amiri-700.ttf", "700"), loadFont("TJ", "SM-Tajawal.ttf"), loadFont("CH", "SM-Changa.ttf"), loadFont("LZ", "SM-Lalezar.ttf")]);
+    const st = M.stage; st.dir = "rtl"; const col = PR.color;
+    // ورق شجر ناعم في الخلفية (دواير باهتة)
+    const bgs = [0, 1, 2, 3].map((i) => M.el("div", "", `position:absolute;left:0;top:0;width:${520 - i * 70}px;height:${520 - i * 70}px;border-radius:50%;background:${i % 2 ? PR.gold : col};opacity:.07;`));
+    const card = (q, n, c) => {
+      const el = M.el("div", "", "position:absolute;left:90px;top:0;width:900px;padding:150px 70px 70px;box-sizing:border-box;background:#fff;border-radius:56px;box-shadow:0 40px 90px rgba(40,40,20,.13);transform-origin:50% 50%;");
+      const qm = M.el("div", "", "position:absolute;right:60px;top:-70px;width:150px;height:150px;border-radius:50%;display:flex;align-items:center;justify-content:center;", `<svg width="150" height="150" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="${col}"/><path d="M28 62c0-12 6-20 16-24l2 5c-5 3-7 7-7 11h7v14H28zm26 0c0-12 6-20 16-24l2 5c-5 3-7 7-7 11h7v14H54z" fill="${PR.gold}"/></svg>`, el);
+      const words = q.split(/\s+/).filter(Boolean).map((w) => `<span style="display:inline-block;opacity:0;margin-left:16px;">${esc(w)}</span>`).join("");
+      const qt = M.el("div", "", `font:700 ${q.length > 40 ? 84 : 100}px/1.5 AM;color:#1d1d1b;text-align:right;`, words, el);
+      const stars = M.el("div", "", "display:flex;gap:10px;margin-top:40px;", Array.from({ length: 5 }, () => `<span style="display:inline-block;transform:scale(0)">${STAR(PR.gold)}</span>`).join(""), el);
+      const who = M.el("div", "", "display:flex;align-items:center;gap:26px;margin-top:46px;padding-top:40px;border-top:2px solid #eee;opacity:0;", `<div style="width:110px;height:110px;border-radius:50%;background:${col};color:#fff;font:700 54px CH;display:flex;align-items:center;justify-content:center;flex:none;">${esc([...n][0] || "")}</div>
+        <div><div style="font:700 46px CH;color:#1d1d1b;display:flex;align-items:center;gap:14px;">${esc(n)} <svg width="38" height="38" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#2f9bf0"/><path d="M7 12.5l3.2 3.2L17 9" stroke="#fff" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div style="font:400 34px TJ;color:#888;margin-top:4px;">${esc(c)} · مشتري موثّق</div></div>`, el);
+      return { el, qm, words: [...qt.children], stars: [...stars.children], who };
+    };
+    const A = card(PR.q1, PR.n1, PR.c1), Bc = card(PR.q2, PR.n2, PR.c2);
+    const head = M.el("div", "", `position:absolute;left:0;top:0;width:1080px;text-align:center;font:110px/1 LZ;color:${col};`, esc(PR.head));
+    // الملخص
+    const sum = M.el("div", "", "position:absolute;left:0;top:0;width:1080px;text-align:center;");
+    const big = M.el("div", "", `font:290px/1 LZ;color:${col};`, "", sum);
+    M.el("div", "", `font:700 48px CH;color:${col};opacity:.75;margin-top:-10px;`, "من ٥", sum);
+    const sStars = M.el("div", "", "display:flex;justify-content:center;gap:14px;margin-top:30px;", Array.from({ length: 5 }, () => `<span style="display:inline-block;transform:scale(0)">${STAR(PR.gold, 84)}</span>`).join(""), sum);
+    const cnt = M.el("div", "", "font:500 46px TJ;color:#555;margin-top:30px;", "", sum);
+    const cta = M.el("div", "", "position:absolute;left:0;top:0;width:1080px;text-align:center;", `<span style="display:inline-block;font:84px/1 LZ;color:#fff;background:${col};padding:34px 90px 44px;border-radius:100px;box-shadow:0 16px 0 rgba(0,0,0,.12);">${esc(PR.cta)}</span>`);
+    const brand = M.el("div", "", `position:absolute;left:0;top:0;width:1080px;text-align:center;font:700 44px CH;color:${col};`, esc(PR.brand));
+    return { head, bgs, A, B: Bc, sum, big, sStars: [...sStars.children], cnt, cta, brand };
+  },
+  seek(t, C, M) {
+    const { seg, springO, expo, cubic, X, op, clamp } = M;
+    C.bgs.forEach((b, i) => X(b, [-120, 700, 640, -60][i] + Math.sin(t * .4 + i) * 40, [180, 420, 1500, 1300][i] + Math.cos(t * .35 + i * 2) * 50));
+    const hk = expo(seg(t, .1, .6)) * (1 - cubic(seg(t, SUM - .5, SUM))); op(C.head, hk); X(C.head, 0, 300 + (1 - hk) * 40);
+    // الكارت: بيظهر، الكلام كلمة كلمة، النجوم، صاحب الرأي
+    const reveal = (K, t0, y) => {
+      const ink = springO(Math.max(0, t - t0 + .3), 10, .7);
+      K.qm.style.transform = `scale(${springO(Math.max(0, t - t0), 14, .45)}) rotate(${(1 - clamp((t - t0) * 2)) * -40}deg)`;
+      const n = K.words.length; K.words.forEach((w, i) => { const k = expo(seg(t, t0 + .2 + i * (2.4 / n), t0 + .55 + i * (2.4 / n))); w.style.opacity = k; w.style.transform = `translateY(${(1 - k) * 30}px)`; });
+      const sT = t0 + (K === C.A ? STARS - T1 : 1.4); K.stars.forEach((s, i) => (s.style.transform = `scale(${t > sT + i * .14 ? springO(t - sT - i * .14, 18, .4) : 0})`));
+      const wT = t0 + (K === C.A ? WHO - T1 : 1.9), wk = expo(seg(t, wT, wT + .5)); K.who.style.opacity = wk; K.who.style.transform = `translateY(${(1 - wk) * 30}px)`;
+      return ink;
+    };
+    const a1 = reveal(C.A, T1, 0), out1 = cubic(seg(t, SWAP, SWAP + .6));
+    op(C.A.el, t > T1 - .3 ? 1 : 0); X(C.A.el, -1100 * out1, 520 + (1 - a1) * 200, 1 - .1 * out1, 1 - .1 * out1, -8 * out1);
+    const a2 = reveal(C.B, SWAP + .3, 0), in2 = expo(seg(t, SWAP + .1, SWAP + .8)), out2 = cubic(seg(t, SUM - .5, SUM + .1));
+    op(C.B.el, t > SWAP ? 1 - out2 : 0); X(C.B.el, 1100 * (1 - in2), 560 - 300 * out2, 1 - .15 * out2, 1 - .15 * out2, 6 * (1 - in2));
+    // الملخص: الرقم بيعدّ لفوق، النجوم، وعدد التقييمات
+    const sk = expo(seg(t, SUM, SUM + .5)), r = parseFloat(PR.rating) || 5, cntN = parseInt(String(PR.count).replace(/\D/g, "")) || 0;
+    op(C.sum, sk); X(C.sum, 0, 520 + (1 - sk) * 80 - 120 * cubic(seg(t, CTA, CTA + .6)));
+    C.big.textContent = ar((r * cubic(seg(t, SUM, SUM + 1.2))).toFixed(1));
+    C.sStars.forEach((s, i) => (s.style.transform = `scale(${t > SUM + .6 + i * .12 ? springO(t - SUM - .6 - i * .12, 16, .45) : 0})`));
+    C.cnt.textContent = `أكتر من ${ar(Math.round(cntN * cubic(seg(t, SUM + .5, SUM + 1.7))).toLocaleString("en").replace(/,/g, "٬"))} تقييم`;
+    const ck = t > CTA ? springO(t - CTA, 12, .55) : 0, pulse = 1 + .04 * Math.max(0, Math.sin((t - CTA) * 5));
+    op(C.cta, ck > 0 ? 1 : 0); X(C.cta, 0, 1340, ck * pulse);
+    op(C.brand, expo(seg(t, CTA + .6, CTA + 1.2))); X(C.brand, 0, 1560);
+  },
+  sound(A) {
+    const N = A.midi;
+    // بيانو دافي + نقرات مع الكلام + رنة لكل نجمة
+    const ch = [[60, 64, 67, 71], [57, 60, 64, 67], [53, 57, 60, 64], [55, 59, 62, 67]];
+    ch.forEach((c, i) => { c.forEach((n, k) => A.tone(i * 3 + k * .08, N(n), 2.8, "sine", .05)); A.tone(i * 3, N(c[0] - 12), 3, "triangle", .07); });
+    [STARS, SWAP + 1.7].forEach((s0) => { for (let i = 0; i < 5; i++) A.pluck(s0 + i * .14, N(79 + [0, 2, 4, 7, 9][i]), .1, .5); });
+    for (let i = 0; i < 5; i++) A.pluck(SUM + .6 + i * .12, N(84 + [0, 2, 4, 7, 9][i]), .1, .6);
+    A.whoosh(SWAP, .5, .2); A.whoosh(SUM - .5, .5, .18); A.hit(CTA, .25); A.pluck(CTA, N(72), .15, 1);
+  },
+});
+</script>
+</body></html>
