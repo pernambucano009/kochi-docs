@@ -10,7 +10,7 @@ const STEP_INFO = {
   1: { num: "02", title: "التقطيع", en: "Cut" },
   2: { num: "03", title: "التوليد بـ Seedance", en: "Generate" },
   6: { num: "04", title: "المونتاج", en: "Montage" },
-  7: { num: "05", title: "النشر على السوشيال", en: "Publish" },
+  7: { num: "05", title: "النشر", en: "Publish" },
   4: { num: "", title: "مكتبة الشخصيات", en: "Characters" },
   3: { num: "", title: "مكتبة التعليق الصوتي", en: "Voices" },
   5: { num: "", title: "مكتبة الموسيقى", en: "Music" },
@@ -28,9 +28,6 @@ const STEP_INFO = {
   settings: { num: "", title: "الإعدادات", en: "Settings" },
   cal: { num: "", title: "المواعيد", en: "Calendar" },
 };
-// صفحات جوه النشر (المواعيد والردود): الرجوع منها بيودّي للنشر مش للرئيسية
-const BACK_TO = { cal: "7", 15: "7" };
-STEP_INFO[7].back = "النشر";
 const NEXT_LABEL = {
   0: "التالي: التقطيع",
   1: "التالي: التوليد",
@@ -78,15 +75,15 @@ function openStage(step) {
   $("stageNum").textContent = [info.en, info.num && PROCESS.includes(step) ? `${Number(info.num)} / 5` : ""].filter(Boolean).join(" · ");
   $("stageNum").hidden = !info.en && !info.num;
   $("stageTitle").textContent = info.title;
-  // أيقونة القسم الزجاج جنب العنوان (البروتوتايب بيحطها في الإعدادات)
-  const ic = { settings: "settings" }[step];
+  // أيقونة القسم الزجاج جنب العنوان: نفس أيقونة المربع اللي فتحه، فالزوم بيوديها مكانها من غير ما تتغيّر
+  const ic = { settings: "settings", 7: "publish", cal: "publish", 15: "publish", 8: "carousel", 9: "series", 10: "publish", 12: "create", 13: "voices", 14: "reel",
+    6: "film", "6f": "film", "6s": "series", "6a": "publish", 3: "voices", 4: "characters", 5: "music" }[step];
   $("stageIc").hidden = !ic;
   $("stageIc").innerHTML = ic ? `<img class="ic-l" src="/icons3d/${ic}.webp?v=8" alt=""><img class="ic-d" src="/icons3d/${ic}_d.webp?v=8" alt="">` : "";
   // المونتاج شاشة شغل: راس صغير (رجوع + اسم المشروع + صدّر) بدل العنوان الكبير، زي البروتوتايب
   $("stage").classList.toggle("mt-mode", ["6", "6s", "6a", "6f"].includes(step));
   // المواعيد صفحة لوحدها جوه النشر: الرجوع بيودّي للنشر مش للرئيسية
   $("stage").classList.toggle("cal-mode", step === "cal");
-  $("stageMin").querySelector("span").textContent = BACK_TO[step] ? STEP_INFO[BACK_TO[step]].back : "الرئيسية";
   const inFlow = PROCESS.includes(step);
   $("flowNav").hidden = !inFlow;
   $("stage").classList.toggle("library", !inFlow);
@@ -155,7 +152,7 @@ async function renderStageProject() {
   $("stageProject").hidden = !f || !PROCESS.includes(shell.step);
 }
 
-$("stageMin").onclick = () => showStep(BACK_TO[shell.step] || "home");
+$("stageMin").onclick = () => showStep("home");
 $("flowNav").addEventListener("click", (e) => {
   const b = e.target.closest("button[data-step]");
   if (!b) return;

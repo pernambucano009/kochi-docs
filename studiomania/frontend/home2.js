@@ -125,15 +125,7 @@ const NH = (() => {
       <linearGradient id="nhGBody" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse"><stop offset="0" style="stop-color:var(--nh-g1)"/><stop offset=".55" style="stop-color:var(--nh-g2)"/><stop offset="1" style="stop-color:var(--nh-g1)"/></linearGradient>
       <filter id="nhGBlur" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="1.1"/></filter></defs></svg>
     <div class="nh-home" id="nhHome">
-      <header class="nh-top">
-        <div class="nh-logo" aria-label="StudioMania">STUDIOMANIA</div>
-        <div class="nh-tools">
-          <button class="nh-chip nh-bell" id="nhBell" title="الإشعارات" aria-label="الإشعارات"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15zM10 20.5a2 2 0 0 0 4 0"/></svg><b class="bell-n" hidden></b></button>
-          <button class="nh-chip latin nh-langb" id="nhLang">EN</button>
-          <button class="nh-chip" id="nhClient" title="العميل اللي شغال عليه"><i id="nhClientAv"></i><span id="nhClientName" data-no-i18n></span></button>
-          <button class="nh-switch" id="nhTheme" aria-label="Switch theme"><span class="track"><span class="knob"></span></span><span class="latin" id="nhMode">Dark</span></button>
-        </div>
-      </header>
+      <div class="nh-top-ph" aria-hidden="true"></div>
       <main class="nh-bento" id="nhBento"></main>
     </div>
     <section class="nh-page" id="nhPage" hidden role="dialog" aria-modal="true">
@@ -145,6 +137,24 @@ const NH = (() => {
       <div class="nh-pgrid" id="nhPGrid"></div>
     </section>`;
 
+  // الشريط اللي فوق: نفس شريط الرئيسية بيفضل ثابت فوق كل الصفحات، وفيه «رجوع» والتسلسل (انت فين)
+  const bar = document.createElement("header");
+  bar.id = "nhBar";
+  bar.className = "nh-top nh-bar";
+  bar.innerHTML = `<div class="nh-bar-r">
+      <div class="nh-logo" aria-label="StudioMania">STUDIOMANIA</div>
+      <button class="nh-goback" id="nhGoBack" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg><span>رجوع</span></button>
+      <nav class="nh-crumbs" id="nhCrumbs" aria-label="انت فين" hidden></nav>
+    </div>
+    <div class="nh-tools" id="nhTools">
+      <button class="nh-chip nh-bell" id="nhBell" title="الإشعارات" aria-label="الإشعارات"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15zM10 20.5a2 2 0 0 0 4 0"/></svg><b class="bell-n" hidden></b></button>
+      <button class="nh-chip latin nh-langb" id="nhLang">EN</button>
+      <button class="nh-chip" id="nhClient" title="العميل اللي شغال عليه"><i id="nhClientAv"></i><span id="nhClientName" data-no-i18n></span></button>
+      <button class="nh-switch" id="nhTheme" aria-label="Switch theme"><span class="track"><span class="knob"></span></span><span class="latin" id="nhMode">Dark</span></button>
+    </div>`;
+  document.body.appendChild(bar);
+  // الرصيد والردود والمواعيد (كانوا في راس الصفحات) بقوا في الشريط، وبيبانوا بره الرئيسية بس
+  ["stageMoney", "stageInbox", "stageCal"].forEach((id) => { const el = document.getElementById(id); if (el) { el.classList.add("nh-xtra"); document.getElementById("nhTools").prepend(el); } });
   const bento = document.getElementById("nhBento"), home = document.getElementById("nhHome");
   const page = document.getElementById("nhPage"), pGrid = document.getElementById("nhPGrid"), pTitle = document.getElementById("nhPTitle");
 
@@ -194,7 +204,8 @@ const NH = (() => {
   }
   function setStage(key) {
     key = key || "";
-    if (key === shown) return;
+    if (key === shown || zoom) return;   // وقت الزوم المسرح بيفضل زي ما هو
+
     shown = key;
     GL?.show(!key ? "app" : key.startsWith("f:") ? "progress" : GLKEY[key] || "app");
     const next = slots[1 - live];
@@ -243,40 +254,100 @@ const NH = (() => {
   document.getElementById("nhLang").textContent = I18N.lang === "en" ? "ع" : "EN";
   document.getElementById("nhLang").onclick = () => document.getElementById("langToggle").click();
 
-  // ---------- الزوم: الكاميرا بتقرّب على المربع لحد ما يبقى الشاشة ----------
+  // ---------- الزوم: المربع بيكبر بنعومة لحد ما يبقى الشاشة، واسمه وأيقونته بيتنقلوا لركن الصفحة زي ما هم ----------
+  // الاسم بيتحرك بالـ transform بس (من غير تكبير ولا تغيير في الخط)، فعنوان الصفحة لازم يبقى بنفس مقاس اسم المربع
   const rectOf = (el) => { const r = el.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height }; };
+  const DUR = () => (reduce.matches ? 1 : 950);
   let zoom = null, busy = false;
-  function zoomIn(tile, after) {   // الرئيسية بتتكبر وتختفي، وحد المربع بيكبر لحد حدود الشاشة
-    const D_ = reduce.matches ? 1 : 1000;
-    const r = tile.getBoundingClientRect(), vw = innerWidth, vh = innerHeight;
-    const radius = parseFloat(getComputedStyle(tile).borderTopLeftRadius) || 24;
-    const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
-    const s = Math.min(2, Math.max(vw / r.width, vh / r.height));   // أكتر من ٢× بيبقى أكبر من اللي كارت الشاشة بيرسمه
-    home.style.transformOrigin = `${cx}px ${cy}px`;
+  const TXT = ["fontFamily", "fontSize", "fontWeight", "letterSpacing", "lineHeight", "textTransform", "direction"];
+  // نسخة طايرة من نص: نفس الخط والمقاس في نفس المكان بالظبط
+  function flyText(el) {
+    const r = rectOf(el), cs = getComputedStyle(el), f = document.createElement("div");
+    f.className = "nh-fly";
+    f.textContent = el.textContent;
+    TXT.forEach((k) => (f.style[k] = cs[k]));
+    Object.assign(f.style, { left: r.x + "px", top: r.y + "px", width: Math.ceil(r.w + 2) + "px", height: r.h + "px", color: cs.color });
+    document.body.appendChild(f);
+    return { f, r, color: cs.color };
+  }
+  function flyIcon(key, r) {
+    const f = document.createElement("div");
+    f.className = "nh-fly nh-fly-ic";
+    f.innerHTML = glImg(key);
+    Object.assign(f.style, { left: r.x + "px", top: r.y + "px", width: r.w + "px", height: r.h + "px" });
+    document.body.appendChild(f);
+    return f;
+  }
+  // مكان المجسّم اللي في النص (مرسوم في الـ WebGL): مربع في نص المسرح
+  function stageIconRect() {
+    const st = document.getElementById("nhStage"), gl = st?.querySelector(".gl") || st;
+    if (!gl) return null;
+    const r = rectOf(gl), size = Math.min(r.w, r.h) * .56;
+    return { x: r.x + (r.w - size) / 2, y: r.y + r.h * .47 - size / 2, w: size, h: size };
+  }
+  /* zoomTo: tile = المربع اللي اتداس · key = أيقونته · dest = { latin, name, icon } عناصر العنوان في الصفحة الجديدة
+     content = اللي بيظهر بعد ما المربع يكبر · bg = لون الصفحة الجديدة · parent/z = فين الإطار بيترسم */
+  function zoomTo(tile, { key, dest, content, bg, parent, z }) {
+    const o = { duration: DUR(), easing: EASE, fill: "both" };
+    const r = rectOf(tile), vw = innerWidth, vh = innerHeight;
+    const cx = r.x + r.w / 2, cy = r.y + r.h / 2;
     const frame = document.createElement("div");
     frame.className = "nh-frame";
-    document.body.appendChild(frame);
-    const o = { duration: D_, easing: EASE, fill: "both" };
+    frame.style.background = bg;
+    frame.style.zIndex = z;
+    parent.appendChild(frame);
+    home.style.transformOrigin = `${cx}px ${cy}px`;
     const anims = [
-      home.animate([{ transform: "none", opacity: 1 }, { opacity: .45, offset: .55 }, { transform: `translate(${vw / 2 - cx}px,${vh / 2 - cy}px) scale(${s})`, opacity: 0 }], o),
-      frame.animate([{ left: r.left + "px", top: r.top + "px", width: r.width + "px", height: r.height + "px", borderRadius: radius + "px", opacity: 1 },
-        { opacity: 1, offset: .75 }, { left: "0px", top: "0px", width: vw + "px", height: vh + "px", borderRadius: "0px", opacity: 0 }], o),
+      home.animate([{ transform: "none", opacity: 1 }, { opacity: 1, offset: .25 }, { transform: "scale(1.08)", opacity: 0 }], o),
+      frame.animate([{ left: r.x + "px", top: r.y + "px", width: r.w + "px", height: r.h + "px", borderRadius: "24px", opacity: 0 },
+        { opacity: 1, offset: .12 }, { left: "0px", top: "0px", width: vw + "px", height: vh + "px", borderRadius: "0px", opacity: 1 }], o),
+      ...content.filter(Boolean).map((el) => el.animate([{ opacity: 0, transform: "translateY(18px)" }, { opacity: 0, transform: "translateY(18px)", offset: .55 }, { opacity: 1, transform: "none" }], o)),
     ];
-    zoom = { tile, anims, frame, r, radius, extra: [] };
-    return { o, r, vw, vh, radius, done: anims[0].finished.then(() => { home.style.visibility = "hidden"; after?.(); }) };
+    const flies = [], real = [];
+    // الاسم: الإنجليزي والعربي كل واحد لوحده، بيتنقلوا لمكانهم في العنوان
+    const src = tile.querySelector(":scope > .nh-head > .nh-name");
+    [[src?.querySelector(".latin"), dest.latin], [src?.querySelector("b"), dest.name]].forEach(([from, to]) => {
+      if (!from || !to || !from.textContent.trim()) return;
+      const t = rectOf(to);
+      if (!t.w) return;   // العنوان مستخبي في الصفحة دي (المونتاج مثلًا)
+      const { f, r: fr, color } = flyText(from), toColor = getComputedStyle(to).color;
+      anims.push(f.animate([{ transform: "none", color }, { transform: `translate(${t.x - fr.x}px,${t.y - fr.y}px)`, color: toColor }], o));
+      flies.push(f); real.push(from, to);
+    });
+    // الأيقونة: من المجسّم اللي في النص لحد جنب العنوان
+    const ir = stageIconRect(), glEl = document.querySelector("#nhStage .gl");
+    const ti = dest.icon && rectOf(dest.icon);
+    if (ir && ti?.w && key) {
+      const t = ti, f = flyIcon(key, ir);
+      anims.push(f.animate([{ transform: "none" }, { transform: `translate(${t.x - ir.x}px,${t.y - ir.y}px) scale(${t.w / ir.w},${t.h / ir.h})` }], o));
+      if (glEl) anims.push(glEl.animate([{ opacity: 1 }, { opacity: 0, offset: .08 }, { opacity: 0 }], o));
+      flies.push(f); real.push(dest.icon);
+    }
+    real.forEach((e) => (e.style.opacity = 0));
+    zoom = { anims, frame, flies, real, cleanup: [] };
+    return anims[0].finished.then(() => {
+      home.style.visibility = "hidden";
+      flies.forEach((f) => (f.style.opacity = 0));
+      real.forEach((e) => (e.style.opacity = ""));
+    });
   }
-  function zoomOut() {
+  function zoomBack() {
     if (!zoom) return Promise.resolve();
     const z = zoom;
     zoom = null;
     home.style.visibility = "";
-    z.anims.concat(z.extra).forEach((a) => a.reverse());
+    z.flies.forEach((f) => (f.style.opacity = ""));
+    z.real.forEach((e) => (e.style.opacity = 0));
+    z.anims.forEach((a) => a.reverse());
     return z.anims[0].finished.then(() => {
-      z.anims.concat(z.extra).forEach((a) => a.cancel());
+      z.anims.forEach((a) => a.cancel());
       z.frame.remove();
-      (z.cleanup || []).forEach((f) => f());
+      z.flies.forEach((f) => f.remove());
+      z.real.forEach((e) => (e.style.opacity = ""));
+      z.cleanup.forEach((f) => f());
     });
   }
+  const zooming = (on) => document.body.classList.toggle("nh-zooming", on);
 
   // صفحة جوه الرئيسية (اعمل جديد / الأصول / شغّال عليه): الأيقونة والاسم بيطيروا لحد ما يبقوا عنوان الصفحة
   function glImg(key) { return `<img class="ic-l" src="/icons3d/${key}.webp?v=8" alt="" loading="lazy"><img class="ic-d" src="/icons3d/${key}_d.webp?v=8" alt="" loading="lazy">`; }
@@ -395,6 +466,7 @@ const NH = (() => {
     else { pStack.push({ key: prev, title: [...pTitle.childNodes], tkey: pTitle.dataset.key }); pTitle.innerHTML = titleHTML(T[key], key); pTitle.dataset.key = key; }
     backLabel();
     fillPage(key);
+    renderBar();
     pGrid.animate([{ opacity: 0, transform: `translateX(${back ? -24 : 24}px)` }, { opacity: 1, transform: "none" }], { duration: reduce.matches ? 1 : 450, easing: EASE });
     pTitle.animate([{ opacity: 0 }, { opacity: 1 }], { duration: reduce.matches ? 1 : 450, easing: EASE });
     if (!MODS[key]) pGrid.querySelectorAll(":scope > .nh-tile").forEach((p, i) => setTimeout(() => { p.classList.add("nh-sweep"); setTimeout(() => p.classList.add("done"), 1100); }, i * 70));
@@ -403,64 +475,128 @@ const NH = (() => {
     if (busy || zoom) return;
     busy = true;
     pStack = [];
-    const t = T[key];
-    pTitle.innerHTML = titleHTML(t, key);
+    pTitle.innerHTML = titleHTML(T[key], key);
     pTitle.dataset.key = key;
-    backLabel();
     page.hidden = false;
     fillPage(key);
-    const z = zoomIn(tile);
-    const sIcon = tile.querySelector(":scope > .nh-head > .gi, :scope > .nh-head > .nh-plate"), sName = tile.querySelector(":scope > .nh-head > .nh-name");
-    const tIcon = pTitle.querySelector(".gi, .nh-plate"), tName = pTitle.querySelector(".nh-name");
-    const fi = rectOf(sIcon), ti = rectOf(tIcon), fn = rectOf(sName), tn = rectOf(tName);
-    const fly = (el, from) => {
-      const f = document.createElement("div");
-      f.className = "nh-fly";
-      f.innerHTML = el.outerHTML;
-      Object.assign(f.style, { left: from.x + "px", top: from.y + "px", width: from.w + "px", height: from.h + "px" });
-      document.body.appendChild(f);
-      return f;
-    };
-    const fIcon = fly(sIcon, fi), fName = fly(sName, fn);
-    fIcon.firstElementChild.style.cssText = "width:100%;height:100%";
-    [sIcon, sName, tIcon, tName].forEach((e) => (e.style.opacity = 0));
-    zoom.extra.push(
-      page.animate([{ clipPath: `inset(${z.r.top}px ${z.vw - z.r.right}px ${z.vh - z.r.bottom}px ${z.r.left}px round ${z.radius}px)` }, { clipPath: "inset(0px 0px 0px 0px round 0px)" }], z.o),
-      pGrid.animate([{ opacity: 0, transform: "scale(.86)" }, { opacity: 0, offset: .3 }, { opacity: 1, transform: "scale(1)" }], z.o),
-      fIcon.animate([{ transform: "none" }, { transform: `translate(${ti.x - fi.x}px,${ti.y - fi.y}px) scale(${ti.w / fi.w},${ti.h / fi.h})` }], z.o),
-      fName.animate([{ transform: "none" }, { transform: `translate(${tn.x - fn.x}px,${tn.y - fn.y}px) scale(${tn.h / fn.h})` }], z.o));
-    zoom.page = { fIcon, fName, parts: [sIcon, sName, tIcon, tName] };
-    zoom.cleanup = [() => { fIcon.remove(); fName.remove(); [sIcon, sName, tIcon, tName].forEach((e) => (e.style.opacity = "")); page.hidden = true; pGrid.innerHTML = ""; }];
-    z.done.then(() => {
-      fIcon.style.opacity = fName.style.opacity = 0;
-      tIcon.style.opacity = tName.style.opacity = 1;
+    const bg = getComputedStyle(page).backgroundColor;
+    zooming(true);
+    zoomTo(tile, { key: GLKEY[key] || GLKEY[T[key].icon], bg, parent: host, z: 4,
+      dest: { latin: pTitle.querySelector(".nh-name .latin"), name: pTitle.querySelector(".nh-name b"), icon: pTitle.querySelector(".nh-glt") },
+      content: [pGrid, document.getElementById("nhPTabs")] }).then(() => {
+      zooming(false);
       busy = false;
-      document.getElementById("nhBack").focus({ preventScroll: true });
+      renderBar();
       if (!MODS[key]) pGrid.querySelectorAll(":scope > .nh-tile").forEach((p, i) => setTimeout(() => { p.classList.add("nh-sweep"); setTimeout(() => p.classList.add("done"), 1100); }, i * 70));
     });
+    zoom.page = true;
+    zoom.cleanup.push(() => { page.hidden = true; pGrid.innerHTML = ""; });
+    renderBar();
   }
-  function closePage() {
-    if (busy || !zoom?.page) return;
-    if (pStack.length) return swapPage(pStack[pStack.length - 1].key, true);
+  function closePage(all = false) {
+    if (busy || !zoom?.page) return Promise.resolve();
+    if (pStack.length && !all) { swapPage(pStack[pStack.length - 1].key, true); renderBar(); return Promise.resolve(); }
+    // راجع للرئيسية على طول: العنوان الأصلي بيرجع الأول عشان يطير لمكان المربع
+    if (pStack.length) { const s0 = pStack[0]; pTitle.replaceChildren(...s0.title); pTitle.dataset.key = s0.tkey; pStack = []; }
     stopMedia();
     busy = true;
-    const p = zoom.page;
-    p.fIcon.style.opacity = p.fName.style.opacity = 1;
-    p.parts[2].style.opacity = p.parts[3].style.opacity = 0;
-    zoomOut().then(() => { busy = false; refresh(); });
+    zooming(true);
+    return zoomBack().then(() => { zooming(false); busy = false; renderBar(); refresh(); });
   }
-  document.getElementById("nhBack").onclick = closePage;
+  document.getElementById("nhBack").onclick = () => closePage();
 
-  // قسم من البرنامج: الكاميرا بتقرّب على المربع، وبعدين القسم بيفتح مكانه
+  // قسم من البرنامج: نفس الزوم، والقسم بيفتح تحت الإطار وبيظهر لما المربع يملا الشاشة
   let sectionZoom = false;
-  function openSection(tile, act) {
+  function openSection(tile, run) {
     if (busy) return;
-    const fromPage = !!zoom?.page;   // من جوه صفحة: القسم بيفتح فوقها على طول
-    if (fromPage || !tile.closest("#nhBento")) return act();
+    if (zoom?.page || !tile.closest("#nhBento")) { run(); return; }
     busy = true;
     sectionZoom = true;
-    zoomIn(tile, () => { busy = false; act(); });
+    run();
+    const card = $("stageCard"), head = card.querySelector(".stage-head");
+    const bg = getComputedStyle(card).backgroundColor;
+    zooming(true);
+    zoomTo(tile, { key: GLKEY[tile.dataset.id], bg, parent: document.body, z: 30,
+      dest: { latin: $("stageNum"), name: $("stageTitle"), icon: $("stageIc").hidden ? null : $("stageIc") },
+      content: [$("stageBody"), ...head.querySelectorAll(":scope > :not(.stage-title, .stage-ic, .stage-logo, .stage-back, .stage-bell, .stage-client)")] }).then(() => {
+      zooming(false);
+      busy = false;
+    });
+    zoom.section = true;
   }
+  // القسم بيتقفل بنفس الزوم بالعكس (لو اتفتح من مربع في الرئيسية)، أو بيختفي بهدوء لو اتفتح من جوه صفحة
+  function closeSection(close) {
+    if (sectionZoom && zoom?.section) {
+      sectionZoom = false;
+      busy = true;
+      zooming(true);
+      return zoomBack().then(() => { close(); requestAnimationFrame(() => zooming(false)); busy = false; refresh(); });
+    }
+    sectionZoom = false;
+    const st = $("stage");
+    if (st.hidden || reduce.matches) { close(); refresh(); return Promise.resolve(); }
+    return st.animate([{ opacity: 1, transform: "none" }, { opacity: 0, transform: "scale(.985)" }], { duration: 260, easing: EASE, fill: "forwards" }).finished
+      .then((a) => { close(); requestAnimationFrame(() => st.getAnimations().forEach((x) => x.cancel())); refresh(); });
+  }
+
+  // ---------- انت فين: التسلسل في الشريط اللي فوق، و«رجوع» ثابت ----------
+  // الأقسام اللي بتتفتح ورا بعض (النشر ← المواعيد مثلًا) بتتسجّل هنا، والصفحات جوه الرئيسية في pStack
+  let stageTrail = [];
+  const stageOpen = () => typeof shell !== "undefined" && shell.step != null && !$("stage").hidden;
+  const _showStep = showStep;
+  showStep = function (step, opts = {}) {
+    step = String(step);
+    if (step === "home") { if (location.hash !== "#home") history.replaceState(null, "", "#home"); return closeStage(); }
+    const was = stageOpen();
+    if (!was) stageTrail = [step];
+    else { const i = stageTrail.indexOf(step); stageTrail = i >= 0 ? stageTrail.slice(0, i + 1) : [...stageTrail, step]; }
+    _showStep(step);
+    // قسم بيتفتح فوق صفحة (من «ابدأ مشروع جديد» مثلًا): بيظهر بهدوء
+    if (!was && !sectionZoom && !opts.instant && !reduce.matches) $("stage").animate([{ opacity: 0, transform: "scale(.985)" }, { opacity: 1, transform: "none" }], { duration: 420, easing: EASE });
+    else if (was && !reduce.matches) $("stageBody").animate([{ opacity: 0, transform: "translateY(10px)" }, { opacity: 1, transform: "none" }], { duration: 380, easing: EASE });
+    renderBar();
+  };
+  function crumbs() {
+    const out = [{ label: "الرئيسية", lv: "home" }];
+    if (zoom?.page) {
+      pStack.forEach((s, i) => out.push({ label: T[s.tkey]?.ar || "", lv: "page", i }));
+      out.push({ label: T[pTitle.dataset.key]?.ar || "", lv: "page", i: pStack.length });
+    }
+    if (stageOpen()) stageTrail.forEach((st, i) => out.push({ label: STEP_INFO[st]?.title || "", lv: "stage", i }));
+    return out;
+  }
+  function renderBar() {
+    const list = crumbs(), nav = document.getElementById("nhCrumbs");
+    const deep = list.length > 1;
+    bar.classList.toggle("deep", deep);
+    document.getElementById("nhGoBack").hidden = !deep;
+    nav.hidden = !deep;
+    nav.innerHTML = list.map((c, k) => k === list.length - 1 ? `<b aria-current="page">${esc(c.label)}</b>`
+      : `<button type="button" data-crumb="${k}">${esc(c.label)}</button><i aria-hidden="true">›</i>`).join("");
+    nav._list = list;
+  }
+  // رجوع خطوة واحدة: القسم اللي قبله، أو تقفل القسم، أو الصفحة اللي قبلها، أو الرئيسية
+  function goBack() {
+    if (busy) return;
+    if (stageOpen()) {
+      if (stageTrail.length > 1) return showStep(stageTrail[stageTrail.length - 2]);
+      return closeStage();
+    }
+    if (zoom?.page) closePage();
+  }
+  // تدوس على أي حتة في التسلسل: ترجع لها بالظبط
+  async function goCrumb(k) {
+    if (busy) return;
+    const c = document.getElementById("nhCrumbs")._list?.[k];
+    if (!c) return;
+    if (c.lv === "stage") return showStep(stageTrail[c.i]);
+    if (stageOpen()) await closeStage();
+    if (c.lv === "home") { if (zoom?.page) await closePage(true); return; }
+    if (c.lv === "page" && c.i < pStack.length) { pStack.length = c.i + 1; swapPage(pStack[c.i].key, true); renderBar(); }
+  }
+  document.getElementById("nhGoBack").onclick = goBack;
+  document.getElementById("nhCrumbs").addEventListener("click", (e) => { const b = e.target.closest("[data-crumb]"); if (b) goCrumb(+b.dataset.crumb); });
+  bar.querySelector(".nh-logo").addEventListener("click", () => { if (bar.classList.contains("deep")) goCrumb(0); });
   function act(id) {
     const t = T[id];
     if (t.fn) return t.fn;
@@ -489,7 +625,12 @@ const NH = (() => {
   host.addEventListener("click", onActivate);
   host.addEventListener("keydown", (e) => {
     if ((e.key === "Enter" || e.key === " ") && e.target.matches(".nh-tile[data-id], .nh-line")) { e.preventDefault(); onActivate(e); }
-    if (e.key === "Escape" && zoom?.page && $("stage").hidden && !document.querySelector(".ml-view")) closePage();
+  });
+  // Esc = رجوع (لو مفيش نافذة مفتوحة فوق)
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape" || e.defaultPrevented || document.querySelector("dialog[open], .ml-view")) return;
+    if (e.target.closest?.("input, textarea, select")) return;
+    if (bar.classList.contains("deep")) goBack();
   });
 
   // ---------- الداتا الحقيقية ----------
@@ -526,10 +667,11 @@ const NH = (() => {
       };
       if (!$("stage").hidden) { closeStage(); setTimeout(go, 1100); } else go();
     },
-    sectionClosed() {
-      if (sectionZoom) { sectionZoom = false; zoomOut(); }
-      refresh();
+    // القسم بيتقفل: بالزوم بالعكس أو بيختفي بهدوء، والتسلسل اللي فوق بيتمسح
+    closeSection(close) {
+      return closeSection(() => { close(); stageTrail = []; if (location.hash !== "#home") history.replaceState(null, "", "#home"); renderBar(); });
     },
+    renderBar,
   };
 })();
 
@@ -537,7 +679,7 @@ if (NH) {
   // الأقسام بتفتح من غير أنيميشن التكبير القديم (الزوم بقى من الرئيسية الجديدة)
   tileFor = () => null;
   const _closeStage = closeStage;
-  closeStage = function () { _closeStage(); NH.sectionClosed(); };
+  closeStage = function () { return NH.closeSection(_closeStage); };
   const _loadClients = loadClients;
   loadClients = async function () { await _loadClients(); NH.refresh(); };
 }

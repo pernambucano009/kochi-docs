@@ -33,8 +33,8 @@ window.NHGL = (stage, getClient) => {
     const x = bd.getContext("2d"), g = x.createRadialGradient(256, 236, 0, 256, 256, 256);
     // نفس لون الصفحة بالظبط عند الأطراف، ونور هادي ورا المجسّم بس (زي المرجع)
     if (dark) { g.addColorStop(0, "#2a2a31"); g.addColorStop(.22, "#16161a"); g.addColorStop(.36, "#0c0c0e"); g.addColorStop(1, "#0c0c0e"); }
-    // اللايت: نفس أرضية الصفحة (#FAFAF8) عند الأطراف، وتوهج برتقالي هادي في النص (زي البروتوتايب)
-    else { g.addColorStop(0, "#F7E2DA"); g.addColorStop(.3, "#F9F0EC"); g.addColorStop(.5, "#FAF8F6"); g.addColorStop(.62, "#FAFAF8"); g.addColorStop(1, "#FAFAF8"); }
+    // اللايت: نفس أرضية الصفحة (#FAFAF8) في كل حتة، من غير توهج ورا المجسّم
+    else { g.addColorStop(0, "#FAFAF8"); g.addColorStop(1, "#FAFAF8"); }
     x.fillStyle = g;
     x.fillRect(0, 0, 512, 512);
     bdTex.needsUpdate = true;
