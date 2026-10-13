@@ -94,7 +94,8 @@ const Gallery = (() => {
 
   // فيديوهات عرض جاهزة للقوالب (متعمولة مرة واحدة ومحفوظة في frontend/gallery)
   const SHOW = ["sk-clay", "sk-papercut", "sk-ugc", "sk-cinema-ad", "sk-skeleton", "sk-talking", "sk-song",
-    "sk-studio-shot", "sk-product-scene", "sk-static-ads", "sk-felt", "sk-anime", "sk-watercolor", "sk-miniature", "sk-noir", "sk-lowpoly"];
+    "sk-studio-shot", "sk-product-scene", "sk-static-ads", "sk-felt", "sk-anime", "sk-watercolor", "sk-miniature", "sk-noir", "sk-lowpoly",
+    "sk-vhs", "sk-chalk", "sk-sand", "sk-foodslow", "sk-surreal", "sk-toy"];
   async function load() {
     const [tpls, cats] = await Promise.all([api("/api/templates"), api("/api/style-cats").catch(() => [])]);
     const catOf = {};
