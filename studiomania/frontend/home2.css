@@ -677,3 +677,43 @@ body.stage-settled #nh { visibility: hidden; }
 #nh .nh-cr-sub { margin: 0; }
 #nh .nh-cr-art { position: relative; overflow: hidden; }
 #nh .nh-cr-art img { position: static !important; inset: auto !important; transform: none !important; width: 92px !important; height: 92px !important; max-width: 92px; object-fit: contain; }
+
+/* ===== عقل البراند: Wizard زي البروتوتايب (سؤال + أيقونة على اليمين، كروت الخطوة على الشمال، رجوع / النقط / التالي تحت) ===== */
+#nh .nh-pgrid[data-key="brand"] { display: block; overflow: hidden; padding: 0; }
+#nh .nh-ptitle[data-key="brand"] .nh-glt { width: 0; height: 0; opacity: 0; overflow: hidden; }
+#nh .nb-wrap { height: 100%; }
+#nh .bw { display: grid; grid-template-columns: 380px minmax(0, 1fr); gap: 56px; height: 100%; min-height: 0; }
+#nh .bw-hero { display: flex; flex-direction: column; justify-content: center; gap: 14px; padding: 10px 6px 40px; min-height: 0; }
+#nh .bw-k { font: 500 11px/1 Unbounded, sans-serif; letter-spacing: .3em; color: var(--accent, #E5613E); text-transform: uppercase; direction: ltr; text-align: right; }
+#nh .bw-hero h1 { margin: 0; font: 500 46px/1.2 "Readex Pro", sans-serif; color: var(--nh-ink, #181718); }
+#nh .bw-hero p { margin: 0; font-size: 14px; line-height: 2; color: var(--nh-muted, #6f6b66); max-width: 360px; }
+#nh .bw-ic { position: relative; width: 260px; height: 260px; margin-top: 10px; align-self: center; }
+#nh .bw-ic::before { content: ""; position: absolute; inset: 8%; border-radius: 50%; background: radial-gradient(closest-side, rgba(229, 97, 62, .22), rgba(229, 97, 62, 0)); filter: blur(10px); }
+#nh .bw-ic img { position: relative; width: 100%; height: 100%; object-fit: contain; }
+#nh .bw-main { display: flex; flex-direction: column; gap: 16px; min-height: 0; overflow: hidden; padding: 4px 4px 20px; }
+#nh .bw-main .nb-bar { padding: 0; }
+#nh .bw-main .nb-grid { flex: 1; min-height: 0; overflow: auto; align-content: start; padding: 4px 6px 24px; margin: -4px -6px 0; }
+#nh .bw-main .nb-card[hidden] { display: none !important; }
+#nh .bw-main .nb-card { border-radius: 28px; padding: 26px 30px; }
+#nh .bw-nav { flex: none; display: flex; align-items: center; gap: 20px; }
+#nh .bw-back, #nh .bw-next { flex: none; height: 40px; padding: 0 22px; border-radius: 999px; font: 500 14px "Readex Pro", sans-serif; cursor: pointer; }
+#nh .bw-back { background: transparent; border: 1px solid var(--nh-ink, #181718); color: var(--nh-ink, #181718); }
+#nh .bw-back:disabled { opacity: .35; cursor: default; }
+#nh .bw-back::before { content: "→"; margin-inline-end: 8px; }
+#nh .bw-next { height: 42px; padding: 0 30px; border: 0; background: var(--accent, #E5613E); color: #fff; box-shadow: 0 10px 24px rgba(229, 97, 62, .35); }
+#nh .bw-next::after { content: "←"; margin-inline-start: 8px; }
+#nh .bw-dots { flex: 1; display: flex; align-items: center; }
+#nh .bw-dots i { flex: 1; height: 2px; background: rgba(24, 23, 24, .12); }
+#nh .bw-dots i.on { background: var(--accent, #E5613E); }
+#nh .bw-dots button { flex: none; width: 36px; height: 36px; border-radius: 50%; border: 0; background: rgba(24, 23, 24, .08); color: #8a857f; font: 500 12px Unbounded, sans-serif; cursor: pointer; }
+#nh .bw-dots button.on { background: var(--accent, #E5613E); color: #fff; }
+#nh .bw-dots button.cur { box-shadow: 0 0 0 6px rgba(229, 97, 62, .16); }
+:root[data-nh-theme="dark"] #nh .bw-dots i, :root[data-nh-theme="dark"] #nh .bw-dots button:not(.on) { background: rgba(255, 255, 255, .1); }
+:root[data-nh-theme="dark"] #nh .bw-back { border-color: rgba(255, 255, 255, .7); color: #fff; }
+:root[data-nh-theme="dark"] #nh .bw-hero h1 { color: #fff; }
+@media (max-width: 1000px) {
+  #nh .nh-pgrid[data-key="brand"] { overflow: auto; }
+  #nh .bw { grid-template-columns: 1fr; gap: 10px; height: auto; }
+  #nh .bw-hero { padding: 0; } #nh .bw-hero h1 { font-size: 30px; } #nh .bw-ic { display: none; }
+  #nh .bw-main, #nh .bw-main .nb-grid { overflow: visible; }
+}

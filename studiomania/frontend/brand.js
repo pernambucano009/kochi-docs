@@ -3,14 +3,21 @@
 
 const BrandPage = (() => {
   const esc = (s) => escapeHtml(String(s ?? ""));
-  const S = { id: null, brains: [], cats: null, el: null, poll: null };
+  const S = { id: null, brains: [], cats: null, el: null, poll: null, step: 1 };
+  // زي البروتوتايب: الصفحة 4 خطوات. على اليمين سؤال الخطوة والأيقونة الزجاج، وعلى الشمال كروت الخطوة، وتحت رجوع / النقط / التالي
+  const STEPS = [
+    ["IDENTITY", "البراند\nمين هو؟", "اسم البراند ومجاله وجمهوره، واللوجو والألوان. البرنامج بيبني على ده في كل شغل."],
+    ["STYLE", "البراند\nشكله إيه؟", "الستايلات اللي بيشتغل بيها، وصور حقيقية منه، والهوية اللي البرنامج استنبطها منها."],
+    ["CONTENT RULES", "إيه اللي\nلازم يتراعى؟", "القواعد دي بتتطبق على كل السكريبتات والصور والفيديو والصوت اللي بتتعمل للبراند."],
+    ["DELIVERY", "الشغل بيطلع\nإزاي؟", "اللوجو والإنترو والأوترو، والدعوة واللينك والكابشن اللي بيتحطوا لوحدهم وقت النشر."],
+  ];
   const cur = () => S.brains.find((b) => b.id === S.id) || null;
   const bAPI = (path, opts) => api(`/api/ad-brains/${S.id}${path}`, opts);
   const KINDS = [["logos", "اللوجو"], ["products", "صور المنتج / الخدمة"], ["screens", "شاشات التطبيق"], ["characters", "شخصيات البراند"], ["sets", "الأماكن والخلفيات"], ["props", "الأدوات"]];
   const styleIds = (b) => String(b?.styles || "").split(",").map((x) => x.trim()).filter((x) => S.cats?.some((c) => c.id === x));
   const hexes = (txt) => [...String(txt || "").matchAll(/#[0-9a-fA-F]{6}\b/g)].map((m) => m[0]).slice(0, 8);
 
-  const card = (span, title, en, inner, cls = "") => `<section class="nh-tile nh-panel nb-card ${cls}" style="grid-column:span ${span}">
+  const card = (span, title, en, inner, step = 1) => `<section class="nh-tile nh-panel nb-card" data-step="${step}" style="grid-column:span ${span}">
     <div class="nb-h"><div class="nh-name"><span class="latin">${en}</span><b>${title}</b></div></div>${inner}</section>`;
   const field = (label, k, { area = 0, ph = "", ltr = false } = {}) => `<label class="nb-f"><span>${label}</span>${area
     ? `<textarea rows="${area}" data-k="${k}" placeholder="${esc(ph)}"${ltr ? ' dir="ltr"' : ""}></textarea>`
@@ -22,7 +29,14 @@ const BrandPage = (() => {
   }
 
   function skeleton() {
-    return `
+    return `<div class="bw">
+    <aside class="bw-hero">
+      <div class="bw-k latin" id="bwK"></div>
+      <h1 id="bwQ"></h1>
+      <p id="bwD"></p>
+      <div class="bw-ic"><img class="ic-l" src="/icons3d/brand.webp?v=8" alt=""><img class="ic-d" src="/icons3d/brand_d.webp?v=8" alt=""></div>
+    </aside>
+    <div class="bw-main">
     <div class="nb-bar">
       <label class="nb-pick"><span>البراند</span><select id="nbPick"></select></label>
       <button class="nb-btn" id="nbNew">＋ براند جديد</button>
@@ -40,14 +54,14 @@ const BrandPage = (() => {
         <div class="nb-sw" id="nbSw"></div>
         ${field("الألوان", "palette", { area: 2, ltr: true, ph: "#E5613E orange, #111111 black" })}
         ${field("الخطوط", "typography")}
-        <div class="nb-row nb-end"><button class="nb-btn" id="nbAnalyze">🔍 استنبط الهوية من الصور</button></div>`)}
+        <div class="nb-row nb-end"><button class="nb-btn" id="nbAnalyze">🔍 استنبط الهوية من الصور</button></div>`, 1)}
       ${card(12, "الستايل", "Style", `
         <p class="nb-hint">اختار الستايلات اللي البراند بيشتغل بيها (واحد أو أكتر). اللي عليه ⭐ هو الافتراضي، وصفحة «ابدأ مشروع جديد» بتبدأ بيه.</p>
-        <div class="nb-cats" id="nbCats"></div>`)}
-      ${card(6, "قواعد المحتوى", "Content Rules", `
+        <div class="nb-cats" id="nbCats"></div>`, 2)}
+      ${card(12, "قواعد المحتوى", "Content Rules", `
         <p class="nb-hint">اكتب بكلامك أي قاعدة لازم تتراعى في كل حاجة بتتعمل للبراند: السكريبت والصور والفيديو والصوت.</p>
-        <textarea class="nb-rules" rows="9" data-k="rules" placeholder="مثلًا:&#10;البنات محجبات ولبسهم واسع&#10;من غير مزيكا&#10;من غير وعود مبالغ فيها"></textarea>`)}
-      ${card(6, "التسليم", "Delivery", `
+        <textarea class="nb-rules" rows="9" data-k="rules" placeholder="مثلًا:&#10;البنات محجبات ولبسهم واسع&#10;من غير مزيكا&#10;من غير وعود مبالغ فيها"></textarea>`, 3)}
+      ${card(12, "التسليم", "Delivery", `
         ${sel("اللوجو على الفيديو", "logo_on", [["", "أيوه"], ["0", "لأ"]])}
         <div class="nb-vids">${["intro", "outro"].map((k) => `<div class="nb-vid" data-vid="${k}">
           <div class="nb-vh"><b>${k === "intro" ? "إنترو البراند" : "أوترو البراند"}</b><label class="nb-tog"><input type="checkbox" data-on="${k}"><span></span></label></div>
@@ -56,16 +70,42 @@ const BrandPage = (() => {
         ${field("الـ CTA الافتراضي", "cta", { ph: "مثلًا: حمّل التطبيق دلوقتي" })}
         ${field("اللينك", "link", { ltr: true, ph: "https://..." })}
         ${field("الكابشن الافتراضي", "caption", { area: 3, ph: "{caption}\n\n{cta} 👇\n{link}\n#هاشتاج" })}
-        <p class="nb-hint">{caption} كابشن الفيديو · {cta} الدعوة · {link} اللينك. بيتحط لوحده وقت النشر.</p>`)}
+        <p class="nb-hint">{caption} كابشن الفيديو · {cta} الدعوة · {link} اللينك. بيتحط لوحده وقت النشر.</p>`, 4)}
       ${card(12, "صور البراند", "Brand Assets", `
         <p class="nb-hint">صور حقيقية من البراند. البرنامج بيوصفها ويستخدمها بالظبط بدل ما يخترع.</p>
-        <div id="nbAssets"></div>`)}
+        <div id="nbAssets"></div>`, 2)}
       ${card(12, "الهوية المستنبطة", "Derived", `
         <p class="nb-hint">بتتكتب لوحدها من اللوجو والصور، وتقدر تعدّلها.</p>
         <div class="nb-row">${field("الثيم", "theme", { area: 2 })}${field("ستايل الرسم (بالإنجليزي أحسن)", "style", { area: 2 })}</div>
         <div class="nb-row">${field("مكان اللوجو", "logo_rule")}${field("وصف اللوجو", "logo_description", { area: 2, ltr: true })}</div>
-        ${field("شكل الواجهة (للبرومبتات)", "ui_style", { area: 2, ltr: true })}`)}
-    </div>`;
+        ${field("شكل الواجهة (للبرومبتات)", "ui_style", { area: 2, ltr: true })}`, 2)}
+    </div>
+    <nav class="bw-nav">
+      <button class="bw-back" data-bwgo="-1">رجوع</button>
+      <div class="bw-dots">${STEPS.map((_, i) => `${i ? "<i></i>" : ""}<button data-bwstep="${i + 1}">${i + 1}</button>`).join("")}</div>
+      <button class="bw-next" data-bwgo="1">التالي</button>
+    </nav>
+    </div></div>`;
+  }
+
+  function step(n) {
+    if (!S.el) return;
+    S.step = Math.min(STEPS.length, Math.max(1, n));
+    const [k, q, d] = STEPS[S.step - 1];
+    S.el.querySelector("#bwK").textContent = `BRAND BRAIN · ${S.step} / ${STEPS.length} · ${k}`;
+    S.el.querySelector("#bwQ").innerHTML = q.split("\n").map(esc).join("<br>");
+    S.el.querySelector("#bwD").textContent = d;
+    S.el.querySelectorAll(".nb-card").forEach((c) => { c.hidden = +c.dataset.step !== S.step; });
+    S.el.querySelectorAll("[data-bwstep]").forEach((b) => {
+      const i = +b.dataset.bwstep;
+      b.classList.toggle("on", i <= S.step);
+      b.classList.toggle("cur", i === S.step);
+      if (b.previousElementSibling?.tagName === "I") b.previousElementSibling.classList.toggle("on", i <= S.step);
+    });
+    S.el.querySelector(".bw-back").disabled = S.step === 1;
+    const nx = S.el.querySelector(".bw-next");
+    nx.textContent = S.step === STEPS.length ? "خلصت" : "التالي";
+    S.el.querySelector(".bw-main .nb-grid")?.scrollTo?.({ top: 0 });
   }
 
   const editing = () => S.el?.contains(document.activeElement) && document.activeElement.matches("input[type=text], textarea");
@@ -163,6 +203,12 @@ const BrandPage = (() => {
     });
     w.addEventListener("click", async (e) => {
       const t = e.target;
+      const go = t.closest("[data-bwgo]"), dot = t.closest("[data-bwstep]");
+      if (dot) return step(+dot.dataset.bwstep);
+      if (go) {
+        if (+go.dataset.bwgo > 0 && S.step === STEPS.length) return toast("✓ عقل البراند متحفظ");
+        return step(S.step + +go.dataset.bwgo);
+      }
       if (t.closest("#nbNew")) {
         const name = prompt("اسم البراند؟");
         if (!name?.trim()) return;
@@ -214,6 +260,7 @@ const BrandPage = (() => {
     S.id = id || clientx?.active || S.id;
     w.innerHTML = skeleton();
     bind(w);
+    step(1);
     try { await load(); } catch (err) { w.innerHTML = `<div class="nh-empty">${esc(err.message)}</div>`; }
   }
   return { html, mount, styleIds: (b) => styleIds(b), cats: () => S.cats };
