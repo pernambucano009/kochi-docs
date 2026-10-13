@@ -1,0 +1,73 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// قالب «رسم بياني متحرك»: العنوان والمحاور ثابتين ومفيش غير الرسم اللي بيتحرك: أعمدة بتطلع واحد ورا التاني، الرقم المهم بيتعلّم،
+// الأعمدة بتتحول لخط بيعدّي على قممها، وفي الآخر الرقم الكبير والبراند. الأرقام زي ما هي بالظبط. من غير نطّ ولا توهج. 1080×1920، 12 ثانية.
+const PR = M.params({
+  title: { label: "العنوان", kind: "text", role: "product", def: "طلباتنا في ٦ شهور" },
+  data: { label: "الأرقام (اسم|رقم في كل سطر)", kind: "lines", def: ["يناير|12", "فبراير|18", "مارس|15", "أبريل|26", "مايو|34", "يونيو|48"] },
+  unit: { label: "الوحدة", kind: "text", def: "ألف طلب" },
+  headline: { label: "الجملة الكبيرة", kind: "text", def: "٤ أضعاف" },
+  sub: { label: "تحت الجملة", kind: "text", def: "في ٦ شهور بس" },
+  note: { label: "ملاحظة صغيرة", kind: "text", def: "أرقام توضيحية" },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "سلة الحي" },
+  color: { label: "لون التمييز", kind: "color", def: "#ff6a3d" },
+});
+const W = 1080, H = 1920, DUR = 12, X0 = 120, X1 = 960, Y0 = 1360, Y1 = 520;
+const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
+const ar = (s) => String(s).replace(/\d/g, (d) => "٠١٢٣٤٥٦٧٨٩"[d]);
+const D = PR.data.slice(0, 8).map((l) => { const [n, v] = String(l).split("|"); return { n: (n || "").trim(), v: parseFloat(v) || 0 }; });
+
+M.reel({
+  W, H, DUR, bg: "#f7f5f0",
+  async init(M) { await Promise.all([loadFont("PB", "TY-PlexArabic-700.ttf", "700"), loadFont("PX", "TY-PlexArabic-400.ttf"), loadFont("LZ", "SM-Lalezar.ttf")]); const c = M.canvas(W, H); return { x: c.getContext("2d") }; },
+  seek(t, C, M) {
+    const { x } = C, { seg, cubicIO, clamp } = M, io = (k) => cubicIO(clamp(k));
+    x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = "#f7f5f0"; x.fillRect(0, 0, W, H);
+    const ink = "#1c1b22", mute = "#8a8794", acc = PR.color;
+    const vmax = Math.max(...D.map((d) => d.v)) * 1.15 || 1, n = D.length, slot = (X1 - X0) / n;
+    // العنوان والمحاور (ثابتين)
+    x.direction = "rtl"; x.textAlign = "right"; x.fillStyle = ink; x.font = `700 ${M.fit(PR.title, "PB", 840, 84, 40, "700")}px PB`; x.fillText(PR.title, X1, 260);
+    x.fillStyle = mute; x.font = "400 34px PX"; x.fillText(PR.unit, X1, 320); x.textAlign = "left"; x.fillText(PR.note, X0, 320);
+    x.strokeStyle = "#dcd8cf"; x.lineWidth = 2; for (let k = 0; k <= 4; k++) { const y = Y0 - (Y0 - Y1) * k / 4; x.beginPath(); x.moveTo(X0, y); x.lineTo(X1, y); x.stroke(); x.fillStyle = mute; x.font = "400 26px PX"; x.textAlign = "left"; x.direction = "ltr"; x.fillText(ar(Math.round(vmax * k / 4)), X0 - 10 - 40, y + 8); }
+    x.strokeStyle = ink; x.lineWidth = 3; x.beginPath(); x.moveTo(X0, Y0); x.lineTo(X1, Y0); x.stroke();
+    // الوقت من الشمال لليمين (زي المتعارف عليه في الرسوم البيانية)
+    const cxOf = (i) => X0 + slot * (i + .5), yOf = (v) => Y0 - (Y0 - Y1) * v / vmax;
+    const morph = io(seg(t, 4.6, 6.4));                  // ٠ = أعمدة، ١ = خط
+    D.forEach((d, i) => {
+      const g = io(seg(t, .6 + i * .3, 1.4 + i * .3)), v = d.v * g, top = yOf(v), cx = cxOf(i), last = i === n - 1;
+      const bw = slot * .56 * (1 - morph) + 6 * morph, bh = (Y0 - top) * (1 - morph);
+      x.fillStyle = last ? acc : "#2c2b36"; x.fillRect(cx - bw / 2, Y0 - bh, bw, bh);
+      x.fillStyle = mute; x.font = "400 30px PX"; x.textAlign = "center"; x.direction = "rtl"; x.fillText(d.n, cx, Y0 + 50);
+      if (g > 0) { x.fillStyle = last ? acc : ink; x.font = `700 ${last ? 44 : 34}px PB`; x.direction = "ltr"; x.fillText(ar(Math.round(v)), cx, top - 22 - 10 * morph); }
+    });
+    // الخط بيترسم على القمم (خطي) + مساحة خفيفة تحته + نقط
+    if (morph > 0) {
+      const pts = D.map((d, i) => [cxOf(i), yOf(d.v)]).reverse(); // من الشمال لليمين = من الأقدم? (الأقدم يمين) فبنرسم من اليمين
+      const ordered = D.map((d, i) => [cxOf(i), yOf(d.v)]), L = morph * (ordered.length - 1);
+      x.beginPath(); x.moveTo(...ordered[0]); for (let k = 1; k <= Math.ceil(L) && k < ordered.length; k++) { const f = Math.min(1, L - (k - 1)); x.lineTo(ordered[k - 1][0] + (ordered[k][0] - ordered[k - 1][0]) * f, ordered[k - 1][1] + (ordered[k][1] - ordered[k - 1][1]) * f); }
+      x.strokeStyle = acc; x.lineWidth = 8; x.lineJoin = "round"; x.lineCap = "round"; x.stroke();
+      x.lineTo(x.currentX || ordered[Math.min(ordered.length - 1, Math.ceil(L))][0], Y0);
+      ordered.forEach(([px, py], k) => { if (k <= L + .01) { x.fillStyle = "#f7f5f0"; x.beginPath(); x.arc(px, py, 12, 0, Math.PI * 2); x.fill(); x.lineWidth = 6; x.strokeStyle = acc; x.stroke(); } });
+    }
+    // علامة على الرقم الأهم (آخر شهر) + سهم مقارنة بأول شهر
+    const hk = io(seg(t, 3.0, 3.6)) * (1 - io(seg(t, 4.4, 4.7)));
+    if (hk > 0) { const cx = cxOf(n - 1), top = yOf(D[n - 1].v); x.globalAlpha = hk; x.strokeStyle = acc; x.lineWidth = 3; x.setLineDash([10, 8]); x.beginPath(); x.moveTo(X0, top); x.lineTo(X1, top); x.stroke(); x.setLineDash([]); x.fillStyle = acc; x.beginPath(); x.roundRect(cx - 220, top - 160, 260, 76, 38); x.fill(); x.fillStyle = "#fff"; x.font = "700 40px PB"; x.textAlign = "center"; x.direction = "rtl"; x.fillText("الأعلى", cx - 90, top - 108); x.globalAlpha = 1; }
+    // الجملة الكبيرة + البراند (تحت الرسم)
+    const bk = io(seg(t, 7.0, 7.8));
+    if (bk > 0) { x.save(); x.beginPath(); x.rect(0, 1440, W, 300); x.clip(); x.translate(0, (1 - bk) * 140); x.fillStyle = acc; x.font = `${M.fit(PR.headline, "LZ", 900, 190, 80)}px LZ`; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.headline, 540, 1630); x.restore();
+      x.globalAlpha = io(seg(t, 7.6, 8.2)); x.fillStyle = ink; x.font = "700 52px PB"; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.sub, 540, 1720); x.globalAlpha = 1; }
+    const rk = io(seg(t, 9.0, 9.6)); if (rk > 0) { x.fillStyle = ink; x.fillRect(540 - 260 * rk, 1790, 520 * rk, 3); x.globalAlpha = rk; x.fillStyle = ink; x.font = "700 44px PB"; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.brand, 540, 1860); x.globalAlpha = 1; }
+  },
+  sound(A) {
+    const N = A.midi;
+    // نقرة نضيفة مع كل عمود + خط بيرسم بنغمة طالعة + باد هادي
+    A.pad(0, [N(48), N(55), N(60), N(64)], 12, .02);
+    D.forEach((d, i) => { A.pluck(1.4 + i * .3, N(60 + i * 2 + (i === D.length - 1 ? 7 : 0)), .1, .6); A.click(.6 + i * .3, .06); });
+    A.tone(3.0, N(84), .3, "sine", .08);
+    for (let k = 0; k < 6; k++) A.tone(4.6 + k * .3, N(67 + k * 3), .25, "sine", .05);
+    A.hit(7.0, .3); A.pluck(7.0, N(79), .12, 1.4); A.pluck(9.0, N(84), .1, 1.2);
+    for (let i = 0; i < 24; i++) A.hat(i * .5 + .25, .03);
+  },
+});
+</script>
+</body></html>

@@ -1,0 +1,86 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// قالب «مكعبات طوب»: عالم من الطوب البلاستيك على مكتب خشب حقيقي، متصور ماكرو بستوب موشن (على «اتنين»):
+// المحل بيتبني طوبة طوبة، يافطة بتترشق، وشخصية مبنية من الطوب ماشية للباب. البلاستيك لامع والفواصل غامقة. 1080×1920، 12 ثانية.
+const PR = M.params({
+  title: { label: "العنوان", kind: "text", role: "product", def: "كل حلم بيتبني حتة حتة" },
+  sign: { label: "اليافطة", kind: "text", def: "مفتوح" },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "عالم المكعبات" },
+  wall: { label: "لون الحيطة", kind: "color", def: "#d6342c" },
+  roof: { label: "لون السقف", kind: "color", def: "#2b6fd6" },
+});
+const W = 1080, H = 1920, DUR = 12, A = 44, BV = 25.4, HZ = 31, OX = 540, OY = 640;
+const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
+const hex = (h) => { const n = parseInt(String(h).slice(1), 16) || 0; return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+const rgb = (c, k = 1) => `rgb(${c.map((v) => Math.min(255, Math.round(v * k))).join(",")})`;
+
+M.reel({
+  W, H, DUR, bg: "#7a5634",
+  async init(M) {
+    await Promise.all([loadFont("LZ", "SM-Lalezar.ttf"), loadFont("CH", "SM-Changa.ttf")]);
+    const c = M.canvas(W, H); const x = c.getContext("2d");
+    // المكتب: ألواح خشب + حاجات حقيقية ورا مموّهة (كوباية، زرعة، شباك)
+    const bg = document.createElement("canvas"); bg.width = W; bg.height = H; const b = bg.getContext("2d"), R = M.rng(5);
+    const wall = b.createLinearGradient(0, 0, 0, 700); wall.addColorStop(0, "#e9e4da"); wall.addColorStop(1, "#cfc6b6"); b.fillStyle = wall; b.fillRect(0, 0, W, 720);
+    b.filter = "blur(26px)"; b.fillStyle = "#fffaf0"; b.fillRect(620, 60, 380, 420); b.fillStyle = "#6c9c5a"; b.beginPath(); b.arc(180, 520, 150, 0, Math.PI * 2); b.fill(); b.fillStyle = "#b5653d"; b.fillRect(110, 560, 140, 180); b.fillStyle = "#3a5f8f"; b.fillRect(820, 520, 150, 200); b.filter = "none";
+    for (let k = 0; k < 7; k++) { const y0 = 700 + k * 190; const g = b.createLinearGradient(0, y0, 0, y0 + 190); g.addColorStop(0, "#9a6b3e"); g.addColorStop(1, "#7f5530"); b.fillStyle = g; b.fillRect(0, y0, W, 186); b.fillStyle = "#5e3d22"; b.fillRect(0, y0 + 186, W, 4); for (let i = 0; i < 26; i++) { b.strokeStyle = `rgba(60,35,15,${.1 + R() * .15})`; b.lineWidth = 1 + R() * 2; b.beginPath(); const yy = y0 + R() * 186; b.moveTo(0, yy); b.bezierCurveTo(W * .3, yy + R() * 20 - 10, W * .6, yy + R() * 20 - 10, W, yy + R() * 10 - 5); b.stroke(); } }
+    const lg = b.createRadialGradient(800, 200, 100, 800, 400, 1300); lg.addColorStop(0, "rgba(255,250,235,.25)"); lg.addColorStop(1, "rgba(0,0,0,.25)"); b.fillStyle = lg; b.fillRect(0, 0, W, H);
+    // الطوب بالترتيب (i, j, z, w, d, h, لون, نوع)
+    const wallC = hex(PR.wall), roofC = hex(PR.roof), white = [242, 242, 238], green = [64, 160, 70], yellow = [250, 200, 40], blue = [40, 90, 190], gray = [150, 150, 150];
+    const L = [];
+    L.push([0, 0, 0, 12, 12, 1 / 3, green, "plate"]);
+    for (let lvl = 0; lvl < 3; lvl++) { const z = 1 / 3 + lvl, col = lvl % 2 ? white : wallC, off = lvl % 2;
+      for (let i = 3 + off; i < 9; i += 2) L.push([i, 3, z, Math.min(2, 9 - i), 1, 1, col]);
+      for (let j = 4; j < 8; j += 2) { L.push([3, j, z, 1, 2, 1, col]); L.push([8, j, z, 1, 2, 1, col]); }
+      for (let i = 3 + off; i < 9; i += 2) { if (i <= 6 && i + 2 >= 6 && lvl < 2) continue; L.push([i, 7, z, Math.min(2, 9 - i), 1, 1, col]); } }
+    L.push([2, 2, 3 + 1 / 3, 8, 6, 1 / 3, roofC, "plate"]); L.push([3, 3, 3 + 2 / 3, 6, 5, 1, roofC]); L.push([4, 4, 4 + 2 / 3, 4, 3, 1, roofC]);
+    L.push([4, 8, 2 + 1 / 3, 4, 1, 1, white, "sign"]);
+    [[1, 9], [10, 4], [10, 9], [1, 3]].forEach(([i, j]) => { L.push([i, j, 1 / 3, 1, 1, 1, green, "round"]); L.push([i, j, 4 / 3, 1, 1, 1 / 3, [220, 50, 60], "round"]); });
+    L.forEach((p, k) => (p.t = .3 + k * .14));
+    return { x, bg, L, fig: { legs: blue, torso: [220, 50, 60], head: yellow } };
+  },
+  seek(t, C, M) {
+    const { x } = C, { seg, smooth, expo } = M;
+    const tq = Math.floor(t * 12) / 12;                      // ستوب موشن على «اتنين»
+    x.setTransform(1, 0, 0, 1, 0, 0); x.drawImage(C.bg, 0, 0);
+    const z0 = 1 + .06 * smooth(seg(t, 0, DUR)); x.translate(540, 1100); x.scale(z0, z0); x.translate(-540, -1100);
+    const P = (i, j, z) => [OX + (i - j) * A, OY + 300 + (i + j) * BV - z * HZ];
+    // طوبة: سطح بحبايات + وشين جانبيين + لمعة + ظل في الفواصل
+    const brick = (i, j, z, w, d, h, col, kind) => {
+      const top = [P(i, j, z + h), P(i + w, j, z + h), P(i + w, j + d, z + h), P(i, j + d, z + h)];
+      const fl = [P(i, j + d, z + h), P(i + w, j + d, z + h), P(i + w, j + d, z), P(i, j + d, z)];
+      const fr = [P(i + w, j, z + h), P(i + w, j + d, z + h), P(i + w, j + d, z), P(i + w, j, z)];
+      const poly = (pts, fill) => { x.beginPath(); pts.forEach((p) => x.lineTo(p[0], p[1])); x.closePath(); x.fillStyle = fill; x.fill(); x.strokeStyle = "rgba(0,0,0,.35)"; x.lineWidth = 1.5; x.stroke(); };
+      poly(fl, rgb(col, .78)); poly(fr, rgb(col, .62)); poly(top, rgb(col, 1.02));
+      x.fillStyle = "rgba(255,255,255,.28)"; x.beginPath(); const a = top[0], bb = top[1]; x.moveTo(a[0] + 4, a[1] + 3); x.lineTo(a[0] + (bb[0] - a[0]) * .6, a[1] + (bb[1] - a[1]) * .6 + 3); x.lineTo(a[0] + (bb[0] - a[0]) * .6 - 6, a[1] + (bb[1] - a[1]) * .6 + 8); x.lineTo(a[0] - 2, a[1] + 8); x.fill();
+      if (kind === "sign") return;
+      for (let si = 0; si < w; si++) for (let sj = 0; sj < d; sj++) { const [cx, cy] = P(i + si + .5, j + sj + .5, z + h); x.fillStyle = rgb(col, .7); x.beginPath(); x.ellipse(cx, cy + 3, 13, 7.5, 0, 0, Math.PI * 2); x.fill(); x.fillStyle = rgb(col, .95); x.fillRect(cx - 13, cy - 4, 26, 7); x.beginPath(); x.ellipse(cx, cy - 4, 13, 7.5, 0, 0, Math.PI * 2); x.fillStyle = rgb(col, 1.1); x.fill(); x.fillStyle = "rgba(255,255,255,.55)"; x.beginPath(); x.ellipse(cx - 4, cy - 6, 4, 2, 0, 0, Math.PI * 2); x.fill(); }
+    };
+    // كل طوبة بتنزل من فوق وترسى (من غير نطّ: الطوب جامد)
+    const items = [];
+    C.L.forEach((p) => { const k = seg(tq, p.t, p.t + .25); if (k <= 0) return; const [i, j, z, w, d, h, col, kind] = p; const bld = i >= 2 && i <= 9 && j >= 2 && j <= 8 && kind !== "round"; items.push({ i, j, z: z + (1 - k) * 6, w, d, h, col, kind, key: kind === "plate" && z < 1 ? -999 : kind === "sign" ? 400 : bld ? 100 + z * 20 + (i + j) * .1 : (i + j < 10 ? -50 + i + j + z : 500 + i + j + z) }); });
+    // الشخصية: رجلين ١×١، جسم ٢×١، راس مدوّرة؛ ماشية للباب
+    const fk = seg(tq, 7.4, 10.4), fi = 8.6 + 0 * fk, fj = 11.4 - 3.0 * fk, step = Math.floor(t * 6) % 2;
+    if (t > 7.0) { const zz = 1 / 3; items.push({ i: fi, j: fj, z: zz + (step ? .15 : 0), w: .5, d: .5, h: 1, col: C.fig.legs, kind: "fig", key: 600 + fi + fj }); items.push({ i: fi + .5, j: fj, z: zz + (step ? 0 : .15), w: .5, d: .5, h: 1, col: C.fig.legs, kind: "fig", key: 600.01 + fi + fj }); items.push({ i: fi, j: fj, z: zz + 1, w: 1, d: .5, h: 1, col: C.fig.torso, kind: "fig", key: 600.02 + fi + fj }); items.push({ i: fi + .1, j: fj - .05, z: zz + 2, w: .8, d: .6, h: .8, col: C.fig.head, kind: "head", key: 600.03 + fi + fj }); }
+    items.sort((a, b) => a.key - b.key).forEach((b) => { brick(b.i, b.j, b.z, b.w, b.d, b.h, b.col, b.kind); if (b.kind === "head") { const [hx, hy] = P(b.i + b.w / 2, b.j + b.d, b.z + .45); x.fillStyle = "#222"; x.fillRect(hx - 9, hy - 6, 4, 6); x.fillRect(hx + 5, hy - 6, 4, 6); x.strokeStyle = "#222"; x.lineWidth = 2.5; x.beginPath(); x.arc(hx, hy + 2, 8, .3, Math.PI - .3); x.stroke(); } });
+    // كلام اليافطة على الطوبة البيضا
+    const sp = C.L.find((p) => p[7] === "sign"); if (tq > sp.t + .25) { const [cx, cy] = P(6, 9, 2.8); x.save(); x.translate(cx, cy); x.transform(1, BV / A, 0, 1, 0, 0); x.fillStyle = "#222"; x.font = "48px LZ"; x.textAlign = "center"; x.textBaseline = "middle"; x.direction = "rtl"; x.fillText(PR.sign, 0, 0); x.restore(); }
+    x.setTransform(1, 0, 0, 1, 0, 0);
+    // العنوان والبراند (كروت طوب مسطحة)
+    const tk = expo(seg(t, 10.0, 10.6));
+    if (tk > 0) { x.save(); x.globalAlpha = tk; x.fillStyle = "rgba(255,255,255,.92)"; x.beginPath(); x.roundRect(70, 110, 940, 220, 30); x.fill(); x.fillStyle = "#1d1d1b"; x.font = `${M.fit(PR.title, "LZ", 880, 100, 44)}px LZ`; x.textAlign = "center"; x.textBaseline = "middle"; x.direction = "rtl"; x.fillText(PR.title, 540, 220); x.restore(); }
+    const bk = expo(seg(t, 10.8, 11.4)); if (bk > 0) { x.save(); x.globalAlpha = bk; x.fillStyle = "#f6c428"; x.beginPath(); x.roundRect(290, 1700, 500, 120, 20); x.fill(); x.fillStyle = "rgba(0,0,0,.2)"; for (let k = 0; k < 4; k++) { x.beginPath(); x.ellipse(370 + k * 115, 1700, 30, 12, 0, 0, Math.PI * 2); x.fill(); } x.fillStyle = "#1d1d1b"; x.font = "700 54px CH"; x.textAlign = "center"; x.textBaseline = "middle"; x.direction = "rtl"; x.fillText(PR.brand, 540, 1765); x.restore(); }
+    const vg = x.createRadialGradient(540, 1000, 500, 540, 1000, 1300); vg.addColorStop(0, "rgba(0,0,0,0)"); vg.addColorStop(1, "rgba(0,0,0,.4)"); x.fillStyle = vg; x.fillRect(0, 0, W, H);
+  },
+  sound(A2) {
+    const N = A2.midi;
+    // طقطقة كل طوبة بترسى + موسيقى خفيفة مرحة
+    for (let k = 0; k < 40; k++) { const t = .3 + k * .14 + .25; if (t > 7.4) break; A2.click(t, .18); A2.tone(t, 900 + (k % 5) * 120, .03, "square", .03); }
+    const mel = [72, 74, 76, 79, 76, 74, 72, 67];
+    for (let i = 0; i < 24; i++) { const t = i * .5; A2.pluck(t, N(mel[i % 8] + (Math.floor(i / 8) % 2 ? 5 : 0)), .07, .45); if (i % 2 === 0) A2.tone(t, N([48, 53, 55, 48][Math.floor(i / 4) % 4]), .45, "triangle", .1); }
+    for (let t = 7.4; t < 10.4; t += 1 / 6) A2.click(t, .06);
+    A2.pluck(10.0, N(84), .12, 1); A2.pluck(10.8, N(88), .12, 1.2);
+  },
+});
+</script>
+</body></html>

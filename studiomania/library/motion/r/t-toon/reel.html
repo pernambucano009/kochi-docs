@@ -1,0 +1,103 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// قالب «كرتون الخمسينات»: ألوان مسطحة مطبوعة، كل لون مزاح شوية عن الخط وبيتهز على «اتنين»، خط حبر رفيع بيتنفس ومش مقفول،
+// مذيعة (جسمها ثابت، الإيدين والعيون بس اللي بتتحرك) بتشرح المنتج في ٣ خطوات، ونجوم وأشكال «أتوميك». 1080×1920، 12 ثانية.
+const PR = M.params({
+  title: { label: "اسم المنتج", kind: "text", role: "product", def: "خلّاط الصباح" },
+  s1: { label: "الخطوة ١", kind: "text", def: "حط الفاكهة" },
+  s2: { label: "الخطوة ٢", kind: "text", def: "دوس الزرار" },
+  s3: { label: "الخطوة ٣", kind: "text", def: "صب واستمتع" },
+  end: { label: "الجملة الأخيرة", kind: "text", def: "بس كده!" },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "بيتي للأجهزة" },
+  product: { label: "لون المنتج", kind: "color", def: "#2bb3a8" },
+});
+const W = 1080, H = 1920, DUR = 12;
+const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
+const INK = "#2a1f1a", PAPER = "#f3e8d2";
+const STEPS = [[0, 1.8, "#f3e8d2", null], [1.8, 4.6, "#f2a38f", "s1"], [4.6, 7.2, "#f0c45a", "s2"], [7.2, 9.8, "#b9c98a", "s3"], [9.8, 12, "#f3e8d2", null]];
+
+M.reel({
+  W, H, DUR, bg: PAPER,
+  async init(M) {
+    await Promise.all([loadFont("LZ", "SM-Lalezar.ttf"), loadFont("CH", "SM-Changa.ttf")]);
+    const c = M.canvas(W, H); const x = c.getContext("2d");
+    return { x };
+  },
+  seek(t, C, M) {
+    const { x } = C, { seg, smooth, expo, springO, clamp } = M;
+    const tw = Math.floor(t * 12), r = M.rng(tw * 7 + 1), REG = [3 + (r() - .5) * 3, 3 + (r() - .5) * 3];   // إزاحة الألوان بتتغير على «اتنين»
+    const si = STEPS.findIndex(([a, b]) => t >= a && t < b), [s0, , ground, key] = STEPS[si], lt = t - s0;
+    x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = ground; x.fillRect(0, 0, W, H);
+    x.fillStyle = "rgba(0,0,0,.06)"; x.fillRect(0, 1450, W, H - 1450);   // الأرض أغمق شوية
+    // شكل بالستايل: اللون مزاح عن الخط + خط حبر بيتنفس فيه قطعات
+    const shape = (path, fill, seed = 1, lw = 4, shade) => {
+      x.save(); x.translate(REG[0], REG[1]); path(); x.fillStyle = fill; x.fill(); if (shade) { x.clip(); x.fillStyle = shade[0]; shade[1](); } x.restore();
+      const rr = M.rng(seed * 13 + Math.floor(tw / 2)); x.setLineDash([60 + rr() * 80, 8 + rr() * 14, 30 + rr() * 50, 6 + rr() * 10]); x.lineDashOffset = rr() * 50;
+      path(); x.strokeStyle = INK; x.lineWidth = lw * (.8 + rr() * .4); x.lineJoin = "round"; x.lineCap = "round"; x.stroke(); x.setLineDash([]);
+    };
+    const poly = (pts) => () => { x.beginPath(); pts.forEach((p) => x.lineTo(p[0], p[1])); x.closePath(); };
+    const ell = (cx, cy, rx, ry, a = 0) => () => { x.beginPath(); x.ellipse(cx, cy, rx, ry, a, 0, Math.PI * 2); };
+    const spark = (cx, cy, s, col) => { x.save(); x.translate(cx, cy); x.scale(s, s); x.fillStyle = col; x.beginPath(); x.moveTo(0, -40); x.quadraticCurveTo(5, -5, 40, 0); x.quadraticCurveTo(5, 5, 0, 40); x.quadraticCurveTo(-5, 5, -40, 0); x.quadraticCurveTo(-5, -5, 0, -40); x.fill(); x.restore(); };
+    const burst = (cx, cy, rad, n, col, rot = 0) => poly(Array.from({ length: n * 2 }, (_, i) => { const a = rot + i / (n * 2) * Math.PI * 2, rr = i % 2 ? rad * .72 : rad; return [cx + Math.cos(a) * rr, cy + Math.sin(a) * rr]; }));
+    // أشكال الخلفية: بومرانج ونقط
+    x.fillStyle = "rgba(255,255,255,.35)"; for (let i = 0; i < 18; i++) { const px = (i * 173) % W, py = 150 + (i * 311) % 1250; x.beginPath(); x.arc(px, py, 10 + (i % 3) * 6, 0, Math.PI * 2); x.fill(); }
+    shape(() => { x.beginPath(); x.moveTo(80, 320); x.quadraticCurveTo(200, 200, 320, 300); x.quadraticCurveTo(220, 260, 140, 380); x.closePath(); }, "rgba(255,255,255,.5)", 3, 3);
+    // العنوان / الخطوة في كارت
+    if (si === 0 || si === 4) {
+      const k = springO(Math.max(0, lt - .1), 12, .5);
+      x.save(); x.translate(540, 360); x.scale(k, k); shape(burst(0, 0, 330, 16, "#f0c45a", t * .3), "#f0c45a", 5); x.restore();
+      const txt = si === 0 ? PR.title : PR.end;
+      x.save(); x.translate(540, 360); x.scale(k, k); x.font = `${M.fit(txt, "LZ", 520, 140, 60)}px LZ`; x.textAlign = "center"; x.textBaseline = "middle"; x.direction = "rtl"; x.fillStyle = "#e9573f"; x.fillText(txt, REG[0], REG[1] + 8); x.lineWidth = 4; x.strokeStyle = INK; x.strokeText(txt, 0, 8); x.restore();
+      if (si === 4) { const bk = expo(seg(lt, .6, 1.1)); x.globalAlpha = bk; x.fillStyle = INK; x.font = "700 60px CH"; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.brand, 540, 1700); x.globalAlpha = 1; }
+    } else {
+      const k = expo(seg(lt, 0, .35)); x.save(); x.translate(540, 300 - (1 - k) * 260);
+      shape(() => { x.beginPath(); x.roundRect(-400, -110, 800, 220, 40); }, "#fffaf0", 7, 5);
+      x.font = `${M.fit(PR[key], "LZ", 560, 110, 50)}px LZ`; x.textAlign = "center"; x.textBaseline = "middle"; x.direction = "rtl"; x.fillStyle = "#e9573f"; x.fillText(`${"١٢٣"[si - 1]}. ${PR[key]}`, REG[0] * .6, 10 + REG[1] * .6); x.fillStyle = INK; x.globalAlpha = .9; x.restore(); x.globalAlpha = 1;
+    }
+    // المنتج: خلاط (لونه ثابت طول الفيلم)
+    const bx = 720, by = 1450, pc = PR.product;
+    const shakeX = si === 2 && lt > .9 && lt < 2.2 ? Math.sin(t * 60) * 5 : 0;
+    x.save(); x.translate(shakeX, 0);
+    shape(poly([[bx - 130, by], [bx + 130, by], [bx + 110, by - 170], [bx - 110, by - 170]]), pc, 11, 5, ["rgba(0,0,0,.18)", () => x.fillRect(bx + 40, by - 200, 120, 220)]);
+    shape(ell(bx, by - 85, 26, 26), si === 2 && lt > .7 && lt < 1.1 ? "#ffd84a" : "#f3e8d2", 12, 4);
+    shape(poly([[bx - 110, by - 175], [bx + 110, by - 175], [bx + 140, by - 560], [bx - 140, by - 560]]), "rgba(220,240,240,.55)", 13, 5);
+    // اللي جوه الخلاط حسب الخطوة
+    const fill2 = si >= 3 ? 1 : si === 2 ? smooth(seg(lt, 1.0, 2.0)) : 0;
+    if (si === 1 || si === 2 && fill2 < 1) { [[-50, "#e9573f"], [20, "#f0c45a"], [60, "#7cbf5a"], [-10, "#e9573f"]].forEach(([ox, col], i) => { const fy = si === 1 ? Math.min(by - 230 - i * 40, by - 900 + 700 * smooth(seg(lt, .5 + i * .3, 1.0 + i * .3))) : by - 230 - i * 40; if (si === 1 && lt < .5 + i * .3) return; shape(ell(bx + ox, fy, 34, 30, i), col, 20 + i, 3.5); }); }
+    if (fill2 > 0) { const top = by - 180 - 300 * (si === 3 ? 1 - smooth(seg(lt, .4, 1.6)) * .7 : fill2); shape(poly([[bx - 106, by - 180], [bx + 106, by - 180], [bx + 106 + (by - 180 - top) * .08, top], [bx - 106 - (by - 180 - top) * .08, top]]), "#f28aa0", 25, 3); }
+    if (si === 2 && lt > 1 && lt < 2.2) for (let k = 0; k < 4; k++) { x.strokeStyle = INK; x.lineWidth = 4; x.beginPath(); x.arc(bx, by - 380, 50 + k * 26, t * 9 + k, t * 9 + k + 1.4); x.stroke(); }
+    shape(poly([[bx - 150, by - 560], [bx + 150, by - 560], [bx + 130, by - 610], [bx - 130, by - 610]]), pc, 14, 5);
+    x.restore();
+    // الكوباية في الخطوة ٣
+    if (si >= 3) { const gx = 960, gy = 1450, gk = smooth(seg(lt, .4, 1.8)); shape(poly([[gx - 55, gy], [gx + 55, gy], [gx + 70, gy - 240], [gx - 70, gy - 240]]), "rgba(230,245,245,.6)", 30, 4); if (gk > 0) shape(poly([[gx - 53, gy - 4], [gx + 53, gy - 4], [gx + 53 + 14 * gk, gy - 230 * gk], [gx - 53 - 14 * gk, gy - 230 * gk]]), "#f28aa0", 31, 3); shape(ell(gx + 30, gy - 260, 18, 18), "#e9573f", 32, 3); }
+    // المذيعة: جسم ثابت (الإيدين والعيون بس بيتحركوا)
+    const px = 300, py = 1450;
+    shape(poly([[px - 150, py], [px + 150, py], [px + 70, py - 470], [px - 70, py - 470]]), "#e9573f", 40, 5, ["rgba(0,0,0,.15)", () => x.fillRect(px + 30, py - 500, 200, 520)]);
+    shape(poly([[px - 70, py - 470], [px + 70, py - 470], [px + 40, py - 520], [px - 40, py - 520]]), "#fffaf0", 41, 4);
+    shape(ell(px, py - 640, 95, 120, -.08), "#f6c9a4", 42, 5);
+    shape(() => { x.beginPath(); x.ellipse(px, py - 700, 110, 80, -.08, Math.PI, 0); x.lineTo(px + 110, py - 640); x.quadraticCurveTo(px + 60, py - 720, px - 100, py - 660); x.closePath(); }, "#3a2a24", 43, 4);
+    const blink = (tw % 40) < 2; [[-35, -650], [35, -655]].forEach(([ox, oy]) => { if (blink) { x.strokeStyle = INK; x.lineWidth = 4; x.beginPath(); x.moveTo(px + ox - 12, py + oy); x.lineTo(px + ox + 12, py + oy); x.stroke(); } else { x.fillStyle = INK; x.beginPath(); x.ellipse(px + ox + 4, py + oy, 9, 13, 0, 0, Math.PI * 2); x.fill(); } });
+    x.strokeStyle = INK; x.lineWidth = 5; x.beginPath(); x.arc(px + 5, py - 590, 34, .3, Math.PI - .3); x.stroke();
+    shape(ell(px - 52, py - 600, 18, 10), "#f2a38f", 44, 0);
+    // الإيد: بتشاور على المنتج (أو بتدوس الزرار في الخطوة ٢)
+    const tgt = si === 2 && lt > .4 && lt < 1.2 ? [bx - 30, by - 85] : si === 0 ? [px + 180, py - 760 + Math.sin(t * 8) * 30] : [bx - 180, by - 330 + Math.sin(t * 2) * 10];
+    const sh = [px + 70, py - 440], el = [(sh[0] + tgt[0]) / 2, Math.max(sh[1], tgt[1]) + 40];
+    x.strokeStyle = "#e9573f"; x.lineWidth = 30; x.lineCap = "round"; x.beginPath(); x.moveTo(...sh); x.quadraticCurveTo(...el, ...tgt); x.stroke(); x.strokeStyle = INK; x.lineWidth = 3; x.stroke();
+    shape(ell(tgt[0], tgt[1], 32, 28), "#fffaf0", 45, 4);
+    // نجوم «أتوميك»
+    [[880, 820, 0], [180, 1000, 1.5], [940, 1240, 3]].forEach(([sx, sy, ph]) => { const k = Math.max(0, Math.sin(t * 2.5 + ph)); if (k > 0) spark(sx, sy, k * .9, "#fffaf0"); });
+    // حبيبات طباعة خفيفة
+    const gr = M.rng(tw); for (let i = 0; i < 500; i++) { x.fillStyle = `rgba(60,40,20,${gr() * .08})`; x.fillRect(gr() * W, gr() * H, 2, 2); }
+  },
+  sound(A) {
+    const N = A.midi;
+    // موسيقى إعلانات الخمسينات: فايبرافون + كونترا باص + فرشاة درامز + «دينج» مع كل خطوة
+    const B = 60 / 132, prog = [[48, [64, 67, 71]], [45, [64, 67, 72]], [50, [65, 69, 72]], [43, [62, 65, 71]]];
+    for (let i = 0, t = 0; t < 12; i++, t += B) { const [r, ch] = prog[Math.floor(i / 4) % 4]; A.tone(t, N(r - 12 + [0, 7, 12, 7][i % 4]), B * .9, "triangle", .12); if (i % 2 === 0) ch.forEach((n, k) => A.tone(t + k * .03, N(n + 12), .5, "sine", .04)); A.nz(t + B / 2, .12, "bandpass", 5000, .03, .5); }
+    [1.8, 4.6, 7.2, 9.8].forEach((t) => { A.tone(t, N(88), .6, "sine", .1); A.tone(t, N(95), .5, "sine", .05); });
+    [2.3, 2.6, 2.9, 3.2].forEach((t) => A.tone(t, N(60), .1, "sine", .12));
+    A.nz(5.6, 1.2, "bandpass", 400, .12, 3); A.tone(5.0, N(84), .08, "square", .05);
+  },
+});
+</script>
+</body></html>

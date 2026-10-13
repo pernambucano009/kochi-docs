@@ -1,0 +1,94 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// قالب «برنامج مسابقات»: كل حاجة على إيقاع واحد سريع (١٤٠)، كل ظهور = صوت. ألوان حلويات سادة بخط تخين وضل صلب، متسابقين لعب
+// بيتنطّوا على البيت، سؤال و٣ إجابات، جرس، «صح!»، لوحة نقط، والجايزة في الآخر. 1080×1920، 12 ثانية.
+const PR = M.params({
+  show: { label: "اسم الفقرة", kind: "text", def: "مين يكسب؟" },
+  q: { label: "السؤال", kind: "text", def: "إيه أسرع طريقة تطلب بيها؟" },
+  a1: { label: "إجابة أ", kind: "text", def: "تتصل" },
+  a2: { label: "إجابة ب", kind: "text", def: "تروح بنفسك" },
+  a3: { label: "إجابة ج (الصح)", kind: "text", def: "من التطبيق" },
+  p1: { label: "المتسابق ١", kind: "text", def: "سارة" },
+  p2: { label: "المتسابق ٢", kind: "text", def: "كريم" },
+  prize: { label: "الجايزة", kind: "text", role: "product", def: "توصيل مجاني لأول طلب" },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "طلباتي" },
+});
+const W = 1080, H = 1920, DUR = 12, BPM = 140, B = 60 / BPM, at = (b) => b * B;
+const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
+const INK = "#1a1a24", CANDY = { pink: "#ff5fa2", blue: "#3b82f6", green: "#22c55e", yellow: "#ffd23f", orange: "#ff8a3d", sky: "#38bdf8", red: "#ef4444" };
+const SETS = [[0, 4, "pink", "burst"], [4, 14, "blue", "stripes"], [14, 20, "green", "burst"], [20, 28, "yellow", "dots"]];
+
+M.reel({
+  W, H, DUR, bg: CANDY.pink,
+  async init(M) { await Promise.all([loadFont("LZ", "SM-Lalezar.ttf"), loadFont("CH", "SM-Changa.ttf")]); const c = M.canvas(W, H); return { x: c.getContext("2d") }; },
+  seek(t, C, M) {
+    const { x } = C, { seg, springO, expo, clamp } = M;
+    const beat = t / B, bi = Math.floor(beat), bf = beat - bi;
+    const si = SETS.findIndex(([a, b]) => beat >= a && beat < b), [, , hue, pat] = SETS[Math.max(0, si)], col = CANDY[hue];
+    // الديكور: لون واحد + نقش أفتح بدرجة + أرضية أغمق بخط
+    x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = col; x.fillRect(0, 0, W, H);
+    x.fillStyle = "rgba(255,255,255,.16)";
+    if (pat === "burst") { x.save(); x.translate(540, 760); x.rotate(t * .4); for (let i = 0; i < 16; i++) { x.rotate(Math.PI / 8); x.beginPath(); x.moveTo(0, 0); x.lineTo(-120, -1600); x.lineTo(120, -1600); x.fill(); } x.restore(); }
+    if (pat === "stripes") { x.save(); x.translate((t * 40) % 140, 0); for (let i = -20; i < 30; i++) { x.beginPath(); x.moveTo(i * 140, 0); x.lineTo(i * 140 + 70, 0); x.lineTo(i * 140 + 70 - 600, H); x.lineTo(i * 140 - 600, H); x.fill(); } x.restore(); }
+    if (pat === "dots") for (let j = 0; j < 22; j++) for (let i = 0; i < 10; i++) { x.beginPath(); x.arc(i * 120 + (j % 2) * 60, j * 100, 18, 0, Math.PI * 2); x.fill(); }
+    x.fillStyle = "rgba(0,0,0,.18)"; x.fillRect(0, 1500, W, H - 1500); x.fillStyle = INK; x.fillRect(0, 1494, W, 8);
+    // أدوات الرسم: شكل بضل صلب + خط تخين
+    const sticker = (path, fill, off = 12, lw = 8) => { x.save(); x.translate(off, off); path(); x.fillStyle = INK; x.fill(); x.restore(); path(); x.fillStyle = fill; x.fill(); x.lineWidth = lw; x.strokeStyle = INK; x.lineJoin = "round"; x.stroke(); };
+    const rr = (cx, cy, w, h, r) => () => { x.beginPath(); x.roundRect(cx - w / 2, cy - h / 2, w, h, r); };
+    const big = (txt, cx, cy, size, fill = "#fff") => { x.font = `${size}px LZ`; x.textAlign = "center"; x.textBaseline = "middle"; x.direction = "rtl"; x.lineJoin = "round"; x.lineWidth = size * .16; x.strokeStyle = INK; x.strokeText(txt, cx, cy); x.fillStyle = fill; x.fillText(txt, cx, cy); };
+    const pop = (b0) => (beat >= b0 ? springO(t - at(b0), 18, .45) : 0);
+    // المتسابقين: جسم فاصوليا + بطن + لافتة اسم، بيتنطّوا على البيت
+    const toy = (cx, cy, bodyCol, name, mood, armsUp) => {
+      const hop = Math.abs(Math.sin(Math.PI * bf)) * 26 * (mood === "win" ? 2.4 : 1), sq = 1 - .06 * Math.cos(Math.PI * 2 * bf);
+      x.save(); x.translate(cx, cy - hop); x.scale(1 / sq, sq);
+      sticker(() => { x.beginPath(); x.ellipse(0, -150, 95, 140, 0, 0, Math.PI * 2); }, bodyCol, 10, 8);
+      sticker(() => { x.beginPath(); x.ellipse(0, -110, 55, 65, 0, 0, Math.PI * 2); }, "#fff6e0", 0, 5);
+      [-30, 30].forEach((ex) => { x.fillStyle = "#fff"; x.beginPath(); x.ellipse(ex, -210, 18, 24, 0, 0, Math.PI * 2); x.fill(); x.lineWidth = 5; x.strokeStyle = INK; x.stroke(); x.fillStyle = INK; x.beginPath(); x.arc(ex + 4, -206, 9, 0, Math.PI * 2); x.fill(); x.fillStyle = "#fff"; x.fillRect(ex + 5, -212, 4, 4); });
+      x.fillStyle = INK; x.beginPath(); if (mood === "win" || mood === "shout") x.ellipse(0, -165, 22, 18, 0, 0, Math.PI * 2); else x.arc(0, -172, 18, .2, Math.PI - .2); mood === "win" || mood === "shout" ? x.fill() : (x.lineWidth = 6, x.stroke());
+      [-1, 1].forEach((s) => { x.save(); x.translate(s * 90, -150); x.rotate(armsUp ? s * -2.2 : s * .4 + Math.sin(t * 8) * .1); sticker(() => { x.beginPath(); x.roundRect(-14, 0, 28, 80, 14); }, bodyCol, 0, 6); sticker(() => { x.beginPath(); x.arc(0, 86, 20, 0, Math.PI * 2); }, "#fff", 0, 5); x.restore(); });
+      x.restore();
+      sticker(rr(cx, cy + 50, 190, 64, 16), "#fff6e0", 8, 6); x.fillStyle = INK; x.font = "700 40px CH"; x.textAlign = "center"; x.textBaseline = "middle"; x.direction = "rtl"; x.fillText(name, cx, cy + 50);
+    };
+    const winner = beat >= 14 && beat < 20;
+    toy(260, 1470, CANDY.sky, PR.p1, winner ? "win" : beat >= 13 && beat < 14 ? "shout" : "idle", winner);
+    toy(820, 1470, CANDY.orange, PR.p2, "idle", false);
+    // الجرس قدّام المتسابق ١
+    if (beat >= 4 && beat < 20) { const press = beat >= 13 && beat < 13.5 ? 14 : 0; sticker(rr(470, 1480, 160, 34, 10), "#555", 6, 6); sticker(() => { x.beginPath(); x.ellipse(470, 1460 + press, 64, 26, 0, Math.PI, 0); x.closePath(); }, CANDY.red, 6, 6); }
+    // ١) الافتتاح: اسم الفقرة في كارت مدوّر
+    if (beat < 4) { const k = pop(0); x.save(); x.translate(540, 640); x.scale(k, k); x.rotate(-.05 + Math.sin(t * 3) * .02); sticker(() => { x.beginPath(); x.arc(0, 0, 330, 0, Math.PI * 2); }, CANDY.yellow, 16, 10); big(PR.show, 0, 10, M.fit(PR.show, "LZ", 520, 150, 60)); x.restore(); }
+    // ٢) السؤال والإجابات (كل إجابة على بيت)
+    if (beat >= 4 && beat < 14) {
+      const k = pop(4); x.save(); x.translate(540, 470); x.scale(k, k); sticker(rr(0, 0, 940, 260, 40), "#fff6e0", 14, 9); x.fillStyle = INK; x.font = `700 ${M.fit(PR.q, "CH", 860, 68, 30, "700")}px CH`; x.textAlign = "center"; x.textBaseline = "middle"; x.direction = "rtl"; x.fillText(PR.q, 0, 6); x.restore();
+      [[PR.a1, "أ", 8], [PR.a2, "ب", 9], [PR.a3, "ج", 10]].forEach(([a, l, b0], i) => { const k2 = pop(b0), right = i === 2 && beat >= 13; x.save(); x.translate(540, 760 + i * 170); x.scale(k2, k2); x.rotate((i - 1) * .015); sticker(rr(0, 0, 820, 130, 65), right ? CANDY.yellow : "#fff", 10, 8); sticker(() => { x.beginPath(); x.arc(330, 0, 46, 0, Math.PI * 2); }, [CANDY.pink, CANDY.orange, CANDY.green][i], 0, 6); big(l, 330, 4, 60); x.fillStyle = INK; x.font = "700 56px CH"; x.textAlign = "center"; x.textBaseline = "middle"; x.direction = "rtl"; x.fillText(a, -40, 4); x.restore(); });
+      if (beat >= 13) { const k3 = pop(13); x.save(); x.translate(430, 1090); x.scale(k3, k3); sticker(() => { x.beginPath(); x.ellipse(0, 0, 120, 90, 0, 0, Math.PI * 2); x.moveTo(-40, 70); x.lineTo(-110, 150); x.lineTo(10, 80); }, "#fff", 8, 7); big("ج!", 0, 4, 90, CANDY.red); x.restore(); }
+    }
+    // ٣) الحكم: «صح!» بانفجار + لوحة النقط
+    if (beat >= 14 && beat < 20) {
+      const k = pop(14); x.save(); x.translate(540, 620); x.scale(k, k); x.rotate(-.06);
+      sticker(() => { x.beginPath(); for (let i = 0; i < 24; i++) { const a = i / 24 * Math.PI * 2, r = i % 2 ? 230 : 330; x.lineTo(Math.cos(a) * r, Math.sin(a) * r); } x.closePath(); }, CANDY.yellow, 16, 10);
+      big("صح!", 0, 10, 200, CANDY.pink); x.restore();
+      for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2 + .2, d = 380 + 80 * ((t - at(14)) % .4); x.fillStyle = INK; x.save(); x.translate(540 + Math.cos(a) * d, 620 + Math.sin(a) * d); x.rotate(a); x.fillRect(-30, -6, 60, 12); x.restore(); }
+      const score = Math.min(100, Math.round(100 * seg(t, at(15), at(17)))); sticker(rr(540, 1060, 520, 170, 30), INK, 0, 6); x.fillStyle = "#ffd23f"; x.font = "110px LZ"; x.textAlign = "center"; x.textBaseline = "middle"; x.direction = "ltr"; x.fillText(String(score).replace(/\d/g, (d) => "٠١٢٣٤٥٦٧٨٩"[d]).padStart(3, "٠"), 540, 1066);
+    }
+    // ٤) الجايزة + البراند
+    if (beat >= 20) {
+      const k = pop(20); x.save(); x.translate(540, 420); x.scale(k, k); sticker(rr(0, 0, 640, 150, 75), CANDY.pink, 12, 8); big("الجايزة", 0, 6, 100); x.restore();
+      const k2 = pop(21); x.save(); x.translate(540, 720); x.scale(k2, k2); x.rotate(.02); sticker(rr(0, 0, 920, 300, 40), "#fff6e0", 16, 10); x.fillStyle = INK; x.font = `${M.fit(PR.prize, "LZ", 840, 110, 50)}px LZ`; x.textAlign = "center"; x.textBaseline = "middle"; x.direction = "rtl"; x.fillText(PR.prize, 0, 10); x.restore();
+      const k3 = pop(23); x.save(); x.translate(540, 1050); x.scale(k3, k3); sticker(rr(0, 0, 560, 140, 70), CANDY.blue, 12, 8); big(PR.brand, 0, 6, 90); x.restore();
+    }
+  },
+  sound(A) {
+    const N = A.midi;
+    // كل حاجة على الشبكة: درامز + باص + «بوب» مع كل ظهور + جرس + دينج دينج + هتاف
+    A.groove(BPM, 0, 12, { snare: true, kg: .85, hg: .1, sg: .3 });
+    for (let b = 0; b < 28; b++) A.bass(at(b), N([45, 45, 48, 50, 43, 43, 45, 47][b % 8]), B * .8, .22);
+    [0, 4, 8, 9, 10, 20, 21, 23].forEach((b, i) => A.tone(at(b), N(72 + (i % 4) * 4), .1, "square", .07));
+    A.tone(at(13), 110, .5, "square", .2); A.tone(at(13), 116, .5, "sawtooth", .12);
+    [14, 14.5].forEach((b) => { A.tone(at(b), N(88), .4, "sine", .2); A.tone(at(b), N(95), .3, "sine", .1); });
+    A.nz(at(14), 1.6, "bandpass", 1500, .18, .6);
+    for (let s = at(15); s < at(17); s += .05) A.click(s, .08);
+    A.hit(at(20), .4); [76, 79, 84, 88].forEach((n, i) => A.pluck(at(21) + i * .1, N(n), .14, .6));
+  },
+});
+</script>
+</body></html>

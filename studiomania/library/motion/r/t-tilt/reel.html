@@ -1,0 +1,84 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// قالب «تيلت شيفت»: مدينة متصورة من فوق بعدسة تيلت شيفت: شريط رفيع بس هو اللي واضح والباقي مموّه، فالمدينة بتبان زي ماكيت صغير؛
+// ألوان مشبّعة، عربيات وناس بتتحرك متقطع (زي الفاصل الزمني)، والناس بتتجمع عند الفرع الجديد. 1080×1920، 12 ثانية.
+const PR = M.params({
+  title: { label: "العنوان", kind: "text", role: "product", def: "افتتاح فرعنا الجديد" },
+  sub: { label: "تحت العنوان", kind: "text", def: "الجمعة الجاية · الساعة ١٠ الصبح" },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "كافيه الركن" },
+  accent: { label: "لون الفرع", kind: "color", def: "#ff4f6d" },
+});
+const W = 1080, H = 1920, DUR = 12, N = 16, TW = 70, TH = 40;
+const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
+const COLS = ["#f4f1ea", "#e9e2d2", "#d97a4e", "#e9b44c", "#3d6fb6", "#f1d3b3", "#9fc7c0"];
+const isRoad = (i, j) => i % 5 === 2 || j % 5 === 2;
+const SHOP = [6, 6];
+
+M.reel({
+  W, H, DUR, bg: "#6f8f5a",
+  async init(M) {
+    await Promise.all([loadFont("LZ", "SM-Lalezar.ttf"), loadFont("CH", "SM-Changa.ttf")]);
+    const c = M.canvas(W, H); const x = c.getContext("2d");
+    const mk = () => { const k = document.createElement("canvas"); k.width = W; k.height = H; return k; };
+    const R = M.rng(12), city = [];
+    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) { if (isRoad(i, j)) continue; const shop = i === SHOP[0] && j === SHOP[1], park = !shop && R() < .12; city.push({ i, j, park, shop, h: shop ? 70 : park ? 0 : 30 + Math.floor(R() * 5) * 22, col: COLS[Math.floor(R() * COLS.length)], roof: R() < .4 ? "#c4573a" : "#8c8c86" }); }
+    return { x, city, scene: mk(), blur: mk(), band: mk() };
+  },
+  seek(t, C, M) {
+    const { x } = C, { seg, smooth, expo } = M;
+    const tq = Math.floor(t * 10) / 10;                        // الحاجات الصغيرة بتتحرك متقطع
+    const s = C.scene.getContext("2d"); s.setTransform(1, 0, 0, 1, 0, 0);
+    s.fillStyle = "#5f8a48"; s.fillRect(0, 0, W, H);
+    // الكاميرا: بان بطيء على المدينة
+    const camx = 540 + 60 * Math.sin(t * .2), camy = 520 - 90 * smooth(seg(t, 0, DUR));
+    const P = (i, j) => [camx + (i - j) * TW, camy + (i + j) * TH];
+    const quad = (pts, col) => { s.beginPath(); pts.forEach((p) => s.lineTo(p[0], p[1])); s.closePath(); s.fillStyle = col; s.fill(); };
+    // أرضية: شوارع (أسفلت بخطوط بيضا) وأرصفة
+    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) { const [ax, ay] = P(i, j), [bx, by] = P(i + 1, j), [cx2, cy2] = P(i + 1, j + 1), [dx, dy] = P(i, j + 1);
+      if (isRoad(i, j)) { quad([[ax, ay], [bx, by], [cx2, cy2], [dx, dy]], "#3b3d42"); s.strokeStyle = "rgba(255,255,255,.7)"; s.lineWidth = 2; s.setLineDash([8, 10]); s.beginPath(); if (i % 5 === 2) { s.moveTo((ax + bx) / 2, (ay + by) / 2); s.lineTo((dx + cx2) / 2, (dy + cy2) / 2); } else { s.moveTo((ax + dx) / 2, (ay + dy) / 2); s.lineTo((bx + cx2) / 2, (by + cy2) / 2); } s.stroke(); s.setLineDash([]); }
+      else quad([[ax, ay], [bx, by], [cx2, cy2], [dx, dy]], "#c9c2b0"); }
+    // المباني (من ورا لقدّام): سطح + وشين جانبيين بشبابيك + ظل أزرق
+    C.city.slice().sort((a, b) => a.i + a.j - (b.i + b.j)).forEach((b) => {
+      const pad = .12, [ax, ay] = P(b.i + pad, b.j + pad), [bx, by] = P(b.i + 1 - pad, b.j + pad), [cx2, cy2] = P(b.i + 1 - pad, b.j + 1 - pad), [dx, dy] = P(b.i + pad, b.j + 1 - pad);
+      if (b.park) { quad([[ax, ay], [bx, by], [cx2, cy2], [dx, dy]], "#5aa64a"); [[.3, .3], [.7, .4], [.5, .7]].forEach(([u, v]) => { const [tx, ty] = P(b.i + u, b.j + v); s.fillStyle = "rgba(20,40,80,.25)"; s.beginPath(); s.ellipse(tx + 8, ty + 4, 14, 7, 0, 0, Math.PI * 2); s.fill(); s.fillStyle = "#2f7d3a"; s.beginPath(); s.arc(tx, ty - 16, 14, 0, Math.PI * 2); s.fill(); s.fillStyle = "#4fae4b"; s.beginPath(); s.arc(tx - 4, ty - 20, 7, 0, Math.PI * 2); s.fill(); }); return; }
+      const h = b.h, col = b.shop ? PR.accent : b.col;
+      quad([[bx, by], [cx2, cy2], [cx2 + 40, cy2 + 10], [bx + 40, by + 10]], "rgba(30,50,110,.28)");   // ظل
+      quad([[dx, dy], [cx2, cy2], [cx2, cy2 - h], [dx, dy - h]], shade(col, .82)); quad([[cx2, cy2], [bx, by], [bx, by - h], [cx2, cy2 - h]], shade(col, .68));
+      quad([[ax, ay - h], [bx, by - h], [cx2, cy2 - h], [dx, dy - h]], b.shop ? "#ffffff" : b.roof);
+      const rows = Math.floor(h / 22); for (let r = 0; r < rows; r++) for (let k = 1; k < 4; k++) { const u = k / 4, yy = -h + 12 + r * 22; s.fillStyle = r === rows - 1 && b.shop ? "#fff3b0" : "rgba(30,60,110,.55)"; const lx = dx + (cx2 - dx) * u, ly = dy + (cy2 - dy) * u + yy; s.fillRect(lx - 5, ly, 10, 12); const rx = cx2 + (bx - cx2) * u, ry = cy2 + (by - cy2) * u + yy; s.fillRect(rx - 5, ry, 10, 12); }
+      if (b.shop) { // تندة مخططة + بلالين
+        for (let k = 0; k < 6; k++) { const u0 = k / 6, u1 = (k + 1) / 6; quad([[dx + (cx2 - dx) * u0, dy + (cy2 - dy) * u0 - 18], [dx + (cx2 - dx) * u1, dy + (cy2 - dy) * u1 - 18], [dx + (cx2 - dx) * u1 + 4, dy + (cy2 - dy) * u1 - 4], [dx + (cx2 - dx) * u0 + 4, dy + (cy2 - dy) * u0 - 4]], k % 2 ? "#fff" : PR.accent); }
+        const bk = smooth(seg(t, 3, 4.5)); [[-20, "#ffd23f"], [0, "#3fa7ff"], [20, "#ff4f6d"]].forEach(([ox, bc], k) => { const bxp = (ax + cx2) / 2 + ox, byp = ay - h - 30 - 50 * bk - Math.sin(t * 2 + k) * 4; s.strokeStyle = "#555"; s.lineWidth = 1; s.beginPath(); s.moveTo((ax + cx2) / 2, ay - h); s.lineTo(bxp, byp); s.stroke(); s.fillStyle = bc; s.beginPath(); s.ellipse(bxp, byp - 10, 9, 11, 0, 0, Math.PI * 2); s.fill(); });
+      }
+    });
+    // عربيات صغيرة على الشوارع
+    for (let k = 0; k < 14; k++) { const lane = (k % 3) * 5 + 2, sp = .9 + (k % 4) * .3, u = ((tq * sp + k * 2.3) % N); const horiz = k % 2; const i = horiz ? u : lane + .3, j = horiz ? lane + .3 : u; const [cx2, cy2] = P(i, j); const cc = ["#e8473c", "#ffffff", "#2a73d9", "#ffd23f", "#1f1f1f"][k % 5]; s.fillStyle = "rgba(20,30,60,.35)"; s.beginPath(); s.ellipse(cx2 + 5, cy2 + 3, 13, 7, 0, 0, Math.PI * 2); s.fill(); s.fillStyle = cc; s.beginPath(); s.ellipse(cx2, cy2 - 4, 12, 7, horiz ? .5 : -.5, 0, Math.PI * 2); s.fill(); s.fillStyle = "rgba(160,210,255,.9)"; s.fillRect(cx2 - 4, cy2 - 8, 8, 3); }
+    // ناس (كبسولات ملونة) بتتجمع عند باب الفرع
+    const [sx, sy] = P(SHOP[0] + 1.02, SHOP[1] + 1.02);
+    for (let k = 0; k < 40; k++) { const r = M.rng(k * 17 + 3), a = r() * Math.PI * 2, d0 = 160 + r() * 260, gk = smooth(seg(tq, 2 + r() * 3, 6 + r() * 3)), d = d0 * (1 - gk) + (20 + r() * 50) * gk, px = sx + Math.cos(a) * d * 1.6, py = sy + Math.sin(a) * d * .7 + 30; s.fillStyle = "rgba(20,30,60,.3)"; s.fillRect(px + 2, py, 6, 3); s.fillStyle = ["#e8473c", "#3fa7ff", "#ffd23f", "#ffffff", "#7fd36b"][k % 5]; s.fillRect(px - 3, py - 12, 6, 12); s.fillStyle = "#f2c9a0"; s.fillRect(px - 2, py - 16, 4, 4); }
+    // ---- العدسة: مموّه فوق وتحت، شريط واضح في النص على الفرع
+    const bandY = sy - 40, bw = 170;
+    const b = C.blur.getContext("2d"); b.setTransform(1, 0, 0, 1, 0, 0); b.filter = "blur(14px)"; b.drawImage(C.scene, 0, 0); b.filter = "none";
+    const bd = C.band.getContext("2d"); bd.setTransform(1, 0, 0, 1, 0, 0); bd.globalCompositeOperation = "source-over"; bd.clearRect(0, 0, W, H); bd.drawImage(C.scene, 0, 0);
+    const g = bd.createLinearGradient(0, bandY - bw * 2.2, 0, bandY + bw * 2.2); g.addColorStop(0, "rgba(0,0,0,0)"); g.addColorStop(.32, "rgba(0,0,0,1)"); g.addColorStop(.68, "rgba(0,0,0,1)"); g.addColorStop(1, "rgba(0,0,0,0)");
+    bd.globalCompositeOperation = "destination-in"; bd.fillStyle = g; bd.fillRect(0, 0, W, H); bd.globalCompositeOperation = "source-over";
+    x.setTransform(1, 0, 0, 1, 0, 0); x.filter = "saturate(1.45) contrast(1.06)"; x.drawImage(C.blur, 0, 0); x.drawImage(C.band, 0, 0); x.filter = "none";
+    const vg = x.createRadialGradient(540, 960, 500, 540, 960, 1250); vg.addColorStop(0, "rgba(0,0,0,0)"); vg.addColorStop(1, "rgba(0,0,0,.35)"); x.fillStyle = vg; x.fillRect(0, 0, W, H);
+    // الكلام: كارت أبيض فوق، والتاريخ والبراند تحت
+    const tk = expo(seg(t, 6.0, 6.7));
+    if (tk > 0) { x.save(); x.globalAlpha = tk; x.translate(0, (1 - tk) * -40); x.fillStyle = "rgba(255,255,255,.94)"; x.beginPath(); x.roundRect(80, 120, 920, 260, 40); x.fill(); x.fillStyle = "#1d1d1b"; x.font = `${M.fit(PR.title, "LZ", 840, 110, 50)}px LZ`; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.title, 540, 250); x.fillStyle = PR.accent; x.font = "700 46px CH"; x.fillText(PR.sub, 540, 330); x.restore(); }
+    const bk = expo(seg(t, 7.2, 7.8)); if (bk > 0) { x.save(); x.globalAlpha = bk; x.fillStyle = PR.accent; x.beginPath(); x.roundRect(290, 1640, 500, 120, 60); x.fill(); x.fillStyle = "#fff"; x.font = "700 56px CH"; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.brand, 540, 1718); x.restore(); }
+  },
+  sound(A) {
+    const N2 = A.midi;
+    // جو مدينة صغيرة: كلاكسات بعيدة + ناس + موسيقى صندوق موسيقى
+    const mel = [79, 83, 86, 83, 81, 84, 88, 84, 79, 83, 86, 91, 88, 86, 83, 79];
+    for (let i = 0; i < 24; i++) { const t = i * .5; A.tone(t, N2(mel[i % 16]), .5, "sine", .05); A.tone(t, N2(mel[i % 16] + 12), .2, "sine", .02); if (i % 2 === 0) A.pluck(t, N2([55, 52, 48, 50][Math.floor(i / 4) % 4]), .06, .8); }
+    A.nz(0, 12, "bandpass", 500, .03, .4);
+    [1.5, 4.2, 8.1].forEach((t) => { A.tone(t, 440, .15, "square", .015); A.tone(t + .18, 440, .15, "square", .015); });
+    A.pluck(6.0, N2(84), .12, 1); A.pluck(7.2, N2(88), .12, 1.2);
+  },
+});
+function shade(hex, k) { const n = parseInt(hex.slice(1), 16); const r = Math.round(((n >> 16) & 255) * k), g = Math.round(((n >> 8) & 255) * k), b = Math.round((n & 255) * k); return `rgb(${r},${g},${b})`; }
+</script>
+</body></html>

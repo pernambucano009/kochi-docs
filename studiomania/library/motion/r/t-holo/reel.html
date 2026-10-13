@@ -1,0 +1,97 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// قالب «هولوجرام»: المنتج دايمًا مجسم خطوط من نور فوق قاعدة إسقاط مدوّرة، على مسرح شبه أسود: مسح بيبني المجسم من تحت لفوق،
+// بيلف، الغطا بيتفصل لفوق، أرقام بتعدّ وتتلوّن بلون التمييز لما تتثبت، وواجهة HUD بأركان ومساطر. 1080×1920، 12 ثانية.
+const PR = M.params({
+  product: { label: "اسم المنتج", kind: "text", role: "product", def: "سبيكر نبض" },
+  f1: { label: "ميزة ١ (رقم + كلام)", kind: "text", def: "24|ساعة بطارية" },
+  f2: { label: "ميزة ٢", kind: "text", def: "360|درجة صوت" },
+  f3: { label: "ميزة ٣", kind: "text", def: "5|دقايق شحن سريع" },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "نبض أوديو" },
+  hue: { label: "لون الهولوجرام", kind: "color", def: "#5ef2c8" },
+  accent: { label: "لون التمييز", kind: "color", def: "#ff8a3d" },
+});
+const W = 1080, H = 1920, DUR = 12, CX = 540, CY = 1050;
+const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
+const hex = (h) => { const n = parseInt(String(h).slice(1), 16) || 0; return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+const ar = (s) => String(s).replace(/\d/g, (d) => "٠١٢٣٤٥٦٧٨٩"[d]);
+
+M.reel({
+  W, H, DUR, bg: "#04070a",
+  async init(M) {
+    await Promise.all([loadFont("PB", "TY-PlexArabic-700.ttf", "700"), loadFont("PX", "TY-PlexArabic-400.ttf"), loadFont("PM", "TY-PlexMono-500.ttf", "500")]);
+    const c = M.canvas(W, H); const x = c.getContext("2d");
+    // المجسم: سبيكر أسطواني (حلقات + خطوط طولية) وغطا فوق وشبكة سماعة
+    const segs = [];   // كل خط: [p1, p2, part]   p = [x,y,z]
+    const ring = (y, r, part, n = 36) => { for (let i = 0; i < n; i++) { const a0 = i / n * Math.PI * 2, a1 = (i + 1) / n * Math.PI * 2; segs.push([[Math.cos(a0) * r, y, Math.sin(a0) * r], [Math.cos(a1) * r, y, Math.sin(a1) * r], part]); } };
+    for (let k = 0; k <= 10; k++) ring(-300 + k * 50, 150 - (k === 0 || k === 10 ? 12 : 0), "body");
+    for (let i = 0; i < 24; i++) { const a = i / 24 * Math.PI * 2; segs.push([[Math.cos(a) * 150, -290, Math.sin(a) * 150], [Math.cos(a) * 150, 190, Math.sin(a) * 150], "body"]); }
+    for (let k = 0; k < 4; k++) ring(210 + k * 18, 150 - k * 22, "cap");
+    for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; segs.push([[Math.cos(a) * 150, 210, Math.sin(a) * 150], [Math.cos(a) * 84, 264, Math.sin(a) * 84], "cap"]); }
+    ring(-120, 80, "core", 24); ring(60, 80, "core", 24); for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; segs.push([[Math.cos(a) * 80, -120, Math.sin(a) * 80], [Math.cos(a) * 80, 60, Math.sin(a) * 80], "core"]); }
+    const plates = [PR.f1, PR.f2, PR.f3].map((s) => { const [n, l] = String(s).split("|"); const el = M.el("div", "", `position:absolute;left:0;top:0;width:330px;padding:18px 22px 22px;background:rgba(3,10,10,.82);border:1px solid ${PR.hue}55;font:400 28px PX;color:#cfe;direction:rtl;`, `<div style="font:500 70px PM;line-height:1;"></div><div style="margin-top:6px;">${l || ""}</div>`); return { el, num: el.firstChild, target: parseInt(n) || 0 }; });
+    const title = M.el("div", "", `position:absolute;left:90px;right:90px;top:0;padding:26px 30px 34px;background:rgba(3,10,10,.85);border:1px solid ${PR.hue}66;text-align:center;direction:rtl;`, `<div style="font:700 92px PB;color:#effffa;">${PR.product}</div><div style="font:400 36px PX;color:${PR.hue};margin-top:6px;">${PR.brand}</div>`);
+    const status = M.el("div", "", "position:absolute;right:70px;top:80px;font:500 26px PM;color:#9fe;direction:ltr;text-align:right;");
+    const sub = M.el("div", "", "position:absolute;left:70px;top:80px;font:500 26px PM;color:#9fe;direction:ltr;", "SUBJECT // SCAN");
+    return { x, segs, plates, title, status };
+  },
+  seek(t, C, M) {
+    const { x } = C, { seg, smooth, expo, cubic, clamp, X, op } = M;
+    const [hr, hg, hb] = hex(PR.hue);
+    x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = "#04070a"; x.fillRect(0, 0, W, H);
+    const lift = x.createRadialGradient(CX, CY, 50, CX, CY, 900); lift.addColorStop(0, `rgba(${hr},${hg},${hb},.12)`); lift.addColorStop(1, "rgba(0,0,0,0)"); x.fillStyle = lift; x.fillRect(0, 0, W, H);
+    // شبكة نقط في الخلفية (بارالاكس بطيء)
+    for (let gy = 0; gy < H; gy += 60) for (let gx = (t * 6) % 60; gx < W; gx += 60) { const a = .12 * (1 - Math.abs(gy - CY) / 1200); x.fillStyle = `rgba(${hr},${hg},${hb},${Math.max(0, a)})`; x.fillRect(gx, gy, 2, 2); }
+    // القاعدة: حلقات بمنظور بتلف
+    const padY = CY + 330, rot = t * .5;
+    x.save(); x.translate(CX, padY); x.scale(1, .28);
+    [[260, .9, false], [220, .35, true], [180, .5, false], [300, .2, true]].forEach(([r, a, dash]) => { x.strokeStyle = `rgba(${hr},${hg},${hb},${a})`; x.lineWidth = dash ? 2 : 3; x.setLineDash(dash ? [14, 10] : []); x.lineDashOffset = -rot * 60; x.beginPath(); x.arc(0, 0, r, 0, Math.PI * 2); x.stroke(); });
+    x.setLineDash([]); for (let i = 0; i < 48; i++) { const a = i / 48 * Math.PI * 2 + rot; x.strokeStyle = `rgba(${hr},${hg},${hb},.4)`; x.beginPath(); x.moveTo(Math.cos(a) * 262, Math.sin(a) * 262); x.lineTo(Math.cos(a) * (i % 4 ? 272 : 286), Math.sin(a) * (i % 4 ? 272 : 286)); x.stroke(); }
+    x.restore();
+    // شعاع خفيف من القاعدة
+    const bk = smooth(seg(t, .3, 1.2)); if (bk > 0) { const g = x.createLinearGradient(0, padY, 0, padY - 760); g.addColorStop(0, `rgba(${hr},${hg},${hb},${.14 * bk})`); g.addColorStop(1, "rgba(0,0,0,0)"); x.fillStyle = g; x.beginPath(); x.moveTo(CX - 260, padY); x.lineTo(CX + 260, padY); x.lineTo(CX + 200, padY - 760); x.lineTo(CX - 200, padY - 760); x.closePath(); x.fill(); }
+    // المجسم: مسح بيبنيه من تحت لفوق + لف + الغطا بيطلع (تفكيك)
+    const scan = -320 + 640 * cubic(seg(t, .6, 3.2)), yaw = t * .45, pitch = .32;
+    const ex = smooth(seg(t, 4.2, 5.2)) * (1 - smooth(seg(t, 8.6, 9.6))), capUp = 170 * ex, coreSide = 0;
+    const proj = ([px, py, pz], part) => { if (part === "cap") py += capUp; const ca = Math.cos(yaw), sa = Math.sin(yaw); let x1 = px * ca - pz * sa, z1 = px * sa + pz * ca; const cp = Math.cos(pitch), sp = Math.sin(pitch); const y1 = py * cp - z1 * sp, z2 = py * sp + z1 * cp; const f = 1400 / (1400 + z2); return [CX + x1 * f, CY - y1 * f, z2]; };
+    x.globalCompositeOperation = "lighter"; x.lineCap = "round";
+    C.segs.forEach(([a, b, part]) => {
+      const ya = a[1] + (part === "cap" ? capUp : 0); if (ya > scan + 4 && t < 3.3) return;
+      const p1 = proj(a, part), p2 = proj(b, part), depth = clamp(1 - ((p1[2] + p2[2]) / 2 + 160) / 420, .25, 1);
+      const hot = part === "core" && ex > .3;
+      x.strokeStyle = hot ? `rgba(255,255,255,${.75 * depth})` : `rgba(${hr},${hg},${hb},${(.35 + .65 * depth) * (part === "core" ? .6 : 1)})`;
+      x.lineWidth = hot ? 2.4 : 1.5; x.beginPath(); x.moveTo(p1[0], p1[1]); x.lineTo(p2[0], p2[1]); x.stroke();
+    });
+    // خط المسح الساخن
+    if (t > .6 && t < 3.3) { const [, sy] = proj([0, scan, 0]); x.strokeStyle = "rgba(255,255,255,.9)"; x.lineWidth = 3; x.beginPath(); x.ellipse(CX, sy, 190, 52, 0, 0, Math.PI * 2); x.stroke(); x.fillStyle = `rgba(${hr},${hg},${hb},.12)`; x.fill(); }
+    x.globalCompositeOperation = "source-over";
+    // HUD: أركان + مساطر بتتحرك أسرع + حالة
+    const brk = (bx, by, sx, sy) => { x.strokeStyle = `rgba(${hr},${hg},${hb},.8)`; x.lineWidth = 3; x.beginPath(); x.moveTo(bx, by + 50 * sy); x.lineTo(bx, by); x.lineTo(bx + 50 * sx, by); x.stroke(); };
+    brk(50, 50, 1, 1); brk(W - 50, 50, -1, 1); brk(50, H - 50, 1, -1); brk(W - 50, H - 50, -1, -1);
+    for (let i = 0; i < 40; i++) { const yy = 200 + ((i * 40 - t * 30) % 1600 + 1600) % 1600; x.fillStyle = `rgba(${hr},${hg},${hb},.4)`; x.fillRect(W - 70, yy, i % 5 ? 10 : 22, 2); x.fillRect(60, (yy + 800) % 1800, i % 5 ? 10 : 22, 2); }
+    const pct = Math.round(100 * seg(t, .6, 3.2)); C.status.textContent = t < 3.3 ? `SCAN ${String(pct).padStart(3, "0")}%` : ex > .5 ? "MODE // EXPLODE" : "STATUS // LOCKED";
+    // لوحات الأرقام: الرقم بيعدّ، ولما يتثبت بيتلوّن بلون التمييز + خط بيوصل للجزء
+    const anchors = [[[150, 120, 0], "body", 640, 620], [[0, 270, 0], "cap", 120, 460], [[80, -120, 0], "core", 640, 1460]];
+    C.plates.forEach((p, i) => {
+      const k0 = 5.2 + i * .7, k = expo(seg(t, k0, k0 + .4)), off = 1 - smooth(seg(t, 9.4, 9.9));
+      op(p.el, k * off); const [ax, ay, part] = [anchors[i][2], anchors[i][3]], pt = proj(anchors[i][0], anchors[i][1]);
+      X(p.el, ax, ay); const v = Math.round(p.target * cubic(seg(t, k0, k0 + 1))); p.num.textContent = ar(v); p.num.style.color = t > k0 + 1 ? PR.accent : "#e6fff8";
+      if (k > 0 && off > 0) { x.strokeStyle = `rgba(${hr},${hg},${hb},${.7 * k * off})`; x.lineWidth = 2; x.beginPath(); x.moveTo(ax < 540 ? ax + 330 : ax, ay + 60); x.lineTo(pt[0], pt[1]); x.stroke(); x.fillStyle = PR.hue; x.beginPath(); x.arc(pt[0], pt[1], 6, 0, Math.PI * 2); x.fill(); }
+    });
+    // لوح الاسم في الآخر
+    const tk = expo(seg(t, 9.8, 10.4)); op(C.title, tk); C.title.style.transform = `translateY(${200 + (1 - tk) * 30}px)`;
+    // خطوط مسح أفقية خفيفة على الكل
+    x.fillStyle = "rgba(0,0,0,.18)"; for (let y = 0; y < H; y += 4) x.fillRect(0, y, W, 1);
+  },
+  sound(A) {
+    const N = A.midi;
+    // جو تكنولوجي: باد بارد + نبضات + «بيب» مع كل رقم بيتثبت + صوت المسح
+    A.pad(0, [N(45), N(52), N(57), N(64)], 12, .025);
+    for (let i = 0; i < 48; i++) { const t = i * .25; if (i % 4 === 0) A.kick(t, .3); A.tone(t, N(i % 8 === 0 ? 76 : 88), .03, "square", .012); }
+    A.riser(.6, 3.2, .12); A.whoosh(4.2, .7, .15);
+    [6.2, 6.9, 7.6].forEach((t) => { A.tone(t, N(91), .12, "sine", .1); A.tone(t + .08, N(96), .15, "sine", .08); });
+    A.hit(9.8, .3); A.pluck(9.8, N(81), .1, 1.5);
+  },
+});
+</script>
+</body></html>
