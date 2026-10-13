@@ -2676,3 +2676,66 @@ dialog.cal-dlg { width: min(720px, 94vw); max-height: 90vh; border: 1px solid va
 .stage-inbox svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linejoin: round; }
 .view[data-view="7"] > .inbox-link { display: none; }
 @media (max-width: 900px) { :root:root .stage-head { grid-template-columns: minmax(0, 1fr) auto auto auto auto auto; grid-template-areas: "logo money bell inbox cal client" "back back back back back back" "title title title title title title"; } }
+
+/* ============ المونتاج بمقاسات البروتوتايب ============
+   راس صغير: رجوع، MONTAGE واسم المشروع، واتحفظ/معاينة/صدّر على الشمال.
+   تحته: عمود الأدوات (84) ← كارت الأداة (360) ← المعاينة الكبيرة، والتايم لاين كارت تحت بعرض الصفحة. */
+.stage.mt-mode .stage-head { grid-template-areas: "back back back back back back back"; padding-top: 14px; padding-bottom: 0; }
+.stage.mt-mode .stage-head > :not(.stage-back) { display: none !important; }
+.stage.mt-mode .stage-head .stage-back { margin-top: 0; }
+.stage.mt-mode .stage-body { padding-top: 4px; }
+/* شريط المشروع = الراس */
+.stage .project-bar { gap: 12px; margin-bottom: 14px; min-height: 52px; }
+.project-bar .mt-k { order: -3; font-family: var(--display); font-size: 10.5px; letter-spacing: .32em; color: var(--accent); direction: ltr; }
+.stage .project-bar #projectName { order: -2; background: transparent !important; box-shadow: none !important; border: 0 !important; padding: 2px 4px !important; font-size: 22px; font-weight: 500; min-width: 120px; max-width: 360px; border-radius: 10px !important; }
+.stage .project-bar #projectName:hover, .stage .project-bar #projectName:focus { background: var(--card) !important; }
+.stage .project-bar #projectSelect { order: -1; font-size: 13px; padding: 8px 14px; }
+.stage .project-bar .new-project { order: -1; }
+.stage .project-bar #saveState { font-size: 13px; color: #8C8C88; }
+.stage .project-bar #deleteProject { font-size: 13px; }
+:root:root .stage .project-bar .mt-preview { background: transparent; border: 1.5px solid var(--text); padding: 10px 18px; font-size: 14px; }
+:root:root .stage .project-bar .mt-preview:hover { background: var(--text); color: var(--card); }
+:root:root .stage .project-bar .mt-export { padding: 11px 26px; font-size: 14px; font-weight: 500; box-shadow: 0 10px 28px rgba(229, 97, 62, .45); }
+/* الأدوات والكارت والمعاينة */
+:root:root .stage .ed-top { grid-template-columns: 460px minmax(0, 1fr); gap: 16px; }
+:root:root .stage .ed-inspector { order: -1; background: none; box-shadow: none; padding: 0; grid-template-columns: 84px minmax(0, 1fr); gap: 0 16px; max-height: none; overflow: visible; }
+:root:root .stage .ed-inspector > .tabs { gap: 10px; align-items: center; }
+:root:root .stage #inspTabs button { width: 72px; padding: 12px 0; border-radius: 20px; background: var(--card); color: var(--text); font-size: 11.5px; gap: 6px; box-shadow: none; }
+:root:root .stage #inspTabs button:hover { background: var(--card); box-shadow: 0 4px 18px rgba(24, 23, 24, .08); }
+:root:root .stage #inspTabs button.active { background: #181718; color: #fff; }
+:root[data-nh-theme="dark"] .stage #inspTabs button.active { background: #F2F1EE; color: #181718; }
+#inspTabs [data-tab="media"] { --ic: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.7' stroke-linejoin='round'%3E%3Crect x='3.5' y='3.5' width='7' height='7' rx='2'/%3E%3Crect x='13.5' y='3.5' width='7' height='7' rx='2'/%3E%3Crect x='3.5' y='13.5' width='7' height='7' rx='2'/%3E%3Cpath d='M17 13.5v7M13.5 17h7'/%3E%3C/svg%3E"); }
+:root:root .stage .ed-inspector > .pane:not([hidden]) { background: var(--card); border-radius: 24px; box-shadow: var(--card-shadow); padding: 22px; min-height: 520px; max-height: 640px; overflow-y: auto; box-sizing: border-box; }
+.stage .ed-inspector > .pane .panel-head { margin-bottom: 10px; }
+.stage .ed-inspector > .pane.ed-media .bin-grid { max-height: none; }
+:root:root .stage .ed-player { background: none; box-shadow: none; padding: 0; gap: 14px; }
+:root:root .stage .ed-player .ty-wrap { background: #EDECE8; border-radius: 24px; flex: 1; min-height: 520px; display: flex; align-items: center; justify-content: center; }
+:root[data-nh-theme="dark"] .stage .ed-player .ty-wrap { background: #2A292A; }
+:root:root .stage .ed-player .frame { border-radius: 22px; box-shadow: 0 30px 60px rgba(24, 23, 24, .25); }
+:root:root .stage .ed-player .transport { justify-content: center; gap: 8px; }
+:root:root .stage .ed-player .transport > .spacer { flex: 0 0 8px; }
+:root:root .stage .ed-player .transport .ic.play { width: 48px; height: 48px; background: #181718; color: #fff; }
+:root[data-nh-theme="dark"] .stage .ed-player .transport .ic.play { background: #F2F1EE; color: #181718; }
+/* التايم لاين: كارت تحت بعرض الصفحة */
+:root:root .stage #montage .ed-timeline { margin-top: 16px; }
+:root:not([data-nh-theme="dark"]) .stage .tl-heads { color: #6B6A66; }
+:root:not([data-nh-theme="dark"]) .stage .tl-clip { border-radius: 10px; }
+:root:not([data-nh-theme="dark"]) .stage .tl-audio { border-radius: 8px; }
+:root:not([data-nh-theme="dark"]) .stage .tl-audio.voice { background: #FBE4DA; }
+:root:not([data-nh-theme="dark"]) .stage .tl-audio.music { background: #E6EEF9; }
+:root:not([data-nh-theme="dark"]) .stage .tl-cap { background: #EDECE8; border-radius: 6px; }
+@media (max-width: 1200px) { :root:root .stage .ed-top { grid-template-columns: 400px minmax(0, 1fr); } }
+@media (max-width: 900px) { :root:root .stage .ed-top { grid-template-columns: 1fr; } :root:root .stage .ed-inspector { grid-template-columns: 1fr; } :root:root .stage .ed-inspector > .tabs { flex-direction: row; overflow-x: auto; position: static; grid-row: auto; } }
+/* المعاينة: مربع رمادي كبير والكادر في نصه، والتشغيل تحته */
+:root:root .stage .project-bar { background: none !important; box-shadow: none !important; padding: 0 !important; border: 0; }
+:root:root .stage .ed-player { border: 0; padding: 24px 0 0; gap: 14px; justify-content: flex-start;
+  background: linear-gradient(#EDECE8, #EDECE8) top / 100% calc(100% - 64px) no-repeat; border-radius: 24px; }
+:root[data-nh-theme="dark"] .stage .ed-player { background: linear-gradient(#2A292A, #2A292A) top / 100% calc(100% - 64px) no-repeat; }
+:root:root .stage .ed-player .ty-wrap { background: none; min-height: 0; flex: none; display: block; align-self: center; border-radius: 0; margin-bottom: 18px; }
+:root:root .stage .ed-player .mt-gbar:empty { display: none; }
+:root:root .stage #inspTabs button { padding: 10px 0; }
+:root:root .stage .ed-player { align-self: start; padding-bottom: 0; }
+:root:root .stage .ed-inspector > .tabs { gap: 6px; }
+:root:root .stage #inspTabs button { padding: 8px 0; gap: 4px; }
+:root:root .stage .ed-inspector > .pane:not([hidden]) { min-height: 0; max-height: 600px; }
+:root:root .stage .ed-inspector > .pane:not([hidden]) { min-height: 460px; }

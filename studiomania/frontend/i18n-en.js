@@ -3975,5 +3975,7 @@ window.I18N_EN = {
   "تاج الكوتش + كولاب": "Coach tag + collab",
   "✓ تاج الكوتش + كولاب": "✓ Coach tag + collab",
   "الغلاف": "Cover",
-  "✓ الغلاف": "✓ Cover"
+  "✓ الغلاف": "✓ Cover",
+  "الميديا": "Media",
+  "معاينة": "Preview"
 };

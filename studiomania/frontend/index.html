@@ -310,6 +310,7 @@
               <select id="newFromVideo" title="تعمل المشروع من فيديو خام؟"></select>
               <button class="btn sm" id="newProject">＋ مشروع جديد</button>
             </span>
+            <span class="mt-k studio-only">MONTAGE</span>
             <input type="text" id="projectName" placeholder="اسم المشروع">
             <span class="linked-video" id="linkedVideo" hidden></span>
             <button class="btn sm" id="refreshFromVideo" hidden title="يجيب آخر الفيديوهات المولَّدة للفيديو ده والصوت المربوط بيه"><span class="emo">🔄</span> حدّث من الفيديو</button>
@@ -317,26 +318,13 @@
             <span class="muted" id="saveState"></span>
             <span class="spacer"></span>
             <button class="btn sm danger" id="deleteProject">حذف المشروع</button>
+            <button class="btn mt-preview studio-only" id="mtPreviewTop" type="button">معاينة</button>
             <button class="btn primary mt-export studio-only" id="mtExportTop" type="button">صدّر الفيديو</button>
           </div>
           <p class="empty panel" id="noProject" hidden>اعمل مشروع جديد عشان تبدأ المونتاج.</p>
 
           <div class="editor" id="montage" hidden>
             <div class="ed-top">
-              <section class="panel ed-media">
-                <div class="panel-head"><h2>الفيديوهات المولَّدة</h2>
-                  <span class="row"><label class="btn sm" title="لو فيه قطعة متحددة في التايم لاين الفيديو بيبدّلها، غير كده بيتحط عند المؤشر">⬆ ارفع فيديو<input type="file" id="clipUpload" accept="video/*,.mkv,.mov" hidden></label>
-                  <label class="btn sm" title="ارفع فيديو أوترو تاني غير أوترو الشخصية، ويتحط في آخر المونتاج">🎬 ＋ أوترو تاني<input type="file" id="outroUpload" accept="video/*,.mkv" hidden></label></span></div>
-                <div class="bin-tools">
-                  <input type="search" id="binSearch" placeholder="🔍 دوّر بالاسم" dir="auto">
-                  <button class="btn sm" id="binFavOnly" title="المفضلة بس"><span class="emo">☆</span> المفضلة</button>
-                </div>
-                <label class="check"><input type="checkbox" id="binCoachOnly" checked> الشخصية المختارة بس</label>
-                <div class="replace-bar" id="replaceBar" hidden>🔁 اختار الفيديو اللي هيتحط مكان القطعة <b id="replaceWhich"></b> (التعديلات بتفضل زي ما هي) <button class="btn sm" id="replaceCancel">إلغاء</button></div>
-                <div class="bin-grid" id="binGrid"></div>
-                <p class="empty" id="binEmpty" hidden>مفيش فيديوهات مولَّدة جاهزة. ولّد من <a href="#" data-goto="2">الخطوة 2</a>.</p>
-                <p class="hint">دوس ＋ أو اسحب الفيديو للتايم لاين.</p>
-              </section>
 
               <section class="ed-player">
                 <div class="ty-wrap" id="pvWrap"><div class="frame" id="previewFrame">
@@ -365,6 +353,7 @@
 
               <section class="panel ed-inspector">
                 <div class="tabs" id="inspTabs">
+                  <button data-tab="media">الميديا</button>
                   <button data-tab="clip" class="active"><span class="emo">🎞️</span> القطعة</button>
                   <button data-tab="audio"><span class="emo">🔊</span> الصوت</button>
                   <button data-tab="text"><span class="emo">🔠</span> نص</button>
@@ -376,6 +365,20 @@
                   <button data-tab="export"><span class="emo">🎬</span> تصدير</button>
                 </div>
 
+              <div class="pane ed-media" data-pane="media" hidden>
+                <div class="panel-head"><h2>الفيديوهات المولَّدة</h2>
+                  <span class="row"><label class="btn sm" title="لو فيه قطعة متحددة في التايم لاين الفيديو بيبدّلها، غير كده بيتحط عند المؤشر">⬆ ارفع فيديو<input type="file" id="clipUpload" accept="video/*,.mkv,.mov" hidden></label>
+                  <label class="btn sm" title="ارفع فيديو أوترو تاني غير أوترو الشخصية، ويتحط في آخر المونتاج">🎬 ＋ أوترو تاني<input type="file" id="outroUpload" accept="video/*,.mkv" hidden></label></span></div>
+                <div class="bin-tools">
+                  <input type="search" id="binSearch" placeholder="🔍 دوّر بالاسم" dir="auto">
+                  <button class="btn sm" id="binFavOnly" title="المفضلة بس"><span class="emo">☆</span> المفضلة</button>
+                </div>
+                <label class="check"><input type="checkbox" id="binCoachOnly" checked> الشخصية المختارة بس</label>
+                <div class="replace-bar" id="replaceBar" hidden>🔁 اختار الفيديو اللي هيتحط مكان القطعة <b id="replaceWhich"></b> (التعديلات بتفضل زي ما هي) <button class="btn sm" id="replaceCancel">إلغاء</button></div>
+                <div class="bin-grid" id="binGrid"></div>
+                <p class="empty" id="binEmpty" hidden>مفيش فيديوهات مولَّدة جاهزة. ولّد من <a href="#" data-goto="2">الخطوة 2</a>.</p>
+                <p class="hint">دوس ＋ أو اسحب الفيديو للتايم لاين.</p>
+              </div>
                 <div class="pane" data-pane="typo" hidden><div id="mtTypoPane"></div></div>
                 <div class="pane" data-pane="scene" hidden><div id="mtScenePane"></div></div>
 

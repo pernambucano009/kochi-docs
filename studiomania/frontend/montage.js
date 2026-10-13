@@ -3127,3 +3127,4 @@ viewHooks["6"] = initMontage;
 
 // «صدّر الفيديو» فوق (من البروتوتايب): بيفتح تاب التصدير
 $("mtExportTop")?.addEventListener("click", () => document.querySelector('#inspTabs [data-tab="export"]')?.click());
+$("mtPreviewTop")?.addEventListener("click", () => $("tpFull")?.click());

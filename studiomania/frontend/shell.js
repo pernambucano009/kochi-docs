@@ -74,6 +74,8 @@ function openStage(step) {
   $("stageNum").textContent = [info.en, info.num && PROCESS.includes(step) ? `${Number(info.num)} / 5` : ""].filter(Boolean).join(" · ");
   $("stageNum").hidden = !info.en && !info.num;
   $("stageTitle").textContent = info.title;
+  // المونتاج شاشة شغل: راس صغير (رجوع + اسم المشروع + صدّر) بدل العنوان الكبير، زي البروتوتايب
+  $("stage").classList.toggle("mt-mode", ["6", "6s", "6a", "6f"].includes(step));
   const inFlow = PROCESS.includes(step);
   $("flowNav").hidden = !inFlow;
   $("stage").classList.toggle("library", !inFlow);
