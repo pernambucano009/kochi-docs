@@ -640,3 +640,40 @@ body.stage-settled #nh { visibility: hidden; }
 #nh .nh-pj-add span { width: 44px; height: 44px; border-radius: 50%; background: var(--card, #fff); box-shadow: 0 4px 14px rgba(24, 23, 24, .08); display: grid; place-items: center; color: var(--nh-accent); font-size: 20px; }
 #nh .nh-pj-add .nh-snake { display: none; }
 :root[data-nh-theme="dark"] #nh .nh-pj-add { border-color: #3D3C3D; }
+/* ابدأ مشروع جديد بمقاسات البروتوتايب: كروت اختيار النوع، ورجوع/التالي تحت */
+#nh .nh-pgrid[data-key="create"] { display: block; overflow: auto; padding: 2px 4px 30px; }
+#nh .nh-ptitle[data-key="create"] .nh-glt { width: 0; height: 0; opacity: 0; overflow: hidden; }
+#nh .nh-cr { display: flex; flex-direction: column; gap: 18px; min-height: 100%; }
+#nh .nh-cr-sub { margin: -12px 0 0; font-size: 15px; color: #6B6A66; }
+#nh .nh-cr-card { background: var(--card, #fff); border-radius: 28px; box-shadow: 0 4px 24px rgba(24, 23, 24, .06); padding: 28px 30px; display: flex; flex-direction: column; gap: 18px; }
+#nh .nh-cr-k { font-size: 10.5px; letter-spacing: .1em; color: #8C8C88; }
+#nh .nh-cr-k .latin { font-size: 10.5px; letter-spacing: .24em; color: #8C8C88; }
+#nh .nh-cr-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; }
+#nh .nh-cr-type { border-radius: 22px; background: #F7F7F5; padding: 18px; display: flex; flex-direction: column; align-items: stretch; gap: 10px; text-align: start; transition: background .2s, box-shadow .2s; }
+#nh .nh-cr-type:hover { background: #F2F1EE; }
+#nh .nh-cr-type.on { background: #FFF6F2; box-shadow: 0 0 0 2px var(--nh-accent); }
+#nh .nh-cr-art { width: 92px; height: 92px; align-self: center; display: grid; place-items: center; }
+#nh .nh-cr-art img { width: 100%; height: 100%; object-fit: contain; }
+#nh .nh-cr-art .ic-d, :root[data-nh-theme="dark"] #nh .nh-cr-art .ic-l { display: none; }
+:root[data-nh-theme="dark"] #nh .nh-cr-art .ic-d { display: block; }
+#nh .nh-cr-t { display: flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 500; }
+#nh .nh-cr-t i { width: 18px; height: 18px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px #8C8C88; flex: none; }
+#nh .nh-cr-type.on .nh-cr-t i { box-shadow: inset 0 0 0 1.5px var(--nh-accent), inset 0 0 0 4.5px #FFF6F2, inset 0 0 0 9px var(--nh-accent); }
+#nh .nh-cr-d { font-size: 13px; color: #6B6A66; line-height: 1.6; }
+#nh .nh-cr-foot { display: flex; align-items: center; gap: 16px; margin-top: auto; padding-top: 8px; }
+#nh .nh-cr-fill { flex: 1; height: 2px; background: linear-gradient(to left, var(--nh-accent) 30%, #E3E2DE 30%); border-radius: 2px; }
+[dir="ltr"] #nh .nh-cr-fill { background: linear-gradient(to right, var(--nh-accent) 30%, #E3E2DE 30%); }
+#nh .nh-cr-back { border: 1.5px solid var(--nh-ink); border-radius: 999px; padding: 10px 22px; font-size: 14px; display: inline-flex; align-items: center; gap: 6px; }
+[dir="ltr"] #nh .nh-cr-back svg { transform: scaleX(-1); }
+#nh .nh-cr-next { flex-direction: row; align-items: center; gap: 8px; background: var(--nh-accent); color: #fff; border-radius: 999px; padding: 12px 30px; font-size: 15px; font-weight: 500; box-shadow: 0 10px 28px rgba(229, 97, 62, .5); }
+[dir="ltr"] #nh .nh-cr-next svg { transform: scaleX(-1); }
+#nh .nh-cr-next .nh-snake { display: none; }
+:root[data-nh-theme="dark"] #nh .nh-cr-type { background: #343334; }
+:root[data-nh-theme="dark"] #nh .nh-cr-type:hover { background: #3D3C3D; }
+:root[data-nh-theme="dark"] #nh .nh-cr-type.on { background: #4A2E25; }
+:root[data-nh-theme="dark"] #nh .nh-cr-type.on .nh-cr-t i { box-shadow: inset 0 0 0 1.5px var(--nh-accent), inset 0 0 0 4.5px #4A2E25, inset 0 0 0 9px var(--nh-accent); }
+:root[data-nh-theme="dark"] #nh .nh-cr-d, :root[data-nh-theme="dark"] #nh .nh-cr-sub { color: #A3A29E; }
+@media (max-width: 1000px) { #nh .nh-cr-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } #nh .nh-cr-card { padding: 20px; } }
+#nh .nh-cr-sub { margin: 0; }
+#nh .nh-cr-art { position: relative; overflow: hidden; }
+#nh .nh-cr-art img { position: static !important; inset: auto !important; transform: none !important; width: 92px !important; height: 92px !important; max-width: 92px; object-fit: contain; }

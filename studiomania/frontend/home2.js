@@ -283,9 +283,20 @@ const NH = (() => {
   const panel = (c, r, inner, attrs = "") => `<div class="nh-tile nh-panel" ${attrs} style="grid-column:span ${c};grid-row:span ${r}">${inner}</div>`;
   const PAGES = {
     // كل نوع كارت فيه أيقونته الزجاج الـ 3D (فاتحة وغامقة)، واسمه، وسطر بيشرح هيعمل إيه
-    create: () => CREATE_ALL.map((k) => panel(3, 3, `<div class="nh-pick-art">${glImg(GLKEY[k] || "create")}</div>
-        <div class="nh-pick-t"><div class="nh-name"><span class="latin">${T[k].en}</span><b>${esc(T[k].ar)}</b></div><p>${esc(T[k].desc)}</p></div>`,
-      `data-id="${k}" tabindex="0" role="button"`).replace('class="nh-tile nh-panel"', 'class="nh-tile nh-panel nh-pick"')).join(""),
+    // زي البروتوتايب: تختار نوع الشغل الأول (كارت باختيار)، وبعدين «التالي» يفتحه. دبل كليك على الكارت بيفتحه على طول
+    create: () => `<div class="nh-cr">
+      <p class="nh-cr-sub">اختار نوع الشغل، وبعدين هنمشي خطوة خطوة.</p>
+      <section class="nh-cr-card">
+        <div class="nh-cr-k"><span class="latin">CHOOSE TYPE</span> · نوع الشغل</div>
+        <div class="nh-cr-grid" role="radiogroup" aria-label="نوع الشغل">${CREATE_ALL.map((k, i) => `<button type="button" class="nh-cr-type${i === 0 ? " on" : ""}" data-pick="${k}" role="radio" aria-checked="${i === 0}">
+          <span class="nh-cr-art">${glImg(GLKEY[k] || "create")}</span>
+          <span class="nh-cr-t"><i></i>${esc(T[k].ar)}</span><span class="nh-cr-d">${esc(T[k].desc)}</span></button>`).join("")}</div>
+      </section>
+      <div class="nh-cr-foot">
+        <button type="button" class="nh-cr-back" data-crback><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 12h14M13 6l6 6-6 6"/></svg>رجوع</button>
+        <span class="nh-cr-fill"></span>
+        <button type="button" class="nh-tile nh-cr-next" data-id="${CREATE_ALL[0]}">التالي<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></button>
+      </div></div>`,
     // (مكتبة الموشن اتشالت من الأصول، ومكانها هيبقى في «اعمل جديد»)
     assets: () => panel(4, 6, `${head("coaches")}<div class="nh-body">${D.coaches.length} شخصية</div><div class="nh-avs">${D.coaches.slice(0, 12).map((c) => `<img src="${esc(c.image_url)}" alt="">`).join("")}</div>`, `data-id="coaches" tabindex="0" role="button"`)
       + panel(4, 6, `${head("voice")}<div class="nh-body">${D.voices} تسجيل</div>`, `data-id="voice" tabindex="0" role="button"`)
@@ -359,6 +370,18 @@ const NH = (() => {
     pageArg = null;
   }
   document.getElementById("nhPClient").onclick = () => document.getElementById("nhClient").click();
+  // ابدأ مشروع جديد: اختيار النوع بيغيّر وجهة «التالي»، ورجوع بيقفل الصفحة
+  pGrid.addEventListener("click", (e) => {
+    const t = e.target.closest("[data-pick]");
+    if (t) {
+      pGrid.querySelectorAll("[data-pick]").forEach((x) => { x.classList.toggle("on", x === t); x.setAttribute("aria-checked", x === t); });
+      const next = pGrid.querySelector(".nh-cr-next");
+      if (next) next.dataset.id = t.dataset.pick;
+      return;
+    }
+    if (e.target.closest("[data-crback]")) closePage();
+  });
+  pGrid.addEventListener("dblclick", (e) => { if (e.target.closest("[data-pick]")) pGrid.querySelector(".nh-cr-next")?.click(); });
   page.addEventListener("click", (e) => {
     const b = e.target.closest("[data-astab]");
     if (!b || b.classList.contains("on")) return;

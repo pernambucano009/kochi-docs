@@ -3984,5 +3984,9 @@ window.I18N_EN = {
   "عرض الكل": "View all",
   "سجّل أو ارفع تعليق": "Record or upload a voiceover",
   "بيتكتب الكلام لوحده": "Gets transcribed automatically",
-  "＋ ابدأ مشروع جديد": "＋ Start a new project"
+  "＋ ابدأ مشروع جديد": "＋ Start a new project",
+  "اختار نوع الشغل، وبعدين هنمشي خطوة خطوة.": "Pick the kind of work, then we go step by step.",
+  "· نوع الشغل": "· Type of work",
+  "نوع الشغل": "Type of work",
+  "التالي": "Next"
 };
