@@ -319,6 +319,179 @@ SCENES = {
                  "no in-place drawing, no smooth digital animation: every piece is a pre-made paper piece sliding, rotating or dropping into place. "
                  "Animation must start at the first frame.",
     },
+    # ---------------------------------------------------------------- الدفعة التاسعة: ستايلات مولّدة جديدة (نفس شكل الصلصال والورق)
+    "sk-felt": {
+        "name": "عالم صوف وخيط (فِلت)", "icon": "🧶", "uses": "إعلانات أطفال ومنتجات بيت دافية، قصص قصيرة لطيفة، ومحتوى موسمي", "transition": "cut",
+        "voice_tone": "soft, cozy, gentle narrator, like a bedtime story",
+        "sample": "بطانية صغيرة بتدفّي بيت كامل في ليلة شتا",
+        "allow_label": False,
+        "writer": "إنت كاتب ومخرج فيديوهات قصيرة بستايل عرايس الصوف والفِلت (ستوب موشن): دافي وناعم وطفولي، كل مشهد فكرة واحدة بتتشاف.\n"
+                  "شكل السكريبت: صورة دافية بتشد من أول ثانية ← المشكلة الصغيرة ← المنتج/الحل ← بيشتغل قدامنا ← الإحساس بعده ← جملة ختام حنينة.\n",
+        "tokens": "handmade needle-felted wool and stitched felt stop-motion world photographed, fuzzy wool fibres catching the light, visible stitches, "
+                  "yarn and button details, soft rounded felt shapes, warm cozy practical lighting with real soft shadows, miniature set filling the frame",
+        "negative": "readable text, letters, words, numbers, captions, subtitles, watermark, logo, smooth CGI render, glossy plastic, photorealism, "
+                    "live-action footage, motion blur, lip-sync, talking characters, visible table or room around the set, color drift",
+        "key": "A style swatch image that locks the look of a needle-felt stop-motion video. {style} Palette: {palette}. A small cozy corner of the felt "
+               "world with a few typical wool props (a knitted rug, felt mushrooms, a yarn-ball cat) and one felt character, mid-shot. Real wool and felt, "
+               "photographed, fuzzy fibres, real soft shadows. No letters, no words, no numbers, no logos, no real people.",
+        "variants": [
+            ("cozy", "دافي: ألوان شتوية وإضاءة لمبة", "warm oatmeal, rust orange and forest green",
+             "Cozy needle-felted miniature scene - everything made of fuzzy felted wool with visible fibres and stitched seams, knitted textures, "
+             "button eyes, warm lamp light with soft falloff, the camera inside the miniature wool world."),
+            ("pastel", "باستيل: ألوان أطفال فاتحة", "soft pastel pink, baby blue and butter yellow",
+             "Pastel felt craft scene - clean soft felt shapes, gentle wool fuzz, embroidered details, bright soft daylight, tidy cute compositions, "
+             "simple dot eyes, the scene filling the entire frame."),
+        ],
+        "devices": "every object named with its wool treatment (a felted wool cup, a knitted scarf, yarn-wrapped trees, embroidered stars); felt "
+                   "characters mid-shot; macro fibre close-ups; the product as a felt imitation of its real form; one simple action per scene",
+        "motion": "ONE simple action or ONE slow camera move per scene (push-in, small orbit); stepped 12fps stop-motion cadence, no motion blur; "
+                  "wool may gently puff or settle",
+        "motion_rule": "حركة واحدة بسيطة بس في المشهد (إيماءة أو حركة كاميرا بطيئة)، بإيقاع ستوب موشن متقطع ١٢ فريم ومن غير موشن بلر.",
+        "audio": "٣-٥ أصوات ناعمة حقيقية (صوف بيتحك، زرار بيتقفل، خطوات خفيفة على سجادة) من غير أي كلام.",
+        "guard": "Handmade needle-felt stop-motion throughout - fuzzy wool fibres, visible stitches, 12fps stop-motion cadence, no motion blur. "
+                 "Non CGI. Animation must start at the first frame.",
+    },
+    "sk-anime": {
+        "name": "أنيمي مرسوم باليد", "icon": "🌸", "uses": "إعلانات فيها حكاية وإحساس، لحظات يومية حلوة، ومنتجات للشباب", "transition": "cut",
+        "voice_tone": "gentle, nostalgic, emotional narrator",
+        "sample": "بنت بتذاكر بالليل وكوباية شاي هي اللي مكمّلة معاها",
+        "allow_label": False,
+        "writer": "إنت كاتب ومخرج فيديوهات قصيرة بستايل الأنيمي المرسوم باليد: لحظات يومية بسيطة فيها إحساس، سما ونور حلو، وتفاصيل صغيرة.\n"
+                  "شكل السكريبت: لقطة جو بتشد ← الشخصية في موقف ← المنتج بيدخل في اللحظة ← الإحساس بيتغير ← لقطة واسعة حلوة ← جملة ختام.\n",
+        "tokens": "hand-drawn 2D anime film look, painterly watercolor-gouache backgrounds, clean cel-shaded characters with soft line art, lush "
+                  "cumulus skies, warm nostalgic light, gentle bloom, subtle film grain, slice-of-life atmosphere",
+        "negative": "readable text, letters, words, numbers, captions, subtitles, watermark, logo, 3D render, photorealism, live-action footage, "
+                    "chibi, exaggerated fan-service, lip-sync, talking mouths, color drift, existing anime characters",
+        "key": "A style swatch image that locks the look of a hand-drawn anime video. {style} Palette: {palette}. A quiet everyday scene with one "
+               "original anime character, mid-shot, a painted background full of small details and a big sky. No letters, no words, no numbers, "
+               "no logos, no existing characters.",
+        "variants": [
+            ("summer", "صيفي: سما زرقا وسحاب كبير", "saturated sky blue, fresh green and sunlit cream",
+             "Summer slice-of-life anime frame - towering cumulus clouds, bright sunlight with crisp cel shadows, painted greenery, warm breeze feeling."),
+            ("dusk", "غروب: برتقالي وبنفسجي حنين", "golden orange, dusty violet and deep blue",
+             "Dusk anime frame - golden hour into twilight, long soft shadows, glowing windows, sparkling dust in the light, nostalgic mood."),
+            ("night", "ليل: نيون ومطر خفيف", "deep navy, neon pink and warm amber",
+             "Night city anime frame - light rain, reflections on wet streets, glowing signs without readable text, warm interior light, calm mood."),
+        ],
+        "devices": "wide establishing shots with big skies, close-ups of small everyday objects (steam from a cup, curtains in the wind), "
+                   "one original character per scene, light rays and floating particles; the product drawn in the same anime style",
+        "motion": "ONE gentle move per scene: slow pan across a painted background, hair and clothes moving in the wind, steam or petals drifting, "
+                  "limited animation on twos like a hand-drawn anime film",
+        "motion_rule": "حركة واحدة هادية في المشهد (بان بطيء على الخلفية، شعر وهدوم بتتحرك مع الهوا، بخار أو ورد طاير)، زي أفلام الأنيمي المرسومة.",
+        "audio": "٣-٥ أصوات جو حقيقية (هوا، عصافير، مطر خفيف، جرس دراجة) من غير أي كلام.",
+        "guard": "Hand-drawn 2D anime look throughout - cel-shaded characters, painted backgrounds, animation on twos, no 3D, no photorealism. "
+                 "Animation must start at the first frame.",
+    },
+    "sk-watercolor": {
+        "name": "ألوان مية متحركة", "icon": "🎨", "uses": "إعلانات هادية وراقية، قصص براندات، مناسبات وتهاني", "transition": "dissolve",
+        "voice_tone": "calm, poetic, warm narrator",
+        "sample": "رحلة وردة من البذرة لحد ما تبقى في بوكيه عروسة",
+        "allow_label": False,
+        "writer": "إنت كاتب ومخرج فيديوهات قصيرة بستايل ألوان المية: شاعري وهادي، الألوان بتنزل على الورق وتكوّن المشهد.\n"
+                  "شكل السكريبت: بقعة لون بتتفتح لمشهد ← الحكاية ← المنتج ← اللحظة الحلوة ← المشهد بيذوب في ورق أبيض ← جملة ختام.\n",
+        "tokens": "animated traditional watercolor painting on cold-press paper, visible paper texture, soft wet-on-wet blooms and pigment granulation, "
+                  "loose ink line accents, white paper showing through, gentle color bleeding at the edges",
+        "negative": "readable text, letters, words, numbers, captions, subtitles, watermark, logo, 3D render, photorealism, live-action footage, "
+                    "hard vector shapes, neon, lip-sync, color drift",
+        "key": "A style swatch image that locks the look of an animated watercolor video. {style} Palette: {palette}. A small scene painted in "
+               "loose watercolor with ink accents and white paper visible around it. No letters, no words, no numbers, no logos, no real people.",
+        "variants": [
+            ("botanical", "نباتي: أخضر وورد", "sage green, blush rose and soft ochre",
+             "Botanical watercolor - flowers and leaves in loose washes, fine ink outlines, airy white paper margins."),
+            ("travel", "سفر: مدن وبحر", "cerulean blue, terracotta and sand",
+             "Travel sketchbook watercolor - quick ink sketch lines with washes of color, sunny streets and sea, sketchbook feel."),
+        ],
+        "devices": "scenes bloom from a drop of pigment spreading on wet paper, edges stay unpainted white paper, ink lines draw in first then color "
+                   "floods in, transitions by colors bleeding into the next scene",
+        "motion": "ONE move per scene: pigment blooming and spreading, a slow drift across the painting, petals or water gently moving; "
+                  "painterly frame-to-frame boil, no hard motion",
+        "motion_rule": "حركة واحدة في المشهد: لون بيتفتح وينتشر على الورق، أو حركة بطيئة على اللوحة، أو ورد/مية بيتحركوا بالراحة.",
+        "audio": "٣-٥ أصوات هادية (فرشة على ورق، نقطة مية، هوا خفيف) من غير أي كلام.",
+        "guard": "Traditional watercolor painting look throughout - visible paper texture, soft washes and granulation, no 3D, no photorealism. "
+                 "Animation must start at the first frame.",
+    },
+    "sk-miniature": {
+        "name": "عالم مصغّر (تيلت شيفت)", "icon": "🔍", "uses": "إعلانات خدمات ومدن وتوصيل، فعاليات، ومشاريع على أرض الواقع", "transition": "cut",
+        "voice_tone": "upbeat, curious, playful narrator",
+        "sample": "يوم في حياة عربية توصيل صغيرة ماشية في المدينة",
+        "allow_label": False,
+        "writer": "إنت كاتب ومخرج فيديوهات قصيرة بستايل العالم المصغّر (تيلت شيفت): الدنيا شكلها لعب صغيرة، مرح وسريع وواضح.\n"
+                  "شكل السكريبت: لقطة من فوق للمدينة الصغيرة ← الحركة اليومية ← المنتج/الخدمة بتظهر ← بتشتغل ← النتيجة ← جملة ختام.\n",
+        "tokens": "real-world tilt-shift photography that makes everything look like a tiny model, high vantage point, strong selective focus band with "
+                  "blurred top and bottom, punchy saturated colors, bright sunlight, toy-like miniature feel, sped-up timelapse life",
+        "negative": "readable text, letters, words, numbers, captions, subtitles, watermark, logo, real brands, close-up faces, cartoon, 3D render, "
+                    "color drift",
+        "key": "A style swatch image that locks the look of a tilt-shift miniature video. {style} Palette: {palette}. A high-angle view of a busy "
+               "street corner with tiny cars and people, a narrow sharp focus band and blurred top and bottom. No letters, no words, no logos.",
+        "variants": [
+            ("city", "مدينة: شوارع وعربيات", "sunny saturated primaries",
+             "Tilt-shift city - busy streets from above, tiny cars and people, crisp sunlight, toy-model look."),
+            ("seaside", "شط: بحر وشماسي", "turquoise sea, white sand and coral umbrellas",
+             "Tilt-shift beach - colorful umbrellas, tiny swimmers, turquoise water, toy-like summer scene."),
+        ],
+        "devices": "high angles looking down, a narrow focus band on the hero (a van, a stall, a crowd), timelapse traffic, tiny people as dots; "
+                   "the product or service as one hero object in the focus band",
+        "motion": "ONE move per scene: slow drift or push over the miniature world while traffic and people move in fast timelapse, stepped "
+                  "slightly like a model animation",
+        "motion_rule": "حركة واحدة في المشهد: الكاميرا بتعدّي بالراحة فوق العالم الصغير والعربيات والناس ماشيين بسرعة زي التايم لابس.",
+        "audio": "٣-٥ أصوات مدينة صغيرة مرحة (زمامير بعيدة، زحمة خفيفة، عصافير) من غير أي كلام.",
+        "guard": "Real tilt-shift miniature photography look throughout - strong selective focus, toy-like scale, saturated sunlight. "
+                 "Animation must start at the first frame.",
+    },
+    "sk-noir": {
+        "name": "فيلم أبيض وأسود (نوار)", "icon": "🕵️", "uses": "إعلانات غموض وتشويق، عطور وساعات، تيزر لإطلاق منتج", "transition": "cut",
+        "voice_tone": "low, slow, mysterious detective narrator",
+        "sample": "تحقيق في اختفاء آخر قطعة من الكيكة في المحل",
+        "allow_label": False,
+        "writer": "إنت كاتب ومخرج فيديوهات قصيرة بستايل أفلام النوار الأبيض والأسود: غموض وظلال وراوي بصوت واطي، وفي الآخر المفاجأة.\n"
+                  "شكل السكريبت: لقطة غامضة ← سؤال/لغز ← خيوط ودلايل ← المنتج هو الحل ← لحظة كشف بالنور ← جملة ختام قوية.\n",
+        "tokens": "classic black-and-white film noir cinematography, high contrast chiaroscuro lighting, venetian blind shadows, wet streets at night, "
+                  "cigarette-free smoky haze, 1940s mood, deep blacks and silver highlights, 35mm film grain",
+        "negative": "readable text, letters, words, numbers, captions, subtitles, watermark, logo, color, cartoon, 3D render, smoking, weapons, "
+                    "real people likeness, color drift",
+        "key": "A style swatch image that locks the look of a film noir video. {style} Palette: {palette}. A rainy night street corner with one "
+               "mysterious figure in a trench coat and hat seen from behind, hard light through blinds. No letters, no words, no logos.",
+        "variants": [
+            ("classic", "كلاسيك: أبيض وأسود صافي", "pure black, white and silver greys",
+             "Classic film noir - hard key light, deep shadows, venetian blind patterns, rain-slick streets."),
+            ("accent", "لمسة لون: أبيض وأسود ولون واحد للمنتج", "black and white with one red accent on the product",
+             "Film noir in black and white with a single saturated red accent reserved for the hero product."),
+        ],
+        "devices": "silhouettes in doorways, shadows of blinds across faces seen from a distance, close-ups of hands and clues, rain on glass, "
+                   "a single hard light revealing the product as the answer",
+        "motion": "ONE slow, deliberate move per scene: a slow dolly through shadows, a light switching on, rain falling, smoke drifting",
+        "motion_rule": "حركة واحدة بطيئة ومقصودة في المشهد (دخول بطيء وسط الضلمة، نور بيولّع، مطر نازل، دخان بيتحرك).",
+        "audio": "٣-٥ أصوات جو غامضة (مطر، خطوات على أرض مبلولة، عربية بعيدة، ساعة بتدق) من غير أي كلام.",
+        "guard": "Black-and-white film noir look throughout - high contrast, hard shadows, film grain, no color except a permitted accent. "
+                 "Animation must start at the first frame.",
+    },
+    "sk-lowpoly": {
+        "name": "عالم 3D بأشكال بسيطة (لو بولي)", "icon": "🔺", "uses": "شرح تطبيقات وخدمات، إعلانات ألعاب، وفيديوهات تقنية مبهجة", "transition": "cut",
+        "voice_tone": "bright, friendly, energetic narrator",
+        "sample": "جزيرة صغيرة بتكبر وتتطور كل ما تستخدم التطبيق أكتر",
+        "allow_label": False,
+        "writer": "إنت كاتب ومخرج فيديوهات قصيرة بستايل الـ 3D البسيط بالأشكال المضلّعة (لو بولي): مبهج وواضح، كل حاجة شبه اللعبة.\n"
+                  "شكل السكريبت: لقطة للعالم الصغير ← المشكلة ← المنتج/التطبيق يظهر ← العالم بيتغير ويكبر ← النتيجة ← جملة ختام.\n",
+        "tokens": "stylized low-poly 3D world, flat-shaded faceted geometry, soft pastel gradients, clean ambient occlusion, floating diorama island, "
+                  "soft global illumination, playful game-art look, simple geometric characters",
+        "negative": "readable text, letters, words, numbers, captions, subtitles, watermark, logo, photorealism, live-action footage, hand-drawn, "
+                    "noisy textures, existing game characters, color drift",
+        "key": "A style swatch image that locks the look of a low-poly 3D video. {style} Palette: {palette}. A small floating island diorama with "
+               "faceted trees, a little house and one simple geometric character. No letters, no words, no numbers, no logos.",
+        "variants": [
+            ("pastel", "باستيل: ألوان هادية", "mint, peach and lavender",
+             "Pastel low-poly world - soft gradients, gentle light, cute faceted shapes."),
+            ("vivid", "ألوان قوية: ألعاب", "vivid teal, sunny yellow and coral",
+             "Vivid low-poly game world - saturated faceted shapes, bright sun, playful energy."),
+        ],
+        "devices": "floating diorama islands, faceted clouds, pieces building themselves up, simple geometric characters, the product as a "
+                   "low-poly version of itself",
+        "motion": "ONE move per scene: a slow orbit around the floating diorama, faceted pieces popping up and growing, gentle bobbing",
+        "motion_rule": "حركة واحدة في المشهد: لفة بطيئة حوالين الجزيرة، أو حتت مضلّعة بتطلع وتكبر، أو حاجات بتتهز بالراحة.",
+        "audio": "٣-٥ أصوات مرحة (بوب، فقاعة، رنة خفيفة، هوا) من غير أي كلام.",
+        "guard": "Stylized low-poly 3D look throughout - flat-shaded facets, pastel gradients, no photorealism, no hand-drawn lines. "
+                 "Animation must start at the first frame.",
+    },
 }
 
 
