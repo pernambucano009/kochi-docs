@@ -55,7 +55,25 @@ $("logout").onclick = async () => {
   location.href = "/login";
 };
 
-viewHooks["settings"] = loadSettings;
+viewHooks["settings"] = () => { loadSettings(); markLook(); };
+
+// ---------- الشكل واللغة: نفس سويتش الرئيسية، من جوه الإعدادات ----------
+const lookTheme = () => document.documentElement.dataset.nhTheme || "light";
+function markLook() {
+  $("themePicks")?.querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.theme === lookTheme()));
+  $("langPicks")?.querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.lang === (window.I18N?.lang || "ar")));
+}
+$("themePicks")?.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-theme]");
+  if (!b || b.dataset.theme === lookTheme()) return;
+  document.getElementById("nhTheme")?.click();   // سويتش الرئيسية هو اللي بيحفظ الاختيار ويقلب المجسّم كمان
+});
+// القلبة بتحصل بعد الانيميشن، فبنعلّم الاختيار لما الوضع يتغيّر فعلًا
+new MutationObserver(markLook).observe(document.documentElement, { attributes: true, attributeFilter: ["data-nh-theme"] });
+$("langPicks")?.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-lang]");
+  if (b && b.dataset.lang !== (window.I18N?.lang || "ar")) $("langToggle").click();
+});
 
 // ---------- المساحة ----------
 const STORAGE_LABELS = {
