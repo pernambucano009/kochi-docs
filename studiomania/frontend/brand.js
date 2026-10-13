@@ -1,161 +1,266 @@
-// 🧠 عقل البراند: صفحة واحدة بشكل الرئيسية الجديدة فيها كل حاجة عن البراند
-// (الهوية، اللوجو والألوان، الستايل، قواعد المحتوى، التسليم، صور البراند). أي تعديل بيتحفظ لوحده.
+// 🧠 عقل البراند: خريطة. المخ في النص، وطالع منه فروع (الهوية، الشكل، القواعد، التسليم، صور البراند)،
+// وكل حاجة في البراند نقطة على فرعها. النقطة الفاضية لسه ناقصة. تدوس على أي نقطة يفتح جنبها كارت تكتب فيه على طول،
+// وأي تعديل بيتحفظ لوحده. مفيش فورم ولا مربعات: كل الشغل جوه الخريطة.
 
 const BrandPage = (() => {
   const esc = (s) => escapeHtml(String(s ?? ""));
-  const S = { id: null, brains: [], cats: null, el: null, poll: null, step: 1 };
-  // زي البروتوتايب: الصفحة 4 خطوات. على اليمين سؤال الخطوة والأيقونة الزجاج، وعلى الشمال كروت الخطوة، وتحت رجوع / النقط / التالي
-  const STEPS = [
-    ["IDENTITY", "البراند\nمين هو؟", "اسم البراند ومجاله وجمهوره، واللوجو والألوان. البرنامج بيبني على ده في كل شغل."],
-    ["STYLE", "البراند\nشكله إيه؟", "الستايلات اللي بيشتغل بيها، وصور حقيقية منه، والهوية اللي البرنامج استنبطها منها."],
-    ["CONTENT RULES", "إيه اللي\nلازم يتراعى؟", "القواعد دي بتتطبق على كل السكريبتات والصور والفيديو والصوت اللي بتتعمل للبراند."],
-    ["DELIVERY", "الشغل بيطلع\nإزاي؟", "اللوجو والإنترو والأوترو، والدعوة واللينك والكابشن اللي بيتحطوا لوحدهم وقت النشر."],
-  ];
+  const S = { id: null, brains: [], cats: null, el: null, poll: null, open: null, raf: 0, nodes: [], t0: performance.now() };
   const cur = () => S.brains.find((b) => b.id === S.id) || null;
   const bAPI = (path, opts) => api(`/api/ad-brains/${S.id}${path}`, opts);
-  const KINDS = [["logos", "اللوجو"], ["products", "صور المنتج / الخدمة"], ["screens", "شاشات التطبيق"], ["characters", "شخصيات البراند"], ["sets", "الأماكن والخلفيات"], ["props", "الأدوات"]];
   const styleIds = (b) => String(b?.styles || "").split(",").map((x) => x.trim()).filter((x) => S.cats?.some((c) => c.id === x));
   const hexes = (txt) => [...String(txt || "").matchAll(/#[0-9a-fA-F]{6}\b/g)].map((m) => m[0]).slice(0, 8);
+  const rulesOf = (b) => String(b?.rules || "").split("\n").map((x) => x.trim()).filter(Boolean);
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)");
 
-  const card = (span, title, en, inner, step = 1) => `<section class="nh-tile nh-panel nb-card" data-step="${step}" style="grid-column:span ${span}">
-    <div class="nb-h"><div class="nh-name"><span class="latin">${en}</span><b>${title}</b></div></div>${inner}</section>`;
-  const field = (label, k, { area = 0, ph = "", ltr = false } = {}) => `<label class="nb-f"><span>${label}</span>${area
-    ? `<textarea rows="${area}" data-k="${k}" placeholder="${esc(ph)}"${ltr ? ' dir="ltr"' : ""}></textarea>`
-    : `<input type="text" data-k="${k}" placeholder="${esc(ph)}"${ltr ? ' dir="ltr"' : ""}>`}</label>`;
-  const sel = (label, k, opts) => `<label class="nb-f"><span>${label}</span><select data-k="${k}">${opts.map(([v, t]) => `<option value="${v}">${t}</option>`).join("")}</select></label>`;
+  // أيقونات الفروع (خط رفيع زي باقي البرنامج)
+  const IC = {
+    identity: "M12 4a4 4 0 1 1 0 8a4 4 0 1 1 0-8z M4.5 20c.8-3.6 3.8-5.5 7.5-5.5s6.7 1.9 7.5 5.5",
+    look: "M12 3.5a8.5 8.5 0 1 0 0 17c1.4 0 2-.9 2-1.8 0-1.3-1-1.6-1-2.7 0-1 .8-1.6 1.8-1.6h2.3a3 3 0 0 0 2.9-3C20.5 6.8 16.7 3.5 12 3.5z M7.8 11a1.2 1.2 0 1 1 0 .1z M10.5 7.4a1.2 1.2 0 1 1 0 .1z M15 7.6a1.2 1.2 0 1 1 0 .1z",
+    rules: "M9 6.5h10.5 M9 12h10.5 M9 17.5h10.5 M4.5 6.5l1 1 2-2 M4.5 12l1 1 2-2 M4.5 17.5l1 1 2-2",
+    delivery: "M20.5 3.5 10 14 M20.5 3.5 14 20.5l-4-6.5-6.5-4z",
+    assets: "M4.5 5h15a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z M3.5 15.5l4.5-4.5 4 4 3-3 5 5 M15.5 8.5a1.3 1.3 0 1 1 0 .1z",
+  };
+  const svg = (d, s = 22) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}" aria-hidden="true"><path d="${d}" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+  // الخريطة: كل فرع وكل نقطة فيه. النوع بيحدد الكارت اللي بيفتح
+  function branches(b) {
+    const kinds = [["products", "صور المنتج"], ["screens", "شاشات التطبيق"], ["characters", "شخصيات البراند"], ["sets", "الأماكن والخلفيات"], ["props", "الأدوات"]]
+      .filter(([k]) => k !== "screens" || b?.type === "app");
+    return [
+      { k: "identity", t: "الهوية", en: "Identity", leaves: [
+        { f: "@name", t: "الاسم", type: "text", ph: "اسم البراند" },
+        { f: "type", t: "نوع المنتج", type: "pick", opts: [["app", "تطبيق"], ["physical", "منتج ملموس"], ["service", "خدمة"]] },
+        { f: "domain", t: "المجال", type: "text", ph: "لياقة، مطاعم، عقارات…" },
+        { f: "about", t: "عن البراند", type: "text", ph: "البراند بيعمل إيه، وبيفرق في إيه عن غيره" },
+        { f: "audience", t: "الجمهور", type: "text", ph: "مين اللي بنكلمه؟ سنه، اهتماماته، بيدوّر على إيه" },
+        { f: "market", t: "السوق", type: "text", ph: "مثلًا: السعودية والخليج" },
+        { f: "language", t: "اللغة واللهجة", type: "text", ph: "مثلًا: اللهجة السعودية البيضاء" },
+      ] },
+      { k: "look", t: "الشكل", en: "Look", leaves: [
+        { f: "logos", t: "اللوجو", type: "imgs" },
+        { f: "palette", t: "الألوان", type: "palette" },
+        { f: "typography", t: "الخطوط", type: "text", ph: "مثلًا: Cairo للعناوين و IBM Plex للكلام" },
+        { f: "styles", t: "الستايل", type: "styles" },
+        { f: "derived", t: "اللي البرنامج استنبطه", type: "multi", fields: [["theme", "الثيم"], ["style", "ستايل الرسم (بالإنجليزي أحسن)"], ["logo_rule", "مكان اللوجو"], ["logo_description", "وصف اللوجو"], ["ui_style", "شكل الواجهة"]] },
+        { f: "analyze", t: "استنبط الهوية من الصور", type: "action" },
+      ] },
+      { k: "rules", t: "القواعد", en: "Rules", leaves: [
+        ...rulesOf(b).map((r, i) => ({ f: "rule", i, t: r, type: "rule" })),
+        { f: "rule+", t: "قاعدة جديدة", type: "rule-new" },
+      ] },
+      { k: "delivery", t: "التسليم", en: "Delivery", leaves: [
+        { f: "logo_on", t: "اللوجو على الفيديو", type: "pick", opts: [["", "أيوه"], ["0", "لأ"]] },
+        { f: "intro", t: "الإنترو", type: "video" },
+        { f: "outro", t: "الأوترو", type: "video" },
+        { f: "cta", t: "الدعوة (CTA)", type: "text", ph: "مثلًا: حمّل التطبيق دلوقتي" },
+        { f: "link", t: "اللينك", type: "text", ph: "https://…", ltr: true },
+        { f: "caption", t: "الكابشن الافتراضي", type: "text", ph: "{caption}\n\n{cta} 👇\n{link}\n#هاشتاج", hint: "{caption} كابشن الفيديو · {cta} الدعوة · {link} اللينك. بيتحطوا لوحدهم وقت النشر." },
+      ] },
+      { k: "assets", t: "صور البراند", en: "Assets", leaves: kinds.map(([k, t]) => ({ f: k, t, type: "imgs" })) },
+    ];
+  }
+  // النقطة مليانة ولا لسه ناقصة
+  function filled(b, l) {
+    if (!b) return false;
+    switch (l.type) {
+      case "text": return !!String(l.f === "@name" ? b.name : b[l.f] || "").trim();
+      case "pick": return l.f === "type" ? !!b.type : true;
+      case "imgs": return (b[l.f] || []).length > 0;
+      case "palette": return hexes(b.palette).length > 0;
+      case "styles": return styleIds(b).length > 0;
+      case "multi": return l.fields.some(([k]) => String(b[k] || "").trim());
+      case "video": return !!b[`${l.f}_url`];
+      case "rule": return true;
+      default: return false;
+    }
+  }
+  const leafValue = (b, l) => {
+    if (l.type === "text") return String(l.f === "@name" ? b?.name : b?.[l.f] || "").trim();
+    if (l.type === "pick") return l.opts.find(([v]) => v === String(b?.[l.f] || ""))?.[1] || "";
+    if (l.type === "imgs") return (b?.[l.f] || []).length ? `${(b[l.f]).length} صورة` : "";
+    if (l.type === "palette") return hexes(b?.palette).join(" ");
+    if (l.type === "styles") return styleIds(b).map((id) => S.cats?.find((c) => c.id === id)?.ar).filter(Boolean).join("، ");
+    if (l.type === "video") return b?.[`${l.f}_url`] ? (b[`${l.f}_on`] ? "شغّال" : "موجود ومقفول") : "";
+    return "";
+  };
 
   function html() {
-    return `<div class="nb-wrap" id="nbWrap"><div class="nh-empty">بيحمّل…</div></div>`;
+    return `<div class="bm" id="nbWrap"><div class="nh-empty">بيحمّل…</div></div>`;
   }
 
+  // ---------- الرسم ----------
   function skeleton() {
-    return `<div class="bw">
-    <aside class="bw-hero">
-      <div class="bw-k latin" id="bwK"></div>
-      <h1 id="bwQ"></h1>
-      <p id="bwD"></p>
-      <div class="bw-ic"><img class="ic-l" src="/icons3d/brand.webp?v=9" alt=""><img class="ic-d" src="/icons3d/brand_d.webp?v=9" alt=""></div>
-    </aside>
-    <div class="bw-main">
-    <div class="nb-bar">
-      <label class="nb-pick"><span>البراند</span><select id="nbPick"></select></label>
-      <button class="nb-btn" id="nbNew">＋ براند جديد</button>
-      <button class="nb-btn danger" id="nbDel">احذف</button>
-      <span class="nb-state" id="nbState"></span>
-    </div>
-    <div class="nb-grid">
-      ${card(7, "الهوية", "Identity", `
-        <div class="nb-row">${field("الاسم", "@name")}${sel("نوع المنتج", "type", [["app", "📱 تطبيق"], ["physical", "📦 منتج ملموس"], ["service", "🤝 خدمة"]])}${field("المجال (النيش)", "domain", { ph: "لياقة، مطاعم، عقارات…" })}</div>
-        ${field("عن البراند", "about", { area: 2 })}
-        ${field("الجمهور", "audience", { area: 2 })}
-        <div class="nb-row">${field("السوق", "market", { ph: "مثلًا: السعودية والخليج" })}${field("اللغة واللهجة", "language", { ph: "مثلًا: اللهجة السعودية البيضاء" })}</div>`)}
-      ${card(5, "اللوجو والألوان", "Logo & Colors", `
-        <div class="nb-logo" id="nbLogo"></div>
-        <div class="nb-sw" id="nbSw"></div>
-        ${field("الألوان", "palette", { area: 2, ltr: true, ph: "#E5613E orange, #111111 black" })}
-        ${field("الخطوط", "typography")}
-        <div class="nb-row nb-end"><button class="nb-btn" id="nbAnalyze">🔍 استنبط الهوية من الصور</button></div>`, 1)}
-      ${card(12, "الستايل", "Style", `
-        <p class="nb-hint">اختار الستايلات اللي البراند بيشتغل بيها (واحد أو أكتر). اللي عليه ⭐ هو الافتراضي، وصفحة «ابدأ مشروع جديد» بتبدأ بيه.</p>
-        <div class="nb-cats" id="nbCats"></div>`, 2)}
-      ${card(12, "قواعد المحتوى", "Content Rules", `
-        <p class="nb-hint">اكتب بكلامك أي قاعدة لازم تتراعى في كل حاجة بتتعمل للبراند: السكريبت والصور والفيديو والصوت.</p>
-        <textarea class="nb-rules" rows="9" data-k="rules" placeholder="مثلًا:&#10;البنات محجبات ولبسهم واسع&#10;من غير مزيكا&#10;من غير وعود مبالغ فيها"></textarea>`, 3)}
-      ${card(12, "التسليم", "Delivery", `
-        ${sel("اللوجو على الفيديو", "logo_on", [["", "أيوه"], ["0", "لأ"]])}
-        <div class="nb-vids">${["intro", "outro"].map((k) => `<div class="nb-vid" data-vid="${k}">
-          <div class="nb-vh"><b>${k === "intro" ? "إنترو البراند" : "أوترو البراند"}</b><label class="nb-tog"><input type="checkbox" data-on="${k}"><span></span></label></div>
-          <div class="nb-vbox"></div>
-          <div class="nb-row"><label class="nb-btn">⬆ ارفع فيديو<input type="file" accept="video/*" data-vup="${k}" hidden></label><button class="nb-btn danger" data-vdel="${k}">شيله</button></div></div>`).join("")}</div>
-        ${field("الـ CTA الافتراضي", "cta", { ph: "مثلًا: حمّل التطبيق دلوقتي" })}
-        ${field("اللينك", "link", { ltr: true, ph: "https://..." })}
-        ${field("الكابشن الافتراضي", "caption", { area: 3, ph: "{caption}\n\n{cta} 👇\n{link}\n#هاشتاج" })}
-        <p class="nb-hint">{caption} كابشن الفيديو · {cta} الدعوة · {link} اللينك. بيتحط لوحده وقت النشر.</p>`, 4)}
-      ${card(12, "صور البراند", "Brand Assets", `
-        <p class="nb-hint">صور حقيقية من البراند. البرنامج بيوصفها ويستخدمها بالظبط بدل ما يخترع.</p>
-        <div id="nbAssets"></div>`, 2)}
-      ${card(12, "الهوية المستنبطة", "Derived", `
-        <p class="nb-hint">بتتكتب لوحدها من اللوجو والصور، وتقدر تعدّلها.</p>
-        <div class="nb-row">${field("الثيم", "theme", { area: 2 })}${field("ستايل الرسم (بالإنجليزي أحسن)", "style", { area: 2 })}</div>
-        <div class="nb-row">${field("مكان اللوجو", "logo_rule")}${field("وصف اللوجو", "logo_description", { area: 2, ltr: true })}</div>
-        ${field("شكل الواجهة (للبرومبتات)", "ui_style", { area: 2, ltr: true })}`, 2)}
-    </div>
-    <nav class="bw-nav">
-      <button class="bw-back" data-bwgo="-1">رجوع</button>
-      <div class="bw-dots">${STEPS.map((_, i) => `${i ? "<i></i>" : ""}<button data-bwstep="${i + 1}">${i + 1}</button>`).join("")}</div>
-      <button class="bw-next" data-bwgo="1">التالي</button>
-    </nav>
-    </div></div>`;
+    return `<svg class="bm-lines" aria-hidden="true"></svg>
+      <div class="bm-nodes"></div>
+      <div class="bm-card" hidden role="dialog"></div>
+      <p class="bm-hint">دوس على أي نقطة تكتب فيها · النقط المفرّغة لسه ناقصة · دوس على المخ تبدّل البراند</p>`;
   }
-
-  function step(n) {
-    if (!S.el) return;
-    S.step = Math.min(STEPS.length, Math.max(1, n));
-    const [k, q, d] = STEPS[S.step - 1];
-    S.el.querySelector("#bwK").textContent = `BRAND BRAIN · ${S.step} / ${STEPS.length} · ${k}`;
-    S.el.querySelector("#bwQ").innerHTML = q.split("\n").map(esc).join("<br>");
-    S.el.querySelector("#bwD").textContent = d;
-    S.el.querySelectorAll(".nb-card").forEach((c) => { c.hidden = +c.dataset.step !== S.step; });
-    S.el.querySelectorAll("[data-bwstep]").forEach((b) => {
-      const i = +b.dataset.bwstep;
-      b.classList.toggle("on", i <= S.step);
-      b.classList.toggle("cur", i === S.step);
-      if (b.previousElementSibling?.tagName === "I") b.previousElementSibling.classList.toggle("on", i <= S.step);
-    });
-    S.el.querySelector(".bw-back").disabled = S.step === 1;
-    const nx = S.el.querySelector(".bw-next");
-    nx.textContent = S.step === STEPS.length ? "خلصت" : "التالي";
-    S.el.querySelector(".bw-main .nb-grid")?.scrollTo?.({ top: 0 });
-  }
-
-  const editing = () => S.el?.contains(document.activeElement) && document.activeElement.matches("input[type=text], textarea");
-
-  function fill() {
-    const b = cur();
-    const w = S.el;
+  function layout() {
+    const w = S.el, b = cur();
     if (!w) return;
-    w.querySelector("#nbPick").innerHTML = S.brains.map((x) => `<option value="${x.id}" ${x.id === S.id ? "selected" : ""}>${esc(x.name)}</option>`).join("");
-    w.querySelector("#nbDel").disabled = S.brains.length < 2;
-    w.querySelector("#nbState").innerHTML = b?.status === "working" ? "🔍 بيشوف الصور ويستنبط الهوية…" : b?.status === "failed" ? `✕ ${esc(b.error || "الاستنباط فشل")}` : "";
-    w.querySelector("#nbAnalyze").disabled = b?.status === "working";
-    if (!b) return;
-    if (!editing()) w.querySelectorAll("[data-k]").forEach((el) => (el.value = el.dataset.k === "@name" ? b.name : b[el.dataset.k] || ""));
-    const logo = b.logos?.[0];
-    w.querySelector("#nbLogo").innerHTML = logo ? `<img src="${esc(logo.url)}" alt="">` : `<span>${esc((b.name || "B").trim().slice(0, 1).toUpperCase())}</span>`;
-    w.querySelector("#nbSw").innerHTML = hexes(b.palette).map((h) => `<i style="background:${h}" title="${h}"></i>`).join("");
-    // الستايل
-    const ids = styleIds(b);
-    w.querySelector("#nbCats").innerHTML = (S.cats || []).map((c) => {
-      const on = ids.includes(c.id), def = ids[0] === c.id;
-      const covers = c.templates.filter((t) => t.cover_url).slice(0, 3);
-      return `<div class="nb-cat ${on ? "on" : ""} ${def ? "def" : ""}" data-cat="${c.id}" role="button" tabindex="0">
-        <div class="nb-cat-art">${covers.length ? covers.map((t) => `<img src="${esc(t.cover_url)}" alt="" loading="lazy">`).join("") : `<span>${c.icon}</span>`}</div>
-        <div class="nb-cat-t"><b>${c.icon} ${esc(c.ar)}</b><span class="latin">${esc(c.en)}</span></div>
-        <small>${c.templates.length ? `${c.templates.length} قالب` : "قريب"}</small>
-        ${on ? `<button class="nb-star" data-star title="خليه الافتراضي">${def ? "⭐" : "☆"}</button>` : ""}</div>`;
-    }).join("");
-    // التسليم
-    for (const k of ["intro", "outro"]) {
-      const box = w.querySelector(`[data-vid="${k}"]`), url = b[`${k}_url`];
-      box.querySelector(".nb-vbox").innerHTML = url ? `<video src="${esc(url)}" controls preload="metadata" playsinline></video>` : `<div class="nb-none">لسه مفيش فيديو</div>`;
-      box.querySelector("[data-vdel]").hidden = !url;
-      const tg = box.querySelector("[data-on]");
-      tg.checked = !!url && !!b[`${k}_on`];
-      tg.disabled = !url;
+    const W = w.clientWidth, H = w.clientHeight;
+    if (!W || !H) return;
+    const cx = W / 2, cy = H / 2 + 6, R1 = Math.min(W * .42, H * .5) * .58, R2 = Math.max(70, R1 * .5);
+    const list = branches(b), nodes = [{ id: "c", kind: "center", x: cx, y: cy }];
+    list.forEach((br, i) => {
+      const a = -Math.PI / 2 + (i / list.length) * Math.PI * 2;
+      const bx = cx + Math.cos(a) * R1 * 1.25, by = cy + Math.sin(a) * R1;
+      const done = br.leaves.filter((l) => !l.type.startsWith("rule-") && l.type !== "action" && filled(b, l)).length;
+      const total = br.leaves.filter((l) => !l.type.startsWith("rule-") && l.type !== "action").length;
+      nodes.push({ id: br.k, kind: "branch", br, x: bx, y: by, from: "c", done, total });
+      const n = br.leaves.length, spread = Math.min(Math.PI * 1.15, .42 * Math.max(1, n - 1));
+      br.leaves.forEach((l, j) => {
+        const la = a + (n === 1 ? 0 : -spread / 2 + (j / (n - 1)) * spread);
+        const rr = R2 * (n > 6 ? (j % 2 ? 1.18 : .9) : 1);
+        nodes.push({ id: `${br.k}:${l.f}:${l.i ?? ""}`, kind: "leaf", br, l, x: bx + Math.cos(la) * rr * 1.2, y: by + Math.sin(la) * rr, from: br.k, on: filled(b, l) });
+      });
+    });
+    S.nodes = nodes.map((n, i) => ({ ...n, ph: i * 1.7 }));
+    draw();
+  }
+  function nodeHTML(n, b) {
+    if (n.kind === "center") {
+      const st = b?.status === "working" ? `<small class="bm-st">بيستنبط الهوية من الصور…</small>` : b?.status === "failed" ? `<small class="bm-st bad">${esc(b.error || "الاستنباط فشل")}</small>` : "";
+      return `<button class="bm-n bm-center" data-n="c" title="بدّل البراند أو اعمل واحد جديد">
+        <span class="bm-brain"><img class="ic-l" src="/icons3d/brand.webp?v=9" alt=""><img class="ic-d" src="/icons3d/brand_d.webp?v=9" alt=""></span>
+        <b>${esc(b?.name || "براند جديد")}</b>${st}</button>`;
     }
-    // صور البراند
-    w.querySelector("#nbAssets").innerHTML = KINDS.filter(([k]) => k !== "screens" || b.type === "app").map(([k, t]) => `
-      <div class="nb-kind"><div class="nb-kh"><b>${t}</b><span class="num">${(b[k] || []).length}</span>
-        <label class="nb-btn sm">⬆ ارفع<input type="file" accept="image/*" multiple data-up="${k}" hidden></label>
-        ${k === "screens" ? `<label class="nb-btn sm">📁 فولدر<input type="file" webkitdirectory directory multiple data-up="${k}" hidden></label>` : ""}</div>
-        <div class="nb-imgs">${(b[k] || []).map((x) => `<figure data-file="${esc(x.file)}"><img src="${esc(x.url)}" alt="" loading="lazy" title="${esc(x.description || x.name)}"><figcaption>${esc(x.name)}</figcaption><button class="nb-x" data-adel title="احذف">✕</button></figure>`).join("") || `<div class="nb-none">مفيش</div>`}</div></div>`).join("");
+    if (n.kind === "branch") {
+      return `<button class="bm-n bm-branch${S.open?.br === n.br.k ? " on" : ""}" data-n="${n.id}" title="${esc(n.br.t)}">
+        <span class="bm-bic">${svg(IC[n.br.k])}</span><b>${esc(n.br.t)}</b><small class="num">${n.done}/${n.total}</small></button>`;
+    }
+    const l = n.l, val = leafValue(b, l);
+    const cls = l.type === "action" ? "act" : l.type === "rule-new" ? "add" : n.on ? "full" : "empty";
+    return `<button class="bm-n bm-leaf ${cls}${S.open?.id === n.id ? " on" : ""}" data-n="${esc(n.id)}" aria-label="${esc(l.t)}">
+      <i>${l.type === "action" ? "✲" : l.type === "rule-new" ? "+" : ""}</i>
+      <span class="bm-tip"><b>${esc(l.type === "rule" ? "قاعدة" : l.t)}</b>${l.type === "rule" ? `<small>${esc(l.t)}</small>` : val ? `<small>${esc(val.slice(0, 60))}</small>` : l.type === "action" || l.type === "rule-new" ? "" : `<small class="miss">لسه ناقصة</small>`}</span></button>`;
+  }
+  function draw() {
+    const w = S.el, b = cur();
+    w.querySelector(".bm-nodes").innerHTML = S.nodes.map((n) => nodeHTML(n, b)).join("");
+    S.nodes.forEach((n) => { n.el = w.querySelector(`[data-n="${CSS.escape(n.id)}"]`); });
+    w.querySelector(".bm-lines").innerHTML = S.nodes.filter((n) => n.from).map((n) => `<line data-l="${esc(n.id)}" class="${n.kind}${n.on === false ? " empty" : ""}"/>`).join("");
+    S.nodes.forEach((n) => { n.line = n.from ? w.querySelector(`.bm-lines [data-l="${CSS.escape(n.id)}"]`) : null; });
+    S.rc = (w.querySelector(".bm-brain")?.offsetWidth || 150) * .5;
+    tick(performance.now());
+  }
+  // النقط بتعوم بهدوء حوالين مكانها، والخطوط ماشية معاها
+  function tick(now) {
+    const t = (now - S.t0) / 1000, still = reduce.matches;
+    const pos = {};
+    for (const n of S.nodes) {
+      const amp = n.kind === "center" ? 2 : n.kind === "branch" ? 4 : 5;
+      const x = n.x + (still ? 0 : Math.sin(t * .55 + n.ph) * amp), y = n.y + (still ? 0 : Math.cos(t * .48 + n.ph * 1.3) * amp);
+      pos[n.id] = [x, y];
+      if (n.el) n.el.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%)`;
+    }
+    for (const n of S.nodes) {
+      if (!n.line) continue;
+      // الخط بيبدأ وبيخلص عند حافة الدايرة (مش من جوّه المخ أو الأيقونة)
+      const [ax, ay] = pos[n.from], [bx, by] = pos[n.id], d = Math.hypot(bx - ax, by - ay) || 1;
+      const r1 = n.from === "c" ? S.rc : 34, r2 = n.kind === "branch" ? 34 : 10;
+      const ux = (bx - ax) / d, uy = (by - ay) / d;
+      n.line.setAttribute("x1", ax + ux * r1); n.line.setAttribute("y1", ay + uy * r1);
+      n.line.setAttribute("x2", bx - ux * r2); n.line.setAttribute("y2", by - uy * r2);
+    }
+    if (S.open?.n) placeCard(pos[S.open.n.id]);
+  }
+  function loop(now) {
+    if (!S.el?.isConnected) { S.raf = 0; return; }
+    tick(now);
+    S.raf = requestAnimationFrame(loop);
   }
 
-  async function save(fn) {
+  // ---------- الكارت اللي بيفتح جنب النقطة ----------
+  const editable = (k, val, ph, ltr) => `<div class="bm-write" contenteditable="plaintext-only" data-k="${k}" data-ph="${esc(ph || "اكتب هنا…")}"${ltr ? ' dir="ltr"' : ""}>${esc(val)}</div>`;
+  function cardHTML(n) {
+    const b = cur();
+    if (n.kind === "center") {
+      return `<div class="bm-ch"><span class="latin">BRANDS</span><b>البراندات</b></div>
+        <div class="bm-pills">${S.brains.map((x) => `<button class="bm-pill${x.id === S.id ? " on" : ""}" data-brain="${x.id}">${esc(x.name)}</button>`).join("")}</div>
+        <div class="bm-new">${editable("@new", "", "اكتب اسم براند جديد واضغط Enter")}</div>
+        ${S.brains.length > 1 ? `<button class="bm-link bad" data-del>احذف «${esc(b?.name || "")}» بكل صوره</button>` : ""}`;
+    }
+    if (n.kind === "branch") {
+      return `<div class="bm-ch"><span class="latin">${n.br.en}</span><b>${esc(n.br.t)}</b></div>
+        <ul class="bm-list">${n.br.leaves.map((l) => `<li><button data-go="${esc(`${n.br.k}:${l.f}:${l.i ?? ""}`)}"><span class="bm-dot ${l.type === "action" || l.type === "rule-new" ? "add" : filled(b, l) ? "full" : "empty"}"></span><b>${esc(l.type === "rule" ? l.t : l.t)}</b></button></li>`).join("")}</ul>`;
+    }
+    const l = n.l, head = `<div class="bm-ch"><span class="latin">${n.br.en}</span><b>${esc(l.type === "rule" ? "قاعدة" : l.t)}</b></div>`;
+    switch (l.type) {
+      case "text": return head + editable(l.f, l.f === "@name" ? b?.name : b?.[l.f], l.ph, l.ltr) + (l.hint ? `<p class="bm-note">${esc(l.hint)}</p>` : "");
+      case "rule": return head + editable(`rule:${l.i}`, l.t, "القاعدة") + `<button class="bm-link bad" data-rdel="${l.i}">شيل القاعدة دي</button>`;
+      case "rule-new": return head + `<p class="bm-note">أي حاجة لازم تتراعى في كل شغل للبراند: السكريبت والصور والفيديو والصوت.</p>` + editable("rule:new", "", "مثلًا: من غير مزيكا · واضغط Enter");
+      case "pick": return head + `<div class="bm-pills">${l.opts.map(([v, t]) => `<button class="bm-pill${String(b?.[l.f] || "") === v ? " on" : ""}" data-pick="${l.f}" data-v="${v}">${t}</button>`).join("")}</div>`;
+      case "palette": {
+        const hs = hexes(b?.palette);
+        return head + `<div class="bm-sw">${hs.map((h) => `<button style="background:${h}" data-hdel="${h}" title="${h} · دوس تشيله"></button>`).join("")}
+          <label class="bm-swadd" title="ضيف لون">+<input type="color" data-hadd hidden></label></div>` + editable("palette", b?.palette, "#E5613E برتقالي، #111111 أسود", true);
+      }
+      case "styles": {
+        const ids = styleIds(b);
+        return head + `<p class="bm-note">اللي عليه ★ هو الافتراضي، و«ابدأ مشروع جديد» بيبدأ بيه.</p><div class="bm-cats">${(S.cats || []).map((c) => {
+          const on = ids.includes(c.id), def = ids[0] === c.id, cover = c.templates.find((t) => t.cover_url);
+          return `<button class="bm-cat${on ? " on" : ""}" data-cat="${c.id}">${cover ? `<img src="${esc(cover.cover_url)}" alt="" loading="lazy">` : `<span>${c.icon}</span>`}<b>${esc(c.ar)}</b>${on ? `<i data-star title="خليه الافتراضي">${def ? "★" : "☆"}</i>` : ""}</button>`;
+        }).join("")}</div>`;
+      }
+      case "imgs": {
+        const xs = b?.[l.f] || [];
+        return head + `<div class="bm-imgs">${xs.map((x) => `<figure data-file="${esc(x.file)}"><img src="${esc(x.url)}" alt="" loading="lazy" title="${esc(x.description || x.name)}"><button data-adel title="احذف">✕</button></figure>`).join("")}
+          <label class="bm-up">+<small>ارفع</small><input type="file" accept="image/*" multiple data-up="${l.f}" hidden></label></div>
+          <p class="bm-note">${l.f === "logos" ? "اللوجو بنسخه (فاتح، غامق، أيقونة)." : "صور حقيقية من البراند. البرنامج بيوصفها ويستخدمها بالظبط بدل ما يخترع."} تقدر تسحب الصور وترميها هنا.</p>`;
+      }
+      case "video": {
+        const url = b?.[`${l.f}_url`];
+        return head + (url ? `<video src="${esc(url)}" controls preload="metadata" playsinline></video>
+          <div class="bm-pills"><button class="bm-pill${b[`${l.f}_on`] ? " on" : ""}" data-von="${l.f}" data-v="1">شغّال</button><button class="bm-pill${b[`${l.f}_on`] ? "" : " on"}" data-von="${l.f}" data-v="">مقفول</button></div>
+          <button class="bm-link bad" data-vdel="${l.f}">شيل الفيديو</button>` : `<label class="bm-up wide">+<small>ارفع فيديو</small><input type="file" accept="video/*" data-vup="${l.f}" hidden></label>`);
+      }
+      case "multi": return head + `<p class="bm-note">بيتكتب لوحده من اللوجو والصور، وتقدر تعدّله.</p>` + l.fields.map(([k, t]) => `<div class="bm-sub"><small>${t}</small>${editable(k, b?.[k], "…", /logo_description|ui_style|style/.test(k))}</div>`).join("");
+      case "action": return head + `<p class="bm-note">البرنامج بيبص على اللوجو وصور البراند ويكتب الثيم والستايل وشكل اللوجو لوحده.</p>
+        <button class="bm-go" data-analyze ${b?.status === "working" ? "disabled" : ""}>${b?.status === "working" ? "بيستنبط…" : "ابدأ الاستنباط"}</button>`;
+    }
+    return head;
+  }
+  function openCard(n) {
+    const card = S.el.querySelector(".bm-card");
+    if (!n) { S.open = null; card.hidden = true; S.el.classList.remove("has-card"); markOpen(); return; }
+    S.open = { id: n.id, br: n.br?.k, n };
+    card.innerHTML = `<button class="bm-x" data-close aria-label="اقفل">✕</button>` + cardHTML(n);
+    card.hidden = false;
+    S.el.classList.add("has-card");
+    card.animate([{ opacity: 0, transform: "scale(.96)" }, { opacity: 1, transform: "none" }], { duration: reduce.matches ? 1 : 260, easing: "cubic-bezier(.2,.8,.2,1)" });
+    markOpen();
+    tick(performance.now());
+    const ed = card.querySelector(".bm-write");
+    if (ed && n.kind === "leaf") { ed.focus(); placeCaret(ed); }
+  }
+  function markOpen() { S.el.querySelectorAll(".bm-n.on").forEach((x) => x.classList.remove("on")); if (S.open?.n?.el) S.open.n.el.classList.add("on"); }
+  const placeCaret = (el) => { const r = document.createRange(); r.selectNodeContents(el); r.collapse(false); const s = getSelection(); s.removeAllRanges(); s.addRange(r); };
+  // الكارت جنب النقطة من الناحية البعيدة عن المخ، ومبيطلعش برّه الخريطة
+  function placeCard(p) {
+    const card = S.el.querySelector(".bm-card");
+    if (!p || card.hidden) return;
+    const W = S.el.clientWidth, H = S.el.clientHeight, cw = card.offsetWidth, ch = card.offsetHeight;
+    const right = p[0] >= W / 2;
+    let x = right ? p[0] + 34 : p[0] - 34 - cw, y = p[1] - ch / 2;
+    if (x + cw > W - 8) x = p[0] - 34 - cw;
+    if (x < 8) x = Math.min(W - cw - 8, p[0] + 34);
+    y = Math.max(8, Math.min(H - ch - 8, y));
+    card.style.transform = `translate(${x}px, ${y}px)`;
+  }
+  const refreshCard = () => { if (S.open) { const n = S.nodes.find((x) => x.id === S.open.id) || (S.open.id === "c" ? S.nodes[0] : null); if (n) openCard(n); else openCard(null); } };
+
+  // ---------- الحفظ ----------
+  async function save(fn, { card = true } = {}) {
     try {
       const b = await fn();
       S.brains = S.brains.map((x) => (x.id === b.id ? b : x));
-      fill();
+      const keep = S.open && S.el.querySelector(".bm-card").contains(document.activeElement) && document.activeElement.matches(".bm-write");
+      layout();
+      if (S.open) {
+        const n = S.nodes.find((x) => x.id === S.open.id);
+        if (n) { S.open.n = n; markOpen(); if (card && !keep) refreshCard(); }
+      }
       if (b.status === "working") watch();
       loadClients();
     } catch (err) { toast(err.message, true); }
@@ -167,19 +272,121 @@ const BrandPage = (() => {
       try {
         const b = await bAPI("");
         S.brains = S.brains.map((x) => (x.id === b.id ? b : x));
-        if (b.status !== "working") { clearInterval(S.poll); loadClients(); }
-        fill();
+        if (b.status !== "working") { clearInterval(S.poll); loadClients(); layout(); if (S.open) refreshCard(); return; }
+        layout();
       } catch { clearInterval(S.poll); }
     }, 3000);
   }
-  const patch = (fields, name) => save(() => bAPI("", { method: "PATCH", ...jsonBody(name != null ? { name, fields } : { fields }) }));
+  const patch = (fields, name, opts) => save(() => bAPI("", { method: "PATCH", ...jsonBody(name != null ? { name, fields } : { fields }) }), opts);
+  // الكتابة بتتحفظ لوحدها بعد ما تقف شوية
+  let typeT = null;
+  function commit(el) {
+    clearTimeout(typeT);
+    const k = el.dataset.k, v = el.innerText.replace(/ /g, " ").trim();
+    const b = cur();
+    if (!b || k === "@new" || k === "rule:new") return;
+    if (k.startsWith("rule:")) {
+      const rs = rulesOf(b), i = +k.slice(5);
+      if (rs[i] === v) return;
+      if (v) rs[i] = v; else rs.splice(i, 1);
+      return patch({ rules: rs.join("\n") }, null, { card: !v });
+    }
+    if (k === "@name") return v && v !== b.name ? patch({}, v, { card: false }) : null;
+    if (String(b[k] || "").trim() === v) return;
+    return patch({ [k]: v }, null, { card: false });
+  }
+  const upload = (kind, files) => {
+    const imgs = [...files].filter((f) => /\.(png|jpe?g|webp)$/i.test(f.name));
+    if (!imgs.length) return toast("مفيش صور (PNG / JPG / WEBP)", true);
+    const form = new FormData();
+    form.append("kind", kind);
+    imgs.slice(0, 120).forEach((f) => form.append("files", f));
+    toast(`⏳ بيرفع ${imgs.length} صورة…`);
+    return save(() => bAPI("/assets", { method: "POST", body: form }));
+  };
 
   function bind(w) {
-    w.addEventListener("change", async (e) => {
+    w.addEventListener("click", async (e) => {
+      const t = e.target;
+      const node = t.closest(".bm-n");
+      if (node) {
+        const n = S.nodes.find((x) => x.id === node.dataset.n);
+        if (!n) return;
+        if (S.open?.id === n.id) return openCard(null);
+        if (n.kind === "leaf" && n.l.type === "action") return openCard(n);
+        return openCard(n);
+      }
+      if (t.closest("[data-close]")) return openCard(null);
+      const go = t.closest("[data-go]");
+      if (go) return openCard(S.nodes.find((x) => x.id === go.dataset.go));
+      const br = t.closest("[data-brain]");
+      if (br) { S.id = br.dataset.brain; openCard(null); layout(); return; }
+      if (t.closest("[data-del]")) {
+        const b = cur();
+        if (!b || !confirm(`تحذف «${b.name}» بكل صوره؟`)) return;
+        try { await api(`/api/ad-brains/${b.id}`, { method: "DELETE" }); openCard(null); await load(); loadClients(); } catch (err) { toast(err.message, true); }
+        return;
+      }
+      const pick = t.closest("[data-pick]");
+      if (pick) return patch({ [pick.dataset.pick]: pick.dataset.v });
+      const von = t.closest("[data-von]");
+      if (von) return patch({ [`${von.dataset.von}_on`]: von.dataset.v });
+      const vdel = t.closest("[data-vdel]");
+      if (vdel) { if (confirm("تشيل الفيديو ده؟")) save(() => bAPI(`/brand-video/${vdel.dataset.vdel}`, { method: "DELETE" })); return; }
+      const rdel = t.closest("[data-rdel]");
+      if (rdel) { const rs = rulesOf(cur()); rs.splice(+rdel.dataset.rdel, 1); openCard(null); return patch({ rules: rs.join("\n") }); }
+      const hdel = t.closest("[data-hdel]");
+      if (hdel) return patch({ palette: String(cur()?.palette || "").replace(new RegExp(`${hdel.dataset.hdel}[^,\\n]*[,\\n]?\\s*`, "i"), "").trim() });
+      if (t.closest("[data-analyze]")) return save(() => bAPI("/analyze", { method: "POST" }));
+      const fig = t.closest("[data-file]");
+      if (fig && t.closest("[data-adel]")) { if (confirm("تحذف الصورة دي؟")) save(() => bAPI(`/assets/${encodeURIComponent(fig.dataset.file)}`, { method: "DELETE" })); return; }
+      const cat = t.closest("[data-cat]");
+      if (cat) {
+        const ids = styleIds(cur()), id = cat.dataset.cat;
+        const next = t.closest("[data-star]") ? [id, ...ids.filter((x) => x !== id)] : ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id];
+        return patch({ styles: next.join(",") });
+      }
+      // دوسة في الفاضي بتقفل الكارت
+      if (!t.closest(".bm-card")) openCard(null);
+    });
+    w.addEventListener("input", (e) => {
+      const el = e.target.closest(".bm-write");
+      if (!el || el.dataset.k === "@new" || el.dataset.k === "rule:new") return;
+      clearTimeout(typeT);
+      typeT = setTimeout(() => commit(el), 900);
+    });
+    w.addEventListener("focusout", (e) => { const el = e.target.closest?.(".bm-write"); if (el) commit(el); });
+    w.addEventListener("keydown", async (e) => {
+      const el = e.target.closest?.(".bm-write");
+      if (!el || e.key !== "Enter" || e.shiftKey) return;
+      const k = el.dataset.k, v = el.innerText.trim();
+      if (k === "@new") {
+        e.preventDefault();
+        if (!v) return;
+        try {
+          const b = await api("/api/ad-brains", { method: "POST", ...jsonBody({ name: v, fields: {} }) });
+          S.brains.push(b); S.id = b.id; openCard(null); layout(); loadClients();
+        } catch (err) { toast(err.message, true); }
+        return;
+      }
+      if (k === "rule:new") {
+        e.preventDefault();
+        if (!v) return;
+        const rs = rulesOf(cur());
+        rs.push(v);
+        el.textContent = "";
+        return patch({ rules: rs.join("\n") }, null, { card: false });
+      }
+      // الخانات القصيرة: Enter بيحفظ ويقفل
+      if (!/about|audience|caption|palette|rules|theme|style|description/.test(k)) { e.preventDefault(); commit(el); openCard(null); }
+    });
+    w.addEventListener("change", (e) => {
       const el = e.target;
-      if (el.id === "nbPick") { S.id = el.value; fill(); return; }
-      if (el.dataset.k) return el.dataset.k === "@name" ? patch({}, el.value) : patch({ [el.dataset.k]: el.value });
-      if (el.dataset.on) return patch({ [`${el.dataset.on}_on`]: el.checked ? "1" : "" });
+      if (el.dataset.up) { const f = el.files; upload(el.dataset.up, f); el.value = ""; return; }
+      if (el.dataset.hadd != null && el.matches("[data-hadd]")) {
+        const b = cur(), p = String(b?.palette || "").trim();
+        return patch({ palette: p ? `${p}, ${el.value.toUpperCase()}` : el.value.toUpperCase() });
+      }
       if (el.dataset.vup) {
         const f = el.files[0];
         el.value = "";
@@ -190,66 +397,30 @@ const BrandPage = (() => {
         toast("⏳ بيرفع الفيديو…");
         return save(() => bAPI("/brand-video", { method: "POST", body: form }));
       }
-      if (el.dataset.up) {
-        const files = [...el.files].filter((f) => /\.(png|jpe?g|webp)$/i.test(f.name));
-        el.value = "";
-        if (!files.length) return toast("مفيش صور (PNG / JPG / WEBP) في اللي اخترته", true);
-        const form = new FormData();
-        form.append("kind", el.dataset.up);
-        files.slice(0, 120).forEach((f) => form.append("files", f));
-        toast(`⏳ بيرفع ${files.length} صورة…`);
-        return save(() => bAPI("/assets", { method: "POST", body: form }));
-      }
     });
-    w.addEventListener("click", async (e) => {
-      const t = e.target;
-      const go = t.closest("[data-bwgo]"), dot = t.closest("[data-bwstep]");
-      if (dot) return step(+dot.dataset.bwstep);
-      if (go) {
-        if (+go.dataset.bwgo > 0 && S.step === STEPS.length) return toast("✓ عقل البراند متحفظ");
-        return step(S.step + +go.dataset.bwgo);
-      }
-      if (t.closest("#nbNew")) {
-        const name = prompt("اسم البراند؟");
-        if (!name?.trim()) return;
-        try {
-          const b = await api("/api/ad-brains", { method: "POST", ...jsonBody({ name, fields: {} }) });
-          S.brains.push(b);
-          S.id = b.id;
-          fill();
-          loadClients();
-        } catch (err) { toast(err.message, true); }
-        return;
-      }
-      if (t.closest("#nbDel")) {
-        const b = cur();
-        if (!b || !confirm(`تحذف «${b.name}» بكل صوره؟`)) return;
-        try { await api(`/api/ad-brains/${b.id}`, { method: "DELETE" }); await load(); loadClients(); } catch (err) { toast(err.message, true); }
-        return;
-      }
-      if (t.closest("#nbAnalyze")) return save(() => bAPI("/analyze", { method: "POST" }));
-      const vdel = t.closest("[data-vdel]");
-      if (vdel) { if (confirm("تشيل الفيديو ده؟")) save(() => bAPI(`/brand-video/${vdel.dataset.vdel}`, { method: "DELETE" })); return; }
-      const fig = t.closest("[data-file]");
-      if (fig && t.closest("[data-adel]")) { if (confirm("تحذف الصورة دي؟")) save(() => bAPI(`/assets/${encodeURIComponent(fig.dataset.file)}`, { method: "DELETE" })); return; }
-      const cat = t.closest("[data-cat]");
-      if (cat) {
-        const ids = styleIds(cur()), id = cat.dataset.cat;
-        const next = t.closest("[data-star]") ? [id, ...ids.filter((x) => x !== id)] : ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id];
-        return patch({ styles: next.join(",") });
-      }
+    // سحب صور ورميها على كارت الصور
+    w.addEventListener("dragover", (e) => { if (e.target.closest(".bm-card") && S.open?.n?.l?.type === "imgs") { e.preventDefault(); S.el.querySelector(".bm-card").classList.add("drop"); } });
+    w.addEventListener("dragleave", (e) => { if (!e.relatedTarget || !S.el.querySelector(".bm-card").contains(e.relatedTarget)) S.el.querySelector(".bm-card").classList.remove("drop"); });
+    w.addEventListener("drop", (e) => {
+      const card = S.el.querySelector(".bm-card");
+      card.classList.remove("drop");
+      if (!e.target.closest(".bm-card") || S.open?.n?.l?.type !== "imgs") return;
+      e.preventDefault();
+      upload(S.open.n.l.f, e.dataTransfer.files);
     });
-    w.addEventListener("keydown", (e) => {
-      if ((e.key === "Enter" || e.key === " ") && e.target.matches("[data-cat]")) { e.preventDefault(); e.target.click(); }
-    });
+    new ResizeObserver(() => layout()).observe(w);
   }
+  // Esc بيقفل الكارت الأول (قبل ما يرجع من الصفحة)
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && S.open && S.el?.isConnected) { e.preventDefault(); openCard(null); }
+  }, true);
 
   async function load() {
     const [brains, cats] = await Promise.all([api("/api/ad-brains"), S.cats ? S.cats : api("/api/style-cats").catch(() => [])]);
     S.brains = brains;
     S.cats = cats;
     if (!S.brains.some((b) => b.id === S.id)) S.id = clientx?.active || S.brains[0]?.id || null;
-    fill();
+    layout();
     if (cur()?.status === "working") watch();
   }
 
@@ -257,11 +428,15 @@ const BrandPage = (() => {
     const w = root.querySelector("#nbWrap");
     if (!w) return;
     S.el = w;
+    S.open = null;
     S.id = id || clientx?.active || S.id;
     w.innerHTML = skeleton();
     bind(w);
-    step(1);
-    try { await load(); } catch (err) { w.innerHTML = `<div class="nh-empty">${esc(err.message)}</div>`; }
+    try { await load(); } catch (err) { w.innerHTML = `<div class="nh-empty">${esc(err.message)}</div>`; return; }
+    if (!S.raf) S.raf = requestAnimationFrame(loop);
+    // أول ما الخريطة تفتح: النقط بتطلع من المخ لبرّه
+    if (!reduce.matches) S.nodes.forEach((n, i) => n.el?.animate([{ opacity: 0, translate: `${S.nodes[0].x - n.x}px ${S.nodes[0].y - n.y}px`, scale: .3 }, { opacity: 1, translate: "0 0", scale: 1 }],
+      { duration: 700, delay: n.kind === "center" ? 0 : n.kind === "branch" ? 120 : 260 + (i % 9) * 25, easing: "cubic-bezier(.2,.8,.2,1)", fill: "backwards" }));
   }
   return { html, mount, styleIds: (b) => styleIds(b), cats: () => S.cats };
 })();
