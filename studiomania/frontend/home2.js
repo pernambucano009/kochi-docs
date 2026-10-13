@@ -43,7 +43,7 @@ const NH = (() => {
   // go = خطوة في البرنامج (showStep) · page = صفحة جوه الرئيسية · fn = حاجة خاصة
   const T = {
     create: KOCHI ? { en: "New Project", ar: "مشروع جديد", icon: "create", go: "0", desc: "الفيديو الخام ← التقطيع ← التوليد ← المونتاج ← النشر، خطوة خطوة." }
-      : { en: "Create", ar: "اعمل جديد", icon: "create", page: "create", desc: "كل أنواع الشغل من هنا: اختار النوع، والخطوات بتمشي معاك لحد التصدير." },
+      : { en: "Create", ar: "ابدأ مشروع جديد", icon: "create", page: "create", desc: "كل أنواع الشغل من هنا: اختار النوع، والخطوات بتمشي معاك لحد التصدير." },
     brand: { en: "Your Brand", ar: "عقل البراند", icon: "brand", page: "brand", desc: "كل تفاصيل البراند وتفضيلاته وستايله. أي شغل بيتعمل بيبني عليه." },
     assets: { en: "Assets", ar: "الأصول", icon: "box", page: "assets", desc: "الشخصيات والأصوات والموسيقى اللي بتستخدمها في أي شغل." },
     settings: { en: "Settings", ar: "الإعدادات", icon: "gear", go: "settings", desc: "المفاتيح والرصيد والعملاء." },
@@ -317,7 +317,7 @@ const NH = (() => {
         <button type="button" data-pjf="done">اتصدّرت · <span class="num">${n("done")}</span></button>
         ${n("fail") ? `<button type="button" data-pjf="fail">وقفت · <span class="num">${n("fail")}</span></button>` : ""}
       </div>
-      <div class="nh-pj-grid">${cards}<button type="button" class="nh-tile nh-pj-add" data-id="create"><span>＋</span>مشروع جديد</button></div>
+      <div class="nh-pj-grid">${cards}<button type="button" class="nh-tile nh-pj-add" data-id="create"><span>＋</span>ابدأ مشروع جديد</button></div>
     </div>`;
   }
   function pjFilter() {
@@ -351,7 +351,7 @@ const NH = (() => {
     pGrid.classList.toggle("nh-scroll", !!MODS[key]);
     // شغّال عليه: «＋ مشروع جديد» فوق جنب العنوان (زي البروتوتايب)
     document.getElementById("nhPTabs").innerHTML = tabs ? asTabs(key)
-      : key === "progress" && !KOCHI ? `<button type="button" class="nh-pj-new nh-tile" data-id="create"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>مشروع جديد</button>` : "";
+      : key === "progress" && !KOCHI ? `<button type="button" class="nh-pj-new nh-tile" data-id="create"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>ابدأ مشروع جديد</button>` : "";
     document.getElementById("nhPClient").innerHTML = document.getElementById("nhClient").innerHTML;
     pGrid.innerHTML = MODS[key] ? MODS[key].html() : PAGES[key]();
     if (MODS[key]) MODS[key].mount(pGrid, pageArg);

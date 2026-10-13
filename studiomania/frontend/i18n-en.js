@@ -3983,5 +3983,6 @@ window.I18N_EN = {
   "آخر التعليقات الصوتية": "Latest voiceovers",
   "عرض الكل": "View all",
   "سجّل أو ارفع تعليق": "Record or upload a voiceover",
-  "بيتكتب الكلام لوحده": "Gets transcribed automatically"
+  "بيتكتب الكلام لوحده": "Gets transcribed automatically",
+  "＋ ابدأ مشروع جديد": "＋ Start a new project"
 };
