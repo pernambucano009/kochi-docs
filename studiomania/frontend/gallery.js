@@ -26,7 +26,7 @@ const Gallery = (() => {
     "sk-product-scene": "المنتج جوه مشهد حقيقي يناسبه.",
     "sk-static-ads": "إعلانات ثابتة جاهزة للنشر من أكتر من 40 تصميم.",
   };
-  const CAT_EN = { cartoon2d: "2D Cartoon", anim3d: "3D Animation", paper: "Paper", clay: "Clay", collage: "Collage", motion: "Motion", ugc: "UGC", cinematic: "Cinematic", product: "Product" };
+  const CAT_EN = { cartoon2d: "2D Cartoon", anim3d: "3D Animation", paper: "Paper", clay: "Clay", collage: "Collage", motion: "Motion", ugc: "UGC", cinematic: "Cinematic", product: "Product", other: "My Templates" };
 
   // فيديوهات عرض جاهزة للقوالب (متعمولة مرة واحدة ومحفوظة في frontend/gallery)
   const SHOW = ["sk-clay", "sk-papercut", "sk-ugc", "sk-cinema-ad", "sk-skeleton", "sk-talking", "sk-song",
@@ -36,7 +36,9 @@ const Gallery = (() => {
     const catOf = {};
     cats.forEach((c) => (c.templates || []).forEach((t) => (catOf[t.id] = c.id)));
     S.cats = cats;
-    S.items = [...tpls.map((t) => ({ ...t, ...(SHOW.includes(t.id) ? { sample_url: `/gallery/${t.id}.mp4`, cover_url: `/gallery/${t.id}.jpg` } : {}),
+    // القوالب اللي اتحفظت من المعمل ومعندهاش فيديو عرض: نعرض الفيديو الأصلي اللي اتعملت منه
+    S.items = [...tpls.map((t) => ({ ...t, sample_url: t.sample_url || t.source_url,
+      ...(SHOW.includes(t.id) ? { sample_url: `/gallery/${t.id}.mp4`, cover_url: `/gallery/${t.id}.jpg` } : {}),
       cat: catOf[t.id] || "other" })), ...EXTRA];
   }
   const catName = (id) => S.cats.find((c) => c.id === id)?.ar || "تانية";
