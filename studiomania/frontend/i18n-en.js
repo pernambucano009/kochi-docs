@@ -3988,5 +3988,13 @@ window.I18N_EN = {
   "اختار نوع الشغل، وبعدين هنمشي خطوة خطوة.": "Pick the kind of work, then we go step by step.",
   "· نوع الشغل": "· Type of work",
   "نوع الشغل": "Type of work",
-  "التالي": "Next"
+  "التالي": "Next",
+  "جدول هنا": "Schedule here",
+  "أوتوبايلوت بيحضّره": "Autopilot is preparing it",
+  "خلصت": "Done",
+  "اسم البراند ومجاله وجمهوره، واللوجو والألوان. البرنامج بيبني على ده في كل شغل.": "The brand's name, field and audience, plus logo and colors. Everything is built on this.",
+  "الستايلات اللي بيشتغل بيها، وصور حقيقية منه، والهوية اللي البرنامج استنبطها منها.": "The styles it uses, real images of it, and the identity derived from them.",
+  "القواعد دي بتتطبق على كل السكريبتات والصور والفيديو والصوت اللي بتتعمل للبراند.": "These rules apply to every script, image, video and voice made for the brand.",
+  "اللوجو والإنترو والأوترو، والدعوة واللينك والكابشن اللي بيتحطوا لوحدهم وقت النشر.": "Logo, intro and outro, plus the CTA, link and caption added automatically when posting.",
+  "✓ عقل البراند متحفظ": "✓ Brand brain saved"
 };

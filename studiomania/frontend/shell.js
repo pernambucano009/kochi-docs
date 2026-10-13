@@ -26,6 +26,7 @@ const STEP_INFO = {
   "6a": { num: "", title: "مونتاج الإعلانات", en: "Ad montage" },
   "6f": { num: "", title: "المونتاج", en: "Montage" },
   settings: { num: "", title: "الإعدادات", en: "Settings" },
+  cal: { num: "", title: "المواعيد", en: "Calendar" },
 };
 const NEXT_LABEL = {
   0: "التالي: التقطيع",
@@ -80,6 +81,9 @@ function openStage(step) {
   $("stageIc").innerHTML = ic ? `<img class="ic-l" src="/icons3d/${ic}.webp?v=8" alt=""><img class="ic-d" src="/icons3d/${ic}_d.webp?v=8" alt="">` : "";
   // المونتاج شاشة شغل: راس صغير (رجوع + اسم المشروع + صدّر) بدل العنوان الكبير، زي البروتوتايب
   $("stage").classList.toggle("mt-mode", ["6", "6s", "6a", "6f"].includes(step));
+  // المواعيد صفحة لوحدها جوه النشر: الرجوع بيودّي للنشر مش للرئيسية
+  $("stage").classList.toggle("cal-mode", step === "cal");
+  $("stageMin").querySelector("span").textContent = step === "cal" ? "النشر" : "الرئيسية";
   const inFlow = PROCESS.includes(step);
   $("flowNav").hidden = !inFlow;
   $("stage").classList.toggle("library", !inFlow);
@@ -148,7 +152,7 @@ async function renderStageProject() {
   $("stageProject").hidden = !f || !PROCESS.includes(shell.step);
 }
 
-$("stageMin").onclick = () => showStep("home");
+$("stageMin").onclick = () => showStep(shell.step === "cal" ? "7" : "home");
 $("flowNav").addEventListener("click", (e) => {
   const b = e.target.closest("button[data-step]");
   if (!b) return;
@@ -304,10 +308,4 @@ setInterval(() => { if (!document.hidden) loadMoney(); }, 60000);
 
 // راس الصفحات: الرصيد بيفتح تفاصيله، والكالندر بيفتح المواعيد في صفحة النشر بالأسبوع
 $("stageMoney").onclick = () => $("moneyBtn").click();
-$("stageCal").onclick = () => {
-  if (shell.step !== "7") showStep("7");
-  setTimeout(() => {
-    document.querySelector('#calViews [data-v="week"]')?.click();
-    $("calViews")?.closest(".panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, 350);
-};
+$("stageCal").onclick = () => showStep("cal");

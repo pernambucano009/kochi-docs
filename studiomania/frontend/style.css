@@ -2776,3 +2776,52 @@ dialog.cal-dlg { width: min(720px, 94vw); max-height: 90vh; border: 1px solid va
 .set-seg { background: #EDECE8; }
 :root[data-nh-theme="dark"] .set-seg { background: var(--field); }
 :root .stage .set-card .btn.set-out { margin-top: 6px; }
+
+/* ===== صفحة المواعيد (الكالندر) زي البروتوتايب: أسبوع في كارت أبيض كبير، كل يوم عمود رمادي ===== */
+.stage.cal-mode .view[data-view="7"] > :not(.cal-panel) { display: none !important; }
+.stage.cal-mode .cal-panel { position: relative; margin: 0 !important; padding: 0 !important; background: none !important; box-shadow: none !important; border: 0 !important; }
+.stage.cal-mode .cal-panel > .panel-head { position: absolute; inset-inline-end: 0; top: 0; margin: 0; padding: 0; border: 0; }
+.stage.cal-mode .cal-panel > .panel-head > :not(#calViews), .stage.cal-mode #calViews [data-v="list"],
+.stage.cal-mode .cal-panel > :is(.posts, .empty, .orphans) { display: none !important; }
+.stage.cal-mode #calViews { display: inline-flex; gap: 2px; padding: 4px; border-radius: 999px; background: var(--field, #EFEEEB); }
+.stage.cal-mode #calViews button { border: 0; background: none; border-radius: 999px; padding: 7px 16px; font: inherit; font-size: 13px; color: #8a857f; cursor: pointer; }
+.stage.cal-mode #calViews button.on { background: var(--card, #fff); color: var(--ink, #181718); box-shadow: 0 1px 4px rgba(0, 0, 0, .08); }
+.stage:not(.cal-mode) #calViews { display: none; }
+.stage.cal-mode .cal-head { min-height: 40px; margin: 0 0 20px; padding-inline-end: 160px; justify-content: flex-end; gap: 20px; }
+.stage.cal-mode .cal-head [data-nav="0"], .stage.cal-mode .cal-legend { display: none; }
+.stage.cal-mode .cal-head [data-nav] { display: grid; place-items: center; flex: none; width: 40px; height: 40px; min-width: 0; padding: 0; line-height: 1; border-radius: 50%; border: 0; background: var(--card, #fff); box-shadow: 0 2px 10px rgba(24, 23, 24, .06); font-size: 18px; }
+.stage.cal-mode .cal-title { font-size: 17px; font-weight: 500; min-width: 190px; text-align: center; }
+.stage.cal-mode :is(.cal-week, .cal-month) { background: var(--card, #fff); border-radius: 24px; box-shadow: var(--card-shadow, 0 4px 24px rgba(24, 23, 24, .06)); padding: 20px; }
+.stage.cal-mode .cal-week { gap: 12px; overflow: visible; }
+.stage.cal-mode .cal-week .cal-day { min-height: 0; padding: 0; background: none; border: 0; gap: 10px; opacity: 1; }
+.stage.cal-mode .cal-week .cal-dh { justify-content: center; gap: 6px; font-size: 13px; color: #8a857f; }
+.stage.cal-mode .cal-week .cal-dh .cal-dn { color: var(--ink, #181718); }
+.stage.cal-mode .cal-week .cal-day.today .cal-dn { color: #fff; }
+.stage.cal-mode .cal-week .cal-list { flex: 1; min-height: max(360px, calc(100vh - 420px)); background: var(--page-bg, #F7F7F5); border-radius: 16px; padding: 10px; display: flex; flex-direction: column; gap: 10px; border: 2px solid transparent; }
+.stage.cal-mode .cal-week .cal-day.today .cal-list { border-color: var(--accent, #E5613E); background: transparent; }
+.stage.cal-mode .cal-week .cal-day.drop .cal-list { border-color: var(--accent, #E5613E); border-style: dashed; }
+.stage.cal-mode .cal-week .cal-day.past .cal-card { opacity: .8; }
+.stage.cal-mode .cal-week .cal-card { border-radius: 12px; box-shadow: 0 2px 10px rgba(24, 23, 24, .06); background: var(--card, #fff); border: 2px solid transparent; }
+.stage.cal-mode .cal-week .cal-card.failed { border-color: #E04A3A; }
+.stage.cal-mode .cal-week .cal-card img, .stage.cal-mode .cal-week .cal-noimg { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; background: linear-gradient(160deg, #4a4542, #221e1b); font-size: 0; }
+.stage.cal-mode .cal-week .cal-card > .cal-n { display: none; }
+.stage.cal-mode .cal-week .cal-meta { display: flex; align-items: center; gap: 6px; padding: 8px 10px; font-size: 12px; }
+.stage.cal-mode .cal-week .cal-meta .cal-pl:first-of-type { margin-inline-start: auto; }
+.stage.cal-mode .cal-bad { margin-inline-start: auto; color: #E04A3A; }
+.stage.cal-mode .cal-week .cal-card.job { background: none; box-shadow: none; border: 1.5px dashed rgba(24, 23, 24, .2); padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; font-size: 12px; }
+.stage.cal-mode .cal-week .cal-card.job .cal-n { display: block; color: #6B6A66; }
+.stage.cal-mode .cal-week .cal-add { position: absolute; inset: auto 0 0; top: 40px; margin: auto; width: fit-content; height: fit-content; display: inline-flex; padding: 7px 16px; border: 1px solid var(--ink, #181718); border-radius: 999px; background: var(--card, #fff); color: var(--ink, #181718); font: inherit; font-size: 13px; opacity: 0; transition: opacity .15s; }
+.stage.cal-mode .cal-week .cal-add span { display: none; }
+.stage.cal-mode .cal-week .cal-add b { font-weight: 500; }
+.stage.cal-mode .cal-week .cal-day:hover .cal-add, .stage.cal-mode .cal-week .cal-day:has(.cal-list:empty) .cal-add { opacity: 1; }
+.stage:not(.cal-mode) .cal-add b { display: none; }
+.stage.cal-mode .cal-month .cal-day { background: var(--page-bg, #F7F7F5); border-radius: 12px; }
+:root[data-nh-theme="dark"] .stage.cal-mode .cal-week .cal-card.job { border-color: rgba(255, 255, 255, .22); }
+:root[data-nh-theme="dark"] .stage.cal-mode .cal-week .cal-list, :root[data-nh-theme="dark"] .stage.cal-mode .cal-month .cal-day { background: rgba(255, 255, 255, .04); }
+:root[data-nh-theme="dark"] .stage.cal-mode .cal-head [data-nav] { background: var(--field); color: #fff; }
+@media (max-width: 900px) { .stage.cal-mode .cal-week { overflow-x: auto; grid-template-columns: repeat(7, 150px); } .stage.cal-mode .cal-head { padding-inline-end: 0; padding-top: 50px; } }
+.stage.cal-mode .cal-head [data-nav="0"] { display: none; }
+:root[data-nh-theme="dark"] .stage.cal-mode .cal-week .cal-dh .cal-dn, :root[data-nh-theme="dark"] .stage.cal-mode .cal-title { color: #f1f1f3; }
+:root[data-nh-theme="dark"] .stage.cal-mode .cal-week .cal-day.today .cal-dn { color: #fff; }
+:root[data-nh-theme="dark"] .stage.cal-mode .cal-week .cal-add { background: #1F1E1F; color: #f1f1f3; border-color: rgba(255, 255, 255, .6); }
+:root[data-nh-theme="dark"] .stage.cal-mode #calViews button.on { background: #2a292a; color: #fff; }

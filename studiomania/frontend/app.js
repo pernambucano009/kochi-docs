@@ -762,7 +762,7 @@ $("clipsGrid").addEventListener("click", async (e) => {
 const viewHooks = {}; // كل صفحة بتسجّل هنا اللي يحصل لما تفتح
 // "home" = الرئيسية (المربعات). أي خطوة تانية بتفتح في الشاشة الكبيرة (shell.js)
 // خطوات بتفتح نفس الصفحة بس لقسم تاني: مونتاج المسلسلات والإعلانات منفصل عن مونتاج فيديوهات الشخصيات
-const VIEW_OF = { "6s": "6", "6a": "6", "6f": "6" };
+const VIEW_OF = { "6s": "6", "6a": "6", "6f": "6", cal: "7" };
 function showStep(step) {
   const view = VIEW_OF[step] || step;
   if (step !== "home" && !document.querySelector(`.view[data-view="${view}"]`)) step = "home";

@@ -57,7 +57,7 @@ function calCard(it, compact) {
   if (it.kind === "job") {
     const j = it.j;
     return `<div class="cal-card job" title="${escapeHtml(`🤖 الأوتوبايلوت لسه بيحضّره: ${AP_STEPS?.[j.step] || j.step}`)}">
-      <span class="cal-t">${calTime(it.when)}</span><span class="cal-n">🤖 ${escapeHtml(j.name || "")}</span></div>`;
+      <span class="cal-t">${calTime(it.when)}</span><span class="cal-n">أوتوبايلوت بيحضّره</span></div>`;
   }
   const p = it.p;
   const thumb = p.image_url || thumbOf(p.export_url || "");
@@ -68,7 +68,7 @@ function calCard(it, compact) {
   }
   return `<div class="cal-card ${p.status}" data-pid="${p.id}"${drag}>
     ${thumb ? `<img src="${thumb}" alt="" loading="lazy">` : `<div class="cal-noimg">🎬</div>`}
-    <div class="cal-meta"><b class="cal-dot ${CAL_DOT[p.status] || ""}"></b><span class="cal-t">${calTime(it.when)}</span>${calPlatIcons(p.platforms)}</div>
+    <div class="cal-meta"><b class="cal-dot ${CAL_DOT[p.status] || ""}"></b><span class="cal-t">${calTime(it.when)}</span>${p.status === "failed" ? `<span class="cal-bad">فشل</span>` : calPlatIcons(p.platforms)}</div>
     <span class="cal-n">${escapeHtml(p.export_name || p.caption || (p.from_zernio ? "🔗 من Zernio" : ""))}</span>
   </div>`;
 }
@@ -85,15 +85,19 @@ function calDayCell(date, items, compact, extraCls = "") {
     <div class="cal-list">${shown.map((it) => calCard(it, compact)).join("")}</div>
     ${more > 0 ? `<button type="button" class="cal-more" data-more="${key}">+${more} كمان</button>` : ""}
     ${open && items.length > CAL_MAX ? `<button type="button" class="cal-more" data-more="">أقل</button>` : ""}
-    ${past ? "" : `<button type="button" class="cal-add" data-add="${key}" title="جدول بوست في اليوم ده">＋</button>`}
+    ${past ? "" : `<button type="button" class="cal-add" data-add="${key}" title="جدول بوست في اليوم ده"><span>＋</span><b>جدول هنا</b></button>`}
   </div>`;
 }
 
+// صفحة المواعيد (من أيقونة الكالندر فوق): أسبوع أو شهر بس، زي البروتوتايب
+const calPage = () => shell.step === "cal";
 function renderCal() {
   const box = $("postsCal");
   if (!box) return;
+  if (calPage() && cal.view === "list") cal.view = "week";
   $("calViews").querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.v === cal.view));
-  const list = cal.view === "list";
+  // صفحة النشر فيها القايمة بس، والأسبوع والشهر في صفحة المواعيد
+  const list = !calPage();
   box.hidden = list;
   $("postsList").hidden = !list;
   $("postFilter").hidden = !list;
@@ -139,7 +143,7 @@ $("calViews").addEventListener("click", async (e) => {
   cal.view = b.dataset.v;
   try { localStorage.setItem(CAL_KEY, cal.view); } catch {}
   cal.openDay = null;
-  if (cal.view !== "list") await calLoadJobs();
+  if (calPage()) await calLoadJobs();
   renderCal();
 });
 
@@ -167,7 +171,9 @@ $("postsCal").addEventListener("click", (e) => {
     const when = new Date(y, m - 1, d, ok ? cur.getHours() : 18, ok ? cur.getMinutes() : 0);
     if (when < new Date()) when.setTime(nextSlot().getTime());
     setWhen(when);
-    $("postForm").scrollIntoView({ behavior: "smooth", block: "start" });
+    // من صفحة المواعيد بيرجع للنشر والميعاد متحط في الفورم
+    if (calPage()) showStep("7");
+    setTimeout(() => $("postForm").scrollIntoView({ behavior: "smooth", block: "start" }), calPage() ? 0 : 400);
     toast(`📅 الميعاد اتحط: ${calFull(when)} — اختار الفيديو وجدول`);
     return;
   }
@@ -281,6 +287,6 @@ function calOpenPost(p) {
 // نحدّث فيديوهات الأوتوبايلوت مع كل تحديث للمواعيد
 const _calPubLoad = pubLoadPosts;
 pubLoadPosts = async function () {
-  if (cal.view !== "list") await calLoadJobs();
+  if (calPage()) await calLoadJobs();
   return _calPubLoad();
 };
