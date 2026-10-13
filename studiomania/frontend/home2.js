@@ -241,9 +241,12 @@ const NH = (() => {
     const t = T[key];
     return `${big(t.icon)}<h1 class="latin">${t.en}</h1><div class="ar">${esc(t.ar)}</div><p>${esc(t.desc)}</p>`;
   }
+  // وقت الزوم وشوية بعد الرجوع: المجسّم بيفضل زي ما هو مهما الماوس واقف فين، وآخر حاجة الماوس وقف عليها بتتطبق بعدها
+  let stageLock = false, pendingKey = null;
   function setStage(key) {
     key = key || "";
-    if (key === shown || zoom) return;   // وقت الزوم المسرح بيفضل زي ما هو
+    if (stageLock || zoom) { pendingKey = key; return; }
+    if (key === shown) return;
 
     shown = key;
     GL?.show(!key ? "app" : key.startsWith("f:") ? "progress" : GLKEY[key] || "app");
@@ -309,21 +312,6 @@ const NH = (() => {
     document.body.appendChild(f);
     return { f, r, color: cs.color };
   }
-  function flyIcon(key, r) {
-    const f = document.createElement("div");
-    f.className = "nh-fly nh-fly-ic";
-    f.innerHTML = glImg(key);
-    Object.assign(f.style, { left: r.x + "px", top: r.y + "px", width: r.w + "px", height: r.h + "px" });
-    document.body.appendChild(f);
-    return f;
-  }
-  // مكان المجسّم اللي في النص (مرسوم في الـ WebGL): مربع في نص المسرح
-  function stageIconRect() {
-    const st = document.getElementById("nhStage"), gl = st?.querySelector(".gl") || st;
-    if (!gl) return null;
-    const r = rectOf(gl), size = Math.min(r.w, r.h) * .56;
-    return { x: r.x + (r.w - size) / 2, y: r.y + r.h * .47 - size / 2, w: size, h: size };
-  }
   /* zoomTo: tile = المربع اللي اتداس · key = أيقونته · dest = { latin, name, icon } عناصر العنوان في الصفحة الجديدة
      content = اللي بيظهر بعد ما المربع يكبر · bg = لون الصفحة الجديدة · parent/z = فين الإطار بيترسم */
   function zoomTo(tile, { key, dest, content, bg, parent, z }) {
@@ -354,16 +342,27 @@ const NH = (() => {
       flies.push(f); real.push(from, to);
     });
     // الأيقونة: من المجسّم اللي في النص لحد جنب العنوان
-    const ir = stageIconRect(), glEl = document.querySelector("#nhStage .gl");
-    const ti = dest.icon && rectOf(dest.icon);
-    if (ir && ti?.w && key) {
-      const t = ti, f = flyIcon(key, ir);
-      anims.push(f.animate([{ transform: "none" }, { transform: `translate(${t.x - ir.x}px,${t.y - ir.y}px) scale(${t.w / ir.w},${t.h / ir.h})` }], o));
-      if (glEl) anims.push(glEl.animate([{ opacity: 1 }, { opacity: 0, offset: .08 }, { opacity: 0 }], o));
-      flies.push(f); real.push(dest.icon);
-    }
+    // الأيقونة: صورة طبق الأصل من المجسّم الحي في نفس مكانه ومقاسه، فمفيش أي نطة لما تبدأ تطير.
+    // وهي واصلة للركن بتدوب في أيقونة العنوان
+    const glEl = document.querySelector("#nhStage .gl"), ti = dest.icon && rectOf(dest.icon);
+    if (key && GL) GL.hold(key);
+    const shot = key && GL && ti?.w ? GL.snap() : null;
+    if (shot) {
+      const r0 = shot.rect, s = Math.min(ti.w / r0.w, ti.h / r0.h);
+      const tx = ti.x + ti.w / 2 - s * r0.w / 2 - r0.x, ty = ti.y + ti.h / 2 - s * r0.h / 2 - r0.y;
+      const f = document.createElement("div");
+      f.className = "nh-fly nh-fly-ic";
+      f.innerHTML = `<img src="${shot.url}" alt="">`;
+      Object.assign(f.style, { left: r0.x + "px", top: r0.y + "px", width: r0.w + "px", height: r0.h + "px" });
+      document.body.appendChild(f);
+      anims.push(f.animate([{ transform: "none", opacity: 1 }, { opacity: 1, offset: .8 }, { transform: `translate(${tx}px,${ty}px) scale(${s})`, opacity: 0 }], o),
+        dest.icon.animate([{ opacity: 0 }, { opacity: 0, offset: .8 }, { opacity: 1 }], o));
+      if (glEl) anims.push(glEl.animate([{ opacity: 0 }, { opacity: 0 }], o));   // المجسّم الحي بيستخبى من أول فريم (الصورة مكانه بالظبط)
+      flies.push(f);
+    } else if (ti?.w) real.push(dest.icon);
     real.forEach((e) => (e.style.opacity = 0));
-    zoom = { anims, frame, flies, real, cleanup: [] };
+    stageLock = true;
+    zoom = { anims, frame, flies, real, cleanup: [], key, glEl };
     return anims[0].finished.then(() => {
       home.style.visibility = "hidden";
       flies.forEach((f) => (f.style.opacity = 0));
@@ -379,11 +378,25 @@ const NH = (() => {
     z.real.forEach((e) => (e.style.opacity = 0));
     z.anims.forEach((a) => a.reverse());
     return z.anims[0].finished.then(() => {
+      // نفس المجسّم اللي راجعين منه بيرجع حي في مكانه، والصورة بتدوب فيه بهدوء
+      if (z.key && GL) GL.hold(z.key);
+      const ic = z.flies.find((f) => f.classList.contains("nh-fly-ic"));
       z.anims.forEach((a) => a.cancel());
       z.frame.remove();
-      z.flies.forEach((f) => f.remove());
+      z.flies.forEach((f) => f !== ic && f.remove());
+      if (ic) {
+        const d = reduce.matches ? 1 : 260;
+        z.glEl?.animate([{ opacity: 0 }, { opacity: 1 }], { duration: d, easing: "ease-out" });
+        ic.animate([{ opacity: 1 }, { opacity: 0 }], { duration: d, easing: "ease-out", fill: "forwards" }).finished.then(() => ic.remove(), () => ic.remove());
+      }
       z.real.forEach((e) => (e.style.opacity = ""));
       z.cleanup.forEach((f) => f());
+      // المجسّم بيفضل ثابت شوية قبل ما يتبع الماوس تاني
+      setTimeout(() => {
+        if (zoom) return;
+        stageLock = false;
+        if (pendingKey !== null) { const k = pendingKey; pendingKey = null; setStage(k); }
+      }, reduce.matches ? 0 : 1300);
     });
   }
   const zooming = (on) => document.body.classList.toggle("nh-zooming", on);
@@ -514,6 +527,7 @@ const NH = (() => {
     if (busy || zoom) return;
     busy = true;
     pStack = [];
+    setStage(tile.dataset.id || key);
     pTitle.innerHTML = titleHTML(T[key], key);
     pTitle.dataset.key = key;
     page.hidden = false;
@@ -552,6 +566,7 @@ const NH = (() => {
     if (zoom?.page || !tile.closest("#nhBento")) { run(); return; }
     busy = true;
     sectionZoom = true;
+    setStage(tile.dataset.id || (tile.closest(".nh-cont") ? "progress" : ""));
     run();
     cornerStage = cornerOf(tile);
     updateCorner("stage");

@@ -555,5 +555,40 @@ window.NHGL = (stage, getClient) => {
     requestAnimationFrame(loop);
   }
   requestAnimationFrame(loop);
-  return { show, theme, brand };
+  // للزوم: يثبّت المجسّم ده على طول (من غير ما يكبر أو يصغر أو يتبدّل)
+  function hold(key) {
+    const g = group(key);
+    cur = g;
+    order += 2;
+    g.traverse((o) => { if (o.isMesh) o.renderOrder = order + (o.userData.mark ? 1 : 0); });
+    Object.values(cache).forEach((o) => { o.userData.to = o.userData.a = o === g ? 1 : 0; o.userData.warm = false; o.visible = o === g; });
+    frame();
+  }
+  // صورة للمجسّم زي ما هو على الشاشة بالظبط (من غير الخلفية)، ومكانه، عشان يطير لركن الصفحة
+  function snap() {
+    if (!cur) return null;
+    frame();
+    const cv = renderer.domElement, cr = cv.getBoundingClientRect();
+    if (!cr.width || !cr.height) return null;
+    const box = new THREE.Box3().setFromObject(cur);
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const x of [box.min.x, box.max.x]) for (const y of [box.min.y, box.max.y]) for (const z of [box.min.z, box.max.z]) {
+      const p = new THREE.Vector3(x, y, z).project(camera);
+      const px = (p.x + 1) / 2 * cr.width, py = (1 - p.y) / 2 * cr.height;
+      x0 = Math.min(x0, px); x1 = Math.max(x1, px); y0 = Math.min(y0, py); y1 = Math.max(y1, py);
+    }
+    const pad = .08 * Math.max(x1 - x0, y1 - y0);
+    x0 = Math.max(0, x0 - pad); y0 = Math.max(0, y0 - pad); x1 = Math.min(cr.width, x1 + pad); y1 = Math.min(cr.height, y1 + pad);
+    const w = x1 - x0, h = y1 - y0;
+    if (w < 4 || h < 4) return null;
+    const dpr = renderer.getPixelRatio(), c = document.createElement("canvas");
+    c.width = Math.round(w * dpr); c.height = Math.round(h * dpr);
+    backdrop.visible = false;
+    renderer.render(scene, camera);
+    c.getContext("2d").drawImage(cv, x0 * dpr, y0 * dpr, w * dpr, h * dpr, 0, 0, c.width, c.height);
+    backdrop.visible = true;
+    renderer.render(scene, camera);
+    return { url: c.toDataURL("image/png"), rect: { x: cr.left + x0, y: cr.top + y0, w, h } };
+  }
+  return { show, theme, brand, hold, snap };
 };
