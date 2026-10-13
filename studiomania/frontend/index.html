@@ -838,9 +838,15 @@
         <main class="view" data-view="7" hidden>
           <div class="alert warn" id="publisherAlert" hidden></div>
           <button class="btn inbox-link" type="button" data-goto="15"><svg><use href="#i-chat"/></svg> الكومنتات والرسايل: رد عليهم من هنا</button>
-          <div class="gen-layout">
-            <section class="panel">
-              <div class="panel-head"><h2>فولدر الفيديوهات الجاهزة <span class="muted" id="readyCount"></span></h2>
+          <div class="pub-grid">
+            <section class="panel pub-where">
+              <div class="pub-k">WHERE TO POST</div><h2>فين هينزل؟</h2>
+              <button type="button" class="pub-all" id="pubAllPlat">اختار الكل</button>
+              <div class="platforms" id="postPlatforms"></div>
+            </section>
+            <section class="panel pub-ready">
+              <div class="pub-k">READY VIDEOS</div>
+              <div class="panel-head"><h2>الفيديوهات الجاهزة <span class="muted" id="readyCount"></span></h2>
                 <label class="btn primary sm">＋ رفع فيديو من عندي
                   <input type="file" id="readyUpload" accept="video/*,.mkv" multiple hidden></label></div>
               <div id="readyUploads"></div>
@@ -848,14 +854,14 @@
               <p class="empty" id="readyEmpty">الفولدر فاضي. صدّر فيديو من <a href="#" data-goto="6">المونتاج</a> أو ارفع فيديو من عندك.</p>
             </section>
 
-            <section class="panel settings">
+            <section class="panel settings pub-form">
+              <div class="pub-k">SCHEDULE</div>
               <div class="panel-head"><h2 id="postFormTitle">جدولة بوست</h2></div>
               <form id="postForm">
                 <div class="post-video" id="postVideo"><span class="muted">اختار فيديو من الفولدر (دوس «جدول»)</span></div>
                 <label class="field">الكابشن
                   <textarea id="postCaption" rows="4" placeholder="الكلام اللي هينزل مع الفيديو، والهاشتاجات"></textarea></label>
                 <div class="loc-row"><button type="button" class="btn sm" id="brandCaption" title="الكابشن الافتراضي من عقل البراند (مع الـ CTA واللينك)"><span class="emo">✨</span> كابشن البراند</button> <button type="button" class="btn sm" id="addRiyadh" title="Zernio مش بيدعم تحديد مكان البوست، فبنكتبه في الكابشن"><span class="emo">📍</span> ضيف «الرياض» للكابشن</button></div>
-                <div class="field">المنصات <div class="platforms" id="postPlatforms"></div></div>
 
                 <div class="post-extra" id="igOpts" hidden>
                   <div class="extra-title">📸 إنستجرام</div>

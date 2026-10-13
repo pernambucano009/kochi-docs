@@ -3968,5 +3968,8 @@ window.I18N_EN = {
   "رجوع": "Back",
   "شغل كوتشي القديم": "Old Kochi work",
   "امسحه من هنا": "Delete it here",
-  "{0} مشروع · {1} فيديو خام · {2} مونتاج": "{0} projects · {1} raw videos · {2} edits"
+  "{0} مشروع · {1} فيديو خام · {2} مونتاج": "{0} projects · {1} raw videos · {2} edits",
+  "فين هينزل؟": "Where to post?",
+  "مختار للجدولة": "Picked to schedule",
+  "دوس عشان تجدوله": "Click to schedule it"
 };

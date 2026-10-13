@@ -50,13 +50,12 @@ function renderReady() {
   const scheduled = new Set(pub.posts.filter((p) => p.status === "scheduled" || p.status === "sending").map((p) => p.export_id));
   $("readyGrid").innerHTML = pub.exports
     .map(
-      (e) => `<div class="ready ${e.id === pub.videoId ? "selected" : ""}" data-id="${e.id}">
-        ${lightVideo(e.url, "controls playsinline")}
+      (e) => `<div class="ready ${e.id === pub.videoId ? "selected" : ""}" data-id="${e.id}" title="دوس عشان تجدوله">
+        <div class="ready-art">${lightVideo(e.url, "muted playsinline loop")}<span class="ready-dur">${fmtDuration(e.duration)}</span><i class="ready-tick" aria-hidden="true"></i></div>
         <div class="body">
           <div class="name" title="${escapeHtml(e.name)}">${escapeHtml(e.name)}</div>
-          <div class="meta"><span>${fmtDuration(e.duration)}</span>
-            <span class="pill">${e.source === "upload" ? "من برا" : "من المونتاج"}</span>
-            ${scheduled.has(e.id) ? `<span class="pill scheduled">متجدول</span>` : ""}</div>
+          <div class="meta">${e.id === pub.videoId ? `<span class="st-pick">مختار للجدولة</span>` : scheduled.has(e.id) ? `<span class="st-sched">متجدول</span>` : `<span>جاهز</span>`}
+            <span class="pill">${e.source === "upload" ? "من برا" : "من المونتاج"}</span></div>
           <div class="acts">
             <button class="btn sm primary" data-act="pick">جدول</button>
             <a class="btn sm" href="${e.download_url}" download="${escapeHtml(e.name)}.mp4" title="تحميل">⬇</a>
@@ -69,9 +68,24 @@ function renderReady() {
     .join("");
 }
 
+// الفيديو بيشتغل من غير صوت وإنت واقف عليه، والدوسة على الكارت بتختاره للجدولة
+$("readyGrid").addEventListener("mouseover", (e) => {
+  const v = e.target.closest(".ready-art")?.querySelector("video");
+  if (v && v.paused) { v.preload = "auto"; v.play().catch(() => {}); }
+});
+$("readyGrid").addEventListener("mouseout", (e) => {
+  const art = e.target.closest(".ready-art");
+  if (art && !art.contains(e.relatedTarget)) art.querySelector("video")?.pause();
+});
+$("pubAllPlat").onclick = () => {
+  const boxes = [...$("postPlatforms").querySelectorAll("input")];
+  const all = boxes.every((i) => i.checked);
+  boxes.forEach((i) => (i.checked = !all));
+  $("postPlatforms").dispatchEvent(new Event("change", { bubbles: true }));
+};
 $("readyGrid").addEventListener("click", async (e) => {
-  const btn = e.target.closest("button[data-act]");
   const card = e.target.closest(".ready");
+  const btn = e.target.closest("button[data-act]") || (card && !e.target.closest("a") ? card.querySelector('[data-act="pick"]') : null);
   if (!btn || !card) return;
   const ex = pub.exports.find((x) => x.id === card.dataset.id);
   try {

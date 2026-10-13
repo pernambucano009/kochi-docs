@@ -2610,3 +2610,36 @@ dialog.cal-dlg { width: min(720px, 94vw); max-height: 90vh; border: 1px solid va
 .kochi-old span { flex: 1; display: flex; flex-direction: column; gap: 2px; }
 .kochi-old b { font-weight: 500; }
 .kochi-old small { color: var(--muted); font-size: 12.5px; }
+
+/* ============ النشر (من البروتوتايب): فين هينزل على اليمين، الفيديوهات الجاهزة في النص، والجدولة على الشمال ============ */
+.pub-grid { display: grid; grid-template-columns: 170px minmax(0, 1fr) 360px; gap: 20px; align-items: start; }
+.pub-k { font-family: var(--display); font-size: 10.5px; letter-spacing: .24em; color: var(--label, var(--muted)); direction: ltr; text-align: right; margin-bottom: 4px; }
+[dir="ltr"] .pub-k { text-align: left; }
+.pub-where { display: flex; flex-direction: column; gap: 8px; position: sticky; top: 0; }
+.pub-where h2 { margin: 0; font-size: 17px; font-weight: 500; }
+.pub-all { align-self: flex-start; border: 0; background: none; padding: 0; font: inherit; font-size: 12.5px; color: var(--muted); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.pub-all:hover { color: var(--accent); }
+:root .stage .pub-where .platforms { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 6px; }
+:root .stage .pub-where .platforms label.plat { aspect-ratio: 1; padding: 0; border-radius: 16px; justify-content: center; }
+:root .stage .pub-where .platforms label.plat span { display: none; }
+:root .stage .pub-where .platforms label.plat svg { width: 22px; height: 22px; }
+.pub-ready .panel-head { margin-bottom: 14px; }
+:root .stage .pub-ready .ready-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 16px; }
+:root .stage .ready { cursor: pointer; }
+.ready-art { position: relative; border-radius: 18px; overflow: hidden; }
+:root .stage .ready-art video { display: block; width: 100%; aspect-ratio: 9 / 16; object-fit: cover; background: #2B2724; border-radius: 18px; }
+.ready-dur { position: absolute; bottom: 8px; inset-inline-end: 8px; background: rgba(0, 0, 0, .55); color: #fff; font-family: var(--display); font-size: 11px; border-radius: 999px; padding: 2px 8px; direction: ltr; }
+.ready-tick { position: absolute; top: 8px; inset-inline-start: 8px; width: 24px; height: 24px; border-radius: 50%; background: var(--accent); display: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 12.5l4 4 8-9'/%3E%3C/svg%3E"); background-size: 16px; background-position: center; background-repeat: no-repeat; }
+.ready.selected .ready-tick { display: block; }
+:root .stage .ready.selected .ready-art video { box-shadow: inset 0 0 0 3px var(--accent); outline: 3px solid var(--accent); outline-offset: -3px; }
+:root .stage .ready .meta { gap: 8px; font-size: 12px; }
+.ready .meta .st-pick { color: var(--accent); }
+.ready .meta .st-sched { color: #2E8F63; }
+:root .stage .ready .acts { opacity: 0; transition: opacity .2s; }
+:root .stage .ready:hover .acts, :root .stage .ready.selected .acts { opacity: 1; }
+:root .stage .ready .acts [data-act="pick"] { display: none; }
+.pub-form #postSubmit { flex: 1; padding: 13px; font-size: 15px; }
+.pub-form .row:has(#postSubmit) { flex-direction: row-reverse; }
+@media (max-width: 1200px) { .pub-grid { grid-template-columns: 150px minmax(0, 1fr); } .pub-form { grid-column: 1 / -1; } }
+@media (max-width: 800px) { .pub-grid { grid-template-columns: 1fr; } .pub-where { position: static; } :root .stage .pub-where .platforms { grid-template-columns: repeat(5, 1fr); } }
