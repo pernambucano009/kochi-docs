@@ -1,0 +1,86 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// قالب «ألوان زيت سميكة» (إمباستو): لوحة بتتبني ضربة سكينة ورا التانية: كل ضربة شريحة لون تخينة ليها حافة منوّرة وحافة غامقة،
+// الكبير الأول (السما والتلال) وبعدين التفاصيل، الضربات مابتعدّيش من شكل لشكل، والعنوان نفسه معمول من ضربات. 1080×1920، 12 ثانية.
+const PR = M.params({
+  title: { label: "العنوان", kind: "text", role: "product", def: "لحظة دافية" },
+  sub: { label: "تحت العنوان", kind: "text", def: "قهوة البيت… في كل مكان" },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "بن العيلة" },
+  subject: { label: "لون الشمسية (الحاجة المميزة)", kind: "color", def: "#e0352b" },
+});
+const W = 1080, H = 1920, DUR = 12;
+const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
+
+M.reel({
+  W, H, DUR, bg: "#2b2420",
+  async init(M) {
+    await Promise.all([loadFont("LZ", "SM-Lalezar.ttf"), loadFont("CH", "SM-Changa.ttf")]);
+    const c = M.canvas(W, H); const x = c.getContext("2d");
+    const mk = () => { const k = document.createElement("canvas"); k.width = W; k.height = H; return k; };
+    // ١) الرسمة المرجعية بقيم واضحة + خريطة المجموعات (كل لون = مجموعة، الضربة ماتعدّيش برّاها)
+    const ref = mk(), r = ref.getContext("2d", { willReadFrequently: true }), grp = mk(), g = grp.getContext("2d", { willReadFrequently: true });
+    const both = (fn, col, id) => { r.fillStyle = col; fn(r); g.fillStyle = `rgb(${id},0,0)`; fn(g); };
+    const sky = r.createLinearGradient(0, 0, 0, 1100); sky.addColorStop(0, "#3d4f8f"); sky.addColorStop(.5, "#c86a7a"); sky.addColorStop(1, "#f2b26a"); r.fillStyle = sky; r.fillRect(0, 0, W, H); g.fillStyle = "rgb(1,0,0)"; g.fillRect(0, 0, W, H);
+    both((q) => { q.beginPath(); q.arc(300, 930, 110, 0, Math.PI * 2); q.fill(); }, "#ffe2a0", 2);
+    both((q) => { q.beginPath(); q.moveTo(0, 1000); for (let xx = 0; xx <= W; xx += 30) q.lineTo(xx, 980 - Math.sin(xx * .006 + 1) * 90); q.lineTo(W, 1300); q.lineTo(0, 1300); q.fill(); }, "#6a5a7a", 3);
+    both((q) => { q.beginPath(); q.moveTo(0, 1140); for (let xx = 0; xx <= W; xx += 30) q.lineTo(xx, 1120 - Math.sin(xx * .009 + 3) * 60); q.lineTo(W, H); q.lineTo(0, H); q.fill(); }, "#4f6b45", 4);
+    both((q) => q.fillRect(0, 1460, W, H - 1460), "#7a5a3c", 5);                                    // ترابيزة
+    both((q) => { q.beginPath(); q.moveTo(782, 1560); q.lineTo(798, 860); q.lineTo(814, 1560); q.fill(); }, "#3a2e28", 8);                                     // عمود الشمسية
+    both((q) => { q.beginPath(); q.moveTo(540, 980); q.quadraticCurveTo(798, 540, 1056, 980); q.quadraticCurveTo(927, 930, 798, 975); q.quadraticCurveTo(669, 930, 540, 980); q.fill(); }, PR.subject, 9);
+    both((q) => { q.beginPath(); q.ellipse(380, 1500, 230, 42, 0, 0, Math.PI * 2); q.fill(); }, "#d9cdb8", 6);                                                  // طبق
+    both((q) => { q.lineWidth = 34; q.strokeStyle = q.fillStyle; q.beginPath(); q.ellipse(560, 1360, 70, 80, 0, -1.4, 1.4); q.stroke(); q.beginPath(); q.moveTo(210, 1240); q.lineTo(550, 1240); q.lineTo(520, 1480); q.quadraticCurveTo(380, 1510, 240, 1480); q.fill(); }, "#efe6d6", 6);   // كوباية بودن
+    both((q) => { q.beginPath(); q.ellipse(380, 1242, 170, 30, 0, 0, Math.PI * 2); q.fill(); }, "#4a2a18", 7);
+    // ٢) الضربات: كبيرة للمساحات الكبيرة، صغيرة على الحواف والتفاصيل
+    const rd = r.getImageData(0, 0, W, H).data, gd = g.getImageData(0, 0, W, H).data, R = M.rng(7);
+    const at = (px, py) => { px = Math.max(0, Math.min(W - 1, px | 0)); py = Math.max(0, Math.min(H - 1, py | 0)); const k = (py * W + px) * 4; return [rd[k], rd[k + 1], rd[k + 2], gd[k]]; };
+    const dirOf = { 1: .1, 2: 0, 3: -.15, 4: .12, 5: 0, 6: 1.5, 7: 0, 8: 1.57, 9: -.25 }, order = { 1: 0, 2: 1, 3: 2, 4: 3, 5: 4, 6: 6, 7: 7, 8: 5, 9: 8 };
+    const S = [];
+    const add = (rad, n, tMin, tMax, onlyEdge) => { for (let i = 0; i < n; i++) { const px = -30 + R() * (W + 60), py = -30 + R() * (H + 60), [cr, cg, cb, id] = at(px, py); if (onlyEdge) { const e = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => at(px + dx * rad * 1.5, py + dy * rad * 1.5)[3] !== id); if (!e) continue; }
+      const a = (dirOf[id] || 0) + (R() - .5) * .45, v = 1 + (R() - .5) * .12, c2 = at(px + Math.cos(a) * rad * 2, py + Math.sin(a) * rad * 2); const tt = tMin + (order[id] / 8) * (tMax - tMin) * .7 + R() * (tMax - tMin) * .3;
+      S.push({ px, py, a, len: rad * (1.7 + R() * 1.4), wid: rad * (.95 + R() * .5), col: [cr * v, cg * v, cb * v], c2: c2[3] === id ? c2 : null, id, t: tt }); } };
+    add(40, 2600, .2, 4.0); add(20, 4200, 2.0, 6.0); add(9, 5000, 3.5, 7.4, true);
+    S.sort((a, b) => a.t - b.t);
+    // ٣) العنوان معمول من ضربات جوه شكل الحروف
+    const tm = mk(), q = tm.getContext("2d", { willReadFrequently: true }); q.fillStyle = "#fff"; q.font = `${M.fit(PR.title, "LZ", 900, 230, 80)}px LZ`; q.textAlign = "center"; q.textBaseline = "middle"; q.direction = "rtl"; q.fillText(PR.title, 540, 330);
+    const td = q.getImageData(0, 0, W, H).data, T = [];
+    for (let i = 0; i < 11000; i++) { const px = 60 + R() * 960, py = 150 + R() * 360; if (td[((py | 0) * W + (px | 0)) * 4 + 3] < 128) continue; T.push({ px, py, a: -.2 + (R() - .5) * .5, len: 12 + R() * 10, wid: 8 + R() * 5, col: [250 - R() * 20, 240 - R() * 25, 220 - R() * 30], t: 7.6 + (1 - px / W) * 1.2 + R() * .3 }); }
+    return { x, S, T };
+  },
+  seek(t, C, M) {
+    const { x } = C, { seg, smooth, expo } = M;
+    x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = "#2b2420"; x.fillRect(0, 0, W, H);
+    // القماش (بيبان بس في الأول قبل ما الألوان تغطيه)
+    x.fillStyle = "#d8cfbd"; x.fillRect(30, 30, W - 60, H - 60);
+    const z = 1.04 - .04 * smooth(seg(t, 0, DUR)); x.translate(540, 960); x.scale(z, z); x.translate(-540, -960);
+    // ضربة سكينة: شريحة بأطراف مايلة، لون + لون تاني مسحوب، حافة منوّرة فوق-شمال وحافة غامقة تحت-يمين
+    const knife = (s, k) => {
+      const L = s.len * (k < 1 ? .4 + .6 * k : 1), w = s.wid; x.save(); x.translate(s.px, s.py); x.rotate(s.a);
+      x.beginPath(); x.moveTo(-L / 2 + w * .25, -w / 2); x.lineTo(L / 2, -w / 2); x.lineTo(L / 2 - w * .25, w / 2); x.lineTo(-L / 2, w / 2); x.closePath();
+      if (s.c2) { const gr = x.createLinearGradient(-L / 2, 0, L / 2, 0); gr.addColorStop(0, `rgb(${s.col.map((v) => v | 0)})`); gr.addColorStop(.75, `rgb(${s.col.map((v) => v | 0)})`); gr.addColorStop(1, `rgb(${s.c2.slice(0, 3).join(",")})`); x.fillStyle = gr; } else x.fillStyle = `rgb(${s.col.map((v) => v | 0)})`;
+      x.fill();
+      x.strokeStyle = "rgba(255,250,235,.32)"; x.lineWidth = Math.max(1, w * .12); x.beginPath(); x.moveTo(-L / 2 + w * .25, -w / 2 + 1); x.lineTo(L / 2, -w / 2 + 1); x.stroke();
+      x.strokeStyle = "rgba(30,15,5,.35)"; x.beginPath(); x.moveTo(L / 2 - w * .25, w / 2 - 1); x.lineTo(-L / 2, w / 2 - 1); x.stroke();
+      x.strokeStyle = "rgba(255,255,255,.12)"; x.lineWidth = 1; x.beginPath(); x.moveTo(-L * .3, -w * .1); x.lineTo(L * .4, -w * .15); x.stroke();
+      x.restore();
+    };
+    for (const s of C.S) { if (s.t > t) break; knife(s, seg(t, s.t, s.t + .12)); }
+    // انعكاس الشمس على الترابيزة بضربات أفقية قصيرة متقطعة
+    const rk = seg(t, 6.0, 7.0); if (rk > 0) for (let i = 0; i < 18; i++) { const y = 1590 + i * 12, w2 = (200 - i * 8) * rk * (.6 + M.hash(i) * .6); x.fillStyle = `rgba(30,18,10,${.22 - i * .01})`; x.fillRect(800 - w2 / 2 + (M.hash(i * 3) - .5) * 40, y, w2, 9); }
+    // بخار من الكوباية: ضربات فاتحة صغيرة بتطلع
+    const sa = seg(t, 6.4, 7.4); if (sa > 0) for (let j = 0; j < 3; j++) for (let i = 0; i < 16; i++) { const u = ((t * .18 + i / 16) % 1), sx = 330 + j * 50 + Math.sin(u * 6 + j * 2 + t * .8) * (18 + u * 30), sy = 1200 - u * 330; x.globalAlpha = sa * Math.sin(u * Math.PI) * .7; knife({ px: sx, py: sy, a: -1.57 + Math.cos(u * 6 + j * 2 + t * .8) * .7, len: 34, wid: 13, col: [250, 242, 230] }, 1); } x.globalAlpha = 1;
+    x.setTransform(1, 0, 0, 1, 0, 0);
+    for (const s of C.T) if (s.t <= t) { const k = seg(t, s.t, s.t + .12); knife({ ...s, px: s.px + 6, py: s.py + 7, col: [60, 30, 30], c2: null }, k); }
+    for (const s of C.T) if (s.t <= t) knife(s, seg(t, s.t, s.t + .12));
+    const sk = expo(seg(t, 9.4, 10.2)); if (sk > 0) { x.globalAlpha = sk; x.fillStyle = "#fff6e6"; x.font = "700 52px CH"; x.textAlign = "center"; x.direction = "rtl"; x.shadowColor = "rgba(0,0,0,.4)"; x.shadowBlur = 12; x.fillText(PR.sub, 540, 540); x.font = "700 60px CH"; x.fillText(PR.brand, 540, 1800); x.shadowBlur = 0; x.globalAlpha = 1; }
+  },
+  sound(A) {
+    const N = A.midi;
+    // جيتار إسباني هادي + صوت سكينة على القماش
+    const ch = [[57, 64, 69, 72], [53, 60, 65, 69], [55, 62, 67, 71], [52, 59, 64, 68]];
+    for (let i = 0; i < 24; i++) { const c = ch[Math.floor(i / 6) % 4]; A.pluck(i * .5, N(c[i % 4]), .08, 1.1); if (i % 3 === 0) A.pluck(i * .5, N(c[0] - 12), .07, 1.5); }
+    for (let s = .2; s < 9; s += .09 + (Math.sin(s * 7) + 1) * .05) A.nz(s, .09, "bandpass", 1200 + Math.sin(s * 3) * 500, .05, 1.2);
+    A.pad(7.6, [N(57), N(64), N(69)], 4.4, .03);
+  },
+});
+</script>
+</body></html>

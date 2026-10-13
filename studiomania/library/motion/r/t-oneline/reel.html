@@ -1,0 +1,85 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// قالب «خط واحد»: رسمة كاملة بخط واحد مابيتقطعش: الترابيزة، الطبق، الكوباية بودنها، البخار اللي بيتحول لقلب بلون البراند،
+// وبعدين الخط يلف ويرسم سطر تحت العنوان. القلم بيمشي بسرعة ثابتة تقريبًا وبيهدى عند القلب. 1080×1920، 12 ثانية.
+const PR = M.params({
+  title: { label: "العنوان", kind: "text", role: "product", def: "اتعمل بحب" },
+  sub: { label: "تحت العنوان", kind: "text", def: "كل فنجان بنحضّره كأنه ليك لوحدك" },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "قهوة ركن" },
+  ink: { label: "لون الخط", kind: "color", def: "#1d1a17" },
+  accent: { label: "لون القلب", kind: "color", def: "#e2483d" },
+  paper: { label: "لون الورق", kind: "color", def: "#f4ede1" },
+});
+const W = 1080, H = 1920, DUR = 12, T0 = .3, T1 = 8.0;
+const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
+
+M.reel({
+  W, H, DUR, bg: PR.paper,
+  async init(M) {
+    await Promise.all([loadFont("AM", "TY-Amiri-700.ttf", "700"), loadFont("TJ", "SM-Tajawal.ttf")]);
+    const c = M.canvas(W, H), x = c.getContext("2d");
+    // المسار: نقط متتابعة، كل نقطة معاها لونها (٠ = حبر، ١ = لون القلب) ووزن السرعة (القلب أبطأ)
+    const P = []; let cx = -30, cy = 1430, tag = 0, slow = 1;
+    const push = (px, py) => P.push([px, py, tag, slow]);
+    const L = (px, py) => { const n = Math.max(2, Math.hypot(px - cx, py - cy) / 8 | 0); for (let i = 1; i <= n; i++) push(cx + (px - cx) * i / n, cy + (py - cy) * i / n); cx = px; cy = py; };
+    const C = (ax, ay, bx, by, px, py) => { const n = 60; for (let i = 1; i <= n; i++) { const u = i / n, v = 1 - u; push(v * v * v * cx + 3 * v * v * u * ax + 3 * v * u * u * bx + u * u * u * px, v * v * v * cy + 3 * v * v * u * ay + 3 * v * u * u * by + u * u * u * py); } cx = px; cy = py; };
+    push(cx, cy);
+    L(230, 1430);                                                    // الترابيزة
+    C(300, 1478, 780, 1478, 850, 1430);                              // بطن الطبق
+    C(800, 1405, 720, 1398, 700, 1392);                              // حرف الطبق لحد قاعدة الكوباية
+    C(730, 1250, 748, 1150, 748, 1110);                              // الجنب اليمين لفوق
+    C(905, 1075, 905, 1315, 730, 1300);                              // الودن
+    C(722, 1340, 710, 1375, 700, 1392);
+    L(380, 1392);                                                    // القاعدة
+    C(345, 1250, 330, 1150, 330, 1050);                              // الجنب الشمال
+    C(430, 1080, 650, 1080, 750, 1050);                              // الحرف القدامي
+    C(650, 1024, 560, 1022, 540, 1030);                              // الحرف الورّاني لحد النص
+    C(610, 960, 470, 900, 540, 840);                                 // البخار
+    C(600, 795, 500, 770, 540, 740);
+    tag = 1; slow = .45;
+    C(380, 640, 440, 500, 540, 580);                                 // القلب
+    C(640, 500, 700, 640, 540, 740);
+    tag = 0; slow = 1;
+    C(720, 820, 930, 700, 890, 560);                                 // زخرفة
+    C(860, 460, 745, 480, 790, 545);
+    C(820, 600, 640, 488, 140, 478);                                 // سطر تحت العنوان (يمين لشمال)
+    // رعشة إيد خفيفة ثابتة
+    P.forEach((p, i) => { p[0] += Math.sin(i * .21) * 1.2 + Math.sin(i * .053) * 1.6; p[1] += Math.cos(i * .17) * 1.2; });
+    const acc = [0]; for (let i = 1; i < P.length; i++) acc.push(acc[i - 1] + Math.hypot(P[i][0] - P[i - 1][0], P[i][1] - P[i - 1][1]) / P[i][3]);
+    return { x, P, acc };
+  },
+  seek(t, C, M) {
+    const { x, P, acc } = C, { seg, smooth, expo, cubicIO, clamp } = M;
+    x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = PR.paper; x.fillRect(0, 0, W, H);
+    // حبيبات الورق
+    x.fillStyle = "rgba(120,90,50,.05)"; for (let i = 0; i < 900; i++) x.fillRect(M.hash(i) * W, M.hash(i + 999) * H, 2, 2);
+    const z = 1.05 - .05 * smooth(seg(t, 0, 10)); x.translate(540, 1000); x.scale(z, z); x.translate(-540, -1000);
+    const prog = seg(t, T0, T1), D = acc[acc.length - 1] * (prog < 1 ? prog * (1 - .12 * Math.sin(prog * Math.PI)) / (1 - .12 * Math.sin(prog * Math.PI) * 0 + 0) : 1);
+    let n = 0; while (n < P.length - 1 && acc[n + 1] <= D) n++;
+    // تعبئة خفيفة للقلب بعد ما يترسم
+    const hf = expo(seg(t, 5.6, 6.6)); if (hf > 0 && P.findIndex((p) => p[2] === 1) < n) {
+      x.save(); x.beginPath(); let f = true; P.forEach((p) => { if (p[2] === 1) { f ? x.moveTo(p[0], p[1]) : x.lineTo(p[0], p[1]); f = false; } }); x.closePath();
+      x.globalAlpha = .28 * hf; x.fillStyle = PR.accent; x.translate(540, 660); x.scale(.92 + .08 * hf, .92 + .08 * hf); x.translate(-540, -660); x.fill(); x.restore(); }
+    x.lineCap = "round"; x.lineJoin = "round"; x.lineWidth = 7;
+    let i = 0; while (i < n) { const tg = P[i][2]; x.beginPath(); x.moveTo(P[i][0], P[i][1]); let j = i; while (j < n && P[j + 1][2] === tg) { j++; x.lineTo(P[j][0], P[j][1]); } if (j < n) { j++; x.lineTo(P[j][0], P[j][1]); } x.strokeStyle = tg ? PR.accent : PR.ink; x.stroke(); i = j; }
+    if (prog > 0 && prog < 1) { const p = P[n]; x.fillStyle = P[n][2] ? PR.accent : PR.ink; x.beginPath(); x.arc(p[0], p[1], 7, 0, Math.PI * 2); x.fill(); x.save(); x.translate(p[0], p[1]); x.rotate(-.6); x.fillStyle = "rgba(40,30,20,.12)"; x.fillRect(4, -5, 150, 10); x.restore(); }
+    x.setTransform(1, 0, 0, 1, 0, 0);
+    // العنوان بيظهر من اليمين للشمال ورا السطر
+    const tk = cubicIO(clamp(seg(t, 7.2, 8.4)));
+    if (tk > 0) { x.save(); x.beginPath(); x.rect(W - (W + 40) * tk, 0, W + 40, 520); x.clip(); x.fillStyle = PR.ink; x.font = `700 ${M.fit(PR.title, "AM", 860, 190, 80, "700")}px AM`; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.title, 540, 400); x.restore(); }
+    const sk = expo(seg(t, 8.6, 9.4)); if (sk > 0) { x.globalAlpha = sk; x.fillStyle = PR.ink; x.font = `400 ${M.fit(PR.sub, "TJ", 900, 50, 30)}px TJ`; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.sub, 540, 1600 + (1 - sk) * 20); x.globalAlpha = 1; }
+    const bk = expo(seg(t, 9.4, 10.2)); if (bk > 0) { x.globalAlpha = bk; x.fillStyle = PR.accent; x.beginPath(); x.arc(540, 1720, 7, 0, Math.PI * 2); x.fill(); x.fillStyle = PR.ink; x.font = "700 64px AM"; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.brand, 540, 1810); x.globalAlpha = 1; }
+  },
+  sound(A) {
+    const N = A.midi;
+    // بيانو هادي + خربشة قلم رصاص طول ما الخط بيترسم
+    const mel = [64, 67, 71, 69, 67, 64, 62, 64, 67, 72, 71, 67];
+    mel.forEach((m, i) => A.pluck(.3 + i * .66, N(m), .07, 1.6));
+    [[52, 59, 64], [48, 55, 64], [50, 57, 62], [52, 59, 67]].forEach((c, i) => A.pad(i * 2.4, c.map(N), 2.6, .022));
+    for (let s = T0; s < T1; s += .06) A.nz(s, .07, "bandpass", 3800 + Math.sin(s * 9) * 900, .018, 3);
+    A.pluck(5.6, N(76), .1, 1.4); A.pluck(5.75, N(83), .08, 1.4);
+    A.pad(8.4, [N(52), N(59), N(64), N(71)], 3.6, .03); A.pluck(9.4, N(76), .08, 1.8);
+  },
+});
+</script>
+</body></html>

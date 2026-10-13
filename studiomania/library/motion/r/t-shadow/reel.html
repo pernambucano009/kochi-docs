@@ -1,0 +1,133 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// قالب «خيال الظل»: عرايس جلد ملوّن شفاف على قماشة منوّرة بلمبة بتترعش من ورا. الراجل أبو طربوش بيدخل ماشي،
+// الجمل بيدخل من الناحية التانية، بيسلّموا على بعض، ويافطة العنوان بتنزل وحروفها مخرومة والنور طالع منها. 1080×1920، 12 ثانية.
+const PR = M.params({
+  title: { label: "العنوان", kind: "text", role: "product", def: "حكايات زمان" },
+  sub: { label: "تحت العنوان", kind: "text", def: "كل خميس في ساحة البيت" },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "مسرح الحارة" },
+  robe: { label: "لون الجلابية", kind: "color", def: "#b3261e" },
+  banner: { label: "لون اليافطة", kind: "color", def: "#2f3d86" },
+});
+const W = 1080, H = 1920, DUR = 12, CL = 70, CR = 1010, CT = 250, CB = 1480;
+const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
+
+M.reel({
+  W, H, DUR, bg: "#1a0e07",
+  async init(M) {
+    await Promise.all([loadFont("RQ", "TY-ArefRuqaa-700.ttf", "700"), loadFont("LZ", "SM-Lalezar.ttf")]);
+    const c = M.canvas(W, H), x = c.getContext("2d");
+    const mk = () => { const k = document.createElement("canvas"); k.width = W; k.height = H; return k.getContext("2d"); };
+    return { x, pa: mk(), pb: mk(), pc: mk() };
+  },
+  seek(t, C, M) {
+    const { x, pa, pb, pc } = C, { seg, smooth, expo, springO, clamp, hash } = M;
+    const OUT = "rgba(40,16,6,.95)";
+    const poly = (q, pts, col) => { q.beginPath(); pts.forEach(([a, b], i) => (i ? q.lineTo(a, b) : q.moveTo(a, b))); q.closePath(); q.fillStyle = col; q.fill(); q.strokeStyle = OUT; q.lineWidth = 4; q.stroke(); };
+    const holes = (q, fn) => { q.save(); q.globalCompositeOperation = "destination-out"; q.fillStyle = "#000"; q.beginPath(); fn(q); q.fill(); q.restore(); };
+    const dot = (q, a, b, r) => { q.moveTo(a + r, b); q.arc(a, b, r, 0, Math.PI * 2); };
+    const dia = (q, a, b, r) => { q.moveTo(a, b - r); q.lineTo(a + r * .7, b); q.lineTo(a, b + r); q.lineTo(a - r * .7, b); q.closePath(); };
+    const wp = (q, a, b) => { const p = q.getTransform().transformPoint(new DOMPoint(a, b)); return [p.x, p.y]; };
+    const rods = [];
+
+    // ── الراجل أبو طربوش (وشه للشمال)
+    const man = (q, X, Y, ph, bow, wave) => {
+      q.save(); q.translate(X, Y - Math.abs(Math.sin(ph)) * 10); q.scale(1.1, 1.1);
+      for (const i of [1, -1]) { q.save(); q.translate(i * 18, -250); q.rotate(Math.sin(ph) * .35 * i); poly(q, [[-22, 0], [22, 0], [16, 225], [22, 250], [-58, 250], [-52, 232], [-18, 225]], "rgba(45,63,122,.85)"); q.restore(); }
+      q.translate(0, -250); q.rotate(-bow);
+      poly(q, [[-95, 30], [95, 30], [72, -120], [60, -222], [-60, -222], [-76, -120]], PR.robe + "d9");
+      holes(q, (h) => { for (let k = -3; k <= 3; k++) dot(h, k * 24, 8, 7); for (let k = -2; k <= 2; k++) dia(h, k * 26, -40, 10); });
+      poly(q, [[-58, -216], [58, -216], [48, -110], [-48, -110]], "rgba(214,150,40,.85)");
+      holes(q, (h) => { for (let k = -1; k <= 1; k++) dot(h, k * 26, -160, 8); });
+      // الراس
+      q.save(); q.translate(0, -222); q.rotate(bow * .4);
+      q.beginPath(); q.ellipse(0, -62, 60, 68, 0, 0, Math.PI * 2); q.fillStyle = "rgba(220,160,96,.85)"; q.fill(); q.strokeStyle = OUT; q.lineWidth = 4; q.stroke();
+      poly(q, [[-50, -78], [-92, -54], [-52, -42]], "rgba(220,160,96,.9)");
+      poly(q, [[-50, -125], [50, -125], [40, -190], [-38, -190]], "rgba(150,22,24,.9)");
+      q.strokeStyle = OUT; q.lineWidth = 5; q.beginPath(); q.moveTo(38, -188); q.quadraticCurveTo(80, -170, 66, -128); q.stroke();
+      q.beginPath(); q.moveTo(-50, -30); q.quadraticCurveTo(-30, -14, -10, -32); q.quadraticCurveTo(10, -12, 22, -34); q.lineWidth = 6; q.stroke();  // شنب
+      holes(q, (h) => { dot(h, -26, -80, 9); for (let k = -1; k <= 1; k++) dia(h, k * 24, -158, 9); });
+      q.restore();
+      // الدراع (بعصاية)
+      q.save(); q.translate(-40, -200); q.rotate(.5 + wave); poly(q, [[-14, 0], [14, 0], [12, 110], [-12, 110]], PR.robe + "d9");
+      q.translate(0, 110); q.rotate(-.9 + wave * 1.4); poly(q, [[-12, 0], [12, 0], [10, 95], [-10, 95]], "rgba(220,160,96,.85)");
+      q.beginPath(); q.arc(0, 108, 16, 0, Math.PI * 2); q.fillStyle = "rgba(220,160,96,.9)"; q.fill(); q.stroke(); rods.push(wp(q, 0, 108)); q.restore();
+      rods.push(wp(q, 0, -100)); q.restore();
+    };
+    // ── الجمل (وشه لليمين)
+    const camel = (q, X, Y, ph, nod) => {
+      q.save(); q.translate(X, Y - Math.abs(Math.sin(ph * 2)) * 6); q.scale(1.1, 1.1);
+      [[-150, 0], [-105, Math.PI], [110, Math.PI * .5], [155, Math.PI * 1.5]].forEach(([lx, o]) => { q.save(); q.translate(lx, -300); q.rotate(Math.sin(ph + o) * .3); poly(q, [[-18, 0], [18, 0], [12, 150], [16, 270], [30, 300], [-24, 300], [-12, 270], [-14, 150]], "rgba(176,106,30,.85)"); q.restore(); });
+      q.beginPath(); q.moveTo(-205, -340); q.bezierCurveTo(-210, -420, -140, -440, -100, -450); q.bezierCurveTo(-50, -580, 70, -580, 110, -450); q.bezierCurveTo(160, -440, 200, -430, 205, -380); q.lineTo(200, -320); q.bezierCurveTo(120, -280, -120, -280, -205, -340); q.closePath();
+      q.fillStyle = "rgba(208,138,42,.85)"; q.fill(); q.strokeStyle = OUT; q.lineWidth = 4; q.stroke();
+      q.strokeStyle = OUT; q.lineWidth = 5; q.beginPath(); q.moveTo(-205, -380); q.quadraticCurveTo(-250, -360, -240, -300); q.stroke();   // ديل
+      poly(q, [[-120, -440], [120, -440], [140, -330], [-140, -330]], PR.banner + "d9");                                                  // البطانية
+      holes(q, (h) => { for (let k = -4; k <= 4; k++) dia(h, k * 28, -385, 12); for (let k = -5; k <= 5; k++) dot(h, k * 26, -345, 5); for (let k = 0; k < 3; k++) dot(h, -40 + k * 40, -500, 9); });
+      q.strokeStyle = "rgba(200,40,30,.9)"; q.lineWidth = 6; for (let k = -6; k <= 6; k++) { q.beginPath(); q.moveTo(k * 22, -330); q.lineTo(k * 22 + Math.sin(ph + k) * 4, -300); q.stroke(); }
+      q.save(); q.translate(185, -400); q.rotate(nod);
+      poly(q, [[-30, -20], [20, 50], [95, -90], [120, -175], [80, -190], [52, -110]], "rgba(208,138,42,.85)");
+      q.beginPath(); q.ellipse(125, -185, 58, 30, .25, 0, Math.PI * 2); q.fillStyle = "rgba(208,138,42,.9)"; q.fill(); q.strokeStyle = OUT; q.lineWidth = 4; q.stroke();
+      poly(q, [[92, -212], [100, -238], [110, -210]], "rgba(208,138,42,.9)");
+      holes(q, (h) => { dot(h, 118, -195, 7); dia(h, 60, -60, 10); });
+      rods.push(wp(q, 120, -175)); q.restore();
+      rods.push(wp(q, 0, -360)); q.restore();
+    };
+
+    // القماشة المنوّرة
+    const fl = .9 + .06 * Math.sin(t * 13) + .04 * Math.sin(t * 29 + 1) + .03 * Math.sin(t * 47), on = smooth(seg(t, .1, 1.0));
+    x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = "#1a0e07"; x.fillRect(0, 0, W, H);
+    const g = x.createRadialGradient(560, 860, 60, 540, 880, 900); g.addColorStop(0, `rgba(255,226,160,${on})`); g.addColorStop(.45, `rgba(240,170,90,${on})`); g.addColorStop(1, `rgba(120,52,18,${on})`);
+    x.fillStyle = "#2a160b"; x.fillRect(CL, CT, CR - CL, CB - CT); x.fillStyle = g; x.fillRect(CL, CT, CR - CL, CB - CT);
+    x.fillStyle = "rgba(90,40,10,.05)"; for (let i = 0; i < 26; i++) x.fillRect(CL + i * 37 + hash(i) * 10, CT, 8 + hash(i + 5) * 14, CB - CT);
+    // العرايس
+    const mw = seg(t, 1.0, 4.2), mx = 1200 - 370 * smooth(mw), mph = mw * 14, bow = Math.sin(Math.PI * seg(t, 6.0, 7.4)) * .35;
+    const cw = seg(t, 2.8, 6.0), cxp = -380 + 670 * smooth(cw), cph = cw * 16, nod = Math.sin(Math.PI * seg(t, 6.3, 7.5)) * .3 + Math.sin(t * 1.3) * .03;
+    const wave = t > 4.2 ? Math.sin((t - 4.2) * 6) * .35 * clamp(seg(t, 4.2, 4.6)) * (1 - seg(t, 5.8, 6.2)) : 0;
+    const comp = (q, blur) => { x.save(); x.beginPath(); x.rect(CL, CT, CR - CL, CB - CT); x.clip(); x.globalCompositeOperation = "multiply"; x.filter = blur > .3 ? `blur(${blur.toFixed(1)}px)` : "none"; x.drawImage(q.canvas, 0, 0); x.restore(); };
+    pa.setTransform(1, 0, 0, 1, 0, 0); pa.clearRect(0, 0, W, H); camel(pa, cxp, 1470, cph, nod); comp(pa, 9 * (1 - smooth(seg(t, 3.0, 4.2))));
+    pb.setTransform(1, 0, 0, 1, 0, 0); pb.clearRect(0, 0, W, H); man(pb, mx, 1470, mph, bow, wave); comp(pb, 9 * (1 - smooth(seg(t, 1.2, 2.4))));
+    // اليافطة بحروف مخرومة
+    const bk = seg(t, 7.4, 8.4);
+    if (bk > 0) {
+      const by = -260 + 800 * expo(bk), sw = Math.sin((t - 7.4) * 5) * .12 * Math.exp(-(t - 7.4) * 1.4);
+      pc.setTransform(1, 0, 0, 1, 0, 0); pc.clearRect(0, 0, W, H); pc.translate(540, by); pc.rotate(sw);
+      pc.beginPath(); pc.moveTo(-400, -110); pc.quadraticCurveTo(0, -150, 400, -110); pc.lineTo(430, 0); pc.lineTo(400, 110); pc.quadraticCurveTo(0, 150, -400, 110); pc.lineTo(-430, 0); pc.closePath();
+      pc.fillStyle = PR.banner + "e6"; pc.fill(); pc.strokeStyle = OUT; pc.lineWidth = 5; pc.stroke();
+      holes(pc, (h) => { for (let k = -13; k <= 13; k++) { dia(h, k * 28, -100 - Math.cos(k / 13) * 0, 8); dia(h, k * 28, 100, 8); } dot(h, -405, 0, 10); dot(h, 405, 0, 10); });
+      pc.save(); pc.globalCompositeOperation = "destination-out"; pc.font = `700 ${M.fit(PR.title, "RQ", 700, 150, 60, "700")}px RQ`; pc.textAlign = "center"; pc.textBaseline = "middle"; pc.direction = "rtl"; pc.fillText(PR.title, 0, 6); pc.restore();
+      rods.push([pc.getTransform().transformPoint(new DOMPoint(-300, -120)).x, CT], [pc.getTransform().transformPoint(new DOMPoint(300, -120)).x, CT]);
+      const p1 = pc.getTransform().transformPoint(new DOMPoint(-300, -120)), p2 = pc.getTransform().transformPoint(new DOMPoint(300, -120));
+      x.save(); x.beginPath(); x.rect(CL, CT, CR - CL, CB - CT); x.clip(); x.globalCompositeOperation = "multiply"; x.strokeStyle = "rgba(40,16,6,.6)"; x.lineWidth = 3; x.filter = "blur(1.5px)";
+      for (const p of [p1, p2]) { x.beginPath(); x.moveTo(p.x, p.y); x.lineTo(p.x + (p === p1 ? -40 : 40), CT); x.stroke(); } x.restore();
+      comp(pc, 6 * (1 - smooth(seg(t, 7.6, 8.4))));
+    }
+    // العصيان (بعيدة عن القماشة فمغبّشة)
+    x.save(); x.beginPath(); x.rect(CL, CT, CR - CL, CB - CT); x.clip(); x.globalCompositeOperation = "multiply"; x.filter = "blur(2.5px)"; x.strokeStyle = "rgba(40,16,6,.55)"; x.lineWidth = 6;
+    rods.filter((r) => r[1] > CT + 1).forEach(([a, b], i) => { x.beginPath(); x.moveTo(a, b); x.lineTo(a + (i % 2 ? 60 : -30), CB); x.stroke(); }); x.restore();
+    // رعشة اللمبة
+    x.fillStyle = `rgba(30,10,0,${(1 - fl) * 1.6 + (1 - on) * .0})`; x.fillRect(CL, CT, CR - CL, CB - CT);
+    // البرواز الخشب
+    const wood = (a, b, w2, h2) => { const wg = x.createLinearGradient(0, b, 0, b + h2); wg.addColorStop(0, "#5a3218"); wg.addColorStop(.5, "#3d200e"); wg.addColorStop(1, "#2a160a"); x.fillStyle = wg; x.fillRect(a, b, w2, h2); x.fillStyle = "rgba(0,0,0,.18)"; for (let i = 0; i < 40; i++) x.fillRect(a, b + hash(i + a) * h2, w2, 1.5); };
+    wood(0, 0, W, CT); wood(0, CB, W, H - CB); wood(0, CT, CL, CB - CT); wood(CR, CT, W - CR, CB - CT);
+    x.strokeStyle = "#c9953f"; x.lineWidth = 4; x.strokeRect(CL - 8, CT - 8, CR - CL + 16, CB - CT + 16);
+    // نقشة مشربية فوق
+    x.fillStyle = "#1a0c05"; for (let k = 0; k < 16; k++) { const a = 70 + k * 63; x.beginPath(); x.moveTo(a, 210); x.lineTo(a, 140); x.arc(a + 24, 140, 24, Math.PI, 0); x.lineTo(a + 48, 210); x.fill(); }
+    x.fillStyle = `rgba(255,190,110,${.25 * on * fl})`; for (let k = 0; k < 16; k++) { const a = 70 + k * 63; x.beginPath(); x.arc(a + 24, 150, 9, 0, Math.PI * 2); x.fill(); }
+    // التحت: الجملة والبراند
+    const sk = expo(seg(t, 8.8, 9.6)); if (sk > 0) { x.globalAlpha = sk; x.fillStyle = "#f0d9a8"; x.font = `400 ${M.fit(PR.sub, "LZ", 900, 64, 34)}px LZ`; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.sub, 540, 1610); x.globalAlpha = 1; }
+    const rk = expo(seg(t, 9.6, 10.4)); if (rk > 0) { x.globalAlpha = rk; x.fillStyle = "#e0ad4a"; x.font = `700 ${M.fit(PR.brand, "RQ", 800, 104, 50, "700")}px RQ`; x.textAlign = "center"; x.direction = "rtl"; x.shadowColor = "rgba(0,0,0,.6)"; x.shadowBlur = 10; x.fillText(PR.brand, 540, 1790); x.shadowBlur = 0;
+      x.fillRect(540 - 200 * rk, 1680, 400 * rk, 3); x.globalAlpha = 1; }
+  },
+  sound(A) {
+    const N = A.midi;
+    // طبلة ورق + عود على مقام حجاز
+    const bt = 60 / 100;
+    for (let b = 0; b < 19; b++) { const s = b * bt; A.kick(s, .5); A.click(s + bt * .5, .08); A.click(s + bt * .75, .05); if (b % 2) A.snare(s + bt * .5, .05); A.hat(s + bt * .25, .03); }
+    const hz = [62, 63, 66, 67, 69, 70, 72, 74];
+    const mel = [0, 1, 2, 3, 4, 3, 2, 1, 2, 3, 4, 5, 4, 3, 2, 1, 0, 0];
+    mel.forEach((m, i) => { A.pluck(.6 + i * bt * .5 * 1.2, N(hz[m]), .1, .7); A.pluck(.6 + i * bt * .6 + .05, N(hz[m]), .04, .4); });
+    A.whoosh(7.3, 1.0, .1); A.hit(8.4, .4); A.pluck(8.4, N(74), .12, 1.6); A.pluck(9.6, N(62), .1, 2.0); A.pad(8.4, [N(50), N(57), N(62)], 3.6, .03);
+  },
+});
+</script>
+</body></html>

@@ -1,0 +1,97 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// قالب «شاشة كمبيوتر قديمة»: شاشة CRT كهرماني بتفتح، أوامر بتتكتب حرف حرف، فنجان قهوة بيتطبع سطر سطر من حروف ورموز
+// (كل ما الحتة أنور الحرف أتقل)، والبخار حروف بتتحرك. خطوط المسح والتوهج والرعشة الخفيفة بتاعة الشاشات القديمة. 1080×1920، 12 ثانية.
+const PR = M.params({
+  l1: { label: "السطر الأول", kind: "text", def: "تشغيل برنامج الصبح" },
+  l2: { label: "السطر التاني", kind: "text", def: "بنحضّر فنجانك…" },
+  l3: { label: "السطر التالت", kind: "text", def: "تم. بالهنا والشفا" },
+  title: { label: "العنوان", kind: "text", role: "product", def: "صباحك أسرع" },
+  sub: { label: "تحت العنوان", kind: "text", def: "اطلب قهوتك في دقيقة" },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "كافيه بت" },
+  color: { label: "لون الشاشة", kind: "color", def: "#ff9a10" },
+});
+const W = 1080, H = 1920, DUR = 12, SL = 60, SR = 1020, ST = 110, SB = 1790, COLS = 44, ROWS = 26, CW = 21.6, RH = 34, GX = 540 - COLS * CW / 2, GY = 560;
+const RAMP = " .:-=+*#%@";
+const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
+const hex = (h) => { h = h.replace("#", ""); return [0, 2, 4].map((i) => parseInt(h.substr(i, 2), 16)); };
+
+M.reel({
+  W, H, DUR, bg: "#0b0a08",
+  async init(M) {
+    await Promise.all([loadFont("PM", "TY-PlexMono-500.ttf", "500"), loadFont("PX", "TY-PlexArabic-400.ttf"), loadFont("PB", "TY-PlexArabic-700.ttf", "700")]);
+    const c = M.canvas(W, H), x = c.getContext("2d"), s = document.createElement("canvas"); s.width = W; s.height = H;
+    // سطوع الفنجان على الشبكة (من غير البخار)
+    const B = [];
+    for (let r = 0; r < ROWS; r++) { const row = []; for (let k = 0; k < COLS; k++) {
+      const u = (k + .5) / COLS - .5, v = (r + .5) / ROWS, ua = u * 1.07;    // الحروف أطول من عرضها
+      let b = 0;
+      const top = .30, bot = .78, half = (vv) => .25 - (vv - top) * .06;
+      if (v > top && v < bot && Math.abs(ua) < half(v)) { const q = ua / half(v); b = .25 + .75 * Math.max(0, Math.cos(q * 1.4 - .5)); if (v > bot - .04) b *= .7; }
+      const ry = (v - top) / .045, rx = ua / .25; if (rx * rx + ry * ry < 1) b = (rx * rx + ry * ry > .6) ? .95 : .18;    // الحرف والقهوة
+      const hx = (ua - .3) / .11, hy = (v - .5) / .13, hd = Math.hypot(hx, hy); if (hd > .62 && hd < 1 && ua > .22) b = Math.max(b, .55 + .3 * (1 - hy));  // الودن
+      const sx = ua / .5, sy = (v - .8) / .035; if (sx * sx + sy * sy < 1 && v > .78) b = Math.max(b, .45 + .4 * (1 - Math.abs(sx)));                      // الطبق
+      row.push(b); } B.push(row); }
+    return { x, s: s.getContext("2d"), B };
+  },
+  seek(t, C, M) {
+    const { x, s, B } = C, { seg, smooth, expo, clamp, hash } = M, [cr, cg, cb] = hex(PR.color), col = (a) => `rgba(${cr},${cg},${cb},${a})`;
+    // ١) كل اللي على الشاشة بيترسم على طبقة لوحده عشان التوهج
+    s.setTransform(1, 0, 0, 1, 0, 0); s.clearRect(0, 0, W, H);
+    const on = seg(t, .15, .7);
+    const typed = (str, t0, cps = 16) => [...str].slice(0, Math.max(0, Math.floor((t - t0) * cps))).join("");
+    const cur = (Math.floor(t * 2.4) % 2) === 0;
+    const line = (str, y, size, font, a = 1, cursor = false) => { s.globalAlpha = a; s.fillStyle = col(1); s.font = `${font === "PB" ? 700 : 400} ${size}px ${font}`; s.textAlign = "right"; s.direction = "rtl"; s.fillText(str, SR - 70, y); const w = s.measureText(str).width; if (cursor && cur) s.fillRect(SR - 70 - w - size * .62, y - size * .78, size * .5, size * .9); s.globalAlpha = 1; return w; };
+    if (on >= 1) {
+      const L1 = "< " + PR.l1, L2 = "< " + PR.l2;
+      const a1 = typed(L1, .8, 18); line(a1, 240, 46, "PX", 1, a1.length < [...L1].length || t < 1.6);
+      if (t > 1.7) { const k = clamp(seg(t, 1.7, 2.7)), n = Math.round(k * 20); s.fillStyle = col(1); s.font = "500 38px PM"; s.textAlign = "right"; s.direction = "ltr"; s.fillText("[" + "#".repeat(n) + ".".repeat(20 - n) + "]", SR - 70, 320); }
+      if (t > 2.8) { const a2 = typed(L2, 2.8, 18); line(a2, 400, 46, "PX", 1, t < 3.4); }
+      // الفنجان بيتطبع سطر سطر
+      const pr = seg(t, 3.3, 5.6) * ROWS; s.font = "500 36px PM"; s.textAlign = "left"; s.direction = "ltr";
+      for (let r = 0; r < ROWS; r++) { if (r >= pr) break; for (let k = 0; k < COLS; k++) {
+        let b = B[r][k]; const v = (r + .5) / ROWS, ua = ((k + .5) / COLS - .5) * 1.07;
+        // بخار: حروف خفيفة بتتموج فوق الفنجان
+        if (t > 5.0 && v < .27 && v > .02) { const sv = (v - .02) / .25; for (const o of [-.08, .06]) { const cx = o + Math.sin(sv * 7 - t * 2.2 + o * 30) * .05; const d = Math.abs(ua - cx); if (d < .05) b = Math.max(b, (1 - d / .05) * .55 * sv * smooth(seg(t, 5.0, 6.0)) * (.7 + .3 * Math.sin(t * 5 + r))); } }
+        if (b < .06) continue; const ch = RAMP[Math.min(RAMP.length - 1, Math.round(b * (RAMP.length - 1)))]; if (ch === " ") continue;
+        const fresh = r > pr - 1.5 ? 1.4 : 1; s.fillStyle = col(Math.min(1, (.45 + .55 * b) * fresh)); s.fillText(ch, GX + k * CW, GY + r * RH);
+      } }
+      if (t > 6.6) { const a3 = typed("< " + PR.l3, 6.6, 18); line(a3, 1520, 44, "PX", 1, false); }
+      if (t > 7.6) { const tt = typed(PR.title, 7.6, 9); line(tt, 1650, M.fit(PR.title, "PB", 860, 110, 50, "700"), "PB", 1, t < 9.2); }
+      if (t > 9.2) { line(PR.sub, 1715, 42, "PX", expo(seg(t, 9.2, 9.7))); }
+      if (t > 9.9) { s.globalAlpha = expo(seg(t, 9.9, 10.4)); s.fillStyle = col(1); s.fillRect(SL + 70, 1745 - 4, SR - SL - 140, 2); s.font = "700 40px PB"; s.textAlign = "center"; s.direction = "rtl"; s.fillText(PR.brand, 540, 1778); s.globalAlpha = 1; }
+    }
+    // ٢) تركيب الشاشة: خلفية، توهج، مسح، انحناء
+    x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = "#0b0a08"; x.fillRect(0, 0, W, H);
+    // الإطار البلاستيك
+    const bz = x.createLinearGradient(0, 0, 0, H); bz.addColorStop(0, "#3a362f"); bz.addColorStop(1, "#24211c"); x.fillStyle = bz; x.beginPath(); x.roundRect(10, 30, W - 20, H - 60, 60); x.fill();
+    x.fillStyle = "#070605"; x.beginPath(); x.roundRect(SL - 12, ST - 12, SR - SL + 24, SB - ST + 24, 70); x.fill();
+    x.save(); x.beginPath(); x.roundRect(SL, ST, SR - SL, SB - ST, 64); x.clip();
+    x.fillStyle = `rgb(${Math.round(cr * .06)},${Math.round(cg * .05)},${Math.round(cb * .03 + 4)})`; x.fillRect(SL, ST, SR - SL, SB - ST);
+    // فتح الشاشة: خط بيتمد
+    if (on < 1) { const hh = Math.max(3, (SB - ST) * expo(seg(t, .35, .7))), ww = (SR - SL) * expo(seg(t, .15, .35)); x.fillStyle = col(.9); x.fillRect(540 - ww / 2, 950 - hh / 2, ww, hh); }
+    const fl = .94 + .04 * Math.sin(t * 50) + .02 * Math.sin(t * 13);
+    // رعشة أفقية خفيفة كل شوية
+    const gl = (t % 2.7) < .08 ? (hash(Math.floor(t * 40)) - .5) * 14 : 0;
+    x.globalAlpha = fl; x.globalCompositeOperation = "lighter"; x.filter = "blur(10px)"; x.drawImage(s.canvas, gl, 0); x.filter = "blur(2px)"; x.drawImage(s.canvas, gl, 0); x.filter = "none"; x.drawImage(s.canvas, gl, 0); x.globalCompositeOperation = "source-over"; x.globalAlpha = 1;
+    x.fillStyle = "rgba(0,0,0,.28)"; for (let y = ST; y < SB; y += 4) x.fillRect(SL, y, SR - SL, 2);
+    const by = ST + ((t * 260) % (SB - ST + 300)) - 150, rb = x.createLinearGradient(0, by - 150, 0, by + 150); rb.addColorStop(0, col(0)); rb.addColorStop(.5, col(.05)); rb.addColorStop(1, col(0)); x.fillStyle = rb; x.fillRect(SL, by - 150, SR - SL, 300);
+    const vg = x.createRadialGradient(540, 950, 400, 540, 950, 1100); vg.addColorStop(0, "rgba(0,0,0,0)"); vg.addColorStop(1, "rgba(0,0,0,.65)"); x.fillStyle = vg; x.fillRect(SL, ST, SR - SL, SB - ST);
+    const gs = x.createLinearGradient(SL, ST, SR, SB); gs.addColorStop(0, "rgba(255,255,255,.06)"); gs.addColorStop(.4, "rgba(255,255,255,0)"); x.fillStyle = gs; x.fillRect(SL, ST, SR - SL, SB - ST);
+    x.restore();
+    // لمبة التشغيل
+    x.fillStyle = on > 0 ? "#7dff6a" : "#1c3318"; x.beginPath(); x.arc(W - 90, H - 70, 9, 0, Math.PI * 2); x.fill();
+  },
+  sound(A) {
+    const N = A.midi;
+    A.tone(.15, 7800, .5, "sine", .02); A.tone(.15, 55, 11.6, "sine", .03);                 // صفارة الشاشة وطنينها
+    const keys = (t0, n, cps) => { for (let i = 0; i < n; i++) A.click(t0 + i / cps + Math.sin(i * 7) * .01, .06 + (i % 3) * .015); };
+    keys(.8, 20, 18); keys(2.8, 16, 18); keys(6.6, 18, 18); keys(7.6, 12, 9);
+    for (let i = 0; i < 20; i++) A.tone(1.7 + i * .05, N(72 + (i % 2) * 12), .03, "square", .02);
+    for (let r = 0; r < 26; r++) A.nz(3.3 + r * (2.3 / 26), .05, "bandpass", 2600, .04, 2);
+    A.tone(6.4, N(81), .12, "square", .04); A.tone(6.55, N(88), .18, "square", .04);
+    A.pad(7.6, [N(45), N(52), N(57), N(64)], 4.4, .03); A.pluck(9.2, N(76), .08, 1.4); A.tone(9.9, N(93), .1, "square", .03);
+  },
+});
+</script>
+</body></html>

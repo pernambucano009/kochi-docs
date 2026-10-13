@@ -1,0 +1,124 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// قالب «صندوق ورق منوّر»: مشهد رمضان معمول من طبقات ورق مقصوص ورا بعض: السما والهلال، الجامع والمدينة البعيدة، البيوت،
+// النخل وحبل الفوانيس، وبرواز مشربية قدام. الطبقات بتطلع واحدة ورا التانية، الشبابيك بتنوّر، والكاميرا بتتحرك فتبان العمق. 1080×1920، 12 ثانية.
+const PR = M.params({
+  title: { label: "العنوان", kind: "text", role: "product", def: "رمضان كريم" },
+  sub: { label: "تحت العنوان", kind: "text", def: "سفرة العيلة مستنياك" },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "حلواني الأمل" },
+  night: { label: "لون الليل", kind: "color", def: "#1b2466" },
+  light: { label: "لون النور", kind: "color", def: "#ffc160" },
+});
+const W = 1080, H = 1920, DUR = 12, PAD = 140, LW = W + PAD * 2;
+const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
+const hex = (h) => { h = h.replace("#", ""); return [0, 2, 4].map((i) => parseInt(h.substr(i, 2), 16)); };
+const shade = (h, k) => `rgb(${hex(h).map((v) => Math.round(v * k)).join(",")})`;
+
+M.reel({
+  W, H, DUR, bg: "#05071a",
+  async init(M) {
+    await Promise.all([loadFont("RQ", "TY-ArefRuqaa-700.ttf", "700"), loadFont("LZ", "SM-Lalezar.ttf")]);
+    const c = M.canvas(W, H), x = c.getContext("2d"), R = M.rng(11), hash = M.hash;
+    const mk = () => { const k = document.createElement("canvas"); k.width = LW; k.height = H; return k.getContext("2d"); };
+    const arch = (q, cx, y, w, h) => { q.moveTo(cx - w / 2, y + h); q.lineTo(cx - w / 2, y + w * .55); q.quadraticCurveTo(cx - w / 2, y, cx, y - w * .25); q.quadraticCurveTo(cx + w / 2, y, cx + w / 2, y + w * .55); q.lineTo(cx + w / 2, y + h); q.closePath(); };
+    const paper = (q, col) => { q.save(); q.globalCompositeOperation = "source-atop"; for (let i = 0; i < 2500; i++) { q.fillStyle = `rgba(${R() < .5 ? "255,255,255" : "0,0,0"},.05)`; q.fillRect(R() * LW, R() * H, 2 + R() * 3, 2 + R() * 3); } q.restore(); };
+    const L = [], WIN = [];
+    const cut = (q, li, list) => { q.save(); q.globalCompositeOperation = "destination-out"; q.beginPath(); list.forEach(([a, b, w, h]) => arch(q, a, b, w, h)); q.fill(); q.restore(); list.forEach(([a, b, w, h], k) => WIN.push({ li, a: a - PAD, b, w, h, on: 3.6 + hash(li * 50 + k) * 1.6 })); };
+    // ١) الجامع والمدينة البعيدة
+    let q = mk(); q.fillStyle = shade(PR.night, .9); q.beginPath();
+    for (let i = 0; i < 18; i++) { const bx = i * 80 + R() * 20, bh = 120 + R() * 160; q.rect(bx, 1200 - bh, 70 + R() * 30, H); }
+    q.moveTo(PAD + 370, 1220); q.lineTo(PAD + 370, 1040); q.bezierCurveTo(PAD + 370, 880, PAD + 470, 860, PAD + 540, 800); q.bezierCurveTo(PAD + 610, 860, PAD + 710, 880, PAD + 710, 1040); q.lineTo(PAD + 710, 1220); q.closePath();
+    q.rect(PAD + 532, 730, 16, 80); q.moveTo(PAD + 540 + 18, 722); q.arc(PAD + 540, 722, 18, 0, Math.PI * 2);
+    for (const mx of [PAD + 270, PAD + 810]) { q.rect(mx - 20, 820, 40, 400); q.rect(mx - 32, 900, 64, 18); q.rect(mx - 28, 1010, 56, 14); q.moveTo(mx - 20, 820); q.lineTo(mx, 720); q.lineTo(mx + 20, 820); q.closePath(); }
+    q.rect(0, 1200, LW, H); q.fill(); paper(q);
+    const w1 = []; for (let i = 0; i < 18; i++) for (let j = 0; j < 2; j++) if (hash(i * 7 + j) < .55) w1.push([i * 80 + 30 + hash(i) * 10, 1110 + j * 50, 14, 24]);
+    w1.push([PAD + 470, 1080, 34, 90], [PAD + 540, 1060, 40, 110], [PAD + 610, 1080, 34, 90], [PAD + 270, 940, 16, 40], [PAD + 810, 940, 16, 40]);
+    cut(q, 0, w1); L.push(q);
+    // ٢) البيوت
+    q = mk(); q.fillStyle = shade(PR.night, .72); q.beginPath(); const w2 = [];
+    [[0, 1240, 260], [250, 1300, 220], [470, 1350, 180], [650, 1300, 240], [880, 1220, 230], [1100, 1280, 260]].forEach(([bx, by, bw], i) => {
+      q.rect(bx, by, bw, H); q.rect(bx - 8, by - 14, bw + 16, 16);
+      if (i % 2 === 0) { q.moveTo(bx + bw * .3, by - 14); q.quadraticCurveTo(bx + bw * .5, by - 110, bx + bw * .7, by - 14); }
+      for (let r = 0; r < 3; r++) for (let k = 0; k < Math.floor(bw / 70); k++) if (hash(i * 31 + r * 7 + k) < .7) w2.push([bx + 45 + k * 70, by + 50 + r * 120, 34, 70]);
+    });
+    q.fill(); paper(q); cut(q, 1, w2); L.push(q);
+    // ٣) النخل والأرض قدام
+    q = mk(); q.fillStyle = shade(PR.night, .45); q.beginPath(); q.moveTo(0, 1640);
+    for (let xx = 0; xx <= LW; xx += 40) q.lineTo(xx, 1620 - Math.sin(xx * .008) * 40); q.lineTo(LW, H); q.lineTo(0, H); q.closePath(); q.fill();
+    for (const [px, ph, s] of [[150, 1040, 1], [1180, 980, 1.1], [330, 1200, .7]]) {
+      q.beginPath(); q.moveTo(px - 14 * s, 1650); q.quadraticCurveTo(px + 20 * s, (1650 + ph) / 2, px, ph); q.lineTo(px + 14 * s, ph); q.quadraticCurveTo(px + 36 * s, (1650 + ph) / 2, px + 14 * s, 1650); q.fill();
+      for (let k = 0; k < 8; k++) { const a = -Math.PI / 2 + (k - 3.5) * .42; q.save(); q.translate(px + 7 * s, ph); q.rotate(a); q.beginPath(); q.moveTo(0, -8); q.quadraticCurveTo(110 * s, -40 * s, 210 * s, 30 * s); q.quadraticCurveTo(110 * s, 0, 0, 8); q.fill(); q.restore(); }
+    }
+    paper(q); L.push(q);
+    // ٤) برواز المشربية
+    q = mk(); q.fillStyle = shade(PR.night, .25); q.fillRect(0, 0, LW, H);
+    q.save(); q.globalCompositeOperation = "destination-out"; q.beginPath(); arch(q, LW / 2, 230, 900, 1440); q.fill(); q.restore();
+    const w4 = []; for (let k = 0; k < 9; k++) { w4.push([PAD + 40, 400 + k * 150, 26, 50], [PAD + W - 40, 400 + k * 150, 26, 50]); }
+    for (let k = 0; k < 7; k++) w4.push([PAD + 180 + k * 120, 70, 26, 50]);
+    paper(q); cut(q, 3, w4); L.push(q);
+    return { x, L, WIN };
+  },
+  seek(t, C, M) {
+    const { x, L, WIN } = C, { seg, smooth, expo, springO, clamp, hash, cubicIO } = M;
+    const [lr, lg, lb] = hex(PR.light), lc = (a) => `rgba(${lr},${lg},${lb},${a})`;
+    x.setTransform(1, 0, 0, 1, 0, 0);
+    const cam = -25 + 50 * cubicIO(seg(t, 2.5, 12)), z = 1.06 - .06 * smooth(seg(t, 0, 12));
+    x.translate(540, 1000); x.scale(z, z); x.translate(-540, -1000);
+    const rise = (k) => (1 - springO(clamp(k), 10, .8)) * 900;
+    // السما + النجوم + الهلال
+    const sk = x.createLinearGradient(0, 0, 0, 1400); sk.addColorStop(0, shade(PR.night, .5)); sk.addColorStop(1, shade(PR.night, 1.8)); x.fillStyle = sk; x.fillRect(-100, -100, W + 200, H + 200);
+    for (let i = 0; i < 90; i++) { const tw = .5 + .5 * Math.sin(t * 3 + i * 1.7); x.fillStyle = `rgba(255,240,210,${(.3 + .5 * tw) * smooth(seg(t, .2 + hash(i) * 1.5, 1 + hash(i) * 1.5))})`; x.fillRect(hash(i) * W - cam * .1, hash(i + 77) * 1100, 3, 3); }
+    const mo = smooth(seg(t, .3, 1.5));
+    if (mo > 0) { const mx = 540 - cam * .15, my = 390; x.save(); const gg = x.createRadialGradient(mx, my, 40, mx, my, 300); gg.addColorStop(0, lc(.35 * mo)); gg.addColorStop(1, lc(0)); x.fillStyle = gg; x.fillRect(mx - 300, my - 300, 600, 600);
+      x.beginPath(); x.arc(mx, my, 90, 0, Math.PI * 2); x.clip(); x.beginPath(); x.arc(mx, my, 90, 0, Math.PI * 2); x.arc(mx + 38, my - 22, 78, 0, Math.PI * 2); x.fillStyle = `rgba(255,236,190,${mo})`; x.fill("evenodd"); x.restore(); }
+    // الطبقات
+    const depth = [.2, .45, .8, 1.0], start = [.4, 1.0, 1.6, 2.2];
+    L.forEach((q, li) => {
+      const oy = rise(seg(t, start[li], start[li] + 1.4)), ox = -140 - cam * depth[li];
+      // نور الشبابيك (ورا الورقة)
+      x.save();
+      WIN.forEach((w) => { if (w.li !== li) return; const k = smooth(seg(t, w.on, w.on + .3)) * (.85 + .15 * Math.sin(t * 9 + w.a)); if (k <= 0) return; const cx = w.a + PAD + ox, cy = w.b + oy;
+        x.fillStyle = lc(k); x.fillRect(cx - w.w / 2 - 2, cy - w.w * .3, w.w + 4, w.h + w.w * .3 + 2); x.fillStyle = `rgba(255,250,230,${.5 * k})`; x.fillRect(cx - w.w / 4, cy + w.h * .2, w.w / 2, w.h * .5); });
+      x.restore();
+      x.save(); x.shadowColor = "rgba(0,0,8,.6)"; x.shadowBlur = 40; x.shadowOffsetY = 14; x.drawImage(q.canvas, ox, oy); x.restore();
+      if (li === 2) lanterns(oy, ox);
+    });
+    function lanterns(oy, ox) {
+      // حبل الفوانيس بين حرفين البرواز
+      const ax = 90 + ox + 140, bx = 990 + ox + 140, ay = 880 + oy, sag = 100, lo = smooth(seg(t, 4.8, 5.8));
+      x.strokeStyle = shade(PR.night, .3); x.lineWidth = 4; x.beginPath(); x.moveTo(ax, ay); x.quadraticCurveTo((ax + bx) / 2, ay + sag * 2, bx, ay); x.stroke();
+      for (let i = 0; i < 6; i++) {
+        const u = (i + .5) / 6, px = ax + (bx - ax) * u, py = ay + sag * 2 * 2 * u * (1 - u) * .5 * 2 * .5 * 2, hl = 50 + (i % 2) * 50, sw = Math.sin(t * 1.7 + i * 1.3) * .14;
+        x.save(); x.translate(px, py); x.rotate(sw); x.strokeStyle = shade(PR.night, .3); x.lineWidth = 3; x.beginPath(); x.moveTo(0, 0); x.lineTo(0, hl); x.stroke(); x.translate(0, hl);
+        const fk = lo * (.85 + .15 * Math.sin(t * 11 + i * 2));
+        if (fk > 0) { x.save(); x.globalCompositeOperation = "lighter"; const gg = x.createRadialGradient(0, 60, 5, 0, 60, 120); gg.addColorStop(0, lc(.3 * fk)); gg.addColorStop(1, lc(0)); x.fillStyle = gg; x.fillRect(-120, -60, 240, 240); x.restore(); }
+        const dk = shade(PR.night, .28);
+        x.fillStyle = dk; x.beginPath(); x.moveTo(-6, 0); x.lineTo(6, 0); x.lineTo(26, 22); x.lineTo(-26, 22); x.fill();
+        x.fillStyle = fk > 0 ? `rgba(${lr},${Math.round(lg * .85)},${Math.round(lb * .6)},${.35 + .65 * fk})` : dk; x.beginPath(); x.moveTo(-26, 22); x.lineTo(26, 22); x.lineTo(34, 60); x.lineTo(22, 98); x.lineTo(-22, 98); x.lineTo(-34, 60); x.closePath(); x.fill();
+        x.strokeStyle = dk; x.lineWidth = 5; x.beginPath(); x.moveTo(0, 22); x.lineTo(0, 98); x.moveTo(-34, 60); x.lineTo(34, 60); x.stroke(); x.lineWidth = 3; x.beginPath(); x.moveTo(-26, 22); x.lineTo(26, 22); x.lineTo(34, 60); x.lineTo(22, 98); x.lineTo(-22, 98); x.lineTo(-34, 60); x.closePath(); x.stroke();
+        x.fillStyle = dk; x.beginPath(); x.moveTo(-22, 98); x.lineTo(22, 98); x.lineTo(0, 128); x.fill();
+        x.restore();
+      }
+    }
+    // نور المشربية بيتنفّس
+    // العنوان: حروف دهب مقصوصة بضل
+    x.setTransform(1, 0, 0, 1, 0, 0);
+    const tk = seg(t, 6.4, 7.4);
+    if (tk > 0) { const e = springO(tk, 9, .65); x.save(); x.translate(540, 620 + (1 - e) * 60); x.globalAlpha = clamp(tk * 3); x.font = `700 ${M.fit(PR.title, "RQ", 820, 190, 70, "700")}px RQ`; x.textAlign = "center"; x.textBaseline = "middle"; x.direction = "rtl";
+      x.shadowColor = "rgba(0,0,10,.7)"; x.shadowBlur = 30; x.shadowOffsetY = 14; const gt = x.createLinearGradient(0, -90, 0, 90); gt.addColorStop(0, "#ffe9a8"); gt.addColorStop(1, PR.light); x.fillStyle = gt; x.fillText(PR.title, 0, 0); x.restore(); }
+    const sb = expo(seg(t, 8.0, 8.8)); if (sb > 0) { x.globalAlpha = sb; x.fillStyle = "#fff1d6"; x.font = `400 ${M.fit(PR.sub, "LZ", 860, 62, 34)}px LZ`; x.textAlign = "center"; x.direction = "rtl"; x.shadowColor = "rgba(0,0,10,.7)"; x.shadowBlur = 16; x.fillText(PR.sub, 540, 780); x.shadowBlur = 0; x.globalAlpha = 1; }
+    const br = expo(seg(t, 9.0, 9.8)); if (br > 0) { x.globalAlpha = br; x.fillStyle = PR.light; x.font = `700 ${M.fit(PR.brand, "RQ", 760, 96, 50, "700")}px RQ`; x.textAlign = "center"; x.direction = "rtl"; x.shadowColor = "rgba(0,0,10,.8)"; x.shadowBlur = 18; x.fillText(PR.brand, 540, 1800); x.shadowBlur = 0; x.globalAlpha = 1; }
+  },
+  sound(A) {
+    const N = A.midi;
+    // قانون/أجراس هادية + طبلة خفيفة + "تشينج" مع نور الشبابيك
+    const sc = [62, 64, 65, 67, 69, 70, 72, 74];
+    for (let i = 0; i < 24; i++) A.pluck(.4 + i * .45, N(sc[[0, 2, 4, 3, 2, 1, 0, 4, 5, 4, 3, 2][i % 12]] + (i >= 12 ? 0 : 0)), .07, .9);
+    [.4, 1.0, 1.6, 2.2].forEach((s) => A.whoosh(s, .7, .05));
+    for (let s = 3.6; s < 5.2; s += .14) A.tone(s, N(86 + Math.floor((s * 7) % 5) * 2), .25, "sine", .03);
+    for (let b = 0; b < 16; b++) { A.kick(4 + b * .6, .25); A.click(4.3 + b * .6, .05); }
+    A.pad(0, [N(50), N(57), N(62)], 6, .02); A.pad(6.4, [N(50), N(57), N(62), N(66)], 5.6, .035); A.pluck(6.4, N(74), .12, 1.6); A.pluck(9.0, N(81), .08, 1.8);
+  },
+});
+</script>
+</body></html>
