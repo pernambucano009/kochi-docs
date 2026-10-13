@@ -54,7 +54,7 @@ function tsHome() {
   const t = D.templates.find((x) => x.id === tsx.pick);
   const opt = (g) => Object.entries(D.dialects).filter(([, v]) => v.group === g).map(([k, v]) => `<option value="${k}">${tse(v.label)}</option>`).join("");
   $("tsGallery").innerHTML = `
-    <section class="panel"><div class="car-head"><h2>🎬 القوالب</h2><small class="muted">اختار ستايل، اكتب فكرتك، والباقي علينا: سكريبت ← فويس أوفر ← ستوري بورد ← فيديو متصل ← مونتاج</small></div>
+    <section class="panel"><div class="car-head"><h2>القوالب</h2><small class="muted">اختار ستايل، اكتب فكرتك، والباقي علينا: سكريبت ← فويس أوفر ← ستوري بورد ← فيديو متصل ← مونتاج</small></div>
       <div class="ts-grid">${D.templates.map(card).join("")}</div></section>
     ${t ? `<section class="panel ts-new" id="tsNew"><h3>${tse(t.icon || "")} فيديو جديد على «${tse(t.name)}»</h3>
       <label>الفيديو عن إيه؟ <textarea id="tsBrief" rows="2" placeholder="${tse(t.sample_brief || "مثلًا: أهم ٣ مميزات في التطبيق والختام: جرّبه النهارده")}"></textarea></label>
@@ -77,7 +77,7 @@ function tsHome() {
       ${!D.fasih ? `<small class="err">اللهجات العربية محتاجة مفتاح فصيح (FASIH_API_KEY) على Railway، أو اقفل الفويس أوفر.</small>` : ""}
       <div class="row wrap"><button class="btn primary" id="tsGo">🚀 ابدأ</button><small class="muted">الحركة بـ Seedance 2.0 Mini (480p)، وكل خطوة بتوريك تمنها قبل ما تبدأ</small></div>
     </section>` : ""}
-    ${D.videos.length ? `<section class="panel"><h3>🎞️ فيديوهاتك من القوالب</h3><div class="fm-list">${D.videos.map((v) => `<article class="fm-card" data-tsopen="${v.id}">
+    ${D.videos.length ? `<section class="panel"><h3>فيديوهاتك من القوالب</h3><div class="fm-list">${D.videos.map((v) => `<article class="fm-card" data-tsopen="${v.id}">
       ${v.thumb ? `<img src="${v.thumb}" alt="">` : `<span class="ph">🎬</span>`}<b data-no-i18n>${tse(v.name)}</b>
       <small class="muted">${tse(v.template_name)} · ${TV_ST[v.status] || ""}</small></article>`).join("")}</div></section>` : ""}`;
   if (t) tsVoices();
