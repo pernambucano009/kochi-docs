@@ -275,9 +275,13 @@ const NH = (() => {
   }
 
   // صفحة جوه الرئيسية (اعمل جديد / الأصول / شغّال عليه): الأيقونة والاسم بيطيروا لحد ما يبقوا عنوان الصفحة
+  const glImg = (key) => `<img class="ic-l" src="/icons3d/${key}.webp?v=7" alt="" loading="lazy"><img class="ic-d" src="/icons3d/${key}_d.webp?v=7" alt="" loading="lazy">`;
   const panel = (c, r, inner, attrs = "") => `<div class="nh-tile nh-panel" ${attrs} style="grid-column:span ${c};grid-row:span ${r}">${inner}</div>`;
   const PAGES = {
-    create: () => CREATE_ALL.map((k) => panel(3, 3, `${head(k)}<div class="nh-body">${esc(T[k].desc)}</div>`, `data-id="${k}" tabindex="0" role="button"`)).join(""),
+    // كل نوع كارت فيه أيقونته الزجاج الـ 3D (فاتحة وغامقة)، واسمه، وسطر بيشرح هيعمل إيه
+    create: () => CREATE_ALL.map((k) => panel(3, 3, `<div class="nh-pick-art">${glImg(GLKEY[k] || "create")}</div>
+        <div class="nh-pick-t"><div class="nh-name"><span class="latin">${T[k].en}</span><b>${esc(T[k].ar)}</b></div><p>${esc(T[k].desc)}</p></div>`,
+      `data-id="${k}" tabindex="0" role="button"`).replace('class="nh-tile nh-panel"', 'class="nh-tile nh-panel nh-pick"')).join(""),
     // (مكتبة الموشن اتشالت من الأصول، ومكانها هيبقى في «اعمل جديد»)
     assets: () => panel(4, 6, `${head("coaches")}<div class="nh-body">${D.coaches.length} شخصية</div><div class="nh-avs">${D.coaches.slice(0, 12).map((c) => `<img src="${esc(c.image_url)}" alt="">`).join("")}</div>`, `data-id="coaches" tabindex="0" role="button"`)
       + panel(4, 6, `${head("voice")}<div class="nh-body">${D.voices} تسجيل</div>`, `data-id="voice" tabindex="0" role="button"`)

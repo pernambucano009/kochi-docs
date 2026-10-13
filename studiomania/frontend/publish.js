@@ -58,7 +58,7 @@ function renderReady() {
             <span class="pill">${e.source === "upload" ? "من برا" : "من المونتاج"}</span>
             ${scheduled.has(e.id) ? `<span class="pill scheduled">متجدول</span>` : ""}</div>
           <div class="acts">
-            <button class="btn sm primary" data-act="pick">📅 جدول</button>
+            <button class="btn sm primary" data-act="pick">جدول</button>
             <a class="btn sm" href="${e.download_url}" download="${escapeHtml(e.name)}.mp4" title="تحميل">⬇</a>
             <button class="btn sm" data-act="rename" title="تغيير الاسم">✎</button>
             <button class="btn sm danger" data-act="delete" title="حذف">✕</button>
@@ -122,6 +122,14 @@ $("readyUpload").addEventListener("change", async (e) => {
 });
 
 // ---------- فورم الجدولة ----------
+// أيقونات المنصات (خطوط رفيعة) لمربعات «فين هينزل»
+const PLAT_SVG = {
+  instagram: "M8.5 4h7A4.5 4.5 0 0 1 20 8.5v7a4.5 4.5 0 0 1-4.5 4.5h-7A4.5 4.5 0 0 1 4 15.5v-7A4.5 4.5 0 0 1 8.5 4z M12 8.4a3.6 3.6 0 1 1 0 7.2a3.6 3.6 0 1 1 0-7.2z M17 6.8v.1",
+  tiktok: "M14 4v10.5a3.5 3.5 0 1 1-3.5-3.5 M14 4c.5 2.6 2.4 4.3 5 4.5",
+  youtube: "M7 6h10a4 4 0 0 1 4 4v4a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4v-4a4 4 0 0 1 4-4z M10.5 9.5v5l4.5-2.5z",
+  facebook: "M14 8h2.5V4.5H14A3.5 3.5 0 0 0 10.5 8v2.5H8V14h2.5v6H14v-6h2.5l.5-3.5h-3V8z",
+  x: "M5 5l14 14 M19 5L5 19",
+};
 function renderPlatformBoxes() {
   let saved = [];
   try { saved = JSON.parse(storageGet(PLATFORMS_KEY) || "[]"); } catch {}
@@ -131,8 +139,9 @@ function renderPlatformBoxes() {
   $("postPlatforms").innerHTML = Object.entries(pub.platforms)
     .map(([k, label]) => {
       const off = needLink && !pub.accounts[k];
-      return `<label title="${off ? "الحساب ده مش مربوط في Zernio" : ""}" class="${off ? "off" : ""}">
-        <input type="checkbox" value="${k}" ${saved.includes(k) && !off ? "checked" : ""} ${off ? "disabled" : ""}> ${label}</label>`;
+      return `<label title="${off ? "الحساب ده مش مربوط في Zernio" : escapeHtml(label)}" class="plat ${off ? "off" : ""}">
+        <input type="checkbox" value="${k}" ${saved.includes(k) && !off ? "checked" : ""} ${off ? "disabled" : ""}>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="${PLAT_SVG[k] || PLAT_SVG.x}"/></svg><span>${label}</span></label>`;
     })
     .join("");
 }
@@ -145,7 +154,7 @@ function renderPostVideo() {
   const ex = pub.exports.find((x) => x.id === pub.videoId);
   $("postVideo").innerHTML = ex
     ? `🎬 ${escapeHtml(ex.name)} <span class="muted">(${fmtDuration(ex.duration)})</span>`
-    : `<span class="muted">اختار فيديو من الفولدر (دوس 📅 جدول)</span>`;
+    : `<span class="muted">اختار فيديو من الفولدر (دوس «جدول»)</span>`;
   // التاج: حساب شخصية المشروع بيتحط لوحده (إلا لو انت كتبت حاجة بإيدك)
   const coachTag = ex?.coach?.instagram ? `@${ex.coach.instagram}` : "";
   if (!pub.tagsTouched && !pub.editing) {
@@ -262,7 +271,7 @@ $("quickTimes").addEventListener("click", (e) => {
 function resetPostForm() {
   pub.editing = null;
   $("postFormTitle").textContent = "جدولة بوست";
-  $("postSubmit").textContent = "📅 جدول";
+  $("postSubmit").textContent = "جدول";
   $("postCancel").hidden = true;
   $("postCaption").value = "";
   pub.tagsTouched = false;
