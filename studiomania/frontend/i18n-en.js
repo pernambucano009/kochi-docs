@@ -3971,5 +3971,9 @@ window.I18N_EN = {
   "{0} مشروع · {1} فيديو خام · {2} مونتاج": "{0} projects · {1} raw videos · {2} edits",
   "فين هينزل؟": "Where to post?",
   "مختار للجدولة": "Picked to schedule",
-  "دوس عشان تجدوله": "Click to schedule it"
+  "دوس عشان تجدوله": "Click to schedule it",
+  "تاج الكوتش + كولاب": "Coach tag + collab",
+  "✓ تاج الكوتش + كولاب": "✓ Coach tag + collab",
+  "الغلاف": "Cover",
+  "✓ الغلاف": "✓ Cover"
 };

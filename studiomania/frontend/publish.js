@@ -16,7 +16,8 @@ async function initPublish() {
   pub.service = info.service;
   pub.accounts = info.accounts || {};
   const alert = $("publisherAlert");
-  alert.hidden = info.service === "mock";
+  // الحسابات المربوطة بتبان في الإعدادات، فالشريط هنا بيظهر بس لو فيه مشكلة (مفيش Zernio أو مقدرش يوصل له)
+  alert.hidden = info.service === "mock" || (info.service === "zernio" && !info.accounts_error);
   alert.className = "alert " + (info.service === "zernio" && !info.accounts_error ? "info" : "warn");
   if (!info.service) {
     alert.innerHTML = `⚠️ لسه مفيش ربط بـ Zernio. تقدر تجدول البوستات عادي، وأول ما تحط مفتاح Zernio من <a href="#" data-goto="settings">⚙️ الإعدادات</a> البرنامج هيبعتهم لوحده.`;
@@ -196,8 +197,16 @@ const coverDefaultMs = (dur) => Math.max(0, Math.round((dur - 2) * 1000));
 function renderPostExtras() {
   const pl = checkedPlatforms();
   const ig = pl.includes("instagram"), tt = pl.includes("tiktok");
-  $("igOpts").hidden = !ig;
-  $("coverOpts").hidden = !(ig || tt) || !pub.videoId;
+  // تاج إنستجرام والغلاف: كبسولة صغيرة جنب «كابشن البراند»، والإعدادات بتتفتح لما تدوس عليها (زي البروتوتايب)
+  const tagged = !!$("igTags").value.trim() || $("igCollab").checked;
+  $("igOptsChip").hidden = !ig;
+  $("igOptsChip").classList.toggle("on", ig && (pub.showIg || tagged));
+  $("igOptsChip").textContent = tagged ? "✓ تاج الكوتش + كولاب" : "تاج الكوتش + كولاب";
+  $("igOpts").hidden = !ig || !pub.showIg;
+  $("coverChip").hidden = !(ig || tt) || !pub.videoId;
+  $("coverChip").classList.toggle("on", !!pub.showCover);
+  $("coverChip").textContent = $("coverOn").checked ? "✓ الغلاف" : "الغلاف";
+  $("coverOpts").hidden = !(ig || tt) || !pub.videoId || !pub.showCover;
   $("coverFor").textContent = ig && tt ? "(إنستجرام وتيك توك)" : ig ? "(إنستجرام)" : "(تيك توك)";
   $("coverPick").hidden = !$("coverOn").checked;
 }
@@ -522,3 +531,8 @@ async function loadPublished(verbose = false) {
   }
 }
 $("publishedRefresh").onclick = () => loadPublished(true);
+
+$("igOptsChip").onclick = () => { pub.showIg = !pub.showIg; renderPostExtras(); };
+$("coverChip").onclick = () => { pub.showCover = !pub.showCover; renderPostExtras(); };
+$("igTags").addEventListener("change", renderPostExtras);
+$("igCollab").addEventListener("change", renderPostExtras);

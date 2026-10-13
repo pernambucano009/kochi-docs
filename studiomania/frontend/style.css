@@ -2666,3 +2666,13 @@ dialog.cal-dlg { width: min(720px, 94vw); max-height: 90vh; border: 1px solid va
 :root[data-nh-theme="dark"] .stage .pub-form .quick-times button { border-color: var(--line); }
 :root[data-nh-theme="dark"] .stage .pub-form .quick-times .on { background: #F2F1EE; color: #181718; }
 :root[data-nh-theme="dark"] .pub-all, :root[data-nh-theme="dark"] .stage .pub-ready .panel-head .btn.primary { border-color: var(--line); }
+:root:root .stage .pub-form .loc-row .btn.opt-chip.on { background: #181718; color: #fff; }
+:root[data-nh-theme="dark"] .stage .pub-form .loc-row .btn.opt-chip.on { background: #F2F1EE; color: #181718; }
+.pub-form .post-extra { margin-top: -4px; }
+/* الراس بنفس عرض الصفحة (1500) على الشاشات الواسعة، عشان العنوان والكروت يبقوا على نفس الخط */
+:root:root .stage-head { box-sizing: border-box; width: 100%; max-width: 1580px; margin-inline: auto; }
+:root:root .stage-head { grid-template-columns: auto minmax(0, 1fr) auto auto auto auto auto; grid-template-areas: "logo . money bell inbox cal client" "back back back back back back back" "title title title title title title title"; }
+:root:root .stage-inbox { grid-area: inbox; width: 44px; height: 44px; border: 0; border-radius: 50%; padding: 0; display: grid; place-items: center; background: var(--card); box-shadow: 0 4px 18px rgba(24, 23, 24, .08); color: var(--text); cursor: pointer; }
+.stage-inbox svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linejoin: round; }
+.view[data-view="7"] > .inbox-link { display: none; }
+@media (max-width: 900px) { :root:root .stage-head { grid-template-columns: minmax(0, 1fr) auto auto auto auto auto; grid-template-areas: "logo money bell inbox cal client" "back back back back back back" "title title title title title title"; } }
