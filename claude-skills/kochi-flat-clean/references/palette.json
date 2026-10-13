@@ -1,0 +1,13 @@
+{
+  "tolerance": 10,
+  "max_off": 0.02,
+  "allow_mixes": false,
+  "_note": "Measured from 01 Flat Clean Vector (47 images + video frames). Grouped as in style-bible.md. Add a colour here only if you also add it to the style bible.",
+  "colors": {
+    "background": ["#FCE3CA", "#FAF2EE", "#F7F6FE", "#FEFEFE", "#DDECFC", "#E9F3F8", "#F7EFE3", "#E4E0F1", "#BBDEF3", "#F4CDAE"],
+    "skin": ["#FBD8C3", "#F9BA86", "#F99A7E", "#EDC397", "#DC8176", "#D77B68", "#AA5D5E", "#7D414D"],
+    "clothing": ["#3338F1", "#118EF6", "#F63F47", "#FBA919", "#F8CC58", "#8162E3", "#B680FA", "#EE7A86", "#4B98AC", "#3CAC71", "#205776"],
+    "ink": ["#192D48", "#2A2C60", "#421783", "#4E3858", "#15324F"],
+    "shadow": ["#C4665E", "#ACA7D8", "#87C3E0", "#3176A3", "#6665AA", "#7E599A"]
+  }
+}

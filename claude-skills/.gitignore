@@ -1,0 +1,3 @@
+# Reference images are stock/third-party art: kept local only, never committed (public repo).
+*/references/examples/*
+!*/references/examples/README.md
