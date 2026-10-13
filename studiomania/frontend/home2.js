@@ -93,7 +93,7 @@ const NH = (() => {
   }
 
   // ---------- الرئيسية (نسخة أ): المجسّم في النص، والأقسام مكتوبة على الجنبين، و«ابدأ مشروع جديد» تحت المجسّم ----------
-  const SIDE_R = ["brand", "assets"], SIDE_L = ["progress", "publish", "settings"];   // RTL: أول عمود على اليمين
+  const SIDE_R = ["brand", "assets"], SIDE_L = KOCHI ? ["progress", "publish", "settings"] : ["publish", "settings"];   // RTL: أول عمود على اليمين
   const META = {
     brand: () => { const pct = brainPct(D.brand); return `<span class="nh-mbar"><i style="width:${pct}%"></i></span><span>مكتمل <span class="num">${pct}%</span></span>`; },
     assets: () => `<span>${D.coaches.length} شخصية · ${D.voices} تعليق · ${D.music} موسيقى</span>`,
@@ -110,14 +110,18 @@ const NH = (() => {
   const side = (id) => `<div class="nh-tile nh-side" data-id="${id}" tabindex="0" role="button" aria-label="${esc(T[id].ar)}">${head(id)}<div class="nh-meta">${META[id]()}</div></div>`;
   const cta = () => `<div class="nh-tile nh-cta nh-gen" data-id="create" tabindex="0" role="button" aria-label="ابدأ مشروع جديد">
       <div class="nh-head"><div class="nh-name"><span class="latin">Create</span><b>ابدأ مشروع جديد</b></div>${gi("create")}</div></div>`;
-  function contHTML() {   // آخر مشروع اتعدّل: «كمّل من مكان ما وقفت»
+  // «كمّل من مكان ما وقفت» (بقى مكان «شغّال عليه»): الزرار كله بيفتح كل المشاريع، والتشغيل اللي جنبه بيكمّل آخر مشروع على طول
+  function contHTML() {
     const p = [...D.work].sort((a, b) => String(b.updated_at || b.created_at || "").localeCompare(String(a.updated_at || a.created_at || "")))[0];
-    if (!p) return "";
-    const where = p.section ? (p.render_status === "done" ? "اتصدّر" : "المونتاج") : STEPS5[folderStage(p).done] || "";
-    const attr = p.section ? `data-proj="${esc(p.id)}"` : `data-folder="${esc(p.id)}"`;
-    return `<div class="nh-cont-wrap nh-gen"><div class="nh-line nh-cont" ${attr} tabindex="0" role="button">
-        <span class="nh-cplay" aria-hidden="true"><svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg></span>
-        <span class="nh-ctxt"><small>كمّل من مكان ما وقفت</small><b>${esc(p.name)} · ${esc(where)}</b></span></div></div>`;
+    if (!p && KOCHI) return "";
+    const where = !p ? "" : p.section ? (p.render_status === "done" ? "اتصدّر" : "المونتاج") : STEPS5[folderStage(p).done] || "";
+    const attr = !p ? "" : p.section ? `data-proj="${esc(p.id)}"` : `data-folder="${esc(p.id)}"`;
+    const n = D.work.length, r = D.work.filter((x) => x.render_status === "rendering").length;
+    const count = n ? `${n} مشروع${r ? ` · ${r} بيتصدّر` : ""}` : "";
+    return `<div class="nh-cont-wrap nh-gen"><div class="nh-tile nh-cont" data-id="progress" tabindex="0" role="button" aria-label="كل المشاريع">
+        ${p ? `<span class="nh-cplay" data-cont ${attr} role="button" tabindex="0" title="كمّل ${esc(p.name)}" aria-label="كمّل آخر مشروع"><svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg></span>` : ""}
+        <span class="nh-ctxt"><small>كمّل من مكان ما وقفت${count ? ` · ${count}` : ""}</small><b>${p ? `${esc(p.name)} · ${esc(where)}` : "كل مشاريعك هنا"}</b></span>
+        <span class="nh-call" aria-hidden="true">كل المشاريع ←</span></div></div>`;
   }
 
   // ---------- الهيكل ----------
@@ -155,6 +159,41 @@ const NH = (() => {
   document.body.appendChild(bar);
   // الرصيد والردود والمواعيد (كانوا في راس الصفحات) بقوا في الشريط، وبيبانوا بره الرئيسية بس
   ["stageMoney", "stageInbox", "stageCal"].forEach((id) => { const el = document.getElementById(id); if (el) { el.classList.add("nh-xtra"); document.getElementById("nhTools").prepend(el); } });
+  // عنوان الصفحة المفتوحة: في نفس الركن اللي المربع كان فيه في الرئيسية (الإعدادات تحت شمال ← عنوانها تحت شمال)
+  const corner = document.createElement("div");
+  corner.id = "nhCorner";
+  corner.className = "nh-corner";
+  corner.hidden = true;
+  corner.innerHTML = `<span class="nh-c-ic"></span><div class="nh-c-name"><span class="latin"></span><b></b></div>`;
+  document.body.appendChild(corner);
+  const cIc = corner.querySelector(".nh-c-ic"), cLatin = corner.querySelector(".latin"), cName = corner.querySelector("b");
+  let cornerPage = "tr", cornerStage = "tr";
+  // الركن من مكان المربع على الشاشة؛ اللي في النص (ابدأ مشروع جديد / كمّل) بيروح فوق يمين
+  function cornerOf(tile) {
+    const r = tile.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    if (Math.abs(cx - innerWidth / 2) < innerWidth * .15) return "tr";
+    return (cy < innerHeight / 2 ? "t" : "b") + (cx < innerWidth / 2 ? "l" : "r");
+  }
+  function updateCorner(mode) {
+    if (mode === undefined) mode = stageOpen() ? "stage" : zoom?.page ? "page" : null;
+    if (mode === "stage" && $("stage").classList.contains("mt-mode")) mode = null;
+    corner.hidden = !mode;
+    document.body.classList.toggle("nh-cb", !!mode && (mode === "stage" ? cornerStage : cornerPage)[0] === "b");
+    document.body.classList.toggle("nh-cl", !!mode && (mode === "stage" ? cornerStage : cornerPage)[1] === "l");
+    if (!mode) return;
+    corner.dataset.corner = mode === "stage" ? cornerStage : cornerPage;
+    if (mode === "stage") {
+      cLatin.textContent = $("stageNum").textContent;
+      cName.textContent = $("stageTitle").textContent;
+      cIc.innerHTML = $("stageIc").hidden ? "" : $("stageIc").innerHTML;
+    } else {
+      cLatin.textContent = pTitle.querySelector(".nh-name .latin")?.textContent || "";
+      cName.textContent = pTitle.querySelector(".nh-name b")?.textContent || "";
+      cIc.innerHTML = pTitle.querySelector(".nh-glt")?.innerHTML || "";
+    }
+    cIc.hidden = !cIc.innerHTML;
+  }
+  const cornerDest = () => ({ latin: cLatin, name: cName, icon: cIc.hidden ? null : cIc });
   const bento = document.getElementById("nhBento"), home = document.getElementById("nhHome");
   const page = document.getElementById("nhPage"), pGrid = document.getElementById("nhPGrid"), pTitle = document.getElementById("nhPTitle");
 
@@ -478,11 +517,12 @@ const NH = (() => {
     pTitle.innerHTML = titleHTML(T[key], key);
     pTitle.dataset.key = key;
     page.hidden = false;
+    cornerPage = cornerOf(tile);
+    updateCorner("page");
     fillPage(key);
     const bg = getComputedStyle(page).backgroundColor;
     zooming(true);
-    zoomTo(tile, { key: GLKEY[key] || GLKEY[T[key].icon], bg, parent: host, z: 4,
-      dest: { latin: pTitle.querySelector(".nh-name .latin"), name: pTitle.querySelector(".nh-name b"), icon: pTitle.querySelector(".nh-glt") },
+    zoomTo(tile, { key: GLKEY[key] || GLKEY[T[key].icon], bg, parent: host, z: 4, dest: cornerDest(),
       content: [pGrid, document.getElementById("nhPTabs")] }).then(() => {
       zooming(false);
       busy = false;
@@ -513,11 +553,12 @@ const NH = (() => {
     busy = true;
     sectionZoom = true;
     run();
+    cornerStage = cornerOf(tile);
+    updateCorner("stage");
     const card = $("stageCard"), head = card.querySelector(".stage-head");
     const bg = getComputedStyle(card).backgroundColor;
     zooming(true);
-    zoomTo(tile, { key: GLKEY[tile.dataset.id], bg, parent: document.body, z: 30,
-      dest: { latin: $("stageNum"), name: $("stageTitle"), icon: $("stageIc").hidden ? null : $("stageIc") },
+    zoomTo(tile, { key: GLKEY[tile.dataset.id] || (tile.closest(".nh-cont") ? "progress" : null), bg, parent: document.body, z: 30, dest: cornerDest(),
       content: [$("stageBody"), ...head.querySelectorAll(":scope > :not(.stage-title, .stage-ic, .stage-logo, .stage-back, .stage-bell, .stage-client)")] }).then(() => {
       zooming(false);
       busy = false;
@@ -548,6 +589,7 @@ const NH = (() => {
     step = String(step);
     if (step === "home") { if (location.hash !== "#home") history.replaceState(null, "", "#home"); return closeStage(); }
     const was = stageOpen();
+    if (!was && !sectionZoom) cornerStage = "tr";
     if (!was) stageTrail = [step];
     else { const i = stageTrail.indexOf(step); stageTrail = i >= 0 ? stageTrail.slice(0, i + 1) : [...stageTrail, step]; }
     _showStep(step);
@@ -566,6 +608,7 @@ const NH = (() => {
     return out;
   }
   function renderBar() {
+    updateCorner();
     const list = crumbs(), nav = document.getElementById("nhCrumbs");
     const deep = list.length > 1;
     bar.classList.toggle("deep", deep);
@@ -604,7 +647,7 @@ const NH = (() => {
     return null;
   }
   function onActivate(e) {
-    const line = e.target.closest(".nh-line");
+    const line = e.target.closest(".nh-line, [data-cont]");
     if (line?.dataset.proj) {   // مشروع مونتاج في ستوديومانيا: يفتح في المونتاج بتاع قسمه
       const p = D.work.find((x) => x.id === line.dataset.proj);
       if (!p) return;
@@ -624,7 +667,7 @@ const NH = (() => {
   }
   host.addEventListener("click", onActivate);
   host.addEventListener("keydown", (e) => {
-    if ((e.key === "Enter" || e.key === " ") && e.target.matches(".nh-tile[data-id], .nh-line")) { e.preventDefault(); onActivate(e); }
+    if ((e.key === "Enter" || e.key === " ") && e.target.matches(".nh-tile[data-id], .nh-line, [data-cont]")) { e.preventDefault(); onActivate(e); }
   });
   // Esc = رجوع (لو مفيش نافذة مفتوحة فوق)
   document.addEventListener("keydown", (e) => {

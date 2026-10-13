@@ -2,7 +2,7 @@
    شاشة واحدة من غير سكرول: أبيض سادة في اللايت وأسود سادة في الدارك، والمربعات من غير خلفية ولا حدود.
    الحد بيبان بس كسنيك بيلف حوالين المربع وقت الهوفر، ولما تدوس الكاميرا بتقرّب على المربع لحد ما يبقى الشاشة.
    المسرح في النص فيه مجسّم زجاج 3D (three.js) لكل مربع. */
-#nh, #nhBar, .nh-fly {
+#nh, #nhBar, #nhCorner, .nh-fly {
   --nh-bg: #ffffff; --nh-ink: #141416; --nh-muted: #85858c; --nh-accent: #E5613E; --nh-ok: #2f8f6b;
   --nh-fill: rgba(20,20,22,.045); --nh-fill-hi: rgba(20,20,22,.1); --nh-line: rgba(20,20,22,.22);
   --nh-g1: rgba(30,30,36,.9); --nh-g2: rgba(30,30,36,.22); --nh-gshadow: rgba(0,0,0,.14);
@@ -10,7 +10,7 @@
   --nh-arabic: "IBM Plex Sans Arabic", "Readex Pro", "Segoe UI", Tahoma, sans-serif;
   --nh-r: 24px; --nh-gap: 12px; --nh-ease: cubic-bezier(.65,0,.35,1);
 }
-:root[data-nh-theme="dark"] #nh, :root[data-nh-theme="dark"] #nhBar, :root[data-nh-theme="dark"] .nh-frame, :root[data-nh-theme="dark"] .nh-fly {
+:root[data-nh-theme="dark"] #nh, :root[data-nh-theme="dark"] #nhBar, :root[data-nh-theme="dark"] #nhCorner, :root[data-nh-theme="dark"] .nh-frame, :root[data-nh-theme="dark"] .nh-fly {
   --nh-bg: #0c0c0e; --nh-ink: #f1f1f3; --nh-muted: #8a8a92; --nh-accent: #F0754F; --nh-ok: #5fd1a4;
   --nh-fill: rgba(255,255,255,.05); --nh-fill-hi: rgba(255,255,255,.12); --nh-line: rgba(255,255,255,.25);
   --nh-g1: rgba(255,255,255,.9); --nh-g2: rgba(255,255,255,.14); --nh-gshadow: rgba(0,0,0,.6);
@@ -73,9 +73,9 @@ body.stage-settled #nh { visibility: hidden; }
 .nh-cta .nh-name b { font-size: 16px; color: #fff; }
 .nh-cta .nh-snake rect { stroke: #fff; }
 .nh-cont-wrap { grid-area: k; display: flex; justify-content: center; padding-top: 6px; }
-.nh-line.nh-cont { display: flex; align-items: center; gap: 12px; padding: 7px 22px 7px 8px; border-radius: 99px; background: var(--nh-fill); }
-[dir="ltr"] .nh-line.nh-cont { padding: 7px 8px 7px 22px; }
-.nh-line.nh-cont:hover { background: var(--nh-fill-hi); }
+.nh-tile.nh-cont { display: flex; align-items: center; gap: 12px; padding: 7px 22px 7px 8px; border-radius: 99px; background: var(--nh-fill); }
+[dir="ltr"] .nh-tile.nh-cont { padding: 7px 8px 7px 22px; }
+.nh-tile.nh-cont:hover { background: var(--nh-fill-hi); }
 .nh-cplay { width: 36px; height: 36px; border-radius: 50%; background: var(--nh-ink); color: var(--nh-bg); display: grid; place-items: center; flex: none; }
 .nh-ctxt { display: flex; flex-direction: column; line-height: 1.35; min-width: 0; }
 .nh-ctxt small { color: var(--nh-muted); font-size: 11.5px; }
@@ -532,9 +532,9 @@ body.stage-settled #nh { visibility: hidden; }
 #nh .nh-cta .nh-snake { display: none; }
 /* «كمّل من مكان ما وقفت»: كارت أبيض تحت */
 #nh .nh-cont-wrap { padding-top: 18px; }
-#nh .nh-line.nh-cont { background: var(--card, #fff); box-shadow: 0 6px 24px rgba(24, 23, 24, .07); padding: 8px 22px 8px 10px; gap: 14px; }
-[dir="rtl"] #nh .nh-line.nh-cont { padding: 8px 10px 8px 22px; }
-#nh .nh-line.nh-cont:hover { background: var(--card, #fff); box-shadow: 0 8px 28px rgba(24, 23, 24, .12); }
+#nh .nh-tile.nh-cont { background: var(--card, #fff); box-shadow: 0 6px 24px rgba(24, 23, 24, .07); padding: 8px 22px 8px 10px; gap: 14px; }
+[dir="rtl"] #nh .nh-tile.nh-cont { padding: 8px 10px 8px 22px; }
+#nh .nh-tile.nh-cont:hover { background: var(--card, #fff); box-shadow: 0 8px 28px rgba(24, 23, 24, .12); }
 #nh .nh-cplay { width: 36px; height: 36px; background: #181718; color: #fff; }
 #nh .nh-ctxt small { font-size: 11.5px; color: var(--nh-muted); }
 #nh .nh-ctxt b { font-size: 14px; font-weight: 500; }
@@ -770,3 +770,34 @@ body.nh-zooming :is(.stage, .stage-card) { background: transparent !important; b
   #nhBar :is(.nh-langb, .nh-switch, .nh-xtra), #nhBar #nhClientName { display: none !important; }
   #nhBar .nh-tools .nh-chip { height: 38px; min-width: 38px; padding: 0 4px; justify-content: center; }
 }
+/* «كمّل من مكان ما وقفت»: بقى مدخل كل المشاريع («شغّال عليه» القديم)، والتشغيل جنبه بيكمّل آخر مشروع */
+#nh .nh-tile.nh-cont { flex-direction: row; align-items: center; min-width: 0; max-width: min(560px, 100%); }
+#nh .nh-tile.nh-cont .nh-ctxt { flex: 1; }
+#nh .nh-cplay { cursor: pointer; transition: transform .2s; }
+#nh .nh-cplay:hover { transform: scale(1.08); }
+#nh .nh-call { flex: none; font-size: 12.5px; color: var(--nh-muted); padding-inline-start: 14px; border-inline-start: 1px solid var(--nh-fill-hi); white-space: nowrap; }
+#nh .nh-tile.nh-cont:hover .nh-call { color: var(--nh-accent); }
+
+/* ===== عنوان الصفحة في الركن (نفس ركن المربع في الرئيسية) ===== */
+.nh-corner { position: fixed; z-index: 50; display: flex; align-items: center; gap: 14px; pointer-events: none; direction: rtl;
+  color: var(--nh-ink); font: 14px/1.5 var(--nh-arabic); -webkit-font-smoothing: antialiased; }
+.nh-corner[hidden] { display: none; }
+.nh-corner[data-corner^="t"] { top: 96px; }
+.nh-corner[data-corner^="b"] { bottom: 30px; }
+.nh-corner[data-corner$="r"] { right: 48px; }
+.nh-corner[data-corner$="l"] { left: 48px; flex-direction: row-reverse; }
+.nh-corner .nh-c-ic { width: 56px; height: 56px; flex: none; }
+.nh-corner .nh-c-ic[hidden] { display: none; }
+.nh-corner .nh-c-ic img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.nh-corner .nh-c-ic .ic-d, :root[data-nh-theme="dark"] .nh-corner .nh-c-ic .ic-l { display: none; }
+:root[data-nh-theme="dark"] .nh-corner .nh-c-ic .ic-d { display: block; }
+.nh-corner .nh-c-name { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; }
+.nh-corner[data-corner$="l"] .nh-c-name { align-items: flex-end; }
+.nh-corner .latin { font-family: var(--nh-latin); text-transform: uppercase; font-size: 11px; letter-spacing: .3em; font-weight: 400; line-height: 1.5; direction: ltr; unicode-bidi: isolate; color: var(--nh-accent); }
+.nh-corner b { font-size: clamp(20px, 1.9vw, 27px); font-weight: 500; line-height: 1.35; white-space: nowrap; }
+/* العنوان اللي جوه الصفحة نفسها بقى في الركن: مكانه بيفضل فاضي فوق، ولو الركن تحت بيتشال وبيتساب مكان تحت */
+#nh .nh-ptitle, :root:root .stage-head :is(.stage-title, .stage-ic) { visibility: hidden; }
+body.nh-cb #nh .nh-phead, :root:root body.nh-cb .stage-head :is(.stage-title, .stage-ic) { display: none; }
+body.nh-cb #nh .nh-pgrid, body.nh-cb #stageBody { margin-bottom: 92px; }
+body.nh-cl #nh .nh-ptop { grid-template-areas: "row row" "tabs head"; grid-template-columns: auto minmax(0, 1fr); }
+@media (max-width: 820px) { .nh-corner[data-corner^="t"] { top: 70px; } .nh-corner[data-corner$="r"] { right: 16px; } .nh-corner[data-corner$="l"] { left: 16px; } .nh-corner .nh-c-ic { width: 40px; height: 40px; } }
