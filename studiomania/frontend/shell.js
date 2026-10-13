@@ -1,17 +1,10 @@
 // StudioMania — الواجهة: الرئيسية (مربعات)، والشاشة الكبيرة اللي كل خطوة بتفتح فيها،
 // والتنقل بين خطوات الشغل بالترتيب ومعاك ناتج الخطوة اللي فاتت
 
-// برنامجين على نفس السيرفر: ستوديومانيا (/) وكوتشي (/kochi) — كوتشي فيه المشاريع (فيديو خام ← … ← نشر) بس
-const APP = /^\/kochi\/?$/.test(location.pathname) ? "kochi" : "studio";
-if (APP === "kochi") {
-  document.title = "Kochi Studio";
-  document.documentElement.classList.add("app-kochi");   // بيخفي أقسام ستوديومانيا (.studio-only) من الرئيسية القديمة
-}
-document.addEventListener("DOMContentLoaded", () => {
-  const w = document.querySelector("#home .wordmark");
-  if (APP === "kochi" && w) w.innerHTML = "<b>Kochi</b><span>Studio</span>";
-});
-const PROCESS = ["0", "1", "2", "6", "7"]; // المشاريع ← التقطيع ← التوليد ← المونتاج ← النشر
+// كوتشي (المشاريع: فيديو خام ← تقطيع ← توليد ← مونتاج ← نشر) اتفصل برنامج لوحده (فولدر kochi)،
+// فستوديومانيا مالوش خطوات مشروع: كل قسم بيفتح لوحده
+const APP = "studio";
+const PROCESS = [];
 const STEP_INFO = {
   0: { num: "01", title: "المشاريع", en: "Projects" },
   1: { num: "02", title: "التقطيع", en: "Cut" },
@@ -78,7 +71,7 @@ function openStage(step) {
   shell.step = step;
   const info = STEP_INFO[step] || { num: "", title: "" };
   // فوق العنوان: اسم القسم بالإنجليزي بحروف متباعدة، ورقم الخطوة لو جوه خطوات المشروع
-  $("stageNum").textContent = [info.en, info.num ? `${Number(info.num)} / 5` : ""].filter(Boolean).join(" · ");
+  $("stageNum").textContent = [info.en, info.num && PROCESS.includes(step) ? `${Number(info.num)} / 5` : ""].filter(Boolean).join(" · ");
   $("stageNum").hidden = !info.en && !info.num;
   $("stageTitle").textContent = info.title;
   const inFlow = PROCESS.includes(step);

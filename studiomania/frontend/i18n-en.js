@@ -3965,5 +3965,8 @@ window.I18N_EN = {
   "التصدير وقف": "Export stopped",
   "بيتصدّر": "Exporting",
   "مفيش مشاريع لسه. ابدأ واحد من «اعمل جديد».": "No projects yet. Start one from “Create”.",
-  "رجوع": "Back"
+  "رجوع": "Back",
+  "شغل كوتشي القديم": "Old Kochi work",
+  "امسحه من هنا": "Delete it here",
+  "{0} مشروع · {1} فيديو خام · {2} مونتاج": "{0} projects · {1} raw videos · {2} edits"
 };

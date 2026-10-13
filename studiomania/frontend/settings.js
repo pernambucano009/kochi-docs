@@ -55,7 +55,27 @@ $("logout").onclick = async () => {
   location.href = "/login";
 };
 
-viewHooks["settings"] = () => { loadSettings(); markLook(); loadSetAccounts(); loadSetCredit(); };
+viewHooks["settings"] = () => { loadSettings(); markLook(); loadSetAccounts(); loadSetCredit(); loadKochiOld(); };
+
+// ---------- شغل كوتشي القديم: اتنقل لبرنامج كوتشي لوحده، فبيتمسح من هنا بدوسة (بعد ما تتأكد إنه وصل هناك) ----------
+async function loadKochiOld() {
+  const k = await api("/api/admin/kochi-cleanup").catch(() => null);
+  const n = k ? k.folders + k.videos + k.projects : 0;
+  $("kochiOld").hidden = !n;
+  if (n) $("kochiOldInfo").textContent = `${k.folders} مشروع · ${k.videos} فيديو خام · ${k.projects} مونتاج`;
+}
+$("kochiOldWipe").onclick = async () => {
+  if (!confirm("اتأكدت إن كل شغل كوتشي وصل لبرنامج كوتشي الجديد؟\n\nهيتمسح من ستوديومانيا: مشاريع كوتشي بفيديوهاتها الخام وقطعها والفيديوهات المولّدة والمونتاج والفيديوهات اللي اتصدّرت منها (إلا اللي عليها بوست لسه متجدول).\nالشخصيات والتعليق الصوتي والموسيقى بيفضلوا.\n\nالمسح ده مينفعش يترجع.")) return;
+  const btn = $("kochiOldWipe");
+  btn.disabled = true;
+  try {
+    const r = await api("/api/admin/kochi-cleanup", { method: "POST" });
+    toast(`✅ اتمسح شغل كوتشي القديم · فضي ${fmtMb(r.freed_mb)}${r.kept ? ` · فضل ${r.kept} عليه بوست متجدول` : ""}`);
+    loadKochiOld();
+    loadStorage();
+  } catch (err) { toast(err.message, true); }
+  btn.disabled = false;
+};
 
 // ---------- الحسابات المربوطة (من Zernio) ----------
 async function loadSetAccounts() {

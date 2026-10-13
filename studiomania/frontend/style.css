@@ -2605,3 +2605,8 @@ dialog.cal-dlg { width: min(720px, 94vw); max-height: 90vh; border: 1px solid va
 :root:not(.app-kochi) .stage .audio-list .dur { background: none; font-family: var(--display); font-weight: 400; font-size: 12.5px; color: var(--muted); }
 :root:not(.app-kochi) .stage .audio-list .progress { height: 4px; background: var(--line); }
 :root:not(.app-kochi) .stage .audio-tools input, :root:not(.app-kochi) .stage .audio-tools select { border-radius: 999px; padding: 10px 16px; }
+.kochi-old { display: flex; align-items: center; gap: 12px; background: color-mix(in srgb, var(--accent) 10%, transparent); border-radius: 16px; padding: 12px 14px; }
+.kochi-old[hidden] { display: none; }
+.kochi-old span { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.kochi-old b { font-weight: 500; }
+.kochi-old small { color: var(--muted); font-size: 12.5px; }

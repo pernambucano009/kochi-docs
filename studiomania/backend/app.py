@@ -562,14 +562,16 @@ async def require_login(request: Request, call_next):
         return response
     if path.startswith("/api/"):
         return JSONResponse({"detail": "لازم تسجّل دخول"}, status_code=401)
-    return RedirectResponse("/login?next=/kochi" if path.rstrip("/") == "/kochi" else "/login")
+    if path.rstrip("/") == "/kochi":
+        return kochi_page()
+    return RedirectResponse("/login")
 
 
 @app.get("/kochi")
 @app.get("/kochi/")
 def kochi_page():
-    """🏋️ برنامج كوتشي: نفس السيرفر، رئيسية لوحدها فيها المشاريع (الفيديو الخام ← التقطيع ← التوليد ← المونتاج ← النشر)."""
-    return html_page("index.html")
+    """كوتشي اتفصل برنامج لوحده (فولدر kochi). اللينك القديم بيوديك عليه لو KOCHI_URL متسجل، وإلا للرئيسية."""
+    return RedirectResponse((os.environ.get("KOCHI_URL") or "").strip() or "/")
 
 
 @app.get("/health")
@@ -2797,6 +2799,73 @@ def wipe_storage(section: str):
     return {"deleted": gone, "kept": kept, "freed_mb": round(max(0, shutil.disk_usage(DATA_DIR).free - before) / 2**20, 1)}
 
 
+# مسح شغل كوتشي القديم من ستوديومانيا (بعد ما اتنقل لبرنامج كوتشي لوحده): كل المشاريع بفيديوهاتها الخام وقطعها
+# والفيديوهات المولّدة ومشاريع المونتاج والفيديوهات اللي اتصدّرت منها (إلا اللي عليها بوست لسه متجدول)، وشغل الأوتوبايلوت.
+# الشخصيات والتعليق والموسيقى بيفضلوا، لأن ستوديومانيا بيستخدمهم.
+def kochi_leftovers(conn: sqlite3.Connection) -> dict:
+    coach = sum(1 for r in conn.execute("SELECT data FROM projects") if (json.loads(r["data"]).get("section") or "coach") == "coach")
+    return {"folders": conn.execute("SELECT COUNT(*) FROM folders").fetchone()[0],
+            "videos": conn.execute("SELECT COUNT(*) FROM videos").fetchone()[0], "projects": coach}
+
+
+@app.get("/api/admin/kochi-cleanup")
+def kochi_cleanup_info():
+    with closing(db()) as conn:
+        return kochi_leftovers(conn)
+
+
+@app.post("/api/admin/kochi-cleanup")
+def kochi_cleanup():
+    before = shutil.disk_usage(DATA_DIR).free
+    files, kept = [], 0
+    with closing(db()) as conn, conn:
+        # أي فيديو خام مستخدم في مشروع مونتاج تبع ستوديومانيا (مسلسل / إعلان / مونتاج حر) بيفضل هو ومشروعه
+        studio = " ".join(r["data"] for r in conn.execute("SELECT data FROM projects")
+                          if json.loads(r["data"]).get("section") in ("series", "ads", "free"))
+        used = lambda vid, fn: bool(vid) and (vid in studio or (fn or "\0") in studio)  # noqa: E731
+        vids = {r["id"]: r["filename"] for r in conn.execute("SELECT id, filename FROM videos")}
+        for r in conn.execute("SELECT id, video_id FROM folders").fetchall():
+            if used(r["video_id"], vids.get(r["video_id"])):
+                kept += 1
+                continue
+            x = purge_folder(conn, r["id"], True)
+            files += x["files"]
+            kept += x["kept"]
+        # فيديوهات خام ملهاش مشروع: هي وقطعها والفيديوهات المولّدة منها
+        for v in conn.execute("SELECT id, filename FROM videos").fetchall():
+            if used(v["id"], v["filename"]):
+                continue
+            for g in conn.execute("SELECT output_filename, status FROM generations WHERE video_id = ?", (v["id"],)).fetchall():
+                if g["status"] in ACTIVE_STATUSES:
+                    raise HTTPException(400, "فيه فيديو لسه بيتولّد. استنى لما يخلص")
+                if g["output_filename"]:
+                    files.append(GENERATED_DIR / g["output_filename"])
+            conn.execute("DELETE FROM generations WHERE video_id = ?", (v["id"],))
+            remove_video(conn, v["id"])
+        # مشاريع مونتاج كوتشي اللي فضلت (من غير فيديو خام)، والفيديوهات اللي اتصدّرت منها
+        for p in conn.execute("SELECT id, data, export_id, render_status FROM projects").fetchall():
+            if (json.loads(p["data"]).get("section") or "coach") != "coach" or p["render_status"] == "rendering":
+                continue
+            if p["export_id"]:
+                e = conn.execute("SELECT filename FROM exports WHERE id = ?", (p["export_id"],)).fetchone()
+                if e and conn.execute("SELECT COUNT(*) FROM posts WHERE export_id = ? AND status IN ('scheduled', 'sending', 'publishing')",
+                                      (p["export_id"],)).fetchone()[0]:
+                    kept += 1
+                elif e:
+                    conn.execute("DELETE FROM exports WHERE id = ?", (p["export_id"],))
+                    files.append(EXPORTS_DIR / e["filename"])
+            conn.execute("DELETE FROM projects WHERE id = ?", (p["id"],))
+    for f in files:
+        f.unlink(missing_ok=True)
+    with AUTOPILOT_LOCK:
+        d = autopilot_load()
+        d["jobs"] = []
+        autopilot_save(d)
+    with closing(db()) as conn:
+        left = kochi_leftovers(conn)
+    return {**left, "kept": kept, "freed_mb": round(max(0, shutil.disk_usage(DATA_DIR).free - before) / 2**20, 1)}
+
+
 @app.post("/api/storage/clean")
 def clean_storage():
     """بيمسح الملفات المؤقتة بس (صور التايم لاين وبقايا التصدير)، وهي بتتعمل تاني لوحدها لما تحتاجها."""
@@ -3993,7 +4062,9 @@ def autopilot_loop() -> None:
             pass
 
 
-threading.Thread(target=autopilot_loop, daemon=True).start()
+# الأوتوبايلوت بتاع مشاريع كوتشي، وكوتشي اتفصل برنامج لوحده: لو اشتغل هنا كمان هيولّد ويجدول نفس الفيديو مرتين
+if os.environ.get("AUTOPILOT_ON") == "1":
+    threading.Thread(target=autopilot_loop, daemon=True).start()
 
 
 @app.get("/api/autopilot")
