@@ -3,7 +3,7 @@
    الحد بيبان بس كسنيك بيلف حوالين المربع وقت الهوفر، ولما تدوس الكاميرا بتقرّب على المربع لحد ما يبقى الشاشة.
    المسرح في النص فيه مجسّم زجاج 3D (three.js) لكل مربع. */
 #nh {
-  --nh-bg: #ffffff; --nh-ink: #141416; --nh-muted: #85858c; --nh-accent: #e8402f; --nh-ok: #2f8f6b;
+  --nh-bg: #ffffff; --nh-ink: #141416; --nh-muted: #85858c; --nh-accent: #E5613E; --nh-ok: #2f8f6b;
   --nh-fill: rgba(20,20,22,.045); --nh-fill-hi: rgba(20,20,22,.1); --nh-line: rgba(20,20,22,.22);
   --nh-g1: rgba(30,30,36,.9); --nh-g2: rgba(30,30,36,.22); --nh-gshadow: rgba(0,0,0,.14);
   --nh-latin: "Jost", "Futura", "Century Gothic", system-ui, sans-serif;
@@ -11,7 +11,7 @@
   --nh-r: 24px; --nh-gap: 12px; --nh-ease: cubic-bezier(.65,0,.35,1);
 }
 :root[data-nh-theme="dark"] #nh, :root[data-nh-theme="dark"] .nh-frame {
-  --nh-bg: #0c0c0e; --nh-ink: #f1f1f3; --nh-muted: #8a8a92; --nh-accent: #ff4a3d; --nh-ok: #5fd1a4;
+  --nh-bg: #0c0c0e; --nh-ink: #f1f1f3; --nh-muted: #8a8a92; --nh-accent: #F0754F; --nh-ok: #5fd1a4;
   --nh-fill: rgba(255,255,255,.05); --nh-fill-hi: rgba(255,255,255,.12); --nh-line: rgba(255,255,255,.25);
   --nh-g1: rgba(255,255,255,.9); --nh-g2: rgba(255,255,255,.14); --nh-gshadow: rgba(0,0,0,.6);
 }
@@ -47,15 +47,39 @@ body.stage-settled #nh { visibility: hidden; }
 .nh-switch .knob { position: absolute; top: 3px; inset-inline-start: 3px; width: 16px; height: 16px; border-radius: 50%; background: var(--nh-ink); transition: inset-inline-start .45s var(--nh-ease); }
 :root[data-nh-theme="light"] .nh-switch .knob { inset-inline-start: 23px; }
 
-/* المربعات (RTL: أول عمود في كل سطر هو اللي على اليمين) */
-.nh-bento { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); grid-template-rows: repeat(6, minmax(0, 1fr)); gap: var(--nh-gap); min-height: 0;
-  grid-template-areas:
-    "c c c s s s s s s b b b"
-    "c c c s s s s s s b b b"
-    "c c c s s s s s s b b b"
-    "c c c s s s s s s a a a"
-    "u u u w w w w w w a a a"
-    "u u u w w w w w w g g g"; }
+/* الرئيسية (نسخة أ): المجسّم في النص، الأقسام مكتوبة على الجنبين، و«ابدأ مشروع جديد» تحته (RTL: أول عمود على اليمين) */
+.nh-bento { display: grid; grid-template-columns: minmax(230px, 1fr) minmax(0, 2.3fr) minmax(230px, 1fr); grid-template-rows: minmax(0, 1fr) auto auto; gap: 6px var(--nh-gap); min-height: 0;
+  grid-template-areas: "r s l" "r c l" "k k k"; }
+.nh-col { display: flex; flex-direction: column; justify-content: space-evenly; gap: 6px; min-height: 0; padding-block: 10px; }
+.nh-col-r { grid-area: r; align-items: flex-start; }
+.nh-col-l { grid-area: l; align-items: flex-end; }
+.nh-side { padding: 14px 20px; gap: 6px; max-width: 100%; }
+.nh-side > .nh-head { justify-content: flex-start; }
+.nh-col-l .nh-side { align-items: flex-end; text-align: end; }
+.nh-col-l .nh-side .nh-name { align-items: flex-end; }
+/* المجسّم في النص هو الأيقونة، فالأيقونة الصغيرة بتبان بس وهي طايرة لعنوان الصفحة */
+.nh-side > .nh-head > .gi, .nh-side > .nh-head > .nh-plate, .nh-cta > .nh-head > .gi { position: absolute; opacity: 0; pointer-events: none; }
+.nh-side .nh-name .latin { font-size: 11px; }
+.nh-side .nh-name b { font-size: clamp(20px, 1.9vw, 27px); font-weight: 500; line-height: 1.35; }
+.nh-meta { color: var(--nh-muted); font-size: 12.5px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.nh-meta em { font-style: normal; color: var(--nh-accent); }
+.nh-col-l .nh-meta { justify-content: flex-end; }
+.nh-mbar { width: 90px; height: 4px; border-radius: 99px; background: var(--nh-fill-hi); overflow: hidden; display: block; }
+.nh-mbar i { display: block; height: 100%; border-radius: inherit; background: var(--nh-accent); }
+.nh-cta { grid-area: c; justify-self: center; flex-direction: row; align-items: center; padding: 15px 42px; border-radius: 99px; background: var(--nh-accent); color: #fff;
+  box-shadow: 0 14px 34px -10px color-mix(in srgb, var(--nh-accent) 80%, transparent); transition: transform .5s var(--nh-ease), box-shadow .5s var(--nh-ease); }
+.nh-cta:hover, .nh-cta:focus-visible { box-shadow: 0 18px 42px -8px color-mix(in srgb, var(--nh-accent) 90%, transparent); }
+.nh-cta .nh-name .latin { display: none; }
+.nh-cta .nh-name b { font-size: 16px; color: #fff; }
+.nh-cta .nh-snake rect { stroke: #fff; }
+.nh-cont-wrap { grid-area: k; display: flex; justify-content: center; padding-top: 6px; }
+.nh-line.nh-cont { display: flex; align-items: center; gap: 12px; padding: 7px 22px 7px 8px; border-radius: 99px; background: var(--nh-fill); }
+[dir="ltr"] .nh-line.nh-cont { padding: 7px 8px 7px 22px; }
+.nh-line.nh-cont:hover { background: var(--nh-fill-hi); }
+.nh-cplay { width: 36px; height: 36px; border-radius: 50%; background: var(--nh-ink); color: var(--nh-bg); display: grid; place-items: center; flex: none; }
+.nh-ctxt { display: flex; flex-direction: column; line-height: 1.35; min-width: 0; }
+.nh-ctxt small { color: var(--nh-muted); font-size: 11.5px; }
+.nh-ctxt b { font-weight: 500; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 46ch; }
 .nh-tile { position: relative; border-radius: var(--nh-r); display: flex; flex-direction: column; padding: 16px 18px; min-width: 0; min-height: 0; cursor: pointer; text-align: start;
   transition: transform .5s var(--nh-ease); isolation: isolate; }
 .nh-tile:hover:not(:has(.nh-tile:hover, .nh-line:hover)), .nh-tile:focus-visible { transform: translateY(-3px); }
@@ -141,12 +165,12 @@ body.stage-settled #nh { visibility: hidden; }
 .nh-stage .gl canvas { width: 100% !important; height: 100% !important; display: block; }
 .nh-stage .slot { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 14px; text-align: center; padding: 30px;
   transition: opacity .55s var(--nh-ease), transform .55s var(--nh-ease); pointer-events: none; will-change: opacity, transform; }
-.nh-stage.has-gl .slot { place-content: end center; padding-bottom: 6%; gap: 10px; }
+.nh-stage.has-gl .slot { place-content: end center; padding-bottom: 3%; gap: 8px; }
 .nh-stage .slot.out { opacity: 0; transform: translateY(8px); }
 .nh-stage .big { width: min(34%, 200px); aspect-ratio: 1; animation: nh-float 7s ease-in-out infinite; }
 .nh-stage .big .gi { width: 100%; height: 100%; }
 @keyframes nh-float { 50% { transform: translateY(-12px); } }
-.nh-stage h1 { margin: 0; font-size: clamp(17px, 1.6vw, 24px); font-weight: 300; }
+.nh-stage h1 { margin: 0; font-size: clamp(18px, 1.9vw, 28px); font-weight: 400; letter-spacing: .42em; }
 .nh-stage .ar { font-size: 15px; font-weight: 500; }
 .nh-stage p { margin: 0; color: var(--nh-muted); max-width: 36ch; font-size: 13px; }
 
@@ -185,10 +209,16 @@ body.stage-settled #nh { visibility: hidden; }
   #nh { position: relative; min-height: 100%; }
   .nh-home { height: auto; }
   .nh-top { height: auto; flex-wrap: wrap; }
-  .nh-bento { grid-template-columns: 1fr; grid-template-rows: none; grid-auto-rows: minmax(140px, auto); grid-template-areas: none; }
+  .nh-bento { grid-template-columns: 1fr; grid-template-rows: none; grid-template-areas: none; }
   .nh-bento > * { grid-area: auto !important; }
-  .nh-bento > .nh-stage { min-height: 300px; order: -2; }
-  .nh-bento > .nh-create { order: -1; }
+  .nh-bento > .nh-stage { min-height: 300px; order: -3; }
+  .nh-bento > .nh-cta { order: -2; }
+  .nh-bento > .nh-cont-wrap { order: -1; }
+  .nh-col { padding-block: 0; }
+  .nh-col, .nh-col-l { align-items: stretch; }
+  .nh-col-l .nh-side, .nh-col-l .nh-side .nh-name { align-items: flex-start; text-align: start; }
+  .nh-col-l .nh-meta { justify-content: flex-start; }
+  .nh-side { background: var(--nh-fill); }
   .nh-page { position: fixed; overflow: auto; }
   .nh-pgrid { grid-template-columns: 1fr; grid-template-rows: none; grid-auto-rows: minmax(150px, auto); }
   .nh-pgrid > * { grid-column: auto !important; grid-row: auto !important; }

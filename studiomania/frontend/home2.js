@@ -64,7 +64,6 @@ const NH = (() => {
     motion: { en: "Motion", ar: "مكتبة الموشن", icon: "clapper", page: "motion", desc: "أنيميشنات مكتوبة بالكود، كل واحدة تتضاف للأصول بضغطة." },
   };
   // «فيديو من تصويرك» (المشاريع) بقى برنامج كوتشي لوحده على /kochi، فمش في ستوديومانيا
-  const CREATE_KIDS = ["reel", "series", "carousel", "ad"];
   const CREATE_ALL = ["reel", "series", "carousel", "ad", "typo", "dub", "edit"];
   const SEC = { series: ["مسلسل", "6s"], ads: ["إعلان", "6a"], free: ["مونتاج حر", "6f"] };
   const STEPS5 = ["المشروع", "التقطيع", "التوليد", "المونتاج", "النشر"];
@@ -76,17 +75,13 @@ const NH = (() => {
   };
   const iconOf = (k) => (k === "brand" ? `<div class="nh-plate">${brandMark()}</div>` : gi(k));
   const head = (id) => `<div class="nh-head"><div class="nh-name"><span class="latin">${T[id].en}</span><b>${T[id].ar}</b></div>${iconOf(T[id].icon)}</div>`;
-  const kid = (id) => `<div class="nh-tile" data-id="${id}" tabindex="0" role="button" aria-label="${esc(T[id].ar)}">${head(id)}</div>`;
   const dots = (n, at) => `<div class="nh-dots">${Array.from({ length: n }, (_, i) => `<i class="${i < at ? "done" : i === at ? "now" : ""}"></i>`).join("")}</div>`;
-  const hexes = (txt) => [...String(txt || "").matchAll(/#[0-9a-fA-F]{6}\b/g)].map((m) => m[0]).slice(0, 5);
   function brainPct(b) {
     if (!b) return 0;
     const keys = ["about", "audience", "rules", "palette", "typography", "styles", "market", "language", "cta"];
     const have = keys.filter((k) => String(b[k] || "").trim()).length + ((b.logos || []).length ? 1 : 0);
     return Math.round((have / (keys.length + 1)) * 100);
   }
-  const styleNames = (b) => String(b?.styles || "").split(",").map((id) => D.cats.find((c) => c.id === id)).filter(Boolean)
-    .map((c, i) => (i ? c.ar : `⭐ ${c.ar}`)).join("، ");
   function lineHTML(f) {
     if (f.section) {   // ستوديومانيا: مشروع مونتاج (مسلسل / إعلان / مونتاج حر)
       return `<div class="nh-line" data-proj="${esc(f.id)}" tabindex="0" role="button"><b>${esc(f.name)}</b><span class="nh-sec">${esc(SEC[f.section]?.[0] || "")}</span><span class="step">${f.render_status === "done" ? "اتصدّر" : "مونتاج"}</span></div>`;
@@ -95,27 +90,33 @@ const NH = (() => {
     return `<div class="nh-line" data-folder="${esc(f.id)}" tabindex="0" role="button"><b>${esc(f.name)}</b>${dots(5, s.done)}<span class="step">${STEPS5[s.done] || ""}</span></div>`;
   }
 
-  const TILE = {
-    create: () => KOCHI ? `${head("create")}<p class="nh-lead">${esc(T.create.desc)}</p><div class="nh-steps5">${STEPS5.map((x, i) => `<span><i class="num">${i + 1}</i>${esc(x)}</span>`).join("")}</div>`
-      : `${head("create")}<p class="nh-lead">اختار نوع الشغل وكمّل خطوة خطوة.</p><div class="nh-kids">${CREATE_KIDS.map(kid).join("")}</div>`,
-    brand: () => {
-      const b = D.brand, c = clientx?.cur, pct = brainPct(b);
-      return `${head("brand")}<div class="nh-brandrow"><div><b>${esc(c?.name || "اختار عميل")}</b><div class="nh-sw">${hexes(b?.palette).map((h) => `<i style="background:${h}"></i>`).join("")}</div></div></div>
-        <div class="nh-lines-txt">${b?.audience ? `<span><b>الجمهور:</b> ${esc(b.audience)}</span>` : ""}${styleNames(b) ? `<span><b>الستايل:</b> ${esc(styleNames(b))}</span>` : ""}${b?.language ? `<span><b>اللهجة:</b> ${esc(b.language)}</span>` : ""}</div>
-        <div class="nh-meter"><small><span>العقل مكتمل</span><span class="num">${pct}%</span></small><div class="bar"><i style="width:${pct}%"></i></div></div>`;
+  // ---------- الرئيسية (نسخة أ): المجسّم في النص، والأقسام مكتوبة على الجنبين، و«ابدأ مشروع جديد» تحت المجسّم ----------
+  const SIDE_R = ["brand", "assets"], SIDE_L = ["progress", "publish", "settings"];   // RTL: أول عمود على اليمين
+  const META = {
+    brand: () => { const pct = brainPct(D.brand); return `<span class="nh-mbar"><i style="width:${pct}%"></i></span><span>مكتمل <span class="num">${pct}%</span></span>`; },
+    assets: () => `<span>${D.coaches.length} شخصية · ${D.voices} تعليق · ${D.music} موسيقى</span>`,
+    progress: () => {
+      const n = D.work.length, r = D.work.filter((p) => p.render_status === "rendering").length;
+      return `<span>${n ? `${n} مشروع${r ? ` · ${r} بيتصدّر دلوقتي` : ""}` : "مفيش مشاريع لسه"}</span>`;
     },
-    assets: () => `${head("assets")}<div class="nh-kids mini" style="grid-template-rows:repeat(3,minmax(0,1fr))">${["coaches", "voice", "music"].map(kid).join("")}</div>`,
-    settings: () => `${head("settings")}<div class="nh-credit">${D.money ? `<span class="num">$${D.money.balance.toFixed(2)}</span><small>رصيد Atlas</small>` : `<small>الرصيد بيظهر لما مفتاح Atlas يتسجّل</small>`}</div>`,
-    progress: () => `${head("progress")}<div class="nh-lines">${D.work.length ? D.work.slice(0, 4).map(lineHTML).join("") : `<div class="nh-empty">مفيش مشاريع لسه. ابدأ من «${KOCHI ? "مشروع جديد" : "اعمل جديد"}».</div>`}</div>`,
     publish: () => {
-      const P = D.publisher, acc = P?.accounts || {};
-      const up = D.posts.filter((p) => p.status === "scheduled").length;
-      return `${head("publish")}<div class="nh-plats">${Object.entries(P?.platforms || {}).slice(0, 4).map(([k, label]) =>
-        `<div class="nh-plat ${acc[k] ? "on" : ""}"><span class="dot"></span>${esc(label)}<span class="pages">${acc[k] ? esc(acc[k].name || "مربوط") : "مش مربوط"}</span></div>`).join("")}</div>
-        <div class="nh-body">${up ? `${up} بوست متجدول` : "مفيش بوستات متجدولة"}</div>`;
+      const up = D.posts.filter((p) => p.status === "scheduled").length, bad = D.posts.filter((p) => p.status === "failed").length;
+      return `<span>${up ? `${up} بوست متجدول` : "مفيش بوستات متجدولة"}${bad ? ` · <em>${bad} فشل</em>` : ""}</span>`;
     },
+    settings: () => `<span>${D.money ? `رصيد Atlas · <span class="num">$${D.money.balance.toFixed(2)}</span>` : "المفاتيح والرصيد والعملاء"}</span>`,
   };
-  const AREA = { create: "c", brand: "b", assets: "a", settings: "g", progress: "w", publish: "u" };
+  const side = (id) => `<div class="nh-tile nh-side" data-id="${id}" tabindex="0" role="button" aria-label="${esc(T[id].ar)}">${head(id)}<div class="nh-meta">${META[id]()}</div></div>`;
+  const cta = () => `<div class="nh-tile nh-cta nh-gen" data-id="create" tabindex="0" role="button" aria-label="ابدأ مشروع جديد">
+      <div class="nh-head"><div class="nh-name"><span class="latin">Create</span><b>ابدأ مشروع جديد</b></div>${gi("create")}</div></div>`;
+  function contHTML() {   // آخر مشروع اتعدّل: «كمّل من مكان ما وقفت»
+    const p = [...D.work].sort((a, b) => String(b.updated_at || b.created_at || "").localeCompare(String(a.updated_at || a.created_at || "")))[0];
+    if (!p) return "";
+    const where = p.section ? (p.render_status === "done" ? "اتصدّر" : "المونتاج") : STEPS5[folderStage(p).done] || "";
+    const attr = p.section ? `data-proj="${esc(p.id)}"` : `data-folder="${esc(p.id)}"`;
+    return `<div class="nh-cont-wrap nh-gen"><div class="nh-line nh-cont" ${attr} tabindex="0" role="button">
+        <span class="nh-cplay" aria-hidden="true"><svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg></span>
+        <span class="nh-ctxt"><small>كمّل من مكان ما وقفت</small><b>${esc(p.name)} · ${esc(where)}</b></span></div></div>`;
+  }
 
   // ---------- الهيكل ----------
   host.innerHTML = `<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
@@ -137,14 +138,16 @@ const NH = (() => {
       <header class="nh-ptop"><button class="nh-back" id="nhBack"><span aria-hidden="true">→</span><span class="latin">Back</span></button><div class="nh-ptitle" id="nhPTitle"></div></header>
       <div class="nh-pgrid" id="nhPGrid"></div>
     </section>`;
+
   const bento = document.getElementById("nhBento"), home = document.getElementById("nhHome");
   const page = document.getElementById("nhPage"), pGrid = document.getElementById("nhPGrid"), pTitle = document.getElementById("nhPTitle");
 
   function renderTiles() {
     const stageEl = document.getElementById("nhStage");
-    const html = Object.keys(TILE).map((id) => `<div class="nh-tile ${id === "create" ? "nh-create" : ""}" data-id="${id}" tabindex="0" role="button" aria-label="${esc(T[id].ar)}" style="grid-area:${AREA[id]}">${TILE[id]()}</div>`).join("");
-    if (stageEl) { bento.querySelectorAll(":scope > .nh-tile").forEach((t) => t.remove()); bento.insertAdjacentHTML("afterbegin", html); }
-    else bento.innerHTML = html + `<section class="nh-stage" id="nhStage" aria-live="polite" style="grid-area:s"><div class="slot" id="nhSlotA"></div><div class="slot out" id="nhSlotB"></div></section>`;
+    const html = `<nav class="nh-col nh-col-r nh-gen" aria-label="الأقسام">${SIDE_R.map(side).join("")}</nav>`
+      + `<nav class="nh-col nh-col-l nh-gen" aria-label="الأقسام">${SIDE_L.map(side).join("")}</nav>` + cta() + contHTML();
+    if (stageEl) { bento.querySelectorAll(":scope > .nh-gen").forEach((t) => t.remove()); bento.insertAdjacentHTML("afterbegin", html); }
+    else bento.innerHTML = html + `<section class="nh-stage" id="nhStage" aria-live="polite"><div class="slot" id="nhSlotA"></div><div class="slot out" id="nhSlotB"></div></section>`;
     bento.querySelectorAll(".nh-tile").forEach(addSnake);
     const c = clientx?.cur;
     document.getElementById("nhClientAv").innerHTML = brandMark();
@@ -175,7 +178,7 @@ const NH = (() => {
   function stageHTML(key) {
     const big = (k) => (GL ? "" : `<div class="big">${iconOf(k)}</div>`);
     if (!key && KOCHI) return `${big("app")}<h1 class="latin">Kochi Studio</h1><div class="ar">فيديوهات مدربين كوتشي</div><p>ابدأ من «مشروع جديد»، أو كمّل مشروع من «شغّال عليه».</p>`;
-    if (!key) return `${big("app")}<h1 class="latin">StudioMania</h1><div class="ar">استوديو المحتوى والفيديو</div><p>ابدأ من «اعمل جديد»، أو كمّل مشروع من اللي تحت.</p>`;
+    if (!key) return `${big("app")}<h1 class="latin">StudioMania</h1><div class="ar">استوديو المحتوى والفيديو</div>`;
     if (key.startsWith("f:")) {
       const f = D.folders.find((x) => x.id === key.slice(2)), s = folderStage(f);
       return `${big("pulse")}<h1 class="latin">Continue</h1><div class="ar">${esc(f?.name)}</div><p>الخطوة ${s.done + 1} من 5: ${STEPS5[s.done] || ""}. دوس عشان تكمّل.</p>`;
