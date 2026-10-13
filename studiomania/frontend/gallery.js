@@ -28,12 +28,16 @@ const Gallery = (() => {
   };
   const CAT_EN = { cartoon2d: "2D Cartoon", anim3d: "3D Animation", paper: "Paper", clay: "Clay", collage: "Collage", motion: "Motion", ugc: "UGC", cinematic: "Cinematic", product: "Product" };
 
+  // فيديوهات عرض جاهزة للقوالب (متعمولة مرة واحدة ومحفوظة في frontend/gallery)
+  const SHOW = ["sk-clay", "sk-papercut", "sk-ugc", "sk-cinema-ad", "sk-skeleton", "sk-talking", "sk-song",
+    "sk-studio-shot", "sk-product-scene", "sk-static-ads"];
   async function load() {
     const [tpls, cats] = await Promise.all([api("/api/templates"), api("/api/style-cats").catch(() => [])]);
     const catOf = {};
     cats.forEach((c) => (c.templates || []).forEach((t) => (catOf[t.id] = c.id)));
     S.cats = cats;
-    S.items = [...tpls.map((t) => ({ ...t, cat: catOf[t.id] || "other" })), ...EXTRA];
+    S.items = [...tpls.map((t) => ({ ...t, ...(SHOW.includes(t.id) ? { sample_url: `/gallery/${t.id}.mp4`, cover_url: `/gallery/${t.id}.jpg` } : {}),
+      cat: catOf[t.id] || "other" })), ...EXTRA];
   }
   const catName = (id) => S.cats.find((c) => c.id === id)?.ar || "تانية";
   function chips() {
