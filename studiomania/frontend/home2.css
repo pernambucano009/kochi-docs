@@ -1147,3 +1147,4 @@ body.nh-cl #nh .nh-ptop { grid-template-areas: "row row" "tabs head"; grid-templ
 @media (max-width: 820px) { .flw-row > div { grid-template-columns: minmax(0, 1fr); } }
 /* الصفحة متتحركش بالعرض على الموبايل (عناصر الرئيسية المتكبّرة كانت بتطلع برّه الشاشة) */
 html { overflow-x: clip; }
+.flw-fit { padding: 8px 12px; border-radius: 12px; background: var(--soft); color: var(--ink); }

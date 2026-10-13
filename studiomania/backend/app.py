@@ -18733,6 +18733,78 @@ def flow_template(tid: str, name: str, cat: str, desc: str) -> dict:
     return {"id": tid, "name": name or t.get("name", ""), "cat": cat, "desc": desc or t.get("uses", ""), "kind": kind}
 
 
+def flow_profile(tpl: dict) -> str:
+    """بطاقة تعريف القالب للمخ: شكله وتسلسله وخاناته واللي ينفع فيه واللي مينفعش، عشان الأفكار تتبني عليه هو بالذات."""
+    kind, tid = tpl.get("kind"), tpl.get("id", "")
+    out = []
+    if kind == "motion":
+        html = (MOTION_DIR / "r" / Path(tid).name / "reel.html").read_text(encoding="utf-8")
+        head = re.search(r"<script>\s*((?://[^\n]*\n\s*)+)", html)
+        if head:
+            out.append("القالب بيعمل إيه بالظبط: " + " ".join(l.strip().lstrip("/").strip() for l in head.group(1).splitlines() if l.strip()))
+        dur = re.search(r"\bDUR\s*=\s*([\d.]+)", html)
+        if dur:
+            out.append(f"مدته ثابتة: {dur.group(1)} ثانية تقريبًا.")
+        schema = fz.motion_schema(MOTION_DIR / "r" / Path(tid).name / "reel.html")
+        rows = []
+        for v in schema.values():
+            if v.get("kind") == "color":
+                continue
+            ex = v.get("def")
+            ex = " / ".join(map(str, ex)) if isinstance(ex, list) else str(ex or "")
+            rows.append(f"- {v.get('label', '')}: مثال «{ex[:220]}»")
+        if rows:
+            out.append("الخانات اللي بتتغير في القالب (والباقي شكل وحركة ثابتين مبيتغيروش):\n" + "\n".join(rows))
+        out.append("يعني: الفكرة لازم تتحكي بالكامل جوه الخانات دي وبنفس تسلسل القالب. مفيش مشاهد أو شخصيات أو أماكن جديدة غير اللي القالب بيرسمها، "
+                   "الكلام بس (والألوان) هو اللي بيتغير. خلي الكلام بنفس طول الأمثلة تقريبًا.")
+    elif kind == "typo":
+        out.append("القالب ده كلام بس بيتحرك على الإيقاع (من غير صور ولا شخصيات ولا مشاهد): الكلمات نفسها هي البطل. "
+                   "الفكرة لازم تبقى جملة/رسالة قوية تتقال بصوت: سؤال وإجابته، قايمة سريعة، اعتراف، مقارنة بالكلام، أو جملة بتتبني كلمة كلمة.")
+    else:
+        try:
+            t = tpl_load(tid)
+        except HTTPException:
+            t = {}
+        if t.get("uses"):
+            out.append(f"مناسب لـ: {t['uses']}")
+        if t.get("sample_brief"):
+            out.append(f"مثال فكرة اتعملت عليه: {t['sample_brief']}")
+        sc = t.get("scene") or {}
+        if sc.get("writer"):
+            out.append("طريقة الحكي في القالب: " + sc["writer"].strip())
+        if sc.get("devices"):
+            out.append(f"اللي بيتشاف في القالب (بالإنجليزي): {sc['devices']}")
+        if sc.get("motion_rule"):
+            out.append(f"الحركة: {sc['motion_rule']}")
+        if sc.get("negative"):
+            out.append(f"اللي مينفعش يظهر في الصورة (بالإنجليزي): {sc['negative']}")
+        if t.get("mode") == "scenes":
+            out.append("الفيديو مشاهد ١٠ ثواني متولّدة بنفس الستايل، والكلام بيتقال فويس أوفر (مفيش كلام مكتوب جوه الصورة).")
+        cfg = t.get("ad_cfg") or {}
+        if cfg:
+            hero = {"person": "شخص حقيقي بيتكلم للكاميرا", "product": "المنتج نفسه", "plate": "شخصية واحدة ثابتة"}.get(cfg.get("hero"), cfg.get("hero", ""))
+            out.append(f"نوعه إعلان «{cfg.get('kind', '')}»، البطل: {hero}" + ("، ومحتاج صورة المنتج." if cfg.get("needs_product") else "."))
+        if t.get("mode") == "still":
+            out.append("ده قالب صور ثابتة (من غير فيديو): الفكرة لازم تتشاف في صورة واحدة أو كام صورة للمنتج.")
+        sch = t.get("schema") or {}
+        if not sc and sch.get("summary"):
+            out.append(f"شكله: {sch['summary']}")
+        beats = [b.get("what", "") for b in sch.get("beats") or [] if b.get("what") and not str(b.get("what")).startswith("مشهد ")]
+        if beats and t.get("mode") not in ("ad", "still"):
+            out.append("تسلسل القالب: " + " ← ".join(beats[:10]))
+    return "\n".join(out)[:3500]
+
+
+def flow_tpl(d: dict) -> dict:
+    tpl = d["template"]
+    if "profile" not in tpl:
+        try:
+            tpl = {**tpl, "profile": flow_profile(tpl)}
+        except (OSError, ValueError):
+            tpl = {**tpl, "profile": ""}
+    return tpl
+
+
 def flow_llm(messages: list[dict], what: str) -> dict:
     return ad_json(series_chat(messages), what)
 
@@ -18756,11 +18828,11 @@ def flow_gen_ideas(fid: str, hint: str = "", more: bool = False) -> None:
     avoid = [i.get("title", "") for i in d.get("ideas") or []]
     k = len(avoid)
     if atlas.mock_mode():
-        raw = fz.mock_ideas(3, k)
+        raw = fz.mock_ideas(3, k, d["template"].get("name", ""))
     else:
-        raw = flow_llm(fz.ideas_messages(az.brain_text(brain, d["template"]["name"]), fz.prefs_text(brain), d["template"], flow_assets_list(d),
+        raw = flow_llm(fz.ideas_messages(az.brain_text(brain, d["template"]["name"]), fz.prefs_text(brain), flow_tpl(d), flow_assets_list(d),
                                          3, avoid if more else [], hint, d.get("season") or ""), "الأفكار")
-    items = [{"id": uuid.uuid4().hex[:8], **{x: str(i.get(x) or "")[:600] for x in ("title", "hook", "idea", "why")}}
+    items = [{"id": uuid.uuid4().hex[:8], **{x: str(i.get(x) or "")[:600] for x in ("title", "hook", "idea", "fit", "why")}}
              for i in (raw.get("ideas") or [])[:5] if isinstance(i, dict)]
     if not items:
         raise HTTPException(400, "المخ مرجعش أفكار، جرّب تاني")
@@ -18776,7 +18848,7 @@ def flow_gen_scenarios(fid: str, hint: str = "", more: bool = False) -> None:
     if atlas.mock_mode():
         raw = fz.mock_scenarios(d["format"], 2, d.get("episodes"))
     else:
-        raw = flow_llm(fz.scenarios_messages(az.brain_text(brain, idea_txt), fz.prefs_text(brain), d["template"], flow_assets_list(d), idea_txt,
+        raw = flow_llm(fz.scenarios_messages(az.brain_text(brain, idea_txt), fz.prefs_text(brain), flow_tpl(d), flow_assets_list(d), idea_txt,
                                              d["format"], d.get("episodes") or "auto", [c["name"] for c in d.get("cast") or []], 2, avoid if more else [], hint),
                        "السيناريوهات")
     items = [{"id": uuid.uuid4().hex[:8], **s} for s in (raw.get("scenarios") or [])[:4] if isinstance(s, dict)]
@@ -18799,6 +18871,7 @@ def flow_new(body: FlowNewIn):
     if not (atlas.api_key() or atlas.mock_mode()):
         raise HTTPException(400, "مفتاح Atlas مش متسجل")
     tpl = flow_template(body.template, body.name.strip()[:120], body.cat.strip()[:40], body.desc.strip()[:400])
+    tpl = flow_tpl({"template": tpl})
     fid = uuid.uuid4().hex[:10]
     d = {"client_id": active_client_id(), "template": tpl, "stage": "idea", "season": body.season.strip()[:200],
          "ideas": [], "idea": None, "idea_chat": [], "format": None, "episodes": "auto", "scenarios": [], "scenario": None, "scen_chat": [],
@@ -18862,7 +18935,7 @@ class FlowPickIn(BaseModel):
 def flow_pick_idea(fid: str, body: FlowPickIn):
     def fn(d):
         if body.item:
-            it = {"id": body.item.get("id") or uuid.uuid4().hex[:8], **{x: str(body.item.get(x) or "")[:1500] for x in ("title", "hook", "idea", "why")}, "own": True}
+            it = {"id": body.item.get("id") or uuid.uuid4().hex[:8], **{x: str(body.item.get(x) or "")[:1500] for x in ("title", "hook", "idea", "fit", "why")}, "own": True}
             if not (it["title"] or it["idea"]):
                 raise HTTPException(400, "اكتب الفكرة")
         else:
@@ -18896,7 +18969,7 @@ def flow_chat(fid: str, body: FlowChatIn):
     if atlas.mock_mode():
         raw = {"reply": "تمام، عدّلتها", "item": {**cur, "title": (cur.get("title") or "") + " ✓"}}
     else:
-        raw = flow_llm(fz.refine_messages(az.brain_text(brain, msg), fz.prefs_text(brain), d["template"], flow_assets_list(d), stage,
+        raw = flow_llm(fz.refine_messages(az.brain_text(brain, msg), fz.prefs_text(brain), flow_tpl(d), flow_assets_list(d), stage,
                                           {k: v for k, v in cur.items() if k != "id"}, chat, d.get("format") or ""), "التعديل")
     item = raw.get("item") if isinstance(raw.get("item"), dict) else None
     reply = str(raw.get("reply") or "تمام")[:800]

@@ -122,7 +122,7 @@ const Flow = (() => {
   function ideaCard(it) {
     if (S.edit === it.id) return ideaForm(it);
     return `<article class="flw-card"><div class="flw-ch"><b>${esc(it.title)}</b>${rateBtns("idea", it.id)}</div>
-      ${it.hook ? `<p class="flw-hook">«${esc(it.hook)}»</p>` : ""}<p>${esc(it.idea)}</p>${it.why ? `<small class="muted">💡 ${esc(it.why)}</small>` : ""}
+      ${it.hook ? `<p class="flw-hook">«${esc(it.hook)}»</p>` : ""}<p>${esc(it.idea)}</p>${it.fit ? `<small class="flw-fit">🎨 على القالب: ${esc(it.fit)}</small>` : ""}${it.why ? `<small class="muted">💡 ${esc(it.why)}</small>` : ""}
       <div class="flw-acts"><button type="button" class="flw-btn pri" data-pick-idea="${it.id}">اختار الفكرة دي</button>
         <button type="button" class="flw-link" data-edit="${it.id}">✏️ عدّل</button></div></article>`;
   }
