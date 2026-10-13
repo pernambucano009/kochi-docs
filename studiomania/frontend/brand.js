@@ -115,7 +115,13 @@ const BrandPage = (() => {
         nodes.push({ id: `${br.k}:${l.f}:${l.i ?? ""}`, kind: "leaf", br, l, x: bx + Math.cos(la) * rr * 1.2, y: by + Math.sin(la) * rr, from: br.k, on: filled(b, l) });
       });
     });
-    S.nodes = nodes.map((n, i) => ({ ...n, ph: i * 1.7 }));
+    // كل نقطة ليها مكانها الأصلي (x, y) ومكانها الحالي (px, py) وسرعتها؛ لو الخريطة اتعادت بتكمّل من مكانها
+    const old = Object.fromEntries((S.nodes || []).map((n) => [n.id, n]));
+    S.nodes = nodes.map((n, i) => {
+      const o = old[n.id];
+      return { ...n, ph: i * 1.7, px: o ? o.px + (n.x - o.x) : n.x, py: o ? o.py + (n.y - o.y) : n.y, vx: o?.vx || 0, vy: o?.vy || 0 };
+    });
+    S.byId = Object.fromEntries(S.nodes.map((n) => [n.id, n]));
     draw();
   }
   function nodeHTML(n, b) {
@@ -145,12 +151,30 @@ const BrandPage = (() => {
     tick(performance.now());
   }
   // النقط بتعوم بهدوء حوالين مكانها، والخطوط ماشية معاها
+  // فيزيا بسيطة: كل نقطة مربوطة بزنبرك لمكانها، واللي متعلّق بيها بيمشي وراها.
+  // لما تمسك نقطة وتسحبها، اللي طالع منها بيتشد معاها، ولما تسيبها بترجع مكانها وبتهتز شوية
+  const FOLLOW = { branch: .55, leaf: .9 };
+  function step(dt) {
+    const k = 140, c = 15;
+    for (const n of S.nodes) {
+      if (S.drag?.n === n && S.drag.moved) { n.vx = n.vy = 0; n.px = S.drag.x; n.py = S.drag.y; continue; }
+      const p = n.from && S.byId[n.from], f = FOLLOW[n.kind] || 0;
+      const tx = n.x + (p ? (p.px - p.x) * f : 0), ty = n.y + (p ? (p.py - p.y) * f : 0);
+      n.vx += (k * (tx - n.px) - c * n.vx) * dt;
+      n.vy += (k * (ty - n.py) - c * n.vy) * dt;
+      n.px += n.vx * dt; n.py += n.vy * dt;
+    }
+  }
   function tick(now) {
     const t = (now - S.t0) / 1000, still = reduce.matches;
+    const dt = Math.min(.033, Math.max(0, (now - (S.last || now)) / 1000));
+    S.last = now;
+    if (still) S.nodes.forEach((n) => { if (!(S.drag?.n === n && S.drag.moved)) { n.px = n.x; n.py = n.y; } else { n.px = S.drag.x; n.py = S.drag.y; } });
+    else for (let i = 0; i < 2; i++) step(dt / 2);
     const pos = {};
     for (const n of S.nodes) {
-      const amp = n.kind === "center" ? 2 : n.kind === "branch" ? 4 : 5;
-      const x = n.x + (still ? 0 : Math.sin(t * .55 + n.ph) * amp), y = n.y + (still ? 0 : Math.cos(t * .48 + n.ph * 1.3) * amp);
+      const amp = S.drag?.n === n ? 0 : n.kind === "center" ? 2 : n.kind === "branch" ? 4 : 5;
+      const x = n.px + (still ? 0 : Math.sin(t * .55 + n.ph) * amp), y = n.py + (still ? 0 : Math.cos(t * .48 + n.ph * 1.3) * amp);
       pos[n.id] = [x, y];
       if (n.el) n.el.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%)`;
     }
@@ -228,9 +252,10 @@ const BrandPage = (() => {
     card.innerHTML = `<button class="bm-x" data-close aria-label="اقفل">✕</button>` + cardHTML(n);
     card.hidden = false;
     S.el.classList.add("has-card");
-    card.animate([{ opacity: 0, transform: "scale(.96)" }, { opacity: 1, transform: "none" }], { duration: reduce.matches ? 1 : 260, easing: "cubic-bezier(.2,.8,.2,1)" });
     markOpen();
-    tick(performance.now());
+    // يتحط في مكانه جنب النقطة الأول، وبعدين يظهر (الأنيميشن على الشفافية والحجم بس، مش على المكان)
+    placeCard([n.px, n.py]);
+    card.animate([{ opacity: 0, scale: .96 }, { opacity: 1, scale: 1 }], { duration: reduce.matches ? 1 : 240, easing: "cubic-bezier(.2,.8,.2,1)" });
     const ed = card.querySelector(".bm-write");
     if (ed && n.kind === "leaf") { ed.focus(); placeCaret(ed); }
   }
@@ -306,8 +331,35 @@ const BrandPage = (() => {
   };
 
   function bind(w) {
+    // مسك وسحب أي نقطة أو فرع أو المخ نفسه
+    w.addEventListener("pointerdown", (e) => {
+      const el = e.target.closest(".bm-n");
+      if (!el || e.button !== 0) return;
+      const n = S.byId[el.dataset.n];
+      if (!n) return;
+      const r = w.getBoundingClientRect();
+      S.drag = { n, el, sx: e.clientX, sy: e.clientY, ox: n.px - (e.clientX - r.left), oy: n.py - (e.clientY - r.top), x: n.px, y: n.py, moved: false, id: e.pointerId };
+    });
+    w.addEventListener("pointermove", (e) => {
+      const d = S.drag;
+      if (!d || e.pointerId !== d.id) return;
+      if (!d.moved && Math.hypot(e.clientX - d.sx, e.clientY - d.sy) < 5) return;
+      if (!d.moved) { d.moved = true; w.setPointerCapture(e.pointerId); w.classList.add("dragging"); d.el.classList.add("held"); }
+      const r = w.getBoundingClientRect();
+      d.x = Math.max(10, Math.min(r.width - 10, e.clientX - r.left + d.ox));
+      d.y = Math.max(10, Math.min(r.height - 10, e.clientY - r.top + d.oy));
+    });
+    const drop = (e) => {
+      const d = S.drag;
+      if (!d || (e.pointerId != null && e.pointerId !== d.id)) return;
+      S.drag = null;
+      if (d.moved) { S.noClick = true; setTimeout(() => (S.noClick = false), 0); w.classList.remove("dragging"); d.el.classList.remove("held"); }
+    };
+    w.addEventListener("pointerup", drop);
+    w.addEventListener("pointercancel", drop);
     w.addEventListener("click", async (e) => {
       const t = e.target;
+      if (S.noClick) { S.noClick = false; return; }
       const node = t.closest(".bm-n");
       if (node) {
         const n = S.nodes.find((x) => x.id === node.dataset.n);

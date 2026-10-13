@@ -869,3 +869,9 @@ body.nh-cl #nh .nh-ptop { grid-template-areas: "row row" "tabs head"; grid-templ
 :root[data-nh-theme="dark"] #nh .bm-cat img, :root[data-nh-theme="dark"] #nh .bm-cat > span { background: rgba(255, 255, 255, .06); }
 :root[data-nh-theme="dark"] #nh .bm-write:empty::before { color: #6E6A66; }
 @media (max-width: 820px) { #nh .bm-hint { display: none; } #nh .bm-bic { width: 48px; height: 48px; } #nh .bm-branch > b { font-size: 12px; } }
+/* مسك وسحب النقط */
+#nh .bm-n { cursor: grab; touch-action: none; }
+#nh .bm.dragging, #nh .bm.dragging .bm-n { cursor: grabbing; }
+#nh .bm-n.held .bm-bic, #nh .bm-n.held > i { box-shadow: 0 0 0 2px var(--nh-accent), 0 14px 34px rgba(229, 97, 62, .3); }
+#nh .bm-n.held .bm-tip { opacity: 0; }
+#nh .bm.dragging .bm-tip { opacity: 0 !important; }
