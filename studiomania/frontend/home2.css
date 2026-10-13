@@ -606,3 +606,37 @@ body.stage-settled #nh { visibility: hidden; }
 #nh .nh-pgrid[data-key="coaches"] .nb-wrap { max-width: none; }
 @media (max-width: 1100px) { #nh .ch-grid.as-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } #nh .as-voices { grid-template-columns: 1fr; } #nh .nh-ptop { grid-template-areas: "row row" "head head" "tabs tabs"; } }
 #nh .nh-ptabs .nh-astabs { overflow: visible; padding: 4px; margin: -4px; }
+/* شغّال عليه بمقاسات البروتوتايب */
+#nh .nh-ptabs .nh-pj-new { height: auto; padding: 12px 24px; font-size: 14px; gap: 8px; display: inline-flex; align-items: center; }
+#nh .nh-pj { max-width: none; gap: 18px; }
+#nh .nh-pj-bar { gap: 10px; }
+#nh .nh-pj-q { flex: 0 0 340px; height: auto; padding: 0 16px; box-shadow: 0 4px 18px rgba(24, 23, 24, .05); }
+#nh .nh-pj-q input { padding: 12px 0; }
+#nh .nh-pj-bar [data-pjf] { height: auto; padding: 9px 16px; font-size: 13px; background: var(--card, #fff); color: var(--nh-ink); }
+#nh .nh-pj-bar [data-pjf].on { background: #181718; color: #fff; }
+:root[data-nh-theme="dark"] #nh .nh-pj-bar [data-pjf].on { background: #F2F1EE; color: #181718; }
+#nh .nh-pj-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; }
+#nh .nh-pj-card { padding: 12px; gap: 10px; border-radius: 24px; }
+#nh .nh-pj-art { aspect-ratio: auto; height: 220px; border-radius: 16px; position: relative; display: block; }
+#nh .nh-pj-art .nh-pj-bar { position: absolute; left: 10px; right: 10px; bottom: 10px; height: 6px; border-radius: 6px; background: rgba(255, 255, 255, .25); display: block; }
+#nh .nh-pj-art .nh-pj-bar i { display: block; height: 100%; border-radius: 6px; background: #fff; }
+#nh .nh-pj-name { display: flex; align-items: center; gap: 8px; padding: 0 4px; }
+#nh .nh-pj-name b { flex: 1; font-weight: 500; font-size: 14.5px; padding: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#nh .nh-pj-av { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; flex: none; background: #E3F5EC; color: #2E8F63; }
+#nh .nh-pj-av.s-series { background: #E6EEF9; color: #2F5A94; }
+#nh .nh-pj-av.s-ads { background: #FBE4DA; color: #B7472A; }
+#nh .nh-pj-card small { padding: 0 4px 4px; font-size: 12px; }
+#nh .nh-pj-card small i { display: none; }
+#nh .nh-pj-card small.st-run { color: #8C8C88; }
+#nh .nh-pj-card small.st-done { color: #2E8F63; }
+@media (max-width: 1100px) { #nh .nh-pj-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } #nh .nh-pj-q { flex: 1 1 100%; } }
+#nh .nh-pj-card { align-items: stretch; }
+#nh .nh-pj-art { height: 150px; }
+#nh .nh-pj-q input { border: 0 !important; background: none !important; box-shadow: none !important; -webkit-appearance: none; appearance: none; }
+#nh .nh-ptabs .nh-pj-new { border-radius: 999px; background: var(--nh-accent); color: #fff; font-weight: 500; box-shadow: 0 10px 28px rgba(229, 97, 62, .45); flex-direction: row; }
+#nh .nh-ptabs .nh-pj-new .nh-snake { display: none; }
+#nh .nh-ptitle[data-key="progress"] .nh-glt { width: 0; height: 0; opacity: 0; overflow: hidden; }
+#nh .nh-pj-add { min-height: 230px; border-radius: 24px; border: 1.5px dashed #DAD9D5; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; font-size: 13px; color: #6B6A66; background: none; }
+#nh .nh-pj-add span { width: 44px; height: 44px; border-radius: 50%; background: var(--card, #fff); box-shadow: 0 4px 14px rgba(24, 23, 24, .08); display: grid; place-items: center; color: var(--nh-accent); font-size: 20px; }
+#nh .nh-pj-add .nh-snake { display: none; }
+:root[data-nh-theme="dark"] #nh .nh-pj-add { border-color: #3D3C3D; }

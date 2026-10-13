@@ -294,6 +294,8 @@ const NH = (() => {
   };
   // شغّال عليه (من البروتوتايب): دوّر، وفلتر بالحالة، وكل مشروع كارت بأيقونة قسمه وحالته
   const PJ_ICON = { series: "series", ads: "publish", free: "film" };
+  const PJ_AV = { series: "س", ads: "إ", free: "م" };   // دايرة صغيرة بأول حرف من القسم (مسلسل / إعلان / مونتاج حر)
+  const PJ_ART = ["linear-gradient(160deg, #4A4542, #24211F)", "linear-gradient(160deg, #57514C, #2B2724)", "linear-gradient(160deg, #46403C, #1E1B19)", "linear-gradient(160deg, #3A3836, #181718)", "linear-gradient(160deg, #4F5A63, #22282D)", "linear-gradient(160deg, #5A4F48, #2A2420)"];
   const pjState = (p) => p.render_status === "rendering" ? ["run", `بيتصدّر${p.render_progress != null ? ` · ${Math.round(p.render_progress)}%` : ""}`]
     : p.render_status === "done" ? ["done", "اتصدّر"] : p.render_status === "failed" ? ["fail", "التصدير وقف"] : ["run", "في المونتاج"];
   function projectsBoard() {
@@ -301,9 +303,11 @@ const NH = (() => {
     const cards = D.work.map((p) => {
       const [k, label] = pjState(p);
       const when = p.updated_at ? new Date(p.updated_at).toLocaleDateString(UI_LOCALE(), { day: "numeric", month: "short" }) : "";
+      const pct = p.render_status === "rendering" && p.render_progress != null ? Math.round(p.render_progress) : null;
       return `<article class="nh-line nh-pj-card" data-proj="${esc(p.id)}" data-st="${k}" data-q="${esc(p.name.toLowerCase())}" tabindex="0" role="button">
-        <div class="nh-pj-art">${glImg(PJ_ICON[p.section] || "film")}<span class="nh-pj-sec">${esc(SEC[p.section]?.[0] || "")}</span></div>
-        <b>${esc(p.name)}</b><small class="st-${k}"><i></i>${label}${when ? ` · ${when}` : ""}</small></article>`;
+        <div class="nh-pj-art" style="background:${PJ_ART[(p.id.charCodeAt(0) + p.id.charCodeAt(1)) % PJ_ART.length]}">${pct != null ? `<span class="nh-pj-bar"><i style="width:${pct}%"></i></span>` : ""}</div>
+        <div class="nh-pj-name"><span class="nh-pj-av s-${esc(p.section)}">${PJ_AV[p.section] || "م"}</span><b>${esc(p.name)}</b></div>
+        <small class="st-${k}">${esc(SEC[p.section]?.[0] || "")} · ${label}${when ? ` · ${when}` : ""}</small></article>`;
     }).join("");
     return `<div class="nh-pj">
       <div class="nh-pj-bar">
@@ -312,10 +316,8 @@ const NH = (() => {
         <button type="button" data-pjf="run">شغّالة · <span class="num">${n("run")}</span></button>
         <button type="button" data-pjf="done">اتصدّرت · <span class="num">${n("done")}</span></button>
         ${n("fail") ? `<button type="button" data-pjf="fail">وقفت · <span class="num">${n("fail")}</span></button>` : ""}
-        <span class="nh-pj-fill"></span>
-        <button type="button" class="nh-pj-new nh-tile" data-id="create">＋ مشروع جديد</button>
       </div>
-      <div class="nh-pj-grid">${cards || `<div class="nh-pj-empty">مفيش مشاريع لسه. ابدأ واحد من «اعمل جديد».</div>`}</div>
+      <div class="nh-pj-grid">${cards}<button type="button" class="nh-tile nh-pj-add" data-id="create"><span>＋</span>مشروع جديد</button></div>
     </div>`;
   }
   function pjFilter() {
@@ -347,7 +349,9 @@ const NH = (() => {
     const tabs = !KOCHI && pTitle.dataset.key === "assets" && AS_TABS.some((x) => x[0] === key);
     pGrid.dataset.key = key;
     pGrid.classList.toggle("nh-scroll", !!MODS[key]);
-    document.getElementById("nhPTabs").innerHTML = tabs ? asTabs(key) : "";
+    // شغّال عليه: «＋ مشروع جديد» فوق جنب العنوان (زي البروتوتايب)
+    document.getElementById("nhPTabs").innerHTML = tabs ? asTabs(key)
+      : key === "progress" && !KOCHI ? `<button type="button" class="nh-pj-new nh-tile" data-id="create"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>مشروع جديد</button>` : "";
     document.getElementById("nhPClient").innerHTML = document.getElementById("nhClient").innerHTML;
     pGrid.innerHTML = MODS[key] ? MODS[key].html() : PAGES[key]();
     if (MODS[key]) MODS[key].mount(pGrid, pageArg);
