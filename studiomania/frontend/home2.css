@@ -515,13 +515,12 @@ body.stage-settled #nh { visibility: hidden; }
 #nh .nh-bento { grid-template-columns: 300px minmax(0, 1fr) 300px; gap: 0 12px; }
 #nh .nh-col { padding-block: 20px; justify-content: space-evenly; }
 #nh .nh-col-l { justify-content: space-around; }
-#nh .nh-side { padding: 8px 0; gap: 4px; }
+#nh .nh-side { padding: 14px 22px; margin: -6px -22px; gap: 4px; }   /* مساحة للسنيك حوالين الزرار، والنص في نفس مكانه */
 #nh .nh-side .nh-name .latin { font-size: 11px; letter-spacing: .3em; color: var(--nh-muted); }
 #nh .nh-side .nh-name b { font-size: 26px; font-weight: 500; line-height: 1.35; }
 #nh .nh-side .nh-meta { font-size: 13px; color: var(--nh-muted); }
 #nh .nh-mbar { width: 90px; height: 4px; border-radius: 4px; background: #EDECE8; }
 #nh .nh-mbar i { background: var(--nh-accent); }
-#nh .nh-side .nh-snake { display: none; }
 /* المسرح: المجسّم لوحده على أرضية الصفحة، من غير توهج ولا دايرة وراه */
 #nh .nh-stage { overflow: visible; }
 #nh .nh-stage h1 { font-size: 26px; font-weight: 500; letter-spacing: .42em; }
@@ -529,7 +528,6 @@ body.stage-settled #nh { visibility: hidden; }
 :root[data-nh-theme="dark"] #nh .nh-stage .ar { color: #A3A29E; }
 #nh .nh-cta { margin-top: 4px; padding: 14px 40px; box-shadow: 0 12px 34px rgba(229, 97, 62, .5); }
 #nh .nh-cta .nh-name b { font-weight: 500; }
-#nh .nh-cta .nh-snake { display: none; }
 /* «كمّل من مكان ما وقفت»: كارت أبيض تحت */
 #nh .nh-cont-wrap { padding-top: 18px; }
 #nh .nh-tile.nh-cont { background: var(--card, #fff); box-shadow: 0 6px 24px rgba(24, 23, 24, .07); padding: 8px 22px 8px 10px; gap: 14px; }
@@ -794,7 +792,7 @@ body.nh-zooming :is(.stage, .stage-card) { background: transparent !important; b
 .nh-corner .nh-c-name { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; }
 .nh-corner[data-corner$="l"] .nh-c-name { align-items: flex-end; }
 .nh-corner .latin { font-family: var(--nh-latin); text-transform: uppercase; font-size: 11px; letter-spacing: .3em; font-weight: 400; line-height: 1.5; direction: ltr; unicode-bidi: isolate; color: var(--nh-accent); }
-.nh-corner b { font-size: clamp(20px, 1.9vw, 27px); font-weight: 500; line-height: 1.35; white-space: nowrap; }
+.nh-corner b { font-size: 26px; font-weight: 500; line-height: 1.35; white-space: nowrap; }
 /* العنوان اللي جوه الصفحة نفسها بقى في الركن: مكانه بيفضل فاضي فوق، ولو الركن تحت بيتشال وبيتساب مكان تحت */
 #nh .nh-ptitle, :root:root .stage-head :is(.stage-title, .stage-ic) { visibility: hidden; }
 body.nh-cb #nh .nh-phead, :root:root body.nh-cb .stage-head :is(.stage-title, .stage-ic) { display: none; }
