@@ -875,3 +875,35 @@ body.nh-cl #nh .nh-ptop { grid-template-areas: "row row" "tabs head"; grid-templ
 #nh .bm-n.held .bm-bic, #nh .bm-n.held > i { box-shadow: 0 0 0 2px var(--nh-accent), 0 14px 34px rgba(229, 97, 62, .3); }
 #nh .bm-n.held .bm-tip { opacity: 0; }
 #nh .bm.dragging .bm-tip { opacity: 0 !important; }
+/* ===== عقل البراند: «ضيف للعقل» والاقتراحات اللي مستنية موافقتك ===== */
+#nh .bm-add { display: flex; flex-direction: column; align-items: center; gap: 6px; z-index: 2; }
+#nh .bm-add > i { width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; font-style: normal; font-size: 24px; font-weight: 300;
+  background: #181718; color: #fff; box-shadow: 0 10px 26px rgba(24, 23, 24, .22); transition: transform .25s var(--nh-ease), background .25s; }
+#nh .bm-add:hover > i, #nh .bm-add.on > i { transform: scale(1.08); background: var(--nh-accent); }
+#nh .bm-add > b { font-size: 12.5px; font-weight: 500; color: var(--nh-muted); }
+#nh .bm-add.busy > i { animation: bm-spin 1.4s linear infinite; background: var(--nh-accent); }
+@keyframes bm-spin { to { rotate: 360deg; } }
+#nh .bm-leaf.pend > i { background: var(--nh-accent); box-shadow: 0 0 0 0 rgba(229, 97, 62, .45); animation: bm-pulse 1.8s ease-out infinite; color: #fff; font-size: 11px; font-weight: 600; }
+#nh .bm-leaf.pend.ask > i { background: #181718; animation: none; box-shadow: 0 0 0 4px rgba(229, 97, 62, .25); }
+@keyframes bm-pulse { 0% { box-shadow: 0 0 0 0 rgba(229, 97, 62, .45); } 70% { box-shadow: 0 0 0 10px rgba(229, 97, 62, 0); } 100% { box-shadow: 0 0 0 0 rgba(229, 97, 62, 0); } }
+#nh .bm-bic { position: relative; }
+#nh .bm-bic em { position: absolute; top: -4px; inset-inline-end: -4px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 10px; background: var(--nh-accent); color: #fff; font-style: normal; font-size: 11px; display: grid; place-items: center; }
+#nh .bm-tabs .bm-pill { padding: 7px 14px; font-size: 13px; }
+#nh .bm-drop { aspect-ratio: auto; padding: 22px 12px; gap: 4px; }
+#nh .bm-types { opacity: .7; }
+#nh .bm-srcs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; border-top: 1px solid rgba(24, 23, 24, .07); padding-top: 8px; }
+#nh .bm-srcs li { display: flex; align-items: center; gap: 10px; padding: 6px 2px; }
+#nh .bm-srcs li > span:nth-child(2) { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+#nh .bm-srcs b { font-size: 13px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#nh .bm-srcs small { font-size: 11.5px; color: var(--nh-muted); }
+#nh .bm-srcs li.failed small { color: #D9473A; }
+#nh .bm-srcs button { width: 24px; height: 24px; border-radius: 50%; color: var(--nh-muted); font-size: 10px; flex: none; }
+#nh .bm-srcs button:hover { background: var(--page-bg, #F7F7F5); }
+#nh .bm-dot.busy { background: var(--nh-accent); animation: bm-pulse 1.4s ease-out infinite; }
+#nh .bm-dot.bad { background: #D9473A; }
+#nh .bm-acts { display: flex; align-items: center; gap: 8px; }
+#nh .bm-acts .bm-go { align-self: auto; }
+#nh .bm-q { margin: 0; font-size: 16px; line-height: 1.7; }
+#nh .bm-now { margin: 2px 0 0; font-size: 14px; color: var(--nh-muted); line-height: 1.7; text-decoration: line-through; text-decoration-color: rgba(217, 71, 58, .4); }
+:root[data-nh-theme="dark"] #nh .bm-add > i, :root[data-nh-theme="dark"] #nh .bm-leaf.pend.ask > i { background: #F1F1F3; color: #141416; }
+:root[data-nh-theme="dark"] #nh .bm-srcs { border-color: rgba(255, 255, 255, .08); }

@@ -10,3 +10,4 @@ numpy>=1.26
 onnxruntime>=1.17  # فصل الشخص في الفيديو (RobustVideoMatting)
 ai-edge-litert>=1.0  # فصل الشخص عن الخلفية في فيديوهات التايبوجرافي (موديل MediaPipe على الـ CPU)
 opencv-python-headless>=4.8  # تراك الحاجات في الفيديو (الكلام بيمشي معاها)
+pymupdf>=1.24  # قراية ملفات الـ PDF في عقل البراند

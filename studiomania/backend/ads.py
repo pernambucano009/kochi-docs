@@ -671,6 +671,10 @@ def brain_text(brain: dict | None) -> str:
         items = brain.get(kind) or []
         if items:
             lines.append(f"{label} (استخدم الاسم بالظبط في asset):\n" + "\n".join(f"- {a.get('name') or a['file']}: {a.get('description', '')}" for a in items[:60]))
+    # المعرفة اللي اتوافق عليها في عقل البراند (من الملفات واللينكات)
+    import brainsrc  # noqa: PLC0415
+    if notes := brainsrc.notes_text(brain):
+        lines.append(notes)
     return "\n".join(lines)
 
 

@@ -25,7 +25,7 @@ from xml.sax.saxutils import escape as xml_escape
 import threading
 import time
 import uuid
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import closing
 from datetime import datetime, timedelta, timezone
@@ -66,6 +66,7 @@ import sheets  # noqa: E402
 import carousel as cz  # noqa: E402
 import series as sz  # noqa: E402
 import ads as az  # noqa: E402
+import brainsrc  # noqa: E402
 import typo  # noqa: E402  (التايبوجرافي)
 import concepts  # noqa: E402  (قاموس المعاني: كلمة ← أيقونة)
 import stt_local  # noqa: E402  (تفريغ على السيرفر من غير خدمة برّه)
@@ -7633,6 +7634,10 @@ def brain_to_dict(b: dict) -> dict:
         out[f"{kind}_url"] = f"{base}/{f}" if f and (brain_dir(b["id"]) / f).exists() else None
     for kind in BRAIN_KINDS:
         out[kind] = [{**a, "url": f"{base}/{a['file']}"} for a in b.get(kind) or []]
+    # المصادر اللي اتقرت، والاقتراحات اللي مستنية موافقتك، والمعرفة اللي اتوافق عليها
+    out["sources"] = [{k: s.get(k) for k in ("id", "kind", "name", "status", "error", "count", "created_at")} for s in b.get("sources") or []]
+    out["pending"] = b.get("pending") or []
+    out["notes"] = b.get("notes") or []
     return out
 
 
@@ -7997,6 +8002,164 @@ def analyze_brain(bid: str):
     update_brain(bid, lambda d: d.update(status="working", error=None))
     threading.Thread(target=run_brain_analyze, args=(bid,), daemon=True).start()
     return brain_to_dict(b)
+
+
+# ---------- 🧠 مصادر العقل: ملف / لينك / كلام ← اقتراحات بتستنى موافقتك ----------
+@app.post("/api/ad-brains/{bid}/sources")
+def add_brain_source(bid: str, url: str = Form(""), text: str = Form(""), note: str = Form(""), files: list[UploadFile] | None = File(None)):
+    if brain_row(bid) is None:
+        raise HTTPException(404, "العميل ده مش موجود")
+    folder = brain_dir(bid) / "src"
+    folder.mkdir(exist_ok=True)
+    new = []
+    for f in (files or [])[:10]:
+        ext = Path(f.filename or "").suffix.lower()
+        if ext not in brainsrc.SOURCE_EXT:
+            raise HTTPException(400, f"نوع الملف ده لسه مش مدعوم: {ext or 'بدون امتداد'} (PDF، Word، صور، نص)")
+        name = save_upload(f, brainsrc.SOURCE_EXT, folder, "src")
+        new.append({"kind": "file", "name": (f.filename or name)[:120], "file": name})
+    if url.strip():
+        try:
+            u = brainsrc.safe_url(url)
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        new.append({"kind": "url", "name": urlparse(u).hostname + urlparse(u).path.rstrip("/"), "url": u})
+    if text.strip():
+        new.append({"kind": "text", "name": text.strip().split("\n")[0][:60], "text": text.strip()[:60000]})
+    if not new:
+        raise HTTPException(400, "ارمي ملف أو حط لينك أو اكتب حاجة")
+    for s in new:
+        s.update(id=uuid.uuid4().hex[:10], status="working", error=None, count=0, note=note.strip()[:300], created_at=now())
+    update_brain(bid, lambda d: d.setdefault("sources", []).extend(new))
+    for s in new:
+        threading.Thread(target=run_brain_source, args=(bid, s["id"]), daemon=True).start()
+    return brain_to_dict(brain_row(bid))
+
+
+def run_brain_source(bid: str, sid: str) -> None:
+    """يقرا المصدر ويطلّع منه اقتراحات (خانات، قواعد، معرفة، أسئلة)."""
+    try:
+        b = brain_row(bid)
+        s = next(x for x in b.get("sources") or [] if x["id"] == sid)
+        folder = brain_dir(bid) / "src"
+        text, imgs = "", []
+        if s["kind"] == "url":
+            text = brainsrc.read_site(s["url"])
+        elif s["kind"] == "text":
+            text = s["text"]
+        else:
+            p = folder / s["file"]
+            ext = p.suffix.lower()
+            if ext == ".pdf":
+                text, imgs = brainsrc.read_pdf(p, folder)
+            elif ext == ".docx":
+                text = brainsrc.read_docx(p)
+            elif ext in brainsrc.IMG_EXT:
+                imgs = [p]
+            else:
+                raw = p.read_text(encoding="utf-8", errors="ignore")
+                text = brainsrc.html_text(raw)[0] if ext in (".html", ".htm") else raw
+        if not text.strip() and not imgs:
+            raise ValueError("المصدر ده فاضي أو مش مقروء")
+        if atlas.mock_mode():
+            out = brainsrc.mock_out(s["name"])
+        else:
+            parts = [{"type": "text", "text": brainsrc.extract_prompt(az.brain_text(b), s["name"], s.get("note", ""), text, len(imgs))}]
+            for im in imgs[:8]:
+                parts.append({"type": "image_url", "image_url": {"url": data_url(model_image(im), "image/jpeg")}})
+            out = ad_json(ad_media_chat([{"role": "user", "content": parts}], 16000), "قراية المصدر")
+        items = brainsrc.to_pending(out, b, sid)
+        def fn(d):
+            d.setdefault("pending", []).extend(items)
+            for x in d.get("sources") or []:
+                if x["id"] == sid:
+                    x.update(status="done", error=None, count=len(items))
+        update_brain(bid, fn)
+    except Exception as exc:  # noqa: BLE001
+        msg = str(getattr(exc, "detail", None) or exc)[:300]
+        def fail(d):
+            for x in d.get("sources") or []:
+                if x["id"] == sid:
+                    x.update(status="failed", error=msg)
+        try:
+            update_brain(bid, fail)
+        except HTTPException:
+            pass
+
+
+@app.delete("/api/ad-brains/{bid}/sources/{sid}")
+def delete_brain_source(bid: str, sid: str):
+    def fn(d):
+        s = next((x for x in d.get("sources") or [] if x["id"] == sid), None)
+        if s and s.get("file"):
+            (brain_dir(bid) / "src" / Path(s["file"]).name).unlink(missing_ok=True)
+        d["sources"] = [x for x in d.get("sources") or [] if x["id"] != sid]
+        d["pending"] = [x for x in d.get("pending") or [] if x.get("source") != sid]
+    update_brain(bid, fn)
+    return brain_to_dict(brain_row(bid))
+
+
+class PendingIn(BaseModel):
+    value: str | None = None
+    title: str | None = None
+
+
+@app.post("/api/ad-brains/{bid}/pending/{pid}/approve")
+def approve_brain_pending(bid: str, pid: str, body: PendingIn):
+    """موافقة على اقتراح (بعد تعديله لو حبيت): الخانة بتتكتب، والقاعدة بتتضاف، والمعرفة بتدخل العقل."""
+    def fn(d):
+        it = next((x for x in d.get("pending") or [] if x["id"] == pid), None)
+        if it is None:
+            raise HTTPException(404, "الاقتراح ده مش موجود")
+        val = (body.value if body.value is not None else it.get("value") or "").strip()
+        if it["kind"] == "field":
+            d[it["field"]] = val[:8000]
+            if it["field"] in ("palette", "typography") and it["field"] not in d.setdefault("edited", []):
+                d["edited"].append(it["field"])
+        elif it["kind"] == "rule":
+            rules = [r for r in str(d.get("rules") or "").split("\n") if r.strip()]
+            d["rules"] = "\n".join([*rules, val])[:8000]
+        else:   # معلومة، أو إجابة على سؤال
+            if it["kind"] == "question" and not val:
+                raise HTTPException(400, "اكتب الإجابة الأول")
+            d.setdefault("notes", []).append({"id": it["id"], "section": it.get("section") or "other",
+                                              "title": (body.title or it.get("title") or "").strip()[:120],
+                                              "summary": it.get("summary", "") if it["kind"] == "note" else val[:300],
+                                              "body": val[:6000] if it["kind"] == "note" else "", "source": it.get("source")})
+        d["pending"] = [x for x in d["pending"] if x["id"] != pid]
+    update_brain(bid, fn)
+    return brain_to_dict(brain_row(bid))
+
+
+@app.delete("/api/ad-brains/{bid}/pending/{pid}")
+def reject_brain_pending(bid: str, pid: str):
+    update_brain(bid, lambda d: d.update(pending=[x for x in d.get("pending") or [] if x["id"] != pid]))
+    return brain_to_dict(brain_row(bid))
+
+
+class NoteIn(BaseModel):
+    title: str | None = None
+    body: str | None = None
+
+
+@app.patch("/api/ad-brains/{bid}/notes/{nid}")
+def patch_brain_note(bid: str, nid: str, body: NoteIn):
+    def fn(d):
+        n = next((x for x in d.get("notes") or [] if x["id"] == nid), None)
+        if n is None:
+            raise HTTPException(404, "المعلومة دي مش موجودة")
+        if body.title is not None:
+            n["title"] = body.title.strip()[:120]
+        if body.body is not None:
+            n["body"] = body.body.strip()[:6000]
+    update_brain(bid, fn)
+    return brain_to_dict(brain_row(bid))
+
+
+@app.delete("/api/ad-brains/{bid}/notes/{nid}")
+def delete_brain_note(bid: str, nid: str):
+    update_brain(bid, lambda d: d.update(notes=[x for x in d.get("notes") or [] if x["id"] != nid]))
+    return brain_to_dict(brain_row(bid))
 
 
 def model_image(path: Path, size: int = 768) -> Path:

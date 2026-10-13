@@ -18,6 +18,7 @@ const BrandPage = (() => {
     look: "M12 3.5a8.5 8.5 0 1 0 0 17c1.4 0 2-.9 2-1.8 0-1.3-1-1.6-1-2.7 0-1 .8-1.6 1.8-1.6h2.3a3 3 0 0 0 2.9-3C20.5 6.8 16.7 3.5 12 3.5z M7.8 11a1.2 1.2 0 1 1 0 .1z M10.5 7.4a1.2 1.2 0 1 1 0 .1z M15 7.6a1.2 1.2 0 1 1 0 .1z",
     rules: "M9 6.5h10.5 M9 12h10.5 M9 17.5h10.5 M4.5 6.5l1 1 2-2 M4.5 12l1 1 2-2 M4.5 17.5l1 1 2-2",
     delivery: "M20.5 3.5 10 14 M20.5 3.5 14 20.5l-4-6.5-6.5-4z",
+    knowledge: "M4 5.5c2.7-1 5.3-1 8 .8 2.7-1.8 5.3-1.8 8-.8v13c-2.7-1-5.3-1-8 .8-2.7-1.8-5.3-1.8-8-.8z M12 6.3v13.3",
     assets: "M4.5 5h15a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z M3.5 15.5l4.5-4.5 4 4 3-3 5 5 M15.5 8.5a1.3 1.3 0 1 1 0 .1z",
   };
   const svg = (d, s = 22) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}" aria-hidden="true"><path d="${d}" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
@@ -57,8 +58,21 @@ const BrandPage = (() => {
         { f: "caption", t: "الكابشن الافتراضي", type: "text", ph: "{caption}\n\n{cta} 👇\n{link}\n#هاشتاج", hint: "{caption} كابشن الفيديو · {cta} الدعوة · {link} اللينك. بيتحطوا لوحدهم وقت النشر." },
       ] },
       { k: "assets", t: "صور البراند", en: "Assets", leaves: kinds.map(([k, t]) => ({ f: k, t, type: "imgs" })) },
-    ];
+      // المعرفة: اللي اتقرا من الملفات واللينكات واتوافق عليه
+      { k: "knowledge", t: "المعرفة", en: "Knowledge", leaves: (b?.notes || []).map((x) => ({ f: "n", i: x.id, t: x.title, type: "note", note: x })) },
+    ].map((br) => {
+      // الاقتراحات اللي مستنية موافقتك بتظهر نقط منوّرة على الفرع بتاعها
+      const mine = (b?.pending || []).filter((p) => pendBranch(p) === br.k);
+      return { ...br, leaves: [...br.leaves, ...mine.map((p) => ({ f: "p", i: p.id, t: pendLabel(p), type: "pending", p }))] };
+    });
   }
+  const FIELD_BR = { about: "identity", audience: "identity", market: "identity", language: "identity", domain: "identity",
+    typography: "look", palette: "look", cta: "delivery", link: "delivery", caption: "delivery" };
+  const FIELD_T = { about: "عن البراند", audience: "الجمهور", market: "السوق", language: "اللغة واللهجة", domain: "المجال", typography: "الخطوط",
+    palette: "الألوان", cta: "الدعوة (CTA)", link: "اللينك", caption: "الكابشن الافتراضي" };
+  const pendBranch = (p) => (p.kind === "field" ? FIELD_BR[p.field] || "identity" : p.kind === "rule" ? "rules" : "knowledge");
+  const pendLabel = (p) => (p.kind === "field" ? `اقتراح: ${FIELD_T[p.field] || p.field}` : p.kind === "rule" ? "قاعدة مقترحة" : p.kind === "question" ? "سؤال" : p.title);
+  const srcName = (id) => cur()?.sources?.find((s) => s.id === id)?.name || "";
   // النقطة مليانة ولا لسه ناقصة
   function filled(b, l) {
     if (!b) return false;
@@ -70,7 +84,7 @@ const BrandPage = (() => {
       case "styles": return styleIds(b).length > 0;
       case "multi": return l.fields.some(([k]) => String(b[k] || "").trim());
       case "video": return !!b[`${l.f}_url`];
-      case "rule": return true;
+      case "rule": case "note": return true;
       default: return false;
     }
   }
@@ -102,12 +116,14 @@ const BrandPage = (() => {
     if (!W || !H) return;
     const cx = W / 2, cy = H / 2 + 6, R1 = Math.min(W * .42, H * .5) * .58, R2 = Math.max(70, R1 * .5);
     const list = branches(b), nodes = [{ id: "c", kind: "center", x: cx, y: cy }];
+    // «+» تحت المخ: ترمي فيه ملف أو لينك أو تكتب، والبرنامج يقراه
+    nodes.push({ id: "add", kind: "add", x: cx, y: cy + R1 * .78, from: "c" });
     list.forEach((br, i) => {
-      const a = -Math.PI / 2 + (i / list.length) * Math.PI * 2;
+      const a = -Math.PI / 2 + Math.PI / list.length + (i / list.length) * Math.PI * 2;
       const bx = cx + Math.cos(a) * R1 * 1.25, by = cy + Math.sin(a) * R1;
-      const done = br.leaves.filter((l) => !l.type.startsWith("rule-") && l.type !== "action" && filled(b, l)).length;
-      const total = br.leaves.filter((l) => !l.type.startsWith("rule-") && l.type !== "action").length;
-      nodes.push({ id: br.k, kind: "branch", br, x: bx, y: by, from: "c", done, total });
+      const real = br.leaves.filter((l) => !l.type.startsWith("rule-") && l.type !== "action" && l.type !== "pending");
+      const done = real.filter((l) => filled(b, l)).length, total = real.length, waiting = br.leaves.length - br.leaves.filter((l) => l.type !== "pending").length;
+      nodes.push({ id: br.k, kind: "branch", br, x: bx, y: by, from: "c", done, total, waiting });
       const n = br.leaves.length, spread = Math.min(Math.PI * 1.15, .42 * Math.max(1, n - 1));
       br.leaves.forEach((l, j) => {
         const la = a + (n === 1 ? 0 : -spread / 2 + (j / (n - 1)) * spread);
@@ -126,20 +142,31 @@ const BrandPage = (() => {
   }
   function nodeHTML(n, b) {
     if (n.kind === "center") {
-      const st = b?.status === "working" ? `<small class="bm-st">بيستنبط الهوية من الصور…</small>` : b?.status === "failed" ? `<small class="bm-st bad">${esc(b.error || "الاستنباط فشل")}</small>` : "";
+      const reading = (b?.sources || []).filter((s) => s.status === "working").length, waiting = (b?.pending || []).length;
+      const st = b?.status === "working" ? `<small class="bm-st">بيستنبط الهوية من الصور…</small>` : b?.status === "failed" ? `<small class="bm-st bad">${esc(b.error || "الاستنباط فشل")}</small>`
+        : reading ? `<small class="bm-st">بيقرا ${reading === 1 ? "مصدر" : `${reading} مصادر`}…</small>` : waiting ? `<small class="bm-st">${waiting} اقتراح مستني موافقتك</small>` : "";
       return `<button class="bm-n bm-center" data-n="c" title="بدّل البراند أو اعمل واحد جديد">
         <span class="bm-brain"><img class="ic-l" src="/icons3d/brand.webp?v=9" alt=""><img class="ic-d" src="/icons3d/brand_d.webp?v=9" alt=""></span>
         <b>${esc(b?.name || "براند جديد")}</b>${st}</button>`;
     }
+    if (n.kind === "add") {
+      const reading = (b?.sources || []).some((s) => s.status === "working");
+      return `<button class="bm-n bm-add${reading ? " busy" : ""}" data-n="add" title="ضيف للعقل: ملف أو لينك أو كلام"><i>+</i><b>ضيف للعقل</b></button>`;
+    }
     if (n.kind === "branch") {
       return `<button class="bm-n bm-branch${S.open?.br === n.br.k ? " on" : ""}" data-n="${n.id}" title="${esc(n.br.t)}">
-        <span class="bm-bic">${svg(IC[n.br.k])}</span><b>${esc(n.br.t)}</b><small class="num">${n.done}/${n.total}</small></button>`;
+        <span class="bm-bic">${svg(IC[n.br.k])}${n.waiting ? `<em class="num">${n.waiting}</em>` : ""}</span><b>${esc(n.br.t)}</b><small class="num">${n.br.k === "knowledge" ? n.total : `${n.done}/${n.total}`}</small></button>`;
     }
     const l = n.l, val = leafValue(b, l);
+    if (l.type === "pending") {
+      const p = l.p, sub = p.kind === "field" || p.kind === "rule" ? p.value : p.kind === "question" ? p.title : p.summary;
+      return `<button class="bm-n bm-leaf pend${p.kind === "question" ? " ask" : ""}${S.open?.id === n.id ? " on" : ""}" data-n="${esc(n.id)}" aria-label="${esc(l.t)}">
+        <i>${p.kind === "question" ? "؟" : ""}</i><span class="bm-tip"><b>${esc(l.t)}</b><small>${esc(String(sub || "").slice(0, 60))}</small><small class="miss">مستني موافقتك</small></span></button>`;
+    }
     const cls = l.type === "action" ? "act" : l.type === "rule-new" ? "add" : n.on ? "full" : "empty";
     return `<button class="bm-n bm-leaf ${cls}${S.open?.id === n.id ? " on" : ""}" data-n="${esc(n.id)}" aria-label="${esc(l.t)}">
       <i>${l.type === "action" ? "✲" : l.type === "rule-new" ? "+" : ""}</i>
-      <span class="bm-tip"><b>${esc(l.type === "rule" ? "قاعدة" : l.t)}</b>${l.type === "rule" ? `<small>${esc(l.t)}</small>` : val ? `<small>${esc(val.slice(0, 60))}</small>` : l.type === "action" || l.type === "rule-new" ? "" : `<small class="miss">لسه ناقصة</small>`}</span></button>`;
+      <span class="bm-tip"><b>${esc(l.type === "rule" ? "قاعدة" : l.t)}</b>${l.type === "rule" || l.type === "note" ? `<small>${esc(l.type === "note" ? l.note.summary || "" : l.t)}</small>` : val ? `<small>${esc(val.slice(0, 60))}</small>` : l.type === "action" || l.type === "rule-new" ? "" : `<small class="miss">لسه ناقصة</small>`}</span></button>`;
   }
   function draw() {
     const w = S.el, b = cur();
@@ -153,7 +180,7 @@ const BrandPage = (() => {
   // النقط بتعوم بهدوء حوالين مكانها، والخطوط ماشية معاها
   // فيزيا بسيطة: كل نقطة مربوطة بزنبرك لمكانها، واللي متعلّق بيها بيمشي وراها.
   // لما تمسك نقطة وتسحبها، اللي طالع منها بيتشد معاها، ولما تسيبها بترجع مكانها وبتهتز شوية
-  const FOLLOW = { branch: .55, leaf: .9 };
+  const FOLLOW = { branch: .55, leaf: .9, add: .6 };
   function step(dt) {
     const k = 140, c = 15;
     for (const n of S.nodes) {
@@ -182,7 +209,7 @@ const BrandPage = (() => {
       if (!n.line) continue;
       // الخط بيبدأ وبيخلص عند حافة الدايرة (مش من جوّه المخ أو الأيقونة)
       const [ax, ay] = pos[n.from], [bx, by] = pos[n.id], d = Math.hypot(bx - ax, by - ay) || 1;
-      const r1 = n.from === "c" ? S.rc : 34, r2 = n.kind === "branch" ? 34 : 10;
+      const r1 = n.from === "c" ? S.rc : 34, r2 = n.kind === "branch" ? 34 : n.kind === "add" ? 24 : 10;
       const ux = (bx - ax) / d, uy = (by - ay) / d;
       n.line.setAttribute("x1", ax + ux * r1); n.line.setAttribute("y1", ay + uy * r1);
       n.line.setAttribute("x2", bx - ux * r2); n.line.setAttribute("y2", by - uy * r2);
@@ -205,8 +232,20 @@ const BrandPage = (() => {
         <div class="bm-new">${editable("@new", "", "اكتب اسم براند جديد واضغط Enter")}</div>
         ${S.brains.length > 1 ? `<button class="bm-link bad" data-del>احذف «${esc(b?.name || "")}» بكل صوره</button>` : ""}`;
     }
+    if (n.kind === "add") {
+      const tab = S.addTab || "file", srcs = [...(b?.sources || [])].reverse();
+      return `<div class="bm-ch"><span class="latin">ADD TO BRAIN</span><b>ضيف للعقل</b></div>
+        <p class="bm-note">ارمي أي حاجة عن البراند، والبرنامج يقراها ويطلّع منها اقتراحات تظهر نقط منوّرة على الخريطة، وانت توافق عليها.</p>
+        <div class="bm-pills bm-tabs">${[["file", "ارفع ملف"], ["url", "من موقع"], ["text", "اكتب"]].map(([k, t]) => `<button class="bm-pill${tab === k ? " on" : ""}" data-tab="${k}">${t}</button>`).join("")}</div>
+        ${tab === "file" ? `<label class="bm-up wide bm-drop">+<small>ارمي الملف هنا أو دوس تختار</small><small class="bm-types">PDF · Word · صور · نص</small><input type="file" multiple accept=".pdf,.docx,.txt,.md,.csv,.json,.html,.htm,image/*" data-src hidden></label>`
+          : tab === "url" ? editable("@url", "", "kochi.fit · واضغط Enter", true)
+          : editable("@text", "", "اكتب أي حاجة عن البراند: الجمهور، النبرة، العروض، اللي ممنوع… واضغط Enter")}
+        ${srcs.length ? `<ul class="bm-srcs">${srcs.map((s) => `<li class="${s.status}"><span class="bm-dot ${s.status === "done" ? "full" : s.status === "failed" ? "bad" : "busy"}"></span>
+          <span><b>${esc(s.name)}</b><small>${s.status === "working" ? "بيتقرا…" : s.status === "failed" ? esc(s.error || "فشل") : s.count ? `خلص · ${s.count} اقتراح` : "خلص · مفيش جديد"}</small></span>
+          <button data-sdel="${s.id}" title="شيله">✕</button></li>`).join("")}</ul>` : ""}`;
+    }
     if (n.kind === "branch") {
-      return `<div class="bm-ch"><span class="latin">${n.br.en}</span><b>${esc(n.br.t)}</b></div>
+      return `<div class="bm-ch"><span class="latin">${n.br.en}</span><b>${esc(n.br.t)}</b></div>${n.br.k === "knowledge" && !n.br.leaves.length ? `<p class="bm-note">لسه فاضية. ارمي ملف أو لينك من «ضيف للعقل» والمعرفة هتطلع هنا.</p>` : ""}
         <ul class="bm-list">${n.br.leaves.map((l) => `<li><button data-go="${esc(`${n.br.k}:${l.f}:${l.i ?? ""}`)}"><span class="bm-dot ${l.type === "action" || l.type === "rule-new" ? "add" : filled(b, l) ? "full" : "empty"}"></span><b>${esc(l.type === "rule" ? l.t : l.t)}</b></button></li>`).join("")}</ul>`;
     }
     const l = n.l, head = `<div class="bm-ch"><span class="latin">${n.br.en}</span><b>${esc(l.type === "rule" ? "قاعدة" : l.t)}</b></div>`;
@@ -240,6 +279,17 @@ const BrandPage = (() => {
           <button class="bm-link bad" data-vdel="${l.f}">شيل الفيديو</button>` : `<label class="bm-up wide">+<small>ارفع فيديو</small><input type="file" accept="video/*" data-vup="${l.f}" hidden></label>`);
       }
       case "multi": return head + `<p class="bm-note">بيتكتب لوحده من اللوجو والصور، وتقدر تعدّله.</p>` + l.fields.map(([k, t]) => `<div class="bm-sub"><small>${t}</small>${editable(k, b?.[k], "…", /logo_description|ui_style|style/.test(k))}</div>`).join("");
+      case "pending": {
+        const p = l.p, from = srcName(p.source);
+        const now = p.kind === "field" ? String(b?.[p.field] || "").trim() : "";
+        const top = `<div class="bm-ch"><span class="latin">SUGGESTION</span><b>${esc(p.kind === "question" ? "سؤال" : p.kind === "note" ? "معلومة جديدة" : l.t)}</b></div>${from ? `<p class="bm-note">من «${esc(from)}»</p>` : ""}`;
+        const body = p.kind === "question" ? `<p class="bm-q">${esc(p.title)}</p>` + editable("@ans", "", "اكتب الإجابة…")
+          : p.kind === "note" ? editable("@ttl", p.title, "العنوان") + (p.summary ? `<p class="bm-note">${esc(p.summary)}</p>` : "") + editable("@val", p.value, "التفاصيل")
+          : (now ? `<div class="bm-sub"><small>دلوقتي</small><p class="bm-now">${esc(now)}</p></div><div class="bm-sub"><small>المقترح</small>` : "<div>") + editable("@val", p.value, "…", p.field === "link" || p.field === "palette") + "</div>";
+        return top + body + `<div class="bm-acts"><button class="bm-go" data-ok="${p.id}">${p.kind === "question" ? "احفظ الإجابة" : "موافق"}</button><button class="bm-pill" data-no="${p.id}">لأ</button></div>`;
+      }
+      case "note": return head.replace(esc(l.t), "معلومة") + editable(`note:t:${l.i}`, l.note.title, "العنوان") + (l.note.summary ? `<p class="bm-note">${esc(l.note.summary)}</p>` : "")
+        + editable(`note:b:${l.i}`, l.note.body, "التفاصيل") + (srcName(l.note.source) ? `<p class="bm-note">من «${esc(srcName(l.note.source))}»</p>` : "") + `<button class="bm-link bad" data-ndel="${l.i}">شيل المعلومة دي</button>`;
       case "action": return head + `<p class="bm-note">البرنامج بيبص على اللوجو وصور البراند ويكتب الثيم والستايل وشكل اللوجو لوحده.</p>
         <button class="bm-go" data-analyze ${b?.status === "working" ? "disabled" : ""}>${b?.status === "working" ? "بيستنبط…" : "ابدأ الاستنباط"}</button>`;
     }
@@ -286,10 +336,16 @@ const BrandPage = (() => {
         const n = S.nodes.find((x) => x.id === S.open.id);
         if (n) { S.open.n = n; markOpen(); if (card && !keep) refreshCard(); }
       }
-      if (b.status === "working") watch();
+      if (busy(b)) watch();
       loadClients();
     } catch (err) { toast(err.message, true); }
   }
+  // مصدر جديد (ملف / لينك / كلام): بيتقرا في الخلفية والاقتراحات بتظهر لوحدها
+  function addSource(form) {
+    toast("⏳ بيقرا… الاقتراحات هتظهر على الخريطة");
+    return save(() => bAPI("/sources", { method: "POST", body: form }));
+  }
+  const busy = (b) => b?.status === "working" || (b?.sources || []).some((s) => s.status === "working");
   function watch() {
     clearInterval(S.poll);
     S.poll = setInterval(async () => {
@@ -297,8 +353,9 @@ const BrandPage = (() => {
       try {
         const b = await bAPI("");
         S.brains = S.brains.map((x) => (x.id === b.id ? b : x));
-        if (b.status !== "working") { clearInterval(S.poll); loadClients(); layout(); if (S.open) refreshCard(); return; }
+        if (!busy(b)) { clearInterval(S.poll); loadClients(); layout(); if (S.open && !S.el.querySelector(".bm-card").contains(document.activeElement)) refreshCard(); return; }
         layout();
+        if (S.open?.id === "add") refreshCard();
       } catch { clearInterval(S.poll); }
     }, 3000);
   }
@@ -309,7 +366,12 @@ const BrandPage = (() => {
     clearTimeout(typeT);
     const k = el.dataset.k, v = el.innerText.replace(/ /g, " ").trim();
     const b = cur();
-    if (!b || k === "@new" || k === "rule:new") return;
+    if (!b || k.startsWith("@") && k !== "@name" || k === "rule:new") return;
+    if (k.startsWith("note:")) {
+      const [, part, id] = k.split(":"), n = (b.notes || []).find((x) => x.id === id);
+      if (!n || (part === "t" ? n.title : n.body || "") === v || (part === "t" && !v)) return;
+      return save(() => bAPI(`/notes/${id}`, { method: "PATCH", ...jsonBody(part === "t" ? { title: v } : { body: v }) }), { card: false });
+    }
     if (k.startsWith("rule:")) {
       const rs = rulesOf(b), i = +k.slice(5);
       if (rs[i] === v) return;
@@ -379,6 +441,20 @@ const BrandPage = (() => {
         try { await api(`/api/ad-brains/${b.id}`, { method: "DELETE" }); openCard(null); await load(); loadClients(); } catch (err) { toast(err.message, true); }
         return;
       }
+      const tab = t.closest("[data-tab]");
+      if (tab) { S.addTab = tab.dataset.tab; refreshCard(); S.el.querySelector(".bm-card .bm-write")?.focus(); return; }
+      const ok = t.closest("[data-ok]");
+      if (ok) {
+        const card = S.el.querySelector(".bm-card"), val = card.querySelector('[data-k="@val"], [data-k="@ans"]')?.innerText.trim(), ttl = card.querySelector('[data-k="@ttl"]')?.innerText.trim();
+        openCard(null);
+        return save(() => bAPI(`/pending/${ok.dataset.ok}/approve`, { method: "POST", ...jsonBody({ value: val ?? null, title: ttl ?? null }) }));
+      }
+      const no = t.closest("[data-no]");
+      if (no) { openCard(null); return save(() => bAPI(`/pending/${no.dataset.no}`, { method: "DELETE" })); }
+      const sdel = t.closest("[data-sdel]");
+      if (sdel) { if (confirm("تشيل المصدر ده واقتراحاته اللي لسه مستنية؟")) save(() => bAPI(`/sources/${sdel.dataset.sdel}`, { method: "DELETE" })); return; }
+      const ndel = t.closest("[data-ndel]");
+      if (ndel) { if (confirm("تشيل المعلومة دي من العقل؟")) { openCard(null); save(() => bAPI(`/notes/${ndel.dataset.ndel}`, { method: "DELETE" })); } return; }
       const pick = t.closest("[data-pick]");
       if (pick) return patch({ [pick.dataset.pick]: pick.dataset.v });
       const von = t.closest("[data-von]");
@@ -403,7 +479,7 @@ const BrandPage = (() => {
     });
     w.addEventListener("input", (e) => {
       const el = e.target.closest(".bm-write");
-      if (!el || el.dataset.k === "@new" || el.dataset.k === "rule:new") return;
+      if (!el || (el.dataset.k.startsWith("@") && el.dataset.k !== "@name") || el.dataset.k === "rule:new") return;
       clearTimeout(typeT);
       typeT = setTimeout(() => commit(el), 900);
     });
@@ -421,6 +497,15 @@ const BrandPage = (() => {
         } catch (err) { toast(err.message, true); }
         return;
       }
+      if (k === "@url" || k === "@text") {
+        e.preventDefault();
+        if (!v) return;
+        const form = new FormData();
+        form.append(k === "@url" ? "url" : "text", v);
+        el.textContent = "";
+        return addSource(form);
+      }
+      if (k === "@ans") { e.preventDefault(); return S.el.querySelector("[data-ok]")?.click(); }
       if (k === "rule:new") {
         e.preventDefault();
         if (!v) return;
@@ -435,6 +520,7 @@ const BrandPage = (() => {
     w.addEventListener("change", (e) => {
       const el = e.target;
       if (el.dataset.up) { const f = el.files; upload(el.dataset.up, f); el.value = ""; return; }
+      if (el.matches("[data-src]")) { const form = new FormData(); [...el.files].forEach((f) => form.append("files", f)); el.value = ""; return addSource(form); }
       if (el.dataset.hadd != null && el.matches("[data-hadd]")) {
         const b = cur(), p = String(b?.palette || "").trim();
         return patch({ palette: p ? `${p}, ${el.value.toUpperCase()}` : el.value.toUpperCase() });
@@ -451,12 +537,14 @@ const BrandPage = (() => {
       }
     });
     // سحب صور ورميها على كارت الصور
-    w.addEventListener("dragover", (e) => { if (e.target.closest(".bm-card") && S.open?.n?.l?.type === "imgs") { e.preventDefault(); S.el.querySelector(".bm-card").classList.add("drop"); } });
+    w.addEventListener("dragover", (e) => { if (e.target.closest(".bm-card") && (S.open?.n?.l?.type === "imgs" || S.open?.id === "add")) { e.preventDefault(); S.el.querySelector(".bm-card").classList.add("drop"); } });
     w.addEventListener("dragleave", (e) => { if (!e.relatedTarget || !S.el.querySelector(".bm-card").contains(e.relatedTarget)) S.el.querySelector(".bm-card").classList.remove("drop"); });
     w.addEventListener("drop", (e) => {
       const card = S.el.querySelector(".bm-card");
       card.classList.remove("drop");
-      if (!e.target.closest(".bm-card") || S.open?.n?.l?.type !== "imgs") return;
+      if (!e.target.closest(".bm-card")) return;
+      if (S.open?.id === "add") { e.preventDefault(); const form = new FormData(); [...e.dataTransfer.files].forEach((f) => form.append("files", f)); return addSource(form); }
+      if (S.open?.n?.l?.type !== "imgs") return;
       e.preventDefault();
       upload(S.open.n.l.f, e.dataTransfer.files);
     });
@@ -473,7 +561,7 @@ const BrandPage = (() => {
     S.cats = cats;
     if (!S.brains.some((b) => b.id === S.id)) S.id = clientx?.active || S.brains[0]?.id || null;
     layout();
-    if (cur()?.status === "working") watch();
+    if (busy(cur())) watch();
   }
 
   async function mount(root, id) {
