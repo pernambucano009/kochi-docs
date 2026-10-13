@@ -1,0 +1,100 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// قالب «سكتش مدينة بالقلم والألوان»: صفحة كراسة رسم: خطوط قلم بني رفيعة بتترسم وبتتهز وبتفوت عن بعضها، وألوان مية خفيفة
+// بتقع فوقها مش مظبوطة على الخطوط. الدنيا كلها بني ورمادي إلا حاجة واحدة ملوّنة: بالونة حمرا بتطير في الشارع والكاميرا ماشية وراها
+// لحد ما توصل لباب المحل. 1080×1920، 12 ثانية.
+const PR = M.params({
+  title: { label: "العنوان", kind: "text", role: "product", def: "الطريق لحد عندنا" },
+  sub: { label: "تحت العنوان", kind: "text", def: "مستنيينك في نفس الركن" },
+  place: { label: "المكان والتاريخ (ركن الصفحة)", kind: "text", def: "وسط البلد · الصبح بدري" },
+  brand: { label: "اسم المحل على اليافطة", kind: "text", role: "brand", def: "كافيه الركن" },
+  accent: { label: "لون البالونة (الحاجة الوحيدة الملوّنة)", kind: "color", def: "#e0352b" },
+});
+const W = 1080, H = 1920, DUR = 12, BASE = 1380, WORLD = 3200;
+const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
+
+M.reel({
+  W, H, DUR, bg: "#f3ecdc",
+  async init(M) {
+    await Promise.all([loadFont("RQ", "TY-ArefRuqaa-700.ttf", "700"), loadFont("AM", "TY-Amiri-700.ttf", "700")]);
+    const c = M.canvas(W, H), x = c.getContext("2d"), R = M.rng(21);
+    const L = [], WASH = [];
+    const ln = (x1, y1, x2, y2, w = 2.2) => { const o = 4 + R() * 8, dx = x2 - x1, dy = y2 - y1, d = Math.hypot(dx, dy) || 1; L.push({ x1: x1 - dx / d * o * R(), y1: y1 - dy / d * o * R() + (R() - .5) * 3, x2: x2 + dx / d * o, y2: y2 + dy / d * o + (R() - .5) * 3, w: w * (.8 + R() * .4), wob: R() * 6 }); };
+    const rect = (x0, y0, w, h, lw) => { ln(x0, y0, x0 + w, y0, lw); ln(x0 + w, y0, x0 + w, y0 + h, lw); ln(x0 + w, y0 + h, x0, y0 + h, lw); ln(x0, y0 + h, x0, y0, lw); };
+    const tones = ["#c9b79a", "#a8b4b8", "#d8c3a0", "#b9a68a", "#9fa9a6"];
+    // الشارع والرصيف
+    for (let k = 0; k < 9; k++) ln(k * 380, BASE + 4 + (R() - .5) * 4, k * 380 + 400, BASE + 4 + (R() - .5) * 4, 2.6);
+    for (let k = 0; k < 9; k++) ln(k * 380 + 20, BASE + 120, k * 380 + 380, BASE + 124, 1.6);
+    for (let k = 0; k < 40; k++) { const sx = k * 80 + R() * 20; ln(sx, BASE + 4, sx - 20, BASE + 120, 1); }
+    for (let k = 0; k < 9; k++) { ln(k * 380, BASE + 250 + (R() - .5) * 6, k * 380 + 300, BASE + 252, 1.4); ln(k * 380 + 100, BASE + 330, k * 380 + 260, BASE + 332, 1.2); }
+    WASH.push({ x: 0, y: BASE + 130, w: WORLD, h: 300, col: "#a59e92", a: .18 });
+    WASH.push({ x: 0, y: BASE + 4, w: WORLD, h: 140, col: "#b8b0a2", a: .25 });
+    // عماير
+    let bx = -40;
+    while (bx < 2350) { const w = 260 + R() * 220, h = 520 + R() * 520, y0 = BASE - h;
+      rect(bx, y0, w, h, 2.4); WASH.push({ x: bx, y: y0, w, h, col: tones[(R() * tones.length) | 0], a: .32 });
+      ln(bx - 12, y0, bx + w + 12, y0, 3); ln(bx - 8, y0 + 14, bx + w + 8, y0 + 14, 1.4);           // كورنيش
+      const cols = Math.max(2, Math.floor(w / 90)), rows = Math.floor((h - 160) / 140);
+      for (let r = 0; r < rows; r++) for (let c2 = 0; c2 < cols; c2++) { const wx = bx + 30 + c2 * ((w - 60) / cols), wy = y0 + 60 + r * 140, ww = (w - 60) / cols - 34;
+        rect(wx, wy, ww, 80, 1.6); ln(wx + ww / 2, wy, wx + ww / 2, wy + 80, 1); if (R() < .4) { ln(wx - 10, wy + 92, wx + ww + 10, wy + 92, 2); for (let b = 0; b < 5; b++) ln(wx - 6 + b * (ww + 12) / 4, wy + 92, wx - 6 + b * (ww + 12) / 4, wy + 112, 1); ln(wx - 10, wy + 112, wx + ww + 10, wy + 112, 1.4); }
+        if (R() < .5) WASH.push({ x: wx, y: wy, w: ww, h: 80, col: "#8c9aa0", a: .25 }); }
+      if (R() < .5) { const ax = bx + 20, aw = w - 40; ln(ax, BASE - 170, ax + aw, BASE - 170, 2); ln(ax, BASE - 170, ax - 20, BASE - 120, 2); ln(ax + aw, BASE - 170, ax + aw + 20, BASE - 120, 2); ln(ax - 20, BASE - 120, ax + aw + 20, BASE - 120, 2); for (let s = 0; s < 6; s++) ln(ax + s * aw / 5, BASE - 170, ax - 20 + s * (aw + 40) / 5, BASE - 120, 1); }
+      bx += w + 10 + R() * 30; }
+    // عمدان نور وشجر
+    for (let k = 0; k < 6; k++) { const lx = 200 + k * 420 + R() * 60; ln(lx, BASE, lx, BASE - 420, 2.4); ln(lx, BASE - 420, lx + 50, BASE - 440, 2); rect(lx + 40, BASE - 450, 30, 40, 1.6); }
+    // المحل في الآخر
+    const sx = 2420, sw = 640, sh = 820; rect(sx, BASE - sh, sw, sh, 3); WASH.push({ x: sx, y: BASE - sh, w: sw, h: sh, col: "#d8c3a0", a: .38 });
+    rect(sx + 60, BASE - sh + 90, sw - 120, 140, 2.6); WASH.push({ x: sx + 60, y: BASE - sh + 90, w: sw - 120, h: 140, col: "#efe4cc", a: .7 });
+    rect(sx + 220, BASE - 420, 200, 420, 2.6); rect(sx + 40, BASE - 420, 150, 220, 2); rect(sx + 450, BASE - 420, 150, 220, 2);
+    for (let s = 0; s < 9; s++) ln(sx + 20 + s * 75, BASE - sh + 260, sx + s * 75, BASE - sh + 330, 1.6); ln(sx, BASE - sh + 260, sx + sw, BASE - sh + 260, 2); ln(sx - 20, BASE - sh + 330, sx + sw + 20, BASE - sh + 330, 2);
+    L.forEach((l) => (l.reveal = Math.min(l.x1, l.x2)));
+    WASH.forEach((w2) => { w2.dx = (R() - .5) * 26; w2.dy = (R() - .5) * 20; w2.seed = R() * 100; });
+    return { x, L, WASH, sx, sw, sh };
+  },
+  seek(t, C, M) {
+    const { x, L, WASH, sx, sw, sh } = C, { seg, clamp, cubicIO, smooth, hash } = M, io = (k) => cubicIO(clamp(k)), A = PR.accent, INK = "#5a3d24";
+    x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = "#f3ecdc"; x.fillRect(0, 0, W, H);
+    for (let i = 0; i < 1400; i++) { x.fillStyle = "rgba(140,110,70,.05)"; x.fillRect(hash(i) * W, hash(i + 1400) * H, 2, 2); }
+    const cam = 2200 * io(seg(t, .3, 9.0)), z = 1.12 - .2 * io(seg(t, 9.0, 11.0)), ox = -cam;
+    x.save(); x.translate(540, 1100); x.scale(z, z); x.translate(-540, -1100); x.translate(ox, 0);
+    const front = cam + 150 + 1000 * io(seg(t, 0, 2.2)), vis = (rx) => clamp((front - rx) / 380);   // اللي بيدخل الكادر بيترسم
+    // ألوان المية (بعد الخطوط بشوية، مش مظبوطة عليها)
+    WASH.forEach((w2) => { const k = clamp((front - 250 - w2.x) / 400); if (k <= 0 || w2.x > cam + 1500 || w2.x + w2.w < cam - 200) return;
+      x.save(); x.globalAlpha = w2.a * k; x.fillStyle = w2.col; x.beginPath();
+      const X0 = w2.x + w2.dx, Y0 = w2.y + w2.dy, wob = (u, s2) => Math.sin(u * 9 + w2.seed + s2) * 6 + Math.sin(u * 23 + s2) * 3;
+      for (let i = 0; i <= 10; i++) x.lineTo(X0 + w2.w * i / 10, Y0 + wob(i / 10, 1)); for (let i = 0; i <= 10; i++) x.lineTo(X0 + w2.w + wob(i / 10, 2), Y0 + w2.h * i / 10);
+      for (let i = 10; i >= 0; i--) x.lineTo(X0 + w2.w * i / 10, Y0 + w2.h + wob(i / 10, 3)); for (let i = 10; i >= 0; i--) x.lineTo(X0 + wob(i / 10, 4), Y0 + w2.h * i / 10); x.closePath(); x.fill();
+      x.globalAlpha = w2.a * k * .6; x.strokeStyle = w2.col; x.lineWidth = 3; x.stroke(); x.restore(); });
+    // الخطوط بقلم الحبر (بتترسم من أولها)
+    x.strokeStyle = INK; x.lineCap = "round";
+    L.forEach((l) => { if (l.reveal > cam + 1500 || Math.max(l.x1, l.x2) < cam - 200) return; const k = vis(l.reveal); if (k <= 0) return;
+      x.lineWidth = l.w; x.beginPath(); const n = 6; for (let i = 0; i <= n * k; i++) { const u = i / n, px = l.x1 + (l.x2 - l.x1) * u, py = l.y1 + (l.y2 - l.y1) * u + Math.sin(u * 7 + l.wob) * 1.6; i ? x.lineTo(px, py) : x.moveTo(px, py); } x.stroke(); });
+    // يافطة المحل بخط الإيد
+    const sk = clamp((front - 250 - sx) / 400); if (sk > 0) { x.globalAlpha = sk; x.fillStyle = INK; x.font = `700 ${M.fit(PR.brand, "RQ", sw - 160, 96, 40, "700")}px RQ`; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.brand, sx + sw / 2, BASE - sh + 190); x.globalAlpha = 1; }
+    // البالونة: الحاجة الوحيدة الملونة
+    const bxw = cam + 420 + Math.sin(t * .9) * 40 + 380 * io(seg(t, 8.6, 10.2)) * 0, byw = 760 + Math.sin(t * 1.4) * 40 - 30 * io(seg(t, 9, 10.5));
+    const tx = t < 8.6 ? bxw : bxw + (sx + sw / 2 + 140 - bxw) * io(seg(t, 8.6, 10.2)), ty = t < 8.6 ? byw : byw + (BASE - sh - 60 - byw) * io(seg(t, 8.6, 10.2));
+    x.strokeStyle = INK; x.lineWidth = 1.8; x.beginPath(); x.moveTo(tx, ty + 120); for (let i = 1; i <= 12; i++) x.lineTo(tx + Math.sin(i * .7 + t * 3) * 10 * (i / 12), ty + 120 + i * 26); x.stroke();
+    x.fillStyle = A; x.beginPath(); x.ellipse(tx, ty, 92, 112, Math.sin(t * 1.1) * .08, 0, Math.PI * 2); x.fill();
+    x.beginPath(); x.moveTo(tx - 14, ty + 108); x.lineTo(tx + 14, ty + 108); x.lineTo(tx, ty + 126); x.fill();
+    x.fillStyle = "rgba(255,255,255,.45)"; x.beginPath(); x.ellipse(tx - 34, ty - 44, 18, 34, -.5, 0, Math.PI * 2); x.fill();
+    x.strokeStyle = INK; x.lineWidth = 2; x.beginPath(); x.ellipse(tx + 3, ty + 2, 92, 112, Math.sin(t * 1.1) * .08 + .04, 0, Math.PI * 2); x.stroke();
+    x.restore();
+    // حواف الصفحة بتدوب + ركن المكان والتاريخ
+    const eg = x.createLinearGradient(0, 0, 0, H); eg.addColorStop(0, "#f3ecdc"); eg.addColorStop(.17, "rgba(243,236,220,0)"); eg.addColorStop(.8, "rgba(243,236,220,0)"); eg.addColorStop(1, "#f3ecdc"); x.fillStyle = eg; x.fillRect(0, 0, W, H);
+    x.fillStyle = INK; x.font = "700 40px RQ"; x.textAlign = "right"; x.direction = "rtl"; x.globalAlpha = .8; x.fillText(PR.place, 1010, 1840); x.globalAlpha = 1;
+    // العنوان بخط الإيد فوق
+    const ta = io(seg(t, 9.6, 10.4)); if (ta > 0) { x.save(); x.beginPath(); x.rect(W - W * ta - 20, 0, W * ta + 40, 600); x.clip(); x.fillStyle = INK; x.font = `700 ${M.fit(PR.title, "RQ", 900, 130, 60, "700")}px RQ`; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.title, 540, 300); x.restore();
+      x.globalAlpha = io(seg(t, 10.3, 10.9)); x.fillStyle = INK; x.font = `700 ${M.fit(PR.sub, "AM", 860, 56, 30, "700")}px AM`; x.textAlign = "center"; x.fillText(PR.sub, 540, 400); x.fillStyle = A; x.fillRect(540 - 80, 432, 160, 5); x.globalAlpha = 1; }
+  },
+  sound(A) {
+    const N = A.midi;
+    // أكورديون/جيتار مدينة هادي + خربشة قلم
+    const ch = [[60, 64, 67], [57, 60, 64], [53, 57, 60], [55, 59, 62]];
+    for (let i = 0; i < 24; i++) { const c = ch[Math.floor(i / 6) % 4]; A.pluck(i * .5, N(c[i % 3] + 12), .06, .7); if (i % 3 === 0) A.pluck(i * .5, N(c[0]), .05, 1.2); }
+    for (let s = .3; s < 9; s += .18) A.nz(s, .07, "bandpass", 4200, .012, 3);
+    A.pad(8.6, [N(48), N(55), N(60), N(64)], 3.4, .03); A.pluck(10.2, N(76), .1, 1.6); A.tone(10.2, N(88), .4, "sine", .03);
+  },
+});
+</script>
+</body></html>

@@ -1,0 +1,101 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// قالب «قص ورق أحمر»: كل حاجة ورقة حمرا متقصوصة بالمقص ومتحطوطة على ورقة فاتحة: الرسم هو اللي اتقص، والخروم هي مكان النور.
+// وردة مطبّقة بتتفتح، بعدين برواز مسنن فيه بيت وشجرة وعصافير بجناحات بتترفرف وشخصية بمفاصل ماشية بهدية، وفي الآخر
+// الاسم مقصوص جوه دايرة. 1080×1920، 12 ثانية.
+const PR = M.params({
+  title: { label: "العنوان", kind: "text", role: "product", def: "كل سنة وإنتم طيبين" },
+  sub: { label: "تحت العنوان", kind: "text", def: "هدايا العيد وصلت" },
+  brand: { label: "اسم البراند (بيتقص جوه الدايرة)", kind: "text", role: "brand", def: "هدية" },
+  red: { label: "لون الورق", kind: "color", def: "#d4202a" },
+  ground: { label: "لون الورقة اللي تحت", kind: "color", def: "#f6efe2" },
+});
+const W = 1080, H = 1920, DUR = 12, TAU = Math.PI * 2;
+const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
+
+M.reel({
+  W, H, DUR, bg: PR.ground,
+  async init(M) {
+    await Promise.all([loadFont("LZ", "SM-Lalezar.ttf"), loadFont("RQ", "TY-ArefRuqaa-700.ttf", "700")]);
+    const c = M.canvas(W, H), x = c.getContext("2d"), L = document.createElement("canvas"); L.width = W; L.height = H;
+    return { x, q: L.getContext("2d") };
+  },
+  seek(t, C, M) {
+    const { x, q } = C, { seg, clamp, cubicIO, springO, hash, smooth } = M, io = (k) => cubicIO(clamp(k)), RED = PR.red;
+    const back = (k) => { k = clamp(k); const c1 = 1.7, c3 = c1 + 1; return 1 + c3 * Math.pow(k - 1, 3) + c1 * Math.pow(k - 1, 2); };
+    x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = PR.ground; x.fillRect(0, 0, W, H);
+    for (let i = 0; i < 1600; i++) { x.fillStyle = "rgba(150,120,80,.05)"; x.fillRect(hash(i) * W, hash(i + 1600) * H, 2, 2); }
+    // كل الورق الأحمر بيترسم على طبقة، والخروم بتتقص منها، وبعدين بتتحط بضل
+    q.setTransform(1, 0, 0, 1, 0, 0); q.clearRect(0, 0, W, H);
+    const cut = (fn) => { q.save(); q.globalCompositeOperation = "destination-out"; q.fillStyle = "#000"; q.beginPath(); fn(); q.fill(); q.restore(); };
+    const cres = (cx, cy, r, a) => { q.moveTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r); q.arc(cx, cy, r, a, a + Math.PI); q.arc(cx + Math.cos(a + Math.PI / 2) * r * .35, cy + Math.sin(a + Math.PI / 2) * r * .35, r * .82, a + Math.PI, a, true); q.closePath(); };
+    const saw = (pts, n, d) => { // حافة مسننة
+      q.beginPath(); for (let i = 0; i < pts.length; i++) { const [ax, ay] = pts[i], [bx, by] = pts[(i + 1) % pts.length]; for (let k = 0; k < n; k++) { const u = k / n, v = (k + .5) / n, nx = -(by - ay), ny = bx - ax, nl = Math.hypot(nx, ny) || 1; q.lineTo(ax + (bx - ax) * u, ay + (by - ay) * u); q.lineTo(ax + (bx - ax) * v + nx / nl * d, ay + (by - ay) * v + ny / nl * d); } } q.closePath(); };
+    q.fillStyle = RED;
+    // ١) وردة مطبّقة بتتفتح (٨ أجزاء)
+    const rose = (cx, cy, R0, open, rot, hole) => {
+      for (let i = 0; i < 8; i++) { const a = rot + open * i * TAU / 8; q.save(); q.translate(cx, cy); q.rotate(a); q.fillStyle = RED;
+        q.beginPath(); q.moveTo(0, 0); q.quadraticCurveTo(R0 * .55, -R0 * .35, R0, -R0 * .05); q.quadraticCurveTo(R0 * .8, R0 * .25, R0 * .62, R0 * .36); q.lineTo(0, 0); q.fill();
+        q.save(); q.globalCompositeOperation = "destination-out"; q.beginPath(); cres(R0 * .62, 0, R0 * .14, -.3); q.moveTo(R0 * .35 + 18, R0 * .05); q.arc(R0 * .35, R0 * .05, 18, 0, TAU); q.moveTo(R0 * .86 + 10, 0); q.arc(R0 * .86, 0, 10, 0, TAU);
+        for (let k = 0; k < 5; k++) { const u = .2 + k * .14; q.moveTo(R0 * u, -R0 * .06 * (1 + k * .5)); q.lineTo(R0 * (u + .05), -R0 * .02); q.lineTo(R0 * u, R0 * .02); } q.fill(); q.restore(); q.restore(); }
+      q.beginPath(); q.arc(cx, cy, R0 * .3, 0, TAU); q.fill(); if (hole) cut(() => { q.moveTo(cx + R0 * .22, cy); q.arc(cx, cy, R0 * .22, 0, TAU); });
+    };
+    const s1 = t < 3.6;
+    if (s1) { const op = io(seg(t, .4, 2.2)), sc = .6 + .4 * back(seg(t, .2, .9)); rose(540, 900, 420 * sc, op, -Math.PI / 2 + (1 - op) * .4 + t * .05, true); }
+    // ٢) برواز الشباك المسنن والمشهد
+    const s2k = io(seg(t, 3.4, 4.2)) * (1 - io(seg(t, 8.0, 8.6)));
+    if (s2k > 0) {
+      q.save(); q.translate(0, (1 - s2k) * 300); q.globalAlpha = 1;
+      q.fillStyle = RED; q.fillRect(90, 470, 900, 1080); cut(() => { q.rect(130, 510, 820, 1000); });
+      q.fillStyle = RED; saw([[130, 510], [950, 510], [950, 1510], [130, 1510]], 24, 18); q.fill(); cut(() => { saw([[150, 530], [930, 530], [930, 1490], [150, 1490]], 24, 14); });
+      // أركان زخرفة
+      for (const [cx, cy] of [[150, 530], [930, 530], [930, 1490], [150, 1490]]) { q.beginPath(); q.arc(cx, cy, 70, 0, TAU); q.fill(); cut(() => { cres(cx, cy, 40, hash(cx) * 6); q.moveTo(cx + 10, cy); q.arc(cx, cy, 10, 0, TAU); }); }
+      // الأرض
+      q.beginPath(); q.moveTo(150, 1490); for (let k = 0; k <= 20; k++) q.lineTo(150 + k * 39, 1380 + Math.sin(k * .9) * 14); q.lineTo(930, 1490); q.fill(); cut(() => { for (let k = 0; k < 12; k++) cres(200 + k * 62, 1440, 16, Math.PI); });
+      // البيت بقبة وباب مقوّس
+      q.beginPath(); q.rect(560, 1060, 300, 340); q.moveTo(540, 1070); q.lineTo(710, 930); q.lineTo(880, 1070); q.fill();
+      cut(() => { q.moveTo(660, 1400); q.lineTo(660, 1290); q.arc(710, 1290, 50, Math.PI, 0); q.lineTo(760, 1400); q.closePath(); for (const wx of [610, 810]) { q.moveTo(wx - 30, 1160); q.rect(wx - 30, 1130, 60, 70); } cres(710, 1010, 32, -Math.PI / 2); });
+      cut(() => { for (let k = 0; k < 9; k++) { q.moveTo(575 + k * 32, 1225); q.lineTo(590 + k * 32, 1250); q.lineTo(560 + k * 32, 1250); q.closePath(); } });
+      // شجرة بورق هلالي
+      q.fillRect(305, 1050, 40, 360); q.beginPath(); q.arc(325, 930, 190, 0, TAU); q.fill();
+      cut(() => { for (let k = 0; k < 16; k++) { const a = k / 16 * TAU, r = 60 + (k % 3) * 45; cres(325 + Math.cos(a) * r, 930 + Math.sin(a) * r, 26, a + Math.sin(t * 2 + k) * .2); } q.moveTo(345, 930); q.arc(325, 930, 20, 0, TAU); });
+      // عصافير بجناح بيرفرف (مفصل)
+      for (let b = 0; b < 2; b++) { const bx = 300 + ((t - 3.4) * 90 + b * 330) % 650, by = 650 + b * 90 + Math.sin(t * 3 + b) * 20, fl = Math.sin(t * 12 + b * 2) * .7;
+        q.save(); q.translate(bx, by); q.fillStyle = RED; q.beginPath(); q.ellipse(0, 0, 50, 24, 0, 0, TAU); q.moveTo(-50, 0); q.lineTo(-90, -22); q.lineTo(-84, 14); q.closePath(); q.moveTo(48, -8); q.lineTo(70, -2); q.lineTo(48, 6); q.fill();
+        q.save(); q.rotate(-.3 + fl); q.beginPath(); q.moveTo(-10, -6); q.quadraticCurveTo(-20, -70, 26, -64); q.quadraticCurveTo(14, -24, 12, -6); q.fill(); q.restore();
+        cut(() => { q.moveTo(36, -6); q.arc(32, -6, 5, 0, TAU); cres(-10, 4, 12, 0); }); q.restore(); }
+      // شخصية بمفاصل ماشية وشايلة هدية
+      const wk = io(seg(t, 4.2, 7.8)), px = 230 + 300 * wk, ph = (t - 4.2) * 9, py = 1380 - Math.abs(Math.sin(ph)) * 6;
+      q.save(); q.translate(px, py); q.fillStyle = RED;
+      for (const s of [1, -1]) { q.save(); q.translate(0, -120); q.rotate(Math.sin(ph) * .4 * s); q.fillRect(-9, 0, 18, 120); q.restore(); }
+      q.beginPath(); q.moveTo(-40, -120); q.lineTo(40, -120); q.lineTo(26, -260); q.lineTo(-26, -260); q.fill();
+      q.beginPath(); q.arc(4, -300, 38, 0, TAU); q.fill(); q.beginPath(); q.moveTo(36, -305); q.lineTo(52, -292); q.lineTo(34, -288); q.fill();
+      q.save(); q.translate(16, -240); q.rotate(-.9); q.fillRect(-8, 0, 16, 80); q.restore(); q.fillRect(50, -232, 70, 60); q.fillRect(44, -246, 82, 18);
+      cut(() => { q.moveTo(20, -306); q.arc(16, -306, 6, 0, TAU); cres(0, -190, 14, Math.PI / 2); q.rect(80, -232, 10, 60); cres(85, -260, 12, Math.PI); q.moveTo(-10, -150); q.arc(-14, -150, 6, 0, TAU); });
+      q.restore();
+      q.restore();
+    }
+    // ٣) الاسم مقصوص جوه دايرة وردية + العنوان
+    if (t > 8.2) { const k = back(seg(t, 8.3, 9.0)); q.save(); q.translate(540, 820); q.scale(k, k); q.translate(-540, -820);
+      rose(540, 820, 400, 1, -Math.PI / 2 + t * .06, false); q.fillStyle = RED; q.beginPath(); q.arc(540, 820, 230, 0, TAU); q.fill();
+      q.save(); q.globalCompositeOperation = "destination-out"; q.font = `${M.fit(PR.brand, "LZ", 360, 170, 70)}px LZ`; q.textAlign = "center"; q.textBaseline = "middle"; q.direction = "rtl"; q.fillText(PR.brand, 540, 836); q.restore(); q.restore(); }
+    // نحط الورق الأحمر بضل خفيف (ورقة فوق ورقة)
+    x.save(); x.shadowColor = "rgba(80,20,10,.35)"; x.shadowBlur = 10; x.shadowOffsetX = 5; x.shadowOffsetY = 8; x.drawImage(q.canvas, 0, 0); x.restore();
+    // كلام
+    const ta = io(seg(t, 1.6, 2.4)) * (1 - io(seg(t, 3.2, 3.6))) + io(seg(t, 9.0, 9.7));
+    if (ta > 0) { x.globalAlpha = Math.min(1, ta); x.fillStyle = RED; x.font = `700 ${M.fit(PR.title, "RQ", 900, 120, 50, "700")}px RQ`; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.title, 540, t > 8 ? 1420 : 1560); x.globalAlpha = 1; }
+    const sa = io(seg(t, 9.8, 10.5)); if (sa > 0) { x.globalAlpha = sa; x.fillStyle = "#7a2a1e"; x.font = `400 ${M.fit(PR.sub, "LZ", 860, 70, 34)}px LZ`; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.sub, 540, 1560); x.globalAlpha = 1; }
+  },
+  sound(A) {
+    const N = A.midi;
+    // مقص وورق + قانون/بيانو فرحان
+    for (let k = 0; k < 10; k++) A.nz(.3 + k * .17, .06, "highpass", 5000, .06, 1);
+    A.whoosh(.4, 1.8, .05); A.pluck(2.2, N(79), .1, 1.2);
+    const mel = [67, 69, 71, 74, 72, 71, 69, 67, 71, 74, 76, 74, 72, 71, 69, 67];
+    mel.forEach((m, i) => A.pluck(3.4 + i * .3, N(m), .07, .6));
+    for (let b = 0; b < 20; b++) { A.kick(2 + b * .5, .2); A.hat(2.25 + b * .5, .03); }
+    A.whoosh(8.1, .6, .06); A.hit(8.4, .35); A.pad(8.4, [N(55), N(62), N(67), N(71)], 3.6, .035); A.pluck(9.0, N(83), .1, 1.6);
+  },
+});
+</script>
+</body></html>

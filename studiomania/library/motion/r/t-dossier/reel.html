@@ -1,0 +1,139 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// قالب «ملف قضية مطبوع»: الفيلم كله ورقة أرشيف كريمي: نقط هالفتون بأحبار سادة متطبعة فوق بعض، عناوين تقيلة بضل مزاح،
+// المشتبه فيه بيقع في صورة الفيش بالطول، دليل برقم عملاق متملي نقط، وختم "القضية اتقفلت" بيخبط بهزة. انتقالات بمسحة نقط. 1080×1920، 12 ثانية.
+const PR = M.params({
+  case: { label: "رقم القضية", kind: "text", def: "٠٤٧" },
+  title: { label: "عنوان القضية", kind: "text", role: "product", def: "لغز الجوع العصر" },
+  hook: { label: "شريط أول مشهد", kind: "text", def: "كل يوم الساعة ٤ نفس الحكاية" },
+  suspect: { label: "اسم المشتبه فيه", kind: "text", def: "الجوع" },
+  clue: { label: "شريط المشتبه فيه", kind: "text", def: "بيظهر فجأة وبيبوّظ المود" },
+  num: { label: "الرقم الكبير", kind: "text", def: "٣" },
+  unit: { label: "تحت الرقم", kind: "text", def: "دقايق ويوصلك سناك صحي" },
+  stamp: { label: "الختم", kind: "text", def: "اتقفلت" },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "سناك بوكس" },
+  ink: { label: "الحبر الغامق", kind: "color", def: "#1f2a4d" },
+  hi: { label: "حبر التمييز", kind: "color", def: "#ffcf2e" },
+  pink: { label: "حبر الضل", kind: "color", def: "#ff5c8a" },
+  red: { label: "حبر الختم", kind: "color", def: "#e5322d" },
+});
+const W = 1080, H = 1920, DUR = 12, PAPER = "#f3e9d2";
+const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
+
+M.reel({
+  W, H, DUR, bg: PAPER,
+  async init(M) {
+    await Promise.all([loadFont("AM", "TY-Amiri-700.ttf", "700"), loadFont("LZ", "SM-Lalezar.ttf"), loadFont("CH", "SM-Changa.ttf"), loadFont("PB", "TY-PlexArabic-700.ttf", "700")]);
+    const c = M.canvas(W, H), x = c.getContext("2d");
+    // طبقة الورق (مرة واحدة): بقع خفيفة + فيجنيت + طبقة في النص
+    const p = document.createElement("canvas"); p.width = W; p.height = H; const q = p.getContext("2d"), R = M.rng(3);
+    q.fillStyle = PAPER; q.fillRect(0, 0, W, H);
+    for (let i = 0; i < 260; i++) { const r = 60 + R() * 220; const g = q.createRadialGradient(R() * W, R() * H, 0, R() * W, R() * H, r); }
+    for (let i = 0; i < 180; i++) { const px = R() * W, py = R() * H, r = 50 + R() * 200, g = q.createRadialGradient(px, py, 0, px, py, r); g.addColorStop(0, `rgba(160,120,60,${.03 + R() * .04})`); g.addColorStop(1, "rgba(160,120,60,0)"); q.fillStyle = g; q.fillRect(px - r, py - r, r * 2, r * 2); }
+    for (let i = 0; i < 9000; i++) { q.fillStyle = `rgba(120,90,50,${R() * .08})`; q.fillRect(R() * W, R() * H, 1.5, 1.5); }
+    const v = q.createRadialGradient(540, 960, 600, 540, 960, 1250); v.addColorStop(0, "rgba(0,0,0,0)"); v.addColorStop(1, "rgba(90,60,20,.28)"); q.fillStyle = v; q.fillRect(0, 0, W, H);
+    q.fillStyle = "rgba(90,60,20,.07)"; q.fillRect(0, 955, W, 3); q.fillStyle = "rgba(255,255,255,.25)"; q.fillRect(0, 958, W, 2);
+    return { x, paper: p };
+  },
+  seek(t, C, M) {
+    const { x, paper } = C, { seg, clamp, hash, expo } = M, INK = PR.ink, HI = PR.hi, PK = PR.pink, RD = PR.red;
+    const back = (k) => { k = clamp(k); const c1 = 1.9, c3 = c1 + 1; return 1 + c3 * Math.pow(k - 1, 3) + c1 * Math.pow(k - 1, 2); };
+    // هزة وفلاش
+    const slam = 9.55, shk = Math.max(0, 1 - (t - slam) / .5) * (t > slam ? 1 : 0), sh = 22 * shk * shk;
+    x.setTransform(1, 0, 0, 1, Math.sin(t * 97) * sh, Math.cos(t * 83) * sh);
+    x.fillStyle = PAPER; x.fillRect(-40, -40, W + 80, H + 80);
+    // نقط هالفتون: شبكة مايلة، الحجم حسب الكثافة
+    const dots = (ang, step, dens, col, clipFn) => { x.save(); if (clipFn) { x.beginPath(); clipFn(); x.clip(); } x.globalCompositeOperation = "multiply"; x.fillStyle = col; x.beginPath();
+      const ca = Math.cos(ang), sa = Math.sin(ang); for (let i = -60; i < 60; i++) for (let j = -60; j < 60; j++) { const px = 540 + (i * ca - j * sa) * step, py = 960 + (i * sa + j * ca) * step; if (px < -20 || px > W + 20 || py < -20 || py > H + 20) continue; const d = dens(px, py); if (d <= .02) continue; const r = Math.min(1, d) * step * .7; x.moveTo(px + r, py); x.arc(px, py, r, 0, Math.PI * 2); } x.fill(); x.restore(); };
+    const head = (s, xr, y, size, k, col = INK) => { // عنوان بضل مزاح وحروف بتنط
+      x.save(); x.font = `700 ${size}px AM`; x.textAlign = "right"; x.direction = "rtl"; const ws = [...s.split(" ")]; let cx = xr;
+      ws.forEach((w, i) => { const kk = back(clamp(k * 1.6 - i * .25)); if (kk <= 0) { cx -= x.measureText(w + " ").width; return; } const dy = (1 - kk) * 80;
+        x.globalCompositeOperation = "multiply"; x.fillStyle = PK; x.fillText(w, cx + 8, y + 8 - dy); x.globalCompositeOperation = "source-over"; x.fillStyle = col; x.fillText(w, cx, y - dy); cx -= x.measureText(w + " ").width; });
+      x.restore(); };
+    const bar = (s, y, k, key) => { if (k <= 0) return; const kk = back(k); x.save(); x.font = `700 ${M.fit(s, "PB", 820, 46, 26, "700")}px PB`; x.textAlign = "center"; x.direction = "rtl"; const w = x.measureText(s).width + 80;
+      x.translate(540, y + (1 - kk) * 120); x.globalCompositeOperation = "multiply"; x.fillStyle = PK; x.beginPath(); x.roundRect(-w / 2 + 8, -48 + 8, w, 92, 46); x.fill(); x.globalCompositeOperation = "source-over";
+      x.fillStyle = INK; x.beginPath(); x.roundRect(-w / 2, -48, w, 92, 46); x.fill(); x.fillStyle = PAPER; x.fillText(s, 0, 14); x.restore(); };
+    const hud = (dark) => { const col = dark ? PAPER : INK; x.fillStyle = col; x.font = "700 34px CH"; x.textAlign = "right"; x.direction = "rtl"; x.fillText("قضية رقم " + PR.case, 1010, 96);
+      x.textAlign = "left"; x.fillStyle = RD; if (Math.floor(t * 2) % 2 === 0) { x.beginPath(); x.arc(80, 84, 12, 0, Math.PI * 2); x.fill(); } x.fillStyle = col; x.fillText("تسجيل", 104, 96); };
+    // ── المشاهد
+    const sc = t < 2.9 ? 0 : t < 6.2 ? 1 : t < 9.1 ? 2 : 3;
+    if (sc === 0) {
+      dots(.26, 24, (px, py) => Math.max(0, 1 - Math.hypot(px - 820, py - 1300) / 700) * .9, HI);
+      dots(-.4, 22, (px, py) => Math.max(0, (py - 1200) / 900) * .8, PK);
+      // فولدر
+      const fk = back(seg(t, .3, .9)); x.save(); x.translate(540, 1180 + (1 - fk) * 600); x.rotate(-.04);
+      x.fillStyle = "#e3c27a"; x.strokeStyle = INK; x.lineWidth = 8; x.beginPath(); x.moveTo(-360, -300); x.lineTo(-120, -300); x.lineTo(-90, -340); x.lineTo(120, -340); x.lineTo(150, -300); x.lineTo(360, -300); x.lineTo(360, 330); x.lineTo(-360, 330); x.closePath(); x.fill(); x.stroke();
+      x.fillStyle = PAPER; x.beginPath(); x.rect(-300, -240, 560, 120); x.fill(); x.stroke(); x.fillStyle = INK; x.font = "700 64px CH"; x.textAlign = "center"; x.direction = "rtl"; x.fillText("سرّي", -20, -158);
+      x.restore();
+      head("ملف القضية", 1000, 400, 150, seg(t, .5, 1.3)); head(PR.title, 1000, 580, M.fit(PR.title, "AM", 900, 120, 60, "700"), seg(t, .9, 1.7), INK);
+      bar(PR.hook, 1700, seg(t, 1.6, 2.0), true); hud(false);
+    } else if (sc === 1) {
+      // صورة الفيش: خطوط الطول
+      x.fillStyle = INK; x.fillRect(0, 0, W, H); dots(.5, 22, (px, py) => .35 + .25 * Math.sin(py * .004), "#3a4a80");
+      x.strokeStyle = PAPER; x.lineWidth = 3; x.fillStyle = PAPER; x.font = "700 30px CH"; x.textAlign = "left"; x.direction = "ltr";
+      for (let k = 0; k < 9; k++) { const y = 1500 - k * 110; x.globalAlpha = .7; x.beginPath(); x.moveTo(80, y); x.lineTo(1000, y); x.stroke(); x.fillText(String(140 + k * 10).replace(/\d/g, (d) => "٠١٢٣٤٥٦٧٨٩"[d]), 90, y - 12); } x.globalAlpha = 1;
+      // المشتبه فيه: دونات بعيون ومخطط تقيل وبتنفس
+      const dk = seg(t, 3.1, 3.6), land = t > 3.6 ? Math.exp(-(t - 3.6) * 6) * Math.cos((t - 3.6) * 25) : 0, sq = 1 + .25 * land, by = 1050 - (1 - dk * dk) * 1300;
+      const boil = Math.floor(t * 10), bj = (n) => (hash(boil * 13 + n) - .5) * 5;
+      x.save(); x.translate(540, by); x.scale(1 / sq, sq * (1 + .015 * Math.sin(t * 3)));
+      x.lineWidth = 9; x.strokeStyle = INK; x.fillStyle = "#e7a35a"; x.beginPath(); x.ellipse(bj(1), bj(2), 300, 290, 0, 0, Math.PI * 2); x.fill(); x.stroke();
+      x.fillStyle = "#ff8fb1"; x.beginPath(); x.ellipse(bj(3), -40 + bj(4), 270, 220, 0, 0, Math.PI * 2); x.fill(); x.stroke();
+      x.fillStyle = INK; x.beginPath(); x.ellipse(0, 20, 70, 55, 0, 0, Math.PI * 2); x.fill();
+      ["#fff", HI, "#6ad3ff", "#fff", "#7be08a"].forEach((cc, i) => { for (let k = 0; k < 4; k++) { const a = i * 1.3 + k * 1.6, r = 150 + 60 * hash(i * 9 + k); x.save(); x.translate(Math.cos(a) * r, -40 + Math.sin(a) * r * .75); x.rotate(a); x.fillStyle = cc; x.fillRect(-16, -5, 32, 10); x.restore(); } });
+      const blink = (t > 4.8 && t < 4.95) ? .1 : 1;
+      for (const ex of [-90, 90]) { x.fillStyle = "#fff"; x.beginPath(); x.ellipse(ex, -120, 46, 54 * blink, 0, 0, Math.PI * 2); x.fill(); x.stroke(); x.fillStyle = INK; x.beginPath(); x.ellipse(ex + 8, -112, 22, 26 * blink, 0, 0, Math.PI * 2); x.fill(); x.fillStyle = "#fff"; x.beginPath(); x.arc(ex + 14, -122, 7, 0, Math.PI * 2); x.fill(); }
+      x.lineWidth = 9; x.beginPath(); x.moveTo(-60, 120); x.quadraticCurveTo(0, 90, 60, 125); x.stroke();
+      x.restore();
+      // لوحة الاسم
+      const nk = back(seg(t, 3.8, 4.3)); x.save(); x.translate(540, 1420 + (1 - nk) * 400); x.fillStyle = PAPER; x.strokeStyle = INK; x.lineWidth = 7; x.beginPath(); x.rect(-300, -80, 600, 160); x.fill(); x.stroke();
+      x.fillStyle = INK; x.font = "700 30px CH"; x.textAlign = "center"; x.direction = "rtl"; x.fillText("المشتبه فيه", 0, -28); x.font = `${M.fit(PR.suspect, "LZ", 540, 80, 40)}px LZ`; x.fillText(PR.suspect, 0, 50); x.restore();
+      head("المشتبه فيه", 1000, 300, 120, seg(t, 3.2, 3.9), PAPER);
+      bar(PR.clue, 1700, seg(t, 4.4, 4.8)); hud(true);
+      const fl = Math.max(0, 1 - Math.abs(t - 3.65) / .18) * .9; if (fl > 0) { x.fillStyle = `rgba(255,255,255,${fl})`; x.fillRect(-40, -40, W + 80, H + 80); }
+    } else if (sc === 2) {
+      dots(.26, 24, (px, py) => .25 + .25 * (py / H), "#9fc6ff");
+      head("الدليل", 1000, 330, 140, seg(t, 6.3, 7.0));
+      // رقم عملاق متملي نقط
+      const nk = back(seg(t, 6.6, 7.2));
+      { const o = C.o || (C.o = Object.assign(document.createElement("canvas"), { width: W, height: H })).getContext("2d");
+        const q = C.o.getContext("2d"); q.setTransform(1, 0, 0, 1, 0, 0); q.clearRect(0, 0, W, H); q.translate(540, 1160); q.scale(nk, nk); q.font = "760px LZ"; q.textAlign = "center"; q.textBaseline = "middle"; q.direction = "rtl";
+        q.fillStyle = HI; q.fillText(PR.num, 0, 0); q.setTransform(1, 0, 0, 1, 0, 0); q.globalCompositeOperation = "source-atop"; q.fillStyle = "#d98a00"; q.beginPath();
+        for (let i = 0; i < 60; i++) for (let j = 0; j < 90; j++) { const px = i * 20 + (j % 2) * 10, py = j * 20, d = clamp((py - 950) / 500); if (d <= .03) continue; q.moveTo(px + 8 * d, py); q.arc(px, py, 8 * d, 0, Math.PI * 2); } q.fill(); q.globalCompositeOperation = "source-over";
+        q.translate(540, 1160); q.scale(nk, nk); q.lineWidth = 12; q.strokeStyle = INK; q.strokeText(PR.num, 0, 0); q.setTransform(1, 0, 0, 1, 0, 0);
+        x.save(); x.globalCompositeOperation = "multiply"; x.globalAlpha = .9; x.translate(14, 14); x.filter = "none"; x.drawImage(C.o, 0, 0); x.restore();
+        x.drawImage(C.o, 0, 0); }
+      bar(PR.unit, 1680, seg(t, 7.4, 7.8)); hud(false);
+      // نجمة انفجار جنب الرقم
+      const sk = back(seg(t, 7.0, 7.4)); x.save(); x.translate(860, 760); x.scale(sk, sk); x.rotate(t * .4); x.fillStyle = RD; x.strokeStyle = INK; x.lineWidth = 6; x.beginPath(); for (let i = 0; i < 24; i++) { const r = i % 2 ? 70 : 120, a = i / 24 * Math.PI * 2; x.lineTo(Math.cos(a) * r, Math.sin(a) * r); } x.closePath(); x.fill(); x.stroke(); x.restore();
+    } else {
+      dots(.26, 24, (px, py) => Math.max(0, 1 - Math.hypot(px - 540, py - 1000) / 900) * .7, HI);
+      head("القضية", 1000, 360, 160, seg(t, 9.2, 9.6));
+      // الختم
+      if (t > slam - .09) { const k = clamp((t - (slam - .09)) / .09), s = t < slam ? 2.6 - 1.6 * k * k : 1 + .06 * Math.exp(-(t - slam) * 8) * Math.cos((t - slam) * 30);
+        x.save(); x.translate(540, 980); x.rotate(-.16); x.scale(s, s); x.globalAlpha = .93; x.strokeStyle = RD; x.lineWidth = 16; x.beginPath(); x.roundRect(-380, -170, 760, 340, 30); x.stroke(); x.lineWidth = 6; x.beginPath(); x.roundRect(-350, -140, 700, 280, 22); x.stroke();
+        x.fillStyle = RD; x.font = `${M.fit(PR.stamp, "LZ", 620, 220, 80)}px LZ`; x.textAlign = "center"; x.textBaseline = "middle"; x.direction = "rtl"; x.fillText(PR.stamp, 0, 10);
+        x.globalCompositeOperation = "destination-out"; for (let i = 0; i < 260; i++) { x.fillRect(-380 + hash(i) * 760, -170 + hash(i + 300) * 340, 3 + hash(i + 600) * 6, 3 + hash(i + 900) * 6); } x.restore(); }
+      const bk = back(seg(t, 10.2, 10.7)); if (bk > 0) { x.save(); x.translate(540, 1480 + (1 - bk) * 300); x.fillStyle = INK; x.font = `${M.fit(PR.brand, "LZ", 800, 150, 60)}px LZ`; x.textAlign = "center"; x.direction = "rtl"; x.globalCompositeOperation = "multiply"; x.fillStyle = PK; x.fillText(PR.brand, 8, 8); x.globalCompositeOperation = "source-over"; x.fillStyle = INK; x.fillText(PR.brand, 0, 0); x.restore(); }
+      bar(PR.unit, 1700, seg(t, 10.6, 11.0)); hud(false);
+      const fl = Math.max(0, 1 - Math.abs(t - slam) / .2) * .5; if (fl > 0) { x.fillStyle = `rgba(255,255,255,${fl})`; x.fillRect(-40, -40, W + 80, H + 80); }
+    }
+    // الورق فوق كل حاجة (multiply) + تراب
+    x.setTransform(1, 0, 0, 1, 0, 0); x.globalCompositeOperation = "multiply"; x.drawImage(paper, 0, 0); x.globalCompositeOperation = "source-over";
+    const g2 = Math.floor(t * 15); for (let i = 0; i < 120; i++) { x.fillStyle = i % 4 ? "rgba(243,233,210,.8)" : "rgba(31,42,77,.5)"; x.fillRect(hash(g2 * 7 + i) * W, hash(g2 * 11 + i + 500) * H, 2.5, 2.5); }
+    // مسحة النقط بين المشاهد
+    for (const tw of [2.9, 6.2, 9.1]) { const k = (t - (tw - .22)) / .44; if (k <= 0 || k >= 1) continue; const col = [PK, HI, INK][[2.9, 6.2, 9.1].indexOf(tw)];
+      x.fillStyle = col; const st = 120; for (let i = 0; i < 10; i++) for (let j = 0; j < 17; j++) { const d = (i + j) / 26, kk = clamp((k < .5 ? k * 2 : (1 - k) * 2) * 1.6 - d * .6); if (kk <= 0) continue; x.beginPath(); x.arc(i * st + 60, j * st + 60, st * .75 * kk, 0, Math.PI * 2); x.fill(); } }
+  },
+  sound(A) {
+    const N = A.midi;
+    for (let b = 0; b < 22; b++) { const s = b * .43; if (s > 9.3 && s < 9.6) continue; A.kick(s, .35); A.hat(s + .215, .04); if (b % 2) A.snare(s, .06); A.bass(s, N([45, 45, 48, 43][Math.floor(b / 4) % 4]), .3, .1); }
+    [0, 1, 2, 3, 4, 5, 6, 7].forEach((i) => A.pluck(.5 + i * .14, N([72, 76, 79, 76, 81, 79, 76, 72][i]), .06, .4));
+    A.click(3.65, .3); A.nz(3.65, .15, "highpass", 3000, .2, 1); A.tone(3.6, N(55), .2, "sine", .1);
+    [2.9, 6.2, 9.1].forEach((s) => A.whoosh(s - .25, .5, .08));
+    A.tone(6.7, N(84), .15, "triangle", .08); A.hit(7.0, .3);
+    A.riser(8.6, .9, .06); A.kick(9.55, 1); A.hit(9.55, .8); A.nz(9.55, .5, "lowpass", 600, .4, .7);
+    A.pad(9.7, [N(57), N(60), N(64), N(69)], 2.3, .04); A.pluck(10.2, N(84), .1, 1.4);
+  },
+});
+</script>
+</body></html>

@@ -7837,11 +7837,11 @@ def set_active_client(body: ActiveClientIn):
 
 # 🎨 فئات الستايل: البراند بيختار منها (واحدة أو أكتر، والأولى هي الافتراضية)، وصفحة «اعمل» بتجمّع القوالب تحتها
 STYLE_CATS = [
-    {"id": "cartoon2d", "icon": "🖍️", "ar": "كارتون 2D", "en": "2D Cartoon", "templates": ["sk-anime", "sk-watercolor", "sk-chalk"],
+    {"id": "cartoon2d", "icon": "🖍️", "ar": "كارتون 2D", "en": "2D Cartoon", "templates": ["sk-anime", "sk-watercolor", "sk-chalk", "sk-scifitoon"],
      "prompt": "flat 2D cartoon animation, clean bold outlines, simple shapes, bright friendly colors"},
-    {"id": "anim3d", "icon": "🧸", "ar": "أنيميشن 3D", "en": "3D Animation", "templates": ["sk-talking", "sk-skeleton", "sk-song", "sk-lowpoly", "sk-toy"],
+    {"id": "anim3d", "icon": "🧸", "ar": "أنيميشن 3D", "en": "3D Animation", "templates": ["sk-talking", "sk-skeleton", "sk-song", "sk-lowpoly", "sk-toy", "sk-hd2d"],
      "prompt": "polished 3D animated film look, soft global illumination, appealing stylized characters"},
-    {"id": "paper", "icon": "✂️", "ar": "ورق", "en": "Paper", "templates": ["sk-papercut", "sk-diorama", "sk-paper", "sk-sand"],
+    {"id": "paper", "icon": "✂️", "ar": "ورق", "en": "Paper", "templates": ["sk-papercut", "sk-diorama", "sk-paper", "sk-sand", "sk-popup"],
      "prompt": "handmade paper-craft look, layered cut paper, visible paper texture and soft shadows, stop-motion feel"},
     {"id": "clay", "icon": "🧱", "ar": "صلصال", "en": "Clay", "templates": ["sk-clay", "sk-felt"],
      "prompt": "claymation stop-motion look, sculpted plasticine with fingerprints, miniature set, warm light"},
@@ -7851,7 +7851,7 @@ STYLE_CATS = [
      "prompt": "clean motion-graphics look, glossy 3D shapes, kinetic typography, smooth camera moves"},
     {"id": "ugc", "icon": "📱", "ar": "UGC بالموبايل", "en": "UGC", "templates": ["sk-ugc", "sk-vhs"],
      "prompt": "authentic handheld smartphone footage, natural light, real person talking to camera"},
-    {"id": "cinematic", "icon": "🎬", "ar": "سينمائي واقعي", "en": "Cinematic", "templates": ["sk-cinema-ad", "sk-noir", "sk-miniature"],
+    {"id": "cinematic", "icon": "🎬", "ar": "سينمائي واقعي", "en": "Cinematic", "templates": ["sk-cinema-ad", "sk-noir", "sk-miniature", "sk-drone"],
      "prompt": "photoreal cinematic commercial, shallow depth of field, dramatic lighting, film color grade"},
     {"id": "product", "icon": "📸", "ar": "صور منتج", "en": "Product Shots", "templates": ["sk-studio-shot", "sk-product-scene", "sk-static-ads", "sk-foodslow"],
      "prompt": "premium product photography, studio lighting, crisp detail, clean composition"},

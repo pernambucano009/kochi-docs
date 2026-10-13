@@ -1,0 +1,87 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// قالب «بطاقات بيكتوجرام»: فيلم كتالوج سريع على الإيقاع: كل بطاقة رسمة بشرية هندسية (عصيان بأطراف مدورة وراس دايرة) بتعمل حركة واحدة،
+// وعنوان ضخم وسطر بلغة تانية ورقم "٠٣ / ٠٦"، وفوق شريط زخرفة من دواير وأنصاص دواير صفوفه بتتزحلق. كل بطاقة بلون. 1080×1920، 12 ثانية.
+const PR = M.params({
+  head: { label: "عنوان الافتتاح", kind: "text", role: "product", def: "كلاسات الشهر" },
+  items: { label: "البطاقات (عربي|English)", kind: "lines", def: ["جري|Running", "سباحة|Swimming", "يوجا|Yoga", "ملاكمة|Boxing", "أثقال|Weights", "دراجة|Cycling"] },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "نادي الحركة" },
+  cta: { label: "الجملة الأخيرة", kind: "text", def: "احجز مكانك من التطبيق" },
+  c1: { label: "لون ١", kind: "color", def: "#e8412c" },
+  c2: { label: "لون ٢", kind: "color", def: "#1b6fd8" },
+  c3: { label: "لون ٣", kind: "color", def: "#11a37f" },
+});
+const W = 1080, H = 1920, DUR = 12, BT = .5, T0 = 1.0, CD = 1.5;
+const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
+const ar = (n) => String(n).padStart(2, "0").replace(/\d/g, (d) => "٠١٢٣٤٥٦٧٨٩"[d]);
+const IT = PR.items.slice(0, 6).map((l) => { const [a, b] = String(l).split("|"); return { a: (a || "").trim(), b: (b || "").trim() }; });
+// وضعيات: [جذع، رقبة، دراع شمال (فوق، تحت)، دراع يمين، رجل شمال (فوق، تحت)، رجل يمين] بالراديان من تحت
+const P = (...a) => a;
+const POSES = [
+  [P(.25, 0, 2.2, 1.4, -1.0, -1.6, .9, -.9, -.6, -.2), P(.25, 0, -1.0, -1.6, 2.2, 1.4, -.6, -.2, .9, -.9)],          // جري
+  [P(1.45, 0, 3.1, 3.1, .2, .1, .15, .15, -.15, -.2), P(1.45, 0, .2, .1, 3.1, 3.1, -.15, -.2, .15, .15)],             // سباحة
+  [P(0, 0, 2.6, 3.1, -2.6, -3.1, 0, 0, 1.9, 3.2), P(0, 0, 1.6, 1.6, -1.6, -1.6, 0, 0, 1.9, 3.2)],                      // يوجا
+  [P(.15, 0, 1.2, 2.6, .5, 2.4, .35, 0, -.35, 0), P(.15, 0, 1.6, 1.6, .5, 2.4, .35, 0, -.35, 0)],                     // ملاكمة
+  [P(0, 0, 1.7, 2.9, -1.7, -2.9, .45, -.1, -.45, .1), P(0, 0, 2.5, 2.9, -2.5, -2.9, .3, 0, -.3, 0)],                // أثقال
+  [P(.7, 0, 1.3, 1.6, 1.1, 1.5, 1.4, -.2, .3, -1.4), P(.7, 0, 1.3, 1.6, 1.1, 1.5, .3, -1.4, 1.4, -.2)],              // دراجة
+];
+
+M.reel({
+  W, H, DUR, bg: "#f4f1ea",
+  async init(M) { await Promise.all([loadFont("LZ", "SM-Lalezar.ttf"), loadFont("BB", "bebas.ttf"), loadFont("PM", "TY-PlexMono-500.ttf", "500"), loadFont("PB", "TY-PlexArabic-700.ttf", "700")]); const c = M.canvas(W, H); return { x: c.getContext("2d") }; },
+  seek(t, C, M) {
+    const { x } = C, { seg, clamp, cubicIO, expo } = M, io = (k) => cubicIO(clamp(k)), cols = [PR.c1, PR.c2, PR.c3];
+    const rise = (k) => (1 - expo(clamp(k))) * 1;
+    x.setTransform(1, 0, 0, 1, 0, 0);
+    const n = IT.length, i = Math.floor((t - T0) / CD), inCards = t >= T0 && i < n, ci = clamp(i, 0, n - 1), lt = t - T0 - ci * CD;
+    const bg = inCards ? cols[ci % 3] : t < T0 ? "#f4f1ea" : "#141414", fg = inCards ? "#fff" : t < T0 ? "#141414" : "#fff";
+    x.fillStyle = bg; x.fillRect(0, 0, W, H);
+    // مسحة البطاقة (لون جديد بيطلع من تحت)
+    if (inCards && lt < .25) { x.fillStyle = ci ? cols[(ci - 1) % 3] : "#f4f1ea"; x.fillRect(0, 0, W, H * (1 - expo(lt / .25))); }
+    // شريط الزخرفة: صفوف دواير وأنصاص بتتزحلق عكس بعض
+    const cell = 90;
+    for (let r = 0; r < 4; r++) { const dir = r % 2 ? 1 : -1, off = ((t * 120 * dir) % (cell * 4) + cell * 4) % (cell * 4), y = 140 + r * cell;
+      for (let k = -4; k < 16; k++) { const cx = k * cell + off, kind = (k + r * 3 + 400) % 4; x.fillStyle = kind === 3 ? (inCards ? "rgba(255,255,255,.25)" : cols[(k + r) % 3]) : fg; x.globalAlpha = inCards ? .9 : .85;
+        x.beginPath(); if (kind === 0) x.arc(cx + cell / 2, y + cell / 2, cell * .42, 0, Math.PI * 2); else if (kind === 1) x.arc(cx + cell / 2, y + cell, cell * .45, Math.PI, 0); else if (kind === 2) { x.arc(cx, y + cell / 2, cell * .45, -Math.PI / 2, Math.PI / 2); } else { for (let a = 0; a < 3; a++) for (let b = 0; b < 3; b++) { x.moveTo(cx + 18 + a * 27 + 7, y + 18 + b * 27); x.arc(cx + 18 + a * 27, y + 18 + b * 27, 7, 0, Math.PI * 2); } }
+        x.fill(); } } x.globalAlpha = 1;
+    // الرسمة الهندسية
+    const fig = (pose, cx, cy, s) => { const lw = 44 * s, seg2 = (ax, ay, a, L) => { const bx = ax + Math.sin(a) * L, by = ay + Math.cos(a) * L; x.beginPath(); x.moveTo(ax, ay); x.lineTo(bx, by); x.stroke(); return [bx, by]; };
+      x.strokeStyle = fg; x.fillStyle = fg; x.lineCap = "round"; x.lineWidth = lw;
+      const [tor] = pose, hx = cx, hy = cy, nx = hx - Math.sin(tor) * 190 * s, ny = hy - Math.cos(tor) * 190 * s;
+      x.beginPath(); x.moveTo(hx, hy); x.lineTo(nx, ny); x.stroke();
+      x.beginPath(); x.arc(nx - Math.sin(tor) * 85 * s, ny - Math.cos(tor) * 85 * s, 52 * s, 0, Math.PI * 2); x.fill();
+      const sx = nx + Math.sin(tor) * 18 * s, sy = ny + Math.cos(tor) * 18 * s;
+      let p = seg2(sx, sy, pose[2], 120 * s); const h1 = seg2(p[0], p[1], pose[3], 110 * s); p = seg2(sx, sy, pose[4], 120 * s); const h2 = seg2(p[0], p[1], pose[5], 110 * s);
+      p = seg2(hx, hy, pose[6], 150 * s); const f1 = seg2(p[0], p[1], pose[7], 140 * s); p = seg2(hx, hy, pose[8], 150 * s); const f2 = seg2(p[0], p[1], pose[9], 140 * s); return { h1, h2, f1, f2 }; };
+    if (t < T0) { // افتتاح
+      const k = rise(seg(t, .1, .6)); x.save(); x.beginPath(); x.rect(0, 860, W, 260); x.clip(); x.fillStyle = "#141414"; x.font = `${M.fit(PR.head, "LZ", 920, 200, 80)}px LZ`; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.head, 540, 1060 + k * 240); x.restore();
+      x.fillStyle = cols[0]; x.fillRect(540 - 300 * io(seg(t, .3, .9)), 1120, 600 * io(seg(t, .3, .9)), 16);
+    } else if (inCards) {
+      const it = IT[ci], ps = POSES[ci % POSES.length], u = .5 - .5 * Math.cos(t / BT * Math.PI), pose = ps[0].map((v, k) => v + (ps[1][k] - v) * u), bump = Math.exp(-((t % BT) / BT) * 5) * .03;
+      const pk = expo(seg(lt, .05, .35)); x.save(); x.translate(540, 1000); x.scale(pk * (1 + bump), pk * (1 + bump)); const J = fig(pose, 0, 120, 1), kind = ci % POSES.length;
+      x.lineWidth = 26; if (kind === 4) { const mx = (J.h1[0] + J.h2[0]) / 2, my = (J.h1[1] + J.h2[1]) / 2; x.beginPath(); x.moveTo(mx - 300, my); x.lineTo(mx + 300, my); x.stroke(); for (const d of [-1, 1]) { x.beginPath(); x.roundRect(mx + d * 300 - 30, my - 80, 60, 160, 20); x.fill(); } }
+      if (kind === 1) { x.lineWidth = 16; for (let w = 0; w < 3; w++) { x.beginPath(); for (let k = 0; k <= 24; k++) { const px = -380 + k * 32, py = 250 + w * 60 + Math.sin(k * .8 + t * 6 + w) * 14; k ? x.lineTo(px, py) : x.moveTo(px, py); } x.stroke(); } }
+      if (kind === 5) { x.lineWidth = 18; for (const [wx] of [[-230], [230]]) { x.beginPath(); x.arc(wx, 300, 110, 0, Math.PI * 2); x.stroke(); } x.beginPath(); x.moveTo(-230, 300); x.lineTo(0, 140); x.lineTo(230, 300); x.stroke(); }
+      x.restore();
+      // العنوان بيطلع من قناع
+      x.save(); x.beginPath(); x.rect(0, 1330, W, 270); x.clip(); x.fillStyle = fg; x.font = `${M.fit(it.a, "LZ", 940, 250, 100)}px LZ`; x.textAlign = "center"; x.direction = "rtl"; x.fillText(it.a, 540, 1550 + rise(seg(lt, .1, .4)) * 280); x.restore();
+      x.save(); x.beginPath(); x.rect(0, 1600, W, 110); x.clip(); x.font = "90px BB"; x.direction = "ltr"; x.fillText(it.b.toUpperCase(), 540, 1690 + rise(seg(lt, .2, .5)) * 110); x.restore();
+      // رقم ومؤشر تقدم
+      x.font = "500 38px PM"; x.textAlign = "left"; x.direction = "ltr"; x.fillText(`${String(ci + 1).padStart(2, "0")} / ${String(n).padStart(2, "0")}`, 70, 640);
+      for (let k = 0; k < n; k++) { x.globalAlpha = k <= ci ? 1 : .35; x.fillRect(70 + k * 60, 670, 46, 8); } x.globalAlpha = 1;
+      x.textAlign = "right"; x.direction = "rtl"; x.font = "700 36px PB"; x.fillText(PR.brand, 1010, 640);
+    } else { // الخاتمة
+      const k = rise(seg(t, T0 + n * CD + .05, T0 + n * CD + .5)); x.save(); x.beginPath(); x.rect(0, 860, W, 290); x.clip(); x.fillStyle = "#fff"; x.font = `${M.fit(PR.brand, "LZ", 920, 230, 90)}px LZ`; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.brand, 540, 1080 + k * 290); x.restore();
+      const ck = io(seg(t, T0 + n * CD + .5, T0 + n * CD + 1)); x.globalAlpha = ck; x.fillStyle = cols[0]; x.beginPath(); x.roundRect(170, 1220, 740, 120, 60); x.fill(); x.fillStyle = "#fff"; x.font = `700 ${M.fit(PR.cta, "PB", 640, 54, 28, "700")}px PB`; x.textAlign = "center"; x.fillText(PR.cta, 540, 1298); x.globalAlpha = 1;
+      for (let k = 0; k < 6; k++) { const ps = POSES[k], u = .5 - .5 * Math.cos(t / BT * Math.PI); x.save(); x.translate(130 + k * 164, 1640); x.scale(.28, .28); fig(ps[0].map((v, j) => v + (ps[1][j] - v) * u), 0, 0, 1); x.restore(); }
+    }
+  },
+  sound(A) {
+    const N = A.midi;
+    for (let b = 0; b < 24; b++) { const s = b * BT; A.kick(s, .5); A.hat(s + BT / 2, .05); if (b % 2) A.clap(s, .1); A.bass(s, N([40, 40, 43, 45, 47, 45][Math.floor(b / 3) % 6]), .35, .14); }
+    for (let i = 0; i < 6; i++) { const s = T0 + i * CD; A.whoosh(s - .1, .25, .06); A.tone(s + .05, N(76 + i * 2), .12, "square", .05); }
+    A.hit(T0 + 6 * CD, .4); A.pluck(T0 + 6 * CD + .5, N(84), .1, 1.4);
+  },
+});
+</script>
+</body></html>

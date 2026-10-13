@@ -1,0 +1,108 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// قالب «طباعة خشب محفور»: كل لقطة لوح خشب أسود والنور موجود بس مكان ما السكينة حفرت: النور الكتير = حفر عريض، الضلمة = خشب سليم.
+// السكينة بتمشي على اللوح وتكشف الصورة، ولون واحد بس للنار. ٣ لوحات: الفرن، الرغيف، والعنوان محفور. 1080×1920، 12 ثانية.
+const PR = M.params({
+  title: { label: "العنوان", kind: "text", role: "product", def: "فرن العيلة" },
+  sub: { label: "تحت العنوان", kind: "text", def: "نفس النار من ١٩٦٠" },
+  line1: { label: "جملة اللوحة الأولى", kind: "text", def: "كل يوم قبل الفجر" },
+  line2: { label: "جملة اللوحة التانية", kind: "text", def: "بإيدينا… رغيف رغيف" },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "مخبز الأمانة" },
+  fire: { label: "لون النار", kind: "color", def: "#e8562a" },
+});
+const W = 1080, H = 1920, DUR = 12, PAPER = "#efe6d2", BLK = "#15120f", MX = 70, MY = 210, BW = W - MX * 2, BH = 1340;
+const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
+
+M.reel({
+  W, H, DUR, bg: PAPER,
+  async init(M) {
+    await Promise.all([loadFont("AM", "TY-Amiri-700.ttf", "700"), loadFont("RQ", "TY-ArefRuqaa-700.ttf", "700")]);
+    const c = M.canvas(W, H), x = c.getContext("2d"), R = M.rng(9), FIRE = PR.fire;
+    const mk = () => { const k = document.createElement("canvas"); k.width = BW; k.height = BH; return k; };
+    // حفر لوح من دالة نور L(x,y) ← ٠..١ ، وماسك للنار F(x,y)
+    const carve = (L, F, dir) => { const k = mk(), q = k.getContext("2d"); q.lineCap = "round";
+      for (let row = 0; row < BH / 10 + 20; row++) { let px = -20, py0 = row * 10 - 100; while (px < BW + 20) { const st = 10 + R() * 6, nx = px + st;
+          const y1 = py0 + Math.sin(px * .01 + row * .7) * 6 + px * dir, y2 = py0 + Math.sin(nx * .01 + row * .7) * 6 + nx * dir, mx = (px + nx) / 2, my = (y1 + y2) / 2;
+          const l = L(mx, my), w = Math.max(0, l * 9.5 - .6 + (R() - .5) * 1.2); if (w > .4) { q.lineWidth = w; q.strokeStyle = F(mx, my) ? FIRE : PAPER; q.beginPath(); q.moveTo(px, y1); q.lineTo(nx, y2); q.stroke(); }
+          px = nx; } }
+      return k; };
+    // لوحة ١: فتحة فرن بنار وطوب وضهر الخباز
+    const ox = 540, aw = 230, ay = 760, inArch = (X, Y) => Math.abs(X - ox) < aw && Y < 1000 && (Y > ay || Math.hypot(X - ox, Y - ay) < aw);
+    const oven = (X, Y) => {
+      if (inArch(X, Y)) return 1;
+      const d = Math.hypot(X - ox, (Y - 820) * 1.2);
+      let l = .08 + .75 * Math.exp(-d / 330);
+      // طوب حوالين الفتحة (وش الطوب منوّر، الكحلة سودا)
+      if (Math.abs(X - ox) < 400 && Y > 360 && Y < 1060) { const row = Math.floor(Y / 70), bx = (X + (row % 2) * 60) % 120, by = Y % 70; l = (bx < 10 || by < 9) ? .02 : .3 + .55 * Math.exp(-d / 420); }
+      if (Y > 1060) l = .05 + .55 * Math.exp(-Math.abs(X - ox) / 260) * Math.max(0, 1 - (Y - 1060) / 280);
+      // مطرحة خشب داخلة الفرن عليها رغيف (سيلويت بحرف منوّر)
+      if (Math.abs(Y - 960 - (X - 540) * .1) < 11 && X > 60 && X < 520) l = 0;
+      const lr = Math.hypot((X - 580) / 130, (Y - 915) / 48); if (lr < 1) l = 0;
+      return Math.min(1, l); };
+    const ovenF = (X, Y) => inArch(X, Y);
+    // لوحة ٢: رغيف كبير وبخار
+    const loaf = (X, Y) => { const lx = (X - 470) / 360, ly = (Y - 820) / 230, r = lx * lx + ly * ly; let l = .1;
+      if (r < 1) { l = .25 + .7 * Math.max(0, 1 - Math.hypot(lx + .3, ly + .5)) ; if (Math.abs(Math.sin(lx * 9 - ly * 2)) < .12 && r < .8) l = .02; }
+      if (Y < 560 && Math.abs(X - 470 - Math.sin(Y * .02) * 40) < 30) l = .55;
+      if (Y < 560 && Math.abs(X - 600 - Math.sin(Y * .02 + 2) * 40) < 24) l = .45;
+      if (Y > 1060) l = .35;   // ترابيزة خشب فاتحة
+      return l; };
+    const P1 = carve(oven, ovenF, .03), P2 = carve(loaf, () => false, -.02);
+    return { x, P1, P2 };
+  },
+  seek(t, C, M) {
+    const { x, P1, P2 } = C, { seg, clamp, hash, smooth, expo } = M;
+    x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = PAPER; x.fillRect(0, 0, W, H);
+    for (let i = 0; i < 70; i++) { x.fillStyle = "rgba(120,100,70,.05)"; x.fillRect(0, i * 28, W, 1); }   // ورق مخطط (laid)
+    const plate = (img, t0, t1, cap) => {
+      if (t < t0 || t > t1) return; const k = seg(t, t0, t1), z = 1 + .04 * smooth(k);
+      x.save(); x.translate(MX, MY); x.fillStyle = BLK; x.fillRect(0, 0, BW, BH);
+      // السكينة بتكشف بمسحة مايلة
+      const sw = seg(t, t0 + .1, t0 + 2.4) * (BW + BH) * 1.05;
+      x.save(); x.beginPath(); x.rect(0, 0, BW, BH); x.clip(); x.beginPath(); x.moveTo(0, 0); x.lineTo(sw, 0); x.lineTo(sw - BH, BH); x.lineTo(0, BH); x.closePath(); x.clip();
+      x.translate(BW / 2, BH / 2); x.scale(z, z); x.translate(-BW / 2, -BH / 2); x.drawImage(img, 0, 0); x.restore();
+      // لمعة النار بتترعش
+      if (img === P1 && sw > 700) { x.save(); x.globalCompositeOperation = "multiply"; x.fillStyle = `rgba(255,${120 + 40 * Math.sin(t * 13) | 0},60,${.25 + .1 * Math.sin(t * 17)})`; x.beginPath(); x.ellipse(540, 860, 230, 170, 0, 0, Math.PI * 2); x.fill(); x.restore(); }
+      // راس السكينة (جاوج)
+      if (sw < BW + BH) { const kx = Math.min(BW - 40, sw - BH * .5), ky = BH * .5; x.save(); x.translate(kx, ky); x.rotate(-.9); x.fillStyle = "#c9c2b4"; x.fillRect(-8, -120, 16, 120); x.fillStyle = "#8a5a32"; x.beginPath(); x.roundRect(-22, -320, 44, 200, 18); x.fill(); x.restore(); }
+      x.restore();
+      // إطار الطبعة + الجملة تحتها بحروف حبر
+      x.strokeStyle = BLK; x.lineWidth = 3; x.strokeRect(MX - 14, MY - 14, BW + 28, BH + 28);
+      const ca = smooth(seg(t, t0 + 1.8, t0 + 2.4)); x.globalAlpha = ca; x.fillStyle = BLK; x.font = `700 ${M.fit(cap, "AM", 900, 88, 40, "700")}px AM`; x.textAlign = "center"; x.direction = "rtl"; x.fillText(cap, 540, MY + BH + 150); x.globalAlpha = 1;
+      x.font = "700 30px AM"; x.fillStyle = "rgba(21,18,15,.6)"; x.textAlign = "left"; x.fillText(img === P1 ? "١ / ٣" : "٢ / ٣", MX, MY - 40);
+    };
+    plate(P1, 0, 4.1, PR.line1);
+    plate(P2, 4.1, 8.1, PR.line2);
+    // لوحة ٣: العنوان محفور + أشعة
+    if (t >= 8.1) {
+      const k = seg(t, 8.1, 9.6); x.save(); x.translate(MX, MY); x.fillStyle = BLK; x.fillRect(0, 0, BW, BH);
+      x.strokeStyle = PAPER; x.lineCap = "round";
+      for (let i = 0; i < 64; i++) { const a = i / 64 * Math.PI * 2, r0 = 330, r1 = 330 + (900 * (hash(i) * .4 + .6)) * clamp(k * 1.4 - hash(i + 5) * .4); if (r1 <= r0) continue; x.lineWidth = 3 + 7 * hash(i + 9); x.beginPath(); x.moveTo(BW / 2 + Math.cos(a) * r0, 560 + Math.sin(a) * r0); x.lineTo(BW / 2 + Math.cos(a) * r1, 560 + Math.sin(a) * r1); x.stroke(); }
+      // شمس/رغيف في النص بلون النار (اللون الوحيد)
+      const sk = expo(seg(t, 8.4, 9.2)); x.fillStyle = PR.fire; x.beginPath(); x.arc(BW / 2, 560, 250 * sk, 0, Math.PI * 2); x.fill();
+      x.strokeStyle = BLK; x.lineWidth = 9; for (let j = -2; j <= 2; j++) { x.beginPath(); x.moveTo(BW / 2 - 150 + j * 10, 560 + j * 60 - 30); x.quadraticCurveTo(BW / 2, 560 + j * 60 - 70 * sk, BW / 2 + 150 - j * 10, 560 + j * 60 - 30); x.globalAlpha = sk; x.stroke(); x.globalAlpha = 1; }
+      // العنوان محفور (حروف ورق جوه الخشب) بحواف مكسرة
+      const tk = seg(t, 9.0, 10.0); x.save(); x.beginPath(); x.rect(BW - BW * tk, 0, BW * tk, BH); x.clip();
+      x.font = `700 ${M.fit(PR.title, "RQ", 860, 200, 80, "700")}px RQ`; x.textAlign = "center"; x.direction = "rtl"; x.fillStyle = PAPER; x.fillText(PR.title, BW / 2, 1040);
+      x.globalCompositeOperation = "source-atop"; x.fillStyle = BLK; for (let i = 0; i < 400; i++) x.fillRect(hash(i) * BW, 860 + hash(i + 400) * 220, 2 + hash(i + 800) * 5, 1.5); x.restore();
+      const sa = smooth(seg(t, 10.0, 10.6)); x.globalAlpha = sa; x.fillStyle = PAPER; x.font = `700 ${M.fit(PR.sub, "AM", 820, 64, 30, "700")}px AM`; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.sub, BW / 2, 1200); x.globalAlpha = 1;
+      x.restore(); x.strokeStyle = BLK; x.lineWidth = 3; x.strokeRect(MX - 14, MY - 14, BW + 28, BH + 28);
+      const ba = smooth(seg(t, 10.4, 11.0)); x.globalAlpha = ba; x.fillStyle = BLK; x.font = `700 ${M.fit(PR.brand, "RQ", 800, 96, 40, "700")}px RQ`; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.brand, 540, MY + BH + 160);
+      x.fillStyle = PR.fire; x.fillRect(540 - 60, MY + BH + 196, 120, 8); x.globalAlpha = 1;
+      x.font = "700 30px AM"; x.fillStyle = "rgba(21,18,15,.6)"; x.textAlign = "left"; x.fillText("٣ / ٣", MX, MY - 40);
+    }
+    // ختم الفنان الأحمر الصغير في الركن
+    x.fillStyle = PR.fire; x.globalAlpha = .85; x.fillRect(W - MX - 60, MY + BH + 40, 50, 50); x.globalAlpha = 1; x.fillStyle = PAPER; x.font = "700 30px RQ"; x.textAlign = "center"; x.fillText([...PR.brand][0] || "", W - MX - 35, MY + BH + 76);
+  },
+  sound(A) {
+    const N = A.midi;
+    // حفر بالسكينة (خربشة خشب) + عود هادي وطبلة بعيدة
+    [0, 4.1, 8.1].forEach((s) => { for (let k = 0; k < 22; k++) A.nz(s + .1 + k * .1, .08, "bandpass", 1800 + (k % 3) * 400, .05, 4); A.hit(s + 2.4, .2); });
+    const mel = [62, 65, 67, 69, 67, 65, 64, 62, 60, 62];
+    mel.forEach((m, i) => A.pluck(.4 + i * 1.1, N(m), .08, 1.2));
+    for (let b = 0; b < 12; b++) A.kick(b, .25);
+    A.pad(8.1, [N(50), N(57), N(62)], 3.9, .035); A.hit(9.0, .35); A.pluck(10.4, N(74), .1, 1.6);
+  },
+});
+</script>
+</body></html>

@@ -1,0 +1,73 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// قالب «إعلان نشرة بريدية»: ظرف بيتفتح ويطلع منه العدد، سؤال بيشد، تلات كروت بتتقلب فيها أهم اللي في العدد،
+// وفي الآخر خانة إيميل بتتكتب لوحدها وزرار اشتراك وعدّاد مشتركين بيزيد. ستايل جرنال هادي. 1080×1920، 12 ثانية.
+const PR = M.params({
+  name: { label: "اسم النشرة", kind: "text", role: "brand", def: "فنجان الأسبوع" },
+  issue: { label: "رقم العدد", kind: "text", def: "العدد ٣٧" },
+  hook: { label: "السؤال", kind: "text", role: "product", def: "إزاي توفّر ساعة كل يوم؟" },
+  points: { label: "التلات نقاط", kind: "lines", def: ["٣ أدوات مجانية بتشتغل بدالك", "قاعدة الدقيقتين للمهام الصغيرة", "قايمة الصبح اللي بتغيّر يومك"] },
+  subs: { label: "عدد المشتركين", kind: "text", def: "12400" },
+  cta: { label: "زرار الاشتراك", kind: "text", def: "اشترك ببلاش" },
+  accent: { label: "لون التمييز", kind: "color", def: "#d9480f" },
+});
+const W = 1080, H = 1920, DUR = 12, PAPER = "#f7f1e6", INK = "#1d1a17";
+const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
+const ar = (s) => String(s).replace(/\d/g, (d) => "٠١٢٣٤٥٦٧٨٩"[d]);
+
+M.reel({
+  W, H, DUR, bg: PAPER,
+  async init(M) { await Promise.all([loadFont("AM", "TY-Amiri-700.ttf", "700"), loadFont("PB", "TY-PlexArabic-700.ttf", "700"), loadFont("PX", "TY-PlexArabic-400.ttf")]); const c = M.canvas(W, H); return { x: c.getContext("2d") }; },
+  seek(t, C, M) {
+    const { x } = C, { seg, clamp, cubicIO, springO, expo, hash } = M, io = (k) => cubicIO(clamp(k)), A = PR.accent;
+    x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = PAPER; x.fillRect(0, 0, W, H);
+    for (let i = 0; i < 1200; i++) { x.fillStyle = "rgba(120,90,50,.04)"; x.fillRect(hash(i) * W, hash(i + 1200) * H, 2, 2); }
+    // رأس الجرنال
+    x.fillStyle = INK; x.fillRect(80, 150, 920, 4); x.fillRect(80, 162, 920, 1.5);
+    x.font = `700 ${M.fit(PR.name, "AM", 700, 76, 40, "700")}px AM`; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.name, 540, 260); x.fillRect(80, 290, 920, 1.5);
+    x.font = "400 28px PX"; x.textAlign = "right"; x.fillText(PR.issue, 1000, 330); x.textAlign = "left"; x.fillText("كل أحد الصبح", 80, 330);
+    // ١) الظرف
+    if (t < 3.2) { const ok = io(seg(t, .5, 1.1)), pk = io(seg(t, 1.0, 1.8)), out = io(seg(t, 2.7, 3.2));
+      x.save(); x.translate(540, 1100 + out * 1200);
+      x.fillStyle = "#fff"; x.save(); x.translate(0, -260 * pk); x.shadowColor = "rgba(0,0,0,.12)"; x.shadowBlur = 20; x.fillRect(-300, -220, 600, 400); x.shadowBlur = 0; x.fillStyle = INK; x.font = "700 40px AM"; x.textAlign = "center"; x.fillText(PR.issue, 0, -130); for (let l = 0; l < 5; l++) { x.fillStyle = "rgba(29,26,23,.25)"; x.fillRect(-240, -80 + l * 40, 480 - (l % 2) * 120, 12); } x.restore();
+      x.fillStyle = "#e9dcc4"; x.fillRect(-380, -60, 760, 420); x.fillStyle = "#e2d2b5"; x.beginPath(); x.moveTo(-380, -60); x.lineTo(0, 170); x.lineTo(380, -60); x.lineTo(380, 360); x.lineTo(-380, 360); x.closePath(); x.fill();
+      x.save(); x.scale(1, 1 - 2 * ok); x.fillStyle = "#d8c6a5"; x.beginPath(); x.moveTo(-380, -60 / (1 - 2 * ok || .001) * 0 - 60); x.lineTo(0, 170); x.lineTo(380, -60); x.closePath(); x.restore();
+      x.fillStyle = "#d8c6a5"; x.beginPath(); x.moveTo(-380, -60); x.lineTo(0, -60 + 230 * (1 - 2 * ok)); x.lineTo(380, -60); x.closePath(); x.fill();
+      x.fillStyle = A; x.beginPath(); x.arc(0, 60 * (1 - ok), 34 * (1 - ok), 0, Math.PI * 2); x.fill();
+      x.restore(); }
+    // ٢) السؤال
+    const qk = io(seg(t, 2.9, 3.5)) * (1 - io(seg(t, 4.6, 5.0)));
+    if (qk > 0) { x.save(); x.globalAlpha = qk; x.fillStyle = INK; x.font = `700 ${M.fit(PR.hook, "AM", 900, 130, 60, "700")}px AM`; x.textAlign = "center"; x.direction = "rtl";
+      const words = PR.hook.split(" "), lines = [[]]; words.forEach((w) => { const c2 = lines[lines.length - 1]; if (x.measureText([...c2, w].join(" ")).width > 860 && c2.length) lines.push([w]); else c2.push(w); });
+      lines.forEach((l, i) => x.fillText(l.join(" "), 540, 920 + i * 150 - (1 - qk) * 30)); x.fillStyle = A; x.fillRect(540 - 120, 980 + (lines.length - 1) * 150, 240 * io(seg(t, 3.3, 3.8)), 8); x.restore(); }
+    // ٣) تلات كروت بتتقلب
+    const PT = PR.points.slice(0, 3);
+    PT.forEach((s, i) => { const t0 = 4.8 + i * 1.1, k = clamp((t - t0) / .5), out = io(seg(t, 8.3, 8.7)); if (k <= 0 || out >= 1) return;
+      const fl = Math.cos((1 - expo(k)) * Math.PI / 2), y = 620 + i * 300 - out * 100; x.save(); x.globalAlpha = 1 - out; x.translate(540, y); x.scale(1, fl); x.rotate((i - 1) * .015);
+      x.fillStyle = "#fff"; x.shadowColor = "rgba(0,0,0,.1)"; x.shadowBlur = 24; x.shadowOffsetY = 8; x.fillRect(-440, -110, 880, 220); x.shadowBlur = 0; x.shadowOffsetY = 0;
+      x.fillStyle = A; x.font = "700 120px AM"; x.textAlign = "center"; x.direction = "rtl"; x.fillText(ar(i + 1), 340, 40); x.fillStyle = A; x.fillRect(270, -80, 2, 160);
+      x.fillStyle = INK; x.font = `700 ${M.fit(s, "PB", 560, 46, 26, "700")}px PB`; x.textAlign = "right"; x.fillText(s, 230, 16); x.restore(); });
+    // ٤) خانة الاشتراك
+    const sk = io(seg(t, 8.5, 9.1));
+    if (sk > 0) { x.save(); x.globalAlpha = sk; x.translate(0, (1 - sk) * 60);
+      x.fillStyle = INK; x.font = "700 64px AM"; x.textAlign = "center"; x.direction = "rtl"; x.fillText("وصّلها لإيميلك", 540, 820);
+      x.strokeStyle = INK; x.lineWidth = 3; x.fillStyle = "#fff"; x.beginPath(); x.roundRect(120, 900, 840, 120, 16); x.fill(); x.stroke();
+      const em = "you@mail.com", n = Math.floor(em.length * clamp((t - 9.1) / .9)); x.fillStyle = INK; x.font = "400 44px PX"; x.textAlign = "left"; x.direction = "ltr"; x.fillText(em.slice(0, n) + (Math.floor(t * 3) % 2 && n < em.length ? "|" : ""), 160, 975);
+      const pressed = t > 10.2 && t < 10.4, done2 = t > 10.3; x.save(); x.translate(540, 1110); x.scale(pressed ? .95 : 1, pressed ? .95 : 1); x.fillStyle = done2 ? "#2f9e44" : A; x.beginPath(); x.roundRect(-420, -60, 840, 120, 16); x.fill(); x.fillStyle = "#fff"; x.font = "700 50px PB"; x.textAlign = "center"; x.direction = "rtl"; x.fillText(done2 ? "اتسجلت" : PR.cta, 0, 16); x.restore();
+      const n0 = parseInt(PR.subs) || 12400, cnt = Math.round(n0 + (done2 ? 1 : 0) + 30 * clamp((t - 9.0) / 3)); x.fillStyle = INK; x.font = "400 38px PX"; x.textAlign = "center"; x.direction = "rtl"; x.fillText(`+${ar(cnt)} مشترك بيقروها كل أسبوع`, 540, 1290);
+      x.restore(); }
+    // ختم صغير
+    const st = springO(clamp((t - 10.5) / .5), 14, .5); if (t > 10.5) { x.save(); x.translate(820, 1520); x.rotate(-.2); x.scale(st, st); x.strokeStyle = A; x.lineWidth = 6; x.beginPath(); x.arc(0, 0, 110, 0, Math.PI * 2); x.stroke(); x.fillStyle = A; x.font = "700 40px AM"; x.textAlign = "center"; x.direction = "rtl"; x.fillText("ببلاش", 0, -6); x.font = "400 26px PX"; x.fillText("وتقدر تلغي", 0, 36); x.restore(); }
+    x.fillStyle = INK; x.fillRect(80, 1780, 920, 1.5);
+  },
+  sound(A) {
+    const N = A.midi;
+    A.nz(.5, .5, "bandpass", 2500, .06, 2); A.whoosh(1.0, .7, .05);
+    [[57, 60, 64], [53, 57, 60], [55, 59, 62], [57, 60, 64]].forEach((c, i) => A.pad(i * 3, c.map(N), 3.1, .025));
+    for (let b = 0; b < 24; b++) { A.hat(b * .5 + .25, .02); if (b % 2 === 0) A.kick(b * .5, .2); }
+    A.pluck(3.0, N(76), .08, 1); [4.8, 5.9, 7.0].forEach((s, i) => { A.whoosh(s, .3, .05); A.pluck(s + .2, N(79 + i * 2), .08, .8); });
+    for (let k = 0; k < 12; k++) A.click(9.1 + k * .075, .05); A.click(10.25, .2); A.tone(10.3, N(84), .15, "sine", .07); A.tone(10.45, N(91), .3, "sine", .07); A.hit(10.5, .25);
+  },
+});
+</script>
+</body></html>

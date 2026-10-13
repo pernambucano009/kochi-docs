@@ -1,0 +1,89 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// قالب «عرض تطبيق حي»: تسجيل شاشة شكله حقيقي: نافذة طايرة على خلفية، مؤشر ماوس ناعم، والكاميرا بتقرّب على مكان الضغطة،
+// وجوه الواجهة كائن بكسل صغير عايش فيها وبيمثّل اللي البرنامج بيعمله: بيشيل الرقم، بيطيّر الفاتورة، وبيحتفل لما تتدفع. 1080×1920، 12 ثانية.
+const PR = M.params({
+  app: { label: "اسم التطبيق", kind: "text", role: "brand", def: "فاتورتي" },
+  client: { label: "اسم العميل في المثال", kind: "text", def: "ستوديو نور" },
+  amount: { label: "المبلغ", kind: "text", def: "٤٥٠٠ جنيه" },
+  line1: { label: "الجملة الأولى", kind: "text", def: "فاتورة في ٣ ضغطات" },
+  line2: { label: "الجملة الأخيرة", kind: "text", role: "product", def: "واتدفعت وانت بتشرب قهوتك" },
+  accent: { label: "لون التطبيق", kind: "color", def: "#5b5bf7" },
+});
+const W = 1080, H = 1920, DUR = 12, WX = 90, WY = 420, WW = 900, WH = 1180;
+const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
+// الماسكوت بكسل ١٢×١٠
+const BLOB = ["....XXXX....", "..XXXXXXXX..", ".XXXXXXXXXX.", "XXXWWXXWWXXX", "XXXWKXXWKXXX", "XXXXXXXXXXXX", "XXXXXMMXXXXX", ".XXXXXXXXXX.", "..XXXXXXXX..", "..XX....XX.."];
+
+M.reel({
+  W, H, DUR, bg: "#dfe3f0",
+  async init(M) { await Promise.all([loadFont("PB", "TY-PlexArabic-700.ttf", "700"), loadFont("PX", "TY-PlexArabic-400.ttf")]); const c = M.canvas(W, H); return { x: c.getContext("2d") }; },
+  seek(t, C, M) {
+    const { x } = C, { seg, clamp, cubicIO, springO, expo, hash } = M, io = (k) => cubicIO(clamp(k)), A = PR.accent;
+    // مسار الماوس (نقط + وقت الضغط)
+    const K = [[0, 760, 1500], [1.4, 760, 640, 1], [3.6, 520, 960], [4.3, 520, 960], [5.6, 540, 1380, 1], [8.2, 720, 1180], [12, 900, 1560]];
+    let mx = K[0][1], my = K[0][2]; for (let i = 0; i < K.length - 1; i++) if (t >= K[i][0] && t < K[i + 1][0]) { const k = io(seg(t, K[i][0], K[i + 1][0] - .2)); mx = K[i][1] + (K[i + 1][1] - K[i][1]) * k; my = K[i][2] + (K[i + 1][2] - K[i][2]) * k; }
+    const clicks = [1.4, 5.6], clk = clicks.find((c) => t >= c && t < c + .35);
+    // زووم أوتوماتيك على مكان الضغطة
+    const zIn = (a, b) => io(seg(t, a, a + .6)) * (1 - io(seg(t, b - .6, b)));
+    const zk = Math.max(zIn(1.0, 3.2), zIn(5.2, 7.6)), zc = t < 4.4 ? [760, 700] : [540, 1300], Z = 1 + .5 * zk;
+    x.setTransform(1, 0, 0, 1, 0, 0);
+    const bg = x.createLinearGradient(0, 0, W, H); bg.addColorStop(0, "#c9d3ff"); bg.addColorStop(1, "#ffd9e8"); x.fillStyle = bg; x.fillRect(0, 0, W, H);
+    // عنوان فوق النافذة
+    const ta = io(seg(t, .2, .8)) * (1 - io(seg(t, 8.6, 9.0))); x.globalAlpha = ta; x.fillStyle = "#1b1d3a"; x.font = `700 ${M.fit(PR.line1, "PB", 900, 78, 40, "700")}px PB`; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.line1, 540, 260); x.globalAlpha = 1;
+    x.save(); x.translate(zc[0], zc[1]); x.scale(Z, Z); x.translate(-zc[0], -zc[1]);
+    // النافذة
+    x.shadowColor = "rgba(40,40,90,.3)"; x.shadowBlur = 60; x.shadowOffsetY = 24; x.fillStyle = "#fff"; x.beginPath(); x.roundRect(WX, WY, WW, WH, 28); x.fill(); x.shadowBlur = 0; x.shadowOffsetY = 0;
+    x.fillStyle = "#f2f3f8"; x.beginPath(); x.roundRect(WX, WY, WW, 70, [28, 28, 0, 0]); x.fill(); ["#ff5f57", "#febc2e", "#28c840"].forEach((c2, i) => { x.fillStyle = c2; x.beginPath(); x.arc(WX + 40 + i * 32, WY + 35, 10, 0, Math.PI * 2); x.fill(); });
+    x.fillStyle = "#1b1d3a"; x.font = "700 30px PB"; x.textAlign = "center"; x.fillText(PR.app, 540, WY + 46);
+    // الواجهة: شريط جانبي + المحتوى
+    x.fillStyle = "#f7f7fc"; x.fillRect(WX + WW - 200, WY + 70, 200, WH - 70); x.fillStyle = A; x.beginPath(); x.roundRect(WX + WW - 180, WY + 110, 160, 56, 14); x.fill();
+    x.fillStyle = "#fff"; x.font = "700 28px PB"; x.textAlign = "right"; x.fillText("الفواتير", WX + WW - 40, WY + 148); ["العملا", "التقارير", "الإعدادات"].forEach((s, i) => { x.fillStyle = "#7a7d99"; x.font = "400 28px PX"; x.fillText(s, WX + WW - 40, WY + 230 + i * 70); });
+    // زرار "فاتورة جديدة"
+    const b1 = clk === 1.4 ? .94 : 1; x.save(); x.translate(760, 640); x.scale(b1, b1); x.fillStyle = A; x.beginPath(); x.roundRect(-140, -40, 280, 80, 18); x.fill(); x.fillStyle = "#fff"; x.font = "700 32px PB"; x.textAlign = "center"; x.fillText("+ فاتورة جديدة", 0, 11); x.restore();
+    // الفورم بيتملي لوحده
+    const fo = io(seg(t, 1.7, 2.3));
+    if (fo > 0) { x.globalAlpha = fo; const rowY = [800, 920, 1040];
+      const typed = (s, a, b) => [...s].slice(0, Math.floor([...s].length * clamp((t - a) / (b - a)))).join("");
+      [["العميل", typed(PR.client, 2.3, 3.0)], ["المبلغ", typed(PR.amount, 3.0, 3.6)], ["الاستحقاق", typed("خلال ٧ أيام", 3.6, 4.2)]].forEach(([lab, val], i) => {
+        x.fillStyle = "#7a7d99"; x.font = "400 28px PX"; x.textAlign = "right"; x.fillText(lab, WX + WW - 230, rowY[i] - 30); x.strokeStyle = "#e1e3ef"; x.lineWidth = 3; x.beginPath(); x.roundRect(WX + 40, rowY[i] - 10, WW - 270, 76, 14); x.stroke();
+        x.fillStyle = "#1b1d3a"; x.font = "700 34px PB"; x.fillText(val, WX + WW - 250, rowY[i] + 40); });
+      x.globalAlpha = 1; }
+    // زرار إرسال
+    const b2 = clk === 5.6 ? .94 : 1; x.save(); x.translate(540, 1380); x.scale(b2, b2); x.fillStyle = t > 5.6 ? "#22c55e" : A; x.globalAlpha = fo; x.beginPath(); x.roundRect(-230, -48, 460, 96, 22); x.fill(); x.fillStyle = "#fff"; x.font = "700 36px PB"; x.textAlign = "center"; x.fillText(t > 5.6 ? "اتبعتت ✓".replace(" ✓", "") : "ابعت الفاتورة", 0, 12); x.restore(); x.globalAlpha = 1;
+    // حالة: اتدفعت
+    const pk = springO(clamp((t - 7.8) / .6), 12, .5); if (t > 7.8) { x.save(); x.translate(380, 1500); x.scale(pk, pk); x.fillStyle = "#dcfce7"; x.beginPath(); x.roundRect(-200, -40, 400, 80, 40); x.fill(); x.fillStyle = "#15803d"; x.font = "700 34px PB"; x.textAlign = "center"; x.fillText("اتدفعت", 20, 12); x.strokeStyle = "#15803d"; x.lineWidth = 6; x.beginPath(); x.moveTo(-150, 0); x.lineTo(-135, 14); x.lineTo(-110, -12); x.stroke(); x.restore(); }
+    // الماسكوت البكسل (بيعيش جوه الواجهة)
+    const blob = (bx, by, sx, sy, col) => { const ps = 9; x.save(); x.translate(bx, by); x.scale(sx, sy); BLOB.forEach((row, r) => [...row].forEach((ch, c2) => { if (ch === ".") return; x.fillStyle = ch === "X" ? col : ch === "W" ? "#fff" : ch === "K" ? "#111" : "#ff7aa8"; x.fillRect((c2 - 6) * ps, (r - 10) * ps, ps, ps); })); x.restore(); };
+    let bx = 300, by = 640, sx = 1, sy = 1;
+    const hop = (a) => { const k = (t - a) % .5 / .5; return Math.sin(Math.PI * k) * 30; };
+    if (t < 3.0) { bx = 300; by = 690 - Math.abs(Math.sin(t * 4)) * 10; }
+    else if (t < 4.2) { const k = io(seg(t, 3.0, 4.0)); bx = 300 + 50 * k; by = 970 - hop(3) ; }       // بيشيل الرقم
+    else if (t < 5.6) { bx = 340; by = 1290; }
+    else if (t < 7.6) { const k = io(seg(t, 5.7, 7.4)); bx = 340 + 500 * k; by = 1290 - 700 * k + Math.sin(k * 9) * 30; sx = sy = 1 - .5 * k; }                          // بيطير مع الفاتورة
+    else { const k = io(seg(t, 7.6, 8.2)); bx = 640; by = 1500 - (Math.max(0, Math.sin((t - 7.6) * 9)) * 50) * (t < 10 ? 1 : 0); sx = 1 + .15 * Math.sin(t * 9); sy = 1 - .15 * Math.sin(t * 9); }
+    if (t > 3.0 && t < 4.2) { x.fillStyle = "#fff4c2"; x.beginPath(); x.roundRect(bx - 70, by - 160, 140, 54, 10); x.fill(); x.fillStyle = "#1b1d3a"; x.font = "700 26px PB"; x.textAlign = "center"; x.fillText(PR.amount, bx, by - 124); }
+    if (t > 5.7 && t < 7.6) { x.save(); x.translate(bx + 40, by - 60); x.rotate(-.4); x.fillStyle = "#fff"; x.strokeStyle = A; x.lineWidth = 4; x.beginPath(); x.moveTo(-60, 0); x.lineTo(60, -30); x.lineTo(20, 30); x.closePath(); x.fill(); x.stroke(); x.restore(); }
+    blob(bx, by, sx, sy, A);
+    if (t > 7.8) for (let i = 0; i < 24; i++) { const a = hash(i) * 6.28, tt = t - 7.8, v = 260 + hash(i + 1) * 300; x.fillStyle = ["#22c55e", A, "#febc2e"][i % 3]; x.fillRect(640 + Math.cos(a) * v * tt, 1460 + Math.sin(a) * v * tt + 300 * tt * tt, 12, 12); }
+    // المؤشر
+    x.save(); x.translate(mx, my); x.scale(clk ? .85 : 1, clk ? .85 : 1); x.fillStyle = "#111"; x.strokeStyle = "#fff"; x.lineWidth = 4; x.beginPath(); x.moveTo(0, 0); x.lineTo(0, 54); x.lineTo(14, 40); x.lineTo(26, 64); x.lineTo(36, 58); x.lineTo(24, 36); x.lineTo(42, 36); x.closePath(); x.stroke(); x.fill(); x.restore();
+    if (clk) { const k = (t - clk) / .35; x.strokeStyle = A; x.lineWidth = 5; x.globalAlpha = 1 - k; x.beginPath(); x.arc(mx, my, 20 + 50 * k, 0, Math.PI * 2); x.stroke(); x.globalAlpha = 1; }
+    x.restore();
+    // الختام
+    const ek = io(seg(t, 9.0, 9.6)); if (ek > 0) { x.globalAlpha = ek; x.fillStyle = "#1b1d3a"; x.font = `700 ${M.fit(PR.line2, "PB", 900, 66, 34, "700")}px PB`; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.line2, 540, 250);
+      x.fillStyle = A; x.beginPath(); x.roundRect(340, 1700, 400, 110, 55); x.fill(); x.fillStyle = "#fff"; x.font = "700 50px PB"; x.fillText(PR.app, 540, 1772); x.globalAlpha = 1; }
+  },
+  sound(A) {
+    const N = A.midi;
+    [[57, 60, 64], [53, 57, 60], [55, 59, 62], [57, 61, 64]].forEach((c, i) => A.pad(i * 3, c.map(N), 3.1, .025));
+    for (let b = 0; b < 24; b++) { A.hat(b * .5 + .25, .025); if (b % 2 === 0) A.kick(b * .5, .2); }
+    [1.4, 5.6].forEach((s) => A.click(s, .25));
+    for (let k = 0; k < 20; k++) A.click(2.3 + k * .09, .05);
+    A.whoosh(5.7, 1.6, .06); A.tone(7.8, N(84), .15, "sine", .08); A.tone(7.95, N(88), .15, "sine", .08); A.tone(8.1, N(91), .3, "sine", .08);
+    for (let k = 0; k < 6; k++) A.tone(3.0 + k * .2, N(76 + k), .08, "square", .02);
+    A.pluck(9.0, N(79), .1, 1.6);
+  },
+});
+</script>
+</body></html>

@@ -1,0 +1,77 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// قالب «كارت شكر بتوقيع»: كارت ورق فاخر بيتفتح، كلمة الشكر بتترسم بالقلم حرف حرف وبعدين تتملي حبر، رسالة قصيرة، وتوقيع بخط الإيد
+// بيتكتب بسن قلم ماشي، وفي الآخر ختم شمع بيتطبع باسم البراند. 1080×1920، 12 ثانية.
+const PR = M.params({
+  word: { label: "كلمة الشكر", kind: "text", role: "product", def: "شكرًا" },
+  msg: { label: "الرسالة", kind: "lines", def: ["إنك كنت معانا السنة دي", "كل طلب منك كان حكاية بنفتخر بيها"] },
+  from: { label: "من مين", kind: "text", def: "فريق" },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "ورد الحديقة" },
+  ink: { label: "لون الحبر", kind: "color", def: "#1f3a5f" },
+  seal: { label: "لون الختم", kind: "color", def: "#a4161a" },
+});
+const W = 1080, H = 1920, DUR = 12;
+const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
+
+M.reel({
+  W, H, DUR, bg: "#e9e2d6",
+  async init(M) {
+    await Promise.all([loadFont("RQ", "TY-ArefRuqaa-700.ttf", "700"), loadFont("AM", "TY-Amiri-700.ttf", "700")]);
+    const c = M.canvas(W, H), R = M.rng(4);
+    // توقيع: منحنى بلفّات من الشمال لليمين (نقط كتير)
+    const S = []; for (let i = 0; i <= 480; i++) { const u = i / 480, ph = u * Math.PI * 2 * 6.5, amp = .55 + .45 * Math.abs(Math.sin(u * 5.3 + 1)); S.push([560 - u * 560 + 16 * Math.cos(ph) * amp, -44 * Math.sin(ph) * amp - 30 * Math.sin(u * Math.PI * 1.6) + (u < .12 ? -60 * (1 - u / .12) : 0)]); }
+    for (let i = 0; i <= 60; i++) { const u = i / 60; S.push([u * 600 - 20, 60 + Math.sin(u * 3) * 8]); }   // خط تحت
+    return { x: c.getContext("2d"), S };
+  },
+  seek(t, C, M) {
+    const { x, S } = C, { seg, clamp, cubicIO, springO, expo, hash } = M, io = (k) => cubicIO(clamp(k)), INK = PR.ink;
+    x.setTransform(1, 0, 0, 1, 0, 0); const bg = x.createRadialGradient(540, 900, 200, 540, 900, 1300); bg.addColorStop(0, "#f2ece2"); bg.addColorStop(1, "#d6ccbb"); x.fillStyle = bg; x.fillRect(0, 0, W, H);
+    // الكارت بيتفتح (نصه العلوي بيلف)
+    const op = io(seg(t, .2, 1.2)), cx = 100, cy = 300, cw = 880, ch = 1320;
+    const lift = io(seg(t, 0, .5)), sc0 = .9 + .1 * lift;
+    x.save(); x.translate(540, cy + ch / 2); x.scale(sc0, sc0); x.translate(-540, -(cy + ch / 2)); x.globalAlpha = lift;
+    x.shadowColor = "rgba(60,40,20,.25)"; x.shadowBlur = 50; x.shadowOffsetY = 20; x.fillStyle = "#fbf8f2"; x.fillRect(cx, cy + ch / 2, cw, ch / 2); x.shadowBlur = 0; x.shadowOffsetY = 0;
+    if (op < 1) { const f = op * 2 - 1; x.save(); x.translate(0, cy + ch / 2); x.scale(1, f); x.fillStyle = f < 0 ? "#e8dcc6" : "#fbf8f2"; x.fillRect(cx, -ch / 2, cw, ch / 2); if (f < 0) { x.fillStyle = PR.seal; x.beginPath(); x.arc(540, -ch / 4, 60, 0, Math.PI * 2); x.fill(); } x.restore(); }
+    x.restore();
+    if (op >= 1) { x.fillStyle = "#fbf8f2"; x.fillRect(cx, cy, cw, ch); x.strokeStyle = "rgba(180,150,90,.6)"; x.lineWidth = 3; x.strokeRect(cx + 30, cy + 30, cw - 60, ch - 60); x.lineWidth = 1; x.strokeRect(cx + 42, cy + 42, cw - 84, ch - 84);
+      x.fillStyle = "rgba(0,0,0,.05)"; x.fillRect(cx, cy + ch / 2 - 1, cw, 2);
+      // كلمة الشكر: بتترسم بالحدود وبعدين تتملي
+      const dk = seg(t, 1.3, 3.6); x.font = `700 ${M.fit(PR.word, "RQ", 700, 300, 120, "700")}px RQ`; x.textAlign = "center"; x.direction = "rtl";
+      x.save(); x.setLineDash([2200 * dk, 6000]); x.lineWidth = 3.5; x.strokeStyle = INK; x.strokeText(PR.word, 540, 680); x.restore();
+      x.globalAlpha = io(seg(t, 3.2, 4.0)); x.fillStyle = INK; x.fillText(PR.word, 540, 680); x.globalAlpha = 1;
+      // زخرفة صغيرة تحت الكلمة
+      const fk = io(seg(t, 3.6, 4.4)); x.strokeStyle = "rgba(180,150,90,.9)"; x.lineWidth = 3; x.beginPath(); x.moveTo(540 - 200 * fk, 760); x.quadraticCurveTo(540, 740, 540 + 200 * fk, 760); x.stroke(); x.fillStyle = "rgba(180,150,90,.9)"; x.beginPath(); x.arc(540, 752, 7 * fk, 0, Math.PI * 2); x.fill();
+      // الرسالة سطر سطر
+      PR.msg.slice(0, 3).forEach((s, i) => { const k = io(seg(t, 4.2 + i * .5, 4.9 + i * .5)); x.globalAlpha = k; x.fillStyle = "#3b3530"; x.font = `700 ${M.fit(s, "AM", 760, 58, 30, "700")}px AM`; x.textAlign = "center"; x.fillText(s, 540, 900 + i * 90 + (1 - k) * 14); }); x.globalAlpha = 1;
+      // "من" + توقيع بيتكتب
+      const fa = io(seg(t, 5.6, 6.1)); x.globalAlpha = fa; x.fillStyle = "#3b3530"; x.font = "700 46px AM"; x.textAlign = "right"; x.fillText(`${PR.from}`, 900, 1200); x.globalAlpha = 1;
+      const sk = seg(t, 6.0, 7.8);
+      if (sk > 0) { x.save(); x.font = `700 ${M.fit(PR.brand, "RQ", 520, 130, 60, "700")}px RQ`; x.textAlign = "right"; x.direction = "rtl"; x.translate(0, 0); x.rotate(-.06);
+        const tw = x.measureText(PR.brand).width, rx = 820, ry = 1400;
+        x.save(); x.beginPath(); x.rect(rx - tw * sk - 20, ry - 160, tw * sk + 60, 220); x.clip(); x.fillStyle = INK; x.fillText(PR.brand, rx, ry); x.restore();
+        const sw = io(seg(t, 7.6, 8.3)); if (sw > 0) { x.strokeStyle = INK; x.lineWidth = 5; x.lineCap = "round"; x.beginPath(); for (let i = 0; i <= 40 * sw; i++) { const u = i / 40; x.lineTo(rx + 40 - u * (tw + 140), ry + 40 - Math.sin(u * Math.PI) * 30 + u * 20); } x.stroke(); }
+        if (sk < 1) { x.save(); x.translate(rx - tw * sk, ry - 40 + Math.sin(t * 30) * 8); x.rotate(-.7); x.fillStyle = "#222"; x.beginPath(); x.moveTo(0, 0); x.lineTo(-10, -40); x.lineTo(10, -40); x.closePath(); x.fill(); x.fillStyle = "#b08d57"; x.fillRect(-14, -240, 28, 200); x.restore(); }
+        x.restore(); }
+      // ختم الشمع
+      const st = seg(t, 8.6, 8.8), sq = t > 8.8 ? 1 + .08 * Math.exp(-(t - 8.8) * 8) * Math.cos((t - 8.8) * 30) : 2.4 - 1.4 * st * st;
+      if (t > 8.6) { x.save(); x.translate(300, 1500); x.scale(sq, sq); x.rotate(-.15);
+        x.fillStyle = PR.seal; x.beginPath(); for (let i = 0; i < 28; i++) { const a = i / 28 * Math.PI * 2, r = 120 + (hash(i) - .5) * 18; x.lineTo(Math.cos(a) * r, Math.sin(a) * r); } x.closePath(); x.fill();
+        x.fillStyle = "rgba(0,0,0,.18)"; x.beginPath(); x.arc(0, 0, 92, 0, Math.PI * 2); x.fill(); x.strokeStyle = "rgba(255,255,255,.25)"; x.lineWidth = 4; x.beginPath(); x.arc(0, 0, 80, 0, Math.PI * 2); x.stroke();
+        x.fillStyle = "rgba(255,230,220,.85)"; x.font = `700 ${M.fit(PR.brand, "RQ", 140, 54, 22, "700")}px RQ`; x.textAlign = "center"; x.textBaseline = "middle"; x.direction = "rtl"; x.fillText(PR.brand, 0, 4);
+        x.fillStyle = "rgba(255,255,255,.35)"; x.beginPath(); x.ellipse(-50, -60, 30, 12, -.6, 0, Math.PI * 2); x.fill(); x.restore(); }
+    }
+    // بتلات ورد بتقع خفيف
+    for (let i = 0; i < 12; i++) { const u = ((t * .08 + hash(i)) % 1), px = hash(i + 7) * W + Math.sin(t + i) * 40, py = -60 + u * (H + 120); x.save(); x.translate(px, py); x.rotate(t * (hash(i) - .5) * 3); x.fillStyle = `rgba(200,80,90,${.35 + hash(i + 3) * .3})`; x.beginPath(); x.ellipse(0, 0, 18, 9, 0, 0, Math.PI * 2); x.fill(); x.restore(); }
+  },
+  sound(A) {
+    const N = A.midi;
+    A.nz(.2, 1.0, "bandpass", 1800, .05, 1.5);
+    const ch = [[60, 64, 67, 72], [57, 60, 64, 69], [53, 57, 60, 65], [55, 59, 62, 67]];
+    for (let i = 0; i < 24; i++) { const c = ch[Math.floor(i / 6) % 4]; A.pluck(i * .5, N(c[i % 4] + 12), .05, 1.2); }
+    for (let s = 1.3; s < 3.6; s += .1) A.nz(s, .08, "bandpass", 3600, .015, 3);
+    for (let s = 6.0; s < 8.2; s += .07) A.nz(s, .06, "bandpass", 4200, .02, 3);
+    A.hit(8.8, .45); A.kick(8.8, .6); A.pad(8.8, [N(48), N(55), N(60), N(64)], 3.2, .035); A.pluck(9.2, N(84), .08, 1.8);
+  },
+});
+</script>
+</body></html>
