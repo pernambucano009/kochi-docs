@@ -5,7 +5,14 @@ const libEsc = (s) => escapeHtml(String(s ?? ""));
 const libDur = (s) => (s ? `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, "0")}` : "");
 
 const CharactersPage = (() => {
-  const S = { list: [], open: null, el: null, adding: false };
+  const S = { list: [], open: null, el: null, adding: false, voices: [] };
+  // ألوان كروت الشخصيات (زي البروتوتايب): كل كارت تدرّج هادي مختلف ورا الصورة
+  const TINTS = [["#EFE7E1", "#D9CCC2"], ["#E4E9EF", "#C8D1DB"], ["#E3EDE4", "#C6D6C8"], ["#EFE4E9", "#D9C5CF"], ["#ECEAE3", "#D3CEC2"], ["#E6E4EF", "#CDC8DB"]];
+  const tint = (i) => `background: linear-gradient(170deg, ${TINTS[i % TINTS.length][0]}, ${TINTS[i % TINTS.length][1]})`;
+  // موجة شكلية ثابتة لكل تسجيل (من الـ id) لحد ما يتشغّل
+  const bars = (id) => { let h = 0; for (const ch of String(id)) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+    return Array.from({ length: 34 }, (_, i) => { h = (h * 1103515245 + 12345) >>> 0; const v = 3 + (h % 15); return `<i style="height:${v}px"></i>`; }).join(""); };
+  const player = new Audio();
   const cur = () => S.list.find((c) => c.id === S.open) || null;
   const html = () => `<div class="nb-wrap" id="chWrap"><div class="nh-empty">بيحمّل…</div></div>`;
 
@@ -45,17 +52,23 @@ const CharactersPage = (() => {
     if (!w) return;
     const c = cur();
     w.innerHTML = `
-      <div class="nb-bar"><button class="nb-btn" data-cnew>＋ شخصية جديدة</button><span class="nb-state">${S.list.length} شخصية</span></div>
       ${S.adding ? `<section class="nh-tile nh-panel nb-card ch-new"><div class="nb-row">
           <label class="nb-f"><span>اسم الشخصية</span><input type="text" id="chNewName" placeholder="مثلًا: سارة"></label>
           <label class="nb-btn">🖼️ اختار صورتها<input type="file" accept="image/*" id="chNewImg" hidden></label>
           <button class="nb-btn" data-cnewgo>حفظ</button><button class="nb-btn danger" data-cnewx>إلغاء</button></div>
           <p class="nb-hint">بعد الحفظ تقدر تضيف الكاركتر شيت والصوت والإنترو والأوترو.</p></section>` : ""}
       ${c ? detail(c) : ""}
-      <div class="ch-grid">${S.list.map((x) => `<div class="ch-card ${x.id === S.open ? "on" : ""}" data-cid="${x.id}" tabindex="0" role="button">
-          <img src="${libEsc(x.image_url)}" alt="" loading="lazy"><b>${libEsc(x.name)}</b>
-          <div class="ch-tags">${x.sheet.length ? `<span>${x.sheet.length} صورة</span>` : ""}${x.voice_url ? "<span>صوت</span>" : ""}${x.intro_url ? "<span>إنترو</span>" : ""}${x.outro_url ? "<span>أوترو</span>" : ""}</div></div>`).join("")
-        || `<div class="nh-empty">لسه مفيش شخصيات. دوس «＋ شخصية جديدة».</div>`}</div>`;
+      <div class="as-sh"><h2>الشخصيات <span>(${S.list.length})</span></h2></div>
+      <div class="ch-grid as-grid">${S.list.map((x, i) => `<div class="ch-card as-card ${x.id === S.open ? "on" : ""}" data-cid="${x.id}" tabindex="0" role="button">
+          <div class="as-art" style="${tint(i)}"><img src="${libEsc(x.image_url)}" alt="" loading="lazy"></div><b>${libEsc(x.name)}</b>
+          <small dir="ltr">${x.instagram ? `@${libEsc(x.instagram)}` : x.tiktok ? `@${libEsc(x.tiktok)}` : ""}</small></div>`).join("")}
+        <button type="button" class="as-new" data-cnew><span>＋</span>شخصية جديدة</button></div>
+      <div class="as-sh"><h2>آخر التعليقات الصوتية</h2><button type="button" class="as-all" data-vall>عرض الكل</button></div>
+      <div class="as-voices">${S.voices.slice(0, 2).map((v) => `<div class="as-voice" data-vplay="${libEsc(v.url)}">
+          <button type="button" class="as-play ${player.dataset.url === v.url && !player.paused ? "on" : ""}" aria-label="تشغيل"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg></button>
+          <span class="as-vt"><b>${libEsc(v.name)}</b><span class="as-wave">${bars(v.id)}</span></span><small class="num">${libDur(v.duration)}</small></div>`).join("")}
+        <button type="button" class="as-rec" data-vall><span class="as-mic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg></span>
+          <span><b>سجّل أو ارفع تعليق</b><small>بيتكتب الكلام لوحده</small></span></button></div>`;
     if (S.adding) w.querySelector("#chNewName")?.focus();
   }
 
@@ -76,7 +89,15 @@ const CharactersPage = (() => {
   function bind(w) {
     w.addEventListener("click", async (e) => {
       const t = e.target;
-      if (t.closest("[data-cnew]")) { S.adding = true; return render(); }
+      if (t.closest("[data-cnew]")) { S.adding = true; render(); return w.closest(".nh-pgrid")?.scrollTo({ top: 0, behavior: "smooth" }); }
+      if (t.closest("[data-vall]")) return document.querySelector('[data-astab="voice"]')?.click();
+      const vp = t.closest("[data-vplay]");
+      if (vp) {
+        if (player.dataset.url === vp.dataset.vplay && !player.paused) player.pause();
+        else { player.src = player.dataset.url = vp.dataset.vplay; player.play().catch(() => {}); }
+        player.onplay = player.onpause = player.onended = () => w.querySelectorAll("[data-vplay]").forEach((el) => el.querySelector(".as-play").classList.toggle("on", el.dataset.vplay === player.dataset.url && !player.paused));
+        return;
+      }
       if (t.closest("[data-cnewx]")) { S.adding = false; return render(); }
       if (t.closest("[data-cnewgo]")) {
         const name = w.querySelector("#chNewName").value.trim(), img = w.querySelector("#chNewImg").files[0];
@@ -132,9 +153,13 @@ const CharactersPage = (() => {
     S.el = w;
     S.adding = false;
     bind(w);
-    try { S.list = await api("/api/coaches"); render(); } catch (err) { w.innerHTML = `<div class="nh-empty">${libEsc(err.message)}</div>`; }
+    try {
+      [S.list, S.voices] = await Promise.all([api("/api/coaches"), api("/api/audio?kind=voice").catch(() => [])]);
+      S.voices = [...S.voices].sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")));
+      render();
+    } catch (err) { w.innerHTML = `<div class="nh-empty">${libEsc(err.message)}</div>`; }
   }
-  return { html, mount };
+  return { html, mount, close: () => player.pause() };
 })();
 
 // 🎙️ / 🎵 مكتبة صوت: رفع (بالسحب أو الزرار)، تشغيل، تغيير الاسم، حذف، وبحث

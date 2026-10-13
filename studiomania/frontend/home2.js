@@ -137,7 +137,11 @@ const NH = (() => {
       <main class="nh-bento" id="nhBento"></main>
     </div>
     <section class="nh-page" id="nhPage" hidden role="dialog" aria-modal="true">
-      <header class="nh-ptop"><button class="nh-back" id="nhBack"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg><span id="nhBackT">الرئيسية</span></button><div class="nh-ptitle" id="nhPTitle"></div></header>
+      <header class="nh-ptop">
+        <div class="nh-prow"><span class="nh-plogo" aria-hidden="true">STUDIOMANIA</span><button class="nh-chip nh-pclient" id="nhPClient" title="العميل اللي شغال عليه"></button></div>
+        <div class="nh-phead"><button class="nh-back" id="nhBack"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg><span id="nhBackT">الرئيسية</span></button><div class="nh-ptitle" id="nhPTitle"></div></div>
+        <nav class="nh-ptabs" id="nhPTabs" aria-label="الأصول"></nav>
+      </header>
       <div class="nh-pgrid" id="nhPGrid"></div>
     </section>`;
 
@@ -328,7 +332,7 @@ const NH = (() => {
   });
   // صفحات كاملة بتنزل لتحت (عقل البراند، مكتبة الموشن): كل واحدة ليها موديول بيرسمها
   const MODS = { brand: BrandPage, motion: MotionPage, coaches: CharactersPage, voice: VoicesPage, music: MusicPage };
-  const stopMedia = () => { MotionPage.close(); VoicesPage.close(); MusicPage.close(); };
+  const stopMedia = () => { MotionPage.close(); VoicesPage.close(); MusicPage.close(); CharactersPage.close?.(); };
   let pageArg = null, pStack = [];
   // عنوان الصفحة (من البروتوتايب): الأيقونة الزجاج كبيرة، وفوق الاسم اسم القسم بالإنجليزي بالبرتقالي
   const titleHTML = (t, key) => `<div class="nh-name"><span class="latin">${t.en}</span><b>${esc(t.ar)}</b></div><span class="gi nh-glt">${glImg(GLKEY[key] || GLKEY[t.icon] || "create")}</span>`;
@@ -343,12 +347,15 @@ const NH = (() => {
     const tabs = !KOCHI && pTitle.dataset.key === "assets" && AS_TABS.some((x) => x[0] === key);
     pGrid.dataset.key = key;
     pGrid.classList.toggle("nh-scroll", !!MODS[key]);
-    pGrid.innerHTML = (tabs ? asTabs(key) : "") + (MODS[key] ? MODS[key].html() : PAGES[key]());
+    document.getElementById("nhPTabs").innerHTML = tabs ? asTabs(key) : "";
+    document.getElementById("nhPClient").innerHTML = document.getElementById("nhClient").innerHTML;
+    pGrid.innerHTML = MODS[key] ? MODS[key].html() : PAGES[key]();
     if (MODS[key]) MODS[key].mount(pGrid, pageArg);
     else pGrid.querySelectorAll(".nh-tile").forEach(addSnake);
     pageArg = null;
   }
-  pGrid.addEventListener("click", (e) => {
+  document.getElementById("nhPClient").onclick = () => document.getElementById("nhClient").click();
+  page.addEventListener("click", (e) => {
     const b = e.target.closest("[data-astab]");
     if (!b || b.classList.contains("on")) return;
     fillPage(b.dataset.astab);

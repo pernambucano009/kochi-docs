@@ -3979,5 +3979,9 @@ window.I18N_EN = {
   "الميديا": "Media",
   "معاينة": "Preview",
   "مفتاح Atlas": "Atlas key",
-  "مفتاح Zernio": "Zernio key"
+  "مفتاح Zernio": "Zernio key",
+  "آخر التعليقات الصوتية": "Latest voiceovers",
+  "عرض الكل": "View all",
+  "سجّل أو ارفع تعليق": "Record or upload a voiceover",
+  "بيتكتب الكلام لوحده": "Gets transcribed automatically"
 };
