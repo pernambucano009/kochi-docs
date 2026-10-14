@@ -174,7 +174,7 @@ function assetTrials(a) {
       <label class="check"><input type="radio" name="tmode" value="transfer" data-tmode ${asx.tmode === "transfer" ? "checked" : ""}> 🔀 نقل (بين لقطتين تانيين)</label>
     </div>
     ${asx.tmode === "transfer" ? `<div class="as-tsides">${trialSidePick("a")}<span class="as-tarrow">⟵ 🔗 ⟵</span>${trialSidePick("b")}</div>` : ""}
-    <div class="row wrap"><select data-tmodel>${models.map((m) => `<option value="${m.key}">${le(m.label)} · ~${m.per_sec}$/ث</option>`).join("")}</select>
+    <div class="row wrap"><select data-tmodel>${vmOptions(models, models[0]?.key, 10)}</select>
       <select data-tres><option value="480p">480p</option><option value="720p">720p (الضعف)</option></select>
       <button type="button" class="btn sm primary" data-tnew>🧠 اعمل الخطة</button></div>
     ${(a.trials || []).map((t) => trialCard(a, t)).join("")}

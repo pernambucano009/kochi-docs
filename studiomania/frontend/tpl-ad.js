@@ -72,7 +72,7 @@ function tvAdDetail(v) {
     </details>
 
     ${plan ? `<details class="panel tv-step" data-dk="a4" ${open("a4", true)}><summary>٤. 🎬 التوليد <small class="muted">${(v.jobs || []).length - missing.length}/${(v.jobs || []).length} اتولّد</small></summary>
-      <div class="row wrap tv-opts"><label>موديل الحركة <select data-tvopt="model">${v.models.filter((m) => m.key !== "seedance-mini").map((m) => `<option value="${m.key}" ${m.key === v.model ? "selected" : ""}>${le(m.label)}</option>`).join("")}</select></label>
+      <div class="row wrap tv-opts"><label>موديل الحركة <select data-tvopt="model">${vmOptions(v.models.filter((m) => m.key !== "seedance-mini"), v.model, (v.jobs || []).reduce((a, j) => a + (j.secs || 0), 0) || 15, v.resolution, "للإعلان كله")}</select></label>
         <label>الجودة <select data-tvopt="resolution"><option value="480p" ${v.resolution === "480p" ? "selected" : ""}>480p</option><option value="720p" ${v.resolution === "720p" ? "selected" : ""}>720p</option></select></label>
         <label>المقاس <select data-tvopt="ratio" ${dis}>${Object.entries(TV_RATIOS).map(([k, l]) => `<option value="${k}" ${k === v.ratio ? "selected" : ""}>${l}</option>`).join("")}</select></label></div>
       ${needProd && !hasProd ? `<p class="err">ارفع صورة المنتج الأول (خطوة ٢)</p>` : ""}${(ugc || plateK) && !hasHero ? `<p class="err">اعمل الشخصية الأول (خطوة ١)</p>` : ""}

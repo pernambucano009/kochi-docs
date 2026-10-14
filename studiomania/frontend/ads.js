@@ -932,7 +932,7 @@ function renderVoices(a) {
     ${fv.error ? `<div class="err">✕ ${adEsc(fv.error)}</div>` : ""}
   </div>`);
   if (document.activeElement !== $("adVideoModelSel")) {
-    $("adVideoModelSel").innerHTML = a.video_models.map((m) => `<option value="${m.key}" ${m.key === (p.header.video_model || "seedance") ? "selected" : ""}>${m.label}</option>`).join("");
+    $("adVideoModelSel").innerHTML = a.video_models.map((m) => `<option value="${m.key}" ${m.key === (p.header.video_model || "seedance") ? "selected" : ""}>${m.label}${m.per_sec ? ` · ~$${vmCost(m, 10)} لكل 10 ث` : ""}</option>`).join("");
   }
 }
 function saveVoices(extra = {}) {

@@ -7105,7 +7105,7 @@ def ad_to_dict(r: sqlite3.Row, d: dict) -> dict:
         "prod": with_ref_motion(prod_to_dict(aid, d.get("prod")), analysis),
         "chain_prod": bool(d.get("chain_prod")),
         "brain_db": ad_brain_db(d.get("settings")),
-        "video_models": [{"key": k, "label": v["label"]} for k, v in AD_VIDEO_MODELS.items()],
+        "video_models": [{"key": k, "label": v["label"], "per_sec": (TRIAL_MODELS.get(k) or {}).get("per_sec")} for k, v in AD_VIDEO_MODELS.items()],
         "ar_voices": [{"id": k, "label": v} for k, v in AR_VOICES.items()],
     }
 
@@ -11141,7 +11141,7 @@ def clip_to_dict(aid: str, d: dict) -> dict:
             "busy": any(v.get("status") == "working" for v in d.get("variants") or [])
             or any(t.get("status") in ("planning", "working") for t in d.get("trials") or []),
             "trials": [trial_to_dict(aid, t) for t in d.get("trials") or []],
-            "trial_models": [{"key": k, "label": v["label"], "per_sec": v["per_sec"]} for k, v in TRIAL_MODELS.items()],
+            "trial_models": vm_list(),
             "vedit_models": [{"key": k, "label": v["label"], "per_sec": v["per_sec"]} for k, v in lab.VEDIT_MODELS.items()]}
 
 
@@ -11762,6 +11762,47 @@ TRIAL_MODELS = {
     "seedance-2.5": {"label": "Seedance 2.5 (لحد 30 ثانية في توليدة واحدة، أغلى)", "model": "bytedance/seedance-2.5/image-to-video",
                      "per_sec": 0.134, "max": 30},
 }
+# 🎬 كل موديلات الفيديو اللي عند Atlas بتتضاف هنا لوحدها (vmodels.py): المفتاح = اسم العيلة، وKling هو الافتراضي والموصى به لغير الإنجليزي
+import vmodels  # noqa: E402
+
+VDEF = vmodels.DEFAULT
+REC_TAG = " · ⭐ موصى به للفيديوهات غير الإنجليزي"
+
+
+def vm_sync() -> None:
+    try:
+        fams = vmodels.families()
+    except Exception:  # noqa: BLE001
+        fams = dict(vmodels.SEED)
+    for k, v in fams.items():
+        if k in TRIAL_MODELS and not k.count("/"):
+            continue
+        TRIAL_MODELS[k] = {"label": v["label"] + (REC_TAG if v.get("rec") else ""), "model": v["model"], "r2v": v.get("r2v"),
+                           "per_sec": v["per_sec"], "rec": bool(v.get("rec"))}
+        # الإعلانات (المحلل): نفس الموديلات، بالمراجع لو العيلة عندها، وإلا من صورة
+        if k.count("/") and k not in AD_VIDEO_MODELS:
+            AD_VIDEO_MODELS[k] = {"label": v["label"] + (REC_TAG if v.get("rec") else ""), "model": v.get("r2v") or v["model"],
+                                  "kind": "ref" if v.get("r2v") else "i2v"}
+
+
+for _k, _v in vmodels.SEED.items():
+    TRIAL_MODELS[_k] = {"label": _v["label"] + REC_TAG, "model": _v["model"], "r2v": _v.get("r2v"), "per_sec": _v["per_sec"], "rec": True}
+threading.Thread(target=vm_sync, daemon=True).start()
+
+
+def vm_list() -> list[dict]:
+    """الموديلات للواجهة: Kling الأول، وبعدين الموصى بيه، وبعدين الأرخص."""
+    if time.time() - vmodels._cat["at"] > 6 * 3600:
+        threading.Thread(target=vm_sync, daemon=True).start()
+    rows = [{"key": k, "label": v["label"], "per_sec": v["per_sec"], "rec": bool(v.get("rec"))} for k, v in TRIAL_MODELS.items()]
+    return sorted(rows, key=lambda r: (r["key"] != VDEF, not r["rec"], r["per_sec"]))
+
+
+@app.get("/api/video-models")
+def video_models():
+    return vm_list()
+
+
 TRIAL_KEY_COST = 0.06   # صورة مفتاحية واحدة (تقريبًا)
 TRIAL_CTX = 2.0         # ثواني من A قبل الكونيكتور ومن B بعده في الفيديو النهائي
 
@@ -11840,7 +11881,7 @@ class TrialIn(BaseModel):
     mode: str = "rebuild"            # rebuild = نفس النقطتين في الفيديو الأصلي، transfer = لقطتين تانيين
     a: TrialSideIn | None = None
     b: TrialSideIn | None = None
-    model: str = "seedance-mini"
+    model: str = VDEF   # Kling (الموصى به لغير الإنجليزي)
     resolution: str = "480p"
 
 
@@ -11869,7 +11910,7 @@ def asset_trial_create(aid: str, body: TrialIn):
     still_at(lab_dir(a["lab"]) / a["src"], a["t"], folder / "a.jpg")
     still_at(lab_dir(b["lab"]) / b["src"], b["t"], folder / "b.jpg")
     t = {"id": tid, "mode": "rebuild" if body.mode == "rebuild" else "transfer", "a": a, "b": b,
-         "model": body.model if body.model in TRIAL_MODELS else "seedance-mini",
+         "model": body.model if body.model in TRIAL_MODELS else VDEF,
          "resolution": body.resolution if body.resolution in ("480p", "720p") else "480p",
          "status": "planning", "step": "بيكتب الخطة", "error": None, "plan": None,
          "files": {"a": "a.jpg", "b": "b.jpg"}, "review": None, "created_at": now()}
@@ -12224,7 +12265,7 @@ def film_to_dict(fid: str, d: dict) -> dict:
             "link_assets": [{"id": l.get("asset"), **({"name": a.get("name"), "url": f"/media/assets/{l['asset']}/{a['file']}",
                              "thumb_url": f"/media/assets/{l['asset']}/{a['thumb']}"} if (a := film_asset_brief(l.get("asset"))) else {})}
                             for l in links],
-            "models": [{"key": k, "label": v["label"], "per_sec": v["per_sec"]} for k, v in TRIAL_MODELS.items()]}
+            "models": vm_list()}
 
 
 def film_asset_brief(aid: str | None) -> dict | None:
@@ -12264,7 +12305,7 @@ class FilmIn(BaseModel):
     connectors: list[str] = []
     scenes: int = 0
     ratio: str = "9:16"
-    model: str = "seedance-mini"
+    model: str = VDEF   # Kling (الموصى به لغير الإنجليزي)
     resolution: str = "480p"
 
 
@@ -12284,7 +12325,7 @@ def film_create(body: FilmIn):
          "brief": body.brief.strip()[:3000] or f"فيديو قصير بيعرض أهم مميزات {client.get('name') or 'المنتج'}",
          "connectors": [c["id"] for c in conns], "n_scenes": n,
          "ratio": body.ratio if body.ratio in az.ASPECTS else "9:16",
-         "model": body.model if body.model in TRIAL_MODELS else "seedance-mini",
+         "model": body.model if body.model in TRIAL_MODELS else VDEF,
          "resolution": body.resolution if body.resolution in ("480p", "720p") else "480p",
          "status": "planning", "step": "بيكتب السيناريو", "error": None, "plan": None, "files": {}, "created_at": now()}
     with FILM_LOCK:
@@ -13721,7 +13762,7 @@ def tv_to_dict(vid: str, d: dict) -> dict:
                       "video": round(sum(trial_gen_seconds(b["t1"] - b["t0"]) * per for i, b in enumerate(beats) if not (segs.get(str(i)) or {}).get("file")), 2),
                       "seg": [round(trial_gen_seconds(b["t1"] - b["t0"]) * per, 2) for b in beats],
                       "once": tv_once_cost(d, per), "once_parts": len(tv_chunks(beats, tv_once_max(d))), "once_max": tv_once_max(d)},
-            "models": [{"key": k, "label": v["label"], "per_sec": v["per_sec"]} for k, v in TRIAL_MODELS.items()],
+            "models": vm_list(),
             **(ad_to_dict(vid, d) if d.get("mode") == "ad" else still_to_dict(vid, d) if d.get("mode") == "still" else {})}
 
 
@@ -13762,7 +13803,7 @@ class TvIn(BaseModel):
     length: int = 60             # قوالب المشاهد: طول الفيديو (كل ١٠ ثواني = مشهد)
     brief: str = ""
     text_mode: str = "blank"
-    model: str = "seedance-mini"
+    model: str = VDEF   # Kling (الموصى به لغير الإنجليزي)
     resolution: str = "480p"
 
 
@@ -13781,7 +13822,7 @@ def tvideo_create(body: TvIn):
          "brief": body.brief.strip()[:3000] or f"فيديو بيعرض أهم مميزات {client.get('name') or 'المنتج'}",
          "text_mode": body.text_mode if body.text_mode in lab.TEXT_MODES else "blank",
          "image_model": body.image_model if body.image_model in TV_IMAGE_MODELS else "nano2",
-         "model": body.model if body.model in TRIAL_MODELS else "seedance-mini",
+         "model": body.model if body.model in TRIAL_MODELS else VDEF,
          "resolution": body.resolution if body.resolution in ("480p", "720p") else "480p",
          "status": "filling", "step": "بيملا الخانات بمحتوى العميل", "error": None, "fill": None, "sheets": {}, "panels": {}, "segs": {},
          "created_at": now()}
@@ -13797,7 +13838,7 @@ def tvideo_create(body: TvIn):
     if body.section == "templates" and t.get("mode") == "ad":
         # 🎯 قوالب الإعلانات: الشخصية والمنتج الأول، وبعدين السكريبت (مفيش حاجة بتشتغل لوحدها في الأول)
         lang = d["lang"]
-        d.update(mode="ad", status="filled", step=None, model=body.model if body.model in TRIAL_MODELS and body.model != "seedance-mini" else "seedance-fast",
+        d.update(mode="ad", status="filled", step=None, model=body.model if body.model in TRIAL_MODELS and body.model != "seedance-mini" else VDEF,
                  ad={"kind": t["ad_cfg"]["kind"], "look": {"skeleton": "bare", "talking": "pixar", "song": "pixar"}.get(t["ad_cfg"]["kind"], "narrative"), "spoken": adtpl.SPOKEN.get(lang) or dub.DIALECTS[lang].get("language") or "Arabic",
                      "script": d["script"] if d["script_mode"] == "own" else "", "place": "", "length": 15, "end_on": t["ad_cfg"]["kind"] == "cinema",
                      "hero": {}, "product": {}, "files": {}, "gens": {}, "plan": None})
@@ -14260,7 +14301,9 @@ def run_tv_gen(vid: str, only: int | None) -> None:
 
 
 def tv_r2v(model_key: str) -> str:
-    return TRIAL_MODELS.get(model_key, TRIAL_MODELS["seedance-mini"])["model"].replace("image-to-video", "reference-to-video")
+    """موديل «مراجع ← فيديو» للعيلة دي؛ ولو العيلة مالهاش، موديل الصورة (أول مرجع بيبقى الصورة)."""
+    m = TRIAL_MODELS.get(model_key) or TRIAL_MODELS[VDEF]
+    return m.get("r2v") or (m["model"].replace("image-to-video", "reference-to-video") if m["model"].startswith("bytedance/seedance") else m["model"])
 
 
 def tv_once_max(d: dict) -> int:

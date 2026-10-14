@@ -111,7 +111,7 @@ $("labSchema").addEventListener("toggle", (e) => { if (e.target.matches("[data-s
 async function openTpl(vid) {
   labx.view = "tpl";
   renderLab();
-  [tplx.list, tplx.tvs] = await Promise.all([api("/api/templates"), api("/api/tvideos")]);
+  [tplx.list, tplx.tvs] = await Promise.all([api("/api/templates"), api("/api/tvideos"), vmLoad()]);
   tplx.cur = vid && tplx.tvs.some((x) => x.id === vid) ? await api(`/api/tvideos/${vid}`) : null;
   renderTpl();
   scheduleTplPoll();
@@ -161,7 +161,7 @@ function tplHome() {
         <label>المقاس <select data-tvf="ratio">${Object.entries(TV_RATIOS).map(([k, l]) => `<option value="${k}">${l}</option>`).join("")}</select></label>
         <label>موديل الصور <select data-tvf="image_model"><option value="nano2">Nano Banana 2 (بيلتزم بالمقاس، رخيص)</option><option value="nanopro">Nano Banana Pro (أجود)</option><option value="sunburst">GPT Image 2.5 (زي ChatGPT)</option></select></label>
         <label>الكلام على الشاشة <select data-tvf="text_mode"><option value="blank">مساحات فاضية (العربي في المونتاج)</option><option value="en">إنجليزي جوه الصور</option></select></label>
-        <label>موديل الحركة <select data-tvf="model"><option value="seedance-mini">Seedance 2.0 Mini (الأرخص)</option><option value="seedance-fast">Seedance 2.0 Fast</option><option value="seedance">Seedance 2.0 (أجود)</option><option value="seedance-2.5">Seedance 2.5 (لحد 30 ثانية في توليدة واحدة، أغلى)</option></select></label>
+        <label>موديل الحركة <select data-tvf="model">${vmOptions(VMODELS, VMODELS[0]?.key, 10)}</select></label>
         <label>الجودة <select data-tvf="resolution"><option value="480p">480p</option><option value="720p">720p (الضعف)</option></select></label>
         <button type="button" class="btn primary" data-tvnew>✍️ املا التيمبليت</button></div>
     </section>` : ""}
@@ -235,7 +235,7 @@ function tvDetail(v) {
       <label>المقاس <select data-tvopt="ratio" ${busy ? "disabled" : ""}>${Object.entries(TV_RATIOS).map(([k, l]) => `<option value="${k}" ${k === v.ratio ? "selected" : ""}>${l}</option>`).join("")}</select></label>
       <label>موديل الصور <select data-tvopt="image_model">${(v.image_models || []).map((m) => `<option value="${m.key}" ${m.key === v.image_model ? "selected" : ""}>${le(m.label)}</option>`).join("")}</select></label>
       <label>الكلام على الشاشة <select data-tvopt="text_mode">${Object.entries(v.text_modes).map(([k, l]) => `<option value="${k}" ${k === v.text_mode ? "selected" : ""}>${l}</option>`).join("")}</select></label>
-      <label>موديل الحركة <select data-tvopt="model">${v.models.map((m) => `<option value="${m.key}" ${m.key === v.model ? "selected" : ""}>${le(m.label)}</option>`).join("")}</select></label>
+      <label>موديل الحركة <select data-tvopt="model">${vmOptions(v.models, v.model, beats.at(-1).t1 - beats[0].t0, v.resolution, "للفيديو كله")}</select></label>
       <label>الجودة <select data-tvopt="resolution"><option value="480p" ${v.resolution === "480p" ? "selected" : ""}>480p</option><option value="720p" ${v.resolution === "720p" ? "selected" : ""}>720p</option></select></label>
       <button type="button" class="btn sm" data-tvrefill ${busy ? "disabled" : ""}>✍️ املاه من جديد</button>
     </div>

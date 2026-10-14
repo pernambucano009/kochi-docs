@@ -119,7 +119,17 @@ def with_rules(prompt: str) -> str:
     return f"{prompt.rstrip()}\n{RULES_HEAD} {rules}"
 
 
+def _adapt_video(body: dict) -> dict:
+    """كل موديل فيديو بأسماء خاناته (vmodels.py)؛ لو حصل أي حاجة الطلب بيروح زي ما هو."""
+    try:
+        import vmodels  # noqa: PLC0415 (بيستورد atlas، فالاستيراد هنا)
+        return vmodels.adapt(body)
+    except Exception:  # noqa: BLE001
+        return body
+
+
 def submit_video(body: dict) -> str:
+    body = _adapt_video(body)
     if body.get("prompt") is not None:
         body = {**body, "prompt": with_rules(body["prompt"])}
     with httpx.Client(timeout=60) as client:
@@ -460,6 +470,8 @@ def reference_url(path: Path) -> str:
 
 def run_model(kind: str, body: dict, what: str, max_seconds: int = 1800, interval: float = 4) -> str:
     """أي موديل على Atlas (Video / Audio / Image): يبعت الطلب ويستنى ويرجّع لينك أول ناتج."""
+    if kind == "Video":
+        body = _adapt_video(body)
     if kind in ("Video", "Image") and isinstance(body.get("prompt"), str):
         body = {**body, "prompt": with_rules(body["prompt"])}
     with httpx.Client(timeout=90) as client:
