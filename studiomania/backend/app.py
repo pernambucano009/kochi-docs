@@ -19640,6 +19640,209 @@ def flow_generate(fid: str, body: FlowGoIn):
     return flow_to_dict(fid, flow_load(fid))
 
 
+# ---------------------------------------------------------------- 🧪 مولّدات من غير قوالب: صوت، صور، فيديو
+# كل توليدة بتتحفظ في gens/<id>/ ومعاها item.json (حالتها وتكلفتها)، وبتظهر في تاريخ المولّدات.
+# الصوت بيدخل مكتبة التعليق الصوتي، والفيديو بيدخل «الفيديوهات الجاهزة» (يتنشر أو يتدبلج أو يدخل المونتاج).
+GEN_DIR = DATA_DIR / "gens"
+GEN_DIR.mkdir(parents=True, exist_ok=True)
+app.mount("/media/gens", StaticFiles(directory=GEN_DIR), name="gens")
+GEN_LOCK = threading.Lock()
+GEN_RATIOS = {"9:16": "1024x1536", "16:9": "1536x1024", "1:1": "1024x1024", "4:5": "1024x1280"}
+
+
+def gen_save(gid: str, item: dict) -> None:
+    f = GEN_DIR / gid / "item.json"
+    f.parent.mkdir(parents=True, exist_ok=True)
+    f.write_text(json.dumps(item, ensure_ascii=False), encoding="utf-8")
+
+
+def gen_set(gid: str, **kw) -> None:
+    with GEN_LOCK:
+        f = GEN_DIR / gid / "item.json"
+        item = json.loads(f.read_text(encoding="utf-8"))
+        item.update(kw, updated_at=now())
+        gen_save(gid, item)
+
+
+def gen_dict(gid: str, item: dict) -> dict:
+    base = f"/media/gens/{gid}"
+    return {**item, "id": gid, "url": f"{base}/{item['file']}" if item.get("file") else None,
+            "ref_url": f"{base}/{item['ref']}" if item.get("ref") else None}
+
+
+@app.get("/api/gens")
+def gens_list():
+    out = []
+    for f in sorted(GEN_DIR.glob("*/item.json"), key=lambda x: x.stat().st_mtime, reverse=True)[:120]:
+        try:
+            d = json.loads(f.read_text(encoding="utf-8"))
+        except ValueError:
+            continue
+        if owned(d.get("client_id")):
+            out.append(gen_dict(f.parent.name, d))
+    return out
+
+
+@app.get("/api/gens/info")
+def gens_info():
+    return {**dub_info(), "image_models": {k: {"label": v[2], "price": v[0]} for k, v in TV_IMAGE_MODELS.items()},
+            "video_models": vm_list(), "ratios": list(GEN_RATIOS), "video_ratios": list(RATIO_VIDEO), "first_frame_cost": TV_IMAGE_MODELS["nano2"][0]}
+
+
+def gen_new(kind: str, prompt: str, **extra) -> tuple[str, dict]:
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات")
+    gid = uuid.uuid4().hex[:12]
+    item = {"kind": kind, "prompt": prompt, "status": "working", "step": "في الطابور", "error": None, "file": None,
+            "client_id": active_client_id(), "created_at": now(), "updated_at": now(), **extra}
+    gen_save(gid, item)
+    return gid, item
+
+
+def gen_job(gid: str, fn) -> None:
+    def run():
+        try:
+            fn()
+        except Exception as exc:  # noqa: BLE001
+            gen_set(gid, status="failed", step=None, error=str(getattr(exc, "detail", None) or exc)[:400])
+    threading.Thread(target=run, daemon=True).start()
+
+
+class GenVoiceIn(BaseModel):
+    text: str
+    lang: str
+    voice: str
+    name: str = ""
+
+
+@app.post("/api/gens/voice")
+def gen_voice(body: GenVoiceIn):
+    """🎙️ مولد صوت: الكلام بلهجة وصوت تختارهم، وبيتحفظ كمان في مكتبة التعليق الصوتي."""
+    text = body.text.strip()[:3000]
+    if not text:
+        raise HTTPException(400, "اكتب الكلام")
+    if body.voice not in dub.VOICES or body.lang not in dub.DIALECTS:
+        raise HTTPException(400, "اختار اللهجة والصوت")
+    if dub.VOICES[body.voice]["provider"] == "fasih" and not (fasih.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "اللهجات العربية محتاجة مفتاح فصيح (FASIH_API_KEY)")
+    gid, item = gen_new("voice", text, lang=body.lang, voice=body.voice, name=body.name.strip()[:80])
+
+    def run():
+        gen_set(gid, step="🎙️ بيعمل الصوت")
+        wav = GEN_DIR / gid / "voice.wav"
+        vo_say(text, body.voice, body.lang, wav)
+        mp3 = GEN_DIR / gid / "voice.mp3"
+        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(wav), "-c:a", "libmp3lame", "-b:a", "160k", str(mp3)],
+                       check=True, capture_output=True, timeout=120)
+        wav.unlink(missing_ok=True)
+        dur = probe_duration(mp3)
+        aid = uuid.uuid4().hex[:12]
+        fname = f"voice_{aid}.mp3"
+        shutil.copy(mp3, AUDIO_DIR / fname)
+        with closing(db()) as conn, conn:
+            conn.execute("INSERT INTO audio (id, kind, name, filename, duration, created_at) VALUES (?, 'voice', ?, ?, ?, ?)",
+                         (aid, (body.name.strip() or f"🎙️ {text[:40]}")[:80], fname, dur, now()))
+        gen_set(gid, status="done", step=None, file=mp3.name, duration=round(dur, 2), audio_id=aid)
+    gen_job(gid, run)
+    return gen_dict(gid, item)
+
+
+@app.post("/api/gens/image")
+def gen_image(prompt: str = Form(...), model: str = Form("nano2"), ratio: str = Form("9:16"), count: int = Form(1),
+              refs: list[UploadFile] | None = File(None)):
+    """🖼️ مولد صور: وصف (ومرجع لو عايز) ← صورة أو أكتر بالموديل اللي تختاره."""
+    prompt = prompt.strip()[:4000]
+    if not prompt:
+        raise HTTPException(400, "اوصف الصورة")
+    model = model if model in TV_IMAGE_MODELS else "nano2"
+    ratio = ratio if ratio in GEN_RATIOS else "9:16"
+    n = max(1, min(4, int(count or 1)))
+    ids = []
+    ref_files = []
+    for i in range(n):
+        gid, item = gen_new("image", prompt, model=model, ratio=ratio, cost=TV_IMAGE_MODELS[model][0])
+        if i == 0:
+            for j, up in enumerate((refs or [])[:4]):
+                if up and up.filename:
+                    ref_files.append(save_upload(up, IMAGE_EXTENSIONS, GEN_DIR / gid, f"ref{j}"))
+            if ref_files:
+                gen_set(gid, ref=ref_files[0])
+        ids.append((gid, item))
+    first = GEN_DIR / ids[0][0]
+
+    def make(gid):
+        def run():
+            gen_set(gid, step="🖼️ بيرسم")
+            dest = GEN_DIR / gid / "image.png"
+            if atlas.mock_mode():
+                subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i",
+                                f"color=c=0x{uuid.uuid4().hex[:6]}:s={GEN_RATIOS[ratio]}", "-frames:v", "1", str(dest)], check=True, capture_output=True, timeout=60)
+            else:
+                images = [atlas.reference_url(first / f) for f in ref_files] or None
+                atlas.download(atlas.generate_image(model, prompt, GEN_RATIOS[ratio], "high", images), dest)
+            gen_set(gid, status="done", step=None, file=dest.name)
+        return run
+    for gid, _ in ids:
+        gen_job(gid, make(gid))
+    return [gen_dict(g, it) for g, it in ids]
+
+
+@app.post("/api/gens/video")
+def gen_video(prompt: str = Form(...), model: str = Form(VDEF), duration: int = Form(5), ratio: str = Form("9:16"),
+              resolution: str = Form("480p"), audio: bool = Form(True), image: UploadFile | None = File(None)):
+    """🎬 مولد فيديو: وصف + (صورة بداية اختيارية) ← فيديو بأي موديل عند Atlas. من غير صورة، البرنامج بيرسم أول فريم من الوصف الأول."""
+    prompt = prompt.strip()[:4000]
+    if not prompt:
+        raise HTTPException(400, "اوصف الفيديو")
+    vm = TRIAL_MODELS.get(model) or TRIAL_MODELS[VDEF]
+    model = model if model in TRIAL_MODELS else VDEF
+    ratio = ratio if ratio in RATIO_VIDEO else "9:16"
+    secs = max(3, min(15, int(duration or 5)))
+    resolution = "720p" if resolution == "720p" else "480p"
+    cost = round(vm["per_sec"] * secs * (2 if resolution == "720p" else 1) + (0 if image and image.filename else TV_IMAGE_MODELS["nano2"][0]), 3)
+    gid, item = gen_new("video", prompt, model=model, model_label=vm["label"], duration=secs, ratio=ratio, resolution=resolution, cost=cost)
+    folder = GEN_DIR / gid
+    ref = save_upload(image, IMAGE_EXTENSIONS, folder, "start") if image and image.filename else None
+    if ref:
+        gen_set(gid, ref=ref)
+
+    def run():
+        start = folder / ref if ref else folder / "frame.png"
+        if not ref:
+            gen_set(gid, step="🖼️ بيرسم أول فريم من الوصف")
+            if atlas.mock_mode():
+                subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i", f"color=c=0x8A7F72:s={GEN_RATIOS[ratio]}",
+                                "-frames:v", "1", str(start)], check=True, capture_output=True, timeout=60)
+            else:
+                atlas.download(atlas.generate_image("nano2", prompt + ". The first frame of a video, cinematic, no text.", GEN_RATIOS[ratio], "medium"), start)
+            gen_set(gid, ref=start.name)
+        gen_set(gid, step=f"🎬 بيولّد الفيديو ({vm['label'].split(' · ')[0]}، {secs} ث)")
+        dest = folder / "video.mp4"
+        W, H = RATIO_VIDEO.get(ratio, RATIO_VIDEO["9:16"])
+        if atlas.mock_mode():
+            gen_motion("seedance-mini", resolution, ratio, prompt, start, start, secs, dest, W, H)
+        else:
+            body = {"model": vm["model"], "prompt": prompt, "image": atlas.reference_url(start), "duration": secs,
+                    "resolution": resolution, "ratio": ratio, "generate_audio": bool(audio), "watermark": False}
+            atlas.download(atlas.run_model("Video", body, "مولد الفيديو", max_seconds=1800, interval=6), dest)
+        dur = probe_duration(dest)
+        export_id = uuid.uuid4().hex[:12]
+        filename = f"gen_{export_id}.mp4"
+        shutil.copy(dest, EXPORTS_DIR / filename)
+        with closing(db()) as conn, conn:
+            conn.execute("INSERT INTO exports (id, name, filename, duration, source, project_id, created_at) VALUES (?, ?, ?, ?, 'gen', NULL, ?)",
+                         (export_id, f"🎬 {prompt[:60]}", filename, dur, now()))
+        gen_set(gid, status="done", step=None, file=dest.name, duration=round(dur, 2), export_id=export_id)
+    gen_job(gid, run)
+    return gen_dict(gid, item)
+
+
+@app.delete("/api/gens/{gid}")
+def gen_delete(gid: str):
+    shutil.rmtree(GEN_DIR / Path(gid).name, ignore_errors=True)
+    return {"ok": True}
+
+
 # ---------------------------------------------------------------- 🗓️ دراع المواسم في المخ
 SEASON_JOBS: dict[str, str] = {}
 

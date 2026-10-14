@@ -199,6 +199,8 @@ const Gallery = (() => {
     root.addEventListener("click", (e) => {
       const c = e.target.closest("[data-gcat]");
       if (c) { S.cat = c.dataset.gcat; render(); return; }
+      const gn = e.target.closest("[data-gen]");
+      if (gn) return Gen.open(gn.dataset.gen);
       const fl = e.target.closest("[data-gflow]");
       if (fl) return Flow.open(fl.dataset.gflow);
       const k = e.target.closest("[data-gi]");
@@ -214,6 +216,17 @@ const Gallery = (() => {
 
   // 🧭 مشاريع بدأتها من قالب ولسه مخلصتش
   const STAGE_AR = { idea: "الفكرة", format: "نوع البوست", scenario: "السيناريو", cast: "الأبطال", assets: "الملفات", generate: "التوليد" };
+  // 🧪 مولّدات من غير قوالب (gen.js): صوت وصور وفيديو بالوصف بس
+  function gens() {
+    const g = S.root.querySelector("#nhGal");
+    if (g.querySelector(".nh-gal-gens")) return;
+    const box = Object.assign(document.createElement("div"), { className: "nh-gal-gens" });
+    box.innerHTML = `<small class="muted">من غير قالب:</small>
+      <button type="button" class="nh-gal-gen" data-gen="video"><i>🎬</i><span><b>مولد فيديو</b><small>وصف ← فيديو بأي موديل</small></span></button>
+      <button type="button" class="nh-gal-gen" data-gen="image"><i>🖼️</i><span><b>مولد صور</b><small>وصف ومرجع ← صور</small></span></button>
+      <button type="button" class="nh-gal-gen" data-gen="voice"><i>🎙️</i><span><b>مولد صوت</b><small>كلام ← صوت بلهجتك</small></span></button>`;
+    g.querySelector(".nh-gal-chips").before(box);
+  }
   async function resume() {
     const g = S.root.querySelector("#nhGal");
     let box = g.querySelector(".nh-gal-resume");
@@ -226,7 +239,7 @@ const Gallery = (() => {
     S.root = root;
     S.cat = "all";
     if (!root._gal) { root._gal = true; bind(root); }   // نفس العنصر بيتعاد استخدامه لكل الصفحات: الأحداث مرة واحدة بس
-    try { await load(); render(); resume(); } catch (err) { root.querySelector(".nh-gal-grid").innerHTML = `<div class="nh-empty">${esc(err.message)}</div>`; }
+    try { await load(); render(); gens(); resume(); } catch (err) { root.querySelector(".nh-gal-grid").innerHTML = `<div class="nh-empty">${esc(err.message)}</div>`; }
   }
   return { mount };
 })();
