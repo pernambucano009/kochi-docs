@@ -16,6 +16,7 @@ from email.message import EmailMessage
 import httpx
 
 log = logging.getLogger("mailer")
+BRAND = os.environ.get("BRAND_NAME") or "SimsimKit"
 
 
 def configured() -> bool:
@@ -66,6 +67,7 @@ def send(to: str, subject: str, text: str, html: str | None = None) -> bool:
 
 def button_html(title: str, body: str, link: str, label: str) -> str:
     return f"""<div dir="rtl" style="font-family:Tahoma,Arial,sans-serif;max-width:520px;margin:auto;padding:24px;color:#141414">
+<div style="font-weight:700;font-size:18px;margin-bottom:18px">Simsim<span style="color:#E5613E">Kit</span></div>
 <h2 style="margin:0 0 12px">{title}</h2><p style="line-height:1.8;color:#555">{body}</p>
 <p style="margin:24px 0"><a href="{link}" style="background:#E5613E;color:#fff;padding:12px 22px;border-radius:12px;text-decoration:none">{label}</a></p>
 <p style="font-size:12px;color:#999">لو الزرار مش شغال، انسخ اللينك ده: {link}</p></div>"""

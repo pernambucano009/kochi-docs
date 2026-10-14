@@ -6094,7 +6094,7 @@
     const { w, h } = eng.doc, mn = Math.min(w, h);
     const mx = w * 0.08, hy = h * 0.045, fz = mn * 0.022;
     const p = eOut(seg(t, b.t0, b.t0 + 0.5));
-    const L = left || "STUDIOMANIA", R = `FIG. ${bi + 1}`;
+    const L = left || "SIMSIMKIT", R = `FIG. ${bi + 1}`;
     let html = `<div style="position:absolute;inset:0;background:${FG.paper}"></div>
       <svg style="position:absolute;inset:0" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">${[0, 1, 2, 3, 4, 5, 6].map((i) => `<circle cx="${(-w * 0.1).toFixed(0)}" cy="${(h * 0.95).toFixed(0)}" r="${(mn * (0.3 + i * 0.03)).toFixed(0)}" fill="none" stroke="#E2DED6" stroke-width="1.2"/>`).join("")}
       <path d="M${(w * 0.7).toFixed(0)} 0 C${(w * 0.85).toFixed(0)} ${(h * 0.3).toFixed(0)} ${(w * 0.6).toFixed(0)} ${(h * 0.6).toFixed(0)} ${(w * 0.9).toFixed(0)} ${h}" fill="none" stroke="#E6E1DA" stroke-width="${(mn * 0.01).toFixed(0)}"/></svg>`;

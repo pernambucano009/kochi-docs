@@ -108,7 +108,7 @@ const NH = (() => {
       const up = D.posts.filter((p) => p.status === "scheduled").length, bad = D.posts.filter((p) => p.status === "failed").length;
       return `<span>${up ? `${up} بوست متجدول` : "مفيش بوستات متجدولة"}${bad ? ` · <em>${bad} فشل</em>` : ""}</span>`;
     },
-    settings: () => `<span>${window.ME ? `رصيدك · <span class="num">${window.ME.credits.total.toLocaleString("en-US")}</span> نقطة`
+    settings: () => `<span>${window.ME && window.ME.role !== "admin" ? `رصيدك · <span class="num">${window.ME.credits.total.toLocaleString("en-US")}</span> نقطة`
       : D.money ? `رصيد Atlas · <span class="num">$${D.money.balance.toFixed(2)}</span>` : "المفاتيح والرصيد والعملاء"}</span>`,
   };
   const side = (id) => `<div class="nh-tile nh-side" data-id="${id}" tabindex="0" role="button" aria-label="${esc(T[id].ar)}">${head(id)}<div class="nh-meta">${META[id]()}</div></div>`;
@@ -138,7 +138,7 @@ const NH = (() => {
     </div>
     <section class="nh-page" id="nhPage" hidden role="dialog" aria-modal="true">
       <header class="nh-ptop">
-        <div class="nh-prow"><span class="nh-plogo" aria-hidden="true">STUDIOMANIA</span><button class="nh-chip nh-pclient" id="nhPClient" title="العميل اللي شغال عليه"></button></div>
+        <div class="nh-prow"><span class="nh-plogo" aria-hidden="true">SIMSIMKIT</span><button class="nh-chip nh-pclient" id="nhPClient" title="العميل اللي شغال عليه"></button></div>
         <div class="nh-phead"><button class="nh-back" id="nhBack"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg><span id="nhBackT">الرئيسية</span></button><div class="nh-ptitle" id="nhPTitle"></div></div>
         <nav class="nh-ptabs" id="nhPTabs" aria-label="الأصول"></nav>
       </header>
@@ -150,7 +150,7 @@ const NH = (() => {
   bar.id = "nhBar";
   bar.className = "nh-top nh-bar";
   bar.innerHTML = `<div class="nh-bar-r">
-      <div class="nh-logo" aria-label="StudioMania">STUDIOMANIA</div>
+      <div class="nh-logo" aria-label="SimsimKit">SIMSIMKIT</div>
       <button class="nh-goback" id="nhGoBack" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg><span>رجوع</span></button>
       <nav class="nh-crumbs" id="nhCrumbs" aria-label="انت فين" hidden></nav>
     </div>
@@ -237,7 +237,7 @@ const NH = (() => {
   function stageHTML(key) {
     const big = (k) => (GL ? "" : `<div class="big">${iconOf(k)}</div>`);
     if (!key && KOCHI) return `${big("app")}<h1 class="latin">Kochi Studio</h1><div class="ar">فيديوهات مدربين كوتشي</div><p>ابدأ من «مشروع جديد»، أو كمّل مشروع من «شغّال عليه».</p>`;
-    if (!key) return `${big("app")}<h1 class="latin">StudioMania</h1><div class="ar">استوديو المحتوى والفيديو</div>`;
+    if (!key) return `${big("app")}<h1 class="latin">SimsimKit</h1><div class="ar">استوديو المحتوى والفيديو</div>`;
     if (key.startsWith("f:")) {
       const f = D.folders.find((x) => x.id === key.slice(2)), s = folderStage(f);
       return `${big("pulse")}<h1 class="latin">Continue</h1><div class="ar">${esc(f?.name)}</div><p>الخطوة ${s.done + 1} من 5: ${STEPS5[s.done] || ""}. دوس عشان تكمّل.</p>`;

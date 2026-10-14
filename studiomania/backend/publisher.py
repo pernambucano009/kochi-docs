@@ -211,7 +211,7 @@ def default_profile() -> str:
         items = data.get("profiles", data.get("data", [])) if isinstance(data, dict) else data
         if items:
             return items[0].get("_id") or items[0].get("id")
-        made = _check(c.post(f"{BASE_URL}/profiles", json={"name": "StudioMania"}), "عمل بروفايل")
+        made = _check(c.post(f"{BASE_URL}/profiles", json={"name": "SimsimKit"}), "عمل بروفايل")
     made = made.get("profile", made) if isinstance(made, dict) else {}
     return made.get("_id") or made.get("id")
 

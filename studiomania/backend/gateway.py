@@ -477,7 +477,7 @@ def send_verify(u: sqlite3.Row, request: Request) -> str | None:
         c.execute("DELETE FROM tokens WHERE user_id=? AND kind='verify'", (u["id"],))
         c.execute("INSERT INTO tokens (token, user_id, kind, expires) VALUES (?, ?, 'verify', ?)", (tok, u["id"], time.time() + 3 * 86400))
     link = f"{base_url(request)}/verify?token={tok}"
-    sent = mailer.send(u["email"], "أكّد إيميلك", f"أهلًا! أكّد إيميلك من اللينك ده:\n{link}",
+    sent = mailer.send(u["email"], f"أكّد إيميلك · {mailer.BRAND}", f"أهلًا! أكّد إيميلك من اللينك ده:\n{link}",
                        mailer.button_html("أكّد إيميلك", "دوس على الزرار عشان نتأكد إن الإيميل ده بتاعك ونفتحلك حسابك.", link, "أكّد الإيميل"))
     return link if (not sent and os.environ.get("MAIL_DEV") == "1") else None
 
@@ -567,7 +567,7 @@ def forgot(body: ForgotIn, request: Request):
             c.execute("DELETE FROM tokens WHERE user_id=? AND kind='reset'", (u["id"],))
             c.execute("INSERT INTO tokens (token, user_id, kind, expires) VALUES (?, ?, 'reset', ?)", (tok, u["id"], time.time() + 3600))
         link = f"{base_url(request)}/reset?token={tok}"
-        sent = mailer.send(u["email"], "غيّر الباسورد", f"لو انت اللي طلبت تغيير الباسورد، ادخل على اللينك ده (صالح ساعة):\n{link}",
+        sent = mailer.send(u["email"], f"غيّر الباسورد · {mailer.BRAND}", f"لو انت اللي طلبت تغيير الباسورد، ادخل على اللينك ده (صالح ساعة):\n{link}",
                            mailer.button_html("غيّر الباسورد", "لو انت اللي طلبت تغيير الباسورد دوس على الزرار. اللينك صالح ساعة. لو مش انت، تجاهل الإيميل ده.", link, "اعمل باسورد جديد"))
         dev = link if (not sent and os.environ.get("MAIL_DEV") == "1") else None
     # نفس الرد سواء الإيميل موجود ولا لأ (عشان محدش يعرف مين متسجل)
