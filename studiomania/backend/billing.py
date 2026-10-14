@@ -19,9 +19,9 @@ PAY_FEE = (0.03, 0.30)  # عمولة سترايب / باي بال التقريب
 
 DEFAULTS = {
     "plans": [
-        {"key": "trial", "name": "تجربة مجانية", "name_en": "Free trial", "price": 0, "credits": 300, "accounts": 1,
-         "autopilot": False, "once": True, "trial_days": 7,
-         "note": "٣٠٠ نقطة مرة واحدة، والنشر على حساب واحد لمدة ٧ أيام"},
+        {"key": "trial", "name": "تجربة مجانية", "name_en": "Free trial", "price": 0, "credits": 300, "accounts": 0,
+         "autopilot": False, "once": True,
+         "note": "٣٠٠ نقطة مرة واحدة؛ ربط الحسابات والنشر في الباقات المدفوعة بس (عشان الحساب في Zernio بيتحسب علينا)"},
         {"key": "starter", "name": "بداية", "name_en": "Starter", "price": 29, "credits": 1000, "accounts": 2, "autopilot": False},
         {"key": "pro", "name": "محترف", "name_en": "Pro", "price": 79, "credits": 3500, "accounts": 4, "autopilot": True, "popular": True},
         {"key": "agency", "name": "وكالات", "name_en": "Agency", "price": 199, "credits": 10000, "accounts": 10, "autopilot": True,

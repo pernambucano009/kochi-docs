@@ -134,7 +134,7 @@ $("lang").onclick = () => I18N.setLang(I18N.lang === "en" ? "ar" : "en");
       <div class="price num">${usd(p.price)}${p.once ? "" : ` <small>في الشهر</small>`}</div>
       <ul>
         <li><b class="num">${n(p.credits)}</b> نقطة ${p.once ? "مرة واحدة" : "كل شهر"}</li>
-        <li>${p.accounts === 1 ? "حساب سوشيال واحد" : `<b class="num">${p.accounts}</b> حسابات سوشيال`}${p.trial_days ? ` لمدة ${p.trial_days} أيام` : ""}</li>
+        <li class="${p.accounts ? "" : "no"}">${!p.accounts ? "ربط الحسابات والنشر في الباقات المدفوعة" : p.accounts === 1 ? "حساب سوشيال واحد" : `<b class="num">${p.accounts}</b> حسابات سوشيال`}</li>
         <li class="${p.autopilot ? "" : "no"}">أوتوبايلوت (النشر لوحده)${!p.autopilot && add.autopilot.for.includes(p.key) ? ` · تقدر تزوّده بـ ${usd(add.autopilot.price)}` : ""}</li>
         ${p.once ? "" : `<li>حساب زيادة بـ ${usd(add.account.price)} في الشهر${p.max_accounts ? ` (لحد ${p.max_accounts})` : ""}</li>`}
       </ul>
