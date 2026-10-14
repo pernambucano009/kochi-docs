@@ -87,12 +87,13 @@ async function loadSetAccounts() {
   try {
     const p = await api("/api/publisher");
     $("setAccHint").innerHTML = p.service === "zernio"
-      ? `عن طريق Zernio · <a href="${escapeHtml(p.dashboard_url || "https://zernio.com")}" target="_blank" rel="noopener">اربط حساب ↗</a>`
+      ? `عن طريق Zernio · <a href="#7" data-goto="7">اربط أو افصل حسابات من صفحة النشر ←</a>`
       : "حط مفتاح Zernio عشان تربط الحسابات";
+    // كل المنصات، وكل الحسابات المربوطة على كل منصة (الربط والفصل من صفحة النشر)
     list.innerHTML = Object.entries(p.platforms).map(([k, label]) => {
-      const a = p.accounts?.[k];
-      return `<li class="${a ? "on" : ""}"><i></i><span>${escapeHtml(label)}</span>
-        <small dir="ltr">${a ? escapeHtml(a.name || "") : ""}</small>${a ? "" : "<small>مش مربوط</small>"}</li>`;
+      const accs = (p.account_list || []).filter((a) => a.platform === k);
+      return `<li class="${accs.length ? "on" : ""}"><i></i><span>${escapeHtml(label)}</span>
+        <small dir="ltr">${accs.map((a) => escapeHtml(a.username ? "@" + a.username : a.name)).join(" · ")}</small>${accs.length ? "" : "<small>مش مربوط</small>"}</li>`;
     }).join("") + (p.accounts_error ? `<li class="err">${escapeHtml(p.accounts_error)}</li>` : "");
   } catch (err) {
     list.innerHTML = `<li class="err">${escapeHtml(err.message)}</li>`;

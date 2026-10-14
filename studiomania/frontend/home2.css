@@ -1168,3 +1168,31 @@ html { overflow-x: clip; }
 .nh-cta, .nh-tile.nh-cont { transition: translate .32s cubic-bezier(.2, .8, .2, 1), scale .32s cubic-bezier(.2, .8, .2, 1), box-shadow .5s var(--nh-ease), background .3s; }
 .nh-cta:hover, .nh-cta:focus-visible, .nh-tile.nh-cont:hover { translate: 0 -2px; scale: 1.04; }
 @media (prefers-reduced-motion: reduce) { .fx, .nh-cta, .nh-tile.nh-cont { translate: none !important; scale: none !important; } .fx-snake rect { animation: none; } }
+
+/* ===== 🔗 حساباتك في صفحة النشر: كل المنصات وأكتر من حساب على كل منصة ===== */
+.pub-accounts .pa-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; margin-bottom: 14px; }
+.pub-accounts .pa-head h3 { margin: 0; font-size: 18px; font-weight: 500; }
+.pub-accounts .pa-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px; }
+.pub-accounts .pa-plat { display: flex; flex-direction: column; gap: 6px; padding: 12px; border-radius: 18px; background: var(--page-bg, #F7F7F5); opacity: .72; transition: opacity .2s; }
+.pub-accounts .pa-plat.on { opacity: 1; }
+.pub-accounts .pa-ph { display: flex; align-items: center; gap: 8px; }
+.pub-accounts .pa-ph svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.pub-accounts .pa-ph b { flex: 1; font-size: 14px; font-weight: 500; }
+.pub-accounts .pa-add { width: 30px; height: 30px; border-radius: 50%; border: 0; background: var(--card, #fff); color: inherit; font-size: 16px; cursor: pointer; }
+.pub-accounts .pa-acc { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 12px; background: var(--card, #fff); }
+.pub-accounts .pa-acc img, .pub-accounts .pa-acc > i { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; flex: none; display: grid; place-items: center; font-style: normal; font-size: 12px; background: var(--page-bg, #F2F1EE); }
+.pub-accounts .pa-acc > span { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.35; }
+.pub-accounts .pa-acc b { font-size: 13px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pub-accounts .pa-acc small { font-size: 11px; color: var(--muted, #8A8984); }
+.pub-accounts .pa-acc small.err { color: #D9473A; }
+.pub-accounts .pa-acc.bad { outline: 1.5px solid rgba(217, 71, 58, .4); }
+.pub-accounts .pa-x, .pub-accounts .pa-re { border: 0; background: none; color: var(--muted, #8A8984); cursor: pointer; font-size: 12px; padding: 4px 6px; border-radius: 8px; }
+.pub-accounts .pa-re { color: #D9473A; }
+/* مربع حساب في «فين هينزل»: الأيقونة واسم الحساب تحتها */
+:root .stage .pub-where .platforms label.plat.acc { aspect-ratio: auto; min-height: 72px; padding: 8px 6px; }
+.platforms label.plat.acc em { font-style: normal; font-size: 10px; opacity: .75; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pub-accounts .pa-more { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+.pub-accounts .pa-chip { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 999px; border: 0; background: var(--page-bg, #F7F7F5); color: inherit; font: inherit; font-size: 12.5px; cursor: pointer; }
+.pub-accounts .pa-chip svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.pub-accounts .pa-grid:empty { display: none; }
+.pub-accounts .pa-acc.bad { flex-wrap: wrap; } .pub-accounts .pa-acc.bad .pa-re { order: 5; flex-basis: 100%; text-align: start; }

@@ -3303,22 +3303,63 @@ POSTS_QUERY = (
 )
 
 
+MOCK_ACCOUNTS = [{"id": "m-tt1", "platform": "tiktok", "name": "حساب تجريبي", "username": "demo", "avatar": None, "url": None, "needs_reconnect": False},
+                 {"id": "m-tt2", "platform": "tiktok", "name": "الحساب التاني", "username": "demo2", "avatar": None, "url": None, "needs_reconnect": False},
+                 {"id": "m-ig1", "platform": "instagram", "name": "إنستا تجريبي", "username": "demo.ig", "avatar": None, "url": None, "needs_reconnect": True}]
+
+
 @app.get("/api/publisher")
 def publisher_status():
     service = publisher.service_name()
-    linked, error = {}, None
+    lst, error = [], None
     if service == "zernio":
         try:
-            linked = publisher.accounts(refresh=True)
+            lst = publisher.account_list(refresh=True)
         except (publisher.PublishError, httpx.HTTPError) as exc:
             error = f"مقدرتش أوصل لـ Zernio: {exc}"
+    elif service == "mock":
+        lst = MOCK_ACCOUNTS
+    linked: dict = {}
+    for a in lst:
+        linked.setdefault(a["platform"], {"id": a["id"], "name": a["name"]})
     return {
         "service": service,
         "platforms": {k: v[1] for k, v in publisher.PLATFORMS.items()},
-        "accounts": linked,
+        "accounts": linked,            # أول حساب لكل منصة (القديم)
+        "account_list": lst,           # كل الحسابات (أكتر من حساب على نفس المنصة)
+        "dashboard_only": sorted(publisher.DASHBOARD_ONLY),
         "accounts_error": error,
         "dashboard_url": publisher.DASHBOARD_URL,
     }
+
+
+class ConnectIn(BaseModel):
+    platform: str
+
+
+@app.post("/api/publisher/connect")
+def publisher_connect(body: ConnectIn, request: Request):
+    """لينك ربط حساب جديد: العميل بيسجّل دخول على المنصة، وZernio بيرجّعه لصفحة النشر هنا."""
+    if publisher.service_name() != "zernio":
+        raise HTTPException(400, "حط مفتاح Zernio من الإعدادات الأول")
+    if body.platform in publisher.DASHBOARD_ONLY:
+        return {"url": publisher.DASHBOARD_URL, "dashboard": True}
+    back = str(request.base_url).rstrip("/") + "/#7"
+    try:
+        return {"url": publisher.connect_url(body.platform, back)}
+    except (publisher.PublishError, httpx.HTTPError) as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.delete("/api/publisher/accounts/{account_id}")
+def publisher_disconnect(account_id: str):
+    if publisher.service_name() != "zernio":
+        raise HTTPException(400, "حط مفتاح Zernio من الإعدادات الأول")
+    try:
+        publisher.disconnect(account_id)
+    except (publisher.PublishError, httpx.HTTPError) as exc:
+        raise HTTPException(400, str(exc)) from exc
+    return publisher_status()
 
 
 @app.get("/api/posts")
@@ -3363,7 +3404,7 @@ def clean_options(opts: PostOptions) -> str:
 def clean_post(conn: sqlite3.Connection, body: PostIn) -> tuple[str, str, str]:
     if not conn.execute("SELECT 1 FROM exports WHERE id = ?", (body.export_id,)).fetchone():
         raise HTTPException(400, "الفيديو مش موجود في الفولدر")
-    platforms = [p for p in dict.fromkeys(body.platforms) if p in publisher.PLATFORMS]
+    platforms = [p for p in dict.fromkeys(body.platforms) if publisher.valid_target(p)]
     if not platforms:
         raise HTTPException(400, "اختار منصة واحدة على الأقل")
     when = body.scheduled_at
@@ -3381,7 +3422,7 @@ def set_post(post_id: str, **fields) -> None:
     status = fields.get("status")
     if old is not None and status in ("published", "failed") and status != old["status"]:
         name = old["carousel_name"] or old["export_name"] or (old["caption"] or "").split("\n")[0][:60] or "بوست"
-        plats = "، ".join(publisher.PLATFORMS.get(k, (None, k))[1] for k in json.loads(old["platforms"] or "[]"))
+        plats = "، ".join(dict.fromkeys(publisher.PLATFORMS.get(publisher.split_target(k)[0], (None, k))[1] for k in json.loads(old["platforms"] or "[]")))
         if status == "published":
             notify("post", "ok", f"اتنشر: {name}", plats, "7", post_id)
         else:
@@ -3403,6 +3444,7 @@ def send_post(post_id: str, old_remote_id: str | None = None) -> None:
             remote_id = publisher.schedule_carousel(
                 post_images(r["carousel_id"], cdata), r["caption"], r["scheduled_at"],
                 publish_now=r["scheduled_at"] <= now(), options=json.loads(r["options"]) if r["options"] else {},
+                targets=json.loads(r["platforms"] or "[]"),
             )
             set_post(post_id, status="scheduled", remote_id=remote_id, error=None)
             return
@@ -4106,7 +4148,7 @@ def autopilot_settings(body: dict):
     if slots:
         s["slots"] = sorted({f"{int(x.split(':')[0]):02d}:{x.split(':')[1]}" for x in slots})
     if isinstance(body.get("platforms"), list):
-        s["platforms"] = [p for p in body["platforms"] if p in publisher.PLATFORMS]
+        s["platforms"] = [p for p in body["platforms"] if publisher.valid_target(p)]
     if "prompt_id" in body:
         s["prompt_id"] = body["prompt_id"] or None
     if body.get("mode") in ("manual", "auto"):

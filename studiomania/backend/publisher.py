@@ -27,7 +27,27 @@ PLATFORMS = {
     "youtube": ("youtube", "يوتيوب شورتس"),
     "facebook": ("facebook", "صفحة فيسبوك"),
     "x": ("twitter", "X (تويتر)"),
+    "linkedin": ("linkedin", "لينكدإن"),
+    "threads": ("threads", "ثريدز"),
+    "pinterest": ("pinterest", "بنترست"),
+    "reddit": ("reddit", "ريديت"),
+    "bluesky": ("bluesky", "بلوسكاي"),
+    "snapchat": ("snapchat", "سناب شات"),
+    "googlebusiness": ("googlebusiness", "جوجل بيزنس"),
+    "telegram": ("telegram", "تيليجرام"),
 }
+# دول بيتربطوا بطريقة غير تسجيل الدخول (باسورد تطبيق / بوت)، فبيتربطوا من لوحة Zernio نفسها
+DASHBOARD_ONLY = {"bluesky", "telegram"}
+
+
+def split_target(t: str) -> tuple[str, str | None]:
+    """«tiktok» = أول حساب تيك توك مربوط · «tiktok@<id>» = حساب معيّن (لو عندك أكتر من حساب على نفس المنصة)."""
+    p, _, acc = str(t).partition("@")
+    return p, (acc or None)
+
+
+def valid_target(t: str) -> bool:
+    return split_target(t)[0] in PLATFORMS
 
 
 class PublishError(Exception):
@@ -63,28 +83,103 @@ def _check(resp: httpx.Response, what: str):
 
 # ---------------------------------------------------------------- الحسابات المربوطة
 
-_accounts_cache: tuple[float, dict] | None = None
+_accounts_cache: tuple[float, list] | None = None
 
 
-def accounts(refresh: bool = False) -> dict:
-    """الحسابات المربوطة في Zernio: {منصة عندنا: {"id", "name"}}."""
+def account_list(refresh: bool = False) -> list[dict]:
+    """كل الحسابات المربوطة في Zernio (ممكن أكتر من حساب على نفس المنصة)."""
     global _accounts_cache
     if not refresh and _accounts_cache and time.monotonic() - _accounts_cache[0] < 300:
         return _accounts_cache[1]
     with _client(30) as c:
-        data = _check(c.get(f"{BASE_URL}/accounts"), "قراءة الحسابات")
+        data = _check(c.get(f"{BASE_URL}/accounts", params={"excludeHidden": "true"}), "قراءة الحسابات")
     items = data.get("accounts", data.get("data", [])) if isinstance(data, dict) else data
     reverse = {remote: ours for ours, (remote, _) in PLATFORMS.items()}
-    found: dict = {}
+    out = []
     for a in items or []:
         ours = reverse.get(str(a.get("platform", "")).lower())
-        if ours and ours not in found and a.get("isActive", True) is not False:
-            found[ours] = {
-                "id": a.get("_id") or a.get("id"),
-                "name": a.get("displayName") or a.get("username") or a.get("name") or "",
-            }
-    _accounts_cache = (time.monotonic(), found)
+        if not ours or a.get("isActive", True) is False or a.get("enabled", True) is False:
+            continue
+        out.append({
+            "id": a.get("_id") or a.get("id"),
+            "platform": ours,
+            "name": a.get("displayName") or a.get("username") or a.get("name") or "",
+            "username": a.get("username") or "",
+            "avatar": a.get("profilePicture") or None,
+            "url": a.get("profileUrl") or None,
+            "needs_reconnect": bool(a.get("needsReconnection")),
+        })
+    _accounts_cache = (time.monotonic(), out)
+    return out
+
+
+def accounts(refresh: bool = False) -> dict:
+    """أول حساب مربوط لكل منصة: {منصة عندنا: {"id", "name"}} (للكود القديم والنشر من غير اختيار حساب)."""
+    found: dict = {}
+    for a in account_list(refresh):
+        found.setdefault(a["platform"], {"id": a["id"], "name": a["name"]})
     return found
+
+
+def resolve_targets(targets: list[str]) -> list[tuple[str, str]]:
+    """كل هدف ← (منصة، رقم الحساب). لو الحساب المختار اتفصل أو المنصة مش مربوطة بيقول بالظبط إيه الناقص."""
+    lst = account_list(refresh=True)
+    ids = {a["id"]: a for a in lst}
+    out, missing = [], []
+    for t in targets:
+        p, acc = split_target(t)
+        if acc:
+            if acc in ids and ids[acc]["platform"] == p:
+                out.append((p, acc))
+            else:
+                missing.append(f"{PLATFORMS.get(p, (p, p))[1]} (الحساب اللي اخترته اتفصل)")
+        else:
+            first = next((a for a in lst if a["platform"] == p), None)
+            if first:
+                out.append((p, first["id"]))
+            else:
+                missing.append(PLATFORMS.get(p, (p, p))[1])
+    if missing:
+        raise PublishError(f"الحسابات دي مش مربوطة في Zernio: {'، '.join(missing)}. اربطها من صفحة النشر")
+    return list(dict.fromkeys(out))
+
+
+# ---------------------------------------------------------------- ربط وفصل الحسابات من جوه البرنامج
+
+def default_profile() -> str:
+    """البروفايل (فولدر الحسابات) عند Zernio: الأول، ولو مفيش بنعمل واحد."""
+    with _client(30) as c:
+        data = _check(c.get(f"{BASE_URL}/profiles"), "قراءة البروفايلات")
+        items = data.get("profiles", data.get("data", [])) if isinstance(data, dict) else data
+        if items:
+            return items[0].get("_id") or items[0].get("id")
+        made = _check(c.post(f"{BASE_URL}/profiles", json={"name": "StudioMania"}), "عمل بروفايل")
+    made = made.get("profile", made) if isinstance(made, dict) else {}
+    return made.get("_id") or made.get("id")
+
+
+def connect_url(platform: str, redirect_url: str) -> str:
+    """لينك تسجيل الدخول على المنصة؛ بعد ما العميل يوافق Zernio بيرجّعه للبرنامج (ولو محتاج يختار صفحة/بورد بيختار عند Zernio)."""
+    if platform not in PLATFORMS:
+        raise PublishError("منصة مش معروفة")
+    with _client(30) as c:
+        data = _check(c.get(f"{BASE_URL}/connect/{PLATFORMS[platform][0]}",
+                            params={"profileId": default_profile(), "redirect_url": redirect_url}), "تجهيز الربط")
+    url = data.get("authUrl") or data.get("url") if isinstance(data, dict) else None
+    if not url:
+        raise PublishError(f"تجهيز الربط: رد غير متوقع: {str(data)[:200]}")
+    global _accounts_cache
+    _accounts_cache = None
+    return url
+
+
+def disconnect(account_id: str) -> None:
+    global _accounts_cache
+    with _client(30) as c:
+        resp = c.delete(f"{BASE_URL}/accounts/{account_id}")
+    if resp.status_code != 404:
+        _check(resp, "فصل الحساب")
+    _accounts_cache = None
 
 
 # ---------------------------------------------------------------- رفع الفيديو وتسليم البوست
@@ -137,16 +232,13 @@ def schedule(
     options: dict | None = None,
 ) -> str:
     """يرفع الفيديو ويسلّم البوست لـ Zernio، ويرجّع رقم البوست عندهم."""
-    linked = accounts(refresh=True)
-    missing = [PLATFORMS[p][1] for p in platforms if p not in linked]
-    if missing:
-        raise PublishError(f"الحسابات دي مش مربوطة في Zernio: {'، '.join(missing)}. اربطها من {DASHBOARD_URL}")
-
+    targets = resolve_targets(platforms)
     opts = options or {}
     url = upload_video(video)
     entries = []
-    for p in platforms:
-        entry = {"platform": PLATFORMS[p][0], "accountId": linked[p]["id"]}
+    first_line = (caption.strip().split("\n")[0] or title)[:100]
+    for p, acc in targets:
+        entry = {"platform": PLATFORMS[p][0], "accountId": acc}
         if p == "tiktok":
             entry["platformSpecificData"] = {
                 "privacyLevel": "PUBLIC_TO_EVERYONE",
@@ -177,6 +269,12 @@ def schedule(
                 "visibility": "public",
                 "containsSyntheticMedia": ai_made,
             }
+        elif p == "pinterest":
+            entry["platformSpecificData"] = {"title": first_line, **({"isAiGenerated": True} if ai_made else {})}
+        elif p == "reddit":
+            entry["platformSpecificData"] = {"title": (title or first_line)[:300]}
+        elif p == "snapchat":
+            entry["platformSpecificData"] = {"contentType": "spotlight"}   # الفيديوهات القصيرة على Spotlight (مش ستوري بتختفي)
         entries.append(entry)
 
     body = {"content": caption, "platforms": entries, "mediaItems": [{"type": "video", "url": url}]}
@@ -193,11 +291,11 @@ def schedule(
     return remote_id
 
 
-def schedule_carousel(images: list[Path], caption: str, when_utc: str, publish_now: bool, options: dict | None = None) -> str:
+def schedule_carousel(images: list[Path], caption: str, when_utc: str, publish_now: bool, options: dict | None = None,
+                      targets: list[str] | None = None) -> str:
     """كاروسيل صور على إنستجرام (لحد 10 صور). إنستجرام مش بيقبل موسيقى على الكاروسيل من الـ API."""
-    linked = accounts(refresh=True)
-    if "instagram" not in linked:
-        raise PublishError(f"حساب إنستجرام مش مربوط في Zernio. اربطه من {DASHBOARD_URL}")
+    ig = [t for t in (targets or []) if split_target(t)[0] == "instagram"] or ["instagram"]
+    ig_targets = resolve_targets(ig)
     if not 2 <= len(images) <= 10:
         raise PublishError("الكاروسيل لازم يكون من 2 لـ 10 صور")
     opts = options or {}
@@ -210,10 +308,13 @@ def schedule_carousel(images: list[Path], caption: str, when_utc: str, publish_n
         data["userTags"] = [{"username": t, "x": 0.5, "y": 0.85, "mediaIndex": index} for t in tags]
         if opts.get("ig_collab"):
             data["collaborators"] = tags[:3]
-    entry = {"platform": "instagram", "accountId": linked["instagram"]["id"]}
-    if data:
-        entry["platformSpecificData"] = data
-    body = {"content": caption, "platforms": [entry], "mediaItems": [{"type": "image", "url": u} for u in urls]}
+    entries = []
+    for _, acc in ig_targets:
+        entry = {"platform": "instagram", "accountId": acc}
+        if data:
+            entry["platformSpecificData"] = data
+        entries.append(entry)
+    body = {"content": caption, "platforms": entries, "mediaItems": [{"type": "image", "url": u} for u in urls]}
     if publish_now:
         body["publishNow"] = True
     else:

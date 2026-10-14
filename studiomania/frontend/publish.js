@@ -15,6 +15,9 @@ async function initPublish() {
   pub.platforms = info.platforms;
   pub.service = info.service;
   pub.accounts = info.accounts || {};
+  pub.list = info.account_list || [];
+  pub.dashOnly = info.dashboard_only || [];
+  pub.dashUrl = info.dashboard_url;
   const alert = $("publisherAlert");
   // الحسابات المربوطة بتبان في الإعدادات، فالشريط هنا بيظهر بس لو فيه مشكلة (مفيش Zernio أو مقدرش يوصل له)
   alert.hidden = info.service === "mock" || (info.service === "zernio" && !info.accounts_error);
@@ -23,12 +26,8 @@ async function initPublish() {
     alert.innerHTML = `⚠️ لسه مفيش ربط بـ Zernio. تقدر تجدول البوستات عادي، وأول ما تحط مفتاح Zernio من <a href="#" data-goto="settings">⚙️ الإعدادات</a> البرنامج هيبعتهم لوحده.`;
   } else if (info.accounts_error) {
     alert.textContent = `⚠️ ${info.accounts_error}`;
-  } else if (info.service === "zernio") {
-    const linked = Object.entries(pub.platforms).map(([k, label]) =>
-      pub.accounts[k] ? `<span class="pill published">✓ ${label}${pub.accounts[k].name ? ` (${escapeHtml(pub.accounts[k].name)})` : ""}</span>`
-        : `<span class="pill failed">✕ ${label}</span>`).join(" ");
-    alert.innerHTML = `الحسابات المربوطة في Zernio: ${linked} · <a href="${info.dashboard_url}" target="_blank">اربط حسابات</a>`;
   }
+  renderAccounts();
   renderPlatformBoxes();
   loadHandles();
   await Promise.all([pubLoadExports(), pubLoadPosts()]);
@@ -144,12 +143,95 @@ const PLAT_SVG = {
   youtube: "M7 6h10a4 4 0 0 1 4 4v4a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4v-4a4 4 0 0 1 4-4z M10.5 9.5v5l4.5-2.5z",
   facebook: "M14 8h2.5V4.5H14A3.5 3.5 0 0 0 10.5 8v2.5H8V14h2.5v6H14v-6h2.5l.5-3.5h-3V8z",
   x: "M5 5l14 14 M19 5L5 19",
+  linkedin: "M5 4h14a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z M8 10v6 M8 7.5v.1 M11.5 16v-3.5a2 2 0 0 1 4 0V16 M11.5 10v6",
+  threads: "M16.5 10.5c-.6-2.6-2.5-3.8-4.8-3.8-3 0-5.2 2.3-5.2 5.3s2.2 5.3 5.2 5.3c2.4 0 4.6-1.4 4.6-3.6 0-2.3-2.2-3-4-3-1.6 0-2.8.8-2.8 2s1.1 1.9 2.3 1.9c2.2 0 3-2 2.6-5",
+  pinterest: "M12 4a8 8 0 0 0-2.9 15.5 M12 4a8 8 0 0 1 0 16 M10.5 20l1.8-7.5 M12.3 12.5c-1-.2-1.5-1-1.3-2a2 2 0 0 1 3.9.5c0 1.8-1 3.4-2.4 3.4",
+  reddit: "M5 13.5c0-2.8 3.1-4.6 7-4.6s7 1.8 7 4.6-3.1 4.6-7 4.6-7-1.8-7-4.6z M9.5 13v.1 M14.5 13v.1 M9.8 15.6c1.3.8 3.1.8 4.4 0 M12 8.9l1-4 3 .8 M17.5 5.8v.1",
+  bluesky: "M12 11c-1.5-3-4.5-6-7-6-1.5 0-1 3 0 5 .8 1.6 3 2 5 1.8-2.2.6-4 1.8-3 3.7 1.3 2.4 4 .7 5-2.5 1 3.2 3.7 4.9 5 2.5 1-1.9-.8-3.1-3-3.7 2 .2 4.2-.2 5-1.8 1-2 1.5-5 0-5-2.5 0-5.5 3-7 6z",
+  snapchat: "M12 4c2.8 0 4.5 2 4.5 4.6v2.2l1.8-.4c.5.5.3 1.1-.5 1.4l-1.4.5c.6 1.6 1.8 2.8 3.3 3.2-.4.8-1.6 1.1-2.8 1.2l-.4 1.1c-1.2-.2-2.3-.1-3.2.6-.8.6-1.6.6-2.4 0-.9-.7-2-.8-3.2-.6l-.4-1.1c-1.2-.1-2.4-.4-2.8-1.2 1.5-.4 2.7-1.6 3.3-3.2l-1.4-.5c-.8-.3-1-.9-.5-1.4l1.8.4V8.6C7.5 6 9.2 4 12 4z",
+  googlebusiness: "M4 9.5 5.5 5h13L20 9.5 M4 9.5a2.7 2.7 0 0 0 5.3 0 2.7 2.7 0 0 0 5.4 0 2.7 2.7 0 0 0 5.3 0 M5.5 12v7h13v-7 M10 19v-4h4v4",
+  telegram: "M4 11.5 19.5 5l-2.7 13.5-5-3.8-2.6 2.5.4-4 7.2-6.2-9 5.3z",
 };
+const platOf = (t) => String(t).split("@")[0];
+const accOf = (id) => (pub.list || []).find((a) => a.id === id);
+// اسم الهدف: المنصة، ولو عندك أكتر من حساب عليها بيتكتب الحساب كمان
+function tLabel(t) {
+  const [p, id] = String(t).split("@"), name = pub.platforms[p] || p, a = id && accOf(id);
+  const many = (pub.list || []).filter((x) => x.platform === p).length > 1;
+  return a && many ? `${name} (${a.username ? "@" + a.username : a.name})` : name;
+}
+
+// ---------- 🔗 حساباتك: كل المنصات، وأكتر من حساب على نفس المنصة، والربط والفصل من هنا ----------
+function renderAccounts() {
+  const box = $("pubAccounts");
+  if (!box) return;
+  box.hidden = !pub.service;
+  if (!pub.service) return;
+  const plats = Object.entries(pub.platforms);
+  box.innerHTML = `<div class="pa-head"><h3>حساباتك</h3><small class="muted">اربط أي عدد من الحسابات على كل منصة، واختار تنشر على أنهي حساب وانت بتجدول.</small></div>
+    <div class="pa-grid">${plats.filter(([k]) => pub.list.some((a) => a.platform === k)).map(([k, label]) => {
+      const accs = pub.list.filter((a) => a.platform === k);
+      return `<div class="pa-plat ${accs.length ? "on" : ""}">
+        <div class="pa-ph"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${PLAT_SVG[k] || PLAT_SVG.x}"/></svg><b>${escapeHtml(label)}</b>
+          <button type="button" class="pa-add" data-paadd="${k}" title="اربط حساب ${escapeHtml(label)}">＋</button></div>
+        ${accs.map((a) => `<div class="pa-acc${a.needs_reconnect ? " bad" : ""}">
+          ${a.avatar ? `<img src="${escapeHtml(a.avatar)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : `<i>${escapeHtml((a.name || a.username || "?").slice(0, 1))}</i>`}
+          <span><b dir="auto">${escapeHtml(a.name || a.username)}</b>${a.username ? `<small dir="ltr">@${escapeHtml(a.username)}</small>` : ""}
+            ${a.needs_reconnect ? `<small class="err">محتاج يتربط تاني</small>` : ""}</span>
+          ${a.needs_reconnect ? `<button type="button" class="pa-re" data-paadd="${k}">اربط تاني</button>` : ""}
+          <button type="button" class="pa-x" data-padel="${escapeHtml(a.id)}" data-paname="${escapeHtml(a.name || a.username)}" title="افصل الحساب">✕</button></div>`).join("")}
+      </div>`;
+    }).join("")}</div>
+    <div class="pa-more"><small class="muted">${pub.list.length ? "اربط منصة تانية:" : "اربط أول حساب:"}</small>
+      ${plats.filter(([k]) => !pub.list.some((a) => a.platform === k)).map(([k, label]) => `<button type="button" class="pa-chip" data-paadd="${k}">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="${PLAT_SVG[k] || PLAT_SVG.x}"/></svg>＋ ${escapeHtml(label)}</button>`).join("")}</div>`;
+}
+document.addEventListener("click", async (e) => {
+  const add = e.target.closest("[data-paadd]"), del = e.target.closest("[data-padel]");
+  if (!add && !del) return;
+  if (pub.service === "mock") return toast("ده وضع تجريبي: الربط الحقيقي بيشتغل لما تحط مفتاح Zernio", true);
+  try {
+    if (add) {
+      const r = await api("/api/publisher/connect", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ platform: add.dataset.paadd }) });
+      if (r.dashboard) toast("المنصة دي بتتربط من لوحة Zernio (باسورد تطبيق أو بوت)، وبعدها ارجع هنا");
+      window.open(r.url, "_blank", "noopener");
+      // لما العميل يرجع للصفحة بعد الربط، الحسابات بتتحدث لوحدها
+      pub.waitLink = true;
+    } else if (confirm(`تفصل حساب «${del.dataset.paname}»؟ البوستات المتجدولة عليه مش هتنزل.`)) {
+      const info = await api(`/api/publisher/accounts/${encodeURIComponent(del.dataset.padel)}`, { method: "DELETE" });
+      pub.list = info.account_list || [];
+      pub.accounts = info.accounts || {};
+      renderAccounts(); renderPlatformBoxes();
+      toast("اتفصل");
+    }
+  } catch (err) { toast(err.message, true); }
+});
+window.addEventListener("focus", async () => {
+  if (!pub.waitLink) return;
+  pub.waitLink = false;
+  try {
+    const info = await api("/api/publisher");
+    pub.list = info.account_list || []; pub.accounts = info.accounts || {};
+    renderAccounts(); renderPlatformBoxes();
+  } catch { /* مش مهم */ }
+});
 function renderPlatformBoxes() {
   let saved = [];
   try { saved = JSON.parse(storageGet(PLATFORMS_KEY) || "[]"); } catch {}
   const keep = checkedPlatforms();
   if (keep.length) saved = keep;
+  // مع Zernio: مربع لكل حساب مربوط (ممكن أكتر من حساب على نفس المنصة) · من غير Zernio: مربع لكل منصة
+  if (pub.list?.length) {
+    $("postPlatforms").innerHTML = pub.list.map((a) => {
+      const v = `${a.platform}@${a.id}`, on = saved.includes(v) || saved.includes(a.platform) && pub.accounts[a.platform]?.id === a.id;
+      const many = pub.list.filter((x) => x.platform === a.platform).length > 1;
+      return `<label title="${escapeHtml(pub.platforms[a.platform] || a.platform)} · ${escapeHtml(a.name || a.username)}" class="plat acc">
+        <input type="checkbox" value="${escapeHtml(v)}" ${on ? "checked" : ""}>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="${PLAT_SVG[a.platform] || PLAT_SVG.x}"/></svg>
+        <span>${escapeHtml(pub.platforms[a.platform] || a.platform)}</span>${many || a.username ? `<em dir="ltr">${escapeHtml(a.username ? "@" + a.username : a.name)}</em>` : ""}</label>`;
+    }).join("");
+    return;
+  }
   const needLink = pub.service === "zernio";
   $("postPlatforms").innerHTML = Object.entries(pub.platforms)
     .map(([k, label]) => {
@@ -196,7 +278,7 @@ const coverDefaultMs = (dur) => Math.max(0, Math.round((dur - 2) * 1000));
 // ---------- إنستجرام: التاج والكولاب · والغلاف لإنستجرام وتيك توك ----------
 function renderPostExtras() {
   const pl = checkedPlatforms();
-  const ig = pl.includes("instagram"), tt = pl.includes("tiktok");
+  const ig = pl.some((v) => platOf(v) === "instagram"), tt = pl.some((v) => platOf(v) === "tiktok");
   // تاج إنستجرام والغلاف: كبسولة صغيرة جنب «كابشن البراند»، والإعدادات بتتفتح لما تدوس عليها (زي البروتوتايب)
   const tagged = !!$("igTags").value.trim() || $("igCollab").checked;
   $("igOptsChip").hidden = !ig;
@@ -323,7 +405,7 @@ async function submitPost(now) {
   if (!platforms.length) return toast("اختار منصة واحدة على الأقل", true);
   const when = now ? new Date() : new Date($("postWhen").value);
   if (isNaN(when)) return toast("اختار الميعاد", true);
-  const names = platforms.map((k) => pub.platforms[k] || k).join("، ");
+  const names = platforms.map(tLabel).join("، ");
   if (now && !confirm(`البوست هينزل دلوقتي على: ${names}. تكمّل؟`)) return;
   if (!now && when < new Date() && !confirm("الميعاد ده عدّى، فالبوست هيتنشر على طول. تكمّل؟")) return;
   const body = JSON.stringify({
@@ -387,7 +469,7 @@ function renderPosts() {
         ${p.image_url ? `<img class="post-thumb" src="${p.image_url}" alt="">` : p.export_url ? lightVideo(p.export_url, "muted") : ""}
         <div class="info">
           <span class="when">${when}</span>
-          <span>${escapeHtml(p.export_name || (p.from_zernio ? "🔗 من Zernio" : "⚠️ الفيديو اتمسح"))} · ${p.platforms.map((k) => pub.platforms[k] || k).join("، ")}</span>
+          <span>${escapeHtml(p.export_name || (p.from_zernio ? "🔗 من Zernio" : "⚠️ الفيديو اتمسح"))} · ${p.platforms.map(tLabel).join("، ")}</span>
           ${p.caption ? `<span class="cap" title="${escapeHtml(p.caption)}">${escapeHtml(p.caption)}</span>` : ""}
           ${p.options?.ig_tags?.length ? `<span class="tags" dir="ltr">🏷️ ${p.options.ig_tags.map((t) => `@${escapeHtml(t)}`).join(" ")}${p.options.ig_collab ? " · 🤝" : ""}</span>` : ""}
           ${p.error ? `<span class="err">${escapeHtml(p.error)}</span>` : ""}
@@ -422,7 +504,9 @@ function editPost(p) {
   $("postSubmit").textContent = "💾 حفظ التعديل";
   $("postCancel").hidden = false;
   $("postCaption").value = p.caption;
-  $("postPlatforms").querySelectorAll("input").forEach((i) => (i.checked = p.platforms.includes(i.value)));
+  // البوستات القديمة متسجّلة بالمنصة بس («tiktok»): بتتعلّم على أول حساب للمنصة دي
+  $("postPlatforms").querySelectorAll("input").forEach((i) => (i.checked = p.platforms.includes(i.value)
+    || (p.platforms.includes(platOf(i.value)) && pub.accounts[platOf(i.value)]?.id === i.value.split("@")[1])));
   setWhen(new Date(p.scheduled_at));
   const o = p.options || {};
   $("igTags").value = (o.ig_tags || []).map((t) => `@${t}`).join(", ");
@@ -472,7 +556,7 @@ async function loadRemoteOrphans(verbose = false) {
       <div class="orphan" data-rid="${escapeHtml(o.id)}">
         ${o.media_url ? lightVideo(escapeHtml(o.media_url), "muted") : ""}
         <div class="info"><span class="when">${when(o.scheduled_for)}</span>
-          <span>${o.platforms.map((k) => pub.platforms[k] || k).join("، ")}</span>
+          <span>${o.platforms.map(tLabel).join("، ")}</span>
           ${o.content ? `<span class="cap">${escapeHtml(o.content)}</span>` : ""}</div>
         <span class="acts"><button class="btn sm" data-oact="adopt">＋ ضيفه للقايمة</button>
           <button class="btn sm danger" data-oact="cancel">✕ الغيه من Zernio</button></span>
