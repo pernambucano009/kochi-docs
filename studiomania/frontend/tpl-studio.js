@@ -75,7 +75,7 @@ function tsHome() {
         <label>الكلام على الشاشة <select id="tsText"><option value="blank">مساحات فاضية (الكلام في المونتاج)</option><option value="en">إنجليزي جوه الصور</option></select></label>
       </div>
       ${!D.fasih ? `<small class="err">اللهجات العربية محتاجة مفتاح فصيح (FASIH_API_KEY) على Railway، أو اقفل الفويس أوفر.</small>` : ""}
-      <div class="row wrap"><button class="btn primary" id="tsGo">🚀 ابدأ</button><small class="muted">الحركة بـ Kling (الموصى به للعربي) وتقدر تختار أي موديل تاني جوه، وكل خطوة بتوريك تمنها قبل ما تبدأ</small></div>
+      <div class="row wrap"><button class="btn primary" id="tsGo">🚀 ابدأ</button><small class="muted">الحركة بـ Seedance 2.0 Mini (الأرخص) وتقدر تختار أي موديل تاني جوه، وKling عليه ⭐ للفيديوهات غير الإنجليزي، وكل خطوة بتوريك تمنها قبل ما تبدأ</small></div>
     </section>` : ""}
     ${D.videos.length ? `<section class="panel"><h3>فيديوهاتك من القوالب</h3><div class="fm-list">${D.videos.map((v) => `<article class="fm-card" data-tsopen="${v.id}">
       ${v.thumb ? `<img src="${v.thumb}" alt="">` : `<span class="ph">🎬</span>`}<b data-no-i18n>${tse(v.name)}</b>

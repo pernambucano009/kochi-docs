@@ -11762,10 +11762,10 @@ TRIAL_MODELS = {
     "seedance-2.5": {"label": "Seedance 2.5 (لحد 30 ثانية في توليدة واحدة، أغلى)", "model": "bytedance/seedance-2.5/image-to-video",
                      "per_sec": 0.134, "max": 30},
 }
-# 🎬 كل موديلات الفيديو اللي عند Atlas بتتضاف هنا لوحدها (vmodels.py): المفتاح = اسم العيلة، وKling هو الافتراضي والموصى به لغير الإنجليزي
+# 🎬 كل موديلات الفيديو اللي عند Atlas بتتضاف هنا لوحدها (vmodels.py): المفتاح = اسم العيلة؛ Seedance Mini الافتراضي، وKling عليه ⭐ لغير الإنجليزي
 import vmodels  # noqa: E402
 
-VDEF = vmodels.DEFAULT
+VDEF = "seedance-mini"   # الافتراضي: الأرخص (Kling موجود وعليه ⭐ للفيديوهات غير الإنجليزي)
 REC_TAG = " · ⭐ موصى به للفيديوهات غير الإنجليزي"
 
 
@@ -11881,7 +11881,7 @@ class TrialIn(BaseModel):
     mode: str = "rebuild"            # rebuild = نفس النقطتين في الفيديو الأصلي، transfer = لقطتين تانيين
     a: TrialSideIn | None = None
     b: TrialSideIn | None = None
-    model: str = VDEF   # Kling (الموصى به لغير الإنجليزي)
+    model: str = VDEF   # Seedance Mini (الافتراضي)
     resolution: str = "480p"
 
 
@@ -12305,7 +12305,7 @@ class FilmIn(BaseModel):
     connectors: list[str] = []
     scenes: int = 0
     ratio: str = "9:16"
-    model: str = VDEF   # Kling (الموصى به لغير الإنجليزي)
+    model: str = VDEF   # Seedance Mini (الافتراضي)
     resolution: str = "480p"
 
 
@@ -13803,7 +13803,7 @@ class TvIn(BaseModel):
     length: int = 60             # قوالب المشاهد: طول الفيديو (كل ١٠ ثواني = مشهد)
     brief: str = ""
     text_mode: str = "blank"
-    model: str = VDEF   # Kling (الموصى به لغير الإنجليزي)
+    model: str = VDEF   # Seedance Mini (الافتراضي)
     resolution: str = "480p"
 
 
@@ -13838,7 +13838,7 @@ def tvideo_create(body: TvIn):
     if body.section == "templates" and t.get("mode") == "ad":
         # 🎯 قوالب الإعلانات: الشخصية والمنتج الأول، وبعدين السكريبت (مفيش حاجة بتشتغل لوحدها في الأول)
         lang = d["lang"]
-        d.update(mode="ad", status="filled", step=None, model=body.model if body.model in TRIAL_MODELS and body.model != "seedance-mini" else VDEF,
+        d.update(mode="ad", status="filled", step=None, model=body.model if body.model in TRIAL_MODELS and body.model != "seedance-mini" else "seedance-fast",
                  ad={"kind": t["ad_cfg"]["kind"], "look": {"skeleton": "bare", "talking": "pixar", "song": "pixar"}.get(t["ad_cfg"]["kind"], "narrative"), "spoken": adtpl.SPOKEN.get(lang) or dub.DIALECTS[lang].get("language") or "Arabic",
                      "script": d["script"] if d["script_mode"] == "own" else "", "place": "", "length": 15, "end_on": t["ad_cfg"]["kind"] == "cinema",
                      "hero": {}, "product": {}, "files": {}, "gens": {}, "plan": None})
