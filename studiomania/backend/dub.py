@@ -41,13 +41,14 @@ FOREIGN = [  # (المعرف، الاسم، اسم اللغة للموديل)
 ELEVEN = {"eleven_liam": ("ليام (راجل)", "Liam"), "eleven_jessica": ("جيسيكا (ست)", "Jessica"),
           "eleven_charlie": ("تشارلي (راجل)", "Charlie"), "eleven_bella": ("بيلا (ست)", "Bella")}
 
+FASIH_PER_MIN = 0.19   # باقة فصيح: ١٠٠ دقيقة بـ $19
 VOICES: dict[str, dict] = {k: {"label": f"{lab} · ElevenLabs", "provider": "eleven", "voice": v, "per_1k": 0.10} for k, (lab, v) in ELEVEN.items()}
 DIALECTS: dict[str, dict] = {}
 for code, label, where, hd in AR:
     vs = [f"{code if code != 'ar-msa' else 'ar-msa-formal'}{'-darija' if code == 'ar-ma' else '-gulf' if code == 'ar-ae' else ''}-{g}-1" for g in ("male", "female")]
     for v in vs + hd:
         VOICES[v] = {"label": f"{'راجل' if '-male-' in v else 'ست'}{' HD' if v.endswith('-2') else ''} · فصيح", "provider": "fasih", "voice": v,
-                     "dialect": code, "per_1k": 0.0}
+                     "dialect": code, "per_1k": 0.0, "per_min": FASIH_PER_MIN}
     DIALECTS[code] = {"label": label, "lang": code, "group": "ar", "voices": hd + vs, "where": where}
 for code, label, lang in FOREIGN:
     DIALECTS[code] = {"label": label, "lang": code, "group": "foreign", "voices": list(ELEVEN), "language": lang}
@@ -128,9 +129,9 @@ def tts_body(voice: str, dialect: str, text: str) -> dict:
 
 
 def estimate(lines: list[str], voice: str, seconds: float, lipsync: str | None) -> float:
-    """بالدولار (فصيح بيتحسب من باقة الدقايق عندهم، فمش داخل هنا)."""
+    """بالدولار: الصوت (ElevenLabs بالحرف، فصيح بالدقيقة) + الليب سينك لو مطلوب."""
     chars = sum(len(x) for x in lines)
-    cost = chars / 1000 * VOICES[voice]["per_1k"]
+    cost = chars / 1000 * VOICES[voice]["per_1k"] + seconds / 60 * VOICES[voice].get("per_min", 0)
     if lipsync in LIPSYNC:
         cost += seconds * LIPSYNC[lipsync]["per_sec"]
     return round(cost, 2)

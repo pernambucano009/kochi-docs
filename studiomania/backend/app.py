@@ -483,7 +483,7 @@ auth = Auth(DB_PATH, DATA_DIR)
 app = FastAPI(title="StudioMania")
 
 # الصفحات والملفات اللي بتفتح من غير دخول
-PUBLIC_PATHS = {"/login", "/login.html", "/style.css", "/i18n.js", "/i18n-en.js", "/health", "/api/auth/state", "/api/auth/login", "/api/auth/setup"}
+PUBLIC_PATHS = {"/login", "/login.html", "/pricing", "/pricing.html", "/api/pricing", "/style.css", "/i18n.js", "/i18n-en.js", "/health", "/api/auth/state", "/api/auth/login", "/api/auth/setup"}
 
 
 # ملفات الواجهة: كل تحديث ليه رقم نسخة جديد عشان المتصفح ميفضلش شغال بالقديم
@@ -19839,6 +19839,65 @@ def gen_video(prompt: str = Form(...), model: str = Form(VDEF), duration: int = 
 def gen_delete(gid: str):
     shutil.rmtree(GEN_DIR / Path(gid).name, ignore_errors=True)
     return {"ok": True}
+
+
+# ---------------------------------------------------------------- 💳 الأسعار والنقط
+import billing  # noqa: E402
+
+AUDIOSHAKE_PER_MIN: float | None = None   # فصل الصوت: لسه مستنيين سعر الكريديت من حساب AudioShake
+
+
+def pricing_examples() -> list[dict]:
+    """أمثلة «كل حاجة بكام نقطة» من أسعار الموديلات الحقيقية دلوقتي."""
+    rows: list[tuple[str, str, float | None]] = []
+    vm = TRIAL_MODELS
+    for key, secs in (("seedance-mini", 5), ("seedance-mini", 10), ("seedance-fast", 10), ("seedance", 10)):
+        if key in vm:
+            rows.append(("🎬 فيديو", f"{vm[key]['label'].split(' (')[0]} · {secs} ثواني", vm[key]["per_sec"] * secs))
+    kling = next((k for k in vm if "kling" in k.lower()), None)
+    if kling:
+        rows.append(("🎬 فيديو", f"{vm[kling]['label']} · 5 ثواني", vm[kling]["per_sec"] * 5))
+    for key in ("nano2", "nanopro", "sunburst"):
+        rows.append(("🖼️ صورة", TV_IMAGE_MODELS[key][2].split(" (")[0], TV_IMAGE_MODELS[key][0]))
+    for key, x in AVATAR_MODELS.items():
+        rows.append(("🗣️ أفاتار بيتكلم", f"{x['label'].split(' (')[0]} · 10 ثواني", x["per_sec"] * 10))
+    rows.append(("🎙️ صوت", "فصيح (عربي) · دقيقة", dub.FASIH_PER_MIN))
+    rows.append(("🎙️ صوت", "ElevenLabs (لغات تانية) · دقيقة", 0.9 * 0.10))
+    for key, x in dub.LIPSYNC.items():
+        rows.append(("👄 ليب سينك", f"{x['label'].split(' (')[0]} · 30 ثانية", x["per_sec"] * 30))
+    dub_min = dub.FASIH_PER_MIN + 0.01 + (AUDIOSHAKE_PER_MIN or 0)
+    rows.append(("🌍 دبلجة", "دقيقة بالعربي من غير ليب سينك" + ("" if AUDIOSHAKE_PER_MIN else " (من غير فصل الصوت لسه)"), dub_min))
+    rows.append(("🧠 العقل", "أفكار وسكريبتات وترجمة", None))
+    return [{"group": g, "label": lab, "credits": billing.credits_for(c) if c is not None else 0, "free": c is None} for g, lab, c in rows]
+
+
+@app.get("/pricing")
+@app.get("/pricing.html")
+def pricing_page():
+    return html_page("pricing.html")
+
+
+@app.get("/api/pricing")
+def pricing_info():
+    cfg = billing.config(DATA_DIR)
+    return {**cfg, "markup": billing.MARKUP, "credit_usd": billing.CREDIT_USD, "examples": pricing_examples()}
+
+
+@app.get("/api/pricing/custom")
+def pricing_custom(plan: str, accounts: int = 0, autopilot: bool = False):
+    try:
+        return billing.custom_total(billing.config(DATA_DIR), plan, accounts, autopilot)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.get("/api/pricing/margins")
+def pricing_margins(zernio: float = billing.ZERNIO_WORST):
+    """لصاحب البرنامج بس (محتاج دخول): مكسبنا من كل باقة وكل باقة نقط في أسوأ حالة."""
+    cfg = billing.config(DATA_DIR)
+    return {"plans": [{"key": p["key"], "price": p["price"], **billing.plan_margin(p, zernio)} for p in cfg["plans"]],
+            "topups": [{"key": t["key"], "price": t["price"], **billing.topup_margin(t)} for t in cfg["topups"]],
+            "account_addon_profit": round(next(a["price"] for a in cfg["addons"] if a["key"] == "account") - zernio, 2)}
 
 
 # ---------------------------------------------------------------- 🗓️ دراع المواسم في المخ
