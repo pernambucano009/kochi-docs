@@ -2764,6 +2764,10 @@ def project_captions(conn: sqlite3.Connection, data: dict, total: float, export_
     # الكلام اللي اتمسح من الكابشن في المشروع ده (بمعاد بدايته جوه ملف الصوت)
     removed = {int(k) for k in cfg.get("removed") or []}
     source = [w for w in tr["words"] if round(w["s"] * 100) not in removed]
+    if cfg.get("lang") in CAPTION_LANGS:   # 🌍 الكابشن بلغة تانية (الجمل المحذوفة بتفضل محذوفة)
+        gone = [(w["s"], w["e"]) for w in tr["words"] if round(w["s"] * 100) in removed]
+        source = [w for w in caption_words(voice["id"], cfg["lang"])
+                  if not any(a <= (w["s"] + w["e"]) / 2 <= b for a, b in gone)]
     words = []
     for part in track_parts(voice):
         offset, delay = max(0.0, part.get("offset") or 0), max(0.0, part.get("delay") or 0)
@@ -4426,6 +4430,81 @@ def start_transcribe(audio_id: str):
     set_transcript(audio_id, {"status": "working", "words": []})
     threading.Thread(target=run_transcribe, args=(audio_id,), daemon=True).start()
     return {"ok": True}
+
+
+# 🌍 لغة الكابشن: الكلام بيتقسم جمل (بتوقيتها)، كل جملة بتتترجم، وكلمات الترجمة بتتوزع على وقت الجملة نفسها
+CAPTION_LANGS = {"ar": "العربي", "en": "English", "fr": "Français", "es": "Español", "de": "Deutsch", "tr": "Türkçe",
+                 "pt": "Português", "it": "Italiano", "id": "Bahasa Indonesia", "ur": "اردو"}
+CAPTION_LANG_NAMES = {"ar": "Arabic (natural, simple Modern Standard or the brand's dialect)", "en": "English", "fr": "French", "es": "Spanish",
+                      "de": "German", "tr": "Turkish", "pt": "Portuguese", "it": "Italian", "id": "Indonesian", "ur": "Urdu"}
+
+
+def caption_phrases(words: list[dict]) -> list[list[dict]]:
+    out, cur = [], []
+    for w in words:
+        if cur and (len(cur) >= 9 or w["s"] - cur[-1]["e"] > 0.7 or re.search(r"[.!?؟،,…]$", cur[-1]["w"])):
+            out.append(cur)
+            cur = []
+        cur.append(w)
+    if cur:
+        out.append(cur)
+    return out
+
+
+def translate_words(words: list[dict], lang: str) -> list[dict]:
+    phrases = caption_phrases(words)
+    texts = [" ".join(w["w"] for w in g) for g in phrases]
+    if atlas.mock_mode():
+        lines = [f"[{lang}] {t}" for t in texts]
+    else:
+        msgs = [{"role": "system", "content": "You translate video captions. Translate each line into " + CAPTION_LANG_NAMES[lang]
+                 + " so it reads naturally on screen: same meaning and tone, short, no notes, keep names and brands as they are. "
+                   'Return exactly the same number of lines in the same order as JSON: {"lines": ["..."]}'},
+                {"role": "user", "content": json.dumps({"lines": texts}, ensure_ascii=False)}]
+        raw = flow_llm(msgs, "ترجمة الكابشن")
+        lines = [str(x or "").strip() for x in (raw.get("lines") or [])]
+        if len(lines) != len(texts):
+            raise HTTPException(400, "الترجمة رجعت بعدد جمل مختلف، جرّب تاني")
+    out = []
+    for g, line in zip(phrases, lines):
+        parts = line.split() or [g[0]["w"]]
+        s0, e0 = g[0]["s"], g[-1]["e"]
+        step = (e0 - s0) / len(parts)
+        out += [{"w": t, "s": round(s0 + i * step, 3), "e": round(s0 + (i + 1) * step, 3)} for i, t in enumerate(parts)]
+    return out
+
+
+def caption_words(audio_id: str, lang: str) -> list[dict]:
+    """كلام الكابشن باللغة المطلوبة (متخزن مع الكلام الأصلي، وبيتعاد لو الكلام اتعدّل)."""
+    with closing(db()) as conn:
+        row = conn.execute("SELECT transcript FROM audio WHERE id = ?", (audio_id,)).fetchone()
+    if row is None:
+        raise HTTPException(404, "الملف غير موجود")
+    tr = transcript_of(row)
+    if tr.get("status") != "done" or not tr.get("words"):
+        raise HTTPException(400, "لسه الكلام بتاع التعليق الصوتي متكتبش")
+    if not lang:
+        return tr["words"]
+    if lang not in CAPTION_LANGS:
+        raise HTTPException(400, "لغة مش متاحة")
+    h = hashlib.sha1(json.dumps(tr["words"], ensure_ascii=False).encode()).hexdigest()[:16]
+    cached = (tr.get("tx") or {}).get(lang) or {}
+    if cached.get("h") == h:
+        return cached["words"]
+    words = translate_words(tr["words"], lang)
+    tr.setdefault("tx", {})[lang] = {"h": h, "words": words}
+    set_transcript(audio_id, tr)
+    return words
+
+
+@app.get("/api/captions/langs")
+def caption_langs():
+    return CAPTION_LANGS
+
+
+@app.get("/api/audio/{audio_id}/transcript/{lang}")
+def get_transcript_lang(audio_id: str, lang: str):
+    return {"lang": lang, "words": caption_words(audio_id, lang)}
 
 
 class WordIn(BaseModel):
@@ -16805,7 +16884,8 @@ def dub_info() -> dict:
             "voices": {k: v["label"] for k, v in dub.VOICES.items()},
             "fasih": bool(fasih.api_key() or atlas.mock_mode()),
             "lipsync": {k: v["label"] for k, v in dub.LIPSYNC.items()},
-            "separate": bool(audioshake.api_key() or atlas.mock_mode())}
+            "separate": bool(audioshake.api_key() or atlas.mock_mode()),
+            "caption_langs": CAPTION_LANGS}
 
 
 @app.get("/api/dub")
@@ -16986,6 +17066,7 @@ def dub_target_edit(did: str, dialect: str, body: DubLinesIn):
 class DubRenderIn(BaseModel):
     lipsync: str | None = None      # None / sync / veed
     background: str = "auto"        # auto / separate / low / none
+    captions: str = ""              # "" من غير كابشن · same بلغة الدبلجة · كود لغة (en, fr…) مترجم
 
 
 @app.post("/api/dub/{did}/target/{dialect}/render")
@@ -17008,7 +17089,8 @@ def dub_render(did: str, dialect: str, body: DubRenderIn):
             raise HTTPException(400, "استنى لما الشغل اللي شغال يخلص")
         t.update(busy=True, step="🎙️ بيسجّل الجمل", error=None, lipsync=body.lipsync)
     d = dub_update(did, fn)
-    threading.Thread(target=run_dub_render, args=(did, dialect, body.lipsync, body.background), daemon=True).start()
+    caps = body.captions if body.captions in ("same", *CAPTION_LANGS) else ""
+    threading.Thread(target=run_dub_render, args=(did, dialect, body.lipsync, body.background, caps), daemon=True).start()
     return dub_to_dict(did, d)
 
 
@@ -17062,7 +17144,7 @@ def dub_background(did: str, d: dict, mode: str) -> Path | None:
     return out
 
 
-def run_dub_render(did: str, dialect: str, lipsync: str | None, background: str) -> None:
+def run_dub_render(did: str, dialect: str, lipsync: str | None, background: str, caps: str = "") -> None:
     from concurrent.futures import ThreadPoolExecutor
     step = lambda s: dub_update(did, lambda x: x["targets"][dialect].update(step=s))  # noqa: E731
     try:
@@ -17141,7 +17223,39 @@ def run_dub_render(did: str, dialect: str, lipsync: str | None, background: str)
             video_in = lip
         step("🎬 بيحفظ الفيديو")
         out = folder / f"{dialect}.mp4"
-        subprocess.run(ff + ["-i", str(video_in), "-i", str(audio), "-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy", "-c:a", "copy",
+        vcodec = ["-c:v", "copy"]
+        if caps:
+            # 🌍 الكابشن: كلام الدبلجة نفسه، أو مترجم للغة اللي اخترتها، في نفس وقت كل جملة
+            step("🔤 بيكتب الكابشن" + ("" if caps == "same" else f" ({CAPTION_LANGS[caps]})"))
+            said = [(texts[i], sp) for i, sp in zip(range(len(lines)), spots) if files[i] and texts[i].strip()]
+            cap_texts = [x[0] for x in said]
+            if caps != "same" and cap_texts:
+                pseudo = [{"w": t, "s": float(k), "e": k + .9} for k, t in enumerate(cap_texts)]   # جملة = «كلمة» عشان الترجمة تفضل جملة بجملة
+                if atlas.mock_mode():
+                    cap_texts = [f"[{caps}] {t}" for t in cap_texts]
+                else:
+                    msgs = [{"role": "system", "content": "You translate video captions. Translate each line into " + CAPTION_LANG_NAMES[caps]
+                             + " so it reads naturally on screen: same meaning and tone, short, no notes, keep names and brands as they are. "
+                               'Return exactly the same number of lines in the same order as JSON: {"lines": ["..."]}'},
+                            {"role": "user", "content": json.dumps({"lines": [p["w"] for p in pseudo]}, ensure_ascii=False)}]
+                    got = [str(x or "").strip() for x in (flow_llm(msgs, "ترجمة الكابشن").get("lines") or [])]
+                    if len(got) == len(cap_texts):
+                        cap_texts = got
+            cwords = []
+            for txt, (_, sp) in zip(cap_texts, said):
+                parts_w = txt.split()
+                if not parts_w:
+                    continue
+                stp = (sp["end"] - sp["start"]) / len(parts_w)
+                cwords += [{"w": wd, "s": round(sp["start"] + k * stp, 3), "e": round(sp["start"] + (k + 1) * stp, 3)} for k, wd in enumerate(parts_w)]
+            if cwords:
+                vi = media_info(video_in)
+                ass = work / "caps.ass"
+                ass.write_text(captions.build_ass(cwords, {"template": "classic" if caps != "same" else captions.DEFAULT_TEMPLATE}, total,
+                                                  (vi.width or 1080, vi.height or 1920)), encoding="utf-8")
+                vcodec = ["-vf", f"subtitles=filename='{captions.filter_path(ass)}':fontsdir='{captions.filter_path(FONTS_DIR)}'",
+                          "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p"]
+        subprocess.run(ff + ["-i", str(video_in), "-i", str(audio), "-map", "0:v:0", "-map", "1:a:0", *vcodec, "-c:a", "copy",
                              "-t", f"{total:.3f}", "-movflags", "+faststart", str(out)], check=True, capture_output=True, timeout=900)
         # نسخة في الفيديوهات الجاهزة (للنشر)
         export_id = uuid.uuid4().hex[:12]

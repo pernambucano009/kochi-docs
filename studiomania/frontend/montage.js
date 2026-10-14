@@ -875,7 +875,13 @@ function captionBlocks() {
   if (!d.captions?.enabled || !(tr?.status === "done" && tr.words.length)) return [];
   const blocks = [];
   const removed = new Set(d.captions.removed || []);
-  const source = tr.words.filter((w) => !removed.has(Math.round(w.s * 100)));
+  let source = tr.words.filter((w) => !removed.has(Math.round(w.s * 100)));
+  // 🌍 كابشن بلغة تانية (لو الترجمة لسه بتحمّل، الأصلي بيبان لحد ما تخلص)
+  const tx = d.captions.lang && brand.trx?.[`${d.voice.id}:${d.captions.lang}`];
+  if (tx) {
+    const gone = tr.words.filter((w) => removed.has(Math.round(w.s * 100)));
+    source = tx.filter((w) => !gone.some((g) => g.s <= (w.s + w.e) / 2 && (w.s + w.e) / 2 <= g.e));
+  } else if (d.captions.lang && typeof capLangLoad === "function") setTimeout(() => capLangLoad(d.captions.lang), 0);
   // كل قطعة من التعليق الصوتي ليها الكلام اللي جواها بس
   for (const x of trackParts("voice")) {
     const words = source.filter((w) => w.e > x.offset && w.s < x.offset + x.len);

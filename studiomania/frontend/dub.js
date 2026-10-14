@@ -70,6 +70,7 @@ function dbRenderProj() {
         }).join("") + `</div>`;
       const lc = t.lip_cost || {};
       h += `<div class="db-opts"><label>🎵 الخلفية <select data-dbbg="${k}">${Object.entries(DB_BG).filter(([b]) => b !== "separate" || info.separate).map(([b, l]) => `<option value="${b}">${l}</option>`).join("")}</select></label>
+        <label>🔤 الكابشن <select data-dbcap="${k}"><option value="">من غير كابشن</option><option value="same">بنفس لغة الدبلجة</option>${Object.entries(info.caption_langs || {}).map(([c, l]) => `<option value="${c}">مترجم: ${dbe(l)}</option>`).join("")}</select></label>
         <label>👄 ليب سينك <select data-dblip="${k}"><option value="">من غير (الصوت بس)</option>${Object.entries(info.lipsync).map(([m, l]) => `<option value="${m}" ${t.lipsync === m ? "selected" : ""}>${dbe(l)} · حوالي $${lc[m]}</option>`).join("")}</select></label>
         <button class="btn primary" data-dbrender="${k}" ${t.busy || d.busy ? "disabled" : ""}>🎙️ اعمل الدبلجة <small>${dl.group === "ar" ? "(الصوت من باقة فصيح)" : `(الصوت حوالي $${(t.cost || {})[t.voice] ?? "?"})`}</small></button></div>`;
     }
@@ -178,7 +179,8 @@ $("dbMain").addEventListener("click", async (e) => {
     const k = b.dataset.dbrender, lip = document.querySelector(`[data-dblip="${k}"]`).value || null;
     const bg = document.querySelector(`[data-dbbg="${k}"]`).value;
     if (lip && !confirm(`الليب سينك بيتكلف حوالي $${dbx.cur.targets[k].lip_cost[lip]} للفيديو ده. تكمّل؟`)) return;
-    return dbAct(`/target/${k}/render`, "POST", { lipsync: lip, background: bg }, "🎙️ بيعمل الدبلجة…");
+    const caps = document.querySelector(`[data-dbcap="${k}"]`)?.value || "";
+    return dbAct(`/target/${k}/render`, "POST", { lipsync: lip, background: bg, captions: caps }, "🎙️ بيعمل الدبلجة…");
   }
 });
 

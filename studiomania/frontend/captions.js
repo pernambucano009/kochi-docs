@@ -47,6 +47,8 @@ function renderBrandPanels() {
   $("capSize").value = c.size; $("capSizeVal").textContent = c.size;
   $("capY").value = c.y; $("capYVal").textContent = `${Math.round(c.y)}%`;
   $("capWords").value = c.words; $("capWordsVal").textContent = c.words;
+  capLangFill();
+  $("capLang").value = c.lang || "";
   $("capColor").value = c.color; $("capHl").value = c.highlight; $("capBoxColor").value = c.box_color;
   $("capHlOn").checked = !!c.highlight_on; $("capBox").checked = !!c.box; $("capPop").checked = !!c.pop;
   renderTranscriptStatus();
@@ -82,6 +84,38 @@ $("capTemplates").addEventListener("click", (e) => {
   scheduleSave();
 });
 $("capRestore").onclick = brandInput(() => (capCfg().removed = []));
+// 🌍 لغة الكابشن: الكلام بيتترجم جملة جملة ويتحط في نفس وقت الكلام (الترجمة بتتحفظ، فبتتعمل مرة واحدة)
+let capLangs = null;
+async function capLangFill() {
+  if (capLangs) return;
+  capLangs = {};
+  try { capLangs = await api("/api/captions/langs"); } catch { /* القايمة فاضية */ }
+  $("capLang").innerHTML = `<option value="">نفس لغة الكلام</option>` + Object.entries(capLangs).map(([k, v]) => `<option value="${k}">${escapeHtml(v)}</option>`).join("");
+  $("capLang").value = mt.project?.data.captions?.lang || "";
+}
+async function capLangLoad(lang) {
+  const voice = mt.project?.data.voice;
+  if (!lang || !voice) return;
+  const key = `${voice.id}:${lang}`;
+  brand.trx = brand.trx || {};
+  brand.trxBusy = brand.trxBusy || {};
+  if (key in brand.trx || brand.trxBusy[key]) return;   // (لو فشلت مش بتتعاد لوحدها؛ تغيير اللغة بيعيدها)
+  brand.trxBusy[key] = true;
+  $("capLangHint").textContent = "⏳ بيترجم الكابشن…";
+  try {
+    brand.trx[key] = (await api(`/api/audio/${voice.id}/transcript/${lang}`)).words;
+    $("capLangHint").textContent = "✓ اتترجم";
+  } catch (err) { brand.trx[key] = null; $("capLangHint").textContent = `⚠️ ${err.message}`; }
+  delete brand.trxBusy[key];
+  updatePreviewOverlays();
+  scheduleTimeline();
+}
+$("capLang").addEventListener("change", () => {
+  const v = $("capLang").value, voice = mt.project?.data.voice;
+  if (voice && brand.trx?.[`${voice.id}:${v}`] === null) delete brand.trx[`${voice.id}:${v}`];
+  brandInput(() => (capCfg().lang = v || null))();
+  capLangLoad(v);
+});
 $("capFont").addEventListener("change", brandInput(() => (capCfg().font = $("capFont").value)));
 $("capSize").addEventListener("input", brandInput(() => (capCfg().size = Number($("capSize").value))));
 $("capY").addEventListener("input", brandInput(() => (capCfg().y = Number($("capY").value))));
