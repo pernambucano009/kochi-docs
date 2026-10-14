@@ -1236,3 +1236,4 @@ html { overflow-x: clip; }
 /* الشريط اللي فوق: نفس الأماكن في العربي والإنجليزي (اللوجو ورجوع يمين، والأدوات شمال)، والكلام جواه بيتقري صح في اللغتين */
 #nhBar { direction: rtl; }
 #nhBar :is(.nh-crumbs b, .nh-crumbs button, #nhClientName, .nh-goback span, #nhMode) { unicode-bidi: plaintext; }
+#nh .nh-pj-av.s-tpl { background: #F1E8FB; color: #6B3FA0; }

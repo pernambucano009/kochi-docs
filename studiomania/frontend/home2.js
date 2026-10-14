@@ -433,8 +433,16 @@ const NH = (() => {
   const pjState = (p) => p.render_status === "rendering" ? ["run", `بيتصدّر${p.render_progress != null ? ` · ${Math.round(p.render_progress)}%` : ""}`]
     : p.render_status === "done" ? ["done", "اتصدّر"] : p.render_status === "failed" ? ["fail", "التصدير وقف"] : ["run", "في المونتاج"];
   function projectsBoard() {
-    const n = (k) => D.work.filter((p) => pjState(p)[0] === k).length;
-    const cards = D.work.map((p) => {
+    const drafts = D.drafts || [];
+    const n = (k) => D.work.filter((p) => pjState(p)[0] === k).length + (k === "run" ? drafts.length : 0);
+    const dcards = drafts.map((x, i) => {
+      const when = x.updated_at ? new Date(x.updated_at).toLocaleDateString(UI_LOCALE(), { day: "numeric", month: "short" }) : "";
+      return `<article class="nh-line nh-pj-card" data-draft="${x.kind}:${esc(x.id)}" data-st="run" data-q="${esc(String(x.name).toLowerCase())}" tabindex="0" role="button">
+        <div class="nh-pj-art" style="background:${x.thumb ? `center/cover no-repeat url('${esc(x.thumb)}'), ` : ""}${PJ_ART[i % PJ_ART.length]}"></div>
+        <div class="nh-pj-name"><span class="nh-pj-av s-tpl">ق</span><b>${esc(x.name)}</b></div>
+        <small class="st-run">${esc(x.sec)} · ${esc(x.step)}${when ? ` · ${when}` : ""}</small></article>`;
+    }).join("");
+    const cards = dcards + D.work.map((p) => {
       const [k, label] = pjState(p);
       const when = p.updated_at ? new Date(p.updated_at).toLocaleDateString(UI_LOCALE(), { day: "numeric", month: "short" }) : "";
       const pct = p.render_status === "rendering" && p.render_progress != null ? Math.round(p.render_progress) : null;
@@ -446,7 +454,7 @@ const NH = (() => {
     return `<div class="nh-pj">
       <div class="nh-pj-bar">
         <label class="nh-pj-q"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4 4"/></svg><input type="search" placeholder="دوّر على مشروع" aria-label="دوّر على مشروع"></label>
-        <button type="button" class="on" data-pjf="">الكل · <span class="num">${D.work.length}</span></button>
+        <button type="button" class="on" data-pjf="">الكل · <span class="num">${D.work.length + drafts.length}</span></button>
         <button type="button" data-pjf="run">شغّالة · <span class="num">${n("run")}</span></button>
         <button type="button" data-pjf="done">اتصدّرت · <span class="num">${n("done")}</span></button>
         ${n("fail") ? `<button type="button" data-pjf="fail">وقفت · <span class="num">${n("fail")}</span></button>` : ""}
@@ -673,6 +681,11 @@ const NH = (() => {
   }
   function onActivate(e) {
     const line = e.target.closest(".nh-line, [data-cont]");
+    if (line?.dataset.draft) {   // شغل قالب لسه ما خلصش: يكمّل من مكان ما وقف
+      const [kind, id] = line.dataset.draft.split(":");
+      if (kind === "flow") return Flow.open(id);
+      return openSection(line, async () => { try { tplx.cur = await api(`/api/tvideos/${id}`); } catch { tplx.cur = null; } showStep("14"); });
+    }
     if (line?.dataset.proj) {   // مشروع مونتاج في ستوديومانيا: يفتح في المونتاج بتاع قسمه
       const p = D.work.find((x) => x.id === line.dataset.proj);
       if (!p) return;
@@ -703,12 +716,21 @@ const NH = (() => {
 
   // ---------- الداتا الحقيقية ----------
   async function refresh() {
-    const [folders, publisher, posts, coaches, voices, music, brains, cats, projects] = await Promise.all([
+    const [folders, publisher, posts, coaches, voices, music, brains, cats, projects, flows, tvs] = await Promise.all([
       KOCHI ? shellFolders(true) : [], api("/api/publisher").catch(() => null), api("/api/posts").catch(() => []), api("/api/coaches").catch(() => []),
       api("/api/audio?kind=voice").catch(() => []), api("/api/audio?kind=music").catch(() => []), api("/api/ad-brains").catch(() => []),
       D.cats.length ? D.cats : api("/api/style-cats").catch(() => []),
       KOCHI ? [] : api("/api/projects").catch(() => []),
+      KOCHI ? [] : api("/api/flows").catch(() => []), KOCHI ? [] : api("/api/tvideos").catch(() => []),
     ]);
+    // 🧭 شغل لسه ما خلصش في القوالب (مسار القالب واقف عند الفكرة/السيناريو…، أو فيديو قالب لسه بيتعمل): بيظهر في «شغّال عليه»
+    const FLOW_ST = { idea: "الفكرة", format: "نوع البوست", scenario: "السيناريو", cast: "الأبطال", assets: "الملفات", generate: "التوليد" };
+    D.drafts = [
+      ...flows.filter((f) => f.stage !== "done").map((f) => ({ kind: "flow", id: f.id, name: f.title || f.template?.name || "فكرة جديدة",
+        sec: `قالب «${f.template?.name || ""}»`, step: `واقف عند ${FLOW_ST[f.stage] || f.stage}`, updated_at: f.updated_at })),
+      ...tvs.filter((v) => v.section === "templates" && v.status !== "done").map((v) => ({ kind: "tv", id: v.id, name: v.name || v.template_name || "فيديو قالب",
+        sec: `قالب «${v.template_name || ""}»`, step: v.status === "failed" ? "وقف" : "لسه بيتعمل", updated_at: v.updated_at, thumb: v.thumb })),
+    ].sort((a, b) => String(b.updated_at || "").localeCompare(String(a.updated_at || "")));
     D.work = KOCHI ? folders : projects.filter((p) => SEC[p.section]);
     Object.assign(D, { cats, folders, publisher, posts, coaches, voices: voices.length, music: music.length, money: window.money?.last || D.money,
       brand: brains.find((b) => b.id === clientx?.active) || brains[0] || null });

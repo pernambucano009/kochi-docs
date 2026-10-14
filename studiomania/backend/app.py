@@ -13942,6 +13942,7 @@ def tvideos_list():
             or ((d.get("still") or {}).get("files") or {}).get("product") or ((d.get("ad") or {}).get("files") or {}).get("head") or ((d.get("ad") or {}).get("files") or {}).get("product")
         out.append({"id": f.parent.name, "name": d.get("name"), "status": d.get("status"), "beats": len(d["schema"]["beats"]),
                     "template_name": d.get("template_name"), "section": d.get("section"),
+                    "updated_at": datetime.fromtimestamp(f.stat().st_mtime, timezone.utc).isoformat(timespec="seconds"),
                     "thumb": f"/media/tvideos/{f.parent.name}/{th}" if th else None})
     return out
 
