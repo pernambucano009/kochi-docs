@@ -63,7 +63,7 @@ const CharactersPage = (() => {
     const opt = (g) => langs.filter(([, v]) => v.group === g).map(([k, v]) => `<option value="${k}" ${k === lang ? "selected" : ""}>${libEsc(v.label)}</option>`).join("");
     const ST = { queued: "في الطابور", working: "شغّال", done: "جاهز", failed: "وقف" };
     return `<div class="ch-sec ch-talk"><div class="nb-kh"><b>🗣️ الأفاتار: خلّيها تتكلم</b><span class="num">${c.talks.length}</span></div>
-      <p class="nb-hint">اكتب اللي الشخصية هتقوله، واختار اللهجة والصوت. البرنامج بيعمل الصوت الأول، وبعدين Kling Avatar بيعمل فيديو والشخصية بتقوله: البُق والوش والإيد ماشيين مع الصوت، والصورة زي ما هي. أو ارفع صوتك انت.</p>
+      <p class="nb-hint">اكتب اللي الشخصية هتقوله، واختار اللهجة والصوت. البرنامج بيعمل الصوت الأول، وبعدين بيعمل فيديو والشخصية بتقوله: البُق والوش والإيد ماشيين مع الصوت، والصورة زي ما هي. أو ارفع صوتك انت.</p>
       <textarea rows="3" data-tk="text" placeholder="مثلًا: أهلًا! أنا ${libEsc(c.name)}، والنهارده هقولك على ٣ حاجات…">${libEsc(d.text || "")}</textarea>
       <div class="nb-row">
         <label class="nb-f"><span>اللهجة / اللغة</span><select data-tk="lang"><optgroup label="عربي">${opt("ar")}</optgroup><optgroup label="لغات تانية">${opt("foreign")}</optgroup></select></label>
@@ -73,7 +73,7 @@ const CharactersPage = (() => {
       <label class="nb-f"><span>الإحساس والحركة (اختياري)</span><input type="text" data-tk="prompt" value="${libEsc(d.prompt || "")}" placeholder="مثلًا: متحمس وبيبتسم، وبيشاور بإيده على الشاشة"></label>
       <div class="nb-row"><button class="nb-btn" data-talk>🎬 خلّيها تقول الكلام ده</button>
         <label class="nb-btn sm">🎙️ أو ارفع صوتك<input type="file" accept="audio/*,video/*" data-tkaudio hidden></label>
-        <small class="muted">${d.text ? `حوالي ${secs} ثانية · ~$${(secs * per).toFixed(2)}` : ""}${!A.fasih ? " · اللهجات العربية محتاجة مفتاح فصيح" : ""}</small></div>
+        <small class="muted">${d.text ? `حوالي ${secs} ثانية · ~$${(secs * per).toFixed(2)}` : ""}${!A.fasih ? " · اللهجات العربية مش متاحة دلوقتي" : ""}</small></div>
       ${c.talks.length ? `<div class="ch-talks">${[...c.talks].reverse().map((t) => `<figure class="ch-tk ${t.status}">
         ${t.url ? `<video src="${libEsc(t.url)}" controls playsinline preload="metadata"></video>` : `<div class="ch-tkph">${t.status === "failed" ? "⚠️" : `<span class="spin-inline"></span>`}<small>${libEsc(t.step || ST[t.status] || "")}</small></div>`}
         <figcaption><span dir="auto">${libEsc(t.text)}</span>${t.error ? `<small class="err">${libEsc(t.error)}</small>` : ""}

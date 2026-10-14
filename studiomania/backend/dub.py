@@ -42,12 +42,12 @@ ELEVEN = {"eleven_liam": ("ليام (راجل)", "Liam"), "eleven_jessica": ("ج
           "eleven_charlie": ("تشارلي (راجل)", "Charlie"), "eleven_bella": ("بيلا (ست)", "Bella")}
 
 FASIH_PER_MIN = 0.19   # باقة فصيح: ١٠٠ دقيقة بـ $19
-VOICES: dict[str, dict] = {k: {"label": f"{lab} · ElevenLabs", "provider": "eleven", "voice": v, "per_1k": 0.10} for k, (lab, v) in ELEVEN.items()}
+VOICES: dict[str, dict] = {k: {"label": lab, "provider": "eleven", "voice": v, "per_1k": 0.10} for k, (lab, v) in ELEVEN.items()}
 DIALECTS: dict[str, dict] = {}
 for code, label, where, hd in AR:
     vs = [f"{code if code != 'ar-msa' else 'ar-msa-formal'}{'-darija' if code == 'ar-ma' else '-gulf' if code == 'ar-ae' else ''}-{g}-1" for g in ("male", "female")]
     for v in vs + hd:
-        VOICES[v] = {"label": f"{'راجل' if '-male-' in v else 'ست'}{' HD' if v.endswith('-2') else ''} · فصيح", "provider": "fasih", "voice": v,
+        VOICES[v] = {"label": f"{'راجل' if '-male-' in v else 'ست'}{' HD' if v.endswith('-2') else ''}", "provider": "fasih", "voice": v,
                      "dialect": code, "per_1k": 0.0, "per_min": FASIH_PER_MIN}
     DIALECTS[code] = {"label": label, "lang": code, "group": "ar", "voices": hd + vs, "where": where}
 for code, label, lang in FOREIGN:
@@ -64,8 +64,8 @@ GUIDES = {
 CHARS_PER_SEC = 14.0      # كلام عربي عامي مريح تقريبًا
 MAX_LINE = 9.0            # أطول جملة (ثواني) قبل ما تتقسم
 LIPSYNC = {
-    "sync": {"label": "Sync.so v3 (أحسن جودة)", "model": "sync/lipsync-v3", "per_sec": 0.22},
-    "veed": {"label": "VEED (أرخص)", "model": "veed/lipsync", "per_sec": 0.013},
+    "sync": {"label": "ليب سينك احترافي (أجود وأغلى)", "model": "sync/lipsync-v3", "per_sec": 0.22},
+    "veed": {"label": "ليب سينك عادي", "model": "veed/lipsync", "per_sec": 0.013},
 }
 
 

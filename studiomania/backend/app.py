@@ -1287,8 +1287,8 @@ def coach_sheet_del(coach_id: str, file: str):
 # ---------------------------------------------------------------- 🧑 الأفاتار: نعمل شخصية بالذكاء الصناعي ونخليها تتكلم بصوتنا
 # الصوت بيتعمل الأول (فصيح للهجات العربية، ElevenLabs للأجنبي، أو صوتك المرفوع)، وبعدين Kling Avatar بياخد صورة الشخصية والصوت
 # ويعمل فيديو والشخصية بتقوله: البق والوش والإيد ماشيين مع الصوت، والصورة (الوش واللبس والخلفية) زي ما هي.
-AVATAR_MODELS = {"pro": {"model": "kwaivgi/kling-v2.6-pro/avatar", "label": "Kling Avatar Pro (اللي جربناه، أجود)", "per_sec": 0.095},
-                 "std": {"model": "kwaivgi/kling-v2.6-std/avatar", "label": "Kling Avatar Std (أرخص)", "per_sec": 0.048}}
+AVATAR_MODELS = {"pro": {"model": "kwaivgi/kling-v2.6-pro/avatar", "label": "جودة عالية", "per_sec": 0.095},
+                 "std": {"model": "kwaivgi/kling-v2.6-std/avatar", "label": "جودة عادية (أرخص)", "per_sec": 0.048}}
 AVATAR_STYLES = {"real": "photorealistic portrait photo, natural skin texture, soft studio light",
                  "3d": "polished 3D animated character, Pixar-like, soft global illumination",
                  "cartoon": "flat 2D cartoon character, clean outlines, friendly colors"}
@@ -19861,14 +19861,14 @@ def pricing_examples() -> list[dict]:
         rows.append(("🎬 فيديو", f"{vm[kling]['label']} · 5 ثواني", vm[kling]["per_sec"] * 5))
     for key in ("nano2", "nanopro", "sunburst"):
         rows.append(("🖼️ صورة", TV_IMAGE_MODELS[key][2].split(" (")[0], TV_IMAGE_MODELS[key][0]))
-    for key, x in AVATAR_MODELS.items():
-        rows.append(("🗣️ أفاتار بيتكلم", f"{x['label'].split(' (')[0]} · 10 ثواني", x["per_sec"] * 10))
-    rows.append(("🎙️ صوت", "فصيح (عربي) · دقيقة", dub.FASIH_PER_MIN))
-    rows.append(("🎙️ صوت", "ElevenLabs (لغات تانية) · دقيقة", 0.9 * 0.10))
-    for key, x in dub.LIPSYNC.items():
-        rows.append(("👄 ليب سينك", f"{x['label'].split(' (')[0]} · 30 ثانية", x["per_sec"] * 30))
-    dub_min = dub.FASIH_PER_MIN + 0.01 + (AUDIOSHAKE_PER_MIN or 0)
-    rows.append(("🌍 دبلجة", "دقيقة بالعربي من غير ليب سينك" + ("" if AUDIOSHAKE_PER_MIN else " (من غير فصل الصوت لسه)"), dub_min))
+    # الأفاتار والصوت والدبلجة: من غير أسماء الشركات (دي في لوحة الأدمن بس)، ورقم واحد يكفي أغلى مزوّد
+    rows.append(("🗣️ أفاتار بيتكلم", "جودة عادية · 10 ثواني", AVATAR_MODELS["std"]["per_sec"] * 10))
+    rows.append(("🗣️ أفاتار بيتكلم", "جودة عالية · 10 ثواني", AVATAR_MODELS["pro"]["per_sec"] * 10))
+    voice_min = max(dub.FASIH_PER_MIN, 0.9 * 0.10)
+    rows.append(("🎙️ صوت", "تعليق صوتي بأي لهجة أو لغة · دقيقة", voice_min))
+    dub_min = voice_min + 0.01 + (AUDIOSHAKE_PER_MIN or 0)
+    rows.append(("🌍 دبلجة", "دبلجة من غير ليب سينك · دقيقة", dub_min))
+    rows.append(("🌍 دبلجة", "دبلجة بليب سينك · دقيقة", dub_min + dub.LIPSYNC["veed"]["per_sec"] * 60))
     rows.append(("🧠 العقل", "أفكار وسكريبتات وترجمة", None))
     return [{"group": g, "label": lab, "credits": billing.credits_for(c) if c is not None else 0, "free": c is None} for g, lab, c in rows]
 

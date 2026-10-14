@@ -62,7 +62,7 @@ function tsHome() {
         <label class="check"><input type="radio" name="tsMode" value="own"> 📝 هكتبه بنفسي</label></div>
       <textarea id="tsScript" rows="4" placeholder="اكتب السكريبت هنا، والبرنامج هيوزّعه على لقطات القالب من غير ما يغيّر كلامك" hidden></textarea>
       <div class="row wrap">
-        <label>🗣️ اللغة / اللهجة <select id="tsLang"><optgroup label="لهجات عربية (فصيح)">${opt("ar")}</optgroup><optgroup label="لغات أجنبية (ElevenLabs)">${opt("foreign")}</optgroup></select></label>
+        <label>🗣️ اللغة / اللهجة <select id="tsLang"><optgroup label="لهجات عربية">${opt("ar")}</optgroup><optgroup label="لغات أجنبية">${opt("foreign")}</optgroup></select></label>
         <label>🎙️ الصوت <select id="tsVoice"></select></label>
         <label class="check"><input type="checkbox" id="tsVoiceOn" checked> فويس أوفر (بيحدد مدة كل لقطة)</label>
       </div>
@@ -74,7 +74,7 @@ function tsHome() {
         <label>موديل الصور <select id="tsImg"><option value="sunburst">GPT Image 2.5 (زي ChatGPT)</option><option value="nano2">Nano Banana 2 (أرخص)</option><option value="nanopro">Nano Banana Pro</option></select></label>
         <label>الكلام على الشاشة <select id="tsText"><option value="blank">مساحات فاضية (الكلام في المونتاج)</option><option value="en">إنجليزي جوه الصور</option></select></label>
       </div>
-      ${!D.fasih ? `<small class="err">اللهجات العربية محتاجة مفتاح فصيح (FASIH_API_KEY) على Railway، أو اقفل الفويس أوفر.</small>` : ""}
+      ${!D.fasih ? `<small class="err">اللهجات العربية مش متاحة دلوقتي، اقفل الفويس أوفر أو اختار لغة تانية.</small>` : ""}
       <div class="row wrap"><button class="btn primary" id="tsGo">🚀 ابدأ</button><small class="muted">الحركة بـ Seedance 2.0 Mini (الأرخص) وتقدر تختار أي موديل تاني جوه، وكل خطوة بتوريك تمنها قبل ما تبدأ</small></div>
     </section>` : ""}
     ${D.videos.length ? `<section class="panel"><h3>فيديوهاتك من القوالب</h3><div class="fm-list">${D.videos.map((v) => `<article class="fm-card" data-tsopen="${v.id}">

@@ -40,7 +40,7 @@ const Gen = (() => {
       <div class="gen-row"><label class="gen-f"><b>اللهجة / اللغة</b><select data-g="lang"><optgroup label="عربي">${opt("ar")}</optgroup><optgroup label="لغات تانية">${opt("foreign")}</optgroup></select></label>
         <label class="gen-f"><b>الصوت</b><select data-g="voice">${voices.map((v) => `<option value="${v}" ${v === d.voice ? "selected" : ""}>${esc(A.voices?.[v] || v)}</option>`).join("")}</select></label>
         <label class="gen-f"><b>الاسم (اختياري)</b><input data-g="name" value="${esc(d.name || "")}" placeholder="بيتحفظ بيه في مكتبة التعليق"></label></div>
-      ${!A.fasih ? `<small class="muted">اللهجات العربية محتاجة مفتاح فصيح.</small>` : ""}`;
+      ${!A.fasih ? `<small class="muted">اللهجات العربية مش متاحة دلوقتي.</small>` : ""}`;
   }
   function imageForm() {
     const A = S.info, d = S.d;
