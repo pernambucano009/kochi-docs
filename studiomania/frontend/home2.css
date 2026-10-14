@@ -681,15 +681,15 @@ body.stage-settled #nh { visibility: hidden; }
 #nhBar.deep .nh-logo { cursor: pointer; }
 #nhBar .nh-goback { flex: none; display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 20px 0 16px; border-radius: 22px;
   border: 1.5px solid var(--nh-ink); background: var(--card, #fff); color: var(--nh-ink); font-size: 14px; font-weight: 500; box-shadow: 0 4px 18px rgba(24, 23, 24, .08); transition: background .2s, color .2s; }
-[dir="ltr"] #nhBar .nh-goback { padding: 0 16px 0 20px; }
+/* (اتشالت: الشريط ثابت في الاتجاهين) */
 #nhBar .nh-goback:hover { background: var(--nh-ink); color: var(--nh-bg); }
 #nhBar .nh-goback svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
-[dir="ltr"] #nhBar .nh-goback svg { transform: scaleX(-1); }
+/* (اتشالت: الشريط ثابت في الاتجاهين) */
 #nhBar .nh-crumbs { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 13.5px; color: var(--nh-muted); white-space: nowrap; overflow: hidden; }
 #nhBar .nh-crumbs button { color: var(--nh-muted); padding: 4px 2px; transition: color .2s; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
 #nhBar .nh-crumbs button:hover { color: var(--nh-accent); }
 #nhBar .nh-crumbs i { font-style: normal; opacity: .6; }
-[dir="ltr"] #nhBar .nh-crumbs i { transform: scaleX(-1); display: inline-block; }
+/* (اتشالت: الشريط ثابت في الاتجاهين) */
 #nhBar .nh-crumbs b { color: var(--nh-ink); font-weight: 500; overflow: hidden; text-overflow: ellipsis; }
 /* الرصيد والكومنتات والمواعيد بيبانوا في الرئيسية كمان */
 #nhBar .nh-tools .nh-xtra { box-shadow: 0 4px 18px rgba(24, 23, 24, .08); }
@@ -1232,3 +1232,7 @@ html { overflow-x: clip; }
 #nh .ch-tk small.err { color: #D9473A; }
 #nh .as-new.ai span { color: var(--nh-accent); }
 #nh .ch-face { display: flex; flex-direction: column; gap: 6px; align-items: stretch; }
+
+/* الشريط اللي فوق: نفس الأماكن في العربي والإنجليزي (اللوجو ورجوع يمين، والأدوات شمال)، والكلام جواه بيتقري صح في اللغتين */
+#nhBar { direction: rtl; }
+#nhBar :is(.nh-crumbs b, .nh-crumbs button, #nhClientName, .nh-goback span, #nhMode) { unicode-bidi: plaintext; }

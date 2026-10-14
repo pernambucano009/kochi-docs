@@ -620,6 +620,8 @@ const NH = (() => {
     if (zoom?.page) {
       pStack.forEach((s, i) => out.push({ label: T[s.tkey]?.ar || "", lv: "page", i }));
       out.push({ label: T[pTitle.dataset.key]?.ar || "", lv: "page", i: pStack.length });
+      const sub = MODS[pGrid.dataset.key]?.sub?.();
+      if (sub) out.push({ label: sub, lv: "sub" });
     }
     if (stageOpen()) stageTrail.forEach((st, i) => out.push({ label: STEP_INFO[st]?.title || "", lv: "stage", i }));
     return out;
@@ -642,8 +644,13 @@ const NH = (() => {
       if (stageTrail.length > 1) return showStep(stageTrail[stageTrail.length - 2]);
       return closeStage();
     }
-    if (zoom?.page) closePage();
+    if (zoom?.page) {
+      // صفحة جوه الصفحة (الشخصية اللي فتحتها مثلًا): رجوع بيقفلها الأول
+      if (MODS[pGrid.dataset.key]?.back?.()) return renderBar();
+      closePage();
+    }
   }
+  window.NHBar = () => renderBar();
   // تدوس على أي حتة في التسلسل: ترجع لها بالظبط
   async function goCrumb(k) {
     if (busy) return;
@@ -652,6 +659,7 @@ const NH = (() => {
     if (c.lv === "stage") return showStep(stageTrail[c.i]);
     if (stageOpen()) await closeStage();
     if (c.lv === "home") { if (zoom?.page) await closePage(true); return; }
+    if (c.lv === "page" && c.i === pStack.length) { MODS[pGrid.dataset.key]?.back?.(); return renderBar(); }
     if (c.lv === "page" && c.i < pStack.length) { pStack.length = c.i + 1; swapPage(pStack[c.i].key, true); renderBar(); }
   }
   document.getElementById("nhGoBack").onclick = goBack;

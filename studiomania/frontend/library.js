@@ -97,13 +97,14 @@ const CharactersPage = (() => {
           <label class="nb-f"><span>اوصفها (السن، الشكل، اللبس، المكان، الإحساس)</span><textarea rows="3" id="chAiDesc" placeholder="مثلًا: مدربة سعودية في التلاتينات، محجبة، لابسة تيشيرت رياضي أسود، في جيم منوّر، ابتسامة واثقة"></textarea></label>
           <div class="nb-row"><button class="nb-btn" data-caigo ${S.aiBusy ? "disabled" : ""}>${S.aiBusy ? "⏳ بترسمها…" : "✨ ارسمها"}</button><button class="nb-btn danger" data-caix>إلغاء</button></div>
           <p class="nb-hint">صورة نص جسم قدام الكاميرا، جاهزة تتكلم في الأفاتار. لو مش عاجباك ارسمها تاني من صفحتها.</p></section>` : ""}
-      ${c ? detail(c) : ""}
+      ${c ? detail(c) : `
       <div class="as-sh"><h2>الشخصيات <span>(${S.list.length})</span></h2></div>
       <div class="ch-grid as-grid">${S.list.map((x, i) => `<div class="ch-card as-card ${x.id === S.open ? "on" : ""}" data-cid="${x.id}" tabindex="0" role="button">
           <div class="as-art" style="${tint(i)}"><img src="${libEsc(x.image_url)}" alt="" loading="lazy"></div><b>${libEsc(x.name)}</b>
           <small dir="ltr">${x.instagram ? `@${libEsc(x.instagram)}` : x.tiktok ? `@${libEsc(x.tiktok)}` : ""}</small></div>`).join("")}
         <button type="button" class="as-new" data-cnew><span>＋</span>شخصية جديدة</button>
-        <button type="button" class="as-new ai" data-cainew><span>✨</span>اعملها بالذكاء الصناعي</button></div>`;   // (التعليقات الصوتية مكانها في تاب «التعليق الصوتي» مش هنا)
+        <button type="button" class="as-new ai" data-cainew><span>✨</span>اعملها بالذكاء الصناعي</button></div>`}`;
+    window.NHBar?.();   // (التعليقات الصوتية مكانها في تاب «التعليق الصوتي» مش هنا)
     if (S.adding) w.querySelector("#chNewName")?.focus();
   }
 
@@ -175,7 +176,7 @@ const CharactersPage = (() => {
       const sfig = t.closest("[data-sfile]");
       if (sfig && t.closest("[data-sdel]")) return save(() => api(`/api/coaches/${S.open}/sheet/${encodeURIComponent(sfig.dataset.sfile)}`, { method: "DELETE" }));
       const card = t.closest("[data-cid]");
-      if (card) { S.open = S.open === card.dataset.cid ? null : card.dataset.cid; render(); w.closest(".nh-pgrid")?.scrollTo({ top: 0, behavior: "smooth" }); }
+      if (card) { S.open = card.dataset.cid; S.draft = {}; render(); w.closest(".nh-pgrid")?.scrollTo({ top: 0 }); }
     });
     w.addEventListener("change", (e) => {
       const el = e.target;
@@ -250,7 +251,15 @@ const CharactersPage = (() => {
       poll();
     } catch (err) { w.innerHTML = `<div class="nh-empty">${libEsc(err.message)}</div>`; }
   }
-  return { html, mount, close: () => { player.pause(); clearTimeout(S.timer); } };
+  // صفحة الشخصية جوه صفحة الشخصيات: «رجوع» بيرجّع للقايمة، واسمها بيظهر في التسلسل اللي فوق
+  function back() {
+    if (!S.open || !S.el?.isConnected) return false;
+    S.open = null; S.aiNew = false; render();
+    S.el.closest(".nh-pgrid")?.scrollTo({ top: 0 });
+    return true;
+  }
+  const sub = () => (S.el?.isConnected ? cur()?.name : "") || "";
+  return { html, mount, back, sub, close: () => { player.pause(); clearTimeout(S.timer); S.open = null; } };
 })();
 
 // 🎙️ / 🎵 مكتبة صوت: رفع (بالسحب أو الزرار)، تشغيل، تغيير الاسم، حذف، وبحث
