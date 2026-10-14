@@ -3,7 +3,7 @@
 
 - العائلة = اسم الموديل من غير آخر جزء (مثلًا kwaivgi/kling-video-o3-std)، وليها:
   image-to-video (صورة ← فيديو) و reference-to-video (مراجع ← فيديو) و start-end-to-video (بداية ونهاية) لو موجودين.
-- Kling هو الافتراضي والموصى به للفيديوهات اللي مش إنجليزي (نطقه للعربي كويس)."""
+- الافتراضي في البرنامج Seedance Mini (VDEF في app.py)، ومفيش موديل عليه علامة "موصى به"."""
 from __future__ import annotations
 
 import json
@@ -21,7 +21,7 @@ DEFAULT = "kwaivgi/kling-video-o3-std"
 # لو الكتالوج موصلناش (من غير نت / وضع تجريبي) دول بيفضلوا موجودين
 SEED = {
     DEFAULT: {"label": "Kling O3 Std", "model": "kwaivgi/kling-video-o3-std/image-to-video",
-              "r2v": "kwaivgi/kling-video-o3-std/reference-to-video", "per_sec": 0.071, "rec": True},
+              "r2v": "kwaivgi/kling-video-o3-std/reference-to-video", "per_sec": 0.071},
 }
 _lock = threading.Lock()
 _cat: dict = {"at": 0.0, "families": {}}
@@ -48,7 +48,7 @@ def _label(entry: dict) -> str:
 
 
 def families(refresh: bool = False) -> dict:
-    """{العيلة: {label, model (i2v), r2v, se, per_sec, rec, org}} من كتالوج Atlas، متخزن ٦ ساعات."""
+    """{العيلة: {label, model (i2v), r2v, se, per_sec, org}} من كتالوج Atlas، متخزن ٦ ساعات."""
     with _lock:
         if not refresh and _cat["families"] and time.time() - _cat["at"] < 6 * 3600:
             return _cat["families"]
@@ -95,7 +95,6 @@ def families(refresh: bool = False) -> dict:
         if not (x.get("model") or x.get("r2v")) or x.get("per_sec") is None:
             continue
         x.setdefault("model", x.get("r2v"))
-        x["rec"] = "kling" in fam.lower()
         out[fam] = x
     for k, v in SEED.items():
         out.setdefault(k, dict(v))
@@ -105,11 +104,11 @@ def families(refresh: bool = False) -> dict:
 
 
 def listing() -> list[dict]:
-    """للواجهة: الموصى بيه الأول، وبعدين الأرخص."""
+    """للواجهة: الأرخص الأول."""
     fams = families()
-    rows = [{"key": k, "label": v["label"], "per_sec": round(v["per_sec"], 4), "rec": bool(v.get("rec")),
+    rows = [{"key": k, "label": v["label"], "per_sec": round(v["per_sec"], 4),
              "refs": bool(v.get("r2v")), "org": v.get("org", "")} for k, v in fams.items()]
-    rows.sort(key=lambda r: (r["key"] != DEFAULT, not r["rec"], r["per_sec"]))
+    rows.sort(key=lambda r: r["per_sec"])
     return rows
 
 

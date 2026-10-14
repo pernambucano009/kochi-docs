@@ -12002,11 +12002,10 @@ TRIAL_MODELS = {
     "seedance-2.5": {"label": "Seedance 2.5 (لحد 30 ثانية في توليدة واحدة، أغلى)", "model": "bytedance/seedance-2.5/image-to-video",
                      "per_sec": 0.134, "max": 30},
 }
-# 🎬 كل موديلات الفيديو اللي عند Atlas بتتضاف هنا لوحدها (vmodels.py): المفتاح = اسم العيلة؛ Seedance Mini الافتراضي، وKling عليه ⭐ لغير الإنجليزي
+# 🎬 كل موديلات الفيديو اللي عند Atlas بتتضاف هنا لوحدها (vmodels.py): المفتاح = اسم العيلة؛ Seedance Mini الافتراضي، ومفيش موديل عليه علامة "موصى به"
 import vmodels  # noqa: E402
 
-VDEF = "seedance-mini"   # الافتراضي: الأرخص (Kling موجود وعليه ⭐ للفيديوهات غير الإنجليزي)
-REC_TAG = " · ⭐ موصى به للفيديوهات غير الإنجليزي"
+VDEF = "seedance-mini"   # الافتراضي: الأرخص
 
 
 def vm_sync() -> None:
@@ -12017,25 +12016,24 @@ def vm_sync() -> None:
     for k, v in fams.items():
         if k in TRIAL_MODELS and not k.count("/"):
             continue
-        TRIAL_MODELS[k] = {"label": v["label"] + (REC_TAG if v.get("rec") else ""), "model": v["model"], "r2v": v.get("r2v"),
-                           "per_sec": v["per_sec"], "rec": bool(v.get("rec"))}
+        TRIAL_MODELS[k] = {"label": v["label"], "model": v["model"], "r2v": v.get("r2v"), "per_sec": v["per_sec"]}
         # الإعلانات (المحلل): نفس الموديلات، بالمراجع لو العيلة عندها، وإلا من صورة
         if k.count("/") and k not in AD_VIDEO_MODELS:
-            AD_VIDEO_MODELS[k] = {"label": v["label"] + (REC_TAG if v.get("rec") else ""), "model": v.get("r2v") or v["model"],
+            AD_VIDEO_MODELS[k] = {"label": v["label"], "model": v.get("r2v") or v["model"],
                                   "kind": "ref" if v.get("r2v") else "i2v"}
 
 
 for _k, _v in vmodels.SEED.items():
-    TRIAL_MODELS[_k] = {"label": _v["label"] + REC_TAG, "model": _v["model"], "r2v": _v.get("r2v"), "per_sec": _v["per_sec"], "rec": True}
+    TRIAL_MODELS[_k] = {"label": _v["label"], "model": _v["model"], "r2v": _v.get("r2v"), "per_sec": _v["per_sec"]}
 threading.Thread(target=vm_sync, daemon=True).start()
 
 
 def vm_list() -> list[dict]:
-    """الموديلات للواجهة: Kling الأول، وبعدين الموصى بيه، وبعدين الأرخص."""
+    """الموديلات للواجهة: الافتراضي الأول، وبعدين الأرخص."""
     if time.time() - vmodels._cat["at"] > 6 * 3600:
         threading.Thread(target=vm_sync, daemon=True).start()
-    rows = [{"key": k, "label": v["label"], "per_sec": v["per_sec"], "rec": bool(v.get("rec"))} for k, v in TRIAL_MODELS.items()]
-    return sorted(rows, key=lambda r: (r["key"] != VDEF, not r["rec"], r["per_sec"]))
+    rows = [{"key": k, "label": v["label"], "per_sec": v["per_sec"]} for k, v in TRIAL_MODELS.items()]
+    return sorted(rows, key=lambda r: (r["key"] != VDEF, r["per_sec"]))
 
 
 @app.get("/api/video-models")

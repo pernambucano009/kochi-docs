@@ -788,7 +788,7 @@ const isStep1 = () => !document.querySelector('.view[data-view="1"]').hidden;
   showStep(location.hash.slice(1) || "home");
 })();
 
-// 🎬 موديلات الفيديو (كل اللي عند Atlas): الاسم، وتكلفة الفيديو جنبه، و⭐ للموصى به (Kling للفيديوهات غير الإنجليزي)
+// 🎬 موديلات الفيديو (كل اللي عند Atlas): الاسم، وتكلفة الفيديو جنبه
 let VMODELS = [];
 const vmLoad = async () => { try { VMODELS = await api("/api/video-models"); } catch { /* القايمة القديمة تفضل */ } return VMODELS; };
 function vmCost(m, secs, res) {
