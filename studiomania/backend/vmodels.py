@@ -210,7 +210,8 @@ def _fit(value, spec: dict):
 def adapt(body: dict) -> dict:
     """نفس الطلب، بأسماء خانات الموديل ده وقيم مسموحة عنده. Seedance (اللي البرنامج مبني عليه) بيعدّي زي ما هو."""
     model = str(body.get("model") or "")
-    if not model or model.startswith("bytedance/seedance"):
+    # بس موديلات الفيديو العادية (صورة / مراجع / بداية ونهاية)؛ الأفاتار والليب سينك وغيرهم طلباتهم مجرّبة وبتروح زي ما هي
+    if not model or model.startswith("bytedance/seedance") or not model.endswith(("/image-to-video", "/reference-to-video", "/start-end-to-video")):
         return body
     props = _props(_schema_for(model) or {})
     if not props:
@@ -220,6 +221,9 @@ def adapt(body: dict) -> dict:
         if k == "model" or v is None:
             continue
         name = next((a for a in ALIASES.get(k, (k,)) if a in props), None)
+        if name is None and k not in ALIASES:
+            out[k] = v   # خانة مش من اللي نعرفها: بتروح زي ما هي
+            continue
         if name is None:
             # موديل صورة واحدة ومعانا مراجع: أول مرجع بيبقى الصورة
             if k == "reference_images" and v:

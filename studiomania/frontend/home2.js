@@ -46,6 +46,8 @@ const NH = (() => {
       : { en: "Create", ar: "ابدأ مشروع جديد", icon: "create", page: "create", desc: "كل أنواع الشغل من هنا: اختار النوع، والخطوات بتمشي معاك لحد التصدير." },
     brand: { en: "Your Brand", ar: "عقل البراند", icon: "brand", page: "brand", desc: "كل تفاصيل البراند وتفضيلاته وستايله. أي شغل بيتعمل بيبني عليه." },
     assets: { en: "Assets", ar: "الأصول", icon: "box", page: "assets", desc: "الشخصيات والأصوات والموسيقى اللي بتستخدمها في أي شغل." },
+    // مكان «الأصول» في الرئيسية (الأصول بقت فرع من عقل البراند)
+    dubhub: { en: "Translate & Dub", ar: "الترجمة والدبلجة", icon: "globe", go: "13", desc: "أي فيديو بلغة أو لهجة تانية: ترجمة الكلام، صوت جديد، وتظبيط البُق." },
     settings: { en: "Settings", ar: "الإعدادات", icon: "gear", go: "settings", desc: "المفاتيح والرصيد والعملاء." },
     progress: { en: "In Progress", ar: "شغّال عليه", icon: "pulse", page: "progress", desc: "كل خط مشروع، وكل نقطة خطوة. دوس على أي خط يكمّل من مكان ما وقفت." },
     publish: { en: "Publish", ar: "النشر", icon: "send", go: "7", desc: "الحسابات المربوطة والجدولة واللي اتنشر." },
@@ -73,7 +75,7 @@ const NH = (() => {
     const c = clientx?.cur;
     return c?.logo ? `<img src="${esc(c.logo)}" alt="">` : esc((c?.name || "B").trim().slice(0, 1).toUpperCase());
   };
-  const GLKEY = { create: "app", brand: "brand", assets: "assets", settings: "settings", progress: "progress", publish: "publish", reel: "reel", raw: "film",
+  const GLKEY = { create: "app", brand: "brand", assets: "assets", dubhub: "voices", settings: "settings", progress: "progress", publish: "publish", reel: "reel", raw: "film",
     series: "series", carousel: "carousel", ad: "publish", typo: "create", dub: "voices", edit: "film", coaches: "characters", voice: "voices", music: "music" };
   const iconOf = (k) => (k === "brand" ? `<div class="nh-plate">${brandMark()}</div>` : gi(k));
   const head = (id) => `<div class="nh-head"><div class="nh-name"><span class="latin">${T[id].en}</span><b>${T[id].ar}</b></div>${GLKEY[id] ? `<span class="gi nh-glt">${glImg(GLKEY[id])}</span>` : iconOf(T[id].icon)}</div>`;
@@ -93,10 +95,11 @@ const NH = (() => {
   }
 
   // ---------- الرئيسية (نسخة أ): المجسّم في النص، والأقسام مكتوبة على الجنبين، و«ابدأ مشروع جديد» تحت المجسّم ----------
-  const SIDE_R = ["brand", "assets"], SIDE_L = KOCHI ? ["progress", "publish", "settings"] : ["publish", "settings"];   // RTL: أول عمود على اليمين
+  const SIDE_R = KOCHI ? ["brand", "assets"] : ["brand", "dubhub"], SIDE_L = KOCHI ? ["progress", "publish", "settings"] : ["publish", "settings"];   // RTL: أول عمود على اليمين
   const META = {
     brand: () => { const pct = brainPct(D.brand); return `<span class="nh-mbar"><i style="width:${pct}%"></i></span><span>مكتمل <span class="num">${pct}%</span></span>`; },
     assets: () => `<span>${D.coaches.length} شخصية · ${D.voices} تعليق · ${D.music} موسيقى</span>`,
+    dubhub: () => `<span>نفس الفيديو بلغة أو لهجة تانية</span>`,
     progress: () => {
       const n = D.work.length, r = D.work.filter((p) => p.render_status === "rendering").length;
       return `<span>${n ? `${n} مشروع${r ? ` · ${r} بيتصدّر دلوقتي` : ""}` : "مفيش مشاريع لسه"}</span>`;
@@ -521,6 +524,7 @@ const NH = (() => {
     pTitle.animate([{ opacity: 0 }, { opacity: 1 }], { duration: reduce.matches ? 1 : 450, easing: EASE });
     if (!MODS[key]) pGrid.querySelectorAll(":scope > .nh-tile").forEach((p, i) => setTimeout(() => { p.classList.add("nh-sweep"); setTimeout(() => p.classList.add("done"), 1100); }, i * 70));
   }
+  window.NHNav = (key) => { if (T[key] && zoom?.page) swapPage(key); };
   function openPage(tile, key) {
     if (busy || zoom) return;
     busy = true;

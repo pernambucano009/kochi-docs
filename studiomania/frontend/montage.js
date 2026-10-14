@@ -3026,6 +3026,21 @@ function renderRender() {
   renderSide();
 }
 
+// 🌍 دبلجة الفيديو اللي اتصدّر: مشروع دبلجة جديد بيتفتح على طول في قسم «الترجمة والدبلجة»
+$("resultDub").onclick = async () => {
+  const p = mt.project;
+  if (!(p.render_status === "done" && p.export_id)) return toast("صدّر الفيديو الأول", true);
+  const btn = $("resultDub");
+  btn.disabled = true;
+  try {
+    const d = await api("/api/dub/from-export", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ export_id: p.export_id }) });
+    storageSet("studiomania.dub", d.id);
+    if (typeof dbx !== "undefined") dbx.cur = null;
+    showStep("13");
+  } catch (err) { toast(err.message, true); }
+  btn.disabled = false;
+};
+
 // اسم ملف الفيديو = اسم المشروع من غير الحروف اللي مينفعش تبقى في اسم ملف
 function exportFileName(name) {
   const clean = (name || "").replace(/[\\/:*?"<>|]+/g, " ").trim();

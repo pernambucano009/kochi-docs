@@ -20,6 +20,7 @@ const BrandPage = (() => {
     delivery: "M20.5 3.5 10 14 M20.5 3.5 14 20.5l-4-6.5-6.5-4z",
     knowledge: "M4 5.5c2.7-1 5.3-1 8 .8 2.7-1.8 5.3-1.8 8-.8v13c-2.7-1-5.3-1-8 .8-2.7-1.8-5.3-1.8-8-.8z M12 6.3v13.3",
     assets: "M4.5 5h15a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z M3.5 15.5l4.5-4.5 4 4 3-3 5 5 M15.5 8.5a1.3 1.3 0 1 1 0 .1z",
+    library: "M9 4.5a3 3 0 1 1 0 6a3 3 0 1 1 0-6z M3.5 19c.6-3 2.8-4.6 5.5-4.6s4.9 1.6 5.5 4.6 M16 7.5v6.2 M16 13.7a1.8 1.8 0 1 1-1.8-1.8 M16 7.5l3.5-1.2",
   };
   const svg = (d, s = 22) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}" aria-hidden="true"><path d="${d}" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
@@ -58,6 +59,12 @@ const BrandPage = (() => {
         { f: "caption", t: "الكابشن الافتراضي", type: "text", ph: "{caption}\n\n{cta} 👇\n{link}\n#هاشتاج", hint: "{caption} كابشن الفيديو · {cta} الدعوة · {link} اللينك. بيتحطوا لوحدهم وقت النشر." },
       ] },
       { k: "assets", t: "صور البراند", en: "Assets", leaves: kinds.map(([k, t]) => ({ f: k, t, type: "imgs" })) },
+      // الشخصيات (والأفاتار) والتعليق الصوتي والموسيقى: من أساسيات البراند، فبقوا فرع من العقل (كل نقطة بتفتح صفحتها)
+      { k: "library", t: "الشخصيات والأصوات", en: "Library", leaves: [
+        { f: "pg", page: "coaches", t: "الشخصيات والأفاتار", type: "page" },
+        { f: "pg", page: "voice", t: "التعليق الصوتي", type: "page" },
+        { f: "pg", page: "music", t: "الموسيقى", type: "page" },
+      ] },
       // المعرفة: اللي اتقرا من الملفات واللينكات واتوافق عليه
       { k: "knowledge", t: "المعرفة", en: "Knowledge", leaves: (b?.notes || []).map((x) => ({ f: "n", i: x.id, t: x.title, type: "note", note: x })) },
     ].map((br) => {
@@ -84,7 +91,7 @@ const BrandPage = (() => {
       case "styles": return styleIds(b).length > 0;
       case "multi": return l.fields.some(([k]) => String(b[k] || "").trim());
       case "video": return !!b[`${l.f}_url`];
-      case "rule": case "note": return true;
+      case "rule": case "note": case "page": return true;
       default: return false;
     }
   }
@@ -297,6 +304,7 @@ const BrandPage = (() => {
     return head;
   }
   function openCard(n) {
+    if (n?.l?.type === "page") return window.NHNav?.(n.l.page);   // الشخصيات / التعليق / الموسيقى: صفحتها بتفتح جوه العقل («رجوع» بيرجّعك هنا)
     const card = S.el.querySelector(".bm-card");
     if (!n) { S.open = null; card.hidden = true; S.el.classList.remove("has-card"); markOpen(); return; }
     S.open = { id: n.id, br: n.br?.k, n };

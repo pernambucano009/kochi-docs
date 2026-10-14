@@ -357,7 +357,8 @@ with closing(db()) as _conn, _conn:
         if _col not in {c[1] for c in _conn.execute("PRAGMA table_info(coaches)")}:
             _conn.execute(f"ALTER TABLE coaches ADD COLUMN {_col} TEXT")
     # الشخصية: وصف، إنترو، صوت، وصور كاركتر شيت (JSON لستة أسماء ملفات)
-    for _col, _typ in (("about", "TEXT"), ("intro_filename", "TEXT"), ("intro_duration", "REAL"), ("voice_filename", "TEXT"), ("sheet", "TEXT")):
+    for _col, _typ in (("about", "TEXT"), ("intro_filename", "TEXT"), ("intro_duration", "REAL"), ("voice_filename", "TEXT"), ("sheet", "TEXT"),
+                       ("talks", "TEXT")):
         if _col not in {c[1] for c in _conn.execute("PRAGMA table_info(coaches)")}:
             _conn.execute(f"ALTER TABLE coaches ADD COLUMN {_col} {_typ}")
     # دليل الحسابات اللي اتستوردت من ملف (حتى لو المدرب لسه مش في البرنامج)
@@ -1000,8 +1001,18 @@ def coach_to_dict(row: sqlite3.Row) -> dict:
         "intro_duration": row["intro_duration"],
         "voice_url": f"/media/coaches/{row['voice_filename']}" if row["voice_filename"] else None,
         "sheet": [{"file": f, "url": f"/media/coaches/{f}"} for f in coach_sheet(row)],
+        # 🗣️ الأفاتار: فيديوهات الشخصية وهي بتتكلم بصوتنا (Kling Avatar)
+        "talks": [{**t, "url": f"/media/coaches/{t['file']}" if t.get("file") else None,
+                   "audio_url": f"/media/coaches/{t['audio']}" if t.get("audio") else None} for t in coach_talks(row)],
         "created_at": row["created_at"],
     }
+
+
+def coach_talks(row: sqlite3.Row) -> list[dict]:
+    try:
+        return json.loads(row["talks"] or "[]") if "talks" in row.keys() else []
+    except ValueError:
+        return []
 
 
 def coach_sheet(row: sqlite3.Row) -> list[str]:
@@ -1271,6 +1282,156 @@ def coach_sheet_del(coach_id: str, file: str):
         conn.execute("UPDATE coaches SET sheet = ? WHERE id = ?", (json.dumps(sheet), coach_id))
         (COACHES_DIR / Path(file).name).unlink(missing_ok=True)
         return coach_to_dict(get_coach(conn, coach_id))
+
+
+# ---------------------------------------------------------------- 🧑 الأفاتار: نعمل شخصية بالذكاء الصناعي ونخليها تتكلم بصوتنا
+# الصوت بيتعمل الأول (فصيح للهجات العربية، ElevenLabs للأجنبي، أو صوتك المرفوع)، وبعدين Kling Avatar بياخد صورة الشخصية والصوت
+# ويعمل فيديو والشخصية بتقوله: البق والوش والإيد ماشيين مع الصوت، والصورة (الوش واللبس والخلفية) زي ما هي.
+AVATAR_MODELS = {"pro": {"model": "kwaivgi/kling-v2.6-pro/avatar", "label": "Kling Avatar Pro (اللي جربناه، أجود)", "per_sec": 0.095},
+                 "std": {"model": "kwaivgi/kling-v2.6-std/avatar", "label": "Kling Avatar Std (أرخص)", "per_sec": 0.048}}
+AVATAR_STYLES = {"real": "photorealistic portrait photo, natural skin texture, soft studio light",
+                 "3d": "polished 3D animated character, Pixar-like, soft global illumination",
+                 "cartoon": "flat 2D cartoon character, clean outlines, friendly colors"}
+TALK_LOCK = threading.Lock()
+
+
+def coach_talk_update(cid: str, tid: str | None, fn) -> dict | None:
+    """تعديل لستة الكلام بتاع الشخصية (fn بتاخد اللستة كلها، أو الكلام ده بس لو tid مبعوت)."""
+    with TALK_LOCK, closing(db()) as conn, conn:
+        row = get_coach(conn, cid)
+        talks = coach_talks(row)
+        if tid is None:
+            fn(talks)
+        else:
+            t = next((x for x in talks if x["id"] == tid), None)
+            if t is None:
+                return None
+            fn(t)
+        conn.execute("UPDATE coaches SET talks = ? WHERE id = ?", (json.dumps(talks[-40:], ensure_ascii=False), cid))
+        return coach_to_dict(get_coach(conn, cid))
+
+
+def run_coach_talk(cid: str, tid: str) -> None:
+    def setp(**kw):
+        coach_talk_update(cid, tid, lambda t: t.update(**kw))
+    try:
+        with closing(db()) as conn:
+            row = get_coach(conn, cid)
+        t = next(x for x in coach_talks(row) if x["id"] == tid)
+        image = COACHES_DIR / row["image_filename"]
+        audio = COACHES_DIR / t["audio"] if t.get("audio") else None
+        if audio is None:
+            setp(status="working", step="🎙️ بيعمل الصوت")
+            audio = COACHES_DIR / f"{cid}_talk_{tid}.wav"
+            vo_say(t["text"], t["voice"], t["lang"], audio)
+            setp(audio=audio.name)
+        dur = probe_duration(audio)
+        if dur > 60:
+            raise RuntimeError("الصوت أطول من دقيقة. قسّم الكلام على أكتر من فيديو")
+        setp(status="working", step="🎬 الشخصية بتتكلم (Kling Avatar، بياخد كام دقيقة)", seconds=round(dur, 1))
+        dest = COACHES_DIR / f"{cid}_talk_{tid}.mp4"
+        if atlas.mock_mode():
+            subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-loop", "1", "-i", str(image), "-i", str(audio),
+                            "-vf", "scale=480:-2,format=yuv420p", "-c:v", "libx264", "-shortest", str(dest)], check=True, capture_output=True, timeout=180)
+        else:
+            m = AVATAR_MODELS.get(t.get("model")) or AVATAR_MODELS["pro"]
+            body = {"model": m["model"], "image": atlas.reference_url(image), "audio": atlas.upload_media(audio),
+                    "prompt": (t.get("prompt") or "").strip() + (" " if t.get("prompt") else "")
+                    + "The person speaks naturally to the camera, lips perfectly synced to the audio, natural blinking, subtle head movement "
+                      "and small hand gestures. Keep the face, outfit and background exactly as in the image."}
+            atlas.download(atlas.run_model("Video", body, "الأفاتار بيتكلم", max_seconds=2400, interval=6), dest)
+        setp(status="done", step=None, file=dest.name, error=None, duration=round(probe_duration(dest), 2))
+    except Exception as exc:  # noqa: BLE001
+        setp(status="failed", step=None, error=str(getattr(exc, "detail", None) or exc)[:400])
+
+
+@app.get("/api/avatar/info")
+def avatar_info():
+    """الأصوات واللهجات (نفس بتاعة الدبلجة) وموديلات الأفاتار وأسعارها."""
+    return {**dub_info(), "models": {k: {"label": v["label"], "per_sec": v["per_sec"]} for k, v in AVATAR_MODELS.items()},
+            "styles": {"real": "صورة حقيقية", "3d": "3D أنيميشن", "cartoon": "كرتون"}}
+
+
+@app.post("/api/coaches/{coach_id}/talks")
+def coach_talk_new(coach_id: str, text: str = Form(""), voice: str = Form(""), lang: str = Form(""), model: str = Form("pro"),
+                   prompt: str = Form(""), audio: UploadFile | None = File(None)):
+    """🗣️ الشخصية تقول الكلام ده (أو الصوت المرفوع) في فيديو."""
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات")
+    tid = uuid.uuid4().hex[:10]
+    item = {"id": tid, "text": text.strip()[:1500], "voice": voice, "lang": lang, "model": model if model in AVATAR_MODELS else "pro",
+            "prompt": prompt.strip()[:600], "status": "queued", "step": "في الطابور", "error": None, "file": None, "audio": None,
+            "created_at": now()}
+    if audio and audio.filename:
+        item["audio"] = save_audio_upload(audio, COACHES_DIR, f"{coach_id}_talkaudio")
+        item["text"] = item["text"] or "🎙️ صوت مرفوع"
+    else:
+        if not item["text"]:
+            raise HTTPException(400, "اكتب الكلام اللي الشخصية هتقوله، أو ارفع صوت")
+        if voice not in dub.VOICES or lang not in dub.DIALECTS:
+            raise HTTPException(400, "اختار اللهجة والصوت")
+        if dub.VOICES[voice]["provider"] == "fasih" and not (fasih.api_key() or atlas.mock_mode()):
+            raise HTTPException(400, "اللهجات العربية محتاجة مفتاح فصيح (FASIH_API_KEY)، أو ارفع صوتك")
+    out = coach_talk_update(coach_id, None, lambda talks: talks.append(item))
+    threading.Thread(target=run_coach_talk, args=(coach_id, tid), daemon=True).start()
+    return out
+
+
+@app.delete("/api/coaches/{coach_id}/talks/{tid}")
+def coach_talk_delete(coach_id: str, tid: str):
+    gone = []
+    def fn(talks):
+        for t in [x for x in talks if x["id"] == tid]:
+            gone.extend([t.get("file"), t.get("audio")])
+            talks.remove(t)
+    out = coach_talk_update(coach_id, None, fn)
+    for f in gone:
+        if f:
+            (COACHES_DIR / Path(f).name).unlink(missing_ok=True)
+    return out
+
+
+class AvatarImageIn(BaseModel):
+    name: str = ""
+    description: str
+    style: str = "real"
+    coach_id: str = ""   # لو مبعوت: صورة جديدة لشخصية موجودة
+
+
+@app.post("/api/coaches/ai")
+def coach_ai(body: AvatarImageIn):
+    """✨ اعمل شخصية بالذكاء الصناعي من وصف: صورة نص جسم قدام الكاميرا (تنفع للأفاتار)، والوصف بيتحفظ في «وصفها»."""
+    desc = body.description.strip()[:1200]
+    if not desc:
+        raise HTTPException(400, "اوصف الشخصية")
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات")
+    cid = body.coach_id or uuid.uuid4().hex[:12]
+    fname = f"{cid}_image_{uuid.uuid4().hex[:6]}.png"
+    dest = COACHES_DIR / fname
+    prompt = (f"An original character portrait: {desc}. Style: {AVATAR_STYLES.get(body.style, AVATAR_STYLES['real'])}. "
+              "Half-body, facing the camera, looking into the lens with a friendly natural expression, mouth closed, hands visible, "
+              "simple clean background, even light. One person only. No text, no letters, no logos, not a real or famous person.")
+    try:
+        if atlas.mock_mode():
+            subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "color=c=0xC9B8A6:s=768x1024",
+                            "-frames:v", "1", str(dest)], check=True, capture_output=True, timeout=60)
+        else:
+            atlas.download(atlas.generate_image("nano2", prompt, "1024x1536", "medium"), dest)
+    except Exception as exc:  # noqa: BLE001
+        dest.unlink(missing_ok=True)
+        raise HTTPException(502, f"معرفناش نرسم الشخصية: {getattr(exc, 'detail', None) or exc}") from exc
+    with closing(db()) as conn, conn:
+        if body.coach_id:
+            row = get_coach(conn, cid)
+            conn.execute("UPDATE coaches SET image_filename = ? WHERE id = ?", (fname, cid))
+            in_use = {r[0] for r in conn.execute("SELECT coach_image FROM generations")}
+            if row["image_filename"] not in in_use:
+                (COACHES_DIR / row["image_filename"]).unlink(missing_ok=True)
+        else:
+            conn.execute("INSERT INTO coaches (id, name, image_filename, created_at, about) VALUES (?, ?, ?, ?, ?)",
+                         (cid, body.name.strip()[:80] or "شخصية جديدة", fname, now(), desc))
+        return coach_to_dict(get_coach(conn, cid))
 
 
 # ---------------------------------------------------------------- التوليد بـ Seedance

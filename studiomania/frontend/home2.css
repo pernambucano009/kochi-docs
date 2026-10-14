@@ -1220,3 +1220,15 @@ html { overflow-x: clip; }
 :root .stage .platforms label.plat .plogo svg { width: 60%; height: 60%; }
 :root[data-nh-theme="dark"] .plogo[style*="#000000;"] { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .18); }
 .plogo { font-style: normal; }
+
+/* ===== 🗣️ الأفاتار في صفحة الشخصية ===== */
+#nh .ch-talk textarea { width: 100%; }
+#nh .ch-talks { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; margin-top: 12px; }
+#nh .ch-tk { margin: 0; display: flex; flex-direction: column; gap: 6px; padding: 8px; border-radius: 16px; background: var(--page-bg, #F7F7F5); position: relative; }
+#nh .ch-tk video, #nh .ch-tkph { width: 100%; aspect-ratio: 9 / 16; border-radius: 12px; background: #1C1B1C; object-fit: cover; }
+#nh .ch-tkph { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: rgba(255, 255, 255, .85); font-size: 12px; text-align: center; padding: 10px; }
+#nh .ch-tk figcaption { font-size: 12px; line-height: 1.6; display: flex; flex-direction: column; gap: 4px; padding-inline-end: 24px; }
+#nh .ch-tk figcaption .nb-x { position: absolute; top: 14px; inset-inline-start: 14px; }
+#nh .ch-tk small.err { color: #D9473A; }
+#nh .as-new.ai span { color: var(--nh-accent); }
+#nh .ch-face { display: flex; flex-direction: column; gap: 6px; align-items: stretch; }
