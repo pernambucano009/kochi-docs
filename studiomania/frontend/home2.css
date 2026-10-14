@@ -691,7 +691,7 @@ body.stage-settled #nh { visibility: hidden; }
 #nhBar .nh-crumbs i { font-style: normal; opacity: .6; }
 [dir="ltr"] #nhBar .nh-crumbs i { transform: scaleX(-1); display: inline-block; }
 #nhBar .nh-crumbs b { color: var(--nh-ink); font-weight: 500; overflow: hidden; text-overflow: ellipsis; }
-#nhBar:not(.deep) #stageMoney { display: none !important; }   /* الكومنتات والمواعيد بيبانوا في الرئيسية كمان */
+/* الرصيد والكومنتات والمواعيد بيبانوا في الرئيسية كمان */
 #nhBar .nh-tools .nh-xtra { box-shadow: 0 4px 18px rgba(24, 23, 24, .08); }
 /* اللي اتكرر في راس الصفحات بقى في الشريط: بيتخبّى (ومكانه بيفضل عشان الشريط يقعد فوقه) */
 #nh .nh-prow > *, #nh #nhBack { visibility: hidden; }
@@ -1156,7 +1156,8 @@ html { overflow-x: clip; }
 
 /* ===== ✨ الزراير في البرنامج كله (fx.js): بروز بسيط لبرّه + السنيك بيلف حوالين الزرار بلون كلامه ===== */
 .fx { transition: translate .32s cubic-bezier(.2, .8, .2, 1), scale .32s cubic-bezier(.2, .8, .2, 1); }
-.fx:not(:disabled):hover, .fx:focus-visible { translate: 0 -2px; scale: 1.04; }
+/* البروز: واضح (بيكبر ويطلع لفوق) وبيكسب أي قاعدة تانية في الصفحة */
+:root .fx:not(:disabled):hover, :root .fx:focus-visible { translate: 0 -3px !important; scale: 1.06 !important; z-index: 2; }
 .fx:not(:disabled):active { translate: 0 0; scale: .98; transition-duration: .12s; }
 .fx-snake { position: absolute; pointer-events: none; overflow: visible; opacity: 0; transition: opacity .4s ease; z-index: 3; }
 .fx-snake rect { fill: none; stroke: currentColor; stroke-linecap: round; }
@@ -1166,7 +1167,15 @@ html { overflow-x: clip; }
 .fx:not(:disabled):hover > .fx-snake, .fx:focus-visible > .fx-snake { opacity: 1; }
 /* زراير الرئيسية (ليها السنيك بتاعها): نفس البروز */
 .nh-cta, .nh-tile.nh-cont { transition: translate .32s cubic-bezier(.2, .8, .2, 1), scale .32s cubic-bezier(.2, .8, .2, 1), box-shadow .5s var(--nh-ease), background .3s; }
-.nh-cta:hover, .nh-cta:focus-visible, .nh-tile.nh-cont:hover { translate: 0 -2px; scale: 1.04; }
+.nh-cta:hover, .nh-cta:focus-visible, .nh-tile.nh-cont:hover { translate: 0 -3px; scale: 1.06; }
+/* مربعات الرئيسية (النشر، عقل البراند، الأصول، الإعدادات): نفس البروز بهدوء */
+.nh-tile.nh-side { transition: translate .32s cubic-bezier(.2, .8, .2, 1), scale .32s cubic-bezier(.2, .8, .2, 1); }
+.nh-tile.nh-side:hover, .nh-tile.nh-side:focus-visible { translate: 0 -3px; scale: 1.03; }
+/* دواير عقل البراند: من غير سنيك، بتنوّر بس */
+#nh .bm-branch .bm-bic { transition: box-shadow .3s ease, transform .3s ease; }
+#nh .bm-branch:hover .bm-bic, #nh .bm-branch:focus-visible .bm-bic { box-shadow: 0 0 0 6px rgba(229, 97, 62, .12), 0 0 26px rgba(229, 97, 62, .45); }
+#nh .bm-center:hover .bm-brain, #nh .bm-add:hover > i { filter: drop-shadow(0 0 14px rgba(229, 97, 62, .45)); }
+#nh .bm-n > .nh-snake, #nh .bm-n > .fx-snake { display: none !important; }
 @media (prefers-reduced-motion: reduce) { .fx, .nh-cta, .nh-tile.nh-cont { translate: none !important; scale: none !important; } .fx-snake rect { animation: none; } }
 
 /* ===== 🔗 حساباتك في صفحة النشر: كل المنصات وأكتر من حساب على كل منصة ===== */
@@ -1196,3 +1205,18 @@ html { overflow-x: clip; }
 .pub-accounts .pa-chip svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .pub-accounts .pa-grid:empty { display: none; }
 .pub-accounts .pa-acc.bad { flex-wrap: wrap; } .pub-accounts .pa-acc.bad .pa-re { order: 5; flex-basis: 100%; text-align: start; }
+/* «ابدأ مشروع جديد» بيبرز فوق المجسّم اللي في النص (كان بيقصّ الجزء اللي فوق منه) */
+.nh-cta { z-index: 5; }
+/* زرار العميل اللي فوق: الاسم جوه حدود الزرار (padding من ناحية النهاية) ولو طويل بيتقص بـ … */
+#nhBar #nhClient { padding-block: 0; padding-inline: 6px 16px; gap: 8px; max-width: 220px; }
+#nhBar #nhClientName { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+#nhBar #nhClient i { flex: none; }
+/* لوجو المنصة: مربع مدوّر بلون المنصة والعلامة جواه */
+.plogo { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 8px; background: var(--pb); flex: none; }
+.plogo svg { width: 60%; height: 60%; fill: var(--pf) !important; stroke: none !important; }
+.plogo.sm { width: 20px; height: 20px; border-radius: 6px; }
+.plogo.xs { width: 16px; height: 16px; border-radius: 5px; vertical-align: -3px; }
+:root .stage .platforms label.plat .plogo { width: 30px; height: 30px; }
+:root .stage .platforms label.plat .plogo svg { width: 60%; height: 60%; }
+:root[data-nh-theme="dark"] .plogo[style*="#000000;"] { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .18); }
+.plogo { font-style: normal; }
