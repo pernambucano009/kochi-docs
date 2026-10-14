@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>StudioMania</title>
+<script src="/i18n-en.js"></script>
+<script src="/i18n.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@200;300;400;500;600;700&family=Unbounded:wght@300;500;700&display=swap">
+<link rel="stylesheet" href="/style.css">
+<style>
+  .au-tabs { display: flex; gap: 6px; background: var(--surface-2); padding: 4px; border-radius: 14px; margin: 6px 0 4px; }
+  .au-tabs a { flex: 1; text-align: center; padding: 9px; border-radius: 11px; color: var(--muted); text-decoration: none; font-size: 14px; }
+  .au-tabs a.on { background: var(--surface); color: var(--text); box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+  .au-or { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 12px; margin: 4px 0; }
+  .au-or::before, .au-or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+  .au-g { display: flex; align-items: center; justify-content: center; gap: 10px; text-decoration: none; }
+  .au-g svg { width: 18px; height: 18px; }
+  .au-links { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; }
+  .au-links a { color: var(--muted); }
+  .au-ok { color: var(--ok); }
+  .au-dev { font-size: 12px; word-break: break-all; background: var(--surface-2); padding: 8px; border-radius: 10px; }
+  .au-big { font-size: 40px; text-align: center; margin: 4px 0; }
+  a.btn { text-decoration: none; text-align: center; }
+</style>
+</head>
+<body>
+<div class="bg-art" aria-hidden="true"><i class="blob b1"></i><i class="blob b2"></i><i class="blob b3"></i><i class="ring r1"></i><i class="ring r2"></i></div>
+<div class="login-wrap">
+  <form class="login glass" id="form" novalidate>
+    <svg class="logo-mark" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="31" fill="#111"/><path d="M24 19.5v25l20-12.5z" fill="#fff"/><circle cx="47" cy="17" r="4.5" fill="#E5613E"/></svg>
+    <div class="wordmark"><b>Studio</b><span>Mania</span></div>
+    <div id="body"></div>
+    <p class="err" id="err" hidden></p>
+    <button type="button" class="lang-link" id="langToggle"></button>
+  </form>
+</div>
+<script>
+const $ = (id) => document.getElementById(id);
+const Q = new URLSearchParams(location.search);
+const path = location.pathname.replace(/\/$/, "") || "/login";
+let S = {};
+$("langToggle").textContent = I18N.lang === "en" ? "عربي" : "English";
+$("langToggle").onclick = () => I18N.setLang(I18N.lang === "en" ? "ar" : "en");
+
+const G = `<svg viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>`;
+const field = (id, label, type = "text", ac = "") => `<label class="field">${label} <input type="${type}" id="${id}" autocomplete="${ac}" required></label>`;
+const tabs = (on) => `<div class="au-tabs"><a href="/login" class="${on === "login" ? "on" : ""}">دخول</a><a href="/signup" class="${on === "signup" ? "on" : ""}">حساب جديد</a></div>`;
+const google = () => S.google ? `<a class="btn wide au-g" href="/auth/google">${G} كمّل بجوجل</a><div class="au-or">أو بالإيميل</div>` : "";
+const devLink = (l) => l ? `<p class="au-dev">وضع التجربة (مفيش إيميل متظبط): <a href="${l}">${l}</a></p>` : "";
+
+function err(m) { $("err").textContent = m || ""; $("err").hidden = !m; }
+async function post(url, body) {
+  const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(typeof d.detail === "string" ? d.detail : "حصلت مشكلة، جرّب تاني");
+  return d;
+}
+const next = () => { const n = Q.get("next"); return n && n.startsWith("/") && !n.startsWith("//") ? n : "/"; };
+
+const VIEWS = {
+  login: () => `${tabs("login")}${google()}
+    ${field("email", "الإيميل", "email", "email")}${field("pw", "الباسورد", "password", "current-password")}
+    <button class="btn primary wide" id="go">دخول</button>
+    <div class="au-links"><a href="/forgot">نسيت الباسورد؟</a><a href="/pricing">الباقات والأسعار</a></div>`,
+  signup: () => `${tabs("signup")}
+    <p class="muted">ابدأ ببلاش: ${S.trial || 300} نقطة تجرّب بيها.</p>${google()}
+    ${field("name", "اسمك أو اسم البراند", "text", "name")}${field("email", "الإيميل", "email", "email")}
+    ${field("pw", "الباسورد (8 حروف أو أرقام على الأقل)", "password", "new-password")}
+    <button class="btn primary wide" id="go">اعمل الحساب</button>
+    <div class="au-links"><a href="/pricing">الباقات والأسعار</a></div>`,
+  forgot: () => `<p class="muted">اكتب إيميلك وهنبعتلك لينك تعمل بيه باسورد جديد.</p>
+    ${field("email", "الإيميل", "email", "email")}<button class="btn primary wide" id="go">ابعت اللينك</button>
+    <div class="au-links"><a href="/login">رجوع للدخول</a></div>`,
+  reset: () => `<p class="muted">اكتب الباسورد الجديد.</p>
+    ${field("pw", "الباسورد الجديد", "password", "new-password")}${field("pw2", "اكتبه تاني", "password", "new-password")}
+    <button class="btn primary wide" id="go">احفظ وادخل</button>`,
+  verify: () => `<div class="au-big">📬</div><p>بعتنالك إيميل على <b>${S.user ? S.user.email : ""}</b>. دوس على اللينك اللي فيه عشان نفتحلك حسابك.</p>
+    <p class="muted">مش لاقيه؟ بص في الـ Spam.</p><div id="dev"></div>
+    <button type="button" class="btn wide" id="resend">ابعته تاني</button>
+    <div class="au-links"><a href="#" id="out">دخول بإيميل تاني</a></div>`,
+  setup: () => `<p class="muted">أول مرة: اعمل حساب الأدمن (صاحب البرنامج). كل شغلك القديم هيبقى في الحساب ده.</p>
+    ${field("name", "اسمك", "text", "name")}${field("email", "إيميلك", "email", "email")}
+    ${field("pw", "باسورد جديد (8 على الأقل)", "password", "new-password")}
+    ${S.old_password ? field("old", "الباسورد القديم بتاع البرنامج (للتأكيد)", "password", "current-password") : ""}
+    <button class="btn primary wide" id="go">اعمل حساب الأدمن</button>`,
+};
+
+const ACTIONS = {
+  login: async () => { const d = await post("/api/auth/login", { email: $("email").value, password: $("pw").value }); location.replace(d.verify ? "/verify" : next()); },
+  signup: async () => {
+    const d = await post("/api/auth/signup", { name: $("name").value, email: $("email").value, password: $("pw").value });
+    sessionStorage.setItem("devlink", d.dev_link || ""); location.replace("/verify");
+  },
+  forgot: async () => {
+    const d = await post("/api/auth/forgot", { email: $("email").value });
+    $("body").innerHTML = `<div class="au-big">📬</div><p class="au-ok">لو الإيميل ده عنده حساب، بعتناله لينك. بص على الإيميل (وفي الـ Spam).</p>${devLink(d.dev_link)}<div class="au-links"><a href="/login">رجوع للدخول</a></div>`;
+  },
+  reset: async () => {
+    if ($("pw").value !== $("pw2").value) throw new Error("الباسوردين مش زي بعض");
+    await post("/api/auth/reset", { token: Q.get("token"), password: $("pw").value }); location.replace("/");
+  },
+  setup: async () => {
+    await post("/api/auth/setup", { name: $("name").value, email: $("email").value, password: $("pw").value, old_password: $("old") ? $("old").value : "" });
+    location.replace("/");
+  },
+};
+
+async function render() {
+  S = await (await fetch("/api/auth/state")).json();
+  let v = path.slice(1);
+  if (S.needs_setup) v = "setup";
+  else if (v === "setup") v = "login";
+  if (v === "verify" && Q.get("token")) {
+    $("body").innerHTML = `<p class="muted">بنأكد الإيميل…</p>`;
+    try { await fetch(`/api/auth/verify?token=${encodeURIComponent(Q.get("token"))}`).then(async (r) => { if (!r.ok) throw new Error((await r.json()).detail); }); location.replace("/"); }
+    catch (e) { $("body").innerHTML = `<p class="err">${e.message}</p><div class="au-links"><a href="/login">الدخول</a></div>`; }
+    return;
+  }
+  if (S.logged_in && v !== "reset") return location.replace(next());
+  if (v === "verify" && !S.user) v = "login";
+  if (!VIEWS[v]) v = "login";
+  $("body").innerHTML = VIEWS[v]();
+  if (Q.get("err") === "google") err("الدخول بجوجل ماكملش، جرّب تاني");
+  if (v === "verify") {
+    $("dev").innerHTML = devLink(sessionStorage.getItem("devlink"));
+    $("resend").onclick = async () => { try { const d = await post("/api/auth/resend"); if (d.verified) return location.replace("/"); $("dev").innerHTML = `<p class="au-ok">اتبعت تاني ✓</p>${devLink(d.dev_link)}`; } catch (e) { err(e.message); } };
+    $("out").onclick = async (e) => { e.preventDefault(); await post("/api/auth/logout"); location.replace("/login"); };
+  }
+  document.querySelector("#body input")?.focus();
+  ACTIVE = v;
+}
+let ACTIVE = null;
+$("form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!ACTIONS[ACTIVE]) return;
+  err(""); const b = $("go"); if (b) b.disabled = true;
+  try { await ACTIONS[ACTIVE](); } catch (x) { err(x.message); } finally { if (b) b.disabled = false; }
+});
+render();
+</script>
+</body>
+</html>

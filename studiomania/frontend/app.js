@@ -21,6 +21,15 @@ function toast(msg, isError = false) {
   toast.t = setTimeout(() => (el.hidden = true), 3500);
 }
 
+// 🚪 الحساب (لو البرنامج شغال ورا البوابة): الإيميل والباقة والنقط
+window.ME = null;
+window.MEP = fetch("/api/me").then((r) => (r.ok ? r.json() : null)).catch(() => null).then((m) => {
+  window.ME = m;
+  const el = document.getElementById("setPlan");
+  if (m && el) el.textContent = `${m.email} · باقتك: ${{ trial: "تجربة مجانية", starter: "بداية", pro: "محترف", agency: "وكالات", owner: "صاحب البرنامج" }[m.plan] || m.plan} · رصيدك ${m.credits.total.toLocaleString("en-US")} نقطة`;
+  return m;
+});
+
 async function api(path, opts = {}) {
   const res = await fetch(path, opts);
   if (res.status === 401 && !path.startsWith("/api/auth/")) {

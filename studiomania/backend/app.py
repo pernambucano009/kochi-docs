@@ -506,6 +506,8 @@ def asset_version(name: str) -> str:
 def html_page(name: str) -> Response:
     """الصفحة بروابط الملفات فيها رقم النسخة، ومن غير كاش."""
     html = (FRONTEND_DIR / name).read_text(encoding="utf-8")
+    # العميل مايشوفش أدوات الأدمن (المفاتيح، المعمل، رصيد الخدمات): .admin-only بتستخبى
+    html = html.replace("<html ", f'<html data-role="{TENANT_ROLE}" ', 1)
     html = re.sub(
         r'((?:src|href)=")/([\w.-]+\.(?:js|css))"',
         lambda m: f'{m.group(1)}/{m.group(2)}?v={asset_version(m.group(2))}"',
@@ -549,9 +551,20 @@ def export_token_ok(request: Request) -> bool:
     return bool(want) and len(want) >= 16 and allowed and request.method == "GET" and hmac.compare_digest(want, got)
 
 
+# 🚪 وضع البوابة (gateway.py): البرنامج ده نسخة عميل واحد، والبوابة هي اللي عملت الدخول. بيقبل طلباتها بس.
+GATEWAY_SECRET = os.environ.get("GATEWAY_SECRET") or ""
+TENANT_ROLE = os.environ.get("TENANT_ROLE") or "admin"
+
+
 @app.middleware("http")
 async def require_login(request: Request, call_next):
     path = request.url.path
+    if GATEWAY_SECRET:
+        if path == "/health" or hmac.compare_digest(request.headers.get("x-gateway-secret", ""), GATEWAY_SECRET):
+            if (fast := gzipped_asset(request)) is not None:
+                return fast
+            return await call_next(request)
+        return JSONResponse({"detail": "forbidden"}, status_code=403)
     if path in PUBLIC_PATHS or auth.valid_token(request.cookies.get(SESSION_COOKIE)) or export_token_ok(request):
         if (fast := gzipped_asset(request)) is not None:
             return fast
@@ -574,6 +587,23 @@ async def require_login(request: Request, call_next):
 def kochi_page():
     """كوتشي اتفصل برنامج لوحده (فولدر kochi). اللينك القديم بيوديك عليه لو KOCHI_URL متسجل، وإلا للرئيسية."""
     return RedirectResponse((os.environ.get("KOCHI_URL") or "").strip() or "/")
+
+
+_BASE_THREADS: set[int] = set()
+
+
+@app.on_event("startup")
+def _count_threads():
+    _BASE_THREADS.update(t.ident for t in threading.enumerate())
+
+
+@app.get("/api/_tenant/busy")
+def tenant_busy():
+    """للبوابة: فيه شغل شغال (توليد، رندر، تحليل…) ولا النسخة دي تتقفل لو مفيش حد بيستخدمها؟
+    الشغل = أي thread اتفتح بعد التشغيل (غير threads السيرفر نفسه اللي بترد على الطلبات)."""
+    jobs = [t for t in threading.enumerate() if t.ident not in _BASE_THREADS and t.is_alive()
+            and not t.name.startswith(("AnyIO", "asyncio", "ThreadPoolExecutor"))]
+    return {"busy": bool(jobs)}
 
 
 @app.get("/health")
@@ -18890,7 +18920,7 @@ reset_stuck_tpl()
 # ---------- نقل الداتا من برنامج للتاني (كوتشي اتفصل عن ستوديومانيا) ----------
 # البرنامج القديم بيطلّع كل الداتا ملف tar واحد بيتبعت على طول (قاعدة البيانات نسخة سليمة من غير ما توقف الشغل)،
 # والبرنامج الجديد (لسه فاضي) بيسحبه بالباسورد بتاع القديم ويفكّه عنده. مرة واحدة بس.
-DATA_SKIP = {"tmp", "models"}
+DATA_SKIP = {"tmp", "models", "_platform"}
 
 
 @app.get("/api/admin/data-export")

@@ -81,6 +81,56 @@ def _check(resp: httpx.Response, what: str):
     return data
 
 
+# ---------------------------------------------------------------- 🔒 كل عميل ليه بروفايل لوحده عند Zernio
+# البوابة بتدّي كل نسخة عميل ZERNIO_PROFILE_NAME (بروفايل بيتعمل لو مش موجود)، وصاحب البرنامج ZERNIO_PROFILE_ID.
+# من غيرهم (البرنامج شغال لوحده من غير بوابة) كل الحسابات بتاعتك زي الأول.
+
+_profile_id: str | None = None
+
+
+def scoped() -> bool:
+    return bool(os.environ.get("ZERNIO_PROFILE_ID") or os.environ.get("ZERNIO_PROFILE_NAME"))
+
+
+def tenant_profile() -> str | None:
+    global _profile_id
+    if os.environ.get("ZERNIO_PROFILE_ID"):
+        return os.environ["ZERNIO_PROFILE_ID"]
+    name = os.environ.get("ZERNIO_PROFILE_NAME")
+    if not name:
+        return None
+    if _profile_id:
+        return _profile_id
+    with _client(30) as c:
+        data = _check(c.get(f"{BASE_URL}/profiles"), "قراءة البروفايلات")
+        items = data.get("profiles", data.get("data", [])) if isinstance(data, dict) else data
+        hit = next((x for x in items or [] if x.get("name") == name), None)
+        if not hit:
+            hit = _check(c.post(f"{BASE_URL}/profiles", json={"name": name}), "عمل بروفايل")
+            hit = hit.get("profile", hit) if isinstance(hit, dict) else {}
+    _profile_id = hit.get("_id") or hit.get("id")
+    return _profile_id
+
+
+def _pid(x) -> str | None:
+    v = x.get("profileId") if isinstance(x, dict) else None
+    if isinstance(v, dict):
+        v = v.get("_id") or v.get("id")
+    return str(v) if v else None
+
+
+def mine(account_id: str | None) -> bool:
+    """الحساب ده بتاع العميل ده؟ (لو مفيش بروفايلات، كل الحسابات بتاعتك)."""
+    if not scoped():
+        return True
+    return bool(account_id) and any(a["id"] == account_id for a in account_list())
+
+
+def require_mine(account_id: str | None) -> None:
+    if not mine(account_id):
+        raise PublishError("الحساب ده مش مربوط عندك")
+
+
 # ---------------------------------------------------------------- الحسابات المربوطة
 
 _accounts_cache: tuple[float, list] | None = None
@@ -91,9 +141,15 @@ def account_list(refresh: bool = False) -> list[dict]:
     global _accounts_cache
     if not refresh and _accounts_cache and time.monotonic() - _accounts_cache[0] < 300:
         return _accounts_cache[1]
+    params = {"excludeHidden": "true"}
+    prof = tenant_profile()
+    if prof:
+        params["profileId"] = prof
     with _client(30) as c:
-        data = _check(c.get(f"{BASE_URL}/accounts", params={"excludeHidden": "true"}), "قراءة الحسابات")
+        data = _check(c.get(f"{BASE_URL}/accounts", params=params), "قراءة الحسابات")
     items = data.get("accounts", data.get("data", [])) if isinstance(data, dict) else data
+    if prof:   # لو Zernio رجّع حسابات بروفايلات تانية، بنشيلها
+        items = [a for a in items or [] if _pid(a) in (None, prof)] if any(_pid(a) for a in items or []) else items
     reverse = {remote: ours for ours, (remote, _) in PLATFORMS.items()}
     out = []
     for a in items or []:
@@ -147,7 +203,9 @@ def resolve_targets(targets: list[str]) -> list[tuple[str, str]]:
 # ---------------------------------------------------------------- ربط وفصل الحسابات من جوه البرنامج
 
 def default_profile() -> str:
-    """البروفايل (فولدر الحسابات) عند Zernio: الأول، ولو مفيش بنعمل واحد."""
+    """البروفايل (فولدر الحسابات) عند Zernio: بتاع العميل لو فيه بوابة، وإلا الأول، ولو مفيش بنعمل واحد."""
+    if (prof := tenant_profile()):
+        return prof
     with _client(30) as c:
         data = _check(c.get(f"{BASE_URL}/profiles"), "قراءة البروفايلات")
         items = data.get("profiles", data.get("data", [])) if isinstance(data, dict) else data
@@ -175,6 +233,7 @@ def connect_url(platform: str, redirect_url: str) -> str:
 
 def disconnect(account_id: str) -> None:
     global _accounts_cache
+    require_mine(account_id)
     with _client(30) as c:
         resp = c.delete(f"{BASE_URL}/accounts/{account_id}")
     if resp.status_code != 404:
@@ -339,9 +398,19 @@ def list_posts(status: str, limit: int = 100) -> list[dict]:
     """بوستات Zernio بحالة معيّنة، بشكل موحّد:
     [{"id", "status", "content", "scheduled_for", "published_at", "media_url",
       "platforms": [{"key" (عندنا), "status", "url", "error", "published_at"}]}]"""
+    params = {"status": status, "limit": limit}
+    if (prof := tenant_profile()):
+        params["profileId"] = prof
     with _client(30) as c:
-        data = _check(c.get(f"{BASE_URL}/posts", params={"status": status, "limit": limit}), "قراءة البوستات من Zernio")
+        data = _check(c.get(f"{BASE_URL}/posts", params=params), "قراءة البوستات من Zernio")
     items = data.get("posts", data.get("data", [])) if isinstance(data, dict) else data
+    if scoped():   # بس البوستات اللي على حسابات العميل ده
+        ids = {a["id"] for a in account_list()}
+
+        def acc(pl):
+            v = pl.get("accountId") if isinstance(pl, dict) else None
+            return str(v.get("_id") or v.get("id")) if isinstance(v, dict) else str(v or "")
+        items = [p for p in items or [] if isinstance(p, dict) and any(acc(pl) in ids for pl in p.get("platforms") or [])]
     reverse = {remote: ours for ours, (remote, _) in PLATFORMS.items()}
     out = []
     for post in items or []:
@@ -432,12 +501,13 @@ def inbox_posts(limit: int = 50, cursor: str | None = None) -> dict:
         params["cursor"] = cursor
     with _client() as c:
         data = _inbox_check(c.get(f"{BASE_URL}/inbox/comments", params=params), "قراءة البوستات اللي عليها كومنتات")
+    rows = [p for p in data.get("data") or [] if mine(p.get("accountId"))]
     posts = [{
         "id": p.get("id"), "platform": p.get("platform"), "account_id": p.get("accountId"),
         "account": p.get("accountUsername"), "content": p.get("content") or "", "picture": p.get("picture"),
         "url": p.get("permalink"), "created_at": p.get("createdTime"), "comments": p.get("commentCount") or 0,
         "likes": p.get("likeCount") or 0,
-    } for p in data.get("data") or []]
+    } for p in rows]
     page = data.get("pagination") or {}
     return {"posts": posts, "next": page.get("nextCursor") if page.get("hasMore") else None, "failed": _failed(data.get("meta"))}
 
@@ -454,6 +524,7 @@ def _comment(x: dict) -> dict:
 
 
 def inbox_comments(post_id: str, account_id: str) -> list[dict]:
+    require_mine(account_id)
     with _client() as c:
         data = _inbox_check(c.get(f"{BASE_URL}/inbox/comments/{post_id}", params={"accountId": account_id, "limit": 100}),
                             "قراءة الكومنتات")
@@ -461,6 +532,7 @@ def inbox_comments(post_id: str, account_id: str) -> list[dict]:
 
 
 def inbox_reply_comment(post_id: str, account_id: str, message: str, comment_id: str | None) -> str:
+    require_mine(account_id)
     body = {"accountId": account_id, "message": message}
     if comment_id:
         body["commentId"] = comment_id
@@ -482,12 +554,13 @@ def inbox_conversations(limit: int = 50, cursor: str | None = None) -> dict:
         "name": x.get("participantName") or "", "picture": x.get("participantPicture"), "last": x.get("lastMessage") or "",
         "updated_at": x.get("updatedTime"), "unread": x.get("unreadCount") or 0, "url": x.get("url"),
         "request": x.get("folder") == "requests",
-    } for x in data.get("data") or []]
+    } for x in data.get("data") or [] if mine(x.get("accountId"))]
     page = data.get("pagination") or {}
     return {"conversations": convs, "next": page.get("nextCursor") if page.get("hasMore") else None, "failed": _failed(data.get("meta"))}
 
 
 def inbox_messages(conversation_id: str, account_id: str) -> list[dict]:
+    require_mine(account_id)
     with _client() as c:
         data = _inbox_check(c.get(f"{BASE_URL}/inbox/conversations/{conversation_id}/messages",
                                   params={"accountId": account_id, "limit": 100, "sortOrder": "asc"}), "قراءة المحادثة")
@@ -506,6 +579,7 @@ def inbox_messages(conversation_id: str, account_id: str) -> list[dict]:
 
 
 def inbox_send(conversation_id: str, account_id: str, message: str) -> str:
+    require_mine(account_id)
     with _client() as c:
         data = _inbox_check(c.post(f"{BASE_URL}/inbox/conversations/{conversation_id}/messages",
                                    json={"accountId": account_id, "message": message},
@@ -514,6 +588,7 @@ def inbox_send(conversation_id: str, account_id: str, message: str) -> str:
 
 
 def inbox_mark_read(conversation_id: str, account_id: str) -> None:
+    require_mine(account_id)
     with _client() as c:
         try:
             c.post(f"{BASE_URL}/inbox/conversations/{conversation_id}/read", json={"accountId": account_id})

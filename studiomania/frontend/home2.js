@@ -108,7 +108,8 @@ const NH = (() => {
       const up = D.posts.filter((p) => p.status === "scheduled").length, bad = D.posts.filter((p) => p.status === "failed").length;
       return `<span>${up ? `${up} بوست متجدول` : "مفيش بوستات متجدولة"}${bad ? ` · <em>${bad} فشل</em>` : ""}</span>`;
     },
-    settings: () => `<span>${D.money ? `رصيد Atlas · <span class="num">$${D.money.balance.toFixed(2)}</span>` : "المفاتيح والرصيد والعملاء"}</span>`,
+    settings: () => `<span>${window.ME ? `رصيدك · <span class="num">${window.ME.credits.total.toLocaleString("en-US")}</span> نقطة`
+      : D.money ? `رصيد Atlas · <span class="num">$${D.money.balance.toFixed(2)}</span>` : "المفاتيح والرصيد والعملاء"}</span>`,
   };
   const side = (id) => `<div class="nh-tile nh-side" data-id="${id}" tabindex="0" role="button" aria-label="${esc(T[id].ar)}">${head(id)}<div class="nh-meta">${META[id]()}</div></div>`;
   const cta = () => `<div class="nh-tile nh-cta nh-gen" data-id="create" tabindex="0" role="button" aria-label="ابدأ مشروع جديد">

@@ -29,4 +29,6 @@ COPY library library
 ENV STUDIOMANIA_DATA=/data
 
 EXPOSE 8000
-CMD ["sh", "-c", "exec uvicorn app:app --app-dir backend --host 0.0.0.0 --port ${PORT:-8000} --proxy-headers --forwarded-allow-ips='*'"]
+# البوابة (gateway.py) هي اللي بتفتح للناس: الحسابات والدخول، وكل عميل ليه نسخة من البرنامج لوحده (app.py على 127.0.0.1)
+# متغيرات اختيارية: ADMIN_EMAIL، PUBLIC_URL، GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET، RESEND_API_KEY أو SMTP_HOST/SMTP_PORT/SMTP_USER/SMTP_PASS، MAIL_FROM
+CMD ["sh", "-c", "exec uvicorn gateway:app --app-dir backend --host 0.0.0.0 --port ${PORT:-8000} --proxy-headers --forwarded-allow-ips='*'"]

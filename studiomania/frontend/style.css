@@ -2918,3 +2918,6 @@ dialog.cal-dlg { width: min(720px, 94vw); max-height: 90vh; border: 1px solid va
 :root[data-nh-theme="dark"] .br-rate.compact > button { background: rgba(30, 30, 32, .9); }
 :root[data-nh-theme="dark"] .br-rate > button.on[data-rv="bad"] { background: #f1f1f3; color: #141416; }
 :root[data-nh-theme="dark"] .br-why { background: #1F1E1F; }
+
+/* 🚪 حساب عميل (من البوابة): أدوات الأدمن بتستخبى */
+html[data-role="customer"] .admin-only { display: none !important; }
