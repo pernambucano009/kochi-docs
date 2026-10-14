@@ -518,8 +518,16 @@ window.NHGL = (stage, getClient) => {
 
   const smooth = (x) => x * x * (3 - 2 * x);
   const reduce = matchMedia("(prefers-reduced-motion: reduce)");
+  // وقت الحركة الهادية (الطفو والميل): بيقف عند لقطة الزوم ويكمّل منها لما ترجع، فالمجسّم الحي بيطابق الصورة اللي طارت بالظبط
+  let tShift = 0, snapT = null;
+  function rewind() {
+    if (snapT === null) return;
+    clock.getDelta();
+    tShift = clock.elapsedTime - snapT;
+    snapT = null;
+  }
   function frame() {
-    const dt = Math.min(.1, clock.getDelta()), t = clock.elapsedTime;
+    const dt = Math.min(.1, clock.getDelta()), t = clock.elapsedTime - tShift;
     const lift = stage.clientHeight > 380 ? .55 : .35;   // the object sits above the title text
     const k = 1 - Math.exp(-dt * (reduce.matches ? 40 : 5.5));
     for (const g of Object.values(cache)) {
@@ -560,6 +568,7 @@ window.NHGL = (stage, getClient) => {
   function snap() {
     if (!cur) return null;
     frame();
+    snapT = clock.elapsedTime - tShift;
     const cv = renderer.domElement, cr = cv.getBoundingClientRect();
     if (!cr.width || !cr.height) return null;
     const box = new THREE.Box3().setFromObject(cur);
@@ -582,5 +591,5 @@ window.NHGL = (stage, getClient) => {
     renderer.render(scene, camera);
     return { url: c.toDataURL("image/png"), rect: { x: cr.left + x0, y: cr.top + y0, w, h } };
   }
-  return { show, theme, brand, hold, snap };
+  return { show, theme, brand, hold, snap, rewind };
 };

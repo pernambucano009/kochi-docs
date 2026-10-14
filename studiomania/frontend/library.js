@@ -62,13 +62,7 @@ const CharactersPage = (() => {
       <div class="ch-grid as-grid">${S.list.map((x, i) => `<div class="ch-card as-card ${x.id === S.open ? "on" : ""}" data-cid="${x.id}" tabindex="0" role="button">
           <div class="as-art" style="${tint(i)}"><img src="${libEsc(x.image_url)}" alt="" loading="lazy"></div><b>${libEsc(x.name)}</b>
           <small dir="ltr">${x.instagram ? `@${libEsc(x.instagram)}` : x.tiktok ? `@${libEsc(x.tiktok)}` : ""}</small></div>`).join("")}
-        <button type="button" class="as-new" data-cnew><span>＋</span>شخصية جديدة</button></div>
-      <div class="as-sh"><h2>آخر التعليقات الصوتية</h2><button type="button" class="as-all" data-vall>عرض الكل</button></div>
-      <div class="as-voices">${S.voices.slice(0, 2).map((v) => `<div class="as-voice" data-vplay="${libEsc(v.url)}">
-          <button type="button" class="as-play ${player.dataset.url === v.url && !player.paused ? "on" : ""}" aria-label="تشغيل"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg></button>
-          <span class="as-vt"><b>${libEsc(v.name)}</b><span class="as-wave">${bars(v.id)}</span></span><small class="num">${libDur(v.duration)}</small></div>`).join("")}
-        <button type="button" class="as-rec" data-vall><span class="as-mic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg></span>
-          <span><b>سجّل أو ارفع تعليق</b><small>بيتكتب الكلام لوحده</small></span></button></div>`;
+        <button type="button" class="as-new" data-cnew><span>＋</span>شخصية جديدة</button></div>`;   // (التعليقات الصوتية مكانها في تاب «التعليق الصوتي» مش هنا)
     if (S.adding) w.querySelector("#chNewName")?.focus();
   }
 

@@ -219,7 +219,7 @@ const NH = (() => {
     const fit = () => {
       const w = el.clientWidth, h = el.clientHeight, r = parseFloat(getComputedStyle(el).borderTopLeftRadius) || 20;
       svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
-      svg.querySelectorAll("rect").forEach((x) => { x.setAttribute("x", .8); x.setAttribute("y", .8); x.setAttribute("width", Math.max(0, w - 1.6)); x.setAttribute("height", Math.max(0, h - 1.6)); x.setAttribute("rx", Math.max(0, r - .8)); });
+      svg.querySelectorAll("rect").forEach((x) => { x.setAttribute("x", .8); x.setAttribute("y", .8); x.setAttribute("width", Math.max(0, w - 1.6)); x.setAttribute("height", Math.max(0, h - 1.6)); x.setAttribute("rx", Math.max(0, Math.min(r, h / 2, w / 2) - .8)); x.setAttribute("ry", Math.max(0, Math.min(r, h / 2, w / 2) - .8)); });
     };
     new ResizeObserver(fit).observe(el);
     fit();
@@ -384,7 +384,8 @@ const NH = (() => {
     z.real.forEach((e) => (e.style.opacity = 0));
     z.anims.forEach((a) => a.reverse());
     return z.anims[0].finished.then(() => {
-      // نفس المجسّم اللي راجعين منه بيرجع حي في مكانه، والصورة بتدوب فيه بهدوء
+      // نفس المجسّم اللي راجعين منه بيرجع حي في مكانه وبنفس وضعه (من لحظة اللقطة)، والصورة بتدوب فيه بهدوء
+      GL?.rewind?.();
       if (z.key && GL) GL.hold(z.key);
       const ic = z.flies.find((f) => f.classList.contains("nh-fly-ic"));
       z.anims.forEach((a) => a.cancel());
