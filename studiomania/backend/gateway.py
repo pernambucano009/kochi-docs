@@ -478,6 +478,9 @@ class SignupIn(BaseModel):
 
 
 SKIP_VERIFY = os.environ.get("SKIP_EMAIL_VERIFY") == "1"
+if SKIP_VERIFY:   # الحسابات اللي اتعملت قبل ما المتغير يتحط كمان
+    with closing(db()) as _c, _c:
+        _c.execute("UPDATE users SET verified=1 WHERE verified=0")
 MAIL_FAIL = "الإيميل مقدرش يتبعت دلوقتي. جرّب كمان شوية، ولو فضلت المشكلة كلّمنا"
 
 
@@ -530,8 +533,8 @@ def login(body: LoginIn, request: Request):
         time.sleep(0.8)
         raise HTTPException(401, "الإيميل أو الباسورد غلط")
     with closing(db()) as c, c:
-        c.execute("UPDATE users SET last_login=? WHERE id=?", (time.time(), u["id"]))
-    return with_session(JSONResponse({"ok": True, "verify": not u["verified"]}), u, request)
+        c.execute("UPDATE users SET last_login=?, verified=MAX(verified, ?) WHERE id=?", (time.time(), int(SKIP_VERIFY), u["id"]))
+    return with_session(JSONResponse({"ok": True, "verify": not (u["verified"] or SKIP_VERIFY)}), u, request)
 
 
 @app.post("/api/auth/logout")
