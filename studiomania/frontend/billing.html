@@ -94,7 +94,10 @@ const Q = new URLSearchParams(location.search);
 const PN = { trial: "تجربة مجانية", starter: "بداية", pro: "محترف", agency: "وكالات", none: "مفيش باقة", owner: "صاحب البرنامج" };
 let B, sel = null, extra = 0;
 
-function msg(t, ok = true) { $("msg").innerHTML = t ? `<div class="msg ${ok ? "ok" : "err"}">${esc(t)}</div>` : ""; }
+function msg(t, ok = true) {
+  $("msg").innerHTML = t ? `<div class="msg ${ok ? "ok" : "err"}">${esc(t)}</div>` : "";
+  if (t) $("msg").scrollIntoView({ behavior: "smooth", block: "center" });
+}
 async function post(url, body) {
   const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
   const d = await r.json().catch(() => ({}));
@@ -160,11 +163,14 @@ async function load() {
     b.disabled = !on;
     if (!on) b.title = "طريقة الدفع دي لسه مش متفعّلة";
     b.onclick = async () => {
-      b.disabled = true; msg("");
+      const label = b.innerHTML;
+      b.disabled = true; b.textContent = "⏳ بيفتح صفحة الدفع…"; msg("");
       try {
         const body = { provider: b.dataset.pay, kind: b.dataset.kind, plan: sel, accounts: extra, autopilot: $("ap").checked, topup: b.dataset.topup || "" };
-        location.href = (await post("/api/billing/checkout", body)).url;
-      } catch (e) { msg(e.message, false); b.disabled = false; }
+        const d = await post("/api/billing/checkout", body);
+        if (!d.url) throw new Error("صفحة الدفع مارجعتش، جرّب تاني");
+        location.href = d.url;
+      } catch (e) { msg(e.message, false); alert(e.message); b.disabled = false; b.innerHTML = label; }
     };
   });
   $("payNote").textContent = !B.stripe && !B.paypal ? "الدفع لسه بيتجهز، هيتفتح قريب." : "الدفع بيتم في صفحة Stripe أو PayPal الآمنة، وبيانات الكارت مش بتعدّي علينا.";

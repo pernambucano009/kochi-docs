@@ -42,6 +42,7 @@ def _stripe(method: str, path: str, data: dict | None = None) -> dict:
         raise PayError(f"Stripe مش بيرد: {e}") from e
     j = r.json() if r.content else {}
     if r.status_code >= 400:
+        log.warning("stripe %s %s failed: %s %s", method, path, r.status_code, str(j.get("error") or j)[:400])
         raise PayError((j.get("error") or {}).get("message") or f"Stripe HTTP {r.status_code}")
     return j
 
