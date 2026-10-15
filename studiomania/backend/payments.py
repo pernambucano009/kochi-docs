@@ -28,14 +28,23 @@ class PayError(RuntimeError):
 
 # ---------------------------------------------------------------- Stripe
 
+def _clean(v: str | None) -> str:
+    # من غير مسافات ولا علامات تنصيص لو اتنسخت معاها بالغلط
+    return (v or "").strip().strip('"').strip("'").strip()
+
+
 def stripe_on() -> bool:
-    return bool(os.environ.get("STRIPE_SECRET_KEY"))
+    return bool(_clean(os.environ.get("STRIPE_SECRET_KEY")))
 
 
 def _stripe(method: str, path: str, data: dict | None = None) -> dict:
-    key = os.environ.get("STRIPE_SECRET_KEY")
+    key = _clean(os.environ.get("STRIPE_SECRET_KEY"))
     if not key:
         raise PayError("الدفع بالكارت مش متفعّل لسه")
+    if key.startswith("whsec_"):
+        raise PayError("STRIPE_SECRET_KEY فيه مفتاح الـ Webhook (whsec_) بالغلط: لازم يكون الـ Secret key اللي بيبدأ بـ sk_test_ أو sk_live_")
+    if key.startswith("pk_"):
+        raise PayError("STRIPE_SECRET_KEY فيه الـ Publishable key (pk_) بالغلط: لازم يكون الـ Secret key اللي بيبدأ بـ sk_test_ أو sk_live_")
     try:
         r = httpx.request(method, f"https://api.stripe.com/v1/{path}", auth=(key, ""), data=_flat(data or {}), timeout=30)
     except httpx.HTTPError as e:
@@ -92,7 +101,7 @@ def stripe_cancel(sub_id: str) -> None:
 
 def stripe_verify(payload: bytes, header: str, tolerance: int = 300) -> bool:
     """التوقيع اللي Stripe بيبعته مع كل إشعار (عشان محدش يزوّر إشعار دفع)."""
-    secret = os.environ.get("STRIPE_WEBHOOK_SECRET") or ""
+    secret = _clean(os.environ.get("STRIPE_WEBHOOK_SECRET"))
     if not secret or not header:
         return False
     parts = dict(p.split("=", 1) for p in header.split(",") if "=" in p)
