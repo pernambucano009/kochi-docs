@@ -423,7 +423,7 @@ const ViralPage = (() => {
   return { html, mount, close: () => {} };
 })();
 
-// 🎨 استنساخ الستايل (مسودة، مستخبية لحد ما يتحدد مكانها؛ بتفتح بـ NHNav("stylecl")):
+// 🎨 استنساخ الستايل (في عقل البراند ← الشخصيات والأصوات):
 // مراجع + فكرة ← أنيميشن مرسوم بالكود فريم فريم، بصوت متعمل بالحساب
 const StyleClonePage = (() => {
   const S = { el: null, list: [], timer: null, busy: false };

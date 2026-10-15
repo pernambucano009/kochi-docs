@@ -65,6 +65,7 @@ const BrandPage = (() => {
         { f: "pg", page: "voice", t: "التعليق الصوتي", type: "page" },
         { f: "pg", page: "music", t: "الموسيقى", type: "page" },
         { f: "pg", page: "viral", t: "🔥 اللي ماشي في مجالك", type: "page" },
+        { f: "pg", page: "stylecl", t: "🎨 استنساخ الستايل", type: "page" },
       ] },
       // المعرفة: اللي اتقرا من الملفات واللينكات واتوافق عليه
       { k: "knowledge", t: "المعرفة", en: "Knowledge", leaves: (b?.notes || []).map((x) => ({ f: "n", i: x.id, t: x.title, type: "note", note: x })) },
