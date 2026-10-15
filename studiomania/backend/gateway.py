@@ -400,6 +400,12 @@ def health():
 for _p in AUTH_PAGES:
     app.add_api_route(_p, lambda: page("auth.html"), methods=["GET"], include_in_schema=False)
 
+# الصفحات العامة (الرئيسية والشروط والخصوصية والاسترجاع): مفتوحة لأي حد، وبوابات الدفع بتراجعها
+SITE_PAGES = {"/welcome": "welcome.html", "/terms": "terms.html", "/privacy": "privacy.html", "/refund": "refund.html"}
+for _p, _f in SITE_PAGES.items():
+    for _u in (_p, _p + ".html"):
+        app.add_api_route(_u, (lambda f=_f: page(f)), methods=["GET"], include_in_schema=False)
+
 
 @app.get("/api/auth/state")
 def auth_state(request: Request):
@@ -1036,7 +1042,9 @@ async def proxy(path: str, request: Request):
         if url_path in PUBLIC_FILES:
             u_pub = True   # صفحة الأسعار: بتتقرا من نسخة صاحب البرنامج
         else:
-            return RedirectResponse("/login" + (f"?next={url_path}" if url_path not in ("/", "") else ""))
+            if url_path in ("/", ""):
+                return RedirectResponse("/welcome")   # الزائر بيشوف الصفحة الرئيسية الأول
+            return RedirectResponse("/login?next=" + url_path)
     elif not u["verified"]:
         if url_path in PUBLIC_FILES:
             u_pub = True
