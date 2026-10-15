@@ -471,7 +471,11 @@ class SignupIn(BaseModel):
     name: str = ""
 
 
-def send_verify(u: sqlite3.Row, request: Request) -> str | None:
+MAIL_FAIL = "الإيميل مقدرش يتبعت دلوقتي. جرّب كمان شوية، ولو فضلت المشكلة كلّمنا"
+
+
+def send_verify(u: sqlite3.Row, request: Request) -> tuple[bool, str | None]:
+    """(اتبعت؟، لينك وضع التجربة)."""
     tok = secrets.token_urlsafe(32)
     with closing(db()) as c, c:
         c.execute("DELETE FROM tokens WHERE user_id=? AND kind='verify'", (u["id"],))
@@ -479,7 +483,7 @@ def send_verify(u: sqlite3.Row, request: Request) -> str | None:
     link = f"{base_url(request)}/verify?token={tok}"
     sent = mailer.send(u["email"], f"أكّد إيميلك · {mailer.BRAND}", f"أهلًا! أكّد إيميلك من اللينك ده:\n{link}",
                        mailer.button_html("أكّد إيميلك", "دوس على الزرار عشان نتأكد إن الإيميل ده بتاعك ونفتحلك حسابك.", link, "أكّد الإيميل"))
-    return link if (not sent and os.environ.get("MAIL_DEV") == "1") else None
+    return sent, (link if (not sent and os.environ.get("MAIL_DEV") == "1") else None)
 
 
 @app.post("/api/auth/signup")
@@ -497,9 +501,9 @@ def signup(body: SignupIn, request: Request):
         c.execute("INSERT INTO users (id, email, name, pw, verified, role, workspace, created_at) VALUES (?, ?, ?, ?, 0, 'customer', ?, ?)",
                   (uid, email, body.name.strip()[:80], pw_hash(body.password), wid, time.time()))
     u = user_by("id", uid)
-    dev = send_verify(u, request)
+    sent, dev = send_verify(u, request)
     failed(client_ip(request))   # كل تسجيل بيتحسب، عشان محدش يعمل حسابات كتير من نفس المكان
-    return with_session(JSONResponse({"ok": True, "verify": True, "dev_link": dev}), u, request)
+    return with_session(JSONResponse({"ok": True, "verify": True, "dev_link": dev, "mail_failed": not sent and not dev}), u, request)
 
 
 class LoginIn(BaseModel):
@@ -537,7 +541,10 @@ def resend(request: Request):
         return {"ok": True, "verified": True}
     throttle("resend:" + u["id"])
     failed("resend:" + u["id"])
-    return {"ok": True, "dev_link": send_verify(u, request)}
+    sent, dev = send_verify(u, request)
+    if not sent and not dev:
+        raise HTTPException(503, MAIL_FAIL)
+    return {"ok": True, "dev_link": dev}
 
 
 @app.get("/api/auth/verify")

@@ -92,7 +92,7 @@ const ACTIONS = {
   login: async () => { const d = await post("/api/auth/login", { email: $("email").value, password: $("pw").value }); location.replace(d.verify ? "/verify" : next()); },
   signup: async () => {
     const d = await post("/api/auth/signup", { name: $("name").value, email: $("email").value, password: $("pw").value });
-    sessionStorage.setItem("devlink", d.dev_link || ""); location.replace("/verify");
+    sessionStorage.setItem("devlink", d.dev_link || ""); sessionStorage.setItem("mailfail", d.mail_failed ? "1" : ""); location.replace("/verify");
   },
   forgot: async () => {
     const d = await post("/api/auth/forgot", { email: $("email").value });
@@ -126,6 +126,7 @@ async function render() {
   if (Q.get("err") === "google") err("الدخول بجوجل ماكملش، جرّب تاني");
   if (v === "verify") {
     $("dev").innerHTML = devLink(sessionStorage.getItem("devlink"));
+    if (sessionStorage.getItem("mailfail")) err("الإيميل مقدرش يتبعت دلوقتي. دوس «ابعته تاني» كمان شوية");
     $("resend").onclick = async () => { try { const d = await post("/api/auth/resend"); if (d.verified) return location.replace("/"); $("dev").innerHTML = `<p class="au-ok">اتبعت تاني ✓</p>${devLink(d.dev_link)}`; } catch (e) { err(e.message); } };
     $("out").onclick = async (e) => { e.preventDefault(); await post("/api/auth/logout"); location.replace("/login"); };
   }

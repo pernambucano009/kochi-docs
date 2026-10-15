@@ -35,6 +35,7 @@ def send(to: str, subject: str, text: str, html: str | None = None) -> bool:
                            headers={"Authorization": f"Bearer {os.environ['RESEND_API_KEY']}"},
                            json={"from": sender(), "to": [to], "subject": subject, "text": text, **({"html": html} if html else {})})
             if r.status_code < 300:
+                log.warning("email sent via resend to %s", to)
                 return True
             log.warning("resend failed %s %s", r.status_code, r.text[:200])
         except httpx.HTTPError as e:
