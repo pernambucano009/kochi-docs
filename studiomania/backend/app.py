@@ -3995,6 +3995,7 @@ def inbox_suggest(body: InboxSuggestIn):
 
 # ---------------------------------------------------------------- 📈 أدوات النمو (growth.py)
 import growth  # noqa: E402
+import stylecl  # noqa: E402
 
 
 def growth_json(messages: list[dict], what: str) -> dict:
@@ -20098,6 +20099,389 @@ def brain_seasons_regen():
     SEASON_JOBS.pop(b["id"], None)
     start_brain_seasons(b["id"])
     return brain_seasons()
+
+
+# ---------------------------------------------------------------- 🎨 استنساخ الستايل (مسودة)
+# مراجع + فكرة ← الموديل بيكتب كود بيرسم كل فريم ← المتصفح بيرسم (من غير نت) ← مراجعة الفريمات ← صوت بالحساب ← MP4
+
+STYLE_DIR = DATA_DIR / "stylecl"
+STYLE_LOCK = threading.Lock()
+STYLE_BUSY = {"planning", "coding", "checking", "reviewing", "rendering"}
+STYLE_IMG = {".jpg", ".jpeg", ".png", ".webp"}
+STYLE_VID = {".mp4", ".mov", ".webm", ".m4v"}
+
+
+def style_load(sid: str) -> dict:
+    f = STYLE_DIR / Path(sid).name / "style.json"
+    if not f.exists():
+        raise HTTPException(404, "المشروع ده مش موجود")
+    return json.loads(f.read_text(encoding="utf-8"))
+
+
+def style_update(sid: str, fn) -> dict:
+    with STYLE_LOCK:
+        d = style_load(sid)
+        fn(d)
+        d["updated_at"] = now()
+        folder = STYLE_DIR / Path(sid).name
+        (folder / "style.json.tmp").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+        (folder / "style.json.tmp").replace(folder / "style.json")
+        return d
+
+
+def style_set(sid: str, **kw) -> dict:
+    return style_update(sid, lambda d: d.update(**kw))
+
+
+def style_view(d: dict) -> dict:
+    u = lambda f: f"/api/stylecl/{d['id']}/file/{f}"
+    p = d.get("plan") or {}
+    return {"id": d["id"], "title": p.get("title") or d.get("idea", "")[:40], "idea": d.get("idea", ""), "ratio": d["ratio"],
+            "duration": d["duration"], "status": d.get("status"), "step": d.get("step"), "error": d.get("error"),
+            "refs": [u(f) for f in d.get("refs") or []], "frames": [u(f) for f in d.get("frames") or []],
+            "video": u(d["final"]) if d.get("final") else None, "style": p.get("style"), "review": d.get("review"),
+            "notes": d.get("notes") or [], "created_at": d.get("created_at"), "updated_at": d.get("updated_at")}
+
+
+def style_ref_images(folder: Path, refs: list[str]) -> list[Path]:
+    """الصور زي ما هي، والفيديو بيتاخد منه 4 فريمات."""
+    out: list[Path] = []
+    for f in refs:
+        p = folder / f
+        if p.suffix.lower() in STYLE_IMG:
+            out.append(model_image(p))
+            continue
+        dur = media_info(p).duration or 4
+        for i, k in enumerate((.1, .35, .6, .85)):
+            fr = folder / f".ref_{p.stem}_{i}.jpg"
+            if not fr.exists():
+                subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{dur * k:.2f}", "-i", str(p),
+                                "-frames:v", "1", "-vf", "scale='min(768,iw)':-2", "-q:v", "4", str(fr)], capture_output=True, timeout=60)
+            if fr.exists():
+                out.append(fr)
+    return out[:10]
+
+
+def style_code_chat(messages: list[dict]) -> str:
+    try:
+        text = atlas.chat(messages, carousel_settings()["text_model"], temperature=.5, max_tokens=16000, timeout=400)
+    except (atlas.AtlasError, httpx.HTTPError) as exc:
+        raise RuntimeError(f"موديل الكود: {exc}") from exc
+    code = stylecl.extract_code(text)
+    if not code:
+        raise RuntimeError("موديل الكود رجّع رد فاضي")
+    return code
+
+
+class StylePage:
+    """متصفح مقفول: الكود جوه صفحة من غير نت ولا كوكيز، والخطوط بس بتيجي من السيرفر نفسه."""
+
+    def __init__(self, p, code: str, w: int, h: int, dur: float, scale: float = 1.0):
+        self.browser = typo_browser(p)
+        self.ctx = self.browser.new_context(viewport={"width": int(w * scale), "height": int(h * scale)}, device_scale_factor=1,
+                                            java_script_enabled=True, offline=False)
+
+        def route(r):
+            url = r.request.url
+            if url.startswith("https://fonts.local/"):
+                f = FONTS_DIR / Path(url.split("/")[-1]).name
+                return r.fulfill(path=str(f)) if f.exists() else r.abort()
+            return r.abort()
+        self.ctx.route("**/*", route)
+        self.page = self.ctx.new_page()
+        if scale != 1:
+            # الكود بيرسم على مقاسه الكامل، والصفحة بتصغّره بس وقت التصوير
+            self.page.add_init_script(f"document.addEventListener('DOMContentLoaded',()=>{{const c=document.getElementById('c');c.style.width='{int(w * scale)}px';c.style.height='{int(h * scale)}px'}})")
+        self.page.set_content(stylecl.harness(code, w, h, dur), wait_until="load", timeout=60000)
+        self.page.evaluate("window.ready")
+        self.cdp = self.ctx.new_cdp_session(self.page)
+
+    def at(self, t: float) -> str | None:
+        return self.page.evaluate(f"renderAt({t:.4f})")
+
+    def shot(self, quality: int = 92) -> bytes:
+        return base64.b64decode(self.cdp.send("Page.captureScreenshot", {"format": "jpeg", "quality": quality, "optimizeForSpeed": True})["data"])
+
+    def close(self):
+        self.browser.close()
+
+
+def style_check(code: str, w: int, h: int, dur: float, folder: Path | None = None) -> tuple[str | None, list[str]]:
+    """بيشغّل الكود في كذا لحظة: أي غلطة، أو كادر فاضي، بترجع كمشكلة. ولو فيه فولدر بيحفظ فريمات للمراجعة."""
+    from playwright.sync_api import sync_playwright
+
+    if (bad := stylecl.wrap_check(code)):
+        return bad, []
+    frames: list[str] = []
+    with sync_playwright() as p:
+        sp = StylePage(p, code, w, h, dur, scale=.5)
+        try:
+            empty = 0
+            for i, t in enumerate(stylecl.sample_times(dur)):
+                started = time.time()
+                if (err := sp.at(t)):
+                    return f"خطأ في التشغيل: {err}", []
+                if time.time() - started > 1.5:
+                    return f"الفريم عند {t:.1f}ث بياخد {time.time() - started:.1f} ثانية (تقيل جدًا، لازم أقل من 0.05)", []
+                st = sp.page.evaluate("stats()")
+                if st["sd"] < 2:
+                    empty += 1
+                if folder is not None:
+                    name = f"frame_{i}.jpg"
+                    (folder / name).write_bytes(sp.shot(85))
+                    frames.append(name)
+            if empty >= 3:
+                return "أغلب الفريمات فاضية (لون واحد): مفيش حاجة باينة", frames
+        finally:
+            sp.close()
+    return None, frames
+
+
+def style_child(fn, *args, timeout: float):
+    """الكود المتولّد بيشتغل في عملية لوحدها: لو علّق (لفة مالهاش آخر) بنقفلها هي والمتصفح بتاعها من غير ما السيرفر يقف."""
+    import multiprocessing
+    import queue as _q
+    import signal
+
+    mp = multiprocessing.get_context("fork")
+    q = mp.Queue()
+
+    def target():
+        os.setsid()
+        try:
+            q.put(("ok", fn(*args)))
+        except Exception as exc:  # noqa: BLE001
+            q.put(("err", str(getattr(exc, "detail", None) or exc)))
+    proc = mp.Process(target=target)
+    proc.start()
+    try:
+        kind, val = q.get(timeout=timeout)
+    except _q.Empty:
+        kind, val = "err", f"الكود علّق (أكتر من {int(timeout)} ثانية)"
+    finally:
+        try:
+            os.killpg(proc.pid, signal.SIGKILL)
+        except (ProcessLookupError, PermissionError):
+            pass
+        proc.join(5)
+    if kind == "err":
+        raise RuntimeError(val)
+    return val
+
+
+def style_fix_loop(sid: str, code: str, d: dict, tries: int = 2) -> tuple[str, list[str]]:
+    folder = STYLE_DIR / sid
+    w, h = stylecl.RATIOS[d["ratio"]]
+    for k in range(tries + 1):
+        problem, frames = style_child(style_check, code, w, h, d["duration"], folder, timeout=120)
+        if not problem:
+            return code, frames
+        if k == tries or atlas.mock_mode():
+            raise RuntimeError(f"الكود فيه مشكلة ومعرفناش نصلّحها: {problem[:200]}")
+        style_set(sid, step=f"🔧 بيصلّح الكود ({k + 1})")
+        code = style_code_chat(stylecl.fix_messages(code, problem))
+    return code, []
+
+
+def style_render(sid: str, code: str, d: dict) -> str:
+    from playwright.sync_api import sync_playwright
+
+    folder = STYLE_DIR / sid
+    w, h = stylecl.RATIOS[d["ratio"]]
+    dur = float(d["duration"])
+    fps = stylecl.FPS
+    n = int(math.ceil(dur * fps))
+    wav = stylecl.soundtrack(d.get("plan") or {}, dur, folder / ".sound.wav", seed=sum(map(ord, sid)))
+    tmp = folder / f".render_{uuid.uuid4().hex[:6]}.mp4"
+    cmd = [ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-f", "image2pipe", "-framerate", str(fps), "-c:v", "mjpeg", "-i", "-",
+           "-i", str(wav), "-map", "0:v", "-map", "1:a", "-vf", f"scale={w}:{h},format=yuv420p", "-c:v", "libx264", "-preset", "veryfast",
+           "-crf", "19", "-c:a", "aac", "-b:a", "160k", "-r", str(fps), "-t", f"{dur:.3f}", "-movflags", "+faststart", str(tmp)]
+    proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+    try:
+        with sync_playwright() as p:
+            sp = StylePage(p, code, w, h, dur)
+            try:
+                for i in range(n):
+                    if (err := sp.at(i / fps)):
+                        raise RuntimeError(f"خطأ وقت الرسم: {err[:200]}")
+                    proc.stdin.write(sp.shot())
+                    if i % fps == 0:
+                        style_set(sid, step=f"🎬 بيرسم {i // fps} من {int(dur)} ثانية")
+            finally:
+                sp.close()
+        proc.stdin.close()
+        err = proc.stderr.read().decode(errors="ignore")
+        if proc.wait(timeout=600) != 0:
+            raise RuntimeError(f"FFmpeg: {err.strip()[-300:]}")
+    except Exception:
+        proc.kill()
+        tmp.unlink(missing_ok=True)
+        raise
+    finally:
+        wav.unlink(missing_ok=True)
+    name = f"style-{uuid.uuid4().hex[:4]}.mp4"
+    tmp.replace(folder / name)
+    return name
+
+
+def style_finish(sid: str, code: str, frames: list[str], review: dict | None = None) -> None:
+    (STYLE_DIR / sid / "scene.js").write_text(code, encoding="utf-8")
+    style_set(sid, status="rendering", step="🎬 بيرسم", frames=frames, **({"review": review} if review else {}))
+    d = style_load(sid)
+    name = style_child(style_render, sid, code, d, timeout=90 + float(d["duration"]) * 25)
+
+    def fin(x):
+        if x.get("final"):
+            (STYLE_DIR / sid / x["final"]).unlink(missing_ok=True)
+        x.update(final=name, status="done", step=None, error=None)
+    style_update(sid, fin)
+
+
+def run_style(sid: str) -> None:
+    folder = STYLE_DIR / sid
+    try:
+        d = style_load(sid)
+        w, h = stylecl.RATIOS[d["ratio"]]
+        refs = style_ref_images(folder, d.get("refs") or [])
+        # 1) الخطة والستايل من المراجع
+        style_set(sid, status="planning", step="👀 بيدرس الستايل من المراجع")
+        if atlas.mock_mode():
+            plan = stylecl.mock_plan(d["idea"], d["duration"])
+        else:
+            parts = [{"type": "text", "text": stylecl.plan_messages(d["idea"], d["duration"], d["ratio"], len(refs), growth_brand())[0]["content"]}]
+            parts += [{"type": "image_url", "image_url": {"url": data_url(r, "image/jpeg")}} for r in refs]
+            plan = stylecl.clean_plan(ad_json(ad_media_chat([{"role": "user", "content": parts}], 8000), "الخطة"), d["idea"], d["duration"])
+        style_set(sid, plan=plan, status="coding", step="✍️ بيكتب كود الرسم")
+        # 2) الكود + تشغيله والتأكد إنه شغال
+        code = stylecl.mock_code(plan["title"]) if atlas.mock_mode() else style_code_chat(stylecl.code_messages(plan, w, h, d["duration"]))
+        style_set(sid, status="checking", step="🧪 بيجرّب الكود")
+        code, frames = style_fix_loop(sid, code, d)
+        # 3) مراجعة الفريمات بالعين جنب المراجع، وتصليح مرة واحدة لو فيه مشاكل
+        review = None
+        if not atlas.mock_mode():
+            style_set(sid, status="reviewing", step="🔍 بيراجع الفريمات جنب المراجع")
+            times = stylecl.sample_times(d["duration"])
+            parts = [{"type": "text", "text": stylecl.review_text(plan, len(refs), times)}]
+            parts += [{"type": "image_url", "image_url": {"url": data_url(r, "image/jpeg")}} for r in refs]
+            parts += [{"type": "image_url", "image_url": {"url": data_url(folder / f, "image/jpeg")}} for f in frames]
+            try:
+                review = ad_json(ad_media_chat([{"role": "user", "content": parts}], 3000), "المراجعة")
+            except (HTTPException, ValueError, RuntimeError):
+                review = None
+            if review and not review.get("ok") and review.get("issues"):
+                style_set(sid, status="checking", step="🔧 بيصلّح اللي ظهر في المراجعة")
+                fixed = style_code_chat(stylecl.fix_messages(code, "عيوب ظهرت في الفريمات:\n- " + "\n- ".join(map(str, review["issues"][:8]))))
+                try:
+                    code, frames = style_fix_loop(sid, fixed, d, tries=1)
+                except RuntimeError:
+                    pass  # التصليح بوّظ الكود: بنكمل بالنسخة اللي كانت شغالة
+        style_finish(sid, code, frames, review)
+    except Exception as exc:  # noqa: BLE001
+        style_set(sid, status="failed", step=None, error=str(getattr(exc, "detail", None) or exc)[:400])
+
+
+def run_style_revise(sid: str, note: str) -> None:
+    try:
+        d = style_load(sid)
+        code = (STYLE_DIR / sid / "scene.js").read_text(encoding="utf-8")
+        if not atlas.mock_mode():
+            code = style_code_chat(stylecl.fix_messages(code, f"العميل عايز التعديل ده: {note}\nنفّذه من غير ما تبوّظ باقي الفيديو."))
+        style_set(sid, status="checking", step="🧪 بيجرّب التعديل")
+        code, frames = style_fix_loop(sid, code, d)
+        style_finish(sid, code, frames)
+    except Exception as exc:  # noqa: BLE001
+        style_set(sid, status="failed", step=None, error=str(getattr(exc, "detail", None) or exc)[:400])
+
+
+def style_start(sid: str, target, *args) -> None:
+    def fn(d):
+        if d.get("status") in STYLE_BUSY:
+            raise HTTPException(400, "استنى لما الشغل اللي شغال يخلص")
+        d.update(status="planning" if target is run_style else "coding", step="⏳ بيبدأ", error=None)
+    style_update(sid, fn)
+    threading.Thread(target=target, args=(sid, *args), daemon=True).start()
+
+
+@app.get("/api/stylecl")
+def style_list():
+    STYLE_DIR.mkdir(parents=True, exist_ok=True)
+    out = []
+    for f in STYLE_DIR.glob("*/style.json"):
+        try:
+            out.append(style_view(json.loads(f.read_text(encoding="utf-8"))))
+        except (OSError, ValueError, KeyError):
+            continue
+    return sorted(out, key=lambda x: x.get("created_at") or "", reverse=True)
+
+
+@app.post("/api/stylecl")
+def style_create(idea: str = Form(...), duration: int = Form(10), ratio: str = Form("9:16"), files: list[UploadFile] = File(...)):
+    idea = idea.strip()
+    if not idea:
+        raise HTTPException(400, "اكتب الفكرة")
+    if ratio not in stylecl.RATIOS:
+        raise HTTPException(400, "المقاس ده مش مدعوم")
+    if duration not in stylecl.DURATIONS:
+        raise HTTPException(400, "المدة لازم تكون " + " أو ".join(map(str, stylecl.DURATIONS)) + " ثانية")
+    files = [f for f in files if f.filename][:6]
+    if not files:
+        raise HTTPException(400, "ارفع صورة أو فيديو مرجعي واحد على الأقل")
+    sid = uuid.uuid4().hex[:10]
+    folder = STYLE_DIR / sid
+    folder.mkdir(parents=True, exist_ok=True)
+    try:
+        refs = [save_upload(f, STYLE_IMG | STYLE_VID, folder, "ref") for f in files]
+    except HTTPException:
+        shutil.rmtree(folder, ignore_errors=True)
+        raise
+    d = {"id": sid, "idea": idea[:1500], "duration": duration, "ratio": ratio, "refs": refs, "status": "new", "created_at": now()}
+    (folder / "style.json").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+    style_start(sid, run_style)
+    return style_view(style_load(sid))
+
+
+@app.get("/api/stylecl/{sid}")
+def style_get(sid: str):
+    return style_view(style_load(sid))
+
+
+class StyleReviseIn(BaseModel):
+    note: str
+
+
+@app.post("/api/stylecl/{sid}/revise")
+def style_revise(sid: str, body: StyleReviseIn):
+    note = body.note.strip()[:1000]
+    if not note:
+        raise HTTPException(400, "اكتب التعديل اللي عايزه")
+    if not (STYLE_DIR / Path(sid).name / "scene.js").exists():
+        raise HTTPException(400, "لسه مفيش فيديو يتعدّل")
+    style_update(sid, lambda d: d.setdefault("notes", []).append({"note": note, "at": now()}))
+    style_start(Path(sid).name, run_style_revise, note)
+    return style_view(style_load(sid))
+
+
+@app.post("/api/stylecl/{sid}/retry")
+def style_retry(sid: str):
+    style_start(Path(sid).name, run_style)
+    return style_view(style_load(sid))
+
+
+@app.delete("/api/stylecl/{sid}")
+def style_delete(sid: str):
+    d = style_load(sid)
+    if d.get("status") in STYLE_BUSY:
+        raise HTTPException(400, "استنى لما الشغل اللي شغال يخلص")
+    shutil.rmtree(STYLE_DIR / Path(sid).name, ignore_errors=True)
+    return {"ok": True}
+
+
+@app.get("/api/stylecl/{sid}/file/{name}")
+def style_file(sid: str, name: str):
+    f = STYLE_DIR / Path(sid).name / Path(name).name
+    if not f.exists() or name.startswith(".") or f.suffix.lower() not in STYLE_IMG | STYLE_VID:
+        raise HTTPException(404, "مش موجود")
+    return FileResponse(f)
 
 
 @app.get("/")

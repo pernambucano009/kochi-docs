@@ -1295,3 +1295,20 @@ html { overflow-x: clip; }
 .vr-idea { padding: 12px 14px; border-radius: 14px; background: var(--nh-bg); font-size: 12.5px; display: grid; gap: 4px; align-content: start; }
 .vr-idea p { margin: 0; color: var(--nh-muted); }
 .vr-idea .nb-btn { justify-self: start; margin-top: 4px; }
+/* 🎨 استنساخ الستايل */
+.sc-wrap { display: grid; gap: 16px; }
+.sc-new { display: grid; gap: 10px; padding: 18px 20px; border-radius: 20px; background: var(--nh-fill); }
+.sc-new > .nb-btn { justify-self: start; }
+.sc-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+.sc-card { display: grid; gap: 10px; align-content: start; padding: 16px; border-radius: 20px; background: var(--nh-fill); }
+.sc-head { display: flex; align-items: center; gap: 8px; }
+.sc-head b { flex: 1; font-weight: 500; }
+.sc-refs, .sc-frames { display: flex; gap: 6px; overflow-x: auto; }
+.sc-refs img, .sc-refs video { height: 56px; border-radius: 8px; object-fit: cover; }
+.sc-frames img { height: 140px; border-radius: 10px; }
+.sc-video { width: 100%; max-height: 520px; border-radius: 14px; background: #000; }
+.sc-step { font-size: 13px; color: var(--nh-accent); }
+.sc-err { font-size: 12.5px; color: var(--nh-accent); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.sc-style { display: flex; gap: 4px; align-items: center; font-size: 12px; color: var(--nh-muted); flex-wrap: wrap; }
+.sc-style i { width: 14px; height: 14px; border-radius: 50%; }
+.sc-style span { margin-inline-start: 6px; }

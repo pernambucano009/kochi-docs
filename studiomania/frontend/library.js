@@ -422,3 +422,92 @@ const ViralPage = (() => {
   }
   return { html, mount, close: () => {} };
 })();
+
+// 🎨 استنساخ الستايل (مسودة، مستخبية لحد ما يتحدد مكانها؛ بتفتح بـ NHNav("stylecl")):
+// مراجع + فكرة ← أنيميشن مرسوم بالكود فريم فريم، بصوت متعمل بالحساب
+const StyleClonePage = (() => {
+  const S = { el: null, list: [], timer: null, busy: false };
+  const BUSY = ["planning", "coding", "checking", "reviewing", "rendering"];
+  const html = () => `<div class="nb-wrap sc-wrap" id="scWrap"><div class="nh-empty">بيحمّل…</div></div>`;
+  const card = (p) => `<div class="sc-card" data-sid="${p.id}">
+      <div class="sc-head"><b>${libEsc(p.title)}</b><span class="nb-state">${p.ratio} · ${p.duration}ث</span>
+        <button class="nb-btn sm danger" data-sdel ${BUSY.includes(p.status) ? "disabled" : ""}>حذف</button></div>
+      <div class="sc-refs">${p.refs.map((u) => /\.(mp4|mov|webm|m4v)$/i.test(u) ? `<video src="${u}" muted></video>` : `<img src="${u}" alt="">`).join("")}</div>
+      <p class="nb-hint">${libEsc(p.idea)}</p>
+      ${BUSY.includes(p.status) ? `<div class="sc-step">${libEsc(p.step || "⏳ شغال…")}</div>` : ""}
+      ${p.status === "failed" ? `<div class="sc-err">⚠️ ${libEsc(p.error || "حصلت مشكلة")} <button class="nb-btn sm" data-sretry>جرّب تاني</button></div>` : ""}
+      ${p.style ? `<div class="sc-style">${(p.style.palette || []).map((c) => `<i style="background:${libEsc(c)}"></i>`).join("")}<span>${libEsc(p.style.name || "")}: ${libEsc(p.style.look || "")}</span></div>` : ""}
+      ${p.video ? `<video class="sc-video" src="${p.video}" controls playsinline></video>
+        <div class="nb-bar"><a class="nb-btn sm" href="${p.video}" download>⬇ نزّل</a>${p.review?.score ? `<span class="nb-state">تقييم المراجعة: ${p.review.score}/10</span>` : ""}</div>`
+        : p.frames.length ? `<div class="sc-frames">${p.frames.map((u) => `<img src="${u}?v=${encodeURIComponent(p.updated_at || "")}" alt="">`).join("")}</div>` : ""}
+      ${p.video && !BUSY.includes(p.status) ? `<div class="nb-row"><label class="nb-f"><span>عايز تغيّر حاجة؟</span><input type="text" data-snote placeholder="مثلًا: خلّي الكلام أكبر والنهاية أبطأ"></label>
+        <button class="nb-btn" data-srev>✏️ عدّل</button></div>` : ""}
+    </div>`;
+  function render() {
+    const w = S.el;
+    if (!w) return;
+    w.innerHTML = `
+      <div class="sc-new">
+        <p class="nb-hint">ارفع صورة أو فيديو مرجعي بالستايل اللي عاجبك، واكتب فكرتك. البرنامج بياخد الستايل بس (مش موضوع المرجع) ويرسم الأنيميشن بالكود فريم فريم، ومعاه موسيقى ومؤثرات. الستايلات المرسومة (فلات، خطوط، ورق مقصوص، حبيبات طباعة) بتطلع أحسن من الواقعي. بياخد كذا دقيقة.</p>
+        <label class="nb-btn">🖼️ المراجع<input type="file" accept="image/*,video/*" multiple data-sfiles hidden></label> <span class="nb-state" data-sfcount></span>
+        <div class="nb-row"><label class="nb-f"><span>الفكرة</span><textarea rows="3" data-sidea placeholder="مثلًا: 3 أخطاء بتبوّظ الدايت، والحل في الآخر"></textarea></label></div>
+        <div class="nb-row">
+          <label class="nb-f"><span>المدة</span><select data-sdur><option>6</option><option selected>10</option><option>15</option><option>20</option></select></label>
+          <label class="nb-f"><span>المقاس</span><select data-sratio><option>9:16</option><option>1:1</option><option>4:5</option><option>16:9</option></select></label>
+          <button class="nb-btn" data-sgo ${S.busy ? "disabled" : ""}>🎨 ابدأ</button></div>
+      </div>
+      <div class="sc-list">${S.list.map(card).join("") || ""}</div>`;
+  }
+  const refreshList = () => { const l = S.el?.querySelector(".sc-list"); if (l) l.innerHTML = S.list.map(card).join(""); };
+  async function poll() {
+    clearTimeout(S.timer);
+    if (!S.el?.isConnected) return;
+    if (S.list.some((p) => BUSY.includes(p.status))) {
+      try { S.list = await api("/api/stylecl"); refreshList(); } catch {}
+      S.timer = setTimeout(poll, 3000);
+    }
+  }
+  function bind(w) {
+    w.addEventListener("change", (e) => {
+      if (e.target.hasAttribute("data-sfiles")) w.querySelector("[data-sfcount]").textContent = e.target.files.length ? `${e.target.files.length} ملف` : "";
+    });
+    w.addEventListener("click", async (e) => {
+      const c = e.target.closest("[data-sid]");
+      const sid = c?.dataset.sid;
+      try {
+        if (e.target.closest("[data-sgo]")) {
+          const files = w.querySelector("[data-sfiles]").files;
+          const idea = w.querySelector("[data-sidea]").value.trim();
+          if (!files.length) return toast("ارفع مرجع واحد على الأقل", true);
+          if (!idea) return toast("اكتب الفكرة", true);
+          const form = new FormData();
+          [...files].slice(0, 6).forEach((f) => form.append("files", f));
+          form.append("idea", idea);
+          form.append("duration", w.querySelector("[data-sdur]").value);
+          form.append("ratio", w.querySelector("[data-sratio]").value);
+          S.busy = true; render();
+          try { const p = await api("/api/stylecl", { method: "POST", body: form }); S.list.unshift(p); } finally { S.busy = false; render(); }
+          return poll();
+        }
+        if (e.target.closest("[data-sdel]") && confirm("تحذف الفيديو ده؟")) {
+          await api(`/api/stylecl/${sid}`, { method: "DELETE" }); S.list = S.list.filter((p) => p.id !== sid); return refreshList();
+        }
+        if (e.target.closest("[data-sretry]")) { const p = await api(`/api/stylecl/${sid}/retry`, { method: "POST" }); S.list = S.list.map((x) => x.id === sid ? p : x); refreshList(); return poll(); }
+        if (e.target.closest("[data-srev]")) {
+          const note = c.querySelector("[data-snote]").value.trim();
+          if (!note) return toast("اكتب التعديل", true);
+          const p = await api(`/api/stylecl/${sid}/revise`, { method: "POST", ...jsonBody({ note }) });
+          S.list = S.list.map((x) => x.id === sid ? p : x); refreshList(); return poll();
+        }
+      } catch (err) { toast(err.message, true); }
+    });
+  }
+  async function mount(root) {
+    const w = root.querySelector("#scWrap");
+    if (!w) return;
+    S.el = w;
+    bind(w);
+    try { S.list = await api("/api/stylecl"); render(); poll(); } catch (err) { w.innerHTML = `<div class="nh-empty">${libEsc(err.message)}</div>`; }
+  }
+  return { html, mount, close: () => clearTimeout(S.timer) };
+})();
