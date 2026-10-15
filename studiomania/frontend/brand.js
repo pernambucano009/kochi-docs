@@ -61,11 +61,11 @@ const BrandPage = (() => {
       { k: "assets", t: "صور البراند", en: "Assets", leaves: kinds.map(([k, t]) => ({ f: k, t, type: "imgs" })) },
       // الشخصيات (والأفاتار) والتعليق الصوتي والموسيقى: من أساسيات البراند، فبقوا فرع من العقل (كل نقطة بتفتح صفحتها)
       { k: "library", t: "الشخصيات والأصوات", en: "Library", leaves: [
-        { f: "pg", page: "coaches", t: "الشخصيات والأفاتار", type: "page" },
-        { f: "pg", page: "voice", t: "التعليق الصوتي", type: "page" },
-        { f: "pg", page: "music", t: "الموسيقى", type: "page" },
-        { f: "pg", page: "viral", t: "🔥 اللي ماشي في مجالك", type: "page" },
-        { f: "pg", page: "stylecl", t: "🎨 استنساخ الستايل", type: "page" },
+        { f: "pg", i: "coaches", page: "coaches", t: "الشخصيات والأفاتار", type: "page" },
+        { f: "pg", i: "voice", page: "voice", t: "التعليق الصوتي", type: "page" },
+        { f: "pg", i: "music", page: "music", t: "الموسيقى", type: "page" },
+        { f: "pg", i: "viral", page: "viral", t: "🔥 اللي ماشي في مجالك", type: "page" },
+        { f: "pg", i: "stylecl", page: "stylecl", t: "🎨 استنساخ الستايل", type: "page" },
       ] },
       // المعرفة: اللي اتقرا من الملفات واللينكات واتوافق عليه
       { k: "knowledge", t: "المعرفة", en: "Knowledge", leaves: (b?.notes || []).map((x) => ({ f: "n", i: x.id, t: x.title, type: "note", note: x })) },
