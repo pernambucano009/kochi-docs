@@ -191,7 +191,9 @@ def failed(*keys: str) -> None:
 
 
 def client_ip(request: Request) -> str:
-    return (request.headers.get("x-forwarded-for") or (request.client.host if request.client else "")).split(",")[0].strip()
+    # آخر عنوان هو اللي البروكسي بتاع Railway ضافه؛ الأول الزائر يقدر يكتبه بنفسه ويتهرب من حد المحاولات
+    fwd = [x.strip() for x in (request.headers.get("x-forwarded-for") or "").split(",") if x.strip()]
+    return fwd[-1] if fwd else (request.client.host if request.client else "")
 
 
 # ---------------------------------------------------------------- مساحات العمل والنقط
@@ -263,6 +265,10 @@ def tenant_env(wid: str) -> dict:
     env.update(STUDIOMANIA_DATA=str(d), GATEWAY_SECRET=GATEWAY_SECRET, TENANT_ID=wid,
                TENANT_ROLE="admin" if wid == OWNER else "customer", PLATFORM_DB=str(PDB))
     env.pop("APP_PASSWORD", None)
+    # أسرار المنصة نفسها (الدفع والإيميل والدخول بجوجل) بتفضل في البوابة بس
+    for k in list(env):
+        if k.startswith(("STRIPE_", "PAYPAL_", "TAP_", "SMTP_", "RESEND_", "GOOGLE_CLIENT_")):
+            env.pop(k)
     if wid == OWNER:
         if kv_get("zernio_owner_profile"):
             env["ZERNIO_PROFILE_ID"] = kv_get("zernio_owner_profile")
@@ -678,6 +684,9 @@ def google_back(request: Request, code: str = "", state: str = ""):
         u = user_by("id", uid)
     else:
         with closing(db()) as c, c:
+            # أول ربط بجوجل: صاحب الإيميل الحقيقي اتأكد، فأي باسورد اتعمل قبل كده (ممكن من حد تاني) بيتشال وجلساته بتقفل
+            if not u["google_sub"] and u["role"] != "admin":
+                c.execute("UPDATE users SET pw=NULL WHERE id=?", (u["id"],))
             c.execute("UPDATE users SET google_sub=?, verified=1, last_login=? WHERE id=?", (sub, time.time(), u["id"]))
         u = user_by("id", u["id"])
     resp = with_session(RedirectResponse("/"), u, request)
@@ -1022,6 +1031,45 @@ def admin_users(request: Request):
 # حاجات للأدمن بس (المفاتيح، المعمل، أدوات السيرفر، مكسبنا)
 ADMIN_ONLY = re.compile(r"^/(api/(lab|admin|pricing/margins|atlas)(/|$)|api/settings$|media/lab/|lab\b)")
 HOP = {"connection", "keep-alive", "proxy-authenticate", "proxy-authorization", "te", "trailers", "transfer-encoding", "upgrade", "host"}
+# هيدرز البوابة بس هي اللي تحطها: لو الزائر بعتها بنفسه بتتشال
+SPOOF = ("x-gateway-secret", "x-user-", "x-forwarded-", "x-real-ip", "forwarded")
+MAX_BODY = int(float(os.environ.get("MAX_UPLOAD_MB") or 2048) * 1024 * 1024)
+SEC_HEADERS = {"x-content-type-options": "nosniff", "x-frame-options": "SAMEORIGIN", "referrer-policy": "strict-origin-when-cross-origin"}
+
+
+class SecurityMiddleware:
+    """هيدرز أمان على كل رد، ورفض الرفع اللي حجمه المعلن أكبر من الحد (ASGI خام عشان الستريم والفيديو يفضلوا زي ما هم)."""
+
+    def __init__(self, app_):
+        self.app = app_
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            return await self.app(scope, receive, send)
+        cl = dict(scope.get("headers") or []).get(b"content-length", b"0")
+        if cl.isdigit() and int(cl) > MAX_BODY:
+            resp = JSONResponse({"detail": f"الملف أكبر من المسموح ({MAX_BODY // 1048576} ميجا)"}, status_code=413)
+            return await resp(scope, receive, send)
+
+        async def send2(msg):
+            if msg["type"] == "http.response.start":
+                have = {k.lower() for k, _ in msg.get("headers") or []}
+                msg["headers"] = list(msg.get("headers") or []) + [(k.encode(), v.encode()) for k, v in SEC_HEADERS.items() if k.encode() not in have]
+            await send(msg)
+        await self.app(scope, receive, send2)
+
+
+app.add_middleware(SecurityMiddleware)
+
+
+async def capped(stream):
+    """الرفع من غير حجم معروف: بيقف لو عدّى الحد."""
+    n = 0
+    async for chunk in stream:
+        n += len(chunk)
+        if n > MAX_BODY:
+            raise HTTPException(413, "الملف أكبر من المسموح")
+        yield chunk
 
 
 @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"])
@@ -1059,14 +1107,15 @@ async def proxy(path: str, request: Request):
     # الملفات العامة (من غير دخول) بتتقرا من نسخة صاحب البرنامج، ومن غير بيانات
     t = await ensure(OWNER if u_pub else u["workspace"])
     t.last = time.time()
-    headers = [(k, v) for k, v in request.headers.raw if k.decode().lower() not in HOP and k.decode().lower() != "cookie"]
+    headers = [(k, v) for k, v in request.headers.raw
+               if (n := k.decode().lower()) not in HOP and n != "cookie" and not n.startswith(SPOOF)]
     headers += [(b"x-gateway-secret", GATEWAY_SECRET.encode()), (b"x-forwarded-host", (request.headers.get("host") or "").encode()),
                 (b"x-forwarded-proto", (request.headers.get("x-forwarded-proto") or request.url.scheme).encode())]
     if u and not u_pub:
         headers += [(b"x-user-email", u["email"].encode()), (b"x-user-role", u["role"].encode())]
     target = f"http://127.0.0.1:{t.port}{url_path}" + (f"?{request.url.query}" if request.url.query else "")
     req = _http.build_request(request.method, target, headers=headers,
-                              content=request.stream() if request.method not in ("GET", "HEAD", "OPTIONS") else None)
+                              content=capped(request.stream()) if request.method not in ("GET", "HEAD", "OPTIONS") else None)
     try:
         r = await _http.send(req, stream=True)
     except httpx.HTTPError:

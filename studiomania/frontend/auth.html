@@ -58,7 +58,7 @@ async function post(url, body) {
   if (!r.ok) throw new Error(typeof d.detail === "string" ? d.detail : "حصلت مشكلة، جرّب تاني");
   return d;
 }
-const next = () => { const n = Q.get("next"); return n && n.startsWith("/") && !n.startsWith("//") ? n : "/"; };
+const next = () => { const n = Q.get("next"); return n && /^\/(?![\/\\])/.test(n) ? n : "/"; };
 
 const VIEWS = {
   login: () => `${tabs("login")}${google()}
