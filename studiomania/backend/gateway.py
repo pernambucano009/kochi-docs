@@ -38,6 +38,7 @@ from starlette.background import BackgroundTask
 
 import billing
 import mailer
+import payments
 
 BACKEND = Path(__file__).resolve().parent
 ROOT = BACKEND.parent
@@ -85,7 +86,12 @@ with closing(db()) as _c, _c:
       updated_at REAL);
     CREATE TABLE IF NOT EXISTS ledger (id TEXT PRIMARY KEY, workspace TEXT, delta INTEGER, kind TEXT, note TEXT, ref TEXT, at REAL);
     CREATE TABLE IF NOT EXISTS kv (k TEXT PRIMARY KEY, v TEXT);
+    CREATE TABLE IF NOT EXISTS payments (ref TEXT PRIMARY KEY, workspace TEXT, provider TEXT, kind TEXT, amount REAL, note TEXT, at REAL);
     """)
+    _cols = {r[1] for r in _c.execute("PRAGMA table_info(workspaces)")}
+    for _col, _typ in (("provider", "TEXT"), ("sub_id", "TEXT"), ("customer", "TEXT"), ("ends_at", "REAL"), ("sub_started", "REAL")):
+        if _col not in _cols:
+            _c.execute(f"ALTER TABLE workspaces ADD COLUMN {_col} {_typ}")
 
 
 def kv_get(k: str) -> str | None:
@@ -471,6 +477,7 @@ class SignupIn(BaseModel):
     name: str = ""
 
 
+SKIP_VERIFY = os.environ.get("SKIP_EMAIL_VERIFY") == "1"
 MAIL_FAIL = "الإيميل مقدرش يتبعت دلوقتي. جرّب كمان شوية، ولو فضلت المشكلة كلّمنا"
 
 
@@ -498,9 +505,11 @@ def signup(body: SignupIn, request: Request):
     wid = new_workspace(body.name.strip()[:80] or email.split("@")[0])
     uid = uuid.uuid4().hex[:12]
     with closing(db()) as c, c:
-        c.execute("INSERT INTO users (id, email, name, pw, verified, role, workspace, created_at) VALUES (?, ?, ?, ?, 0, 'customer', ?, ?)",
-                  (uid, email, body.name.strip()[:80], pw_hash(body.password), wid, time.time()))
+        c.execute("INSERT INTO users (id, email, name, pw, verified, role, workspace, created_at) VALUES (?, ?, ?, ?, ?, 'customer', ?, ?)",
+                  (uid, email, body.name.strip()[:80], pw_hash(body.password), int(SKIP_VERIFY), wid, time.time()))
     u = user_by("id", uid)
+    if SKIP_VERIFY:   # لحد ما الإيميل يشتغل على السيرفر
+        return with_session(JSONResponse({"ok": True, "verify": False}), u, request)
     sent, dev = send_verify(u, request)
     failed(client_ip(request))   # كل تسجيل بيتحسب، عشان محدش يعمل حسابات كتير من نفس المكان
     return with_session(JSONResponse({"ok": True, "verify": True, "dev_link": dev, "mail_failed": not sent and not dev}), u, request)
@@ -666,6 +675,318 @@ def google_back(request: Request, code: str = "", state: str = ""):
     resp.delete_cookie("g_state")
     return resp
 
+
+
+# ---------------------------------------------------------------- 💳 الاشتراكات والنقط (Stripe / PayPal)
+
+def plan_of(key: str) -> dict | None:
+    return next((p for p in billing.config(DATA_DIR)["plans"] if p["key"] == key and not p.get("once")), None)
+
+
+def ledger_add(c: sqlite3.Connection, wid: str, delta: int, kind: str, note: str, ref: str = "") -> None:
+    c.execute("INSERT INTO ledger (id, workspace, delta, kind, note, ref, at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+              (uuid.uuid4().hex, wid, delta, kind, note, ref, time.time()))
+
+
+def paid_once(c: sqlite3.Connection, ref: str, wid: str, provider: str, kind: str, amount: float, note: str) -> bool:
+    """True أول مرة بس (كل دفعة بتتسجل مرة واحدة حتى لو الإشعار وصل مرتين)."""
+    try:
+        c.execute("INSERT INTO payments (ref, workspace, provider, kind, amount, note, at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                  (ref, wid, provider, kind, amount, note, time.time()))
+        return True
+    except sqlite3.IntegrityError:
+        return False
+
+
+def apply_subscription(wid: str, plan: str, extra: int, autopilot: bool, provider: str, sub_id: str, customer: str | None, ref: str,
+                       amount: float) -> None:
+    p = plan_of(plan)
+    w = workspace(wid)
+    if not p or not w:
+        return
+    old = (w["provider"], w["sub_id"])
+    with closing(db()) as c, c:
+        if not paid_once(c, ref, wid, provider, "subscription", amount, f"{plan} +{extra} {'ap' if autopilot else ''}"):
+            return
+        c.execute("""UPDATE workspaces SET plan=?, extra_accounts=?, autopilot=?, provider=?, sub_id=?, customer=COALESCE(?, customer),
+                     ends_at=NULL, sub_started=? WHERE id=?""", (plan, extra, int(autopilot), provider, sub_id, customer, time.time(), wid))
+        c.execute("INSERT OR IGNORE INTO wallet (workspace, plan_credits, topup_credits, updated_at) VALUES (?, 0, 0, ?)", (wid, time.time()))
+        c.execute("UPDATE wallet SET plan_credits=?, updated_at=? WHERE workspace=?", (p["credits"], time.time(), wid))
+        ledger_add(c, wid, p["credits"], "plan", f"باقة {p['name']}", ref)
+    # اشتراك قديم بباقة تانية: بيتلغي (عشان العميل مايدفعش مرتين)
+    if old[1] and old[1] != sub_id:
+        try:
+            (payments.stripe_cancel if old[0] == "stripe" else payments.paypal_cancel)(old[1])
+        except payments.PayError:
+            pass
+
+
+def renew(wid: str, ref: str, amount: float) -> None:
+    """تجديد شهري: نقط الباقة بترجع لعددها (من غير ترحيل)."""
+    w = workspace(wid)
+    p = plan_of(w["plan"]) if w else None
+    if not p:
+        return
+    if w["sub_started"] and time.time() - w["sub_started"] < 2 * 86400:
+        return   # أول دفعة (الاشتراك لسه متعمل ومحسوب)
+    with closing(db()) as c, c:
+        if not paid_once(c, ref, wid, w["provider"] or "", "renewal", amount, w["plan"]):
+            return
+        c.execute("UPDATE wallet SET plan_credits=?, updated_at=? WHERE workspace=?", (p["credits"], time.time(), wid))
+        ledger_add(c, wid, p["credits"], "renewal", f"تجديد باقة {p['name']}", ref)
+
+
+def end_subscription(wid: str, at: float | None = None) -> None:
+    """الاشتراك اتلغى: بيفضل شغال لآخر الفترة المدفوعة، وبعدها نقط الباقة والحسابات والأوتوبايلوت بيروحوا (النقط الزيادة بتفضل)."""
+    with closing(db()) as c, c:
+        if at and at > time.time():
+            c.execute("UPDATE workspaces SET ends_at=? WHERE id=?", (at, wid))
+            return
+        c.execute("UPDATE workspaces SET plan='none', extra_accounts=0, autopilot=0, sub_id=NULL, ends_at=NULL WHERE id=?", (wid,))
+        c.execute("UPDATE wallet SET plan_credits=0, updated_at=? WHERE workspace=?", (time.time(), wid))
+        ledger_add(c, wid, 0, "cancel", "الاشتراك خلص")
+
+
+def add_topup(wid: str, key: str, provider: str, ref: str, amount: float) -> bool:
+    t = next((x for x in billing.config(DATA_DIR)["topups"] if x["key"] == key), None)
+    if not t or amount + 0.01 < t["price"]:
+        return False
+    with closing(db()) as c, c:
+        if not paid_once(c, ref, wid, provider, "topup", amount, key):
+            return True
+        c.execute("INSERT OR IGNORE INTO wallet (workspace, plan_credits, topup_credits, updated_at) VALUES (?, 0, 0, ?)", (wid, time.time()))
+        c.execute("UPDATE wallet SET topup_credits=topup_credits+?, updated_at=? WHERE workspace=?", (t["credits"], time.time(), wid))
+        ledger_add(c, wid, t["credits"], "topup", f"نقط زيادة {t['credits']}", ref)
+    return True
+
+
+def expirer() -> None:
+    while True:
+        time.sleep(3600)
+        with closing(db()) as c:
+            due = [r["id"] for r in c.execute("SELECT id FROM workspaces WHERE ends_at IS NOT NULL AND ends_at < ?", (time.time(),))]
+        for wid in due:
+            end_subscription(wid)
+
+
+threading.Thread(target=expirer, daemon=True).start()
+
+
+def customer_user(request: Request) -> sqlite3.Row:
+    u = current_user(request)
+    if not u or not u["verified"]:
+        raise HTTPException(401, "لازم تسجّل دخول")
+    if u["workspace"] == OWNER:
+        raise HTTPException(400, "حساب صاحب البرنامج مش محتاج اشتراك")
+    return u
+
+
+@app.get("/billing")
+def billing_page(request: Request):
+    if not current_user(request):
+        return RedirectResponse("/login?next=/billing")
+    return page("billing.html")
+
+
+@app.get("/api/billing")
+def billing_state(request: Request):
+    u = current_user(request)
+    if not u:
+        raise HTTPException(401, "لازم تسجّل دخول")
+    w = workspace(u["workspace"])
+    with closing(db()) as c:
+        hist = [dict(r) for r in c.execute("SELECT delta, kind, note, at FROM ledger WHERE workspace=? ORDER BY at DESC LIMIT 30",
+                                          (u["workspace"],))]
+    cfg = billing.config(DATA_DIR)
+    return {"me": me_dict(u), "owner": u["workspace"] == OWNER, "plan": w["plan"] if w else "owner",
+            "extra_accounts": (w["extra_accounts"] if w else 0), "autopilot": bool(w and w["autopilot"]),
+            "provider": w["provider"] if w else None, "ends_at": w["ends_at"] if w else None,
+            "can_portal": bool(w and w["provider"] == "stripe" and w["customer"]),
+            "stripe": payments.stripe_on(), "paypal": payments.paypal_on(),
+            "plans": cfg["plans"], "addons": cfg["addons"], "topups": cfg["topups"], "rules": cfg["rules"], "history": hist}
+
+
+class CheckoutIn(BaseModel):
+    provider: str
+    kind: str                 # plan | topup
+    plan: str = ""
+    accounts: int = 0         # حسابات زيادة
+    autopilot: bool = False
+    topup: str = ""
+
+
+@app.post("/api/billing/checkout")
+def checkout(body: CheckoutIn, request: Request):
+    u = customer_user(request)
+    wid, back = u["workspace"], base_url(request)
+    w = workspace(wid)
+    cfg = billing.config(DATA_DIR)
+    try:
+        if body.kind == "topup":
+            t = next((x for x in cfg["topups"] if x["key"] == body.topup), None)
+            if not t:
+                raise HTTPException(400, "باقة النقط دي مش موجودة")
+            name = f"SimsimKit · {t['credits']:,} نقطة"
+            if body.provider == "stripe":
+                url = payments.stripe_checkout(mode="payment", lines=[(name, t["price"], 1)],
+                                               meta={"wid": wid, "kind": "topup", "topup": t["key"]}, email=u["email"],
+                                               customer=w["customer"] if w and w["provider"] == "stripe" else None,
+                                               success=f"{back}/billing?ok=topup", cancel=f"{back}/billing")
+            elif body.provider == "paypal":
+                url = payments.paypal_order(t["price"], f"{wid}|topup|{t['key']}", name,
+                                            ret=f"{back}/api/billing/paypal/order", cancel=f"{back}/billing")
+            else:
+                raise HTTPException(400, "طريقة دفع مش معروفة")
+            return {"url": url}
+        try:
+            tot = billing.custom_total(cfg, body.plan, body.accounts, body.autopilot)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+        p, add = plan_of(body.plan), {a["key"]: a for a in cfg["addons"]}
+        extra = tot["accounts"] - p["accounts"]
+        ap_paid = tot["autopilot"] and not p.get("autopilot")
+        meta = {"wid": wid, "kind": "plan", "plan": p["key"], "extra": str(extra), "ap": "1" if ap_paid else "0"}
+        if body.provider == "stripe":
+            lines = [(f"SimsimKit · باقة {p['name']}", p["price"], 1), (add["account"]["name"], add["account"]["price"], extra)]
+            if ap_paid:
+                lines.append((add["autopilot"]["name"], add["autopilot"]["price"], 1))
+            url = payments.stripe_checkout(mode="subscription", lines=lines, meta=meta, email=u["email"],
+                                           customer=w["customer"] if w and w["provider"] == "stripe" else None,
+                                           success=f"{back}/billing?ok=plan", cancel=f"{back}/billing")
+        elif body.provider == "paypal":
+            key = f"{p['key']}:{extra}:{int(ap_paid)}:{tot['total']}"
+            pid = payments.paypal_plan((kv_get, kv_set), key, f"SimsimKit {p['name_en']} +{extra} accounts{' +autopilot' if ap_paid else ''}",
+                                       tot["total"])
+            url = payments.paypal_subscribe(pid, f"{wid}|{p['key']}|{extra}|{int(ap_paid)}", u["email"],
+                                            ret=f"{back}/api/billing/paypal/sub", cancel=f"{back}/billing")
+        else:
+            raise HTTPException(400, "طريقة دفع مش معروفة")
+        return {"url": url}
+    except payments.PayError as e:
+        raise HTTPException(502, str(e))
+
+
+@app.post("/api/billing/portal")
+def portal(request: Request):
+    u = customer_user(request)
+    w = workspace(u["workspace"])
+    if not w or w["provider"] != "stripe" or not w["customer"]:
+        raise HTTPException(400, "مفيش اشتراك بالكارت")
+    try:
+        return {"url": payments.stripe_portal(w["customer"], f"{base_url(request)}/billing")}
+    except payments.PayError as e:
+        raise HTTPException(502, str(e))
+
+
+@app.post("/api/billing/cancel")
+def cancel_sub(request: Request):
+    """إلغاء اشتراك PayPal من جوه البرنامج (Stripe بيتلغي من بوابة العميل)."""
+    u = customer_user(request)
+    w = workspace(u["workspace"])
+    if not w or not w["sub_id"]:
+        raise HTTPException(400, "مفيش اشتراك شغال")
+    try:
+        if w["provider"] == "paypal":
+            nxt = payments.paypal_sub(w["sub_id"]).get("next")
+            payments.paypal_cancel(w["sub_id"])
+            end_subscription(u["workspace"], _iso(nxt))
+        else:
+            raise HTTPException(400, "الاشتراك بالكارت بيتلغي من «إدارة الاشتراك»")
+    except payments.PayError as e:
+        raise HTTPException(502, str(e))
+    return {"ok": True}
+
+
+def _iso(s: str | None) -> float | None:
+    if not s:
+        return None
+    from datetime import datetime
+    try:
+        return datetime.fromisoformat(s.replace("Z", "+00:00")).timestamp()
+    except ValueError:
+        return None
+
+
+@app.post("/api/billing/stripe/webhook")
+async def stripe_hook(request: Request):
+    raw = await request.body()
+    if not payments.stripe_verify(raw, request.headers.get("stripe-signature", "")):
+        raise HTTPException(400, "bad signature")
+    ev = json.loads(raw)
+    obj, typ = (ev.get("data") or {}).get("object") or {}, ev.get("type")
+    if typ == "checkout.session.completed" and obj.get("payment_status") in ("paid", "no_payment_required"):
+        m = obj.get("metadata") or {}
+        wid, amount = m.get("wid") or obj.get("client_reference_id"), (obj.get("amount_total") or 0) / 100
+        if wid and workspace(wid):
+            if m.get("kind") == "topup":
+                add_topup(wid, m.get("topup", ""), "stripe", obj["id"], amount)
+            elif m.get("kind") == "plan" and obj.get("subscription"):
+                apply_subscription(wid, m.get("plan", ""), int(m.get("extra") or 0), m.get("ap") == "1", "stripe",
+                                   obj["subscription"], obj.get("customer"), obj["id"], amount)
+    elif typ == "invoice.paid" and obj.get("billing_reason") == "subscription_cycle":
+        with closing(db()) as c:
+            r = c.execute("SELECT id FROM workspaces WHERE provider='stripe' AND sub_id=?", (obj.get("subscription"),)).fetchone()
+        if r:
+            renew(r["id"], obj["id"], (obj.get("amount_paid") or 0) / 100)
+    elif typ == "customer.subscription.deleted":
+        with closing(db()) as c:
+            r = c.execute("SELECT id FROM workspaces WHERE provider='stripe' AND sub_id=?", (obj.get("id"),)).fetchone()
+        if r:
+            end_subscription(r["id"])
+    elif typ == "customer.subscription.updated" and obj.get("cancel_at_period_end"):
+        with closing(db()) as c:
+            r = c.execute("SELECT id FROM workspaces WHERE provider='stripe' AND sub_id=?", (obj.get("id"),)).fetchone()
+        if r and obj.get("current_period_end"):
+            with closing(db()) as c, c:
+                c.execute("UPDATE workspaces SET ends_at=? WHERE id=?", (float(obj["current_period_end"]) + 3600, r["id"]))
+    return {"ok": True}
+
+
+@app.get("/api/billing/paypal/order")
+def paypal_order_back(request: Request, token: str = ""):
+    u = customer_user(request)
+    try:
+        cap = payments.paypal_capture(token)
+    except payments.PayError:
+        return RedirectResponse("/billing?err=paypal")
+    wid, kind, key = (cap.get("custom") or "||").split("|")[:3]
+    if cap["status"] != "COMPLETED" or wid != u["workspace"] or kind != "topup" or not add_topup(wid, key, "paypal", token, cap["amount"]):
+        return RedirectResponse("/billing?err=paypal")
+    return RedirectResponse("/billing?ok=topup")
+
+
+@app.get("/api/billing/paypal/sub")
+def paypal_sub_back(request: Request, subscription_id: str = ""):
+    u = customer_user(request)
+    try:
+        s = payments.paypal_sub(subscription_id)
+    except payments.PayError:
+        return RedirectResponse("/billing?err=paypal")
+    parts = (s.get("custom") or "").split("|")
+    if s["status"] not in ("ACTIVE", "APPROVED") or len(parts) != 4 or parts[0] != u["workspace"]:
+        return RedirectResponse("/billing?err=paypal")
+    wid, plan, extra, ap = parts
+    tot = billing.custom_total(billing.config(DATA_DIR), plan, int(extra), ap == "1")
+    apply_subscription(wid, plan, int(extra), ap == "1", "paypal", subscription_id, None, f"pp-sub-{subscription_id}", tot["total"])
+    return RedirectResponse("/billing?ok=plan")
+
+
+@app.post("/api/billing/paypal/webhook")
+async def paypal_hook(request: Request):
+    ev = json.loads(await request.body() or b"{}")
+    if not await asyncio.to_thread(payments.paypal_verify, request.headers, ev):
+        raise HTTPException(400, "bad signature")
+    typ, res = ev.get("event_type"), ev.get("resource") or {}
+    sub_id = res.get("billing_agreement_id") if typ == "PAYMENT.SALE.COMPLETED" else res.get("id")
+    with closing(db()) as c:
+        r = c.execute("SELECT id FROM workspaces WHERE provider='paypal' AND sub_id=?", (sub_id,)).fetchone()
+    if not r:
+        return {"ok": True}
+    if typ == "PAYMENT.SALE.COMPLETED":
+        renew(r["id"], res.get("id") or ev.get("id"), float((res.get("amount") or {}).get("total") or 0))
+    elif typ in ("BILLING.SUBSCRIPTION.CANCELLED", "BILLING.SUBSCRIPTION.SUSPENDED", "BILLING.SUBSCRIPTION.EXPIRED"):
+        end_subscription(r["id"], _iso((res.get("billing_info") or {}).get("next_billing_time")) if typ == "BILLING.SUBSCRIPTION.CANCELLED" else None)
+    return {"ok": True}
 
 # ---------------------------------------------------------------- لوحة الأدمن (أول جزء: العملاء)
 

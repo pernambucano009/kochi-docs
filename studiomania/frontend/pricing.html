@@ -138,7 +138,7 @@ $("lang").onclick = () => I18N.setLang(I18N.lang === "en" ? "ar" : "en");
         <li class="${p.autopilot ? "" : "no"}">أوتوبايلوت (النشر لوحده)${!p.autopilot && add.autopilot.for.includes(p.key) ? ` · تقدر تزوّده بـ ${usd(add.autopilot.price)}` : ""}</li>
         ${p.once ? "" : `<li>حساب زيادة بـ ${usd(add.account.price)} في الشهر${p.max_accounts ? ` (لحد ${p.max_accounts})` : ""}</li>`}
       </ul>
-      <a class="btn${p.popular ? " primary" : ""} wide" href="/login">${p.once ? "جرّب ببلاش" : "اشترك"}</a>
+      <a class="btn${p.popular ? " primary" : ""} wide" href="${p.once ? "/signup" : `/billing?plan=${p.key}`}">${p.once ? "جرّب ببلاش" : "اشترك"}</a>
     </div>`).join("");
 
   // باقة على مقاسك
@@ -175,7 +175,7 @@ $("lang").onclick = () => I18N.setLang(I18N.lang === "en" ? "ar" : "en");
     <div class="top">
       <div class="credits num">${n(t.credits)} <small class="muted" style="font-family:var(--font);font-size:14px">نقطة</small></div>
       <div class="rate">${(t.price * 100 / t.credits).toFixed(2)} سنت للنقطة</div>
-      <a class="btn wide" href="/login">اشتري بـ ${usd(t.price)}</a>
+      <a class="btn wide" href="/billing">اشتري بـ ${usd(t.price)}</a>
     </div>`).join("");
 
   // أمثلة
