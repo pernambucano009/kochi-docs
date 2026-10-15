@@ -12,11 +12,13 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import logging
 import os
 import time
 
 import httpx
 
+log = logging.getLogger("payments")
 CUR = (os.environ.get("PAY_CURRENCY") or "USD").upper()
 
 
@@ -103,32 +105,47 @@ def stripe_verify(payload: bytes, header: str, tolerance: int = 300) -> bool:
 
 # ---------------------------------------------------------------- PayPal
 
+def _pp_cred() -> tuple[str, str]:
+    # من غير مسافات ولا علامات تنصيص لو اتنسخت معاها بالغلط
+    clean = lambda v: (v or "").strip().strip('"').strip("'").strip()
+    return clean(os.environ.get("PAYPAL_CLIENT_ID")), clean(os.environ.get("PAYPAL_SECRET"))
+
+
 def paypal_on() -> bool:
-    return bool(os.environ.get("PAYPAL_CLIENT_ID") and os.environ.get("PAYPAL_SECRET"))
+    return all(_pp_cred())
+
+
+LIVE, SANDBOX = "https://api-m.paypal.com", "https://api-m.sandbox.paypal.com"
+_pp_tok: dict = {"t": "", "exp": 0.0, "base": None}
 
 
 def _pp_base() -> str:
-    return "https://api-m.paypal.com" if (os.environ.get("PAYPAL_MODE") or "sandbox") == "live" else "https://api-m.sandbox.paypal.com"
-
-
-_pp_tok: dict = {"t": "", "exp": 0.0}
+    if _pp_tok["base"]:
+        return _pp_tok["base"]
+    return LIVE if (os.environ.get("PAYPAL_MODE") or "sandbox").strip().lower() == "live" else SANDBOX
 
 
 def _pp_token() -> str:
     if _pp_tok["t"] and _pp_tok["exp"] > time.time() + 60:
         return _pp_tok["t"]
-    if not paypal_on():
+    cid, sec = _pp_cred()
+    if not (cid and sec):
         raise PayError("الدفع بـ PayPal مش متفعّل لسه")
-    try:
-        r = httpx.post(f"{_pp_base()}/v1/oauth2/token", auth=(os.environ["PAYPAL_CLIENT_ID"], os.environ["PAYPAL_SECRET"]),
-                       data={"grant_type": "client_credentials"}, timeout=30)
-        j = r.json()
-    except (httpx.HTTPError, ValueError) as e:
-        raise PayError(f"PayPal مش بيرد: {e}") from e
-    if r.status_code >= 400 or "access_token" not in j:
-        raise PayError("بيانات PayPal غلط (PAYPAL_CLIENT_ID / PAYPAL_SECRET)")
-    _pp_tok.update(t=j["access_token"], exp=time.time() + int(j.get("expires_in") or 3000))
-    return _pp_tok["t"]
+    first = _pp_base()
+    # لو المفاتيح من «Sandbox» والوضع «live» (أو العكس) بنجرّب التاني بدل ما نوقف
+    for base in (first, SANDBOX if first == LIVE else LIVE):
+        try:
+            r = httpx.post(f"{base}/v1/oauth2/token", auth=(cid, sec), data={"grant_type": "client_credentials"}, timeout=30)
+            j = r.json()
+        except (httpx.HTTPError, ValueError) as e:
+            raise PayError(f"PayPal مش بيرد: {e}") from e
+        if r.status_code < 400 and "access_token" in j:
+            if base != first:
+                log.warning("paypal keys belong to %s, not PAYPAL_MODE", "sandbox" if base == SANDBOX else "live")
+            _pp_tok.update(t=j["access_token"], exp=time.time() + int(j.get("expires_in") or 3000), base=base)
+            return _pp_tok["t"]
+        log.warning("paypal token failed on %s: %s %s", base, r.status_code, str(j)[:200])
+    raise PayError("PayPal رفض المفاتيح: اتأكد إن PAYPAL_CLIENT_ID و PAYPAL_SECRET من نفس الـ App ومنسوخين كاملين")
 
 
 def _pp(method: str, path: str, body: dict | None = None) -> dict:
@@ -171,6 +188,7 @@ def paypal_capture(order_id: str) -> dict:
 def paypal_plan(plans_cache, key: str, name: str, price: float) -> str:
     """خطة اشتراك شهري بالسعر ده (بتتعمل مرة واحدة وبتتحفظ). plans_cache = (get, set)."""
     get, put = plans_cache
+    _pp_token()   # يحدد sandbox ولا live قبل ما نقرا الكاش
     if (pid := get(f"paypal_plan:{_pp_base()}:{key}")):
         return pid
     prod = get(f"paypal_product:{_pp_base()}")
