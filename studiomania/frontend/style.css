@@ -2921,3 +2921,13 @@ dialog.cal-dlg { width: min(720px, 94vw); max-height: 90vh; border: 1px solid va
 
 /* 🚪 حساب عميل (من البوابة): أدوات الأدمن بتستخبى */
 html[data-role="customer"] .admin-only { display: none !important; }
+
+/* 🧠 فرز الكومنتات */
+.ib-triage { display: grid; gap: 8px; padding: 12px 14px; margin: 10px 0; border-radius: 14px; background: var(--surface-2); }
+.ib-triage input { flex: 1; min-width: 160px; font: inherit; padding: 7px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); color: var(--text); }
+.ib-tg { align-self: flex-start; font-size: 10.5px; border-radius: 999px; padding: 0 8px; background: var(--surface-2); }
+.ib-tg.t-lead, .ib-tg.t-keyword { background: color-mix(in srgb, var(--ok) 18%, transparent); }
+.ib-tg.t-support { background: color-mix(in srgb, var(--danger) 16%, transparent); }
+.ib-tg.t-question { background: color-mix(in srgb, var(--warn) 18%, transparent); }
+.ib-dm { margin-top: 6px; padding: 8px 10px; border-radius: 10px; border: 1px dashed var(--line); display: grid; gap: 4px; }
+.ib-dm p { margin: 0; }

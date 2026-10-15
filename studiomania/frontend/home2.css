@@ -1269,3 +1269,29 @@ html { overflow-x: clip; }
 .gen-card small.err { color: #D9473A; }
 .gen-acts { display: flex; gap: 8px; }
 @media (max-width: 820px) { .gen-tabs { order: 3; flex-basis: 100%; justify-content: flex-start; overflow-x: auto; } }
+
+/* 🪝 الهوكات بدرجاتها */
+.flw-hooks { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 8px; }
+.flw-hk { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 99px; border: 1px solid var(--line, rgba(0,0,0,.1));
+  background: transparent; color: inherit; font: inherit; font-size: 12px; cursor: pointer; max-width: 100%; text-align: start; }
+.flw-hk b { font-size: 12px; color: var(--acc, #E5613E); }
+.flw-hk i { font-style: normal; opacity: .75; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 260px; }
+.flw-hk.on { border-color: var(--acc, #E5613E); background: color-mix(in srgb, var(--acc, #E5613E) 10%, transparent); }
+/* 🔥 اللي ماشي في مجالك */
+.vr-wrap { display: grid; gap: 14px; }
+.vr-rows { display: grid; gap: 8px; }
+.vr-row { display: grid; grid-template-columns: 1fr 2fr .8fr .8fr 1.2fr auto; gap: 6px; align-items: center; }
+@media (max-width: 760px) { .vr-row { grid-template-columns: 1fr 1fr; } .vr-row [data-k=hook] { grid-column: 1 / -1; } }
+.vr-res h4 { margin: 10px 0 8px; font-weight: 500; font-size: 14px; }
+.vr-table { display: grid; gap: 6px; }
+.vr-tr { display: grid; grid-template-columns: 64px 1fr; gap: 2px 12px; padding: 10px 14px; border-radius: 14px; background: var(--nh-bg); font-size: 12.5px; }
+.vr-tr > :not(.vr-x) { grid-column: 2; }
+.vr-tr.top { outline: 1px solid var(--nh-accent); }
+.vr-x { grid-row: span 3; font: 500 20px var(--nh-latin); color: var(--nh-accent); align-self: center; }
+.vr-hk { color: var(--nh-ink); }
+.vr-tr small { color: var(--nh-muted); line-height: 1.6; }
+.vr-pat { margin: 10px 0 0; font-size: 13px; }
+.vr-ideas { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
+.vr-idea { padding: 12px 14px; border-radius: 14px; background: var(--nh-bg); font-size: 12.5px; display: grid; gap: 4px; align-content: start; }
+.vr-idea p { margin: 0; color: var(--nh-muted); }
+.vr-idea .nb-btn { justify-self: start; margin-top: 4px; }

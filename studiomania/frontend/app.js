@@ -807,3 +807,23 @@ function vmCost(m, secs, res) {
 function vmOptions(models, sel, secs = 10, res = "480p", what = "") {
   return (models || []).map((m) => `<option value="${m.key}" ${m.key === sel ? "selected" : ""}>${escapeHtml(m.label)} · ~$${vmCost(m, secs, res)} ${what || `لكل ${Math.round(secs)} ث`}</option>`).join("");
 }
+
+
+// 🧹 «شيل نَفَس الذكاء الصناعي»: أي زرار عليه data-humanize="#textarea" بينضّف الكلام اللي فيها ويوريك اتغيّر إيه
+document.addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-humanize]");
+  if (!b) return;
+  const ta = document.querySelector(b.dataset.humanize);
+  if (!ta || !ta.value.trim()) return toast("اكتب الكلام الأول", true);
+  const label = b.innerHTML;
+  b.disabled = true; b.textContent = "⏳ بينضّف…";
+  try {
+    const r = await api("/api/humanize", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: ta.value }) });
+    const old = ta.value;
+    ta.value = r.text;
+    ta.dispatchEvent(new Event("input", { bubbles: true }));
+    toast("✅ " + (r.changes || []).slice(0, 3).join(" · "));
+    b.dataset.undo = old;
+  } catch (err) { toast(err.message, true); }
+  b.disabled = false; b.innerHTML = label;
+});

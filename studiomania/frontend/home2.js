@@ -63,6 +63,7 @@ const NH = (() => {
     coaches: { en: "Characters", ar: "الشخصيات", icon: "users", page: "coaches", desc: "كل شخصية بصورتها والكاركتر شيت وصوتها والإنترو والأوترو." },
     voice: { en: "Voices", ar: "التعليق الصوتي", icon: "mic", page: "voice", desc: "مكتبة التعليق." },
     music: { en: "Music", ar: "الموسيقى", icon: "music", page: "music", desc: "مكتبة الموسيقى." },
+    viral: { en: "Trends", ar: "اللي ماشي في مجالك", icon: "megaphone", page: "viral", desc: "بوستات المجال مرتّبة بقد إيه عدّت العادي، وأفكار بنفس الهيكل." },
     motion: { en: "Motion", ar: "مكتبة الموشن", icon: "clapper", page: "motion", desc: "أنيميشنات مكتوبة بالكود، كل واحدة تتضاف للأصول بضغطة." },
   };
   // «فيديو من تصويرك» (المشاريع) بقى برنامج كوتشي لوحده على /kochi، فمش في ستوديومانيا
@@ -476,7 +477,7 @@ const NH = (() => {
     pjFilter();
   });
   // صفحات كاملة بتنزل لتحت (عقل البراند، مكتبة الموشن): كل واحدة ليها موديول بيرسمها
-  const MODS = { brand: BrandPage, motion: MotionPage, coaches: CharactersPage, voice: VoicesPage, music: MusicPage };
+  const MODS = { brand: BrandPage, motion: MotionPage, coaches: CharactersPage, voice: VoicesPage, music: MusicPage, viral: ViralPage };
   const stopMedia = () => { MotionPage.close(); VoicesPage.close(); MusicPage.close(); CharactersPage.close?.(); };
   let pageArg = null, pStack = [];
   // عنوان الصفحة (من البروتوتايب): الأيقونة الزجاج كبيرة، وفوق الاسم اسم القسم بالإنجليزي بالبرتقالي

@@ -3993,6 +3993,92 @@ def inbox_suggest(body: InboxSuggestIn):
     return {"reply": reply.strip().strip('"«»').strip()}
 
 
+# ---------------------------------------------------------------- 📈 أدوات النمو (growth.py)
+import growth  # noqa: E402
+
+
+def growth_json(messages: list[dict], what: str) -> dict:
+    try:
+        return az.parse_json(llm(messages, json_mode=True, temperature=0.6), what)
+    except ValueError as exc:
+        raise HTTPException(400, f"المخ رجّع رد مش مفهوم ({what})، جرّب تاني") from exc
+
+
+def growth_brand(query: str = "") -> str:
+    b = cz.full_brand(brand_settings())
+    return "\n".join(x for x in (b.get("name"), b.get("about"), f"الجمهور: {b.get('audience') or ''}", b.get("rules") or "") if x)[:3000]
+
+
+class TriageIn(BaseModel):
+    post: str = ""
+    platform: str = ""
+    keyword: str = ""      # كلمة الـ CTA اللي الناس بتكتبها في الكومنت
+    dm_hint: str = ""      # الرسالة الخاصة لازم تقول إيه (مثلًا اللينك)
+    comments: list[dict] = []
+
+
+@app.post("/api/inbox/triage")
+def inbox_triage(body: TriageIn):
+    """بيفرز الكومنتات (عميل محتمل / سؤال / الكلمة / مشكلة / مدح / سبام) ويجهّز رد لكل واحد، ورسالة خاصة للي محتاجها."""
+    coms = [{"id": str(c.get("id") or ""), "name": str(c.get("name") or "")[:60], "text": str(c.get("text") or "")[:500]}
+            for c in body.comments if c.get("id") and str(c.get("text") or "").strip()][:60]
+    if not coms:
+        raise HTTPException(400, "مفيش كومنتات محتاجة رد")
+    raw = growth.mock_triage(coms, body.keyword) if atlas.mock_mode() else growth_json(
+        growth.triage_messages(growth_brand(), body.post, body.platform, body.keyword.strip()[:40], body.dm_hint.strip()[:400], coms), "فرز الكومنتات")
+    ids = {c["id"]: c for c in coms}
+    out = []
+    for it in raw.get("items") or []:
+        cid = str(it.get("id") or "").strip("[] ")
+        if cid not in ids:
+            continue
+        kind = str(it.get("type") or "other")
+        if growth.keyword_hit(ids[cid]["text"], body.keyword):
+            kind = "keyword"   # الكلمة نفسها مكتوبة: أكيد
+        kind = kind if kind in growth.KINDS else "other"
+        out.append({"id": cid, "type": kind, "label": growth.KINDS[kind], "reply": str(it.get("reply") or "").strip()[:600],
+                    "dm": str(it.get("dm") or "").strip()[:800]})
+    counts = {k: sum(1 for o in out if o["type"] == k) for k in growth.KINDS}
+    return {"items": out, "counts": counts, "labels": growth.KINDS}
+
+
+class ViralIn(BaseModel):
+    niche: str = ""
+    items: list[dict] = []   # [{url, account, hook, views, avg}]
+
+
+@app.post("/api/viral")
+def viral_finder(body: ViralIn):
+    """«اللي ماشي في مجالك»: كل بوست بمشاهداته ÷ متوسط حسابه، وتحليل ليه الأعلى نجحوا، وأفكار بنفس الهيكل للبراند."""
+    rows = growth.outliers([i for i in body.items if isinstance(i, dict)][:30])
+    if not rows:
+        raise HTTPException(400, "ضيف بوست واحد على الأقل")
+    if not any(r["multiple"] for r in rows):
+        raise HTTPException(400, "اكتب مشاهدات البوست ومتوسط مشاهدات الحساب علشان نحسب المضاعف")
+    raw = growth.mock_viral(rows) if atlas.mock_mode() else growth_json(growth.viral_messages(growth_brand(), body.niche.strip()[:200], rows), "التحليل")
+    return {"rows": rows, "top": raw.get("top") or [], "pattern": str(raw.get("pattern") or ""), "ideas": raw.get("ideas") or []}
+
+
+class HumanizeIn(BaseModel):
+    text: str
+
+
+@app.post("/api/humanize")
+def humanize(body: HumanizeIn):
+    """🧹 بيشيل نَفَس الذكاء الصناعي من الكابشن أو السكريبت: الحروف المخفية والعبارات المعلّبة، من غير ما يغيّر المعنى أو اللهجة."""
+    text, changes = growth.clean_invisible(body.text or "")
+    if not text:
+        raise HTTPException(400, "مفيش كلام")
+    if not atlas.mock_mode():
+        raw = growth_json(growth.humanize_messages(text, growth_brand()), "التنضيف")
+        new = str(raw.get("text") or "").strip()
+        if new:
+            new, more = growth.clean_invisible(new)
+            text = new
+            changes += [str(c)[:200] for c in raw.get("changes") or [] if str(c).strip()][:12]
+    return {"text": text, "changes": changes or ["الكلام كان نضيف، ماغيرتش حاجة"]}
+
+
 # ---------------------------------------------------------------- 🔔 الإشعارات
 # حاجات بتحصل في الخلفية وانت مش فاتح صفحتها: تصدير خلص أو فشل، بوست اتنشر أو فشل، أوتوبايلوت خلص أو وقف.
 NOTIFY_KEEP = 200
@@ -19250,8 +19336,15 @@ def flow_gen_ideas(fid: str, hint: str = "", more: bool = False) -> None:
     else:
         raw = flow_llm(fz.ideas_messages(flow_brand(brain, d["template"]["name"]), fz.prefs_text(brain), flow_tpl(d), flow_assets_list(d),
                                          3, avoid if more else [], hint, d.get("season") or ""), "الأفكار")
-    items = [{"id": uuid.uuid4().hex[:8], **{x: str(i.get(x) or "")[:600] for x in ("title", "hook", "idea", "fit", "why")}}
-             for i in (raw.get("ideas") or [])[:5] if isinstance(i, dict)]
+    items = []
+    for i in (raw.get("ideas") or [])[:5]:
+        if not isinstance(i, dict):
+            continue
+        it = {"id": uuid.uuid4().hex[:8], **{x: str(i.get(x) or "")[:600] for x in ("title", "hook", "idea", "fit", "why")}}
+        best, hooks = growth.best_hook(i.get("hooks"))   # ٣ هوكات بدرجات، وأحسنهم هو الهوك
+        if hooks:
+            it.update(hook=best, hooks=hooks)
+        items.append(it)
     if not items:
         raise HTTPException(400, "المخ مرجعش أفكار، جرّب تاني")
     flow_update(fid, lambda x: x.update(ideas=(x.get("ideas") or []) + items if more else items))
@@ -19273,6 +19366,26 @@ def flow_gen_scenarios(fid: str, hint: str = "", more: bool = False) -> None:
     if not items:
         raise HTTPException(400, "المخ مرجعش سيناريوهات، جرّب تاني")
     flow_update(fid, lambda x: x.update(scenarios=(x.get("scenarios") or []) + items if more else items))
+
+
+class FlowHookIn(BaseModel):
+    idea_id: str
+    hook: str
+
+
+@app.post("/api/flows/{fid}/hook")
+def flow_set_hook(fid: str, body: FlowHookIn):
+    """العميل اختار هوك تاني من الهوكات المقترحة للفكرة."""
+    hook = body.hook.strip()[:300]
+
+    def upd(x):
+        for it in x.get("ideas") or []:
+            if it.get("id") == body.idea_id:
+                it["hook"] = hook
+        if (x.get("idea") or {}).get("id") == body.idea_id:
+            x["idea"]["hook"] = hook
+    flow_update(fid, upd)
+    return flow_to_dict(fid, flow_load(fid))
 
 
 class FlowNewIn(BaseModel):

@@ -124,9 +124,15 @@ const Flow = (() => {
   function ideaCard(it) {
     if (S.edit === it.id) return ideaForm(it);
     return `<article class="flw-card${S.seen.has(it.id) ? "" : " in"}" data-cid="${esc(it.id)}"><div class="flw-ch"><b>${esc(it.title)}</b>${rateBtns("idea", it.id)}</div>
-      ${it.hook ? `<p class="flw-hook">«${esc(it.hook)}»</p>` : ""}<p>${esc(it.idea)}</p>${it.fit ? `<small class="flw-fit">🎨 على القالب: ${esc(it.fit)}</small>` : ""}${it.why ? `<small class="muted">💡 ${esc(it.why)}</small>` : ""}
+      ${it.hook ? `<p class="flw-hook">«${esc(it.hook)}»</p>` : ""}${hooksRow(it)}<p>${esc(it.idea)}</p>${it.fit ? `<small class="flw-fit">🎨 على القالب: ${esc(it.fit)}</small>` : ""}${it.why ? `<small class="muted">💡 ${esc(it.why)}</small>` : ""}
       <div class="flw-acts"><button type="button" class="flw-btn pri" data-pick-idea="${it.id}">اختار الفكرة دي</button>
         <button type="button" class="flw-link" data-edit="${it.id}">✏️ عدّل</button></div></article>`;
+  }
+  // ٣ هوكات بدرجات (من قوالب مختلفة): الأعلى هو المختار، والعميل يقدر يبدّل بدوسة
+  function hooksRow(it) {
+    if (!(it.hooks || []).length) return "";
+    return `<div class="flw-hooks">${it.hooks.map((h) => `<button type="button" class="flw-hk${h.text === it.hook ? " on" : ""}" data-hook="${esc(it.id)}" data-text="${esc(h.text)}"
+        title="${esc(h.why || "")}"><b class="num">${h.score}</b><span>${esc(h.formula || "هوك")}</span>${h.text === it.hook ? "" : `<i>«${esc(h.text)}»</i>`}</button>`).join("")}</div>`;
   }
   function ideaForm(it = {}) {
     return `<form class="flw-card flw-form" data-ideaform="${esc(it.id || "")}">
@@ -392,6 +398,7 @@ const Flow = (() => {
       const s = S.seasons.items[+b.dataset.season];
       return call("/ideas", { hint: `أفكار لمناسبة «${s.name}» (${s.date}${s.countries?.length ? ` — ${s.countries.join("، ")}` : ""}). زاوية مقترحة: ${s.angle || ""}`, more: true });
     }
+    if ((b = q("[data-hook]"))) return call("/hook", { idea_id: b.dataset.hook, hook: b.dataset.text });
     if ((b = q("[data-pick-idea]"))) { reset(); return call("/idea", { id: b.dataset.pickIdea }); }
     if ((b = q("[data-pick-scen]"))) { reset(); S.castOpts = null; S.cast = null; return call("/scenario", { id: b.dataset.pickScen }); }
     if ((b = q("[data-chat]"))) { S.chat = S.chat === b.dataset.chat ? null : b.dataset.chat; render(); return S.el.querySelector("[data-chatin]")?.focus(); }

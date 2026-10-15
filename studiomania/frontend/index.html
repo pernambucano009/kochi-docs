@@ -772,7 +772,7 @@
                 <div class="post-video" id="postVideo"><span class="muted">اختار فيديو من الفولدر (دوس «جدول»)</span></div>
                 <label class="field">الكابشن
                   <textarea id="postCaption" rows="4" placeholder="الكلام اللي هينزل مع الفيديو، والهاشتاجات"></textarea></label>
-                <div class="loc-row"><button type="button" class="btn sm" id="brandCaption" title="الكابشن الافتراضي من عقل البراند (مع الـ CTA واللينك)"><span class="emo">✨</span> كابشن البراند</button> <button type="button" class="btn sm" id="addRiyadh" title="Zernio مش بيدعم تحديد مكان البوست، فبنكتبه في الكابشن"><span class="emo">📍</span> ضيف «الرياض» للكابشن</button>
+                <div class="loc-row"><button type="button" class="btn sm" id="brandCaption" title="الكابشن الافتراضي من عقل البراند (مع الـ CTA واللينك)"><span class="emo">✨</span> كابشن البراند</button> <button type="button" class="btn sm" data-humanize="#postCaption" title="بيشيل العبارات المعلّبة والحروف المخفية اللي بتبيّن إن الكلام متولد، من غير ما يغيّر المعنى"><span class="emo">🧹</span> شيل نَفَس الذكاء الصناعي</button> <button type="button" class="btn sm" id="addRiyadh" title="Zernio مش بيدعم تحديد مكان البوست، فبنكتبه في الكابشن"><span class="emo">📍</span> ضيف «الرياض» للكابشن</button>
                   <button type="button" class="btn sm opt-chip" id="igOptsChip" hidden>تاج الكوتش + كولاب</button>
                   <button type="button" class="btn sm opt-chip" id="coverChip" hidden>الغلاف</button></div>
 
@@ -938,6 +938,7 @@
                 <p class="hint">راجع كل كلمة هنا قبل الرسم: الكلام ده هو اللي هيتكتب على الصور بالحرف. تقدر تعدّل بإيدك.</p>
                 <div class="car-slides-edit" id="carPlan"></div>
                 <label class="field">الكابشن <textarea id="carCaption" rows="3"></textarea></label>
+                <button type="button" class="btn sm" data-humanize="#carCaption"><span class="emo">🧹</span> شيل نَفَس الذكاء الصناعي</button>
                 <label class="field">الهاشتاجات <input type="text" id="carTags" dir="auto"></label>
                 <div class="row"><button class="btn primary" id="carToOverview"><span class="emo">🖼️</span> ارسم الشكل العام</button></div>
               </section>
@@ -980,6 +981,7 @@
                   <label class="check"><input type="checkbox" id="carPubTt" checked> تيك توك</label>
                 </div>
                 <label class="field">الكابشن <textarea id="carPubCaption" rows="4" data-no-i18n></textarea></label>
+                <button type="button" class="btn sm" data-humanize="#carPubCaption"><span class="emo">🧹</span> شيل نَفَس الذكاء الصناعي</button>
                 <div class="car-pub-tags">
                   <label class="field">تاج على إنستجرام (حساب الشخصية وأي حد تاني، افصل بمسافة) <input type="text" id="carPubTags" dir="ltr" placeholder="@coach_name"></label>
                   <label id="carPubSlideWrap">التاج على سلايد <select id="carPubSlide"></select></label>

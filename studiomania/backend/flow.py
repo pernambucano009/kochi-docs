@@ -11,6 +11,8 @@ import json
 import re
 from pathlib import Path
 
+import growth
+
 FORMATS = {"reel": "ريل (فيديو قصير)", "carousel": "كاروسيل (صور ورا بعض)", "series": "مسلسل (كذا حلقة)"}
 STAGES = ("idea", "format", "scenario", "cast", "assets", "generate", "done")
 
@@ -93,7 +95,10 @@ def ideas_messages(brand: str, prefs: str, tpl: dict, assets: list[dict], n: int
             + (f"طلب العميل: {hint}\n" if hint else "")
             + (f"المناسبة/الموسم: {season}\n" if season else "")
             + (("ابعد عن الأفكار دي (اتقالت قبل كده):\n" + "\n".join(f"- {a}" for a in avoid[-12:]) + "\n") if avoid else "")
-            + 'رجّع JSON بالشكل ده بس: {"ideas": [{"title": "عنوان قصير", "hook": "أول جملة بتشد", "idea": "الفكرة في ٢-٣ جمل، بتوصف اللي هيتشاف في القالب", '
+            + growth.hooks_rule() + "\n"
+            + 'رجّع JSON بالشكل ده بس: {"ideas": [{"title": "عنوان قصير", '
+              '"hooks": [{"text": "الهوك", "formula": "اسم القالب", "score": 8.5, "why": "ليه الدرجة دي"}, {...}, {...}], '
+              '"idea": "الفكرة في ٢-٣ جمل، بتوصف اللي هيتشاف في القالب", '
               '"fit": "إزاي الفكرة ماشية على القالب: أنهي جزء/خانة/مشهد في القالب بيعمل إيه", "why": "ليه تنفع للبراند ده"}]}')
     return [{"role": "system", "content": _base_system(brand, prefs, tpl, assets)}, {"role": "user", "content": user}]
 
@@ -221,7 +226,7 @@ def scenario_text(sc: dict, fmt: str) -> str:
 
 def mock_ideas(n: int, k: int = 0, tpl_name: str = "") -> dict:
     base = [("ليه الصبح بيبدأ متأخر؟", "مشكلة وحل"), ("حكاية أول عميل", "حكاية"), ("٣ حاجات محدش قالك عليها", "معلومة"), ("تحدّي الـ ٧ أيام", "تحدّي"), ("قبل وبعد", "مقارنة")]
-    return {"ideas": [{"title": f"{base[(i + k) % 5][0]}", "hook": "استنى… الحكاية مش زي ما انت فاكر", "idea": f"فكرة تجريبية بزاوية {base[(i + k) % 5][1]}.",
+    return {"ideas": [{"title": f"{base[(i + k) % 5][0]}", "hooks": growth.mock_hooks(i + k), "idea": f"فكرة تجريبية بزاوية {base[(i + k) % 5][1]}.",
                        "fit": f"ماشية على تسلسل قالب «{tpl_name}»", "why": "بتكلم الجمهور بلغته"} for i in range(n)]}
 
 

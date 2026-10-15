@@ -1,7 +1,7 @@
 // StudioMania — 💬 صندوق الردود: الكومنتات والرسايل من الحسابات المربوطة في Zernio.
 // تختار بوست أو محادثة، تقرا، و«✨ اقترح رد» بيكتب رد بصوت البراند ونفس لهجة اللي كتب. انت تعدّله وتبعته.
 
-const ib = { tab: "comments", posts: [], convs: [], next: null, sel: null, post: null, comments: [], messages: [], loading: false, onlyWaiting: false };
+const ib = { tab: "comments", posts: [], convs: [], next: null, sel: null, post: null, comments: [], messages: [], loading: false, onlyWaiting: false, triage: null, tkw: "", tdm: "" };
 const IB_ICON = { instagram: "◎", facebook: "f", tiktok: "♪", youtube: "▶", twitter: "𝕏", x: "𝕏", threads: "@", linkedin: "in", telegram: "✈", whatsapp: "✆", bluesky: "🦋", reddit: "◉" };
 const IB_NAME = { instagram: "إنستجرام", facebook: "فيسبوك", tiktok: "تيك توك", youtube: "يوتيوب", twitter: "X", x: "X", threads: "ثريدز", linkedin: "لينكدإن", telegram: "تيليجرام", whatsapp: "واتساب", bluesky: "بلوسكاي", reddit: "ريديت" };
 const ibCount = (n) => (n === 1 ? "كومنت واحد" : n === 2 ? "كومنتين" : `${n} كومنتات`);
@@ -77,7 +77,7 @@ const ibWaiting = (c) => !c.mine && !(c.replies || []).some((r) => r.mine);
 async function ibOpenPost(id) {
   const p = ib.posts.find((x) => x.id === id);
   if (!p) return;
-  ib.sel = id; ib.post = p; ib.comments = [];
+  ib.sel = id; ib.post = p; ib.comments = []; ib.triage = null;
   ibRenderList();
   $("ibThread").innerHTML = `<p class="empty">بيحمّل الكومنتات…</p>`;
   try {
@@ -89,15 +89,19 @@ async function ibOpenPost(id) {
 }
 
 function ibCommentHTML(c, reply = false) {
+  const tg = !reply && ib.triage ? ib.triage[c.id] : null;
   return `<div class="ib-c${reply ? " reply" : ""}${c.mine ? " mine" : ""}" data-cid="${escapeHtml(c.id)}">
       ${ibAv(c.picture, c.name)}
       <div class="ib-cb">
         <div class="ib-top"><b>${escapeHtml(c.mine ? "انت" : c.name || c.username || "—")}</b><small>${c.created_at ? ntfAgo(c.created_at) : ""}</small>
-          ${c.hidden ? `<span class="ib-req">مخفي</span>` : ""}${!reply && ibWaiting(c) ? `<span class="ib-wait">مستني رد</span>` : ""}</div>
+          ${c.hidden ? `<span class="ib-req">مخفي</span>` : ""}${!reply && ibWaiting(c) ? `<span class="ib-wait">مستني رد</span>` : ""}
+          ${!reply && tg ? `<span class="ib-tg t-${tg.type}">${escapeHtml(tg.label)}</span>` : ""}</div>
         <p dir="auto">${escapeHtml(c.text)}</p>
-        ${!reply && !c.mine && c.can_reply !== false ? `<button type="button" class="ib-act" data-reply="${escapeHtml(c.id)}">رد</button>` : ""}
+        ${!reply && !c.mine && c.can_reply !== false && !(tg && tg.reply) ? `<button type="button" class="ib-act" data-reply="${escapeHtml(c.id)}">رد</button>` : ""}
         ${(c.replies || []).map((r) => ibCommentHTML(r, true)).join("")}
-        <div class="ib-slot"></div>
+        <div class="ib-slot">${!reply && tg && tg.reply && ibWaiting(c) ? ibComposer(`c:${c.id}`, tg.reply) : ""}
+          ${!reply && tg && tg.dm ? `<div class="ib-dm"><small>✉️ رسالة خاصة مقترحة (انسخها وابعتها من الرسايل):</small><p dir="auto">${escapeHtml(tg.dm)}</p>
+            <button type="button" class="btn sm" data-copy="${escapeHtml(tg.dm)}">📋 انسخ</button></div>` : ""}</div>
       </div></div>`;
 }
 
@@ -109,13 +113,37 @@ function ibRenderPost() {
       <h3 class="ib-cap" dir="auto">${escapeHtml(p.content || "(من غير كابشن)")}</h3>
       ${p.url ? `<a class="ib-open" href="${escapeHtml(p.url)}" target="_blank" rel="noopener">افتح البوست ↗</a>` : ""}
       <label class="ib-filter"><input type="checkbox" id="ibOnlyWaiting" ${ib.onlyWaiting ? "checked" : ""}> اللي مستني رد بس${waiting ? ` (${waiting})` : ""}</label></div>
+    ${waiting ? `<div class="ib-triage">
+      <b>🧠 رتّب الكومنتات وجهّز ردود</b>
+      <div class="row wrap"><input type="text" id="ibKw" placeholder="(اختياري) كلمة الـ CTA، مثلًا: دليل" value="${escapeHtml(ib.tkw)}">
+        <input type="text" id="ibDm" placeholder="(اختياري) الرسالة الخاصة تقول إيه؟ مثلًا: لينك الدليل" value="${escapeHtml(ib.tdm)}">
+        <button type="button" class="btn sm primary" id="ibTriage">رتّب ${waiting} ${waiting === 1 ? "كومنت" : "كومنتات"}</button></div>
+      ${ib.triage ? `<small class="muted">${ibTriageSummary()} · راجع كل رد ودوس «إرسال»، أو عدّله الأول.</small>` : ""}</div>` : ""}
     <div class="ib-comments">${list.map((c) => ibCommentHTML(c)).join("") || `<p class="empty">${ib.onlyWaiting ? "✅ رديت على كل الكومنتات" : "مفيش كومنتات"}</p>`}</div>`;
 }
 
 // صندوق الرد: بيتحط تحت الكومنت (أو فوق لو كومنت جديد على البوست)
-function ibComposer(target) {
+function ibTriageSummary() {
+  const cnt = {};
+  Object.values(ib.triage || {}).forEach((t) => { cnt[t.label] = (cnt[t.label] || 0) + 1; });
+  return Object.entries(cnt).map(([k, v]) => `${k} ${v}`).join(" · ");
+}
+
+async function ibRunTriage(btn) {
+  ib.tkw = $("ibKw").value.trim(); ib.tdm = $("ibDm").value.trim();
+  const coms = ib.comments.filter(ibWaiting).map((c) => ({ id: c.id, name: c.name || c.username || "", text: c.text }));
+  btn.disabled = true; btn.textContent = "⏳ بيرتّب…";
+  try {
+    const r = await api("/api/inbox/triage", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ post: ib.post.content || "", platform: ib.post.platform || "", keyword: ib.tkw, dm_hint: ib.tdm, comments: coms }) });
+    ib.triage = Object.fromEntries(r.items.map((x) => [x.id, x]));
+    ibRenderPost();
+  } catch (err) { toast(err.message, true); btn.disabled = false; btn.textContent = "جرّب تاني"; }
+}
+
+function ibComposer(target, text = "") {
   return `<div class="ib-compose" data-target="${escapeHtml(target)}">
-      <textarea rows="2" placeholder="اكتب الرد… أو دوس «اقترح رد»" dir="auto"></textarea>
+      <textarea rows="2" placeholder="اكتب الرد… أو دوس «اقترح رد»" dir="auto">${escapeHtml(text)}</textarea>
       <input type="text" class="ib-hint" placeholder="(اختياري) عايز الرد يقول إيه؟ مثلًا: الحجز من اللينك في البايو">
       <div class="row">
         <button type="button" class="btn sm ib-sug" data-sug>اقترح رد</button>
@@ -203,6 +231,9 @@ $("ibThread").addEventListener("change", (e) => {
 });
 
 $("ibThread").addEventListener("click", async (e) => {
+  if (e.target.closest("#ibTriage")) return ibRunTriage(e.target.closest("#ibTriage"));
+  const cp = e.target.closest("[data-copy]");
+  if (cp) { try { await navigator.clipboard.writeText(cp.dataset.copy); toast("✅ اتنسخت"); } catch { toast("مقدرتش أنسخ", true); } return; }
   const rep = e.target.closest("[data-reply]");
   if (rep) {
     $("ibThread").querySelectorAll(".ib-compose:not([data-target=conv])").forEach((x) => x.remove());
