@@ -360,9 +360,11 @@ def soundtrack(plan: dict, dur: float, out: Path, seed: int = 7) -> Path:
     except (TypeError, ValueError):
         bpm = 100
     x = _music(dur, bpm, str(m.get("mood") or "warm"), str(m.get("key") or "D")[:1].upper())
+    if plan.get("silent") or plan.get("no_music"):   # «من غير صوت» أو «مؤثرات بس»
+        x = np.zeros_like(x)
     rnd = np.random.default_rng(seed)
     n = x.size
-    for c in plan.get("sfx") or []:
+    for c in ([] if plan.get("silent") else plan.get("sfx") or []):
         try:
             t = float(c.get("t"))
         except (TypeError, ValueError, AttributeError):
@@ -374,6 +376,8 @@ def soundtrack(plan: dict, dur: float, out: Path, seed: int = 7) -> Path:
             x[a:a + k] += s[:k]
     x = _reverb(x)
     peak = float(np.max(np.abs(x))) or 1
+    if plan.get("silent"):
+        peak = 1.0
     x = np.tanh(x / peak * 1.2) * .85
     pcm = (x * 32767).astype("<i2")
     with wave.open(str(out), "wb") as wf:

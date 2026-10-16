@@ -3996,6 +3996,7 @@ def inbox_suggest(body: InboxSuggestIn):
 # ---------------------------------------------------------------- 📈 أدوات النمو (growth.py)
 import growth  # noqa: E402
 import stylecl  # noqa: E402
+import fstudio  # noqa: E402
 
 
 def growth_json(messages: list[dict], what: str) -> dict:
@@ -20203,7 +20204,8 @@ class StylePage:
         self.browser.close()
 
 
-def style_check(code: str, w: int, h: int, dur: float, folder: Path | None = None) -> tuple[str | None, list[str]]:
+def style_check(code: str, w: int, h: int, dur: float, folder: Path | None = None, times: list[float] | None = None,
+                prefix: str = "frame") -> tuple[str | None, list[str]]:
     """بيشغّل الكود في كذا لحظة: أي غلطة، أو كادر فاضي، بترجع كمشكلة. ولو فيه فولدر بيحفظ فريمات للمراجعة."""
     from playwright.sync_api import sync_playwright
 
@@ -20214,7 +20216,8 @@ def style_check(code: str, w: int, h: int, dur: float, folder: Path | None = Non
         sp = StylePage(p, code, w, h, dur, scale=.5)
         try:
             empty = 0
-            for i, t in enumerate(stylecl.sample_times(dur)):
+            times = times or stylecl.sample_times(dur)
+            for i, t in enumerate(times):
                 started = time.time()
                 if (err := sp.at(t)):
                     return f"خطأ في التشغيل: {err}", []
@@ -20224,10 +20227,10 @@ def style_check(code: str, w: int, h: int, dur: float, folder: Path | None = Non
                 if st["sd"] < 2:
                     empty += 1
                 if folder is not None:
-                    name = f"frame_{i}.jpg"
+                    name = f"{prefix}_{i}.jpg"
                     (folder / name).write_bytes(sp.shot(85))
                     frames.append(name)
-            if empty >= 3:
+            if empty >= max(3, len(times) * .6):
                 return "أغلب الفريمات فاضية (لون واحد): مفيش حاجة باينة", frames
         finally:
             sp.close()
@@ -20280,15 +20283,12 @@ def style_fix_loop(sid: str, code: str, d: dict, tries: int = 2) -> tuple[str, l
     return code, []
 
 
-def style_render(sid: str, code: str, d: dict) -> str:
+def code_render(folder: Path, code: str, w: int, h: int, dur: float, fps: int, sound: dict, seed: int, on_step, prefix: str = "style") -> str:
+    """الرسم الكامل: المتصفح المقفول بيرسم كل فريم، والصوت بيتعمل بالحساب، وFFmpeg بيجمّعهم ويظبط علو الصوت."""
     from playwright.sync_api import sync_playwright
 
-    folder = STYLE_DIR / sid
-    w, h = stylecl.RATIOS[d["ratio"]]
-    dur = float(d["duration"])
-    fps = int((d.get("plan") or {}).get("fps") or stylecl.FPS)
     n = int(math.ceil(dur * fps))
-    wav = stylecl.soundtrack(d.get("plan") or {}, dur, folder / ".sound.wav", seed=sum(map(ord, sid)))
+    wav = stylecl.soundtrack(sound, dur, folder / ".sound.wav", seed=seed)
     tmp = folder / f".render_{uuid.uuid4().hex[:6]}.mp4"
     cmd = [ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-f", "image2pipe", "-framerate", str(fps), "-c:v", "mjpeg", "-i", "-",
            "-i", str(wav), "-map", "0:v", "-map", "1:a", "-vf", f"scale={w}:{h},format=yuv420p", "-c:v", "libx264", "-preset", "veryfast",
@@ -20303,7 +20303,7 @@ def style_render(sid: str, code: str, d: dict) -> str:
                         raise RuntimeError(f"خطأ وقت الرسم: {err[:200]}")
                     proc.stdin.write(sp.shot())
                     if i % fps == 0:
-                        style_set(sid, step=f"🎬 بيرسم {i // fps} من {int(dur)} ثانية")
+                        on_step(f"🎬 بيرسم {i // fps} من {int(dur)} ثانية")
             finally:
                 sp.close()
         proc.stdin.close()
@@ -20316,9 +20316,16 @@ def style_render(sid: str, code: str, d: dict) -> str:
         raise
     finally:
         wav.unlink(missing_ok=True)
-    name = f"style-{uuid.uuid4().hex[:4]}.mp4"
+    name = f"{prefix}-{uuid.uuid4().hex[:4]}.mp4"
     tmp.replace(folder / name)
     return name
+
+
+def style_render(sid: str, code: str, d: dict) -> str:
+    w, h = stylecl.RATIOS[d["ratio"]]
+    fps = int((d.get("plan") or {}).get("fps") or stylecl.FPS)
+    return code_render(STYLE_DIR / sid, code, w, h, float(d["duration"]), fps, d.get("plan") or {}, sum(map(ord, sid)),
+                       lambda step: style_set(sid, step=step))
 
 
 def style_finish(sid: str, code: str, frames: list[str], review: dict | None = None) -> None:
@@ -20477,6 +20484,316 @@ def style_delete(sid: str):
 def style_file(sid: str, name: str):
     f = STYLE_DIR / Path(sid).name / Path(name).name
     if not f.exists() or name.startswith(".") or f.suffix.lower() not in STYLE_IMG | STYLE_VID:
+        raise HTTPException(404, "مش موجود")
+    return FileResponse(f)
+
+
+# ---------------------------------------------------------------- 🎞️ «فريم فريم»: استوديو مرسوم بالكود على مراحل
+# المدخلات ← دليل الستايل ← الفكرة والمشاهد ← صور ثابتة (المراجعة الأولى) ← الفيديو (المراجعة التانية).
+# كل مرحلة العميل يعدّلها ويعتمدها قبل اللي بعدها، والتعديل في الأول رخيص.
+
+FS_DIR = DATA_DIR / "fstudio"
+FS_LOCK = threading.Lock()
+FS_BUSY = {"bible", "concept", "stills", "render"}
+FS_STAGES = ("inputs", "bible", "concept", "stills", "done")
+
+
+def fs_load(fid: str) -> dict:
+    f = FS_DIR / Path(fid).name / "fstudio.json"
+    if not f.exists():
+        raise HTTPException(404, "المشروع ده مش موجود")
+    return json.loads(f.read_text(encoding="utf-8"))
+
+
+def fs_update(fid: str, fn) -> dict:
+    with FS_LOCK:
+        d = fs_load(fid)
+        fn(d)
+        d["updated_at"] = now()
+        folder = FS_DIR / Path(fid).name
+        (folder / "fstudio.json.tmp").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+        (folder / "fstudio.json.tmp").replace(folder / "fstudio.json")
+        return d
+
+
+def fs_set(fid: str, **kw) -> dict:
+    return fs_update(fid, lambda d: d.update(**kw))
+
+
+def fs_view(d: dict) -> dict:
+    u = lambda f: f"/api/fstudio/{d['id']}/file/{f}?v={(d.get('updated_at') or '')[-8:]}"
+    return {"id": d["id"], "title": (d.get("concept") or {}).get("title") or d["inputs"]["idea"][:40], "stage": d.get("stage", "inputs"),
+            "job": d.get("job"), "step": d.get("step"), "error": d.get("error"), "inputs": d["inputs"],
+            "refs": [u(f) for f in d.get("refs") or []], "bible": d.get("bible"), "concept": d.get("concept"), "sound": d.get("sound"),
+            "stills": [{"t": s["t"], "url": u(s["file"])} for s in d.get("stills") or []], "review": d.get("review"),
+            "strip": u(d["strip"]) if d.get("strip") else None, "video": u(d["final"]) if d.get("final") else None,
+            "motion_review": d.get("motion_review"), "notes": d.get("notes") or [], "has_code": (FS_DIR / d["id"] / "scene.js").exists(),
+            "created_at": d.get("created_at"), "updated_at": d.get("updated_at")}
+
+
+def fs_job(fid: str, job: str, target, *args) -> dict:
+    def fn(d):
+        if d.get("job") in FS_BUSY:
+            raise HTTPException(400, "استنى لما الخطوة اللي شغالة تخلص")
+        d.update(job=job, step="⏳ بيبدأ", error=None)
+    fs_update(fid, fn)
+
+    def run():
+        try:
+            target(fid, *args)
+            fs_set(fid, job=None, step=None)
+        except Exception as exc:  # noqa: BLE001
+            fs_set(fid, job=None, step=None, error=str(getattr(exc, "detail", None) or exc)[:400])
+    threading.Thread(target=run, daemon=True).start()
+    return fs_view(fs_load(fid))
+
+
+def fs_refs(fid: str) -> list[Path]:
+    return style_ref_images(FS_DIR / fid, fs_load(fid).get("refs") or [])
+
+
+def run_fs_bible(fid: str) -> None:
+    d = fs_load(fid)
+    fs_set(fid, step="👀 بيدرس الستايل من المراجع")
+    if atlas.mock_mode():
+        bible = fstudio.mock_bible(d["inputs"])
+    else:
+        refs = fs_refs(fid)
+        parts = [{"type": "text", "text": fstudio.bible_messages(d["inputs"], len(refs), growth_brand())[0]["content"]}]
+        parts += [{"type": "image_url", "image_url": {"url": data_url(r, "image/jpeg")}} for r in refs]
+        bible = fstudio.clean_bible(ad_json(ad_media_chat([{"role": "user", "content": parts}], 6000), "دليل الستايل"))
+    fs_set(fid, bible=bible, stage="bible")
+
+
+def run_fs_concept(fid: str) -> None:
+    d = fs_load(fid)
+    fs_set(fid, step="🧠 بيكتب الفكرة والمشاهد")
+    if atlas.mock_mode():
+        raw = fstudio.mock_concept(d["inputs"])
+    else:
+        try:
+            raw = az.parse_json(atlas.chat(fstudio.concept_messages(d["inputs"], d.get("bible") or {}), carousel_settings()["text_model"],
+                                           temperature=.7, max_tokens=8000, json_mode=True, timeout=300), "الفكرة")
+        except (atlas.AtlasError, httpx.HTTPError) as exc:
+            raise RuntimeError(f"موديل الكلام: {exc}") from exc
+    dur = d["inputs"]["duration"]
+    concept = fstudio.clean_concept(raw, dur)
+    fs_set(fid, concept={k: v for k, v in concept.items() if k not in ("sfx", "music")}, sound=fstudio.clean_sound(concept, dur), stage="concept")
+
+
+def run_fs_stills(fid: str, note: str = "") -> None:
+    """المراجعة الأولى: الكود + صورة من كل مشهد + رأي «المخرج» جنب المراجع. الملاحظة بتتطبّق على الكود اللي موجود."""
+    d = fs_load(fid)
+    folder = FS_DIR / fid
+    i = d["inputs"]
+    w, h = stylecl.RATIOS[i["ratio"]]
+    plan = fstudio.plan_for_code(d)
+    code_f = folder / "scene.js"
+    if note and code_f.exists():
+        fs_set(fid, step="🔧 بيطبّق ملاحظتك")
+        code = code_f.read_text(encoding="utf-8") if atlas.mock_mode() else style_code_chat(stylecl.fix_messages(code_f.read_text(encoding="utf-8"), note))
+    else:
+        fs_set(fid, step="✍️ بيكتب كود الرسم")
+        code = stylecl.mock_code(plan.get("title") or i["idea"]) if atlas.mock_mode() else style_code_chat(stylecl.code_messages(plan, w, h, i["duration"]))
+    times = fstudio.still_times(d)
+    for k in range(3):
+        fs_set(fid, step="🧪 بيجرّب الكود ويطلّع الصور الثابتة")
+        problem, files = style_child(style_check, code, w, h, i["duration"], folder, times, "still", timeout=180)
+        if not problem:
+            break
+        if k == 2 or atlas.mock_mode():
+            raise RuntimeError(f"الكود فيه مشكلة ومعرفناش نصلّحها: {problem[:200]}")
+        fs_set(fid, step=f"🔧 بيصلّح الكود ({k + 1})")
+        code = style_code_chat(stylecl.fix_messages(code, problem))
+    code_f.write_text(code, encoding="utf-8")
+    review = None
+    if not atlas.mock_mode():
+        fs_set(fid, step="🔍 المخرج بيراجع الصور جنب المراجع")
+        refs = fs_refs(fid)
+        parts = [{"type": "text", "text": stylecl.review_text(plan, len(refs), times)}]
+        parts += [{"type": "image_url", "image_url": {"url": data_url(r, "image/jpeg")}} for r in refs]
+        parts += [{"type": "image_url", "image_url": {"url": data_url(folder / f, "image/jpeg")}} for f in files]
+        try:
+            review = ad_json(ad_media_chat([{"role": "user", "content": parts}], 3000), "المراجعة")
+        except (HTTPException, ValueError, RuntimeError):
+            review = None
+    fs_update(fid, lambda x: x.update(stills=[{"t": t, "file": f} for t, f in zip(times, files)], review=review, stage="stills",
+                                      **({"notes": [*(x.get("notes") or []), {"note": note[:600], "at": now(), "stage": "stills"}]} if note else {})))
+
+
+def run_fs_render(fid: str, note: str = "") -> None:
+    """المراجعة التانية: الفيديو كامل + شريط حركة (3 صور في الثانية) يتشاف مرة واحدة."""
+    d = fs_load(fid)
+    folder = FS_DIR / fid
+    i = d["inputs"]
+    w, h = stylecl.RATIOS[i["ratio"]]
+    code = (folder / "scene.js").read_text(encoding="utf-8")
+    if note:
+        fs_set(fid, step="🔧 بيطبّق ملاحظتك")
+        if not atlas.mock_mode():
+            code = style_code_chat(stylecl.fix_messages(code, note))
+        problem, _ = style_child(style_check, code, w, h, i["duration"], None, fstudio.still_times(d), timeout=180)
+        if problem:
+            raise RuntimeError(f"التعديل بوّظ الكود: {problem[:200]}. جرّب تكتب الملاحظة بشكل تاني")
+        (folder / "scene.js").write_text(code, encoding="utf-8")
+    dur = float(i["duration"])
+    name = style_child(code_render, folder, code, w, h, dur, i["fps"], fstudio.sound_plan(d), sum(map(ord, fid)),
+                       lambda step: fs_set(fid, step=step), "frames", timeout=120 + dur * 30)
+    fs_set(fid, step="🎞️ بيعمل شريط الحركة")
+    strip = f"strip-{uuid.uuid4().hex[:4]}.jpg"
+    rows = max(1, math.ceil(dur * 3 / 15))
+    subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(folder / name), "-vf",
+                    f"fps=3,scale=144:-1,tile=15x{rows}", "-frames:v", "1", str(folder / strip)], capture_output=True, timeout=180)
+    motion = None
+    if not atlas.mock_mode() and (folder / strip).exists():
+        fs_set(fid, step="🔍 المخرج بيراجع الحركة")
+        txt = ("This is a contact strip of an animation (3 frames per second, left to right, top to bottom). Plan:\n"
+               + json.dumps(fstudio.plan_for_code(d), ensure_ascii=False)[:3000]
+               + "\nCheck: a hook in the first second; energy rises and there is a breath before the payoff; every transition has a reason; "
+                 "no dead stretch longer than ~2s; the continuity device stays visible; no flicker, blank segments or clipped text.\n"
+                 'Return JSON only: {"score": 1-10, "ok": true/false, "issues": ["specific issue + time + fix", ...]}')
+        try:
+            motion = ad_json(ad_media_chat([{"role": "user", "content": [{"type": "text", "text": txt},
+                                                                       {"type": "image_url", "image_url": {"url": data_url(folder / strip, "image/jpeg")}}]}], 2000),
+                             "مراجعة الحركة")
+        except (HTTPException, ValueError, RuntimeError):
+            motion = None
+
+    def fin(x):
+        for old in (x.get("final"), x.get("strip")):
+            if old:
+                (folder / old).unlink(missing_ok=True)
+        x.update(final=name, strip=strip if (folder / strip).exists() else None, motion_review=motion, stage="done")
+        if note:
+            x["notes"] = [*(x.get("notes") or []), {"note": note[:600], "at": now(), "stage": "video"}]
+    fs_update(fid, fin)
+
+
+@app.get("/api/fstudio")
+def fs_list():
+    FS_DIR.mkdir(parents=True, exist_ok=True)
+    out = []
+    for f in FS_DIR.glob("*/fstudio.json"):
+        try:
+            out.append(fs_view(json.loads(f.read_text(encoding="utf-8"))))
+        except (OSError, ValueError, KeyError):
+            continue
+    return {"items": sorted(out, key=lambda x: x.get("created_at") or "", reverse=True),
+            "options": {"formats": fstudio.FORMATS, "energy": fstudio.ENERGY, "sound": fstudio.SOUND, "ratios": list(stylecl.RATIOS),
+                        "durations": list(stylecl.DURATIONS), "fonts": list(stylecl.FONTS), "sfx": list(stylecl.SFX_KINDS),
+                        "moods": list(stylecl.MOODS), "keys": list(stylecl.KEYS)}}
+
+
+@app.post("/api/fstudio")
+def fs_create(inputs: str = Form("{}"), files: list[UploadFile] = File(...)):
+    try:
+        i = fstudio.clean_inputs(json.loads(inputs or "{}"))
+    except ValueError:
+        raise HTTPException(400, "البيانات مش مفهومة") from None
+    if not i["idea"]:
+        raise HTTPException(400, "اكتب الفكرة")
+    files = [f for f in files if f.filename][:6]
+    if not files:
+        raise HTTPException(400, "ارفع صورة أو فيديو مرجعي واحد على الأقل")
+    fid = uuid.uuid4().hex[:10]
+    folder = FS_DIR / fid
+    folder.mkdir(parents=True, exist_ok=True)
+    try:
+        refs = [save_upload(f, STYLE_IMG | STYLE_VID, folder, "ref") for f in files]
+    except HTTPException:
+        shutil.rmtree(folder, ignore_errors=True)
+        raise
+    d = {"id": fid, "inputs": i, "refs": refs, "stage": "inputs", "created_at": now()}
+    (folder / "fstudio.json").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+    return fs_job(fid, "bible", run_fs_bible)
+
+
+@app.get("/api/fstudio/{fid}")
+def fs_get(fid: str):
+    return fs_view(fs_load(fid))
+
+
+class FsPatchIn(BaseModel):
+    inputs: dict | None = None
+    bible: dict | None = None
+    concept: dict | None = None
+    sound: dict | None = None
+
+
+@app.patch("/api/fstudio/{fid}")
+def fs_patch(fid: str, body: FsPatchIn):
+    """تعديلات العميل على أي مرحلة (بتتحفظ زي ما هي بعد تنضيفها)."""
+    def fn(d):
+        if d.get("job") in FS_BUSY:
+            raise HTTPException(400, "استنى لما الخطوة اللي شغالة تخلص")
+        if body.inputs is not None:
+            d["inputs"] = fstudio.clean_inputs(body.inputs, d["inputs"])
+        dur = d["inputs"]["duration"]
+        try:
+            if body.bible is not None:
+                d["bible"] = fstudio.clean_bible(body.bible)
+            if body.concept is not None:
+                d["concept"] = {k: v for k, v in fstudio.clean_concept(body.concept, dur).items() if k not in ("sfx", "music")}
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        if body.sound is not None:
+            d["sound"] = fstudio.clean_sound(body.sound, dur)
+    return fs_view(fs_update(Path(fid).name, fn))
+
+
+class FsNoteIn(BaseModel):
+    note: str = ""
+
+
+@app.post("/api/fstudio/{fid}/bible")
+def fs_bible(fid: str):
+    return fs_job(Path(fid).name, "bible", run_fs_bible)
+
+
+@app.post("/api/fstudio/{fid}/concept")
+def fs_concept(fid: str):
+    if not fs_load(fid).get("bible"):
+        raise HTTPException(400, "اعتمد دليل الستايل الأول")
+    return fs_job(Path(fid).name, "concept", run_fs_concept)
+
+
+@app.post("/api/fstudio/{fid}/stills")
+def fs_stills(fid: str, body: FsNoteIn):
+    if not fs_load(fid).get("concept"):
+        raise HTTPException(400, "اعتمد الفكرة والمشاهد الأول")
+    return fs_job(Path(fid).name, "stills", run_fs_stills, body.note.strip()[:1500])
+
+
+@app.post("/api/fstudio/{fid}/render")
+def fs_render(fid: str, body: FsNoteIn):
+    if not (FS_DIR / Path(fid).name / "scene.js").exists():
+        raise HTTPException(400, "اعتمد الصور الثابتة الأول")
+    return fs_job(Path(fid).name, "render", run_fs_render, body.note.strip()[:1500])
+
+
+@app.post("/api/fstudio/{fid}/sound-preview")
+def fs_sound_preview(fid: str):
+    d = fs_load(fid)
+    folder = FS_DIR / Path(fid).name
+    for old in folder.glob("preview-*.wav"):
+        old.unlink(missing_ok=True)
+    name = f"preview-{uuid.uuid4().hex[:4]}.wav"
+    stylecl.soundtrack(fstudio.sound_plan(d), float(d["inputs"]["duration"]), folder / name, seed=sum(map(ord, d["id"])))
+    return {"url": f"/api/fstudio/{d['id']}/file/{name}"}
+
+
+@app.delete("/api/fstudio/{fid}")
+def fs_delete(fid: str):
+    if fs_load(fid).get("job") in FS_BUSY:
+        raise HTTPException(400, "استنى لما الخطوة اللي شغالة تخلص")
+    shutil.rmtree(FS_DIR / Path(fid).name, ignore_errors=True)
+    return {"ok": True}
+
+
+@app.get("/api/fstudio/{fid}/file/{name}")
+def fs_file(fid: str, name: str):
+    f = FS_DIR / Path(fid).name / Path(name).name
+    if not f.exists() or name.startswith(".") or f.suffix.lower() not in STYLE_IMG | STYLE_VID | {".wav"}:
         raise HTTPException(404, "مش موجود")
     return FileResponse(f)
 

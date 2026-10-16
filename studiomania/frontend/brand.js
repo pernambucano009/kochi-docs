@@ -66,6 +66,7 @@ const BrandPage = (() => {
         { f: "pg", i: "music", page: "music", t: "الموسيقى", type: "page" },
         { f: "pg", i: "viral", page: "viral", t: "🔥 اللي ماشي في مجالك", type: "page" },
         { f: "pg", i: "stylecl", page: "stylecl", t: "🎨 استنساخ الستايل", type: "page" },
+        { f: "pg", i: "fstudio", page: "fstudio", t: "🎞️ فريم فريم", type: "page" },
       ] },
       // المعرفة: اللي اتقرا من الملفات واللينكات واتوافق عليه
       { k: "knowledge", t: "المعرفة", en: "Knowledge", leaves: (b?.notes || []).map((x) => ({ f: "n", i: x.id, t: x.title, type: "note", note: x })) },

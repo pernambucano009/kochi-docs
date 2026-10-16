@@ -65,6 +65,7 @@ const NH = (() => {
     music: { en: "Music", ar: "الموسيقى", icon: "music", page: "music", desc: "مكتبة الموسيقى." },
     viral: { en: "Trends", ar: "اللي ماشي في مجالك", icon: "megaphone", page: "viral", desc: "بوستات المجال مرتّبة بقد إيه عدّت العادي، وأفكار بنفس الهيكل." },
     stylecl: { en: "Style Clone", ar: "استنساخ الستايل", icon: "clapper", page: "stylecl", desc: "مرجع بستايل عاجبك + فكرتك ← أنيميشن مرسوم بالكود." },
+    fstudio: { en: "Frame by Frame", ar: "فريم فريم", icon: "clapper", page: "fstudio", desc: "استوديو أنيميشن مرسوم بالكود، وانت متحكم في كل مرحلة." },
     motion: { en: "Motion", ar: "مكتبة الموشن", icon: "clapper", page: "motion", desc: "أنيميشنات مكتوبة بالكود، كل واحدة تتضاف للأصول بضغطة." },
   };
   // «فيديو من تصويرك» (المشاريع) بقى برنامج كوتشي لوحده على /kochi، فمش في ستوديومانيا
@@ -478,8 +479,8 @@ const NH = (() => {
     pjFilter();
   });
   // صفحات كاملة بتنزل لتحت (عقل البراند، مكتبة الموشن): كل واحدة ليها موديول بيرسمها
-  const MODS = { brand: BrandPage, motion: MotionPage, coaches: CharactersPage, voice: VoicesPage, music: MusicPage, viral: ViralPage, stylecl: StyleClonePage };
-  const stopMedia = () => { MotionPage.close(); VoicesPage.close(); MusicPage.close(); CharactersPage.close?.(); StyleClonePage.close(); };
+  const MODS = { brand: BrandPage, motion: MotionPage, coaches: CharactersPage, voice: VoicesPage, music: MusicPage, viral: ViralPage, stylecl: StyleClonePage, fstudio: FrameStudioPage };
+  const stopMedia = () => { MotionPage.close(); VoicesPage.close(); MusicPage.close(); CharactersPage.close?.(); StyleClonePage.close(); FrameStudioPage.close(); };
   let pageArg = null, pStack = [];
   // عنوان الصفحة (من البروتوتايب): الأيقونة الزجاج كبيرة، وفوق الاسم اسم القسم بالإنجليزي بالبرتقالي
   const titleHTML = (t, key) => `<div class="nh-name"><span class="latin">${t.en}</span><b>${esc(t.ar)}</b></div><span class="gi nh-glt">${glImg(GLKEY[key] || GLKEY[t.icon] || "create")}</span>`;
