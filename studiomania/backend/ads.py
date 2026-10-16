@@ -9,6 +9,8 @@ from __future__ import annotations
 import json
 import re
 
+import growth
+
 VIDEO_FORMAT = """{
   "title": "اسم قصير للإعلان",
   "brand": "البراند أو المنتج اللي في الإعلان (لو باين)",
@@ -233,7 +235,7 @@ def adapt_messages(brand: dict, analysis: dict, audio: dict, settings: dict, sty
         + f"رجّع JSON بس بالشكل ده:\n{ADAPT_FORMAT}"
     )
     first = {"role": "user", "content": f"اقترح إعلان لـ«{name}» مستوحى من الإعلان ده."}
-    return [{"role": "system", "content": system}, first] + chat[-12:]
+    return [{"role": "system", "content": system + "\n\n" + growth.psych_rule()}, first] + chat[-12:]
 
 
 def _extract(text: str) -> str:
@@ -839,7 +841,8 @@ def directions_messages(brand: dict, analysis: dict, settings: dict, brain: dict
         + 
         f"رجّع JSON بس بالشكل ده:\n{DIRECTIONS_FORMAT}"
     )
-    return [{"role": "system", "content": system}, {"role": "user", "content": "اقترح 3 اتجاهات."}]
+    return [{"role": "system", "content": system + "\n\n" + growth.psych_rule()
+             + "\nكل اتجاه يتبني على مبدأ نفسي مختلف، واكتب اسمه جوه وصف الاتجاه."}, {"role": "user", "content": "اقترح 3 اتجاهات."}]
 
 
 def mock_directions() -> dict:

@@ -370,12 +370,12 @@ const ViralPage = (() => {
           <b class="vr-x">${r.multiple ? "×" + r.multiple : "—"}</b>
           <span>${libEsc(r.account || "—")} · ${num(r.views)} / ${num(r.avg)}</span>
           <span class="vr-hk">${libEsc(r.hook || "")}</span>
-          ${why[r.n] ? `<small>💡 ${libEsc(why[r.n].why || "")}${why[r.n].formula ? ` · <i>${libEsc(why[r.n].formula)}</i>` : ""}${why[r.n].structure ? `<br>🧩 ${libEsc(why[r.n].structure)}` : ""}</small>` : ""}
+          ${why[r.n] ? `<small>💡 ${libEsc(why[r.n].why || "")}${why[r.n].formula ? ` · <i>${libEsc(why[r.n].formula)}</i>` : ""}${why[r.n].principle ? ` · 🧠 ${libEsc(why[r.n].principle)}` : ""}${why[r.n].structure ? `<br>🧩 ${libEsc(why[r.n].structure)}` : ""}</small>` : ""}
         </div>`).join("")}</div>
       ${R.pattern ? `<p class="vr-pat">🔁 النمط: ${libEsc(R.pattern)}</p>` : ""}
       ${(R.ideas || []).length ? `<h4>أفكار لبراندك بنفس الهيكل (مش نسخ)</h4>
         <div class="vr-ideas">${R.ideas.map((d) => `<div class="vr-idea"><b>${libEsc(d.title || "")}</b>
-          <p>🎣 ${libEsc(d.hook || "")}</p><p>${libEsc(d.idea || "")}</p>
+          <p>🎣 ${libEsc(d.hook || "")}</p><p>${libEsc(d.idea || "")}</p>${d.principle ? `<p>🧠 ${libEsc(d.principle)}</p>` : ""}
           <button class="nb-btn sm" data-cp="${libEsc((d.hook || "") + "\n" + (d.idea || ""))}">📋 انسخ</button></div>`).join("")}</div>` : ""}
     </div>`;
   }

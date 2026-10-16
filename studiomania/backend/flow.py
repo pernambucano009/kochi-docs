@@ -78,7 +78,7 @@ TPL_RULE = ("القالب هو نقطة البداية مش ديكور: العم
 
 def _base_system(brand: str, prefs: str, tpl: dict, assets: list[dict]) -> str:
     parts = ["إنت «مخ البراند»: كاتب ومخرج محتوى سوشيال شاطر بيعرف البراند ده كويس. اكتب بنفس لغة ولهجة البراند (لو مش محددة: عربي مصري خفيف).",
-             "ملف البراند:\n" + (brand or "(لسه مفيش بيانات كتير عن البراند)"), _tpl_line(tpl), TPL_RULE]
+             "ملف البراند:\n" + (brand or "(لسه مفيش بيانات كتير عن البراند)"), _tpl_line(tpl), TPL_RULE, growth.psych_rule()]
     if prefs:
         parts.append(prefs)
     if assets:
@@ -97,7 +97,7 @@ def ideas_messages(brand: str, prefs: str, tpl: dict, assets: list[dict], n: int
             + (("ابعد عن الأفكار دي (اتقالت قبل كده):\n" + "\n".join(f"- {a}" for a in avoid[-12:]) + "\n") if avoid else "")
             + growth.hooks_rule() + "\n"
             + 'رجّع JSON بالشكل ده بس: {"ideas": [{"title": "عنوان قصير", '
-              '"hooks": [{"text": "الهوك", "formula": "اسم القالب", "score": 8.5, "why": "ليه الدرجة دي"}, {...}, {...}], '
+              '"hooks": [{"text": "الهوك", "formula": "اسم القالب", "score": 8.5, "why": "ليه الدرجة دي", "principle": "المبدأ النفسي"}, {...}, {...}], '
               '"idea": "الفكرة في ٢-٣ جمل، بتوصف اللي هيتشاف في القالب", '
               '"fit": "إزاي الفكرة ماشية على القالب: أنهي جزء/خانة/مشهد في القالب بيعمل إيه", "why": "ليه تنفع للبراند ده"}]}')
     return [{"role": "system", "content": _base_system(brand, prefs, tpl, assets)}, {"role": "user", "content": user}]

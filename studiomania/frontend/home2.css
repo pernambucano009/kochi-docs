@@ -1275,6 +1275,7 @@ html { overflow-x: clip; }
 .flw-hk { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 99px; border: 1px solid var(--line, rgba(0,0,0,.1));
   background: transparent; color: inherit; font: inherit; font-size: 12px; cursor: pointer; max-width: 100%; text-align: start; }
 .flw-hk b { font-size: 12px; color: var(--acc, #E5613E); }
+.flw-psy { font-size: 11px; opacity: .8; white-space: nowrap; }
 .flw-hk i { font-style: normal; opacity: .75; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 260px; }
 .flw-hk.on { border-color: var(--acc, #E5613E); background: color-mix(in srgb, var(--acc, #E5613E) 10%, transparent); }
 /* 🔥 اللي ماشي في مجالك */
