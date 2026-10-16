@@ -20189,9 +20189,6 @@ class StylePage:
             return r.abort()
         self.ctx.route("**/*", route)
         self.page = self.ctx.new_page()
-        if scale != 1:
-            # الكود بيرسم على مقاسه الكامل، والصفحة بتصغّره بس وقت التصوير
-            self.page.add_init_script(f"document.addEventListener('DOMContentLoaded',()=>{{const c=document.getElementById('c');c.style.width='{int(w * scale)}px';c.style.height='{int(h * scale)}px'}})")
         self.page.set_content(stylecl.harness(code, w, h, dur), wait_until="load", timeout=60000)
         self.page.evaluate("window.ready")
         self.cdp = self.ctx.new_cdp_session(self.page)
@@ -20289,13 +20286,13 @@ def style_render(sid: str, code: str, d: dict) -> str:
     folder = STYLE_DIR / sid
     w, h = stylecl.RATIOS[d["ratio"]]
     dur = float(d["duration"])
-    fps = stylecl.FPS
+    fps = int((d.get("plan") or {}).get("fps") or stylecl.FPS)
     n = int(math.ceil(dur * fps))
     wav = stylecl.soundtrack(d.get("plan") or {}, dur, folder / ".sound.wav", seed=sum(map(ord, sid)))
     tmp = folder / f".render_{uuid.uuid4().hex[:6]}.mp4"
     cmd = [ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-f", "image2pipe", "-framerate", str(fps), "-c:v", "mjpeg", "-i", "-",
            "-i", str(wav), "-map", "0:v", "-map", "1:a", "-vf", f"scale={w}:{h},format=yuv420p", "-c:v", "libx264", "-preset", "veryfast",
-           "-crf", "19", "-c:a", "aac", "-b:a", "160k", "-r", str(fps), "-t", f"{dur:.3f}", "-movflags", "+faststart", str(tmp)]
+           "-crf", "19", "-af", "loudnorm=I=-14:TP=-1.2:LRA=11", "-ar", "48000", "-c:a", "aac", "-b:a", "192k", "-r", str(fps), "-t", f"{dur:.3f}", "-movflags", "+faststart", str(tmp)]
     proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
     try:
         with sync_playwright() as p:
