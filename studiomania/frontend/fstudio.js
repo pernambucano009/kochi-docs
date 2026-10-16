@@ -33,6 +33,7 @@ const FrameStudioPage = (() => {
       <label class="nb-f"><span>الشكل</span><select data-i="format">${opt(o.formats, i.format ?? "auto")}</select></label>
       <label class="nb-f"><span>إحساس الحركة</span><select data-i="fps"><option value="30" ${i.fps == 24 ? "" : "selected"}>ناعمة (30 فريم)</option><option value="24" ${i.fps == 24 ? "selected" : ""}>مرسومة باليد (24 فريم)</option></select></label>
       <label class="nb-f"><span>الصوت</span><select data-i="sound">${opt(o.sound, i.sound ?? "on")}</select></label>
+      <label class="nb-f"><span>أداة الرسم</span><select data-i="engine">${opt(o.engines || { canvas: "أشكال وخطوط بالكود" }, i.engine ?? "canvas")}</select></label>
       <label class="nb-f"><span>الخط</span><select data-i="font">${optArr(["auto", ...o.fonts], i.font ?? "auto", (x) => (x === "auto" ? "على حسب الستايل" : x))}</select></label>
       <label class="nb-f"><span>عنوان على الشاشة (اختياري)</span><input type="text" data-i="title" value="${esc(i.title)}"></label>
       <label class="nb-f"><span>جملة النهاية (اختياري)</span><input type="text" data-i="closing" value="${esc(i.closing)}"></label>

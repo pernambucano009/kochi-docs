@@ -20175,11 +20175,25 @@ def style_code_chat(messages: list[dict]) -> str:
     return code
 
 
+BRUSH_JS = Path(__file__).resolve().parent / "vendor" / "p5brush" / "brush.js"
+
+
+def style_browser(p):
+    """زي متصفح التايبوجرافي، بس بـ WebGL برمجي (SwiftShader) علشان الفُرش الحقيقية تشتغل على سيرفر من غير كارت شاشة."""
+    args = ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"]
+    for path in (os.environ.get("TYPO_CHROMIUM"), None, "/opt/pw-browsers/chromium"):
+        try:
+            return p.chromium.launch(executable_path=path, args=args) if path else p.chromium.launch(args=args)
+        except Exception:  # noqa: BLE001
+            continue
+    return typo_browser(p)
+
+
 class StylePage:
     """متصفح مقفول: الكود جوه صفحة من غير نت ولا كوكيز، والخطوط بس بتيجي من السيرفر نفسه."""
 
     def __init__(self, p, code: str, w: int, h: int, dur: float, scale: float = 1.0):
-        self.browser = typo_browser(p)
+        self.browser = style_browser(p)
         self.ctx = self.browser.new_context(viewport={"width": int(w * scale), "height": int(h * scale)}, device_scale_factor=1,
                                             java_script_enabled=True, offline=False)
 
@@ -20188,6 +20202,8 @@ class StylePage:
             if url.startswith("https://fonts.local/"):
                 f = FONTS_DIR / Path(url.split("/")[-1]).name
                 return r.fulfill(path=str(f)) if f.exists() else r.abort()
+            if url == "https://libs.local/brush.js":   # مكتبة الفُرش الحقيقية (p5.brush، MIT) من السيرفر نفسه
+                return r.fulfill(path=str(BRUSH_JS), content_type="text/javascript")
             return r.abort()
         self.ctx.route("**/*", route)
         self.page = self.ctx.new_page()
@@ -20218,12 +20234,15 @@ def style_check(code: str, w: int, h: int, dur: float, folder: Path | None = Non
         try:
             empty = 0
             times = times or stylecl.sample_times(dur)
+            sp.at(0)   # أول فريم بيجهّز الشيدرز والحاجات المتخزنة (bake)، فمش بيتحسب في السرعة
+            spent: list[float] = []
             for i, t in enumerate(times):
                 started = time.time()
                 if (err := sp.at(t)):
                     return f"خطأ في التشغيل: {err}", []
-                if time.time() - started > 1.5:
-                    return f"الفريم عند {t:.1f}ث بياخد {time.time() - started:.1f} ثانية (تقيل جدًا، لازم أقل من 0.05)", []
+                spent.append(time.time() - started)
+                if spent[-1] > 8:
+                    return f"الفريم عند {t:.1f}ث بياخد {spent[-1]:.1f} ثانية (تقيل جدًا)", []
                 st = sp.page.evaluate("stats()")
                 if st["sd"] < 2:
                     empty += 1
@@ -20231,6 +20250,10 @@ def style_check(code: str, w: int, h: int, dur: float, folder: Path | None = Non
                     name = f"{prefix}_{i}.jpg"
                     (folder / name).write_bytes(sp.shot(85))
                     frames.append(name)
+            slow = sorted(spent)[len(spent) // 2] if spent else 0
+            if slow > 1.0:
+                return (f"الفريم بياخد حوالي {slow:.1f} ثانية (تقيل جدًا، لازم أقل من 0.3)."
+                        + (" brush.fill() بيتنادى كل فريم: اعمله مرة واحدة بـ bake() وحرّك الصورة" if stylecl.uses_brush(code) else "")), []
             if empty >= max(3, len(times) * .6):
                 return "أغلب الفريمات فاضية (لون واحد): مفيش حاجة باينة", frames
         finally:
@@ -20356,9 +20379,10 @@ def run_style(sid: str) -> None:
             parts = [{"type": "text", "text": stylecl.plan_messages(d["idea"], d["duration"], d["ratio"], len(refs), growth_brand())[0]["content"]}]
             parts += [{"type": "image_url", "image_url": {"url": data_url(r, "image/jpeg")}} for r in refs]
             plan = stylecl.clean_plan(ad_json(ad_media_chat([{"role": "user", "content": parts}], 8000), "الخطة"), d["idea"], d["duration"])
+        plan["engine"] = d.get("engine", "canvas")
         style_set(sid, plan=plan, status="coding", step="✍️ بيكتب كود الرسم")
         # 2) الكود + تشغيله والتأكد إنه شغال
-        code = stylecl.mock_code(plan["title"]) if atlas.mock_mode() else style_code_chat(stylecl.code_messages(plan, w, h, d["duration"]))
+        code = stylecl.mock_code(plan["title"], plan.get("engine", "canvas")) if atlas.mock_mode() else style_code_chat(stylecl.code_messages(plan, w, h, d["duration"]))
         style_set(sid, status="checking", step="🧪 بيجرّب الكود")
         code, frames = style_fix_loop(sid, code, d)
         # 3) مراجعة الفريمات بالعين جنب المراجع، وتصليح مرة واحدة لو فيه مشاكل
@@ -20420,7 +20444,8 @@ def style_list():
 
 
 @app.post("/api/stylecl")
-def style_create(idea: str = Form(...), duration: int = Form(10), ratio: str = Form("9:16"), files: list[UploadFile] = File(...)):
+def style_create(idea: str = Form(...), duration: int = Form(10), ratio: str = Form("9:16"), engine: str = Form("canvas"),
+                 files: list[UploadFile] = File(...)):
     idea = idea.strip()
     if not idea:
         raise HTTPException(400, "اكتب الفكرة")
@@ -20439,7 +20464,8 @@ def style_create(idea: str = Form(...), duration: int = Form(10), ratio: str = F
     except HTTPException:
         shutil.rmtree(folder, ignore_errors=True)
         raise
-    d = {"id": sid, "idea": idea[:1500], "duration": duration, "ratio": ratio, "refs": refs, "status": "new", "created_at": now()}
+    d = {"id": sid, "idea": idea[:1500], "duration": duration, "ratio": ratio, "refs": refs, "status": "new", "created_at": now(),
+         "engine": "brush" if engine == "brush" else "canvas"}
     (folder / "style.json").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
     style_start(sid, run_style)
     return style_view(style_load(sid))
@@ -20595,7 +20621,7 @@ def run_fs_stills(fid: str, note: str = "") -> None:
         code = code_f.read_text(encoding="utf-8") if atlas.mock_mode() else style_code_chat(stylecl.fix_messages(code_f.read_text(encoding="utf-8"), note))
     else:
         fs_set(fid, step="✍️ بيكتب كود الرسم")
-        code = stylecl.mock_code(plan.get("title") or i["idea"]) if atlas.mock_mode() else style_code_chat(stylecl.code_messages(plan, w, h, i["duration"]))
+        code = stylecl.mock_code(plan.get("title") or i["idea"], i.get("engine", "canvas")) if atlas.mock_mode() else style_code_chat(stylecl.code_messages(plan, w, h, i["duration"]))
     times = fstudio.still_times(d)
     for k in range(3):
         fs_set(fid, step="🧪 بيجرّب الكود ويطلّع الصور الثابتة")
@@ -20680,7 +20706,7 @@ def fs_list():
         except (OSError, ValueError, KeyError):
             continue
     return {"items": sorted(out, key=lambda x: x.get("created_at") or "", reverse=True),
-            "options": {"formats": fstudio.FORMATS, "energy": fstudio.ENERGY, "sound": fstudio.SOUND, "ratios": list(stylecl.RATIOS),
+            "options": {"formats": fstudio.FORMATS, "energy": fstudio.ENERGY, "sound": fstudio.SOUND, "engines": fstudio.ENGINES, "ratios": list(stylecl.RATIOS),
                         "durations": list(stylecl.DURATIONS), "fonts": list(stylecl.FONTS), "sfx": list(stylecl.SFX_KINDS),
                         "moods": list(stylecl.MOODS), "keys": list(stylecl.KEYS)}}
 

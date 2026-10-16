@@ -1,0 +1,1 @@
+p5.brush 2.2.3 (standalone build, dist/brush.js) — https://github.com/acamposuribe/p5.brush — MIT, see LICENSE.md

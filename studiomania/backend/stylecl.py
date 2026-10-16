@@ -100,26 +100,81 @@ HELPERS_DOC = """متاح لك جاهز (متعرّفش تاني):
 الخطوط المتاحة: """ + "، ".join(FONTS)
 
 
+BRUSH_NAMES = ("pen", "rotring", "2B", "HB", "2H", "cpencil", "pastel", "crayon", "charcoal", "spray", "marker")
+BRUSH_FIELDS = ("hand", "curved", "zigzag", "waves", "seabed", "spiral", "columns")
+BRUSH_DOC = f"""REAL BRUSHES (p5.brush, standalone build) are available as the global `brush`.
+Layers per frame: ctx (2D: paper/background) -> brush marks (real pencil/charcoal/ink/watercolour), printed onto the paper with MULTIPLY like real ink
+-> fg (2D: text, grain, overlays). Because marks multiply, use a light ground (paper, cream, pastel); light marks on a dark ground will not show (draw those on ctx).
+Use the same pixel coordinates as ctx (origin top-left). The harness clears all layers, reseeds brush every frame and calls brush.render() for you.
+Brush names: {", ".join(BRUSH_NAMES)}. Vector fields: {", ".join(BRUSH_FIELDS)}.
+API (call inside scene):
+- brush.set(name, color, weight) · brush.stroke(color) · brush.strokeWeight(w) · brush.noStroke()
+- brush.line(x1,y1,x2,y2) · brush.spline([[x,y],...], curvature 0..1) · brush.flowLine(x,y,length,dir)
+- brush.beginShape(curvature) · brush.vertex(x,y,pressure) · brush.endShape(close?)  (pressure 0..1 shapes the line weight)
+- brush.circle(x,y,r) · brush.rect(x,y,w,h) · brush.arc(x,y,r,start,end) · brush.polygon([[x,y],...])
+- watercolour fill: brush.fill(color, opacity 0..255) · brush.fillBleed(0..1, 'out'|'in') · brush.fillTexture(0..1, 0..1) · brush.noFill()
+- flat fill: brush.wash(color, opacity) · brush.noWash()
+- hatching: brush.hatch(dist, angle, {{rand:0..1, continuous:true, gradient:0..1}}) · brush.hatchStyle(name,color,weight) · brush.noHatch()
+- brush.field(name) bends strokes that follow · brush.noField()
+- brush.push() / brush.pop() / brush.translate(x,y) / brush.rotate(rad) / brush.scale(s)
+- brush.seed(n) to vary marks (e.g. brush.seed(Math.floor(t*12)) makes lines "boil" on 2s like hand-drawn animation; omit for steady lines)
+Draw-on effect: pass only the first part of a point list, e.g. pts.slice(0, Math.max(2, Math.ceil(pts.length*p))).
+SPEED (important, the server has no GPU): strokes, hatch and wash() are fast (~0.1s); watercolour brush.fill() is VERY slow (~3s per call).
+NEVER call brush.fill() every frame. Bake it once and reuse the picture:
+  const img = bake('petal', () => {{ brush.noStroke(); brush.fill('#d9534f', 90); brush.fillBleed(.35, 'out'); brush.circle(540, 800, 200); brush.noFill(); }});
+  // then print the baked picture onto the paper (multiply) and animate it: paste(img, {{alpha: k, scale: s, cx: 540, cy: 800, x: 0, y: 0}});
+bake(key, fn) draws fn with real brushes ONCE, caches it by key and returns it (white outside the marks, so always use paste(), never plain drawImage).
+Call bake() at the START of scene, before other brush calls.
+Keep each frame light: at most ~150 brush primitives. Text and grain go on `fg`: text(fg, ...), grain(fg, ...)."""
+
+
+BRUSH_SCALE = 1.0   # نص الدقة كان أسرع بس brush.scale بيبوّظ الأشكال (spline/rect/hatch)
+
+
+def uses_brush(code: str) -> bool:
+    return "brush." in (code or "")
+
+
 def harness(code: str, w: int, h: int, dur: float) -> str:
-    """الصفحة اللي بترسم: الكود جوه، ومفيش نت (غير الخطوط من السيرفر نفسه)."""
+    """الصفحة اللي بترسم: الكود جوه، ومفيش نت (غير الخطوط ومكتبة الفُرش من السيرفر نفسه).
+    الكود اللي بيستخدم brush بيترسم على 3 طبقات: ctx (ورق/خلفية) ← فُرش حقيقية (WebGL) ← top (كلام وحبيبات)."""
     faces = "".join(f'@font-face{{font-family:"{fam}";src:url("https://fonts.local/{f}")}}' for fam, f in FONTS.items())
     loads = ",".join(f'document.fonts.load(\'800 40px "{fam}"\')' for fam in FONTS)
     safe = code.replace("</script", "<\\/script")
+    br = uses_brush(code)
+    lib = '<script src="https://libs.local/brush.js"></script>' if br else ""
+    # طبقة الفُرش بنفس مقاس الفيديو (BRUSH_SCALE)، والتلوين بألوان المية التقيل بيتعمل مرة واحدة بـ bake()
+    bs = BRUSH_SCALE
+    setup = (f"const _fc=document.createElement('canvas');_fc.width={w};_fc.height={h};fg=_fc.getContext('2d');_bc=brush.createCanvas({round(w * bs)},{round(h * bs)},{{parent:document.getElementById('b')}});"
+             f"brush.scaleBrushes({max(1.0, w * bs / 400):.2f});" if br else "")
+    pre = ("fg.save();fg.setTransform(1,0,0,1,0,0);fg.clearRect(0,0,W,H);brush.seed(1234);brush.noiseSeed(1234);brush.clear('#ffffff');brush.push();"
+           + (f"brush.translate(-W*{bs}/2,-H*{bs}/2);brush.scale({bs});" if bs != 1 else "brush.translate(-W/2,-H/2);") if br else "")
+    post = ("brush.pop();brush.render();fg.restore();ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;ctx.globalCompositeOperation='multiply';"
+            "ctx.drawImage(_bc,0,0,W,H);ctx.globalCompositeOperation='source-over';ctx.drawImage(fg.canvas,0,0);ctx.restore();" if br else "")
+    bake = ("const _BK={};function bake(k,fn){if(_BK[k])return _BK[k];fn();brush.render();const c=document.createElement('canvas');c.width=W;c.height=H;"
+            "c.getContext('2d').drawImage(_bc,0,0,W,H);_BK[k]=c;brush.clear('#ffffff');return c}"
+            "function paste(img,{alpha=1,scale=1,cx=W/2,cy=H/2,x=0,y=0}={}){if(alpha<=0||scale<=0)return;ctx.save();ctx.globalAlpha*=alpha;"
+            "ctx.globalCompositeOperation='multiply';ctx.translate(cx+x,cy+y);ctx.scale(scale,scale);ctx.translate(-cx,-cy);ctx.drawImage(img,0,0,W,H);ctx.restore()}" if br else "")
+    layers = f'<div id="b" style="display:none"></div>' if br else ""
+    snap = "const d=ctx.getImageData(0,0,W,H).data;"
     return f"""<!doctype html><html><head><meta charset="utf-8"><style>{faces}
-html,body{{margin:0;background:#000;overflow:hidden}}canvas{{display:block;width:100vw;height:100vh}}</style></head><body>
-<canvas id="c" width="{w}" height="{h}"></canvas>
+html,body{{margin:0;background:#000;overflow:hidden}}canvas{{display:block;width:100vw;height:100vh}}
+</style>{lib}</head><body>
+<canvas id="c" width="{w}" height="{h}"></canvas>{layers}
 <script>
-const W={w},H={h},DUR={dur};const ctx=document.getElementById('c').getContext('2d');window.__err=null;
+const W={w},H={h},DUR={dur};const ctx=document.getElementById('c').getContext('2d');let fg=ctx,_bc=null;window.__err=null;
 {HELPERS}
+{bake}
 try{{
+{setup}
 {safe}
 ;if(typeof scene!=='function')throw new Error('scene is not defined');
 }}catch(e){{window.__err='load: '+(e&&e.message||e)}}
 window.ready=Promise.all([{loads}]).catch(()=>0);
 window.renderAt=(t)=>{{if(window.__err&&window.__err.startsWith('load'))return window.__err;ctx.save();ctx.setTransform(1,0,0,1,0,0);
   ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';ctx.clearRect(0,0,W,H);
-  try{{scene(ctx,t,W,H)}}catch(e){{window.__err='t='+t.toFixed(2)+': '+(e&&e.message||e)}}ctx.restore();return window.__err}};
-window.stats=()=>{{const d=ctx.getImageData(0,0,W,H).data;let s=0,s2=0,n=0;for(let i=0;i<d.length;i+=4*97){{const v=(d[i]+d[i+1]+d[i+2])/3;s+=v;s2+=v*v;n++}}
+  try{{{pre}scene(ctx,t,W,H);{post}}}catch(e){{window.__err='t='+t.toFixed(2)+': '+(e&&e.message||e)}}ctx.restore();return window.__err}};
+window.stats=()=>{{{snap}let s=0,s2=0,n=0;for(let i=0;i<d.length;i+=4*97){{const v=(d[i]+d[i+1]+d[i+2])/3;s+=v;s2+=v*v;n++}}
   const m=s/n;return {{mean:m,sd:Math.sqrt(Math.max(0,s2/n-m*m))}}}};
 </script></body></html>"""
 
@@ -181,17 +236,19 @@ Craft (the bar: "Claude drew every frame" videos):
 
 
 def code_messages(plan: dict, w: int, h: int, dur: int) -> list[dict]:
+    br = plan.get("engine") == "brush"
     system = ("You are a senior motion designer who writes Canvas 2D JavaScript. You write ONE function scene(ctx, t, W, H) that draws the full frame at time t (seconds).\n"
-              f"{CODE_RULES}\n{HELPERS_DOC}\n"
-              "Return only the code inside ```js ... ``` with no explanation.")
+              f"{CODE_RULES}\n{HELPERS_DOC}\n" + (f"{BRUSH_DOC}\nThis piece MUST use real brushes for its marks (lines, shading, fills); use ctx only for the paper/background.\n" if br else "")
+              + "Return only the code inside ```js ... ``` with no explanation.")
     user = (f"Size {w}x{h} · duration {dur}s.\nPlan and style bible:\n{json.dumps(plan, ensure_ascii=False, indent=1)}\n\n"
             "Write scene(ctx,t,W,H) that executes this plan exactly, in this style.")
     return [{"role": "system", "content": system}, {"role": "user", "content": user}]
 
 
 def fix_messages(code: str, problem: str) -> list[dict]:
+    extra = f"\n{BRUSH_DOC}" if uses_brush(code) else ""
     return [{"role": "system", "content": "You fix Canvas 2D animation code. Apply the principle behind the note everywhere it matters, not just at one spot. "
-                                          f"{CODE_RULES}\n{HELPERS_DOC}\nReturn the full fixed code inside ```js ... ``` only."},
+                                          f"{CODE_RULES}\n{HELPERS_DOC}{extra}\nReturn the full fixed code inside ```js ... ``` only."},
             {"role": "user", "content": f"Problem / note:\n{problem}\n\nCode:\n```js\n{code}\n```"}]
 
 
@@ -222,8 +279,27 @@ def mock_plan(idea: str, dur: int) -> dict:
             "music": {"bpm": 104, "mood": "playful", "key": "D"}}
 
 
-def mock_code(title: str) -> str:
+MOCK_BRUSH = r"""const HORSE=Array.from({length:40},(_,i)=>{const a=i/39*Math.PI*2;return [W*.5+Math.cos(a)*W*.3*(1+.15*Math.sin(a*3)),H*.42+Math.sin(a)*W*.2]});
+function scene(ctx,t,W,H){
+  const blot=bake('blot',()=>{brush.noStroke();brush.fill('#d9534f',110);brush.fillBleed(.35,'out');brush.fillTexture(.5,.4);brush.circle(W*.5,H*.42,W*.2);brush.noFill()});
+  paper(ctx,'#f1e9d8',5);
+  const k=E.outBack(prog(t,2,3));
+  paste(blot,{scale:k,cx:W*.5,cy:H*.42});
+  brush.seed(Math.floor(t*12));
+  brush.set('charcoal','#2a2522',1.3);
+  brush.spline(HORSE.slice(0,Math.max(2,Math.ceil(HORSE.length*prog(t,.2,2.2)))),.6);
+  brush.set('2B','#2a2522',1);brush.hatch(18,.8,{rand:.2});brush.rect(W*.12,H*.66,W*.76,H*.08);brush.noHatch();
+  brush.set('marker','#1d3557',1.5);brush.field('waves');brush.line(W*.1,H*.8,W*.1+W*.8*prog(t,1,3.5),H*.8);brush.noField();
+  text(fg,typed(TITLE,prog(t,1.5,3)),W/2,H*.14,{size:96,color:'#2a2522'});
+  grain(fg,.1,t);
+}
+"""
+
+
+def mock_code(title: str, engine: str = "canvas") -> str:
     t = json.dumps(title[:40], ensure_ascii=False)
+    if engine == "brush":
+        return "const TITLE=" + t + ";\n" + MOCK_BRUSH
     return """
 const PAL=['#f4a259','#5b8e7d','#bc4b51','#f4e285'];
 const R=rng(7);const DOTS=Array.from({length:40},()=>({x:R(),y:R(),r:6+R()*22,c:PAL[Math.floor(R()*4)],d:R()*1.5}));

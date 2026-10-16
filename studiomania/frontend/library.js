@@ -454,6 +454,7 @@ const StyleClonePage = (() => {
         <div class="nb-row">
           <label class="nb-f"><span>المدة</span><select data-sdur><option>6</option><option selected>10</option><option>15</option><option>20</option></select></label>
           <label class="nb-f"><span>المقاس</span><select data-sratio><option>9:16</option><option>1:1</option><option>4:5</option><option>16:9</option></select></label>
+          <label class="nb-f"><span>أداة الرسم</span><select data-sengine><option value="canvas">أشكال وخطوط بالكود</option><option value="brush">فُرش حقيقية (رصاص، فحم، حبر، ألوان مية)</option></select></label>
           <button class="nb-btn" data-sgo ${S.busy ? "disabled" : ""}>🎨 ابدأ</button></div>
       </div>
       <div class="sc-list">${S.list.map(card).join("") || ""}</div>`;
@@ -485,6 +486,7 @@ const StyleClonePage = (() => {
           form.append("idea", idea);
           form.append("duration", w.querySelector("[data-sdur]").value);
           form.append("ratio", w.querySelector("[data-sratio]").value);
+          form.append("engine", w.querySelector("[data-sengine]").value);
           S.busy = true; render();
           try { const p = await api("/api/stylecl", { method: "POST", body: form }); S.list.unshift(p); } finally { S.busy = false; render(); }
           return poll();

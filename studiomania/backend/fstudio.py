@@ -15,7 +15,8 @@ FORMATS = {"auto": "البرنامج يختار", "single-world story": "حكا�
 ENERGY = {"calm": "هادي", "building": "بيتصاعد", "intense": "حماسي"}
 SOUND = {"on": "موسيقى ومؤثرات", "sfx": "مؤثرات بس", "off": "من غير صوت"}
 
-DEFAULT_INPUTS = {"idea": "", "duration": 15, "ratio": "9:16", "energy": "building", "format": "auto", "fps": 30,
+ENGINES = {"canvas": "أشكال وخطوط بالكود", "brush": "فُرش حقيقية (رصاص، فحم، حبر، ألوان مية)"}
+DEFAULT_INPUTS = {"idea": "", "duration": 15, "ratio": "9:16", "energy": "building", "format": "auto", "fps": 30, "engine": "canvas",
                   "title": "", "closing": "", "include": "", "avoid": "", "sound": "on", "font": "auto"}
 
 
@@ -32,6 +33,7 @@ def clean_inputs(raw: dict | None, base: dict | None = None) -> dict:
     d["fps"] = 24 if str(d["fps"]) == "24" else 30
     d["sound"] = d["sound"] if d["sound"] in SOUND else "on"
     d["font"] = d["font"] if d["font"] in ("auto", *stylecl.FONTS) else "auto"
+    d["engine"] = d["engine"] if d["engine"] in ENGINES else "canvas"
     for k in ("title", "closing", "include", "avoid"):
         d[k] = str(d[k] or "").strip()[:300]
     return d
@@ -51,6 +53,9 @@ def _extras(i: dict) -> str:
         out.append(f"Must avoid: {i['avoid']}.")
     if i["font"] != "auto":
         out.append(f"Typeface: {i['font']}.")
+    if i.get("engine") == "brush":
+        out.append("Marks are drawn with REAL natural-media brushes (" + ", ".join(stylecl.BRUSH_NAMES) + ", watercolour fills with bleed, "
+                   "pencil hatching, flow fields). Lean into hand-drawn line, pencil shading and watercolour; keep grounds light (marks print like ink).")
     return "\n".join(out)
 
 
@@ -186,7 +191,7 @@ def clean_sound(raw: dict | None, dur: int) -> dict:
 def plan_for_code(d: dict) -> dict:
     """الخطة اللي بتروح لموديل الكود والمراجعة: الفكرة + دليل الستايل + الصوت."""
     i, c = d["inputs"], d.get("concept") or {}
-    return {**{k: v for k, v in c.items() if k not in ("sfx", "music")}, "style": d.get("bible") or {}, "fps": i["fps"],
+    return {**{k: v for k, v in c.items() if k not in ("sfx", "music")}, "style": d.get("bible") or {}, "fps": i["fps"], "engine": i.get("engine", "canvas"),
             "energy": i["energy"], "must_include": i["include"], "must_avoid": i["avoid"], "duration": i["duration"]}
 
 
