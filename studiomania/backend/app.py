@@ -4062,6 +4062,272 @@ def viral_finder(body: ViralIn):
     return {"rows": rows, "top": raw.get("top") or [], "pattern": str(raw.get("pattern") or ""), "ideas": raw.get("ideas") or []}
 
 
+# ---------------------------------------------------------------- 🏆 منافسينك في المجال (rivals.py)
+import rivals  # noqa: E402
+
+RIVALS_BUSY: set[str] = set()
+
+
+def brain_rivals(text: str, brain: dict | None) -> str:
+    """ملف البراند + اللي بينجح عند المنافسين (للأفكار والسكريبتات والهوكات)."""
+    rv = rivals.insight_text(brain)
+    return text + (f"\n\n{rv}" if rv else "")
+
+
+def rivals_state(bid: str) -> dict:
+    return (brain_row(bid) or {}).get("competitors") or {}
+
+
+def rivals_set(bid: str, **kw) -> None:
+    def fn(d):
+        c = d.setdefault("competitors", {})
+        c.update(kw)
+    update_brain(bid, fn)
+
+
+def rivals_llm(messages: list[dict], what: str) -> dict:
+    try:
+        return az.parse_json(llm(messages, json_mode=True, temperature=0.4), what)
+    except ValueError as exc:
+        raise rivals.RivalsError(f"المخ رجّع رد مش مفهوم ({what})") from exc
+
+
+def rivals_fetch(platform: str, handle: str) -> dict:
+    posts = rivals.mock_posts(platform, handle) if not rivals.live() else rivals.profile_posts(platform, handle)
+    if not posts:
+        raise rivals.RivalsError(f"مالقيتش بوستات للحساب @{handle} على {rivals.PLATFORMS.get(platform, platform)}")
+    it = rivals.summarize(platform, handle, posts)
+    if rivals.live():   # الكلام المنطوق في أول بوستين: الهوك الحقيقي غالبًا مش في الكابشن
+        for p in it["posts"][:2]:
+            p["spoken"] = rivals.transcript(platform, p["url"])
+    return it
+
+
+def rivals_digest(brain: dict, items: list[dict]) -> dict:
+    if not items:
+        return {}
+    if atlas.mock_mode():
+        return rivals.mock_digest()
+    return rivals.clean_digest(rivals_llm(rivals.digest_messages(brain, items), "تحليل المنافسين"))
+
+
+def rivals_job(bid: str, step: str, fn) -> None:
+    if bid in RIVALS_BUSY:
+        raise HTTPException(409, "لسه شغال على المنافسين، استنى شوية")
+    RIVALS_BUSY.add(bid)
+    rivals_set(bid, status="working", step=step, error=None)
+
+    def run():
+        try:
+            fn()
+            rivals_set(bid, status="ready", step=None, error=None, updated_at=time.time())
+        except Exception as exc:  # noqa: BLE001
+            rivals_set(bid, status="failed", step=None, error=str(getattr(exc, "detail", None) or exc)[:300])
+        finally:
+            RIVALS_BUSY.discard(bid)
+    threading.Thread(target=run, daemon=True).start()
+
+
+def rivals_key(i: dict) -> str:
+    return f"{i['platform']}:{i['handle'].lower()}"
+
+
+def rivals_discover(bid: str) -> None:
+    brain = brain_row(bid) or {}
+    c = brain.get("competitors") or {}
+    keep = [i for i in c.get("items") or [] if i.get("pinned")][:rivals.TOP]
+    exclude = set(c.get("excluded") or []) | {rivals_key(i) for i in keep}
+    need = rivals.TOP - len(keep)
+    found = []
+    if need > 0:
+        rivals_set(bid, step="بيدوّر في المجال…")
+        if not rivals.live():
+            posts = rivals.mock_search(brain)
+        else:
+            raw = {} if atlas.mock_mode() else rivals_llm(rivals.queries_messages(brain), "كلمات البحث")
+            qs = [str(q).strip()[:60] for q in raw.get("queries") or [] if str(q).strip()][:6] or [brain.get("domain") or brain.get("name") or ""]
+            posts, errs = [], []
+            for q in qs:
+                for plat in rivals.PLATFORMS:
+                    try:
+                        posts += rivals.search(plat, q)
+                    except rivals.RivalsError as exc:
+                        errs.append(str(exc))
+            if not posts and errs:
+                raise rivals.RivalsError(errs[0])
+        cands = rivals.candidates(posts, exclude)[:15]
+        if not cands:
+            raise rivals.RivalsError("مالقيتش حسابات في المجال ده، جرّب تكتب «المجال» و«السوق» بشكل أوضح في الهوية")
+        picks = []
+        if atlas.mock_mode() or len(cands) <= need:
+            picks = [{"i": k, "why": "من أعلى المشاهدات في البحث"} for k in range(min(need, len(cands)))]
+        else:
+            for p in rivals_llm(rivals.pick_messages(brain, cands, need), "اختيار المنافسين").get("picks") or []:
+                try:
+                    k = int(p.get("i"))
+                except (TypeError, ValueError, AttributeError):
+                    continue
+                if 0 <= k < len(cands) and k not in [x["i"] for x in picks]:
+                    picks.append({"i": k, "why": str(p.get("why") or "")[:200]})
+            picks = picks[:need] or [{"i": k, "why": ""} for k in range(min(need, len(cands)))]
+        for n, p in enumerate(picks):
+            cd = cands[p["i"]]
+            rivals_set(bid, step=f"بيجيب بوستات @{cd['handle']} ({n + 1}/{len(picks)})…")
+            try:
+                it = rivals_fetch(cd["platform"], cd["handle"])
+            except rivals.RivalsError:
+                continue
+            found.append({**it, "id": uuid.uuid4().hex[:8], "why": p["why"], "pinned": False, "updated": time.time()})
+    items = keep + found
+    rivals_set(bid, step="بيحلّل اللي بينجح عندهم…")
+    digest = rivals_digest(brain, items)
+    rivals_set(bid, items=items, digest=digest)
+
+
+def rivals_refresh(bid: str, only: str | None = None) -> None:
+    brain = brain_row(bid) or {}
+    items = list((brain.get("competitors") or {}).get("items") or [])
+    for n, it in enumerate(items):
+        if only and it["id"] != only:
+            continue
+        rivals_set(bid, step=f"بيحدّث @{it['handle']} ({n + 1}/{len(items)})…")
+        try:
+            items[n] = {**it, **rivals_fetch(it["platform"], it["handle"]), "updated": time.time(), "error": None}
+        except rivals.RivalsError as exc:
+            items[n] = {**it, "error": str(exc)[:200]}
+    rivals_set(bid, step="بيحلّل اللي بينجح عندهم…")
+    rivals_set(bid, items=items, digest=rivals_digest(brain, [i for i in items if i.get("posts")]))
+
+
+def rivals_out(bid: str) -> dict:
+    b = brain_row(bid) or {}
+    c = b.get("competitors") or {}
+    return {"client": bid, "name": b.get("name"), "live": rivals.live(), "platforms": rivals.PLATFORMS, "top": rivals.TOP,
+            "brain": {k: b.get(k) or "" for k in ("domain", "market", "audience", "language")},
+            "items": c.get("items") or [], "digest": c.get("digest") or {}, "status": c.get("status") or "", "step": c.get("step"),
+            "error": c.get("error"), "updated_at": c.get("updated_at"), "excluded": len(c.get("excluded") or [])}
+
+
+def rivals_client() -> str:
+    bid = active_client_id()
+    if not bid:
+        raise HTTPException(400, "اعمل براند الأول")
+    return bid
+
+
+@app.get("/api/rivals")
+def rivals_get():
+    """«منافسينك في المجال»: لو البوستات قدمت (أسبوع) بتتحدّث لوحدها."""
+    bid = rivals_client()
+    c = rivals_state(bid)
+    if c.get("status") == "working" and bid not in RIVALS_BUSY:   # السيرفر اتعمله ريستارت والشغل وقف
+        rivals_set(bid, status="failed", step=None, error="الشغل وقف، دوس تحديث تاني")
+    elif c.get("items") and c.get("status") != "working" and time.time() - float(c.get("updated_at") or 0) > rivals.STALE:
+        rivals_job(bid, "بيحدّث بوستات المنافسين…", lambda: rivals_refresh(bid))
+    return rivals_out(bid)
+
+
+@app.post("/api/rivals/discover")
+def rivals_discover_ep():
+    """يدوّر على أعلى 5 في المجال (اللي انت مثبّتهم بيفضلوا، والباقي بيتبدّل)."""
+    bid = rivals_client()
+    b = brain_row(bid) or {}
+    if not (b.get("domain") or b.get("about")):
+        raise HTTPException(400, "اكتب «المجال» في فرع الهوية الأول، علشان نعرف ندوّر فين")
+    rivals_job(bid, "بيدوّر في المجال…", lambda: rivals_discover(bid))
+    return rivals_out(bid)
+
+
+@app.post("/api/rivals/refresh")
+def rivals_refresh_ep(rid: str = ""):
+    bid = rivals_client()
+    rivals_job(bid, "بيحدّث بوستات المنافسين…", lambda: rivals_refresh(bid, rid or None))
+    return rivals_out(bid)
+
+
+class RivalAddIn(BaseModel):
+    handle: str
+    platform: str = ""
+    replace: str = ""   # id المنافس اللي هيتشال ويتحط ده مكانه
+
+
+@app.post("/api/rivals/add")
+def rivals_add(body: RivalAddIn):
+    """تضيف حساب بنفسك (أو تبدّل واحد بيه). اللي بتضيفه بيتثبّت ومايتبدّلش في البحث الجاي."""
+    bid = rivals_client()
+    handle = rivals.clean_handle(body.handle)
+    plat = body.platform if body.platform in rivals.PLATFORMS else rivals.guess_platform(body.handle)
+    if not handle:
+        raise HTTPException(400, "اكتب اسم الحساب أو اللينك بتاعه")
+    c = rivals_state(bid)
+    items = c.get("items") or []
+    if any(rivals_key(i) == f"{plat}:{handle.lower()}" for i in items):
+        raise HTTPException(400, "الحساب ده موجود بالفعل")
+    if not body.replace and len(items) >= rivals.TOP * 2:
+        raise HTTPException(400, f"أقصى حاجة {rivals.TOP * 2} منافسين، شيل واحد الأول")
+
+    def work():
+        it = rivals_fetch(plat, handle)
+        new = {**it, "id": uuid.uuid4().hex[:8], "why": "انت اللي ضفته", "pinned": True, "updated": time.time()}
+
+        def fn(d):
+            cc = d.setdefault("competitors", {})
+            lst = cc.get("items") or []
+            gone = [i for i in lst if i["id"] == body.replace]
+            if gone:
+                cc["excluded"] = list({*(cc.get("excluded") or []), rivals_key(gone[0])})[-200:]
+                lst = [new if i["id"] == body.replace else i for i in lst]
+            else:
+                lst = lst + [new]
+            cc["items"] = lst
+        update_brain(bid, fn)
+        b = brain_row(bid) or {}
+        rivals_set(bid, step="بيحلّل اللي بينجح عندهم…")
+        rivals_set(bid, digest=rivals_digest(b, [i for i in (b.get("competitors") or {}).get("items") or [] if i.get("posts")]))
+    rivals_job(bid, f"بيجيب بوستات @{handle}…", work)
+    return rivals_out(bid)
+
+
+class RivalPatchIn(BaseModel):
+    pinned: bool | None = None
+
+
+@app.patch("/api/rivals/{rid}")
+def rivals_patch(rid: str, body: RivalPatchIn):
+    bid = rivals_client()
+
+    def fn(d):
+        for i in (d.get("competitors") or {}).get("items") or []:
+            if i["id"] == rid and body.pinned is not None:
+                i["pinned"] = body.pinned
+    update_brain(bid, fn)
+    return rivals_out(bid)
+
+
+@app.delete("/api/rivals/{rid}")
+def rivals_delete(rid: str):
+    """تشيله، ومايرجعش تاني في البحث."""
+    bid = rivals_client()
+    if bid in RIVALS_BUSY:
+        raise HTTPException(409, "لسه شغال على المنافسين، استنى شوية")
+
+    def fn(d):
+        cc = d.setdefault("competitors", {})
+        gone = [i for i in cc.get("items") or [] if i["id"] == rid]
+        cc["items"] = [i for i in cc.get("items") or [] if i["id"] != rid]
+        if gone:
+            cc["excluded"] = list({*(cc.get("excluded") or []), rivals_key(gone[0])})[-200:]
+    update_brain(bid, fn)
+    return rivals_out(bid)
+
+
+@app.post("/api/rivals/reset-excluded")
+def rivals_reset_excluded():
+    bid = rivals_client()
+    rivals_set(bid, excluded=[])
+    return rivals_out(bid)
+
+
 class HumanizeIn(BaseModel):
     text: str
 
@@ -8040,6 +8306,7 @@ def brain_to_dict(b: dict) -> dict:
     out["pending"] = b.get("pending") or []
     out["notes"] = b.get("notes") or []
     out["knowledge"] = fz.knowledge(b, BRAIN_FIELDS, BRAIN_KINDS)
+    out["rivals"] = [{k: i.get(k) for k in ("id", "platform", "handle", "median_views")} for i in (b.get("competitors") or {}).get("items") or []]
     return out
 
 
@@ -12701,7 +12968,7 @@ def run_film_plan(fid: str) -> None:
         if atlas.mock_mode():
             raw = lab.mock_film_plan(conns, d["n_scenes"], (brain or {}).get("name") or "البراند")
         else:
-            parts: list[dict] = [{"type": "text", "text": lab.film_plan_messages(az.brain_text(brain, d["brief"]), d["brief"], conns, d["n_scenes"])}]
+            parts: list[dict] = [{"type": "text", "text": lab.film_plan_messages(brain_rivals(az.brain_text(brain, d["brief"]), brain), d["brief"], conns, d["n_scenes"])}]
             for c in conns:
                 for k in (c.get("keyframes") or [])[:3]:
                     p = clip_dir(c["id"]) / k["file"]
@@ -17567,7 +17834,7 @@ def run_tv_script(vid: str) -> None:
         if atlas.mock_mode():
             res = {"title": "فيديو تجريبي", "lines": [f"{dub.DIALECTS[d['lang']]['label']} — جملة {i + 1}" for i in range(n)]}
         else:
-            res = ad_json(series_chat(tv_script_messages(d, az.brain_text(brain, d.get("brief") or "")), json_mode=True), "السكريبت")
+            res = ad_json(series_chat(tv_script_messages(d, brain_rivals(az.brain_text(brain, d.get("brief") or ""), brain)), json_mode=True), "السكريبت")
         lines = [str(x or "").strip()[:400] for x in (res.get("lines") or [])][:n]
         lines += [""] * (n - len(lines))
         tv_set(vid, script_lines=lines, name=f"🎬 {res.get('title') or d['name']}"[:120])
@@ -17786,7 +18053,7 @@ def run_tv_scenes_script(vid: str) -> None:
             res = {"title": "شرح تجريبي", "through_line": "a paper coin", "lines": [f"جملة المشهد {i + 1} تجريبية" for i in range(n)],
                    "scenes": [{"scene": f"Scene {i + 1}: cutouts snap in.", "motion": "slow push in", "audio": "paper rustle", "label": ""} for i in range(n)]}
         else:
-            res = ad_json(series_chat(scenes_messages(d, az.brain_text(brain, d.get("brief") or "")), json_mode=True), "سكريبت المشاهد")
+            res = ad_json(series_chat(scenes_messages(d, brain_rivals(az.brain_text(brain, d.get("brief") or ""), brain)), json_mode=True), "سكريبت المشاهد")
         lines = [str(x or "").strip()[:400] for x in (res.get("lines") or [])][:n]
         lines += [""] * (n - len(lines))
         sc = [{"scene": lab._plain(x.get("scene"))[:1500], "motion": lab._plain(x.get("motion"))[:800], "audio": lab._plain(x.get("audio"))[:400],
@@ -18342,7 +18609,7 @@ def run_ad_plan(vid: str) -> None:
                     "shots": [{"beat": b, "dur": 3, "what": f"لقطة {k + 1}", "visual": "The runner pauses.", "camera": "50mm, slow push-in",
                                "audio": "footsteps", "with": ["hero", "product"], "line": "" if k else "كل يوم بداية"} for k, b in enumerate(["HOOK", "PROBLEM", "REVEAL", "PAYOFF"])]})
         else:
-            brain_txt = az.brain_text(tv_brain(d), d.get("brief") or "")
+            brain_txt = brain_rivals(az.brain_text(tv_brain(d), d.get("brief") or ""), tv_brain(d))
             msgs = (adtpl.ugc_messages(d, lang_txt, guide, brain_txt) if a["kind"] == "ugc"
                     else adtpl.beats_messages(d, lang_txt, guide, brain_txt) if a["kind"] in AD_PLATE_KINDS
                     else adtpl.cinema_messages(d, lang_txt, guide, brain_txt, total))
@@ -19313,7 +19580,8 @@ def flow_llm(messages: list[dict], what: str) -> dict:
 
 
 def flow_brand(brain: dict | None, query: str) -> str:
-    return az.brain_text(brain, query)[:7000]   # ملف البراند الطويل جدًا بيبطّأ الرد من غير فايدة
+    # ملف البراند الطويل جدًا بيبطّأ الرد من غير فايدة؛ واللي بينجح عند المنافسين بيدخل دايمًا (مايتقصّش)
+    return brain_rivals(az.brain_text(brain, query)[:7000], brain)
 
 
 def flow_job(fid: str, what: str, fn) -> None:

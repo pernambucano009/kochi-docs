@@ -207,7 +207,7 @@ def adapt_messages(brand: dict, analysis: dict, audio: dict, settings: dict, sty
                  f"(نفس الذكاء والبناء والإحساس، مش نسخة).{market}\n\n")
     system = (
         f"أنت كريتيف دايركتور لبراند «{name}». " + intro
-        + (f"ملف العميل (المنتج وهويته وأصوله الحقيقية، التزم بيه بالظبط):\n{brain_text(brain)}\n"
+        + (f"ملف العميل (المنتج وهويته وأصوله الحقيقية، التزم بيه بالظبط):\n{brain_text(brain)}\n{_rivals(brain)}"
            "أي شاشة تطبيق أو لوجو أو صورة منتج في الإعلان لازم تكون من الأصول دي (اكتب اسمها في asset)، "
            "ومتخترعش شاشات أو لوجوهات تانية. ألوان البراند اللي في ملف العميل ثابتة في اللوجو والشاشات، "
            "وألوان الإعلان نفسه حسب «التطبيق على البراند» تحت.\n\n" if brain else
@@ -655,6 +655,12 @@ def brain_messages(brain: dict, files: list[str]) -> str:
         "ووصّف كل صورة لوحدها عشان نعرف نختار الشاشة المناسبة لأي مشهد في إعلان.\n"
         f"رجّع JSON بس بالشكل ده:\n{BRAIN_FORMAT}"
     )
+
+
+def _rivals(brain: dict | None) -> str:
+    import rivals  # noqa: PLC0415
+    rv = rivals.insight_text(brain)
+    return f"{rv}\n" if rv else ""
 
 
 def brain_text(brain: dict | None, query: str = "") -> str:
