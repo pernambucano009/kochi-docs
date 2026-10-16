@@ -3997,6 +3997,7 @@ def inbox_suggest(body: InboxSuggestIn):
 import growth  # noqa: E402
 import stylecl  # noqa: E402
 import fstudio  # noqa: E402
+import ref2p  # noqa: E402
 
 
 def growth_json(messages: list[dict], what: str) -> dict:
@@ -20794,6 +20795,212 @@ def fs_delete(fid: str):
 def fs_file(fid: str, name: str):
     f = FS_DIR / Path(fid).name / Path(name).name
     if not f.exists() or name.startswith(".") or f.suffix.lower() not in STYLE_IMG | STYLE_VID | {".wav"}:
+        raise HTTPException(404, "مش موجود")
+    return FileResponse(f)
+
+
+# ---------------------------------------------------------------- 🎥 «من مرجع لبرومبت»
+# فيديو مرجعي ← قياسات حقيقية + فريمات بتوقيتها + القطعات ← قايمة لقطات وبرومبت بـ 14 جزء يتعدّل، وبعدين يتولّد بأي موديل فيديو عندنا.
+
+R2P_DIR = DATA_DIR / "ref2p"
+R2P_LOCK = threading.Lock()
+
+
+def r2p_load(rid: str) -> dict:
+    f = R2P_DIR / Path(rid).name / "ref2p.json"
+    if not f.exists():
+        raise HTTPException(404, "مش موجود")
+    return json.loads(f.read_text(encoding="utf-8"))
+
+
+def r2p_update(rid: str, fn) -> dict:
+    with R2P_LOCK:
+        d = r2p_load(rid)
+        fn(d)
+        d["updated_at"] = now()
+        folder = R2P_DIR / Path(rid).name
+        (folder / "ref2p.json.tmp").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+        (folder / "ref2p.json.tmp").replace(folder / "ref2p.json")
+        return d
+
+
+def r2p_view(d: dict) -> dict:
+    u = lambda f: f"/api/ref2p/{d['id']}/file/{f}"
+    r = d.get("result") or {}
+    return {"id": d["id"], "name": d.get("name"), "target": d.get("target", ""), "goal": d.get("goal", "copy"), "note": d.get("note", ""),
+            "job": d.get("job"), "step": d.get("step"), "error": d.get("error"), "facts": d.get("facts"), "cuts": d.get("cuts") or [],
+            "video": u(d["file"]), "sheet": u(d["sheet"]) if d.get("sheet") else None, "shots": r.get("shots") or [],
+            "shot_count": r.get("shot_count"), "prompt": d.get("prompt") or r.get("prompt") or "", "notes": r.get("notes") or {},
+            "clips": d.get("clips") if d.get("clips") is not None else r.get("clips") or [], "missing": ref2p.missing_sections(d.get("prompt") or r.get("prompt") or "") if r else [],
+            "variants": d.get("variants") or [], "gens": d.get("gens") or [], "created_at": d.get("created_at")}
+
+
+def r2p_job(rid: str, job: str, target, *args) -> dict:
+    def fn(d):
+        if d.get("job"):
+            raise HTTPException(400, "استنى لما الخطوة اللي شغالة تخلص")
+        d.update(job=job, step="⏳ بيبدأ", error=None)
+    r2p_update(rid, fn)
+
+    def run():
+        try:
+            target(rid, *args)
+            r2p_update(rid, lambda x: x.update(job=None, step=None))
+        except Exception as exc:  # noqa: BLE001
+            r2p_update(rid, lambda x: x.update(job=None, step=None, error=str(getattr(exc, "detail", None) or exc)[:400]))
+    threading.Thread(target=run, daemon=True).start()
+    return r2p_view(r2p_load(rid))
+
+
+def r2p_cuts(path: Path) -> list[float]:
+    err = subprocess.run([ffmpeg_exe(), "-hide_banner", "-i", str(path), "-vf", "select='gt(scene,0.3)',showinfo", "-f", "null", "-"],
+                         capture_output=True, text=True, timeout=600).stderr
+    return [round(float(x), 2) for x in re.findall(r"pts_time:([0-9.]+)", err)][:120]
+
+
+def run_r2p(rid: str) -> None:
+    d = r2p_load(rid)
+    folder = R2P_DIR / rid
+    src = folder / d["file"]
+    r2p_update(rid, lambda x: x.update(step="📏 بيقيس الفيديو ويدوّر على القطعات"))
+    mi = media_info(src)
+    if not mi.duration:
+        raise RuntimeError("مقدرناش نقرا الفيديو ده")
+    facts = {"duration": round(mi.duration, 2), "width": mi.width, "height": mi.height, "fps": round(mi.fps or 30, 2),
+             "aspect": ref2p.aspect(mi.width, mi.height), "has_audio": bool(mi.has_audio)}
+    cuts = r2p_cuts(src)
+    # فريمين في الثانية، و4 لو القطعات سريعة، وبحد أقصى 48 فريم
+    fps = 4 if len(cuts) / max(1, facts["duration"]) > .6 else 2
+    fps = min(fps, 48 / max(1, facts["duration"]))
+    times = [round(k / fps, 2) for k in range(int(facts["duration"] * fps)) if k / fps < facts["duration"]][:48]
+    fr = folder / "frames"
+    shutil.rmtree(fr, ignore_errors=True)
+    fr.mkdir()
+    r2p_update(rid, lambda x: x.update(step=f"🖼️ بيطلّع {len(times)} فريم"))
+    subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src), "-vf", f"fps={fps:g},scale=384:-2",
+                    "-frames:v", str(len(times)), "-q:v", "5", str(fr / "f_%03d.jpg")], capture_output=True, timeout=600)
+    frames = sorted(fr.glob("f_*.jpg"))
+    cols = 8
+    subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src), "-vf",
+                    f"fps={fps:g},scale=160:-2,tile={cols}x{max(1, math.ceil(len(times) / cols))}", "-frames:v", "1", str(folder / "sheet.jpg")],
+                   capture_output=True, timeout=600)
+    r2p_update(rid, lambda x: x.update(facts=facts, cuts=cuts, sheet="sheet.jpg" if (folder / "sheet.jpg").exists() else None))
+    r2p_update(rid, lambda x: x.update(step="🧠 بيكتب قايمة اللقطات والبرومبت"))
+    if atlas.mock_mode():
+        raw = ref2p.mock_result(facts, cuts)
+    else:
+        parts = [{"type": "text", "text": ref2p.messages_text(facts, times[:len(frames)], cuts, d.get("target", ""), d.get("goal", "copy"), d.get("note", ""))}]
+        parts += [{"type": "image_url", "image_url": {"url": data_url(f, "image/jpeg")}} for f in frames]
+        raw = ad_json(ad_media_chat([{"role": "user", "content": parts}], 16000), "البرومبت")
+    res = ref2p.clean_result(raw, facts["duration"])
+    r2p_update(rid, lambda x: x.update(result=res, prompt=res["prompt"], clips=res["clips"], variants=[]))
+
+
+def run_r2p_variant(rid: str, change: str) -> None:
+    d = r2p_load(rid)
+    r2p_update(rid, lambda x: x.update(step="🔀 بيعمل نسخة مختلفة"))
+    if atlas.mock_mode():
+        out = {"prompt": (d.get("prompt") or "") + f"\n\n(variant: {change})", "summary": change}
+    else:
+        try:
+            out = az.parse_json(atlas.chat([{"role": "user", "content": ref2p.variant_text(d.get("prompt") or "", change)}],
+                                           carousel_settings()["text_model"], temperature=.6, max_tokens=8000, json_mode=True, timeout=300), "النسخة")
+        except (atlas.AtlasError, httpx.HTTPError) as exc:
+            raise RuntimeError(f"موديل الكلام: {exc}") from exc
+    if not str(out.get("prompt") or "").strip():
+        raise RuntimeError("النسخة رجعت فاضية")
+    r2p_update(rid, lambda x: x.update(variants=[*(x.get("variants") or []), {"change": change[:300], "summary": str(out.get("summary") or "")[:300],
+                                                                            "prompt": str(out["prompt"])[:12000], "at": now()}][-8:]))
+
+
+@app.get("/api/ref2p")
+def r2p_list():
+    R2P_DIR.mkdir(parents=True, exist_ok=True)
+    out = []
+    for f in R2P_DIR.glob("*/ref2p.json"):
+        try:
+            out.append(r2p_view(json.loads(f.read_text(encoding="utf-8"))))
+        except (OSError, ValueError, KeyError):
+            continue
+    return {"items": sorted(out, key=lambda x: x.get("created_at") or "", reverse=True), "targets": ref2p.TARGETS}
+
+
+@app.post("/api/ref2p")
+def r2p_create(file: UploadFile = File(...), target: str = Form(""), goal: str = Form("copy"), note: str = Form("")):
+    rid = uuid.uuid4().hex[:10]
+    folder = R2P_DIR / rid
+    folder.mkdir(parents=True, exist_ok=True)
+    try:
+        name = save_upload(file, STYLE_VID, folder, "ref")
+    except HTTPException:
+        shutil.rmtree(folder, ignore_errors=True)
+        raise
+    d = {"id": rid, "file": name, "name": Path(file.filename or "فيديو").stem[:60], "target": target if target in ref2p.TARGETS else "",
+         "goal": "variant" if goal == "variant" else "copy", "note": note.strip()[:600], "created_at": now()}
+    (folder / "ref2p.json").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+    return r2p_job(rid, "analyze", run_r2p)
+
+
+@app.get("/api/ref2p/{rid}")
+def r2p_get(rid: str):
+    return r2p_view(r2p_load(rid))
+
+
+class R2pPatchIn(BaseModel):
+    prompt: str | None = None
+    clips: list[dict] | None = None
+    gens: list[str] | None = None
+    target: str | None = None
+    goal: str | None = None
+    note: str | None = None
+
+
+@app.patch("/api/ref2p/{rid}")
+def r2p_patch(rid: str, body: R2pPatchIn):
+    def fn(d):
+        if body.prompt is not None:
+            d["prompt"] = body.prompt[:12000]
+        if body.clips is not None:
+            d["clips"] = [{"t0": c.get("t0", 0), "t1": c.get("t1", 0), "prompt": str(c.get("prompt") or "")[:8000]} for c in body.clips if isinstance(c, dict)][:6]
+        if body.gens is not None:
+            d["gens"] = [g for g in body.gens if isinstance(g, str) and re.fullmatch(r"[0-9a-f]{12}", g)][-30:]
+        if body.target is not None and body.target in ref2p.TARGETS:
+            d["target"] = body.target
+        if body.goal is not None:
+            d["goal"] = "variant" if body.goal == "variant" else "copy"
+        if body.note is not None:
+            d["note"] = body.note.strip()[:600]
+    return r2p_view(r2p_update(Path(rid).name, fn))
+
+
+class R2pVariantIn(BaseModel):
+    change: str
+
+
+@app.post("/api/ref2p/{rid}/variant")
+def r2p_variant(rid: str, body: R2pVariantIn):
+    if not body.change.strip():
+        raise HTTPException(400, "اكتب إيه اللي يتغيّر")
+    return r2p_job(Path(rid).name, "variant", run_r2p_variant, body.change.strip()[:300])
+
+
+@app.post("/api/ref2p/{rid}/redo")
+def r2p_redo(rid: str):
+    return r2p_job(Path(rid).name, "analyze", run_r2p)
+
+
+@app.delete("/api/ref2p/{rid}")
+def r2p_delete(rid: str):
+    if r2p_load(rid).get("job"):
+        raise HTTPException(400, "استنى لما الخطوة اللي شغالة تخلص")
+    shutil.rmtree(R2P_DIR / Path(rid).name, ignore_errors=True)
+    return {"ok": True}
+
+
+@app.get("/api/ref2p/{rid}/file/{name}")
+def r2p_file(rid: str, name: str):
+    f = R2P_DIR / Path(rid).name / Path(name).name
+    if not f.exists() or name.startswith(".") or f.suffix.lower() not in STYLE_IMG | STYLE_VID:
         raise HTTPException(404, "مش موجود")
     return FileResponse(f)
 
