@@ -3511,9 +3511,11 @@ def cancel_remote_post(remote_id: str):
 @app.post("/api/posts/{post_id}/retry")
 def retry_post(post_id: str):
     with closing(db()) as conn:
-        row = conn.execute("SELECT status, remote_id, scheduled_at FROM posts WHERE id = ?", (post_id,)).fetchone()
+        row = conn.execute("SELECT status, remote_id, scheduled_at, error FROM posts WHERE id = ?", (post_id,)).fetchone()
     if row is None or row["status"] != "failed":
         raise HTTPException(400, "البوست ده مش فاشل")
+    if resend_without_tags(post_id, row["error"] or ""):   # التاج هو اللي موقّعه: نبعته من غيره
+        return {"ok": True}
     if row["remote_id"]:
         # Zernio بتعيد المنصات اللي فشلت بس، فمفيش نشر مكرر
         try:
@@ -3525,6 +3527,36 @@ def retry_post(post_id: str):
         set_post(post_id, status="sending" if publisher.service_name() == "zernio" else "scheduled", error=None)
         after_save(post_id, row["scheduled_at"], None)
     return {"ok": True}
+
+
+# إنستجرام بيرفض البوست كله لو الحساب اللي عليه تاج أو كولاب برايفت أو اسمه غلط
+IG_TAG_ERROR = re.compile(r"private profile|invalid username|cannot be accessed|cannot load user|user.{0,20}not found|collaborator", re.I)
+
+
+def resend_without_tags(post_id: str, error: str) -> bool:
+    """لو إنستجرام رفض بسبب التاج/الكولاب: نشيل التاج وننشر على إنستجرام تاني على طول، ونقول للمستخدم."""
+    if "إنستجرام" not in error or not IG_TAG_ERROR.search(error):
+        return False
+    with closing(db()) as conn:
+        r = conn.execute(POSTS_QUERY + " WHERE p.id = ?", (post_id,)).fetchone()
+    opts = json.loads(r["options"]) if r is not None and r["options"] else {}
+    tags = opts.get("ig_tags") or []
+    if r is None or not tags or r["carousel_id"] or not r["export_filename"] or not (EXPORTS_DIR / r["export_filename"]).exists():
+        return False
+    opts = {**opts, "ig_tags": [], "ig_collab": False}
+    try:
+        remote_id = publisher.schedule(EXPORTS_DIR / r["export_filename"], r["caption"], ["instagram"], now(),
+                                       title=r["caption"].split("\n")[0].strip() or r["export_name"], ai_made=r["export_source"] == "studio",
+                                       publish_now=True, options=opts)
+    except (publisher.PublishError, httpx.HTTPError):
+        return False
+    with closing(db()) as conn, conn:
+        conn.execute("UPDATE posts SET options = ? WHERE id = ?", (json.dumps(opts), post_id))
+    set_post(post_id, status="scheduled", remote_id=remote_id, error=None)
+    who = "، ".join("@" + t for t in tags)
+    notify("post", "bad", f"شلت التاج من البوست ({who})",
+           f"إنستجرام رفض التاج والكولاب لأن الحساب برايفت أو الاسم غلط، فالبوست اتبعت تاني من غيرهم. صحّح اسم الحساب في صفحة المدرب أو خليه عام.", "7", post_id)
+    return True
 
 
 _publish_lock = threading.Lock()
@@ -3561,7 +3593,8 @@ def publish_due_posts() -> None:
                 if state == "published":
                     set_post(r["id"], status="published", published_at=now(), error=None)
                 elif state == "failed":
-                    set_post(r["id"], status="failed", error=error)
+                    if not resend_without_tags(r["id"], error or ""):
+                        set_post(r["id"], status="failed", error=error)
             return
 
         for r in due:
