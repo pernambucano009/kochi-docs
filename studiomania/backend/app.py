@@ -3999,6 +3999,7 @@ import stylecl  # noqa: E402
 import fstudio  # noqa: E402
 import ref2p  # noqa: E402
 import hekaya  # noqa: E402
+import comics  # noqa: E402
 
 
 def growth_json(messages: list[dict], what: str) -> dict:
@@ -21326,11 +21327,387 @@ def r2p_file(rid: str, name: str):
     return FileResponse(f)
 
 
+# ---------------------------------------------------------------- 🎭 مكتبة الكوميكس (comics.py)
+# مكتبة واحدة مشتركة لكل الحسابات (COMICS_DATA)، والتجميع والتعديل للأدمن بس.
+COMICS_DIR = Path(os.environ.get("COMICS_DATA") or DATA_DIR / "comics")
+COMICS_MEDIA = COMICS_DIR / "media"
+COMICS_LOCK = threading.Lock()
+COMICS_RUN = {"stop": False, "thread": None}
+COMICS_MAX_MB = 12
+COMICS_BAD = ("nsfw", "violent")
+
+
+def cdb() -> sqlite3.Connection:
+    COMICS_MEDIA.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(COMICS_DIR / "comics.db", timeout=30)
+    conn.row_factory = sqlite3.Row
+    conn.executescript("""
+CREATE TABLE IF NOT EXISTS comics (id TEXT PRIMARY KEY, source TEXT, source_id TEXT, kind TEXT, file TEXT, thumb TEXT, w INT, h INT, dur REAL,
+  has_audio INT, title TEXT, query TEXT, ctx TEXT, status TEXT, created_at TEXT, UNIQUE(source, source_id));
+CREATE VIRTUAL TABLE IF NOT EXISTS comics_fts USING fts5(id UNINDEXED, body, tokenize='unicode61 remove_diacritics 2');
+""")
+    return conn
+
+
+def comics_admin() -> None:
+    if TENANT_ROLE != "admin":
+        raise HTTPException(403, "دي للأدمن بس")
+
+
+def comics_state() -> dict:
+    f = COMICS_DIR / "state.json"
+    try:
+        return json.loads(f.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {"running": False}
+
+
+def comics_state_set(**kw) -> dict:
+    with COMICS_LOCK:
+        st = {**comics_state(), **kw}
+        COMICS_DIR.mkdir(parents=True, exist_ok=True)
+        (COMICS_DIR / "state.json.tmp").write_text(json.dumps(st, ensure_ascii=False), encoding="utf-8")
+        (COMICS_DIR / "state.json.tmp").replace(COMICS_DIR / "state.json")
+        return st
+
+
+def comic_row(r: sqlite3.Row) -> dict:
+    ctx = json.loads(r["ctx"]) if r["ctx"] else {}
+    u = lambda f: f"/api/comics/file/{f}" if f else None
+    return {"id": r["id"], "source": r["source"], "kind": r["kind"], "url": u(r["file"]), "thumb": u(r["thumb"]), "w": r["w"], "h": r["h"],
+            "dur": r["dur"], "has_audio": bool(r["has_audio"]), "title": r["title"], "query": r["query"], "ctx": ctx, "status": r["status"]}
+
+
+def comic_index(conn: sqlite3.Connection, cid: str, title: str, query: str, ctx: dict) -> None:
+    conn.execute("DELETE FROM comics_fts WHERE id = ?", (cid,))
+    conn.execute("INSERT INTO comics_fts (id, body) VALUES (?, ?)", (cid, comics.ctx_text(title, query, ctx)))
+
+
+def comic_store(item: dict, query: str, data: bytes | None = None, src_path: Path | None = None) -> str | None:
+    """بينزّل الملف ويعمل صورة صغيرة، ويسجّله (من غير سياق لسه)."""
+    with closing(cdb()) as conn:
+        if conn.execute("SELECT 1 FROM comics WHERE source = ? AND source_id = ?", (item["source"], item["source_id"])).fetchone():
+            return None
+    cid = uuid.uuid4().hex[:12]
+    ext = item.get("ext") or "gif"
+    f = COMICS_MEDIA / f"{cid}.{ext}"
+    if data is not None:
+        f.write_bytes(data)
+    elif src_path is not None:
+        shutil.copyfile(src_path, f)
+    elif atlas.mock_mode() or not item.get("url"):   # تجربة: صورة ملوّنة بدل التنزيل
+        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i",
+                        f"testsrc2=size=320x240:rate=12:duration={'0.1' if ext in ('png', 'jpg') else '2'}", *(["-frames:v", "1"] if ext in ("png", "jpg") else []),
+                        str(f)], check=True, capture_output=True, timeout=60)
+    else:
+        with httpx.stream("GET", item["url"], timeout=60, follow_redirects=True) as r:
+            r.raise_for_status()
+            size = 0
+            with f.open("wb") as out:
+                for chunk in r.iter_bytes():
+                    size += len(chunk)
+                    if size > COMICS_MAX_MB * 1024 * 1024:
+                        raise ValueError("الملف كبير")
+                    out.write(chunk)
+    try:
+        info = media_info(f)
+        thumb = f"{cid}.jpg"
+        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", *(["-ss", f"{max(0, info.duration * .4):.2f}"] if info.duration > .3 else []),
+                        "-i", str(f), "-frames:v", "1", "-vf", "scale='min(480,iw)':-2", "-q:v", "4", str(COMICS_MEDIA / thumb)], capture_output=True, timeout=60)
+        if not (COMICS_MEDIA / thumb).exists():
+            raise ValueError("مش مقروء")
+    except Exception:
+        f.unlink(missing_ok=True)
+        raise
+    with closing(cdb()) as conn, conn:
+        conn.execute("INSERT OR IGNORE INTO comics (id, source, source_id, kind, file, thumb, w, h, dur, has_audio, title, query, ctx, status, created_at) "
+                     "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'new', ?)",
+                     (cid, item["source"], item["source_id"], item["kind"], f.name, thumb, info.width, info.height, round(info.duration, 2),
+                      int(info.has_audio), item.get("title", "")[:200], query[:120], json.dumps({"tags": item.get("tags") or []}, ensure_ascii=False), now()))
+        comic_index(conn, cid, item.get("title", ""), query, {"tags": item.get("tags") or []})
+    return cid
+
+
+def comics_tag_pending(limit: int = 60) -> int:
+    """المخ بيتفرج على الكوميكس اللي لسه من غير سياق ويكتبه (6 في المرة)."""
+    with closing(cdb()) as conn:
+        rows = conn.execute("SELECT * FROM comics WHERE status = 'new' ORDER BY created_at LIMIT ?", (limit,)).fetchall()
+    done = 0
+    for j in range(0, len(rows), 6):
+        if COMICS_RUN["stop"]:
+            break
+        batch = rows[j:j + 6]
+        items = [{"kind": r["kind"], "title": r["title"], "query": r["query"], "tags": (json.loads(r["ctx"] or "{}")).get("tags")} for r in batch]
+        if atlas.mock_mode():
+            got = {k: comics.mock_ctx(it, k) for k, it in enumerate(items)}
+        else:
+            parts = [{"type": "text", "text": comics.tag_messages(items)}]
+            parts += [{"type": "image_url", "image_url": {"url": data_url(COMICS_MEDIA / r["thumb"], "image/jpeg")}} for r in batch]
+            try:
+                raw = ad_json(ad_media_chat([{"role": "user", "content": parts}], 4000), "سياق الكوميكس")
+            except (HTTPException, ValueError, RuntimeError) as exc:
+                comics_state_set(last_error=str(getattr(exc, "detail", None) or exc)[:200])
+                continue
+            got = {}
+            for x in raw.get("items") or []:
+                try:
+                    got[int(x.get("i"))] = comics.clean_ctx(x)
+                except (TypeError, ValueError, AttributeError):
+                    continue
+        with closing(cdb()) as conn, conn:
+            for k, r in enumerate(batch):
+                ctx = got.get(k)
+                if not ctx:
+                    continue
+                ctx["tags"] = list(dict.fromkeys([*ctx["tags"], *((json.loads(r["ctx"] or "{}")).get("tags") or [])]))[:15]
+                st = "hidden" if any(f in COMICS_BAD for f in ctx["flags"]) else "ready"
+                conn.execute("UPDATE comics SET ctx = ?, status = ? WHERE id = ?", (json.dumps(ctx, ensure_ascii=False), st, r["id"]))
+                comic_index(conn, r["id"], r["title"], r["query"], ctx)
+                done += 1
+    return done
+
+
+def comics_count() -> int:
+    with closing(cdb()) as conn:
+        return conn.execute("SELECT COUNT(*) FROM comics").fetchone()[0]
+
+
+def run_comics_harvest(queries: list[str], kinds: list[str], pages: int, cap: int) -> None:
+    COMICS_RUN["stop"] = False
+    srcs = {k: v for k, v in comics.sources().items() if v["on"]}
+    added = tagged = 0
+    try:
+        if "imgflip" in srcs and "meme" in kinds:
+            comics_state_set(step="بيجيب قوالب الميمز المشهورة")
+            try:
+                for it in (comics.mock_items("meme template", "meme", 3) if atlas.mock_mode() else comics.imgflip_templates()):
+                    try:
+                        added += bool(comic_store(it, "meme template"))
+                    except Exception:  # noqa: BLE001
+                        continue
+            except comics.SourceError as exc:
+                comics_state_set(last_error=f"Imgflip: {exc}")
+        jobs = [(q, src, kind, pg) for q in queries for src, v in srcs.items() if src != "imgflip" for kind in kinds if kind in v["kinds"] for pg in range(pages)]
+        if not jobs and not atlas.mock_mode():
+            comics_state_set(last_error="مفيش مصدر شغال: حط KLIPY_API_KEY أو GIPHY_API_KEY في Railway")
+        if atlas.mock_mode():
+            jobs = [(q, "mock", kind, 0) for q in queries[:12] for kind in kinds[:2]]
+        for n, (q, src, kind, pg) in enumerate(jobs):
+            if COMICS_RUN["stop"] or comics_count() >= cap:
+                break
+            comics_state_set(step=f"بيدوّر على «{q}» في {src} ({n + 1}/{len(jobs)})", progress=round(n / max(1, len(jobs)) * 100), added=added, tagged=tagged)
+            try:
+                items = comics.mock_items(q, kind, 2) if src == "mock" else comics.search(src, kind, q, pg)
+            except comics.SourceError as exc:
+                comics_state_set(last_error=f"{src}: {exc}")
+                continue
+
+            def grab(it, q=q):
+                try:
+                    return bool(comic_store(it, q))
+                except Exception:  # noqa: BLE001 — ملف واحد بايظ مايوقفش التجميع
+                    return False
+            with ThreadPoolExecutor(6) as ex:
+                added += sum(ex.map(grab, items))
+            if n % 3 == 2:
+                comics_state_set(step=f"المخ بيكتب سياق الكوميكس الجديدة ({added} لحد دلوقتي)")
+                tagged += comics_tag_pending(36)
+        while not COMICS_RUN["stop"]:
+            comics_state_set(step="المخ بيكمّل سياق الباقي", added=added, tagged=tagged)
+            got = comics_tag_pending(60)
+            tagged += got
+            if not got:
+                break
+    finally:
+        comics_state_set(running=False, step=None, progress=100, added=added, tagged=tagged, finished_at=now())
+
+
+class ComicsHarvestIn(BaseModel):
+    queries: list[str] = []
+    use_seeds: bool = True
+    kinds: list[str] = ["gif", "clip", "meme"]
+    pages: int = 1
+    cap: int = 5000
+
+
+@app.post("/api/comics/harvest")
+def comics_harvest(body: ComicsHarvestIn):
+    """التجميع: بيدوّر بكلمات كتير في المصادر، وينزّل، والمخ يكتب سياق كل كوميك."""
+    comics_admin()
+    if comics_state().get("running") and COMICS_RUN["thread"] and COMICS_RUN["thread"].is_alive():
+        raise HTTPException(400, "التجميع شغال بالفعل")
+    custom = [q.strip()[:60] for q in body.queries if q.strip()][:500]
+    qs = list(dict.fromkeys(custom + (comics.seeds() if body.use_seeds else [])))
+    kinds = [k for k in body.kinds if k in comics.KINDS] or ["gif"]
+    pages, cap = max(1, min(5, body.pages)), max(100, min(50000, body.cap))
+    comics_state_set(running=True, step="بيبدأ", progress=0, added=0, tagged=0, last_error=None, started_at=now(), queries=len(qs))
+    t = threading.Thread(target=run_comics_harvest, args=(qs, kinds, pages, cap), daemon=True)
+    COMICS_RUN["thread"] = t
+    t.start()
+    return comics_status()
+
+
+@app.post("/api/comics/harvest/stop")
+def comics_stop():
+    comics_admin()
+    COMICS_RUN["stop"] = True
+    return {"ok": True}
+
+
+@app.post("/api/comics/tag")
+def comics_tag():
+    comics_admin()
+    if COMICS_RUN["thread"] and COMICS_RUN["thread"].is_alive():
+        raise HTTPException(400, "التجميع شغال، السياق بيتكتب معاه")
+    COMICS_RUN["stop"] = False
+
+    def run():
+        comics_state_set(running=True, step="المخ بيكتب سياق الكوميكس")
+        try:
+            while not COMICS_RUN["stop"] and comics_tag_pending(60):
+                pass
+        finally:
+            comics_state_set(running=False, step=None)
+    COMICS_RUN["thread"] = threading.Thread(target=run, daemon=True)
+    COMICS_RUN["thread"].start()
+    return comics_status()
+
+
+@app.get("/api/comics/status")
+def comics_status():
+    st = comics_state()
+    if st.get("running") and not (COMICS_RUN["thread"] and COMICS_RUN["thread"].is_alive()):
+        st = comics_state_set(running=False, step=None)
+    with closing(cdb()) as conn:
+        by = {r[0]: r[1] for r in conn.execute("SELECT status, COUNT(*) FROM comics GROUP BY status")}
+        kinds = {r[0]: r[1] for r in conn.execute("SELECT kind, COUNT(*) FROM comics GROUP BY kind")}
+    return {"state": st, "total": sum(by.values()), "ready": by.get("ready", 0), "pending": by.get("new", 0), "hidden": by.get("hidden", 0),
+            "kinds": kinds, "kind_names": comics.KINDS, "sources": comics.sources(), "seeds": len(comics.seeds()), "admin": TENANT_ROLE == "admin"}
+
+
+@app.get("/api/comics")
+def comics_list(q: str = "", kind: str = "", status: str = "ready", page: int = 0):
+    with closing(cdb()) as conn:
+        where, args = [], []
+        if kind in comics.KINDS:
+            where.append("c.kind = ?")
+            args.append(kind)
+        if status in ("ready", "new", "hidden"):
+            where.append("c.status = ?")
+            args.append(status)
+        if fq := comics.fts_query(q):
+            sql = ("SELECT c.* FROM comics_fts f JOIN comics c ON c.id = f.id WHERE comics_fts MATCH ?" + "".join(f" AND {w}" for w in where)
+                   + " ORDER BY bm25(comics_fts) LIMIT 60 OFFSET ?")
+            rows = conn.execute(sql, (fq, *args, page * 60)).fetchall()
+        else:
+            rows = conn.execute("SELECT c.* FROM comics c" + (" WHERE " + " AND ".join(where) if where else "") + " ORDER BY c.created_at DESC LIMIT 60 OFFSET ?",
+                                (*args, page * 60)).fetchall()
+    return {"items": [comic_row(r) for r in rows], "page": page, "more": len(rows) == 60}
+
+
+class ComicPatchIn(BaseModel):
+    ctx: dict | None = None
+    status: str | None = None
+
+
+@app.patch("/api/comics/{cid}")
+def comics_patch(cid: str, body: ComicPatchIn):
+    comics_admin()
+    with closing(cdb()) as conn, conn:
+        r = conn.execute("SELECT * FROM comics WHERE id = ?", (cid,)).fetchone()
+        if r is None:
+            raise HTTPException(404, "مش موجود")
+        ctx = comics.clean_ctx({**json.loads(r["ctx"] or "{}"), **(body.ctx or {})}) if body.ctx is not None else json.loads(r["ctx"] or "{}")
+        st = body.status if body.status in ("ready", "hidden", "new") else ("ready" if body.ctx is not None and r["status"] == "new" else r["status"])
+        conn.execute("UPDATE comics SET ctx = ?, status = ? WHERE id = ?", (json.dumps(ctx, ensure_ascii=False), st, cid))
+        comic_index(conn, cid, r["title"], r["query"], ctx)
+        return comic_row(conn.execute("SELECT * FROM comics WHERE id = ?", (cid,)).fetchone())
+
+
+@app.delete("/api/comics/{cid}")
+def comics_delete(cid: str):
+    comics_admin()
+    with closing(cdb()) as conn, conn:
+        r = conn.execute("SELECT * FROM comics WHERE id = ?", (cid,)).fetchone()
+        if r is None:
+            return {"ok": True}
+        for f in (r["file"], r["thumb"]):
+            (COMICS_MEDIA / f).unlink(missing_ok=True)
+        conn.execute("DELETE FROM comics WHERE id = ?", (cid,))
+        conn.execute("DELETE FROM comics_fts WHERE id = ?", (cid,))
+    return {"ok": True}
+
+
+@app.post("/api/comics/import")
+def comics_import(files: list[UploadFile] = File(default=[]), urls: str = Form(""), note: str = Form("")):
+    """تضيف كوميكس بنفسك: ملفات أو لينكات مباشرة، والمخ يكتب سياقهم."""
+    comics_admin()
+    added = 0
+    tmp = COMICS_DIR / ".up"
+    tmp.mkdir(parents=True, exist_ok=True)
+    for f in files[:100]:
+        ext = Path(f.filename or "").suffix.lower().lstrip(".")
+        if ext not in ("gif", "mp4", "webm", "mov", "png", "jpg", "jpeg", "webp"):
+            continue
+        p = tmp / f"{uuid.uuid4().hex}.{ext}"
+        with p.open("wb") as out:
+            shutil.copyfileobj(f.file, out)
+        kind = "clip" if ext in ("mp4", "webm", "mov") else "gif" if ext == "gif" else "image"
+        try:
+            added += bool(comic_store({"source": "upload", "source_id": hashlib.md5(p.read_bytes()).hexdigest(), "kind": kind,
+                                       "ext": "jpg" if ext == "jpeg" else ext, "title": Path(f.filename or "").stem[:120], "tags": []}, note[:120], src_path=p))
+        except Exception:  # noqa: BLE001
+            pass
+        finally:
+            p.unlink(missing_ok=True)
+    for url in [u.strip() for u in urls.split() if u.strip().startswith("http")][:100]:
+        m = re.search(r"\.(mp4|gif|webp|jpe?g|png)(\?|$)", url, re.I)
+        ext = (m.group(1).lower() if m else "mp4").replace("jpeg", "jpg")
+        try:
+            added += bool(comic_store({"source": "url", "source_id": url[:300], "kind": "clip" if ext == "mp4" else "gif" if ext == "gif" else "image",
+                                       "url": url, "ext": ext, "title": "", "tags": []}, note[:120]))
+        except Exception:  # noqa: BLE001
+            pass
+    if added and not (COMICS_RUN["thread"] and COMICS_RUN["thread"].is_alive()):
+        comics_tag()
+    return {"added": added, **comics_status()}
+
+
+@app.get("/api/comics/file/{name}")
+def comics_file(name: str):
+    f = COMICS_MEDIA / Path(name).name
+    if not f.exists():
+        raise HTTPException(404, "مش موجود")
+    return FileResponse(f, headers={"Cache-Control": "public, max-age=604800"})
+
+
+def comics_candidates(texts: list[str], k: int = 8) -> list[list[dict]]:
+    """لكل جملة: أقرب كوميكس في المكتبة (بحث في السياق المكتوب)."""
+    out = []
+    with closing(cdb()) as conn:
+        for t in texts:
+            fq = comics.fts_query(t)
+            rows = conn.execute("SELECT c.* FROM comics_fts f JOIN comics c ON c.id = f.id WHERE comics_fts MATCH ? AND c.status = 'ready' "
+                                "ORDER BY bm25(comics_fts) LIMIT ?", (fq, k)).fetchall() if fq else []
+            out.append([comic_row(r) for r in rows])
+    return out
+
+
+class ComicsMatchIn(BaseModel):
+    text: str
+    n: int = 6
+
+
+@app.post("/api/comics/match")
+def comics_match(body: ComicsMatchIn):
+    return {"items": comics_candidates([body.text[:600]], max(1, min(20, body.n)))[0]}
+
+
 # ---------------------------------------------------------------- 📖 حكاية (hekaya.py)
 # الفكرة ← القصة ← صوت الراوي ← توقيت كل كلمة ← الشخصيات والمشاهد بالكود ← صور ثابتة ← الفيديو. والستايل يتغيّر في أي وقت من غير ما يتكتب كود تاني.
 HK_DIR = DATA_DIR / "hekaya"
 HK_LOCK = threading.Lock()
-HK_BUSY = {"story", "voice", "scenes", "stills", "render"}
+HK_BUSY = {"story", "voice", "scenes", "stills", "render", "comics"}
 HK_STAGES = ("story", "voice", "scenes", "done")
 HK_PREV = threading.Semaphore(2)
 
@@ -21403,6 +21780,7 @@ def hk_view(d: dict) -> dict:
             "timing": [{"s": x["s"], "e": x["e"], "n": len(x["words"])} for x in scn], "total": d.get("total"),
             "stills": [{"i": x["i"], "url": hk_url(d, x["file"]), "style": x.get("style")} for x in d.get("stills") or []],
             "has_code": bool((d.get("code") or {}).get("scenes")), "video": hk_url(d, d.get("final")), "video_style": d.get("final_style"),
+            "comics": d.get("comics") or {"items": []}, "comics_total": hk_comics_ready(),
             "notes": d.get("notes") or [], "created_at": d.get("created_at"), "updated_at": d.get("updated_at")}
 
 
@@ -21632,11 +22010,134 @@ def run_hk_render(hid: str) -> None:
                        lambda step: hk_set(hid, step=step), "hekaya", folder / d["voice"]["file"], hekaya.LEAD,
                        hekaya.RATIOS[i["ratio"]], hekaya.OUT_FPS, 23, timeout=180 + dur * 40)
 
+    cm = [c for c in (d.get("comics") or {}).get("items") or [] if (COMICS_MEDIA / c.get("file", "")).exists()]
+    if cm:
+        hk_set(hid, step=f"🎭 بيحط {len(cm)} كوميك")
+        out = f"hekaya-{uuid.uuid4().hex[:4]}.mp4"
+        comics_overlay(folder / name, folder / out, cm, *hekaya.RATIOS[i["ratio"]], (d.get("comics") or {}).get("audio", True))
+        (folder / name).unlink(missing_ok=True)
+        name = out
+
     def fin(x):
         if x.get("final"):
             (folder / x["final"]).unlink(missing_ok=True)
         x.update(final=name, final_style=i["style"], stage="done")
     hk_update(hid, fin)
+
+
+def hk_comics_ready() -> int:
+    try:
+        with closing(cdb()) as conn:
+            return conn.execute("SELECT COUNT(*) FROM comics WHERE status = 'ready'").fetchone()[0]
+    except sqlite3.Error:
+        return 0
+
+
+def comics_overlay(video: Path, out: Path, items: list[dict], W: int, H: int, audio: bool) -> None:
+    """الكوميكس فوق الفيديو في وقتها، بإطار أبيض زي الستيكر، وصوتها لو فيديو بصوت."""
+    args = [ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(video)]
+    fil, last, aud = [], "[0:v]", ["[0:a]"]
+    bw, bh = int(W * (.42 if W > H else .72)), int(H * (.5 if W > H else .36))
+    m = max(8, W // 120)
+    for k, c in enumerate(items, start=1):
+        f, dur, at = COMICS_MEDIA / c["file"], float(c["dur"]), float(c["at"])
+        ext = f.suffix.lower()
+        loop = ["-loop", "1"] if ext in (".png", ".jpg", ".jpeg", ".webp") else ["-ignore_loop", "0"] if ext == ".gif" else ["-stream_loop", "-1"]
+        args += loop + ["-t", f"{dur:.2f}", "-i", str(f)]
+        fil.append(f"[{k}:v]scale=w={bw}:h={bh}:force_original_aspect_ratio=decrease,pad=iw+{m * 2}:ih+{m * 2}:{m}:{m}:white,"
+                   f"format=yuva420p,fade=t=in:st=0:d=0.12:alpha=1,fade=t=out:st={max(0.1, dur - .15):.2f}:d=0.15:alpha=1,setpts=PTS-STARTPTS+{at:.2f}/TB[c{k}]")
+        fil.append(f"{last}[c{k}]overlay=x=(W-w)/2:y=H*0.06:eof_action=pass:enable='between(t,{at:.2f},{at + dur:.2f})'[v{k}]")
+        last = f"[v{k}]"
+        if audio and c.get("has_audio"):
+            ms = int(at * 1000)
+            fil.append(f"[{k}:a]atrim=0:{dur:.2f},asetpts=PTS-STARTPTS,aformat=channel_layouts=mono,adelay={ms}|{ms},volume=1.1[a{k}]")
+            aud.append(f"[a{k}]")
+    amap = ["-map", "0:a"]
+    if len(aud) > 1:
+        fil.append("".join(aud) + f"amix=inputs={len(aud)}:duration=first:normalize=0[ao]")
+        amap = ["-map", "[ao]"]
+    r = subprocess.run(args + ["-filter_complex", ";".join(fil), "-map", last, *amap, "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
+                               "-maxrate", "9M", "-bufsize", "18M", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", str(out)],
+                       capture_output=True, text=True, timeout=900)
+    if r.returncode != 0 or not out.exists():
+        raise RuntimeError(f"تركيب الكوميكس: {r.stderr.strip()[-240:]}")
+
+
+def run_hk_comics(hid: str, every: float, audio: bool) -> None:
+    """لكل مشهد: المخ بيكتب كلمات البحث، ونجيب أقرب كوميكس من المكتبة، والمخ يختار الأنسب لمشاهد قليلة بس."""
+    d = hk_load(hid)
+    story, scn = d["story"], d["scn"]
+    idx = [k for k, s in enumerate(story["scenes"]) if not s.get("end")]
+    hk_set(hid, step="🎭 بيدوّر على كوميكس تناسب الكلام")
+    words = {}
+    if not atlas.mock_mode():
+        raw = hk_chat_json([{"role": "system", "content": "Return JSON only."},
+                            {"role": "user", "content": "For each narration line give 4-8 short search words (Egyptian Arabic + English) describing the reaction/emotion/situation "
+                             "a funny reaction meme would show for it.\n" + "\n".join(f"{k + 1}. {story['scenes'][k]['text']}" for k in idx)
+                             + '\nReturn {"scenes": [{"n": 1, "words": ["..."]}]}'}], "كلمات البحث")
+        for x in raw.get("scenes") or []:
+            try:
+                words[int(x.get("n")) - 1] = " ".join(str(w) for w in x.get("words") or [])
+            except (TypeError, ValueError, AttributeError):
+                continue
+    cands = dict(zip(idx, comics_candidates([f"{story['scenes'][k]['text']} {words.get(k, '')}" for k in idx], 6)))
+    cands = {k: v for k, v in cands.items() if v}
+    if not cands:
+        raise RuntimeError("المكتبة لسه مفيهاش كوميكس تناسب الكلام ده. جمّع كوميكس الأول من «مكتبة الكوميكس»")
+    if atlas.mock_mode():
+        picks = [{"scene": k + 1, "id": v[0]["id"], "why": "تجربة"} for n, (k, v) in enumerate(cands.items()) if n % 3 == 1]
+    else:
+        raw = hk_chat_json(comics.pick_messages(story["scenes"], cands, every), "اختيار الكوميكس")
+        picks = [p for p in raw.get("picks") or [] if isinstance(p, dict)]
+    byid = {c["id"]: c for v in cands.values() for c in v}
+    items, used, last = [], set(), -9
+
+    def scene_of(p):
+        try:
+            return int(p.get("scene")) - 1
+        except (TypeError, ValueError):
+            return -1
+    for p in sorted(picks, key=scene_of):
+        k = scene_of(p)
+        c = byid.get(str(p.get("id")))
+        if c is None or k not in cands or c["id"] in used or k - last < 2:
+            continue
+        sc = scn[k]
+        last_word = sc["words"][-1]["t"] if sc["words"] else sc["s"] + .5
+        at = round(max(sc["s"] + hekaya.TD, last_word - .15), 2)
+        dur = min(c["dur"] or 1.8, 2.8) if c["kind"] in ("gif", "clip") else 1.8
+        dur = round(max(1.0, min(dur, d["total"] - at - .2)), 2)
+        with closing(cdb()) as conn:
+            row = conn.execute("SELECT file FROM comics WHERE id = ?", (c["id"],)).fetchone()
+        if not row:
+            continue
+        items.append({"scene": k, "id": c["id"], "file": row["file"], "thumb": c["thumb"], "kind": c["kind"], "has_audio": c["has_audio"],
+                      "at": at, "dur": dur, "why": str(p.get("why") or "")[:200], "emotion": c["ctx"].get("emotion", "")})
+        used.add(c["id"])
+        last = k
+    hk_update(hid, lambda x: x.update(comics={"items": items, "every": every, "audio": audio}))
+
+
+class HkComicsIn(BaseModel):
+    every: float = .35
+    audio: bool = True
+    remove: int | None = None
+    clear: bool = False
+
+
+@app.post("/api/hekaya/{hid}/comics")
+def hk_comics(hid: str, body: HkComicsIn):
+    """🎭 كوميكس أوتوماتيك: بيختار من المكتبة لمشاهد قليلة، وتشيل اللي مش عاجبك."""
+    d = hk_load(hid)
+    if not d.get("scn"):
+        raise HTTPException(400, "سجّل صوت الراوي الأول")
+    if body.clear or body.remove is not None:
+        def fn(x):
+            c = x.get("comics") or {"items": []}
+            c["items"] = [] if body.clear else [it for n, it in enumerate(c["items"]) if n != body.remove]
+            x["comics"] = c
+        return hk_view(hk_update(hid, fn))
+    return hk_job(hid, "comics", run_hk_comics, max(.1, min(.8, body.every)), body.audio)
 
 
 @app.get("/api/hekaya")

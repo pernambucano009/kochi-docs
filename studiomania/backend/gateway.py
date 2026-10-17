@@ -262,6 +262,7 @@ def tenant_env(wid: str) -> dict:
         env.setdefault(k, v)
     d = workspace_dir(wid)
     d.mkdir(parents=True, exist_ok=True)
+    env.setdefault("COMICS_DATA", str(DATA_DIR / "_shared" / "comics"))   # مكتبة الكوميكس واحدة لكل الحسابات
     env.update(STUDIOMANIA_DATA=str(d), GATEWAY_SECRET=GATEWAY_SECRET, TENANT_ID=wid,
                TENANT_ROLE="admin" if wid == OWNER else "customer", PLATFORM_DB=str(PDB))
     env.pop("APP_PASSWORD", None)

@@ -86,7 +86,17 @@ const HekayaPage = (() => {
       <div class="hk-stills">${d.stills.map((s) => `<figure class="hk-still"><img src="${s.url}" alt="" loading="lazy"><figcaption><b class="num">${s.i + 1}</b> ${esc(sc[s.i]?.text || "")}</figcaption>
           ${sc[s.i] && !sc[s.i].end ? `<button class="nb-btn sm" data-hone="${s.i}">🔁 ارسمه تاني</button>` : ""}</figure>`).join("")}</div>
       <div class="nb-row"><label class="nb-f"><span>ملاحظة على كل المشاهد</span><input type="text" data-hnote="scenes" placeholder="مثلًا: حركة أكتر، والثعلب أكبر شوية"></label><button class="nb-btn" data-hredo="scenes">🎨 ارسمهم تاني</button></div>
+      ${comicsCard(d)}
       <div class="nb-bar"><button class="nb-btn fs-go" data-hrender>🎬 اعمل الفيديو</button><span class="nb-state">الفيديو بياخد دقايق (كل فريم بيترسم)</span></div></section>`;
+  }
+  function comicsCard(d) {
+    const c = d.comics || { items: [] }, ev = c.every || .35;
+    return `<div class="hk-cm"><h4 class="hk-h">🎭 كوميكس أوتوماتيك <small class="nb-state">${d.comics_total || 0} كوميك جاهز في المكتبة</small></h4>
+      <div class="nb-bar"><select data-hcmevery>${[[.2, "قليل"], [.35, "متوسط"], [.5, "كتير"]].map(([v, t]) => `<option value="${v}" ${Math.abs(v - ev) < .01 ? "selected" : ""}>${t}</option>`).join("")}</select>
+        <label class="hk-big"><input type="checkbox" data-hcmaudio ${c.audio !== false ? "checked" : ""}> صوت الكوميك</label>
+        <button class="nb-btn" data-hcmgo>🎭 ${c.items.length ? "اختار تاني" : "اختار كوميكس للمشاهد"}</button>${c.items.length ? `<button class="nb-btn sm" data-hcmclear>شيل الكل</button>` : ""}</div>
+      ${c.items.length ? `<div class="hk-cms">${c.items.map((x, n) => `<figure><img src="${x.thumb}" alt=""><figcaption><b class="num">${x.scene + 1}</b> ${esc(x.emotion)}${x.has_audio ? " 🔊" : ""}<small>${esc(x.why)}</small></figcaption>
+          <button class="nb-btn sm danger" data-hcmrm="${n}">✕</button></figure>`).join("")}</div><p class="nb-hint">هيتحطوا فوق المشاهد دي في الفيديو لما تدوس «اعمل الفيديو».</p>` : ""}</div>`;
   }
   function videoSec(d) {
     if (!d.video) return "";
@@ -184,6 +194,9 @@ const HekayaPage = (() => {
       }
       if (q("[data-hrestyle]")) return act("/stills", { method: "POST" });
       if (q("[data-hrender]")) return act("/render", { method: "POST" });
+      if (q("[data-hcmgo]")) return act("/comics", { method: "POST", ...jsonBody({ every: +w.querySelector("[data-hcmevery]").value, audio: w.querySelector("[data-hcmaudio]").checked }) });
+      if (q("[data-hcmclear]")) return act("/comics", { method: "POST", ...jsonBody({ clear: true }) });
+      if (q("[data-hcmrm]")) return act("/comics", { method: "POST", ...jsonBody({ remove: +q("[data-hcmrm]").dataset.hcmrm }) });
     });
   }
   async function mount(root) {

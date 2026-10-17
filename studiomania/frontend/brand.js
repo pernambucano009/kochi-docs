@@ -68,6 +68,7 @@ const BrandPage = (() => {
         { f: "pg", i: "stylecl", page: "stylecl", t: "🎨 استنساخ الستايل", type: "page" },
         { f: "pg", i: "fstudio", page: "fstudio", t: "🎞️ فريم فريم", type: "page" },
         { f: "pg", i: "hekaya", page: "hekaya", t: "📖 حكاية", type: "page" },
+        { f: "pg", i: "comics", page: "comics", t: "🎭 مكتبة الكوميكس", type: "page" },
         { f: "pg", i: "ref2p", page: "ref2p", t: "🎥 من مرجع لبرومبت", type: "page" },
       ] },
       // نبض المجال: المنافسين (أعلى 5 في المجال والسوق) واللي بينجح عندهم والترند وتحليل بوستات بنفسك، كله في فرع واحد

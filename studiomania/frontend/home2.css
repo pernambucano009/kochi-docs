@@ -1470,3 +1470,28 @@ html { overflow-x: clip; }
 .hk-video { width: 100%; max-height: 70vh; border-radius: 16px; background: #000; }
 .hk-steps li.on { color: var(--nh-accent); }
 audio { width: 100%; }
+
+/* 🎭 مكتبة الكوميكس */
+.cm-stats, .cm-srcs { display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: 13px; }
+.cm-stats b { font-size: 16px; color: var(--nh-accent); margin-inline-end: 4px; }
+.cm-src { padding: 4px 10px; border-radius: 999px; background: var(--nh-bg, rgba(127,127,127,.1)); opacity: .7; }
+.cm-src.on { opacity: 1; }
+.cm-q, .cm-urls { flex: 1 1 220px; min-width: 0; }
+.cm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(46%, 170px), 1fr)); gap: 10px; }
+.cm-item { margin: 0; border-radius: 14px; overflow: hidden; background: var(--nh-bg, rgba(127,127,127,.08)); cursor: pointer; display: grid; align-content: start; }
+.cm-item img, .cm-item video { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; display: block; background: #111; }
+.cm-item figcaption { padding: 8px 10px 10px; display: grid; gap: 3px; font-size: 12.5px; line-height: 1.45; }
+.cm-item figcaption small { opacity: .7; }
+.cm-item figcaption i { color: var(--nh-accent); font-style: normal; }
+.cm-edit { grid-template-columns: minmax(0, 260px) 1fr; }
+.cm-edit .nb-bar { grid-column: 1 / -1; }
+.cm-edit-m img, .cm-edit-m video { width: 100%; border-radius: 12px; }
+@media (max-width: 640px) { .cm-edit { grid-template-columns: 1fr; } }
+.hk-cm { display: grid; gap: 8px; padding: 12px; border-radius: 16px; background: var(--nh-bg, rgba(127,127,127,.08)); }
+.hk-cms { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(46%, 150px), 1fr)); gap: 8px; }
+.hk-cms figure { margin: 0; display: grid; gap: 4px; position: relative; }
+.hk-cms img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 10px; }
+.hk-cms figcaption { font-size: 12px; display: grid; }
+.hk-cms figcaption b { color: var(--nh-accent); }
+.hk-cms button { position: absolute; top: 6px; inset-inline-end: 6px; }
+.cm-q, .cm-urls { padding: 10px 14px; border-radius: 12px; border: 1px solid rgba(127,127,127,.25); background: transparent; color: inherit; font: inherit; min-height: 42px; box-sizing: border-box; }
