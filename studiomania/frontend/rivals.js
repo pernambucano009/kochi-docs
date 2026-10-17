@@ -1,8 +1,10 @@
-// 🏆 «منافسينك في المجال» (فرع في عقل البراند): أعلى 5 حسابات مشاهدات في مجالك وسوقك على تيك توك وإنستجرام.
-// تقدر تضيف وتشيل وتبدّل وتثبّت. أفضل بوستاتهم (اللي عدّت متوسط صاحبها بكتير) بتدخل في كتابة الأفكار والسكريبتات والهوكات.
+// 💓 «نبض المجال» (فرع في عقل البراند): كل اللي بيحصل في مجالك في مكان واحد، بتابات:
+// المنافسين (أعلى 5 مشاهدات في مجالك وسوقك، تضيف وتشيل وتبدّل وتثبّت) · اللي بينجح عندهم · الترند آخر ٣٠ يوم · حلّل بوستات بنفسك.
+// المنافسين والترند بيدخلوا لوحدهم في كتابة الأفكار والسكريبتات والهوكات.
 const RivalsPage = (() => {
   const esc = (s) => escapeHtml(String(s ?? ""));
-  const S = { el: null, d: null, timer: null, swap: null, focus: null };
+  const S = { el: null, d: null, timer: null, swap: null, focus: null, tab: "rivals" };
+  const TABS = [["rivals", "🏆 المنافسين"], ["works", "🧠 اللي بينجح عندهم"], ["trend", "📈 الترند آخر ٣٠ يوم"], ["mine", "🔥 حلّل بوستات بنفسك"]];
   const html = () => `<div class="nb-wrap fs-wrap rv-wrap" id="rvWrap"><div class="nh-empty">بيحمّل…</div></div>`;
   const fmt = (n) => { n = +n || 0; return n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${Math.round(n / 1e3)}K` : String(n); };
   const PL = { tiktok: "TikTok", instagram: "Instagram" };
@@ -39,36 +41,57 @@ const RivalsPage = (() => {
       ${d.summary ? `<p>${esc(d.summary)}</p>` : ""}
       <div class="rv-dg">${box("hooks", "🎣 هوكات بتكسب")}${box("concepts", "💡 أفكار بتجيب مشاهدات")}${box("formats", "🧩 أشكال ناجحة")}${box("angles", "🚪 زوايا فاضية ليك")}${box("avoid", "🚫 بيجيب مشاهدات قليلة")}</div></section>`;
   }
-  function render() {
-    const w = S.el, d = S.d;
-    if (!w || !d) return;
-    const busy = d.status === "working", b = d.brain || {};
+  function top() {
+    const d = S.d, busy = d.status === "working", b = d.brain || {};
     const where = [b.domain && `المجال: ${b.domain}`, b.market && `السوق: ${b.market}`, b.audience && `الجمهور: ${b.audience}`].filter(Boolean);
-    w.innerHTML = `<section class="fs-hero">
-        <div class="fs-hero-t"><b>منافسينك في المجال</b><span class="latin">NICHE COMPETITORS</span></div>
-        <p>أعلى ${d.top} حسابات مشاهدات في مجالك وسوقك على تيك توك وإنستجرام. كل بوست بيتحسب عدّى متوسط صاحبه بكام مرة: البوست اللي عدّاه بكتير يبقى الفكرة هي اللي نجحت. واللي بينجح عندهم بيدخل لوحده في الأفكار والسكريبتات والهوكات بتاعتك، من غير ما ننسخ كلامهم.</p>
+    return `<section class="fs-hero">
+        <div class="fs-hero-t"><b>نبض المجال</b><span class="latin">NICHE PULSE</span></div>
+        <p>كل اللي بيحصل في مجالك في مكان واحد: أعلى ${d.top} منافسين مشاهدات في مجالك وسوقك، واللي بينجح عندهم، وأعلى البوستات في آخر ٣٠ يوم. كل ده بيدخل لوحده في الأفكار والسكريبتات والهوكات بتاعتك، من غير ما ننسخ كلام حد.</p>
         <p class="nb-hint">بندوّر على حسب: ${where.length ? esc(where.join(" · ")) : "اكتب المجال والسوق والجمهور في فرع «الهوية» الأول"}</p>
         ${d.live ? "" : `<p class="nb-hint">⚠️ وضع تجربة: الحسابات والأرقام دي تجريبية لحد ما يتحط مفتاح مصدر الداتا.</p>`}
         <div class="nb-bar"><button class="nb-btn fs-go" data-rvfind ${busy ? "disabled" : ""}>${d.items.length ? "🔍 دوّر تاني (المثبّتين بيفضلوا)" : `🔍 هات أعلى ${d.top} في مجالي`}</button>
-          ${d.items.length ? `<button class="nb-btn" data-rvall ${busy ? "disabled" : ""}>↻ حدّث البوستات</button>` : ""}
-          ${d.excluded ? `<button class="nb-btn sm" data-rvreset title="الحسابات اللي شيلتها مش بترجع في البحث">رجّع اللي شيلتهم (${d.excluded})</button>` : ""}
+          ${d.items.length ? `<button class="nb-btn" data-rvall ${busy ? "disabled" : ""}>↻ حدّث</button>` : ""}
           ${d.updated_at ? `<span class="nb-state">آخر تحديث ${ago(d.updated_at)} · بيتحدّث لوحده كل أسبوع</span>` : ""}</div>
       </section>
       ${busy ? `<div class="fs-busy">⏳ ${esc(d.step || "شغال…")}</div>` : d.error ? `<div class="fs-err">⚠️ ${esc(d.error)}</div>` : ""}
-      <section class="fs-card"><h3>ضيف منافس بنفسك</h3>
+      <nav class="rv-tabs" role="tablist">${TABS.map(([k, t]) => `<button role="tab" data-rvtab="${k}" aria-selected="${k === S.tab}" class="${k === S.tab ? "on" : ""}">${t}</button>`).join("")}</nav>`;
+  }
+  function trend(list) {
+    if (!list?.length) return `<div class="nh-empty">لسه مفيش. دوس «هات أعلى ${S.d.top} في مجالي» وهنجيب معاهم أعلى البوستات في مجالك آخر ٣٠ يوم.</div>`;
+    return `<section class="fs-card"><h3>📈 أعلى البوستات في مجالك آخر ٣٠ يوم <small>من أي حساب، مش المنافسين بس</small></h3>
+      <div class="rv-posts">${list.map((p) => `<a class="rv-post" href="${esc(p.url)}" target="_blank" rel="noopener noreferrer">
+        <b class="vr-x num">${fmt(p.views)}</b><span>${PL[p.platform] || ""} · <bdi dir="ltr">@${esc(p.handle)}</bdi> · ${ago(p.ts)}</span>
+        <p>${esc((p.caption || "").slice(0, 160))}</p></a>`).join("")}</div></section>`;
+  }
+  function body() {
+    const d = S.d, busy = d.status === "working";
+    if (S.tab === "works") return digest(d.digest) || `<div class="nh-empty">لسه مفيش تحليل. هات المنافسين الأول.</div>`;
+    if (S.tab === "trend") return trend(d.trending);
+    if (S.tab === "mine") return `<p class="nb-hint">لو شايف بوستات بنفسك (من أي حساب)، حطها هنا ونحسبلك كل بوست عدّى متوسط صاحبه بكام، ونطلعلك أفكار بنفس الهيكل.</p>${ViralPage.html()}`;
+    return `<section class="fs-card"><h3>ضيف منافس بنفسك</h3>
         <div class="nb-row rv-add"><input type="text" data-rvnew placeholder="@اسم الحساب أو اللينك" dir="ltr">
           <select data-rvnewpl>${Object.entries(PL).map(([k, t]) => `<option value="${k}">${t}</option>`).join("")}</select>
           <button class="nb-btn" data-rvadd ${busy ? "disabled" : ""}>＋ ضيف</button></div>
-        <p class="nb-hint">اللي بتضيفه بيتثبّت لوحده. واللي بتشيله مش بيرجع تاني لما تدوّر.</p></section>
-      <div class="rv-list ${busy ? "fs-lock" : ""}">${d.items.map(card).join("") || `<div class="nh-empty">لسه مفيش منافسين. دوس «هات أعلى ${d.top} في مجالي».</div>`}</div>
-      ${digest(d.digest)}`;
+        <p class="nb-hint">اللي بتضيفه بيتثبّت لوحده. واللي بتشيله مش بيرجع تاني لما تدوّر.
+          ${d.excluded ? `<button class="nb-btn sm" data-rvreset>رجّع اللي شيلتهم (${d.excluded})</button>` : ""}</p></section>
+      <div class="rv-list ${busy ? "fs-lock" : ""}">${d.items.map(card).join("") || `<div class="nh-empty">لسه مفيش منافسين. دوس «هات أعلى ${d.top} في مجالي».</div>`}</div>`;
+  }
+  function render(onlyTop) {
+    const w = S.el;
+    if (!w || !S.d) return;
+    if (!w.querySelector(".rv-top")) w.innerHTML = `<div class="rv-top"></div><div class="rv-body"></div>`;
+    w.querySelector(".rv-top").innerHTML = top();
+    if (onlyTop && S.tab === "mine") return;   // ماتمسحش اللي بتكتبه في «حلّل بنفسك»
+    const bd = w.querySelector(".rv-body");
+    bd.innerHTML = body();
+    if (S.tab === "mine") ViralPage.mount(bd);
     if (S.focus) { w.querySelector(`[data-rid="${CSS.escape(S.focus)}"]`)?.scrollIntoView({ block: "center" }); S.focus = null; }
   }
   function poll() {
     clearTimeout(S.timer);
     if (S.d?.status !== "working") return;
     S.timer = setTimeout(async () => {
-      try { S.d = await api("/api/rivals"); render(); } catch {}
+      try { S.d = await api("/api/rivals"); render(true); } catch {}
       poll();
     }, 2500);
   }
@@ -78,6 +101,9 @@ const RivalsPage = (() => {
   }
   function bind(w) {
     w.addEventListener("click", (e) => {
+      const tb = e.target.closest("[data-rvtab]");
+      if (tb) { S.tab = tb.dataset.rvtab; return render(); }
+      if (e.target.closest(".vr-wrap")) return;
       const rid = e.target.closest("[data-rid]")?.dataset.rid;
       if (e.target.closest("[data-rvfind]")) return act("/api/rivals/discover", { method: "POST" });
       if (e.target.closest("[data-rvall]")) return act("/api/rivals/refresh", { method: "POST" });
@@ -104,8 +130,11 @@ const RivalsPage = (() => {
     const w = root.querySelector("#rvWrap");
     if (!w) return;
     S.el = w;
-    S.focus = String(window.RV_FOCUS || "").replace(/^rv/, "") || null;
+    w.innerHTML = "";
+    const f = String(window.RV_FOCUS || "");
     window.RV_FOCUS = null;
+    S.tab = TABS.some(([k]) => `rv:${k}` === f) ? f.slice(3) : "rivals";
+    S.focus = /^rv[^:]/.test(f) ? f.slice(2) : null;
     bind(w);
     try { S.d = await api("/api/rivals"); render(); poll(); }
     catch (err) { w.innerHTML = `<div class="nh-empty">${esc(err.message)}</div>`; }

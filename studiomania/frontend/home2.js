@@ -66,7 +66,7 @@ const NH = (() => {
     viral: { en: "Trends", ar: "اللي ماشي في مجالك", icon: "megaphone", page: "viral", desc: "بوستات المجال مرتّبة بقد إيه عدّت العادي، وأفكار بنفس الهيكل." },
     stylecl: { en: "Style Clone", ar: "استنساخ الستايل", icon: "clapper", page: "stylecl", desc: "مرجع بستايل عاجبك + فكرتك ← أنيميشن مرسوم بالكود." },
     fstudio: { en: "Frame by Frame", ar: "فريم فريم", icon: "clapper", page: "fstudio", desc: "استوديو أنيميشن مرسوم بالكود، وانت متحكم في كل مرحلة." },
-    rivals: { en: "Competitors", ar: "منافسينك في المجال", icon: "megaphone", page: "rivals", desc: "أعلى 5 في مجالك وسوقك، واللي بينجح عندهم بيدخل في أفكارك." },
+    rivals: { en: "Niche Pulse", ar: "نبض المجال", icon: "megaphone", page: "rivals", desc: "منافسينك والترند واللي بينجح في مجالك، وبيدخل في أفكارك." },
     ref2p: { en: "Reference → Prompt", ar: "من مرجع لبرومبت", icon: "clapper", page: "ref2p", desc: "فيديو مرجعي ← برومبت جاهز بـ 14 جزء ← توليد." },
     motion: { en: "Motion", ar: "مكتبة الموشن", icon: "clapper", page: "motion", desc: "أنيميشنات مكتوبة بالكود، كل واحدة تتضاف للأصول بضغطة." },
   };

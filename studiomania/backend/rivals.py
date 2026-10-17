@@ -1,4 +1,4 @@
-"""🏆 «منافسينك في المجال»: أعلى 5 حسابات مشاهدات في مجال البراند وسوقه (تيك توك وإنستجرام).
+"""💓 «نبض المجال» (فرع في عقل البراند): المنافسين والترند. أعلى 5 حسابات مشاهدات في مجال البراند وسوقه (تيك توك وإنستجرام).
 
 البرنامج بيدوّر بكلمات المجال بلهجة السوق، يجمّع الحسابات اللي بتطلع، يختار الأقرب للبراند،
 وبعدين يجيب آخر بوستات كل حساب ويحسب كل بوست عدّى متوسط صاحبه بكام مرة.
@@ -186,6 +186,20 @@ def summarize(platform: str, handle: str, posts: list[dict], now: float | None =
             "top_views": max(views or [0]), "posts": best}
 
 
+def trending(posts: list[dict], now: float | None = None, n: int = 15) -> list[dict]:
+    """نبض المجال: أعلى البوستات مشاهدات في آخر ٣٠ يوم (من أي حساب)."""
+    now = now or time.time()
+    seen, out = set(), []
+    for p in sorted(posts, key=lambda p: -p["views"]):
+        if p["id"] in seen or not p["ts"] or now - p["ts"] > RECENT:
+            continue
+        seen.add(p["id"])
+        out.append({k: p.get(k) for k in ("platform", "handle", "url", "caption", "views", "likes", "comments", "ts")})
+        if len(out) >= n:
+            break
+    return out
+
+
 def fmt(n: int) -> str:
     n = int(n or 0)
     return f"{n / 1e6:.1f}M" if n >= 1e6 else f"{n / 1e3:.0f}K" if n >= 1e3 else str(n)
@@ -254,7 +268,7 @@ def insight_text(brain: dict | None) -> str:
     """اللي بيدخل في برومبت الأفكار والسكريبتات."""
     c = (brain or {}).get("competitors") or {}
     items = [i for i in c.get("items") or [] if i.get("posts")]
-    if not items:
+    if not items and not c.get("trending"):
         return ""
     lines = ["منافسين البراند في نفس المجال والسوق (أعلى مشاهدات). اتعلّم من الفكرة والهوك والهيكل اللي نجح عندهم، وماتنسخش كلامهم:"]
     for i in items[:TOP]:
@@ -262,6 +276,9 @@ def insight_text(brain: dict | None) -> str:
         for p in i["posts"][:3]:
             hook = (p.get("spoken") or p.get("caption") or "").split("\n")[0][:140]
             lines.append(f"  ×{p.get('multiple')} ({fmt(p.get('views'))}): {hook}")
+    if tr := c.get("trending") or []:
+        lines.append("أعلى بوستات في المجال آخر ٣٠ يوم (الترند دلوقتي):")
+        lines += [f"  {fmt(p.get('views'))} @{p.get('handle')}: {(p.get('caption') or '').split(chr(10))[0][:120]}" for p in tr[:5]]
     d = c.get("digest") or {}
     for k, t in (("hooks", "هوكات بتكسب عندهم"), ("concepts", "أفكار بتجيب مشاهدات"), ("formats", "أشكال ناجحة"), ("angles", "زوايا فاضية ينفع ناخدها"), ("avoid", "بيجيب مشاهدات قليلة")):
         if d.get(k):

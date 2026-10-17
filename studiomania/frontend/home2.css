@@ -1436,3 +1436,8 @@ html { overflow-x: clip; }
 .rv-dg { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr)); gap: 12px; }
 .rv-dg h4 { margin: 0 0 6px; font-size: 14px; }
 .rv-dg ul { margin: 0; padding-inline-start: 18px; display: grid; gap: 4px; font-size: 13px; line-height: 1.5; }
+.rv-wrap { display: grid; gap: 14px; }
+.rv-top, .rv-body { display: grid; gap: 14px; }
+.rv-tabs { display: flex; gap: 6px; overflow-x: auto; padding: 4px; border-radius: 999px; background: var(--nh-fill); scrollbar-width: none; }
+.rv-tabs button { flex: 0 0 auto; border: 0; background: none; color: inherit; font: inherit; font-size: 14px; padding: 9px 16px; border-radius: 999px; cursor: pointer; opacity: .75; }
+.rv-tabs button.on { background: var(--nh-accent); color: #fff; opacity: 1; }

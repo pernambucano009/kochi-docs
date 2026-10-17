@@ -20,7 +20,7 @@ const BrandPage = (() => {
     delivery: "M20.5 3.5 10 14 M20.5 3.5 14 20.5l-4-6.5-6.5-4z",
     knowledge: "M4 5.5c2.7-1 5.3-1 8 .8 2.7-1.8 5.3-1.8 8-.8v13c-2.7-1-5.3-1-8 .8-2.7-1.8-5.3-1.8-8-.8z M12 6.3v13.3",
     assets: "M4.5 5h15a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z M3.5 15.5l4.5-4.5 4 4 3-3 5 5 M15.5 8.5a1.3 1.3 0 1 1 0 .1z",
-    rivals: "M7 4.5h10v4a5 5 0 0 1-10 0z M7 6H4.5a2.5 2.5 0 0 0 2.8 3.4 M17 6h2.5a2.5 2.5 0 0 1-2.8 3.4 M12 13.5v3.5 M8.5 20h7l-.8-3h-5.4z",
+    pulse: "M7 4.5h10v4a5 5 0 0 1-10 0z M7 6H4.5a2.5 2.5 0 0 0 2.8 3.4 M17 6h2.5a2.5 2.5 0 0 1-2.8 3.4 M12 13.5v3.5 M8.5 20h7l-.8-3h-5.4z",
     library: "M9 4.5a3 3 0 1 1 0 6a3 3 0 1 1 0-6z M3.5 19c.6-3 2.8-4.6 5.5-4.6s4.9 1.6 5.5 4.6 M16 7.5v6.2 M16 13.7a1.8 1.8 0 1 1-1.8-1.8 M16 7.5l3.5-1.2",
   };
   const svg = (d, s = 22) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}" aria-hidden="true"><path d="${d}" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
@@ -65,15 +65,17 @@ const BrandPage = (() => {
         { f: "pg", i: "coaches", page: "coaches", t: "الشخصيات والأفاتار", type: "page" },
         { f: "pg", i: "voice", page: "voice", t: "التعليق الصوتي", type: "page" },
         { f: "pg", i: "music", page: "music", t: "الموسيقى", type: "page" },
-        { f: "pg", i: "viral", page: "viral", t: "🔥 اللي ماشي في مجالك", type: "page" },
         { f: "pg", i: "stylecl", page: "stylecl", t: "🎨 استنساخ الستايل", type: "page" },
         { f: "pg", i: "fstudio", page: "fstudio", t: "🎞️ فريم فريم", type: "page" },
         { f: "pg", i: "ref2p", page: "ref2p", t: "🎥 من مرجع لبرومبت", type: "page" },
       ] },
-      // منافسينك في المجال: أعلى 5 في المجال والسوق، واللي بينجح عندهم بيدخل في الأفكار والسكريبتات
-      { k: "rivals", t: "منافسينك في المجال", en: "Competitors", leaves: [
+      // نبض المجال: المنافسين (أعلى 5 في المجال والسوق) واللي بينجح عندهم والترند وتحليل بوستات بنفسك، كله في فرع واحد
+      { k: "pulse", t: "نبض المجال", en: "Niche Pulse", leaves: [
         ...(b?.rivals || []).map((r) => ({ f: "pg", i: `rv${r.id}`, page: "rivals", t: `@${r.handle}`, type: "page" })),
-        { f: "pg", i: "rv+", page: "rivals", t: (b?.rivals || []).length ? "إدارة المنافسين" : "دوّر على منافسينك", type: "page" },
+        ...((b?.rivals || []).length ? [] : [{ f: "pg", i: "rv:rivals", page: "rivals", t: "🏆 هات منافسينك", type: "page" }]),
+        { f: "pg", i: "rv:works", page: "rivals", t: "🧠 اللي بينجح عندهم", type: "page" },
+        { f: "pg", i: "rv:trend", page: "rivals", t: "📈 الترند آخر ٣٠ يوم", type: "page" },
+        { f: "pg", i: "rv:mine", page: "rivals", t: "🔥 حلّل بوستات بنفسك", type: "page" },
       ] },
       // المعرفة: اللي اتقرا من الملفات واللينكات واتوافق عليه
       { k: "knowledge", t: "المعرفة", en: "Knowledge", leaves: (b?.notes || []).map((x) => ({ f: "n", i: x.id, t: x.title, type: "note", note: x })) },

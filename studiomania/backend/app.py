@@ -4132,6 +4132,27 @@ def rivals_key(i: dict) -> str:
     return f"{i['platform']}:{i['handle'].lower()}"
 
 
+def rivals_search(bid: str, brain: dict, queries: list[str] | None = None) -> tuple[list[dict], list[str]]:
+    """بيدوّر في المجال بكلام الناس في السوق: منها بنطلّع المنافسين والترند (أعلى بوستات آخر ٣٠ يوم)."""
+    rivals_set(bid, step="بيدوّر في المجال…")
+    if not rivals.live():
+        return rivals.mock_search(brain), queries or ["تجربة"]
+    qs = queries
+    if not qs:
+        raw = {} if atlas.mock_mode() else rivals_llm(rivals.queries_messages(brain), "كلمات البحث")
+        qs = [str(q).strip()[:60] for q in raw.get("queries") or [] if str(q).strip()][:6] or [brain.get("domain") or brain.get("name") or ""]
+    posts, errs = [], []
+    for q in qs:
+        for plat in rivals.PLATFORMS:
+            try:
+                posts += rivals.search(plat, q)
+            except rivals.RivalsError as exc:
+                errs.append(str(exc))
+    if not posts and errs:
+        raise rivals.RivalsError(errs[0])
+    return posts, qs
+
+
 def rivals_discover(bid: str) -> None:
     brain = brain_row(bid) or {}
     c = brain.get("competitors") or {}
@@ -4139,22 +4160,9 @@ def rivals_discover(bid: str) -> None:
     exclude = set(c.get("excluded") or []) | {rivals_key(i) for i in keep}
     need = rivals.TOP - len(keep)
     found = []
+    posts, qs = rivals_search(bid, brain)
+    rivals_set(bid, trending=rivals.trending(posts), queries=qs)
     if need > 0:
-        rivals_set(bid, step="بيدوّر في المجال…")
-        if not rivals.live():
-            posts = rivals.mock_search(brain)
-        else:
-            raw = {} if atlas.mock_mode() else rivals_llm(rivals.queries_messages(brain), "كلمات البحث")
-            qs = [str(q).strip()[:60] for q in raw.get("queries") or [] if str(q).strip()][:6] or [brain.get("domain") or brain.get("name") or ""]
-            posts, errs = [], []
-            for q in qs:
-                for plat in rivals.PLATFORMS:
-                    try:
-                        posts += rivals.search(plat, q)
-                    except rivals.RivalsError as exc:
-                        errs.append(str(exc))
-            if not posts and errs:
-                raise rivals.RivalsError(errs[0])
         cands = rivals.candidates(posts, exclude)[:15]
         if not cands:
             raise rivals.RivalsError("مالقيتش حسابات في المجال ده، جرّب تكتب «المجال» و«السوق» بشكل أوضح في الهوية")
@@ -4186,7 +4194,11 @@ def rivals_discover(bid: str) -> None:
 
 def rivals_refresh(bid: str, only: str | None = None) -> None:
     brain = brain_row(bid) or {}
-    items = list((brain.get("competitors") or {}).get("items") or [])
+    c = brain.get("competitors") or {}
+    items = list(c.get("items") or [])
+    if not only:   # الترند بيتحدّث بنفس كلمات البحث (من غير ما المخ يكتبها تاني)
+        posts, qs = rivals_search(bid, brain, c.get("queries") or None)
+        rivals_set(bid, trending=rivals.trending(posts), queries=qs)
     for n, it in enumerate(items):
         if only and it["id"] != only:
             continue
@@ -4204,7 +4216,7 @@ def rivals_out(bid: str) -> dict:
     c = b.get("competitors") or {}
     return {"client": bid, "name": b.get("name"), "live": rivals.live(), "platforms": rivals.PLATFORMS, "top": rivals.TOP,
             "brain": {k: b.get(k) or "" for k in ("domain", "market", "audience", "language")},
-            "items": c.get("items") or [], "digest": c.get("digest") or {}, "status": c.get("status") or "", "step": c.get("step"),
+            "items": c.get("items") or [], "digest": c.get("digest") or {}, "trending": c.get("trending") or [], "status": c.get("status") or "", "step": c.get("step"),
             "error": c.get("error"), "updated_at": c.get("updated_at"), "excluded": len(c.get("excluded") or [])}
 
 
