@@ -4028,6 +4028,7 @@ def inbox_suggest(body: InboxSuggestIn):
 
 # ---------------------------------------------------------------- 📈 أدوات النمو (growth.py)
 import growth  # noqa: E402
+import algo  # noqa: E402
 import stylecl  # noqa: E402
 import fstudio  # noqa: E402
 import ref2p  # noqa: E402
@@ -4045,6 +4046,32 @@ def growth_json(messages: list[dict], what: str) -> dict:
 def growth_brand(query: str = "") -> str:
     b = cz.full_brand(brand_settings())
     return "\n".join(x for x in (b.get("name"), b.get("about"), f"الجمهور: {b.get('audience') or ''}", b.get("rules") or "") if x)[:3000]
+
+
+# ---------- 📡 العقل العام: قواعد الخوارزميات (algo.py) + فحص قبل النشر
+@app.get("/api/algo")
+def algo_rules():
+    return algo.public()
+
+
+class AlgoReviewIn(BaseModel):
+    text: str
+    kind: str = "script"      # script / caption / idea / hook
+    platform: str = ""        # tiktok / instagram / youtube / linkedin / facebook
+    goal: str = ""
+
+
+@app.post("/api/algo/review")
+def algo_review(body: AlgoReviewIn):
+    """بيقيّم السكريبت أو الكابشن بقواعد الخوارزميات قبل النشر: درجة لكل بند وتعديلات وهوكات وكابشن أحسن."""
+    text = body.text.strip()
+    if len(text) < 8:
+        raise HTTPException(400, "اكتب السكريبت أو الكابشن الأول")
+    if atlas.mock_mode():
+        return algo.mock_review(text)
+    kind = body.kind if body.kind in algo.KINDS else "script"
+    platform = body.platform if body.platform in algo.PLATFORMS else ""
+    return algo.clean_review(growth_json(algo.review_messages(text, kind, platform, growth_brand(), body.goal.strip()[:300]), "الفحص"))
 
 
 class TriageIn(BaseModel):

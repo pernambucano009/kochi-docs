@@ -14,6 +14,7 @@ import statistics
 import time
 
 import httpx
+import algo
 
 API = "https://api.scrapecreators.com"
 PLATFORMS = {"tiktok": "تيك توك", "instagram": "إنستجرام"}
@@ -240,7 +241,7 @@ def digest_messages(brain: dict, items: list[dict]) -> list[dict]:
         posts = "\n".join(f"  ×{p['multiple']} · {fmt(p['views'])} views · caption: {p['caption'][:200]}" + (f" · spoken: {p['spoken'][:300]}" if p.get("spoken") else "")
                           for p in c.get("posts", [])[:6])
         blocks.append(f"@{c['handle']} ({c['platform']}, median {fmt(c['median_views'])} views):\n{posts}")
-    return [{"role": "system", "content": "You are a short-form content strategist. Return JSON only."},
+    return [{"role": "system", "content": "You are a short-form content strategist. Return JSON only.\n\n" + algo.for_use("analysis")},
             {"role": "user", "content": f"""{brand_info(brain)}
 
 Here are the brand's top competitors and their posts that beat their own median the most (×multiple = views ÷ that account's median).

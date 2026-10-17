@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import re
+import algo
 
 # اللهجة ← اسمها بالإنجليزي (للموديل اللي بيتكلم بصوته جوه الفيديو)
 SPOKEN = {
@@ -86,7 +87,7 @@ def ugc_messages(d: dict, lang_txt: str, guide: str, brain_txt: str) -> list[dic
     task = (f"العميل كتب السكريبت ده: «{own}». قسّمه على الأربع نبضات بكلامه هو، وقصّر بس لو أطول من الوقت. لو جزء ناقص اكتبه إنت."
             if own else f"الفكرة: {d.get('brief') or ''}")
     p = a.get("product") or {}
-    return [{"role": "system", "content": sys}, {"role": "user", "content":
+    return [{"role": "system", "content": sys + "\n\n" + algo.for_use("ads")}, {"role": "user", "content":
             f"ملف العميل:\n{brain_txt or '(مفيش)'}\n\nالمنتج: {p.get('name') or '-'} ({p.get('kind') or '-'})\nالمكان: {a.get('place') or '-'}\n{task}"}]
 
 
@@ -164,7 +165,7 @@ def cinema_messages(d: dict, lang_txt: str, guide: str, brain_txt: str, total: i
         'رجّع JSON بس: {"title": "اسم قصير", "world": "...", "end": {"brand": "...", "slogan": "..."}, '
         '"shots": [{"beat": "HOOK", "dur": 2.5, "what": "وصف قصير بالعامية", "visual": "...", "camera": "...", "audio": "...", "with": ["hero", "product"], "line": ""}]}')
     p = a.get("product") or {}
-    return [{"role": "system", "content": sys}, {"role": "user", "content":
+    return [{"role": "system", "content": sys + "\n\n" + algo.for_use("ads")}, {"role": "user", "content":
             f"ملف العميل:\n{brain_txt or '(مفيش)'}\n\nالمنتج: {p.get('name') or '-'} ({p.get('kind') or '-'})\nالمكان: {a.get('place') or '-'}\n"
             f"الإعلان: {(a.get('script') or '').strip() or d.get('brief') or ''}"}]
 
@@ -345,7 +346,7 @@ def beats_messages(d: dict, lang_txt: str, guide: str, brain_txt: str) -> list[d
                "قدام الكاميرا (الهوك والكورس الأخير غالبًا)، والباقي صورة بتوضح الكلام.\n" + common +
                'رجّع JSON بس: {"title": "...", "angle": "الفكرة في سطر", "style": "...", "lyrics": "...", '
                '"shots": [{"lyric": "...", "sing": false, "visual": "...", "camera": "...", "with": ["hero"]}]}')
-    return [{"role": "system", "content": sys}, {"role": "user", "content":
+    return [{"role": "system", "content": sys + "\n\n" + algo.for_use("ads")}, {"role": "user", "content":
             f"ملف العميل:\n{brain_txt or '(مفيش)'}\n\nالمنتج: {p.get('name') or '-'} ({p.get('kind') or '-'})\nالشخصية: {hero.get('handle') or '-'}\n"
             f"الإعلان: {(a.get('script') or '').strip() or d.get('brief') or ''}"}]
 

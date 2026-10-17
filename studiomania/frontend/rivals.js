@@ -3,8 +3,8 @@
 // المنافسين والترند بيدخلوا لوحدهم في كتابة الأفكار والسكريبتات والهوكات.
 const RivalsPage = (() => {
   const esc = (s) => escapeHtml(String(s ?? ""));
-  const S = { el: null, d: null, timer: null, swap: null, focus: null, tab: "rivals" };
-  const TABS = [["rivals", "🏆 المنافسين"], ["works", "🧠 اللي بينجح عندهم"], ["trend", "📈 الترند آخر ٣٠ يوم"], ["mine", "🔥 حلّل بوستات بنفسك"]];
+  const S = { el: null, d: null, timer: null, swap: null, focus: null, tab: "rivals", ac: { text: "", kind: "script", platform: "", res: null, busy: false, rules: null } };
+  const TABS = [["rivals", "🏆 المنافسين"], ["works", "🧠 اللي بينجح عندهم"], ["trend", "📈 الترند آخر ٣٠ يوم"], ["mine", "🔥 حلّل بوستات بنفسك"], ["algo", "📡 افحص قبل النشر"]];
   const html = () => `<div class="nb-wrap fs-wrap rv-wrap" id="rvWrap"><div class="nh-empty">بيحمّل…</div></div>`;
   const fmt = (n) => { n = +n || 0; return n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${Math.round(n / 1e3)}K` : String(n); };
   const PL = { tiktok: "TikTok", instagram: "Instagram" };
@@ -63,10 +63,36 @@ const RivalsPage = (() => {
         <b class="vr-x num">${fmt(p.views)}</b><span>${PL[p.platform] || ""} · <bdi dir="ltr">@${esc(p.handle)}</bdi> · ${ago(p.ts)}</span>
         <p>${esc((p.caption || "").slice(0, 160))}</p></a>`).join("")}</div></section>`;
   }
+  // 📡 فحص قبل النشر: السكريبت/الكابشن بيتقيّم بقواعد الخوارزميات (العقل العام)، وتحته القواعد نفسها
+  const AK = { script: "سكريبت فيديو", caption: "كابشن", idea: "فكرة", hook: "هوك" };
+  const AP = { "": "أي منصة", tiktok: "تيك توك", instagram: "إنستجرام", youtube: "يوتيوب شورتس", linkedin: "لينكدإن", facebook: "فيسبوك" };
+  const tone = (n, max) => (n == null ? "" : n / max >= .8 ? "ok" : n / max >= .55 ? "mid" : "bad");
+  function algoTab() {
+    const a = S.ac, r = a.res, rules = a.rules;
+    const report = r ? `<section class="fs-card rv-rep">
+        <div class="rv-score ${tone(r.score, 100)}"><b class="num">${r.score}</b><small>من ١٠٠</small></div>
+        <p class="rv-verdict">${esc(r.verdict)}</p>
+        ${r.top_fixes.length ? `<h4>أهم التعديلات</h4><ol>${r.top_fixes.map((x) => `<li>${esc(x)}</li>`).join("")}</ol>` : ""}
+        <div class="rv-checks">${r.checks.map((c) => `<div class="rv-check ${tone(c.score, 10)}"><span class="num">${c.score ?? "—"}</span><div><b>${esc(c.title)}</b><small>${esc(c.why)}</small>${c.fix ? `<i>✎ ${esc(c.fix)}</i>` : ""}</div></div>`).join("")}</div>
+        ${r.hooks.length ? `<h4>هوكات أقوى</h4>${r.hooks.map((h) => `<div class="rv-copy"><span>${esc(h)}</span><button class="nb-btn sm" data-accopy="${esc(h)}">انسخ</button></div>`).join("")}` : ""}
+        ${r.caption ? `<h4>كابشن مقترح</h4><div class="rv-copy"><span class="pre">${esc(r.caption)}</span><button class="nb-btn sm" data-accopy="${esc(r.caption)}">انسخ</button></div>` : ""}
+      </section>` : "";
+    return `<section class="fs-card"><h3>📡 افحص قبل النشر <small>بقواعد الخوارزميات: الهوك، النتيجة في الآخر، الحشو، الدعوة، الكابشن</small></h3>
+        <textarea class="rv-actext" data-actext rows="7" placeholder="الصق السكريبت أو الكابشن أو الفكرة هنا">${esc(a.text)}</textarea>
+        <div class="nb-bar"><select data-ackind>${Object.entries(AK).map(([k, t]) => `<option value="${k}" ${k === a.kind ? "selected" : ""}>${t}</option>`).join("")}</select>
+          <select data-acpl>${Object.entries(AP).map(([k, t]) => `<option value="${k}" ${k === a.platform ? "selected" : ""}>${t}</option>`).join("")}</select>
+          <button class="nb-btn fs-go" data-acgo ${a.busy ? "disabled" : ""}>${a.busy ? "⏳ بيفحص…" : "🔎 افحص"}</button></div></section>
+      ${report}
+      <section class="fs-card"><h3>📚 القواعد اللي البرنامج ماشي عليها <small>كل أداة بتستخدمها لوحدها في الأفكار والهوكات والسكريبتات والكابشن والتحليل${rules ? ` · آخر تحديث ${esc(rules.updated)}` : ""}</small></h3>
+        ${rules ? rules.parts.map((p, i) => `<details class="rv-rule" ${i === 0 ? "open" : ""}><summary>${esc(p.title)} <span class="num">${p.items.length}</span></summary><ul>${p.items.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></details>`).join("")
+          + `<details class="rv-rule"><summary>الفرق بين المنصات <span class="num">${Object.keys(rules.platforms).length}</span></summary><ul>${Object.values(rules.platforms).map((x) => `<li>${esc(x)}</li>`).join("")}</ul></details>` : `<div class="nh-empty">بيحمّل…</div>`}
+      </section>`;
+  }
   function body() {
     const d = S.d, busy = d.status === "working";
     if (S.tab === "works") return digest(d.digest) || `<div class="nh-empty">لسه مفيش تحليل. هات المنافسين الأول.</div>`;
     if (S.tab === "trend") return trend(d.trending);
+    if (S.tab === "algo") return algoTab();
     if (S.tab === "mine") return `<p class="nb-hint">لو شايف بوستات بنفسك (من أي حساب)، حطها هنا ونحسبلك كل بوست عدّى متوسط صاحبه بكام، ونطلعلك أفكار بنفس الهيكل.</p>${ViralPage.html()}`;
     return `<section class="fs-card"><h3>ضيف منافس بنفسك</h3>
         <div class="nb-row rv-add"><input type="text" data-rvnew placeholder="@اسم الحساب أو اللينك" dir="ltr">
@@ -81,10 +107,11 @@ const RivalsPage = (() => {
     if (!w || !S.d) return;
     if (!w.querySelector(".rv-top")) w.innerHTML = `<div class="rv-top"></div><div class="rv-body"></div>`;
     w.querySelector(".rv-top").innerHTML = top();
-    if (onlyTop && S.tab === "mine") return;   // ماتمسحش اللي بتكتبه في «حلّل بنفسك»
+    if (onlyTop && (S.tab === "mine" || S.tab === "algo")) return;   // ماتمسحش اللي بتكتبه في «حلّل بنفسك» أو «افحص»
     const bd = w.querySelector(".rv-body");
     bd.innerHTML = body();
     if (S.tab === "mine") ViralPage.mount(bd);
+    if (S.tab === "algo" && !S.ac.rules) api("/api/algo").then((x) => { S.ac.rules = x; if (S.tab === "algo") render(); }).catch(() => {});
     if (S.focus) { w.querySelector(`[data-rid="${CSS.escape(S.focus)}"]`)?.scrollIntoView({ block: "center" }); S.focus = null; }
   }
   function poll() {
@@ -100,7 +127,23 @@ const RivalsPage = (() => {
     catch (err) { toast(err.message, true); }
   }
   function bind(w) {
-    w.addEventListener("click", (e) => {
+    w.addEventListener("input", (e) => { if (e.target.matches("[data-actext]")) S.ac.text = e.target.value; });
+    w.addEventListener("change", (e) => {
+      if (e.target.matches("[data-ackind]")) S.ac.kind = e.target.value;
+      if (e.target.matches("[data-acpl]")) S.ac.platform = e.target.value;
+    });
+    w.addEventListener("click", async (e) => {
+      const cp = e.target.closest("[data-accopy]");
+      if (cp) { try { await navigator.clipboard.writeText(cp.dataset.accopy); toast("✅ اتنسخ"); } catch { toast("مقدرتش أنسخ", true); } return; }
+      if (e.target.closest("[data-acgo]")) {
+        const a = S.ac;
+        if (a.text.trim().length < 8) return toast("الصق السكريبت أو الكابشن الأول", true);
+        a.busy = true; render();
+        try { a.res = await api("/api/algo/review", { method: "POST", ...jsonBody({ text: a.text, kind: a.kind, platform: a.platform }) }); }
+        catch (err) { toast(err.message, true); }
+        a.busy = false; render();
+        return S.el.querySelector(".rv-rep")?.scrollIntoView({ block: "start", behavior: "smooth" });
+      }
       const tb = e.target.closest("[data-rvtab]");
       if (tb) { S.tab = tb.dataset.rvtab; return render(); }
       if (e.target.closest(".vr-wrap")) return;

@@ -14,6 +14,7 @@ import math
 import re
 
 import growth
+import algo
 
 # ---------------------------------------------------------------- الهوية البصرية (بتتعدّل من الإعدادات)
 
@@ -161,7 +162,8 @@ def chat_system(brand: dict) -> str:
 لما تقترح أفكار: رقّمها، ولكل فكرة عنوان/هوك وسطر يشرح الزاوية وعدد السلايدات المقترح.
 اتكلم مع المستخدم بالعربي البسيط، وأي نص مقترح للسلايدات يكون بـ{b['language']}.
 {dialect_rules(b)}
-{growth.psych_rule()}"""
+{growth.psych_rule()}
+{algo.for_use("carousel")}"""
 
 
 PLAN_SCHEMA = """{

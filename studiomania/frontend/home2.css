@@ -1554,3 +1554,25 @@ audio { width: 100%; }
 #nh .cm-tab .num { opacity: .65; margin-inline-start: 4px; }
 .cm-n { margin-inline-start: auto; opacity: .65; }
 .cm-selbar { background: rgba(217, 71, 58, .08); border-radius: 12px; padding: 8px 12px; align-items: center; }
+/* 📡 افحص قبل النشر */
+.rv-actext { width: 100%; resize: vertical; font: inherit; line-height: 1.7; padding: 12px 14px; border-radius: 12px; border: 1px solid rgba(127, 127, 127, .25); background: var(--nh-bg, transparent); color: inherit; box-sizing: border-box; }
+.rv-rep h4 { margin: 14px 0 6px; font-size: 14px; }
+.rv-rep ol { margin: 0; padding-inline-start: 20px; line-height: 1.8; }
+.rv-score { display: inline-flex; align-items: baseline; gap: 6px; padding: 8px 16px; border-radius: 14px; background: rgba(127, 127, 127, .1); }
+.rv-score b { font-size: 34px; line-height: 1; }
+.rv-score.ok b, .rv-check.ok > .num { color: #2f8f6b; }
+.rv-score.mid b, .rv-check.mid > .num { color: #C9861A; }
+.rv-score.bad b, .rv-check.bad > .num { color: #D9473A; }
+.rv-verdict { margin: 10px 0 0; font-size: 15px; line-height: 1.7; }
+.rv-checks { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; margin-top: 12px; }
+.rv-check { display: flex; gap: 10px; padding: 10px 12px; border-radius: 12px; background: rgba(127, 127, 127, .07); }
+.rv-check > .num { font-size: 20px; font-weight: 600; min-width: 26px; text-align: center; }
+.rv-check div { display: grid; gap: 3px; font-size: 13px; line-height: 1.55; }
+.rv-check small { opacity: .75; }
+.rv-check i { font-style: normal; color: var(--nh-accent, #E5613E); }
+.rv-copy { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 8px 12px; border-radius: 10px; background: rgba(127, 127, 127, .07); margin-bottom: 6px; line-height: 1.7; }
+.rv-copy .pre { white-space: pre-wrap; }
+.rv-rule { border-top: 1px solid rgba(127, 127, 127, .15); padding: 8px 0; }
+.rv-rule summary { cursor: pointer; font-weight: 500; }
+.rv-rule summary .num { opacity: .55; font-size: 12px; margin-inline-start: 6px; }
+.rv-rule ul { margin: 8px 0 4px; padding-inline-start: 20px; line-height: 1.85; font-size: 14px; }

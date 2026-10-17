@@ -78,6 +78,7 @@ const BrandPage = (() => {
         { f: "pg", i: "rv:works", page: "rivals", t: "🧠 اللي بينجح عندهم", type: "page" },
         { f: "pg", i: "rv:trend", page: "rivals", t: "📈 الترند آخر ٣٠ يوم", type: "page" },
         { f: "pg", i: "rv:mine", page: "rivals", t: "🔥 حلّل بوستات بنفسك", type: "page" },
+        { f: "pg", i: "rv:algo", page: "rivals", t: "📡 افحص قبل النشر", type: "page" },
       ] },
       // المعرفة: اللي اتقرا من الملفات واللينكات واتوافق عليه
       { k: "knowledge", t: "المعرفة", en: "Knowledge", leaves: (b?.notes || []).map((x) => ({ f: "n", i: x.id, t: x.title, type: "note", note: x })) },

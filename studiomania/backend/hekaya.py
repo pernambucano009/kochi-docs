@@ -12,6 +12,7 @@ from __future__ import annotations
 import difflib
 import json
 import re
+import algo
 
 RATIOS = {"16:9": (1920, 1080), "9:16": (1080, 1920), "1:1": (1080, 1080)}
 DRAW = {"16:9": (1280, 720), "9:16": (720, 1280), "1:1": (864, 864)}   # بيترسم بالمقاس ده ويتكبّر في الآخر (أسرع ×2.2)
@@ -402,7 +403,10 @@ def story_messages(i: dict, brand: str) -> list[dict]:
     elif i["ending"] == "custom":
         end = (f"After the story add exactly 2 closing scenes: \"end\": \"card\" with a short closing line, and \"end\": \"cta\" whose text invites people to comment the word "
                f"«{i.get('keyword') or 'حكاية'}»" + (f" and says: {i['cta_line']}" if i.get("cta_line") else "") + ".")
-    return [{"role": "system", "content": "You are a children's-book author and animation director. Return JSON only."},
+    sys_ = "You are a children's-book author and animation director. Return JSON only."
+    if i["audience"] != "kids":   # حكاية للسوشيال: نفس قواعد الحكي اللي بتمسك المشاهد للآخر
+        sys_ += "\n\n" + algo.for_use("story")
+    return [{"role": "system", "content": sys_},
             {"role": "user", "content": f"""Write {aud}.
 IDEA: {i['idea']}
 LANGUAGE of the narration: {i.get('lang') or 'Arabic'} (write naturally in it, as a storyteller would read aloud; if Arabic dialect, write it the way it is spoken).

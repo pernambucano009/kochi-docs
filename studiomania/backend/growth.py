@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import re
+import algo
 
 # ---------------------------------------------------------------- 🪝 قوالب الهوك
 HOOK_FORMULAS = [
@@ -122,7 +123,7 @@ def viral_messages(brand: str, niche: str, rows: list[dict]) -> list[dict]:
                     f"{'×' + str(r['multiple']) if r['multiple'] else 'من غير متوسط'} · الهوك: {r['hook'] or '—'}" for r in rows[:15])
     formulas = "، ".join(n for n, _ in HOOK_FORMULAS)
     system = ("انت محلل محتوى سوشيال ميديا. بتفهم ليه بوست معيّن نجح أكتر من العادي بتاع صاحبه، وبتحوّل ده لأفكار أصلية للبراند من غير نسخ.\n"
-              f"البراند:\n{brand}\n\n{psych_rule()}")
+              f"البراند:\n{brand}\n\n{psych_rule()}\n\n{algo.for_use('analysis')}")
     user = (f"المجال: {niche or 'نفس مجال البراند'}\n"
             f"دي بوستات من المجال، مترتبة بالمضاعف (مشاهدات البوست ÷ متوسط الحساب نفسه):\n{lst}\n\n"
             f"حلّل أعلى ٣ (أو أقل لو مفيش). لكل واحد: ليه نجح، وأنهي قالب هوك استخدم من دول ({formulas})، والمبدأ النفسي اللي شغال بيه، وهيكله (بيبدأ إزاي ويكمّل إزاي ويخلص إزاي).\n"

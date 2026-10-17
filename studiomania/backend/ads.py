@@ -10,6 +10,7 @@ import json
 import re
 
 import growth
+import algo
 
 VIDEO_FORMAT = """{
   "title": "اسم قصير للإعلان",
@@ -235,7 +236,7 @@ def adapt_messages(brand: dict, analysis: dict, audio: dict, settings: dict, sty
         + f"رجّع JSON بس بالشكل ده:\n{ADAPT_FORMAT}"
     )
     first = {"role": "user", "content": f"اقترح إعلان لـ«{name}» مستوحى من الإعلان ده."}
-    return [{"role": "system", "content": system + "\n\n" + growth.psych_rule()}, first] + chat[-12:]
+    return [{"role": "system", "content": system + "\n\n" + growth.psych_rule() + "\n\n" + algo.for_use("ads")}, first] + chat[-12:]
 
 
 def _extract(text: str) -> str:
@@ -847,7 +848,7 @@ def directions_messages(brand: dict, analysis: dict, settings: dict, brain: dict
         + 
         f"رجّع JSON بس بالشكل ده:\n{DIRECTIONS_FORMAT}"
     )
-    return [{"role": "system", "content": system + "\n\n" + growth.psych_rule()
+    return [{"role": "system", "content": system + "\n\n" + growth.psych_rule() + "\n\n" + algo.for_use("ads")
              + "\nكل اتجاه يتبني على مبدأ نفسي مختلف، واكتب اسمه جوه وصف الاتجاه."}, {"role": "user", "content": "اقترح 3 اتجاهات."}]
 
 
