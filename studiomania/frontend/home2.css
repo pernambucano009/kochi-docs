@@ -1441,3 +1441,32 @@ html { overflow-x: clip; }
 .rv-tabs { display: flex; gap: 6px; overflow-x: auto; padding: 4px; border-radius: 999px; background: var(--nh-fill); scrollbar-width: none; }
 .rv-tabs button { flex: 0 0 auto; border: 0; background: none; color: inherit; font: inherit; font-size: 14px; padding: 9px 16px; border-radius: 999px; cursor: pointer; opacity: .75; }
 .rv-tabs button.on { background: var(--nh-accent); color: #fff; opacity: 1; }
+
+/* 📖 حكاية */
+.hk-h { margin: 6px 0 0; font-size: 15px; }
+.hk-styles { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(46%, 150px), 1fr)); gap: 10px; }
+.hk-style { display: grid; gap: 4px; padding: 6px 6px 10px; border-radius: 16px; border: 2px solid transparent; background: var(--nh-bg, rgba(127,127,127,.08)); color: inherit; font: inherit; text-align: start; cursor: pointer; }
+.hk-style.on { border-color: var(--nh-accent); }
+.hk-style b { font-size: 14px; padding: 0 4px; }
+.hk-style small { font-size: 11.5px; opacity: .7; padding: 0 4px; line-height: 1.45; }
+.hk-sw { display: block; aspect-ratio: 16 / 9; border-radius: 11px; overflow: hidden; }
+.hk-sw img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.hk-scenes { display: grid; gap: 8px; }
+.hk-sc { display: grid; grid-template-columns: 28px 1fr auto; gap: 10px; align-items: start; padding: 10px; border-radius: 14px; background: var(--nh-bg, rgba(127,127,127,.08)); }
+.hk-sc.end { opacity: .85; }
+.hk-sc > b { font-size: 16px; color: var(--nh-accent); padding-top: 6px; }
+.hk-sc-b { display: grid; gap: 6px; min-width: 0; }
+.hk-sc-b textarea, .hk-sc-b input[type=text] { width: 100%; box-sizing: border-box; }
+.hk-big { font-size: 12.5px; opacity: .8; display: flex; gap: 6px; align-items: center; }
+.hk-tag { font-size: 12px; opacity: .75; }
+.hk-timing { display: flex; flex-wrap: wrap; gap: 6px; font-size: 12px; }
+.hk-timing span { padding: 4px 9px; border-radius: 999px; background: var(--nh-bg, rgba(127,127,127,.1)); }
+.hk-timing b { color: var(--nh-accent); margin-inline-end: 3px; }
+.hk-stills { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); gap: 10px; }
+.hk-still { margin: 0; display: grid; gap: 6px; align-content: start; }
+.hk-still img { width: 100%; border-radius: 12px; display: block; }
+.hk-still figcaption { font-size: 12.5px; line-height: 1.5; }
+.hk-still figcaption b { color: var(--nh-accent); }
+.hk-video { width: 100%; max-height: 70vh; border-radius: 16px; background: #000; }
+.hk-steps li.on { color: var(--nh-accent); }
+audio { width: 100%; }

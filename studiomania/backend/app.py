@@ -3998,6 +3998,7 @@ import growth  # noqa: E402
 import stylecl  # noqa: E402
 import fstudio  # noqa: E402
 import ref2p  # noqa: E402
+import hekaya  # noqa: E402
 
 
 def growth_json(messages: list[dict], what: str) -> dict:
@@ -20587,16 +20588,30 @@ def style_fix_loop(sid: str, code: str, d: dict, tries: int = 2) -> tuple[str, l
     return code, []
 
 
-def code_render(folder: Path, code: str, w: int, h: int, dur: float, fps: int, sound: dict, seed: int, on_step, prefix: str = "style") -> str:
-    """الرسم الكامل: المتصفح المقفول بيرسم كل فريم، والصوت بيتعمل بالحساب، وFFmpeg بيجمّعهم ويظبط علو الصوت."""
+def code_render(folder: Path, code: str, w: int, h: int, dur: float, fps: int, sound: dict, seed: int, on_step, prefix: str = "style",
+                voice: Path | None = None, voice_at: float = 0.0, out_size: tuple[int, int] | None = None, out_fps: int | None = None,
+                crf: int = 19) -> str:
+    """الرسم الكامل: المتصفح المقفول بيرسم كل فريم، والصوت بيتعمل بالحساب، وFFmpeg بيجمّعهم ويظبط علو الصوت.
+    لو فيه صوت راوي: الموسيقى بتوطى لوحدها وهو بيتكلم."""
     from playwright.sync_api import sync_playwright
 
     n = int(math.ceil(dur * fps))
     wav = stylecl.soundtrack(sound, dur, folder / ".sound.wav", seed=seed)
+    if voice is not None and voice.exists():
+        mixed = folder / ".mix.wav"
+        ms = int(max(0.0, voice_at) * 1000)
+        r = subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(wav), "-i", str(voice), "-filter_complex",
+                            f"[1:a]aresample=44100,pan=mono|c0=c0,adelay={ms},apad,asplit=2[v1][v2];[0:a]volume=0.45[m];"
+                            "[m][v1]sidechaincompress=threshold=0.02:ratio=10:attack=15:release=400[md];[md][v2]amix=inputs=2:duration=first:normalize=0[o]",
+                            "-map", "[o]", "-ac", "1", "-ar", "44100", str(mixed)], capture_output=True, text=True, timeout=300)
+        if r.returncode != 0:
+            raise RuntimeError(f"دمج الصوت: {r.stderr.strip()[-200:]}")
+        wav.unlink(missing_ok=True)
+        wav = mixed
     tmp = folder / f".render_{uuid.uuid4().hex[:6]}.mp4"
     cmd = [ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-f", "image2pipe", "-framerate", str(fps), "-c:v", "mjpeg", "-i", "-",
-           "-i", str(wav), "-map", "0:v", "-map", "1:a", "-vf", f"scale={w}:{h},format=yuv420p", "-c:v", "libx264", "-preset", "veryfast",
-           "-crf", "19", "-af", "loudnorm=I=-14:TP=-1.2:LRA=11", "-ar", "48000", "-c:a", "aac", "-b:a", "192k", "-r", str(fps), "-t", f"{dur:.3f}", "-movflags", "+faststart", str(tmp)]
+           "-i", str(wav), "-map", "0:v", "-map", "1:a", "-vf", f"scale={(out_size or (w, h))[0]}:{(out_size or (w, h))[1]}:flags=lanczos,format=yuv420p", "-c:v", "libx264", "-preset", "veryfast",
+           "-crf", str(crf), *(["-maxrate", "9M", "-bufsize", "18M"] if crf > 19 else []), "-af", "loudnorm=I=-14:TP=-1.2:LRA=11", "-ar", "48000", "-c:a", "aac", "-b:a", "192k", "-r", str(out_fps or fps), "-t", f"{dur:.3f}", "-movflags", "+faststart", str(tmp)]
     proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
     try:
         with sync_playwright() as p:
@@ -21309,6 +21324,498 @@ def r2p_file(rid: str, name: str):
     if not f.exists() or name.startswith(".") or f.suffix.lower() not in STYLE_IMG | STYLE_VID:
         raise HTTPException(404, "مش موجود")
     return FileResponse(f)
+
+
+# ---------------------------------------------------------------- 📖 حكاية (hekaya.py)
+# الفكرة ← القصة ← صوت الراوي ← توقيت كل كلمة ← الشخصيات والمشاهد بالكود ← صور ثابتة ← الفيديو. والستايل يتغيّر في أي وقت من غير ما يتكتب كود تاني.
+HK_DIR = DATA_DIR / "hekaya"
+HK_LOCK = threading.Lock()
+HK_BUSY = {"story", "voice", "scenes", "stills", "render"}
+HK_STAGES = ("story", "voice", "scenes", "done")
+HK_PREV = threading.Semaphore(2)
+
+
+def hk_dir(hid: str) -> Path:
+    return HK_DIR / Path(hid).name
+
+
+def hk_load(hid: str) -> dict:
+    f = hk_dir(hid) / "hekaya.json"
+    if not f.exists():
+        raise HTTPException(404, "الحكاية دي مش موجودة")
+    return json.loads(f.read_text(encoding="utf-8"))
+
+
+def hk_update(hid: str, fn) -> dict:
+    with HK_LOCK:
+        d = hk_load(hid)
+        fn(d)
+        d["updated_at"] = now()
+        folder = hk_dir(hid)
+        (folder / "hekaya.json.tmp").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+        (folder / "hekaya.json.tmp").replace(folder / "hekaya.json")
+        return d
+
+
+def hk_set(hid: str, **kw) -> dict:
+    return hk_update(hid, lambda d: d.update(**kw))
+
+
+def hk_inputs(raw: dict, old: dict | None = None) -> dict:
+    i = {**(old or {}), **{k: v for k, v in (raw or {}).items() if v is not None}}
+    lang = str(i.get("lang") or "").strip()[:80]
+    if not lang:
+        b = active_client() or {}
+        lang = str(b.get("language") or "").strip()[:80] or "العربي المصري"
+    try:
+        length = int(i.get("length") or 40)
+    except (TypeError, ValueError):
+        length = 40
+    return {"idea": str(i.get("idea") or "").strip()[:1500], "audience": i.get("audience") if i.get("audience") in hekaya.AUDIENCES else "kids",
+            "lang": lang, "length": length if length in hekaya.LENGTHS else 40, "ratio": i.get("ratio") if i.get("ratio") in hekaya.RATIOS else "16:9",
+            "style": i.get("style") if i.get("style") in hekaya.STYLES else hekaya.DEFAULT_STYLE,
+            "voice_id": i.get("voice_id") if i.get("voice_id") in AR_VOICES else "Arabic_FriendlyGuy",
+            "ending": i.get("ending") if i.get("ending") in hekaya.ENDINGS else "none", "keyword": str(i.get("keyword") or "").strip()[:30],
+            "cta_line": str(i.get("cta_line") or "").strip()[:200], "mood": i.get("mood") if i.get("mood") in hekaya.MOODS else "playful"}
+
+
+def hk_end(d: dict) -> dict:
+    sc = (d.get("story") or {}).get("scenes") or []
+    card = next((s["text"] for s in sc if s.get("end") == "card"), "")
+    cta = next((s["text"] for s in sc if s.get("end") == "cta"), "")
+    i = d["inputs"]
+    if i["ending"] == "brand" and not card:
+        b = active_client() or {}
+        card = str(b.get("name") or "")
+    return {"card": card, "keyword": i["keyword"] if i["ending"] == "custom" else "", "line": i["cta_line"] or cta}
+
+
+def hk_url(d: dict, f: str | None) -> str | None:
+    return f"/api/hekaya/{d['id']}/file/{f}?v={(d.get('updated_at') or '')[-8:]}" if f else None
+
+
+def hk_view(d: dict) -> dict:
+    v = d.get("voice") or {}
+    scn = d.get("scn") or []
+    return {"id": d["id"], "title": (d.get("story") or {}).get("title") or d["inputs"]["idea"][:40], "stage": d.get("stage", "story"),
+            "job": d.get("job"), "step": d.get("step"), "error": d.get("error"), "inputs": d["inputs"], "story": d.get("story"),
+            "voice": {"url": hk_url(d, v.get("file")), "dur": v.get("dur"), "source": v.get("source"), "voice_id": v.get("voice_id")} if v.get("file") else None,
+            "timing": [{"s": x["s"], "e": x["e"], "n": len(x["words"])} for x in scn], "total": d.get("total"),
+            "stills": [{"i": x["i"], "url": hk_url(d, x["file"]), "style": x.get("style")} for x in d.get("stills") or []],
+            "has_code": bool((d.get("code") or {}).get("scenes")), "video": hk_url(d, d.get("final")), "video_style": d.get("final_style"),
+            "notes": d.get("notes") or [], "created_at": d.get("created_at"), "updated_at": d.get("updated_at")}
+
+
+def hk_job(hid: str, job: str, target, *args) -> dict:
+    def fn(d):
+        if d.get("job") in HK_BUSY:
+            raise HTTPException(400, "استنى لما الخطوة اللي شغالة تخلص")
+        d.update(job=job, step="⏳ بيبدأ", error=None)
+    hk_update(hid, fn)
+
+    def run():
+        try:
+            target(hid, *args)
+            hk_set(hid, job=None, step=None)
+        except Exception as exc:  # noqa: BLE001
+            hk_set(hid, job=None, step=None, error=str(getattr(exc, "detail", None) or exc)[:400])
+    threading.Thread(target=run, daemon=True).start()
+    return hk_view(hk_load(hid))
+
+
+def hk_chat_json(messages: list[dict], what: str) -> dict:
+    try:
+        return az.parse_json(atlas.chat(messages, carousel_settings()["text_model"], temperature=.8, max_tokens=8000, json_mode=True, timeout=300), what)
+    except (atlas.AtlasError, httpx.HTTPError) as exc:
+        raise RuntimeError(f"موديل الكلام: {exc}") from exc
+
+
+def run_hk_story(hid: str, note: str = "") -> None:
+    d = hk_load(hid)
+    i = d["inputs"]
+    hk_set(hid, step="✍️ بيكتب الحكاية والمشاهد")
+    if atlas.mock_mode():
+        raw = hekaya.mock_story(i)
+    else:
+        msgs = hekaya.story_messages(i, growth_brand() if i["audience"] == "brand" else "")
+        if note and d.get("story"):
+            msgs.append({"role": "user", "content": "Previous version:\n" + json.dumps(d["story"], ensure_ascii=False)[:6000]
+                         + f"\nRewrite it applying this note from the user: {note}"})
+        raw = hk_chat_json(msgs, "الحكاية")
+    story = hekaya.clean_story(raw, i)
+    hk_update(hid, lambda x: x.update(story=story, stage="story", voice=None, scn=None, total=None, stills=[], code=None,
+                                      **({"notes": [*(x.get("notes") or []), {"note": note[:600], "at": now(), "stage": "story"}]} if note else {})))
+
+
+def hk_tts(text: str, voice_id: str, lang: str, out: Path) -> None:
+    if atlas.mock_mode():
+        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i",
+                        f"sine=frequency=220:duration={max(2.0, 0.42 * len(text.split())):.2f}", "-c:a", "libmp3lame", str(out)],
+                       check=True, capture_output=True, timeout=60)
+        return
+    boost = "English" if re.search(r"english|انجليز|إنجليز", lang, re.I) else "Arabic"
+    url = atlas.run_model("Audio", {"model": TTS_MODEL, "text": text[:4000], "voice_id": voice_id, "language_boost": boost},
+                          "صوت الراوي", max_seconds=400, interval=2)
+    atlas.download(url, out)
+
+
+def hk_align(hid: str, name: str, source: str, voice_id: str = "") -> None:
+    """الصوت جاهز: بنسمعه ونعرف كل كلمة اتقالت إمتى، والمشاهد بتتظبط عليه."""
+    d = hk_load(hid)
+    folder = hk_dir(hid)
+    dur = probe_duration(folder / name)
+    if dur < 1:
+        raise RuntimeError("الصوت قصير جدًا أو مش مقروء")
+    hk_set(hid, step="👂 بيسمع الصوت ويعرف كل كلمة اتقالت إمتى")
+    try:
+        heard = atlas.transcribe(folder / name, dur)
+    except Exception:  # noqa: BLE001 — من غير تفريغ بنوزّع على طول الصوت
+        heard = []
+    words = [w for s in d["story"]["scenes"] for w in hekaya.split_words(s["text"])]
+    times = hekaya.align(words, heard, dur)
+    scn, total = hekaya.timeline(d["story"], times, dur)
+
+    def fin(x):
+        old = (x.get("voice") or {}).get("file")
+        if old and old != name:
+            (folder / old).unlink(missing_ok=True)
+        x.update(voice={"file": name, "dur": round(dur, 2), "source": source, "voice_id": voice_id, "heard": len(heard)},
+                 scn=scn, total=total, stage="voice", stills=[], final=None)
+    hk_update(hid, fin)
+
+
+def run_hk_voice(hid: str, voice_id: str) -> None:
+    d = hk_load(hid)
+    hk_set(hid, step="🎙️ بيسجّل صوت الراوي")
+    name = f"voice_{uuid.uuid4().hex[:6]}.mp3"
+    hk_tts(hekaya.narration(d["story"]), voice_id, d["inputs"]["lang"], hk_dir(hid) / name)
+    hk_align(hid, name, "tts", voice_id)
+
+
+HK_SYNTAX_JS = """(a)=>{const out={};try{new Function(a.cast)}catch(e){out.cast=String(e.message)}
+for(const [k,b] of Object.entries(a.bodies)){try{new Function('ctx','t','d','W','H','w',b)}catch(e){out[k]=String(e.message)}}return out}"""
+HK_BANNED = ("Math.random", "Date.now", "new Date", "performance.now", "requestAnimationFrame", "fetch(", "XMLHttpRequest", "new Image", "import(")
+
+
+def hk_syntax(cast: str, bodies: dict[int, str]) -> dict:
+    """كل مشهد بيتراجع لوحده: الغلطة في مشهد ماتوقّعش الباقي."""
+    from playwright.sync_api import sync_playwright
+    out = {}
+    for k, b in bodies.items():
+        if bad := next((x for x in HK_BANNED if x in b), None):
+            out[str(k)] = f"uses {bad} (forbidden: frames must be a pure function of t; use rng(seed))"
+    with sync_playwright() as p:
+        br = style_browser(p)
+        try:
+            res = br.new_page().evaluate(HK_SYNTAX_JS, {"cast": cast, "bodies": {str(k): v for k, v in bodies.items()}})
+        finally:
+            br.close()
+    return {**res, **out}
+
+
+def hk_code(d: dict, style: str | None = None) -> str:
+    c = d.get("code") or {}
+    return hekaya.runtime_code(style or d["inputs"]["style"], d["scn"], hk_end(d), c.get("cast") or "", {int(k): v for k, v in (c.get("scenes") or {}).items()})
+
+
+def hk_llm_code(messages: list[dict]) -> str:
+    return style_code_chat(messages)
+
+
+def run_hk_scenes(hid: str, note: str = "", only: int | None = None) -> None:
+    d = hk_load(hid)
+    if not d.get("scn"):
+        raise RuntimeError("سجّل صوت الراوي الأول")
+    i, story, scn = d["inputs"], d["story"], d["scn"]
+    w, h = hekaya.DRAW[i["ratio"]]
+    code = d.get("code") or {}
+    cast = code.get("cast") or ""
+    bodies = {int(k): v for k, v in (code.get("scenes") or {}).items()}
+    todo = [k for k, s in enumerate(story["scenes"]) if not s.get("end")]
+    mock = atlas.mock_mode()
+    if only is not None:
+        hk_set(hid, step=f"🔁 بيرسم المشهد {only + 1} تاني")
+        if mock:
+            bodies[only] = hekaya.mock_scene(only, story)
+        else:
+            base = bodies.get(only) or "M.bg(ctx,'sky','sky2');"
+            want = note or "Redraw this scene so it is clearer, livelier and closer to the story; more motion and charm."
+            got = hekaya.parse_scenes("// === SCENE 1 ===\n" + hk_llm_code(hekaya.fix_messages(base, f"NOTE FROM THE DIRECTOR: {want}", only + 1, cast)))
+            bodies[only] = got.get(0) or bodies.get(only) or base
+    else:
+        if not cast or note:
+            hk_set(hid, step="🦊 بيرسم الشخصيات")
+            cast = hekaya.MOCK_CAST if mock else hk_llm_code(hekaya.cast_messages(story, w, h))
+        hk_set(hid, step=f"🎨 بيرسم {len(todo)} مشهد")
+        if mock:
+            bodies = {k: hekaya.mock_scene(k, story) for k in todo}
+        else:
+            batches = [todo[j:j + 4] for j in range(0, len(todo), 4)]
+            extra = f"\n\nNOTE FROM THE DIRECTOR (apply to every scene): {note}" if note else ""
+
+            def one(idx):
+                msgs = hekaya.scenes_messages(story, scn, cast, idx, w, h)
+                msgs[-1]["content"] += extra
+                return hekaya.parse_scenes(hk_llm_code(msgs))
+            bodies = {}
+            with ThreadPoolExecutor(3) as ex:
+                for got in ex.map(one, batches):
+                    bodies.update(got)
+            missing = [k for k in todo if k not in bodies]
+            if missing:
+                hk_set(hid, step=f"🎨 بيكمّل {len(missing)} مشهد")
+                for idx in [missing[j:j + 4] for j in range(0, len(missing), 4)]:
+                    bodies.update(one(idx))
+            missing = [k for k in todo if k not in bodies]
+            if missing:
+                raise RuntimeError("موديل الكود مكتبش المشاهد: " + "، ".join(str(k + 1) for k in missing))
+    d = hk_update(hid, lambda x: x.update(code={"cast": cast, "scenes": {str(k): v for k, v in bodies.items()}}))
+    hk_check_fix(hid, mock)
+    if note:
+        hk_update(hid, lambda x: x.update(notes=[*(x.get("notes") or []), {"note": note[:600], "at": now(), "stage": "scenes", "scene": only}]))
+
+
+def hk_check_fix(hid: str, mock: bool, tries: int = 3) -> None:
+    """بيجرّب كل مشهد: اللي فيه غلطة بيتصلّح لوحده، وبعدين صورة من كل مشهد."""
+    for k in range(tries + 1):
+        d = hk_load(hid)
+        code = d["code"]
+        bodies = {int(a): b for a, b in code["scenes"].items()}
+        hk_set(hid, step="🧪 بيراجع الكود")
+        bad = style_child(hk_syntax, code["cast"], bodies, timeout=90)
+        problem = None
+        if not bad:
+            hk_set(hid, step="🖼️ بيطلّع صورة من كل مشهد")
+            i = d["inputs"]
+            w, h = hekaya.DRAW[i["ratio"]]
+            times = hekaya.still_times(d["scn"])
+            problem, files = style_child(style_check, hk_code(d), w, h, d["total"], hk_dir(hid), times, f"st{uuid.uuid4().hex[:4]}",
+                                         timeout=90 + len(times) * 10)
+            if not problem:
+                def fin(x):
+                    for s in x.get("stills") or []:
+                        (hk_dir(hid) / s["file"]).unlink(missing_ok=True)
+                    x.update(stills=[{"i": n, "file": f, "style": i["style"]} for n, f in enumerate(files)], stage="scenes")
+                hk_update(hid, fin)
+                return
+            m = re.search(r"scene (\d+)", problem)
+            bad = {str(int(m.group(1)) - 1): problem} if m else {"cast": problem}
+        if k == tries or mock:
+            raise RuntimeError(f"الكود فيه مشكلة ومعرفناش نصلّحها: {json.dumps(bad, ensure_ascii=False)[:240]}")
+        hk_set(hid, step=f"🔧 بيصلّح {len(bad)} {'مشهد' if len(bad) == 1 else 'حاجات'} ({k + 1})")
+        if "cast" in bad:
+            code["cast"] = hk_llm_code(hekaya.cast_fix_messages(code["cast"], bad["cast"]))
+        for key, err in bad.items():
+            if key == "cast":
+                continue
+            n = int(key)
+            got = hekaya.parse_scenes("// === SCENE 1 ===\n" + hk_llm_code(hekaya.fix_messages(bodies.get(n, ""), err, n + 1, code["cast"])))
+            if got.get(0):
+                code["scenes"][str(n)] = got[0]
+        hk_update(hid, lambda x: x.update(code=code))
+
+
+def run_hk_stills(hid: str) -> None:
+    """الستايل اتغيّر: نفس المشاهد بخامة تانية (من غير كود جديد)."""
+    hk_check_fix(hid, True, 0)
+
+
+def run_hk_render(hid: str) -> None:
+    d = hk_load(hid)
+    i = d["inputs"]
+    w, h = hekaya.DRAW[i["ratio"]]
+    folder = hk_dir(hid)
+    dur = float(d["total"])
+    sound = hekaya.sound_plan(d["scn"], {**(d["story"].get("music") or {}), "mood": i.get("mood") or (d["story"].get("music") or {}).get("mood")},
+                              hk_end(d)["keyword"])
+    name = style_child(code_render, folder, hk_code(d), w, h, dur, hekaya.FPS, sound, sum(map(ord, hid)),
+                       lambda step: hk_set(hid, step=step), "hekaya", folder / d["voice"]["file"], hekaya.LEAD,
+                       hekaya.RATIOS[i["ratio"]], hekaya.OUT_FPS, 23, timeout=180 + dur * 40)
+
+    def fin(x):
+        if x.get("final"):
+            (folder / x["final"]).unlink(missing_ok=True)
+        x.update(final=name, final_style=i["style"], stage="done")
+    hk_update(hid, fin)
+
+
+@app.get("/api/hekaya")
+def hk_list():
+    items = []
+    for f in sorted(HK_DIR.glob("*/hekaya.json"), key=lambda p: p.stat().st_mtime, reverse=True)[:60]:
+        try:
+            items.append(hk_view(json.loads(f.read_text(encoding="utf-8"))))
+        except (ValueError, KeyError, OSError):
+            continue
+    b = active_client() or {}
+    return {"items": items, "options": {"styles": hekaya.styles_list(), "audiences": hekaya.AUDIENCES, "lengths": hekaya.LENGTHS,
+                                        "ratios": list(hekaya.RATIOS), "voices": AR_VOICES, "endings": hekaya.ENDINGS, "moods": hekaya.MOODS,
+                                        "lang": str(b.get("language") or "") or "العربي المصري", "brand": str(b.get("name") or "")}}
+
+
+class HkIn(BaseModel):
+    inputs: dict = {}
+
+
+@app.post("/api/hekaya")
+def hk_create(body: HkIn):
+    i = hk_inputs(body.inputs)
+    if len(i["idea"]) < 3:
+        raise HTTPException(400, "اكتب فكرة الحكاية")
+    hid = uuid.uuid4().hex[:10]
+    hk_dir(hid).mkdir(parents=True, exist_ok=True)
+    d = {"id": hid, "inputs": i, "stage": "story", "created_at": now(), "updated_at": now()}
+    (hk_dir(hid) / "hekaya.json").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+    return hk_job(hid, "story", run_hk_story)
+
+
+@app.get("/api/hekaya/{hid}")
+def hk_get(hid: str):
+    d = hk_load(hid)
+    if d.get("job") and time.time() - Path(hk_dir(hid) / "hekaya.json").stat().st_mtime > 1800:
+        d = hk_set(hid, job=None, step=None, error="الخطوة وقفت (السيرفر اتعمله ريستارت)، جرّب تاني")
+    return hk_view(d)
+
+
+class HkPatchIn(BaseModel):
+    inputs: dict | None = None
+    scenes: list[dict] | None = None
+    title: str | None = None
+
+
+@app.patch("/api/hekaya/{hid}")
+def hk_patch(hid: str, body: HkPatchIn):
+    """تعديل المدخلات أو المشاهد. لو كلام الراوي اتغيّر الصوت لازم يتسجّل تاني؛ لو الستايل اتغيّر الصور بتتعمل تاني من غير كود جديد."""
+    d = hk_load(hid)
+    if d.get("job") in HK_BUSY:
+        raise HTTPException(400, "استنى لما الخطوة اللي شغالة تخلص")
+
+    def fn(x):
+        if body.inputs:
+            x["inputs"] = hk_inputs(body.inputs, x["inputs"])
+        st = x.get("story")
+        if st and body.title is not None:
+            st["title"] = body.title.strip()[:80] or st["title"]
+        if st and body.scenes is not None:
+            old_text = [s["text"] for s in st["scenes"]]
+            new = []
+            for k, s in enumerate(body.scenes[:30]):
+                if not isinstance(s, dict) or not str(s.get("text") or "").strip():
+                    continue
+                prev = st["scenes"][k] if k < len(st["scenes"]) else {}
+                new.append({**prev, "text": hekaya.clean_spoken(str(s["text"]))[:220], "visual": str(s.get("visual") or "")[:400],
+                            "motion": str(s.get("motion") or "")[:300], "big": bool(s.get("big")),
+                            "keys": [str(k2)[:30] for k2 in s.get("keys") or prev.get("keys") or []][:3], "end": prev.get("end") if s.get("end") is None else s.get("end")})
+            if len(new) < 2:
+                raise HTTPException(400, "الحكاية محتاجة مشهدين على الأقل")
+            st["scenes"] = new
+            if [s["text"] for s in new] != old_text:   # الكلام اتغيّر: الصوت والمشاهد يتعملوا تاني
+                x.update(voice=None, scn=None, total=None, stills=[], code=None, final=None, stage="story")
+    return hk_view(hk_update(hid, fn))
+
+
+class HkNoteIn(BaseModel):
+    note: str = ""
+    scene: int | None = None
+    voice_id: str = ""
+
+
+@app.post("/api/hekaya/{hid}/story")
+def hk_story(hid: str, body: HkNoteIn):
+    return hk_job(hid, "story", run_hk_story, body.note.strip()[:600])
+
+
+@app.post("/api/hekaya/{hid}/voice")
+def hk_voice(hid: str, body: HkNoteIn):
+    d = hk_load(hid)
+    if not d.get("story"):
+        raise HTTPException(400, "استنى لما الحكاية تتكتب")
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل")
+    vid = body.voice_id if body.voice_id in AR_VOICES else d["inputs"]["voice_id"]
+    hk_update(hid, lambda x: x["inputs"].update(voice_id=vid))
+    return hk_job(hid, "voice", run_hk_voice, vid)
+
+
+@app.post("/api/hekaya/{hid}/voice/upload")
+def hk_voice_upload(hid: str, file: UploadFile = File(...)):
+    """تسجّل الحكاية بصوتك: البرنامج بيسمعه ويظبط المشاهد على كلامك."""
+    d = hk_load(hid)
+    if not d.get("story"):
+        raise HTTPException(400, "استنى لما الحكاية تتكتب")
+    if d.get("job") in HK_BUSY:
+        raise HTTPException(400, "استنى لما الخطوة اللي شغالة تخلص")
+    name = save_audio_upload(file, hk_dir(hid), "voice")
+    return hk_job(hid, "voice", lambda h, n: hk_align(h, n, "upload"), name)
+
+
+@app.post("/api/hekaya/{hid}/scenes")
+def hk_scenes(hid: str, body: HkNoteIn):
+    d = hk_load(hid)
+    if not d.get("scn"):
+        raise HTTPException(400, "سجّل صوت الراوي الأول")
+    if body.scene is not None and not (0 <= body.scene < len(d["story"]["scenes"]) and not d["story"]["scenes"][body.scene].get("end")
+                                       and (d.get("code") or {}).get("scenes")):
+        raise HTTPException(400, "المشهد ده مينفعش يترسم لوحده")
+    return hk_job(hid, "scenes", run_hk_scenes, body.note.strip()[:600], body.scene)
+
+
+@app.post("/api/hekaya/{hid}/stills")
+def hk_stills(hid: str):
+    if not (hk_load(hid).get("code") or {}).get("scenes"):
+        raise HTTPException(400, "ارسم المشاهد الأول")
+    return hk_job(hid, "stills", run_hk_stills)
+
+
+@app.post("/api/hekaya/{hid}/render")
+def hk_render(hid: str):
+    d = hk_load(hid)
+    if not (d.get("code") or {}).get("scenes") or not d.get("voice"):
+        raise HTTPException(400, "ارسم المشاهد الأول")
+    return hk_job(hid, "render", run_hk_render)
+
+
+@app.delete("/api/hekaya/{hid}")
+def hk_delete(hid: str):
+    if hk_load(hid).get("job") in HK_BUSY:
+        raise HTTPException(400, "استنى لما الخطوة اللي شغالة تخلص")
+    shutil.rmtree(hk_dir(hid), ignore_errors=True)
+    return {"ok": True}
+
+
+@app.get("/api/hekaya/{hid}/file/{name}")
+def hk_file(hid: str, name: str):
+    f = hk_dir(hid) / Path(name).name
+    if not f.exists() or name.startswith(".") or f.suffix.lower() not in {".jpg", ".png", ".mp4", ".mp3", ".m4a", ".wav", ".aac", ".ogg"}:
+        raise HTTPException(404, "مش موجود")
+    return FileResponse(f)
+
+
+def hk_preview_shot(key: str) -> bytes:
+    from playwright.sync_api import sync_playwright
+    with sync_playwright() as p:
+        sp = StylePage(p, hekaya.demo_code(key), 1920, 1080, 3, scale=.3)
+        try:
+            sp.at(0)
+            if err := sp.at(1.6):
+                raise RuntimeError(err)
+            return sp.shot(82)
+        finally:
+            sp.close()
+
+
+@app.get("/api/hekaya-style/{key}.jpg")
+def hk_style_preview(key: str):
+    """صورة لكل ستايل: نفس المشهد بخامة الستايل (بتتعمل مرة واحدة وتتحفظ)."""
+    if key not in hekaya.STYLES:
+        raise HTTPException(404, "مش موجود")
+    f = HK_DIR / "_styles" / f"{key}-{hashlib.md5((hekaya.IMPL.get(key, '') + hekaya.KIT + hekaya.RUNTIME).encode()).hexdigest()[:8]}.jpg"
+    if not f.exists():
+        with HK_PREV:
+            if not f.exists():
+                f.parent.mkdir(parents=True, exist_ok=True)
+                f.write_bytes(style_child(hk_preview_shot, key, timeout=90))
+    return FileResponse(f, headers={"Cache-Control": "public, max-age=86400"})
 
 
 @app.get("/")
