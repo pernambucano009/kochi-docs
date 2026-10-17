@@ -247,7 +247,7 @@ const BrandPage = (() => {
     const w = S.el, b = cur();
     w.querySelector(".bm-nodes").innerHTML = S.nodes.map((n) => nodeHTML(n, b)).join("");
     S.nodes.forEach((n) => { n.el = w.querySelector(`[data-n="${CSS.escape(n.id)}"]`); });
-    w.querySelector(".bm-lines").innerHTML = S.nodes.filter((n) => n.from).map((n) => `<line data-l="${esc(n.id)}" class="${n.kind}${n.on === false ? " empty" : ""}"/>`).join("");
+    w.querySelector(".bm-lines").innerHTML = S.nodes.filter((n) => n.from).map((n) => `<path data-l="${esc(n.id)}" class="${n.kind}${n.on === false ? " empty" : ""}"/>`).join("");
     S.nodes.forEach((n) => { n.line = n.from ? w.querySelector(`.bm-lines [data-l="${CSS.escape(n.id)}"]`) : null; });
     // نقط الدراع: النقط الجديدة بتطلع بنبضة
     const prev = S.beads || null;
@@ -276,7 +276,13 @@ const BrandPage = (() => {
       const p = n.from && S.byId[n.from], f = FOLLOW[n.kind] || 0;
       // الماوس واقف على الفرع: الورق بتاعه بيفرد لبرّه شوية
       const open = S.hov && n.kind === "leaf" && n.br.k === S.hov ? .14 : 0;
-      const tx = n.x + (p ? (p.px - p.x) * f + (n.x - p.x) * open : 0), ty = n.y + (p ? (p.py - p.y) * f + (n.y - p.y) * open : 0);
+      let tx = n.x + (p ? (p.px - p.x) * f + (n.x - p.x) * open : 0), ty = n.y + (p ? (p.py - p.y) * f + (n.y - p.y) * open : 0);
+      // الدايرة اللي الماوس عليها بتتشد ناحيته زي المغناطيس، واللي جنبها بتوسّعله
+      if (S.mw && !S.drag && (n.kind === "leaf" || n.kind === "branch")) {
+        const mx = S.mw[0] - n.x, my = S.mw[1] - n.y, md = Math.hypot(mx, my) || 1;
+        if (S.hovNode === n) { const pull = Math.min(n.kind === "leaf" ? 16 : 12, md * .4); tx += mx / md * pull; ty += my / md * pull; }
+        else if (md < 110) { const push = (1 - md / 110) * 14; tx -= mx / md * push; ty -= my / md * push; }
+      }
       n.vx += (k * (tx - n.px) - c * n.vx) * dt;
       n.vy += (k * (ty - n.py) - c * n.vy) * dt;
       n.px += n.vx * dt; n.py += n.vy * dt;
@@ -295,19 +301,35 @@ const BrandPage = (() => {
       pos[n.id] = [x, y];
       if (n.el) n.el.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%)`;
     }
+    // الأذرع خطوط منحنية: الدراع بيلف شوية وهو طالع من المخ، والورق بيكمّل في نفس اتجاه الدراع وبعدين يميل لمكانه
+    const c = pos.c;
     for (const n of S.nodes) {
       if (!n.line) continue;
+      const A = pos[n.from], B = pos[n.id], d = Math.hypot(B[0] - A[0], B[1] - A[1]) || 1;
+      const ux = (B[0] - A[0]) / d, uy = (B[1] - A[1]) / d;
+      let c1, c2;
+      if (n.from === "c") {
+        const sw = n.kind === "add" ? 0 : .5, cs = Math.cos(sw), sn = Math.sin(sw);
+        c1 = [A[0] + (ux * cs - uy * sn) * d * .45, A[1] + (ux * sn + uy * cs) * d * .45];
+        c2 = [B[0] - ux * d * .35, B[1] - uy * d * .35];
+      } else {
+        const od = Math.hypot(A[0] - c[0], A[1] - c[1]) || 1, ox = (A[0] - c[0]) / od, oy = (A[1] - c[1]) / od;
+        c1 = [A[0] + ox * d * .42, A[1] + oy * d * .42];
+        c2 = [B[0] - (ox * .15 + ux * .35) * d, B[1] - (oy * .15 + uy * .35) * d];
+      }
       // الخط بيبدأ وبيخلص عند حافة الدايرة (مش من جوّه المخ أو الأيقونة)
-      const [ax, ay] = pos[n.from], [bx, by] = pos[n.id], d = Math.hypot(bx - ax, by - ay) || 1;
       const r1 = n.from === "c" ? S.rc : 34, r2 = n.kind === "branch" ? 34 : n.kind === "add" ? 24 : 10;
-      const ux = (bx - ax) / d, uy = (by - ay) / d;
-      n.line.setAttribute("x1", ax + ux * r1); n.line.setAttribute("y1", ay + uy * r1);
-      n.line.setAttribute("x2", bx - ux * r2); n.line.setAttribute("y2", by - uy * r2);
+      const dir = (p, q) => { const l = Math.hypot(q[0] - p[0], q[1] - p[1]) || 1; return [(q[0] - p[0]) / l, (q[1] - p[1]) / l]; };
+      const s1 = dir(A, c1), s2 = dir(c2, B);
+      const P0 = [A[0] + s1[0] * r1, A[1] + s1[1] * r1], P3 = [B[0] - s2[0] * r2, B[1] - s2[1] * r2];
+      n.line.setAttribute("d", `M${P0[0].toFixed(1)} ${P0[1].toFixed(1)}C${c1[0].toFixed(1)} ${c1[1].toFixed(1)} ${c2[0].toFixed(1)} ${c2[1].toFixed(1)} ${P3[0].toFixed(1)} ${P3[1].toFixed(1)}`);
       if (n.bead) {
-        const s0 = r1 + 10, s1 = d - r2 - 10, k = n.bead.length;
-        n.bead.forEach((c, i) => {
-          const f = s0 + (s1 - s0) * (k === 1 ? .5 : i / (k - 1));
-          c.setAttribute("cx", ax + ux * f); c.setAttribute("cy", ay + uy * f);
+        const k = n.bead.length;
+        n.bead.forEach((el, i) => {
+          const t = .07 + .86 * (k === 1 ? .5 : i / (k - 1)), m = 1 - t;
+          const a = m * m * m, b2 = 3 * m * m * t, c3 = 3 * m * t * t, d4 = t * t * t;
+          el.setAttribute("cx", a * P0[0] + b2 * c1[0] + c3 * c2[0] + d4 * P3[0]);
+          el.setAttribute("cy", a * P0[1] + b2 * c1[1] + c3 * c2[1] + d4 * P3[1]);
         });
       }
     }
@@ -584,9 +606,11 @@ const BrandPage = (() => {
     w.addEventListener("pointerover", (e) => {
       const el = e.target.closest(".bm-n"), n = el && S.byId[el.dataset.n];
       const k = n?.kind === "branch" ? n.id : n?.kind === "leaf" ? n.br.k : null;
+      S.hovNode = n?.kind === "leaf" || n?.kind === "branch" ? n : null;
       hover(k, n?.kind === "leaf" ? n.id : null);
     });
     w.addEventListener("pointermove", (e) => {
+      if (S.view && e.pointerType !== "touch") { const r = w.getBoundingClientRect(); S.mw = toWorld(e.clientX - r.left, e.clientY - r.top); }
       if (S.dv && e.pointerType !== "touch") { const r = w.getBoundingClientRect(); S.dv.tx = e.clientX - r.left; S.dv.ty = e.clientY - r.top; if (S.dv.a < .01) { S.dv.mx = S.dv.tx; S.dv.my = S.dv.ty; } S.dv.ta = 1; }
       const pn = S.pan;
       if (pn && e.pointerId === pn.id) {
@@ -613,7 +637,7 @@ const BrandPage = (() => {
       S.drag = null;
       if (d.moved) { S.noClick = true; setTimeout(() => (S.noClick = false), 0); w.classList.remove("dragging"); d.el.classList.remove("held"); }
     };
-    w.addEventListener("pointerleave", () => { if (S.dv) S.dv.ta = 0; hover(null); });
+    w.addEventListener("pointerleave", () => { if (S.dv) S.dv.ta = 0; S.mw = null; S.hovNode = null; hover(null); });
     w.addEventListener("pointerup", drop);
     w.addEventListener("pointercancel", drop);
     w.addEventListener("click", async (e) => {
