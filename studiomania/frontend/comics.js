@@ -12,12 +12,12 @@ const ComicsPage = (() => {
     return `<section class="fs-hero">
         <div class="fs-hero-t"><b>مكتبة الكوميكس</b><span class="latin">COMICS LIBRARY</span></div>
         <p>كوميكس حقيقية (GIF وصور وفيديوهات بصوت) بتتجمّع أوتوماتيك، والمخ بيتفرج على كل واحد ويكتب سياقه: الإحساس، الموقف، يتقال إمتى، والجملة اللي فيه. وأي أداة (زي «حكاية») بتختار منها الكوميك المناسب للكلام.</p>
-        <div class="cm-stats"><span><b class="num">${st.total}</b> كوميك</span><span><b class="num">${st.ready}</b> جاهز بسياقه</span><span><b class="num">${st.pending}</b> مستني سياق</span><span><b class="num">${st.hidden}</b> مستخبي</span>
+        <div class="cm-stats"><span><b class="num">${st.total}</b> كوميك</span><span><b class="num">${st.ready}</b> جاهز بسياقه</span><span><b class="num">${st.pending}</b> مستني سياق</span><span><b class="num">${st.hidden}</b> مستخبي</span>${st.skipped ? `<span><b class="num">${st.skipped}</b> اتساب (وصفه فشل)</span>` : ""}
           ${Object.entries(st.kinds).map(([k, n]) => `<span>${esc(st.kind_names[k] || k)} <b class="num">${n}</b></span>`).join("")}</div>
         <div class="cm-srcs">${src}</div>
       </section>
       ${st.admin ? `<section class="fs-card"><h3>التجميع <small>${st.seeds} كلمة جاهزة بالمصري والخليجي والإنجليزي، وتقدر تزوّد</small></h3>
-        ${run ? `<div class="fs-busy">⏳ ${esc(s.step || "شغال…")} · ${s.progress || 0}% · اتضاف ${s.added || 0} · اتكتب سياق ${s.tagged || 0} <button class="nb-btn sm danger" data-cmstop>وقّف</button></div>` : ""}
+        ${run ? `<div class="fs-busy">⏳ ${esc(s.step || "شغال…")} · ${s.progress || 0}% · اتضاف ${s.added || 0} · اتكتب سياق ${s.tagged || 0} · اتصرف تقريبًا $${(s.spent || 0).toFixed(2)} من حد $${st.max_usd} <button class="nb-btn sm danger" data-cmstop>وقّف</button></div>` : ""}
         ${s.last_error ? `<div class="fs-err">⚠️ ${esc(s.last_error)}</div>` : ""}
         <label class="nb-f"><span>كلمات زيادة (كل سطر كلمة): أسماء أفلام، إفيهات، شخصيات، مواقف</span><textarea rows="3" data-cmq placeholder="مثلًا:&#10;اسم فيلم كوميدي&#10;إفيه مشهور"></textarea></label>
         <div class="nb-bar"><label class="hk-big"><input type="checkbox" data-cmseeds checked> استخدم الكلمات الجاهزة كمان</label>

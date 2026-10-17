@@ -8066,12 +8066,25 @@ def adapt_ad(aid: str, body: AdAdaptIn):
     return ad_response(aid)
 
 
-def ad_media_chat(messages: list[dict], max_tokens: int = 32000) -> str:
-    """موديل بيفهم الفيديو والصوت (Gemini). بيجرب المختار، ولو مش متاح اللي بعده."""
+# سعر التوكن بالدولار (من قايمة موديلات Atlas): (الداخل، الطالع). الموديل اللي مش هنا بيتحسب بسعر Pro عشان نبقى في الأمان
+MEDIA_PRICES = {"google/gemini-2.5-pro": (1.25e-6, 10e-6), "google/gemini-2.5-flash": (.3e-6, 2.5e-6),
+                "google/gemini-2.5-flash-lite": (.1e-6, .4e-6), "google/gemini-3.1-flash-lite": (.25e-6, 1.5e-6)}
+
+
+def media_cost(model: str, usage: dict) -> float:
+    pin, pout = MEDIA_PRICES.get(model, MEDIA_PRICES["google/gemini-2.5-pro"])
+    i, o = int(usage.get("prompt_tokens") or 0), int(usage.get("completion_tokens") or 0)
+    o = max(o, int(usage.get("total_tokens") or 0) - i)  # تفكير الموديل بيتحسب طالع حتى لو مش مكتوب في completion
+    return i * pin + o * pout
+
+
+def ad_media_chat(messages: list[dict], max_tokens: int = 32000, models: list[str] | None = None, meter: dict | None = None) -> str:
+    """موديل بيفهم الفيديو والصوت (Gemini). بيجرب المختار، ولو مش متاح اللي بعده.
+    models: موديلات بعينها للشغل الكتير الرخيص. meter: بيتجمع فيه الصرف التقريبي بالدولار."""
     if atlas.mock_mode():
         return "{}"
     errors = []
-    for model in atlas.model_candidates(ads_settings()["video_model"], ("gemini-2.5-pro", "gemini-2.5-flash"), AD_VIDEO_FALLBACKS)[:4]:
+    for model in models or atlas.model_candidates(ads_settings()["video_model"], ("gemini-2.5-pro", "gemini-2.5-flash"), AD_VIDEO_FALLBACKS)[:4]:
         try:
             body = {"model": model, "messages": messages, "temperature": 0.3, "max_tokens": max_tokens,
                     "response_format": {"type": "json_object"}}
@@ -8081,6 +8094,8 @@ def ad_media_chat(messages: list[dict], max_tokens: int = 32000) -> str:
                     body.pop("response_format")
                     resp = client.post(f"{atlas.LLM_URL}/chat/completions", headers=atlas._headers(), json=body)
             data = atlas._check(resp, f"موديل الفيديو ({model})")
+            if meter is not None:
+                meter["usd"] = meter.get("usd", 0.0) + media_cost(model, data.get("usage") or {})
             text = str(data["choices"][0]["message"]["content"] or "").strip()
             if text:
                 return text
@@ -21365,7 +21380,11 @@ def r2p_file(rid: str, name: str):
 COMICS_DIR = Path(os.environ.get("COMICS_DATA") or DATA_DIR / "comics")
 COMICS_MEDIA = COMICS_DIR / "media"
 COMICS_LOCK = threading.Lock()
-COMICS_RUN = {"stop": False, "thread": None}
+COMICS_RUN = {"stop": False, "thread": None, "meter": {"usd": 0.0}}
+# وصف الكوميكس شغل كتير وبسيط: أرخص موديل بيشوف صور (أرخص من Pro بحوالي 25 مرة)، ومعاه حد أقصى للصرف في كل مرة
+COMICS_MODELS = ["google/gemini-2.5-flash-lite", "google/gemini-3.1-flash-lite", "google/gemini-2.5-flash"]
+COMICS_MAX_USD = float(os.environ.get("COMICS_MAX_USD", "1") or 1)
+COMICS_TRIES = 2  # الكوميك اللي وصفه فشل مرتين بيتساب (مابيتبعتش تاني على الفاضي)
 COMICS_MAX_MB = 12
 COMICS_BAD = ("nsfw", "violent")
 
@@ -21466,8 +21485,13 @@ def comics_tag_pending(limit: int = 60) -> int:
     with closing(cdb()) as conn:
         rows = conn.execute("SELECT * FROM comics WHERE status = 'new' ORDER BY created_at LIMIT ?", (limit,)).fetchall()
     done = 0
+    meter = COMICS_RUN["meter"]
     for j in range(0, len(rows), 6):
         if COMICS_RUN["stop"]:
+            break
+        if meter["usd"] >= COMICS_MAX_USD:
+            COMICS_RUN["stop"] = True
+            comics_state_set(last_error=f"وقف لوحده: وصل حد الصرف (${COMICS_MAX_USD:g} في المرة). دوس «اكتب السياق» تاني لو عايز تكمّل")
             break
         batch = rows[j:j + 6]
         items = [{"kind": r["kind"], "title": r["title"], "query": r["query"], "tags": (json.loads(r["ctx"] or "{}")).get("tags")} for r in batch]
@@ -21477,10 +21501,10 @@ def comics_tag_pending(limit: int = 60) -> int:
             parts = [{"type": "text", "text": comics.tag_messages(items)}]
             parts += [{"type": "image_url", "image_url": {"url": data_url(COMICS_MEDIA / r["thumb"], "image/jpeg")}} for r in batch]
             try:
-                raw = ad_json(ad_media_chat([{"role": "user", "content": parts}], 4000), "سياق الكوميكس")
+                raw = ad_json(ad_media_chat([{"role": "user", "content": parts}], 2500, COMICS_MODELS, meter), "سياق الكوميكس")
             except (HTTPException, ValueError, RuntimeError) as exc:
-                comics_state_set(last_error=str(getattr(exc, "detail", None) or exc)[:200])
-                continue
+                comics_state_set(last_error=str(getattr(exc, "detail", None) or exc)[:200], spent=round(meter["usd"], 3))
+                raw = {}
             got = {}
             for x in raw.get("items") or []:
                 try:
@@ -21491,12 +21515,17 @@ def comics_tag_pending(limit: int = 60) -> int:
             for k, r in enumerate(batch):
                 ctx = got.get(k)
                 if not ctx:
+                    old = json.loads(r["ctx"] or "{}")
+                    old["_tries"] = int(old.get("_tries") or 0) + 1
+                    conn.execute("UPDATE comics SET ctx = ?, status = ? WHERE id = ?",
+                                 (json.dumps(old, ensure_ascii=False), "skip" if old["_tries"] >= COMICS_TRIES else "new", r["id"]))
                     continue
                 ctx["tags"] = list(dict.fromkeys([*ctx["tags"], *((json.loads(r["ctx"] or "{}")).get("tags") or [])]))[:15]
                 st = "hidden" if any(f in COMICS_BAD for f in ctx["flags"]) else "ready"
                 conn.execute("UPDATE comics SET ctx = ?, status = ? WHERE id = ?", (json.dumps(ctx, ensure_ascii=False), st, r["id"]))
                 comic_index(conn, r["id"], r["title"], r["query"], ctx)
                 done += 1
+        comics_state_set(spent=round(meter["usd"], 3))
     return done
 
 
@@ -21507,6 +21536,7 @@ def comics_count() -> int:
 
 def run_comics_harvest(queries: list[str], kinds: list[str], pages: int, cap: int) -> None:
     COMICS_RUN["stop"] = False
+    COMICS_RUN["meter"] = {"usd": 0.0}
     srcs = {k: v for k, v in comics.sources().items() if v["on"]}
     added = tagged = 0
     try:
@@ -21593,6 +21623,7 @@ def comics_tag():
     if COMICS_RUN["thread"] and COMICS_RUN["thread"].is_alive():
         raise HTTPException(400, "التجميع شغال، السياق بيتكتب معاه")
     COMICS_RUN["stop"] = False
+    COMICS_RUN["meter"] = {"usd": 0.0}
 
     def run():
         comics_state_set(running=True, step="المخ بيكتب سياق الكوميكس")
@@ -21614,7 +21645,7 @@ def comics_status():
     with closing(cdb()) as conn:
         by = {r[0]: r[1] for r in conn.execute("SELECT status, COUNT(*) FROM comics GROUP BY status")}
         kinds = {r[0]: r[1] for r in conn.execute("SELECT kind, COUNT(*) FROM comics GROUP BY kind")}
-    return {"state": st, "total": sum(by.values()), "ready": by.get("ready", 0), "pending": by.get("new", 0), "hidden": by.get("hidden", 0),
+    return {"state": st, "total": sum(by.values()), "ready": by.get("ready", 0), "pending": by.get("new", 0), "hidden": by.get("hidden", 0), "skipped": by.get("skip", 0), "max_usd": COMICS_MAX_USD,
             "kinds": kinds, "kind_names": comics.KINDS, "sources": comics.sources(), "seeds": len(comics.seeds()), "admin": TENANT_ROLE == "admin"}
 
 
