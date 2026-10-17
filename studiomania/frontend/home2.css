@@ -1495,3 +1495,12 @@ audio { width: 100%; }
 .hk-cms figcaption b { color: var(--nh-accent); }
 .hk-cms button { position: absolute; top: 6px; inset-inline-end: 6px; }
 .cm-q, .cm-urls { padding: 10px 14px; border-radius: 12px; border: 1px solid rgba(127,127,127,.25); background: transparent; color: inherit; font: inherit; min-height: 42px; box-sizing: border-box; }
+/* خلفية العقل: نقط والماوس بينوّر اللي تحته · ونقط الدراع بتزيد كل ما تضيف حاجة */
+#nh .bm-dots { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+#nh .bm-lines line.branch { stroke: rgba(24, 23, 24, .1); }
+#nh .bm-beads circle { fill: #CFC6BC; transform-box: fill-box; transform-origin: center; }
+:root[data-nh-theme="dark"] #nh .bm-beads circle { fill: #4A4744; }
+:root[data-nh-theme="dark"] #nh .bm-lines line { stroke: rgba(241, 241, 243, .12); }
+#nh .bm-beads circle.new { animation: bmBead .9s var(--d, 0ms) cubic-bezier(.2, .8, .2, 1) both; }
+@keyframes bmBead { 0% { transform: scale(0); fill: var(--nh-accent); } 45% { transform: scale(2.2); fill: var(--nh-accent); } 100% { transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { #nh .bm-beads circle.new { animation: none; } }

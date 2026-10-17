@@ -125,7 +125,8 @@ const BrandPage = (() => {
 
   // ---------- الرسم ----------
   function skeleton() {
-    return `<svg class="bm-lines" aria-hidden="true"></svg>
+    return `<canvas class="bm-dots" aria-hidden="true"></canvas>
+      <svg class="bm-lines" aria-hidden="true"></svg>
       <div class="bm-nodes"></div>
       <div class="bm-card" hidden role="dialog"></div>
       <p class="bm-hint">دوس على أي نقطة تكتب فيها · النقط المفرّغة لسه ناقصة · دوس على المخ تبدّل البراند</p>`;
@@ -141,10 +142,12 @@ const BrandPage = (() => {
     nodes.push({ id: "add", kind: "add", x: cx, y: cy + R1 * .78, from: "c" });
     list.forEach((br, i) => {
       const a = -Math.PI / 2 + Math.PI / list.length + (i / list.length) * Math.PI * 2;
-      const bx = cx + Math.cos(a) * R1 * 1.25, by = cy + Math.sin(a) * R1;
+      // الفرع بيطول مع كل حاجة بتتضاف فيه: العميل يشوف العقل بيكبر
+      const g = growth(b, br), s = .78 + .42 * (1 - Math.exp(-g / 7));
+      const bx = cx + Math.cos(a) * R1 * 1.25 * s, by = cy + Math.sin(a) * R1 * s;
       const real = br.leaves.filter((l) => !l.type.startsWith("rule-") && l.type !== "action" && l.type !== "pending");
       const done = real.filter((l) => filled(b, l)).length, total = real.length, waiting = br.leaves.length - br.leaves.filter((l) => l.type !== "pending").length;
-      nodes.push({ id: br.k, kind: "branch", br, x: bx, y: by, from: "c", done, total, waiting });
+      nodes.push({ id: br.k, kind: "branch", br, x: bx, y: by, from: "c", done, total, waiting, g });
       const n = br.leaves.length, spread = Math.min(Math.PI * 1.15, .42 * Math.max(1, n - 1));
       br.leaves.forEach((l, j) => {
         const la = a + (n === 1 ? 0 : -spread / 2 + (j / (n - 1)) * spread);
@@ -156,11 +159,27 @@ const BrandPage = (() => {
     const old = Object.fromEntries((S.nodes || []).map((n) => [n.id, n]));
     S.nodes = nodes.map((n, i) => {
       const o = old[n.id];
-      return { ...n, ph: i * 1.7, px: o ? o.px + (n.x - o.x) : n.x, py: o ? o.py + (n.y - o.y) : n.y, vx: o?.vx || 0, vy: o?.vy || 0 };
+      // الفرع لما يطول بيتمد لمكانه الجديد بالزنبرك (مش بينط)
+      const grew = o && n.kind !== "center" && o.g !== n.g && !reduce.matches;
+      return { ...n, ph: i * 1.7, px: o ? (grew ? o.px : o.px + (n.x - o.x)) : n.x, py: o ? (grew ? o.py : o.py + (n.y - o.y)) : n.y, vx: o?.vx || 0, vy: o?.vy || 0 };
     });
     S.byId = Object.fromEntries(S.nodes.map((n) => [n.id, n]));
     draw();
   }
+  // وزن الفرع: كل حاجة اتملت أو اتضافت (صورة، لون، قاعدة، معرفة، منافس) بتزوّد نقطة في الدراع
+  function growth(b, br) {
+    if (!b) return 0;
+    let g = 0;
+    for (const l of br.leaves) {
+      if (l.type === "imgs") g += Math.min(4, (b[l.f] || []).length);
+      else if (l.type === "palette") g += Math.min(3, hexes(b.palette).length);
+      else if (l.type === "page") g += /^rv\d/.test(String(l.i)) ? 1 : 0;
+      else if (l.type === "pick") g += l.f === "type" && b.type ? 1 : 0;
+      else if (!["action", "rule-new", "pending"].includes(l.type) && filled(b, l)) g += 1;
+    }
+    return g;
+  }
+  const beadsOf = (n) => Math.min(30, 2 + n.g);
   function nodeHTML(n, b) {
     if (n.kind === "center") {
       const reading = (b?.sources || []).filter((s) => s.status === "working").length, waiting = (b?.pending || []).length;
@@ -196,6 +215,17 @@ const BrandPage = (() => {
     S.nodes.forEach((n) => { n.el = w.querySelector(`[data-n="${CSS.escape(n.id)}"]`); });
     w.querySelector(".bm-lines").innerHTML = S.nodes.filter((n) => n.from).map((n) => `<line data-l="${esc(n.id)}" class="${n.kind}${n.on === false ? " empty" : ""}"/>`).join("");
     S.nodes.forEach((n) => { n.line = n.from ? w.querySelector(`.bm-lines [data-l="${CSS.escape(n.id)}"]`) : null; });
+    // نقط الدراع: النقط الجديدة بتطلع بنبضة
+    const prev = S.beads || null;
+    S.beads = {};
+    const svgEl = w.querySelector(".bm-lines");
+    for (const n of S.nodes) {
+      if (n.kind !== "branch") continue;
+      const k = beadsOf(n), was = prev ? prev[n.id] ?? k : k;
+      svgEl.insertAdjacentHTML("beforeend", `<g class="bm-beads" data-b="${esc(n.id)}">${Array.from({ length: k }, (_, i) => `<circle r="2.4" class="${i >= was ? "new" : ""}" style="--d:${(i - was) * 90}ms"/>`).join("")}</g>`);
+      n.bead = [...svgEl.lastElementChild.children];
+      S.beads[n.id] = k;
+    }
     S.rc = (w.querySelector(".bm-brain")?.offsetWidth || 150) * .5;
     tick(performance.now());
   }
@@ -235,8 +265,63 @@ const BrandPage = (() => {
       const ux = (bx - ax) / d, uy = (by - ay) / d;
       n.line.setAttribute("x1", ax + ux * r1); n.line.setAttribute("y1", ay + uy * r1);
       n.line.setAttribute("x2", bx - ux * r2); n.line.setAttribute("y2", by - uy * r2);
+      if (n.bead) {
+        const s0 = r1 + 10, s1 = d - r2 - 10, k = n.bead.length;
+        n.bead.forEach((c, i) => {
+          const f = s0 + (s1 - s0) * (k === 1 ? .5 : i / (k - 1));
+          c.setAttribute("cx", ax + ux * f); c.setAttribute("cy", ay + uy * f);
+        });
+      }
     }
+    dots(now);
     if (S.open?.n) placeCard(pos[S.open.n.id]);
+  }
+  // الخلفية نقط هادية، والماوس بينوّر اللي تحته (زي كشاف صغير ماشي معاك)
+  const GAP = 22, GLOW = 170;
+  function dotsSize() {
+    const w = S.el, cv = w?.querySelector(".bm-dots");
+    if (!cv) return;
+    const dpr = Math.min(2, devicePixelRatio || 1), W = w.clientWidth, H = w.clientHeight;
+    const cs = getComputedStyle(w), ink = cs.getPropertyValue("--nh-ink").trim() || "#181718", acc = cs.getPropertyValue("--nh-accent").trim() || "#E5613E";
+    const key = `${W}x${H}@${dpr}${ink}`;
+    S.dv = S.dv || { mx: -999, my: -999, tx: -999, ty: -999, a: 0, ta: 0, dirty: true };
+    S.dv.ink = ink; S.dv.acc = acc;
+    if (S.dv.key === key) return;
+    S.dv.key = key; S.dv.dirty = true;
+    cv.width = W * dpr; cv.height = H * dpr;
+    // الشبكة الأساسية بتترسم مرة واحدة وتتنسخ كل فريم
+    const base = S.dv.base = document.createElement("canvas");
+    base.width = cv.width; base.height = cv.height;
+    const g = base.getContext("2d");
+    g.scale(dpr, dpr); g.fillStyle = ink; g.globalAlpha = .16;
+    const ox = (W % GAP) / 2, oy = (H % GAP) / 2;
+    for (let y = oy; y <= H; y += GAP) for (let x = ox; x <= W; x += GAP) { g.beginPath(); g.arc(x, y, 1, 0, 6.2832); g.fill(); }
+    S.dv.ox = ox; S.dv.oy = oy; S.dv.dpr = dpr; S.dv.W = W; S.dv.H = H;
+  }
+  function dots() {
+    const v = S.dv, cv = S.el?.querySelector(".bm-dots");
+    if (!v?.base || !cv) return;
+    const e = reduce.matches ? 1 : .18;
+    v.mx += (v.tx - v.mx) * e; v.my += (v.ty - v.my) * e; v.a += (v.ta - v.a) * (reduce.matches ? 1 : .12);
+    const moving = Math.abs(v.tx - v.mx) > .3 || Math.abs(v.ty - v.my) > .3 || Math.abs(v.ta - v.a) > .004;
+    if (!moving && !v.dirty) return;
+    v.dirty = moving;
+    const c = cv.getContext("2d");
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.clearRect(0, 0, cv.width, cv.height);
+    c.drawImage(v.base, 0, 0);
+    if (v.a < .01) return;
+    c.setTransform(v.dpr, 0, 0, v.dpr, 0, 0);
+    c.fillStyle = v.acc;
+    const x0 = Math.max(v.ox, v.ox + Math.ceil((v.mx - GLOW - v.ox) / GAP) * GAP), y0 = Math.max(v.oy, v.oy + Math.ceil((v.my - GLOW - v.oy) / GAP) * GAP);
+    for (let y = y0; y <= Math.min(v.H, v.my + GLOW); y += GAP) for (let x = x0; x <= Math.min(v.W, v.mx + GLOW); x += GAP) {
+      const d = Math.hypot(x - v.mx, y - v.my) / GLOW;
+      if (d >= 1) continue;
+      const f = (1 - d * d) ** 2 * v.a;
+      c.globalAlpha = .16 + .7 * f;
+      c.beginPath(); c.arc(x, y, 1 + 1.3 * f, 0, 6.2832); c.fill();
+    }
+    c.globalAlpha = 1;
   }
   function loop(now) {
     if (!S.el?.isConnected) { S.raf = 0; return; }
@@ -426,6 +511,7 @@ const BrandPage = (() => {
       S.drag = { n, el, sx: e.clientX, sy: e.clientY, ox: n.px - (e.clientX - r.left), oy: n.py - (e.clientY - r.top), x: n.px, y: n.py, moved: false, id: e.pointerId };
     });
     w.addEventListener("pointermove", (e) => {
+      if (S.dv && e.pointerType !== "touch") { const r = w.getBoundingClientRect(); S.dv.tx = e.clientX - r.left; S.dv.ty = e.clientY - r.top; if (S.dv.a < .01) { S.dv.mx = S.dv.tx; S.dv.my = S.dv.ty; } S.dv.ta = 1; }
       const d = S.drag;
       if (!d || e.pointerId !== d.id) return;
       if (!d.moved && Math.hypot(e.clientX - d.sx, e.clientY - d.sy) < 5) return;
@@ -440,6 +526,7 @@ const BrandPage = (() => {
       S.drag = null;
       if (d.moved) { S.noClick = true; setTimeout(() => (S.noClick = false), 0); w.classList.remove("dragging"); d.el.classList.remove("held"); }
     };
+    w.addEventListener("pointerleave", () => { if (S.dv) S.dv.ta = 0; });
     w.addEventListener("pointerup", drop);
     w.addEventListener("pointercancel", drop);
     w.addEventListener("click", async (e) => {
@@ -571,7 +658,9 @@ const BrandPage = (() => {
       e.preventDefault();
       upload(S.open.n.l.f, e.dataTransfer.files);
     });
-    new ResizeObserver(() => layout()).observe(w);
+    new ResizeObserver(() => { dotsSize(); layout(); }).observe(w);
+    // لو الثيم اتغيّر (فاتح/غامق) النقط بتترسم من جديد بلونه
+    if (!S.mo) (S.mo = new MutationObserver(() => { if (S.dv) S.dv.key = ""; dotsSize(); })).observe(document.documentElement, { attributes: true, attributeFilter: ["data-nh-theme"] });
   }
   // Esc بيقفل الكارت الأول (قبل ما يرجع من الصفحة)
   document.addEventListener("keydown", (e) => {
@@ -594,7 +683,9 @@ const BrandPage = (() => {
     S.open = null;
     S.id = id || clientx?.active || S.id;
     w.innerHTML = skeleton();
+    S.dv = null; S.beads = null;
     bind(w);
+    dotsSize();
     try { await load(); } catch (err) { w.innerHTML = `<div class="nh-empty">${esc(err.message)}</div>`; return; }
     if (!S.raf) S.raf = requestAnimationFrame(loop);
     // أول ما الخريطة تفتح: النقط بتطلع من المخ لبرّه
