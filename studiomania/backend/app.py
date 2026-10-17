@@ -21398,6 +21398,12 @@ CREATE TABLE IF NOT EXISTS comics (id TEXT PRIMARY KEY, source TEXT, source_id T
   has_audio INT, title TEXT, query TEXT, ctx TEXT, status TEXT, created_at TEXT, UNIQUE(source, source_id));
 CREATE VIRTUAL TABLE IF NOT EXISTS comics_fts USING fts5(id UNINDEXED, body, tokenize='unicode61 remove_diacritics 2');
 """)
+    # عربي / أجنبي / الاتنين: عمود اتضاف بعدين، فالقديم بيتصنّف مرة واحدة من سياقه أو من لغة كلمة البحث
+    if "lang" not in {r[1] for r in conn.execute("PRAGMA table_info(comics)")}:
+        with conn:
+            conn.execute("ALTER TABLE comics ADD COLUMN lang TEXT")
+            for r in conn.execute("SELECT id, title, query, ctx FROM comics").fetchall():
+                conn.execute("UPDATE comics SET lang = ? WHERE id = ?", (comics.lang_group(json.loads(r["ctx"] or "{}"), r["title"], r["query"]), r["id"]))
     return conn
 
 
@@ -21427,7 +21433,8 @@ def comic_row(r: sqlite3.Row) -> dict:
     ctx = json.loads(r["ctx"]) if r["ctx"] else {}
     u = lambda f: f"/api/comics/file/{f}" if f else None
     return {"id": r["id"], "source": r["source"], "kind": r["kind"], "url": u(r["file"]), "thumb": u(r["thumb"]), "w": r["w"], "h": r["h"],
-            "dur": r["dur"], "has_audio": bool(r["has_audio"]), "title": r["title"], "query": r["query"], "ctx": ctx, "status": r["status"]}
+            "dur": r["dur"], "has_audio": bool(r["has_audio"]), "title": r["title"], "query": r["query"], "ctx": ctx, "status": r["status"],
+            "lang": r["lang"] or "both"}
 
 
 def comic_index(conn: sqlite3.Connection, cid: str, title: str, query: str, ctx: dict) -> None:
@@ -21472,10 +21479,11 @@ def comic_store(item: dict, query: str, data: bytes | None = None, src_path: Pat
         f.unlink(missing_ok=True)
         raise
     with closing(cdb()) as conn, conn:
-        conn.execute("INSERT OR IGNORE INTO comics (id, source, source_id, kind, file, thumb, w, h, dur, has_audio, title, query, ctx, status, created_at) "
-                     "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'new', ?)",
+        conn.execute("INSERT OR IGNORE INTO comics (id, source, source_id, kind, file, thumb, w, h, dur, has_audio, title, query, ctx, status, created_at, lang) "
+                     "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'new', ?, ?)",
                      (cid, item["source"], item["source_id"], item["kind"], f.name, thumb, info.width, info.height, round(info.duration, 2),
-                      int(info.has_audio), item.get("title", "")[:200], query[:120], json.dumps({"tags": item.get("tags") or []}, ensure_ascii=False), now()))
+                      int(info.has_audio), item.get("title", "")[:200], query[:120], json.dumps({"tags": item.get("tags") or []}, ensure_ascii=False), now(),
+                      comics.lang_group({}, item.get("title", ""), query)))
         comic_index(conn, cid, item.get("title", ""), query, {"tags": item.get("tags") or []})
     return cid
 
@@ -21522,7 +21530,8 @@ def comics_tag_pending(limit: int = 60) -> int:
                     continue
                 ctx["tags"] = list(dict.fromkeys([*ctx["tags"], *((json.loads(r["ctx"] or "{}")).get("tags") or [])]))[:15]
                 st = "hidden" if any(f in COMICS_BAD for f in ctx["flags"]) else "ready"
-                conn.execute("UPDATE comics SET ctx = ?, status = ? WHERE id = ?", (json.dumps(ctx, ensure_ascii=False), st, r["id"]))
+                conn.execute("UPDATE comics SET ctx = ?, status = ?, lang = ? WHERE id = ?",
+                             (json.dumps(ctx, ensure_ascii=False), st, comics.lang_group(ctx, r["title"], r["query"]), r["id"]))
                 comic_index(conn, r["id"], r["title"], r["query"], ctx)
                 done += 1
         comics_state_set(spent=round(meter["usd"], 3))
@@ -21645,33 +21654,48 @@ def comics_status():
     with closing(cdb()) as conn:
         by = {r[0]: r[1] for r in conn.execute("SELECT status, COUNT(*) FROM comics GROUP BY status")}
         kinds = {r[0]: r[1] for r in conn.execute("SELECT kind, COUNT(*) FROM comics GROUP BY kind")}
+        langs = {r[0] or "both": r[1] for r in conn.execute("SELECT lang, COUNT(*) FROM comics WHERE status = 'ready' GROUP BY lang")}
     return {"state": st, "total": sum(by.values()), "ready": by.get("ready", 0), "pending": by.get("new", 0), "hidden": by.get("hidden", 0), "skipped": by.get("skip", 0), "max_usd": COMICS_MAX_USD,
+            "langs": langs, "lang_names": comics.LANGS,
             "kinds": kinds, "kind_names": comics.KINDS, "sources": comics.sources(), "seeds": len(comics.seeds()), "admin": TENANT_ROLE == "admin"}
 
 
+def comics_where(q: str, kind: str, status: str, lang: str) -> tuple[str, list, str]:
+    """فلتر المكتبة (النوع، الحالة، عربي/أجنبي، والبحث) — نفسه للعرض وللمسح بالجملة."""
+    where, args = [], []
+    if kind in comics.KINDS:
+        where.append("c.kind = ?")
+        args.append(kind)
+    if status in ("ready", "new", "hidden", "skip"):
+        where.append("c.status = ?")
+        args.append(status)
+    if lang in comics.LANGS:
+        where.append("COALESCE(c.lang, 'both') = ?")
+        args.append(lang)
+    return " AND ".join(where), args, comics.fts_query(q)
+
+
+def comics_query(conn: sqlite3.Connection, q: str, kind: str, status: str, lang: str, cols: str = "c.*", tail: str = "", tail_args: tuple = ()) -> list:
+    where, args, fq = comics_where(q, kind, status, lang)
+    if fq:
+        sql = f"SELECT {cols} FROM comics_fts f JOIN comics c ON c.id = f.id WHERE comics_fts MATCH ?" + (f" AND {where}" if where else "")
+        return conn.execute(sql + tail.replace("{rank}", "bm25(comics_fts)"), (fq, *args, *tail_args)).fetchall()
+    sql = f"SELECT {cols} FROM comics c" + (f" WHERE {where}" if where else "")
+    return conn.execute(sql + tail.replace("{rank}", "c.created_at DESC"), (*args, *tail_args)).fetchall()
+
+
 @app.get("/api/comics")
-def comics_list(q: str = "", kind: str = "", status: str = "ready", page: int = 0):
+def comics_list(q: str = "", kind: str = "", status: str = "ready", page: int = 0, lang: str = ""):
     with closing(cdb()) as conn:
-        where, args = [], []
-        if kind in comics.KINDS:
-            where.append("c.kind = ?")
-            args.append(kind)
-        if status in ("ready", "new", "hidden"):
-            where.append("c.status = ?")
-            args.append(status)
-        if fq := comics.fts_query(q):
-            sql = ("SELECT c.* FROM comics_fts f JOIN comics c ON c.id = f.id WHERE comics_fts MATCH ?" + "".join(f" AND {w}" for w in where)
-                   + " ORDER BY bm25(comics_fts) LIMIT 60 OFFSET ?")
-            rows = conn.execute(sql, (fq, *args, page * 60)).fetchall()
-        else:
-            rows = conn.execute("SELECT c.* FROM comics c" + (" WHERE " + " AND ".join(where) if where else "") + " ORDER BY c.created_at DESC LIMIT 60 OFFSET ?",
-                                (*args, page * 60)).fetchall()
-    return {"items": [comic_row(r) for r in rows], "page": page, "more": len(rows) == 60}
+        rows = comics_query(conn, q, kind, status, lang, tail=" ORDER BY {rank} LIMIT 60 OFFSET ?", tail_args=(page * 60,))
+        total = comics_query(conn, q, kind, status, lang, cols="COUNT(*)")[0][0]
+    return {"items": [comic_row(r) for r in rows], "page": page, "more": len(rows) == 60, "total": total}
 
 
 class ComicPatchIn(BaseModel):
     ctx: dict | None = None
     status: str | None = None
+    lang: str | None = None
 
 
 @app.patch("/api/comics/{cid}")
@@ -21683,23 +21707,55 @@ def comics_patch(cid: str, body: ComicPatchIn):
             raise HTTPException(404, "مش موجود")
         ctx = comics.clean_ctx({**json.loads(r["ctx"] or "{}"), **(body.ctx or {})}) if body.ctx is not None else json.loads(r["ctx"] or "{}")
         st = body.status if body.status in ("ready", "hidden", "new") else ("ready" if body.ctx is not None and r["status"] == "new" else r["status"])
-        conn.execute("UPDATE comics SET ctx = ?, status = ? WHERE id = ?", (json.dumps(ctx, ensure_ascii=False), st, cid))
+        lg = body.lang if body.lang in comics.LANGS else (r["lang"] or "both")
+        conn.execute("UPDATE comics SET ctx = ?, status = ?, lang = ? WHERE id = ?", (json.dumps(ctx, ensure_ascii=False), st, lg, cid))
         comic_index(conn, cid, r["title"], r["query"], ctx)
         return comic_row(conn.execute("SELECT * FROM comics WHERE id = ?", (cid,)).fetchone())
+
+
+def comics_remove(conn: sqlite3.Connection, rows: list) -> int:
+    for r in rows:
+        for f in (r["file"], r["thumb"]):
+            if f:
+                (COMICS_MEDIA / Path(f).name).unlink(missing_ok=True)
+        conn.execute("DELETE FROM comics WHERE id = ?", (r["id"],))
+        conn.execute("DELETE FROM comics_fts WHERE id = ?", (r["id"],))
+    return len(rows)
 
 
 @app.delete("/api/comics/{cid}")
 def comics_delete(cid: str):
     comics_admin()
     with closing(cdb()) as conn, conn:
-        r = conn.execute("SELECT * FROM comics WHERE id = ?", (cid,)).fetchone()
-        if r is None:
-            return {"ok": True}
-        for f in (r["file"], r["thumb"]):
-            (COMICS_MEDIA / f).unlink(missing_ok=True)
-        conn.execute("DELETE FROM comics WHERE id = ?", (cid,))
-        conn.execute("DELETE FROM comics_fts WHERE id = ?", (cid,))
+        comics_remove(conn, conn.execute("SELECT id, file, thumb FROM comics WHERE id = ?", (cid,)).fetchall())
     return {"ok": True}
+
+
+class ComicsBulkDeleteIn(BaseModel):
+    ids: list[str] = []
+    # أو امسح كل اللي في الفلتر ده
+    all: bool = False
+    q: str = ""
+    kind: str = ""
+    status: str = ""
+    lang: str = ""
+
+
+@app.post("/api/comics/delete")
+def comics_bulk_delete(body: ComicsBulkDeleteIn):
+    """مسح بالجملة: كوميكس مختارة، أو كل نتايج فلتر معين (مثلًا كل الأجنبي)."""
+    comics_admin()
+    if COMICS_RUN["thread"] and COMICS_RUN["thread"].is_alive():
+        raise HTTPException(400, "وقّف التجميع الأول وبعدين امسح")
+    with closing(cdb()) as conn, conn:
+        if body.all:
+            rows = comics_query(conn, body.q, body.kind, body.status, body.lang, cols="c.id, c.file, c.thumb")
+        else:
+            ids = [str(x) for x in body.ids][:5000]
+            rows = [r for i in range(0, len(ids), 500)
+                    for r in conn.execute(f"SELECT id, file, thumb FROM comics WHERE id IN ({','.join('?' * len(ids[i:i + 500]))})", ids[i:i + 500]).fetchall()]
+        n = comics_remove(conn, rows)
+    return {"deleted": n, **comics_status()}
 
 
 @app.post("/api/comics/import")
@@ -21745,14 +21801,16 @@ def comics_file(name: str):
     return FileResponse(f, headers={"Cache-Control": "public, max-age=604800"})
 
 
-def comics_candidates(texts: list[str], k: int = 8) -> list[list[dict]]:
-    """لكل جملة: أقرب كوميكس في المكتبة (بحث في السياق المكتوب)."""
+def comics_candidates(texts: list[str], k: int = 8, lang: str = "") -> list[list[dict]]:
+    """لكل جملة: أقرب كوميكس في المكتبة (بحث في السياق المكتوب).
+    lang: فيديو عربي بياخد من العربي واللي ينفع الاتنين بس، والإنجليزي من الأجنبي واللي ينفع الاتنين."""
     out = []
+    only = (" AND COALESCE(c.lang, 'both') IN (?, 'both')", (lang,)) if lang in ("ar", "en") else ("", ())
     with closing(cdb()) as conn:
         for t in texts:
             fq = comics.fts_query(t)
-            rows = conn.execute("SELECT c.* FROM comics_fts f JOIN comics c ON c.id = f.id WHERE comics_fts MATCH ? AND c.status = 'ready' "
-                                "ORDER BY bm25(comics_fts) LIMIT ?", (fq, k)).fetchall() if fq else []
+            rows = conn.execute("SELECT c.* FROM comics_fts f JOIN comics c ON c.id = f.id WHERE comics_fts MATCH ? AND c.status = 'ready'" + only[0]
+                                + " ORDER BY bm25(comics_fts) LIMIT ?", (fq, *only[1], k)).fetchall() if fq else []
             out.append([comic_row(r) for r in rows])
     return out
 
@@ -21764,7 +21822,7 @@ class ComicsMatchIn(BaseModel):
 
 @app.post("/api/comics/match")
 def comics_match(body: ComicsMatchIn):
-    return {"items": comics_candidates([body.text[:600]], max(1, min(20, body.n)))[0]}
+    return {"items": comics_candidates([body.text[:600]], max(1, min(20, body.n)), comics.text_lang(body.text))[0]}
 
 
 # ---------------------------------------------------------------- 📖 حكاية (hekaya.py)
@@ -22144,7 +22202,8 @@ def run_hk_comics(hid: str, every: float, audio: bool) -> None:
                 words[int(x.get("n")) - 1] = " ".join(str(w) for w in x.get("words") or [])
             except (TypeError, ValueError, AttributeError):
                 continue
-    cands = dict(zip(idx, comics_candidates([f"{story['scenes'][k]['text']} {words.get(k, '')}" for k in idx], 6)))
+    lang = comics.text_lang(" ".join(story["scenes"][k]["text"] for k in idx))
+    cands = dict(zip(idx, comics_candidates([f"{story['scenes'][k]['text']} {words.get(k, '')}" for k in idx], 6, lang)))
     cands = {k: v for k, v in cands.items() if v}
     if not cands:
         raise RuntimeError("المكتبة لسه مفيهاش كوميكس تناسب الكلام ده. جمّع كوميكس الأول من «مكتبة الكوميكس»")

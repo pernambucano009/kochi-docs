@@ -173,6 +173,7 @@ Return JSON only: {{"items": [{{"i": 0,
  "phrase": "the exact text/catchphrase written or famously said in it, or empty",
  "who": "famous character/actor/film if clearly recognisable, else empty",
  "lang": "ar-eg | ar-gulf | ar | en | none",
+ "audience": "ar | en | both  (ar: Arabic text/speech OR from Arab film/TV/people/culture · en: English text/speech OR clearly from Western film/TV/meme culture · both: no text and nothing culture-specific, a universal reaction anyone gets)",
  "tags": ["5-10 short search words, Arabic and English"],
  "flags": ["nsfw" | "political" | "religious" | "violent" | "watermark" | "low_quality"],
  "quality": 1-5}}]}}
@@ -188,7 +189,31 @@ def clean_ctx(raw: dict) -> dict:
         q = 3
     return {"emotion": str(raw.get("emotion") or "")[:60], "situation": str(raw.get("situation") or "")[:300], "use_when": str(raw.get("use_when") or "")[:400],
             "phrase": str(raw.get("phrase") or "")[:160], "who": str(raw.get("who") or "")[:120], "lang": str(raw.get("lang") or "")[:10],
+            "audience": str(raw.get("audience") or "").strip().lower()[:4] if str(raw.get("audience") or "").strip().lower() in LANGS else "",
             "tags": [str(t)[:40] for t in raw.get("tags") or [] if str(t).strip()][:12], "flags": flags, "quality": q}
+
+
+# الكوميك عربي صرف، ولا أجنبي صرف، ولا ينفع الاتنين
+LANGS = {"ar": "عربي", "en": "أجنبي", "both": "ينفع الاتنين"}
+_AR = re.compile(r"[\u0600-\u06FF]")
+
+
+def lang_group(ctx: dict, title: str = "", query: str = "") -> str:
+    """من وصف المخ لو موجود، ولو لسه مااتوصفش: من لغة الكلمة اللي اتلاقى بيها."""
+    ctx = ctx or {}
+    if ctx.get("audience") in LANGS:
+        return ctx["audience"]
+    lg = str(ctx.get("lang") or "")
+    if lg.startswith("ar"):
+        return "ar"
+    if lg == "en":
+        return "en"
+    guess = "ar" if _AR.search(f"{title} {query}") else "en"
+    return "both" if lg == "none" and not ctx.get("who") else guess
+
+
+def text_lang(text: str) -> str:
+    return "ar" if _AR.search(text or "") else "en"
 
 
 def ctx_text(title: str, query: str, ctx: dict) -> str:
@@ -225,4 +250,5 @@ def mock_items(q: str, kind: str, n: int = 4) -> list[dict]:
 
 def mock_ctx(it: dict, k: int) -> dict:
     return clean_ctx({"emotion": EMOTIONS[k % len(EMOTIONS)], "situation": f"لما حد يقول «{it.get('query') or it.get('title')}»",
-                      "use_when": it.get("query") or it.get("title"), "phrase": "", "lang": "ar-eg", "tags": [it.get("query") or ""], "quality": 4})
+                      "use_when": it.get("query") or it.get("title"), "phrase": "", "tags": [it.get("query") or ""], "quality": 4,
+                      "lang": "ar-eg" if _AR.search(it.get("query") or "") else ("en" if k % 2 else "none")})

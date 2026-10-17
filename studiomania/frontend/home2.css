@@ -1541,3 +1541,16 @@ audio { width: 100%; }
 #nh .nh-page:has(> .nh-pgrid[data-key="brand"]) > :not(.nh-pgrid) { position: relative; z-index: 2; pointer-events: none; }
 #nh .nh-page:has(> .nh-pgrid[data-key="brand"]) > :not(.nh-pgrid) * { pointer-events: auto; }
 #nh .nh-pgrid[data-key="brand"] .bm { min-height: 0; }
+/* الكوميكس: عربي / أجنبي / الاتنين، والاختيار للمسح */
+.cm-item { position: relative; }
+.cm-lang { position: absolute; top: 8px; inset-inline-start: 8px; padding: 2px 8px; border-radius: 999px; background: rgba(0, 0, 0, .55); color: #fff; font-size: 11px; font-weight: 600; letter-spacing: .02em; }
+.cm-check { position: absolute; top: 8px; inset-inline-start: 8px; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: rgba(255, 255, 255, .9); border: 2px solid rgba(0, 0, 0, .25); color: #fff; font-weight: 700; }
+.cm-item.picked { outline: 3px solid #D9473A; outline-offset: -3px; }
+.cm-item.picked .cm-check { background: #D9473A; border-color: #D9473A; }
+.cm-item.picking img, .cm-item.picking video { opacity: .85; }
+.cm-tabs { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 4px 0 10px; }
+#nh .cm-tab { padding: 7px 14px; border-radius: 999px; background: var(--nh-bg, rgba(127, 127, 127, .08)); font-size: 13.5px; }
+#nh .cm-tab.on { background: var(--nh-ink, #181718); color: var(--nh-bg, #fff); }
+#nh .cm-tab .num { opacity: .65; margin-inline-start: 4px; }
+.cm-n { margin-inline-start: auto; opacity: .65; }
+.cm-selbar { background: rgba(217, 71, 58, .08); border-radius: 12px; padding: 8px 12px; align-items: center; }
