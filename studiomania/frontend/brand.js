@@ -126,33 +126,37 @@ const BrandPage = (() => {
   // ---------- الرسم ----------
   function skeleton() {
     return `<canvas class="bm-dots" aria-hidden="true"></canvas>
-      <svg class="bm-lines" aria-hidden="true"></svg>
-      <div class="bm-nodes"></div>
+      <div class="bm-world"><svg class="bm-lines" aria-hidden="true"></svg><div class="bm-nodes"></div></div>
+      <div class="bm-zoom"><button data-zoom="1" aria-label="قرّب">+</button><button data-zoom="0" aria-label="الخريطة كلها">⤢</button><button data-zoom="-1" aria-label="بعّد">−</button></div>
       <div class="bm-card" hidden role="dialog"></div>
       <p class="bm-hint">دوس على أي نقطة تكتب فيها · النقط المفرّغة لسه ناقصة · دوس على المخ تبدّل البراند</p>`;
   }
+  // الخريطة ليها عالم خاص بيها بمسافات واسعة ثابتة (المخ في 0,0)، والشاشة بتتفرّج عليه بزوم وسحب.
+  // كده الفروع عمرها ما تدخل في بعض مهما الشاشة صغرت: الخريطة بتبعد شوية، وتقدر تقرّب بالعجلة أو الأزرار
   function layout() {
     const w = S.el, b = cur();
     if (!w) return;
     const W = w.clientWidth, H = w.clientHeight;
     if (!W || !H) return;
-    const cx = W / 2, cy = H / 2 + 6, R1 = Math.min(W * .42, H * .5) * .58, R2 = Math.max(70, R1 * .5);
-    const list = branches(b), nodes = [{ id: "c", kind: "center", x: cx, y: cy }];
+    const ex = Math.max(1.1, Math.min(1.45, W / H));
+    const list = branches(b), nodes = [{ id: "c", kind: "center", x: 0, y: 0 }];
     // «+» تحت المخ: ترمي فيه ملف أو لينك أو تكتب، والبرنامج يقراه
-    nodes.push({ id: "add", kind: "add", x: cx, y: cy + R1 * .78, from: "c" });
+    nodes.push({ id: "add", kind: "add", x: 0, y: 182, from: "c" });
     list.forEach((br, i) => {
       const a = -Math.PI / 2 + Math.PI / list.length + (i / list.length) * Math.PI * 2;
       // الفرع بيطول مع كل حاجة بتتضاف فيه: العميل يشوف العقل بيكبر
-      const g = growth(b, br), s = .78 + .42 * (1 - Math.exp(-g / 7));
-      const bx = cx + Math.cos(a) * R1 * 1.25 * s, by = cy + Math.sin(a) * R1 * s;
+      const g = growth(b, br), D = 215 + 140 * (1 - Math.exp(-g / 8));
+      const bx = Math.cos(a) * D * ex, by = Math.sin(a) * D;
       const real = br.leaves.filter((l) => !l.type.startsWith("rule-") && l.type !== "action" && l.type !== "pending");
       const done = real.filter((l) => filled(b, l)).length, total = real.length, waiting = br.leaves.length - br.leaves.filter((l) => l.type !== "pending").length;
       nodes.push({ id: br.k, kind: "branch", br, x: bx, y: by, from: "c", done, total, waiting, g });
-      const n = br.leaves.length, spread = Math.min(Math.PI * 1.15, .42 * Math.max(1, n - 1));
+      // ورق الفرع على قوس برّه، ولو كتير بيبقى على صفين؛ بين كل نقطة والتانية مسافة كفاية
+      const n = br.leaves.length, two = n > 7, RL = 92 + Math.min(36, n * 2.5);
+      const spread = Math.min(Math.PI * .95, Math.max(0, n - 1) * (two ? 24 : 40) / RL);
       br.leaves.forEach((l, j) => {
         const la = a + (n === 1 ? 0 : -spread / 2 + (j / (n - 1)) * spread);
-        const rr = R2 * (n > 6 ? (j % 2 ? 1.18 : .9) : 1);
-        nodes.push({ id: `${br.k}:${l.f}:${l.i ?? ""}`, kind: "leaf", br, l, x: bx + Math.cos(la) * rr * 1.2, y: by + Math.sin(la) * rr, from: br.k, on: filled(b, l) });
+        const rr = RL * (two && j % 2 ? 1.42 : 1);
+        nodes.push({ id: `${br.k}:${l.f}:${l.i ?? ""}`, kind: "leaf", br, l, x: bx + Math.cos(la) * rr, y: by + Math.sin(la) * rr, from: br.k, on: filled(b, l) });
       });
     });
     // كل نقطة ليها مكانها الأصلي (x, y) ومكانها الحالي (px, py) وسرعتها؛ لو الخريطة اتعادت بتكمّل من مكانها
@@ -164,8 +168,38 @@ const BrandPage = (() => {
       return { ...n, ph: i * 1.7, px: o ? (grew ? o.px : o.px + (n.x - o.x)) : n.x, py: o ? (grew ? o.py : o.py + (n.y - o.y)) : n.y, vx: o?.vx || 0, vy: o?.vy || 0 };
     });
     S.byId = Object.fromEntries(S.nodes.map((n) => [n.id, n]));
+    fit();
     draw();
   }
+  // ---------- الزوم والسحب ----------
+  function fit(force) {
+    const w = S.el, W = w.clientWidth, H = w.clientHeight;
+    if (S.view?.user && !force) return applyView();
+    let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+    for (const n of S.nodes) {
+      const m = n.kind === "leaf" ? 26 : n.kind === "center" ? 110 : 80;
+      x0 = Math.min(x0, n.x - m); x1 = Math.max(x1, n.x + m); y0 = Math.min(y0, n.y - m); y1 = Math.max(y1, n.y + m + (n.kind === "branch" ? 30 : 0));
+    }
+    const s = Math.max(.35, Math.min(1.05, (W - 32) / (x1 - x0), (H - 56) / (y1 - y0)));
+    S.view = { s, x: W / 2 - (x0 + x1) / 2 * s, y: (H - 24) / 2 - (y0 + y1) / 2 * s, user: false };
+    applyView();
+  }
+  function applyView() {
+    const v = S.view, world = S.el?.querySelector(".bm-world");
+    if (!v || !world) return;
+    world.style.transform = `translate(${v.x}px, ${v.y}px) scale(${v.s})`;
+    S.el.style.setProperty("--bm-s", v.s);
+    if (S.dv) S.dv.dirty = true;
+  }
+  function zoomAt(f, sx, sy) {
+    const v = S.view;
+    if (!v) return;
+    const s = Math.max(.35, Math.min(2, v.s * f));
+    v.x = sx - (sx - v.x) * (s / v.s); v.y = sy - (sy - v.y) * (s / v.s); v.s = s; v.user = true;
+    applyView();
+  }
+  const toWorld = (sx, sy) => [(sx - S.view.x) / S.view.s, (sy - S.view.y) / S.view.s];
+  const toScreen = (p) => p && [p[0] * S.view.s + S.view.x, p[1] * S.view.s + S.view.y];
   // وزن الفرع: كل حاجة اتملت أو اتضافت (صورة، لون، قاعدة، معرفة، منافس) بتزوّد نقطة في الدراع
   function growth(b, br) {
     if (!b) return 0;
@@ -223,7 +257,9 @@ const BrandPage = (() => {
       if (n.kind !== "branch") continue;
       const k = beadsOf(n), was = prev ? prev[n.id] ?? k : k;
       svgEl.insertAdjacentHTML("beforeend", `<g class="bm-beads" data-b="${esc(n.id)}">${Array.from({ length: k }, (_, i) => `<circle r="2.4" class="${i >= was ? "new" : ""}" style="--d:${(i - was) * 90}ms"/>`).join("")}</g>`);
-      n.bead = [...svgEl.lastElementChild.children];
+      n.beadG = svgEl.lastElementChild;
+      n.bead = [...n.beadG.children];
+      n.bead.forEach((c, i) => c.style.setProperty("--i", i));
       S.beads[n.id] = k;
     }
     S.rc = (w.querySelector(".bm-brain")?.offsetWidth || 150) * .5;
@@ -238,7 +274,9 @@ const BrandPage = (() => {
     for (const n of S.nodes) {
       if (S.drag?.n === n && S.drag.moved) { n.vx = n.vy = 0; n.px = S.drag.x; n.py = S.drag.y; continue; }
       const p = n.from && S.byId[n.from], f = FOLLOW[n.kind] || 0;
-      const tx = n.x + (p ? (p.px - p.x) * f : 0), ty = n.y + (p ? (p.py - p.y) * f : 0);
+      // الماوس واقف على الفرع: الورق بتاعه بيفرد لبرّه شوية
+      const open = S.hov && n.kind === "leaf" && n.br.k === S.hov ? .14 : 0;
+      const tx = n.x + (p ? (p.px - p.x) * f + (n.x - p.x) * open : 0), ty = n.y + (p ? (p.py - p.y) * f + (n.y - p.y) * open : 0);
       n.vx += (k * (tx - n.px) - c * n.vx) * dt;
       n.vy += (k * (ty - n.py) - c * n.vy) * dt;
       n.px += n.vx * dt; n.py += n.vy * dt;
@@ -274,7 +312,7 @@ const BrandPage = (() => {
       }
     }
     dots(now);
-    if (S.open?.n) placeCard(pos[S.open.n.id]);
+    if (S.open?.n) placeCard(toScreen(pos[S.open.n.id]));
   }
   // الخلفية نقط هادية، والماوس بينوّر اللي تحته (زي كشاف صغير ماشي معاك)
   const GAP = 22, GLOW = 170;
@@ -291,12 +329,11 @@ const BrandPage = (() => {
     cv.width = W * dpr; cv.height = H * dpr;
     // الشبكة الأساسية بتترسم مرة واحدة وتتنسخ كل فريم
     const base = S.dv.base = document.createElement("canvas");
-    base.width = cv.width; base.height = cv.height;
+    base.width = (W + GAP) * dpr; base.height = (H + GAP) * dpr;
     const g = base.getContext("2d");
     g.scale(dpr, dpr); g.fillStyle = ink; g.globalAlpha = .16;
-    const ox = (W % GAP) / 2, oy = (H % GAP) / 2;
-    for (let y = oy; y <= H; y += GAP) for (let x = ox; x <= W; x += GAP) { g.beginPath(); g.arc(x, y, 1, 0, 6.2832); g.fill(); }
-    S.dv.ox = ox; S.dv.oy = oy; S.dv.dpr = dpr; S.dv.W = W; S.dv.H = H;
+    for (let y = GAP / 2; y <= H + GAP; y += GAP) for (let x = GAP / 2; x <= W + GAP; x += GAP) { g.beginPath(); g.arc(x, y, 1, 0, 6.2832); g.fill(); }
+    S.dv.dpr = dpr; S.dv.W = W; S.dv.H = H;
   }
   function dots() {
     const v = S.dv, cv = S.el?.querySelector(".bm-dots");
@@ -309,11 +346,14 @@ const BrandPage = (() => {
     const c = cv.getContext("2d");
     c.setTransform(1, 0, 0, 1, 0, 0);
     c.clearRect(0, 0, cv.width, cv.height);
-    c.drawImage(v.base, 0, 0);
+    // النقط ماشية مع الخريطة لما تسحبها
+    const m = (a) => ((a % GAP) + GAP) % GAP;
+    v.ox = m(S.view?.x || 0); v.oy = m(S.view?.y || 0);
+    c.drawImage(v.base, (m(v.ox - GAP / 2) - GAP) * v.dpr, (m(v.oy - GAP / 2) - GAP) * v.dpr);
     if (v.a < .01) return;
     c.setTransform(v.dpr, 0, 0, v.dpr, 0, 0);
     c.fillStyle = v.acc;
-    const x0 = Math.max(v.ox, v.ox + Math.ceil((v.mx - GLOW - v.ox) / GAP) * GAP), y0 = Math.max(v.oy, v.oy + Math.ceil((v.my - GLOW - v.oy) / GAP) * GAP);
+    const x0 = v.ox + Math.ceil((Math.max(0, v.mx - GLOW) - v.ox) / GAP) * GAP, y0 = v.oy + Math.ceil((Math.max(0, v.my - GLOW) - v.oy) / GAP) * GAP;
     for (let y = y0; y <= Math.min(v.H, v.my + GLOW); y += GAP) for (let x = x0; x <= Math.min(v.W, v.mx + GLOW); x += GAP) {
       const d = Math.hypot(x - v.mx, y - v.my) / GLOW;
       if (d >= 1) continue;
@@ -412,7 +452,7 @@ const BrandPage = (() => {
     S.el.classList.add("has-card");
     markOpen();
     // يتحط في مكانه جنب النقطة الأول، وبعدين يظهر (الأنيميشن على الشفافية والحجم بس، مش على المكان)
-    placeCard([n.px, n.py]);
+    placeCard(toScreen([n.px, n.py]));
     card.animate([{ opacity: 0, scale: .96 }, { opacity: 1, scale: 1 }], { duration: reduce.matches ? 1 : 240, easing: "cubic-bezier(.2,.8,.2,1)" });
     const ed = card.querySelector(".bm-write");
     if (ed && n.kind === "leaf") { ed.focus(); placeCaret(ed); }
@@ -500,33 +540,80 @@ const BrandPage = (() => {
     return save(() => bAPI("/assets", { method: "POST", body: form }));
   };
 
+  function hover(k, leaf) {
+    if (S.hov === k && S.hovLeaf === leaf) return;
+    S.hov = k; S.hovLeaf = leaf;
+    S.el.classList.toggle("hovering", !!k);
+    for (const n of S.nodes) {
+      const mine = !!k && (n.id === k || n.br?.k === k || n.id === "c");
+      n.el?.classList.toggle("hl", mine);
+      n.line?.classList.toggle("hl", mine && (n.kind === "branch" || !leaf || n.id === leaf));
+      n.beadG?.classList.toggle("hl", n.id === k);
+    }
+  }
   function bind(w) {
     // مسك وسحب أي نقطة أو فرع أو المخ نفسه
     w.addEventListener("pointerdown", (e) => {
-      const el = e.target.closest(".bm-n");
-      if (!el || e.button !== 0) return;
+      if (e.button !== 0) return;
+      const el = e.target.closest(".bm-n"), r = w.getBoundingClientRect();
+      // سحب الخلفية بيحرّك الخريطة كلها
+      if (!el) {
+        if (!S.view || e.target.closest(".bm-card, .bm-zoom")) return;
+        S.pan = { sx: e.clientX, sy: e.clientY, x: S.view.x, y: S.view.y, id: e.pointerId, moved: false };
+        return;
+      }
       const n = S.byId[el.dataset.n];
       if (!n) return;
+      const [wx, wy] = toWorld(e.clientX - r.left, e.clientY - r.top);
+      S.drag = { n, el, sx: e.clientX, sy: e.clientY, ox: n.px - wx, oy: n.py - wy, x: n.px, y: n.py, moved: false, id: e.pointerId };
+    });
+    w.addEventListener("wheel", (e) => {
+      if (e.target.closest(".bm-card")) return;
+      e.preventDefault();
       const r = w.getBoundingClientRect();
-      S.drag = { n, el, sx: e.clientX, sy: e.clientY, ox: n.px - (e.clientX - r.left), oy: n.py - (e.clientY - r.top), x: n.px, y: n.py, moved: false, id: e.pointerId };
+      zoomAt(Math.exp(-e.deltaY * (e.ctrlKey ? .01 : .0015)), e.clientX - r.left, e.clientY - r.top);
+    }, { passive: false });
+    w.querySelector(".bm-zoom").addEventListener("click", (e) => {
+      const z = e.target.closest("[data-zoom]");
+      if (!z) return;
+      e.stopPropagation();
+      if (z.dataset.zoom === "0") { fit(true); return; }
+      zoomAt(z.dataset.zoom === "1" ? 1.25 : .8, w.clientWidth / 2, w.clientHeight / 2);
+    });
+    // الماوس على نقطة أو فرع: الدراع كله بينوّر واللي حواليه يهدى
+    w.addEventListener("pointerover", (e) => {
+      const el = e.target.closest(".bm-n"), n = el && S.byId[el.dataset.n];
+      const k = n?.kind === "branch" ? n.id : n?.kind === "leaf" ? n.br.k : null;
+      hover(k, n?.kind === "leaf" ? n.id : null);
     });
     w.addEventListener("pointermove", (e) => {
       if (S.dv && e.pointerType !== "touch") { const r = w.getBoundingClientRect(); S.dv.tx = e.clientX - r.left; S.dv.ty = e.clientY - r.top; if (S.dv.a < .01) { S.dv.mx = S.dv.tx; S.dv.my = S.dv.ty; } S.dv.ta = 1; }
+      const pn = S.pan;
+      if (pn && e.pointerId === pn.id) {
+        if (!pn.moved && Math.hypot(e.clientX - pn.sx, e.clientY - pn.sy) < 4) return;
+        if (!pn.moved) { pn.moved = true; w.setPointerCapture(e.pointerId); w.classList.add("panning"); }
+        S.view.x = pn.x + e.clientX - pn.sx; S.view.y = pn.y + e.clientY - pn.sy; S.view.user = true;
+        applyView();
+        return;
+      }
       const d = S.drag;
       if (!d || e.pointerId !== d.id) return;
       if (!d.moved && Math.hypot(e.clientX - d.sx, e.clientY - d.sy) < 5) return;
       if (!d.moved) { d.moved = true; w.setPointerCapture(e.pointerId); w.classList.add("dragging"); d.el.classList.add("held"); }
-      const r = w.getBoundingClientRect();
-      d.x = Math.max(10, Math.min(r.width - 10, e.clientX - r.left + d.ox));
-      d.y = Math.max(10, Math.min(r.height - 10, e.clientY - r.top + d.oy));
+      const r = w.getBoundingClientRect(), [wx, wy] = toWorld(e.clientX - r.left, e.clientY - r.top);
+      d.x = wx + d.ox; d.y = wy + d.oy;
     });
     const drop = (e) => {
+      if (S.pan && (e.pointerId == null || e.pointerId === S.pan.id)) {
+        if (S.pan.moved) { S.noClick = true; setTimeout(() => (S.noClick = false), 0); w.classList.remove("panning"); }
+        S.pan = null;
+      }
       const d = S.drag;
       if (!d || (e.pointerId != null && e.pointerId !== d.id)) return;
       S.drag = null;
       if (d.moved) { S.noClick = true; setTimeout(() => (S.noClick = false), 0); w.classList.remove("dragging"); d.el.classList.remove("held"); }
     };
-    w.addEventListener("pointerleave", () => { if (S.dv) S.dv.ta = 0; });
+    w.addEventListener("pointerleave", () => { if (S.dv) S.dv.ta = 0; hover(null); });
     w.addEventListener("pointerup", drop);
     w.addEventListener("pointercancel", drop);
     w.addEventListener("click", async (e) => {
@@ -683,7 +770,7 @@ const BrandPage = (() => {
     S.open = null;
     S.id = id || clientx?.active || S.id;
     w.innerHTML = skeleton();
-    S.dv = null; S.beads = null;
+    S.dv = null; S.beads = null; S.view = null; S.hov = null;
     bind(w);
     dotsSize();
     try { await load(); } catch (err) { w.innerHTML = `<div class="nh-empty">${esc(err.message)}</div>`; return; }
