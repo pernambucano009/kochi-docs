@@ -1534,3 +1534,10 @@ audio { width: 100%; }
 #nh .bm-world .bm-tip b { font-size: calc(12.5px * max(1, .82 / var(--bm-s, 1))); }
 #nh .bm-world .bm-tip small { font-size: calc(11px * max(1, .82 / var(--bm-s, 1))); }
 #nh .bm-lines path { fill: none; stroke-linecap: round; }
+/* اللي يتسحب تحت الشريط اللي فوق بيختفي بهدوء بدل ما يتغطّى */
+#nh .bm { -webkit-mask-image: linear-gradient(to bottom, transparent 0, transparent calc(var(--bm-top, 0px) - 24px), #000 calc(var(--bm-top, 0px) + 6px)); mask-image: linear-gradient(to bottom, transparent 0, transparent calc(var(--bm-top, 0px) - 24px), #000 calc(var(--bm-top, 0px) + 6px)); }
+/* صفحة العقل: الخريطة مالية الشاشة كلها من فوق لتحت، والعنوان طاير فوقها */
+#nh .nh-page:has(> .nh-pgrid[data-key="brand"]) > .nh-pgrid { position: absolute; inset: 0; }
+#nh .nh-page:has(> .nh-pgrid[data-key="brand"]) > :not(.nh-pgrid) { position: relative; z-index: 2; pointer-events: none; }
+#nh .nh-page:has(> .nh-pgrid[data-key="brand"]) > :not(.nh-pgrid) * { pointer-events: auto; }
+#nh .nh-pgrid[data-key="brand"] .bm { min-height: 0; }

@@ -180,14 +180,27 @@ const BrandPage = (() => {
       const m = n.kind === "leaf" ? 26 : n.kind === "center" ? 110 : 80;
       x0 = Math.min(x0, n.x - m); x1 = Math.max(x1, n.x + m); y0 = Math.min(y0, n.y - m); y1 = Math.max(y1, n.y + m + (n.kind === "branch" ? 30 : 0));
     }
-    const s = Math.max(.35, Math.min(1.05, (W - 32) / (x1 - x0), (H - 56) / (y1 - y0)));
-    S.view = { s, x: W / 2 - (x0 + x1) / 2 * s, y: (H - 24) / 2 - (y0 + y1) / 2 * s, user: false };
+    // الشريط اللي فوق ثابت وطاير فوق الصفحة: الخريطة بتتحط تحته مش وراه
+    const top = topInset(), hh = H - top - 40;
+    const s = Math.max(.35, Math.min(1.05, (W - 32) / (x1 - x0), hh / (y1 - y0)));
+    S.view = { s, x: W / 2 - (x0 + x1) / 2 * s, y: top + hh / 2 - (y0 + y1) / 2 * s, user: false };
     applyView();
+  }
+  // الخريطة مالية الصفحة كلها، والشريط اللي فوق وعنوان الصفحة طايرين فوقها: المحتوى بيتحط تحتهم
+  function topInset() {
+    const r = S.el.getBoundingClientRect();
+    let y = 8;
+    for (const id of ["nhBar", "nhPTitle"]) {
+      const e = document.getElementById(id);
+      if (e && e.offsetHeight && S.el.closest("#nh")?.contains(S.el)) y = Math.max(y, e.getBoundingClientRect().bottom - r.top + 12);
+    }
+    return y;
   }
   function applyView() {
     const v = S.view, world = S.el?.querySelector(".bm-world");
     if (!v || !world) return;
     world.style.transform = `translate(${v.x}px, ${v.y}px) scale(${v.s})`;
+    S.el.style.setProperty("--bm-top", `${topInset()}px`);
     S.el.style.setProperty("--bm-s", v.s);
     if (S.dv) S.dv.dirty = true;
   }
@@ -490,7 +503,8 @@ const BrandPage = (() => {
     let x = right ? p[0] + 34 : p[0] - 34 - cw, y = p[1] - ch / 2;
     if (x + cw > W - 8) x = p[0] - 34 - cw;
     if (x < 8) x = Math.min(W - cw - 8, p[0] + 34);
-    y = Math.max(8, Math.min(H - ch - 8, y));
+    const top = topInset();
+    y = Math.max(top, Math.min(H - ch - 8, y));
     card.style.transform = `translate(${x}px, ${y}px)`;
   }
   const refreshCard = () => { if (S.open) { const n = S.nodes.find((x) => x.id === S.open.id) || (S.open.id === "c" ? S.nodes[0] : null); if (n) openCard(n); else openCard(null); } };
