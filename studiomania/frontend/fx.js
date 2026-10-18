@@ -3,7 +3,7 @@
 (() => {
   const SEL = "button, .btn, a.btn, label.btn, .nb-btn, .flw-btn, .flw-chip, .nh-gal-chip, .nh-chip, [role='button']";
   // اللي ليه حركته الخاصة أو صغير/جوه أدوات دقيقة (التايم لاين، المحرر) بيفضل زي ما هو
-  const SKIP = ".nh-tile, .nh-line, .nh-gal-card, .nh-switch, .bm-n, [data-nofx], .nofx, input, select, textarea, .tl, .timeline, .mt-timeline, .gizmo";
+  const SKIP = ".nh-tile, .nh-line, .nh-gal-card, .nh-wc, .nh-switch, .bm-n, [data-nofx], .nofx, input, select, textarea, .tl, .timeline, .mt-timeline, .gizmo";
   const NS = "http://www.w3.org/2000/svg";
   const fits = new WeakMap();
   const ro = new ResizeObserver((list) => list.forEach((e) => fits.get(e.target)?.()));
