@@ -4097,6 +4097,24 @@ def algo_review(body: AlgoReviewIn):
 
 
 # ---------- 🧭 خطة المحتوى: فريمويركس الاستراتيجية مطبّقة على البراند، والخطة بتدخل في كل برومبت محتوى بعدها
+class AlgoModeIn(BaseModel):
+    on: bool
+
+
+@app.get("/api/algo/mode")
+def algo_mode_get():
+    return {"on": algo.mode_on(brain_row(rivals_client()))}
+
+
+@app.post("/api/algo/mode")
+def algo_mode_set(body: AlgoModeIn):
+    """⚡ وضع الخوارزمية للبراند: القواعد خطوات إجبارية (مفتوح من الأول)."""
+    def fn(d):
+        d["algo_mode"] = bool(body.on)
+    update_brain(rivals_client(), fn)
+    return {"on": bool(body.on)}
+
+
 @app.get("/api/strategy")
 def strategy_get():
     b = brain_row(rivals_client()) or {}
@@ -4431,7 +4449,7 @@ def rivals_refresh(bid: str, only: str | None = None) -> None:
 def rivals_out(bid: str) -> dict:
     b = brain_row(bid) or {}
     c = b.get("competitors") or {}
-    return {"client": bid, "name": b.get("name"), "live": rivals.live(), "platforms": rivals.PLATFORMS, "top": rivals.TOP,
+    return {"client": bid, "name": b.get("name"), "live": rivals.live(), "platforms": rivals.PLATFORMS, "top": rivals.TOP, "algo_mode": algo.mode_on(b),
             "brain": {k: b.get(k) or "" for k in ("domain", "market", "audience", "language")},
             "items": c.get("items") or [], "digest": c.get("digest") or {}, "trending": c.get("trending") or [], "status": c.get("status") or "", "step": c.get("step"),
             "error": c.get("error"), "updated_at": c.get("updated_at"), "excluded": len(c.get("excluded") or [])}
@@ -19706,6 +19724,7 @@ def flow_to_dict(fid: str, d: dict) -> dict:
     brain = flow_brain(d)
     out["knowledge"] = fz.knowledge(brain, BRAIN_FIELDS, BRAIN_KINDS)
     out["brand_name"] = (brain or {}).get("name") or ""
+    out["algo_mode"] = algo.mode_on(brain)
     o = d.get("output") or {}
     if o.get("kind") == "motion" and o.get("status") == "working":
         job = MOTION_JOBS.get(o.get("mid")) or {}
@@ -19850,16 +19869,44 @@ def flow_gen_ideas(fid: str, hint: str = "", more: bool = False) -> None:
     brain = flow_brain(d)
     avoid = [i.get("title", "") for i in d.get("ideas") or []]
     k = len(avoid)
-    if atlas.mock_mode():
-        raw = fz.mock_ideas(3, k, d["template"].get("name", ""))
-    else:
-        raw = flow_llm(fz.ideas_messages(flow_brand(brain, d["template"]["name"]), fz.prefs_text(brain), flow_tpl(d), flow_assets_list(d),
-                                         3, avoid if more else [], hint, d.get("season") or ""), "الأفكار")
+    gate = algo.mode_on(brain)   # ⚡ وضع الخوارزمية: كل فكرة بدايرتها ومجموعتها ودرجة HEAT، والضعيفة بتتعمل غيرها قبل ما العميل يشوفها
+    items, dropped = [], []
+    for attempt in range(2 if gate else 1):
+        if atlas.mock_mode():
+            raw = fz.mock_ideas(3, k + attempt * 3, d["template"].get("name", ""))
+        else:
+            rej = ("\nالأفكار دي اترفضت، اعمل غيرها مختلفة عنها: " + " · ".join(f"«{x['title']}» ({x['why_out']})" for x in dropped)) if dropped else ""
+            raw = flow_llm(fz.ideas_messages(flow_brand(brain, d["template"]["name"]), fz.prefs_text(brain), flow_tpl(d), flow_assets_list(d),
+                                             3 + (1 if gate else 0) - len(items) if attempt else 3 + (1 if gate else 0),
+                                             (avoid if more else []) + [x["title"] for x in items + dropped], hint, d.get("season") or "",
+                                             (algo.idea_gate_rule(brain) + rej) if gate else ""), "الأفكار")
+        for it in flow_parse_ideas(raw):
+            if gate:
+                why = algo.idea_gate(it, brain)
+                if why:
+                    dropped.append({"title": it.get("title", ""), "why_out": why})
+                    continue
+            items.append(it)
+        if len(items) >= 3:
+            break
+    items = sorted(items, key=lambda x: -((x.get("heat") or {}).get("avg") or 0))[:3] if gate else items
+    if not items:
+        raise HTTPException(400, "المخ مرجعش أفكار، جرّب تاني")
+    flow_update(fid, lambda x: x.update(ideas=(x.get("ideas") or []) + items if more else items, ideas_dropped=dropped[:6]))
+
+
+def flow_parse_ideas(raw: dict) -> list[dict]:
     items = []
-    for i in (raw.get("ideas") or [])[:5]:
+    for i in (raw.get("ideas") or [])[:6]:
         if not isinstance(i, dict):
             continue
         it = {"id": uuid.uuid4().hex[:8], **{x: str(i.get(x) or "")[:600] for x in ("title", "hook", "idea", "fit", "why")}}
+        if i.get("heat") is not None:
+            it["heat"] = algo.heat_of(i.get("heat"))
+        if str(i.get("ring") or "").isdigit():
+            it["ring"] = max(1, min(5, int(i["ring"])))
+        if i.get("bucket"):
+            it["bucket"] = str(i["bucket"])[:80]
         best, hooks = growth.best_hook(i.get("hooks"))   # ٣ هوكات بدرجات، وأحسنهم هو الهوك
         if hooks:
             it.update(hook=best, hooks=hooks)
@@ -19867,9 +19914,7 @@ def flow_gen_ideas(fid: str, hint: str = "", more: bool = False) -> None:
         if any(str(pk.get(x) or "").strip() for x in ("screen", "visual", "spoken", "lockin")):
             it["pack"] = {**{x: str(pk.get(x) or "").strip()[:300] for x in ("screen", "visual", "spoken", "lockin", "lockin_method")}, "for": it.get("hook", "")}
         items.append(it)
-    if not items:
-        raise HTTPException(400, "المخ مرجعش أفكار، جرّب تاني")
-    flow_update(fid, lambda x: x.update(ideas=(x.get("ideas") or []) + items if more else items))
+    return items
 
 
 def flow_gen_scenarios(fid: str, hint: str = "", more: bool = False) -> None:

@@ -90,7 +90,7 @@ def _base_system(brand: str, prefs: str, tpl: dict, assets: list[dict]) -> str:
     return "\n\n".join(parts)
 
 
-def ideas_messages(brand: str, prefs: str, tpl: dict, assets: list[dict], n: int, avoid: list[str], hint: str, season: str = "") -> list[dict]:
+def ideas_messages(brand: str, prefs: str, tpl: dict, assets: list[dict], n: int, avoid: list[str], hint: str, season: str = "", extra: str = "") -> list[dict]:
     user = (f"اقترح {n} أفكار لبوست على قالب «{tpl.get('name', '')}» للبراند ده. كل فكرة مولودة من القالب: مبنية على تسلسله وخاناته وشكله، "
             "ومختلفة عن التانية في الزاوية (مشكلة وحل، حكاية، معلومة، عرض، مقارنة...) بس كلها جوه عالم القالب.\n"
             + (f"طلب العميل: {hint}\n" if hint else "")
@@ -99,6 +99,7 @@ def ideas_messages(brand: str, prefs: str, tpl: dict, assets: list[dict], n: int
             + growth.hooks_rule() + "\n" + algo.for_use("ideas") + "\n"
             + "لكل فكرة اعمل «pack» للهوك الأعلى درجة بطريقة الهوك التلاتي: المكتوب والمعروض والمنطوق بيقولوا نفس المعنى بالظبط، "
               "ويعدّوا اختبار الصوت المقفول، وبعدهم جملتين قفل بطريقة من الـ ٦ (لمّح للدليل، لمّح للتحوّل، تباين سريع، الصندوق السحري، رد على الاعتراض، أكّد الادعاء).\n"
+            + (extra + "\n" if extra else "")
             + 'رجّع JSON بالشكل ده بس: {"ideas": [{"title": "عنوان قصير", '
               '"hooks": [{"text": "الهوك", "formula": "اسم القالب", "score": 8.5, "why": "ليه الدرجة دي", "principle": "المبدأ النفسي"}, {...}, {...}], '
               '"pack": {"screen": "الهوك المكتوب على الشاشة (٣–١٠ كلمات، سطرين بالكتير، من غير علامات ترقيم)", "visual": "اللي بيتشاف في أول ثانيتين (حركة/تباين/حاجة غير متوقعة)", '
@@ -234,6 +235,8 @@ def mock_ideas(n: int, k: int = 0, tpl_name: str = "") -> dict:
     base = [("ليه الصبح بيبدأ متأخر؟", "مشكلة وحل"), ("حكاية أول عميل", "حكاية"), ("٣ حاجات محدش قالك عليها", "معلومة"), ("تحدّي الـ ٧ أيام", "تحدّي"), ("قبل وبعد", "مقارنة")]
     return {"ideas": [{"title": f"{base[(i + k) % 5][0]}", "hooks": growth.mock_hooks(i + k), "idea": f"فكرة تجريبية بزاوية {base[(i + k) % 5][1]}.",
                        "fit": f"ماشية على تسلسل قالب «{tpl_name}»", "why": "بتكلم الجمهور بلغته",
+                       "ring": 1 + (i + k) % 3, "bucket": "أخطاء المبتدئين",
+                       "heat": {"h": 8, "e": 7, "a": 8, "t": 7, "r": 8} if (i + k) % 4 != 1 else {"h": 4, "e": 5, "a": 4, "t": 6, "r": 5},
                        "pack": {"screen": "غلطة بتعملها كل يوم", "visual": "إيد بتوقف المنبه فجأة", "spoken": "انت بتبدأ يومك غلط من أول دقيقة",
                                 "lockin": "جرّبت أغيّرها ٣٠ يوم، والفرق ظهر من الأسبوع الأول", "lockin_method": "لمّح للدليل"}} for i in range(n)]}
 

@@ -52,6 +52,8 @@ const RivalsPage = (() => {
         <div class="nb-bar"><button class="nb-btn fs-go" data-rvfind ${busy ? "disabled" : ""}>${d.items.length ? "🔍 دوّر تاني (المثبّتين بيفضلوا)" : `🔍 هات أعلى ${d.top} في مجالي`}</button>
           ${d.items.length ? `<button class="nb-btn" data-rvall ${busy ? "disabled" : ""}>↻ حدّث</button>` : ""}
           ${d.updated_at ? `<span class="nb-state">آخر تحديث ${ago(d.updated_at)} · بيتحدّث لوحده كل أسبوع</span>` : ""}</div>
+        <label class="rv-mode" title="القواعد بتبقى خطوات إجبارية: الأفكار الضعيفة أو برّه المجال بتتشال، السكريبت بيتفحص ويتصلّح قبل ما تشوفه، والمونتاج والكابشن بيتعملوا على القواعد">
+          <input type="checkbox" data-rvmode ${d.algo_mode ? "checked" : ""}> <b>⚡ وضع الخوارزمية</b> <small>${d.algo_mode ? "شغال: القواعد خطوات إجبارية في صناعة كل فيديو" : "مقفول: القواعد نصايح بس"}</small></label>
       </section>
       ${busy ? `<div class="fs-busy">⏳ ${esc(d.step || "شغال…")}</div>` : d.error ? `<div class="fs-err">⚠️ ${esc(d.error)}</div>` : ""}
       <nav class="rv-tabs" role="tablist">${TABS.map(([k, t]) => `<button role="tab" data-rvtab="${k}" aria-selected="${k === S.tab}" class="${k === S.tab ? "on" : ""}">${t}</button>`).join("")}</nav>`;
@@ -208,6 +210,10 @@ const RivalsPage = (() => {
       if (e.target.matches("[data-ackind]")) S.ac.kind = e.target.value;
       if (e.target.matches("[data-acpl]")) S.ac.platform = e.target.value;
       if (e.target.matches("[data-btpl]")) S.bt.platform = e.target.value;
+      if (e.target.matches("[data-rvmode]")) {
+        api("/api/algo/mode", { method: "POST", ...jsonBody({ on: e.target.checked }) })
+          .then((x) => { S.d.algo_mode = x.on; render(true); toast(x.on ? "⚡ وضع الخوارزمية اشتغل" : "وضع الخوارزمية اتقفل"); }).catch((err) => toast(err.message, true));
+      }
       if (e.target.matches("[data-btm]")) {
         const row = S.el.querySelectorAll(`[data-btm="${CSS.escape(e.target.dataset.btm)}"]`), val = (k) => { const x = [...row].find((i) => i.dataset.k === k)?.value; return x === "" || x == null ? null : +x; };
         api("/api/batch/metric", { method: "PATCH", ...jsonBody({ id: e.target.dataset.btm, leads: val("leads"), follows: val("follows") }) })

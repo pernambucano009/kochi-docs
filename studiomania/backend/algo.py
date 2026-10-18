@@ -431,3 +431,50 @@ def batch_text(brain: dict | None) -> str:
     if a.get("stop"):
         lines.append("- بطّلنا: " + " · ".join(a["stop"][:4]))
     return "\n".join(lines)[:1200]
+
+
+# ---------------------------------------------------------------- ⚡ وضع الخوارزمية: القواعد خطوات إجبارية في صناعة الفيديو (مفتوح لكل براند إلا لو قفله)
+
+def mode_on(brain: dict | None) -> bool:
+    return (brain or {}).get("algo_mode", True) is not False
+
+
+HEAT_KEYS = {"h": "فضول الهوك", "e": "مفيش ركود", "a": "نتيجة في الآخر", "t": "relatable", "r": "قابلة للتكرار"}
+IDEA_MIN = 6.5   # متوسط HEAT اللي أقل منه الفكرة بتترفض وتتعمل غيرها
+
+
+def idea_gate_rule(brain: dict | None) -> str:
+    st = (brain or {}).get("strategy") or {}
+    buckets = "، ".join(b["name"] for b in st.get("buckets") or [])
+    return ("\n⚡ وضع الخوارزمية: لكل فكرة زوّد في الـ JSON:\n"
+            f'"ring": رقم دايرة الجمهور من ١ (الأضيق) لـ ٥ (الأعرض)' + (f" حسب الخطة ({' ← '.join(st.get('rings') or [])})" if st.get("rings") else "") + ",\n"
+            f'"bucket": مجموعة المواضيع' + (f" (واحدة من: {buckets})" if buckets else "") + ",\n"
+            '"heat": {"h": 0-10 قوة الفضول في الهوك, "e": 0-10 خالية من الركود, "a": 0-10 فيه نتيجة قوية في الآخر, "t": 0-10 relatable, "r": 0-10 قابلة للتكرار بتغيير عنصر}.\n'
+            "قيّم بصراحة (الدرجة العالية لازم تكون مستحقة). ماتقترحش أفكار في الدايرة الخامسة ولا برّه مجموعات المواضيع.")
+
+
+def heat_of(raw) -> dict:
+    raw = raw if isinstance(raw, dict) else {}
+    out = {}
+    for k in HEAT_KEYS:
+        try:
+            out[k] = max(0.0, min(10.0, float(raw.get(k))))
+        except (TypeError, ValueError):
+            out[k] = None
+    vals = [v for v in out.values() if v is not None]
+    out["avg"] = round(sum(vals) / len(vals), 1) if vals else None
+    return out
+
+
+def idea_gate(it: dict, brain: dict | None) -> str:
+    """سبب رفض الفكرة (فاضي = تعدّي)."""
+    st = (brain or {}).get("strategy") or {}
+    names = {b["name"] for b in st.get("buckets") or []}
+    h = (it.get("heat") or {}).get("avg")
+    if h is not None and h < IDEA_MIN:
+        return f"درجة HEAT {h} أقل من {IDEA_MIN}"
+    if it.get("ring") == 5:
+        return "في أوسع دايرة (هتجيب جمهور غلط)"
+    if names and it.get("bucket") and it["bucket"] not in names and not any(n in it["bucket"] or it["bucket"] in n for n in names):
+        return f"برّه مجموعات المواضيع ({it['bucket']})"
+    return ""

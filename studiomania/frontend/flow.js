@@ -123,7 +123,7 @@ const Flow = (() => {
   // ---------------------------------------------------------------- 1) الفكرة
   function ideaCard(it) {
     if (S.edit === it.id) return ideaForm(it);
-    return `<article class="flw-card${S.seen.has(it.id) ? "" : " in"}" data-cid="${esc(it.id)}"><div class="flw-ch"><b>${esc(it.title)}</b>${rateBtns("idea", it.id)}</div>
+    return `<article class="flw-card${S.seen.has(it.id) ? "" : " in"}" data-cid="${esc(it.id)}"><div class="flw-ch"><b>${esc(it.title)}</b>${rateBtns("idea", it.id)}</div>${algoTags(it)}
       ${it.hook ? `<p class="flw-hook">«${esc(it.hook)}»</p>` : ""}${hooksRow(it)}${it.pack && (it.pack.for == null || it.pack.for === it.hook) ? packRow(it.pack) : ""}<p>${esc(it.idea)}</p>${it.fit ? `<small class="flw-fit">🎨 على القالب: ${esc(it.fit)}</small>` : ""}${it.why ? `<small class="muted">💡 ${esc(it.why)}</small>` : ""}
       <div class="flw-acts"><button type="button" class="flw-btn pri" data-pick-idea="${it.id}">اختار الفكرة دي</button>
         <button type="button" class="flw-link" data-edit="${it.id}">✏️ عدّل</button></div></article>`;
@@ -133,6 +133,15 @@ const Flow = (() => {
     if (!(it.hooks || []).length) return "";
     return `<div class="flw-hooks">${it.hooks.map((h) => `<button type="button" class="flw-hk${h.text === it.hook ? " on" : ""}" data-hook="${esc(it.id)}" data-text="${esc(h.text)}"
         title="${esc(h.why || "")}"><b class="num">${h.score}</b><span>${esc(h.formula || "هوك")}</span>${h.principle ? `<small class="flw-psy" title="المبدأ النفسي">🧠 ${esc(h.principle)}</small>` : ""}${h.text === it.hook ? "" : `<i>«${esc(h.text)}»</i>`}</button>`).join("")}</div>`;
+  }
+  // ⚡ وضع الخوارزمية: الفكرة معلّمة بدايرة الجمهور ومجموعة المواضيع ودرجة HEAT
+  function algoTags(it) {
+    const h = it.heat;
+    if (!h && !it.ring && !it.bucket) return "";
+    const names = { h: "فضول الهوك", e: "مفيش ركود", a: "نتيجة في الآخر", t: "relatable", r: "تتكرر" };
+    const tip = h ? Object.entries(names).map(([k, t]) => `${t}: ${h[k] ?? "—"}`).join(" · ") : "";
+    return `<div class="flw-algo">${h?.avg != null ? `<span class="heat ${h.avg >= 8 ? "hi" : ""}" title="${esc(tip)}">🔥 HEAT ${h.avg}</span>` : ""}
+      ${it.ring ? `<span title="دايرة الجمهور (١ الأضيق)">🎯 دايرة ${it.ring}</span>` : ""}${it.bucket ? `<span>🗂 ${esc(it.bucket)}</span>` : ""}</div>`;
   }
   // الهوك التلاتي: نفس المعنى مكتوب ومعروض ومنطوق (أغلب الناس بتتفرج من غير صوت)، وبعده جمل القفل اللي بتمسك المشاهد
   function packRow(p) {
@@ -161,6 +170,7 @@ const Flow = (() => {
     const loading = d.busy === "ideas";
     return `<h2>اختار فكرة للبوست</h2><p class="flw-sub">المخ اقترح أفكار على قد البراند والقالب. اختار واحدة، أو عدّلها، أو اطلب غيرهم، أو اكتب فكرتك.</p>
       ${seasonsRow()}
+      ${d.algo_mode && (d.ideas_dropped || []).length ? `<p class="flw-algo-note" title="${esc(d.ideas_dropped.map((x) => `«${x.title}»: ${x.why_out}`).join("\n"))}">⚡ وضع الخوارزمية شال ${d.ideas_dropped.length} ${d.ideas_dropped.length === 1 ? "فكرة ضعيفة" : "أفكار ضعيفة"} وجاب غيرها (حط الماوس تشوف ليه)</p>` : ""}
       <div class="flw-cards">${(d.ideas || []).map(ideaCard).join("")}${S.own ? ideaForm() : ""}</div>
       ${loading ? working("المخ بيفكّر في أفكار على القالب…") : failed("idea")}
       <div class="flw-more">${S.hint ? `<div class="flw-chatrow"><input id="flwHint" placeholder="عايز أفكار عن إيه؟ (اختياري)"><button type="button" class="flw-btn" data-more="idea">اقترح</button></div>` : `

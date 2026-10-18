@@ -1638,3 +1638,12 @@ audio { width: 100%; }
 .flw-pack span { opacity: .65; }
 .flw-pack b { font-weight: 500; }
 @media (max-width: 600px) { .flw-pack > div { grid-template-columns: 1fr; gap: 0; } }
+/* ⚡ وضع الخوارزمية */
+.flw-algo { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 2px; }
+.flw-algo span { padding: 2px 10px; border-radius: 999px; background: rgba(127, 127, 127, .1); font-size: 12px; }
+.flw-algo .heat { background: rgba(229, 97, 62, .12); color: var(--nh-accent, #E5613E); font-weight: 600; }
+.flw-algo .heat.hi { background: var(--nh-accent, #E5613E); color: #fff; }
+.flw-algo-note { margin: 0 0 10px; font-size: 13px; color: var(--nh-accent, #E5613E); cursor: help; }
+.rv-mode { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 12px; padding: 10px 14px; border-radius: 12px; background: rgba(229, 97, 62, .08); cursor: pointer; }
+.rv-mode input { width: 18px; height: 18px; accent-color: var(--nh-accent, #E5613E); }
+.rv-mode small { opacity: .7; }
