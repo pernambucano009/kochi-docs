@@ -1,0 +1,146 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// قالب «ستيكرات بتتقلب زي الكروت»: ٣ رسايل ورا بعض، كل رسالة كارت فيه عنوان تقيل بشخبطة برتقالي، صورة أبيض وأسود (شخص أو منتج) قدام دايرة خوخي،
+// وستيكرات حاجات حواليها (ساعات، فلوس، كاميرا…) بتطلع واحدة واحدة. الكارت بيتقلب للي بعده، وفي الآخر اللوجو في الدايرة وعملة بتلف. 1080×1920، 13 ثانية.
+const PR = M.params({
+  h1: { label: "الرسالة ١", kind: "text", def: "جه الوقت" },
+  h2: { label: "الرسالة ٢", kind: "text", def: "تبدأ تحوّش" },
+  h3: { label: "الرسالة ٣", kind: "text", def: "لمغامرتك الجاية" },
+  img1: { label: "صورة الكارت ١ (شخص أو منتج)", kind: "image", role: "product_img1", def: "" },
+  img2: { label: "صورة الكارت ٢", kind: "image", role: "product_img2", def: "" },
+  img3: { label: "صورة الكارت ٣", kind: "image", role: "product_img3", def: "" },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "حصّالة" },
+  logo: { label: "اللوجو", kind: "image", role: "logo", def: "" },
+  tag: { label: "الجملة الأخيرة", kind: "text", role: "tagline", def: "حوّش بذكاء" },
+  peach: { label: "لون الدايرة", kind: "color", def: "#f6c6a8" },
+  orange: { label: "لون الشخبطة", kind: "color", role: "accent", def: "#e2691f" },
+  paper: { label: "الخلفية", kind: "color", def: "#faf8f4" },
+});
+const W = 1080, H = 1920, DUR = 13, CARD = 3.3, FLIP = .5;
+const SETS = [["clock", "clock", "bolt", "star", "cloud"], ["coins", "calc", "heart", "plus", "chat"], ["camera", "card", "mail", "bolt", "cloud"]];
+
+M.reel({
+  W, H, DUR, bg: PR.paper,
+  async init(M) {
+    await M.fonts({ HD: ["archivoblack.ttf", "400"], TX: ["inter600.ttf", "600"] });
+    const imgs = await Promise.all([PR.img1, PR.img2, PR.img3, PR.logo].map(M.img));
+    const c = M.canvas(W, H);
+    return { x: c.getContext("2d"), imgs };
+  },
+  seek(t, C, M) {
+    const { x, imgs } = C, { seg, clamp, springO, cubicIO } = M, io = (k) => cubicIO(clamp(k));
+    const PE = PR.peach, OR = PR.orange, K = "#141414";
+    x.setTransform(1, 0, 0, 1, 0, 0); x.globalAlpha = 1;
+    x.fillStyle = PR.paper; x.fillRect(0, 0, W, H);
+    const txt = (s, cx, cy, size, color, fam = "HD", w = "400", maxW = 940) => {
+      const sz = M.fit(String(s), fam, maxW, size, 24, w); x.font = `${w} ${sz}px ${fam}`; x.fillStyle = color; x.textAlign = "center"; x.textBaseline = "middle";
+      x.direction = M.isAr(s) ? "rtl" : "ltr"; x.fillText(String(s), cx, cy); return sz;
+    };
+    // ستيكر أبيض وأسود بحرف أبيض حواليه (زي المقصوص)
+    const sticker = (kind, s) => {
+      x.lineJoin = "round"; x.lineCap = "round";
+      const body = (fill, stroke, lw) => {
+        x.fillStyle = fill; x.strokeStyle = stroke; x.lineWidth = lw;
+        const P = new Path2D();
+        if (kind === "clock") { P.arc(0, 0, s * .42, 0, Math.PI * 2); }
+        else if (kind === "coins") { for (let i = 0; i < 4; i++) P.ellipse(0, s * .25 - i * s * .16, s * .38, s * .12, 0, 0, Math.PI * 2); P.rect(-s * .38, -s * .23, s * .76, s * .48); }
+        else if (kind === "calc") P.roundRect(-s * .3, -s * .42, s * .6, s * .84, s * .08);
+        else if (kind === "camera") { P.roundRect(-s * .45, -s * .26, s * .9, s * .6, s * .1); P.rect(-s * .15, -s * .38, s * .3, s * .14); }
+        else if (kind === "card") P.roundRect(-s * .45, -s * .28, s * .9, s * .56, s * .07);
+        else if (kind === "mail") P.rect(-s * .42, -s * .28, s * .84, s * .56);
+        else if (kind === "chat") { P.roundRect(-s * .42, -s * .3, s * .84, s * .5, s * .2); P.moveTo(-s * .2, s * .18); P.lineTo(-s * .3, s * .38); P.lineTo(0, s * .2); }
+        else if (kind === "heart") { P.moveTo(0, s * .36); P.bezierCurveTo(-s * .55, -s * .05, -s * .25, -s * .48, 0, -s * .16); P.bezierCurveTo(s * .25, -s * .48, s * .55, -s * .05, 0, s * .36); }
+        else if (kind === "bolt") { P.moveTo(s * .08, -s * .45); P.lineTo(-s * .25, s * .05); P.lineTo(0, s * .05); P.lineTo(-s * .1, s * .45); P.lineTo(s * .25, -s * .08); P.lineTo(0, -s * .08); P.closePath(); }
+        else if (kind === "star") for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2 - Math.PI / 2, rr = i % 2 ? s * .18 : s * .42; i ? P.lineTo(Math.cos(a) * rr, Math.sin(a) * rr) : P.moveTo(Math.cos(a) * rr, Math.sin(a) * rr); }
+        else if (kind === "plus") { P.rect(-s * .1, -s * .38, s * .2, s * .76); P.rect(-s * .38, -s * .1, s * .76, s * .2); }
+        else { P.arc(-s * .15, 0, s * .22, 0, Math.PI * 2); P.arc(s * .15, -s * .05, s * .26, 0, Math.PI * 2); P.rect(-s * .36, 0, s * .7, s * .2); }
+        x.stroke(P); x.fill(P);
+      };
+      x.shadowColor = "rgba(0,0,0,.18)"; x.shadowBlur = 12; x.shadowOffsetY = 6; body("#fff", "#fff", s * .14); x.shadowColor = "transparent";
+      body(["clock", "coins", "camera", "card"].includes(kind) ? "#fff" : K, K, s * .05);
+      x.strokeStyle = K; x.lineWidth = s * .04;
+      if (kind === "clock") { const a = t * 2; x.beginPath(); x.moveTo(0, 0); x.lineTo(Math.cos(a) * s * .3, Math.sin(a) * s * .3); x.moveTo(0, 0); x.lineTo(Math.cos(a / 12) * s * .2, Math.sin(a / 12) * s * .2); x.stroke(); for (let i = 0; i < 12; i++) { const q = i / 12 * Math.PI * 2; x.beginPath(); x.moveTo(Math.cos(q) * s * .34, Math.sin(q) * s * .34); x.lineTo(Math.cos(q) * s * .38, Math.sin(q) * s * .38); x.stroke(); } x.fillStyle = OR; x.beginPath(); x.arc(0, 0, s * .04, 0, Math.PI * 2); x.fill(); }
+      if (kind === "coins") { x.fillStyle = OR; x.font = `${s * .28}px HD`; x.textAlign = "center"; x.textBaseline = "middle"; x.direction = "ltr"; x.fillText("$", 0, -s * .23); }
+      if (kind === "camera") { x.beginPath(); x.arc(0, s * .04, s * .16, 0, Math.PI * 2); x.stroke(); x.fillStyle = OR; x.beginPath(); x.arc(s * .3, -s * .14, s * .04, 0, Math.PI * 2); x.fill(); }
+      if (kind === "card") { x.fillStyle = OR; x.fillRect(-s * .45, -s * .14, s * .9, s * .12); }
+      if (kind === "mail") { x.beginPath(); x.moveTo(-s * .42, -s * .28); x.lineTo(0, s * .05); x.lineTo(s * .42, -s * .28); x.stroke(); }
+      if (kind === "calc") { x.fillStyle = "#fff"; x.fillRect(-s * .22, -s * .34, s * .44, s * .16); for (let i = 0; i < 9; i++) { x.fillStyle = i === 8 ? OR : "#fff"; x.fillRect(-s * .22 + (i % 3) * s * .16, -s * .1 + Math.floor(i / 3) * s * .16, s * .12, s * .12); } }
+    };
+    // شخبطة برتقالي: شرارات وحلزونة بتترسم
+    const doodles = (k, seed) => {
+      x.strokeStyle = OR; x.lineWidth = 7; x.lineCap = "round";
+      const r = M.rng(seed);
+      for (let j = 0; j < 3; j++) {
+        const cx = 140 + r() * 800, cy = 600 + r() * 900, a0 = r() * 6;
+        x.globalAlpha = k;
+        for (let l = 0; l < 3; l++) { const a = a0 + l * .5, L = 34 * k; x.beginPath(); x.moveTo(cx + Math.cos(a) * 20, cy + Math.sin(a) * 20); x.lineTo(cx + Math.cos(a) * (20 + L), cy + Math.sin(a) * (20 + L)); x.stroke(); }
+      }
+      x.globalAlpha = 1;
+    };
+    // الكارت: عنوان + شخبطة تحته + دايرة + صورة + ستيكرات
+    const card = (i, lt) => {
+      const head = [PR.h1, PR.h2, PR.h3][i], set = SETS[i], im = imgs[i];
+      const ce = springO(clamp(lt / .6), 10, .6);
+      x.fillStyle = PE; x.beginPath(); x.arc(540, 1060, 360 * ce, 0, Math.PI * 2); x.fill();
+      const he = springO(clamp((lt - .15) / .5), 12, .55);
+      x.save(); x.translate(540, 560); x.rotate(-.04); x.scale(he, he);
+      const sz = txt(head, 0, 0, 132, K);
+      // خط تحت بيترسم
+      const ul = io(seg(lt, .5, 1.1)); x.font = `400 ${sz}px HD`; const tw = Math.min(940, x.measureText(head).width);
+      x.strokeStyle = OR; x.lineWidth = 12; x.lineCap = "round"; x.beginPath();
+      for (let q = 0; q <= 40 * ul; q++) { const f = q / 40, px = tw / 2 - f * tw * 1.05, py = sz * .62 + Math.sin(f * Math.PI) * 16; q ? x.lineTo(px, py) : x.moveTo(px, py); }
+      x.stroke();
+      if (ul >= 1) { x.beginPath(); x.ellipse(-tw / 2 - 30, sz * .5, 46, 32, -.4, 0, Math.PI * 2 * io(seg(lt, 1.1, 1.4))); x.stroke(); }
+      x.restore();
+      // الصورة أبيض وأسود
+      const pe = springO(clamp((lt - .25) / .7), 9, .65);
+      x.save(); x.translate(540, 1080 + (1 - pe) * 200); x.globalAlpha = clamp(pe * 2);
+      if (im) { const k = Math.min(680 / im.width, 760 / im.height) * (.85 + .15 * pe); x.filter = "grayscale(1) contrast(1.12)"; x.drawImage(im, -im.width * k / 2, -im.height * k / 2, im.width * k, im.height * k); x.filter = "none"; }
+      else { x.scale(1.9 * pe, 1.9 * pe); sticker(set[0], 200); }
+      x.restore(); x.globalAlpha = 1;
+      // ستيكرات حواليها بتطلع واحدة واحدة
+      const spots = [[230, 820, 190], [860, 800, 170], [190, 1380, 150], [890, 1360, 180], [780, 1610, 130]];
+      spots.forEach(([sx, sy, ss], j) => {
+        const e = springO(clamp((lt - .4 - j * .12) / .5), 13, .5); if (e <= 0) return;
+        x.save(); x.translate(sx, sy + Math.sin(t * 2 + j) * 8); x.rotate(Math.sin(j * 2.3) * .3 + Math.sin(t * 1.5 + j) * .05); x.scale(e, e); sticker(set[(j + 1) % set.length], ss); x.restore();
+      });
+      doodles(io(seg(lt, .8, 1.2)), 11 + i * 7);
+    };
+    // التقليب: الكارت بيلف على المحور الطولي ويتغيّر في النص
+    const n = Math.floor(t / CARD), lt = t - n * CARD, ft = lt - (CARD - FLIP / 2);
+    let sx = 1, idx = n;
+    if (n < 3 && ft > 0) { const k = clamp(ft / FLIP); sx = Math.abs(Math.cos(k * Math.PI)); if (k > .5) idx = n + 1; }
+    if (n > 0 && lt < FLIP / 2) { const k = .5 + lt / FLIP; sx = Math.abs(Math.cos(k * Math.PI)); }
+    x.save(); x.translate(540, 0); x.scale(Math.max(.02, sx), 1); x.translate(-540, 0);
+    // بعد التقليب الكارت بيبان شبه كامل (آخر ستيكرات بس اللي بتطلع)
+    const ct = (idx === n ? lt : lt - CARD) + (idx > 0 ? 1.2 : 0);
+    if (idx < 3) card(idx, ct);
+    else {
+      // الكارت الأخير: اللوجو في الدايرة وعملة بتلف
+      const le = springO(clamp(ct / .7), 10, .6);
+      x.fillStyle = PE; x.beginPath(); x.arc(540, 960, 330 * le, 0, Math.PI * 2); x.fill();
+      const lg = imgs[3];
+      x.save(); x.translate(540, 960); x.scale(le, le);
+      if (lg) { const k = Math.min(460 / lg.width, 300 / lg.height); x.drawImage(lg, -lg.width * k / 2, -lg.height * k / 2, lg.width * k, lg.height * k); }
+      else txt(PR.brand, 0, 0, 150, K, "HD", "400", 540);
+      x.restore();
+      const cs = Math.cos(t * 5); x.save(); x.translate(820, 760); x.scale(Math.max(.08, Math.abs(cs)) * le, le);
+      x.fillStyle = cs > 0 ? K : OR; x.beginPath(); x.arc(0, 0, 58, 0, Math.PI * 2); x.fill(); x.fillStyle = "#fff"; x.font = "64px HD"; x.textAlign = "center"; x.textBaseline = "middle"; x.direction = "ltr"; x.fillText("$", 0, 4); x.restore();
+      const tk = io(seg(ct, 1.5, 2.0)); if (tk > 0) { x.globalAlpha = tk; txt(PR.tag, 540, 1380 + (1 - tk) * 30, 64, K, "TX", "600"); x.globalAlpha = 1; }
+    }
+    x.restore();
+  },
+  sound(A) {
+    const N = A.midi;
+    A.groove(112, 0, DUR - .4, { kg: .65, hg: .08, snare: true, sg: .18 });
+    for (let c = 0; c < 4; c++) {
+      const t0 = c * CARD;
+      if (c) A.whoosh(t0 - .3, .5, .25);
+      A.pluck(t0 + .15, N(72 + c * 2), .14, .3);
+      for (let j = 0; j < 5 && c < 3; j++) A.click(t0 + .45 + j * .12, .12);
+    }
+    A.pluck(3 * CARD + .3, N(84), .12, 1); A.tone(3 * CARD + .5, N(91), .4, "sine", .06);
+  },
+});
+</script>
+</body></html>

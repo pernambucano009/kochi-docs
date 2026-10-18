@@ -64,7 +64,8 @@ const MotionPage = (() => {
     const about = String(b.about || "").split(/[.\n،,]/)[0].trim().slice(0, 70);
     const handle = (String(b.link || "").match(/instagram\.com\/([A-Za-z0-9_.]+)/) || [])[1];
     return { brand: b.name, product: b.name, tagline: about, about, cta: b.cta, handle: handle ? `@${handle}` : b.name,
-      logo: b.logos?.[0]?.url, accent: hexes[0], accent2: hexes[1] };
+      logo: b.logos?.[0]?.url, accent: hexes[0], accent2: hexes[1],
+      ...Object.fromEntries([...(b.products || []), ...(b.screens || [])].slice(0, 3).map((a, i) => [`product_img${i + 1}`, a.url])) };
   }
   const applyBrand = (schema, vals, bv) => {
     for (const [k, f] of Object.entries(schema)) if (f.role && bv[f.role]) vals[k] = bv[f.role];

@@ -1,0 +1,162 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// قالب «متجر بمنتجات طايرة»: جملة البراند بتظهر كلمة كلمة وجواها أيقونات المنتجات، مساحات لون بتمسح الشاشة، منتجين طايرين على بلوكات لون،
+// كروت منتج فيها الاسم والسعر وزرار «أضف للسلة» بيتداس، وفي الآخر اللوجو على لون البراند. 1080×1920، 14 ثانية. صور المنتجات واللوجو من عقل البراند.
+const PR = M.params({
+  line1: { label: "جملة البداية", kind: "text", role: "tagline", def: "كل أوضة بتحكي حكاية" },
+  line2: { label: "الجملة التانية", kind: "text", def: "كل موسم بيجيب لمسة جديدة" },
+  img1: { label: "صورة المنتج ١", kind: "image", role: "product_img1", def: "" },
+  img2: { label: "صورة المنتج ٢", kind: "image", role: "product_img2", def: "" },
+  img3: { label: "صورة المنتج ٣", kind: "image", role: "product_img3", def: "" },
+  name1: { label: "اسم المنتج ١", kind: "text", def: "فازة سيراميك" },
+  price1: { label: "سعر المنتج ١", kind: "text", def: "٤٥٠ جنيه" },
+  name2: { label: "اسم المنتج ٢", kind: "text", def: "أباجورة خشب" },
+  price2: { label: "سعر المنتج ٢", kind: "text", def: "٨٩٠ جنيه" },
+  cart: { label: "زرار الشراء", kind: "text", def: "أضف للسلة" },
+  added: { label: "بعد الضغط", kind: "text", def: "اتضاف ✓" },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "دار" },
+  logo: { label: "اللوجو", kind: "image", role: "logo", def: "" },
+  tag: { label: "الجملة الأخيرة", kind: "text", role: "cta", def: "اكتشف البيت بتاعك" },
+  c1: { label: "لون البراند", kind: "color", role: "accent", def: "#ff4a0a" },
+  c2: { label: "اللون التاني", kind: "color", role: "accent2", def: "#0f3b2e" },
+  c3: { label: "لون الخلفية الفاتح", kind: "color", def: "#ece4d8" },
+});
+const W = 1080, H = 1920, DUR = 14;
+const T_W1 = 3.2, T_S2 = 3.7, T_W2 = 7.0, T_S3 = 7.5, T_C2 = 9.5, T_S4 = 11.5;
+
+M.reel({
+  W, H, DUR, bg: PR.c1,
+  async init(M) {
+    await M.fonts({ HD: ["TY-Outfit-800.ttf", "800"], TX: ["inter500.ttf", "500"] });
+    const imgs = await Promise.all([PR.img1, PR.img2, PR.img3, PR.logo].map(M.img));
+    const c = M.canvas(W, H);
+    return { x: c.getContext("2d"), imgs };
+  },
+  seek(t, C, M) {
+    const { x, imgs } = C, { seg, clamp, springO, cubicIO, expo, quint } = M;
+    const io = (k) => cubicIO(clamp(k)), A = PR.c1, G = PR.c2, CR = PR.c3;
+    x.setTransform(1, 0, 0, 1, 0, 0); x.globalAlpha = 1;
+    const rtl = (s) => M.isAr(s);
+    const txt = (s, cx, cy, size, color, fam = "HD", w = "800", maxW = 940) => {
+      const sz = M.fit(String(s), fam, maxW, size, 24, w); x.font = `${w} ${sz}px ${fam}`; x.fillStyle = color;
+      x.textAlign = "center"; x.textBaseline = "middle"; x.direction = rtl(s) ? "rtl" : "ltr"; x.fillText(String(s), cx, cy); return sz;
+    };
+    // منتج: الصورة نفسها (contain) بظل ناعم، ولو مفيش صورة شكل فازة/أباجورة بسيط بلون التمييز
+    const prod = (i, cx, cy, size, rot = 0) => {
+      const im = imgs[i]; x.save(); x.translate(cx, cy); x.rotate(rot);
+      x.fillStyle = "rgba(0,0,0,.16)"; x.beginPath(); x.ellipse(0, size * .52, size * .34, size * .06, 0, 0, Math.PI * 2); x.fill();
+      if (im) { const k = Math.min(size / im.width, size / im.height); x.drawImage(im, -im.width * k / 2, -im.height * k / 2, im.width * k, im.height * k); }
+      else {
+        const col = [A, G, "#c98b5e"][i % 3], g = x.createLinearGradient(-size * .3, 0, size * .3, 0);
+        g.addColorStop(0, col); g.addColorStop(.45, "rgba(255,255,255,.55)"); g.addColorStop(.5, col); g.addColorStop(1, col);
+        x.fillStyle = g;
+        if (i % 2 === 0) { x.beginPath(); x.moveTo(-size * .12, -size * .45); x.bezierCurveTo(-size * .1, -size * .2, -size * .34, -size * .1, -size * .3, size * .2);
+          x.bezierCurveTo(-size * .26, size * .5, size * .26, size * .5, size * .3, size * .2); x.bezierCurveTo(size * .34, -size * .1, size * .1, -size * .2, size * .12, -size * .45); x.closePath(); x.fill(); }
+        else { x.beginPath(); x.moveTo(-size * .3, -size * .1); x.lineTo(size * .3, -size * .1); x.lineTo(size * .2, -size * .45); x.lineTo(-size * .2, -size * .45); x.closePath(); x.fill();
+          x.fillRect(-size * .03, -size * .1, size * .06, size * .5); x.beginPath(); x.ellipse(0, size * .42, size * .22, size * .07, 0, 0, Math.PI * 2); x.fill(); }
+      }
+      x.restore();
+    };
+    const bob = (s, a = 18) => Math.sin(t * 1.6 + s) * a;
+
+    // ---------- ١) جملة البداية كلمة كلمة وبين الكلمات أيقونات المنتجات
+    if (t < T_W1 + .6) {
+      x.fillStyle = A; x.fillRect(0, 0, W, H);
+      const words = String(PR.line1).split(/\s+/).filter(Boolean), toks = [];
+      words.forEach((w, i) => { toks.push({ w }); if (i === 0 || i === 2) toks.push({ ic: toks.filter((q) => q.ic !== undefined).length }); });
+      const sz = 118; x.font = `800 ${sz}px HD`;
+      toks.forEach((q) => (q.wd = q.w ? x.measureText(q.w).width + 34 : 150));
+      const rows = [[]]; let rw = 0;
+      toks.forEach((q) => { if (rw + q.wd > 920 && rows[rows.length - 1].length) { rows.push([]); rw = 0; } rows[rows.length - 1].push(q); rw += q.wd; });
+      const R = rtl(PR.line1), y0 = 960 - (rows.length - 1) * 80;
+      let k = 0;
+      rows.forEach((row, ri) => {
+        const total = row.reduce((s, q) => s + q.wd, 0); let px = R ? 540 + total / 2 : 540 - total / 2;
+        row.forEach((q) => {
+          const cx = R ? px - q.wd / 2 : px + q.wd / 2; px += R ? -q.wd : q.wd;
+          const s0 = .25 + k * .3, e = springO(clamp((t - s0) / .6), 13, .6); k++;
+          if (e <= 0) return;
+          const cy = y0 + ri * 160 + (1 - e) * 60;
+          x.globalAlpha = clamp(e * 1.5);
+          if (q.w) txt(q.w, cx, cy, sz, "#fff8ef");
+          else { x.save(); x.translate(cx, cy); x.scale(e, e); x.fillStyle = "rgba(255,255,255,.18)"; x.beginPath(); x.arc(0, 0, 62, 0, Math.PI * 2); x.fill(); x.restore(); prod(q.ic, cx, cy + bob(q.ic, 4), 110 * e, Math.sin(t * 2 + q.ic) * .1); }
+          x.globalAlpha = 1;
+        });
+      });
+    }
+    // مسحة: بلوك كريمي من اليمين وشريط أخضر وراه
+    const w1 = io(seg(t, T_W1, T_S2));
+    if (w1 > 0 && t < T_S2 + .1) { x.fillStyle = G; x.fillRect(W - w1 * (W + 200), 0, W + 200, H); x.fillStyle = CR; x.fillRect(W - w1 * (W + 200) + 200, 0, W + 200, H); }
+
+    // ---------- ٢) منتجين طايرين على بلوكات لون
+    if (t >= T_S2 && t < T_S3) {
+      x.fillStyle = CR; x.fillRect(0, 0, W, H);
+      const sp = io(seg(t, T_S2, T_S2 + .7));
+      x.fillStyle = G; x.fillRect(0, 1000 + (1 - sp) * 920, W, 920);
+      x.fillStyle = A; x.fillRect(W * .5, 1000 + (1 - io(seg(t, T_S2 + .2, T_S2 + .9))) * 920, W * .5, 920);
+      x.fillStyle = "#f0c7cc"; x.fillRect(0, 1560 + (1 - io(seg(t, T_S2 + .35, T_S2 + 1.05))) * 400, W * .5, 400);
+      const e1 = springO(clamp((t - T_S2 - .3) / .9), 9, .7), e2 = springO(clamp((t - T_S2 - .6) / .9), 9, .7);
+      prod(0, 540 + Math.sin(t * .9) * 30, 560 + (1 - e1) * -500 + bob(0), 520, Math.sin(t * 1.1) * .08);
+      prod(1, 800, 1320 + (1 - e2) * 700 + bob(2), 400, Math.sin(t * 1.3 + 1) * .1);
+      prod(2, 290, 1300 + (1 - e2) * 800 + bob(4), 340, Math.sin(t * 1.2 + 2) * .1);
+      const tk = io(seg(t, T_S2 + .9, T_S2 + 1.5)); x.globalAlpha = tk; txt(PR.line2, 540, 200 + (1 - tk) * 30, 74, G); x.globalAlpha = 1;
+    }
+    // مسحة: مثلث أخضر بيكبر من تحت
+    const w2 = io(seg(t, T_W2, T_S3));
+    if (w2 > 0 && t < T_S3 + .05) { x.fillStyle = G; x.beginPath(); x.moveTo(0, H); x.lineTo(w2 * 2.4 * W, H); x.lineTo(0, H - w2 * 2.4 * H); x.closePath(); x.fill(); }
+
+    // ---------- ٣) كروت المنتجات بالسعر وزرار الشراء
+    if (t >= T_S3 && t < T_S4 + .4) {
+      const cards = [[0, PR.name1, PR.price1, T_S3], [1, PR.name2, PR.price2, T_C2]];
+      cards.forEach(([i, nm, pr, t0], ci) => {
+        const t1 = ci === 0 ? T_C2 : T_S4, out = io(seg(t, t1 - .1, t1 + .4)), inn = ci === 0 ? 1 : io(seg(t, t0 - .1, t0 + .4));
+        if (t < t0 - .1 || out >= 1) return;
+        x.save(); x.translate((1 - inn) * W - out * W, 0);
+        x.fillStyle = CR; x.fillRect(0, 0, W, H);
+        x.fillStyle = A; x.beginPath(); x.arc(W, H, 1050, Math.PI, Math.PI * 1.5); x.lineTo(W, H); x.fill();
+        const e = springO(clamp((t - t0) / .8), 10, .65);
+        prod(i, 560, 1060 + bob(i * 2, 14), 640 * (.6 + .4 * e), Math.sin(t * 1.2 + i) * .06);
+        txt(nm, 540, 330, 104, G);
+        x.globalAlpha = .7; txt(PR.brand, 540, 430, 40, G, "TX", "500"); x.globalAlpha = 1;
+        txt(pr, 540, 520, 64, A);
+        // الزرار: بيتداس بعد ثانية وربع ويتقلب أخضر
+        const tap = t - (t0 + 1.25), pressed = tap > 0, sc = pressed ? 1 - .08 * Math.exp(-tap * 8) * Math.sin(Math.min(Math.PI, tap * 14)) : 1;
+        x.save(); x.translate(540, 1640); x.scale(sc, sc);
+        x.fillStyle = pressed ? G : "#1b1b1b"; x.beginPath(); x.roundRect(-300, -72, 600, 144, 72); x.fill();
+        txt(pressed ? PR.added : PR.cart, 0, 2, 56, "#fff", "HD", "800", 520);
+        x.restore();
+        // صباع/ماوس بيدوس
+        const hk = io(seg(t, t0 + .6, t0 + 1.2)) * (1 - io(seg(t, t0 + 1.6, t0 + 2)));
+        if (hk > 0) { x.globalAlpha = hk; x.fillStyle = "#fff"; x.strokeStyle = "#111"; x.lineWidth = 6; const px = 660 + (1 - hk) * 180, py = 1700 + (1 - hk) * 160 - (pressed && tap < .2 ? 10 : 0);
+          x.beginPath(); x.moveTo(px, py); x.lineTo(px + 30, py + 90); x.lineTo(px + 46, py + 56); x.lineTo(px + 86, py + 64); x.closePath(); x.fill(); x.stroke(); x.globalAlpha = 1; }
+        x.restore();
+      });
+    }
+
+    // ---------- ٤) اللوجو على لون البراند
+    if (t >= T_S4) {
+      const e = springO(clamp((t - T_S4 - .2) / .9), 9, .6), bg = io(seg(t, T_S4, T_S4 + .45));
+      x.fillStyle = CR; x.fillRect(0, 0, W, H);
+      x.fillStyle = A; x.beginPath(); x.arc(540, 960, 1400 * bg, 0, Math.PI * 2); x.fill();
+      for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2 + t * .3, r = 300 + 260 * io(seg(t, T_S4 + .3, T_S4 + 1.2)); x.globalAlpha = .25 * (1 - io(seg(t, T_S4 + 1.0, T_S4 + 1.8))); x.fillStyle = CR; x.beginPath(); x.arc(540 + Math.cos(a) * r, 900 + Math.sin(a) * r, 18, 0, Math.PI * 2); x.fill(); }
+      x.globalAlpha = 1;
+      const lg = imgs[3];
+      x.save(); x.translate(540, 900); x.scale(e, e);
+      if (lg) { const k = Math.min(560 / lg.width, 360 / lg.height); x.drawImage(lg, -lg.width * k / 2, -lg.height * k / 2, lg.width * k, lg.height * k); }
+      else txt(PR.brand, 0, 0, 230, CR);
+      x.restore();
+      const tk = io(seg(t, T_S4 + .9, T_S4 + 1.5)); x.globalAlpha = tk; txt(PR.tag, 540, 1180 + (1 - tk) * 30, 64, CR, "TX", "500"); x.globalAlpha = 1;
+    }
+  },
+  sound(A) {
+    const N = A.midi;
+    A.pad(0, [N(53), N(60), N(64), N(69)], 14, .028);
+    A.groove(100, T_S2, T_S4 + 2, { kg: .5, hg: .06 });
+    String(PR.line1).split(/\s+/).filter(Boolean).forEach((_, i) => A.pluck(.25 + i * .6, N(72 + (i % 3) * 3), .12, .35));
+    [T_W1, T_W2, T_C2 - .1].forEach((s) => A.whoosh(s - .05, .5, .22));
+    [T_S3 + 1.25, T_C2 + 1.25].forEach((s) => { A.click(s, .25); A.tone(s + .05, N(84), .2, "sine", .08); A.tone(s + .15, N(91), .3, "sine", .07); });
+    A.hit(T_S4 + .2, .45); A.pluck(T_S4 + .3, N(72), .14, 1.5); A.pluck(T_S4 + .45, N(76), .12, 1.5); A.pluck(T_S4 + .6, N(79), .1, 2);
+  },
+});
+</script>
+</body></html>

@@ -1,0 +1,163 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// قالب «كشف هوية البراند»: سريع على الإيقاع: علامة البراند بتنطّ، الاسم حرف حرف، كاروسيل بوستات ثري دي بيلف، أول حرف بيتحوّل بخطوط مختلفة،
+// صفحات دليل البراند (الألوان والخط واللوجو) في شبكة، وفي الآخر مطر من رمز البراند بيملا الشاشة والاسم فوقه. 1080×1920، 9 ثواني، 120 BPM.
+const PR = M.params({
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "ذَيل" },
+  logo: { label: "اللوجو", kind: "image", role: "logo", def: "" },
+  words: { label: "كلام كروت البوستات (سطر لكل كارت)", kind: "lines", def: ["اقعد!", "استنى!", "تعالى؟", "العب!", "نام!", "يلا!"] },
+  img1: { label: "صورة ١ للكروت", kind: "image", role: "product_img1", def: "" },
+  img2: { label: "صورة ٢ للكروت", kind: "image", role: "product_img2", def: "" },
+  img3: { label: "صورة ٣ للكروت", kind: "image", role: "product_img3", def: "" },
+  shape: { label: "رمز المطر في الآخر (عضمة / نجمة / قلب / دايرة / ورقة)", kind: "text", def: "عضمة" },
+  tag: { label: "الجملة الأخيرة", kind: "text", role: "tagline", def: "رعاية بتحبها كلابك" },
+  accent: { label: "لون البراند", kind: "color", role: "accent", def: "#ff4a12" },
+  ink: { label: "اللون الغامق", kind: "color", role: "dark", def: "#161c1e" },
+  paper: { label: "اللون الفاتح", kind: "color", def: "#f4f4f4" },
+});
+const W = 1080, H = 1920, DUR = 9, B = .5;
+const T1 = 1, T2 = 2, T3 = 4.5, T4 = 5.5, T5 = 6.5;
+const SHAPES = { "عضمة": "bone", "bone": "bone", "نجمة": "star", "star": "star", "قلب": "heart", "heart": "heart", "دايرة": "dot", "circle": "dot", "ورقة": "leaf", "leaf": "leaf" };
+const SHAPE = SHAPES[String(PR.shape).trim()] || "bone";
+
+M.reel({
+  W, H, DUR, bg: PR.paper,
+  async init(M) {
+    await M.fonts({ HD: ["TY-Outfit-800.ttf", "800"], SR: ["Instrument_Serif.ttf", "400"], CV: ["Caveat_wght_500.ttf", "500"], LZ: ["SM-Lalezar.ttf", "400"], TX: ["inter500.ttf", "500"] });
+    // خطوط عربي مستقلة (من غير بديل Alexandria) علشان الحرف العربي يتحوّل بشكل مختلف فعلًا
+    const own = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
+    await Promise.all([own("ALZ", "SM-Lalezar.ttf"), own("ARQ", "TY-ArefRuqaa-700.ttf", "700"), own("AMR", "TY-Amiri-700.ttf", "700"), own("ACH", "SM-Changa.ttf")]);
+    const imgs = await Promise.all([PR.img1, PR.img2, PR.img3, PR.logo].map(M.img));
+    const c = M.canvas(W, H);
+    // المطر: كل قطعة ليها مكان وقوع ووقت (ثابتين بالـ seed)
+    const r = M.rng(7), rain = [];
+    for (let i = 0; i < 150; i++) rain.push({ x: r() * W, t0: T5 + .1 + r() * 1.9, rot: r() * 6.28, spin: (r() - .5) * 4, s: 70 + r() * 70, land: H - 80 - (i / 150) * 1500 - r() * 240 });
+    return { x: c.getContext("2d"), imgs, rain };
+  },
+  seek(t, C, M) {
+    const { x, imgs, rain } = C, { seg, clamp, springO, cubicIO, expo } = M, io = (k) => cubicIO(clamp(k));
+    const A = PR.accent, K = PR.ink, P = PR.paper;
+    x.setTransform(1, 0, 0, 1, 0, 0); x.globalAlpha = 1;
+    const txt = (s, cx, cy, size, color, fam = "HD", w = "800", maxW = 940) => {
+      const sz = M.fit(String(s), fam, maxW, size, 24, w); x.font = `${w} ${sz}px ${fam}`; x.fillStyle = color; x.textAlign = "center"; x.textBaseline = "middle";
+      x.direction = M.isAr(s) ? "rtl" : "ltr"; x.fillText(String(s), cx, cy); return sz;
+    };
+    const mark = (cx, cy, size, col, bgc) => {   // علامة البراند: اللوجو أو أول حرف في دايرة
+      const lg = imgs[3];
+      x.fillStyle = col; x.beginPath(); x.arc(cx, cy, size / 2, 0, Math.PI * 2); x.fill();   // دايرة بلون البراند ورا اللوجو علشان يبان على أي خلفية
+      if (lg) { const k = Math.min(size * .66 / lg.width, size * .66 / lg.height); x.drawImage(lg, cx - lg.width * k / 2, cy - lg.height * k / 2, lg.width * k, lg.height * k); return; }
+      txt([...String(PR.brand).replace(/[ً-ْ]/g, "")][0] || "B", cx, cy + size * .04, size * .62, bgc, "HD", "800", size);
+    };
+    const shape = (kind, s) => {
+      x.beginPath();
+      if (kind === "bone") { const r = s * .17; x.roundRect(-s * .36, -s * .09, s * .72, s * .18, s * .09); [[-1, -1], [-1, 1], [1, -1], [1, 1]].forEach(([a, b]) => { x.moveTo(a * s * .38 + r, b * s * .1); x.arc(a * s * .38, b * s * .1, r, 0, Math.PI * 2); }); }
+      else if (kind === "star") for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2 - Math.PI / 2, rr = i % 2 ? s * .2 : s * .48; x[i ? "lineTo" : "moveTo"](Math.cos(a) * rr, Math.sin(a) * rr); }
+      else if (kind === "heart") { x.moveTo(0, s * .38); x.bezierCurveTo(-s * .6, -s * .05, -s * .28, -s * .5, 0, -s * .18); x.bezierCurveTo(s * .28, -s * .5, s * .6, -s * .05, 0, s * .38); }
+      else if (kind === "leaf") { x.moveTo(0, -s * .48); x.quadraticCurveTo(s * .42, 0, 0, s * .48); x.quadraticCurveTo(-s * .42, 0, 0, -s * .48); }
+      else x.arc(0, 0, s * .36, 0, Math.PI * 2);
+      x.fill();
+    };
+    const beat = (t0) => { const k = ((t - t0) % B) / B; return t >= t0 ? Math.exp(-k * 7) : 0; };
+
+    // ---------- ١) العلامة بتنطّ على أبيض
+    if (t < T1) {
+      x.fillStyle = P; x.fillRect(0, 0, W, H);
+      const e = springO(clamp(t / .5), 14, .45), sq = beat(0) * .18;
+      x.save(); x.translate(540, 1000); x.scale(e * (1 + sq), e * (1 - sq)); mark(0, -40, 520, A, P); x.restore();
+    }
+    // ---------- ٢) الاسم حرف حرف (كلمة كلمة لو عربي) على لون البراند
+    else if (t < T2) {
+      x.fillStyle = A; x.fillRect(0, 0, W, H);
+      const name = String(PR.brand), ar = M.isAr(name), parts = ar ? [name] : [...name];
+      const sz = M.fit(name, "HD", 940, 300, 80, "800"); x.font = `800 ${sz}px HD`;
+      if (ar) { const e = springO(clamp((t - T1) / .5), 12, .5), sq = beat(T1) * .12; x.save(); x.translate(540, 960); x.scale(e * (1 + sq), e * (1 - sq)); txt(name, 0, 0, sz, P); x.restore(); }
+      else {
+        const ws = parts.map((ch) => x.measureText(ch).width), tot = ws.reduce((a, b) => a + b, 0); let px = 540 - tot / 2;
+        parts.forEach((ch, i) => { const e = springO(clamp((t - T1 - i * .06) / .5), 12, .5); x.save(); x.translate(px + ws[i] / 2, 960 - (1 - e) * 300); x.rotate((1 - e) * (i % 2 ? .4 : -.4)); x.globalAlpha = clamp(e * 2);
+          x.font = `800 ${sz}px HD`; x.fillStyle = P; x.textAlign = "center"; x.textBaseline = "middle"; x.direction = "ltr"; x.fillText(ch, 0, 0); x.restore(); px += ws[i]; });
+      }
+      x.globalAlpha = 1;
+    }
+    // ---------- ٣) كاروسيل البوستات ثري دي بيلف
+    else if (t < T3) {
+      x.fillStyle = P; x.fillRect(0, 0, W, H);
+      const words = PR.words.length ? PR.words : ["!"], n = Math.max(5, Math.min(8, words.length)), rot = (t - T2) * 1.25 + io(seg(t, T2, T2 + .5)) * 1.5;
+      const cards = [];
+      for (let i = 0; i < n; i++) { const a = i / n * Math.PI * 2 + rot; cards.push({ i, a, z: Math.cos(a), xx: Math.sin(a) }); }
+      cards.sort((p, q) => p.z - q.z);
+      const intro = io(seg(t, T2, T2 + .6));
+      cards.forEach(({ i, z, xx }) => {
+        const sc = (.62 + .38 * (z + 1) / 2) * intro, face = Math.abs(Math.cos(Math.atan2(xx, z) * 0 + 0)) , cw = 520 * sc, ch = 680 * sc;
+        const flat = Math.max(.08, Math.abs(z) * .85 + .15), cx = 540 + xx * 470, cy = 960 + (1 - intro) * 300;
+        x.save(); x.translate(cx, cy); x.scale(flat, 1);
+        const bgc = [A, K, "#d9d9d6"][i % 3], fg = i % 3 === 2 ? K : P;
+        x.shadowColor = "rgba(0,0,0,.18)"; x.shadowBlur = 40 * sc; x.shadowOffsetY = 20 * sc;
+        x.fillStyle = bgc; x.beginPath(); x.roundRect(-cw / 2, -ch / 2, cw, ch, 26 * sc); x.fill(); x.shadowColor = "transparent";
+        if (z > -.2) {
+          const im = imgs[i % 3];
+          if (im) { x.save(); x.beginPath(); x.roundRect(-cw / 2 + 24 * sc, -ch * .1, cw - 48 * sc, ch * .55, 18 * sc); x.clip(); const k = Math.max((cw - 48 * sc) / im.width, ch * .55 / im.height); x.drawImage(im, -im.width * k / 2, ch * .175 - im.height * k / 2, im.width * k, im.height * k); x.restore(); }
+          else { x.fillStyle = i % 3 === 0 ? K : A; x.save(); x.translate(0, ch * .18); x.rotate(.3 * i); shape(SHAPE, 220 * sc); x.restore(); }
+          txt(words[i % words.length], 0, -ch * .3, 120 * sc, fg, "HD", "800", cw - 50 * sc);
+          x.globalAlpha = .8; txt(PR.brand, cw * .28, ch * .43, 30 * sc, fg, "HD", "800", cw * .4); x.globalAlpha = 1;
+        }
+        x.restore();
+      });
+    }
+    // ---------- ٤) أول حرف بيتحوّل بخطوط مختلفة على الإيقاع
+    else if (t < T4) {
+      x.fillStyle = K; x.fillRect(0, 0, W, H);
+      const ch = [...String(PR.brand).replace(/[ً-ْ]/g, "")][0] || "B", fams = M.isAr(ch) ? [["ALZ", "400"], ["ARQ", "700"], ["AMR", "700"], ["ACH", "400"]] : [["HD", "800"], ["SR", "400"], ["CV", "500"], ["LZ", "400"]];
+      const k = Math.floor((t - T3) / (B / 2)) % fams.length, f = ((t - T3) % (B / 2)) / (B / 2), sq = Math.exp(-f * 6) * .25;
+      x.save(); x.translate(540, 980); x.scale(1 + sq, 1 - sq); x.rotate(Math.sin(t * 9) * .04);
+      x.font = `${fams[k][1]} 760px ${fams[k][0]}`; x.fillStyle = A; x.textAlign = "center"; x.textBaseline = "middle"; x.direction = M.isAr(ch) ? "rtl" : "ltr"; x.fillText(ch, 0, 0);
+      x.restore();
+      x.strokeStyle = "rgba(255,255,255,.18)"; x.lineWidth = 3; x.setLineDash([12, 14]); x.strokeRect(160, 420, 760, 1100); x.setLineDash([]);
+    }
+    // ---------- ٥) صفحات دليل البراند في شبكة
+    else if (t < T5) {
+      x.fillStyle = K; x.fillRect(0, 0, W, H);
+      const pan = io(seg(t, T4, T5)) * 260;
+      for (let r = 0; r < 4; r++) for (let c = 0; c < 2; c++) {
+        const i = r * 2 + c, e = springO(clamp((t - T4 - i * .05) / .5), 12, .7), px = 70 + c * 490, py = 120 + r * 460 - pan + (1 - e) * 400;
+        x.globalAlpha = clamp(e * 2); x.fillStyle = i % 3 === 1 ? A : P; x.beginPath(); x.roundRect(px, py, 450, 400, 18); x.fill();
+        const fg = i % 3 === 1 ? P : K;
+        if (i === 0) { x.save(); mark(px + 225, py + 190, 220, A, P); x.restore(); }
+        else if (i === 1) txt("Aa", px + 225, py + 190, 200, fg, "HD");
+        else if (i === 2) { [A, K, "#d9d9d6"].forEach((cc, j) => { x.fillStyle = cc; x.fillRect(px + 40 + j * 130, py + 90, 110, 160); }); txt(A.toUpperCase(), px + 225, py + 320, 36, K, "TX", "500"); }
+        else if (i === 3) { txt(PR.brand, px + 225, py + 180, 110, fg); }
+        else { x.fillStyle = fg; for (let l = 0; l < 5; l++) { x.globalAlpha = clamp(e * 2) * .5; x.fillRect(px + 40, py + 90 + l * 50, 370 - (l % 2) * 120, 18); } }
+        x.globalAlpha = clamp(e * 2); txt(`0${i + 1}`, px + 400, py + 360, 30, fg, "TX", "500");
+      }
+      x.globalAlpha = 1;
+    }
+    // ---------- ٦) مطر رمز البراند بيملا الشاشة والاسم فوقه
+    else {
+      x.fillStyle = A; x.fillRect(0, 0, W, H);
+      const ne = springO(clamp((t - T5) / .5), 11, .6);
+      x.save(); x.translate(540, 900); x.scale(ne, ne); txt(PR.brand, 0, 0, 260, P); x.restore();
+      x.fillStyle = P;
+      rain.forEach((d) => {
+        const s = t - d.t0; if (s <= 0) return;
+        const yy = Math.min(d.land, -150 + 2600 * s * s), landed = yy >= d.land;
+        x.save(); x.translate(d.x, yy); x.rotate(d.rot + (landed ? d.spin * Math.sqrt(Math.max(0, (d.land + 150) / 2600)) : d.spin * s)); shape(SHAPE, d.s); x.restore();
+      });
+      // الاسم بيطلع فوق الكومة في الآخر
+      const fin = io(seg(t, 8.0, 8.5));
+      if (fin > 0) { x.save(); x.translate(540, 900); x.scale(.9 + .1 * fin, .9 + .1 * fin); x.globalAlpha = fin;
+        x.lineWidth = 34; x.strokeStyle = A; x.lineJoin = "round"; const sz = M.fit(PR.brand, "HD", 900, 260, 80, "800"); x.font = `800 ${sz}px HD`; x.textAlign = "center"; x.textBaseline = "middle"; x.direction = M.isAr(PR.brand) ? "rtl" : "ltr";
+        x.strokeText(PR.brand, 0, 0); x.fillStyle = P; x.fillText(PR.brand, 0, 0); x.restore();
+        x.globalAlpha = fin; x.fillStyle = A; x.beginPath(); x.roundRect(140, 1080, 800, 110, 55); x.fill(); txt(PR.tag, 540, 1137, 54, P, "TX", "500", 740); x.globalAlpha = 1; }
+    }
+  },
+  sound(A) {
+    const N = A.midi;
+    A.groove(120, 0, DUR - .3, { kg: .8, hg: .09, snare: true, sg: .22 });
+    A.bass(0, N(40), .45); A.bass(T1, N(43), .45); A.bass(T2, N(45), .45); A.bass(T3, N(41), .45); A.bass(T4, N(43), .45); A.bass(T5, N(40), .9);
+    [T1, T2, T3, T4, T5].forEach((s) => A.whoosh(s - .12, .3, .2));
+    for (let i = 0; i < 4; i++) A.pluck(T3 + i * .25, N(76 + i * 2), .12, .25);
+    for (let i = 0; i < 24; i++) A.click(T5 + .2 + i * .08, .08);
+    A.riser(7.2, 8.0, .18); A.hit(8.0, .5); A.pluck(8.05, N(72), .13, 1); A.pluck(8.2, N(79), .1, 1);
+  },
+});
+</script>
+</body></html>

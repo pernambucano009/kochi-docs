@@ -12681,6 +12681,22 @@ def motion_library():
 MEDIA_ROOTS = {"/media/ads/": lambda: ADS_DIR, "/media/brand/": lambda: BRAND_DIR, "/media/coaches/": lambda: COACHES_DIR, "/media/assets/": lambda: ASSETS_DIR}
 
 
+def motion_brand_fill(schema: dict, brain: dict | None) -> dict:
+    """خانات قوالب الموشن اللي ليها «دور» بتتملا من عقل البراند: الاسم واللوجو وصور المنتجات والألوان (زي «🎨 من البراند» في المحرر)."""
+    if not brain:
+        return {}
+    b = brain_to_dict(brain)
+    hexes = re.findall(r"#[0-9a-fA-F]{6}\b", str(b.get("palette") or ""))
+    about = re.split(r"[.\n،,]", str(b.get("about") or ""))[0].strip()[:70]
+    handle = re.search(r"instagram\.com/([A-Za-z0-9_.]+)", str(b.get("link") or ""))
+    pics = [a["url"] for a in (b.get("products") or []) + (b.get("screens") or []) if a.get("url")]
+    vals = {"brand": b.get("name"), "product": b.get("name"), "tagline": about, "about": about, "cta": b.get("cta"),
+            "handle": f"@{handle.group(1)}" if handle else b.get("name"), "logo": ((b.get("logos") or [{}])[0]).get("url"),
+            "accent": hexes[0] if hexes else None, "accent2": hexes[1] if len(hexes) > 1 else None,
+            **{f"product_img{i + 1}": pics[i] for i in range(min(3, len(pics)))}}
+    return {k: vals[f["role"]] for k, f in schema.items() if f.get("role") and vals.get(f["role"])}
+
+
 def motion_params(params: dict) -> dict:
     out = {}
     for k, v in (params or {}).items():
@@ -18189,8 +18205,18 @@ def seed_media_copy(tid: str, old: dict | None) -> dict | None:
             "sample_status": "done", "sample_error": None, "sample_kind": "scenes", "seed_media": hv}
 
 
+TPL_RETIRED = ("sk-shopfloat", "sk-brandreveal", "sk-flipcards")   # بقوا قوالب موشن بالكود (t-*): النسخة المتولدة بتتشال
+
+
 def seed_templates() -> None:
     """القوالب الجاهزة بتتحط في المكتبة أول مرة (والعينات اللي اتعملت بتفضل لو القالب اتحدّث)."""
+    for tid in TPL_RETIRED:
+        f = TPL_DIR / tid / "tpl.json"
+        try:
+            if f.exists() and json.loads(f.read_text(encoding="utf-8")).get("builtin"):
+                shutil.rmtree(TPL_DIR / tid, ignore_errors=True)
+        except ValueError:
+            pass
     for tid, t in tplseed.BUILTIN.items():
         f = TPL_DIR / tid / "tpl.json"
         old = None
@@ -20553,11 +20579,13 @@ def flow_generate(fid: str, body: FlowGoIn):
         schema = fz.motion_schema(MOTION_DIR / "r" / mid / "reel.html")
         brain = flow_brain(d)
         def run_motion():
+            fill = motion_brand_fill(schema, brain)
             if atlas.mock_mode():
-                params = {}
+                params = fill
             else:
                 raw = flow_llm(fz.params_messages(schema, {**sc, "brief": brief}, (brain or {}).get("name") or "", flow_assets_list(d)), "خانات القالب")
-                params = fz.clean_params(schema, raw)
+                # الكلام من السيناريو، والصور والألوان والاسم من عقل البراند (الموديل مايعرفش يجيب صورة)
+                params = {**fill, **{k: v for k, v in fz.clean_params(schema, raw).items() if schema[k].get("kind") != "image" and not (schema[k].get("kind") == "color" and k in fill)}}
             before = motion_assets().get(mid, [])
             MOTION_JOBS[mid] = {"status": "working", "progress": 0.0, "error": ""}
             flow_update(fid, lambda x: x.update(output={"kind": "motion", "mid": mid, "params": params, "before": before, "status": "working"}))
