@@ -19837,6 +19837,9 @@ def flow_gen_ideas(fid: str, hint: str = "", more: bool = False) -> None:
         best, hooks = growth.best_hook(i.get("hooks"))   # ٣ هوكات بدرجات، وأحسنهم هو الهوك
         if hooks:
             it.update(hook=best, hooks=hooks)
+        pk = i.get("pack") if isinstance(i.get("pack"), dict) else {}   # الهوك التلاتي: مكتوب + معروض + منطوق + جمل القفل
+        if any(str(pk.get(x) or "").strip() for x in ("screen", "visual", "spoken", "lockin")):
+            it["pack"] = {**{x: str(pk.get(x) or "").strip()[:300] for x in ("screen", "visual", "spoken", "lockin", "lockin_method")}, "for": it.get("hook", "")}
         items.append(it)
     if not items:
         raise HTTPException(400, "المخ مرجعش أفكار، جرّب تاني")
@@ -19848,6 +19851,9 @@ def flow_gen_scenarios(fid: str, hint: str = "", more: bool = False) -> None:
     brain = flow_brain(d)
     idea = d.get("idea") or {}
     idea_txt = "\n".join(str(idea.get(k) or "") for k in ("title", "hook", "idea") if idea.get(k))
+    if (pk := idea.get("pack")) and pk.get("for", idea.get("hook")) == idea.get("hook"):   # الهوك التلاتي (لو العميل مابدّلش الهوك): أول مشهد لازم يبقى عليه
+        idea_txt += ("\nالهوك التلاتي (أول مشهد لازم يطبقه بالظبط): المكتوب على الشاشة «" + pk.get("screen", "") + "» · اللي بيتشاف: " + pk.get("visual", "")
+                     + " · اللي بيتقال: «" + pk.get("spoken", "") + "» · جمل القفل بعده: «" + pk.get("lockin", "") + "»")
     avoid = [s.get("title", "") for s in d.get("scenarios") or []]
     if atlas.mock_mode():
         raw = fz.mock_scenarios(d["format"], 2, d.get("episodes"))

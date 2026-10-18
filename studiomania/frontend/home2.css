@@ -1632,3 +1632,9 @@ audio { width: 100%; }
 .pub-check li > span { flex: 1 1 auto; min-width: 0; }
 .pub-check li i { flex: none; }
 .pub-check li .btn.xs { flex: none; }
+/* الهوك التلاتي في كارت الفكرة */
+.flw-pack { display: grid; gap: 6px; margin: 8px 0; padding: 10px 12px; border-radius: 12px; background: rgba(229, 97, 62, .06); border: 1px dashed rgba(229, 97, 62, .3); }
+.flw-pack > div { display: grid; grid-template-columns: 118px minmax(0, 1fr); gap: 8px; font-size: 13px; line-height: 1.6; }
+.flw-pack span { opacity: .65; }
+.flw-pack b { font-weight: 500; }
+@media (max-width: 600px) { .flw-pack > div { grid-template-columns: 1fr; gap: 0; } }

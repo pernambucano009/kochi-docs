@@ -124,7 +124,7 @@ const Flow = (() => {
   function ideaCard(it) {
     if (S.edit === it.id) return ideaForm(it);
     return `<article class="flw-card${S.seen.has(it.id) ? "" : " in"}" data-cid="${esc(it.id)}"><div class="flw-ch"><b>${esc(it.title)}</b>${rateBtns("idea", it.id)}</div>
-      ${it.hook ? `<p class="flw-hook">«${esc(it.hook)}»</p>` : ""}${hooksRow(it)}<p>${esc(it.idea)}</p>${it.fit ? `<small class="flw-fit">🎨 على القالب: ${esc(it.fit)}</small>` : ""}${it.why ? `<small class="muted">💡 ${esc(it.why)}</small>` : ""}
+      ${it.hook ? `<p class="flw-hook">«${esc(it.hook)}»</p>` : ""}${hooksRow(it)}${it.pack && (it.pack.for == null || it.pack.for === it.hook) ? packRow(it.pack) : ""}<p>${esc(it.idea)}</p>${it.fit ? `<small class="flw-fit">🎨 على القالب: ${esc(it.fit)}</small>` : ""}${it.why ? `<small class="muted">💡 ${esc(it.why)}</small>` : ""}
       <div class="flw-acts"><button type="button" class="flw-btn pri" data-pick-idea="${it.id}">اختار الفكرة دي</button>
         <button type="button" class="flw-link" data-edit="${it.id}">✏️ عدّل</button></div></article>`;
   }
@@ -133,6 +133,13 @@ const Flow = (() => {
     if (!(it.hooks || []).length) return "";
     return `<div class="flw-hooks">${it.hooks.map((h) => `<button type="button" class="flw-hk${h.text === it.hook ? " on" : ""}" data-hook="${esc(it.id)}" data-text="${esc(h.text)}"
         title="${esc(h.why || "")}"><b class="num">${h.score}</b><span>${esc(h.formula || "هوك")}</span>${h.principle ? `<small class="flw-psy" title="المبدأ النفسي">🧠 ${esc(h.principle)}</small>` : ""}${h.text === it.hook ? "" : `<i>«${esc(h.text)}»</i>`}</button>`).join("")}</div>`;
+  }
+  // الهوك التلاتي: نفس المعنى مكتوب ومعروض ومنطوق (أغلب الناس بتتفرج من غير صوت)، وبعده جمل القفل اللي بتمسك المشاهد
+  function packRow(p) {
+    if (!p) return "";
+    const row = (ic, t, v) => (v ? `<div><span>${ic} ${t}</span><b>${esc(v)}</b></div>` : "");
+    return `<div class="flw-pack" title="الهوك التلاتي: لازم التلاتة يقولوا نفس المعنى">${row("📝", "على الشاشة", p.screen)}${row("👁", "اللي بيتشاف", p.visual)}${row("🎙", "اللي بيتقال", p.spoken)}
+      ${row("🔒", `بعد الهوك${p.lockin_method ? ` (${esc(p.lockin_method)})` : ""}`, p.lockin)}</div>`;
   }
   function ideaForm(it = {}) {
     return `<form class="flw-card flw-form" data-ideaform="${esc(it.id || "")}">
