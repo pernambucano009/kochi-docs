@@ -2,16 +2,26 @@
 <script>
 // قالب «قصة شات»: موبايل عايم فيه محادثة بين عميل والمتجر؛ الرسايل بتظهر بنطّة، «بيكتب…» قبل كل رد، قلب على رسالة،
 // كارت تأكيد الطلب، وفي الآخر الموبايل بيصغر ويظهر سطر الدعوة واسم البراند. 1080×1920، 12 ثانية.
+const G1 = "١ · المحادثة", G2 = "٢ · التأكيد والدعوة", GS = "الشكل العام";
 const PR = M.params({
-  store: { label: "اسم المتجر في الشات", kind: "text", role: "brand", def: "متجر لمسة" },
-  msgs: { label: "الرسايل (سطر لكل رسالة، أنا: أو هم:)", kind: "lines", def: ["أنا: السلام عليكم، الطلب يوصل إمتى؟", "هم: وعليكم السلام! بيوصلك بكرة الصبح", "أنا: بجد؟ والشحن ببلاش؟", "هم: أيوه، شحن مجاني لحد آخر الأسبوع", "أنا: خلاص، هاخد اتنين"] },
-  card: { label: "كارت الآخر", kind: "text", def: "تم تأكيد طلبك" },
-  cta: { label: "سطر الدعوة", kind: "text", def: "اطلب برسالة… وإحنا علينا الباقي" },
-  color: { label: "لون البراند", kind: "color", def: "#7c5cff" },
-  bg: { label: "لون الخلفية", kind: "color", def: "#f1ecff" },
+  store: { label: "اسم المتجر في الشات", kind: "text", role: "brand", def: "متجر لمسة", group: G1, max: 16, hint: "اسم الحساب زي ما بيظهر في واتساب/إنستجرام." },
+  logo: { label: "صورة حساب المتجر", kind: "image", role: "logo", def: "", group: G1, img: { ratio: "1:1", cut: false, tip: "اللوجو مربع (بيتقص دايرة). لو مفيش بيظهر أول حرف من الاسم." } },
+  msgs: { label: "الرسايل (سطر لكل رسالة، يبدأ بـ «أنا:» أو «هم:»)", kind: "lines", def: ["أنا: السلام عليكم، الطلب يوصل إمتى؟", "هم: وعليكم السلام! بيوصلك بكرة الصبح", "أنا: بجد؟ والشحن ببلاش؟", "هم: أيوه، شحن مجاني لحد آخر الأسبوع", "أنا: خلاص، هاخد اتنين"], group: G1,
+    hint: "٤–٦ رسايل قصيرة. «أنا:» = العميل (يمين) و«هم:» = المتجر. ابدأ بسؤال أو تردد حقيقي من عملائك، وخلّي ردود المتجر بتحل الاعتراض (الوقت، السعر، الشحن). الرسالة الخامسة بياخد قلب." },
+  card: { label: "كارت التأكيد", kind: "text", def: "تم تأكيد طلبك", group: G2, max: 18, hint: "النتيجة اللي العميل وصلها (تم الطلب، تم الحجز)." },
+  card2: { label: "تحت كارت التأكيد", kind: "text", def: "الشحن بكرة · الدفع عند الاستلام", group: G2, max: 34, hint: "تفاصيل بتطمّن (ميعاد الوصول، طريقة الدفع)." },
+  cta: { label: "سطر الدعوة", kind: "text", def: "اطلب برسالة… وإحنا علينا الباقي", group: G2, max: 34, hint: "الدعوة في سطر: إزاي العميل يبدأ (ابعت رسالة، اللينك في البايو)." },
+  color: { label: "لون البراند", kind: "color", role: "accent", def: "#7c5cff", group: GS, hint: "فقاعات رسايل العميل والهيدر." },
+  bg: { label: "لون الخلفية", kind: "color", def: "#f1ecff", group: GS, hint: "درجة فاتحة جدًا من لون البراند." },
+  fHead: { label: "خط الدعوة", kind: "font", def: "lalezar", group: GS },
+  fBody: { label: "خط الرسايل", kind: "font", def: "tajawal", group: GS, hint: "خط مقروء زي خطوط التطبيقات (تجوّل، بلكس، الإسكندرية العادي)." },
+});
+M.meta({
+  story: "قصة شات بتبيع: محادثة حقيقية بين عميل متردد والمتجر بترد على اعتراضاته، «بيكتب…» قبل كل رد، قلب على رسالة، كارت تأكيد الطلب، وسطر الدعوة.",
+  scenes: [{ name: G1, t0: 0, t1: 7.5, about: "الرسايل ورا بعض (طولها على حسب عددها)" }, { name: G2, t0: 7.5, t1: 12, about: "كارت التأكيد والموبايل بيصغر والدعوة" }],
+  tips: ["خد الأسئلة من الكومنتات والرسايل الحقيقية.", "كل رسالة سطر واحد (الشات الطويل بيتقري ببطء).", "خلّي آخر رسالة من العميل قرار شراء."],
 });
 const W = 1080, H = 1920, DUR = 12;
-const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
 const esc = (v) => String(v ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 const MSGS = PR.msgs.slice(0, 6).map((l) => { const m = String(l).match(/^\s*(أنا|هم)\s*[:：]\s*(.*)$/); return m ? { me: m[1] === "أنا", txt: m[2] } : { me: false, txt: String(l) }; });
 // التوقيت: كل رد من المتجر قبله «بيكتب…»
@@ -21,7 +31,7 @@ const CARD_T = T + .7, TYP_CARD = [T, T + .7], HEART_T = MSGS.length > 4 ? MSGS[
 M.reel({
   W, H, DUR, bg: PR.bg,
   async init(M) {
-    await Promise.all([loadFont("TJ", "SM-Tajawal.ttf"), loadFont("LZ", "SM-Lalezar.ttf"), loadFont("CH", "SM-Changa.ttf")]);
+    await Promise.all([M.font("TJ", PR.fBody), M.font("LZ", PR.fHead), M.font("CH", PR.fBody)]);
     const col = PR.color;
     const st = M.stage; st.style.fontFamily = "TJ"; st.dir = "rtl";
     // خلفية: لون فاتح + دواير ناعمة بتتحرك
@@ -35,7 +45,7 @@ M.reel({
     M.el("div", "", "position:absolute;inset:0;opacity:.35;background-image:radial-gradient(rgba(0,0,0,.08) 2px,transparent 2px);background-size:34px 34px;", "", scr);
     const head = M.el("div", "", `position:absolute;z-index:3;left:0;right:0;top:0;height:200px;background:${col};color:#fff;`, "", scr);
     M.el("div", "", "position:absolute;left:50%;top:22px;width:200px;height:44px;margin-left:-100px;border-radius:30px;background:#111;", "", scr);
-    const av = M.el("div", "", `position:absolute;right:44px;top:96px;width:84px;height:84px;border-radius:50%;background:#fff;color:${col};font:700 44px CH;display:flex;align-items:center;justify-content:center;`, esc([...PR.store][0] || "م"), head);
+    const av = M.el("div", "", `position:absolute;right:44px;top:96px;width:84px;height:84px;border-radius:50%;background:${PR.logo ? `#fff url(${JSON.stringify(PR.logo)}) center/cover` : "#fff"};color:${col};font:700 44px CH;display:flex;align-items:center;justify-content:center;`, PR.logo ? "" : esc([...PR.store][0] || "م"), head);
     M.el("div", "", "position:absolute;right:148px;top:100px;font:700 40px TJ;white-space:nowrap;", esc(PR.store), head);
     const status = M.el("div", "", "position:absolute;right:148px;top:148px;font:400 28px TJ;opacity:.85;white-space:nowrap;", "متصل الآن", head);
     M.el("div", "", "position:absolute;left:44px;top:112px;font:400 46px TJ;", "⋮", head);
@@ -50,7 +60,7 @@ M.reel({
     MSGS.forEach((m) => { const b = mkB(esc(m.txt) + `<span style="font:400 28px TJ;opacity:.6;margin-inline-start:16px;">${m.me ? "١٠:٤٢ ✓✓" : "١٠:٤٢"}</span>`, m.me); const h = b.offsetHeight; bubbles.push({ b, m, y, h, t: m.t }); y += h + 30; });
     const typing = mkB('<span class="d"></span><span class="d"></span><span class="d"></span>', false, "padding:30px 36px;display:flex;gap:12px;");
     [...typing.children].forEach((d) => (d.style.cssText = "width:18px;height:18px;border-radius:50%;background:#999;display:inline-block;"));
-    const card = mkB(`<div style="display:flex;align-items:center;gap:22px;"><div style="width:84px;height:84px;border-radius:50%;background:${col};display:flex;align-items:center;justify-content:center;flex:none;"><svg width="48" height="48" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div><b style="font:700 42px TJ;">${esc(PR.card)}</b><div style="font:400 30px TJ;color:#666;margin-top:6px;">الشحن بكرة · الدفع عند الاستلام</div></div></div>`, false, "max-width:640px;");
+    const card = mkB(`<div style="display:flex;align-items:center;gap:22px;"><div style="width:84px;height:84px;border-radius:50%;background:${col};display:flex;align-items:center;justify-content:center;flex:none;"><svg width="48" height="48" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div><b style="font:700 42px TJ;">${esc(PR.card)}</b><div style="font:400 30px TJ;color:#666;margin-top:6px;">${esc(PR.card2)}</div></div></div>`, false, "max-width:640px;");
     const cardY = y, cardH = card.offsetHeight;
     const heart = M.el("div", "", "position:absolute;left:0;top:0;z-index:2;width:64px;height:64px;border-radius:50%;background:#fff;box-shadow:0 4px 12px rgba(0,0,0,.15);display:flex;align-items:center;justify-content:center;", '<svg width="36" height="36" viewBox="0 0 24 24"><path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3.1 4.5 6.9 4.5c2.2 0 3.6 1.2 5.1 3 1.5-1.8 2.9-3 5.1-3 3.8 0 6 3.9 4.5 7.3C19.5 16.4 12 21 12 21z" fill="#ff3b5c"/></svg>', list);
     return { blobs, phone, list, bubbles, typing, card, cardY, cardH, heart, view, status, ctaWrap, cta, brand, endY: y };

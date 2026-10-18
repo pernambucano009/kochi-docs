@@ -2,18 +2,29 @@
 <script>
 // قالب «كشف هوية البراند»: سريع على الإيقاع: علامة البراند بتنطّ، الاسم حرف حرف، كاروسيل بوستات ثري دي بيلف، أول حرف بيتحوّل بخطوط مختلفة،
 // صفحات دليل البراند (الألوان والخط واللوجو) في شبكة، وفي الآخر مطر من رمز البراند بيملا الشاشة والاسم فوقه. 1080×1920، 9 ثواني، 120 BPM.
+const G1 = "١ · العلامة والاسم", G2 = "٢ · كروت البوستات", G3 = "٣ · الحرف والدليل", G4 = "٤ · المطر والختام", GS = "الشكل العام";
 const PR = M.params({
-  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "ذَيل" },
-  logo: { label: "اللوجو", kind: "image", role: "logo", def: "" },
-  words: { label: "كلام كروت البوستات (سطر لكل كارت)", kind: "lines", def: ["اقعد!", "استنى!", "تعالى؟", "العب!", "نام!", "يلا!"] },
-  img1: { label: "صورة ١ للكروت", kind: "image", role: "product_img1", def: "" },
-  img2: { label: "صورة ٢ للكروت", kind: "image", role: "product_img2", def: "" },
-  img3: { label: "صورة ٣ للكروت", kind: "image", role: "product_img3", def: "" },
-  shape: { label: "رمز المطر في الآخر (عضمة / نجمة / قلب / دايرة / ورقة)", kind: "text", def: "عضمة" },
-  tag: { label: "الجملة الأخيرة", kind: "text", role: "tagline", def: "رعاية بتحبها كلابك" },
-  accent: { label: "لون البراند", kind: "color", role: "accent", def: "#ff4a12" },
-  ink: { label: "اللون الغامق", kind: "color", role: "dark", def: "#161c1e" },
-  paper: { label: "اللون الفاتح", kind: "color", def: "#f4f4f4" },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "ذَيل", group: G1, max: 12, hint: "اسم قصير (كلمة). أول حرف منه بيبقى العلامة لو مفيش لوجو، وبيتحوّل بخطوط مختلفة في المشهد ٣." },
+  logo: { label: "اللوجو", kind: "image", role: "logo", def: "", group: G1, img: { ratio: "1:1", cut: true, tip: "علامة اللوجو لوحدها (من غير الاسم)، فاتحة ومن غير خلفية: بتظهر جوه دايرة بلون البراند." } },
+  words: { label: "كلام كروت البوستات (سطر لكل كارت)", kind: "lines", def: ["اقعد!", "استنى!", "تعالى؟", "العب!", "نام!", "يلا!"], group: G2,
+    hint: "٥–٨ كلمات قصيرة جدًا (كلمة لكل كارت) بصوت البراند. زي عناوين بوستاتك." },
+  img1: { label: "صورة ١ للكروت", kind: "image", role: "product_img1", def: "", group: G2, img: { ratio: "4:5", cut: false, tip: "صور من بوستاتك أو منتجاتك (بتتقص في نص الكارت)." } },
+  img2: { label: "صورة ٢ للكروت", kind: "image", role: "product_img2", def: "", group: G2, img: { ratio: "4:5", cut: false } },
+  img3: { label: "صورة ٣ للكروت", kind: "image", role: "product_img3", def: "", group: G2, img: { ratio: "4:5", cut: false } },
+  shape: { label: "رمز البراند", kind: "select", def: "عضمة", options: [["عضمة", "🦴 عضمة"], ["نجمة", "⭐ نجمة"], ["قلب", "❤️ قلب"], ["دايرة", "⚪ دايرة"], ["ورقة", "🍃 ورقة شجر"]], group: G4,
+    hint: "الشكل اللي بيمطر ويملا الشاشة في الآخر (وبيظهر في الكروت لو مفيش صور). اختار اللي يناسب مجالك." },
+  tag: { label: "الجملة الأخيرة", kind: "text", role: "tagline", def: "رعاية بتحبها كلابك", group: G4, max: 26, hint: "وعد البراند في سطر (بيظهر تحت الاسم في الآخر)." },
+  accent: { label: "لون البراند", kind: "color", role: "accent", def: "#ff4a12", group: GS, hint: "لون واحد قوي: بيملا الشاشة كتير، فلازم يكون لون البراند الأساسي." },
+  ink: { label: "اللون الغامق", kind: "color", role: "dark", def: "#161c1e", group: GS, hint: "خلفية الحرف والدليل وكروت غامقة." },
+  paper: { label: "اللون الفاتح", kind: "color", def: "#f4f4f4", group: GS, hint: "الأبيض بتاع البراند (أوف وايت أو كريمي)." },
+  fHead: { label: "خط الاسم والكلام", kind: "font", def: "outfit", group: GS, hint: "خط عريض بيمثّل البراند." },
+  fBody: { label: "خط السطور الصغيرة", kind: "font", def: "inter", group: GS },
+});
+M.meta({
+  story: "كشف هوية براند في ٩ ثواني على الإيقاع: العلامة بتنطّ، الاسم، كاروسيل بوستات ثري دي، أول حرف بيتحوّل بخطوط، صفحات دليل البراند، ومطر من رمز البراند بيملا الشاشة والاسم فوقه.",
+  scenes: [{ name: G1, t0: 0, t1: 2, about: "العلامة على أبيض، والاسم على لون البراند" }, { name: G2, t0: 2, t1: 4.5, about: "كروت البوستات بتلف" },
+    { name: G3, t0: 4.5, t1: 6.5, about: "الحرف بيتحوّل، وصفحات الألوان والخط واللوجو" }, { name: G4, t0: 6.5, t1: 9, about: "المطر والاسم والجملة" }],
+  tips: ["أحسن لإطلاق براند أو هوية جديدة.", "اسم قصير وأول حرف مميز بيطلعوا أحلى.", "صور البوستات بتخلّي الكاروسيل حقيقي."],
 });
 const W = 1080, H = 1920, DUR = 9, B = .5;
 const T1 = 1, T2 = 2, T3 = 4.5, T4 = 5.5, T5 = 6.5;
@@ -23,7 +34,7 @@ const SHAPE = SHAPES[String(PR.shape).trim()] || "bone";
 M.reel({
   W, H, DUR, bg: PR.paper,
   async init(M) {
-    await M.fonts({ HD: ["TY-Outfit-800.ttf", "800"], SR: ["Instrument_Serif.ttf", "400"], CV: ["Caveat_wght_500.ttf", "500"], LZ: ["SM-Lalezar.ttf", "400"], TX: ["inter500.ttf", "500"] });
+    await M.fonts({ SR: ["Instrument_Serif.ttf", "400"], CV: ["Caveat_wght_500.ttf", "500"], LZ: ["SM-Lalezar.ttf", "400"] }); await M.font("HD", PR.fHead); await M.font("TX", PR.fBody);
     // خطوط عربي مستقلة (من غير بديل Alexandria) علشان الحرف العربي يتحوّل بشكل مختلف فعلًا
     const own = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
     await Promise.all([own("ALZ", "SM-Lalezar.ttf"), own("ARQ", "TY-ArefRuqaa-700.ttf", "700"), own("AMR", "TY-Amiri-700.ttf", "700"), own("ACH", "SM-Changa.ttf")]);

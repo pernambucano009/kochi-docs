@@ -2,23 +2,30 @@
 <script>
 // قالب «رقم إنجاز»: آلاف النقط بتتحرك زي نجوم في سما بالليل، بتتجمع وتكوّن الرقم بتاعك، بتلمع، وبعدين تتفرق وتتجمع تاني
 // في اسم البراند. 1080×1920، 12 ثانية.
+const K1 = "١ · الرقم", K2 = "٢ · اسم البراند", KS = "الشكل العام";
 const PR = M.params({
-  number: { label: "الرقم", kind: "text", def: "+١٠ آلاف" },
-  label: { label: "تحت الرقم", kind: "text", def: "عميل وثق فينا" },
-  thanks: { label: "سطر الشكر", kind: "text", def: "شكرًا لكل واحد فيكم" },
-  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "نجمة" },
-  tag: { label: "تحت الاسم", kind: "text", def: "والجاي أحلى" },
-  accent: { label: "لون اللمعة", kind: "color", def: "#ffc94a" },
+  number: { label: "الرقم", kind: "text", def: "+١٠ آلاف", group: K1, max: 10, hint: "الإنجاز نفسه بالأرقام (+١٠ آلاف، ١ مليون، ٥ سنين). قصير علشان النقط تكتبه واضح." },
+  label: { label: "تحت الرقم", kind: "text", def: "عميل وثق فينا", group: K1, max: 22, hint: "الرقم ده عبارة عن إيه (عميل، طلب، متابع)." },
+  thanks: { label: "سطر الشكر", kind: "text", def: "شكرًا لكل واحد فيكم", group: K1, max: 26, hint: "الإنجاز بتاعهم هما كمان: اشكرهم." },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "نجمة", group: K2, max: 10, hint: "النقط بتكتبه: الأقصر أوضح (كلمة واحدة)." },
+  tag: { label: "تحت الاسم", kind: "text", role: "tagline", def: "والجاي أحلى", group: K2, max: 20 },
+  accent: { label: "لون اللمعة", kind: "color", role: "accent", def: "#ffc94a", group: KS, hint: "النقط اللي بتلمع على الأسود: لون فاتح (دهبي، سماوي، وردي)." },
+  fHead: { label: "خط الرقم والاسم", kind: "font", def: "lalezar", group: KS, hint: "النقط بتتجمع في شكل الخط ده: الخطوط التقيلة بتطلع أوضح." },
+  fBody: { label: "خط السطور", kind: "font", def: "changa", group: KS },
+});
+M.meta({
+  story: "احتفال برقم إنجاز: آلاف النقط زي نجوم بالليل بتتجمع وتكتب الرقم بتاعك وتلمع، وبعدين تتفرق وتتجمع تاني في اسم البراند.",
+  scenes: [{ name: K1, t0: 0, t1: 6.4, about: "النجوم بتكوّن الرقم والسطور" }, { name: K2, t0: 6.4, t1: 12, about: "النجوم بتكتب اسم البراند" }],
+  tips: ["رقم حقيقي ومستدير بيبان أقوى.", "مناسب لعيد ميلاد البراند أو وصول عدد عملاء أو متابعين."],
 });
 const W = 1080, H = 1920, DUR = 12, N = 5200;
-const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
 const esc = (v) => String(v ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 const G0 = 1.0, G1 = 3.4, S0 = 6.4, S1 = 8.8;
 
 M.reel({
   W, H, DUR, bg: "#060a1c",
   async init(M) {
-    await Promise.all([loadFont("LZ", "SM-Lalezar.ttf"), loadFont("CH", "SM-Changa.ttf")]);
+    await Promise.all([M.font("LZ", PR.fHead), M.font("CH", PR.fBody)]);
     const c = M.canvas(W, H); const x = c.getContext("2d");
     // أهداف النقط: بنرسم الكلام في كانفاس مخفي وناخد نقط عشوائية من جواه
     const sample = (txt, size, cy) => {

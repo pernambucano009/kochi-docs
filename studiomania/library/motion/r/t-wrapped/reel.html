@@ -2,29 +2,46 @@
 <script>
 // قالب «ملخص السنة»: شرايح سريعة بألوان صريحة (زي ملخصات آخر السنة)، كل شريحة رقم أو معلومة عن العميل، بتدخل بمسحة مايلة،
 // وأشكال بتتنطط على الإيقاع، والآخر شكر واسم البراند. 1080×1920، 12 ثانية، 128 BPM.
+const K1 = "١ · البداية", K2 = "٢ · الشرايح", K3 = "٣ · الشكر", KS = "الشكل العام";
 const PR = M.params({
-  year: { label: "السنة", kind: "text", def: "٢٠٢٦" },
-  intro: { label: "سطر البداية", kind: "text", def: "سنتك معانا" },
-  s1a: { label: "شريحة ١ فوق", kind: "text", def: "طلبت" }, s1n: { label: "شريحة ١ الرقم", kind: "text", def: "48" }, s1b: { label: "شريحة ١ تحت", kind: "text", def: "مرة" },
-  s2a: { label: "شريحة ٢ العنوان", kind: "text", def: "أكتر حاجات حبيتها" },
-  top: { label: "شريحة ٢ القايمة (٣ سطور)", kind: "lines", def: ["لاتيه بالكراميل", "كرواسون زبدة", "موكا ساقعة"] },
-  s3a: { label: "شريحة ٣ فوق", kind: "text", def: "وفّرت" }, s3n: { label: "شريحة ٣ الرقم", kind: "text", def: "1200" }, s3b: { label: "شريحة ٣ تحت", kind: "text", def: "جنيه" },
-  s4: { label: "شريحة ٤", kind: "text", def: "إنت من أوفى عملائنا" },
-  outro: { label: "الشكر", kind: "text", def: "شكرًا… نكمل السنة الجاية سوا" },
-  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "قهوة الركن" },
+  year: { label: "السنة", kind: "text", def: "٢٠٢٦", group: K1, max: 6 },
+  intro: { label: "سطر البداية", kind: "text", def: "سنتك معانا", group: K1, max: 18, hint: "بيكلم العميل نفسه (سنتك، رحلتك)." },
+  s1a: { label: "شريحة ١ فوق", kind: "text", def: "طلبت", group: K2, max: 12 }, s1n: { label: "شريحة ١ الرقم", kind: "text", def: "48", group: K2, max: 6, hint: "رقم حقيقي عن العميل أو عن كل العملاء (بيعدّ)." },
+  s1b: { label: "شريحة ١ تحت", kind: "text", def: "مرة", group: K2, max: 12 },
+  s2a: { label: "شريحة ٢ العنوان", kind: "text", def: "أكتر حاجات حبيتها", group: K2, max: 20 },
+  top: { label: "شريحة ٢ القايمة (٣ سطور)", kind: "lines", def: ["لاتيه بالكراميل", "كرواسون زبدة", "موكا ساقعة"], group: K2, hint: "أكتر ٣ منتجات اتطلبت (كلمتين لكل سطر)." },
+  s3a: { label: "شريحة ٣ فوق", kind: "text", def: "وفّرت", group: K2, max: 12 }, s3n: { label: "شريحة ٣ الرقم", kind: "text", def: "1200", group: K2, max: 7 },
+  s3b: { label: "شريحة ٣ تحت", kind: "text", def: "جنيه", group: K2, max: 12 },
+  s4: { label: "شريحة ٤", kind: "text", def: "إنت من أوفى عملائنا", group: K2, max: 24, hint: "جملة بتحسّس العميل إنه مميز." },
+  outro: { label: "الشكر", kind: "text", def: "شكرًا… نكمل السنة الجاية سوا", group: K3, max: 32 },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "قهوة الركن", group: K3, max: 16 },
+  pal: { label: "ألوان الشرايح", kind: "select", def: "pop", options: [["pop", "صريحة (زي ملخصات آخر السنة)"], ["brand", "ألوان البراند"], ["calm", "هادية (باستيل)"]], group: KS, hint: "«ألوان البراند» بتستخدم اللونين اللي تحت." },
+  accent: { label: "لون البراند ١", kind: "color", role: "accent", def: "#6c3bff", group: KS },
+  accent2: { label: "لون البراند ٢", kind: "color", role: "accent2", def: "#c6ff3d", group: KS },
+  fHead: { label: "خط الأرقام والعناوين", kind: "font", def: "lalezar", group: KS },
+  fBody: { label: "خط الكلام", kind: "font", def: "changa", group: KS },
+});
+M.meta({
+  story: "ملخص السنة للعميل: شرايح سريعة على الإيقاع، كل شريحة رقم أو معلومة عنه بتدخل بمسحة مايلة وأشكال بتتنطط، والآخر شكر واسم البراند.",
+  scenes: [{ name: K1, t0: 0, t1: 2 }, { name: K2, t0: 2, t1: 10.2, about: "٤ شرايح (رقم، قايمة، رقم، جملة)" }, { name: K3, t0: 10.2, t1: 12 }],
+  tips: ["أرقام حقيقية عن عملاءك بتتشير أكتر.", "اكتب بصيغة «إنت» علشان كل واحد يحس إنه عنه."],
 });
 const W = 1080, H = 1920, DUR = 12, BPM = 128, B = 60 / BPM;
-const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
 const esc = (v) => String(v ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 const ar = (s) => String(s).replace(/\d/g, (d) => "٠١٢٣٤٥٦٧٨٩"[d]);
 const num = (s) => parseInt(String(s).replace(/[٠-٩]/g, (d) => "٠١٢٣٤٥٦٧٨٩".indexOf(d)).replace(/\D/g, "")) || 0;
 // الشرايح: وقت البداية، الخلفية، لون الكلام، لون الأشكال، نوع الأشكال
-const SL = [[0, "#6c3bff", "#ffffff", "#c6ff3d", "dots"], [2.0, "#c6ff3d", "#121212", "#6c3bff", "stars"], [4.2, "#ff4fa3", "#ffffff", "#ffe14a", "rings"], [6.4, "#ff7a1a", "#121212", "#ffe14a", "coins"], [8.4, "#29d3ff", "#121212", "#ff4fa3", "hearts"], [10.2, "#121212", "#ffffff", "#c6ff3d", "dots"]];
+const PALS = {   // [الخلفية، الكلام، الأشكال] لكل شريحة
+  pop: [["#6c3bff", "#ffffff", "#c6ff3d"], ["#c6ff3d", "#121212", "#6c3bff"], ["#ff4fa3", "#ffffff", "#ffe14a"], ["#ff7a1a", "#121212", "#ffe14a"], ["#29d3ff", "#121212", "#ff4fa3"], ["#121212", "#ffffff", "#c6ff3d"]],
+  calm: [["#c9b8ff", "#1d1640", "#fff3c4"], ["#d6f5e3", "#14382a", "#8f7bff"], ["#ffd6e5", "#40142a", "#ffffff"], ["#ffe7c2", "#3a2508", "#ff9f6e"], ["#cdeeff", "#0d2c3d", "#ffb5d0"], ["#1d1640", "#ffffff", "#c9b8ff"]],
+  brand: [[PR.accent, "#ffffff", PR.accent2], [PR.accent2, "#121212", PR.accent], ["#121212", "#ffffff", PR.accent], ["#ffffff", "#121212", PR.accent], [PR.accent, "#ffffff", "#ffffff"], ["#121212", "#ffffff", PR.accent2]],
+};
+const SL = [[0, "dots"], [2.0, "stars"], [4.2, "rings"], [6.4, "coins"], [8.4, "hearts"], [10.2, "dots"]].map(([t, k], i) => [t, ...(PALS[PR.pal] || PALS.pop)[i], k]);
 
 M.reel({
   W, H, DUR, bg: SL[0][1],
   async init(M) {
-    await Promise.all([loadFont("LZ", "SM-Lalezar.ttf"), loadFont("CH", "SM-Changa.ttf")]);
+    await Promise.all([M.font("LZ", PR.fHead), M.font("CH", PR.fBody)]);
     const st = M.stage; st.dir = "rtl";
     const cv = M.canvas(W, H); const x = cv.getContext("2d");
     const wrap = () => M.el("div", "", "position:absolute;left:0;top:0;width:1080px;height:1920px;");
