@@ -2,24 +2,38 @@
 <script>
 // قالب «رأي عميل»: علامة اقتباس بتترسم، الكلام بيطلع كلمة كلمة، ٥ نجوم بتنور واحدة ورا التانية، صاحب الرأي بعلامة «موثّق»،
 // كارت تاني بيدخل مكانه، وفي الآخر متوسط التقييم بيعدّ لفوق وزرار «جرّبه» واسم البراند. 1080×1920، 12 ثانية.
+const G1 = "١ · الرأي الأول", G2 = "٢ · الرأي التاني", G3 = "٣ · التقييم والزرار", GS = "الشكل العام";
 const PR = M.params({
-  q1: { label: "الرأي الأول", kind: "text", def: "من أول استخدام حسيت بالفرق، والتوصيل كان أسرع من المتوقع" },
-  n1: { label: "صاحب الرأي الأول", kind: "text", def: "سارة م." },
-  c1: { label: "مدينته", kind: "text", def: "عميلة من الرياض" },
-  q2: { label: "الرأي التاني", kind: "text", def: "أحسن قرار خدته السنة دي" },
-  n2: { label: "صاحب الرأي التاني", kind: "text", def: "أحمد ع." },
-  c2: { label: "مدينته", kind: "text", def: "عميل من القاهرة" },
-  head: { label: "العنوان فوق", kind: "text", def: "آراء عملائنا" },
-  rating: { label: "متوسط التقييم", kind: "text", def: "4.9" },
-  count: { label: "عدد التقييمات", kind: "text", def: "2000" },
-  cta: { label: "الزرار", kind: "text", def: "جرّبه بنفسك" },
-  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "نقاء للعناية" },
-  color: { label: "اللون الأساسي", kind: "color", def: "#1f4d3a" },
-  gold: { label: "لون النجوم", kind: "color", def: "#e0a63a" },
-  bg: { label: "الخلفية", kind: "color", def: "#f6f1e8" },
+  head: { label: "العنوان فوق", kind: "text", def: "آراء عملائنا", group: G1, max: 16, hint: "كلمتين بيقولوا إن ده كلام عملاء حقيقيين." },
+  q1: { label: "الرأي الأول", kind: "text", def: "من أول استخدام حسيت بالفرق، والتوصيل كان أسرع من المتوقع", group: G1, max: 70,
+    hint: "رأي حقيقي بكلام العميل نفسه (من الكومنتات أو الرسايل). الأقوى اللي فيه نتيجة محددة. لو أطول من ٤٠ حرف الخط بيصغر." },
+  n1: { label: "صاحب الرأي الأول", kind: "text", def: "سارة م.", group: G1, max: 14, hint: "الاسم الأول وأول حرف من العيلة (بإذنه)." },
+  c1: { label: "عنه (مدينته/نوعه)", kind: "text", def: "عميلة من الرياض", group: G1, max: 18 },
+  p1: { label: "صورته", kind: "image", def: "", group: G1, img: { ratio: "1:1", cut: false, tip: "صورة وش العميل (بإذنه). لو مفيش بيظهر أول حرف من اسمه في دايرة." } },
+  q2: { label: "الرأي التاني", kind: "text", def: "أحسن قرار خدته السنة دي", group: G2, max: 70, hint: "رأي أقصر وأقوى من الأول (جملة تتحفظ)." },
+  n2: { label: "صاحب الرأي التاني", kind: "text", def: "أحمد ع.", group: G2, max: 14 },
+  c2: { label: "عنه (مدينته/نوعه)", kind: "text", def: "عميل من القاهرة", group: G2, max: 18 },
+  p2: { label: "صورته", kind: "image", def: "", group: G2, img: { ratio: "1:1", cut: false, tip: "صورة وش (بإذنه)." } },
+  verified: { label: "علامة «موثّق»", kind: "toggle", def: true, group: G2, hint: "العلامة الزرقا والسطر ده. اقفلها لو الرأي مش من مشتري متأكد منه." },
+  vtext: { label: "كلمة التوثيق", kind: "text", def: "مشتري موثّق", group: G2, max: 14 },
+  rating: { label: "متوسط التقييم", kind: "text", def: "4.9", group: G3, max: 3, hint: "رقم من ٥ (زي ٤٫٨). بيعدّ لفوق." },
+  count: { label: "عدد التقييمات", kind: "text", def: "2000", group: G3, max: 7, hint: "عدد حقيقي (بيظهر «أكتر من …»)." },
+  cta: { label: "الزرار", kind: "text", def: "جرّبه بنفسك", group: G3, max: 14 },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "نقاء للعناية", group: G3, max: 20 },
+  color: { label: "اللون الأساسي", kind: "color", role: "accent", def: "#1f4d3a", group: GS, hint: "العنوان والأرقام والزرار: لون غامق هادي بيدّي ثقة." },
+  gold: { label: "لون النجوم", kind: "color", def: "#e0a63a", group: GS, hint: "دهبي أو أصفر (الناس متعودة عليه للتقييم)." },
+  bg: { label: "الخلفية", kind: "color", def: "#f6f1e8", group: GS, hint: "فاتح ودافي علشان الكروت البيضا تبان." },
+  fQuote: { label: "خط الرأي", kind: "font", def: "amiri", group: GS, hint: "خط فيه إحساس الكلام المكتوب (أميري، رقعة، بلكس)." },
+  fHead: { label: "خط العناوين والأرقام", kind: "font", def: "lalezar", group: GS },
+  fBody: { label: "خط الأسماء", kind: "font", def: "changa", group: GS },
+});
+M.meta({
+  story: "شهادة عملاء: علامة اقتباس، الرأي بيطلع كلمة كلمة، ٥ نجوم بتنوّر، صاحب الرأي، كارت رأي تاني بيدخل، وفي الآخر متوسط التقييم بيعدّ والزرار.",
+  scenes: [{ name: G1, t0: 0, t1: 5.9, about: "العنوان والرأي الأول والنجوم وصاحبه" }, { name: G2, t0: 5.9, t1: 8.6, about: "الكارت التاني بيدخل مكان الأول" },
+    { name: G3, t0: 8.6, t1: 12, about: "الرقم الكبير والنجوم وعدد التقييمات والزرار" }],
+  tips: ["آراء حقيقية بكلام العملاء أحسن مليون مرة من آراء مكتوبة.", "رأي فيه نتيجة محددة (الوقت، الفرق، الرقم) أقوى من «حلو جدًا».", "خد إذن العميل قبل ما تحط اسمه وصورته."],
 });
 const W = 1080, H = 1920, DUR = 12;
-const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
 const esc = (v) => String(v ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 const ar = (s) => String(s).replace(/\d/g, (d) => "٠١٢٣٤٥٦٧٨٩"[d]).replace(".", "٫");
 const STAR = (c, s = 64) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24"><path d="M12 2.5l2.9 6.2 6.6.7-4.9 4.5 1.4 6.6L12 17.2l-5.9 3.3 1.3-6.6L2.5 9.4l6.6-.7z" fill="${c}"/></svg>`;
@@ -28,22 +42,22 @@ const T1 = .6, STARS = 3.3, WHO = 4.3, SWAP = 5.9, SUM = 8.6, CTA = 10.2;
 M.reel({
   W, H, DUR, bg: PR.bg,
   async init(M) {
-    await Promise.all([loadFont("AM", "TY-Amiri-700.ttf", "700"), loadFont("TJ", "SM-Tajawal.ttf"), loadFont("CH", "SM-Changa.ttf"), loadFont("LZ", "SM-Lalezar.ttf")]);
+    await Promise.all([M.font("AM", PR.fQuote), M.font("TJ", PR.fBody), M.font("CH", PR.fBody), M.font("LZ", PR.fHead)]);
     const st = M.stage; st.dir = "rtl"; const col = PR.color;
     // ورق شجر ناعم في الخلفية (دواير باهتة)
     const bgs = [0, 1, 2, 3].map((i) => M.el("div", "", `position:absolute;left:0;top:0;width:${520 - i * 70}px;height:${520 - i * 70}px;border-radius:50%;background:${i % 2 ? PR.gold : col};opacity:.07;`));
-    const card = (q, n, c) => {
+    const card = (q, n, c, ph) => {
       const el = M.el("div", "", "position:absolute;left:90px;top:0;width:900px;padding:150px 70px 70px;box-sizing:border-box;background:#fff;border-radius:56px;box-shadow:0 40px 90px rgba(40,40,20,.13);transform-origin:50% 50%;");
       const qm = M.el("div", "", "position:absolute;right:60px;top:-70px;width:150px;height:150px;border-radius:50%;display:flex;align-items:center;justify-content:center;", `<svg width="150" height="150" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="${col}"/><path d="M28 62c0-12 6-20 16-24l2 5c-5 3-7 7-7 11h7v14H28zm26 0c0-12 6-20 16-24l2 5c-5 3-7 7-7 11h7v14H54z" fill="${PR.gold}"/></svg>`, el);
       const words = q.split(/\s+/).filter(Boolean).map((w) => `<span style="display:inline-block;opacity:0;margin-left:16px;">${esc(w)}</span>`).join("");
       const qt = M.el("div", "", `font:700 ${q.length > 40 ? 84 : 100}px/1.5 AM;color:#1d1d1b;text-align:right;`, words, el);
       const stars = M.el("div", "", "display:flex;gap:10px;margin-top:40px;", Array.from({ length: 5 }, () => `<span style="display:inline-block;transform:scale(0)">${STAR(PR.gold)}</span>`).join(""), el);
-      const who = M.el("div", "", "display:flex;align-items:center;gap:26px;margin-top:46px;padding-top:40px;border-top:2px solid #eee;opacity:0;", `<div style="width:110px;height:110px;border-radius:50%;background:${col};color:#fff;font:700 54px CH;display:flex;align-items:center;justify-content:center;flex:none;">${esc([...n][0] || "")}</div>
-        <div><div style="font:700 46px CH;color:#1d1d1b;display:flex;align-items:center;gap:14px;">${esc(n)} <svg width="38" height="38" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#2f9bf0"/><path d="M7 12.5l3.2 3.2L17 9" stroke="#fff" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-        <div style="font:400 34px TJ;color:#888;margin-top:4px;">${esc(c)} · مشتري موثّق</div></div>`, el);
+      const who = M.el("div", "", "display:flex;align-items:center;gap:26px;margin-top:46px;padding-top:40px;border-top:2px solid #eee;opacity:0;", `<div style="width:110px;height:110px;border-radius:50%;background:${ph ? `url('${ph}') center/cover` : col};color:#fff;font:700 54px CH;display:flex;align-items:center;justify-content:center;flex:none;">${ph ? "" : esc([...n][0] || "")}</div>
+        <div><div style="font:700 46px CH;color:#1d1d1b;display:flex;align-items:center;gap:14px;">${esc(n)} ${PR.verified ? `<svg width="38" height="38" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#2f9bf0"/><path d="M7 12.5l3.2 3.2L17 9" stroke="#fff" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>` : ""}</div>
+        <div style="font:400 34px TJ;color:#888;margin-top:4px;">${esc(c)}${PR.verified ? ` · ${esc(PR.vtext)}` : ""}</div></div>`, el);
       return { el, qm, words: [...qt.children], stars: [...stars.children], who };
     };
-    const A = card(PR.q1, PR.n1, PR.c1), Bc = card(PR.q2, PR.n2, PR.c2);
+    const A = card(PR.q1, PR.n1, PR.c1, PR.p1), Bc = card(PR.q2, PR.n2, PR.c2, PR.p2);
     const head = M.el("div", "", `position:absolute;left:0;top:0;width:1080px;text-align:center;font:110px/1 LZ;color:${col};`, esc(PR.head));
     // الملخص
     const sum = M.el("div", "", "position:absolute;left:0;top:0;width:1080px;text-align:center;");

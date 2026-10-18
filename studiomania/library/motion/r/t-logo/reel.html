@@ -2,21 +2,30 @@
 <script>
 // قالب «ظهور لوجو»: نقطة بتقع وتتنطط وتتمط، تتحول لدايرة بتترسم، أربع بتلات بتتفتح حواليها وتلف وتقف بنطة، الخلفية بتتقلب للون البراند
 // بدايرة بتكبر، الاسم بيظهر من ورا قناع، الجملة تحت، واللوجو بيلف لفة أخيرة. 1080×1920، 12 ثانية.
+const G1 = "١ · العلامة", G2 = "٢ · الاسم", GS = "الشكل العام";
 const PR = M.params({
-  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "زهرة" },
-  tag: { label: "الجملة تحت الاسم", kind: "text", def: "ورد طازة لكل مناسبة" },
-  c1: { label: "اللون الأساسي", kind: "color", def: "#ff4f6d" },
-  c2: { label: "اللون التاني", kind: "color", def: "#ffb347" },
-  bg: { label: "لون الخلفية", kind: "color", def: "#fff6ec" },
+  logo: { label: "اللوجو بتاعك (اختياري)", kind: "image", role: "logo", def: "", group: G1, img: { ratio: "1:1", cut: true, tip: "لوجو أبيض أو فاتح من غير خلفية (بيظهر على لون البراند). لو مفيش، الوردة المرسومة هي العلامة." },
+    hint: "لو حطيته: الوردة بتتفتح وبعدين بتتحول للوجو بتاعك لما الخلفية تتقلب." },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "زهرة", group: G2, max: 12, hint: "الاسم بس (كلمة أو كلمتين): بيظهر كبير من ورا قناع." },
+  tag: { label: "الجملة تحت الاسم", kind: "text", role: "tagline", def: "ورد طازة لكل مناسبة", group: G2, max: 28, hint: "البراند بيعمل إيه في ٣–٥ كلمات." },
+  c1: { label: "اللون الأساسي", kind: "color", role: "accent", def: "#ff4f6d", group: GS, hint: "النقطة والبتلات، وبعدين الشاشة كلها بتتقلب له." },
+  c2: { label: "اللون التاني", kind: "color", role: "accent2", def: "#ffb347", group: GS, hint: "البتلات التانية والنقط: لون فاتح مكمّل." },
+  bg: { label: "لون الخلفية", kind: "color", def: "#fff6ec", group: GS, hint: "فاتح جدًا (أول ٤ ثواني)." },
+  fHead: { label: "خط الاسم", kind: "font", def: "lalezar", group: GS },
+  fBody: { label: "خط الجملة", kind: "font", def: "tajawal", group: GS },
+});
+M.meta({
+  story: "ظهور لوجو مرح: نقطة بتقع وتتنطط وتتحول لوردة بتتفتح وتلف، الخلفية بتتقلب للون البراند، الاسم بيطلع من ورا قناع والجملة تحته.",
+  scenes: [{ name: G1, t0: 0, t1: 5.2, about: "النقطة والوردة وقلب الخلفية" }, { name: G2, t0: 5.2, t1: 12, about: "الاسم والجملة واللفة الأخيرة" }],
+  tips: ["ينفع إنترو أو أوترو لأي فيديو للبراند.", "الاسم القصير بيطلع أضخم وأحلى."],
 });
 const W = 1080, H = 1920, DUR = 12, CX = 540, CY = 820;
-const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
 
 M.reel({
   W, H, DUR, bg: PR.bg,
-  async init(M) { await Promise.all([loadFont("LZ", "SM-Lalezar.ttf"), loadFont("TJ", "SM-Tajawal.ttf")]); const c = M.canvas(W, H); return { x: c.getContext("2d") }; },
+  async init(M) { await Promise.all([M.font("LZ", PR.fHead), M.font("TJ", PR.fBody)]); const lg = await M.img(PR.logo); const c = M.canvas(W, H); return { x: c.getContext("2d"), lg }; },
   seek(t, C, M) {
-    const { x } = C, { seg, cubicIO, clamp, springO, expo, smooth } = M, io = (k) => cubicIO(clamp(k));
+    const { x, lg } = C, { seg, cubicIO, clamp, springO, expo, smooth } = M, io = (k) => cubicIO(clamp(k));
     x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = PR.bg; x.fillRect(0, 0, W, H);
     // الخلفية بتتقلب للون البراند بدايرة بتكبر من نص اللوجو
     const fl = io(seg(t, 4.2, 5.2)), dark = fl > .5;
@@ -34,11 +43,14 @@ M.reel({
       const lift = -120 * io(seg(t, 5.0, 6.0)), sc = 1 - .12 * io(seg(t, 5.0, 6.0));
       x.save(); x.translate(CX, CY + lift); x.scale(sc, sc);
       // البتلات (أربع أنصاص دواير بلونين)
-      x.save(); x.rotate(rot);
+      const lgk = lg ? io(seg(t, 4.4, 5.0)) : 0;   // لوجو العميل: الوردة بتختفي وهو بيطلع مكانها
+      x.save(); x.rotate(rot); x.globalAlpha = 1 - lgk;
       for (let i = 0; i < 4; i++) { x.save(); x.rotate(i * Math.PI / 2); x.translate(0, -150 * pk); x.scale(pk, pk);
-        x.fillStyle = i % 2 ? ink2 : ink; x.globalAlpha = fl > 0 ? (i % 2 ? .75 : 1) : 1; x.beginPath(); x.moveTo(-110, 40); x.arc(0, 40, 110, Math.PI, 0); x.closePath(); x.fill(); x.restore(); }
+        x.fillStyle = i % 2 ? ink2 : ink; x.globalAlpha = (fl > 0 ? (i % 2 ? .75 : 1) : 1) * (1 - lgk); x.beginPath(); x.moveTo(-110, 40); x.arc(0, 40, 110, Math.PI, 0); x.closePath(); x.fill(); x.restore(); }
       x.restore(); x.globalAlpha = 1;
       // القلب: دايرة بحد بتترسم
+      if (lgk > 0) { const e = springO(clamp((t - 4.5) / .8), 11, .55), k = Math.min(420 / lg.width, 420 / lg.height) * e; x.save(); x.rotate((1 - e) * -.6); x.drawImage(lg, -lg.width * k / 2, -lg.height * k / 2, lg.width * k, lg.height * k); x.restore(); }
+      x.globalAlpha = 1 - lgk;
       x.lineWidth = 26; x.strokeStyle = ink; x.lineCap = "round"; x.beginPath(); x.arc(0, 0, 70, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * rk); x.stroke();
       x.fillStyle = fl > 0 ? PR.c1 : PR.bg; x.beginPath(); x.arc(0, 0, 57 * rk, 0, Math.PI * 2); x.fill();
       x.fillStyle = ink2; x.beginPath(); x.arc(0, 0, 22 * springO(clamp((t - 2.4) / .6), 14, .5), 0, Math.PI * 2); x.fill();

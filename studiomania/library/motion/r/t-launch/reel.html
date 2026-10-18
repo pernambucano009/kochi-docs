@@ -2,22 +2,33 @@
 <script>
 // قالب «إطلاق منتج»: جملة واحدة متقسمة على المشاهد، شاشة المنتج «زجاج» عايمة بدخلة بطيئة، طلب بيتكتب جوه خانة الكتابة بس،
 // النتيجة بتظهر، علامات صح، مميزات، رقم بيعدّ، وفي الآخر الاسم والزرار. من غير نطّ ولا توهج. 1080×1920، 12 ثانية.
+const G1 = "١ · الجملة", G2 = "٢ · المنتج شغال", G3 = "٣ · المميزات والرقم", G4 = "٤ · الاسم والزرار", GS = "الشكل العام";
 const PR = M.params({
-  s1: { label: "الجملة (الجزء ١)", kind: "text", def: "وصفتك الجاية" },
-  s2: { label: "الجملة (الجزء ٢)", kind: "text", def: "من اللي في تلاجتك" },
-  prompt: { label: "اللي بيتكتب في الخانة", kind: "text", def: "عندي فراخ ورز وطماطم" },
-  result: { label: "النتيجة", kind: "text", def: "كبسة فراخ سريعة" },
-  steps: { label: "خطوات النتيجة (٣)", kind: "lines", def: ["حمّر الفراخ بالبهارات", "ضيف الطماطم والرز", "سيبها ٢٠ دقيقة على نار هادية"] },
-  checks: { label: "علامات الصح (٣)", kind: "lines", def: ["بمكونات عندك", "خطوات بسيطة", "سعرات محسوبة"] },
-  count: { label: "الرقم", kind: "text", def: "12000" },
-  countLabel: { label: "بعد الرقم", kind: "text", def: "وصفة جاهزة" },
-  name: { label: "اسم المنتج", kind: "text", role: "product", def: "طبختي" },
-  cta: { label: "الزرار", kind: "text", def: "نزّل التطبيق" },
-  color: { label: "اللون الأساسي", kind: "color", def: "#6a3df0" },
-  color2: { label: "اللون التاني", kind: "color", def: "#ff7a59" },
+  s1: { label: "الجملة (الجزء ١)", kind: "text", def: "وصفتك الجاية", group: G1, max: 18, hint: "أول نص الوعد (٢–٣ كلمات). الجزأين مع بعض جملة واحدة بتقول المنتج بيعمل إيه للعميل." },
+  s2: { label: "الجملة (الجزء ٢)", kind: "text", def: "من اللي في تلاجتك", group: G1, max: 20, hint: "باقي الوعد بشكل ملموس (من إيه أو في قد إيه)." },
+  name: { label: "اسم المنتج", kind: "text", role: "product", def: "طبختي", group: G2, max: 14, hint: "بيظهر فوق الشاشة الزجاج، وكبير في الآخر." },
+  logo: { label: "أيقونة/لوجو المنتج", kind: "image", role: "logo", def: "", group: G2, img: { ratio: "1:1", cut: false, tip: "أيقونة التطبيق مربعة. لو مفيش بيظهر مربع بلون البراند." } },
+  prompt: { label: "اللي بيتكتب في الخانة", kind: "text", def: "عندي فراخ ورز وطماطم", group: G2, max: 26, hint: "اللي العميل بيكتبه أو بيطلبه من منتجك بكلامه هو (بيتكتب حرف حرف)." },
+  result: { label: "النتيجة", kind: "text", def: "كبسة فراخ سريعة", group: G2, max: 20, hint: "اللي المنتج بيرجّعه (عنوان النتيجة)." },
+  badge: { label: "شارة جنب النتيجة", kind: "text", def: "٣٠ دقيقة", group: G2, max: 10, hint: "معلومة سريعة عن النتيجة (الوقت، السعر، المقاس)." },
+  steps: { label: "تفاصيل النتيجة (٣ سطور)", kind: "lines", def: ["حمّر الفراخ بالبهارات", "ضيف الطماطم والرز", "سيبها ٢٠ دقيقة على نار هادية"], group: G2, hint: "٣ سطور قصيرة (٤–٦ كلمات) بتوضح النتيجة." },
+  checks: { label: "المميزات (٣)", kind: "lines", def: ["بمكونات عندك", "خطوات بسيطة", "سعرات محسوبة"], group: G3, hint: "٣ مميزات بكلمتين تلاتة، كل واحدة بعلامة صح." },
+  count: { label: "الرقم", kind: "text", def: "12000", group: G3, max: 8, hint: "رقم حقيقي بيبيّن الحجم (مستخدمين، طلبات، وصفات). بيعدّ لحد الرقم." },
+  countLabel: { label: "بعد الرقم", kind: "text", def: "وصفة جاهزة", group: G3, max: 18 },
+  cta: { label: "الزرار", kind: "text", def: "نزّل التطبيق", group: G4, max: 16, hint: "فعل واضح: نزّل التطبيق، جرّب ببلاش، احجز." },
+  color: { label: "اللون الأساسي", kind: "color", role: "accent", def: "#6a3df0", group: GS, hint: "زرار الإرسال والتمييز وبقعة النور ورا الزجاج." },
+  color2: { label: "اللون التاني", kind: "color", role: "accent2", def: "#ff7a59", group: GS, hint: "أرقام الخطوات والبقعة التانية. لون مكمّل للأساسي." },
+  fHead: { label: "خط العناوين", kind: "font", def: "plex", group: GS, hint: "الجملة والنتيجة والمميزات." },
+  fBody: { label: "خط الكتابة", kind: "font", def: "plex4", group: GS, hint: "اللي بيتكتب في الخانة والتفاصيل." },
+  fName: { label: "خط اسم المنتج", kind: "font", def: "lalezar", group: GS, hint: "الاسم الكبير في الآخر (خط مميز)." },
+});
+M.meta({
+  story: "فيلم إطلاق هادي: الوعد في جملة، المنتج شغال قدامك (طلب بيتكتب ونتيجته بتطلع)، المميزات بعلامات صح، رقم بيعدّ، وفي الآخر الاسم والزرار.",
+  scenes: [{ name: G1, t0: 0, t1: 2, about: "الجملة كلمة كلمة" }, { name: G2, t0: 2, t1: 6.4, about: "الشاشة الزجاج: الكتابة والإرسال والنتيجة" },
+    { name: G3, t0: 6.4, t1: 10.2, about: "٣ علامات صح ورقم بيعدّ" }, { name: G4, t0: 10.2, t1: 12, about: "الاسم الكبير والزرار" }],
+  tips: ["اكتب الطلب زي ما العميل الحقيقي بيكتبه.", "النتيجة لازم تبان مفيدة في ثانيتين.", "الرقم حقيقي وبس."],
 });
 const W = 1080, H = 1920, DUR = 12;
-const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
 const esc = (v) => String(v ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 const ar = (s) => String(s).replace(/\d/g, (d) => "٠١٢٣٤٥٦٧٨٩"[d]);
 const GLASS = "background:rgba(255,255,255,.58);border:2px solid rgba(255,255,255,.85);box-shadow:0 40px 90px rgba(60,30,140,.18), inset 0 1px 0 rgba(255,255,255,.9);backdrop-filter:blur(24px);";
@@ -25,20 +36,20 @@ const GLASS = "background:rgba(255,255,255,.58);border:2px solid rgba(255,255,25
 M.reel({
   W, H, DUR, bg: "#f3f1fb",
   async init(M) {
-    await Promise.all([loadFont("PB", "TY-PlexArabic-700.ttf", "700"), loadFont("PX", "TY-PlexArabic-400.ttf"), loadFont("LZ", "SM-Lalezar.ttf")]);
+    await Promise.all([M.font("PB", PR.fHead), M.font("PX", PR.fBody), M.font("LZ", PR.fName)]);
     const st = M.stage; st.dir = "rtl"; const col = PR.color;
     const blobs = [[col, 680], [PR.color2, 560], ["#3fc6ff", 500]].map(([c, s]) => M.el("div", "", `position:absolute;left:0;top:0;width:${s}px;height:${s}px;border-radius:50%;background:${c};opacity:.32;filter:blur(90px);`));
     const words = (txt, top, size) => { const w = M.el("div", "", `position:absolute;left:0;top:${top}px;width:1080px;text-align:center;font:700 ${size}px/1.15 PB;color:#16112e;`); return txt.split(" ").map((s) => { const c = M.el("span", "", "display:inline-block;overflow:hidden;vertical-align:bottom;margin:0 10px;padding-bottom:16px;", "", w); const i = M.el("span", "", "display:inline-block;", esc(s), c); return i; }); };
     const w1 = words(PR.s1, 260, 116), w2 = words(PR.s2, 400, 116);
     // شاشة المنتج: لوح زجاج فيه خانة كتابة ونتيجة
     const panel = M.el("div", "", `position:absolute;left:90px;top:0;width:900px;height:900px;border-radius:64px;${GLASS}padding:56px;box-sizing:border-box;`);
-    const bar = M.el("div", "", "display:flex;align-items:center;gap:18px;margin-bottom:40px;", `<div style="width:64px;height:64px;border-radius:20px;background:${col};"></div><div style="font:700 40px PB;color:#16112e;">${esc(PR.name)}</div>`, panel);
+    const bar = M.el("div", "", "display:flex;align-items:center;gap:18px;margin-bottom:40px;", `${PR.logo ? `<img src="${esc(PR.logo)}" alt="" style="width:64px;height:64px;border-radius:20px;object-fit:cover;">` : `<div style="width:64px;height:64px;border-radius:20px;background:${col};"></div>`}<div style="font:700 40px PB;color:#16112e;">${esc(PR.name)}</div>`, panel);
     const input = M.el("div", "", "display:flex;align-items:center;gap:18px;height:120px;border-radius:40px;background:rgba(255,255,255,.9);border:2px solid #e6e1f7;padding:0 26px 0 30px;", "", panel);
     const typed = M.el("div", "", "flex:1;font:400 44px PX;color:#16112e;white-space:nowrap;overflow:hidden;", "", input);
     const caret = M.el("span", "", `display:inline-block;width:4px;height:50px;background:${col};vertical-align:middle;margin-inline-start:4px;`, "");
     const send = M.el("div", "", `width:84px;height:84px;border-radius:50%;background:${col};display:flex;align-items:center;justify-content:center;flex:none;`, '<svg width="40" height="40" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7" stroke="#fff" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>', input);
     const out = M.el("div", "", "margin-top:40px;border-radius:40px;background:rgba(255,255,255,.92);padding:40px 44px;", "", panel);
-    const head = M.el("div", "", "display:flex;justify-content:space-between;align-items:center;", `<div style="font:700 56px PB;color:#16112e;">${esc(PR.result)}</div><div style="font:700 32px PB;color:${col};background:#efeaff;padding:8px 22px 14px;border-radius:24px;">${ar(30)} دقيقة</div>`, out);
+    const head = M.el("div", "", "display:flex;justify-content:space-between;align-items:center;", `<div style="font:700 56px PB;color:#16112e;">${esc(PR.result)}</div><div style="font:700 32px PB;color:${col};background:#efeaff;padding:8px 22px 14px;border-radius:24px;">${esc(PR.badge)}</div>`, out);
     const steps = PR.steps.slice(0, 3).map((s, i) => M.el("div", "", "display:flex;align-items:center;gap:22px;margin-top:30px;", `<div style="width:56px;height:56px;border-radius:50%;background:${PR.color2};color:#fff;font:700 32px PB;display:flex;align-items:center;justify-content:center;flex:none;">${ar(i + 1)}</div><div style="font:400 40px PX;color:#3a345a;">${esc(s)}</div>`, out));
     // علامات الصح
     const checks = PR.checks.slice(0, 3).map((s) => M.el("div", "", `position:absolute;right:120px;top:0;display:flex;align-items:center;gap:22px;font:700 52px PB;color:#16112e;`, `<svg width="66" height="66" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#22c55e"/><path d="M7 12.5l3.2 3.2L17 9" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>${esc(s)}`));
@@ -48,7 +59,7 @@ M.reel({
     M.el("div", "", "font:700 60px PB;color:#16112e;margin-top:10px;", esc(PR.countLabel), num);
     // الاسم والزرار
     const end = M.el("div", "", "position:absolute;left:0;top:0;width:1080px;text-align:center;");
-    M.el("div", "", `width:200px;height:200px;border-radius:56px;background:linear-gradient(135deg,${col},${PR.color2});margin:0 auto 40px;box-shadow:0 30px 60px rgba(60,30,140,.25);`, "", end);
+    M.el("div", "", `width:200px;height:200px;border-radius:56px;background:${PR.logo ? `url(${JSON.stringify(PR.logo)}) center/cover` : `linear-gradient(135deg,${col},${PR.color2})`};margin:0 auto 40px;box-shadow:0 30px 60px rgba(60,30,140,.25);`, "", end);
     M.el("div", "", `font:${M.fit(PR.name, "LZ", 900, 200, 80)}px/1 LZ;color:#16112e;`, esc(PR.name), end);
     const ctaB = M.el("div", "", `display:inline-block;margin-top:60px;font:700 60px PB;color:#fff;background:#16112e;padding:30px 80px 40px;border-radius:100px;`, esc(PR.cta), end);
     return { blobs, w1, w2, panel, typed, caret, send, out, head, steps, checks, num, nBig, end, ctaB };

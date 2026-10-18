@@ -2,20 +2,35 @@
 <script>
 // قالب «كشف السعر»: كلام بيخبط على الإيقاع ← المنتج بيطلع ← السعر القديم بيتشطب ← الجديد بيعدّ لتحت ويخبط بكونفيتي
 // ← ستيكر التوفير ← عد تنازلي للعرض ← زرار «اطلب» بينبض واسم البراند. 1080×1920، 12 ثانية، 120 BPM.
+const G1 = "١ · الهوك", G2 = "٢ · المنتج والسعر", G3 = "٣ · العد التنازلي", G4 = "٤ · الزرار", GS = "الشكل العام";
 const PR = M.params({
-  hook: { label: "الجملة الأولى (٣ كلمات)", kind: "text", def: "عرض مش هيتكرر" },
-  product: { label: "اسم المنتج", kind: "text", role: "product", def: "عطر ليالي" },
-  oldPrice: { label: "السعر القديم", kind: "text", def: "450" },
-  newPrice: { label: "السعر الجديد", kind: "text", def: "270" },
-  currency: { label: "العملة", kind: "text", def: "جنيه" },
-  ends: { label: "سطر العد التنازلي", kind: "text", def: "العرض بيخلص خلال" },
-  cta: { label: "الزرار", kind: "text", def: "اطلب دلوقتي" },
-  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "بيت العطور" },
-  color: { label: "اللون الأساسي", kind: "color", def: "#ff3d2e" },
-  color2: { label: "اللون التاني", kind: "color", def: "#ffd23f" },
+  hook: { label: "الجملة الأولى", kind: "text", def: "عرض مش هيتكرر", group: G1, max: 22,
+    hint: "٣ كلمات بالظبط (كل كلمة بتخبط على دقة). خليها عن الفرصة مش عن المنتج: «عرض مش هيتكرر»، «الحق قبل ما يخلص»." },
+  product: { label: "اسم المنتج", kind: "text", role: "product", def: "عطر ليالي", group: G2, max: 20, hint: "اسم قصير يتقري من بعيد (كلمتين)." },
+  img: { label: "صورة المنتج", kind: "image", role: "product_img1", def: "", group: G2,
+    img: { ratio: "4:5", cut: true, tip: "PNG من غير خلفية، المنتج واقف ومالي الصورة. لو مفيش صورة بيظهر منتج مرسوم." }, hint: "بيطلع من تحت ويطفو فوق السعر." },
+  oldPrice: { label: "السعر القديم", kind: "text", def: "450", group: G2, max: 7, hint: "الرقم بس (من غير العملة). لازم يكون أكبر من الجديد علشان التوفير يتحسب." },
+  newPrice: { label: "السعر الجديد", kind: "text", def: "270", group: G2, max: 7, hint: "الرقم بس. العداد بينزل من القديم للجديد ويخبط." },
+  currency: { label: "العملة", kind: "text", def: "جنيه", group: G2, max: 6, hint: "كلمة واحدة: جنيه، ريال، درهم، $." },
+  showSave: { label: "ستيكر «وفّر»", kind: "toggle", def: true, group: G2, hint: "نجمة بتلف فيها الفرق بين السعرين (بيتحسب لوحده)." },
+  confetti: { label: "كونفيتي مع خبطة السعر", kind: "toggle", def: true, group: G2 },
+  showCd: { label: "العد التنازلي", kind: "toggle", def: true, group: G3, hint: "اقفله لو العرض مالوش ميعاد انتهاء (الصدق أهم من الضغط)." },
+  ends: { label: "سطر العد التنازلي", kind: "text", def: "العرض بيخلص خلال", group: G3, max: 20 },
+  hours: { label: "الساعات اللي فاضلة", kind: "number", def: 2, min: 0, max: 72, step: 1, unit: " ساعة", group: G3, hint: "الرقم اللي العداد بيبدأ منه." },
+  cta: { label: "الزرار", kind: "text", def: "اطلب دلوقتي", group: G4, max: 14, hint: "فعل واضح بكلمتين: اطلب دلوقتي، احجز، اشتري." },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "بيت العطور", group: G4, max: 20, hint: "بيظهر صغير تحت الزرار." },
+  color: { label: "اللون الأساسي", kind: "color", role: "accent", def: "#ff3d2e", group: GS, hint: "خلفية الفيديو كله: لون قوي ومشبّع (أحمر، برتقالي، بنفسجي) علشان إحساس العرض." },
+  color2: { label: "اللون التاني", kind: "color", def: "#ffd23f", group: GS, hint: "السعر الجديد وشطب القديم: لون فاتح بيبان قوي على الأساسي (أصفر، أبيض)." },
+  fHead: { label: "خط الأرقام والعناوين", kind: "font", def: "lalezar", group: GS, hint: "خط إعلاني تقيل للهوك والأسعار." },
+  fBody: { label: "خط الكلام", kind: "font", def: "changa", group: GS, hint: "اسم المنتج والعملة والسطور الصغيرة." },
+});
+M.meta({
+  story: "إعلان عرض سعر على الإيقاع: هوك بيخبط، المنتج بيطلع، السعر القديم بيتشطب والجديد بيعد لتحت ويخبط بكونفيتي، ستيكر التوفير، عد تنازلي، وزرار الطلب.",
+  scenes: [{ name: G1, t0: 0, t1: 1.6, about: "٣ كلمات على ٣ دقات" }, { name: G2, t0: 1.6, t1: 6.6, about: "المنتج، الشطب، العداد والخبطة، وستيكر التوفير" },
+    { name: G3, t0: 6.6, t1: 8.6, about: "ساعة العرض بتعد" }, { name: G4, t0: 8.6, t1: 12, about: "الزرار بينبض وبيتداس، واسم البراند" }],
+  tips: ["الفرق بين السعرين هو البطل: كل ما الخصم أوضح كل ما أحسن.", "صورة منتج من غير خلفية بتفرق جدًا عن المرسوم.", "العد التنازلي بس لو العرض بيخلص فعلًا."],
 });
 const W = 1080, H = 1920, DUR = 12, BPM = 120, B = 60 / BPM;
-const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
 const esc = (v) => String(v ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 const ar = (s) => String(s).replace(/\d/g, (d) => "٠١٢٣٤٥٦٧٨٩"[d]);
 const num = (s) => parseFloat(String(s).replace(/[٠-٩]/g, (d) => "٠١٢٣٤٥٦٧٨٩".indexOf(d))) || 0;
@@ -25,13 +40,14 @@ const T_HOOK = 0, T_PROD = 1.6, T_OLD = 2.6, T_STRIKE = 3.4, T_NEW = 4.0, T_SLAM
 M.reel({
   W, H, DUR, bg: PR.color,
   async init(M) {
-    await Promise.all([loadFont("LZ", "SM-Lalezar.ttf"), loadFont("CH", "SM-Changa.ttf"), loadFont("TJ", "SM-Tajawal.ttf")]);
+    await Promise.all([M.font("LZ", PR.fHead), M.font("CH", PR.fBody), M.font("TJ", PR.fBody)]);
     const st = M.stage; st.dir = "rtl";
     const cv = M.canvas(W, H); const x = cv.getContext("2d");
     const words = PR.hook.split(/\s+/).filter(Boolean).slice(0, 4);
     const hook = words.map((w) => M.el("div", "", `position:absolute;left:0;top:0;width:1080px;text-align:center;font:${M.fit(w, "LZ", 980, 330, 120)}px/1 LZ;color:#fff;text-shadow:0 14px 0 rgba(0,0,0,.18);`, esc(w)));
     // المنتج: زجاجة عطر مرسومة SVG (من غير أي لوجو)
-    const prod = M.el("div", "", "position:absolute;left:290px;top:0;width:500px;height:640px;",
+    const prod = M.el("div", "", "position:absolute;left:290px;top:0;width:500px;height:640px;", PR.img
+      ? `<img src="${esc(PR.img)}" alt="" style="width:500px;height:640px;object-fit:contain;filter:drop-shadow(0 30px 30px rgba(0,0,0,.28))">` :
       `<svg width="500" height="640" viewBox="0 0 500 640"><defs><linearGradient id="g" x1="0" x2="1"><stop offset="0" stop-color="#ffe9b0"/><stop offset=".5" stop-color="#ffb347"/><stop offset="1" stop-color="#e07b1a"/></linearGradient><linearGradient id="c" x1="0" x2="1"><stop offset="0" stop-color="#333"/><stop offset=".5" stop-color="#777"/><stop offset="1" stop-color="#222"/></linearGradient></defs>
       <ellipse cx="250" cy="610" rx="190" ry="22" fill="rgba(0,0,0,.22)"/>
       <rect x="185" y="40" width="130" height="120" rx="18" fill="url(#c)"/><rect x="215" y="150" width="70" height="50" fill="#c9a24a"/>
@@ -96,18 +112,18 @@ M.reel({
     op(C.neu, t > T_NEW ? 1 : 0); X(C.neu, 0, 1240, t < T_SLAM ? .75 + .1 * Math.sin(t * 30) * 0 : 1.35 - .35 * slam);
     // كونفيتي مع الخبطة
     const ct = t - T_SLAM;
-    if (ct > 0 && ct < 3.5) conf_draw(x, C.conf, ct);
+    if (PR.confetti && ct > 0 && ct < 3.5) conf_draw(x, C.conf, ct);
     // ٥) ستيكر التوفير
     const bk = t > T_BADGE ? springO(t - T_BADGE, 14, .45) : 0;
-    op(C.badge, bk > 0 ? 1 : 0); X(C.badge, 700, 220, bk, bk, -12 + Math.sin(t * 1.6) * 8);
+    op(C.badge, bk > 0 && PR.showSave ? 1 : 0); X(C.badge, 700, 220, bk, bk, -12 + Math.sin(t * 1.6) * 8);
     // ٦) العد التنازلي (ساعات:دقايق:ثواني بتعد) + شريط بيخلص
-    const dk = expo(seg(t, T_CD, T_CD + .5)), secs = 2 * 3600 + 45 * 60 + 10 - Math.floor(Math.max(0, t - T_CD) * 3);
+    const dk = expo(seg(t, T_CD, T_CD + .5)), secs = Math.max(0, PR.hours * 3600 + (PR.hours ? 45 * 60 + 10 : 59 * 60 + 50)) - Math.floor(Math.max(0, t - T_CD) * 3);
     X(C.cd, 90, 1520 + (1 - dk) * 120);
     [Math.floor(secs / 3600), Math.floor(secs / 60) % 60, secs % 60].forEach((v, i) => (C.cells[i].textContent = ar(String(v).padStart(2, "0"))));
     C.bar.style.transform = `scaleX(${.62 - .3 * seg(t, T_CD, DUR)})`;
     // ٧) كل اللي فوق بيطلع لفوق ويفضّي مكان للزرار
     const up = expo(seg(t, T_CTA, T_CTA + .6));
-    op(C.cd, dk * (1 - up)); C.cd.style.marginTop = `${up * 160}px`;
+    op(C.cd, PR.showCd ? dk * (1 - up) : 0); C.cd.style.marginTop = `${up * 160}px`;
     const ck = t > T_CTA + .3 ? springO(t - T_CTA - .3, 13, .5) : 0, pulse = 1 + .05 * Math.max(0, Math.sin((t - T_CTA) * Math.PI * 2 / (B * 2)));
     op(C.cta, ck > 0 ? 1 : 0); X(C.cta, 0, 1590, ck * pulse);
     // نقرة على الزرار (دايرة بتكبر وتختفي)

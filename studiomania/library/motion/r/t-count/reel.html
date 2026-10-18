@@ -2,26 +2,33 @@
 <script>
 // قالب «عد تنازلي»: رقم بيقلب زي ساعات المطارات القديمة، والرقم محسوب من الوقت نفسه (عشان يوصل صفر بالظبط)،
 // حلقة بتخلص، آخر ٣ ثواني بتحمر وتنبض، وعند الصفر: فلاش ونور ويتكشف العرض والزرار واسم البراند. 1080×1920، 12 ثانية.
+const G1 = "١ · العداد", G2 = "٢ · الكشف", GS = "الشكل العام";
 const PR = M.params({
-  label: { label: "فوق العداد", kind: "text", def: "العرض الكبير بيبدأ بعد" },
-  from: { label: "يعد من كام", kind: "text", def: "7" },
-  reveal: { label: "جملة الكشف", kind: "text", role: "product", def: "العرض بدأ!" },
-  offer: { label: "العرض", kind: "text", def: "خصومات لحد النص على كل حاجة" },
-  cta: { label: "الزرار", kind: "text", def: "الحق دلوقتي" },
-  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "سوق البلد" },
-  color: { label: "اللون الأساسي", kind: "color", def: "#5b2bff" },
-  hot: { label: "لون آخر ثواني", kind: "color", def: "#ff2d55" },
+  label: { label: "فوق العداد", kind: "text", def: "العرض الكبير بيبدأ بعد", group: G1, max: 26, hint: "بيقول الناس مستنيين إيه (العرض، الافتتاح، الإطلاق)." },
+  from: { label: "يعد من كام", kind: "number", def: 7, min: 3, max: 9, step: 1, unit: " ثواني", group: G1, hint: "كل رقم ثانية: ٥–٧ أحسن حاجة (أطول من كده الناس بتزهق)." },
+  reveal: { label: "جملة الكشف", kind: "text", role: "product", def: "العرض بدأ!", group: G2, max: 16, hint: "اللي بيطلع مع الفلاش عند الصفر: قصيرة وفيها حماس." },
+  offer: { label: "العرض", kind: "text", def: "خصومات لحد النص على كل حاجة", group: G2, max: 34, hint: "العرض بالتفصيل في سطر (النسبة أو السعر أو الهدية)." },
+  cta: { label: "الزرار", kind: "text", def: "الحق دلوقتي", group: G2, max: 14 },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "سوق البلد", group: G2, max: 20 },
+  color: { label: "اللون الأساسي", kind: "color", role: "accent", def: "#5b2bff", group: GS, hint: "الخلفية والكروت: لون قوي." },
+  hot: { label: "لون آخر ثواني", kind: "color", def: "#ff2d55", group: GS, hint: "آخر ٣ ثواني الرقم بيحمر وينبض: لون إنذار (أحمر، برتقالي)." },
+  fHead: { label: "خط الأرقام والكشف", kind: "font", def: "lalezar", group: GS },
+  fBody: { label: "خط الكلام", kind: "font", def: "changa", group: GS },
+});
+M.meta({
+  story: "عد تنازلي زي ساعات المطارات: الرقم بيقلب لحد الصفر، آخر ٣ ثواني بتحمر وتنبض، وعند الصفر فلاش ويتكشف العرض والزرار.",
+  scenes: [{ name: G1, t0: 0, t1: 7.6, about: "الأرقام بتقلب (طوله على حسب «يعد من كام»)" }, { name: G2, t0: 7.6, t1: 12, about: "الفلاش والعرض والزرار" }],
+  tips: ["ينفع قبل لايف أو افتتاح أو عرض محدود.", "جملة الكشف قصيرة والتفاصيل في سطر العرض."],
 });
 const W = 1080, H = 1920, DUR = 12, T0 = .6;
 const FROM = Math.max(3, Math.min(9, parseInt(String(PR.from).replace(/[٠-٩]/g, (d) => "٠١٢٣٤٥٦٧٨٩".indexOf(d))) || 7)), TZ = T0 + FROM;
-const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
 const esc = (v) => String(v ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 const ar = (n) => String(n).replace(/\d/g, (d) => "٠١٢٣٤٥٦٧٨٩"[d]);
 
 M.reel({
   W, H, DUR, bg: "#0c0820",
   async init(M) {
-    await Promise.all([loadFont("LZ", "SM-Lalezar.ttf"), loadFont("CH", "SM-Changa.ttf")]);
+    await Promise.all([M.font("LZ", PR.fHead), M.font("CH", PR.fBody)]);
     const st = M.stage; st.dir = "rtl";
     const cv = M.canvas(W, H); const x = cv.getContext("2d");
     const label = M.el("div", "", "position:absolute;left:0;top:330px;width:1080px;text-align:center;font:700 64px CH;color:#fff;");

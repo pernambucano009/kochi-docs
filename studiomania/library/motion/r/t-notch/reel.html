@@ -2,36 +2,47 @@
 <script>
 // قالب «النوتش اللي بيكبر»: فيلم إطلاق هادي وفخم: شاشة موبايل بخلفية ناعمة، والكبسولة السودا اللي فوق بتكبر وتتحول لودجت ورا ودجت
 // (الطلب في الطريق، الدفع تم، الخريطة)، وبعدين بتنفجر وتملى الشاشة باسم المنتج. حركات سبرنج ناعمة. 1080×1920، 12 ثانية.
+const G0 = "١ · الشاشة الرئيسية", G1 = "٢ · الودجت الأول", G2 = "٣ · الودجت التاني", G3 = "٤ · الودجت التالت", G4 = "٥ · اسم المنتج", GS = "الشكل العام";
 const PR = M.params({
-  w1: { label: "ودجت ١ (العنوان)", kind: "text", def: "طلبك في الطريق" },
-  w1b: { label: "ودجت ١ (الوقت)", kind: "text", def: "٧ دقايق" },
-  w2: { label: "ودجت ٢", kind: "text", def: "اتدفع ١٢٠ جنيه" },
-  w3: { label: "ودجت ٣", kind: "text", def: "المندوب قرّب منك" },
-  c1: { label: "تعليق ١", kind: "text", def: "تتابع طلبك لحظة بلحظة" },
-  c2: { label: "تعليق ٢", kind: "text", def: "تدفع في ثانية" },
-  c3: { label: "تعليق ٣", kind: "text", def: "وتعرف المندوب فين بالظبط" },
-  title: { label: "اسم المنتج", kind: "text", role: "product", def: "توصيلة" },
-  tag: { label: "الجملة الأخيرة", kind: "text", def: "كل حاجة… في لمحة" },
-  accent: { label: "لون التمييز", kind: "color", def: "#34d399" },
+  w1: { label: "ودجت ١ (العنوان)", kind: "text", def: "طلبك في الطريق", group: G1, max: 16, hint: "أول حاجة العميل بيشوفها من منتجك وهو شغال (حالة، تقدّم)." },
+  w1b: { label: "ودجت ١ (الوقت/الرقم)", kind: "text", def: "٧ دقايق", group: G1, max: 9, hint: "رقم قصير جنب العنوان بلون التمييز." },
+  c1: { label: "تعليق ١", kind: "text", def: "تتابع طلبك لحظة بلحظة", group: G1, max: 26, hint: "الفايدة في جملة (مش وصف الشاشة)." },
+  w2: { label: "ودجت ٢", kind: "text", def: "اتدفع ١٢٠ جنيه", group: G2, max: 18, hint: "لحظة نجاح بعلامة صح (دفع، حجز، تأكيد)." },
+  c2: { label: "تعليق ٢", kind: "text", def: "تدفع في ثانية", group: G2, max: 26 },
+  w3: { label: "ودجت ٣ (فوق الخريطة)", kind: "text", def: "المندوب قرّب منك", group: G3, max: 20, hint: "الودجت الكبير بخريطة ونقطة بتتحرك (توصيل، تتبع، مكان)." },
+  c3: { label: "تعليق ٣", kind: "text", def: "وتعرف المندوب فين بالظبط", group: G3, max: 26 },
+  title: { label: "اسم المنتج", kind: "text", role: "product", def: "توصيلة", group: G4, max: 14, hint: "بيظهر كبير لما الكبسولة تملى الشاشة." },
+  tag: { label: "الجملة الأخيرة", kind: "text", role: "tagline", def: "كل حاجة… في لمحة", group: G4, max: 24, hint: "الوعد في ٣ كلمات." },
+  clock: { label: "الساعة على الشاشة", kind: "text", def: "9:41", group: G0, max: 5, hint: "الوقت اللي فوق (٩:٤١ هي ساعة الإعلانات المشهورة)." },
+  accent: { label: "لون التمييز", kind: "color", role: "accent", def: "#34d399", group: GS, hint: "لون الودجتس والنقطة: لون فاتح بيبان على الأسود (أخضر، أصفر، سماوي)." },
+  bg1: { label: "لون الخلفية ١", kind: "color", def: "#1e1b4b", group: GS, hint: "الخلفية متدرّجة بين اللونين دول: غامقين." },
+  bg2: { label: "لون الخلفية ٢", kind: "color", def: "#3b2a6b", group: GS },
+  fHead: { label: "خط الكلام", kind: "font", def: "plex", group: GS },
+  fBody: { label: "خط السطر الأخير", kind: "font", def: "plex4", group: GS },
+});
+M.meta({
+  story: "فيلم إطلاق تطبيق فخم وهادي: الكبسولة السودا اللي فوق شاشة الموبايل بتكبر وتتحول لودجت ورا ودجت (حالة، نجاح، خريطة)، وبعدين بتنفجر وتملى الشاشة باسم المنتج.",
+  scenes: [{ name: G0, t0: 0, t1: 1, about: "الشاشة الرئيسية والساعة" }, { name: G1, t0: 1, t1: 3.4, about: "الكبسولة بتكبر بودجت الحالة" }, { name: G2, t0: 3.4, t1: 5.4, about: "ودجت علامة الصح" },
+    { name: G3, t0: 5.4, t1: 7.6, about: "ودجت الخريطة" }, { name: G4, t0: 7.6, t1: 12, about: "الكبسولة بتملى الشاشة بالاسم" }],
+  tips: ["كل ودجت لحظة حقيقية من استخدام منتجك.", "الودجتس قصيرة جدًا (كلمتين تلاتة) علشان مساحتها صغيرة.", "التعليقات تحت بتقول الفايدة."],
 });
 const W = 1080, H = 1920, DUR = 12;
-const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
 
 M.reel({
   W, H, DUR, bg: "#0b0b10",
-  async init(M) { await Promise.all([loadFont("PB", "TY-PlexArabic-700.ttf", "700"), loadFont("PX", "TY-PlexArabic-400.ttf"), loadFont("IN", "inter600.ttf", "600")]); const c = M.canvas(W, H); return { x: c.getContext("2d") }; },
+  async init(M) { await Promise.all([M.font("PB", PR.fHead), M.font("PX", PR.fBody), M.font("IN", "inter")]); const c = M.canvas(W, H); return { x: c.getContext("2d") }; },
   seek(t, C, M) {
     const { x } = C, { seg, clamp, springO, cubicIO, expo } = M, io = (k) => cubicIO(clamp(k)), A = PR.accent;
     x.setTransform(1, 0, 0, 1, 0, 0);
     // خلفية ناعمة بتتحرك
-    const g = x.createLinearGradient(0, 0, W, H); g.addColorStop(0, "#1e1b4b"); g.addColorStop(.5, "#3b2a6b"); g.addColorStop(1, "#0f172a"); x.fillStyle = g; x.fillRect(0, 0, W, H);
+    const g = x.createLinearGradient(0, 0, W, H); g.addColorStop(0, PR.bg1); g.addColorStop(.5, PR.bg2); g.addColorStop(1, "#0f172a"); x.fillStyle = g; x.fillRect(0, 0, W, H);
     for (let i = 0; i < 3; i++) { const bx = 540 + Math.sin(t * .3 + i * 2) * 300, by = 900 + Math.cos(t * .25 + i) * 500, r = 500; const gg = x.createRadialGradient(bx, by, 0, bx, by, r); gg.addColorStop(0, ["rgba(129,140,248,.35)", "rgba(244,114,182,.25)", "rgba(52,211,153,.2)"][i]); gg.addColorStop(1, "rgba(0,0,0,0)"); x.fillStyle = gg; x.fillRect(0, 0, W, H); }
     // شريط الحالة
-    x.fillStyle = "#fff"; x.font = "600 40px IN"; x.textAlign = "left"; x.direction = "ltr"; x.fillText("9:41", 70, 92);
+    x.fillStyle = "#fff"; x.font = "600 40px IN"; x.textAlign = "left"; x.direction = "ltr"; x.fillText(PR.clock, 70, 92);
     x.strokeStyle = "#fff"; x.lineWidth = 3; x.beginPath(); x.roundRect(930, 64, 70, 34, 9); x.stroke(); x.fillRect(936, 70, 46, 22); x.fillRect(1004, 74, 5, 14);
     for (let k = 0; k < 4; k++) x.fillRect(840 + k * 16, 92 - k * 8 - 8, 10, k * 8 + 8);
     // ساعة كبيرة على الشاشة الرئيسية
-    const ha = 1 - io(seg(t, 1.0, 1.6)); if (ha > 0) { x.globalAlpha = ha; x.font = "600 220px IN"; x.textAlign = "center"; x.fillText("9:41", 540, 620); x.globalAlpha = 1; }
+    const ha = 1 - io(seg(t, 1.0, 1.6)); if (ha > 0) { x.globalAlpha = ha; x.font = "600 220px IN"; x.textAlign = "center"; x.fillText(PR.clock, 540, 620); x.globalAlpha = 1; }
     // كاميرا بتقرّب على الكبسولة وقت الودجتس
     const zc = io(seg(t, 1.0, 1.8)) * (1 - io(seg(t, 7.4, 8.2))), Z = 1 + .13 * zc; x.save(); x.translate(540, 30); x.scale(Z, Z); x.translate(-540, -60);
     // الكبسولة: حالات (عرض، ارتفاع، y)
