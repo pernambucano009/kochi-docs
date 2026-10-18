@@ -73,6 +73,7 @@ const BrandPage = (() => {
       ] },
       // نبض المجال: المنافسين (أعلى 5 في المجال والسوق) واللي بينجح عندهم والترند وتحليل بوستات بنفسك، كله في فرع واحد
       { k: "pulse", t: "نبض المجال", en: "Niche Pulse", leaves: [
+        { f: "pg", i: "rv:plan", page: "rivals", t: "🧭 خطة المحتوى", type: "page" },
         ...(b?.rivals || []).map((r) => ({ f: "pg", i: `rv${r.id}`, page: "rivals", t: `@${r.handle}`, type: "page" })),
         ...((b?.rivals || []).length ? [] : [{ f: "pg", i: "rv:rivals", page: "rivals", t: "🏆 هات منافسينك", type: "page" }]),
         { f: "pg", i: "rv:works", page: "rivals", t: "🧠 اللي بينجح عندهم", type: "page" },

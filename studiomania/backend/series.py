@@ -338,7 +338,7 @@ def writer_messages(bible: str, character: str, previous: list[dict], number: in
         "اسم الشخصية ما يتذكرش أبدًا."
     )
     first = f"اكتب الحلقة رقم {number} استكمالًا للي فات."
-    msgs = [{"role": "system", "content": system + "\n\n" + algo.rule("hook", "story")}]
+    msgs = [{"role": "system", "content": system + "\n\n" + algo.for_use("series")}]
     if not chat or chat[0]["role"] != "user":
         msgs.append({"role": "user", "content": first})
     return msgs + chat[-30:]

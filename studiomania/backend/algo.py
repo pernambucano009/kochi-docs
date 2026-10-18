@@ -6,6 +6,8 @@
 """
 from __future__ import annotations
 
+import playbook
+
 UPDATED = "2026-10-17"
 
 # كل جزء: (العنوان، القواعد). مكتوبة قصيرة ومباشرة لأنها بتتحط جوه برومبتات الموديل
@@ -95,20 +97,8 @@ PLATFORMS = {
     "facebook": "فيسبوك: نفس منطق الريلز، وبيمشي مع إنستجرام حسب سن الجمهور.",
 }
 
-# اللي كل أداة بتاخده
-USES = {
-    "ideas": ("core", "idea", "hook"),
-    "script": ("hook", "story", "edit", "caption"),
-    "carousel": ("idea", "hook", "engage", "caption"),
-    "ads": ("hook", "story", "convert"),
-    "analysis": ("analyze", "idea", "hook"),
-    "story": ("story",),
-    "review": ("core", "idea", "hook", "story", "edit", "engage", "convert", "caption"),
-}
-
-
 def rule(*parts: str, platform: str = "") -> str:
-    """قواعد جاهزة تتحط في البرومبت."""
+    """القواعد المختصرة (لما البرومبت محتاج تذكير سريع بس)."""
     blocks = []
     for p in parts:
         if p in PARTS:
@@ -121,13 +111,20 @@ def rule(*parts: str, platform: str = "") -> str:
     return "📡 قواعد الخوارزميات (العقل العام للبرنامج، طبّقها من غير ما تذكرها بالاسم):\n" + "\n\n".join(blocks)
 
 
-def for_use(use: str, platform: str = "") -> str:
-    return rule(*USES.get(use, ()), platform=platform)
+def for_use(use: str, platform: str = "", limit: int = 14000) -> str:
+    """الفريمويركس الكاملة اللي تخص الأداة دي من مكتبة playbook (مش ملخّص)."""
+    body = playbook.pack(use, limit)
+    if platform in PLATFORMS:
+        body += "\n\n[المنصة]\n- " + PLATFORMS[platform]
+    if not body:
+        return ""
+    return ("📚 العقل العام: فريمويركس المحتوى والخوارزميات. اشتغل بيها فعلًا في كل اللي بتكتبه (طبّق الخطوات، "
+            "مش تذكرها بالاسم ولا تشرحها للعميل)، وقواعد البراند ليها الأولوية لو حصل تعارض:\n\n" + body)
 
 
 def public() -> dict:
-    """للعرض في البرنامج: العميل يشوف القواعد اللي الأدوات ماشية عليها."""
-    return {"updated": UPDATED, "parts": [{"key": k, "title": t, "items": items} for k, (t, items) in PARTS.items()],
+    """للعرض في البرنامج: العميل يشوف كل الفريمويركس اللي الأدوات ماشية عليها."""
+    return {"updated": UPDATED, "parts": [{"key": f["id"], "title": f["title"], "items": f["steps"]} for f in playbook.public()],
             "platforms": PLATFORMS}
 
 
@@ -136,22 +133,28 @@ def public() -> dict:
 KINDS = {"script": "سكريبت فيديو قصير", "caption": "كابشن بوست", "idea": "فكرة فيديو", "hook": "هوك"}
 
 CHECKS = [
-    ("topic", "الموضوع يهم الجمهور والزاوية جديدة"),
-    ("hook", "الهوك واضح ومختصر وبيفتح فضول"),
-    ("align", "المكتوب والمنطوق والمعروض بيقولوا نفس المعنى"),
-    ("lockin", "أول جمل بعد الهوك بتأكد الوعد وفيها دليل"),
+    ("topic", "الموضوع يهم المشاهد المثالي ومن مجال الحساب"),
+    ("seed", "الزاوية أو الرأي جديد ومش بديهي"),
+    ("format", "الشكل (format) أنسب طريقة للفكرة"),
+    ("hook", "الهوك: موضوع واضح + سبب يكمّل + مختصر + تفسير واحد"),
+    ("align", "المكتوب والمعروض والمنطوق بيقولوا نفس المعنى"),
+    ("soundoff", "يتفهم من غير صوت في أول ٥ ثواني"),
+    ("lockin", "أول جمل بعد الهوك بتأكد الوعد وفيها دليل بدري"),
     ("lulls", "مفيش حشو أو لحظات مملة"),
+    ("loops", "أسئلة بتتفتح وتتقفل (بس… علشان كده…) وفيه مفاجأة منطقية"),
     ("payoff", "النتيجة في الآخر وبتوفي بوعد الهوك"),
-    ("relatable", "relatable وبيولّد كومنتات أو مشاركة أو حفظ"),
-    ("cta", "فيه دعوة واضحة مناسبة للموضوع"),
-    ("repeat", "شكل ينفع يتكرر"),
+    ("relatable", "relatable وبيولّد كومنتات أو مشاركة"),
+    ("save", "فيه قيمة تتحفظ (خطوات، قايمة، شرح)"),
+    ("trust", "فيه دليل حقيقي يبني ثقة"),
+    ("cta", "دعوة واضحة مطابقة لموضوع الفيديو"),
+    ("repeat", "شكل ينفع يتكرر بتغيير عنصر"),
 ]
 
 
 def review_messages(text: str, kind: str, platform: str, brand: str, goal: str = "") -> list[dict]:
     checks = "\n".join(f'- "{k}": {t}' for k, t in CHECKS)
     return [{"role": "system", "content": "إنت مراجع محتوى سوشيال صريح وعملي، بتقيّم قبل النشر بقواعد الخوارزميات. بترد بالعربي المصري البسيط. Return JSON only.\n\n"
-             + rule(*USES["review"], platform=platform)},
+             + for_use("review", platform)},
             {"role": "user", "content": f"""{('البراند:' + chr(10) + brand[:3000] + chr(10) * 2) if brand else ''}{('هدف المحتوى: ' + goal + chr(10)) if goal else ''}قيّم {KINDS.get(kind, 'المحتوى')} ده قبل النشر:
 «««
 {text[:6000]}
@@ -198,3 +201,115 @@ def mock_review(text: str) -> dict:
                          "top_fixes": ["قول الموضوع في أول جملة", "أخّر النتيجة لآخر ٥ ثواني", "ضيف دعوة بكلمة في الكومنت"],
                          "hooks": ["أغلب الناس بتعمل كده غلط", "قالولك كذا… الحقيقة كذا", "لو انت كذا، الفيديو ده ليك"],
                          "caption": "مكنتش متوقع النتيجة دي 👀\n\nعلّق بكلمة «دليل» وأبعتلك الخطوات\n#مجالك #نصايح"})
+
+
+# ---------------------------------------------------------------- 🧭 خطة المحتوى للبراند (فريمويركس الاستراتيجية مطبّقة على العميل)
+
+GAMES = {"mainstream": "شهرة عامة", "category": "شهرة في الفئة", "intuitive": "منتج بديهي (بيتباع بالإحساس)",
+         "explanatory": "منتج محتاج شرح", "authority": "بناء ثقة وخبرة (خدمات/كوتشينج)"}
+AXES = {"topic": "الموضوع", "substance": "العمق", "avatar": "الجمهور", "format": "الشكل", "visual": "الصورة"}
+DAYS = ["السبت", "الأحد", "الاتنين", "التلات", "الأربع", "الخميس", "الجمعة"]
+
+
+def strategy_messages(brand: str, rivals_txt: str, notes: str = "") -> list[dict]:
+    games = " · ".join(f"{k} = {v}" for k, v in GAMES.items())
+    axes = "، ".join(f"{k} ({v})" for k, v in AXES.items())
+    return [{"role": "system", "content": "إنت استراتيجي محتوى سوشيال شاطر، بتطبّق الفريمويركس دي بالحرف على براند حقيقي، بالعربي المصري البسيط. Return JSON only.\n\n"
+             + for_use("strategy", limit=16000)},
+            {"role": "user", "content": f"""البراند:
+{brand[:5000] or '(بيانات قليلة)'}
+
+{rivals_txt[:2500] if rivals_txt else '(لسه مفيش داتا منافسين)'}
+{('ملاحظات العميل: ' + notes) if notes else ''}
+
+اعمل خطة محتوى كاملة للبراند ده مبنية على الفريمويركس، كلها مخصوصة ليه (ممنوع كلام عام ينفع لأي براند، وممنوع أرقام أو نتايج مخترعة):
+رجّع JSON بالشكل ده بس:
+{{"game": {{"key": "واحد من: {games}", "why": "ليه دي لعبته في جملتين"}},
+  "statement": "أنا بساعد [مين بالظبط] يوصل لـ[نتيجة] عن طريق [طريقة]",
+  "avatar": "الشخص الواحد اللي بنكلمه: سنه، موقفه، ألمه الأساسي، بيحلم بإيه",
+  "rings": ["٥ دواير الجمهور من المركز الأضيق للأعرض"],
+  "buckets": [{{"name": "مجموعة مواضيع", "ring": رقم الدايرة 1-5, "why": "ليه تهم الجمهور (من داتا المنافسين لو موجودة)", "topics": ["٣ مواضيع محددة من ٣–٥ كلمات"]}}],
+  "formats": [{{"name": "شكل (format)", "why": "ليه يناسب البراند"}}],
+  "formulas": [{{"topic": "مجموعة", "format": "شكل", "visual": "طريقة العرض البصري"}}],
+  "week": [{{"day": "السبت", "ring": 1, "bucket": "", "idea": "فكرة الفيديو", "hook": "الهوك المكتوب على الشاشة", "cta": "الدعوة"}}],
+  "takes": ["٥ آراء عكس السائد في المجال البراند يقدر يدافع عنها"],
+  "words": ["٢–٣ كلمات أو عبارات عايزين الناس تربط البراند بيها"],
+  "signature": "حاجة شكلية ثابتة تميّز فيديوهات البراند",
+  "white_space": {{{', '.join(f'"{k}": "الفراغ في {v} اللي المنافسين مش مغطيينه"' for k, v in AXES.items())}}},
+  "funnel": {{"keyword": "كلمة الكومنت", "magnet": "الهدية المجانية المطابقة للمواضيع (ملف/دليل…)", "offer": "إزاي توصل للعرض المدفوع"}},
+  "cadence": "كام فيديو في الأسبوع ودلوقتي في أنهي مرحلة (تجريب ولا تكرار) وإيه اللي يتقاس",
+  "platform": "منصة البيت المقترحة وليه",
+  "profile": {{"bio": "بايو مقترح ~٨٠ حرف", "pinned": "الفيديو اللي يتثبّت"}},
+  "avoid": ["٣–٥ حاجات البراند يبعد عنها"]}}
+أعداد: buckets ٣–٤، formats ٢–٣، formulas ٤–٦، week ٧ أيام بالظبط بخلطة ٣-٢-١ (٤ في الدايرتين ١–٢، ١ في الدايرة ٤، ١ تجريبي، ١ تكرار لأحسن تركيبة)."""}]
+
+
+def clean_strategy(raw: dict) -> dict:
+    raw = raw if isinstance(raw, dict) else {}
+    s = lambda v, n=400: str(v or "").strip()[:n]
+    lst = lambda v, n, m=300: [s(x, m) for x in (v or []) if s(x, m)][:n] if isinstance(v, list) else []
+    num = lambda v, lo, hi: max(lo, min(hi, int(v))) if str(v).strip().lstrip("-").isdigit() else lo
+    g = raw.get("game") or {}
+    key = s(g.get("key"), 40).split(" ")[0].split("=")[0].strip()
+    out = {"game": {"key": key if key in GAMES else "authority", "why": s(g.get("why"))},
+           "statement": s(raw.get("statement")), "avatar": s(raw.get("avatar"), 600), "rings": lst(raw.get("rings"), 5, 120),
+           "buckets": [{"name": s(b.get("name"), 80), "ring": num(b.get("ring"), 1, 5), "why": s(b.get("why")), "topics": lst(b.get("topics"), 4, 100)}
+                       for b in (raw.get("buckets") or []) if isinstance(b, dict) and s(b.get("name"))][:5],
+           "formats": [{"name": s(f.get("name"), 80), "why": s(f.get("why"))} for f in (raw.get("formats") or []) if isinstance(f, dict) and s(f.get("name"))][:4],
+           "formulas": [{k: s(f.get(k), 120) for k in ("topic", "format", "visual")} for f in (raw.get("formulas") or []) if isinstance(f, dict)][:8],
+           "week": [{"day": s(w.get("day"), 20) or DAYS[i % 7], "ring": num(w.get("ring"), 1, 5), "bucket": s(w.get("bucket"), 80), "idea": s(w.get("idea")),
+                     "hook": s(w.get("hook"), 160), "cta": s(w.get("cta"), 200)} for i, w in enumerate(raw.get("week") or []) if isinstance(w, dict)][:7],
+           "takes": lst(raw.get("takes"), 6), "words": lst(raw.get("words"), 4, 60), "signature": s(raw.get("signature")),
+           "white_space": {k: s((raw.get("white_space") or {}).get(k)) for k in AXES},
+           "funnel": {k: s((raw.get("funnel") or {}).get(k), 300) for k in ("keyword", "magnet", "offer")},
+           "cadence": s(raw.get("cadence"), 500), "platform": s(raw.get("platform"), 400),
+           "profile": {k: s((raw.get("profile") or {}).get(k), 200) for k in ("bio", "pinned")}, "avoid": lst(raw.get("avoid"), 5)}
+    return out
+
+
+def strategy_text(brain: dict | None) -> str:
+    """الخطة اللي العميل عملها بتدخل في كل برومبت محتوى (مختصرة)."""
+    st = (brain or {}).get("strategy") or {}
+    if not st.get("statement") and not st.get("buckets"):
+        return ""
+    lines = ["خطة المحتوى المعتمدة للبراند (امشي عليها: نفس الجمهور والمواضيع والآراء، وماتخرجش برّه المجال):"]
+    if st.get("statement"):
+        lines.append(f"- التموضع: {st['statement']}")
+    if st.get("game", {}).get("key"):
+        lines.append(f"- لعبة المحتوى: {GAMES.get(st['game']['key'], '')}")
+    if st.get("avatar"):
+        lines.append(f"- الشخص اللي بنكلمه: {st['avatar']}")
+    if st.get("buckets"):
+        lines.append("- مجموعات المواضيع: " + " · ".join(f"{b['name']} ({'، '.join(b['topics'][:3])})" for b in st["buckets"]))
+    if st.get("formats"):
+        lines.append("- الأشكال الأساسية: " + "، ".join(f["name"] for f in st["formats"]))
+    if st.get("takes"):
+        lines.append("- آراء البراند المختلفة: " + " · ".join(st["takes"][:5]))
+    if st.get("words"):
+        lines.append("- كلمات نتعرف بيها (كررها): " + "، ".join(st["words"]))
+    fn = st.get("funnel") or {}
+    if fn.get("keyword") or fn.get("magnet"):
+        lines.append(f"- الدعوة: علّق بكلمة «{fn.get('keyword') or '…'}» وناخد {fn.get('magnet') or 'الهدية'}")
+    if st.get("avoid"):
+        lines.append("- نبعد عن: " + " · ".join(st["avoid"]))
+    return "\n".join(lines)[:2200]
+
+
+def mock_strategy() -> dict:
+    return clean_strategy({
+        "game": {"key": "authority", "why": "البراند بيبيع خدمة محتاجة ثقة، فالمهم المشاهد الصح مش عدد المشاهدات"},
+        "statement": "أنا بساعد المبتدئين في الجيم يوصلوا لأول نتيجة في ٩٠ يوم عن طريق تمارين بيتية بسيطة",
+        "avatar": "شاب ٢٢–٣٠ سنة، شغال وماعندوش وقت، جرّب الجيم ووقف، نفسه يشوف نتيجة من غير ما يعيش في الجيم",
+        "rings": ["مبتدئين جيم مشغولين", "مبتدئين لياقة", "مهتمين بالصحة", "شباب بيهتموا بشكلهم", "أي حد"],
+        "buckets": [{"name": "أخطاء المبتدئين", "ring": 1, "why": "أعلى مضاعف عند المنافسين", "topics": ["غلطة الإحماء", "تمرين البطن الغلط", "الأكل بعد التمرين"]},
+                    {"name": "تمارين بيتية سريعة", "ring": 2, "why": "بتتحفظ كتير", "topics": ["١٠ دقايق الصبح", "من غير أدوات", "قبل النوم"]},
+                    {"name": "قصص تحوّل", "ring": 4, "why": "بتتشارك", "topics": ["٩٠ يوم", "رجعت بعد سنة", "من غير جيم"]}],
+        "formats": [{"name": "غلطة ← التصحيح", "why": "بيوقف الناس اللي بتعمل الغلطة"}, {"name": "قبل وبعد", "why": "تحوّل واضح"}],
+        "formulas": [{"topic": "أخطاء المبتدئين", "format": "غلطة ← التصحيح", "visual": "الكوتش للكاميرا + لقطة الغلط"}],
+        "week": [{"day": d, "ring": [1, 2, 1, 2, 4, 3, 1][i], "bucket": "أخطاء المبتدئين", "idea": "فكرة تجريبية", "hook": "انت بتعمل التمرين ده غلط", "cta": "علّق «خطة»"} for i, d in enumerate(DAYS)],
+        "takes": ["مش محتاج جيم في أول ٣ شهور", "الكارديو مش أحسن طريقة للتنشيف"], "words": ["٩٠ يوم", "من غير جيم"],
+        "signature": "خلفية الأوضة نفسها ولوح أبيض عليه رقم اليوم",
+        "white_space": {k: "تجريبي" for k in AXES}, "funnel": {"keyword": "خطة", "magnet": "جدول ٩٠ يوم PDF", "offer": "متابعة شهرية"},
+        "cadence": "٣ فيديو في الأسبوع أول شهر (تجريب)، بعدين ٥", "platform": "إنستجرام علشان الكومنت بكلمة والرسايل",
+        "profile": {"bio": "تمارين بيتية للمبتدئين · نتيجة في ٩٠ يوم · فيديو يومي", "pinned": "أكبر ٣ أخطاء للمبتدئين"},
+        "avoid": ["فيديوهات ترند برّه اللياقة", "وعود بأرقام وزن"]})

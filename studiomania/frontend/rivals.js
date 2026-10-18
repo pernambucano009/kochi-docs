@@ -3,8 +3,8 @@
 // المنافسين والترند بيدخلوا لوحدهم في كتابة الأفكار والسكريبتات والهوكات.
 const RivalsPage = (() => {
   const esc = (s) => escapeHtml(String(s ?? ""));
-  const S = { el: null, d: null, timer: null, swap: null, focus: null, tab: "rivals", ac: { text: "", kind: "script", platform: "", res: null, busy: false, rules: null } };
-  const TABS = [["rivals", "🏆 المنافسين"], ["works", "🧠 اللي بينجح عندهم"], ["trend", "📈 الترند آخر ٣٠ يوم"], ["mine", "🔥 حلّل بوستات بنفسك"], ["algo", "📡 افحص قبل النشر"]];
+  const S = { el: null, d: null, timer: null, swap: null, focus: null, tab: "rivals", pl: { d: null, busy: false, notes: "" }, ac: { text: "", kind: "script", platform: "", res: null, busy: false, rules: null } };
+  const TABS = [["plan", "🧭 خطة المحتوى"], ["rivals", "🏆 المنافسين"], ["works", "🧠 اللي بينجح عندهم"], ["trend", "📈 الترند آخر ٣٠ يوم"], ["mine", "🔥 حلّل بوستات بنفسك"], ["algo", "📡 افحص قبل النشر"]];
   const html = () => `<div class="nb-wrap fs-wrap rv-wrap" id="rvWrap"><div class="nh-empty">بيحمّل…</div></div>`;
   const fmt = (n) => { n = +n || 0; return n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${Math.round(n / 1e3)}K` : String(n); };
   const PL = { tiktok: "TikTok", instagram: "Instagram" };
@@ -88,11 +88,46 @@ const RivalsPage = (() => {
           + `<details class="rv-rule"><summary>الفرق بين المنصات <span class="num">${Object.keys(rules.platforms).length}</span></summary><ul>${Object.values(rules.platforms).map((x) => `<li>${esc(x)}</li>`).join("")}</ul></details>` : `<div class="nh-empty">بيحمّل…</div>`}
       </section>`;
   }
+  // 🧭 خطة المحتوى: فريمويركس الاستراتيجية مطبّقة على البراند (لعبة المحتوى، التموضع، دواير الجمهور، المواضيع، خلطة ٣-٢-١…)
+  function planTab() {
+    const P = S.pl, st = P.d?.strategy, G = P.d?.games || {}, AX = P.d?.axes || {};
+    const form = `<label class="nb-f"><span>عايز تقول حاجة للمخ قبل ما يعمل الخطة؟ (اختياري: هدفك، عرضك، اللي مش عايزه)</span>
+        <textarea rows="2" data-plnotes placeholder="مثلًا: عايز أبيع اشتراك شهري، ومش عايز أظهر بوشي">${esc(P.notes)}</textarea></label>
+      <div class="nb-bar"><button class="nb-btn fs-go" data-plgo ${P.busy ? "disabled" : ""}>${P.busy ? "⏳ بيعمل الخطة… (دقيقة تقريبًا)" : st ? "🔄 اعمل خطة جديدة" : "🧭 اعمل خطتي"}</button>
+        ${st && !P.busy ? `<button class="nb-btn sm danger" data-plclear>امسح الخطة</button>` : ""}</div>`;
+    if (!P.d) return `<div class="nh-empty">بيحمّل…</div>`;
+    if (!st) return `<section class="fs-card"><h3>🧭 خطة المحتوى <small>المخ بيطبّق فريمويركس الاستراتيجية على براندك انت</small></h3>
+        <p class="nb-hint">بيحدد لعبتك (شهرة ولا بيع)، وجملة التموضع، والشخص اللي بتكلمه، ودواير الجمهور، ومجموعات المواضيع والأشكال، وجدول أسبوع بخلطة ٣-٢-١، وآراءك المختلفة، والفراغ اللي المنافسين سايبينه، والدعوة والهدية. ولما تعملها، كل الأفكار والسكريبتات والهوكات في البرنامج بتمشي عليها. هات المنافسين الأول علشان الخطة تبقى على داتا حقيقية.</p>
+        ${form}</section>`;
+    const li = (a) => a.map((x) => `<li>${esc(x)}</li>`).join("");
+    const sec = (t, h) => `<section class="fs-card pl-sec"><h3>${t}</h3>${h}</section>`;
+    return `<section class="fs-card pl-hero">
+        <span class="pl-game">${esc(G[st.game.key] || "")}</span>
+        <p class="pl-state">${esc(st.statement)}</p>
+        <p class="nb-hint">${esc(st.game.why)}</p>
+        ${st.avatar ? `<p><b>الشخص اللي بنكلمه:</b> ${esc(st.avatar)}</p>` : ""}
+        ${form}</section>
+      ${st.rings.length ? sec("🎯 دواير الجمهور <small>من الأضيق للأعرض · ماتنزلش في أوسع دايرة</small>", `<ol class="pl-rings">${st.rings.map((r, i) => `<li style="--r:${i}"><span class="num">${i + 1}</span>${esc(r)}</li>`).join("")}</ol>`) : ""}
+      ${st.buckets.length ? sec("🗂 مجموعات المواضيع", `<div class="pl-grid">${st.buckets.map((b) => `<div class="pl-card"><b>${esc(b.name)}</b><small>دايرة ${b.ring} · ${esc(b.why)}</small><ul>${li(b.topics)}</ul></div>`).join("")}</div>`) : ""}
+      ${st.formats.length || st.formulas.length ? sec("🧱 الأشكال والتركيبات <small>موضوع + شكل + عرض بصري</small>", `<div class="pl-grid">${st.formats.map((f) => `<div class="pl-card"><b>${esc(f.name)}</b><small>${esc(f.why)}</small></div>`).join("")}</div>
+          ${st.formulas.length ? `<table class="pl-tbl"><tr><th>الموضوع</th><th>الشكل</th><th>العرض</th></tr>${st.formulas.map((f) => `<tr><td>${esc(f.topic)}</td><td>${esc(f.format)}</td><td>${esc(f.visual)}</td></tr>`).join("")}</table>` : ""}`) : ""}
+      ${st.week.length ? sec("📅 أسبوعك بخلطة ٣-٢-١", `<div class="pl-week">${st.week.map((w) => `<div class="pl-day"><span>${esc(w.day)}<small>دايرة ${w.ring}</small></span><div><b>${esc(w.idea)}</b>${w.hook ? `<i>«${esc(w.hook)}»</i>` : ""}<small>${esc(w.bucket)}${w.cta ? ` · ${esc(w.cta)}` : ""}</small></div></div>`).join("")}</div>`) : ""}
+      ${st.takes.length ? sec("🔥 آراءك المختلفة <small>اللي هيخليك تخترق المجال</small>", `<ul class="pl-list">${li(st.takes)}</ul>`) : ""}
+      ${sec("🧲 الارتباط والتميّز", `${st.words.length ? `<p><b>كلمات نتعرف بيها:</b> ${st.words.map((w) => `<span class="pl-chip">${esc(w)}</span>`).join("")}</p>` : ""}
+          ${st.signature ? `<p><b>توقيعك الشكلي:</b> ${esc(st.signature)}</p>` : ""}
+          <div class="pl-grid">${Object.entries(st.white_space).filter(([, v]) => v).map(([k, v]) => `<div class="pl-card"><b>الفراغ في ${esc(AX[k] || k)}</b><small>${esc(v)}</small></div>`).join("")}</div>`)}
+      ${sec("💰 من مشاهد لعميل", `<div class="pl-grid"><div class="pl-card"><b>علّق بكلمة</b><span class="pl-chip">${esc(st.funnel.keyword || "—")}</span></div>
+          <div class="pl-card"><b>الهدية</b><small>${esc(st.funnel.magnet)}</small></div><div class="pl-card"><b>العرض</b><small>${esc(st.funnel.offer)}</small></div></div>`)}
+      ${sec("⏱ الإيقاع والمنصة والبروفايل", `${st.cadence ? `<p><b>الإيقاع:</b> ${esc(st.cadence)}</p>` : ""}${st.platform ? `<p><b>منصة البيت:</b> ${esc(st.platform)}</p>` : ""}
+          ${st.profile.bio ? `<p><b>البايو:</b> ${esc(st.profile.bio)}</p>` : ""}${st.profile.pinned ? `<p><b>الفيديو المثبّت:</b> ${esc(st.profile.pinned)}</p>` : ""}
+          ${st.avoid.length ? `<p><b>نبعد عن:</b></p><ul class="pl-list">${li(st.avoid)}</ul>` : ""}`)}`;
+  }
   function body() {
     const d = S.d, busy = d.status === "working";
     if (S.tab === "works") return digest(d.digest) || `<div class="nh-empty">لسه مفيش تحليل. هات المنافسين الأول.</div>`;
     if (S.tab === "trend") return trend(d.trending);
     if (S.tab === "algo") return algoTab();
+    if (S.tab === "plan") return planTab();
     if (S.tab === "mine") return `<p class="nb-hint">لو شايف بوستات بنفسك (من أي حساب)، حطها هنا ونحسبلك كل بوست عدّى متوسط صاحبه بكام، ونطلعلك أفكار بنفس الهيكل.</p>${ViralPage.html()}`;
     return `<section class="fs-card"><h3>ضيف منافس بنفسك</h3>
         <div class="nb-row rv-add"><input type="text" data-rvnew placeholder="@اسم الحساب أو اللينك" dir="ltr">
@@ -107,10 +142,11 @@ const RivalsPage = (() => {
     if (!w || !S.d) return;
     if (!w.querySelector(".rv-top")) w.innerHTML = `<div class="rv-top"></div><div class="rv-body"></div>`;
     w.querySelector(".rv-top").innerHTML = top();
-    if (onlyTop && (S.tab === "mine" || S.tab === "algo")) return;   // ماتمسحش اللي بتكتبه في «حلّل بنفسك» أو «افحص»
+    if (onlyTop && (S.tab === "mine" || S.tab === "algo" || S.tab === "plan")) return;   // ماتمسحش اللي بتكتبه في «حلّل بنفسك» أو «افحص»
     const bd = w.querySelector(".rv-body");
     bd.innerHTML = body();
     if (S.tab === "mine") ViralPage.mount(bd);
+    if (S.tab === "plan" && !S.pl.d) api("/api/strategy").then((x) => { S.pl.d = x; if (S.tab === "plan") render(); }).catch((err) => toast(err.message, true));
     if (S.tab === "algo" && !S.ac.rules) api("/api/algo").then((x) => { S.ac.rules = x; if (S.tab === "algo") render(); }).catch(() => {});
     if (S.focus) { w.querySelector(`[data-rid="${CSS.escape(S.focus)}"]`)?.scrollIntoView({ block: "center" }); S.focus = null; }
   }
@@ -127,7 +163,10 @@ const RivalsPage = (() => {
     catch (err) { toast(err.message, true); }
   }
   function bind(w) {
-    w.addEventListener("input", (e) => { if (e.target.matches("[data-actext]")) S.ac.text = e.target.value; });
+    w.addEventListener("input", (e) => {
+      if (e.target.matches("[data-actext]")) S.ac.text = e.target.value;
+      if (e.target.matches("[data-plnotes]")) S.pl.notes = e.target.value;
+    });
     w.addEventListener("change", (e) => {
       if (e.target.matches("[data-ackind]")) S.ac.kind = e.target.value;
       if (e.target.matches("[data-acpl]")) S.ac.platform = e.target.value;
@@ -135,6 +174,17 @@ const RivalsPage = (() => {
     w.addEventListener("click", async (e) => {
       const cp = e.target.closest("[data-accopy]");
       if (cp) { try { await navigator.clipboard.writeText(cp.dataset.accopy); toast("✅ اتنسخ"); } catch { toast("مقدرتش أنسخ", true); } return; }
+      if (e.target.closest("[data-plgo]")) {
+        S.pl.busy = true; render();
+        try { S.pl.d = await api("/api/strategy", { method: "POST", ...jsonBody({ notes: S.pl.notes }) }); toast("✅ الخطة جاهزة، وكل الأدوات هتمشي عليها"); }
+        catch (err) { toast(err.message, true); }
+        S.pl.busy = false; return render();
+      }
+      if (e.target.closest("[data-plclear]")) {
+        if (!confirm("تمسح خطة المحتوى؟ الأدوات هترجع تشتغل من غيرها.")) return;
+        try { S.pl.d = await api("/api/strategy", { method: "DELETE" }); } catch (err) { toast(err.message, true); }
+        return render();
+      }
       if (e.target.closest("[data-acgo]")) {
         const a = S.ac;
         if (a.text.trim().length < 8) return toast("الصق السكريبت أو الكابشن الأول", true);

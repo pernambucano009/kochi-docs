@@ -4074,6 +4074,46 @@ def algo_review(body: AlgoReviewIn):
     return algo.clean_review(growth_json(algo.review_messages(text, kind, platform, growth_brand(), body.goal.strip()[:300]), "الفحص"))
 
 
+# ---------- 🧭 خطة المحتوى: فريمويركس الاستراتيجية مطبّقة على البراند، والخطة بتدخل في كل برومبت محتوى بعدها
+@app.get("/api/strategy")
+def strategy_get():
+    b = brain_row(rivals_client()) or {}
+    return {"strategy": b.get("strategy"), "games": algo.GAMES, "axes": algo.AXES}
+
+
+class StrategyIn(BaseModel):
+    notes: str = ""
+
+
+@app.post("/api/strategy")
+def strategy_make(body: StrategyIn):
+    bid = rivals_client()
+    brain = brain_row(bid) or {}
+    if atlas.mock_mode():
+        st = algo.mock_strategy()
+    else:
+        msgs = algo.strategy_messages(az.brain_text(brain), rivals.insight_text(brain), body.notes.strip()[:800])
+        try:
+            raw = az.parse_json(atlas.chat(msgs, carousel_settings()["text_model"], temperature=0.6, max_tokens=9000, json_mode=True, timeout=300), "خطة المحتوى")
+        except (ValueError, atlas.AtlasError, httpx.HTTPError) as exc:
+            raise HTTPException(502, f"مقدرتش أعمل الخطة: {str(getattr(exc, 'detail', None) or exc)[:200]}") from exc
+        st = algo.clean_strategy(raw)
+    st["made_at"] = now()
+
+    def fn(d):
+        d["strategy"] = st
+    update_brain(bid, fn)
+    return {"strategy": st, "games": algo.GAMES, "axes": algo.AXES}
+
+
+@app.delete("/api/strategy")
+def strategy_clear():
+    def fn(d):
+        d.pop("strategy", None)
+    update_brain(rivals_client(), fn)
+    return {"strategy": None, "games": algo.GAMES, "axes": algo.AXES}
+
+
 class TriageIn(BaseModel):
     post: str = ""
     platform: str = ""
@@ -4132,7 +4172,7 @@ RIVALS_BUSY: set[str] = set()
 
 def brain_rivals(text: str, brain: dict | None) -> str:
     """ملف البراند + اللي بينجح عند المنافسين (للأفكار والسكريبتات والهوكات)."""
-    rv = rivals.insight_text(brain)
+    rv = "\n\n".join(x for x in (algo.strategy_text(brain), rivals.insight_text(brain)) if x)   # خطة المحتوى المعتمدة + المنافسين
     return text + (f"\n\n{rv}" if rv else "")
 
 

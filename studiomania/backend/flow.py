@@ -96,7 +96,7 @@ def ideas_messages(brand: str, prefs: str, tpl: dict, assets: list[dict], n: int
             + (f"طلب العميل: {hint}\n" if hint else "")
             + (f"المناسبة/الموسم: {season}\n" if season else "")
             + (("ابعد عن الأفكار دي (اتقالت قبل كده):\n" + "\n".join(f"- {a}" for a in avoid[-12:]) + "\n") if avoid else "")
-            + growth.hooks_rule() + "\n" + algo.rule("idea", "hook") + "\n"
+            + growth.hooks_rule() + "\n" + algo.for_use("ideas") + "\n"
             + 'رجّع JSON بالشكل ده بس: {"ideas": [{"title": "عنوان قصير", '
               '"hooks": [{"text": "الهوك", "formula": "اسم القالب", "score": 8.5, "why": "ليه الدرجة دي", "principle": "المبدأ النفسي"}, {...}, {...}], '
               '"idea": "الفكرة في ٢-٣ جمل، بتوصف اللي هيتشاف في القالب", '
@@ -118,7 +118,7 @@ def scenarios_messages(brand: str, prefs: str, tpl: dict, assets: list[dict], id
             + (("ابعد عن السيناريوهات دي:\n" + "\n".join(f"- {a}" for a in avoid[-8:]) + "\n") if avoid else "")
             + f"اكتب {n} سيناريوهات مختلفة عن بعض للفكرة دي على القالب ده بالظبط: امشي على تسلسل القالب وخاناته ومشاهده (لو القالب له تسلسل ثابت، "
               "المشاهد تبقى بنفس الترتيب والعدد)، ووصف كل مشهد يبقى باللي القالب فعلًا بيرسمه. أول ثانيتين لازم يشدوا، والختام فيه دعوة واضحة.\n"
-            + algo.rule("hook", "story", "caption") + "\n"
+            + algo.for_use("script") + "\n"
             + shape + '\nرجّع JSON بس: {"scenarios": [ ... ]}')
     return [{"role": "system", "content": _base_system(brand, prefs, tpl, assets)}, {"role": "user", "content": user}]
 
