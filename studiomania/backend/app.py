@@ -17728,6 +17728,26 @@ reset_stuck_typo()
 import dub  # noqa: E402
 import fasih  # noqa: E402
 
+
+_FASIH_SYNC = {"running": False}
+
+
+def fasih_sync() -> None:
+    """أصوات فصيح التانية (سامي وزيد وهالة...) من الكتالوج بتتضاف للهجات في الخلفية، مرة كل يوم."""
+    if _FASIH_SYNC["running"] or atlas.mock_mode():
+        return
+    _FASIH_SYNC["running"] = True
+
+    def run():
+        try:
+            dub.merge_fasih(fasih.catalog())
+        finally:
+            _FASIH_SYNC["running"] = False
+    threading.Thread(target=run, daemon=True, name="fasih-catalog").start()
+
+
+fasih_sync()
+
 DUB_DIR = DATA_DIR / "dub"
 DUB_DIR.mkdir(parents=True, exist_ok=True)
 DUB_LOCK = threading.Lock()
@@ -17773,8 +17793,9 @@ def dub_to_dict(did: str, d: dict) -> dict:
 
 
 def dub_info() -> dict:
+    fasih_sync()
     return {"dialects": {k: {"label": v["label"], "voices": v["voices"], "group": v["group"]} for k, v in dub.DIALECTS.items()},
-            "voices": {k: v["label"] for k, v in dub.VOICES.items()},
+            "voices": {k: v["label"] for k, v in dub.VOICES.items() if not v.get("hidden")},
             "fasih": bool(fasih.api_key() or atlas.mock_mode()),
             "lipsync": {k: v["label"] for k, v in dub.LIPSYNC.items()},
             "separate": bool(audioshake.api_key() or atlas.mock_mode()),
@@ -19643,11 +19664,12 @@ def run_still_gen(vid: str, only: int | None) -> None:
 @app.get("/api/tpl-studio")
 def tpl_studio():
     """المعرض: كل القوالب (الجاهزة واللي اتطلّعت من المعمل) + اللغات والأصوات + فيديوهات العميل من القوالب."""
+    fasih_sync()
     tpls = templates_list()
     tpls.sort(key=lambda t: (not t.get("builtin"), t.get("name") or ""))
     vids = [v for v in tvideos_list() if v.get("section") == "templates"]
     return {"templates": tpls, "videos": vids, "dialects": {k: {"label": v["label"], "voices": v["voices"], "group": v["group"]} for k, v in dub.DIALECTS.items()},
-            "voices": {k: v["label"] for k, v in dub.VOICES.items()}, "fasih": bool(fasih.api_key() or atlas.mock_mode())}
+            "voices": {k: v["label"] for k, v in dub.VOICES.items() if not v.get("hidden")}, "fasih": bool(fasih.api_key() or atlas.mock_mode())}
 
 
 @app.post("/api/templates/{tid}/sample")

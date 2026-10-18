@@ -4,25 +4,26 @@ from __future__ import annotations
 
 import re
 
-# 🇸🇦🇪🇬 اللهجات العربية: فصيح (FasihTTS) — صوت راجل وست لكل لهجة، و«-2» أصوات HD
+# 🇸🇦🇪🇬 اللهجات العربية: فصيح (FasihTTS) بأصوات HD بس («-2»، الواجهة الجديدة). الأصوات القديمة «-1» صوتها أوحش وبتلخبط اللهجة.
+# كل لهجة ليها صوتين ثابتين (عمر وليلى)، والأصوات التانية (سامي وزيد ورامي وهالة ونور وسلمى) بتيجي من كتالوج فصيح (merge_fasih).
 # 🌍 اللغات الأجنبية: ElevenLabs v3 على Atlas (الأصوات دي بتتكلم كل اللغات)
-AR = [  # (المعرف عند فصيح، الاسم، البلد/الناس، أصوات زيادة HD)
-    ("ar-eg-cairo", "🇪🇬 مصري", "مصر (القاهرة)", ["ar-eg-cairo-male-2"]),
-    ("ar-sa-najdi", "🇸🇦 سعودي نجدي", "السعودية (الرياض ونجد)", []),
-    ("ar-sa-hijazi", "🇸🇦 سعودي حجازي", "السعودية (جدة ومكة والحجاز)", []),
-    ("ar-gulf", "🌊 خليجي عام", "الخليج", []),
-    ("ar-ae", "🇦🇪 إماراتي", "الإمارات", []),
-    ("ar-kw", "🇰🇼 كويتي", "الكويت", []),
-    ("ar-qa", "🇶🇦 قطري", "قطر", []),
-    ("ar-bh", "🇧🇭 بحريني", "البحرين", []),
-    ("ar-om", "🇴🇲 عماني", "عمان", []),
-    ("ar-levant", "🇱🇧 شامي", "الشام (سوريا ولبنان والأردن وفلسطين)", []),
-    ("ar-iq", "🇮🇶 عراقي", "العراق", []),
-    ("ar-sd", "🇸🇩 سوداني", "السودان", []),
-    ("ar-ma", "🇲🇦 مغربي", "المغرب (الدارجة)", []),
-    ("ar-dz", "🇩🇿 جزائري", "الجزائر", []),
-    ("ar-tn", "🇹🇳 تونسي", "تونس", []),
-    ("ar-msa", "📖 فصحى", "", ["ar-msa-formal-male-2"]),
+AR = [  # (معرف اللهجة عند فصيح، الاسم، البلد/الناس، أول جزء من معرف الصوت، ثابتة ولا تجريبية)
+    ("ar-eg-cairo", "🇪🇬 مصري", "مصر (القاهرة)", "ar-eg-cairo", True),
+    ("ar-sa-najdi", "🇸🇦 سعودي نجدي", "السعودية (الرياض ونجد)", "ar-sa-najdi", False),
+    ("ar-sa-hijazi", "🇸🇦 سعودي حجازي", "السعودية (جدة ومكة والحجاز)", "ar-sa-hijazi", False),
+    ("ar-gulf", "🌊 خليجي عام", "الخليج", "ar-gulf", True),
+    ("ar-ae", "🇦🇪 إماراتي", "الإمارات", "ar-ae-gulf", False),
+    ("ar-kw", "🇰🇼 كويتي", "الكويت", "ar-kw", False),
+    ("ar-qa", "🇶🇦 قطري", "قطر", "ar-qa", False),
+    ("ar-bh", "🇧🇭 بحريني", "البحرين", "ar-bh", False),
+    ("ar-om", "🇴🇲 عماني", "عمان", "ar-om", False),
+    ("ar-levant", "🇱🇧 شامي", "الشام (سوريا ولبنان والأردن وفلسطين)", "ar-levant", False),
+    ("ar-iq", "🇮🇶 عراقي", "العراق", "ar-iq", False),
+    ("ar-sd", "🇸🇩 سوداني", "السودان", "ar-sd", False),
+    ("ar-ma", "🇲🇦 مغربي", "المغرب (الدارجة)", "ar-ma-darija", False),
+    ("ar-dz", "🇩🇿 جزائري", "الجزائر", "ar-dz", False),
+    ("ar-tn", "🇹🇳 تونسي", "تونس", "ar-tn", False),
+    ("ar-msa", "📖 فصحى", "", "ar-msa-formal", True),
 ]
 FOREIGN = [  # (المعرف، الاسم، اسم اللغة للموديل)
     ("en", "🇺🇸 English", "natural conversational American English"),
@@ -44,14 +45,39 @@ ELEVEN = {"eleven_liam": ("ليام (راجل)", "Liam"), "eleven_jessica": ("ج
 FASIH_PER_MIN = 0.19   # باقة فصيح: ١٠٠ دقيقة بـ $19
 VOICES: dict[str, dict] = {k: {"label": lab, "provider": "eleven", "voice": v, "per_1k": 0.10} for k, (lab, v) in ELEVEN.items()}
 DIALECTS: dict[str, dict] = {}
-for code, label, where, hd in AR:
-    vs = [f"{code if code != 'ar-msa' else 'ar-msa-formal'}{'-darija' if code == 'ar-ma' else '-gulf' if code == 'ar-ae' else ''}-{g}-1" for g in ("male", "female")]
-    for v in vs + hd:
-        VOICES[v] = {"label": f"{'راجل' if '-male-' in v else 'ست'}{' HD' if v.endswith('-2') else ''}", "provider": "fasih", "voice": v,
-                     "dialect": code, "per_1k": 0.0, "per_min": FASIH_PER_MIN}
-    DIALECTS[code] = {"label": label, "lang": code, "group": "ar", "voices": hd + vs, "where": where}
+for code, label, where, base, stable in AR:
+    vs = []
+    for g, name in (("male", "عمر (راجل)"), ("female", "ليلى (ست)")):
+        v = f"{base}-{g}-2"
+        VOICES[v] = {"label": name + ("" if stable else " · تجريبي"), "provider": "fasih", "voice": v, "dialect": code,
+                     "gender": g, "per_1k": 0.0, "per_min": FASIH_PER_MIN}
+        # المشاريع القديمة اللي اتحفظ فيها الصوت القديم «-1» بتتقال بالصوت الـ HD اللي زيه
+        VOICES[f"{base}-{g}-1"] = {**VOICES[v], "hidden": True}
+        vs.append(v)
+    DIALECTS[code] = {"label": label, "lang": code, "group": "ar", "voices": vs, "where": where}
 for code, label, lang in FOREIGN:
     DIALECTS[code] = {"label": label, "lang": code, "group": "foreign", "voices": list(ELEVEN), "language": lang}
+
+def merge_fasih(voices: list[dict]) -> int:
+    """بيضيف أصوات كتالوج فصيح (GET /v1/voices) للهجاتها: HD ونشطة بس، وصوت كل لهجة لازم يتبعت بنفس dialectId بتاعه."""
+    added = 0
+    for x in voices or []:
+        vid, dia = str(x.get("id") or ""), str(x.get("dialectId") or "")
+        if not vid.endswith("-2") or dia not in DIALECTS or DIALECTS[dia]["group"] != "ar" or (x.get("lifecycle") or "active") != "active":
+            continue
+        g = "female" if str(x.get("gender") or "").lower().startswith("f") else "male"
+        name = x.get("arabicName") or x.get("name") or vid
+        lab = f"{name} ({'ست' if g == 'female' else 'راجل'})" + (" · تجريبي" if x.get("status") == "preview" else "")
+        if vid in VOICES and not VOICES[vid].get("hidden"):
+            VOICES[vid]["label"] = lab
+        else:
+            VOICES[vid] = {"label": lab, "provider": "fasih", "voice": vid, "dialect": dia, "gender": g, "per_1k": 0.0,
+                           "per_min": FASIH_PER_MIN, "sample": x.get("sampleUrl") or ""}
+        if vid not in DIALECTS[dia]["voices"]:
+            DIALECTS[dia]["voices"].append(vid)
+            added += 1
+    return added
+
 
 GUIDES = {
     "ar-eg-cairo": ("عامية مصرية قاهرية طبيعية زي ما صناع المحتوى المصريين بيتكلموا. كلام زي: بص، يعني، كده، دلوقتي، عشان، مش، إيه، ليه، إزاي، أوي، خالص، "
