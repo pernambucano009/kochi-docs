@@ -14,6 +14,8 @@ import uuid
 from array import array
 from pathlib import Path
 
+import algo
+
 SR = 16000          # صوت التحليل
 HOP = 160           # 10 مللي ثانية
 SFX_CATEGORIES = ("click", "whoosh", "pop", "impact", "typing", "swipe", "notification", "riser", "transition",
@@ -718,6 +720,7 @@ def film_plan_messages(brain_txt: str, brief: str, conns: list[dict], n_scenes: 
         "- الفويس أوفر: جملة واحدة قصيرة لكل مشهد (٥-١٢ كلمة)، والجمل مع بعض بتحكي قصة واحدة متصلة، والكلام اللي على الشاشة "
         "مش لازم يكرر الفويس بالحرف.\n"
         "- seconds للمشهد من 2 لـ 5.\n"
+        + algo.AIVIDEO_RULE + "\n"
         "رجّع JSON بس بالشكل ده:\n" + FILM_FORMAT
     )
 
@@ -938,6 +941,7 @@ def fill_messages(brain_txt: str, schema: dict, brief: str, text_mode: str) -> s
         + ("- ⚠️ الصور من غير كلام: desc ما يذكرش أي كلام مكتوب أو عناوين أو أزرار عليها كلام أو أرقام. مكان الكلام اكتب بداله: "
            "\"a clean empty area in the upper part (reserved for text added later)\".\n" if text_mode != "en" else "")
         + "- العمود الفقري (spine) فكرة استمرارية (حركة، عنصر ثابت)، مش خط أو علامة تترسم: وصّفه كعنصر حقيقي في المشهد أو كطريقة حركة.\n"
+        + (algo.AIVIDEO_RULE if text_mode != "en" else algo.AIVIDEO_RULE.rsplit("\n", 1)[0]) + "\n"
         "رجّع JSON بس بالشكل ده:\n" + FILL_FORMAT
     )
 

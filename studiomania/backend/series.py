@@ -244,7 +244,7 @@ def shots_messages(bible: str, character: str, script: str, lines: list[dict], t
 
 رجّع JSON بس بالشكل ده:
 {SHOTS_FORMAT}"""
-    return [{"role": "system", "content": system}, {"role": "user", "content": user}]
+    return [{"role": "system", "content": system + "\n\n" + algo.AIVIDEO_RULE}, {"role": "user", "content": user}]
 
 
 def parse_shots(text: str, total: float) -> list[dict]:
@@ -392,7 +392,7 @@ def insert_shot_messages(bible: str, character: str, prev: dict | None, nxt: dic
         "فيديو طولي 9:16 واقعي سينمائي، الشخصية ما بتتكلمش قدام الكاميرا، ومن غير أي كلام مكتوب على الشاشة. اسم الشخصية ما يتذكرش أبدًا.\n\n"
         f"رجّع JSON بس بالشكل ده:\n{ONE_SHOT_FORMAT}"
     )
-    return [{"role": "system", "content": system}, {"role": "user", "content": user}]
+    return [{"role": "system", "content": system + "\n\n" + algo.AIVIDEO_RULE}, {"role": "user", "content": user}]
 
 
 def reprompt_messages(bible: str, character: str, items: list[dict]) -> list[dict]:
@@ -419,7 +419,7 @@ def reprompt_messages(bible: str, character: str, items: list[dict]) -> list[dic
         "فيديو طولي 9:16 واقعي سينمائي، الشخصية ما بتتكلمش قدام الكاميرا، ومن غير أي كلام مكتوب على الشاشة. اسم الشخصية ما يتذكرش أبدًا.\n\n"
         'رجّع JSON بس بالشكل ده، لكل لقطة بنفس الـ id:\n{"shots": [' + ONE_SHOT_FORMAT.replace("{", '{"id": "...", ', 1) + "]}"
     )
-    return [{"role": "system", "content": system}, {"role": "user", "content": user}]
+    return [{"role": "system", "content": system + "\n\n" + algo.AIVIDEO_RULE}, {"role": "user", "content": user}]
 
 
 def parse_reprompt(text: str) -> dict[str, dict]:
