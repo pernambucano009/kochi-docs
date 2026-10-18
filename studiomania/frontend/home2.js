@@ -426,7 +426,7 @@ const NH = (() => {
     // كل نوع كارت فيه أيقونته الزجاج الـ 3D (فاتحة وغامقة)، واسمه، وسطر بيشرح هيعمل إيه
     // زي البروتوتايب: تختار نوع الشغل الأول (كارت باختيار)، وبعدين «التالي» يفتحه. دبل كليك على الكارت بيفتحه على طول
     // 🎬 معرض القوالب: كل قالب ستايل بفيديو بيعبّر عنه (بيشتغل لما تقف عليه)، متقسّمين بالستايل
-    create: () => `<div class="nh-gal" id="nhGal"><nav class="nh-gal-chips" aria-label="الستايلات"></nav><div class="nh-gal-grid"><div class="nh-empty">بيحمّل القوالب…</div></div></div>
+    create: () => `<div class="nh-gal" id="nhGal"><div class="nh-gal-grid"><div class="nh-empty">بيحمّل القوالب…</div></div></div>
 `,
     // (مكتبة الموشن اتشالت من الأصول، ومكانها هيبقى في «اعمل جديد»)
     assets: () => panel(4, 6, `${head("coaches")}<div class="nh-body">${D.coaches.length} شخصية</div><div class="nh-avs">${D.coaches.slice(0, 12).map((c) => `<img src="${esc(c.image_url)}" alt="">`).join("")}</div>`, `data-id="coaches" tabindex="0" role="button"`)
@@ -498,6 +498,7 @@ const NH = (() => {
     if (key === "assets") key = "coaches";
     const tabs = !KOCHI && pTitle.dataset.key === "assets" && AS_TABS.some((x) => x[0] === key);
     pGrid.dataset.key = key;
+    page.classList.toggle("nh-full", key === "create");   // 🎡 عجلة القوالب مالية الشاشة من غير عنوان
     pGrid.classList.toggle("nh-scroll", !!MODS[key]);
     // شغّال عليه: «＋ مشروع جديد» فوق جنب العنوان (زي البروتوتايب)
     document.getElementById("nhPTabs").innerHTML = tabs ? asTabs(key)

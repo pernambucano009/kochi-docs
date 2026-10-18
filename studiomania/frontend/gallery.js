@@ -1,8 +1,8 @@
-// 🎬 معرض القوالب («ابدأ مشروع جديد»): كل قالب ستايل كارت طولي بفيديو بيعبّر عنه.
-// الفيديو بيشتغل لما تقف على الكارت، والدوسة بتفتحه كبير. (اللي بيحصل بعد كده هنتفق عليه بعدين)
+// 🎬 معرض القوالب («ابدأ مشروع جديد»): عجلة مالية الشاشة، وكل قالب ستايل كارت بفيديو بيعبّر عنه.
+// الفيديو بيشتغل للكارت اللي في النص، والدوسة عليه بتفتحه كبير. مولّدات الصوت والصور والفيديو زراير جوه كورة العجلة.
 const Gallery = (() => {
   const esc = (s) => escapeHtml(String(s ?? ""));
-  const S = { items: [], cats: [], cat: "all", root: null };
+  const S = { items: [], cats: [], root: null };
   // التايبوجرافي قالب زي الباقي: فيديو العرض بتاعه مترسوم بمحرك الكلام المتحرك نفسه
   const EXTRA = [{ id: "typo", name: "تايبوجرافي", icon: "🔤", sample_url: "/gallery/typo.mp4", cover_url: "/gallery/typo.jpg", cat: "motion",
     desc: "كلام بيتحرك على الإيقاع من صوتك أو سكريبتك، بأكتر من 300 حركة جاهزة." },
@@ -127,41 +127,46 @@ const Gallery = (() => {
       cat: catOf[t.id] || "other" })), ...EXTRA];
   }
   const catName = (id) => S.cats.find((c) => c.id === id)?.ar || "تانية";
-  function chips() {
-    const used = new Set(S.items.map((x) => x.cat));
-    const list = [["all", "الكل"], ...S.cats.filter((c) => used.has(c.id)).map((c) => [c.id, c.ar])];
-    return list.map(([k, t]) => `<button type="button" class="nh-gal-chip${S.cat === k ? " on" : ""}" data-gcat="${k}">${esc(t)}<span class="num">${k === "all" ? S.items.length : S.items.filter((x) => x.cat === k).length}</span></button>`).join("");
-  }
-  // 🎡 العجلة: أسماء القوالب على قوس على الشمال، واسم القالب اللي السهم عليه في النص، والكروت عمودين على اليمين.
+  // 🎡 العجلة: مالية الصفحة. أسماء القوالب على قوس على الشمال، واسم القالب اللي السهم عليه في النص، والكروت عمودين على اليمين.
   // رول الماوس بيدّي العجلة دفعة فتجري وتهدى بالاحتكاك وتقف على أقرب قالب (فوق العجلة بتجري أكتر من فوق الكروت)، ومعاها تكّة سقاطة.
-  const W = { list: [], pos: 0, vel: 0, mode: "snap", target: 0, fric: 1.7, shown: -1, cell: 0, lastTick: 0, G: {}, raf: 0, drag: null };
+  // العجلة طبقات على عمق مختلف (حلقات ← أسماء ← طوق ← كورة ← زراير) فلما الماوس يقف عليها بتميل ناحيته والطبقات بتبعد عن بعض.
+  const W = { list: [], pos: 0, vel: 0, mode: "snap", target: 0, fric: 1.7, shown: -1, cell: 0, lastTick: 0, G: {}, raf: 0, drag: null, tilt: { x: 0, y: 0, l: 0, tx: 0, ty: 0, tl: 0 } };
   const VMAX = 42, SNAPV = 1.6, STEP = 7.5 * Math.PI / 180;
   const pad = (n) => String(n).padStart(2, "0");
-  function card(x, i, k) {
+  // 🧪 مولّدات من غير قوالب (gen.js): زراير جوه الكورة الرمادي
+  const GENS = [["video", "🎬", "مولد فيديو", "وصف ← فيديو"], ["image", "🖼️", "مولد صور", "وصف ومرجع ← صور"], ["voice", "🎙️", "مولد صوت", "كلام ← صوت"]];
+  const gensHTML = (cls) => `<div class="${cls}">${GENS.map(([k, i, b, s]) => `<button type="button" class="nh-wh-gen" data-gen="${k}"><i>${i}</i><span><b>${b}</b><small>${s}</small></span></button>`).join("")}</div>`;
+  function card(x, k) {
     const vid = x.sample_url ? `<video muted loop playsinline preload="none" ${x.cover_url ? `poster="${esc(x.cover_url)}"` : ""} data-src="${esc(x.sample_url)}"></video>` : `<span class="nh-gal-ph"><i>${x.icon || "✦"}</i><small>فيديو العرض جاي قريب</small></span>`;
     return `<article class="nh-wc${x.sample_url ? "" : " soon"}" tabindex="0" data-wi="${k}" aria-label="${esc(x.name)}">
       <div class="nh-wc-h"><b>${esc(x.name)}</b><i>${k + 1}</i></div><div class="nh-wc-art">${vid}</div></article>`;
   }
   function render() {
-    const g = S.root.querySelector("#nhGal");
-    g.querySelector(".nh-gal-chips").innerHTML = chips();
-    const list = S.items.map((x, i) => [x, i]).filter(([x]) => S.cat === "all" || x.cat === S.cat);
+    const list = S.items.map((x, i) => [x, i]);
     list.sort((a, b) => (!!b[0].sample_url - !!a[0].sample_url));   // اللي ليه فيديو الأول
     W.list = list;
-    const box = g.querySelector(".nh-gal-grid");
+    const box = S.root.querySelector(".nh-gal-grid");
+    if (!list.length) { box.innerHTML = `<div class="nh-empty">مفيش قوالب لسه.</div>`; return; }
     box.innerHTML = `<div class="nh-wh" dir="ltr">
-      <div class="nh-wh-wheel" aria-hidden="true"><svg></svg><div class="nh-wh-labs">${list.map(([x]) => `<span>${esc(x.name)}</span>`).join("")}</div><i class="nh-wh-ptr"></i></div>
+      <div class="nh-wh-wheel"><div class="nh-wh-3d">
+        <svg class="nh-wh-l nh-wh-back" aria-hidden="true"></svg>
+        <div class="nh-wh-l nh-wh-labs" aria-hidden="true">${list.map(([x]) => `<span>${esc(x.name)}</span>`).join("")}</div>
+        <svg class="nh-wh-l nh-wh-ring" aria-hidden="true"></svg>
+        <svg class="nh-wh-l nh-wh-ball" aria-hidden="true"></svg>
+        <i class="nh-wh-l nh-wh-ptr" aria-hidden="true"></i>
+        ${gensHTML("nh-wh-l nh-wh-gens")}
+      </div></div>
       <section class="nh-wh-info" dir="rtl" aria-live="polite">
+        ${gensHTML("nh-wh-mgens")}
         <div class="nh-wh-eye"><span class="num"></span><span>·</span><span class="cat"></span></div>
         <h2 class="nh-wh-title"><span></span></h2><p class="nh-wh-desc"></p>
         <button type="button" class="nh-wh-go">ابدأ بالقالب ده <span aria-hidden="true">←</span></button>
         <div class="nh-wh-foot"><span><kbd>رول الماوس</kbd> فوق العجلة بيجري أسرع</span><span><kbd>↑</kbd> <kbd>↓</kbd> قالب قالب</span></div>
       </section>
-      <div class="nh-wh-cards"><div class="nh-wh-track">${list.map(([x, i], k) => card(x, i, k)).join("")}</div></div>
+      <div class="nh-wh-cards"><div class="nh-wh-track">${list.map(([x], k) => card(x, k)).join("")}</div></div>
       <aside class="nh-wh-side"><span class="nh-wh-dots" aria-hidden="true">${"<i></i>".repeat(12)}</span>
         <button type="button" class="nh-wh-snd" aria-pressed="${sndOn}" title="صوت العجلة"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 5 6 9H3v6h3l5 4V5z"/><path d="M16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12"/></svg><span>${sndOn ? "الصوت شغال" : "شغّل الصوت"}</span></button></aside>
     </div>`;
-    if (!list.length) { box.innerHTML = `<div class="nh-empty">مفيش قوالب هنا لسه.</div>`; return; }
     Object.assign(W, { pos: 0, vel: 0, target: 0, mode: "snap", shown: -1, cell: 0, drag: null, el: box.querySelector(".nh-wh") });
     wheelBind(W.el);
     layout();
@@ -170,18 +175,36 @@ const Gallery = (() => {
   }
   function layout() {
     const el = W.el; if (!el || !el.isConnected) return;
-    // الإطار بياخد الباقي من الشاشة تحت الفلاتر، علشان العجلة والكروت يبانوا كاملين من غير سكرول
-    el.style.height = Math.max(innerWidth <= 720 ? 620 : 480, Math.min(900, innerHeight - Math.max(0, el.getBoundingClientRect().top) - 20)) + "px";
-    const wheel = el.querySelector(".nh-wh-wheel"), cards = el.querySelector(".nh-wh-cards"), mobile = innerWidth <= 720, h = wheel.clientHeight;
-    const R = mobile ? Math.min(h * .5, 300) : Math.min(h * .52, 470), cx = mobile ? -R * .66 : -R * .42, cy = h * (mobile ? .36 : .5);
-    const ring = (r, sw, op) => `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--nh-ink)" stroke-opacity="${op}" stroke-width="${sw}"/>`, rs = R * .6;
-    wheel.querySelector("svg").innerHTML = `<defs><radialGradient id="nhWhSph" cx="68%" cy="38%" r="75%"><stop offset="0" stop-color="var(--nh-ink)" stop-opacity=".55"/><stop offset=".6" stop-color="var(--nh-ink)"/></radialGradient></defs>`
-      + ring(R * 1.03, 1.2, .14) + ring(R * .985, 1, .07) + `<path class="arc" fill="none" stroke="var(--nh-ink)" stroke-width="3" stroke-linecap="round"/>`
-      + ring(rs + 24, 13, .62) + `<circle cx="${cx}" cy="${cy}" r="${rs}" fill="url(#nhWhSph)"/><g class="ticks"></g>`;
-    const ptr = wheel.querySelector(".nh-wh-ptr"); ptr.style.left = (cx + R * .74) + "px"; ptr.style.top = (cy - 7) + "px";
+    // الإطار بياخد الباقي من الشاشة كله، علشان العجلة والكروت يبانوا كاملين من غير سكرول
+    const mobile = innerWidth <= 720;
+    el.style.height = Math.max(mobile ? 620 : 480, innerHeight - Math.max(0, el.getBoundingClientRect().top)) + "px";
+    const wheel = el.querySelector(".nh-wh-wheel"), cards = el.querySelector(".nh-wh-cards");
+    wheel.style.top = mobile ? cards.offsetTop + "px" : "";   // على الموبايل العجلة جنب الكروت تحت الكلام
+    const h = wheel.clientHeight, w = wheel.clientWidth;
+    // على الكمبيوتر الكورة باينة أكتر علشان الزراير تبقى جواها، وعلى الموبايل العجلة مستخبية أكتر ورا الحرف
+    const R = mobile ? Math.min(h * .5, 300) : Math.min(h * .5, w * .78, 460), cx = mobile ? -R * .66 : -R * .1, cy = h * (mobile ? .36 : .5);
+    const rs = R * (mobile ? .6 : .56), rr = rs + R * .06;
+    const ring = (r, sw, op) => `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--nh-ink)" stroke-opacity="${op}" stroke-width="${sw}"/>`;
+    el.querySelector(".nh-wh-back").innerHTML = ring(R * 1.03, 1.2, .14) + ring(R * .985, 1, .07) + `<path class="arc" fill="none" stroke="var(--nh-ink)" stroke-width="3" stroke-linecap="round"/><g class="ticks"></g>`;
+    // الطوق: حلقة تخينة بتدرّج نور ضلمة فوق الكورة
+    el.querySelector(".nh-wh-ring").innerHTML = `<defs><linearGradient id="nhWhRg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" style="stop-color:var(--wh-ring-hi)"/><stop offset=".55" style="stop-color:var(--wh-ring)"/><stop offset="1" style="stop-color:var(--wh-ring-lo)"/></linearGradient></defs>
+      <circle cx="${cx}" cy="${cy + 6}" r="${rr}" fill="none" stroke="#000" stroke-opacity=".12" stroke-width="${R * .05}" style="filter:blur(6px)"/>
+      <circle cx="${cx}" cy="${cy}" r="${rr}" fill="none" stroke="url(#nhWhRg)" stroke-width="${R * .05}"/>
+      <circle cx="${cx}" cy="${cy}" r="${rr + R * .025}" fill="none" stroke="#fff" stroke-opacity=".25" stroke-width="1"/>`;
+    // الكورة: تدرّج دايري بنقطة نور بتمشي مع الماوس، وضل تحتها، وحزوز على الحرف بتلف مع العجلة
+    el.querySelector(".nh-wh-ball").innerHTML = `<defs><radialGradient id="nhWhSph" gradientUnits="userSpaceOnUse" cx="${cx + rs * .35}" cy="${cy - rs * .35}" r="${rs * 1.5}" fx="${cx + rs * .35}" fy="${cy - rs * .35}">
+        <stop offset="0" style="stop-color:var(--wh-ball-hi)"/><stop offset=".45" style="stop-color:var(--wh-ball)"/><stop offset="1" style="stop-color:var(--wh-ball-lo)"/></radialGradient>
+        <radialGradient id="nhWhRim" cx="50%" cy="50%" r="50%"><stop offset=".82" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".35"/></radialGradient></defs>
+      <ellipse cx="${cx + rs * .08}" cy="${cy + rs * .96}" rx="${rs * .8}" ry="${rs * .12}" fill="#000" fill-opacity=".18" style="filter:blur(10px)"/>
+      <circle cx="${cx}" cy="${cy}" r="${rs}" fill="url(#nhWhSph)"/><circle cx="${cx}" cy="${cy}" r="${rs}" fill="url(#nhWhRim)"/><g class="knurl"></g>`;
+    const ptr = el.querySelector(".nh-wh-ptr"); ptr.style.left = (cx + R * .74) + "px"; ptr.style.top = (cy - 7) + "px";
+    // الزراير في الجزء الباين من الكورة
+    const gw = Math.max(110, Math.min(170, cx + Math.sqrt(Math.max(0, rs * rs - 95 * 95)) - 70));
+    Object.assign(el.querySelector(".nh-wh-gens").style, { left: "34px", top: (cy - 92) + "px", width: gw + "px" });
     const cols = mobile ? 1 : 2, colW = cards.clientWidth / cols, cellH = (mobile ? 54 : 96) + colW * 5 / 4;
-    W.G = { R, cx, cy, cols, cellH, gh: cards.clientHeight, labs: [...wheel.querySelectorAll(".nh-wh-labs span")], cards: [...el.querySelectorAll(".nh-wc")],
-      arc: wheel.querySelector(".arc"), ticks: wheel.querySelector(".ticks"), track: el.querySelector(".nh-wh-track") };
+    W.G = { R, cx, cy, rs, cols, cellH, gh: cards.clientHeight, labs: [...el.querySelectorAll(".nh-wh-labs span")], cards: [...el.querySelectorAll(".nh-wc")],
+      arc: el.querySelector(".arc"), ticks: el.querySelector(".ticks"), knurl: el.querySelector(".knurl"), sph: el.querySelector("#nhWhSph"),
+      d3: el.querySelector(".nh-wh-3d"), track: el.querySelector(".nh-wh-track"), wheelW: w };
     W.G.cards.forEach((c, i) => { const col = cols === 1 ? 0 : i % 2, row = cols === 1 ? i : Math.floor(i / 2); c.style.top = (row * cellH + (col ? cellH / 2 : 0)) + "px"; c.style.left = col || cols === 1 ? "0" : "50%"; });
   }
   // مكان نص الكارت لأي مكان كسري في القايمة، علشان الحركة متصلة
@@ -199,6 +222,13 @@ const Gallery = (() => {
       W.vel = Math.max(-VMAX, Math.min(VMAX, W.vel + Math.sign(d) * Math.min(cap, Math.abs(d) * k)));
       W.mode = "coast";
     }, { passive: false });
+    // الميلان الثلاثي الأبعاد: الماوس فوق العجلة بيميّلها ناحيته وبيبعّد الطبقات
+    el.addEventListener("pointermove", (e) => {
+      const r = el.getBoundingClientRect(), x = (e.clientX - r.left) / Math.max(1, W.G.wheelW), y = (e.clientY - r.top) / r.height, T = W.tilt;
+      const on = e.pointerType === "mouse" && x < 1;
+      T.tx = on ? (x - .45) * 16 : 0; T.ty = on ? (y - .5) * -12 : 0; T.tl = on ? 1 : 0;
+    });
+    el.addEventListener("pointerleave", () => { const T = W.tilt; T.tx = T.ty = T.tl = 0; });
     el.addEventListener("keydown", (e) => {
       const cur = W.mode === "snap" ? W.target : W.pos;
       if (e.key === "ArrowDown" || e.key === "PageDown") { e.preventDefault(); snapTo(cur + 1); }
@@ -260,6 +290,13 @@ const Gallery = (() => {
     if (cell !== W.cell) { if (now - W.lastTick > 18) { tick(Math.abs(W.vel) || 4); W.lastTick = now; } W.cell = cell; }
     if (idx !== W.shown) show(idx);
     G.track.style.transform = `translateY(${G.gh / 2 - yOf(pos)}px)`;
+    // الميلان بيلحق الماوس بنعومة، والسرعة بتميّل العجلة سنة كمان كأنها تقيلة
+    const T = W.tilt, k = 1 - Math.exp(-dt * 7);
+    T.x += (T.tx - T.x) * k; T.y += (T.ty - T.y) * k; T.l += (T.tl - T.l) * k;
+    const spin = Math.max(-1, Math.min(1, W.vel / 20));
+    G.d3.style.setProperty("--ry", (16 + T.x).toFixed(2) + "deg"); G.d3.style.setProperty("--rx", (T.y + spin * 3).toFixed(2) + "deg"); G.d3.style.setProperty("--lift", T.l.toFixed(3));
+    const lx = G.cx + G.rs * (.35 + T.x * .02), ly = G.cy - G.rs * (.35 + T.y * .03);
+    G.sph.setAttribute("cx", lx); G.sph.setAttribute("cy", ly); G.sph.setAttribute("fx", lx); G.sph.setAttribute("fy", ly);
     const rl = G.R * .8;
     G.labs.forEach((s, i) => {
       const a = (i - pos) * STEP;
@@ -269,12 +306,21 @@ const Gallery = (() => {
       s.style.transform = `translate(${G.cx + Math.cos(a) * rl}px,${G.cy + Math.sin(a) * rl - 8}px) rotate(${a}rad) scale(${d < .5 ? 1.12 : 1})`;
       s.classList.toggle("on", i === idx);
     });
-    // القوس الغامق بيلف مع العجلة، والتكّات على الحلقة بتعدّي
+    // القوس الغامق بيلف مع العجلة، والتكّات على الحلقة والحزوز على الكورة بتعدّي
     const r = G.R * 1.03, a0 = -0.95 + (pos / Math.max(1, N - 1)) * 1.6, P = (a) => `${G.cx + Math.cos(a) * r} ${G.cy + Math.sin(a) * r}`;
     G.arc.setAttribute("d", `M ${P(a0)} A ${r} ${r} 0 0 1 ${P(a0 + .3)}`);
+    const fr = ((pos % 1) + 1) % 1;
     let html = "";
-    for (let j = -16; j <= 16; j++) { const a = (j - (((pos % 1) + 1) % 1)) * STEP, r1 = G.R * .96, r2 = G.R * .935; html += `<line x1="${G.cx + Math.cos(a) * r1}" y1="${G.cy + Math.sin(a) * r1}" x2="${G.cx + Math.cos(a) * r2}" y2="${G.cy + Math.sin(a) * r2}" stroke="var(--nh-ink)" stroke-opacity="${Math.max(0, .32 - Math.abs(j) * .018).toFixed(3)}" stroke-width="1.2"/>`; }
+    for (let j = -16; j <= 16; j++) { const a = (j - fr) * STEP, r1 = G.R * .96, r2 = G.R * .935; html += `<line x1="${G.cx + Math.cos(a) * r1}" y1="${G.cy + Math.sin(a) * r1}" x2="${G.cx + Math.cos(a) * r2}" y2="${G.cy + Math.sin(a) * r2}" stroke="var(--nh-ink)" stroke-opacity="${Math.max(0, .32 - Math.abs(j) * .018).toFixed(3)}" stroke-width="1.2"/>`; }
     G.ticks.innerHTML = html;
+    html = "";
+    for (let j = 0; j < 48; j++) {   // الحزوز بتنوّر في الناحية اللي جاي منها النور (فوق يمين)
+      const a = (j - fr * 2) * Math.PI / 24, c = Math.cos(a), s = Math.sin(a);
+      if (c < -.2) continue;
+      const lit = Math.max(0, c * .7 - s * .7), r1 = G.rs * .9, r2 = G.rs * .985;
+      html += `<line x1="${G.cx + c * r1}" y1="${G.cy + s * r1}" x2="${G.cx + c * r2}" y2="${G.cy + s * r2}" stroke="var(--wh-knurl)" stroke-opacity="${(.12 + lit * .45).toFixed(3)}" stroke-width="2" stroke-linecap="round"/>`;
+    }
+    G.knurl.innerHTML = html;
     W.raf = requestAnimationFrame(loop);
   }
   addEventListener("resize", () => layout());
@@ -359,43 +405,17 @@ const Gallery = (() => {
   }
   function bind(root) {
     root.addEventListener("click", (e) => {
-      const c = e.target.closest("[data-gcat]");
-      if (c) { S.cat = c.dataset.gcat; render(); return; }
       const gn = e.target.closest("[data-gen]");
       if (gn) return Gen.open(gn.dataset.gen);
-      const fl = e.target.closest("[data-gflow]");
-      if (fl) return Flow.open(fl.dataset.gflow);
     });
   }
   // Esc بيقفل المعاينة الأول (قبل ما يرجع من الصفحة)
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && closePv()) e.preventDefault(); }, true);
 
-  // 🧭 مشاريع بدأتها من قالب ولسه مخلصتش
-  const STAGE_AR = { idea: "الفكرة", format: "نوع البوست", scenario: "السيناريو", cast: "الأبطال", assets: "الملفات", generate: "التوليد" };
-  // 🧪 مولّدات من غير قوالب (gen.js): صوت وصور وفيديو بالوصف بس
-  function gens() {
-    const g = S.root.querySelector("#nhGal");
-    if (g.querySelector(".nh-gal-gens")) return;
-    const box = Object.assign(document.createElement("div"), { className: "nh-gal-gens" });
-    box.innerHTML = `<small class="muted">من غير قالب:</small>
-      <button type="button" class="nh-gal-gen" data-gen="video"><i>🎬</i><span><b>مولد فيديو</b><small>وصف ← فيديو بأي موديل</small></span></button>
-      <button type="button" class="nh-gal-gen" data-gen="image"><i>🖼️</i><span><b>مولد صور</b><small>وصف ومرجع ← صور</small></span></button>
-      <button type="button" class="nh-gal-gen" data-gen="voice"><i>🎙️</i><span><b>مولد صوت</b><small>كلام ← صوت بلهجتك</small></span></button>`;
-    g.querySelector(".nh-gal-chips").before(box);
-  }
-  async function resume() {
-    const g = S.root.querySelector("#nhGal");
-    let box = g.querySelector(".nh-gal-resume");
-    if (!box) { box = Object.assign(document.createElement("div"), { className: "nh-gal-resume" }); g.querySelector(".nh-gal-chips").before(box); }
-    const list = await Flow.recent();
-    box.hidden = !list.length;
-    box.innerHTML = list.length ? `<small class="muted">كمّل اللي بدأته:</small>${list.map((f) => `<button type="button" class="nh-gal-chip" data-gflow="${esc(f.id)}">🧭 ${esc(f.title || f.template?.name || "مشروع")}<span class="num">${esc(STAGE_AR[f.stage] || "")}</span></button>`).join("")}` : "";
-  }
   async function mount(root) {
     S.root = root;
-    S.cat = "all";
     if (!root._gal) { root._gal = true; bind(root); }   // نفس العنصر بيتعاد استخدامه لكل الصفحات: الأحداث مرة واحدة بس
-    try { await load(); render(); gens(); resume(); } catch (err) { root.querySelector(".nh-gal-grid").innerHTML = `<div class="nh-empty">${esc(err.message)}</div>`; }
+    try { await load(); render(); } catch (err) { root.querySelector(".nh-gal-grid").innerHTML = `<div class="nh-empty">${esc(err.message)}</div>`; }
   }
   return { mount };
 })();
