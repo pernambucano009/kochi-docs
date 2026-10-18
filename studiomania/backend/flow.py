@@ -15,7 +15,7 @@ import growth
 import algo
 
 FORMATS = {"reel": "ريل (فيديو قصير)", "carousel": "كاروسيل (صور ورا بعض)", "series": "مسلسل (كذا حلقة)"}
-STAGES = ("idea", "format", "scenario", "cast", "assets", "generate", "done")
+STAGES = ("idea", "format", "scenario", "cast", "voice", "assets", "generate", "done")
 
 
 # ---------------------------------------------------------------- ذوق العميل (اللي المخ اتعلّمه)

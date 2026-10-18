@@ -5,7 +5,7 @@ const Flow = (() => {
   const esc = (s) => escapeHtml(String(s ?? ""));
   const J = (o) => ({ headers: { "Content-Type": "application/json" }, body: JSON.stringify(o) });
   const S = { seen: new Set(), html: {}, busyFrom: null, tickT: null, el: null, d: null, timer: null, edit: null, own: false, hint: false, chat: null, cast: null, seasons: null, why: false };
-  const STEPS = [["idea", "الفكرة"], ["format", "نوع البوست"], ["scenario", "السيناريو"], ["cast", "الأبطال"], ["assets", "ملفاتك"], ["generate", "التوليد"]];
+  const STEPS = [["idea", "الفكرة"], ["format", "نوع البوست"], ["scenario", "السيناريو"], ["cast", "الأبطال"], ["voice", "الصوت"], ["assets", "ملفاتك"], ["generate", "التوليد"]];
   const FMT = { reel: ["🎬", "ريل", "فيديو قصير رأسي"], carousel: ["🗂️", "كاروسيل", "صور ورا بعض بتتقلب"], series: ["📺", "مسلسل", "كذا حلقة بنفس الأبطال"] };
   const OUT = { tvideo: "قسم القوالب", carousel: "الكاروسيل", series: "المسلسلات", typo: "التايبوجرافي", motion: "الموشن" };
   const idx = (st) => Math.max(0, STEPS.findIndex(([k]) => k === (st === "done" ? "generate" : st)));
@@ -27,7 +27,7 @@ const Flow = (() => {
   }
   async function start(t) {
     shell();
-    Object.assign(S, { d: null, edit: null, own: false, hint: false, chat: null, cast: null });
+    Object.assign(S, { d: null, edit: null, own: false, hint: false, chat: null, cast: null, vopts: null, vo: null });
     S.el.hidden = false;
     S.el.innerHTML = `<div class="flw-box"><div class="flw-load"><span class="flw-spin"></span><p>المخ بيقرا البراند والقالب وبيجهّز أفكار…</p></div></div>`;
     try {
@@ -38,7 +38,7 @@ const Flow = (() => {
   }
   async function open(fid) {
     shell();
-    Object.assign(S, { d: null, edit: null, own: false, hint: false, chat: null, cast: null });
+    Object.assign(S, { d: null, edit: null, own: false, hint: false, chat: null, cast: null, vopts: null, vo: null });
     S.el.hidden = false;
     S.el.innerHTML = `<div class="flw-box"><div class="flw-load"><span class="flw-spin"></span></div></div>`;
     try { S.d = await api(`/api/flows/${fid}`); render(); poll(); } catch (err) { toast(err.message, true); close(); }
@@ -89,7 +89,7 @@ const Flow = (() => {
   }
   function stepper(d) {
     const cur = idx(d.stage);
-    const ready = { idea: true, format: !!d.idea, scenario: !!d.format, cast: !!d.scenario, assets: !!d.scenario, generate: !!d.scenario };
+    const ready = { idea: true, format: !!d.idea, scenario: !!d.format, cast: !!d.scenario, voice: !!d.scenario, assets: !!d.scenario, generate: !!d.scenario };
     return `<ol class="flw-steps">${STEPS.map(([k, t], i) => `<li class="${i < cur ? "past" : i === cur ? "now" : ""}">
       <button type="button" ${ready[k] && i !== cur && !busy() ? `data-go="${k}"` : "disabled"}><i class="num">${i < cur ? "✓" : i + 1}</i><span>${t}</span></button></li>`).join("")}</ol>`;
   }
@@ -273,6 +273,46 @@ const Flow = (() => {
     render();
   }
 
+  // ---------------------------------------------------------------- 🎙️ الصوت: مين بيتكلم، وبأي لهجة، وبأي صوت
+  function stVoice(d) {
+    const o = S.vopts;
+    if (!o) { loadVoice(); return `${picked("scenario")}${working("بجيب الأصوات…")}`; }
+    S.vo ??= { ...o.pick };
+    const v = S.vo, on = v.speaker !== "none";
+    const voices = o.voices[v.lang] || [];
+    if (!voices.some((x) => x.id === v.voice)) v.voice = voices[0]?.id || "";
+    const grp = (g) => o.dialects.filter((x) => x.group === g).map((x) => `<button type="button" class="flw-chip${x.id === v.lang ? " on" : ""}" data-vlang="${esc(x.id)}">${esc(x.label)}</button>`).join("");
+    return `${picked("scenario")}<h2>مين اللي بيتكلم؟</h2><p class="flw-sub">اختار صاحب الصوت، وبعدين اللهجة والصوت اللي هيتقال بيه الكلام.</p>
+      <div class="flw-spk">${o.speakers.map((s) => `<button type="button" class="flw-person sm${s.id === v.speaker ? " on" : ""}" data-vspk="${esc(s.id)}">
+        ${s.image_url ? `<img src="${esc(s.image_url)}" alt="" loading="lazy">` : `<i>${s.id === "none" ? "🔇" : "🎙️"}</i>`}<b>${esc(s.name)}</b><small>${esc(s.about || "")}</small></button>`).join("")}</div>
+      ${on ? `<h3 class="flw-h3">اللهجة</h3><div class="flw-langs">${grp("ar")}</div><div class="flw-langs">${grp("foreign")}</div>
+        ${!o.fasih && o.dialects.find((x) => x.id === v.lang)?.group === "ar" ? `<div class="flw-empty bad">اللهجات العربية محتاجة مفتاح فصيح على السيرفر.</div>` : ""}
+        <h3 class="flw-h3">الصوت</h3><div class="flw-voices">${voices.map((x) => `<div class="flw-voice${x.id === v.voice ? " on" : ""}">
+          <button type="button" class="flw-vpick" data-nofx data-vvoice="${esc(x.id)}"><i>${x.gender === "female" ? "👩" : "👨"}</i><b>${esc(x.label)}</b></button>
+          ${o.voices[v.lang] && o.fasih && /^ar-/.test(x.id) ? `<button type="button" class="flw-vplay" data-nofx data-vplay="${esc(x.id)}" title="اسمع عينة">${S.vplay === x.id ? "⏳" : "▶"}</button>` : ""}</div>`).join("")}</div>
+        <small class="muted">أول مرة تسمع عينة صوت بتتحسب ثواني قليلة من رصيد فصيح، وبعدها بتتحفظ.</small>` : ""}
+      <div class="flw-acts end"><button type="button" class="flw-btn pri big" data-setvoice>كمّل ←</button></div>`;
+  }
+  async function loadVoice() {
+    if (S.vLoading) return;
+    S.vLoading = true;
+    try { S.vopts = await api(`/api/flows/${S.d.id}/voice-options`); } catch (err) { toast(err.message, true); S.vopts = null; S.vLoading = false; return; }
+    S.vLoading = false;
+    render();
+  }
+  async function playSample(id) {
+    const cached = (S.vopts.voices[S.vo.lang] || []).find((x) => x.id === id)?.sample;
+    let url = cached;
+    if (!url) {
+      S.vplay = id; render();
+      try { url = (await api("/api/voice-sample", { method: "POST", ...J({ voice: id }) })).url; } catch (err) { toast(err.message, true); }
+      S.vplay = null; render();
+      if (!url) return;
+      const it = (S.vopts.voices[S.vo.lang] || []).find((x) => x.id === id); if (it) it.sample = url;
+    }
+    S.audio?.pause(); S.audio = new Audio(url); S.audio.play().catch(() => {});
+  }
+
   // ---------------------------------------------------------------- 5) الملفات
   function assetTile(a) {
     const media = a.kind === "فيديو" ? `<video src="${esc(a.url)}" muted playsinline preload="metadata"></video>` : `<img src="${esc(a.url)}" alt="" loading="lazy">`;
@@ -322,7 +362,7 @@ const Flow = (() => {
     const d = S.d;
     if (!d || !S.el) return;
     const st = d.stage === "generate" && (d.output || d.busy === "generate") ? "done" : d.stage;
-    const body = { idea: stIdea, format: stFormat, scenario: stScenario, cast: stCast, assets: stAssets, generate: stGenerate, done: stDone }[st] || stIdea;
+    const body = { idea: stIdea, format: stFormat, scenario: stScenario, cast: stCast, voice: stVoice, assets: stAssets, generate: stGenerate, done: stDone }[st] || stIdea;
     if (S.stage && S.stage !== st) S.chat = null;   // النقاش بيتقفل لما تنتقل خطوة
     if (!d.busy) S.busyFrom = null;
     const head = `<div class="flw-tpl"><small class="latin">Template</small><b>${esc(d.template.name)}</b>${d.brand_name ? `<small class="muted">لـ ${esc(d.brand_name)}</small>` : ""}</div>
@@ -439,7 +479,12 @@ const Flow = (() => {
       S.cast = S.cast.includes(id) ? S.cast.filter((x) => x !== id) : [...S.cast, id];
       return render();
     }
-    if (q("[data-setcast]")) return call("/cast", { ids: S.cast || [] });
+    if (q("[data-setcast]")) { S.vopts = null; S.vo = null; return call("/cast", { ids: S.cast || [] }); }
+    if ((b = q("[data-vspk]"))) { S.vo.speaker = b.dataset.vspk; return render(); }
+    if ((b = q("[data-vlang]"))) { S.vo.lang = b.dataset.vlang; S.vo.voice = ""; return render(); }
+    if ((b = q("[data-vvoice]"))) { S.vo.voice = b.dataset.vvoice; return render(); }
+    if ((b = q("[data-vplay]"))) return playSample(b.dataset.vplay);
+    if (q("[data-setvoice]")) { S.audio?.pause(); return call("/voice", S.vo); }
     if ((b = q("[data-adel]"))) return call(`/assets/${encodeURIComponent(b.dataset.adel)}`, null, "DELETE");
     if ((b = q("[data-ment]"))) {
       const ta = S.el.querySelector("#flwPrompt"), m = `@${b.dataset.ment} `;

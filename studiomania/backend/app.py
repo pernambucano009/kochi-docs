@@ -20434,7 +20434,98 @@ class FlowCastIn(BaseModel):
 def flow_cast(fid: str, body: FlowCastIn):
     opts = {o["id"]: o for o in flow_cast_options(fid)}
     cast = [opts[i] for i in body.ids if i in opts][:6]
-    return flow_to_dict(fid, flow_update(fid, lambda d: d.update(cast=cast, stage="assets")))
+    return flow_to_dict(fid, flow_update(fid, lambda d: d.update(cast=cast, stage="voice")))
+
+
+# 🎙️ خطوة الصوت: مين اللي بيتكلم (معلّق أو بطل من الأبطال أو من غير صوت)، وبأي لهجة، وبأي صوت
+LANG_HINTS = (("نجد|رياض|القصيم", "ar-sa-najdi"), ("حجاز|جدة|جده|مكة|مكه|المدينة", "ar-sa-hijazi"), ("سعود", "ar-sa-najdi"),
+              ("إمارات|امارات|دبي|أبوظبي|ابوظبي", "ar-ae"), ("كويت", "ar-kw"), ("قطر", "ar-qa"), ("بحرين", "ar-bh"), ("عمان|عُمان|مسقط", "ar-om"),
+              ("خليج", "ar-gulf"), ("مصر|مصري|القاهرة", "ar-eg-cairo"), ("شام|سوري|لبنان|أردن|اردن|فلسطين", "ar-levant"), ("عراق", "ar-iq"),
+              ("سودان", "ar-sd"), ("مغرب|دارجة", "ar-ma"), ("جزائر", "ar-dz"), ("تونس", "ar-tn"), ("فصحى|فصحي", "ar-msa"),
+              (r"english|إنجليز|انجليز", "en"))
+
+
+def flow_lang_guess(d: dict) -> str:
+    """لهجة البراند من مخه (اللغة والسوق)، وإلا مصري."""
+    b = flow_brain(d) or {}
+    s = f"{b.get('language') or ''} {b.get('market') or ''} {brand_settings().get('language') or ''}".lower()
+    for pat, code in LANG_HINTS:
+        if re.search(pat, s):
+            return code
+    return "ar-eg-cairo"
+
+
+@app.get("/api/flows/{fid}/voice-options")
+def flow_voice_options(fid: str):
+    d = flow_load(fid)
+    fasih_sync()
+    speakers = [{"id": "narrator", "name": "معلّق من برّه الكادر", "about": "صوت بيحكي على الصور"}]
+    speakers += [{"id": c["id"], "name": c["name"], "about": "البطل نفسه هو اللي بيتكلم", "image_url": c.get("image_url")} for c in d.get("cast") or []]
+    speakers.append({"id": "none", "name": "من غير صوت", "about": "موسيقى وكلام مكتوب بس"})
+    dialects = [{"id": k, "label": v["label"], "group": v["group"]} for k, v in dub.DIALECTS.items()]
+    voices = {k: [{"id": x, "label": dub.VOICES[x]["label"], "gender": dub.VOICES[x].get("gender") or "",
+                   "sample": dub.VOICES[x].get("sample") or (f"/media/vsamples/{x}.mp3" if (VSAMPLE_DIR / f"{x}.mp3").exists() else "")}
+                  for x in v["voices"]] for k, v in dub.DIALECTS.items()}
+    vo = d.get("vo") or {}
+    lang = vo.get("lang") if vo.get("lang") in dub.DIALECTS else flow_lang_guess(d)
+    voice = vo.get("voice") if vo.get("voice") in dub.DIALECTS[lang]["voices"] else dub.DIALECTS[lang]["voices"][0]
+    return {"speakers": speakers, "dialects": dialects, "voices": voices, "fasih": bool(fasih.api_key() or atlas.mock_mode()),
+            "pick": {"speaker": vo.get("speaker") or "narrator", "lang": lang, "voice": voice}}
+
+
+class FlowVoiceIn(BaseModel):
+    speaker: str = "narrator"
+    lang: str = "ar-eg-cairo"
+    voice: str = ""
+
+
+@app.post("/api/flows/{fid}/voice")
+def flow_voice(fid: str, body: FlowVoiceIn):
+    d = flow_load(fid)
+    names = {"narrator": "معلّق", "none": ""} | {c["id"]: c["name"] for c in d.get("cast") or []}
+    if body.speaker not in names:
+        raise HTTPException(400, "اختار مين اللي بيتكلم")
+    if body.lang not in dub.DIALECTS:
+        raise HTTPException(400, "اللهجة دي مش موجودة")
+    voice = body.voice if body.voice in dub.DIALECTS[body.lang]["voices"] else dub.DIALECTS[body.lang]["voices"][0]
+    vo = {"speaker": body.speaker, "speaker_name": names[body.speaker], "lang": body.lang, "voice": voice, "on": body.speaker != "none"}
+    return flow_to_dict(fid, flow_update(fid, lambda x: x.update(vo=vo, stage="assets")))
+
+
+# 🔊 عينة لكل صوت (جملة قصيرة باللهجة)، بتتعمل مرة واحدة وتتحفظ، فمابتتحسبش غير أول مرة
+VSAMPLE_DIR = DATA_DIR / "voice_samples"
+VSAMPLE_DIR.mkdir(parents=True, exist_ok=True)
+app.mount("/media/vsamples", StaticFiles(directory=VSAMPLE_DIR), name="vsamples")
+VSAMPLE_TEXT = {"ar-eg-cairo": "أهلًا، أنا الصوت ده. لو عجبك، أنا اللي هتكلم في الفيديو بتاعك.",
+                "ar-msa": "مرحبًا، هذا صوتي. إن أعجبك، سأكون أنا من يتحدث في فيديوك.",
+                "ar-levant": "مرحبا، هاد صوتي. إذا عجبك، أنا رح احكي بالفيديو تبعك.",
+                "ar-iq": "هلا، هذا صوتي. إذا عجبك، آني راح أحچي بالفيديو مالتك.",
+                "ar-ma": "سلام، هادا هو الصوت ديالي. إلا عجبك، أنا اللي غادي نهضر فالفيديو ديالك.",
+                "ar-dz": "سلام، هذا هو الصوت تاعي. إذا عجبك، أنا اللي نهدر في الفيديو تاعك.",
+                "ar-tn": "عسلامة، هذا صوتي. كان عجبك، أنا اللي باش نحكي في الفيديو متاعك.",
+                "ar-sd": "سلام، دا صوتي. لو عجبك، أنا البتكلم في الفيديو بتاعك."}
+VSAMPLE_GULF = "هلا والله، هذا صوتي. إذا عجبك، أنا اللي بتكلم في الفيديو حقك."
+
+
+class VoiceSampleIn(BaseModel):
+    voice: str
+
+
+@app.post("/api/voice-sample")
+def voice_sample(body: VoiceSampleIn):
+    v = dub.VOICES.get(body.voice)
+    if not v or v.get("provider") != "fasih" or v.get("hidden"):
+        raise HTTPException(400, "العينة متاحة لأصوات فصيح بس")
+    dest = VSAMPLE_DIR / f"{Path(body.voice).name}.mp3"
+    if not dest.exists():
+        if atlas.mock_mode():
+            raise HTTPException(400, "العينات مش متاحة في وضع التجربة")
+        try:
+            fasih.speak(VSAMPLE_TEXT.get(v["dialect"], VSAMPLE_GULF), v["voice"], v["dialect"], dest)
+        except fasih.FasihError as e:
+            dest.unlink(missing_ok=True)
+            raise HTTPException(400, str(e)) from e
+    return {"url": f"/media/vsamples/{dest.name}?v={int(dest.stat().st_mtime)}"}
 
 
 @app.post("/api/flows/{fid}/assets")
@@ -20564,6 +20655,15 @@ def flow_brief(d: dict) -> str:
     parts = [f"الفكرة: {idea.get('title', '')} — {idea.get('idea', '')}", "السيناريو:\n" + fz.scenario_text(sc, fmt)]
     if d.get("cast"):
         parts.append("الأبطال: " + "، ".join(f"{c['name']} ({c.get('about', '')[:120]})" for c in d["cast"]))
+    vo = d.get("vo") or {}
+    if vo.get("speaker") == "none":
+        parts.append("الصوت: من غير فويس أوفر (موسيقى وكلام مكتوب على الشاشة بس)")
+    elif vo.get("speaker") and vo["speaker"] != "narrator":
+        parts.append(f"الصوت: {vo.get('speaker_name')} نفسه هو اللي بيتكلم للكاميرا، والكلام على لسانه")
+    elif vo:
+        parts.append("الصوت: معلّق من برّه الكادر بيحكي على الصور")
+    if vo.get("lang") in dub.DIALECTS:
+        parts.append(f"لغة الكلام: {dub.DIALECTS[vo['lang']]['label'].split(' ', 1)[-1]}")
     if d.get("assets"):
         parts.append("ملفات العميل: " + "، ".join(f"@{a['name']}" for a in d["assets"]))
     if (d.get("prompt") or "").strip():
@@ -20629,8 +20729,11 @@ def flow_generate(fid: str, body: FlowGoIn):
         flow_update(fid, lambda x: x.update(output={"kind": "typo", "id": r["id"], "status": "done"}, stage="done"))
     else:
         script = fz.scenario_script(sc, fmt)
+        vo = d.get("vo") or {}
+        lang = vo.get("lang") if vo.get("lang") in dub.DIALECTS else flow_lang_guess(d)
         tv = tvideo_create(TvIn(template=tpl["id"], section="templates", script=script, script_mode="own" if script else "ai",
-                                brief=brief[:3000], length=max(20, min(60, 10 * len(sc.get("beats") or [1, 2, 3])))))
+                                brief=brief[:3000], length=max(20, min(60, 10 * len(sc.get("beats") or [1, 2, 3]))),
+                                lang=lang, voice=vo.get("voice") or "", voice_on=vo.get("on", True)))
         refs = flow_refs(d)
         if refs:
             tv_update(tv["id"], lambda x: x.update(flow_refs=refs))
