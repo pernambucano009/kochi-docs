@@ -2466,6 +2466,8 @@ class ProjectIn(BaseModel):
     sounds: list = []           # تراكات صوت زيادة ومؤثرات
     export: dict = {}           # إعدادات التصدير {res, fps, quality}
     mix: dict = {}              # الصوت: {duck: 0..1 توطية الموسيقى وقت الكلام، normalize: توحيد العلو، enhance: تنضيف التعليق}
+    algo: dict = {}             # ⚡ وضع الخوارزمية: {sig, caps, marks: [السكتات/الحشو اللي اتعلّمت بالأحمر للمراجعة]}
+    hook_text: str = ""         # الهوك المكتوب على الشاشة لو جاي من الفكرة
 
 
 PROJECT_SECTIONS = ("coach", "series", "ads", "free")   # coach = برنامج كوتشي · free = المونتاج الحر في ستوديومانيا
@@ -2540,6 +2542,7 @@ def save_project(project_id: str, body: ProjectIn):
     with closing(db()) as conn, conn:
         old = json.loads(get_project(conn, project_id)["data"])
         data["section"] = old.get("section") or "coach"  # القسم مبيتغيرش من الحفظ
+        data["hook_text"] = data.get("hook_text") or old.get("hook_text") or ""
         conn.execute(
             "UPDATE projects SET name = ?, data = ?, updated_at = ? WHERE id = ?",
             (data["name"], json.dumps(data), now(), project_id),
@@ -5009,6 +5012,98 @@ LOGO_DEFAULTS = {"enabled": True, "size": 37, "x": 0, "y": 4, "opacity": 0.9, "o
 
 def transcript_of(row: sqlite3.Row) -> dict:
     return json.loads(row["transcript"]) if row["transcript"] else {"status": "none", "words": []}
+
+
+# ---------- ⚡ وضع الخوارزمية في المونتاج: تحليل بس (المحرر هو اللي بيطبّق ويحفظ، علشان مايتكتبش فوق شغل العميل)
+def project_voice_words(conn: sqlite3.Connection, data: dict) -> tuple[str, list[dict]]:
+    v = data.get("voice")
+    if not v:
+        return "none", []
+    row = conn.execute("SELECT transcript FROM audio WHERE id = ?", (v["id"],)).fetchone()
+    tr = transcript_of(row) if row else {"status": "none", "words": []}
+    return tr.get("status") or "none", tr.get("words") or []
+
+
+@app.post("/api/projects/{project_id}/algo-prep")
+def project_algo_prep(project_id: str):
+    """السكتات في الفيديوهات اللي بصوت (بالأحمر للمراجعة)، وهوك الشاشة، وحالة الكابشن."""
+    with closing(db()) as conn:
+        data = json.loads(get_project(conn, project_id)["data"])
+        clips = data.get("clips") or []
+        n = len(clips)
+        marks = []
+        cache: dict[str, list] = {}
+        for i, c in enumerate(clips):
+            if c.get("disabled") or float(c.get("volume", 1) or 0) <= 0 or c.get("kf"):
+                continue
+            path = clip_source(conn, c["gen_id"])
+            if not path or not media_info(path).has_audio:
+                continue
+            info = media_info(path)
+            if str(path) not in cache:
+                try:
+                    cache[str(path)] = silences(path, algo.SILENCE_MIN)
+                except (subprocess.SubprocessError, OSError):
+                    cache[str(path)] = []
+            a, b = float(c.get("start") or 0), float(c["end"] if c.get("end") is not None else info.duration)
+            for m in algo.silence_marks(cache[str(path)], a, b, i == 0, i == n - 1):
+                marks.append({"id": f"{i}-{m['a']}", "i": i, **m})
+        status, words = project_voice_words(conn, data)
+    if data.get("voice") and status == "none":   # الكابشن محتاج الكلام مكتوب: بيبدأ يتكتب لوحده
+        with closing(db()) as conn, conn:
+            conn.execute("UPDATE audio SET transcript = ? WHERE id = ?", (json.dumps({"status": "working", "words": []}), data["voice"]["id"]))
+        threading.Thread(target=run_transcribe, args=(data["voice"]["id"],), daemon=True).start()
+        status = "working"
+    hook = None
+    texts = data.get("texts") or []
+    if not any(float(x.get("t0") or 0) < 3 for x in texts if isinstance(x, dict)):
+        context = data.get("hook_text") or ""
+        if not context:
+            context = " ".join(w["w"] for w in words[:40]) or data.get("name") or ""
+        if data.get("hook_text"):
+            hook = data["hook_text"]
+        elif context.strip():
+            if atlas.mock_mode():
+                hook = "غلطة بتعملها\nكل يوم"
+            else:
+                try:
+                    hook = str(az.parse_json(llm(algo.hook_text_messages(context), json_mode=True, temperature=0.5), "هوك الشاشة").get("text") or "").strip()[:80] or None
+                except (ValueError, HTTPException, atlas.AtlasError, httpx.HTTPError):
+                    hook = None
+    return {"marks": marks, "hook": hook, "caps": status if data.get("voice") else "no_voice"}
+
+
+@app.post("/api/projects/{project_id}/fillers")
+def project_fillers(project_id: str):
+    """الحشو (أمم/آه) والكلام المتكرر في الفيديوهات اللي بصوت: بيكتب كلام كل قطعة (بيتحسب من رصيد Atlas) ويعلّمه بالأحمر."""
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "محتاج مفتاح Atlas علشان يسمع الكلام")
+    with closing(db()) as conn:
+        data = json.loads(get_project(conn, project_id)["data"])
+        jobs = []
+        for i, c in enumerate(data.get("clips") or []):
+            if c.get("disabled") or float(c.get("volume", 1) or 0) <= 0 or c.get("kf"):
+                continue
+            path = clip_source(conn, c["gen_id"])
+            if path and media_info(path).has_audio:
+                a = float(c.get("start") or 0)
+                b = float(c["end"] if c.get("end") is not None else media_info(path).duration)
+                jobs.append((i, path, a, b))
+    marks = []
+    for i, path, a, b in jobs[:20]:
+        wav = TMP_DIR / f"fill_{uuid.uuid4().hex[:8]}.wav"
+        try:
+            subprocess.run([ffmpeg_exe(), "-y", "-loglevel", "error", "-ss", f"{a:.3f}", "-to", f"{b:.3f}", "-i", str(path), "-vn", "-ac", "1", "-ar", "16000", str(wav)],
+                           check=True, timeout=120)
+            words = atlas.transcribe(wav, b - a)
+        except (subprocess.SubprocessError, OSError, atlas.AtlasError, httpx.HTTPError):
+            continue
+        finally:
+            wav.unlink(missing_ok=True)
+        for m in algo.filler_marks(words, a):
+            if a <= m["a"] < m["b"] <= b:
+                marks.append({"id": f"{i}-f{m['a']}", "i": i, **m})
+    return {"marks": marks}
 
 
 @app.get("/api/captions/options")

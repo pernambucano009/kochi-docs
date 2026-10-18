@@ -144,6 +144,7 @@ function openProject(p) {
   renderRender();
   if (!same) requestAnimationFrame(fitZoom);
   if (mt.project.render_status === "rendering") pollRender();
+  algoPrep();
 }
 
 // ---------- الأوترو: قطعة فيديو عادية جوه التايم لاين ----------
@@ -653,7 +654,7 @@ function renderTimeline() {
             <span class="nm" dir="auto">${label}</span><span class="du">${fxBadges(it.c)}${(it.t1 - it.t0).toFixed(1)}s</span>
             ${soundBadge(it)}
             ${hasSound(it) ? volLine(it.volume) : ""}
-            ${it.kind === "clip" ? `<b class="h l" data-h="l"></b><b class="h r" data-h="r"></b>` : ""}${kfd}
+            ${it.kind === "clip" ? `<b class="h l" data-h="l"></b><b class="h r" data-h="r"></b>` : ""}${kfd}${it.kind === "clip" ? silMarksHtml(it) : ""}
           </div>`;
         })
         .join("")
@@ -3061,6 +3062,8 @@ function exportFileName(name) {
 
 $("renderBtn").onclick = async () => {
   pause();
+  const pend = silPending().filter((m) => m.del).length;
+  if (pend && !confirm(`لسه فيه ${pend} جزء أحمر (سكتة/حشو) ماراجعتهوش. تصدّر من غير ما تشيلهم؟`)) return;
   await saveProject();
   try {
     await api(`/api/projects/${mt.project.id}/render`, { method: "POST" });
@@ -3155,3 +3158,142 @@ viewHooks["6"] = initMontage;
 // «صدّر الفيديو» فوق (من البروتوتايب): بيفتح تاب التصدير
 $("mtExportTop")?.addEventListener("click", () => document.querySelector('#inspTabs [data-tab="export"]')?.click());
 $("mtPreviewTop")?.addEventListener("click", () => $("tpFull")?.click());
+
+
+// ---------------------------------------------------------------- ⚡ وضع الخوارزمية في المونتاج
+// أول ما المشروع يفتح: السكتات في الفيديوهات اللي بصوت بتتعلّم بالأحمر (ماتتشالش غير لما العميل يراجع ويدوس «احذف»)،
+// وهوك مكتوب على الشاشة أول ٣ ثواني لو مفيش، والكابشن بيشتغل لما الكلام يتكتب.
+let ALGO_ON = null;
+const silAll = () => mt.project?.data.algo?.marks || [];
+const silPending = () => silAll().filter((m) => !m.done);
+async function algoPrep(force = false) {
+  const p = mt.project;
+  if (!p) return;
+  if (ALGO_ON === null) { try { ALGO_ON = (await api("/api/algo/mode")).on; } catch { ALGO_ON = false; } }
+  if (!ALGO_ON && !force) return;
+  const d = p.data, sig = JSON.stringify(d.clips.map((c) => [c.gen_id, c.start, c.end]));
+  if (!force && d.algo?.sig === sig && d.algo?.caps !== "working") return renderSilReview();
+  await saveProject();
+  let r;
+  try { r = await api(`/api/projects/${p.id}/algo-prep`, { method: "POST" }); } catch (err) { if (force) toast(err.message, true); return; }
+  if (mt.project?.id !== p.id) return;
+  const old = new Map(silAll().map((m) => [m.id, m]));
+  d.algo = { ...(d.algo || {}), sig, caps: r.caps, marks: r.marks.map((m) => ({ ...m, del: old.get(m.id)?.del ?? true, done: old.get(m.id)?.done || false })) };
+  if (r.hook && !texts().some((x) => x.t0 < 3)) {
+    texts().push({ text: r.hook, t0: 0, dur: 3, font: "SM Changa", size: 88, color: "#FFFFFF", x: 0.5, y: 0.22, angle: 0, scale: 1, opacity: 1, spacing: 0,
+      stroke: { w: 6, color: "#000000" }, shadow: true, bg: { on: false, color: "#000000" }, bold: true, italic: false,
+      anim_in: { type: "pop", dur: 0.35 }, anim_out: { type: "fade", dur: 0.25 }, lane: freeTextLane(0, 3), algo: true });
+    toast("⚡ اتحط هوك مكتوب على الشاشة أول ٣ ثواني (تقدر تعدّله من تاب النص)");
+  }
+  if (r.caps === "done" && d.voice && d.captions?.enabled === undefined) d.captions = { ...(d.captions || {}), enabled: true };
+  renderAll();
+  renderSilReview();
+  scheduleSave();
+}
+function silMarksHtml(it) {
+  const list = silPending().filter((m) => m.i === it.i);
+  if (!list.length || it.rev) return "";
+  const sp = it.speed || 1;
+  return list.map((m) => `<i class="tl-sil ${m.del ? "del" : "keep"}" data-mk="${m.id}" title="${m.kind === "filler" ? `حشو «${escapeHtml(m.text || "")}»` : m.kind === "repeat" ? `تكرار «${escapeHtml(m.text || "")}»` : m.kind === "end" ? "سكوت بعد النهاية" : m.kind === "start" ? "سكوت قبل البداية" : "سكتة"} ${(m.b - m.a).toFixed(1)}ث · دوسة تسيبه/تشيله"
+      style="left:${Math.max(0, (m.a - it.in) / sp) * mt.pps}px;width:${Math.max(2, (m.b - m.a) / sp * mt.pps)}px"></i>`).join("");
+}
+const SIL_KIND = { silence: "سكتة", start: "سكوت في الأول", end: "سكوت في الآخر", filler: "حشو", repeat: "تكرار" };
+function silTime(m) {
+  const it = seq().items.find((x) => x.kind === "clip" && x.i === m.i);
+  return it ? it.t0 + (m.a - it.in) / (it.speed || 1) : 0;
+}
+function renderSilReview() {
+  const box = $("silReview");
+  const list = silPending();
+  if (!list.length) { box.hidden = true; return; }
+  const dels = list.filter((m) => m.del), secs = dels.reduce((s, m) => s + (m.b - m.a), 0);
+  box.hidden = false;
+  box.innerHTML = `<div class="sr-head"><b>⚡ لقيت ${list.length} ${list.length === 1 ? "جزء" : "أجزاء"} ممكن تتشال</b>
+      <span class="muted">الأحمر هيتشال (${secs.toFixed(1)} ثانية). اسمع كل واحد ودوس عليه لو عايز تسيبه.</span>
+      <button class="btn sm primary" id="srApply" ${dels.length ? "" : "disabled"}>✂️ احذف الأحمر (${dels.length})</button>
+      <button class="btn sm" id="srFillers" title="بيكتب كلام الفيديوهات ويدوّر على «أمم/آه» والكلام المتكرر (بيتحسب من رصيد Atlas)">🔎 الحشو كمان</button>
+      <button class="btn sm" id="srDismiss">سيبهم كلهم</button></div>
+    <div class="sr-list">${list.map((m) => `<div class="sr-row ${m.del ? "del" : "keep"}" data-mk="${m.id}">
+      <button class="ic" data-srplay="${m.id}" title="اسمعه">▶︎</button><span>${SIL_KIND[m.kind] || "سكتة"}${m.text ? ` «${escapeHtml(m.text)}»` : ""}</span>
+      <small class="num">${fmtTC(silTime(m))} · ${(m.b - m.a).toFixed(1)}ث</small>
+      <label class="check"><input type="checkbox" data-srdel="${m.id}" ${m.del ? "checked" : ""}> يتشال</label></div>`).join("")}</div>`;
+}
+function silToggle(id, val) {
+  const m = silAll().find((x) => x.id === id);
+  if (!m) return;
+  m.del = val ?? !m.del;
+  renderTimeline();
+  renderSilReview();
+  scheduleSave();
+}
+// بيشيل الأجزاء الحمرا: كل قطعة بتتقسم لحتت من غير السكتات، والسرعة والإعدادات زي ما هي
+function silApply() {
+  const d = mt.project.data, cut = silPending().filter((m) => m.del);
+  if (!cut.length) return;
+  pushHistory();
+  const out = [];
+  d.clips.forEach((c, i) => {
+    const ms = cut.filter((m) => m.i === i).sort((a, b) => a.a - b.a);
+    if (!ms.length || hasKf(c)) { out.push(c); return; }
+    let a = c.start;
+    const end = clipOut(c), pieces = [];
+    for (const m of ms) {
+      if (m.a - a > 0.05) pieces.push([a, m.a]);
+      a = Math.max(a, m.b);
+    }
+    if (end - a > 0.05) pieces.push([a, end]);
+    pieces.forEach(([s, e], k) => out.push({ ...structuredClone(c), start: s, end: e, ...(k ? { trans: null, fade_in: 0 } : {}), ...(k < pieces.length - 1 ? { fade_out: 0 } : {}) }));
+  });
+  d.clips = out;
+  const n = cut.length, secs = cut.reduce((s, m) => s + (m.b - m.a), 0);
+  d.algo.marks = [];
+  d.algo.sig = JSON.stringify(d.clips.map((c) => [c.gen_id, c.start, c.end]));
+  mt.sel = null;
+  renderAll();
+  renderSilReview();
+  scheduleSave();
+  toast(`✂️ اتشال ${n} ${n === 1 ? "جزء" : "أجزاء"} (${secs.toFixed(1)} ثانية). Ctrl+Z يرجّعهم`);
+}
+$("silReview").addEventListener("change", (e) => { const id = e.target.dataset?.srdel; if (id) silToggle(id, e.target.checked); });
+$("silReview").addEventListener("click", async (e) => {
+  const pl = e.target.closest("[data-srplay]");
+  if (pl) {
+    const m = silAll().find((x) => x.id === pl.dataset.srplay);
+    if (!m) return;
+    const t = silTime(m);
+    pause(); seek(Math.max(0, t - 0.8)); play();
+    clearTimeout(mt.silStop);
+    mt.silStop = setTimeout(pause, ((m.b - m.a) / (d_speed(m) || 1) + 1.6) * 1000);
+    return;
+  }
+  if (e.target.closest("#srApply")) return silApply();
+  if (e.target.closest("#srDismiss")) { silPending().forEach((m) => (m.done = true)); renderTimeline(); renderSilReview(); return scheduleSave(); }
+  if (e.target.closest("#srFillers")) {
+    const b = e.target.closest("#srFillers");
+    b.disabled = true; b.textContent = "⏳ بيسمع الكلام…";
+    await saveProject();
+    try {
+      const r = await api(`/api/projects/${mt.project.id}/fillers`, { method: "POST" });
+      const have = new Set(silAll().map((m) => m.id));
+      const add = r.marks.filter((m) => !have.has(m.id)).map((m) => ({ ...m, del: true, done: false }));
+      mt.project.data.algo = { ...(mt.project.data.algo || {}), marks: [...silAll(), ...add] };
+      toast(add.length ? `🔎 لقيت ${add.length} حشو/تكرار` : "مفيش حشو واضح 👌");
+      renderTimeline(); renderSilReview(); scheduleSave();
+    } catch (err) { toast(err.message, true); b.disabled = false; b.textContent = "🔎 الحشو كمان"; }
+  }
+});
+function d_speed(m) { return clipSpeed(mt.project.data.clips[m.i]); }
+$("tlCanvas").addEventListener("click", (e) => {
+  const mk = e.target.closest(".tl-sil");
+  if (!mk) return;
+  e.stopPropagation();
+  silToggle(mk.dataset.mk);
+}, true);
+$("tlSilence").onclick = async () => {
+  if (!mt.project?.data.clips.length) return toast("ضيف فيديو الأول", true);
+  const b = $("tlSilence");
+  b.disabled = true;
+  await algoPrep(true);
+  b.disabled = false;
+  if (!silPending().length) toast("مفيش سكتات واضحة في الفيديوهات اللي بصوت 👌");
+};

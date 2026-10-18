@@ -539,3 +539,48 @@ AIVIDEO_RULE = ("⚡ قواعد برومبت الفيديو (من العقل ا�
                 "- اللقطة الواحدة فعل واحد واضح، مش كذا حدث ورا بعض.\n"
                 "- أول لقطة فيها حركة أو تباين أو حاجة غير متوقعة من أول ثانية (الهوك المعروض).\n"
                 "- من غير أي كلام مكتوب جوه الصورة: الكلام على الشاشة بيتحط في المونتاج.")
+
+
+# ---------------------------------------------------------------- ✂️ السكتات والحشو (بتتعلّم بالأحمر والعميل يراجع قبل الحذف)
+SILENCE_MIN = 0.45    # السكوت اللي أطول من كده بيتعلّم
+SILENCE_PAD = 0.12    # بنسيب نَفَس صغير قبل وبعد الكلام علشان القطع مايبانش
+FILLERS = {"امم", "اممم", "ممم", "مم", "إمم", "ااه", "آآ", "اا", "ااا", "إيييه", "um", "umm", "uh", "uhh", "hmm", "erm", "ah"}
+
+
+def silence_marks(quiet: list[tuple[float, float]], a: float, b: float, first: bool, last: bool) -> list[dict]:
+    """السكتات جوه قطعة [a, b] من الفيديو الأصلي. السكوت في أول أول قطعة وآخر آخر قطعة بيتشال كله (القفل بعد النتيجة)."""
+    out = []
+    for s, e in quiet:
+        s, e = max(s, a), min(e, b)
+        if e - s < SILENCE_MIN:
+            continue
+        head, tail = s <= a + 0.05, e >= b - 0.05
+        cs = s if (head and first) else s + SILENCE_PAD
+        ce = e if (tail and last) else e - SILENCE_PAD
+        if ce - cs >= 0.25:
+            out.append({"a": round(cs, 2), "b": round(ce, 2), "kind": "end" if tail and last else "start" if head and first else "silence"})
+    return out
+
+
+def filler_marks(words: list[dict], base: float) -> list[dict]:
+    """الحشو (أمم/آه) والكلمة اللي اتكررت ورا بعضها. الأوقات بالنسبة للفيديو الأصلي."""
+    norm = lambda w: "".join(ch for ch in str(w).lower() if ch.isalnum())
+    out = []
+    for i, w in enumerate(words):
+        t = norm(w.get("w"))
+        if not t:
+            continue
+        if t in FILLERS or (len(t) >= 2 and len(set(t)) == 1):
+            out.append({"a": round(base + w["s"], 2), "b": round(base + w["e"], 2), "kind": "filler", "text": str(w.get("w"))[:20]})
+        elif i + 1 < len(words) and norm(words[i + 1].get("w")) == t and len(t) > 1:
+            out.append({"a": round(base + w["s"], 2), "b": round(base + words[i + 1]["s"], 2), "kind": "repeat", "text": str(w.get("w"))[:20]})
+    return out
+
+
+def hook_text_messages(context: str) -> list[dict]:
+    return [{"role": "system", "content": "إنت بتكتب الهوك المكتوب على الشاشة لفيديو قصير. Return JSON only.\n\n" + playbook.pack("hook", 4000)},
+            {"role": "user", "content": f"""الفيديو ده:
+{context[:2000]}
+
+اكتب الكلام اللي يتحط على الشاشة في أول ٣ ثواني: نفس معنى أول جملة بتتقال، ٣–٨ كلمات، سطرين بالكتير (افصل بينهم بـ \\n عند عبارة طبيعية)، من غير علامات ترقيم ولا كلمات ربط، بنفس لغة ولهجة الكلام.
+رجّع {{"text": "..."}}"""}]
