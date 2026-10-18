@@ -2,21 +2,28 @@
 <script>
 // قالب «جزيئات»: آلاف النقط المنوّرة بتلف زي مجرة، وبعدين بتتجمع وتكتب العنوان، تنفجر، وترجع تتجمع تاني وتكتب اسم البراند.
 // كل نقطة بتتحرك بدالة في الوقت بس، فأي فريم بيطلع زي ما هو. 1080×1920، 12 ثانية.
+const K1 = "١ · المجرة والكلمة", K2 = "٢ · اسم البراند", KS = "الشكل العام";
 const PR = M.params({
-  title: { label: "الكلمة الأولى", kind: "text", role: "product", def: "قريبًا جدًا" },
-  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "مدار" },
-  sub: { label: "تحت الاسم", kind: "text", def: "تطبيق جديد · أول نوفمبر" },
-  c1: { label: "اللون الأول", kind: "color", def: "#5ee7ff" },
-  c2: { label: "اللون التاني", kind: "color", def: "#b36bff" },
+  title: { label: "الكلمة الأولى", kind: "text", role: "product", def: "قريبًا جدًا", group: K1, max: 12, hint: "النقط بتكتبها: كلمة أو اتنين بالكتير (قريبًا، الإطلاق، مفاجأة)." },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "مدار", group: K2, max: 10, hint: "كلمة واحدة: النقط بتكتبها وكل ما كانت أقصر كل ما بانت أوضح." },
+  sub: { label: "تحت الاسم", kind: "text", def: "تطبيق جديد · أول نوفمبر", group: K2, max: 28, hint: "إيه وإمتى (منتج جديد · التاريخ)." },
+  c1: { label: "اللون الأول", kind: "color", role: "accent", def: "#5ee7ff", group: KS, hint: "النقط بتتدرّج بين اللونين على أسود: ألوان نيون فاتحة." },
+  c2: { label: "اللون التاني", kind: "color", role: "accent2", def: "#b36bff", group: KS },
+  fHead: { label: "خط الكلام اللي النقط بتكتبه", kind: "font", def: "lalezar", group: KS, hint: "الخطوط التقيلة بتطلع أوضح بالنقط." },
+  fBody: { label: "خط السطر الأخير", kind: "font", def: "plex4", group: KS },
+});
+M.meta({
+  story: "تشويق قبل إطلاق: آلاف النقط المنوّرة بتلف زي مجرة، بتكتب الكلمة الأولى، تنفجر، وترجع تكتب اسم البراند.",
+  scenes: [{ name: K1, t0: 0, t1: 6, about: "المجرة والكلمة والانفجار" }, { name: K2, t0: 6, t1: 12, about: "الاسم والسطر تحته" }],
+  tips: ["أحسن حاجة قبل إطلاق أو افتتاح.", "كلمات قصيرة جدًا علشان النقط تكتبها واضح."],
 });
 const W = 1080, H = 1920, DUR = 12, N = 4200;
-const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
 const hex = (h) => { h = h.replace("#", ""); return [0, 2, 4].map((i) => parseInt(h.substr(i, 2), 16)); };
 
 M.reel({
   W, H, DUR, bg: "#05060d",
   async init(M) {
-    await Promise.all([loadFont("LZ", "SM-Lalezar.ttf"), loadFont("PX", "TY-PlexArabic-400.ttf")]);
+    await Promise.all([M.font("LZ", PR.fHead), M.font("PX", PR.fBody)]);
     const c = M.canvas(W, H), x = c.getContext("2d"), R = M.rng(5);
     const pts = (txt, size, y) => { const k = document.createElement("canvas"); k.width = W; k.height = H; const q = k.getContext("2d", { willReadFrequently: true });
       q.fillStyle = "#fff"; q.font = `${M.fit(txt, "LZ", 940, size, 80)}px LZ`; q.textAlign = "center"; q.textBaseline = "middle"; q.direction = "rtl"; q.fillText(txt, 540, y);

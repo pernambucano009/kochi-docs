@@ -11,6 +11,10 @@ const PR = M.params({
   card: { label: "كارت التأكيد", kind: "text", def: "تم تأكيد طلبك", group: G2, max: 18, hint: "النتيجة اللي العميل وصلها (تم الطلب، تم الحجز)." },
   card2: { label: "تحت كارت التأكيد", kind: "text", def: "الشحن بكرة · الدفع عند الاستلام", group: G2, max: 34, hint: "تفاصيل بتطمّن (ميعاد الوصول، طريقة الدفع)." },
   cta: { label: "سطر الدعوة", kind: "text", def: "اطلب برسالة… وإحنا علينا الباقي", group: G2, max: 34, hint: "الدعوة في سطر: إزاي العميل يبدأ (ابعت رسالة، اللينك في البايو)." },
+  online: { label: "حالة المتجر", kind: "text", def: "متصل الآن", group: GS, max: 12, hint: "كلام الشات نفسه (غيّره لو الفيديو بلغة تانية)." },
+  typing: { label: "وقت الكتابة", kind: "text", def: "بيكتب…", group: GS, max: 12 },
+  typeHere: { label: "خانة الكتابة", kind: "text", def: "اكتب رسالة", group: GS, max: 14 },
+  time: { label: "وقت الرسايل", kind: "text", def: "١٠:٤٢", group: GS, max: 6 },
   color: { label: "لون البراند", kind: "color", role: "accent", def: "#7c5cff", group: GS, hint: "فقاعات رسايل العميل والهيدر." },
   bg: { label: "لون الخلفية", kind: "color", def: "#f1ecff", group: GS, hint: "درجة فاتحة جدًا من لون البراند." },
   fHead: { label: "خط الدعوة", kind: "font", def: "lalezar", group: GS },
@@ -47,17 +51,17 @@ M.reel({
     M.el("div", "", "position:absolute;left:50%;top:22px;width:200px;height:44px;margin-left:-100px;border-radius:30px;background:#111;", "", scr);
     const av = M.el("div", "", `position:absolute;right:44px;top:96px;width:84px;height:84px;border-radius:50%;background:${PR.logo ? `#fff url(${JSON.stringify(PR.logo)}) center/cover` : "#fff"};color:${col};font:700 44px CH;display:flex;align-items:center;justify-content:center;`, PR.logo ? "" : esc([...PR.store][0] || "م"), head);
     M.el("div", "", "position:absolute;right:148px;top:100px;font:700 40px TJ;white-space:nowrap;", esc(PR.store), head);
-    const status = M.el("div", "", "position:absolute;right:148px;top:148px;font:400 28px TJ;opacity:.85;white-space:nowrap;", "متصل الآن", head);
+    const status = M.el("div", "", "position:absolute;right:148px;top:148px;font:400 28px TJ;opacity:.85;white-space:nowrap;", esc(PR.online), head);
     M.el("div", "", "position:absolute;left:44px;top:112px;font:400 46px TJ;", "⋮", head);
     const list = M.el("div", "", "position:absolute;left:0;right:0;top:0;", "", scr);
     const view = { top: 240, bottom: 1556 - 170 };
     const bar = M.el("div", "", "position:absolute;z-index:3;left:0;right:0;bottom:0;height:150px;background:#f6f3ee;display:flex;align-items:center;gap:18px;padding:0 30px 20px;box-sizing:border-box;", "", scr);
-    M.el("div", "", "flex:1;height:84px;border-radius:42px;background:#fff;font:400 34px TJ;color:#999;display:flex;align-items:center;padding:0 36px;", "اكتب رسالة", bar);
+    M.el("div", "", "flex:1;height:84px;border-radius:42px;background:#fff;font:400 34px TJ;color:#999;display:flex;align-items:center;padding:0 36px;", esc(PR.typeHere), bar);
     M.el("div", "", `width:84px;height:84px;border-radius:50%;background:${col};display:flex;align-items:center;justify-content:center;`, '<svg width="40" height="40" viewBox="0 0 24 24"><path d="M20 12L4 4l3 8-3 8z" fill="#fff" transform="rotate(180 12 12)"/></svg>', bar);
     // الرسايل: الأرقام (ارتفاع ومكان) بتتحسب مرة واحدة، والظهور بيتعمل في seek
     let y = 0; const bubbles = [];
     const mkB = (html, me, extra = "") => { const b = M.el("div", "", `position:absolute;${me ? "right" : "left"}:34px;top:0;max-width:600px;padding:30px 38px 36px;font:500 46px/1.45 TJ;color:#1b1b1b;border-radius:38px;${me ? `border-top-right-radius:10px;background:${col};color:#fff;` : "border-top-left-radius:10px;background:#fff;"}box-shadow:0 3px 0 rgba(0,0,0,.06);transform-origin:${me ? "100%" : "0%"} 0;${extra}`, html, list); return b; };
-    MSGS.forEach((m) => { const b = mkB(esc(m.txt) + `<span style="font:400 28px TJ;opacity:.6;margin-inline-start:16px;">${m.me ? "١٠:٤٢ ✓✓" : "١٠:٤٢"}</span>`, m.me); const h = b.offsetHeight; bubbles.push({ b, m, y, h, t: m.t }); y += h + 30; });
+    MSGS.forEach((m) => { const b = mkB(esc(m.txt) + `<span style="font:400 28px TJ;opacity:.6;margin-inline-start:16px;">${esc(PR.time)}${m.me ? " ✓✓" : ""}</span>`, m.me); const h = b.offsetHeight; bubbles.push({ b, m, y, h, t: m.t }); y += h + 30; });
     const typing = mkB('<span class="d"></span><span class="d"></span><span class="d"></span>', false, "padding:30px 36px;display:flex;gap:12px;");
     [...typing.children].forEach((d) => (d.style.cssText = "width:18px;height:18px;border-radius:50%;background:#999;display:inline-block;"));
     const card = mkB(`<div style="display:flex;align-items:center;gap:22px;"><div style="width:84px;height:84px;border-radius:50%;background:${col};display:flex;align-items:center;justify-content:center;flex:none;"><svg width="48" height="48" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div><b style="font:700 42px TJ;">${esc(PR.card)}</b><div style="font:400 30px TJ;color:#666;margin-top:6px;">${esc(PR.card2)}</div></div></div>`, false, "max-width:640px;");
@@ -83,7 +87,7 @@ M.reel({
     if (t >= TYP_CARD[0] && t < TYP_CARD[1]) curTyping = C.cardY;
     // «بيكتب…» بالنقط اللي بتتنطط
     op(C.typing, curTyping != null ? 1 : 0);
-    if (curTyping != null) { C.typing.style.transform = `translateY(${curTyping}px)`; [...C.typing.children].forEach((d, i) => (d.style.transform = `translateY(${-Math.max(0, Math.sin(t * 9 - i * .9)) * 12}px)`)); shown = Math.max(shown, curTyping + 100); C.status.textContent = "بيكتب…"; } else C.status.textContent = "متصل الآن";
+    if (curTyping != null) { C.typing.style.transform = `translateY(${curTyping}px)`; [...C.typing.children].forEach((d, i) => (d.style.transform = `translateY(${-Math.max(0, Math.sin(t * 9 - i * .9)) * 12}px)`)); shown = Math.max(shown, curTyping + 100); C.status.textContent = PR.typing; } else C.status.textContent = PR.online;
     const ck = seg(t, CARD_T, CARD_T + .5);
     op(C.card, ck > 0 ? 1 : 0); C.card.style.transform = `translateY(${C.cardY}px) scale(${ck > 0 ? .4 + .6 * springO(t - CARD_T, 15, .55) : .4})`;
     if (ck > 0) shown = C.cardY + C.cardH;

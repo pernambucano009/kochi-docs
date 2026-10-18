@@ -13,10 +13,12 @@ const PR = M.params({
   newPrice: { label: "السعر الجديد", kind: "text", def: "270", group: G2, max: 7, hint: "الرقم بس. العداد بينزل من القديم للجديد ويخبط." },
   currency: { label: "العملة", kind: "text", def: "جنيه", group: G2, max: 6, hint: "كلمة واحدة: جنيه، ريال، درهم، $." },
   showSave: { label: "ستيكر «وفّر»", kind: "toggle", def: true, group: G2, hint: "نجمة بتلف فيها الفرق بين السعرين (بيتحسب لوحده)." },
+  saveW: { label: "كلمة الستيكر", kind: "text", def: "وفّر", group: G2, max: 6 },
   confetti: { label: "كونفيتي مع خبطة السعر", kind: "toggle", def: true, group: G2 },
   showCd: { label: "العد التنازلي", kind: "toggle", def: true, group: G3, hint: "اقفله لو العرض مالوش ميعاد انتهاء (الصدق أهم من الضغط)." },
   ends: { label: "سطر العد التنازلي", kind: "text", def: "العرض بيخلص خلال", group: G3, max: 20 },
   hours: { label: "الساعات اللي فاضلة", kind: "number", def: 2, min: 0, max: 72, step: 1, unit: " ساعة", group: G3, hint: "الرقم اللي العداد بيبدأ منه." },
+  uH: { label: "كلمة «ساعة»", kind: "text", def: "ساعة", group: G3, max: 6 }, uM: { label: "كلمة «دقيقة»", kind: "text", def: "دقيقة", group: G3, max: 6 }, uS: { label: "كلمة «ثانية»", kind: "text", def: "ثانية", group: G3, max: 6 },
   cta: { label: "الزرار", kind: "text", def: "اطلب دلوقتي", group: G4, max: 14, hint: "فعل واضح بكلمتين: اطلب دلوقتي، احجز، اشتري." },
   brand: { label: "اسم البراند", kind: "text", role: "brand", def: "بيت العطور", group: G4, max: 20, hint: "بيظهر صغير تحت الزرار." },
   color: { label: "اللون الأساسي", kind: "color", role: "accent", def: "#ff3d2e", group: GS, hint: "خلفية الفيديو كله: لون قوي ومشبّع (أحمر، برتقالي، بنفسجي) علشان إحساس العرض." },
@@ -63,12 +65,12 @@ M.reel({
     // ستيكر التوفير (نجمة بتلف)
     const badge = M.el("div", "", "position:absolute;left:0;top:0;width:300px;height:300px;",
       `<svg width="300" height="300" viewBox="-150 -150 300 300" style="position:absolute;inset:0"><path fill="#fff" d="${Array.from({ length: 32 }, (_, i) => { const a = i / 32 * Math.PI * 2, r = i % 2 ? 128 : 150; return `${i ? "L" : "M"}${(Math.cos(a) * r).toFixed(1)},${(Math.sin(a) * r).toFixed(1)}`; }).join("")}Z"/></svg>
-      <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:${PR.color};text-align:center;line-height:1;"><span style="font:700 46px CH">وفّر</span><span style="font:96px LZ;margin-top:6px">${esc(ar(SAVE))}</span><span style="font:700 34px CH">${esc(PR.currency)}</span></div>`);
+      <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:${PR.color};text-align:center;line-height:1;"><span style="font:700 46px CH">${esc(PR.saveW)}</span><span style="font:96px LZ;margin-top:6px">${esc(ar(SAVE))}</span><span style="font:700 34px CH">${esc(PR.currency)}</span></div>`);
     // العد التنازلي
     const cd = M.el("div", "", "position:absolute;left:90px;top:0;width:900px;text-align:center;color:#fff;");
     M.el("div", "", "font:700 50px CH;margin-bottom:22px;", esc(PR.ends), cd);
     const clock = M.el("div", "", "display:flex;justify-content:center;gap:20px;", "", cd);
-    const cells = [0, 1, 2].map((i) => { const c = M.el("div", "", "width:200px;height:190px;border-radius:30px;background:rgba(0,0,0,.22);display:flex;flex-direction:column;align-items:center;justify-content:center;", "", clock); const n = M.el("div", "", "font:120px/1 LZ;", "", c); M.el("div", "", "font:600 28px TJ;opacity:.8;margin-top:4px;", ["ساعة", "دقيقة", "ثانية"][i], c); return n; });
+    const cells = [0, 1, 2].map((i) => { const c = M.el("div", "", "width:200px;height:190px;border-radius:30px;background:rgba(0,0,0,.22);display:flex;flex-direction:column;align-items:center;justify-content:center;", "", clock); const n = M.el("div", "", "font:120px/1 LZ;", "", c); M.el("div", "", "font:600 28px TJ;opacity:.8;margin-top:4px;", esc([PR.uH, PR.uM, PR.uS][i]), c); return n; });
     const barW = M.el("div", "", "margin:30px auto 0;width:760px;height:22px;border-radius:11px;background:rgba(0,0,0,.22);overflow:hidden;", "", cd);
     const bar = M.el("div", "", `height:100%;width:100%;background:${PR.color2};border-radius:11px;transform-origin:100% 50%;`, "", barW);
     // الزرار واسم البراند

@@ -2,28 +2,41 @@
 <script>
 // قالب «مقدمة ونهاية لقناة»: افتتاحية سريعة بأشكال بتتجمع وتعمل لوجو القناة واسمها، بعدها كارت عنوان الحلقة، وفي الآخر شاشة النهاية:
 // فيديوهين مقترحين، صورة القناة، وزرار اشتراك بيتضغط والجرس بيرن. 1080×1920، 12 ثانية.
+const K1 = "١ · افتتاحية القناة", K2 = "٢ · عنوان الحلقة", K3 = "٣ · شاشة النهاية", KS = "الشكل العام";
 const PR = M.params({
-  channel: { label: "اسم القناة", kind: "text", role: "brand", def: "مطبخ سلمى" },
-  ep: { label: "عنوان الحلقة", kind: "text", role: "product", def: "كيكة البرتقال في ١٠ دقايق" },
-  epno: { label: "رقم الحلقة", kind: "text", def: "الحلقة ٢٤" },
-  v1: { label: "الفيديو المقترح ١", kind: "text", def: "أسهل عيش في البيت" },
-  v2: { label: "الفيديو المقترح ٢", kind: "text", def: "٥ أكلات للسحور" },
-  sub: { label: "زرار الاشتراك", kind: "text", def: "اشترك" },
-  c1: { label: "لون القناة", kind: "color", def: "#ff7a1a" },
-  c2: { label: "اللون التاني", kind: "color", def: "#2d1b4e" },
+  channel: { label: "اسم القناة", kind: "text", role: "brand", def: "مطبخ سلمى", group: K1, max: 14, hint: "بيظهر كبير في الافتتاحية وصغير تحت الفيديوهات." },
+  logo: { label: "لوجو القناة", kind: "image", role: "logo", def: "", group: K1, img: { ratio: "1:1", cut: true, tip: "علامة القناة فاتحة من غير خلفية (بتظهر جوه دايرة بلون القناة). لو مفيش بتظهر معلقة مرسومة." } },
+  ep: { label: "عنوان الحلقة", kind: "text", role: "product", def: "كيكة البرتقال في ١٠ دقايق", group: K2, max: 28, hint: "نفس عنوان الفيديو على يوتيوب (فيه وعد أو رقم)." },
+  epno: { label: "رقم الحلقة", kind: "text", def: "الحلقة ٢٤", group: K2, max: 12 },
+  more: { label: "عنوان شاشة النهاية", kind: "text", def: "شوف كمان", group: K3, max: 12 },
+  v1: { label: "الفيديو المقترح ١", kind: "text", def: "أسهل عيش في البيت", group: K3, max: 22, hint: "عنوان فيديو حقيقي على القناة (أكتر واحد اتشاف)." },
+  th1: { label: "ثامبنيل الفيديو ١", kind: "image", def: "", group: K3, img: { ratio: "16:9", cut: false, tip: "صورة الثامبنيل الحقيقية للفيديو (عرضي). لو مفيش بيظهر مستطيل ملوّن بزرار تشغيل." } },
+  v2: { label: "الفيديو المقترح ٢", kind: "text", def: "٥ أكلات للسحور", group: K3, max: 22 },
+  th2: { label: "ثامبنيل الفيديو ٢", kind: "image", def: "", group: K3, img: { ratio: "16:9", cut: false, tip: "صورة الثامبنيل الحقيقية للفيديو (عرضي). لو مفيش بيظهر مستطيل ملوّن بزرار تشغيل." } },
+  sub: { label: "زرار الاشتراك", kind: "text", def: "اشترك", group: K3, max: 8 },
+  subd: { label: "الزرار بعد الضغط", kind: "text", def: "مشترك", group: K3, max: 8 },
+  c1: { label: "لون القناة", kind: "color", role: "accent", def: "#ff7a1a", group: KS, hint: "لون هوية القناة (الأشكال والتمييز)." },
+  c2: { label: "اللون التاني", kind: "color", role: "dark", def: "#2d1b4e", group: KS, hint: "الخلفية: غامق." },
+  fHead: { label: "خط اسم القناة", kind: "font", def: "lalezar", group: KS },
+  fBody: { label: "خط العناوين", kind: "font", def: "plex", group: KS },
+});
+M.meta({
+  story: "مقدمة ونهاية لقناة: أشكال بتتجمع وتعمل لوجو القناة واسمها، كارت عنوان الحلقة، وشاشة النهاية بفيديوهين مقترحين وزرار اشتراك بيتضغط والجرس بيرن.",
+  scenes: [{ name: K1, t0: 0, t1: 3.4, about: "الأشكال واسم القناة" }, { name: K2, t0: 3.4, t1: 7, about: "رقم وعنوان الحلقة" }, { name: K3, t0: 7, t1: 12, about: "الفيديوهات المقترحة والاشتراك" }],
+  tips: ["حط أول ٣ ثواني في أول الفيديو وآخر ٥ في آخره (اقسمه في المونتاج).", "الثامبنيلز الحقيقية بتخلي الناس تدوس."],
 });
 const W = 1080, H = 1920, DUR = 12;
-const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
 
 M.reel({
   W, H, DUR, bg: PR.c2,
-  async init(M) { await Promise.all([loadFont("LZ", "SM-Lalezar.ttf"), loadFont("PB", "TY-PlexArabic-700.ttf", "700"), loadFont("PX", "TY-PlexArabic-400.ttf")]); const c = M.canvas(W, H); return { x: c.getContext("2d") }; },
+  async init(M) { await Promise.all([M.font("LZ", PR.fHead), M.font("PB", PR.fBody), M.font("PX", "plex4")]); const [th1, th2, lgI] = await Promise.all([M.img(PR.th1), M.img(PR.th2), M.img(PR.logo)]); const c = M.canvas(W, H); return { x: c.getContext("2d"), th: [th1, th2], lgI }; },
   seek(t, C, M) {
-    const { x } = C, { seg, clamp, cubicIO, springO, expo, hash } = M, io = (k) => cubicIO(clamp(k)), A = PR.c1, B = PR.c2;
+    const { x, th, lgI } = C, { seg, clamp, cubicIO, springO, expo, hash } = M, io = (k) => cubicIO(clamp(k)), A = PR.c1, B = PR.c2;
     x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = B; x.fillRect(0, 0, W, H);
     const logo = (cx, cy, s, k) => { // لوجو: دايرة + معلقة + بخار
       x.save(); x.translate(cx, cy); x.scale(s, s);
       x.fillStyle = A; x.beginPath(); x.arc(0, 0, 150 * springO(clamp(k / .6), 12, .5), 0, Math.PI * 2); x.fill();
+      if (lgI) { const q = springO(clamp((k - .25) / .6), 12, .5), z = 210 * q / Math.max(lgI.width, lgI.height); x.drawImage(lgI, -lgI.width * z / 2, -lgI.height * z / 2, lgI.width * z, lgI.height * z); x.restore(); return; }   // لوجو القناة بدل المعلقة
       const k2 = springO(clamp((k - .25) / .6), 12, .5); x.fillStyle = "#fff"; x.save(); x.rotate(-.5 + (1 - k2) * 2); x.beginPath(); x.ellipse(0, -30, 44 * k2, 58 * k2, 0, 0, Math.PI * 2); x.fill(); x.fillRect(-10 * k2, 20, 20 * k2, 110 * k2); x.restore();
       x.strokeStyle = "#fff"; x.lineWidth = 10; x.lineCap = "round"; for (let i = 0; i < 3; i++) { const k3 = clamp((k - .4 - i * .08) / .4); if (k3 <= 0) continue; x.beginPath(); for (let j = 0; j <= 10 * k3; j++) { const u = j / 10; x.lineTo(60 + i * 26 + Math.sin(u * 6 + t * 4) * 8, -60 - u * 120); } x.stroke(); }
       x.restore(); };
@@ -50,14 +63,15 @@ M.reel({
       x.fillStyle = "rgba(255,255,255,.04)"; for (let i = 0; i < 30; i++) x.fillRect(0, i * 64 + (t * 30) % 64, W, 2);
       const card = (cy, title, k, seed) => { x.save(); x.translate(540 + (1 - k) * 1100 * (seed ? -1 : 1), cy); x.fillStyle = "#3b2963"; x.beginPath(); x.roundRect(-430, -170, 860, 340, 26); x.fill();
         const g = x.createLinearGradient(-430, -170, 430, 170); g.addColorStop(0, seed ? "#ffb36b" : "#ff8a5c"); g.addColorStop(1, seed ? "#c2410c" : "#7c2d12"); x.fillStyle = g; x.beginPath(); x.roundRect(-410, -150, 400, 300, 18); x.fill();
+        const im = th[seed]; if (im) { x.save(); x.beginPath(); x.roundRect(-410, -150, 400, 300, 18); x.clip(); const q = Math.max(400 / im.width, 300 / im.height); x.drawImage(im, -210 - im.width * q / 2, -im.height * q / 2, im.width * q, im.height * q); x.restore(); }
         x.fillStyle = "rgba(255,255,255,.9)"; x.beginPath(); x.arc(-210, 0, 50, 0, Math.PI * 2); x.fill(); x.fillStyle = seed ? "#c2410c" : "#7c2d12"; x.beginPath(); x.moveTo(-228, -28); x.lineTo(-228, 28); x.lineTo(-180, 0); x.closePath(); x.fill();
         x.fillStyle = "#fff"; x.font = `700 ${M.fit(title, "PB", 360, 46, 26, "700")}px PB`; x.textAlign = "right"; x.direction = "rtl"; x.fillText(title, 400, -40); x.fillStyle = "rgba(255,255,255,.6)"; x.font = "400 30px PX"; x.fillText(PR.channel, 400, 20); x.fillStyle = A; x.fillRect(400 - 160, 60, 160, 8); x.restore(); };
       card(560, PR.v1, io(seg(t, 7.1, 7.7)), 0); card(960, PR.v2, io(seg(t, 7.3, 7.9)), 1);
-      x.fillStyle = "#fff"; x.globalAlpha = io(seg(t, 7.0, 7.5)); x.font = "700 56px PB"; x.textAlign = "center"; x.direction = "rtl"; x.fillText("شوف كمان", 540, 330); x.globalAlpha = 1;
+      x.fillStyle = "#fff"; x.globalAlpha = io(seg(t, 7.0, 7.5)); x.font = "700 56px PB"; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.more, 540, 330); x.globalAlpha = 1;
       // صورة القناة + اشتراك
       const ak = springO(clamp((t - 8.0) / .6), 11, .5); x.save(); x.translate(540, 1400); x.scale(ak, ak); x.fillStyle = "#fff"; x.beginPath(); x.arc(0, 0, 130, 0, Math.PI * 2); x.fill(); x.restore(); logo(540, 1400, .75 * ak, t - 8.0);
       const press = t > 9.4 && t < 9.6, subd = t > 9.5, sk = springO(clamp((t - 8.6) / .5), 12, .5) * (press ? .92 : 1);
-      x.save(); x.translate(540, 1650); x.scale(sk, sk); x.fillStyle = subd ? "#5a4a7a" : "#e3242b"; x.beginPath(); x.roundRect(-230, -60, 460, 120, 60); x.fill(); x.fillStyle = "#fff"; x.font = "700 52px PB"; x.textAlign = "center"; x.direction = "rtl"; x.fillText(subd ? "مشترك" : PR.sub, 30, 18);
+      x.save(); x.translate(540, 1650); x.scale(sk, sk); x.fillStyle = subd ? "#5a4a7a" : "#e3242b"; x.beginPath(); x.roundRect(-230, -60, 460, 120, 60); x.fill(); x.fillStyle = "#fff"; x.font = "700 52px PB"; x.textAlign = "center"; x.direction = "rtl"; x.fillText(subd ? PR.subd : PR.sub, 30, 18);
       const rg = subd ? Math.sin((t - 9.6) * 30) * .4 * Math.exp(-(t - 9.6) * 3) : 0; x.save(); x.translate(-150, 0); x.rotate(rg); x.beginPath(); x.moveTo(-22, 16); x.quadraticCurveTo(-24, -26, 0, -28); x.quadraticCurveTo(24, -26, 22, 16); x.closePath(); x.fill(); x.beginPath(); x.arc(0, 22, 8, 0, Math.PI * 2); x.fill(); x.restore(); x.restore();
       // مؤشر بيضغط
       const cx = 540 + 400 * (1 - io(seg(t, 8.8, 9.4))), cy = 1700 + 200 * (1 - io(seg(t, 8.8, 9.4))); if (t > 8.8) { x.save(); x.translate(cx, cy); x.scale(press ? .85 : 1, press ? .85 : 1); x.fillStyle = "#fff"; x.strokeStyle = "#111"; x.lineWidth = 4; x.beginPath(); x.moveTo(0, 0); x.lineTo(0, 54); x.lineTo(14, 40); x.lineTo(26, 64); x.lineTo(36, 58); x.lineTo(24, 36); x.lineTo(42, 36); x.closePath(); x.fill(); x.stroke(); x.restore(); }

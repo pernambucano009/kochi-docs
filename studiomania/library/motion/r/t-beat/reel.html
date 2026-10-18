@@ -2,21 +2,29 @@
 <script>
 // قالب «على الإيقاع»: مونتاج كلمات سريع متقطّع على البيت (١٢٠ ضربة في الدقيقة): كل ضربة قطع جديد بلون وشكل وتكوين مختلف
 // (كلمة ضخمة، كلمة مكررة بحدود، دايرة، كلمة مايلة، تقسيم)، وبعد البناء "الدروب" باسم البراند بيومض مع الكيك. 1080×1920، 12 ثانية.
+const K1 = "١ · البناء", K2 = "٢ · الدروب", KS = "الشكل العام";
 const PR = M.params({
-  words: { label: "الكلمات (كلمة في كل سطر)", kind: "lines", def: ["جاهز؟", "صيف", "جديد", "ألوان", "جريئة", "خفيف", "سريع", "ليك", "انت", "بس"] },
-  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "موجة" },
-  sub: { label: "الجملة الأخيرة", kind: "text", def: "الكولكشن نازل الخميس" },
-  c1: { label: "لون ١", kind: "color", def: "#ff2e63" },
-  c2: { label: "لون ٢", kind: "color", def: "#08d9d6" },
-  c3: { label: "لون ٣", kind: "color", def: "#fcee21" },
+  words: { label: "الكلمات (كلمة في كل سطر)", kind: "lines", def: ["جاهز؟", "صيف", "جديد", "ألوان", "جريئة", "خفيف", "سريع", "ليك", "انت", "بس"], group: K1,
+    hint: "٨–١٢ كلمة، كل كلمة ضربة (نص ثانية). لما تتقري ورا بعض تبقى إحساس الكولكشن أو الحملة. كلمة واحدة في السطر." },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "موجة", group: K2, max: 10, hint: "بيومض مع الكيك في الدروب." },
+  sub: { label: "الجملة الأخيرة", kind: "text", def: "الكولكشن نازل الخميس", group: K2, max: 26, hint: "إيه اللي جاي وإمتى." },
+  c1: { label: "لون ١", kind: "color", role: "accent", def: "#ff2e63", group: KS, hint: "كل ضربة بلون: ٣ ألوان صريحة ومتضادة." },
+  c2: { label: "لون ٢", kind: "color", role: "accent2", def: "#08d9d6", group: KS },
+  c3: { label: "لون ٣", kind: "color", def: "#fcee21", group: KS },
+  fHead: { label: "خط الكلمات", kind: "font", def: "lalezar", group: KS },
+  fBody: { label: "خط الجملة الأخيرة", kind: "font", def: "plex", group: KS },
+});
+M.meta({
+  story: "مونتاج كلمات متقطّع على البيت: كل ضربة كلمة جديدة بلون وتكوين مختلف، وبعد البناء الدروب باسم البراند بيومض مع الكيك.",
+  scenes: [{ name: K1, t0: 0, t1: 8, about: "كل ضربة كلمة" }, { name: K2, t0: 8, t1: 12, about: "الدروب باسم البراند" }],
+  tips: ["أحسن لإعلان كولكشن أو حملة.", "كلمات قصيرة (كلمة واحدة) بتتقري في نص ثانية."],
 });
 const W = 1080, H = 1920, DUR = 12, BT = .5, DROP = 16;
-const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
 const WD = PR.words.length ? PR.words : ["!"];
 
 M.reel({
   W, H, DUR, bg: "#111",
-  async init(M) { await Promise.all([loadFont("LZ", "SM-Lalezar.ttf"), loadFont("PB", "TY-PlexArabic-700.ttf", "700")]); const c = M.canvas(W, H); return { x: c.getContext("2d") }; },
+  async init(M) { await Promise.all([M.font("LZ", PR.fHead), M.font("PB", PR.fBody)]); const c = M.canvas(W, H); return { x: c.getContext("2d") }; },
   seek(t, C, M) {
     const { x } = C, { clamp, hash, expo, springO } = M, b = Math.floor(t / BT), f = (t % BT) / BT, cols = [PR.c1, PR.c2, PR.c3, "#111", "#fff"];
     x.setTransform(1, 0, 0, 1, 0, 0);

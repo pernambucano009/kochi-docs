@@ -2,23 +2,32 @@
 <script>
 // قالب «أوديوجرام بودكاست»: كارت الحلقة بغلاف بيتنفّس، موجة صوت بتتحرك مع الكلام، والجملة بتظهر كلمة كلمة والكلمة الحالية متعلّمة،
 // وشريط تقدّم بالوقت، وفي الآخر "اسمع الحلقة كاملة" والبراند. 1080×1920، 12 ثانية.
+const K1 = "١ · الحلقة", K2 = "٢ · الكلام", K3 = "٣ · الختام", KS = "الشكل العام";
 const PR = M.params({
-  show: { label: "اسم البودكاست", kind: "text", role: "brand", def: "فنجان الصبح" },
-  ep: { label: "عنوان الحلقة", kind: "text", role: "product", def: "الحلقة ١٢ · إزاي تبدأ مشروعك" },
-  lines: { label: "الجمل (كل سطر جملة)", kind: "lines", def: ["أول خطوة مش إنك تبقى جاهز", "أول خطوة إنك تبدأ بالموجود", "والباقي بيتعلّم وانت ماشي"] },
-  cta: { label: "الجملة الأخيرة", kind: "text", def: "اسمع الحلقة كاملة" },
-  color: { label: "لون التمييز", kind: "color", def: "#ff5a36" },
-  bg: { label: "لون الخلفية", kind: "color", def: "#171320" },
+  show: { label: "اسم البودكاست", kind: "text", role: "brand", def: "فنجان الصبح", group: K1, max: 16 },
+  cover: { label: "غلاف البودكاست", kind: "image", role: "logo", def: "", group: K1, img: { ratio: "1:1", cut: false, tip: "غلاف البودكاست المربع. لو مفيش بيظهر غلاف ملوّن بمايك." } },
+  ep: { label: "عنوان الحلقة", kind: "text", role: "product", def: "الحلقة ١٢ · إزاي تبدأ مشروعك", group: K1, max: 32 },
+  lines: { label: "الجمل (كل سطر جملة)", kind: "lines", def: ["أول خطوة مش إنك تبقى جاهز", "أول خطوة إنك تبدأ بالموجود", "والباقي بيتعلّم وانت ماشي"], group: K2,
+    hint: "أقوى ٣ جمل في الحلقة بالكلام زي ما اتقال (كل جملة ٥–٧ كلمات، بتطلع كلمة كلمة في ٢٫٨ ثانية)." },
+  cta: { label: "الجملة الأخيرة", kind: "text", def: "اسمع الحلقة كاملة", group: K3, max: 20, hint: "فين يسمعوها (سبوتيفاي، يوتيوب، اللينك)." },
+  color: { label: "لون التمييز", kind: "color", role: "accent", def: "#ff5a36", group: KS, hint: "الكلمة الحالية والموجة والغلاف." },
+  bg: { label: "لون الخلفية", kind: "color", def: "#171320", group: KS, hint: "غامق علشان الكلام يبان." },
+  fHead: { label: "خط الكلام", kind: "font", def: "plex", group: KS },
+  fBody: { label: "خط السطور الصغيرة", kind: "font", def: "plex4", group: KS },
+});
+M.meta({
+  story: "أوديوجرام لقطة من بودكاست: كارت الحلقة بغلاف بيتنفّس، موجة صوت بتتحرك، والجملة بتظهر كلمة كلمة والكلمة الحالية متعلّمة، وفي الآخر «اسمع الحلقة كاملة».",
+  scenes: [{ name: K1, t0: 0, t1: 1.2 }, { name: K2, t0: 1.2, t1: 9.6, about: "٣ جمل كل واحدة ٢٫٨ ثانية" }, { name: K3, t0: 9.6, t1: 12 }],
+  tips: ["حط صوت الجملة الحقيقي في المونتاج على نفس التوقيت.", "اختار الجمل اللي بتتحفظ."],
 });
 const W = 1080, H = 1920, DUR = 12, L0 = 1.2, LD = 2.8;
-const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
 const ar = (s) => String(s).replace(/\d/g, (d) => "٠١٢٣٤٥٦٧٨٩"[d]);
 const LINES = PR.lines.slice(0, 3);
 
 M.reel({
   W, H, DUR, bg: PR.bg,
   async init(M) {
-    await Promise.all([loadFont("PB", "TY-PlexArabic-700.ttf", "700"), loadFont("PX", "TY-PlexArabic-400.ttf"), loadFont("LZ", "SM-Lalezar.ttf")]);
+    await Promise.all([M.font("PB", PR.fHead), M.font("PX", PR.fBody), M.font("LZ", "lalezar")]); const cov = await M.img(PR.cover);
     const c = M.canvas(W, H), x = c.getContext("2d");
     // توقيت كل كلمة + مكانها (من اليمين للشمال، بلفّ لسطرين لو طويلة)
     x.font = "700 64px PB"; const sp = 36;
@@ -26,10 +35,10 @@ M.reel({
       const rows = [[]]; let w = 0; ws.forEach((wd) => { const ww = x.measureText(wd).width; if (w + ww > 900 && rows[rows.length - 1].length) { rows.push([]); w = 0; } rows[rows.length - 1].push({ wd, ww }); w += ww + sp; });
       const out = []; let k = 0; rows.forEach((r, ri) => { const tot = r.reduce((a, b) => a + b.ww, 0) + sp * (r.length - 1); let px = 540 + tot / 2; r.forEach((o) => { out.push({ ...o, x: px, row: ri, nrow: rows.length, t: t0 + k * step, step }); px -= o.ww + sp; k++; }); });
       return { t0, words: out }; });
-    return { x, L };
+    return { x, L, cov };
   },
   seek(t, C, M) {
-    const { x, L } = C, { seg, smooth, expo, cubicIO, springO, clamp, hash, noise1 } = M, A = PR.color, io = (k) => cubicIO(clamp(k));
+    const { x, L, cov } = C, { seg, smooth, expo, cubicIO, springO, clamp, hash, noise1 } = M, A = PR.color, io = (k) => cubicIO(clamp(k));
     x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = PR.bg; x.fillRect(0, 0, W, H);
     // هالة لونية بتتحرك ببطء
     const g = x.createRadialGradient(540 + Math.sin(t * .4) * 160, 640, 50, 540, 700, 900); g.addColorStop(0, A + "55"); g.addColorStop(1, A + "00"); x.fillStyle = g; x.fillRect(0, 0, W, H);
@@ -45,10 +54,11 @@ M.reel({
     x.save(); x.globalAlpha = clamp(ck * 1.4); x.translate(540, cy); x.rotate(Math.sin(t * .6) * .015);
     x.shadowColor = "rgba(0,0,0,.5)"; x.shadowBlur = 60; x.shadowOffsetY = 30; const cg = x.createLinearGradient(-cs / 2, -cs / 2, cs / 2, cs / 2); cg.addColorStop(0, A); cg.addColorStop(1, "#2b1e5a");
     x.fillStyle = cg; x.beginPath(); x.roundRect(-cs / 2, -cs / 2, cs, cs, 44); x.fill(); x.shadowBlur = 0; x.shadowOffsetY = 0;
+    if (cov) { x.save(); x.beginPath(); x.roundRect(-cs / 2, -cs / 2, cs, cs, 44); x.clip(); x.drawImage(cov, -cs / 2, -cs / 2, cs, cs); x.restore(); } else {
     x.save(); x.clip(); for (let r = 0; r < 7; r++) { x.strokeStyle = `rgba(255,255,255,${.1 - r * .012})`; x.lineWidth = 3; x.beginPath(); x.arc(0, 0, 80 + r * 52 + ((t * 40) % 52) + e0 * 10, 0, Math.PI * 2); x.stroke(); } x.restore();
     // مايك
     x.fillStyle = "#fff"; x.beginPath(); x.roundRect(-48, -150, 96, 170, 48); x.fill(); x.strokeStyle = "#fff"; x.lineWidth = 14; x.lineCap = "round"; x.beginPath(); x.arc(0, -40, 86, .15, Math.PI - .15); x.stroke(); x.beginPath(); x.moveTo(0, 46); x.lineTo(0, 100); x.moveTo(-50, 104); x.lineTo(50, 104); x.stroke();
-    x.fillStyle = A; for (let k = 0; k < 4; k++) x.fillRect(-30, -120 + k * 26, 60, 8);
+    x.fillStyle = A; for (let k = 0; k < 4; k++) x.fillRect(-30, -120 + k * 26, 60, 8); }
     x.restore(); x.globalAlpha = 1;
     // ٣) عنوان الحلقة
     const ea = io(seg(t, .6, 1.1)); x.globalAlpha = ea; x.fillStyle = "#cfc8db"; x.font = `400 ${M.fit(PR.ep, "PX", 900, 44, 28)}px PX`; x.textAlign = "center"; x.direction = "rtl"; x.fillText(ar(PR.ep), 540, 1040); x.globalAlpha = 1;

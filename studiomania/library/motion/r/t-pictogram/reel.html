@@ -2,17 +2,25 @@
 <script>
 // قالب «بطاقات بيكتوجرام»: فيلم كتالوج سريع على الإيقاع: كل بطاقة رسمة بشرية هندسية (عصيان بأطراف مدورة وراس دايرة) بتعمل حركة واحدة،
 // وعنوان ضخم وسطر بلغة تانية ورقم "٠٣ / ٠٦"، وفوق شريط زخرفة من دواير وأنصاص دواير صفوفه بتتزحلق. كل بطاقة بلون. 1080×1920، 12 ثانية.
+const K1 = "١ · الافتتاح", K2 = "٢ · البطاقات", K3 = "٣ · الختام", KS = "الشكل العام";
 const PR = M.params({
-  head: { label: "عنوان الافتتاح", kind: "text", role: "product", def: "كلاسات الشهر" },
-  items: { label: "البطاقات (عربي|English)", kind: "lines", def: ["جري|Running", "سباحة|Swimming", "يوجا|Yoga", "ملاكمة|Boxing", "أثقال|Weights", "دراجة|Cycling"] },
-  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "نادي الحركة" },
-  cta: { label: "الجملة الأخيرة", kind: "text", def: "احجز مكانك من التطبيق" },
-  c1: { label: "لون ١", kind: "color", def: "#e8412c" },
-  c2: { label: "لون ٢", kind: "color", def: "#1b6fd8" },
-  c3: { label: "لون ٣", kind: "color", def: "#11a37f" },
+  head: { label: "عنوان الافتتاح", kind: "text", role: "product", def: "كلاسات الشهر", group: K1, max: 16, hint: "بيقول البطاقات دي عن إيه (الكلاسات، الخدمات، الأنشطة)." },
+  items: { label: "البطاقات (سطر لكل بطاقة: عربي|English)", kind: "lines", def: ["جري|Running", "سباحة|Swimming", "يوجا|Yoga", "ملاكمة|Boxing", "أثقال|Weights", "دراجة|Cycling"], group: K2,
+    hint: "٦ بطاقات بالترتيب ده بالظبط: كل بطاقة ليها رسمة بتعمل الحركة دي (جري، سباحة، يوجا، ملاكمة، أثقال، دراجة). غيّر الاسم بس، أو الكلمة الإنجليزي." },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "نادي الحركة", group: K3, max: 16 },
+  cta: { label: "الجملة الأخيرة", kind: "text", def: "احجز مكانك من التطبيق", group: K3, max: 26 },
+  c1: { label: "لون ١", kind: "color", role: "accent", def: "#e8412c", group: KS, hint: "البطاقات بتلف على التلات ألوان: ألوان صريحة زي الأولمبياد." },
+  c2: { label: "لون ٢", kind: "color", role: "accent2", def: "#1b6fd8", group: KS },
+  c3: { label: "لون ٣", kind: "color", def: "#11a37f", group: KS },
+  fHead: { label: "خط العناوين العربي", kind: "font", def: "lalezar", group: KS },
+  fLat: { label: "خط الأرقام والإنجليزي", kind: "font", def: "bebas", script: "lat", group: KS, hint: "خط ضيق طويل زي البيكتوجرامات (Bebas، Anton)." },
+});
+M.meta({
+  story: "كتالوج سريع على الإيقاع زي بيكتوجرامات الأولمبياد: كل بطاقة رسمة بشرية هندسية بتعمل حركة، وعنوان ضخم وسطر إنجليزي ورقم، وشريط زخرفة بيتزحلق.",
+  scenes: [{ name: K1, t0: 0, t1: 1 }, { name: K2, t0: 1, t1: 10, about: "٦ بطاقات كل واحدة ١٫٥ ثانية" }, { name: K3, t0: 10, t1: 12 }],
+  tips: ["مناسب لجيم أو نادي أو أي كتالوج أنشطة.", "الحركات مرسومة بالترتيب ده، فخلّي أسامي البطاقات مطابقة ليها."],
 });
 const W = 1080, H = 1920, DUR = 12, BT = .5, T0 = 1.0, CD = 1.5;
-const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
 const ar = (n) => String(n).padStart(2, "0").replace(/\d/g, (d) => "٠١٢٣٤٥٦٧٨٩"[d]);
 const IT = PR.items.slice(0, 6).map((l) => { const [a, b] = String(l).split("|"); return { a: (a || "").trim(), b: (b || "").trim() }; });
 // وضعيات: [جذع، رقبة، دراع شمال (فوق، تحت)، دراع يمين، رجل شمال (فوق، تحت)، رجل يمين] بالراديان من تحت
@@ -28,7 +36,7 @@ const POSES = [
 
 M.reel({
   W, H, DUR, bg: "#f4f1ea",
-  async init(M) { await Promise.all([loadFont("LZ", "SM-Lalezar.ttf"), loadFont("BB", "bebas.ttf"), loadFont("PM", "TY-PlexMono-500.ttf", "500"), loadFont("PB", "TY-PlexArabic-700.ttf", "700")]); const c = M.canvas(W, H); return { x: c.getContext("2d") }; },
+  async init(M) { await M.fonts({ PM: ["TY-PlexMono-500.ttf", "500"], PB: ["TY-PlexArabic-700.ttf", "700"] }); await Promise.all([M.font("LZ", PR.fHead), M.font("BB", PR.fLat)]); const c = M.canvas(W, H); return { x: c.getContext("2d") }; },
   seek(t, C, M) {
     const { x } = C, { seg, clamp, cubicIO, expo } = M, io = (k) => cubicIO(clamp(k)), cols = [PR.c1, PR.c2, PR.c3];
     const rise = (k) => (1 - expo(clamp(k))) * 1;

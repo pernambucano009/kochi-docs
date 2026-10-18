@@ -2,22 +2,29 @@
 <script>
 // قالب «عنوان مجسّم»: عنوان بحروف بارزة ليها عمق (طبقات ورا بعض بتغمق)، بيطلع من الأرض اللامعة وانعكاسه تحته، والكاميرا بتلف حواليه
 // فاتجاه العمق بيتغير، ولمعة نور بتعدّي على وش الحروف، وأشعة نور ورا. زي تترات الأفلام والمسلسلات. 1080×1920، 12 ثانية.
+const K1 = "١ · العنوان المجسّم", K2 = "٢ · التفاصيل", KS = "الشكل العام";
 const PR = M.params({
-  l1: { label: "السطر الأول", kind: "text", role: "product", def: "الموسم" },
-  l2: { label: "السطر التاني", kind: "text", def: "الجديد" },
-  sub: { label: "تحت العنوان", kind: "text", def: "أول حلقة الجمعة ٩ بالليل" },
-  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "قناة حكاية" },
-  face: { label: "لون وش الحروف", kind: "color", def: "#ffd36b" },
-  side: { label: "لون جنب الحروف", kind: "color", def: "#b0461f" },
-  bg: { label: "لون الخلفية", kind: "color", def: "#140a24" },
+  l1: { label: "السطر الأول", kind: "text", role: "product", def: "الموسم", group: K1, max: 8, hint: "كلمة واحدة تقيلة (الحروف بارزة ولها عمق، فالكلمة القصيرة بتطلع أضخم)." },
+  l2: { label: "السطر التاني", kind: "text", def: "الجديد", group: K1, max: 8, hint: "كلمة تانية بتكمّل الأولى (أو سيبه فاضي لسطر واحد)." },
+  sub: { label: "تحت العنوان", kind: "text", def: "أول حلقة الجمعة ٩ بالليل", group: K2, max: 28, hint: "الميعاد أو التفاصيل." },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "قناة حكاية", group: K2, max: 16 },
+  face: { label: "لون وش الحروف", kind: "color", role: "accent", def: "#ffd36b", group: KS, hint: "لون فاتح لامع (دهبي، فضي، أبيض)." },
+  side: { label: "لون جنب الحروف", kind: "color", def: "#b0461f", group: KS, hint: "أغمق بكتير من الوش علشان العمق يبان." },
+  bg: { label: "لون الخلفية", kind: "color", role: "dark", def: "#140a24", group: KS, hint: "غامق جدًا زي تترات الأفلام." },
+  fHead: { label: "خط العنوان", kind: "font", def: "lalezar", group: KS, hint: "خط تقيل جدًا علشان العمق يبان (لاله‌زار، الإسكندرية، Anton)." },
+  fBody: { label: "خط السطور", kind: "font", def: "plex", group: KS },
+});
+M.meta({
+  story: "عنوان تترات زي الأفلام: حروف بارزة ليها عمق بتطلع من أرض لامعة بانعكاسها، والكاميرا بتلف حواليها، ولمعة نور بتعدّي على وش الحروف وأشعة ورا.",
+  scenes: [{ name: K1, t0: 0, t1: 7, about: "الحروف بتطلع والكاميرا بتلف واللمعة" }, { name: K2, t0: 7, t1: 12, about: "السطر تحت واسم البراند" }],
+  tips: ["أحسن لإعلان موسم أو برنامج أو إطلاق كبير.", "كلمتين قصيرين بالكتير."],
 });
 const W = 1080, H = 1920, DUR = 12, FLOOR = 1300;
-const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
 const hex = (h) => { h = h.replace("#", ""); return [0, 2, 4].map((i) => parseInt(h.substr(i, 2), 16)); };
 
 M.reel({
   W, H, DUR, bg: PR.bg,
-  async init(M) { await Promise.all([loadFont("LZ", "SM-Lalezar.ttf"), loadFont("PB", "TY-PlexArabic-700.ttf", "700")]); const c = M.canvas(W, H), o = document.createElement("canvas"); o.width = W; o.height = H; return { x: c.getContext("2d"), o: o.getContext("2d") }; },
+  async init(M) { await Promise.all([M.font("LZ", PR.fHead), M.font("PB", PR.fBody)]); const c = M.canvas(W, H), o = document.createElement("canvas"); o.width = W; o.height = H; return { x: c.getContext("2d"), o: o.getContext("2d") }; },
   seek(t, C, M) {
     const { x, o } = C, { seg, cubicIO, clamp, springO, expo, smooth } = M, io = (k) => cubicIO(clamp(k));
     const [sr, sg, sb] = hex(PR.side);
