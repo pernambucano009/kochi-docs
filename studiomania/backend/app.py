@@ -2681,6 +2681,18 @@ def project_bg(data: dict) -> str:
     return bg if re.fullmatch(r"#[0-9a-fA-F]{6}", bg) else "black"
 
 
+def whoosh_sounds(data: dict, segments: list) -> list[montage.AudioTrack]:
+    """💨 صوت «ووش» خفيف مع كل انتقال بين الفيديوهات (بيربط اللقطتين بدل ما القطع يبان ناشف)."""
+    if not (data.get("mix") or {}).get("whoosh") or track_flag(data, "snd", "mute"):
+        return []
+    path, out, t = sfxlib.ensure(SFXLIB_DIR, "whoosh"), [], 0.0
+    for seg in segments:
+        if seg.trans_in:
+            out.append(montage.AudioTrack(path, volume=0.45, delay=max(0.0, t - 0.25)))
+        t += seg.duration
+    return out
+
+
 def build_montage(conn: sqlite3.Connection, data: dict):
     """يحوّل بيانات المشروع لقطع ومسارات صوت جاهزة لـ FFmpeg، ويتأكد إن كل حاجة موجودة."""
     ff = ffmpeg_exe()
@@ -2721,6 +2733,16 @@ def build_montage(conn: sqlite3.Connection, data: dict):
         )
     if not segments:
         raise HTTPException(400, "ضيف فيديو واحد على الأقل للمونتاج")
+    # 🔍 تقريب خفيف على القطع (punch-in): لما فيديو واحد متقطّع ورا بعضه من غير انتقال، كل قطعة تانية بتقرّب شوية
+    # علشان العين تحس بحركة وماتزهقش (من قواعد المونتاج في العقل العام). العميل يقدر يقفلها من «ظبط الصوت كله».
+    if (data.get("mix") or {}).get("punch"):
+        prev, alt = None, False
+        for c, seg in zip(data["clips"], segments):
+            same = prev == c["gen_id"] and not seg.trans_in
+            alt = (not alt) if same else False
+            if alt and abs(seg.zoom - 1) < 0.001 and not seg.kf and seg.fit == "fill" and not c["gen_id"].startswith(ANY_OUTRO):
+                seg.zoom = 1.08
+            prev = c["gen_id"]
     # الأوترو اللي في آخر المونتاج (عشان اللوجو يختفي وقته لو اخترت كده)
     for c, seg in zip(reversed(data["clips"]), reversed(segments)):
         if not c["gen_id"].startswith(ANY_OUTRO):
@@ -3294,7 +3316,7 @@ def start_render(conn: sqlite3.Connection, row: sqlite3.Row, project_id: str, da
         ffmpeg_exe(), segments, EXPORTS_DIR / f"{export_id}.mp4", work_dir, voice, music,
         logo=project_logo(data, total, outro_len), subtitles=subs,
         low_memory=(system_info()["memory_limit_mb"] or 99999) < 1500,
-        sounds=project_sounds(conn, data) + ov_sounds, audio_fx=project_mix(data), overlays=overlays,
+        sounds=project_sounds(conn, data) + whoosh_sounds(data, segments) + ov_sounds, audio_fx=project_mix(data), overlays=overlays,
     )
     RENDER_ACTIVE[project_id] = "بيبدأ…"
     conn.execute(
@@ -3323,7 +3345,7 @@ def render_project_audio(project_id: str):
         row = get_project(conn, project_id)
         data = json.loads(row["data"])
         segments, voice, music, _ = build_montage(conn, data)
-        sounds = project_sounds(conn, data)
+        sounds = project_sounds(conn, data) + whoosh_sounds(data, segments)
     aid = uuid.uuid4().hex[:12]
     work = TMP_DIR / f"aud_{aid}"
     out = EXPORTS_DIR / f"audio_{aid}.mp3"
@@ -7695,13 +7717,17 @@ def approve_take(eid: str, take_id: str, approved: bool = True):
 DEFAULT_MUSIC_NAME = "beat"  # الموسيقى اللي بتتحط في أي مونتاج جديد لو موجودة في المكتبة
 
 
+# صوت المشاريع الجديدة على قواعد المونتاج (العقل العام): المزيكا واطية وبتوطى وقت الكلام، ووش مع الانتقالات، وتقريب خفيف على القطع
+PRO_MIX = {"duck": 0.6, "whoosh": True, "punch": True}
+
+
 def default_music(conn: sqlite3.Connection) -> dict | None:
     row = conn.execute("SELECT id FROM audio WHERE kind = 'music' AND lower(name) LIKE ? ORDER BY lower(name) = ? DESC, created_at DESC",
                        (f"%{DEFAULT_MUSIC_NAME}%", DEFAULT_MUSIC_NAME)).fetchone()
     if not row:
         return None
-    return {"id": row["id"], "volume": 0.3, "delay": 0.0, "offset": 0.0, "length": None, "fade_out": True,
-            "parts": [{"delay": 0.0, "offset": 0.0, "length": None, "volume": 0.3}]}
+    return {"id": row["id"], "volume": 0.2, "delay": 0.0, "offset": 0.0, "length": None, "fade_out": True,
+            "parts": [{"delay": 0.0, "offset": 0.0, "length": None, "volume": 0.2}]}
 
 
 def stretch_take(src: Path, out: Path, start: float, have: float, need: float) -> None:
@@ -7764,7 +7790,7 @@ def episode_to_editor(eid: str):
         pid = uuid.uuid4().hex[:12]
         pdata = {"name": label, "section": "series", "video_id": None, "coach_id": None, "clips": clips,
                  "voice": {"id": vid, "volume": 1.0, "delay": 0.0, "offset": 0.0, "length": None, "fade_out": False, "parts": []},
-                 "music": default_music(conn), "outro": False, "outro_volume": 1.0, "captions": {}, "logo": {}}
+                 "music": default_music(conn), "outro": False, "outro_volume": 1.0, "captions": {}, "logo": {}, "mix": dict(PRO_MIX)}
         conn.execute("INSERT INTO projects (id, name, data, render_status, created_at, updated_at) VALUES (?, ?, ?, 'idle', ?, ?)",
                      (pid, label, json.dumps(pdata, ensure_ascii=False), now(), now()))
     update_episode(eid, lambda d: d.update(project_id=pid))
@@ -11012,7 +11038,7 @@ def prod_to_editor(aid: str):
         voice = ad_voice_track(aid, conn, [s for s, _ in picks], label)
         pid = uuid.uuid4().hex[:12]
         pdata = {"name": f"📣 {label}", "section": "ads", "video_id": None, "coach_id": None, "clips": clips, "voice": voice,
-                 "music": default_music(conn), "outro": False, "outro_volume": 1.0, "captions": {}, "logo": {}}
+                 "music": default_music(conn), "outro": False, "outro_volume": 1.0, "captions": {}, "logo": {}, "mix": dict(PRO_MIX)}
         conn.execute("INSERT INTO projects (id, name, data, render_status, created_at, updated_at) VALUES (?, ?, ?, 'idle', ?, ?)",
                      (pid, pdata["name"], json.dumps(pdata, ensure_ascii=False), now(), now()))
     update_ad(aid, lambda d: d["prod"].update(project_id=pid))
@@ -14119,7 +14145,7 @@ def film_to_editor(fid: str):
             voice = {"id": vid, "volume": 1.0, "delay": 0.0, "offset": 0.0, "length": None, "fade_out": False, "parts": []}
         pid = uuid.uuid4().hex[:12]
         pdata = {"name": label, "section": "ads", "video_id": None, "coach_id": None, "clips": clips, "voice": voice,
-                 "music": default_music(conn), "outro": False, "outro_volume": 1.0, "captions": {}, "logo": {}}
+                 "music": default_music(conn), "outro": False, "outro_volume": 1.0, "captions": {}, "logo": {}, "mix": dict(PRO_MIX)}
         conn.execute("INSERT INTO projects (id, name, data, render_status, created_at, updated_at) VALUES (?, ?, ?, 'idle', ?, ?)",
                      (pid, pdata["name"], json.dumps(pdata, ensure_ascii=False), now(), now()))
     film_update(fid, lambda x: x.update(project_id=pid))
@@ -15278,7 +15304,7 @@ def tvideo_to_editor(vid: str):
             voice = {"id": aid, "volume": 1.0, "delay": 0.0, "offset": 0.0, "length": None, "fade_out": False, "parts": []}
         pid = uuid.uuid4().hex[:12]
         pdata = {"name": label, "section": "ads", "video_id": None, "coach_id": None, "clips": clips, "voice": voice,
-                 "music": default_music(conn), "outro": False, "outro_volume": 1.0, "captions": {}, "logo": {}}
+                 "music": default_music(conn), "outro": False, "outro_volume": 1.0, "captions": {}, "logo": {}, "mix": dict(PRO_MIX)}
         conn.execute("INSERT INTO projects (id, name, data, render_status, created_at, updated_at) VALUES (?, ?, ?, 'idle', ?, ?)",
                      (pid, pdata["name"], json.dumps(pdata, ensure_ascii=False), now(), now()))
     return {"project_id": pid, "skipped": [] if once else [i + 1 for i in range(len(beats)) if i not in dict(ready)]}

@@ -66,10 +66,12 @@ const DEFAULT_MUSIC = "beat";
 function defaultMusic() {
   const list = mt.music || [];
   const a = list.find((x) => x.name.trim().toLowerCase() === DEFAULT_MUSIC) || list.find((x) => x.name.toLowerCase().includes(DEFAULT_MUSIC));
-  return a ? { id: a.id, volume: 0.3, delay: 0, offset: 0, length: null, fade_out: true, parts: [{ delay: 0, offset: 0, length: null, volume: 0.3 }] } : null;
+  // الموسيقى واطية تحت الكلام (قواعد المونتاج في العقل العام: المزيكا بتخدم ومابتغطيش على الهوك)
+  return a ? { id: a.id, volume: 0.2, delay: 0, offset: 0, length: null, fade_out: true, parts: [{ delay: 0, offset: 0, length: null, volume: 0.2 }] } : null;
 }
 function blankProject(name) {
-  return { name, coach_id: null, clips: [], voice: null, music: defaultMusic(), outro: true, outro_volume: 1 };
+  return { name, coach_id: null, clips: [], voice: null, music: defaultMusic(), outro: true, outro_volume: 1,
+    mix: { duck: 0.6, whoosh: true, punch: true } };
 }
 
 async function initMontage() {
@@ -2597,6 +2599,8 @@ function renderMix() {
   $("mixDuckVal").textContent = m.duck ? `${Math.round(m.duck * 100)}%` : "";
   $("mixEnhance").checked = !!m.enhance;
   $("mixNormalize").checked = !!m.normalize;
+  $("mixWhoosh").checked = !!m.whoosh;
+  $("mixPunch").checked = !!m.punch;
 }
 function setMix(patch) {
   pushHistory("mix");
@@ -2608,6 +2612,8 @@ $("mixDuckOn").addEventListener("change", () => setMix({ duck: $("mixDuckOn").ch
 $("mixDuck").addEventListener("input", () => setMix({ duck: Number($("mixDuck").value) / 100 }));
 $("mixEnhance").addEventListener("change", () => setMix({ enhance: $("mixEnhance").checked }));
 $("mixNormalize").addEventListener("change", () => setMix({ normalize: $("mixNormalize").checked }));
+$("mixWhoosh").addEventListener("change", () => setMix({ whoosh: $("mixWhoosh").checked }));
+$("mixPunch").addEventListener("change", () => setMix({ punch: $("mixPunch").checked }));
 
 // ---------- مقاس الكادر ولون الخلفية وإعدادات التصدير ----------
 const RATIOS = { "9:16": [1080, 1920], "4:5": [1080, 1350], "3:4": [1080, 1440], "1:1": [1080, 1080], "16:9": [1920, 1080] };

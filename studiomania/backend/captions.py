@@ -29,7 +29,7 @@ TEMPLATES = {
         "color": "#FFFFFF", "highlight": "#FFFFFF", "highlight_on": False, "box": False, "box_color": "#000000", "pop": True,
     },
     "classic": {
-        "label": "ترجمة عادية", "font": "SM Almarai", "size": 62, "y": 86, "words": 7,
+        "label": "ترجمة عادية", "font": "SM Almarai", "size": 62, "y": 78, "words": 5,
         "color": "#FFFFFF", "highlight": "#FFFFFF", "highlight_on": False, "box": True, "box_color": "#000000", "pop": False,
     },
     "box": {
