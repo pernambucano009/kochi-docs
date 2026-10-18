@@ -182,7 +182,7 @@ const Gallery = (() => {
     wheel.style.top = mobile ? cards.offsetTop + "px" : "";   // على الموبايل العجلة جنب الكروت تحت الكلام
     const h = wheel.clientHeight, w = wheel.clientWidth;
     // على الكمبيوتر الكورة باينة أكتر علشان الزراير تبقى جواها، وعلى الموبايل العجلة مستخبية أكتر ورا الحرف
-    const R = mobile ? Math.min(h * .5, 300) : Math.min(h * .5, w * .78, 460), cx = mobile ? -R * .66 : -R * .1, cy = h * (mobile ? .36 : .5);
+    const R = mobile ? Math.min(h * .5, 300) : Math.min(h * .45, w * .7, 420), cx = mobile ? -R * .66 : -R * .1, cy = h * (mobile ? .36 : .5);
     const rs = R * (mobile ? .6 : .56), rr = rs + R * .06;
     const ring = (r, sw, op) => `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--nh-ink)" stroke-opacity="${op}" stroke-width="${sw}"/>`;
     el.querySelector(".nh-wh-back").innerHTML = ring(R * 1.03, 1.2, .14) + ring(R * .985, 1, .07) + `<path class="arc" fill="none" stroke="var(--nh-ink)" stroke-width="3" stroke-linecap="round"/><g class="ticks"></g>`;
@@ -203,12 +203,16 @@ const Gallery = (() => {
     // الزراير في الجزء الباين من الكورة
     const gw = Math.max(110, Math.min(170, cx + Math.sqrt(Math.max(0, rs * rs - 95 * 95)) - 70));
     Object.assign(el.querySelector(".nh-wh-gens").style, { left: "34px", top: (cy - 92) + "px", width: gw + "px" });
-    // عمود واحد بكروت كبيرة (قالب ونص في الشاشة)، وكل كارت في مكانه على أسطوانة بتلف
-    const cols = 1, colW = cards.clientWidth, cellH = (mobile ? 54 : 72) + colW * 5 / 4;
+    // عمودين كروت كبيرة متزحزحين نص كارت (قالبين في الشاشة)، وكل كارت في مكانه على أسطوانة بتلف. الموبايل عمود واحد
+    const cols = mobile ? 1 : 2, colW = cards.clientWidth / cols, cellH = (mobile ? 54 : 72) + colW * 5 / 4;
     W.G = { R, cx, cy, rs, cols, cellH, gh: cards.clientHeight, labs: [...el.querySelectorAll(".nh-wh-labs span")], cards: [...el.querySelectorAll(".nh-wc")],
       arc: el.querySelector(".arc"), ticks: el.querySelector(".ticks"), knurl: el.querySelector(".knurl"), sph: el.querySelector("#nhWhSph"),
       d3: el.querySelector(".nh-wh-3d"), track: el.querySelector(".nh-wh-track"), wheelW: w };
-    W.G.cards.forEach((c, i) => { c.style.top = i * cellH + "px"; c.style.transform = ""; c._hx = c._hy = 0; });
+    W.G.cards.forEach((c, i) => {
+      const col = cols === 1 ? 0 : i % 2, row = cols === 1 ? i : Math.floor(i / 2);
+      Object.assign(c.style, { top: (row * cellH + (col ? cellH / 2 : 0)) + "px", left: col || cols === 1 ? "0" : "50%", width: 100 / cols + "%", transform: "" });
+      c._hx = c._hy = 0;
+    });
   }
   // مكان نص الكارت لأي مكان كسري في القايمة، علشان الحركة متصلة
   const yOne = (i) => { const G = W.G, N = W.list.length; i = Math.max(0, Math.min(N - 1, i)); const col = G.cols === 1 ? 0 : i % 2, row = G.cols === 1 ? i : Math.floor(i / 2); return row * G.cellH + (col ? G.cellH / 2 : 0) + G.cellH / 2; };
@@ -301,11 +305,12 @@ const Gallery = (() => {
     G.track.style.transform = `translateY(${G.gh / 2 - yOf(pos)}px)`;
     // الكروت على أسطوانة: اللي بعيد عن النص بيلف لورا ويصغر ويغمق، واللي تحت الماوس بيميل ناحيته
     const kh = 1 - Math.exp(-dt * 10);
-    for (let j = Math.max(0, Math.floor(pos) - 2); j <= Math.min(N - 1, Math.ceil(pos) + 2); j++) {
-      const c = G.cards[j], d = j - pos, ad = Math.abs(d), H = W.hov && W.hov.c === c ? W.hov : null;
+    const yc = yOf(pos);
+    for (let j = Math.max(0, Math.floor(pos) - 4); j <= Math.min(N - 1, Math.ceil(pos) + 4); j++) {
+      const c = G.cards[j], d = (yOne(j) - yc) / G.cellH, ad = Math.abs(d), H = W.hov && W.hov.c === c ? W.hov : null;
       c._hx += ((H ? H.x : 0) - c._hx) * kh; c._hy += ((H ? H.y : 0) - c._hy) * kh;
-      c.style.transform = `translateZ(${(-ad * 90).toFixed(1)}px) rotateX(${(-d * 24 - c._hy * 12).toFixed(2)}deg) rotateY(${(c._hx * 14).toFixed(2)}deg) scale(${(1 - Math.min(.16, ad * .1)).toFixed(3)})`;
-      c.style.setProperty("--dim", Math.min(.55, ad * .4).toFixed(3));
+      c.style.transform = `translateZ(${(-ad * 70).toFixed(1)}px) rotateX(${(-d * 18 - c._hy * 12).toFixed(2)}deg) rotateY(${(c._hx * 14).toFixed(2)}deg) scale(${(1 - Math.min(.12, ad * .07)).toFixed(3)})`;
+      c.style.setProperty("--dim", Math.min(.5, Math.max(0, ad - .3) * .45).toFixed(3));
       c.style.setProperty("--gx", (50 + c._hx * 90).toFixed(1) + "%"); c.style.setProperty("--gy", (50 + c._hy * 90).toFixed(1) + "%");
       c.style.setProperty("--gl", Math.min(1, Math.hypot(c._hx, c._hy) * 3).toFixed(3));
     }
