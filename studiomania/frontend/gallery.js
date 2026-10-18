@@ -197,15 +197,18 @@ const Gallery = (() => {
         <radialGradient id="nhWhRim" cx="50%" cy="50%" r="50%"><stop offset=".82" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".35"/></radialGradient></defs>
       <ellipse cx="${cx + rs * .08}" cy="${cy + rs * .96}" rx="${rs * .8}" ry="${rs * .12}" fill="#000" fill-opacity=".18" style="filter:blur(10px)"/>
       <circle cx="${cx}" cy="${cy}" r="${rs}" fill="url(#nhWhSph)"/><circle cx="${cx}" cy="${cy}" r="${rs}" fill="url(#nhWhRim)"/><g class="knurl"></g>`;
+    // الكلام في النص يبدأ بعد آخر أسماء العجلة علشان مايركبش عليها
+    el.querySelector(".nh-wh-info").style.paddingLeft = mobile ? "" : Math.round(cx + R * .8 + 210) + "px";
     const ptr = el.querySelector(".nh-wh-ptr"); ptr.style.left = (cx + R * .74) + "px"; ptr.style.top = (cy - 7) + "px";
     // الزراير في الجزء الباين من الكورة
     const gw = Math.max(110, Math.min(170, cx + Math.sqrt(Math.max(0, rs * rs - 95 * 95)) - 70));
     Object.assign(el.querySelector(".nh-wh-gens").style, { left: "34px", top: (cy - 92) + "px", width: gw + "px" });
-    const cols = mobile ? 1 : 2, colW = cards.clientWidth / cols, cellH = (mobile ? 54 : 96) + colW * 5 / 4;
+    // عمود واحد بكروت كبيرة (قالب ونص في الشاشة)، وكل كارت في مكانه على أسطوانة بتلف
+    const cols = 1, colW = cards.clientWidth, cellH = (mobile ? 54 : 72) + colW * 5 / 4;
     W.G = { R, cx, cy, rs, cols, cellH, gh: cards.clientHeight, labs: [...el.querySelectorAll(".nh-wh-labs span")], cards: [...el.querySelectorAll(".nh-wc")],
       arc: el.querySelector(".arc"), ticks: el.querySelector(".ticks"), knurl: el.querySelector(".knurl"), sph: el.querySelector("#nhWhSph"),
       d3: el.querySelector(".nh-wh-3d"), track: el.querySelector(".nh-wh-track"), wheelW: w };
-    W.G.cards.forEach((c, i) => { const col = cols === 1 ? 0 : i % 2, row = cols === 1 ? i : Math.floor(i / 2); c.style.top = (row * cellH + (col ? cellH / 2 : 0)) + "px"; c.style.left = col || cols === 1 ? "0" : "50%"; });
+    W.G.cards.forEach((c, i) => { c.style.top = i * cellH + "px"; c.style.transform = ""; c._hx = c._hy = 0; });
   }
   // مكان نص الكارت لأي مكان كسري في القايمة، علشان الحركة متصلة
   const yOne = (i) => { const G = W.G, N = W.list.length; i = Math.max(0, Math.min(N - 1, i)); const col = G.cols === 1 ? 0 : i % 2, row = G.cols === 1 ? i : Math.floor(i / 2); return row * G.cellH + (col ? G.cellH / 2 : 0) + G.cellH / 2; };
@@ -228,7 +231,14 @@ const Gallery = (() => {
       const on = e.pointerType === "mouse" && x < 1;
       T.tx = on ? (x - .45) * 16 : 0; T.ty = on ? (y - .5) * -12 : 0; T.tl = on ? 1 : 0;
     });
-    el.addEventListener("pointerleave", () => { const T = W.tilt; T.tx = T.ty = T.tl = 0; });
+    el.addEventListener("pointerleave", () => { const T = W.tilt; T.tx = T.ty = T.tl = 0; W.hov = null; });
+    // الكارت اللي الماوس عليه بيميل ناحيته ولمعة بتمشي عليه
+    cards.addEventListener("pointermove", (e) => {
+      if (e.pointerType !== "mouse") return;
+      const c = e.target.closest(".nh-wc"); if (!c) { W.hov = null; return; }
+      const r = c.getBoundingClientRect(); W.hov = { c, x: (e.clientX - r.left) / r.width - .5, y: (e.clientY - r.top) / r.height - .5 };
+    });
+    cards.addEventListener("pointerleave", () => (W.hov = null));
     el.addEventListener("keydown", (e) => {
       const cur = W.mode === "snap" ? W.target : W.pos;
       if (e.key === "ArrowDown" || e.key === "PageDown") { e.preventDefault(); snapTo(cur + 1); }
@@ -254,7 +264,6 @@ const Gallery = (() => {
     cards.addEventListener("pointerup", end); cards.addEventListener("pointercancel", () => end(null));
     el.querySelector(".nh-wh-go").addEventListener("click", () => preview(S.items[W.list[W.shown][1]]));
     el.querySelector(".nh-wh-snd").addEventListener("click", () => setSound(!sndOn));
-    el.addEventListener("pointerdown", unlock);
   }
   // دوسة على القالب اللي في النص بتفتحه، وعلى أي قالب تاني بتلف العجلة عليه
   function tap(k) { if (k === W.shown && Math.abs(W.vel) < 1) preview(S.items[W.list[k][1]]); else snapTo(k); }
@@ -290,6 +299,16 @@ const Gallery = (() => {
     if (cell !== W.cell) { if (now - W.lastTick > 18) { tick(Math.abs(W.vel) || 4); W.lastTick = now; } W.cell = cell; }
     if (idx !== W.shown) show(idx);
     G.track.style.transform = `translateY(${G.gh / 2 - yOf(pos)}px)`;
+    // الكروت على أسطوانة: اللي بعيد عن النص بيلف لورا ويصغر ويغمق، واللي تحت الماوس بيميل ناحيته
+    const kh = 1 - Math.exp(-dt * 10);
+    for (let j = Math.max(0, Math.floor(pos) - 2); j <= Math.min(N - 1, Math.ceil(pos) + 2); j++) {
+      const c = G.cards[j], d = j - pos, ad = Math.abs(d), H = W.hov && W.hov.c === c ? W.hov : null;
+      c._hx += ((H ? H.x : 0) - c._hx) * kh; c._hy += ((H ? H.y : 0) - c._hy) * kh;
+      c.style.transform = `translateZ(${(-ad * 90).toFixed(1)}px) rotateX(${(-d * 24 - c._hy * 12).toFixed(2)}deg) rotateY(${(c._hx * 14).toFixed(2)}deg) scale(${(1 - Math.min(.16, ad * .1)).toFixed(3)})`;
+      c.style.setProperty("--dim", Math.min(.55, ad * .4).toFixed(3));
+      c.style.setProperty("--gx", (50 + c._hx * 90).toFixed(1) + "%"); c.style.setProperty("--gy", (50 + c._hy * 90).toFixed(1) + "%");
+      c.style.setProperty("--gl", Math.min(1, Math.hypot(c._hx, c._hy) * 3).toFixed(3));
+    }
     // الميلان بيلحق الماوس بنعومة، والسرعة بتميّل العجلة سنة كمان كأنها تقيلة
     const T = W.tilt, k = 1 - Math.exp(-dt * 7);
     T.x += (T.tx - T.x) * k; T.y += (T.ty - T.y) * k; T.l += (T.tl - T.l) * k;
@@ -325,9 +344,11 @@ const Gallery = (() => {
   }
   addEventListener("resize", () => layout());
   // 🔊 تكّة سقاطة متولّدة بالكود (مش ملف صوت): طقّة تخينة + خبطة واطية + رنّة معدن قصيرة
-  let ac = null, sndOn = false, noiseB = null;
-  try { sndOn = localStorage.getItem("nh-wheel-snd") === "1"; } catch (e) {}
+  // الصوت شغال من الأول إلا لو العميل قفله. المتصفح بيسمح بيه بعد أول دوسة في الصفحة (زي الدوسة اللي فتحت المعرض)
+  let ac = null, sndOn = true, noiseB = null;
+  try { sndOn = localStorage.getItem("nh-wheel-snd") !== "0"; } catch (e) {}
   function unlock() { if (!sndOn) return; try { ac = ac || new (window.AudioContext || window.webkitAudioContext)(); if (ac.state === "suspended") ac.resume(); } catch (e) { ac = null; } }
+  addEventListener("pointerdown", unlock, true); addEventListener("keydown", unlock, true);
   function setSound(on) {
     sndOn = on;
     try { localStorage.setItem("nh-wheel-snd", on ? "1" : "0"); } catch (e) {}
@@ -335,7 +356,8 @@ const Gallery = (() => {
     unlock(); if (on) setTimeout(() => tick(4), 60);
   }
   function tick(speed) {
-    if (!sndOn || !ac || ac.state !== "running") return;
+    if (!sndOn) return;
+    if (!ac || ac.state !== "running") { unlock(); if (!ac || ac.state !== "running") return; }
     if (!noiseB) { noiseB = ac.createBuffer(1, Math.floor(ac.sampleRate * .03), ac.sampleRate); const d = noiseB.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; }
     const t = ac.currentTime + .002, r = () => 1 + (Math.random() - .5) * .14;
     const out = ac.createGain(); out.gain.value = Math.min(.42, .16 + Math.min(speed, 30) * .009) * (.85 + Math.random() * .3); out.connect(ac.destination);
