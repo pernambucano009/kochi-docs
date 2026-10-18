@@ -3645,6 +3645,10 @@ def set_post(post_id: str, **fields) -> None:
         plats = "، ".join(dict.fromkeys(publisher.PLATFORMS.get(publisher.split_target(k)[0], (None, k))[1] for k in json.loads(old["platforms"] or "[]")))
         if status == "published":
             notify("post", "ok", f"اتنشر: {name}", plats, "7", post_id)
+            try:
+                batch_auto()
+            except Exception:  # noqa: BLE001  (التحليل الأوتوماتيك عمره مايوقف النشر)
+                pass
         else:
             notify("post", "bad", f"البوست مااتنشرش: {name}", fields.get("error") or old["error"] or "", "7", post_id)
 
@@ -4099,6 +4103,64 @@ def algo_review(body: AlgoReviewIn):
     return algo.clean_review(growth_json(algo.review_messages(text, kind, platform, growth_brand(), body.goal.strip()[:300]), "الفحص"))
 
 
+class PostPackIn(BaseModel):
+    export_id: str
+    platform: str = ""
+
+
+def export_project(conn: sqlite3.Connection, export_id: str) -> tuple[sqlite3.Row, dict]:
+    ex = conn.execute("SELECT * FROM exports WHERE id = ?", (export_id,)).fetchone()
+    if ex is None:
+        raise HTTPException(404, "الفيديو مش موجود في الفولدر")
+    pr = conn.execute("SELECT data FROM projects WHERE id = ?", (ex["project_id"],)).fetchone() if ex["project_id"] else None
+    return ex, json.loads(pr["data"]) if pr else {}
+
+
+def project_is_ai(conn: sqlite3.Connection, data: dict) -> bool:
+    """أي قطعة في المونتاج متولدة (مش مرفوعة ولا أوترو) يبقى الفيديو معمول بالذكاء الصناعي."""
+    for c in data.get("clips") or []:
+        gid = str(c.get("gen_id") or "")
+        if not gid or gid.startswith((OUTRO_PREFIX, EXTRA_OUTRO_PREFIX)) or c.get("disabled"):
+            continue
+        r = conn.execute("SELECT model FROM generations WHERE id = ?", (gid,)).fetchone()
+        if r and r["model"] != "upload":
+            return True
+    return (data.get("section") or "") == "series"
+
+
+@app.post("/api/algo/post-pack")
+def algo_post_pack(body: PostPackIn):
+    """⚡ وضع الخوارزمية في النشر: الكابشن (هوك تاني + دعوة الخطة + هاشتاجات المجال) والغلاف وقت ظهور الهوك وعلامة AI."""
+    brain = brain_row(active_client_id() or "")
+    if not algo.mode_on(brain):
+        return {"on": False}
+    with closing(db()) as conn:
+        ex, data = export_project(conn, body.export_id)
+        ai = project_is_ai(conn, data)
+        _, words = project_voice_words(conn, data)
+    hooks = [x for x in data.get("texts") or [] if isinstance(x, dict) and float(x.get("t0") or 0) < 3 and x.get("text")]
+    hook = data.get("hook_text") or (hooks[0]["text"] if hooks else "")
+    # الغلاف: فريم الهوك اللي على الشاشة (الكلام مكتوب عليه = عنوان الغلاف)، ولو مفيش هوك قبل الآخر بثانيتين
+    if hooks:
+        h = hooks[0]
+        t1 = float(h.get("t0") or 0) + float(h.get("dur") or 2)
+        cover_ms = int(round((float(h.get("t0") or 0) + t1) / 2 * 1000))
+    else:
+        cover_ms = int(max(0, (float(ex["duration"] or 0) - 2) * 1000))
+    context = "\n".join(x for x in (f"الهوك اللي على الشاشة: {hook}" if hook else "", f"اسم الفيديو: {ex['name']}",
+                                       "الكلام: " + " ".join(w["w"] for w in words[:220]) if words else "") if x)
+    platform = body.platform if body.platform in algo.PLATFORMS else ""
+    if atlas.mock_mode():
+        raw = algo.mock_post_caption(hook or ex["name"])
+    else:
+        try:
+            raw = az.parse_json(llm(algo.post_caption_messages(context, algo.strategy_text(brain), platform), json_mode=True, temperature=0.6), "الكابشن")
+        except (ValueError, HTTPException, atlas.AtlasError, httpx.HTTPError) as exc:
+            raise HTTPException(502, f"الكابشن ماتكتبش: {str(getattr(exc, 'detail', None) or exc)[:200]}") from exc
+    return {"on": True, "caption": algo.assemble_caption(raw, brain, ai), "ai": ai, "cover_ms": min(cover_ms, int(float(ex["duration"] or 0) * 1000)),
+            "cover_hook": bool(hooks), "cta": algo.funnel_cta(brain)}
+
+
 # ---------- 🧭 خطة المحتوى: فريمويركس الاستراتيجية مطبّقة على البراند، والخطة بتدخل في كل برومبت محتوى بعدها
 class AlgoModeIn(BaseModel):
     on: bool
@@ -4163,7 +4225,7 @@ def batch_out(bid: str) -> dict:
     calc = algo.batch_rows(bt.get("posts") or [], bt.get("metrics") or {}) if bt.get("posts") else None
     return {"platform": bt.get("platform") or "tiktok", "handle": bt.get("handle") or "", "fetched_at": bt.get("fetched_at"),
             "calc": calc, "verdict_text": algo.VERDICTS.get(calc["verdict"]) if calc else "", "analysis": bt.get("analysis"),
-            "history": (bt.get("history") or [])[-6:], "live": rivals.live()}
+            "history": (bt.get("history") or [])[-6:], "live": rivals.live(), "algo_mode": algo.mode_on(brain_row(bid))}
 
 
 @app.get("/api/batch")
@@ -4183,6 +4245,11 @@ def batch_fetch(body: BatchFetchIn):
     handle, platform = rivals.clean_handle(body.handle), body.platform if body.platform in rivals.PLATFORMS else "tiktok"
     if not handle:
         raise HTTPException(400, "اكتب اسم حساب البراند")
+    batch_pull(bid, handle, platform)
+    return batch_out(bid)
+
+
+def batch_pull(bid: str, handle: str, platform: str) -> None:
     try:
         posts = rivals.mock_posts(platform, handle) if not rivals.live() else rivals.profile_posts(platform, handle)
     except rivals.RivalsError as exc:
@@ -4204,7 +4271,6 @@ def batch_fetch(body: BatchFetchIn):
         bt.update(platform=platform, handle=handle, posts=posts, fetched_at=now(), analysis=None)
         bt["metrics"] = {k: v for k, v in (bt.get("metrics") or {}).items() if k in {str(p["id"]) for p in posts}}
     update_brain(bid, fn)
-    return batch_out(bid)
 
 
 class BatchMetricIn(BaseModel):
@@ -4228,6 +4294,11 @@ def batch_metric(body: BatchMetricIn):
 @app.post("/api/batch/analyze")
 def batch_analyze():
     bid = rivals_client()
+    batch_run(bid)
+    return batch_out(bid)
+
+
+def batch_run(bid: str) -> None:
     brain = brain_row(bid) or {}
     bt = brain.get("batch") or {}
     if not bt.get("posts"):
@@ -4247,7 +4318,32 @@ def batch_analyze():
     def fn(d):
         d.setdefault("batch", {})["analysis"] = res
     update_brain(bid, fn)
-    return batch_out(bid)
+
+
+def batch_auto() -> None:
+    """⚡ كل ١٠ بوستات بتتنشر: آخر ١٠ فيديوهات بتتجاب وتتحلل لوحدها، والنتيجة بتدخل في الأفكار الجاية."""
+    bid = active_client_id()
+    brain = brain_row(bid) if bid else None
+    bt = (brain or {}).get("batch") or {}
+    if not brain or not algo.mode_on(brain) or not bt.get("handle"):
+        return
+    with closing(db()) as conn:
+        n = conn.execute("SELECT COUNT(*) FROM posts WHERE status = 'published'").fetchone()[0]
+    if n - int(bt.get("auto_n") or 0) < algo.BATCH_EVERY:
+        return
+
+    def mark(d):
+        d.setdefault("batch", {})["auto_n"] = n
+    update_brain(bid, mark)   # قبل الشغل علشان مايتكررش لو بوستين اتنشروا مع بعض
+
+    def work():
+        try:
+            batch_pull(bid, bt["handle"], bt.get("platform") or "tiktok")
+            batch_run(bid)
+            notify("batch", "ok", "📊 الدفعة اتحللت لوحدها", f"آخر {algo.BATCH} فيديوهات اتحللوا، والأفكار الجاية هتمشي على النتيجة", "7", bid)
+        except Exception as exc:  # noqa: BLE001
+            notify("batch", "bad", "📊 تحليل الدفعة الأوتوماتيك ماكملش", str(getattr(exc, "detail", None) or exc)[:200], "7", bid)
+    threading.Thread(target=work, daemon=True).start()
 
 
 class TriageIn(BaseModel):

@@ -290,12 +290,38 @@ function renderPostVideo() {
     v.src = ex.url;
     $("coverRange").max = Math.round(ex.duration * 1000);
     // الغلاف دايمًا قبل آخر فريم بثانيتين (تقدر تغيّره)
-    if (!pub.editing) { $("coverOn").checked = true; setCover(coverDefaultMs(ex.duration)); }
+    if (!pub.editing) { $("coverOn").checked = true; setCover(coverDefaultMs(ex.duration)); algoPack(false); }
   }
   renderPostExtras();
 }
 
 const coverDefaultMs = (dur) => Math.max(0, Math.round((dur - 2) * 1000));
+// ⚡ وضع الخوارزمية: الكابشن والغلاف وعلامة AI بيتجهزوا لوحدهم أول ما تختار الفيديو (تقدر تعدّلهم)
+async function algoPack(force) {
+  const id = pub.videoId, note = $("pubAlgo");
+  if (!id) return force && toast("اختار فيديو من الفولدر الأول", true);
+  if (!force && $("postCaption").value.trim()) return;
+  if (force) { note.hidden = false; note.textContent = "⏳ بيكتب الكابشن…"; }
+  try {
+    const pl = checkedPlatforms().map(platOf)[0] || "";
+    const r = await api("/api/algo/post-pack", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ export_id: id, platform: pl }) });
+    if (pub.videoId !== id || pub.editing) return;
+    if (!r.on) { note.hidden = !force; note.textContent = "⚡ وضع الخوارزمية مقفول (افتحه من عقل البراند ← منافسينك في المجال)"; return; }
+    if (force || !$("postCaption").value.trim()) $("postCaption").value = r.caption;
+    $("coverOn").checked = true;
+    setCover(r.cover_ms);
+    pub.notAi = !r.ai;
+    note.hidden = false;
+    note.textContent = `⚡ اتجهز بالخوارزمية: كابشن (هوك تاني${r.cta ? " + دعوة الخطة" : ""} + هاشتاجات المجال) · الغلاف ${r.cover_hook ? "على فريم الهوك" : "قبل الآخر بثانيتين"}${r.ai ? " · 🤖 علامة AI" : ""}. عدّل براحتك.`;
+    renderPostExtras();
+  } catch (err) {
+    note.hidden = !force;
+    note.textContent = "";
+    if (force) toast(err.message, true);
+  }
+}
+$("algoCaption").onclick = () => algoPack(true);
+
 // ---------- إنستجرام: التاج والكولاب · والغلاف لإنستجرام وتيك توك ----------
 function renderPostExtras() {
   const pl = checkedPlatforms();
@@ -401,6 +427,7 @@ $("postWhen").addEventListener("input", () => $("quickTimes").querySelectorAll("
 function resetPostForm() {
   pub.editing = null;
   pub.notAi = false;
+  $("pubAlgo").hidden = true;
   $("postFormTitle").textContent = "جدولة بوست";
   $("postSubmit").textContent = "جدول";
   $("postCancel").hidden = true;
@@ -413,6 +440,7 @@ function resetPostForm() {
   $("coverOn").checked = !!ex;
   if (ex) setCover(coverDefaultMs(ex.duration));
   renderPostExtras();
+  if (ex) algoPack(false);
 }
 $("postCancel").onclick = resetPostForm;
 

@@ -1663,3 +1663,4 @@ audio { width: 100%; }
 .sil-review .sr-row { flex: none; display: flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 10px; background: rgba(229, 57, 53, .14); font-size: 12.5px; }
 .sil-review .sr-row.keep { background: rgba(127, 127, 127, .12); opacity: .75; }
 .sil-review .sr-row .check { display: flex; align-items: center; gap: 4px; }
+.pub-algo { margin: 6px 0 0; padding: 8px 12px; border-radius: 10px; background: rgba(255, 196, 0, .1); }

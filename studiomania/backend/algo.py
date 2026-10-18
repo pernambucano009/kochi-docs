@@ -584,3 +584,59 @@ def hook_text_messages(context: str) -> list[dict]:
 
 اكتب الكلام اللي يتحط على الشاشة في أول ٣ ثواني: نفس معنى أول جملة بتتقال، ٣–٨ كلمات، سطرين بالكتير (افصل بينهم بـ \\n عند عبارة طبيعية)، من غير علامات ترقيم ولا كلمات ربط، بنفس لغة ولهجة الكلام.
 رجّع {{"text": "..."}}"""}]
+
+
+# ---------------------------------------------------------------- ⚡ النشر: كابشن جاهز بالقواعد + علامة AI + الدفعة الأوتوماتيك
+
+AI_LABEL = "🤖 الفيديو معمول بالذكاء الصناعي"
+BAD_TAGS = {"fyp", "foryou", "foryoupage", "viral", "explore", "explorepage", "trending", "اكسبلور", "إكسبلور", "ترند", "فيرال"}
+BATCH_EVERY = 10   # كل كام بوست منشور الدفعة بتتحلل لوحدها
+
+
+def post_caption_messages(context: str, strategy: str, platform: str) -> list[dict]:
+    return [{"role": "system", "content": "إنت بتكتب كابشن فيديو قصير بقواعد الخوارزميات. Return JSON only.\n\n" + playbook.pack("caption", 3000)},
+            {"role": "user", "content": f"""{strategy or 'مفيش خطة محتوى لسه.'}
+
+الفيديو (المنصة: {platform or 'تيك توك وريلز'}):
+{context[:2500]}
+
+اكتب:
+- "first": أول سطر هوك تاني (٥–١٢ كلمة) بيكمّل فضول الفيديو، مش تكرار للهوك اللي على الشاشة، ومن غير «أهلًا» أو تحية.
+- "body": سطر أو اتنين قيمة من الفيديو بنفس اللهجة (من غير حشو).
+- "cta": دعوة واحدة مطابقة للفيديو؛ لو الخطة فيها كلمة كومنت استخدمها بالظبط («علّق بكلمة …» وهتاخد الهدية).
+- "tags": ٣–٥ هاشتاجات للمجال نفسه بس (من غير #fyp #viral #explore ولا هاشتاجات عامة).
+رجّع {{"first": "", "body": "", "cta": "", "tags": ["#..."]}}"""}]
+
+
+def clean_tags(raw) -> list[str]:
+    out = []
+    for t in raw if isinstance(raw, list) else str(raw or "").split():
+        t = "#" + str(t).strip().lstrip("#").replace(" ", "_")[:40]
+        if len(t) > 2 and t[1:].lower() not in BAD_TAGS and t not in out:
+            out.append(t)
+    return out[:5]
+
+
+def funnel_cta(brain: dict | None) -> str:
+    fn = ((brain or {}).get("strategy") or {}).get("funnel") or {}
+    if not fn.get("keyword"):
+        return ""
+    return f"علّق بكلمة «{fn['keyword']}»" + (f" وهبعتلك {fn['magnet']}" if fn.get("magnet") else "")
+
+
+def assemble_caption(raw: dict, brain: dict | None, ai: bool) -> str:
+    raw = raw if isinstance(raw, dict) else {}
+    s = lambda k: str(raw.get(k) or "").strip()
+    cta = s("cta")
+    fc = funnel_cta(brain)
+    if fc and (((brain or {}).get("strategy") or {}).get("funnel") or {}).get("keyword", "") not in cta:
+        cta = fc   # كلمة الكومنت بتاعة الخطة دايمًا هي الدعوة (علشان ManyChat يرد)
+    parts = [s("first"), s("body"), cta, " ".join(clean_tags(raw.get("tags")))]
+    if ai:
+        parts.append(AI_LABEL)
+    return "\n\n".join(p for p in parts if p)[:2200]
+
+
+def mock_post_caption(context: str) -> dict:
+    return {"first": "أغلب الناس بتعمل الغلطة دي من غير ما تاخد بالها 👇", "body": (context.split("\n")[0] or "الفيديو ده هيوفّر عليك وقت")[:120],
+            "cta": "احفظ الفيديو علشان ترجعله", "tags": ["#تسويق", "#محتوى", "#fyp", "#براند"]}

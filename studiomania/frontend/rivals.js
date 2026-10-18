@@ -136,6 +136,7 @@ const RivalsPage = (() => {
           <select data-btpl>${Object.entries(PL).map(([k, t]) => `<option value="${k}" ${k === plat ? "selected" : ""}>${t}</option>`).join("")}</select>
           <button class="nb-btn" data-btfetch ${B.busy ? "disabled" : ""}>${B.busy === "fetch" ? "⏳ بيجيب…" : "📥 هات آخر ١٠"}</button></div>
         ${d.live ? "" : `<p class="nb-hint">⚠️ وضع تجربة: الأرقام تجريبية لحد ما يتحط مفتاح مصدر الداتا.</p>`}
+        ${d.algo_mode !== false ? `<p class="nb-hint">⚡ وضع الخوارزمية: بعد أول مرة تجيب فيها الفيديوهات، كل ١٠ بوستات تتنشر من البرنامج الدفعة بتتجاب وتتحلل لوحدها، والنتيجة بتدخل في الأفكار الجاية.</p>` : ""}
         <p class="nb-hint">لو عندك أرقام العملاء/التسجيلات (من ManyChat أو الرسايل) أو المتابعين اللي جابهم كل فيديو، اكتبها جنبه: التحليل بيقدّمها على المشاهدات.</p></section>`;
     if (!c) return head;
     const rows = c.rows.map((r, i) => `<div class="bt-row ${r.tier}">
