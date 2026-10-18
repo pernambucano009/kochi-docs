@@ -12776,10 +12776,20 @@ class MotionImportIn(BaseModel):
     name: str = ""
 
 
+@app.get("/api/motion-fonts")
+def motion_fonts():
+    """🔤 الخطوط اللي القوالب بتختار منها (نفس قايمة M.FONTS في core.js)."""
+    src = (MOTION_DIR / "lib" / "core.js").read_text(encoding="utf-8")
+    return {k: {"label": lab, "script": sc, "weight": w} for k, w, lab, sc in
+            re.findall(r'^\s*(\w+): \{ file: "[^"]+", weight: "(\d+)", label: "([^"]+)", script: "(\w+)" \}', src, re.M)}
+
+
 @app.post("/api/motion-library/{mid}/import")
 def motion_import(mid: str, body: MotionImportIn | None = None):
-    """🎞️ العنصر بتعديلاته (كلام، ألوان، لوجو) بيترسم فيديو ويدخل الأصول. كل نسخة أصل لوحده."""
+    """🎞️ العنصر بتعديلاته (كلام، ألوان، لوجو) بيترسم فيديو ويدخل الأصول. كل نسخة أصل لوحده. (وقوالب المعرض t-* كمان)"""
     meta = next((m for m in motion_manifest() if m["id"] == mid), None)
+    if meta is None and mid.startswith("t-") and (MOTION_DIR / "r" / Path(mid).name / "reel.html").exists():
+        meta = {"id": mid, "name": (body.name if body else "") or mid, "category": "motion_graphics", "tags": ["قالب"]}
     if meta is None:
         raise HTTPException(404, "العنصر ده مش موجود")
     if (MOTION_JOBS.get(mid) or {}).get("status") == "working":

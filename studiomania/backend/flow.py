@@ -141,10 +141,14 @@ def refine_messages(brand: str, prefs: str, tpl: dict, assets: list[dict], stage
 
 def params_messages(schema: dict, scenario: dict, brand_name: str, assets: list[dict]) -> list[dict]:
     """قالب موشن بالكود: الموديل بيملا الخانات (كلام، ألوان) من السيناريو."""
-    fields = {k: {"label": v.get("label"), "kind": v.get("kind"), "example": v.get("def")} for k, v in schema.items()}
+    # الصور والخطوط والاختيارات بتتملا من البراند أو العميل بيختارها: الموديل بيكتب الكلام والألوان بس، بنصيحة كل خانة وحدها الأقصى
+    fields = {k: {"label": v.get("label"), "kind": v.get("kind"), "example": v.get("def"), **({"hint": v["hint"]} if v.get("hint") else {}),
+                  **({"max_chars": v["max"]} if v.get("max") and v.get("kind") == "text" else {}), **({"scene": v["group"]} if v.get("group") else {})}
+              for k, v in schema.items() if v.get("kind") not in ("image", "font", "toggle", "select", "number")}
     return [{"role": "system", "content": "إنت بتملا خانات قالب موشن جرافيك من سيناريو. كل خانة نصية خليها قصيرة زي المثال بتاعها بالظبط (نفس الطول تقريبًا) "
                                           "عشان تتناسب مع التصميم. الأرقام بالأرقام العربي (٠١٢٣). الألوان hex. لو الخانة قايمة (kind=lines) رجّع array بنفس عدد العناصر "
-                                          "وبنفس الشكل (لو فيها | خليها). خانة role=brand = اسم البراند. متغيّرش الألوان إلا لو ألوان البراند معروفة. رجّع JSON بالمفاتيح بس."},
+                                          "وبنفس الشكل (لو فيها | خليها). خانة role=brand = اسم البراند. متغيّرش الألوان إلا لو ألوان البراند معروفة. "
+                                          "لو الخانة ليها hint امشي عليه بالظبط، ولو ليها max_chars ماتعدّيهوش. رجّع JSON بالمفاتيح بس."},
             {"role": "user", "content": f"البراند: {brand_name}\nالخانات:\n{json.dumps(fields, ensure_ascii=False)}\n\nالسيناريو:\n{json.dumps(scenario, ensure_ascii=False)}"}]
 
 
@@ -160,7 +164,11 @@ def motion_schema(reel: Path) -> dict:
     if not m:
         return {}
     body = m.group(1)
-    body = re.sub(r"//[^\n]*", "", body)
+    # الثوابت النصية اللي فوق (const G1 = "…", G2 = "…") بتتحط مكان اسمها (أسماء المشاهد مثلًا)
+    consts = dict(re.findall(r'(?:const|,)\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*("(?:[^"\\]|\\.)*")', src[:m.start()]))
+    if consts:
+        body = re.sub(r":\s*([A-Za-z_][A-Za-z0-9_]*)\b(?=\s*[,}])", lambda z: ": " + consts.get(z.group(1), z.group(1)), body)
+    body = re.sub(r"(?m)^\s*//[^\n]*", "", body)
     body = re.sub(r'(?<=[{,\s])([A-Za-z_][A-Za-z0-9_]*)\s*:', r'"\1":', body)
     body = re.sub(r",\s*([}\]])", r"\1", body)
     try:

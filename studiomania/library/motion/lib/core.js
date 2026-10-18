@@ -36,19 +36,63 @@
 
   // ---------- params: كل عنصر بيعلن الحاجات اللي بتتعدّل فيه (كلام، ألوان، لوجو...) وقيمها الأصلية.
   // القيم الجديدة بتيجي في اللينك (#p=JSON) أو window.PARAMS. لازم M.params تتنادى في أول الصفحة قبل أي حاجة بتستخدمها.
+  const AR_RANGE = "U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF, U+200C-200F";
   let given = {};
   try { const h = location.hash.match(/[#&]p=([^&]*)/); if (h) given = JSON.parse(decodeURIComponent(h[1])); } catch (e) { given = {}; }
+  // ⚙️ صيغة القالب (v1) — كل خانة ممكن تزوّد عليها (كلهم اختياري):
+  //   group: اسم المشهد اللي الخانة فيه (المحرر بيقسّم الخانات عليه وبيقفز للمشهد ده)
+  //   hint: نصيحة للعميل يحط إيه بالظبط علشان يطلع أحسن نتيجة · max: أقصى عدد حروف مقترح
+  //   img: { ratio: "1:1", cut: true (من غير خلفية), tip: "..." } للصور
+  //   kind: text | lines | image | color | font | select | number | toggle
+  //   font: script = "ar" | "lat" | "any" · select: options = [[القيمة، الاسم]] · number: min, max, step, unit
   M.params = (schema) => {
     window.PARAM_SCHEMA = schema;
     const extra = window.PARAMS || {}, out = {};
     for (const k in schema) {
-      const v = k in extra ? extra[k] : given[k];
-      out[k] = v === undefined || v === null ? schema[k].def : v;   // فاضي = فاضي (مش القيمة الأصلية)
-      if (schema[k].kind === "color" && !/^#[0-9a-f]{3,8}$/i.test(String(out[k]))) out[k] = schema[k].def;
-      if (Array.isArray(schema[k].def) && !Array.isArray(out[k])) out[k] = String(out[k]).split("\n").map((x) => x.trim()).filter(Boolean);
+      const f = schema[k], v = k in extra ? extra[k] : given[k];
+      out[k] = v === undefined || v === null ? f.def : v;   // فاضي = فاضي (مش القيمة الأصلية)
+      if (f.kind === "color" && !/^#[0-9a-f]{3,8}$/i.test(String(out[k]))) out[k] = f.def;
+      if (f.kind === "font" && !M.FONTS[out[k]]) out[k] = f.def;
+      if (f.kind === "select" && !(f.options || []).some((o) => String(o[0]) === String(out[k]))) out[k] = f.def;
+      if (f.kind === "number") { const n = parseFloat(out[k]); out[k] = isNaN(n) ? f.def : Math.min(f.max ?? n, Math.max(f.min ?? n, n)); }
+      if (f.kind === "toggle") out[k] = out[k] === true || out[k] === "true" || out[k] === 1 || out[k] === "1";
+      if (Array.isArray(f.def) && !Array.isArray(out[k])) out[k] = String(out[k]).split("\n").map((x) => x.trim()).filter(Boolean);
     }
     M.P = out;
     return out;
+  };
+  // قصة القالب ومشاهده: المحرر بيعرضها فوق الخانات، والتايم لاين بيتقسم عليها
+  //   M.meta({ story: "...", scenes: [{ name: "البداية", t0: 0, t1: 3.2, about: "..." }], tips: ["..."] })
+  M.meta = (m) => { window.TEMPLATE_META = m; return m; };
+  // 🔤 الخطوط اللي العميل يقدر يختار منها (kind: "font"). script: ar = عربي، lat = لاتيني، any = الاتنين
+  M.FONTS = {
+    alexandria: { file: "TY-Alexandria-800.ttf", weight: "800", label: "الإسكندرية (عريض)", script: "ar" },
+    alexandria5: { file: "TY-Alexandria-500.ttf", weight: "500", label: "الإسكندرية (عادي)", script: "ar" },
+    plex: { file: "TY-PlexArabic-700.ttf", weight: "700", label: "بلكس عربي", script: "ar" },
+    plex4: { file: "TY-PlexArabic-400.ttf", weight: "400", label: "بلكس عربي (رفيع)", script: "ar" },
+    changa: { file: "SM-Changa.ttf", weight: "400", label: "شنقا", script: "ar" },
+    lalezar: { file: "SM-Lalezar.ttf", weight: "400", label: "لاله‌زار (إعلاني)", script: "ar" },
+    tajawal: { file: "SM-Tajawal.ttf", weight: "400", label: "تجوّل", script: "ar" },
+    amiri: { file: "TY-Amiri-700.ttf", weight: "700", label: "أميري (كلاسيك)", script: "ar" },
+    ruqaa: { file: "TY-ArefRuqaa-700.ttf", weight: "700", label: "رقعة", script: "ar" },
+    outfit: { file: "TY-Outfit-800.ttf", weight: "800", label: "Outfit", script: "lat" },
+    inter: { file: "inter600.ttf", weight: "600", label: "Inter", script: "lat" },
+    gabarito: { file: "TY-Gabarito-800.ttf", weight: "800", label: "Gabarito", script: "lat" },
+    archivo: { file: "archivoblack.ttf", weight: "400", label: "Archivo Black", script: "lat" },
+    anton: { file: "anton.ttf", weight: "400", label: "Anton", script: "lat" },
+    bebas: { file: "bebas.ttf", weight: "400", label: "Bebas", script: "lat" },
+    serif: { file: "Instrument_Serif.ttf", weight: "400", label: "Instrument Serif", script: "lat" },
+    caveat: { file: "Caveat_wght_500.ttf", weight: "500", label: "Caveat (خط إيد)", script: "lat" },
+    jost: { file: "Jost.ttf", weight: "400", label: "Jost", script: "lat" },
+  };
+  // بيحمّل الخط اللي اتختار باسم عيلة ثابت (fam) يتكتب بيه في الكانفاس: `${M.FONTS[k].weight} 80px ${fam}`
+  // الخط العربي بيتحط زي ما هو، واللاتيني بياخد الحروف العربي من Alexandria زي M.fonts
+  M.font = async (fam, key) => {
+    const f = M.FONTS[key] || M.FONTS.alexandria, faces = [new FontFace(fam, `url(../../fonts/${f.file})`, { weight: f.weight })];
+    if (f.script === "lat") faces.push(new FontFace(fam, `url(../../fonts/${+f.weight >= 600 ? "TY-Alexandria-800.ttf" : "TY-Alexandria-500.ttf"})`, { weight: f.weight, unicodeRange: AR_RANGE }));
+    faces.forEach((x) => document.fonts.add(x));
+    await Promise.all(faces.map((x) => x.load().catch(() => {})));
+    return f.weight;
   };
   M.img = (src) => new Promise((res) => { if (!src) return res(null); const i = new Image(); i.onload = () => res(i); i.onerror = () => res(null); i.src = src; });
   M.isAr = (s) => /[\u0600-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF]/.test(String(s || ""));
@@ -57,7 +101,6 @@
 
   // ---------- fonts (files live in pm/fonts; pages are pm/r/NNN/reel.html)
   // كل خط بياخد الحروف العربي من Alexandria (unicode-range)، فأي كلام عربي بيظهر صح في أي عنصر
-  const AR_RANGE = "U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF, U+200C-200F";
   M.fonts = async (map) => {
     const all = Object.entries(map).flatMap(([fam, spec]) => {
       const [file, weight = "400", style = "normal"] = Array.isArray(spec) ? spec : [spec];

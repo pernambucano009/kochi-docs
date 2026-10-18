@@ -170,6 +170,11 @@ const Gallery = (() => {
           closePv();
           return Flow.start({ id: x.id, name: x.name, cat: catName(x.cat), desc: DESC[x.id] || x.desc || x.description || "" });
         }
+        if (e.target.closest("[data-gedit]")) {   // ✏️ محرر القالب: كل خانة بنصيحتها، والخطوط والألوان والمشاهد
+          const x = S.pvItem;
+          closePv();
+          return MotionPage.openTemplate(x.id, x.name);
+        }
         if (e.target === S.pv || e.target.closest("[data-gclose]")) closePv();
       });
       document.body.appendChild(S.pv);
@@ -184,6 +189,7 @@ const Gallery = (() => {
       <div class="nh-gal-pvt"><span class="latin">${esc(CAT_EN[x.cat] || x.cat)}</span><b>${esc(x.name)}</b>
         <p>${esc(DESC[x.id] || x.desc || x.description || "")}</p><small class="muted">${esc(catName(x.cat))}</small>
         <button type="button" class="nh-gal-go" data-gstart>✨ ابدأ بالقالب ده</button>
+        ${String(x.id).startsWith("t-") ? `<button type="button" class="nh-gal-go ghost" data-gedit>✏️ عدّله بنفسك</button>` : ""}
         <small class="nh-gal-hint">المخ هيقترح عليك أفكار وسيناريوهات على قد البراند بتاعك، وانت تختار.</small></div></div>`;
     S.pvItem = x;
     pv.hidden = false;

@@ -86,30 +86,55 @@ const MotionPage = (() => {
   function srcOf(m, vals, n) {
     return `${m.preview_url}?v=${n}#p=${encodeURIComponent(JSON.stringify(vals || {}))}`;
   }
-  function fieldHTML(k, f, v) {
-    const lab = `<span>${esc(f.label || k)}</span>`;
-    if (f.kind === "color") return `<label class="ml-f ml-fc">${lab}<input type="color" data-pk="${k}" value="${esc(/^#[0-9a-f]{6}$/i.test(v) ? v : f.def)}"></label>`;
-    if (f.kind === "lines") return `<label class="ml-f">${lab}<textarea rows="${Math.min(8, Math.max(3, (v || []).length + 1))}" data-pk="${k}" data-lines>${esc((Array.isArray(v) ? v : String(v || "").split("\n")).join("\n"))}</textarea></label>`;
-    if (f.kind === "image") {
-      const b = S.brand || {}, imgs = [...(b.logos || []), ...(b.products || [])].slice(0, 12);
-      return `<div class="ml-f">${lab}<div class="ml-imgs"><button type="button" class="ml-img ${!v ? "on" : ""}" data-pimg="${k}" data-src="">بدون</button>${imgs.map((x) => `<button type="button" class="ml-img ${v === x.url ? "on" : ""}" data-pimg="${k}" data-src="${esc(x.url)}"><img src="${esc(x.url)}" alt=""></button>`).join("")}</div>
-        ${imgs.length ? "" : `<small class="ml-hint">ارفع لوجو في عقل البراند عشان يظهر هنا.</small>`}</div>`;
-    }
-    return `<label class="ml-f">${lab}<input type="text" data-pk="${k}" value="${esc(v)}"></label>`;
+  // ---------- صيغة القالب: كل خانة بنصيحتها وحدودها (core.js · M.params / M.meta)
+  const GS = "الشكل العام";
+  const FONT_LIST = () => S.fonts || {};
+  function counter(f, v) {
+    if (!f.max || typeof v !== "string") return "";
+    const n = [...v].length;
+    return `<small class="ml-cnt ${n > f.max ? "over" : ""}">${n}/${f.max}${n > f.max ? " · أطول من المقترح، هيصغر" : ""}</small>`;
   }
+  function fieldHTML(k, f, v) {
+    const hint = f.hint ? `<small class="ml-hint2">${esc(f.hint)}</small>` : "";
+    const lab = `<span class="ml-lab">${esc(f.label || k)}</span>`;
+    if (f.kind === "color") return `<label class="ml-f ml-fc" title="${esc(f.hint || "")}">${lab}<input type="color" data-pk="${k}" value="${esc(/^#[0-9a-f]{6}$/i.test(v) ? v : f.def)}"></label>`;
+    if (f.kind === "toggle") return `<label class="ml-f ml-ft">${lab}<input type="checkbox" data-pk="${k}" data-tog ${v ? "checked" : ""}>${hint}</label>`;
+    if (f.kind === "font") {
+      const fonts = Object.entries(FONT_LIST()).filter(([, x]) => !f.script || f.script === "any" || x.script === f.script || x.script === "any");
+      return `<label class="ml-f">${lab}<select data-pk="${k}">${fonts.map(([id, x]) => `<option value="${id}" ${id === v ? "selected" : ""}>${esc(x.label)}${x.script === "lat" ? " · لاتيني" : ""}</option>`).join("")}</select>${hint}</label>`;
+    }
+    if (f.kind === "select") return `<label class="ml-f">${lab}<select data-pk="${k}">${(f.options || []).map(([o, t]) => `<option value="${esc(o)}" ${String(o) === String(v) ? "selected" : ""}>${esc(t)}</option>`).join("")}</select>${hint}</label>`;
+    if (f.kind === "number") return `<label class="ml-f">${lab}<span class="ml-num"><input type="range" data-pk="${k}" min="${f.min ?? 0}" max="${f.max ?? 100}" step="${f.step ?? 1}" value="${esc(v)}"><b class="num">${esc(v)}${esc(f.unit || "")}</b></span>${hint}</label>`;
+    if (f.kind === "lines") return `<label class="ml-f">${lab}<textarea rows="${Math.min(8, Math.max(3, (v || []).length + 1))}" data-pk="${k}" data-lines>${esc((Array.isArray(v) ? v : String(v || "").split("\n")).join("\n"))}</textarea>${hint}</label>`;
+    if (f.kind === "image") {
+      const b = S.brand || {}, imgs = [...(b.products || []), ...(b.logos || []), ...(b.screens || [])].slice(0, 14), im = f.img || {};
+      const own = v && !imgs.some((x) => x.url === v);
+      const tip = [im.ratio ? `مقاس ${im.ratio}` : "", im.cut ? "من غير خلفية" : ""].filter(Boolean).join(" · ");
+      return `<div class="ml-f">${lab}${tip ? `<small class="ml-badge">${esc(tip)}</small>` : ""}
+        <div class="ml-imgs"><button type="button" class="ml-img ${!v ? "on" : ""}" data-pimg="${k}" data-src="">بدون</button>
+          ${own ? `<button type="button" class="ml-img on" data-pimg="${k}" data-src="${esc(v)}"><img src="${esc(v)}" alt=""></button>` : ""}
+          ${imgs.map((x) => `<button type="button" class="ml-img ${v === x.url ? "on" : ""}" data-pimg="${k}" data-src="${esc(x.url)}"><img src="${esc(x.url)}" alt=""></button>`).join("")}
+          <label class="ml-img ml-up" title="ارفع صورة">＋<input type="file" accept="image/*" data-pup="${k}" hidden></label></div>
+        ${im.tip ? `<small class="ml-hint2">💡 ${esc(im.tip)}</small>` : ""}${hint}</div>`;
+    }
+    return `<label class="ml-f">${lab}<input type="text" data-pk="${k}" value="${esc(v)}">${counter(f, v)}${hint}</label>`;
+  }
+  // المحرر بيشتغل مع أي قالب كود: عناصر الموشن (المكتبة) أو قوالب المعرض (t-*)
   async function openView(m) {
     closeView();
+    if (!S.fonts) S.fonts = await api("/api/motion-fonts").catch(() => ({}));
     const box = document.createElement("div");
     box.className = "ml-view";
     box.innerHTML = `<div class="ml-vin">
       <div class="ml-vtop"><b>${esc(m.name)}</b><span class="nb-state" data-vs>بيحمّل…</span>
         <button class="nb-btn sm" data-mute title="الصوت">🔊</button><button class="nb-btn sm" data-x title="قفل">✕</button></div>
-      <div class="ml-vbody"><div class="ml-stage"><iframe title="${esc(m.name)}"></iframe></div>
+      <div class="ml-vbody"><div class="ml-left"><div class="ml-stage"><iframe title="${esc(m.name)}"></iframe></div>
+          <div class="ml-tl"><button class="nb-btn sm" data-play title="تشغيل/إيقاف">⏸</button><div class="ml-tlbar" data-tlbar><i class="ml-ph"></i></div><span class="num" data-tt>0.0</span></div></div>
         <aside class="ml-side"><div class="ml-fields"><div class="nh-empty">بيحمّل الخانات…</div></div>
           <div class="ml-sact"><button class="nb-btn sm" data-brand>🎨 من البراند</button><button class="nb-btn sm" data-reset>↺ الأصلي</button>
-            <button class="nb-btn ml-add" data-add>＋ ضيفه للأصول</button></div></aside></div></div>`;
+            <button class="nb-btn ml-add" data-add>${m.template ? "🎬 صدّر الفيديو" : "＋ ضيفه للأصول"}</button></div></aside></div></div>`;
     document.body.appendChild(box);
-    const v = { m, box, raf: 0, audio: null, vals: {}, n: 0, muted: false, key: (e) => e.key === "Escape" && closeView() };
+    const v = { m, box, raf: 0, audio: null, vals: {}, n: 0, muted: false, open: null, range: null, paused: false, t: 0, key: (e) => e.key === "Escape" && closeView() };
     S.view = v;
     document.addEventListener("keydown", v.key);
     const fr = box.querySelector("iframe"), stage = box.querySelector(".ml-stage");
@@ -122,30 +147,43 @@ const MotionPage = (() => {
       cancelAnimationFrame(v.raf);
       v.audio?.pause();
       const W = win.W, H = win.H, D = win.DUR;
+      v.D = D;
       const fit = () => { const s = Math.min(stage.clientWidth / W, stage.clientHeight / H); Object.assign(fr.style, { width: W + "px", height: H + "px", transform: `scale(${s})` }); };
       fit();
       if (!v.ro) { v.ro = new ResizeObserver(() => S.view === v && v.fit?.()); v.ro.observe(stage); }
       v.fit = fit;
-      if (!v.schema) {   // أول مرة: نقرا الخانات ونملاها من البراند
+      if (!v.schema) {   // أول مرة: نقرا الخانات وقصة القالب ونملاها من البراند
         v.schema = win.PARAM_SCHEMA || {};
+        v.meta = win.TEMPLATE_META || null;
         S.schema[m.id] = v.schema;
         await brandValues();
         if (S.view !== v) return;
         const vals = applyBrand(v.schema, {}, await brandValues());
         renderFields();
+        renderTl();
         if (Object.keys(vals).length) { v.vals = vals; renderFields(); return reload(0); }
       }
       try {
         v.audio = new Audio("data:audio/wav;base64," + (await win.soundtrack()));
         v.audio.loop = true; v.audio.muted = v.muted;
-        await v.audio.play().catch(() => {});
+        if (!v.paused) await v.audio.play().catch(() => {});
+        v.audio.currentTime = v.t || 0;
       } catch { v.audio = null; }
       box.querySelector("[data-vs]").textContent = `${Math.round(D)} ثانية`;
-      const t0 = performance.now();
+      let last = performance.now();
       const tick = () => {
         if (S.view !== v) return;
-        const t = v.audio && !v.audio.paused ? v.audio.currentTime % D : ((performance.now() - t0) / 1000) % D;
-        win.seek(t);
+        const now = performance.now();
+        if (!v.paused) {
+          if (v.audio && !v.audio.paused) v.t = v.audio.currentTime;
+          else v.t += (now - last) / 1000;
+          const [a, b] = v.range || [0, D];
+          if (v.t >= b || v.t < a) { v.t = a; if (v.audio) v.audio.currentTime = a; }
+        }
+        last = now;
+        try { win.seek(v.t % D); } catch { return; }   // المعاينة بتتحمّل من جديد (تعديل)
+        const ph = box.querySelector(".ml-ph"); if (ph) ph.style.insetInlineStart = `${(v.t / D) * 100}%`;
+        box.querySelector("[data-tt]").textContent = v.t.toFixed(1);
         v.raf = requestAnimationFrame(tick);
       };
       tick();
@@ -154,20 +192,67 @@ const MotionPage = (() => {
       clearTimeout(v.reloadT);
       v.reloadT = setTimeout(() => { if (S.view !== v) return; box.querySelector("[data-vs]").textContent = "بيحدّث…"; fr.src = srcOf(m, v.vals, ++v.n); }, delay);
     };
-    function renderFields() {
-      const sch = v.schema || {}, el = box.querySelector(".ml-fields");
-      const val = (k) => (k in v.vals ? v.vals[k] : sch[k].def);
-      const keys = Object.keys(sch), texts = keys.filter((k) => sch[k].kind !== "color"), colors = keys.filter((k) => sch[k].kind === "color");
-      el.innerHTML = keys.length ? texts.map((k) => fieldHTML(k, sch[k], val(k))).join("")
-        + (colors.length ? `<div class="ml-colors">${colors.map((k) => fieldHTML(k, sch[k], val(k))).join("")}</div>` : "")
-        : `<div class="nh-empty">العنصر ده مفيهوش حاجة تتعدّل.</div>`;
+    // التايم لاين: المشاهد كأجزاء ملوّنة، الدوسة على مشهد بتشغّله لوحده
+    function renderTl() {
+      const bar = box.querySelector("[data-tlbar]"), sc = v.meta?.scenes || [], D = v.D || 1;
+      bar.innerHTML = sc.map((s, i) => `<button type="button" class="ml-sc ${v.open === s.name ? "on" : ""}" data-scene="${i}" style="inset-inline-start:${(s.t0 / D) * 100}%;width:${((s.t1 - s.t0) / D) * 100}%" title="${esc(s.about || "")}">${esc(s.name)}</button>`).join("") + `<i class="ml-ph"></i>`;
     }
-    const setVal = (k, raw, lines) => { v.vals[k] = lines ? String(raw).split("\n").map((z) => z.trim()).filter(Boolean) : raw; reload(); };
-    box.addEventListener("input", (e) => { const k = e.target.dataset.pk; if (k) setVal(k, e.target.value, e.target.hasAttribute("data-lines")); });
+    function renderFields() {
+      const sch = v.schema || {}, el = box.querySelector(".ml-fields"), meta = v.meta;
+      const val = (k) => (k in v.vals ? v.vals[k] : sch[k].def);
+      const keys = Object.keys(sch);
+      if (!keys.length) { el.innerHTML = `<div class="nh-empty">العنصر ده مفيهوش حاجة تتعدّل.</div>`; return; }
+      // الخانات متقسمة على المشاهد بترتيبها، وبعدها الشكل العام (ألوان وخطوط)
+      const order = [...(meta?.scenes || []).map((s) => s.name)];
+      keys.forEach((k) => { const g = sch[k].group || (["color", "font"].includes(sch[k].kind) ? GS : "الخانات"); if (!order.includes(g)) order.push(g); });
+      const groups = order.map((g) => [g, keys.filter((k) => (sch[k].group || (["color", "font"].includes(sch[k].kind) ? GS : "الخانات")) === g)]).filter(([, ks]) => ks.length);
+      const scene = (g) => (meta?.scenes || []).find((s) => s.name === g);
+      const story = meta?.story ? `<div class="ml-story"><b>📖 قصة القالب</b><p>${esc(meta.story)}</p>${(meta.tips || []).length ? `<ul>${meta.tips.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}</div>` : "";
+      el.innerHTML = story + groups.map(([g, ks]) => {
+        const sc = scene(g), on = v.open === null ? groups.length < 3 || g === groups[0][0] : v.open === g;
+        const colors = ks.filter((k) => sch[k].kind === "color"), rest = ks.filter((k) => sch[k].kind !== "color");
+        return `<section class="ml-grp ${on ? "on" : ""}"><button type="button" class="ml-gh" data-grp="${esc(g)}"><b>${esc(g)}</b>${sc ? `<small class="num">${sc.t0}–${sc.t1} ث</small>` : ""}<i>${on ? "−" : "+"}</i></button>
+          ${on ? `<div class="ml-gb">${sc?.about ? `<small class="ml-hint2">🎬 ${esc(sc.about)}</small>` : ""}${rest.map((k) => fieldHTML(k, sch[k], val(k))).join("")}
+            ${colors.length ? `<div class="ml-colors">${colors.map((k) => fieldHTML(k, sch[k], val(k))).join("")}</div>${colors.map((k) => sch[k].hint ? `<small class="ml-hint2">🎨 ${esc(sch[k].label)}: ${esc(sch[k].hint)}</small>` : "").join("")}` : ""}</div>` : ""}</section>`;
+      }).join("");
+    }
+    const setVal = (k, raw, lines) => {
+      v.vals[k] = lines ? String(raw).split("\n").map((z) => z.trim()).filter(Boolean) : raw;
+      const f = v.schema?.[k], inp = box.querySelector(`[data-pk="${k}"]`);
+      if (f?.max && inp) { const c = inp.parentElement.querySelector(".ml-cnt"); if (c) c.outerHTML = counter(f, raw); }
+      if (f?.kind === "number" && inp) inp.parentElement.querySelector("b").textContent = raw + (f.unit || "");
+      reload();
+    };
+    const playScene = (g) => {
+      const sc = (v.meta?.scenes || []).find((s) => s.name === g);
+      v.range = sc ? [sc.t0, sc.t1] : null;
+      if (sc) { v.t = sc.t0; if (v.audio) v.audio.currentTime = sc.t0; }
+    };
+    box.addEventListener("input", (e) => {
+      const k = e.target.dataset.pk;
+      if (!k || e.target.type === "file") return;
+      setVal(k, e.target.hasAttribute("data-tog") ? e.target.checked : e.target.value, e.target.hasAttribute("data-lines"));
+    });
+    box.addEventListener("change", (e) => {
+      const up = e.target.dataset?.pup;
+      if (!up || !e.target.files?.[0]) return;
+      const fl = e.target.files[0];
+      if (fl.size > 8 * 1024 * 1024) return toast("الصورة كبيرة أوي (أقصى ٨ ميجا)", true);
+      const rd = new FileReader();
+      rd.onload = () => { v.vals[up] = rd.result; renderFields(); reload(0); };
+      rd.readAsDataURL(fl);
+    });
     box.addEventListener("click", async (e) => {
       const t = e.target;
       if (t === box || t.closest("[data-x]")) return closeView();
       if (t.closest("[data-mute]")) { v.muted = !v.muted; if (v.audio) v.audio.muted = v.muted; t.closest("[data-mute]").textContent = v.muted ? "🔇" : "🔊"; return; }
+      if (t.closest("[data-play]")) { v.paused = !v.paused; if (v.audio) v.paused ? v.audio.pause() : v.audio.play().catch(() => {}); t.closest("[data-play]").textContent = v.paused ? "▶" : "⏸"; return; }
+      const scb = t.closest("[data-scene]");
+      if (scb) { const s = v.meta.scenes[+scb.dataset.scene]; v.open = v.open === s.name && v.range ? null : s.name; if (v.open) playScene(s.name); else v.range = null; renderFields(); renderTl(); return; }
+      const bar = t.closest("[data-tlbar]");
+      if (bar) { const r = bar.getBoundingClientRect(), f = (e.clientX - r.left) / r.width, rtl = getComputedStyle(bar).direction === "rtl"; v.range = null; v.t = (rtl ? 1 - f : f) * (v.D || 0); if (v.audio) v.audio.currentTime = v.t; return; }
+      const gh = t.closest("[data-grp]");
+      if (gh) { const g = gh.dataset.grp; v.open = v.open === g ? "" : g; playScene(v.open); renderFields(); renderTl(); return; }
       const im = t.closest("[data-pimg]");
       if (im) { v.vals[im.dataset.pimg] = im.dataset.src; renderFields(); return reload(0); }
       if (t.closest("[data-brand]")) { v.vals = applyBrand(v.schema || {}, { ...v.vals }, await brandValues()); renderFields(); return reload(0); }
@@ -180,8 +265,8 @@ const MotionPage = (() => {
           await api(`/api/motion-library/${m.id}/import`, { method: "POST", ...jsonBody({ params: v.vals, name }) });
           toast("🎞️ بيتعمل فيديو بتعديلاتك… دقيقة أو اتنين، وتلاقيه في الأصول");
           closeView();
-          await load();
-        } catch (err) { toast(err.message, true); add.disabled = false; add.textContent = "＋ ضيفه للأصول"; }
+          if (!m.template) await load();
+        } catch (err) { toast(err.message, true); add.disabled = false; add.textContent = m.template ? "🎬 صدّر الفيديو" : "＋ ضيفه للأصول"; }
       }
     });
     fr.src = srcOf(m, {}, ++v.n);
@@ -208,5 +293,7 @@ const MotionPage = (() => {
     bind(w);
     try { await load(); } catch (err) { w.innerHTML = `<div class="nh-empty">${esc(err.message)}</div>`; }
   }
-  return { html, mount, close: closeView };
+  // قالب من المعرض (t-*): بيتفتح في نفس المحرر
+  const openTemplate = (id, name) => openView({ id, name, template: true, preview_url: `/media/motion/r/${id}/reel.html` });
+  return { html, mount, close: closeView, openTemplate };
 })();
