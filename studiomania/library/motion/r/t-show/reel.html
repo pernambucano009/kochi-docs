@@ -2,25 +2,34 @@
 <script>
 // قالب «برنامج مسابقات»: كل حاجة على إيقاع واحد سريع (١٤٠)، كل ظهور = صوت. ألوان حلويات سادة بخط تخين وضل صلب، متسابقين لعب
 // بيتنطّوا على البيت، سؤال و٣ إجابات، جرس، «صح!»، لوحة نقط، والجايزة في الآخر. 1080×1920، 12 ثانية.
+const K1 = "١ · الفقرة والمتسابقين", K2 = "٢ · السؤال والإجابات", K3 = "٣ · الجايزة", KS = "الشكل العام";
 const PR = M.params({
-  show: { label: "اسم الفقرة", kind: "text", def: "مين يكسب؟" },
-  q: { label: "السؤال", kind: "text", def: "إيه أسرع طريقة تطلب بيها؟" },
-  a1: { label: "إجابة أ", kind: "text", def: "تتصل" },
-  a2: { label: "إجابة ب", kind: "text", def: "تروح بنفسك" },
-  a3: { label: "إجابة ج (الصح)", kind: "text", def: "من التطبيق" },
-  p1: { label: "المتسابق ١", kind: "text", def: "سارة" },
-  p2: { label: "المتسابق ٢", kind: "text", def: "كريم" },
-  prize: { label: "الجايزة", kind: "text", role: "product", def: "توصيل مجاني لأول طلب" },
-  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "طلباتي" },
+  show: { label: "اسم الفقرة", kind: "text", def: "مين يكسب؟", group: K1, max: 12, hint: "اسم مسابقة قصير ومرح." },
+  p1: { label: "المتسابق ١", kind: "text", def: "سارة", group: K1, max: 8, hint: "أسماء قصيرة (كلمة)." },
+  p2: { label: "المتسابق ٢", kind: "text", def: "كريم", group: K1, max: 8 },
+  q: { label: "السؤال", kind: "text", def: "إيه أسرع طريقة تطلب بيها؟", group: K2, max: 28, hint: "سؤال إجابته الصح هي منتجك أو ميزته." },
+  a1: { label: "إجابة أ", kind: "text", def: "تتصل", group: K2, max: 12, hint: "إجابة غلط بس منطقية (الطريقة القديمة)." },
+  a2: { label: "إجابة ب", kind: "text", def: "تروح بنفسك", group: K2, max: 12 },
+  a3: { label: "إجابة ج (الصح)", kind: "text", def: "من التطبيق", group: K2, max: 12, hint: "الإجابة الصح دايمًا التالتة: منتجك." },
+  right: { label: "كلمة الإجابة الصح", kind: "text", def: "صح!", group: K2, max: 6 },
+  prizeT: { label: "عنوان الجايزة", kind: "text", def: "الجايزة", group: K3, max: 8 },
+  prize: { label: "الجايزة", kind: "text", role: "product", def: "توصيل مجاني لأول طلب", group: K3, max: 26, hint: "عرض حقيقي للي يتفاعل (كوبون، شحن مجاني)." },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "طلباتي", group: K3, max: 14 },
+  fHead: { label: "خط العناوين", kind: "font", def: "lalezar", group: KS, hint: "خط تخين مرح." },
+  fBody: { label: "خط الكلام", kind: "font", def: "changa", group: KS },
+});
+M.meta({
+  story: "فقرة مسابقات على إيقاع سريع: ألوان حلويات، متسابقين بيتنطّوا، سؤال و٣ إجابات، جرس و«صح!»، لوحة نقط، والجايزة في الآخر.",
+  scenes: [{ name: K1, t0: 0, t1: 2.6 }, { name: K2, t0: 2.6, t1: 8.6, about: "السؤال والإجابات والجرس والنقط" }, { name: K3, t0: 8.6, t1: 12 }],
+  tips: ["خلّي الإجابة الصح هي فايدة منتجك.", "الجايزة الحقيقية بتجيب تفاعل."],
 });
 const W = 1080, H = 1920, DUR = 12, BPM = 140, B = 60 / BPM, at = (b) => b * B;
-const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
 const INK = "#1a1a24", CANDY = { pink: "#ff5fa2", blue: "#3b82f6", green: "#22c55e", yellow: "#ffd23f", orange: "#ff8a3d", sky: "#38bdf8", red: "#ef4444" };
 const SETS = [[0, 4, "pink", "burst"], [4, 14, "blue", "stripes"], [14, 20, "green", "burst"], [20, 28, "yellow", "dots"]];
 
 M.reel({
   W, H, DUR, bg: CANDY.pink,
-  async init(M) { await Promise.all([loadFont("LZ", "SM-Lalezar.ttf"), loadFont("CH", "SM-Changa.ttf")]); const c = M.canvas(W, H); return { x: c.getContext("2d") }; },
+  async init(M) { await Promise.all([M.font("LZ", PR.fHead), M.font("CH", PR.fBody)]); const c = M.canvas(W, H); return { x: c.getContext("2d") }; },
   seek(t, C, M) {
     const { x } = C, { seg, springO, expo, clamp } = M;
     const beat = t / B, bi = Math.floor(beat), bf = beat - bi;
@@ -66,13 +75,13 @@ M.reel({
     if (beat >= 14 && beat < 20) {
       const k = pop(14); x.save(); x.translate(540, 620); x.scale(k, k); x.rotate(-.06);
       sticker(() => { x.beginPath(); for (let i = 0; i < 24; i++) { const a = i / 24 * Math.PI * 2, r = i % 2 ? 230 : 330; x.lineTo(Math.cos(a) * r, Math.sin(a) * r); } x.closePath(); }, CANDY.yellow, 16, 10);
-      big("صح!", 0, 10, 200, CANDY.pink); x.restore();
+      big(PR.right, 0, 10, 200, CANDY.pink); x.restore();
       for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2 + .2, d = 380 + 80 * ((t - at(14)) % .4); x.fillStyle = INK; x.save(); x.translate(540 + Math.cos(a) * d, 620 + Math.sin(a) * d); x.rotate(a); x.fillRect(-30, -6, 60, 12); x.restore(); }
       const score = Math.min(100, Math.round(100 * seg(t, at(15), at(17)))); sticker(rr(540, 1060, 520, 170, 30), INK, 0, 6); x.fillStyle = "#ffd23f"; x.font = "110px LZ"; x.textAlign = "center"; x.textBaseline = "middle"; x.direction = "ltr"; x.fillText(String(score).replace(/\d/g, (d) => "٠١٢٣٤٥٦٧٨٩"[d]).padStart(3, "٠"), 540, 1066);
     }
     // ٤) الجايزة + البراند
     if (beat >= 20) {
-      const k = pop(20); x.save(); x.translate(540, 420); x.scale(k, k); sticker(rr(0, 0, 640, 150, 75), CANDY.pink, 12, 8); big("الجايزة", 0, 6, 100); x.restore();
+      const k = pop(20); x.save(); x.translate(540, 420); x.scale(k, k); sticker(rr(0, 0, 640, 150, 75), CANDY.pink, 12, 8); big(PR.prizeT, 0, 6, 100); x.restore();
       const k2 = pop(21); x.save(); x.translate(540, 720); x.scale(k2, k2); x.rotate(.02); sticker(rr(0, 0, 920, 300, 40), "#fff6e0", 16, 10); x.fillStyle = INK; x.font = `${M.fit(PR.prize, "LZ", 840, 110, 50)}px LZ`; x.textAlign = "center"; x.textBaseline = "middle"; x.direction = "rtl"; x.fillText(PR.prize, 0, 10); x.restore();
       const k3 = pop(23); x.save(); x.translate(540, 1050); x.scale(k3, k3); sticker(rr(0, 0, 560, 140, 70), CANDY.blue, 12, 8); big(PR.brand, 0, 6, 90); x.restore();
     }

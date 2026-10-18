@@ -2,22 +2,38 @@
 <script>
 // قالب «إعلان نشرة بريدية»: ظرف بيتفتح ويطلع منه العدد، سؤال بيشد، تلات كروت بتتقلب فيها أهم اللي في العدد،
 // وفي الآخر خانة إيميل بتتكتب لوحدها وزرار اشتراك وعدّاد مشتركين بيزيد. ستايل جرنال هادي. 1080×1920، 12 ثانية.
+const K1 = "١ · الظرف والسؤال", K2 = "٢ · أهم اللي في العدد", K3 = "٣ · الاشتراك", KS = "الشكل العام";
 const PR = M.params({
-  name: { label: "اسم النشرة", kind: "text", role: "brand", def: "فنجان الأسبوع" },
-  issue: { label: "رقم العدد", kind: "text", def: "العدد ٣٧" },
-  hook: { label: "السؤال", kind: "text", role: "product", def: "إزاي توفّر ساعة كل يوم؟" },
-  points: { label: "التلات نقاط", kind: "lines", def: ["٣ أدوات مجانية بتشتغل بدالك", "قاعدة الدقيقتين للمهام الصغيرة", "قايمة الصبح اللي بتغيّر يومك"] },
-  subs: { label: "عدد المشتركين", kind: "text", def: "12400" },
-  cta: { label: "زرار الاشتراك", kind: "text", def: "اشترك ببلاش" },
-  accent: { label: "لون التمييز", kind: "color", def: "#d9480f" },
+  name: { label: "اسم النشرة", kind: "text", role: "brand", def: "فنجان الأسبوع", group: K1, max: 18, hint: "اسم النشرة زي ما بيظهر في الإيميل." },
+  issue: { label: "رقم العدد", kind: "text", def: "العدد ٣٧", group: K1, max: 12 },
+  when: { label: "بتوصل إمتى", kind: "text", def: "كل أحد الصبح", group: K1, max: 16, hint: "ميعاد ثابت بيدّي إحساس العادة." },
+  hook: { label: "السؤال", kind: "text", role: "product", def: "إزاي توفّر ساعة كل يوم؟", group: K1, max: 28, hint: "سؤال العدد ده بيجاوب عليه (فضول بفايدة)." },
+  points: { label: "التلات نقاط", kind: "lines", def: ["٣ أدوات مجانية بتشتغل بدالك", "قاعدة الدقيقتين للمهام الصغيرة", "قايمة الصبح اللي بتغيّر يومك"], group: K2, hint: "٣ حاجات محددة في العدد (أرقام وأسماء مش كلام عام). كل نقطة ٤–٦ كلمات." },
+  ask: { label: "فوق خانة الإيميل", kind: "text", def: "وصّلها لإيميلك", group: K3, max: 18 },
+  email: { label: "الإيميل اللي بيتكتب", kind: "text", def: "you@mail.com", group: K3, max: 20, hint: "إيميل مثال (مش إيميل حد حقيقي)." },
+  subs: { label: "عدد المشتركين", kind: "text", def: "12400", group: K3, max: 7, hint: "عدد حقيقي (بيعدّ لفوق)." },
+  subsLabel: { label: "بعد عدد المشتركين", kind: "text", def: "مشترك بيقروها كل أسبوع", group: K3, max: 26 },
+  cta: { label: "زرار الاشتراك", kind: "text", def: "اشترك ببلاش", group: K3, max: 14 },
+  done: { label: "الزرار بعد الضغط", kind: "text", def: "اتسجلت", group: K3, max: 10 },
+  stamp1: { label: "الختم (كلمة كبيرة)", kind: "text", def: "ببلاش", group: K3, max: 8 },
+  stamp2: { label: "الختم (سطر صغير)", kind: "text", def: "وتقدر تلغي", group: K3, max: 12, hint: "بيطمّن (تقدر تلغي، من غير سبام)." },
+  accent: { label: "لون التمييز", kind: "color", role: "accent", def: "#d9480f", group: KS, hint: "الختم والزرار والخطوط: لون جرايد (طوبي، أحمر، كحلي)." },
+  paper: { label: "لون الورق", kind: "color", def: "#f7f1e6", group: KS, hint: "كريمي زي ورق الجرايد." },
+  ink: { label: "لون الحبر", kind: "color", def: "#1d1a17", group: KS },
+  fHead: { label: "خط العناوين", kind: "font", def: "amiri", group: KS, hint: "خط جرايد كلاسيك (أميري، رقعة) أو حديث (بلكس)." },
+  fBody: { label: "خط الكلام", kind: "font", def: "plex4", group: KS },
 });
-const W = 1080, H = 1920, DUR = 12, PAPER = "#f7f1e6", INK = "#1d1a17";
-const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
+M.meta({
+  story: "إعلان نشرة بريدية بستايل جرنال: ظرف بيتفتح ويطلع العدد، سؤال بيشد، ٣ كروت فيها أهم اللي في العدد، وخانة إيميل بتتكتب لوحدها وزرار اشتراك وعدّاد مشتركين.",
+  scenes: [{ name: K1, t0: 0, t1: 4, about: "الظرف بيتفتح والسؤال" }, { name: K2, t0: 4, t1: 8.6, about: "٣ كروت بتتقلب" }, { name: K3, t0: 8.6, t1: 12, about: "الإيميل والزرار والعداد والختم" }],
+  tips: ["النقاط محددة جدًا: «٣ أدوات» أحسن من «نصايح مفيدة».", "الختم بيشيل خوف الاشتراك."],
+});
+const W = 1080, H = 1920, DUR = 12, PAPER = PR.paper, INK = PR.ink;
 const ar = (s) => String(s).replace(/\d/g, (d) => "٠١٢٣٤٥٦٧٨٩"[d]);
 
 M.reel({
   W, H, DUR, bg: PAPER,
-  async init(M) { await Promise.all([loadFont("AM", "TY-Amiri-700.ttf", "700"), loadFont("PB", "TY-PlexArabic-700.ttf", "700"), loadFont("PX", "TY-PlexArabic-400.ttf")]); const c = M.canvas(W, H); return { x: c.getContext("2d") }; },
+  async init(M) { await Promise.all([M.font("AM", PR.fHead), M.font("PB", PR.fHead === "amiri" || PR.fHead === "ruqaa" ? "plex" : PR.fHead), M.font("PX", PR.fBody)]); const c = M.canvas(W, H); return { x: c.getContext("2d") }; },
   seek(t, C, M) {
     const { x } = C, { seg, clamp, cubicIO, springO, expo, hash } = M, io = (k) => cubicIO(clamp(k)), A = PR.accent;
     x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = PAPER; x.fillRect(0, 0, W, H);
@@ -25,7 +41,7 @@ M.reel({
     // رأس الجرنال
     x.fillStyle = INK; x.fillRect(80, 150, 920, 4); x.fillRect(80, 162, 920, 1.5);
     x.font = `700 ${M.fit(PR.name, "AM", 700, 76, 40, "700")}px AM`; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.name, 540, 260); x.fillRect(80, 290, 920, 1.5);
-    x.font = "400 28px PX"; x.textAlign = "right"; x.fillText(PR.issue, 1000, 330); x.textAlign = "left"; x.fillText("كل أحد الصبح", 80, 330);
+    x.font = "400 28px PX"; x.textAlign = "right"; x.fillText(PR.issue, 1000, 330); x.textAlign = "left"; x.fillText(PR.when, 80, 330);
     // ١) الظرف
     if (t < 3.2) { const ok = io(seg(t, .5, 1.1)), pk = io(seg(t, 1.0, 1.8)), out = io(seg(t, 2.7, 3.2));
       x.save(); x.translate(540, 1100 + out * 1200);
@@ -50,14 +66,14 @@ M.reel({
     // ٤) خانة الاشتراك
     const sk = io(seg(t, 8.5, 9.1));
     if (sk > 0) { x.save(); x.globalAlpha = sk; x.translate(0, (1 - sk) * 60);
-      x.fillStyle = INK; x.font = "700 64px AM"; x.textAlign = "center"; x.direction = "rtl"; x.fillText("وصّلها لإيميلك", 540, 820);
+      x.fillStyle = INK; x.font = "700 64px AM"; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.ask, 540, 820);
       x.strokeStyle = INK; x.lineWidth = 3; x.fillStyle = "#fff"; x.beginPath(); x.roundRect(120, 900, 840, 120, 16); x.fill(); x.stroke();
-      const em = "you@mail.com", n = Math.floor(em.length * clamp((t - 9.1) / .9)); x.fillStyle = INK; x.font = "400 44px PX"; x.textAlign = "left"; x.direction = "ltr"; x.fillText(em.slice(0, n) + (Math.floor(t * 3) % 2 && n < em.length ? "|" : ""), 160, 975);
-      const pressed = t > 10.2 && t < 10.4, done2 = t > 10.3; x.save(); x.translate(540, 1110); x.scale(pressed ? .95 : 1, pressed ? .95 : 1); x.fillStyle = done2 ? "#2f9e44" : A; x.beginPath(); x.roundRect(-420, -60, 840, 120, 16); x.fill(); x.fillStyle = "#fff"; x.font = "700 50px PB"; x.textAlign = "center"; x.direction = "rtl"; x.fillText(done2 ? "اتسجلت" : PR.cta, 0, 16); x.restore();
-      const n0 = parseInt(PR.subs) || 12400, cnt = Math.round(n0 + (done2 ? 1 : 0) + 30 * clamp((t - 9.0) / 3)); x.fillStyle = INK; x.font = "400 38px PX"; x.textAlign = "center"; x.direction = "rtl"; x.fillText(`+${ar(cnt)} مشترك بيقروها كل أسبوع`, 540, 1290);
+      const em = String(PR.email), n = Math.floor(em.length * clamp((t - 9.1) / .9)); x.fillStyle = INK; x.font = "400 44px PX"; x.textAlign = "left"; x.direction = "ltr"; x.fillText(em.slice(0, n) + (Math.floor(t * 3) % 2 && n < em.length ? "|" : ""), 160, 975);
+      const pressed = t > 10.2 && t < 10.4, done2 = t > 10.3; x.save(); x.translate(540, 1110); x.scale(pressed ? .95 : 1, pressed ? .95 : 1); x.fillStyle = done2 ? "#2f9e44" : A; x.beginPath(); x.roundRect(-420, -60, 840, 120, 16); x.fill(); x.fillStyle = "#fff"; x.font = "700 50px PB"; x.textAlign = "center"; x.direction = "rtl"; x.fillText(done2 ? PR.done : PR.cta, 0, 16); x.restore();
+      const n0 = parseInt(PR.subs) || 12400, cnt = Math.round(n0 + (done2 ? 1 : 0) + 30 * clamp((t - 9.0) / 3)); x.fillStyle = INK; x.font = "400 38px PX"; x.textAlign = "center"; x.direction = "rtl"; x.fillText(`+${ar(cnt)} ${PR.subsLabel}`, 540, 1290);
       x.restore(); }
     // ختم صغير
-    const st = springO(clamp((t - 10.5) / .5), 14, .5); if (t > 10.5) { x.save(); x.translate(820, 1520); x.rotate(-.2); x.scale(st, st); x.strokeStyle = A; x.lineWidth = 6; x.beginPath(); x.arc(0, 0, 110, 0, Math.PI * 2); x.stroke(); x.fillStyle = A; x.font = "700 40px AM"; x.textAlign = "center"; x.direction = "rtl"; x.fillText("ببلاش", 0, -6); x.font = "400 26px PX"; x.fillText("وتقدر تلغي", 0, 36); x.restore(); }
+    const st = springO(clamp((t - 10.5) / .5), 14, .5); if (t > 10.5) { x.save(); x.translate(820, 1520); x.rotate(-.2); x.scale(st, st); x.strokeStyle = A; x.lineWidth = 6; x.beginPath(); x.arc(0, 0, 110, 0, Math.PI * 2); x.stroke(); x.fillStyle = A; x.font = "700 40px AM"; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.stamp1, 0, -6); x.font = "400 26px PX"; x.fillText(PR.stamp2, 0, 36); x.restore(); }
     x.fillStyle = INK; x.fillRect(80, 1780, 920, 1.5);
   },
   sound(A) {

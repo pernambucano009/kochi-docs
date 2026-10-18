@@ -2,38 +2,51 @@
 <script>
 // قالب «كابشن تيك توك»: فيديو منتج بخلفية بوكيه، والكلام بيطلع كلمتين تلاتة في المرة بحروف تقيلة بحدود، الكلمة المهمة
 // (اللي بين نجمتين *كده*) ملوّنة وبتتنطط، وزراير التفاعل على الجنب، والقلب بيتدق، واسم الحساب تحت. 1080×1920، 12 ثانية.
+const K1 = "١ · الهوك", K2 = "٢ · الكلام", KS = "الشكل العام";
 const PR = M.params({
-  hook: { label: "الجملة اللي فوق", kind: "text", def: "متشتريش سيروم قبل ما تشوف ده" },
-  script: { label: "الكلام (كل سطر لقطة، *الكلمة المهمة*)", kind: "lines", def: ["*٣ حاجات*", "لازم تبص عليها", "في *المكونات*", "مش في *الإعلان*", "وبشرتك هتشكرك", "*جرّبه* النهارده"] },
-  handle: { label: "اسم الحساب", kind: "text", role: "brand", def: "@ندى_سكين" },
-  product: { label: "اسم المنتج", kind: "text", role: "product", def: "سيروم ندى" },
-  color: { label: "لون الكلمة المهمة", kind: "color", def: "#ffd23f" },
-  bottle: { label: "لون الزجاجة", kind: "color", def: "#f08aa8" },
+  hook: { label: "الجملة اللي فوق", kind: "text", def: "متشتريش سيروم قبل ما تشوف ده", group: K1, max: 32, hint: "هوك بيوقف السكرول: تحذير أو فضول («متشتريش… قبل ما تشوف»، «الغلطة اللي…»)." },
+  script: { label: "الكلام (كل سطر لقطة، *الكلمة المهمة*)", kind: "lines", def: ["*٣ حاجات*", "لازم تبص عليها", "في *المكونات*", "مش في *الإعلان*", "وبشرتك هتشكرك", "*جرّبه* النهارده"], group: K2,
+    hint: "٥–٧ سطور، كل سطر ٢–٣ كلمات بس (اللقطة ١٫٤ ثانية). حط الكلمة المهمة بين نجمتين *كده* علشان تتلون وتتنطط." },
+  handle: { label: "اسم الحساب", kind: "text", role: "handle", def: "@ندى_سكين", group: K2, max: 18 },
+  product: { label: "اسم المنتج", kind: "text", role: "product", def: "سيروم ندى", group: K2, max: 14, hint: "بيتكتب على الزجاجة المرسومة (لو مفيش صورة)." },
+  sub: { label: "جنب اسم المنتج تحت", kind: "text", def: "جربته بنفسي", group: K2, max: 16, hint: "زي وصف البوست (جربته بنفسي، ريفيو صريح)." },
+  img: { label: "صورة المنتج", kind: "image", role: "product_img1", def: "", group: K2, img: { ratio: "3:4", cut: true, tip: "PNG من غير خلفية، المنتج واقف. لو مفيش بتظهر زجاجة مرسومة." } },
+  bgimg: { label: "صورة الخلفية (اختياري)", kind: "image", def: "", group: KS, img: { ratio: "9:16", cut: false, tip: "صورة طولي هادية وفيها مساحة (حمام، ترابيزة، طبيعة). بتتغمق شوية علشان الكلام يبان." } },
+  color: { label: "لون الكلمة المهمة", kind: "color", role: "accent", def: "#ffd23f", group: KS, hint: "لون فاتح وقوي (أصفر، أخضر فسفوري) علشان يبان على أي خلفية." },
+  bottle: { label: "لون الزجاجة", kind: "color", def: "#f08aa8", group: KS },
+  fHead: { label: "خط الكابشن", kind: "font", def: "lalezar", group: KS, hint: "خط تقيل جدًا زي كابشن تيك توك (لاله‌زار، الإسكندرية، Anton)." },
+  fBody: { label: "خط الهوك والأزرار", kind: "font", def: "plex", group: KS },
+});
+M.meta({
+  story: "فيديو منتج بكابشن تيك توك: هوك فوق في صندوق أبيض، الكلام بيطلع كلمتين تلاتة بحروف تقيلة والكلمة المهمة ملونة وبتتنطط، زراير التفاعل على الجنب والقلب بيدق.",
+  scenes: [{ name: K1, t0: 0, t1: 1.6, about: "المنتج والهوك" }, { name: K2, t0: 1.6, t1: 12, about: "سطور الكابشن ورا بعض" }],
+  tips: ["كل سطر لقطة: أقل كلام ممكن.", "كلمة واحدة مهمة في كل سطر أو سطرين.", "صورة منتج حقيقية من غير خلفية بتفرق جدًا."],
 });
 const W = 1080, H = 1920, DUR = 12, S0 = 1.6, SD = 1.45;
-const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
 const SC = PR.script.slice(0, 7);
 
 M.reel({
   W, H, DUR, bg: "#2a1c22",
-  async init(M) { await Promise.all([loadFont("LZ", "SM-Lalezar.ttf"), loadFont("PB", "TY-PlexArabic-700.ttf", "700")]); const c = M.canvas(W, H); return { x: c.getContext("2d") }; },
+  async init(M) { await Promise.all([M.font("LZ", PR.fHead), M.font("PB", PR.fBody)]); const [pimg, bimg] = await Promise.all([M.img(PR.img), M.img(PR.bgimg)]); const c = M.canvas(W, H); return { x: c.getContext("2d"), pimg, bimg }; },
   seek(t, C, M) {
-    const { x } = C, { seg, smooth, expo, cubicIO, springO, clamp, hash } = M, io = (k) => cubicIO(clamp(k)), A = PR.color;
+    const { x, pimg, bimg } = C, { seg, smooth, expo, cubicIO, springO, clamp, hash } = M, io = (k) => cubicIO(clamp(k)), A = PR.color;
     x.setTransform(1, 0, 0, 1, 0, 0);
     // ١) "الفيديو": رخامة + بوكيه + زجاجة مع حركة كاميرا إيد
     const hx = Math.sin(t * 1.3) * 8 + Math.sin(t * 3.1) * 3, hy = Math.cos(t * 1.1) * 6, zz = 1.04 + .03 * smooth(seg(t, 0, 12));
     x.save(); x.translate(540 + hx, 960 + hy); x.scale(zz, zz); x.translate(-540, -960);
     const bg = x.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, "#5b3a45"); bg.addColorStop(.55, "#c98f8a"); bg.addColorStop(.56, "#efe4dc"); bg.addColorStop(1, "#d8c8bd"); x.fillStyle = bg; x.fillRect(-60, -60, W + 120, H + 120);
-    for (let i = 0; i < 26; i++) { const r = 40 + hash(i) * 110, bx = hash(i + 3) * W, by = hash(i + 9) * 1000 + Math.sin(t * .5 + i) * 10; const g = x.createRadialGradient(bx, by, 0, bx, by, r); g.addColorStop(0, `rgba(255,${200 + hash(i + 1) * 50 | 0},${170 + hash(i + 2) * 60 | 0},.35)`); g.addColorStop(1, "rgba(255,220,200,0)"); x.fillStyle = g; x.fillRect(bx - r, by - r, r * 2, r * 2); }
-    for (let i = 0; i < 9; i++) { x.strokeStyle = "rgba(160,130,120,.07)"; x.lineWidth = 2; x.beginPath(); x.moveTo(hash(i) * W, 1080); x.bezierCurveTo(hash(i + 1) * W, 1300, hash(i + 2) * W, 1600, hash(i + 3) * W, H); x.stroke(); }
+    if (bimg) { const k = Math.max((W + 120) / bimg.width, (H + 120) / bimg.height); x.drawImage(bimg, 540 - bimg.width * k / 2, 960 - bimg.height * k / 2, bimg.width * k, bimg.height * k); x.fillStyle = "rgba(0,0,0,.18)"; x.fillRect(-60, -60, W + 120, H + 120); }
+    if (!bimg) for (let i = 0; i < 26; i++) { const r = 40 + hash(i) * 110, bx = hash(i + 3) * W, by = hash(i + 9) * 1000 + Math.sin(t * .5 + i) * 10; const g = x.createRadialGradient(bx, by, 0, bx, by, r); g.addColorStop(0, `rgba(255,${200 + hash(i + 1) * 50 | 0},${170 + hash(i + 2) * 60 | 0},.35)`); g.addColorStop(1, "rgba(255,220,200,0)"); x.fillStyle = g; x.fillRect(bx - r, by - r, r * 2, r * 2); }
+    if (!bimg) for (let i = 0; i < 9; i++) { x.strokeStyle = "rgba(160,130,120,.07)"; x.lineWidth = 2; x.beginPath(); x.moveTo(hash(i) * W, 1080); x.bezierCurveTo(hash(i + 1) * W, 1300, hash(i + 2) * W, 1600, hash(i + 3) * W, H); x.stroke(); }
     // الزجاجة
     const bx = 540, by = 1240; x.fillStyle = "rgba(60,30,30,.25)"; x.beginPath(); x.ellipse(bx + 30, by + 300, 200, 36, 0, 0, Math.PI * 2); x.fill();
+    if (pimg) { const k = Math.min(620 / pimg.width, 760 / pimg.height); x.drawImage(pimg, bx - pimg.width * k / 2, by + 300 - pimg.height * k, pimg.width * k, pimg.height * k); } else {
     const gb = x.createLinearGradient(bx - 140, 0, bx + 140, 0); gb.addColorStop(0, PR.bottle); gb.addColorStop(.3, "#fff2f5"); gb.addColorStop(.45, PR.bottle); gb.addColorStop(1, "#7a3a4c");
     x.fillStyle = gb; x.beginPath(); x.roundRect(bx - 140, by - 160, 280, 460, 60); x.fill();
     x.fillStyle = "#2b1d22"; x.beginPath(); x.roundRect(bx - 50, by - 260, 100, 110, 16); x.fill(); x.fillStyle = "#f6efe9"; x.beginPath(); x.roundRect(bx - 34, by - 380, 68, 130, 30); x.fill();
     x.fillStyle = "rgba(255,255,255,.85)"; x.beginPath(); x.roundRect(bx - 110, by + 20, 220, 150, 16); x.fill();
     x.fillStyle = "#3a2228"; x.font = `${M.fit(PR.product, "LZ", 190, 52, 24)}px LZ`; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.product, bx, by + 110);
-    x.fillStyle = "rgba(255,255,255,.5)"; x.fillRect(bx - 100, by - 140, 26, 400);
+    x.fillStyle = "rgba(255,255,255,.5)"; x.fillRect(bx - 100, by - 140, 26, 400); }
     x.restore();
     // تظليل خفيف فوق وتحت عشان الكلام يبان
     const vg = x.createLinearGradient(0, 0, 0, H); vg.addColorStop(0, "rgba(0,0,0,.45)"); vg.addColorStop(.25, "rgba(0,0,0,0)"); vg.addColorStop(.75, "rgba(0,0,0,0)"); vg.addColorStop(1, "rgba(0,0,0,.6)"); x.fillStyle = vg; x.fillRect(0, 0, W, H);
@@ -65,7 +78,7 @@ M.reel({
     if (t > 8.6) for (let h = 0; h < 7; h++) { const u = clamp((t - 8.6 - h * .08) / 1.2); if (u <= 0 || u >= 1) continue; x.save(); x.globalAlpha = ui * (1 - u); x.translate(970 - u * (80 + hash(h) * 140), 1060 - u * (300 + hash(h + 4) * 200)); x.rotate((hash(h) - .5) * .8); x.scale(.6, .6); x.fillStyle = "#ff3b5c"; x.beginPath(); x.moveTo(0, 26); x.bezierCurveTo(-60, -10, -30, -55, 0, -24); x.bezierCurveTo(30, -55, 60, -10, 0, 26); x.fill(); x.restore(); }
     // اسم الحساب + زرار متابعة
     x.globalAlpha = ui; x.fillStyle = "#fff"; x.font = "700 46px PB"; x.textAlign = "right"; x.direction = "rtl"; x.fillText(PR.handle, 860, 1640);
-    x.fillStyle = "rgba(255,255,255,.85)"; x.font = "400 34px PB"; x.fillText(PR.product + " · جربته بنفسي", 860, 1700);
+    x.fillStyle = "rgba(255,255,255,.85)"; x.font = "400 34px PB"; x.fillText(PR.product + (PR.sub ? " · " + PR.sub : ""), 860, 1700);
     const fk = t > 10.2 ? springO((t - 10.2) / .6, 14, .6) : 0; const fw = 240;
     x.fillStyle = fk > .5 ? "rgba(255,255,255,.2)" : "#ff3b5c"; x.beginPath(); x.roundRect(80, 1586, fw, 84, 42); x.fill(); x.fillStyle = "#fff"; x.font = "700 38px PB"; x.textAlign = "center"; x.fillText(fk > .5 ? "متابَع" : "متابعة", 80 + fw / 2, 1642);
     // شريط تقدم الفيديو
