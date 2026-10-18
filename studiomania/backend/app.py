@@ -19935,6 +19935,16 @@ def flow_gen_scenarios(fid: str, hint: str = "", more: bool = False) -> None:
     items = [{"id": uuid.uuid4().hex[:8], **s} for s in (raw.get("scenarios") or [])[:4] if isinstance(s, dict)]
     if not items:
         raise HTTPException(400, "المخ مرجعش سيناريوهات، جرّب تاني")
+    if algo.mode_on(brain):   # ⚡ وضع الخوارزمية: كل سيناريو بيتفحص بالـ ١٥ بند والضعيف بيتصلّح قبل ما العميل يشوفه
+        if atlas.mock_mode():
+            fixed = {"scenarios": [{"score": 84, "checks": [{"key": "payoff", "score": 9}], "fixes": ["النتيجة اتنقلت لآخر مشهد", "اتضافت جملة قفل بعد الهوك"],
+                                    "scenario": {k: v for k, v in s.items() if k != "id"}} for s in items]}
+        else:
+            try:
+                fixed = flow_llm(algo.scenario_fix_messages(flow_brand(brain, idea_txt), idea_txt, fz.FORMATS.get(d["format"], d["format"]), items), "فحص السيناريوهات")
+            except HTTPException:
+                fixed = {}
+        items = algo.apply_scenario_fixes(items, fixed)
     flow_update(fid, lambda x: x.update(scenarios=(x.get("scenarios") or []) + items if more else items))
 
 

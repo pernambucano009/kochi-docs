@@ -229,10 +229,16 @@ const Flow = (() => {
       <label>الكابشن <input name="caption" value="${esc(sc.caption || "")}"></label>
       <div class="flw-acts"><button class="flw-btn pri">اختار ده</button><button type="button" class="flw-link" data-cancel>إلغاء</button></div></form>`;
   }
+  // ⚡ السيناريو اتفحص بالـ ١٥ بند واتصلّح قبل ما يظهر: درجته واللي اتغيّر
+  function scenAlgo(a) {
+    if (!a || a.score == null) return "";
+    return `<details class="flw-scal"><summary><span class="heat ${a.score >= 85 ? "hi" : ""}">⚡ ${a.score}/100</span> ${a.fixes.length ? `اتصلّح فيه ${a.fixes.length} ${a.fixes.length === 1 ? "حاجة" : "حاجات"}` : "اتفحص وماحتاجش تصليح"}</summary>
+      ${a.fixes.length ? `<ul>${a.fixes.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}</details>`;
+  }
   function scenCard(sc, fmt) {
     if (S.edit === sc.id) return scenForm(sc, fmt);
     return `<article class="flw-card${S.seen.has(sc.id) ? "" : " in"}" data-cid="${esc(sc.id)}"><div class="flw-ch"><b>${esc(sc.title)}</b>${rateBtns("scenario", sc.id)}</div>
-      ${sc.summary ? `<p>${esc(sc.summary)}</p>` : ""}${scenBody(sc, fmt)}${sc.caption ? `<small class="muted">✍️ ${esc(sc.caption)}</small>` : ""}
+      ${scenAlgo(sc.algo)}${sc.summary ? `<p>${esc(sc.summary)}</p>` : ""}${scenBody(sc, fmt)}${sc.caption ? `<small class="muted">✍️ ${esc(sc.caption)}</small>` : ""}
       <div class="flw-acts"><button type="button" class="flw-btn pri" data-pick-scen="${sc.id}">اختار السيناريو ده</button>
         <button type="button" class="flw-link" data-edit="${sc.id}">✏️ عدّل</button></div></article>`;
   }

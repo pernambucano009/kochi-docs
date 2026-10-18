@@ -6,6 +6,8 @@
 """
 from __future__ import annotations
 
+import json
+
 import playbook
 
 UPDATED = "2026-10-17"
@@ -478,3 +480,53 @@ def idea_gate(it: dict, brain: dict | None) -> str:
     if names and it.get("bucket") and it["bucket"] not in names and not any(n in it["bucket"] or it["bucket"] in n for n in names):
         return f"برّه مجموعات المواضيع ({it['bucket']})"
     return ""
+
+
+SCEN_KEYS = ("beats", "slides", "episodes")
+
+
+def scenario_fix_messages(brand: str, idea: str, fmt: str, scenarios: list[dict]) -> list[dict]:
+    checks = "\n".join(f'- "{k}": {t}' for k, t in CHECKS)
+    body = json.dumps([{k: v for k, v in s.items() if k != "id"} for s in scenarios], ensure_ascii=False)
+    return [{"role": "system", "content": "إنت مراجع ومصلّح سكريبتات فيديو قصير صارم، بتشتغل بفريمويركس الخوارزميات. بترد بنفس لغة ولهجة السكريبت. Return JSON only.\n\n"
+             + for_use("script", limit=9000)},
+            {"role": "user", "content": f"""البراند:
+{brand[:2500]}
+
+الفكرة:
+{idea[:1500]}
+
+نوع البوست: {fmt}
+السيناريوهات:
+{body[:12000]}
+
+لكل سيناريو: قيّمه على البنود دي (من ١٠ لكل بند، وnull لو مايتطبقش على النوع ده):
+{checks}
+وأي بند أقل من ٨ صلّحه جوه السيناريو نفسه: الموضوع واضح في أول جملة، المكتوب على الشاشة والمعروض والمنطوق نفس المعنى، جمل قفل بعد الهوك، شيل الحشو، «بس…/علشان كده…» بدل «وبعدين»، النتيجة في آخر مشهد وتوفّي بالوعد، ودعوة مطابقة للموضوع.
+ممنوع تغيّر عدد المشاهد/السلايدات/الحلقات ولا ترتيب تسلسل القالب ولا شكل الـ JSON، وممنوع تخترع أرقام أو نتايج.
+رجّع JSON بالشكل ده بس:
+{{"scenarios": [{{"score": الدرجة من ١٠٠ بعد التصليح, "checks": [{{"key": "hook", "score": 9}}], "fixes": ["اللي اتصلّح في جملة"], "scenario": {{...نفس السيناريو كامل بنفس المفاتيح بعد التصليح...}}}}]}}
+بنفس ترتيب السيناريوهات وعددها."""}]
+
+
+def apply_scenario_fixes(items: list[dict], raw: dict) -> list[dict]:
+    """بيركّب التصليح على السيناريوهات لو الشكل سليم، ولو لأ بيسيب الأصل."""
+    names = dict(CHECKS)
+    out = []
+    fixed = raw.get("scenarios") if isinstance(raw, dict) else None
+    for i, s in enumerate(items):
+        f = fixed[i] if isinstance(fixed, list) and i < len(fixed) and isinstance(fixed[i], dict) else {}
+        sc = f.get("scenario") if isinstance(f.get("scenario"), dict) else None
+        key = next((k for k in SCEN_KEYS if isinstance(s.get(k), list)), None)
+        ok = sc and (not key or (isinstance(sc.get(key), list) and len(sc[key]) == len(s[key])))
+        new = {**s, **{k: v for k, v in sc.items() if k != "id"}} if ok else dict(s)
+        try:
+            score = max(0, min(100, round(float(f.get("score")))))
+        except (TypeError, ValueError):
+            score = None
+        checks = [{"key": c["key"], "title": names[c["key"]], "score": c.get("score")} for c in (f.get("checks") or [])
+                  if isinstance(c, dict) and c.get("key") in names]
+        new["algo"] = {"score": score, "fixes": [str(x)[:200] for x in (f.get("fixes") or []) if str(x).strip()][:6] if ok else [],
+                       "checks": checks, "applied": bool(ok)}
+        out.append(new)
+    return out
