@@ -62,6 +62,60 @@ def catalog(max_age: float = 86400) -> list[dict]:
     return _CAT["voices"]
 
 
+DESIGN = os.environ.get("FASIH_DESIGN_URL", "https://www.fasihtts.com/v1/voice-design")
+
+
+def _customs(node, out: list) -> None:
+    """بيدوّر في رد فصيح على أي صوت خاص (معرّفه بيبدأ بـ custom-)، أيًا كان شكل الرد."""
+    if isinstance(node, dict):
+        vid = str(node.get("voiceId") or node.get("voice_id") or node.get("id") or "")
+        if vid.startswith("custom-"):
+            out.append(node)
+        for v in node.values():
+            _customs(v, out)
+    elif isinstance(node, list):
+        for v in node:
+            _customs(v, out)
+
+
+_CUSTOM: dict = {"at": 0.0, "voices": []}
+
+
+def custom_voices(max_age: float = 600) -> list[dict]:
+    """الأصوات الخاصة اللي اتصممت في حساب فصيح (Voice Design) بشكل كتالوج الأصوات، علشان تظهر في اللستة.
+    كمان ممكن تتكتب بإيدك في FASIH_CUSTOM_VOICES بالشكل: custom-...-2:ar-sa-najdi:اسم الصوت (وأكتر من واحد بفاصلة)."""
+    if time.time() - _CUSTOM["at"] < max_age:
+        return _CUSTOM["voices"]
+    out, seen = [], set()
+    for part in (os.environ.get("FASIH_CUSTOM_VOICES") or "").split(","):
+        bits = [b.strip() for b in part.split(":")]
+        if bits and bits[0].startswith("custom-") and len(bits) >= 2:
+            out.append({"id": bits[0], "dialectId": bits[1], "arabicName": bits[2] if len(bits) > 2 else "صوتك الخاص", "custom": True})
+    key = api_key()
+    if key:
+        try:
+            r = httpx.get(DESIGN, headers={"x-api-key": key}, timeout=20)
+            if r.status_code == 200:
+                found: list = []
+                _customs(r.json(), found)
+                for x in found:
+                    st = str(x.get("status") or x.get("lifecycle") or "").lower()
+                    if st in ("archived", "deleted", "failed", "draft", "preview"):
+                        continue   # المؤرشف والمتمسح والمسودة اللي لسه ما اتحفظتش مايتقالش بيها
+                    out.append({"id": str(x.get("voiceId") or x.get("voice_id") or x.get("id")),
+                                "dialectId": x.get("dialectId") or x.get("dialect") or "", "gender": x.get("gender") or "",
+                                "arabicName": x.get("name") or x.get("arabicName") or "صوتك الخاص", "custom": True})
+        except (httpx.HTTPError, ValueError):
+            pass
+    res = []
+    for x in out:
+        if x["id"] not in seen:
+            seen.add(x["id"])
+            res.append(x)
+    _CUSTOM.update(at=time.time(), voices=res)
+    return res
+
+
 def hd_voice(voice: str) -> str:
     """الأصوات القديمة «-1» بتتحول للـ HD اللي زيها."""
     return voice[:-2] + "-2" if voice.endswith("-1") else voice

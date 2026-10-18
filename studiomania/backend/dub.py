@@ -67,14 +67,16 @@ def merge_fasih(voices: list[dict]) -> int:
             continue
         g = "female" if str(x.get("gender") or "").lower().startswith("f") else "male"
         name = x.get("arabicName") or x.get("name") or vid
-        lab = f"{name} ({'ست' if g == 'female' else 'راجل'})" + (" · تجريبي" if x.get("status") == "preview" else "")
+        lab = (f"🎨 {name} (صوتك الخاص)" if x.get("custom") else
+               f"{name} ({'ست' if g == 'female' else 'راجل'})" + (" · تجريبي" if x.get("status") == "preview" else ""))
         if vid in VOICES and not VOICES[vid].get("hidden"):
             VOICES[vid]["label"] = lab
         else:
             VOICES[vid] = {"label": lab, "provider": "fasih", "voice": vid, "dialect": dia, "gender": g, "per_1k": 0.0,
                            "per_min": FASIH_PER_MIN, "sample": x.get("sampleUrl") or ""}
         if vid not in DIALECTS[dia]["voices"]:
-            DIALECTS[dia]["voices"].append(vid)
+            # الصوت الخاص بيبقى أول اختيار في لهجته
+            DIALECTS[dia]["voices"].insert(0, vid) if x.get("custom") else DIALECTS[dia]["voices"].append(vid)
             added += 1
     return added
 

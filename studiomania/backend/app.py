@@ -17741,6 +17741,7 @@ def fasih_sync() -> None:
     def run():
         try:
             dub.merge_fasih(fasih.catalog())
+            dub.merge_fasih(fasih.custom_voices())   # 🎨 الصوت الخاص المتصمم في حساب فصيح
         finally:
             _FASIH_SYNC["running"] = False
     threading.Thread(target=run, daemon=True, name="fasih-catalog").start()
