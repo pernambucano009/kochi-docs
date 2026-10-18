@@ -187,6 +187,43 @@ def onsets(samples: array, max_count: int = 300) -> list[dict]:
     return sorted(out[:max_count], key=lambda x: x["t"])
 
 
+def beat_grid(marks: list[dict], dur: float) -> dict:
+    """إيقاع المزيكا من بدايات الأصوات: أكتر مسافة متكررة بين الدقات (٠٫٣–١ ثانية) وشبكة دقات منتظمة على طول المزيكا."""
+    ts = sorted(m["t"] for m in marks if m.get("rise", 0) >= 9)
+    if len(ts) < 4 or dur <= 0:
+        return {"period": 0.0, "beats": []}
+    votes: dict[int, float] = {}
+    for i, a in enumerate(ts):
+        for b in ts[i + 1:i + 6]:
+            d = b - a
+            for k in (1, 2, 3, 4):   # المسافة ممكن تكون دقتين أو تلاتة
+                p = d / k
+                if 0.3 <= p <= 1.0:
+                    key = round(p * 100)
+                    votes[key] = votes.get(key, 0) + 1 / k
+    if not votes:
+        return {"period": 0.0, "beats": []}
+    best = max(votes, key=lambda k: sum(votes.get(k + j, 0) for j in (-1, 0, 1)))
+    near = [(k, votes[k]) for k in (best - 1, best, best + 1) if k in votes]
+    period = sum(k * v for k, v in near) / sum(v for _, v in near) / 100
+    # بداية الشبكة: الإزاحة اللي بتخلّي أكتر دقات تقع على الشبكة
+    phase = max((t % period for t in ts[:40]), key=lambda ph: sum(1 for t in ts if min((t - ph) % period, period - (t - ph) % period) < 0.05))
+    # تظبيط دقيق: خط مستقيم بين رقم الدقة ووقتها من الدقات اللي واقعة على الشبكة (علشان مايبعدش في الآخر)
+    pts = [(round((t - phase) / period), t) for t in ts if min((t - phase) % period, period - (t - phase) % period) < 0.06]
+    if len(pts) >= 4:
+        n = len(pts)
+        mx, my = sum(i for i, _ in pts) / n, sum(t for _, t in pts) / n
+        den = sum((i - mx) ** 2 for i, _ in pts)
+        if den > 0:
+            period = sum((i - mx) * (t - my) for i, t in pts) / den
+            phase = (my - period * mx) % period
+    beats, t = [], phase
+    while t <= dur + 1e-6:
+        beats.append(round(t, 3))
+        t += period
+    return {"period": round(period, 3), "beats": beats}
+
+
 def speech_segments(words: list[dict], gap: float = 0.55) -> list[dict]:
     segs = []
     for w in words or []:
@@ -885,7 +922,7 @@ def clean_schema(data: dict, duration: float) -> dict:
     return {k: _plain(d.get(k))[:1500] for k in ("title", "summary", "style", "palette", "spine", "camera", "text_style", "music",
                                                  "background", "negative", "last_frame")} | {
         "transition": tr if tr in TRANSITION_KEYS else "",
-        "beat_sec": round(max(0.0, _f(d.get("beat_sec"))), 3), "beats": beats}
+        "beat_sec": round(max(0.0, _f(d.get("beat_sec"))), 3), "loop": bool(d.get("loop")), "beats": beats}
 
 
 def mock_schema(d: dict) -> dict:
@@ -931,6 +968,8 @@ def fill_messages(brain_txt: str, schema: dict, brief: str, text_mode: str) -> s
         f"ثوابت التيمبليت:\n{json.dumps(glob, ensure_ascii=False, indent=1)}\n\nأجزاء التيمبليت:\n{json.dumps(beats, ensure_ascii=False, indent=1)}\n\n"
         f"- panels = {n + 1} لوحة بالظبط: لوحة رقم i هي شكل الشاشة في أول الجزء i، واللوحة الأخيرة شكلها في آخر الفيديو. "
         "يعني الجزء i بيتحرك من اللوحة i للوحة i+1، فاللوحتين لازم يكونوا نفس العالم ونفس العناصر، والفرق بينهم هو اللي بيعمله into_next.\n"
+        + ("- 🔁 الفيديو ده لوب: آخر جزء بيرجع لأول لوحة بالظبط، فاللوحة الأخيرة لازم تكون نفس اللوحة الأولى حرفيًا (نفس desc)، "
+           "والـ motion بتاع آخر جزء بيوصّل للشكل ده من غير قطع.\n" if schema.get("loop") else "") +
         f"- beats = {n} بالظبط بنفس الترتيب.\n"
         "- العالم واحد في كل اللوحات: نفس الخلفية والإضاءة والألوان، والعمود الفقري (spine) موجود ومتوصف بنفس الكلام في كل لوحة.\n"
         f"- {text_rule}\n"

@@ -5202,6 +5202,30 @@ def project_fillers(project_id: str):
     return {"marks": marks}
 
 
+BEATS_CACHE: dict[str, dict] = {}
+
+
+@app.get("/api/projects/{project_id}/beats")
+def project_beats(project_id: str):
+    """🎵 دقات المزيكا على التايم لاين (علشان القطع ييجي على الإيقاع زي ريلز الأعمال)."""
+    with closing(db()) as conn:
+        data = json.loads(get_project(conn, project_id)["data"])
+        m = data.get("music")
+        row = conn.execute("SELECT filename FROM audio WHERE id = ? AND kind = 'music'", (m["id"],)).fetchone() if m else None
+    if not row or not (AUDIO_DIR / row["filename"]).exists():
+        raise HTTPException(400, "حط مزيكا في المشروع الأول")
+    path = AUDIO_DIR / row["filename"]
+    key = f"{row['filename']}:{path.stat().st_mtime}"
+    if key not in BEATS_CACHE:
+        BEATS_CACHE[key] = lab.beat_grid(lab.onsets(lab.pcm(ffmpeg_exe(), path), 2000), media_info(path).duration)
+    g = BEATS_CACHE[key]
+    if not g["beats"]:
+        raise HTTPException(400, "مالقيتش إيقاع واضح في المزيكا دي")
+    part = track_parts(m)[0]
+    delay, offset = max(0.0, float(part.get("delay") or 0)), max(0.0, float(part.get("offset") or 0))
+    return {"period": g["period"], "beats": [round(delay + t - offset, 3) for t in g["beats"] if t >= offset]}
+
+
 @app.get("/api/captions/options")
 def caption_options():
     return {
@@ -15355,7 +15379,9 @@ def run_tv_gen(vid: str, only: int | None) -> None:
                 subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-sseof", "-0.08", "-i", str(folder / prev),
                                 "-frames:v", "1", "-update", "1", str(start)], check=True, capture_output=True, timeout=60)
                 conform_image(start, d["ratio"])
-            gen_motion(d["model"], d["resolution"], ratio, prompt, start, tv_panel(d, folder, i + 1),
+            # 🔁 قالب لوب: آخر جزء بيخلص على أول لوحة بالظبط، فالفيديو بيلف على نفسه من غير قطع
+            end = 0 if d["schema"].get("loop") and i == len(beats) - 1 else i + 1
+            gen_motion(d["model"], d["resolution"], ratio, prompt, start, tv_panel(d, folder, end),
                        trial_gen_seconds(b["t1"] - b["t0"]), folder / name, W, H, "حركة الجزء")
             def fn(x, i=i, name=name):
                 old = (x.setdefault("segs", {}).get(str(i)) or {}).get("file")
@@ -18143,7 +18169,7 @@ reset_stuck_dub()
 
 import tplseed  # noqa: E402
 
-TPL_SEED_V = 2
+TPL_SEED_V = 3
 
 
 def seed_media_hash(tid: str) -> str:

@@ -3289,6 +3289,44 @@ $("tlCanvas").addEventListener("click", (e) => {
   e.stopPropagation();
   silToggle(mk.dataset.mk);
 }, true);
+// 🎵 القطع على الإيقاع: كل قطعة طولها عدد دقات (حوالي ١٫٦ ثانية)، وفي آخر تلت نص العدد علشان الإحساس يسرع
+function beatFit(beats, period) {
+  const d = mt.project.data, k = Math.max(1, Math.round(1.6 / period)), k2 = Math.max(1, Math.round(k / 2));
+  const list = d.clips.filter((c) => !c.disabled && !isAnyOutro(c));
+  let t = 0, n = 0;
+  list.forEach((c, idx) => {
+    const step = idx >= list.length * 2 / 3 ? k2 : k, sp = clipSpeed(c);
+    const dur = clipSource(c)?.duration, room = dur ? (dur - c.start) / sp : Infinity;
+    let j = beats.findIndex((b) => b > t + 0.2);
+    if (j < 0) return;
+    let end = beats[Math.min(beats.length - 1, j + step - 1)];
+    for (let s = step; s > 1 && end - t > room; s--) end = beats[Math.min(beats.length - 1, j + s - 2)];
+    if (end - t > room) end = t + room;   // القطعة أقصر من دقة: بتفضل بطولها
+    c.end = +(c.start + (end - t) * sp).toFixed(3);
+    t = end;
+    n++;
+  });
+  return n;
+}
+$("tlBeat").onclick = async () => {
+  if (!mt.project?.data.clips.length) return toast("ضيف فيديو الأول", true);
+  if (!mt.project.data.music) return toast("حط مزيكا في المشروع الأول 🎵", true);
+  const b = $("tlBeat");
+  b.disabled = true;
+  try {
+    await saveProject();
+    const r = await api(`/api/projects/${mt.project.id}/beats`);
+    pushHistory();
+    const n = beatFit(r.beats, r.period);
+    const al = mt.project.data.algo;   // السكتات اللي بقت برّه القطعة بعد القص ماتتعرضش
+    if (al?.marks) al.marks = al.marks.filter((m) => { const c = mt.project.data.clips[m.i]; return c && m.a >= c.start && m.b <= clipOut(c); });
+    renderAll();
+    renderSilReview();
+    scheduleSave();
+    toast(`🎵 ${n} ${n === 1 ? "قطعة اتظبطت" : "قطع اتظبطوا"} على الإيقاع (دقة كل ${r.period} ثانية). Ctrl+Z يرجّعهم`);
+  } catch (err) { toast(err.message, true); }
+  b.disabled = false;
+};
 $("tlSilence").onclick = async () => {
   if (!mt.project?.data.clips.length) return toast("ضيف فيديو الأول", true);
   const b = $("tlSilence");
