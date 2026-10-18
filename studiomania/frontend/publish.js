@@ -312,6 +312,7 @@ function renderPostExtras() {
   $("coverOpts").hidden = !(ig || tt) || !pub.videoId || !pub.showCover;
   $("coverFor").textContent = ig && tt ? "(إنستجرام وتيك توك)" : ig ? "(إنستجرام)" : "(تيك توك)";
   $("coverPick").hidden = !$("coverOn").checked;
+  if (typeof PC_CTA !== "undefined") renderPubCheck();
 }
 function setCover(ms) {
   $("coverRange").value = ms;
@@ -399,6 +400,7 @@ $("postWhen").addEventListener("input", () => $("quickTimes").querySelectorAll("
 
 function resetPostForm() {
   pub.editing = null;
+  pub.notAi = false;
   $("postFormTitle").textContent = "جدولة بوست";
   $("postSubmit").textContent = "جدول";
   $("postCancel").hidden = true;
@@ -641,3 +643,61 @@ $("igOptsChip").onclick = () => { pub.showIg = !pub.showIg; renderPostExtras(); 
 $("coverChip").onclick = () => { pub.showCover = !pub.showCover; renderPostExtras(); };
 $("igTags").addEventListener("change", renderPostExtras);
 $("igCollab").addEventListener("change", renderPostExtras);
+
+// ✅ شيك ليست النشر (بروتوكول النشر من العقل العام): بتتحسب وانت بتكتب، ببلاش ومن غير موديل.
+// وزرار «📡 افحص الكابشن» بيقيّمه بالموديل ويقترح كابشن أحسن.
+var PC_BAD_TAGS = /#(fyp|foryou|foryoupage|viral|explore|explorepage|trending|اكسبلور|إكسبلور|ترند|فيرال)\b/i;
+var PC_GREET = /^(\s*)(اهلا|أهلا|هلا|السلام|مرحبا|هاي|hi|hello|hey|صباح|مساء)/i;
+var PC_CTA = /(علّق|علق|اكتب|كومنت|تعليق|احفظ|شارك|ابعت|تابع|اللينك|الرابط|link|comment|save|follow|DM|رسالة|اطلب|حمّل|حمل|سجّل|سجل|احجز)/i;
+var PC_AI = /(ذكاء صناعي|ذكاء اصطناعي|#ai\b|AI generated|بالذكاء)/i;
+function pubChecks() {
+  const cap = $("postCaption").value.trim(), first = cap.split("\n").find((l) => l.trim()) || "";
+  const tags = cap.match(/#[\p{L}\p{N}_]+/gu) || [];
+  const fw = first.replace(/#[\p{L}\p{N}_]+/gu, "").trim().split(/\s+/).filter(Boolean).length;
+  const pl = checkedPlatforms(), visual = pl.some((v) => ["instagram", "tiktok"].includes(platOf(v)));
+  return [
+    { ok: !!cap && fw > 0 && fw <= 14 && !PC_GREET.test(first), t: "أول سطر هوك تاني (مختصر، بيكمّل الفضول، مش «أهلًا بيكم»)", tip: "آخر حاجة بيقراها قبل ما يسكرول: سيب سؤال مفتوح أو كمّل وعد الفيديو" },
+    { ok: PC_CTA.test(cap), t: "فيه دعوة واضحة (علّق بكلمة، احفظ، اللينك…)", tip: "دعوة واحدة مطابقة لموضوع الفيديو" },
+    { ok: tags.length >= 3 && tags.length <= 5, t: `٣–٥ هاشتاجات من المجال (دلوقتي ${tags.length})`, tip: "الهاشتاج تأثيره ضعيف؛ ٣–٥ محددين كفاية" },
+    { ok: !tags.some((x) => PC_BAD_TAGS.test(x)), t: "من غير #fyp #viral #explore", tip: "بيودّوا الفيديو لناس مش مهتمة فوقت المشاهدة يقل" },
+    ...(visual && pub.videoId ? [{ ok: $("coverOn").checked, t: "الغلاف متختار بنفسك (فريم مثير)", tip: "فرصة هوك زيادة في البروفايل", act: "cover" }] : []),
+    { ok: PC_AI.test(cap) || !!pub.notAi, t: "لو الفيديو معمول بالذكاء الصناعي معلّم عليه", tip: "مفيش عقاب، والمنصة ممكن تشيله لو ماعلّمتش", act: "ai" },
+    { ok: null, t: "الترجمة في نص الشاشة ومش مستخبية تحت الكابشن والأزرار", tip: "اتأكد من الفيديو نفسه" },
+    { ok: null, t: "بعد النشر: رد على أول ٣٠ كومنت", tip: "النقاش في الكومنتات بيطوّل وقت المشاهدة" },
+  ];
+}
+function renderPubCheck() {
+  const box = $("pubCheck");
+  if (!box) return;
+  const list = pubChecks(), scored = list.filter((c) => c.ok !== null), n = scored.filter((c) => c.ok).length;
+  box.innerHTML = `<div class="pc-head"><b>✅ قبل ما تنشر</b><span class="num ${n === scored.length ? "ok" : ""}">${n}/${scored.length}</span>
+      <button type="button" class="btn sm" id="pcReview" title="الموديل بيقيّم الكابشن بقواعد الخوارزميات ويقترح واحد أحسن">📡 افحص الكابشن</button></div>
+    <ul>${list.map((c) => `<li class="${c.ok === null ? "info" : c.ok ? "ok" : "no"}" title="${escapeHtml(c.tip)}"><i>${c.ok === null ? "•" : c.ok ? "✓" : "✕"}</i><span>${escapeHtml(c.t)}</span>
+      ${c.act === "cover" && !c.ok ? `<button type="button" class="btn xs" data-pc="cover">اختار الغلاف</button>` : ""}
+      ${c.act === "ai" && !c.ok ? `<button type="button" class="btn xs" data-pc="ai">🤖 علّم إنه AI</button><button type="button" class="btn xs" data-pc="notai">مش AI</button>` : ""}</li>`).join("")}</ul>
+    <div id="pcOut"></div>`;
+}
+$("postCaption").addEventListener("input", renderPubCheck);
+$("coverOn").addEventListener("change", renderPubCheck);
+$("postPlatforms").addEventListener("change", renderPubCheck);
+$("pubCheck").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-pc]");
+  if (b?.dataset.pc === "cover") { pub.showCover = true; $("coverOn").checked = true; $("coverOn").dispatchEvent(new Event("change")); return; }
+  if (b?.dataset.pc === "ai") { const c = $("postCaption"); c.value = `${c.value.trimEnd()}${c.value.trim() ? "\n\n" : ""}🤖 الفيديو معمول بالذكاء الصناعي`; return renderPubCheck(); }
+  if (b?.dataset.pc === "notai") { pub.notAi = true; return renderPubCheck(); }
+  const use = e.target.closest("[data-pcuse]");
+  if (use) { $("postCaption").value = use.dataset.pcuse; return renderPubCheck(); }
+  if (!e.target.closest("#pcReview")) return;
+  const cap = $("postCaption").value.trim();
+  if (cap.length < 8) return toast("اكتب الكابشن الأول", true);
+  const out = $("pcOut");
+  out.innerHTML = `<p class="muted">⏳ بيفحص…</p>`;
+  try {
+    const pl = checkedPlatforms().map(platOf)[0] || "";
+    const r = await api("/api/algo/review", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: cap, kind: "caption", platform: pl }) });
+    out.innerHTML = `<div class="pc-rev"><b class="num">${r.score}/100</b> ${escapeHtml(r.verdict)}
+      ${r.top_fixes.length ? `<ol>${r.top_fixes.map((x) => `<li>${escapeHtml(x)}</li>`).join("")}</ol>` : ""}
+      ${r.caption ? `<div class="pc-sug"><span>${escapeHtml(r.caption)}</span><button type="button" class="btn sm primary" data-pcuse="${escapeHtml(r.caption)}">استخدمه</button></div>` : ""}</div>`;
+  } catch (err) { out.innerHTML = ""; toast(err.message, true); }
+});
+renderPubCheck();
