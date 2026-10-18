@@ -4114,6 +4114,99 @@ def strategy_clear():
     return {"strategy": None, "games": algo.GAMES, "axes": algo.AXES}
 
 
+# ---------- 📊 تحليل الدفعة: آخر ١٠ فيديوهات للبراند نفسه، وقاعدة ٥× و١٠× (playbook: batch)
+def batch_out(bid: str) -> dict:
+    bt = (brain_row(bid) or {}).get("batch") or {}
+    calc = algo.batch_rows(bt.get("posts") or [], bt.get("metrics") or {}) if bt.get("posts") else None
+    return {"platform": bt.get("platform") or "tiktok", "handle": bt.get("handle") or "", "fetched_at": bt.get("fetched_at"),
+            "calc": calc, "verdict_text": algo.VERDICTS.get(calc["verdict"]) if calc else "", "analysis": bt.get("analysis"),
+            "history": (bt.get("history") or [])[-6:], "live": rivals.live()}
+
+
+@app.get("/api/batch")
+def batch_get():
+    return batch_out(rivals_client())
+
+
+class BatchFetchIn(BaseModel):
+    handle: str
+    platform: str = "tiktok"
+
+
+@app.post("/api/batch/fetch")
+def batch_fetch(body: BatchFetchIn):
+    """بيجيب آخر بوستات حساب البراند (ScrapeCreators) وكلامها المنطوق علشان التحليل يشوف الهوك."""
+    bid = rivals_client()
+    handle, platform = rivals.clean_handle(body.handle), body.platform if body.platform in rivals.PLATFORMS else "tiktok"
+    if not handle:
+        raise HTTPException(400, "اكتب اسم حساب البراند")
+    try:
+        posts = rivals.mock_posts(platform, handle) if not rivals.live() else rivals.profile_posts(platform, handle)
+    except rivals.RivalsError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    posts = sorted([p for p in posts if p["handle"].lower() == handle.lower()] or posts, key=lambda p: -(p.get("ts") or 0))[:algo.BATCH]
+    if not posts:
+        raise HTTPException(400, f"مالقيتش بوستات للحساب @{handle}")
+    if rivals.live():
+        with ThreadPoolExecutor(5) as ex:
+            for p, t in zip(posts, ex.map(lambda p: rivals.transcript(platform, p["url"]), posts)):
+                p["spoken"] = t
+
+    def fn(d):
+        bt = d.setdefault("batch", {})
+        if bt.get("analysis") and bt.get("posts"):   # الدفعة القديمة بتتحفظ في التاريخ
+            calc = algo.batch_rows(bt["posts"], bt.get("metrics") or {})
+            bt.setdefault("history", []).append({"at": bt.get("fetched_at"), "verdict": calc["verdict"], "best": calc["best"],
+                                                 "hypothesis": (bt["analysis"] or {}).get("hypothesis", "")})
+        bt.update(platform=platform, handle=handle, posts=posts, fetched_at=now(), analysis=None)
+        bt["metrics"] = {k: v for k, v in (bt.get("metrics") or {}).items() if k in {str(p["id"]) for p in posts}}
+    update_brain(bid, fn)
+    return batch_out(bid)
+
+
+class BatchMetricIn(BaseModel):
+    id: str
+    leads: int | None = None
+    follows: int | None = None
+
+
+@app.patch("/api/batch/metric")
+def batch_metric(body: BatchMetricIn):
+    """العملاء/التسجيلات والمتابعين اللي جابهم كل فيديو (بيكتبهم العميل من الإحصائيات أو ManyChat)."""
+    bid = rivals_client()
+
+    def fn(d):
+        m = d.setdefault("batch", {}).setdefault("metrics", {})
+        m[body.id] = {"leads": max(0, body.leads) if body.leads is not None else None, "follows": max(0, body.follows) if body.follows is not None else None}
+    update_brain(bid, fn)
+    return batch_out(bid)
+
+
+@app.post("/api/batch/analyze")
+def batch_analyze():
+    bid = rivals_client()
+    brain = brain_row(bid) or {}
+    bt = brain.get("batch") or {}
+    if not bt.get("posts"):
+        raise HTTPException(400, "هات الفيديوهات الأول")
+    calc = algo.batch_rows(bt["posts"], bt.get("metrics") or {})
+    if atlas.mock_mode():
+        res = algo.mock_batch(calc)
+    else:
+        try:
+            raw = az.parse_json(atlas.chat(algo.batch_messages(az.brain_text(brain), algo.strategy_text(brain), calc), carousel_settings()["text_model"],
+                                           temperature=0.5, max_tokens=7000, json_mode=True, timeout=300), "تحليل الدفعة")
+        except (ValueError, atlas.AtlasError, httpx.HTTPError) as exc:
+            raise HTTPException(502, f"التحليل ماكملش: {str(getattr(exc, 'detail', None) or exc)[:200]}") from exc
+        res = algo.clean_batch(raw)
+    res["at"] = now()
+
+    def fn(d):
+        d.setdefault("batch", {})["analysis"] = res
+    update_brain(bid, fn)
+    return batch_out(bid)
+
+
 class TriageIn(BaseModel):
     post: str = ""
     platform: str = ""
@@ -4172,7 +4265,7 @@ RIVALS_BUSY: set[str] = set()
 
 def brain_rivals(text: str, brain: dict | None) -> str:
     """ملف البراند + اللي بينجح عند المنافسين (للأفكار والسكريبتات والهوكات)."""
-    rv = "\n\n".join(x for x in (algo.strategy_text(brain), rivals.insight_text(brain)) if x)   # خطة المحتوى المعتمدة + المنافسين
+    rv = "\n\n".join(x for x in (algo.strategy_text(brain), algo.batch_text(brain), rivals.insight_text(brain)) if x)   # خطة المحتوى المعتمدة + المنافسين
     return text + (f"\n\n{rv}" if rv else "")
 
 

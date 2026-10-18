@@ -3,8 +3,8 @@
 // المنافسين والترند بيدخلوا لوحدهم في كتابة الأفكار والسكريبتات والهوكات.
 const RivalsPage = (() => {
   const esc = (s) => escapeHtml(String(s ?? ""));
-  const S = { el: null, d: null, timer: null, swap: null, focus: null, tab: "rivals", pl: { d: null, busy: false, notes: "" }, ac: { text: "", kind: "script", platform: "", res: null, busy: false, rules: null } };
-  const TABS = [["plan", "🧭 خطة المحتوى"], ["rivals", "🏆 المنافسين"], ["works", "🧠 اللي بينجح عندهم"], ["trend", "📈 الترند آخر ٣٠ يوم"], ["mine", "🔥 حلّل بوستات بنفسك"], ["algo", "📡 افحص قبل النشر"]];
+  const S = { el: null, d: null, timer: null, swap: null, focus: null, tab: "rivals", pl: { d: null, busy: false, notes: "" }, bt: { d: null, busy: "", handle: "", platform: "" }, ac: { text: "", kind: "script", platform: "", res: null, busy: false, rules: null } };
+  const TABS = [["plan", "🧭 خطة المحتوى"], ["rivals", "🏆 المنافسين"], ["works", "🧠 اللي بينجح عندهم"], ["trend", "📈 الترند آخر ٣٠ يوم"], ["mine", "🔥 حلّل بوستات بنفسك"], ["batch", "📊 حلّل آخر ١٠"], ["algo", "📡 افحص قبل النشر"]];
   const html = () => `<div class="nb-wrap fs-wrap rv-wrap" id="rvWrap"><div class="nh-empty">بيحمّل…</div></div>`;
   const fmt = (n) => { n = +n || 0; return n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${Math.round(n / 1e3)}K` : String(n); };
   const PL = { tiktok: "TikTok", instagram: "Instagram" };
@@ -122,12 +122,47 @@ const RivalsPage = (() => {
           ${st.profile.bio ? `<p><b>البايو:</b> ${esc(st.profile.bio)}</p>` : ""}${st.profile.pinned ? `<p><b>الفيديو المثبّت:</b> ${esc(st.profile.pinned)}</p>` : ""}
           ${st.avoid.length ? `<p><b>نبعد عن:</b></p><ul class="pl-list">${li(st.avoid)}</ul>` : ""}`)}`;
   }
+  // 📊 تحليل الدفعة: آخر ١٠ فيديوهات للبراند، كل واحد بكام ضعف وسيط الدفعة، والمخ يقارن الفايزين بالخاسرين ويخطط العشرة الجايين
+  const TIER = { gold: "🥇", win: "🏆", ok: "", low: "" };
+  function batchTab() {
+    const B = S.bt, d = B.d;
+    if (!d) return `<div class="nh-empty">بيحمّل…</div>`;
+    const c = d.calc, a = d.analysis, handle = B.handle || d.handle, plat = B.platform || d.platform;
+    const by = { leads: "العملاء", follows: "المتابعين", views: "المشاهدات" };
+    const head = `<section class="fs-card"><h3>📊 حلّل آخر ١٠ فيديوهات <small>بنقارن الفيديوهات ببعض مش بالأرقام المجردة: اللي عمل ٥ أضعاف وسيط الدفعة فايز، و١٠ أضعاف دهب</small></h3>
+        <div class="nb-row rv-add"><input type="text" data-btin placeholder="@حساب البراند" dir="ltr" value="${esc(handle)}">
+          <select data-btpl>${Object.entries(PL).map(([k, t]) => `<option value="${k}" ${k === plat ? "selected" : ""}>${t}</option>`).join("")}</select>
+          <button class="nb-btn" data-btfetch ${B.busy ? "disabled" : ""}>${B.busy === "fetch" ? "⏳ بيجيب…" : "📥 هات آخر ١٠"}</button></div>
+        ${d.live ? "" : `<p class="nb-hint">⚠️ وضع تجربة: الأرقام تجريبية لحد ما يتحط مفتاح مصدر الداتا.</p>`}
+        <p class="nb-hint">لو عندك أرقام العملاء/التسجيلات (من ManyChat أو الرسايل) أو المتابعين اللي جابهم كل فيديو، اكتبها جنبه: التحليل بيقدّمها على المشاهدات.</p></section>`;
+    if (!c) return head;
+    const rows = c.rows.map((r, i) => `<div class="bt-row ${r.tier}">
+        <span class="bt-x num">${r.x != null ? "×" + r.x : "—"}${TIER[r.tier] ? " " + TIER[r.tier] : ""}</span>
+        <a href="${esc(r.url)}" target="_blank" rel="noopener noreferrer" class="bt-cap"><b>${i + 1}.</b> ${esc((r.caption || "").slice(0, 120) || "—")}<small>${fmt(r.views)} مشاهدة · ${ago(r.ts)}</small></a>
+        <label>عملاء<input type="number" min="0" data-btm="${esc(r.id)}" data-k="leads" value="${r.leads ?? ""}"></label>
+        <label>متابعين<input type="number" min="0" data-btm="${esc(r.id)}" data-k="follows" value="${r.follows ?? ""}"></label></div>`).join("");
+    const an = a ? `<section class="fs-card bt-an"><h3>🧠 اللي الدفعة دي بتقوله</h3>
+        <p>${esc(a.summary)}</p>
+        <div class="pl-grid"><div class="pl-card"><b>✅ اللي نجح</b><small>${esc(a.pattern)}</small></div><div class="pl-card"><b>❌ أوضح غلطة</b><small>${esc(a.mistake)}</small></div>
+          <div class="pl-card"><b>🧪 التحسين الواحد اللي هنجرّبه</b><small>${esc(a.hypothesis)}</small></div>
+          ${Object.values(a.formula).some(Boolean) ? `<div class="pl-card"><b>🧱 التركيبة الفايزة</b><small>${esc(a.formula.topic)} · ${esc(a.formula.format)} · ${esc(a.formula.hook_style)}</small></div>` : ""}</div>
+        ${a.bricks.length ? `<table class="pl-tbl"><tr><th>القطعة</th><th>في الفايزين</th><th>في الخاسرين</th></tr>${a.bricks.map((x) => `<tr><td>${esc(x.brick)}</td><td>${esc(x.winners)}</td><td>${esc(x.losers)}</td></tr>`).join("")}</table>` : ""}
+        ${a.next.length ? `<h4>📅 العشرة الجايين</h4><div class="pl-week">${a.next.map((x) => `<div class="pl-day"><span>${x.n}<small>${x.kind === "repeat" ? "تكرار" : "تجربة"}</small></span><div><b>${esc(x.idea)}</b>${x.hook ? `<i>«${esc(x.hook)}»</i>` : ""}${x.based_on ? `<small>زي فيديو ${x.based_on}</small>` : ""}</div></div>`).join("")}</div>` : ""}
+        ${a.stop.length ? `<h4>🛑 نبطّل</h4><ul class="pl-list">${a.stop.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
+        <p class="nb-hint">التحليل ده بيدخل لوحده في كتابة الأفكار والسكريبتات الجاية.</p></section>` : "";
+    const hist = d.history.length ? `<section class="fs-card"><h3>🗂 الدفعات اللي فاتت</h3><ul class="pl-list">${d.history.slice().reverse().map((h) => `<li>${TIER[h.verdict] || "🔁"} ×${h.best} · ${esc(h.hypothesis || "")}</li>`).join("")}</ul></section>` : "";
+    return head + `<section class="fs-card"><div class="bt-verdict ${c.verdict}">${esc(d.verdict_text)}</div>
+        <p class="nb-hint">المضاعف محسوب على ${by[c.rows.find((r) => r.by)?.by] || "المشاهدات"} (وسيط الدفعة)</p>
+        <div class="bt-rows">${rows}</div>
+        <div class="nb-bar"><button class="nb-btn fs-go" data-btgo ${B.busy ? "disabled" : ""}>${B.busy === "an" ? "⏳ بيحلّل…" : a ? "🔄 حلّل تاني" : "🧠 حلّل الدفعة"}</button></div></section>` + an + hist;
+  }
   function body() {
     const d = S.d, busy = d.status === "working";
     if (S.tab === "works") return digest(d.digest) || `<div class="nh-empty">لسه مفيش تحليل. هات المنافسين الأول.</div>`;
     if (S.tab === "trend") return trend(d.trending);
     if (S.tab === "algo") return algoTab();
     if (S.tab === "plan") return planTab();
+    if (S.tab === "batch") return batchTab();
     if (S.tab === "mine") return `<p class="nb-hint">لو شايف بوستات بنفسك (من أي حساب)، حطها هنا ونحسبلك كل بوست عدّى متوسط صاحبه بكام، ونطلعلك أفكار بنفس الهيكل.</p>${ViralPage.html()}`;
     return `<section class="fs-card"><h3>ضيف منافس بنفسك</h3>
         <div class="nb-row rv-add"><input type="text" data-rvnew placeholder="@اسم الحساب أو اللينك" dir="ltr">
@@ -142,10 +177,11 @@ const RivalsPage = (() => {
     if (!w || !S.d) return;
     if (!w.querySelector(".rv-top")) w.innerHTML = `<div class="rv-top"></div><div class="rv-body"></div>`;
     w.querySelector(".rv-top").innerHTML = top();
-    if (onlyTop && (S.tab === "mine" || S.tab === "algo" || S.tab === "plan")) return;   // ماتمسحش اللي بتكتبه في «حلّل بنفسك» أو «افحص»
+    if (onlyTop && (S.tab === "mine" || S.tab === "algo" || S.tab === "plan" || S.tab === "batch")) return;   // ماتمسحش اللي بتكتبه في «حلّل بنفسك» أو «افحص»
     const bd = w.querySelector(".rv-body");
     bd.innerHTML = body();
     if (S.tab === "mine") ViralPage.mount(bd);
+    if (S.tab === "batch" && !S.bt.d) api("/api/batch").then((x) => { S.bt.d = x; if (S.tab === "batch") render(); }).catch((err) => toast(err.message, true));
     if (S.tab === "plan" && !S.pl.d) api("/api/strategy").then((x) => { S.pl.d = x; if (S.tab === "plan") render(); }).catch((err) => toast(err.message, true));
     if (S.tab === "algo" && !S.ac.rules) api("/api/algo").then((x) => { S.ac.rules = x; if (S.tab === "algo") render(); }).catch(() => {});
     if (S.focus) { w.querySelector(`[data-rid="${CSS.escape(S.focus)}"]`)?.scrollIntoView({ block: "center" }); S.focus = null; }
@@ -166,14 +202,35 @@ const RivalsPage = (() => {
     w.addEventListener("input", (e) => {
       if (e.target.matches("[data-actext]")) S.ac.text = e.target.value;
       if (e.target.matches("[data-plnotes]")) S.pl.notes = e.target.value;
+      if (e.target.matches("[data-btin]")) S.bt.handle = e.target.value;
     });
     w.addEventListener("change", (e) => {
       if (e.target.matches("[data-ackind]")) S.ac.kind = e.target.value;
       if (e.target.matches("[data-acpl]")) S.ac.platform = e.target.value;
+      if (e.target.matches("[data-btpl]")) S.bt.platform = e.target.value;
+      if (e.target.matches("[data-btm]")) {
+        const row = S.el.querySelectorAll(`[data-btm="${CSS.escape(e.target.dataset.btm)}"]`), val = (k) => { const x = [...row].find((i) => i.dataset.k === k)?.value; return x === "" || x == null ? null : +x; };
+        api("/api/batch/metric", { method: "PATCH", ...jsonBody({ id: e.target.dataset.btm, leads: val("leads"), follows: val("follows") }) })
+          .then((x) => { S.bt.d = x; render(); }).catch((err) => toast(err.message, true));
+      }
     });
     w.addEventListener("click", async (e) => {
       const cp = e.target.closest("[data-accopy]");
       if (cp) { try { await navigator.clipboard.writeText(cp.dataset.accopy); toast("✅ اتنسخ"); } catch { toast("مقدرتش أنسخ", true); } return; }
+      if (e.target.closest("[data-btfetch]")) {
+        const B = S.bt, h = (B.handle || B.d?.handle || "").trim();
+        if (!h) return toast("اكتب حساب البراند", true);
+        B.busy = "fetch"; render();
+        try { B.d = await api("/api/batch/fetch", { method: "POST", ...jsonBody({ handle: h, platform: B.platform || B.d?.platform || "tiktok" }) }); }
+        catch (err) { toast(err.message, true); }
+        B.busy = ""; return render();
+      }
+      if (e.target.closest("[data-btgo]")) {
+        S.bt.busy = "an"; render();
+        try { S.bt.d = await api("/api/batch/analyze", { method: "POST" }); } catch (err) { toast(err.message, true); }
+        S.bt.busy = ""; render();
+        return S.el.querySelector(".bt-an")?.scrollIntoView({ block: "start", behavior: "smooth" });
+      }
       if (e.target.closest("[data-plgo]")) {
         S.pl.busy = true; render();
         try { S.pl.d = await api("/api/strategy", { method: "POST", ...jsonBody({ notes: S.pl.notes }) }); toast("✅ الخطة جاهزة، وكل الأدوات هتمشي عليها"); }

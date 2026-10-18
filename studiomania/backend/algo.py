@@ -313,3 +313,121 @@ def mock_strategy() -> dict:
         "cadence": "٣ فيديو في الأسبوع أول شهر (تجريب)، بعدين ٥", "platform": "إنستجرام علشان الكومنت بكلمة والرسايل",
         "profile": {"bio": "تمارين بيتية للمبتدئين · نتيجة في ٩٠ يوم · فيديو يومي", "pinned": "أكبر ٣ أخطاء للمبتدئين"},
         "avoid": ["فيديوهات ترند برّه اللياقة", "وعود بأرقام وزن"]})
+
+
+# ---------------------------------------------------------------- 📊 تحليل الدفعة: آخر ١٠ فيديوهات + قاعدة ٥× و١٠×
+
+BATCH = 10
+
+
+def batch_rows(posts: list[dict], metrics: dict | None = None, n: int = BATCH) -> dict:
+    """آخر n بوست، وكل بوست بكام ضعف وسيط الدفعة في (العملاء ← المتابعين ← المشاهدات)."""
+    import statistics
+    metrics = metrics or {}
+    rows = sorted(posts, key=lambda p: -(p.get("ts") or 0))[:n]
+    out = [{**{k: p.get(k) for k in ("id", "url", "caption", "views", "likes", "comments", "shares", "ts", "spoken")},
+            "leads": (metrics.get(str(p.get("id"))) or {}).get("leads"), "follows": (metrics.get(str(p.get("id"))) or {}).get("follows")} for p in rows]
+
+    def mult(key):
+        vals = [r[key] for r in out if isinstance(r.get(key), (int, float)) and r[key] > 0]
+        if len(vals) < 3:
+            return None
+        med = statistics.median(vals)
+        for r in out:
+            r[f"x_{key}"] = round(r[key] / med, 1) if isinstance(r.get(key), (int, float)) and med else None
+        return med
+    meds = {k: mult(k) for k in ("leads", "follows", "views")}
+    best = 0.0
+    for r in out:
+        # المقياس الأهم الموجود: عملاء ← متابعين ← مشاهدات
+        key = next((k for k in ("leads", "follows", "views") if meds.get(k) and r.get(f"x_{k}") is not None), None)
+        r["x"] = r.get(f"x_{key}") if key else None
+        r["by"] = key
+        r["tier"] = "gold" if (r["x"] or 0) >= 10 else "win" if (r["x"] or 0) >= 5 else "ok" if (r["x"] or 0) >= 1 else "low"
+        best = max(best, r["x"] or 0)
+    verdict = "gold" if best >= 10 else "win" if best >= 5 else "redo"
+    return {"rows": out, "medians": meds, "verdict": verdict, "best": best}
+
+
+VERDICTS = {"gold": "🥇 دهب: فيديو عمل ١٠ أضعاف أو أكتر. كرّر نفس الموضوع ونفس الشكل بالظبط في ٣ من العشرة الجايين.",
+            "win": "🏆 فايز: فيديو بين ٥ و١٠ أضعاف. خد نفس الموضوع/الشكل وعدّل فيه شوية في ٣ من العشرة الجايين.",
+            "redo": "🔁 محدش عدّى ٥ أضعاف: الدفعة الجاية من الأول، وغالبًا فيه غلطة واضحة (الموضوع ولا الهوك)."}
+
+
+def batch_messages(brand: str, strategy: str, b: dict) -> list[dict]:
+    lines = []
+    for i, r in enumerate(b["rows"], 1):
+        extra = "".join(f" · {t} {r[k]}" for k, t in (("leads", "عملاء"), ("follows", "متابعين")) if r.get(k) is not None)
+        lines.append(f"{i}) ×{r['x'] if r['x'] is not None else '?'} ({r['tier']}) · {r.get('views') or 0} مشاهدة{extra} · "
+                     f"كومنت {r.get('comments') or 0} · شير {r.get('shares') or 0}\n   الكابشن: {(r.get('caption') or '')[:300]}"
+                     + (f"\n   الكلام: {r['spoken'][:400]}" if r.get("spoken") else ""))
+    return [{"role": "system", "content": "إنت محلل محتوى بيشتغل بنظام الدفعة (كل ١٠ فيديوهات مع بعض)، بالعربي المصري البسيط. Return JSON only.\n\n"
+             + for_use("analysis", limit=9000) + "\n\n" + rule("idea", "hook")},
+            {"role": "user", "content": f"""البراند:
+{brand[:3000]}
+{strategy}
+
+آخر {len(b['rows'])} فيديوهات للبراند (×المضاعف = قد إيه عدّى وسيط الدفعة في أهم مقياس موجود: العملاء ثم المتابعين ثم المشاهدات):
+{chr(10).join(lines)}
+
+حكم الدفعة: {VERDICTS[b['verdict']]}
+
+١) شغّل شيك ليست الـ ١١ قطعة (الشكل، الموضوع، البذرة، المحتوى، الهوك المعروض، الهوك المكتوب، الهوك المنطوق، هيكل الحكاية، الدعوة، العرض البصري، العناصر) على الفايزين مقابل الخاسرين: إيه اللي الفايزين عملوه ومش موجود في الخاسرين؟
+٢) طلّع فرضية تحسين واحدة بس للدفعة الجاية.
+٣) خطة الدفعة الجاية حسب الحكم: لو دهب أو فايز ٣ فيديوهات على نفس التركيبة + ٧ فيديوهات بالفرضية الجديدة؛ لو مفيش فايز ١٠ فيديوهات جديدة بتصلّح الغلطة.
+رجّع JSON بالشكل ده بس:
+{{"summary": "جملتين: الدفعة دي بتقول إيه",
+  "bricks": [{{"brick": "اسم القطعة", "winners": "اللي في الفايزين", "losers": "اللي في الخاسرين"}}],
+  "pattern": "النمط المشترك في الفايزين",
+  "mistake": "أوضح غلطة في الخاسرين",
+  "hypothesis": "التحسين الواحد اللي هنجرّبه",
+  "formula": {{"topic": "", "format": "", "hook_style": ""}},
+  "next": [{{"n": 1, "kind": "repeat أو test", "idea": "", "hook": "الهوك المكتوب على الشاشة", "based_on": رقم الفيديو أو null}}],
+  "stop": ["حاجات نبطّلها"]}}
+next = ١٠ فيديوهات بالظبط. ماتخترعش أرقام."""}]
+
+
+def clean_batch(raw: dict) -> dict:
+    raw = raw if isinstance(raw, dict) else {}
+    s = lambda v, n=400: str(v or "").strip()[:n]
+    nxt = []
+    for i, x in enumerate(raw.get("next") or []):
+        if not isinstance(x, dict) or not s(x.get("idea")):
+            continue
+        bo = x.get("based_on")
+        nxt.append({"n": i + 1, "kind": "repeat" if str(x.get("kind")).startswith("rep") else "test", "idea": s(x.get("idea")), "hook": s(x.get("hook"), 160),
+                    "based_on": int(bo) if str(bo).isdigit() else None})
+    f = raw.get("formula") or {}
+    return {"summary": s(raw.get("summary"), 500), "pattern": s(raw.get("pattern"), 500), "mistake": s(raw.get("mistake"), 400),
+            "hypothesis": s(raw.get("hypothesis"), 400), "formula": {k: s(f.get(k), 120) for k in ("topic", "format", "hook_style")},
+            "bricks": [{"brick": s(x.get("brick"), 60), "winners": s(x.get("winners"), 250), "losers": s(x.get("losers"), 250)}
+                       for x in (raw.get("bricks") or []) if isinstance(x, dict) and s(x.get("brick"))][:11],
+            "next": nxt[:10], "stop": [s(x, 200) for x in (raw.get("stop") or []) if s(x)][:5]}
+
+
+def mock_batch(b: dict) -> dict:
+    top = max(range(len(b["rows"])), key=lambda i: b["rows"][i]["x"] or 0) + 1 if b["rows"] else None
+    return clean_batch({"summary": "الفيديوهات اللي بتبدأ بغلطة الجمهور كسبت، واللي بتبدأ بالبراند وقعت.", "pattern": "هوك «انت بتعمل كذا غلط» + النتيجة في الآخر",
+                        "mistake": "أول ٣ ثواني مفيهاش الموضوع", "hypothesis": "كل الهوكات تبدأ بالموضوع في أول ٣ كلمات",
+                        "formula": {"topic": "أخطاء المبتدئين", "format": "غلطة ← تصحيح", "hook_style": "تقريري"},
+                        "bricks": [{"brick": "الهوك المكتوب", "winners": "موضوع واضح", "losers": "تحية وتعريف"}],
+                        "next": [{"kind": "repeat" if i < 3 else "test", "idea": f"فكرة تجريبية {i + 1}", "hook": "انت بتعمل ده غلط", "based_on": top if i < 3 else None} for i in range(10)],
+                        "stop": ["نبدأ بـ «أهلًا بيكم»"]})
+
+
+def batch_text(brain: dict | None) -> str:
+    """آخر تحليل دفعة بيدخل في كتابة الأفكار: نكرّر الفايز ونجرّب الفرضية."""
+    a = ((brain or {}).get("batch") or {}).get("analysis") or {}
+    if not a.get("hypothesis") and not a.get("pattern"):
+        return ""
+    f = a.get("formula") or {}
+    lines = ["آخر تحليل لفيديوهات البراند نفسه (اشتغل عليه):"]
+    if a.get("pattern"):
+        lines.append(f"- اللي نجح عندنا: {a['pattern']}")
+    if any(f.values()):
+        lines.append(f"- التركيبة الفايزة: موضوع «{f.get('topic')}» · شكل «{f.get('format')}» · هوك {f.get('hook_style')}")
+    if a.get("hypothesis"):
+        lines.append(f"- التحسين اللي بنجرّبه الدفعة دي: {a['hypothesis']}")
+    if a.get("stop"):
+        lines.append("- بطّلنا: " + " · ".join(a["stop"][:4]))
+    return "\n".join(lines)[:1200]
