@@ -169,7 +169,8 @@ def motion_schema(reel: Path) -> dict:
     if consts:
         body = re.sub(r":\s*([A-Za-z_][A-Za-z0-9_]*)\b(?=\s*[,}])", lambda z: ": " + consts.get(z.group(1), z.group(1)), body)
     body = re.sub(r"(?m)^\s*//[^\n]*", "", body)
-    body = re.sub(r'(?<=[{,\s])([A-Za-z_][A-Za-z0-9_]*)\s*:', r'"\1":', body)
+    # المفاتيح بس اللي بتتحط بين علامات تنصيص، مش أي «كلمة:» جوه نص (زي "me: finally")
+    body = re.sub(r'("(?:[^"\\]|\\.)*")|(?<=[{,\s])([A-Za-z_][A-Za-z0-9_]*)\s*:', lambda z: z.group(1) or f'"{z.group(2)}":', body)
     body = re.sub(r",\s*([}\]])", r"\1", body)
     try:
         out = json.loads(body)

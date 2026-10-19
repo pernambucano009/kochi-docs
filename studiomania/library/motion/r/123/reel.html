@@ -3,27 +3,33 @@
 // #123 (عنصر: فيلم إطلاق ورقي) Paper-style launch film — any product (the template's {{PRODUCT}}). 15 s, no voice, no footage.
 // Paper canvas, marker notes that draw on (Caveat, stroke reveal), a red ball with real bounce physics, huge Anton type,
 // hard light/dark switches, a new idea every ~1.8 s, a sound on every hit. No invented results, no numbers.
+const G1 = "١ · الفكرة", G2 = "٢ · بيتعلّم براندك", G3 = "٣ · المميزات", G4 = "٤ · الخطوات", G5 = "٥ · النهاية", GC = "الألوان";
 const PR = M.params({
-  hook: { label: "الجملة الأولى", kind: "text", def: "ONE IDEA." },
-  hookNote: { label: "ملاحظة بخط الإيد تحتها", kind: "text", def: "that's all you bring" },
-  word: { label: "الكلمة اللي الكورة بتنط عليها", kind: "text", def: "IDEA." },
-  l1: { label: "مشهد غامق (سطر ١)", kind: "text", def: "IT LEARNS" },
-  l2: { label: "مشهد غامق (سطر ٢، ملوّن)", kind: "text", def: "YOUR BRAND." },
-  notes: { label: "٣ ملاحظات بخط الإيد", kind: "lines", def: ["your colours", "your voice", "your audience"] },
-  cards: { label: "٤ كروت (المميزات أو المنتجات)", kind: "lines", def: ["REELS", "ADS", "CAROUSELS", "DUBBING"] },
-  cardsNote: { label: "ملاحظة تحت الكروت", kind: "text", def: "every format, one place" },
-  b1: { label: "كلمة كبيرة (سطر ١)", kind: "text", def: "ARABIC" },
-  b2: { label: "كلمة كبيرة (سطر ٢، ملوّن)", kind: "text", def: "FIRST." },
-  bNote: { label: "ملاحظة جنبها", kind: "text", def: "and English too" },
-  steps: { label: "الخطوات (٥)", kind: "lines", def: ["SCRIPT", "VOICE", "SCENES", "EDIT", "EXPORT"] },
-  slam: { label: "٤ كلمات بتخبط (آخر واحدة ملوّنة)", kind: "lines", def: ["ALL", "IN", "ONE", "STUDIO."] },
-  logo: { label: "اللوجو", kind: "image", role: "logo", def: "" },
-  name: { label: "اسم البراند", kind: "text", role: "brand", def: "STUDIOMANIA" },
-  endNote: { label: "ملاحظة في الآخر", kind: "text", role: "cta", def: "start with one idea." },
-  paper: { label: "الورق", kind: "color", role: "bg", def: "#f5f1e8" },
-  ink: { label: "لون الكلام", kind: "color", role: "ink", def: "#161616" },
-  red: { label: "لون الكورة", kind: "color", role: "accent", def: "#e8402f" },
-  blue: { label: "لون الملاحظات", kind: "color", role: "accent2", def: "#2f5bff" },
+  hook: { label: "الجملة الأولى", kind: "text", def: "ONE IDEA.", group: G1, max: 12, hint: "جملة قصيرة جدًا بخط ضخم." },
+  hookNote: { label: "ملاحظة بخط الإيد تحتها", kind: "text", def: "that's all you bring", group: G1, max: 26, hint: "ملاحظة بخط الإيد بتترسم تحتها." },
+  word: { label: "الكلمة اللي الكورة بتنط عليها", kind: "text", def: "IDEA.", group: G1, max: 10, hint: "الكورة الحمرا بتنط عليها وتطير." },
+  l1: { label: "مشهد غامق (سطر ١)", kind: "text", def: "IT LEARNS", group: G2, max: 12 },
+  l2: { label: "مشهد غامق (سطر ٢، ملوّن)", kind: "text", def: "YOUR BRAND.", group: G2, max: 14 },
+  notes: { label: "٣ ملاحظات بخط الإيد", kind: "lines", def: ["your colours", "your voice", "your audience"], group: G2, max: 18, hint: "٣ ملاحظات بخط الإيد." },
+  cards: { label: "٤ كروت (المميزات أو المنتجات)", kind: "lines", def: ["REELS", "ADS", "CAROUSELS", "DUBBING"], group: G3, max: 10, hint: "٤ كروت: كلمة واحدة لكل كارت." },
+  cardsNote: { label: "ملاحظة تحت الكروت", kind: "text", def: "every format, one place", group: G3, max: 26 },
+  b1: { label: "كلمة كبيرة (سطر ١)", kind: "text", def: "ARABIC", group: G3, max: 10 },
+  b2: { label: "كلمة كبيرة (سطر ٢، ملوّن)", kind: "text", def: "FIRST.", group: G3, max: 10 },
+  bNote: { label: "ملاحظة جنبها", kind: "text", def: "and English too", group: G3, max: 20 },
+  steps: { label: "الخطوات (٥)", kind: "lines", def: ["SCRIPT", "VOICE", "SCENES", "EDIT", "EXPORT"], group: G4, max: 10, hint: "٥ خطوات، كلمة لكل خطوة: الكورة بتنط عليهم واحدة واحدة." },
+  slam: { label: "٤ كلمات بتخبط (آخر واحدة ملوّنة)", kind: "lines", def: ["ALL", "IN", "ONE", "STUDIO."], group: G4, max: 10, hint: "٤ كلمات بتخبط على الإيقاع، آخر واحدة ملوّنة." },
+  logo: { label: "اللوجو", kind: "image", role: "logo", def: "", group: G5 },
+  name: { label: "اسم البراند", kind: "text", role: "brand", def: "STUDIOMANIA", group: G5, max: 16 },
+  endNote: { label: "ملاحظة في الآخر", kind: "text", role: "cta", def: "start with one idea.", group: G5, max: 28 },
+  paper: { label: "الورق", kind: "color", role: "bg", def: "#f5f1e8", group: GC },
+  ink: { label: "لون الكلام", kind: "color", role: "ink", def: "#161616", group: GC },
+  red: { label: "لون الكورة", kind: "color", role: "accent", def: "#e8402f", group: GC },
+  blue: { label: "لون الملاحظات", kind: "color", role: "accent2", def: "#2f5bff", group: GC },
+});
+M.meta({
+  story: "فيلم إطلاق بستايل الورق: ورق وملاحظات بالماركر بتترسم، وكورة حمرا بتنط بفيزيا حقيقية، وكلام ضخم، وقلبات بين فاتح وغامق، وفكرة جديدة كل ثانيتين تقريبًا وصوت مع كل خبطة.",
+  scenes: [{ name: G1, t0: 0, t1: 3.6, about: "الجملة الأولى والكورة" }, { name: G2, t0: 3.6, t1: 5.4, about: "مشهد غامق وملاحظات" }, { name: G3, t0: 5.4, t1: 9, about: "الكروت والكلمة الكبيرة" }, { name: G4, t0: 9, t1: 12.6, about: "الخطوات والكلمات اللي بتخبط" }, { name: G5, t0: 12.6, t1: 15, about: "اللوجو والاسم" }],
+  tips: ["مفيش أرقام ولا نتايج: الفيلم عن الفكرة.", "كلمة أو اتنين في كل خانة: الخط ضخم.", "مناسب لإطلاق منتج أو خدمة جديدة."],
 });
 const PAPER = PR.paper, INK = PR.ink, RED = PR.red, BLUE = PR.blue, CHAR = "#1d1c1a";
 const L = (arr, n) => Array.from({ length: n }, (_, i) => arr[i] ?? "");

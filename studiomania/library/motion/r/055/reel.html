@@ -5,21 +5,27 @@
 // 0–2 hook: the cursor types "HIRE ME?" · 2–4 kinetic type · 4–6 the cursor morphs through skill marks · 6–8 skill cards in a 3D ring
 // 8–10 a skills radar draws itself · 10–12 a project timeline · 12–14 strongest: every skill clicks into a grid, stamp "HIRED"
 // 14–15 end title → back to the lone cursor.
+const G1 = "١ · السؤال والجملة", G2 = "٢ · المهارات والرقم", G3 = "٣ · الشغل", G4 = "٤ · الختم والاسم", GC = "الألوان";
 const PR = M.params({
-  hook: { label: "السؤال في الأول", kind: "text", def: "HIRE ME?" },
-  line: { label: "جملة من ٤ كلمات", kind: "text", def: "I MAKE THINGS MOVE" },
-  skills: { label: "المهارات أو المميزات (٦، كل واحدة في سطر)", kind: "lines", def: ["TYPE", "3D", "CODE", "SOUND", "UI", "EDIT"] },
-  stat: { label: "الرقم الكبير", kind: "text", def: "85%" },
-  statLabel: { label: "تحت الرقم", kind: "text", def: "average across six skills" },
-  projects: { label: "الشغل أو الإنجازات (٤)", kind: "lines", def: ["Brand film", "App launch", "Title seq.", "Data story"] },
-  range: { label: "الفترة", kind: "text", def: "2019 — 2026" },
-  tags: { label: "كلمات الشبكة (لحد ١٢)", kind: "lines", def: ["TYPE", "3D", "CODE", "SOUND", "UI", "EDIT", "DESIGN", "MOTION", "STORY", "COLOR", "RIG", "FX"] },
-  stamp: { label: "الختم", kind: "text", def: "HIRED." },
-  name: { label: "الاسم في الآخر", kind: "text", role: "brand", def: "Your Name" },
-  role: { label: "تحت الاسم", kind: "text", role: "tagline", def: "motion designer · available now" },
-  ink: { label: "الخلفية الغامقة", kind: "color", role: "dark", def: "#0f0f12" },
-  lime: { label: "اللون المميز", kind: "color", role: "accent", def: "#c6ff3d" },
-  cob: { label: "اللون التاني", kind: "color", role: "accent2", def: "#3d5afe" },
+  hook: { label: "السؤال في الأول", kind: "text", def: "HIRE ME?", group: G1, max: 10, hint: "الكيرسر بيكتبه في الأول." },
+  line: { label: "جملة من ٤ كلمات", kind: "text", def: "I MAKE THINGS MOVE", group: G1, max: 24, hint: "٤ كلمات بالظبط بيتحركوا." },
+  skills: { label: "المهارات أو المميزات (٦، كل واحدة في سطر)", kind: "lines", def: ["TYPE", "3D", "CODE", "SOUND", "UI", "EDIT"], group: G2, max: 14, hint: "٦ مهارات أو مميزات: بيلفوا في دايرة 3D." },
+  stat: { label: "الرقم الكبير", kind: "text", def: "85%", group: G2, max: 6 },
+  statLabel: { label: "تحت الرقم", kind: "text", def: "average across six skills", group: G2, max: 20 },
+  projects: { label: "الشغل أو الإنجازات (٤)", kind: "lines", def: ["Brand film", "App launch", "Title seq.", "Data story"], group: G3, max: 20, hint: "٤ شغلانات أو إنجازات على خط زمني." },
+  range: { label: "الفترة", kind: "text", def: "2019 — 2026", group: G3, max: 14 },
+  tags: { label: "كلمات الشبكة (لحد ١٢)", kind: "lines", def: ["TYPE", "3D", "CODE", "SOUND", "UI", "EDIT", "DESIGN", "MOTION", "STORY", "COLOR", "RIG", "FX"], group: G4, max: 12, hint: "لحد ١٢ كلمة بتترص في شبكة." },
+  stamp: { label: "الختم", kind: "text", def: "HIRED.", group: G4, max: 8 },
+  name: { label: "الاسم في الآخر", kind: "text", role: "brand", def: "Your Name", group: G4, max: 18 },
+  role: { label: "تحت الاسم", kind: "text", role: "tagline", def: "motion designer · available now", group: G4, max: 26 },
+  ink: { label: "الخلفية الغامقة", kind: "color", role: "dark", def: "#0f0f12", group: GC },
+  lime: { label: "اللون المميز", kind: "color", role: "accent", def: "#c6ff3d", group: GC },
+  cob: { label: "اللون التاني", kind: "color", role: "accent2", def: "#3d5afe", group: GC },
+});
+M.meta({
+  story: "بروفايل في ١٥ ثانية: «سي في بيتحرك لوحده». كيرسر بيكتب كل مشهد: السؤال، وجملة متحركة، وعلامات المهارات، وكروت في دايرة 3D، ورادار مهارات، وخط زمني للشغل، وشبكة وختم، والاسم.",
+  scenes: [{ name: G1, t0: 0, t1: 4, about: "السؤال والجملة" }, { name: G2, t0: 4, t1: 10, about: "المهارات والرادار والرقم" }, { name: G3, t0: 10, t1: 12, about: "الخط الزمني للشغل" }, { name: G4, t0: 12, t1: 15, about: "الشبكة والختم والاسم" }],
+  tips: ["مناسب للفريلانسرز والتقديم على شغل وتعريف بفريق.", "المهارات كلمة أو اتنين.", "الختم كلمة واحدة قوية."],
 });
 const B = .5, INK = PR.ink, WHITE = "#f7f7f5", LIME = PR.lime, COB = PR.cob;
 const SK = Array.from({ length: 6 }, (_, i) => PR.skills[i] || PR.skills[i % Math.max(1, PR.skills.length)] || "");
