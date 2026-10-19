@@ -2,17 +2,24 @@
 <script>
 // قالب «ريزوجراف»: ٣ أحبار شفافة بتتطبع فوق بعض على ورق دافي (كل لون لوح لوحده)، نقط طباعة، وألواح مش راكبة على بعض بالظبط.
 // الألواح بتوصل واحد ورا التاني بمسحة الرول، والعجلة ماشية على التل، والعنوان بيتطبع على لوحين. 1080×1920، 12 ثانية.
+const G1 = "١ · الطباعة", G2 = "٢ · العنوان", G3 = "٣ · الشريط", GS = "الشكل العام";
 const PR = M.params({
-  title: { label: "العنوان", kind: "text", role: "product", def: "صيف ملوّن" },
-  sub: { label: "السطر اللي تحته", kind: "text", def: "تخفيضات على كل التشكيلة" },
-  strip: { label: "الشريط اللي تحت", kind: "text", def: "من ١ لـ ١٥ يوليو · اطلب أونلاين" },
-  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "دراجة" },
-  ink1: { label: "حبر ١ (الأساسي)", kind: "color", def: "#0078BF" },
-  ink2: { label: "حبر ٢", kind: "color", def: "#FF48B0" },
-  ink3: { label: "حبر ٣", kind: "color", def: "#FFE800" },
+  title: { label: "العنوان", kind: "text", role: "product", def: "صيف ملوّن", group: G2, max: 12, hint: "كلمتين بالكتير: بيتطبع كبير على لوحين حبر مش راكبين على بعض بالظبط." },
+  sub: { label: "السطر اللي تحته", kind: "text", def: "تخفيضات على كل التشكيلة", group: G2, max: 26, hint: "العرض أو الخبر." },
+  strip: { label: "الشريط اللي تحت", kind: "text", def: "من ١ لـ ١٥ يوليو · اطلب أونلاين", group: G3, max: 34, hint: "المعاد ومكان الطلب، بنقطة في النص بين الحاجتين." },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "دراجة", group: G3, max: 16 },
+  ink1: { label: "حبر ١ (الأساسي)", kind: "color", role: "accent", def: "#0078BF", group: G1, hint: "أحبار الريزو الحقيقية: أزرق، وردي فلورسنت، أصفر. لما بيتراكبوا بيعملوا ألوان تالتة." },
+  ink2: { label: "حبر ٢", kind: "color", def: "#FF48B0", group: G1 },
+  ink3: { label: "حبر ٣", kind: "color", def: "#FFE800", group: G1 },
+  fHead: { label: "خط العنوان", kind: "font", def: "lalezar", group: GS },
+  fText: { label: "خط الكلام", kind: "font", def: "changa", group: GS },
+});
+M.meta({
+  story: "طباعة ريزوجراف بـ٣ أحبار شفافة فوق بعض على ورق دافي: كل لون لوح لوحده، نقط طباعة، والألواح بتوصل بمسحة الرول، والعجلة ماشية على التل، والعنوان بيتطبع على لوحين.",
+  scenes: [{ name: G1, t0: 0, t1: 3, about: "الألواح بتتطبع واحد ورا التاني" }, { name: G2, t0: 3, t1: 6, about: "العنوان والسطر" }, { name: G3, t0: 6, t1: 12, about: "العجلة والشريط والبراند" }],
+  tips: ["مناسب للعروض الموسمية والأحداث والبراندات الشبابية.", "٣ ألوان بس: الجمال في التراكب.", "العنوان القصير بيتطبع أحلى."],
 });
 const W = 1080, H = 1920, DUR = 12, BPM = 112, B = 60 / BPM;
-const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
 const INKS = [PR.ink1, PR.ink2, PR.ink3];
 const ANG = [15, 75, 45];          // زاوية شبكة النقط لكل لوح
 const ARRIVE = [[1.0, 1.8], [1.9, 2.7], [0.1, 0.9]];   // إمتى كل لوح بيتطبع (أزرق، بمبي، أصفر)
@@ -21,7 +28,7 @@ const REG = [[2, -1, .0015], [-2, 2, -.001], [1, 2, .0008]];   // إزاحة ث�
 M.reel({
   W, H, DUR, bg: "#F4EEE2",
   async init(M) {
-    await Promise.all([loadFont("LZ", "SM-Lalezar.ttf"), loadFont("CH", "SM-Changa.ttf")]);
+    await Promise.all([M.font("LZ", PR.fHead), M.font("CH", PR.fText)]);
     const c = M.canvas(W, H); const x = c.getContext("2d");
     const mk = () => { const k = document.createElement("canvas"); k.width = W; k.height = H; return k; };
     const plates = [0, 1, 2].map(mk);

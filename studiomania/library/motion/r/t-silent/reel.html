@@ -2,21 +2,29 @@
 <script>
 // قالب «فيلم صامت»: شاشة سينما بين ستاير قطيفة، فيلم أبيض وأسود بلون فضي/سيبيا بيرعش وفيه خدوش، كروت كلام مزخرفة،
 // وقصة كوميدية بالحركة بس (راجل مستني الأتوبيس… والطلب بيوصله قبل ما يستنى) ومزيكا بيانو راجتايم. 1080×1920، 12 ثانية.
+const G1 = "١ · الكارت الأول", G2 = "٢ · المشهد والكارت التاني", G3 = "٣ · الحل والنهاية", GS = "الشكل العام";
 const PR = M.params({
-  card1: { label: "الكارت ١", kind: "text", def: "في يوم من الأيام…" },
-  card2: { label: "الكارت ٢", kind: "text", def: "والأتوبيس ما جاش!" },
-  card3: { label: "الكارت ٣", kind: "text", def: "طلبك يوصلك… قبل ما تستنى" },
-  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "توصيل البرق" },
-  end: { label: "كلمة النهاية", kind: "text", def: "النهاية" },
+  card1: { label: "الكارت ١", kind: "text", def: "في يوم من الأيام…", group: G1, max: 22, hint: "بداية الحكاية زي الأفلام الصامتة: «في يوم من الأيام…»." },
+  sign: { label: "يافطة المحطة", kind: "text", def: "محطة", group: G2, max: 8, hint: "اليافطة اللي الراجل واقف تحتها." },
+  card2: { label: "الكارت ٢", kind: "text", def: "والأتوبيس ما جاش!", group: G2, max: 22, hint: "المشكلة: الحاجة اللي بتضايق عميلك، بهزار." },
+  card3: { label: "الكارت ٣", kind: "text", def: "طلبك يوصلك… قبل ما تستنى", group: G3, max: 28, hint: "الحل بتاعك في جملة." },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "توصيل البرق", group: G3, max: 18 },
+  end: { label: "كلمة النهاية", kind: "text", def: "النهاية", group: G3, max: 10 },
+  fCard: { label: "خط الكروت", kind: "font", def: "amiri", group: GS, hint: "خط كلاسيكي بيليق على كروت السينما القديمة." },
+  fDeco: { label: "خط الزخرفة", kind: "font", def: "ruqaa", group: GS },
+});
+M.meta({
+  story: "فيلم صامت أبيض وأسود بيرعش على شاشة سينما بين ستاير قطيفة: كروت كلام مزخرفة، وقصة كوميدية بالحركة بس (راجل مستني الأتوبيس… والطلب بيوصله قبل ما يستنى)، ومزيكا بيانو.",
+  scenes: [{ name: G1, t0: 0, t1: 2, about: "الستاير والكارت الأول" }, { name: G2, t0: 2, t1: 8.6, about: "الراجل مستني والكارت التاني" }, { name: G3, t0: 8.6, t1: 12, about: "الكارت التالت والبراند والنهاية" }],
+  tips: ["القصة: مشكلة بتضحك ← الحل بتاعك. القالب مبني على التوصيل السريع.", "الكروت قصيرة: الفيلم الصامت بيعتمد على الحركة.", "مناسب للتوصيل والخدمات اللي بتوفر وقت."],
 });
 const W = 1080, H = 1920, DUR = 12, SX = 110, SY = 330, SW = 860, SH = 1150;
-const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
 const CARDS = [[.3, 2.0, "card1"], [4.6, 6.0, "card2"], [8.6, 10.2, "card3"]];
 
 M.reel({
   W, H, DUR, bg: "#0b0706",
   async init(M) {
-    await Promise.all([loadFont("AM", "TY-Amiri-700.ttf", "700"), loadFont("RQ", "TY-ArefRuqaa-700.ttf", "700")]);
+    await Promise.all([M.font("AM", PR.fCard), M.font("RQ", PR.fDeco)]);
     const c = M.canvas(W, H); const x = c.getContext("2d");
     const scr = document.createElement("canvas"); scr.width = SW; scr.height = SH;
     // المسرح: ستاير قطيفة على الجنبين وفوق، وكراسي ضلّ تحت (مرة واحدة)
@@ -55,7 +63,7 @@ M.reel({
       s.fillStyle = "#6d675e"; s.fillRect(0, 900, SW, 60); s.fillStyle = "#a8a297"; s.fillRect(0, 960, SW, SH - 960); L([[0, 900], [SW, 900]], 4); L([[0, 960], [SW, 960]], 4);
       for (let k = 0; k < 8; k++) L([[k * 120, 1080], [k * 120 + 70, 1080]], 3, "#6d675e");
       L([[150, 940], [150, 420]], 14); L([[150, 430], [200, 410]], 8); s.fillStyle = "#efe9dc"; s.beginPath(); s.arc(205, 430, 22, 0, Math.PI * 2); s.fill(); L([[150, 940], [150, 420]], 4, "#3a3631");
-      L([[700, 940], [700, 640]], 8); s.fillStyle = "#efe9dc"; s.fillRect(640, 600, 120, 70); s.strokeStyle = ink; s.lineWidth = 4; s.strokeRect(640, 600, 120, 70); s.fillStyle = ink; s.font = "700 40px AM"; s.textAlign = "center"; s.direction = "rtl"; s.fillText("محطة", 700, 646);
+      L([[700, 940], [700, 640]], 8); s.fillStyle = "#efe9dc"; s.fillRect(640, 600, 120, 70); s.strokeStyle = ink; s.lineWidth = 4; s.strokeRect(640, 600, 120, 70); s.fillStyle = ink; s.font = "700 40px AM"; s.textAlign = "center"; s.direction = "rtl"; s.fillText(PR.sign, 700, 646);
       // الراجل: بدلة غامقة، برنيطة، عصاية، وش فاتح بمكياج زمان
       const man = (mx, my, pose) => {
         const tap = pose === "wait" ? Math.abs(Math.sin(tq * 9)) * 10 : 0, jump = pose === "jump" ? Math.abs(Math.sin(tq * 8)) * 70 : 0, angry = pose === "angry";

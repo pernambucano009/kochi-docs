@@ -2,15 +2,22 @@
 <script>
 // قالب «حبر صيني»: لوحة حبر بتترسم قدامك على ورق رز دافي: جبال بعيدة بتدوب في الضباب، صخرة وشجرة صنوبر بضربات فرشاة محمّلة،
 // مية فاضية عليها قارب صغير، طيور، والعنوان مكتوب في الفراغ، وختم أحمر واحد بس. 1080×1920، 12 ثانية.
+const G1 = "١ · اللوحة", G2 = "٢ · العنوان والختم", GS = "الشكل العام";
 const PR = M.params({
-  title: { label: "العنوان", kind: "text", role: "product", def: "صفاء" },
-  line: { label: "السطر (زي البيت الشعر)", kind: "text", def: "الهدوء… بداية كل حاجة حلوة" },
-  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "شاي الجبل" },
-  seal: { label: "حرف الختم", kind: "text", def: "ج" },
-  red: { label: "لون الختم", kind: "color", def: "#b02e22" },
+  title: { label: "العنوان", kind: "text", role: "product", def: "صفاء", group: G2, max: 8, hint: "كلمة واحدة بخط كبير في الفراغ فوق: إحساس مش اسم منتج (صفاء، هدوء، أصالة)." },
+  line: { label: "السطر (زي البيت الشعر)", kind: "text", def: "الهدوء… بداية كل حاجة حلوة", group: G2, max: 30, hint: "جملة هادية بتكمّل الكلمة، زي بيت شعر." },
+  seal: { label: "حرف الختم", kind: "text", def: "ج", group: G2, max: 2, hint: "حرف واحد (أول حرف من البراند) بيتحفر في الختم الأحمر." },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "شاي الجبل", group: G2, max: 16 },
+  red: { label: "لون الختم", kind: "color", role: "accent", def: "#b02e22", group: GS, hint: "الختم بس: أحمر صيني. اللوحة نفسها حبر أسود ودرجاته." },
+  fTitle: { label: "خط العنوان", kind: "font", def: "ruqaa", group: GS, hint: "خط إيد/فرشاة للكلمة الكبيرة والختم." },
+  fText: { label: "خط السطر", kind: "font", def: "amiri", group: GS },
+});
+M.meta({
+  story: "لوحة حبر صيني بتترسم على ورق رز: جبال بتدوب في الضباب، صخرة وشجرة صنوبر بضربات فرشاة، مية فاضية عليها قارب صغير وطيور، والكلمة مكتوبة في الفراغ، وختم أحمر واحد بس.",
+  scenes: [{ name: G1, t0: 0, t1: 7.2, about: "الجبال والشجرة والمية والقارب بيترسموا" }, { name: G2, t0: 7.2, t1: 12, about: "الكلمة والسطر والختم والبراند" }],
+  tips: ["مناسب للشاي والمنتجات الطبيعية والسبا والبراندات الهادية.", "كلمة واحدة أقوى من جملة.", "الفراغ جزء من اللوحة: ماتزحمش الكلام."],
 });
 const W = 1080, H = 1920, DUR = 12;
-const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
 const INK = [24, 20, 18];
 const TONE = { jiao: .96, nong: .82, zhong: .6, dan: .34, qing: .16 };
 
@@ -35,7 +42,7 @@ const ridge = (y0, amp, seed, x0 = -100, x1 = 1180, fade = 0) => { const out = [
 M.reel({
   W, H, DUR, bg: "#f2ecde",
   async init(M) {
-    await Promise.all([loadFont("RQ", "TY-ArefRuqaa-700.ttf", "700"), loadFont("AM", "TY-Amiri-700.ttf", "700")]);
+    await Promise.all([M.font("RQ", PR.fTitle), M.font("AM", PR.fText)]);
     const c = M.canvas(W, H); const x = c.getContext("2d");
     const paper = document.createElement("canvas"); paper.width = W; paper.height = H * 1.15; const p = paper.getContext("2d"), R = M.rng(9);
     p.fillStyle = "#f2ecde"; p.fillRect(0, 0, W, paper.height);

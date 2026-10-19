@@ -2,21 +2,29 @@
 <script>
 // قالب «أنمي التمانينات»: خلفية مرسومة لمدينة بالليل (سما متدرجة، شبابيك منورة، نيون، أرض مبلولة بانعكاسات)،
 // شخصية «سيل» بألوان مسطحة وضل حاد وخط ملوّن على سكوتر بخطوط سرعة، لمعة فانوس، عنوان منوّر من ورا، وشريط فيديو على شاشة قديمة.
+const G1 = "١ · المدينة", G2 = "٢ · العنوان", G3 = "٣ · الشريط", GS = "الشكل العام";
 const PR = M.params({
-  title: { label: "العنوان", kind: "text", role: "product", def: "طريق الليل" },
-  sub: { label: "تحت العنوان", kind: "text", def: "مفتوحين لحد الفجر" },
-  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "كافيه نيون" },
-  sign1: { label: "يافطة نيون ١", kind: "text", def: "قهوة" },
-  sign2: { label: "يافطة نيون ٢", kind: "text", def: "٢٤ ساعة" },
-  accent: { label: "لون البطلة", kind: "color", def: "#ff3d6e" },
+  sign1: { label: "يافطة نيون ١", kind: "text", def: "قهوة", group: G1, max: 8, hint: "كلمة على يافطة نيون في المدينة: نوع المحل." },
+  sign2: { label: "يافطة نيون ٢", kind: "text", def: "٢٤ ساعة", group: G1, max: 8, hint: "معلومة تانية: المواعيد أو العرض." },
+  title: { label: "العنوان", kind: "text", role: "product", def: "طريق الليل", group: G2, max: 12, hint: "عنوان شبه أفلام الأنمي: كلمتين بإحساس، بيتنوّر من ورا." },
+  sub: { label: "تحت العنوان", kind: "text", def: "مفتوحين لحد الفجر", group: G2, max: 22 },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "كافيه نيون", group: G2, max: 16 },
+  play: { label: "كلمة الشريط", kind: "text", def: "PLAY ▶", group: G3, max: 10, hint: "الكتابة على شاشة الفيديو القديمة." },
+  accent: { label: "لون البطلة", kind: "color", role: "accent", def: "#ff3d6e", group: GS, hint: "لون جاكيت البطلة والنيون: وردي أو سماوي نيون." },
+  fHead: { label: "خط العنوان", kind: "font", def: "lalezar", group: GS },
+  fText: { label: "خط الكلام", kind: "font", def: "changa", group: GS },
+});
+M.meta({
+  story: "أنمي التمانينات: مدينة بالليل بسما متدرجة وشبابيك منورة ونيون وأرض مبلولة، بطلة على سكوتر بخطوط سرعة، لمعة فانوس، عنوان منوّر من ورا، وشريط فيديو على شاشة قديمة.",
+  scenes: [{ name: G1, t0: 0, t1: 3, about: "المدينة واليافطات" }, { name: G2, t0: 3, t1: 8.6, about: "البطلة والعنوان" }, { name: G3, t0: 8.6, t1: 12, about: "البراند والشريط القديم" }],
+  tips: ["مناسب للكافيهات والمطاعم اللي بتشتغل بالليل والبراندات الشبابية.", "اليافطات بتحكي عن المحل من غير ما تقول.", "العنوان إحساس أكتر منه معلومة."],
 });
 const W = 1080, H = 1920, DUR = 12, PW = 2600;
-const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
 
 M.reel({
   W, H, DUR, bg: "#0a0620",
   async init(M) {
-    await Promise.all([loadFont("LZ", "SM-Lalezar.ttf"), loadFont("CH", "SM-Changa.ttf"), loadFont("PM", "TY-PlexMono-500.ttf", "500")]);
+    await Promise.all([M.font("LZ", PR.fHead), M.font("CH", PR.fText), new FontFace("PM", "url(../../fonts/TY-PlexMono-500.ttf)", { weight: "500" }).load().then((f) => document.fonts.add(f)).catch(() => {})]);
     const c = M.canvas(W, H); const x = c.getContext("2d");
     const mk = (w, h) => { const k = document.createElement("canvas"); k.width = w; k.height = h; return k; };
     // لوحة الخلفية: لون + «إضاءة» (الحاجات اللي بتنور) بنفس المقاس، بتترسم مرة
@@ -96,7 +104,7 @@ M.reel({
     const vg = x.createRadialGradient(540, 960, 600, 540, 960, 1250); vg.addColorStop(0, "rgba(0,0,0,0)"); vg.addColorStop(1, "rgba(0,0,0,.55)"); x.fillStyle = vg; x.fillRect(0, 0, W, H);
     const nr = M.rng(Math.floor(t * 30)); for (let i = 0; i < 400; i++) { x.fillStyle = `rgba(255,255,255,${nr() * .07})`; x.fillRect(nr() * W, nr() * H, 2, 1); }
     if (Math.floor(t * 30) % 140 < 3) { x.fillStyle = "rgba(255,255,255,.08)"; x.fillRect(0, nr() * H, W, 40); }
-    x.font = "500 40px PM"; x.fillStyle = "rgba(255,255,255,.85)"; x.textAlign = "left"; x.direction = "ltr"; x.fillText("PLAY ▶", 70, 120);
+    x.font = "500 40px PM"; x.fillStyle = "rgba(255,255,255,.85)"; x.textAlign = "left"; x.direction = "ltr"; x.fillText(PR.play, 70, 120);
     const sec = Math.floor(t); x.fillText(`SP  00:${String(sec).padStart(2, "0")}:${String(Math.floor((t % 1) * 30)).padStart(2, "0")}`, 70, 175);
   },
   sound(A) {

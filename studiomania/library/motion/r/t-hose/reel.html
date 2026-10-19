@@ -2,20 +2,27 @@
 <script>
 // قالب «كرتون قديم» (ستايل التلاتينات): أبيض وأسود، كوباية قهوة بإيدين ورجلين خراطيم وجوانتي أبيض وعيون «فطيرة»،
 // كل حاجة بتتنفس على الإيقاع، كروت عناوين قديمة، وخدوش وتراب فيلم. 1080×1920، 12 ثانية، 120 BPM.
+const G1 = "١ · الكارت الأول", G2 = "٢ · الكارت التاني", G3 = "٣ · الختام", GS = "الشكل العام";
 const PR = M.params({
-  title: { label: "العنوان", kind: "text", role: "product", def: "قهوة الصباح" },
-  sub: { label: "الكارت التاني", kind: "text", def: "أول رشفة… وتصحصح" },
-  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "بُن الحارة" },
+  title: { label: "العنوان", kind: "text", role: "product", def: "قهوة الصباح", group: G1, max: 14, hint: "كارت عنوان زي أفلام التلاتينات: كلمتين بالكتير." },
+  sub: { label: "الكارت التاني", kind: "text", def: "أول رشفة… وتصحصح", group: G2, max: 22, hint: "جملة ظريفة بتكمّل العنوان، بنقط (…) لو فيها وقفة." },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "بُن الحارة", group: G3, max: 16 },
+  fHead: { label: "خط الكروت", kind: "font", def: "lalezar", group: GS, hint: "خط تقيل للعناوين." },
+  fText: { label: "خط الكلام", kind: "font", def: "amiri", group: GS, hint: "خط كلاسيكي بيدّي إحساس الأفلام القديمة." },
+});
+M.meta({
+  story: "كرتون التلاتينات بالأبيض والأسود: كوباية قهوة بإيدين ورجلين خراطيم وجوانتي أبيض بترقص على الإيقاع، كروت عناوين قديمة، وخدوش وتراب فيلم.",
+  scenes: [{ name: G1, t0: 0, t1: 7, about: "الكوباية بترقص وكارت العنوان" }, { name: G2, t0: 7, t1: 9.6, about: "الكارت التاني" }, { name: G3, t0: 9.6, t1: 12, about: "كارت البراند" }],
+  tips: ["مناسب للقهوة والمشروبات والمحلات اللي ليها روح قديمة.", "الكلام القليل أحسن: الشخصية هي اللي بتتكلم.", "الستايل أبيض وأسود، فمفيش ألوان تختارها."],
 });
 const W = 1080, H = 1920, DUR = 12, BPM = 120, B = 60 / BPM;
-const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
 const G = ["#151311", "#3a3632", "#5e5953", "#85807a", "#aaa59e", "#cbc6bf", "#f2efe9"];   // ٦ درجات رمادي + أبيض الشخصيات
 const INK = G[0], WHITE = G[6];
 
 M.reel({
   W, H, DUR, bg: "#000",
   async init(M) {
-    await Promise.all([loadFont("LZ", "SM-Lalezar.ttf"), loadFont("AM", "TY-Amiri-700.ttf", "700")]);
+    await Promise.all([M.font("LZ", PR.fHead), M.font("AM", PR.fText)]);
     const c = M.canvas(W, H); const x = c.getContext("2d");
     // الخلفية: بتترسم مرة واحدة (ورق حيطة، كاونتر، أرضية شطرنج) بدرجات رمادي نص
     const bgc = document.createElement("canvas"); bgc.width = W; bgc.height = H; const b = bgc.getContext("2d"), R = M.rng(3);

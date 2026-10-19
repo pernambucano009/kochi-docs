@@ -2,16 +2,23 @@
 <script>
 // قالب «أوكييو-إي» (طباعة خشب يابانية): لوحة على ورق واشي بإطار، كل لون بيتطبع من لوح خشب لوحده (مش راكب بالظبط على الخط الأسود)،
 // سما متدرجة «بوكاشي»، جبل وموج بخطوط متوازية، قارب صغير، شمس حمرا، والعنوان في خانة بختم أحمر. 1080×1920، 12 ثانية.
+const G1 = "١ · اللوحة", G2 = "٢ · العنوان والختم", GS = "الشكل العام";
 const PR = M.params({
-  title: { label: "العنوان", kind: "text", role: "product", def: "طازة من البحر" },
-  sub: { label: "تحت العنوان", kind: "text", def: "سمك اليوم… على سفرتك الليلة" },
-  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "مطعم الموجة" },
-  seal: { label: "حرف الختم", kind: "text", def: "م" },
-  sky: { label: "لون السما والمية", kind: "color", def: "#1f3f78" },
-  red: { label: "اللون الأحمر", kind: "color", def: "#c8402c" },
+  title: { label: "العنوان", kind: "text", role: "product", def: "طازة من البحر", group: G2, max: 14, hint: "بيتكتب في خانة العنوان الطولية زي اللوحات اليابانية." },
+  sub: { label: "تحت العنوان", kind: "text", def: "سمك اليوم… على سفرتك الليلة", group: G2, max: 30 },
+  seal: { label: "حرف الختم", kind: "text", def: "م", group: G2, max: 2, hint: "حرف واحد في الختم الأحمر." },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "مطعم الموجة", group: G2, max: 16 },
+  sky: { label: "لون السما والمية", kind: "color", def: "#1f3f78", group: G1, hint: "أزرق بروسي (الأزرق الياباني التقليدي) أو كحلي." },
+  red: { label: "اللون الأحمر", kind: "color", role: "accent", def: "#c8402c", group: GS, hint: "الشمس والختم." },
+  fTitle: { label: "خط العنوان", kind: "font", def: "ruqaa", group: GS },
+  fText: { label: "خط الكلام", kind: "font", def: "amiri", group: GS },
+});
+M.meta({
+  story: "طباعة خشب يابانية على ورق واشي بإطار: كل لون بيتطبع من لوح لوحده ومش راكب بالظبط على الخط، سما متدرجة، جبل وموج بخطوط متوازية، قارب، شمس حمرا، والعنوان في خانة بختم.",
+  scenes: [{ name: G1, t0: 0, t1: 7, about: "الألواح بتتطبع: السما والجبل والموج" }, { name: G2, t0: 7, t1: 12, about: "العنوان والختم والبراند" }],
+  tips: ["مناسب للمطاعم البحرية والسوشي والمنتجات اليدوية.", "اللوحة نفسها بحر وجبل: أحسن مع البحر والطبيعة.", "خلي العنوان قصير علشان الخانة الطولية."],
 });
 const W = 1080, H = 1920, DUR = 12;
-const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
 const KEY = "#1d1b1a", PAPER = "#efe3c8";
 // الألواح: كل لوح ليه إزاحة صغيرة ثابتة عن الخط الأسود
 const BLOCKS = { sky: [2, -1.5], blue: [-1.8, 2], green: [2.2, 1.5], red: [-1.5, -2], key: [0, 0] };
@@ -19,7 +26,7 @@ const BLOCKS = { sky: [2, -1.5], blue: [-1.8, 2], green: [2.2, 1.5], red: [-1.5,
 M.reel({
   W, H, DUR, bg: "#d9cbaa",
   async init(M) {
-    await Promise.all([loadFont("RQ", "TY-ArefRuqaa-700.ttf", "700"), loadFont("AM", "TY-Amiri-700.ttf", "700")]);
+    await Promise.all([M.font("RQ", PR.fTitle), M.font("AM", PR.fText)]);
     const c = M.canvas(W, H); const x = c.getContext("2d");
     const mk = () => { const k = document.createElement("canvas"); k.width = W; k.height = H; return k; };
     // ورق واشي + ملمس خشب لكل لون (مرة واحدة)

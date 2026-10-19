@@ -2,19 +2,26 @@
 <script>
 // قالب «ألوان مية»: صفحة كراسة رسم بترسم نفسها بالفرشاة (الكوباية ← النعناع ← البخار) وملاحظات بخط اليد والاسم في الآخر.
 // كل حاجة دالة في الوقت t (ينفع يترسم أي فريم لوحده). 1080×1920، 12 ثانية.
+const G1 = "١ · الرسمة", G2 = "٢ · الملاحظات", G3 = "٣ · الاسم والختم", GS = "الشكل العام";
 const PR = M.params({
-  title: { label: "العنوان", kind: "text", role: "product", def: "شاي بالنعناع" },
-  sub: { label: "السطر اللي تحته", kind: "text", def: "كوباية دافية تبدأ بيها يومك" },
-  note1: { label: "ملاحظة ١ (على الورق)", kind: "text", def: "نعناع طازة من الجنينة" },
-  note2: { label: "ملاحظة ٢ (على الكوباية)", kind: "text", def: "٣ دقايق وبس" },
-  stamp: { label: "الختم", kind: "text", def: "طبيعي تمامًا" },
-  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "بيت الشاي" },
-  cup: { label: "لون الكوباية", kind: "color", def: "#3f7f93" },
-  leaf: { label: "لون الورق الأخضر", kind: "color", def: "#5f9a4a" },
-  accent: { label: "لون الختم", kind: "color", def: "#c8442a" },
+  note1: { label: "ملاحظة ١ (على الورق)", kind: "text", def: "نعناع طازة من الجنينة", group: G2, max: 22, hint: "ملاحظة بخط اليد جنب الرسمة: مكوّن أو تفصيلة طبيعية." },
+  note2: { label: "ملاحظة ٢ (على الكوباية)", kind: "text", def: "٣ دقايق وبس", group: G2, max: 16, hint: "رقم أو معلومة سريعة بتشاور على الكوباية." },
+  title: { label: "العنوان", kind: "text", role: "product", def: "شاي بالنعناع", group: G3, max: 16, hint: "اسم المنتج بخط كلاسيكي كبير تحت الرسمة." },
+  sub: { label: "السطر اللي تحته", kind: "text", def: "كوباية دافية تبدأ بيها يومك", group: G3, max: 30, hint: "إحساس، مش مواصفات: «كوباية دافية تبدأ بيها يومك»." },
+  stamp: { label: "الختم", kind: "text", def: "طبيعي تمامًا", group: G3, max: 14, hint: "ختم أحمر صغير بكلمتين: طبيعي، صنع يدوي، من غير إضافات." },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "بيت الشاي", group: G3, max: 18 },
+  cup: { label: "لون الكوباية", kind: "color", def: "#3f7f93", group: G1, hint: "ألوان مية هادية: أزرق، تركواز، أخضر زيتي. الألوان الصارخة مش بتليق على الستايل." },
+  leaf: { label: "لون الورق الأخضر", kind: "color", def: "#5f9a4a", group: G1 },
+  accent: { label: "لون الختم", kind: "color", role: "accent", def: "#c8442a", group: GS, hint: "الختم بس: أحمر طوبي أو لون البراند." },
+  fTitle: { label: "خط العنوان", kind: "font", def: "amiri", group: GS, hint: "خط كلاسيكي (أميري) بيليق على ألوان المية." },
+  fHand: { label: "خط الملاحظات", kind: "font", def: "ruqaa", group: GS, hint: "خط إيد للملاحظات." },
+});
+M.meta({
+  story: "صفحة كراسة رسم بترسم نفسها بالفرشاة: الكوباية، النعناع، البخار، وملاحظات بخط اليد، والاسم والختم في الآخر.",
+  scenes: [{ name: G1, t0: 0, t1: 5, about: "الكوباية والنعناع والبخار بيترسموا" }, { name: G2, t0: 5, t1: 8, about: "ملاحظتين بخط اليد" }, { name: G3, t0: 8, t1: 12, about: "العنوان والسطر والختم والبراند" }],
+  tips: ["مناسب للمشروبات والأكل البيتي والمنتجات الطبيعية.", "الرسمة نفسها كوباية: أحسن مع المشروبات.", "خلي الكلام دافي وقليل، الستايل هادي."],
 });
 const W = 1080, H = 1920, DUR = 12;
-const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
 const rgb = (h) => { const n = parseInt(String(h).slice(1).replace(/^(.)(.)(.)$/, "$1$1$2$2$3$3"), 16) || 0; return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
 const rgba = (c, a) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
 const dark = (c, k) => c.map((v) => Math.round(v * k));
@@ -70,7 +77,7 @@ function wash(x, poly, col, a, seed, reveal = 1, box) {
 M.reel({
   W, H, DUR, bg: "#f3ead8",
   async init(M) {
-    await Promise.all([loadFont("AM", "TY-Amiri-700.ttf", "700"), loadFont("RQ", "TY-ArefRuqaa-700.ttf", "700"), loadFont("TJ", "SM-Tajawal.ttf")]);
+    await Promise.all([M.font("AM", PR.fTitle), M.font("RQ", PR.fHand), M.font("TJ", "tajawal")]);
     const c = M.canvas(W, H); const x = c.getContext("2d");
     // الورق: لون دافي + بقع خفيفة + ألياف + تغميق الأطراف (بيترسم مرة واحدة)
     const paper = document.createElement("canvas"); paper.width = W; paper.height = H; const p = paper.getContext("2d");

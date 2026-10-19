@@ -2,17 +2,27 @@
 <script>
 // قالب «بكسل» (ألعاب زمان): كل حاجة مرسومة على شاشة صغيرة ١٨٠×٣٢٠ بكسل ومكبّرة ×٦ من غير تنعيم، ألوان محدودة،
 // البطل بيمشي للمحل، صندوق كلام بصورة البيّاع، «حصلت على…» بفانفار، قايمة اختيار بإيد بتشاور، وفي الآخر اسم البراند. 12 ثانية.
+const G1 = "١ · العنوان والبيّاع", G2 = "٢ · الجايزة والاختيار", G3 = "٣ · الختام", GS = "الشكل العام";
 const PR = M.params({
-  title: { label: "العنوان", kind: "text", def: "مغامرة التسوّق" },
-  line1: { label: "كلام البيّاع", kind: "text", def: "أهلاً يا بطل! عندنا عرض النهارده" },
-  item: { label: "الجايزة", kind: "text", role: "product", def: "هدية مجانية مع أول طلب" },
-  opt1: { label: "الاختيار الأول", kind: "text", def: "اطلب دلوقتي" },
-  opt2: { label: "الاختيار التاني", kind: "text", def: "شوف العروض" },
-  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "متجر النجمة" },
-  press: { label: "السطر اللي بيرمش", kind: "text", def: "اضغط وابدأ" },
+  title: { label: "العنوان", kind: "text", def: "مغامرة التسوّق", group: G1, max: 16, hint: "اسم «اللعبة» بيظهر في الأول بنجوم تحته." },
+  who: { label: "اسم المتكلم", kind: "text", def: "البيّاع", group: G1, max: 10, hint: "اسم الشخصية اللي في صندوق الكلام: البيّاع، الشيف، المدرب…" },
+  line1: { label: "كلام البيّاع", kind: "text", def: "أهلاً يا بطل! عندنا عرض النهارده", group: G1, max: 40, hint: "بيتكتب حرف حرف زي ألعاب زمان. جملة ترحيب + العرض." },
+  got: { label: "كلمة «حصلت على:»", kind: "text", def: "حصلت على:", group: G2, max: 12 },
+  item: { label: "الجايزة", kind: "text", role: "product", def: "هدية مجانية مع أول طلب", group: G2, max: 28, hint: "اللي العميل هياخده: هدية، خصم، شحن مجاني." },
+  opt1: { label: "الاختيار الأول", kind: "text", def: "اطلب دلوقتي", group: G2, max: 14, hint: "الإيد بتشاور عليه وبيتختار: ده الـ CTA." },
+  opt2: { label: "الاختيار التاني", kind: "text", def: "شوف العروض", group: G2, max: 14 },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "متجر النجمة", group: G3, max: 16 },
+  press: { label: "السطر اللي بيرمش", kind: "text", def: "اضغط وابدأ", group: G3, max: 14, hint: "زي «PRESS START»." },
+  copy: { label: "سطر الحقوق", kind: "text", def: "© 2026", group: G3, max: 16 },
+  fHead: { label: "خط العناوين", kind: "font", def: "lalezar", group: GS },
+  fText: { label: "خط الكلام", kind: "font", def: "changa", group: GS },
+});
+M.meta({
+  story: "عالم لعبة قديمة على شاشة بكسل: البطل بيمشي للمحل، صندوق كلام بصورة البيّاع بيتكتب حرف حرف، صندوق كنز و«حصلت على…» بفانفار، قايمة اختيار بإيد بتشاور، وفي الآخر اسم البراند.",
+  scenes: [{ name: G1, t0: 0, t1: 4.8, about: "العنوان والمشي وكلام البيّاع" }, { name: G2, t0: 4.8, t1: 9.6, about: "الكنز والجايزة والقايمة" }, { name: G3, t0: 9.6, t1: 12, about: "اسم البراند و«اضغط وابدأ»" }],
+  tips: ["مناسب للعروض والمسابقات والجمهور الشبابي.", "كلام البيّاع قصير: الشاشة صغيرة.", "الاختيار الأول هو اللي بيتختار، فخليه الزرار اللي عايز الناس تدوسه."],
 });
 const W = 1080, H = 1920, DUR = 12, NW = 180, NH = 320, TS = 2;   // الكلام على شبكة أنعم بمرتين
-const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
 const C = { K: "#181425", D: "#262b44", B: "#3a4466", S: "#5a6988", L: "#8b9bb4", W: "#ffffff", sky: "#0099db", sky2: "#2ce8f5", G0: "#265c42", G1: "#3e8948", G2: "#63c74d", br: "#733e39", br2: "#b86f50", tan: "#e4a672", tan2: "#ead4aa", red: "#e43b44", red2: "#a22633", or: "#f77622", ye: "#feae34", ye2: "#fee761", pk: "#f6757a", pu: "#68386c", bl: "#124e89" };
 const BAYER = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]];
 const T_TYPE = [1.6, 4.4], T_CHEST = 4.8, T_GET = 5.7, T_MENU = 7.6, T_PICK = 9.0, T_END = 9.6;
@@ -20,7 +30,7 @@ const T_TYPE = [1.6, 4.4], T_CHEST = 4.8, T_GET = 5.7, T_MENU = 7.6, T_PICK = 9.
 M.reel({
   W, H, DUR, bg: C.K,
   async init(M) {
-    await Promise.all([loadFont("CH", "SM-Changa.ttf"), loadFont("LZ", "SM-Lalezar.ttf")]);
+    await Promise.all([M.font("CH", PR.fText), M.font("LZ", PR.fHead)]);
     const out = M.canvas(W, H); const o = out.getContext("2d"); o.imageSmoothingEnabled = false;
     const mk = (w, h) => { const c = document.createElement("canvas"); c.width = w; c.height = h; return c; };
     const art = mk(NW, NH), tl = mk(NW * TS, NH * TS);
@@ -110,16 +120,16 @@ M.reel({
     if (t < T_END + .3) txt("× " + X.coins, 322, 20, 16, C.W, "CH", "left");
     if (t < 1.6) { const k = seg(t, .3, .6); if (k > 0) { txt(PR.title, 180, 120, M.fit(PR.title, "LZ", 330, 52, 24), C.ye2, "LZ", "center"); txt("★ ★ ★", 180, 168, 20, C.W, "CH", "center"); } }
     if (showDlg) { const sy = slide(T_TYPE[0]) * TS, n = Math.floor([...PR.line1].length * seg(t, T_TYPE[0] + .2, T_TYPE[1])); const s = [...PR.line1].slice(0, n).join("");
-      txt("البيّاع", 262, 532 + sy, 18, C.ye, "CH"); T.font = "700 22px CH"; wrap(T, s, 262, 566 + sy, 240, 30, (l, x, y) => txt(l, x, y, 22, C.W));
+      txt(PR.who, 262, 532 + sy, 18, C.ye, "CH"); T.font = "700 22px CH"; wrap(T, s, 262, 566 + sy, 240, 30, (l, x, y) => txt(l, x, y, 22, C.W));
       if (t > T_TYPE[1] && f8 % 2) txt("▼", 30, 610 + sy, 16, C.W, "CH", "center", false); }
-    if (showGet) { const sy = -slide(T_GET + .2) * TS; txt("حصلت على:", 332, 64 + sy, 18, C.ye, "CH"); txt(PR.item, 332, 90 + sy, M.fit(PR.item, "CH", 300, 22, 12, "700"), C.W, "CH"); }
+    if (showGet) { const sy = -slide(T_GET + .2) * TS; txt(PR.got, 332, 64 + sy, 18, C.ye, "CH"); txt(PR.item, 332, 90 + sy, M.fit(PR.item, "CH", 300, 22, 12, "700"), C.W, "CH"); }
     if (showMenu) { const sy = slide(T_MENU) * TS, sel = t > T_PICK && f12 % 2;
       txt(PR.opt1, 320, 532 + sy, 22, sel ? C.ye2 : C.W); txt(PR.opt2, 320, 574 + sy, 22, C.L);
       const bob = (Math.floor(t * 4) % 2) * 2; if (!(t > T_PICK)) { T.fillStyle = C.W; T.fillRect(136 + bob, 526 + sy, 14, 8); T.fillStyle = C.K; T.fillRect(136 + bob, 534 + sy, 14, 2); } else { T.fillStyle = C.ye2; T.fillRect(136, 526 + sy, 14, 8); } }
     if (t > T_END + .4) { const k = seg(t, T_END + .4, T_END + .8);
       if (k > 0) txt(PR.brand, 180, 280, M.fit(PR.brand, "LZ", 320, 60, 24), C.ye2, "LZ", "center");
       if (t > T_END + 1 && Math.floor(t * 2.5) % 2) txt(PR.press, 180, 360, 22, C.W, "CH", "center");
-      txt("© 2026", 180, 600, 14, C.L, "CH", "center", false); }
+      txt(PR.copy, 180, 600, 14, C.L, "CH", "center", false); }
     // تحويل الكلام لحاد
     const id = T.getImageData(0, 0, NW * TS, NH * TS), d = id.data; for (let i = 3; i < d.length; i += 4) d[i] = d[i] >= 120 ? 255 : 0; T.putImageData(id, 0, 0);
     // الشاشة النهائية: كل حاجة بتتكبّر من غير تنعيم

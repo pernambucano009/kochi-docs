@@ -2,20 +2,27 @@
 <script>
 // قالب «تصميم سويسري»: شبكة صارمة، حبر أسود وورق ورمادي فاتح ولون إشارة واحد بس، كل حاجة بتنزل على الإيقاع بمنحنى واحد دقيق
 // (من غير نطّ)، الدخول بالمسح مش بالبهتان، والحذف بقطعة سكينة… والدايرة الحمرا هي الاستثناء: بتتحرك حرّة برّه الشبكة. 12 ثانية.
+const G1 = "١ · الرقم", G2 = "٢ · السطور", G3 = "٣ · الاسم", GS = "الشكل العام";
 const PR = M.params({
-  num: { label: "الرقم الكبير", kind: "text", def: "01" },
-  l1: { label: "السطر ١", kind: "text", def: "أقل كلام." },
-  l2: { label: "السطر ٢", kind: "text", def: "أوضح فكرة." },
-  l3: { label: "السطر ٣ (اللي بيفضل)", kind: "text", def: "أقوى براند." },
-  note: { label: "ملاحظة صغيرة", kind: "text", def: "إصدار ٣ · ٢٠٢٦" },
-  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "ستوديو أثر" },
-  tag: { label: "تحت الاسم", kind: "text", def: "تصميم هويات · القاهرة" },
-  signal: { label: "لون الإشارة", kind: "color", def: "#E30613" },
+  num: { label: "الرقم الكبير", kind: "text", def: "01", group: G1, max: 3, hint: "رقم ضخم (رقم الإصدار أو العدد أو السنة)، بالأرقام اللاتيني أحلى في الستايل ده." },
+  note: { label: "ملاحظة صغيرة", kind: "text", def: "إصدار ٣ · ٢٠٢٦", group: G1, max: 22, hint: "معلومة صغيرة تحت الرقم." },
+  l1: { label: "السطر ١", kind: "text", def: "أقل كلام.", group: G2, max: 14, hint: "٣ سطور قصيرة بنقطة في الآخر. التالت بس هو اللي بيفضل، فخليه أقواهم." },
+  l2: { label: "السطر ٢", kind: "text", def: "أوضح فكرة.", group: G2, max: 14 },
+  l3: { label: "السطر ٣ (اللي بيفضل)", kind: "text", def: "أقوى براند.", group: G2, max: 14 },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "ستوديو أثر", group: G3, max: 14 },
+  tag: { label: "تحت الاسم", kind: "text", role: "tagline", def: "تصميم هويات · القاهرة", group: G3, max: 26, hint: "الشغلانة والمدينة." },
+  signal: { label: "لون الإشارة", kind: "color", role: "accent", def: "#E30613", group: GS, hint: "اللون الوحيد في الفيديو (الدايرة): أحمر سويسري أو لون البراند لو قوي." },
+  fHead: { label: "خط السطور", kind: "font", def: "plex", group: GS, hint: "خط نضيف من غير زخرفة يليق على الشبكة." },
+  fText: { label: "خط الملاحظات", kind: "font", def: "plex4", group: GS },
+});
+M.meta({
+  story: "تصميم سويسري: شبكة صارمة، حبر أسود وورق ولون إشارة واحد، رقم ضخم وسطور بتنزل على الإيقاع بالمسح، وبتتشال بقطعة سكينة، والدايرة الحمرا بتتحرك حرة برّه الشبكة، وفي الآخر الاسم.",
+  scenes: [{ name: G1, t0: 0, t1: 3, about: "الرقم الكبير والملاحظة" }, { name: G2, t0: 3, t1: 8, about: "٣ سطور واحد ورا التاني" }, { name: G3, t0: 8, t1: 12, about: "الاسم وتحته الوصف" }],
+  tips: ["مناسب لاستوديوهات التصميم والبراندات اللي بتحب البساطة.", "قلّل الكلام لأقصى حد: الستايل كله عن الفراغ.", "لون واحد بس، الباقي أسود ورمادي."],
 });
 const W = 1080, H = 1920, DUR = 12, BPM = 100, B = 60 / BPM;
 const MX = 72, GUT = 24, COLS = 6, CW = (W - 2 * MX - GUT * (COLS - 1)) / COLS;   // ٦ أعمدة
 const colX = (i) => W - MX - (i + 1) * CW - i * GUT;                                 // العمود ٠ على اليمين (عربي)
-const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
 const esc = (v) => String(v ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 const ar = (s) => String(s).replace(/\d/g, (d) => "٠١٢٣٤٥٦٧٨٩"[d]);
 // المنحنى الوحيد: cubic-bezier(.7,0,.2,1)
@@ -26,7 +33,7 @@ const snap = (t, b, len = .5) => bez((t - (at(b) - len * B)) / (len * B));   // 
 M.reel({
   W, H, DUR, bg: "#EAE9E5",
   async init(M) {
-    await Promise.all([loadFont("PB", "TY-PlexArabic-700.ttf", "700"), loadFont("PX", "TY-PlexArabic-400.ttf"), loadFont("I9", "inter900.ttf", "900"), loadFont("PM", "TY-PlexMono-500.ttf", "500")]);
+    await Promise.all([M.font("PB", PR.fHead), M.font("PX", PR.fText), new FontFace("I9", "url(../../fonts/inter900.ttf)", { weight: "900" }).load().then((f) => document.fonts.add(f)).catch(() => {}), new FontFace("PM", "url(../../fonts/TY-PlexMono-500.ttf)", { weight: "500" }).load().then((f) => document.fonts.add(f)).catch(() => {})]);
     const st = M.stage; st.dir = "rtl";
     const cv = M.canvas(W, H); const x = cv.getContext("2d");
     const clip = (txt, top, size, font = "PB", col = "#111") => { const w = M.el("div", "", `position:absolute;right:${MX}px;top:${top}px;height:${size * 1.25}px;overflow:hidden;`); const i = M.el("div", "", `font:${font === "PB" ? 700 : 400} ${size}px/1.25 ${font};color:${col};white-space:nowrap;letter-spacing:-.01em;`, esc(txt), w); return { w, i }; };
