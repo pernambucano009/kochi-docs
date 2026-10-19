@@ -10,7 +10,7 @@ const Gallery = (() => {
     ...[["t-watercolor", "ألوان مية", "art", "صفحة كراسة بترسم نفسها بالفرشاة، وملاحظات بخط اليد جنب الرسمة."],
       ["t-riso", "ريزوجراف", "art", "طباعة بـ٣ أحبار فوق بعض، بنقط وألوان مش راكبة على بعض بالظبط."],
       ["t-hose", "كرتون قديم", "cartoon2d", "كرتون التلاتينات بالأبيض والأسود: شخصية بترقص على الجاز وكروت عناوين قديمة."],
-      ["t-board", "سبورة بيضا", "explain", "شرح بيترسم قدامك بالماركر، والكاميرا بتمشي على السبورة من فكرة للتانية."],
+      ["t-board", "سبورة", "explain", "شرح بيترسم قدامك على سبورة بيضا بالماركر أو خضرا وسودا بالطباشير، والكاميرا بتمشي من فكرة للتانية."],
       ["t-chat", "قصة شات", "social", "محادثة بين العميل والمتجر على الموبايل، بتنتهي بتأكيد الطلب."],
       ["t-price", "كشف السعر", "social", "السعر القديم بيتشطب والجديد بيخبط بكونفيتي، وعد تنازلي وزرار اطلب."],
       ["t-pixel", "بكسل", "retro", "عالم لعبة قديمة: البطل بيروح للمحل، صندوق كلام، «حصلت على…» وقايمة اختيار."],
@@ -73,58 +73,14 @@ const Gallery = (() => {
       .map(([id, name, cat, desc]) => ({ id, name, cat, desc, sample_url: `/gallery/${id}.mp4`, cover_url: `/gallery/${id}.jpg` }))];
   // تصنيفات القوالب اللي مش جاية من السيرفر
   const MORE_CATS = [{ id: "art", ar: "رسم وطباعة" }, { id: "explain", ar: "شرح" }, { id: "social", ar: "إعلانات سوشيال" }, { id: "cartoon2d", ar: "كرتون 2D" }, { id: "retro", ar: "ألعاب وريترو" }, { id: "other", ar: "قوالبي" }];
-  // سطر بيعرّف كل قالب (بيبان في المعاينة الكبيرة)
-  const DESC = {
-    "sk-diorama": "عالم ورق مجسّم بالطبقات زي الديوراما، بإضاءة دافية وحكاية وثائقية.",
-    "sk-vox": "كولاج تحريري: صور مقصوصة وأسهم وورق قديم، زي فيديوهات Vox الشارحة.",
-    "sk-glitch": "أشكال بيضا نضيفة وتشويش رقمي سريع، لإحساس تقني وحديث.",
-    "sk-glass": "أجسام زجاج ثلاثية الأبعاد بتلمع وبتتحرك بنعومة.",
-    "sk-engraved": "رسم محفور بالخطوط زي الكتب القديمة، بحركة تحريرية هادية.",
-    "sk-archive": "صور أرشيف بالأبيض والأسود بتتحرك وبتتركّب فوق بعض.",
-    "sk-paper": "ورق عتيق وطوابع وقصاصات، تكريم بإحساس الزمن الجميل.",
-    "sk-clay": "شخصيات وعالم من الصلصال، ستوب موشن ببصمات الإيد.",
-    "sk-papercut": "عالم كامل من الورق المقصوص بيتحرك ستوب موشن.",
-    "sk-ugc": "شخص بيتكلم للكاميرا بالموبايل ويراجع المنتج بشكل طبيعي.",
-    "sk-cinema-ad": "إعلان سينمائي باللقطات: إضاءة درامية وكاميرا وقصة قصيرة.",
-    "sk-song": "إعلان على شكل أغنية وميوزك فيديو.",
-    "sk-talking": "المنتج نفسه شخصية بتتكلم بأنيميشن.",
-    "sk-skeleton": "«إيه اللي يحصل لو…؟» بهيكل عظمي ثلاثي الأبعاد بيشرح.",
-    "sk-studio-shot": "صور استوديو احترافية للمنتج بإضاءة نضيفة.",
-    "sk-product-scene": "المنتج جوه مشهد حقيقي يناسبه.",
-    "sk-static-ads": "إعلانات ثابتة جاهزة للنشر من أكتر من 40 تصميم.",
-    "sk-felt": "عالم وعرايس من الصوف والفِلت بخيوط وزراير، ستوب موشن دافي.",
-    "sk-anime": "أنيمي مرسوم باليد بسما كبيرة ونور حنين ولحظات يومية.",
-    "sk-watercolor": "لوحة ألوان مية بتتفتح على الورق وبتتحرك بهدوء.",
-    "sk-miniature": "الدنيا الحقيقية شكلها لعب صغيرة بتصوير تيلت شيفت.",
-    "sk-noir": "فيلم أبيض وأسود غامض بظلال قوية ومطر وراوي.",
-    "sk-lowpoly": "عالم 3D بأشكال مضلّعة بسيطة وألوان باستيل زي الألعاب.",
-    "sk-vhs": "فيديو بيتي قديم من التسعينات بألوان باهتة ودفا العيلة.",
-    "sk-chalk": "رسومات طباشير بتترسم خط خط على سبورة لشرح الأفكار.",
-    "sk-sand": "رسم بالرمل على ترابيزة منوّرة، والصور بتتحول لبعضها.",
-    "sk-foodslow": "إعلان أكل بالتصوير البطيء جدًا: رشات وقطرات وإضاءة شهية.",
-    "sk-surreal": "عالم أحلام سريالي: حاجات عملاقة وأشياء طايرة وسما ناعمة.",
-    "sk-toy": "عالم لعب بلاستيك لامعة وألوان حلويات وحركة مرحة.",
-    "sk-hd2d": "شخصيات بكسل جوه ديوراما مجسّمة منوّرة بفوانيس وضباب، زي ألعاب المغامرات.",
-    "sk-popup": "كتاب بوب أب حقيقي على مكتب بيتفتح ويقوم منه مسرح ورق.",
-    "sk-scifitoon": "كرتون فضاء مضحك: رائد فضاء صغير وروبوت وكواكب ملونة.",
-    "sk-drone": "إعلان عقارات فخم بتصوير درون: فيلات وبيسينات وبحر وقت الغروب.",
-  };
   const CAT_EN = { cartoon2d: "2D Cartoon", anim3d: "3D Animation", paper: "Paper", clay: "Clay", collage: "Collage", motion: "Motion", ugc: "UGC", cinematic: "Cinematic", product: "Product", art: "Art & Print", explain: "Explainer", social: "Social Ads", retro: "Retro Games", other: "My Templates" };
 
-  // فيديوهات عرض جاهزة للقوالب (متعمولة مرة واحدة ومحفوظة في frontend/gallery)
-  const SHOW = ["sk-clay", "sk-papercut", "sk-ugc", "sk-cinema-ad", "sk-skeleton", "sk-talking", "sk-song",
-    "sk-studio-shot", "sk-product-scene", "sk-static-ads", "sk-felt", "sk-anime", "sk-watercolor", "sk-miniature", "sk-noir", "sk-lowpoly",
-    "sk-vhs", "sk-chalk", "sk-sand", "sk-foodslow", "sk-surreal", "sk-toy",
-    "sk-hd2d", "sk-popup", "sk-scifitoon", "sk-drone"];
   async function load() {
-    const [tpls, cats] = await Promise.all([api("/api/templates"), api("/api/style-cats").catch(() => [])]);
-    const catOf = {};
-    cats.forEach((c) => (c.templates || []).forEach((t) => (catOf[t.id] = c.id)));
+    const cats = await api("/api/style-cats").catch(() => []);
     S.cats = [...cats, ...MORE_CATS.filter((m) => !cats.some((c) => c.id === m.id))];
-    // القوالب اللي اتحفظت من المعمل ومعندهاش فيديو عرض: نعرض الفيديو الأصلي اللي اتعملت منه
-    S.items = [...tpls.map((t) => ({ ...t, sample_url: t.sample_url || t.source_url,
-      ...(SHOW.includes(t.id) ? { sample_url: `/gallery/${t.id}.mp4`, cover_url: `/gallery/${t.id}.jpg` } : {}),
-      cat: catOf[t.id] || "other" })), ...EXTRA];
+    // المعرض قوالب كود بس: بتترسم زي الغلاف بالظبط ومن غير توليد. قوالب التوليد بالذكاء الصناعي (sk-* واللي من المعمل)
+    // اتشالت من هنا لأن نتيجتها مش مضمونة ومش شبه الغلاف، ومكانها بعدين في «مولد الفيديو» لو احتجناها
+    S.items = [...EXTRA];
   }
   const catName = (id) => S.cats.find((c) => c.id === id)?.ar || "تانية";
   // 🎡 العجلة: مالية الصفحة. أسماء القوالب على قوس على الشمال، واسم القالب اللي السهم عليه في النص، والكروت عمودين على اليمين.
@@ -281,7 +237,7 @@ const Gallery = (() => {
     W.swapT = setTimeout(() => {   // الاسم بيتغيّر لما العجلة تهدى شوية (مش مع كل تكّة)
       const ti = el.querySelector(".nh-wh-title"); ti.innerHTML = ""; const s = document.createElement("span"); s.textContent = x.name; ti.appendChild(s);
       s.animate?.([{ opacity: 0, transform: "translateY(14px)" }, { opacity: 1, transform: "none" }], { duration: 320, easing: "cubic-bezier(.2,.8,.2,1)" });
-      el.querySelector(".nh-wh-desc").textContent = DESC[x.id] || x.desc || x.description || "";
+      el.querySelector(".nh-wh-desc").textContent = x.desc || x.description || "";
       el.querySelector(".nh-wh-eye .cat").textContent = catName(x.cat);
     }, 60);
     clearTimeout(W.playT);
@@ -394,7 +350,7 @@ const Gallery = (() => {
         if (e.target.closest("[data-gstart]")) {   // 🧭 مسار القالب (flow.js)
           const x = S.pvItem;
           closePv();
-          return Flow.start({ id: x.id, name: x.name, cat: catName(x.cat), desc: DESC[x.id] || x.desc || x.description || "" });
+          return Flow.start({ id: x.id, name: x.name, cat: catName(x.cat), desc: x.desc || x.description || "" });
         }
         if (e.target.closest("[data-gedit]")) {   // ✏️ محرر القالب: كل خانة بنصيحتها، والخطوط والألوان والمشاهد
           const x = S.pvItem;
@@ -413,7 +369,7 @@ const Gallery = (() => {
       <button type="button" class="nh-gal-x" data-gclose aria-label="اقفل">✕</button>
       <div class="nh-gal-pvart">${x.sample_url ? `<video src="${esc(x.sample_url)}" ${x.cover_url ? `poster="${esc(x.cover_url)}"` : ""} autoplay loop playsinline controls></video>` : `<span class="nh-gal-ph big"><i>${x.icon || "✦"}</i><small>فيديو العرض جاي قريب</small></span>`}</div>
       <div class="nh-gal-pvt"><span class="latin">${esc(CAT_EN[x.cat] || x.cat)}</span><b>${esc(x.name)}</b>
-        <p>${esc(DESC[x.id] || x.desc || x.description || "")}</p><small class="muted">${esc(catName(x.cat))}</small>
+        <p>${esc(x.desc || x.description || "")}</p><small class="muted">${esc(catName(x.cat))}</small>
         <button type="button" class="nh-gal-go" data-gstart>✨ ابدأ بالقالب ده</button>
         ${String(x.id).startsWith("t-") ? `<button type="button" class="nh-gal-go ghost" data-gedit>✏️ عدّله بنفسك</button>` : ""}
         <small class="nh-gal-hint">المخ هيقترح عليك أفكار وسيناريوهات على قد البراند بتاعك، وانت تختار.</small></div></div>`;

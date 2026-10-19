@@ -43,8 +43,9 @@
   //   group: اسم المشهد اللي الخانة فيه (المحرر بيقسّم الخانات عليه وبيقفز للمشهد ده)
   //   hint: نصيحة للعميل يحط إيه بالظبط علشان يطلع أحسن نتيجة · max: أقصى عدد حروف مقترح
   //   img: { ratio: "1:1", cut: true (من غير خلفية), tip: "..." } للصور
-  //   kind: text | lines | image | color | font | select | number | toggle
+  //   kind: text | lines | image | color | font | select | look | number | toggle
   //   font: script = "ar" | "lat" | "any" · select: options = [[القيمة، الاسم]] · number: min, max, step, unit
+  //   look: اختيار بالصور، options = [[القيمة، الاسم، صورة جنب القالب، {خانة: قيمة}]]: الاختيار بيحط قيمه في الخانات اللي ماتحددتش
   M.params = (schema) => {
     window.PARAM_SCHEMA = schema;
     const extra = window.PARAMS || {}, out = {};
@@ -53,10 +54,15 @@
       out[k] = v === undefined || v === null ? f.def : v;   // فاضي = فاضي (مش القيمة الأصلية)
       if (f.kind === "color" && !/^#[0-9a-f]{3,8}$/i.test(String(out[k]))) out[k] = f.def;
       if (f.kind === "font" && !M.FONTS[out[k]]) out[k] = f.def;
-      if (f.kind === "select" && !(f.options || []).some((o) => String(o[0]) === String(out[k]))) out[k] = f.def;
+      if ((f.kind === "select" || f.kind === "look") && !(f.options || []).some((o) => String(o[0]) === String(out[k]))) out[k] = f.def;
       if (f.kind === "number") { const n = parseFloat(out[k]); out[k] = isNaN(n) ? f.def : Math.min(f.max ?? n, Math.max(f.min ?? n, n)); }
       if (f.kind === "toggle") out[k] = out[k] === true || out[k] === "true" || out[k] === 1 || out[k] === "1";
       if (Array.isArray(f.def) && !Array.isArray(out[k])) out[k] = String(out[k]).split("\n").map((x) => x.trim()).filter(Boolean);
+    }
+    for (const k in schema) {
+      if (schema[k].kind !== "look") continue;
+      const set = (schema[k].options.find((o) => String(o[0]) === String(out[k])) || [])[3] || {};
+      for (const pk in set) if (pk in schema && !(pk in extra) && given[pk] === undefined) out[pk] = set[pk];
     }
     M.P = out;
     return out;

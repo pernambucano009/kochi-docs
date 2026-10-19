@@ -1,7 +1,7 @@
 <!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
 <script>
-// قالب «سبورة بيضا»: شرح بيترسم قدامك على سبورة لامعة بماركر طاير (من غير إيد)، الكاميرا بتمشي على السبورة من فكرة للتانية،
-// وفي الآخر بتبعد وتورّي الصورة كلها. 1080×1920، 12 ثانية.
+// قالب «سبورة»: شرح بيترسم قدامك على سبورة: بيضا لامعة بماركر طاير، أو خضرا/سودا بطباشير ليه تراب وحبيبات (من غير إيد)،
+// الكاميرا بتمشي على السبورة من فكرة للتانية، وفي الآخر بتبعد وتورّي الصورة كلها. 1080×1920، 12 ثانية.
 const G1 = "١ · العنوان", G2 = "٢ · الخطوات", G3 = "٣ · النتيجة", GS = "الشكل العام";
 const PR = M.params({
   title1: { label: "العنوان (السطر الأول)", kind: "text", role: "product", def: "إزاي تزوّد مبيعاتك", group: G1, max: 20,
@@ -15,18 +15,27 @@ const PR = M.params({
   icon3: { label: "رسمة الخطوة ٣", kind: "select", def: "chart", options: [["person", "👤 شخص"], ["bulb", "💡 لمبة"], ["chart", "📈 رسم بياني"], ["check", "✅ علامة صح"], ["star", "⭐ نجمة"]], group: G2, hint: "اختار رسمة بتشرح الخطوة من غير كلام." },
   result: { label: "النتيجة", kind: "text", def: "مبيعات أكتر", group: G3, max: 16, hint: "اللي العميل هياخده في الآخر، بتتعمل حواليها دايرة وعلامة صح." },
   brand: { label: "اسم البراند", kind: "text", role: "brand", def: "ستوديو نمو", group: G3, max: 20, hint: "بيتكتب تحت النتيجة، والكاميرا بتبعد وتورّي السبورة كلها." },
-  ink: { label: "لون الحبر الأساسي", kind: "color", def: "#23262c", group: GS, hint: "المربعات والكلام: لون غامق (أسود أو كحلي) علشان يتقري على السبورة البيضا." },
-  ink2: { label: "اللون التاني", kind: "color", def: "#2a5cb3", group: GS, hint: "الأسهم والرسومات: أزرق أو أخضر ماركر." },
-  accent: { label: "لون التمييز", kind: "color", role: "accent", def: "#d97757", group: GS, hint: "سطر العنوان التاني والدايرة حوالين النتيجة: لون البراند لو غامق كفاية." },
+  board: { label: "نوع السبورة", kind: "look", def: "white", group: GS, hint: "اختار السبورة وبعدين ظبط ألوانها تحت لو حابب.", options: [
+    ["white", "بيضا بماركر", "look-white.jpg", { bcol: "#f4f3ef", ink: "#23262c", ink2: "#2a5cb3", accent: "#d97757" }],
+    ["green", "خضرا بطباشير", "look-green.jpg", { bcol: "#2e4a3b", ink: "#f1efe6", ink2: "#bfe1f0", accent: "#f3d35a" }],
+    ["black", "سودا بطباشير", "look-black.jpg", { bcol: "#23272b", ink: "#f1efe6", ink2: "#f5b3c6", accent: "#f3d35a" }]] },
+  bcol: { label: "لون السبورة", kind: "color", def: "#f4f3ef", group: GS },
+  ink: { label: "لون الكتابة (الماركر أو الطباشير)", kind: "color", def: "#23262c", group: GS, hint: "المربعات والكلام: لازم يبقى عكس لون السبورة (غامق على البيضا، فاتح على الخضرا والسودا)." },
+  ink2: { label: "اللون التاني", kind: "color", def: "#2a5cb3", group: GS, hint: "الأسهم والرسومات." },
+  accent: { label: "لون التمييز", kind: "color", role: "accent", def: "#d97757", group: GS, hint: "سطر العنوان التاني والدايرة حوالين النتيجة." },
   fHand: { label: "خط الكتابة", kind: "font", def: "ruqaa", group: GS, hint: "الرقعة بتدي إحساس ماركر بإيد حقيقية. لو عايز شكل أنضف جرّب «بلكس عربي»." },
 });
 M.meta({
-  story: "شرح بيترسم قدامك على سبورة بيضا بماركر طاير: عنوان، ٣ خطوات كل واحدة في مربع برسمة وسهم للي بعدها، والنتيجة بدايرة، والكاميرا بتبعد وتورّي السبورة كلها.",
+  story: "شرح بيترسم قدامك على سبورة (بيضا بماركر، أو خضرا وسودا بطباشير): عنوان، ٣ خطوات كل واحدة في مربع برسمة وسهم للي بعدها، والنتيجة بدايرة، والكاميرا بتبعد وتورّي السبورة كلها.",
   scenes: [{ name: G1, t0: 0, t1: 2.9, about: "العنوان بسطرين وخط تحته" }, { name: G2, t0: 2.9, t1: 8.9, about: "٣ خطوات، كل خطوة ثانيتين" },
     { name: G3, t0: 8.9, t1: 12, about: "النتيجة بدايرة وصح، والبراند، والكاميرا بتبعد" }],
   tips: ["كل خطوة فعل قصير: الكلام الكتير بيصغر الخط ويتقري بصعوبة.", "الخطوات لازم تكون بالترتيب اللي العميل هيعمله فعلًا.", "النتيجة هي اللي بتخلي الناس تشيّر: خليها رقم أو مكسب واضح."],
 });
 const W = 1080, H = 1920, DUR = 12, BW = 1600, BH = 3050;
+// الطباشير: أي سبورة غير البيضا (الماركر بيتعمل multiply، والطباشير طبقة فاتحة متاكلة حبيبات)
+const CHALK = ["green", "black"].includes(PR.board);
+const hex = (h) => { const n = parseInt(String(h).replace("#", "").padEnd(6, "0").slice(0, 6), 16) || 0; return [n >> 16, n >> 8 & 255, n & 255]; };
+const shade = (h, k) => `rgb(${hex(h).map((v) => Math.max(0, Math.min(255, Math.round(k > 1 ? v + (255 - v) * (k - 1) : v * k)))).join(",")})`;
 
 // خط إيد بيترعش: بنعيد تقسيم المسار ونزوّد رعشة بطيئة + رعشة صغيرة
 function wob(pts, seed, amp = 3) {
@@ -40,17 +49,27 @@ const rect = (x0, y0, w, h, s) => [[[x0 - 6, y0 + 2], [x0 + w + 10, y0 - 3]], [[
 const ease = (u) => u - Math.sin(2 * Math.PI * u) / (2 * Math.PI) * .8;   // بطيء-سريع-بطيء زي الإيد
 
 M.reel({
-  W, H, DUR, bg: "#f4f3ef",
+  W, H, DUR, bg: PR.bcol,
   async init(M) {
     await M.font("RQ", PR.fHand);
     const FW = (M.FONTS[PR.fHand] || M.FONTS.ruqaa).weight;
     const c = M.canvas(W, H); const x = c.getContext("2d");
     const ink = PR.ink, ink2 = PR.ink2, acc = PR.accent;
-    // السبورة: أبيض دافي + آثار كتابة قديمة باهتة + خدوش
+    // السبورة: لونها + (بيضا) آثار كتابة قديمة باهتة + خدوش، أو (طباشير) آثار مساحة وتراب
     const board = document.createElement("canvas"); board.width = BW; board.height = BH; const b = board.getContext("2d"), R = M.rng(4);
-    const g = b.createLinearGradient(0, 0, BW, BH); g.addColorStop(0, "#f7f6f2"); g.addColorStop(1, "#ecebe6"); b.fillStyle = g; b.fillRect(0, 0, BW, BH);
+    const g = b.createLinearGradient(0, 0, BW, BH); g.addColorStop(0, shade(PR.bcol, CHALK ? 1.06 : 1.01)); g.addColorStop(1, shade(PR.bcol, CHALK ? .9 : .965)); b.fillStyle = g; b.fillRect(0, 0, BW, BH);
+    if (CHALK) {
+      // مسح المساحة: سحابات عريضة فاتحة رايحة جاية، وتراب خفيف
+      for (let i = 0; i < 70; i++) { b.strokeStyle = `rgba(255,255,255,${.012 + R() * .018})`; b.lineWidth = 80 + R() * 140; b.lineCap = "round"; b.beginPath(); const cx = R() * BW, cy = R() * BH, len = 200 + R() * 500; b.moveTo(cx, cy); b.bezierCurveTo(cx + len * .3, cy - 40 + R() * 80, cx + len * .7, cy - 40 + R() * 80, cx + len, cy + R() * 40 - 20); b.stroke(); }
+      for (let i = 0; i < 9000; i++) { b.fillStyle = `rgba(255,255,255,${R() * .07})`; b.fillRect(R() * BW, R() * BH, 1 + R() * 2, 1 + R() * 2); }
+    } else {
     for (let i = 0; i < 40; i++) { b.strokeStyle = `rgba(${R() < .5 ? "120,120,130" : "90,120,180"},${.05 + R() * .06})`; b.lineWidth = 6 + R() * 6; b.beginPath(); const cx = R() * BW, cy = R() * BH; if (R() < .4) { b.arc(cx, cy, 30 + R() * 90, R() * 6, R() * 6 + 4); } else { b.moveTo(cx, cy); for (let k = 0; k < 4; k++) b.lineTo(cx + R() * 200 - 60, cy + R() * 40 - 20); } b.stroke(); }
     for (let i = 0; i < 400; i++) { b.strokeStyle = `rgba(0,0,0,${R() * .04})`; b.lineWidth = .7; b.beginPath(); const cx = R() * BW, cy = R() * BH; b.moveTo(cx, cy); b.lineTo(cx + R() * 60 - 30, cy + R() * 10 - 5); b.stroke(); }
+    }
+    // حبيبات الطباشير: نقط شفافة بتتشال من الكتابة (destination-out) فتبان متاكلة
+    const grain = document.createElement("canvas"); grain.width = grain.height = 220; const gg = grain.getContext("2d"), R2 = M.rng(9);
+    for (let i = 0; i < 5200; i++) { gg.fillStyle = `rgba(0,0,0,${.15 + R2() * .7})`; const s = .8 + R2() * 2.2; gg.fillRect(R2() * 220, R2() * 220, s, s); }
+    const layer = document.createElement("canvas"); layer.width = W; layer.height = H;
     // كل حاجة بتترسم: نوع، وقت بداية ونهاية، لون، والنقط
     const I = [];
     const add = (o) => I.push(o);
@@ -78,7 +97,7 @@ M.reel({
     I.forEach((o) => { if (o.k === "line") o.L = o.p[o.p.length - 1][2]; if (o.k === "text") { x.font = `${FW} ${o.size}px RQ`; o.size = Math.min(o.size, o.size * (o.maxw || 1300) / Math.max(1, x.measureText(o.txt).width)); x.font = `${FW} ${o.size}px RQ`; o.w = x.measureText(o.txt).width; } });
     // ورقة الحبر: الحاجات اللي خلصت بتترسم مرة واحدة على طبقة ثابتة
     const inkL = document.createElement("canvas"); inkL.width = BW; inkL.height = BH;
-    return { x, board, I, inkL, done: -1, FW };
+    return { x, board, I, inkL, done: -1, FW, layer, grainPat: layer.getContext("2d").createPattern(grain, "repeat") };
   },
   seek(t, C, M) {
     const { x, I } = C, { seg, smooth, clamp } = M;
@@ -87,14 +106,19 @@ M.reel({
     let k = 0; while (k < K.length - 2 && t > K[k + 1][0]) k++;
     const [ta, xa, ya, za] = K[k], [tb, xb, yb, zb] = K[k + 1], u = smooth(seg(t, ta, tb));
     const iz = 1 / za + (1 / zb - 1 / za) * u, z = 1 / iz, cx = xa + (xb - xa) * u, hh = H / (2 * z), cy = hh * 2 < BH ? clamp(ya + (yb - ya) * u, hh, BH - hh) : BH / 2;
-    x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = "#d9d6cf"; x.fillRect(0, 0, W, H);
+    x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = CHALK ? "#3b3531" : "#d9d6cf"; x.fillRect(0, 0, W, H);
     x.save(); x.translate(W / 2, H / 2); x.rotate(Math.sin(t * .4) * .004); x.scale(z, z); x.translate(-cx, -cy);
     x.drawImage(C.board, 0, 0);
     // إطار السبورة (بيبان بس لما الكاميرا تبعد)
-    x.lineWidth = 34; x.strokeStyle = "#b9b6ae"; x.strokeRect(-17, -17, BW + 34, BH + 34);
-    x.globalCompositeOperation = "multiply";
+    x.lineWidth = 34; x.strokeStyle = CHALK ? "#7a5634" : "#b9b6ae"; x.strokeRect(-17, -17, BW + 34, BH + 34);
+    if (CHALK) { x.lineWidth = 6; x.strokeStyle = "rgba(0,0,0,.35)"; x.strokeRect(3, 3, BW - 6, BH - 6); }
+    // الماركر بيترسم على طول (multiply)، والطباشير بيترسم على طبقة لوحده وبعدين بتتاكل حبيبات
+    const lx = CHALK ? C.layer.getContext("2d") : x;
+    if (CHALK) { lx.setTransform(1, 0, 0, 1, 0, 0); lx.clearRect(0, 0, W, H); lx.setTransform(x.getTransform()); }
+    else x.globalCompositeOperation = "multiply";
     let pen = null, penCol = PR.ink;
     I.forEach((o) => {
+      const x = lx;
       const p = ease(seg(t, o.t0, o.t1)); if (p <= 0) return;
       if (o.k === "line") {
         const lim = o.L * p, pts = o.p; x.beginPath(); let last = pts[0];
@@ -111,20 +135,32 @@ M.reel({
       }
     });
     x.globalCompositeOperation = "source-over";
+    if (CHALK) {
+      lx.setTransform(1, 0, 0, 1, 0, 0); lx.globalCompositeOperation = "destination-out"; lx.fillStyle = C.grainPat; lx.fillRect(0, 0, W, H); lx.globalCompositeOperation = "source-over";
+      x.save(); x.setTransform(1, 0, 0, 1, 0, 0); x.globalAlpha = .93; x.drawImage(C.layer, 0, 0); x.restore();
+    }
     // الماركر: بيطير لمكان الكتابة وبيترفع شوية بين الضربات (ضله بيكبر)، ولما مفيش كتابة بيركن برّه
     const park = [cx - W / z * .62, cy - H / z * .55];
     const mp = pen || park, lift = pen ? 0 : 60;
     C.mpos = C.mpos && Math.abs(C.lastT - t) < .1 ? [C.mpos[0] + (mp[0] - C.mpos[0]) * .5, C.mpos[1] + (mp[1] - C.mpos[1]) * .5] : mp; C.lastT = t;
     const [mx, my] = C.mpos;
-    x.save(); x.translate(mx + 14 + lift * .4, my + 16 + lift * .6); x.rotate(-2.3); x.fillStyle = `rgba(0,0,0,${.18 - lift * .0015})`; x.beginPath(); x.roundRect(0, -16, 260, 32, 14); x.fill(); x.restore();
+    x.save(); x.translate(mx + 14 + lift * .4, my + 16 + lift * .6); x.rotate(-2.3); x.fillStyle = `rgba(0,0,0,${.18 - lift * .0015})`; x.beginPath(); x.roundRect(0, -16, CHALK ? 160 : 260, 32, 14); x.fill(); x.restore();
     x.save(); x.translate(mx, my - lift); x.rotate(-2.3);
+    if (CHALK) {
+      // حتة طباشير: أسطوانة قصيرة بلون الكتابة، طرفها اللي بيكتب متآكل
+      x.fillStyle = penCol; x.beginPath(); x.roundRect(0, -15, 150, 30, 12); x.fill();
+      x.fillStyle = "rgba(0,0,0,.18)"; x.fillRect(4, 6, 142, 9); x.fillStyle = "rgba(255,255,255,.35)"; x.fillRect(10, -11, 120, 5);
+      x.restore(); x.restore();
+    } else {
     x.fillStyle = penCol; x.beginPath(); x.moveTo(0, 0); x.lineTo(18, -9); x.lineTo(18, 9); x.closePath(); x.fill();
     x.fillStyle = "#f8f8f6"; x.strokeStyle = "rgba(0,0,0,.25)"; x.lineWidth = 2; x.beginPath(); x.roundRect(18, -17, 200, 34, 6); x.fill(); x.stroke();
     x.fillStyle = penCol; x.fillRect(150, -17, 26, 34); x.beginPath(); x.roundRect(218, -19, 60, 38, 8); x.fill();
     x.fillStyle = "rgba(255,255,255,.5)"; x.fillRect(24, -12, 120, 6);
     x.restore();
     x.restore();
+    }
     // لمعة الشباك على السبورة (بتتحرك أبطأ من الكاميرا)
+    if (CHALK) return;
     x.save(); x.globalCompositeOperation = "screen"; const sx = 300 - cy * .12 * .35;
     const sg = x.createLinearGradient(sx, 0, sx + 500, 500); sg.addColorStop(0, "rgba(255,255,255,0)"); sg.addColorStop(.45, "rgba(255,255,255,.13)"); sg.addColorStop(.55, "rgba(255,255,255,.13)"); sg.addColorStop(1, "rgba(255,255,255,0)");
     x.fillStyle = sg; x.translate(0, 0); x.fillRect(0, 0, W, H); x.restore();
@@ -133,7 +169,7 @@ M.reel({
     const N = A.midi;
     // صرير الماركر على السبورة أثناء الكتابة (رشقات قصيرة)
     const writes = [[.4, 2.85], [3.0, 4.85], [5.0, 6.85], [7.0, 8.85], [8.9, 10.35], [10.6, 11.3]];
-    writes.forEach(([a, b]) => { for (let s = a; s < b; s += .11 + (Math.sin(s * 13) + 1) * .04) A.nz(s, .07 + (Math.sin(s * 7) + 1) * .03, "bandpass", 2600 + Math.sin(s * 5) * 900, .05, 3); });
+    writes.forEach(([a, b]) => { for (let s = a; s < b; s += .11 + (Math.sin(s * 13) + 1) * .04) A.nz(s, .07 + (Math.sin(s * 7) + 1) * .03, "bandpass", (CHALK ? 1500 : 2600) + Math.sin(s * 5) * (CHALK ? 500 : 900), CHALK ? .07 : .05, 3); });
     [2.9, 4.95, 6.95, 8.9, 10.5].forEach((s) => A.whoosh(s, .5, .12));
     // موسيقى خفيفة: نقرات كيبورد وجيتار
     const chords = [[60, 64, 67], [57, 60, 64], [62, 65, 69], [55, 59, 62]];

@@ -1825,3 +1825,8 @@ audio { width: 100%; }
 .flw-ref.ok { opacity: .7; }
 .flw-ref > div { flex: 1; }
 .flw-ref > label { flex: none; align-self: center; white-space: nowrap; cursor: pointer; }
+/* اختيار بالصور (kind: look): كل كارت شكل جاهز للقالب */
+.ml-looks { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; }
+.ml-look { display: grid; gap: 6px; padding: 5px 5px 8px; border-radius: 14px; border: 2px solid transparent; background: var(--nh-bg); cursor: pointer; font: 12px var(--nh-arabic); color: var(--nh-ink, inherit); }
+.ml-look img { width: 100%; aspect-ratio: 3 / 4; object-fit: cover; border-radius: 10px; display: block; }
+.ml-look.on { border-color: var(--nh-accent); }

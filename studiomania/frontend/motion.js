@@ -104,6 +104,12 @@ const MotionPage = (() => {
       return `<label class="ml-f">${lab}<select data-pk="${k}">${fonts.map(([id, x]) => `<option value="${id}" ${id === v ? "selected" : ""}>${esc(x.label)}${x.script === "lat" ? " · لاتيني" : ""}</option>`).join("")}</select>${hint}</label>`;
     }
     if (f.kind === "select") return `<label class="ml-f">${lab}<select data-pk="${k}">${(f.options || []).map(([o, t]) => `<option value="${esc(o)}" ${String(o) === String(v) ? "selected" : ""}>${esc(t)}</option>`).join("")}</select>${hint}</label>`;
+    // اختيار بالصور: كل صورة شكل جاهز، ولما تختاره بيحط ألوانه في الخانات (وتقدر تظبطها بعدها)
+    if (f.kind === "look") {
+      const base = (S.view?.m.preview_url || "").replace(/[^/]*$/, "");
+      return `<div class="ml-f">${lab}<div class="ml-looks">${(f.options || []).map(([o, t, img]) => `<button type="button" class="ml-look ${String(o) === String(v) ? "on" : ""}" data-plook="${k}" data-val="${esc(o)}">
+        ${img ? `<img src="${esc(base + img)}" alt="" loading="lazy">` : ""}<span>${esc(t)}</span></button>`).join("")}</div>${hint}</div>`;
+    }
     if (f.kind === "number") return `<label class="ml-f">${lab}<span class="ml-num"><input type="range" data-pk="${k}" min="${f.min ?? 0}" max="${f.max ?? 100}" step="${f.step ?? 1}" value="${esc(v)}"><b class="num">${esc(v)}${esc(f.unit || "")}</b></span>${hint}</label>`;
     if (f.kind === "lines") return `<label class="ml-f">${lab}<textarea rows="${Math.min(8, Math.max(3, (v || []).length + 1))}" data-pk="${k}" data-lines>${esc((Array.isArray(v) ? v : String(v || "").split("\n")).join("\n"))}</textarea>${hint}</label>`;
     if (f.kind === "image") {
@@ -253,6 +259,12 @@ const MotionPage = (() => {
       if (bar) { const r = bar.getBoundingClientRect(), f = (e.clientX - r.left) / r.width, rtl = getComputedStyle(bar).direction === "rtl"; v.range = null; v.t = (rtl ? 1 - f : f) * (v.D || 0); if (v.audio) v.audio.currentTime = v.t; return; }
       const gh = t.closest("[data-grp]");
       if (gh) { const g = gh.dataset.grp; v.open = v.open === g ? "" : g; playScene(v.open); renderFields(); renderTl(); return; }
+      const lk = t.closest("[data-plook]");
+      if (lk) {
+        const k = lk.dataset.plook, opt = (v.schema?.[k]?.options || []).find((o) => String(o[0]) === lk.dataset.val);
+        v.vals = { ...v.vals, [k]: lk.dataset.val, ...(opt?.[3] || {}) };
+        renderFields(); return reload(0);
+      }
       const im = t.closest("[data-pimg]");
       if (im) { v.vals[im.dataset.pimg] = im.dataset.src; renderFields(); return reload(0); }
       if (t.closest("[data-brand]")) { v.vals = applyBrand(v.schema || {}, { ...v.vals }, await brandValues()); renderFields(); return reload(0); }
