@@ -22,6 +22,7 @@ const STEP_INFO = {
   13: { num: "", title: "الدبلجة باللهجات", en: "Dubbing" },
   14: { num: "", title: "القوالب", en: "Templates" },
   15: { num: "", title: "الكومنتات والرسايل", en: "Inbox" },
+  16: { num: "", title: "نسختي", en: "My twin" },
   "6s": { num: "", title: "مونتاج المسلسلات", en: "Series montage" },
   "6a": { num: "", title: "مونتاج الإعلانات", en: "Ad montage" },
   "6f": { num: "", title: "المونتاج", en: "Montage" },
@@ -77,7 +78,7 @@ function openStage(step) {
   $("stageTitle").textContent = info.title;
   // أيقونة القسم الزجاج جنب العنوان: نفس أيقونة المربع اللي فتحه، فالزوم بيوديها مكانها من غير ما تتغيّر
   const ic = { settings: "settings", 7: "publish", cal: "publish", 15: "publish", 8: "carousel", 9: "series", 10: "publish", 12: "create", 13: "voices", 14: "reel",
-    6: "film", "6f": "film", "6s": "series", "6a": "publish", 3: "voices", 4: "characters", 5: "music" }[step];
+    6: "film", "6f": "film", "6s": "series", "6a": "publish", 3: "voices", 4: "characters", 5: "music", 16: "characters" }[step];
   $("stageIc").hidden = !ic;
   $("stageIc").innerHTML = ic ? `<img class="ic-l" src="/icons3d/${ic}.webp?v=9" alt=""><img class="ic-d" src="/icons3d/${ic}_d.webp?v=9" alt="">` : "";
   // المونتاج شاشة شغل: راس صغير (رجوع + اسم المشروع + صدّر) بدل العنوان الكبير، زي البروتوتايب

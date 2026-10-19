@@ -65,6 +65,7 @@ const BrandPage = (() => {
       // الشخصيات (والأفاتار) والتعليق الصوتي والموسيقى: من أساسيات البراند، فبقوا فرع من العقل (كل نقطة بتفتح صفحتها)
       { k: "library", t: "الشخصيات والأصوات", en: "Library", leaves: [
         { f: "pg", i: "coaches", page: "coaches", t: "الشخصيات والأفاتار", type: "page" },
+        { f: "pg", i: "twin", page: "twin", t: "🪞 نسختي (أفاتار منك)", type: "page" },
         { f: "pg", i: "voice", page: "voice", t: "التعليق الصوتي", type: "page" },
         { f: "pg", i: "music", page: "music", t: "الموسيقى", type: "page" },
         { f: "pg", i: "stylecl", page: "stylecl", t: "🎨 استنساخ الستايل", type: "page" },
@@ -599,6 +600,7 @@ const BrandPage = (() => {
     return head;
   }
   function openCard(n) {
+    if (n?.l?.type === "page" && n.l.page === "twin") return showStep("16");   // قسم لوحده (مش صفحة جوه العقل)
     if (n?.l?.type === "page") { window.RV_FOCUS = n.l.page === "rivals" ? n.l.i : null; return window.NHNav?.(n.l.page); }   // الشخصيات / التعليق / الموسيقى: صفحتها بتفتح جوه العقل («رجوع» بيرجّعك هنا)
     const card = S.el.querySelector(".bm-card");
     if (!n) { S.open = null; card.hidden = true; S.el.classList.remove("has-card"); markOpen(); return; }

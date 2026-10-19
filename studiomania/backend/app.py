@@ -4067,6 +4067,7 @@ import hekaya  # noqa: E402
 import brainquiz  # noqa: E402
 import brainsocial  # noqa: E402
 import stock  # noqa: E402
+import twin  # noqa: E402
 import wallet  # noqa: E402
 import comics  # noqa: E402
 
@@ -5659,6 +5660,9 @@ app.mount("/media/carousels", StaticFiles(directory=CAROUSELS_DIR), name="carous
 app.mount("/media/series", StaticFiles(directory=SERIES_DIR), name="series")
 app.mount("/media/ads", StaticFiles(directory=ADS_DIR), name="ads")
 app.mount("/media/brand", StaticFiles(directory=BRAND_DIR), name="brand")
+TWINS_DIR = DATA_DIR / "twins"
+TWINS_DIR.mkdir(parents=True, exist_ok=True)
+app.mount("/media/twins", StaticFiles(directory=TWINS_DIR), name="twins")
 app.mount("/media/lab", StaticFiles(directory=DATA_DIR / "lab", check_dir=False), name="lab")
 app.mount("/media/assets", StaticFiles(directory=DATA_DIR / "assets", check_dir=False), name="assets")
 app.mount("/media/films", StaticFiles(directory=DATA_DIR / "films", check_dir=False), name="films")
@@ -23792,4 +23796,313 @@ def index():
     return html_page("index.html")
 
 
+
+
+# ---------------------------------------------------------------- 🪞 «نسختي»: أفاتار من تسجيلات الشخص الحقيقية
+TWIN_LOCK = threading.Lock()
+TWIN_COST = {"video:veed": dub.LIPSYNC["veed"]["per_sec"], "video:sync": dub.LIPSYNC["sync"]["per_sec"],
+             "photo:std": AVATAR_MODELS["std"]["per_sec"], "photo:pro": AVATAR_MODELS["pro"]["per_sec"]}
+
+
+def twin_dir(tid: str) -> Path:
+    return TWINS_DIR / Path(tid).name
+
+
+def twin_load(tid: str) -> dict:
+    f = twin_dir(tid) / "twin.json"
+    if not f.exists():
+        raise HTTPException(404, "النسخة دي مش موجودة")
+    return json.loads(f.read_text(encoding="utf-8"))
+
+
+def twin_save(tid: str, d: dict) -> None:
+    d["updated_at"] = now()
+    f = twin_dir(tid) / "twin.json"
+    f.with_suffix(".tmp").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+    f.with_suffix(".tmp").replace(f)
+
+
+def twin_update(tid: str, fn) -> dict:
+    with TWIN_LOCK:
+        d = twin_load(tid)
+        fn(d)
+        twin_save(tid, d)
+        return d
+
+
+def twin_to_dict(tid: str, d: dict) -> dict:
+    ver = re.sub(r"\D", "", str(d.get("updated_at") or ""))[-10:]
+    u = lambda f: f"/media/twins/{tid}/{f}?v={ver}" if f else None  # noqa: E731
+    return {**d, "id": tid, "ready": twin.ready(d), "cost": TWIN_COST,
+            "video_url": u((d.get("video") or {}).get("file")), "voice_url": u((d.get("voice") or {}).get("file")),
+            "photos": [{**p, "url": u(p["file"])} for p in d.get("photos") or []],
+            "clips": [{**c, "url": u(c.get("file")), "audio_url": u(c.get("audio"))} for c in d.get("clips") or []],
+            "busy": any(c.get("status") in ("queued", "working") for c in d.get("clips") or [])}
+
+
+@app.get("/api/twin-kit")
+def twin_kit(lang: str = "ar"):
+    """السكريبت اللي هيتقري قدام الكاميرا، وسكريبت الصوت، والاتجاهات، والنصايح."""
+    return twin.kit("en" if lang == "en" else "ar")
+
+
+@app.get("/api/twins")
+def twins_list():
+    out = []
+    for f in sorted(TWINS_DIR.glob("*/twin.json"), key=lambda x: x.stat().st_mtime, reverse=True):
+        try:
+            d = json.loads(f.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if d.get("client_id") not in (None, active_client_id()) and active_client_id():
+            continue
+        out.append(twin_to_dict(f.parent.name, d))
+    return out
+
+
+class TwinNewIn(BaseModel):
+    name: str
+    consent: bool = False
+
+
+@app.post("/api/twins")
+def twin_new(body: TwinNewIn):
+    """نسخة جديدة. لازم تأكيد إن ده الشخص نفسه أو معاه إذنه."""
+    if not body.consent:
+        raise HTTPException(400, "لازم تأكد إن ده انت، أو إن معاك إذن صريح من الشخص")
+    name = body.name.strip()[:80]
+    if not name:
+        raise HTTPException(400, "اكتب اسم الشخص")
+    tid = uuid.uuid4().hex[:10]
+    twin_dir(tid).mkdir(parents=True)
+    d = {"name": name, "client_id": active_client_id(), "consent": {"at": now(), "role": TENANT_ROLE}, "video": None, "photos": [],
+         "voice": None, "clips": [], "created_at": now()}
+    with TWIN_LOCK:
+        twin_save(tid, d)
+    return twin_to_dict(tid, d)
+
+
+@app.get("/api/twins/{tid}")
+def twin_get(tid: str):
+    return twin_to_dict(tid, twin_load(tid))
+
+
+@app.delete("/api/twins/{tid}")
+def twin_delete(tid: str):
+    twin_load(tid)
+    shutil.rmtree(twin_dir(tid), ignore_errors=True)
+    return {"ok": True}
+
+
+def twin_mp4(src: Path, dest: Path) -> None:
+    """أي فيديو (والمتسجّل من المتصفح webm) ← mp4 بصوت، ومقلوب صح، وحجم معقول للموديلات."""
+    subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src),
+                    "-vf", "scale='if(gt(iw,ih),min(1920,iw),-2)':'if(gt(iw,ih),-2,min(1920,ih))',fps=30,format=yuv420p",
+                    "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-c:a", "aac", "-b:a", "160k", "-ac", "1", "-movflags", "+faststart", str(dest)],
+                   check=True, capture_output=True, timeout=1200)
+
+
+@app.post("/api/twins/{tid}/video")
+def twin_video(tid: str, file: UploadFile = File(...)):
+    """🎬 الفيديو وهو بيقرا السكريبت: ده اللي بنركّب عليه أي كلام جديد بعدين (الوش والحركة واللبس بتوعه هو)."""
+    folder = twin_dir(tid)
+    twin_load(tid)
+    raw = save_upload(file, VIDEO_EXTENSIONS, folder, "raw")
+    name = f"video_{uuid.uuid4().hex[:6]}.mp4"
+    try:
+        twin_mp4(folder / raw, folder / name)
+    except subprocess.CalledProcessError as exc:
+        raise HTTPException(400, "الفيديو ده مش بيتقري. جرّب تسجّله تاني أو ارفع mp4") from exc
+    finally:
+        (folder / raw).unlink(missing_ok=True)
+    info = media_info(folder / name)
+    if info.duration < 15:
+        (folder / name).unlink(missing_ok=True)
+        raise HTTPException(400, "الفيديو قصير. اقرا السكريبت كله (دقيقة تقريبًا)")
+    if info.duration > 300:
+        (folder / name).unlink(missing_ok=True)
+        raise HTTPException(400, "الفيديو أطول من ٥ دقايق. سجّل السكريبت بس")
+    def fn(d):
+        old = (d.get("video") or {}).get("file")
+        if old:
+            (folder / old).unlink(missing_ok=True)
+        d["video"] = {"file": name, "duration": round(info.duration, 2), "w": info.width, "h": info.height, "at": now()}
+    return twin_to_dict(tid, twin_update(tid, fn))
+
+
+@app.post("/api/twins/{tid}/photo")
+def twin_photo(tid: str, angle: str = Form(...), file: UploadFile = File(...)):
+    """📷 صورة من اتجاه معيّن (كل اتجاه صورة واحدة، والجديدة بتبدّل القديمة)."""
+    if angle not in twin.ANGLE_IDS:
+        raise HTTPException(400, "الاتجاه ده مش معروف")
+    folder = twin_dir(tid)
+    twin_load(tid)
+    name = save_upload(file, IMAGE_EXTENSIONS, folder, f"photo_{angle}")
+    def fn(d):
+        for p in [x for x in d.get("photos") or [] if x["angle"] == angle]:
+            (folder / p["file"]).unlink(missing_ok=True)
+        d["photos"] = [x for x in d.get("photos") or [] if x["angle"] != angle] + [{"angle": angle, "file": name, "at": now()}]
+    return twin_to_dict(tid, twin_update(tid, fn))
+
+
+@app.delete("/api/twins/{tid}/photo/{angle}")
+def twin_photo_delete(tid: str, angle: str):
+    folder = twin_dir(tid)
+    def fn(d):
+        for p in [x for x in d.get("photos") or [] if x["angle"] == angle]:
+            (folder / p["file"]).unlink(missing_ok=True)
+        d["photos"] = [x for x in d.get("photos") or [] if x["angle"] != angle]
+    return twin_to_dict(tid, twin_update(tid, fn))
+
+
+@app.post("/api/twins/{tid}/voice")
+def twin_voice(tid: str, file: UploadFile = File(...)):
+    """🎙️ الصوت لوحده في مكان هادي (لاستنساخ الصوت بعدين، ولو الفيديو صوته وحش)."""
+    folder = twin_dir(tid)
+    twin_load(tid)
+    name = save_audio_upload(file, folder, "voice")
+    dur = probe_duration(folder / name)
+    if dur < 20:
+        (folder / name).unlink(missing_ok=True)
+        raise HTTPException(400, "التسجيل قصير. اقرا سكريبت الصوت كله (دقيقة تقريبًا)")
+    def fn(d):
+        old = (d.get("voice") or {}).get("file")
+        if old:
+            (folder / old).unlink(missing_ok=True)
+        d["voice"] = {"file": name, "duration": round(dur, 2), "at": now()}
+    return twin_to_dict(tid, twin_update(tid, fn))
+
+
+def twin_base_video(src: Path, dur: float, dest: Path) -> None:
+    """فيديو القراية على قد الصوت الجديد: لو أقصر بيتعاد رايح جاي (من غير قفلة باينة)، ومن غير صوته."""
+    ff = [ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y"]
+    have = probe_duration(src)
+    if have >= dur + 0.2:
+        subprocess.run(ff + ["-i", str(src), "-t", f"{dur + 0.2:.2f}", "-an", "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", str(dest)],
+                       check=True, capture_output=True, timeout=900)
+        return
+    pp = dest.with_name("pingpong.mp4")
+    subprocess.run(ff + ["-i", str(src), "-filter_complex", "[0:v]split[a][b];[b]reverse[r];[a][r]concat=n=2:v=1:a=0[v]", "-map", "[v]",
+                         "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", str(pp)], check=True, capture_output=True, timeout=1800)
+    subprocess.run(ff + ["-stream_loop", "-1", "-i", str(pp), "-t", f"{dur + 0.2:.2f}", "-an", "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", str(dest)],
+                   check=True, capture_output=True, timeout=900)
+    pp.unlink(missing_ok=True)
+
+
+def twin_clip_set(tid: str, cid: str, **kw) -> None:
+    def fn(d):
+        for c in d.get("clips") or []:
+            if c["id"] == cid:
+                c.update(**kw)
+    twin_update(tid, fn)
+
+
+def run_twin_clip(tid: str, cid: str) -> None:
+    """الكلام الجديد بصوته ← فيديو بيه هو: يا إما على فيديو القراية بتاعه (ليب سينك)، يا إما من صورته القدامية."""
+    folder = twin_dir(tid)
+    try:
+        d = twin_load(tid)
+        c = next(x for x in d["clips"] if x["id"] == cid)
+        audio = folder / c["audio"]
+        dur = probe_duration(audio)
+        if dur > 120:
+            raise RuntimeError("الصوت أطول من دقيقتين. قسّمه على أكتر من فيديو")
+        key = f"{c['method']}:{c['quality']}"
+        cost = wallet.credits(TWIN_COST[key] * dur)
+        wallet.need(cost, "فيديو بنسختك")
+        dest = folder / f"clip_{cid}.mp4"
+        if c["method"] == "video":
+            twin_clip_set(tid, cid, status="working", step="بيجهّز فيديو القراية على قد الكلام")
+            base = folder / f"base_{cid}.mp4"
+            twin_base_video(folder / d["video"]["file"], dur, base)
+            twin_clip_set(tid, cid, step="👄 بيركّب الكلام على شفايفك (بياخد كام دقيقة)")
+            if atlas.mock_mode():
+                subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(base), "-i", str(audio), "-map", "0:v", "-map", "1:a",
+                                "-c:v", "copy", "-c:a", "aac", "-shortest", str(dest)], check=True, capture_output=True, timeout=600)
+            else:
+                lip = dub.LIPSYNC[c["quality"]]
+                vurl, aurl = atlas.upload_media(base), atlas.upload_media(audio)
+                body = {"model": lip["model"], "video_url": vurl, "audio_url": aurl, "video": vurl, "audio": aurl}
+                if c["quality"] == "sync":
+                    body["sync_mode"] = "cut_off"
+                atlas.download(atlas.run_model("Video", body, "الليب سينك", max_seconds=3600, interval=6), dest)
+            base.unlink(missing_ok=True)
+        else:
+            photo = next((p for p in d.get("photos") or [] if p["angle"] == "front"), None) or next(p for p in d["photos"] if p["angle"] == "smile")
+            twin_clip_set(tid, cid, status="working", step="🎬 صورتك بتتكلم (بياخد كام دقيقة)")
+            if atlas.mock_mode():
+                subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-loop", "1", "-i", str(folder / photo["file"]), "-i", str(audio),
+                                "-vf", "scale=720:-2,format=yuv420p", "-c:v", "libx264", "-shortest", str(dest)], check=True, capture_output=True, timeout=300)
+            else:
+                m = AVATAR_MODELS[c["quality"]]
+                body = {"model": m["model"], "image": atlas.reference_url(folder / photo["file"]), "audio": atlas.upload_media(audio),
+                        "prompt": "The person speaks naturally to the camera, lips perfectly synced to the audio, natural blinking, subtle head movement. "
+                                  "Keep the face, hair, outfit and background exactly as in the photo."}
+                atlas.download(atlas.run_model("Video", body, "الأفاتار", max_seconds=2400, interval=6), dest)
+        spent = 0 if atlas.mock_mode() else wallet.charge(cost, f"نسختي: فيديو {round(dur)} ثانية", cid)
+        twin_clip_set(tid, cid, status="done", step=None, file=dest.name, duration=round(probe_duration(dest), 2), credits=spent, error=None)
+    except wallet.NoCredits as exc:
+        twin_clip_set(tid, cid, status="failed", step=None, error=str(exc))
+    except Exception as exc:  # noqa: BLE001
+        twin_clip_set(tid, cid, status="failed", step=None, error=str(getattr(exc, "detail", None) or exc)[:400])
+
+
+@app.post("/api/twins/{tid}/clips")
+def twin_clip_new(tid: str, method: str = Form("video"), quality: str = Form(""), text: str = Form(""), audio: UploadFile = File(...)):
+    """🎥 فيديو جديد بنسختك: الكلام بصوتك (تسجيل أو ملف)، والشكل من فيديو القراية أو من صورتك."""
+    d = twin_load(tid)
+    r = twin.ready(d)
+    if method == "video" and not r["video"]:
+        raise HTTPException(400, "سجّل فيديو القراية الأول")
+    if method == "photo" and not r["photo"]:
+        raise HTTPException(400, "ارفع صورة قدام الكاميرا الأول")
+    quality = quality or ("veed" if method == "video" else "pro")
+    if f"{method}:{quality}" not in TWIN_COST:
+        raise HTTPException(400, "اختيار مش معروف")
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "مفتاح Atlas مش متسجل")
+    cid = uuid.uuid4().hex[:8]
+    name = save_audio_upload(audio, twin_dir(tid), f"say_{cid}")
+    item = {"id": cid, "method": method, "quality": quality, "text": text.strip()[:2000], "audio": name, "status": "queued",
+            "step": "في الطابور", "file": None, "error": None, "created_at": now()}
+    out = twin_update(tid, lambda x: x.setdefault("clips", []).append(item))
+    threading.Thread(target=run_twin_clip, args=(tid, cid), daemon=True).start()
+    return twin_to_dict(tid, out)
+
+
+@app.delete("/api/twins/{tid}/clips/{cid}")
+def twin_clip_delete(tid: str, cid: str):
+    folder = twin_dir(tid)
+    def fn(d):
+        for c in [x for x in d.get("clips") or [] if x["id"] == cid]:
+            for f in (c.get("file"), c.get("audio")):
+                if f:
+                    (folder / f).unlink(missing_ok=True)
+        d["clips"] = [x for x in d.get("clips") or [] if x["id"] != cid]
+    return twin_to_dict(tid, twin_update(tid, fn))
+
+
+@app.post("/api/twins/{tid}/clips/{cid}/typo")
+def twin_clip_to_typo(tid: str, cid: str):
+    """🔤 الفيديو ده يروح للتايبوجرافي: الكلام بيتفرّغ ويتكتب فوقه، وتقدر تغيّر الخلفية."""
+    d = twin_load(tid)
+    c = next((x for x in d.get("clips") or [] if x["id"] == cid), None)
+    if not c or not c.get("file"):
+        raise HTTPException(400, "الفيديو لسه مخلصش")
+    r = typo_new(TypoNewIn(name=f"🪞 {d['name']}"[:100]))
+    pid = r["id"]
+    folder = TYPO_PROJ / pid
+    name = f"src_{uuid.uuid4().hex[:8]}.mp4"
+    shutil.copy(twin_dir(tid) / c["file"], folder / name)
+    info = media_info(folder / name)
+    def fn(x):
+        x["source"] = {"kind": "video", "file": name, "name": f"{d['name']}.mp4", "duration": round(info.duration, 3), "w": info.width, "h": info.height}
+        x["duration"] = round(info.duration, 3)
+        x["ratio"] = "9:16" if info.height >= info.width else "16:9"
+        x.update(words=[], blocks=[], final=None, scene=None, bg={**(x.get("bg") or {}), "kind": "source"})
+    typo_update(pid, fn)
+    return typo_start(pid, "transcribing", "🎧 بيسمع الكلام ويكتبه بتوقيته", run_typo_transcribe)
+
+
+# الواجهة آخر حاجة: أي مسار مش API بيروح للملفات (لازم تفضل بعد كل الـ routes)
 app.mount("/", StaticFiles(directory=FRONTEND_DIR), name="frontend")
