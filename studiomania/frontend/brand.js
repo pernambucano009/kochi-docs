@@ -582,7 +582,7 @@ const BrandPage = (() => {
         const top = `<div class="bm-ch"><span class="latin">SUGGESTION</span><b>${esc(p.kind === "question" ? "سؤال" : p.kind === "note" ? "معلومة جديدة" : l.t)}</b></div>${from ? `<p class="bm-note">من «${esc(from)}»</p>` : ""}`;
         const body = p.kind === "question" ? `<p class="bm-q">${esc(p.title)}</p>` + editable("@ans", "", "اكتب الإجابة…")
           : p.kind === "note" ? editable("@ttl", p.title, "العنوان") + (p.summary ? `<p class="bm-note">${esc(p.summary)}</p>` : "") + editable("@val", p.value, "التفاصيل")
-          : (now ? `<div class="bm-sub"><small>دلوقتي</small><p class="bm-now">${esc(now)}</p></div><div class="bm-sub"><small>المقترح</small>` : "<div>") + editable("@val", p.value, "…", p.field === "link" || p.field === "palette") + "</div>";
+          : (now ? `<div class="bm-sub"><small>المكتوب في العقل دلوقتي (هيتشال)</small><p class="bm-now">${esc(now)}</p></div><div class="bm-sub"><small>المخ بيقترح يتكتب بداله (تقدر تعدّله)</small>` : "<div>") + editable("@val", p.value, "…", p.field === "link" || p.field === "palette") + "</div>";
         return top + (p.why ? `<p class="bm-note bm-why">${esc(p.why)}</p>` : "") + body + `<div class="bm-acts"><button class="bm-go" data-ok="${p.id}">${p.kind === "question" ? "احفظ الإجابة" : "موافق"}</button><button class="bm-pill" data-no="${p.id}">لأ</button></div>`;
       }
       case "note": return head.replace(esc(l.t), "معلومة") + editable(`note:t:${l.i}`, l.note.title, "العنوان") + (l.note.summary ? `<p class="bm-note">${esc(l.note.summary)}</p>` : "")

@@ -11,6 +11,7 @@ import statistics
 import time
 import uuid
 
+import brainsrc
 import rivals
 
 KINDS = {"products": "صور المنتج", "characters": "شخصيات البراند / صاحب الحساب", "sets": "الأماكن والخلفيات", "props": "الأدوات", "logos": "اللوجو"}
@@ -115,7 +116,7 @@ def analyze_prompt(prof: dict, st: dict, items: list[dict], videos: list[dict], 
         f"وفيه {n_imgs} صورة بالترتيب: الأول لقطات الفيديوهات، وبعدين صور أغلفة البوستات وصورة البروفايل (images_from).\n\n"
         "اللي في العقل دلوقتي:\n" + (brain_txt or "(لسه فاضي)") + "\n\n"
         "المطلوب JSON:\n"
-        "1) fields: قيم للخانات دي لو الحساب بيقولها بوضوح ومختلفة عن العقل: " + "، ".join(f"{k} ({v})" for k, v in fields.items()) + ".\n"
+        "1) fields: قيم للخانات دي لو الحساب بيقولها بوضوح: " + brainsrc.fields_desc() + ". " + brainsrc.FIELD_RULES +
         "2) niche: النيتش بالظبط في جملة (المجال + الجمهور + الزاوية).\n"
         "3) notes: معرفة مهمة عن الشخص أو البراند (اللي بيقدمه، أسلوبه، المواضيع اللي بيتكلم فيها، أكتر حاجة بتنجح عنده وليه). كل note موضوع واحد.\n"
         "4) todos: «نقاط لازم تتشتغل»: أخطاء حقيقية شفتها ولقطات ناقصة (الهوك، أول ٣ ثواني، الإضاءة والصوت، الكلام على الشاشة، طول الفيديو، "
@@ -123,7 +124,7 @@ def analyze_prompt(prof: dict, st: dict, items: list[dict], videos: list[dict], 
         "5) images: لكل صورة من صور الأغلفة والبروفايل (بالرقم i من 0 في images_from) حدد kind من: " + "، ".join(f"{k} ({v})" for k, v in KINDS.items())
         + " أو skip لو مش مفيدة للعقل، ووصف قصير description.\n"
         "ممنوع تخترع معلومة مش موجودة في الحساب. اكتب بالعربي.\n"
-        'الشكل: {"fields":{},"niche":"","notes":[{"section":"identity|voice|products|offers|audience|campaigns|other","title":"","summary":"","body":""}],'
+        'الشكل: {"fields":{"<خانة>":{"value":"","why":""}},"niche":"","notes":[{"section":"identity|voice|products|offers|audience|campaigns|other","title":"","summary":"","body":""}],'
         '"todos":[{"title":"","why":"","how":""}],"images":[{"i":0,"kind":"","description":""}]}'
     )
 

@@ -25,6 +25,27 @@ MAX_TEXT = 60000
 # الخانات اللي الموديل يقدر يقترح لها قيمة (نفس خانات الخريطة)
 FIELDS = {"about": "عن البراند", "audience": "الجمهور", "market": "السوق", "language": "اللغة واللهجة", "domain": "المجال",
           "typography": "الخطوط", "palette": "الألوان", "cta": "الدعوة (CTA)", "link": "اللينك", "caption": "الكابشن الافتراضي"}
+# كل خانة بتاخد إيه بالظبط (عشان الموديل ميحطش المجال في خانة السوق مثلًا)
+FIELD_SCOPE = {
+    "about": "جملتين: البراند بيقدم إيه وإيه اللي بيميزه",
+    "audience": "مين العميل: السن والاهتمامات واللي بيدوّر عليه",
+    "market": "المكان الجغرافي بس (دولة / مدينة / منطقة). من غير المجال أو الخدمة",
+    "language": "لغة أو لهجة الكلام مع الجمهور بس",
+    "domain": "المجال أو نوع النشاط بس، في كلمات قليلة",
+    "typography": "أسماء الخطوط بس", "palette": "الألوان بأكوادها (#RRGGBB) بس",
+    "cta": "جملة الدعوة للفعل بس", "link": "لينك أو رقم تواصل بس", "caption": "كابشن افتراضي قصير",
+}
+FIELD_RULES = (
+    "كل خانة تاخد اللي في وصفها بس، وممنوع تخلط خانة في خانة (مثلًا المجال ميتحطش في السوق). "
+    "اقترح قيمة لخانة بس لو هي معلومة جديدة أو بتصحّح غلط في اللي موجود؛ لو اللي في العقل صح بنفس المعنى (حتى لو بكلام تاني) متقترحش. "
+    "ولكل اقتراح خانة اكتب ليه في why بجملة قصيرة. الشكل: \"fields\": {\"market\": {\"value\": \"…\", \"why\": \"…\"}}.\n"
+)
+
+
+def fields_desc() -> str:
+    return "، ".join(f"{k} ({FIELDS[k]}: {FIELD_SCOPE.get(k, '')})" for k in FIELDS)
+
+
 SECTIONS = {"identity": "الهوية", "voice": "النبرة", "products": "المنتجات", "offers": "العروض", "audience": "الجمهور",
             "seasonal": "المواسم", "claims": "الادعاءات المسموحة", "campaigns": "حملات ودروس", "visual": "الشكل", "other": "تانية"}
 
@@ -141,7 +162,7 @@ def read_site(url: str, pages: int = 6) -> str:
 
 # ---------- الموديل ----------
 FORMAT = """{
-  "fields": {"audience": "...", "about": "...", "market": "...", "language": "...", "domain": "...", "typography": "...", "palette": "#HEX اسم اللون, ...", "cta": "...", "link": "...", "caption": "..."},
+  "fields": {"<خانة>": {"value": "...", "why": "ليه الاقتراح ده"}},
   "rules": ["قاعدة صريحة لازم تتراعى", "..."],
   "notes": [{"section": "voice|products|offers|audience|seasonal|claims|campaigns|identity|visual|other", "title": "عنوان قصير", "summary": "سطر واحد بيقول الصفحة دي فيها إيه", "body": "التفاصيل"}],
   "questions": ["سؤال عن حاجة مهمة ناقصة ومش موجودة في المصدر"]
@@ -155,8 +176,7 @@ def extract_prompt(brain_txt: str, name: str, note: str, text: str, n_images: in
         + (f"وفيه {n_images} صورة (صفحات أو صور) مع الرسالة.\n" if n_images else "")
         + "\nاللي في العقل دلوقتي:\n" + (brain_txt or "(لسه فاضي)") + "\n\n"
         "المطلوب: اقرا المصدر وطلّع منه اللي يفيد العقل بس:\n"
-        "1) fields: قيمة لخانة من الخانات دي لو المصدر بيقولها بوضوح ومختلفة عن اللي في العقل: "
-        + "، ".join(f"{k} ({v})" for k, v in FIELDS.items()) + ". متكتبش خانة مش موجودة في المصدر.\n"
+        "1) fields: قيمة لخانة من الخانات دي لو المصدر بيقولها بوضوح: " + fields_desc() + ". متكتبش خانة مش موجودة في المصدر. " + FIELD_RULES +
         "2) rules: القواعد الصارمة (ممنوعات، لازم، ادعاءات ممنوعة، disclaimers) بنصها الحرفي لو مكتوبة. كل قاعدة سطر واحد قابل للتنفيذ.\n"
         "3) notes: أي معرفة تانية مهمة (منتجات وأسعار، عروض، أمثلة حقيقية لكلام البراند بين علامات تنصيص، مواسم، حملات ناجحة وليه نجحت…). "
         "كل note موضوع واحد بس، وsummary سطر واحد.\n"
@@ -172,9 +192,11 @@ def to_pending(out: dict, brain: dict, sid: str) -> list[dict]:
     items = []
     rules_now = {r.strip() for r in str(brain.get("rules") or "").split("\n") if r.strip()}
     for k, v in (out.get("fields") or {}).items():
-        v = str(v or "").strip()
-        if k in FIELDS and v and v != str(brain.get(k) or "").strip():
-            items.append({"kind": "field", "field": k, "value": v[:4000]})
+        why = str(v.get("why") or "").strip()[:300] if isinstance(v, dict) else ""
+        v = str((v.get("value") if isinstance(v, dict) else v) or "").strip()
+        now = str(brain.get(k) or "").strip()
+        if k in FIELDS and v and v != now and v.lower() not in now.lower():
+            items.append({"kind": "field", "field": k, "value": v[:4000], **({"why": why} if why else {})})
     for r in out.get("rules") or []:
         r = str(r or "").strip()
         if r and r not in rules_now:
