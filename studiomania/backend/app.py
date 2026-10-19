@@ -4062,6 +4062,9 @@ import stylecl  # noqa: E402
 import fstudio  # noqa: E402
 import ref2p  # noqa: E402
 import hekaya  # noqa: E402
+import brainquiz  # noqa: E402
+import brainsocial  # noqa: E402
+import wallet  # noqa: E402
 import comics  # noqa: E402
 
 
@@ -8745,7 +8748,8 @@ BRAIN_KINDS = ("screens", "logos", "products", "characters", "sets", "props")
 BRAIN_FIELDS = ("type", "domain", "about", "audience", "rules", "palette", "theme", "typography", "ui_style", "logo_description",
                 "style", "market", "language", "logo_rule", "modest",
                 # 🧠 عقل البراند: الستايلات (أول واحد هو الديفولت) والتسليم (اللوجو، الإنترو والأوترو، الـ CTA، الكابشن الثابت واللينك)
-                "styles", "logo_on", "intro_on", "outro_on", "cta", "caption", "link")
+                "styles", "logo_on", "intro_on", "outro_on", "cta", "caption", "link",
+                "niche")   # النيتش: من تحليل حساب السوشيال (وتقدر تكتبه بإيدك)
 BRAND_VIDEOS = ("intro", "outro")
 BRAIN_LOCK = threading.Lock()
 
@@ -8783,7 +8787,12 @@ def brain_to_dict(b: dict) -> dict:
     for kind in BRAIN_KINDS:
         out[kind] = [{**a, "url": f"{base}/{a['file']}"} for a in b.get(kind) or []]
     # المصادر اللي اتقرت، والاقتراحات اللي مستنية موافقتك، والمعرفة اللي اتوافق عليها
-    out["sources"] = [{k: s.get(k) for k in ("id", "kind", "name", "status", "error", "count", "created_at")} for s in b.get("sources") or []]
+    out["sources"] = [{k: s.get(k) for k in ("id", "kind", "name", "status", "error", "count", "credits", "step", "created_at")} for s in b.get("sources") or []]
+    # 📱 من تحليل الحساب: نقاط لازم تتشتغل، والنيتش · 🧩 الكويز: الأسئلة اللي اتجاوبت
+    out["todos"] = b.get("todos") or []
+    out["niche"] = b.get("niche") or ""
+    out["quiz_done"] = b.get("quiz_done") or []
+    out["credits"] = wallet.balance()
     out["pending"] = b.get("pending") or []
     out["notes"] = b.get("notes") or []
     out["knowledge"] = fz.knowledge(b, BRAIN_FIELDS, BRAIN_KINDS)
@@ -9162,7 +9171,7 @@ def analyze_brain(bid: str):
 
 # ---------- 🧠 مصادر العقل: ملف / لينك / كلام ← اقتراحات بتستنى موافقتك ----------
 @app.post("/api/ad-brains/{bid}/sources")
-def add_brain_source(bid: str, url: str = Form(""), text: str = Form(""), note: str = Form(""), files: list[UploadFile] | None = File(None)):
+def add_brain_source(bid: str, url: str = Form(""), text: str = Form(""), note: str = Form(""), social: str = Form(""), files: list[UploadFile] | None = File(None)):
     if brain_row(bid) is None:
         raise HTTPException(404, "العميل ده مش موجود")
     folder = brain_dir(bid) / "src"
@@ -9182,8 +9191,18 @@ def add_brain_source(bid: str, url: str = Form(""), text: str = Form(""), note: 
         new.append({"kind": "url", "name": urlparse(u).hostname + urlparse(u).path.rstrip("/"), "url": u})
     if text.strip():
         new.append({"kind": "text", "name": text.strip().split("\n")[0][:60], "text": text.strip()[:60000]})
+    if social.strip():
+        plat, handle = brainsocial.parse(social)
+        if not handle:
+            raise HTTPException(400, "اكتب يوزر الحساب أو لينكه")
+        new.append({"kind": "social", "name": f"@{handle} · {'تيك توك' if plat == 'tiktok' else 'إنستجرام'}", "platform": plat, "handle": handle})
     if not new:
         raise HTTPException(400, "ارمي ملف أو حط لينك أو اكتب حاجة")
+    # 💳 قبل ما نبدأ: الرصيد لازم يكفي التقدير (تحليل الحساب أغلى من قراية ملف)
+    try:
+        wallet.need(sum(wallet.credits(wallet.est(scrape=3, chars=40000, images=20, stt_min=3)) if x["kind"] == "social" else 3 for x in new), "قراية المصادر")
+    except wallet.NoCredits as e:
+        raise HTTPException(402, str(e)) from e
     for s in new:
         s.update(id=uuid.uuid4().hex[:10], status="working", error=None, count=0, note=note.strip()[:300], created_at=now())
     update_brain(bid, lambda d: d.setdefault("sources", []).extend(new))
@@ -9215,7 +9234,140 @@ def brain_av_text(p: Path, folder: Path) -> tuple[str, list[Path]]:
                 imgs.append(out)
     if not text and not imgs:
         raise ValueError("مقدرتش أسمع كلام في الملف ده")
-    return (f"(تفريغ كلام من {'فيديو' if imgs else 'تسجيل صوتي'}: {p.name})\n{text}" if text else ""), imgs
+    return (f"(تفريغ كلام من {'فيديو' if imgs else 'تسجيل صوتي'}: {p.name})\n{text}" if text else ""), imgs, dur
+
+
+def brain_src_step(bid: str, sid: str, step: str) -> None:
+    def fn(d):
+        for x in d.get("sources") or []:
+            if x["id"] == sid:
+                x["step"] = step
+    update_brain(bid, fn)
+
+
+def brain_fetch(url: str, dest: Path, limit: int = 40 * 1024 * 1024) -> bool:
+    """تنزيل صورة أو فيديو من السوشيال (بحد أقصى للحجم)."""
+    try:
+        with httpx.stream("GET", url, timeout=60, follow_redirects=True, headers={"User-Agent": "Mozilla/5.0"}) as r:
+            if r.status_code != 200:
+                return False
+            n = 0
+            with dest.open("wb") as out:
+                for chunk in r.iter_bytes(1 << 16):
+                    n += len(chunk)
+                    if n > limit:
+                        break
+                    out.write(chunk)
+        return dest.stat().st_size > 1000
+    except (httpx.HTTPError, OSError):
+        dest.unlink(missing_ok=True)
+        return False
+
+
+def run_brain_social(bid: str, sid: str) -> None:
+    """📱 حساب السوشيال ← العقل: البايو والمعلومات والنيتش (اقتراحات توافق عليها)، الصور كل واحدة في مكانها (اقتراحات)،
+    وتحليل البوستات والمشاهدات وأحسن وأضعف الفيديوهات ← «نقاط لازم تتشتغل». كل ده بيتخصم من الرصيد على قد اللي اتصرف."""
+    b = brain_row(bid)
+    s = next(x for x in b.get("sources") or [] if x["id"] == sid)
+    folder = brain_dir(bid) / "src"
+    plat, handle = s["platform"], s["handle"]
+    meter, calls, stt = {"usd": 0.0}, 0, 0.0
+    brain_src_step(bid, sid, "بيجيب الحساب والبوستات")
+    if atlas.mock_mode() or not rivals.live():
+        if not atlas.mock_mode():
+            raise ValueError("مفتاح ScrapeCreators مش متسجل (SCRAPECREATORS_API_KEY)")
+        prof, items = brainsocial.mock_posts(plat, handle)
+    else:
+        prof, items = brainsocial.profile(plat, handle), brainsocial.posts(plat, handle)
+        calls = 2
+    if not items and not prof.get("bio"):
+        raise ValueError("الحساب ده فاضي أو خاص (private)")
+    st = brainsocial.stats(items)
+    by = {p["id"]: p for p in items}
+    # 🎬 أحسن فيديوهين وأضعف واحد: الكلام اللي اتقال + ٤ لقطات من كل فيديو
+    videos, frames = [], []
+    for pid in [*st.get("best", [])[:2], *st.get("worst", [])[:1]]:
+        p = by.get(pid)
+        if not p or not p.get("video"):
+            continue
+        brain_src_step(bid, sid, f"بيحلل فيديو ({len(videos) + 1}/3)")
+        mp4 = folder / f"{sid}-v{len(videos)}.mp4"
+        if not brain_fetch(p["video"], mp4):
+            continue
+        try:
+            words = rivals.transcript(plat, p["url"]) if rivals.live() else ""
+            calls += 1
+            if not words:
+                wav = folder / f"{sid}-v.wav"
+                subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(mp4), "-vn", "-ac", "1", "-ar", "16000", str(wav)],
+                               check=True, capture_output=True, timeout=300)
+                d_ = probe_duration(wav)
+                words = " ".join(str(w.get("w") or "") for w in atlas.transcribe(wav, d_)) if d_ > .5 else ""
+                stt += d_
+                wav.unlink(missing_ok=True)
+            vd = probe_duration(mp4)
+            for k, f in enumerate((.04, .3, .6, .9)):
+                out = folder / f"{sid}-v{len(videos)}-{k}.jpg"
+                r = subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{vd * f:.2f}", "-i", str(mp4), "-frames:v", "1",
+                                    "-vf", "scale=512:-2", "-q:v", "5", str(out)], capture_output=True, timeout=60)
+                if r.returncode == 0 and out.exists():
+                    frames.append(out)
+            videos.append({"id": pid, "rank": "best" if pid in st.get("best", []) else "worst", "views": p["views"], "seconds": round(vd, 1),
+                           "transcript": words[:1500]})
+        finally:
+            mp4.unlink(missing_ok=True)
+    # 🖼️ صور الأغلفة وصورة البروفايل: المخ هيقول كل واحدة مكانها فين في العقل
+    brain_src_step(bid, sid, "بينزّل الصور")
+    covers = []
+    for i, url in enumerate([prof.get("avatar")] + [p.get("cover") for p in items[:8]]):
+        if url:
+            f = folder / f"{sid}-c{i}.jpg"
+            if brain_fetch(url, f, 8 * 1024 * 1024):
+                covers.append(f)
+    brain_src_step(bid, sid, "بيحلل الحساب")
+    imgs = frames[:12] + covers[:9]
+    prompt = brainsocial.analyze_prompt(prof, st, items, videos, len(imgs), az.brain_text(b), brainsrc.FIELDS)
+    if atlas.mock_mode():
+        out = brainsocial.mock_out()
+    else:
+        parts = [{"type": "text", "text": prompt + f"\nimages_from (أول صورة غلاف/بروفايل في الترتيب): {len(frames[:12])}"}]
+        for im in imgs:
+            parts.append({"type": "image_url", "image_url": {"url": data_url(model_image(im), "image/jpeg")}})
+        out = ad_json(ad_media_chat([{"role": "user", "content": parts}], 16000, meter=meter), "تحليل الحساب")
+    for f in frames:
+        f.unlink(missing_ok=True)
+    fields = dict(out.get("fields") or {})
+    items_p = brainsrc.to_pending({"fields": fields, "rules": [], "notes": out.get("notes") or [], "questions": []}, b, sid)
+    # الصور: كل صورة ليها مكان (أو بتتشال لو مش مفيدة)
+    keep = set()
+    for im in out.get("images") or []:
+        try:
+            f = covers[int(im.get("i"))]
+        except (TypeError, ValueError, IndexError):
+            continue
+        if im.get("kind") in brainsocial.KINDS:
+            keep.add(f.name)
+            items_p.append({"id": uuid.uuid4().hex[:10], "kind": "image", "target": im["kind"], "file": f.name, "title": brainsocial.KINDS[im["kind"]],
+                            "summary": str(im.get("description") or "")[:300], "source": sid})
+    for f in covers:
+        if f.name not in keep:
+            f.unlink(missing_ok=True)
+    todos = brainsocial.clean_todos(out.get("todos"), sid)
+    niche = str(out.get("niche") or "").strip()[:300]
+    usd = meter["usd"] or wallet.est(chars=len(prompt) + 6000, images=len(imgs))
+    cost = 0 if atlas.mock_mode() else wallet.charge(wallet.credits(usd + wallet.est(scrape=calls, stt_min=stt / 60)), f"العقل: تحليل حساب @{handle}", sid)
+
+    def fn(d):
+        d.setdefault("pending", []).extend(items_p)
+        have = {t["title"] for t in d.get("todos") or []}
+        d.setdefault("todos", []).extend(t for t in todos if t["title"] not in have)
+        if niche and not str(d.get("niche") or "").strip():
+            d["niche"] = niche
+        d["social"] = {"platform": plat, "handle": handle, "followers": prof.get("followers"), "stats": st, "at": now()}
+        for x in d.get("sources") or []:
+            if x["id"] == sid:
+                x.update(status="done", error=None, step=None, count=len(items_p) + len(todos), credits=cost)
+    update_brain(bid, fn)
 
 
 def run_brain_source(bid: str, sid: str) -> None:
@@ -9224,7 +9376,9 @@ def run_brain_source(bid: str, sid: str) -> None:
         b = brain_row(bid)
         s = next(x for x in b.get("sources") or [] if x["id"] == sid)
         folder = brain_dir(bid) / "src"
-        text, imgs = "", []
+        if s["kind"] == "social":
+            return run_brain_social(bid, sid)
+        text, imgs, stt = "", [], 0.0
         if s["kind"] == "url":
             text = brainsrc.read_site(s["url"])
         elif s["kind"] == "text":
@@ -9239,7 +9393,7 @@ def run_brain_source(bid: str, sid: str) -> None:
             elif ext in brainsrc.IMG_EXT:
                 imgs = [p]
             elif ext in brainsrc.AUDIO_EXT | brainsrc.VIDEO_EXT:
-                text, imgs = brain_av_text(p, folder)
+                text, imgs, stt = brain_av_text(p, folder)
             else:
                 raw = p.read_text(encoding="utf-8", errors="ignore")
                 text = brainsrc.html_text(raw)[0] if ext in (".html", ".htm") else raw
@@ -9253,11 +9407,13 @@ def run_brain_source(bid: str, sid: str) -> None:
                 parts.append({"type": "image_url", "image_url": {"url": data_url(model_image(im), "image/jpeg")}})
             out = ad_json(ad_media_chat([{"role": "user", "content": parts}], 16000), "قراية المصدر")
         items = brainsrc.to_pending(out, b, sid)
+        # 💳 الخصم بعد ما القراية تنجح: الكلام اللي دخل الموديل والصور ودقايق التفريغ
+        cost = 0 if atlas.mock_mode() else wallet.charge(wallet.credits(wallet.est(chars=len(text) + 6000, images=min(8, len(imgs)), stt_min=stt / 60)), f"العقل: قراية «{s['name']}»", sid)
         def fn(d):
             d.setdefault("pending", []).extend(items)
             for x in d.get("sources") or []:
                 if x["id"] == sid:
-                    x.update(status="done", error=None, count=len(items))
+                    x.update(status="done", error=None, count=len(items), credits=cost)
         update_brain(bid, fn)
     except Exception as exc:  # noqa: BLE001
         msg = str(getattr(exc, "detail", None) or exc)[:300]
@@ -9286,6 +9442,7 @@ def delete_brain_source(bid: str, sid: str):
 class PendingIn(BaseModel):
     value: str | None = None
     title: str | None = None
+    target: str | None = None   # الصور: تتحط في أنهي خانة (لو غيّرتها)
 
 
 @app.post("/api/ad-brains/{bid}/pending/{pid}/approve")
@@ -9296,7 +9453,13 @@ def approve_brain_pending(bid: str, pid: str, body: PendingIn):
         if it is None:
             raise HTTPException(404, "الاقتراح ده مش موجود")
         val = (body.value if body.value is not None else it.get("value") or "").strip()
-        if it["kind"] == "field":
+        if it["kind"] == "image":   # صورة من الحساب ← مكانها في صور البراند
+            src, tgt = brain_dir(bid) / "src" / Path(it["file"]).name, body.target or it.get("target")
+            if src.exists() and tgt in BRAIN_KINDS:
+                name = f"{tgt[:-1]}_{uuid.uuid4().hex[:8]}{src.suffix}"
+                shutil.move(str(src), brain_dir(bid) / name)
+                d.setdefault(tgt, []).append({"file": name, "name": (body.title or it.get("title") or "")[:60], "description": val or it.get("summary", "")})
+        elif it["kind"] == "field":
             d[it["field"]] = val[:8000]
             if it["field"] in ("palette", "typography") and it["field"] not in d.setdefault("edited", []):
                 d["edited"].append(it["field"])
@@ -9317,8 +9480,90 @@ def approve_brain_pending(bid: str, pid: str, body: PendingIn):
 
 @app.delete("/api/ad-brains/{bid}/pending/{pid}")
 def reject_brain_pending(bid: str, pid: str):
-    update_brain(bid, lambda d: d.update(pending=[x for x in d.get("pending") or [] if x["id"] != pid]))
+    def fn(d):
+        for x in d.get("pending") or []:
+            if x["id"] == pid and x.get("kind") == "image":
+                (brain_dir(bid) / "src" / Path(x["file"]).name).unlink(missing_ok=True)
+        d["pending"] = [x for x in d.get("pending") or [] if x["id"] != pid]
+    update_brain(bid, fn)
     return brain_to_dict(brain_row(bid))
+
+
+class TodoIn(BaseModel):
+    done: bool | None = None
+
+
+@app.patch("/api/ad-brains/{bid}/todos/{tid}")
+def patch_brain_todo(bid: str, tid: str, body: TodoIn):
+    """نقطة لازم تتشتغل: اتعملت ✓ ولا لسه."""
+    def fn(d):
+        t = next((x for x in d.get("todos") or [] if x["id"] == tid), None)
+        if t is None:
+            raise HTTPException(404, "النقطة دي مش موجودة")
+        if body.done is not None:
+            t["done"] = bool(body.done)
+    update_brain(bid, fn)
+    return brain_to_dict(brain_row(bid))
+
+
+@app.delete("/api/ad-brains/{bid}/todos/{tid}")
+def delete_brain_todo(bid: str, tid: str):
+    update_brain(bid, lambda d: d.update(todos=[x for x in d.get("todos") or [] if x["id"] != tid]))
+    return brain_to_dict(brain_row(bid))
+
+
+@app.get("/api/brain-quiz")
+def brain_quiz(lang: str = "ar"):
+    """🧩 أسئلة الكويز (فصحى بسيطة أو إنجليزي)."""
+    return brainquiz.public("en" if lang == "en" else "ar")
+
+
+class QuizIn(BaseModel):
+    qid: str
+    answer: str = ""
+    lang: str = "ar"
+
+
+@app.post("/api/ad-brains/{bid}/quiz")
+def brain_quiz_answer(bid: str, body: QuizIn):
+    """إجابة سؤال: بتروح لخانتها في العقل على طول (خانة، معلومة في المعرفة، أو قواعد)."""
+    q = brainquiz.BY_ID.get(body.qid)
+    if not q:
+        raise HTTPException(404, "السؤال ده مش موجود")
+    ans = body.answer.strip()[:6000]
+
+    def fn(d):
+        to = q["to"]
+        if ans:
+            if "field" in to:
+                d[to["field"]] = ans
+            elif "pick" in to:
+                if ans in [o[0] for o in q["opts"]]:
+                    d[to["pick"]] = ans
+            elif "rules" in to:
+                have = [r for r in str(d.get("rules") or "").split("\n") if r.strip()]
+                d["rules"] = "\n".join([*have, *[x.strip() for x in ans.split("\n") if x.strip() and x.strip() not in have]])[:8000]
+            elif "note" in to:
+                notes = d.setdefault("notes", [])
+                n = next((x for x in notes if x.get("quiz") == q["id"]), None)
+                if n is None:
+                    n = {"id": uuid.uuid4().hex[:10], "quiz": q["id"], "section": to["note"], "title": to["title_en" if body.lang == "en" else "title_ar"], "source": "quiz"}
+                    notes.append(n)
+                n.update(body=ans, summary=ans.split("\n")[0][:300])
+        done = d.setdefault("quiz_done", [])
+        if ans and q["id"] not in done:
+            done.append(q["id"])
+    update_brain(bid, fn)
+    return brain_to_dict(brain_row(bid))
+
+
+@app.get("/api/ad-brains/{bid}/quiz-answers")
+def brain_quiz_answers(bid: str):
+    """الإجابات اللي في العقل دلوقتي لكل سؤال (عشان تظهر لو رجعت لسؤال)."""
+    b = brain_row(bid)
+    if b is None:
+        raise HTTPException(404, "العميل ده مش موجود")
+    return {q["id"]: brainquiz.current(q, b) for q in brainquiz.Q}
 
 
 class NoteIn(BaseModel):

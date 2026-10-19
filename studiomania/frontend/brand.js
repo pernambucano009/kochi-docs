@@ -18,6 +18,7 @@ const BrandPage = (() => {
     look: "M12 3.5a8.5 8.5 0 1 0 0 17c1.4 0 2-.9 2-1.8 0-1.3-1-1.6-1-2.7 0-1 .8-1.6 1.8-1.6h2.3a3 3 0 0 0 2.9-3C20.5 6.8 16.7 3.5 12 3.5z M7.8 11a1.2 1.2 0 1 1 0 .1z M10.5 7.4a1.2 1.2 0 1 1 0 .1z M15 7.6a1.2 1.2 0 1 1 0 .1z",
     rules: "M9 6.5h10.5 M9 12h10.5 M9 17.5h10.5 M4.5 6.5l1 1 2-2 M4.5 12l1 1 2-2 M4.5 17.5l1 1 2-2",
     delivery: "M20.5 3.5 10 14 M20.5 3.5 14 20.5l-4-6.5-6.5-4z",
+    improve: "M4 19h16 M6 15l4-4 3 3 5-6 M15 8h3v3",
     knowledge: "M4 5.5c2.7-1 5.3-1 8 .8 2.7-1.8 5.3-1.8 8-.8v13c-2.7-1-5.3-1-8 .8-2.7-1.8-5.3-1.8-8-.8z M12 6.3v13.3",
     assets: "M4.5 5h15a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z M3.5 15.5l4.5-4.5 4 4 3-3 5 5 M15.5 8.5a1.3 1.3 0 1 1 0 .1z",
     pulse: "M7 4.5h10v4a5 5 0 0 1-10 0z M7 6H4.5a2.5 2.5 0 0 0 2.8 3.4 M17 6h2.5a2.5 2.5 0 0 1-2.8 3.4 M12 13.5v3.5 M8.5 20h7l-.8-3h-5.4z",
@@ -33,7 +34,8 @@ const BrandPage = (() => {
       { k: "identity", t: "الهوية", en: "Identity", leaves: [
         { f: "@name", t: "الاسم", type: "text", ph: "اسم البراند" },
         { f: "type", t: "نوع المنتج", type: "pick", opts: [["app", "تطبيق"], ["physical", "منتج ملموس"], ["service", "خدمة"]] },
-        { f: "domain", t: "المجال", type: "text", ph: "لياقة، مطاعم، عقارات…" },
+        { f: "domain", t: "المجال", type: "text", ph: "مطاعم، تجميل، تعليم، عقارات…" },
+        { f: "niche", t: "النيتش", type: "text", ph: "المجال + الجمهور + الزاوية بالظبط", hint: "بيتكتب لوحده لما تحلّل حساب السوشيال، وتقدر تعدّله." },
         { f: "about", t: "عن البراند", type: "text", ph: "البراند بيعمل إيه، وبيفرق في إيه عن غيره" },
         { f: "audience", t: "الجمهور", type: "text", ph: "مين اللي بنكلمه؟ سنه، اهتماماته، بيدوّر على إيه" },
         { f: "market", t: "السوق", type: "text", ph: "مثلًا: السعودية والخليج" },
@@ -82,6 +84,10 @@ const BrandPage = (() => {
         { f: "pg", i: "rv:batch", page: "rivals", t: "📊 حلّل آخر ١٠", type: "page" },
         { f: "pg", i: "rv:algo", page: "rivals", t: "📡 افحص قبل النشر", type: "page" },
       ] },
+      // 📱 نقاط لازم تتشتغل: من تحليل حساب السوشيال (البوستات والمشاهدات والفيديوهات)
+      { k: "improve", t: "نقاط للتحسين", en: "To improve", leaves: (b?.todos || []).length
+        ? b.todos.map((x) => ({ f: "td", i: x.id, t: x.title, type: "todo", todo: x }))
+        : [{ f: "social", t: "حلّل حساب السوشيال", type: "social-go" }] },
       // المعرفة: اللي اتقرا من الملفات واللينكات واتوافق عليه
       { k: "knowledge", t: "المعرفة", en: "Knowledge", leaves: (b?.notes || []).map((x) => ({ f: "n", i: x.id, t: x.title, type: "note", note: x })) },
     ].map((br) => {
@@ -90,12 +96,12 @@ const BrandPage = (() => {
       return { ...br, leaves: [...br.leaves, ...mine.map((p) => ({ f: "p", i: p.id, t: pendLabel(p), type: "pending", p }))] };
     });
   }
-  const FIELD_BR = { about: "identity", audience: "identity", market: "identity", language: "identity", domain: "identity",
+  const FIELD_BR = { niche: "identity", about: "identity", audience: "identity", market: "identity", language: "identity", domain: "identity",
     typography: "look", palette: "look", cta: "delivery", link: "delivery", caption: "delivery" };
-  const FIELD_T = { about: "عن البراند", audience: "الجمهور", market: "السوق", language: "اللغة واللهجة", domain: "المجال", typography: "الخطوط",
+  const FIELD_T = { niche: "النيتش", about: "عن البراند", audience: "الجمهور", market: "السوق", language: "اللغة واللهجة", domain: "المجال", typography: "الخطوط",
     palette: "الألوان", cta: "الدعوة (CTA)", link: "اللينك", caption: "الكابشن الافتراضي" };
-  const pendBranch = (p) => (p.kind === "field" ? FIELD_BR[p.field] || "identity" : p.kind === "rule" ? "rules" : "knowledge");
-  const pendLabel = (p) => (p.kind === "field" ? `اقتراح: ${FIELD_T[p.field] || p.field}` : p.kind === "rule" ? "قاعدة مقترحة" : p.kind === "question" ? "سؤال" : p.title);
+  const pendBranch = (p) => (p.kind === "field" ? FIELD_BR[p.field] || "identity" : p.kind === "rule" ? "rules" : p.kind === "image" ? "assets" : "knowledge");
+  const pendLabel = (p) => (p.kind === "field" ? `اقتراح: ${FIELD_T[p.field] || p.field}` : p.kind === "rule" ? "قاعدة مقترحة" : p.kind === "question" ? "سؤال" : p.kind === "image" ? `صورة: ${p.title}` : p.title);
   const srcName = (id) => (id === "feedback" ? "تقييماتك" : cur()?.sources?.find((s) => s.id === id)?.name || "");
   // النقطة مليانة ولا لسه ناقصة
   function filled(b, l) {
@@ -109,6 +115,7 @@ const BrandPage = (() => {
       case "multi": return l.fields.some(([k]) => String(b[k] || "").trim());
       case "video": return !!b[`${l.f}_url`];
       case "rule": case "note": case "page": return true;
+      case "todo": return !!l.todo.done;
       default: return false;
     }
   }
@@ -119,22 +126,13 @@ const BrandPage = (() => {
     if (l.type === "palette") return hexes(b?.palette).join(" ");
     if (l.type === "styles") return styleIds(b).map((id) => S.cats?.find((c) => c.id === id)?.ar).filter(Boolean).join("، ");
     if (l.type === "video") return b?.[`${l.f}_url`] ? (b[`${l.f}_on`] ? "شغّال" : "موجود ومقفول") : "";
+    if (l.type === "todo") return l.todo.done ? "اتعملت ✓" : l.todo.why;
     return "";
   };
 
-  // 📥 صندوق العقل فوق المخ: ارمي أي حاجة (ملف، صوت، فيديو، صور، نص) أو اكتب أو سجّل صوتك،
+  // ➕ «ضيف للعقل» (الدايرة السودا تحت المخ): ملف (أي نوع: صوت وفيديو كمان) أو حساب سوشيال أو كلام أو لينك أو تسجيل صوتك،
   // والمخ بيقراها ويطلّع منها اقتراحات بتظهر نقط منوّرة على الخريطة في الفرع بتاعها
-  const ADD = { id: "add", kind: "add" };
   const SRC_ACCEPT = ".pdf,.docx,.txt,.md,.csv,.json,.html,.htm,image/*,audio/*,video/*,.mp3,.wav,.m4a,.ogg,.webm,.mp4,.mov";
-  function inboxHTML(b) {
-    const srcs = b?.sources || [], reading = srcs.filter((x) => x.status === "working").length, rec = S.rec;
-    return `<div class="bm-ib-t"><b>📥 ارمي أي حاجة عن البراند</b><small>${reading ? `<span class="bm-ib-spin"></span> بيقرا ${reading === 1 ? "مصدر" : `${reading} مصادر`}…` : "ملف · صوت · فيديو · صور · كلام، والمخ يفصّصها ويحط كل معلومة في مكانها"}</small></div>
-      <div class="bm-ib-acts"><label class="bm-ib-btn">📎 ارفع<input type="file" multiple accept="${SRC_ACCEPT}" data-src hidden></label>
-        <button class="bm-ib-btn" data-ibwrite>✍️ اكتب</button>
-        <button class="bm-ib-btn${rec ? " rec" : ""}" data-ibrec>${rec ? `⏹ وقّف <span class="num" data-rect>0:00</span>` : "🎙️ سجّل"}</button>
-        ${srcs.length ? `<button class="bm-ib-btn ghost" data-ibsrc title="اللي اترمى في العقل">🗂 <span class="num">${srcs.length}</span></button>` : ""}</div>`;
-  }
-  function renderInbox() { const el = S.el?.querySelector("[data-inbox]"); if (el && !S.rec) el.innerHTML = inboxHTML(cur()); }
   async function toggleRec() {
     if (S.rec) { S.rec.mr.stop(); return; }
     let stream;
@@ -142,9 +140,10 @@ const BrandPage = (() => {
     const type = ["audio/webm", "audio/mp4", "audio/ogg"].find((t) => window.MediaRecorder?.isTypeSupported?.(t)) || "";
     const mr = new MediaRecorder(stream, type ? { mimeType: type } : {}), parts = [], t0 = Date.now();
     S.rec = { mr, timer: setInterval(() => { const n = Math.round((Date.now() - t0) / 1000), el = S.el?.querySelector("[data-rect]"); if (el) el.textContent = `${Math.floor(n / 60)}:${String(n % 60).padStart(2, "0")}`; if (n >= 600) mr.stop(); }, 500) };
+    refreshCard();
     mr.ondataavailable = (e) => e.data.size && parts.push(e.data);
     mr.onstop = () => {
-      clearInterval(S.rec.timer); S.rec = null; stream.getTracks().forEach((t) => t.stop()); renderInbox();
+      clearInterval(S.rec.timer); S.rec = null; stream.getTracks().forEach((t) => t.stop()); refreshCard();
       const mt = mr.mimeType || type || "audio/webm", ext = /mp4/.test(mt) ? "m4a" : /ogg/.test(mt) ? "ogg" : "webm";
       if (Date.now() - t0 < 1200 || !parts.length) return toast("التسجيل قصير أوي", true);
       const form = new FormData();
@@ -153,7 +152,6 @@ const BrandPage = (() => {
       addSource(form);
     };
     mr.start(1000);
-    S.el.querySelector("[data-inbox]").innerHTML = inboxHTML(cur());
   }
   function html() {
     return `<div class="bm" id="nbWrap"><div class="nh-empty">بيحمّل…</div></div>`;
@@ -165,7 +163,6 @@ const BrandPage = (() => {
       <div class="bm-world"><svg class="bm-lines" aria-hidden="true"></svg><div class="bm-nodes"></div></div>
       <div class="bm-zoom"><button data-zoom="1" aria-label="قرّب">+</button><button data-zoom="0" aria-label="الخريطة كلها">⤢</button><button data-zoom="-1" aria-label="بعّد">−</button></div>
       <div class="bm-card" hidden role="dialog"></div>
-      <div class="bm-inbox" data-inbox></div>
       <div class="bm-dropall" aria-hidden="true"><b>ارمي هنا</b><small>المخ هيقرا الملف ويحط كل معلومة في مكانها</small></div>
       <p class="bm-hint">دوس على أي نقطة تكتب فيها · النقط المفرّغة لسه ناقصة · دوس على المخ تبدّل البراند</p>`;
   }
@@ -178,8 +175,12 @@ const BrandPage = (() => {
     if (!W || !H) return;
     const ex = Math.max(1.1, Math.min(1.45, W / H));
     const list = branches(b), nodes = [{ id: "c", kind: "center", x: 0, y: 0 }];
+    // «+» تحت المخ (ترمي فيه أي حاجة)، و«ضيف للعقل بكويز» البرتقاني فوقه
+    nodes.push({ id: "add", kind: "add", x: 0, y: 182, from: "c" }, { id: "quiz", kind: "quiz", x: 0, y: -176, from: "c" });
     list.forEach((br, i) => {
-      const a = -Math.PI / 2 + Math.PI / list.length + (i / list.length) * Math.PI * 2;
+      // نص الفروع يمين ونصها شمال، وفوق المخ وتحته فاضيين دايمًا للكويز و«+» (حتى لو عدد الفروع فردي)
+      const nr = Math.ceil(list.length / 2), nl = list.length - nr;
+      const a = i < nr ? -Math.PI / 2 + Math.PI * (i + .5) / nr : Math.PI / 2 + Math.PI * (i - nr + .5) / nl;
       // الفرع بيطول مع كل حاجة بتتضاف فيه: العميل يشوف العقل بيكبر
       const g = growth(b, br), D = 215 + 140 * (1 - Math.exp(-g / 8));
       const bx = Math.cos(a) * D * ex, by = Math.sin(a) * D;
@@ -204,7 +205,6 @@ const BrandPage = (() => {
       return { ...n, ph: i * 1.7, px: o ? (grew ? o.px : o.px + (n.x - o.x)) : n.x, py: o ? (grew ? o.py : o.py + (n.y - o.y)) : n.y, vx: o?.vx || 0, vy: o?.vy || 0 };
     });
     S.byId = Object.fromEntries(S.nodes.map((n) => [n.id, n]));
-    renderInbox();
     fit();
     draw();
   }
@@ -231,9 +231,7 @@ const BrandPage = (() => {
       const e = document.getElementById(id);
       if (e && e.offsetHeight && S.el.closest("#nh")?.contains(S.el)) y = Math.max(y, e.getBoundingClientRect().bottom - r.top + 12);
     }
-    S.headY = y;   // لحد هنا الخريطة بتختفي تحت الشريط (mask)، والصندوق تحته مباشرة
-    const ib = S.el.querySelector(".bm-inbox");
-    if (ib) { ib.style.top = `${y}px`; y += ib.offsetHeight + 14; }
+    S.headY = y;   // لحد هنا الخريطة بتختفي تحت الشريط (mask)
     return y;
   }
   function applyView() {
@@ -277,6 +275,10 @@ const BrandPage = (() => {
         <span class="bm-brain"><img class="ic-l" src="/icons3d/brand.webp?v=9" alt=""><img class="ic-d" src="/icons3d/brand_d.webp?v=9" alt=""></span>
         <b>${esc(b?.name || "براند جديد")}</b>${st}
         ${b?.knowledge ? `<small class="bm-kn" title="${esc((b.knowledge.tips || []).join(" · "))}">المخ يعرفك <span class="num">${b.knowledge.score}٪</span> · ${esc(b.knowledge.level)}</small>` : ""}</button>`;
+    }
+    if (n.kind === "quiz") {
+      const done = (b?.quiz_done || []).length, total = S.quiz?.length || 17;
+      return `<button class="bm-n bm-quiz${done >= total ? " full" : ""}" data-n="quiz" title="أسئلة قصيرة، كل إجابة بتروح لخانتها في العقل"><i>?</i><b>ضيف للعقل بكويز</b><small class="num">${Math.min(done, total)}/${total}</small></button>`;
     }
     if (n.kind === "add") {
       const reading = (b?.sources || []).some((s) => s.status === "working");
@@ -368,7 +370,7 @@ const BrandPage = (() => {
       const ux = (B[0] - A[0]) / d, uy = (B[1] - A[1]) / d;
       let c1, c2;
       if (n.from === "c") {
-        const sw = n.kind === "add" ? 0 : .5, cs = Math.cos(sw), sn = Math.sin(sw);
+        const sw = n.kind === "add" || n.kind === "quiz" ? 0 : .5, cs = Math.cos(sw), sn = Math.sin(sw);
         c1 = [A[0] + (ux * cs - uy * sn) * d * .45, A[1] + (ux * sn + uy * cs) * d * .45];
         c2 = [B[0] - ux * d * .35, B[1] - uy * d * .35];
       } else {
@@ -377,7 +379,7 @@ const BrandPage = (() => {
         c2 = [B[0] - (ox * .15 + ux * .35) * d, B[1] - (oy * .15 + uy * .35) * d];
       }
       // الخط بيبدأ وبيخلص عند حافة الدايرة (مش من جوّه المخ أو الأيقونة)
-      const r1 = n.from === "c" ? S.rc : 34, r2 = n.kind === "branch" ? 34 : n.kind === "add" ? 24 : 10;
+      const r1 = n.from === "c" ? S.rc : 34, r2 = n.kind === "branch" ? 34 : n.kind === "add" || n.kind === "quiz" ? 24 : 10;
       const dir = (p, q) => { const l = Math.hypot(q[0] - p[0], q[1] - p[1]) || 1; return [(q[0] - p[0]) / l, (q[1] - p[1]) / l]; };
       const s1 = dir(A, c1), s2 = dir(c2, B);
       const P0 = [A[0] + s1[0] * r1, A[1] + s1[1] * r1], P3 = [B[0] - s2[0] * r2, B[1] - s2[1] * r2];
@@ -452,6 +454,49 @@ const BrandPage = (() => {
 
   // ---------- الكارت اللي بيفتح جنب النقطة ----------
   const editable = (k, val, ph, ltr) => `<div class="bm-write" contenteditable="plaintext-only" data-k="${k}" data-ph="${esc(ph || "اكتب هنا…")}"${ltr ? ' dir="ltr"' : ""}>${esc(val)}</div>`;
+  // 🧩 الكويز: سؤال واحد كل مرة، والإجابة بتتحفظ في خانتها أول ما تدوس «التالي». تقدر تخرج وتكمّل بعدين.
+  const QLANG = () => (window.I18N?.lang === "en" ? "en" : "ar");
+  async function loadQA(b) {
+    try {
+      const [qs, qa] = await Promise.all([S.quiz ? S.quiz : api(`/api/brain-quiz?lang=${QLANG()}`), api(`/api/ad-brains/${b.id}/quiz-answers`)]);
+      S.quiz = qs; S.qa = qa; S.qaFor = b.id;
+    } catch (err) { S.qaFor = b.id; S.qa = {}; toast(err.message, true); }
+    if (S.open?.id === "quiz") refreshCard();
+  }
+  function quizHTML(b) {
+    const head = `<div class="bm-ch"><span class="latin">QUIZ</span><b>ضيف للعقل بكويز</b></div>`;
+    if (!S.quiz || S.qaFor !== b?.id) { if (b && S.qaLoading !== b.id) { S.qaLoading = b.id; loadQA(b).finally(() => (S.qaLoading = null)); } return head + `<p class="bm-note">بيجهّز الأسئلة…</p>`; }
+    const qs = S.quiz, total = qs.length, done = new Set(b.quiz_done || []);
+    if (S.qi == null) { const i = qs.findIndex((q) => !done.has(q.id)); S.qi = i < 0 ? total : i; }
+    const bar = `<div class="bm-qbar"><i style="width:${Math.round(100 * Math.min(done.size, total) / total)}%"></i></div>`;
+    if (S.qi >= total) {
+      return head + bar + `<p class="bm-q">${done.size >= total ? "خلصت كل الأسئلة 🎉" : "وصلت لآخر سؤال"}</p>
+        <p class="bm-note">${done.size >= total ? "كل إجابة اتحطت في خانتها في العقل. تقدر ترجع تعدّل أي إجابة في أي وقت." : `جاوبت ${done.size} من ${total}. الأسئلة اللي اتخطت تقدر ترجع لها في أي وقت.`}</p>
+        <div class="bm-acts"><button class="bm-go" data-qgo="0">راجع الإجابات</button>${done.size < total ? `<button class="bm-pill" data-qgo="first">كمّل الناقص</button>` : ""}</div>`;
+    }
+    const q = qs[S.qi], val = S.qa?.[q.id] || "";
+    const field = q.opts ? `<div class="bm-pills">${q.opts.map(([v, t]) => `<button class="bm-pill${val === v ? " on" : ""}" data-qpick="${esc(v)}">${esc(t)}</button>`).join("")}</div>`
+      : `<div class="bm-write bm-qans${q.multi ? " multi" : ""}" contenteditable="plaintext-only" data-k="@quiz" data-ph="${esc(q.ph || "اكتب إجابتك…")}"${q.ltr ? ' dir="ltr"' : ""}>${esc(val)}</div>`;
+    return head + `<div class="bm-qtop"><span>سؤال <b class="num">${S.qi + 1}</b> من <b class="num">${total}</b></span>${done.has(q.id) ? `<small>✓ متجاوب</small>` : ""}</div>` + bar
+      + `<p class="bm-q">${esc(q.q)}</p>` + field
+      + (q.multi ? `<p class="bm-note">كل حاجة في سطر (Enter لسطر جديد).</p>` : "")
+      + `<div class="bm-acts bm-qacts">${S.qi > 0 ? `<button class="bm-pill" data-qprev>→ السابق</button>` : ""}<span></span><button class="bm-pill" data-qskip>تخطّي</button><button class="bm-go" data-qnext>${S.qi + 1 === total ? "خلّصت" : "التالي ←"}</button></div>
+      <p class="bm-note bm-qsave">إجابتك بتتحفظ في العقل أول ما تدوس «التالي». تقدر تخرج وتكمّل في أي وقت.</p>`;
+  }
+  async function quizStep(step, pick) {
+    const b = cur(), q = S.quiz?.[S.qi];
+    if (!b || !q) return;
+    const ed = S.el.querySelector('.bm-card [data-k="@quiz"]');
+    const ans = (pick ?? (ed ? ed.innerText.replace(/\u00a0/g, " ").trim() : "")) || "";
+    const move = () => { S.qi = Math.max(0, S.qi + step); refreshCard(); S.el.querySelector('.bm-card [data-k="@quiz"]')?.focus(); };
+    if (step > 0 && pick == null && !ans && !(b.quiz_done || []).includes(q.id)) return toast("اكتب الإجابة، أو دوس «تخطّي»", true);
+    if (ans && ans !== (S.qa?.[q.id] || "")) {
+      S.qa = { ...S.qa, [q.id]: ans };
+      await save(() => bAPI("/quiz", { method: "POST", ...jsonBody({ qid: q.id, answer: ans, lang: QLANG() }) }), { card: false });
+    }
+    move();
+  }
+
   function cardHTML(n) {
     const b = cur();
     if (n.kind === "center") {
@@ -461,17 +506,24 @@ const BrandPage = (() => {
         ${S.brains.length > 1 ? `<button class="bm-link bad" data-del>احذف «${esc(b?.name || "")}» بكل صوره</button>` : ""}`;
     }
     if (n.kind === "add") {
-      const tab = S.addTab || "file", srcs = [...(b?.sources || [])].reverse();
+      const tab = S.addTab || "file", srcs = [...(b?.sources || [])].reverse(), rec = S.rec;
+      const TABS = [["file", "📎 ملف"], ["social", "📱 حساب سوشيال"], ["text", "✍️ اكتب"], ["rec", "🎙️ سجّل"], ["url", "🔗 موقع"]];
       return `<div class="bm-ch"><span class="latin">ADD TO BRAIN</span><b>ضيف للعقل</b></div>
-        <p class="bm-note">ارمي أي حاجة عن البراند، والبرنامج يقراها ويطلّع منها اقتراحات تظهر نقط منوّرة على الخريطة، وانت توافق عليها.</p>
-        <div class="bm-pills bm-tabs">${[["file", "ارفع ملف"], ["url", "من موقع"], ["text", "اكتب"]].map(([k, t]) => `<button class="bm-pill${tab === k ? " on" : ""}" data-tab="${k}">${t}</button>`).join("")}</div>
-        ${tab === "file" ? `<label class="bm-up wide bm-drop">+<small>ارمي الملف هنا أو دوس تختار</small><small class="bm-types">PDF · Word · صور · نص · صوت · فيديو</small><input type="file" multiple accept="${SRC_ACCEPT}" data-src hidden></label>`
-          : tab === "url" ? editable("@url", "", "kochi.fit · واضغط Enter", true)
-          : editable("@text", "", "اكتب أي حاجة عن البراند: الجمهور، النبرة، العروض، اللي ممنوع… واضغط Enter")}
+        <p class="bm-note">ارمي أي حاجة عن البراند، والمخ يقراها ويفصّصها: كل معلومة بتظهر نقطة منوّرة في الفرع بتاعها وانت توافق عليها.</p>
+        <div class="bm-pills bm-tabs">${TABS.map(([k, t]) => `<button class="bm-pill${tab === k ? " on" : ""}" data-tab="${k}">${t}</button>`).join("")}</div>
+        ${tab === "file" ? `<label class="bm-up wide bm-drop">+<small>ارمي الملف هنا أو دوس تختار (أو ارميه في أي حتة على الخريطة)</small><small class="bm-types">PDF · Word · صور · نص · صوت · فيديو</small><input type="file" multiple accept="${SRC_ACCEPT}" data-src hidden></label>`
+          : tab === "social" ? `${editable("@social", "", "لينك الحساب أو @اليوزر · واضغط Enter", true)}
+            <p class="bm-note">إنستجرام أو تيك توك. المخ بياخد البايو والمعلومات والنيتش، وبينزّل الصور ويحط كل واحدة مكانها، وبيحلل البوستات والمشاهدات وأحسن وأضعف الفيديوهات، والأخطاء واللي ناقص بيتسجلوا في «نقاط للتحسين».</p>
+            <p class="bm-note bm-cost">💳 بيتخصم من رصيدك على قد الشغل اللي اتعمل فعلًا (عادةً ما بين ١٠ و٦٠ نقطة).</p>`
+          : tab === "text" ? editable("@text", "", "اكتب أي حاجة عن البراند: الجمهور، النبرة، العروض، اللي ممنوع… واضغط Enter")
+          : tab === "rec" ? `<div class="bm-rec"><button class="bm-recb${rec ? " on" : ""}" data-ibrec>${rec ? "⏹" : "🎙️"}</button>
+            <div><b>${rec ? `بيسجّل <span class="num" data-rect>0:00</span>` : "سجّل واحكي عن البراند بصوتك"}</b><small class="muted">${rec ? "دوس تاني لما تخلص، والتسجيل بيتبعت للمخ لوحده" : "احكي براحتك: بتعمل إيه، لمين، وإيه اللي بيميزك. لحد ١٠ دقايق."}</small></div></div>`
+          : editable("@url", "", "example.com · واضغط Enter", true)}
         ${srcs.length ? `<ul class="bm-srcs">${srcs.map((s) => `<li class="${s.status}"><span class="bm-dot ${s.status === "done" ? "full" : s.status === "failed" ? "bad" : "busy"}"></span>
-          <span><b>${esc(s.name)}</b><small>${s.status === "working" ? "بيتقرا…" : s.status === "failed" ? esc(s.error || "فشل") : s.count ? `خلص · ${s.count} اقتراح` : "خلص · مفيش جديد"}</small></span>
+          <span><b>${esc(s.name)}</b><small>${s.status === "working" ? esc(s.step || "بيتقرا…") : s.status === "failed" ? esc(s.error || "فشل") : `${s.count ? `خلص · ${s.count} اقتراح` : "خلص · مفيش جديد"}${s.credits ? ` · ${s.credits} نقطة` : ""}`}</small></span>
           <button data-sdel="${s.id}" title="شيله">✕</button></li>`).join("")}</ul>` : ""}`;
     }
+    if (n.kind === "quiz") return quizHTML(b);
     if (n.kind === "branch") {
       return `<div class="bm-ch"><span class="latin">${n.br.en}</span><b>${esc(n.br.t)}</b></div>${n.br.k === "knowledge" && !n.br.leaves.length ? `<p class="bm-note">لسه فاضية. ارمي ملف أو لينك من «ضيف للعقل» والمعرفة هتطلع هنا.</p>` : ""}
         <ul class="bm-list">${n.br.leaves.map((l) => `<li><button data-go="${esc(`${n.br.k}:${l.f}:${l.i ?? ""}`)}"><span class="bm-dot ${l.type === "action" || l.type === "rule-new" ? "add" : filled(b, l) ? "full" : "empty"}"></span><b>${esc(l.type === "rule" ? l.t : l.t)}</b></button></li>`).join("")}</ul>`;
@@ -507,8 +559,24 @@ const BrandPage = (() => {
           <button class="bm-link bad" data-vdel="${l.f}">شيل الفيديو</button>` : `<label class="bm-up wide">+<small>ارفع فيديو</small><input type="file" accept="video/*" data-vup="${l.f}" hidden></label>`);
       }
       case "multi": return head + `<p class="bm-note">بيتكتب لوحده من اللوجو والصور، وتقدر تعدّله.</p>` + l.fields.map(([k, t]) => `<div class="bm-sub"><small>${t}</small>${editable(k, b?.[k], "…", /logo_description|ui_style|style/.test(k))}</div>`).join("");
+      case "todo": {
+        const x = l.todo;
+        return head + (x.why ? `<div class="bm-sub"><small>ليه</small><p class="bm-now">${esc(x.why)}</p></div>` : "") + (x.how ? `<div class="bm-sub"><small>تتصلّح إزاي</small><p class="bm-now">${esc(x.how)}</p></div>` : "")
+          + `<div class="bm-acts"><button class="bm-go" data-tdone="${x.id}" data-v="${x.done ? "" : "1"}">${x.done ? "↩︎ لسه ماتعملتش" : "✓ اتعملت"}</button><button class="bm-pill" data-tdel="${x.id}">شيلها</button></div>`
+          + (srcName(x.source) ? `<p class="bm-note">من تحليل «${esc(srcName(x.source))}»</p>` : "");
+      }
+      case "social-go": return head + `<p class="bm-note">حط لينك حساب البراند على إنستجرام أو تيك توك، والمخ يحلل البوستات والفيديوهات ويكتب هنا النقاط اللي لازم تتشتغل.</p>
+        <button class="bm-go" data-socialgo>📱 حلّل حساب</button>`;
       case "pending": {
         const p = l.p, from = srcName(p.source);
+        if (p.kind === "image") {
+          const KN = { products: "صور المنتج", characters: "شخصيات البراند", sets: "الأماكن والخلفيات", props: "الأدوات", logos: "اللوجو" };
+          S.imgTarget = S.imgTarget?.id === p.id ? S.imgTarget : { id: p.id, t: p.target };
+          return `<div class="bm-ch"><span class="latin">SUGGESTION</span><b>صورة من الحساب</b></div>${from ? `<p class="bm-note">من «${esc(from)}»</p>` : ""}
+            <img class="bm-pimg" src="/media/ads/brains/${esc(b.id)}/src/${esc(p.file)}" alt="">${p.summary ? `<p class="bm-note">${esc(p.summary)}</p>` : ""}
+            <div class="bm-sub"><small>تتحط في</small><div class="bm-pills">${Object.entries(KN).map(([k, t]) => `<button class="bm-pill${S.imgTarget.t === k ? " on" : ""}" data-itgt="${k}">${t}</button>`).join("")}</div></div>
+            <div class="bm-acts"><button class="bm-go" data-ok="${p.id}">حطها</button><button class="bm-pill" data-no="${p.id}">لأ</button></div>`;
+        }
         const now = p.kind === "field" ? String(b?.[p.field] || "").trim() : "";
         const top = `<div class="bm-ch"><span class="latin">SUGGESTION</span><b>${esc(p.kind === "question" ? "سؤال" : p.kind === "note" ? "معلومة جديدة" : l.t)}</b></div>${from ? `<p class="bm-note">من «${esc(from)}»</p>` : ""}`;
         const body = p.kind === "question" ? `<p class="bm-q">${esc(p.title)}</p>` + editable("@ans", "", "اكتب الإجابة…")
@@ -539,8 +607,7 @@ const BrandPage = (() => {
     S.el.classList.add("has-card");
     markOpen();
     // يتحط في مكانه جنب النقطة الأول، وبعدين يظهر (الأنيميشن على الشفافية والحجم بس، مش على المكان)
-    if (n.kind === "add") { const ib = S.el.querySelector(".bm-inbox"); card.style.transform = `translate(${(S.el.clientWidth - card.offsetWidth) / 2}px, ${ib.offsetTop + ib.offsetHeight + 10}px)`; }
-    else placeCard(toScreen([n.px, n.py]));
+    placeCard(toScreen([n.px, n.py]));
     card.animate([{ opacity: 0, scale: .96 }, { opacity: 1, scale: 1 }], { duration: reduce.matches ? 1 : 240, easing: "cubic-bezier(.2,.8,.2,1)" });
     const ed = card.querySelector(".bm-write");
     if (ed && n.kind === "leaf") { ed.focus(); placeCaret(ed); }
@@ -560,7 +627,7 @@ const BrandPage = (() => {
     y = Math.max(top, Math.min(H - ch - 8, y));
     card.style.transform = `translate(${x}px, ${y}px)`;
   }
-  const refreshCard = () => { if (S.open) { const n = S.open.id === "add" ? ADD : S.nodes.find((x) => x.id === S.open.id) || (S.open.id === "c" ? S.nodes[0] : null); S.backing = true; if (n) openCard(n); else openCard(null); } };
+  const refreshCard = () => { if (S.open) { const n = S.nodes.find((x) => x.id === S.open.id) || (S.open.id === "c" ? S.nodes[0] : null); S.backing = true; if (n) openCard(n); else openCard(null); } };
 
   // ---------- الحفظ ----------
   async function save(fn, { card = true } = {}) {
@@ -645,7 +712,7 @@ const BrandPage = (() => {
   // النقطة اللي اتمسكت بتفضل ماسكة لحد ما الماوس يبعد عنها ضعف المسافة تقريبًا.
   const HOT_R = { leaf: 20, branch: 46 };
   function pickHover(target) {
-    if (target?.closest?.(".bm-card, .bm-zoom, .bm-inbox")) return setHot(null);
+    if (target?.closest?.(".bm-card, .bm-zoom")) return setHot(null);
     const m = S.mw, d = (n) => Math.hypot(m[0] - n.px, m[1] - n.py);
     const cur = S.hovNode;
     if (cur && d(cur) < HOT_R[cur.kind] * 1.9) return;
@@ -728,18 +795,32 @@ const BrandPage = (() => {
     w.addEventListener("click", async (e) => {
       const t = e.target;
       if (S.noClick) { S.noClick = false; return; }
-      const node = t.closest(".bm-n") || (S.hovNode && !t.closest(".bm-card, .bm-zoom, .bm-inbox") ? S.hovNode.el : null);
+      const node = t.closest(".bm-n") || (S.hovNode && !t.closest(".bm-card, .bm-zoom") ? S.hovNode.el : null);
       if (node) {
         const n = S.nodes.find((x) => x.id === node.dataset.n);
         if (!n) return;
         if (S.open?.id === n.id) return openCard(null);
+        if (n.kind === "quiz") S.qi = null;
+        if (n.kind === "add" && !S.open) S.addTab = S.addTab || "file";
         if (n.kind === "leaf" && n.l.type === "action") return openCard(n);
         return openCard(n);
       }
       if (t.closest("[data-close]")) return openCard(null);
-      if (t.closest("[data-ibwrite]")) { S.addTab = "text"; openCard(ADD); S.el.querySelector(".bm-card .bm-write")?.focus(); return; }
-      if (t.closest("[data-ibsrc]")) { S.addTab = S.addTab || "file"; return openCard(S.open?.id === "add" ? null : ADD); }
       if (t.closest("[data-ibrec]")) return toggleRec();
+      if (t.closest("[data-qnext]")) return quizStep(1);
+      if (t.closest("[data-qskip]")) { S.qi += 1; return refreshCard(); }
+      if (t.closest("[data-qprev]")) return quizStep(-1);
+      const qp = t.closest("[data-qpick]");
+      if (qp) return quizStep(1, qp.dataset.qpick);
+      const qg = t.closest("[data-qgo]");
+      if (qg) { const done = new Set(cur()?.quiz_done || []); S.qi = qg.dataset.qgo === "first" ? Math.max(0, S.quiz.findIndex((q) => !done.has(q.id))) : +qg.dataset.qgo; return refreshCard(); }
+      const td = t.closest("[data-tdone]");
+      if (td) return save(() => bAPI(`/todos/${td.dataset.tdone}`, { method: "PATCH", ...jsonBody({ done: !!td.dataset.v }) }));
+      const tdl = t.closest("[data-tdel]");
+      if (tdl) { if (confirm("تشيل النقطة دي؟")) { openCard(null); save(() => bAPI(`/todos/${tdl.dataset.tdel}`, { method: "DELETE" })); } return; }
+      if (t.closest("[data-socialgo]")) { S.addTab = "social"; const a = S.nodes.find((x) => x.id === "add"); if (a) { openCard(a); S.el.querySelector('.bm-card [data-k="@social"]')?.focus(); } return; }
+      const itg = t.closest("[data-itgt]");
+      if (itg) { if (S.imgTarget) S.imgTarget.t = itg.dataset.itgt; S.el.querySelectorAll(".bm-card [data-itgt]").forEach((x) => x.classList.toggle("on", x === itg)); return; }
       const bk = t.closest("[data-back]");
       if (bk) {
         const to = S.nodes.find((x) => x.id === bk.dataset.back);
@@ -763,7 +844,7 @@ const BrandPage = (() => {
       if (ok) {
         const card = S.el.querySelector(".bm-card"), val = card.querySelector('[data-k="@val"], [data-k="@ans"]')?.innerText.trim(), ttl = card.querySelector('[data-k="@ttl"]')?.innerText.trim();
         openCard(null);
-        return save(() => bAPI(`/pending/${ok.dataset.ok}/approve`, { method: "POST", ...jsonBody({ value: val ?? null, title: ttl ?? null }) }));
+        return save(() => bAPI(`/pending/${ok.dataset.ok}/approve`, { method: "POST", ...jsonBody({ value: val ?? null, title: ttl ?? null, target: S.imgTarget?.id === ok.dataset.ok ? S.imgTarget.t : null }) }));
       }
       const no = t.closest("[data-no]");
       if (no) { openCard(null); return save(() => bAPI(`/pending/${no.dataset.no}`, { method: "DELETE" })); }
@@ -813,12 +894,14 @@ const BrandPage = (() => {
         } catch (err) { toast(err.message, true); }
         return;
       }
-      if (k === "@url" || k === "@text") {
+      if (k === "@quiz") { if (!el.classList.contains("multi")) { e.preventDefault(); quizStep(1); } return; }
+      if (k === "@url" || k === "@text" || k === "@social") {
         e.preventDefault();
         if (!v) return;
         const form = new FormData();
-        form.append(k === "@url" ? "url" : "text", v);
+        form.append(k === "@url" ? "url" : k === "@social" ? "social" : "text", v);
         el.textContent = "";
+        el.blur();
         return addSource(form);
       }
       if (k === "@ans") { e.preventDefault(); return S.el.querySelector("[data-ok]")?.click(); }
