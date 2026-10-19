@@ -20252,7 +20252,16 @@ def flow_load(fid: str) -> dict:
     f = flow_path(fid)
     if not f.exists():
         raise HTTPException(404, "المشروع ده مش موجود")
-    return json.loads(f.read_text(encoding="utf-8"))
+    d = json.loads(f.read_text(encoding="utf-8"))
+    # الموديل ساعات كان بيرجّع id بتاعه (فاضي أو مكرر) فوق بتاعنا ← «اختار» مكانش بيلاقيه. كل واحد بياخد id ثابت مميز.
+    for key in ("ideas", "scenarios"):
+        seen = set()
+        for i, it in enumerate(d.get(key) or []):
+            if isinstance(it, dict) and (not isinstance(it.get("id"), str) or not it["id"] or it["id"] in seen or it["id"] in ("None", "null", "undefined")):
+                it["id"] = f"{key[0]}{i}x{fid[:4]}"
+            if isinstance(it, dict):
+                seen.add(it["id"])
+    return d
 
 
 def flow_save(fid: str, d: dict) -> None:
@@ -20515,7 +20524,7 @@ def flow_gen_scenarios(fid: str, hint: str = "", more: bool = False) -> None:
         raw = flow_llm(fz.scenarios_messages(flow_brand(brain, idea_txt), fz.prefs_text(brain), flow_tpl(d), flow_assets_list(d), idea_txt,
                                              d["format"], d.get("episodes") or "auto", [c["name"] for c in d.get("cast") or []], 2, avoid if more else [], hint),
                        "السيناريوهات")
-    items = [{"id": uuid.uuid4().hex[:8], **s} for s in (raw.get("scenarios") or [])[:4] if isinstance(s, dict)]
+    items = [{**s, "id": uuid.uuid4().hex[:8]} for s in (raw.get("scenarios") or [])[:4] if isinstance(s, dict)]
     if not items:
         raise HTTPException(400, "المخ مرجعش سيناريوهات، جرّب تاني")
     if algo.mode_on(brain):   # ⚡ وضع الخوارزمية: كل سيناريو بيتفحص بالـ ١٥ بند والضعيف بيتصلّح قبل ما العميل يشوفه
@@ -20654,7 +20663,7 @@ def flow_gen_scripts(fid: str, d: dict, brain, idea_txt: str, avoid: list[str], 
     else:
         raw = flow_llm(fz.motion_script_messages(flow_brand(brain, idea_txt), fz.prefs_text(brain), flow_tpl(d), schema, live["scenes"], idea_txt, lang_label,
                                                  dub.GUIDES.get(lang, ""), dub.CHARS_PER_SEC, 2, avoid, hint), "السكريبت")
-    items = [{"id": uuid.uuid4().hex[:8], **s} for s in fz.clean_scripts(raw, schema, live["scenes"])]
+    items = [{**s, "id": uuid.uuid4().hex[:8]} for s in fz.clean_scripts(raw, schema, live["scenes"])]
     if not items:
         raise HTTPException(400, "المخ مرجعش سكريبت، جرّب تاني")
     flow_update(fid, lambda x: x.update(lang=lang, scenarios=(x.get("scenarios") or []) + items if more else items))
@@ -20748,10 +20757,11 @@ def flow_pick_idea(fid: str, body: FlowPickIn):
             it = next((i for i in d.get("ideas") or [] if i["id"] == body.id), None)
             if not it:
                 raise HTTPException(404, "الفكرة دي مش موجودة")
-        code = d["template"].get("kind") == "motion"   # قالب كود: مفيش نوع بوست، على السكريبت على طول
+        # قالب كود (موشن أو تايبوجرافي): مفيش نوع بوست، على السكريبت على طول
+        code = d["template"].get("kind") in ("motion", "typo")
         d.update(idea=it, stage="scenario" if code else "format", scenarios=[], scenario=None, **({"format": "reel"} if code else {}))
     d = flow_update(fid, fn)
-    if d["template"].get("kind") == "motion":
+    if d["template"].get("kind") in ("motion", "typo"):
         flow_job(fid, "scenarios", lambda: flow_gen_scenarios(fid))
     return flow_to_dict(fid, flow_load(fid))
 
@@ -20832,7 +20842,8 @@ def flow_pick_scenario(fid: str, body: FlowPickIn):
             if not it:
                 raise HTTPException(404, "السيناريو ده مش موجود")
         code = d["template"].get("kind") == "motion"
-        d.update(scenario=it, stage="voice" if code else "cast", **({"vo_track": None} if code else {}))
+        # التايبوجرافي كلام بس: مفيش أبطال ولا ملفات، من السكريبت للتوليد على طول
+        d.update(scenario=it, stage="voice" if code else "generate" if d["template"].get("kind") == "typo" else "cast", **({"vo_track": None} if code else {}))
         if code:
             d["params"] = flow_motion_params(d)
     return flow_to_dict(fid, flow_update(fid, fn))

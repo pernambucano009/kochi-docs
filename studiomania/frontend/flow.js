@@ -1,5 +1,6 @@
 // 🧭 مسار القالب: العميل داس على قالب ← المخ بيمشي معاه خطوة بخطوة
 // قالب كود: الفكرة ← السكريبت على مشاهد القالب ← الصوت (المشاهد بتاخد طول جملها) ← لوحة التحكم ← التصدير.
+// قالب تايبوجرافي: الفكرة ← السكريبت ← التوليد.
 // (الطريقة القديمة لقوالب التوليد: الفكرة ← نوع البوست ← السيناريو ← الأبطال ← الملفات ← التوليد.)
 // في كل خطوة: اختار / عدّل / اتناقش مع المخ / اقترح غيرهم / اكتب بنفسك، وكل 👍👎 بيتسجل في المخ.
 const Flow = (() => {
@@ -9,8 +10,10 @@ const Flow = (() => {
   const STEPS_AI = [["idea", "الفكرة"], ["format", "نوع البوست"], ["scenario", "السيناريو"], ["cast", "الأبطال"], ["voice", "الصوت"], ["assets", "ملفاتك"], ["generate", "التوليد"]];
   // قالب كود: السكريبت على مشاهد القالب ← الصوت (المشاهد بتاخد طول جملها) ← لوحة التحكم ← التصدير
   const STEPS_CODE = [["idea", "الفكرة"], ["scenario", "السكريبت"], ["voice", "الصوت"], ["panel", "لوحة التحكم"], ["generate", "التصدير"]];
+  // قالب تايبوجرافي: كلام بس بيتحرك (مفيش نوع بوست ولا أبطال ولا ملفات)
+  const STEPS_TYPO = [["idea", "الفكرة"], ["scenario", "السكريبت"], ["generate", "التوليد"]];
   const isCode = (d) => d?.template?.kind === "motion";
-  const steps = (d) => (isCode(d) ? STEPS_CODE : STEPS_AI);
+  const steps = (d) => (isCode(d) ? STEPS_CODE : d?.template?.kind === "typo" ? STEPS_TYPO : STEPS_AI);
   const FMT = { reel: ["🎬", "ريل", "فيديو قصير رأسي"], carousel: ["🗂️", "كاروسيل", "صور ورا بعض بتتقلب"], series: ["📺", "مسلسل", "كذا حلقة بنفس الأبطال"] };
   const OUT = { tvideo: "قسم القوالب", carousel: "الكاروسيل", series: "المسلسلات", typo: "التايبوجرافي", motion: "الموشن" };
   const idx = (st, d = S.d) => Math.max(0, steps(d).findIndex(([k]) => k === (st === "done" ? "generate" : st)));
@@ -436,6 +439,13 @@ const Flow = (() => {
 
   // ---------------------------------------------------------------- 6) التوليد والنتيجة
   function stGenerate(d) {
+    if (d.template.kind === "typo") {   // تايبوجرافي: الكلام بس، والحركة والتوقيت في قسم التايبوجرافي
+      return `<h2>جاهز للتوليد</h2>${d.error ? `<div class="flw-empty bad">⚠️ ${esc(d.error)}</div>` : ""}
+        <div class="flw-sum"><div><small>القالب</small><b>${esc(d.template.name)}</b></div><div><small>الفكرة</small><b>${esc(d.idea?.title || "")}</b></div>
+          <div><small>السكريبت</small><b>${esc(d.scenario?.title || "")}</b></div></div>
+        <p class="muted">الكلام هيتحط في التايبوجرافي، وهناك تختار الشكل والصوت وتصدّر الفيديو.</p>
+        <div class="flw-acts end"><button type="button" class="flw-btn pri big" data-gen ${d.busy ? "disabled" : ""}>🚀 ولّد</button></div>`;
+    }
     const fmt = FMT[d.format] || FMT.reel;
     return `<h2>جاهز للتوليد</h2>${d.error ? `<div class="flw-empty bad">⚠️ ${esc(d.error)}</div>` : ""}
       <div class="flw-sum">
