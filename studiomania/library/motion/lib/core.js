@@ -189,10 +189,50 @@
     return btoa(bin);
   };
 
+  // ---------- ⏱️ منظّم الوقت: كل مشهد (من M.meta) بياخد طول جملة الفويس أوفر بتاعته
+  //   window.TIMING (أو #tm=[...] في اللينك) = طول كل مشهد بالثواني بنفس ترتيب M.meta.scenes (0 أو فاضي = زي ما هو).
+  //   لحد ١.٥ مرة أسرع/أبطأ المشهد بيتمط أو يتضغط كله؛ لو الجملة أطول من كده المشهد بيتمط ١.٥ ويقف ثابت قبل آخره
+  //   (آخر ١٥٪ فيه الخروج للمشهد اللي بعده) لحد ما الجملة تخلص. المزيكا والمؤثرات بتتنقل معاه.
+  const MAXS = 1.5;
+  function timeMap(dur) {
+    let tm = window.TIMING;
+    try { const h = location.hash.match(/[#&]tm=([^&]*)/); if (h) tm = JSON.parse(decodeURIComponent(h[1])); } catch (e) { /* لينك بايظ = من غير تنظيم */ }
+    const sc = ((window.TEMPLATE_META || {}).scenes || []).map((x, i) => ({ a: +x.t0, b: Math.min(+x.t1, dur), d: +(tm || [])[i] || 0 }));
+    if (!Array.isArray(tm) || !sc.length || !sc.some((x) => x.d > 0)) return null;
+    // أجزاء متصلة من ٠ لآخر القالب: المشاهد، والفراغات بينها بتفضل زي ما هي
+    const parts = []; let cur = 0;
+    sc.filter((x) => x.b > x.a).sort((p, q) => p.a - q.a).forEach((x) => {
+      const a = Math.max(x.a, cur); if (a > cur) parts.push({ a: cur, b: a, d: a - cur });
+      if (x.b > a) parts.push({ a, b: x.b, d: x.d > 0 ? x.d : x.b - a }); cur = Math.max(cur, x.b);
+    });
+    if (cur < dur) parts.push({ a: cur, b: dur, d: dur - cur });
+    // كل جزء بيتحول لقطع (طول حقيقي ← من/لحد في وقت القالب)؛ القطعة الثابتة من = لحد
+    const segs = []; let r = 0;
+    parts.forEach(({ a, b, d }) => {
+      const L = b - a;
+      if (d <= L * MAXS + 1e-6) segs.push({ r0: r, r1: r + d, a, b });
+      else { const m = a + L * .85, hold = d - L * MAXS; segs.push({ r0: r, r1: r + (m - a) * MAXS, a, b: m }, { r0: r + (m - a) * MAXS, r1: r + (m - a) * MAXS + hold, a: m, b: m }, { r0: r + (m - a) * MAXS + hold, r1: r + d, a: m, b }); }
+      r += d;
+    });
+    const real = (t) => { const s = segs.find((x) => t < x.r1) || segs[segs.length - 1]; return s.a + (s.b - s.a) * Math.min(1, Math.max(0, (t - s.r0) / ((s.r1 - s.r0) || 1))); };
+    const fwd = (o) => { const s = segs.find((x) => o < x.b && x.b > x.a) || segs[segs.length - 1]; return s.b > s.a ? s.r0 + (s.r1 - s.r0) * Math.min(1, Math.max(0, (o - s.a) / (s.b - s.a))) : s.r0; };
+    return { dur: r, real, fwd };
+  }
+  // الصوت بالوقت الجديد: كل دالة في A أول رقم فيها وقت بدايتها (والريزر كمان وقت نهايته)
+  const warpA = (A, fwd) => {
+    const B = Object.create(A);
+    ["kick", "nz", "hat", "snare", "clap", "hit", "tone", "pluck", "bass", "pad", "whoosh", "click"].forEach((k) => { if (A[k]) B[k] = (t0, ...rest) => A[k](fwd(t0), ...rest); });
+    if (A.riser) B.riser = (t0, t1, ...rest) => A.riser(fwd(t0), Math.max(fwd(t0) + .05, fwd(t1)), ...rest);
+    if (A.groove) B.groove = (bpm, t0, t1, ...rest) => A.groove(bpm, fwd(t0), fwd(t1), ...rest);
+    return B;
+  };
+
   // ---------- boot: a reel calls M.reel({W,H,DUR,fonts,init,seek,sound})
   M.reel = (o) => {
     const W = o.W || 1920, H = o.H || 1080;
-    window.W = W; window.H = H; window.DUR = o.DUR; window.SUB = o.SUB || 2;
+    const TM = timeMap(o.DUR), DUR = TM ? TM.dur : o.DUR, at = TM ? TM.real : (t) => t;
+    if (TM && window.TEMPLATE_META) window.TEMPLATE_META = { ...window.TEMPLATE_META, scenes: window.TEMPLATE_META.scenes.map((x) => ({ ...x, t0: TM.fwd(+x.t0), t1: TM.fwd(+x.t1 - 1e-4) })) };
+    window.W = W; window.H = H; window.DUR = DUR; window.SUB = o.SUB || 2;
     document.documentElement.style.cssText = `margin:0;width:${W}px;height:${H}px;overflow:hidden;background:${o.bg || "#000"}`;
     document.body.style.cssText = `margin:0;width:${W}px;height:${H}px;overflow:hidden;`;
     M.stage = document.createElement("div");
@@ -201,8 +241,8 @@
     document.body.appendChild(M.stage);
     let ctx = null;
     window.ready = (async () => { if (o.fonts) await M.fonts(o.fonts); ctx = await o.init(M); o.seek(0, ctx, M); })();
-    window.seek = (t) => { if (ctx) o.seek(Math.min(t, o.DUR - 1e-4), ctx, M); };
-    window.soundtrack = () => M.track(o.DUR, (A) => o.sound(A, M));
+    window.seek = (t) => { if (ctx) o.seek(Math.min(at(t), o.DUR - 1e-4), ctx, M); };
+    window.soundtrack = () => M.track(DUR, (A) => o.sound(TM ? warpA(A, TM.fwd) : A, M));
   };
   window.M = M;
 })();

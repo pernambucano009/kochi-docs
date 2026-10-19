@@ -79,12 +79,14 @@ const MotionPage = (() => {
     S.view = null;
     cancelAnimationFrame(v.raf);
     v.audio?.pause();
+    v.voa?.pause();
     clearTimeout(v.reloadT);
     v.box.remove();
     document.removeEventListener("keydown", v.key);
   }
+  // tm = طول كل مشهد على قد الفويس أوفر (منظّم الوقت في core.js)
   function srcOf(m, vals, n) {
-    return `${m.preview_url}?v=${n}#p=${encodeURIComponent(JSON.stringify(vals || {}))}`;
+    return `${m.preview_url}?v=${n}#p=${encodeURIComponent(JSON.stringify(vals || {}))}${m.timing ? `&tm=${encodeURIComponent(JSON.stringify(m.timing))}` : ""}`;
   }
   // ---------- صيغة القالب: كل خانة بنصيحتها وحدودها (core.js · M.params / M.meta)
   const GS = "الشكل العام";
@@ -164,7 +166,7 @@ const MotionPage = (() => {
         S.schema[m.id] = v.schema;
         await brandValues();
         if (S.view !== v) return;
-        const vals = applyBrand(v.schema, {}, await brandValues());
+        const vals = m.vals ? { ...m.vals } : applyBrand(v.schema, {}, await brandValues());   // جاي من المسار: كلام السكريبت وألوان البراند جاهزين
         renderFields();
         renderTl();
         if (Object.keys(vals).length) { v.vals = vals; renderFields(); return reload(0); }
@@ -172,6 +174,8 @@ const MotionPage = (() => {
       try {
         v.audio = new Audio("data:audio/wav;base64," + (await win.soundtrack()));
         v.audio.loop = true; v.audio.muted = v.muted;
+        // الفويس أوفر: ملف لوحده ماشي مع المزيكا (اللي بتوطى تحته)
+        if (m.vo) { v.voa ??= new Audio(m.vo); v.voa.muted = v.muted; v.audio.volume = .35; }
         if (!v.paused) await v.audio.play().catch(() => {});
         v.audio.currentTime = v.t || 0;
       } catch { v.audio = null; }
@@ -185,6 +189,10 @@ const MotionPage = (() => {
           else v.t += (now - last) / 1000;
           const [a, b] = v.range || [0, D];
           if (v.t >= b || v.t < a) { v.t = a; if (v.audio) v.audio.currentTime = a; }
+        }
+        if (v.voa) {
+          if (v.paused || v.t >= v.voa.duration) { if (!v.voa.paused) v.voa.pause(); }
+          else { if (v.voa.paused) v.voa.play().catch(() => {}); if (Math.abs(v.voa.currentTime - v.t) > .25) v.voa.currentTime = v.t; }
         }
         last = now;
         try { win.seek(v.t % D); } catch { return; }   // المعاينة بتتحمّل من جديد (تعديل)
@@ -217,7 +225,7 @@ const MotionPage = (() => {
       el.innerHTML = story + groups.map(([g, ks]) => {
         const sc = scene(g), on = v.open === null ? groups.length < 3 || g === groups[0][0] : v.open === g;
         const colors = ks.filter((k) => sch[k].kind === "color"), rest = ks.filter((k) => sch[k].kind !== "color");
-        return `<section class="ml-grp ${on ? "on" : ""}"><button type="button" class="ml-gh" data-grp="${esc(g)}"><b>${esc(g)}</b>${sc ? `<small class="num">${sc.t0}–${sc.t1} ث</small>` : ""}<i>${on ? "−" : "+"}</i></button>
+        return `<section class="ml-grp ${on ? "on" : ""}"><button type="button" class="ml-gh" data-grp="${esc(g)}"><b>${esc(g)}</b>${sc ? `<small class="num">${(+sc.t0).toFixed(1)}–${(+sc.t1).toFixed(1)} ث</small>` : ""}<i>${on ? "−" : "+"}</i></button>
           ${on ? `<div class="ml-gb">${sc?.about ? `<small class="ml-hint2">🎬 ${esc(sc.about)}</small>` : ""}${rest.map((k) => fieldHTML(k, sch[k], val(k))).join("")}
             ${colors.length ? `<div class="ml-colors">${colors.map((k) => fieldHTML(k, sch[k], val(k))).join("")}</div>${colors.map((k) => sch[k].hint ? `<small class="ml-hint2">🎨 ${esc(sch[k].label)}: ${esc(sch[k].hint)}</small>` : "").join("")}` : ""}</div>` : ""}</section>`;
       }).join("");
@@ -251,7 +259,7 @@ const MotionPage = (() => {
     box.addEventListener("click", async (e) => {
       const t = e.target;
       if (t === box || t.closest("[data-x]")) return closeView();
-      if (t.closest("[data-mute]")) { v.muted = !v.muted; if (v.audio) v.audio.muted = v.muted; t.closest("[data-mute]").textContent = v.muted ? "🔇" : "🔊"; return; }
+      if (t.closest("[data-mute]")) { v.muted = !v.muted; if (v.audio) v.audio.muted = v.muted; if (v.voa) v.voa.muted = v.muted; t.closest("[data-mute]").textContent = v.muted ? "🔇" : "🔊"; return; }
       if (t.closest("[data-play]")) { v.paused = !v.paused; if (v.audio) v.paused ? v.audio.pause() : v.audio.play().catch(() => {}); t.closest("[data-play]").textContent = v.paused ? "▶" : "⏸"; return; }
       const scb = t.closest("[data-scene]");
       if (scb) { const s = v.meta.scenes[+scb.dataset.scene]; v.open = v.open === s.name && v.range ? null : s.name; if (v.open) playScene(s.name); else v.range = null; renderFields(); renderTl(); return; }
@@ -272,6 +280,10 @@ const MotionPage = (() => {
       const add = t.closest("[data-add]");
       if (add) {
         add.disabled = true; add.textContent = "⏳";
+        if (m.onExport) {   // من المسار: التصدير بيرجع للمسار بالخانات (والمشاهد على قد الصوت)
+          try { await m.onExport(v.vals); closeView(); } catch (err) { toast(err.message, true); add.disabled = false; add.textContent = "🎬 صدّر الفيديو"; }
+          return;
+        }
         try {
           const name = [m.name, S.brand?.name].filter(Boolean).join(" · ");
           await api(`/api/motion-library/${m.id}/import`, { method: "POST", ...jsonBody({ params: v.vals, name }) });
@@ -306,6 +318,7 @@ const MotionPage = (() => {
     try { await load(); } catch (err) { w.innerHTML = `<div class="nh-empty">${esc(err.message)}</div>`; }
   }
   // قالب من المعرض (t-*): بيتفتح في نفس المحرر
-  const openTemplate = (id, name) => openView({ id, name, template: true, preview_url: `/media/motion/r/${id}/reel.html` });
+  // opts (من مسار القالب): vals = الخانات، timing = طول كل مشهد، vo = لينك الفويس أوفر، onExport = بيتنادى بالخانات بدل الإضافة للأصول
+  const openTemplate = (id, name, opts = {}) => openView({ id, name, template: true, preview_url: `/media/motion/r/${id}/reel.html`, ...opts });
   return { html, mount, close: closeView, openTemplate };
 })();

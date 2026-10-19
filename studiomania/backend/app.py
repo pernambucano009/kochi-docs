@@ -12722,7 +12722,7 @@ def motion_params(params: dict) -> dict:
     return out
 
 
-def run_motion_import(mid: str, meta: dict, params: dict | None = None, name: str = "") -> None:
+def run_motion_import(mid: str, meta: dict, params: dict | None = None, name: str = "", timing: list | None = None, vo: Path | None = None) -> None:
     """بيفتح الأنيميشن في المتصفح، يرسم كل فريم من الوقت (seek)، وياخد الصوت اللي مكتوب بالكود، ويعمل منهم فيديو + أصل."""
     aid = uuid.uuid4().hex[:12]
     folder = clip_dir(aid)
@@ -12735,12 +12735,18 @@ def run_motion_import(mid: str, meta: dict, params: dict | None = None, name: st
             browser = typo_browser(p)
             try:
                 page = browser.new_page(viewport={"width": 1920, "height": 1080})
-                page.add_init_script("window.PARAMS = " + json.dumps(motion_params(params or {}), ensure_ascii=False) + ";")
+                page.add_init_script("window.PARAMS = " + json.dumps(motion_params(params or {}), ensure_ascii=False) + ";"
+                                     + (f"window.TIMING = {json.dumps([float(x) for x in timing])};" if timing else ""))
                 page.goto((MOTION_DIR / "r" / mid / "reel.html").as_uri())
                 page.evaluate("() => window.ready")
                 W, H, dur = page.evaluate("() => [window.W, window.H, window.DUR]")
                 page.set_viewport_size({"width": W, "height": H})
                 (folder / "track.wav").write_bytes(base64.b64decode(page.evaluate("() => soundtrack()")))
+                if vo:   # الفويس أوفر فوق المزيكا: المزيكا بتوطى، والصوت بطول الفيديو بالظبط
+                    subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(folder / "track.wav"), "-i", str(vo), "-filter_complex",
+                                    "[0]volume=0.32[m];[1]aformat=channel_layouts=stereo,volume=1.15[v];[m][v]amix=inputs=2:duration=first:normalize=0[o]",
+                                    "-map", "[o]", "-ar", "48000", str(folder / "mix.wav")], check=True, capture_output=True, timeout=180)
+                    (folder / "mix.wav").replace(folder / "track.wav")
                 n = int(math.ceil(dur * MOTION_FPS))
                 cmd = [ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-f", "image2pipe", "-framerate", str(MOTION_FPS), "-c:v", "mjpeg", "-i", "-",
                        "-i", str(folder / "track.wav"), "-c:v", "libx264", "-preset", "veryfast", "-crf", "19", "-pix_fmt", "yuv420p",
@@ -20003,6 +20009,18 @@ def flow_to_dict(fid: str, d: dict) -> dict:
     out["brand_name"] = (brain or {}).get("name") or ""
     out["algo_mode"] = algo.mode_on(brain)
     out["guide"] = flow_guide(d["template"])
+    if d["template"].get("kind") == "motion":   # قالب كود: مشاهده بأطوالها الأصلية، والفويس أوفر لو اتعمل
+        try:
+            live = motion_live(d["template"]["id"])
+            sch = fz.motion_schema(MOTION_DIR / "r" / d["template"]["id"] / "reel.html")
+            per = fz.scene_fields(sch, live["scenes"])
+            out["mlive"] = {"DUR": live["DUR"], "scenes": live["scenes"], "cps": dub.CHARS_PER_SEC, "max_stretch": fz.MAX_STRETCH,
+                            "fields": {k: {"label": sch[k].get("label") or k, "kind": sch[k].get("kind"), "max": sch[k].get("max")} for ks in per.values() for k in ks}}
+        except Exception:  # noqa: BLE001
+            out["mlive"] = None
+        vt = d.get("vo_track") or {}
+        if vt.get("file"):
+            out["vo_url"] = f"{base}/{vt['file']}"
     o = d.get("output") or {}
     if o.get("kind") == "motion" and o.get("status") == "working":
         job = MOTION_JOBS.get(o.get("mid")) or {}
@@ -20207,6 +20225,8 @@ def flow_gen_scenarios(fid: str, hint: str = "", more: bool = False) -> None:
         idea_txt += ("\nالهوك التلاتي (أول مشهد لازم يطبقه بالظبط): المكتوب على الشاشة «" + pk.get("screen", "") + "» · اللي بيتشاف: " + pk.get("visual", "")
                      + " · اللي بيتقال: «" + pk.get("spoken", "") + "» · جمل القفل بعده: «" + pk.get("lockin", "") + "»")
     avoid = [s.get("title", "") for s in d.get("scenarios") or []]
+    if d["template"].get("kind") == "motion":
+        return flow_gen_scripts(fid, d, brain, idea_txt, avoid if more else [], hint, more)
     if atlas.mock_mode():
         raw = fz.mock_scenarios(d["format"], 2, d.get("episodes"))
     else:
@@ -20304,6 +20324,114 @@ def flow_delete(fid: str):
 class FlowGenIn(BaseModel):
     hint: str = ""
     more: bool = False
+    lang: str = ""   # قوالب الكود: لهجة الفويس أوفر اللي السكريبت بيتكتب بيها
+
+
+# ---------------------------------------------------------------- 🎙️ قوالب الكود: سكريبت على مشاهد القالب ← فويس أوفر ← المشاهد على قد الصوت
+MOTION_LIVE_DIR = DATA_DIR / "motion_live"
+MOTION_LIVE_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def motion_live(mid: str) -> dict:
+    """مقاس القالب وطوله ومشاهده (M.meta) زي ما المتصفح شايفهم بالظبط (فيه قوالب مشاهدها بتتحسب بالكود). بيتحفظ لحد ما الملف يتغير."""
+    reel, core = MOTION_DIR / "r" / Path(mid).name / "reel.html", MOTION_DIR / "lib" / "core.js"
+    stamp = f"{reel.stat().st_mtime_ns}-{core.stat().st_mtime_ns}"
+    cache = MOTION_LIVE_DIR / f"{Path(mid).name}.json"
+    if cache.exists():
+        try:
+            c = json.loads(cache.read_text(encoding="utf-8"))
+            if c.get("stamp") == stamp:
+                return c
+        except ValueError:
+            pass
+    from playwright.sync_api import sync_playwright
+    with sync_playwright() as p:
+        browser = typo_browser(p)
+        try:
+            page = browser.new_page(viewport={"width": 1080, "height": 1920})
+            page.goto(reel.as_uri())
+            page.evaluate("() => window.ready")
+            info = page.evaluate("() => ({ W: window.W, H: window.H, DUR: window.DUR, scenes: ((window.TEMPLATE_META || {}).scenes || []).map((s) => ({ name: s.name, t0: +s.t0, t1: +s.t1, about: s.about || '' })) })")
+        finally:
+            browser.close()
+    if not info["scenes"]:   # قالب من غير مشاهد: كله مشهد واحد
+        info["scenes"] = [{"name": "الفيديو كله", "t0": 0.0, "t1": float(info["DUR"]), "about": ""}]
+    info["stamp"] = stamp
+    cache.write_text(json.dumps(info, ensure_ascii=False), encoding="utf-8")
+    return info
+
+
+def flow_gen_scripts(fid: str, d: dict, brain, idea_txt: str, avoid: list[str], hint: str, more: bool) -> None:
+    mid = d["template"]["id"]
+    live, schema = motion_live(mid), fz.motion_schema(MOTION_DIR / "r" / mid / "reel.html")
+    lang = d.get("lang") if d.get("lang") in dub.DIALECTS else flow_lang_guess(d)
+    dl = dub.DIALECTS[lang]
+    lang_label = dl.get("language") or dl["label"].split(" ", 1)[-1]
+    if atlas.mock_mode():
+        raw = fz.mock_scripts(schema, live["scenes"], 2)
+    else:
+        raw = flow_llm(fz.motion_script_messages(flow_brand(brain, idea_txt), fz.prefs_text(brain), flow_tpl(d), schema, live["scenes"], idea_txt, lang_label,
+                                                 dub.GUIDES.get(lang, ""), dub.CHARS_PER_SEC, 2, avoid, hint), "السكريبت")
+    items = [{"id": uuid.uuid4().hex[:8], **s} for s in fz.clean_scripts(raw, schema, live["scenes"])]
+    if not items:
+        raise HTTPException(400, "المخ مرجعش سكريبت، جرّب تاني")
+    flow_update(fid, lambda x: x.update(lang=lang, scenarios=(x.get("scenarios") or []) + items if more else items))
+
+
+def flow_motion_params(d: dict) -> dict:
+    """خانات القالب: الصور والألوان والاسم من عقل البراند، والكلام من السكريبت المختار."""
+    mid = d["template"]["id"]
+    schema = fz.motion_schema(MOTION_DIR / "r" / mid / "reel.html")
+    out = motion_brand_fill(schema, flow_brain(d))
+    for row in (d.get("scenario") or {}).get("scenes") or []:
+        out.update(fz.clean_params(schema, row.get("fields") or {}))
+    return out
+
+
+def flow_make_vo(fid: str) -> None:
+    """الفويس أوفر كله مرة واحدة (نبرة واحدة سلسة)، وبعدين بنسمعه ونعرف كل جملة بدأت وخلصت إمتى، وكل مشهد بياخد طول جملته."""
+    d = flow_load(fid)
+    vo, live = d.get("vo") or {}, motion_live(d["template"]["id"])
+    rows = (d.get("scenario") or {}).get("scenes") or []
+    says = [str((rows[i] if i < len(rows) else {}).get("say") or "").strip() for i in range(len(live["scenes"]))]
+    if not any(says):
+        raise HTTPException(400, "السكريبت مفيهوش ولا جملة فويس أوفر")
+    folder = FLOWS_DIR / Path(fid).name
+    raw = folder / f"vo-raw-{uuid.uuid4().hex[:6]}.wav"
+    vo_say("\n".join(x for x in says if x), vo.get("voice") or "", vo.get("lang") or d.get("lang") or "ar-eg-cairo", raw)
+    vdur = probe_duration(raw)
+    try:
+        heard = atlas.transcribe(raw, vdur)
+    except Exception:  # noqa: BLE001 — من غير تفريغ الكلام بيتوزّع على طول الصوت بعدد الحروف
+        heard = []
+    words, owner = [], []
+    for i, t in enumerate(says):
+        for w in hekaya.split_words(t):
+            words.append(w); owner.append(i)
+    times = hekaya.align(words, heard, vdur)
+    first = {}
+    for k, i in enumerate(owner):
+        first.setdefault(i, times[k])
+    voiced = [i for i in range(len(says)) if says[i] and i in first]
+    spans = [None] * len(says)
+    for n, i in enumerate(voiced):
+        end = first[voiced[n + 1]] - 0.05 if n + 1 < len(voiced) else vdur
+        spans[i] = (first[i], max(first[i] + 0.3, end))
+    plan = fz.vo_plan(live["scenes"], float(live["DUR"]), spans, vdur)
+    # الصوت النهائي: كل جملة في مكان مشهدها، والباقي سكوت، بطول الفيديو الجديد بالظبط
+    out = folder / f"vo-{uuid.uuid4().hex[:6]}.wav"
+    parts = "".join(f"[0]atrim={p['from']}:{p['to']},asetpts=PTS-STARTPTS,adelay={int(p['at'] * 1000)}|{int(p['at'] * 1000)}[p{i}];" for i, p in enumerate(plan["pieces"]))
+    mix = "".join(f"[p{i}]" for i in range(len(plan["pieces"]))) + f"amix=inputs={len(plan['pieces'])}:duration=longest:normalize=0,apad=whole_dur={plan['total']},atrim=end={plan['total']}[o]"
+    subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(raw), "-filter_complex", parts + mix, "-map", "[o]", "-ac", "1", "-ar", "48000", str(out)],
+                   check=True, capture_output=True, timeout=180)
+    raw.unlink(missing_ok=True)
+
+    def fin(x):
+        old = (x.get("vo_track") or {}).get("file")
+        if old and old != out.name:
+            (folder / old).unlink(missing_ok=True)
+        x.update(vo_track={"file": out.name, "timing": plan["timing"], "total": plan["total"], "heard": len(heard)}, stage="panel")
+    flow_update(fid, fin)
 
 
 def flow_stale(d: dict) -> bool:
@@ -20338,8 +20466,12 @@ def flow_pick_idea(fid: str, body: FlowPickIn):
             it = next((i for i in d.get("ideas") or [] if i["id"] == body.id), None)
             if not it:
                 raise HTTPException(404, "الفكرة دي مش موجودة")
-        d.update(idea=it, stage="format", scenarios=[], scenario=None)
-    return flow_to_dict(fid, flow_update(fid, fn))
+        code = d["template"].get("kind") == "motion"   # قالب كود: مفيش نوع بوست، على السكريبت على طول
+        d.update(idea=it, stage="scenario" if code else "format", scenarios=[], scenario=None, **({"format": "reel"} if code else {}))
+    d = flow_update(fid, fn)
+    if d["template"].get("kind") == "motion":
+        flow_job(fid, "scenarios", lambda: flow_gen_scenarios(fid))
+    return flow_to_dict(fid, flow_load(fid))
 
 
 class FlowChatIn(BaseModel):
@@ -20400,6 +20532,8 @@ def flow_scenarios(fid: str, body: FlowGenIn):
     flow_idle(d)
     if not d.get("format"):
         raise HTTPException(400, "اختار نوع البوست الأول")
+    if body.lang in dub.DIALECTS:   # قالب كود: اللهجة اتغيرت ← السكريبت بيتكتب بيها
+        flow_update(fid, lambda x: x.update(lang=body.lang))
     flow_job(fid, "scenarios", lambda: flow_gen_scenarios(fid, body.hint.strip()[:500], body.more))
     return flow_to_dict(fid, flow_load(fid))
 
@@ -20415,7 +20549,10 @@ def flow_pick_scenario(fid: str, body: FlowPickIn):
             it = next((s for s in d.get("scenarios") or [] if s["id"] == body.id), None)
             if not it:
                 raise HTTPException(404, "السيناريو ده مش موجود")
-        d.update(scenario=it, stage="cast")
+        code = d["template"].get("kind") == "motion"
+        d.update(scenario=it, stage="voice" if code else "cast", **({"vo_track": None} if code else {}))
+        if code:
+            d["params"] = flow_motion_params(d)
     return flow_to_dict(fid, flow_update(fid, fn))
 
 
@@ -20473,7 +20610,7 @@ def flow_voice_options(fid: str):
                    "sample": dub.VOICES[x].get("sample") or (f"/media/vsamples/{x}.mp3" if (VSAMPLE_DIR / f"{x}.mp3").exists() else "")}
                   for x in v["voices"]] for k, v in dub.DIALECTS.items()}
     vo = d.get("vo") or {}
-    lang = vo.get("lang") if vo.get("lang") in dub.DIALECTS else flow_lang_guess(d)
+    lang = vo.get("lang") if vo.get("lang") in dub.DIALECTS else d.get("lang") if d.get("lang") in dub.DIALECTS else flow_lang_guess(d)
     voice = vo.get("voice") if vo.get("voice") in dub.DIALECTS[lang]["voices"] else dub.DIALECTS[lang]["voices"][0]
     return {"speakers": speakers, "dialects": dialects, "voices": voices, "fasih": bool(fasih.api_key() or atlas.mock_mode()),
             "pick": {"speaker": vo.get("speaker") or "narrator", "lang": lang, "voice": voice}}
@@ -20529,6 +20666,11 @@ def flow_voice(fid: str, body: FlowVoiceIn):
         raise HTTPException(400, "اللهجة دي مش موجودة")
     voice = body.voice if body.voice in dub.DIALECTS[body.lang]["voices"] else dub.DIALECTS[body.lang]["voices"][0]
     vo = {"speaker": body.speaker, "speaker_name": names[body.speaker], "lang": body.lang, "voice": voice, "on": body.speaker != "none"}
+    if d["template"].get("kind") == "motion":
+        flow_update(fid, lambda x: x.update(vo=vo, vo_track=None, stage="voice" if vo["on"] else "panel"))
+        if vo["on"]:
+            flow_job(fid, "vo", lambda: flow_make_vo(fid))
+        return flow_to_dict(fid, flow_load(fid))
     return flow_to_dict(fid, flow_update(fid, lambda x: x.update(vo=vo, stage="assets")))
 
 
@@ -20709,6 +20851,33 @@ def flow_brief(d: dict) -> str:
     if (d.get("prompt") or "").strip():
         parts.append("توجيهات العميل للتوليد: " + d["prompt"].strip())
     return "\n".join(parts)
+
+
+class FlowExportIn(BaseModel):
+    params: dict = {}
+
+
+@app.post("/api/flows/{fid}/export")
+def flow_export(fid: str, body: FlowExportIn):
+    """🎬 قالب الكود بيترسم فيديو: بخانات لوحة التحكم، والمشاهد على قد الفويس أوفر (لو فيه)، والصوت متركّب على المزيكا."""
+    d = flow_load(fid)
+    flow_idle(d)
+    if d["template"].get("kind") != "motion":
+        raise HTTPException(400, "التصدير ده لقوالب الكود بس")
+    mid = d["template"]["id"]
+    if (MOTION_JOBS.get(mid) or {}).get("status") == "working":
+        raise HTTPException(400, "القالب ده بيترسم لمشروع تاني دلوقتي، استنى لما يخلص")
+    schema = fz.motion_schema(MOTION_DIR / "r" / mid / "reel.html")
+    params = {**(d.get("params") or {}), **{k: v for k, v in (body.params or {}).items() if k in schema}}
+    vt = d.get("vo_track") or {}
+    vo_path = FLOWS_DIR / Path(fid).name / vt["file"] if vt.get("file") else None
+    title = (d.get("scenario") or {}).get("title") or (d.get("idea") or {}).get("title") or d["template"]["name"]
+    before = motion_assets().get(mid, [])
+    MOTION_JOBS[mid] = {"status": "working", "progress": 0.0, "error": ""}
+    flow_update(fid, lambda x: x.update(params=params, stage="generate", output={"kind": "motion", "mid": mid, "params": params, "before": before, "status": "working"}))
+    threading.Thread(target=run_motion_import, args=(mid, {"name": f"🧭 {title}"[:100], "category": "motion_graphics", "tags": ["مسار القالب"]}, params, f"🧭 {title}"),
+                     kwargs={"timing": vt.get("timing"), "vo": vo_path if vo_path and vo_path.exists() else None}, daemon=True).start()
+    return flow_to_dict(fid, flow_load(fid))
 
 
 @app.post("/api/flows/{fid}/generate")

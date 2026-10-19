@@ -1830,3 +1830,16 @@ audio { width: 100%; }
 .ml-look { display: grid; gap: 6px; padding: 5px 5px 8px; border-radius: 14px; border: 2px solid transparent; background: var(--nh-bg); cursor: pointer; font: 12px var(--nh-arabic); color: var(--nh-ink, inherit); }
 .ml-look img { width: 100%; aspect-ratio: 3 / 4; object-fit: cover; border-radius: 10px; display: block; }
 .ml-look.on { border-color: var(--nh-accent); }
+/* 🎙️ قالب كود: السكريبت على مشاهد القالب، وطول كل جملة جنب طول مشهدها */
+.flw-sbeats li { display: grid; gap: 4px; }
+.flw-scn { font-weight: 500; font-size: 13px; }
+.flw-sec { font-size: 12px; color: var(--muted); }
+.flw-sec.warn { color: #b7791f; }
+.flw-sec.bad { color: #c0392b; }
+.flw-srow { border: 0; margin: 0 0 12px; padding: 12px; border-radius: 14px; background: var(--bg, rgba(0, 0, 0, .03)); display: grid; gap: 8px; }
+.flw-srow legend { font-weight: 500; padding: 0 4px; }
+.flw-times { list-style: none; margin: 14px 0 6px; padding: 0; display: grid; gap: 6px; }
+.flw-times li { display: flex; gap: 10px; align-items: baseline; padding: 8px 12px; border-radius: 12px; background: var(--card); box-shadow: 0 2px 10px rgba(24, 23, 24, .05); font-size: 14px; }
+.flw-times li b { flex: 1; font-weight: 500; }
+.flw-times .warn { color: #b7791f; }
+.flw-vo { width: 100%; margin: 6px 0 4px; }

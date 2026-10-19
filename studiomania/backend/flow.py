@@ -15,7 +15,7 @@ import growth
 import algo
 
 FORMATS = {"reel": "ريل (فيديو قصير)", "carousel": "كاروسيل (صور ورا بعض)", "series": "مسلسل (كذا حلقة)"}
-STAGES = ("idea", "format", "scenario", "cast", "voice", "assets", "generate", "done")
+STAGES = ("idea", "format", "scenario", "cast", "voice", "assets", "panel", "generate", "done")
 
 
 # ---------------------------------------------------------------- ذوق العميل (اللي المخ اتعلّمه)
@@ -293,3 +293,104 @@ def mock_seasons(today: str) -> dict:
     y = int(today[:4])
     return {"target": "مصر", "countries": ["مصر"], "items": [{"name": "رأس السنة", "date": f"{y + 1}-01-01", "end": "", "countries": ["مصر"], "type": "اجتماعي", "angle": "بداية جديدة"},
                                                            {"name": "عيد الأم", "date": f"{y + 1}-03-21", "end": "", "countries": ["مصر"], "type": "اجتماعي", "angle": "شكرًا يا ماما"}]}
+
+
+# ---------------------------------------------------------------- 🎙️ قوالب الكود بفويس أوفر: السكريبت على مشاهد القالب، والمشاهد على قد الصوت
+MAX_STRETCH = 1.5   # نفس MAXS في core.js: أكتر من كده المشهد بيقف ثابت لحد ما الجملة تخلص
+LEAD, TAIL = 0.25, 0.7   # المشهد بيبدأ قبل الكلام بشوية، وآخر مشهد بيكمّل بعد آخر كلمة
+
+
+def scene_fields(schema: dict, scenes: list[dict]) -> dict[str, list[str]]:
+    """الخانات النصية لكل مشهد (بالـ group)، من غير الألوان والخطوط والصور والاختيارات."""
+    names = {sc["name"] for sc in scenes}
+    out: dict[str, list[str]] = {sc["name"]: [] for sc in scenes}
+    for k, v in schema.items():
+        if v.get("kind") in ("text", "lines", None) and v.get("group") in names:
+            out[v["group"]].append(k)
+    return out
+
+
+def motion_script_messages(brand: str, prefs: str, tpl: dict, schema: dict, scenes: list[dict], idea: str, lang_label: str, guide: str,
+                           cps: float, n: int, avoid: list[str], hint: str) -> list[dict]:
+    """سكريبت لقالب كود: لكل مشهد جملة فويس أوفر على قد وقته + الكلام اللي بيظهر في خانات المشهد ده."""
+    fields = scene_fields(schema, scenes)
+    rows = []
+    for sc in scenes:
+        sec = round(sc["t1"] - sc["t0"], 1)
+        rows.append({"scene": sc["name"], "seconds": sec, "what_happens": sc.get("about", ""), "max_say_chars": int(sec * cps * 1.15),
+                     "fields": {k: {"label": schema[k].get("label"), "example": schema[k].get("def"), **({"hint": schema[k]["hint"]} if schema[k].get("hint") else {}),
+                                    **({"max_chars": schema[k]["max"]} if schema[k].get("max") else {})} for k in fields[sc["name"]]}})
+    sys = ("إنت كاتب إعلانات ومحتوى سوشيال. القالب ده فيديو بيترسم بالكود: مشاهده ثابتة وحركتها ثابتة، والمتغيّر الكلام بس. "
+           "لكل مشهد اكتب: say = جملة فويس أوفر واحدة بتتقال على المشهد ده (طبيعية ومتكلّمة، ماتعدّيش max_say_chars عشان المشهد مايتمطش أوي)، "
+           "وfields = الكلام اللي بيظهر في خانات المشهد (قصير زي المثال، وماتعدّيش max_chars، ولو الخانة قايمة رجّع array بنفس عدد العناصر وشكلها). "
+           "الجمل لازم تكمّل بعض كقصة واحدة بالترتيب، وماتكررش الكلام المكتوب على الشاشة حرفيًا في الفويس أوفر (الصوت بيشرح والشاشة بتلخّص). "
+           f"لغة الفويس أوفر والكلام: {lang_label}. {guide} الأرقام بالأرقام العربي (٠١٢٣). "
+           'رجّع JSON: {"scripts":[{"title":"","summary":"","caption":"","scenes":[{"scene":"اسم المشهد بالظبط","say":"","fields":{}}]}]}')
+    user = (f"البراند:\n{brand}\n\n{prefs}\n\nالقالب: {tpl.get('name', '')}\n{tpl.get('profile', '')}\n\nالفكرة:\n{idea}\n\n"
+            f"المشاهد بالترتيب:\n{json.dumps(rows, ensure_ascii=False)}\n\nاكتب {n} سكريبت مختلفين.")
+    if avoid:
+        user += "\nماتكررش دول: " + "، ".join(avoid)
+    if hint:
+        user += f"\nطلب العميل: {hint}"
+    return [{"role": "system", "content": sys}, {"role": "user", "content": user}]
+
+
+def clean_scripts(raw: dict, schema: dict, scenes: list[dict]) -> list[dict]:
+    """بيظبط رد المخ: كل مشهد بترتيبه (حتى لو اسمه جه غلط)، والخانات المسموحة بس."""
+    fields, out = scene_fields(schema, scenes), []
+    for s in (raw.get("scripts") or [])[:4]:
+        if not isinstance(s, dict):
+            continue
+        got = [x for x in s.get("scenes") or [] if isinstance(x, dict)]
+        by = {str(x.get("scene") or "").strip(): x for x in got}
+        rows = []
+        for i, sc in enumerate(scenes):
+            x = by.get(sc["name"]) or (got[i] if i < len(got) else {})
+            f = x.get("fields") if isinstance(x.get("fields"), dict) else {}
+            rows.append({"scene": sc["name"], "say": str(x.get("say") or "").strip()[:400],
+                         "fields": clean_params({k: schema[k] for k in fields[sc["name"]]}, f)})
+        out.append({"title": str(s.get("title") or "")[:120], "summary": str(s.get("summary") or "")[:400], "caption": str(s.get("caption") or "")[:600], "scenes": rows})
+    return out
+
+
+def mock_scripts(schema: dict, scenes: list[dict], n: int) -> dict:
+    fields = scene_fields(schema, scenes)
+    return {"scripts": [{"title": f"سكريبت تجريبي {j + 1}", "summary": "سكريبت للتجربة من غير المخ", "caption": "كابشن تجريبي",
+                         "scenes": [{"scene": sc["name"], "say": f"دي جملة المشهد {i + 1} للتجربة.", "fields": {k: schema[k].get("def") for k in fields[sc["name"]]}}
+                                    for i, sc in enumerate(scenes)]} for j in range(n)]}
+
+
+def say_seconds(text: str, cps: float) -> float:
+    return round(len(re.sub(r"\s+", " ", text or "").strip()) / cps, 1) if text else 0.0
+
+
+def vo_plan(scenes: list[dict], dur: float, spans: list[tuple[float, float] | None], vo_dur: float) -> dict:
+    """طول كل مشهد على قد جملته، ومكان كل حتة صوت في الفيديو الجديد.
+    scenes = مشاهد القالب بترتيب M.meta (t0/t1 الأصليين)، spans = (بداية، نهاية) الجملة في ملف الصوت لكل مشهد (None = من غير كلام).
+    لازم يمشي بنفس طريقة timeMap في core.js: الفراغات بين المشاهد بتفضل بطولها."""
+    timing = [0.0] * len(scenes)
+    last_voiced = max((i for i, sp in enumerate(spans) if sp), default=-1)
+    for i, sc in enumerate(scenes):
+        L = max(0.01, min(sc["t1"], dur) - sc["t0"])
+        sp = spans[i] if i < len(spans) else None
+        if not sp:
+            timing[i] = round(L, 3)
+            continue
+        need = (sp[1] - sp[0]) + LEAD + (TAIL if i == last_voiced else 0.15)
+        timing[i] = round(max(need, L / MAX_STRETCH), 3)
+    # أماكن المشاهد في الوقت الجديد (نفس ترتيب core: بالـ t0، والفراغات زي ما هي)
+    order = sorted(range(len(scenes)), key=lambda i: scenes[i]["t0"])
+    starts, cur, r = [0.0] * len(scenes), 0.0, 0.0
+    for i in order:
+        a, b = max(scenes[i]["t0"], cur), min(scenes[i]["t1"], dur)
+        if b <= a:
+            continue
+        if a > cur:
+            r += a - cur
+        starts[i] = r
+        r += timing[i]
+        cur = b
+    total = r + max(0.0, dur - cur)
+    pieces = [{"from": round(max(0.0, spans[i][0] - 0.05), 3), "to": round(min(vo_dur, spans[i][1]), 3), "at": round(starts[i] + LEAD, 3)}
+              for i in range(len(scenes)) if i < len(spans) and spans[i]]
+    return {"timing": timing, "total": round(total, 3), "pieces": pieces}

@@ -1,14 +1,19 @@
 // 🧭 مسار القالب: العميل داس على قالب ← المخ بيمشي معاه خطوة بخطوة
-// الفكرة ← نوع البوست ← السيناريو ← الأبطال ← الملفات (@منشن) ← التوليد ← التقييم.
+// قالب كود: الفكرة ← السكريبت على مشاهد القالب ← الصوت (المشاهد بتاخد طول جملها) ← لوحة التحكم ← التصدير.
+// (الطريقة القديمة لقوالب التوليد: الفكرة ← نوع البوست ← السيناريو ← الأبطال ← الملفات ← التوليد.)
 // في كل خطوة: اختار / عدّل / اتناقش مع المخ / اقترح غيرهم / اكتب بنفسك، وكل 👍👎 بيتسجل في المخ.
 const Flow = (() => {
   const esc = (s) => escapeHtml(String(s ?? ""));
   const J = (o) => ({ headers: { "Content-Type": "application/json" }, body: JSON.stringify(o) });
   const S = { seen: new Set(), html: {}, busyFrom: null, tickT: null, el: null, d: null, timer: null, edit: null, own: false, hint: false, chat: null, cast: null, seasons: null, why: false };
-  const STEPS = [["idea", "الفكرة"], ["format", "نوع البوست"], ["scenario", "السيناريو"], ["cast", "الأبطال"], ["voice", "الصوت"], ["assets", "ملفاتك"], ["generate", "التوليد"]];
+  const STEPS_AI = [["idea", "الفكرة"], ["format", "نوع البوست"], ["scenario", "السيناريو"], ["cast", "الأبطال"], ["voice", "الصوت"], ["assets", "ملفاتك"], ["generate", "التوليد"]];
+  // قالب كود: السكريبت على مشاهد القالب ← الصوت (المشاهد بتاخد طول جملها) ← لوحة التحكم ← التصدير
+  const STEPS_CODE = [["idea", "الفكرة"], ["scenario", "السكريبت"], ["voice", "الصوت"], ["panel", "لوحة التحكم"], ["generate", "التصدير"]];
+  const isCode = (d) => d?.template?.kind === "motion";
+  const steps = (d) => (isCode(d) ? STEPS_CODE : STEPS_AI);
   const FMT = { reel: ["🎬", "ريل", "فيديو قصير رأسي"], carousel: ["🗂️", "كاروسيل", "صور ورا بعض بتتقلب"], series: ["📺", "مسلسل", "كذا حلقة بنفس الأبطال"] };
   const OUT = { tvideo: "قسم القوالب", carousel: "الكاروسيل", series: "المسلسلات", typo: "التايبوجرافي", motion: "الموشن" };
-  const idx = (st) => Math.max(0, STEPS.findIndex(([k]) => k === (st === "done" ? "generate" : st)));
+  const idx = (st, d = S.d) => Math.max(0, steps(d).findIndex(([k]) => k === (st === "done" ? "generate" : st)));
 
   // ---------------------------------------------------------------- فتح وقفل
   function shell() {
@@ -88,9 +93,9 @@ const Flow = (() => {
         ${(k.tips || []).map((t) => `<p>• ${esc(t)}</p>`).join("")}<small class="muted">${k.counts?.prefs || 0} تقييم متسجل</small></div>` : ""}`;
   }
   function stepper(d) {
-    const cur = idx(d.stage);
-    const ready = { idea: true, format: !!d.idea, scenario: !!d.format, cast: !!d.scenario, voice: !!d.scenario, assets: !!d.scenario, generate: !!d.scenario };
-    return `<ol class="flw-steps">${STEPS.map(([k, t], i) => `<li class="${i < cur ? "past" : i === cur ? "now" : ""}">
+    const cur = idx(d.stage, d);
+    const ready = { idea: true, format: !!d.idea, scenario: !!d.format, cast: !!d.scenario, voice: !!d.scenario, assets: !!d.scenario, panel: !!d.scenario, generate: !!d.scenario && !isCode(d) };
+    return `<ol class="flw-steps">${steps(d).map(([k, t], i) => `<li class="${i < cur ? "past" : i === cur ? "now" : ""}">
       <button type="button" ${ready[k] && i !== cur && !busy() ? `data-go="${k}"` : "disabled"}><i class="num">${i < cur ? "✓" : i + 1}</i><span>${t}</span></button></li>`).join("")}</ol>`;
   }
   function rateBtns(stage, id) {
@@ -281,6 +286,79 @@ const Flow = (() => {
         <button type="button" class="flw-link" data-own>✍️ اكتب السيناريو بنفسك</button></div>`;
   }
 
+  // ---------------------------------------------------------------- 🎙️ قالب كود: السكريبت على مشاهد القالب
+  // كل مشهد: جملة فويس أوفر (وجنبها هتاخد قد إيه مقارنة بطول المشهد) + الكلام اللي بيظهر في خانات المشهد
+  const sec = (txt, cps) => (txt ? Math.round((String(txt).replace(/\s+/g, " ").trim().length / cps) * 10) / 10 : 0);
+  function sayBadge(say, scn, ml) {
+    if (!say) return `<small class="flw-sec muted">من غير كلام</small>`;
+    const L = scn.t1 - scn.t0, need = sec(say, ml.cps), over = need > L * ml.max_stretch;
+    return `<small class="flw-sec ${over ? "bad" : need > L ? "warn" : ""}" title="طول المشهد الأصلي ${L.toFixed(1)} ثانية">
+      ⏱ <span class="num">${need}</span> ث من <span class="num">${L.toFixed(1)}</span>${over ? " · طويلة: المشهد هيقف ثابت شوية، قصّرها" : need > L ? " · المشهد هيبطّأ شوية" : ""}</small>`;
+  }
+  const fieldVal = (v) => (Array.isArray(v) ? v.join(" · ") : String(v ?? ""));
+  function scriptBody(sc, ml) {
+    return `<ol class="flw-beats flw-sbeats">${(sc.scenes || []).map((r, i) => { const scn = ml.scenes[i] || { t0: 0, t1: 1 }; return `<li>
+      <b class="flw-scn">${esc(r.scene)}</b>${r.say ? `<em>🎙 «${esc(r.say)}»</em>` : ""}${sayBadge(r.say, scn, ml)}
+      ${Object.entries(r.fields || {}).map(([k, v]) => `<small class="muted">📝 ${esc(ml.fields[k]?.label || k)}: ${esc(fieldVal(v))}</small>`).join("")}</li>`; }).join("")}</ol>`;
+  }
+  function scriptForm(sc, ml) {
+    const rows = ml.scenes.map((scn, i) => (sc.scenes || [])[i] || { scene: scn.name, say: "", fields: {} });
+    return `<form class="flw-card flw-form flw-wideform" data-scriptform="${esc(sc.id || "")}">
+      <label>العنوان <input name="title" value="${esc(sc.title || "")}"></label>
+      ${rows.map((r, i) => `<fieldset class="flw-srow" data-si="${i}"><legend>${esc(ml.scenes[i].name)} <small class="muted num">${(ml.scenes[i].t1 - ml.scenes[i].t0).toFixed(1)} ث</small></legend>
+        <label>🎙 الفويس أوفر <textarea data-say rows="2" dir="auto">${esc(r.say || "")}</textarea></label>
+        ${Object.entries(r.fields || {}).map(([k, v]) => `<label>📝 ${esc(ml.fields[k]?.label || k)}${ml.fields[k]?.kind === "lines"
+          ? `<textarea data-fk="${esc(k)}" data-lines rows="3" dir="auto">${esc((Array.isArray(v) ? v : String(v || "").split("\n")).join("\n"))}</textarea>`
+          : `<input data-fk="${esc(k)}" value="${esc(fieldVal(v))}" dir="auto">`}</label>`).join("")}</fieldset>`).join("")}
+      <label>الكابشن <input name="caption" value="${esc(sc.caption || "")}"></label>
+      <div class="flw-acts"><button class="flw-btn pri">اختار ده</button><button type="button" class="flw-link" data-cancel>إلغاء</button></div></form>`;
+  }
+  function scriptFrom(form, ml) {
+    const base = (S.d.scenarios || []).find((x) => x.id === form.dataset.scriptform) || S.d.scenario || {};
+    return {
+      id: form.dataset.scriptform || "", title: form.querySelector("[name=title]").value.trim(), caption: form.querySelector("[name=caption]").value.trim(), summary: base.summary || "",
+      scenes: [...form.querySelectorAll(".flw-srow")].map((fs, i) => ({ scene: ml.scenes[i].name, say: fs.querySelector("[data-say]").value.trim(),
+        fields: Object.fromEntries([...fs.querySelectorAll("[data-fk]")].map((el) => [el.dataset.fk, el.hasAttribute("data-lines") ? el.value.split("\n").map((x) => x.trim()).filter(Boolean) : el.value.trim()])) })),
+    };
+  }
+  function scriptCard(sc, ml) {
+    if (S.edit === sc.id) return scriptForm(sc, ml);
+    const total = (sc.scenes || []).reduce((a, r, i) => a + Math.max(sec(r.say, ml.cps), ml.scenes[i] ? (ml.scenes[i].t1 - ml.scenes[i].t0) / ml.max_stretch : 0), 0);
+    return `<article class="flw-card${S.seen.has(sc.id) ? "" : " in"}" data-cid="${esc(sc.id)}"><div class="flw-ch"><b>${esc(sc.title)}</b>${rateBtns("scenario", sc.id)}</div>
+      ${sc.summary ? `<p>${esc(sc.summary)}</p>` : ""}${scriptBody(sc, ml)}
+      <small class="muted">⏱ الفيديو هيبقى حوالي <span class="num">${Math.round(total)}</span> ثانية بالفويس أوفر (القالب الأصلي <span class="num">${Math.round(ml.DUR)}</span>)</small>
+      ${sc.caption ? `<small class="muted">✍️ ${esc(sc.caption)}</small>` : ""}
+      <div class="flw-acts"><button type="button" class="flw-btn pri" data-pick-scen="${sc.id}">اختار السكريبت ده</button>
+        <button type="button" class="flw-link" data-edit="${sc.id}">✏️ عدّل</button></div></article>`;
+  }
+  function stScript(d) {
+    const ml = d.mlive, loading = d.busy === "scenarios";
+    if (!ml) return `${picked("idea")}<div class="flw-empty bad">مقدرتش أقرا مشاهد القالب.</div>`;
+    if (!S.vopts) loadVoice();
+    const langs = (S.vopts?.dialects || []).filter((x) => x.group === "ar");
+    const cur = d.lang || S.vopts?.pick?.lang;
+    return `${picked("idea")}<h2>السكريبت على مشاهد القالب</h2>
+      <p class="flw-sub">لكل مشهد جملة فويس أوفر والكلام اللي بيظهر فيه. المشهد بياخد طول جملته، فخلي الجمل قريبة من طول المشهد (جنب كل جملة هتاخد قد إيه).</p>
+      ${langs.length ? `<div class="flw-tset"><small>لهجة الفويس أوفر (السكريبت بيتكتب بيها):</small><div class="flw-langs">${langs.map((x) => `<button type="button" class="flw-chip${x.id === cur ? " on" : ""}" data-slang="${esc(x.id)}" ${loading ? "disabled" : ""}>${esc(x.label)}</button>`).join("")}</div></div>` : ""}
+      <div class="flw-cards wide">${(d.scenarios || []).map((s) => scriptCard(s, ml)).join("")}</div>
+      ${loading ? working("المخ بيكتب السكريبت على مشاهد القالب…") : failed("scen")}
+      <div class="flw-more">${S.hint ? `<div class="flw-chatrow"><input id="flwHint" placeholder="عايز السكريبت يبقى إزاي؟ (اختياري)"><button type="button" class="flw-btn" data-more="scen">اقترح</button></div>` : `
+        <button type="button" class="flw-btn" data-more="scen" ${loading ? "disabled" : ""}>💡 اقترح سكريبتات تانية</button>
+        <button type="button" class="flw-link" data-hint>🎯 وجّه المخ</button>`}</div>`;
+  }
+  // 🎛️ لوحة التحكم: طول كل مشهد على قد الصوت، والفويس أوفر، وزرار يفتح لوحة القالب نفسها (المعاينة والخانات)
+  function stPanel(d) {
+    const ml = d.mlive || { scenes: [] }, vt = d.vo_track, t = vt?.timing;
+    const rows = ml.scenes.map((s, i) => { const L = s.t1 - s.t0, n = t ? t[i] : L; return `<li><b>${esc(s.name)}</b><span class="num">${L.toFixed(1)}</span>${t ? ` ← <span class="num ${n > L * (ml.max_stretch || 1.5) ? "warn" : ""}">${n.toFixed(1)}</span>` : ""} ث</li>`; }).join("");
+    return `${picked("scenario")}<h2>لوحة التحكم</h2>
+      <p class="flw-sub">${vt ? "المشاهد اتظبطت على الفويس أوفر: كل مشهد بياخد طول جملته." : "من غير فويس أوفر: المشاهد بطولها الأصلي."} افتح لوحة القالب تشوف الفيديو بالصوت وتظبط الكلام والألوان والخطوط والصور، وبعدين صدّر.</p>
+      ${d.vo_url ? `<audio class="flw-vo" src="${esc(d.vo_url)}" controls preload="none"></audio>` : ""}
+      <ol class="flw-times">${rows}</ol>${vt ? `<small class="muted">⏱ الفيديو <span class="num">${vt.total.toFixed(1)}</span> ثانية</small>` : ""}
+      <div class="flw-acts end"><button type="button" class="flw-btn big" data-panel>🎛️ افتح لوحة القالب</button>
+        <button type="button" class="flw-btn pri big" data-export ${d.busy ? "disabled" : ""}>🎬 صدّر الفيديو</button></div>
+      <div class="flw-more"><button type="button" class="flw-link" data-go="voice">↩︎ غيّر الصوت</button><button type="button" class="flw-link" data-go="scenario">↩︎ غيّر السكريبت</button></div>`;
+  }
+
   // ---------------------------------------------------------------- 4) الأبطال
   function stCast(d) {
     const opts = S.castOpts;
@@ -302,6 +380,7 @@ const Flow = (() => {
 
   // ---------------------------------------------------------------- 🎙️ الصوت: مين بيتكلم، وبأي لهجة، وبأي صوت
   function stVoice(d) {
+    if (d.busy === "vo") return `${picked("scenario")}${working("بيسجّل الفويس أوفر كله مرة واحدة، وبيسمعه عشان يعرف كل جملة بتبدأ وتخلص فين ويظبط المشاهد عليها…")}`;
     const o = S.vopts;
     if (!o) { loadVoice(); return `${picked("scenario")}${working("بجيب الأصوات…")}`; }
     S.vo ??= { ...o.pick };
@@ -318,7 +397,8 @@ const Flow = (() => {
           <button type="button" class="flw-vpick" data-nofx data-vvoice="${esc(x.id)}"><i>${x.gender === "female" ? "👩" : "👨"}</i><b>${esc(x.label)}</b></button>
           ${o.voices[v.lang] && o.fasih && /^ar-/.test(x.id) ? `<button type="button" class="flw-vplay" data-nofx data-vplay="${esc(x.id)}" title="اسمع عينة">${S.vplay === x.id ? "⏳" : "▶"}</button>` : ""}</div>`).join("")}</div>
         <small class="muted">أول مرة تسمع عينة صوت بتتحسب ثواني قليلة من رصيد فصيح، وبعدها بتتحفظ.</small>` : ""}
-      <div class="flw-acts end"><button type="button" class="flw-btn pri big" data-setvoice>كمّل ←</button></div>`;
+      ${isCode(d) ? failed("vo") : ""}
+      <div class="flw-acts end"><button type="button" class="flw-btn pri big" data-setvoice>${isCode(d) && on ? "🎙️ سجّل الفويس أوفر وظبط المشاهد ←" : "كمّل ←"}</button></div>`;
   }
   async function loadVoice() {
     if (S.vLoading) return;
@@ -390,7 +470,7 @@ const Flow = (() => {
     const d = S.d;
     if (!d || !S.el) return;
     const st = d.stage === "generate" && (d.output || d.busy === "generate") ? "done" : d.stage;
-    const body = { idea: stIdea, format: stFormat, scenario: stScenario, cast: stCast, voice: stVoice, assets: stAssets, generate: stGenerate, done: stDone }[st] || stIdea;
+    const body = { idea: stIdea, format: stFormat, scenario: isCode(d) ? stScript : stScenario, cast: stCast, voice: stVoice, assets: stAssets, panel: stPanel, generate: stGenerate, done: stDone }[st] || stIdea;
     if (S.stage && S.stage !== st) S.chat = null;   // النقاش بيتقفل لما تنتقل خطوة
     if (!d.busy) S.busyFrom = null;
     const head = `<div class="flw-tpl"><small class="latin">Template</small><b>${esc(d.template.name)}</b>${d.brand_name ? `<small class="muted">لـ ${esc(d.brand_name)}</small>` : ""}</div>
@@ -476,6 +556,16 @@ const Flow = (() => {
     if (q("[data-cancel]")) { reset(); return render(); }
     if (q("[data-own]")) { S.own = true; S.edit = null; render(); return S.el.querySelector(".flw-form input")?.focus(); }
     if (q("[data-hint]")) { S.hint = true; render(); return S.el.querySelector("#flwHint")?.focus(); }
+    if ((b = q("[data-retry]")) && b.dataset.retry === "vo") return call("/voice", S.vo);
+    if ((b = q("[data-slang]"))) return call("/scenarios", { lang: b.dataset.slang, more: false });
+    if (q("[data-panel]")) {
+      const d = S.d;
+      return MotionPage.openTemplate(d.template.id, d.template.name, {
+        vals: d.params || {}, timing: d.vo_track?.timing || null, vo: d.vo_url || null,
+        onExport: (vals) => api(`/api/flows/${d.id}/export`, { method: "POST", ...J({ params: vals }) }).then((x) => { S.d = x; render(); poll(); }),
+      });
+    }
+    if (q("[data-export]")) return call("/export", { params: {} });
     if ((b = q("[data-retry]"))) {
       const idea = b.dataset.retry === "idea";
       return call(idea ? "/ideas" : "/scenarios", { more: !!(idea ? S.d.ideas : S.d.scenarios)?.length });
@@ -562,6 +652,7 @@ const Flow = (() => {
     e.preventDefault();
     const v = Object.fromEntries(new FormData(f));
     if (f.dataset.ideaform !== undefined) { reset(); call("/idea", { item: { id: f.dataset.ideaform || "", title: v.title, hook: v.hook, idea: v.idea } }); }
+    if (f.dataset.scriptform !== undefined) { reset(); call("/scenario", { item: scriptFrom(f, S.d.mlive) }); return; }
     if (f.dataset.scenform !== undefined) {
       reset(); S.castOpts = null; S.cast = null;
       call("/scenario", { item: { id: f.dataset.scenform || "", title: v.title, summary: v.summary, caption: v.caption, ...rowsFrom(f, S.d.format) } });
