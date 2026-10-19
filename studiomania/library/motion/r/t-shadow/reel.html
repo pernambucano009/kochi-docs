@@ -2,20 +2,27 @@
 <script>
 // قالب «خيال الظل»: عرايس جلد ملوّن شفاف على قماشة منوّرة بلمبة بتترعش من ورا. الراجل أبو طربوش بيدخل ماشي،
 // الجمل بيدخل من الناحية التانية، بيسلّموا على بعض، ويافطة العنوان بتنزل وحروفها مخرومة والنور طالع منها. 1080×1920، 12 ثانية.
+const G1 = "١ · العرايس", G2 = "٢ · اليافطة", G3 = "٣ · الكلام والبراند", GS = "الشكل العام";
 const PR = M.params({
-  title: { label: "العنوان", kind: "text", role: "product", def: "حكايات زمان" },
-  sub: { label: "تحت العنوان", kind: "text", def: "كل خميس في ساحة البيت" },
-  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "مسرح الحارة" },
-  robe: { label: "لون الجلابية", kind: "color", def: "#b3261e" },
-  banner: { label: "لون اليافطة", kind: "color", def: "#2f3d86" },
+  title: { label: "العنوان", kind: "text", role: "product", def: "حكايات زمان", group: G2, max: 12, hint: "حروفه بتتخرم في اليافطة والنور بيطلع منها: كلمتين كفاية." },
+  sub: { label: "تحت العنوان", kind: "text", def: "كل خميس في ساحة البيت", group: G3, max: 28, hint: "إمتى وفين." },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "مسرح الحارة", group: G3, max: 16 },
+  robe: { label: "لون الجلابية", kind: "color", role: "accent", def: "#b3261e", group: G1, hint: "لون جلد عروسة الراجل أبو طربوش." },
+  banner: { label: "لون اليافطة", kind: "color", def: "#2f3d86", group: G2 },
+  fTitle: { label: "خط العنوان والبراند", kind: "font", def: "ruqaa", group: GS },
+  fText: { label: "خط تحت العنوان", kind: "font", def: "lalezar", group: GS },
+});
+M.meta({
+  story: "خيال الظل: عرايس جلد ملوّن شفاف على قماشة منوّرة بلمبة بتترعش من ورا. الراجل أبو طربوش بيدخل ماشي، والجمل من الناحية التانية، بيسلّموا على بعض، ويافطة العنوان بتنزل وحروفها مخرومة والنور طالع منها.",
+  scenes: [{ name: G1, t0: 0, t1: 6, about: "الراجل والجمل بيدخلوا ويسلّموا" }, { name: G2, t0: 6, t1: 8.8, about: "اليافطة بتنزل بالعنوان" }, { name: G3, t0: 8.8, t1: 12, about: "تحت العنوان والبراند" }],
+  tips: ["مناسب للفعاليات والمسرح والحكايات والمطاعم الشعبية ورمضان.", "روح الحواديت القديمة: كلام بسيط ودافي.", "العنوان القصير بيبان أوضح وهو مخروم."],
 });
 const W = 1080, H = 1920, DUR = 12, CL = 70, CR = 1010, CT = 250, CB = 1480;
-const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
 
 M.reel({
   W, H, DUR, bg: "#1a0e07",
   async init(M) {
-    await Promise.all([loadFont("RQ", "TY-ArefRuqaa-700.ttf", "700"), loadFont("LZ", "SM-Lalezar.ttf")]);
+    await Promise.all([M.font("RQ", PR.fTitle), M.font("LZ", PR.fText)]);
     const c = M.canvas(W, H), x = c.getContext("2d");
     const mk = () => { const k = document.createElement("canvas"); k.width = W; k.height = H; return k.getContext("2d"); };
     return { x, pa: mk(), pb: mk(), pc: mk() };

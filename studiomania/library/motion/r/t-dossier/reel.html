@@ -2,28 +2,44 @@
 <script>
 // قالب «ملف قضية مطبوع»: الفيلم كله ورقة أرشيف كريمي: نقط هالفتون بأحبار سادة متطبعة فوق بعض، عناوين تقيلة بضل مزاح،
 // المشتبه فيه بيقع في صورة الفيش بالطول، دليل برقم عملاق متملي نقط، وختم "القضية اتقفلت" بيخبط بهزة. انتقالات بمسحة نقط. 1080×1920، 12 ثانية.
+const G1 = "١ · فتح الملف", G2 = "٢ · المشتبه فيه", G3 = "٣ · الدليل", G4 = "٤ · القضية اتقفلت", GL = "كلام الملف الثابت", GC = "ألوان الحبر", GS = "الشكل العام";
 const PR = M.params({
-  case: { label: "رقم القضية", kind: "text", def: "٠٤٧" },
-  title: { label: "عنوان القضية", kind: "text", role: "product", def: "لغز الجوع العصر" },
-  hook: { label: "شريط أول مشهد", kind: "text", def: "كل يوم الساعة ٤ نفس الحكاية" },
-  suspect: { label: "اسم المشتبه فيه", kind: "text", def: "الجوع" },
-  clue: { label: "شريط المشتبه فيه", kind: "text", def: "بيظهر فجأة وبيبوّظ المود" },
-  num: { label: "الرقم الكبير", kind: "text", def: "٣" },
-  unit: { label: "تحت الرقم", kind: "text", def: "دقايق ويوصلك سناك صحي" },
-  stamp: { label: "الختم", kind: "text", def: "اتقفلت" },
-  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "سناك بوكس" },
-  ink: { label: "الحبر الغامق", kind: "color", def: "#1f2a4d" },
-  hi: { label: "حبر التمييز", kind: "color", def: "#ffcf2e" },
-  pink: { label: "حبر الضل", kind: "color", def: "#ff5c8a" },
-  red: { label: "حبر الختم", kind: "color", def: "#e5322d" },
+  case: { label: "رقم القضية", kind: "text", def: "٠٤٧", group: G1, max: 6 },
+  title: { label: "عنوان القضية", kind: "text", role: "product", def: "لغز الجوع العصر", group: G1, max: 18, hint: "المشكلة اللي عميلك بيعاني منها، كأنها جريمة." },
+  hook: { label: "شريط أول مشهد", kind: "text", def: "كل يوم الساعة ٤ نفس الحكاية", group: G1, max: 30 },
+  suspect: { label: "اسم المشتبه فيه", kind: "text", def: "الجوع", group: G2, max: 12, hint: "المشكلة نفسها في كلمة: هي «المجرم»." },
+  clue: { label: "شريط المشتبه فيه", kind: "text", def: "بيظهر فجأة وبيبوّظ المود", group: G2, max: 30 },
+  num: { label: "الرقم الكبير", kind: "text", def: "٣", group: G3, max: 3, hint: "رقم واحد أو اتنين: بيتملي نقط ويبقى عملاق." },
+  unit: { label: "تحت الرقم", kind: "text", def: "دقايق ويوصلك سناك صحي", group: G3, max: 30, hint: "الرقم ده إيه: ده الحل بتاعك." },
+  stamp: { label: "الختم", kind: "text", def: "اتقفلت", group: G4, max: 8 },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "سناك بوكس", group: G4, max: 16 },
+  lFile: { label: "عنوان أول مشهد", kind: "text", def: "ملف القضية", group: GL, max: 12 },
+  lCase: { label: "قبل رقم القضية", kind: "text", def: "قضية رقم", group: GL, max: 12 },
+  lRec: { label: "كلمة التسجيل", kind: "text", def: "تسجيل", group: GL, max: 8 },
+  lSecret: { label: "ختم الملف", kind: "text", def: "سرّي", group: GL, max: 6 },
+  lSuspect: { label: "عنوان المشتبه فيه", kind: "text", def: "المشتبه فيه", group: GL, max: 12 },
+  lClue: { label: "عنوان الدليل", kind: "text", def: "الدليل", group: GL, max: 10 },
+  lClose: { label: "عنوان آخر مشهد", kind: "text", def: "القضية", group: GL, max: 10 },
+  ink: { label: "الحبر الغامق", kind: "color", def: "#1f2a4d", group: GC, hint: "الكلام والخطوط: لازم يفضل غامق على الورق الكريمي." },
+  hi: { label: "حبر التمييز", kind: "color", role: "accent", def: "#ffcf2e", group: GC },
+  pink: { label: "حبر الضل", kind: "color", def: "#ff5c8a", group: GC },
+  red: { label: "حبر الختم", kind: "color", def: "#e5322d", group: GC },
+  fHead: { label: "خط العناوين", kind: "font", def: "amiri", group: GS },
+  fBig: { label: "خط الرقم والاسم", kind: "font", def: "lalezar", group: GS },
+  fText: { label: "خط الكلام الصغير", kind: "font", def: "changa", group: GS },
+  fBar: { label: "خط الشرايط", kind: "font", def: "plex", group: GS },
+});
+M.meta({
+  story: "ملف قضية مطبوع على ورق أرشيف كريمي بنقط هالفتون وأحبار سادة: المشكلة بتتعامل كأنها جريمة، المشتبه فيه بيقع في صورة الفيش، الدليل رقم عملاق متملي نقط (ده الحل بتاعك)، وختم «القضية اتقفلت» بيخبط بهزة، والبراند.",
+  scenes: [{ name: G1, t0: 0, t1: 3.1, about: "فتح الملف والعنوان" }, { name: G2, t0: 3.1, t1: 6.3, about: "صورة المشتبه فيه" }, { name: G3, t0: 6.3, t1: 9.2, about: "الدليل: الرقم الكبير" }, { name: G4, t0: 9.2, t1: 12, about: "الختم والبراند" }],
+  tips: ["القصة: المشكلة = المجرم، والرقم = الحل بتاعك.", "مناسب للأكل السريع والخدمات اللي بتحل مشكلة يومية.", "خلي الرقم الكبير حاجة بتبهر: دقايق، سعر، نسبة."],
 });
 const W = 1080, H = 1920, DUR = 12, PAPER = "#f3e9d2";
-const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
 
 M.reel({
   W, H, DUR, bg: PAPER,
   async init(M) {
-    await Promise.all([loadFont("AM", "TY-Amiri-700.ttf", "700"), loadFont("LZ", "SM-Lalezar.ttf"), loadFont("CH", "SM-Changa.ttf"), loadFont("PB", "TY-PlexArabic-700.ttf", "700")]);
+    await Promise.all([M.font("AM", PR.fHead), M.font("LZ", PR.fBig), M.font("CH", PR.fText), M.font("PB", PR.fBar)]);
     const c = M.canvas(W, H), x = c.getContext("2d");
     // طبقة الورق (مرة واحدة): بقع خفيفة + فيجنيت + طبقة في النص
     const p = document.createElement("canvas"); p.width = W; p.height = H; const q = p.getContext("2d"), R = M.rng(3);
@@ -53,8 +69,8 @@ M.reel({
     const bar = (s, y, k, key) => { if (k <= 0) return; const kk = back(k); x.save(); x.font = `700 ${M.fit(s, "PB", 820, 46, 26, "700")}px PB`; x.textAlign = "center"; x.direction = "rtl"; const w = x.measureText(s).width + 80;
       x.translate(540, y + (1 - kk) * 120); x.globalCompositeOperation = "multiply"; x.fillStyle = PK; x.beginPath(); x.roundRect(-w / 2 + 8, -48 + 8, w, 92, 46); x.fill(); x.globalCompositeOperation = "source-over";
       x.fillStyle = INK; x.beginPath(); x.roundRect(-w / 2, -48, w, 92, 46); x.fill(); x.fillStyle = PAPER; x.fillText(s, 0, 14); x.restore(); };
-    const hud = (dark) => { const col = dark ? PAPER : INK; x.fillStyle = col; x.font = "700 34px CH"; x.textAlign = "right"; x.direction = "rtl"; x.fillText("قضية رقم " + PR.case, 1010, 96);
-      x.textAlign = "left"; x.fillStyle = RD; if (Math.floor(t * 2) % 2 === 0) { x.beginPath(); x.arc(80, 84, 12, 0, Math.PI * 2); x.fill(); } x.fillStyle = col; x.fillText("تسجيل", 104, 96); };
+    const hud = (dark) => { const col = dark ? PAPER : INK; x.fillStyle = col; x.font = `700 ${M.fit(PR.lCase + " " + PR.case, "CH", 560, 34, 20, "700")}px CH`; x.textAlign = "right"; x.direction = "rtl"; x.fillText(PR.lCase + " " + PR.case, 1010, 96);
+      x.textAlign = "left"; x.fillStyle = RD; if (Math.floor(t * 2) % 2 === 0) { x.beginPath(); x.arc(80, 84, 12, 0, Math.PI * 2); x.fill(); } x.fillStyle = col; x.font = `700 ${M.fit(PR.lRec, "CH", 300, 34, 18, "700")}px CH`; x.fillText(PR.lRec, 104, 96); };
     // ── المشاهد
     const sc = t < 2.9 ? 0 : t < 6.2 ? 1 : t < 9.1 ? 2 : 3;
     if (sc === 0) {
@@ -63,9 +79,9 @@ M.reel({
       // فولدر
       const fk = back(seg(t, .3, .9)); x.save(); x.translate(540, 1180 + (1 - fk) * 600); x.rotate(-.04);
       x.fillStyle = "#e3c27a"; x.strokeStyle = INK; x.lineWidth = 8; x.beginPath(); x.moveTo(-360, -300); x.lineTo(-120, -300); x.lineTo(-90, -340); x.lineTo(120, -340); x.lineTo(150, -300); x.lineTo(360, -300); x.lineTo(360, 330); x.lineTo(-360, 330); x.closePath(); x.fill(); x.stroke();
-      x.fillStyle = PAPER; x.beginPath(); x.rect(-300, -240, 560, 120); x.fill(); x.stroke(); x.fillStyle = INK; x.font = "700 64px CH"; x.textAlign = "center"; x.direction = "rtl"; x.fillText("سرّي", -20, -158);
+      x.fillStyle = PAPER; x.beginPath(); x.rect(-300, -240, 560, 120); x.fill(); x.stroke(); x.fillStyle = INK; x.font = `700 ${M.fit(PR.lSecret, "CH", 500, 64, 28, "700")}px CH`; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.lSecret, -20, -158);
       x.restore();
-      head("ملف القضية", 1000, 400, 150, seg(t, .5, 1.3)); head(PR.title, 1000, 580, M.fit(PR.title, "AM", 900, 120, 60, "700"), seg(t, .9, 1.7), INK);
+      head(PR.lFile, 1000, 400, M.fit(PR.lFile, "AM", 900, 150, 60, "700"), seg(t, .5, 1.3)); head(PR.title, 1000, 580, M.fit(PR.title, "AM", 900, 120, 60, "700"), seg(t, .9, 1.7), INK);
       bar(PR.hook, 1700, seg(t, 1.6, 2.0), true); hud(false);
     } else if (sc === 1) {
       // صورة الفيش: خطوط الطول
@@ -86,13 +102,13 @@ M.reel({
       x.restore();
       // لوحة الاسم
       const nk = back(seg(t, 3.8, 4.3)); x.save(); x.translate(540, 1420 + (1 - nk) * 400); x.fillStyle = PAPER; x.strokeStyle = INK; x.lineWidth = 7; x.beginPath(); x.rect(-300, -80, 600, 160); x.fill(); x.stroke();
-      x.fillStyle = INK; x.font = "700 30px CH"; x.textAlign = "center"; x.direction = "rtl"; x.fillText("المشتبه فيه", 0, -28); x.font = `${M.fit(PR.suspect, "LZ", 540, 80, 40)}px LZ`; x.fillText(PR.suspect, 0, 50); x.restore();
-      head("المشتبه فيه", 1000, 300, 120, seg(t, 3.2, 3.9), PAPER);
+      x.fillStyle = INK; x.font = `700 ${M.fit(PR.lSuspect, "CH", 520, 30, 18, "700")}px CH`; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.lSuspect, 0, -28); x.font = `${M.fit(PR.suspect, "LZ", 540, 80, 40)}px LZ`; x.fillText(PR.suspect, 0, 50); x.restore();
+      head(PR.lSuspect, 1000, 300, M.fit(PR.lSuspect, "AM", 900, 120, 60, "700"), seg(t, 3.2, 3.9), PAPER);
       bar(PR.clue, 1700, seg(t, 4.4, 4.8)); hud(true);
       const fl = Math.max(0, 1 - Math.abs(t - 3.65) / .18) * .9; if (fl > 0) { x.fillStyle = `rgba(255,255,255,${fl})`; x.fillRect(-40, -40, W + 80, H + 80); }
     } else if (sc === 2) {
       dots(.26, 24, (px, py) => .25 + .25 * (py / H), "#9fc6ff");
-      head("الدليل", 1000, 330, 140, seg(t, 6.3, 7.0));
+      head(PR.lClue, 1000, 330, M.fit(PR.lClue, "AM", 900, 140, 60, "700"), seg(t, 6.3, 7.0));
       // رقم عملاق متملي نقط
       const nk = back(seg(t, 6.6, 7.2));
       { const o = C.o || (C.o = Object.assign(document.createElement("canvas"), { width: W, height: H })).getContext("2d");
@@ -107,7 +123,7 @@ M.reel({
       const sk = back(seg(t, 7.0, 7.4)); x.save(); x.translate(860, 760); x.scale(sk, sk); x.rotate(t * .4); x.fillStyle = RD; x.strokeStyle = INK; x.lineWidth = 6; x.beginPath(); for (let i = 0; i < 24; i++) { const r = i % 2 ? 70 : 120, a = i / 24 * Math.PI * 2; x.lineTo(Math.cos(a) * r, Math.sin(a) * r); } x.closePath(); x.fill(); x.stroke(); x.restore();
     } else {
       dots(.26, 24, (px, py) => Math.max(0, 1 - Math.hypot(px - 540, py - 1000) / 900) * .7, HI);
-      head("القضية", 1000, 360, 160, seg(t, 9.2, 9.6));
+      head(PR.lClose, 1000, 360, M.fit(PR.lClose, "AM", 900, 160, 60, "700"), seg(t, 9.2, 9.6));
       // الختم
       if (t > slam - .09) { const k = clamp((t - (slam - .09)) / .09), s = t < slam ? 2.6 - 1.6 * k * k : 1 + .06 * Math.exp(-(t - slam) * 8) * Math.cos((t - slam) * 30);
         x.save(); x.translate(540, 980); x.rotate(-.16); x.scale(s, s); x.globalAlpha = .93; x.strokeStyle = RD; x.lineWidth = 16; x.beginPath(); x.roundRect(-380, -170, 760, 340, 30); x.stroke(); x.lineWidth = 6; x.beginPath(); x.roundRect(-350, -140, 700, 280, 22); x.stroke();

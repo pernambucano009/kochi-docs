@@ -3,20 +3,27 @@
 // قالب «سكتش مدينة بالقلم والألوان»: صفحة كراسة رسم: خطوط قلم بني رفيعة بتترسم وبتتهز وبتفوت عن بعضها، وألوان مية خفيفة
 // بتقع فوقها مش مظبوطة على الخطوط. الدنيا كلها بني ورمادي إلا حاجة واحدة ملوّنة: بالونة حمرا بتطير في الشارع والكاميرا ماشية وراها
 // لحد ما توصل لباب المحل. 1080×1920، 12 ثانية.
+const G1 = "١ · الشارع والبالونة", G2 = "٢ · العنوان والمحل", GS = "الشكل العام";
 const PR = M.params({
-  title: { label: "العنوان", kind: "text", role: "product", def: "الطريق لحد عندنا" },
-  sub: { label: "تحت العنوان", kind: "text", def: "مستنيينك في نفس الركن" },
-  place: { label: "المكان والتاريخ (ركن الصفحة)", kind: "text", def: "وسط البلد · الصبح بدري" },
-  brand: { label: "اسم المحل على اليافطة", kind: "text", role: "brand", def: "كافيه الركن" },
-  accent: { label: "لون البالونة (الحاجة الوحيدة الملوّنة)", kind: "color", def: "#e0352b" },
+  place: { label: "المكان والتاريخ (ركن الصفحة)", kind: "text", def: "وسط البلد · الصبح بدري", group: G1, max: 26, hint: "بيتكتب في ركن الكراسة زي الرسامين." },
+  title: { label: "العنوان", kind: "text", role: "product", def: "الطريق لحد عندنا", group: G2, max: 20 },
+  sub: { label: "تحت العنوان", kind: "text", def: "مستنيينك في نفس الركن", group: G2, max: 26 },
+  brand: { label: "اسم المحل على اليافطة", kind: "text", role: "brand", def: "كافيه الركن", group: G2, max: 14, hint: "البالونة بتوقف عند المحل ده." },
+  accent: { label: "لون البالونة (الحاجة الوحيدة الملوّنة)", kind: "color", role: "accent", def: "#e0352b", group: G1 },
+  fHead: { label: "خط العنوان", kind: "font", def: "ruqaa", group: GS },
+  fText: { label: "خط الكلام", kind: "font", def: "amiri", group: GS },
+});
+M.meta({
+  story: "صفحة كراسة رسم: شارع بيترسم بقلم بني رفيع بيتهز، وألوان مية خفيفة مش مظبوطة على الخطوط. الدنيا كلها بني ورمادي إلا بالونة حمرا بتطير في الشارع والكاميرا ماشية وراها لحد ما توقف عند المحل.",
+  scenes: [{ name: G1, t0: 0, t1: 8.6, about: "الشارع بيترسم والبالونة بتطير" }, { name: G2, t0: 8.6, t1: 12, about: "العنوان والمحل" }],
+  tips: ["مناسب للكافيهات والمحلات اللي ليها مكان مميز في الحي.", "القصة: الطريق لحد عندك.", "لون البالونة لون براندك."],
 });
 const W = 1080, H = 1920, DUR = 12, BASE = 1380, WORLD = 3200;
-const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
 
 M.reel({
   W, H, DUR, bg: "#f3ecdc",
   async init(M) {
-    await Promise.all([loadFont("RQ", "TY-ArefRuqaa-700.ttf", "700"), loadFont("AM", "TY-Amiri-700.ttf", "700")]);
+    await Promise.all([M.font("RQ", PR.fHead), M.font("AM", PR.fText)]);
     const c = M.canvas(W, H), x = c.getContext("2d"), R = M.rng(21);
     const L = [], WASH = [];
     const ln = (x1, y1, x2, y2, w = 2.2) => { const o = 4 + R() * 8, dx = x2 - x1, dy = y2 - y1, d = Math.hypot(dx, dy) || 1; L.push({ x1: x1 - dx / d * o * R(), y1: y1 - dy / d * o * R() + (R() - .5) * 3, x2: x2 + dx / d * o, y2: y2 + dy / d * o + (R() - .5) * 3, w: w * (.8 + R() * .4), wob: R() * 6 }); };
@@ -82,7 +89,7 @@ M.reel({
     x.restore();
     // حواف الصفحة بتدوب + ركن المكان والتاريخ
     const eg = x.createLinearGradient(0, 0, 0, H); eg.addColorStop(0, "#f3ecdc"); eg.addColorStop(.17, "rgba(243,236,220,0)"); eg.addColorStop(.8, "rgba(243,236,220,0)"); eg.addColorStop(1, "#f3ecdc"); x.fillStyle = eg; x.fillRect(0, 0, W, H);
-    x.fillStyle = INK; x.font = "700 40px RQ"; x.textAlign = "right"; x.direction = "rtl"; x.globalAlpha = .8; x.fillText(PR.place, 1010, 1840); x.globalAlpha = 1;
+    x.fillStyle = INK; x.font = `700 ${M.fit(PR.place, "RQ", 600, 40, 22, "700")}px RQ`; x.textAlign = "right"; x.direction = "rtl"; x.globalAlpha = .8; x.fillText(PR.place, 1010, 1840); x.globalAlpha = 1;
     // العنوان بخط الإيد فوق
     const ta = io(seg(t, 9.6, 10.4)); if (ta > 0) { x.save(); x.beginPath(); x.rect(W - W * ta - 20, 0, W * ta + 40, 600); x.clip(); x.fillStyle = INK; x.font = `700 ${M.fit(PR.title, "RQ", 900, 130, 60, "700")}px RQ`; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.title, 540, 300); x.restore();
       x.globalAlpha = io(seg(t, 10.3, 10.9)); x.fillStyle = INK; x.font = `700 ${M.fit(PR.sub, "AM", 860, 56, 30, "700")}px AM`; x.textAlign = "center"; x.fillText(PR.sub, 540, 400); x.fillStyle = A; x.fillRect(540 - 80, 432, 160, 5); x.globalAlpha = 1; }

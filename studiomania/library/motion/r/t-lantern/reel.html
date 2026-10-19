@@ -2,22 +2,29 @@
 <script>
 // قالب «صندوق ورق منوّر»: مشهد رمضان معمول من طبقات ورق مقصوص ورا بعض: السما والهلال، الجامع والمدينة البعيدة، البيوت،
 // النخل وحبل الفوانيس، وبرواز مشربية قدام. الطبقات بتطلع واحدة ورا التانية، الشبابيك بتنوّر، والكاميرا بتتحرك فتبان العمق. 1080×1920، 12 ثانية.
+const G1 = "١ · المشهد", G2 = "٢ · العنوان", G3 = "٣ · الكلام والبراند", GS = "الشكل العام";
 const PR = M.params({
-  title: { label: "العنوان", kind: "text", role: "product", def: "رمضان كريم" },
-  sub: { label: "تحت العنوان", kind: "text", def: "سفرة العيلة مستنياك" },
-  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "حلواني الأمل" },
-  night: { label: "لون الليل", kind: "color", def: "#1b2466" },
-  light: { label: "لون النور", kind: "color", def: "#ffc160" },
+  title: { label: "العنوان", kind: "text", role: "product", def: "رمضان كريم", group: G2, max: 14, hint: "التهنئة أو اسم العرض." },
+  sub: { label: "تحت العنوان", kind: "text", def: "سفرة العيلة مستنياك", group: G3, max: 26 },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "حلواني الأمل", group: G3, max: 16 },
+  night: { label: "لون الليل", kind: "color", def: "#1b2466", group: G1, hint: "كل طبقات الورق بتتعمل من درجات اللون ده: خليه غامق (كحلي، بنفسجي، أخضر غامق)." },
+  light: { label: "لون النور", kind: "color", role: "accent", def: "#ffc160", group: G1, hint: "نور الشبابيك والفوانيس والبراند." },
+  fTitle: { label: "خط العنوان والبراند", kind: "font", def: "ruqaa", group: GS },
+  fText: { label: "خط تحت العنوان", kind: "font", def: "lalezar", group: GS },
+});
+M.meta({
+  story: "صندوق ورق منوّر لمشهد رمضان: طبقات ورق مقصوص ورا بعض (السما والهلال، الجامع والمدينة، البيوت، النخل وحبل الفوانيس، وبرواز مشربية قدام) بتطلع واحدة ورا التانية، والشبابيك بتنوّر، والكاميرا بتتحرك فيبان العمق.",
+  scenes: [{ name: G1, t0: 0, t1: 6.4, about: "طبقات الورق بتطلع والشبابيك بتنوّر" }, { name: G2, t0: 6.4, t1: 8, about: "العنوان" }, { name: G3, t0: 8, t1: 12, about: "تحت العنوان والبراند" }],
+  tips: ["مناسب لرمضان والعيد والحلويات وعروض المواسم.", "غيّر لون الليل علشان المشهد يبقى بألوان براندك.", "التهنئة قصيرة بتبان أحلى بالرقعة."],
 });
 const W = 1080, H = 1920, DUR = 12, PAD = 140, LW = W + PAD * 2;
-const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
 const hex = (h) => { h = h.replace("#", ""); return [0, 2, 4].map((i) => parseInt(h.substr(i, 2), 16)); };
 const shade = (h, k) => `rgb(${hex(h).map((v) => Math.round(v * k)).join(",")})`;
 
 M.reel({
   W, H, DUR, bg: "#05071a",
   async init(M) {
-    await Promise.all([loadFont("RQ", "TY-ArefRuqaa-700.ttf", "700"), loadFont("LZ", "SM-Lalezar.ttf")]);
+    await Promise.all([M.font("RQ", PR.fTitle), M.font("LZ", PR.fText)]);
     const c = M.canvas(W, H), x = c.getContext("2d"), R = M.rng(11), hash = M.hash;
     const mk = () => { const k = document.createElement("canvas"); k.width = LW; k.height = H; return k.getContext("2d"); };
     const arch = (q, cx, y, w, h) => { q.moveTo(cx - w / 2, y + h); q.lineTo(cx - w / 2, y + w * .55); q.quadraticCurveTo(cx - w / 2, y, cx, y - w * .25); q.quadraticCurveTo(cx + w / 2, y, cx + w / 2, y + w * .55); q.lineTo(cx + w / 2, y + h); q.closePath(); };

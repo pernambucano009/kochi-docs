@@ -3,20 +3,27 @@
 // قالب «قص ورق أحمر»: كل حاجة ورقة حمرا متقصوصة بالمقص ومتحطوطة على ورقة فاتحة: الرسم هو اللي اتقص، والخروم هي مكان النور.
 // وردة مطبّقة بتتفتح، بعدين برواز مسنن فيه بيت وشجرة وعصافير بجناحات بتترفرف وشخصية بمفاصل ماشية بهدية، وفي الآخر
 // الاسم مقصوص جوه دايرة. 1080×1920، 12 ثانية.
+const G1 = "١ · الوردة والبرواز", G2 = "٢ · العنوان والبراند", GS = "الشكل العام";
 const PR = M.params({
-  title: { label: "العنوان", kind: "text", role: "product", def: "كل سنة وإنتم طيبين" },
-  sub: { label: "تحت العنوان", kind: "text", def: "هدايا العيد وصلت" },
-  brand: { label: "اسم البراند (بيتقص جوه الدايرة)", kind: "text", role: "brand", def: "هدية" },
-  red: { label: "لون الورق", kind: "color", def: "#d4202a" },
-  ground: { label: "لون الورقة اللي تحت", kind: "color", def: "#f6efe2" },
+  title: { label: "العنوان", kind: "text", role: "product", def: "كل سنة وإنتم طيبين", group: G2, max: 22, hint: "التهنئة أو العرض." },
+  sub: { label: "تحت العنوان", kind: "text", def: "هدايا العيد وصلت", group: G2, max: 24 },
+  brand: { label: "اسم البراند (بيتقص جوه الدايرة)", kind: "text", role: "brand", def: "هدية", group: G2, max: 8, hint: "كلمة قصيرة علشان تتقص جوه دايرة صغيرة." },
+  red: { label: "لون الورق", kind: "color", role: "accent", def: "#d4202a", group: G1, hint: "لون الورق المقصوص كله." },
+  ground: { label: "لون الورقة اللي تحت", kind: "color", def: "#f6efe2", group: G1, hint: "لازم تبقى فاتحة علشان القص يبان." },
+  fHead: { label: "خط العنوان", kind: "font", def: "ruqaa", group: GS },
+  fText: { label: "خط الكلام", kind: "font", def: "lalezar", group: GS },
+});
+M.meta({
+  story: "قص ورق أحمر على ورقة فاتحة: الرسم هو اللي اتقص والخروم مكان النور. وردة مطبّقة بتتفتح، وبعدين برواز مسنن فيه بيت وشجرة وعصافير بتترفرف وشخصية بمفاصل ماشية بهدية، وفي الآخر العنوان والبراند متقصوص في دايرة.",
+  scenes: [{ name: G1, t0: 0, t1: 8, about: "الوردة والبرواز والشخصية بالهدية" }, { name: G2, t0: 8, t1: 12, about: "العنوان والبراند في الدايرة" }],
+  tips: ["مناسب للأعياد والمناسبات والهدايا.", "اللون الواحد هو سر الستايل: اختار لون براندك.", "البراند كلمة واحدة قصيرة."],
 });
 const W = 1080, H = 1920, DUR = 12, TAU = Math.PI * 2;
-const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
 
 M.reel({
   W, H, DUR, bg: PR.ground,
   async init(M) {
-    await Promise.all([loadFont("LZ", "SM-Lalezar.ttf"), loadFont("RQ", "TY-ArefRuqaa-700.ttf", "700")]);
+    await Promise.all([M.font("LZ", PR.fText), M.font("RQ", PR.fHead)]);
     const c = M.canvas(W, H), x = c.getContext("2d"), L = document.createElement("canvas"); L.width = W; L.height = H;
     return { x, q: L.getContext("2d") };
   },

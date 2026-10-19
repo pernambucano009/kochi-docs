@@ -2,21 +2,28 @@
 <script>
 // قالب «طباعة خشب محفور»: كل لقطة لوح خشب أسود والنور موجود بس مكان ما السكينة حفرت: النور الكتير = حفر عريض، الضلمة = خشب سليم.
 // السكينة بتمشي على اللوح وتكشف الصورة، ولون واحد بس للنار. ٣ لوحات: الفرن، الرغيف، والعنوان محفور. 1080×1920، 12 ثانية.
+const G1 = "١ · لوح الفرن", G2 = "٢ · لوح الرغيف", G3 = "٣ · لوح العنوان", GS = "الشكل العام";
 const PR = M.params({
-  title: { label: "العنوان", kind: "text", role: "product", def: "فرن العيلة" },
-  sub: { label: "تحت العنوان", kind: "text", def: "نفس النار من ١٩٦٠" },
-  line1: { label: "جملة اللوحة الأولى", kind: "text", def: "كل يوم قبل الفجر" },
-  line2: { label: "جملة اللوحة التانية", kind: "text", def: "بإيدينا… رغيف رغيف" },
-  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "مخبز الأمانة" },
-  fire: { label: "لون النار", kind: "color", def: "#e8562a" },
+  line1: { label: "جملة اللوحة الأولى", kind: "text", def: "كل يوم قبل الفجر", group: G1, max: 24, hint: "تحت لوح الفرن والنار." },
+  line2: { label: "جملة اللوحة التانية", kind: "text", def: "بإيدينا… رغيف رغيف", group: G2, max: 24, hint: "تحت لوح الرغيف." },
+  title: { label: "العنوان", kind: "text", role: "product", def: "فرن العيلة", group: G3, max: 12, hint: "بيتحفر في اللوح التالت." },
+  sub: { label: "تحت العنوان", kind: "text", def: "نفس النار من ١٩٦٠", group: G3, max: 24 },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "مخبز الأمانة", group: G3, max: 16, hint: "أول حرف منه بيتطبع ختم صغير في الركن." },
+  fire: { label: "لون النار", kind: "color", role: "accent", def: "#e8562a", group: GS, hint: "اللون الوحيد غير الأبيض والأسود." },
+  fHead: { label: "خط العنوان", kind: "font", def: "ruqaa", group: GS },
+  fText: { label: "خط الجمل", kind: "font", def: "amiri", group: GS },
+});
+M.meta({
+  story: "طباعة خشب محفور: كل لقطة لوح خشب أسود والنور بيظهر بس مكان ما السكينة بتحفر، ولون واحد للنار. ٣ لوحات: الفرن بالنار، الرغيف في الإيد، والعنوان محفور.",
+  scenes: [{ name: G1, t0: 0, t1: 4, about: "لوح الفرن والنار" }, { name: G2, t0: 4, t1: 8, about: "لوح الرغيف" }, { name: G3, t0: 8, t1: 12, about: "العنوان المحفور والبراند" }],
+  tips: ["مناسب للمخابز والحرف اليدوية والبراندات اللي ليها تاريخ.", "الجمل بتحكي الصنعة: «قبل الفجر»، «بإيدينا».", "لون النار هو لون البراند."],
 });
 const W = 1080, H = 1920, DUR = 12, PAPER = "#efe6d2", BLK = "#15120f", MX = 70, MY = 210, BW = W - MX * 2, BH = 1340;
-const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
 
 M.reel({
   W, H, DUR, bg: PAPER,
   async init(M) {
-    await Promise.all([loadFont("AM", "TY-Amiri-700.ttf", "700"), loadFont("RQ", "TY-ArefRuqaa-700.ttf", "700")]);
+    await Promise.all([M.font("AM", PR.fText), M.font("RQ", PR.fHead)]);
     const c = M.canvas(W, H), x = c.getContext("2d"), R = M.rng(9), FIRE = PR.fire;
     const mk = () => { const k = document.createElement("canvas"); k.width = BW; k.height = BH; return k; };
     // حفر لوح من دالة نور L(x,y) ← ٠..١ ، وماسك للنار F(x,y)

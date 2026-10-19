@@ -2,24 +2,31 @@
 <script>
 // قالب «شاشة كمبيوتر قديمة»: شاشة CRT كهرماني بتفتح، أوامر بتتكتب حرف حرف، فنجان قهوة بيتطبع سطر سطر من حروف ورموز
 // (كل ما الحتة أنور الحرف أتقل)، والبخار حروف بتتحرك. خطوط المسح والتوهج والرعشة الخفيفة بتاعة الشاشات القديمة. 1080×1920، 12 ثانية.
+const G1 = "١ · الأوامر", G2 = "٢ · العنوان", GS = "الشكل العام";
 const PR = M.params({
-  l1: { label: "السطر الأول", kind: "text", def: "تشغيل برنامج الصبح" },
-  l2: { label: "السطر التاني", kind: "text", def: "بنحضّر فنجانك…" },
-  l3: { label: "السطر التالت", kind: "text", def: "تم. بالهنا والشفا" },
-  title: { label: "العنوان", kind: "text", role: "product", def: "صباحك أسرع" },
-  sub: { label: "تحت العنوان", kind: "text", def: "اطلب قهوتك في دقيقة" },
-  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "كافيه بت" },
-  color: { label: "لون الشاشة", kind: "color", def: "#ff9a10" },
+  l1: { label: "السطر الأول", kind: "text", def: "تشغيل برنامج الصبح", group: G1, max: 24, hint: "أول أمر بيتكتب حرف حرف على الشاشة." },
+  l2: { label: "السطر التاني", kind: "text", def: "بنحضّر فنجانك…", group: G1, max: 24, hint: "بيظهر وشريط التحميل ماشي." },
+  l3: { label: "السطر التالت", kind: "text", def: "تم. بالهنا والشفا", group: G1, max: 24, hint: "بعد ما الفنجان يتطبع بالحروف." },
+  title: { label: "العنوان", kind: "text", role: "product", def: "صباحك أسرع", group: G2, max: 16 },
+  sub: { label: "تحت العنوان", kind: "text", def: "اطلب قهوتك في دقيقة", group: G2, max: 28 },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "كافيه بت", group: G2, max: 16 },
+  color: { label: "لون الشاشة", kind: "color", role: "accent", def: "#ff9a10", group: GS, hint: "كهرماني أو أخضر فسفوري زي الشاشات القديمة." },
+  fHead: { label: "خط العنوان", kind: "font", def: "plex", group: GS },
+  fText: { label: "خط الأوامر", kind: "font", def: "plex4", group: GS },
+});
+M.meta({
+  story: "شاشة كمبيوتر CRT قديمة كهرماني بتفتح: أوامر بتتكتب حرف حرف، شريط تحميل، وفنجان قهوة بيتطبع سطر سطر من حروف ورموز (الحتة الأنور حرفها أتقل)، والبخار حروف بتتحرك، وبعدين العنوان والبراند.",
+  scenes: [{ name: G1, t0: 0, t1: 7.6, about: "الأوامر والفنجان بالحروف" }, { name: G2, t0: 7.6, t1: 12, about: "العنوان وتحته والبراند" }],
+  tips: ["مناسب للتطبيقات والتقنية والكافيهات الشبابية وأي حاجة «أسرع».", "الأوامر بتحكي اللي بيحصل: «تشغيل»، «تحضير»، «تم».", "خليك في سطور قصيرة علشان الكتابة حرف حرف."],
 });
 const W = 1080, H = 1920, DUR = 12, SL = 60, SR = 1020, ST = 110, SB = 1790, COLS = 44, ROWS = 26, CW = 21.6, RH = 34, GX = 540 - COLS * CW / 2, GY = 560;
 const RAMP = " .:-=+*#%@";
-const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
 const hex = (h) => { h = h.replace("#", ""); return [0, 2, 4].map((i) => parseInt(h.substr(i, 2), 16)); };
 
 M.reel({
   W, H, DUR, bg: "#0b0a08",
   async init(M) {
-    await Promise.all([loadFont("PM", "TY-PlexMono-500.ttf", "500"), loadFont("PX", "TY-PlexArabic-400.ttf"), loadFont("PB", "TY-PlexArabic-700.ttf", "700")]);
+    await Promise.all([new FontFace("PM", "url(../../fonts/TY-PlexMono-500.ttf)", { weight: "500" }).load().then((f) => document.fonts.add(f)).catch(() => {}), M.font("PX", PR.fText), M.font("PB", PR.fHead)]);
     const c = M.canvas(W, H), x = c.getContext("2d"), s = document.createElement("canvas"); s.width = W; s.height = H;
     // سطوع الفنجان على الشبكة (من غير البخار)
     const B = [];
@@ -58,8 +65,8 @@ M.reel({
       } }
       if (t > 6.6) { const a3 = typed("< " + PR.l3, 6.6, 18); line(a3, 1520, 44, "PX", 1, false); }
       if (t > 7.6) { const tt = typed(PR.title, 7.6, 9); line(tt, 1650, M.fit(PR.title, "PB", 860, 110, 50, "700"), "PB", 1, t < 9.2); }
-      if (t > 9.2) { line(PR.sub, 1715, 42, "PX", expo(seg(t, 9.2, 9.7))); }
-      if (t > 9.9) { s.globalAlpha = expo(seg(t, 9.9, 10.4)); s.fillStyle = col(1); s.fillRect(SL + 70, 1745 - 4, SR - SL - 140, 2); s.font = "700 40px PB"; s.textAlign = "center"; s.direction = "rtl"; s.fillText(PR.brand, 540, 1778); s.globalAlpha = 1; }
+      if (t > 9.2) { line(PR.sub, 1715, M.fit(PR.sub, "PX", 860, 42, 24), "PX", expo(seg(t, 9.2, 9.7))); }
+      if (t > 9.9) { s.globalAlpha = expo(seg(t, 9.9, 10.4)); s.fillStyle = col(1); s.fillRect(SL + 70, 1745 - 4, SR - SL - 140, 2); s.font = `700 ${M.fit(PR.brand, "PB", 800, 40, 22, "700")}px PB`; s.textAlign = "center"; s.direction = "rtl"; s.fillText(PR.brand, 540, 1778); s.globalAlpha = 1; }
     }
     // ٢) تركيب الشاشة: خلفية، توهج، مسح، انحناء
     x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = "#0b0a08"; x.fillRect(0, 0, W, H);

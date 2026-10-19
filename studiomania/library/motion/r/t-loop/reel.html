@@ -2,23 +2,30 @@
 <script>
 // قالب «لوب هندسي»: شكل واحد بيتحول من دايرة لنجمة لمربع، والكاميرا بتبعد فيبان إنه بلاطة في شبكة مالهاش آخر بتتحرك بموجة،
 // وبعدين بترجع تغطس في نفس الشكل فاللوب بيقفل من غير ما يبان. ألوان طباعة ريزو وحبيبات. 1080×1920، 12 ثانية بالظبط.
+const G1 = "١ · الشبكة والكلام", GC = "الألوان", GS = "الشكل العام";
 const PR = M.params({
-  title: { label: "العنوان", kind: "text", role: "product", def: "تصميم بيتكرر… ومابيتعادش" },
-  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "ستوديو شكل" },
-  c1: { label: "لون ١", kind: "color", def: "#ff5c39" },
-  c2: { label: "لون ٢", kind: "color", def: "#2f5bea" },
-  c3: { label: "لون ٣", kind: "color", def: "#ffcf3f" },
-  paper: { label: "لون الورق", kind: "color", def: "#f3ead8" },
+  title: { label: "العنوان", kind: "text", role: "product", def: "تصميم بيتكرر… ومابيتعادش", group: G1, max: 28, hint: "بيظهر في نص الشبكة لما الكاميرا تبعد." },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "ستوديو شكل", group: G1, max: 16 },
+  c1: { label: "لون ١", kind: "color", role: "accent", def: "#ff5c39", group: GC, hint: "كمان لون اسم البراند." },
+  c2: { label: "لون ٢", kind: "color", def: "#2f5bea", group: GC },
+  c3: { label: "لون ٣", kind: "color", def: "#ffcf3f", group: GC },
+  paper: { label: "لون الورق", kind: "color", def: "#f3ead8", group: GC },
+  fTitle: { label: "خط العنوان", kind: "font", def: "lalezar", group: GS },
+  fText: { label: "خط البراند", kind: "font", def: "plex", group: GS },
+});
+M.meta({
+  story: "لوب هندسي بألوان طباعة ريزو: شكل واحد بيتحول من دايرة لنجمة لمربع، والكاميرا بتبعد فيبان إنه بلاطة في شبكة مالهاش آخر بتتحرك بموجة، والكلام يظهر في النص، وبعدين الكاميرا تغطس تاني في نفس الشكل فاللوب بيقفل من غير ما يبان.",
+  scenes: [{ name: "الكاميرا بتبعد", t0: 0, t1: 4.4, about: "الشكل بيتحول والشبكة بتبان" }, { name: G1, t0: 4.4, t1: 7.6, about: "العنوان والبراند في النص" }, { name: "الكاميرا بترجع", t0: 7.6, t1: 12, about: "الغطس في نفس الشكل (اللوب بيقفل)" }],
+  tips: ["مناسب لاستوديوهات التصميم والبراندات الحديثة والخلفيات اللي بتتكرر.", "الفيديو لوب: ينفع يتعاد من غير ما حد ياخد باله.", "تلات ألوان متباينة بيدّوا أحسن موجة."],
 });
 const W = 1080, H = 1920, DUR = 12, T = 420;
-const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
 
 M.reel({
   W, H, DUR, bg: PR.paper,
-  async init(M) { await Promise.all([loadFont("LZ", "SM-Lalezar.ttf"), loadFont("PB", "TY-PlexArabic-700.ttf", "700")]); const c = M.canvas(W, H); return { x: c.getContext("2d") }; },
+  async init(M) { await Promise.all([M.font("LZ", PR.fTitle), M.font("PB", PR.fText)]); const c = M.canvas(W, H); return { x: c.getContext("2d") }; },
   seek(t, C, M) {
     const { x } = C, { clamp, hash, smooth } = M, P = Math.PI * 2, u = t / DUR;   // u من ٠ لـ ١ واللوب بيقفل
-    x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = PR.paper; x.fillRect(0, 0, W, H);
+    x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = PR.paper; const pp = parseInt(PR.paper.slice(1), 16), DARK = (.299 * (pp >> 16) + .587 * (pp >> 8 & 255) + .114 * (pp & 255)) < 110; x.fillRect(0, 0, W, H);
     // شكل سوبر إليبس بيتحول: m = عدد السنون، k = قد إيه داخل (نجمة)
     const shape = (r, m, k, rot) => { x.beginPath(); for (let i = 0; i <= 120; i++) { const a = i / 120 * P; const rr = r * (1 - k * (.5 + .5 * Math.cos(a * m))) ; x.lineTo(Math.cos(a + rot) * rr, Math.sin(a + rot) * rr); } x.closePath(); };
     // زوم: بيبدأ ببلاطة واحدة، يبعد لحد ~٦ بلاطات، ويرجع (اللوب)
@@ -39,8 +46,8 @@ M.reel({
     x.fillStyle = "rgba(40,30,20,.08)"; for (let i = 0; i < 1500; i++) x.fillRect(hash(i) * W, hash(i + 1500) * H, 2, 2);
     // العنوان وقت الزوم آوت
     const ta = clamp((zf - .55) / .25); if (ta > 0) { x.globalAlpha = ta; x.fillStyle = PR.paper; x.beginPath(); x.roundRect(80, 780, 920, 360, 40); x.fill(); x.strokeStyle = "#1c1a17"; x.lineWidth = 6; x.stroke();
-      x.fillStyle = "#1c1a17"; x.font = `${M.fit(PR.title, "LZ", 840, 96, 44)}px LZ`; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.title, 540, 940);
-      x.fillStyle = PR.c1; x.font = "700 56px PB"; x.fillText(PR.brand, 540, 1060); x.globalAlpha = 1; }
+      x.fillStyle = DARK ? "#f3ead8" : "#1c1a17"; x.font = `${M.fit(PR.title, "LZ", 840, 96, 44)}px LZ`; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.title, 540, 940);
+      x.fillStyle = PR.c1; x.font = `700 ${M.fit(PR.brand, "PB", 820, 56, 26, "700")}px PB`; x.fillText(PR.brand, 540, 1060); x.globalAlpha = 1; }
   },
   sound(A) {
     const N = A.midi;
