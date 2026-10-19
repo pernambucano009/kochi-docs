@@ -15955,7 +15955,7 @@ TYPO_STYLES = TYPO_DIR / "styles"
 for _d in (TYPO_PROJ, TYPO_STK, TYPO_STYLES):
     _d.mkdir(parents=True, exist_ok=True)
 TYPO_LOCK = threading.Lock()
-TYPO_BUSY = ("transcribing", "analyzing", "planning", "drawing", "rendering", "tracking", "scene")
+TYPO_BUSY = ("transcribing", "analyzing", "planning", "drawing", "rendering", "tracking", "scene", "bgauto")
 TYPO_RATIOS = {"9:16": (1080, 1920), "16:9": (1920, 1080), "1:1": (1080, 1080), "4:5": (1080, 1350)}
 TYPO_STICKER_COST = 0.03
 TYPO_DICT = TYPO_DIR / "concepts.json"
@@ -16760,6 +16760,140 @@ def typo_bg_stock(pid: str, body: StockPickIn):
         bg.setdefault("dim", 0.35)   # تغميق بسيط عشان الكلام يتقري فوق الصورة
         x.update(bg=bg, final=None)
     return typo_to_dict(pid, typo_update(pid, fn))
+
+
+def typo_segments(words: list[dict], total: float) -> list[dict]:
+    """الكلام ← مقاطع من ٢ لـ ٦ ثواني تقريبًا، بتتقطع عند علامات الوقف لو ينفع. كل مقطع ليه خلفية."""
+    segs, cur = [], []
+    for i, w in enumerate(words):
+        cur.append(w)
+        dur = w["e"] - cur[0]["s"]
+        stop = bool(re.search(r"[.!?؟،,؛:…]$", str(w.get("w") or "")))
+        if (stop and dur >= 2.2) or dur >= 5.5 or i == len(words) - 1:
+            segs.append(cur)
+            cur = []
+    if len(segs) > 1 and segs[-1][-1]["e"] - segs[-1][0]["s"] < 1.5:
+        segs[-2] += segs.pop()
+    out, t = [], 0.0
+    for i, g in enumerate(segs):
+        t1 = segs[i + 1][0]["s"] if i + 1 < len(segs) else max(total, g[-1]["e"])
+        out.append({"t0": round(t, 3), "t1": round(t1, 3), "text": " ".join(str(w.get("w") or "") for w in g)})
+        t = t1
+    return out[:16]
+
+
+def typo_bg_keywords(segs: list[dict], brief: str) -> list[str]:
+    """لكل مقطع: كلمات بحث إنجليزي لصورة حقيقية بتعبّر عنه (حاجة بتتصوّر، مش فكرة مجردة)."""
+    if atlas.mock_mode():
+        return [("city night", "coffee cup", "ocean waves", "office desk", "sunrise")[i % 5] for i in range(len(segs))]
+    lines = "\n".join(f"{i + 1}. {x['text']}" for i, x in enumerate(segs))
+    meter = {"usd": 0.0}
+    raw = ad_media_chat([{"role": "user", "content": (
+        "You pick real stock footage (filmed, not illustrations) as the background behind kinetic text in a short vertical video.\n"
+        + (f"Video topic: {brief[:400]}\n" if brief else "")
+        + "For each numbered line, give 2-4 English search keywords for Pexels that SHOW what the line is about: a concrete, filmable scene "
+          "(objects, places, actions, people from behind or far away). Avoid abstract words, text, logos and close-up faces. "
+          "Keep the visual mood consistent across the video and avoid repeating the same scene.\n"
+          'Reply JSON only: {"q": ["...", "..."]} with exactly one entry per line.\n' + lines)}], 1200, meter=meter)
+    q = [str(x).strip()[:80] for x in (ad_json(raw, "كلمات الخلفيات").get("q") or [])]
+    wallet.charge(wallet.credits(meter["usd"] or 0.002), "التايبوجرافي: اختيار الخلفيات على حسب الكلام", "bgauto")
+    return [(q[i] if i < len(q) and q[i] else (q[-1] if q else "abstract light")) for i in range(len(segs))]
+
+
+def run_typo_bgauto(pid: str, kind: str) -> None:
+    """🎬 خلفيات على حسب الكلام: لكل مقطع فيديو (أو صورة بحركة زووم بسيطة) من المكتبة، وكلهم بيتلزقوا في فيديو خلفية واحد."""
+    folder = TYPO_PROJ / Path(pid).name
+    tmp = folder / f"_bgauto_{uuid.uuid4().hex[:6]}"
+    try:
+        d = typo_load(pid)
+        W, H = TYPO_RATIOS.get(d.get("ratio") or "9:16", (1080, 1920))
+        orient = "portrait" if H > W else "landscape" if W > H else "square"
+        segs = typo_segments(d.get("words") or [], float(d.get("duration") or 0))
+        if not segs:
+            raise RuntimeError("اكتب الكلام الأول")
+        typo_set(pid, step=f"بيختار خلفية لكل جملة ({len(segs)} مقاطع)")
+        qs = typo_bg_keywords(segs, d.get("brief") or d.get("script") or "")
+        tmp.mkdir()
+        ff = [ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y"]
+        used, parts, credits = set(), [], []
+        for i, (sg, q) in enumerate(zip(segs, qs)):
+            typo_set(pid, step=f"بيجيب الخلفية {i + 1} من {len(segs)}: {q}")
+            dur = max(0.5, sg["t1"] - sg["t0"])
+            pick = None
+            for query in (q, " ".join(q.split()[:2]), q.split()[0] if q.split() else "abstract"):
+                try:
+                    items = stock.search(query, "photo" if kind == "photo" else "video", orient).get("items") or []
+                except stock.StockError:
+                    items = []
+                # الفيديو لازم يبقى أطول من المقطع شوية لو ينفع، ومن غير تكرار
+                fresh = [x for x in items if x["id"] not in used]
+                pick = next((x for x in fresh if kind == "photo" or (x.get("dur") or 0) >= dur), None) or (fresh[0] if fresh else None)
+                if pick:
+                    break
+            out = tmp / f"s{i:02d}.mp4"
+            if pick:
+                used.add(pick["id"])
+                src = tmp / f"in{i:02d}{'.jpg' if pick['kind'] == 'image' else '.mp4'}"
+                if not brain_fetch(pick["file"], src, 300 * 1024 * 1024):
+                    pick = None
+            if pick and pick["kind"] == "image":
+                frames = max(1, round(dur * 30))
+                vf = (f"scale={W * 2}:{H * 2}:force_original_aspect_ratio=increase,crop={W * 2}:{H * 2},"
+                      f"zoompan=z='min(zoom+0.0009,1.15)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d={frames}:s={W}x{H}:fps=30,setsar=1")
+                subprocess.run(ff + ["-loop", "1", "-i", str(src), "-vf", vf, "-frames:v", str(frames), "-an", "-c:v", "libx264", "-preset", "veryfast",
+                                     "-crf", "22", "-pix_fmt", "yuv420p", str(out)], check=True, capture_output=True, timeout=600)
+            elif pick:
+                vf = f"scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},fps=30,setsar=1"
+                subprocess.run(ff + ["-stream_loop", "-1", "-i", str(src), "-t", f"{dur:.3f}", "-vf", vf, "-an", "-c:v", "libx264", "-preset", "veryfast",
+                                     "-crf", "22", "-pix_fmt", "yuv420p", str(out)], check=True, capture_output=True, timeout=600)
+            else:   # مفيش نتيجة: لون غامق بدل ما الفيديو يقف
+                subprocess.run(ff + ["-f", "lavfi", "-i", f"color=c=0x101010:s={W}x{H}:r=30", "-t", f"{dur:.3f}", "-c:v", "libx264", "-preset", "veryfast",
+                                     "-pix_fmt", "yuv420p", str(out)], check=True, capture_output=True, timeout=120)
+            parts.append(out)
+            credits.append({"t0": sg["t0"], "t1": sg["t1"], "q": q, "by": (pick or {}).get("author", ""), "by_url": (pick or {}).get("author_url", ""),
+                            "page": (pick or {}).get("page", "")})
+        typo_set(pid, step="بيجمّع الخلفيات في فيديو واحد")
+        (tmp / "list.txt").write_text("".join(f"file '{p.name}'\n" for p in parts), encoding="utf-8")
+        name = f"bg_auto_{uuid.uuid4().hex[:8]}.mp4"
+        subprocess.run(ff + ["-f", "concat", "-safe", "0", "-i", str(tmp / "list.txt"), "-c", "copy", "-movflags", "+faststart", str(folder / name)],
+                       check=True, capture_output=True, timeout=600)
+        old = (typo_load(pid).get("bg") or {}).get("file")
+        def fn(x):
+            bg = {k: v for k, v in (x.get("bg") or {}).items() if k != "credit"}
+            bg.update(kind="video", file=name, auto=credits, credit={"by": "، ".join(sorted({c["by"] for c in credits if c["by"]}))[:200], "src": "Pexels"})
+            bg.setdefault("dim", 0.4)
+            x.update(bg=bg, final=None, status=typo_idle(x), step=None, error=None)
+        typo_update(pid, fn)
+        if old and old != name:
+            (folder / old).unlink(missing_ok=True)
+    except Exception as exc:  # noqa: BLE001
+        typo_update(pid, lambda x: x.update(status=typo_idle(x), step=None, error=f"الخلفيات: {str(getattr(exc, 'detail', None) or exc)[:300]}"))
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+class TypoBgAutoIn(BaseModel):
+    kind: str = "video"
+
+
+@app.post("/api/typo/{pid}/bg-auto")
+def typo_bg_auto(pid: str, body: TypoBgAutoIn):
+    """✨ البرنامج يختار الخلفيات لوحده على حسب الكلام."""
+    if not stock.live():
+        raise HTTPException(503, "مفتاح Pexels مش متسجل. حطه من الإعدادات ← المفاتيح والرصيد" if TENANT_ROLE != "customer"
+                            else "مكتبة الصور مش متاحة دلوقتي. جرّب تاني بعد شوية")
+    d = typo_load(pid)
+    if d.get("status") in TYPO_BUSY:
+        raise HTTPException(400, "استنى الشغل اللي شغال يخلص")
+    if not d.get("words"):
+        raise HTTPException(400, "اكتب الكلام الأول")
+    try:
+        wallet.need(2, "اختيار الخلفيات")
+    except wallet.NoCredits as exc:
+        raise HTTPException(402, str(exc)) from None
+    typo_set(pid, status="bgauto", step="بيقسّم الكلام لمقاطع", error=None)
+    threading.Thread(target=run_typo_bgauto, args=(pid, "photo" if body.kind == "photo" else "video"), daemon=True).start()
+    return typo_to_dict(pid, typo_load(pid))
 
 
 class TypoPlanIn(BaseModel):

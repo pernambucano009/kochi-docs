@@ -35,7 +35,7 @@ const TY_PLACES = { auto: "📍 مكان الكلام: البرنامج يختا
 const TY_AKINDS = { photo: "🖼️ صورة", paper: "📄 ورقة", screen: "📱 شاشة", object: "📦 حاجة", product: "🛍️ منتج", face: "🙂 وش", person: "🧍 شخص", sign: "🪧 يافطة", space: "⬜ مساحة فاضية" };
 const TY_THEMES = { light: "☀️ فاتح", dark: "🌙 غامق", accent: "🟨 ملوّن" };
 const TY_BG = { theme: "🎨 ألوان الستايل", solid: "🟦 لون سادة", image: "🖼️ صورة", video: "🎬 فيديو", source: "🎥 الفيديو المرفوع" };
-const TY_ST = { new: "", ready: "📝 الكلام جاهز", planned: "🧠 الحركات جاهزة", done: "✅ الفيديو جاهز", failed: "⚠️ فشل",
+const TY_ST = { new: "", bgauto: "🎬 بيجيب خلفيات على حسب الكلام", ready: "📝 الكلام جاهز", planned: "🧠 الحركات جاهزة", done: "✅ الفيديو جاهز", failed: "⚠️ فشل",
   transcribing: "🎧 بيسمع", analyzing: "👁️ بيحلل الفيديو", planning: "🧠 بيوزّع", drawing: "🎨 بيرسم الأيقونات", rendering: "🎬 بيعمل الفيديو", tracking: "🎯 بيعمل تراك" };
 const tye = (v) => escapeHtml(v == null ? "" : String(v));
 const tyT = (t) => `${Math.floor((t || 0) / 60)}:${((t || 0) % 60).toFixed(1).padStart(4, "0")}`;
@@ -116,8 +116,10 @@ function tyRenderProj() {
       ${bg.kind === "solid" ? `<label>اللون <input type="color" data-tybg="color" value="${tye(bg.color || "#101010")}"></label>` : ""}
       ${bg.kind === "image" || bg.kind === "video" ? `<label class="btn sm">⬆ ${bg.file ? "غيّر" : "ارفع"} ${bg.kind === "image" ? "الصورة" : "الفيديو"}
         <input type="file" data-tybgfile accept="${bg.kind === "image" ? "image/*" : "video/*"}" hidden></label>
-        <button type="button" class="btn sm" data-tystock="${bg.kind}">🔎 من المكتبة</button>` : ""}
-      ${bg.credit && ["image", "video"].includes(bg.kind) ? `<small class="muted ty-credit" data-no-i18n>${bg.kind === "video" ? "🎬" : "📷"} ${bg.credit.by_url ? `<a href="${tye(bg.credit.by_url)}" target="_blank" rel="noopener">${tye(bg.credit.by)}</a>` : tye(bg.credit.by)} · <a href="https://www.pexels.com" target="_blank" rel="noopener">Pexels</a></small>` : ""}
+        <button type="button" class="btn sm" data-tystock="${bg.kind}">🔎 من المكتبة</button>
+        <button type="button" class="btn sm primary" data-tybgauto="${bg.kind}" ${v.busy || !v.words?.length ? "disabled" : ""} title="البرنامج بيقسّم الكلام لمقاطع ويختار لكل مقطع ${bg.kind === "image" ? "صورة" : "فيديو"} حقيقي بيعبّر عنه">✨ على حسب الكلام</button>` : ""}
+      ${bg.auto?.length && bg.kind === "video" ? `<small class="muted ty-credit" data-no-i18n title="${tye(bg.auto.map((a) => `${tyT(a.t0)} ${a.q}`).join("\n"))}">🎬 ${bg.auto.length} مقاطع من <a href="https://www.pexels.com" target="_blank" rel="noopener">Pexels</a>${bg.credit?.by ? ` · ${tye(bg.credit.by)}` : ""}</small>`
+        : bg.credit && ["image", "video"].includes(bg.kind) ? `<small class="muted ty-credit" data-no-i18n>${bg.kind === "video" ? "🎬" : "📷"} ${bg.credit.by_url ? `<a href="${tye(bg.credit.by_url)}" target="_blank" rel="noopener">${tye(bg.credit.by)}</a>` : tye(bg.credit.by)} · <a href="https://www.pexels.com" target="_blank" rel="noopener">Pexels</a></small>` : ""}
       ${["image", "video", "source"].includes(bg.kind) ? `<label>تغميق <input type="range" min="0" max="0.8" step="0.05" data-tybg="dim" value="${bg.dim || 0}"></label>` : ""}
     </div>
     <details class="panel tv-step" ${tyx.open.s1 ?? !v.words?.length ? "open" : ""} data-tydk="s1"><summary>١. 🗣️ الكلام <small class="muted">${v.words?.length ? `${v.words.length} كلمة · ${tyT(v.duration)}` : ""} ${kindTxt}</small></summary>
@@ -572,6 +574,11 @@ $("tyMain").addEventListener("click", async (e) => {
   const wrap = (btn, fn) => busyButton(btn, "⏳", async () => { try { await fn(); } catch (err) { toast(err.message, true); } });
   const stk = t.closest("[data-tystock]");
   if (stk) return tyStockOpen(v, stk.dataset.tystock);
+  const bga = t.closest("[data-tybgauto]");
+  if (bga) {
+    if ((v.bg?.file) && !confirm("الخلفية الحالية هتتبدل بخلفيات بيختارها البرنامج على حسب الكلام. تكمّل؟")) return;
+    return wrap(bga, async () => { tyx.cur = await api(TY(`/${v.id}/bg-auto`), { method: "POST", ...jsonBody({ kind: bga.dataset.tybgauto === "image" ? "photo" : "video" }) }); tyRender(); tyPoll(); });
+  }
   const play = t.closest("[data-typlay]");
   if (play) return tyx.play ? tyStop() : tyStart();
   const rs = t.closest("[data-tyreset]");
