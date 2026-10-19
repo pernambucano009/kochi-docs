@@ -2,21 +2,28 @@
 <script>
 // قالب «خط واحد»: رسمة كاملة بخط واحد مابيتقطعش: الترابيزة، الطبق، الكوباية بودنها، البخار اللي بيتحول لقلب بلون البراند،
 // وبعدين الخط يلف ويرسم سطر تحت العنوان. القلم بيمشي بسرعة ثابتة تقريبًا وبيهدى عند القلب. 1080×1920، 12 ثانية.
+const G1 = "١ · الرسمة", G2 = "٢ · العنوان والبراند", GS = "الشكل العام";
 const PR = M.params({
-  title: { label: "العنوان", kind: "text", role: "product", def: "اتعمل بحب" },
-  sub: { label: "تحت العنوان", kind: "text", def: "كل فنجان بنحضّره كأنه ليك لوحدك" },
-  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "قهوة ركن" },
-  ink: { label: "لون الخط", kind: "color", def: "#1d1a17" },
-  accent: { label: "لون القلب", kind: "color", def: "#e2483d" },
-  paper: { label: "لون الورق", kind: "color", def: "#f4ede1" },
+  title: { label: "العنوان", kind: "text", role: "product", def: "اتعمل بحب", group: G2, max: 14 },
+  sub: { label: "تحت العنوان", kind: "text", def: "كل فنجان بنحضّره كأنه ليك لوحدك", group: G2, max: 40 },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "قهوة ركن", group: G2, max: 16 },
+  ink: { label: "لون الخط", kind: "color", def: "#1d1a17", group: G1, hint: "الخط والكلام: لازم يكون عكس لون الورق (غامق على فاتح أو العكس)." },
+  accent: { label: "لون القلب", kind: "color", role: "accent", def: "#e2483d", group: G1, hint: "البخار بيتحول لقلب بالون ده." },
+  paper: { label: "لون الورق", kind: "color", def: "#f4ede1", group: G1 },
+  fTitle: { label: "خط العنوان والبراند", kind: "font", def: "amiri", group: GS },
+  fText: { label: "خط تحت العنوان", kind: "font", def: "tajawal", group: GS },
+});
+M.meta({
+  story: "رسمة كاملة بخط واحد مابيتقطعش: الترابيزة والطبق والكوباية بودنها، والبخار بيتحول لقلب بلون البراند، وبعدين الخط يلف ويرسم سطر تحت العنوان. القلم بيمشي بسرعة ثابتة وبيهدى عند القلب.",
+  scenes: [{ name: G1, t0: 0, t1: 7.2, about: "الخط بيرسم الكوباية والقلب" }, { name: G2, t0: 7.2, t1: 12, about: "العنوان وتحته والبراند" }],
+  tips: ["مناسب للقهوة والحلويات والهدايا وأي حاجة معمولة بحب.", "ستايل هادي ونضيف: الكلام قليل.", "خليك في لونين: الخط والقلب بس."],
 });
 const W = 1080, H = 1920, DUR = 12, T0 = .3, T1 = 8.0;
-const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
 
 M.reel({
   W, H, DUR, bg: PR.paper,
   async init(M) {
-    await Promise.all([loadFont("AM", "TY-Amiri-700.ttf", "700"), loadFont("TJ", "SM-Tajawal.ttf")]);
+    await Promise.all([M.font("AM", PR.fTitle), M.font("TJ", PR.fText)]);
     const c = M.canvas(W, H), x = c.getContext("2d");
     // المسار: نقط متتابعة، كل نقطة معاها لونها (٠ = حبر، ١ = لون القلب) ووزن السرعة (القلب أبطأ)
     const P = []; let cx = -30, cy = 1430, tag = 0, slow = 1;
@@ -68,7 +75,7 @@ M.reel({
     const tk = cubicIO(clamp(seg(t, 7.2, 8.4)));
     if (tk > 0) { x.save(); x.beginPath(); x.rect(W - (W + 40) * tk, 0, W + 40, 520); x.clip(); x.fillStyle = PR.ink; x.font = `700 ${M.fit(PR.title, "AM", 860, 190, 80, "700")}px AM`; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.title, 540, 400); x.restore(); }
     const sk = expo(seg(t, 8.6, 9.4)); if (sk > 0) { x.globalAlpha = sk; x.fillStyle = PR.ink; x.font = `400 ${M.fit(PR.sub, "TJ", 900, 50, 30)}px TJ`; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.sub, 540, 1600 + (1 - sk) * 20); x.globalAlpha = 1; }
-    const bk = expo(seg(t, 9.4, 10.2)); if (bk > 0) { x.globalAlpha = bk; x.fillStyle = PR.accent; x.beginPath(); x.arc(540, 1720, 7, 0, Math.PI * 2); x.fill(); x.fillStyle = PR.ink; x.font = "700 64px AM"; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.brand, 540, 1810); x.globalAlpha = 1; }
+    const bk = expo(seg(t, 9.4, 10.2)); if (bk > 0) { x.globalAlpha = bk; x.fillStyle = PR.accent; x.beginPath(); x.arc(540, 1720, 7, 0, Math.PI * 2); x.fill(); x.fillStyle = PR.ink; x.font = `700 ${M.fit(PR.brand, "AM", 820, 64, 30, "700")}px AM`; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.brand, 540, 1810); x.globalAlpha = 1; }
   },
   sound(A) {
     const N = A.midi;

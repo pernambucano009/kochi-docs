@@ -2,20 +2,27 @@
 <script>
 // قالب «ألوان شمع» (كتاب أطفال): صفحة بتترسم قدامك بألوان شمع على ورق خشن: الشمع بيمسك في نتوءات الورق بس، التلوين خطوط رايحة جاية
 // بتطلع برّه الخط شوية، كل خط بيرتعش (بيترسم تاني كل شوية)، وفي الآخر لون مية أزرق للسما والشمع بيرفضه. 1080×1920، 12 ثانية.
+const G1 = "١ · الرسمة", G2 = "٢ · العنوان والبراند", GS = "الشكل العام";
 const PR = M.params({
-  title: { label: "العنوان", kind: "text", role: "product", def: "ارسم يومك بألوانك" },
-  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "مكتبة ألوان" },
-  line: { label: "لون الخط", kind: "color", def: "#2d2a6e" },
-  balloon: { label: "لون البالونة", kind: "color", def: "#e5423b" },
+  title: { label: "العنوان", kind: "text", role: "product", def: "ارسم يومك بألوانك", group: G2, max: 20, hint: "بيتكتب بالشمع فوق الرسمة: جملة فرحانة وقصيرة." },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "مكتبة ألوان", group: G2, max: 16 },
+  line: { label: "لون الخط", kind: "color", def: "#2d2a6e", group: G1, hint: "لون خطوط الرسم والكلام: خليه غامق علشان يبان على الورق." },
+  balloon: { label: "لون البالونة", kind: "color", role: "accent", def: "#e5423b", group: G1, hint: "البالونة اللي بتطير في الرسمة: لون براندك." },
+  fTitle: { label: "خط العنوان", kind: "font", def: "lalezar", group: GS },
+  fText: { label: "خط البراند", kind: "font", def: "changa", group: GS },
+});
+M.meta({
+  story: "صفحة كتاب أطفال بتترسم قدامك بألوان شمع على ورق خشن: بيت وشجرة وشمس وبالونة، التلوين خطوط رايحة جاية بتطلع برّه الخط، كل خط بيرتعش، وفي الآخر لون مية أزرق للسما والشمع بيرفضه، والعنوان بيتكتب.",
+  scenes: [{ name: G1, t0: 0, t1: 8.6, about: "الرسمة بتتلوّن بالشمع والمية" }, { name: G2, t0: 8.6, t1: 12, about: "العنوان والبراند" }],
+  tips: ["مناسب لمنتجات الأطفال والمكتبات والحضانات والأنشطة.", "العنوان بصوت طفل: بسيط وفرحان.", "لون البالونة هو اللي بيلفت النظر: خليه لون البراند."],
 });
 const W = 1080, H = 1920, DUR = 12;
-const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
 const BOX = { yellow: "#f6c431", orange: "#f08a2c", green: "#5aa83c", dgreen: "#2f7a3a", brown: "#8a5a34", blue: "#3b8fd6", pink: "#f2a1b4", skin: "#f3c9a2", sky: "#7cc4ef" };
 
 M.reel({
   W, H, DUR, bg: "#f4efe3",
   async init(M) {
-    await Promise.all([loadFont("LZ", "SM-Lalezar.ttf"), loadFont("CH", "SM-Changa.ttf")]);
+    await Promise.all([M.font("LZ", PR.fTitle), M.font("CH", PR.fText)]);
     const c = M.canvas(W, H); const x = c.getContext("2d");
     const mk = () => { const k = document.createElement("canvas"); k.width = W; k.height = H; return k; };
     // الورق وملمسه (النتوءات ثابتة على الصفحة)
@@ -98,7 +105,7 @@ M.reel({
     if (wk > 0) { const ws = C.wash.getContext("2d"); ws.setTransform(1, 0, 0, 1, 0, 0); ws.clearRect(0, 0, W, H); const g = ws.createLinearGradient(0, 0, 0, 1400); g.addColorStop(0, BOX.sky); g.addColorStop(1, "rgba(124,196,239,.25)"); ws.fillStyle = g; ws.beginPath(); ws.rect(0, 0, W, 1400 * wk); ws.fill(); ws.globalCompositeOperation = "destination-out"; ws.drawImage(C.wax, 0, 0); ws.globalCompositeOperation = "source-over";
       x.globalCompositeOperation = "multiply"; x.globalAlpha = .55; x.drawImage(C.wash, 0, 0); x.globalAlpha = 1; x.globalCompositeOperation = "source-over"; }
     x.drawImage(C.wax, 0, 0);
-    const bk = smooth(seg(t, 10.6, 11.3)); if (bk > 0) { x.globalAlpha = bk; x.fillStyle = PR.line; x.font = "700 58px CH"; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.brand, 540, 1760); x.globalAlpha = 1; }
+    const bk = smooth(seg(t, 10.6, 11.3)); if (bk > 0) { x.globalAlpha = bk; x.fillStyle = PR.line; x.font = `700 ${M.fit(PR.brand, "CH", 760, 58, 28, "700")}px CH`; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.brand, 540, 1760); x.globalAlpha = 1; }
     // ظل لمبة دافي على الصفحة
     const vg = x.createRadialGradient(540, 900, 400, 540, 900, 1300); vg.addColorStop(0, "rgba(0,0,0,0)"); vg.addColorStop(1, "rgba(90,60,20,.22)"); x.fillStyle = vg; x.fillRect(0, 0, W, H);
   },

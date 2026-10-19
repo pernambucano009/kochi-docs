@@ -2,24 +2,31 @@
 <script>
 // قالب «كرتون الخمسينات»: ألوان مسطحة مطبوعة، كل لون مزاح شوية عن الخط وبيتهز على «اتنين»، خط حبر رفيع بيتنفس ومش مقفول،
 // مذيعة (جسمها ثابت، الإيدين والعيون بس اللي بتتحرك) بتشرح المنتج في ٣ خطوات، ونجوم وأشكال «أتوميك». 1080×1920، 12 ثانية.
+const G1 = "١ · المنتج", G2 = "٢ · الخطوات", G3 = "٣ · النهاية", GS = "الشكل العام";
 const PR = M.params({
-  title: { label: "اسم المنتج", kind: "text", role: "product", def: "خلّاط الصباح" },
-  s1: { label: "الخطوة ١", kind: "text", def: "حط الفاكهة" },
-  s2: { label: "الخطوة ٢", kind: "text", def: "دوس الزرار" },
-  s3: { label: "الخطوة ٣", kind: "text", def: "صب واستمتع" },
-  end: { label: "الجملة الأخيرة", kind: "text", def: "بس كده!" },
-  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "بيتي للأجهزة" },
-  product: { label: "لون المنتج", kind: "color", def: "#2bb3a8" },
+  title: { label: "اسم المنتج", kind: "text", role: "product", def: "خلّاط الصباح", group: G1, max: 14, hint: "المذيعة بتقدّمه في الأول." },
+  s1: { label: "الخطوة ١", kind: "text", def: "حط الفاكهة", group: G2, max: 14, hint: "إزاي تستخدم المنتج في ٣ خطوات سهلة." },
+  s2: { label: "الخطوة ٢", kind: "text", def: "دوس الزرار", group: G2, max: 14 },
+  s3: { label: "الخطوة ٣", kind: "text", def: "صب واستمتع", group: G2, max: 14 },
+  end: { label: "الجملة الأخيرة", kind: "text", def: "بس كده!", group: G3, max: 12 },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "بيتي للأجهزة", group: G3, max: 16 },
+  product: { label: "لون المنتج", kind: "color", role: "accent", def: "#2bb3a8", group: G1, hint: "لون المنتج المرسوم جنب المذيعة." },
+  fHead: { label: "خط العناوين", kind: "font", def: "lalezar", group: GS },
+  fText: { label: "خط البراند", kind: "font", def: "changa", group: GS },
+});
+M.meta({
+  story: "إعلان كرتون من الخمسينات بألوان مطبوعة مزاحة عن الخط وبتتهز: مذيعة مبتسمة (الإيدين والعيون بس اللي بتتحرك) بتقدّم المنتج وتشرحه في ٣ خطوات مرقّمة، مع نجوم وأشكال «أتوميك»، وجملة النهاية والبراند.",
+  scenes: [{ name: G1, t0: 0, t1: 1.8, about: "المذيعة واسم المنتج" }, { name: G2, t0: 1.8, t1: 9.8, about: "الخطوات التلاتة" }, { name: G3, t0: 9.8, t1: 12, about: "الجملة الأخيرة والبراند" }],
+  tips: ["مناسب للأجهزة المنزلية والمنتجات اللي ليها طريقة استخدام.", "كل خطوة فعل قصير: «حط»، «دوس»، «صب».", "الجملة الأخيرة بتقول قد إيه الموضوع سهل."],
 });
 const W = 1080, H = 1920, DUR = 12;
-const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
 const INK = "#2a1f1a", PAPER = "#f3e8d2";
 const STEPS = [[0, 1.8, "#f3e8d2", null], [1.8, 4.6, "#f2a38f", "s1"], [4.6, 7.2, "#f0c45a", "s2"], [7.2, 9.8, "#b9c98a", "s3"], [9.8, 12, "#f3e8d2", null]];
 
 M.reel({
   W, H, DUR, bg: PAPER,
   async init(M) {
-    await Promise.all([loadFont("LZ", "SM-Lalezar.ttf"), loadFont("CH", "SM-Changa.ttf")]);
+    await Promise.all([M.font("LZ", PR.fHead), M.font("CH", PR.fText)]);
     const c = M.canvas(W, H); const x = c.getContext("2d");
     return { x };
   },
@@ -48,7 +55,7 @@ M.reel({
       x.save(); x.translate(540, 360); x.scale(k, k); shape(burst(0, 0, 330, 16, "#f0c45a", t * .3), "#f0c45a", 5); x.restore();
       const txt = si === 0 ? PR.title : PR.end;
       x.save(); x.translate(540, 360); x.scale(k, k); x.font = `${M.fit(txt, "LZ", 520, 140, 60)}px LZ`; x.textAlign = "center"; x.textBaseline = "middle"; x.direction = "rtl"; x.fillStyle = "#e9573f"; x.fillText(txt, REG[0], REG[1] + 8); x.lineWidth = 4; x.strokeStyle = INK; x.strokeText(txt, 0, 8); x.restore();
-      if (si === 4) { const bk = expo(seg(lt, .6, 1.1)); x.globalAlpha = bk; x.fillStyle = INK; x.font = "700 60px CH"; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.brand, 540, 1700); x.globalAlpha = 1; }
+      if (si === 4) { const bk = expo(seg(lt, .6, 1.1)); x.globalAlpha = bk; x.fillStyle = INK; x.font = `700 ${M.fit(PR.brand, "CH", 860, 60, 28, "700")}px CH`; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.brand, 540, 1700); x.globalAlpha = 1; }
     } else {
       const k = expo(seg(lt, 0, .35)); x.save(); x.translate(540, 300 - (1 - k) * 260);
       shape(() => { x.beginPath(); x.roundRect(-400, -110, 800, 220, 40); }, "#fffaf0", 7, 5);

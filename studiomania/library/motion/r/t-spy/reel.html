@@ -2,20 +2,27 @@
 <script>
 // قالب «تترات جاسوسية» (ستايل الستينات): ورق مقصوص بالمقص بأربع ألوان سادة، سيلويت راجل ببرنيطة وكرافتة حمرا بيجري ورا شنطة،
 // الكلام هو المباني والأسطح، النحاس بيقطع المشاهد، وفي الآخر الشنطة بتتفتح على «العرض السري». 1080×1920، 12 ثانية.
+const G1 = "١ · التقديم", G2 = "٢ · المطاردة والشنطة", G3 = "٣ · اسم العرض", GC = "الألوان", GS = "الشكل العام";
 const PR = M.params({
-  presents: { label: "الكلام الأول", kind: "text", def: "تقدّم" },
-  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "ستوديو البلد" },
-  starring: { label: "سطر البطولة", kind: "text", def: "بطولة: إنت" },
-  title: { label: "اسم العرض", kind: "text", role: "product", def: "العرض السري" },
-  code: { label: "جوه الشنطة", kind: "text", def: "كود: صيف٤٠" },
-  date: { label: "التاريخ", kind: "text", def: "الخميس الجاي الساعة ٩" },
-  ink: { label: "الحبر الغامق", kind: "color", def: "#1b1714" },
-  cream: { label: "الورق", kind: "color", def: "#efe4c9" },
-  hot: { label: "اللون السخن", kind: "color", def: "#d23a22" },
-  warm: { label: "اللون الدافي", kind: "color", def: "#e2a52a" },
+  presents: { label: "الكلام الأول", kind: "text", def: "تقدّم", group: G1, max: 10, hint: "زي تترات الأفلام: «تقدّم» أو «بالاشتراك مع»." },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "ستوديو البلد", group: G1, max: 16, hint: "بيظهر كبير في الأول وصغير في الآخر." },
+  starring: { label: "سطر البطولة", kind: "text", def: "بطولة: إنت", group: G2, max: 16, hint: "هزار التترات: العميل هو البطل." },
+  code: { label: "جوه الشنطة", kind: "text", def: "كود: صيف٤٠", group: G2, max: 14, hint: "الشنطة بتتفتح على السر: كود خصم أو هدية." },
+  title: { label: "اسم العرض", kind: "text", role: "product", def: "العرض السري", group: G3, max: 14 },
+  date: { label: "التاريخ", kind: "text", def: "الخميس الجاي الساعة ٩", group: G3, max: 28, hint: "إمتى العرض يبدأ أو يخلص." },
+  ink: { label: "الحبر الغامق", kind: "color", def: "#1b1714", group: GC, hint: "السيلويت والضلّ: لازم يفضل غامق." },
+  cream: { label: "الورق", kind: "color", def: "#efe4c9", group: GC, hint: "لون الكلام الفاتح: لازم يفضل فاتح." },
+  hot: { label: "اللون السخن", kind: "color", role: "accent", def: "#d23a22", group: GC },
+  warm: { label: "اللون الدافي", kind: "color", def: "#e2a52a", group: GC },
+  fHead: { label: "خط التترات", kind: "font", def: "lalezar", group: GS },
+  fText: { label: "خط الكلام الصغير", kind: "font", def: "changa", group: GS },
+});
+M.meta({
+  story: "تترات أفلام جاسوسية من الستينات بورق مقصوص بأربع ألوان سادة: سيلويت راجل ببرنيطة وكرافتة حمرا بيجري ورا شنطة، الكلام هو المباني والأسطح، النحاس بيقطع المشاهد، وفي الآخر الشنطة بتتفتح على العرض السري.",
+  scenes: [{ name: G1, t0: 0, t1: 3, about: "البراند بيقدّم" }, { name: G2, t0: 3, t1: 9, about: "البطولة والمطاردة والشنطة" }, { name: G3, t0: 9, t1: 12, about: "اسم العرض والتاريخ والبراند" }],
+  tips: ["مناسب للعروض السرية وأكواد الخصم وإطلاق منتج مفاجأة.", "اللعب على السر: متقولش العرض في الأول.", "الكلام قصير علشان يبقى زي التترات."],
 });
 const W = 1080, H = 1920, DUR = 12;
-const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
 // قص بالمقص: الحواف بتتقسم وبتتهز شوية (ثابتة لكل قطعة)
 const cut = (pts, seed, amp = 1.8) => { const out = []; for (let i = 0; i < pts.length; i++) { const a = pts[i], b = pts[(i + 1) % pts.length], n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 10)); for (let k = 0; k < n; k++) { const u = k / n, h = M.hash(seed + i * 7.1 + k * .37); out.push([a[0] + (b[0] - a[0]) * u + (h - .5) * amp * 2, a[1] + (b[1] - a[1]) * u + (M.hash(seed * 3 + i + k * .91) - .5) * amp * 2]); } } return out; };
 const SC = [[0, 3.0, "warm"], [3.0, 6.0, "hot"], [6.0, 9.0, "ink"], [9.0, 12, "cream"]];
@@ -23,7 +30,7 @@ const SC = [[0, 3.0, "warm"], [3.0, 6.0, "hot"], [6.0, 9.0, "ink"], [9.0, 12, "c
 M.reel({
   W, H, DUR, bg: PR.warm,
   async init(M) {
-    await Promise.all([loadFont("LZ", "SM-Lalezar.ttf"), loadFont("CH", "SM-Changa.ttf")]);
+    await Promise.all([M.font("LZ", PR.fHead), M.font("CH", PR.fText)]);
     const c = M.canvas(W, H); const x = c.getContext("2d");
     const tex = document.createElement("canvas"); tex.width = W; tex.height = H; const g = tex.getContext("2d"), R = M.rng(9);
     for (let i = 0; i < 120; i++) { const cx = R() * W, cy = R() * H, r = 60 + R() * 260, gr = g.createRadialGradient(cx, cy, 0, cx, cy, r); gr.addColorStop(0, `rgba(${R() < .5 ? "255,250,235" : "60,40,20"},${R() * .07})`); gr.addColorStop(1, "rgba(0,0,0,0)"); g.fillStyle = gr; g.fillRect(cx - r, cy - r, r * 2, r * 2); }
@@ -61,7 +68,7 @@ M.reel({
     if (sc === 0) {
       // مشهد ١: الكلام مباني، والراجل بيجري ورا الشنطة
       [[60, 900, 160, 820], [250, 700, 130, 1020], [420, 1050, 180, 670], [640, 820, 150, 900], [830, 980, 190, 740]].forEach(([a, b, w2, h2], i) => piece(rect(a, b, w2, h2), i % 2 ? PR.cream : "#b5821f", 40 + i));
-      word(PR.presents, 540, 420, 130, PR.ink, "LZ", -.04, expo(seg(lt, .1, .4)));
+      word(PR.presents, 540, 420, M.fit(PR.presents, "LZ", 860, 130, 60), PR.ink, "LZ", -.04, expo(seg(lt, .1, .4)));
       word(PR.brand, 540, 600, M.fit(PR.brand, "LZ", 900, 160, 60), PR.cream, "LZ", .03, expo(seg(lt, .7, 1.0)));
       const mxp = -150 + 1400 * seg(lt, .8, 3.0); man(mxp, 1630, 1.1, "run"); brief(mxp + 260, 1560 - Math.abs(Math.sin(t * 9)) * 30, .9);
     } else if (sc === 1) {
@@ -85,7 +92,7 @@ M.reel({
       piece(rect(80, 560, 920, 640), PR.hot, 100);
       word(PR.title, 540, 820, M.fit(PR.title, "LZ", 860, 220, 80), PR.cream, "LZ", -.03, expo(seg(lt, .1, .5)));
       word(PR.date, 540, 1050, M.fit(PR.date, "CH", 820, 60, 30, "700"), PR.ink, "CH", 0, expo(seg(lt, .5, .8)));
-      piece(rect(330, 1340, 420, 110), PR.ink, 101); word(PR.brand, 540, 1395, 56, PR.cream, "CH", 0, expo(seg(lt, .9, 1.2)));
+      piece(rect(330, 1340, 420, 110), PR.ink, 101); word(PR.brand, 540, 1395, M.fit(PR.brand, "CH", 390, 56, 24, "700"), PR.cream, "CH", 0, expo(seg(lt, .9, 1.2)));
       man(170, 1720, .7, "stand"); brief(900, 1690, .7);
     }
     // مسحة القطع بين المشاهد (خطين مايلين)

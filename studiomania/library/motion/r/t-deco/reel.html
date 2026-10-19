@@ -2,21 +2,28 @@
 <script>
 // قالب «آرت ديكو»: خطوط دهب على أسود لكّيه دافي، كل حاجة حوالين محور واحد بالطول: شمس بأشعة، قوس متدرّج (زقورة)، مراوح وشيفرون،
 // المنتج في النص بحجم «إيرباش» وحافة دهب، لمعة دهب بتعدّي، والعنوان والبراند. 1080×1920، 12 ثانية.
+const G1 = "١ · الزخرفة والجوهرة", G2 = "٢ · العنوان", G3 = "٣ · البراند", GS = "الشكل العام";
 const PR = M.params({
-  title: { label: "العنوان", kind: "text", role: "product", def: "أناقة لا تنتهي" },
-  sub: { label: "تحت العنوان", kind: "text", def: "مجموعة الشتا الجديدة" },
-  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "دار الذهب" },
-  since: { label: "سطر صغير", kind: "text", def: "منذ ١٩٢٥" },
-  accent: { label: "لون الجوهرة", kind: "color", def: "#8e1b3a" },
+  title: { label: "العنوان", kind: "text", role: "product", def: "أناقة لا تنتهي", group: G2, max: 16, hint: "بيتكتب بالدهب فوق الشمس." },
+  sub: { label: "تحت العنوان", kind: "text", def: "مجموعة الشتا الجديدة", group: G2, max: 28 },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "دار الذهب", group: G3, max: 16 },
+  since: { label: "سطر صغير", kind: "text", def: "منذ ١٩٢٥", group: G3, max: 18, hint: "تحت البراند بين شرطتين: سنة التأسيس أو جملة قصيرة." },
+  accent: { label: "لون الجوهرة", kind: "color", role: "accent", def: "#8e1b3a", group: G1, hint: "لون الجوهرة اللي في النص: نبيتي، زمردي، أو ياقوتي." },
+  fHead: { label: "خط العنوان والبراند", kind: "font", def: "amiri", group: GS },
+  fText: { label: "خط الكلام الصغير", kind: "font", def: "plex", group: GS },
+});
+M.meta({
+  story: "آرت ديكو العشرينات: خطوط دهب بتترسم على أسود لكّيه حوالين محور واحد: شمس بأشعة، قوس متدرّج، مراوح وشيفرون، وجوهرة بتلمع في النص، ولمعة دهب بتعدّي على العنوان والبراند.",
+  scenes: [{ name: G1, t0: 0, t1: 6, about: "الزخرفة الدهب والجوهرة" }, { name: G2, t0: 6, t1: 8.6, about: "العنوان وتحته" }, { name: G3, t0: 8.6, t1: 12, about: "البراند والسطر الصغير" }],
+  tips: ["مناسب للمجوهرات والعطور والفنادق والمنتجات الفاخرة.", "العنوان كلمتين أو تلاتة: الفخامة في البساطة.", "لون الجوهرة الغامق بيبان أغلى على الدهب."],
 });
 const W = 1080, H = 1920, DUR = 12, CX = 540;
-const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
 const BG = "#140e0a";
 
 M.reel({
   W, H, DUR, bg: BG,
   async init(M) {
-    await Promise.all([loadFont("AM", "TY-Amiri-700.ttf", "700"), loadFont("PB", "TY-PlexArabic-700.ttf", "700")]);
+    await Promise.all([M.font("AM", PR.fHead), M.font("PB", PR.fText)]);
     const c = M.canvas(W, H); const x = c.getContext("2d");
     return { x };
   },
@@ -65,9 +72,9 @@ M.reel({
       x.fillStyle = "rgba(0,0,0,.6)"; x.fillText(PR.title, CX + 3, 303); x.fillStyle = gold(CX - tw / 2, 230, CX + tw / 2, 380); x.fillText(PR.title, CX, 300); x.restore();
       gline(() => { x.moveTo(CX - 300 * tk, 395); x.lineTo(CX + 300 * tk, 395); }, 2);
     }
-    const sk = smooth(seg(t, 7.2, 8.0)); if (sk > 0) { x.globalAlpha = sk; x.fillStyle = "#efe4c8"; x.font = "700 44px PB"; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.sub, CX, 455); x.globalAlpha = 1; }
+    const sk = smooth(seg(t, 7.2, 8.0)); if (sk > 0) { x.globalAlpha = sk; x.fillStyle = "#efe4c8"; x.font = `700 ${M.fit(PR.sub, "PB", 880, 44, 22, "700")}px PB`; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.sub, CX, 455); x.globalAlpha = 1; }
     const bk = smooth(seg(t, 8.6, 9.6));
-    if (bk > 0) { x.save(); x.globalAlpha = bk; x.font = "700 78px AM"; x.textAlign = "center"; x.direction = "rtl"; x.fillStyle = gold(CX - 250, 1720, CX + 250, 1800); x.fillText(PR.brand, CX, 1790); x.fillStyle = "#c9a24a"; x.font = "700 30px PB"; x.fillText(`— ${PR.since} —`, CX, 1850); x.restore(); }
+    if (bk > 0) { x.save(); x.globalAlpha = bk; x.font = `700 ${M.fit(PR.brand, "AM", 760, 78, 36, "700")}px AM`; x.textAlign = "center"; x.direction = "rtl"; x.fillStyle = gold(CX - 250, 1720, CX + 250, 1800); x.fillText(PR.brand, CX, 1790); x.fillStyle = "#c9a24a"; x.font = `700 ${M.fit(`— ${PR.since} —`, "PB", 700, 30, 18, "700")}px PB`; x.fillText(`— ${PR.since} —`, CX, 1850); x.restore(); }
     // إطار دهب مزدوج حوالين الكادر
     gline(() => x.rect(34, 34, W - 68, H - 68), 3, smooth(seg(t, 0, 1)));
     gline(() => x.rect(50, 50, W - 100, H - 100), 1.2, smooth(seg(t, .3, 1.3)));

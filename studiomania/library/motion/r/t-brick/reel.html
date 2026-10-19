@@ -2,22 +2,29 @@
 <script>
 // قالب «مكعبات طوب»: عالم من الطوب البلاستيك على مكتب خشب حقيقي، متصور ماكرو بستوب موشن (على «اتنين»):
 // المحل بيتبني طوبة طوبة، يافطة بتترشق، وشخصية مبنية من الطوب ماشية للباب. البلاستيك لامع والفواصل غامقة. 1080×1920، 12 ثانية.
+const G1 = "١ · البناء", G2 = "٢ · العنوان والبراند", GS = "الشكل العام";
 const PR = M.params({
-  title: { label: "العنوان", kind: "text", role: "product", def: "كل حلم بيتبني حتة حتة" },
-  sign: { label: "اليافطة", kind: "text", def: "مفتوح" },
-  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "عالم المكعبات" },
-  wall: { label: "لون الحيطة", kind: "color", def: "#d6342c" },
-  roof: { label: "لون السقف", kind: "color", def: "#2b6fd6" },
+  sign: { label: "اليافطة", kind: "text", def: "مفتوح", group: G1, max: 8, hint: "كلمة على يافطة المحل اللي بتترشق وهو بيتبني." },
+  title: { label: "العنوان", kind: "text", role: "product", def: "كل حلم بيتبني حتة حتة", group: G2, max: 26 },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "عالم المكعبات", group: G2, max: 16, hint: "بيتكتب على طوبة صفرا كبيرة في الآخر." },
+  wall: { label: "لون الحيطة", kind: "color", role: "accent", def: "#d6342c", group: G1 },
+  roof: { label: "لون السقف", kind: "color", def: "#2b6fd6", group: G1 },
+  fTitle: { label: "خط العنوان واليافطة", kind: "font", def: "lalezar", group: GS },
+  fText: { label: "خط البراند", kind: "font", def: "changa", group: GS },
+});
+M.meta({
+  story: "عالم مكعبات طوب بلاستيك على مكتب خشب، متصوّر ماكرو بستوب موشن: المحل بيتبني طوبة طوبة، اليافطة بتترشق، وشخصية مبنية من الطوب ماشية للباب، وبعدين العنوان والبراند على طوبة صفرا.",
+  scenes: [{ name: G1, t0: 0, t1: 10, about: "المحل بيتبني والشخصية ماشية" }, { name: G2, t0: 10, t1: 12, about: "العنوان والبراند" }],
+  tips: ["مناسب للمحلات الجديدة والافتتاحات ولعب الأطفال والبدايات.", "الفكرة: حاجة بتتبني خطوة خطوة.", "اليافطة كلمة واحدة علشان تبان على الطوب."],
 });
 const W = 1080, H = 1920, DUR = 12, A = 44, BV = 25.4, HZ = 31, OX = 540, OY = 640;
-const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
 const hex = (h) => { const n = parseInt(String(h).slice(1), 16) || 0; return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
 const rgb = (c, k = 1) => `rgb(${c.map((v) => Math.min(255, Math.round(v * k))).join(",")})`;
 
 M.reel({
   W, H, DUR, bg: "#7a5634",
   async init(M) {
-    await Promise.all([loadFont("LZ", "SM-Lalezar.ttf"), loadFont("CH", "SM-Changa.ttf")]);
+    await Promise.all([M.font("LZ", PR.fTitle), M.font("CH", PR.fText)]);
     const c = M.canvas(W, H); const x = c.getContext("2d");
     // المكتب: ألواح خشب + حاجات حقيقية ورا مموّهة (كوباية، زرعة، شباك)
     const bg = document.createElement("canvas"); bg.width = W; bg.height = H; const b = bg.getContext("2d"), R = M.rng(5);
@@ -64,12 +71,12 @@ M.reel({
     if (t > 7.0) { const zz = 1 / 3; items.push({ i: fi, j: fj, z: zz + (step ? .15 : 0), w: .5, d: .5, h: 1, col: C.fig.legs, kind: "fig", key: 600 + fi + fj }); items.push({ i: fi + .5, j: fj, z: zz + (step ? 0 : .15), w: .5, d: .5, h: 1, col: C.fig.legs, kind: "fig", key: 600.01 + fi + fj }); items.push({ i: fi, j: fj, z: zz + 1, w: 1, d: .5, h: 1, col: C.fig.torso, kind: "fig", key: 600.02 + fi + fj }); items.push({ i: fi + .1, j: fj - .05, z: zz + 2, w: .8, d: .6, h: .8, col: C.fig.head, kind: "head", key: 600.03 + fi + fj }); }
     items.sort((a, b) => a.key - b.key).forEach((b) => { brick(b.i, b.j, b.z, b.w, b.d, b.h, b.col, b.kind); if (b.kind === "head") { const [hx, hy] = P(b.i + b.w / 2, b.j + b.d, b.z + .45); x.fillStyle = "#222"; x.fillRect(hx - 9, hy - 6, 4, 6); x.fillRect(hx + 5, hy - 6, 4, 6); x.strokeStyle = "#222"; x.lineWidth = 2.5; x.beginPath(); x.arc(hx, hy + 2, 8, .3, Math.PI - .3); x.stroke(); } });
     // كلام اليافطة على الطوبة البيضا
-    const sp = C.L.find((p) => p[7] === "sign"); if (tq > sp.t + .25) { const [cx, cy] = P(6, 9, 2.8); x.save(); x.translate(cx, cy); x.transform(1, BV / A, 0, 1, 0, 0); x.fillStyle = "#222"; x.font = "48px LZ"; x.textAlign = "center"; x.textBaseline = "middle"; x.direction = "rtl"; x.fillText(PR.sign, 0, 0); x.restore(); }
+    const sp = C.L.find((p) => p[7] === "sign"); if (tq > sp.t + .25) { const [cx, cy] = P(6, 9, 2.8); x.save(); x.translate(cx, cy); x.transform(1, BV / A, 0, 1, 0, 0); x.fillStyle = "#222"; x.font = `${M.fit(PR.sign, "LZ", 200, 48, 22)}px LZ`; x.textAlign = "center"; x.textBaseline = "middle"; x.direction = "rtl"; x.fillText(PR.sign, 0, 0); x.restore(); }
     x.setTransform(1, 0, 0, 1, 0, 0);
     // العنوان والبراند (كروت طوب مسطحة)
     const tk = expo(seg(t, 10.0, 10.6));
     if (tk > 0) { x.save(); x.globalAlpha = tk; x.fillStyle = "rgba(255,255,255,.92)"; x.beginPath(); x.roundRect(70, 110, 940, 220, 30); x.fill(); x.fillStyle = "#1d1d1b"; x.font = `${M.fit(PR.title, "LZ", 880, 100, 44)}px LZ`; x.textAlign = "center"; x.textBaseline = "middle"; x.direction = "rtl"; x.fillText(PR.title, 540, 220); x.restore(); }
-    const bk = expo(seg(t, 10.8, 11.4)); if (bk > 0) { x.save(); x.globalAlpha = bk; x.fillStyle = "#f6c428"; x.beginPath(); x.roundRect(290, 1700, 500, 120, 20); x.fill(); x.fillStyle = "rgba(0,0,0,.2)"; for (let k = 0; k < 4; k++) { x.beginPath(); x.ellipse(370 + k * 115, 1700, 30, 12, 0, 0, Math.PI * 2); x.fill(); } x.fillStyle = "#1d1d1b"; x.font = "700 54px CH"; x.textAlign = "center"; x.textBaseline = "middle"; x.direction = "rtl"; x.fillText(PR.brand, 540, 1765); x.restore(); }
+    const bk = expo(seg(t, 10.8, 11.4)); if (bk > 0) { x.save(); x.globalAlpha = bk; x.fillStyle = "#f6c428"; x.beginPath(); x.roundRect(290, 1700, 500, 120, 20); x.fill(); x.fillStyle = "rgba(0,0,0,.2)"; for (let k = 0; k < 4; k++) { x.beginPath(); x.ellipse(370 + k * 115, 1700, 30, 12, 0, 0, Math.PI * 2); x.fill(); } x.fillStyle = "#1d1d1b"; x.font = `700 ${M.fit(PR.brand, "CH", 440, 54, 24, "700")}px CH`; x.textAlign = "center"; x.textBaseline = "middle"; x.direction = "rtl"; x.fillText(PR.brand, 540, 1765); x.restore(); }
     const vg = x.createRadialGradient(540, 1000, 500, 540, 1000, 1300); vg.addColorStop(0, "rgba(0,0,0,0)"); vg.addColorStop(1, "rgba(0,0,0,.4)"); x.fillStyle = vg; x.fillRect(0, 0, W, H);
   },
   sound(A2) {

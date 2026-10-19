@@ -2,21 +2,28 @@
 <script>
 // قالب «زجاج معشق»: شباك مقوّس في حيطة حجر، قطع زجاج ملوّنة بين خطوط رصاص غامقة، الزجاج مالوش نور من نفسه:
 // بينوّر بس لما الشمس تعدّي من وراه (شريط نور بيمشي)، وبيرمي نسخة ملونة على أرضية الحجر مع أشعة وتراب. 1080×1920، 12 ثانية.
+const G1 = "١ · الشباك والنور", G2 = "٢ · الكلام", GS = "الشكل العام";
 const PR = M.params({
-  ribbon: { label: "الكلام على الشريط", kind: "text", role: "brand", def: "إضاءة نور" },
-  tag: { label: "المحفور تحت", kind: "text", def: "النور بيغيّر كل حاجة" },
-  sky: { label: "لون السما", kind: "color", def: "#2a5db0" },
-  sun: { label: "لون الشمس", kind: "color", def: "#f2b134" },
+  ribbon: { label: "الكلام على الشريط", kind: "text", role: "brand", def: "إضاءة نور", group: G2, max: 16, hint: "بيظهر على شريط جوه الزجاج لما النور يكمل: اسم البراند أو كلمتين." },
+  tag: { label: "المحفور تحت", kind: "text", def: "النور بيغيّر كل حاجة", group: G2, max: 28, hint: "جملة محفورة في الحجر تحت الشباك." },
+  sky: { label: "لون السما", kind: "color", def: "#2a5db0", group: G1, hint: "لون أغلب قطع الزجاج: أزرق أو أخضر غامق بيبان أحلى." },
+  sun: { label: "لون الشمس", kind: "color", role: "accent", def: "#f2b134", group: G1, hint: "لون الشمس اللي في النص والنور اللي بيقع على الأرض." },
+  fRibbon: { label: "خط الشريط", kind: "font", def: "ruqaa", group: GS },
+  fTag: { label: "خط الجملة المحفورة", kind: "font", def: "amiri", group: GS },
+});
+M.meta({
+  story: "شباك زجاج معشّق مقوّس في حيطة حجر: الزجاج ضلمة لحد ما الشمس تعدّي من وراه فينوّر حتة حتة، ويرمي ألوانه على الأرض مع أشعة وتراب، وبعدين الكلام يظهر على الشريط ويتحفر تحت.",
+  scenes: [{ name: G1, t0: 0, t1: 6.8, about: "النور بيعدّي ويولّع الزجاج" }, { name: G2, t0: 6.8, t1: 12, about: "الشريط والجملة المحفورة" }],
+  tips: ["مناسب للإضاءة والديكور والأماكن الهادية (كافيه، فندق، معرض).", "الكلام قليل: الإحساس في النور مش في الكلام.", "ألوان السما الغامقة بتخلي الشمس تبان أقوى."],
 });
 const W = 1080, H = 1920, DUR = 12, WX0 = 200, WX1 = 880, WY0 = 250, WY1 = 1380, AR = (WX1 - WX0) / 2;
-const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
 const hex = (h) => { const n = parseInt(String(h).slice(1).replace(/^(.)(.)(.)$/, "$1$1$2$2$3$3"), 16) || 0; return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
 const inWin = (x, y) => x > WX0 && x < WX1 && y < WY1 && (y > WY0 + AR || Math.hypot(x - (WX0 + AR), y - (WY0 + AR)) < AR);
 
 M.reel({
   W, H, DUR, bg: "#1a1714",
   async init(M) {
-    await Promise.all([loadFont("AM", "TY-Amiri-700.ttf", "700"), loadFont("RQ", "TY-ArefRuqaa-700.ttf", "700")]);
+    await Promise.all([M.font("AM", PR.fTag), M.font("RQ", PR.fRibbon)]);
     const c = M.canvas(W, H); const x = c.getContext("2d");
     const R = M.rng(4);
     // الصورة اللي في الزجاج: سما، شمس، تلال، شجرة، شريط تحت

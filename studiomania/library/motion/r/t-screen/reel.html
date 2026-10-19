@@ -2,20 +2,27 @@
 <script>
 // قالب «بوستر طباعة شاشة» (سيلك سكرين): بوستر بيتطبع قدام الكاميرا، كل لون حبر سادة لوحده بمسّاحة (سكويجي) بتسحب من فوق لتحت،
 // الحبر بيغطي اللي تحته، الألواح مش راكبة بالظبط، لمعة الحبر المبلول بتختفي، وشريط بيانات غامق تحت. 1080×1920، 12 ثانية.
+const G1 = "١ · طباعة الألوان", G2 = "٢ · الكلام والختم", GI = "ألوان الحبر", GS = "الشكل العام";
 const PR = M.params({
-  name: { label: "الاسم الكبير", kind: "text", role: "product", def: "سيوة" },
-  num: { label: "الرقم", kind: "text", def: "٠٧" },
-  stats: { label: "سطر البيانات", kind: "text", def: "٣ أيام · ٢ ليالي · من ٤٥٠٠ جنيه" },
-  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "رحلات الواحة" },
-  i1: { label: "حبر السما الفاتح", kind: "color", def: "#f6d7a7" },
-  i2: { label: "حبر السما الغامق", kind: "color", def: "#eba26a" },
-  i3: { label: "حبر الكثبان", kind: "color", def: "#c9724a" },
-  i4: { label: "حبر النخل", kind: "color", def: "#2f6b5a" },
-  i5: { label: "الحبر الغامق", kind: "color", def: "#2b2140" },
-  acc: { label: "حبر التمييز (الشمس)", kind: "color", def: "#ff5a3c" },
+  name: { label: "الاسم الكبير", kind: "text", role: "product", def: "سيوة", group: G2, max: 8, hint: "كلمة واحدة كبيرة: المكان أو المنتج." },
+  num: { label: "الرقم", kind: "text", def: "٠٧", group: G2, max: 3, hint: "رقم صغير بلون التمييز: رقم الرحلة أو الإصدار." },
+  stats: { label: "سطر البيانات", kind: "text", def: "٣ أيام · ٢ ليالي · من ٤٥٠٠ جنيه", group: G2, max: 36, hint: "المعلومات المهمة مفصولة بـ « · »." },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "رحلات الواحة", group: G2, max: 16, hint: "بيتلزق على ورقة في الآخر." },
+  i1: { label: "حبر السما الفاتح", kind: "color", def: "#f6d7a7", group: GI },
+  i2: { label: "حبر السما الغامق", kind: "color", def: "#eba26a", group: GI },
+  i3: { label: "حبر الكثبان", kind: "color", def: "#c9724a", group: GI },
+  i4: { label: "حبر النخل", kind: "color", def: "#2f6b5a", group: GI },
+  i5: { label: "الحبر الغامق", kind: "color", def: "#2b2140", group: GI, hint: "لون شريط البيانات والكلام: خليه غامق علشان الكلام الفاتح يبان عليه." },
+  acc: { label: "حبر التمييز (الشمس)", kind: "color", role: "accent", def: "#ff5a3c", group: GI },
+  fName: { label: "خط الاسم", kind: "font", def: "lalezar", group: GS },
+  fText: { label: "خط البيانات", kind: "font", def: "changa", group: GS },
+});
+M.meta({
+  story: "بوستر سيلك سكرين بيتطبع قدام الكاميرا: كل لون حبر بيتسحب بالمسّاحة لوحده من فوق لتحت (سما، كثبان، نخل، شمس)، والألواح مش راكبة بالظبط، وبعدين الاسم والبيانات، والكاميرا ترجع لورا وورقة البراند تتلزق.",
+  scenes: [{ name: G1, t0: 0, t1: 6.8, about: "ألوان الحبر بتتطبع واحد ورا التاني" }, { name: G2, t0: 6.8, t1: 12, about: "الاسم والبيانات وورقة البراند" }],
+  tips: ["مناسب للرحلات والأماكن والحفلات والإصدارات المحدودة.", "الصورة المرسومة واحة: غيّر ألوان الحبر علشان تناسب براندك.", "الاسم الكبير كلمة واحدة بتبان أقوى."],
 });
 const W = 1080, H = 1920, DUR = 12, PX = 70, PY = 150, PW = 940, PH = 1410;
-const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
 const PAPER = "#f1e8d6";
 const u = (v) => v * PW / 1000;   // وحدات البوستر (١٠٠٠×١٥٠٠)
 const palm = (q, x0, y0, s) => { q.rect(x0 - 3 * s, y0 - 70 * s, 6 * s, 70 * s); for (let k = 0; k < 7; k++) { const a = -Math.PI / 2 + (k - 3) * .45; q.moveTo(x0, y0 - 70 * s); q.quadraticCurveTo(x0 + Math.cos(a) * 30 * s, y0 - 70 * s + Math.sin(a) * 30 * s - 6 * s, x0 + Math.cos(a) * 48 * s, y0 - 70 * s + Math.sin(a) * 48 * s + 14 * s); q.lineTo(x0 + Math.cos(a) * 40 * s, y0 - 70 * s + Math.sin(a) * 40 * s + 18 * s); q.closePath(); } };
@@ -33,7 +40,7 @@ const PULL = (i) => [.4 + i * 1.05, 1.25 + i * 1.05];   // وقت سحب كل ل
 M.reel({
   W, H, DUR, bg: "#d8d2c6",
   async init(M) {
-    await Promise.all([loadFont("LZ", "SM-Lalezar.ttf"), loadFont("CH", "SM-Changa.ttf")]);
+    await Promise.all([M.font("LZ", PR.fName), M.font("CH", PR.fText)]);
     const c = M.canvas(W, H); const x = c.getContext("2d");
     const mk = (w, h) => { const k = document.createElement("canvas"); k.width = w; k.height = h; return k; };
     const paper = mk(PW, PH), p = paper.getContext("2d"), R = M.rng(6);
@@ -88,7 +95,7 @@ M.reel({
     }
     // اسم البراند على ورقة لاصقة برّه البوستر
     x.setTransform(1, 0, 0, 1, 0, 0);
-    const bk = expo(seg(t, 10.2, 10.8)); if (bk > 0) { x.save(); x.translate(540, 1780); x.rotate(.03); x.scale(bk, bk); x.fillStyle = "#fff8e8"; x.fillRect(-230, -55, 460, 110); x.fillStyle = "rgba(255,255,255,.6)"; x.fillRect(-60, -70, 120, 30); x.fillStyle = PR.i5; x.font = "700 50px CH"; x.textAlign = "center"; x.textBaseline = "middle"; x.direction = "rtl"; x.fillText(PR.brand, 0, 4); x.restore(); }
+    const bk = expo(seg(t, 10.2, 10.8)); if (bk > 0) { x.save(); x.translate(540, 1780); x.rotate(.03); x.scale(bk, bk); x.fillStyle = "#fff8e8"; x.fillRect(-230, -55, 460, 110); x.fillStyle = "rgba(255,255,255,.6)"; x.fillRect(-60, -70, 120, 30); x.fillStyle = PR.i5; x.font = `700 ${M.fit(PR.brand, "CH", 420, 50, 24, "700")}px CH`; x.textAlign = "center"; x.textBaseline = "middle"; x.direction = "rtl"; x.fillText(PR.brand, 0, 4); x.restore(); }
   },
   sound(A) {
     const N = A.midi;

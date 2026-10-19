@@ -2,19 +2,26 @@
 <script>
 // قالب «ألوان زيت سميكة» (إمباستو): لوحة بتتبني ضربة سكينة ورا التانية: كل ضربة شريحة لون تخينة ليها حافة منوّرة وحافة غامقة،
 // الكبير الأول (السما والتلال) وبعدين التفاصيل، الضربات مابتعدّيش من شكل لشكل، والعنوان نفسه معمول من ضربات. 1080×1920، 12 ثانية.
+const G1 = "١ · اللوحة", G2 = "٢ · العنوان", G3 = "٣ · الكلام والبراند", GS = "الشكل العام";
 const PR = M.params({
-  title: { label: "العنوان", kind: "text", role: "product", def: "لحظة دافية" },
-  sub: { label: "تحت العنوان", kind: "text", def: "قهوة البيت… في كل مكان" },
-  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "بن العيلة" },
-  subject: { label: "لون الشمسية (الحاجة المميزة)", kind: "color", def: "#e0352b" },
+  title: { label: "العنوان", kind: "text", role: "product", def: "لحظة دافية", group: G2, max: 12, hint: "العنوان نفسه بيترسم بضربات سكينة: كلمتين بيبانوا أحلى." },
+  sub: { label: "تحت العنوان", kind: "text", def: "قهوة البيت… في كل مكان", group: G3, max: 28 },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "بن العيلة", group: G3, max: 16 },
+  subject: { label: "لون الشمسية (الحاجة المميزة)", kind: "color", role: "accent", def: "#e0352b", group: G1, hint: "الحاجة الوحيدة اللي لونها صارخ في اللوحة: لون براندك." },
+  fTitle: { label: "خط العنوان", kind: "font", def: "lalezar", group: GS },
+  fText: { label: "خط الكلام", kind: "font", def: "changa", group: GS },
+});
+M.meta({
+  story: "لوحة زيت سميكة بتتبني ضربة سكينة ورا التانية: كل ضربة شريحة لون تخينة بحافة منوّرة وحافة غامقة، الكبير الأول (السما والتلال) وبعدين التفاصيل والشمسية الحمرا، والعنوان نفسه معمول من ضربات.",
+  scenes: [{ name: G1, t0: 0, t1: 6, about: "اللوحة بتترسم بالسكينة" }, { name: G2, t0: 6, t1: 9.4, about: "العنوان بالضربات" }, { name: G3, t0: 9.4, t1: 12, about: "تحت العنوان والبراند" }],
+  tips: ["مناسب للقهوة والمطاعم الدافية والمنتجات اليدوية والفن.", "العنوان إحساس: «لحظة»، «دفا»، «ريحة».", "لون الشمسية هو اللي بيشد العين: خليه لون البراند."],
 });
 const W = 1080, H = 1920, DUR = 12;
-const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
 
 M.reel({
   W, H, DUR, bg: "#2b2420",
   async init(M) {
-    await Promise.all([loadFont("LZ", "SM-Lalezar.ttf"), loadFont("CH", "SM-Changa.ttf")]);
+    await Promise.all([M.font("LZ", PR.fTitle), M.font("CH", PR.fText)]);
     const c = M.canvas(W, H); const x = c.getContext("2d");
     const mk = () => { const k = document.createElement("canvas"); k.width = W; k.height = H; return k; };
     // ١) الرسمة المرجعية بقيم واضحة + خريطة المجموعات (كل لون = مجموعة، الضربة ماتعدّيش برّاها)
@@ -71,7 +78,7 @@ M.reel({
     x.setTransform(1, 0, 0, 1, 0, 0);
     for (const s of C.T) if (s.t <= t) { const k = seg(t, s.t, s.t + .12); knife({ ...s, px: s.px + 6, py: s.py + 7, col: [60, 30, 30], c2: null }, k); }
     for (const s of C.T) if (s.t <= t) knife(s, seg(t, s.t, s.t + .12));
-    const sk = expo(seg(t, 9.4, 10.2)); if (sk > 0) { x.globalAlpha = sk; x.fillStyle = "#fff6e6"; x.font = "700 52px CH"; x.textAlign = "center"; x.direction = "rtl"; x.shadowColor = "rgba(0,0,0,.4)"; x.shadowBlur = 12; x.fillText(PR.sub, 540, 540); x.font = "700 60px CH"; x.fillText(PR.brand, 540, 1800); x.shadowBlur = 0; x.globalAlpha = 1; }
+    const sk = expo(seg(t, 9.4, 10.2)); if (sk > 0) { x.globalAlpha = sk; x.fillStyle = "#fff6e6"; x.font = `700 ${M.fit(PR.sub, "CH", 920, 52, 26, "700")}px CH`; x.textAlign = "center"; x.direction = "rtl"; x.shadowColor = "rgba(0,0,0,.4)"; x.shadowBlur = 12; x.fillText(PR.sub, 540, 540); x.font = `700 ${M.fit(PR.brand, "CH", 860, 60, 28, "700")}px CH`; x.fillText(PR.brand, 540, 1800); x.shadowBlur = 0; x.globalAlpha = 1; }
   },
   sound(A) {
     const N = A.midi;
