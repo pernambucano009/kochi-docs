@@ -4,20 +4,26 @@
 // Physics is simulated once (fixed step, seeded), so every frame is a lookup — the film is exactly reproducible.
 // Story: hook (0–1 s) · three escalating fails (it slams the first ring again and again, faster each time) · the turn (a gap lines up, 4.7 s)
 // · a chain of escapes, each ring shattering, music rising · FREE (17.1 s) · gag: the camera pulls back… there's a 13th ring.
+const G1 = "١ · السؤال", G2 = "٢ · المحاولات والهروب", G3 = "٣ · النهاية", GC = "الألوان";
 const PR = M.params({
-  hook1: { label: "السؤال (سطر ١)", kind: "text", def: "CAN IT ESCAPE" },
-  hook2: { label: "السؤال (سطر ٢، ملوّن)", kind: "text", def: "ALL 12?" },
-  left: { label: "تحت العدّاد", kind: "text", def: "RINGS LEFT" },
-  tries: { label: "كلمة المحاولة", kind: "text", def: "try" },
-  free: { label: "لما يخرج", kind: "text", def: "FREE!" },
-  gag: { label: "الإفيه في الآخر", kind: "text", def: "…oh no." },
-  accent: { label: "لون السؤال", kind: "color", role: "accent", def: "#ffcf3a" },
+  hook1: { label: "السؤال (سطر ١)", kind: "text", def: "CAN IT ESCAPE", group: G1, max: 14 },
+  hook2: { label: "السؤال (سطر ٢، ملوّن)", kind: "text", def: "ALL 12?", group: G1, max: 10 },
+  left: { label: "تحت العدّاد", kind: "text", def: "RINGS LEFT", group: G2, max: 12, hint: "تحت العدّاد اللي بيقل." },
+  tries: { label: "كلمة المحاولة", kind: "text", def: "try", group: G2, max: 8 },
+  free: { label: "لما يخرج", kind: "text", def: "FREE!", group: G3, max: 8 },
+  gag: { label: "الإفيه في الآخر", kind: "text", def: "…oh no.", group: G3, max: 12, hint: "الإفيه لما الكاميرا ترجع ويبان فيه دايرة كمان." },
+  accent: { label: "لون السؤال", kind: "color", role: "accent", def: "#ffcf3a", group: GC },
 });
 const W = 1080, H = 1920;
 const SIM = simulate({ e: 1.04, GAP: .55, v0: [260, 50], hold: 1.2, T: 20 });
 const PASS = SIM.events.filter((e) => e[0] === "pass").map((e) => e[1]);
 const HITS = SIM.events.filter((e) => e[0] === "hit");
 const FREE = (SIM.events.find((e) => e[0] === "free") || [0, 17.1])[1];
+M.meta({
+  story: "هوك الكورة والـ ١٢ دايرة: كورة بعيون عايزة تخرج من ١٢ دايرة بتلف. بتخبط في أول دايرة كذا مرة وكل مرة أسرع، وبعدين فتحة بتتظبط وتبدأ سلسلة هروب والدواير بتتكسر والمزيكا بتعلى، لحد ما تخرج… والكاميرا ترجع ويبان فيه دايرة ١٣.",
+  scenes: [{ name: G1, t0: 0, t1: 1, about: "السؤال" }, { name: G2, t0: 1, t1: FREE, about: "المحاولات وسلسلة الهروب" }, { name: G3, t0: FREE, t1: 20, about: "خرجت… والإفيه" }],
+  tips: ["هوك قوي لأول ثانيتين في أي ريل.", "السؤال بيخلي الناس تستنى النهاية.", "الإفيه في الآخر بيخليهم يعيدوا الفيديو."],
+});
 const R0 = 70, DR = 30, GAP = .55;
 const ang = (i, t) => i * 1.3 + (i % 2 ? -1 : 1) * (.9 + i * .12) * t;
 M.reel({

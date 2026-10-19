@@ -4,14 +4,22 @@
 // Arrangement: intro (bars 1–4) · build (5–8, snare roll tightening) · DROP on the downbeat of bar 9 (strongest) · outro (bars 15–17).
 // Two colours: black + acid yellow. Kick → the big disc punches; snare → the bars slam down; wobble → the wide shape stretches with the LFO.
 const BPM = 140, BEAT = 60 / BPM, BAR = BEAT * 4, DUR = 30;
+const G1 = "١ · البداية والتجهيز", G2 = "٢ · الدروب", G3 = "٣ · النهاية", GH = "الكلام الصغير في الركن", GC = "الألوان";
 const PR = M.params({
-  intro: { label: "كلمة البداية", kind: "text", def: "BASS" },
-  build: { label: "٣ كلمات قبل الدروب", kind: "lines", def: ["WAIT", "FOR", "IT"] },
-  drop: { label: "كلمة الدروب (أقوى لحظة)", kind: "text", role: "brand", def: "DROP" },
-  outro: { label: "كلمة النهاية", kind: "text", def: "OUT" },
-  corner: { label: "كلام صغير في الركن (فاضي = مفيش)", kind: "text", def: "140 BPM" },
-  yel: { label: "اللون المنوّر", kind: "color", role: "accent", def: "#e9ff3b" },
-  blk: { label: "اللون الغامق", kind: "color", role: "dark", def: "#0b0b0b" },
+  intro: { label: "كلمة البداية", kind: "text", def: "BASS", group: G1, max: 8 },
+  build: { label: "٣ كلمات قبل الدروب", kind: "lines", def: ["WAIT", "FOR", "IT"], group: G1, max: 8, hint: "٣ كلمات قبل الدروب، والسنير بيسرّع." },
+  drop: { label: "كلمة الدروب (أقوى لحظة)", kind: "text", role: "brand", def: "DROP", group: G2, max: 8, hint: "أقوى لحظة في الفيديو." },
+  outro: { label: "كلمة النهاية", kind: "text", def: "OUT", group: G3, max: 8 },
+  barWord: { label: "كلمة المازورة", kind: "text", def: "BAR", group: GH, max: 6 },
+  phases: { label: "أسامي المراحل (٤)", kind: "lines", def: ["INTRO", "BUILD", "DROP", "OUTRO"], group: GH, max: 8, hint: "٤ كلمات للمراحل: البداية، التجهيز، الدروب، النهاية." },
+  corner: { label: "كلام صغير في الركن (فاضي = مفيش)", kind: "text", def: "140 BPM", group: GH, max: 14, hint: "فاضي = مفيش كلام في الركن خالص." },
+  yel: { label: "اللون المنوّر", kind: "color", role: "accent", def: "#e9ff3b", group: GC },
+  blk: { label: "اللون الغامق", kind: "color", role: "dark", def: "#0b0b0b", group: GC },
+});
+M.meta({
+  story: "كلمات على الدروب: مزيكا مكتوبة بالكود ١٤٠ BPM، وكل حركة محسوبة من نفس جدول النوتات: الكيك بيخبط الدايرة الكبيرة، والسنير بينزّل الشرايط، والووبل بيمط الشكل العريض. بداية، وتجهيز، والدروب، ونهاية.",
+  scenes: [{ name: G1, t0: 0, t1: 13.7, about: "البداية والتجهيز" }, { name: G2, t0: 13.7, t1: 24, about: "الدروب" }, { name: G3, t0: 24, t1: 30, about: "النهاية" }],
+  tips: ["مناسب لإعلانات الحفلات والمنتجات الشبابية.", "كل خانة كلمة واحدة: الخط ضخم.", "كلمة الدروب هي اسم البراند أو العرض."],
 });
 const YEL = PR.yel, BLK = PR.blk, BW = [0, 1, 2].map((i) => PR.build[i] ?? "");
 // schedule (seconds)
@@ -76,8 +84,8 @@ M.reel({
     x.fillStyle = fg; x.fillText(word, 960, 475);                       // outside the disc: fg
     x.save(); x.beginPath(); x.arc(960, 470, R, 0, 7); x.clip(); x.fillStyle = bg; x.fillText(word, 960, 475); x.restore();   // inside: knocked out
     x.direction = "ltr";
-    if (PR.corner) { x.font = "500 26px MO"; x.fillStyle = fg; x.textAlign = "left"; x.fillText(`${PR.corner}  BAR ${Math.floor(t / BAR) + 1}`, 120, 940);
-      x.textAlign = "right"; x.fillText(t < BUILD ? "INTRO" : t < DROP ? "BUILD" : t < OUTRO ? "DROP" : "OUTRO", 1800, 940); }
+    if (PR.corner) { x.font = "500 26px MO"; x.fillStyle = fg; x.textAlign = "left"; x.fillText(`${PR.corner}  ${PR.barWord} ${Math.floor(t / BAR) + 1}`, 120, 940);
+      x.textAlign = "right"; x.fillText((PR.phases || [])[t < BUILD ? 0 : t < DROP ? 1 : t < OUTRO ? 2 : 3] || "", 1800, 940); }
   },
   sound(A) {
     const ctx = A.ctx;

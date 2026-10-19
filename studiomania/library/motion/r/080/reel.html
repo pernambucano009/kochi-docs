@@ -5,13 +5,19 @@
 // circle→square→triangle→star→circle · 6–9 2D→3D: it flips like a coin, becomes a sphere, lands on a floor and rolls
 // · 9–12 data/UI: the floor flattens into a chart; the ball is the first point, the line grows, then it becomes a slider knob
 // · 12–15 end title: the knob is the period of FULL STOP.  One typeface (Inter Tight 800). Palette: cream, red, black (+ white).
+const G1 = "١ · الكلمات والنقطة", G2 = "٢ · الأشكال والشارت", G3 = "٣ · النهاية", GC = "الألوان";
 const PR = M.params({
-  words: { label: "٦ كلمات ورا بعض (النقطة جنبهم)", kind: "lines", def: ["MOTION", "DESIGN", "MADE", "OF", "ONE", "DOT"] },
-  stat: { label: "الرقم على الشارت", kind: "text", def: "+411%" },
-  end: { label: "الكلمة في الآخر (النقطة جنبها)", kind: "text", role: "brand", def: "FULL STOP" },
-  cream: { label: "الخلفية", kind: "color", role: "bg", def: "#f1ece2" },
-  ink: { label: "لون الكلام", kind: "color", role: "ink", def: "#111111" },
-  red: { label: "لون النقطة", kind: "color", role: "accent", def: "#ff3b2f" },
+  words: { label: "٦ كلمات ورا بعض (النقطة جنبهم)", kind: "lines", def: ["MOTION", "DESIGN", "MADE", "OF", "ONE", "DOT"], group: G1, max: 10, hint: "٦ كلمات ورا بعض، والنقطة بتبقى آخر كل واحدة." },
+  stat: { label: "الرقم على الشارت", kind: "text", def: "+411%", group: G2, max: 6, hint: "الرقم على الشارت." },
+  end: { label: "الكلمة في الآخر (النقطة جنبها)", kind: "text", role: "brand", def: "FULL STOP", group: G3, max: 12 },
+  cream: { label: "الخلفية", kind: "color", role: "bg", def: "#f1ece2", group: GC },
+  ink: { label: "لون الكلام", kind: "color", role: "ink", def: "#111111", group: GC },
+  red: { label: "لون النقطة", kind: "color", role: "accent", def: "#ff3b2f", group: GC, hint: "لون النقطة اللي ماشية في الفيديو كله." },
+});
+M.meta({
+  story: "كل حاجة من نقطة: النقطة مابتسيبش الشاشة وكل مشهد معمول منها. بتبقى نقطة آخر كلمة بتتغير، وبتتنفخ وتبقى أشكال، وتتقلب زي عملة وتبقى كورة بتتدحرج، والأرض بتبقى شارت، وفي الآخر هي نقطة الكلمة الأخيرة.",
+  scenes: [{ name: G1, t0: 0, t1: 3, about: "الكلمات والنقطة" }, { name: G2, t0: 3, t1: 12, about: "الأشكال والكورة والشارت" }, { name: G3, t0: 12, t1: 15, about: "الكلمة الأخيرة" }],
+  tips: ["مناسب لاستوديوهات الموشن والبراندات البسيطة.", "كلمة واحدة في كل سطر.", "الرقم لازم يكون حقيقي."],
 });
 const W = 1920, H = 1080, CREAM = PR.cream, INK = PR.ink, RED = PR.red;
 const BASE = 640, PX = 1260, DR = 30;

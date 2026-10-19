@@ -4,19 +4,25 @@
 // 0–2 a dot starts circling (hook) · 2–4 "WHAT IF" spirals inward, a new ending each beat · 4–6 the spiral morphs into a knot
 // 6–8 the knot becomes a 3D ball of thread · 8–10 a phone full of second-guessing (UI/data) · 10–12 the ball winds tighter
 // 12–14 strongest: the thread is pulled straight, one word per beat · 14–15 "JUST START." → back to the single dot.
+const G1 = "١ · التردد", G2 = "٢ · الأفكار والموبايل", G3 = "٣ · ابدأ", GC = "الألوان";
 const PR = M.params({
-  hm: { label: "٣ كلمات تردد في الأول", kind: "lines", def: ["HM.", "WAIT.", "BUT—"] },
-  whatif: { label: "٤ أفكار بتلف (أول واحدة كبيرة)", kind: "lines", def: ["WHAT IF", "THEY SAW?", "I'M WRONG?", "IT'S TOO LATE?"] },
-  shapes: { label: "أسامي الأشكال (٣)", kind: "lines", def: ["SPIRAL", "SCRIBBLE", "KNOT"] },
-  msgs: { label: "رسايل الموبايل (٦)", kind: "lines", def: ["Did they read it?", "Read 10:41", "Typing…", "…stopped typing", "Should I say sorry?", "Rewrite it (draft 7)"] },
-  meter: { label: "تحت العدّاد ({h} = الساعات)", kind: "text", def: "{h} h thinking · 0 h doing" },
-  beats: { label: "٤ كلمات على الإيقاع", kind: "lines", def: ["STOP.", "BREATHE.", "DECIDE.", "GO."] },
-  end1: { label: "النهاية (سطر ١)", kind: "text", def: "JUST" },
-  end2: { label: "النهاية (سطر ٢، ملوّن)", kind: "text", role: "cta", def: "START." },
-  paper: { label: "الخلفية", kind: "color", role: "bg", def: "#f2efe8" },
-  ink: { label: "الغامق", kind: "color", role: "ink", def: "#121214" },
-  vio: { label: "اللون الأساسي", kind: "color", role: "accent", def: "#6b4cff" },
-  yel: { label: "اللون التاني", kind: "color", role: "accent2", def: "#ffd23f" },
+  hm: { label: "٣ كلمات تردد في الأول", kind: "lines", def: ["HM.", "WAIT.", "BUT—"], group: G1, max: 8, hint: "٣ كلمات تردد قصيرة." },
+  whatif: { label: "٤ أفكار بتلف (أول واحدة كبيرة)", kind: "lines", def: ["WHAT IF", "THEY SAW?", "I'M WRONG?", "IT'S TOO LATE?"], group: G1, max: 14, hint: "٤ أفكار بتلف في دوامة، أول واحدة كبيرة." },
+  shapes: { label: "أسامي الأشكال (٣)", kind: "lines", def: ["SPIRAL", "SCRIBBLE", "KNOT"], group: G2, max: 10 },
+  msgs: { label: "رسايل الموبايل (٦)", kind: "lines", def: ["Did they read it?", "Read 10:41", "Typing…", "…stopped typing", "Should I say sorry?", "Rewrite it (draft 7)"], group: G2, max: 24, hint: "٦ رسايل على شاشة الموبايل." },
+  meter: { label: "تحت العدّاد ({h} = الساعات)", kind: "text", def: "{h} h thinking · 0 h doing", group: G2, max: 30, hint: "{h} بيتبدّل بعدد الساعات." },
+  beats: { label: "٤ كلمات على الإيقاع", kind: "lines", def: ["STOP.", "BREATHE.", "DECIDE.", "GO."], group: G3, max: 10, hint: "٤ كلمات على الإيقاع والخيط بيتشد." },
+  end1: { label: "النهاية (سطر ١)", kind: "text", def: "JUST", group: G3, max: 8 },
+  end2: { label: "النهاية (سطر ٢، ملوّن)", kind: "text", role: "cta", def: "START.", group: G3, max: 8 },
+  paper: { label: "الخلفية", kind: "color", role: "bg", def: "#f2efe8", group: GC },
+  ink: { label: "الغامق", kind: "color", role: "ink", def: "#121214", group: GC },
+  vio: { label: "اللون الأساسي", kind: "color", role: "accent", def: "#6b4cff", group: GC },
+  yel: { label: "اللون التاني", kind: "color", role: "accent2", def: "#ffd23f", group: GC },
+});
+M.meta({
+  story: "كفاية تفكير: فكرة واحدة = خيط واحد مابيبطلش يلف. نقطة بتلف، و«ماذا لو» بتتلف لجوه بنهاية جديدة كل إيقاع، والدوامة بتبقى عقدة وكورة خيط 3D، وموبايل مليان تردد، وبعدين الخيط بيتشد مستقيم كلمة كلمة لحد «ابدأ».",
+  scenes: [{ name: G1, t0: 0, t1: 4, about: "النقطة والأفكار اللي بتلف" }, { name: G2, t0: 4, t1: 12, about: "العقدة وكورة الخيط والموبايل" }, { name: G3, t0: 12, t1: 15, about: "الخيط بيتشد وابدأ" }],
+  tips: ["مناسب لكورسات وخدمات بتساعد الناس تبدأ.", "الأفكار أسئلة قصيرة بتقلق.", "النهاية أمر واضح: «ابدأ»، «جرّب»، «احجز»."],
 });
 const N_ = (a, n) => Array.from({ length: n }, (_, i) => a[i] ?? "");
 const W = 1080, H = 1920, B = .5, PAPER = PR.paper, INK = PR.ink, VIO = PR.vio, YEL = PR.yel;

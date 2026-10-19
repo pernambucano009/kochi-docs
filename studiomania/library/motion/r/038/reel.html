@@ -3,17 +3,23 @@
 // #38 (عنصر: شوريل ورق بيتطوي) Showreel — concept: "Everything is one sheet of paper." 15 s, 120 BPM.
 // 0–4 split-flap words on a folding card · 4–6 the card folds into a crane (shape morph) · 6–8 a cube net folds up (2D→3D)
 // 8–10 the cube unfolds into a bar chart · 10–14 an accordion of panels carrying one word (strongest at 12–14) · 14–15 end title, back to a blank sheet.
+const G1 = "١ · لوحة الكلمات", G2 = "٢ · الأكورديون", G3 = "٣ · النهاية", GC = "الألوان";
 const PR = M.params({
-  words: { label: "٧ كلمات بتتقلب (لوحة مطار)", kind: "lines", def: ["EVERY", "IDEA", "STARTS", "AS", "ONE", "FLAT", "SHEET."] },
-  big: { label: "الكلمة الكبيرة على الأكورديون", kind: "text", role: "brand", def: "FOLD" },
-  end: { label: "العنوان في الآخر", kind: "text", role: "brand", def: "FOLD." },
-  endSub: { label: "تحت العنوان", kind: "text", role: "tagline", def: "A STUDIO OF PAPER MOTION" },
-  labels: { label: "عناوين صغيرة فوق (٥، فاضي = مفيش)", kind: "lines", def: ["01 — FLAP", "02 — FOLD", "03 — DEPTH", "04 — DATA", "05 — ACCORDION"] },
-  paper: { label: "الورق", kind: "color", role: "bg", def: "#f6f4ef" },
-  bg: { label: "الخلفية", kind: "color", def: "#d8d4cb" },
-  ink: { label: "الغامق", kind: "color", role: "ink", def: "#141416" },
-  red: { label: "اللون الأساسي", kind: "color", role: "accent", def: "#e63b2e" },
-  blue: { label: "اللون التاني", kind: "color", role: "accent2", def: "#2f4bff" },
+  words: { label: "٧ كلمات بتتقلب (لوحة مطار)", kind: "lines", def: ["EVERY", "IDEA", "STARTS", "AS", "ONE", "FLAT", "SHEET."], group: G1, max: 8, hint: "٧ كلمات بتتقلب زي لوحة المطار." },
+  big: { label: "الكلمة الكبيرة على الأكورديون", kind: "text", role: "brand", def: "FOLD", group: G2, max: 6, hint: "كلمة قصيرة على ألواح الأكورديون." },
+  end: { label: "العنوان في الآخر", kind: "text", role: "brand", def: "FOLD.", group: G3, max: 8 },
+  endSub: { label: "تحت العنوان", kind: "text", role: "tagline", def: "A STUDIO OF PAPER MOTION", group: G3, max: 30 },
+  labels: { label: "عناوين صغيرة فوق (٥، فاضي = مفيش)", kind: "lines", def: ["01 — FLAP", "02 — FOLD", "03 — DEPTH", "04 — DATA", "05 — ACCORDION"], group: G1, max: 18, hint: "٥ عناوين صغيرة فوق كل مشهد (فاضي = مفيش)." },
+  paper: { label: "الورق", kind: "color", role: "bg", def: "#f6f4ef", group: GC },
+  bg: { label: "الخلفية", kind: "color", def: "#d8d4cb", group: GC },
+  ink: { label: "الغامق", kind: "color", role: "ink", def: "#141416", group: GC },
+  red: { label: "اللون الأساسي", kind: "color", role: "accent", def: "#e63b2e", group: GC },
+  blue: { label: "اللون التاني", kind: "color", role: "accent2", def: "#2f4bff", group: GC },
+});
+M.meta({
+  story: "شوريل ورق بيتطوي: «كل حاجة ورقة واحدة». كلمات بتتقلب على كارت بيتطوي، والكارت يبقى كركي، وشبكة مكعب بتتقفل 3D، والمكعب يتفرد شارت، وأكورديون ألواح عليه كلمة، وفي الآخر ورقة فاضية.",
+  scenes: [{ name: G1, t0: 0, t1: 10, about: "الكلمات والكركي والمكعب والشارت" }, { name: G2, t0: 10, t1: 14, about: "الأكورديون" }, { name: G3, t0: 14, t1: 15, about: "العنوان" }],
+  tips: ["مناسب لاستوديوهات التصميم والطباعة والورق.", "الكلمات السبعة بيعملوا جملة واحدة.", "الكلمة الكبيرة قصيرة علشان الألواح."],
 });
 const esc = (v) => String(v ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 const LB = Array.from({ length: 5 }, (_, i) => PR.labels[i] ?? "");
