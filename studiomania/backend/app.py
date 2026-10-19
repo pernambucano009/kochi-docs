@@ -4068,6 +4068,7 @@ import brainquiz  # noqa: E402
 import brainsocial  # noqa: E402
 import stock  # noqa: E402
 import twin  # noqa: E402
+import phone  # noqa: E402
 import wallet  # noqa: E402
 import comics  # noqa: E402
 
@@ -17387,7 +17388,9 @@ def typo_overlay(tid: str, base: Path, out: Path, base_url: str, progress=None) 
         with sync_playwright() as p:
             browser = typo_browser(p)
             try:
-                ctx = browser.new_context(viewport={"width": W, "height": H}, device_scale_factor=1)
+                # ورا البوابة كل طلب لازم معاه سر البوابة، وإلا صفحة الرسم بترجع ممنوعة (والتايبوجرافي مش بتطلع في التصدير)
+                ctx = browser.new_context(viewport={"width": W, "height": H}, device_scale_factor=1,
+                                          extra_http_headers={"x-gateway-secret": GATEWAY_SECRET} if GATEWAY_SECRET else None)
                 ctx.add_cookies([{"name": SESSION_COOKIE, "value": auth.make_token(), "url": base_url}])
                 page = ctx.new_page()
                 page.goto(f"{base_url}/typo-render.html?id={tid}", wait_until="load", timeout=60000)
@@ -18150,7 +18153,8 @@ def run_typo_render(pid: str, base: str, quality: str) -> None:
         with sync_playwright() as p:
             browser = typo_browser(p)
             try:
-                ctx = browser.new_context(viewport={"width": W, "height": H}, device_scale_factor=scale)
+                ctx = browser.new_context(viewport={"width": W, "height": H}, device_scale_factor=scale,
+                                          extra_http_headers={"x-gateway-secret": GATEWAY_SECRET} if GATEWAY_SECRET else None)
                 ctx.add_cookies([{"name": SESSION_COOKIE, "value": auth.make_token(), "url": base}])
                 page = ctx.new_page()
                 page.goto(f"{base}/typo-render.html?id={pid}", wait_until="load", timeout=60000)
@@ -20554,6 +20558,8 @@ def flow_template(tid: str, name: str, cat: str, desc: str) -> dict:
         return {"id": tid, "name": name, "cat": cat, "desc": desc, "kind": "motion"}
     if tid == "typo":
         return {"id": tid, "name": name or "تايبوجرافي", "cat": cat, "desc": desc, "kind": "typo"}
+    if tid == "phone":
+        return {"id": tid, "name": name or "تصوير بالموبايل", "cat": cat, "desc": desc, "kind": "phone"}
     try:
         t = tpl_load(tid)
     except HTTPException:
@@ -20586,6 +20592,10 @@ def flow_profile(tpl: dict) -> str:
             out.append("الخانات اللي بتتغير في القالب (والباقي شكل وحركة ثابتين مبيتغيروش):\n" + "\n".join(rows))
         out.append("يعني: الفكرة لازم تتحكي بالكامل جوه الخانات دي وبنفس تسلسل القالب. مفيش مشاهد أو شخصيات أو أماكن جديدة غير اللي القالب بيرسمها، "
                    "الكلام بس (والألوان) هو اللي بيتغير. خلي الكلام بنفس طول الأمثلة تقريبًا.")
+    elif kind == "phone":
+        out.append("القالب ده فيديو بيصوّره صاحب البراند بنفسه بالموبايل وهو بيتكلم للكاميرا (Talking head)، ومعاه لقطات قصيرة يصورها (B-roll). "
+                   "السكريبت = الجمل اللي هيقولها بصوته بالترتيب، بلغة طبيعية سهلة تتقال، والهوك أول جملة، وكل beat فيه say (اللي هيتقال) "
+                   "و visual (هيبان إيه: وشه، أو لقطة B-roll يصورها). مفيش شخصيات متولّدة ولا مشاهد خيالية.")
     elif kind == "typo":
         out.append("القالب ده كلام بس بيتحرك على الإيقاع (من غير صور ولا شخصيات ولا مشاهد): الكلمات نفسها هي البطل. "
                    "الفكرة لازم تبقى جملة/رسالة قوية تتقال بصوت: سؤال وإجابته، قايمة سريعة، اعتراف، مقارنة بالكلام، أو جملة بتتبني كلمة كلمة.")
@@ -20975,10 +20985,10 @@ def flow_pick_idea(fid: str, body: FlowPickIn):
             if not it:
                 raise HTTPException(404, "الفكرة دي مش موجودة")
         # قالب كود (موشن أو تايبوجرافي): مفيش نوع بوست، على السكريبت على طول
-        code = d["template"].get("kind") in ("motion", "typo")
+        code = d["template"].get("kind") in ("motion", "typo", "phone")
         d.update(idea=it, stage="scenario" if code else "format", scenarios=[], scenario=None, **({"format": "reel"} if code else {}))
     d = flow_update(fid, fn)
-    if d["template"].get("kind") in ("motion", "typo"):
+    if d["template"].get("kind") in ("motion", "typo", "phone"):
         flow_job(fid, "scenarios", lambda: flow_gen_scenarios(fid))
     return flow_to_dict(fid, flow_load(fid))
 
@@ -21060,7 +21070,8 @@ def flow_pick_scenario(fid: str, body: FlowPickIn):
                 raise HTTPException(404, "السيناريو ده مش موجود")
         code = d["template"].get("kind") == "motion"
         # التايبوجرافي كلام بس: مفيش أبطال ولا ملفات، من السكريبت للتوليد على طول
-        d.update(scenario=it, stage="voice" if code else "generate" if d["template"].get("kind") == "typo" else "cast", **({"vo_track": None} if code else {}))
+        kd = d["template"].get("kind")
+        d.update(scenario=it, stage="voice" if code else "generate" if kd == "typo" else "shoot" if kd == "phone" else "cast", **({"vo_track": None} if code else {}))
         if code:
             d["params"] = flow_motion_params(d)
     return flow_to_dict(fid, flow_update(fid, fn))
@@ -24102,6 +24113,295 @@ def twin_clip_to_typo(tid: str, cid: str):
         x.update(words=[], blocks=[], final=None, scene=None, bg={**(x.get("bg") or {}), "kind": "source"})
     typo_update(pid, fn)
     return typo_start(pid, "transcribing", "🎧 بيسمع الكلام ويكتبه بتوقيته", run_typo_transcribe)
+
+
+# ---------------------------------------------------------------- 📱 قالب «تصوير بالموبايل»: الفيديو ← المراجعة ← المونتاج الأوتوماتيك
+def phone_gen(path: Path, label: str) -> str:
+    """الفيديو بيتحفظ في مكتبة الفيديوهات (نفس اللي المونتاج بيقرا منها)، عشان يبان في «فيديوهاتي» ويتستخدم تاني."""
+    gid = uuid.uuid4().hex[:12]
+    with closing(db()) as conn, conn:
+        conn.execute(
+            "INSERT INTO generations (id, clip_id, clip_filename, clip_label, coach_id, coach_name, coach_image, model, prompt, "
+            "params, status, output_filename, created_at, updated_at) VALUES (?, 'upload', ?, ?, '', '', '', 'upload', '', '{}', 'completed', ?, ?, ?)",
+            (gid, path.name, label[:120], path.name, now(), now()))
+    return gid
+
+
+def phone_item(gid: str) -> dict | None:
+    with closing(db()) as conn:
+        r = conn.execute("SELECT id, clip_label, output_filename, created_at FROM generations WHERE id = ?", (gid,)).fetchone()
+        path = clip_source(conn, gid)
+    if not r or not path:
+        return None
+    info = media_info(path)
+    return {"gen_id": gid, "name": r["clip_label"], "url": f"/media/generated/{r['output_filename']}", "duration": round(info.duration, 2),
+            "w": info.width, "h": info.height, "audio": info.has_audio}
+
+
+@app.post("/api/flows/{fid}/skip-shoot")
+def flow_skip_shoot(fid: str):
+    """«عندي الفيديو بتاعي»: من غير فكرة وسكريبت، على الرفع على طول."""
+    return flow_to_dict(fid, flow_update(fid, lambda d: d.update(stage="shoot", format=d.get("format") or "reel")))
+
+
+@app.get("/api/footage-library")
+def footage_library():
+    """☁️ الفيديوهات اللي اترفعت قبل كده (المكتبة السحابية للحساب): تتستخدم في أي مشروع."""
+    with closing(db()) as conn:
+        rows = conn.execute("SELECT id, clip_label, output_filename, created_at FROM generations WHERE model = 'upload' AND status = 'completed' "
+                            "ORDER BY created_at DESC LIMIT 120").fetchall()
+    return [{"gen_id": r["id"], "name": r["clip_label"], "url": f"/media/generated/{r['output_filename']}", "at": r["created_at"]}
+            for r in rows if (GENERATED_DIR / (r["output_filename"] or "_")).exists()]
+
+
+def phone_set_footage(fid: str, item: dict, role: str) -> dict:
+    def fn(d):
+        f = d.setdefault("footage", {"main": None, "broll": []})
+        if role == "main":
+            f["main"] = item
+            d.update(review=None, montage=None, stage="shoot")
+        elif item["gen_id"] not in [x["gen_id"] for x in f.get("broll") or []]:
+            f.setdefault("broll", []).append(item)
+            f["broll"] = f["broll"][-12:]
+    return flow_update(fid, fn)
+
+
+@app.post("/api/flows/{fid}/footage")
+def flow_footage_upload(fid: str, role: str = Form("main"), file: UploadFile = File(...)):
+    """🎬 الفيديو الأساسي (انت بتتكلم) أو لقطة B-roll."""
+    flow_load(fid)
+    name = save_upload(file, VIDEO_EXTENSIONS, GENERATED_DIR, "upload")
+    try:
+        media_info(GENERATED_DIR / name)
+    except Exception as exc:  # noqa: BLE001
+        (GENERATED_DIR / name).unlink(missing_ok=True)
+        raise HTTPException(400, "مقدرتش أقرا الفيديو ده") from exc
+    gid = phone_gen(GENERATED_DIR / name, f"📱 {Path(file.filename or 'video').stem}")
+    return flow_to_dict(fid, phone_set_footage(fid, phone_item(gid), "broll" if role == "broll" else "main"))
+
+
+class FootagePickIn(BaseModel):
+    gen_id: str
+    role: str = "main"
+
+
+@app.post("/api/flows/{fid}/footage/pick")
+def flow_footage_pick(fid: str, body: FootagePickIn):
+    it = phone_item(body.gen_id)
+    if not it:
+        raise HTTPException(404, "الفيديو ده مش موجود")
+    return flow_to_dict(fid, phone_set_footage(fid, it, "broll" if body.role == "broll" else "main"))
+
+
+@app.delete("/api/flows/{fid}/footage/{gid}")
+def flow_footage_remove(fid: str, gid: str):
+    def fn(d):
+        f = d.setdefault("footage", {"main": None, "broll": []})
+        if (f.get("main") or {}).get("gen_id") == gid:
+            f["main"] = None
+            d.update(review=None, montage=None)
+        f["broll"] = [x for x in f.get("broll") or [] if x["gen_id"] != gid]
+    return flow_to_dict(fid, flow_update(fid, fn))
+
+
+def phone_main_path(d: dict) -> Path:
+    gid = ((d.get("footage") or {}).get("main") or {}).get("gen_id")
+    with closing(db()) as conn:
+        path = clip_source(conn, gid) if gid else None
+    if not path:
+        raise HTTPException(400, "ارفع الفيديو الأول")
+    return path
+
+
+def phone_measure(path: Path) -> dict:
+    """أرقام الفيديو: الطول، المقاس، الإضاءة والتشبع، علو الصوت، والسكتات."""
+    info = media_info(path)
+    m = {"dur": round(info.duration, 2), "w": info.width, "h": info.height, "yavg": None, "satavg": None, "loud": None}
+    ff = [ffmpeg_exe(), "-hide_banner", "-nostats"]
+    r = subprocess.run(ff + ["-i", str(path), "-vf", "fps=1,scale=320:-2,signalstats,metadata=print", "-an", "-f", "null", "-"],
+                       capture_output=True, text=True, timeout=600)
+    ys = [float(x) for x in re.findall(r"lavfi\.signalstats\.YAVG=([\d.]+)", r.stderr)]
+    ss = [float(x) for x in re.findall(r"lavfi\.signalstats\.SATAVG=([\d.]+)", r.stderr)]
+    m["yavg"] = round(sum(ys) / len(ys), 1) if ys else None
+    m["satavg"] = round(sum(ss) / len(ss), 1) if ss else None
+    if info.has_audio:
+        r = subprocess.run(ff + ["-i", str(path), "-vn", "-af", "volumedetect", "-f", "null", "-"], capture_output=True, text=True, timeout=600)
+        mv = re.search(r"mean_volume:\s*(-?[\d.]+) dB", r.stderr)
+        m["loud"] = float(mv.group(1)) if mv else None
+        try:
+            quiet = silences(path, 0.35)
+        except (subprocess.SubprocessError, OSError):
+            quiet = []
+    else:
+        quiet = [(0.0, info.duration)]
+    m["quiet"] = [(round(a, 2), round(b, 2)) for a, b in quiet]
+    m["silence_ratio"] = round(sum(b - a for a, b in quiet) / max(0.1, info.duration), 3)
+    return m
+
+
+def phone_words(path: Path, dur: float) -> list[dict]:
+    wav = TMP_DIR / f"phone-{uuid.uuid4().hex[:8]}.wav"
+    try:
+        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(path), "-vn", "-ac", "1", "-ar", "16000", str(wav)],
+                       check=True, capture_output=True, timeout=600)
+        return [w for w in atlas.transcribe(wav, dur) if w.get("w")]
+    finally:
+        wav.unlink(missing_ok=True)
+
+
+def run_phone_review(fid: str) -> None:
+    d = flow_load(fid)
+    path = phone_main_path(d)
+    m = phone_measure(path)
+    words = phone_words(path, m["dur"]) if m["loud"] is not None else []
+    if words:
+        m["first_word"] = round(words[0]["s"], 2)
+        m["wpm"] = round(len(words) / max(0.1, (words[-1]["e"] - words[0]["s"]) / 60))
+    notes = phone.rule_notes(m)
+    script = fz.scenario_script(d["scenario"], "reel") if d.get("scenario") else ""
+    if atlas.mock_mode():
+        out = phone.clean_review(phone.mock_review())
+    else:
+        wallet.need(3, "مراجعة الفيديو")
+        frames = []
+        for i in range(6):
+            fr = TMP_DIR / f"phone-{fid}-{i}.jpg"
+            r = subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{m['dur'] * (i + 0.5) / 6:.2f}", "-i", str(path),
+                                "-frames:v", "1", "-vf", "scale=512:-2", "-q:v", "4", str(fr)], capture_output=True, timeout=60)
+            if r.returncode == 0 and fr.exists():
+                frames.append(fr)
+        text = " ".join(f"[{w['s']:.1f}] {w['w']}" if i % 12 == 0 else w["w"] for i, w in enumerate(words))
+        prompt = phone.review_prompt(m, text, script, algo.for_use("review", "", 9000), len(frames))
+        parts = [{"type": "text", "text": prompt}] + [{"type": "image_url", "image_url": {"url": data_url(model_image(f), "image/jpeg")}} for f in frames]
+        meter = {"usd": 0.0}
+        raw = ad_json(ad_media_chat([{"role": "user", "content": parts}], 6000, meter=meter), "مراجعة الفيديو")
+        for f in frames:
+            f.unlink(missing_ok=True)
+        out = phone.clean_review(raw)
+        wallet.charge(wallet.credits((meter["usd"] or 0.01) + wallet.est(stt_min=m["dur"] / 60)), "تصوير بالموبايل: مراجعة الفيديو", fid)
+    out["notes"] = notes + out["notes"]
+    out["metrics"] = {k: v for k, v in m.items() if k != "quiet"}
+    flow_update(fid, lambda x: x.update(review=out, stage="review", phone_words=words, phone_quiet=m["quiet"]))
+
+
+@app.post("/api/flows/{fid}/review")
+def flow_phone_review(fid: str):
+    """🔎 البرنامج بيتفرج على الفيديو ويديك ملاحظات للتحسين على قواعد الخوارزميات."""
+    d = flow_load(fid)
+    flow_idle(d)
+    phone_main_path(d)
+    flow_job(fid, "review", lambda: run_phone_review(fid))
+    return flow_to_dict(fid, flow_load(fid))
+
+
+def phone_build_montage(fid: str, plain: bool = False) -> None:
+    """🎬 المونتاج الأوتوماتيك: قص السكتات، لقطة كل كام ثانية بزاوية كاميرا مختلفة، ألوان متظبطة، B-roll فوق الكلام،
+    وتايبوجرافي بالكلام نفسه. plain = الفيديو زي ما هو (من غير مونتاج)."""
+    d = flow_load(fid)
+    path = phone_main_path(d)
+    main = d["footage"]["main"]
+    info = media_info(path)
+    vertical = info.height >= info.width
+    m = (d.get("review") or {}).get("metrics") or {}
+    quiet = d.get("phone_quiet")
+    if quiet is None:
+        mm = phone_measure(path)
+        quiet, m = mm["quiet"], {**mm, **m}
+    words = d.get("phone_words") or []
+    title = (d.get("idea") or {}).get("title") or main.get("name") or "تصوير بالموبايل"
+    report = {"shots": 1, "cut": 0.0, "broll": 0, "typo": False}
+    if plain:
+        clips = [{"gen_id": main["gen_id"], "start": 0, "end": None, "fit": "fill" if vertical else "blur"}]
+        overlays = []
+    else:
+        shots = phone.split_shots(phone.speech_ranges(info.duration, [tuple(q) for q in quiet]), words)
+        cams = phone.camera_plan(len(shots))
+        adj = phone.auto_color(m.get("yavg"), m.get("satavg"))
+        clips = [{"gen_id": main["gen_id"], "start": round(a, 3), "end": round(b, 3), "zoom": z if vertical else max(1.0, z), "x": x, "y": y,
+                  "adj": adj, "fit": "fill" if vertical else "blur", "cam": name} for (a, b), (name, z, x, y) in zip(shots, cams)]
+        report.update(shots=len(clips), cut=round(info.duration - sum(b - a for a, b in shots), 1))
+        # B-roll: فوق الكلام (الصوت بيكمّل)، بعد الهوك، كل لقطة تانية، ٢–٣ ثواني
+        overlays, t, brolls = [], 0.0, [x for x in (d.get("footage") or {}).get("broll") or []]
+        starts = []
+        for (a, b) in shots:
+            starts.append((t, b - a))
+            t += b - a
+        bi = 0
+        for k, (t0, ln) in enumerate(starts):
+            if bi >= len(brolls) or k == 0 or k % 2 == 0 or ln < 1.5:
+                continue
+            br = brolls[bi]
+            bw, bh = br.get("w") or 1080, br.get("h") or 1920
+            cover = max(1.0, (bw / max(1, bh)) / (9 / 16))
+            overlays.append({"id": uuid.uuid4().hex[:8], "src": br["gen_id"], "t0": round(t0 + 0.2, 2), "dur": round(min(3.0, ln - 0.3, br.get("duration") or 3), 2),
+                             "start": 0, "x": 0.5, "y": 0.5, "w": round(cover, 3), "volume": 0, "anim_in": {"type": "fade", "dur": 0.2},
+                             "anim_out": {"type": "fade", "dur": 0.2}})
+            bi += 1
+        report["broll"] = len(overlays)
+    data = {"name": f"📱 {title}"[:100], "section": "free", "clips": clips, "overlays": overlays, "outro": False, "brand_intro": True, "brand_outro": True,
+            "char_intro": False, "canvas": {"ratio": "9:16", "bg": "#000000"}, "captions": {}, "hook_text": (d.get("idea") or {}).get("hook") or "",
+            "mix": {"normalize": True, "enhance": True}}
+    # كل الخانات الافتراضية بتاعة المشروع (زي ما المونتاج بيحفظه)، ومعاها اللي زيادة (زاوية الكاميرا لكل لقطة)
+    cams = [c.get("cam") for c in clips]
+    data = {**ProjectIn(**data).model_dump(), "client_id": active_client_id()}
+    for c, cam in zip(data["clips"], cams):
+        c["cam"] = cam
+    old = (d.get("montage") or {}).get("project_id")
+    with closing(db()) as conn, conn:
+        if old and conn.execute("SELECT 1 FROM projects WHERE id = ?", (old,)).fetchone():
+            pid = old
+            prev = json.loads(get_project(conn, pid)["data"])
+            data["typo_id"] = prev.get("typo_id")
+            conn.execute("UPDATE projects SET name = ?, data = ?, updated_at = ? WHERE id = ?", (data["name"], json.dumps(data), now(), pid))
+        else:
+            pid = uuid.uuid4().hex[:12]
+            conn.execute("INSERT INTO projects (id, name, data, render_status, created_at, updated_at) VALUES (?, ?, ?, 'idle', ?, ?)",
+                         (pid, data["name"], json.dumps(data), now(), now()))
+    if not plain and words:
+        try:
+            brief = (fz.scenario_script(d["scenario"], "reel") if d.get("scenario") else "")[:900]
+            montage_typo(pid, MontageTypoIn(brief=brief or title, run=True))
+            report["typo"] = True
+        except HTTPException:
+            pass
+    flow_update(fid, lambda x: x.update(montage={"project_id": pid, "plain": plain, "report": report, "at": now()}, stage="montage"))
+
+
+class PhoneMontageIn(BaseModel):
+    plain: bool = False
+
+
+@app.post("/api/flows/{fid}/auto-montage")
+def flow_phone_montage(fid: str, body: PhoneMontageIn):
+    """المونتاج الأوتوماتيك (أو الفيديو زي ما هو)."""
+    d = flow_load(fid)
+    flow_idle(d)
+    phone_main_path(d)
+    flow_job(fid, "montage", lambda: phone_build_montage(fid, body.plain))
+    return flow_to_dict(fid, flow_load(fid))
+
+
+@app.get("/api/flows/{fid}/montage-state")
+def flow_phone_state(fid: str):
+    """حالة المونتاج: التايبوجرافي والتصدير."""
+    d = flow_load(fid)
+    pid = (d.get("montage") or {}).get("project_id")
+    if not pid:
+        return {"project": None}
+    with closing(db()) as conn:
+        row = conn.execute("SELECT * FROM projects WHERE id = ?", (pid,)).fetchone()
+        if not row:
+            return {"project": None}
+        pj = project_to_dict(row)
+    data = json.loads(row["data"])
+    tid = data.get("typo_id")
+    typo = None
+    if tid and (TYPO_PROJ / Path(tid).name / "typo.json").exists():
+        t = typo_load(tid)
+        typo = {"status": t.get("status"), "step": t.get("step"), "busy": t.get("status") in TYPO_BUSY, "error": t.get("error")}
+    return {"project": {"id": pid, "render_status": pj.get("render_status"), "render_error": pj.get("render_error"),
+                        "render_progress": pj.get("render_progress"), "export_url": f"/media/exports/{pj['export_id']}.mp4" if pj.get("export_id") else None},
+            "typo": typo}
 
 
 # الواجهة آخر حاجة: أي مسار مش API بيروح للملفات (لازم تفضل بعد كل الـ routes)

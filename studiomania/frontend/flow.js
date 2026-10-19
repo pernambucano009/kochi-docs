@@ -13,7 +13,10 @@ const Flow = (() => {
   // قالب تايبوجرافي: كلام بس بيتحرك (مفيش نوع بوست ولا أبطال ولا ملفات)
   const STEPS_TYPO = [["idea", "الفكرة"], ["scenario", "السكريبت"], ["generate", "التوليد"]];
   const isCode = (d) => d?.template?.kind === "motion";
-  const steps = (d) => (isCode(d) ? STEPS_CODE : d?.template?.kind === "typo" ? STEPS_TYPO : STEPS_AI);
+  // 📱 تصوير بالموبايل: الفكرة والسكريبت اختياريين (تقدر تتخطاهم لو عندك الفيديو)، وبعدين الفيديو ← الملاحظات ← المونتاج الأوتوماتيك
+  const STEPS_PHONE = [["idea", "الفكرة"], ["scenario", "السكريبت"], ["shoot", "الفيديو"], ["review", "الملاحظات"], ["montage", "المونتاج"]];
+  const isPhone = (d) => d?.template?.kind === "phone";
+  const steps = (d) => (isCode(d) ? STEPS_CODE : d?.template?.kind === "typo" ? STEPS_TYPO : isPhone(d) ? STEPS_PHONE : STEPS_AI);
   const FMT = { reel: ["🎬", "ريل", "فيديو قصير رأسي"], carousel: ["🗂️", "كاروسيل", "صور ورا بعض بتتقلب"], series: ["📺", "مسلسل", "كذا حلقة بنفس الأبطال"] };
   const OUT = { tvideo: "قسم القوالب", carousel: "الكاروسيل", series: "المسلسلات", typo: "التايبوجرافي", motion: "الموشن" };
   const idx = (st, d = S.d) => Math.max(0, steps(d).findIndex(([k]) => k === (st === "done" ? "generate" : st)));
@@ -97,7 +100,8 @@ const Flow = (() => {
   }
   function stepper(d) {
     const cur = idx(d.stage, d);
-    const ready = { idea: true, format: !!d.idea, scenario: !!d.format, cast: !!d.scenario, voice: !!d.scenario, assets: !!d.scenario, panel: !!d.scenario, generate: !!d.scenario && !isCode(d) };
+    const ready = { idea: true, format: !!d.idea, scenario: !!d.format, cast: !!d.scenario, voice: !!d.scenario, assets: !!d.scenario, panel: !!d.scenario, generate: !!d.scenario && !isCode(d),
+      shoot: isPhone(d), review: !!d.footage?.main, montage: !!(d.review || d.montage) };
     return `<ol class="flw-steps">${steps(d).map(([k, t], i) => `<li class="${i < cur ? "past" : i === cur ? "now" : ""}">
       <button type="button" ${ready[k] && i !== cur && !busy() ? `data-go="${k}"` : "disabled"}><i class="num">${i < cur ? "✓" : i + 1}</i><span>${t}</span></button></li>`).join("")}</ol>`;
   }
@@ -204,7 +208,7 @@ const Flow = (() => {
   function stIdea(d) {
     const loading = d.busy === "ideas";
     return `<h2>اختار فكرة للبوست</h2><p class="flw-sub">المخ اقترح أفكار على قد البراند والقالب. اختار واحدة، أو عدّلها، أو اطلب غيرهم، أو اكتب فكرتك.</p>
-      ${tipBox(d.guide?.idea)}${seasonsRow()}
+      ${isPhone(d) ? `<div class="flw-skip"><button type="button" class="flw-btn" data-skipshoot>⏭ عندي الفيديو بتاعي، على الرفع على طول</button></div>` : ""}${tipBox(d.guide?.idea)}${seasonsRow()}
       ${d.algo_mode && (d.ideas_dropped || []).length ? `<p class="flw-algo-note" title="${esc(d.ideas_dropped.map((x) => `«${x.title}»: ${x.why_out}`).join("\n"))}">⚡ وضع الخوارزمية شال ${d.ideas_dropped.length} ${d.ideas_dropped.length === 1 ? "فكرة ضعيفة" : "أفكار ضعيفة"} وجاب غيرها (حط الماوس تشوف ليه)</p>` : ""}
       <div class="flw-cards">${(d.ideas || []).map(ideaCard).join("")}${S.own ? ideaForm() : ""}</div>
       ${loading ? working("المخ بيفكّر في أفكار على القالب…") : failed("idea")}
@@ -280,7 +284,8 @@ const Flow = (() => {
   function stScenario(d) {
     const loading = d.busy === "scenarios";
     const eps = d.format === "series" ? ` · ${d.episodes === "auto" ? "عدد الحلقات تلقائي" : `${d.episodes} حلقات`}` : "";
-    return `${picked("idea")}<h2>اختار السيناريو</h2><p class="flw-sub">${FMT[d.format]?.[0] || ""} ${FMT[d.format]?.[1] || ""}${eps} — <button type="button" class="flw-link" data-go="format">غيّر النوع</button></p>
+    const skipS = isPhone(d) ? `<div class="flw-skip"><button type="button" class="flw-btn" data-skipshoot>⏭ عندي الفيديو بتاعي، على الرفع على طول</button></div>` : "";
+    return `${picked("idea")}<h2>اختار السيناريو</h2><p class="flw-sub">${FMT[d.format]?.[0] || ""} ${FMT[d.format]?.[1] || ""}${eps}${isPhone(d) ? "" : ` — <button type="button" class="flw-link" data-go="format">غيّر النوع</button>`}</p>${skipS}
       ${tipBox(d.guide?.scen)}<div class="flw-cards wide">${(d.scenarios || []).map((s) => scenCard(s, d.format)).join("")}${S.own ? scenForm({}, d.format) : ""}</div>
       ${loading ? working("المخ بيكتب السيناريوهات…") : failed("scen")}
       <div class="flw-more">${S.hint ? `<div class="flw-chatrow"><input id="flwHint" placeholder="عايز السيناريو يبقى إزاي؟ (اختياري)"><button type="button" class="flw-btn" data-more="scen">اقترح</button></div>` : `
@@ -474,14 +479,86 @@ const Flow = (() => {
         <button type="button" class="flw-link" data-go="scenario">↩︎ جرّب سيناريو تاني</button></div>` : ""}`;
   }
 
+  // ---------------------------------------------------------------- 📱 تصوير بالموبايل
+  const secs = (x) => `${Math.floor((x || 0) / 60)}:${String(Math.round((x || 0) % 60)).padStart(2, "0")}`;
+  function libBox(role) {
+    if (S.lib?.role !== role) return "";
+    const items = S.lib.items;
+    return `<div class="flw-lib">${items == null ? working("بيجيب فيديوهاتك…") : items.length ? items.map((x) => `<button type="button" class="flw-libit" data-libpick="${esc(x.gen_id)}">
+      <video src="${esc(x.url)}#t=0.5" muted preload="metadata"></video><small>${esc(x.name)}</small></button>`).join("") : `<p class="muted">لسه مفيش فيديوهات مرفوعة.</p>`}</div>`;
+  }
+  function stShoot(d) {
+    const f = d.footage || {}, mn = f.main, sc = d.scenario;
+    const beats = (sc?.beats || []).map((b, i) => `<li><b class="num">${i + 1}</b><span dir="auto">${esc(b.say || b.text || "")}</span>${b.visual ? `<small class="muted">🎥 ${esc(b.visual)}</small>` : ""}</li>`).join("");
+    return `<h2>الفيديو</h2><p class="flw-sub">صوّر نفسك بالموبايل وانت بتتكلم (طولي، والنور قدامك)، وارفعه. ولو عندك لقطات تانية (B-roll) ارفعها كمان والمونتاج هيحطها فوق كلامك.</p>
+      ${beats ? `<details class="flw-shotlist" open><summary>📝 السكريبت اللي هتقوله</summary><ol>${beats}</ol></details>` : ""}
+      <div class="flw-ph">
+        <section><h3>🎙️ الفيديو الأساسي (انت بتتكلم)</h3>
+          ${mn ? `<div class="flw-main-v"><video src="${esc(mn.url)}" controls playsinline preload="metadata"></video>
+            <small class="muted">${esc(mn.name)} · ${secs(mn.duration)} · ${mn.w}×${mn.h}${mn.audio ? "" : " · ⚠️ من غير صوت"}</small>
+            <button type="button" class="flw-link" data-fdel="${esc(mn.gen_id)}">بدّله</button></div>`
+          : `<div class="flw-acts"><label class="flw-btn pri">⬆ ارفع الفيديو<input type="file" accept="video/*" data-phup="main" hidden></label>
+              <button type="button" class="flw-btn" data-lib="main">☁️ من فيديوهاتي</button></div>${libBox("main")}`}</section>
+        <section><h3>🎥 لقطات B-roll <small class="muted">(اختياري)</small></h3>
+          <div class="flw-broll">${(f.broll || []).map((x) => `<figure><video src="${esc(x.url)}#t=0.5" muted preload="metadata"></video><button type="button" data-fdel="${esc(x.gen_id)}" title="شيلها">✕</button></figure>`).join("")}</div>
+          <div class="flw-acts"><label class="flw-btn">⬆ ارفع لقطات<input type="file" accept="video/*" multiple data-phup="broll" hidden></label>
+            <button type="button" class="flw-btn" data-lib="broll">☁️ من فيديوهاتي</button></div>${libBox("broll")}</section></div>
+      ${d.busy === "upload" ? working("بيرفع…") : failed("shoot")}
+      ${mn ? `<div class="flw-acts end"><button type="button" class="flw-link" data-automont>⏭ على المونتاج على طول</button>
+        <button type="button" class="flw-btn pri big" data-phreview ${d.busy ? "disabled" : ""}>🔎 راجع الفيديو وقولّي أحسّن إيه</button></div>` : ""}`;
+  }
+  function stReview(d) {
+    const r = d.review;
+    if (d.busy === "review" || !r) return `<h2>الملاحظات</h2>${d.busy === "review" ? working("البرنامج بيتفرج على الفيديو ويسمع الكلام ويقارنه بقواعد الخوارزميات…") : failed("review")}`;
+    const mt = r.metrics || {}, note = (n) => `<li class="${n.level}"><div><b>${n.level === "must" ? "🔴" : "🟡"} ${esc(n.title)}</b>${n.t != null ? `<button type="button" class="flw-chip num" data-seek="${n.t}">⏱ ${secs(n.t)}</button>` : ""}</div>
+      ${n.why ? `<p>${esc(n.why)}</p>` : ""}${n.fix ? `<p class="flw-fix">✅ ${esc(n.fix)}</p>` : ""}</li>`;
+    return `<h2>الملاحظات</h2><p class="flw-sub">دي ملاحظات على الفيديو زي ما هو، على قواعد الخوارزميات اللي عندنا. لو هتنفذها، صوّر تاني وارفع. ولو كفاية كده، كمّل للمونتاج.</p>
+      <div class="flw-rev"><div class="flw-score">${r.score != null ? `<b class="num">${r.score}</b><small>من 100</small>` : ""}</div><div><p>${esc(r.summary || "")}</p>
+        <small class="muted">⏱ ${secs(mt.dur)} · ${mt.w}×${mt.h}${mt.wpm ? ` · ${mt.wpm} كلمة/دقيقة` : ""}${mt.first_word != null ? ` · أول كلمة بعد ${mt.first_word} ث` : ""}</small></div></div>
+      <video class="flw-rv" src="${esc(d.footage?.main?.url || "")}" controls playsinline preload="metadata"></video>
+      <ul class="flw-notes">${(r.notes || []).map(note).join("") || `<li class="nice"><b>مفيش ملاحظات مهمة 👌</b></li>`}</ul>
+      ${(r.broll || []).length ? `<h3>🎥 لقطات B-roll تقوّي الكلام</h3><ul class="flw-bsug">${r.broll.map((b) => `<li>${esc(b.what)}${b.at ? ` <small class="muted">(${esc(b.at)})</small>` : ""}</li>`).join("")}</ul>` : ""}
+      <div class="flw-acts end"><button type="button" class="flw-btn" data-reshoot>🎬 هنفّذها وأعيد التصوير</button>
+        <button type="button" class="flw-btn pri big" data-automont ${d.busy ? "disabled" : ""}>⏭ كمّل للمونتاج الأوتوماتيك</button></div>`;
+  }
+  function stMontage(d) {
+    const mo = d.montage, ms = S.mstate || {};
+    if (d.busy === "montage" || !mo) return `<h2>المونتاج</h2>${d.busy === "montage" ? working("بيقص السكتات، ويغيّر زاوية الكاميرا كل لقطة، ويظبط الألوان، ويحط اللقطات والتايبوجرافي…") : failed("montage")}`;
+    const rp = mo.report || {}, pj = ms.project || {}, ty = ms.typo;
+    const rendering = pj.render_status === "rendering", done = pj.export_url && !rendering;
+    const tyBusy = ty?.busy;
+    return `<h2>${mo.plain ? "الفيديو من غير مونتاج" : "المونتاج الأوتوماتيك جاهز"}</h2>
+      ${mo.plain ? `<p class="flw-sub">الفيديو زي ما هو، بس على مقاس الريلز.</p>` : `<ul class="flw-mrep">
+        <li>✂️ اتشال <b class="num">${rp.cut || 0}</b> ثانية سكوت</li><li>🎥 <b class="num">${rp.shots || 1}</b> لقطة بزوايا كاميرا مختلفة (واسعة، قريبة، من الجنب…)</li>
+        <li>🎨 الألوان اتظبطت أوتوماتيك</li>${rp.broll ? `<li>🎞️ <b class="num">${rp.broll}</b> لقطة B-roll فوق الكلام</li>` : ""}
+        <li>🔤 التايبوجرافي: ${!rp.typo ? "مفيش كلام مسموع" : tyBusy ? `⏳ ${esc(ty.step || "بيتعمل")}` : ty?.error ? `⚠️ ${esc(ty.error)}` : "✓ جاهز"}</li></ul>`}
+      ${done ? `<video class="flw-rv" src="${esc(pj.export_url)}" controls playsinline></video>` : ""}
+      ${rendering ? working(`بيصدّر الفيديو… ${esc(pj.render_progress || "")}`) : pj.render_error ? `<div class="flw-empty bad">⚠️ ${esc(pj.render_error)}</div>` : ""}
+      <div class="flw-acts end">
+        ${mo.plain ? `<button type="button" class="flw-link" data-automont>↩︎ رجّع المونتاج الأوتوماتيك</button>` : `<button type="button" class="flw-link" data-plain>✕ من غير مونتاج</button>`}
+        <button type="button" class="flw-btn" data-myedit>✏️ هعمل المونتاج بنفسي</button>
+        ${done ? `<a class="flw-btn" href="${esc(pj.export_url)}" download>⬇ نزّل</a>` : ""}
+        <button type="button" class="flw-btn pri big" data-render ${rendering || tyBusy ? "disabled" : ""}>${done ? "🔁 صدّر تاني" : "✓ موافق، صدّر الفيديو"}</button></div>
+      ${tyBusy ? `<p class="muted">التصدير بيستنى التايبوجرافي يخلص عشان الكلام يطلع فوق الفيديو.</p>` : ""}`;
+  }
+  async function mpoll() {
+    clearTimeout(S.mtimer);
+    if (!S.d || S.d.stage !== "montage" || !S.d.montage) return;
+    try { S.mstate = await api(`/api/flows/${S.d.id}/montage-state`); render(); } catch { /* السيرفر بيعيد التشغيل */ }
+    const ms = S.mstate || {};
+    if (ms.typo?.busy || ms.project?.render_status === "rendering") S.mtimer = setTimeout(mpoll, 2500);
+  }
+
   // ---------------------------------------------------------------- الرسم
   // الشاشة بتتبني مرة واحدة، وبعد كده بيتغير بس الجزء اللي اتغير فعلًا (من غير ما تختفي وتظهر كل شوية)
   function render() {
     const d = S.d;
     if (!d || !S.el) return;
     const st = d.stage === "generate" && (d.output || d.busy === "generate") ? "done" : d.stage;
-    const body = { idea: stIdea, format: stFormat, scenario: isCode(d) ? stScript : stScenario, cast: stCast, voice: stVoice, assets: stAssets, panel: stPanel, generate: stGenerate, done: stDone }[st] || stIdea;
+    const body = { idea: stIdea, format: stFormat, scenario: isCode(d) ? stScript : stScenario, cast: stCast, voice: stVoice, assets: stAssets, panel: stPanel, generate: stGenerate, done: stDone,
+      shoot: stShoot, review: stReview, montage: stMontage }[st] || stIdea;
     if (S.stage && S.stage !== st) S.chat = null;   // النقاش بيتقفل لما تنتقل خطوة
+    if (st === "montage" && d.montage && S.mfor !== d.montage.at) { S.mfor = d.montage.at; S.mstate = null; setTimeout(mpoll, 0); }
     if (!d.busy) S.busyFrom = null;
     const head = `<div class="flw-tpl"><small class="latin">Template</small><b>${esc(d.template.name)}</b>${d.brand_name ? `<small class="muted">لـ ${esc(d.brand_name)}</small>` : ""}</div>
         ${stepper(d)}<div class="flw-hr">${meter(d.knowledge)}<button type="button" class="flw-x big" data-close aria-label="اقفل">✕</button></div>`;
@@ -552,6 +629,26 @@ const Flow = (() => {
     if (q("[data-why]")) { S.why = !S.why; return render(); }
     if (S.why && !q(".flw-tips")) { S.why = false; render(); }
     let b;
+    if (q("[data-skipshoot]")) { reset(); return call("/skip-shoot", {}); }
+    if ((b = q("[data-lib]"))) {
+      if (S.lib?.role === b.dataset.lib) { S.lib = null; return render(); }
+      S.lib = { role: b.dataset.lib, items: null }; render();
+      try { S.lib.items = await api("/api/footage-library"); } catch (err) { S.lib.items = []; toast(err.message, true); }
+      return render();
+    }
+    if ((b = q("[data-libpick]"))) { const role = S.lib?.role || "main"; S.lib = null; return call("/footage/pick", { gen_id: b.dataset.libpick, role }); }
+    if ((b = q("[data-fdel]"))) return call(`/footage/${b.dataset.fdel}`, null, "DELETE");
+    if (q("[data-phreview]")) return call("/review", {}).then(poll);
+    if (q("[data-reshoot]")) return call("/stage", { stage: "shoot" });
+    if (q("[data-automont]")) { S.mstate = null; return call("/auto-montage", { plain: false }).then(poll); }
+    if (q("[data-plain]")) { if (!confirm("تشيل المونتاج الأوتوماتيك وتطلّع الفيديو زي ما هو؟")) return; S.mstate = null; return call("/auto-montage", { plain: true }).then(poll); }
+    if ((b = q("[data-seek]"))) { const v = S.el.querySelector(".flw-rv"); if (v) { v.currentTime = +b.dataset.seek; v.play().catch(() => {}); } return; }
+    if (q("[data-myedit]")) { const pid = S.d.montage?.project_id; if (!pid) return; close(); storageSet(projectKey("free"), pid); return showStep("6f"); }
+    if (q("[data-render]")) {
+      const pid = S.d.montage?.project_id;
+      try { await api(`/api/projects/${pid}/render`, { method: "POST" }); toast("⏳ بيصدّر الفيديو…"); } catch (err) { return toast(err.message, true); }
+      return mpoll();
+    }
     if ((b = q("[data-go]"))) { reset(); S.chat = null; S.fmt = null; S.eps = null; return call("/stage", { stage: b.dataset.go }); }
     if ((b = q("[data-rate]"))) {
       return call("/rate", { stage: b.dataset.rate, item: b.dataset.rid, value: +b.dataset.v });
@@ -636,8 +733,19 @@ const Flow = (() => {
     }
     if (q("[data-openout]")) return openOutput(S.d.output);
   }
-  function onChange(e) {
+  async function onChange(e) {
     if (e.target.id === "flwFiles") upload(e.target.files);
+    const ph = e.target.dataset?.phup;
+    if (ph && e.target.files?.length) {
+      const files = [...e.target.files];
+      e.target.value = "";
+      for (const [i, file] of files.entries()) {
+        const f = new FormData(); f.append("role", ph); f.append("file", file);
+        toast(`⏳ بيرفع ${files.length > 1 ? `${i + 1} من ${files.length}` : "الفيديو"}…`);
+        if (!(await call("/footage", f))) break;
+      }
+      return;
+    }
     const rk = e.target.dataset?.refup, rf = e.target.files?.[0];
     if (rk && rf) {
       // الخانة متاخدة قبل كده: الملف القديم بيتشال والجديد بياخد نفس الاسم
