@@ -395,7 +395,8 @@ const BrandPage = (() => {
       }
     }
     dots(now);
-    if (S.open?.n) placeCard(toScreen(pos[S.open.n.id]));
+    // الكارت بيتبع مكان النقطة الثابت (من غير تمايلها) عشان مايترعشش، وبيتحرك بس لو الخريطة اتحركت أو النقطة اتسحبت
+    if (S.open?.n) placeCard(toScreen([S.open.n.px, S.open.n.py]));
   }
   // الخلفية نقط هادية، والماوس بينوّر اللي تحته (زي كشاف صغير ماشي معاك)
   const GAP = 22, GLOW = 170;
@@ -599,6 +600,7 @@ const BrandPage = (() => {
     if (S.open && S.open.id !== n.id && !S.backing) S.hist = [...(S.hist || []), S.open.id].slice(-12);
     if (!S.open) S.hist = [];
     S.backing = false;
+    if (S.open?.id !== n.id) { S.cardSide = null; S.cardAt = null; }
     S.open = { id: n.id, br: n.br?.k, n };
     const back = S.hist.length ? S.nodes.find((x) => x.id === S.hist[S.hist.length - 1]) : n.kind === "leaf" ? S.byId[n.br.k] : null;
     card.innerHTML = `<button class="bm-x" data-close aria-label="اقفل">✕</button>`
@@ -619,13 +621,21 @@ const BrandPage = (() => {
     const card = S.el.querySelector(".bm-card");
     if (!p || card.hidden) return;
     const W = S.el.clientWidth, H = S.el.clientHeight, cw = card.offsetWidth, ch = card.offsetHeight;
-    const right = p[0] >= W / 2;
-    let x = right ? p[0] + 34 : p[0] - 34 - cw, y = p[1] - ch / 2;
-    if (x + cw > W - 8) x = p[0] - 34 - cw;
-    if (x < 8) x = Math.min(W - cw - 8, p[0] + 34);
+    // الناحية (يمين/شمال النقطة) بتتحدد مرة واحدة لما الكارت يفتح، فمش بيقفز من ناحية للتانية
+    if (S.cardSide == null) {
+      let r = p[0] >= W / 2;
+      if (r && p[0] + 34 + cw > W - 8) r = false;
+      if (!r && p[0] - 34 - cw < 8) r = true;
+      S.cardSide = r;
+    }
+    let x = S.cardSide ? p[0] + 34 : p[0] - 34 - cw;
+    x = Math.max(8, Math.min(W - cw - 8, x));
     const top = topInset();
-    y = Math.max(top, Math.min(H - ch - 8, y));
-    card.style.transform = `translate(${x}px, ${y}px)`;
+    const y = Math.max(top, Math.min(H - ch - 8, p[1] - ch / 2));
+    const k = `${Math.round(x)},${Math.round(y)}`;
+    if (S.cardAt === k) return;
+    S.cardAt = k;
+    card.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
   }
   const refreshCard = () => { if (S.open) { const n = S.nodes.find((x) => x.id === S.open.id) || (S.open.id === "c" ? S.nodes[0] : null); S.backing = true; if (n) openCard(n); else openCard(null); } };
 
