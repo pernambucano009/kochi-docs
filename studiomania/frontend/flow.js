@@ -514,11 +514,11 @@ const Flow = (() => {
       ${n.why ? `<p>${esc(n.why)}</p>` : ""}${n.fix ? `<p class="flw-fix">✅ ${esc(n.fix)}</p>` : ""}</li>`;
     return `<h2>الملاحظات</h2><p class="flw-sub">دي ملاحظات على الفيديو زي ما هو، على قواعد الخوارزميات اللي عندنا. لو هتنفذها، صوّر تاني وارفع. ولو كفاية كده، كمّل للمونتاج.</p>
       <div class="flw-rev"><div class="flw-score">${r.score != null ? `<b class="num">${r.score}</b><small>من 100</small>` : ""}</div><div><p>${esc(r.summary || "")}</p>
-        <small class="muted">⏱ ${secs(mt.dur)} · ${mt.w}×${mt.h}${mt.wpm ? ` · ${mt.wpm} كلمة/دقيقة` : ""}${mt.first_word != null ? ` · أول كلمة بعد ${mt.first_word} ث` : ""}</small></div></div>
+        <small class="muted">${{ comedy: "😂 كوميدي", educational: "📚 تعليمي", story: "📖 حكاية", sales: "🛒 بيع" }[r.tone] ? `${{ comedy: "😂 كوميدي", educational: "📚 تعليمي", story: "📖 حكاية", sales: "🛒 بيع" }[r.tone]} · ` : ""}⏱ ${secs(mt.dur)} · ${mt.w}×${mt.h}${mt.wpm ? ` · ${mt.wpm} كلمة/دقيقة` : ""}${mt.first_word != null ? ` · أول كلمة بعد ${mt.first_word} ث` : ""}</small></div></div>
       <video class="flw-rv" src="${esc(d.footage?.main?.url || "")}" controls playsinline preload="metadata"></video>
       <ul class="flw-notes">${(r.notes || []).map(note).join("") || `<li class="nice"><b>مفيش ملاحظات مهمة 👌</b></li>`}</ul>
       ${(r.broll || []).length ? `<h3>🎥 لقطات B-roll تقوّي الكلام</h3><ul class="flw-bsug">${r.broll.map((b) => `<li>${esc(b.what)}${b.at ? ` <small class="muted">(${esc(b.at)})</small>` : ""}</li>`).join("")}</ul>` : ""}
-      <div class="flw-acts end"><button type="button" class="flw-btn" data-reshoot>🎬 هنفّذها وأعيد التصوير</button>
+      <div class="flw-acts end"><label class="flw-csel">🎭 كوميكس <select data-comics><option value="auto" ${(S.comics || "auto") === "auto" ? "selected" : ""}>لو الفيديو كوميدي</option><option value="on" ${S.comics === "on" ? "selected" : ""}>دايمًا</option><option value="off" ${S.comics === "off" ? "selected" : ""}>لأ</option></select></label><button type="button" class="flw-btn" data-reshoot>🎬 هنفّذها وأعيد التصوير</button>
         <button type="button" class="flw-btn pri big" data-automont ${d.busy ? "disabled" : ""}>⏭ كمّل للمونتاج الأوتوماتيك</button></div>`;
   }
   function stMontage(d) {
@@ -530,7 +530,7 @@ const Flow = (() => {
     return `<h2>${mo.plain ? "الفيديو من غير مونتاج" : "المونتاج الأوتوماتيك جاهز"}</h2>
       ${mo.plain ? `<p class="flw-sub">الفيديو زي ما هو، بس على مقاس الريلز.</p>` : `<ul class="flw-mrep">
         <li>✂️ اتشال <b class="num">${rp.cut || 0}</b> ثانية سكوت</li><li>🎥 <b class="num">${rp.shots || 1}</b> لقطة بزوايا كاميرا مختلفة (واسعة، قريبة، من الجنب…)</li>
-        <li>🎨 الألوان اتظبطت أوتوماتيك</li>${rp.broll ? `<li>🎞️ <b class="num">${rp.broll}</b> لقطة B-roll فوق الكلام</li>` : ""}
+        <li>🎨 الألوان اتظبطت أوتوماتيك</li>${rp.broll ? `<li>🎞️ <b class="num">${rp.broll}</b> لقطة B-roll فوق الكلام</li>` : ""}${rp.comics ? `<li>🎭 <b class="num">${rp.comics}</b> كوميك عند الإفيهات</li>` : rp.comics === 0 ? `<li class="muted">🎭 ملقتش كوميكس في المكتبة تناسب الكلام ده</li>` : ""}
         <li>🔤 التايبوجرافي: ${!rp.typo ? "مفيش كلام مسموع" : tyBusy ? `⏳ ${esc(ty.step || "بيتعمل")}` : ty?.error ? `⚠️ ${esc(ty.error)}` : "✓ جاهز"}</li></ul>`}
       ${done ? `<video class="flw-rv" src="${esc(pj.export_url)}" controls playsinline></video>` : ""}
       ${rendering ? working(`بيصدّر الفيديو… ${esc(pj.render_progress || "")}`) : pj.render_error ? `<div class="flw-empty bad">⚠️ ${esc(pj.render_error)}</div>` : ""}
@@ -640,7 +640,7 @@ const Flow = (() => {
     if ((b = q("[data-fdel]"))) return call(`/footage/${b.dataset.fdel}`, null, "DELETE");
     if (q("[data-phreview]")) return call("/review", {}).then(poll);
     if (q("[data-reshoot]")) return call("/stage", { stage: "shoot" });
-    if (q("[data-automont]")) { S.mstate = null; return call("/auto-montage", { plain: false }).then(poll); }
+    if (q("[data-automont]")) { S.mstate = null; return call("/auto-montage", { plain: false, comics: S.comics || "auto" }).then(poll); }
     if (q("[data-plain]")) { if (!confirm("تشيل المونتاج الأوتوماتيك وتطلّع الفيديو زي ما هو؟")) return; S.mstate = null; return call("/auto-montage", { plain: true }).then(poll); }
     if ((b = q("[data-seek]"))) { const v = S.el.querySelector(".flw-rv"); if (v) { v.currentTime = +b.dataset.seek; v.play().catch(() => {}); } return; }
     if (q("[data-myedit]")) { const pid = S.d.montage?.project_id; if (!pid) return; close(); storageSet(projectKey("free"), pid); return showStep("6f"); }
@@ -734,6 +734,7 @@ const Flow = (() => {
     if (q("[data-openout]")) return openOutput(S.d.output);
   }
   async function onChange(e) {
+    if (e.target.matches?.("[data-comics]")) { S.comics = e.target.value; return; }
     if (e.target.id === "flwFiles") upload(e.target.files);
     const ph = e.target.dataset?.phup;
     if (ph && e.target.files?.length) {

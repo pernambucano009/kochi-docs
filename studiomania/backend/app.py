@@ -24294,7 +24294,67 @@ def flow_phone_review(fid: str):
     return flow_to_dict(fid, flow_load(fid))
 
 
-def phone_build_montage(fid: str, plain: bool = False) -> None:
+def phone_comics(shots: list[tuple[float, float]], words: list[dict], busy: set[int]) -> list[dict]:
+    """🎭 فيديو كوميدي: كل كام لقطة كوميك (ميم أو GIF) من المكتبة على قد الكلام، عند آخر اللقطة (الإفيه)."""
+    texts = [" ".join(w["w"] for w in words if a - 0.05 <= w["s"] < b) for a, b in shots]
+    idx = [k for k, t in enumerate(texts) if t.strip() and k not in busy and k > 0]
+    if not idx:
+        return []
+    lang = comics.text_lang(" ".join(texts))
+    cands = {k: v for k, v in zip(idx, comics_candidates([texts[k] for k in idx], 6, lang)) if v}
+    if not cands:
+        return []
+    scenes = [{"text": t} for t in texts]
+    if atlas.mock_mode():
+        picks = [{"scene": k + 1, "id": v[0]["id"]} for n, (k, v) in enumerate(cands.items()) if n % 2 == 0]
+    else:
+        raw = hk_chat_json(comics.pick_messages(scenes, cands, 0.3), "اختيار الكوميكس")
+        picks = [p for p in raw.get("picks") or [] if isinstance(p, dict)]
+        wallet.charge(1, "تصوير بالموبايل: اختيار الكوميكس", "comics")
+    byid = {c["id"]: c for v in cands.values() for c in v}
+    starts, t = [], 0.0
+    for a, b in shots:
+        starts.append((t, b - a))
+        t += b - a
+    out, used, last = [], set(), -9
+    for p in sorted(picks, key=lambda p: int(p.get("scene") or 0) if str(p.get("scene") or "").isdigit() else 0):
+        try:
+            k = int(p.get("scene")) - 1
+        except (TypeError, ValueError):
+            continue
+        c = byid.get(str(p.get("id")))
+        if c is None or k not in cands or c["id"] in used or k - last < 2:
+            continue
+        with closing(cdb()) as conn:
+            row = conn.execute("SELECT file FROM comics WHERE id = ?", (c["id"],)).fetchone()
+        src_file = COMICS_MEDIA / Path(row["file"]).name if row and row["file"] else None
+        if not src_file or not src_file.exists():
+            continue
+        moving = c["kind"] in ("gif", "clip")
+        if moving:   # GIF/فيديو ← mp4 في مكتبة الفيديوهات عشان المونتاج يقراه
+            name = f"comic_{uuid.uuid4().hex[:8]}.mp4"
+            r = subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src_file), "-t", "4",
+                                "-vf", "scale='trunc(min(720,iw)/2)*2':-2,format=yuv420p", "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
+                                *(["-c:a", "aac"] if c.get("has_audio") else ["-an"]), str(GENERATED_DIR / name)], capture_output=True, timeout=120)
+            if r.returncode != 0:
+                continue
+            src = phone_gen(GENERATED_DIR / name, f"🎭 {c.get('title') or 'كوميك'}")
+        else:
+            OVERLAY_DIR.mkdir(parents=True, exist_ok=True)
+            name = f"comic_{uuid.uuid4().hex[:8]}{src_file.suffix.lower() or '.png'}"
+            shutil.copy(src_file, OVERLAY_DIR / name)
+            src = f"img:{name}"
+        t0, ln = starts[k]
+        dur = min(float(c.get("dur") or 1.8) if moving else 1.8, 2.6, max(0.8, ln - 0.2))
+        out.append({"id": uuid.uuid4().hex[:8], "src": src, "t0": round(t0 + max(0.2, ln - dur), 2), "dur": round(dur, 2), "start": 0,
+                    "x": 0.5, "y": 0.64, "w": 0.62, "volume": 0.55 if c.get("has_audio") else 0, "comic": c["id"],
+                    "anim_in": {"type": "pop", "dur": 0.25}, "anim_out": {"type": "fade", "dur": 0.2}})
+        used.add(c["id"])
+        last = k
+    return out
+
+
+def phone_build_montage(fid: str, plain: bool = False, comics_mode: str = "auto") -> None:
     """🎬 المونتاج الأوتوماتيك: قص السكتات، لقطة كل كام ثانية بزاوية كاميرا مختلفة، ألوان متظبطة، B-roll فوق الكلام،
     وتايبوجرافي بالكلام نفسه. plain = الفيديو زي ما هو (من غير مونتاج)."""
     d = flow_load(fid)
@@ -24338,6 +24398,15 @@ def phone_build_montage(fid: str, plain: bool = False) -> None:
                              "anim_out": {"type": "fade", "dur": 0.2}})
             bi += 1
         report["broll"] = len(overlays)
+        tone = (d.get("review") or {}).get("tone")
+        if comics_mode == "on" or (comics_mode == "auto" and tone == "comedy"):
+            busy = {k for k, (t0, ln) in enumerate(starts) for o in overlays if t0 <= o["t0"] < t0 + ln}
+            try:
+                cm = phone_comics(shots, words, busy)
+            except Exception:  # noqa: BLE001
+                cm = []
+            overlays += cm
+            report["comics"] = len(cm)
     data = {"name": f"📱 {title}"[:100], "section": "free", "clips": clips, "overlays": overlays, "outro": False, "brand_intro": True, "brand_outro": True,
             "char_intro": False, "canvas": {"ratio": "9:16", "bg": "#000000"}, "captions": {}, "hook_text": (d.get("idea") or {}).get("hook") or "",
             "mix": {"normalize": True, "enhance": True}}
@@ -24364,11 +24433,12 @@ def phone_build_montage(fid: str, plain: bool = False) -> None:
             report["typo"] = True
         except HTTPException:
             pass
-    flow_update(fid, lambda x: x.update(montage={"project_id": pid, "plain": plain, "report": report, "at": now()}, stage="montage"))
+    flow_update(fid, lambda x: x.update(montage={"project_id": pid, "plain": plain, "report": report, "comics": comics_mode, "at": now()}, stage="montage"))
 
 
 class PhoneMontageIn(BaseModel):
     plain: bool = False
+    comics: str = "auto"   # auto = لو الفيديو كوميدي · on · off
 
 
 @app.post("/api/flows/{fid}/auto-montage")
@@ -24377,7 +24447,7 @@ def flow_phone_montage(fid: str, body: PhoneMontageIn):
     d = flow_load(fid)
     flow_idle(d)
     phone_main_path(d)
-    flow_job(fid, "montage", lambda: phone_build_montage(fid, body.plain))
+    flow_job(fid, "montage", lambda: phone_build_montage(fid, body.plain, body.comics if body.comics in ("auto", "on", "off") else "auto"))
     return flow_to_dict(fid, flow_load(fid))
 
 

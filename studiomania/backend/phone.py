@@ -55,14 +55,15 @@ def review_prompt(m: dict, words_txt: str, script: str, rules: str, n_frames: in
           "fix (يعمل إيه بالظبط المرة الجاية)، level («must» لو بتأثر على المشاهدات بجد، «nice» لو تحسين)، و t (الثانية لو الملاحظة على لحظة معينة، أو null). "
           "ركّز على: الهوك في أول ثانيتين (المكتوب والمعروض والمنطوق)، الطاقة ونبرة الصوت، البص للكاميرا، الكادر والإضاءة والخلفية، "
           "إيقاع الكلام، الجملة اللي بعد الهوك، الدعوة للفعل في الآخر، ولو فيه سكريبت: اللي اتنسى أو اتغير. من ٣ لـ ٨ ملاحظات، ومتكررش ملاحظات الإضاءة والصوت لو الأرقام كويسة.\n"
-          "وكمان: score من 100 للفيديو زي ما هو، وsummary جملة واحدة، وbroll: من ٢ لـ ٥ لقطات قصيرة (B-roll) يصورها تقوّي الكلام (كل واحدة: what تتصوّر إيه، at بعد أي جملة).\n"
+          "وكمان: tone نوع الفيديو (comedy لو كوميدي/هزار، educational لو تعليمي، story لو حكاية، sales لو بيع، other)، "
+          "وscore من 100 للفيديو زي ما هو، وsummary جملة واحدة، وbroll: من ٢ لـ ٥ لقطات قصيرة (B-roll) يصورها تقوّي الكلام (كل واحدة: what تتصوّر إيه، at بعد أي جملة).\n"
           "اكتب بالعربي البسيط. ممنوع تخترع حاجة مش في الفيديو.\n"
-          'الشكل: {"score":0,"summary":"","notes":[{"title":"","why":"","fix":"","level":"must","t":null}],"broll":[{"what":"","at":""}]}'
+          'الشكل: {"tone":"other","score":0,"summary":"","notes":[{"title":"","why":"","fix":"","level":"must","t":null}],"broll":[{"what":"","at":""}]}'
     )
 
 
 def mock_review() -> dict:
-    return {"score": 68, "summary": "الفكرة كويسة، بس البداية هادية والكادر ثابت طول الوقت.",
+    return {"tone": "comedy", "score": 68, "summary": "الفكرة كويسة، بس البداية هادية والكادر ثابت طول الوقت.",
             "notes": [{"title": "الهوك محتاج يبقى أقوى", "why": "أول جملة تعريف بالنفس، مش سبب للفرجة.", "fix": "ابدأ بالنتيجة أو بسؤال مباشر للمشاهد.", "level": "must", "t": 0},
                       {"title": "البص للكاميرا", "why": "عينك على الشاشة في نص الفيديو.", "fix": "بُص في عدسة الكاميرا نفسها.", "level": "nice", "t": 8}],
             "broll": [{"what": "لقطة قريبة لإيدك وانت بتشتغل", "at": "بعد الجملة التانية"}]}
@@ -81,7 +82,8 @@ def clean_review(raw: dict) -> dict:
     except (TypeError, ValueError):
         score = None
     broll = [{"what": str(b.get("what") or "")[:200], "at": str(b.get("at") or "")[:120]} for b in raw.get("broll") or [] if isinstance(b, dict) and b.get("what")]
-    return {"score": score, "summary": str(raw.get("summary") or "")[:300], "notes": notes[:10], "broll": broll[:6]}
+    tone = raw.get("tone") if raw.get("tone") in ("comedy", "educational", "story", "sales", "other") else "other"
+    return {"tone": tone, "score": score, "summary": str(raw.get("summary") or "")[:300], "notes": notes[:10], "broll": broll[:6]}
 
 
 def speech_ranges(dur: float, quiet: list[tuple[float, float]]) -> list[tuple[float, float]]:

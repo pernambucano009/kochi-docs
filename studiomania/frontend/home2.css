@@ -1920,3 +1920,4 @@ audio { width: 100%; }
 .flw-notes .flw-fix { color: var(--nh-ink, #181718); }
 .flw-bsug { margin: 6px 0 12px; padding-inline-start: 20px; line-height: 1.9; font-size: 14px; }
 .flw-mrep { list-style: none; margin: 8px 0 14px; padding: 0; display: grid; gap: 6px; font-size: 14.5px; }
+.flw-csel { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; margin-inline-end: auto; }
