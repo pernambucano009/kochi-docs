@@ -9196,7 +9196,7 @@ def add_brain_source(bid: str, url: str = Form(""), text: str = Form(""), note: 
         if not handle:
             raise HTTPException(400, "اكتب يوزر الحساب أو لينكه")
         if not atlas.mock_mode() and not rivals.live():   # من غير المفتاح: نقول على طول بدل ما يتسجل مصدر فاشل
-            raise HTTPException(503, "مفتاح ScrapeCreators مش متسجل (SCRAPECREATORS_API_KEY)" if os.environ.get("TENANT_ROLE") != "customer"
+            raise HTTPException(503, rivals.missing_msg() if os.environ.get("TENANT_ROLE") != "customer"
                                 else "تحليل الحسابات مش متاح دلوقتي. جرّب تاني بعد شوية")
         new.append({"kind": "social", "name": f"@{handle} · {'تيك توك' if plat == 'tiktok' else 'إنستجرام'}", "platform": plat, "handle": handle})
     if not new:
@@ -9281,7 +9281,7 @@ def run_brain_social(bid: str, sid: str) -> None:
     brain_src_step(bid, sid, "بيجيب الحساب والبوستات")
     if atlas.mock_mode() or not rivals.live():
         if not atlas.mock_mode():
-            raise ValueError("مفتاح ScrapeCreators مش متسجل (SCRAPECREATORS_API_KEY)" if os.environ.get("TENANT_ROLE") != "customer"
+            raise ValueError(rivals.missing_msg() if os.environ.get("TENANT_ROLE") != "customer"
                              else "تحليل الحسابات مش متاح دلوقتي. جرّب تاني بعد شوية")
         prof, items = brainsocial.mock_posts(plat, handle)
     else:

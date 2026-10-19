@@ -23,8 +23,31 @@ STALE = 7 * 86400  # بعد أسبوع البوستات بتتحدّث لوحد�
 RECENT = 30 * 86400
 
 
+def _norm(name: str) -> str:
+    return "".join(ch for ch in name.upper() if ch.isalnum())
+
+
+def key_names() -> list[str]:
+    """أسماء المتغيرات اللي شكلها مفتاح ScrapeCreators (الأسماء بس، من غير القيم)."""
+    return sorted(k for k in os.environ if "SCRAPECREATOR" in _norm(k))
+
+
 def key() -> str:
-    return os.environ.get("SCRAPECREATORS_API_KEY", "").strip()
+    """المفتاح بالاسم الرسمي، أو بأي اسم قريب منه (SCRAPE_CREATORS_API_KEY، SCRAPECREATORS_KEY…) ومن غير مسافات أو علامات تنصيص زيادة."""
+    names = ["SCRAPECREATORS_API_KEY", *[k for k in key_names() if k != "SCRAPECREATORS_API_KEY"]]
+    for k in names:
+        v = os.environ.get(k, "").strip().strip("'\"").strip()
+        if v:
+            return v
+    return ""
+
+
+def missing_msg() -> str:
+    """رسالة لصاحب البرنامج لما المفتاح مش واصل للبرنامج: بتقول لقينا أنهي أسماء (من غير القيم)."""
+    names = key_names()
+    if names:
+        return f"لقيت متغير باسم {', '.join(names)} بس قيمته فاضية. حط المفتاح فيه في Railway"
+    return "مفتاح ScrapeCreators مش واصل للبرنامج. اتأكد إن اسمه SCRAPECREATORS_API_KEY في Variables بتاعة نفس الخدمة اللي البرنامج شغال عليها"
 
 
 def live() -> bool:
