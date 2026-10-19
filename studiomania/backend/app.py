@@ -9195,6 +9195,9 @@ def add_brain_source(bid: str, url: str = Form(""), text: str = Form(""), note: 
         plat, handle = brainsocial.parse(social)
         if not handle:
             raise HTTPException(400, "اكتب يوزر الحساب أو لينكه")
+        if not atlas.mock_mode() and not rivals.live():   # من غير المفتاح: نقول على طول بدل ما يتسجل مصدر فاشل
+            raise HTTPException(503, "مفتاح ScrapeCreators مش متسجل (SCRAPECREATORS_API_KEY)" if os.environ.get("TENANT_ROLE") != "customer"
+                                else "تحليل الحسابات مش متاح دلوقتي. جرّب تاني بعد شوية")
         new.append({"kind": "social", "name": f"@{handle} · {'تيك توك' if plat == 'tiktok' else 'إنستجرام'}", "platform": plat, "handle": handle})
     if not new:
         raise HTTPException(400, "ارمي ملف أو حط لينك أو اكتب حاجة")
@@ -9225,8 +9228,11 @@ def brain_av_text(p: Path, folder: Path) -> tuple[str, list[Path]]:
         wav.unlink(missing_ok=True)
     text = " ".join(str(w.get("w") or "").strip() for w in words).strip()
     imgs = []
-    if p.suffix.lower() in brainsrc.VIDEO_EXT:
-        vdur = probe_duration(p)
+    # تسجيل المايك بيتحفظ webm صوت بس ومن غير طول في الملف: اللقطات بس لو فيه صورة فعلًا، والطول من الصوت
+    info = subprocess.run([ffmpeg_exe(), "-hide_banner", "-i", str(p)], capture_output=True, text=True).stderr
+    if p.suffix.lower() in brainsrc.VIDEO_EXT and re.search(r"Stream #.*Video:", info):
+        m = re.search(r"Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)", info)
+        vdur = int(m[1]) * 3600 + int(m[2]) * 60 + float(m[3]) if m else dur
         for i, f in enumerate((.2, .5, .8)):
             out = folder / f"{p.stem}-frame{i}.jpg"
             r = subprocess.run(ff + ["-ss", f"{vdur * f:.2f}", "-i", str(p), "-frames:v", "1", "-vf", "scale=768:-2", "-q:v", "4", str(out)], capture_output=True, timeout=60)
@@ -9275,7 +9281,8 @@ def run_brain_social(bid: str, sid: str) -> None:
     brain_src_step(bid, sid, "بيجيب الحساب والبوستات")
     if atlas.mock_mode() or not rivals.live():
         if not atlas.mock_mode():
-            raise ValueError("مفتاح ScrapeCreators مش متسجل (SCRAPECREATORS_API_KEY)")
+            raise ValueError("مفتاح ScrapeCreators مش متسجل (SCRAPECREATORS_API_KEY)" if os.environ.get("TENANT_ROLE") != "customer"
+                             else "تحليل الحسابات مش متاح دلوقتي. جرّب تاني بعد شوية")
         prof, items = brainsocial.mock_posts(plat, handle)
     else:
         prof, items = brainsocial.profile(plat, handle), brainsocial.posts(plat, handle)
