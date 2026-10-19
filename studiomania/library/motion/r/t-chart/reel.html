@@ -2,33 +2,47 @@
 <script>
 // قالب «رسم بياني متحرك»: العنوان والمحاور ثابتين ومفيش غير الرسم اللي بيتحرك: أعمدة بتطلع واحد ورا التاني، الرقم المهم بيتعلّم،
 // الأعمدة بتتحول لخط بيعدّي على قممها، وفي الآخر الرقم الكبير والبراند. الأرقام زي ما هي بالظبط. من غير نطّ ولا توهج. 1080×1920، 12 ثانية.
+const G1 = "١ · العنوان والأرقام", G2 = "٢ · الرقم المهم", G3 = "٣ · الختام", GS = "الشكل العام";
 const PR = M.params({
-  title: { label: "العنوان", kind: "text", role: "product", def: "طلباتنا في ٦ شهور" },
-  data: { label: "الأرقام (اسم|رقم في كل سطر)", kind: "lines", def: ["يناير|12", "فبراير|18", "مارس|15", "أبريل|26", "مايو|34", "يونيو|48"] },
-  unit: { label: "الوحدة", kind: "text", def: "ألف طلب" },
-  headline: { label: "الجملة الكبيرة", kind: "text", def: "٤ أضعاف" },
-  sub: { label: "تحت الجملة", kind: "text", def: "في ٦ شهور بس" },
-  note: { label: "ملاحظة صغيرة", kind: "text", def: "أرقام توضيحية" },
-  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "سلة الحي" },
-  color: { label: "لون التمييز", kind: "color", def: "#ff6a3d" },
+  title: { label: "العنوان", kind: "text", role: "product", def: "طلباتنا في ٦ شهور", group: G1, max: 26, hint: "بيقول الرسم ده عن إيه بالظبط (الحاجة + المدة)." },
+  data: { label: "الأرقام (اسم|رقم في كل سطر)", kind: "lines", def: ["يناير|12", "فبراير|18", "مارس|15", "أبريل|26", "مايو|34", "يونيو|48"], group: G1, max: 14,
+    hint: "من ٣ لـ ٨ سطور، كل سطر: الاسم|الرقم (زي «يناير|12»). آخر عمود بيتلوّن بلون التمييز، فخلي آخر رقم هو الأهم. الأرقام بتظهر زي ما هي بالظبط، فاكتب أرقام حقيقية." },
+  unit: { label: "الوحدة", kind: "text", def: "ألف طلب", group: G1, max: 16, hint: "بتظهر تحت العنوان: «ألف طلب»، «عميل»، «ريال»." },
+  note: { label: "ملاحظة صغيرة", kind: "text", def: "أرقام توضيحية", group: G1, max: 20, hint: "مصدر الأرقام أو ملاحظة أمانة (على الشمال فوق)." },
+  hiLabel: { label: "كلمة «الأعلى»", kind: "text", def: "الأعلى", group: G2, max: 10, hint: "بتتكتب جنب الخط المتقطع عند أعلى رقم." },
+  headline: { label: "الجملة الكبيرة", kind: "text", def: "٤ أضعاف", group: G3, max: 14, hint: "النتيجة في كلمتين: «٤ أضعاف»، «+٣٠٠٪»، «الأول في السوق». الأرقام بتشد أكتر." },
+  sub: { label: "تحت الجملة", kind: "text", def: "في ٦ شهور بس", group: G3, max: 22 },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "سلة الحي", group: G3, max: 20 },
+  color: { label: "لون التمييز", kind: "color", role: "accent", def: "#ff6a3d", group: GS, hint: "العمود الأخير والخط والجملة الكبيرة. لازم يبان قوي على الخلفية." },
+  bar: { label: "لون الأعمدة", kind: "color", def: "#2c2b36", group: GS, hint: "باقي الأعمدة: لون غامق هادي علشان التمييز يبان." },
+  paper: { label: "لون الخلفية", kind: "color", def: "#f7f5f0", group: GS, hint: "فاتح (أوف وايت) أحسن للرسوم البيانية." },
+  fHead: { label: "خط الجملة الكبيرة", kind: "font", def: "lalezar", group: GS },
+  fText: { label: "خط العنوان", kind: "font", def: "plex", group: GS },
+});
+M.meta({
+  story: "رسم بياني هادي ومحترم: أعمدة بتطلع واحد ورا التاني بأرقامك زي ما هي، الرقم الأعلى بيتعلّم بخط متقطع، الأعمدة بتتحول لخط على قممها، وبعدين الجملة الكبيرة والبراند.",
+  scenes: [{ name: G1, t0: 0, t1: 4.6, about: "العنوان والمحاور والأعمدة" }, { name: G2, t0: 4.6, t1: 7, about: "الخط والرقم الأعلى" }, { name: G3, t0: 7, t1: 12, about: "الجملة الكبيرة والبراند" }],
+  tips: ["الرسم بيقنع لما الأرقام حقيقية والزيادة واضحة.", "من ٥ لـ ٧ أعمدة أحسن عدد: أقل من كده مالوش لازمة وأكتر بيزحم.", "حط الرقم الأهم في الآخر علشان يتلوّن."],
 });
 const W = 1080, H = 1920, DUR = 12, X0 = 120, X1 = 960, Y0 = 1360, Y1 = 520;
-const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
 const ar = (s) => String(s).replace(/\d/g, (d) => "٠١٢٣٤٥٦٧٨٩"[d]);
-const D = PR.data.slice(0, 8).map((l) => { const [n, v] = String(l).split("|"); return { n: (n || "").trim(), v: parseFloat(v) || 0 }; });
+const en = (s) => String(s ?? "").replace(/[٠-٩]/g, (d) => "٠١٢٣٤٥٦٧٨٩".indexOf(d)).replace(/[٫,]/g, ".");
+const D = PR.data.slice(0, 8).map((l) => { const [n, v] = String(l).split("|"); return { n: (n || "").trim(), v: parseFloat(en(v)) || 0 }; }).filter((d) => d.n || d.v);
+// الخلفية غامقة ولا فاتحة: الكلام والخطوط بياخدوا اللون اللي يتقري عليها
+const DARK = (() => { const h = String(PR.paper).replace("#", ""), n = parseInt(h.length === 3 ? h.replace(/./g, "$&$&") : h, 16) || 0; return ((n >> 16) * .299 + ((n >> 8) & 255) * .587 + (n & 255) * .114) < 128; })();
 
 M.reel({
-  W, H, DUR, bg: "#f7f5f0",
-  async init(M) { await Promise.all([loadFont("PB", "TY-PlexArabic-700.ttf", "700"), loadFont("PX", "TY-PlexArabic-400.ttf"), loadFont("LZ", "SM-Lalezar.ttf")]); const c = M.canvas(W, H); return { x: c.getContext("2d") }; },
+  W, H, DUR, bg: PR.paper,
+  async init(M) { await Promise.all([M.font("PB", PR.fText), M.font("PX", "plex4"), M.font("LZ", PR.fHead)]); const c = M.canvas(W, H); return { x: c.getContext("2d") }; },
   seek(t, C, M) {
     const { x } = C, { seg, cubicIO, clamp } = M, io = (k) => cubicIO(clamp(k));
-    x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = "#f7f5f0"; x.fillRect(0, 0, W, H);
-    const ink = "#1c1b22", mute = "#8a8794", acc = PR.color;
+    x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = PR.paper; x.fillRect(0, 0, W, H);
+    const ink = DARK ? "#f1f0ec" : "#1c1b22", mute = DARK ? "#9a98a3" : "#8a8794", acc = PR.color;
     const vmax = Math.max(...D.map((d) => d.v)) * 1.15 || 1, n = D.length, slot = (X1 - X0) / n;
     // العنوان والمحاور (ثابتين)
     x.direction = "rtl"; x.textAlign = "right"; x.fillStyle = ink; x.font = `700 ${M.fit(PR.title, "PB", 840, 84, 40, "700")}px PB`; x.fillText(PR.title, X1, 260);
     x.fillStyle = mute; x.font = "400 34px PX"; x.fillText(PR.unit, X1, 320); x.textAlign = "left"; x.fillText(PR.note, X0, 320);
-    x.strokeStyle = "#dcd8cf"; x.lineWidth = 2; for (let k = 0; k <= 4; k++) { const y = Y0 - (Y0 - Y1) * k / 4; x.beginPath(); x.moveTo(X0, y); x.lineTo(X1, y); x.stroke(); x.fillStyle = mute; x.font = "400 26px PX"; x.textAlign = "left"; x.direction = "ltr"; x.fillText(ar(Math.round(vmax * k / 4)), X0 - 10 - 40, y + 8); }
+    x.strokeStyle = DARK ? "rgba(255,255,255,.12)" : "#dcd8cf"; x.lineWidth = 2; for (let k = 0; k <= 4; k++) { const y = Y0 - (Y0 - Y1) * k / 4; x.beginPath(); x.moveTo(X0, y); x.lineTo(X1, y); x.stroke(); x.fillStyle = mute; x.font = "400 26px PX"; x.textAlign = "left"; x.direction = "ltr"; x.fillText(ar(Math.round(vmax * k / 4)), X0 - 10 - 40, y + 8); }
     x.strokeStyle = ink; x.lineWidth = 3; x.beginPath(); x.moveTo(X0, Y0); x.lineTo(X1, Y0); x.stroke();
     // الوقت من الشمال لليمين (زي المتعارف عليه في الرسوم البيانية)
     const cxOf = (i) => X0 + slot * (i + .5), yOf = (v) => Y0 - (Y0 - Y1) * v / vmax;
@@ -36,7 +50,7 @@ M.reel({
     D.forEach((d, i) => {
       const g = io(seg(t, .6 + i * .3, 1.4 + i * .3)), v = d.v * g, top = yOf(v), cx = cxOf(i), last = i === n - 1;
       const bw = slot * .56 * (1 - morph) + 6 * morph, bh = (Y0 - top) * (1 - morph);
-      x.fillStyle = last ? acc : "#2c2b36"; x.fillRect(cx - bw / 2, Y0 - bh, bw, bh);
+      x.fillStyle = last ? acc : PR.bar; x.fillRect(cx - bw / 2, Y0 - bh, bw, bh);
       x.fillStyle = mute; x.font = "400 30px PX"; x.textAlign = "center"; x.direction = "rtl"; x.fillText(d.n, cx, Y0 + 50);
       if (g > 0) { x.fillStyle = last ? acc : ink; x.font = `700 ${last ? 44 : 34}px PB`; x.direction = "ltr"; x.fillText(ar(Math.round(v)), cx, top - 22 - 10 * morph); }
     });
@@ -47,11 +61,11 @@ M.reel({
       x.beginPath(); x.moveTo(...ordered[0]); for (let k = 1; k <= Math.ceil(L) && k < ordered.length; k++) { const f = Math.min(1, L - (k - 1)); x.lineTo(ordered[k - 1][0] + (ordered[k][0] - ordered[k - 1][0]) * f, ordered[k - 1][1] + (ordered[k][1] - ordered[k - 1][1]) * f); }
       x.strokeStyle = acc; x.lineWidth = 8; x.lineJoin = "round"; x.lineCap = "round"; x.stroke();
       x.lineTo(x.currentX || ordered[Math.min(ordered.length - 1, Math.ceil(L))][0], Y0);
-      ordered.forEach(([px, py], k) => { if (k <= L + .01) { x.fillStyle = "#f7f5f0"; x.beginPath(); x.arc(px, py, 12, 0, Math.PI * 2); x.fill(); x.lineWidth = 6; x.strokeStyle = acc; x.stroke(); } });
+      ordered.forEach(([px, py], k) => { if (k <= L + .01) { x.fillStyle = PR.paper; x.beginPath(); x.arc(px, py, 12, 0, Math.PI * 2); x.fill(); x.lineWidth = 6; x.strokeStyle = acc; x.stroke(); } });
     }
     // علامة على الرقم الأهم (آخر شهر) + سهم مقارنة بأول شهر
     const hk = io(seg(t, 3.0, 3.6)) * (1 - io(seg(t, 4.4, 4.7)));
-    if (hk > 0) { const cx = cxOf(n - 1), top = yOf(D[n - 1].v); x.globalAlpha = hk; x.strokeStyle = acc; x.lineWidth = 3; x.setLineDash([10, 8]); x.beginPath(); x.moveTo(X0, top); x.lineTo(X1, top); x.stroke(); x.setLineDash([]); x.fillStyle = acc; x.beginPath(); x.roundRect(cx - 220, top - 160, 260, 76, 38); x.fill(); x.fillStyle = "#fff"; x.font = "700 40px PB"; x.textAlign = "center"; x.direction = "rtl"; x.fillText("الأعلى", cx - 90, top - 108); x.globalAlpha = 1; }
+    if (hk > 0) { const cx = cxOf(n - 1), top = yOf(D[n - 1].v); x.globalAlpha = hk; x.strokeStyle = acc; x.lineWidth = 3; x.setLineDash([10, 8]); x.beginPath(); x.moveTo(X0, top); x.lineTo(X1, top); x.stroke(); x.setLineDash([]); x.fillStyle = acc; x.beginPath(); x.roundRect(cx - 220, top - 160, 260, 76, 38); x.fill(); x.fillStyle = "#fff"; x.font = "700 40px PB"; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.hiLabel, cx - 90, top - 108); x.globalAlpha = 1; }
     // الجملة الكبيرة + البراند (تحت الرسم)
     const bk = io(seg(t, 7.0, 7.8));
     if (bk > 0) { x.save(); x.beginPath(); x.rect(0, 1440, W, 300); x.clip(); x.translate(0, (1 - bk) * 140); x.fillStyle = acc; x.font = `${M.fit(PR.headline, "LZ", 900, 190, 80)}px LZ`; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.headline, 540, 1630); x.restore();

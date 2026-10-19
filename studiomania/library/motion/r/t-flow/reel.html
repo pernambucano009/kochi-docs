@@ -2,27 +2,38 @@
 <script>
 // قالب «رسم توضيحي للخطوات»: مخطط بيشرح "بيشتغل إزاي": كروت الخطوات بتظهر واحدة واحدة متعرّجة، الخطوط بينهم بتترسم،
 // ونقط بيانات بتجري عليها، وكل ما توصل لكارت يتنوّر ويطلع رقمه، وفي الآخر النتيجة في كارت كبير. شبكة نقط ورا زي لوحة رسم. 1080×1920، 12 ثانية.
+const G1 = "١ · العنوان", G2 = "٢ · الخطوات", G3 = "٣ · النتيجة", GS = "الشكل العام";
 const PR = M.params({
-  title: { label: "العنوان", kind: "text", role: "product", def: "بيشتغل إزاي؟" },
-  steps: { label: "الخطوات (اسم|وصف في كل سطر)", kind: "lines", def: ["ارفع ملفك|صورة أو PDF", "بنحلّله|في ثواني", "بنظبطه|حسب البراند بتاعك", "يوصلك جاهز|على الإيميل"] },
-  result: { label: "النتيجة", kind: "text", def: "١٠ دقايق بدل يوم كامل" },
-  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "سهل" },
-  accent: { label: "لون التمييز", kind: "color", def: "#6c5cff" },
+  title: { label: "العنوان", kind: "text", role: "product", def: "بيشتغل إزاي؟", group: G1, max: 18, hint: "سؤال قصير بيفتح الشرح: «بيشتغل إزاي؟»، «من الطلب للباب»." },
+  steps: { label: "الخطوات (اسم|وصف في كل سطر)", kind: "lines", def: ["ارفع ملفك|صورة أو PDF", "بنحلّله|في ثواني", "بنظبطه|حسب البراند بتاعك", "يوصلك جاهز|على الإيميل"], group: G2, max: 32,
+    hint: "من ٣ لـ ٥ سطور، كل سطر: اسم الخطوة|وصف قصير (زي «ارفع ملفك|صورة أو PDF»). الاسم فعل بكلمتين، والوصف بيطمّن (سرعة، سهولة)." },
+  result: { label: "النتيجة", kind: "text", def: "١٠ دقايق بدل يوم كامل", group: G3, max: 26, hint: "الفرق اللي العميل هيحسه: وقت أو فلوس أو مجهود، بمقارنة لو ينفع." },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "سهل", group: G3, max: 18 },
+  accent: { label: "لون التمييز", kind: "color", role: "accent", def: "#6c5cff", group: GS, hint: "الخطوط والنقط وكارت النتيجة: لون البراند." },
+  paper: { label: "لون الخلفية", kind: "color", def: "#f6f5fb", group: GS, hint: "فاتح أو غامق، الكلام بيغيّر لونه لوحده علشان يتقري." },
+  fHead: { label: "خط العناوين", kind: "font", def: "plex", group: GS },
+  fText: { label: "خط الوصف", kind: "font", def: "plex4", group: GS },
+});
+M.meta({
+  story: "مخطط «بيشتغل إزاي»: كروت الخطوات بتظهر متعرّجة واحدة واحدة، الخطوط بينها بتترسم ونقط بتجري عليها، وكل كارت بيتنوّر برقمه لما توصله، وفي الآخر النتيجة في كارت كبير.",
+  scenes: [{ name: G1, t0: 0, t1: 1, about: "العنوان والشبكة" }, { name: G2, t0: 1, t1: 8.5, about: "الخطوات واحدة ورا التانية" }, { name: G3, t0: 8.5, t1: 12, about: "كارت النتيجة والبراند" }],
+  tips: ["٤ خطوات أحسن عدد: كفاية علشان يبان سهل ومش كتير.", "اكتب الخطوات من وجهة نظر العميل (إنت بتعمل إيه)، مش من جوه الشركة.", "النتيجة بالأرقام بتقنع أكتر."],
 });
 const W = 1080, H = 1920, DUR = 12, S0 = 1.0, SD = 1.7;
-const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
-const ST = PR.steps.slice(0, 5).map((l) => { const [a, b] = String(l).split("|"); return { a: (a || "").trim(), b: (b || "").trim() }; });
+const ST = PR.steps.slice(0, 5).map((l) => { const [a, b] = String(l).split("|"); return { a: (a || "").trim(), b: (b || "").trim() }; }).filter((s) => s.a || s.b);
+// الخلفية غامقة ولا فاتحة: الكلام بياخد اللون اللي يتقري عليها
+const DARK = (() => { const h = String(PR.paper).replace("#", ""), n = parseInt(h.length === 3 ? h.replace(/./g, "$&$&") : h, 16) || 0; return ((n >> 16) * .299 + ((n >> 8) & 255) * .587 + (n & 255) * .114) < 128; })();
 const NS = ST.length, POS = ST.map((s, i) => [i % 2 ? 360 : 720, 470 + i * (1000 / Math.max(1, NS - 1))]);
 
 M.reel({
-  W, H, DUR, bg: "#f6f5fb",
-  async init(M) { await Promise.all([loadFont("PB", "TY-PlexArabic-700.ttf", "700"), loadFont("PX", "TY-PlexArabic-400.ttf")]); const c = M.canvas(W, H); return { x: c.getContext("2d") }; },
+  W, H, DUR, bg: PR.paper,
+  async init(M) { await Promise.all([M.font("PB", PR.fHead), M.font("PX", PR.fText)]); const c = M.canvas(W, H); return { x: c.getContext("2d") }; },
   seek(t, C, M) {
     const { x } = C, { seg, cubicIO, clamp, springO, expo } = M, io = (k) => cubicIO(clamp(k)), A = PR.accent, ar = (n) => "١٢٣٤٥٦٧٨٩"[n];
-    x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = "#f6f5fb"; x.fillRect(0, 0, W, H);
+    x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = PR.paper; x.fillRect(0, 0, W, H);
     x.fillStyle = "rgba(40,30,90,.12)"; for (let yy = 30; yy < H; yy += 40) for (let xx = 30; xx < W; xx += 40) x.fillRect(xx - 1.5, yy - 1.5, 3, 3);
     // العنوان
-    const ta = io(seg(t, .1, .6)); x.globalAlpha = ta; x.fillStyle = "#1d1838"; x.font = `700 ${M.fit(PR.title, "PB", 900, 90, 44, "700")}px PB`; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.title, 540, 250 - (1 - ta) * 20); x.globalAlpha = 1;
+    const ta = io(seg(t, .1, .6)); x.globalAlpha = ta; x.fillStyle = DARK ? "#f3f2fa" : "#1d1838"; x.font = `700 ${M.fit(PR.title, "PB", 900, 90, 44, "700")}px PB`; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.title, 540, 250 - (1 - ta) * 20); x.globalAlpha = 1;
     // الوصلات (بتترسم ومنقّطة متحركة) + نقط بتجري
     const curve = (i) => { const [x1, y1] = POS[i], [x2, y2] = POS[i + 1]; return [x1, y1 + 80, x1, (y1 + y2) / 2, x2, (y1 + y2) / 2, x2, y2 - 80]; };
     const bez = (c, u) => { const v = 1 - u; return [v * v * v * c[0] + 3 * v * v * u * c[2] + 3 * v * u * u * c[4] + u * u * u * c[6], v * v * v * c[1] + 3 * v * v * u * c[3] + 3 * v * u * u * c[5] + u * u * u * c[7]]; };
@@ -50,7 +61,7 @@ M.reel({
     // النتيجة
     const rk = io(seg(t, S0 + NS * SD + .1, S0 + NS * SD + .8)); if (rk > 0) { x.save(); x.globalAlpha = rk; x.translate(0, (1 - rk) * 40); x.fillStyle = A; x.beginPath(); x.roundRect(100, 1590, 880, 150, 40); x.fill();
       x.fillStyle = "#fff"; x.font = `700 ${M.fit(PR.result, "PB", 800, 64, 32, "700")}px PB`; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.result, 540, 1688); x.restore(); }
-    const bk = io(seg(t, 10.4, 11.0)); if (bk > 0) { x.globalAlpha = bk; x.fillStyle = "#1d1838"; x.font = "700 52px PB"; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.brand, 540, 1840); x.globalAlpha = 1; }
+    const bk = io(seg(t, 10.4, 11.0)); if (bk > 0) { x.globalAlpha = bk; x.fillStyle = DARK ? "#f3f2fa" : "#1d1838"; x.font = "700 52px PB"; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.brand, 540, 1840); x.globalAlpha = 1; }
   },
   sound(A) {
     const N = A.midi;

@@ -2,27 +2,40 @@
 <script>
 // قالب «خريطة متحركة» (ستايل خرايط Vox): خريطة مدينة مرسومة (نيل، شوارع، جناين)، دبابيس بتنزل على الأحياء، الكاميرا بتدخل على الفرع،
 // طريق التوصيل بيترسم لحد العميل والموتوسيكل ماشي عليه، وبعدين تبعد وتنوّر مناطق التغطية واحدة واحدة. الرسومات على ١٢ فريم. 12 ثانية.
+const G1 = "١ · الأحياء والفرع", G2 = "٢ · التوصيل", G3 = "٣ · مناطق التغطية والختام", GS = "الشكل العام";
 const PR = M.params({
-  areas: { label: "الأحياء (٥ سطور)", kind: "lines", def: ["الزمالك", "الدقي", "المعادي", "مدينة نصر", "التجمع"] },
-  store: { label: "اسم الفرع", kind: "text", def: "الفرع الرئيسي" },
-  eta: { label: "وقت التوصيل (دقايق)", kind: "text", def: "24" },
-  done: { label: "عند الوصول", kind: "text", def: "اتسلّم" },
-  head: { label: "العنوان في الآخر", kind: "text", role: "product", def: "بنوصل لكل حتة" },
-  sub: { label: "تحت العنوان", kind: "text", def: "في أقل من ساعة" },
-  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "طيارة دليفري" },
-  color: { label: "اللون الأساسي", kind: "color", def: "#ff5a1f" },
+  areas: { label: "الأحياء (٥ سطور)", kind: "lines", def: ["الزمالك", "الدقي", "المعادي", "مدينة نصر", "التجمع"], group: G1, max: 14,
+    hint: "٥ أحياء أو مدن بتوصل لها فعلًا، كل واحد في سطر. أسماء قصيرة علشان الدبوس يبان (اسم واحد مش «حي كذا الجديد»)." },
+  store: { label: "اسم الفرع", kind: "text", def: "الفرع الرئيسي", group: G1, max: 16, hint: "اسم الفرع أو المطبخ اللي الطلب طالع منه." },
+  eta: { label: "وقت التوصيل", kind: "number", def: 24, min: 5, max: 120, step: 1, unit: " دقيقة", group: G2, hint: "العداد بيعد لتحت من الرقم ده لحد ما الموتوسيكل يوصل. حط وقتك الحقيقي." },
+  unit: { label: "كلمة «دقيقة»", kind: "text", def: "دقيقة", group: G2, max: 8 },
+  done: { label: "عند الوصول", kind: "text", def: "اتسلّم", group: G2, max: 10, hint: "كلمة بتظهر جنب العميل لما الطلب يوصل." },
+  head: { label: "العنوان في الآخر", kind: "text", role: "product", def: "بنوصل لكل حتة", group: G3, max: 18, hint: "الوعد الكبير بتاعك في التوصيل." },
+  sub: { label: "تحت العنوان", kind: "text", role: "tagline", def: "في أقل من ساعة", group: G3, max: 22, hint: "رقم أو ميزة بتأكد العنوان." },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "طيارة دليفري", group: G3, max: 20 },
+  color: { label: "اللون الأساسي", kind: "color", role: "accent", def: "#ff5a1f", group: GS, hint: "الطريق ودبوس الفرع ومناطق التغطية: لون البراند لو قوي ومشبّع." },
+  color2: { label: "لون العميل", kind: "color", def: "#2f9bf0", group: GS, hint: "دبوس العميل: لون بعيد عن الأساسي علشان يتفرّق عنه." },
+  fHead: { label: "خط العنوان", kind: "font", def: "lalezar", group: GS },
+  fBody: { label: "خط الأسماء", kind: "font", def: "changa", group: GS, hint: "أسماء الأحياء والفرع والكارت." },
+});
+M.meta({
+  story: "خريطة مدينة مرسومة: دبابيس بتنزل على أحياءك، الكاميرا بتدخل على الفرع، الطريق بيترسم لحد العميل والموتوسيكل ماشي عليه والعداد بيعد، وبعدين تبعد وتنوّر مناطق التغطية، وكارت الختام.",
+  scenes: [{ name: G1, t0: 0, t1: 2.4, about: "الخريطة ودبابيس الأحياء" }, { name: G2, t0: 2.4, t1: 7.6, about: "الفرع والعميل والطريق والعداد" },
+    { name: G3, t0: 7.6, t1: 12, about: "مناطق التغطية وكارت العنوان" }],
+  tips: ["أسماء أحياء حقيقية بيعرفها جمهورك بتخلي الناس تدوّر على حيّها.", "وقت التوصيل الحقيقي أهم من رقم أصغر مش صادق.", "الخريطة نفسها مرسومة مش حقيقية، فمش لازم الأماكن تبقى مظبوطة جغرافيًا."],
 });
 const W = 1080, H = 1920, DUR = 12, MW = 2300, MH = 3900;
-const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
 const ar = (s) => String(s).replace(/\d/g, (d) => "٠١٢٣٤٥٦٧٨٩"[d]);
-const AREAS = [[820, 1180], [700, 1560], [1000, 2500], [1550, 1400], [1750, 2050]];   // أماكن الأحياء على الخريطة
+const SPOTS = [[820, 1180], [700, 1560], [1000, 2500], [1550, 1400], [1750, 2050]];   // أماكن الأحياء على الخريطة
+const NAMES = PR.areas.map((s) => String(s || "").trim()).filter(Boolean).slice(0, 5);
+const AREAS = SPOTS.slice(0, Math.max(1, NAMES.length));   // دبوس لكل حي اتكتب بس
 const STORE = [1180, 1650], CUST = [1640, 1300];
 const ROUTE = [STORE, [1180, 1540], [1330, 1540], [1330, 1420], [1500, 1420], [1500, 1300], CUST];
 
 M.reel({
   W, H, DUR, bg: "#efe8db",
   async init(M) {
-    await Promise.all([loadFont("CH", "SM-Changa.ttf"), loadFont("LZ", "SM-Lalezar.ttf")]);
+    await Promise.all([M.font("CH", PR.fBody), M.font("LZ", PR.fHead)]);
     const c = M.canvas(W, H); const x = c.getContext("2d");
     const map = document.createElement("canvas"); map.width = MW; map.height = MH; const m = map.getContext("2d"), R = M.rng(5);
     m.fillStyle = "#efe8db"; m.fillRect(0, 0, MW, MH);
@@ -41,8 +54,8 @@ M.reel({
     // مناطق التغطية (أشكال حوالين كل حي) بتتحسب هنا وتترسم بعدين
     const regions = AREAS.map(([a, b], i) => Array.from({ length: 14 }, (_, k) => { const ang = k / 14 * Math.PI * 2, r = 230 + M.hash(i * 9 + k) * 90; return [a + Math.cos(ang) * r, b + Math.sin(ang) * r * .85]; }));
     const lab = M.el("div", "", "position:absolute;left:0;top:0;width:0;height:0;");
-    const labels = PR.areas.slice(0, 5).map((n) => M.el("div", "", "position:absolute;left:0;top:0;transform-origin:50% 100%;white-space:nowrap;font:700 40px CH;color:#1d1d1b;background:#fff;padding:4px 22px 10px;border-radius:30px;box-shadow:0 6px 0 rgba(0,0,0,.12);", "", lab));
-    labels.forEach((l, i) => (l.textContent = PR.areas[i] || ""));
+    const labels = NAMES.map((n) => M.el("div", "", "position:absolute;left:0;top:0;transform-origin:50% 100%;white-space:nowrap;font:700 40px CH;color:#1d1d1b;background:#fff;padding:4px 22px 10px;border-radius:30px;box-shadow:0 6px 0 rgba(0,0,0,.12);", "", lab));
+    labels.forEach((l, i) => (l.textContent = NAMES[i] || ""));
     const sLab = M.el("div", "", `position:absolute;left:0;top:0;white-space:nowrap;font:700 38px CH;color:#fff;background:${PR.color};padding:6px 24px 12px;border-radius:30px;`, "", lab); sLab.textContent = PR.store;
     const eta = M.el("div", "", "position:absolute;left:0;top:0;white-space:nowrap;font:700 36px CH;color:#1d1d1b;background:#fff;padding:6px 22px 12px;border-radius:30px;box-shadow:0 6px 0 rgba(0,0,0,.12);", "", lab);
     const card = M.el("div", "", "position:absolute;left:70px;right:70px;top:0;background:#fff;border-radius:48px;padding:50px 60px 56px;box-shadow:0 30px 70px rgba(0,0,0,.18);text-align:center;");
@@ -74,9 +87,9 @@ M.reel({
     // الدبابيس: بتنزل بنطة
     const pin = (p, col, k2, size = 1) => { if (k2 <= 0) return; const [a, b] = p, s = springO(k2 * .6, 16, .45) * size / z * .9; x.save(); x.translate(a, b); x.scale(s, s); x.fillStyle = "rgba(0,0,0,.18)"; x.beginPath(); x.ellipse(0, 4, 26, 9, 0, 0, Math.PI * 2); x.fill(); x.fillStyle = col; x.beginPath(); x.moveTo(0, 0); x.bezierCurveTo(-36, -50, -42, -110, 0, -112); x.bezierCurveTo(42, -110, 36, -50, 0, 0); x.fill(); x.fillStyle = "#fff"; x.beginPath(); x.arc(0, -74, 17, 0, Math.PI * 2); x.fill(); x.restore(); };
     AREAS.forEach((p, i) => pin(p, "#1d1d1b", seg(tq, .4 + i * .22, 1.2 + i * .22)));
-    pin(STORE, PR.color, seg(tq, 2.4, 3.0), 1.3); pin(CUST, "#2f9bf0", seg(tq, 3.0, 3.6), 1.3);
+    pin(STORE, PR.color, seg(tq, 2.4, 3.0), 1.3); pin(CUST, PR.color2, seg(tq, 3.0, 3.6), 1.3);
     // نبضة الوصول
-    const ak = seg(t, 6.4, 7.4); if (ak > 0 && ak < 1) { x.strokeStyle = `rgba(47,155,240,${1 - ak})`; x.lineWidth = 8 / z; x.beginPath(); x.arc(CUST[0], CUST[1] - 40, 40 + ak * 200, 0, Math.PI * 2); x.stroke(); }
+    const ak = seg(t, 6.4, 7.4); if (ak > 0 && ak < 1) { x.strokeStyle = PR.color2; x.globalAlpha = 1 - ak; x.lineWidth = 8 / z; x.beginPath(); x.arc(CUST[0], CUST[1] - 40, 40 + ak * 200, 0, Math.PI * 2); x.stroke(); x.globalAlpha = 1; }
     // الموتوسيكل ماشي على الطريق
     if (rk > 0 && t < 7.6) { x.save(); x.translate(pos[0], pos[1]); const s = 1 / z * 1.1; x.scale(s, s); x.fillStyle = "#fff"; x.beginPath(); x.arc(0, 0, 40, 0, Math.PI * 2); x.fill(); x.fillStyle = PR.color; x.beginPath(); x.arc(0, 0, 32, 0, Math.PI * 2); x.fill(); x.fillStyle = "#fff"; x.fillRect(-14, -12, 28, 18); x.beginPath(); x.arc(-12, 10, 6, 0, Math.PI * 2); x.arc(12, 10, 6, 0, Math.PI * 2); x.fill(); x.restore(); }
     // الأسامي (مكانها محسوب من الكاميرا)
@@ -84,7 +97,7 @@ M.reel({
     C.labels.forEach((l, i) => { const lk = seg(tq, .8 + i * .22, 1.2 + i * .22), [sx, sy] = toS(AREAS[i]); op(l, lk > 0 ? 1 : 0); l.style.transform = `translate(${sx - l.offsetWidth / 2}px,${sy + 20}px) scale(${lk > 0 ? springO(lk * .5, 16, .5) : 0})`; });
     const sk = seg(tq, 2.8, 3.2), [ssx, ssy] = toS(STORE); op(C.sLab, sk > 0 && t < 8 ? 1 : 0); C.sLab.style.transform = `translate(${ssx - C.sLab.offsetWidth / 2}px,${ssy + 26}px) scale(${springO(sk * .5, 16, .5)})`;
     const ek = seg(t, 3.4, 3.8), [csx, csy] = toS(CUST), mins = Math.max(0, Math.round((parseInt(String(PR.eta).replace(/[٠-٩]/g, (d) => "٠١٢٣٤٥٦٧٨٩".indexOf(d))) || 24) * (1 - seg(tq, 3.2, 6.4))));
-    op(C.eta, ek > 0 && t < 8 ? 1 : 0); C.eta.textContent = t > 6.4 ? `${PR.done} ✓` : `${ar(mins)} دقيقة`; C.eta.style.transform = `translate(${csx - C.eta.offsetWidth / 2}px,${csy - 200}px) scale(${springO(ek * .5, 16, .5)})`;
+    op(C.eta, ek > 0 && t < 8 ? 1 : 0); C.eta.textContent = t > 6.4 ? `${PR.done} ✓` : `${ar(mins)} ${PR.unit}`; C.eta.style.transform = `translate(${csx - C.eta.offsetWidth / 2}px,${csy - 200}px) scale(${springO(ek * .5, 16, .5)})`;
     const ck = t > 9.4 ? springO(t - 9.4, 12, .6) : 0; op(C.card, ck > 0 ? 1 : 0); C.card.style.transform = `translateY(${1420 + (1 - ck) * 500}px)`;
   },
   sound(A) {

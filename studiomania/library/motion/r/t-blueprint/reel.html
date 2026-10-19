@@ -2,20 +2,34 @@
 <script>
 // قالب «مخطط هندسي» (بلوبرنت): ورقة زرقا على ترابيزة رسم، المنتج بيترسم بخطوط بيضا بترتيب الرسّام
 // (خط النص ← الحدود ← التفاصيل ← التظليل ← المقاسات ← الأرقام والملاحظات ← جدول البيانات) وختم أحمر واحد في الآخر. 12 ثانية.
+const G1 = "١ · الرسمة والمقاسات", G2 = "٢ · الملاحظات", G3 = "٣ · جدول البيانات والختم", GS = "الشكل العام";
 const PR = M.params({
-  title: { label: "اسم المنتج", kind: "text", role: "product", def: "زمزمية برو" },
-  sub: { label: "تحت الاسم", kind: "text", def: "مخطط رقم ٠٧ · نسخة نهائية" },
-  n1: { label: "ملاحظة ١", kind: "text", def: "غطا محكم ضد التسريب" },
-  n2: { label: "ملاحظة ٢", kind: "text", def: "ستانلس ستيل بطبقتين" },
-  n3: { label: "ملاحظة ٣", kind: "text", def: "بيفضل ساقع ٢٤ ساعة" },
-  h: { label: "الطول", kind: "text", def: "٢٨ سم" },
-  w: { label: "العرض", kind: "text", def: "٨ سم" },
-  brand: { label: "اسم البراند (الرسّام)", kind: "text", role: "brand", def: "ورشة ميزان" },
-  stamp: { label: "الختم", kind: "text", def: "معتمد" },
-  stampColor: { label: "لون الختم", kind: "color", def: "#e0343a" },
+  h: { label: "الطول", kind: "text", def: "٢٨ سم", group: G1, max: 8, hint: "رقم ووحدة (٢٨ سم). بيتكتب جنب سهم الطول." },
+  w: { label: "العرض", kind: "text", def: "٨ سم", group: G1, max: 8, hint: "بيتكتب تحت سهم العرض." },
+  n1: { label: "ملاحظة ١ (فوق)", kind: "text", def: "غطا محكم ضد التسريب", group: G2, max: 22, hint: "ميزة في الجزء اللي فوق (الغطا/الراس). جملة قصيرة بتشاور على الجزء ده." },
+  n2: { label: "ملاحظة ٢ (النص)", kind: "text", def: "ستانلس ستيل بطبقتين", group: G2, max: 22, hint: "الخامة أو التصنيع." },
+  n3: { label: "ملاحظة ٣ (تحت)", kind: "text", def: "بيفضل ساقع ٢٤ ساعة", group: G2, max: 22, hint: "أقوى فايدة للعميل، رقم لو ينفع." },
+  title: { label: "اسم المنتج", kind: "text", role: "product", def: "زمزمية برو", group: G3, max: 16, hint: "بيتكتب في الجدول وبعدين كبير فوق الرسمة." },
+  sub: { label: "تحت الاسم", kind: "text", def: "مخطط رقم ٠٧ · نسخة نهائية", group: G3, max: 30, hint: "سطر صغير زي ورق المهندسين: رقم المخطط أو الموديل." },
+  brand: { label: "اسم البراند (الرسّام)", kind: "text", role: "brand", def: "ورشة ميزان", group: G3, max: 18 },
+  lProject: { label: "كلمة «المشروع»", kind: "text", def: "المشروع", group: G3, max: 10 },
+  lScale: { label: "كلمة «المقياس»", kind: "text", def: "المقياس", group: G3, max: 10 },
+  scale: { label: "المقياس", kind: "text", def: "١ : ٢", group: G3, max: 8 },
+  lBy: { label: "كلمة «الرسّام»", kind: "text", def: "الرسّام", group: G3, max: 10 },
+  lDate: { label: "كلمة «التاريخ»", kind: "text", def: "التاريخ", group: G3, max: 10 },
+  date: { label: "التاريخ", kind: "text", def: "٢٠٢٦", group: G3, max: 10 },
+  stamp: { label: "الختم", kind: "text", def: "معتمد", group: G3, max: 8, hint: "كلمة واحدة بتخبط في الآخر: معتمد، أصلي، جديد." },
+  stampColor: { label: "لون الختم", kind: "color", role: "accent", def: "#e0343a", group: GS, hint: "اللون الوحيد غير الأبيض في الفيديو: أحمر أو لون البراند لو قوي." },
+  paper: { label: "لون الورقة", kind: "color", def: "#21468a", group: GS, hint: "أزرق المخططات التقليدي، أو كحلي/أخضر غامق. لازم غامق علشان الخطوط البيضا تبان." },
+  fHand: { label: "خط الكتابة", kind: "font", def: "ruqaa", group: GS, hint: "الملاحظات والاسم. الرقعة شبه خط المهندس بالقلم." },
+});
+M.meta({
+  story: "المنتج بيترسم بخطوط بيضا على ورق أزرق بترتيب المهندس: الحدود والتفاصيل، المقاسات بأسهمها، ٣ ملاحظات بأرقام، جدول البيانات، والاسم كبير، وختم أحمر بيخبط في الآخر.",
+  scenes: [{ name: G1, t0: 0, t1: 5.2, about: "الرسمة وأسهم الطول والعرض" }, { name: G2, t0: 5.2, t1: 7.2, about: "٣ ملاحظات بتشاور على أجزاء المنتج" },
+    { name: G3, t0: 7.2, t1: 12, about: "الجدول، الاسم الكبير، والختم" }],
+  tips: ["الملاحظات بتبان أصدق لما تبقى أرقام وخامات حقيقية، مش كلام إعلاني.", "المقاسات الحقيقية بتدي إحساس جودة وهندسة.", "الرسمة نفسها شكل زمزمية/عبوة: مناسب للمنتجات الطولية."],
 });
 const W = 1080, H = 1920, DUR = 12, SW = 1080, SH = 1920;
-const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
 const LINE = "rgba(231,240,249,.95)";
 const pathLen = (p) => { let L = 0; const out = [[p[0][0], p[0][1], 0]]; for (let i = 1; i < p.length; i++) { L += Math.hypot(p[i][0] - p[i - 1][0], p[i][1] - p[i - 1][1]); out.push([p[i][0], p[i][1], L]); } out.L = L; return out; };
 const arc = (cx, cy, r, a0, a1, n = 10) => Array.from({ length: n + 1 }, (_, i) => { const a = a0 + (a1 - a0) * i / n; return [cx + Math.cos(a) * r, cy + Math.sin(a) * r]; });
@@ -23,12 +37,13 @@ const arc = (cx, cy, r, a0, a1, n = 10) => Array.from({ length: n + 1 }, (_, i) 
 M.reel({
   W, H, DUR, bg: "#0d1116",
   async init(M) {
-    await Promise.all([loadFont("RQ", "TY-ArefRuqaa-700.ttf", "700"), loadFont("PX", "TY-PlexArabic-400.ttf"), loadFont("PB", "TY-PlexArabic-700.ttf", "700")]);
+    await Promise.all([M.font("RQ", PR.fHand), M.font("PX", "plex4"), M.font("PB", "plex")]);
+    const FW = (M.FONTS[PR.fHand] || M.FONTS.ruqaa).weight;
     const c = M.canvas(W, H); const x = c.getContext("2d");
     // الورقة: أزرقين بيتلخبطوا + خطوط طلا + ألياف + تنية ورقة + حواف باهتة (بتترسم مرة)
     const sh = document.createElement("canvas"); sh.width = SW; sh.height = SH; const s = sh.getContext("2d"), R = M.rng(7);
-    s.fillStyle = "#21468a"; s.fillRect(0, 0, SW, SH);
-    for (let i = 0; i < 120; i++) { const cx = R() * SW, cy = R() * SH, r = 80 + R() * 340, g = s.createRadialGradient(cx, cy, 0, cx, cy, r); g.addColorStop(0, R() < .5 ? "rgba(42,88,166,.35)" : "rgba(18,40,90,.35)"); g.addColorStop(1, "rgba(0,0,0,0)"); s.fillStyle = g; s.fillRect(cx - r, cy - r, r * 2, r * 2); }
+    s.fillStyle = PR.paper; s.fillRect(0, 0, SW, SH);
+    for (let i = 0; i < 120; i++) { const cx = R() * SW, cy = R() * SH, r = 80 + R() * 340, g = s.createRadialGradient(cx, cy, 0, cx, cy, r); g.addColorStop(0, R() < .5 ? "rgba(255,255,255,.07)" : "rgba(0,0,20,.16)"); g.addColorStop(1, "rgba(0,0,0,0)"); s.fillStyle = g; s.fillRect(cx - r, cy - r, r * 2, r * 2); }
     for (let i = 0; i < 30; i++) { s.fillStyle = `rgba(${R() < .5 ? "255,255,255" : "0,10,40"},${.006 + R() * .01})`; s.fillRect(0, R() * SH, SW, 4 + R() * 30); }
     for (let i = 0; i < 1800; i++) { s.strokeStyle = `rgba(200,220,255,${R() * .06})`; s.lineWidth = .7; s.beginPath(); const fx = R() * SW, fy = R() * SH, a = R() * 6; s.moveTo(fx, fy); s.lineTo(fx + Math.cos(a) * 12, fy + Math.sin(a) * 12); s.stroke(); }
     s.strokeStyle = "rgba(200,220,255,.07)"; s.lineWidth = 1; for (let gx = 60; gx < SW; gx += 40) { s.beginPath(); s.moveTo(gx, 0); s.lineTo(gx, SH); s.stroke(); } for (let gy = 60; gy < SH; gy += 40) { s.beginPath(); s.moveTo(0, gy); s.lineTo(SW, gy); s.stroke(); }
@@ -60,15 +75,16 @@ M.reel({
     add([[tb[0], tb[1] + 135], [tb[0] + tb[2], tb[1] + 135]], 7.55, 7.7, 2); add([[tb[0] + 560, tb[1]], [tb[0] + 560, tb[1] + tb[3]]], 7.6, 7.75, 2); add([[tb[0] + 280, tb[1] + 135], [tb[0] + 280, tb[1] + tb[3]]], 7.65, 7.8, 2);
     // النصوص (بتتكتب من اليمين للشمال بسن قلم منوّر)
     const T = [];
-    const txt = (s, x2, y2, size, t0, t1, font = "RQ", align = "right", col = LINE) => T.push({ s, x: x2, y: y2, size, t0, t1, font, align, col });
+    const txt = (s, x2, y2, size, t0, t1, font = "RQ", align = "right", col = LINE, maxw = 0) => T.push({ s, x: x2, y: y2, size, t0, t1, font, align, col, maxw });
     txt(PR.h, cx + 280, 860, 36, 4.6, 4.9, "PB", "left"); txt(PR.w, cx, 1530, 44, 5.0, 5.3, "PB", "center");
-    balloons.forEach(([, , bx, by, n, note], i) => { const T0 = 5.2 + i * .65; txt(n, bx, by + 4, 34, T0 + .3, T0 + .4, "PB", "center"); txt(note, bx - 46, by + 4, 36, T0 + .38, T0 + .7, "RQ", "right"); });
-    txt("المشروع", tb[0] + tb[2] - 24, tb[1] + 40, 26, 7.8, 7.9, "PX"); txt(PR.title, tb[0] + tb[2] - 24, tb[1] + 95, 54, 7.9, 8.3, "RQ");
-    txt("المقياس", tb[0] + 536, tb[1] + 175, 26, 8.0, 8.1, "PX"); txt("١ : ٢", tb[0] + 536, tb[1] + 225, 40, 8.1, 8.2, "PB");
-    txt("الرسّام", tb[0] + 256, tb[1] + 175, 26, 8.1, 8.2, "PX"); txt(PR.brand, tb[0] + 256, tb[1] + 228, 38, 8.2, 8.5, "RQ");
-    txt("التاريخ", tb[0] + tb[2] - 24, tb[1] + 175, 26, 8.2, 8.3, "PX"); txt("٢٠٢٦", tb[0] + tb[2] - 24, tb[1] + 228, 40, 8.3, 8.4, "PB");
-    txt(PR.title, 1000, 170, 92, 8.7, 9.4, "RQ"); txt(PR.sub, 1000, 250, 32, 9.3, 9.7, "PX");
-    T.forEach((o) => { x.font = `${o.font === "PB" || o.font === "RQ" ? "700 " : ""}${o.size}px ${o.font}`; o.w = x.measureText(o.s).width; });
+    balloons.forEach(([, , bx, by, n, note], i) => { const T0 = 5.2 + i * .65; txt(n, bx, by + 4, 34, T0 + .3, T0 + .4, "PB", "center"); txt(note, bx - 46, by + 4, 36, T0 + .38, T0 + .7, "RQ", "right", LINE, bx - 46 - 70); });
+    txt(PR.lProject, tb[0] + tb[2] - 24, tb[1] + 40, 26, 7.8, 7.9, "PX"); txt(PR.title, tb[0] + tb[2] - 24, tb[1] + 95, 54, 7.9, 8.3, "RQ");
+    txt(PR.lScale, tb[0] + 536, tb[1] + 175, 26, 8.0, 8.1, "PX"); txt(PR.scale, tb[0] + 536, tb[1] + 225, 40, 8.1, 8.2, "PB");
+    txt(PR.lBy, tb[0] + 256, tb[1] + 175, 26, 8.1, 8.2, "PX"); txt(PR.brand, tb[0] + 256, tb[1] + 228, 38, 8.2, 8.5, "RQ");
+    txt(PR.lDate, tb[0] + tb[2] - 24, tb[1] + 175, 26, 8.2, 8.3, "PX"); txt(PR.date, tb[0] + tb[2] - 24, tb[1] + 228, 40, 8.3, 8.4, "PB");
+    txt(PR.title, 1000, 170, 92, 8.7, 9.4, "RQ", "right", LINE, 900); txt(PR.sub, 1000, 250, 32, 9.3, 9.7, "PX");
+    const fw = (o) => o.font === "RQ" ? FW + " " : o.font === "PB" ? "700 " : "";
+    T.forEach((o) => { o.fw = fw(o); x.font = `${o.fw}${o.size}px ${o.font}`; o.w = x.measureText(o.s).width; if (o.maxw && o.w > o.maxw) { o.size *= o.maxw / o.w; o.w = o.maxw; } });
     return { x, sh, L, T, tb };
   },
   seek(t, C, M) {
@@ -96,7 +112,7 @@ M.reel({
     });
     C.T.forEach((o) => {
       const p = seg(t, o.t0, o.t1); if (p <= 0) return;
-      x.save(); x.font = `${o.font === "PB" || o.font === "RQ" ? "700 " : ""}${o.size}px ${o.font}`; x.direction = "rtl"; x.textAlign = o.align; x.textBaseline = "middle";
+      x.save(); x.font = `${o.fw}${o.size}px ${o.font}`; x.direction = "rtl"; x.textAlign = o.align; x.textBaseline = "middle";
       const x0 = o.align === "right" ? o.x - o.w : o.align === "center" ? o.x - o.w / 2 : o.x, x1 = x0 + o.w, edge = x1 - (o.w + 10) * p;
       x.beginPath(); x.rect(edge, o.y - o.size, x1 - edge + 12, o.size * 2); x.clip(); x.fillStyle = o.col; x.fillText(o.s, o.x, o.y); x.restore();
       if (p < 1) nib = [edge, o.y];
