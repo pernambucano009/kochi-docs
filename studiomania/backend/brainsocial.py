@@ -124,6 +124,7 @@ def analyze_prompt(prof: dict, st: dict, items: list[dict], videos: list[dict], 
         "5) images: لكل صورة من صور الأغلفة والبروفايل (بالرقم i من 0 في images_from) حدد kind من: " + "، ".join(f"{k} ({v})" for k, v in KINDS.items())
         + " أو skip لو مش مفيدة للعقل، ووصف قصير description.\n"
         "ممنوع تخترع معلومة مش موجودة في الحساب. اكتب بالعربي.\n"
+        "ممنوع تكتب id البوستات (زي DbYA-54K5ct) في الكلام: لو بتتكلم عن فيديو اذكر موضوعه من الكابشن، والعميل لازم يفهم من غير ما يشوف أي كود.\n"
         'الشكل: {"fields":{"<خانة>":{"value":"","why":""}},"niche":"","notes":[{"section":"identity|voice|products|offers|audience|campaigns|other","title":"","summary":"","body":""}],'
         '"todos":[{"title":"","why":"","how":""}],"images":[{"i":0,"kind":"","description":""}]}'
     )
@@ -154,3 +155,24 @@ def clean_todos(raw: list, source: str) -> list[dict]:
             out.append({"id": "t" + uuid.uuid4().hex[:9], "title": str(t["title"]).strip()[:120],
                         "why": str(t.get("why") or "").strip()[:600], "how": str(t.get("how") or "").strip()[:800], "source": source, "done": False})
     return out[:10]
+
+
+def deid(out: dict, items: list[dict]) -> dict:
+    """لو الموديل كتب id بوست برضه: بيتبدّل بأول كلام الكابشن عشان العميل يفهم قصده أنهي فيديو."""
+    names = {}
+    for p in items:
+        cap = re.sub(r"\s+", " ", str(p.get("caption") or "")).strip()
+        names[str(p["id"])] = f"فيديو «{cap[:40]}…»" if cap else "فيديو من الحساب"
+    if not names:
+        return out
+    pat = re.compile(r"['\"«]?(" + "|".join(re.escape(k) for k in sorted(names, key=len, reverse=True)) + r")['\"»]?")
+    fix = lambda t: pat.sub(lambda m: names[m.group(1)], t) if isinstance(t, str) else t  # noqa: E731
+    for n in out.get("notes") or []:
+        if isinstance(n, dict):
+            for k in ("title", "summary", "body"):
+                n[k] = fix(n.get(k))
+    for t in out.get("todos") or []:
+        if isinstance(t, dict):
+            for k in ("title", "why", "how"):
+                t[k] = fix(t.get(k))
+    return out

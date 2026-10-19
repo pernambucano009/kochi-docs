@@ -583,7 +583,13 @@ const BrandPage = (() => {
         const body = p.kind === "question" ? `<p class="bm-q">${esc(p.title)}</p>` + editable("@ans", "", "اكتب الإجابة…")
           : p.kind === "note" ? editable("@ttl", p.title, "العنوان") + (p.summary ? `<p class="bm-note">${esc(p.summary)}</p>` : "") + editable("@val", p.value, "التفاصيل")
           : (now ? `<div class="bm-sub"><small>المكتوب في العقل دلوقتي (هيتشال)</small><p class="bm-now">${esc(now)}</p></div><div class="bm-sub"><small>المخ بيقترح يتكتب بداله (تقدر تعدّله)</small>` : "<div>") + editable("@val", p.value, "…", p.field === "link" || p.field === "palette") + "</div>";
-        return top + (p.why ? `<p class="bm-note bm-why">${esc(p.why)}</p>` : "") + body + `<div class="bm-acts"><button class="bm-go" data-ok="${p.id}">${p.kind === "question" ? "احفظ الإجابة" : "موافق"}</button><button class="bm-pill" data-no="${p.id}">لأ</button></div>`;
+        // بنقول بوضوح «موافق» هتعمل إيه بالظبط
+        const what = p.kind === "field" ? [`لو وافقت: هتتكتب في خانة «${esc(String(l.t).replace(/^اقتراح:\s*/, ""))}» في العقل${now ? " بدل اللي مكتوب دلوقتي" : ""}، وكل سكريبت وفيديو جديد هيمشي عليها.`, "اكتبها في الخانة"]
+          : p.kind === "rule" ? ["لو وافقت: هتتضاف للقواعد، وكل شغل جديد للبراند لازم يلتزم بيها.", "ضيف القاعدة"]
+          : p.kind === "question" ? ["إجابتك هتتحفظ في «المعرفة»، والمخ هيرجع لها وهو بيكتب.", "احفظ الإجابة"]
+          : ["دي معلومة عن البراند، مش مهمة مطلوب منك تعملها. لو وافقت: هتتحفظ في «المعرفة»، والمخ هيقراها وهو بيكتب أي سكريبت أو فكرة جديدة. تقدر تعدّل الكلام قبل ما توافق.", "احفظها في المعرفة"];
+        return top + (p.why ? `<p class="bm-note bm-why">${esc(p.why)}</p>` : "") + body + `<p class="bm-note bm-what">${what[0]}</p>`
+          + `<div class="bm-acts"><button class="bm-go" data-ok="${p.id}">${what[1]}</button><button class="bm-pill" data-no="${p.id}">لأ، مش محتاجها</button></div>`;
       }
       case "note": return head.replace(esc(l.t), "معلومة") + editable(`note:t:${l.i}`, l.note.title, "العنوان") + (l.note.summary ? `<p class="bm-note">${esc(l.note.summary)}</p>` : "")
         + editable(`note:b:${l.i}`, l.note.body, "التفاصيل") + (srcName(l.note.source) ? `<p class="bm-note">من «${esc(srcName(l.note.source))}»</p>` : "") + `<button class="bm-link bad" data-ndel="${l.i}">شيل المعلومة دي</button>`;

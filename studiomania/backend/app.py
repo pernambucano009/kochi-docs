@@ -9344,6 +9344,7 @@ def run_brain_social(bid: str, sid: str) -> None:
         out = ad_json(ad_media_chat([{"role": "user", "content": parts}], 16000, meter=meter), "تحليل الحساب")
     for f in frames:
         f.unlink(missing_ok=True)
+    out = brainsocial.deid(out, items)
     fields = dict(out.get("fields") or {})
     items_p = brainsrc.to_pending({"fields": fields, "rules": [], "notes": out.get("notes") or [], "questions": []}, b, sid)
     # الصور: كل صورة ليها مكان (أو بتتشال لو مش مفيدة)

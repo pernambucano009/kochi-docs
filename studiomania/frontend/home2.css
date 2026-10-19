@@ -913,6 +913,7 @@ body.nh-cl #nh .nh-ptop { grid-template-areas: "row row" "tabs head"; grid-templ
 :root[data-nh-theme="dark"] #nh .bm-add > i, :root[data-nh-theme="dark"] #nh .bm-leaf.pend.ask > i { background: #F1F1F3; color: #141416; }
 :root[data-nh-theme="dark"] #nh .bm-srcs { border-color: rgba(255, 255, 255, .08); }
 #nh .bm-why { color: var(--nh-accent); }
+#nh .bm-what { padding: 8px 12px; border-radius: 12px; background: var(--page-bg, #F7F7F5); font-size: 12.5px; }
 
 /* ===== 🎬 معرض القوالب («ابدأ مشروع جديد») ===== */
 #nh .nh-gal { display: flex; flex-direction: column; gap: 22px; padding: 4px 2px 40px; }
