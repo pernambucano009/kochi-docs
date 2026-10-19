@@ -18216,6 +18216,7 @@ reset_stuck_dub()
 # ← المونتاج بالترانزيشن اللي على روح القالب والفويس أوفر.
 
 import tplseed  # noqa: E402
+import tplguide  # noqa: E402
 
 TPL_SEED_V = 3
 
@@ -20001,6 +20002,7 @@ def flow_to_dict(fid: str, d: dict) -> dict:
     out["knowledge"] = fz.knowledge(brain, BRAIN_FIELDS, BRAIN_KINDS)
     out["brand_name"] = (brain or {}).get("name") or ""
     out["algo_mode"] = algo.mode_on(brain)
+    out["guide"] = flow_guide(d["template"])
     o = d.get("output") or {}
     if o.get("kind") == "motion" and o.get("status") == "working":
         job = MOTION_JOBS.get(o.get("mid")) or {}
@@ -20068,6 +20070,9 @@ def flow_profile(tpl: dict) -> str:
             t = {}
         if t.get("uses"):
             out.append(f"مناسب لـ: {t['uses']}")
+        tg = tplguide.GUIDE.get(tid)
+        if tg:
+            out.append(f"نوع الفكرة اللي بتنجح على القالب: {tg[0]}" + (f" والسيناريو: {tg[1]}" if tg[1] else ""))
         if t.get("sample_brief"):
             out.append(f"مثال فكرة اتعملت عليه: {t['sample_brief']}")
         sc = t.get("scene") or {}
@@ -20480,6 +20485,40 @@ class FlowVoiceIn(BaseModel):
     voice: str = ""
 
 
+def flow_guide(tpl: dict) -> dict | None:
+    """🧭 لوحة قالب الذكاء الصناعي: نصايح الفكرة والسيناريو، الصور المرجعية، والشكل والطول والمقاس اللي ينفعوا."""
+    kind = tpl.get("kind")
+    if kind not in ("scene", "lab", "ad", "still"):
+        return None
+    g = tplguide.guide(tpl["id"], kind) or {"idea": "", "scen": "", "refs": [], "lens": [20, 30, 40, 60], "len": 30, "ratios": list(tplguide.RATIOS)}
+    if kind == "lab":
+        g["ratios"] = list(tplguide.RATIOS)
+    g["looks"] = []
+    if kind in ("scene", "lab"):
+        try:
+            g["looks"] = [{"id": v[0], "label": v[1]} for v in scene_cfg_for(tpl_load(tpl["id"])).get("variants") or []]
+        except HTTPException:
+            pass
+    return g
+
+
+class FlowTsetIn(BaseModel):
+    length: int = 0
+    ratio: str = ""
+    look: str = ""
+
+
+@app.post("/api/flows/{fid}/tset")
+def flow_tset(fid: str, body: FlowTsetIn):
+    """إعدادات القالب: الشكل (من أشكال الستايل)، والطول، والمقاس. اللي مش متاح للقالب بيترمي."""
+    d = flow_load(fid)
+    g = flow_guide(d["template"]) or {}
+    ts = {"length": body.length if body.length in (g.get("lens") or []) else g.get("len") or 0,
+          "ratio": body.ratio if body.ratio in (g.get("ratios") or []) else "",
+          "look": body.look if body.look in [x["id"] for x in g.get("looks") or []] else ""}
+    return flow_to_dict(fid, flow_update(fid, lambda x: x.update(tset=ts)))
+
+
 @app.post("/api/flows/{fid}/voice")
 def flow_voice(fid: str, body: FlowVoiceIn):
     d = flow_load(fid)
@@ -20730,14 +20769,16 @@ def flow_generate(fid: str, body: FlowGoIn):
         flow_update(fid, lambda x: x.update(output={"kind": "typo", "id": r["id"], "status": "done"}, stage="done"))
     else:
         script = fz.scenario_script(sc, fmt)
-        vo = d.get("vo") or {}
+        vo, ts = d.get("vo") or {}, d.get("tset") or {}
         lang = vo.get("lang") if vo.get("lang") in dub.DIALECTS else flow_lang_guess(d)
         tv = tvideo_create(TvIn(template=tpl["id"], section="templates", script=script, script_mode="own" if script else "ai",
-                                brief=brief[:3000], length=max(20, min(60, 10 * len(sc.get("beats") or [1, 2, 3]))),
-                                lang=lang, voice=vo.get("voice") or "", voice_on=vo.get("on", True)))
+                                brief=brief[:3000], length=ts.get("length") or max(20, min(60, 10 * len(sc.get("beats") or [1, 2, 3]))),
+                                ratio=ts.get("ratio") or "", lang=lang, voice=vo.get("voice") or "", voice_on=vo.get("on", True)))
         refs = flow_refs(d)
-        if refs:
-            tv_update(tv["id"], lambda x: x.update(flow_refs=refs))
+        # الشكل اللي اختاره في المسار بيبقى هو المختار في صفحة الفيديو (مفتاح الستايل بيترسم بيه)
+        extra = {**({"flow_refs": refs} if refs else {}), **({"style_variant": ts["look"]} if ts.get("look") else {})}
+        if extra:
+            tv_update(tv["id"], lambda x: x.update(**extra))
         flow_update(fid, lambda x: x.update(output={"kind": "tvideo", "id": tv["id"], "status": "done"}, stage="done"))
     return flow_to_dict(fid, flow_load(fid))
 

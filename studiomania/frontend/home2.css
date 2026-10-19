@@ -1810,3 +1810,18 @@ audio { width: 100%; }
   .ml-side { grid-template-rows: auto auto; }
   .ml-fields { overflow: visible; }
 }
+/* 🧭 قوالب الذكاء الصناعي: نصيحة القالب ولوحة إعداداته في خطوة الملفات */
+.flw-tip { display: flex; gap: 10px; align-items: baseline; margin: -6px 0 18px; padding: 12px 16px; border-radius: 14px; background: var(--card); box-shadow: 0 2px 10px rgba(24, 23, 24, .06); font-size: 14px; line-height: 1.8; }
+.flw-tip b { flex: none; font-weight: 500; }
+.flw-tpanel { margin: 24px 0 8px; padding: 4px 18px 16px; border-radius: 18px; background: var(--card); box-shadow: 0 2px 12px rgba(24, 23, 24, .06); }
+.flw-tpanel > small, .flw-tset > small, .flw-refs > small { display: block; margin: 12px 0 8px; color: var(--muted); font-size: 13px; }
+.flw-refs { display: grid; gap: 8px; }
+.flw-ref { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 12px; background: var(--bg, rgba(0, 0, 0, .03)); }
+.flw-ref i { font-style: normal; }
+.flw-ref div { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
+.flw-ref b { font-weight: 500; }
+.flw-ref .num { font-size: 12px; color: var(--muted); }
+.flw-ref small { flex-basis: 100%; }
+.flw-ref.ok { opacity: .7; }
+.flw-ref > div { flex: 1; }
+.flw-ref > label { flex: none; align-self: center; white-space: nowrap; cursor: pointer; }

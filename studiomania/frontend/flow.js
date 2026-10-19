@@ -120,6 +120,33 @@ const Flow = (() => {
       ${open ? chatBox(stage) : ""}</div>`;
   }
 
+  // 🧭 نصيحة القالب (قوالب الذكاء الصناعي): نوع الفكرة أو السيناريو اللي بينجح عليه
+  const tipBox = (t) => (t ? `<div class="flw-tip"><b>💡 نصيحة القالب</b><span>${esc(t)}</span></div>` : "");
+  // 🧭 إعدادات القالب: الصور اللي محتاجها، والشكل والطول والمقاس (بتتحفظ أول ما تدوس)
+  function tplPanel(d) {
+    const g = d.guide;
+    if (!g) return "";
+    const ts = { length: g.len, ratio: "", look: "", ...(d.tset || {}) };
+    const row = (title, items, attr, cur) => (items.length ? `<div class="flw-tset"><small>${title}</small><div class="flw-langs">${items.map(([v, l]) =>
+      `<button type="button" class="flw-chip${String(v) === String(cur) ? " on" : ""}" data-nofx ${attr}="${esc(v)}">${esc(l)}</button>`).join("")}</div></div>` : "");
+    const looks = g.looks.map((x) => [x.id, x.label]), lens = g.lens.map((n) => [n, `${n} ثانية`]);
+    const ratios = g.ratios.map((r) => [r, { "9:16": "📱 طولي 9:16", "1:1": "⬜ مربع 1:1", "16:9": "🖥️ عرضي 16:9" }[r] || r]);
+    return `<div class="flw-tpanel"><h3 class="flw-h3">🧭 إعدادات القالب</h3>
+      ${g.refs.length ? `<div class="flw-refs"><small>الصور اللي القالب ده محتاجها: ارفع كل واحدة في خانتها وهتتسمّى لوحدها.</small>
+        ${g.refs.map((r) => { const key = refKey(r.name), has = (d.assets || []).some((a) => a.name === key); return `<div class="flw-ref${has ? " ok" : ""}"><i>${has ? "✅" : "🖼️"}</i><div><b>${esc(r.name)}</b>
+          <span class="num latin">${esc(r.ratio)}</span><small class="muted">${esc(r.why)}</small></div>
+          <label class="flw-link">${has ? "↻ غيّر" : "⬆️ ارفع"}<input type="file" accept="image/*" hidden data-refup="${esc(key)}"></label></div>`; }).join("")}</div>` : ""}
+      ${row("شكل الستايل", looks, "data-tlook", ts.look || looks[0]?.[0] || "")}
+      ${row("طول الفيديو", lens, "data-tlen", ts.length)}${!g.lens.length && g.len ? `<small class="muted">⏱️ طوله ${g.len} ثانية (ثابت للقالب ده)</small>` : ""}
+      ${row("مقاس الفيديو", ratios, "data-tratio", ts.ratio || "9:16")}</div>`;
+  }
+  const refKey = (n) => n.trim().replace(/\s+/g, "_");
+  function tset(k, v) {
+    const g = S.d.guide, cur = { length: g.len, ratio: "", look: "", ...(S.d.tset || {}) };
+    cur[k] = k === "length" ? +v : v;
+    return call("/tset", cur);
+  }
+
   // ---------------------------------------------------------------- 1) الفكرة
   function ideaCard(it) {
     if (S.edit === it.id) return ideaForm(it);
@@ -169,7 +196,7 @@ const Flow = (() => {
   function stIdea(d) {
     const loading = d.busy === "ideas";
     return `<h2>اختار فكرة للبوست</h2><p class="flw-sub">المخ اقترح أفكار على قد البراند والقالب. اختار واحدة، أو عدّلها، أو اطلب غيرهم، أو اكتب فكرتك.</p>
-      ${seasonsRow()}
+      ${tipBox(d.guide?.idea)}${seasonsRow()}
       ${d.algo_mode && (d.ideas_dropped || []).length ? `<p class="flw-algo-note" title="${esc(d.ideas_dropped.map((x) => `«${x.title}»: ${x.why_out}`).join("\n"))}">⚡ وضع الخوارزمية شال ${d.ideas_dropped.length} ${d.ideas_dropped.length === 1 ? "فكرة ضعيفة" : "أفكار ضعيفة"} وجاب غيرها (حط الماوس تشوف ليه)</p>` : ""}
       <div class="flw-cards">${(d.ideas || []).map(ideaCard).join("")}${S.own ? ideaForm() : ""}</div>
       ${loading ? working("المخ بيفكّر في أفكار على القالب…") : failed("idea")}
@@ -246,7 +273,7 @@ const Flow = (() => {
     const loading = d.busy === "scenarios";
     const eps = d.format === "series" ? ` · ${d.episodes === "auto" ? "عدد الحلقات تلقائي" : `${d.episodes} حلقات`}` : "";
     return `${picked("idea")}<h2>اختار السيناريو</h2><p class="flw-sub">${FMT[d.format]?.[0] || ""} ${FMT[d.format]?.[1] || ""}${eps} — <button type="button" class="flw-link" data-go="format">غيّر النوع</button></p>
-      <div class="flw-cards wide">${(d.scenarios || []).map((s) => scenCard(s, d.format)).join("")}${S.own ? scenForm({}, d.format) : ""}</div>
+      ${tipBox(d.guide?.scen)}<div class="flw-cards wide">${(d.scenarios || []).map((s) => scenCard(s, d.format)).join("")}${S.own ? scenForm({}, d.format) : ""}</div>
       ${loading ? working("المخ بيكتب السيناريوهات…") : failed("scen")}
       <div class="flw-more">${S.hint ? `<div class="flw-chatrow"><input id="flwHint" placeholder="عايز السيناريو يبقى إزاي؟ (اختياري)"><button type="button" class="flw-btn" data-more="scen">اقترح</button></div>` : `
         <button type="button" class="flw-btn" data-more="scen" ${loading ? "disabled" : ""}>💡 اقترح سيناريوهات تانية</button>
@@ -323,6 +350,7 @@ const Flow = (() => {
     return `${picked("scenario")}<h2>ارفع ملفاتك</h2><p class="flw-sub">صور منتج، لوجو، لقطات… كل ملف ليه اسم، وتقدر تعمل له منشن <b class="latin">@اسمه</b> في البرومبت عشان المخ يستخدمه في المكان الصح.</p>
       <label class="flw-drop"><input type="file" id="flwFiles" accept="image/*,video/*" multiple hidden><i>⬆️</i><b>دوس أو اسحب الملفات هنا</b><small class="muted">صور أو فيديوهات، لحد ١٠ مرة واحدة</small></label>
       ${(d.assets || []).length ? `<div class="flw-assets">${d.assets.map(assetTile).join("")}</div>` : ""}
+      ${tplPanel(d)}
       <div class="flw-acts end"><button type="button" class="flw-btn pri big" data-go="generate">${(d.assets || []).length ? "كمّل" : "كمّل من غير ملفات"} ←</button></div>`;
   }
 
@@ -485,6 +513,9 @@ const Flow = (() => {
     if ((b = q("[data-vvoice]"))) { S.vo.voice = b.dataset.vvoice; return render(); }
     if ((b = q("[data-vplay]"))) return playSample(b.dataset.vplay);
     if (q("[data-setvoice]")) { S.audio?.pause(); return call("/voice", S.vo); }
+    if ((b = q("[data-tlook]"))) return tset("look", b.dataset.tlook);
+    if ((b = q("[data-tlen]"))) return tset("length", b.dataset.tlen);
+    if ((b = q("[data-tratio]"))) return tset("ratio", b.dataset.tratio);
     if ((b = q("[data-adel]"))) return call(`/assets/${encodeURIComponent(b.dataset.adel)}`, null, "DELETE");
     if ((b = q("[data-ment]"))) {
       const ta = S.el.querySelector("#flwPrompt"), m = `@${b.dataset.ment} `;
@@ -507,6 +538,13 @@ const Flow = (() => {
   }
   function onChange(e) {
     if (e.target.id === "flwFiles") upload(e.target.files);
+    const rk = e.target.dataset?.refup, rf = e.target.files?.[0];
+    if (rk && rf) {
+      // الخانة متاخدة قبل كده: الملف القديم بيتشال والجديد بياخد نفس الاسم
+      const old = (S.d.assets || []).find((a) => a.name === rk);
+      (old ? call(`/assets/${encodeURIComponent(old.file)}`, null, "DELETE") : Promise.resolve(true))
+        .then(() => upload([new File([rf], rk + (rf.name.match(/\.\w+$/)?.[0] || ".png"), { type: rf.type })]));
+    }
     const n = e.target.dataset?.aname;
     if (n !== undefined) call(`/assets/${encodeURIComponent(n)}`, { name: e.target.value }, "PATCH");
   }
