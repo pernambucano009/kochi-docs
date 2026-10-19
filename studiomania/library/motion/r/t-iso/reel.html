@@ -2,19 +2,27 @@
 <script>
 // قالب «رسم أيزومتري»: رسم تقني أبيض وأسود بخطوط رفيعة ولون واحد مميز، بيحكي رحلة الطلب: ضغطة على الموبايل، الكرتونة على السير،
 // العربية بتمشي وعجلها بيلف، والكرتونة بتنط لحد باب البيت وتتعلّم صح. الكاميرا ماشية مع الكرتونة. 1080×1920، 12 ثانية.
+const G1 = "١ · العنوان", G2 = "٢ · رحلة الطلب", G3 = "٣ · الختام", GS = "الشكل العام";
 const PR = M.params({
-  title: { label: "العنوان", kind: "text", role: "product", def: "من الضغطة لباب البيت" },
-  steps: { label: "الخطوات (٤ سطور)", kind: "lines", def: ["اطلب", "بنجهّز", "بنوصّل", "وصل"] },
-  end: { label: "الجملة الأخيرة", kind: "text", def: "توصيل في نفس اليوم" },
-  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "شنطة" },
-  accent: { label: "لون التمييز", kind: "color", def: "#ff6b2c" },
+  title: { label: "العنوان", kind: "text", role: "product", def: "من الضغطة لباب البيت", group: G1, max: 22, hint: "بيلخص الرحلة كلها في جملة: «من الضغطة لباب البيت»." },
+  steps: { label: "الخطوات (٤ سطور)", kind: "lines", def: ["اطلب", "بنجهّز", "بنوصّل", "وصل"], group: G2, max: 10,
+    hint: "٤ كلمات بالترتيب ده: الطلب (الموبايل)، التجهيز (السير)، التوصيل (العربية)، الوصول (الباب). كلمة واحدة لكل خطوة." },
+  end: { label: "الجملة الأخيرة", kind: "text", role: "tagline", def: "توصيل في نفس اليوم", group: G3, max: 24, hint: "الوعد: سرعة أو ضمان أو سعر توصيل." },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "شنطة", group: G3, max: 18 },
+  accent: { label: "لون التمييز", kind: "color", role: "accent", def: "#ff6b2c", group: GS, hint: "اللون الوحيد في الرسم (الكرتونة وعلامة الصح): لون البراند لو قوي." },
+  fHead: { label: "خط العناوين", kind: "font", def: "plex", group: GS },
+  fText: { label: "خط الخطوات", kind: "font", def: "plex4", group: GS },
+});
+M.meta({
+  story: "رسم تقني أيزومتري أبيض وأسود بلون واحد مميز بيحكي رحلة الطلب: ضغطة على الموبايل، الكرتونة على السير، العربية ماشية وعجلها بيلف، والكرتونة بتوصل باب البيت وتتعلّم صح.",
+  scenes: [{ name: G1, t0: 0, t1: 1.5, about: "العنوان" }, { name: G2, t0: 1.5, t1: 9.5, about: "الموبايل ← السير ← العربية ← الباب" }, { name: G3, t0: 9.5, t1: 12, about: "الجملة الأخيرة والبراند" }],
+  tips: ["مناسب لأي متجر أونلاين أو خدمة توصيل.", "الرسم ثابت (موبايل/سير/عربية/باب)، فخلي الخطوات بنفس الترتيب ده.", "لون التمييز الواحد هو اللي بيوجّه العين للكرتونة."],
 });
 const W = 1080, H = 1920, DUR = 12, S = 80, CS = .866;
-const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
 
 M.reel({
   W, H, DUR, bg: "#060606",
-  async init(M) { await Promise.all([loadFont("PB", "TY-PlexArabic-700.ttf", "700"), loadFont("PX", "TY-PlexArabic-400.ttf")]); const c = M.canvas(W, H); return { x: c.getContext("2d") }; },
+  async init(M) { await Promise.all([M.font("PB", PR.fHead), M.font("PX", PR.fText)]); const c = M.canvas(W, H); return { x: c.getContext("2d") }; },
   seek(t, C, M) {
     const { x } = C, { seg, cubicIO, clamp, smooth, springO, expo } = M, io = (k) => cubicIO(clamp(k)), A = PR.accent;
     x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = "#060606"; x.fillRect(0, 0, W, H);
@@ -86,7 +94,7 @@ M.reel({
     // واجهة فوق: العنوان والخطوات
     x.setTransform(1, 0, 0, 1, 0, 0);
     const ta = io(seg(t, .1, .7)); x.globalAlpha = ta; x.fillStyle = "#fff"; x.font = `700 ${M.fit(PR.title, "PB", 900, 76, 40, "700")}px PB`; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.title, 540, 250);
-    const st = PR.steps.slice(0, 4), cur = t < 1.6 ? 0 : t < 4.8 ? 1 : t < 8.6 ? 2 : 3, sx = (i) => 900 - i * 240;
+    const st = [0, 1, 2, 3].map((i) => String(PR.steps[i] || "").trim() || window.PARAM_SCHEMA.steps.def[i]), cur = t < 1.6 ? 0 : t < 4.8 ? 1 : t < 8.6 ? 2 : 3, sx = (i) => 900 - i * 240;
     x.strokeStyle = "rgba(255,255,255,.35)"; x.lineWidth = 2; x.beginPath(); x.moveTo(sx(0), 370); x.lineTo(sx(3), 370); x.stroke();
     x.strokeStyle = A; x.lineWidth = 4; x.beginPath(); x.moveTo(sx(0), 370); x.lineTo(sx(0) - 240 * Math.min(3, cur + 0), 370); x.stroke();
     st.forEach((s, i) => { const on = i <= cur; x.fillStyle = on ? A : "#060606"; x.strokeStyle = on ? A : "rgba(255,255,255,.5)"; x.lineWidth = 3; x.beginPath(); x.arc(sx(i), 370, i === cur ? 18 : 13, 0, Math.PI * 2); x.fill(); x.stroke();

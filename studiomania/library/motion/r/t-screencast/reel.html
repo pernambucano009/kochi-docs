@@ -2,22 +2,42 @@
 <script>
 // قالب «عرض تطبيق حي»: تسجيل شاشة شكله حقيقي: نافذة طايرة على خلفية، مؤشر ماوس ناعم، والكاميرا بتقرّب على مكان الضغطة،
 // وجوه الواجهة كائن بكسل صغير عايش فيها وبيمثّل اللي البرنامج بيعمله: بيشيل الرقم، بيطيّر الفاتورة، وبيحتفل لما تتدفع. 1080×1920، 12 ثانية.
+const G1 = "١ · الجملة الأولى والتطبيق", G2 = "٢ · ملء الفورم", G3 = "٣ · الإرسال والدفع", G4 = "٤ · الختام", GS = "الشكل العام";
 const PR = M.params({
-  app: { label: "اسم التطبيق", kind: "text", role: "brand", def: "فاتورتي" },
-  client: { label: "اسم العميل في المثال", kind: "text", def: "ستوديو نور" },
-  amount: { label: "المبلغ", kind: "text", def: "٤٥٠٠ جنيه" },
-  line1: { label: "الجملة الأولى", kind: "text", def: "فاتورة في ٣ ضغطات" },
-  line2: { label: "الجملة الأخيرة", kind: "text", role: "product", def: "واتدفعت وانت بتشرب قهوتك" },
-  accent: { label: "لون التطبيق", kind: "color", def: "#5b5bf7" },
+  line1: { label: "الجملة الأولى", kind: "text", def: "فاتورة في ٣ ضغطات", group: G1, max: 22, hint: "الوعد في سطر فوق النافذة: كام ضغطة/ثانية بياخد." },
+  app: { label: "اسم التطبيق", kind: "text", role: "brand", def: "فاتورتي", group: G1, max: 16, hint: "بيظهر في شريط النافذة فوق." },
+  nav1: { label: "القايمة: الصفحة المفتوحة", kind: "text", def: "الفواتير", group: G1, max: 12, hint: "القايمة الجانبية: أول كلمة غامقة (الصفحة اللي إحنا فيها) والباقي رمادي." },
+  nav2: { label: "القايمة ٢", kind: "text", def: "العملا", group: G1, max: 12 },
+  nav3: { label: "القايمة ٣", kind: "text", def: "التقارير", group: G1, max: 12 },
+  nav4: { label: "القايمة ٤", kind: "text", def: "الإعدادات", group: G1, max: 12 },
+  newBtn: { label: "زرار الإضافة", kind: "text", def: "+ فاتورة جديدة", group: G1, max: 16, hint: "الزرار اللي الماوس بيدوس عليه أول حاجة." },
+  f1: { label: "الخانة ١", kind: "text", def: "العميل", group: G2, max: 10 },
+  client: { label: "قيمة الخانة ١", kind: "text", def: "ستوديو نور", group: G2, max: 18, hint: "بتتكتب حرف حرف كأن حد بيكتب." },
+  f2: { label: "الخانة ٢", kind: "text", def: "المبلغ", group: G2, max: 10 },
+  amount: { label: "قيمة الخانة ٢", kind: "text", def: "٤٥٠٠ جنيه", group: G2, max: 14 },
+  f3: { label: "الخانة ٣", kind: "text", def: "الاستحقاق", group: G2, max: 10 },
+  due: { label: "قيمة الخانة ٣", kind: "text", def: "خلال ٧ أيام", group: G2, max: 14 },
+  send: { label: "زرار الإرسال", kind: "text", def: "ابعت الفاتورة", group: G3, max: 14 },
+  sent: { label: "بعد الإرسال", kind: "text", def: "اتبعتت", group: G3, max: 10, hint: "الزرار بيخضر وبيتكتب عليه الكلمة دي." },
+  paid: { label: "الختم", kind: "text", def: "اتدفعت", group: G3, max: 10, hint: "الكائن بيحتفل وبيظهر الختم ده." },
+  line2: { label: "الجملة الأخيرة", kind: "text", role: "product", def: "واتدفعت وانت بتشرب قهوتك", group: G4, max: 28, hint: "النتيجة اللي العميل بيحس بيها (راحة، وقت)." },
+  accent: { label: "لون التطبيق", kind: "color", role: "accent", def: "#5b5bf7", group: GS, hint: "لون زراير التطبيق ودوايرة الضغطة: لون البراند." },
+  fHead: { label: "خط العناوين", kind: "font", def: "plex", group: GS },
+  fText: { label: "خط الواجهة", kind: "font", def: "plex4", group: GS },
+});
+M.meta({
+  story: "تسجيل شاشة شكله حقيقي: نافذة التطبيق طايرة، الماوس بيدوس والكاميرا بتقرّب على مكان الضغطة، الفورم بيتملي حرف حرف، والإرسال، وكائن بكسل صغير عايش جوه الواجهة بيمثّل اللي بيحصل وبيحتفل في الآخر.",
+  scenes: [{ name: G1, t0: 0, t1: 2.2, about: "الجملة الأولى والنافذة والضغطة الأولى" }, { name: G2, t0: 2.2, t1: 4.4, about: "الخانات بتتملي" },
+    { name: G3, t0: 4.4, t1: 9, about: "زرار الإرسال والختم والاحتفال" }, { name: G4, t0: 9, t1: 12, about: "الجملة الأخيرة" }],
+  tips: ["غيّر كلام الواجهة لكلام تطبيقك الحقيقي (حجز، طلب، تسجيل…).", "الخطوات القليلة هي الرسالة: كل ما الضغطات أقل كل ما أحسن.", "القيم المكتوبة في الخانات خليها واقعية من شغلك."],
 });
 const W = 1080, H = 1920, DUR = 12, WX = 90, WY = 420, WW = 900, WH = 1180;
-const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
 // الماسكوت بكسل ١٢×١٠
 const BLOB = ["....XXXX....", "..XXXXXXXX..", ".XXXXXXXXXX.", "XXXWWXXWWXXX", "XXXWKXXWKXXX", "XXXXXXXXXXXX", "XXXXXMMXXXXX", ".XXXXXXXXXX.", "..XXXXXXXX..", "..XX....XX.."];
 
 M.reel({
   W, H, DUR, bg: "#dfe3f0",
-  async init(M) { await Promise.all([loadFont("PB", "TY-PlexArabic-700.ttf", "700"), loadFont("PX", "TY-PlexArabic-400.ttf")]); const c = M.canvas(W, H); return { x: c.getContext("2d") }; },
+  async init(M) { await Promise.all([M.font("PB", PR.fHead), M.font("PX", PR.fText)]); const c = M.canvas(W, H); return { x: c.getContext("2d") }; },
   seek(t, C, M) {
     const { x } = C, { seg, clamp, cubicIO, springO, expo, hash } = M, io = (k) => cubicIO(clamp(k)), A = PR.accent;
     // مسار الماوس (نقط + وقت الضغط)
@@ -38,21 +58,21 @@ M.reel({
     x.fillStyle = "#1b1d3a"; x.font = "700 30px PB"; x.textAlign = "center"; x.fillText(PR.app, 540, WY + 46);
     // الواجهة: شريط جانبي + المحتوى
     x.fillStyle = "#f7f7fc"; x.fillRect(WX + WW - 200, WY + 70, 200, WH - 70); x.fillStyle = A; x.beginPath(); x.roundRect(WX + WW - 180, WY + 110, 160, 56, 14); x.fill();
-    x.fillStyle = "#fff"; x.font = "700 28px PB"; x.textAlign = "right"; x.fillText("الفواتير", WX + WW - 40, WY + 148); ["العملا", "التقارير", "الإعدادات"].forEach((s, i) => { x.fillStyle = "#7a7d99"; x.font = "400 28px PX"; x.fillText(s, WX + WW - 40, WY + 230 + i * 70); });
+    x.fillStyle = "#fff"; x.font = "700 28px PB"; x.textAlign = "right"; x.fillText(PR.nav1, WX + WW - 40, WY + 148); [PR.nav2, PR.nav3, PR.nav4].forEach((s, i) => { x.fillStyle = "#7a7d99"; x.font = "400 28px PX"; x.fillText(s, WX + WW - 40, WY + 230 + i * 70); });
     // زرار "فاتورة جديدة"
-    const b1 = clk === 1.4 ? .94 : 1; x.save(); x.translate(760, 640); x.scale(b1, b1); x.fillStyle = A; x.beginPath(); x.roundRect(-140, -40, 280, 80, 18); x.fill(); x.fillStyle = "#fff"; x.font = "700 32px PB"; x.textAlign = "center"; x.fillText("+ فاتورة جديدة", 0, 11); x.restore();
+    const b1 = clk === 1.4 ? .94 : 1; x.save(); x.translate(760, 640); x.scale(b1, b1); x.fillStyle = A; x.beginPath(); x.roundRect(-140, -40, 280, 80, 18); x.fill(); x.fillStyle = "#fff"; x.font = "700 32px PB"; x.textAlign = "center"; x.fillText(PR.newBtn, 0, 11); x.restore();
     // الفورم بيتملي لوحده
     const fo = io(seg(t, 1.7, 2.3));
     if (fo > 0) { x.globalAlpha = fo; const rowY = [800, 920, 1040];
       const typed = (s, a, b) => [...s].slice(0, Math.floor([...s].length * clamp((t - a) / (b - a)))).join("");
-      [["العميل", typed(PR.client, 2.3, 3.0)], ["المبلغ", typed(PR.amount, 3.0, 3.6)], ["الاستحقاق", typed("خلال ٧ أيام", 3.6, 4.2)]].forEach(([lab, val], i) => {
+      [[PR.f1, typed(PR.client, 2.3, 3.0)], [PR.f2, typed(PR.amount, 3.0, 3.6)], [PR.f3, typed(PR.due, 3.6, 4.2)]].forEach(([lab, val], i) => {
         x.fillStyle = "#7a7d99"; x.font = "400 28px PX"; x.textAlign = "right"; x.fillText(lab, WX + WW - 230, rowY[i] - 30); x.strokeStyle = "#e1e3ef"; x.lineWidth = 3; x.beginPath(); x.roundRect(WX + 40, rowY[i] - 10, WW - 270, 76, 14); x.stroke();
         x.fillStyle = "#1b1d3a"; x.font = "700 34px PB"; x.fillText(val, WX + WW - 250, rowY[i] + 40); });
       x.globalAlpha = 1; }
     // زرار إرسال
-    const b2 = clk === 5.6 ? .94 : 1; x.save(); x.translate(540, 1380); x.scale(b2, b2); x.fillStyle = t > 5.6 ? "#22c55e" : A; x.globalAlpha = fo; x.beginPath(); x.roundRect(-230, -48, 460, 96, 22); x.fill(); x.fillStyle = "#fff"; x.font = "700 36px PB"; x.textAlign = "center"; x.fillText(t > 5.6 ? "اتبعتت ✓".replace(" ✓", "") : "ابعت الفاتورة", 0, 12); x.restore(); x.globalAlpha = 1;
+    const b2 = clk === 5.6 ? .94 : 1; x.save(); x.translate(540, 1380); x.scale(b2, b2); x.fillStyle = t > 5.6 ? "#22c55e" : A; x.globalAlpha = fo; x.beginPath(); x.roundRect(-230, -48, 460, 96, 22); x.fill(); x.fillStyle = "#fff"; x.font = "700 36px PB"; x.textAlign = "center"; x.fillText(t > 5.6 ? PR.sent : PR.send, 0, 12); x.restore(); x.globalAlpha = 1;
     // حالة: اتدفعت
-    const pk = springO(clamp((t - 7.8) / .6), 12, .5); if (t > 7.8) { x.save(); x.translate(380, 1500); x.scale(pk, pk); x.fillStyle = "#dcfce7"; x.beginPath(); x.roundRect(-200, -40, 400, 80, 40); x.fill(); x.fillStyle = "#15803d"; x.font = "700 34px PB"; x.textAlign = "center"; x.fillText("اتدفعت", 20, 12); x.strokeStyle = "#15803d"; x.lineWidth = 6; x.beginPath(); x.moveTo(-150, 0); x.lineTo(-135, 14); x.lineTo(-110, -12); x.stroke(); x.restore(); }
+    const pk = springO(clamp((t - 7.8) / .6), 12, .5); if (t > 7.8) { x.save(); x.translate(380, 1500); x.scale(pk, pk); x.fillStyle = "#dcfce7"; x.beginPath(); x.roundRect(-200, -40, 400, 80, 40); x.fill(); x.fillStyle = "#15803d"; x.font = "700 34px PB"; x.textAlign = "center"; x.fillText(PR.paid, 20, 12); x.strokeStyle = "#15803d"; x.lineWidth = 6; x.beginPath(); x.moveTo(-150, 0); x.lineTo(-135, 14); x.lineTo(-110, -12); x.stroke(); x.restore(); }
     // الماسكوت البكسل (بيعيش جوه الواجهة)
     const blob = (bx, by, sx, sy, col) => { const ps = 9; x.save(); x.translate(bx, by); x.scale(sx, sy); BLOB.forEach((row, r) => [...row].forEach((ch, c2) => { if (ch === ".") return; x.fillStyle = ch === "X" ? col : ch === "W" ? "#fff" : ch === "K" ? "#111" : "#ff7aa8"; x.fillRect((c2 - 6) * ps, (r - 10) * ps, ps, ps); })); x.restore(); };
     let bx = 300, by = 640, sx = 1, sy = 1;

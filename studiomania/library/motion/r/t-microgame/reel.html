@@ -2,25 +2,36 @@
 <script>
 // قالب «ألعاب سريعة»: فيلم ألعاب صغيرة ورا بعض: أمر بكلمة واحدة بيتصرخ، ثانيتين تلاتة، حركة واحدة، ونتيجة. كل لعبة بستايل رسم مختلف
 // (نيون مسطح، بكسل، رسم بالقلم، ورق مقصوص) والإيقاع بيسرع كل مرة، وفي الآخر المنتج هو الجايزة. 1080×1920، 12 ثانية.
+const G1 = "١ · الألعاب", G2 = "٢ · الجايزة", GS = "الشكل العام";
 const PR = M.params({
-  g1: { label: "أمر اللعبة ١", kind: "text", def: "اضغط!" },
-  g2: { label: "أمر اللعبة ٢", kind: "text", def: "اصطاد!" },
-  g3: { label: "أمر اللعبة ٣", kind: "text", def: "صب!" },
-  g4: { label: "أمر اللعبة ٤", kind: "text", def: "افتح!" },
-  win: { label: "جملة الفوز", kind: "text", def: "كسبت!" },
-  title: { label: "جملة الآخر", kind: "text", role: "product", def: "كل يوم تحدي جديد" },
-  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "لعبة اليوم" },
+  g1: { label: "أمر اللعبة ١ (نيون)", kind: "text", def: "اضغط!", group: G1, max: 8, hint: "فعل أمر واحد بعلامة تعجب بيتصرخ على الشاشة. كل لعبة أقصر من اللي قبلها." },
+  g2: { label: "أمر اللعبة ٢ (بكسل)", kind: "text", def: "اصطاد!", group: G1, max: 8 },
+  g3: { label: "أمر اللعبة ٣ (رسم بالقلم)", kind: "text", def: "صب!", group: G1, max: 8 },
+  g4: { label: "أمر اللعبة ٤ (ورق مقصوص)", kind: "text", def: "افتح!", group: G1, max: 8, hint: "اللعبة الأخيرة بتفتح علبة جايزة فيها المنتج." },
+  gameW: { label: "كلمة «لعبة»", kind: "text", def: "لعبة", group: G1, max: 8, hint: "بتظهر فوق مع رقم اللعبة." },
+  faster: { label: "بين الألعاب", kind: "text", def: "أسرع!", group: G1, max: 8, hint: "بتخبط على الشاشة الصفرا بين كل لعبة والتانية." },
+  ok: { label: "بعد كل لعبة", kind: "text", def: "تمام!", group: G1, max: 8, hint: "النجمة اللي بتطلع لما اللعبة تخلص." },
+  prize: { label: "صورة الجايزة", kind: "image", role: "product_img1", def: "", group: G2,
+    img: { ratio: "1:1", cut: true, tip: "المنتج من غير خلفية، مالي المربع. لو مفيش بيظهر اسم البراند في الدايرة." }, hint: "بتطلع من العلبة في اللعبة الأخيرة." },
+  win: { label: "جملة الفوز", kind: "text", def: "كسبت!", group: G2, max: 10, hint: "كلمة كبيرة بتخبط في الآخر." },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "لعبة اليوم", group: G2, max: 16 },
+  title: { label: "جملة الآخر", kind: "text", role: "product", def: "كل يوم تحدي جديد", group: G2, max: 26, hint: "الدعوة: «العب كل يوم»، «جرب حظك»، أو العرض." },
+  fHead: { label: "خط الأوامر", kind: "font", def: "lalezar", group: GS, hint: "خط تقيل إعلاني علشان الأوامر تتقري في ثانية." },
+});
+M.meta({
+  story: "ألعاب صغيرة ورا بعض: أمر بكلمة واحدة بيتصرخ، حركة واحدة، ونتيجة. كل لعبة بستايل رسم مختلف (نيون، بكسل، قلم، ورق مقصوص) والإيقاع بيسرع، وفي الآخر المنتج هو الجايزة.",
+  scenes: [{ name: G1, t0: 0, t1: 8.8, about: "٤ ألعاب كل واحدة أسرع" }, { name: G2, t0: 8.8, t1: 12, about: "جملة الفوز والبراند" }],
+  tips: ["الأوامر لازم تتقري في نص ثانية: كلمة واحدة بس.", "مناسب للمسابقات والعروض والتطبيقات اللي فيها لعب.", "صورة منتج من غير خلفية بتطلع من العلبة أحلى بكتير."],
 });
 const W = 1080, H = 1920, DUR = 12;
 const G = [[0, 2.6], [2.6, 4.9], [4.9, 7.0], [7.0, 8.8]];   // كل لعبة أقصر من اللي قبلها
-const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
 
 M.reel({
   W, H, DUR, bg: "#111",
   async init(M) {
-    await Promise.all([loadFont("LZ", "SM-Lalezar.ttf"), loadFont("RQ", "TY-ArefRuqaa-700.ttf", "700"), loadFont("PB", "TY-PlexArabic-700.ttf", "700")]);
+    const [prize] = await Promise.all([M.img(PR.prize), M.font("LZ", PR.fHead), M.font("RQ", "ruqaa"), M.font("PB", "plex")]);
     const c = M.canvas(W, H), px = document.createElement("canvas"); px.width = 108; px.height = 192;
-    return { x: c.getContext("2d"), p: px.getContext("2d") };
+    return { x: c.getContext("2d"), p: px.getContext("2d"), prize };
   },
   seek(t, C, M) {
     const { x, p } = C, { seg, clamp, springO, expo, hash, cubicIO } = M, io = (k) => cubicIO(clamp(k));
@@ -28,7 +39,7 @@ M.reel({
     const gi = G.findIndex(([a, b]) => t >= a && t < b), lt = gi >= 0 ? t - G[gi][0] : 0, gd = gi >= 0 ? G[gi][1] - G[gi][0] : 1, done = lt > gd * .62;
     const cmd = (s, col, shadow, font = "LZ") => { const k = springO(clamp(lt / .4), 16, .45), out = clamp((lt - .9) / .2); if (out >= 1) return; x.save(); x.translate(540, 520 - out * 260); x.scale(k * (1 - out * .4), k * (1 - out * .4)); x.rotate(-.06);
       x.font = `${font === "LZ" ? "" : "700 "}${M.fit(s, font, 900, 260, 100, font === "LZ" ? "" : "700")}px ${font}`; x.textAlign = "center"; x.textBaseline = "middle"; x.direction = "rtl"; x.lineJoin = "round"; x.lineWidth = 30; x.strokeStyle = shadow; x.strokeText(s, 0, 0); x.fillStyle = col; x.fillText(s, 0, 0); x.restore(); };
-    const winTag = (col) => { if (!done) return; const k = springO((lt - gd * .62) / .4, 14, .5); x.save(); x.translate(540, 1560); x.scale(k, k); x.rotate(.05); x.fillStyle = col; x.beginPath(); for (let i = 0; i < 24; i++) { const r = i % 2 ? 150 : 210, a = i / 24 * Math.PI * 2; x.lineTo(Math.cos(a) * r * 1.4, Math.sin(a) * r * .7); } x.closePath(); x.fill(); x.fillStyle = "#111"; x.font = "120px LZ"; x.textAlign = "center"; x.textBaseline = "middle"; x.direction = "rtl"; x.fillText("تمام!", 0, 8); x.restore(); };
+    const winTag = (col) => { if (!done) return; const k = springO((lt - gd * .62) / .4, 14, .5); x.save(); x.translate(540, 1560); x.scale(k, k); x.rotate(.05); x.fillStyle = col; x.beginPath(); for (let i = 0; i < 24; i++) { const r = i % 2 ? 150 : 210, a = i / 24 * Math.PI * 2; x.lineTo(Math.cos(a) * r * 1.4, Math.sin(a) * r * .7); } x.closePath(); x.fill(); x.fillStyle = "#111"; x.font = "120px LZ"; x.textAlign = "center"; x.textBaseline = "middle"; x.direction = "rtl"; x.fillText(PR.ok, 0, 8); x.restore(); };
     if (gi === 0) { // ١) نيون مسطح: زرار كبير
       x.fillStyle = "#2b1055"; x.fillRect(0, 0, W, H); for (let i = 0; i < 12; i++) { x.strokeStyle = `rgba(255,60,200,${.15})`; x.lineWidth = 4; x.beginPath(); x.arc(540, 1050, 200 + i * 90 + (t * 120) % 90, 0, Math.PI * 2); x.stroke(); }
       const press = lt > 1.4 && lt < 1.65, sq = press ? .82 : 1;
@@ -61,7 +72,10 @@ M.reel({
       x.save(); x.shadowColor = "rgba(120,30,60,.35)"; x.shadowBlur = 0; x.shadowOffsetX = 10; x.shadowOffsetY = 12;
       x.fillStyle = "#ff4f81"; x.fillRect(330, 1000, 420, 380); x.fillStyle = "#ffd23f"; x.fillRect(515, 1000, 50, 380);
       const lk = springO(clamp((lt - .7) / .6), 10, .5); x.save(); x.translate(330 - 40 * lk, 990 - 400 * lk); x.rotate(-1.1 * lk); x.fillStyle = "#ff2e63"; x.fillRect(-20, -90, 460, 100); x.fillStyle = "#ffd23f"; x.fillRect(185, -90, 50, 100); x.restore();
-      if (lt > .8) { const k = springO((lt - .8) / .7, 9, .55); x.save(); x.translate(540, 990 - 330 * k); x.scale(k, k); x.fillStyle = "#fff"; x.beginPath(); x.arc(0, 0, 150, 0, Math.PI * 2); x.fill(); x.fillStyle = "#ff2e63"; x.font = `${M.fit(PR.brand, "LZ", 250, 90, 36)}px LZ`; x.textAlign = "center"; x.textBaseline = "middle"; x.direction = "rtl"; x.fillText(PR.brand, 0, 6); x.restore(); }
+      if (lt > .8) { const k = springO((lt - .8) / .7, 9, .55); x.save(); x.translate(540, 990 - 330 * k); x.scale(k, k); x.fillStyle = "#fff"; x.beginPath(); x.arc(0, 0, 150, 0, Math.PI * 2); x.fill();
+        if (C.prize) { const pw = C.prize.width, ph = C.prize.height, s = 250 / Math.max(pw, ph); x.drawImage(C.prize, -pw * s / 2, -ph * s / 2, pw * s, ph * s); }
+        else { x.fillStyle = "#ff2e63"; x.font = `${M.fit(PR.brand, "LZ", 250, 90, 36)}px LZ`; x.textAlign = "center"; x.textBaseline = "middle"; x.direction = "rtl"; x.fillText(PR.brand, 0, 6); }
+        x.restore(); }
       x.restore();
       cmd(PR.g4, "#fff", "#ff2e63"); winTag("#ffd23f");
     } else { // الجايزة
@@ -73,8 +87,8 @@ M.reel({
     // الواجهة: عداد وقت (فتيل) + قلوب + "أسرع!"
     if (gi >= 0) { const left = 1 - lt / gd; x.fillStyle = "rgba(0,0,0,.35)"; x.fillRect(90, 1800, 900, 26); x.fillStyle = left < .3 ? "#ff3b30" : "#fff"; x.fillRect(90, 1800, 900 * left, 26); x.fillStyle = "#ffb000"; x.beginPath(); x.arc(90 + 900 * left, 1813, 18 + Math.sin(t * 40) * 4, 0, Math.PI * 2); x.fill();
       for (let h = 0; h < 4; h++) { x.fillStyle = "#ff3b30"; x.save(); x.translate(110 + h * 70, 130); x.scale(.5, .5); x.beginPath(); x.moveTo(0, 26); x.bezierCurveTo(-60, -10, -30, -55, 0, -24); x.bezierCurveTo(30, -55, 60, -10, 0, 26); x.fill(); x.restore(); }
-      x.fillStyle = "#fff"; x.font = "700 44px PB"; x.textAlign = "right"; x.direction = "rtl"; x.lineWidth = 8; x.strokeStyle = "#000"; x.strokeText(`لعبة ${"١٢٣٤"[gi]}`, 1000, 150); x.fillText(`لعبة ${"١٢٣٤"[gi]}`, 1000, 150); }
-    for (const [a] of G.slice(1).concat([[8.8]])) { const k = (t - a + .2) / .4; if (k > 0 && k < 1) { x.fillStyle = "#fcd000"; x.fillRect(0, 0, W, H * Math.sin(Math.PI * k)); if (k > .3 && k < .7) { x.fillStyle = "#111"; x.font = "200px LZ"; x.textAlign = "center"; x.direction = "rtl"; x.fillText("أسرع!", 540, 1000); } } }
+      x.fillStyle = "#fff"; x.font = "700 44px PB"; x.textAlign = "right"; x.direction = "rtl"; x.lineWidth = 8; x.strokeStyle = "#000"; x.strokeText(`${PR.gameW} ${"١٢٣٤"[gi]}`, 1000, 150); x.fillText(`${PR.gameW} ${"١٢٣٤"[gi]}`, 1000, 150); }
+    for (const [a] of G.slice(1).concat([[8.8]])) { const k = (t - a + .2) / .4; if (k > 0 && k < 1) { x.fillStyle = "#fcd000"; x.fillRect(0, 0, W, H * Math.sin(Math.PI * k)); if (k > .3 && k < .7) { x.fillStyle = "#111"; x.font = "200px LZ"; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.faster, 540, 1000); } } }
   },
   sound(A) {
     const N = A.midi;

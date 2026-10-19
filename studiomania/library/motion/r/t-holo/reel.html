@@ -2,24 +2,36 @@
 <script>
 // قالب «هولوجرام»: المنتج دايمًا مجسم خطوط من نور فوق قاعدة إسقاط مدوّرة، على مسرح شبه أسود: مسح بيبني المجسم من تحت لفوق،
 // بيلف، الغطا بيتفصل لفوق، أرقام بتعدّ وتتلوّن بلون التمييز لما تتثبت، وواجهة HUD بأركان ومساطر. 1080×1920، 12 ثانية.
+const G1 = "١ · المسح والمجسم", G2 = "٢ · المميزات", G3 = "٣ · الاسم", GS = "الشكل العام";
 const PR = M.params({
-  product: { label: "اسم المنتج", kind: "text", role: "product", def: "سبيكر نبض" },
-  f1: { label: "ميزة ١ (رقم + كلام)", kind: "text", def: "24|ساعة بطارية" },
-  f2: { label: "ميزة ٢", kind: "text", def: "360|درجة صوت" },
-  f3: { label: "ميزة ٣", kind: "text", def: "5|دقايق شحن سريع" },
-  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "نبض أوديو" },
-  hue: { label: "لون الهولوجرام", kind: "color", def: "#5ef2c8" },
-  accent: { label: "لون التمييز", kind: "color", def: "#ff8a3d" },
+  hudTop: { label: "الكلمة فوق على الشمال", kind: "text", def: "SUBJECT // SCAN", group: G1, max: 20, hint: "كلام الشاشة التقنية (HUD). الإنجليزي بيدي إحساس خيال علمي، وممكن تكتبه عربي." },
+  hudScan: { label: "كلمة المسح", kind: "text", def: "SCAN", group: G1, max: 10, hint: "بيظهر جنبها نسبة المسح بتعد لحد ١٠٠٪." },
+  hudExplode: { label: "وقت التفكيك", kind: "text", def: "MODE // EXPLODE", group: G1, max: 20 },
+  hudLock: { label: "بعد التثبيت", kind: "text", def: "STATUS // LOCKED", group: G1, max: 20 },
+  f1: { label: "ميزة ١ (رقم|كلام)", kind: "text", def: "24|ساعة بطارية", group: G2, max: 24,
+    hint: "رقم|كلام (زي «24|ساعة بطارية»). الرقم بيعد ويتلوّن لما يتثبت، فلازم يكون رقم حقيقي ومهم." },
+  f2: { label: "ميزة ٢ (رقم|كلام)", kind: "text", def: "360|درجة صوت", group: G2, max: 24 },
+  f3: { label: "ميزة ٣ (رقم|كلام)", kind: "text", def: "5|دقايق شحن سريع", group: G2, max: 24 },
+  product: { label: "اسم المنتج", kind: "text", role: "product", def: "سبيكر نبض", group: G3, max: 14, hint: "بيظهر كبير في كارت تحت المجسم." },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "نبض أوديو", group: G3, max: 20 },
+  hue: { label: "لون الهولوجرام", kind: "color", def: "#5ef2c8", group: GS, hint: "لون النور: سماوي أو أخضر نعناعي بيدّي إحساس الهولوجرام." },
+  accent: { label: "لون التمييز", kind: "color", role: "accent", def: "#ff8a3d", group: GS, hint: "الأرقام لما تتثبت: لون دافي عكس لون الهولوجرام علشان يبان." },
+  fTitle: { label: "خط الاسم", kind: "font", def: "plex", group: GS },
+  fText: { label: "خط الكلام", kind: "font", def: "plex4", group: GS },
+});
+M.meta({
+  story: "المنتج مجسم خطوط نور فوق قاعدة إسقاط: مسح بيبنيه من تحت لفوق، بيلف ويتفكك، ٣ أرقام بتعد وتتلوّن لما تتثبت، وواجهة تقنية بأركان ومساطر، وفي الآخر الاسم في كارت.",
+  scenes: [{ name: G1, t0: 0, t1: 3.3, about: "المسح بيبني المجسم والنسبة بتعد" }, { name: G2, t0: 3.3, t1: 8.5, about: "التفكيك و٣ أرقام" }, { name: G3, t0: 8.5, t1: 12, about: "كارت الاسم والبراند" }],
+  tips: ["مناسب للإلكترونيات والأجهزة والتقنية.", "الأرقام هي البطل: ٣ أرقام مختلفة (مدة، قوة، سرعة) أحسن من ٣ عن نفس الحاجة.", "الكلام التقني فوق ممكن تسيبه إنجليزي حتى لو الفيديو عربي."],
 });
 const W = 1080, H = 1920, DUR = 12, CX = 540, CY = 1050;
-const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
 const hex = (h) => { const n = parseInt(String(h).slice(1), 16) || 0; return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
 const ar = (s) => String(s).replace(/\d/g, (d) => "٠١٢٣٤٥٦٧٨٩"[d]);
 
 M.reel({
   W, H, DUR, bg: "#04070a",
   async init(M) {
-    await Promise.all([loadFont("PB", "TY-PlexArabic-700.ttf", "700"), loadFont("PX", "TY-PlexArabic-400.ttf"), loadFont("PM", "TY-PlexMono-500.ttf", "500")]);
+    await Promise.all([M.font("PB", PR.fTitle), M.font("PX", PR.fText), new FontFace("PM", "url(../../fonts/TY-PlexMono-500.ttf)", { weight: "500" }).load().then((f) => document.fonts.add(f)).catch(() => {})]);
     const c = M.canvas(W, H); const x = c.getContext("2d");
     // المجسم: سبيكر أسطواني (حلقات + خطوط طولية) وغطا فوق وشبكة سماعة
     const segs = [];   // كل خط: [p1, p2, part]   p = [x,y,z]
@@ -29,10 +41,10 @@ M.reel({
     for (let k = 0; k < 4; k++) ring(210 + k * 18, 150 - k * 22, "cap");
     for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; segs.push([[Math.cos(a) * 150, 210, Math.sin(a) * 150], [Math.cos(a) * 84, 264, Math.sin(a) * 84], "cap"]); }
     ring(-120, 80, "core", 24); ring(60, 80, "core", 24); for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; segs.push([[Math.cos(a) * 80, -120, Math.sin(a) * 80], [Math.cos(a) * 80, 60, Math.sin(a) * 80], "core"]); }
-    const plates = [PR.f1, PR.f2, PR.f3].map((s) => { const [n, l] = String(s).split("|"); const el = M.el("div", "", `position:absolute;left:0;top:0;width:330px;padding:18px 22px 22px;background:rgba(3,10,10,.82);border:1px solid ${PR.hue}55;font:400 28px PX;color:#cfe;direction:rtl;`, `<div style="font:500 70px PM;line-height:1;"></div><div style="margin-top:6px;">${l || ""}</div>`); return { el, num: el.firstChild, target: parseInt(n) || 0 }; });
+    const plates = [PR.f1, PR.f2, PR.f3].map((s) => { const [n, l] = String(s).split("|"); const el = M.el("div", "", `position:absolute;left:0;top:0;width:330px;padding:18px 22px 22px;background:rgba(3,10,10,.82);border:1px solid ${PR.hue}55;font:400 28px PX;color:#cfe;direction:rtl;`, `<div style="font:500 70px PM;line-height:1;"></div><div style="margin-top:6px;">${l || ""}</div>`); return { el, num: el.firstChild, target: parseInt(String(n || "").replace(/[٠-٩]/g, (d) => "٠١٢٣٤٥٦٧٨٩".indexOf(d))) || 0 }; });
     const title = M.el("div", "", `position:absolute;left:90px;right:90px;top:0;padding:26px 30px 34px;background:rgba(3,10,10,.85);border:1px solid ${PR.hue}66;text-align:center;direction:rtl;`, `<div style="font:700 92px PB;color:#effffa;">${PR.product}</div><div style="font:400 36px PX;color:${PR.hue};margin-top:6px;">${PR.brand}</div>`);
-    const status = M.el("div", "", "position:absolute;right:70px;top:80px;font:500 26px PM;color:#9fe;direction:ltr;text-align:right;");
-    const sub = M.el("div", "", "position:absolute;left:70px;top:80px;font:500 26px PM;color:#9fe;direction:ltr;", "SUBJECT // SCAN");
+    const status = M.el("div", "", `position:absolute;right:70px;top:80px;font:500 26px PM;color:${PR.hue};direction:ltr;text-align:right;unicode-bidi:plaintext;`);
+    const sub = M.el("div", "", `position:absolute;left:70px;top:80px;font:500 26px PM;color:${PR.hue};direction:ltr;unicode-bidi:plaintext;`, PR.hudTop);
     return { x, segs, plates, title, status };
   },
   seek(t, C, M) {
@@ -69,7 +81,7 @@ M.reel({
     const brk = (bx, by, sx, sy) => { x.strokeStyle = `rgba(${hr},${hg},${hb},.8)`; x.lineWidth = 3; x.beginPath(); x.moveTo(bx, by + 50 * sy); x.lineTo(bx, by); x.lineTo(bx + 50 * sx, by); x.stroke(); };
     brk(50, 50, 1, 1); brk(W - 50, 50, -1, 1); brk(50, H - 50, 1, -1); brk(W - 50, H - 50, -1, -1);
     for (let i = 0; i < 40; i++) { const yy = 200 + ((i * 40 - t * 30) % 1600 + 1600) % 1600; x.fillStyle = `rgba(${hr},${hg},${hb},.4)`; x.fillRect(W - 70, yy, i % 5 ? 10 : 22, 2); x.fillRect(60, (yy + 800) % 1800, i % 5 ? 10 : 22, 2); }
-    const pct = Math.round(100 * seg(t, .6, 3.2)); C.status.textContent = t < 3.3 ? `SCAN ${String(pct).padStart(3, "0")}%` : ex > .5 ? "MODE // EXPLODE" : "STATUS // LOCKED";
+    const pct = Math.round(100 * seg(t, .6, 3.2)); C.status.textContent = t < 3.3 ? `${PR.hudScan} ${String(pct).padStart(3, "0")}%` : ex > .5 ? PR.hudExplode : PR.hudLock;
     // لوحات الأرقام: الرقم بيعدّ، ولما يتثبت بيتلوّن بلون التمييز + خط بيوصل للجزء
     const anchors = [[[150, 120, 0], "body", 640, 620], [[0, 270, 0], "cap", 120, 460], [[80, -120, 0], "core", 640, 1460]];
     C.plates.forEach((p, i) => {

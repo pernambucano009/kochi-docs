@@ -2,25 +2,36 @@
 <script>
 // قالب «شرح رياضي»: العنوان بيترسم بخطه وبعدين يتملي، المعادلة بتظهر حرف حرف وكل رمز بياخد لونه واسمه،
 // المحاور بتترسم، منحنيين (عادي ومركّب) بيتسابقوا ونقطة بتمشي برقمها، والفرق بينهم بيتعلّم. ستايل فيديوهات الشرح الهادية. 1080×1920، 12 ثانية.
+const G1 = "١ · العنوان والمعادلة", G2 = "٢ · المنحنيات", G3 = "٣ · الختام", GS = "الشكل العام";
 const PR = M.params({
-  title: { label: "العنوان", kind: "text", role: "product", def: "سحر الفايدة المركّبة" },
-  p: { label: "المبلغ في الأول", kind: "text", def: "1000" },
-  rate: { label: "النسبة في السنة (رقم)", kind: "text", def: "10" },
-  years: { label: "عدد السنين", kind: "text", def: "20" },
-  gap: { label: "جملة الفرق", kind: "text", def: "الفرق ده كله فايدة على الفايدة" },
-  end: { label: "الجملة الأخيرة", kind: "text", def: "ابدأ بدري… والوقت يشتغل لك" },
-  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "محفظتي" },
-  accent: { label: "لون المنحنى", kind: "color", def: "#58c4dd" },
+  title: { label: "العنوان", kind: "text", role: "product", def: "سحر الفايدة المركّبة", group: G1, max: 22, hint: "اسم الفكرة اللي هتشرحها. بيترسم بخطه الأول وبعدين يتملي." },
+  lP: { label: "اسم الرمز P", kind: "text", def: "المبلغ", group: G1, max: 10 },
+  lR: { label: "اسم الرمز r", kind: "text", def: "النسبة", group: G1, max: 10 },
+  lN: { label: "اسم الرمز n", kind: "text", def: "السنين", group: G1, max: 10, hint: "كل رمز في المعادلة بيتلوّن ويتكتب تحته اسمه بالعربي." },
+  p: { label: "المبلغ في الأول", kind: "number", def: 1000, min: 1, max: 100000000, step: 100, group: G2, hint: "الرقم اللي المنحنيين بيبدأوا منه." },
+  rate: { label: "النسبة في السنة", kind: "number", def: 10, min: 1, max: 100, step: 1, unit: "٪", group: G2, hint: "كل ما النسبة أعلى كل ما الفرق بين المنحنيين أكبر." },
+  years: { label: "عدد السنين", kind: "number", def: 20, min: 2, max: 60, step: 1, group: G2 },
+  axisX: { label: "اسم المحور الأفقي", kind: "text", def: "السنين", group: G2, max: 10 },
+  axisY: { label: "اسم المحور الرأسي", kind: "text", def: "الفلوس", group: G2, max: 10 },
+  gap: { label: "جملة الفرق", kind: "text", def: "الفرق ده كله فايدة على الفايدة", group: G2, max: 32, hint: "بتشرح المساحة اللي بين المنحنيين في الآخر." },
+  end: { label: "الجملة الأخيرة", kind: "text", role: "tagline", def: "ابدأ بدري… والوقت يشتغل لك", group: G3, max: 30, hint: "النصيحة أو الدعوة اللي طالعة من الشرح." },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "محفظتي", group: G3, max: 18 },
+  accent: { label: "لون المنحنى", kind: "color", role: "accent", def: "#58c4dd", group: GS, hint: "المنحنى المركّب والنسبة: لون فاتح بيبان على الخلفية الغامقة." },
+  fHead: { label: "خط العربي", kind: "font", def: "plex", group: GS, hint: "العنوان والجمل. المعادلة نفسها بخط سيريف ثابت." },
+});
+M.meta({
+  story: "شرح رياضي هادي: العنوان بيترسم، المعادلة بتظهر رمز رمز وكل رمز بلونه واسمه، المحاور بتترسم، منحنيين (عادي ومركّب) بيتسابقوا ونقطة بتمشي برقمها، والفرق بينهم بيتعلّم.",
+  scenes: [{ name: G1, t0: 0, t1: 4, about: "العنوان والمعادلة وأسماء الرموز" }, { name: G2, t0: 4, t1: 9.4, about: "المحاور والمنحنيين والفرق" }, { name: G3, t0: 9.4, t1: 12, about: "الجملة الأخيرة والبراند" }],
+  tips: ["مناسب للمالية والاستثمار والادخار، أو أي فكرة فيها نمو مع الوقت.", "أرقام واقعية (نسبة معقولة) بتخلي الشرح محترم.", "جملة الفرق هي اللي الناس بتفتكرها."],
 });
 const W = 1080, H = 1920, DUR = 12, GX0 = 150, GX1 = 950, GY0 = 1430, GY1 = 760;
-const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
 const ar = (s) => String(s).replace(/\d/g, (d) => "٠١٢٣٤٥٦٧٨٩"[d]);
 const P0 = parseFloat(PR.p) || 1000, RT = (parseFloat(PR.rate) || 10) / 100, NY = Math.max(2, Math.min(60, parseInt(PR.years) || 20));
 const YM = P0 * Math.pow(1 + RT, NY) * 1.08;
 
 M.reel({
   W, H, DUR, bg: "#1b1b1f",
-  async init(M) { await Promise.all([loadFont("SR", "Instrument_Serif.ttf"), loadFont("PB", "TY-PlexArabic-700.ttf", "700"), loadFont("PX", "TY-PlexArabic-400.ttf")]); const c = M.canvas(W, H); return { x: c.getContext("2d") }; },
+  async init(M) { await Promise.all([M.font("SR", "serif"), M.font("PB", PR.fHead), M.font("PX", "plex4")]); const c = M.canvas(W, H); return { x: c.getContext("2d") }; },
   seek(t, C, M) {
     const { x } = C, { seg, cubicIO, clamp, smooth, expo } = M, io = (k) => cubicIO(clamp(k)), A = PR.accent, YEL = "#f7d96b", GRN = "#83c167", GRY = "#8b8b94";
     x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = "#1b1b1f"; x.fillRect(0, 0, W, H);
@@ -38,15 +49,15 @@ M.reel({
     { const k = io(seg(t, 2.4, 2.9)); x.globalAlpha = k; x.fillStyle = GRN; x.font = "italic 72px SR"; x.fillText("n", ex + 6, ey - 52 + (1 - k) * 30); pos.n = ex + 26; }
     x.globalAlpha = 1;
     // أسامي الرموز
-    const lab = [[pos.P, YEL, "المبلغ"], [pos.r, A, "النسبة"], [pos.n, GRN, "السنين"]];
+    const lab = [[pos.P, YEL, PR.lP], [pos.r, A, PR.lR], [pos.n, GRN, PR.lN]];
     lab.forEach(([lx, col, s], i) => { const k = io(seg(t, 2.9 + i * .2, 3.4 + i * .2)) * (1 - io(seg(t, 7.0, 7.4))); if (k <= 0) return; x.globalAlpha = k;
-      x.strokeStyle = col; x.lineWidth = 3; x.beginPath(); x.moveTo(lx, ey + 30); x.lineTo(lx, ey + 30 + 50 * k); x.stroke(); x.fillStyle = col; x.font = "400 40px PX"; x.textAlign = "center"; x.direction = "rtl"; x.fillText(s, lx, ey + 130); x.globalAlpha = 1; });
+      x.strokeStyle = col; x.lineWidth = 3; x.beginPath(); x.moveTo(lx, ey + 30); x.lineTo(lx, ey + 30 + (50 + i % 2 * 60) * k); x.stroke(); x.fillStyle = col; x.font = "400 40px PX"; x.textAlign = "center"; x.direction = "rtl"; x.fillText(s, lx, ey + 130 + i % 2 * 60); x.globalAlpha = 1; });
     // ٣) المحاور
     const ak = io(seg(t, 3.6, 4.6));
     if (ak > 0) { x.strokeStyle = "rgba(255,255,255,.08)"; x.lineWidth = 2; for (let k = 1; k <= 4; k++) { const y = GY0 - (GY0 - GY1) * k / 4; x.beginPath(); x.moveTo(GX0, y); x.lineTo(GX0 + (GX1 - GX0) * ak, y); x.stroke(); }
       x.strokeStyle = "#e8e8ea"; x.lineWidth = 4; x.beginPath(); x.moveTo(GX0, GY0); x.lineTo(GX0 + (GX1 - GX0 + 30) * ak, GY0); x.moveTo(GX0, GY0); x.lineTo(GX0, GY0 - (GY0 - GY1 + 40) * ak); x.stroke();
       x.fillStyle = "#e8e8ea"; x.font = "400 30px PX"; x.textAlign = "center"; x.direction = "ltr"; for (let k = 0; k <= 4; k++) { const n = Math.round(NY * k / 4), xx = GX0 + (GX1 - GX0) * k / 4; x.globalAlpha = ak; x.fillRect(xx - 2, GY0, 4, 14); x.fillText(ar(n), xx, GY0 + 52); }
-      x.direction = "rtl"; x.font = "400 34px PX"; x.fillText("السنين", (GX0 + GX1) / 2, GY0 + 110); x.textAlign = "left"; x.fillText("الفلوس", GX0 - 10, GY1 - 70); x.globalAlpha = 1; }
+      x.direction = "rtl"; x.font = "400 34px PX"; x.fillText(PR.axisX, (GX0 + GX1) / 2, GY0 + 110); x.textAlign = "left"; x.fillText(PR.axisY, GX0 - 10, GY1 - 70); x.globalAlpha = 1; }
     const X = (n) => GX0 + (GX1 - GX0) * n / NY, Y = (v) => GY0 - (GY0 - GY1) * v / YM;
     // ٤) المنحنيين
     const ck = io(seg(t, 4.8, 7.2)), nn = NY * ck;

@@ -2,14 +2,21 @@
 <script>
 // قالب «تيلت شيفت»: مدينة متصورة من فوق بعدسة تيلت شيفت: شريط رفيع بس هو اللي واضح والباقي مموّه، فالمدينة بتبان زي ماكيت صغير؛
 // ألوان مشبّعة، عربيات وناس بتتحرك متقطع (زي الفاصل الزمني)، والناس بتتجمع عند الفرع الجديد. 1080×1920، 12 ثانية.
+const G1 = "١ · المدينة", G2 = "٢ · الختام", GS = "الشكل العام";
 const PR = M.params({
-  title: { label: "العنوان", kind: "text", role: "product", def: "افتتاح فرعنا الجديد" },
-  sub: { label: "تحت العنوان", kind: "text", def: "الجمعة الجاية · الساعة ١٠ الصبح" },
-  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "كافيه الركن" },
-  accent: { label: "لون الفرع", kind: "color", def: "#ff4f6d" },
+  title: { label: "العنوان", kind: "text", role: "product", def: "افتتاح فرعنا الجديد", group: G2, max: 22, hint: "الخبر: افتتاح، فرع جديد، حدث. بيظهر بعد ما الناس تتجمع عند المحل." },
+  sub: { label: "تحت العنوان", kind: "text", def: "الجمعة الجاية · الساعة ١٠ الصبح", group: G2, max: 32, hint: "الميعاد والمكان: يوم + ساعة، أو اسم الحي." },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "كافيه الركن", group: G2, max: 18, hint: "بيظهر في كبسولة بلون الفرع تحت." },
+  accent: { label: "لون الفرع", kind: "color", role: "accent", def: "#ff4f6d", group: GS, hint: "لون سقف المحل وناسه: لون البراند علشان العين تروحله على طول." },
+  fHead: { label: "خط العنوان", kind: "font", def: "lalezar", group: GS },
+  fText: { label: "خط الكلام", kind: "font", def: "changa", group: GS },
+});
+M.meta({
+  story: "مدينة متصورة من فوق بعدسة تيلت شيفت: شريط رفيع واضح والباقي مموّه فالمدينة شبه ماكيت صغير، عربيات وناس بتتحرك متقطع، والناس بتتجمع عند الفرع الجديد، وبعدين العنوان والميعاد.",
+  scenes: [{ name: G1, t0: 0, t1: 7, about: "المدينة والحركة والتجمّع عند المحل" }, { name: G2, t0: 7, t1: 12, about: "العنوان والميعاد" }],
+  tips: ["مناسب لافتتاح فرع أو حدث أو عرض في مكان معيّن.", "قول الميعاد بالظبط (يوم وساعة) علشان الناس تيجي.", "لون الفرع لازم يبان وسط ألوان المدينة الهادية."],
 });
 const W = 1080, H = 1920, DUR = 12, N = 16, TW = 70, TH = 40;
-const loadFont = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
 const COLS = ["#f4f1ea", "#e9e2d2", "#d97a4e", "#e9b44c", "#3d6fb6", "#f1d3b3", "#9fc7c0"];
 const isRoad = (i, j) => i % 5 === 2 || j % 5 === 2;
 const SHOP = [6, 6];
@@ -17,7 +24,7 @@ const SHOP = [6, 6];
 M.reel({
   W, H, DUR, bg: "#6f8f5a",
   async init(M) {
-    await Promise.all([loadFont("LZ", "SM-Lalezar.ttf"), loadFont("CH", "SM-Changa.ttf")]);
+    await Promise.all([M.font("LZ", PR.fHead), M.font("CH", PR.fText)]);
     const c = M.canvas(W, H); const x = c.getContext("2d");
     const mk = () => { const k = document.createElement("canvas"); k.width = W; k.height = H; return k; };
     const R = M.rng(12), city = [];
