@@ -2,7 +2,7 @@
 
 async function loadSettings() {
   const s = await api("/api/settings");
-  for (const name of ["atlas", "zernio"]) {
+  for (const name of ["atlas", "zernio", "scrape"]) {
     const k = s.keys[name];
     // المفتاح المتسجل بيبان نقط جوه الخانة (زي البروتوتايب)، والحالة سطر صغير بس لو مفيش مفتاح
     $(`${name}State`).textContent = k.set ? "" : "✕ مفيش مفتاح لسه";
@@ -22,7 +22,7 @@ async function loadSettings() {
 $("keysForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const body = {};
-  for (const name of ["atlas", "zernio"]) {
+  for (const name of ["atlas", "zernio", "scrape"]) {
     const v = $(`${name}Key`).value.trim();
     if (v) body[name] = v;
   }

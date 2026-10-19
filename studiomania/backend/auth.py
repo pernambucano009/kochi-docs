@@ -17,7 +17,7 @@ SESSION_COOKIE = "sm_session"
 SESSION_DAYS = 30
 
 # المفاتيح اللي ينفع تتحط من صفحة الإعدادات
-SETTING_KEYS = {"atlas": "ATLASCLOUD_API_KEY", "zernio": "ZERNIO_API_KEY"}
+SETTING_KEYS = {"atlas": "ATLASCLOUD_API_KEY", "zernio": "ZERNIO_API_KEY", "scrape": "SCRAPECREATORS_API_KEY"}
 
 
 class Auth:

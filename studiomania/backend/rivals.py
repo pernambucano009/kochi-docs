@@ -47,7 +47,7 @@ def missing_msg() -> str:
     names = key_names()
     if names:
         return f"لقيت متغير باسم {', '.join(names)} بس قيمته فاضية. حط المفتاح فيه في Railway"
-    return "مفتاح ScrapeCreators مش واصل للبرنامج. اتأكد إن اسمه SCRAPECREATORS_API_KEY في Variables بتاعة نفس الخدمة اللي البرنامج شغال عليها"
+    return "مفتاح ScrapeCreators مش واصل للبرنامج. حطه من الإعدادات ← المفاتيح والرصيد ← مفتاح ScrapeCreators"
 
 
 def live() -> bool:

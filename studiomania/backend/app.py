@@ -697,11 +697,12 @@ def get_settings():
 class SettingsIn(BaseModel):
     atlas: str | None = None  # None = متغيرش، "" = امسح
     zernio: str | None = None
+    scrape: str | None = None   # ScrapeCreators: تحليل الحسابات و«نبض المجال»
 
 
 @app.put("/api/settings")
 def save_settings(body: SettingsIn):
-    for name in ("atlas", "zernio"):
+    for name in ("atlas", "zernio", "scrape"):
         value = getattr(body, name)
         if value is not None:
             auth.save_key(name, value)
