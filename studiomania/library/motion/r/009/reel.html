@@ -4,15 +4,15 @@
 const BPM = 100, B = 60 / BPM, BAR = B * 4;
 const G1 = "١ · الاسم", G2 = "٢ · المكونات", G3 = "٣ · التقليب والزينة", GC = "الألوان";
 const PR = M.params({
-  title: { label: "اسم المشروب", kind: "text", role: "product", def: "Sunset Fizz", group: G1, max: 14 },
-  sub: { label: "سطر تحت الاسم", kind: "text", def: "Fresh · bubbly · over ice", group: G1, max: 40 },
-  subEnd: { label: "السطر في الآخر", kind: "text", def: "Orange · Pomegranate · Soda — 2 : 1 : 1", group: G3, max: 50 },
-  ice: { label: "التلج (الاسم | الكمية | الوحدة)", kind: "text", def: "Ice | 3 | cubes", group: G2, max: 24, hint: "الاسم | الكمية | الوحدة." },
-  liquids: { label: "٣ سوايل (الاسم | الكمية | الوحدة | اللون | الشفافية 0-1)", kind: "lines", def: ["Orange juice | 40 | ml | #f6a21a | .9", "Pomegranate syrup | 20 | ml | #b0122e | .95", "Soda water | 30 | ml | #e8f2f4 | .2"], group: G2, max: 40, hint: "٣ سوايل: الاسم | الكمية | الوحدة | اللون | الشفافية (0 لـ 1). الكوباية بتتملي بنسبتهم." },
-  stir: { label: "التقليب (الاسم | الكمية | الوحدة)", kind: "text", def: "Stir | 10 | sec", group: G3, max: 24 },
-  garnish: { label: "الزينة (الاسم | الكمية | الوحدة)", kind: "text", def: "Mint sprig | 1 | leaf", group: G3, max: 28 },
+  title: { label: "اسم المشروب", kind: "text", role: "product", def: "شروق", group: G1, max: 14 },
+  sub: { label: "سطر تحت الاسم", kind: "text", def: "منعش · بالفوار · على التلج", group: G1, max: 40 },
+  subEnd: { label: "السطر في الآخر", kind: "text", def: "برتقال · رمان · صودا — ٢ : ١ : ١", group: G3, max: 50 },
+  ice: { label: "التلج (الاسم | الكمية | الوحدة)", kind: "text", def: "تلج | ٣ | مكعبات", group: G2, max: 24, hint: "الاسم | الكمية | الوحدة." },
+  liquids: { label: "٣ سوايل (الاسم | الكمية | الوحدة | اللون | الشفافية 0-1)", kind: "lines", def: ["عصير برتقال | ٤٠ | مل | #f6a21a | .9", "شراب رمان | ٢٠ | مل | #b0122e | .95", "صودا | ٣٠ | مل | #e8f2f4 | .2"], group: G2, max: 40, hint: "٣ سوايل: الاسم | الكمية | الوحدة | اللون | الشفافية (0 لـ 1). الكوباية بتتملي بنسبتهم." },
+  stir: { label: "التقليب (الاسم | الكمية | الوحدة)", kind: "text", def: "قلّب | ١٠ | ثواني", group: G3, max: 24 },
+  garnish: { label: "الزينة (الاسم | الكمية | الوحدة)", kind: "text", def: "عود نعناع | ١ | ورقة", group: G3, max: 28 },
   garnishColor: { label: "لون الزينة", kind: "color", def: "#3f9b4a", group: GC },
-  unit: { label: "وحدة القياس جنب الكوباية", kind: "text", def: "ml", group: G2, max: 4 },
+  unit: { label: "وحدة القياس جنب الكوباية", kind: "text", def: "مل", group: G2, max: 4, hint: "بيظهر جنب الرقم اللي بيزيد وانت بتصب." },
 });
 M.meta({
   story: "وصفة مشروب خطوة بخطوة على الإيقاع: التلج بيقع، وكل سايل بيتصب بلونه ونصيبه في الكوباية، وبعدين التقليب والزينة، والوصفة كلها في سطر في الآخر.",
@@ -31,19 +31,26 @@ const STEPS = [
 ];
 // الكوباية مصممة على ٩٠ وحدة: كل سايل بياخد نصيبه من المجموع
 { const tot = STEPS.reduce((a, s) => a + (s.vol || 0), 0) || 90; STEPS.forEach((s) => { if (s.vol) { s.shown = s.vol; s.vol = s.vol / tot * 90; } }); }
+// عربي: الكلام بيتقلب يمين، من اليمين للشمال، والاسم بخط أميري، والأرقام اللي بتتعد بالهندي
+const AR = M.isAr([PR.title, PR.sub, ...STEPS.map((s) => s.name)].join(" "));
+const SIDE = (px) => (AR ? `right:${px}px;direction:rtl;text-align:right;` : `left:${px}px;`);
+const HEAD = AR ? "AM" : "SE";
+// أميري بيتحمّل لوحده (M.fonts بيركّب Alexandria على الحروف العربي في أي خط)
+if (AR) new FontFace("AM", "url(../../fonts/TY-Amiri-700.ttf)", { weight: "700" }).load().then((f) => document.fonts.add(f)).catch(() => {});
+const DIG = (v) => (AR ? String(v).replace(/\d/g, (d) => "٠١٢٣٤٥٦٧٨٩"[d]) : String(v));
 M.reel({
   W: 1080, H: 1080, DUR: 30, bg: "#eee5da",
   fonts: { SE: "Instrument_Serif.ttf", I8: ["inter800.ttf", "800"], I5: ["inter500.ttf", "500"] },
   init(M) {
     const c = M.canvas(1080, 1080); const x = c.getContext("2d");
     const lab = M.el("div", "", "position:absolute;left:0;top:0;width:1080px;height:1080px;");
-    const big = M.el("div", "", "position:absolute;left:640px;top:470px;width:420px;height:300px;overflow:hidden;", "", lab);
-    const bigNum = M.el("div", "", "position:absolute;left:0;top:0;font:800 150px I8;letter-spacing:-.04em;color:#1b1512;line-height:1;white-space:pre;", "", big);
-    const bigUnit = M.el("div", "", "position:absolute;left:0;top:0;font:500 30px I5;color:#1b1512;letter-spacing:.02em;", "", big);
-    const bigName = M.el("div", "", "position:absolute;left:0;top:168px;font:400 64px SE;color:#1b1512;line-height:1;white-space:pre;", "", big);
-    const list = STEPS.map((s) => M.el("div", "", `position:absolute;left:640px;top:0;font:500 24px I5;color:#1b1512;white-space:pre;`, `<b style="font:800 24px I8">${esc(s.amt)}</b> ${esc(s.unit)} &nbsp;<span style="font:400 30px SE">${esc(s.name)}</span>`, lab));
-    const title = M.el("div", "", `position:absolute;left:72px;top:64px;font:400 ${M.fit(PR.title, "SE", 940, 120, 40)}px SE;direction:auto;unicode-bidi:plaintext;`+"color:#1b1512;line-height:1;white-space:pre;", PR.title, lab);
-    const sub = M.el("div", "", "position:absolute;left:78px;top:196px;font:500 22px I5;letter-spacing:.14em;text-transform:uppercase;color:#6c5a4c;white-space:pre;", PR.sub, lab);
+    const big = M.el("div", "", `position:absolute;${SIDE(AR ? 40 : 640)}top:470px;width:420px;height:300px;overflow:hidden;`, "", lab);
+    const bigNum = M.el("div", "", `position:absolute;${SIDE(0)}top:0;font:800 150px I8;letter-spacing:${AR ? 0 : "-.04em"};color:#1b1512;line-height:1;white-space:pre;`, "", big);
+    const bigUnit = M.el("div", "", `position:absolute;${SIDE(0)}top:0;font:500 30px I5;color:#1b1512;letter-spacing:${AR ? 0 : ".02em"};`, "", big);
+    const bigName = M.el("div", "", `position:absolute;${SIDE(0)}top:168px;font:${AR ? 700 : 400} 64px ${HEAD};color:#1b1512;line-height:1.1;white-space:pre;`, "", big);
+    const list = STEPS.map((s) => M.el("div", "", `position:absolute;${SIDE(AR ? 40 : 640)}top:0;font:500 24px I5;color:#1b1512;white-space:pre;`, `<b style="font:800 24px I8">${esc(s.amt)}</b> ${esc(s.unit)} &nbsp;<span style="font:${AR ? "700 30px AM" : "400 30px SE"}">${esc(s.name)}</span>`, lab));
+    const title = M.el("div", "", `position:absolute;${SIDE(72)}top:64px;font:${AR ? 700 : 400} ${M.fit(PR.title, HEAD, 940, 120, 40, AR ? "700" : "400")}px ${HEAD};unicode-bidi:plaintext;`+"color:#1b1512;line-height:1;white-space:pre;", PR.title, lab);
+    const sub = M.el("div", "", `position:absolute;${SIDE(78)}top:${AR ? 210 : 196}px;font:500 ${AR ? 26 : 22}px I5;${AR ? "" : "letter-spacing:.14em;text-transform:uppercase;"}color:#6c5a4c;white-space:pre;`, PR.sub, lab);
     const meas = M.el("div", "", "position:absolute;left:0;top:0;font:800 22px I8;color:#1b1512;white-space:pre;", "", lab);
     return { x, big, bigNum, bigUnit, bigName, list, title, sub, meas };
   },
@@ -217,10 +224,10 @@ M.reel({
     if (cur >= 0) {
       const s = STEPS[cur];
       const inK = expo(seg(t, s.t0, s.t0 + .45)), outK = M.expoIn(seg(t, s.t1 - .3, s.t1));
-      P.bigNum.textContent = s.amt; P.bigUnit.textContent = s.unit; P.bigName.textContent = s.name; P.bigName.style.fontSize = M.fit(s.name, "SE", 420, 64, 22) + "px";
+      P.bigNum.textContent = s.amt; P.bigUnit.textContent = s.unit; P.bigName.textContent = s.name; P.bigName.style.fontSize = M.fit(s.name, HEAD, 420, 64, 22, AR ? "700" : "400") + "px";
       const nw = M.measure(s.amt, "800 150px I8") * .97 + 6;
       M.X(P.bigNum, 0, (1 - inK) * 170 - outK * 170);
-      M.X(P.bigUnit, nw + 14, 26 + (1 - inK) * 200 - outK * 200);
+      M.X(P.bigUnit, AR ? -(nw + 14) : nw + 14, 26 + (1 - inK) * 200 - outK * 200);
       M.X(P.bigName, 0, (1 - expo(seg(t, s.t0 + .1, s.t0 + .55))) * 120 - outK * 120);
       M.show(P.big, true);
     } else M.show(P.big, false);
@@ -233,7 +240,7 @@ M.reel({
     // live measure beside the glass (only while pouring)
     const pouring = liq.find((s) => t > s.t0 + .5 && t < s.t1);
     if (pouring && vol > 0) {
-      M.show(P.meas, true); { const tot = STEPS.reduce((a, s) => a + (s.shown || 0), 0) || 90; P.meas.textContent = Math.round(vol / 90 * tot) + (PR.unit ? " " + PR.unit : ""); }
+      M.show(P.meas, true); { const tot = STEPS.reduce((a, s) => a + (s.shown || 0), 0) || 90; P.meas.textContent = DIG(Math.round(vol / 90 * tot)) + (PR.unit ? " " + PR.unit : ""); }
       M.X(P.meas, 130, (surfY - CY) * CS + CY - 12);
     } else M.show(P.meas, false);
     // title: on at the start, back for the finish
