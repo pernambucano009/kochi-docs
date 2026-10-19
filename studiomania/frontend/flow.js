@@ -539,7 +539,37 @@ const Flow = (() => {
         <button type="button" class="flw-btn" data-myedit>✏️ هعمل المونتاج بنفسي</button>
         ${done ? `<a class="flw-btn" href="${esc(pj.export_url)}" download>⬇ نزّل</a>` : ""}
         <button type="button" class="flw-btn pri big" data-render ${rendering || tyBusy ? "disabled" : ""}>${done ? "🔁 صدّر تاني" : "✓ موافق، صدّر الفيديو"}</button></div>
-      ${tyBusy ? `<p class="muted">التصدير بيستنى التايبوجرافي يخلص عشان الكلام يطلع فوق الفيديو.</p>` : ""}`;
+      ${tyBusy ? `<p class="muted">التصدير بيستنى التايبوجرافي يخلص عشان الكلام يطلع فوق الفيديو.</p>` : ""}
+      ${mo.plain ? "" : camBench(d)}`;
+  }
+  // 🎥 تجربة زاوية كاميرا حقيقية: لقطة ٥ ثواني على كل موديل ممكن يغيّر مكان الكاميرا، والنتايج جنب بعض
+  const CAMNAME = { wide: "واسعة", close: "قريبة", medium: "متوسطة", side_l: "من الشمال", closer: "قريبة جدًا", side_r: "من اليمين" };
+  function camBench(d) {
+    const cm = S.cam, cb = d.cambench, shots = (S.mstate || {}).shots || [];
+    if (!S.camOpen) return `<div class="flw-cam"><button type="button" class="flw-link" data-camopen>🎥 جرّب زاوية كاميرا حقيقية (تجربة)</button></div>`;
+    if (!cm) return `<div class="flw-cam">${working("بيدوّر على الموديلات اللي على Atlas…")}</div>`;
+    const sec = cm.seconds || 5;
+    const runs = (cb?.runs || []).map((r) => `<figure class="${r.status}">${r.file ? `<video src="/media/ads/flows/${esc(d.id)}/${esc(r.file)}" controls loop playsinline></video>` : `<span class="flw-ph">${r.status === "failed" ? "⚠️" : "⏳"}</span>`}
+      <figcaption><b>${esc(r.label)}</b><small class="${r.status === "failed" ? "err" : "muted"}">${r.status === "done" ? `✓${r.credits ? ` · ${r.credits} نقطة` : ""}` : r.status === "failed" ? esc(r.error || "فشل") : "بيتعمل (ممكن ياخد كام دقيقة)"}</small></figcaption></figure>`).join("");
+    return `<div class="flw-cam"><h3>🎥 زاوية كاميرا حقيقية (تجربة)</h3>
+      <p class="flw-sub">بنبعت ${sec} ثواني من لقطة لكل موديل على Atlas ممكن يصوّر نفس المشهد من مكان تاني، وتشوف النتايج جنب بعض وتقرر أنهي ينفع.</p>
+      ${cm.models.length ? "" : `<p class="flw-empty bad">ملقتش موديلات تعديل فيديو في كتالوج Atlas.</p>`}
+      <div class="flw-camf"><label>اللقطة <select data-camshot>${shots.map((x) => `<option value="${x.i}" ${S.camShot == x.i ? "selected" : ""}>${x.i + 1} · ${esc(CAMNAME[x.cam] || x.cam || "")} · ${secs(x.start)}</option>`).join("")}</select></label>
+        <label>الزاوية <select data-camangle>${Object.entries(cm.angles).map(([k, t]) => `<option value="${k}" ${(S.camAngle || "side") === k ? "selected" : ""}>${esc(t)}</option>`).join("")}</select></label></div>
+      <div class="flw-camm">${cm.models.map((m) => `<label><input type="checkbox" data-cammodel value="${esc(m.model)}" ${!S.camSel || S.camSel.includes(m.model) ? "checked" : ""}>
+        ${esc(m.label)} <small class="muted">${m.kind === "ref" ? "مرجع فيديو" : "تعديل فيديو"} · ${m.per_sec ? `$${(m.per_sec * sec * (m.kind === "ref" ? 2 : 1)).toFixed(2)} للتجربة` : "السعر مش معروف"}</small></label>`).join("")}</div>
+      <div class="flw-acts"><button type="button" class="flw-btn pri" data-camgo ${cm.models.length ? "" : "disabled"}>جرّب على الموديلات المختارة</button>
+        <small class="muted">بيتخصم من الرصيد على قد الموديلات اللي اشتغلت بس.</small></div>
+      ${cb ? `<h4>اللقطة ${cb.shot + 1} · ${esc(cb.angle_ar)}</h4><div class="flw-camr"><figure><video src="/media/ads/flows/${esc(d.id)}/${esc(cb.src)}" controls loop playsinline></video><figcaption><b>الأصل</b></figcaption></figure>${runs}</div>` : ""}</div>`;
+  }
+  // نتايج تجربة الكاميرا: بنحدّث لحد ما كل الموديلات تخلص
+  function campoll() {
+    clearTimeout(S.ctimer);
+    if (!S.d?.cambench?.runs?.some((r) => r.status === "working")) return;
+    S.ctimer = setTimeout(async () => {
+      try { S.d = await api(`/api/flows/${S.d.id}`); render(); } catch { /* السيرفر بيعيد التشغيل */ }
+      campoll();
+    }, 5000);
   }
   async function mpoll() {
     clearTimeout(S.mtimer);
@@ -648,6 +678,22 @@ const Flow = (() => {
       const pid = S.d.montage?.project_id;
       try { await api(`/api/projects/${pid}/render`, { method: "POST" }); toast("⏳ بيصدّر الفيديو…"); } catch (err) { return toast(err.message, true); }
       return mpoll();
+    }
+    if (q("[data-camopen]")) {
+      S.camOpen = true; render();
+      if (!S.cam) { try { S.cam = await api("/api/cam-models"); } catch (err) { S.cam = { models: [], angles: {}, seconds: 5 }; toast(err.message, true); } render(); }
+      return;
+    }
+    if (q("[data-camgo]")) {
+      const el = S.el;
+      const models = [...el.querySelectorAll("[data-cammodel]:checked")].map((x) => x.value);
+      if (!models.length) return toast("اختار موديل واحد على الأقل", true);
+      S.camSel = models;
+      S.camShot = +(el.querySelector("[data-camshot]")?.value || 0);
+      S.camAngle = el.querySelector("[data-camangle]")?.value || "side";
+      const ok = await call("/cambench", { shot: S.camShot, angle: S.camAngle, models });
+      if (ok) campoll();
+      return;
     }
     if ((b = q("[data-go]"))) { reset(); S.chat = null; S.fmt = null; S.eps = null; return call("/stage", { stage: b.dataset.go }); }
     if ((b = q("[data-rate]"))) {

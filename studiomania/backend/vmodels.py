@@ -239,3 +239,62 @@ def adapt(body: dict) -> dict:
             v = str(v)
         out[name] = _fit(v, spec)
     return out
+
+
+# ---------------------------------------------------------------- 🎥 زاوية كاميرا جديدة لفيديو موجود (تجربة)
+# الموديلات اللي بتاخد فيديو وتطلّعه تاني: تعديل فيديو (video-edit / video-to-video / modify) أو مرجع فيديو (Seedance reference-to-video)
+CAM_HINTS = ("aleph", "recammaster", "camera", "reangle")
+CAM_KINDS = ("video-edit", "edit-video", "video-to-video", "modify", "v2v")
+VIDEO_FIELDS = ("video", "video_url", "input_video", "source_video", "reference_video", "videos", "video_urls", "reference_videos")
+
+
+def catalog() -> list[dict]:
+    families()   # بيتأكد إن الكتالوج اتجاب واتخزن
+    f = _cache_dir() / "catalog.json"
+    try:
+        return json.loads(f.read_text(encoding="utf-8")) if f.exists() else []
+    except ValueError:
+        return []
+
+
+def camera_candidates() -> list[dict]:
+    """الموديلات اللي ممكن تغيّر زاوية الكاميرا: من كتالوج Atlas نفسه (عشان أي موديل جديد يظهر لوحده)."""
+    out, seen = [], set()
+    for e in catalog():
+        if e.get("type") != "Video" or e.get("display_console") is False:
+            continue
+        mid = str(e.get("model") or "")
+        low, last = mid.lower(), mid.rpartition("/")[2].lower()
+        ref = last == "reference-to-video" and ("seedance-2.5" in low or "seedance-2-5" in low)
+        if not (ref or last in CAM_KINDS or any(h in low for h in CAM_HINTS)) or mid in seen:
+            continue
+        seen.add(mid)
+        out.append({"model": mid, "label": _label(e) or mid, "per_sec": _price(e), "kind": "ref" if last == "reference-to-video" else "edit",
+                    "org": e.get("organization") or mid.split("/")[0], "schema": e.get("schema")})
+    out.sort(key=lambda x: (x["kind"] != "ref", x["per_sec"] or 9))
+    return out
+
+
+def camera_body(c: dict, video_url: str, prompt: str, dur: float, ratio: str) -> dict:
+    """طلب «صوّر نفس المشهد من زاوية تانية» بأسماء خانات الموديل ده (من الـ schema بتاعه لو موجود)."""
+    if c["kind"] == "ref":
+        return {"model": c["model"], "prompt": prompt, "reference_videos": [video_url], "duration": max(4, round(dur)),
+                "resolution": "720p", "aspect_ratio": ratio, "generate_audio": False}
+    sch = _schema_for(c["model"])
+    if sch is None and c.get("schema"):
+        try:
+            with httpx.Client(timeout=20) as cl:
+                r = cl.get(c["schema"])
+            sch = r.json() if r.status_code < 400 else None
+            _schemas[c["model"]] = sch
+        except (httpx.HTTPError, ValueError):
+            sch = None
+    props = _props(sch or {})
+    body = {"model": c["model"], "prompt": prompt}
+    vf = next((f for f in VIDEO_FIELDS if f in props), "video")
+    body[vf] = [video_url] if (props.get(vf) or {}).get("type") == "array" or vf.endswith("s") else video_url
+    for k, v in (("duration", round(dur)), ("resolution", "720p"), ("aspect_ratio", ratio)):
+        name = next((a for a in ALIASES.get(k, (k,)) if a in props), None)
+        if name:
+            body[name] = _fit(v, props[name])
+    return body

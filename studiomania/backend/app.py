@@ -24436,6 +24436,108 @@ def phone_build_montage(fid: str, plain: bool = False, comics_mode: str = "auto"
     flow_update(fid, lambda x: x.update(montage={"project_id": pid, "plain": plain, "report": report, "comics": comics_mode, "at": now()}, stage="montage"))
 
 
+# 🎥 زاوية كاميرا حقيقية (تجربة): لقطة ٥ ثواني بتتبعت لكل موديل ممكن يغيّر مكان الكاميرا، والنتايج جنب بعض عشان نختار
+CAM_ANGLES = {
+    "high_left": ("من فوق وعلى الشمال", "a high angle from above, slightly to the left of the person"),
+    "low_right": ("من تحت وعلى اليمين", "a low angle from below, slightly to the right of the person"),
+    "side": ("من الجنب", "a side angle (three-quarter profile) from the person's right side"),
+    "wide_back": ("كادر واسع من ورا شوية", "a wider shot from further back, showing more of the room"),
+    "close_front": ("قريبة جدًا قدام الوش", "a tight close-up straight in front of the face"),
+}
+CAM_TRY_SEC = 5.0
+CAM_MOCK = [{"model": "mock/seedance-2.5/reference-to-video", "label": "Seedance 2.5 (تجريبي)", "per_sec": 0.138, "kind": "ref"},
+            {"model": "mock/kling-o1/video-edit", "label": "Kling O1 Edit (تجريبي)", "per_sec": 0.17, "kind": "edit"}]
+
+
+def cam_prompt(angle: str) -> str:
+    return (f"Re-film this exact same scene from a new camera position: {CAM_ANGLES[angle][1]}. Same person, same face and identity, same hair and clothes, "
+            "same background and lighting, same words with the same lip movements and the same timing, same gestures. Only the camera position "
+            "and framing change. Photorealistic, natural phone-camera look, vertical 9:16, no text, no logos.")
+
+
+@app.get("/api/cam-models")
+def cam_models():
+    """الموديلات اللي على Atlas وممكن تغيّر زاوية الكاميرا لفيديو موجود (من الكتالوج)."""
+    models = [{k: c[k] for k in ("model", "label", "per_sec", "kind", "org")} for c in vmodels.camera_candidates()]
+    if not models and atlas.mock_mode():
+        models = [{"model": m["model"], "label": m["label"], "per_sec": m["per_sec"], "kind": m["kind"], "org": "mock"} for m in CAM_MOCK]
+    return {"models": models,
+            "angles": {k: v[0] for k, v in CAM_ANGLES.items()}, "seconds": CAM_TRY_SEC}
+
+
+class CamBenchIn(BaseModel):
+    shot: int = 0
+    angle: str = "side"
+    models: list[str] = []
+
+
+def run_cam_try(fid: str, rid: str, cand: dict, clip: Path, angle: str, dur: float) -> None:
+    folder = FLOWS_DIR / Path(fid).name
+    def setr(**kw):
+        def fn(x):
+            for r in (x.get("cambench") or {}).get("runs") or []:
+                if r["id"] == rid:
+                    r.update(**kw)
+        flow_update(fid, fn)
+    try:
+        dest = folder / f"cam_{rid}.mp4"
+        if atlas.mock_mode():
+            subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(clip), "-vf", "hflip,crop=iw*0.8:ih*0.8,scale=720:-2",
+                            "-an", str(dest)], check=True, capture_output=True, timeout=120)
+        else:
+            body = vmodels.camera_body(cand, atlas.upload_media(clip), cam_prompt(angle), dur, "9:16")
+            atlas.download(atlas.run_model("Video", body, cand["label"], max_seconds=2400, interval=6), dest)
+        cost = 0 if atlas.mock_mode() else wallet.charge(wallet.credits((cand.get("per_sec") or 0.3) * dur * (2 if cand["kind"] == "ref" else 1)),
+                                                         f"تجربة زاوية كاميرا: {cand['label']}", rid)
+        setr(status="done", file=dest.name, credits=cost, error=None)
+    except Exception as exc:  # noqa: BLE001
+        setr(status="failed", error=str(getattr(exc, "detail", None) or exc)[:300])
+
+
+@app.post("/api/flows/{fid}/cambench")
+def flow_cambench(fid: str, body: CamBenchIn):
+    """جرّب لقطة واحدة على كل الموديلات (أو اللي اخترتها) بنفس الزاوية."""
+    d = flow_load(fid)
+    if body.angle not in CAM_ANGLES:
+        raise HTTPException(400, "الزاوية دي مش معروفة")
+    pid = (d.get("montage") or {}).get("project_id")
+    if not pid:
+        raise HTTPException(400, "اعمل المونتاج الأوتوماتيك الأول")
+    with closing(db()) as conn:
+        clips = json.loads(get_project(conn, pid)["data"]).get("clips") or []
+        if not 0 <= body.shot < len(clips):
+            raise HTTPException(400, "اختار لقطة")
+        sh = clips[body.shot]
+        path = clip_source(conn, sh["gen_id"])
+    if not path:
+        raise HTTPException(400, "الفيديو مش موجود")
+    cands = [c for c in vmodels.camera_candidates() if not body.models or c["model"] in body.models]
+    if atlas.mock_mode() and not cands:
+        cands = [m for m in CAM_MOCK if not body.models or m["model"] in body.models]
+    if not cands:
+        raise HTTPException(400, "ملقتش على Atlas موديلات بتعدّل الفيديو. جرّب تاني بعد شوية")
+    a = float(sh.get("start") or 0)
+    b = float(sh["end"]) if sh.get("end") is not None else a + CAM_TRY_SEC
+    dur = round(max(2.0, min(CAM_TRY_SEC, b - a)), 2)
+    est = sum(wallet.credits((c.get("per_sec") or 0.3) * dur * (2 if c["kind"] == "ref" else 1)) for c in cands)
+    try:
+        wallet.need(est, "تجربة زاوية الكاميرا")
+    except wallet.NoCredits as exc:
+        raise HTTPException(402, str(exc)) from None
+    folder = FLOWS_DIR / Path(fid).name
+    folder.mkdir(parents=True, exist_ok=True)
+    clip = folder / f"camsrc_{uuid.uuid4().hex[:6]}.mp4"
+    subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{a:.3f}", "-i", str(path), "-t", f"{dur:.3f}",
+                    "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-c:a", "aac", str(clip)], check=True, capture_output=True, timeout=300)
+    runs = [{"id": uuid.uuid4().hex[:8], "model": c["model"], "label": c["label"], "per_sec": c.get("per_sec"), "kind": c["kind"],
+             "status": "working", "file": None, "error": None} for c in cands]
+    flow_update(fid, lambda x: x.update(cambench={"shot": body.shot, "angle": body.angle, "angle_ar": CAM_ANGLES[body.angle][0], "src": clip.name,
+                                                  "dur": dur, "runs": runs, "at": now()}))
+    for c, r in zip(cands, runs):
+        threading.Thread(target=run_cam_try, args=(fid, r["id"], c, clip, body.angle, dur), daemon=True).start()
+    return flow_to_dict(fid, flow_load(fid))
+
+
 class PhoneMontageIn(BaseModel):
     plain: bool = False
     comics: str = "auto"   # auto = لو الفيديو كوميدي · on · off
@@ -24469,7 +24571,8 @@ def flow_phone_state(fid: str):
     if tid and (TYPO_PROJ / Path(tid).name / "typo.json").exists():
         t = typo_load(tid)
         typo = {"status": t.get("status"), "step": t.get("step"), "busy": t.get("status") in TYPO_BUSY, "error": t.get("error")}
-    return {"project": {"id": pid, "render_status": pj.get("render_status"), "render_error": pj.get("render_error"),
+    shots = [{"i": i, "cam": c.get("cam") or "", "start": c.get("start"), "end": c.get("end")} for i, c in enumerate(data.get("clips") or [])]
+    return {"shots": shots, "project": {"id": pid, "render_status": pj.get("render_status"), "render_error": pj.get("render_error"),
                         "render_progress": pj.get("render_progress"), "export_url": f"/media/exports/{pj['export_id']}.mp4" if pj.get("export_id") else None},
             "typo": typo}
 
