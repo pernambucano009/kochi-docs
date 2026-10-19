@@ -17,7 +17,10 @@ import httpx
 TEXT_EXT = {".txt", ".md", ".csv", ".json", ".html", ".htm"}
 DOC_EXT = {".pdf", ".docx"}
 IMG_EXT = {".png", ".jpg", ".jpeg", ".webp"}
-SOURCE_EXT = TEXT_EXT | DOC_EXT | IMG_EXT
+# صوت وفيديو: الكلام بيتفرّغ نص (والفيديو بياخد كام لقطة منه كمان)
+AUDIO_EXT = {".mp3", ".wav", ".m4a", ".ogg", ".aac", ".opus"}
+VIDEO_EXT = {".mp4", ".mov", ".webm", ".mkv"}
+SOURCE_EXT = TEXT_EXT | DOC_EXT | IMG_EXT | AUDIO_EXT | VIDEO_EXT
 MAX_TEXT = 60000
 # الخانات اللي الموديل يقدر يقترح لها قيمة (نفس خانات الخريطة)
 FIELDS = {"about": "عن البراند", "audience": "الجمهور", "market": "السوق", "language": "اللغة واللهجة", "domain": "المجال",

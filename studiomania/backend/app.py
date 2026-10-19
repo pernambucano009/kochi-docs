@@ -9171,7 +9171,7 @@ def add_brain_source(bid: str, url: str = Form(""), text: str = Form(""), note: 
     for f in (files or [])[:10]:
         ext = Path(f.filename or "").suffix.lower()
         if ext not in brainsrc.SOURCE_EXT:
-            raise HTTPException(400, f"نوع الملف ده لسه مش مدعوم: {ext or 'بدون امتداد'} (PDF، Word، صور، نص)")
+            raise HTTPException(400, f"نوع الملف ده لسه مش مدعوم: {ext or 'بدون امتداد'} (PDF، Word، صور، نص، صوت، فيديو)")
         name = save_upload(f, brainsrc.SOURCE_EXT, folder, "src")
         new.append({"kind": "file", "name": (f.filename or name)[:120], "file": name})
     if url.strip():
@@ -9190,6 +9190,32 @@ def add_brain_source(bid: str, url: str = Form(""), text: str = Form(""), note: 
     for s in new:
         threading.Thread(target=run_brain_source, args=(bid, s["id"]), daemon=True).start()
     return brain_to_dict(brain_row(bid))
+
+
+def brain_av_text(p: Path, folder: Path) -> tuple[str, list[Path]]:
+    """ملف صوت أو فيديو (أو تسجيل من المايك): الكلام بيتفرّغ نص، ولو فيه صورة بناخد ٣ لقطات منه."""
+    wav = folder / f"{p.stem}-stt.wav"
+    ff = [ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y"]
+    subprocess.run(ff + ["-i", str(p), "-vn", "-ac", "1", "-ar", "16000", str(wav)], check=True, capture_output=True, timeout=600)
+    dur = probe_duration(wav)
+    if dur < .5:
+        raise ValueError("الملف مفيهوش صوت مسموع")
+    try:
+        words = atlas.transcribe(wav, dur)
+    finally:
+        wav.unlink(missing_ok=True)
+    text = " ".join(str(w.get("w") or "").strip() for w in words).strip()
+    imgs = []
+    if p.suffix.lower() in brainsrc.VIDEO_EXT:
+        vdur = probe_duration(p)
+        for i, f in enumerate((.2, .5, .8)):
+            out = folder / f"{p.stem}-frame{i}.jpg"
+            r = subprocess.run(ff + ["-ss", f"{vdur * f:.2f}", "-i", str(p), "-frames:v", "1", "-vf", "scale=768:-2", "-q:v", "4", str(out)], capture_output=True, timeout=60)
+            if r.returncode == 0 and out.exists() and out.stat().st_size:
+                imgs.append(out)
+    if not text and not imgs:
+        raise ValueError("مقدرتش أسمع كلام في الملف ده")
+    return (f"(تفريغ كلام من {'فيديو' if imgs else 'تسجيل صوتي'}: {p.name})\n{text}" if text else ""), imgs
 
 
 def run_brain_source(bid: str, sid: str) -> None:
@@ -9212,6 +9238,8 @@ def run_brain_source(bid: str, sid: str) -> None:
                 text = brainsrc.read_docx(p)
             elif ext in brainsrc.IMG_EXT:
                 imgs = [p]
+            elif ext in brainsrc.AUDIO_EXT | brainsrc.VIDEO_EXT:
+                text, imgs = brain_av_text(p, folder)
             else:
                 raw = p.read_text(encoding="utf-8", errors="ignore")
                 text = brainsrc.html_text(raw)[0] if ext in (".html", ".htm") else raw

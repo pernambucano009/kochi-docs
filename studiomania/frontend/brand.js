@@ -122,6 +122,39 @@ const BrandPage = (() => {
     return "";
   };
 
+  // 📥 صندوق العقل فوق المخ: ارمي أي حاجة (ملف، صوت، فيديو، صور، نص) أو اكتب أو سجّل صوتك،
+  // والمخ بيقراها ويطلّع منها اقتراحات بتظهر نقط منوّرة على الخريطة في الفرع بتاعها
+  const ADD = { id: "add", kind: "add" };
+  const SRC_ACCEPT = ".pdf,.docx,.txt,.md,.csv,.json,.html,.htm,image/*,audio/*,video/*,.mp3,.wav,.m4a,.ogg,.webm,.mp4,.mov";
+  function inboxHTML(b) {
+    const srcs = b?.sources || [], reading = srcs.filter((x) => x.status === "working").length, rec = S.rec;
+    return `<div class="bm-ib-t"><b>📥 ارمي أي حاجة عن البراند</b><small>${reading ? `<span class="bm-ib-spin"></span> بيقرا ${reading === 1 ? "مصدر" : `${reading} مصادر`}…` : "ملف · صوت · فيديو · صور · كلام، والمخ يفصّصها ويحط كل معلومة في مكانها"}</small></div>
+      <div class="bm-ib-acts"><label class="bm-ib-btn">📎 ارفع<input type="file" multiple accept="${SRC_ACCEPT}" data-src hidden></label>
+        <button class="bm-ib-btn" data-ibwrite>✍️ اكتب</button>
+        <button class="bm-ib-btn${rec ? " rec" : ""}" data-ibrec>${rec ? `⏹ وقّف <span class="num" data-rect>0:00</span>` : "🎙️ سجّل"}</button>
+        ${srcs.length ? `<button class="bm-ib-btn ghost" data-ibsrc title="اللي اترمى في العقل">🗂 <span class="num">${srcs.length}</span></button>` : ""}</div>`;
+  }
+  function renderInbox() { const el = S.el?.querySelector("[data-inbox]"); if (el && !S.rec) el.innerHTML = inboxHTML(cur()); }
+  async function toggleRec() {
+    if (S.rec) { S.rec.mr.stop(); return; }
+    let stream;
+    try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch { return toast("المتصفح مش سامح بالمايك. اسمح بيه من جنب اللينك وجرّب تاني", true); }
+    const type = ["audio/webm", "audio/mp4", "audio/ogg"].find((t) => window.MediaRecorder?.isTypeSupported?.(t)) || "";
+    const mr = new MediaRecorder(stream, type ? { mimeType: type } : {}), parts = [], t0 = Date.now();
+    S.rec = { mr, timer: setInterval(() => { const n = Math.round((Date.now() - t0) / 1000), el = S.el?.querySelector("[data-rect]"); if (el) el.textContent = `${Math.floor(n / 60)}:${String(n % 60).padStart(2, "0")}`; if (n >= 600) mr.stop(); }, 500) };
+    mr.ondataavailable = (e) => e.data.size && parts.push(e.data);
+    mr.onstop = () => {
+      clearInterval(S.rec.timer); S.rec = null; stream.getTracks().forEach((t) => t.stop()); renderInbox();
+      const mt = mr.mimeType || type || "audio/webm", ext = /mp4/.test(mt) ? "m4a" : /ogg/.test(mt) ? "ogg" : "webm";
+      if (Date.now() - t0 < 1200 || !parts.length) return toast("التسجيل قصير أوي", true);
+      const form = new FormData();
+      form.append("files", new File(parts, `تسجيل صوتي ${new Date().toLocaleTimeString("ar-EG-u-nu-latn", { hour: "2-digit", minute: "2-digit" })}.${ext}`, { type: mt }));
+      form.append("note", "تسجيل صوتي من صاحب البراند");
+      addSource(form);
+    };
+    mr.start(1000);
+    S.el.querySelector("[data-inbox]").innerHTML = inboxHTML(cur());
+  }
   function html() {
     return `<div class="bm" id="nbWrap"><div class="nh-empty">بيحمّل…</div></div>`;
   }
@@ -132,6 +165,8 @@ const BrandPage = (() => {
       <div class="bm-world"><svg class="bm-lines" aria-hidden="true"></svg><div class="bm-nodes"></div></div>
       <div class="bm-zoom"><button data-zoom="1" aria-label="قرّب">+</button><button data-zoom="0" aria-label="الخريطة كلها">⤢</button><button data-zoom="-1" aria-label="بعّد">−</button></div>
       <div class="bm-card" hidden role="dialog"></div>
+      <div class="bm-inbox" data-inbox></div>
+      <div class="bm-dropall" aria-hidden="true"><b>ارمي هنا</b><small>المخ هيقرا الملف ويحط كل معلومة في مكانها</small></div>
       <p class="bm-hint">دوس على أي نقطة تكتب فيها · النقط المفرّغة لسه ناقصة · دوس على المخ تبدّل البراند</p>`;
   }
   // الخريطة ليها عالم خاص بيها بمسافات واسعة ثابتة (المخ في 0,0)، والشاشة بتتفرّج عليه بزوم وسحب.
@@ -143,8 +178,6 @@ const BrandPage = (() => {
     if (!W || !H) return;
     const ex = Math.max(1.1, Math.min(1.45, W / H));
     const list = branches(b), nodes = [{ id: "c", kind: "center", x: 0, y: 0 }];
-    // «+» تحت المخ: ترمي فيه ملف أو لينك أو تكتب، والبرنامج يقراه
-    nodes.push({ id: "add", kind: "add", x: 0, y: 182, from: "c" });
     list.forEach((br, i) => {
       const a = -Math.PI / 2 + Math.PI / list.length + (i / list.length) * Math.PI * 2;
       // الفرع بيطول مع كل حاجة بتتضاف فيه: العميل يشوف العقل بيكبر
@@ -171,6 +204,7 @@ const BrandPage = (() => {
       return { ...n, ph: i * 1.7, px: o ? (grew ? o.px : o.px + (n.x - o.x)) : n.x, py: o ? (grew ? o.py : o.py + (n.y - o.y)) : n.y, vx: o?.vx || 0, vy: o?.vy || 0 };
     });
     S.byId = Object.fromEntries(S.nodes.map((n) => [n.id, n]));
+    renderInbox();
     fit();
     draw();
   }
@@ -197,13 +231,17 @@ const BrandPage = (() => {
       const e = document.getElementById(id);
       if (e && e.offsetHeight && S.el.closest("#nh")?.contains(S.el)) y = Math.max(y, e.getBoundingClientRect().bottom - r.top + 12);
     }
+    S.headY = y;   // لحد هنا الخريطة بتختفي تحت الشريط (mask)، والصندوق تحته مباشرة
+    const ib = S.el.querySelector(".bm-inbox");
+    if (ib) { ib.style.top = `${y}px`; y += ib.offsetHeight + 14; }
     return y;
   }
   function applyView() {
     const v = S.view, world = S.el?.querySelector(".bm-world");
     if (!v || !world) return;
     world.style.transform = `translate(${v.x}px, ${v.y}px) scale(${v.s})`;
-    S.el.style.setProperty("--bm-top", `${topInset()}px`);
+    S.topY = topInset();
+    S.el.style.setProperty("--bm-top", `${S.headY}px`);
     S.el.style.setProperty("--bm-s", v.s);
     if (S.dv) S.dv.dirty = true;
   }
@@ -263,6 +301,7 @@ const BrandPage = (() => {
     const w = S.el, b = cur();
     w.querySelector(".bm-nodes").innerHTML = S.nodes.map((n) => nodeHTML(n, b)).join("");
     S.nodes.forEach((n) => { n.el = w.querySelector(`[data-n="${CSS.escape(n.id)}"]`); });
+    if (S.hovNode) { const h = S.nodes.find((x) => x.id === S.hovNode.id); S.hovNode = h || null; h?.el?.classList.add("hot"); }
     w.querySelector(".bm-lines").innerHTML = S.nodes.filter((n) => n.from).map((n) => `<path data-l="${esc(n.id)}" class="${n.kind}${n.on === false ? " empty" : ""}"/>`).join("");
     S.nodes.forEach((n) => { n.line = n.from ? w.querySelector(`.bm-lines [data-l="${CSS.escape(n.id)}"]`) : null; });
     // نقط الدراع: النقط الجديدة بتطلع بنبضة
@@ -315,7 +354,11 @@ const BrandPage = (() => {
       const amp = S.drag?.n === n ? 0 : n.kind === "center" ? 2 : n.kind === "branch" ? 4 : 5;
       const x = n.px + (still ? 0 : Math.sin(t * .55 + n.ph) * amp), y = n.py + (still ? 0 : Math.cos(t * .48 + n.ph * 1.3) * amp);
       pos[n.id] = [x, y];
-      if (n.el) n.el.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%)`;
+      if (n.el) {
+        n.el.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%)`;
+        // الشريط اللي فوق طاير فوق الخريطة: لو النقطة قريبة منه اسمها بيظهر تحتها
+        if (n.kind === "leaf") { const down = y * S.view.s + S.view.y < S.topY + 70; if (down !== n.down) { n.down = down; n.el.classList.toggle("tipdown", down); } }
+      }
     }
     // الأذرع خطوط منحنية: الدراع بيلف شوية وهو طالع من المخ، والورق بيكمّل في نفس اتجاه الدراع وبعدين يميل لمكانه
     const c = pos.c;
@@ -422,7 +465,7 @@ const BrandPage = (() => {
       return `<div class="bm-ch"><span class="latin">ADD TO BRAIN</span><b>ضيف للعقل</b></div>
         <p class="bm-note">ارمي أي حاجة عن البراند، والبرنامج يقراها ويطلّع منها اقتراحات تظهر نقط منوّرة على الخريطة، وانت توافق عليها.</p>
         <div class="bm-pills bm-tabs">${[["file", "ارفع ملف"], ["url", "من موقع"], ["text", "اكتب"]].map(([k, t]) => `<button class="bm-pill${tab === k ? " on" : ""}" data-tab="${k}">${t}</button>`).join("")}</div>
-        ${tab === "file" ? `<label class="bm-up wide bm-drop">+<small>ارمي الملف هنا أو دوس تختار</small><small class="bm-types">PDF · Word · صور · نص</small><input type="file" multiple accept=".pdf,.docx,.txt,.md,.csv,.json,.html,.htm,image/*" data-src hidden></label>`
+        ${tab === "file" ? `<label class="bm-up wide bm-drop">+<small>ارمي الملف هنا أو دوس تختار</small><small class="bm-types">PDF · Word · صور · نص · صوت · فيديو</small><input type="file" multiple accept="${SRC_ACCEPT}" data-src hidden></label>`
           : tab === "url" ? editable("@url", "", "kochi.fit · واضغط Enter", true)
           : editable("@text", "", "اكتب أي حاجة عن البراند: الجمهور، النبرة، العروض، اللي ممنوع… واضغط Enter")}
         ${srcs.length ? `<ul class="bm-srcs">${srcs.map((s) => `<li class="${s.status}"><span class="bm-dot ${s.status === "done" ? "full" : s.status === "failed" ? "bad" : "busy"}"></span>
@@ -484,13 +527,20 @@ const BrandPage = (() => {
     if (n?.l?.type === "page") { window.RV_FOCUS = n.l.page === "rivals" ? n.l.i : null; return window.NHNav?.(n.l.page); }   // الشخصيات / التعليق / الموسيقى: صفحتها بتفتح جوه العقل («رجوع» بيرجّعك هنا)
     const card = S.el.querySelector(".bm-card");
     if (!n) { S.open = null; card.hidden = true; S.el.classList.remove("has-card"); markOpen(); return; }
+    // رجوع: للكارت اللي كنت فيه قبل كده، ولو فتحت النقطة من الخريطة على طول فلفرعها
+    if (S.open && S.open.id !== n.id && !S.backing) S.hist = [...(S.hist || []), S.open.id].slice(-12);
+    if (!S.open) S.hist = [];
+    S.backing = false;
     S.open = { id: n.id, br: n.br?.k, n };
-    card.innerHTML = `<button class="bm-x" data-close aria-label="اقفل">✕</button>` + cardHTML(n);
+    const back = S.hist.length ? S.nodes.find((x) => x.id === S.hist[S.hist.length - 1]) : n.kind === "leaf" ? S.byId[n.br.k] : null;
+    card.innerHTML = `<button class="bm-x" data-close aria-label="اقفل">✕</button>`
+      + (back ? `<button class="bm-back" data-back="${esc(back.id)}">→ ${esc(back.kind === "branch" ? back.br.t : back.kind === "leaf" ? back.l.t : back.kind === "center" ? "البراندات" : "رجوع")}</button>` : "") + cardHTML(n);
     card.hidden = false;
     S.el.classList.add("has-card");
     markOpen();
     // يتحط في مكانه جنب النقطة الأول، وبعدين يظهر (الأنيميشن على الشفافية والحجم بس، مش على المكان)
-    placeCard(toScreen([n.px, n.py]));
+    if (n.kind === "add") { const ib = S.el.querySelector(".bm-inbox"); card.style.transform = `translate(${(S.el.clientWidth - card.offsetWidth) / 2}px, ${ib.offsetTop + ib.offsetHeight + 10}px)`; }
+    else placeCard(toScreen([n.px, n.py]));
     card.animate([{ opacity: 0, scale: .96 }, { opacity: 1, scale: 1 }], { duration: reduce.matches ? 1 : 240, easing: "cubic-bezier(.2,.8,.2,1)" });
     const ed = card.querySelector(".bm-write");
     if (ed && n.kind === "leaf") { ed.focus(); placeCaret(ed); }
@@ -510,7 +560,7 @@ const BrandPage = (() => {
     y = Math.max(top, Math.min(H - ch - 8, y));
     card.style.transform = `translate(${x}px, ${y}px)`;
   }
-  const refreshCard = () => { if (S.open) { const n = S.nodes.find((x) => x.id === S.open.id) || (S.open.id === "c" ? S.nodes[0] : null); if (n) openCard(n); else openCard(null); } };
+  const refreshCard = () => { if (S.open) { const n = S.open.id === "add" ? ADD : S.nodes.find((x) => x.id === S.open.id) || (S.open.id === "c" ? S.nodes[0] : null); S.backing = true; if (n) openCard(n); else openCard(null); } };
 
   // ---------- الحفظ ----------
   async function save(fn, { card = true } = {}) {
@@ -590,6 +640,31 @@ const BrandPage = (() => {
       n.beadG?.classList.toggle("hl", n.id === k);
     }
   }
+  // الماوس على نقطة أو فرع: الدراع كله بينوّر واللي حواليه يهدى.
+  // بالمسافة مش بـ :hover: النقطة بتتحرك ناحية الماوس وبتعوم، فلو اعتمدنا على اللي تحت الماوس بالظبط كانت بتطلع وتدخل كل فريم (رعشة).
+  // النقطة اللي اتمسكت بتفضل ماسكة لحد ما الماوس يبعد عنها ضعف المسافة تقريبًا.
+  const HOT_R = { leaf: 20, branch: 46 };
+  function pickHover(target) {
+    if (target?.closest?.(".bm-card, .bm-zoom, .bm-inbox")) return setHot(null);
+    const m = S.mw, d = (n) => Math.hypot(m[0] - n.px, m[1] - n.py);
+    const cur = S.hovNode;
+    if (cur && d(cur) < HOT_R[cur.kind] * 1.9) return;
+    let best = null, bd = 1e9;
+    for (const n of S.nodes) {
+      if (n.kind !== "leaf" && n.kind !== "branch") continue;
+      const k = d(n);
+      if (k < HOT_R[n.kind] && k < bd) { best = n; bd = k; }
+    }
+    setHot(best);
+  }
+  function setHot(n) {
+    if (S.hovNode === n) return;
+    S.hovNode?.el?.classList.remove("hot");
+    S.hovNode = n;
+    n?.el?.classList.add("hot");
+    S.el.classList.toggle("hotting", !!n);
+    hover(n?.kind === "branch" ? n.id : n?.kind === "leaf" ? n.br.k : null, n?.kind === "leaf" ? n.id : null);
+  }
   function bind(w) {
     // مسك وسحب أي نقطة أو فرع أو المخ نفسه
     w.addEventListener("pointerdown", (e) => {
@@ -619,15 +694,8 @@ const BrandPage = (() => {
       if (z.dataset.zoom === "0") { fit(true); return; }
       zoomAt(z.dataset.zoom === "1" ? 1.25 : .8, w.clientWidth / 2, w.clientHeight / 2);
     });
-    // الماوس على نقطة أو فرع: الدراع كله بينوّر واللي حواليه يهدى
-    w.addEventListener("pointerover", (e) => {
-      const el = e.target.closest(".bm-n"), n = el && S.byId[el.dataset.n];
-      const k = n?.kind === "branch" ? n.id : n?.kind === "leaf" ? n.br.k : null;
-      S.hovNode = n?.kind === "leaf" || n?.kind === "branch" ? n : null;
-      hover(k, n?.kind === "leaf" ? n.id : null);
-    });
     w.addEventListener("pointermove", (e) => {
-      if (S.view && e.pointerType !== "touch") { const r = w.getBoundingClientRect(); S.mw = toWorld(e.clientX - r.left, e.clientY - r.top); }
+      if (S.view && e.pointerType !== "touch") { const r = w.getBoundingClientRect(); S.mw = toWorld(e.clientX - r.left, e.clientY - r.top); if (!S.pan?.moved && !S.drag?.moved) pickHover(e.target); }
       if (S.dv && e.pointerType !== "touch") { const r = w.getBoundingClientRect(); S.dv.tx = e.clientX - r.left; S.dv.ty = e.clientY - r.top; if (S.dv.a < .01) { S.dv.mx = S.dv.tx; S.dv.my = S.dv.ty; } S.dv.ta = 1; }
       const pn = S.pan;
       if (pn && e.pointerId === pn.id) {
@@ -654,13 +722,13 @@ const BrandPage = (() => {
       S.drag = null;
       if (d.moved) { S.noClick = true; setTimeout(() => (S.noClick = false), 0); w.classList.remove("dragging"); d.el.classList.remove("held"); }
     };
-    w.addEventListener("pointerleave", () => { if (S.dv) S.dv.ta = 0; S.mw = null; S.hovNode = null; hover(null); });
+    w.addEventListener("pointerleave", () => { if (S.dv) S.dv.ta = 0; S.mw = null; setHot(null); });
     w.addEventListener("pointerup", drop);
     w.addEventListener("pointercancel", drop);
     w.addEventListener("click", async (e) => {
       const t = e.target;
       if (S.noClick) { S.noClick = false; return; }
-      const node = t.closest(".bm-n");
+      const node = t.closest(".bm-n") || (S.hovNode && !t.closest(".bm-card, .bm-zoom, .bm-inbox") ? S.hovNode.el : null);
       if (node) {
         const n = S.nodes.find((x) => x.id === node.dataset.n);
         if (!n) return;
@@ -669,6 +737,16 @@ const BrandPage = (() => {
         return openCard(n);
       }
       if (t.closest("[data-close]")) return openCard(null);
+      if (t.closest("[data-ibwrite]")) { S.addTab = "text"; openCard(ADD); S.el.querySelector(".bm-card .bm-write")?.focus(); return; }
+      if (t.closest("[data-ibsrc]")) { S.addTab = S.addTab || "file"; return openCard(S.open?.id === "add" ? null : ADD); }
+      if (t.closest("[data-ibrec]")) return toggleRec();
+      const bk = t.closest("[data-back]");
+      if (bk) {
+        const to = S.nodes.find((x) => x.id === bk.dataset.back);
+        if (S.hist?.[S.hist.length - 1] === bk.dataset.back) S.hist.pop();
+        S.backing = true;
+        return openCard(to || null);
+      }
       const go = t.closest("[data-go]");
       if (go) return openCard(S.nodes.find((x) => x.id === go.dataset.go));
       const br = t.closest("[data-brain]");
@@ -775,16 +853,25 @@ const BrandPage = (() => {
       }
     });
     // سحب صور ورميها على كارت الصور
-    w.addEventListener("dragover", (e) => { if (e.target.closest(".bm-card") && (S.open?.n?.l?.type === "imgs" || S.open?.id === "add")) { e.preventDefault(); S.el.querySelector(".bm-card").classList.add("drop"); } });
-    w.addEventListener("dragleave", (e) => { if (!e.relatedTarget || !S.el.querySelector(".bm-card").contains(e.relatedTarget)) S.el.querySelector(".bm-card").classList.remove("drop"); });
-    w.addEventListener("drop", (e) => {
-      const card = S.el.querySelector(".bm-card");
-      card.classList.remove("drop");
-      if (!e.target.closest(".bm-card")) return;
-      if (S.open?.id === "add") { e.preventDefault(); const form = new FormData(); [...e.dataTransfer.files].forEach((f) => form.append("files", f)); return addSource(form); }
-      if (S.open?.n?.l?.type !== "imgs") return;
+    // سحب ملفات ورميها: على كارت الصور بتروح للصور، وفي أي حتة تانية في الخريطة بتروح للمخ يقراها
+    const files = (e) => [...(e.dataTransfer?.types || [])].includes("Files");
+    const toImgs = (e) => e.target.closest(".bm-card") && S.open?.n?.l?.type === "imgs";
+    w.addEventListener("dragover", (e) => {
+      if (!files(e)) return;
       e.preventDefault();
-      upload(S.open.n.l.f, e.dataTransfer.files);
+      const img = toImgs(e);
+      S.el.querySelector(".bm-card").classList.toggle("drop", !!img);
+      S.el.classList.toggle("dropping", !img);
+    });
+    w.addEventListener("dragleave", (e) => { if (!e.relatedTarget || !w.contains(e.relatedTarget)) { S.el.classList.remove("dropping"); S.el.querySelector(".bm-card").classList.remove("drop"); } });
+    w.addEventListener("drop", (e) => {
+      S.el.classList.remove("dropping");
+      S.el.querySelector(".bm-card").classList.remove("drop");
+      if (!files(e)) return;
+      e.preventDefault();
+      if (toImgs(e)) return upload(S.open.n.l.f, e.dataTransfer.files);
+      const form = new FormData(); [...e.dataTransfer.files].slice(0, 10).forEach((f) => form.append("files", f));
+      return addSource(form);
     });
     new ResizeObserver(() => { dotsSize(); layout(); }).observe(w);
     // لو الثيم اتغيّر (فاتح/غامق) النقط بتترسم من جديد بلونه
