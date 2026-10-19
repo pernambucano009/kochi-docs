@@ -115,7 +115,9 @@ function tyRenderProj() {
         .map(([k, l]) => `<option value="${k}" ${k === bg.kind ? "selected" : ""}>${l}</option>`).join("")}</select></label>
       ${bg.kind === "solid" ? `<label>اللون <input type="color" data-tybg="color" value="${tye(bg.color || "#101010")}"></label>` : ""}
       ${bg.kind === "image" || bg.kind === "video" ? `<label class="btn sm">⬆ ${bg.file ? "غيّر" : "ارفع"} ${bg.kind === "image" ? "الصورة" : "الفيديو"}
-        <input type="file" data-tybgfile accept="${bg.kind === "image" ? "image/*" : "video/*"}" hidden></label>` : ""}
+        <input type="file" data-tybgfile accept="${bg.kind === "image" ? "image/*" : "video/*"}" hidden></label>
+        <button type="button" class="btn sm" data-tystock="${bg.kind}">🔎 من المكتبة</button>` : ""}
+      ${bg.credit && ["image", "video"].includes(bg.kind) ? `<small class="muted ty-credit" data-no-i18n>${bg.kind === "video" ? "🎬" : "📷"} ${bg.credit.by_url ? `<a href="${tye(bg.credit.by_url)}" target="_blank" rel="noopener">${tye(bg.credit.by)}</a>` : tye(bg.credit.by)} · <a href="https://www.pexels.com" target="_blank" rel="noopener">Pexels</a></small>` : ""}
       ${["image", "video", "source"].includes(bg.kind) ? `<label>تغميق <input type="range" min="0" max="0.8" step="0.05" data-tybg="dim" value="${bg.dim || 0}"></label>` : ""}
     </div>
     <details class="panel tv-step" ${tyx.open.s1 ?? !v.words?.length ? "open" : ""} data-tydk="s1"><summary>١. 🗣️ الكلام <small class="muted">${v.words?.length ? `${v.words.length} كلمة · ${tyT(v.duration)}` : ""} ${kindTxt}</small></summary>
@@ -494,9 +496,82 @@ $("tyMain").addEventListener("toggle", (e) => {
   if (d) tyx.open[d.dataset.tydk] = d.open;
 }, true);
 
+// 📚 مكتبة الخلفيات: صور وفيديوهات حقيقية متصوّرة من Pexels (مش متولّدة). البحث بالعربي بيتترجم لوحده.
+const TY_STOCK = { q: "", kind: "video", items: [], page: 1, next: false, busy: false };
+function tyStockOpen(v, kind) {
+  TY_STOCK.kind = kind === "image" ? "photo" : "video";
+  let el = document.getElementById("tyStock");
+  if (!el) {
+    el = Object.assign(document.createElement("div"), { id: "tyStock", className: "ty-stock" });
+    document.body.appendChild(el);
+    el.addEventListener("click", tyStockClick);
+    el.addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.matches("[data-stq]")) { e.preventDefault(); tyStockSearch(e.target.value, 1); } });
+    el.addEventListener("mouseover", (e) => { const vd = e.target.closest("[data-stv]")?.querySelector("video"); if (vd) vd.play().catch(() => {}); });
+    el.addEventListener("mouseout", (e) => { const vd = e.target.closest("[data-stv]")?.querySelector("video"); if (vd) vd.pause(); });
+  }
+  el.hidden = false;
+  tyStockDraw();
+  el.querySelector("[data-stq]")?.focus();
+}
+const tyStockOrient = () => ({ "9:16": "portrait", "4:5": "portrait", "16:9": "landscape", "1:1": "square" })[tyx.cur?.ratio] || "portrait";
+function tyStockDraw() {
+  const el = document.getElementById("tyStock"), st = TY_STOCK;
+  el.innerHTML = `<div class="ty-stock-box" role="dialog" aria-label="مكتبة الخلفيات">
+    <div class="ty-stock-top"><b>📚 مكتبة الخلفيات</b><small class="muted">صور وفيديوهات حقيقية متصوّرة، مش متولّدة</small><button type="button" class="btn sm" data-stclose>✕</button></div>
+    <div class="ty-stock-bar"><input type="search" data-stq dir="auto" placeholder="دوّر بأي كلمة: قهوة، مدينة بالليل، بحر، مكتب…" value="${tye(st.q)}">
+      <div class="seg"><button type="button" class="btn sm ${st.kind === "video" ? "primary" : ""}" data-stkind="video">🎬 فيديو</button><button type="button" class="btn sm ${st.kind === "photo" ? "primary" : ""}" data-stkind="photo">🖼️ صورة</button></div>
+      <button type="button" class="btn primary sm" data-stgo>دوّر</button></div>
+    ${st.q_en && st.q_en !== st.q ? `<small class="muted">بيدوّر على: <span data-no-i18n dir="ltr">${tye(st.q_en)}</span></small>` : ""}
+    <div class="ty-stock-grid">${st.busy && !st.items.length ? `<p class="muted">⏳ بيدوّر…</p>` : st.items.length ? st.items.map((it, i) => `<button type="button" class="ty-stock-it" data-stpick="${i}" ${it.kind === "video" ? "data-stv" : ""} title="${tye(it.author)}">
+        <img src="${tye(it.thumb)}" alt="" loading="lazy">${it.kind === "video" ? `<video src="${tye(it.preview)}" muted loop playsinline preload="none"></video><em class="num">${Math.round(it.dur || 0)}ث</em>` : ""}
+        <small data-no-i18n>${tye(it.author)}</small></button>`).join("") : st.q ? `<p class="muted">مفيش نتايج. جرّب كلمة تانية.</p>` : `<p class="muted">اكتب كلمة ودوس Enter.</p>`}</div>
+    <div class="ty-stock-foot">${st.next ? `<button type="button" class="btn sm" data-stmore ${st.busy ? "disabled" : ""}>نتايج أكتر</button>` : "<span></span>"}
+      <a href="https://www.pexels.com" target="_blank" rel="noopener" class="muted" data-no-i18n>Photos & videos provided by Pexels</a></div></div>`;
+}
+async function tyStockSearch(q, page) {
+  const st = TY_STOCK;
+  st.q = String(q ?? st.q).trim();
+  if (!st.q) return;
+  st.busy = true; st.page = page;
+  if (page === 1) st.items = [];
+  tyStockDraw();
+  try {
+    const r = await api(`/api/stock/search?${new URLSearchParams({ q: st.q, kind: st.kind, orient: tyStockOrient(), page })}`);
+    st.items = page === 1 ? r.items : [...st.items, ...r.items];
+    st.next = r.next; st.q_en = r.q_en;
+  } catch (err) { toast(err.message, true); }
+  st.busy = false;
+  tyStockDraw();
+}
+async function tyStockClick(e) {
+  const t = e.target, st = TY_STOCK, el = document.getElementById("tyStock");
+  if (t === el || t.closest("[data-stclose]")) { el.hidden = true; return; }
+  const k = t.closest("[data-stkind]");
+  if (k) { st.kind = k.dataset.stkind; if (st.q) return tyStockSearch(st.q, 1); return tyStockDraw(); }
+  if (t.closest("[data-stgo]")) return tyStockSearch(el.querySelector("[data-stq]").value, 1);
+  if (t.closest("[data-stmore]")) return tyStockSearch(st.q, st.page + 1);
+  const pk = t.closest("[data-stpick]");
+  if (pk) {
+    const it = st.items[Number(pk.dataset.stpick)], v = tyx.cur;
+    if (!it || !v) return;
+    pk.classList.add("busy");
+    toast(it.kind === "video" ? "⏳ بينزّل الفيديو…" : "⏳ بينزّل الصورة…");
+    try {
+      tyx.cur = await api(TY(`/${v.id}/bg-stock`), { method: "POST", ...jsonBody({ kind: it.kind, file: it.file, author: it.author, author_url: it.author_url, page: it.page }) });
+      el.hidden = true;
+      tyx.force = true;
+      tyRender();
+      toast("✓ الخلفية اتحطت");
+    } catch (err) { pk.classList.remove("busy"); toast(err.message, true); }
+  }
+}
+document.addEventListener("keydown", (e) => { const el = document.getElementById("tyStock"); if (e.key === "Escape" && el && !el.hidden) el.hidden = true; });
+
 $("tyMain").addEventListener("click", async (e) => {
   const t = e.target, v = tyx.cur;
   const wrap = (btn, fn) => busyButton(btn, "⏳", async () => { try { await fn(); } catch (err) { toast(err.message, true); } });
+  const stk = t.closest("[data-tystock]");
+  if (stk) return tyStockOpen(v, stk.dataset.tystock);
   const play = t.closest("[data-typlay]");
   if (play) return tyx.play ? tyStop() : tyStart();
   const rs = t.closest("[data-tyreset]");

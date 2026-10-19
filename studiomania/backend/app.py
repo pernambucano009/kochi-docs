@@ -698,11 +698,12 @@ class SettingsIn(BaseModel):
     atlas: str | None = None  # None = متغيرش، "" = امسح
     zernio: str | None = None
     scrape: str | None = None   # ScrapeCreators: تحليل الحسابات و«نبض المجال»
+    pexels: str | None = None   # مكتبة الصور والفيديوهات الحقيقية للخلفيات
 
 
 @app.put("/api/settings")
 def save_settings(body: SettingsIn):
-    for name in ("atlas", "zernio", "scrape"):
+    for name in ("atlas", "zernio", "scrape", "pexels"):
         value = getattr(body, name)
         if value is not None:
             auth.save_key(name, value)
@@ -4065,6 +4066,7 @@ import ref2p  # noqa: E402
 import hekaya  # noqa: E402
 import brainquiz  # noqa: E402
 import brainsocial  # noqa: E402
+import stock  # noqa: E402
 import wallet  # noqa: E402
 import comics  # noqa: E402
 
@@ -16680,7 +16682,84 @@ def typo_bg(pid: str, file: UploadFile = File(...)):
     old = (d.get("bg") or {}).get("file")
     if old and old != name:
         (folder / old).unlink(missing_ok=True)
-    return typo_to_dict(pid, typo_update(pid, lambda x: x.update(bg={**(x.get("bg") or {}), "kind": kind, "file": name}, final=None)))
+    return typo_to_dict(pid, typo_update(pid, lambda x: x.update(bg={**{k: v for k, v in (x.get("bg") or {}).items() if k != "credit"}, "kind": kind, "file": name}, final=None)))
+
+
+# ---------------------------------------------------------------- 📚 مكتبة الصور والفيديوهات (Pexels)
+STOCK_TR = DATA_DIR / "cache" / "stock_tr.json"   # ترجمة كلمات البحث العربي (عشان منترجمش نفس الكلمة مرتين)
+
+
+def stock_query_en(q: str) -> str:
+    """المكتبة بتفهم إنجليزي: الكلمة العربي بتتترجم مرة واحدة وتتحفظ، والترجمة بتتخصم من الرصيد."""
+    q = " ".join(q.split())[:100]
+    if not stock.has_arabic(q):
+        return q
+    try:
+        saved = json.loads(STOCK_TR.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        saved = {}
+    if q in saved:
+        return saved[q]
+    if atlas.mock_mode():
+        return q
+    wallet.need(1, "ترجمة كلمة البحث")
+    meter = {"usd": 0.0}
+    raw = ad_media_chat([{"role": "user", "content": "Translate this stock-footage search query to short English keywords (2-5 words). "
+                                                      'Reply JSON only: {"en": "..."}\nQuery: ' + q}], 200, meter=meter)
+    en = str(ad_json(raw, "ترجمة البحث").get("en") or "").strip()[:100] or q
+    wallet.charge(wallet.credits(meter["usd"] or 0.0005), "مكتبة الصور: ترجمة كلمة البحث", "stock")
+    saved[q] = en
+    STOCK_TR.parent.mkdir(parents=True, exist_ok=True)
+    STOCK_TR.write_text(json.dumps(dict(list(saved.items())[-2000:]), ensure_ascii=False), encoding="utf-8")
+    return en
+
+
+@app.get("/api/stock/search")
+def stock_search(q: str = "", kind: str = "video", orient: str = "portrait", page: int = 1):
+    """🔎 صور وفيديوهات حقيقية للخلفية (مش متولّدة)."""
+    if not stock.live():
+        raise HTTPException(503, "مفتاح Pexels مش متسجل. حطه من الإعدادات ← المفاتيح والرصيد" if TENANT_ROLE != "customer"
+                            else "مكتبة الصور مش متاحة دلوقتي. جرّب تاني بعد شوية")
+    try:
+        en = stock_query_en(q)
+        res = stock.search(en, "photo" if kind == "photo" else "video", orient, page)
+    except stock.StockError as exc:
+        raise HTTPException(502, str(exc)) from None
+    except wallet.NoCredits as exc:
+        raise HTTPException(402, str(exc)) from None
+    return {**res, "q_en": en}
+
+
+class StockPickIn(BaseModel):
+    kind: str
+    file: str
+    author: str = ""
+    author_url: str = ""
+    page: str = ""
+
+
+@app.post("/api/typo/{pid}/bg-stock")
+def typo_bg_stock(pid: str, body: StockPickIn):
+    """صورة أو فيديو من المكتبة ← خلفية التايبوجرافي (بتتنزّل على السيرفر، ومعاها اسم المصوّر)."""
+    if not stock.allowed_url(body.file):
+        raise HTTPException(400, "اللينك ده مش من مكتبة الصور")
+    folder = TYPO_PROJ / Path(pid).name
+    d = typo_load(pid)
+    kind = "video" if body.kind == "video" else "image"
+    name = f"bg_stock_{uuid.uuid4().hex[:8]}{'.mp4' if kind == 'video' else '.jpg'}"
+    limit = 300 * 1024 * 1024
+    if not brain_fetch(body.file, folder / name, limit) or (folder / name).stat().st_size >= limit:
+        (folder / name).unlink(missing_ok=True)
+        raise HTTPException(502, "مقدرتش أنزّل الملف ده من المكتبة، جرّب واحد تاني")
+    old = (d.get("bg") or {}).get("file")
+    if old and old != name:
+        (folder / old).unlink(missing_ok=True)
+    credit = {"by": body.author[:120], "by_url": body.author_url[:300], "page": body.page[:300], "src": "Pexels"}
+    def fn(x):
+        bg = {**(x.get("bg") or {}), "kind": kind, "file": name, "credit": credit}
+        bg.setdefault("dim", 0.35)   # تغميق بسيط عشان الكلام يتقري فوق الصورة
+        x.update(bg=bg, final=None)
+    return typo_to_dict(pid, typo_update(pid, fn))
 
 
 class TypoPlanIn(BaseModel):

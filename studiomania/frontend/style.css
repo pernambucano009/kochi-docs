@@ -2931,3 +2931,25 @@ html[data-role="customer"] .admin-only { display: none !important; }
 .ib-tg.t-question { background: color-mix(in srgb, var(--warn) 18%, transparent); }
 .ib-dm { margin-top: 6px; padding: 8px 10px; border-radius: 10px; border: 1px dashed var(--line); display: grid; gap: 4px; }
 .ib-dm p { margin: 0; }
+
+/* 📚 مكتبة الخلفيات (Pexels) في التايبوجرافي */
+.ty-stock { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; padding: 16px; background: rgba(10, 10, 12, .55); backdrop-filter: blur(3px); }
+.ty-stock[hidden] { display: none; }
+.ty-stock-box { width: min(980px, 100%); max-height: min(88vh, 900px); display: flex; flex-direction: column; gap: 10px; padding: 18px; border-radius: 22px; background: var(--card, #fff); color: var(--text, #181718); box-shadow: 0 24px 70px rgba(0, 0, 0, .3); }
+.ty-stock-top { display: flex; align-items: baseline; gap: 10px; }
+.ty-stock-top b { font-size: 17px; }
+.ty-stock-top .btn { margin-inline-start: auto; }
+.ty-stock-bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.ty-stock-bar input { flex: 1; min-width: 200px; }
+.ty-stock-bar .seg { display: flex; gap: 4px; }
+.ty-stock-grid { flex: 1; overflow: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; align-content: start; min-height: 200px; }
+.ty-stock-it { position: relative; aspect-ratio: 9 / 13; border-radius: 12px; overflow: hidden; padding: 0; border: 0; background: #222; cursor: pointer; }
+.ty-stock-it img, .ty-stock-it video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.ty-stock-it video { opacity: 0; transition: opacity .2s; }
+.ty-stock-it:hover video { opacity: 1; }
+.ty-stock-it small { position: absolute; inset-inline: 0; bottom: 0; padding: 14px 8px 6px; font-size: 11px; color: #fff; text-align: start; background: linear-gradient(transparent, rgba(0, 0, 0, .65)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ty-stock-it em { position: absolute; top: 6px; inset-inline-start: 6px; padding: 2px 6px; border-radius: 8px; font-size: 11px; font-style: normal; color: #fff; background: rgba(0, 0, 0, .55); }
+.ty-stock-it:hover { outline: 2px solid var(--accent, #E5613E); }
+.ty-stock-it.busy { opacity: .5; pointer-events: none; }
+.ty-stock-foot { display: flex; justify-content: space-between; align-items: center; font-size: 12px; }
+.ty-credit a { color: inherit; text-decoration: underline; }
