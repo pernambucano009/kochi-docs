@@ -5,16 +5,22 @@
 // looks around and blinks · 6–9 2D→3D: the eye becomes an eyeball, a sphere of 100 dots that turns · 9–12 data: the dots drop into a
 // 10×10 grid and light up one by one, 1→100 · 12–15 end title: the dots run into one line under THANK YOU.
 // One typeface (Gabarito 800). Palette: electric blue, yellow, black + white. Camera: one slow push-in.
+const G1 = "١ · الرقم", G2 = "٢ · العين", G3 = "٣ · الشكر", GC = "الألوان";
 const P = M.params({
-  number: { label: "الرقم", kind: "text", def: "100" },
-  top: { label: "كلمة فوق الرقم", kind: "text", def: "FIRST" },
-  bottom: { label: "كلمة تحت الرقم", kind: "text", def: "USERS" },
-  line: { label: "جملة مع العين", kind: "text", def: "YOU SEE IT FIRST" },
-  thanks: { label: "الشكر في الآخر", kind: "text", def: "THANK YOU" },
-  handle: { label: "اسم الحساب أو البراند", kind: "text", role: "handle", def: "@EYEZONBOT" },
-  c1: { label: "اللون الأساسي", kind: "color", role: "accent", def: "#3d7bff" },
-  c2: { label: "اللون التاني", kind: "color", role: "accent2", def: "#ffd23f" },
-  bg: { label: "الخلفية", kind: "color", role: "dark", def: "#000000" },
+  number: { label: "الرقم", kind: "text", def: "100", group: G1, max: 5, hint: "عدد المتابعين أو العملاء: النقط بتكوّن الرقم ده." },
+  top: { label: "كلمة فوق الرقم", kind: "text", def: "FIRST", group: G1, max: 10 },
+  bottom: { label: "كلمة تحت الرقم", kind: "text", def: "USERS", group: G1, max: 10 },
+  line: { label: "جملة مع العين", kind: "text", def: "YOU SEE IT FIRST", group: G2, max: 22, hint: "جملة بتظهر مع العين." },
+  thanks: { label: "الشكر في الآخر", kind: "text", def: "THANK YOU", group: G3, max: 14 },
+  handle: { label: "اسم الحساب أو البراند", kind: "text", role: "handle", def: "@EYEZONBOT", group: G3, max: 20, hint: "اسم الحساب أو البراند تحت الشكر." },
+  c1: { label: "اللون الأساسي", kind: "color", role: "accent", def: "#3d7bff", group: GC },
+  c2: { label: "اللون التاني", kind: "color", role: "accent2", def: "#ffd23f", group: GC },
+  bg: { label: "الخلفية", kind: "color", role: "dark", def: "#000000", group: GC },
+});
+M.meta({
+  story: "شكر لأول N متابع: كل متابع نقطة، ونقطة واحدة بتتقسم لـ ١٠٠ بيكوّنوا الرقم، وبعدين بيبقوا عين بتبص وترمش، وكورة 3D من النقط، وشبكة بتنوّر نقطة نقطة، وفي الآخر بيجروا لخط واحد تحت الشكر.",
+  scenes: [{ name: G1, t0: 0, t1: 3, about: "النقط بتكوّن الرقم" }, { name: G2, t0: 3, t1: 12, about: "العين والكورة والشبكة" }, { name: G3, t0: 12, t1: 15, about: "الشكر والحساب" }],
+  tips: ["مناسب للاحتفال بعدد متابعين أو أول عملاء.", "الرقم لازم يكون حقيقي.", "الكلام قصير: كلمة فوق وكلمة تحت."],
 });
 const W = 1920, H = 1080, BLUE = P.c1, YEL = P.c2, BG = P.bg, N = 100;
 const NUM = String(P.number).trim() || "100", NUMV = parseInt(NUM.replace(/[^0-9]/g, ""), 10) || 100;

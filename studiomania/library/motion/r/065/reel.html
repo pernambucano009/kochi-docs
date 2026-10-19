@@ -5,20 +5,26 @@
 // 4–6 the red circle pushes through the border and morphs (circle → square → star) · 6–8 the poster peels off the wall in 3D, its back is the event info
 // 8–10 data/UI: the info builds as a table/timeline · 10–12 the grid modules start to slide out · 12–14 strongest: every module flies out on the beat
 // 14–15 end title "OUT OF FRAME" → modules snap back: the still poster of frame one.
+const G1 = "١ · البوستر", G2 = "٢ · معلومات الحدث", G3 = "٣ · النهاية", GC = "الألوان";
 const PR = M.params({
-  header: { label: "اسم الحدث فوق البوستر", kind: "text", role: "brand", def: "POSTER CLUB" },
-  issue: { label: "الرقم جنبه", kind: "text", def: "NO. 07" },
-  big: { label: "الكلمة الكبيرة (بتخرج من البرواز)", kind: "text", def: "BREAK" },
-  info: { label: "معلومات الحدث (٣ سطور: العنوان | القيمة)", kind: "lines", def: ["WHAT | Poster Club", "WHEN | Fri 20:00", "WHERE | Hall 3"] },
-  seatsLabel: { label: "عنوان العدد", kind: "text", def: "SEATS" },
-  seats: { label: "المحجوز", kind: "text", def: "240" },
-  total: { label: "من", kind: "text", def: "300" },
-  end1: { label: "النهاية (سطر ١)", kind: "text", def: "OUT OF" },
-  end2: { label: "النهاية (سطر ٢، ملوّن)", kind: "text", def: "FRAME." },
-  cream: { label: "لون البوستر", kind: "color", role: "bg", def: "#f1ebde" },
-  red: { label: "اللون المميز", kind: "color", role: "accent", def: "#e2321f" },
-  ink: { label: "لون الكلام", kind: "color", role: "ink", def: "#121212" },
-  wall: { label: "الحيطة", kind: "color", role: "dark", def: "#2a2a2c" },
+  header: { label: "اسم الحدث فوق البوستر", kind: "text", role: "brand", def: "POSTER CLUB", group: G1, max: 18 },
+  issue: { label: "الرقم جنبه", kind: "text", def: "NO. 07", group: G1, max: 8 },
+  big: { label: "الكلمة الكبيرة (بتخرج من البرواز)", kind: "text", def: "BREAK", group: G1, max: 7, hint: "كلمة واحدة كبيرة: حروفها بتخرج من البرواز." },
+  info: { label: "معلومات الحدث (٣ سطور: العنوان | القيمة)", kind: "lines", def: ["WHAT | Poster Club", "WHEN | Fri 20:00", "WHERE | Hall 3"], group: G2, max: 24, hint: "٣ سطور: العنوان | القيمة (إيه، إمتى، فين)." },
+  seatsLabel: { label: "عنوان العدد", kind: "text", def: "SEATS", group: G2, max: 10 },
+  seats: { label: "المحجوز", kind: "text", def: "240", group: G2, max: 5 },
+  total: { label: "من", kind: "text", def: "300", group: G2, max: 5 },
+  end1: { label: "النهاية (سطر ١)", kind: "text", def: "OUT OF", group: G3, max: 8 },
+  end2: { label: "النهاية (سطر ٢، ملوّن)", kind: "text", def: "FRAME.", group: G3, max: 8 },
+  cream: { label: "لون البوستر", kind: "color", role: "bg", def: "#f1ebde", group: GC },
+  red: { label: "اللون المميز", kind: "color", role: "accent", def: "#e2321f", group: GC },
+  ink: { label: "لون الكلام", kind: "color", role: "ink", def: "#121212", group: GC },
+  wall: { label: "الحيطة", kind: "color", role: "dark", def: "#2a2a2c", group: GC },
+});
+M.meta({
+  story: "بوستر حدث بيكسر البرواز: بوستر سويسري ثابت، حروفه بتطلع برّه الإطار، والدايرة الحمرا بتزق الحافة وتتحول أشكال، والبوستر بيتقشر من الحيطة 3D وضهره فيه معلومات الحدث، والموديولات بتطير على الإيقاع وترجع.",
+  scenes: [{ name: G1, t0: 0, t1: 6, about: "البوستر والحروف بتخرج" }, { name: G2, t0: 6, t1: 12, about: "ضهر البوستر ومعلومات الحدث" }, { name: G3, t0: 12, t1: 15, about: "الموديولات بتطير والنهاية" }],
+  tips: ["مناسب للحفلات والورش والمعارض وأي حدث بمواعيد.", "الكلمة الكبيرة قصيرة: ٤-٦ حروف.", "عدد المحجوز بيعمل إحساس إن الأماكن بتخلص."],
 });
 const B = .5, CREAM = PR.cream, RED = PR.red, INK = PR.ink, WALL = PR.wall;
 const BIG = String(PR.big).trim(), BAR = M.isAr(BIG), UNITS = (BAR ? BIG.split(/\s+/) : [...BIG.replace(/\s+/g, "")]).slice(0, 6);

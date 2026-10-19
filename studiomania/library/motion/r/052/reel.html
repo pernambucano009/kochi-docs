@@ -3,16 +3,17 @@
 // #52 (عنصر: ميم POV طولي) Chaotic POV — "POV: you're the AI someone opens 47 times a day". 30 s, 1080×1920, 140 BPM.
 // Fast cuts on the beat, stacked captions, zoom punches; running joke: "make it pop" (the blob inflates more each time
 // until it literally pops). Payoff loops to the start: "ok perfect. now the same for tomorrow".
+const G1 = "الميم", GC = "الألوان";
 const PR = M.params({
-  pov: { label: "سطر الـ POV فوق", kind: "text", def: "POV: you're the AI they open all day" },
-  counter: { label: "العدّاد (مثلًا: requests today)", kind: "text", def: "requests today" },
+  pov: { label: "سطر الـ POV فوق", kind: "text", def: "POV: you're the AI they open all day", group: G1, max: 40, hint: "السطر اللي فوق طول الفيديو." },
+  counter: { label: "العدّاد (مثلًا: requests today)", kind: "text", def: "requests today", group: G1, max: 18, hint: "كلمة جنب العدّاد اللي بيزيد." },
   events: { label: "اللقطات (كل سطر: الطلب | رد الفعل الكبير | التعليق | درجة النفخ 0-9 اختياري)", kind: "lines", def: [
     "write me a poem | SURE! | me: finally, art", "shorter | OK | me: cut 3 lines", "longer | OK?? | me: put them back",
     "make it pop | POP | me: what is pop | 1", "more pop | POPPP | me: adding pop | 2", "less pop | pop | me: removing pop | .5",
     "make it sound like me | HI ME | me: who are you", "but smarter | BIG BRAIN | me: rude but ok", "now in Arabic | حاضر | me: يلا",
     "as a spreadsheet | =POEM() | me: cells. so many cells", "make it pop | POP!! | me: again?? | 3", "MORE | POP!!!! | me: it's getting big | 4.5",
-    "MORE POP | pls | me: please | 6", " | *POP* |  | 9", "ok perfect | THANK YOU | me: …i made a thing", "now the same for tomorrow | SURE! | me: (loads poem.exe)"] },
-  bubble: { label: "لون فقاعة الشات", kind: "color", role: "accent", def: "#0a84ff" },
+    "MORE POP | pls | me: please | 6", " | *POP* |  | 9", "ok perfect | THANK YOU | me: …i made a thing", "now the same for tomorrow | SURE! | me: (loads poem.exe)"], group: G1, max: 80, hint: "كل سطر لقطة: الطلب | رد الفعل الكبير | التعليق | درجة النفخ (اختياري). لحد ٢٤ لقطة، والفيديو بيطول معاهم." },
+  bubble: { label: "لون فقاعة الشات", kind: "color", role: "accent", def: "#0a84ff", group: GC },
 });
 const W = 1080, H = 1920, BPM = 140, B = 60 / BPM;
 const C = ["#ff3b30", "#ffd60a", "#30d158", "#0a84ff", "#bf5af2", "#ff9f0a", "#111111", "#f2f2f2"];
@@ -21,6 +22,11 @@ const EV = []; let _b = 0;
 PR.events.slice(0, 24).forEach((l) => { const [req = "", big = "", cap = "", pop = "0"] = String(l).split("|").map((z) => z.trim()); EV.push([_b, req, big, cap, parseFloat(pop) || 0]); _b += (req + cap).length > 26 ? 4 : 3; });
 if (!EV.length) EV.push([0, "", "", "", 0]);
 const DUR = Math.min(60, Math.max(6, (_b + 2) * B));
+M.meta({
+  story: "ميم POV طولي فوضوي: قطعات سريعة على الإيقاع، وكابشنز فوق بعض، وزووم، وإفيه متكرر (فقاعة بتتنفخ أكتر كل مرة لحد ما تفرقع)، والآخر بيرجع للأول.",
+  scenes: [{ name: G1, t0: 0, t1: DUR, about: "اللقطات ورا بعض على الإيقاع" }],
+  tips: ["الإفيه المتكرر هو سر الميم: نفس الطلب بيرجع أكبر.", "الطلب قصير ورد الفعل أقصر.", "خلي آخر لقطة ترجّع لأول واحدة."],
+});
 const ar = (s) => M.isAr(s);
 M.reel({
   W, H, DUR, bg: "#111",

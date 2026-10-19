@@ -2,23 +2,15 @@
 <script>
 // #27 (عنصر: خط زمني) Editorial timeline, any events. One typeface (Inter). The camera travels along one line;
 // each moment has the same rhythm: year lands (hit) → event → why it mattered. Illustrations are drawn in code.
+const G1 = "١ · العنوان", G2 = "٢ · المحطات", G3 = "٣ · النهاية", GC = "الألوان";
 const PR = M.params({
-  title: { label: "العنوان", kind: "text", def: "75 years of AI" },
-  subtitle: { label: "تحت العنوان", kind: "text", def: "in thirteen moments that changed its course." },
-  events: { label: "المحطات (كل سطر: السنة | الحدث | ليه مهم)", kind: "lines", def: [
-    "1950 | Alan Turing publishes “Computing Machinery and Intelligence” | It reframed “can machines think?” as a test you could actually run.",
-    "1956 | The Dartmouth workshop names the field “artificial intelligence” | AI became a research discipline with a name, a goal and funding.",
-    "1958 | Frank Rosenblatt builds the Perceptron | The first machine that learned from examples instead of rules.",
-    "1986 | Rumelhart, Hinton and Williams popularise backpropagation | Multi-layer networks could finally be trained.",
-    "1997 | IBM's Deep Blue beats Garry Kasparov at chess | A machine beat the world champion under tournament conditions.",
-    "2012 | AlexNet wins the ImageNet challenge | GPUs + data + deep nets: the start of the deep-learning boom.",
-    "2017 | Google researchers introduce the Transformer | “Attention Is All You Need” — the architecture behind today's models.",
-    "2022 | ChatGPT launches to the public | AI went from labs to a hundred million people in about two months.",
-    "2025 | Models see, speak, write code and act as agents | AI is now a tool people use every day — and the questions are bigger."] },
-  ending: { label: "الجملة في الآخر", kind: "text", def: "And it's still being written." },
-  ink: { label: "لون الكلام", kind: "color", role: "ink", def: "#111214" },
-  accent: { label: "اللون المميز", kind: "color", role: "accent", def: "#2f5cff" },
-  bg: { label: "الخلفية", kind: "color", role: "bg", def: "#f4f2ed" },
+  title: { label: "العنوان", kind: "text", def: "حكاية ٤٠ سنة", group: G1, max: 26 },
+  subtitle: { label: "تحت العنوان", kind: "text", def: "في ٦ محطات غيّرت كل حاجة.", group: G1, max: 50 },
+  events: { label: "المحطات (كل سطر: السنة | الحدث | ليه مهم)", kind: "lines", def: ["١٩٨٥ | فتحنا أول فرن في شارع صغير | كان فرن واحد وعيلة واحدة وحلم كبير.", "١٩٩٦ | أول فرع تاني في الحي اللي جنبنا | الناس بقت تيجي من بعيد علشان الرغيف.", "٢٠٠٤ | ابتدينا نعمل حلويات الأعياد | السفرة بقت تستنانا في كل موسم.", "٢٠١٣ | فتحنا ورشة تدريب للخبازين | الصنعة بقت تتعلم بدل ما تضيع.", "٢٠٢٠ | التوصيل لحد البيت | الرغيف السخن بقى يوصل في ٢٠ دقيقة.", "٢٠٢٥ | ١٢ فرع ونفس الوصفة | كبرنا… والطعم زي ما هو."], group: G2, max: 120, hint: "كل سطر: السنة | اللي حصل | ليه كان مهم. لحد ١٤ محطة، والفيديو بيطول مع عددهم." },
+  ending: { label: "الجملة في الآخر", kind: "text", def: "والحكاية لسه بتتكتب.", group: G3, max: 40 },
+  ink: { label: "لون الكلام", kind: "color", role: "ink", def: "#111214", group: GC },
+  accent: { label: "اللون المميز", kind: "color", role: "accent", def: "#2f5cff", group: GC, hint: "لون السنة والرسومات المميزة." },
+  bg: { label: "الخلفية", kind: "color", role: "bg", def: "#f4f2ed", group: GC },
 });
 const ARTS = ["perceptron", "backprop", "imagenet", "transformer", "chat", "now", "dartmouth", "winter"];
 const MOM = PR.events.slice(0, 14).map((l, i) => { const [y = "", w = "", why = ""] = String(l).split("|").map((z) => z.trim()); return [y, w, why, ARTS[i % ARTS.length]]; });
@@ -26,6 +18,11 @@ if (!MOM.length) MOM.push(["", "", "", "now"]);
 const RTL = M.isAr(PR.title + MOM.map((m) => m[1]).join(""));
 const HOOK = 5, PER = MOM.length > 8 ? 7 : 7.6, SPACE = 1500, INK = PR.ink, PAPER = PR.bg, ACC = PR.accent, MUTE = "#8b8a86";
 const DUR = HOOK + MOM.length * PER + 4.8;
+M.meta({
+  story: "خط زمني تحريري: الكاميرا ماشية على خط واحد، وكل محطة ليها نفس الإيقاع: السنة بتخبط ← اللي حصل ← ليه كان مهم، مع رسمة صغيرة بالكود. بيمشي من اليمين للعربي ومن الشمال للإنجليزي.",
+  scenes: [{ name: G1, t0: 0, t1: HOOK, about: "العنوان" }, { name: G2, t0: HOOK, t1: DUR - 4.8, about: "المحطات واحدة ورا التانية" }, { name: G3, t0: DUR - 4.8, t1: DUR, about: "الجملة الأخيرة" }],
+  tips: ["مناسب لحكاية البراند وتاريخ الشركة وإنجازات السنة.", "كل محطة جملة قصيرة + ليه كانت مهمة.", "من ٤ لـ ٨ محطات بيبقى طول مريح."],
+});
 M.reel({
   W: 1920, H: 1080, DUR, bg: PAPER,
   fonts: { I4: ["inter400.ttf", "400"], I6: ["inter600.ttf", "600"], I8: ["inter800.ttf", "800"] },

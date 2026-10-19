@@ -5,17 +5,23 @@
 // 0–2 hook question · 2–6 kinetic type: day names spin on a reel, slowing · 6–10 morph: 7 dots → calendar grid → clock face
 // 10–14 2D→3D: a day-die (cube) rolls one face per beat · 14–18 UI: a calendar month builds, today ringed · 18–22 a sun arcs over the week strip
 // 22–28 strongest: SUNDAY lands letter by letter, one per beat · 28–30 end title → the question again (frame one).
+const G1 = "١ · السؤال", G2 = "٢ · عجلة الأيام", G3 = "٣ · اليوم", GC = "الألوان";
 const PR = M.params({
-  date: { label: "التاريخ (سنة-شهر-يوم)", kind: "text", def: "2026-10-11" },
-  q1: { label: "السؤال (سطر ١)", kind: "text", def: "WHAT DAY" },
-  q2: { label: "السؤال (سطر ٢)", kind: "text", def: "IS IT?" },
-  spin: { label: "تحت عجلة الأيام", kind: "text", def: "SPIN THE WEEK" },
-  strong: { label: "جملة مع اسم اليوم", kind: "text", def: "ALL DAY. ALL OF IT." },
-  final: { label: "الجملة في الآخر ({day} = اسم اليوم)", kind: "text", def: "IT'S {day}." },
-  cream: { label: "الخلفية", kind: "color", role: "bg", def: "#f4efe4" },
-  ink: { label: "لون الكلام", kind: "color", role: "ink", def: "#141414" },
-  ora: { label: "اللون المميز", kind: "color", role: "accent", def: "#ff6b2b" },
-  blue: { label: "اللون التاني", kind: "color", role: "accent2", def: "#2d5bff" },
+  date: { label: "التاريخ (سنة-شهر-يوم)", kind: "text", def: "2026-10-11", group: G1, max: 10, hint: "اكتبها كده: 2026-10-11 — اسم اليوم بيطلع لوحده." },
+  q1: { label: "السؤال (سطر ١)", kind: "text", def: "WHAT DAY", group: G1, max: 12 },
+  q2: { label: "السؤال (سطر ٢)", kind: "text", def: "IS IT?", group: G1, max: 12 },
+  spin: { label: "تحت عجلة الأيام", kind: "text", def: "SPIN THE WEEK", group: G2, max: 18 },
+  strong: { label: "جملة مع اسم اليوم", kind: "text", def: "ALL DAY. ALL OF IT.", group: G3, max: 24 },
+  final: { label: "الجملة في الآخر ({day} = اسم اليوم)", kind: "text", def: "IT'S {day}.", group: G3, max: 20, hint: "{day} بيتبدّل باسم اليوم." },
+  cream: { label: "الخلفية", kind: "color", role: "bg", def: "#f4efe4", group: GC },
+  ink: { label: "لون الكلام", kind: "color", role: "ink", def: "#141414", group: GC },
+  ora: { label: "اللون المميز", kind: "color", role: "accent", def: "#ff6b2b", group: GC },
+  blue: { label: "اللون التاني", kind: "color", role: "accent2", def: "#2d5bff", group: GC },
+});
+M.meta({
+  story: "إعلان عن تاريخ: «الأسبوع ماكينة قمار والنهارده الجاكبوت». أسامي الأيام بتلف على بكرة وتهدى، ونقط بتبقى نتيجة وساعة، ومكعب أيام بيتدحرج، ونتيجة الشهر واليوم متعلّم، وشمس فوق الأسبوع، واسم اليوم بينزل حرف حرف.",
+  scenes: [{ name: G1, t0: 0, t1: 2, about: "السؤال" }, { name: G2, t0: 2, t1: 22, about: "عجلة الأيام والنتيجة والمكعب" }, { name: G3, t0: 22, t1: 30, about: "اسم اليوم والجملة الأخيرة" }],
+  tips: ["مناسب لإعلان موعد افتتاح أو عرض أو إطلاق.", "اكتب التاريخ بالأرقام الإنجليزي علشان اليوم يتحسب صح.", "الجملة الأخيرة فيها {day} علشان اسم اليوم."],
 });
 const B = .5, CREAM = PR.cream, INK = PR.ink, ORA = PR.ora, BLUE = PR.blue;
 const AR = M.isAr(PR.q1 + PR.q2 + PR.final);

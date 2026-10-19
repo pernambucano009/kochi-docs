@@ -1,17 +1,23 @@
 <!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
 <script>
-// #9 (عنصر: وصفة مشروب خطوة بخطوة) Drink recipe — 30 s, 100 BPM, 1080×1080. Gin 30 ml, Campari 30 ml, sweet vermouth 30 ml, ice, stir, orange peel.
+// #9 (عنصر: وصفة مشروب خطوة بخطوة) Drink recipe — 30 s, 100 BPM, 1080×1080. Three liquids poured in proportion, ice, stir, garnish.
 const BPM = 100, B = 60 / BPM, BAR = B * 4;
+const G1 = "١ · الاسم", G2 = "٢ · المكونات", G3 = "٣ · التقليب والزينة", GC = "الألوان";
 const PR = M.params({
-  title: { label: "اسم المشروب", kind: "text", role: "product", def: "Negroni" },
-  sub: { label: "سطر تحت الاسم", kind: "text", def: "Equal parts · stirred · on the rocks" },
-  subEnd: { label: "السطر في الآخر", kind: "text", def: "Gin · Campari · Sweet vermouth — 1 : 1 : 1" },
-  ice: { label: "التلج (الاسم | الكمية | الوحدة)", kind: "text", def: "Ice | 3 | cubes" },
-  liquids: { label: "٣ سوايل (الاسم | الكمية | الوحدة | اللون | الشفافية 0-1)", kind: "lines", def: ["Gin | 30 | ml | #ecf0ec | .22", "Campari | 30 | ml | #c41c16 | .9", "Sweet vermouth | 30 | ml | #6e1e0c | .92"] },
-  stir: { label: "التقليب (الاسم | الكمية | الوحدة)", kind: "text", def: "Stir | 20 | sec" },
-  garnish: { label: "الزينة (الاسم | الكمية | الوحدة)", kind: "text", def: "Orange peel | 1 | twist" },
-  garnishColor: { label: "لون الزينة", kind: "color", def: "#f28a1e" },
-  unit: { label: "وحدة القياس جنب الكوباية", kind: "text", def: "ml" },
+  title: { label: "اسم المشروب", kind: "text", role: "product", def: "Sunset Fizz", group: G1, max: 14 },
+  sub: { label: "سطر تحت الاسم", kind: "text", def: "Fresh · bubbly · over ice", group: G1, max: 40 },
+  subEnd: { label: "السطر في الآخر", kind: "text", def: "Orange · Pomegranate · Soda — 2 : 1 : 1", group: G3, max: 50 },
+  ice: { label: "التلج (الاسم | الكمية | الوحدة)", kind: "text", def: "Ice | 3 | cubes", group: G2, max: 24, hint: "الاسم | الكمية | الوحدة." },
+  liquids: { label: "٣ سوايل (الاسم | الكمية | الوحدة | اللون | الشفافية 0-1)", kind: "lines", def: ["Orange juice | 40 | ml | #f6a21a | .9", "Pomegranate syrup | 20 | ml | #b0122e | .95", "Soda water | 30 | ml | #e8f2f4 | .2"], group: G2, max: 40, hint: "٣ سوايل: الاسم | الكمية | الوحدة | اللون | الشفافية (0 لـ 1). الكوباية بتتملي بنسبتهم." },
+  stir: { label: "التقليب (الاسم | الكمية | الوحدة)", kind: "text", def: "Stir | 10 | sec", group: G3, max: 24 },
+  garnish: { label: "الزينة (الاسم | الكمية | الوحدة)", kind: "text", def: "Mint sprig | 1 | leaf", group: G3, max: 28 },
+  garnishColor: { label: "لون الزينة", kind: "color", def: "#3f9b4a", group: GC },
+  unit: { label: "وحدة القياس جنب الكوباية", kind: "text", def: "ml", group: G2, max: 4 },
+});
+M.meta({
+  story: "وصفة مشروب خطوة بخطوة على الإيقاع: التلج بيقع، وكل سايل بيتصب بلونه ونصيبه في الكوباية، وبعدين التقليب والزينة، والوصفة كلها في سطر في الآخر.",
+  scenes: [{ name: G1, t0: 0, t1: 2.4, about: "اسم المشروب" }, { name: G2, t0: 2.4, t1: 19.2, about: "التلج والسوايل" }, { name: G3, t0: 19.2, t1: 30, about: "التقليب والزينة والوصفة" }],
+  tips: ["مناسب للكافيهات ومحلات العصير والمشروبات.", "الكميات أرقام علشان الكوباية تتملي صح.", "لون كل سايل بيفرق: خليه قريب من الحقيقة."],
 });
 const esc = (v) => String(v ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 const part = (l) => String(l || "").split("|").map((z) => z.trim());
@@ -19,7 +25,7 @@ const hex = (h, a) => { const m = String(h || "").replace("#", ""); const n = pa
 const st = (l, t0, t1, extra = {}) => { const [name = "", amt = "", unit = ""] = part(l); return { name, amt, unit, t0, t1, ...extra }; };
 const STEPS = [
   st(PR.ice, BAR * 1, BAR * 2),
-  ...[0, 1, 2].map((i) => { const [n, a, u, c, o] = part(PR.liquids[i]); const v = parseFloat(a) || 30; return st(`${n || ""} | ${a || ""} | ${u || ""}`, BAR * (2 + i * 2), BAR * (4 + i * 2), { col: hex(c || "#cccccc", Math.max(.05, Math.min(1, parseFloat(o) || .85))), vol: v }); }),
+  ...[0, 1, 2].map((i) => { const [n, a, u, c, o] = part(PR.liquids[i]); const v = parseFloat(String(a || "").replace(/[٠-٩]/g, (d) => "٠١٢٣٤٥٦٧٨٩".indexOf(d))) || 30; return st(`${n || ""} | ${a || ""} | ${u || ""}`, BAR * (2 + i * 2), BAR * (4 + i * 2), { col: hex(c || "#cccccc", Math.max(.05, Math.min(1, parseFloat(o) || .85))), vol: v }); }),
   st(PR.stir, BAR * 8, BAR * 10),
   st(PR.garnish, BAR * 10, BAR * 11),
 ];
