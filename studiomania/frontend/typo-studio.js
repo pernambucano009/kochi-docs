@@ -55,7 +55,7 @@
     "qr", "codetag", "toolbar", "terminal", "scan",
     "toasts", "footer", "marquee", "datestrip",
     "fileicon", "chaos",
-    "gradword", "meshprompt", "orbsplit", "bento", "figdays", "figcurve", "figplay", "figequal", "figwords", "figphone", "figdrop", "figcount", "figgears", "figbar", "figcheck", "figcta", "goldcap", "iconbelt", "glowsweep", "namepill", "kashida", "molecule", "weightstack", "stretch", "desatpop", "arcs", "chrome", "inkverse", "poemfade", "hashend", "flipverb", "strobe", "duoline", "capstack", "pillword", "blurduo", "tagstack", "underbars", "contactcard", "iconorbit", "blurstrobe", "kinstack", "incall", "cineband", "scriptover", "tricolor", "drumpicker", "redmix", "headbubble", "pincard", "emojifloat", "slotreel", "posterwall", "quoteline", "medallion", "clockhand", "roadtext", "markpan", "objectquote", "racechart", "calflip", "glosscards", "dropword", "tasklens", "monostack", "dashbox", "sparklist", "followbtn", "silhouette", "petalstack", "followcount", "twopillars", "cutmat", "labelbox", "stampcard", "lcdtype", "genpanel", "holopulse", "coverflow", "featuretag", "luxmix", "goldframes", "goldrows", "tilegrid", "goldpill", "holoclock", "curvewall", "newsscan", "neonvenn", "wavebelt", "cardarc", "shadowquote", "haloring", "noirtitle", "stickerstack", "graphhop", "podium", "hudcallout", "termbar", "glowtoggle", "pinkdoodle", "lensfind", "echostack", "dofwords", "portalchat", "cardframe", "wordvoid", "facecam", "spreadcaps", "tinysub", "ringword", "handcap", "blobcam", "brushbar", "beforeafter", "pillcarousel", "namescript", "stackrepeat", "vertword", "serifsolo", "selectword", "tornlabel", "radartags"]);
+    "gradword", "meshprompt", "orbsplit", "bento", "figdays", "figcurve", "figplay", "figequal", "figwords", "figphone", "figdrop", "figcount", "figgears", "figbar", "figcheck", "figcta", "goldcap", "iconbelt", "glowsweep", "namepill", "kashida", "molecule", "weightstack", "stretch", "desatpop", "arcs", "chrome", "inkverse", "poemfade", "hashend", "flipverb", "strobe", "duoline", "capstack", "pillword", "blurduo", "tagstack", "underbars", "contactcard", "iconorbit", "blurstrobe", "kinstack", "incall", "cineband", "scriptover", "tricolor", "drumpicker", "redmix", "headbubble", "pincard", "emojifloat", "slotreel", "posterwall", "quoteline", "medallion", "clockhand", "roadtext", "markpan", "objectquote", "racechart", "calflip", "glosscards", "dropword", "tasklens", "monostack", "dashbox", "sparklist", "followbtn", "silhouette", "petalstack", "followcount", "twopillars", "cutmat", "labelbox", "stampcard", "lcdtype", "genpanel", "holopulse", "coverflow", "featuretag", "luxmix", "goldframes", "goldrows", "tilegrid", "goldpill", "holoclock", "curvewall", "newsscan", "neonvenn", "wavebelt", "cardarc", "shadowquote", "haloring", "noirtitle", "stickerstack", "graphhop", "podium", "hudcallout", "termbar", "glowtoggle", "pinkdoodle", "lensfind", "echostack", "dofwords", "portalchat", "cardframe", "wordvoid", "facecam", "spreadcaps", "tinysub", "ringword", "handcap", "blobcam", "brushbar", "beforeafter", "pillcarousel", "namescript", "stackrepeat", "vertword", "serifsolo", "selectword", "tornlabel", "radartags", "slamword", "scrawl", "spikeburst", "laserprompt"]);
   E.TYPING = new Set(["type", "artype"]);
   const MC = document.createElement("canvas").getContext("2d");
   const measure = (s, font) => { MC.font = font; return MC.measureText(s).width; };
@@ -8041,5 +8041,94 @@
     it.forEach((x, i) => { if (t < x.t0 - 0.05) return; const s = this.text(x.w), q = eBack(seg(t, x.t0 - 0.05, x.t0 + 0.2)), tw = measure(s, `700 ${tz}px ${famOf(s)}`) + tz * 1.4, ty = cy - (n - 1) * tz * 0.8 + i * tz * 1.6, tx = cx + ((i % 2 ? 1 : -1) * mn * 0.06);
       html += `<div dir="${this.dir(s)}" style="position:absolute;left:${(tx - tw / 2).toFixed(1)}px;top:${(ty - tz * 0.75).toFixed(1)}px;width:${tw.toFixed(1)}px;height:${(tz * 1.5).toFixed(1)}px;background:linear-gradient(180deg,#5BA7E8,#2F7CC9);border:2px solid #CDE6FF;box-shadow:0 4px 0 #1B4F82,0 6px 14px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;font:700 ${tz.toFixed(1)}px ${famOf(s)};color:#fff;transform:scale(${clamp(q, 0, 1.2).toFixed(3)})">${esc(s)}</div>`; });
     return html + VHS(w, h, t);
+  };
+  // ======== r46 «كينتك أحمر» — كلمة بتخبط الكادر كله (أحمر/أبيض/أسود)، شطب بفرشة حمرا، انفجار شوك أحمر، ومربع برومبت بنقطة ليزر ========
+  const KT = "'TY Outfit', 'SM Tajawal'";
+  const ktFam = (s) => (AR.test(s) ? famOf(s) : KT);
+  // اهتزاز صغير أول ما الكلمة تخبط (ثابت لنفس الوقت)
+  const ktShake = (t, t0, amp) => { const q = 1 - seg(t, t0, t0 + 0.14); return q <= 0 ? [0, 0] : [Math.sin(t * 97) * amp * q, Math.cos(t * 83) * amp * q]; };
+  const KT_CARDS = [["#E8202A", "#FFFFFF", ""], ["#F4F2EE", "#0B0B0C", ""], ["#050506", "#F6F6F4", "rgba(232,32,42,.75)"]];
+  // ---------- slamword: كل كلمة بتتقال بتخبط الكادر كله بكارت (أحمر/أبيض/أسود بالتبادل) بسحبة وبلير وزووم بيرجع، وعلى الأسود توهج أحمر
+  P.k_slamword = function (b, t, k, th, bi) {
+    const it = this.items(b); if (!it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h);
+    let ci = 0; it.forEach((x, i) => { if (t >= x.t0 - 0.03) ci = i; });
+    // كلمتين قصيرين (NO WAY / CAN YOU): بيتراصّوا فوق بعض بدل ما يتبدلوا
+    const stack = it.length <= 3 && it.every((x) => [...x.w].length <= 6);
+    const rows = stack ? it.slice(0, ci + 1) : [it[ci]], [bg, ink, glow] = KT_CARDS[(stack ? bi : ci + bi) % 3];
+    const x0 = rows[rows.length - 1], q = seg(t, x0.t0 - 0.03, x0.t0 + 0.16), e = eOut(q), dir = (ci + bi) % 2 ? 1 : -1;
+    const [sx, sy] = ktShake(t, x0.t0, mn * 0.012);
+    let html = `<div style="position:absolute;inset:0;background:${bg}"></div>`;
+    if (glow) html += `<div style="position:absolute;inset:0;background:radial-gradient(ellipse at 50% 50%,${glow},rgba(232,32,42,0) 55%);opacity:${(0.55 + 0.45 * e).toFixed(2)}"></div>`;
+    const sizes = rows.map((x) => { const s = this.text(x.w); return fitSize(s, `900 {}px ${ktFam(s)}`, w * 0.9, mn * (stack ? 0.24 : 0.3) * this.ts); });
+    const tot = sizes.reduce((a, z) => a + z * 0.92, 0);
+    let y = h / 2 - tot / 2;
+    rows.forEach((x, j) => {
+      const s = this.text(x.w), z = sizes[j], last = j === rows.length - 1, ee = last ? e : 1, qq = last ? q : 1;
+      html += `<div dir="${this.dir(s)}" style="position:absolute;left:0;right:0;top:${(y + sy).toFixed(1)}px;text-align:center;white-space:nowrap;font:900 ${z.toFixed(1)}px ${ktFam(s)};line-height:.92;letter-spacing:-0.045em;color:${ink};${glow ? `text-shadow:0 0 ${(z * 0.18).toFixed(0)}px ${glow}` : ""};transform:translateX(${(sx + (1 - ee) * dir * w * 0.3).toFixed(1)}px) scale(${lerp(1.35, 1, ee).toFixed(3)}) skewX(${((1 - ee) * dir * -16).toFixed(1)}deg);filter:blur(${((1 - ee) * z * 0.14).toFixed(1)}px);opacity:${clamp(qq * 3).toFixed(2)}">${esc(s)}</div>`;
+      y += z * 0.92;
+    });
+    return html;
+  };
+  // ---------- scrawl: كلمتين تقال فوق بعض على أبيض، وفرشة حمرا بتشخبط على الكلمة المهمة (focus) زي «NO ~~~ WAY»
+  P.k_scrawl = function (b, t, k, th, bi) {
+    const it = this.items(b); if (!it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h), fi = b.focus >= 0 && b.focus < it.length ? b.focus : 0;
+    const zs = it.map((x) => { const s = this.text(x.w); return fitSize(s, `900 {}px ${ktFam(s)}`, w * 0.86, mn * 0.26 * this.ts / Math.max(1, it.length * 0.6)); });
+    const tot = zs.reduce((a, z) => a + z * 0.95, 0);
+    let y = h / 2 - tot / 2, html = `<div style="position:absolute;inset:0;background:#F4F2EE"></div>`, fy = h / 2, fz = zs[0], fw = w * 0.5;
+    it.forEach((x, j) => {
+      const s = this.text(x.w), z = zs[j], q = seg(t, x.t0 - 0.03, x.t0 + 0.14), e = eOut(q), [sx, sy] = ktShake(t, x.t0, mn * 0.01);
+      if (j === fi) { fy = y + z * 0.48; fz = z; fw = measure(s, `900 ${z}px ${ktFam(s)}`); }
+      if (q > 0) html += `<div dir="${this.dir(s)}" style="position:absolute;left:0;right:0;top:${(y + sy).toFixed(1)}px;text-align:center;white-space:nowrap;font:900 ${z.toFixed(1)}px ${ktFam(s)};line-height:.95;letter-spacing:-0.04em;color:#0B0B0C;transform:translateX(${sx.toFixed(1)}px) scale(${lerp(1.25, 1, e).toFixed(3)});filter:blur(${((1 - e) * z * 0.1).toFixed(1)}px)">${esc(s)}</div>`;
+      y += z * 0.95;
+    });
+    const p = seg(t, it[fi].t0 + 0.08, it[fi].t0 + 0.55), r = rng(7 + bi), n = 7, x1 = w / 2 - fw * 0.6, x2 = w / 2 + fw * 0.6;
+    let d = `M${x1.toFixed(1)} ${(fy + (r() - 0.5) * fz * 0.3).toFixed(1)}`;
+    for (let i = 1; i <= n; i++) { const xx = lerp(x1, x2, i / n), yy = fy + (i % 2 ? -1 : 1) * fz * (0.18 + r() * 0.14); d += ` Q${(xx - (x2 - x1) / n / 2).toFixed(1)} ${(yy + (i % 2 ? 1 : -1) * fz * 0.25).toFixed(1)} ${xx.toFixed(1)} ${yy.toFixed(1)}`; }
+    if (p > 0) html += `<svg data-free style="position:absolute;inset:0;overflow:visible" width="${w}" height="${h}"><path d="${d}" fill="none" stroke="#E8202A" stroke-width="${(fz * 0.16).toFixed(1)}" stroke-linecap="round" stroke-linejoin="round" pathLength="1000" stroke-dasharray="1000" stroke-dashoffset="${(1000 * (1 - eOut(p))).toFixed(0)}" style="filter:url(#ktRough)" opacity=".92"/>
+      <defs><filter id="ktRough"><feTurbulence type="fractalNoise" baseFrequency=".035" numOctaves="2" seed="${bi + 3}"/><feDisplacementMap in="SourceGraphic" scale="${(fz * 0.08).toFixed(1)}"/></filter></defs></svg>`;
+    return html;
+  };
+  // ---------- spikeburst: على أبيض، انفجار شوك أحمر بيكبر ويلف ورا كلام تقيل أسود متراص بيخبط كلمة كلمة — للصدمة «ARE YOU KIDDING ME?!»
+  P.k_spikeburst = function (b, t, k, th, bi) {
+    const it = this.items(b); if (!it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h), r = rng(31 + bi), n = 15;
+    const g = eBack(seg(t, b.t0 + 0.05, b.t0 + 0.5)), rot = (t - b.t0) * 22, R = mn * 0.36 * g, cx = w * 0.6, cy = h * 0.47;
+    let pts = ""; for (let i = 0; i < n * 2; i++) { const a = (i / (n * 2)) * Math.PI * 2, rr = i % 2 ? R * (0.45 + r() * 0.15) : R * (0.85 + r() * 0.3); pts += `${(cx + Math.cos(a) * rr).toFixed(1)},${(cy + Math.sin(a) * rr).toFixed(1)} `; }
+    let html = `<div style="position:absolute;inset:0;background:#F4F2EE"></div><svg data-free style="position:absolute;inset:0" width="${w}" height="${h}"><polygon points="${pts}" fill="#E8202A" transform="rotate(${rot.toFixed(1)} ${cx.toFixed(1)} ${cy.toFixed(1)})"/></svg>`;
+    const lines = []; let cur = [];
+    it.forEach((x) => { cur.push(x); if (cur.map((y) => y.w).join(" ").length >= 6 || cur.length === 2) { lines.push(cur); cur = []; } });
+    if (cur.length) lines.push(cur);
+    const zs = lines.map((l) => { const s = this.text(l.map((x) => x.w).join(" ")); return fitSize(s, `900 {}px ${ktFam(s)}`, w * 0.84, mn * 0.17 * this.ts); });
+    let y = h * 0.47 - zs.reduce((a, z) => a + z * 1.02, 0) / 2;
+    lines.forEach((l, j) => {
+      const z = zs[j], vis = l.filter((x) => t >= x.t0 - 0.03); if (!vis.length) { y += z * 1.02; return; }
+      const s = this.text(vis.map((x) => x.w).join(" ")), lx = vis[vis.length - 1], e = eOut(seg(t, lx.t0 - 0.03, lx.t0 + 0.14)), [sx, sy] = ktShake(t, lx.t0, mn * 0.014);
+      html += `<div dir="${this.dir(s)}" style="position:absolute;left:${(w * 0.08).toFixed(1)}px;right:${(w * 0.08).toFixed(1)}px;top:${(y + sy).toFixed(1)}px;text-align:${AR.test(s) ? "right" : "left"};white-space:nowrap;font:900 ${z.toFixed(1)}px ${ktFam(s)};line-height:.9;letter-spacing:-0.04em;color:#0B0B0C;transform:translateX(${sx.toFixed(1)}px) rotate(${(j % 2 ? 1.5 : -1.5)}deg) scale(${lerp(1.2, 1, e).toFixed(3)})">${esc(s)}</div>`;
+      y += z * 1.02;
+    });
+    return html;
+  };
+  // ---------- laserprompt: شاشة سودا، نقطة ليزر حمرا بتجري على خط رفيع، وبعدها مربع برومبت غامق الكلام بيتكتب فيه والكلمة المهمة في كبسولة حمرا وزرار إرسال
+  P.k_laserprompt = function (b, t, k, th, bi) {
+    const it = this.items(b); if (!it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h), D = b.t1 - b.t0, fi = b.focus >= 0 && b.focus < it.length ? b.focus : it.length - 1;
+    const lp = eOut(seg(t, b.t0, b.t0 + Math.min(0.6, D * 0.3))), bx = eBack(seg(t, b.t0 + Math.min(0.5, D * 0.25), b.t0 + Math.min(0.85, D * 0.4)));
+    const cw = Math.min(w * 0.9, mn * 1.5), chh = mn * 0.2 * this.ts, cy = h * 0.5, z = chh * 0.3, lx = lerp(w * 0.08, w * 0.92, lp);
+    let html = `<div style="position:absolute;inset:0;background:radial-gradient(ellipse at 50% 60%,#1A0607,#030203 70%)"></div>`;
+    if (bx < 0.05) html += `<div style="position:absolute;left:${(w * 0.08).toFixed(1)}px;width:${(w * 0.84).toFixed(1)}px;top:${cy.toFixed(1)}px;height:1px;background:rgba(255,255,255,.12)"></div>
+      <div style="position:absolute;left:${(w * 0.08).toFixed(1)}px;width:${(lx - w * 0.08).toFixed(1)}px;top:${(cy - 1).toFixed(1)}px;height:2px;background:linear-gradient(90deg,rgba(232,32,42,0),#E8202A)"></div>
+      <div style="position:absolute;left:${(lx - mn * 0.018).toFixed(1)}px;top:${(cy - mn * 0.018).toFixed(1)}px;width:${(mn * 0.036).toFixed(1)}px;height:${(mn * 0.036).toFixed(1)}px;border-radius:50%;background:#FF4A4F;box-shadow:0 0 ${(mn * 0.04).toFixed(0)}px ${(mn * 0.015).toFixed(0)}px rgba(232,32,42,.85)"></div>`;
+    else {
+      let words = "";
+      it.forEach((x, i) => { if (t < x.t0 - 0.03) return; const s = this.text(x.w), f = i === fi;
+        words += f ? `<span style="display:inline-block;padding:0 ${(z * 0.35).toFixed(1)}px;margin:0 ${(z * 0.15).toFixed(1)}px;border-radius:${(z * 0.25).toFixed(1)}px;background:#E8202A;color:#fff;transform:scale(${eBack(seg(t, x.t0 - 0.03, x.t0 + 0.2)).toFixed(3)})">${esc(s)}</span>` : `${esc(s)} `; });
+      const ar = AR.test(it.map((x) => x.w).join(" "));
+      html += `<div style="position:absolute;left:${((w - cw) / 2).toFixed(1)}px;top:${(cy - chh / 2).toFixed(1)}px;width:${cw.toFixed(1)}px;height:${chh.toFixed(1)}px;border-radius:${(chh * 0.22).toFixed(1)}px;background:linear-gradient(180deg,#1F2A4A,#141B33);border:1px solid rgba(140,160,255,.35);box-shadow:0 0 ${(mn * 0.06).toFixed(0)}px rgba(232,32,42,.35);transform:scale(${bx.toFixed(3)})">
+        <div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;inset:0 ${(chh * 1.1).toFixed(1)}px 0 ${(chh * 0.3).toFixed(1)}px;display:flex;align-items:center;white-space:nowrap;overflow:hidden;font:600 ${z.toFixed(1)}px ${ar ? famOf("ع") : "'TY Mono', monospace"};color:#E8ECFF">${words}<span style="display:inline-block;width:2px;height:${(z * 1.1).toFixed(1)}px;background:#fff;opacity:${(Math.floor((t - b.t0) * 3) % 2 ? 0.2 : 1)}"></span></div>
+        <div style="position:absolute;${ar ? "left" : "right"}:${(chh * 0.2).toFixed(1)}px;top:${(chh * 0.2).toFixed(1)}px;width:${(chh * 0.6).toFixed(1)}px;height:${(chh * 0.6).toFixed(1)}px;border-radius:${(chh * 0.16).toFixed(1)}px;background:#E8202A;color:#fff;display:flex;align-items:center;justify-content:center;font:700 ${(z * 1.1).toFixed(1)}px sans-serif">↵</div></div>`;
+    }
+    return html;
   };
 })();
