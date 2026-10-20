@@ -124,7 +124,7 @@ const AutoPage = (() => {
     if (n.kind === "run") {
       const last = (r.runs || [])[0];
       const st = r.busy ? esc(last?.step || "شغال…") : last?.status === "failed" ? "آخر تشغيل فشل" : last?.status === "done" ? "آخر فيديو جاهز ✓" : "دوس تشغّل";
-      return `<button class="bm-n bm-quiz am-start${r.busy ? " busy" : ""}" data-n="run" title="شغّل الموديل، وغيّر اسمه أو بدّله"><i>▶</i><b>${esc(r.name)}</b><small>${st}</small></button>`;
+      return `<button class="bm-n bm-quiz am-start${r.busy ? " busy" : ""}" data-n="run" title="شغّل الموديل، وغيّر اسمه أو بدّله"><i>▶</i><b>${r.active ? "⚡ " : ""}${esc(r.name)}</b><small>${r.saved ? "" : "مسودة · "}${st}</small></button>`;
     }
     if (n.kind === "add") return `<button class="bm-n bm-add" data-n="add" title="ضيف خطوة (فعل + منشن)"><i>+</i><b>خطوة جديدة</b></button>`;
     if (n.kind === "branch") {
@@ -273,7 +273,12 @@ const AutoPage = (() => {
         ${editable("@name", r.name, "اسم الموديل")}
         <p class="bm-note">بيمشي على الخطوات من الشمال لليمين: بيعمل الفيديو، ويصدّره، وينشره (أو يستناك توافق).${r.est ? ` التكلفة حوالي <b class="num">${AR_N(r.est)}</b> نقطة (كتابة الكلام للكابشن).` : " من غير تكلفة نقط."}</p>
         <div class="bm-acts"><button class="bm-go" data-run ${r.busy ? "disabled" : ""}>${r.busy ? "⏳ شغال…" : "▶ شغّل الموديل"}</button></div>
-        <div class="bm-pills">${S.list.map((x) => `<button class="bm-pill${x.id === S.id ? " on" : ""}" data-pick="${x.id}">${esc(x.name)}</button>`).join("")}
+        <div class="am-save">${r.saved
+          ? `<span class="am-tag ok">💾 محفوظ باسم «${esc(r.name)}»</span>
+             <button class="bm-pill${r.active ? " on" : ""}" data-active="${r.active ? 0 : 1}">${r.active ? "⚡ متفعّل للأوتوبايلوت (دوس تقفله)" : "⚡ فعّله للأوتوبايلوت"}</button>`
+          : `<span class="am-tag">مسودة (لسه مااتحفظش)</span><button class="bm-pill" data-saverec>💾 احفظ الموديل باسم</button>`}</div>
+        <p class="bm-note">${r.saved ? "الأوتوبايلوت هيشتغل بالموديل المتفعّل بس (واحد في المرة: لما تفعّل موديل، التاني بيتقفل)." : "احفظه باسم يميّزه، وبعدها تقدر تفعّله للأوتوبايلوت."}</p>
+        <div class="bm-pills">${S.list.map((x) => `<button class="bm-pill${x.id === S.id ? " on" : ""}" data-pick="${x.id}">${x.active ? "⚡ " : x.saved ? "" : "✎ "}${esc(x.name)}</button>`).join("")}
           <button class="bm-pill" data-new>＋ موديل جديد</button><button class="bm-pill" data-delrec>🗑 امسح ده</button></div>
         ${runs.map((x) => `<div class="am-run ${x.status}"><b>${x.status === "done" ? "✓" : x.status === "failed" ? "⚠️" : "⏳"} ${esc(new Date(x.at).toLocaleString("ar-EG-u-nu-latn", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }))}</b>
           ${x.step ? `<small>${esc(x.step)}</small>` : ""}${(x.report || []).map((t) => `<small>${esc(t)}</small>`).join("")}${x.error ? `<small class="bad">${esc(x.error)}</small>` : ""}
@@ -449,6 +454,15 @@ const AutoPage = (() => {
           const ns = { id: Math.random().toString(36).slice(2, 10), verb: b.dataset.addverb, src: null, opts: { ...S.meta.verbs[b.dataset.addverb].opts } };
           steps.splice(at < 0 || ns.verb === "export" ? steps.length : at, 0, ns);
           openCard(null); await saveSteps(steps); const nn = S.byId[ns.id]; if (nn) openCard(nn); return;
+        }
+        if (t.closest("[data-saverec]")) {
+          const name = prompt("اسم الموديل (علشان تختاره بعدين في الأوتوبايلوت):", S.rec.name || ""); if (name == null || !name.trim()) return;
+          const r = await aAPI("", { method: "PATCH", ...jsonBody({ name: name.trim(), saved: true }) });
+          S.list = await api("/api/automations"); toast(`💾 اتحفظ «${r.name}»`); return setRec(r);
+        }
+        if ((b = t.closest("[data-active]"))) {
+          const r = await aAPI("", { method: "PATCH", ...jsonBody({ active: b.dataset.active === "1" }) });
+          S.list = await api("/api/automations"); toast(r.active ? `⚡ «${r.name}» هو اللي متفعّل للأوتوبايلوت` : "اتقفل التفعيل"); return setRec(r);
         }
         if (t.closest("[data-run]")) { const r = await aAPI("/run", { method: "POST" }); return setRec(r); }
         if ((b = t.closest("[data-openpj]"))) { storageSet(projectKey("free"), b.dataset.openpj); return showStep("6f"); }

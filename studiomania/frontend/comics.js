@@ -2,7 +2,7 @@
 // التجميع أوتوماتيك (كلمات كتير بالمصري والخليجي والإنجليزي)، والمخ بيتفرج على كل كوميك ويكتب: الإحساس، الموقف، يتقال إمتى، الجملة اللي فيه.
 const ComicsPage = (() => {
   const esc = (s) => escapeHtml(String(s ?? ""));
-  const S = { el: null, st: null, items: [], q: "", kind: "", status: "ready", lang: "", page: 0, more: false, total: 0, timer: null, open: null, sel: null };
+  const S = { react: true, el: null, st: null, items: [], q: "", kind: "", status: "ready", lang: "", appr: "", page: 0, more: false, total: 0, timer: null, open: null, sel: null };
   const html = () => `<div class="nb-wrap fs-wrap cm-wrap" id="cmWrap"><div class="nh-empty">بيحمّل…</div></div>`;
   const media = (c) => (c.kind === "clip" || /\.mp4/.test(c.url || "") ? `<video src="${c.url}" poster="${c.thumb}" muted loop playsinline preload="none"></video>` : `<img src="${c.url}" alt="" loading="lazy">`);
 
@@ -12,16 +12,17 @@ const ComicsPage = (() => {
     return `<section class="fs-hero">
         <div class="fs-hero-t"><b>مكتبة الكوميكس</b><span class="latin">COMICS LIBRARY</span></div>
         <p>كوميكس حقيقية (GIF وصور وفيديوهات بصوت) بتتجمّع أوتوماتيك، والمخ بيتفرج على كل واحد ويكتب سياقه: الإحساس، الموقف، يتقال إمتى، والجملة اللي فيه. وأي أداة (زي «حكاية») بتختار منها الكوميك المناسب للكلام.</p>
-        <div class="cm-stats"><span><b class="num">${st.total}</b> كوميك</span><span><b class="num">${st.ready}</b> جاهز بسياقه</span><span><b class="num">${st.pending}</b> مستني سياق</span><span><b class="num">${st.hidden}</b> مستخبي</span>${st.skipped ? `<span><b class="num">${st.skipped}</b> اتساب (وصفه فشل)</span>` : ""}
+        <div class="cm-stats"><span><b class="num">${st.total}</b> كوميك</span><span><b class="num">${st.ready}</b> جاهز بسياقه</span><span><b class="num">${st.pending}</b> مستني سياق</span><span><b class="num">${st.hidden}</b> مستخبي</span><span>✅ <b class="num">${st.approved || 0}</b> معتمد</span>${st.skipped ? `<span><b class="num">${st.skipped}</b> اتساب (وصفه فشل)</span>` : ""}
           ${Object.entries(st.kinds).map(([k, n]) => `<span>${esc(st.kind_names[k] || k)} <b class="num">${n}</b></span>`).join("")}</div>
         <div class="cm-srcs">${src}</div>
       </section>
       ${st.admin ? `<section class="fs-card"><h3>التجميع <small>${st.seeds} كلمة جاهزة بالمصري والخليجي والإنجليزي، وتقدر تزوّد</small></h3>
-        ${run ? `<div class="fs-busy">⏳ ${esc(s.step || "شغال…")} · ${s.progress || 0}% · اتضاف ${s.added || 0} · اتكتب سياق ${s.tagged || 0} · اتصرف تقريبًا $${(s.spent || 0).toFixed(2)} من حد $${st.max_usd} <button class="nb-btn sm danger" data-cmstop>وقّف</button></div>` : ""}
+        ${run ? `<div class="fs-busy">⏳ ${esc(s.step || "شغال…")} · ${s.progress || 0}% · اتضاف ${s.added || 0} · اتكتب سياق ${s.tagged || 0}${s.reactions ? ` · اتشال ${s.rejected || 0} (عليه كلام أو مش رد فعل)` : ""} · اتصرف تقريبًا $${(s.spent || 0).toFixed(2)} من حد $${st.max_usd} <button class="nb-btn sm danger" data-cmstop>وقّف</button></div>` : ""}
         ${s.last_error ? `<div class="fs-err">⚠️ ${esc(s.last_error)}</div>` : ""}
         <label class="nb-f"><span>كلمات زيادة (كل سطر كلمة): أسماء أفلام، إفيهات، شخصيات، مواقف</span><textarea rows="3" data-cmq placeholder="مثلًا:&#10;اسم فيلم كوميدي&#10;إفيه مشهور"></textarea></label>
+        <label class="hk-big cm-react"><input type="checkbox" data-cmreact ${S.react ? "checked" : ""}> 😮 ردود فعل كوميدي بس (${Object.values(st.reaction_names || {}).join("، ")}): GIF وفيديو بس، ومن غير أي كلام مكتوب على الشاشة. اللي يطلع عليه كلام بيتشال لوحده</label>
         <div class="nb-bar"><label class="hk-big"><input type="checkbox" data-cmseeds checked> استخدم الكلمات الجاهزة كمان</label>
-          ${Object.entries(st.kind_names).filter(([k]) => k !== "image").map(([k, t]) => `<label class="hk-big"><input type="checkbox" data-cmkind="${k}" ${k !== "sticker" ? "checked" : ""}> ${esc(t)}</label>`).join("")}
+          ${Object.entries(st.kind_names).filter(([k]) => k !== "image").map(([k, t]) => { const off = S.react && !["gif", "clip"].includes(k); return `<label class="hk-big${off ? " dim" : ""}"><input type="checkbox" data-cmkind="${k}" ${off ? "disabled" : (k !== "sticker" ? "checked" : "")}> ${esc(t)}</label>`; }).join("")}
           <select data-cmpages><option value="1">صفحة لكل كلمة</option><option value="2">صفحتين</option><option value="3">3 صفحات</option></select>
           <select data-cmcap><option value="3000">لحد 3000</option><option value="5000" selected>لحد 5000</option><option value="10000">لحد 10000</option><option value="20000">لحد 20000</option></select></div>
         <div class="nb-bar"><button class="nb-btn fs-go" data-cmgo ${run ? "disabled" : ""}>🎭 جمّع كوميكس</button>
@@ -33,10 +34,11 @@ const ComicsPage = (() => {
   }
   const LANG_IC = { ar: "ع", en: "EN", both: "ع+EN" };
   function card(c) {
-    const x = c.ctx || {}, on = S.sel?.has(c.id);
-    return `<figure class="cm-item${S.sel ? " picking" : ""}${on ? " picked" : ""}" data-cid="${c.id}">${media(c)}
-      ${S.sel ? `<span class="cm-check">${on ? "✓" : ""}</span>` : `<span class="cm-lang" title="${esc(S.st.lang_names[c.lang] || "")}">${LANG_IC[c.lang] || ""}</span>`}
-      <figcaption><b>${esc(x.emotion || c.title || "")}</b>${c.has_audio ? " 🔊" : ""}<small>${esc(x.situation || c.query || "")}</small>${x.phrase ? `<i>«${esc(x.phrase)}»</i>` : ""}</figcaption></figure>`;
+    const x = c.ctx || {}, on = S.sel?.has(c.id), lock = S.sel && c.approved;
+    return `<figure class="cm-item${S.sel ? " picking" : ""}${on ? " picked" : ""}${c.approved ? " approved" : ""}${lock ? " locked" : ""}" data-cid="${c.id}">${media(c)}
+      ${S.sel ? `<span class="cm-check" title="${lock ? "معتمد: شيل الاعتماد الأول علشان تقدر تمسحه" : ""}">${lock ? "🔒" : on ? "✓" : ""}</span>` : `<span class="cm-lang" title="${esc(S.st.lang_names[c.lang] || "")}">${LANG_IC[c.lang] || ""}</span>`}
+      ${S.st.admin ? `<label class="cm-appr${c.approved ? " on" : ""}"><input type="checkbox" data-cmappr ${c.approved ? "checked" : ""}> اعتمد الكوميك</label>` : ""}
+      <figcaption><b>${esc(x.emotion || c.title || "")}</b>${x.reaction && S.st.reaction_names?.[x.reaction] ? ` <span class="cm-rx">${esc(S.st.reaction_names[x.reaction])}</span>` : ""}${c.has_audio ? " 🔊" : ""}<small>${esc(x.situation || c.query || "")}</small>${x.phrase ? `<i>«${esc(x.phrase)}»</i>` : ""}</figcaption></figure>`;
   }
   function editor(c) {
     const x = c.ctx || {};
@@ -46,7 +48,7 @@ const ComicsPage = (() => {
       ${f("who", "مين/منين", x.who)}${f("tags", "كلمات البحث (بفاصلة)", (x.tags || []).join("، "))}
       <label class="nb-f"><span>عربي ولا أجنبي</span><select data-cmlang>${Object.entries(S.st.lang_names).map(([k, t]) => `<option value="${k}" ${k === c.lang ? "selected" : ""}>${LANG_IC[k]} ${esc(t)}</option>`).join("")}</select></label></div>
       <div class="nb-bar"><button class="nb-btn" data-cmsave>💾 احفظ</button><button class="nb-btn" data-cmhide>${c.status === "hidden" ? "👁 أظهره" : "🙈 خبّيه"}</button>
-        <button class="nb-btn danger" data-cmdel>🗑 امسحه</button><button class="nb-btn sm" data-cmclose>✕</button>
+        ${c.approved ? `<button class="nb-btn" disabled title="شيل الاعتماد الأول">🔒 معتمد (مايتمسحش)</button>` : `<button class="nb-btn danger" data-cmdel>🗑 امسحه</button>`}<button class="nb-btn sm" data-cmclose>✕</button>
         <small class="nb-state">${esc(c.source)} · ${esc(c.kind)}${c.dur ? ` · ${c.dur}ث` : ""}</small></div></section>`;
   }
   function render() {
@@ -55,22 +57,28 @@ const ComicsPage = (() => {
     S.el.innerHTML = head() + `<section class="fs-card"><h3>المكتبة</h3>
       <div class="nb-bar"><input type="search" data-cmsearch placeholder="دوّر بالإحساس أو الموقف أو الجملة… مثلًا: صدمة، مفلس، آخر الشهر" value="${esc(S.q)}" class="cm-q">
         <select data-cmfk><option value="">كل الأنواع</option>${Object.entries(S.st.kind_names).map(([k, t]) => `<option value="${k}" ${k === S.kind ? "selected" : ""}>${esc(t)}</option>`).join("")}</select>
-        <select data-cmfs><option value="ready" ${S.status === "ready" ? "selected" : ""}>الجاهز</option><option value="new" ${S.status === "new" ? "selected" : ""}>مستني سياق</option><option value="hidden" ${S.status === "hidden" ? "selected" : ""}>المستخبي</option><option value="skip" ${S.status === "skip" ? "selected" : ""}>اللي اتساب</option></select></div>
+        <select data-cmfs><option value="ready" ${S.status === "ready" ? "selected" : ""}>الجاهز</option><option value="new" ${S.status === "new" ? "selected" : ""}>مستني سياق</option><option value="hidden" ${S.status === "hidden" ? "selected" : ""}>المستخبي</option><option value="skip" ${S.status === "skip" ? "selected" : ""}>اللي اتساب</option></select>
+        <select data-cmfa><option value="">معتمد وغير معتمد</option><option value="1" ${S.appr === "1" ? "selected" : ""}>✅ المعتمد بس</option><option value="0" ${S.appr === "0" ? "selected" : ""}>اللي لسه مااتعتمدش</option></select></div>
       <div class="cm-tabs">${[["", "الكل"], ...Object.entries(S.st.lang_names)].map(([k, t]) => `<button class="cm-tab${S.lang === k ? " on" : ""}" data-cmlt="${k}">${k ? LANG_IC[k] + " " : ""}${esc(t)}${k && S.st.langs?.[k] != null ? ` <span class="num">${S.st.langs[k]}</span>` : ""}</button>`).join("")}
         <small class="cm-n">${S.total} نتيجة</small></div>
+      ${S.st.admin && !S.sel ? `<div class="nb-bar cm-apprbar"><button class="nb-btn sm" data-cmapprvis ${S.total ? "" : "disabled"}>✅ اعتمد كل الظاهر (${S.total})</button>
+          <button class="nb-btn sm" data-cmapprall ${S.st.total ? "" : "disabled"}>✅ اعتمد الكل (${S.st.total})</button>
+          ${S.st.approved ? `<button class="nb-btn sm" data-cmunapprvis>شيل الاعتماد من الظاهر</button>` : ""}
+          <small class="nb-state">المعتمد مابيتمسحش، ولا بيتعلّم عليه للمسح، غير لما تشيل اعتماده</small></div>` : ""}
       ${S.st.admin ? (S.sel ? `<div class="nb-bar cm-selbar"><b>اختار اللي عايز تمسحه (دوس عليه)</b><span class="num">${S.sel.size}</span> مختار
           <button class="nb-btn sm" data-cmselall>اختار كل اللي ظاهر</button>
           <button class="nb-btn sm danger" data-cmseldel ${S.sel.size ? "" : "disabled"}>🗑 امسح المختار</button>
           <button class="nb-btn sm" data-cmselx>إلغاء</button></div>`
         : `<div class="nb-bar"><button class="nb-btn sm" data-cmsel>☑ اختار كوميكس وامسحها</button>
-          ${S.total ? `<button class="nb-btn sm danger" data-cmdelall>🗑 امسح كل الـ ${S.total} اللي في الفلتر ده</button>` : ""}</div>`) : ""}
+          ${S.total ? `<button class="nb-btn sm danger" data-cmdelall>🗑 امسح الظاهر (${S.total}) ما عدا المعتمد</button>` : ""}
+          ${S.st.total ? `<button class="nb-btn sm danger" data-cmdelevery>🗑 امسح الكل ما عدا المعتمد</button>` : ""}</div>`) : ""}
       ${open && S.st.admin && !S.sel ? editor(open) : ""}
       <div class="cm-grid">${S.items.map(card).join("") || `<div class="nh-empty">${S.st.total ? "مفيش نتايج" : "المكتبة لسه فاضية. دوس «جمّع كوميكس»."}</div>`}</div>
       ${S.more ? `<div class="nb-bar"><button class="nb-btn" data-cmmore>اعرض أكتر</button></div>` : ""}</section>`;
   }
   async function load(more = false) {
     S.page = more ? S.page + 1 : 0;
-    const r = await api(`/api/comics?q=${encodeURIComponent(S.q)}&kind=${S.kind}&status=${S.status}&lang=${S.lang}&page=${S.page}`);
+    const r = await api(`/api/comics?q=${encodeURIComponent(S.q)}&kind=${S.kind}&status=${S.status}&lang=${S.lang}&approved=${S.appr}&page=${S.page}`);
     S.items = more ? [...S.items, ...r.items] : r.items; S.more = r.more; S.total = r.total ?? S.items.length;
   }
   async function refresh() { S.st = await api("/api/comics/status"); }
@@ -90,6 +98,16 @@ const ComicsPage = (() => {
     w.addEventListener("change", async (e) => {
       if (e.target.matches("[data-cmfk]")) { S.kind = e.target.value; await load(); return render(); }
       if (e.target.matches("[data-cmfs]")) { S.status = e.target.value; await load(); return render(); }
+      if (e.target.matches("[data-cmfa]")) { S.appr = e.target.value; await load(); return render(); }
+      if (e.target.matches("[data-cmreact]")) { S.react = e.target.checked; return render(); }
+      if (e.target.matches("[data-cmappr]")) {
+        const id = e.target.closest(".cm-item").dataset.cid;
+        try {
+          const r = await api(`/api/comics/${id}`, { method: "PATCH", ...jsonBody({ approved: e.target.checked }) });
+          S.items = S.items.map((c) => (c.id === r.id ? r : c)); await refresh();
+        } catch (err) { toast(err.message, true); }
+        return render();
+      }
       if (e.target.matches("[data-cmfiles]") && e.target.files.length) {
         const fd = new FormData();
         [...e.target.files].forEach((f) => fd.append("files", f));
@@ -104,7 +122,8 @@ const ComicsPage = (() => {
       try {
         if (q("[data-cmgo]")) {
           const body = { queries: (w.querySelector("[data-cmq]").value || "").split("\n"), use_seeds: w.querySelector("[data-cmseeds]").checked,
-            kinds: [...w.querySelectorAll("[data-cmkind]:checked")].map((x) => x.dataset.cmkind), pages: +w.querySelector("[data-cmpages]").value, cap: +w.querySelector("[data-cmcap]").value };
+            kinds: [...w.querySelectorAll("[data-cmkind]:checked")].map((x) => x.dataset.cmkind), pages: +w.querySelector("[data-cmpages]").value, cap: +w.querySelector("[data-cmcap]").value,
+            reactions: !!S.react };
           S.st = await api("/api/comics/harvest", { method: "POST", ...jsonBody(body) }); render(); return poll();
         }
         if (q("[data-cmstop]")) { await api("/api/comics/harvest/stop", { method: "POST" }); return toast("هيقف بعد الخطوة اللي شغالة"); }
@@ -117,20 +136,32 @@ const ComicsPage = (() => {
         if (q("[data-cmlt]")) { S.lang = q("[data-cmlt]").dataset.cmlt; S.open = null; await load(); return render(); }
         if (q("[data-cmsel]")) { S.sel = new Set(); S.open = null; return render(); }
         if (q("[data-cmselx]")) { S.sel = null; return render(); }
-        if (q("[data-cmselall]")) { S.items.forEach((c) => S.sel.add(c.id)); return render(); }
+        if (q("[data-cmselall]")) { S.items.forEach((c) => { if (!c.approved) S.sel.add(c.id); }); return render(); }
+        if (q("[data-cmappr]") || q(".cm-appr")) return;   // التشيك بوكس بيتعامل معاه في change
+        const flt = { q: S.q, kind: S.kind, status: S.status, lang: S.lang };
+        if (q("[data-cmapprvis]") || q("[data-cmunapprvis]") || q("[data-cmapprall]")) {
+          const all = !!q("[data-cmapprall]"), value = !q("[data-cmunapprvis]");
+          const r = await api("/api/comics/approve", { method: "POST", ...jsonBody(all ? { all: true, value } : { all: true, value, ...flt }) });
+          toast(value ? `✅ اتعتمد ${r.changed}` : `اتشال الاعتماد من ${r.changed}`); S.st = r; await load(); return render();
+        }
         if (q("[data-cmseldel]")) {
           if (!confirm(`تمسح ${S.sel.size} كوميك؟ المسح نهائي.`)) return;
           const r = await api("/api/comics/delete", { method: "POST", ...jsonBody({ ids: [...S.sel] }) });
           toast(`🗑 اتمسح ${r.deleted}`); S.sel = null; S.st = r; await load(); return render();
         }
-        if (q("[data-cmdelall]")) {
-          if (!confirm(`تمسح كل الـ ${S.total} كوميك اللي في الفلتر ده؟ المسح نهائي.`)) return;
-          const r = await api("/api/comics/delete", { method: "POST", ...jsonBody({ all: true, q: S.q, kind: S.kind, status: S.status, lang: S.lang }) });
-          toast(`🗑 اتمسح ${r.deleted}`); S.st = r; await load(); return render();
+        if (q("[data-cmdelall]") || q("[data-cmdelevery]")) {
+          const every = !!q("[data-cmdelevery]");
+          if (!confirm(every ? "تمسح كل المكتبة ما عدا المعتمد؟ المسح نهائي." : `تمسح الظاهر (${S.total}) ما عدا المعتمد؟ المسح نهائي.`)) return;
+          const r = await api("/api/comics/delete", { method: "POST", ...jsonBody(every ? { all: true } : { all: true, ...flt }) });
+          toast(`🗑 اتمسح ${r.deleted}${r.kept_approved ? ` · فضل ${r.kept_approved} معتمد` : ""}`); S.st = r; await load(); return render();
         }
         if (q("[data-cmclose]")) { S.open = null; return render(); }
         const it = q(".cm-item");
-        if (it && S.sel) { const id = it.dataset.cid; S.sel.has(id) ? S.sel.delete(id) : S.sel.add(id); return render(); }
+        if (it && S.sel) {
+          const id = it.dataset.cid;
+          if (S.items.find((c) => c.id === id)?.approved) return toast("ده معتمد: شيل الاعتماد الأول علشان تقدر تعلّم عليه للمسح", true);
+          S.sel.has(id) ? S.sel.delete(id) : S.sel.add(id); return render();
+        }
         if (it && S.st.admin) { S.open = it.dataset.cid; render(); return w.querySelector(".cm-edit")?.scrollIntoView({ block: "center" }); }
         const cur = S.items.find((c) => c.id === S.open);
         if (!cur) return;

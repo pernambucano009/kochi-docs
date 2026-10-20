@@ -1663,6 +1663,17 @@ audio { width: 100%; }
 .cm-item.picked { outline: 3px solid #D9473A; outline-offset: -3px; }
 .cm-item.picked .cm-check { background: #D9473A; border-color: #D9473A; }
 .cm-item.picking img, .cm-item.picking video { opacity: .85; }
+/* «اعتمد الكوميك»: المعتمد عليه علامة خضرا، ومابيتعلّمش عليه للمسح */
+.cm-appr { position: absolute; top: 8px; inset-inline-end: 8px; display: flex; align-items: center; gap: 5px; padding: 3px 9px 3px 7px; border-radius: 999px; background: rgba(0, 0, 0, .55); color: #fff; font-size: 11.5px; font-weight: 600; cursor: pointer; z-index: 2; }
+.cm-appr input { margin: 0; accent-color: #2E9E5B; cursor: pointer; }
+.cm-appr.on { background: #2E9E5B; }
+.cm-item.approved { outline: 2px solid #2E9E5B; outline-offset: -2px; }
+.cm-item.locked { cursor: not-allowed; }
+.cm-item.locked img, .cm-item.locked video { opacity: .55; }
+.cm-item.locked .cm-check { background: #2E9E5B; border-color: #2E9E5B; font-size: 13px; }
+.cm-rx { display: inline-block; padding: 0 7px; border-radius: 999px; background: rgba(46, 158, 91, .15); color: #2E9E5B; font-size: 11px; font-weight: 600; }
+.cm-react { display: block; margin: 6px 0 2px; }
+label.dim { opacity: .4; }
 .cm-tabs { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 4px 0 10px; }
 #nh .cm-tab { padding: 7px 14px; border-radius: 999px; background: var(--nh-bg, rgba(127, 127, 127, .08)); font-size: 13.5px; }
 #nh .cm-tab.on { background: var(--nh-ink, #181718); color: var(--nh-bg, #fff); }
@@ -2001,6 +2012,9 @@ audio { width: 100%; }
 .am-file img, .am-file span { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 10px; background: var(--nh-fill); display: grid; place-items: center; outline: 2px solid transparent; }
 .am-file.on img, .am-file.on span { outline-color: var(--nh-accent, #E5613E); }
 .am-file small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.am-save { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; }
+.am-tag { padding: 4px 10px; border-radius: 999px; background: var(--nh-fill); font-size: 12px; opacity: .8; }
+.am-tag.ok { background: rgba(46, 158, 91, .14); color: #2E9E5B; opacity: 1; font-weight: 600; }
 .am-run { display: grid; gap: 3px; padding: 10px 12px; border-radius: 14px; background: var(--nh-fill); margin-top: 6px; font-size: 12.5px; }
 .am-run small { color: var(--nh-muted); }
 .am-run small.bad { color: var(--nh-accent, #E5613E); }

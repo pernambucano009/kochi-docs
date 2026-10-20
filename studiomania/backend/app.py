@@ -22928,7 +22928,7 @@ def r2p_file(rid: str, name: str):
 COMICS_DIR = Path(os.environ.get("COMICS_DATA") or DATA_DIR / "comics")
 COMICS_MEDIA = COMICS_DIR / "media"
 COMICS_LOCK = threading.Lock()
-COMICS_RUN = {"stop": False, "thread": None, "meter": {"usd": 0.0}}
+COMICS_RUN = {"stop": False, "thread": None, "meter": {"usd": 0.0}, "reactions": False, "rejected": 0}
 # وصف الكوميكس شغل كتير وبسيط: أرخص موديل بيشوف صور (أرخص من Pro بحوالي 25 مرة)، ومعاه حد أقصى للصرف في كل مرة
 COMICS_MODELS = ["google/gemini-2.5-flash-lite", "google/gemini-3.1-flash-lite", "google/gemini-2.5-flash"]
 COMICS_MAX_USD = float(os.environ.get("COMICS_MAX_USD", "1") or 1)
@@ -22952,6 +22952,10 @@ CREATE VIRTUAL TABLE IF NOT EXISTS comics_fts USING fts5(id UNINDEXED, body, tok
             conn.execute("ALTER TABLE comics ADD COLUMN lang TEXT")
             for r in conn.execute("SELECT id, title, query, ctx FROM comics").fetchall():
                 conn.execute("UPDATE comics SET lang = ? WHERE id = ?", (comics.lang_group(json.loads(r["ctx"] or "{}"), r["title"], r["query"]), r["id"]))
+    # «اعتمد الكوميك»: المعتمد مابيتمسحش (لا لوحده ولا بالجملة) غير لما الاعتماد يتشال
+    if "approved" not in {r[1] for r in conn.execute("PRAGMA table_info(comics)")}:
+        with conn:
+            conn.execute("ALTER TABLE comics ADD COLUMN approved INT DEFAULT 0")
     return conn
 
 
@@ -22982,7 +22986,7 @@ def comic_row(r: sqlite3.Row) -> dict:
     u = lambda f: f"/api/comics/file/{f}" if f else None
     return {"id": r["id"], "source": r["source"], "kind": r["kind"], "url": u(r["file"]), "thumb": u(r["thumb"]), "w": r["w"], "h": r["h"],
             "dur": r["dur"], "has_audio": bool(r["has_audio"]), "title": r["title"], "query": r["query"], "ctx": ctx, "status": r["status"],
-            "lang": r["lang"] or "both"}
+            "lang": r["lang"] or "both", "approved": bool(r["approved"])}
 
 
 def comic_index(conn: sqlite3.Connection, cid: str, title: str, query: str, ctx: dict) -> None:
@@ -23070,6 +23074,10 @@ def comics_tag_pending(limit: int = 60) -> int:
         with closing(cdb()) as conn, conn:
             for k, r in enumerate(batch):
                 ctx = got.get(k)
+                # تجميع «ردود الفعل بس»: الجديد اللي عليه كلام أو مش رد فعل بيتشال على طول (المعتمد مابيتلمسش)
+                if ctx and COMICS_RUN.get("reactions") and not r["approved"] and comics.reaction_reject(ctx):
+                    COMICS_RUN["rejected"] = COMICS_RUN.get("rejected", 0) + comics_remove(conn, [r])
+                    continue
                 if not ctx:
                     old = json.loads(r["ctx"] or "{}")
                     old["_tries"] = int(old.get("_tries") or 0) + 1
@@ -23091,9 +23099,10 @@ def comics_count() -> int:
         return conn.execute("SELECT COUNT(*) FROM comics").fetchone()[0]
 
 
-def run_comics_harvest(queries: list[str], kinds: list[str], pages: int, cap: int) -> None:
+def run_comics_harvest(queries: list[str], kinds: list[str], pages: int, cap: int, reactions: bool = False) -> None:
     COMICS_RUN["stop"] = False
     COMICS_RUN["meter"] = {"usd": 0.0}
+    COMICS_RUN["reactions"], COMICS_RUN["rejected"] = reactions, 0
     srcs = {k: v for k, v in comics.sources().items() if v["on"]}
     added = tagged = 0
     try:
@@ -23115,7 +23124,8 @@ def run_comics_harvest(queries: list[str], kinds: list[str], pages: int, cap: in
         for n, (q, src, kind, pg) in enumerate(jobs):
             if COMICS_RUN["stop"] or comics_count() >= cap:
                 break
-            comics_state_set(step=f"بيدوّر على «{q}» في {src} ({n + 1}/{len(jobs)})", progress=round(n / max(1, len(jobs)) * 100), added=added, tagged=tagged)
+            comics_state_set(step=f"بيدوّر على «{q}» في {src} ({n + 1}/{len(jobs)})", progress=round(n / max(1, len(jobs)) * 100), added=added, tagged=tagged,
+                             rejected=COMICS_RUN["rejected"])
             try:
                 items = comics.mock_items(q, kind, 2) if src == "mock" else comics.search(src, kind, q, pg)
             except comics.SourceError as exc:
@@ -23139,7 +23149,8 @@ def run_comics_harvest(queries: list[str], kinds: list[str], pages: int, cap: in
             if not got:
                 break
     finally:
-        comics_state_set(running=False, step=None, progress=100, added=added, tagged=tagged, finished_at=now())
+        COMICS_RUN["reactions"] = False
+        comics_state_set(running=False, step=None, progress=100, added=added, tagged=tagged, rejected=COMICS_RUN["rejected"], finished_at=now())
 
 
 class ComicsHarvestIn(BaseModel):
@@ -23148,6 +23159,8 @@ class ComicsHarvestIn(BaseModel):
     kinds: list[str] = ["gif", "clip", "meme"]
     pages: int = 1
     cap: int = 5000
+    # ردود فعل بس (استغراب، غضب، دهشة، ملل، حيرة): GIF وفيديو بس، واللي عليه كلام مكتوب بيتشال
+    reactions: bool = False
 
 
 @app.post("/api/comics/harvest")
@@ -23157,11 +23170,12 @@ def comics_harvest(body: ComicsHarvestIn):
     if comics_state().get("running") and COMICS_RUN["thread"] and COMICS_RUN["thread"].is_alive():
         raise HTTPException(400, "التجميع شغال بالفعل")
     custom = [q.strip()[:60] for q in body.queries if q.strip()][:500]
-    qs = list(dict.fromkeys(custom + (comics.seeds() if body.use_seeds else [])))
-    kinds = [k for k in body.kinds if k in comics.KINDS] or ["gif"]
+    seeds = (comics.reaction_seeds() if body.reactions else comics.seeds()) if body.use_seeds else []
+    qs = list(dict.fromkeys(custom + seeds))
+    kinds = [k for k in body.kinds if k in (comics.REACTION_KINDS if body.reactions else comics.KINDS)] or ["gif"]
     pages, cap = max(1, min(5, body.pages)), max(100, min(50000, body.cap))
-    comics_state_set(running=True, step="بيبدأ", progress=0, added=0, tagged=0, last_error=None, started_at=now(), queries=len(qs))
-    t = threading.Thread(target=run_comics_harvest, args=(qs, kinds, pages, cap), daemon=True)
+    comics_state_set(running=True, step="بيبدأ", progress=0, added=0, tagged=0, rejected=0, reactions=body.reactions, last_error=None, started_at=now(), queries=len(qs))
+    t = threading.Thread(target=run_comics_harvest, args=(qs, kinds, pages, cap, body.reactions), daemon=True)
     COMICS_RUN["thread"] = t
     t.start()
     return comics_status()
@@ -23203,12 +23217,13 @@ def comics_status():
         by = {r[0]: r[1] for r in conn.execute("SELECT status, COUNT(*) FROM comics GROUP BY status")}
         kinds = {r[0]: r[1] for r in conn.execute("SELECT kind, COUNT(*) FROM comics GROUP BY kind")}
         langs = {r[0] or "both": r[1] for r in conn.execute("SELECT lang, COUNT(*) FROM comics WHERE status = 'ready' GROUP BY lang")}
-    return {"state": st, "total": sum(by.values()), "ready": by.get("ready", 0), "pending": by.get("new", 0), "hidden": by.get("hidden", 0), "skipped": by.get("skip", 0), "max_usd": COMICS_MAX_USD,
+        approved = conn.execute("SELECT COUNT(*) FROM comics WHERE approved = 1").fetchone()[0]
+    return {"state": st, "total": sum(by.values()), "approved": approved, "reaction_names": comics.REACTIONS, "ready": by.get("ready", 0), "pending": by.get("new", 0), "hidden": by.get("hidden", 0), "skipped": by.get("skip", 0), "max_usd": COMICS_MAX_USD,
             "langs": langs, "lang_names": comics.LANGS,
             "kinds": kinds, "kind_names": comics.KINDS, "sources": comics.sources(), "seeds": len(comics.seeds()), "admin": TENANT_ROLE == "admin"}
 
 
-def comics_where(q: str, kind: str, status: str, lang: str) -> tuple[str, list, str]:
+def comics_where(q: str, kind: str, status: str, lang: str, appr: str = "") -> tuple[str, list, str]:
     """فلتر المكتبة (النوع، الحالة، عربي/أجنبي، والبحث) — نفسه للعرض وللمسح بالجملة."""
     where, args = [], []
     if kind in comics.KINDS:
@@ -23220,11 +23235,14 @@ def comics_where(q: str, kind: str, status: str, lang: str) -> tuple[str, list, 
     if lang in comics.LANGS:
         where.append("COALESCE(c.lang, 'both') = ?")
         args.append(lang)
+    if appr in ("1", "0"):
+        where.append("COALESCE(c.approved, 0) = ?")
+        args.append(int(appr))
     return " AND ".join(where), args, comics.fts_query(q)
 
 
-def comics_query(conn: sqlite3.Connection, q: str, kind: str, status: str, lang: str, cols: str = "c.*", tail: str = "", tail_args: tuple = ()) -> list:
-    where, args, fq = comics_where(q, kind, status, lang)
+def comics_query(conn: sqlite3.Connection, q: str, kind: str, status: str, lang: str, cols: str = "c.*", tail: str = "", tail_args: tuple = (), appr: str = "") -> list:
+    where, args, fq = comics_where(q, kind, status, lang, appr)
     if fq:
         sql = f"SELECT {cols} FROM comics_fts f JOIN comics c ON c.id = f.id WHERE comics_fts MATCH ?" + (f" AND {where}" if where else "")
         return conn.execute(sql + tail.replace("{rank}", "bm25(comics_fts)"), (fq, *args, *tail_args)).fetchall()
@@ -23233,10 +23251,10 @@ def comics_query(conn: sqlite3.Connection, q: str, kind: str, status: str, lang:
 
 
 @app.get("/api/comics")
-def comics_list(q: str = "", kind: str = "", status: str = "ready", page: int = 0, lang: str = ""):
+def comics_list(q: str = "", kind: str = "", status: str = "ready", page: int = 0, lang: str = "", approved: str = ""):
     with closing(cdb()) as conn:
-        rows = comics_query(conn, q, kind, status, lang, tail=" ORDER BY {rank} LIMIT 60 OFFSET ?", tail_args=(page * 60,))
-        total = comics_query(conn, q, kind, status, lang, cols="COUNT(*)")[0][0]
+        rows = comics_query(conn, q, kind, status, lang, tail=" ORDER BY {rank} LIMIT 60 OFFSET ?", tail_args=(page * 60,), appr=approved)
+        total = comics_query(conn, q, kind, status, lang, cols="COUNT(*)", appr=approved)[0][0]
     return {"items": [comic_row(r) for r in rows], "page": page, "more": len(rows) == 60, "total": total}
 
 
@@ -23244,6 +23262,7 @@ class ComicPatchIn(BaseModel):
     ctx: dict | None = None
     status: str | None = None
     lang: str | None = None
+    approved: bool | None = None
 
 
 @app.patch("/api/comics/{cid}")
@@ -23256,7 +23275,8 @@ def comics_patch(cid: str, body: ComicPatchIn):
         ctx = comics.clean_ctx({**json.loads(r["ctx"] or "{}"), **(body.ctx or {})}) if body.ctx is not None else json.loads(r["ctx"] or "{}")
         st = body.status if body.status in ("ready", "hidden", "new") else ("ready" if body.ctx is not None and r["status"] == "new" else r["status"])
         lg = body.lang if body.lang in comics.LANGS else (r["lang"] or "both")
-        conn.execute("UPDATE comics SET ctx = ?, status = ?, lang = ? WHERE id = ?", (json.dumps(ctx, ensure_ascii=False), st, lg, cid))
+        ap = int(body.approved) if body.approved is not None else int(r["approved"] or 0)
+        conn.execute("UPDATE comics SET ctx = ?, status = ?, lang = ?, approved = ? WHERE id = ?", (json.dumps(ctx, ensure_ascii=False), st, lg, ap, cid))
         comic_index(conn, cid, r["title"], r["query"], ctx)
         return comic_row(conn.execute("SELECT * FROM comics WHERE id = ?", (cid,)).fetchone())
 
@@ -23275,7 +23295,10 @@ def comics_remove(conn: sqlite3.Connection, rows: list) -> int:
 def comics_delete(cid: str):
     comics_admin()
     with closing(cdb()) as conn, conn:
-        comics_remove(conn, conn.execute("SELECT id, file, thumb FROM comics WHERE id = ?", (cid,)).fetchall())
+        rows = conn.execute("SELECT id, file, thumb, approved FROM comics WHERE id = ?", (cid,)).fetchall()
+        if rows and rows[0]["approved"]:
+            raise HTTPException(400, "الكوميك ده معتمد: شيل الاعتماد الأول وبعدين امسحه")
+        comics_remove(conn, rows)
     return {"ok": True}
 
 
@@ -23296,14 +23319,42 @@ def comics_bulk_delete(body: ComicsBulkDeleteIn):
     if COMICS_RUN["thread"] and COMICS_RUN["thread"].is_alive():
         raise HTTPException(400, "وقّف التجميع الأول وبعدين امسح")
     with closing(cdb()) as conn, conn:
+        # المعتمد مابيتمسحش بالجملة أبدًا (لا «امسح الكل» ولا «امسح الظاهر» ولا المختار)
         if body.all:
-            rows = comics_query(conn, body.q, body.kind, body.status, body.lang, cols="c.id, c.file, c.thumb")
+            rows = comics_query(conn, body.q, body.kind, body.status, body.lang, cols="c.id, c.file, c.thumb", appr="0")
         else:
             ids = [str(x) for x in body.ids][:5000]
             rows = [r for i in range(0, len(ids), 500)
-                    for r in conn.execute(f"SELECT id, file, thumb FROM comics WHERE id IN ({','.join('?' * len(ids[i:i + 500]))})", ids[i:i + 500]).fetchall()]
+                    for r in conn.execute(f"SELECT id, file, thumb FROM comics WHERE COALESCE(approved, 0) = 0 AND id IN ({','.join('?' * len(ids[i:i + 500]))})",
+                                          ids[i:i + 500]).fetchall()]
         n = comics_remove(conn, rows)
-    return {"deleted": n, **comics_status()}
+        kept = conn.execute("SELECT COUNT(*) FROM comics WHERE approved = 1").fetchone()[0]
+    return {"deleted": n, "kept_approved": kept, **comics_status()}
+
+
+class ComicsApproveIn(BaseModel):
+    ids: list[str] = []
+    # أو اعتمد/شيل اعتماد كل اللي في الفلتر ده («اعتمد الظاهر»)، ومن غير فلتر = الكل
+    all: bool = False
+    q: str = ""
+    kind: str = ""
+    status: str = ""
+    lang: str = ""
+    value: bool = True
+
+
+@app.post("/api/comics/approve")
+def comics_approve(body: ComicsApproveIn):
+    comics_admin()
+    with closing(cdb()) as conn, conn:
+        if body.all:
+            ids = [r[0] for r in comics_query(conn, body.q, body.kind, body.status, body.lang, cols="c.id")]
+        else:
+            ids = [str(x) for x in body.ids][:5000]
+        for i in range(0, len(ids), 500):
+            part = ids[i:i + 500]
+            conn.execute(f"UPDATE comics SET approved = ? WHERE id IN ({','.join('?' * len(part))})", (int(body.value), *part))
+    return {"changed": len(ids), **comics_status()}
 
 
 @app.post("/api/comics/import")
@@ -25302,8 +25353,30 @@ def automations_list():
             d = json.loads(f.read_text(encoding="utf-8"))
         except ValueError:
             continue
-        out.append({"id": f.stem, "name": d.get("name"), "steps": len(d.get("steps") or []), "runs": len(d.get("runs") or []), "updated_at": d.get("updated_at")})
+        out.append({"id": f.stem, "name": d.get("name"), "steps": len(d.get("steps") or []), "runs": len(d.get("runs") or []), "updated_at": d.get("updated_at"),
+                    "saved": bool(d.get("saved")), "active": bool(d.get("active"))})
     return out
+
+
+def auto_active(bid: str) -> str | None:
+    """الموديل اللي العميل فعّله للأوتوبايلوت (واحد بس في المرة)، أو None."""
+    for f in auto_dir(bid).glob("*.json"):
+        if f.name.startswith("_"):
+            continue
+        try:
+            d = json.loads(f.read_text(encoding="utf-8"))
+        except ValueError:
+            continue
+        if d.get("saved") and d.get("active"):
+            return f.stem
+    return None
+
+
+@app.get("/api/automations-active")
+def automations_active():
+    bid = active_client_id()
+    rid = auto_active(bid)
+    return {"id": rid, "model": auto_to_dict(rid, auto_load(rid, bid), bid) if rid else None}
 
 
 class AutoNewIn(BaseModel):
@@ -25327,6 +25400,9 @@ def automation_get(rid: str):
 class AutoPatchIn(BaseModel):
     name: str | None = None
     steps: list | None = None
+    # 💾 احفظ الموديل (باسم يختاره العميل)، و«فعّله» = الأوتوبايلوت يشتغل بيه هو بس
+    saved: bool | None = None
+    active: bool | None = None
 
 
 @app.patch("/api/automations/{rid}")
@@ -25337,7 +25413,26 @@ def automation_patch(rid: str, body: AutoPatchIn):
             d["name"] = lib_.clean_name(body.name, d.get("name") or "موديل")
         if body.steps is not None:
             d["steps"] = automate.clean_steps(body.steps)
-    return auto_to_dict(rid, auto_update(rid, fn, bid), bid)
+        if body.saved is not None:
+            if body.saved and not (body.name or "").strip() and not d.get("saved"):
+                raise HTTPException(400, "اختار اسم للموديل علشان تحفظه")
+            d["saved"] = body.saved
+            if not body.saved:
+                d["active"] = False
+        if body.active is not None:
+            if body.active and not d.get("saved"):
+                raise HTTPException(400, "احفظ الموديل باسم الأول، وبعدين فعّله")
+            d["active"] = body.active
+    d = auto_update(rid, fn, bid)
+    if body.active:   # تفعيل واحد بس: الباقيين بيتقفلوا
+        for f in auto_dir(bid).glob("*.json"):
+            if f.stem != Path(rid).name and not f.name.startswith("_"):
+                try:
+                    if json.loads(f.read_text(encoding="utf-8")).get("active"):
+                        auto_update(f.stem, lambda x: x.update(active=False), bid)
+                except ValueError:
+                    continue
+    return auto_to_dict(rid, d, bid)
 
 
 @app.delete("/api/automations/{rid}")

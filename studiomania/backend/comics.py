@@ -43,6 +43,32 @@ def seeds() -> list[str]:
     return [q.strip() for q in (SEEDS_AR + "|" + SEEDS_EN).split("|") if q.strip()]
 
 
+# «ردود فعل بس»: الكوميدي هنا مش ضحك، ده الوش اللي بيتحط عشان يعلّق على الكلام (استغراب، غضب، دهشة، ملل، حيرة)
+# فيديو أو GIF بس، ومن غير أي كلام مكتوب على الشاشة
+REACTIONS = {"surprise": "استغراب", "anger": "غضب", "shock": "دهشة", "bored": "ملل", "confused": "حيرة"}
+REACTION_KINDS = ("gif", "clip")
+REACTION_SEEDS = {
+    "surprise": "ايه ده|بجد|ازاي يعني|لا يا شيخ|نعم|يعني ايه|surprised face|raised eyebrow|wait what|side eye|suspicious look|double take|what reaction",
+    "anger": "متعصب|غضبان|اتنرفز|هتجنن|angry face|rage reaction|furious|annoyed face|frustrated reaction|angry stare|losing it|mad face",
+    "shock": "مصدوم|يا نهار ابيض|يا خبر|اتصدمت|shocked face|jaw drop|mind blown|speechless|gasp|stunned|omg reaction|in disbelief",
+    "bored": "زهقان|ملل|مش فارقة|نايم|bored face|yawn|unimpressed|eye roll|not interested|waiting bored|so bored|blank stare",
+    "confused": "مش فاهم|حيرة|محتار|confused face|confused math|thinking hard|huh|puzzled|what is happening|lost|scratching head|confused look",
+}
+
+
+def reaction_seeds() -> list[str]:
+    return list(dict.fromkeys(q.strip() for v in REACTION_SEEDS.values() for q in v.split("|") if q.strip()))
+
+
+def reaction_reject(ctx: dict) -> str | None:
+    """ليه الكوميك ده مايدخلش مكتبة «ردود الفعل»: عليه كلام مكتوب، أو مش رد فعل من الخمسة. None = ينفع."""
+    if ctx.get("text_on_screen"):
+        return "عليه كلام مكتوب"
+    if ctx.get("reaction") not in REACTIONS:
+        return "مش رد فعل"
+    return None
+
+
 # ---------------------------------------------------------------- المصادر
 def klipy_key() -> str:
     return os.environ.get("KLIPY_API_KEY", "").strip()
@@ -171,6 +197,8 @@ Return JSON only: {{"items": [{{"i": 0,
  "situation": "بالعربي المصري: الموقف اللي الكوميك ده بيتحط فيه (جملة)",
  "use_when": "بالعربي المصري: الكلام اللي لو اتقال في الفيديو يبقى الكوميك ده مناسب (أمثلة قصيرة)",
  "phrase": "the exact text/catchphrase written or famously said in it, or empty",
+ "text_on_screen": true if ANY words/letters/captions/subtitles are written on the image (watermark logos alone don't count), else false,
+ "reaction": "the face/body reaction it shows: {' | '.join(REACTIONS)} | other  (surprise = puzzled/raised eyebrow, anger, shock = astonished/jaw drop, bored, confused)",
  "who": "famous character/actor/film if clearly recognisable, else empty",
  "lang": "ar-eg | ar-gulf | ar | en | none",
  "audience": "ar | en | both  (ar: Arabic text/speech OR from Arab film/TV/people/culture · en: English text/speech OR clearly from Western film/TV/meme culture · both: no text and nothing culture-specific, a universal reaction anyone gets)",
@@ -190,7 +218,9 @@ def clean_ctx(raw: dict) -> dict:
     return {"emotion": str(raw.get("emotion") or "")[:60], "situation": str(raw.get("situation") or "")[:300], "use_when": str(raw.get("use_when") or "")[:400],
             "phrase": str(raw.get("phrase") or "")[:160], "who": str(raw.get("who") or "")[:120], "lang": str(raw.get("lang") or "")[:10],
             "audience": str(raw.get("audience") or "").strip().lower()[:4] if str(raw.get("audience") or "").strip().lower() in LANGS else "",
-            "tags": [str(t)[:40] for t in raw.get("tags") or [] if str(t).strip()][:12], "flags": flags, "quality": q}
+            "tags": [str(t)[:40] for t in raw.get("tags") or [] if str(t).strip()][:12], "flags": flags, "quality": q,
+            "text_on_screen": raw.get("text_on_screen") in (True, "true", 1, "yes"),
+            "reaction": str(raw.get("reaction") or "").strip().lower() if str(raw.get("reaction") or "").strip().lower() in REACTIONS else ""}
 
 
 # الكوميك عربي صرف، ولا أجنبي صرف، ولا ينفع الاتنين
@@ -251,4 +281,5 @@ def mock_items(q: str, kind: str, n: int = 4) -> list[dict]:
 def mock_ctx(it: dict, k: int) -> dict:
     return clean_ctx({"emotion": EMOTIONS[k % len(EMOTIONS)], "situation": f"لما حد يقول «{it.get('query') or it.get('title')}»",
                       "use_when": it.get("query") or it.get("title"), "phrase": "", "tags": [it.get("query") or ""], "quality": 4,
+                      "text_on_screen": k % 3 == 2, "reaction": list(REACTIONS)[k % len(REACTIONS)],
                       "lang": "ar-eg" if _AR.search(it.get("query") or "") else ("en" if k % 2 else "none")})
