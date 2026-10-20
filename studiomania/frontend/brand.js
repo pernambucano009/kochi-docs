@@ -64,6 +64,7 @@ const BrandPage = (() => {
       { k: "assets", t: "صور البراند", en: "Assets", leaves: kinds.map(([k, t]) => ({ f: k, t, type: "imgs" })) },
       // الشخصيات (والأفاتار) والتعليق الصوتي والموسيقى: من أساسيات البراند، فبقوا فرع من العقل (كل نقطة بتفتح صفحتها)
       { k: "library", t: "الشخصيات والأصوات", en: "Library", leaves: [
+        { f: "pg", i: "brainlib", page: "brainlib", t: "📁 مكتبة العقل (صور وفيديوهات وأصوات)", type: "page" },
         { f: "pg", i: "coaches", page: "coaches", t: "الشخصيات والأفاتار", type: "page" },
         { f: "pg", i: "twin", page: "twin", t: "🪞 نسختي (أفاتار منك)", type: "page" },
         { f: "pg", i: "voice", page: "voice", t: "التعليق الصوتي", type: "page" },

@@ -4068,6 +4068,7 @@ import brainquiz  # noqa: E402
 import brainsocial  # noqa: E402
 import stock  # noqa: E402
 import hairdraw  # noqa: E402
+import library as lib_  # noqa: E402
 import ideamem  # noqa: E402
 import twin  # noqa: E402
 import phone  # noqa: E402
@@ -24960,6 +24961,262 @@ def flow_phone_state(fid: str):
     return {"shots": shots, "project": {"id": pid, "render_status": pj.get("render_status"), "render_error": pj.get("render_error"),
                         "render_progress": pj.get("render_progress"), "export_url": f"/media/exports/{pj['export_id']}.mp4" if pj.get("export_id") else None},
             "typo": typo}
+
+
+# ---------------------------------------------------------------- 📁 مكتبة العقل: فولدرات جوه فولدرات + المخ بيوصّف كل ملف
+LIB_LOCK = threading.Lock()
+
+
+def lib_dir(bid: str | None = None) -> Path:
+    d = brain_dir(bid or active_client_id() or "default") / "library"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def lib_load(bid: str | None = None) -> dict:
+    f = lib_dir(bid) / "library.json"
+    try:
+        return json.loads(f.read_text(encoding="utf-8")) if f.exists() else lib_.empty()
+    except ValueError:
+        return lib_.empty()
+
+
+def lib_update(fn, bid: str | None = None) -> dict:
+    with LIB_LOCK:
+        d = lib_load(bid)
+        fn(d)
+        f = lib_dir(bid) / "library.json"
+        f.with_suffix(".tmp").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+        f.with_suffix(".tmp").replace(f)
+        return d
+
+
+def lib_file_dict(lib: dict, f: dict, bid: str) -> dict:
+    base = f"/media/ads/brains/{Path(bid).name}/library"
+    return {**f, "url": f"{base}/{f['file']}", "thumb": f"{base}/{f['thumb']}" if f.get("thumb") else (f"{base}/{f['file']}" if f["kind"] == "image" else None),
+            "path": lib_.path_text(lib, f.get("folder"))}
+
+
+def lib_to_dict(lib: dict, bid: str) -> dict:
+    counts = {}
+    for f in lib["files"]:
+        for a in [x["id"] for x in lib_.path_of(lib, f.get("folder"))]:   # الفولدر وكل اللي فوقه
+            counts[a] = counts.get(a, 0) + 1
+    return {"folders": [{**x, "count": counts.get(x["id"], 0), "path": lib_.path_text(lib, x["id"])} for x in lib["folders"]],
+            "files": [lib_file_dict(lib, f, bid) for f in lib["files"]], "total": len(lib["files"]),
+            "tagging": sum(1 for f in lib["files"] if f.get("status") == "tagging"), "kinds": lib_.KINDS}
+
+
+@app.get("/api/library")
+def library_get():
+    bid = active_client_id()
+    return lib_to_dict(lib_load(bid), bid)
+
+
+class LibFolderIn(BaseModel):
+    name: str = ""
+    parent: str | None = None
+
+
+@app.post("/api/library/folders")
+def library_folder_new(body: LibFolderIn):
+    bid = active_client_id()
+    def fn(d):
+        if body.parent and not any(f["id"] == body.parent for f in d["folders"]):
+            raise HTTPException(404, "الفولدر ده مش موجود")
+        if len(lib_.path_of(d, body.parent)) >= lib_.MAX_DEPTH:
+            raise HTTPException(400, "كفاية فولدرات جوه بعض كده")
+        d["folders"].append({"id": lib_.fid(), "name": lib_.clean_name(body.name, "فولدر جديد"), "parent": body.parent or None})
+    return lib_to_dict(lib_update(fn, bid), bid)
+
+
+class LibFolderPatch(BaseModel):
+    name: str | None = None
+    parent: str | None = None
+    move: bool = False   # parent = None معناه الرئيسية لما move = true
+
+
+@app.patch("/api/library/folders/{fid}")
+def library_folder_patch(fid: str, body: LibFolderPatch):
+    bid = active_client_id()
+    def fn(d):
+        f = next((x for x in d["folders"] if x["id"] == fid), None)
+        if not f:
+            raise HTTPException(404, "الفولدر ده مش موجود")
+        if body.name is not None:
+            f["name"] = lib_.clean_name(body.name, f["name"])
+        if body.move:
+            if body.parent and (body.parent == fid or body.parent in lib_.descendants(d, fid)):
+                raise HTTPException(400, "مينفعش تحط الفولدر جوه نفسه")
+            f["parent"] = body.parent or None
+    return lib_to_dict(lib_update(fn, bid), bid)
+
+
+@app.delete("/api/library/folders/{fid}")
+def library_folder_delete(fid: str):
+    """الفولدر بيتشال، واللي جواه (فولدرات وملفات) بيطلع للفولدر اللي فوقه، مفيش ملف بيتمسح."""
+    bid = active_client_id()
+    def fn(d):
+        f = next((x for x in d["folders"] if x["id"] == fid), None)
+        if not f:
+            raise HTTPException(404, "الفولدر ده مش موجود")
+        for c in d["folders"]:
+            if c.get("parent") == fid:
+                c["parent"] = f.get("parent")
+        for x in d["files"]:
+            if x.get("folder") == fid:
+                x["folder"] = f.get("parent")
+        d["folders"] = [x for x in d["folders"] if x["id"] != fid]
+    return lib_to_dict(lib_update(fn, bid), bid)
+
+
+@app.post("/api/library/files")
+def library_upload(folder: str = Form(""), paths: str = Form(""), files: list[UploadFile] = File(...)):
+    """⬆ ملفات أو فولدر كامل بفولدراته (paths = المسار جوه الفولدر لكل ملف، بنفس الترتيب)."""
+    bid = active_client_id()
+    folder_dir = lib_dir(bid)
+    rel = [x for x in paths.split("\n")] if paths else []
+    added = []
+    for i, up in enumerate(files[:200]):
+        ext = Path(up.filename or "").suffix.lower()
+        kind = lib_.kind_of(ext)
+        if not kind:
+            continue   # الفولدر ممكن يكون فيه ملفات تانية
+        allowed = lib_.IMAGE_EXT if kind == "image" else lib_.VIDEO_EXT if kind == "video" else lib_.AUDIO_EXT
+        name = save_upload(up, allowed, folder_dir, kind)
+        meta = {}
+        if kind != "image":
+            try:
+                info = media_info(folder_dir / name)
+                meta = {"dur": round(info.duration, 2), **({"w": info.width, "h": info.height} if kind == "video" else {})}
+            except Exception:  # noqa: BLE001
+                (folder_dir / name).unlink(missing_ok=True)
+                continue
+        parts = [p for p in re.split(r"[/\\]+", rel[i])][:-1] if i < len(rel) and rel[i] else []
+        added.append({"id": lib_.fid(), "file": name, "name": lib_.clean_name(Path(up.filename or name).stem), "kind": kind, "parts": parts,
+                      "size": (folder_dir / name).stat().st_size, "desc": "", "tags": [], "status": "tagging", "at": now(), **meta})
+    if not added:
+        raise HTTPException(400, "مفيش صور أو فيديوهات أو أصوات في الملفات دي")
+    def fn(d):
+        base = folder or None
+        if base and not any(f["id"] == base for f in d["folders"]):
+            base = None
+        for a in added:
+            a["folder"] = lib_.ensure_path(d, base, a.pop("parts"))
+            d["files"].append(a)
+    lib = lib_update(fn, bid)
+    threading.Thread(target=run_library_tag, args=(bid, [a["id"] for a in added]), daemon=True).start()
+    return lib_to_dict(lib, bid)
+
+
+def run_library_tag(bid: str, ids: list[str]) -> None:
+    """🧠 المخ بيتفرج على كل ملف ويكتب وصف وتاجات (بيتخصم على قد اللي اتعمل)."""
+    folder = lib_dir(bid)
+    for i in ids:
+        lib = lib_load(bid)
+        f = next((x for x in lib["files"] if x["id"] == i), None)
+        if not f or f.get("status") != "tagging":
+            continue
+        path, where, upd = folder / f["file"], lib_.path_text(lib, f.get("folder")), {}
+        try:
+            if f["kind"] == "video":   # صورة صغيرة من النص (للمكتبة وللوصف)
+                th = folder / f"th_{f['id']}.jpg"
+                typo_frame(path, (f.get("dur") or 1) / 2, th, 480)
+                upd["thumb"] = th.name
+            if atlas.mock_mode() or not atlas.api_key():
+                desc, tags = lib_.mock_tags(f["name"], where)
+            else:
+                wallet.need(1, "توصيف ملفات المكتبة")
+                if f["kind"] == "audio":
+                    words = atlas.transcribe(path, min(60.0, f.get("dur") or 60))
+                    said = " ".join(w["w"] for w in words or [])[:1200]
+                    raw = ad_json(series_chat(lib_.tag_messages("audio", f["name"], where, f"الكلام اللي فيه: «{said or 'مفيش كلام'}» · مدته {f.get('dur') or 0} ثانية")), "توصيف ملف")
+                    usd = wallet.est(chars=4000, stt_min=min(1.0, (f.get('dur') or 60) / 60))
+                else:
+                    img = folder / (upd.get("thumb") or f["file"])
+                    small = TMP_DIR / f"libtag_{f['id']}.jpg"
+                    typo_frame(img, 0, small, 640) if f["kind"] == "image" and img.suffix.lower() != ".gif" else shutil.copy(img, small)
+                    extra = f"ده فريم من نص فيديو مدته {f.get('dur') or 0} ثانية." if f["kind"] == "video" else ""
+                    try:
+                        raw = ad_json(lab_media_chat(az.with_media(lib_.tag_messages(f["kind"], f["name"], where, extra), data_url(small, "image/jpeg"), "image.jpg")), "توصيف ملف")
+                    finally:
+                        small.unlink(missing_ok=True)
+                    usd = wallet.est(chars=3000, images=1)
+                desc, tags = lib_.clean_tags(raw)
+                wallet.charge(wallet.credits(usd), "توصيف ملف في المكتبة", f["id"])
+            upd.update(desc=desc, tags=tags, status="ready", error=None)
+        except wallet.NoCredits as exc:
+            upd.update(status="ready", error=str(exc)[:200])
+        except Exception as exc:  # noqa: BLE001
+            upd.update(status="ready", error=str(getattr(exc, "detail", None) or exc)[:200])
+        lib_update(lambda d, i=i, upd=upd: next((x.update(upd) for x in d["files"] if x["id"] == i), None), bid)
+
+
+class LibFilePatch(BaseModel):
+    name: str | None = None
+    desc: str | None = None
+    tags: list[str] | None = None
+    folder: str | None = None
+    move: bool = False
+
+
+@app.patch("/api/library/files/{fid}")
+def library_file_patch(fid: str, body: LibFilePatch):
+    bid = active_client_id()
+    def fn(d):
+        f = next((x for x in d["files"] if x["id"] == fid), None)
+        if not f:
+            raise HTTPException(404, "الملف ده مش موجود")
+        if body.name is not None:
+            f["name"] = lib_.clean_name(body.name, f["name"])
+        if body.desc is not None:
+            f["desc"] = body.desc.strip()[:300]
+        if body.tags is not None:
+            f["desc"], f["tags"] = lib_.clean_tags({"desc": f.get("desc"), "tags": body.tags})
+        if body.move:
+            if body.folder and not any(x["id"] == body.folder for x in d["folders"]):
+                raise HTTPException(404, "الفولدر ده مش موجود")
+            f["folder"] = body.folder or None
+    return lib_to_dict(lib_update(fn, bid), bid)
+
+
+@app.post("/api/library/files/{fid}/retag")
+def library_file_retag(fid: str):
+    bid = active_client_id()
+    lib = lib_update(lambda d: next((x.update(status="tagging", error=None) for x in d["files"] if x["id"] == fid), None), bid)
+    threading.Thread(target=run_library_tag, args=(bid, [fid]), daemon=True).start()
+    return lib_to_dict(lib, bid)
+
+
+@app.delete("/api/library/files/{fid}")
+def library_file_delete(fid: str):
+    bid = active_client_id()
+    gone = []
+    def fn(d):
+        gone.extend(x for x in d["files"] if x["id"] == fid)
+        d["files"] = [x for x in d["files"] if x["id"] != fid]
+    lib = lib_update(fn, bid)
+    for f in gone:
+        for n in (f.get("file"), f.get("thumb")):
+            if n:
+                (lib_dir(bid) / Path(n).name).unlink(missing_ok=True)
+    return lib_to_dict(lib, bid)
+
+
+@app.get("/api/library/search")
+def library_search(q: str = "", kind: str = "", ref: str = ""):
+    """🔎 بحث (بالاسم والوصف والتاجات)، أو منشن: ref = «صور/أسنان/قبل» (فولدر) أو مسار ملف بعينه."""
+    bid = active_client_id()
+    lib = lib_load(bid)
+    folder = None
+    if ref:
+        folder, f = lib_.resolve(lib, ref)
+        if f:
+            return {"ref": ref, "folder": folder, "files": [lib_file_dict(lib, f, bid)]}
+        if folder is None:
+            return {"ref": ref, "folder": None, "files": [], "error": "مش لاقي الفولدر ده"}
+    hits = lib_.search(lib, q, kind if kind in lib_.KINDS else "", folder)
+    return {"ref": ref, "folder": folder, "files": [lib_file_dict(lib, f, bid) for f in hits[:200]]}
 
 
 # الواجهة آخر حاجة: أي مسار مش API بيروح للملفات (لازم تفضل بعد كل الـ routes)
