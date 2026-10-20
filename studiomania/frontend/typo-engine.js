@@ -134,6 +134,7 @@
         // الحركات الاحترافية (typo-moments.js) بترسم الكادر كله بنفسها: الورق والإضاءة والحبيبات
         this.stage.style.background = "#000";
         this.stage.innerHTML = this[`k_${b.kind}`](b, t, (t - b.t0) / Math.max(0.01, b.t1 - b.t0), th, i) + (this.showAnchors ? this.anchorGuides(t) : "");
+        if (this.afterPaint) this.afterPaint(t);
         return;
       }
       if (b && TypoEngine.STUDIO?.has(b.kind)) {
@@ -143,6 +144,7 @@
         if (this.doc.transparent) {
           this.stage.style.background = "transparent";
           this.stage.innerHTML = html + (this.showAnchors ? this.anchorGuides(t) : "");
+          if (this.afterPaint) this.afterPaint(t);
           this.fitFrame();
           if (this.applyTrans) this.applyTrans(b, t, i);
           return;
@@ -172,6 +174,8 @@
       this.stage.style.background = bg;
       this.stage.style.color = th.ink;
       this.stage.innerHTML = html;
+      // عناصر ليها عقدة DOM بتعيش بين الفريمات (رسومات Hairline): بتترجع مكانها بعد ما الكادر يترسم
+      if (this.afterPaint) this.afterPaint(t);
       this.fitFrame();
       if (b && TypoEngine.STUDIO?.has(b.kind) && this.applyTrans) this.applyTrans(b, t, i);
     }

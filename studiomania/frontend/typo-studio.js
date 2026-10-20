@@ -55,7 +55,7 @@
     "qr", "codetag", "toolbar", "terminal", "scan",
     "toasts", "footer", "marquee", "datestrip",
     "fileicon", "chaos",
-    "gradword", "meshprompt", "orbsplit", "bento", "figdays", "figcurve", "figplay", "figequal", "figwords", "figphone", "figdrop", "figcount", "figgears", "figbar", "figcheck", "figcta", "goldcap", "iconbelt", "glowsweep", "namepill", "kashida", "molecule", "weightstack", "stretch", "desatpop", "arcs", "chrome", "inkverse", "poemfade", "hashend", "flipverb", "strobe", "duoline", "capstack", "pillword", "blurduo", "tagstack", "underbars", "contactcard", "iconorbit", "blurstrobe", "kinstack", "incall", "cineband", "scriptover", "tricolor", "drumpicker", "redmix", "headbubble", "pincard", "emojifloat", "slotreel", "posterwall", "quoteline", "medallion", "clockhand", "roadtext", "markpan", "objectquote", "racechart", "calflip", "glosscards", "dropword", "tasklens", "monostack", "dashbox", "sparklist", "followbtn", "silhouette", "petalstack", "followcount", "twopillars", "cutmat", "labelbox", "stampcard", "lcdtype", "genpanel", "holopulse", "coverflow", "featuretag", "luxmix", "goldframes", "goldrows", "tilegrid", "goldpill", "holoclock", "curvewall", "newsscan", "neonvenn", "wavebelt", "cardarc", "shadowquote", "haloring", "noirtitle", "stickerstack", "graphhop", "podium", "hudcallout", "termbar", "glowtoggle", "pinkdoodle", "lensfind", "echostack", "dofwords", "portalchat", "cardframe", "wordvoid", "facecam", "spreadcaps", "tinysub", "ringword", "handcap", "blobcam", "brushbar", "beforeafter", "pillcarousel", "namescript", "stackrepeat", "vertword", "serifsolo", "selectword", "tornlabel", "radartags", "slamword", "scrawl", "spikeburst", "laserprompt"]);
+    "gradword", "meshprompt", "orbsplit", "bento", "figdays", "figcurve", "figplay", "figequal", "figwords", "figphone", "figdrop", "figcount", "figgears", "figbar", "figcheck", "figcta", "goldcap", "iconbelt", "glowsweep", "namepill", "kashida", "molecule", "weightstack", "stretch", "desatpop", "arcs", "chrome", "inkverse", "poemfade", "hashend", "flipverb", "strobe", "duoline", "capstack", "pillword", "blurduo", "tagstack", "underbars", "contactcard", "iconorbit", "blurstrobe", "kinstack", "incall", "cineband", "scriptover", "tricolor", "drumpicker", "redmix", "headbubble", "pincard", "emojifloat", "slotreel", "posterwall", "quoteline", "medallion", "clockhand", "roadtext", "markpan", "objectquote", "racechart", "calflip", "glosscards", "dropword", "tasklens", "monostack", "dashbox", "sparklist", "followbtn", "silhouette", "petalstack", "followcount", "twopillars", "cutmat", "labelbox", "stampcard", "lcdtype", "genpanel", "holopulse", "coverflow", "featuretag", "luxmix", "goldframes", "goldrows", "tilegrid", "goldpill", "holoclock", "curvewall", "newsscan", "neonvenn", "wavebelt", "cardarc", "shadowquote", "haloring", "noirtitle", "stickerstack", "graphhop", "podium", "hudcallout", "termbar", "glowtoggle", "pinkdoodle", "lensfind", "echostack", "dofwords", "portalchat", "cardframe", "wordvoid", "facecam", "spreadcaps", "tinysub", "ringword", "handcap", "blobcam", "brushbar", "beforeafter", "pillcarousel", "namescript", "stackrepeat", "vertword", "serifsolo", "selectword", "tornlabel", "radartags", "slamword", "scrawl", "spikeburst", "laserprompt", "hairfig"]);
   E.TYPING = new Set(["type", "artype"]);
   const MC = document.createElement("canvas").getContext("2d");
   const measure = (s, font) => { MC.font = font; return MC.measureText(s).width; };
@@ -8130,5 +8130,73 @@
         <div style="position:absolute;${ar ? "left" : "right"}:${(chh * 0.2).toFixed(1)}px;top:${(chh * 0.2).toFixed(1)}px;width:${(chh * 0.6).toFixed(1)}px;height:${(chh * 0.6).toFixed(1)}px;border-radius:${(chh * 0.16).toFixed(1)}px;background:#E8202A;color:#fff;display:flex;align-items:center;justify-content:center;font:700 ${(z * 1.1).toFixed(1)}px sans-serif">↵</div></div>`;
     }
     return html;
+  };
+  // ======== Hairline — رسومات أيزومتريك بخط رفيع (مكتبة Hairline من Lucas Marques، رخصة MIT، في vendor/hairline) ========
+  // الرسمة عقدة DOM بتعيش طول البلوك (مش HTML بيتعاد كل فريم): بتتحط في مكانها بعد الرسم، وساعتها يدوية،
+  // فبنمشّيها من أول البلوك لحد الوقت المطلوب بخطوات ٦٠ في الثانية، والماوس الوهمي بيتنقل محطة مع كل كلمة بتتقال
+  const HL_FIGS = ["laptop", "phone", "keyboard", "terminal", "padlock", "vault", "plot", "cabinet", "router", "dish", "query", "drawer", "basket",
+    "plug", "hub", "relay", "settle", "format", "rebuild", "stack", "loupe", "lockers", "rail", "sieve", "elevator", "terrain", "riffle",
+    "exploded", "phosphor", "slow", "turntable", "branches", "patch"];
+  const HL_WORDS = [
+    [/لابتوب|كمبيوتر|جهاز|مكتب|laptop|computer|desk|work/i, "laptop"], [/موبايل|تليفون|تطبيق|ابلكيشن|app|phone|mobile/i, "phone"],
+    [/كتابة|اكتب|كيبورد|type|typing|keyboard|write/i, "keyboard"], [/كود|برمجة|سيرفر|terminal|code|coding|command|developer/i, "terminal"],
+    [/أمان|امان|حماية|قفل|باسورد|secure|security|lock|password|safe/i, "padlock"], [/فلوس|ادخار|توفير|بنك|خزنة|money|saving|bank|vault|cash/i, "vault"],
+    [/أرقام|ارقام|نمو|مبيعات|نتائج|إحصائ|chart|growth|sales|numbers|data|stats/i, "plot"], [/سؤال|ليه|إزاي|ازاي|\?|؟|question|why|how/i, "query"],
+    [/ملفات|أرشيف|ارشيف|ورق|file|files|archive|documents/i, "drawer"], [/تسوق|شراء|سلة|متجر|shop|store|buy|cart/i, "basket"],
+    [/طاقة|كهربا|شحن|power|energy|charge|plug/i, "plug"], [/إنترنت|انترنت|واي ?فاي|شبكة|internet|wifi|network/i, "router"],
+    [/فريق|ناس|تواصل|team|people|connect|community/i, "hub"], [/خطوات|مراحل|steps|levels|stages/i, "elevator"],
+    [/تنظيم|ترتيب|منظم|organi[sz]e|tidy|order/i, "settle"], [/بحث|تفاصيل|دقة|search|detail|zoom|look/i, "loupe"],
+    [/إشارة|بث|اعلان|إعلان|signal|broadcast|reach|ads?\b/i, "dish"], [/وقت|ببطء|بطء|time|slow|patience/i, "slow"],
+    [/تصميم|طبقات|design|layers|ui/i, "exploded"], [/لبس|هدوم|موضة|fashion|clothes|outfit/i, "rail"], [/فلتر|تصفية|filter|sift/i, "sieve"],
+  ];
+  const HL_DEFAULT = ["laptop", "plot", "hub", "padlock", "terminal", "settle", "exploded", "relay", "query", "vault"];
+  const hlFig = (b, s, bi) => (HL_FIGS.includes(b.fig) ? b.fig : (HL_WORDS.find(([re]) => re.test(s)) || [])[1] || HL_DEFAULT[bi % HL_DEFAULT.length]);
+  const HL_LAP = [[128, 150], [200, 118], [272, 150], [200, 206]];
+  // ---------- hairfig: رسمة أيزومتريك بخط رفيع على أسود بتتحرك مع الكلام، وتحتها الكلام كلمة كلمة والكلمة المهمة (focus) بلون الستايل
+  P.k_hairfig = function (b, t, k, th, bi) {
+    const it = this.items(b); if (!it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h), s = it.map((x) => this.text(x.w)).join(" "), fig = hlFig(b, s, bi);
+    const fw = Math.min(w * 1.3, h * 0.66 * 1.25), fh = fw * 0.8, fy = h * (h > w ? 0.4 : 0.4) - fh / 2;
+    const fi = b.focus >= 0 && b.focus < it.length ? b.focus : -1, acc = (this.style.accent?.bg && this.style.accent.bg !== "#E9B21C") ? this.style.accent.bg : "#E5322D";
+    const z = fitSize(s, `600 {}px ${famOf(s)}`, w * 0.86, mn * 0.06 * this.ts), ty = Math.min(h * 0.86, fy + fh * 0.9);
+    const appear = eOut(seg(t, b.t0, b.t0 + 0.45));
+    this._hlNeed = window.Hairline ? { key: `${b.t0}|${fig}`, fig, b, t, it } : null;
+    const words = it.map((x, i) => { const q = seg(t, x.t0 - 0.03, x.t0 + 0.2);
+      return `<span style="display:inline-block;opacity:${(0.15 + 0.85 * q).toFixed(2)};transform:translateY(${((1 - eOut(q)) * z * 0.25).toFixed(1)}px);color:${i === fi ? acc : "#F2F2F0"}">${esc(this.text(x.w))}</span>`; }).join(" ");
+    return `<div style="position:absolute;inset:0;background:#08090A"></div>
+      <div data-hlslot data-free style="position:absolute;left:${((w - fw) / 2).toFixed(1)}px;top:${fy.toFixed(1)}px;width:${fw.toFixed(1)}px;height:${fh.toFixed(1)}px;opacity:${appear.toFixed(2)};transform:scale(${lerp(0.94, 1, appear).toFixed(3)});--hairline-plate:#08090A;--hairline-hi:#FFFFFF;--hairline-edge:#C9CCD4;--hairline-mid:#7C7F88;--hairline-lo:#3C3E45;--hairline-stroke:${(mn / 380).toFixed(2)}"></div>
+      <div dir="${this.dir(s)}" style="position:absolute;left:0;right:0;top:${ty.toFixed(1)}px;text-align:center;white-space:nowrap;font:600 ${z.toFixed(1)}px ${famOf(s)};letter-spacing:-0.01em">${words}</div>`;
+  };
+  // بعد ما الكادر يترسم: الرسمة بتتحط في مكانها وتتمشّى لحد الوقت ده (ولو رجعنا لورا بتتعمل من الأول عشان الشكل يفضل نفسه)
+  P.afterPaint = function (t) {
+    const need = this._hlNeed, H = window.Hairline;
+    this._hlNeed = null;
+    let cur = this._hl;
+    if (!need || !H) { if (cur) { cur.fig.destroy(); this._hl = null; } return; }
+    const slot = this.stage.querySelector("[data-hlslot]");
+    if (!slot) return;
+    const tl = Math.max(0, need.t - need.b.t0);
+    if (!cur || cur.key !== need.key || tl < cur.tl - 1e-4) {
+      cur?.fig.destroy();
+      H.hlManual(true);
+      const el = document.createElement("div");
+      el.style.cssText = "position:absolute;inset:0;aspect-ratio:auto";
+      cur = this._hl = { key: need.key, el, tl: 0, now: 1e4, fig: H[need.fig](el, { theme: "dark", intensity: 0.75 }) };
+      H.hlStep(cur.now);
+    }
+    slot.appendChild(cur.el);
+    const stops = (cur.el.__hlTour || HL_LAP).filter(Boolean), starts = need.it.map((x) => Math.max(0, x.t0 - need.b.t0));
+    const at = (u) => {   // المحطة: كلمة كلمة، من تحت الرسمة للمحطة الأولى، وكل كلمة جديدة بتتحرك للي بعدها في نص ثانية
+      let n = -1; starts.forEach((s0, i) => { if (u >= s0) n = i; });
+      if (n < 0) return [200, 320];
+      const a = n ? stops[(n - 1) % stops.length] : [200, 320], c = stops[n % stops.length], q = eOut(seg(u, starts[n], starts[n] + 0.5));
+      return [lerp(a[0], c[0], q), lerp(a[1], c[1], q)];
+    };
+    while (cur.tl < tl - 1e-6) {
+      const d = Math.min(1 / 60, tl - cur.tl);
+      cur.tl += d; cur.now += d * 1000;
+      H.hlPoint(cur.el, at(cur.tl));
+      H.hlStep(cur.now);
+    }
   };
 })();
