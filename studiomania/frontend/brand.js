@@ -22,10 +22,14 @@ const BrandPage = (() => {
     knowledge: "M4 5.5c2.7-1 5.3-1 8 .8 2.7-1.8 5.3-1.8 8-.8v13c-2.7-1-5.3-1-8 .8-2.7-1.8-5.3-1.8-8-.8z M12 6.3v13.3",
     assets: "M4.5 5h15a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z M3.5 15.5l4.5-4.5 4 4 3-3 5 5 M15.5 8.5a1.3 1.3 0 1 1 0 .1z",
     pulse: "M7 4.5h10v4a5 5 0 0 1-10 0z M7 6H4.5a2.5 2.5 0 0 0 2.8 3.4 M17 6h2.5a2.5 2.5 0 0 1-2.8 3.4 M12 13.5v3.5 M8.5 20h7l-.8-3h-5.4z",
+    algo: "M4 18.5h16 M6.5 18.5V12 M11 18.5V8 M15.5 18.5V5 M19.5 9.5l-3-3-3 3",
+    trends: "M3.5 17l5.5-5.5 4 4 7.5-7.5 M15 8h5.5v5.5",
     library: "M9 4.5a3 3 0 1 1 0 6a3 3 0 1 1 0-6z M3.5 19c.6-3 2.8-4.6 5.5-4.6s4.9 1.6 5.5 4.6 M16 7.5v6.2 M16 13.7a1.8 1.8 0 1 1-1.8-1.8 M16 7.5l3.5-1.2",
   };
   const svg = (d, s = 22) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}" aria-hidden="true"><path d="${d}" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
+  const ALGO_G = { strategy: "الاستراتيجية والتوزيع", ideas: "الأفكار", hook: "الهوك", script: "السكريبت والحكي", edit: "المونتاج والشكل",
+    publish: "النشر والكابشن", analysis: "التحليل", ads: "الإعلانات", aivideo: "فيديو الذكاء الصناعي" };
   // الخريطة: كل فرع وكل نقطة فيه. النوع بيحدد الكارت اللي بيفتح
   function branches(b) {
     const kinds = [["products", "صور المنتج"], ["screens", "شاشات التطبيق"], ["characters", "شخصيات البراند"], ["sets", "الأماكن والخلفيات"], ["props", "الأدوات"]]
@@ -76,17 +80,16 @@ const BrandPage = (() => {
         { f: "pg", i: "comics", page: "comics", t: "🎭 مكتبة الكوميكس", type: "page" },
         { f: "pg", i: "ref2p", page: "ref2p", t: "🎥 من مرجع لبرومبت", type: "page" },
       ] },
-      // نبض المجال: المنافسين (أعلى 5 في المجال والسوق) واللي بينجح عندهم والترند وتحليل بوستات بنفسك، كله في فرع واحد
-      { k: "pulse", t: "نبض المجال", en: "Niche Pulse", leaves: [
-        { f: "pg", i: "rv:plan", page: "rivals", t: "🧭 خطة المحتوى", type: "page" },
+      // 🏆 منافسينك: أعلى 5 في المجال والسوق، واللي بينجح عندهم، وتحليل آخر ١٠ فيديوهات ليك، وخطة المحتوى (كلهم صفحة واحدة بتابات)
+      { k: "pulse", t: "منافسينك", en: "Competitors", leaves: [
         ...(b?.rivals || []).map((r) => ({ f: "pg", i: `rv${r.id}`, page: "rivals", t: `@${r.handle}`, type: "page" })),
         ...((b?.rivals || []).length ? [] : [{ f: "pg", i: "rv:rivals", page: "rivals", t: "🏆 هات منافسينك", type: "page" }]),
         { f: "pg", i: "rv:works", page: "rivals", t: "🧠 اللي بينجح عندهم", type: "page" },
-        { f: "pg", i: "rv:trend", page: "rivals", t: "📈 الترند آخر ٣٠ يوم", type: "page" },
-        { f: "pg", i: "rv:mine", page: "rivals", t: "🔥 حلّل بوستات بنفسك", type: "page" },
-        { f: "pg", i: "rv:batch", page: "rivals", t: "📊 حلّل آخر ١٠", type: "page" },
-        { f: "pg", i: "rv:algo", page: "rivals", t: "📡 افحص قبل النشر", type: "page" },
+        { f: "pg", i: "rv:batch", page: "rivals", t: "📊 حلّل آخر ١٠ فيديوهات ليك", type: "page" },
+        { f: "pg", i: "rv:plan", page: "rivals", t: "🧭 خطة المحتوى", type: "page" },
       ] },
+      // 📡 قواعد الخوارزميات: القواعد الأساسية اللي كل الأدوات بتمشي عليها (تتعدّل وتتقفل وترجع للأصل)
+      { k: "algo", t: "قواعد الخوارزميات", en: "Algorithm Rules", leaves: Object.entries(ALGO_G).map(([g, t]) => ({ f: "ag", i: g, t, type: "algo" })) },
       // 📱 نقاط لازم تتشتغل: من تحليل حساب السوشيال (البوستات والمشاهدات والفيديوهات)
       { k: "improve", t: "نقاط للتحسين", en: "To improve", leaves: (b?.todos || []).length
         ? b.todos.map((x) => ({ f: "td", i: x.id, t: x.title, type: "todo", todo: x }))
@@ -117,7 +120,7 @@ const BrandPage = (() => {
       case "styles": return styleIds(b).length > 0;
       case "multi": return l.fields.some(([k]) => String(b[k] || "").trim());
       case "video": return !!b[`${l.f}_url`];
-      case "rule": case "note": case "page": return true;
+      case "rule": case "note": case "page": case "algo": return true;
       case "todo": return !!l.todo.done;
       default: return false;
     }
@@ -167,7 +170,7 @@ const BrandPage = (() => {
       <div class="bm-zoom"><button data-zoom="1" aria-label="قرّب">+</button><button data-zoom="0" aria-label="الخريطة كلها">⤢</button><button data-zoom="-1" aria-label="بعّد">−</button></div>
       <div class="bm-card" hidden role="dialog"></div>
       <div class="bm-dropall" aria-hidden="true"><b>ارمي هنا</b><small>المخ هيقرا الملف ويحط كل معلومة في مكانها</small></div>
-      <p class="bm-hint">دوس على أي نقطة تكتب فيها · النقط المفرّغة لسه ناقصة · دوس على المخ تبدّل البراند</p>`;
+      <p class="bm-hint"><i class="bm-lg o"></i> مليانة · <i class="bm-lg e"></i> لسه ناقصة · <i class="bm-lg b"></i> معلومات وقواعد ثابتة · <i class="bm-lg g"></i> اقتراحات وأسئلة مستنياك · دوس على المخ تبدّل البراند</p>`;
   }
   // الخريطة ليها عالم خاص بيها بمسافات واسعة ثابتة (المخ في 0,0)، والشاشة بتتفرّج عليه بزوم وسحب.
   // كده الفروع عمرها ما تدخل في بعض مهما الشاشة صغرت: الخريطة بتبعد شوية، وتقدر تقرّب بالعجلة أو الأزرار
@@ -200,6 +203,9 @@ const BrandPage = (() => {
         nodes.push({ id: `${br.k}:${l.f}:${l.i ?? ""}`, kind: "leaf", br, l, x: bx + Math.cos(la) * rr, y: by + Math.sin(la) * rr, from: br.k, on: filled(b, l) });
       });
     });
+    // 📈 الترند: دراع طويل طالع لفوق في الزاوية الشمال، ومربع أحمر بعدد الترندات الجديدة
+    { const xs = nodes.map((n) => n.x), ys = nodes.map((n) => n.y);
+      nodes.push({ id: "trends", kind: "trends", x: Math.min(...xs) * .9, y: Math.min(...ys) - 70, from: "c" }); }
     // كل نقطة ليها مكانها الأصلي (x, y) ومكانها الحالي (px, py) وسرعتها؛ لو الخريطة اتعادت بتكمّل من مكانها
     const old = Object.fromEntries((S.nodes || []).map((n) => [n.id, n]));
     S.nodes = nodes.map((n, i) => {
@@ -287,6 +293,13 @@ const BrandPage = (() => {
       const qd = Math.min((b?.quiz_done || []).length, S.quiz?.length || 17), done = qd + (tq?.done || 0), total = (S.quiz?.length || 17) + (tq?.total || 0);
       return `<button class="bm-n bm-quiz${tq && done >= total ? " full" : ""}" data-n="quiz" title="كل اللي العقل محتاجه: أسئلة قصيرة + مهام (ترفع صور، فيديو، صوتك…)"><i>?</i><b>كمّل العقل</b><small class="num">${done}/${total}</small></button>`;
     }
+    if (n.kind === "trends") {
+      if (b && S.trFor !== b.id && S.trLoading !== b.id) loadTrends(b);
+      const tr = S.trFor === b?.id ? S.tr : null, nw = tr?.new || 0;
+      return `<button class="bm-n bm-trends${nw ? " has" : ""}${tr?.status === "working" ? " busy" : ""}" data-n="trends" title="الترند اللي ماشي دلوقتي في سوقك (بيتحدّث لوحده)">
+        <span class="bm-trbox">${svg(IC.trends, 18)}<b>الترند</b>${nw ? `<em class="num">${nw}</em>` : ""}</span>
+        <small>${tr?.status === "working" ? "بيدوّر…" : tr ? `${(tr.items || []).length} ترند${tr.market ? ` · ${esc(tr.market)}` : ""}` : ""}</small></button>`;
+    }
     if (n.kind === "add") {
       const reading = (b?.sources || []).some((s) => s.status === "working");
       return `<button class="bm-n bm-add${reading ? " busy" : ""}" data-n="add" title="ضيف للعقل: ملف أو لينك أو كلام"><i>+</i><b>ضيف للعقل</b></button>`;
@@ -301,7 +314,8 @@ const BrandPage = (() => {
       return `<button class="bm-n bm-leaf pend${p.kind === "question" ? " ask" : ""}${S.open?.id === n.id ? " on" : ""}" data-n="${esc(n.id)}" aria-label="${esc(l.t)}">
         <i>${p.kind === "question" ? "؟" : ""}</i><span class="bm-tip"><b>${esc(l.t)}</b><small>${esc(String(sub || "").slice(0, 60))}</small><small class="miss">مستني موافقتك</small></span></button>`;
     }
-    const cls = l.type === "action" ? "act" : l.type === "rule-new" ? "add" : n.on ? "full" : "empty";
+    // المعلومات الثابتة (قواعد الخوارزميات، القواعد، المعرفة) لونها لوحدها
+    const cls = l.type === "action" ? "act" : l.type === "rule-new" ? "add" : ["algo", "rule", "note"].includes(l.type) ? "full info" : n.on ? "full" : "empty";
     return `<button class="bm-n bm-leaf ${cls}${S.open?.id === n.id ? " on" : ""}" data-n="${esc(n.id)}" aria-label="${esc(l.t)}">
       <i>${l.type === "action" ? "✲" : l.type === "rule-new" ? "+" : ""}</i>
       <span class="bm-tip"><b>${esc(l.type === "rule" ? "قاعدة" : l.t)}</b>${l.type === "rule" || l.type === "note" ? `<small>${esc(l.type === "note" ? l.note.summary || "" : l.t)}</small>` : val ? `<small>${esc(val.slice(0, 60))}</small>` : l.type === "action" || l.type === "rule-new" ? "" : `<small class="miss">لسه ناقصة</small>`}</span></button>`;
@@ -332,7 +346,7 @@ const BrandPage = (() => {
   // النقط بتعوم بهدوء حوالين مكانها، والخطوط ماشية معاها
   // فيزيا بسيطة: كل نقطة مربوطة بزنبرك لمكانها، واللي متعلّق بيها بيمشي وراها.
   // لما تمسك نقطة وتسحبها، اللي طالع منها بيتشد معاها، ولما تسيبها بترجع مكانها وبتهتز شوية
-  const FOLLOW = { branch: .55, leaf: .9, add: .6 };
+  const FOLLOW = { branch: .55, leaf: .9, add: .6, trends: .5 };
   function step(dt) {
     const k = 140, c = 15;
     for (const n of S.nodes) {
@@ -386,7 +400,7 @@ const BrandPage = (() => {
         c2 = [B[0] - (ox * .15 + ux * .35) * d, B[1] - (oy * .15 + uy * .35) * d];
       }
       // الخط بيبدأ وبيخلص عند حافة الدايرة (مش من جوّه المخ أو الأيقونة)
-      const r1 = n.from === "c" ? S.rc : 34, r2 = n.kind === "branch" ? 34 : n.kind === "add" || n.kind === "quiz" ? 24 : 10;
+      const r1 = n.from === "c" ? S.rc : 34, r2 = n.kind === "branch" ? 34 : n.kind === "add" || n.kind === "quiz" ? 24 : n.kind === "trends" ? 30 : 10;
       const dir = (p, q) => { const l = Math.hypot(q[0] - p[0], q[1] - p[1]) || 1; return [(q[0] - p[0]) / l, (q[1] - p[1]) / l]; };
       const s1 = dir(A, c1), s2 = dir(c2, B);
       const P0 = [A[0] + s1[0] * r1, A[1] + s1[1] * r1], P3 = [B[0] - s2[0] * r2, B[1] - s2[1] * r2];
@@ -471,6 +485,64 @@ const BrandPage = (() => {
     } catch (err) { S.qaFor = b.id; S.qa = {}; toast(err.message, true); }
     if (S.open?.id === "quiz") refreshCard();
   }
+  // 📈 الترند: القايمة بتتحدّث لوحدها، والجديد بيتعدّ في المربع الأحمر لحد ما تفتحها
+  async function loadTrends(b) {
+    S.trLoading = b.id;
+    try { S.tr = await bAPI("/trends"); S.trFor = b.id; } catch { S.tr = null; S.trFor = b.id; }
+    S.trLoading = null;
+    redrawNode("trends");
+    if (S.open?.id === "trends") refreshCard();
+    clearTimeout(S.trT);   // وهو بيدوّر بنشوف كل شوية، وبعدها كل ١٠ دقايق (السيرفر بيحدّث لوحده كل ١٢ ساعة)
+    S.trT = setTimeout(() => { if (S.el?.isConnected && cur()?.id === b.id) { S.trFor = null; loadTrends(b); } }, S.tr?.status === "working" ? 4000 : 600000);
+  }
+  function redrawNode(id) {
+    const n = S.byId?.[id];
+    if (n?.el && cur()) { n.el.outerHTML = nodeHTML(n, cur()); n.el = S.el.querySelector(`[data-n="${CSS.escape(id)}"]`); if (S.open?.id === id) n.el?.classList.add("on"); }
+  }
+  function trendsHTML(b) {
+    const tr = S.trFor === b?.id ? S.tr : null;
+    const head = `<div class="bm-ch"><span class="latin">TRENDS</span><b>📈 الترند</b></div>`;
+    if (!tr) { if (b && S.trLoading !== b.id) loadTrends(b); return head + `<p class="bm-note">بيجيب الترند…</p>`; }
+    if (tr.new && !S.trSeenBusy) { S.trSeenBusy = true; bAPI("/trends/seen", { method: "POST" }).then((x) => { S.tr = x; redrawNode("trends"); }).catch(() => {}).finally(() => (S.trSeenBusy = false)); }
+    const ago = tr.checked_at ? Math.round((Date.now() / 1000 - tr.checked_at) / 3600) : null;
+    const row = (x) => `<li class="bm-tr${x.seen ? "" : " new"}"><div><b>${x.seen ? "" : "🔴 "}${esc(x.title)}</b>${x.what ? `<small>${esc(x.what)}</small>` : ""}
+        ${x.angle ? `<p class="bm-note">💡 ليك: ${esc(x.angle)}</p>` : ""}
+        ${(x.posts || []).length ? `<small class="bm-trsrc">${x.posts.slice(0, 3).map((p) => `<a href="${esc(p.url)}" target="_blank" rel="noopener noreferrer" dir="ltr">@${esc(p.handle)}</a>`).join(" · ")}</small>` : ""}</div>
+      <div class="bm-acts"><button class="bm-go" data-trnow="${esc(x.id)}">✨ استخدمه في بوست دلوقتي</button>
+        <button class="bm-pill" data-trsave="${esc(x.id)}" ${x.saved ? "disabled" : ""}>${x.saved ? "🔖 محفوظ" : "🔖 احفظه لبعدين"}</button>
+        <button class="bm-pill" data-trdel="${esc(x.id)}" title="امسحه من القايمة">✕</button></div></li>`;
+    return head + `<p class="bm-note">اللي ماشي دلوقتي في ${esc(tr.market || "سوقك")} ومجالك. بيتحدّث لوحده، والترند بيفضل هنا لحد ما تمسحه.${tr.live ? "" : " (وضع تجربة: ترندات تجريبية لحد ما يتحط مفتاح مصدر الداتا)"}</p>
+      <div class="bm-acts"><button class="bm-pill" data-trref ${tr.status === "working" ? "disabled" : ""}>${tr.status === "working" ? "⏳ بيدوّر…" : "🔄 دوّر دلوقتي"}</button>
+        ${ago != null ? `<small class="bm-note">آخر تحديث من ${ago < 1 ? "أقل من ساعة" : `${ago} ساعة`}</small>` : ""}</div>
+      ${tr.error ? `<p class="bm-note bad">⚠️ ${esc(tr.error)}</p>` : ""}
+      ${(tr.items || []).length ? `<ul class="bm-trs">${tr.items.map(row).join("")}</ul>` : `<p class="bm-note">لسه مفيش ترندات.${tr.market ? "" : " اكتب «السوق» و«المجال» في الهوية علشان يبدأ يدوّر."}</p>`}`;
+  }
+  // 📡 قواعد الخوارزميات: كل مجموعة نقطة، وجوّاها الفريمويركس وقواعدها (تشغيل/قفل، تعديل، زيادة، مسح، رجوع للأصل)
+  async function loadAlgo(b) {
+    S.arLoading = b.id;
+    try { S.ar = await bAPI("/algo-rules"); S.arFor = b.id; } catch (err) { toast(err.message, true); }
+    S.arLoading = null;
+    if (S.open?.n?.l?.type === "algo") refreshCard();
+  }
+  function algoHTML(b, l) {
+    const head = `<div class="bm-ch"><span class="latin">ALGORITHM RULES</span><b>${esc(l.t)}</b></div>`;
+    const ar = S.arFor === b?.id ? S.ar : null;
+    if (!ar) { if (b && S.arLoading !== b.id) loadAlgo(b); return head + `<p class="bm-note">بيجيب القواعد…</p>`; }
+    const parts = ar.parts.filter((p) => p.group === l.i);
+    return head + `<p class="bm-warn">⚠️ ${esc(ar.warn)}</p>
+      <p class="bm-note">دي القواعد الأساسية اللي كل أدوات البرنامج بتمشي عليها وهي بتكتب الأفكار والهوكات والسكريبتات والكابشن. علامة ✓ معناها القاعدة شغالة.</p>
+      ${parts.map((p) => `<div class="bm-ar"><div class="bm-arh"><b>${esc(p.title)}</b>${p.changed ? `<button class="bm-pill" data-arreset="${p.id}" title="يرجع للقواعد الأصلية">↺ رجّع الأصل</button>` : ""}</div>
+        <ul>${p.rules.map((r, i) => `<li class="${r.on ? "" : "off"}${r.custom ? " custom" : ""}"><input type="checkbox" data-aron="${p.id}:${i}" ${r.on ? "checked" : ""} title="شغّال / مقفول">
+          ${editable(`ar:${p.id}:${i}`, r.t, "القاعدة")}<button class="bm-x2" data-ardel="${p.id}:${i}" title="امسح القاعدة">✕</button></li>`).join("")}</ul>
+        <button class="bm-link" data-aradd="${p.id}">＋ قاعدة جديدة</button></div>`).join("")}
+      ${ar.changed ? `<div class="bm-acts"><button class="bm-pill" data-arreset="all">↺ رجّع كل القواعد للأصل</button></div>` : ""}`;
+  }
+  async function algoSave(fid, rows, reset) {
+    try { S.ar = await bAPI("/algo-rules", { method: "PUT", ...jsonBody(reset ? { reset: [fid] } : { parts: { [fid]: rows } }) }); S.arFor = cur()?.id; refreshCard(); }
+    catch (err) { toast(err.message, true); }
+  }
+  const arRows = (fid) => (S.ar?.parts.find((p) => p.id === fid)?.rules || []).map((r) => ({ t: r.t, on: r.on }));
+
   // ✅ مهام العقل (مش أسئلة): رفع اللوجو، صور الأفاتار، الفيديو، صوتك… كل واحدة بتتعلّم لوحدها لما تتعمل
   async function loadTasks(b) {
     S.tqLoading = b.id;
@@ -555,6 +627,7 @@ const BrandPage = (() => {
           <button data-sdel="${s.id}" title="شيله">✕</button></li>`).join("")}</ul>` : ""}`;
     }
     if (n.kind === "quiz") return quizHTML(b);
+    if (n.kind === "trends") return trendsHTML(b);
     if (n.kind === "branch") {
       return `<div class="bm-ch"><span class="latin">${n.br.en}</span><b>${esc(n.br.t)}</b></div>${n.br.k === "knowledge" && !n.br.leaves.length ? `<p class="bm-note">لسه فاضية. ارمي ملف أو لينك من «ضيف للعقل» والمعرفة هتطلع هنا.</p>` : ""}
         <ul class="bm-list">${n.br.leaves.map((l) => `<li><button data-go="${esc(`${n.br.k}:${l.f}:${l.i ?? ""}`)}"><span class="bm-dot ${l.type === "action" || l.type === "rule-new" ? "add" : filled(b, l) ? "full" : "empty"}"></span><b>${esc(l.type === "rule" ? l.t : l.t)}</b></button></li>`).join("")}</ul>`;
@@ -622,6 +695,7 @@ const BrandPage = (() => {
           + `<div class="bm-acts"><button class="bm-go" data-ok="${p.id}">${what[1]}</button><button class="bm-pill" data-no="${p.id}">لأ، مش محتاجها</button></div>`;
       }
       // معلومة في «المعرفة»: حاجة المخ عرفها عن البراند وبيرجع لها وهو بيكتب (مش مهمة مطلوب منك تعملها)
+      case "algo": return algoHTML(b, l);
       case "note": return head.replace(esc(l.t), "معلومة")
         + `<p class="bm-note">دي معلومة المخ عرفها عن البراند${srcName(l.note.source) ? ` من «${esc(srcName(l.note.source))}»` : l.note.source === "quiz" ? " من إجابتك في الكويز" : ""}، وبيرجع لها وهو بيكتب السكريبتات والأفكار والكابشن. لو فيها حاجة غلط عدّلها هنا، وأي تعديل بيتحفظ لوحده.</p>`
         + `<div class="bm-sub"><small>العنوان</small>${editable(`note:t:${l.i}`, l.note.title, "العنوان")}</div>`
@@ -726,6 +800,12 @@ const BrandPage = (() => {
     const k = el.dataset.k, v = el.innerText.replace(/ /g, " ").trim();
     const b = cur();
     if (!b || k.startsWith("@") && k !== "@name" || k === "rule:new") return;
+    if (k.startsWith("ar:")) {
+      const [, fid, i] = k.split(":"), rows = arRows(fid);
+      if (!rows[+i] || rows[+i].t === v || !v) return;
+      rows[+i].t = v;
+      return algoSave(fid, rows);
+    }
     if (k.startsWith("note:")) {
       const [, part, id] = k.split(":"), n = (b.notes || []).find((x) => x.id === id);
       const key = { t: "title", s: "summary", b: "body" }[part];
@@ -864,6 +944,26 @@ const BrandPage = (() => {
       if (t.closest("[data-close]")) return openCard(null);
       if (t.closest("[data-ibrec]")) return toggleRec();
       if (t.closest("[data-qnext]")) return quizStep(1);
+      const trb = t.closest("[data-trnow], [data-trsave]");
+      if (trb) {
+        const now = !!trb.dataset.trnow, id = trb.dataset.trnow || trb.dataset.trsave;
+        try { S.tr = await bAPI(`/trends/${id}/save`, { method: "POST", ...jsonBody({ now }) }); redrawNode("trends"); } catch (err) { return toast(err.message, true); }
+        if (!now) { toast("🔖 اتحفظ. هيظهرلك وانت بتختار الفكرة في أي قالب"); return refreshCard(); }
+        toast("✨ اختار القالب، والفكرة هتتبني على الترند ده");
+        openCard(null);
+        return window.NHNav?.("create");
+      }
+      const trd = t.closest("[data-trdel]");
+      if (trd) { if (!confirm("تمسح الترند ده من القايمة؟")) return; try { S.tr = await bAPI(`/trends/${trd.dataset.trdel}`, { method: "DELETE" }); redrawNode("trends"); refreshCard(); } catch (err) { toast(err.message, true); } return; }
+      if (t.closest("[data-trref]")) { try { S.tr = await bAPI("/trends/refresh", { method: "POST" }); redrawNode("trends"); refreshCard(); S.trFor = null; loadTrends(cur()); } catch (err) { toast(err.message, true); } return; }
+      const aro = t.closest("[data-aron]");
+      if (aro) { const [fid, i] = aro.dataset.aron.split(":"), rows = arRows(fid); rows[+i].on = aro.checked; return algoSave(fid, rows); }
+      const ard = t.closest("[data-ardel]");
+      if (ard) { if (!confirm("تمسح القاعدة دي؟ (تقدر ترجّعها بـ «رجّع الأصل»)")) return; const [fid, i] = ard.dataset.ardel.split(":"), rows = arRows(fid); rows.splice(+i, 1); return algoSave(fid, rows); }
+      const ara = t.closest("[data-aradd]");
+      if (ara) { const v = prompt("القاعدة الجديدة:"); if (!v?.trim()) return; const rows = arRows(ara.dataset.aradd); rows.push({ t: v.trim(), on: true }); return algoSave(ara.dataset.aradd, rows); }
+      const arr = t.closest("[data-arreset]");
+      if (arr) { if (!confirm(arr.dataset.arreset === "all" ? "ترجّع كل قواعد الخوارزميات للأصل؟ أي تعديل عملته هيتمسح." : "ترجّع القواعد دي للأصل؟")) return; return algoSave(arr.dataset.arreset, null, true); }
       const qt = t.closest("[data-qtab]");
       if (qt) { S.qtab = qt.dataset.qtab; if (S.qtab === "t") { const b = cur(); if (b) { S.tqFor = null; loadTasks(b); } } return refreshCard(); }
       const tg = t.closest("[data-tgo]");

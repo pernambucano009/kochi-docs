@@ -337,10 +337,27 @@ FW: list[tuple[str, str, tuple[str, ...], list[str]]] = [
 BY_ID = {f[0]: f for f in FW}
 
 
+# 📡 قواعد الخوارزميات المعدّلة للبراند المختار (لو العميل غيّر فيها من «قواعد الخوارزميات» في العقل):
+# دالة بترجع {id: [steps]} أو None، والقواعد اللي اتقفلت مابتتبعتش للموديل. «رجّع الأصل» بيمسح التعديل.
+OVERRIDE = None
+
+
+def current() -> list[tuple[str, str, tuple[str, ...], list[str]]]:
+    try:
+        ov = OVERRIDE() if OVERRIDE else None
+    except Exception:  # noqa: BLE001 — لو العقل مش متاح بنرجع للأصل
+        ov = None
+    if not ov:
+        return FW
+    return [(fid, t, u, ov.get(fid, s) if isinstance(ov.get(fid, s), list) else s) for fid, t, u, s in FW]
+
+
 def pack(use: str, limit: int = 0) -> str:
     """الفريمويركس الكاملة اللي تخص أداة معينة (بالترتيب)، ومن غير ما تعدّي حد الطول لو اتحدد."""
     out, n = [], 0
-    for fid, title, uses, steps in FW:
+    for fid, title, uses, steps in current():
+        if not steps:
+            continue
         if use not in uses:
             continue
         block = f"[{title}]\n" + "\n".join(f"- {s}" for s in steps)
@@ -353,3 +370,40 @@ def pack(use: str, limit: int = 0) -> str:
 
 def public() -> list[dict]:
     return [{"id": fid, "title": t, "uses": list(u), "steps": s} for fid, t, u, s in FW]
+
+
+def editable(saved: dict | None) -> list[dict]:
+    """للعرض والتعديل: كل فريمورك وقواعده (المتعدّلة لو فيه)، وكل قاعدة شغالة ولا مقفولة، ومتغيرة عن الأصل ولا لأ."""
+    saved = saved or {}
+    out = []
+    for fid, t, u, steps in FW:
+        rows = saved.get(fid)
+        if not isinstance(rows, list):
+            rows = [{"t": x, "on": True} for x in steps]
+        base = set(steps)
+        out.append({"id": fid, "title": t, "rules": [{"t": str(r.get("t") or ""), "on": r.get("on") is not False, "custom": r.get("t") not in base} for r in rows if isinstance(r, dict)],
+                    "changed": isinstance(saved.get(fid), list), "group": u[0] if u else "strategy"})
+    return out
+
+
+# مجموعات القواعد في دراع «قواعد الخوارزميات» (كل فريمورك في مجموعة أول أداة بتستخدمه)
+GROUPS = {"strategy": "الاستراتيجية والتوزيع", "ideas": "الأفكار", "hook": "الهوك", "script": "السكريبت والحكي", "edit": "المونتاج والشكل",
+          "publish": "النشر والكابشن", "analysis": "التحليل", "ads": "الإعلانات", "aivideo": "فيديو الذكاء الصناعي"}
+
+
+def clean_saved(raw: dict) -> dict:
+    """اللي العميل بعته ← {id: [{t, on}]} للفريمويركس اللي اتغيرت بس."""
+    out = {}
+    for fid, _t, _u, steps in FW:
+        rows = (raw or {}).get(fid)
+        if not isinstance(rows, list):
+            continue
+        rows = [{"t": str(r.get("t") or "").strip()[:600], "on": r.get("on") is not False} for r in rows[:60] if isinstance(r, dict) and str(r.get("t") or "").strip()]
+        if rows != [{"t": x, "on": True} for x in steps]:
+            out[fid] = rows
+    return out
+
+
+def active(saved: dict | None) -> dict:
+    """{id: [القواعد الشغالة بس]} للموديل."""
+    return {fid: [r["t"] for r in rows if r.get("on") is not False] for fid, rows in (saved or {}).items() if isinstance(rows, list)}

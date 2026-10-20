@@ -97,6 +97,7 @@ $("readyGrid").addEventListener("click", async (e) => {
       const cap = $("postCaption").value.trim();
       if (!pub.editing && (!cap || cap === pub.autoCaption)) $("postCaption").value = pub.autoCaption = ex.name;
       $("postCaption").focus();
+      pcAuto();   // الفحص قبل النشر بيشتغل لوحده
     }
     if (btn.dataset.act === "rename") {
       const name = prompt("الاسم الجديد:", ex.name);
@@ -706,6 +707,19 @@ function renderPubCheck() {
     <div id="pcOut"></div>`;
 }
 $("postCaption").addEventListener("input", renderPubCheck);
+// 📡 «افحص قبل النشر» بقى أوتوماتيك: لما الكابشن يقف عن التغيير شوية بيتفحص بقواعد الخوارزميات لوحده (مرة لكل كابشن)
+let pcAutoT = 0, pcAutoLast = "";
+function pcAuto() {
+  clearTimeout(pcAutoT);
+  pcAutoT = setTimeout(() => {
+    const cap = $("postCaption").value.trim();
+    if (cap.length < 20 || cap === pcAutoLast || !pub.videoId) return;
+    pcAutoLast = cap;
+    $("pcReview")?.click();
+  }, 2500);
+}
+$("postCaption").addEventListener("input", pcAuto);
+$("postCaption").addEventListener("change", pcAuto);
 $("coverOn").addEventListener("change", renderPubCheck);
 $("postPlatforms").addEventListener("change", renderPubCheck);
 $("pubCheck").addEventListener("click", async (e) => {

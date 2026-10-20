@@ -183,8 +183,8 @@ const Flow = (() => {
     const note = n ? `<p class="flw-algo-note">🔁 شلنا ${n} ${kind === "idea" ? "أفكار" : "اقتراحات"} شبه حاجات استخدمتها قبل كده، وجبنا غيرها.</p>` : "";
     if (!S.savedOpen) return `${note}<div class="flw-saved"><button type="button" class="flw-link" data-savedopen>🔖 محفوظاتك لبعدين</button></div>`;
     const items = S.saved;
-    const row = (x) => `<li><div><b>${x.kind === "idea" ? "💡" : "🎬"} ${esc(x.title || "من غير عنوان")}</b>
-        <small class="muted">${x.kind === "idea" ? "فكرة" : `سيناريو${x.idea_title ? ` لفكرة «${esc(x.idea_title)}»` : ""} · قالب «${esc(x.template?.name || "")}»`}</small>
+    const row = (x) => `<li><div><b>${x.kind === "idea" ? "💡" : x.kind === "trend" ? "📈" : "🎬"} ${esc(x.title || "من غير عنوان")}</b>
+        <small class="muted">${x.kind === "idea" ? "فكرة" : x.kind === "trend" ? "ترند (الأفكار هتتبني عليه)" : `سيناريو${x.idea_title ? ` لفكرة «${esc(x.idea_title)}»` : ""} · قالب «${esc(x.template?.name || "")}»`}</small>
         ${x.hook ? `<p class="flw-hook">«${esc(x.hook)}»</p>` : ""}${x.text ? `<p>${esc(x.text)}</p>` : ""}</div>
       <div class="flw-acts">${x.here ? `<button type="button" class="flw-btn pri" data-usesaved="${esc(x.id)}" ${S.d.busy ? "disabled" : ""}>استخدمها هنا</button>` : `<small class="muted">بتنفع في قالبها بس</small>`}
         <button type="button" class="flw-link" data-delsaved="${esc(x.id)}">✕ شيلها</button></div></li>`;
@@ -229,12 +229,30 @@ const Flow = (() => {
     return `<div class="flw-seasons"><small class="muted">🗓️ مناسبات جاية${s.target ? ` في ${esc(s.target)}` : ""}:</small>
       ${s.items.slice(0, 8).map((x, i) => `<button type="button" class="flw-chip" data-season="${i}" title="${esc(x.angle || "")}">${esc(x.name)} <span class="num">${fmt(x.date)}</span></button>`).join("")}</div>`;
   }
+  // 📈 ترند محفوظ من عقل البراند: «تبني الفكرة عليه؟»، واللي اخترت «استخدمه دلوقتي» بيتطبّق لوحده أول ما تفتح القالب
+  function trendRow(d) {
+    if (S.trendsFor !== d.id) {
+      S.trendsFor = d.id; S.trends = null;
+      api(`/api/flows/${d.id}/saved`).then((x) => { S.trends = x.filter((i) => i.kind === "trend"); render(); }).catch(() => { S.trends = []; });
+      return "";
+    }
+    const list = S.trends || [], now = list.find((x) => x.now);
+    if (now && !d.busy && S.trendAuto !== now.id) {
+      S.trendAuto = now.id;
+      setTimeout(() => call(`/use-saved/${now.id}`).then(() => { S.trendsFor = null; poll(); }), 0);
+      return `<div class="flw-trend on"><b>📈 بيبني الأفكار على الترند «${esc(now.title)}»…</b></div>`;
+    }
+    if (d.trend?.title) return `<div class="flw-trend on"><b>📈 الأفكار دي مبنية على الترند «${esc(d.trend.title)}»</b></div>`;
+    if (!list.length) return "";
+    return `<div class="flw-trend"><b>📈 عندك ${list.length === 1 ? "ترند محفوظ" : `${list.length} ترند محفوظين`} لبعدين. تبني الفكرة عليه؟</b>
+      <div class="flw-acts">${list.slice(0, 3).map((x) => `<button type="button" class="flw-btn" data-usesaved="${esc(x.id)}" title="${esc(x.text || "")}" ${d.busy ? "disabled" : ""}>استخدم «${esc(x.title)}»</button>`).join("")}</div></div>`;
+  }
   function stIdea(d) {
     const loading = d.busy === "ideas";
     return `<h2>اختار فكرة للبوست</h2><p class="flw-sub">المخ اقترح أفكار على قد البراند والقالب. اختار واحدة، أو عدّلها، أو اطلب غيرهم، أو اكتب فكرتك.</p>
       ${isPhone(d) ? `<div class="flw-skip"><button type="button" class="flw-btn" data-skipshoot>⏭ عندي الفيديو بتاعي، على الرفع على طول</button></div>` : ""}${tipBox(d.guide?.idea)}${seasonsRow()}
       ${d.algo_mode && (d.ideas_dropped || []).length ? `<p class="flw-algo-note" title="${esc(d.ideas_dropped.map((x) => `«${x.title}»: ${x.why_out}`).join("\n"))}">⚡ وضع الخوارزمية شال ${d.ideas_dropped.length} ${d.ideas_dropped.length === 1 ? "فكرة ضعيفة" : "أفكار ضعيفة"} وجاب غيرها (حط الماوس تشوف ليه)</p>` : ""}
-      ${savedBox("idea", d)}<div class="flw-cards">${(d.ideas || []).map(ideaCard).join("")}${S.own ? ideaForm() : ""}</div>
+      ${trendRow(d)}${savedBox("idea", d)}<div class="flw-cards">${(d.ideas || []).map(ideaCard).join("")}${S.own ? ideaForm() : ""}</div>
       ${loading ? working("المخ بيفكّر في أفكار على القالب…") : failed("idea")}
       <div class="flw-more">${S.hint ? `<div class="flw-chatrow"><input id="flwHint" placeholder="عايز أفكار عن إيه؟ (اختياري)"><button type="button" class="flw-btn" data-more="idea">اقترح</button></div>` : `
         <button type="button" class="flw-btn" data-more="idea" ${loading ? "disabled" : ""}>💡 اقترح أفكار تانية</button>

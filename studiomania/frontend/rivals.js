@@ -1,10 +1,10 @@
-// 💓 «نبض المجال» (فرع في عقل البراند): كل اللي بيحصل في مجالك في مكان واحد، بتابات:
-// المنافسين (أعلى 5 مشاهدات في مجالك وسوقك، تضيف وتشيل وتبدّل وتثبّت) · اللي بينجح عندهم · الترند آخر ٣٠ يوم · حلّل بوستات بنفسك.
-// المنافسين والترند بيدخلوا لوحدهم في كتابة الأفكار والسكريبتات والهوكات.
+// 🏆 «منافسينك» (فرع في عقل البراند): كل اللي يخص المنافسين في صفحة واحدة، بتابات:
+// المنافسين (أعلى 5 مشاهدات في مجالك وسوقك، تضيف وتشيل وتبدّل وتثبّت) · اللي بينجح عندهم · حلّل آخر ١٠ فيديوهات ليك · خطة المحتوى.
+// الترند بقى دراع لوحده في العقل، والفحص قبل النشر بقى أوتوماتيك في صفحة النشر، وقواعد الخوارزميات دراع لوحدها.
 const RivalsPage = (() => {
   const esc = (s) => escapeHtml(String(s ?? ""));
-  const S = { el: null, d: null, timer: null, swap: null, focus: null, tab: "rivals", pl: { d: null, busy: false, notes: "" }, bt: { d: null, busy: "", handle: "", platform: "" }, ac: { text: "", kind: "script", platform: "", res: null, busy: false, rules: null } };
-  const TABS = [["plan", "🧭 خطة المحتوى"], ["rivals", "🏆 المنافسين"], ["works", "🧠 اللي بينجح عندهم"], ["trend", "📈 الترند آخر ٣٠ يوم"], ["mine", "🔥 حلّل بوستات بنفسك"], ["batch", "📊 حلّل آخر ١٠"], ["algo", "📡 افحص قبل النشر"]];
+  const S = { el: null, d: null, timer: null, swap: null, focus: null, tab: "rivals", pl: { d: null, busy: false, notes: "" }, bt: { d: null, busy: "", handle: "", platform: "" } };
+  const TABS = [["rivals", "🏆 المنافسين"], ["works", "🧠 اللي بينجح عندهم"], ["batch", "📊 حلّل آخر ١٠ فيديوهات ليك"], ["plan", "🧭 خطة المحتوى"]];
   const html = () => `<div class="nb-wrap fs-wrap rv-wrap" id="rvWrap"><div class="nh-empty">بيحمّل…</div></div>`;
   const fmt = (n) => { n = +n || 0; return n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${Math.round(n / 1e3)}K` : String(n); };
   const PL = { tiktok: "TikTok", instagram: "Instagram" };
@@ -45,8 +45,8 @@ const RivalsPage = (() => {
     const d = S.d, busy = d.status === "working", b = d.brain || {};
     const where = [b.domain && `المجال: ${b.domain}`, b.market && `السوق: ${b.market}`, b.audience && `الجمهور: ${b.audience}`].filter(Boolean);
     return `<section class="fs-hero">
-        <div class="fs-hero-t"><b>نبض المجال</b><span class="latin">NICHE PULSE</span></div>
-        <p>كل اللي بيحصل في مجالك في مكان واحد: أعلى ${d.top} منافسين مشاهدات في مجالك وسوقك، واللي بينجح عندهم، وأعلى البوستات في آخر ٣٠ يوم. كل ده بيدخل لوحده في الأفكار والسكريبتات والهوكات بتاعتك، من غير ما ننسخ كلام حد.</p>
+        <div class="fs-hero-t"><b>منافسينك</b><span class="latin">YOUR COMPETITORS</span></div>
+        <p>أعلى ${d.top} منافسين مشاهدات في مجالك وسوقك، واللي بينجح عندهم، وتحليل آخر ١٠ فيديوهات ليك قصادهم. كل ده بيدخل لوحده في الأفكار والسكريبتات والهوكات بتاعتك، من غير ما ننسخ كلام حد.</p>
         <p class="nb-hint">بندوّر على حسب: ${where.length ? esc(where.join(" · ")) : "اكتب المجال والسوق والجمهور في فرع «الهوية» الأول"}</p>
         ${d.live ? "" : `<p class="nb-hint">⚠️ وضع تجربة: الحسابات والأرقام دي تجريبية لحد ما يتحط مفتاح مصدر الداتا.</p>`}
         <div class="nb-bar"><button class="nb-btn fs-go" data-rvfind ${busy ? "disabled" : ""}>${d.items.length ? "🔍 دوّر تاني (المثبّتين بيفضلوا)" : `🔍 هات أعلى ${d.top} في مجالي`}</button>
@@ -57,38 +57,6 @@ const RivalsPage = (() => {
       </section>
       ${busy ? `<div class="fs-busy">⏳ ${esc(d.step || "شغال…")}</div>` : d.error ? `<div class="fs-err">⚠️ ${esc(d.error)}</div>` : ""}
       <nav class="rv-tabs" role="tablist">${TABS.map(([k, t]) => `<button role="tab" data-rvtab="${k}" aria-selected="${k === S.tab}" class="${k === S.tab ? "on" : ""}">${t}</button>`).join("")}</nav>`;
-  }
-  function trend(list) {
-    if (!list?.length) return `<div class="nh-empty">لسه مفيش. دوس «هات أعلى ${S.d.top} في مجالي» وهنجيب معاهم أعلى البوستات في مجالك آخر ٣٠ يوم.</div>`;
-    return `<section class="fs-card"><h3>📈 أعلى البوستات في مجالك آخر ٣٠ يوم <small>من أي حساب، مش المنافسين بس</small></h3>
-      <div class="rv-posts">${list.map((p) => `<a class="rv-post" href="${esc(p.url)}" target="_blank" rel="noopener noreferrer">
-        <b class="vr-x num">${fmt(p.views)}</b><span>${PL[p.platform] || ""} · <bdi dir="ltr">@${esc(p.handle)}</bdi> · ${ago(p.ts)}</span>
-        <p>${esc((p.caption || "").slice(0, 160))}</p></a>`).join("")}</div></section>`;
-  }
-  // 📡 فحص قبل النشر: السكريبت/الكابشن بيتقيّم بقواعد الخوارزميات (العقل العام)، وتحته القواعد نفسها
-  const AK = { script: "سكريبت فيديو", caption: "كابشن", idea: "فكرة", hook: "هوك" };
-  const AP = { "": "أي منصة", tiktok: "تيك توك", instagram: "إنستجرام", youtube: "يوتيوب شورتس", linkedin: "لينكدإن", facebook: "فيسبوك" };
-  const tone = (n, max) => (n == null ? "" : n / max >= .8 ? "ok" : n / max >= .55 ? "mid" : "bad");
-  function algoTab() {
-    const a = S.ac, r = a.res, rules = a.rules;
-    const report = r ? `<section class="fs-card rv-rep">
-        <div class="rv-score ${tone(r.score, 100)}"><b class="num">${r.score}</b><small>من ١٠٠</small></div>
-        <p class="rv-verdict">${esc(r.verdict)}</p>
-        ${r.top_fixes.length ? `<h4>أهم التعديلات</h4><ol>${r.top_fixes.map((x) => `<li>${esc(x)}</li>`).join("")}</ol>` : ""}
-        <div class="rv-checks">${r.checks.map((c) => `<div class="rv-check ${tone(c.score, 10)}"><span class="num">${c.score ?? "—"}</span><div><b>${esc(c.title)}</b><small>${esc(c.why)}</small>${c.fix ? `<i>✎ ${esc(c.fix)}</i>` : ""}</div></div>`).join("")}</div>
-        ${r.hooks.length ? `<h4>هوكات أقوى</h4>${r.hooks.map((h) => `<div class="rv-copy"><span>${esc(h)}</span><button class="nb-btn sm" data-accopy="${esc(h)}">انسخ</button></div>`).join("")}` : ""}
-        ${r.caption ? `<h4>كابشن مقترح</h4><div class="rv-copy"><span class="pre">${esc(r.caption)}</span><button class="nb-btn sm" data-accopy="${esc(r.caption)}">انسخ</button></div>` : ""}
-      </section>` : "";
-    return `<section class="fs-card"><h3>📡 افحص قبل النشر <small>بقواعد الخوارزميات: الهوك، النتيجة في الآخر، الحشو، الدعوة، الكابشن</small></h3>
-        <textarea class="rv-actext" data-actext rows="7" placeholder="الصق السكريبت أو الكابشن أو الفكرة هنا">${esc(a.text)}</textarea>
-        <div class="nb-bar"><select data-ackind>${Object.entries(AK).map(([k, t]) => `<option value="${k}" ${k === a.kind ? "selected" : ""}>${t}</option>`).join("")}</select>
-          <select data-acpl>${Object.entries(AP).map(([k, t]) => `<option value="${k}" ${k === a.platform ? "selected" : ""}>${t}</option>`).join("")}</select>
-          <button class="nb-btn fs-go" data-acgo ${a.busy ? "disabled" : ""}>${a.busy ? "⏳ بيفحص…" : "🔎 افحص"}</button></div></section>
-      ${report}
-      <section class="fs-card"><h3>📚 القواعد اللي البرنامج ماشي عليها <small>كل أداة بتستخدمها لوحدها في الأفكار والهوكات والسكريبتات والكابشن والتحليل${rules ? ` · آخر تحديث ${esc(rules.updated)}` : ""}</small></h3>
-        ${rules ? rules.parts.map((p, i) => `<details class="rv-rule" ${i === 0 ? "open" : ""}><summary>${esc(p.title)} <span class="num">${p.items.length}</span></summary><ul>${p.items.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></details>`).join("")
-          + `<details class="rv-rule"><summary>الفرق بين المنصات <span class="num">${Object.keys(rules.platforms).length}</span></summary><ul>${Object.values(rules.platforms).map((x) => `<li>${esc(x)}</li>`).join("")}</ul></details>` : `<div class="nh-empty">بيحمّل…</div>`}
-      </section>`;
   }
   // 🧭 خطة المحتوى: فريمويركس الاستراتيجية مطبّقة على البراند (لعبة المحتوى، التموضع، دواير الجمهور، المواضيع، خلطة ٣-٢-١…)
   function planTab() {
@@ -162,11 +130,8 @@ const RivalsPage = (() => {
   function body() {
     const d = S.d, busy = d.status === "working";
     if (S.tab === "works") return digest(d.digest) || `<div class="nh-empty">لسه مفيش تحليل. هات المنافسين الأول.</div>`;
-    if (S.tab === "trend") return trend(d.trending);
-    if (S.tab === "algo") return algoTab();
     if (S.tab === "plan") return planTab();
     if (S.tab === "batch") return batchTab();
-    if (S.tab === "mine") return `<p class="nb-hint">لو شايف بوستات بنفسك (من أي حساب)، حطها هنا ونحسبلك كل بوست عدّى متوسط صاحبه بكام، ونطلعلك أفكار بنفس الهيكل.</p>${ViralPage.html()}`;
     return `<section class="fs-card"><h3>ضيف منافس بنفسك</h3>
         <div class="nb-row rv-add"><input type="text" data-rvnew placeholder="@اسم الحساب أو اللينك" dir="ltr">
           <select data-rvnewpl>${Object.entries(PL).map(([k, t]) => `<option value="${k}">${t}</option>`).join("")}</select>
@@ -180,13 +145,11 @@ const RivalsPage = (() => {
     if (!w || !S.d) return;
     if (!w.querySelector(".rv-top")) w.innerHTML = `<div class="rv-top"></div><div class="rv-body"></div>`;
     w.querySelector(".rv-top").innerHTML = top();
-    if (onlyTop && (S.tab === "mine" || S.tab === "algo" || S.tab === "plan" || S.tab === "batch")) return;   // ماتمسحش اللي بتكتبه في «حلّل بنفسك» أو «افحص»
+    if (onlyTop && (S.tab === "plan" || S.tab === "batch")) return;   // ماتمسحش اللي بتكتبه
     const bd = w.querySelector(".rv-body");
     bd.innerHTML = body();
-    if (S.tab === "mine") ViralPage.mount(bd);
     if (S.tab === "batch" && !S.bt.d) api("/api/batch").then((x) => { S.bt.d = x; if (S.tab === "batch") render(); }).catch((err) => toast(err.message, true));
     if (S.tab === "plan" && !S.pl.d) api("/api/strategy").then((x) => { S.pl.d = x; if (S.tab === "plan") render(); }).catch((err) => toast(err.message, true));
-    if (S.tab === "algo" && !S.ac.rules) api("/api/algo").then((x) => { S.ac.rules = x; if (S.tab === "algo") render(); }).catch(() => {});
     if (S.focus) { w.querySelector(`[data-rid="${CSS.escape(S.focus)}"]`)?.scrollIntoView({ block: "center" }); S.focus = null; }
   }
   function poll() {
@@ -203,13 +166,10 @@ const RivalsPage = (() => {
   }
   function bind(w) {
     w.addEventListener("input", (e) => {
-      if (e.target.matches("[data-actext]")) S.ac.text = e.target.value;
       if (e.target.matches("[data-plnotes]")) S.pl.notes = e.target.value;
       if (e.target.matches("[data-btin]")) S.bt.handle = e.target.value;
     });
     w.addEventListener("change", (e) => {
-      if (e.target.matches("[data-ackind]")) S.ac.kind = e.target.value;
-      if (e.target.matches("[data-acpl]")) S.ac.platform = e.target.value;
       if (e.target.matches("[data-btpl]")) S.bt.platform = e.target.value;
       if (e.target.matches("[data-rvmode]")) {
         api("/api/algo/mode", { method: "POST", ...jsonBody({ on: e.target.checked }) })
@@ -222,8 +182,6 @@ const RivalsPage = (() => {
       }
     });
     w.addEventListener("click", async (e) => {
-      const cp = e.target.closest("[data-accopy]");
-      if (cp) { try { await navigator.clipboard.writeText(cp.dataset.accopy); toast("✅ اتنسخ"); } catch { toast("مقدرتش أنسخ", true); } return; }
       if (e.target.closest("[data-btfetch]")) {
         const B = S.bt, h = (B.handle || B.d?.handle || "").trim();
         if (!h) return toast("اكتب حساب البراند", true);
@@ -248,15 +206,6 @@ const RivalsPage = (() => {
         if (!confirm("تمسح خطة المحتوى؟ الأدوات هترجع تشتغل من غيرها.")) return;
         try { S.pl.d = await api("/api/strategy", { method: "DELETE" }); } catch (err) { toast(err.message, true); }
         return render();
-      }
-      if (e.target.closest("[data-acgo]")) {
-        const a = S.ac;
-        if (a.text.trim().length < 8) return toast("الصق السكريبت أو الكابشن الأول", true);
-        a.busy = true; render();
-        try { a.res = await api("/api/algo/review", { method: "POST", ...jsonBody({ text: a.text, kind: a.kind, platform: a.platform }) }); }
-        catch (err) { toast(err.message, true); }
-        a.busy = false; render();
-        return S.el.querySelector(".rv-rep")?.scrollIntoView({ block: "start", behavior: "smooth" });
       }
       const tb = e.target.closest("[data-rvtab]");
       if (tb) { S.tab = tb.dataset.rvtab; return render(); }

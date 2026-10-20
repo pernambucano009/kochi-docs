@@ -4073,6 +4073,8 @@ import automate  # noqa: E402
 import random  # noqa: E402
 from types import SimpleNamespace  # noqa: E402
 import ideamem  # noqa: E402
+import trends  # noqa: E402
+import playbook  # noqa: E402
 import twin  # noqa: E402
 import phone  # noqa: E402
 import wallet  # noqa: E402
@@ -4114,7 +4116,9 @@ def algo_review(body: AlgoReviewIn):
         return algo.mock_review(text)
     kind = body.kind if body.kind in algo.KINDS else "script"
     platform = body.platform if body.platform in algo.PLATFORMS else ""
-    return algo.clean_review(growth_json(algo.review_messages(text, kind, platform, growth_brand(), body.goal.strip()[:300]), "الفحص"))
+    out = algo.clean_review(growth_json(algo.review_messages(text, kind, platform, growth_brand(), body.goal.strip()[:300]), "الفحص"))
+    wallet.charge(wallet.credits(wallet.est(chars=9000 + len(text))), "فحص قبل النشر بقواعد الخوارزميات")
+    return out
 
 
 class PostPackIn(BaseModel):
@@ -21265,7 +21269,7 @@ def flow_saved(fid: str):
     """مكتبة «لبعدين» بتاعة العميل: الأفكار تنفع في أي قالب، والسيناريو في نفس القالب بس."""
     d = flow_load(fid)
     m = mem_load(mem_cid(d))
-    return [{**saved_to_dict(s), "here": s["kind"] == "idea" or (s.get("template") or {}).get("id") == d["template"].get("id")}
+    return [{**saved_to_dict(s), "now": bool(s.get("now")), "here": s["kind"] in ("idea", "trend") or (s.get("template") or {}).get("id") == d["template"].get("id")}
             for s in reversed(m.get("saved") or [])]
 
 
@@ -21284,6 +21288,11 @@ def flow_use_saved(fid: str, sid: str):
     s = next((x for x in mem_load(mem_cid(d)).get("saved") or [] if x["id"] == sid), None)
     if not s:
         raise HTTPException(404, "مش موجودة في المحفوظات")
+    if s["kind"] == "trend":   # 📈 ترند محفوظ: الأفكار بتتبني عليه (والترند بيفضل محفوظ لحد ما تمسحه)
+        mem_update(mem_cid(d), lambda m: [x.pop("now", None) for x in m.get("saved") or [] if x["id"] == sid])
+        flow_update(fid, lambda x: x.update(trend={"title": s["item"].get("title"), "saved_id": sid}, stage="idea"))
+        flow_job(fid, "ideas", lambda: flow_gen_ideas(fid, trends.hint(s["item"])))
+        return flow_to_dict(fid, flow_load(fid))
     if s["kind"] == "idea":
         it = {**s["item"], "id": uuid.uuid4().hex[:8]}
         flow_update(fid, lambda x: x.update(ideas=[it, *(x.get("ideas") or [])]))
@@ -25960,6 +25969,166 @@ def run_automation(rid: str, run_id: str, bid: str, port: int = 8000) -> None:
         setr(status="done", step=None, project_id=pj["id"], export_url=f"/media/exports/{ex}.mp4" if ex else None, report=report, error=None)
     except Exception as exc:  # noqa: BLE001
         setr(status="failed", step=None, report=report, error=str(getattr(exc, "detail", None) or exc)[:300])
+
+
+# ---------------------------------------------------------------- 📡 قواعد الخوارزميات (دراع لوحده في العقل)
+playbook.OVERRIDE = lambda: playbook.active((active_client() or {}).get("algo_rules"))
+ALGO_WARN = "نرجو عدم تعديل أو إزالة أو حذف أي قاعدة: القواعد الأساسية دي اتجمعت من دراسات متعمقة في خوارزميات السوشيال ميديا، وكل الأدوات بتمشي عليها."
+
+
+@app.get("/api/ad-brains/{bid}/algo-rules")
+def brain_algo_rules(bid: str):
+    b = brain_row(bid)
+    if b is None:
+        raise HTTPException(404, "العميل ده مش موجود")
+    return {"parts": playbook.editable(b.get("algo_rules")), "groups": playbook.GROUPS, "warn": ALGO_WARN, "updated": algo.UPDATED, "changed": bool(b.get("algo_rules"))}
+
+
+class AlgoRulesIn(BaseModel):
+    parts: dict = {}     # {id: [{t, on}]}
+    reset: list[str] = []   # فريمويركس ترجع للأصل (أو "all")
+
+
+@app.put("/api/ad-brains/{bid}/algo-rules")
+def brain_algo_rules_put(bid: str, body: AlgoRulesIn):
+    def fn(d):
+        cur = dict(d.get("algo_rules") or {})
+        if "all" in body.reset:
+            cur = {}
+        for k in body.reset:
+            cur.pop(k, None)
+        for fid, rows in playbook.clean_saved(body.parts).items():
+            cur[fid] = rows
+        for fid in body.parts:   # اتبعتت زي الأصل بالظبط = رجعت للأصل
+            if fid not in playbook.clean_saved(body.parts):
+                cur.pop(fid, None)
+        d["algo_rules"] = cur
+    update_brain(bid, fn)
+    return brain_algo_rules(bid)
+
+
+# ---------------------------------------------------------------- 📈 الترند (دراع لوحده في العقل)
+TRENDS_BUSY: set[str] = set()
+
+
+def trends_state(bid: str) -> dict:
+    return (brain_row(bid) or {}).get("trends") or {}
+
+
+def trends_out(bid: str) -> dict:
+    t = trends_state(bid)
+    items = t.get("items") or []
+    return {"items": items, "new": sum(1 for x in items if not x.get("seen")), "status": "working" if bid in TRENDS_BUSY else t.get("status") or "idle",
+            "error": t.get("error"), "checked_at": t.get("checked_at"), "live": rivals.live(), "market": (brain_row(bid) or {}).get("market") or ""}
+
+
+def run_trends(bid: str) -> None:
+    try:
+        b = brain_row(bid) or {}
+        old = (b.get("trends") or {}).get("items") or []
+        if atlas.mock_mode() or not rivals.live():
+            new = trends.mock(old)
+        else:
+            qs = (b.get("competitors") or {}).get("queries") or []
+            if not qs:
+                raw = rivals_llm(rivals.queries_messages(b), "كلمات البحث")
+                qs = [str(q).strip()[:60] for q in raw.get("queries") or [] if str(q).strip()][:6] or [b.get("domain") or b.get("name") or ""]
+            wallet.need(wallet.credits(wallet.est(scrape=len(qs) * len(rivals.PLATFORMS), chars=12000)), "الترند")
+            posts = []
+            for q in qs[:6]:
+                for plat in rivals.PLATFORMS:
+                    try:
+                        posts += rivals.search(plat, q)
+                    except rivals.RivalsError:
+                        continue
+            top = trends.recent(posts)
+            raw = rivals_llm(trends.messages(rivals.brand_info(b), b.get("market") or "", top, [x.get("title", "") for x in old]), "الترند") if top else {}
+            new = trends.clean(raw, top, old)
+            wallet.charge(wallet.credits(wallet.est(scrape=len(qs[:6]) * len(rivals.PLATFORMS), chars=12000)), "عقل البراند: الترند في السوق", bid)
+        update_brain(bid, lambda d: d.update(trends={**(d.get("trends") or {}), "items": trends.merge((d.get("trends") or {}).get("items") or [], new),
+                                                      "checked_at": time.time(), "status": "ready", "error": None}))
+    except Exception as exc:  # noqa: BLE001
+        msg = str(getattr(exc, "detail", None) or exc)[:240]
+        update_brain(bid, lambda d: d.update(trends={**(d.get("trends") or {}), "status": "failed", "error": msg, "checked_at": time.time()}))
+    finally:
+        TRENDS_BUSY.discard(bid)
+
+
+def start_trends(bid: str) -> None:
+    if bid in TRENDS_BUSY:
+        return
+    TRENDS_BUSY.add(bid)
+    threading.Thread(target=run_trends, args=(bid,), daemon=True).start()
+
+
+@app.get("/api/ad-brains/{bid}/trends")
+def brain_trends(bid: str):
+    """الترندات: بتتحدّث لوحدها لو آخر تحديث عدّى عليه ١٢ ساعة (والسوق أو المجال مكتوبين)."""
+    b = brain_row(bid)
+    if b is None:
+        raise HTTPException(404, "العميل ده مش موجود")
+    t = b.get("trends") or {}
+    if (b.get("market") or b.get("domain")) and time.time() - float(t.get("checked_at") or 0) > trends.EVERY:
+        start_trends(bid)
+    return trends_out(bid)
+
+
+@app.post("/api/ad-brains/{bid}/trends/refresh")
+def brain_trends_refresh(bid: str):
+    b = brain_row(bid)
+    if b is None:
+        raise HTTPException(404, "العميل ده مش موجود")
+    if not (b.get("market") or b.get("domain")):
+        raise HTTPException(400, "اكتب «السوق» و«المجال» في الهوية الأول، علشان نعرف ندوّر على الترند فين")
+    start_trends(bid)
+    return trends_out(bid)
+
+
+@app.post("/api/ad-brains/{bid}/trends/seen")
+def brain_trends_seen(bid: str):
+    """فتحت القايمة: المربع الأحمر بيروح (الترندات بتفضل موجودة)."""
+    def fn(d):
+        for x in (d.get("trends") or {}).get("items") or []:
+            x["seen"] = True
+    update_brain(bid, fn)
+    return trends_out(bid)
+
+
+@app.delete("/api/ad-brains/{bid}/trends/{tid}")
+def brain_trend_delete(bid: str, tid: str):
+    def fn(d):
+        t = d.setdefault("trends", {})
+        t["items"] = [x for x in t.get("items") or [] if x.get("id") != tid]
+    update_brain(bid, fn)
+    return trends_out(bid)
+
+
+class TrendUseIn(BaseModel):
+    now: bool = False   # «استخدمه دلوقتي»: أول فكرة في القالب الجاي بتتبني عليه
+
+
+@app.post("/api/ad-brains/{bid}/trends/{tid}/save")
+def brain_trend_save(bid: str, tid: str, body: TrendUseIn):
+    """🔖 الترند بيتحفظ في «محفوظاتك لبعدين» (جنب الأفكار)، وبيظهر في خطوة الفكرة في أي قالب."""
+    t = next((x for x in (trends_state(bid).get("items") or []) if x.get("id") == tid), None)
+    if not t:
+        raise HTTPException(404, "الترند ده مش موجود")
+    item = {"id": uuid.uuid4().hex[:10], "kind": "trend", "item": trends.to_saved(t), "at": now(), "template": {}, "format": "", "now": body.now, "trend_id": tid}
+    cid = re.sub(r"[^\w-]", "", str(bid))[:64] or "default"
+
+    def fn(m):
+        saved = [x for x in m.get("saved") or [] if not (x.get("kind") == "trend" and x.get("trend_id") == tid)]
+        if body.now:   # ترند واحد بس مستني «دلوقتي»
+            for x in saved:
+                x.pop("now", None)
+        m["saved"] = [*saved, item][-ideamem.SAVED_MAX:]
+    mem_update(cid, fn)
+    def mark(d):
+        for x in (d.get("trends") or {}).get("items") or []:
+            if x.get("id") == tid:
+                x.update(saved=True, seen=True)
+    update_brain(bid, mark)
+    return {**trends_out(bid), "saved_id": item["id"]}
 
 
 # الواجهة آخر حاجة: أي مسار مش API بيروح للملفات (لازم تفضل بعد كل الـ routes)

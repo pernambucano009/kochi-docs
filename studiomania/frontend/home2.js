@@ -66,7 +66,7 @@ const NH = (() => {
     viral: { en: "Trends", ar: "اللي ماشي في مجالك", icon: "megaphone", page: "viral", desc: "بوستات المجال مرتّبة بقد إيه عدّت العادي، وأفكار بنفس الهيكل." },
     stylecl: { en: "Style Clone", ar: "استنساخ الستايل", icon: "clapper", page: "stylecl", desc: "مرجع بستايل عاجبك + فكرتك ← أنيميشن مرسوم بالكود." },
     fstudio: { en: "Frame by Frame", ar: "فريم فريم", icon: "clapper", page: "fstudio", desc: "استوديو أنيميشن مرسوم بالكود، وانت متحكم في كل مرحلة." },
-    rivals: { en: "Niche Pulse", ar: "نبض المجال", icon: "megaphone", page: "rivals", desc: "منافسينك والترند واللي بينجح في مجالك، وبيدخل في أفكارك." },
+    rivals: { en: "Your Competitors", ar: "منافسينك", icon: "megaphone", page: "rivals", desc: "أعلى ٥ في مجالك واللي بينجح عندهم وتحليل فيديوهاتك وخطة المحتوى، وبيدخلوا في أفكارك." },
     auto: { en: "Custom Model", ar: "الموديل المخصص", icon: "film", page: "auto", desc: "خطوات بترتّبها بنفسك (اسحب، حط، قطّع، صدّر) من مكتبة العقل، وكل تشغيل فيديو جديد." },
     brainlib: { en: "Brand Library", ar: "مكتبة العقل", icon: "film", page: "brainlib", desc: "صورك وفيديوهاتك وأصواتك في فولدرات، والمخ بيوصّف كل ملف عشان تلاقيه وتمنشنه." },
     comics: { en: "Comics", ar: "مكتبة الكوميكس", icon: "megaphone", page: "comics", desc: "كوميكس حقيقية بسياق كل واحد، علشان تتحط في مكانها الصح." },

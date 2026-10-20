@@ -2059,3 +2059,45 @@ label.dim { opacity: .4; }
 #nh .bm-ttx small { font-size: 11.5px; color: var(--nh-muted); }
 #nh .bm-tasks .bm-pill { flex: none; padding: 5px 11px; font-size: 12px; }
 #nh .bm-dot.full, :root[data-nh-theme="dark"] #nh .bm-dot.full { background: var(--nh-accent, #E5613E); }
+/* 📡 المعلومات الثابتة (قواعد الخوارزميات، القواعد، المعرفة) لونها أزرق، والمليانة اللي بتتعدّل برتقاني، والاقتراحات والأسئلة رمادي */
+#nh .bm-leaf.info > i, :root[data-nh-theme="dark"] #nh .bm-leaf.info > i { background: #3D6FD9; }
+/* 📈 الترند: مربع على دراع طويل فوق شمال، أحمر لما فيه جديد */
+#nh .bm-trends { display: flex; flex-direction: column; align-items: center; gap: 6px; z-index: 3; }
+#nh .bm-trbox { position: relative; display: flex; align-items: center; gap: 7px; padding: 10px 16px; border-radius: 14px; background: var(--card, #fff);
+  box-shadow: 0 8px 24px rgba(24, 23, 24, .12); border: 1.5px solid rgba(24, 23, 24, .1); transition: transform .25s var(--nh-ease), background .25s; }
+#nh .bm-trbox b { font-size: 14px; font-weight: 600; }
+#nh .bm-trends:hover .bm-trbox, #nh .bm-trends.on .bm-trbox { transform: scale(1.05); }
+#nh .bm-trends.has .bm-trbox { background: #E0342B; color: #fff; border-color: #E0342B; animation: bm-trpulse 1.8s ease-out infinite; }
+#nh .bm-trbox em { font-style: normal; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 999px; background: #fff; color: #E0342B; font-size: 12.5px; font-weight: 700; display: grid; place-items: center; }
+#nh .bm-trends > small { font-size: 11px; color: var(--nh-muted); }
+#nh .bm-trends.busy .bm-trbox svg { animation: bm-spin 1.4s linear infinite; }
+@keyframes bm-trpulse { 0% { box-shadow: 0 0 0 0 rgba(224, 52, 43, .5); } 100% { box-shadow: 0 0 0 14px rgba(224, 52, 43, 0); } }
+@media (prefers-reduced-motion: reduce) { #nh .bm-trends.has .bm-trbox, #nh .bm-trends.busy .bm-trbox svg { animation: none; } }
+#nh .bm-lines path.trends { stroke: #E0342B; stroke-width: 1.6; opacity: .55; }
+#nh .bm-trs { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+#nh .bm-tr { padding: 12px; border-radius: 14px; background: var(--nh-fill, rgba(127, 127, 127, .08)); display: grid; gap: 8px; }
+#nh .bm-tr.new { box-shadow: inset 0 0 0 1.5px rgba(224, 52, 43, .5); }
+#nh .bm-tr b { font-size: 14px; }
+#nh .bm-tr small { display: block; font-size: 12px; color: var(--nh-muted); margin-top: 2px; }
+#nh .bm-trsrc a { color: inherit; }
+/* قواعد الخوارزميات */
+#nh .bm-warn { margin: 0; padding: 10px 12px; border-radius: 12px; background: rgba(224, 52, 43, .08); color: #B4302A; font-size: 12.5px; line-height: 1.6; }
+#nh .bm-ar { display: grid; gap: 6px; padding-top: 6px; border-top: 1px solid rgba(127, 127, 127, .18); }
+#nh .bm-arh { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+#nh .bm-arh b { font-size: 13.5px; }
+#nh .bm-ar ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+#nh .bm-ar li { display: flex; align-items: flex-start; gap: 6px; }
+#nh .bm-ar li input { margin-top: 7px; accent-color: #3D6FD9; flex: none; }
+#nh .bm-ar li .bm-write { flex: 1; font-size: 12.5px; min-height: 0; padding: 4px 6px; }
+#nh .bm-ar li.off .bm-write { opacity: .45; text-decoration: line-through; }
+#nh .bm-ar li.custom .bm-write { border-inline-start: 2px solid #3D6FD9; }
+#nh .bm-x2 { flex: none; width: 22px; height: 22px; border-radius: 50%; font-size: 11px; opacity: .45; }
+#nh .bm-x2:hover { opacity: 1; background: rgba(224, 52, 43, .12); color: #E0342B; }
+#nh .bm-lg { display: inline-block; width: 9px; height: 9px; border-radius: 50%; vertical-align: middle; margin-inline-end: 3px; }
+#nh .bm-lg.o { background: var(--nh-accent, #E5613E); } #nh .bm-lg.e { border: 1.5px dashed #BDB5AC; } #nh .bm-lg.b { background: #3D6FD9; } #nh .bm-lg.g { background: #A9A39C; }
+/* 📈 ترند محفوظ في خطوة الفكرة */
+.flw-trend { margin: 0 0 12px; padding: 12px 14px; border-radius: 16px; background: rgba(224, 52, 43, .07); border: 1px solid rgba(224, 52, 43, .25); display: grid; gap: 8px; }
+.flw-trend.on { background: rgba(224, 52, 43, .1); }
+.flw-trend b { font-size: 14px; }
+#nh .bm-tr .bm-acts { flex-wrap: wrap; gap: 6px; }
+#nh .bm-tr .bm-acts > button { padding: 6px 12px; font-size: 12.5px; white-space: nowrap; }
