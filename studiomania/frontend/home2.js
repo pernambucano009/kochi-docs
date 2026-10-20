@@ -67,7 +67,7 @@ const NH = (() => {
     plan: { en: "Content Plan", ar: "خطة المحتوى", icon: "megaphone", page: "plan", desc: "استراتيجية حسابك، بتتبني لوحدها من كل اللي العقل عرفه عنك." },
     rivals: { en: "Your Competitors", ar: "منافسينك", icon: "megaphone", page: "rivals", desc: "أعلى ٥ في مجالك واللي بينجح عندهم وتحليل فيديوهاتك، وبيدخلوا في أفكارك." },
     auto: { en: "Custom Model", ar: "الموديل المخصص", icon: "film", page: "auto", desc: "خطوات بترتّبها بنفسك (اسحب، حط، قطّع، صدّر) من مكتبة العقل، وكل تشغيل فيديو جديد." },
-    brainlib: { en: "Brand Library", ar: "مكتبة العقل", icon: "film", page: "brainlib", desc: "صورك وفيديوهاتك وأصواتك في فولدرات، والمخ بيوصّف كل ملف عشان تلاقيه وتمنشنه." },
+    brainlib: { en: "Content Library", ar: "مكتبة محتويات البراند", icon: "film", page: "brainlib", desc: "الخلفيات والأماكن، والتعليقات الصوتية، والموسيقى، والكوميكس، وفولدراتك. كل ملف تقدر تمنشنه في الأوتوميشن." },
     comics: { en: "Comics", ar: "مكتبة الكوميكس", icon: "megaphone", page: "comics", desc: "كوميكس حقيقية بسياق كل واحد، علشان تتحط في مكانها الصح." },
     ref2p: { en: "Reference → Prompt", ar: "من مرجع لبرومبت", icon: "clapper", page: "ref2p", desc: "فيديو مرجعي ← برومبت جاهز بـ 14 جزء ← توليد." },
     motion: { en: "Motion", ar: "مكتبة الموشن", icon: "clapper", page: "motion", desc: "أنيميشنات مكتوبة بالكود، كل واحدة تتضاف للأصول بضغطة." },

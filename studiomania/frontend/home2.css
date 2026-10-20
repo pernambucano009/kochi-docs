@@ -2171,3 +2171,12 @@ label.dim { opacity: .4; }
 #nh .nh-col-r .nh-tip { left: auto; right: 0; translate: 0 4px; }
 #nh .nh-col-l .nh-tip { left: 0; right: auto; translate: 0 4px; }
 #nh .nh-col-r .nh-tile:hover > .nh-tip, #nh .nh-col-l .nh-tile:hover > .nh-tip, #nh .nh-col-r .nh-tile:focus-visible > .nh-tip, #nh .nh-col-l .nh-tile:focus-visible > .nh-tip { translate: 0 0; }
+/* 📚 مكتبة محتويات البراند: تابات فوق */
+#nh .bl-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 14px; padding: 5px; border-radius: 999px; background: var(--nh-fill); width: fit-content; max-width: 100%; }
+#nh .bl-tab { border: 0; padding: 8px 16px; border-radius: 999px; font-size: 13.5px; color: var(--nh-muted); white-space: nowrap; transition: background .2s, color .2s; }
+#nh .bl-tab:hover { color: inherit; }
+#nh .bl-tab.on { background: var(--nh-bg, #fff); color: inherit; box-shadow: 0 2px 8px rgba(0, 0, 0, .08); }
+#nh .bl-item.bl-bg { position: relative; cursor: default; }
+#nh .bl-x { position: absolute; top: 8px; inset-inline-start: 8px; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; background: rgba(0, 0, 0, .55); color: #fff; font-size: 11px; opacity: 0; transition: opacity .2s; }
+#nh .bl-item.bl-bg:hover .bl-x { opacity: 1; }
+#nh .bl-h { margin: 18px 0 8px; font-size: 14px; font-weight: 500; }

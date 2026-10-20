@@ -27,6 +27,8 @@ const BrandPage = (() => {
     algo: "M4 18.5h16 M6.5 18.5V12 M11 18.5V8 M15.5 18.5V5 M19.5 9.5l-3-3-3 3",
     trends: "M3.5 17l5.5-5.5 4 4 7.5-7.5 M15 8h5.5v5.5",
     chars: "M12 4a3.5 3.5 0 1 1 0 7a3.5 3.5 0 1 1 0-7z M5 20c.7-3.7 3.4-5.8 7-5.8s6.3 2.1 7 5.8 M17.5 4.5l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6z",
+    content: "M3.5 6.5a1 1 0 0 1 1-1h5l2 2h8a1 1 0 0 1 1 1v9.5a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1z M8 15.5l2.5-2.5 2 2 2-2 2.5 2.5",
+    tools: "M14.5 5.5a4 4 0 0 0-5 5L4 16l4 4 5.5-5.5a4 4 0 0 0 5-5l-2.5 2.5-2.5-.5-.5-2.5z",
     library: "M9 4.5a3 3 0 1 1 0 6a3 3 0 1 1 0-6z M3.5 19c.6-3 2.8-4.6 5.5-4.6s4.9 1.6 5.5 4.6 M16 7.5v6.2 M16 13.7a1.8 1.8 0 1 1-1.8-1.8 M16 7.5l3.5-1.2",
   };
   const svg = (d, s = 22) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}" aria-hidden="true"><path d="${d}" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
@@ -35,8 +37,6 @@ const BrandPage = (() => {
     publish: "النشر والكابشن", analysis: "التحليل", ads: "الإعلانات", aivideo: "فيديو الذكاء الصناعي" };
   // الخريطة: كل فرع وكل نقطة فيه. النوع بيحدد الكارت اللي بيفتح
   function branches(b) {
-    const kinds = [["products", "صور المنتج"], ["screens", "شاشات التطبيق"], ["characters", "شخصيات البراند"], ["sets", "الأماكن والخلفيات"], ["props", "الأدوات"]]
-      .filter(([k]) => k !== "screens" || b?.type === "app");
     return [
       { k: "identity", t: "الهوية", en: "Identity", leaves: [
         { f: "@name", t: "الاسم", type: "text", ph: "اسم البراند" },
@@ -68,19 +68,22 @@ const BrandPage = (() => {
         { f: "link", t: "اللينك", type: "text", ph: "https://…", ltr: true },
         { f: "caption", t: "الكابشن الافتراضي", type: "text", ph: "{caption}\n\n{cta} 👇\n{link}\n#هاشتاج", hint: "{caption} كابشن الفيديو · {cta} الدعوة · {link} اللينك. بيتحطوا لوحدهم وقت النشر." },
       ] },
-      { k: "assets", t: "صور البراند", en: "Assets", leaves: kinds.map(([k, t]) => ({ f: k, t, type: "imgs" })) },
       // 🧑‍🎤 الشخصيات والأفاتار: دراع لوحده من المخ (الشخصيات ونسختي)
       { k: "chars", t: "الشخصيات والأفاتار", en: "Characters", leaves: [
         { f: "pg", i: "coaches", page: "coaches", t: "🧑‍🎤 الشخصيات والأفاتار", type: "page" },
         { f: "pg", i: "twin", page: "twin", t: "🪞 نسختي (أفاتار منك)", type: "page" },
       ] },
-      // المكتبة والأصوات: ملفات العقل والتعليق الصوتي والموسيقى والكوميكس (كل نقطة بتفتح صفحتها)
-      { k: "library", t: "المكتبة والأصوات", en: "Library", leaves: [
-        { f: "pg", i: "brainlib", page: "brainlib", t: "📁 مكتبة العقل (صور وفيديوهات وأصوات)", type: "page" },
+      // 📚 مكتبة محتويات البراند: الخلفيات والأماكن، التعليقات الصوتية، الموسيقى، الكوميكس، وفولدراتك (كلهم صفحة واحدة بتابات)
+      { k: "content", t: "مكتبة محتويات البراند", en: "Content Library", leaves: [
+        { f: "pg", i: "bl:bg", page: "brainlib", t: "🏞️ الخلفيات والأماكن", type: "page" },
+        { f: "pg", i: "bl:voice", page: "brainlib", t: "🎙️ التعليقات الصوتية", type: "page" },
+        { f: "pg", i: "bl:music", page: "brainlib", t: "🎵 الموسيقى", type: "page" },
+        { f: "pg", i: "bl:comics", page: "brainlib", t: "🎭 الكوميكس", type: "page" },
+        { f: "pg", i: "bl:files", page: "brainlib", t: "📁 فولدراتك (صور وفيديوهات)", type: "page" },
+      ] },
+      // 🧰 أدوات: الموديل المخصص ومن مرجع لبرومبت (لحد ما نحدد مكانهم)
+      { k: "tools", t: "أدوات", en: "Tools", leaves: [
         { f: "pg", i: "auto", page: "auto", t: "🤖 الموديل المخصص (أوتوميشن)", type: "page" },
-        { f: "pg", i: "voice", page: "voice", t: "التعليق الصوتي", type: "page" },
-        { f: "pg", i: "music", page: "music", t: "الموسيقى", type: "page" },
-        { f: "pg", i: "comics", page: "comics", t: "🎭 مكتبة الكوميكس", type: "page" },
         { f: "pg", i: "ref2p", page: "ref2p", t: "🎥 من مرجع لبرومبت", type: "page" },
       ] },
       // 🏆 منافسينك: أعلى 5 في المجال والسوق، واللي بينجح عندهم، وتحليل آخر ١٠ فيديوهات ليك، وخطة المحتوى (كلهم صفحة واحدة بتابات)
@@ -100,7 +103,8 @@ const BrandPage = (() => {
       { k: "knowledge", t: "المعرفة", en: "Knowledge", leaves: (b?.notes || []).map((x) => ({ f: "n", i: x.id, t: x.title, type: "note", note: x })) },
     ].map((br) => {
       // الاقتراحات اللي مستنية موافقتك بتظهر نقط منوّرة على الفرع بتاعها
-      const mine = (b?.pending || []).filter((p) => pendBranch(p) === br.k);
+      // صور المنتج وشخصيات البراند اتشالوا: الاقتراحات القديمة بتاعتهم مابتظهرش
+      const mine = (b?.pending || []).filter((p) => (p.kind !== "image" || ["sets", "logos"].includes(p.target)) && pendBranch(p) === br.k);
       return { ...br, leaves: [...br.leaves, ...mine.map((p) => ({ f: "p", i: p.id, t: pendLabel(p), type: "pending", p }))] };
     });
   }
@@ -108,7 +112,7 @@ const BrandPage = (() => {
     typography: "look", palette: "look", cta: "delivery", link: "delivery", caption: "delivery" };
   const FIELD_T = { niche: "النيتش", about: "عن البراند", audience: "الجمهور", market: "السوق", language: "اللغة واللهجة", domain: "المجال", typography: "الخطوط",
     palette: "الألوان", cta: "الدعوة (CTA)", link: "اللينك", caption: "الكابشن الافتراضي" };
-  const pendBranch = (p) => (p.kind === "field" ? FIELD_BR[p.field] || "identity" : p.kind === "rule" ? "rules" : p.kind === "image" ? "assets" : "knowledge");
+  const pendBranch = (p) => (p.kind === "field" ? FIELD_BR[p.field] || "identity" : p.kind === "rule" ? "rules" : p.kind === "image" ? (p.target === "logos" ? "look" : "content") : "knowledge");
   const pendLabel = (p) => (p.kind === "field" ? `اقتراح: ${FIELD_T[p.field] || p.field}` : p.kind === "rule" ? "قاعدة مقترحة" : p.kind === "question" ? "سؤال" : p.kind === "image" ? `صورة: ${p.title}` : p.title);
   const srcName = (id) => (id === "feedback" ? "تقييماتك" : cur()?.sources?.find((s) => s.id === id)?.name || "");
   // النقطة مليانة ولا لسه ناقصة
@@ -747,7 +751,7 @@ const BrandPage = (() => {
   function openCard(n) {
     if (n?.kind === "plan") { window.RV_FOCUS = "plan-only"; return window.NHNav?.("plan"); }
     if (n?.l?.type === "page" && n.l.page === "twin") return showStep("16");   // قسم لوحده (مش صفحة جوه العقل)
-    if (n?.l?.type === "page") { window.RV_FOCUS = n.l.page === "rivals" ? n.l.i : null; return window.NHNav?.(n.l.page); }   // الشخصيات / التعليق / الموسيقى: صفحتها بتفتح جوه العقل («رجوع» بيرجّعك هنا)
+    if (n?.l?.type === "page") { window.RV_FOCUS = n.l.page === "rivals" ? n.l.i : null; window.BL_TAB = n.l.page === "brainlib" ? String(n.l.i).split(":")[1] : null; return window.NHNav?.(n.l.page); }   // الشخصيات / التعليق / الموسيقى: صفحتها بتفتح جوه العقل («رجوع» بيرجّعك هنا)
     const card = S.el.querySelector(".bm-card");
     if (!n) { S.open = null; card.hidden = true; S.el.classList.remove("has-card"); markOpen(); return; }
     // رجوع: للكارت اللي كنت فيه قبل كده، ولو فتحت النقطة من الخريطة على طول فلفرعها
@@ -1007,7 +1011,7 @@ const BrandPage = (() => {
       const tg = t.closest("[data-tgo]");
       if (tg) {
         const go = JSON.parse(tg.dataset.tgo);
-        if (go.page) { S.tqFor = null; return window.NHNav?.(go.page); }
+        if (go.page) { S.tqFor = null; window.BL_TAB = go.tab || null; return window.NHNav?.(go.page); }
         const ln = S.nodes.find((x) => x.id === go.leaf);
         S.tqFor = null;
         return ln ? openCard(ln) : toast("مش لاقي النقطة دي في الخريطة", true);

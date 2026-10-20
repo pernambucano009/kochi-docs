@@ -14,7 +14,7 @@ import uuid
 import brainsrc
 import rivals
 
-KINDS = {"products": "صور المنتج", "characters": "شخصيات البراند / صاحب الحساب", "sets": "الأماكن والخلفيات", "props": "الأدوات", "logos": "اللوجو"}
+KINDS = {"sets": "الأماكن والخلفيات", "logos": "اللوجو"}   # صور المنتج وشخصيات البراند اتشالوا (الشخصيات في «الشخصيات والأفاتار»)
 
 
 def parse(s: str) -> tuple[str, str]:

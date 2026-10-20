@@ -1,9 +1,12 @@
-// 📁 مكتبة العقل: صور وفيديوهات وأصوات العميل في فولدرات جوه فولدرات، والمخ بيكتب على كل ملف هو إيه (وصف وتاجات).
+// 📚 مكتبة محتويات البراند: صفحة واحدة بتابات: الخلفيات والأماكن، التعليقات الصوتية، الموسيقى، الكوميكس، وفولدراتك.
+// «فولدراتك»: صور وفيديوهات وأصوات العميل في فولدرات جوه فولدرات، والمخ بيكتب على كل ملف هو إيه (وصف وتاجات).
 // ده الأساس اللي «الموديل المخصص» بيشتغل عليه: منشن لفولدر («@صور/أسنان/قبل») أو لملف بعينه، أو بحث بالمعنى.
 const BrainLibPage = (() => {
   const esc = (s) => escapeHtml(String(s ?? ""));
-  const S = { el: null, lib: null, cur: null, q: "", kind: "", hits: null, open: null, timer: null };
-  const html = () => `<div class="nb-wrap fs-wrap bl-wrap" id="blWrap"><div class="nh-empty">بيحمّل…</div></div>`;
+  const S = { el: null, body: null, tab: "files", mod: null, bg: null, lib: null, cur: null, q: "", kind: "", hits: null, open: null, timer: null };
+  const TABS = [["bg", "🏞️ الخلفيات والأماكن"], ["voice", "🎙️ التعليقات الصوتية"], ["music", "🎵 الموسيقى"], ["comics", "🎭 الكوميكس"], ["files", "📁 فولدراتك"]];
+  const SUB = { voice: () => VoicesPage, music: () => MusicPage, comics: () => ComicsPage };
+  const html = () => `<div class="nb-wrap fs-wrap bl-wrap" id="blWrap"><nav class="bl-tabs" role="tablist"></nav><div class="bl-tabbody" id="blBody"><div class="nh-empty">بيحمّل…</div></div></div>`;
   const IC = { image: "🖼️", video: "🎬", audio: "🎙️" };
   const dur = (s) => (s ? `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, "0")}` : "");
   const folder = (id) => S.lib.folders.find((f) => f.id === id);
@@ -41,12 +44,12 @@ const BrainLibPage = (() => {
             <button type="button" class="nb-btn danger" data-bldel>🗑 امسح</button></div></div></div></section>`;
   }
   function render() {
-    if (!S.el || !S.lib) return;
+    if (!S.el || !S.lib || S.tab !== "files") return;
     const L = S.lib, inHere = L.files.filter((f) => (f.folder || null) === (S.cur || null)), sub = kidsOf(S.cur);
     const shown = S.hits ?? inHere;
     const cur = L.files.find((f) => f.id === S.open);
-    S.el.innerHTML = `<section class="fs-hero">
-        <div class="fs-hero-t"><b>مكتبة العقل</b><span class="latin">BRAND LIBRARY</span></div>
+    S.body.innerHTML = `<section class="fs-hero">
+        <div class="fs-hero-t"><b>فولدراتك</b><span class="latin">FOLDERS</span></div>
         <p>صورك وفيديوهاتك وأصواتك في فولدرات جوه فولدرات زي ما تحب. ارفع فولدر كامل بفولدراته، والمخ بيتفرج على كل ملف ويكتب هو إيه، فبعدين تلاقيه بالبحث أو تمنشنه («@صور/أسنان/قبل») في الأوتوميشن.</p>
         <div class="cm-stats"><span><b class="num">${L.total}</b> ملف</span><span><b class="num">${L.folders.length}</b> فولدر</span>${L.tagging ? `<span>⏳ <b class="num">${L.tagging}</b> المخ بيشوفهم</span>` : ""}</div>
       </section>
@@ -109,7 +112,7 @@ const BrainLibPage = (() => {
         }
         if ((b = q("[data-blfile]"))) { S.open = S.open === b.dataset.blfile ? null : b.dataset.blfile; render(); return w.querySelector(".bl-edit")?.scrollIntoView({ block: "nearest" }); }
         if (q("[data-blclose]")) { S.open = null; return render(); }
-        const f = S.lib.files.find((x) => x.id === S.open);
+        const f = S.lib?.files.find((x) => x.id === S.open);
         if (!f) return;
         if (q("[data-blsave]")) {
           const v = (k) => w.querySelector(`[data-blf="${k}"]`).value;
@@ -149,12 +152,76 @@ const BrainLibPage = (() => {
       } catch (err) { toast(err.message, true); }
     });
   }
+  // 🏞️ الخلفيات والأماكن: صور «الأماكن والخلفيات» بتاعة البراند (ترفعها هنا)، وأماكن التصوير اللي اتضافت من «نسختي»
+  function bgTile(x) {
+    return `<figure class="bl-item bl-bg"><img src="${esc(x.url)}" alt="" loading="lazy">
+      <figcaption><b>${esc(x.name || "خلفية")}</b>${x.source === "twin" ? `<small class="muted">🪞 من «${esc(x.twin)}»</small>` : x.desc ? `<small>${esc(x.desc)}</small>` : ""}</figcaption>
+      ${x.source === "brand" ? `<button type="button" class="bl-x" data-bgdel="${esc(x.file)}" title="امسحها">✕</button>` : ""}</figure>`;
+  }
+  async function renderBg() {
+    S.body.innerHTML = `<div class="nh-empty">بيحمّل…</div>`;
+    S.bg = await api("/api/content/backgrounds");
+    if (S.tab !== "bg") return;
+    const B = S.bg;
+    S.body.innerHTML = `<section class="fs-hero"><div class="fs-hero-t"><b>الخلفيات والأماكن</b><span class="latin">BACKGROUNDS</span></div>
+        <p>الأماكن اللي بتظهر في فيديوهاتك. ارفعها هنا، أو ضيف أماكن التصوير من «نسختي» وهتظهر هنا لوحدها. تقدر تمنشن أي واحدة في الأوتوميشن («@») علشان التوليد يستخدمها مرجع.</p>
+        <div class="cm-stats"><span><b class="num">${B.brand.length + B.twin.length}</b> خلفية</span></div></section>
+      <div class="nb-bar"><label class="nb-btn">⬆ ارفع صور خلفيات<input type="file" multiple accept="image/*" data-bgup hidden></label></div>
+      <div class="bl-grid" data-bgdrop>${B.brand.map(bgTile).join("") || `<div class="nh-empty">لسه مفيش خلفيات. ارفع صور أو اسحبها هنا.</div>`}</div>
+      ${B.twin.length ? `<h4 class="bl-h">🪞 أماكن التصوير من «نسختي»</h4><div class="bl-grid">${B.twin.map(bgTile).join("")}</div>` : ""}`;
+  }
+  async function bgUpload(files) {
+    const list = [...files].filter((f) => f.type.startsWith("image/"));
+    if (!list.length) return toast("ارفع صور (PNG / JPG / WEBP)", true);
+    const fd = new FormData();
+    fd.append("kind", "sets");
+    list.forEach((f) => fd.append("files", f));
+    toast(`⏳ بيرفع ${list.length} صورة…`);
+    await api(`/api/ad-brains/${S.bg.bid}/assets`, { method: "POST", body: fd });
+    await renderBg();
+    toast("✅ اترفعت، والمخ بيوصّفها");
+  }
+  function closeSub() { try { S.mod?.close?.(); } catch { /* */ } S.mod = null; clearTimeout(S.timer); }
+  async function showTab(tab) {
+    closeSub();
+    S.tab = TABS.some(([k]) => k === tab) ? tab : "files";
+    S.el.querySelector(".bl-tabs").innerHTML = TABS.map(([k, t]) => `<button type="button" role="tab" class="bl-tab${k === S.tab ? " on" : ""}" data-bltab="${k}" aria-selected="${k === S.tab}">${t}</button>`).join("");
+    try {
+      if (SUB[S.tab]) { const M = SUB[S.tab](); S.mod = M; S.body.innerHTML = M.html(); return await M.mount(S.body); }
+      if (S.tab === "bg") return await renderBg();
+      S.hits = null; S.q = ""; S.body.innerHTML = `<div class="nh-empty">بيحمّل…</div>`;
+      await refresh(); render(); poll();
+    } catch (err) { S.body.innerHTML = `<div class="nh-empty">${esc(err.message)}</div>`; }
+  }
+  function bindShell(w) {
+    w.addEventListener("click", async (e) => {
+      const t = e.target.closest("[data-bltab]");
+      if (t) return showTab(t.dataset.bltab);
+      const d = e.target.closest("[data-bgdel]");
+      if (d && confirm("تمسح الخلفية دي؟")) {
+        try { await api(`/api/ad-brains/${S.bg.bid}/assets/${encodeURIComponent(d.dataset.bgdel)}`, { method: "DELETE" }); await renderBg(); } catch (err) { toast(err.message, true); }
+      }
+    });
+    w.addEventListener("change", async (e) => {
+      if (!e.target.matches("[data-bgup]")) return;
+      try { await bgUpload(e.target.files); } catch (err) { toast(err.message, true); }
+      e.target.value = "";
+    });
+    w.addEventListener("dragover", (e) => { if (e.target.closest("[data-bgdrop]")) e.preventDefault(); });
+    w.addEventListener("drop", async (e) => {
+      if (!e.target.closest("[data-bgdrop]") || !e.dataTransfer.files?.length) return;
+      e.preventDefault();
+      try { await bgUpload(e.dataTransfer.files); } catch (err) { toast(err.message, true); }
+    });
+  }
   async function mount(root) {
     const w = root.querySelector("#blWrap");
     if (!w) return;
-    S.el = w; S.hits = null; S.q = "";
-    bind(w);
-    try { await refresh(); render(); poll(); } catch (err) { w.innerHTML = `<div class="nh-empty">${esc(err.message)}</div>`; }
+    S.el = w; S.body = w.querySelector("#blBody"); S.hits = null; S.q = "";
+    bind(w); bindShell(w);
+    const tab = window.BL_TAB || "bg";
+    window.BL_TAB = null;
+    await showTab(tab);
   }
-  return { html, mount, close: () => clearTimeout(S.timer) };
+  return { html, mount, close: closeSub };
 })();

@@ -97,8 +97,7 @@ def tasks(b: dict, ctx: dict) -> list[dict]:
         ("palette", "حط ألوان البراند", "الألوان بتمشي على كل التصميمات", bool(hexes), {"leaf": "look:palette:"}),
         ("typography", "اختار خطوط البراند", "خط العناوين وخط الكلام", bool(str(b.get("typography") or "").strip()), {"leaf": "look:typography:"}),
         ("styles", "اختار الستايل اللي يشبهك", "علشان الفيديوهات والصور تطلع بنفس الروح", bool(str(b.get("styles") or "").strip()), {"leaf": "look:styles:"}),
-        ("screens" if app else "products", "ارفع صور شاشات التطبيق" if app else "ارفع صور المنتج أو الخدمة",
-         "بتتحط في الإعلانات والفيديوهات", has("screens" if app else "products"), {"leaf": f"assets:{'screens' if app else 'products'}:"}),
+        ("sets", "ارفع صور الأماكن والخلفيات", "الأماكن اللي بتظهر في الفيديوهات", has("sets"), {"page": "brainlib", "tab": "bg"}),
         ("intro", "ارفع إنترو البراند", "فيديو قصير في أول كل فيديو", bool(b.get("intro_file")), {"leaf": "delivery:intro:"}),
         ("outro", "ارفع أوترو البراند", "فيديو قصير في آخر كل فيديو", bool(b.get("outro_file")), {"leaf": "delivery:outro:"}),
         ("caption", "اكتب الكابشن الافتراضي", "الشكل اللي الكابشن بينزل بيه مع كل بوست", bool(str(b.get("caption") or "").strip()), {"leaf": "delivery:caption:"}),
@@ -108,8 +107,8 @@ def tasks(b: dict, ctx: dict) -> list[dict]:
         ("twin_video", "ارفع فيديو ليك وانت بتتكلم", "علشان الأفاتار يتحرك ويتكلم زيك", bool(tw.get("video")), {"page": "twin"}),
         ("twin_voice", "سجّل صوتك", "علشان الأفاتار يتكلم بصوتك", bool(tw.get("voice")), {"page": "twin"}),
         ("characters", "اعمل شخصية للبراند", "شخصية ثابتة تظهر في الفيديوهات", ctx.get("coaches", 0) > 0, {"page": "coaches"}),
-        ("voice", "ضيف تعليق صوتي", "تسجيلات صوت تتحط على الفيديوهات", ctx.get("voices", 0) > 0, {"page": "voice"}),
-        ("music", "ضيف موسيقى", "موسيقى البراند للفيديوهات", ctx.get("music", 0) > 0, {"page": "music"}),
+        ("voice", "ضيف تعليق صوتي", "تسجيلات صوت تتحط على الفيديوهات", ctx.get("voices", 0) > 0, {"page": "brainlib", "tab": "voice"}),
+        ("music", "ضيف موسيقى", "موسيقى البراند للفيديوهات", ctx.get("music", 0) > 0, {"page": "brainlib", "tab": "music"}),
         ("lib_media", "ارفع صور وفيديوهات في مكتبة العقل", "المكتبة اللي الموديل المخصص بيسحب منها", ctx.get("lib_media", 0) > 0, {"page": "brainlib"}),
     ]
     return [{"id": i, "t": t, "why": w, "done": bool(d), "go": g} for i, t, w, d, g in items]

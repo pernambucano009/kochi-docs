@@ -25358,6 +25358,26 @@ def flow_phone_state(fid: str):
             "typo": typo}
 
 
+# ---------------------------------------------------------------- 🏞️ مكتبة محتويات البراند: الخلفيات والأماكن
+def content_backgrounds(bid: str | None = None) -> dict:
+    """خلفيات البراند (صور «الأماكن والخلفيات» في العقل) + أماكن التصوير اللي اتضافت من «نسختي»."""
+    bid = bid or active_client_id()
+    b = brain_row(bid) or {}
+    base = f"/media/ads/brains/{bid}"
+    brand = [{"id": f"bg:{a['file']}", "file": a["file"], "name": a.get("name") or "", "desc": a.get("description") or "",
+              "url": f"{base}/{a['file']}", "source": "brand"} for a in b.get("sets") or [] if (brain_dir(bid) / a["file"]).exists()]
+    tw = []
+    for t in twins_list():
+        for x in t.get("backgrounds") or []:
+            tw.append({"id": f"tw:{t['id']}:{x['id']}", "name": x.get("name") or "", "url": x["url"], "source": "twin", "twin": t.get("name") or ""})
+    return {"bid": bid, "brand": brand, "twin": tw}
+
+
+@app.get("/api/content/backgrounds")
+def get_content_backgrounds():
+    return content_backgrounds()
+
+
 # ---------------------------------------------------------------- 📁 مكتبة العقل: فولدرات جوه فولدرات + المخ بيوصّف كل ملف
 LIB_LOCK = threading.Lock()
 
