@@ -80,6 +80,11 @@ const Flow = (() => {
       poll();
     }, 1400);
   }
+  async function loadSaved() {
+    S.saved = null; render();
+    try { S.saved = await api(`/api/flows/${S.d.id}/saved`); } catch (err) { S.saved = []; toast(err.message, true); }
+    render();
+  }
   async function call(path, body, method = "POST") {
     try {
       S.d = await api(`/api/flows/${S.d.id}${path}`, { method, ...(body instanceof FormData ? { body } : J(body || {})) });
@@ -165,7 +170,26 @@ const Flow = (() => {
     return `<article class="flw-card${S.seen.has(it.id) ? "" : " in"}" data-cid="${esc(it.id)}"><div class="flw-ch"><b>${esc(it.title)}</b>${rateBtns("idea", it.id)}</div>${algoTags(it)}
       ${it.hook ? `<p class="flw-hook">«${esc(it.hook)}»</p>` : ""}${hooksRow(it)}${it.pack && (it.pack.for == null || it.pack.for === it.hook) ? packRow(it.pack) : ""}<p>${esc(it.idea)}</p>${it.fit ? `<small class="flw-fit">🎨 على القالب: ${esc(it.fit)}</small>` : ""}${it.why ? `<small class="muted">💡 ${esc(it.why)}</small>` : ""}
       <div class="flw-acts"><button type="button" class="flw-btn pri" data-pick-idea="${it.id}">اختار الفكرة دي</button>
-        <button type="button" class="flw-link" data-edit="${it.id}">✏️ عدّل</button></div></article>`;
+        <button type="button" class="flw-link" data-edit="${it.id}">✏️ عدّل</button>${laterBtn("idea", it.id)}</div></article>`;
+  }
+  // 🔖 احفظها لبعدين: بتروح مكتبة «محفوظاتك» ومابتتقترحش تاني لحد ما تستخدمها
+  function laterBtn(kind, id) {
+    const on = (S.d?.saved_ids || []).includes(id);
+    return `<button type="button" class="flw-link" data-later="${kind}:${esc(id)}" ${on ? "disabled" : ""}>${on ? "🔖 اتحفظت لبعدين" : "🔖 احفظها لبعدين"}</button>`;
+  }
+  // مكتبة «لبعدين» + ملاحظة لو شلنا اقتراحات شبه اللي اتستخدم قبل كده
+  function savedBox(kind, d) {
+    const n = kind === "idea" ? d.ideas_repeats : d.scen_repeats;
+    const note = n ? `<p class="flw-algo-note">🔁 شلنا ${n} ${kind === "idea" ? "أفكار" : "اقتراحات"} شبه حاجات استخدمتها قبل كده، وجبنا غيرها.</p>` : "";
+    if (!S.savedOpen) return `${note}<div class="flw-saved"><button type="button" class="flw-link" data-savedopen>🔖 محفوظاتك لبعدين</button></div>`;
+    const items = S.saved;
+    const row = (x) => `<li><div><b>${x.kind === "idea" ? "💡" : "🎬"} ${esc(x.title || "من غير عنوان")}</b>
+        <small class="muted">${x.kind === "idea" ? "فكرة" : `سيناريو${x.idea_title ? ` لفكرة «${esc(x.idea_title)}»` : ""} · قالب «${esc(x.template?.name || "")}»`}</small>
+        ${x.hook ? `<p class="flw-hook">«${esc(x.hook)}»</p>` : ""}${x.text ? `<p>${esc(x.text)}</p>` : ""}</div>
+      <div class="flw-acts">${x.here ? `<button type="button" class="flw-btn pri" data-usesaved="${esc(x.id)}" ${S.d.busy ? "disabled" : ""}>استخدمها هنا</button>` : `<small class="muted">بتنفع في قالبها بس</small>`}
+        <button type="button" class="flw-link" data-delsaved="${esc(x.id)}">✕ شيلها</button></div></li>`;
+    return `${note}<div class="flw-saved open"><div class="flw-ch"><b>🔖 محفوظاتك لبعدين</b><button type="button" class="flw-link" data-savedopen>إخفاء</button></div>
+      ${items == null ? working("بيجيب المحفوظات…") : items.length ? `<ul>${items.map(row).join("")}</ul>` : `<p class="muted">لسه مفيش. أي فكرة أو سيناريو يعجبك ومش هتستخدمه دلوقتي، دوس «🔖 احفظها لبعدين».</p>`}</div>`;
   }
   // ٣ هوكات بدرجات (من قوالب مختلفة): الأعلى هو المختار، والعميل يقدر يبدّل بدوسة
   function hooksRow(it) {
@@ -210,7 +234,7 @@ const Flow = (() => {
     return `<h2>اختار فكرة للبوست</h2><p class="flw-sub">المخ اقترح أفكار على قد البراند والقالب. اختار واحدة، أو عدّلها، أو اطلب غيرهم، أو اكتب فكرتك.</p>
       ${isPhone(d) ? `<div class="flw-skip"><button type="button" class="flw-btn" data-skipshoot>⏭ عندي الفيديو بتاعي، على الرفع على طول</button></div>` : ""}${tipBox(d.guide?.idea)}${seasonsRow()}
       ${d.algo_mode && (d.ideas_dropped || []).length ? `<p class="flw-algo-note" title="${esc(d.ideas_dropped.map((x) => `«${x.title}»: ${x.why_out}`).join("\n"))}">⚡ وضع الخوارزمية شال ${d.ideas_dropped.length} ${d.ideas_dropped.length === 1 ? "فكرة ضعيفة" : "أفكار ضعيفة"} وجاب غيرها (حط الماوس تشوف ليه)</p>` : ""}
-      <div class="flw-cards">${(d.ideas || []).map(ideaCard).join("")}${S.own ? ideaForm() : ""}</div>
+      ${savedBox("idea", d)}<div class="flw-cards">${(d.ideas || []).map(ideaCard).join("")}${S.own ? ideaForm() : ""}</div>
       ${loading ? working("المخ بيفكّر في أفكار على القالب…") : failed("idea")}
       <div class="flw-more">${S.hint ? `<div class="flw-chatrow"><input id="flwHint" placeholder="عايز أفكار عن إيه؟ (اختياري)"><button type="button" class="flw-btn" data-more="idea">اقترح</button></div>` : `
         <button type="button" class="flw-btn" data-more="idea" ${loading ? "disabled" : ""}>💡 اقترح أفكار تانية</button>
@@ -279,14 +303,14 @@ const Flow = (() => {
     return `<article class="flw-card${S.seen.has(sc.id) ? "" : " in"}" data-cid="${esc(sc.id)}"><div class="flw-ch"><b>${esc(sc.title)}</b>${rateBtns("scenario", sc.id)}</div>
       ${scenAlgo(sc.algo)}${sc.summary ? `<p>${esc(sc.summary)}</p>` : ""}${scenBody(sc, fmt)}${sc.caption ? `<small class="muted">✍️ ${esc(sc.caption)}</small>` : ""}
       <div class="flw-acts"><button type="button" class="flw-btn pri" data-pick-scen="${sc.id}">اختار السيناريو ده</button>
-        <button type="button" class="flw-link" data-edit="${sc.id}">✏️ عدّل</button></div></article>`;
+        <button type="button" class="flw-link" data-edit="${sc.id}">✏️ عدّل</button>${laterBtn("scenario", sc.id)}</div></article>`;
   }
   function stScenario(d) {
     const loading = d.busy === "scenarios";
     const eps = d.format === "series" ? ` · ${d.episodes === "auto" ? "عدد الحلقات تلقائي" : `${d.episodes} حلقات`}` : "";
     const skipS = isPhone(d) ? `<div class="flw-skip"><button type="button" class="flw-btn" data-skipshoot>⏭ عندي الفيديو بتاعي، على الرفع على طول</button></div>` : "";
     return `${picked("idea")}<h2>اختار السيناريو</h2><p class="flw-sub">${FMT[d.format]?.[0] || ""} ${FMT[d.format]?.[1] || ""}${eps}${isPhone(d) ? "" : ` — <button type="button" class="flw-link" data-go="format">غيّر النوع</button>`}</p>${skipS}
-      ${tipBox(d.guide?.scen)}<div class="flw-cards wide">${(d.scenarios || []).map((s) => scenCard(s, d.format)).join("")}${S.own ? scenForm({}, d.format) : ""}</div>
+      ${tipBox(d.guide?.scen)}${savedBox("scenario", d)}<div class="flw-cards wide">${(d.scenarios || []).map((s) => scenCard(s, d.format)).join("")}${S.own ? scenForm({}, d.format) : ""}</div>
       ${loading ? working("المخ بيكتب السيناريوهات…") : failed("scen")}
       <div class="flw-more">${S.hint ? `<div class="flw-chatrow"><input id="flwHint" placeholder="عايز السيناريو يبقى إزاي؟ (اختياري)"><button type="button" class="flw-btn" data-more="scen">اقترح</button></div>` : `
         <button type="button" class="flw-btn" data-more="scen" ${loading ? "disabled" : ""}>💡 اقترح سيناريوهات تانية</button>
@@ -337,7 +361,7 @@ const Flow = (() => {
       <small class="muted">⏱ الفيديو هيبقى حوالي <span class="num">${Math.round(total)}</span> ثانية بالفويس أوفر (القالب الأصلي <span class="num">${Math.round(ml.DUR)}</span>)</small>
       ${sc.caption ? `<small class="muted">✍️ ${esc(sc.caption)}</small>` : ""}
       <div class="flw-acts"><button type="button" class="flw-btn pri" data-pick-scen="${sc.id}">اختار السكريبت ده</button>
-        <button type="button" class="flw-link" data-edit="${sc.id}">✏️ عدّل</button></div></article>`;
+        <button type="button" class="flw-link" data-edit="${sc.id}">✏️ عدّل</button>${laterBtn("scenario", sc.id)}</div></article>`;
   }
   function stScript(d) {
     const ml = d.mlive, loading = d.busy === "scenarios";
@@ -348,7 +372,7 @@ const Flow = (() => {
     return `${picked("idea")}<h2>السكريبت على مشاهد القالب</h2>
       <p class="flw-sub">لكل مشهد جملة فويس أوفر والكلام اللي بيظهر فيه. المشهد بياخد طول جملته، فخلي الجمل قريبة من طول المشهد (جنب كل جملة هتاخد قد إيه).</p>
       ${langs.length ? `<div class="flw-tset"><small>لهجة الفويس أوفر (السكريبت بيتكتب بيها):</small><div class="flw-langs">${langs.map((x) => `<button type="button" class="flw-chip${x.id === cur ? " on" : ""}" data-slang="${esc(x.id)}" ${loading ? "disabled" : ""}>${esc(x.label)}</button>`).join("")}</div></div>` : ""}
-      <div class="flw-cards wide">${(d.scenarios || []).map((s) => scriptCard(s, ml)).join("")}</div>
+      ${savedBox("scenario", d)}<div class="flw-cards wide">${(d.scenarios || []).map((s) => scriptCard(s, ml)).join("")}</div>
       ${loading ? working("المخ بيكتب السكريبت على مشاهد القالب…") : failed("scen")}
       <div class="flw-more">${S.hint ? `<div class="flw-chatrow"><input id="flwHint" placeholder="عايز السكريبت يبقى إزاي؟ (اختياري)"><button type="button" class="flw-btn" data-more="scen">اقترح</button></div>` : `
         <button type="button" class="flw-btn" data-more="scen" ${loading ? "disabled" : ""}>💡 اقترح سكريبتات تانية</button>
@@ -767,6 +791,10 @@ const Flow = (() => {
       return call("/ideas", { hint: `أفكار لمناسبة «${s.name}» (${s.date}${s.countries?.length ? ` — ${s.countries.join("، ")}` : ""}). زاوية مقترحة: ${s.angle || ""}`, more: true });
     }
     if ((b = q("[data-hook]"))) return call("/hook", { idea_id: b.dataset.hook, hook: b.dataset.text });
+    if ((b = q("[data-later]"))) { const [kind, id] = b.dataset.later.split(":"); if (await call("/save-later", { kind, id })) { toast("🔖 اتحفظت في «محفوظاتك لبعدين»"); S.saved = null; if (S.savedOpen) loadSaved(); } return; }
+    if (q("[data-savedopen]")) { S.savedOpen = !S.savedOpen; render(); if (S.savedOpen) loadSaved(); return; }
+    if ((b = q("[data-usesaved]"))) { reset(); S.savedOpen = false; S.saved = null; return call(`/use-saved/${b.dataset.usesaved}`).then(poll); }
+    if ((b = q("[data-delsaved]"))) { try { S.saved = await api(`/api/flows/${S.d.id}/saved/${b.dataset.delsaved}`, { method: "DELETE" }); render(); } catch (err) { toast(err.message, true); } return; }
     if ((b = q("[data-pick-idea]"))) { reset(); return call("/idea", { id: b.dataset.pickIdea }); }
     if ((b = q("[data-pick-scen]"))) { reset(); S.castOpts = null; S.cast = null; return call("/scenario", { id: b.dataset.pickScen }); }
     if ((b = q("[data-chat]"))) { S.chat = S.chat === b.dataset.chat ? null : b.dataset.chat; render(); return S.el.querySelector("[data-chatin]")?.focus(); }

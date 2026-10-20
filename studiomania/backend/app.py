@@ -4067,6 +4067,7 @@ import hekaya  # noqa: E402
 import brainquiz  # noqa: E402
 import brainsocial  # noqa: E402
 import stock  # noqa: E402
+import ideamem  # noqa: E402
 import twin  # noqa: E402
 import phone  # noqa: E402
 import wallet  # noqa: E402
@@ -20681,23 +20682,55 @@ def flow_job(fid: str, what: str, fn) -> None:
     threading.Thread(target=run, daemon=True).start()
 
 
+# 🧠 ذاكرة الأفكار لكل عميل: اللي اتستخدم (مايتقترحش تاني) واللي اتحفظ لبعدين
+IDEA_MEM_DIR = DATA_DIR / "idea_memory"
+IDEA_MEM_DIR.mkdir(parents=True, exist_ok=True)
+IDEA_MEM_LOCK = threading.Lock()
+
+
+def mem_cid(d: dict) -> str:
+    return re.sub(r"[^\w-]", "", str(d.get("client_id") or active_client_id() or "default"))[:64] or "default"
+
+
+def mem_load(cid: str) -> dict:
+    f = IDEA_MEM_DIR / f"{cid}.json"
+    try:
+        return json.loads(f.read_text(encoding="utf-8")) if f.exists() else {"used": [], "saved": []}
+    except ValueError:
+        return {"used": [], "saved": []}
+
+
+def mem_update(cid: str, fn) -> dict:
+    with IDEA_MEM_LOCK:
+        m = mem_load(cid)
+        fn(m)
+        f = IDEA_MEM_DIR / f"{cid}.json"
+        f.with_suffix(".tmp").write_text(json.dumps(m, ensure_ascii=False), encoding="utf-8")
+        f.with_suffix(".tmp").replace(f)
+        return m
+
+
 def flow_gen_ideas(fid: str, hint: str = "", more: bool = False) -> None:
     d = flow_load(fid)
     brain = flow_brain(d)
     avoid = [i.get("title", "") for i in d.get("ideas") or []]
     k = len(avoid)
     gate = algo.mode_on(brain)   # ⚡ وضع الخوارزمية: كل فكرة بدايرتها ومجموعتها ودرجة HEAT، والضعيفة بتتعمل غيرها قبل ما العميل يشوفها
-    items, dropped = [], []
-    for attempt in range(2 if gate else 1):
+    mem = mem_load(mem_cid(d))   # 🧠 اللي اتستخدم أو اتحفظ قبل كده مايتقترحش تاني
+    old_titles, old_refs = ideamem.avoid_titles(mem, "idea"), ideamem.refs(mem, "idea")
+    items, dropped, repeats = [], [], []
+    for attempt in range(2):
         if atlas.mock_mode():
             raw = fz.mock_ideas(3, k + attempt * 3, d["template"].get("name", ""))
         else:
             rej = ("\nالأفكار دي اترفضت، اعمل غيرها مختلفة عنها: " + " · ".join(f"«{x['title']}» ({x['why_out']})" for x in dropped)) if dropped else ""
             raw = flow_llm(fz.ideas_messages(flow_brand(brain, d["template"]["name"]), fz.prefs_text(brain), flow_tpl(d), flow_assets_list(d),
                                              3 + (1 if gate else 0) - len(items) if attempt else 3 + (1 if gate else 0),
-                                             (avoid if more else []) + [x["title"] for x in items + dropped], hint, d.get("season") or "",
+                                             (avoid if more else []) + old_titles + [x["title"] for x in items + dropped + repeats], hint, d.get("season") or "",
                                              (algo.idea_gate_rule(brain) + rej) if gate else ""), "الأفكار")
-        for it in flow_parse_ideas(raw):
+        got, rep = ideamem.fresh("idea", flow_parse_ideas(raw), old_refs + [ideamem.entry("idea", x) for x in items + ((d.get("ideas") or []) if more else [])])
+        repeats += rep
+        for it in got:
             if gate:
                 why = algo.idea_gate(it, brain)
                 if why:
@@ -20708,8 +20741,8 @@ def flow_gen_ideas(fid: str, hint: str = "", more: bool = False) -> None:
             break
     items = sorted(items, key=lambda x: -((x.get("heat") or {}).get("avg") or 0))[:3] if gate else items
     if not items:
-        raise HTTPException(400, "المخ مرجعش أفكار، جرّب تاني")
-    flow_update(fid, lambda x: x.update(ideas=(x.get("ideas") or []) + items if more else items, ideas_dropped=dropped[:6]))
+        raise HTTPException(400, "كل الأفكار اللي طلعت شبه حاجات استخدمتها أو حفظتها قبل كده. جرّب «وجّه المخ» بموضوع مختلف" if repeats else "المخ مرجعش أفكار، جرّب تاني")
+    flow_update(fid, lambda x: x.update(ideas=(x.get("ideas") or []) + items if more else items, ideas_dropped=dropped[:6], ideas_repeats=len(repeats)))
 
 
 def flow_parse_ideas(raw: dict) -> list[dict]:
@@ -20734,6 +20767,10 @@ def flow_parse_ideas(raw: dict) -> list[dict]:
     return items
 
 
+def flow_fresh_scen(d: dict, items: list[dict], more: bool = False) -> tuple[list[dict], list[dict]]:
+    return ideamem.fresh("scenario", items, ideamem.refs(mem_load(mem_cid(d)), "scenario"))
+
+
 def flow_gen_scenarios(fid: str, hint: str = "", more: bool = False) -> None:
     d = flow_load(fid)
     brain = flow_brain(d)
@@ -20749,11 +20786,20 @@ def flow_gen_scenarios(fid: str, hint: str = "", more: bool = False) -> None:
         raw = fz.mock_scenarios(d["format"], 2, d.get("episodes"))
     else:
         raw = flow_llm(fz.scenarios_messages(flow_brand(brain, idea_txt), fz.prefs_text(brain), flow_tpl(d), flow_assets_list(d), idea_txt,
-                                             d["format"], d.get("episodes") or "auto", [c["name"] for c in d.get("cast") or []], 2, avoid if more else [], hint),
+                                             d["format"], d.get("episodes") or "auto", [c["name"] for c in d.get("cast") or []], 2,
+                                             (avoid if more else []) + ideamem.avoid_titles(mem_load(mem_cid(d)), "scenario"), hint),
                        "السيناريوهات")
     items = [{**s, "id": uuid.uuid4().hex[:8]} for s in (raw.get("scenarios") or [])[:4] if isinstance(s, dict)]
+    items, rep = flow_fresh_scen(d, items, more)
+    if rep and not items and not atlas.mock_mode():   # كلهم شبه حاجات اتستخدمت: مرة كمان بعناوينهم في «تجنّب»
+        raw = flow_llm(fz.scenarios_messages(flow_brand(brain, idea_txt), fz.prefs_text(brain), flow_tpl(d), flow_assets_list(d), idea_txt,
+                                             d["format"], d.get("episodes") or "auto", [c["name"] for c in d.get("cast") or []], 2,
+                                             avoid + [x.get("title", "") for x in rep] + ideamem.avoid_titles(mem_load(mem_cid(d)), "scenario"), hint), "السيناريوهات")
+        items, rep2 = flow_fresh_scen(d, [{**s, "id": uuid.uuid4().hex[:8]} for s in (raw.get("scenarios") or [])[:4] if isinstance(s, dict)], more)
+        rep += rep2
     if not items:
-        raise HTTPException(400, "المخ مرجعش سيناريوهات، جرّب تاني")
+        raise HTTPException(400, "كل السيناريوهات اللي طلعت شبه حاجات استخدمتها قبل كده. جرّب «وجّه المخ» بفكرة مختلفة" if rep else "المخ مرجعش سيناريوهات، جرّب تاني")
+    flow_update(fid, lambda x: x.update(scen_repeats=len(rep)))
     if algo.mode_on(brain):   # ⚡ وضع الخوارزمية: كل سيناريو بيتفحص بالـ ١٥ بند والضعيف بيتصلّح قبل ما العميل يشوفه
         if atlas.mock_mode():
             fixed = {"scenarios": [{"score": 84, "checks": [{"key": "payoff", "score": 9}], "fixes": ["النتيجة اتنقلت لآخر مشهد", "اتضافت جملة قفل بعد الهوك"],
@@ -20889,10 +20935,11 @@ def flow_gen_scripts(fid: str, d: dict, brain, idea_txt: str, avoid: list[str], 
         raw = fz.mock_scripts(schema, live["scenes"], 2)
     else:
         raw = flow_llm(fz.motion_script_messages(flow_brand(brain, idea_txt), fz.prefs_text(brain), flow_tpl(d), schema, live["scenes"], idea_txt, lang_label,
-                                                 dub.GUIDES.get(lang, ""), dub.CHARS_PER_SEC, 2, avoid, hint), "السكريبت")
-    items = [{**s, "id": uuid.uuid4().hex[:8]} for s in fz.clean_scripts(raw, schema, live["scenes"])]
+                                                 dub.GUIDES.get(lang, ""), dub.CHARS_PER_SEC, 2, avoid + ideamem.avoid_titles(mem_load(mem_cid(d)), "scenario"), hint), "السكريبت")
+    items, rep = flow_fresh_scen(d, [{**s, "id": uuid.uuid4().hex[:8]} for s in fz.clean_scripts(raw, schema, live["scenes"])], more)
     if not items:
-        raise HTTPException(400, "المخ مرجعش سكريبت، جرّب تاني")
+        raise HTTPException(400, "كل السكريبتات اللي طلعت شبه حاجات استخدمتها قبل كده. جرّب «وجّه المخ» بفكرة مختلفة" if rep else "المخ مرجعش سكريبت، جرّب تاني")
+    flow_update(fid, lambda x: x.update(scen_repeats=len(rep)))
     flow_update(fid, lambda x: x.update(lang=lang, scenarios=(x.get("scenarios") or []) + items if more else items))
 
 
@@ -20988,6 +21035,7 @@ def flow_pick_idea(fid: str, body: FlowPickIn):
         code = d["template"].get("kind") in ("motion", "typo", "phone")
         d.update(idea=it, stage="scenario" if code else "format", scenarios=[], scenario=None, **({"format": "reel"} if code else {}))
     d = flow_update(fid, fn)
+    mem_update(mem_cid(d), lambda m: ideamem.mark_used(m, "idea", d["idea"], fid, now()))
     if d["template"].get("kind") in ("motion", "typo", "phone"):
         flow_job(fid, "scenarios", lambda: flow_gen_scenarios(fid))
     return flow_to_dict(fid, flow_load(fid))
@@ -21074,7 +21122,77 @@ def flow_pick_scenario(fid: str, body: FlowPickIn):
         d.update(scenario=it, stage="voice" if code else "generate" if kd == "typo" else "shoot" if kd == "phone" else "cast", **({"vo_track": None} if code else {}))
         if code:
             d["params"] = flow_motion_params(d)
-    return flow_to_dict(fid, flow_update(fid, fn))
+    d = flow_update(fid, fn)
+    mem_update(mem_cid(d), lambda m: ideamem.mark_used(m, "scenario", d["scenario"], fid, now()))
+    return flow_to_dict(fid, d)
+
+
+# 🔖 «احفظها لبعدين»: فكرة أو سيناريو عجبك ومش هتستخدمه دلوقتي، يتحفظ في مكتبة ومايتقترحش تاني لحد ما تستخدمه
+class FlowSaveIn(BaseModel):
+    kind: str = "idea"   # idea · scenario
+    id: str
+
+
+def saved_to_dict(s: dict) -> dict:
+    it = s["item"]
+    return {"id": s["id"], "kind": s["kind"], "title": it.get("title") or "", "hook": it.get("hook") or "", "text": (it.get("idea") or it.get("summary") or "")[:400],
+            "template": s.get("template") or {}, "format": s.get("format") or "", "idea_title": (s.get("idea") or {}).get("title") or "", "at": s.get("at")}
+
+
+@app.post("/api/flows/{fid}/save-later")
+def flow_save_later(fid: str, body: FlowSaveIn):
+    d = flow_load(fid)
+    kind = "scenario" if body.kind == "scenario" else "idea"
+    it = next((x for x in d.get("ideas" if kind == "idea" else "scenarios") or [] if x.get("id") == body.id), None)
+    if not it:
+        raise HTTPException(404, "مش لاقيها")
+    item = {"id": uuid.uuid4().hex[:10], "kind": kind, "item": {k: v for k, v in it.items() if k != "id"}, "at": now(),
+            "template": {k: d["template"].get(k) for k in ("id", "name", "kind")}, "format": d.get("format") or "",
+            **({"idea": {k: v for k, v in (d.get("idea") or {}).items() if k != "id"}} if kind == "scenario" else {})}
+
+    def fn(m):
+        e = ideamem.entry(kind, item["item"])
+        if not any(x["kind"] == kind and ideamem.similar(ideamem.entry(kind, x["item"]), e) for x in m.get("saved") or []):
+            m["saved"] = ([*(m.get("saved") or []), item])[-ideamem.SAVED_MAX:]
+    mem_update(mem_cid(d), fn)
+    flow_update(fid, lambda x: x.update(saved_ids=list(dict.fromkeys([*(x.get("saved_ids") or []), body.id]))[-50:]))
+    return flow_to_dict(fid, flow_load(fid))
+
+
+@app.get("/api/flows/{fid}/saved")
+def flow_saved(fid: str):
+    """مكتبة «لبعدين» بتاعة العميل: الأفكار تنفع في أي قالب، والسيناريو في نفس القالب بس."""
+    d = flow_load(fid)
+    m = mem_load(mem_cid(d))
+    return [{**saved_to_dict(s), "here": s["kind"] == "idea" or (s.get("template") or {}).get("id") == d["template"].get("id")}
+            for s in reversed(m.get("saved") or [])]
+
+
+@app.delete("/api/flows/{fid}/saved/{sid}")
+def flow_saved_delete(fid: str, sid: str):
+    d = flow_load(fid)
+    mem_update(mem_cid(d), lambda m: m.update(saved=[s for s in m.get("saved") or [] if s["id"] != sid]))
+    return flow_saved(fid)
+
+
+@app.post("/api/flows/{fid}/use-saved/{sid}")
+def flow_use_saved(fid: str, sid: str):
+    """استخدم حاجة من «لبعدين»: الفكرة بتتختار، والسيناريو بيتختار هو والفكرة بتاعته."""
+    d = flow_load(fid)
+    flow_idle(d)
+    s = next((x for x in mem_load(mem_cid(d)).get("saved") or [] if x["id"] == sid), None)
+    if not s:
+        raise HTTPException(404, "مش موجودة في المحفوظات")
+    if s["kind"] == "idea":
+        it = {**s["item"], "id": uuid.uuid4().hex[:8]}
+        flow_update(fid, lambda x: x.update(ideas=[it, *(x.get("ideas") or [])]))
+        return flow_pick_idea(fid, FlowPickIn(id=it["id"]))
+    if (s.get("template") or {}).get("id") != d["template"].get("id"):
+        raise HTTPException(400, f"السيناريو ده متعمل لقالب «{(s.get('template') or {}).get('name') or ''}»، استخدمه من هناك")
+    sc, idea = {**s["item"], "id": uuid.uuid4().hex[:8]}, {**(s.get("idea") or {"title": s["item"].get("title", "")}), "id": uuid.uuid4().hex[:8]}
+    flow_update(fid, lambda x: x.update(idea=idea, format=s.get("format") or x.get("format") or "reel", scenarios=[sc, *(x.get("scenarios") or [])]))
+    mem_update(mem_cid(d), lambda m: ideamem.mark_used(m, "idea", idea, fid, now()))
+    return flow_pick_scenario(fid, FlowPickIn(id=sc["id"]))
 
 
 @app.get("/api/flows/{fid}/cast-options")

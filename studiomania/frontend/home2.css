@@ -1938,3 +1938,12 @@ audio { width: 100%; }
 .flw-camr figcaption { display: grid; gap: 2px; font-size: 12.5px; }
 .flw-camr figure.failed small { color: #D9473A; }
 .flw-camm label { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+/* 🔖 محفوظاتك لبعدين */
+.flw-saved { margin: 0 0 12px; }
+.flw-saved.open { padding: 12px 14px; border-radius: 14px; background: rgba(127, 127, 127, .08); }
+.flw-saved ul { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 10px; }
+.flw-saved li { display: flex; gap: 12px; align-items: flex-start; justify-content: space-between; padding: 10px 0; border-top: 1px solid rgba(127, 127, 127, .18); }
+.flw-saved li p { margin: 4px 0 0; font-size: 13px; }
+.flw-saved li .flw-acts { flex: none; margin: 0; }
+@media (max-width: 640px) { .flw-saved li { flex-direction: column; } }
