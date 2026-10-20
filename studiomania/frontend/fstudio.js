@@ -154,7 +154,7 @@ const FrameStudioPage = (() => {
     const w = S.el;
     if (!w) return;
     const y = w.closest(".nh-scroll")?.scrollTop;
-    w.innerHTML = S.d ? projectView(S.d) : listView();
+    setHTML(w, S.d ? projectView(S.d) : listView());   // من غير وميض وهو شغال
     if (y != null) w.closest(".nh-scroll").scrollTop = y;
   }
 

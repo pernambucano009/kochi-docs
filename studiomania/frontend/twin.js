@@ -27,7 +27,7 @@ function twRender() {
     <form class="tw-new" data-twnew><input name="name" placeholder="اسم الشخص" required maxlength="80">
       <label class="tw-consent"><input type="checkbox" name="consent" required> ده أنا، أو معايا إذن صريح من الشخص إننا نعمل نسخة منه</label>
       <button class="btn primary sm">＋ نسخة جديدة</button></form></aside>`;
-  el.innerHTML = `<div class="car-layout">${side}<section class="tw-body">${tw.cur ? twBody(tw.cur) : `<div class="panel"><p class="muted">اعمل نسخة جديدة من الشمال، وهنمشي معاك خطوة خطوة.</p></div>`}</section></div>`;
+  setHTML(el, `<div class="car-layout">${side}<section class="tw-body">${tw.cur ? twBody(tw.cur) : `<div class="panel"><p class="muted">اعمل نسخة جديدة من الشمال، وهنمشي معاك خطوة خطوة.</p></div>`}</section></div>`);
 }
 
 function twTips(k) { return `<ul class="tw-tips">${(tw.kit?.tips?.[k] || []).map((x) => `<li>${twe(x)}</li>`).join("")}</ul>`; }

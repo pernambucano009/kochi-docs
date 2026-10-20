@@ -116,7 +116,7 @@ const HekayaPage = (() => {
   function render() {
     if (!S.el) return;
     const keep = S.el.closest(".nh-scroll")?.scrollTop;
-    S.el.innerHTML = S.d ? projectView(S.d) : listView();
+    setHTML(S.el, S.d ? projectView(S.d) : listView());   // من غير وميض وهو شغال
     if (keep != null) S.el.closest(".nh-scroll").scrollTop = keep;
   }
   function poll() {

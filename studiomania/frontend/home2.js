@@ -121,9 +121,13 @@ const NH = (() => {
     settings: () => `<span>${window.ME && window.ME.role !== "admin" ? `رصيدك · <span class="num">${window.ME.credits.total.toLocaleString("en-US")}</span> نقطة`
       : D.money ? `رصيد Atlas · <span class="num">$${D.money.balance.toFixed(2)}</span>` : "المفاتيح والرصيد والعملاء"}</span>`,
   };
-  const side = (id) => `<div class="nh-tile nh-side" data-id="${id}" tabindex="0" role="button" aria-label="${esc(T[id].ar)}">${head(id)}<div class="nh-meta">${META[id]()}</div></div>`;
+  // الرئيسية بسيطة: كل قسم أيقونة واسمه بس، والشرح والحالة بيظهروا في فقاعة لما تقف بالماوس عليه
+  const tipOf = (id, extra = "") => `<span class="nh-tip" role="tooltip"><b>${esc(T[id].ar)}</b><span>${esc(T[id].desc)}</span>${extra ? `<span class="nh-tip-m">${extra}</span>` : ""}</span>`;
+  const sideIc = (id) => (GLKEY[id] ? `<span class="nh-glt">${glImg(GLKEY[id])}</span>` : iconOf(T[id].icon));
+  const side = (id) => `<div class="nh-tile nh-side" data-id="${id}" tabindex="0" role="button" aria-label="${esc(T[id].ar)}">
+      <span class="nh-sic">${sideIc(id)}</span><b class="nh-sname">${esc(T[id].ar)}</b>${tipOf(id, META[id]())}</div>`;
   const cta = () => `<div class="nh-tile nh-cta nh-gen" data-id="create" tabindex="0" role="button" aria-label="ابدأ مشروع جديد">
-      <div class="nh-head"><div class="nh-name"><span class="latin">Create</span><b>ابدأ مشروع جديد</b></div>${gi("create")}</div></div>`;
+      <div class="nh-head"><div class="nh-name"><span class="latin">Create</span><b>ابدأ مشروع جديد</b></div>${gi("create")}</div>${tipOf("create")}</div>`;
   // «كمّل من مكان ما وقفت» (بقى مكان «شغّال عليه»): الزرار كله بيفتح كل المشاريع، والتشغيل اللي جنبه بيكمّل آخر مشروع على طول
   function contHTML() {
     const p = [...D.work].sort((a, b) => String(b.updated_at || b.created_at || "").localeCompare(String(a.updated_at || a.created_at || "")))[0];
@@ -132,10 +136,11 @@ const NH = (() => {
     const attr = !p ? "" : p.section ? `data-proj="${esc(p.id)}"` : `data-folder="${esc(p.id)}"`;
     const n = D.work.length, r = D.work.filter((x) => x.render_status === "rendering").length;
     const count = n ? `${n} مشروع${r ? ` · ${r} بيتصدّر` : ""}` : "";
-    return `<div class="nh-cont-wrap nh-gen"><div class="nh-tile nh-cont" data-id="progress" tabindex="0" role="button" aria-label="كل المشاريع">
-        ${p ? `<span class="nh-cplay" data-cont ${attr} role="button" tabindex="0" title="كمّل ${esc(p.name)}" aria-label="كمّل آخر مشروع"><svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg></span>` : ""}
-        <span class="nh-ctxt"><small>كمّل من مكان ما وقفت${count ? ` · ${count}` : ""}</small><b>${p ? `${esc(p.name)} · ${esc(where)}` : "كل مشاريعك هنا"}</b></span>
-        <span class="nh-call" aria-hidden="true">كل المشاريع ←</span></div></div>`;
+    // «شغّال عليه»: أيقونة واسم، وآخر مشروع وعدد المشاريع في الفقاعة. زرار التشغيل الصغير بيكمّل آخر مشروع على طول
+    return `<div class="nh-tile nh-cont nh-cont-ic" data-id="progress" tabindex="0" role="button" aria-label="شغّال عليه">
+        <span class="nh-sic"><span class="nh-glt">${glImg("progress")}</span></span><b class="nh-sname">شغّال عليه</b>
+        ${p ? `<span class="nh-cplay" data-cont ${attr} role="button" tabindex="0" aria-label="كمّل آخر مشروع"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg></span>` : ""}
+        ${tipOf("progress", p ? `${count ? `${count} · ` : ""}آخر مشروع: ${esc(p.name)} · ${esc(where)}${p ? " · ▶ يكمّله على طول" : ""}` : "مفيش مشاريع لسه")}</div>`;
   }
 
   // ---------- الهيكل ----------
@@ -211,12 +216,17 @@ const NH = (() => {
   const bento = document.getElementById("nhBento"), home = document.getElementById("nhHome");
   const page = document.getElementById("nhPage"), pGrid = document.getElementById("nhPGrid"), pTitle = document.getElementById("nhPTitle");
 
+  // الأقسام بتتبني مرة واحدة، وبعد كده بيتغيّر اللي اتغيّر بس (الأرقام في الفقاعات): مفيش حاجة بتختفي وترجع
   function renderTiles() {
-    const stageEl = document.getElementById("nhStage");
-    const html = `<nav class="nh-col nh-col-r nh-gen" aria-label="الأقسام">${SIDE_R.map(side).join("")}</nav>`
-      + `<nav class="nh-col nh-col-l nh-gen" aria-label="الأقسام">${SIDE_L.map(side).join("")}</nav>` + cta() + contHTML();
-    if (stageEl) { bento.querySelectorAll(":scope > .nh-gen").forEach((t) => t.remove()); bento.insertAdjacentHTML("afterbegin", html); }
-    else bento.innerHTML = html + `<section class="nh-stage" id="nhStage" aria-live="polite"><div class="slot" id="nhSlotA"></div><div class="slot out" id="nhSlotB"></div></section>`;
+    if (!document.getElementById("nhStage")) {
+      bento.innerHTML = `<nav class="nh-col nh-col-r nh-gen" aria-label="الأقسام"></nav><nav class="nh-col nh-col-l nh-gen" aria-label="الأقسام"></nav>`
+        + `<div class="nh-cta-wrap nh-gen"></div><div class="nh-cont-wrap nh-gen"></div>`
+        + `<section class="nh-stage" id="nhStage" aria-live="polite"><div class="nh-stage-ph" aria-hidden="true"></div><div class="slot" id="nhSlotA"></div><div class="slot out" id="nhSlotB"></div></section>`;
+    }
+    setHTML(bento.querySelector(".nh-col-r"), SIDE_R.map(side).join(""));
+    setHTML(bento.querySelector(".nh-col-l"), SIDE_L.map(side).join(""));
+    setHTML(bento.querySelector(".nh-cta-wrap"), cta());
+    setHTML(bento.querySelector(".nh-cont-wrap"), contHTML());
     bento.querySelectorAll(".nh-tile").forEach(addSnake);
     const c = clientx?.cur;
     document.getElementById("nhClientAv").innerHTML = brandMark();
@@ -228,6 +238,7 @@ const NH = (() => {
     if (el.querySelector(":scope > .nh-snake")) return;
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svg.setAttribute("class", "nh-snake");
+    svg.setAttribute("data-keep", "");   // التحديث مايشيلوش
     svg.innerHTML = ["s3", "s2", "s1"].map((c) => `<rect class="${c}" pathLength="1000"/>`).join("");
     el.prepend(svg);
     const fit = () => {
@@ -250,10 +261,10 @@ const NH = (() => {
     if (!key) return `${big("app")}<h1 class="latin">SimsimKit</h1><div class="ar">استوديو المحتوى والفيديو</div>`;
     if (key.startsWith("f:")) {
       const f = D.folders.find((x) => x.id === key.slice(2)), s = folderStage(f);
-      return `${big("pulse")}<h1 class="latin">Continue</h1><div class="ar">${esc(f?.name)}</div><p>الخطوة ${s.done + 1} من 5: ${STEPS5[s.done] || ""}. دوس عشان تكمّل.</p>`;
+      return `${big("pulse")}<h1 class="latin">Continue</h1><div class="ar">${esc(f?.name)}</div>`;
     }
     const t = T[key];
-    return `${big(t.icon)}<h1 class="latin">${t.en}</h1><div class="ar">${esc(t.ar)}</div><p>${esc(t.desc)}</p>`;
+    return `${big(t.icon)}<h1 class="latin">${t.en}</h1><div class="ar">${esc(t.ar)}</div>`;   // الاسم بس، والشرح في فقاعة القسم
   }
   // وقت الزوم وشوية بعد الرجوع: المجسّم بيفضل زي ما هو مهما الماوس واقف فين، وآخر حاجة الماوس وقف عليها بتتطبق بعدها
   let stageLock = false, pendingKey = null;
@@ -266,6 +277,8 @@ const NH = (() => {
 
     shown = key;
     GL?.show(!key ? "app" : key.startsWith("f:") ? "progress" : GLKEY[key] || "app");
+    const ph = document.querySelector(".nh-stage-ph:not(.off)");
+    if (ph) ph.innerHTML = glImg(!key ? "app" : key.startsWith("f:") ? "progress" : GLKEY[key] || "app");
     const next = slots[1 - live];
     next.innerHTML = stageHTML(key);
     next.classList.remove("out");
@@ -278,6 +291,9 @@ const NH = (() => {
   shown = firstKey;
   slots[0].innerHTML = stageHTML(firstKey);
   GL?.show(GLKEY[firstKey] || "app");
+  // لحد ما المجسّم الـ 3D يجهز (أول تحميل أو ريفرش) نفس الأيقونة بتبان صورة في مكانه، فالنص عمره ما يبقى فاضي
+  { const ph = document.querySelector(".nh-stage-ph");
+    if (ph && GL) { ph.innerHTML = glImg(GLKEY[firstKey] || "app"); GL.onReady(() => ph.classList.add("off")); } else ph?.remove(); }
   // الماوس لما يعدّي على مربع في طريقه لمربع تاني مش بيغيّر المجسّم (عشان ميبقاش فيه تقطيع)
   let leaveT, hoverT;
   bento.addEventListener("pointerover", (e) => {

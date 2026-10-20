@@ -55,6 +55,55 @@ function escapeHtml(s) {
   return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
+// 🧊 تحديث الشاشة من غير وميض: بدل ما نمسح الصندوق كله ونكتبه تاني (فالصور والفيديوهات بتتحمّل من الأول والأنيميشن بيبدأ تاني)،
+// بنغيّر بس اللي اتغيّر فعلًا. الخانة اللي انت بتكتب فيها، والفيديو اللي شغّال، و<details> اللي فتحتها بيفضلوا زي ما هم.
+function setHTML(el, html) {
+  if (!el) return;
+  const t = document.createElement("template");
+  t.innerHTML = html;
+  morphKids(el, t.content);
+}
+function morphKids(a, b) {
+  // العناصر اللي عليها data-keep (زي إطار السنيك المرسوم بالكود) بتفضل زي ما هي ومش بتدخل في المقارنة
+  const an = [...a.childNodes].filter((n) => !(n.nodeType === 1 && n.hasAttribute("data-keep"))), bn = [...b.childNodes];
+  bn.forEach((y, i) => {
+    const x = an[i];
+    if (!x) a.appendChild(y);
+    else if (morphSame(x, y)) morphNode(x, y);
+    else a.replaceChild(y, x);
+  });
+  for (let i = bn.length; i < an.length; i++) an[i].remove();
+}
+function morphSame(x, y) {
+  if (x.nodeType !== y.nodeType) return false;
+  if (x.nodeType !== 1) return true;
+  if (x.tagName !== y.tagName) return false;
+  if (/^(IMG|VIDEO|AUDIO|IFRAME|SOURCE)$/.test(x.tagName)) return (x.getAttribute("src") || "") === (y.getAttribute("src") || "");
+  return (x.id || "") === (y.id || "");
+}
+function morphNode(x, y) {
+  if (x.nodeType !== 1) { if (x.nodeValue !== y.nodeValue) x.nodeValue = y.nodeValue; return; }
+  const busy = x === document.activeElement || x.contains?.(document.activeElement) && x.isContentEditable;
+  const dirty = (x.tagName === "INPUT" || x.tagName === "TEXTAREA") && x.value !== x.defaultValue;   // كتبت فيها ولسه ماتحفظتش
+  for (const at of [...x.attributes]) if (!y.hasAttribute(at.name) && !(at.name === "open" && x.tagName === "DETAILS")) x.removeAttribute(at.name);
+  for (const at of [...y.attributes]) if (x.getAttribute(at.name) !== at.value) x.setAttribute(at.name, at.value);
+  if (x.tagName === "INPUT" && !busy) {
+    if (x.type === "checkbox" || x.type === "radio") x.checked = y.hasAttribute("checked");
+    else if (!dirty) x.value = y.getAttribute("value") || "";
+  }
+  if (x.tagName === "TEXTAREA") {
+    if (!busy && !dirty) { x.textContent = y.textContent; x.value = y.value; }
+    return;
+  }
+  if (x.tagName === "SELECT") {
+    if (!busy) { morphKids(x, y); const o = y.querySelector("option[selected]"); x.value = o ? o.value : (y.options[0]?.value ?? x.value); }
+    return;
+  }
+  if (busy && x.isContentEditable) return;   // اللي بتكتبه دلوقتي مايتلمسش
+  if (/^(VIDEO|AUDIO|CANVAS|IFRAME|svg)$/.test(x.tagName) && x.childNodes.length) return;
+  morphKids(x, y);
+}
+
 // نفس منطق السيرفر عشان الشاشة تتحدث فورًا
 function buildSegments(duration, cuts, skipped) {
   const points = [0, ...[...cuts].sort((a, b) => a - b), duration];

@@ -549,7 +549,12 @@ window.NHGL = (stage, getClient) => {
       g.children.forEach((c) => { if (c.userData.spin && !reduce.matches) c.rotation.z = t * .25; });
     }
     renderer.render(scene, camera);
+    // أول مرة المجسّم الحالي يبان كله (والصورة بتاعته اتحمّلت): الصورة المؤقتة اللي مكانه بتختفي
+    if (!readyDone && cur && cur.userData.a > .9 && (!cur.userData.img || cur.children[0].material.visible)) { readyDone = true; readyCbs.splice(0).forEach((f) => f()); }
   }
+  let readyDone = false;
+  const readyCbs = [];
+  function onReady(f) { if (readyDone) f(); else readyCbs.push(f); }
   function loop() {
     if (!document.hidden && stage.offsetParent !== null && !document.body.classList.contains("stage-settled")) frame();
     requestAnimationFrame(loop);
@@ -591,5 +596,5 @@ window.NHGL = (stage, getClient) => {
     renderer.render(scene, camera);
     return { url: c.toDataURL("image/png"), rect: { x: cr.left + x0, y: cr.top + y0, w, h } };
   }
-  return { show, theme, brand, hold, snap, rewind };
+  return { show, theme, brand, hold, snap, rewind, onReady };
 };

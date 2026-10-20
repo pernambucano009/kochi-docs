@@ -80,7 +80,7 @@ const Ref2PromptPage = (() => {
     if (!S.el) return;
     const sc = S.el.closest(".nh-scroll"), y = sc?.scrollTop;
     const open = [...S.el.querySelectorAll("details[open]")].map((x) => x.querySelector("summary")?.textContent);
-    S.el.innerHTML = S.d ? projectView(S.d) : listView();
+    setHTML(S.el, S.d ? projectView(S.d) : listView());   // من غير وميض وهو شغال
     S.el.querySelectorAll("details").forEach((x) => { if (open.includes(x.querySelector("summary")?.textContent)) x.open = true; });
     if (sc) sc.scrollTop = y;
   }

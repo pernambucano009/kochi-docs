@@ -135,7 +135,10 @@ function renderTpl() {
   const box = $("labTpl");
   if (tplx.host === "studio" && !tplx.cur) return tsHome();   // 🎬 قسم القوالب: المعرض بتاعه
   if (tplx.host === "studio") box.hidden = false;
-  box.innerHTML = tplx.cur ? tvDetail(tplx.cur) : tplHome();
+  // نفس الفيديو: نغيّر اللي اتغيّر بس (من غير وميض وهو بيرسم المشاهد)
+  if (tplx.cur && box.dataset.tv === tplx.cur.id) setHTML(box, tvDetail(tplx.cur));
+  else box.innerHTML = tplx.cur ? tvDetail(tplx.cur) : tplHome();
+  box.dataset.tv = tplx.cur?.id || "";
 }
 const tplBack = () => (tplx.host === "studio" ? tsHome() : openTpl());
 

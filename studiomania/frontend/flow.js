@@ -669,12 +669,12 @@ const Flow = (() => {
       box = S.el.querySelector(".flw-box");
       S.html = {};
     }
-    if (S.html.head !== head) { box.querySelector(".flw-head").innerHTML = head; S.html.head = head; }
+    if (S.html.head !== head) { setHTML(box.querySelector(".flw-head"), head); S.html.head = head; }
     if (S.html.main !== main) {
       const m = box.querySelector(".flw-main"), scroll = m.scrollTop;
       // اللي بيكتبه العميل في خانة مفتوحة ميضيعش لو الشاشة اتحدثت
       const keep = [...m.querySelectorAll("input[id], textarea[id]")].map((el) => [el.id, el.value]);
-      m.innerHTML = main;
+      if (S.stage === st) setHTML(m, main); else m.innerHTML = main;   // نفس الخطوة: نغيّر اللي اتغيّر بس (من غير وميض)
       keep.forEach(([id, v]) => { const el = m.querySelector(`#${id}`); if (el && !el.value) el.value = v; });
       if (S.stage === st) m.scrollTop = scroll; else m.scrollTop = 0;
       S.html.main = main;

@@ -214,7 +214,7 @@ body.stage-settled #nh { visibility: hidden; }
   .nh-bento { grid-template-columns: 1fr; grid-template-rows: none; grid-template-areas: none; }
   .nh-bento > * { grid-area: auto !important; }
   .nh-bento > .nh-stage { min-height: 300px; order: -3; }
-  .nh-bento > .nh-cta { order: -2; }
+  .nh-bento > .nh-cta-wrap { order: -2; }
   .nh-bento > .nh-cont-wrap { order: -1; }
   .nh-col { padding-block: 0; }
   .nh-col, .nh-col-l { align-items: stretch; }
@@ -2113,3 +2113,46 @@ label.dim { opacity: .4; }
 .pl-count b { font-size: 34px; font-weight: 700; color: var(--nh-accent, #E5613E); }
 .pl-by { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; }
 .pl-by span { padding: 4px 10px; border-radius: 999px; background: rgba(127, 127, 127, .1); font-size: 12px; }
+/* 🏠 الرئيسية البسيطة: كل قسم أيقونة واسمه بس، والشرح في فقاعة وقت الهوفر */
+.nh-cta-wrap { grid-area: c; justify-self: center; display: flex; justify-content: center; }
+#nh .nh-tile { position: relative; }
+#nh .nh-side { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 14px 18px; margin: -6px -10px; text-align: center; }
+#nh .nh-col-l .nh-side, #nh .nh-col-r .nh-side { align-items: center; text-align: center; }
+#nh .nh-sic { width: 74px; height: 74px; display: grid; place-items: center; transition: transform .3s var(--nh-ease); }
+#nh .nh-sic .nh-glt { width: 100%; height: 100%; }
+#nh .nh-sic .gi, #nh .nh-sic .nh-plate { position: static; opacity: 1; width: 52px; height: 52px; }
+#nh .nh-tile:hover .nh-sic, #nh .nh-tile:focus-visible .nh-sic { transform: translateY(-3px) scale(1.06); }
+#nh .nh-sname { font-size: 17px; font-weight: 500; line-height: 1.3; }
+/* الفقاعة */
+#nh .nh-tip { position: absolute; top: calc(100% + 6px); left: 50%; translate: -50% 4px; z-index: 20; width: max-content; max-width: 260px; display: grid; gap: 4px;
+  padding: 10px 13px; border-radius: 14px; background: #181718; color: #fff; text-align: start; font-size: 12.5px; line-height: 1.55;
+  box-shadow: 0 12px 30px rgba(24, 23, 24, .22); opacity: 0; pointer-events: none; transition: opacity .18s, translate .18s; }
+#nh .nh-tip b { font-size: 13.5px; font-weight: 600; }
+#nh .nh-tip > span { color: rgba(255, 255, 255, .78); }
+#nh .nh-tip .nh-tip-m { color: #F6B29E; }
+#nh .nh-tip .nh-tip-m * { color: inherit !important; background: none !important; }
+#nh .nh-tip .nh-mbar { display: none; }
+#nh .nh-tile:hover > .nh-tip, #nh .nh-tile:focus-visible > .nh-tip { opacity: 1; translate: -50% 0; }
+#nh .nh-cta > .nh-tip { top: calc(100% + 10px); }
+#nh .nh-cont-ic > .nh-tip { top: auto; bottom: calc(100% + 8px); }
+:root[data-nh-theme="dark"] #nh .nh-tip { background: #F1F1F3; color: #141416; }
+:root[data-nh-theme="dark"] #nh .nh-tip > span { color: rgba(20, 20, 22, .72); }
+:root[data-nh-theme="dark"] #nh .nh-tip .nh-tip-m { color: #C2482E; }
+/* «شغّال عليه» تحت: أيقونة واسم */
+#nh .nh-tile.nh-cont.nh-cont-ic { display: flex; flex-direction: row; align-items: center; gap: 10px; padding: 6px 18px 6px 8px; border-radius: 99px; }
+[dir="rtl"] #nh .nh-tile.nh-cont.nh-cont-ic { padding: 6px 8px 6px 18px; }
+#nh .nh-cont-ic .nh-sic { width: 40px; height: 40px; }
+#nh .nh-cont-ic .nh-sname { font-size: 14px; }
+#nh .nh-cont-ic .nh-cplay { width: 28px; height: 28px; }
+/* المسرح: الاسم بس، وصورة مؤقتة للأيقونة لحد ما المجسّم يجهز */
+#nh .nh-stage-ph { position: absolute; left: 50%; top: 40%; translate: -50% -50%; height: 54%; aspect-ratio: 1; z-index: 2; pointer-events: none; display: grid; place-items: center; transition: opacity .35s; }
+#nh .nh-stage-ph img { width: 100%; height: 100%; object-fit: contain; }
+#nh .nh-stage-ph .ic-d, :root[data-nh-theme="dark"] #nh .nh-stage-ph .ic-l { display: none; }
+:root[data-nh-theme="dark"] #nh .nh-stage-ph .ic-d { display: block; }
+#nh .nh-stage-ph.off { opacity: 0; }
+#nh .nh-sic .nh-glt { display: grid; place-items: center; overflow: hidden; }
+#nh .nh-sic img { max-width: 100%; max-height: 100%; }
+/* الفقاعة بتفضل جوه الشاشة: أقسام اليمين بتفتح لجوه من اليمين، وأقسام الشمال من الشمال */
+#nh .nh-col-r .nh-tip { left: auto; right: 0; translate: 0 4px; }
+#nh .nh-col-l .nh-tip { left: 0; right: auto; translate: 0 4px; }
+#nh .nh-col-r .nh-tile:hover > .nh-tip, #nh .nh-col-l .nh-tile:hover > .nh-tip, #nh .nh-col-r .nh-tile:focus-visible > .nh-tip, #nh .nh-col-l .nh-tile:focus-visible > .nh-tip { translate: 0 0; }
