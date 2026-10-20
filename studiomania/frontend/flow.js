@@ -555,12 +555,15 @@ const Flow = (() => {
       <p class="flw-sub">بنبعت ${sec} ثواني من لقطة لكل موديل على Atlas ممكن يصوّر نفس المشهد من مكان تاني، وتشوف النتايج جنب بعض وتقرر أنهي ينفع.</p>
       ${cm.models.length ? "" : `<p class="flw-empty bad">ملقتش موديلات تعديل فيديو في كتالوج Atlas.</p>`}
       <div class="flw-camf"><label>اللقطة <select data-camshot>${shots.map((x) => `<option value="${x.i}" ${S.camShot == x.i ? "selected" : ""}>${x.i + 1} · ${esc(CAMNAME[x.cam] || x.cam || "")} · ${secs(x.start)}</option>`).join("")}</select></label>
-        <label>الزاوية <select data-camangle>${Object.entries(cm.angles).map(([k, t]) => `<option value="${k}" ${(S.camAngle || "side") === k ? "selected" : ""}>${esc(t)}</option>`).join("")}</select></label></div>
+        <label>الزاوية <select data-camangle>${Object.entries(cm.angles).map(([k, t]) => `<option value="${k}" ${(S.camAngle || "side") === k ? "selected" : ""}>${esc(t)}</option>`).join("")}</select></label>
+        <label title="صور الشخص من كذا اتجاه بتخلّي الموديل ميخمّنش شكله من الزاوية الجديدة">📷 صور الشخص <select data-camtwin><option value="">من غير صور</option>
+          ${(S.camTwins || []).filter((t) => t.ready?.photos).map((t) => `<option value="${esc(t.id)}" ${S.camTwin === t.id || (!S.camTwin && S.camTwin !== "" && t === S.camTwins.find((x) => x.ready?.photos)) ? "selected" : ""}>${esc(t.name)} (${t.ready.photos} صورة)</option>`).join("")}</select></label></div>
+      ${(S.camTwins || []).some((t) => t.ready?.photos) ? "" : `<p class="muted">💡 لو عملت «🪞 نسختي» وصوّرت صورك من كذا اتجاه، تقدر تبعتها مع اللقطة والوش من الزاوية الجديدة هيطلع أدق.</p>`}
       <div class="flw-camm">${cm.models.map((m) => `<label><input type="checkbox" data-cammodel value="${esc(m.model)}" ${!S.camSel || S.camSel.includes(m.model) ? "checked" : ""}>
         ${esc(m.label)} <small class="muted">${m.kind === "ref" ? "مرجع فيديو" : "تعديل فيديو"} · ${m.per_sec ? `$${(m.per_sec * sec * (m.kind === "ref" ? 2 : 1)).toFixed(2)} للتجربة` : "السعر مش معروف"}</small></label>`).join("")}</div>
       <div class="flw-acts"><button type="button" class="flw-btn pri" data-camgo ${cm.models.length ? "" : "disabled"}>جرّب على الموديلات المختارة</button>
         <small class="muted">بيتخصم من الرصيد على قد الموديلات اللي اشتغلت بس.</small></div>
-      ${cb ? `<h4>اللقطة ${cb.shot + 1} · ${esc(cb.angle_ar)}</h4><div class="flw-camr"><figure><video src="/media/ads/flows/${esc(d.id)}/${esc(cb.src)}" controls loop playsinline></video><figcaption><b>الأصل</b></figcaption></figure>${runs}</div>` : ""}</div>`;
+      ${cb ? `<h4>اللقطة ${cb.shot + 1} · ${esc(cb.angle_ar)}${cb.photos ? ` · 📷 ومعاها ${cb.photos} صور للشخص` : " · من غير صور للشخص"}</h4><div class="flw-camr"><figure><video src="/media/ads/flows/${esc(d.id)}/${esc(cb.src)}" controls loop playsinline></video><figcaption><b>الأصل</b></figcaption></figure>${runs}</div>` : ""}</div>`;
   }
   // نتايج تجربة الكاميرا: بنحدّث لحد ما كل الموديلات تخلص
   function campoll() {
@@ -681,7 +684,10 @@ const Flow = (() => {
     }
     if (q("[data-camopen]")) {
       S.camOpen = true; render();
-      if (!S.cam) { try { S.cam = await api("/api/cam-models"); } catch (err) { S.cam = { models: [], angles: {}, seconds: 5 }; toast(err.message, true); } render(); }
+      if (!S.cam) {
+        try { [S.cam, S.camTwins] = await Promise.all([api("/api/cam-models"), api("/api/twins").catch(() => [])]); } catch (err) { S.cam = { models: [], angles: {}, seconds: 5 }; toast(err.message, true); }
+        render();
+      }
       return;
     }
     if (q("[data-camgo]")) {
@@ -691,7 +697,8 @@ const Flow = (() => {
       S.camSel = models;
       S.camShot = +(el.querySelector("[data-camshot]")?.value || 0);
       S.camAngle = el.querySelector("[data-camangle]")?.value || "side";
-      const ok = await call("/cambench", { shot: S.camShot, angle: S.camAngle, models });
+      S.camTwin = el.querySelector("[data-camtwin]")?.value ?? "";
+      const ok = await call("/cambench", { shot: S.camShot, angle: S.camAngle, models, twin: S.camTwin });
       if (ok) campoll();
       return;
     }

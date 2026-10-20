@@ -275,11 +275,15 @@ def camera_candidates() -> list[dict]:
     return out
 
 
-def camera_body(c: dict, video_url: str, prompt: str, dur: float, ratio: str) -> dict:
-    """طلب «صوّر نفس المشهد من زاوية تانية» بأسماء خانات الموديل ده (من الـ schema بتاعه لو موجود)."""
+def camera_body(c: dict, video_url: str, prompt: str, dur: float, ratio: str, images: list[str] | None = None) -> dict:
+    """طلب «صوّر نفس المشهد من زاوية تانية» بأسماء خانات الموديل ده (من الـ schema بتاعه لو موجود).
+    images: صور حقيقية للشخص من كذا اتجاه (من «نسختي»)، عشان الموديل ميخمّنش شكله من الزاوية الجديدة."""
     if c["kind"] == "ref":
-        return {"model": c["model"], "prompt": prompt, "reference_videos": [video_url], "duration": max(4, round(dur)),
+        body = {"model": c["model"], "prompt": prompt, "reference_videos": [video_url], "duration": max(4, round(dur)),
                 "resolution": "720p", "aspect_ratio": ratio, "generate_audio": False}
+        if images:
+            body["reference_images"] = images[:4]
+        return body
     sch = _schema_for(c["model"])
     if sch is None and c.get("schema"):
         try:
@@ -297,4 +301,8 @@ def camera_body(c: dict, video_url: str, prompt: str, dur: float, ratio: str) ->
         name = next((a for a in ALIASES.get(k, (k,)) if a in props), None)
         if name:
             body[name] = _fit(v, props[name])
+    if images:   # الموديل بياخد صور مرجع؟ بنبعتها، ولو لأ بيشتغل بالفيديو بس
+        name = next((a for a in ALIASES["reference_images"] if a in props), None)
+        if name:
+            body[name] = images[:4] if (props.get(name) or {}).get("type") == "array" or name.endswith("s") else images[0]
     return body

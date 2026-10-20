@@ -24469,9 +24469,23 @@ class CamBenchIn(BaseModel):
     shot: int = 0
     angle: str = "side"
     models: list[str] = []
+    twin: str = ""   # صور الشخص من «نسختي» (اختياري، بس بيخلّي الوش من الزاوية الجديدة أدق)
 
 
-def run_cam_try(fid: str, rid: str, cand: dict, clip: Path, angle: str, dur: float) -> None:
+# أنهي صور من «نسختي» تنفع لكل زاوية (أول صورة القدام دايمًا، وبعدها الأقرب للزاوية)
+CAM_PHOTOS = {"high_left": ("front", "l45", "up", "l90"), "low_right": ("front", "r45", "r90", "smile"), "side": ("front", "r45", "r90", "l45"),
+              "wide_back": ("front", "body", "r45", "l45"), "close_front": ("front", "smile", "r45", "l45")}
+
+
+def cam_twin_photos(tid: str, angle: str) -> list[Path]:
+    if not tid:
+        return []
+    t = twin_load(tid)
+    have = {p["angle"]: twin_dir(tid) / p["file"] for p in t.get("photos") or []}
+    return [have[a] for a in CAM_PHOTOS.get(angle, ("front",)) if a in have and have[a].exists()][:4]
+
+
+def run_cam_try(fid: str, rid: str, cand: dict, clip: Path, angle: str, dur: float, photos: list[Path] | None = None) -> None:
     folder = FLOWS_DIR / Path(fid).name
     def setr(**kw):
         def fn(x):
@@ -24485,7 +24499,9 @@ def run_cam_try(fid: str, rid: str, cand: dict, clip: Path, angle: str, dur: flo
             subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(clip), "-vf", "hflip,crop=iw*0.8:ih*0.8,scale=720:-2",
                             "-an", str(dest)], check=True, capture_output=True, timeout=120)
         else:
-            body = vmodels.camera_body(cand, atlas.upload_media(clip), cam_prompt(angle), dur, "9:16")
+            prompt = cam_prompt(angle) + (" The reference photos show this same real person from other angles: use them so the face, hair, "
+                                          "body and clothes look exactly like this person from the new camera position." if photos else "")
+            body = vmodels.camera_body(cand, atlas.upload_media(clip), prompt, dur, "9:16", [atlas.reference_url(p) for p in photos or []])
             atlas.download(atlas.run_model("Video", body, cand["label"], max_seconds=2400, interval=6), dest)
         cost = 0 if atlas.mock_mode() else wallet.charge(wallet.credits((cand.get("per_sec") or 0.3) * dur * (2 if cand["kind"] == "ref" else 1)),
                                                          f"تجربة زاوية كاميرا: {cand['label']}", rid)
@@ -24524,6 +24540,7 @@ def flow_cambench(fid: str, body: CamBenchIn):
         wallet.need(est, "تجربة زاوية الكاميرا")
     except wallet.NoCredits as exc:
         raise HTTPException(402, str(exc)) from None
+    photos = cam_twin_photos(body.twin, body.angle)
     folder = FLOWS_DIR / Path(fid).name
     folder.mkdir(parents=True, exist_ok=True)
     clip = folder / f"camsrc_{uuid.uuid4().hex[:6]}.mp4"
@@ -24532,9 +24549,9 @@ def flow_cambench(fid: str, body: CamBenchIn):
     runs = [{"id": uuid.uuid4().hex[:8], "model": c["model"], "label": c["label"], "per_sec": c.get("per_sec"), "kind": c["kind"],
              "status": "working", "file": None, "error": None} for c in cands]
     flow_update(fid, lambda x: x.update(cambench={"shot": body.shot, "angle": body.angle, "angle_ar": CAM_ANGLES[body.angle][0], "src": clip.name,
-                                                  "dur": dur, "runs": runs, "at": now()}))
+                                                  "dur": dur, "runs": runs, "photos": len(photos), "at": now()}))
     for c, r in zip(cands, runs):
-        threading.Thread(target=run_cam_try, args=(fid, r["id"], c, clip, body.angle, dur), daemon=True).start()
+        threading.Thread(target=run_cam_try, args=(fid, r["id"], c, clip, body.angle, dur, photos), daemon=True).start()
     return flow_to_dict(fid, flow_load(fid))
 
 
