@@ -25406,6 +25406,91 @@ def lib_update(fn, bid: str | None = None) -> dict:
         return d
 
 
+# 📚 مكتبة محتويات البراند: ٤ فولدرات أساسية (صور، فيديوهات، تعليقات صوتية، موسيقى)، وجوه كل واحد فولدرات زي ما تحب.
+# التعليقات الصوتية والموسيقى مربوطة بمكتبة الصوت القديمة (اللي المونتاج بيختار منها): أي حاجة هنا بتظهر هناك والعكس.
+LIB_ROOTS = {"images": ("صور", "image"), "videos": ("فيديوهات", "video"), "voice": ("تعليقات صوتية", "audio"), "music": ("موسيقى", "audio")}
+
+
+def lib_root_for(f: dict) -> str:
+    if f["kind"] == "image":
+        return "images"
+    if f["kind"] == "video":
+        return "videos"
+    return "music" if re.search(r"موسيق|مزيك|music|song|track|بيت", f.get("name") or "", re.I) else "voice"
+
+
+def lib_prepare(d: dict) -> dict:
+    """الفولدرات الأساسية موجودة دايمًا، وأي ملف أو فولدر برّاها بيتنقل جوه المناسب ليه. بيرجّع {النوع: id الفولدر}."""
+    roots = {}
+    for key, (name, _) in LIB_ROOTS.items():
+        f = next((x for x in d["folders"] if x.get("sys") == key), None) \
+            or next((x for x in d["folders"] if not x.get("parent") and not x.get("sys") and lib_.norm(x["name"]) == lib_.norm(name)), None)
+        if not f:
+            f = {"id": lib_.fid(), "name": name, "parent": None}
+            d["folders"].append(f)
+        f.update(sys=key, parent=None)
+        roots[key] = f["id"]
+    ids = set(roots.values())
+    for f in d["files"]:
+        if not f.get("folder") or f["folder"] not in {x["id"] for x in d["folders"]}:
+            f["folder"] = roots[lib_root_for(f)]
+    for x in d["folders"]:
+        if x["id"] in ids or x.get("parent"):
+            continue
+        inside = lib_.descendants(d, x["id"]) | {x["id"]}
+        kinds = [lib_root_for(f) for f in d["files"] if f.get("folder") in inside]
+        x["parent"] = roots[max(set(kinds), key=kinds.count)] if kinds else roots["images"]
+    return roots
+
+
+def lib_root_of(d: dict, folder: str | None) -> str | None:
+    for f in lib_.path_of(d, folder):
+        if f.get("sys"):
+            return f["sys"]
+    return None
+
+
+def lib_audio_link(bid: str, f: dict, kind: str) -> None:
+    """ملف صوت اتحط في «تعليقات صوتية» أو «موسيقى»: بيتسجّل في مكتبة الصوت كمان (المونتاج والقوالب بيختاروا منها)."""
+    src = lib_dir(bid) / f["file"]
+    aid = uuid.uuid4().hex[:12]
+    name = f"{kind}_{aid}{src.suffix.lower()}"
+    try:
+        shutil.copyfile(src, AUDIO_DIR / name)
+        with closing(db()) as conn, conn:
+            conn.execute("INSERT INTO audio (id, kind, name, filename, duration, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                         (aid, kind, f["name"], name, float(f.get("dur") or probe_duration(AUDIO_DIR / name)), now()))
+        f["audio_id"] = aid
+    except (OSError, ValueError, sqlite3.Error):
+        pass
+
+
+def lib_ready(bid: str) -> dict:
+    """قبل ما المكتبة تتعرض: الفولدرات الأساسية، والتعليقات والموسيقى اللي اترفعت من مكان تاني بتتجاب هنا (مرة واحدة)."""
+    with closing(db()) as conn:
+        rows = [dict(r) for r in conn.execute("SELECT * FROM audio ORDER BY created_at")]
+    def fn(d):
+        roots = lib_prepare(d)
+        seen = set(d.get("audio_seen") or [])
+        for r in rows:
+            if r["id"] in seen or any(f.get("audio_id") == r["id"] for f in d["files"]):
+                seen.add(r["id"])
+                continue
+            seen.add(r["id"])
+            src = AUDIO_DIR / r["filename"]
+            if not src.exists():
+                continue
+            name = f"audio_{uuid.uuid4().hex[:8]}{src.suffix.lower()}"
+            try:
+                shutil.copyfile(src, lib_dir(bid) / name)
+            except OSError:
+                continue
+            d["files"].append({"id": lib_.fid(), "file": name, "name": lib_.clean_name(r["name"]), "kind": "audio", "folder": roots["music" if r["kind"] == "music" else "voice"],
+                               "size": src.stat().st_size, "desc": "", "tags": [], "status": "ready", "at": r["created_at"], "dur": r["duration"], "audio_id": r["id"]})
+        d["audio_seen"] = sorted(seen)
+    return lib_update(fn, bid)
+
+
 def lib_file_dict(lib: dict, f: dict, bid: str) -> dict:
     base = f"/media/ads/brains/{Path(bid).name}/library"
     return {**f, "url": f"{base}/{f['file']}", "thumb": f"{base}/{f['thumb']}" if f.get("thumb") else (f"{base}/{f['file']}" if f["kind"] == "image" else None),
@@ -25417,7 +25502,8 @@ def lib_to_dict(lib: dict, bid: str) -> dict:
     for f in lib["files"]:
         for a in [x["id"] for x in lib_.path_of(lib, f.get("folder"))]:   # الفولدر وكل اللي فوقه
             counts[a] = counts.get(a, 0) + 1
-    return {"folders": [{**x, "count": counts.get(x["id"], 0), "path": lib_.path_text(lib, x["id"])} for x in lib["folders"]],
+    return {"roots": {x["sys"]: x["id"] for x in lib["folders"] if x.get("sys")},
+            "folders": [{**x, "count": counts.get(x["id"], 0), "path": lib_.path_text(lib, x["id"])} for x in lib["folders"]],
             "files": [lib_file_dict(lib, f, bid) for f in lib["files"]], "total": len(lib["files"]),
             "tagging": sum(1 for f in lib["files"] if f.get("status") == "tagging"), "kinds": lib_.KINDS}
 
@@ -25425,7 +25511,7 @@ def lib_to_dict(lib: dict, bid: str) -> dict:
 @app.get("/api/library")
 def library_get():
     bid = active_client_id()
-    return lib_to_dict(lib_load(bid), bid)
+    return lib_to_dict(lib_ready(bid), bid)
 
 
 class LibFolderIn(BaseModel):
@@ -25439,6 +25525,8 @@ def library_folder_new(body: LibFolderIn):
     def fn(d):
         if body.parent and not any(f["id"] == body.parent for f in d["folders"]):
             raise HTTPException(404, "الفولدر ده مش موجود")
+        if not body.parent:
+            raise HTTPException(400, "الفولدر الجديد بيتعمل جوه صور أو فيديوهات أو تعليقات صوتية أو موسيقى")
         if len(lib_.path_of(d, body.parent)) >= lib_.MAX_DEPTH:
             raise HTTPException(400, "كفاية فولدرات جوه بعض كده")
         d["folders"].append({"id": lib_.fid(), "name": lib_.clean_name(body.name, "فولدر جديد"), "parent": body.parent or None})
@@ -25458,6 +25546,10 @@ def library_folder_patch(fid: str, body: LibFolderPatch):
         f = next((x for x in d["folders"] if x["id"] == fid), None)
         if not f:
             raise HTTPException(404, "الفولدر ده مش موجود")
+        if f.get("sys"):
+            raise HTTPException(400, "ده فولدر أساسي في المكتبة، مينفعش يتغيّر")
+        if body.move and not body.parent:
+            raise HTTPException(400, "الفولدر لازم يفضل جوه واحد من الفولدرات الأساسية")
         if body.name is not None:
             f["name"] = lib_.clean_name(body.name, f["name"])
         if body.move:
@@ -25475,6 +25567,8 @@ def library_folder_delete(fid: str):
         f = next((x for x in d["folders"] if x["id"] == fid), None)
         if not f:
             raise HTTPException(404, "الفولدر ده مش موجود")
+        if f.get("sys"):
+            raise HTTPException(400, "ده فولدر أساسي في المكتبة، مينفعش يتشال")
         for c in d["folders"]:
             if c.get("parent") == fid:
                 c["parent"] = f.get("parent")
@@ -25513,12 +25607,20 @@ def library_upload(folder: str = Form(""), paths: str = Form(""), files: list[Up
     if not added:
         raise HTTPException(400, "مفيش صور أو فيديوهات أو أصوات في الملفات دي")
     def fn(d):
+        roots = lib_prepare(d)
         base = folder or None
         if base and not any(f["id"] == base for f in d["folders"]):
             base = None
+        here = lib_root_of(d, base)
         for a in added:
-            a["folder"] = lib_.ensure_path(d, base, a.pop("parts"))
+            want = "voice" if a["kind"] == "audio" and here not in ("voice", "music") else lib_root_for(a) if a["kind"] != "audio" else here
+            start = base if here == want or (a["kind"] == "audio" and here in ("voice", "music")) else roots[want]
+            a["folder"] = lib_.ensure_path(d, start, a.pop("parts"))
             d["files"].append(a)
+            r = lib_root_of(d, a["folder"])
+            if r in ("voice", "music"):
+                lib_audio_link(bid, a, r)
+        d["audio_seen"] = sorted(set(d.get("audio_seen") or []) | {a["audio_id"] for a in added if a.get("audio_id")})
     lib = lib_update(fn, bid)
     threading.Thread(target=run_library_tag, args=(bid, [a["id"] for a in added]), daemon=True).start()
     return lib_to_dict(lib, bid)
@@ -25592,6 +25694,11 @@ def library_file_patch(fid: str, body: LibFilePatch):
             if body.folder and not any(x["id"] == body.folder for x in d["folders"]):
                 raise HTTPException(404, "الفولدر ده مش موجود")
             f["folder"] = body.folder or None
+            lib_prepare(d)
+        if f.get("audio_id"):   # مكتبة الصوت بتتحدّث معاه (الاسم، وتعليق ولا موسيقى)
+            r = lib_root_of(d, f.get("folder"))
+            with closing(db()) as conn, conn:
+                conn.execute("UPDATE audio SET name = ?, kind = COALESCE(?, kind) WHERE id = ?", (f["name"], r if r in ("voice", "music") else None, f["audio_id"]))
     return lib_to_dict(lib_update(fn, bid), bid)
 
 
@@ -25615,6 +25722,11 @@ def library_file_delete(fid: str):
         for n in (f.get("file"), f.get("thumb")):
             if n:
                 (lib_dir(bid) / Path(n).name).unlink(missing_ok=True)
+        if f.get("audio_id"):
+            try:
+                delete_audio(f["audio_id"])
+            except HTTPException:
+                pass
     return lib_to_dict(lib, bid)
 
 

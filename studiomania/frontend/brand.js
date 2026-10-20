@@ -73,18 +73,17 @@ const BrandPage = (() => {
         { f: "pg", i: "coaches", page: "coaches", t: "🧑‍🎤 الشخصيات والأفاتار", type: "page" },
         { f: "pg", i: "twin", page: "twin", t: "🪞 نسختي (أفاتار منك)", type: "page" },
       ] },
-      // 📚 مكتبة محتويات البراند: الخلفيات والأماكن، التعليقات الصوتية، الموسيقى، الكوميكس، وفولدراتك (كلهم صفحة واحدة بتابات)
+      // 📚 مكتبة محتويات البراند: صور، فيديوهات، تعليقات صوتية، موسيقى (كل واحد فولدرات جوه فولدرات)، والكوميكس. صفحة واحدة بتابات
       { k: "content", t: "مكتبة محتويات البراند", en: "Content Library", leaves: [
-        { f: "pg", i: "bl:bg", page: "brainlib", t: "🏞️ الخلفيات والأماكن", type: "page" },
+        { f: "pg", i: "bl:images", page: "brainlib", t: "🖼️ الصور", type: "page" },
+        { f: "pg", i: "bl:videos", page: "brainlib", t: "🎬 الفيديوهات", type: "page" },
         { f: "pg", i: "bl:voice", page: "brainlib", t: "🎙️ التعليقات الصوتية", type: "page" },
         { f: "pg", i: "bl:music", page: "brainlib", t: "🎵 الموسيقى", type: "page" },
         { f: "pg", i: "bl:comics", page: "brainlib", t: "🎭 الكوميكس", type: "page" },
-        { f: "pg", i: "bl:files", page: "brainlib", t: "📁 فولدراتك (صور وفيديوهات)", type: "page" },
       ] },
-      // 🧰 أدوات: الموديل المخصص ومن مرجع لبرومبت (لحد ما نحدد مكانهم)
-      { k: "tools", t: "أدوات", en: "Tools", leaves: [
+      // 🤖 الموديل المخصص: مؤقتًا لوحده لحد ما نحدد مكانه
+      { k: "tools", t: "الموديل المخصص", en: "Custom Model", leaves: [
         { f: "pg", i: "auto", page: "auto", t: "🤖 الموديل المخصص (أوتوميشن)", type: "page" },
-        { f: "pg", i: "ref2p", page: "ref2p", t: "🎥 من مرجع لبرومبت", type: "page" },
       ] },
       // 🏆 منافسينك: أعلى 5 في المجال والسوق، واللي بينجح عندهم، وتحليل آخر ١٠ فيديوهات ليك، وخطة المحتوى (كلهم صفحة واحدة بتابات)
       { k: "pulse", t: "منافسينك", en: "Competitors", leaves: [
@@ -104,7 +103,7 @@ const BrandPage = (() => {
     ].map((br) => {
       // الاقتراحات اللي مستنية موافقتك بتظهر نقط منوّرة على الفرع بتاعها
       // صور المنتج وشخصيات البراند اتشالوا: الاقتراحات القديمة بتاعتهم مابتظهرش
-      const mine = (b?.pending || []).filter((p) => (p.kind !== "image" || ["sets", "logos"].includes(p.target)) && pendBranch(p) === br.k);
+      const mine = (b?.pending || []).filter((p) => (p.kind !== "image" || p.target === "logos") && pendBranch(p) === br.k);
       return { ...br, leaves: [...br.leaves, ...mine.map((p) => ({ f: "p", i: p.id, t: pendLabel(p), type: "pending", p }))] };
     });
   }
@@ -112,7 +111,7 @@ const BrandPage = (() => {
     typography: "look", palette: "look", cta: "delivery", link: "delivery", caption: "delivery" };
   const FIELD_T = { niche: "النيتش", about: "عن البراند", audience: "الجمهور", market: "السوق", language: "اللغة واللهجة", domain: "المجال", typography: "الخطوط",
     palette: "الألوان", cta: "الدعوة (CTA)", link: "اللينك", caption: "الكابشن الافتراضي" };
-  const pendBranch = (p) => (p.kind === "field" ? FIELD_BR[p.field] || "identity" : p.kind === "rule" ? "rules" : p.kind === "image" ? (p.target === "logos" ? "look" : "content") : "knowledge");
+  const pendBranch = (p) => (p.kind === "field" ? FIELD_BR[p.field] || "identity" : p.kind === "rule" ? "rules" : p.kind === "image" ? "look" : "knowledge");
   const pendLabel = (p) => (p.kind === "field" ? `اقتراح: ${FIELD_T[p.field] || p.field}` : p.kind === "rule" ? "قاعدة مقترحة" : p.kind === "question" ? "سؤال" : p.kind === "image" ? `صورة: ${p.title}` : p.title);
   const srcName = (id) => (id === "feedback" ? "تقييماتك" : cur()?.sources?.find((s) => s.id === id)?.name || "");
   // النقطة مليانة ولا لسه ناقصة

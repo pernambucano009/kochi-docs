@@ -1,21 +1,28 @@
-// 📚 مكتبة محتويات البراند: صفحة واحدة بتابات: الخلفيات والأماكن، التعليقات الصوتية، الموسيقى، الكوميكس، وفولدراتك.
-// «فولدراتك»: صور وفيديوهات وأصوات العميل في فولدرات جوه فولدرات، والمخ بيكتب على كل ملف هو إيه (وصف وتاجات).
+// 📚 مكتبة محتويات البراند: تابات (صور، فيديوهات، تعليقات صوتية، موسيقى، كوميكس). كل تاب من الأربعة الأولانيين فولدر أساسي،
+// وجواه فولدرات جوه فولدرات زي ما تحب، والمخ بيكتب على كل ملف هو إيه (وصف وتاجات).
 // ده الأساس اللي «الموديل المخصص» بيشتغل عليه: منشن لفولدر («@صور/أسنان/قبل») أو لملف بعينه، أو بحث بالمعنى.
+// التعليقات الصوتية والموسيقى هنا هي نفسها اللي المونتاج والقوالب بيختاروا منها.
 const BrainLibPage = (() => {
   const esc = (s) => escapeHtml(String(s ?? ""));
-  const S = { el: null, body: null, tab: "files", mod: null, bg: null, lib: null, cur: null, q: "", kind: "", hits: null, open: null, timer: null };
-  const TABS = [["bg", "🏞️ الخلفيات والأماكن"], ["voice", "🎙️ التعليقات الصوتية"], ["music", "🎵 الموسيقى"], ["comics", "🎭 الكوميكس"], ["files", "📁 فولدراتك"]];
-  const SUB = { voice: () => VoicesPage, music: () => MusicPage, comics: () => ComicsPage };
+  const S = { el: null, body: null, tab: "images", mod: null, lib: null, root: null, cur: null, q: "", hits: null, open: null, timer: null };
+  const TABS = [["images", "🖼️ الصور"], ["videos", "🎬 الفيديوهات"], ["voice", "🎙️ التعليقات الصوتية"], ["music", "🎵 الموسيقى"], ["comics", "🎭 الكوميكس"]];
+  const TAB = {
+    images: { kind: "image", accept: "image/*", t: "الصور", en: "IMAGES", hint: "صور البراند في فولدرات جوه فولدرات زي ما تحب (مثلًا: صور ← أسنان ← قبل)." },
+    videos: { kind: "video", accept: "video/*", t: "الفيديوهات", en: "VIDEOS", hint: "فيديوهاتك الخام واللقطات في فولدرات جوه فولدرات." },
+    voice: { kind: "audio", accept: "audio/*,video/*", t: "التعليقات الصوتية", en: "VOICE-OVERS", hint: "تسجيلات التعليق الصوتي. بتظهر برضو في المونتاج والقوالب." },
+    music: { kind: "audio", accept: "audio/*,video/*", t: "الموسيقى", en: "MUSIC", hint: "الموسيقى اللي بتتحط تحت الفيديوهات. بتظهر برضو في المونتاج والقوالب." },
+  };
   const html = () => `<div class="nb-wrap fs-wrap bl-wrap" id="blWrap"><nav class="bl-tabs" role="tablist"></nav><div class="bl-tabbody" id="blBody"><div class="nh-empty">بيحمّل…</div></div></div>`;
   const IC = { image: "🖼️", video: "🎬", audio: "🎙️" };
   const dur = (s) => (s ? `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, "0")}` : "");
   const folder = (id) => S.lib.folders.find((f) => f.id === id);
   const kidsOf = (id) => S.lib.folders.filter((f) => (f.parent || null) === (id || null)).sort((a, b) => a.name.localeCompare(b.name, "ar"));
+  const T = () => TAB[S.tab];
 
   function crumbs() {
     const path = [];
-    for (let f = folder(S.cur); f; f = folder(f.parent)) path.unshift(f);
-    return `<nav class="bl-crumbs"><button type="button" data-blgo="">📁 المكتبة</button>${path.map((f) => `<span>›</span><button type="button" data-blgo="${f.id}">${esc(f.name)}</button>`).join("")}</nav>`;
+    for (let f = folder(S.cur); f && f.id !== S.root; f = folder(f.parent)) path.unshift(f);
+    return `<nav class="bl-crumbs"><button type="button" data-blgo="${S.root}">${IC[T().kind]} ${esc(T().t)}</button>${path.map((f) => `<span>›</span><button type="button" data-blgo="${f.id}">${esc(f.name)}</button>`).join("")}</nav>`;
   }
   function tree(parent, depth = 0) {
     return kidsOf(parent).map((f) => `<button type="button" class="bl-tf${f.id === S.cur ? " on" : ""}" data-blgo="${f.id}" style="padding-inline-start:${10 + depth * 14}px"
@@ -23,54 +30,58 @@ const BrainLibPage = (() => {
   }
   function card(f) {
     const media = f.kind === "image" ? `<img src="${esc(f.thumb)}" alt="" loading="lazy">` : f.kind === "video"
-      ? (f.thumb ? `<img src="${esc(f.thumb)}" alt="" loading="lazy">` : `<span class="bl-ph">🎬</span>`) : `<span class="bl-ph">🎙️</span>`;
+      ? (f.thumb ? `<img src="${esc(f.thumb)}" alt="" loading="lazy">` : `<span class="bl-ph">🎬</span>`) : `<span class="bl-ph">${S.tab === "music" ? "🎵" : "🎙️"}</span>`;
     return `<figure class="bl-item${S.open === f.id ? " on" : ""}" data-blfile="${f.id}" draggable="true">${media}
-      <figcaption><b>${IC[f.kind]} ${esc(f.name)}</b>${f.dur ? ` <small class="num">${dur(f.dur)}</small>` : ""}
+      <figcaption><b>${esc(f.name)}</b>${f.dur ? ` <small class="num">${dur(f.dur)}</small>` : ""}
         ${f.status === "tagging" ? `<small class="muted">⏳ المخ بيشوفه…</small>` : f.desc ? `<small>${esc(f.desc)}</small>` : ""}
         ${(f.tags || []).length ? `<span class="bl-tags">${f.tags.slice(0, 4).map((t) => `<i>${esc(t)}</i>`).join("")}</span>` : ""}</figcaption></figure>`;
   }
   function editor(f) {
-    const opts = (id, depth = 0) => kidsOf(id).map((x) => `<option value="${x.id}" ${x.id === f.folder ? "selected" : ""}>${"— ".repeat(depth)}${esc(x.name)}</option>${opts(x.id, depth + 1)}`).join("");
+    const opts = (id, depth = 0) => kidsOf(id).map((x) => `<option value="${x.id}" ${x.id === f.folder ? "selected" : ""}>${"— ".repeat(depth + 1)}${esc(x.name)}</option>${opts(x.id, depth + 1)}`).join("");
+    const roots = f.kind === "audio" ? ["voice", "music"] : [S.tab];
     return `<section class="fs-card bl-edit"><div class="bl-eh"><b>${IC[f.kind]} ${esc(f.name)}</b><button type="button" class="nb-btn sm" data-blclose>✕</button></div>
       <div class="bl-eb">${f.kind === "image" ? `<img src="${esc(f.url)}" alt="">` : f.kind === "video" ? `<video src="${esc(f.url)}" controls playsinline preload="metadata"></video>` : `<audio src="${esc(f.url)}" controls preload="metadata"></audio>`}
         <div class="bl-ef">
           <label class="nb-f"><span>الاسم</span><input data-blf="name" value="${esc(f.name)}"></label>
           <label class="nb-f"><span>الوصف (المخ كتبه، وتقدر تعدّله)</span><textarea rows="2" data-blf="desc">${esc(f.desc || "")}</textarea></label>
           <label class="nb-f"><span>التاجات (بينهم فاصلة)</span><input data-blf="tags" value="${esc((f.tags || []).join("، "))}"></label>
-          <label class="nb-f"><span>الفولدر</span><select data-blf="folder"><option value="">📁 المكتبة (برّه أي فولدر)</option>${opts(null)}</select></label>
-          <p class="muted bl-ref">للمنشن: <code dir="auto">@${esc([f.path, f.name].filter(Boolean).join("/"))}</code></p>
+          <label class="nb-f"><span>الفولدر</span><select data-blf="folder">${roots.map((k) => { const r = S.lib.roots[k]; return `<option value="${r}" ${r === f.folder ? "selected" : ""}>📁 ${esc(TAB[k].t)}</option>${opts(r)}`; }).join("")}</select></label>
+          <p class="muted bl-ref">للمنشن في الأوتوميشن: <code dir="auto">@${esc([f.path, f.name].filter(Boolean).join("/"))}</code></p>
           ${f.error ? `<p class="fs-err">⚠️ ${esc(f.error)}</p>` : ""}
           <div class="nb-bar"><button type="button" class="nb-btn fs-go" data-blsave>✓ احفظ</button><button type="button" class="nb-btn" data-blretag>🧠 خلّي المخ يشوفه تاني</button>
             <button type="button" class="nb-btn danger" data-bldel>🗑 امسح</button></div></div></div></section>`;
   }
   function render() {
-    if (!S.el || !S.lib || S.tab !== "files") return;
-    const L = S.lib, inHere = L.files.filter((f) => (f.folder || null) === (S.cur || null)), sub = kidsOf(S.cur);
+    if (!S.el || !S.lib || !TAB[S.tab]) return;
+    const L = S.lib, t = T();
+    S.root = L.roots?.[S.tab] || null;
+    if (!S.cur || !folder(S.cur)) S.cur = S.root;
+    const inRoot = new Set([S.root, ...L.folders.filter((f) => { for (let x = f; x; x = folder(x.parent)) if (x.id === S.root) return true; return false; }).map((f) => f.id)]);
+    const all = L.files.filter((f) => inRoot.has(f.folder)), inHere = L.files.filter((f) => f.folder === S.cur), sub = kidsOf(S.cur);
     const shown = S.hits ?? inHere;
     const cur = L.files.find((f) => f.id === S.open);
     S.body.innerHTML = `<section class="fs-hero">
-        <div class="fs-hero-t"><b>فولدراتك</b><span class="latin">FOLDERS</span></div>
-        <p>صورك وفيديوهاتك وأصواتك في فولدرات جوه فولدرات زي ما تحب. ارفع فولدر كامل بفولدراته، والمخ بيتفرج على كل ملف ويكتب هو إيه، فبعدين تلاقيه بالبحث أو تمنشنه («@صور/أسنان/قبل») في الأوتوميشن.</p>
-        <div class="cm-stats"><span><b class="num">${L.total}</b> ملف</span><span><b class="num">${L.folders.length}</b> فولدر</span>${L.tagging ? `<span>⏳ <b class="num">${L.tagging}</b> المخ بيشوفهم</span>` : ""}</div>
+        <div class="fs-hero-t"><b>${esc(t.t)}</b><span class="latin">${t.en}</span></div>
+        <p>${t.hint} تقدر ترفع فولدر كامل بفولدراته، والمخ بيتفرج على كل ملف ويكتب هو إيه، فبعدين تلاقيه بالبحث أو تمنشنه («@») في الأوتوميشن.</p>
+        <div class="cm-stats"><span><b class="num">${all.length}</b> ملف</span><span><b class="num">${inRoot.size - 1}</b> فولدر</span>${L.tagging ? `<span>⏳ <b class="num">${L.tagging}</b> المخ بيشوفهم</span>` : ""}</div>
       </section>
-      <div class="bl-main"><aside class="bl-tree"><button type="button" class="bl-tf${!S.cur ? " on" : ""}" data-blgo="" data-bldrop="">📁 المكتبة <small class="num">${L.total || ""}</small></button>${tree(null)}</aside>
+      <div class="bl-main"><aside class="bl-tree"><button type="button" class="bl-tf${S.cur === S.root ? " on" : ""}" data-blgo="${S.root}" data-bldrop="${S.root}">📁 ${esc(t.t)} <small class="num">${all.length || ""}</small></button>${tree(S.root)}</aside>
         <div class="bl-body">${crumbs()}
-          <div class="nb-bar"><input type="search" class="bl-q" data-blq placeholder="🔎 دوّر بالمعنى: ابتسامة، قبل التبييض، العيادة من برا…" value="${esc(S.q)}">
-            <select data-blkind><option value="">الكل</option>${Object.entries(L.kinds).map(([k, t]) => `<option value="${k}" ${S.kind === k ? "selected" : ""}>${IC[k]} ${esc(t)}</option>`).join("")}</select></div>
-          <div class="nb-bar"><button type="button" class="nb-btn" data-blnew>＋ فولدر${S.cur ? " جوه ده" : ""}</button>
-            <label class="nb-btn">⬆ ملفات<input type="file" multiple accept="image/*,video/*,audio/*" data-blup hidden></label>
+          <div class="nb-bar"><input type="search" class="bl-q" data-blq placeholder="🔎 دوّر بالاسم أو المعنى…" value="${esc(S.q)}"></div>
+          <div class="nb-bar"><button type="button" class="nb-btn" data-blnew>＋ فولدر${S.cur !== S.root ? " جوه ده" : ""}</button>
+            <label class="nb-btn">⬆ ملفات<input type="file" multiple accept="${t.accept}" data-blup hidden></label>
             <label class="nb-btn">📂 فولدر كامل<input type="file" webkitdirectory directory multiple data-blup hidden></label>
-            ${S.cur ? `<button type="button" class="nb-btn" data-blren>✏️ غيّر اسم الفولدر</button><button type="button" class="nb-btn danger" data-blrm>🗑 شيل الفولدر</button>` : ""}</div>
+            ${S.cur !== S.root ? `<button type="button" class="nb-btn" data-blren>✏️ غيّر اسم الفولدر</button><button type="button" class="nb-btn danger" data-blrm>🗑 شيل الفولدر</button>` : ""}</div>
           ${cur ? editor(cur) : ""}
-          ${S.hits ? `<p class="muted">${S.hits.length} نتيجة${S.cur ? " في الفولدر ده واللي جواه" : ""}</p>` : ""}
+          ${S.hits ? `<p class="muted">${S.hits.length} نتيجة${S.cur !== S.root ? " في الفولدر ده واللي جواه" : ""}</p>` : ""}
           ${!S.hits && sub.length ? `<div class="bl-folders">${sub.map((f) => `<button type="button" class="bl-fold" data-blgo="${f.id}" data-bldrop="${f.id}"><span>📁</span><b>${esc(f.name)}</b><small class="num">${f.count || 0}</small></button>`).join("")}</div>` : ""}
-          <div class="bl-grid" data-bldrop="${S.cur || ""}">${shown.map(card).join("") || (sub.length ? "" : `<div class="nh-empty">الفولدر فاضي. ارفع ملفات أو اسحبها هنا.</div>`)}</div>
+          <div class="bl-grid" data-bldrop="${S.cur}">${shown.map(card).join("") || (sub.length ? "" : `<div class="nh-empty">الفولدر فاضي. ارفع ملفات أو اسحبها هنا.</div>`)}</div>
           <p class="muted">💡 اسحب أي ملف على فولدر عشان تنقله.</p></div></div>`;
   }
   async function refresh() { S.lib = await api("/api/library"); }
   async function runSearch() {
-    if (!S.q.trim() && !S.kind) { S.hits = null; return render(); }
-    const r = await api(`/api/library/search?q=${encodeURIComponent(S.q)}&kind=${encodeURIComponent(S.kind)}${S.cur ? `&ref=${encodeURIComponent(folder(S.cur)?.path || "")}` : ""}`);
+    if (!S.q.trim()) { S.hits = null; return render(); }
+    const r = await api(`/api/library/search?q=${encodeURIComponent(S.q)}&kind=${encodeURIComponent(T().kind)}&ref=${encodeURIComponent(folder(S.cur)?.path || "")}`);
     S.hits = r.files || [];
     render();
   }
@@ -83,7 +94,7 @@ const BrainLibPage = (() => {
     const list = [...files];
     if (!list.length) return;
     const fd = new FormData();
-    if (S.cur) fd.append("folder", S.cur);
+    fd.append("folder", S.cur || "");
     fd.append("paths", list.map((f) => f.webkitRelativePath || "").join("\n"));
     list.forEach((f) => fd.append("files", f));
     toast(`⏳ بيرفع ${list.length} ملف…`);
@@ -96,7 +107,9 @@ const BrainLibPage = (() => {
       const q = (s) => e.target.closest(s);
       try {
         let b;
-        if ((b = q("[data-blgo]"))) { S.cur = b.dataset.blgo || null; S.open = null; S.hits = null; S.q = ""; return render(); }
+        if ((b = q("[data-bltab]"))) return showTab(b.dataset.bltab);
+        if (!TAB[S.tab]) return;
+        if ((b = q("[data-blgo]"))) { S.cur = b.dataset.blgo || S.root; S.open = null; S.hits = null; S.q = ""; return render(); }
         if (q("[data-blnew]")) {
           const name = prompt("اسم الفولدر الجديد:"); if (!name?.trim()) return;
           S.lib = await api("/api/library/folders", { method: "POST", ...jsonBody({ name, parent: S.cur }) }); return render();
@@ -107,7 +120,7 @@ const BrainLibPage = (() => {
         }
         if (q("[data-blrm]")) {
           if (!confirm("تشيل الفولدر ده؟ اللي جواه هيطلع للفولدر اللي فوقه، ومفيش ملف هيتمسح.")) return;
-          const up = folder(S.cur)?.parent || null;
+          const up = folder(S.cur)?.parent || S.root;
           S.lib = await api(`/api/library/folders/${S.cur}`, { method: "DELETE" }); S.cur = up; return render();
         }
         if ((b = q("[data-blfile]"))) { S.open = S.open === b.dataset.blfile ? null : b.dataset.blfile; render(); return w.querySelector(".bl-edit")?.scrollIntoView({ block: "nearest" }); }
@@ -128,8 +141,7 @@ const BrainLibPage = (() => {
     });
     w.addEventListener("change", async (e) => {
       try {
-        if (e.target.matches("[data-blup]")) { const fs = e.target.files; await upload(fs); e.target.value = ""; return; }
-        if (e.target.matches("[data-blkind]")) { S.kind = e.target.value; return runSearch(); }
+        if (e.target.matches("[data-blup]")) { const fs = e.target.files; await upload(fs); e.target.value = ""; }
       } catch (err) { toast(err.message, true); }
     });
     let qt = 0;
@@ -147,79 +159,29 @@ const BrainLibPage = (() => {
       e.preventDefault(); t.classList.remove("over");
       try {
         const id = e.dataTransfer.getData("text/bl-file");
-        if (id) { S.lib = await api(`/api/library/files/${id}`, { method: "PATCH", ...jsonBody({ folder: t.dataset.bldrop || null, move: true }) }); return render(); }
-        if (e.dataTransfer.files?.length) await upload(e.dataTransfer.files);
+        if (id) { S.lib = await api(`/api/library/files/${id}`, { method: "PATCH", ...jsonBody({ folder: t.dataset.bldrop || S.root, move: true }) }); return render(); }
+        if (e.dataTransfer.files?.length) { S.cur = t.dataset.bldrop || S.cur; await upload(e.dataTransfer.files); }
       } catch (err) { toast(err.message, true); }
     });
-  }
-  // 🏞️ الخلفيات والأماكن: صور «الأماكن والخلفيات» بتاعة البراند (ترفعها هنا)، وأماكن التصوير اللي اتضافت من «نسختي»
-  function bgTile(x) {
-    return `<figure class="bl-item bl-bg"><img src="${esc(x.url)}" alt="" loading="lazy">
-      <figcaption><b>${esc(x.name || "خلفية")}</b>${x.source === "twin" ? `<small class="muted">🪞 من «${esc(x.twin)}»</small>` : x.desc ? `<small>${esc(x.desc)}</small>` : ""}</figcaption>
-      ${x.source === "brand" ? `<button type="button" class="bl-x" data-bgdel="${esc(x.file)}" title="امسحها">✕</button>` : ""}</figure>`;
-  }
-  async function renderBg() {
-    S.body.innerHTML = `<div class="nh-empty">بيحمّل…</div>`;
-    S.bg = await api("/api/content/backgrounds");
-    if (S.tab !== "bg") return;
-    const B = S.bg;
-    S.body.innerHTML = `<section class="fs-hero"><div class="fs-hero-t"><b>الخلفيات والأماكن</b><span class="latin">BACKGROUNDS</span></div>
-        <p>الأماكن اللي بتظهر في فيديوهاتك. ارفعها هنا، أو ضيف أماكن التصوير من «نسختي» وهتظهر هنا لوحدها. تقدر تمنشن أي واحدة في الأوتوميشن («@») علشان التوليد يستخدمها مرجع.</p>
-        <div class="cm-stats"><span><b class="num">${B.brand.length + B.twin.length}</b> خلفية</span></div></section>
-      <div class="nb-bar"><label class="nb-btn">⬆ ارفع صور خلفيات<input type="file" multiple accept="image/*" data-bgup hidden></label></div>
-      <div class="bl-grid" data-bgdrop>${B.brand.map(bgTile).join("") || `<div class="nh-empty">لسه مفيش خلفيات. ارفع صور أو اسحبها هنا.</div>`}</div>
-      ${B.twin.length ? `<h4 class="bl-h">🪞 أماكن التصوير من «نسختي»</h4><div class="bl-grid">${B.twin.map(bgTile).join("")}</div>` : ""}`;
-  }
-  async function bgUpload(files) {
-    const list = [...files].filter((f) => f.type.startsWith("image/"));
-    if (!list.length) return toast("ارفع صور (PNG / JPG / WEBP)", true);
-    const fd = new FormData();
-    fd.append("kind", "sets");
-    list.forEach((f) => fd.append("files", f));
-    toast(`⏳ بيرفع ${list.length} صورة…`);
-    await api(`/api/ad-brains/${S.bg.bid}/assets`, { method: "POST", body: fd });
-    await renderBg();
-    toast("✅ اترفعت، والمخ بيوصّفها");
   }
   function closeSub() { try { S.mod?.close?.(); } catch { /* */ } S.mod = null; clearTimeout(S.timer); }
   async function showTab(tab) {
     closeSub();
-    S.tab = TABS.some(([k]) => k === tab) ? tab : "files";
+    if (tab !== S.tab) { S.cur = null; S.open = null; S.hits = null; S.q = ""; }
+    S.tab = TABS.some(([k]) => k === tab) ? tab : "images";
     S.el.querySelector(".bl-tabs").innerHTML = TABS.map(([k, t]) => `<button type="button" role="tab" class="bl-tab${k === S.tab ? " on" : ""}" data-bltab="${k}" aria-selected="${k === S.tab}">${t}</button>`).join("");
     try {
-      if (SUB[S.tab]) { const M = SUB[S.tab](); S.mod = M; S.body.innerHTML = M.html(); return await M.mount(S.body); }
-      if (S.tab === "bg") return await renderBg();
-      S.hits = null; S.q = ""; S.body.innerHTML = `<div class="nh-empty">بيحمّل…</div>`;
+      if (S.tab === "comics") { S.mod = ComicsPage; S.body.innerHTML = ComicsPage.html(); return await ComicsPage.mount(S.body); }
+      S.body.innerHTML = `<div class="nh-empty">بيحمّل…</div>`;
       await refresh(); render(); poll();
     } catch (err) { S.body.innerHTML = `<div class="nh-empty">${esc(err.message)}</div>`; }
-  }
-  function bindShell(w) {
-    w.addEventListener("click", async (e) => {
-      const t = e.target.closest("[data-bltab]");
-      if (t) return showTab(t.dataset.bltab);
-      const d = e.target.closest("[data-bgdel]");
-      if (d && confirm("تمسح الخلفية دي؟")) {
-        try { await api(`/api/ad-brains/${S.bg.bid}/assets/${encodeURIComponent(d.dataset.bgdel)}`, { method: "DELETE" }); await renderBg(); } catch (err) { toast(err.message, true); }
-      }
-    });
-    w.addEventListener("change", async (e) => {
-      if (!e.target.matches("[data-bgup]")) return;
-      try { await bgUpload(e.target.files); } catch (err) { toast(err.message, true); }
-      e.target.value = "";
-    });
-    w.addEventListener("dragover", (e) => { if (e.target.closest("[data-bgdrop]")) e.preventDefault(); });
-    w.addEventListener("drop", async (e) => {
-      if (!e.target.closest("[data-bgdrop]") || !e.dataTransfer.files?.length) return;
-      e.preventDefault();
-      try { await bgUpload(e.dataTransfer.files); } catch (err) { toast(err.message, true); }
-    });
   }
   async function mount(root) {
     const w = root.querySelector("#blWrap");
     if (!w) return;
-    S.el = w; S.body = w.querySelector("#blBody"); S.hits = null; S.q = "";
-    bind(w); bindShell(w);
-    const tab = window.BL_TAB || "bg";
+    S.el = w; S.body = w.querySelector("#blBody");
+    bind(w);
+    const tab = window.BL_TAB || S.tab || "images";
     window.BL_TAB = null;
     await showTab(tab);
   }
