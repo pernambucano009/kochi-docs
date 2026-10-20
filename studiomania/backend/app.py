@@ -4200,32 +4200,92 @@ def algo_mode_set(body: AlgoModeIn):
 
 @app.get("/api/strategy")
 def strategy_get():
-    b = brain_row(rivals_client()) or {}
-    return {"strategy": b.get("strategy"), "games": algo.GAMES, "axes": algo.AXES}
+    bid = rivals_client()
+    plan_maybe(bid)
+    b = brain_row(bid) or {}
+    return {"strategy": b.get("strategy"), "games": algo.GAMES, "axes": algo.AXES, "plan": plan_out(bid)}
 
 
 class StrategyIn(BaseModel):
     notes: str = ""
 
 
-@app.post("/api/strategy")
-def strategy_make(body: StrategyIn):
-    bid = rivals_client()
+def build_plan(bid: str) -> dict:
+    """🧭 الخطة من كل اللي العقل عرفه (والهدف مستنتج، مش مطلوب من العميل)."""
     brain = brain_row(bid) or {}
+    inputs = algo.plan_inputs(brain)
     if atlas.mock_mode():
         st = algo.mock_strategy()
     else:
-        msgs = algo.strategy_messages(az.brain_text(brain), rivals.insight_text(brain), body.notes.strip()[:800])
+        wallet.need(wallet.credits(wallet.est(chars=30000)), "خطة المحتوى")
+        extra = "\n\n".join(x for x in (algo.plan_goal(brain), fz.prefs_text(brain), algo.batch_text(brain),
+                                           "\n".join(f"- {i['name']} ({i['date']})" for i in ((brain.get("seasons") or {}).get("items") or [])[:20])) if x)
+        msgs = algo.strategy_messages(az.brain_text(brain), rivals.insight_text(brain), extra[:3500])
         try:
             raw = az.parse_json(atlas.chat(msgs, carousel_settings()["text_model"], temperature=0.6, max_tokens=9000, json_mode=True, timeout=300), "خطة المحتوى")
         except (ValueError, atlas.AtlasError, httpx.HTTPError) as exc:
             raise HTTPException(502, f"مقدرتش أعمل الخطة: {str(getattr(exc, 'detail', None) or exc)[:200]}") from exc
         st = algo.clean_strategy(raw)
-    st["made_at"] = now()
+        wallet.charge(wallet.credits(wallet.est(chars=30000)), "عقل البراند: خطة المحتوى", bid)
+    st.update(made_at=now(), built_from=len(inputs), key_sig=algo.plan_key_sig(brain))
 
     def fn(d):
         d["strategy"] = st
     update_brain(bid, fn)
+    return st
+
+
+PLAN_BUSY: dict[str, str] = {}
+
+
+def run_plan(bid: str) -> None:
+    try:
+        build_plan(bid)
+        PLAN_BUSY.pop(bid, None)
+    except Exception as exc:  # noqa: BLE001
+        PLAN_BUSY[bid] = f"error:{str(getattr(exc, 'detail', None) or exc)[:200]}"
+
+
+def plan_out(bid: str) -> dict:
+    b = brain_row(bid) or {}
+    inputs = algo.plan_inputs(b)
+    by: dict[str, int] = {}
+    for k, _ in inputs:
+        by[k] = by.get(k, 0) + 1
+    st = b.get("strategy") or {}
+    job = PLAN_BUSY.get(bid) or ""
+    return {"count": len(inputs), "built_from": int(st.get("built_from") or 0) if st else 0, "made_at": st.get("made_at"), "has": bool(st),
+            "status": "working" if job == "working" else "failed" if job.startswith("error") else "idle", "error": job[6:] if job.startswith("error") else None,
+            "by": [{"k": k, "t": algo.PLAN_KINDS.get(k, k), "n": n} for k, n in by.items()], "min": algo.PLAN_MIN,
+            "ready": bool(b.get("domain") or b.get("about"))}
+
+
+def plan_maybe(bid: str) -> None:
+    """الخطة بتتعمل من جديد لوحدها لما يتجمع معلومات جديدة كفاية أو حاجة أساسية تتغير."""
+    b = brain_row(bid) or {}
+    if PLAN_BUSY.get(bid) == "working" or not algo.plan_should(b, len(algo.plan_inputs(b))):
+        return
+    if str(PLAN_BUSY.get(bid) or "").startswith("error") and not (atlas.api_key() or atlas.mock_mode()):
+        return
+    PLAN_BUSY[bid] = "working"
+    threading.Thread(target=run_plan, args=(bid,), daemon=True).start()
+
+
+@app.get("/api/ad-brains/{bid}/plan")
+def brain_plan(bid: str):
+    """🧭 عدّاد الخطة (بتتبني من كام معلومة) وحالتها. بيشغّل التحديث لوحده لو فيه جديد كفاية."""
+    if brain_row(bid) is None:
+        raise HTTPException(404, "العميل ده مش موجود")
+    if PLAN_BUSY.get(bid, "").startswith("error"):
+        PLAN_BUSY.pop(bid, None)
+    plan_maybe(bid)
+    return plan_out(bid)
+
+
+@app.post("/api/strategy")
+def strategy_make(body: StrategyIn):
+    """حدّث الخطة دلوقتي (اختياري: هي أصلًا بتتحدّث لوحدها)."""
+    st = build_plan(rivals_client())
     return {"strategy": st, "games": algo.GAMES, "axes": algo.AXES}
 
 

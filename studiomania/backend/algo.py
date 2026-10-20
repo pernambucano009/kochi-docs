@@ -246,6 +246,63 @@ def strategy_messages(brand: str, rivals_txt: str, notes: str = "") -> list[dict
 أعداد: buckets ٣–٤، formats ٢–٣، formulas ٤–٦، week ٧ أيام بالظبط بخلطة ٣-٢-١ (٤ في الدايرتين ١–٢، ١ في الدايرة ٤، ١ تجريبي، ١ تكرار لأحسن تركيبة)."""}]
 
 
+# 🧭 خطة المحتوى بتتبني لوحدها من كل اللي العقل عرفه: كل خانة، كل إجابة، كل معلومة، كل موسم، كل لايك وديسلايك، كل تحليل.
+# العدّاد = عدد المعلومات دي، وكل ما يزيد كفاية (أو حاجة أساسية تتغير) الخطة بتتعمل من جديد لوحدها.
+PLAN_FIELDS = (("domain", "المجال"), ("about", "عن البراند"), ("audience", "الجمهور"), ("market", "السوق"), ("language", "اللغة واللهجة"),
+               ("niche", "النيتش"), ("type", "نوع المنتج"), ("cta", "الدعوة (CTA)"), ("link", "اللينك"), ("caption", "الكابشن الافتراضي"), ("rules", "القواعد"))
+PLAN_KEY = ("domain", "about", "audience", "market", "type", "cta")   # لو واحدة منهم اتغيرت الخطة بتتعمل من جديد على طول
+PLAN_STEP = 3          # أو لما يتجمع ٣ معلومات جديدة
+PLAN_MIN = 4           # أقل عدد معلومات تتعمل بيه أول خطة (ولازم المجال أو «عن البراند»)
+
+
+def plan_inputs(b: dict) -> list[tuple[str, str]]:
+    """(النوع، المعلومة) لكل حاجة الخطة بتتبني عليها."""
+    out = [("field", t) for k, t in PLAN_FIELDS if str(b.get(k) or "").strip()]
+    out += [("quiz", q) for q in b.get("quiz_done") or []]
+    out += [("note", n.get("title") or "") for n in b.get("notes") or [] if n.get("quiz") != "seasons_ai"]
+    out += [("season", i.get("name") or "") for i in ((b.get("seasons") or {}).get("items") or [])[:40]]
+    out += [("pref", (p.get("text") or "")[:40]) for p in (b.get("prefs") or [])[-60:]]
+    comp = b.get("competitors") or {}
+    out += [("rival", i.get("handle") or "") for i in comp.get("items") or []]
+    if comp.get("digest"):
+        out.append(("rivals_digest", "اللي بينجح عند المنافسين"))
+    out += [("todo", t.get("title") or "") for t in b.get("todos") or []]
+    bt = b.get("batch") or {}
+    out += [("batch", h.get("hypothesis") or "") for h in bt.get("history") or []]
+    if bt.get("analysis"):
+        out.append(("batch", "تحليل آخر ١٠ فيديوهات"))
+    out += [("trend", t.get("title") or "") for t in ((b.get("trends") or {}).get("items") or []) if t.get("saved")]
+    return out
+
+
+PLAN_KINDS = {"field": "خانات الهوية والتسليم", "quiz": "إجابات الكويز", "note": "معلومات المعرفة", "season": "مواسم ومناسبات", "pref": "لايكات وديسلايكات على الأفكار والسكريبتات",
+              "rival": "منافسين", "rivals_digest": "تحليل المنافسين", "todo": "تحليل حسابك على السوشيال", "batch": "تحليل فيديوهاتك", "trend": "ترندات محفوظة"}
+
+
+def plan_key_sig(b: dict) -> str:
+    return "|".join(str(b.get(k) or "")[:300] for k in PLAN_KEY)
+
+
+def plan_goal(b: dict) -> str:
+    """الهدف بيتستنتج من العقل نفسه (الدعوة، اللينك، العروض، المنتجات، نوع المنتج) مش من العميل."""
+    notes = {n.get("section"): n for n in b.get("notes") or []}
+    bits = [f"الدعوة اللي في آخر الفيديوهات: {b['cta']}" if b.get("cta") else "", f"اللينك: {b['link']}" if b.get("link") else "",
+            f"العرض: {(notes.get('offers') or {}).get('body', '')[:300]}" if notes.get("offers") else "",
+            f"المنتجات والخدمات: {(notes.get('products') or {}).get('body', '')[:400]}" if notes.get("products") else ""]
+    bits = [x for x in bits if x]
+    return ("استنتج هدف البراند (بيع ولا شهرة ولا حجز ولا تحميل…) من المعلومات دي ومن ملف البراند، ماتسألش العميل:\n" + "\n".join(bits)) if bits else \
+        "استنتج هدف البراند من ملفه (نوع المنتج، المجال، اللي بيقدمه)، ماتسألش العميل."
+
+
+def plan_should(b: dict, count: int) -> bool:
+    st = b.get("strategy") or {}
+    if count < PLAN_MIN or not (b.get("domain") or b.get("about")):
+        return False
+    if not st:
+        return True
+    return plan_key_sig(b) != st.get("key_sig") or count - int(st.get("built_from") or 0) >= PLAN_STEP
+
+
 def clean_strategy(raw: dict) -> dict:
     raw = raw if isinstance(raw, dict) else {}
     s = lambda v, n=400: str(v or "").strip()[:n]

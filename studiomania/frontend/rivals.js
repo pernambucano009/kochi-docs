@@ -4,7 +4,7 @@
 const RivalsPage = (() => {
   const esc = (s) => escapeHtml(String(s ?? ""));
   const S = { el: null, d: null, timer: null, swap: null, focus: null, tab: "rivals", pl: { d: null, busy: false, notes: "" }, bt: { d: null, busy: "", handle: "", platform: "" } };
-  const TABS = [["rivals", "🏆 المنافسين"], ["works", "🧠 اللي بينجح عندهم"], ["batch", "📊 حلّل آخر ١٠ فيديوهات ليك"], ["plan", "🧭 خطة المحتوى"]];
+  const TABS = [["rivals", "🏆 المنافسين"], ["works", "🧠 اللي بينجح عندهم"], ["batch", "📊 حلّل آخر ١٠ فيديوهات ليك"]];
   const html = () => `<div class="nb-wrap fs-wrap rv-wrap" id="rvWrap"><div class="nh-empty">بيحمّل…</div></div>`;
   const fmt = (n) => { n = +n || 0; return n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${Math.round(n / 1e3)}K` : String(n); };
   const PL = { tiktok: "TikTok", instagram: "Instagram" };
@@ -60,15 +60,17 @@ const RivalsPage = (() => {
   }
   // 🧭 خطة المحتوى: فريمويركس الاستراتيجية مطبّقة على البراند (لعبة المحتوى، التموضع، دواير الجمهور، المواضيع، خلطة ٣-٢-١…)
   function planTab() {
-    const P = S.pl, st = P.d?.strategy, G = P.d?.games || {}, AX = P.d?.axes || {};
-    const form = `<label class="nb-f"><span>عايز تقول حاجة للمخ قبل ما يعمل الخطة؟ (اختياري: هدفك، عرضك، اللي مش عايزه)</span>
-        <textarea rows="2" data-plnotes placeholder="مثلًا: عايز أبيع اشتراك شهري، ومش عايز أظهر بوشي">${esc(P.notes)}</textarea></label>
-      <div class="nb-bar"><button class="nb-btn fs-go" data-plgo ${P.busy ? "disabled" : ""}>${P.busy ? "⏳ بيعمل الخطة… (دقيقة تقريبًا)" : st ? "🔄 اعمل خطة جديدة" : "🧭 اعمل خطتي"}</button>
-        ${st && !P.busy ? `<button class="nb-btn sm danger" data-plclear>امسح الخطة</button>` : ""}</div>`;
+    const P = S.pl, st = P.d?.strategy, G = P.d?.games || {}, AX = P.d?.axes || {}, pl = P.d?.plan;
     if (!P.d) return `<div class="nh-empty">بيحمّل…</div>`;
+    // الخطة بتتبني لوحدها من كل اللي العقل عرفه: عدّاد بيزيد، والهدف مستنتج من الدعوة واللينك والعروض والكويز (من غير ما تكتبه)
+    const fresh = pl ? Math.max(0, pl.count - pl.built_from) : 0;
+    const form = pl ? `<div class="pl-count"><b class="num">${pl.count}</b><span>معلومة العقل بيبني منها خطتك${pl.status === "working" ? " · ⏳ بتتبني دلوقتي…" : fresh && pl.has ? ` · ${fresh} جديدة هتدخل في التحديث الجاي` : ""}</span></div>
+      <div class="pl-by">${pl.by.map((x) => `<span>${esc(x.t)} <b class="num">${x.n}</b></span>`).join("")}</div>
+      <p class="nb-hint">الخطة بتتعمل وبتتحدّث لوحدها كل ما العقل يعرف حاجات جديدة عنك (من الهوية والكويز والمعرفة والمواسم ولايكاتك على الأفكار وتحليل صفحتك والمنافسين). هدفك بيتستنتج من الدعوة واللينك والعروض، مش محتاج تكتبه.
+        ${st && pl.status !== "working" ? `<button class="nb-btn sm" data-plgo ${P.busy ? "disabled" : ""}>${P.busy ? "⏳…" : "🔄 حدّثها دلوقتي"}</button>` : ""}</p>${pl.error ? `<div class="fs-err">⚠️ ${esc(pl.error)}</div>` : ""}` : "";
     if (!st) return `<section class="fs-card"><h3>🧭 خطة المحتوى <small>المخ بيطبّق فريمويركس الاستراتيجية على براندك انت</small></h3>
-        <p class="nb-hint">بيحدد لعبتك (شهرة ولا بيع)، وجملة التموضع، والشخص اللي بتكلمه، ودواير الجمهور، ومجموعات المواضيع والأشكال، وجدول أسبوع بخلطة ٣-٢-١، وآراءك المختلفة، والفراغ اللي المنافسين سايبينه، والدعوة والهدية. ولما تعملها، كل الأفكار والسكريبتات والهوكات في البرنامج بتمشي عليها. هات المنافسين الأول علشان الخطة تبقى على داتا حقيقية.</p>
-        ${form}</section>`;
+        <p class="nb-hint">بتحدد لعبتك (شهرة ولا بيع)، وجملة التموضع، والشخص اللي بتكلمه، ودواير الجمهور، ومجموعات المواضيع والأشكال، وجدول أسبوع بخلطة ٣-٢-١، وآراءك المختلفة، والفراغ اللي المنافسين سايبينه، والدعوة والهدية. وكل الأفكار والسكريبتات والهوكات في البرنامج بتمشي عليها.</p>
+        ${form}${pl && pl.status !== "working" && (pl.count < pl.min || !pl.ready) ? `<p class="nb-hint">⏳ هتتبني لوحدها أول ما العقل يعرف ${pl.min} معلومات على الأقل (ومنهم «المجال» أو «عن البراند»). كمّل العقل من الكويز أو ضيف للعقل.</p>` : ""}</section>`;
     const li = (a) => a.map((x) => `<li>${esc(x)}</li>`).join("");
     const sec = (t, h) => `<section class="fs-card pl-sec"><h3>${t}</h3>${h}</section>`;
     return `<section class="fs-card pl-hero">
@@ -144,13 +146,20 @@ const RivalsPage = (() => {
     const w = S.el;
     if (!w || !S.d) return;
     if (!w.querySelector(".rv-top")) w.innerHTML = `<div class="rv-top"></div><div class="rv-body"></div>`;
-    w.querySelector(".rv-top").innerHTML = top();
+    w.querySelector(".rv-top").innerHTML = S.only ? `<section class="fs-hero"><div class="fs-hero-t"><b>خطة المحتوى</b><span class="latin">CONTENT PLAN</span></div>
+        <p>استراتيجية حسابك كله: بتتبني لوحدها وبتكبر مع كل معلومة العقل بيعرفها عنك، وكل الأفكار والسكريبتات والهوكات بتمشي عليها.</p></section>` : top();
     if (onlyTop && (S.tab === "plan" || S.tab === "batch")) return;   // ماتمسحش اللي بتكتبه
     const bd = w.querySelector(".rv-body");
     bd.innerHTML = body();
     if (S.tab === "batch" && !S.bt.d) api("/api/batch").then((x) => { S.bt.d = x; if (S.tab === "batch") render(); }).catch((err) => toast(err.message, true));
-    if (S.tab === "plan" && !S.pl.d) api("/api/strategy").then((x) => { S.pl.d = x; if (S.tab === "plan") render(); }).catch((err) => toast(err.message, true));
+    if (S.tab === "plan" && !S.pl.d) api("/api/strategy").then((x) => { S.pl.d = x; if (S.tab === "plan") render(); planPoll(); }).catch((err) => toast(err.message, true));
     if (S.focus) { w.querySelector(`[data-rid="${CSS.escape(S.focus)}"]`)?.scrollIntoView({ block: "center" }); S.focus = null; }
+  }
+  // الخطة وهي بتتبني لوحدها: بنشوف كل شوية لحد ما تخلص
+  function planPoll() {
+    clearTimeout(S.plT);
+    if (S.pl.d?.plan?.status !== "working") return;
+    S.plT = setTimeout(async () => { try { S.pl.d = await api("/api/strategy"); if (S.tab === "plan") render(); } catch {} planPoll(); }, 4000);
   }
   function poll() {
     clearTimeout(S.timer);
@@ -166,7 +175,6 @@ const RivalsPage = (() => {
   }
   function bind(w) {
     w.addEventListener("input", (e) => {
-      if (e.target.matches("[data-plnotes]")) S.pl.notes = e.target.value;
       if (e.target.matches("[data-btin]")) S.bt.handle = e.target.value;
     });
     w.addEventListener("change", (e) => {
@@ -198,14 +206,9 @@ const RivalsPage = (() => {
       }
       if (e.target.closest("[data-plgo]")) {
         S.pl.busy = true; render();
-        try { S.pl.d = await api("/api/strategy", { method: "POST", ...jsonBody({ notes: S.pl.notes }) }); toast("✅ الخطة جاهزة، وكل الأدوات هتمشي عليها"); }
+        try { await api("/api/strategy", { method: "POST", ...jsonBody({}) }); S.pl.d = await api("/api/strategy"); toast("✅ الخطة اتحدّثت، وكل الأدوات هتمشي عليها"); }
         catch (err) { toast(err.message, true); }
         S.pl.busy = false; return render();
-      }
-      if (e.target.closest("[data-plclear]")) {
-        if (!confirm("تمسح خطة المحتوى؟ الأدوات هترجع تشتغل من غيرها.")) return;
-        try { S.pl.d = await api("/api/strategy", { method: "DELETE" }); } catch (err) { toast(err.message, true); }
-        return render();
       }
       const tb = e.target.closest("[data-rvtab]");
       if (tb) { S.tab = tb.dataset.rvtab; return render(); }
@@ -239,7 +242,9 @@ const RivalsPage = (() => {
     w.innerHTML = "";
     const f = String(window.RV_FOCUS || "");
     window.RV_FOCUS = null;
-    S.tab = TABS.some(([k]) => `rv:${k}` === f) ? f.slice(3) : "rivals";
+    S.only = f === "plan-only";   // 🧭 من نقطة «خطة المحتوى» في العقل: صفحة الخطة لوحدها
+    S.tab = S.only ? "plan" : TABS.some(([k]) => `rv:${k}` === f) ? f.slice(3) : "rivals";
+    S.pl.d = null;   // عدّاد الخطة بيتجاب من جديد كل مرة
     S.focus = /^rv[^:]/.test(f) ? f.slice(2) : null;
     bind(w);
     try { S.d = await api("/api/rivals"); render(); poll(); }

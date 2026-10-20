@@ -86,7 +86,6 @@ const BrandPage = (() => {
         ...((b?.rivals || []).length ? [] : [{ f: "pg", i: "rv:rivals", page: "rivals", t: "🏆 هات منافسينك", type: "page" }]),
         { f: "pg", i: "rv:works", page: "rivals", t: "🧠 اللي بينجح عندهم", type: "page" },
         { f: "pg", i: "rv:batch", page: "rivals", t: "📊 حلّل آخر ١٠ فيديوهات ليك", type: "page" },
-        { f: "pg", i: "rv:plan", page: "rivals", t: "🧭 خطة المحتوى", type: "page" },
       ] },
       // 📡 قواعد الخوارزميات: القواعد الأساسية اللي كل الأدوات بتمشي عليها (تتعدّل وتتقفل وترجع للأصل)
       { k: "algo", t: "قواعد الخوارزميات", en: "Algorithm Rules", leaves: Object.entries(ALGO_G).map(([g, t]) => ({ f: "ag", i: g, t, type: "algo" })) },
@@ -205,7 +204,9 @@ const BrandPage = (() => {
     });
     // 📈 الترند: دراع طويل طالع لفوق في الزاوية الشمال، ومربع أحمر بعدد الترندات الجديدة
     { const xs = nodes.map((n) => n.x), ys = nodes.map((n) => n.y);
-      nodes.push({ id: "trends", kind: "trends", x: Math.min(...xs) * .9, y: Math.min(...ys) - 70, from: "c" }); }
+      nodes.push({ id: "trends", kind: "trends", x: Math.min(...xs) * .9, y: Math.min(...ys) - 70, from: "c" });
+      // 🧭 خطة المحتوى: نقطة لوحدها فوق يمين، عدّادها بيزيد مع كل معلومة العقل بيعرفها والخطة بتتبني لوحدها
+      nodes.push({ id: "plan", kind: "plan", x: Math.max(...xs) * .9, y: Math.min(...ys) - 70, from: "c" }); }
     // كل نقطة ليها مكانها الأصلي (x, y) ومكانها الحالي (px, py) وسرعتها؛ لو الخريطة اتعادت بتكمّل من مكانها
     const old = Object.fromEntries((S.nodes || []).map((n) => [n.id, n]));
     S.nodes = nodes.map((n, i) => {
@@ -300,6 +301,14 @@ const BrandPage = (() => {
         <span class="bm-trbox">${svg(IC.trends, 18)}<b>الترند</b>${nw ? `<em class="num">${nw}</em>` : ""}</span>
         <small>${tr?.status === "working" ? "بيدوّر…" : tr ? `${(tr.items || []).length} ترند${tr.market ? ` · ${esc(tr.market)}` : ""}` : ""}</small></button>`;
     }
+    if (n.kind === "plan") {
+      if (b && S.plFor !== b.id && S.plLoading !== b.id) loadPlan(b);
+      const pl = S.plFor === b?.id ? S.pl : null, fresh = pl ? Math.max(0, pl.count - pl.built_from) : 0;
+      return `<button class="bm-n bm-plan${pl?.status === "working" ? " busy" : ""}" data-n="plan" title="خطة المحتوى بتتبني لوحدها من كل اللي العقل عرفه عنك">
+        <span class="bm-trbox">🧭<b>خطة المحتوى</b><em class="num">${pl ? pl.count : "…"}</em></span>
+        <small>${!pl ? "" : pl.status === "working" ? "بتتبني دلوقتي…" : !pl.has ? (pl.count < pl.min || !pl.ready ? `محتاجة معلومات أكتر (${pl.count}/${pl.min})` : "هتتبني لوحدها")
+          : fresh ? `+${fresh} معلومة جديدة هتدخل فيها` : `مبنية من ${pl.built_from} معلومة`}</small></button>`;
+    }
     if (n.kind === "add") {
       const reading = (b?.sources || []).some((s) => s.status === "working");
       return `<button class="bm-n bm-add${reading ? " busy" : ""}" data-n="add" title="ضيف للعقل: ملف أو لينك أو كلام"><i>+</i><b>ضيف للعقل</b></button>`;
@@ -346,7 +355,7 @@ const BrandPage = (() => {
   // النقط بتعوم بهدوء حوالين مكانها، والخطوط ماشية معاها
   // فيزيا بسيطة: كل نقطة مربوطة بزنبرك لمكانها، واللي متعلّق بيها بيمشي وراها.
   // لما تمسك نقطة وتسحبها، اللي طالع منها بيتشد معاها، ولما تسيبها بترجع مكانها وبتهتز شوية
-  const FOLLOW = { branch: .55, leaf: .9, add: .6, trends: .5 };
+  const FOLLOW = { branch: .55, leaf: .9, add: .6, trends: .5, plan: .5 };
   function step(dt) {
     const k = 140, c = 15;
     for (const n of S.nodes) {
@@ -400,7 +409,7 @@ const BrandPage = (() => {
         c2 = [B[0] - (ox * .15 + ux * .35) * d, B[1] - (oy * .15 + uy * .35) * d];
       }
       // الخط بيبدأ وبيخلص عند حافة الدايرة (مش من جوّه المخ أو الأيقونة)
-      const r1 = n.from === "c" ? S.rc : 34, r2 = n.kind === "branch" ? 34 : n.kind === "add" || n.kind === "quiz" ? 24 : n.kind === "trends" ? 30 : 10;
+      const r1 = n.from === "c" ? S.rc : 34, r2 = n.kind === "branch" ? 34 : n.kind === "add" || n.kind === "quiz" ? 24 : n.kind === "trends" || n.kind === "plan" ? 30 : 10;
       const dir = (p, q) => { const l = Math.hypot(q[0] - p[0], q[1] - p[1]) || 1; return [(q[0] - p[0]) / l, (q[1] - p[1]) / l]; };
       const s1 = dir(A, c1), s2 = dir(c2, B);
       const P0 = [A[0] + s1[0] * r1, A[1] + s1[1] * r1], P3 = [B[0] - s2[0] * r2, B[1] - s2[1] * r2];
@@ -494,6 +503,14 @@ const BrandPage = (() => {
     if (S.open?.id === "trends") refreshCard();
     clearTimeout(S.trT);   // وهو بيدوّر بنشوف كل شوية، وبعدها كل ١٠ دقايق (السيرفر بيحدّث لوحده كل ١٢ ساعة)
     S.trT = setTimeout(() => { if (S.el?.isConnected && cur()?.id === b.id) { S.trFor = null; loadTrends(b); } }, S.tr?.status === "working" ? 4000 : 600000);
+  }
+  async function loadPlan(b) {
+    S.plLoading = b.id;
+    try { S.pl = await bAPI("/plan"); S.plFor = b.id; } catch { S.pl = null; S.plFor = b.id; }
+    S.plLoading = null;
+    redrawNode("plan");
+    clearTimeout(S.plT);   // وهي بتتبني بنشوف كل شوية لحد ما تخلص
+    if (S.pl?.status === "working") S.plT = setTimeout(() => { if (S.el?.isConnected && cur()?.id === b.id) { S.plFor = null; loadPlan(b); } }, 4000);
   }
   function redrawNode(id) {
     const n = S.byId?.[id];
@@ -710,6 +727,7 @@ const BrandPage = (() => {
     return head;
   }
   function openCard(n) {
+    if (n?.kind === "plan") { window.RV_FOCUS = "plan-only"; return window.NHNav?.("plan"); }
     if (n?.l?.type === "page" && n.l.page === "twin") return showStep("16");   // قسم لوحده (مش صفحة جوه العقل)
     if (n?.l?.type === "page") { window.RV_FOCUS = n.l.page === "rivals" ? n.l.i : null; return window.NHNav?.(n.l.page); }   // الشخصيات / التعليق / الموسيقى: صفحتها بتفتح جوه العقل («رجوع» بيرجّعك هنا)
     const card = S.el.querySelector(".bm-card");
@@ -763,6 +781,7 @@ const BrandPage = (() => {
       const b = await fn();
       S.brains = S.brains.map((x) => (x.id === b.id ? b : x));
       if (S.tqFor === b.id) S.tqFor = null;   // المهام بتتحسب تاني (ممكن تكون واحدة اتعملت)
+      if (S.plFor === b.id) S.plFor = null;   // وعدّاد خطة المحتوى (وممكن تتبني لوحدها)
       const keep = S.open && S.el.querySelector(".bm-card").contains(document.activeElement) && document.activeElement.matches(".bm-write");
       layout();
       if (S.open) {
