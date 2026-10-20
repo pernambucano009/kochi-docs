@@ -4069,6 +4069,8 @@ import brainsocial  # noqa: E402
 import stock  # noqa: E402
 import hairdraw  # noqa: E402
 import library as lib_  # noqa: E402
+import automate  # noqa: E402
+import random  # noqa: E402
 import ideamem  # noqa: E402
 import twin  # noqa: E402
 import phone  # noqa: E402
@@ -25217,6 +25219,309 @@ def library_search(q: str = "", kind: str = "", ref: str = ""):
             return {"ref": ref, "folder": None, "files": [], "error": "مش لاقي الفولدر ده"}
     hits = lib_.search(lib, q, kind if kind in lib_.KINDS else "", folder)
     return {"ref": ref, "folder": folder, "files": [lib_file_dict(lib, f, bid) for f in hits[:200]]}
+
+
+# ---------------------------------------------------------------- 🤖 الموديل المخصص: خطوات بأفعال ومنشن من المكتبة ← مشروع مونتاج
+AUTO_LOCK = threading.Lock()
+AUTO_CANVAS = {"9:16": (1080, 1920), "1:1": (1080, 1080), "4:5": (1080, 1350), "16:9": (1920, 1080)}
+
+
+def auto_dir(bid: str | None = None) -> Path:
+    d = brain_dir(bid or active_client_id() or "default") / "automations"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def auto_load(rid: str, bid: str | None = None) -> dict:
+    f = auto_dir(bid) / f"{Path(rid).name}.json"
+    if not f.exists():
+        raise HTTPException(404, "الموديل ده مش موجود")
+    return json.loads(f.read_text(encoding="utf-8"))
+
+
+def auto_save(rid: str, d: dict, bid: str | None = None) -> None:
+    d["updated_at"] = now()
+    f = auto_dir(bid) / f"{Path(rid).name}.json"
+    f.with_suffix(".tmp").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+    f.with_suffix(".tmp").replace(f)
+
+
+def auto_update(rid: str, fn, bid: str | None = None) -> dict:
+    with AUTO_LOCK:
+        d = auto_load(rid, bid)
+        fn(d)
+        auto_save(rid, d, bid)
+        return d
+
+
+def auto_files(lib: dict, src: dict | None, kinds: tuple[str, ...]) -> list[dict]:
+    """الملفات اللي المنشن بيشاور عليها: فولدر (واللي جواه)، ملف بعينه، أو بحث بالمعنى."""
+    if not src:
+        return []
+    if src["mode"] == "file":
+        return [f for f in lib["files"] if f["id"] == src["id"] and f["kind"] in kinds]
+    if src["mode"] == "search":
+        return [f for f in lib_.search(lib, src["q"]) if f["kind"] in kinds]
+    return [f for f in lib_.search(lib, "", "", src.get("id")) if f["kind"] in kinds]
+
+
+def auto_to_dict(rid: str, d: dict, bid: str) -> dict:
+    lib = lib_load(bid)
+    steps = []
+    for s in d.get("steps") or []:
+        v = automate.VERBS[s["verb"]]
+        kinds = v["accept"] if s["verb"] != "pull" else (("image", "video") if s["opts"].get("type") == "any" else (s["opts"].get("type") or "image",))
+        n = len(auto_files(lib, s.get("src"), kinds)) if v["accept"] else None
+        steps.append({**s, "found": n})
+    voice_sec = 0.0
+    for s in d.get("steps") or []:
+        if s["verb"] == "voice":
+            fs = auto_files(lib, s.get("src"), ("audio",))
+            voice_sec = max((f.get("dur") or 0 for f in fs), default=0)
+    caps = any(s["verb"] == "caption" and s["opts"].get("on") for s in d.get("steps") or [])
+    est = wallet.credits(wallet.est(stt_min=voice_sec / 60)) if caps and voice_sec else 0
+    return {**d, "id": rid, "steps": steps, "est": est, "busy": any(r.get("status") == "working" for r in d.get("runs") or [])}
+
+
+@app.get("/api/automations-meta")
+def automations_meta():
+    return {"verbs": {k: {x: v[x] for x in ("t", "desc", "accept", "opts")} for k, v in automate.VERBS.items()},
+            "orders": automate.ORDERS, "trans": automate.TRANS, "ratios": automate.RATIOS}
+
+
+@app.get("/api/automations")
+def automations_list():
+    bid = active_client_id()
+    out = []
+    for f in sorted(auto_dir(bid).glob("*.json"), key=lambda x: x.stat().st_mtime, reverse=True):
+        if f.name.startswith("_"):
+            continue
+        try:
+            d = json.loads(f.read_text(encoding="utf-8"))
+        except ValueError:
+            continue
+        out.append({"id": f.stem, "name": d.get("name"), "steps": len(d.get("steps") or []), "runs": len(d.get("runs") or []), "updated_at": d.get("updated_at")})
+    return out
+
+
+class AutoNewIn(BaseModel):
+    name: str = ""
+
+
+@app.post("/api/automations")
+def automation_new(body: AutoNewIn):
+    bid, rid = active_client_id(), uuid.uuid4().hex[:10]
+    d = {"name": lib_.clean_name(body.name, "موديل جديد"), "steps": automate.starter(), "runs": [], "used": {}, "created_at": now()}
+    auto_save(rid, d, bid)
+    return auto_to_dict(rid, d, bid)
+
+
+@app.get("/api/automations/{rid}")
+def automation_get(rid: str):
+    bid = active_client_id()
+    return auto_to_dict(rid, auto_load(rid, bid), bid)
+
+
+class AutoPatchIn(BaseModel):
+    name: str | None = None
+    steps: list | None = None
+
+
+@app.patch("/api/automations/{rid}")
+def automation_patch(rid: str, body: AutoPatchIn):
+    bid = active_client_id()
+    def fn(d):
+        if body.name is not None:
+            d["name"] = lib_.clean_name(body.name, d.get("name") or "موديل")
+        if body.steps is not None:
+            d["steps"] = automate.clean_steps(body.steps)
+    return auto_to_dict(rid, auto_update(rid, fn, bid), bid)
+
+
+@app.delete("/api/automations/{rid}")
+def automation_delete(rid: str):
+    (auto_dir() / f"{Path(rid).name}.json").unlink(missing_ok=True)
+    return {"ok": True}
+
+
+@app.post("/api/automations/{rid}/run")
+def automation_run(rid: str):
+    """▶ شغّل: الخطوات بتتحول لمشروع مونتاج جديد (بيتفتح في المحرر أو يتصدّر على طول)."""
+    bid = active_client_id()
+    d = auto_load(rid, bid)
+    if any(r.get("status") == "working" for r in d.get("runs") or []):
+        raise HTTPException(400, "فيه تشغيل شغال، استنى يخلص")
+    if not any(s["verb"] in ("pull", "intro", "outro") for s in d.get("steps") or []):
+        raise HTTPException(400, "الموديل محتاج خطوة «اسحب» صور أو فيديوهات على الأقل")
+    run = {"id": uuid.uuid4().hex[:8], "at": now(), "status": "working", "step": "بيبدأ…", "project_id": None, "report": [], "error": None}
+    auto_update(rid, lambda x: x.update(runs=[run, *(x.get("runs") or [])][:20]), bid)
+    threading.Thread(target=run_automation, args=(rid, run["id"], bid), daemon=True).start()
+    return auto_to_dict(rid, auto_load(rid, bid), bid)
+
+
+def auto_cache(bid: str) -> tuple[dict, Path]:
+    f = auto_dir(bid) / "_cache.json"
+    try:
+        return (json.loads(f.read_text(encoding="utf-8")) if f.exists() else {}), f
+    except ValueError:
+        return {}, f
+
+
+def auto_video_gen(bid: str, f: dict, cache: dict) -> str:
+    """فيديو من المكتبة ← مكتبة فيديوهات المونتاج (مرة واحدة لكل ملف)."""
+    k = f"vid:{f['id']}"
+    if cache.get(k):
+        return cache[k]
+    src = lib_dir(bid) / f["file"]
+    dest = GENERATED_DIR / f"auto_{f['id']}{src.suffix.lower()}"
+    if not dest.exists():
+        shutil.copy(src, dest)
+    cache[k] = phone_gen(dest, f"📁 {f['name']}")
+    return cache[k]
+
+
+def auto_image_gen(bid: str, f: dict, sec: float, ratio: str, cache: dict) -> str:
+    """صورة ← لقطة فيديو بطولها، مالية الكادر وبزووم بطيء."""
+    sec = round(max(0.6, sec) * 2) / 2
+    k = f"img:{f['id']}:{sec}:{ratio}"
+    if cache.get(k):
+        return cache[k]
+    W, H = AUTO_CANVAS.get(ratio, AUTO_CANVAS["9:16"])
+    W, H = W * 2 // 3 // 2 * 2, H * 2 // 3 // 2 * 2   # 720 أسرع، والمونتاج بيكبّر
+    n = int(sec * 30)
+    dest = GENERATED_DIR / f"auto_{f['id']}_{int(sec * 10)}_{ratio.replace(':', 'x')}.mp4"
+    subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-loop", "1", "-i", str(lib_dir(bid) / f["file"]), "-t", f"{sec:.2f}",
+                    "-vf", f"scale={W * 2}:{H * 2}:force_original_aspect_ratio=increase,crop={W * 2}:{H * 2},"
+                           f"zoompan=z='1+0.06*on/{max(1, n)}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s={W}x{H}:fps=30,format=yuv420p",
+                    "-r", "30", "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", str(dest)], check=True, capture_output=True, timeout=300)
+    cache[k] = phone_gen(dest, f"📁 {f['name']}")
+    return cache[k]
+
+
+def auto_audio_id(bid: str, f: dict, kind: str, cache: dict) -> tuple[str, float]:
+    k = f"aud:{f['id']}:{kind}"
+    if cache.get(k):
+        with closing(db()) as conn:
+            r = conn.execute("SELECT duration FROM audio WHERE id = ?", (cache[k],)).fetchone()
+        if r:
+            return cache[k], float(r["duration"])
+    src = lib_dir(bid) / f["file"]
+    aid = uuid.uuid4().hex[:12]
+    name = f"{kind}_{aid}{src.suffix.lower()}"
+    shutil.copy(src, AUDIO_DIR / name)
+    dur = probe_duration(AUDIO_DIR / name)
+    with closing(db()) as conn, conn:
+        conn.execute("INSERT INTO audio (id, kind, name, filename, duration, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                     (aid, kind, f["name"][:80], name, dur, now()))
+    cache[k] = aid
+    return aid, dur
+
+
+def run_automation(rid: str, run_id: str, bid: str) -> None:
+    def setr(**kw):
+        def fn(x):
+            for r in x.get("runs") or []:
+                if r["id"] == run_id:
+                    r.update(**kw)
+        auto_update(rid, fn, bid)
+    report: list[str] = []
+    try:
+        d = auto_load(rid, bid)
+        lib, (cache, cache_f) = lib_load(bid), auto_cache(bid)
+        rnd, used = random.Random(), dict(d.get("used") or {})
+        steps = d.get("steps") or []
+        opt = lambda verb: next((s["opts"] for s in steps if s["verb"] == verb), None)  # noqa: E731
+        ratio = (opt("export") or {}).get("ratio", "9:16")
+        cut = opt("cut") or {}
+        cap = float(cut.get("max") or 0) or None
+        trans = cut.get("trans") or ""
+        picked: list[dict] = []
+        voice = music = None
+        intro = outro = None
+        setr(step="📁 بيختار من المكتبة")
+        for s in steps:
+            v, o = s["verb"], s["opts"]
+            if v == "pull":
+                kinds = ("image", "video") if o.get("type") == "any" else (o.get("type") or "image",)
+                files = auto_files(lib, s.get("src"), kinds)
+                got, wrapped = automate.pick(files, int(o.get("count") or 1), o.get("order") or "fresh", used, rnd)
+                if not got:
+                    report.append(f"⚠️ «اسحب» مالقاش {lib_.KINDS.get(kinds[0], 'ملفات')} في «{(s.get('src') or {}).get('label') or 'المكتبة'}»")
+                    continue
+                if wrapped:
+                    report.append(f"🔁 «{(s.get('src') or {}).get('label') or 'المكتبة'}» خلص، فبدأ من الأول")
+                picked += [{"f": f, "sec": float(o.get("sec") or 2.5)} for f in got]
+                report.append(f"✓ سحب {len(got)} من «{(s.get('src') or {}).get('label') or 'المكتبة'}»")
+            elif v in ("intro", "outro"):
+                got, _ = automate.pick(auto_files(lib, s.get("src"), ("video",)), 1, "random", {}, rnd)
+                if got:
+                    if v == "intro":
+                        intro = got[0]
+                    else:
+                        outro = got[0]
+                    report.append(f"✓ {'الإنترو' if v == 'intro' else 'الأوترو'}: {got[0]['name']}")
+            elif v in ("voice", "music"):
+                got, _ = automate.pick(auto_files(lib, s.get("src"), ("audio",)), 1, o.get("order") or "fresh", used, rnd)
+                if not got:
+                    report.append(f"⚠️ مالقاش {'تعليق صوتي' if v == 'voice' else 'موسيقى'} في «{(s.get('src') or {}).get('label') or 'المكتبة'}»")
+                    continue
+                if v == "voice":
+                    voice = {"f": got[0], "fit": bool(o.get("fit"))}
+                else:
+                    music = {"f": got[0], "volume": int(o.get("volume") or 35), "duck": bool(o.get("duck"))}
+                report.append(f"✓ {'التعليق' if v == 'voice' else 'الموسيقى'}: {got[0]['name']}")
+        if not picked and not intro and not outro:
+            raise RuntimeError("مفيش ولا صورة ولا فيديو اتسحب. راجع المنشن في خطوة «اسحب»")
+        setr(step="🎞️ بيجهّز اللقطات")
+        voice_id = music_id = None
+        target = None
+        if voice:
+            voice_id, vdur = auto_audio_id(bid, voice["f"], "voice", cache)
+            target = vdur if voice["fit"] else None
+        if music:
+            music_id, _ = auto_audio_id(bid, music["f"], "music", cache)
+        lens = automate.plan_lengths([(x["f"]["kind"], x["f"].get("dur")) for x in picked], target, cap, [x["sec"] for x in picked])
+        clips = []
+        Wc, Hc = AUTO_CANVAS.get(ratio, AUTO_CANVAS["9:16"])
+        def vclip(f, L):
+            ok = f.get("w") and f.get("h") and abs((f["w"] / f["h"]) - (Wc / Hc)) < 0.08
+            return {"gen_id": auto_video_gen(bid, f, cache), "start": 0, "end": round(min(L, f.get("dur") or L), 2) if L else None, "fit": "fill" if ok else "blur"}
+        if intro:
+            clips.append(vclip(intro, None))
+        for x, L in zip(picked, lens):
+            f = x["f"]
+            c = {"gen_id": auto_image_gen(bid, f, L, ratio, cache), "start": 0, "end": None, "fit": "fill"} if f["kind"] == "image" else vclip(f, L)
+            if trans and clips:
+                c["trans"] = {"type": trans, "dur": 0.3}
+            clips.append(c)
+        if outro:
+            clips.append({**vclip(outro, None), **({"trans": {"type": trans, "dur": 0.3}} if trans else {})})
+        cache_f.write_text(json.dumps(cache, ensure_ascii=False), encoding="utf-8")
+        caps = (opt("caption") or {}).get("on") and voice_id
+        data = {"name": f"🤖 {d.get('name') or 'موديل'}"[:100], "section": "free", "clips": clips, "outro": False, "brand_intro": False, "brand_outro": False,
+                "char_intro": False, "canvas": {"ratio": ratio, "bg": "#000000"}, "captions": {"enabled": True} if caps else {},
+                "voice": {"id": voice_id} if voice_id else None,
+                "music": {"id": music_id, "volume": round((music or {}).get("volume", 35) / 100, 2)} if music_id else None,
+                "mix": {"duck": 0.75 if (music or {}).get("duck") and voice_id else 0, "normalize": True, "enhance": bool(voice_id)}}
+        pj = create_project(ProjectIn(**data))
+        if caps:   # الكابشن محتاج الكلام مكتوب بتوقيته
+            setr(step="✍️ بيكتب الكلام عشان الكابشن", project_id=pj["id"])
+            with closing(db()) as conn:
+                tr = transcript_of(conn.execute("SELECT transcript FROM audio WHERE id = ?", (voice_id,)).fetchone())
+            if tr.get("status") != "done":
+                set_transcript(voice_id, {"status": "working", "words": []})
+                run_transcribe(voice_id)
+                if not atlas.mock_mode():
+                    with closing(db()) as conn:
+                        r = conn.execute("SELECT duration FROM audio WHERE id = ?", (voice_id,)).fetchone()
+                    wallet.charge(wallet.credits(wallet.est(stt_min=float(r["duration"]) / 60)), "موديل مخصص: كتابة الكلام للكابشن", run_id)
+        for x in picked + ([voice] if voice else []) + ([music] if music else []):
+            used[x["f"]["id"]] = used.get(x["f"]["id"], 0) + 1
+        auto_update(rid, lambda z: z.update(used=used), bid)
+        report.append(f"🎬 {len(clips)} لقطة · مقاس {ratio}" + (f" · حوالي {round(target)} ثانية على قد التعليق" if target else ""))
+        setr(status="done", step=None, project_id=pj["id"], report=report, error=None)
+    except Exception as exc:  # noqa: BLE001
+        setr(status="failed", step=None, report=report, error=str(getattr(exc, "detail", None) or exc)[:300])
 
 
 # الواجهة آخر حاجة: أي مسار مش API بيروح للملفات (لازم تفضل بعد كل الـ routes)

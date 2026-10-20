@@ -1650,6 +1650,12 @@ audio { width: 100%; }
 #nh .nh-page:has(> .nh-pgrid[data-key="brand"]) > :not(.nh-pgrid) { position: relative; z-index: 2; pointer-events: none; }
 #nh .nh-page:has(> .nh-pgrid[data-key="brand"]) > :not(.nh-pgrid) * { pointer-events: auto; }
 #nh .nh-pgrid[data-key="brand"] .bm { min-height: 0; }
+/* 🤖 الموديل المخصص: نفس شاشة خريطة العقل */
+#nh .nh-pgrid[data-key="auto"] { display: block; overflow: hidden; padding: 0; }
+#nh .nh-page:has(> .nh-pgrid[data-key="auto"]) > .nh-pgrid { position: absolute; inset: 0; }
+#nh .nh-page:has(> .nh-pgrid[data-key="auto"]) > :not(.nh-pgrid) { position: relative; z-index: 2; pointer-events: none; }
+#nh .nh-page:has(> .nh-pgrid[data-key="auto"]) > :not(.nh-pgrid) * { pointer-events: auto; }
+#nh .nh-pgrid[data-key="auto"] .bm { min-height: 0; }
 /* الكوميكس: عربي / أجنبي / الاتنين، والاختيار للمسح */
 .cm-item { position: relative; }
 .cm-lang { position: absolute; top: 8px; inset-inline-start: 8px; padding: 2px 8px; border-radius: 999px; background: rgba(0, 0, 0, .55); color: #fff; font-size: 11px; font-weight: 600; letter-spacing: .02em; }
@@ -1980,3 +1986,20 @@ audio { width: 100%; }
 .bl-ef { display: grid; gap: 8px; }
 .bl-ref code { font-size: 12px; padding: 2px 8px; border-radius: 8px; background: var(--nh-bg); }
 @media (max-width: 820px) { .bl-main { grid-template-columns: 1fr; } .bl-tree { position: static; max-height: none; } .bl-eb { grid-template-columns: 1fr; } }
+
+/* 🤖 الموديل المخصص: خط الترتيب بين الخطوات، والفعل الجديد، والملفات في المنشن */
+.bm .bm-lines .am-seq { fill: none; stroke: var(--nh-accent, #E5613E); stroke-width: 1.4; stroke-dasharray: 3 6; opacity: .55; }
+.am-verbs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.am-verb { display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; align-items: center; padding: 10px; border-radius: 14px; border: 0; background: var(--nh-fill); color: var(--nh-ink); text-align: start; cursor: pointer; }
+.am-verb small { grid-column: 1 / -1; color: var(--nh-muted); font-size: 11.5px; line-height: 1.5; }
+.am-verb:hover { background: var(--nh-fill-hi); }
+.am-tree { max-height: 180px; overflow: auto; }
+.am-files { display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 6px; max-height: 220px; overflow: auto; }
+.am-file { display: grid; gap: 3px; padding: 0; border: 0; background: none; color: var(--nh-ink); cursor: pointer; font-size: 11px; text-align: start; }
+.am-file img, .am-file span { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 10px; background: var(--nh-fill); display: grid; place-items: center; outline: 2px solid transparent; }
+.am-file.on img, .am-file.on span { outline-color: var(--nh-accent, #E5613E); }
+.am-file small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.am-run { display: grid; gap: 3px; padding: 10px 12px; border-radius: 14px; background: var(--nh-fill); margin-top: 6px; font-size: 12.5px; }
+.am-run small { color: var(--nh-muted); }
+.am-run small.bad { color: var(--nh-accent, #E5613E); }
+.am-run .bm-pill { justify-self: start; margin-top: 4px; }
