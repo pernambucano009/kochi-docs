@@ -4067,6 +4067,7 @@ import hekaya  # noqa: E402
 import brainquiz  # noqa: E402
 import brainsocial  # noqa: E402
 import stock  # noqa: E402
+import hairdraw  # noqa: E402
 import ideamem  # noqa: E402
 import twin  # noqa: E402
 import phone  # noqa: E402
@@ -15965,6 +15966,10 @@ TYPO_BUSY = ("transcribing", "analyzing", "planning", "drawing", "rendering", "t
 TYPO_RATIOS = {"9:16": (1080, 1920), "16:9": (1920, 1080), "1:1": (1080, 1080), "4:5": (1080, 1350)}
 TYPO_STICKER_COST = 0.03
 TYPO_DICT = TYPO_DIR / "concepts.json"
+# ✏️ مكتبة رسومات Hairline الجديدة (كلمة ← رسمة): بتترسم مرة واحدة وتتستخدم في أي فيديو بعد كده
+HAIRDRAW_DIR = TYPO_DIR / "hairdraw"
+HAIRDRAW_DIR.mkdir(parents=True, exist_ok=True)
+HAIRDRAW_NEW_MAX = 6   # أقصى رسومات جديدة في التوزيعة الواحدة
 TYPO_SFX = TYPO_DIR / "sfx"   # الأصوات الرسمية (بتترفع من البرنامج، مش في الكود)
 TYPO_DICT_LOCK = threading.Lock()
 TYPO_FPS = 30
@@ -16557,6 +16562,8 @@ def typo_patch(pid: str, body: TypoPatchIn):
             d["ratio"] = body.ratio
         if body.style is not None:
             d["style"] = body.style
+            if typo_style(body.style).get("audio_only") and (d.get("bg") or {}).get("kind") == "source":
+                d["bg"] = {**d["bg"], "kind": "theme"}
         if body.brief is not None:
             d["brief"] = body.brief[:1000]
         if body.ai in ("smart", "off"):   # «من غير ذكاء اصطناعي»: قواعد + قاموس + تفريغ على السيرفر
@@ -16613,7 +16620,11 @@ def typo_clean_blocks(blocks: list, d: dict) -> list[dict]:
         if isinstance(b, dict):
             raw.append({**b, "from": typo._i(b.get("from")), "to": typo._i(b.get("to"))})
     out = typo.clean_plan({"blocks": raw}, words, d.get("duration") or 0) if words else []
-    # الأيقونات اللي اتختارت بإيدك (رقم ستيكر) بتفضل زي ما هي
+    # الأيقونات اللي اتختارت بإيدك (رقم ستيكر) بتفضل زي ما هي، والرسمة الجديدة بتاعة hairfig كمان
+    for o, b in zip(out, raw):
+        sl = str(b.get("draw") or "")
+        if o.get("kind") == "hairfig" and sl and (HAIRDRAW_DIR / f"{Path(sl).name}.json").exists():
+            o["draw"] = Path(sl).name
     return out
 
 
@@ -16648,7 +16659,7 @@ def typo_source(pid: str, file: UploadFile = File(...)):
         x["source"] = {"kind": kind, "file": name, "name": file.filename, "duration": round(dur, 3), "w": info.width, "h": info.height}
         x["duration"] = round(dur, 3)
         x.update(words=[], blocks=[], final=None, scene=None)
-        if kind == "video":
+        if kind == "video" and not typo_style(x.get("style")).get("audio_only"):   # ستايل «الصوت بس» (Hairline): الفيديو صوته بس، والخلفية ألوان الستايل
             x["bg"] = {**(x.get("bg") or {}), "kind": "source"}
     typo_update(pid, fn)
     return typo_start(pid, "transcribing", "🎧 بيسمع الكلام ويكتبه بتوقيته", run_typo_transcribe)
@@ -16923,7 +16934,7 @@ def run_typo_plan(pid: str) -> None:
         words, dur = d["words"], d.get("duration") or d["words"][-1]["e"] + 0.5
         items = stickers_load()
         anchors = None
-        if (d.get("source") or {}).get("kind") == "video":   # فوق فيديو: الموديل لازم يشوف اللي في الكادر الأول
+        if (d.get("source") or {}).get("kind") == "video" and (d.get("bg") or {}).get("kind") == "source":   # فوق فيديو: الموديل لازم يشوف اللي في الكادر الأول
             anchors = (d.get("scene") or {}).get("anchors")
             if anchors is None:
                 typo_set(pid, step="👁️ بيحلل الفيديو: إيه اللي في الكادر وفين")
@@ -16977,6 +16988,7 @@ def run_typo_plan(pid: str) -> None:
                     b["icon"] = found[0] if found else ""
                 else:
                     b["icons"] = found
+        hair_assign(pid, blocks)
         typo_update(pid, lambda x: x.update(blocks=blocks, final=None, status="planned", step=None, error=None))
     except Exception as exc:  # noqa: BLE001
         typo_fail(pid, exc)
@@ -17144,6 +17156,60 @@ def typo_still(pid: str, src: Path, t: float) -> str | None:
     return f"/media/typo/projects/{pid}/stills/{name}" if out.exists() else None
 
 
+def hair_drawing(word: str, context: str) -> str | None:
+    """رسمة جديدة بخط رفيع للكلمة (من المكتبة لو اترسمت قبل كده). بيرجّع اسمها في المكتبة."""
+    sl = hairdraw.slug(word)
+    f = HAIRDRAW_DIR / f"{sl}.json"
+    if f.exists():
+        return sl
+    if atlas.mock_mode() or not atlas.api_key():
+        dr = hairdraw.mock_drawing(word)
+    else:
+        try:
+            wallet.need(1, "رسمة خط رفيع")
+            dr = hairdraw.clean_drawing(ad_json(series_chat(hairdraw.draw_messages(word, context)), "رسمة خط رفيع"))
+        except (wallet.NoCredits, HTTPException, RuntimeError, ValueError):
+            return None
+        if not dr:
+            return None
+        wallet.charge(1, f"رسمة خط رفيع: {word}", sl)
+    f.write_text(json.dumps({**dr, "word": word, "at": now()}, ensure_ascii=False), encoding="utf-8")
+    return sl
+
+
+def hair_assign(pid: str, blocks: list[dict]) -> None:
+    """✏️ كل hairfig: رسمة جاهزة على قد الكلام، ولو مفيش، رسمة جديدة لأهم كلمة (من المكتبة أو تترسم)."""
+    new = 0
+    for b in blocks:
+        if b.get("kind") != "hairfig" or b.get("fig") or b.get("draw"):
+            continue
+        ws = [w["w"] for w in b.get("words") or []] or str(b.get("text") or "").split()
+        text = " ".join(ws)
+        fig = hairdraw.pick_fig(text)
+        if fig:
+            b["fig"] = fig
+            continue
+        word = hairdraw.concept(ws, b.get("focus", -1) if isinstance(b.get("focus"), int) else -1)
+        if not word:
+            continue
+        had = (HAIRDRAW_DIR / f"{hairdraw.slug(word)}.json").exists()
+        if not had and new >= HAIRDRAW_NEW_MAX:
+            continue
+        typo_set(pid, step=f"✏️ بيرسم «{word}» بخط رفيع")
+        sl = hair_drawing(word, text)
+        new += 0 if had else 1
+        if sl:
+            b["draw"] = sl
+
+
+def hair_svg(sl: str) -> list[dict] | None:
+    f = HAIRDRAW_DIR / f"{Path(sl).name}.json"
+    try:
+        return json.loads(f.read_text(encoding="utf-8"))["paths"] if f.exists() else None
+    except (ValueError, KeyError):
+        return None
+
+
 def typo_doc(pid: str, d: dict) -> dict:
     """الخطة بالشكل اللي المحرّك بيرسمه: المقاس والستايل والبلوكات بلينكات الصور."""
     W, H = TYPO_RATIOS.get(d.get("ratio"), TYPO_RATIOS["9:16"])
@@ -17160,6 +17226,7 @@ def typo_doc(pid: str, d: dict) -> dict:
                      for sn in sents if sn[0] <= b.get("from", 0) <= sn[-1]), None)
         blocks.append({**{k: b.get(k) for k in ("t0", "t1", "kind", "theme", "text", "words", "focus", "letter", "anchor", "place", "skip",
                                                  "intro", "outro", "sign", "box", "redact", "marks", "mx", "my", "ms", "trans", "xf", "xk", *typo.VARIANTS)}, "sent": sent,
+                       **({"draw": b["draw"], "draw_svg": hair_svg(b["draw"])} if b.get("draw") else {}),
                        "icon": img(b.get("icon")), "side": img(b.get("side")), "icons": [u for u in (img(i) for i in b.get("icons") or []) if u]})
     # الحركات اللي محتاجة صورة من الفيديو نفسه (الصورة جوه الحروف، البولارويد، الكروت): لقطة من نص البلوك
     srcf = (d.get("source") or {})

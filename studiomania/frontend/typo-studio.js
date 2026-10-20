@@ -55,7 +55,7 @@
     "qr", "codetag", "toolbar", "terminal", "scan",
     "toasts", "footer", "marquee", "datestrip",
     "fileicon", "chaos",
-    "gradword", "meshprompt", "orbsplit", "bento", "figdays", "figcurve", "figplay", "figequal", "figwords", "figphone", "figdrop", "figcount", "figgears", "figbar", "figcheck", "figcta", "goldcap", "iconbelt", "glowsweep", "namepill", "kashida", "molecule", "weightstack", "stretch", "desatpop", "arcs", "chrome", "inkverse", "poemfade", "hashend", "flipverb", "strobe", "duoline", "capstack", "pillword", "blurduo", "tagstack", "underbars", "contactcard", "iconorbit", "blurstrobe", "kinstack", "incall", "cineband", "scriptover", "tricolor", "drumpicker", "redmix", "headbubble", "pincard", "emojifloat", "slotreel", "posterwall", "quoteline", "medallion", "clockhand", "roadtext", "markpan", "objectquote", "racechart", "calflip", "glosscards", "dropword", "tasklens", "monostack", "dashbox", "sparklist", "followbtn", "silhouette", "petalstack", "followcount", "twopillars", "cutmat", "labelbox", "stampcard", "lcdtype", "genpanel", "holopulse", "coverflow", "featuretag", "luxmix", "goldframes", "goldrows", "tilegrid", "goldpill", "holoclock", "curvewall", "newsscan", "neonvenn", "wavebelt", "cardarc", "shadowquote", "haloring", "noirtitle", "stickerstack", "graphhop", "podium", "hudcallout", "termbar", "glowtoggle", "pinkdoodle", "lensfind", "echostack", "dofwords", "portalchat", "cardframe", "wordvoid", "facecam", "spreadcaps", "tinysub", "ringword", "handcap", "blobcam", "brushbar", "beforeafter", "pillcarousel", "namescript", "stackrepeat", "vertword", "serifsolo", "selectword", "tornlabel", "radartags", "slamword", "scrawl", "spikeburst", "laserprompt", "hairfig"]);
+    "gradword", "meshprompt", "orbsplit", "bento", "figdays", "figcurve", "figplay", "figequal", "figwords", "figphone", "figdrop", "figcount", "figgears", "figbar", "figcheck", "figcta", "goldcap", "iconbelt", "glowsweep", "namepill", "kashida", "molecule", "weightstack", "stretch", "desatpop", "arcs", "chrome", "inkverse", "poemfade", "hashend", "flipverb", "strobe", "duoline", "capstack", "pillword", "blurduo", "tagstack", "underbars", "contactcard", "iconorbit", "blurstrobe", "kinstack", "incall", "cineband", "scriptover", "tricolor", "drumpicker", "redmix", "headbubble", "pincard", "emojifloat", "slotreel", "posterwall", "quoteline", "medallion", "clockhand", "roadtext", "markpan", "objectquote", "racechart", "calflip", "glosscards", "dropword", "tasklens", "monostack", "dashbox", "sparklist", "followbtn", "silhouette", "petalstack", "followcount", "twopillars", "cutmat", "labelbox", "stampcard", "lcdtype", "genpanel", "holopulse", "coverflow", "featuretag", "luxmix", "goldframes", "goldrows", "tilegrid", "goldpill", "holoclock", "curvewall", "newsscan", "neonvenn", "wavebelt", "cardarc", "shadowquote", "haloring", "noirtitle", "stickerstack", "graphhop", "podium", "hudcallout", "termbar", "glowtoggle", "pinkdoodle", "lensfind", "echostack", "dofwords", "portalchat", "cardframe", "wordvoid", "facecam", "spreadcaps", "tinysub", "ringword", "handcap", "blobcam", "brushbar", "beforeafter", "pillcarousel", "namescript", "stackrepeat", "vertword", "serifsolo", "selectword", "tornlabel", "radartags", "slamword", "scrawl", "spikeburst", "laserprompt", "hairfig", "hairtext"]);
   E.TYPING = new Set(["type", "artype"]);
   const MC = document.createElement("canvas").getContext("2d");
   const measure = (s, font) => { MC.font = font; return MC.measureText(s).width; };
@@ -8152,20 +8152,54 @@
   const HL_DEFAULT = ["laptop", "plot", "hub", "padlock", "terminal", "settle", "exploded", "relay", "query", "vault"];
   const hlFig = (b, s, bi) => (HL_FIGS.includes(b.fig) ? b.fig : (HL_WORDS.find(([re]) => re.test(s)) || [])[1] || HL_DEFAULT[bi % HL_DEFAULT.length]);
   const HL_LAP = [[128, 150], [200, 118], [272, 150], [200, 206]];
+  const HL_FONT = (s) => (AR.test(s) ? "'TY Lite', 'TY PlexAr', 'SM Tajawal'" : "'TY Lite', 'TY Outfit', 'SM Tajawal'");
+  const HL_INK = { hi: "#FFFFFF", edge: "#C9CCD4", mid: "#7C7F88", lo: "#3C3E45" };
   // ---------- hairfig: رسمة أيزومتريك بخط رفيع على أسود بتتحرك مع الكلام، وتحتها الكلام كلمة كلمة والكلمة المهمة (focus) بلون الستايل
   P.k_hairfig = function (b, t, k, th, bi) {
     const it = this.items(b); if (!it.length) return "";
     const { w, h } = this.doc, mn = Math.min(w, h), s = it.map((x) => this.text(x.w)).join(" "), fig = hlFig(b, s, bi);
     const fw = Math.min(w * 1.3, h * 0.66 * 1.25), fh = fw * 0.8, fy = h * (h > w ? 0.4 : 0.4) - fh / 2;
     const fi = b.focus >= 0 && b.focus < it.length ? b.focus : -1, acc = (this.style.accent?.bg && this.style.accent.bg !== "#E9B21C") ? this.style.accent.bg : "#E5322D";
-    const z = fitSize(s, `600 {}px ${famOf(s)}`, w * 0.86, mn * 0.06 * this.ts), ty = Math.min(h * 0.86, fy + fh * 0.9);
+    const z = fitSize(s, `400 {}px ${HL_FONT(s)}`, w * 0.86, mn * 0.06 * this.ts), ty = Math.min(h * 0.86, fy + fh * 0.9);
     const appear = eOut(seg(t, b.t0, b.t0 + 0.45));
-    this._hlNeed = window.Hairline ? { key: `${b.t0}|${fig}`, fig, b, t, it } : null;
+    const drawn = Array.isArray(b.draw_svg) && b.draw_svg.length;
+    this._hlNeed = !drawn && window.Hairline ? { key: `${b.t0}|${fig}`, fig, b, t, it } : null;
     const words = it.map((x, i) => { const q = seg(t, x.t0 - 0.03, x.t0 + 0.2);
       return `<span style="display:inline-block;opacity:${(0.15 + 0.85 * q).toFixed(2)};transform:translateY(${((1 - eOut(q)) * z * 0.25).toFixed(1)}px);color:${i === fi ? acc : "#F2F2F0"}">${esc(this.text(x.w))}</span>`; }).join(" ");
+    const cap = `<div dir="${this.dir(s)}" style="position:absolute;left:0;right:0;top:${ty.toFixed(1)}px;text-align:center;white-space:nowrap;font:400 ${z.toFixed(1)}px ${HL_FONT(s)};letter-spacing:-0.01em">${words}</div>`;
+    if (drawn) {   // رسمة جديدة من المكتبة: بتترسم خط خط، وبعدين بتتنفّس طلوع ونزول خفيف
+      const P = b.draw_svg, D = b.t1 - b.t0, span = Math.min(1.6, D * 0.55), n = P.length, bob = Math.sin((t - b.t0) * 1.6) * fh * 0.008;
+      const paths = P.map((q, i) => { const a = b.t0 + 0.1 + (span * i) / n, pr = eOut(seg(t, a, a + 0.4));
+        return `<path d="${esc(q.d)}" pathLength="1" stroke-dasharray="1" stroke-dashoffset="${(1 - pr).toFixed(3)}" stroke="${HL_INK[q.c] || HL_INK.mid}"/>`; }).join("");
+      return `<div style="position:absolute;inset:0;background:#08090A"></div>
+        <svg data-free viewBox="0 0 400 320" style="position:absolute;left:${((w - fw) / 2).toFixed(1)}px;top:${(fy + bob).toFixed(1)}px;width:${fw.toFixed(1)}px;height:${fh.toFixed(1)}px;overflow:visible;opacity:${appear.toFixed(2)}"
+          fill="none" stroke-linecap="round" stroke-linejoin="round"><g style="vector-effect:non-scaling-stroke" stroke-width="${(mn / 380).toFixed(2)}">${paths.replace(/<path /g, '<path vector-effect="non-scaling-stroke" ')}</g></svg>${cap}`;
+    }
     return `<div style="position:absolute;inset:0;background:#08090A"></div>
       <div data-hlslot data-free style="position:absolute;left:${((w - fw) / 2).toFixed(1)}px;top:${fy.toFixed(1)}px;width:${fw.toFixed(1)}px;height:${fh.toFixed(1)}px;opacity:${appear.toFixed(2)};transform:scale(${lerp(0.94, 1, appear).toFixed(3)});--hairline-plate:#08090A;--hairline-hi:#FFFFFF;--hairline-edge:#C9CCD4;--hairline-mid:#7C7F88;--hairline-lo:#3C3E45;--hairline-stroke:${(mn / 380).toFixed(2)}"></div>
-      <div dir="${this.dir(s)}" style="position:absolute;left:0;right:0;top:${ty.toFixed(1)}px;text-align:center;white-space:nowrap;font:600 ${z.toFixed(1)}px ${famOf(s)};letter-spacing:-0.01em">${words}</div>`;
+      ${cap}`;
+  };
+  // ---------- hairtext: كلام بخط رفيع أبيض على أسود، الكلمة بتطلع وهي بتتقال، والكلمة المهمة تحتها خط رفيع بيترسم، وورا شبكة نقط أيزومتريك باهتة
+  P.k_hairtext = function (b, t, k, th, bi) {
+    const it = this.items(b); if (!it.length) return "";
+    const { w, h } = this.doc, mn = Math.min(w, h), s = it.map((x) => this.text(x.w)).join(" "), ff = HL_FONT(s), ar = AR.test(s);
+    const fi = b.focus >= 0 && b.focus < it.length ? b.focus : -1, acc = "#E5322D";
+    // سطور: كل سطر لحد ٣ كلمات تقريبًا (أو على قد العرض)
+    const lines = []; let cur = [];
+    it.forEach((x, i) => { cur.push([x, i]); if (cur.length >= (it.length > 6 ? 3 : 2) || /[.!?؟،,]$/.test(x.w)) { lines.push(cur); cur = []; } });
+    if (cur.length) lines.push(cur);
+    const z = Math.min(...lines.map((l) => fitSize(l.map(([x]) => this.text(x.w)).join(" "), `300 {}px ${ff}`, w * 0.82, mn * 0.1 * this.ts)));
+    let dots = ""; const gap = mn * 0.07;
+    for (let y = gap / 2; y < h; y += gap * 0.58) for (let x = ((Math.round(y / (gap * 0.58)) % 2) * gap) / 2; x < w; x += gap) dots += `<circle cx="${x.toFixed(0)}" cy="${y.toFixed(0)}" r="${(mn * 0.0018).toFixed(1)}"/>`;
+    let html = `<div style="position:absolute;inset:0;background:#08090A"></div><svg data-free style="position:absolute;inset:0" width="${w}" height="${h}" fill="#26282E">${dots}</svg>`;
+    let y = h * 0.47 - (lines.length * z * 1.25) / 2;
+    lines.forEach((l) => {
+      const spans = l.map(([x, i]) => { const q = seg(t, x.t0 - 0.03, x.t0 + 0.25), e = eOut(q);
+        return `<span data-hw="${i}" style="display:inline-block;position:relative;opacity:${(0.12 + 0.88 * q).toFixed(2)};transform:translateY(${((1 - e) * z * 0.18).toFixed(1)}px);filter:blur(${((1 - e) * z * 0.04).toFixed(1)}px);color:${i === fi ? acc : "#F2F2F0"}">${esc(this.text(x.w))}${i === fi ? `<svg data-free style="position:absolute;left:0;right:0;bottom:${(-z * 0.12).toFixed(1)}px;width:100%;height:${(z * 0.12).toFixed(1)}px;overflow:visible" viewBox="0 0 100 10" preserveAspectRatio="none"><line x1="${ar ? 100 : 0}" y1="5" x2="${ar ? 0 : 100}" y2="5" stroke="${acc}" stroke-width="1.5" vector-effect="non-scaling-stroke" pathLength="1" stroke-dasharray="1" stroke-dashoffset="${(1 - eOut(seg(t, x.t0 + 0.1, x.t0 + 0.6))).toFixed(3)}"/></svg>` : ""}</span>`; }).join(" ");
+      html += `<div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:0;right:0;top:${y.toFixed(1)}px;text-align:center;white-space:nowrap;font:300 ${z.toFixed(1)}px ${ff};line-height:1.25;letter-spacing:-0.01em">${spans}</div>`;
+      y += z * 1.25;
+    });
+    return html;
   };
   // بعد ما الكادر يترسم: الرسمة بتتحط في مكانها وتتمشّى لحد الوقت ده (ولو رجعنا لورا بتتعمل من الأول عشان الشكل يفضل نفسه)
   P.afterPaint = function (t) {

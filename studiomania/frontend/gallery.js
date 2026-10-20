@@ -7,6 +7,9 @@ const Gallery = (() => {
   // 📱 الخط الأساسي: تصوير بالموبايل (أول قالب): الفكرة والسكريبت اختياريين ← الفيديو ← ملاحظات ← مونتاج أوتوماتيك
   const EXTRA = [{ id: "phone", name: "تصوير بالموبايل", icon: "📱", sample_url: "/gallery/phone.mp4", cover_url: "/gallery/phone.jpg", cat: "ugc",
     desc: "صوّر نفسك بالموبايل وانت بتتكلم: البرنامج يديك ملاحظات للتحسين، ويعمل مونتاج أوتوماتيك بزوايا كاميرا وألوان وتايبوجرافي." },
+    // ✏️ Hairline: سجّل صوتك (أو ارفع فيديو، بناخد صوته بس) ← كلام بخط رفيع على أسود ورسومات أيزومتريك على قد الكلام
+    { id: "hairline", name: "Hairline: خط رفيع على أسود", icon: "✏️", sample_url: "/gallery/hairline.mp4", cover_url: "/gallery/hairline.jpg", cat: "explain",
+    desc: "سجّل صوتك، والبرنامج يكتب كلامك بخط رفيع على أسود، ويرسم جنبه رسومات أيزومتريك على قد الكلام (لابتوب، قفل، فلوس…)، ولو مفيش رسمة جاهزة يرسم واحدة." },
     { id: "typo", name: "تايبوجرافي", icon: "🔤", sample_url: "/gallery/typo.mp4", cover_url: "/gallery/typo.jpg", cat: "motion",
     desc: "كلام بيتحرك على الإيقاع من صوتك أو سكريبتك، بأكتر من 300 حركة جاهزة." },
     // قوالب موشن بالكود (library/motion/r/t-*): بتترسم من غير توليد، والكلام والألوان بيتغيروا
@@ -344,6 +347,15 @@ const Gallery = (() => {
       cardEl.classList.add("playing");
     } else { if (!v.paused) v.pause(); cardEl.classList.remove("playing"); }
   }
+  // ✏️ Hairline: مشروع تايبوجرافي جديد بالستايل ده، والصفحة بتفتح على «سجّل صوتك»
+  async function startHairline() {
+    try {
+      const p = await api("/api/typo", { method: "POST", ...jsonBody({ name: "✏️ Hairline", style: "hairline", ratio: "9:16" }) });
+      storageSet("studiomania.typo", p.id);
+      if (typeof tyx !== "undefined") tyx.cur = null;
+      showStep("12");
+    } catch (err) { toast(err.message, true); }
+  }
   // المعاينة فوق الشاشة كلها (برّه الصفحة نفسها)
   function pvEl() {
     if (!S.pv) {
@@ -353,6 +365,7 @@ const Gallery = (() => {
         if (e.target.closest("[data-gstart]")) {   // 🧭 مسار القالب (flow.js)
           const x = S.pvItem;
           closePv();
+          if (x.id === "hairline") return startHairline();
           return Flow.start({ id: x.id, name: x.name, cat: catName(x.cat), desc: x.desc || x.description || "" });
         }
         if (e.target.closest("[data-gedit]")) {   // ✏️ محرر القالب: كل خانة بنصيحتها، والخطوط والألوان والمشاهد

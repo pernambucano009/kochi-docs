@@ -127,7 +127,10 @@ function tyRenderProj() {
       ${v.source?.kind === "audio" || v.source?.kind === "video" ? `<p class="ty-words" dir="auto" data-no-i18n>${(v.words || []).map((w) => tye(w.w)).join(" ")}</p>`
         : `<textarea rows="4" dir="auto" data-tytext placeholder="الكلام اللي هيتحوّل لتايبوجرافي" data-no-i18n>${tye(v.script || "")}</textarea>
            <button type="button" class="btn sm" data-tysavetext ${busy ? "disabled" : ""}>✍️ استخدم الكلام ده</button>`}
-      <label class="btn sm">⬆ ارفع صوت أو فيديو<input type="file" data-tysrc accept="audio/*,video/*,.mp3,.m4a,.wav,.mp4,.mov" hidden></label>
+      <div class="row wrap"><label class="btn sm">⬆ ارفع صوت أو فيديو<input type="file" data-tysrc accept="audio/*,video/*,.mp3,.m4a,.wav,.mp4,.mov" hidden></label>
+        <button type="button" class="btn sm ${tyx.rec ? "danger" : ""}" data-tyrec ${busy ? "disabled" : ""}>${tyx.rec ? "⏹ وقّف واستخدم التسجيل" : "🎙️ سجّل صوتك"}</button>
+        ${tyx.rec ? `<b class="num" data-tyrect>0:00</b>` : ""}</div>
+      ${tyx.styles.find((x) => x.id === v.style)?.audio_only ? `<p class="hint">✏️ الستايل ده بياخد الصوت بس: لو رفعت فيديو، الصورة مش هتظهر، والكلام والرسومات بالخط الرفيع على أسود.</p>` : ""}
       ${v.source_url && v.source?.kind !== "text" ? (v.source.kind === "video" ? `<video src="${v.source_url}" controls playsinline preload="metadata" class="ty-src"></video>`
         : `<audio src="${v.source_url}" controls preload="metadata"></audio>`) : ""}
     </details>
@@ -415,6 +418,30 @@ async function tyPatch(body) {
   tyRender();
 }
 
+// 🎙️ تسجيل الصوت من المتصفح: لما يوقف، التسجيل بيترفع كأنه ملف صوت (والكلام بيتكتب بتوقيته)
+async function tyRecord(v) {
+  if (tyx.rec) { tyx.rec.mr.stop(); return; }
+  if (v.blocks?.length && !confirm("تسجّل من جديد؟ الكلام والحركات الحالية هيتبدلوا.")) return;
+  let stream;
+  try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch { return toast("مقدرتش أفتح المايك. اسمح للمتصفح يستخدمه", true); }
+  const type = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"].find((x) => window.MediaRecorder?.isTypeSupported?.(x)) || "";
+  const mr = new MediaRecorder(stream, type ? { mimeType: type } : {}), parts = [], t0 = Date.now();
+  mr.ondataavailable = (e) => e.data.size && parts.push(e.data);
+  mr.onstop = async () => {
+    stream.getTracks().forEach((x) => x.stop());
+    clearInterval(tyx.rec?.tick);
+    tyx.rec = null;
+    tyRender();
+    if ((Date.now() - t0) < 1500 || !parts.length) return toast("التسجيل قصير أوي", true);
+    const ext = (mr.mimeType || type).includes("mp4") ? "m4a" : "weba";   // weba مش webm: عشان يتعامل كصوت (بيتحوّل m4a) مش فيديو
+    const file = new File(parts, `تسجيل.${ext}`, { type: mr.mimeType || type || "audio/webm" });
+    try { tyx.cur = await tyUpload(TY(`/${v.id}/source`), file); tyx.force = true; tyRender(); tyPoll(); } catch (err) { toast(err.message, true); }
+  };
+  mr.start(500);
+  tyx.rec = { mr, tick: setInterval(() => { const el = document.querySelector("[data-tyrect]"); if (el) { const s = Math.floor((Date.now() - t0) / 1000); el.textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; } }, 500) };
+  tyRender();
+}
+
 function tyPoll() {
   clearTimeout(tyx.timer);
   if (!tyx.cur?.busy || document.querySelector('.view[data-view="12"]').hidden) return;
@@ -591,6 +618,7 @@ $("tyMain").addEventListener("click", async (e) => {
   if (seek) { tyStop(); tySeek(Number(seek.dataset.tyseek)); return $("tyScreen")?.scrollIntoView({ behavior: "smooth", block: "center" }); }
   const sc = t.closest("[data-tyscene]");
   if (sc) return wrap(sc, async () => { tyx.cur = await api(TY(`/${v.id}/scene`), { method: "POST" }); tyRender(); tyPoll(); });
+  if (t.closest("[data-tyrec]")) return tyRecord(v);
   const st = t.closest("[data-tysavetext]");
   if (st) return wrap(st, () => tyPatch({ text: document.querySelector("[data-tytext]").value }));
   const plan = t.closest("[data-typlan]");
