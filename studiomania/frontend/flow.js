@@ -490,22 +490,46 @@ const Flow = (() => {
   function stShoot(d) {
     const f = d.footage || {}, mn = f.main, sc = d.scenario;
     const beats = (sc?.beats || []).map((b, i) => `<li><b class="num">${i + 1}</b><span dir="auto">${esc(b.say || b.text || "")}</span>${b.visual ? `<small class="muted">🎥 ${esc(b.visual)}</small>` : ""}</li>`).join("");
-    return `<h2>الفيديو</h2><p class="flw-sub">صوّر نفسك بالموبايل وانت بتتكلم (طولي، والنور قدامك)، وارفعه. ولو عندك لقطات تانية (B-roll) ارفعها كمان والمونتاج هيحطها فوق كلامك.</p>
+    return `<h2>الفيديو</h2><p class="flw-sub">صوّر نفسك بالموبايل وانت بتتكلم (طولي، والنور قدامك)، وارفعه. لقطات الـ B-roll البرنامج بيعملها لوحده في المونتاج.</p>
       ${beats ? `<details class="flw-shotlist" open><summary>📝 السكريبت اللي هتقوله</summary><ol>${beats}</ol></details>` : ""}
       <div class="flw-ph">
-        <section><h3>🎙️ الفيديو الأساسي (انت بتتكلم)</h3>
+        <section><h3>🎙️ الفيديو (انت بتتكلم)</h3>
           ${mn ? `<div class="flw-main-v"><video src="${esc(mn.url)}" controls playsinline preload="metadata"></video>
             <small class="muted">${esc(mn.name)} · ${secs(mn.duration)} · ${mn.w}×${mn.h}${mn.audio ? "" : " · ⚠️ من غير صوت"}</small>
             <button type="button" class="flw-link" data-fdel="${esc(mn.gen_id)}">بدّله</button></div>`
-          : `<div class="flw-acts"><label class="flw-btn pri">⬆ ارفع الفيديو<input type="file" accept="video/*" data-phup="main" hidden></label>
-              <button type="button" class="flw-btn" data-lib="main">☁️ من فيديوهاتي</button></div>${libBox("main")}`}</section>
-        <section><h3>🎥 لقطات B-roll <small class="muted">(اختياري)</small></h3>
-          <div class="flw-broll">${(f.broll || []).map((x) => `<figure><video src="${esc(x.url)}#t=0.5" muted preload="metadata"></video><button type="button" data-fdel="${esc(x.gen_id)}" title="شيلها">✕</button></figure>`).join("")}</div>
-          <div class="flw-acts"><label class="flw-btn">⬆ ارفع لقطات<input type="file" accept="video/*" multiple data-phup="broll" hidden></label>
-            <button type="button" class="flw-btn" data-lib="broll">☁️ من فيديوهاتي</button></div>${libBox("broll")}</section></div>
+          : `<div class="flw-acts"><label class="flw-btn pri">⬆ ارفع فيديو جديد<input type="file" accept="video/*" data-phup="main" hidden></label>
+              <button type="button" class="flw-btn" data-lib="main">☁️ أو اختار من اللي رفعته قبل كده</button></div>${libBox("main")}`}
+          ${(f.broll || []).length ? `<div class="flw-broll">${f.broll.map((x) => `<figure><video src="${esc(x.url)}#t=0.5" muted preload="metadata"></video><button type="button" data-fdel="${esc(x.gen_id)}" title="شيلها">✕</button></figure>`).join("")}</div>` : ""}</section>
+        ${castBox(d)}</div>
       ${d.busy === "upload" ? working("بيرفع…") : failed("shoot")}
       ${mn ? `<div class="flw-acts end"><button type="button" class="flw-link" data-automont>⏭ على المونتاج على طول</button>
         <button type="button" class="flw-btn pri big" data-phreview ${d.busy ? "disabled" : ""}>🔎 راجع الفيديو وقولّي أحسّن إيه</button></div>` : ""}`;
+  }
+  // 🪞 مين في الفيديو وصوّر فين: عشان لقطات الـ B-roll اللي فيها الشخص تطلع بنفس الوش ونفس المكان
+  function castBox(d) {
+    if (S.twins === undefined) {
+      S.twins = null;
+      api("/api/twins").then((t) => { S.twins = t; render(); }).catch(() => { S.twins = []; render(); });
+    }
+    const twins = (S.twins || []).filter((t) => t.ready?.photos), cast = d.phone_cast;
+    if (!cast && twins.length && !S.castAuto) {   // أول مرة: أول نسخة جاهزة هي الاختيار
+      S.castAuto = true;
+      call("/phone-cast", { twin: twins[0].id, bg: "" });
+    }
+    const tw = twins.find((t) => t.id === cast?.twin);
+    const bgs = tw?.backgrounds || [];
+    const auto = `<p class="muted">🪄 الـ B-roll أوتوماتيك: اللقطات اللي لازم تظهر فيها بتتعمل بنسختك${tw ? " في نفس المكان" : ""}، واللي مش لازم بتيجي من فيديوهات ستوك حقيقية. وفي المونتاج تقدر تشيل أي لقطة أو تبدّلها بفيديو من عندك.</p>`;
+    if (S.twins === null) return `<section><h3>🪞 مين في الفيديو؟</h3>${working("بيجيب نسخك…")}</section>`;
+    if (!twins.length) return `<section><h3>🪞 مين في الفيديو؟</h3><p class="muted">لو عملت «🪞 نسختي» (فيديو وصور من كذا اتجاه)، البرنامج يقدر يعمل لقطات B-roll بيك انت. من غيرها هيستخدم فيديوهات ستوك بس.</p>
+      <button type="button" class="flw-link" data-gotwin>🪞 اعمل نسختك</button>${auto}</section>`;
+    return `<section><h3>🪞 مين في الفيديو؟</h3>
+      <label class="flw-csel"><select data-casttwin><option value="">محدش من نسختي (ستوك بس)</option>
+        ${twins.map((t) => `<option value="${esc(t.id)}" ${cast?.twin === t.id ? "selected" : ""}>${esc(t.name)}</option>`).join("")}</select></label>
+      ${tw ? `<h4>🏠 صوّرت فين؟</h4><div class="flw-bgs">
+        <button type="button" class="flw-bgit ${!cast.bg ? "on" : ""}" data-castbg=""><span>🎬</span><small>زي الفيديو نفسه</small></button>
+        ${bgs.map((b) => `<button type="button" class="flw-bgit ${cast.bg === b.id ? "on" : ""}" data-castbg="${esc(b.id)}"><img src="${esc(b.url)}" alt=""><small>${esc(b.name || "مكان")}</small></button>`).join("")}
+        <button type="button" class="flw-bgit add" data-gotwin><span>＋</span><small>ضيف مكان</small></button></div>` : ""}
+      ${auto}</section>`;
   }
   function stReview(d) {
     const r = d.review;
@@ -523,14 +547,14 @@ const Flow = (() => {
   }
   function stMontage(d) {
     const mo = d.montage, ms = S.mstate || {};
-    if (d.busy === "montage" || !mo) return `<h2>المونتاج</h2>${d.busy === "montage" ? working("بيقص السكتات، ويغيّر زاوية الكاميرا كل لقطة، ويظبط الألوان، ويحط اللقطات والتايبوجرافي…") : failed("montage")}`;
+    if (d.busy === "montage" || !mo) return `<h2>المونتاج</h2>${d.busy === "montage" ? working("بيقص السكتات، ويغيّر زاوية الكاميرا كل لقطة، ويظبط الألوان، ويختار ويعمل لقطات الـ B-roll، ويحط التايبوجرافي… (لقطات نسختك ممكن تاخد كام دقيقة)") : failed("montage")}`;
     const rp = mo.report || {}, pj = ms.project || {}, ty = ms.typo;
     const rendering = pj.render_status === "rendering", done = pj.export_url && !rendering;
     const tyBusy = ty?.busy;
     return `<h2>${mo.plain ? "الفيديو من غير مونتاج" : "المونتاج الأوتوماتيك جاهز"}</h2>
       ${mo.plain ? `<p class="flw-sub">الفيديو زي ما هو، بس على مقاس الريلز.</p>` : `<ul class="flw-mrep">
         <li>✂️ اتشال <b class="num">${rp.cut || 0}</b> ثانية سكوت</li><li>🎥 <b class="num">${rp.shots || 1}</b> لقطة بزوايا كاميرا مختلفة (واسعة، قريبة، من الجنب…)</li>
-        <li>🎨 الألوان اتظبطت أوتوماتيك</li>${rp.broll ? `<li>🎞️ <b class="num">${rp.broll}</b> لقطة B-roll فوق الكلام</li>` : ""}${rp.comics ? `<li>🎭 <b class="num">${rp.comics}</b> كوميك عند الإفيهات</li>` : rp.comics === 0 ? `<li class="muted">🎭 ملقتش كوميكس في المكتبة تناسب الكلام ده</li>` : ""}
+        <li>🎨 الألوان اتظبطت أوتوماتيك</li>${rp.broll_ai ? `<li>🪄 <b class="num">${rp.broll_ai}</b> لقطة B-roll بنسختك (في نفس المكان)</li>` : ""}${rp.broll_stock ? `<li>🎞️ <b class="num">${rp.broll_stock}</b> لقطة ستوك حقيقية فوق الكلام</li>` : ""}${rp.broll && !rp.broll_ai && !rp.broll_stock ? `<li>🎞️ <b class="num">${rp.broll}</b> لقطة B-roll فوق الكلام</li>` : ""}${rp.broll_note ? `<li class="muted">⚠️ ${esc(rp.broll_note)}</li>` : ""}${rp.comics ? `<li>🎭 <b class="num">${rp.comics}</b> كوميك عند الإفيهات</li>` : rp.comics === 0 ? `<li class="muted">🎭 ملقتش كوميكس في المكتبة تناسب الكلام ده</li>` : ""}
         <li>🔤 التايبوجرافي: ${!rp.typo ? "مفيش كلام مسموع" : tyBusy ? `⏳ ${esc(ty.step || "بيتعمل")}` : ty?.error ? `⚠️ ${esc(ty.error)}` : "✓ جاهز"}</li></ul>`}
       ${done ? `<video class="flw-rv" src="${esc(pj.export_url)}" controls playsinline></video>` : ""}
       ${rendering ? working(`بيصدّر الفيديو… ${esc(pj.render_progress || "")}`) : pj.render_error ? `<div class="flw-empty bad">⚠️ ${esc(pj.render_error)}</div>` : ""}
@@ -539,6 +563,7 @@ const Flow = (() => {
         <button type="button" class="flw-btn" data-myedit>✏️ هعمل المونتاج بنفسي</button>
         ${done ? `<a class="flw-btn" href="${esc(pj.export_url)}" download>⬇ نزّل</a>` : ""}
         <button type="button" class="flw-btn pri big" data-render ${rendering || tyBusy ? "disabled" : ""}>${done ? "🔁 صدّر تاني" : "✓ موافق، صدّر الفيديو"}</button></div>
+      ${rp.broll && !mo.plain ? `<p class="muted">✏️ لو هتعمل المونتاج بنفسك: لقطات الـ B-roll طبقات فوق الفيديو، تشيل أي واحدة أو تبدّلها بفيديو أو صورة من عندك.</p>` : ""}
       ${tyBusy ? `<p class="muted">التصدير بيستنى التايبوجرافي يخلص عشان الكلام يطلع فوق الفيديو.</p>` : ""}
       ${mo.plain ? "" : camBench(d)}`;
   }
@@ -673,6 +698,8 @@ const Flow = (() => {
     if ((b = q("[data-fdel]"))) return call(`/footage/${b.dataset.fdel}`, null, "DELETE");
     if (q("[data-phreview]")) return call("/review", {}).then(poll);
     if (q("[data-reshoot]")) return call("/stage", { stage: "shoot" });
+    if ((b = q("[data-castbg]"))) return call("/phone-cast", { twin: S.d.phone_cast?.twin || "", bg: b.dataset.castbg });
+    if (q("[data-gotwin]")) { S.twins = undefined; close(); return showStep("16"); }
     if (q("[data-automont]")) { S.mstate = null; return call("/auto-montage", { plain: false, comics: S.comics || "auto" }).then(poll); }
     if (q("[data-plain]")) { if (!confirm("تشيل المونتاج الأوتوماتيك وتطلّع الفيديو زي ما هو؟")) return; S.mstate = null; return call("/auto-montage", { plain: true }).then(poll); }
     if ((b = q("[data-seek]"))) { const v = S.el.querySelector(".flw-rv"); if (v) { v.currentTime = +b.dataset.seek; v.play().catch(() => {}); } return; }
@@ -788,6 +815,7 @@ const Flow = (() => {
   }
   async function onChange(e) {
     if (e.target.matches?.("[data-comics]")) { S.comics = e.target.value; return; }
+    if (e.target.matches?.("[data-casttwin]")) return call("/phone-cast", { twin: e.target.value, bg: "" });
     if (e.target.id === "flwFiles") upload(e.target.files);
     const ph = e.target.dataset?.phup;
     if (ph && e.target.files?.length) {

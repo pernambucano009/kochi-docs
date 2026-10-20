@@ -1904,6 +1904,12 @@ audio { width: 100%; }
 .flw-broll figure { position: relative; margin: 0; width: 90px; aspect-ratio: 9 / 16; border-radius: 10px; overflow: hidden; background: #000; }
 .flw-broll video { width: 100%; height: 100%; object-fit: cover; }
 .flw-broll button { position: absolute; top: 4px; inset-inline-end: 4px; width: 22px; height: 22px; border-radius: 50%; background: rgba(0, 0, 0, .6); color: #fff; font-size: 10px; }
+.flw-ph h4 { margin: 14px 0 8px; font-size: 14px; font-weight: 500; }
+.flw-bgs { display: flex; flex-wrap: wrap; gap: 8px; }
+.flw-bgit { display: grid; gap: 4px; justify-items: center; width: 84px; padding: 0; background: none; font-size: 11px; color: inherit; }
+.flw-bgit img, .flw-bgit span { width: 84px; aspect-ratio: 9 / 16; object-fit: cover; border-radius: 10px; background: rgba(127, 127, 127, .14); display: grid; place-items: center; font-size: 22px; outline: 2px solid transparent; }
+.flw-bgit.on img, .flw-bgit.on span { outline-color: var(--nh-accent, #E5613E); }
+.flw-bgit.add span { border: 1px dashed rgba(127, 127, 127, .5); }
 .flw-lib { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; margin-top: 10px; max-height: 320px; overflow: auto; }
 .flw-libit { display: grid; gap: 4px; padding: 0; border-radius: 10px; background: none; text-align: start; font-size: 11px; }
 .flw-libit video { width: 100%; aspect-ratio: 9 / 16; object-fit: cover; border-radius: 10px; background: #000; }

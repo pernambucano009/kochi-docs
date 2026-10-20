@@ -514,6 +514,7 @@
                   <p class="hint" id="ovNone">ضيف فيديو كطبقة بزرار ⧉ على أي فيديو في المكتبة، أو ارفع صورة (PNG شفافة تنفع ستيكر أو لوجو). وتقدر تحوّل أي قطعة من التراك الأساسي لطبقة من تاب 🎞️ القطعة.</p>
                   <div class="ov-editor" id="ovEditor" hidden>
                     <p class="muted" id="ovName"></p>
+                    <p class="hint" id="ovBroll" hidden>🪄 دي لقطة B-roll البرنامج حطّها أوتوماتيك. شيلها لو مش عاجباك، أو بدّلها بفيديو أو صورة من عندك (بنفس المكان والمدة).</p>
                     <label class="field slider-field">الحجم <b id="ovWVal"></b><input type="range" id="ovW" min="3" max="200" step="1" dir="ltr"></label>
                     <label class="field slider-field">شمال ⟷ يمين<input type="range" id="ovX" min="-50" max="150" step="1" dir="ltr"></label>
                     <label class="field slider-field">فوق ⟷ تحت<input type="range" id="ovY" min="-50" max="150" step="1" dir="ltr"></label>
@@ -539,6 +540,7 @@
                       <button class="btn sm" id="ovFlip">↔ اقلب</button>
                       <button class="btn sm" id="ovSplit"><span class="emo">✂</span> قسّم</button>
                       <button class="btn sm" id="ovToMain">⤵ رجّعها للتراك الأساسي</button>
+                      <label class="btn sm">🔁 بدّلها بفيديو أو صورة<input type="file" id="ovReplace" accept="video/*,image/*" hidden></label>
                       <button class="btn sm danger" id="ovDelete"><span class="emo">🗑</span> احذف</button>
                     </div>
                     <p class="hint">💡 حرّك الطبقة بالسحب على المعاينة، والمربع اللي في الركن بيكبّر، والدايرة اللي فوق بتلف.</p>

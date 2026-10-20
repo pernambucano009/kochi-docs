@@ -2019,7 +2019,7 @@ def montage_upload(file: UploadFile = File(...), coach_id: str = Form(""), repla
             synced = sid
         except HTTPException:
             synced = None
-    return {"id": gid, "duration": info.duration, "synced_shot": synced}
+    return {"id": gid, "duration": info.duration, "width": info.width, "height": info.height, "name": label, "synced_shot": synced}
 
 
 @app.get("/api/montage/sfx")
@@ -23847,6 +23847,7 @@ def twin_to_dict(tid: str, d: dict) -> dict:
     return {**d, "id": tid, "ready": twin.ready(d), "cost": TWIN_COST,
             "video_url": u((d.get("video") or {}).get("file")), "voice_url": u((d.get("voice") or {}).get("file")),
             "photos": [{**p, "url": u(p["file"])} for p in d.get("photos") or []],
+            "backgrounds": [{**b, "url": u(b["file"])} for b in d.get("backgrounds") or []],
             "clips": [{**c, "url": u(c.get("file")), "audio_url": u(c.get("audio"))} for c in d.get("clips") or []],
             "busy": any(c.get("status") in ("queued", "working") for c in d.get("clips") or [])}
 
@@ -23953,6 +23954,26 @@ def twin_photo(tid: str, angle: str = Form(...), file: UploadFile = File(...)):
         for p in [x for x in d.get("photos") or [] if x["angle"] == angle]:
             (folder / p["file"]).unlink(missing_ok=True)
         d["photos"] = [x for x in d.get("photos") or [] if x["angle"] != angle] + [{"angle": angle, "file": name, "at": now()}]
+    return twin_to_dict(tid, twin_update(tid, fn))
+
+
+@app.post("/api/twins/{tid}/background")
+def twin_background(tid: str, name: str = Form(""), file: UploadFile = File(...)):
+    """🏠 مكان التصوير فاضي (من غير الشخص): بيتبعت مع صور الشخص للموديل عشان لقطات الـB-roll تطلع في نفس المكان."""
+    folder = twin_dir(tid)
+    twin_load(tid)
+    fname = save_upload(file, IMAGE_EXTENSIONS, folder, "bg")
+    item = {"id": uuid.uuid4().hex[:8], "name": (name.strip() or Path(file.filename or "").stem or "مكان")[:60], "file": fname, "at": now()}
+    return twin_to_dict(tid, twin_update(tid, lambda d: d.setdefault("backgrounds", []).append(item)))
+
+
+@app.delete("/api/twins/{tid}/background/{bid}")
+def twin_background_delete(tid: str, bid: str):
+    folder = twin_dir(tid)
+    def fn(d):
+        for b in [x for x in d.get("backgrounds") or [] if x["id"] == bid]:
+            (folder / b["file"]).unlink(missing_ok=True)
+        d["backgrounds"] = [x for x in d.get("backgrounds") or [] if x["id"] != bid]
     return twin_to_dict(tid, twin_update(tid, fn))
 
 
@@ -24185,6 +24206,20 @@ class FootagePickIn(BaseModel):
     role: str = "main"
 
 
+class PhoneCastIn(BaseModel):
+    twin: str = ""      # مين في الفيديو (من «نسختي»)
+    bg: str = ""        # صوّر فين: id مكان من النسخة، أو فاضي = من الفيديو نفسه
+
+
+@app.post("/api/flows/{fid}/phone-cast")
+def flow_phone_cast(fid: str, body: PhoneCastIn):
+    if body.twin:
+        t = twin_load(body.twin)
+        if body.bg and body.bg not in [b["id"] for b in t.get("backgrounds") or []]:
+            raise HTTPException(400, "المكان ده مش في النسخة")
+    return flow_to_dict(fid, flow_update(fid, lambda d: d.update(phone_cast={"twin": body.twin, "bg": body.bg if body.twin else ""})))
+
+
 @app.post("/api/flows/{fid}/footage/pick")
 def flow_footage_pick(fid: str, body: FootagePickIn):
     it = phone_item(body.gen_id)
@@ -24354,7 +24389,146 @@ def phone_comics(shots: list[tuple[float, float]], words: list[dict], busy: set[
     return out
 
 
-def phone_build_montage(fid: str, plain: bool = False, comics_mode: str = "auto") -> None:
+# 🪄 B-roll أوتوماتيك: البرنامج بيختار اللقطات، لو الشخص لازم يظهر ← لقطة متولّدة بيه (من «نسختي» + مكان التصوير)، لو لأ ← ستوك حقيقي
+BROLL_MODEL = "bytedance/seedance-2.0/reference-to-video"
+BROLL_PER_SEC = 0.09
+BROLL_AI_SEC = 5
+
+
+def phone_broll_refs(d: dict, path: Path, at: float) -> tuple[list[Path], Path | None]:
+    """صور الشخص (قدام + ربع لفة) ومكان التصوير: المكان اللي اختاره من النسخة، أو فريم من الفيديو نفسه."""
+    cast = d.get("phone_cast") or {}
+    tid = cast.get("twin")
+    if not tid:
+        return [], None
+    try:
+        t = twin_load(tid)
+    except HTTPException:
+        return [], None
+    have = {p["angle"]: twin_dir(tid) / p["file"] for p in t.get("photos") or []}
+    people = [have[a] for a in ("front", "smile", "r45", "l45") if a in have and have[a].exists()][:3]
+    bg = next((twin_dir(tid) / b["file"] for b in t.get("backgrounds") or [] if b["id"] == cast.get("bg")), None)
+    if bg is None or not bg.exists():
+        bg = FLOWS_DIR / d["id"] / f"bgframe_{int(at * 10)}.jpg" if d.get("id") else None
+        if bg is not None:
+            bg.parent.mkdir(parents=True, exist_ok=True)
+            r = subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{max(0.0, at):.2f}", "-i", str(path), "-frames:v", "1",
+                                "-q:v", "3", str(bg)], capture_output=True, timeout=60)
+            bg = bg if r.returncode == 0 and bg.exists() else None
+    return people, bg
+
+
+def phone_broll_stock(b: dict, vertical: bool, used: set) -> Path | None:
+    folder = GENERATED_DIR
+    raw = folder / f"stock_{uuid.uuid4().hex[:8]}_raw.mp4"
+    out = folder / f"broll_{uuid.uuid4().hex[:8]}.mp4"
+    if atlas.mock_mode() and not stock.live():
+        r = subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i",
+                            f"testsrc2=size={'720x1280' if vertical else '1280x720'}:rate=30:duration=4", "-pix_fmt", "yuv420p", "-c:v", "libx264",
+                            "-preset", "veryfast", str(out)], capture_output=True, timeout=120)
+        return out if r.returncode == 0 else None
+    if not stock.live():
+        return None
+    try:
+        items = stock.search(b["query"], "video", "portrait" if vertical else "landscape")["items"]
+    except stock.StockError:
+        return None
+    pick = next((it for it in items if it["id"] not in used and (it.get("dur") or 0) >= 2 and stock.allowed_url(it["file"])), None)
+    if not pick or not brain_fetch(pick["file"], raw, 120 * 1024 * 1024):
+        return None
+    used.add(pick["id"])
+    r = subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(raw), "-t", "4", "-an",
+                        "-vf", "scale='trunc(min(1080,iw)/2)*2':-2,format=yuv420p", "-c:v", "libx264", "-preset", "veryfast", "-crf", "21", str(out)],
+                       capture_output=True, timeout=300)
+    raw.unlink(missing_ok=True)
+    return out if r.returncode == 0 else None
+
+
+def phone_broll_avatar(b: dict, people: list[Path], bg: Path | None, vertical: bool) -> Path | None:
+    out = GENERATED_DIR / f"broll_ai_{uuid.uuid4().hex[:8]}.mp4"
+    if atlas.mock_mode():
+        src = people[0]
+        r = subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-loop", "1", "-i", str(src), "-t", "4",
+                            "-vf", f"scale={'720:1280' if vertical else '1280:720'}:force_original_aspect_ratio=increase,crop={'720:1280' if vertical else '1280:720'},"
+                                   "zoompan=z='min(zoom+0.0015,1.2)':d=120:s=" + ("720x1280" if vertical else "1280x720") + ",format=yuv420p",
+                            "-r", "30", "-c:v", "libx264", "-preset", "veryfast", str(out)], capture_output=True, timeout=180)
+        return out if r.returncode == 0 else None
+    refs = [atlas.reference_url(p) for p in people] + ([atlas.reference_url(bg)] if bg else [])
+    prompt = (f"{b['prompt']} The person is exactly the same real person shown in the first reference photos (same face, hair, body and clothes)"
+              + (", in exactly the same place shown in the last reference photo (same room, furniture, colors and light)" if bg else "")
+              + ". Photorealistic, natural phone-camera look, no talking to the camera, no text, no logos, no subtitles.")
+    body = {"model": BROLL_MODEL, "prompt": prompt, "reference_images": refs, "duration": BROLL_AI_SEC, "resolution": "720p",
+            "ratio": "9:16" if vertical else "16:9", "generate_audio": False, "watermark": False}
+    atlas.download(atlas.run_model("Video", body, "لقطة B-roll بنسختك", max_seconds=1500, interval=6), out)
+    return out
+
+
+def phone_auto_broll(d: dict, path: Path, shots: list[tuple[float, float]], words: list[dict], starts: list[tuple[float, float]],
+                     vertical: bool, brief: str) -> tuple[list[dict], dict]:
+    texts = [" ".join(w["w"] for w in words if a - 0.05 <= w["s"] < b) for a, b in shots]
+    rep = {"broll_ai": 0, "broll_stock": 0, "broll_note": ""}
+    if len(shots) < 2 or not any(t.strip() for t in texts):
+        return [], rep
+    people, bg = phone_broll_refs(d, path, shots[min(1, len(shots) - 1)][0])
+    has_twin = bool(people)
+    if atlas.mock_mode():
+        raw = phone.mock_broll_plan(len(shots), has_twin)
+    else:
+        try:
+            wallet.need(1, "اختيار لقطات B-roll")
+            raw = hk_chat_json([{"role": "user", "content": phone.broll_plan_prompt(texts, has_twin, brief)}], "اختيار لقطات B-roll")
+            wallet.charge(1, "تصوير بالموبايل: اختيار لقطات B-roll", d.get("id") or "")
+        except (wallet.NoCredits, RuntimeError, ValueError) as exc:
+            rep["broll_note"] = str(exc)[:200]
+            return [], rep
+    plan = phone.clean_broll_plan(raw, len(shots), has_twin)
+    per_ai = wallet.credits(BROLL_PER_SEC * BROLL_AI_SEC)
+    n_ai = sum(b["kind"] == "avatar" for b in plan)
+    if n_ai and not atlas.mock_mode():
+        try:
+            wallet.need(per_ai * n_ai, "لقطات B-roll بنسختك")
+        except wallet.NoCredits:
+            rep["broll_note"] = "الرصيد مايكفيش لقطات بنسختك، فحطّينا ستوك بدالها"
+            for b in plan:
+                b["kind"] = "stock"
+    used: set = set()
+
+    def make(b):
+        try:
+            if b["kind"] == "avatar":
+                f = phone_broll_avatar(b, people, bg, vertical)
+                if f:
+                    if not atlas.mock_mode():
+                        wallet.charge(per_ai, "تصوير بالموبايل: لقطة B-roll بنسختك", d.get("id") or "")
+                    return b, f, "avatar"
+        except Exception:  # noqa: BLE001  # الموديل وقع ← ستوك بداله
+            pass
+        try:
+            f = phone_broll_stock(b, vertical, used)
+        except Exception:  # noqa: BLE001
+            f = None
+        return b, f, "stock" if f else None
+
+    with ThreadPoolExecutor(max_workers=4) as ex:
+        results = list(ex.map(make, plan))
+    overlays = []
+    for b, f, kind in results:
+        if not f:
+            continue
+        t0, ln = starts[b["shot"]]
+        if ln < 1.5:
+            continue
+        info = media_info(f)
+        gid = phone_gen(f, ("🪄 " if kind == "avatar" else "🎞️ ") + (b["query"] if kind == "stock" else "B-roll بنسختك"))
+        cover = max(1.0, (info.width / max(1, info.height)) / ((9 / 16) if vertical else (16 / 9)))
+        overlays.append({"id": uuid.uuid4().hex[:8], "src": gid, "t0": round(t0 + 0.2, 2), "dur": round(min(3.0, ln - 0.3, info.duration or 3), 2),
+                         "start": 0, "x": 0.5, "y": 0.5, "w": round(cover, 3), "volume": 0, "broll": kind,
+                         "anim_in": {"type": "fade", "dur": 0.2}, "anim_out": {"type": "fade", "dur": 0.2}})
+        rep["broll_ai" if kind == "avatar" else "broll_stock"] += 1
+    return overlays, rep
+
+
+def phone_build_montage(fid: str, plain: bool = False, comics_mode: str = "auto", broll_mode: str = "auto") -> None:
     """🎬 المونتاج الأوتوماتيك: قص السكتات، لقطة كل كام ثانية بزاوية كاميرا مختلفة، ألوان متظبطة، B-roll فوق الكلام،
     وتايبوجرافي بالكلام نفسه. plain = الفيديو زي ما هو (من غير مونتاج)."""
     d = flow_load(fid)
@@ -24397,6 +24571,13 @@ def phone_build_montage(fid: str, plain: bool = False, comics_mode: str = "auto"
                              "start": 0, "x": 0.5, "y": 0.5, "w": round(cover, 3), "volume": 0, "anim_in": {"type": "fade", "dur": 0.2},
                              "anim_out": {"type": "fade", "dur": 0.2}})
             bi += 1
+        if broll_mode == "auto":
+            taken = {k for k, (t0, ln) in enumerate(starts) for o in overlays if t0 <= o["t0"] < t0 + ln}
+            brief = (fz.scenario_script(d["scenario"], "reel") if d.get("scenario") else "")[:500] or title
+            auto, rep = phone_auto_broll({**d, "id": fid}, path, shots, words, starts, vertical, brief)
+            auto = [o for o in auto if not any(starts[k][0] <= o["t0"] < starts[k][0] + starts[k][1] for k in taken)]
+            overlays += auto
+            report.update(rep, broll_ai=sum(o["broll"] == "avatar" for o in auto), broll_stock=sum(o["broll"] == "stock" for o in auto))
         report["broll"] = len(overlays)
         tone = (d.get("review") or {}).get("tone")
         if comics_mode == "on" or (comics_mode == "auto" and tone == "comedy"):
@@ -24558,6 +24739,7 @@ def flow_cambench(fid: str, body: CamBenchIn):
 class PhoneMontageIn(BaseModel):
     plain: bool = False
     comics: str = "auto"   # auto = لو الفيديو كوميدي · on · off
+    broll: str = "auto"    # auto = البرنامج بيختار ويعمل لقطات B-roll · off
 
 
 @app.post("/api/flows/{fid}/auto-montage")
@@ -24566,7 +24748,8 @@ def flow_phone_montage(fid: str, body: PhoneMontageIn):
     d = flow_load(fid)
     flow_idle(d)
     phone_main_path(d)
-    flow_job(fid, "montage", lambda: phone_build_montage(fid, body.plain, body.comics if body.comics in ("auto", "on", "off") else "auto"))
+    flow_job(fid, "montage", lambda: phone_build_montage(fid, body.plain, body.comics if body.comics in ("auto", "on", "off") else "auto",
+                                                         "off" if body.broll == "off" else "auto"))
     return flow_to_dict(fid, flow_load(fid))
 
 

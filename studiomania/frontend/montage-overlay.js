@@ -356,6 +356,7 @@ function renderOverPane() {
   $("ovVol").value = Math.round((o.volume ?? 1) * 100); $("ovVolVal").textContent = `${Math.round((o.volume ?? 1) * 100)}%`;
   $("ovAnimIn").value = o.anim_in?.type || ""; $("ovAnimOut").value = o.anim_out?.type || "";
   $("ovToMain").hidden = !!src?.image;
+  $("ovBroll").hidden = !o.broll;
 }
 function ovInput(key, apply) {
   return (e) => {
@@ -399,6 +400,28 @@ function initOverPane() {
       const r = await api("/api/montage/overlay-image", { method: "POST", body: form });
       ovImages.set(r.src, { url: r.url, w: r.w, h: r.h, name: r.name, image: true });
       addOverlay(r.src, { src_w: r.w, src_h: r.h, name: r.name });
+    } catch (err) { toast(err.message, true); }
+  });
+  // 🔁 تبديل مصدر الطبقة (زي لقطات الـ B-roll الأوتوماتيك): نفس المكان والوقت، والفيديو الجديد مالي الكادر زي القديم
+  $("ovReplace").addEventListener("change", async (e) => {
+    const file = e.target.files[0], o = selOver();
+    e.target.value = "";
+    if (!file || !o) return;
+    const form = new FormData();
+    form.append("file", file);
+    try {
+      toast(`⏳ بيرفع ${file.name}...`);
+      const img = file.type.startsWith("image/");
+      const r = await api(img ? "/api/montage/overlay-image" : "/api/montage/upload", { method: "POST", body: form });
+      if (img) ovImages.set(r.src, { url: r.url, w: r.w, h: r.h, name: r.name, image: true });
+      else mt.sources = await api("/api/montage/sources");
+      pushHistory();
+      const w = img ? r.w : r.width, h = img ? r.h : r.height, ratio = (mt.project.data.canvas?.ratio || "9:16").split(":").map(Number);
+      const cover = o.broll && w && h ? Math.max(1, (w / h) / (ratio[0] / ratio[1])) : o.w;
+      Object.assign(o, { src: img ? r.src : r.id, start: 0, src_w: w, src_h: h, name: r.name, w: cover, broll: o.broll ? "mine" : o.broll,
+        dur: img ? o.dur : Math.min(o.dur, r.duration || o.dur) });
+      drawOverlayLayer(); renderOverPane(); changed();
+      toast("✅ اتبدّلت");
     } catch (err) { toast(err.message, true); }
   });
   $("trkOver").addEventListener("pointerdown", overTrackDown);

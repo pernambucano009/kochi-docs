@@ -136,3 +136,47 @@ def auto_color(yavg: float | None, satavg: float | None) -> dict:
     if satavg is not None:
         adj["sat"] = int(max(-10, min(22, (42 - satavg) * 0.5)))
     return adj
+
+
+# ---------------------------------------------------------------- 🎞️ B-roll أوتوماتيك: لقطة بالشخص (متولّدة بصوره) أو لقطة ستوك حقيقية
+MAX_BROLL = 4
+MAX_AVATAR = 2
+
+
+def broll_plan_prompt(texts: list[str], has_twin: bool, brief: str) -> str:
+    lines = "\n".join(f"{i + 1}. {t}" for i, t in enumerate(texts))
+    kinds = ("avatar = a short shot of THE SAME PERSON doing something that shows the line (cooking, working at the laptop, walking, pointing at a product…), "
+             "generated from their real photos and their filming place; stock = real stock footage WITHOUT the person (objects, places, hands, food, city…). "
+             if has_twin else "stock = real stock footage that shows the line (objects, places, hands, food, city…). There is no avatar option. ")
+    return ("You are the editor of a vertical talking-head video (one person speaking to a phone camera). Choose B-roll cutaways that make it less boring.\n"
+            + (f"Topic: {brief[:500]}\n" if brief else "")
+            + "Shots (what the person says in each shot):\n" + lines + "\n\n"
+            + kinds
+            + f"Rules: at most {MAX_BROLL} B-rolls" + (f", at most {MAX_AVATAR} avatar" if has_twin else "") + "; never shot 1 (the hook keeps the face); never two shots in a row; "
+              "only where a visual really adds something concrete to the words. For each: shot number, kind, query (2-5 English Pexels keywords for stock), "
+              "and prompt (one English sentence describing the action and framing for avatar, vertical 9:16, natural phone-camera look).\n"
+              'Return JSON only: {"broll": [{"shot": 2, "kind": "stock", "query": "...", "prompt": "..."}]}')
+
+
+def mock_broll_plan(n: int, has_twin: bool) -> dict:
+    out = []
+    for k in range(1, n, 2):
+        out.append({"shot": k + 1, "kind": "avatar" if has_twin and len(out) % 2 == 0 else "stock", "query": "coffee cup morning",
+                    "prompt": "The person pours coffee in their kitchen, medium shot, natural light"})
+    return {"broll": out[:MAX_BROLL]}
+
+
+def clean_broll_plan(raw: dict, n: int, has_twin: bool) -> list[dict]:
+    out, last, av = [], -9, 0
+    for b in sorted([x for x in raw.get("broll") or [] if isinstance(x, dict)], key=lambda x: int(x.get("shot") or 0) if str(x.get("shot") or "").isdigit() else 0):
+        try:
+            k = int(b.get("shot")) - 1
+        except (TypeError, ValueError):
+            continue
+        if not 0 < k < n or k - last < 2 or len(out) >= MAX_BROLL:
+            continue
+        kind = "avatar" if b.get("kind") == "avatar" and has_twin and av < MAX_AVATAR else "stock"
+        av += kind == "avatar"
+        out.append({"shot": k, "kind": kind, "query": str(b.get("query") or "")[:80] or "lifestyle", "prompt": str(b.get("prompt") or "")[:400]})
+        last = k
+    return out
