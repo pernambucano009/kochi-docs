@@ -51,9 +51,7 @@ Q = [
     {"id": "link", "to": {"field": "link"},
      "ar": "ما رابط موقعك أو صفحتك أو رقم التواصل؟", "en": "What is your website, page link, or contact number?",
      "ph_ar": "https://…", "ph_en": "https://…", "ltr": True},
-    {"id": "seasons", "to": {"note": "seasonal", "title_ar": "مواسم مهمة للعلامة", "title_en": "Important seasons"},
-     "ar": "هل هناك مواسم أو مناسبات مهمة لعملك؟", "en": "Are there seasons or occasions that matter for your business?",
-     "ph_ar": "مثلًا: رمضان، الأعياد، العودة للمدارس، الصيف", "ph_en": "e.g. holidays, back to school, summer"},
+    # المواسم مش سؤال: المخ بيجيبها لوحده من السوق والجمهور (رمضان والأعياد والمواسم المحلية) وبتتحط في «المعرفة»
     {"id": "rivals", "to": {"note": "other", "title_ar": "منافسون وحسابات مُلهمة", "title_en": "Competitors or accounts we like"},
      "ar": "من منافسوك، أو من الحسابات التي تعجبك في مجالك؟", "en": "Who are your competitors, or accounts you admire in your field?",
      "ph_ar": "اكتب اسم الحساب أو رابطه في كل سطر", "ph_en": "One account name or link per line", "multi": True},

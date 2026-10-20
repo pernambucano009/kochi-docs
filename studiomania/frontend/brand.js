@@ -621,8 +621,15 @@ const BrandPage = (() => {
         return top + (p.why ? `<p class="bm-note bm-why">${esc(p.why)}</p>` : "") + body + `<p class="bm-note bm-what">${what[0]}</p>`
           + `<div class="bm-acts"><button class="bm-go" data-ok="${p.id}">${what[1]}</button><button class="bm-pill" data-no="${p.id}">لأ، مش محتاجها</button></div>`;
       }
-      case "note": return head.replace(esc(l.t), "معلومة") + editable(`note:t:${l.i}`, l.note.title, "العنوان") + (l.note.summary ? `<p class="bm-note">${esc(l.note.summary)}</p>` : "")
-        + editable(`note:b:${l.i}`, l.note.body, "التفاصيل") + (srcName(l.note.source) ? `<p class="bm-note">من «${esc(srcName(l.note.source))}»</p>` : "") + `<button class="bm-link bad" data-ndel="${l.i}">شيل المعلومة دي</button>`;
+      // معلومة في «المعرفة»: حاجة المخ عرفها عن البراند وبيرجع لها وهو بيكتب (مش مهمة مطلوب منك تعملها)
+      case "note": return head.replace(esc(l.t), "معلومة")
+        + `<p class="bm-note">دي معلومة المخ عرفها عن البراند${srcName(l.note.source) ? ` من «${esc(srcName(l.note.source))}»` : l.note.source === "quiz" ? " من إجابتك في الكويز" : ""}، وبيرجع لها وهو بيكتب السكريبتات والأفكار والكابشن. لو فيها حاجة غلط عدّلها هنا، وأي تعديل بيتحفظ لوحده.</p>`
+        + `<div class="bm-sub"><small>العنوان</small>${editable(`note:t:${l.i}`, l.note.title, "العنوان")}</div>`
+        + `<div class="bm-sub"><small>الملخص (سطر واحد بيظهر لما تقف على النقطة)</small>${editable(`note:s:${l.i}`, l.note.summary || "", "سطر واحد")}</div>`
+        + `<div class="bm-sub"><small>التفاصيل (الكلام اللي المخ بيقراه)</small>${editable(`note:b:${l.i}`, l.note.body, "التفاصيل")}</div>`
+        + (l.note.quiz === "seasons_ai" ? `<p class="bm-note">المواسم دي المخ جابها لوحده من «السوق» و«الجمهور» في الهوية (الأعياد الرسمية والإسلامية ورمضان والمواسم المحلية)، وبتتجدد لوحدها لما تغيّرهم.</p>
+          <div class="bm-acts"><button class="bm-pill" data-seasons>🔄 هات المواسم من جديد</button></div>` : "")
+        + `<button class="bm-link bad" data-ndel="${l.i}">🗑 امسح المعلومة دي من العقل (لو غلط أو مش محتاجها)</button>`;
       case "action": return head + `<p class="bm-note">البرنامج بيبص على اللوجو وصور البراند ويكتب الثيم والستايل وشكل اللوجو لوحده.</p>
         <button class="bm-go" data-analyze ${b?.status === "working" ? "disabled" : ""}>${b?.status === "working" ? "بيستنبط…" : "ابدأ الاستنباط"}</button>`;
     }
@@ -721,8 +728,9 @@ const BrandPage = (() => {
     if (!b || k.startsWith("@") && k !== "@name" || k === "rule:new") return;
     if (k.startsWith("note:")) {
       const [, part, id] = k.split(":"), n = (b.notes || []).find((x) => x.id === id);
-      if (!n || (part === "t" ? n.title : n.body || "") === v || (part === "t" && !v)) return;
-      return save(() => bAPI(`/notes/${id}`, { method: "PATCH", ...jsonBody(part === "t" ? { title: v } : { body: v }) }), { card: false });
+      const key = { t: "title", s: "summary", b: "body" }[part];
+      if (!n || (n[key] || "") === v || (part === "t" && !v)) return;
+      return save(() => bAPI(`/notes/${id}`, { method: "PATCH", ...jsonBody({ [key]: v }) }), { card: false });
     }
     if (k.startsWith("rule:")) {
       const rs = rulesOf(b), i = +k.slice(5);
@@ -908,8 +916,13 @@ const BrandPage = (() => {
       if (no) { openCard(null); return save(() => bAPI(`/pending/${no.dataset.no}`, { method: "DELETE" })); }
       const sdel = t.closest("[data-sdel]");
       if (sdel) { if (confirm("تشيل المصدر ده واقتراحاته اللي لسه مستنية؟")) save(() => bAPI(`/sources/${sdel.dataset.sdel}`, { method: "DELETE" })); return; }
+      if (t.closest("[data-seasons]")) {
+        try { await bAPI("/seasons", { method: "POST" }); toast("🗓️ المخ بيجيب المواسم… هتتحدّث هنا بعد شوية"); } catch (err) { return toast(err.message, true); }
+        const id = S.id; setTimeout(() => { if (S.id === id) save(() => bAPI("")); }, 15000);
+        return;
+      }
       const ndel = t.closest("[data-ndel]");
-      if (ndel) { if (confirm("تشيل المعلومة دي من العقل؟")) { openCard(null); save(() => bAPI(`/notes/${ndel.dataset.ndel}`, { method: "DELETE" })); } return; }
+      if (ndel) { if (confirm("تمسح المعلومة دي؟ المخ مش هيعرفها تاني ومش هيستخدمها في أي كتابة جديدة. (اللي اتعمل قبل كده مش هيتغير)")) { openCard(null); save(() => bAPI(`/notes/${ndel.dataset.ndel}`, { method: "DELETE" })); } return; }
       const pick = t.closest("[data-pick]");
       if (pick) return patch({ [pick.dataset.pick]: pick.dataset.v });
       const von = t.closest("[data-von]");

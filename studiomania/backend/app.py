@@ -9097,10 +9097,7 @@ def patch_brain(bid: str, body: BrainIn):
     old = brain_row(bid) or {}
     update_brain(bid, fn)
     new = brain_row(bid) or {}
-    # 🗓️ البلد أو الجمهور اتغيروا: المخ بيولّد تقويم المناسبات من جديد لوحده
-    if (old.get("market"), old.get("audience")) != (new.get("market"), new.get("audience")) and (new.get("market") or new.get("audience")):
-        SEASON_JOBS.pop(bid, None)
-        start_brain_seasons(bid)
+    seasons_if_changed(bid, old, new)   # 🗓️ المواسم بتتجاب من جديد لوحدها
     return brain_to_dict(new)
 
 
@@ -9496,8 +9493,11 @@ def approve_brain_pending(bid: str, pid: str, body: PendingIn):
                                               "summary": it.get("summary", "") if it["kind"] == "note" else val[:300],
                                               "body": val[:6000] if it["kind"] == "note" else "", "source": it.get("source")})
         d["pending"] = [x for x in d["pending"] if x["id"] != pid]
+    old = brain_row(bid) or {}
     update_brain(bid, fn)
-    return brain_to_dict(brain_row(bid))
+    new = brain_row(bid) or {}
+    seasons_if_changed(bid, old, new)
+    return brain_to_dict(new)
 
 
 @app.delete("/api/ad-brains/{bid}/pending/{pid}")
@@ -9575,8 +9575,11 @@ def brain_quiz_answer(bid: str, body: QuizIn):
         done = d.setdefault("quiz_done", [])
         if ans and q["id"] not in done:
             done.append(q["id"])
+    old = brain_row(bid) or {}
     update_brain(bid, fn)
-    return brain_to_dict(brain_row(bid))
+    new = brain_row(bid) or {}
+    seasons_if_changed(bid, old, new)
+    return brain_to_dict(new)
 
 
 @app.get("/api/ad-brains/{bid}/tasks")
@@ -9614,6 +9617,7 @@ def brain_quiz_answers(bid: str):
 class NoteIn(BaseModel):
     title: str | None = None
     body: str | None = None
+    summary: str | None = None
 
 
 @app.patch("/api/ad-brains/{bid}/notes/{nid}")
@@ -9626,6 +9630,8 @@ def patch_brain_note(bid: str, nid: str, body: NoteIn):
             n["title"] = body.title.strip()[:120]
         if body.body is not None:
             n["body"] = body.body.strip()[:6000]
+        if body.summary is not None:
+            n["summary"] = body.summary.strip()[:300]
     update_brain(bid, fn)
     return brain_to_dict(brain_row(bid))
 
@@ -21963,10 +21969,40 @@ def run_brain_seasons(bid: str) -> None:
         else:
             raw = flow_llm(fz.seasons_messages(b.get("market", ""), b.get("audience", ""), b.get("domain", ""), today), "المواسم")
         data = {**fz.clean_seasons(raw), "for": f"{b.get('market', '')}|{b.get('audience', '')}", "made_at": now()}
-        update_brain(bid, lambda d: d.update(seasons=data))
+        note = seasons_note(data)
+
+        def fn(d):
+            d["seasons"] = data
+            # 🗓️ في «المعرفة» كمان: المخ بيرجع لها وهو بيكتب (بتتبدّل كل مرة السوق أو الجمهور يتغيروا)
+            notes = [x for x in d.get("notes") or [] if x.get("quiz") != "seasons_ai"]
+            if note:
+                notes.append(note)
+            d["notes"] = notes
+        update_brain(bid, fn)
+        if not atlas.mock_mode():
+            wallet.charge(wallet.credits(wallet.est(chars=9000)), "عقل البراند: مواسم ومناسبات السوق", bid)
         SEASON_JOBS.pop(bid, None)
     except Exception as exc:  # noqa: BLE001
         SEASON_JOBS[bid] = f"error:{str(getattr(exc, 'detail', None) or exc)[:200]}"
+
+
+def seasons_note(data: dict) -> dict | None:
+    items = data.get("items") or []
+    if not items:
+        return None
+    lines = [f"• {i['name']} — {i['date']}{' لـ ' + i['end'] if i.get('end') else ''}{' (' + i['type'] + ')' if i.get('type') else ''}"
+             f"{': ' + i['angle'] if i.get('angle') else ''}" for i in items[:60]]
+    where = data.get("target") or "، ".join(data.get("countries") or [])
+    return {"id": uuid.uuid4().hex[:10], "quiz": "seasons_ai", "section": "seasonal", "title": "🗓️ مواسم ومناسبات السوق", "source": "ai",
+            "summary": f"{len(items)} مناسبة في السنة الجاية{' في ' + where if where else ''} (اتجابت بالذكاء الاصطناعي من السوق والجمهور)",
+            "body": "\n".join(lines)}
+
+
+def seasons_if_changed(bid: str, old: dict, new: dict) -> None:
+    """🗓️ البلد أو الجمهور اتغيروا (من أي مكان: كتابة، كويز، أو اقتراح اتوافق عليه): المخ بيجيب المواسم من جديد لوحده."""
+    if (old.get("market"), old.get("audience")) != (new.get("market"), new.get("audience")) and (new.get("market") or new.get("audience")):
+        SEASON_JOBS.pop(bid, None)
+        start_brain_seasons(bid)
 
 
 def start_brain_seasons(bid: str) -> None:
@@ -21974,6 +22010,19 @@ def start_brain_seasons(bid: str) -> None:
         return
     SEASON_JOBS[bid] = "working"
     threading.Thread(target=run_brain_seasons, args=(bid,), daemon=True).start()
+
+
+@app.post("/api/ad-brains/{bid}/seasons")
+def brain_seasons_now(bid: str):
+    """🔄 هات المواسم من جديد للعقل ده (من السوق والجمهور)."""
+    b = brain_row(bid)
+    if b is None:
+        raise HTTPException(404, "العميل ده مش موجود")
+    if not (b.get("market") or b.get("audience")):
+        raise HTTPException(400, "اكتب السوق (البلد أو المدينة) أو الجمهور في «الهوية» الأول، والمخ هيجيب المواسم لوحده")
+    SEASON_JOBS.pop(bid, None)
+    start_brain_seasons(bid)
+    return {"status": "working"}
 
 
 @app.get("/api/brain-seasons")
