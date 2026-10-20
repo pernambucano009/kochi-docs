@@ -25678,15 +25678,104 @@ def auto_files(lib: dict, src: dict | None, kinds: tuple[str, ...]) -> list[dict
     return [f for f in lib_.search(lib, "", "", src.get("id")) if f["kind"] in kinds]
 
 
+GEN_MOCK = [{"model": "mock/kling-o1/video-edit", "label": "Kling O1 Edit (تجريبي)", "per_sec": 0.17, "mode": "video", "kind": "edit", "video_in": True},
+            {"model": "mock/seedance-2.5/reference-to-video", "label": "Seedance 2.5 مراجع (تجريبي)", "per_sec": 0.138, "mode": "refs", "kind": "ref", "video_in": True},
+            {"model": "mock/kling-o3/reference-to-video", "label": "Kling O3 مراجع (تجريبي)", "per_sec": 0.09, "mode": "refs", "kind": "ref", "video_in": False},
+            {"model": "mock/kling-o3/image-to-video", "label": "Kling O3 من صورة (تجريبي)", "per_sec": 0.071, "mode": "image", "kind": "edit", "video_in": False},
+            {"model": "mock/kling-o3/start-end-to-video", "label": "Kling O3 بداية ونهاية (تجريبي)", "per_sec": 0.071, "mode": "startend", "kind": "edit", "video_in": False},
+            {"model": "mock/veo-3/text-to-video", "label": "Veo 3 من الكلام (تجريبي)", "per_sec": 0.2, "mode": "text", "kind": "edit", "video_in": False}]
+GEN_MODE_T = {"video": "من القطعة نفسها (فيديو ← فيديو)", "refs": "من مراجع (شخصيات وخلفيات وصور)", "image": "من صورة بداية",
+              "startend": "من صورة بداية وصورة نهاية", "text": "من الكلام بس"}
+
+
 def auto_gen_models() -> list[dict]:
-    """موديلات «ولّد» (بتاخد فيديو + برومبت وتطلّع فيديو جديد): نفس كتالوج تعديل الفيديو على Atlas."""
+    """موديلات «ولّد»: كل موديلات الفيديو على Atlas، وكل موديل بنوع مدخلاته (من القطعة / مراجع / صورة / بداية ونهاية / كلام)."""
     try:
-        ms = vmodels.camera_candidates()
+        ms = vmodels.gen_catalog()
     except Exception:  # noqa: BLE001 — الكتالوج مش متاح دلوقتي
         ms = []
     if not ms and atlas.mock_mode():
-        ms = CAM_MOCK
+        ms = GEN_MOCK
     return ms
+
+
+def auto_refs(q: str = "") -> list[dict]:
+    """اللي ينفع يتمنشن (@) في «ولّد»: الشخصيات، نسختي، الخلفيات والأماكن، والفولدرات والصور والفيديوهات من مكتبة المحتويات."""
+    out = []
+    with closing(db()) as conn:
+        for r in conn.execute("SELECT * FROM coaches ORDER BY name"):
+            c = coach_to_dict(r)
+            out.append({"kind": "char", "id": str(c["id"]), "label": c["name"], "thumb": c["image_url"], "sub": "شخصية"})
+    for t in twins_list():
+        ph = next((p for p in t.get("photos") or [] if p.get("angle") in ("front", "smile")), None) or next(iter(t.get("photos") or []), None)
+        if ph:
+            out.append({"kind": "twin", "id": t["id"], "label": t.get("name") or "نسختي", "thumb": ph["url"], "sub": "🪞 نسختي"})
+    bg = content_backgrounds()
+    for x in bg["brand"] + bg["twin"]:
+        out.append({"kind": "bg", "id": x["id"], "label": x["name"] or "خلفية", "thumb": x["url"], "sub": "خلفية"})
+    bid = active_client_id()
+    lib = lib_load(bid)
+    view = lib_to_dict(lib, bid)
+    for f in view["folders"]:
+        out.append({"kind": "folder", "id": f["id"], "label": f["path"] or f["name"], "thumb": "", "sub": f"📁 فولدر · {f['count']} ملف"})
+    hits = {f["id"] for f in lib_.search(lib, q, "")} if q.strip() else None
+    for f in view["files"]:
+        if f.get("kind") in ("image", "video") and (hits is None or f["id"] in hits):
+            out.append({"kind": "file", "id": f["id"], "label": f["name"], "thumb": f.get("thumb") or "", "sub": "🖼️ صورة" if f["kind"] == "image" else "🎬 فيديو"})
+    if q.strip():
+        n = lib_.norm(q)
+        out = [x for x in out if x["kind"] == "file" or n in lib_.norm(x["label"])]
+    return out[:80]
+
+
+@app.get("/api/automations-refs")
+def automations_refs(q: str = ""):
+    return auto_refs(q)
+
+
+def auto_ref_image(r: dict, src: Path | None, tmp: Path) -> Path | None:
+    """منشن ← صورة على الجهاز (الفيديو بناخد منه فريم، والفولدر بناخد منه صورة عشوائية)."""
+    k, rid = r.get("kind"), str(r.get("id") or "")
+    try:
+        if k == "frame" and src:
+            out = tmp / "frame0.jpg"
+            subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", "0.05", "-i", str(src), "-frames:v", "1", "-q:v", "3", str(out)],
+                           check=True, capture_output=True, timeout=60)
+            return out if out.exists() else None
+        if k == "char":
+            with closing(db()) as conn:
+                row = conn.execute("SELECT image_filename FROM coaches WHERE id = ?", (rid,)).fetchone()
+            return COACHES_DIR / row["image_filename"] if row else None
+        if k == "twin":
+            t = twin_load(rid)
+            ph = next((p for p in t.get("photos") or [] if p.get("angle") in ("front", "smile")), None) or next(iter(t.get("photos") or []), None)
+            return twin_dir(rid) / ph["file"] if ph else None
+        if k == "bg":
+            if rid.startswith("bg:"):
+                return brain_dir(active_client_id()) / Path(rid[3:]).name
+            if rid.startswith("tw:"):
+                _, tid, xid = rid.split(":", 2)
+                x = next((b for b in twin_load(tid).get("backgrounds") or [] if b["id"] == xid), None)
+                return twin_dir(tid) / x["file"] if x else None
+        if k in ("file", "folder"):
+            lib = lib_load()
+            if k == "file":
+                f = next((x for x in lib["files"] if x["id"] == rid), None)
+            else:
+                pool = [x for x in lib_.search(lib, "", "", rid) if x["kind"] in ("image", "video")]
+                f = random.choice(pool) if pool else None
+            if not f:
+                return None
+            p = lib_dir() / f["file"]
+            if f["kind"] == "video":
+                out = tmp / f"ref-{f['id']}.jpg"
+                subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", "0.5", "-i", str(p), "-frames:v", "1", "-q:v", "3", str(out)],
+                               check=True, capture_output=True, timeout=60)
+                return out if out.exists() else None
+            return p
+    except (subprocess.SubprocessError, OSError, KeyError, ValueError, HTTPException):
+        return None
+    return None
 
 
 def auto_split_plan(lib: dict, s: dict) -> dict:
@@ -25739,7 +25828,8 @@ def automations_meta():
     return {"verbs": {k: {x: v[x] for x in ("t", "desc", "accept", "opts")} for k, v in automate.VERBS.items()},
             "orders": automate.ORDERS, "trans": automate.TRANS, "ratios": automate.RATIOS, "when": automate.WHEN, "fixed": automate.FIXED,
             "lane_verbs": automate.LANE_VERBS, "max_lanes": automate.MAX_LANES,
-            "gen_models": [{k: m.get(k) for k in ("model", "label", "per_sec", "kind")} for m in auto_gen_models()]}
+            "gen_models": [{k: m.get(k) for k in ("model", "label", "per_sec", "kind", "mode", "video_in")} for m in auto_gen_models()],
+            "gen_modes": GEN_MODE_T, "ref_kinds": automate.REF_KINDS, "max_refs": automate.MAX_REFS}
 
 
 @app.get("/api/automations")
@@ -26011,24 +26101,58 @@ def auto_cut_spans(src: Path, dur: float, s: dict, run_id: str, report: list[str
 
 
 def auto_gen_piece(src: Path, dur: float, g: dict, dest: Path, run_id: str, ratio: str) -> str:
-    """«ولّد»: القطعة + البرومبت ← فيديو جديد من موديل تعديل الفيديو، والخصم على قد الثواني."""
-    prompt = (g["opts"].get("prompt") or "").strip()
+    """«ولّد»: البرومبت + اللي الموديل بياخده (القطعة نفسها، أو صورة بداية/نهاية، أو مراجع من المنشن) ← فيديو جديد، والخصم على قد الثواني."""
+    o = g["opts"]
+    prompt = (o.get("prompt") or "").strip()
     if not prompt:
         raise RuntimeError("خطوة «ولّد» من غير برومبت")
     ms = auto_gen_models()
-    cand = next((m for m in ms if m["model"] == g["opts"].get("model")), None) or (ms[0] if ms else None)
+    cand = next((m for m in ms if m["model"] == o.get("model")), None) or (ms[0] if ms else None)
     if not cand:
         raise RuntimeError("مفيش موديل توليد فيديو متاح على Atlas دلوقتي")
-    if atlas.mock_mode():
-        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src), "-vf", "hue=h=140:s=1.6,eq=contrast=1.15",
-                        "-c:a", "copy", str(dest)], check=True, capture_output=True, timeout=300)
+    mode = cand.get("mode") or ("video" if cand.get("kind") == "edit" else "refs")
+    tmp = GENERATED_DIR / f"autoref_{run_id}_{g['id']}"
+    tmp.mkdir(parents=True, exist_ok=True)
+    try:
+        refs = [(r, p) for r in o.get("refs") or [] if (p := auto_ref_image(r, src, tmp)) and p.exists()]
+        # المنشن في البرومبت بيتحول لرقم المرجع علشان الموديل يعرف مين مين
+        if mode in ("refs", "video"):
+            for i, (r, _) in enumerate(refs):
+                if r.get("label"):
+                    prompt = prompt.replace(f"@{r['label']}", f"{r['label']} (reference image {i + 1})")
+        prompt = re.sub(r"@(?=\S)", "", prompt)   # أي منشن تاني بيفضل اسم عادي
+        pick = lambda key, fallback: (auto_ref_image(o[key], src, tmp) if o.get(key) else None) or fallback  # noqa: E731
+        start = pick("start", refs[0][1] if refs else auto_ref_image({"kind": "frame"}, src, tmp)) if mode in ("image", "startend") else None
+        end = pick("end", refs[1][1] if len(refs) > 1 else None) if mode == "startend" else None
+        if mode == "refs" and not refs and not (cand.get("video_in") and o.get("use_piece", True)):
+            raise RuntimeError("الموديل ده بيشتغل بمراجع: منشن شخصية أو خلفية أو صورة (@)")
+        if mode == "startend" and not end:
+            raise RuntimeError("الموديل ده محتاج صورة نهاية: اختارها من «صورة النهاية»")
+        if atlas.mock_mode():
+            subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src), "-vf", "hue=h=140:s=1.6,eq=contrast=1.15",
+                            "-c:a", "copy", str(dest)], check=True, capture_output=True, timeout=300)
+            return f"{cand['label']} · {GEN_MODE_T.get(mode, mode)}" + (f" · {len(refs)} مرجع" if refs else "")
+        cost = wallet.credits((cand.get("per_sec") or 0.3) * dur * (2 if mode == "refs" and cand.get("video_in") else 1))
+        wallet.need(cost, "توليد قطعة فيديو")
+        imgs = [atlas.upload_media(seedance_ref(p)) for _, p in refs]
+        secs = max(4, round(dur))
+        if mode == "video":
+            body = vmodels.camera_body({**cand, "kind": cand.get("kind") or "edit"}, atlas.upload_media(src), prompt, dur, ratio, images=imgs or None)
+        else:
+            body = {"model": cand["model"], "prompt": prompt, "duration": secs, "ratio": ratio, "resolution": "720p"}
+            if mode == "refs":
+                body["reference_images"] = imgs[:4]
+                if cand.get("video_in") and o.get("use_piece", True):
+                    body["reference_videos"] = [atlas.upload_media(src)]
+            elif mode in ("image", "startend"):
+                body["image"] = atlas.upload_media(seedance_ref(start))
+                if end:
+                    body["last_image"] = atlas.upload_media(seedance_ref(end))
+        atlas.download(atlas.run_model("Video", body, cand["label"], max_seconds=2400, interval=6), dest)
+        wallet.charge(cost, f"موديل مخصص: توليد قطعة ({cand['label']})", run_id)
         return cand["label"]
-    cost = wallet.credits((cand.get("per_sec") or 0.3) * dur * (2 if cand["kind"] == "ref" else 1))
-    wallet.need(cost, "توليد قطعة فيديو")
-    body = vmodels.camera_body(cand, atlas.upload_media(src), prompt, dur, ratio)
-    atlas.download(atlas.run_model("Video", body, cand["label"], max_seconds=2400, interval=6), dest)
-    wallet.charge(cost, f"موديل مخصص: توليد قطعة ({cand['label']})", run_id)
-    return cand["label"]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
 
 
 def auto_run_split(bid: str, s: dict, merge: dict | None, f: dict, ratio: str, run_id: str, setr, report: list[str]) -> list[dict]:

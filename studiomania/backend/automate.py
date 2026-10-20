@@ -23,7 +23,8 @@ VERBS = {
     "music": {"t": "حط موسيقى", "desc": "موسيقى بتوطى لوحدها وقت الكلام", "accept": ("audio",), "opts": {"volume": 35, "duck": True, "order": "fresh"}},
     "split": {"t": "قطّع الفيديو", "desc": "يقسم فيديو طويل لقطع أقصر، وكل قطعة بتمشي في مسار لوحدها", "accept": ("video",),
               "opts": {"max": 15.0, "note": "", "order": "fresh"}},
-    "gen": {"t": "ولّد", "desc": "فيديو جديد بالذكاء الصناعي من القطعة دي بالبرومبت اللي تكتبه", "accept": (), "opts": {"prompt": "", "model": ""}},
+    "gen": {"t": "ولّد", "desc": "فيديو جديد بالذكاء الصناعي: من القطعة، أو من صورة، أو من مراجع (شخصيات وخلفيات)، أو من الكلام بس، على حسب الموديل",
+            "accept": (), "opts": {"prompt": "", "model": "", "refs": [], "start": None, "end": None, "use_piece": True}},
     "merge": {"t": "جمّع", "desc": "يجمع المخرجات اللي تختارها في فيديو واحد بالترتيب اللي تحدده", "accept": (), "opts": {"items": []}},
     "cut": {"t": "طول اللقطات", "desc": "أقصى طول لكل لقطة، وانتقال بين اللقطات", "accept": (), "opts": {"max": 3.0, "trans": "fade"}},
     "caption": {"t": "حط كابشن", "desc": "الكلام مكتوب على الشاشة من التعليق الصوتي", "accept": (), "opts": {"on": True}},
@@ -31,7 +32,9 @@ VERBS = {
     "publish": {"t": "انشر", "desc": "على حساباتك المربوطة في صفحة النشر، أو يستنى موافقتك", "accept": (), "opts": {"when": "draft", "platforms": [], "caption": ""}},
 }
 FIXED = ("export", "publish")
-LANE_VERBS = ("gen",)          # الخطوات اللي بتتحط جوه مسار قطعة
+LANE_VERBS = ("gen",)
+REF_KINDS = {"char": "شخصية", "twin": "نسختي", "bg": "خلفية", "file": "ملف", "folder": "فولدر", "frame": "أول فريم من القطعة"}
+MAX_REFS = 6          # الخطوات اللي بتتحط جوه مسار قطعة
 MAX_LANES = 12   # آخر خطوتين دايمًا: صدّر وبعدها انشر (مابيتشالوش ومابيتحركوش)
 WHEN = {"draft": "يستنى موافقتي", "now": "ينزل على طول"}
 ORDERS = {"fresh": "اللي متستخدمش قبل كده", "random": "عشوائي", "newest": "الأحدث الأول", "oldest": "الأقدم الأول"}
@@ -70,6 +73,17 @@ def clean_src(raw) -> dict | None:
     return None
 
 
+def clean_ref(raw) -> dict | None:
+    """منشن (@) لشخصية أو نسختي أو خلفية أو ملف أو فولدر من مكتبة المحتويات، أو «أول فريم من القطعة»."""
+    if not isinstance(raw, dict) or raw.get("kind") not in REF_KINDS:
+        return None
+    if raw["kind"] == "frame":
+        return {"kind": "frame", "id": "", "label": REF_KINDS["frame"]}
+    if not str(raw.get("id") or "").strip():
+        return None
+    return {"kind": raw["kind"], "id": str(raw["id"])[:120], "label": str(raw.get("label") or "")[:80], "thumb": str(raw.get("thumb") or "")[:300]}
+
+
 def clean_opts(verb: str, raw: dict) -> dict:
     base = dict(VERBS[verb]["opts"])
     raw = raw if isinstance(raw, dict) else {}
@@ -101,7 +115,17 @@ def clean_opts(verb: str, raw: dict) -> dict:
                 if isinstance(it, dict) and isinstance(it.get("lane"), (int, float)) and 0 <= int(it["lane"]) < MAX_LANES:
                     out.append({"lane": int(it["lane"]), "node": str(it.get("node") or "piece")[:12]})
             base[k] = out
-        elif k in ("fit", "duck", "on"):
+        elif k == "refs" and isinstance(raw[k], list):
+            seen, out = set(), []
+            for r in raw[k]:
+                r = clean_ref(r)
+                if r and r["kind"] != "frame" and (r["kind"], r["id"]) not in seen:
+                    seen.add((r["kind"], r["id"]))
+                    out.append(r)
+            base[k] = out[:MAX_REFS]
+        elif k in ("start", "end"):
+            base[k] = clean_ref(raw[k])
+        elif k in ("fit", "duck", "on", "use_piece"):
             base[k] = bool(raw[k])
         elif k == "count":
             base[k] = int(num(k, 1, 20))

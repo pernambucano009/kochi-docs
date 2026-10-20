@@ -41,13 +41,76 @@ const AutoPage = (() => {
       split: [{ ...srcLeaf, t: "الفيديو", val: src ? `${src}${s.video ? ` · ${AR_N(Math.round(s.video.dur))} ث` : s.found != null ? ` · ${AR_N(s.found)} فيديو` : ""}` : "" },
         { f: "max", t: "أقصى طول للقطعة", val: `${AR_N(o.max)} ث${s.pieces ? ` · ${AR_N(s.pieces)} قطع` : ""}` },
         { f: "note", t: "محتاج إيه في التقطيع", val: (o.note || "").slice(0, 40) || "قطع متساوية عند السكوت" }, { f: "order", t: "أنهي فيديو", val: M.orders[o.order] }],
-      gen: [{ f: "prompt", t: "البرومبت", val: (o.prompt || "").slice(0, 40), miss: !(o.prompt || "").trim() },
-        { f: "model", t: "الموديل", val: (M.gen_models || []).find((m) => m.model === o.model)?.label || "الافتراضي" }],
+      gen: genLeaves(o),
       merge: [{ f: "items", t: "إيه اللي يتجمع وبأي ترتيب", val: (o.items || []).length ? `${AR_N(o.items.length)} مخرج بالترتيب بتاعك` : "آخر حاجة في كل مسار" }],
       publish: [{ f: "when", t: "إمتى", val: M.when[o.when] }, { f: "platforms", t: "على فين", val: (o.platforms || []).length ? `${AR_N(o.platforms.length)} حساب` : "", miss: o.when === "now" && !(o.platforms || []).length },
         { f: "caption", t: "الكابشن", val: (o.caption || "").slice(0, 40) || "اسم الموديل" }],
     }[s.verb] || [];
     return [...L.map((l) => ({ ...l, type: "opt" })), ...(M.fixed.includes(s.verb) || s.verb === "merge" ? [] : [{ f: "move", t: "رتّبها أو شيلها", type: "action" }])];
+  }
+  // ✨ «ولّد»: النقط بتتغيّر على حسب نوع الموديل (من القطعة / مراجع / صورة / بداية ونهاية / الكلام بس)
+  const genModel = (o) => (S.meta.gen_models || []).find((m) => m.model === o.model) || (S.meta.gen_models || [])[0] || null;
+  const genMode = (o) => genModel(o)?.mode || "video";
+  function genLeaves(o) {
+    const m = genModel(o), mode = genMode(o), refs = o.refs || [];
+    const L = [{ f: "model", t: "الموديل", val: m ? `${m.label} · ${S.meta.gen_modes?.[mode] || ""}` : "الافتراضي" },
+      { f: "prompt", t: "البرومبت", val: (o.prompt || "").slice(0, 40), miss: !(o.prompt || "").trim() }];
+    if (mode === "image" || mode === "startend") L.push({ f: "start", t: "صورة البداية", val: o.start?.label || refs[0]?.label || "أول فريم من القطعة" });
+    if (mode === "startend") L.push({ f: "end", t: "صورة النهاية", val: o.end?.label || refs[1]?.label || "", miss: !o.end && refs.length < 2 });
+    if (mode === "refs" || mode === "video") L.push({ f: "refs", t: mode === "refs" ? "المراجع (شخصيات وخلفيات وصور)" : "مراجع (اختياري)", val: refs.length ? refs.map((r) => r.label).join("، ").slice(0, 40) : "",
+      miss: mode === "refs" && !refs.length && !(m?.video_in && o.use_piece) });
+    if (mode === "refs" && m?.video_in) L.push({ f: "use_piece", t: "القطعة كمرجع فيديو", val: o.use_piece ? "أيوه" : "لأ" });
+    return L;
+  }
+  // اللي ينفع يتمنشن: الشخصيات، نسختي، الخلفيات، والفولدرات والملفات من مكتبة المحتويات
+  function loadRefs() {
+    if (S.refsLoading) return;
+    S.refsLoading = true;
+    api("/api/automations-refs").then((x) => { S.refs = x; refreshCard(); }).catch((err) => toast(err.message, true)).finally(() => (S.refsLoading = false));
+  }
+  const refKey = (r) => `${r.kind}|${r.id}`;
+  const refFind = (key) => (S.refs || []).find((r) => refKey(r) === key);
+  const refThumb = (r) => (r.thumb ? `<img src="${esc(r.thumb)}" alt="">` : `<span>${r.kind === "folder" ? "📁" : r.kind === "file" ? "🎬" : "✦"}</span>`);
+  function refList(q, chosen, f) {
+    if (!S.refs) { loadRefs(); return `<p class="bm-note">بيجيب الشخصيات والخلفيات والملفات…</p>`; }
+    const nq = String(q || "").trim().toLowerCase(), on = new Set(chosen.map(refKey));
+    const list = S.refs.filter((r) => !nq || `${r.label} ${r.sub}`.toLowerCase().includes(nq)).slice(0, 40);
+    const groups = [["char", "🧑‍🎤 الشخصيات"], ["twin", "🪞 نسختي"], ["bg", "🏞️ الخلفيات والأماكن"], ["folder", "📁 فولدرات"], ["file", "🖼️ صور وفيديوهات"]];
+    return groups.map(([k, t]) => { const xs = list.filter((r) => r.kind === k); return xs.length ? `<p class="am-gh">${t}</p><div class="am-files">${xs.map((r) =>
+      `<button class="am-file${on.has(refKey(r)) ? " on" : ""}" data-refpick="${esc(f)}" data-ref="${esc(refKey(r))}" title="${esc(r.sub)}">${refThumb(r)}<small>${esc(r.label)}</small></button>`).join("")}</div>` : ""; }).join("")
+      || `<p class="bm-note">مفيش حاجة بالاسم ده. ضيف شخصيات من «الشخصيات والأفاتار» وخلفيات وملفات من «مكتبة محتويات البراند».</p>`;
+  }
+  function refsCard(s, f) {
+    const o = s.opts, mode = genMode(o), one = f !== "refs", chosen = one ? (o[f] ? [o[f]] : []) : (o.refs || []);
+    const note = { refs: mode === "refs" ? `الموديل بيعمل الفيديو من المراجع دي (لحد ${AR_N(S.meta.max_refs || 6)}). اختار شخصية أو خلفية أو صورة، أو اكتب @ في البرومبت.` : "لو الموديل بيقبل صور مرجع، بتتبعت معاه القطعة (مثلًا الشخصية علشان شكلها يفضل ثابت).",
+      start: "الصورة اللي الفيديو هيبدأ منها. الافتراضي: أول فريم من القطعة.", end: "الصورة اللي الفيديو هيخلص عليها." }[f];
+    return `<p class="bm-note">${note}</p>
+      ${chosen.length ? `<div class="am-chosen">${chosen.map((r) => `<span class="am-chip">${refThumb(r)}<b>${esc(r.label)}</b><button data-refrm="${esc(f)}|${esc(refKey(r))}" title="شيله">✕</button></span>`).join("")}</div>` : ""}
+      ${f === "start" ? `<div class="bm-pills"><button class="bm-pill${o.start?.kind === "frame" || !o.start ? " on" : ""}" data-refset="start|frame|">🎞️ أول فريم من القطعة</button></div>` : ""}
+      <div class="bm-write" contenteditable="plaintext-only" data-k="refq" data-ph="🔎 دوّر بالاسم">${esc(S.refQ || "")}</div>
+      <div data-reflist>${refList(S.refQ, chosen, f)}</div>`;
+  }
+  // @ في البرومبت: قايمة صغيرة تحت الكتابة، والاختيار بيكتب الاسم ويضيفه للمراجع
+  function mentionQuery(el) { const m = /(^|\s)@([^\s@]*)$/.exec(el.innerText); return m ? m[2] : null; }
+  function showMentions(el) {
+    const box = S.el.querySelector("[data-ment]");
+    if (!box) return;
+    const q = mentionQuery(el);
+    if (q == null || !S.refs) { box.hidden = true; return; }
+    const nq = q.toLowerCase(), xs = S.refs.filter((r) => !nq || r.label.toLowerCase().includes(nq)).slice(0, 8);
+    box.hidden = !xs.length;
+    box.innerHTML = xs.map((r) => `<button type="button" class="am-mi" data-mention="${esc(refKey(r))}">${refThumb(r)}<b>${esc(r.label)}</b><small>${esc(r.sub)}</small></button>`).join("");
+  }
+  function insertMention(s, key) {
+    const r = refFind(key), el = S.el.querySelector('[data-k="opt:prompt"]');
+    if (!r || !el) return;
+    const txt = el.innerText.replace(/(^|\s)@([^\s@]*)$/, (_, a) => `${a}@${r.label} `);
+    el.innerText = txt;   // لو فيه حفظ للكتابة لسه مستني، بيحفظ نفس الكلام
+    const it = { kind: r.kind, id: r.id, label: r.label, thumb: r.thumb };
+    return saveSteps(mapStep(s.id, (x) => {
+      const cur = x.opts.refs || [];
+      return { ...x, opts: { ...x.opts, prompt: txt, refs: cur.some((y) => refKey(y) === key) ? cur : [...cur, it].slice(0, S.meta.max_refs || 6) } };
+    }));
   }
   // خط واحد من الشمال لليمين: ابدأ ← الخطوات ← «＋» ← صدّر ← انشر، ونقط كل خطوة على قوس فوقها.
   // «قطّع الفيديو» بيفتح مسار لكل قطعة (فوق بعض)، وكلهم بيرجعوا يتقابلوا عند «جمّع».
@@ -361,11 +424,26 @@ const AutoPage = (() => {
     if (l.f === "when") return head + pills("when", Object.entries(M.when), o.when) + `<p class="bm-note">«يستنى موافقتي»: الفيديو بيتصدّر ويستناك في صفحة النشر. «ينزل على طول»: بينزل على الحسابات اللي هتختارها.</p>`;
     if (l.f === "platforms") return head + platCard(o);
     if (l.f === "caption") return head + editable("pubcap", o.caption || "", "الكابشن اللي هينزل مع الفيديو (لو فاضي: اسم الموديل)") + `<p class="bm-note">بيتحفظ لوحده لما تقف عن الكتابة.</p>`;
-    if (l.f === "prompt") return head + editable("opt:prompt", o.prompt || "", "اكتب الفيديو الجديد اللي عايزه من القطعة دي: مثلًا «نفس المشهد بس بستايل أنمي، ألوان دافية»") + `<p class="bm-note">الموديل بياخد القطعة نفسها كمرجع وبيعمل منها فيديو جديد بالبرومبت ده. بيتحفظ لوحده لما تقف عن الكتابة.${S.rec.est ? ` تكلفة التشغيل كله حوالي <b class="num">${AR_N(S.rec.est)}</b> نقطة.` : ""}</p>`;
+    if (l.f === "prompt" && s.verb === "gen") {
+      const mode = genMode(o), PH = { video: "مثلًا: نفس المشهد بس بستايل أنمي، ألوان دافية", refs: "مثلًا: @سارة ماشية في @المكتب وبتشاور على الشاشة", image: "مثلًا: الكاميرا بتقرّب ببطء والناس بتتحرك",
+        startend: "مثلًا: الكاميرا بتلف من البداية للنهاية", text: "اكتب الفيديو كله: المكان، الناس، الحركة، الإضاءة" };
+      const NOTE = { video: "الموديل بياخد القطعة نفسها وبيعمل منها فيديو جديد بالبرومبت ده.", refs: "الموديل بيعمل فيديو جديد من المراجع اللي منشنتها.", image: "الموديل بيبدأ من صورة البداية ويحرّكها على حسب البرومبت.",
+        startend: "الموديل بيعمل الحركة من صورة البداية لصورة النهاية.", text: "الموديل بيعمل الفيديو من الكلام بس، من غير القطعة." };
+      if (!S.refs) loadRefs();
+      return head + editable("opt:prompt", o.prompt || "", PH[mode]) + `<div class="am-ment" data-ment hidden></div>`
+        + `<p class="bm-note">${NOTE[mode]} اكتب <b>@</b> علشان تمنشن شخصية أو خلفية أو صورة أو فولدر (بتتبعت للموديل كمرجع). بيتحفظ لوحده لما تقف عن الكتابة.${S.rec.est ? ` تكلفة التشغيل كله حوالي <b class="num">${AR_N(S.rec.est)}</b> نقطة.` : ""}</p>`;
+    }
+    if (["refs", "start", "end"].includes(l.f)) return head + refsCard(s, l.f);
     if (l.f === "note") return head + editable("opt:note", o.note || "", "مثلًا: اقطع عند آخر كل جملة، وشيل أول ٣ ثواني، ومن غير السكوت الطويل") + `<p class="bm-note">لو سبته فاضي: قطع متساوية، والقطع بيتزق لأقرب سكوت علشان مايقطعش في نص كلمة. لو كتبت: المخ بيسمع الكلام ويقطّع على حسب طلبك (بيتخصم على قد طول الفيديو).</p>`;
-    if (l.f === "model") return head + pills("model", [["", "الافتراضي"], ...(M.gen_models || []).map((m) => [m.model, `${m.label}${m.per_sec ? ` · $${m.per_sec}/ث` : ""}`])], o.model) + `<p class="bm-note">موديلات بتاخد فيديو + برومبت وتطلّع فيديو جديد.</p>`;
+    if (l.f === "model") {
+      const cur = genModel(o)?.model;
+      return head + `<p class="bm-note">كل موديل بياخد حاجة مختلفة، والنقط اللي حوالين الخطوة بتتغيّر على حسبه.</p>` + Object.entries(M.gen_modes || {}).map(([mode, t]) => {
+        const xs = (M.gen_models || []).filter((m) => m.mode === mode);
+        return xs.length ? `<p class="am-gh">${esc(t)}</p>` + pills("model", xs.map((m) => [m.model, `${m.label}${m.per_sec ? ` · $${m.per_sec}/ث` : ""}`]), cur) : "";
+      }).join("");
+    }
     if (l.f === "items") return head + mergeCard(s);
-    if (["fit", "duck", "on"].includes(l.f)) return head + pills(l.f, [[true, "أيوه"], [false, "لأ"]], o[l.f]);
+    if (["fit", "duck", "on", "use_piece"].includes(l.f)) return head + pills(l.f, [[true, "أيوه"], [false, "لأ"]], o[l.f]);
     const NUM = { count: [[1, "١"], [2, "٢"], [3, "٣"], [4, "٤"], [6, "٦"], [8, "٨"], [12, "١٢"]], sec: [[1.5, "١.٥ ث"], [2, "٢ ث"], [2.5, "٢.٥ ث"], [3, "٣ ث"], [4, "٤ ث"], [6, "٦ ث"]],
       max: [[1.5, "١.٥ ث"], [2, "٢ ث"], [3, "٣ ث"], [4, "٤ ث"], [6, "٦ ث"], [10, "١٠ ث"]], volume: [[15, "١٥٪"], [25, "٢٥٪"], [35, "٣٥٪"], [50, "٥٠٪"], [70, "٧٠٪"], [100, "١٠٠٪"]] };
     if (s.verb === "split" && l.f === "max") return head + pills("max", [[5, "٥ ث"], [8, "٨ ث"], [10, "١٠ ث"], [12, "١٢ ث"], [15, "١٥ ث"], [20, "٢٠ ث"], [30, "٣٠ ث"], [60, "٦٠ ث"]], o.max)
@@ -399,7 +477,7 @@ const AutoPage = (() => {
   function openCard(n) {
     const card = S.el.querySelector(".bm-card");
     if (!n) { S.open = null; card.hidden = true; S.el.classList.remove("has-card"); markOpen(); return; }
-    if (S.open?.id !== n.id) { S.cardSide = null; S.cardAt = null; S.srcQ = ""; }
+    if (S.open?.id !== n.id) { S.cardSide = null; S.cardAt = null; S.srcQ = ""; S.refQ = ""; }
     S.open = { id: n.id, br: n.kind === "leaf" ? n.s.id : n.kind === "branch" ? n.id : null, n };
     card.innerHTML = `<button class="bm-x" data-close aria-label="اقفل">✕</button>${cardHTML(n)}`;
     card.hidden = false;
@@ -612,6 +690,21 @@ const AutoPage = (() => {
           openCard(null);
           return saveSteps(mapStep(s.id, () => null).filter(Boolean).map((x) => (x.lanes ? { ...x, lanes: x.lanes.map((ln) => ln.filter(Boolean)) } : x)).filter((x) => !(s.verb === "split" && x.verb === "merge")));
         }
+        if ((b = t.closest("[data-refpick]"))) {
+          const f = b.dataset.refpick, r = refFind(b.dataset.ref);
+          if (!r) return;
+          const it = { kind: r.kind, id: r.id, label: r.label, thumb: r.thumb };
+          if (f !== "refs") return saveSteps(mapStep(s.id, (x) => ({ ...x, opts: { ...x.opts, [f]: it } })));
+          const cur = s.opts.refs || [], has = cur.some((x) => refKey(x) === refKey(r));
+          if (!has && cur.length >= (S.meta.max_refs || 6)) return toast(`أقصى عدد ${S.meta.max_refs || 6} مراجع`, true);
+          return saveSteps(mapStep(s.id, (x) => ({ ...x, opts: { ...x.opts, refs: has ? cur.filter((y) => refKey(y) !== refKey(r)) : [...cur, it] } })));
+        }
+        if ((b = t.closest("[data-refset]"))) { const [f, kind] = b.dataset.refset.split("|"); return saveSteps(mapStep(s.id, (x) => ({ ...x, opts: { ...x.opts, [f]: { kind, id: "", label: "" } } }))); }
+        if ((b = t.closest("[data-refrm]"))) {
+          const [f, ...k] = b.dataset.refrm.split("|"), key = k.join("|");
+          return saveSteps(mapStep(s.id, (x) => ({ ...x, opts: { ...x.opts, ...(f === "refs" ? { refs: (x.opts.refs || []).filter((r) => refKey(r) !== key) } : { [f]: null }) } })));
+        }
+        if ((b = t.closest("[data-mention]"))) return insertMention(s, b.dataset.mention);
         if ((b = t.closest("[data-set]"))) {
           const k = b.dataset.set, raw = b.dataset.v, val = raw === "true" ? true : raw === "false" ? false : isNaN(Number(raw)) || raw === "" ? raw : Number(raw);
           return saveSteps(mapStep(s.id, (x) => ({ ...x, opts: { ...x.opts, [k]: val }, ...(k === "type" ? { src: x.src } : {}) })));
@@ -632,6 +725,8 @@ const AutoPage = (() => {
       clearTimeout(typeT);
       if (el.dataset.k === "srcq") { S.srcQ = el.innerText.trim(); typeT = setTimeout(() => { const keep = S.srcQ; refreshCard(); const ed = S.el.querySelector('[data-k="srcq"]'); if (ed) { ed.focus(); const rg = document.createRange(); rg.selectNodeContents(ed); rg.collapse(false); const sl = getSelection(); sl.removeAllRanges(); sl.addRange(rg); } S.srcQ = keep; }, 450); return; }
       if (el.dataset.k === "pubcap") { const sid = S.open?.n?.s?.id; typeT = setTimeout(() => { const v = el.innerText.trim(); saveSteps(mapStep(sid, (x) => ({ ...x, opts: { ...x.opts, caption: v } })), { card: false }); }, 800); return; }
+      if (el.dataset.k === "refq") { S.refQ = el.innerText.trim(); const box = S.el.querySelector("[data-reflist]"), f = S.open?.n?.l?.f, s = S.open?.n?.s; if (box && s) box.innerHTML = refList(S.refQ, f === "refs" ? s.opts.refs || [] : s.opts[f] ? [s.opts[f]] : [], f); return; }
+      if (el.dataset.k === "opt:prompt") showMentions(el);
       if (el.dataset.k?.startsWith("opt:")) { const sid = S.open?.n?.s?.id, key = el.dataset.k.slice(4); typeT = setTimeout(() => { const v = el.innerText.trim(); saveSteps(mapStep(sid, (x) => ({ ...x, opts: { ...x.opts, [key]: v } })), { card: false }); }, 800); return; }
       if (el.dataset.k === "desc") return;
       if (el.dataset.k === "@name") typeT = setTimeout(async () => { const v = el.innerText.trim(); if (v && v !== S.rec.name) { const r = await aAPI("", { method: "PATCH", ...jsonBody({ name: v }) }); S.list = await api("/api/automations"); setRec(r, { card: false }); } }, 700);

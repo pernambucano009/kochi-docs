@@ -2180,3 +2180,17 @@ label.dim { opacity: .4; }
 #nh .bl-x { position: absolute; top: 8px; inset-inline-start: 8px; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; background: rgba(0, 0, 0, .55); color: #fff; font-size: 11px; opacity: 0; transition: opacity .2s; }
 #nh .bl-item.bl-bg:hover .bl-x { opacity: 1; }
 #nh .bl-h { margin: 18px 0 8px; font-size: 14px; font-weight: 500; }
+/* ✨ «ولّد»: المراجع والمنشن */
+.am-gh { margin: 10px 0 4px; font-size: 12px; color: var(--nh-muted); }
+.am-chosen { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 8px; }
+.am-chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 4px 3px 8px; border-radius: 999px; background: var(--nh-fill); font-size: 12px; }
+.am-chip img, .am-chip > span { width: 22px; height: 22px; border-radius: 50%; object-fit: cover; display: grid; place-items: center; font-size: 11px; background: var(--nh-bg); }
+.am-chip b { font-weight: 500; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.am-chip button { border: 0; background: none; color: var(--nh-muted); cursor: pointer; font-size: 11px; padding: 2px 4px; }
+.am-ment { display: grid; gap: 2px; margin: 4px 0; padding: 4px; border-radius: 12px; background: var(--nh-bg, #fff); box-shadow: 0 8px 24px rgba(0, 0, 0, .12); max-height: 240px; overflow: auto; }
+.am-ment[hidden] { display: none; }
+.am-mi { display: grid; grid-template-columns: 28px 1fr auto; align-items: center; gap: 8px; padding: 5px 8px; border: 0; border-radius: 8px; background: none; color: var(--nh-ink); cursor: pointer; text-align: start; font-size: 12.5px; }
+.am-mi:hover { background: var(--nh-fill); }
+.am-mi img, .am-mi > span { width: 28px; height: 28px; border-radius: 8px; object-fit: cover; display: grid; place-items: center; background: var(--nh-fill); }
+.am-mi b { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.am-mi small { color: var(--nh-muted); font-size: 11px; }
