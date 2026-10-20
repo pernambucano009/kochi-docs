@@ -16,6 +16,10 @@ const AutoPage = (() => {
     caption: "M4 6h16v12H4z M7.5 13.5h4 M13.5 13.5h3 M7.5 10.5h9",
     export: "M12 15V3.5 M7.5 8 12 3.5 16.5 8 M4.5 14v5.5h15V14",
     publish: "M20.5 3.5 10 14 M20.5 3.5 14 20.5l-4-6.5-6.5-4z",
+    split: "M3.5 12h5 M8.5 12 14 6.5h6 M8.5 12 14 17.5h6 M8.5 12H20",
+    gen: "M12 3.5l1.9 5.4 5.6 1.9-5.6 1.9L12 18.1l-1.9-5.4-5.6-1.9 5.6-1.9z M18.5 16.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z",
+    merge: "M3.5 6.5h5L14 12l-5.5 5.5h-5 M3.5 12H20 M16.5 9 20 12l-3.5 3",
+    piece: "M5 4.5h14v15H5z M5 9h14 M5 15h14 M8 4.5v4.5 M16 15v4.5",
   };
   const svg = (d, s = 22) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}" aria-hidden="true"><path d="${d}" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
   const KIND_T = { image: "صور", video: "فيديوهات", any: "صور وفيديوهات" };
@@ -34,32 +38,58 @@ const AutoPage = (() => {
       cut: [{ f: "max", t: "أقصى طول للقطة", val: `${AR_N(o.max)} ث` }, { f: "trans", t: "الانتقال", val: M.trans[o.trans] }],
       caption: [{ f: "on", t: "الكابشن", val: o.on ? "شغّال" : "مقفول" }],
       export: [{ f: "ratio", t: "المقاس", val: o.ratio }],
+      split: [{ ...srcLeaf, t: "الفيديو", val: src ? `${src}${s.video ? ` · ${AR_N(Math.round(s.video.dur))} ث` : s.found != null ? ` · ${AR_N(s.found)} فيديو` : ""}` : "" },
+        { f: "max", t: "أقصى طول للقطعة", val: `${AR_N(o.max)} ث${s.pieces ? ` · ${AR_N(s.pieces)} قطع` : ""}` },
+        { f: "note", t: "محتاج إيه في التقطيع", val: (o.note || "").slice(0, 40) || "قطع متساوية عند السكوت" }, { f: "order", t: "أنهي فيديو", val: M.orders[o.order] }],
+      gen: [{ f: "prompt", t: "البرومبت", val: (o.prompt || "").slice(0, 40), miss: !(o.prompt || "").trim() },
+        { f: "model", t: "الموديل", val: (M.gen_models || []).find((m) => m.model === o.model)?.label || "الافتراضي" }],
+      merge: [{ f: "items", t: "إيه اللي يتجمع وبأي ترتيب", val: (o.items || []).length ? `${AR_N(o.items.length)} مخرج بالترتيب بتاعك` : "آخر حاجة في كل مسار" }],
       publish: [{ f: "when", t: "إمتى", val: M.when[o.when] }, { f: "platforms", t: "على فين", val: (o.platforms || []).length ? `${AR_N(o.platforms.length)} حساب` : "", miss: o.when === "now" && !(o.platforms || []).length },
         { f: "caption", t: "الكابشن", val: (o.caption || "").slice(0, 40) || "اسم الموديل" }],
     }[s.verb] || [];
-    return [...L.map((l) => ({ ...l, type: "opt" })), ...(M.fixed.includes(s.verb) ? [] : [{ f: "move", t: "رتّبها أو شيلها", type: "action" }])];
+    return [...L.map((l) => ({ ...l, type: "opt" })), ...(M.fixed.includes(s.verb) || s.verb === "merge" ? [] : [{ f: "move", t: "رتّبها أو شيلها", type: "action" }])];
   }
-  // خط واحد من الشمال لليمين: ابدأ ← الخطوات ← «＋» ← صدّر ← انشر، ونقط كل خطوة على قوس فوقها
-  const GAPX = 210;
+  // خط واحد من الشمال لليمين: ابدأ ← الخطوات ← «＋» ← صدّر ← انشر، ونقط كل خطوة على قوس فوقها.
+  // «قطّع الفيديو» بيفتح مسار لكل قطعة (فوق بعض)، وكلهم بيرجعوا يتقابلوا عند «جمّع».
+  const GAPX = 210, LANEY = 250;
+  const lanesOf = (sp) => (sp.lanes && sp.lanes.length ? sp.lanes : [[]]);
   function layout() {
     const w = S.el, r = S.rec;
     if (!w || !r) return;
     if (!w.clientWidth || !w.clientHeight) return;
     const steps = r.steps || [], fixed = S.meta.fixed, user = steps.filter((x) => !fixed.includes(x.verb)), tail = steps.filter((x) => fixed.includes(x.verb));
     const row = [{ id: "run", kind: "run" }, ...user.map((s) => ({ id: s.id, kind: "branch", s })), { id: "add", kind: "add" }, ...tail.map((s) => ({ id: s.id, kind: "branch", s }))];
-    const x0 = -((row.length - 1) * GAPX) / 2, nodes = [];
-    let k = 0;
-    row.forEach((n, i) => {
-      const x = x0 + i * GAPX, y = 0, prev = row[i - 1];
-      if (n.kind !== "branch") { nodes.push({ ...n, x, y, from: prev?.id }); return; }
+    const nodes = [];
+    let k = 0, x = 0, prev = null, ends = null;
+    const put = (n, x, y, from, links) => {
+      if (n.kind !== "branch") { nodes.push({ ...n, x, y, from, links }); return; }
       const leaves = leavesOf(n.s), missing = leaves.some((l) => l.miss);
-      nodes.push({ ...n, i: k++, x, y, from: prev?.id, missing, g: leaves.length });
+      nodes.push({ ...n, i: n.lane ? null : k++, x, y, from, links, missing, g: leaves.length });
       const m = leaves.length, R = 108, spread = Math.min(Math.PI * .8, Math.max(0, m - 1) * .34);
       leaves.forEach((l, j) => {
         const a = -Math.PI / 2 + (m === 1 ? 0 : -spread / 2 + (j / (m - 1)) * spread);
         nodes.push({ id: `${n.s.id}:${l.f}`, kind: "leaf", s: n.s, l, br: { k: n.s.id }, x: x + Math.cos(a) * R, y: y + Math.sin(a) * R, from: n.s.id, on: !l.miss });
       });
-    });
+    };
+    for (const n of row) {
+      if (n.kind === "branch" && n.s.verb === "merge" && ends) { put(n, x, 0, ends[0], ends.slice(1)); prev = n.id; ends = null; x += GAPX; continue; }
+      put(n, x, 0, prev); prev = n.id; x += GAPX;
+      if (n.kind !== "branch" || n.s.verb !== "split") continue;
+      const sp = n.s, L = lanesOf(sp);
+      let wmax = 0;
+      ends = L.map((ln, li) => {
+        const y = (li - (L.length - 1) / 2) * LANEY;
+        let lx = x, from = sp.id;
+        put({ id: `piece:${li}`, kind: "piece", sp, li }, lx, y, from); from = `piece:${li}`; lx += GAPX;
+        ln.forEach((st) => { put({ id: st.id, kind: "branch", s: st, lane: [sp.id, li] }, lx, y, from); from = st.id; lx += GAPX; });
+        put({ id: `ladd:${li}`, kind: "ladd", sp, li }, lx, y, from);
+        wmax = Math.max(wmax, lx - x + GAPX);
+        return `ladd:${li}`;
+      });
+      x += wmax;
+    }
+    const xs = nodes.filter((n) => n.kind !== "leaf").map((n) => n.x), mid = (Math.min(...xs) + Math.max(...xs)) / 2;
+    nodes.forEach((n) => { n.x -= mid; });
     const old = Object.fromEntries((S.nodes || []).map((n) => [n.id, n]));
     S.nodes = nodes.map((n, i) => {
       const o = old[n.id];
@@ -117,7 +147,12 @@ const AutoPage = (() => {
       <div class="bm-world"><svg class="bm-lines" aria-hidden="true"></svg><div class="bm-nodes"></div></div>
       <div class="bm-zoom"><button data-zoom="1" aria-label="قرّب">+</button><button data-zoom="0" aria-label="الخريطة كلها">⤢</button><button data-zoom="-1" aria-label="بعّد">−</button></div>
       <div class="bm-card" hidden role="dialog"></div>
-      <p class="bm-hint">الخطوات من الشمال لليمين · دوس على أي نقطة تغيّرها · النقط المفرّغة لسه ناقصة · «+» خطوة جديدة قبل «صدّر» · «▶» على الشمال يشغّل الموديل</p>`;
+      <div class="am-desc${S.descOpen ? " open" : ""}"><button class="am-desc-t" data-desc-open>✨ اوصف الموديل بكلامك (كتابة أو صوت)</button>
+        <div class="am-desc-b"><div class="bm-write" contenteditable="plaintext-only" data-k="desc" data-ph="مثلًا: قطّع الفيديو اللي في فولدر «لايفات» لقطع أقل من ١٥ ثانية، وولّد كل قطعة بستايل كرتون، وجمّعهم، وحط موسيقى وكابشن، واستنى موافقتي قبل النشر"></div>
+          <div class="bm-acts"><button class="bm-pill" data-rec>🎙️ سجّل صوتك</button><span class="am-recst"></span>
+            <button class="bm-go" data-desc-go>✨ اعمل الخطوات</button><button class="bm-pill" data-undo hidden>↩ رجّع زي ما كان</button></div>
+          <p class="bm-note am-say"></p></div></div>
+      <p class="bm-hint">الخطوات من الشمال لليمين · دوس على أي نقطة تغيّرها · «قطّع الفيديو» بيفتح مسار لكل قطعة، و«جمّع» بيلمّهم · «+» خطوة جديدة · «▶» على الشمال يشغّل الموديل</p>`;
   }
   function nodeHTML(n) {
     const r = S.rec;
@@ -127,10 +162,16 @@ const AutoPage = (() => {
       return `<button class="bm-n bm-quiz am-start${r.busy ? " busy" : ""}" data-n="run" title="شغّل الموديل، وغيّر اسمه أو بدّله"><i>▶</i><b>${r.active ? "⚡ " : ""}${esc(r.name)}</b><small>${r.saved ? "" : "مسودة · "}${st}</small></button>`;
     }
     if (n.kind === "add") return `<button class="bm-n bm-add" data-n="add" title="ضيف خطوة (فعل + منشن)"><i>+</i><b>خطوة جديدة</b></button>`;
+    if (n.kind === "ladd") return `<button class="bm-n bm-add am-ladd" data-n="${n.id}" title="ضيف خطوة في مسار القطعة دي"><i>+</i><b>في المسار ده</b></button>`;
+    if (n.kind === "piece") {
+      const sp = n.sp, span = (sp.spans || [])[n.li], one = !sp.pieces && lanesOf(sp).length === 1;
+      return `<button class="bm-n bm-branch am-piece${S.open?.id === n.id ? " on" : ""}" data-n="${n.id}" title="مسار القطعة دي">
+        <span class="bm-bic">${svg(IC.piece)}</span><b>${one ? "كل قطعة" : `قطعة ${AR_N(n.li + 1)}`}</b><small class="num">${span ? `${AR_N(span[0].toFixed(1))}–${AR_N(span[1].toFixed(1))} ث` : sp.pieces ? "" : "العدد بيتعرف وقت التشغيل"}</small></button>`;
+    }
     if (n.kind === "branch") {
       const v = S.meta.verbs[n.s.verb];
       return `<button class="bm-n bm-branch${S.open?.br === n.id ? " on" : ""}" data-n="${n.id}" title="${esc(v.desc)}">
-        <span class="bm-bic">${svg(IC[n.s.verb])}${n.missing ? `<em class="num">!</em>` : ""}</span><b>${esc(v.t)}</b><small class="num">${AR_N(n.i + 1)}</small></button>`;
+        <span class="bm-bic">${svg(IC[n.s.verb])}${n.missing ? `<em class="num">!</em>` : ""}</span><b>${esc(v.t)}</b><small class="num">${n.i == null ? "" : AR_N(n.i + 1)}</small></button>`;
     }
     const l = n.l, cls = l.type === "action" ? "act" : n.on ? "full" : "empty";
     return `<button class="bm-n bm-leaf ${cls}${S.open?.id === n.id ? " on" : ""}" data-n="${esc(n.id)}" aria-label="${esc(l.t)}">
@@ -140,11 +181,15 @@ const AutoPage = (() => {
     const w = S.el;
     w.querySelector(".bm-nodes").innerHTML = S.nodes.map(nodeHTML).join("");
     S.nodes.forEach((n) => { n.el = w.querySelector(`[data-n="${CSS.escape(n.id)}"]`); });
-    w.querySelector(".bm-lines").innerHTML = S.nodes.filter((n) => n.from).map((n) => `<path data-l="${esc(n.id)}" class="${n.kind === "leaf" ? "leaf" : "branch am-flow"}${n.on === false ? " empty" : ""}"/>`).join("");
-    S.nodes.forEach((n) => { n.line = n.from ? w.querySelector(`.bm-lines [data-l="${CSS.escape(n.id)}"]`) : null; });
+    w.querySelector(".bm-lines").innerHTML = S.nodes.filter((n) => n.from).map((n) => `<path data-l="${esc(n.id)}" class="${n.kind === "leaf" ? "leaf" : "branch am-flow"}${n.on === false ? " empty" : ""}"/>`).join("")
+      + S.nodes.flatMap((n) => (n.links || []).map((f) => `<path data-l="${esc(n.id)}|${esc(f)}" class="branch am-flow"/>`)).join("");
+    S.nodes.forEach((n) => {
+      n.line = n.from ? w.querySelector(`.bm-lines [data-l="${CSS.escape(n.id)}"]`) : null;
+      n.extra = (n.links || []).map((f) => [f, w.querySelector(`.bm-lines [data-l="${CSS.escape(`${n.id}|${f}`)}"]`)]);
+    });
     tick(performance.now());
   }
-  const FOLLOW = { branch: .25, leaf: .9, add: .25, run: 0 };
+  const FOLLOW = { branch: .25, leaf: .9, add: .25, run: 0, piece: .25, ladd: .25 };
   function step(dt) {
     const k = 140, c = 15;
     for (const n of S.nodes) {
@@ -178,6 +223,12 @@ const AutoPage = (() => {
       }
     }
     // الخط الأساسي: من كل خطوة للي بعدها (أفقي)، ونقط الخطوة طالعة لفوق من الدايرة
+    const flow = (line, A, B, fromKind, toKind) => {
+      const ra = fromKind === "branch" || fromKind === "piece" ? 36 : 28, rb = toKind === "branch" || toKind === "piece" ? 36 : 28;
+      const P0 = [A[0] + ra, A[1]], P3 = [B[0] - rb, B[1]], mx = (P0[0] + P3[0]) / 2;
+      line.setAttribute("d", `M${P0[0].toFixed(1)} ${P0[1].toFixed(1)}C${mx.toFixed(1)} ${P0[1].toFixed(1)} ${mx.toFixed(1)} ${P3[1].toFixed(1)} ${P3[0].toFixed(1)} ${P3[1].toFixed(1)}`);
+    };
+    for (const n of S.nodes) for (const [f, line] of n.extra || []) if (line && pos[f]) flow(line, pos[f], pos[n.id], S.byId[f]?.kind, n.kind);
     for (const n of S.nodes) {
       if (!n.line) continue;
       const A = pos[n.from], B = pos[n.id];
@@ -186,9 +237,7 @@ const AutoPage = (() => {
         n.line.setAttribute("d", `M${P0[0].toFixed(1)} ${P0[1].toFixed(1)}C${P0[0].toFixed(1)} ${(P0[1] - 30).toFixed(1)} ${P3[0].toFixed(1)} ${(P3[1] + 30).toFixed(1)} ${P3[0].toFixed(1)} ${P3[1].toFixed(1)}`);
         continue;
       }
-      const ra = S.byId[n.from]?.kind === "branch" ? 36 : 28, rb = n.kind === "branch" ? 36 : 28;
-      const P0 = [A[0] + ra, A[1]], P3 = [B[0] - rb, B[1]], mx = (P0[0] + P3[0]) / 2;
-      n.line.setAttribute("d", `M${P0[0].toFixed(1)} ${P0[1].toFixed(1)}C${mx.toFixed(1)} ${P0[1].toFixed(1)} ${mx.toFixed(1)} ${P3[1].toFixed(1)} ${P3[0].toFixed(1)} ${P3[1].toFixed(1)}`);
+      flow(n.line, A, B, S.byId[n.from]?.kind, n.kind);
     }
     dots();
     if (S.open?.n) placeCard(toScreen([S.open.n.px, S.open.n.py]));
@@ -265,7 +314,20 @@ const AutoPage = (() => {
     const r = S.rec, M = S.meta;
     if (n.kind === "add") {
       return `<div class="bm-ch"><span class="latin">ADD STEP</span><b>خطوة جديدة</b></div><p class="bm-note">اختار الفعل، والخطوة بتتحط آخر الخطوات (قبل «صدّر» و«انشر»). بعدها اختار المنشن من نقطة «منين».</p>
-        <div class="am-verbs">${Object.entries(M.verbs).filter(([k]) => !M.fixed.includes(k)).map(([k, v]) => `<button class="am-verb" data-addverb="${k}">${svg(IC[k], 18)}<b>${esc(v.t)}</b><small>${esc(v.desc)}</small></button>`).join("")}</div>`;
+        <div class="am-verbs">${Object.entries(M.verbs).filter(([k]) => !M.fixed.includes(k) && !M.lane_verbs.includes(k) && k !== "merge" && !(k === "split" && r.steps.some((x) => x.verb === "split"))).map(([k, v]) => `<button class="am-verb" data-addverb="${k}">${svg(IC[k], 18)}<b>${esc(v.t)}</b><small>${esc(v.desc)}</small></button>`).join("")}</div>`;
+    }
+    if (n.kind === "ladd") {
+      return `<div class="bm-ch"><span class="latin">LANE ${n.li + 1}</span><b>خطوة في مسار ${lanesOf(n.sp).length === 1 && !n.sp.pieces ? "كل قطعة" : `القطعة ${AR_N(n.li + 1)}`}</b></div>
+        <div class="am-verbs">${M.lane_verbs.map((k) => `<button class="am-verb" data-laneadd="${n.li}" data-verb="${k}">${svg(IC[k], 18)}<b>${esc(M.verbs[k].t)}</b><small>${esc(M.verbs[k].desc)}</small></button>`).join("")}</div>`;
+    }
+    if (n.kind === "piece") {
+      const sp = n.sp, L = lanesOf(sp), span = (sp.spans || [])[n.li];
+      return `<div class="bm-ch"><span class="latin">PIECE ${n.li + 1}</span><b>${!sp.pieces && L.length === 1 ? "كل قطعة" : `القطعة ${AR_N(n.li + 1)}`}</b></div>
+        <p class="bm-note">${span ? `من ${AR_N(span[0].toFixed(1))} لـ ${AR_N(span[1].toFixed(1))} ثانية في «${esc(sp.video?.name || "")}». ` : ""}${sp.pieces
+          ? `الفيديو هيتقطّع لـ ${AR_N(sp.pieces)} قطع، وكل قطعة ليها مسار لوحدها. حط في المسار ده اللي عايزه يحصل للقطعة دي («+» في آخر المسار).`
+          : "عدد القطع بيتعرف وقت التشغيل (على قد طول الفيديو اللي هيتختار). القطع الزيادة عن المسارات اللي هنا بتمشي زي آخر مسار."}</p>
+        <div class="bm-acts">${L.length > 1 ? `<button class="bm-pill" data-lanecopy="${n.li}">⇊ نفس المسار ده لكل القطع</button>` : ""}
+          ${!sp.pieces ? `<button class="bm-pill" data-laneplus>＋ مسار لقطعة كمان</button>${L.length > 1 ? `<button class="bm-pill" data-lanerm="${n.li}">🗑 شيل المسار ده</button>` : ""}` : ""}</div>`;
     }
     if (n.kind === "run") {
       const runs = r.runs || [];
@@ -286,7 +348,7 @@ const AutoPage = (() => {
     }
     if (n.kind === "branch") {
       const v = M.verbs[n.s.verb];
-      return `<div class="bm-ch"><span class="latin">STEP ${n.i + 1}</span><b>${esc(v.t)}</b></div><p class="bm-note">${esc(v.desc)}. دوس على أي نقطة فوقها تغيّرها.</p>${M.fixed.includes(n.s.verb) ? `<p class="bm-note">دي من آخر خطوتين ثابتين (صدّر ثم انشر).</p>` : moveActs(n.s)}`;
+      return `<div class="bm-ch"><span class="latin">${n.i == null ? "LANE STEP" : `STEP ${n.i + 1}`}</span><b>${esc(v.t)}</b></div><p class="bm-note">${esc(v.desc)}. دوس على أي نقطة فوقها تغيّرها.</p>${M.fixed.includes(n.s.verb) ? `<p class="bm-note">دي من آخر خطوتين ثابتين (صدّر ثم انشر).</p>` : n.s.verb === "merge" ? `<p class="bm-note">«جمّع» بييجي مع «قطّع الفيديو»، ولو شلت التقطيع بيتشال معاه.</p>` : moveActs(n.s)}`;
     }
     const s = n.s, l = n.l, o = s.opts;
     const head = `<div class="bm-ch"><span class="latin">${esc(M.verbs[s.verb].t)}</span><b>${esc(l.t)}</b></div>`;
@@ -299,10 +361,28 @@ const AutoPage = (() => {
     if (l.f === "when") return head + pills("when", Object.entries(M.when), o.when) + `<p class="bm-note">«يستنى موافقتي»: الفيديو بيتصدّر ويستناك في صفحة النشر. «ينزل على طول»: بينزل على الحسابات اللي هتختارها.</p>`;
     if (l.f === "platforms") return head + platCard(o);
     if (l.f === "caption") return head + editable("pubcap", o.caption || "", "الكابشن اللي هينزل مع الفيديو (لو فاضي: اسم الموديل)") + `<p class="bm-note">بيتحفظ لوحده لما تقف عن الكتابة.</p>`;
+    if (l.f === "prompt") return head + editable("opt:prompt", o.prompt || "", "اكتب الفيديو الجديد اللي عايزه من القطعة دي: مثلًا «نفس المشهد بس بستايل أنمي، ألوان دافية»") + `<p class="bm-note">الموديل بياخد القطعة نفسها كمرجع وبيعمل منها فيديو جديد بالبرومبت ده. بيتحفظ لوحده لما تقف عن الكتابة.${S.rec.est ? ` تكلفة التشغيل كله حوالي <b class="num">${AR_N(S.rec.est)}</b> نقطة.` : ""}</p>`;
+    if (l.f === "note") return head + editable("opt:note", o.note || "", "مثلًا: اقطع عند آخر كل جملة، وشيل أول ٣ ثواني، ومن غير السكوت الطويل") + `<p class="bm-note">لو سبته فاضي: قطع متساوية، والقطع بيتزق لأقرب سكوت علشان مايقطعش في نص كلمة. لو كتبت: المخ بيسمع الكلام ويقطّع على حسب طلبك (بيتخصم على قد طول الفيديو).</p>`;
+    if (l.f === "model") return head + pills("model", [["", "الافتراضي"], ...(M.gen_models || []).map((m) => [m.model, `${m.label}${m.per_sec ? ` · $${m.per_sec}/ث` : ""}`])], o.model) + `<p class="bm-note">موديلات بتاخد فيديو + برومبت وتطلّع فيديو جديد.</p>`;
+    if (l.f === "items") return head + mergeCard(s);
     if (["fit", "duck", "on"].includes(l.f)) return head + pills(l.f, [[true, "أيوه"], [false, "لأ"]], o[l.f]);
     const NUM = { count: [[1, "١"], [2, "٢"], [3, "٣"], [4, "٤"], [6, "٦"], [8, "٨"], [12, "١٢"]], sec: [[1.5, "١.٥ ث"], [2, "٢ ث"], [2.5, "٢.٥ ث"], [3, "٣ ث"], [4, "٤ ث"], [6, "٦ ث"]],
       max: [[1.5, "١.٥ ث"], [2, "٢ ث"], [3, "٣ ث"], [4, "٤ ث"], [6, "٦ ث"], [10, "١٠ ث"]], volume: [[15, "١٥٪"], [25, "٢٥٪"], [35, "٣٥٪"], [50, "٥٠٪"], [70, "٧٠٪"], [100, "١٠٠٪"]] };
+    if (s.verb === "split" && l.f === "max") return head + pills("max", [[5, "٥ ث"], [8, "٨ ث"], [10, "١٠ ث"], [12, "١٢ ث"], [15, "١٥ ث"], [20, "٢٠ ث"], [30, "٣٠ ث"], [60, "٦٠ ث"]], o.max)
+      + `<p class="bm-note">كل قطعة هتطلع أقل من (أو قد) الطول ده. فيديو ٤٠ ثانية على ١٥ = ٣ قطع = ٣ مسارات.</p>`;
     return head + pills(l.f, NUM[l.f] || [], o[l.f]);
+  }
+  // «جمّع»: كل مخرج ممكن (القطعة الأصلية أو بعد «ولّد») زرار، واللي بتختاره بيتحط في الترتيب
+  function mergeCard(s) {
+    const sp = S.rec.steps.find((x) => x.verb === "split");
+    if (!sp) return `<p class="bm-note">ضيف «قطّع الفيديو» الأول.</p>`;
+    const L = lanesOf(sp), items = s.opts.items || [], one = !sp.pieces && L.length === 1;
+    const name = (it) => { const pc = one ? "كل قطعة" : `القطعة ${AR_N(it.lane + 1)}`; if (it.node === "piece") return `${pc} (الأصلية)`; return `${pc} ← ولّد`; };
+    const opts = L.flatMap((ln, li) => [{ lane: li, node: "piece" }, ...ln.filter((x) => x.verb === "gen").map((x) => ({ lane: li, node: x.id }))]);
+    return `<p class="bm-note">اختار المخرجات اللي تتجمع في فيديو واحد، بالترتيب اللي عايزه. لو مااخترتش حاجة: آخر حاجة في كل مسار، بالترتيب.</p>
+      <div class="bm-pills">${opts.map((it) => `<button class="bm-pill" data-mitem="${it.lane}|${esc(it.node)}">＋ ${esc(name(it))}</button>`).join("")}</div>
+      ${items.length ? `<ol class="am-order">${items.map((it, i) => `<li><span>${esc(name(it))}</span><button class="bm-pill" data-mmv="${i}|-1" ${i ? "" : "disabled"}>↑</button><button class="bm-pill" data-mmv="${i}|1" ${i < items.length - 1 ? "" : "disabled"}>↓</button><button class="bm-pill" data-mrm="${i}">✕</button></li>`).join("")}</ol>
+        <div class="bm-acts"><button class="bm-pill" data-mreset>رجّعها للافتراضي</button></div>` : ""}`;
   }
   const editable = (k, val, ph) => `<div class="bm-write" contenteditable="plaintext-only" data-k="${k}" data-ph="${esc(ph || "اكتب هنا…")}">${esc(val)}</div>`;
   // حسابات النشر المربوطة (من صفحة النشر): كل حساب زرار يتعلّم
@@ -313,7 +393,7 @@ const AutoPage = (() => {
     return `<div class="bm-pills">${list.map((a) => { const key = `${a.platform}@${a.id}`; return `<button class="bm-pill${on.has(key) || on.has(a.platform) ? " on" : ""}" data-plat="${esc(key)}">${esc(S.pub.platforms[a.platform] || a.platform)} · ${esc(a.name || "")}</button>`; }).join("")}</div>`;
   }
   // الترتيب جوه خطوات العميل بس (صدّر وانشر ثابتين في الآخر)
-  const moveActs = (s) => { const user = S.rec.steps.filter((x) => !S.meta.fixed.includes(x.verb)), i = user.findIndex((x) => x.id === s.id), n = user.length;
+  const moveActs = (s) => { const lc = laneOf(s.id), user = lc ? lc.ln : S.rec.steps.filter((x) => !S.meta.fixed.includes(x.verb) && x.verb !== "merge"), i = user.findIndex((x) => x.id === s.id), n = user.length;
     return `<div class="bm-acts"><button class="bm-pill" data-mv="-1" ${i <= 0 ? "disabled" : ""}>← خليها قبل</button><button class="bm-pill" data-mv="1" ${i >= n - 1 ? "disabled" : ""}>خليها بعد →</button>
       <button class="bm-pill" data-rmstep>🗑 شيل الخطوة</button></div>`; };
   function openCard(n) {
@@ -356,7 +436,12 @@ const AutoPage = (() => {
     if (r.busy) watch();
   }
   const saveSteps = (steps, opts) => aAPI("", { method: "PATCH", ...jsonBody({ steps }) }).then((r) => setRec(r, opts)).catch((err) => toast(err.message, true));
-  const stepOf = (id) => S.rec.steps.find((x) => x.id === id);
+  // الخطوات جوه مسارات التقطيع: تعديلها ونقلها ومسحها زي خطوات الخط الأساسي
+  const laneOf = (id) => { for (const sp of S.rec.steps) for (const [li, ln] of (sp.lanes || []).entries()) if (ln.some((y) => y.id === id)) return { sp, li, ln }; return null; };
+  const mapStep = (id, fn) => S.rec.steps.map((x) => (x.id === id ? fn(x) : x.lanes ? { ...x, lanes: x.lanes.map((ln) => ln.map((y) => (y.id === id ? fn(y) : y))) } : x));
+  const mapLanes = (fn) => S.rec.steps.map((x) => (x.verb === "split" ? { ...x, lanes: fn(lanesOf(x).map((ln) => [...ln])) } : x));
+  const newId = () => Math.random().toString(36).slice(2, 10);
+  const cloneLane = (ln) => ln.map((y) => ({ ...y, id: newId(), opts: JSON.parse(JSON.stringify(y.opts)) }));
   function watch() {
     clearTimeout(S.timer);
     S.timer = setTimeout(async () => {
@@ -370,14 +455,14 @@ const AutoPage = (() => {
     w.addEventListener("pointerdown", (e) => {
       if (e.button !== 0) return;
       const el = e.target.closest(".bm-n"), r = w.getBoundingClientRect();
-      if (!el) { if (!S.view || e.target.closest(".bm-card, .bm-zoom")) return; S.pan = { sx: e.clientX, sy: e.clientY, x: S.view.x, y: S.view.y, id: e.pointerId, moved: false }; return; }
+      if (!el) { if (!S.view || e.target.closest(".bm-card, .bm-zoom, .am-desc")) return; S.pan = { sx: e.clientX, sy: e.clientY, x: S.view.x, y: S.view.y, id: e.pointerId, moved: false }; return; }
       const n = S.byId[el.dataset.n];
       if (!n) return;
       const [wx, wy] = toWorld(e.clientX - r.left, e.clientY - r.top);
       S.drag = { n, el, sx: e.clientX, sy: e.clientY, ox: n.px - wx, oy: n.py - wy, x: n.px, y: n.py, moved: false, id: e.pointerId };
     });
     w.addEventListener("wheel", (e) => {
-      if (e.target.closest(".bm-card")) return;
+      if (e.target.closest(".bm-card, .am-desc")) return;
       e.preventDefault();
       const r = w.getBoundingClientRect();
       zoomAt(Math.exp(-e.deltaY * (e.ctrlKey ? .01 : .0015)), e.clientX - r.left, e.clientY - r.top);
@@ -396,7 +481,7 @@ const AutoPage = (() => {
       if (S.view && e.pointerType !== "touch") {
         S.mw = toWorld(e.clientX - r.left, e.clientY - r.top);
         if (!S.pan?.moved && !S.drag?.moved) {
-          if (e.target.closest?.(".bm-card, .bm-zoom")) setHot(null);
+          if (e.target.closest?.(".bm-card, .bm-zoom, .am-desc")) setHot(null);
           else { const dd = (n) => Math.hypot(S.mw[0] - n.px, S.mw[1] - n.py); if (!(S.hovNode && dd(S.hovNode) < HOT_R[S.hovNode.kind] * 1.9)) { let best = null, bd = 1e9; for (const n of S.nodes) { if (!HOT_R[n.kind]) continue; const k = dd(n); if (k < HOT_R[n.kind] && k < bd) { best = n; bd = k; } } setHot(best); } }
         }
       }
@@ -428,7 +513,7 @@ const AutoPage = (() => {
     w.addEventListener("click", async (e) => {
       const t = e.target;
       if (S.noClick) { S.noClick = false; return; }
-      const node = t.closest(".bm-n") || (S.hovNode && !t.closest(".bm-card, .bm-zoom") ? S.hovNode.el : null);
+      const node = t.closest(".bm-n") || (S.hovNode && !t.closest(".bm-card, .bm-zoom, .am-desc") ? S.hovNode.el : null);
       if (node) {
         const n = S.nodes.find((x) => x.id === node.dataset.n);
         if (!n) return;
@@ -464,30 +549,78 @@ const AutoPage = (() => {
           const r = await aAPI("", { method: "PATCH", ...jsonBody({ active: b.dataset.active === "1" }) });
           S.list = await api("/api/automations"); toast(r.active ? `⚡ «${r.name}» هو اللي متفعّل للأوتوبايلوت` : "اتقفل التفعيل"); return setRec(r);
         }
+        if ((b = t.closest("[data-laneadd]"))) {
+          const li = Number(b.dataset.laneadd), verb = b.dataset.verb, ns = { id: newId(), verb, src: null, opts: { ...S.meta.verbs[verb].opts } };
+          openCard(null); await saveSteps(mapLanes((L) => L.map((ln, i) => (i === li ? [...ln, ns] : ln)))); const nn = S.byId[`${ns.id}:prompt`] || S.byId[ns.id]; if (nn) openCard(nn); return;
+        }
+        if ((b = t.closest("[data-lanecopy]"))) { const li = Number(b.dataset.lanecopy); return saveSteps(mapLanes((L) => L.map((ln, i) => (i === li ? ln : cloneLane(L[li]))))); }
+        if (t.closest("[data-laneplus]")) { openCard(null); return saveSteps(mapLanes((L) => [...L, cloneLane(L[L.length - 1] || [])])); }
+        if ((b = t.closest("[data-lanerm]"))) { const li = Number(b.dataset.lanerm); openCard(null); return saveSteps(mapLanes((L) => L.filter((_, i) => i !== li))); }
+        if (t.closest("[data-desc-open]")) { S.descOpen = !S.descOpen; S.el.querySelector(".am-desc").classList.toggle("open", S.descOpen); if (S.descOpen) S.el.querySelector('[data-k="desc"]').focus(); return; }
+        if (t.closest("[data-rec]")) return recToggle();
+        if (t.closest("[data-desc-go]")) {
+          const box = S.el.querySelector(".am-desc"), text = box.querySelector('[data-k="desc"]').innerText.trim();
+          if (!text && !S.recBlob) return toast("اكتب أو سجّل اللي عايزه الأول", true);
+          const fd = new FormData(); fd.append("text", text); if (S.recBlob) fd.append("audio", S.recBlob, "describe.webm");
+          const go = box.querySelector("[data-desc-go]"); go.disabled = true; go.textContent = "⏳ بيفهم…";
+          try {
+            const r = await aAPI("/describe", { method: "POST", body: fd });
+            S.recBlob = null; box.querySelector(".am-recst").textContent = ""; box.querySelector(".am-say").textContent = r.say || "";
+            box.querySelector("[data-undo]").hidden = false; openCard(null); S.view = null; await setRec(r); toast("✨ الخطوات اتعملت. راجعها");
+          } finally { go.disabled = false; go.textContent = "✨ اعمل الخطوات"; }
+          return;
+        }
+        if (t.closest("[data-undo]")) { const r = await aAPI("/undo", { method: "POST" }); S.el.querySelector("[data-undo]").hidden = true; openCard(null); S.view = null; return setRec(r); }
         if (t.closest("[data-run]")) { const r = await aAPI("/run", { method: "POST" }); return setRec(r); }
         if ((b = t.closest("[data-openpj]"))) { storageSet(projectKey("free"), b.dataset.openpj); return showStep("6f"); }
         if (!s) return;
         if ((b = t.closest("[data-plat]"))) {
           const cur = new Set(s.opts.platforms || []), k = b.dataset.plat, plat = k.split("@")[0];
           if (cur.has(k) || cur.has(plat)) { cur.delete(k); cur.delete(plat); } else cur.add(k);
-          return saveSteps(S.rec.steps.map((x) => (x.id === s.id ? { ...x, opts: { ...x.opts, platforms: [...cur] } } : x)));
+          return saveSteps(mapStep(s.id, (x) => ({ ...x, opts: { ...x.opts, platforms: [...cur] } })));
         }
+        if ((b = t.closest("[data-mitem]"))) {
+          const [lane, node] = b.dataset.mitem.split("|");
+          return saveSteps(mapStep(s.id, (x) => ({ ...x, opts: { ...x.opts, items: [...(x.opts.items || []), { lane: Number(lane), node }] } })));
+        }
+        if ((b = t.closest("[data-mmv]"))) {
+          const [i, d] = b.dataset.mmv.split("|").map(Number), it = [...(s.opts.items || [])], j = i + d;
+          if (j < 0 || j >= it.length) return;
+          [it[i], it[j]] = [it[j], it[i]];
+          return saveSteps(mapStep(s.id, (x) => ({ ...x, opts: { ...x.opts, items: it } })));
+        }
+        if ((b = t.closest("[data-mrm]"))) { const i = Number(b.dataset.mrm); return saveSteps(mapStep(s.id, (x) => ({ ...x, opts: { ...x.opts, items: (x.opts.items || []).filter((_, k) => k !== i) } }))); }
+        if (t.closest("[data-mreset]")) return saveSteps(mapStep(s.id, (x) => ({ ...x, opts: { ...x.opts, items: [] } })));
         if ((b = t.closest("[data-mv]"))) {
-          const steps = [...S.rec.steps], i = steps.findIndex((x) => x.id === s.id), j = i + Number(b.dataset.mv);
-          if (j < 0 || j >= steps.length || S.meta.fixed.includes(steps[j].verb)) return;
-          [steps[i], steps[j]] = [steps[j], steps[i]];
-          return saveSteps(steps);
+          const lc = laneOf(s.id);
+          if (lc) {
+            const ln = [...lc.ln], i = ln.findIndex((x) => x.id === s.id), j = i + Number(b.dataset.mv);
+            if (j < 0 || j >= ln.length) return;
+            [ln[i], ln[j]] = [ln[j], ln[i]];
+            return saveSteps(mapLanes((L) => L.map((x, li) => (li === lc.li ? ln : x))));
+          }
+          // الخط الأساسي: «قطّع الفيديو» و«جمّع» بيتحركوا مع بعض كبلوك واحد
+          const fixed = S.meta.fixed, user = S.rec.steps.filter((x) => !fixed.includes(x.verb)), tail = S.rec.steps.filter((x) => fixed.includes(x.verb)), units = [];
+          for (const x of user) { if (x.verb === "merge" && units.length && units[units.length - 1][0].verb === "split") units[units.length - 1].push(x); else units.push([x]); }
+          const i = units.findIndex((u) => u.some((x) => x.id === s.id)), j = i + Number(b.dataset.mv);
+          if (j < 0 || j >= units.length) return;
+          [units[i], units[j]] = [units[j], units[i]];
+          return saveSteps([...units.flat(), ...tail]);
         }
-        if (t.closest("[data-rmstep]")) { if (!confirm("تشيل الخطوة دي؟")) return; openCard(null); return saveSteps(S.rec.steps.filter((x) => x.id !== s.id)); }
+        if (t.closest("[data-rmstep]")) {
+          if (!confirm(s.verb === "split" ? "تشيل التقطيع؟ المسارات و«جمّع» هيتشالوا معاه." : "تشيل الخطوة دي؟")) return;
+          openCard(null);
+          return saveSteps(mapStep(s.id, () => null).filter(Boolean).map((x) => (x.lanes ? { ...x, lanes: x.lanes.map((ln) => ln.filter(Boolean)) } : x)).filter((x) => !(s.verb === "split" && x.verb === "merge")));
+        }
         if ((b = t.closest("[data-set]"))) {
           const k = b.dataset.set, raw = b.dataset.v, val = raw === "true" ? true : raw === "false" ? false : isNaN(Number(raw)) || raw === "" ? raw : Number(raw);
-          return saveSteps(S.rec.steps.map((x) => (x.id === s.id ? { ...x, opts: { ...x.opts, [k]: val }, ...(k === "type" ? { src: x.src } : {}) } : x)));
+          return saveSteps(mapStep(s.id, (x) => ({ ...x, opts: { ...x.opts, [k]: val }, ...(k === "type" ? { src: x.src } : {}) })));
         }
         if ((b = t.closest("[data-src]"))) {
           const mode = b.dataset.src;
           const src = mode === "search" ? (S.srcQ?.trim() ? { mode, q: S.srcQ.trim() } : null) : { mode, id: b.dataset.id || null, label: b.dataset.label };
           if (!src) return toast("اكتب الكلمة اللي هيدوّر بيها الأول", true);
-          return saveSteps(S.rec.steps.map((x) => (x.id === s.id ? { ...x, src } : x)));
+          return saveSteps(mapStep(s.id, (x) => ({ ...x, src })));
         }
       } catch (err) { toast(err.message, true); }
     });
@@ -498,7 +631,9 @@ const AutoPage = (() => {
       if (!el) return;
       clearTimeout(typeT);
       if (el.dataset.k === "srcq") { S.srcQ = el.innerText.trim(); typeT = setTimeout(() => { const keep = S.srcQ; refreshCard(); const ed = S.el.querySelector('[data-k="srcq"]'); if (ed) { ed.focus(); const rg = document.createRange(); rg.selectNodeContents(ed); rg.collapse(false); const sl = getSelection(); sl.removeAllRanges(); sl.addRange(rg); } S.srcQ = keep; }, 450); return; }
-      if (el.dataset.k === "pubcap") { const sid = S.open?.n?.s?.id; typeT = setTimeout(() => { const v = el.innerText.trim(); saveSteps(S.rec.steps.map((x) => (x.id === sid ? { ...x, opts: { ...x.opts, caption: v } } : x)), { card: false }); }, 800); return; }
+      if (el.dataset.k === "pubcap") { const sid = S.open?.n?.s?.id; typeT = setTimeout(() => { const v = el.innerText.trim(); saveSteps(mapStep(sid, (x) => ({ ...x, opts: { ...x.opts, caption: v } })), { card: false }); }, 800); return; }
+      if (el.dataset.k?.startsWith("opt:")) { const sid = S.open?.n?.s?.id, key = el.dataset.k.slice(4); typeT = setTimeout(() => { const v = el.innerText.trim(); saveSteps(mapStep(sid, (x) => ({ ...x, opts: { ...x.opts, [key]: v } })), { card: false }); }, 800); return; }
+      if (el.dataset.k === "desc") return;
       if (el.dataset.k === "@name") typeT = setTimeout(async () => { const v = el.innerText.trim(); if (v && v !== S.rec.name) { const r = await aAPI("", { method: "PATCH", ...jsonBody({ name: v }) }); S.list = await api("/api/automations"); setRec(r, { card: false }); } }, 700);
     });
   }
@@ -509,6 +644,18 @@ const AutoPage = (() => {
     S.id = S.list.some((x) => x.id === last) ? last : S.list[0].id;
     S.view = null;
     await setRec(await aAPI());
+  }
+  // 🎙️ تسجيل الوصف بالصوت (بيتبعت مع الكتابة لو فيه)
+  async function recToggle() {
+    const box = S.el.querySelector(".am-desc"), btn = box.querySelector("[data-rec]"), st = box.querySelector(".am-recst");
+    if (S.rec_?.state === "recording") { S.rec_.stop(); return; }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true }), chunks = [], t0 = Date.now();
+      const mr = new MediaRecorder(stream);
+      mr.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+      mr.onstop = () => { stream.getTracks().forEach((x) => x.stop()); S.recBlob = new Blob(chunks, { type: mr.mimeType || "audio/webm" }); btn.textContent = "🎙️ سجّل تاني"; st.textContent = `✓ تسجيل ${AR_N(Math.round((Date.now() - t0) / 1000))} ث جاهز`; };
+      mr.start(); S.rec_ = mr; btn.textContent = "⏹ وقّف التسجيل"; st.textContent = "بيسجّل…";
+    } catch { toast("مقدرتش أفتح المايك. اسمح للمتصفح يستخدمه", true); }
   }
   function html() { return `<div class="bm am" id="amWrap"><div class="nh-empty">بيحمّل…</div></div>`; }
   async function mount(root) {

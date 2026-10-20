@@ -23218,7 +23218,8 @@ def comics_status():
         kinds = {r[0]: r[1] for r in conn.execute("SELECT kind, COUNT(*) FROM comics GROUP BY kind")}
         langs = {r[0] or "both": r[1] for r in conn.execute("SELECT lang, COUNT(*) FROM comics WHERE status = 'ready' GROUP BY lang")}
         approved = conn.execute("SELECT COUNT(*) FROM comics WHERE approved = 1").fetchone()[0]
-    return {"state": st, "total": sum(by.values()), "approved": approved, "reaction_names": comics.REACTIONS, "ready": by.get("ready", 0), "pending": by.get("new", 0), "hidden": by.get("hidden", 0), "skipped": by.get("skip", 0), "max_usd": COMICS_MAX_USD,
+    return {"state": st, "total": sum(by.values()), "approved": approved, "reaction_names": comics.REACTIONS,
+            "groups": {g: {"t": t, "n": sum(kinds.get(k, 0) for k in ks)} for g, (t, ks) in comics.GROUPS.items()}, "ready": by.get("ready", 0), "pending": by.get("new", 0), "hidden": by.get("hidden", 0), "skipped": by.get("skip", 0), "max_usd": COMICS_MAX_USD,
             "langs": langs, "lang_names": comics.LANGS,
             "kinds": kinds, "kind_names": comics.KINDS, "sources": comics.sources(), "seeds": len(comics.seeds()), "admin": TENANT_ROLE == "admin"}
 
@@ -23229,6 +23230,10 @@ def comics_where(q: str, kind: str, status: str, lang: str, appr: str = "") -> t
     if kind in comics.KINDS:
         where.append("c.kind = ?")
         args.append(kind)
+    elif kind in comics.GROUPS:   # صور / GIF / فيديوهات
+        ks = comics.GROUPS[kind][1]
+        where.append(f"c.kind IN ({','.join('?' * len(ks))})")
+        args += list(ks)
     if status in ("ready", "new", "hidden", "skip"):
         where.append("c.status = ?")
         args.append(status)
@@ -25317,12 +25322,46 @@ def auto_files(lib: dict, src: dict | None, kinds: tuple[str, ...]) -> list[dict
     return [f for f in lib_.search(lib, "", "", src.get("id")) if f["kind"] in kinds]
 
 
+def auto_gen_models() -> list[dict]:
+    """موديلات «ولّد» (بتاخد فيديو + برومبت وتطلّع فيديو جديد): نفس كتالوج تعديل الفيديو على Atlas."""
+    try:
+        ms = vmodels.camera_candidates()
+    except Exception:  # noqa: BLE001 — الكتالوج مش متاح دلوقتي
+        ms = []
+    if not ms and atlas.mock_mode():
+        ms = CAM_MOCK
+    return ms
+
+
+def auto_split_plan(lib: dict, s: dict) -> dict:
+    """التقطيع قبل التشغيل: لو الفيديو معروف (ملف بعينه أو فولدر فيه فيديو واحد) بنعرف عدد القطع ومكانها."""
+    vids = auto_files(lib, s.get("src"), ("video",))
+    out = {"found": len(vids), "pieces": None, "spans": [], "video": None}
+    if len(vids) == 1 and vids[0].get("dur"):
+        sp = automate.even_spans(float(vids[0]["dur"]), float(s["opts"].get("max") or 15))
+        out.update(pieces=len(sp), spans=sp, video={"name": vids[0]["name"], "dur": vids[0]["dur"]})
+    return out
+
+
 def auto_to_dict(rid: str, d: dict, bid: str) -> dict:
     d = {**d, "steps": automate.clean_steps(d.get("steps") or [])}   # الموديلات القديمة: «صدّر» و«انشر» بيتضافوا في الآخر
     lib = lib_load(bid)
     steps = []
+    gen_sec = 0.0
     for s in d.get("steps") or []:
         v = automate.VERBS[s["verb"]]
+        if s["verb"] == "split":
+            plan = auto_split_plan(lib, s)
+            lanes = [list(x) for x in s.get("lanes") or [[]]]
+            if plan["pieces"]:   # قطعة = مسار (المسارات الناقصة بتبان فاضية لحد ما تتعدّل)
+                lanes = (lanes + [[] for _ in range(plan["pieces"])])[:plan["pieces"]]
+            n_pieces = plan["pieces"] or max(1, len(lanes))
+            for i in range(n_pieces):
+                ln = automate.lane_for(lanes, i)
+                L = (plan["spans"][i][1] - plan["spans"][i][0]) if plan["spans"] else float(s["opts"].get("max") or 15)
+                gen_sec += L * sum(1 for x in ln if x["verb"] == "gen")
+            steps.append({**s, "lanes": lanes, "found": plan["found"], "pieces": plan["pieces"], "spans": plan["spans"], "video": plan["video"]})
+            continue
         kinds = v["accept"] if s["verb"] != "pull" else (("image", "video") if s["opts"].get("type") == "any" else (s["opts"].get("type") or "image",))
         n = len(auto_files(lib, s.get("src"), kinds)) if v["accept"] else None
         steps.append({**s, "found": n})
@@ -25333,13 +25372,18 @@ def auto_to_dict(rid: str, d: dict, bid: str) -> dict:
             voice_sec = max((f.get("dur") or 0 for f in fs), default=0)
     caps = any(s["verb"] == "caption" and s["opts"].get("on") for s in d.get("steps") or [])
     est = wallet.credits(wallet.est(stt_min=voice_sec / 60)) if caps and voice_sec else 0
-    return {**d, "id": rid, "steps": steps, "est": est, "busy": any(r.get("status") == "working" for r in d.get("runs") or [])}
+    if gen_sec:   # «ولّد» أغلى حاجة: على قد ثواني القطع اللي هتتولّد
+        per = next((m.get("per_sec") or 0.17 for m in auto_gen_models()), 0.17)
+        est += wallet.credits(per * gen_sec)
+    return {**d, "id": rid, "steps": steps, "est": est, "gen_sec": round(gen_sec, 1), "busy": any(r.get("status") == "working" for r in d.get("runs") or [])}
 
 
 @app.get("/api/automations-meta")
 def automations_meta():
     return {"verbs": {k: {x: v[x] for x in ("t", "desc", "accept", "opts")} for k, v in automate.VERBS.items()},
-            "orders": automate.ORDERS, "trans": automate.TRANS, "ratios": automate.RATIOS, "when": automate.WHEN, "fixed": automate.FIXED}
+            "orders": automate.ORDERS, "trans": automate.TRANS, "ratios": automate.RATIOS, "when": automate.WHEN, "fixed": automate.FIXED,
+            "lane_verbs": automate.LANE_VERBS, "max_lanes": automate.MAX_LANES,
+            "gen_models": [{k: m.get(k) for k in ("model", "label", "per_sec", "kind")} for m in auto_gen_models()]}
 
 
 @app.get("/api/automations")
@@ -25441,6 +25485,72 @@ def automation_delete(rid: str):
     return {"ok": True}
 
 
+@app.post("/api/automations/{rid}/describe")
+def automation_describe(rid: str, text: str = Form(""), audio: UploadFile | None = File(default=None)):
+    """✨ «اوصفه بكلامك»: كتابة أو تسجيل صوت، والمخ بيفهم وبيبني الخطوات (التقطيع والمسارات والتوليد والتجميع…)."""
+    bid = active_client_id()
+    d = auto_load(rid, bid)
+    said, usd = text.strip()[:3000], 0.0
+    if audio is not None and audio.filename:
+        tmp = TMP_DIR / f"autodesc_{uuid.uuid4().hex[:8]}{Path(audio.filename).suffix.lower() or '.webm'}"
+        with tmp.open("wb") as out:
+            shutil.copyfileobj(audio.file, out)
+        try:
+            dur = probe_duration(tmp) or 30.0
+            if dur > 300:
+                raise HTTPException(400, "التسجيل طويل أوي، خليه أقل من ٥ دقايق")
+            wallet.need(wallet.credits(wallet.est(chars=12000, stt_min=dur / 60)), "فهم وصف الموديل")
+            words = atlas.transcribe(tmp, dur) or []
+            usd += wallet.est(stt_min=dur / 60)
+        finally:
+            tmp.unlink(missing_ok=True)
+        heard = " ".join(w["w"] for w in words).strip()
+        if atlas.mock_mode() and not said:
+            heard = "قطّع الفيديو لقطع 15 ثانية وولّد كل قطعة برومبت: cinematic anime style وحط موسيقى"
+        said = f"{said} {heard}".strip()
+    if not said:
+        raise HTTPException(400, "اكتب أو سجّل اللي عايزه الأول")
+    lib = lib_load(bid)
+    current = automate.clean_steps(d.get("steps") or [])
+    if atlas.mock_mode() or not atlas.api_key():
+        res = automate.mock_describe(said, current)
+    else:
+        wallet.need(wallet.credits(wallet.est(chars=12000)), "فهم وصف الموديل")
+        folders = [lib_.path_text(lib, f["id"]) for f in lib.get("folders") or []]
+        files = [f"{lib_.path_text(lib, f.get('folder')) or ''}/{f['name']} ({f['kind']}{', ' + str(round(f['dur'])) + 's' if f.get('dur') else ''})" for f in lib.get("files") or []]
+        raw = ad_json(series_chat(automate.describe_messages(said, folders, files, current)), "بناء الموديل")
+        usd += wallet.est(chars=12000)
+        res = {"steps": raw.get("steps") or current, "say": str(raw.get("say") or "")[:400], "changed": bool(raw.get("steps"))}
+    # المنشن بالاسم ← فولدر حقيقي في المكتبة (المخ بيكتب المسار، احنا بنلاقي الـ id)
+    for st in automate.walk([x for x in res["steps"] if isinstance(x, dict)]):
+        src = st.get("src") if isinstance(st.get("src"), dict) else None
+        if src and src.get("mode") == "folder" and not src.get("id") and src.get("label"):
+            folder, f = lib_.resolve(lib, str(src["label"]))
+            if f:
+                st["src"] = {"mode": "file", "id": f["id"], "label": src["label"]}
+            elif folder:
+                st["src"] = {"mode": "folder", "id": folder, "label": src["label"]}
+            else:
+                st["src"] = {"mode": "search", "q": str(src["label"]).split("/")[-1]}
+    steps = automate.clean_steps(res["steps"])
+    prev = d.get("steps") or []
+    d = auto_update(rid, lambda x: x.update(steps=steps, undo=prev), bid)
+    if usd:
+        wallet.charge(wallet.credits(usd), "موديل مخصص: فهم الوصف وبناء الخطوات", rid)
+    return {**auto_to_dict(rid, d, bid), "say": res.get("say") or "", "heard": said}
+
+
+@app.post("/api/automations/{rid}/undo")
+def automation_undo(rid: str):
+    """↩ يرجّع الخطوات زي ما كانت قبل آخر «اوصفه بكلامك»."""
+    bid = active_client_id()
+    d = auto_load(rid, bid)
+    if not d.get("undo"):
+        raise HTTPException(400, "مفيش حاجة أرجّعها")
+    d = auto_update(rid, lambda x: x.update(steps=x.pop("undo")), bid)
+    return auto_to_dict(rid, d, bid)
+
+
 @app.post("/api/automations/{rid}/run")
 def automation_run(rid: str, request: Request):
     """▶ شغّل: الخطوات بتتحول لمشروع مونتاج جديد (بيتفتح في المحرر أو يتصدّر على طول)."""
@@ -25448,8 +25558,8 @@ def automation_run(rid: str, request: Request):
     d = auto_load(rid, bid)
     if any(r.get("status") == "working" for r in d.get("runs") or []):
         raise HTTPException(400, "فيه تشغيل شغال، استنى يخلص")
-    if not any(s["verb"] in ("pull", "intro", "outro") for s in d.get("steps") or []):
-        raise HTTPException(400, "الموديل محتاج خطوة «اسحب» صور أو فيديوهات على الأقل")
+    if not any(s["verb"] in ("pull", "intro", "outro", "split") for s in d.get("steps") or []):
+        raise HTTPException(400, "الموديل محتاج خطوة «اسحب» صور أو فيديوهات، أو «قطّع الفيديو»، على الأقل")
     run = {"id": uuid.uuid4().hex[:8], "at": now(), "status": "working", "step": "بيبدأ…", "project_id": None, "report": [], "error": None}
     auto_update(rid, lambda x: x.update(runs=[run, *(x.get("runs") or [])][:20]), bid)
     port = (request.scope.get("server") or ("127.0.0.1", 8000))[1]
@@ -25515,6 +25625,103 @@ def auto_audio_id(bid: str, f: dict, kind: str, cache: dict) -> tuple[str, float
     return aid, dur
 
 
+def auto_cut_spans(src: Path, dur: float, s: dict, run_id: str, report: list[str]) -> list[tuple[float, float]]:
+    """مكان القطع: لو كاتب «محتاج إيه في التقطيع» المخ بيسمع الكلام ويختار، وإلا قطع متساوية متزقوقة على أماكن السكوت."""
+    mx, note = float(s["opts"].get("max") or 15), (s["opts"].get("note") or "").strip()
+    base = automate.even_spans(dur, mx)
+    has_audio = media_info(src).has_audio
+    if note and not atlas.mock_mode() and atlas.api_key():
+        try:
+            words = []
+            if has_audio:
+                wallet.need(wallet.credits(wallet.est(chars=6000, stt_min=dur / 60)), "تقطيع الفيديو")
+                audio = TMP_DIR / f"autosplit_{run_id}.m4a"
+                subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src), "-vn", "-ac", "1", "-c:a", "aac", "-b:a", "96k", str(audio)],
+                               check=True, capture_output=True, timeout=300)
+                try:
+                    words = atlas.transcribe(audio, dur) or []
+                finally:
+                    audio.unlink(missing_ok=True)
+            spans = automate.clean_spans(dict_chat(automate.split_messages(note, words, dur, mx)), dur, mx)
+            wallet.charge(wallet.credits(wallet.est(chars=6000, stt_min=dur / 60 if has_audio else 0)), "موديل مخصص: التقطيع على حسب طلبك", run_id)
+            if spans:
+                report.append(f"✂️ قطّع على حسب «{note[:60]}»")
+                return spans
+        except wallet.NoCredits:
+            raise
+        except Exception as exc:  # noqa: BLE001 — لو المخ مارجعش حاجة نافعة بنقطع بالتساوي
+            report.append(f"⚠️ التقطيع الذكي ماشتغلش ({str(getattr(exc, 'detail', None) or exc)[:80]})، فقطّع بالتساوي")
+    return automate.snap_quiet(base, silences(src) if has_audio else [], mx)
+
+
+def auto_gen_piece(src: Path, dur: float, g: dict, dest: Path, run_id: str, ratio: str) -> str:
+    """«ولّد»: القطعة + البرومبت ← فيديو جديد من موديل تعديل الفيديو، والخصم على قد الثواني."""
+    prompt = (g["opts"].get("prompt") or "").strip()
+    if not prompt:
+        raise RuntimeError("خطوة «ولّد» من غير برومبت")
+    ms = auto_gen_models()
+    cand = next((m for m in ms if m["model"] == g["opts"].get("model")), None) or (ms[0] if ms else None)
+    if not cand:
+        raise RuntimeError("مفيش موديل توليد فيديو متاح على Atlas دلوقتي")
+    if atlas.mock_mode():
+        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src), "-vf", "hue=h=140:s=1.6,eq=contrast=1.15",
+                        "-c:a", "copy", str(dest)], check=True, capture_output=True, timeout=300)
+        return cand["label"]
+    cost = wallet.credits((cand.get("per_sec") or 0.3) * dur * (2 if cand["kind"] == "ref" else 1))
+    wallet.need(cost, "توليد قطعة فيديو")
+    body = vmodels.camera_body(cand, atlas.upload_media(src), prompt, dur, ratio)
+    atlas.download(atlas.run_model("Video", body, cand["label"], max_seconds=2400, interval=6), dest)
+    wallet.charge(cost, f"موديل مخصص: توليد قطعة ({cand['label']})", run_id)
+    return cand["label"]
+
+
+def auto_run_split(bid: str, s: dict, merge: dict | None, f: dict, ratio: str, run_id: str, setr, report: list[str]) -> list[dict]:
+    """قطّع ← كل قطعة تمشي في مسارها (ولّد…) ← جمّع المخرجات المختارة بالترتيب. بيرجّع لقطات للمونتاج."""
+    src = lib_dir(bid) / f["file"]
+    dur = float(f.get("dur") or probe_duration(src))
+    setr(step=f"✂️ بيقطّع «{f['name']}»")
+    spans = auto_cut_spans(src, dur, s, run_id, report)
+    lanes = s.get("lanes") or [[]]
+    outs: dict[tuple[int, str], tuple[Path, float]] = {}
+    last: list[tuple[int, str]] = []
+    for i, (a, b) in enumerate(spans):
+        piece = GENERATED_DIR / f"autosplit_{run_id}_{i}.mp4"
+        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{a:.2f}", "-to", f"{b:.2f}", "-i", str(src),
+                        "-c:v", "libx264", "-preset", "veryfast", "-crf", "19", "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", str(piece)],
+                       check=True, capture_output=True, timeout=600)
+        outs[(i, "piece")] = (piece, b - a)
+        cur, cur_key = piece, (i, "piece")
+        for g in automate.lane_for(lanes, i):
+            if g["verb"] != "gen":
+                continue
+            setr(step=f"✨ بيولّد القطعة {i + 1} من {len(spans)}")
+            dest = GENERATED_DIR / f"autogen_{run_id}_{i}_{g['id']}.mp4"
+            try:
+                label = auto_gen_piece(cur, b - a, g, dest, run_id, ratio)
+                outs[(i, g["id"])] = (dest, probe_duration(dest) or (b - a))
+                cur, cur_key = dest, (i, g["id"])
+                report.append(f"✓ القطعة {i + 1}: اتولّدت ({label})")
+            except wallet.NoCredits:
+                raise
+            except Exception as exc:  # noqa: BLE001 — قطعة واحدة فشلت: بنكمّل بالأصل بتاعها
+                report.append(f"⚠️ القطعة {i + 1}: التوليد فشل ({str(getattr(exc, 'detail', None) or exc)[:90]})، فاتحطت زي ما هي")
+        last.append(cur_key)
+    items = [(it["lane"], it["node"]) for it in ((merge or {}).get("opts") or {}).get("items") or []]
+    chosen = [k for k in items if k in outs] or last
+    if items and len(chosen) < len(items):
+        report.append(f"⚠️ «جمّع»: {len(items) - len(chosen)} من المخرجات اللي اخترتها مش موجودة في التشغيل ده (عدد القطع طلع {len(spans)})")
+    report.append(f"✂️ {len(spans)} قطعة · اتجمّع منهم {len(chosen)} في فيديو واحد")
+    Wc, Hc = AUTO_CANVAS.get(ratio, AUTO_CANVAS["9:16"])
+    clips = []
+    for lane, node in chosen:
+        path, L = outs[(lane, node)]
+        info = media_info(path)
+        ok = info.width and info.height and abs(info.width / info.height - Wc / Hc) < 0.08
+        clips.append({"gen_id": phone_gen(path, f"✂️ قطعة {lane + 1}" + ("" if node == "piece" else " ✨")), "start": 0, "end": None,
+                      "fit": "fill" if ok else "blur", "_dur": L})
+    return clips
+
+
 def auto_export_publish(pid: str, steps: list[dict], name: str, port: int, setr, report: list[str]) -> None:
     """صدّر (زي زرار التصدير في المونتاج) واستنى يخلص، وبعدين انشر لو الخطوة بتقول «على طول»."""
     setr(step="🎬 بيصدّر الفيديو")
@@ -25565,10 +25772,21 @@ def run_automation(rid: str, run_id: str, bid: str, port: int = 8000) -> None:
         picked: list[dict] = []
         voice = music = None
         intro = outro = None
+        split_f = None
         setr(step="📁 بيختار من المكتبة")
         for s in steps:
             v, o = s["verb"], s["opts"]
-            if v == "pull":
+            if v == "split":
+                got, _ = automate.pick(auto_files(lib, s.get("src"), ("video",)), 1, o.get("order") or "fresh", used, rnd)
+                if not got:
+                    report.append(f"⚠️ «قطّع الفيديو» مالقاش فيديو في «{(s.get('src') or {}).get('label') or 'المكتبة'}»")
+                    continue
+                split_f = got[0]
+                report.append(f"✓ الفيديو اللي هيتقطّع: {got[0]['name']}")
+            elif v == "merge":
+                if split_f:
+                    picked.append({"split": s, "merge": next((x for x in steps if x["verb"] == "merge"), None), "f": split_f})
+            elif v == "pull":
                 kinds = ("image", "video") if o.get("type") == "any" else (o.get("type") or "image",)
                 files = auto_files(lib, s.get("src"), kinds)
                 got, wrapped = automate.pick(files, int(o.get("count") or 1), o.get("order") or "fresh", used, rnd)
@@ -25598,7 +25816,12 @@ def run_automation(rid: str, run_id: str, bid: str, port: int = 8000) -> None:
                     music = {"f": got[0], "volume": int(o.get("volume") or 35), "duck": bool(o.get("duck"))}
                 report.append(f"✓ {'التعليق' if v == 'voice' else 'الموسيقى'}: {got[0]['name']}")
         if not picked and not intro and not outro:
-            raise RuntimeError("مفيش ولا صورة ولا فيديو اتسحب. راجع المنشن في خطوة «اسحب»")
+            raise RuntimeError("مفيش ولا صورة ولا فيديو اتسحب. راجع المنشن في خطوة «اسحب» أو «قطّع الفيديو»")
+        # التقطيع والتوليد الأول (أطول حاجة)، والقطع المتجمّعة بتاخد مكان «جمّع» في الترتيب
+        for x in picked:
+            if "split" in x:
+                sp = next(s for s in steps if s["verb"] == "split")
+                x["clips"] = auto_run_split(bid, sp, x["merge"], x["f"], ratio, run_id, setr, report)
         setr(step="🎞️ بيجهّز اللقطات")
         voice_id = music_id = None
         target = None
@@ -25607,7 +25830,11 @@ def run_automation(rid: str, run_id: str, bid: str, port: int = 8000) -> None:
             target = vdur if voice["fit"] else None
         if music:
             music_id, _ = auto_audio_id(bid, music["f"], "music", cache)
-        lens = automate.plan_lengths([(x["f"]["kind"], x["f"].get("dur")) for x in picked], target, cap, [x["sec"] for x in picked])
+        lib_picks = [x for x in picked if "split" not in x]
+        fixed_sec = sum(c["_dur"] for x in picked for c in x.get("clips") or [])
+        lens = automate.plan_lengths([(x["f"]["kind"], x["f"].get("dur")) for x in lib_picks], max(1.0, target - fixed_sec) if target else None, cap,
+                                     [x["sec"] for x in lib_picks])
+        len_of = {id(x): L for x, L in zip(lib_picks, lens)}
         clips = []
         Wc, Hc = AUTO_CANVAS.get(ratio, AUTO_CANVAS["9:16"])
         def vclip(f, L):
@@ -25615,8 +25842,15 @@ def run_automation(rid: str, run_id: str, bid: str, port: int = 8000) -> None:
             return {"gen_id": auto_video_gen(bid, f, cache), "start": 0, "end": round(min(L, f.get("dur") or L), 2) if L else None, "fit": "fill" if ok else "blur"}
         if intro:
             clips.append(vclip(intro, None))
-        for x, L in zip(picked, lens):
-            f = x["f"]
+        for x in picked:
+            if "split" in x:   # القطع بطولها (مابيتطبقش عليها «طول اللقطات»)
+                for c in x["clips"]:
+                    c = {k: v for k, v in c.items() if k != "_dur"}
+                    if trans and clips:
+                        c["trans"] = {"type": trans, "dur": 0.3}
+                    clips.append(c)
+                continue
+            f, L = x["f"], len_of[id(x)]
             c = {"gen_id": auto_image_gen(bid, f, L, ratio, cache), "start": 0, "end": None, "fit": "fill"} if f["kind"] == "image" else vclip(f, L)
             if trans and clips:
                 c["trans"] = {"type": trans, "dur": 0.3}
@@ -25643,7 +25877,7 @@ def run_automation(rid: str, run_id: str, bid: str, port: int = 8000) -> None:
                         r = conn.execute("SELECT duration FROM audio WHERE id = ?", (voice_id,)).fetchone()
                     wallet.charge(wallet.credits(wallet.est(stt_min=float(r["duration"]) / 60)), "موديل مخصص: كتابة الكلام للكابشن", run_id)
         for x in picked + ([voice] if voice else []) + ([music] if music else []):
-            used[x["f"]["id"]] = used.get(x["f"]["id"], 0) + 1
+            used[x["f"]["id"]] = used.get(x["f"]["id"], 0) + 1   # الفيديو اللي اتقطّع كمان (المرة الجاية ياخد غيره)
         auto_update(rid, lambda z: z.update(used=used), bid)
         report.append(f"🎬 {len(clips)} لقطة · مقاس {ratio}" + (f" · حوالي {round(target)} ثانية على قد التعليق" if target else ""))
         setr(project_id=pj["id"], report=report)

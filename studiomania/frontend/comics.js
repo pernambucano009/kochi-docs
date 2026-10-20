@@ -56,9 +56,10 @@ const ComicsPage = (() => {
     const open = S.items.find((c) => c.id === S.open);
     S.el.innerHTML = head() + `<section class="fs-card"><h3>المكتبة</h3>
       <div class="nb-bar"><input type="search" data-cmsearch placeholder="دوّر بالإحساس أو الموقف أو الجملة… مثلًا: صدمة، مفلس، آخر الشهر" value="${esc(S.q)}" class="cm-q">
-        <select data-cmfk><option value="">كل الأنواع</option>${Object.entries(S.st.kind_names).map(([k, t]) => `<option value="${k}" ${k === S.kind ? "selected" : ""}>${esc(t)}</option>`).join("")}</select>
         <select data-cmfs><option value="ready" ${S.status === "ready" ? "selected" : ""}>الجاهز</option><option value="new" ${S.status === "new" ? "selected" : ""}>مستني سياق</option><option value="hidden" ${S.status === "hidden" ? "selected" : ""}>المستخبي</option><option value="skip" ${S.status === "skip" ? "selected" : ""}>اللي اتساب</option></select>
         <select data-cmfa><option value="">معتمد وغير معتمد</option><option value="1" ${S.appr === "1" ? "selected" : ""}>✅ المعتمد بس</option><option value="0" ${S.appr === "0" ? "selected" : ""}>اللي لسه مااتعتمدش</option></select></div>
+      <div class="cm-tabs cm-groups">${[["", "كل الأنواع", S.st.total], ...Object.entries(S.st.groups || {}).map(([k, g]) => [k, g.t, g.n])].map(([k, t, n]) =>
+          `<button class="cm-tab${S.kind === k ? " on" : ""}" data-cmgk="${k}">${{ images: "🖼️ ", gifs: "🎞️ ", videos: "🎬 " }[k] || ""}${esc(t)} <span class="num">${n ?? 0}</span></button>`).join("")}</div>
       <div class="cm-tabs">${[["", "الكل"], ...Object.entries(S.st.lang_names)].map(([k, t]) => `<button class="cm-tab${S.lang === k ? " on" : ""}" data-cmlt="${k}">${k ? LANG_IC[k] + " " : ""}${esc(t)}${k && S.st.langs?.[k] != null ? ` <span class="num">${S.st.langs[k]}</span>` : ""}</button>`).join("")}
         <small class="cm-n">${S.total} نتيجة</small></div>
       ${S.st.admin && !S.sel ? `<div class="nb-bar cm-apprbar"><button class="nb-btn sm" data-cmapprvis ${S.total ? "" : "disabled"}>✅ اعتمد كل الظاهر (${S.total})</button>
@@ -133,6 +134,7 @@ const ComicsPage = (() => {
           const r = await api("/api/comics/import", { method: "POST", body: fd }); toast(`✅ اتضاف ${r.added}`); await refresh(); render(); return poll();
         }
         if (q("[data-cmmore]")) { await load(true); return render(); }
+        if (q("[data-cmgk]")) { S.kind = q("[data-cmgk]").dataset.cmgk; S.open = null; await load(); return render(); }
         if (q("[data-cmlt]")) { S.lang = q("[data-cmlt]").dataset.cmlt; S.open = null; await load(); return render(); }
         if (q("[data-cmsel]")) { S.sel = new Set(); S.open = null; return render(); }
         if (q("[data-cmselx]")) { S.sel = null; return render(); }

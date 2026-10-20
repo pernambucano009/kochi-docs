@@ -2019,3 +2019,20 @@ label.dim { opacity: .4; }
 .am-run small { color: var(--nh-muted); }
 .am-run small.bad { color: var(--nh-accent, #E5613E); }
 .am-run .bm-pill { justify-self: start; margin-top: 4px; }
+/* 🤖 الموديل المخصص: مسارات التقطيع، و«اوصفه بكلامك» */
+#nh .am-ladd > i { width: 34px; height: 34px; font-size: 18px; }
+#nh .am-ladd > b { font-size: 11.5px; }
+#nh .am-piece .bm-bic { border-style: dashed; }
+#nh .am-desc { position: absolute; top: calc(var(--bm-top, 90px) + 4px); left: 50%; transform: translateX(-50%); z-index: 6; width: min(620px, calc(100% - 32px));
+  display: grid; justify-items: center; gap: 8px; }
+#nh .am-desc-t { padding: 9px 18px; border-radius: 999px; background: var(--card, #fff); box-shadow: 0 6px 24px rgba(0, 0, 0, .08); font-size: 13.5px; font-weight: 600; }
+#nh .am-desc.open .am-desc-t { background: var(--nh-ink); color: var(--nh-bg); }
+#nh .am-desc-b { display: none; width: 100%; padding: 14px; border-radius: 22px; background: var(--card, #fff); box-shadow: 0 10px 40px rgba(0, 0, 0, .12); }
+#nh .am-desc.open .am-desc-b { display: grid; gap: 10px; }
+#nh .am-desc .bm-write { min-height: 74px; }
+#nh .am-recst { font-size: 12px; color: var(--nh-muted); align-self: center; }
+#nh .am-say:empty { display: none; }
+#nh .am-order { margin: 8px 0 0; padding: 0 18px 0 0; display: grid; gap: 6px; font-size: 13px; }
+#nh .am-order li { display: flex; align-items: center; gap: 6px; }
+#nh .am-order li > span { flex: 1; }
+#nh .am-order .bm-pill { padding: 3px 9px; }
