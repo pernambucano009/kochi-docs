@@ -9579,6 +9579,29 @@ def brain_quiz_answer(bid: str, body: QuizIn):
     return brain_to_dict(brain_row(bid))
 
 
+@app.get("/api/ad-brains/{bid}/tasks")
+def brain_tasks(bid: str):
+    """✅ مهام العقل (رفع صور، فيديو، صوتك…) جنب أسئلة الكويز: الاتنين لما يخلصوا يبقى العقل عنده كل اللي محتاجه."""
+    b = brain_row(bid)
+    if b is None:
+        raise HTTPException(404, "العميل ده مش موجود")
+    tw = {"photo": False, "video": False, "voice": False}
+    for t in twins_list():
+        for k in tw:
+            tw[k] = tw[k] or bool((t.get("ready") or {}).get(k))
+    with closing(db()) as conn:
+        coaches = conn.execute("SELECT COUNT(*) FROM coaches").fetchone()[0]
+        voices = conn.execute("SELECT COUNT(*) FROM audio WHERE kind = 'voice'").fetchone()[0]
+        music = conn.execute("SELECT COUNT(*) FROM audio WHERE kind = 'music'").fetchone()[0]
+    try:
+        lib_media = sum(1 for f in lib_load(active_client_id())["files"] if f.get("kind") in ("image", "video"))
+    except Exception:  # noqa: BLE001 — المكتبة لسه ماتعملتش
+        lib_media = 0
+    items = brainquiz.tasks(b, {"twin": tw, "coaches": coaches, "voices": voices, "music": music, "lib_media": lib_media})
+    return {"items": items, "done": sum(x["done"] for x in items), "total": len(items),
+            "questions": len(brainquiz.Q), "answered": len([q for q in b.get("quiz_done") or [] if q in brainquiz.BY_ID])}
+
+
 @app.get("/api/ad-brains/{bid}/quiz-answers")
 def brain_quiz_answers(bid: str):
     """الإجابات اللي في العقل دلوقتي لكل سؤال (عشان تظهر لو رجعت لسؤال)."""

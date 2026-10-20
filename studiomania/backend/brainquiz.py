@@ -84,3 +84,34 @@ def current(q: dict, brain: dict) -> str:
         n = next((x for x in brain.get("notes") or [] if x.get("quiz") == q["id"]), None)
         return str((n or {}).get("body") or "")
     return ""
+
+
+# ✅ مهام العقل: الحاجات اللي مش أسئلة (ترفع صور، فيديو، تسجّل صوتك…). الكويز بيجمعها مع الأسئلة،
+# ولما الاتنين يخلصوا يبقى العقل عنده كل اللي محتاجه. go: نقطة في الخريطة (leaf) أو صفحة (page).
+def tasks(b: dict, ctx: dict) -> list[dict]:
+    import re
+    hexes = re.findall(r"#[0-9a-fA-F]{6}\b", str(b.get("palette") or ""))
+    has = lambda k: bool(b.get(k))  # noqa: E731
+    app = b.get("type") == "app"
+    tw = ctx.get("twin") or {}
+    items = [
+        ("logo", "ارفع اللوجو", "اللوجو بيتحط على الفيديوهات والصور", has("logos"), {"leaf": "look:logos:"}),
+        ("palette", "حط ألوان البراند", "الألوان بتمشي على كل التصميمات", bool(hexes), {"leaf": "look:palette:"}),
+        ("typography", "اختار خطوط البراند", "خط العناوين وخط الكلام", bool(str(b.get("typography") or "").strip()), {"leaf": "look:typography:"}),
+        ("styles", "اختار الستايل اللي يشبهك", "علشان الفيديوهات والصور تطلع بنفس الروح", bool(str(b.get("styles") or "").strip()), {"leaf": "look:styles:"}),
+        ("screens" if app else "products", "ارفع صور شاشات التطبيق" if app else "ارفع صور المنتج أو الخدمة",
+         "بتتحط في الإعلانات والفيديوهات", has("screens" if app else "products"), {"leaf": f"assets:{'screens' if app else 'products'}:"}),
+        ("intro", "ارفع إنترو البراند", "فيديو قصير في أول كل فيديو", bool(b.get("intro_file")), {"leaf": "delivery:intro:"}),
+        ("outro", "ارفع أوترو البراند", "فيديو قصير في آخر كل فيديو", bool(b.get("outro_file")), {"leaf": "delivery:outro:"}),
+        ("caption", "اكتب الكابشن الافتراضي", "الشكل اللي الكابشن بينزل بيه مع كل بوست", bool(str(b.get("caption") or "").strip()), {"leaf": "delivery:caption:"}),
+        ("social", "حلّل حساب السوشيال بتاعك", "المخ بيتعلم من بوستاتك ومشاهداتك", bool(b.get("todos") or b.get("niche")), {"leaf": "improve:social:"}),
+        ("rivals", "هات منافسينك", "أعلى ٥ في مجالك وسوقك", bool((b.get("competitors") or {}).get("items")), {"page": "rivals"}),
+        ("twin_photos", "ارفع صورك علشان الأفاتار", "صور وشّك من كذا زاوية في «نسختي»", bool(tw.get("photo")), {"page": "twin"}),
+        ("twin_video", "ارفع فيديو ليك وانت بتتكلم", "علشان الأفاتار يتحرك ويتكلم زيك", bool(tw.get("video")), {"page": "twin"}),
+        ("twin_voice", "سجّل صوتك", "علشان الأفاتار يتكلم بصوتك", bool(tw.get("voice")), {"page": "twin"}),
+        ("characters", "اعمل شخصية للبراند", "شخصية ثابتة تظهر في الفيديوهات", ctx.get("coaches", 0) > 0, {"page": "coaches"}),
+        ("voice", "ضيف تعليق صوتي", "تسجيلات صوت تتحط على الفيديوهات", ctx.get("voices", 0) > 0, {"page": "voice"}),
+        ("music", "ضيف موسيقى", "موسيقى البراند للفيديوهات", ctx.get("music", 0) > 0, {"page": "music"}),
+        ("lib_media", "ارفع صور وفيديوهات في مكتبة العقل", "المكتبة اللي الموديل المخصص بيسحب منها", ctx.get("lib_media", 0) > 0, {"page": "brainlib"}),
+    ]
+    return [{"id": i, "t": t, "why": w, "done": bool(d), "go": g} for i, t, w, d, g in items]

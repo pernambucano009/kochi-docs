@@ -2036,3 +2036,26 @@ label.dim { opacity: .4; }
 #nh .am-order li { display: flex; align-items: center; gap: 6px; }
 #nh .am-order li > span { flex: 1; }
 #nh .am-order .bm-pill { padding: 3px 9px; }
+/* 🧠 عقل البراند: المخ أكبر (الخريطة بالعرض)، والنقط: المليانة برتقاني، الفاضية مفرّغة، والاقتراحات رمادي */
+#nh .bm-brain { width: 240px; }
+#nh .bm-leaf.full > i { background: var(--nh-accent, #E5613E); }
+:root[data-nh-theme="dark"] #nh .bm-leaf.full > i { background: var(--nh-accent, #E5613E); }
+#nh .bm-leaf.pend > i { background: #A9A39C; animation: bm-pulse-g 1.8s ease-out infinite; }
+#nh .bm-leaf.pend.ask > i { background: #A9A39C; box-shadow: 0 0 0 4px rgba(169, 163, 156, .3); animation: none; color: #fff; }
+:root[data-nh-theme="dark"] #nh .bm-leaf.pend > i, :root[data-nh-theme="dark"] #nh .bm-leaf.pend.ask > i { background: #77716B; color: #fff; }
+@keyframes bm-pulse-g { 0% { box-shadow: 0 0 0 0 rgba(169, 163, 156, .55); } 100% { box-shadow: 0 0 0 9px rgba(169, 163, 156, 0); } }
+@media (prefers-reduced-motion: reduce) { #nh .bm-leaf.pend > i { animation: none; } }
+/* الشرح فوق النقطة دايمًا */
+#nh .bm-leaf.tipdown .bm-tip { bottom: calc(100% + 10px); top: auto; }
+/* ✅ مهام العقل جوه «كمّل العقل» */
+#nh .bm-qtabs { margin: 2px 0 4px; }
+#nh .bm-tasks { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+#nh .bm-tasks li { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 14px; background: var(--nh-fill, rgba(127, 127, 127, .08)); }
+#nh .bm-tasks li.ok { opacity: .6; }
+#nh .bm-tck { flex: none; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; border: 1.5px dashed #BDB5AC; font-size: 12px; color: #fff; }
+#nh .bm-tasks li.ok .bm-tck { background: var(--nh-accent, #E5613E); border: 0; }
+#nh .bm-ttx { flex: 1; display: grid; gap: 2px; min-width: 0; }
+#nh .bm-ttx b { font-size: 13px; font-weight: 600; }
+#nh .bm-ttx small { font-size: 11.5px; color: var(--nh-muted); }
+#nh .bm-tasks .bm-pill { flex: none; padding: 5px 11px; font-size: 12px; }
+#nh .bm-dot.full, :root[data-nh-theme="dark"] #nh .bm-dot.full { background: var(--nh-accent, #E5613E); }

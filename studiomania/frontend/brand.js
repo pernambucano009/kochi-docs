@@ -176,17 +176,18 @@ const BrandPage = (() => {
     if (!w) return;
     const W = w.clientWidth, H = w.clientHeight;
     if (!W || !H) return;
-    const ex = Math.max(1.1, Math.min(1.45, W / H));
+    // الشاشة بالعرض (16:9): الفروع بتتمد يمين وشمال أكتر من فوق وتحت، فالمخ يكبر ويملا الشاشة
+    const ex = Math.max(1.2, Math.min(2.1, (W / H) * 1.15)), ey = .78;
     const list = branches(b), nodes = [{ id: "c", kind: "center", x: 0, y: 0 }];
     // «+» تحت المخ (ترمي فيه أي حاجة)، و«ضيف للعقل بكويز» البرتقاني فوقه
-    nodes.push({ id: "add", kind: "add", x: 0, y: 182, from: "c" }, { id: "quiz", kind: "quiz", x: 0, y: -176, from: "c" });
+    nodes.push({ id: "add", kind: "add", x: 0, y: 214, from: "c" }, { id: "quiz", kind: "quiz", x: 0, y: -206, from: "c" });
     list.forEach((br, i) => {
       // نص الفروع يمين ونصها شمال، وفوق المخ وتحته فاضيين دايمًا للكويز و«+» (حتى لو عدد الفروع فردي)
       const nr = Math.ceil(list.length / 2), nl = list.length - nr;
       const a = i < nr ? -Math.PI / 2 + Math.PI * (i + .5) / nr : Math.PI / 2 + Math.PI * (i - nr + .5) / nl;
       // الفرع بيطول مع كل حاجة بتتضاف فيه: العميل يشوف العقل بيكبر
-      const g = growth(b, br), D = 215 + 140 * (1 - Math.exp(-g / 8));
-      const bx = Math.cos(a) * D * ex, by = Math.sin(a) * D;
+      const g = growth(b, br), D = 250 + 140 * (1 - Math.exp(-g / 8));
+      const bx = Math.cos(a) * D * ex, by = Math.sin(a) * D * ey;
       const real = br.leaves.filter((l) => !l.type.startsWith("rule-") && l.type !== "action" && l.type !== "pending");
       const done = real.filter((l) => filled(b, l)).length, total = real.length, waiting = br.leaves.length - br.leaves.filter((l) => l.type !== "pending").length;
       nodes.push({ id: br.k, kind: "branch", br, x: bx, y: by, from: "c", done, total, waiting, g });
@@ -217,8 +218,9 @@ const BrandPage = (() => {
     if (S.view?.user && !force) return applyView();
     let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
     for (const n of S.nodes) {
-      const m = n.kind === "leaf" ? 26 : n.kind === "center" ? 110 : 80;
-      x0 = Math.min(x0, n.x - m); x1 = Math.max(x1, n.x + m); y0 = Math.min(y0, n.y - m); y1 = Math.max(y1, n.y + m + (n.kind === "branch" ? 30 : 0));
+      const m = n.kind === "leaf" ? 26 : n.kind === "center" ? 130 : 80;
+      // الشرح بيطلع فوق النقطة دايمًا: مساحة فوق النقط اللي فوق علشان مايدخلش تحت الشريط
+      x0 = Math.min(x0, n.x - m); x1 = Math.max(x1, n.x + m); y0 = Math.min(y0, n.y - m - (n.kind === "leaf" ? 46 : 0)); y1 = Math.max(y1, n.y + m + (n.kind === "branch" ? 30 : 0));
     }
     // الشريط اللي فوق ثابت وطاير فوق الصفحة: الخريطة بتتحط تحته مش وراه
     const top = topInset(), hh = H - top - 40;
@@ -280,8 +282,10 @@ const BrandPage = (() => {
         ${b?.knowledge ? `<small class="bm-kn" title="${esc((b.knowledge.tips || []).join(" · "))}">المخ يعرفك <span class="num">${b.knowledge.score}٪</span> · ${esc(b.knowledge.level)}</small>` : ""}</button>`;
     }
     if (n.kind === "quiz") {
-      const done = (b?.quiz_done || []).length, total = S.quiz?.length || 17;
-      return `<button class="bm-n bm-quiz${done >= total ? " full" : ""}" data-n="quiz" title="أسئلة قصيرة، كل إجابة بتروح لخانتها في العقل"><i>?</i><b>ضيف للعقل بكويز</b><small class="num">${Math.min(done, total)}/${total}</small></button>`;
+      if (b && S.tqFor !== b.id && S.tqLoading !== b.id) loadTasks(b);
+      const tq = S.tqFor === b?.id ? S.tq : null;
+      const qd = Math.min((b?.quiz_done || []).length, S.quiz?.length || 17), done = qd + (tq?.done || 0), total = (S.quiz?.length || 17) + (tq?.total || 0);
+      return `<button class="bm-n bm-quiz${tq && done >= total ? " full" : ""}" data-n="quiz" title="كل اللي العقل محتاجه: أسئلة قصيرة + مهام (ترفع صور، فيديو، صوتك…)"><i>?</i><b>كمّل العقل</b><small class="num">${done}/${total}</small></button>`;
     }
     if (n.kind === "add") {
       const reading = (b?.sources || []).some((s) => s.status === "working");
@@ -362,7 +366,7 @@ const BrandPage = (() => {
       if (n.el) {
         n.el.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%)`;
         // الشريط اللي فوق طاير فوق الخريطة: لو النقطة قريبة منه اسمها بيظهر تحتها
-        if (n.kind === "leaf") { const down = y * S.view.s + S.view.y < S.topY + 70; if (down !== n.down) { n.down = down; n.el.classList.toggle("tipdown", down); } }
+
       }
     }
     // الأذرع خطوط منحنية: الدراع بيلف شوية وهو طالع من المخ، والورق بيكمّل في نفس اتجاه الدراع وبعدين يميل لمكانه
@@ -467,8 +471,31 @@ const BrandPage = (() => {
     } catch (err) { S.qaFor = b.id; S.qa = {}; toast(err.message, true); }
     if (S.open?.id === "quiz") refreshCard();
   }
+  // ✅ مهام العقل (مش أسئلة): رفع اللوجو، صور الأفاتار، الفيديو، صوتك… كل واحدة بتتعلّم لوحدها لما تتعمل
+  async function loadTasks(b) {
+    S.tqLoading = b.id;
+    try { S.tq = await bAPI("/tasks"); S.tqFor = b.id; } catch { S.tq = null; S.tqFor = b.id; }
+    S.tqLoading = null;
+    const n = S.byId?.quiz;
+    if (n?.el && cur()?.id === b.id) { n.el.outerHTML = nodeHTML(n, cur()); n.el = S.el.querySelector('[data-n="quiz"]'); }
+    if (S.open?.id === "quiz") refreshCard();
+  }
+  function tasksHTML(b) {
+    const tq = S.tqFor === b?.id ? S.tq : null;
+    if (!tq) { if (b && S.tqLoading !== b.id) loadTasks(b); return `<p class="bm-note">بيشوف إيه اللي ناقص…</p>`; }
+    const left = tq.items.filter((x) => !x.done);
+    return `<div class="bm-qbar"><i style="width:${Math.round(100 * tq.done / Math.max(1, tq.total))}%"></i></div>
+      <p class="bm-note">${left.length ? `فاضل ${left.length} من ${tq.total}. كل مهمة بتتعلّم لوحدها أول ما تتعمل.` : "خلصت كل المهام 🎉"}</p>
+      <ul class="bm-tasks">${[...left, ...tq.items.filter((x) => x.done)].map((x) => `<li class="${x.done ? "ok" : ""}"><span class="bm-tck">${x.done ? "✓" : ""}</span>
+        <span class="bm-ttx"><b>${esc(x.t)}</b><small>${esc(x.why)}</small></span>${x.done ? "" : `<button class="bm-pill" data-tgo="${esc(JSON.stringify(x.go))}">اعملها ←</button>`}</li>`).join("")}</ul>`;
+  }
   function quizHTML(b) {
-    const head = `<div class="bm-ch"><span class="latin">QUIZ</span><b>ضيف للعقل بكويز</b></div>`;
+    const tq = S.tqFor === b?.id ? S.tq : null, qn = S.quiz?.length || 0, qd = Math.min((b?.quiz_done || []).length, qn || 99);
+    const tabs = `<div class="bm-pills bm-qtabs"><button class="bm-pill${S.qtab !== "t" ? " on" : ""}" data-qtab="q">🧩 الأسئلة <span class="num">${qd}/${qn || "…"}</span></button>
+      <button class="bm-pill${S.qtab === "t" ? " on" : ""}" data-qtab="t">✅ المهام <span class="num">${tq ? `${tq.done}/${tq.total}` : "…"}</span></button></div>`;
+    const head = `<div class="bm-ch"><span class="latin">COMPLETE THE BRAIN</span><b>كمّل العقل</b></div>
+      <p class="bm-note">لما الأسئلة والمهام يخلصوا، العقل بيبقى عنده كل اللي محتاجه علشان يعرفك.</p>${tabs}`;
+    if (S.qtab === "t") return head + tasksHTML(b);
     if (!S.quiz || S.qaFor !== b?.id) { if (b && S.qaLoading !== b.id) { S.qaLoading = b.id; loadQA(b).finally(() => (S.qaLoading = null)); } return head + `<p class="bm-note">بيجهّز الأسئلة…</p>`; }
     const qs = S.quiz, total = qs.length, done = new Set(b.quiz_done || []);
     if (S.qi == null) { const i = qs.findIndex((q) => !done.has(q.id)); S.qi = i < 0 ? total : i; }
@@ -476,7 +503,7 @@ const BrandPage = (() => {
     if (S.qi >= total) {
       return head + bar + `<p class="bm-q">${done.size >= total ? "خلصت كل الأسئلة 🎉" : "وصلت لآخر سؤال"}</p>
         <p class="bm-note">${done.size >= total ? "كل إجابة اتحطت في خانتها في العقل. تقدر ترجع تعدّل أي إجابة في أي وقت." : `جاوبت ${done.size} من ${total}. الأسئلة اللي اتخطت تقدر ترجع لها في أي وقت.`}</p>
-        <div class="bm-acts"><button class="bm-go" data-qgo="0">راجع الإجابات</button>${done.size < total ? `<button class="bm-pill" data-qgo="first">كمّل الناقص</button>` : ""}</div>`;
+        <div class="bm-acts">${tq && tq.done < tq.total ? `<button class="bm-go" data-qtab="t">✅ كمّل المهام (فاضل ${tq.total - tq.done})</button>` : ""}<button class="${tq && tq.done < tq.total ? "bm-pill" : "bm-go"}" data-qgo="0">راجع الإجابات</button>${done.size < total ? `<button class="bm-pill" data-qgo="first">كمّل الناقص</button>` : ""}</div>`;
     }
     const q = qs[S.qi], val = S.qa?.[q.id] || "";
     const field = q.opts ? `<div class="bm-pills">${q.opts.map(([v, t]) => `<button class="bm-pill${val === v ? " on" : ""}" data-qpick="${esc(v)}">${esc(t)}</button>`).join("")}</div>`
@@ -654,6 +681,7 @@ const BrandPage = (() => {
     try {
       const b = await fn();
       S.brains = S.brains.map((x) => (x.id === b.id ? b : x));
+      if (S.tqFor === b.id) S.tqFor = null;   // المهام بتتحسب تاني (ممكن تكون واحدة اتعملت)
       const keep = S.open && S.el.querySelector(".bm-card").contains(document.activeElement) && document.activeElement.matches(".bm-write");
       layout();
       if (S.open) {
@@ -828,6 +856,16 @@ const BrandPage = (() => {
       if (t.closest("[data-close]")) return openCard(null);
       if (t.closest("[data-ibrec]")) return toggleRec();
       if (t.closest("[data-qnext]")) return quizStep(1);
+      const qt = t.closest("[data-qtab]");
+      if (qt) { S.qtab = qt.dataset.qtab; if (S.qtab === "t") { const b = cur(); if (b) { S.tqFor = null; loadTasks(b); } } return refreshCard(); }
+      const tg = t.closest("[data-tgo]");
+      if (tg) {
+        const go = JSON.parse(tg.dataset.tgo);
+        if (go.page) { S.tqFor = null; return window.NHNav?.(go.page); }
+        const ln = S.nodes.find((x) => x.id === go.leaf);
+        S.tqFor = null;
+        return ln ? openCard(ln) : toast("مش لاقي النقطة دي في الخريطة", true);
+      }
       if (t.closest("[data-qskip]")) { S.qi += 1; return refreshCard(); }
       if (t.closest("[data-qprev]")) return quizStep(-1);
       const qp = t.closest("[data-qpick]");
