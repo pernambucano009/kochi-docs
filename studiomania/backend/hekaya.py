@@ -113,6 +113,9 @@ def styles_list() -> list[dict]:
 # ---------------------------------------------------------------- محرّك الرسم (JS)
 # الأدوات العامة: P (أشكال) و M (خامة)، والخامة بتختلف حسب الستايل. فوقها: الكاميرا، الهزّة، الانتقالات، والكلام اللي بيظهر كلمة كلمة.
 KIT = r"""
+// الموديل ساعات بيكتب min() و sin() و PI من غير Math.: بنعرّفهم عامّين (كخصائص، فلو كود الشخصيات عرّف واحد بنفس الاسم مايحصلش تعارض)
+for(const k of ['min','max','abs','floor','ceil','round','trunc','sin','cos','tan','asin','acos','atan','atan2','sqrt','cbrt','hypot','pow','sign','exp','log','log2','log10'])if(!(k in globalThis))globalThis[k]=Math[k];
+if(!('PI' in globalThis))globalThis.PI=Math.PI;if(!('TAU' in globalThis))globalThis.TAU=Math.PI*2;
 const u=Math.min(W,H)/1080;let T=0;
 function hx(c){c=M.c(c);if(typeof c!=='string'||c[0]!=='#')return [128,128,128];let s=c.slice(1);if(s.length===3)s=s.split('').map(x=>x+x).join('');const n=parseInt(s.slice(0,6),16);return [n>>16&255,n>>8&255,n&255]}
 function mix(a,b,k){const A=hx(a),B=hx(b);return '#'+A.map((v,i)=>Math.round(lerp(v,B[i],clamp(k))).toString(16).padStart(2,'0')).join('')}
