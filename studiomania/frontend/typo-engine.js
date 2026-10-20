@@ -116,38 +116,10 @@
     }
 
     renderAt(t) {
-      if (this.style.mockup === "laptop" && !this.doc.transparent) return this.renderLaptop(t);
       this.renderRaw(t);
       const b = this._b;
       if (b && !TypoEngine.FULL?.has(b.kind)) this.applyXf(b, t);
       else this._xf = null;
-    }
-
-    // 💻 الفيديو كله على شاشة لابتوب في أوضة غامقة بنور دافي من فوق (زي فيديوهات «الكلمة بتخبط الشاشة»):
-    // الحركات بتترسم بمقاس الشاشة نفسها (عرضي)، وبعدين بتتحط جوه الشاشة والكاميرا بتتهز هزة إيد خفيفة
-    renderLaptop(t) {
-      const full = this.doc, { w, h } = full, vert = h > w * 1.05, u = this.u, ts = this.ts, st = this.stage.style, ow = st.width, oh = st.height;
-      const sw = Math.round(vert ? w * 0.97 : w * 0.64), sh = Math.round(sw * 0.625), sx = (w - sw) / 2, sy = vert ? h * 0.34 : h * 0.1;
-      this.doc = { ...full, w: sw, h: sh }; this.u = Math.min(sw, sh) / 100; this.ts = 1;
-      st.width = `${sw}px`; st.height = `${sh}px`;
-      try {
-        this.renderRaw(t);
-        const b = this._b;
-        if (b && !TypoEngine.FULL?.has(b.kind)) this.applyXf(b, t); else this._xf = null;
-      } finally { this.doc = full; this.u = u; this.ts = ts; st.width = ow; st.height = oh; }
-      const inner = this.stage.innerHTML, ibg = this.stage.style.background || "#000";
-      const bz = sw * 0.018, dx = Math.sin(t * 0.7) * w * 0.004, dy = Math.cos(t * 0.53) * h * 0.003, deckY = sy + sh + bz * 1.6, deckH = vert ? sw * 0.42 : h - deckY;
-      this.stage.style.background = "#060403";
-      this.stage.innerHTML = `<div style="position:absolute;inset:0;background:radial-gradient(ellipse 75% 42% at 50% ${vert ? 14 : 4}%,#C9A272 0%,#7A5A36 32%,#2A1D11 62%,#070504 100%)"></div>
-        <div style="position:absolute;inset:-2%;transform:translate(${dx.toFixed(1)}px,${dy.toFixed(1)}px)">
-          <div style="position:absolute;left:${(sx - bz).toFixed(1)}px;top:${(sy - bz).toFixed(1)}px;width:${(sw + bz * 2).toFixed(1)}px;height:${(sh + bz * 2.6).toFixed(1)}px;border-radius:${(bz * 1.2).toFixed(1)}px;background:#0B0B0C;box-shadow:0 ${(bz * 2).toFixed(0)}px ${(bz * 6).toFixed(0)}px rgba(0,0,0,.6)"></div>
-          <div style="position:absolute;left:${sx.toFixed(1)}px;top:${sy.toFixed(1)}px;width:${sw}px;height:${sh}px;overflow:hidden;background:${ibg};box-shadow:0 0 ${(sw * 0.12).toFixed(0)}px rgba(255,255,255,.07)">${inner}
-            <div style="position:absolute;inset:0;background:linear-gradient(125deg,rgba(255,255,255,.07),rgba(255,255,255,0) 40%);pointer-events:none"></div></div>
-          <div style="position:absolute;left:${(sx - sw * 0.04).toFixed(1)}px;top:${deckY.toFixed(1)}px;width:${(sw * 1.08).toFixed(1)}px;height:${deckH.toFixed(1)}px;clip-path:polygon(4% 0,96% 0,100% 100%,0 100%);background:linear-gradient(180deg,#1B1B1D,#0A0A0B 70%)">
-            <div style="position:absolute;left:8%;right:8%;top:5%;height:${(bz * 0.35).toFixed(1)}px;border-radius:9px;background:linear-gradient(90deg,#3a7bff,#b44cff,#ff4a6a,#ffb23a,#3affb2,#3a7bff);opacity:.55;filter:blur(1px)"></div>
-            <div style="position:absolute;left:7%;right:7%;top:14%;height:58%;background:repeating-linear-gradient(90deg,rgba(255,255,255,.05) 0 ${(sw * 0.052).toFixed(0)}px,transparent ${(sw * 0.052).toFixed(0)}px ${(sw * 0.06).toFixed(0)}px),repeating-linear-gradient(0deg,transparent 0 ${(sw * 0.052).toFixed(0)}px,rgba(0,0,0,.6) ${(sw * 0.052).toFixed(0)}px ${(sw * 0.06).toFixed(0)}px)"></div>
-            <div style="position:absolute;inset:0;background:radial-gradient(ellipse 60% 40% at 50% 0%,rgba(255,255,255,.08),rgba(255,255,255,0))"></div></div>
-        </div>`;
     }
 
     renderRaw(t) {

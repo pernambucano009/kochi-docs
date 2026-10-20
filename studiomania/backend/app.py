@@ -17242,7 +17242,7 @@ def typo_doc(pid: str, d: dict) -> dict:
                    "icon": None, "side": None, "icons": []})
     return {"w": W, "h": H, "fps": TYPO_FPS, "anchors": anchors, "tracks": tracks, "person": pdoc, "fx": fx, "dim": float((d.get("bg") or {}).get("dim") or 0),
             "duration": max(d.get("duration") or (blocks[-1]["t1"] if blocks else 1), *[q["t1"] for q in fx]) if fx else (d.get("duration") or (blocks[-1]["t1"] if blocks else 1)),
-            "style": {**{k: st.get(k) for k in ("font", "case", "grain", "weight", "light", "dark", "accent")}, "mockup": st.get("mockup") if kind == "theme" else None,
+            "style": {**{k: st.get(k) for k in ("font", "case", "grain", "weight", "light", "dark", "accent")},
                       "moments": {**(st.get("moments") or {}), **(d.get("fonts") or {})}},
             "transparent": kind != "theme", "blocks": blocks}
 
