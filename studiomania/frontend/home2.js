@@ -64,14 +64,11 @@ const NH = (() => {
     voice: { en: "Voices", ar: "التعليق الصوتي", icon: "mic", page: "voice", desc: "مكتبة التعليق." },
     music: { en: "Music", ar: "الموسيقى", icon: "music", page: "music", desc: "مكتبة الموسيقى." },
     viral: { en: "Trends", ar: "اللي ماشي في مجالك", icon: "megaphone", page: "viral", desc: "بوستات المجال مرتّبة بقد إيه عدّت العادي، وأفكار بنفس الهيكل." },
-    stylecl: { en: "Style Clone", ar: "استنساخ الستايل", icon: "clapper", page: "stylecl", desc: "مرجع بستايل عاجبك + فكرتك ← أنيميشن مرسوم بالكود." },
-    fstudio: { en: "Frame by Frame", ar: "فريم فريم", icon: "clapper", page: "fstudio", desc: "استوديو أنيميشن مرسوم بالكود، وانت متحكم في كل مرحلة." },
     plan: { en: "Content Plan", ar: "خطة المحتوى", icon: "megaphone", page: "plan", desc: "استراتيجية حسابك، بتتبني لوحدها من كل اللي العقل عرفه عنك." },
     rivals: { en: "Your Competitors", ar: "منافسينك", icon: "megaphone", page: "rivals", desc: "أعلى ٥ في مجالك واللي بينجح عندهم وتحليل فيديوهاتك، وبيدخلوا في أفكارك." },
     auto: { en: "Custom Model", ar: "الموديل المخصص", icon: "film", page: "auto", desc: "خطوات بترتّبها بنفسك (اسحب، حط، قطّع، صدّر) من مكتبة العقل، وكل تشغيل فيديو جديد." },
     brainlib: { en: "Brand Library", ar: "مكتبة العقل", icon: "film", page: "brainlib", desc: "صورك وفيديوهاتك وأصواتك في فولدرات، والمخ بيوصّف كل ملف عشان تلاقيه وتمنشنه." },
     comics: { en: "Comics", ar: "مكتبة الكوميكس", icon: "megaphone", page: "comics", desc: "كوميكس حقيقية بسياق كل واحد، علشان تتحط في مكانها الصح." },
-    hekaya: { en: "Story", ar: "حكاية", icon: "clapper", page: "hekaya", desc: "حكاية بصوت راوي، كل مشهد مرسوم على الكلام، وستايلات كتير." },
     ref2p: { en: "Reference → Prompt", ar: "من مرجع لبرومبت", icon: "clapper", page: "ref2p", desc: "فيديو مرجعي ← برومبت جاهز بـ 14 جزء ← توليد." },
     motion: { en: "Motion", ar: "مكتبة الموشن", icon: "clapper", page: "motion", desc: "أنيميشنات مكتوبة بالكود، كل واحدة تتضاف للأصول بضغطة." },
   };
@@ -502,8 +499,8 @@ const NH = (() => {
     pjFilter();
   });
   // صفحات كاملة بتنزل لتحت (عقل البراند، مكتبة الموشن): كل واحدة ليها موديول بيرسمها
-  const MODS = { brand: BrandPage, motion: MotionPage, coaches: CharactersPage, voice: VoicesPage, music: MusicPage, viral: ViralPage, stylecl: StyleClonePage, fstudio: FrameStudioPage, ref2p: Ref2PromptPage, rivals: RivalsPage, plan: RivalsPage, hekaya: HekayaPage, comics: ComicsPage, brainlib: BrainLibPage, auto: AutoPage };
-  const stopMedia = () => { MotionPage.close(); VoicesPage.close(); MusicPage.close(); CharactersPage.close?.(); StyleClonePage.close(); FrameStudioPage.close(); Ref2PromptPage.close(); RivalsPage.close(); HekayaPage.close(); ComicsPage.close(); BrainLibPage.close(); AutoPage.close(); };
+  const MODS = { brand: BrandPage, motion: MotionPage, coaches: CharactersPage, voice: VoicesPage, music: MusicPage, viral: ViralPage, ref2p: Ref2PromptPage, rivals: RivalsPage, plan: RivalsPage, comics: ComicsPage, brainlib: BrainLibPage, auto: AutoPage };
+  const stopMedia = () => { MotionPage.close(); VoicesPage.close(); MusicPage.close(); CharactersPage.close?.(); Ref2PromptPage.close(); RivalsPage.close(); ComicsPage.close(); BrainLibPage.close(); AutoPage.close(); };
   let pageArg = null, pStack = [];
   // عنوان الصفحة (من البروتوتايب): الأيقونة الزجاج كبيرة، وفوق الاسم اسم القسم بالإنجليزي بالبرتقالي
   const titleHTML = (t, key) => `<div class="nh-name"><span class="latin">${t.en}</span><b>${esc(t.ar)}</b></div><span class="gi nh-glt">${glImg(GLKEY[key] || GLKEY[t.icon] || "create")}</span>`;

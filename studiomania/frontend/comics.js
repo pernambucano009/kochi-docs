@@ -11,7 +11,7 @@ const ComicsPage = (() => {
     const src = Object.entries(st.sources).map(([, v]) => `<span class="cm-src ${v.on ? "on" : ""}">${v.on ? "✅" : "⚪"} ${esc(v.name)}${!v.on && v.env ? ` <small dir="ltr">${esc(v.env)}</small>` : ""}</span>`).join("");
     return `<section class="fs-hero">
         <div class="fs-hero-t"><b>مكتبة الكوميكس</b><span class="latin">COMICS LIBRARY</span></div>
-        <p>كوميكس حقيقية (GIF وصور وفيديوهات بصوت) بتتجمّع أوتوماتيك، والمخ بيتفرج على كل واحد ويكتب سياقه: الإحساس، الموقف، يتقال إمتى، والجملة اللي فيه. وأي أداة (زي «حكاية») بتختار منها الكوميك المناسب للكلام.</p>
+        <p>كوميكس حقيقية (GIF وصور وفيديوهات بصوت) بتتجمّع أوتوماتيك، والمخ بيتفرج على كل واحد ويكتب سياقه: الإحساس، الموقف، يتقال إمتى، والجملة اللي فيه. وأي أداة (زي التصوير بالموبايل) بتختار منها الكوميك المناسب للكلام.</p>
         <div class="cm-stats"><span><b class="num">${st.total}</b> كوميك</span><span><b class="num">${st.ready}</b> جاهز بسياقه</span><span><b class="num">${st.pending}</b> مستني سياق</span><span><b class="num">${st.hidden}</b> مستخبي</span><span>✅ <b class="num">${st.approved || 0}</b> معتمد</span>${st.skipped ? `<span><b class="num">${st.skipped}</b> اتساب (وصفه فشل)</span>` : ""}
           ${Object.entries(st.kinds).map(([k, n]) => `<span>${esc(st.kind_names[k] || k)} <b class="num">${n}</b></span>`).join("")}</div>
         <div class="cm-srcs">${src}</div>

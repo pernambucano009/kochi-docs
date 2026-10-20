@@ -7,7 +7,9 @@ const BrandPage = (() => {
   const S = { id: null, brains: [], cats: null, el: null, poll: null, open: null, raf: 0, nodes: [], t0: performance.now() };
   const cur = () => S.brains.find((b) => b.id === S.id) || null;
   const bAPI = (path, opts) => api(`/api/ad-brains/${S.id}${path}`, opts);
-  const styleIds = (b) => String(b?.styles || "").split(",").map((x) => x.trim()).filter((x) => S.cats?.some((c) => c.id === x));
+  // الستايلات: الجاهزة (من السيرفر) + ستايلات البراند اللي المخ استنبطها («+ إضافة ستايل»)
+  const allStyles = (b) => [...(b?.custom_styles || []).filter((c) => c.status === "done"), ...(S.cats || [])];
+  const styleIds = (b) => String(b?.styles || "").split(",").map((x) => x.trim()).filter((x) => allStyles(b).some((c) => c.id === x));
   const hexes = (txt) => [...String(txt || "").matchAll(/#[0-9a-fA-F]{6}\b/g)].map((m) => m[0]).slice(0, 8);
   const rulesOf = (b) => String(b?.rules || "").split("\n").map((x) => x.trim()).filter(Boolean);
   const reduce = matchMedia("(prefers-reduced-motion: reduce)");
@@ -24,6 +26,7 @@ const BrandPage = (() => {
     pulse: "M7 4.5h10v4a5 5 0 0 1-10 0z M7 6H4.5a2.5 2.5 0 0 0 2.8 3.4 M17 6h2.5a2.5 2.5 0 0 1-2.8 3.4 M12 13.5v3.5 M8.5 20h7l-.8-3h-5.4z",
     algo: "M4 18.5h16 M6.5 18.5V12 M11 18.5V8 M15.5 18.5V5 M19.5 9.5l-3-3-3 3",
     trends: "M3.5 17l5.5-5.5 4 4 7.5-7.5 M15 8h5.5v5.5",
+    chars: "M12 4a3.5 3.5 0 1 1 0 7a3.5 3.5 0 1 1 0-7z M5 20c.7-3.7 3.4-5.8 7-5.8s6.3 2.1 7 5.8 M17.5 4.5l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6z",
     library: "M9 4.5a3 3 0 1 1 0 6a3 3 0 1 1 0-6z M3.5 19c.6-3 2.8-4.6 5.5-4.6s4.9 1.6 5.5 4.6 M16 7.5v6.2 M16 13.7a1.8 1.8 0 1 1-1.8-1.8 M16 7.5l3.5-1.2",
   };
   const svg = (d, s = 22) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}" aria-hidden="true"><path d="${d}" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
@@ -66,17 +69,17 @@ const BrandPage = (() => {
         { f: "caption", t: "الكابشن الافتراضي", type: "text", ph: "{caption}\n\n{cta} 👇\n{link}\n#هاشتاج", hint: "{caption} كابشن الفيديو · {cta} الدعوة · {link} اللينك. بيتحطوا لوحدهم وقت النشر." },
       ] },
       { k: "assets", t: "صور البراند", en: "Assets", leaves: kinds.map(([k, t]) => ({ f: k, t, type: "imgs" })) },
-      // الشخصيات (والأفاتار) والتعليق الصوتي والموسيقى: من أساسيات البراند، فبقوا فرع من العقل (كل نقطة بتفتح صفحتها)
-      { k: "library", t: "الشخصيات والأصوات", en: "Library", leaves: [
+      // 🧑‍🎤 الشخصيات والأفاتار: دراع لوحده من المخ (الشخصيات ونسختي)
+      { k: "chars", t: "الشخصيات والأفاتار", en: "Characters", leaves: [
+        { f: "pg", i: "coaches", page: "coaches", t: "🧑‍🎤 الشخصيات والأفاتار", type: "page" },
+        { f: "pg", i: "twin", page: "twin", t: "🪞 نسختي (أفاتار منك)", type: "page" },
+      ] },
+      // المكتبة والأصوات: ملفات العقل والتعليق الصوتي والموسيقى والكوميكس (كل نقطة بتفتح صفحتها)
+      { k: "library", t: "المكتبة والأصوات", en: "Library", leaves: [
         { f: "pg", i: "brainlib", page: "brainlib", t: "📁 مكتبة العقل (صور وفيديوهات وأصوات)", type: "page" },
         { f: "pg", i: "auto", page: "auto", t: "🤖 الموديل المخصص (أوتوميشن)", type: "page" },
-        { f: "pg", i: "coaches", page: "coaches", t: "الشخصيات والأفاتار", type: "page" },
-        { f: "pg", i: "twin", page: "twin", t: "🪞 نسختي (أفاتار منك)", type: "page" },
         { f: "pg", i: "voice", page: "voice", t: "التعليق الصوتي", type: "page" },
         { f: "pg", i: "music", page: "music", t: "الموسيقى", type: "page" },
-        { f: "pg", i: "stylecl", page: "stylecl", t: "🎨 استنساخ الستايل", type: "page" },
-        { f: "pg", i: "fstudio", page: "fstudio", t: "🎞️ فريم فريم", type: "page" },
-        { f: "pg", i: "hekaya", page: "hekaya", t: "📖 حكاية", type: "page" },
         { f: "pg", i: "comics", page: "comics", t: "🎭 مكتبة الكوميكس", type: "page" },
         { f: "pg", i: "ref2p", page: "ref2p", t: "🎥 من مرجع لبرومبت", type: "page" },
       ] },
@@ -129,7 +132,7 @@ const BrandPage = (() => {
     if (l.type === "pick") return l.opts.find(([v]) => v === String(b?.[l.f] || ""))?.[1] || "";
     if (l.type === "imgs") return (b?.[l.f] || []).length ? `${(b[l.f]).length} صورة` : "";
     if (l.type === "palette") return hexes(b?.palette).join(" ");
-    if (l.type === "styles") return styleIds(b).map((id) => S.cats?.find((c) => c.id === id)?.ar).filter(Boolean).join("، ");
+    if (l.type === "styles") return styleIds(b).map((id) => allStyles(b).find((c) => c.id === id)?.ar).filter(Boolean).join("، ");
     if (l.type === "video") return b?.[`${l.f}_url`] ? (b[`${l.f}_on`] ? "شغّال" : "موجود ومقفول") : "";
     if (l.type === "todo") return l.todo.done ? "اتعملت ✓" : l.todo.why;
     return "";
@@ -661,11 +664,26 @@ const BrandPage = (() => {
           <label class="bm-swadd" title="ضيف لون">+<input type="color" data-hadd hidden></label></div>` + editable("palette", b?.palette, "#E5613E برتقالي، #111111 أسود", true);
       }
       case "styles": {
-        const ids = styleIds(b);
-        return head + `<p class="bm-note">اللي عليه ★ هو الافتراضي، و«ابدأ مشروع جديد» بيبدأ بيه.</p><div class="bm-cats">${(S.cats || []).map((c) => {
-          const on = ids.includes(c.id), def = ids[0] === c.id, cover = c.templates.find((t) => t.cover_url);
-          return `<button class="bm-cat${on ? " on" : ""}" data-cat="${c.id}">${cover ? `<img src="${esc(cover.cover_url)}" alt="" loading="lazy">` : `<span>${c.icon}</span>`}<b>${esc(c.ar)}</b>${on ? `<i data-star title="خليه الافتراضي">${def ? "★" : "☆"}</i>` : ""}</button>`;
-        }).join("")}</div>`;
+        const ids = styleIds(b), mine = b?.custom_styles || [], A = S.stAdd;
+        const tile = (c, own) => {
+          const on = ids.includes(c.id), def = ids[0] === c.id, wait = own && c.status === "working", bad = own && c.status === "failed";
+          return `<button class="bm-cat${on ? " on" : ""}${wait ? " wait" : ""}${bad ? " bad" : ""}" ${wait || bad ? "" : `data-cat="${c.id}"`} title="${esc(c.look || c.en || "")}">
+            ${c.cover_url ? `<img src="${esc(c.cover_url)}" alt="" loading="lazy">` : `<span>${c.icon || "🎨"}</span>`}
+            <b>${esc(c.ar)}</b>${wait ? `<small>⏳ ${esc(c.step || "بيستنبط…")}</small>` : bad ? `<small>⚠️ ${esc(c.error || "ما نفعش")}</small>` : ""}
+            ${own && (c.palette || []).length ? `<em>${c.palette.slice(0, 5).map((h) => `<u style="background:${esc(h)}"></u>`).join("")}</em>` : ""}
+            ${on ? `<i data-star title="خليه الافتراضي">${def ? "★" : "☆"}</i>` : ""}${own && !wait ? `<s data-stdel="${c.id}" title="احذف الستايل ده">✕</s>` : ""}</button>`;
+        };
+        const form = A ? `<div class="bm-stadd">
+            <p class="bm-note">اديله لينك صفحة عاجبك شكلها، أو ارفع صور وفيديوهات بالستايل، واختار ألوان لو حابب. المخ بياخد الستايل بس (مش الموضوع) ويعمله ستايل خاص بيك. بيتخصم من رصيدك.</p>
+            <input class="bm-in" data-st="url" dir="ltr" placeholder="https://… لينك الصفحة (اختياري)" value="${esc(A.url || "")}">
+            <label class="bm-pill">🖼️ صور وفيديوهات<input type="file" accept="image/*,video/*" multiple data-stfiles hidden></label> <small class="bm-note">${A.files?.length ? `${A.files.length} ملف` : ""}</small>
+            <div class="bm-sw">${(A.cols || []).map((h) => `<button style="background:${h}" data-stcdel="${h}" title="${h} · دوس تشيله"></button>`).join("")}<label class="bm-swadd" title="ضيف لون">+<input type="color" data-stcol hidden></label></div>
+            <input class="bm-in" data-st="name" placeholder="اسم الستايل (اختياري، المخ هيسمّيه)" value="${esc(A.name || "")}">
+            <input class="bm-in" data-st="note" placeholder="ملاحظة (اختياري): مثلًا خليه أهدى وألوانه فاتحة" value="${esc(A.note || "")}">
+            <div class="bm-acts"><button class="bm-go" data-stgo>✨ استنبط الستايل</button><button class="bm-link" data-stcancel>إلغاء</button></div></div>` : "";
+        return head + `<p class="bm-note">اختار ستايل أو أكتر. اللي عليه ★ هو الافتراضي، و«ابدأ مشروع جديد» بيبدأ بيه.</p>${form}<div class="bm-cats">
+          ${A ? "" : `<button class="bm-cat add" data-stnew><span>＋</span><b>إضافة ستايل</b><small>من لينك أو صور وفيديوهات</small></button>`}
+          ${mine.map((c) => tile(c, true)).join("")}${(S.cats || []).map((c) => tile(c, false)).join("")}</div>`;
       }
       case "imgs": {
         const xs = b?.[l.f] || [];
@@ -738,6 +756,7 @@ const BrandPage = (() => {
     S.backing = false;
     if (S.open?.id !== n.id) { S.cardSide = null; S.cardAt = null; }
     S.open = { id: n.id, br: n.br?.k, n };
+    card.classList.toggle("wide", n.l?.type === "styles");
     const back = S.hist.length ? S.nodes.find((x) => x.id === S.hist[S.hist.length - 1]) : n.kind === "leaf" ? S.byId[n.br.k] : null;
     card.innerHTML = `<button class="bm-x" data-close aria-label="اقفل">✕</button>`
       + (back ? `<button class="bm-back" data-back="${esc(back.id)}">→ ${esc(back.kind === "branch" ? back.br.t : back.kind === "leaf" ? back.l.t : back.kind === "center" ? "البراندات" : "رجوع")}</button>` : "") + cardHTML(n);
@@ -797,7 +816,7 @@ const BrandPage = (() => {
     toast("⏳ بيقرا… الاقتراحات هتظهر على الخريطة");
     return save(() => bAPI("/sources", { method: "POST", body: form }));
   }
-  const busy = (b) => b?.status === "working" || (b?.sources || []).some((s) => s.status === "working");
+  const busy = (b) => b?.status === "working" || (b?.sources || []).some((s) => s.status === "working") || (b?.custom_styles || []).some((s) => s.status === "working");
   function watch() {
     clearInterval(S.poll);
     S.poll = setInterval(async () => {
@@ -807,7 +826,7 @@ const BrandPage = (() => {
         S.brains = S.brains.map((x) => (x.id === b.id ? b : x));
         if (!busy(b)) { clearInterval(S.poll); loadClients(); layout(); if (S.open && !S.el.querySelector(".bm-card").contains(document.activeElement)) refreshCard(); return; }
         layout();
-        if (S.open?.id === "add") refreshCard();
+        if (S.open?.id === "add" || (S.open?.n?.l?.type === "styles" && !S.stAdd)) refreshCard();
       } catch { clearInterval(S.poll); }
     }, 3000);
   }
@@ -1055,6 +1074,22 @@ const BrandPage = (() => {
       if (t.closest("[data-analyze]")) return save(() => bAPI("/analyze", { method: "POST" }));
       const fig = t.closest("[data-file]");
       if (fig && t.closest("[data-adel]")) { if (confirm("تحذف الصورة دي؟")) save(() => bAPI(`/assets/${encodeURIComponent(fig.dataset.file)}`, { method: "DELETE" })); return; }
+      if (t.closest("[data-stnew]")) { S.stAdd = { cols: hexes(cur()?.palette).slice(0, 4), files: null }; return refreshCard(); }
+      if (t.closest("[data-stcancel]")) { S.stAdd = null; return refreshCard(); }
+      const stc = t.closest("[data-stcdel]");
+      if (stc) { S.stAdd.cols = S.stAdd.cols.filter((h) => h !== stc.dataset.stcdel); return refreshCard(); }
+      const stdel = t.closest("[data-stdel]");
+      if (stdel) { e.stopPropagation(); if (confirm("تحذف الستايل ده؟")) save(() => bAPI(`/styles/${stdel.dataset.stdel}`, { method: "DELETE" })); return; }
+      if (t.closest("[data-stgo]")) {
+        const A = S.stAdd, form = new FormData();
+        S.el.querySelectorAll("[data-st]").forEach((el) => { A[el.dataset.st] = el.value.trim(); });
+        if (!A.url && !A.files?.length && !A.cols.length) return toast("حط لينك، أو ارفع صور وفيديوهات، أو اختار ألوان", true);
+        form.append("url", A.url || ""); form.append("name", A.name || ""); form.append("note", A.note || ""); form.append("colors", A.cols.join(","));
+        [...(A.files || [])].slice(0, 8).forEach((f) => form.append("files", f));
+        S.stAdd = null;
+        toast("⏳ المخ بيستنبط الستايل… هيظهر في القايمة لما يخلص");
+        return save(() => bAPI("/styles", { method: "POST", body: form }));
+      }
       const cat = t.closest("[data-cat]");
       if (cat) {
         const ids = styleIds(cur()), id = cat.dataset.cat;
@@ -1109,6 +1144,13 @@ const BrandPage = (() => {
     w.addEventListener("change", (e) => {
       const el = e.target;
       if (el.dataset.up) { const f = el.files; upload(el.dataset.up, f); el.value = ""; return; }
+      if (el.matches("[data-stfiles]") && S.stAdd) { S.el.querySelectorAll("[data-st]").forEach((x) => { S.stAdd[x.dataset.st] = x.value.trim(); }); S.stAdd.files = [...el.files]; return refreshCard(); }
+      if (el.matches("[data-stcol]") && S.stAdd) {
+        S.el.querySelectorAll("[data-st]").forEach((x) => { S.stAdd[x.dataset.st] = x.value.trim(); });
+        const h = el.value.toUpperCase();
+        if (!S.stAdd.cols.includes(h)) S.stAdd.cols = [...S.stAdd.cols, h].slice(0, 6);
+        return refreshCard();
+      }
       if (el.matches("[data-src]")) { const form = new FormData(); [...el.files].forEach((f) => form.append("files", f)); el.value = ""; return addSource(form); }
       if (el.dataset.hadd != null && el.matches("[data-hadd]")) {
         const b = cur(), p = String(b?.palette || "").trim();

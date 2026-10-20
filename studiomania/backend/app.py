@@ -4075,6 +4075,7 @@ from types import SimpleNamespace  # noqa: E402
 import ideamem  # noqa: E402
 import trends  # noqa: E402
 import playbook  # noqa: E402
+import stylegen  # noqa: E402
 import twin  # noqa: E402
 import phone  # noqa: E402
 import wallet  # noqa: E402
@@ -8875,6 +8876,7 @@ def brain_to_dict(b: dict) -> dict:
     out["notes"] = b.get("notes") or []
     out["knowledge"] = fz.knowledge(b, BRAIN_FIELDS, BRAIN_KINDS)
     out["rivals"] = [{k: i.get(k) for k in ("id", "platform", "handle", "median_views")} for i in (b.get("competitors") or {}).get("items") or []]
+    out["custom_styles"] = [{**c, "cover_url": f"{base}/{c['cover']}" if c.get("cover") else None} for c in b.get("custom_styles") or []]
     return out
 
 
@@ -9074,24 +9076,53 @@ def set_active_client(body: ActiveClientIn):
 
 # 🎨 فئات الستايل: البراند بيختار منها (واحدة أو أكتر، والأولى هي الافتراضية)، وصفحة «اعمل» بتجمّع القوالب تحتها
 STYLE_CATS = [
-    {"id": "cartoon2d", "icon": "🖍️", "ar": "كارتون 2D", "en": "2D Cartoon", "templates": ["sk-anime", "sk-watercolor", "sk-chalk", "sk-scifitoon"],
+    {"id": "cartoon2d", "icon": "🖍️", "ar": "كارتون 2D", "en": "2D Cartoon", "cover": "sk-scifitoon", "templates": ["sk-anime", "sk-watercolor", "sk-chalk", "sk-scifitoon"],
      "prompt": "flat 2D cartoon animation, clean bold outlines, simple shapes, bright friendly colors"},
-    {"id": "anim3d", "icon": "🧸", "ar": "أنيميشن 3D", "en": "3D Animation", "templates": ["sk-talking", "sk-skeleton", "sk-song", "sk-lowpoly", "sk-toy", "sk-hd2d"],
+    {"id": "anim3d", "icon": "🧸", "ar": "أنيميشن 3D", "en": "3D Animation", "cover": "sk-song", "templates": ["sk-talking", "sk-skeleton", "sk-song", "sk-lowpoly", "sk-toy", "sk-hd2d"],
      "prompt": "polished 3D animated film look, soft global illumination, appealing stylized characters"},
-    {"id": "paper", "icon": "✂️", "ar": "ورق", "en": "Paper", "templates": ["sk-papercut", "sk-diorama", "sk-paper", "sk-sand", "sk-popup"],
+    {"id": "paper", "icon": "✂️", "ar": "ورق", "en": "Paper", "cover": "sk-papercut", "templates": ["sk-papercut", "sk-diorama", "sk-paper", "sk-sand", "sk-popup"],
      "prompt": "handmade paper-craft look, layered cut paper, visible paper texture and soft shadows, stop-motion feel"},
-    {"id": "clay", "icon": "🧱", "ar": "صلصال", "en": "Clay", "templates": ["sk-clay", "sk-felt"],
+    {"id": "clay", "icon": "🧱", "ar": "صلصال", "en": "Clay", "cover": "sk-clay", "templates": ["sk-clay", "sk-felt"],
      "prompt": "claymation stop-motion look, sculpted plasticine with fingerprints, miniature set, warm light"},
-    {"id": "collage", "icon": "📰", "ar": "كولاج وتحريري", "en": "Collage", "templates": ["sk-vox", "sk-archive", "sk-engraved"],
+    {"id": "collage", "icon": "📰", "ar": "كولاج وتحريري", "en": "Collage", "cover": "t-dossier", "templates": ["sk-vox", "sk-archive", "sk-engraved"],
      "prompt": "editorial mixed-media collage, cut-out photos, halftone, archival paper and bold annotations"},
-    {"id": "motion", "icon": "🔷", "ar": "موشن جرافيك", "en": "Motion Graphics", "templates": ["sk-glass", "sk-glitch", "sk-surreal"],
+    {"id": "motion", "icon": "🔷", "ar": "موشن جرافيك", "en": "Motion Graphics", "cover": "t-loop", "templates": ["sk-glass", "sk-glitch", "sk-surreal"],
      "prompt": "clean motion-graphics look, glossy 3D shapes, kinetic typography, smooth camera moves"},
-    {"id": "ugc", "icon": "📱", "ar": "UGC بالموبايل", "en": "UGC", "templates": ["sk-ugc", "sk-vhs"],
+    {"id": "ugc", "icon": "📱", "ar": "UGC بالموبايل", "en": "UGC", "cover": "sk-ugc", "templates": ["sk-ugc", "sk-vhs"],
      "prompt": "authentic handheld smartphone footage, natural light, real person talking to camera"},
-    {"id": "cinematic", "icon": "🎬", "ar": "سينمائي واقعي", "en": "Cinematic", "templates": ["sk-cinema-ad", "sk-noir", "sk-miniature", "sk-drone"],
+    {"id": "cinematic", "icon": "🎬", "ar": "سينمائي واقعي", "en": "Cinematic", "cover": "sk-cinema-ad", "templates": ["sk-cinema-ad", "sk-noir", "sk-miniature", "sk-drone"],
      "prompt": "photoreal cinematic commercial, shallow depth of field, dramatic lighting, film color grade"},
-    {"id": "product", "icon": "📸", "ar": "صور منتج", "en": "Product Shots", "templates": ["sk-studio-shot", "sk-product-scene", "sk-static-ads", "sk-foodslow"],
+    {"id": "product", "icon": "📸", "ar": "صور منتج", "en": "Product Shots", "cover": "sk-studio-shot", "templates": ["sk-studio-shot", "sk-product-scene", "sk-static-ads", "sk-foodslow"],
      "prompt": "premium product photography, studio lighting, crisp detail, clean composition"},
+    # ستايلات زيادة: كل واحد بكفر من المعرض (من غير قوالب تحته لسه)
+    *[{"id": i, "icon": ic, "ar": ar, "en": en, "cover": cv, "templates": [], "prompt": pr} for i, ic, ar, en, cv, pr in [
+        ("anime", "🌸", "أنمي", "Anime", "sk-anime", "Japanese anime film look, hand-painted backgrounds, soft cel shading, warm cinematic light"),
+        ("watercolor", "💧", "ألوان مية", "Watercolor", "sk-watercolor", "delicate watercolor painting, soft wet edges, visible paper grain, airy pastel washes"),
+        ("chalk", "🧑‍🏫", "طباشير على سبورة", "Chalkboard", "sk-chalk", "white and colored chalk drawing on a dark blackboard, dusty strokes, hand-drawn arrows and doodles"),
+        ("lowpoly", "🔺", "Low-poly", "Low-poly", "sk-lowpoly", "low-poly 3D world, faceted geometric shapes, flat shading, soft pastel gradient sky"),
+        ("toy", "🚗", "ألعاب بلاستيك", "Plastic Toys", "sk-toy", "glossy plastic toy world, chunky rounded shapes, saturated candy colors, tilt-shift macro look"),
+        ("felt", "🧶", "صوف وكروشيه", "Felt & Knit", "sk-felt", "handmade felt and knitted wool craft, fuzzy fibers, stitched details, cozy warm lamp light"),
+        ("sand", "🏜️", "رسم بالرمل", "Sand Art", "sk-sand", "sand animation on a backlit glass table, warm amber glow, silhouettes drawn with fingers in sand"),
+        ("miniature", "🏘️", "عالم مصغّر", "Miniature", "sk-miniature", "tilt-shift miniature diorama look, tiny detailed buildings and people, shallow focus from above"),
+        ("noir", "🕵️", "أبيض وأسود نوار", "Film Noir", "sk-noir", "black and white film noir, hard contrast, wet streets, long shadows, smoky backlight"),
+        ("hd2d", "🏰", "بيكسل مجسّم", "HD-2D", "sk-hd2d", "HD-2D look, pixel-art sprites in a 3D diorama, depth of field, glowing lights at night"),
+        ("vhs", "📼", "VHS ريترو", "Retro VHS", "sk-vhs", "1990s home-video VHS footage, scanlines, color bleed, soft noise, timestamp-camcorder feel"),
+        ("popup", "📖", "كتاب منبثق", "Pop-up Book", "sk-popup", "pop-up paper book, folded paper scenes rising from open pages, soft daylight, craft texture"),
+        ("surreal", "☁️", "سريالي حالم", "Dreamy Surreal", "sk-surreal", "dreamy surreal minimal scene, oversized objects in soft pastel desert, gentle haze, calm light"),
+        ("riso", "🖨️", "طباعة ريزو", "Risograph", "t-riso", "risograph print look, two to three bold spot inks, halftone grain, slight misregistration"),
+        ("ukiyo", "🗻", "رسم ياباني قديم", "Ukiyo-e", "t-ukiyo", "ukiyo-e woodblock print, flat color areas, fine black outlines, aged washi paper"),
+        ("woodcut", "🪵", "حفر خشب", "Woodcut", "t-woodcut", "bold woodcut linocut print, carved black lines, single accent ink, rough paper texture"),
+        ("pixel", "👾", "بيكسل آرت", "Pixel Art", "t-pixel", "retro 16-bit pixel art, limited palette, crisp pixels, side-scrolling game look"),
+        ("ink", "🖋️", "حبر وفرشاة", "Ink Wash", "t-ink", "East-Asian ink wash painting, expressive brush strokes, misty empty space, one red seal accent"),
+        ("impasto", "🖼️", "زيت سميك", "Impasto Oil", "t-impasto", "thick impasto oil painting, visible palette-knife strokes, rich saturated colors"),
+        ("crayon", "🖍", "رسم أطفال بالشمع", "Kids Crayon", "t-crayon", "child-like wax crayon drawing on paper, wobbly lines, bright naive colors"),
+        ("iso", "🧊", "أيزومتريك", "Isometric", "t-iso", "clean isometric illustration, crisp line-art, flat faces, one or two accent colors"),
+        ("deco", "💎", "آرت ديكو", "Art Deco", "t-deco", "art deco poster, gold geometric lines, symmetrical framing, deep jewel tones"),
+        ("shadow", "🏮", "خيال الظل", "Shadow Puppets", "t-shadow", "traditional shadow puppet theater, cut-out silhouettes on warm backlit cloth, ornate patterns"),
+        ("stained", "⛪", "زجاج ملوّن", "Stained Glass", "t-glass", "stained glass window, glowing colored panes, thick dark lead lines, light shining through"),
+        ("swiss", "⬛", "تصميم سويسري", "Swiss Design", "t-swiss", "Swiss international typographic style, strict grid, bold sans-serif, lots of white space, one red accent"),
+        ("blueprint", "📐", "بلوبرينت", "Blueprint", "t-blueprint", "technical blueprint drawing, white line-art on deep blue, measurement lines and annotations"),
+    ]],
 ]
 STYLE_CAT_IDS = {c["id"] for c in STYLE_CATS}
 
@@ -9104,8 +9135,170 @@ def style_cats():
             tpls[f.parent.name] = tpl_to_dict(f.parent.name, json.loads(f.read_text(encoding="utf-8")))
         except (ValueError, KeyError):
             continue
-    return [{**c, "templates": [{"id": t["id"], "name": t["name"], "icon": t.get("icon", ""), "cover_url": t.get("cover_url")}
+    # الكفر صورة ثابتة من المعرض (/gallery) عشان تظهر دايمًا، حتى لو القوالب لسه ملهاش غلاف
+    return [{**c, "cover_url": f"/gallery/{c['cover']}.jpg", "templates": [{"id": t["id"], "name": t["name"], "icon": t.get("icon", ""), "cover_url": t.get("cover_url")}
                                 for tid in c["templates"] if (t := tpls.get(tid))]} for c in STYLE_CATS]
+
+
+# 🎨 «+ إضافة ستايل»: لينك صفحة أو صور/فيديوهات ستوك وألوان ← المخ بيستنبط ستايل خاص بالبراند (بيتخصم من الرصيد)
+STYLE_MEDIA = brainsrc.IMG_EXT | brainsrc.VIDEO_EXT
+
+
+def page_shot(url: str, out: Path) -> bool:
+    """سكرين شوت للصفحة (أهم حاجة عشان نشوف شكلها بجد)."""
+    try:
+        from playwright.sync_api import sync_playwright
+        with sync_playwright() as p:
+            br = typo_browser(p)
+            try:
+                pg = br.new_page(viewport={"width": 1280, "height": 1600})
+                pg.route("**/*", lambda r: r.abort() if not r.request.url.startswith(("http://", "https://")) or _private_url(r.request.url) else r.continue_())
+                pg.goto(url, wait_until="domcontentloaded", timeout=30000)
+                pg.wait_for_timeout(2500)
+                pg.screenshot(path=str(out), type="jpeg", quality=80)
+            finally:
+                br.close()
+        return out.exists() and out.stat().st_size > 2000
+    except Exception:  # noqa: BLE001 — الصفحة مش راضية تفتح: نكمّل بالصور اللي فيها
+        return False
+
+
+def _private_url(u: str) -> bool:
+    try:
+        brainsrc.safe_url(u)
+        return False
+    except ValueError:
+        return True
+
+
+def video_frames(p: Path, folder: Path, n: int = 4) -> list[Path]:
+    dur = probe_duration(p) or 4
+    out = []
+    for k in range(n):
+        f = folder / f"{p.stem}-f{k}.jpg"
+        r = subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{dur * (k + .5) / n:.2f}", "-i", str(p), "-frames:v", "1",
+                            "-vf", "scale=768:-2", "-q:v", "4", str(f)], capture_output=True, timeout=60)
+        if r.returncode == 0 and f.exists() and f.stat().st_size:
+            out.append(f)
+    return out
+
+
+def set_custom_style(bid: str, sid: str, **kw) -> None:
+    def fn(d):
+        for c in d.get("custom_styles") or []:
+            if c["id"] == sid:
+                c.update(kw)
+    update_brain(bid, fn)
+
+
+def run_style_clone(bid: str, sid: str, url: str, files: list[str], colors: list[str], note: str) -> None:
+    folder = brain_dir(bid) / "styles"
+    tmp = []
+    try:
+        imgs, page, cols = [], "", list(colors)
+        if url:
+            set_custom_style(bid, sid, step="بيفتح الصفحة")
+            shot = folder / f"{sid}-page.jpg"
+            if page_shot(url, shot):
+                imgs.append(shot)
+            try:
+                with httpx.Client(timeout=20, follow_redirects=True, headers={"User-Agent": "Mozilla/5.0"},
+                                  event_hooks={"request": [lambda req: brainsrc.safe_url(str(req.url))]}) as cl:
+                    r = cl.get(url)
+                if "html" in r.headers.get("content-type", "html"):
+                    pics, css = stylegen.page_assets(r.text[:2_000_000], str(r.url))
+                    page = brainsrc.html_text(r.text[:400_000])[0]
+                    cols += [c for c in css if c not in cols]
+                    for i, u in enumerate(pics[:4]):
+                        f = folder / f"{sid}-p{i}.jpg"
+                        if brain_fetch(u, f, 8 * 1024 * 1024):
+                            imgs.append(f)
+                            tmp.append(f)
+                elif r.headers.get("content-type", "").startswith(("image/", "video/")):
+                    ext = ".mp4" if "video" in r.headers["content-type"] else ".jpg"
+                    f = folder / f"{sid}-link{ext}"
+                    f.write_bytes(r.content[:60 * 1024 * 1024])
+                    files = [f.name, *files]
+            except (httpx.HTTPError, ValueError):
+                pass
+        set_custom_style(bid, sid, step="بيبص على المراجع")
+        for name in files:
+            p = folder / name
+            if p.suffix.lower() in brainsrc.VIDEO_EXT:
+                fr = video_frames(p, folder)
+                imgs += fr
+                tmp += fr
+            else:
+                imgs.append(p)
+        if not imgs and not cols:
+            raise ValueError("مقدرتش أجيب صور من اللينك ده. ارفع صور أو فيديوهات بالستايل بدالها")
+        set_custom_style(bid, sid, step="بيستنبط الستايل")
+        meter = {"usd": 0.0}
+        if atlas.mock_mode():
+            st = stylegen.mock(cols, note)
+        else:
+            wallet.need(wallet.credits(wallet.est(chars=4000, images=len(imgs[:8]))))
+            parts = [{"type": "text", "text": stylegen.messages_text(len(imgs[:8]), cols[:6], note, page)}]
+            for im in imgs[:8]:
+                parts.append({"type": "image_url", "image_url": {"url": data_url(model_image(im), "image/jpeg")}})
+            st = stylegen.clean(ad_json(ad_media_chat([{"role": "user", "content": parts}], 4000, meter=meter), "الستايل"), cols)
+            wallet.charge(wallet.credits(meter["usd"] or wallet.est(chars=4000, images=len(imgs[:8]))), f"عقل البراند: استنباط ستايل «{st['ar']}»", sid)
+        cover = ""
+        if imgs:   # الكفر: أول مرجع (السكرين شوت أو أول صورة)، متصغّر
+            cover = f"{sid}-cover.jpg"
+            shutil.copyfile(model_image(imgs[0], 720), folder / cover)
+            cover = f"styles/{cover}"
+        cur = next((c for c in (brain_row(bid) or {}).get("custom_styles") or [] if c["id"] == sid), {})
+        name = cur.get("ar") if cur.get("named") else st["ar"]
+        set_custom_style(bid, sid, **{**st, "ar": name, "cover": cover, "status": "done", "error": None, "step": None})
+    except Exception as exc:  # noqa: BLE001
+        set_custom_style(bid, sid, status="failed", error=str(getattr(exc, "detail", None) or exc)[:300], step=None)
+    finally:
+        for f in tmp:
+            f.unlink(missing_ok=True)
+
+
+@app.post("/api/ad-brains/{bid}/styles")
+def add_custom_style(bid: str, url: str = Form(""), colors: str = Form(""), note: str = Form(""), name: str = Form(""),
+                     files: list[UploadFile] = File(default=[])):
+    if not brain_row(bid):
+        raise HTTPException(404, "البراند ده مش موجود")
+    url = url.strip()
+    if url:
+        try:
+            url = brainsrc.safe_url(url)
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from None
+    cols = [c for c in dict.fromkeys(("#" + x.lstrip("#").lower()) for x in re.findall(r"#?[0-9a-fA-F]{6}\b", colors or ""))][:6]
+    if not url and not files and not cols:
+        raise HTTPException(400, "حط لينك، أو ارفع صور وفيديوهات، أو اختار ألوان")
+    if not atlas.mock_mode():
+        wallet.need(1)
+    folder = brain_dir(bid) / "styles"
+    folder.mkdir(exist_ok=True)
+    item = stylegen.new_item(name)
+    item["named"] = bool(name.strip())
+    saved = [save_upload(f, STYLE_MEDIA, folder, item["id"]) for f in files[:8]]
+    item["refs"] = saved
+    def fn(d):
+        d.setdefault("custom_styles", []).append(item)
+    update_brain(bid, fn)
+    threading.Thread(target=run_style_clone, args=(bid, item["id"], url, saved, cols, note.strip()[:300]), daemon=True).start()
+    return brain_to_dict(brain_row(bid))
+
+
+@app.delete("/api/ad-brains/{bid}/styles/{sid}")
+def del_custom_style(bid: str, sid: str):
+    def fn(d):
+        gone = [c for c in d.get("custom_styles") or [] if c["id"] == sid]
+        d["custom_styles"] = [c for c in d.get("custom_styles") or [] if c["id"] != sid]
+        d["styles"] = ",".join(x for x in str(d.get("styles") or "").split(",") if x and x != sid)
+        for c in gone:
+            for f in [*(c.get("refs") or []), Path(c.get("cover") or "").name]:
+                if f:
+                    (brain_dir(bid) / "styles" / Path(f).name).unlink(missing_ok=True)
+    update_brain(bid, fn)
+    return brain_to_dict(brain_row(bid))
 
 
 @app.get("/api/ad-brains")
@@ -9151,8 +9344,9 @@ def patch_brain(bid: str, body: BrainIn):
                 if k in ("palette", "theme", "typography", "ui_style", "logo_description") and k not in d.setdefault("edited", []):
                     d["edited"].append(k)  # الاستنباط بعد كده ميغيّرش اللي كتبته بإيدك
         if "styles" in body.fields:   # الستايل الافتراضي بيكتب «ستايل الرسم» لو انت مكتبتهوش بإيدك
-            d["styles"] = ",".join(x for x in d.get("styles", "").split(",") if x in STYLE_CAT_IDS)
-            first = next((c for c in STYLE_CATS if c["id"] == d["styles"].split(",")[0]), None)
+            mine = {c["id"]: c for c in d.get("custom_styles") or [] if c.get("prompt")}   # ستايلاتك اللي المخ استنبطها
+            d["styles"] = ",".join(x for x in d.get("styles", "").split(",") if x in STYLE_CAT_IDS or x in mine)
+            first = next((c for c in [*STYLE_CATS, *mine.values()] if c["id"] == d["styles"].split(",")[0]), None)
             if first and "style" not in d.get("edited", []):
                 d["style"] = first["prompt"]
         if "style" in body.fields and "styles" not in body.fields and "style" not in d.setdefault("edited", []):
