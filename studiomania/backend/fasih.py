@@ -122,7 +122,23 @@ def hd_voice(voice: str) -> str:
 
 
 def speak(text: str, voice: str, dialect: str, dest: Path) -> Path:
-    """بيكتب ملف mp3 في dest بصوت HD. voice و dialect لازم يكونوا من نفس اللهجة."""
+    """بيكتب ملف mp3 في dest بصوت HD. voice و dialect لازم يكونوا من نفس اللهجة.
+    لو المهمة فشلت عند فصيح نفسه (من غير سبب واضح) بنعيدها مرة واحدة بطلب جديد: المهمة الفاشلة مابتطلعش صوت."""
+    try:
+        return _speak_once(text, voice, dialect, dest)
+    except _JobFailed as exc:
+        time.sleep(3)
+        try:
+            return _speak_once(text, voice, dialect, dest)
+        except _JobFailed as exc2:
+            raise FasihError(f"{exc2} — اتعادت مرتين وفشلت. جرّب صوت تاني أو غيّر صياغة الجملة") from exc
+
+
+class _JobFailed(FasihError):
+    pass
+
+
+def _speak_once(text: str, voice: str, dialect: str, dest: Path) -> Path:
     key = api_key()
     if not key:
         raise FasihError("مفتاح فصيح مش متسجل: ضيف FASIH_API_KEY في متغيرات Railway")
@@ -174,5 +190,6 @@ def speak(text: str, voice: str, dialect: str, dest: Path) -> Path:
                 dest.write_bytes(a.content)
                 return dest
             if st in ("failed", "error", "cancelled", "canceled"):
-                raise FasihError(f"فصيح: {j.get('error') or 'الصوت فشل'} (رقم المهمة {job})")   # مابنعيدش لوحدنا
+                why = j.get("error") or j.get("error_message") or j.get("message") or j.get("reason") or "الصوت فشل"
+                raise _JobFailed(f"فصيح: {why} (رقم المهمة {job}) · الجملة: «{text[:60]}»")
         raise FasihError(f"فصيح اتأخر أكتر من 10 دقايق (رقم المهمة {job})")

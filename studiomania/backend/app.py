@@ -18676,7 +18676,8 @@ def run_dub_render(did: str, dialect: str, lipsync: str | None, background: str,
             done[0] += 1
             step(f"🎙️ بيسجّل الجمل ({done[0]} من {len(texts)})")
             return out
-        with ThreadPoolExecutor(4) as pool:
+        # فصيح بيفشّل مهام لما تتبعت كتير مرة واحدة، فبنبعتله اتنين اتنين
+        with ThreadPoolExecutor(2 if dub.VOICES[t["voice"]]["provider"] == "fasih" else 4) as pool:
             files = list(pool.map(say, range(len(lines))))
         durs = [probe_duration(f) if f else 0.0 for f in files]
         spots = dub.place(lines, durs, total)

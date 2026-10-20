@@ -329,7 +329,10 @@ def transcribe(audio_path: Path, duration: float) -> list[dict]:
 # Atlas بيدّي موديلات كلام بنفس شكل OpenAI: POST /v1/chat/completions بنفس المفتاح
 
 LLM_URL = os.environ.get("ATLASCLOUD_LLM_URL", f"{BASE_URL}/v1")
-DEFAULT_TEXT_MODEL = "deepseek-ai/DeepSeek-V3.1"
+DEFAULT_TEXT_MODEL = "deepseek-ai/deepseek-v4-flash"
+# لو Atlas شال موديل (بيرد «not found») بنحوّل لأول واحد شغال من دول، ونفتكر البديل علشان الطلبات الجاية
+TEXT_FALLBACKS = ["deepseek-ai/deepseek-v4-flash", "openai/gpt-5.4-mini", "google/gemini-2.5-flash", "openai/gpt-4.1", "openai/gpt-4o"]
+_MODEL_SWAP: dict[str, str] = {}
 # موديل بيشوف الصور (بيقرا التيمبليت والستايل ويكتب وصفه)
 DEFAULT_VISION_MODEL = "google/gemini-2.5-flash"
 # لو الموديل المختار مش موجود بنجرب دول بالترتيب (الأسماء بتختلف في Atlas)
@@ -381,6 +384,14 @@ def vision_candidates(preferred: str) -> list[str]:
     return out
 
 
+def _missing(resp: httpx.Response) -> bool:
+    """Atlas بيرد 400/404 «not found» لما اسم الموديل مش موجود عنده."""
+    if resp.status_code not in (400, 404):
+        return False
+    t = resp.text.lower()
+    return "not found" in t or "model_not_found" in t or "does not exist" in t or "no such model" in t
+
+
 def chat(messages: list[dict], model: str, temperature: float = 0.8, max_tokens: int = 4000, json_mode: bool = False, timeout: float = 180) -> str:
     rules, cta = (brand_rules() or "").strip(), (brand_cta() or "").strip()
     if (rules or cta) and not any(RULES_HEAD in str(m.get("content") or "") for m in messages):
@@ -389,15 +400,34 @@ def chat(messages: list[dict], model: str, temperature: float = 0.8, max_tokens:
         if cta:
             sys_txt += f"\nDefault call to action for this brand (use it when a CTA is needed and none is given): {cta}"
         messages = [{"role": "system", "content": sys_txt}, *messages]
+    model = _MODEL_SWAP.get(model, model)
     body = {"model": model, "messages": messages, "temperature": temperature, "max_tokens": max_tokens, "stream": False}
     if json_mode:
         body["response_format"] = {"type": "json_object"}
     with httpx.Client(timeout=timeout) as client:
-        resp = client.post(f"{LLM_URL}/chat/completions", headers=_headers(), json=body)
-        # بعض الموديلات مش بتقبل response_format، فنجرّب من غيره
-        if json_mode and resp.status_code in (400, 422):
-            body.pop("response_format")
-            resp = client.post(f"{LLM_URL}/chat/completions", headers=_headers(), json=body)
+        def send(b):
+            r = client.post(f"{LLM_URL}/chat/completions", headers=_headers(), json=b)
+            # بعض الموديلات مش بتقبل response_format، فنجرّب من غيره
+            if "response_format" in b and r.status_code in (400, 422) and not _missing(r):
+                b = {k: v for k, v in b.items() if k != "response_format"}
+                r = client.post(f"{LLM_URL}/chat/completions", headers=_headers(), json=b)
+            return r
+        resp = send(body)
+        if _missing(resp):   # الموديل اتشال من Atlas: أقرب بديل شغال (موديل صور لو الرسالة فيها صور)
+            images = any(isinstance(m.get("content"), list) and any(isinstance(p, dict) and p.get("type") == "image_url" for p in m["content"]) for m in messages)
+            avail = {m.lower(): m for m in list_models()}
+            for alt in (VISION_FALLBACKS if images else TEXT_FALLBACKS):
+                alt = avail.get(alt.lower(), alt)
+                if alt.lower() == model.lower() or (avail and alt.lower() not in avail):
+                    continue
+                r2 = send({**body, "model": alt})
+                if r2.status_code < 400:
+                    _MODEL_SWAP[model] = alt
+                    resp, model = r2, alt
+                    break
+                if not _missing(r2):
+                    resp, model = r2, alt
+                    break
     data = _check(resp, f"موديل الكلام ({model})")
     try:
         return str(data["choices"][0]["message"]["content"] or "").strip()
