@@ -1,6 +1,6 @@
-// 🤖 الموديل المخصص: نفس شكل خريطة العقل بالظبط. الموديل في النص، وكل خطوة فرع طالع منه بالترتيب (١، ٢، ٣…)،
-// وكل اختيار في الخطوة نقطة على فرعها (النوع، منين، العدد، الترتيب…). «+» تحت بيضيف خطوة، و«▶ جرّب» فوق بيشغّل الموديل
-// ويطلّع مشروع مونتاج جاهز يتفتح في المحرر. المنشن من «مكتبة العقل»: فولدر، أو ملف بعينه، أو بحث بالمعنى.
+// 🤖 الموديل المخصص: بنفس شكل خريطة العقل (النقط والخطوط والزوم والكارت)، بس الخطوات خط واحد من الشمال لليمين:
+// «▶ ابدأ» على الشمال، وبعدها الخطوات اللي العميل بيضيفها (فعل + منشن من «مكتبة العقل»)، و«＋» قبل «صدّر»، وآخر حاجة «انشر».
+// كل اختيار في الخطوة نقطة فوقها (النوع، منين، العدد…). «ابدأ» بيشغّل الموديل ويطلّع الفيديو ويصدّره وينشره.
 const AutoPage = (() => {
   const esc = (s) => escapeHtml(String(s ?? ""));
   const S = { el: null, list: [], id: null, rec: null, meta: null, lib: null, open: null, raf: 0, nodes: [], t0: performance.now(), timer: null };
@@ -15,6 +15,7 @@ const AutoPage = (() => {
     cut: "M6.5 8.5a2.5 2.5 0 1 0 0-.1z M6.5 18a2.5 2.5 0 1 0 0-.1z M8.6 9.6 20 18 M8.6 16.4 20 6",
     caption: "M4 6h16v12H4z M7.5 13.5h4 M13.5 13.5h3 M7.5 10.5h9",
     export: "M12 15V3.5 M7.5 8 12 3.5 16.5 8 M4.5 14v5.5h15V14",
+    publish: "M20.5 3.5 10 14 M20.5 3.5 14 20.5l-4-6.5-6.5-4z",
   };
   const svg = (d, s = 22) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}" aria-hidden="true"><path d="${d}" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
   const KIND_T = { image: "صور", video: "فيديوهات", any: "صور وفيديوهات" };
@@ -33,35 +34,36 @@ const AutoPage = (() => {
       cut: [{ f: "max", t: "أقصى طول للقطة", val: `${AR_N(o.max)} ث` }, { f: "trans", t: "الانتقال", val: M.trans[o.trans] }],
       caption: [{ f: "on", t: "الكابشن", val: o.on ? "شغّال" : "مقفول" }],
       export: [{ f: "ratio", t: "المقاس", val: o.ratio }],
+      publish: [{ f: "when", t: "إمتى", val: M.when[o.when] }, { f: "platforms", t: "على فين", val: (o.platforms || []).length ? `${AR_N(o.platforms.length)} حساب` : "", miss: o.when === "now" && !(o.platforms || []).length },
+        { f: "caption", t: "الكابشن", val: (o.caption || "").slice(0, 40) || "اسم الموديل" }],
     }[s.verb] || [];
-    return [...L.map((l) => ({ ...l, type: "opt" })), { f: "move", t: "رتّبها أو شيلها", type: "action" }];
+    return [...L.map((l) => ({ ...l, type: "opt" })), ...(M.fixed.includes(s.verb) ? [] : [{ f: "move", t: "رتّبها أو شيلها", type: "action" }])];
   }
+  // خط واحد من الشمال لليمين: ابدأ ← الخطوات ← «＋» ← صدّر ← انشر، ونقط كل خطوة على قوس فوقها
+  const GAPX = 210;
   function layout() {
     const w = S.el, r = S.rec;
     if (!w || !r) return;
-    const W = w.clientWidth, H = w.clientHeight;
-    if (!W || !H) return;
-    const ex = Math.max(1.1, Math.min(1.45, W / H));
-    const steps = r.steps || [], nodes = [{ id: "c", kind: "center", x: 0, y: 0 }];
-    nodes.push({ id: "add", kind: "add", x: 0, y: 182, from: "c" }, { id: "run", kind: "run", x: 0, y: -176, from: "c" });
-    // الخطوات بالترتيب مع عقارب الساعة: نصها يمين من فوق لتحت، والباقي شمال من تحت لفوق (فوق المخ وتحته فاضيين)
-    const nr = Math.ceil(steps.length / 2), nl = steps.length - nr;
-    steps.forEach((s, i) => {
-      const a = i < nr ? -Math.PI / 2 + Math.PI * (i + .5) / nr : Math.PI / 2 + Math.PI * (i - nr + .5) / nl;
-      const leaves = leavesOf(s), D = 230 + Math.min(110, leaves.length * 14);
-      const bx = Math.cos(a) * D * ex, by = Math.sin(a) * D;
-      const missing = leaves.some((l) => l.miss);
-      nodes.push({ id: s.id, kind: "branch", s, i, x: bx, y: by, from: "c", missing, g: leaves.length });
-      const n = leaves.length, RL = 92 + Math.min(36, n * 2.5), spread = Math.min(Math.PI * .95, Math.max(0, n - 1) * 40 / RL);
+    if (!w.clientWidth || !w.clientHeight) return;
+    const steps = r.steps || [], fixed = S.meta.fixed, user = steps.filter((x) => !fixed.includes(x.verb)), tail = steps.filter((x) => fixed.includes(x.verb));
+    const row = [{ id: "run", kind: "run" }, ...user.map((s) => ({ id: s.id, kind: "branch", s })), { id: "add", kind: "add" }, ...tail.map((s) => ({ id: s.id, kind: "branch", s }))];
+    const x0 = -((row.length - 1) * GAPX) / 2, nodes = [];
+    let k = 0;
+    row.forEach((n, i) => {
+      const x = x0 + i * GAPX, y = 0, prev = row[i - 1];
+      if (n.kind !== "branch") { nodes.push({ ...n, x, y, from: prev?.id }); return; }
+      const leaves = leavesOf(n.s), missing = leaves.some((l) => l.miss);
+      nodes.push({ ...n, i: k++, x, y, from: prev?.id, missing, g: leaves.length });
+      const m = leaves.length, R = 108, spread = Math.min(Math.PI * .8, Math.max(0, m - 1) * .34);
       leaves.forEach((l, j) => {
-        const la = a + (n === 1 ? 0 : -spread / 2 + (j / (n - 1)) * spread);
-        nodes.push({ id: `${s.id}:${l.f}`, kind: "leaf", s, l, br: { k: s.id }, x: bx + Math.cos(la) * RL, y: by + Math.sin(la) * RL, from: s.id, on: !l.miss });
+        const a = -Math.PI / 2 + (m === 1 ? 0 : -spread / 2 + (j / (m - 1)) * spread);
+        nodes.push({ id: `${n.s.id}:${l.f}`, kind: "leaf", s: n.s, l, br: { k: n.s.id }, x: x + Math.cos(a) * R, y: y + Math.sin(a) * R, from: n.s.id, on: !l.miss });
       });
     });
     const old = Object.fromEntries((S.nodes || []).map((n) => [n.id, n]));
     S.nodes = nodes.map((n, i) => {
       const o = old[n.id];
-      return { ...n, ph: i * 1.7, px: o ? o.px + (n.x - o.x) : n.x, py: o ? o.py + (n.y - o.y) : n.y, vx: o?.vx || 0, vy: o?.vy || 0 };
+      return { ...n, ph: i * 1.7, px: o ? o.px : n.x, py: o ? o.py : n.y, vx: o?.vx || 0, vy: o?.vy || 0 };
     });
     S.byId = Object.fromEntries(S.nodes.map((n) => [n.id, n]));
     fit();
@@ -115,19 +117,16 @@ const AutoPage = (() => {
       <div class="bm-world"><svg class="bm-lines" aria-hidden="true"></svg><div class="bm-nodes"></div></div>
       <div class="bm-zoom"><button data-zoom="1" aria-label="قرّب">+</button><button data-zoom="0" aria-label="الخريطة كلها">⤢</button><button data-zoom="-1" aria-label="بعّد">−</button></div>
       <div class="bm-card" hidden role="dialog"></div>
-      <p class="bm-hint">كل فرع خطوة بالترتيب · دوس على أي نقطة تغيّرها · النقط المفرّغة لسه ناقصة · «+» خطوة جديدة · «▶ جرّب» يطلّع الفيديو</p>`;
+      <p class="bm-hint">الخطوات من الشمال لليمين · دوس على أي نقطة تغيّرها · النقط المفرّغة لسه ناقصة · «+» خطوة جديدة قبل «صدّر» · «▶» على الشمال يشغّل الموديل</p>`;
   }
   function nodeHTML(n) {
     const r = S.rec;
-    if (n.kind === "center") {
+    if (n.kind === "run") {
       const last = (r.runs || [])[0];
-      const st = r.busy ? `<small class="bm-st">${esc(last?.step || "شغال…")}</small>` : last?.status === "failed" ? `<small class="bm-st bad">${esc(last.error || "التشغيل فشل")}</small>`
-        : last?.status === "done" ? `<small class="bm-st">آخر فيديو جاهز ✓</small>` : `<small class="bm-st">${AR_N((r.steps || []).length)} خطوات</small>`;
-      return `<button class="bm-n bm-center" data-n="c" title="غيّر الاسم أو بدّل الموديل">
-        <span class="bm-brain"><img class="ic-l" src="/icons3d/film.webp" alt=""><img class="ic-d" src="/icons3d/film_d.webp" alt=""></span><b>${esc(r.name)}</b>${st}</button>`;
+      const st = r.busy ? esc(last?.step || "شغال…") : last?.status === "failed" ? "آخر تشغيل فشل" : last?.status === "done" ? "آخر فيديو جاهز ✓" : "دوس تشغّل";
+      return `<button class="bm-n bm-quiz am-start${r.busy ? " busy" : ""}" data-n="run" title="شغّل الموديل، وغيّر اسمه أو بدّله"><i>▶</i><b>${esc(r.name)}</b><small>${st}</small></button>`;
     }
-    if (n.kind === "run") return `<button class="bm-n bm-quiz${r.busy ? " busy" : ""}" data-n="run" title="شغّل الموديل وطلّع فيديو"><i>▶</i><b>${r.busy ? "شغال…" : "جرّب"}</b><small class="num">${AR_N((r.runs || []).length)}</small></button>`;
-    if (n.kind === "add") return `<button class="bm-n bm-add" data-n="add" title="ضيف خطوة"><i>+</i><b>خطوة جديدة</b></button>`;
+    if (n.kind === "add") return `<button class="bm-n bm-add" data-n="add" title="ضيف خطوة (فعل + منشن)"><i>+</i><b>خطوة جديدة</b></button>`;
     if (n.kind === "branch") {
       const v = S.meta.verbs[n.s.verb];
       return `<button class="bm-n bm-branch${S.open?.br === n.id ? " on" : ""}" data-n="${n.id}" title="${esc(v.desc)}">
@@ -141,15 +140,11 @@ const AutoPage = (() => {
     const w = S.el;
     w.querySelector(".bm-nodes").innerHTML = S.nodes.map(nodeHTML).join("");
     S.nodes.forEach((n) => { n.el = w.querySelector(`[data-n="${CSS.escape(n.id)}"]`); });
-    w.querySelector(".bm-lines").innerHTML = S.nodes.filter((n) => n.from).map((n) => `<path data-l="${esc(n.id)}" class="${n.kind === "run" ? "quiz" : n.kind}${n.on === false ? " empty" : ""}"/>`).join("")
-      // الترتيب: خط متقطع بيوصّل كل خطوة باللي بعدها
-      + `<path class="am-seq" data-seq="1"/>`;
+    w.querySelector(".bm-lines").innerHTML = S.nodes.filter((n) => n.from).map((n) => `<path data-l="${esc(n.id)}" class="${n.kind === "leaf" ? "leaf" : "branch am-flow"}${n.on === false ? " empty" : ""}"/>`).join("");
     S.nodes.forEach((n) => { n.line = n.from ? w.querySelector(`.bm-lines [data-l="${CSS.escape(n.id)}"]`) : null; });
-    S.seq = w.querySelector(".bm-lines [data-seq]");
-    S.rc = (w.querySelector(".bm-brain")?.offsetWidth || 150) * .5;
     tick(performance.now());
   }
-  const FOLLOW = { branch: .55, leaf: .9, add: .6, run: .6 };
+  const FOLLOW = { branch: .25, leaf: .9, add: .25, run: 0 };
   function step(dt) {
     const k = 140, c = 15;
     for (const n of S.nodes) {
@@ -182,38 +177,18 @@ const AutoPage = (() => {
         if (n.kind === "leaf") { const down = y * S.view.s + S.view.y < S.topY + 70; if (down !== n.down) { n.down = down; n.el.classList.toggle("tipdown", down); } }
       }
     }
-    const c = pos.c;
+    // الخط الأساسي: من كل خطوة للي بعدها (أفقي)، ونقط الخطوة طالعة لفوق من الدايرة
     for (const n of S.nodes) {
       if (!n.line) continue;
-      const A = pos[n.from], B = pos[n.id], d = Math.hypot(B[0] - A[0], B[1] - A[1]) || 1;
-      const ux = (B[0] - A[0]) / d, uy = (B[1] - A[1]) / d;
-      let c1, c2;
-      if (n.from === "c") {
-        const sw = n.kind === "add" || n.kind === "run" ? 0 : .5, cs = Math.cos(sw), sn = Math.sin(sw);
-        c1 = [A[0] + (ux * cs - uy * sn) * d * .45, A[1] + (ux * sn + uy * cs) * d * .45];
-        c2 = [B[0] - ux * d * .35, B[1] - uy * d * .35];
-      } else {
-        const od = Math.hypot(A[0] - c[0], A[1] - c[1]) || 1, ox = (A[0] - c[0]) / od, oy = (A[1] - c[1]) / od;
-        c1 = [A[0] + ox * d * .42, A[1] + oy * d * .42];
-        c2 = [B[0] - (ox * .15 + ux * .35) * d, B[1] - (oy * .15 + uy * .35) * d];
+      const A = pos[n.from], B = pos[n.id];
+      if (n.kind === "leaf") {
+        const P0 = [A[0] + (B[0] - A[0]) * .3, A[1] - 34], P3 = [B[0], B[1] + 10];
+        n.line.setAttribute("d", `M${P0[0].toFixed(1)} ${P0[1].toFixed(1)}C${P0[0].toFixed(1)} ${(P0[1] - 30).toFixed(1)} ${P3[0].toFixed(1)} ${(P3[1] + 30).toFixed(1)} ${P3[0].toFixed(1)} ${P3[1].toFixed(1)}`);
+        continue;
       }
-      const r1 = n.from === "c" ? S.rc : 34, r2 = n.kind === "branch" ? 34 : n.kind === "add" || n.kind === "run" ? 24 : 10;
-      const dir = (p, q) => { const l = Math.hypot(q[0] - p[0], q[1] - p[1]) || 1; return [(q[0] - p[0]) / l, (q[1] - p[1]) / l]; };
-      const s1 = dir(A, c1), s2 = dir(c2, B);
-      const P0 = [A[0] + s1[0] * r1, A[1] + s1[1] * r1], P3 = [B[0] - s2[0] * r2, B[1] - s2[1] * r2];
-      n.line.setAttribute("d", `M${P0[0].toFixed(1)} ${P0[1].toFixed(1)}C${c1[0].toFixed(1)} ${c1[1].toFixed(1)} ${c2[0].toFixed(1)} ${c2[1].toFixed(1)} ${P3[0].toFixed(1)} ${P3[1].toFixed(1)}`);
-    }
-    // خط الترتيب بين الخطوات (من غير ما يعدّي على المخ): قوس بين كل فرع واللي بعده
-    if (S.seq) {
-      const br = S.nodes.filter((n) => n.kind === "branch").sort((a, b) => a.i - b.i).map((n) => pos[n.id]);
-      let dd = "";
-      for (let i = 0; i + 1 < br.length; i++) {
-        const A = br[i], B = br[i + 1], mx = (A[0] + B[0]) / 2, my = (A[1] + B[1]) / 2, ml = Math.hypot(mx - c[0], my - c[1]) || 1;
-        const q = [mx + (mx - c[0]) / ml * 60, my + (my - c[1]) / ml * 60];
-        const a1 = Math.hypot(q[0] - A[0], q[1] - A[1]) || 1, b1 = Math.hypot(B[0] - q[0], B[1] - q[1]) || 1;
-        dd += `M${(A[0] + (q[0] - A[0]) / a1 * 38).toFixed(1)} ${(A[1] + (q[1] - A[1]) / a1 * 38).toFixed(1)}Q${q[0].toFixed(1)} ${q[1].toFixed(1)} ${(B[0] - (B[0] - q[0]) / b1 * 38).toFixed(1)} ${(B[1] - (B[1] - q[1]) / b1 * 38).toFixed(1)}`;
-      }
-      S.seq.setAttribute("d", dd);
+      const ra = S.byId[n.from]?.kind === "branch" ? 36 : 28, rb = n.kind === "branch" ? 36 : 28;
+      const P0 = [A[0] + ra, A[1]], P3 = [B[0] - rb, B[1]], mx = (P0[0] + P3[0]) / 2;
+      n.line.setAttribute("d", `M${P0[0].toFixed(1)} ${P0[1].toFixed(1)}C${mx.toFixed(1)} ${P0[1].toFixed(1)} ${mx.toFixed(1)} ${P3[1].toFixed(1)} ${P3[0].toFixed(1)} ${P3[1].toFixed(1)}`);
     }
     dots();
     if (S.open?.n) placeCard(toScreen([S.open.n.px, S.open.n.py]));
@@ -288,29 +263,25 @@ const AutoPage = (() => {
   }
   function cardHTML(n) {
     const r = S.rec, M = S.meta;
-    if (n.kind === "center") {
-      return `<div class="bm-ch"><span class="latin">MODEL</span><b>الموديل</b></div>
-        ${editable("@name", r.name, "اسم الموديل")}
-        <p class="bm-note">الموديل خطوات بالترتيب، وكل تشغيل بيطلّع فيديو جديد بملفات لسه متستخدمتش.</p>
-        <div class="bm-pills">${S.list.map((x) => `<button class="bm-pill${x.id === S.id ? " on" : ""}" data-pick="${x.id}">${esc(x.name)}</button>`).join("")}</div>
-        <div class="bm-acts"><button class="bm-go" data-new>＋ موديل جديد</button><button class="bm-pill" data-delrec>🗑 امسح الموديل ده</button></div>`;
-    }
     if (n.kind === "add") {
-      return `<div class="bm-ch"><span class="latin">ADD STEP</span><b>خطوة جديدة</b></div><p class="bm-note">اختار الفعل، والخطوة بتتحط قبل «صدّر».</p>
-        <div class="am-verbs">${Object.entries(M.verbs).map(([k, v]) => `<button class="am-verb" data-addverb="${k}">${svg(IC[k], 18)}<b>${esc(v.t)}</b><small>${esc(v.desc)}</small></button>`).join("")}</div>`;
+      return `<div class="bm-ch"><span class="latin">ADD STEP</span><b>خطوة جديدة</b></div><p class="bm-note">اختار الفعل، والخطوة بتتحط آخر الخطوات (قبل «صدّر» و«انشر»). بعدها اختار المنشن من نقطة «منين».</p>
+        <div class="am-verbs">${Object.entries(M.verbs).filter(([k]) => !M.fixed.includes(k)).map(([k, v]) => `<button class="am-verb" data-addverb="${k}">${svg(IC[k], 18)}<b>${esc(v.t)}</b><small>${esc(v.desc)}</small></button>`).join("")}</div>`;
     }
     if (n.kind === "run") {
       const runs = r.runs || [];
-      return `<div class="bm-ch"><span class="latin">RUN</span><b>جرّب الموديل</b></div>
-        <p class="bm-note">بيمشي على الخطوات بالترتيب ويطلّع مشروع مونتاج جاهز، تفتحه في المحرر وتصدّره أو تعدّل فيه.${r.est ? ` التكلفة حوالي <b class="num">${AR_N(r.est)}</b> نقطة (كتابة الكلام للكابشن).` : " من غير تكلفة نقط."}</p>
+      return `<div class="bm-ch"><span class="latin">START</span><b>ابدأ</b></div>
+        ${editable("@name", r.name, "اسم الموديل")}
+        <p class="bm-note">بيمشي على الخطوات من الشمال لليمين: بيعمل الفيديو، ويصدّره، وينشره (أو يستناك توافق).${r.est ? ` التكلفة حوالي <b class="num">${AR_N(r.est)}</b> نقطة (كتابة الكلام للكابشن).` : " من غير تكلفة نقط."}</p>
         <div class="bm-acts"><button class="bm-go" data-run ${r.busy ? "disabled" : ""}>${r.busy ? "⏳ شغال…" : "▶ شغّل الموديل"}</button></div>
+        <div class="bm-pills">${S.list.map((x) => `<button class="bm-pill${x.id === S.id ? " on" : ""}" data-pick="${x.id}">${esc(x.name)}</button>`).join("")}
+          <button class="bm-pill" data-new>＋ موديل جديد</button><button class="bm-pill" data-delrec>🗑 امسح ده</button></div>
         ${runs.map((x) => `<div class="am-run ${x.status}"><b>${x.status === "done" ? "✓" : x.status === "failed" ? "⚠️" : "⏳"} ${esc(new Date(x.at).toLocaleString("ar-EG-u-nu-latn", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }))}</b>
           ${x.step ? `<small>${esc(x.step)}</small>` : ""}${(x.report || []).map((t) => `<small>${esc(t)}</small>`).join("")}${x.error ? `<small class="bad">${esc(x.error)}</small>` : ""}
-          ${x.project_id ? `<button class="bm-pill" data-openpj="${x.project_id}">🎞️ افتح في المونتاج</button>` : ""}</div>`).join("")}`;
+          <span class="bm-acts">${x.export_url ? `<a class="bm-pill" href="${esc(x.export_url)}" target="_blank" rel="noopener">⬇ الفيديو</a>` : ""}${x.project_id ? `<button class="bm-pill" data-openpj="${x.project_id}">🎞️ افتح في المونتاج</button>` : ""}</span></div>`).join("")}`;
     }
     if (n.kind === "branch") {
       const v = M.verbs[n.s.verb];
-      return `<div class="bm-ch"><span class="latin">STEP ${n.i + 1}</span><b>${esc(v.t)}</b></div><p class="bm-note">${esc(v.desc)}. دوس على أي نقطة على الفرع تغيّرها.</p>${moveActs(n.s)}`;
+      return `<div class="bm-ch"><span class="latin">STEP ${n.i + 1}</span><b>${esc(v.t)}</b></div><p class="bm-note">${esc(v.desc)}. دوس على أي نقطة فوقها تغيّرها.</p>${M.fixed.includes(n.s.verb) ? `<p class="bm-note">دي من آخر خطوتين ثابتين (صدّر ثم انشر).</p>` : moveActs(n.s)}`;
     }
     const s = n.s, l = n.l, o = s.opts;
     const head = `<div class="bm-ch"><span class="latin">${esc(M.verbs[s.verb].t)}</span><b>${esc(l.t)}</b></div>`;
@@ -320,14 +291,25 @@ const AutoPage = (() => {
     if (l.f === "order") return head + pills("order", Object.entries(M.orders), o.order) + `<p class="bm-note">«اللي متستخدمش» بياخد الملفات اللي لسه ماطلعتش في فيديو قبل كده، ولما الفولدر يخلص بيبدأ من الأول.</p>`;
     if (l.f === "trans") return head + pills("trans", Object.entries(M.trans), o.trans);
     if (l.f === "ratio") return head + pills("ratio", M.ratios.map((x) => [x, x]), o.ratio);
+    if (l.f === "when") return head + pills("when", Object.entries(M.when), o.when) + `<p class="bm-note">«يستنى موافقتي»: الفيديو بيتصدّر ويستناك في صفحة النشر. «ينزل على طول»: بينزل على الحسابات اللي هتختارها.</p>`;
+    if (l.f === "platforms") return head + platCard(o);
+    if (l.f === "caption") return head + editable("pubcap", o.caption || "", "الكابشن اللي هينزل مع الفيديو (لو فاضي: اسم الموديل)") + `<p class="bm-note">بيتحفظ لوحده لما تقف عن الكتابة.</p>`;
     if (["fit", "duck", "on"].includes(l.f)) return head + pills(l.f, [[true, "أيوه"], [false, "لأ"]], o[l.f]);
     const NUM = { count: [[1, "١"], [2, "٢"], [3, "٣"], [4, "٤"], [6, "٦"], [8, "٨"], [12, "١٢"]], sec: [[1.5, "١.٥ ث"], [2, "٢ ث"], [2.5, "٢.٥ ث"], [3, "٣ ث"], [4, "٤ ث"], [6, "٦ ث"]],
       max: [[1.5, "١.٥ ث"], [2, "٢ ث"], [3, "٣ ث"], [4, "٤ ث"], [6, "٦ ث"], [10, "١٠ ث"]], volume: [[15, "١٥٪"], [25, "٢٥٪"], [35, "٣٥٪"], [50, "٥٠٪"], [70, "٧٠٪"], [100, "١٠٠٪"]] };
     return head + pills(l.f, NUM[l.f] || [], o[l.f]);
   }
   const editable = (k, val, ph) => `<div class="bm-write" contenteditable="plaintext-only" data-k="${k}" data-ph="${esc(ph || "اكتب هنا…")}">${esc(val)}</div>`;
-  const moveActs = (s) => { const i = S.rec.steps.findIndex((x) => x.id === s.id), n = S.rec.steps.length;
-    return `<div class="bm-acts"><button class="bm-pill" data-mv="-1" ${i <= 0 ? "disabled" : ""}>→ قدّمها</button><button class="bm-pill" data-mv="1" ${i >= n - 1 ? "disabled" : ""}>أخّرها ←</button>
+  // حسابات النشر المربوطة (من صفحة النشر): كل حساب زرار يتعلّم
+  function platCard(o) {
+    if (!S.pub) { if (!S.pubLoading) { S.pubLoading = true; api("/api/publisher").then((x) => { S.pub = x; refreshCard(); }).catch((err) => toast(err.message, true)).finally(() => (S.pubLoading = false)); } return `<p class="bm-note">بيجيب حساباتك…</p>`; }
+    const list = S.pub.account_list || [], on = new Set(o.platforms || []);
+    if (!list.length) return `<p class="bm-note">مفيش حسابات مربوطة. اربطها من صفحة النشر، وبعدين ارجع هنا.</p>`;
+    return `<div class="bm-pills">${list.map((a) => { const key = `${a.platform}@${a.id}`; return `<button class="bm-pill${on.has(key) || on.has(a.platform) ? " on" : ""}" data-plat="${esc(key)}">${esc(S.pub.platforms[a.platform] || a.platform)} · ${esc(a.name || "")}</button>`; }).join("")}</div>`;
+  }
+  // الترتيب جوه خطوات العميل بس (صدّر وانشر ثابتين في الآخر)
+  const moveActs = (s) => { const user = S.rec.steps.filter((x) => !S.meta.fixed.includes(x.verb)), i = user.findIndex((x) => x.id === s.id), n = user.length;
+    return `<div class="bm-acts"><button class="bm-pill" data-mv="-1" ${i <= 0 ? "disabled" : ""}>← خليها قبل</button><button class="bm-pill" data-mv="1" ${i >= n - 1 ? "disabled" : ""}>خليها بعد →</button>
       <button class="bm-pill" data-rmstep>🗑 شيل الخطوة</button></div>`; };
   function openCard(n) {
     const card = S.el.querySelector(".bm-card");
@@ -359,7 +341,7 @@ const AutoPage = (() => {
     S.cardAt = k;
     card.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
   }
-  const refreshCard = () => { if (S.open) { const n = S.nodes.find((x) => x.id === S.open.id) || (S.open.id === "c" ? S.nodes[0] : null); openCard(n || null); } };
+  const refreshCard = () => { if (S.open) { const n = S.nodes.find((x) => x.id === S.open.id) || null; openCard(n || null); } };
 
   // ---------- الحفظ ----------
   async function setRec(r, { card = true } = {}) {
@@ -374,7 +356,7 @@ const AutoPage = (() => {
     clearTimeout(S.timer);
     S.timer = setTimeout(async () => {
       if (!S.el?.isConnected) return;
-      try { const r = await aAPI(); await setRec(r, { card: S.open?.id === "run" || S.open?.id === "c" }); if (!r.busy) toast("✓ الفيديو جاهز. افتحه من «جرّب»"); } catch { /* السيرفر بيعيد التشغيل */ }
+      try { const r = await aAPI(); await setRec(r, { card: S.open?.id === "run" }); if (!r.busy) toast("✓ الموديل خلّص. التفاصيل في «ابدأ»"); } catch { /* السيرفر بيعيد التشغيل */ }
     }, 2500);
   }
   async function loadLib() { if (S.libLoading) return; S.libLoading = true; try { S.lib = await api("/api/library"); refreshCard(); } catch (err) { toast(err.message, true); } S.libLoading = false; }
@@ -471,9 +453,14 @@ const AutoPage = (() => {
         if (t.closest("[data-run]")) { const r = await aAPI("/run", { method: "POST" }); return setRec(r); }
         if ((b = t.closest("[data-openpj]"))) { storageSet(projectKey("free"), b.dataset.openpj); return showStep("6f"); }
         if (!s) return;
+        if ((b = t.closest("[data-plat]"))) {
+          const cur = new Set(s.opts.platforms || []), k = b.dataset.plat, plat = k.split("@")[0];
+          if (cur.has(k) || cur.has(plat)) { cur.delete(k); cur.delete(plat); } else cur.add(k);
+          return saveSteps(S.rec.steps.map((x) => (x.id === s.id ? { ...x, opts: { ...x.opts, platforms: [...cur] } } : x)));
+        }
         if ((b = t.closest("[data-mv]"))) {
           const steps = [...S.rec.steps], i = steps.findIndex((x) => x.id === s.id), j = i + Number(b.dataset.mv);
-          if (j < 0 || j >= steps.length) return;
+          if (j < 0 || j >= steps.length || S.meta.fixed.includes(steps[j].verb)) return;
           [steps[i], steps[j]] = [steps[j], steps[i]];
           return saveSteps(steps);
         }
@@ -497,6 +484,7 @@ const AutoPage = (() => {
       if (!el) return;
       clearTimeout(typeT);
       if (el.dataset.k === "srcq") { S.srcQ = el.innerText.trim(); typeT = setTimeout(() => { const keep = S.srcQ; refreshCard(); const ed = S.el.querySelector('[data-k="srcq"]'); if (ed) { ed.focus(); const rg = document.createRange(); rg.selectNodeContents(ed); rg.collapse(false); const sl = getSelection(); sl.removeAllRanges(); sl.addRange(rg); } S.srcQ = keep; }, 450); return; }
+      if (el.dataset.k === "pubcap") { const sid = S.open?.n?.s?.id; typeT = setTimeout(() => { const v = el.innerText.trim(); saveSteps(S.rec.steps.map((x) => (x.id === sid ? { ...x, opts: { ...x.opts, caption: v } } : x)), { card: false }); }, 800); return; }
       if (el.dataset.k === "@name") typeT = setTimeout(async () => { const v = el.innerText.trim(); if (v && v !== S.rec.name) { const r = await aAPI("", { method: "PATCH", ...jsonBody({ name: v }) }); S.list = await api("/api/automations"); setRec(r, { card: false }); } }, 700);
     });
   }

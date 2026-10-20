@@ -4071,6 +4071,7 @@ import hairdraw  # noqa: E402
 import library as lib_  # noqa: E402
 import automate  # noqa: E402
 import random  # noqa: E402
+from types import SimpleNamespace  # noqa: E402
 import ideamem  # noqa: E402
 import twin  # noqa: E402
 import phone  # noqa: E402
@@ -25266,6 +25267,7 @@ def auto_files(lib: dict, src: dict | None, kinds: tuple[str, ...]) -> list[dict
 
 
 def auto_to_dict(rid: str, d: dict, bid: str) -> dict:
+    d = {**d, "steps": automate.clean_steps(d.get("steps") or [])}   # الموديلات القديمة: «صدّر» و«انشر» بيتضافوا في الآخر
     lib = lib_load(bid)
     steps = []
     for s in d.get("steps") or []:
@@ -25286,7 +25288,7 @@ def auto_to_dict(rid: str, d: dict, bid: str) -> dict:
 @app.get("/api/automations-meta")
 def automations_meta():
     return {"verbs": {k: {x: v[x] for x in ("t", "desc", "accept", "opts")} for k, v in automate.VERBS.items()},
-            "orders": automate.ORDERS, "trans": automate.TRANS, "ratios": automate.RATIOS}
+            "orders": automate.ORDERS, "trans": automate.TRANS, "ratios": automate.RATIOS, "when": automate.WHEN, "fixed": automate.FIXED}
 
 
 @app.get("/api/automations")
@@ -25345,7 +25347,7 @@ def automation_delete(rid: str):
 
 
 @app.post("/api/automations/{rid}/run")
-def automation_run(rid: str):
+def automation_run(rid: str, request: Request):
     """▶ شغّل: الخطوات بتتحول لمشروع مونتاج جديد (بيتفتح في المحرر أو يتصدّر على طول)."""
     bid = active_client_id()
     d = auto_load(rid, bid)
@@ -25355,7 +25357,8 @@ def automation_run(rid: str):
         raise HTTPException(400, "الموديل محتاج خطوة «اسحب» صور أو فيديوهات على الأقل")
     run = {"id": uuid.uuid4().hex[:8], "at": now(), "status": "working", "step": "بيبدأ…", "project_id": None, "report": [], "error": None}
     auto_update(rid, lambda x: x.update(runs=[run, *(x.get("runs") or [])][:20]), bid)
-    threading.Thread(target=run_automation, args=(rid, run["id"], bid), daemon=True).start()
+    port = (request.scope.get("server") or ("127.0.0.1", 8000))[1]
+    threading.Thread(target=run_automation, args=(rid, run["id"], bid, port), daemon=True).start()
     return auto_to_dict(rid, auto_load(rid, bid), bid)
 
 
@@ -25417,7 +25420,36 @@ def auto_audio_id(bid: str, f: dict, kind: str, cache: dict) -> tuple[str, float
     return aid, dur
 
 
-def run_automation(rid: str, run_id: str, bid: str) -> None:
+def auto_export_publish(pid: str, steps: list[dict], name: str, port: int, setr, report: list[str]) -> None:
+    """صدّر (زي زرار التصدير في المونتاج) واستنى يخلص، وبعدين انشر لو الخطوة بتقول «على طول»."""
+    setr(step="🎬 بيصدّر الفيديو")
+    with closing(db()) as conn, conn:
+        row = get_project(conn, pid)
+        data = json.loads(row["data"])
+        cw, ch, fps, crf = export_settings(data)
+        with montage.canvas(cw, ch, fps, crf):
+            start_render(conn, row, pid, data, SimpleNamespace(scope={"server": ("127.0.0.1", port)}))
+    t0 = time.time()
+    while time.time() - t0 < 1800:
+        time.sleep(3)
+        with closing(db()) as conn:
+            r = conn.execute("SELECT render_status, render_error, export_id FROM projects WHERE id = ?", (pid,)).fetchone()
+        if r["render_status"] != "rendering":
+            break
+    if r["render_status"] == "rendering" or r["render_error"] or not r["export_id"]:
+        raise RuntimeError(f"التصدير فشل: {r['render_error'] or 'خد وقت أطول من اللازم'}")
+    report.append("✓ اتصدّر")
+    pub = next((s["opts"] for s in steps if s["verb"] == "publish"), {})
+    if pub.get("when") != "now" or not pub.get("platforms"):
+        report.append("⏸ النشر مستني موافقتك: الفيديو في صفحة النشر" if pub.get("when") != "now" else "⚠️ مفيش حسابات متختارة في «انشر»")
+        return
+    setr(step="📣 بينشر")
+    caption = pub.get("caption") or name
+    post = create_post(PostIn(export_id=r["export_id"], caption=caption, platforms=pub["platforms"], scheduled_at=datetime.now(timezone.utc)))
+    report.append(f"✓ اتبعت للنشر على {len(post.get('platforms') or pub['platforms'])} حساب")
+
+
+def run_automation(rid: str, run_id: str, bid: str, port: int = 8000) -> None:
     def setr(**kw):
         def fn(x):
             for r in x.get("runs") or []:
@@ -25429,7 +25461,7 @@ def run_automation(rid: str, run_id: str, bid: str) -> None:
         d = auto_load(rid, bid)
         lib, (cache, cache_f) = lib_load(bid), auto_cache(bid)
         rnd, used = random.Random(), dict(d.get("used") or {})
-        steps = d.get("steps") or []
+        steps = automate.clean_steps(d.get("steps") or [])
         opt = lambda verb: next((s["opts"] for s in steps if s["verb"] == verb), None)  # noqa: E731
         ratio = (opt("export") or {}).get("ratio", "9:16")
         cut = opt("cut") or {}
@@ -25519,7 +25551,11 @@ def run_automation(rid: str, run_id: str, bid: str) -> None:
             used[x["f"]["id"]] = used.get(x["f"]["id"], 0) + 1
         auto_update(rid, lambda z: z.update(used=used), bid)
         report.append(f"🎬 {len(clips)} لقطة · مقاس {ratio}" + (f" · حوالي {round(target)} ثانية على قد التعليق" if target else ""))
-        setr(status="done", step=None, project_id=pj["id"], report=report, error=None)
+        setr(project_id=pj["id"], report=report)
+        auto_export_publish(pj["id"], steps, d.get("name") or "", port, setr, report)
+        with closing(db()) as conn:
+            ex = conn.execute("SELECT export_id FROM projects WHERE id = ?", (pj["id"],)).fetchone()["export_id"]
+        setr(status="done", step=None, project_id=pj["id"], export_url=f"/media/exports/{ex}.mp4" if ex else None, report=report, error=None)
     except Exception as exc:  # noqa: BLE001
         setr(status="failed", step=None, report=report, error=str(getattr(exc, "detail", None) or exc)[:300])
 

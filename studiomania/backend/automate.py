@@ -17,8 +17,11 @@ VERBS = {
     "music": {"t": "حط موسيقى", "desc": "موسيقى بتوطى لوحدها وقت الكلام", "accept": ("audio",), "opts": {"volume": 35, "duck": True, "order": "fresh"}},
     "cut": {"t": "قطّع", "desc": "أقصى طول لكل لقطة، وانتقال بين اللقطات", "accept": (), "opts": {"max": 3.0, "trans": "fade"}},
     "caption": {"t": "حط كابشن", "desc": "الكلام مكتوب على الشاشة من التعليق الصوتي", "accept": (), "opts": {"on": True}},
-    "export": {"t": "صدّر", "desc": "مقاس الفيديو", "accept": (), "opts": {"ratio": "9:16"}},
+    "export": {"t": "صدّر", "desc": "الفيديو بيتصدّر بالمقاس ده", "accept": (), "opts": {"ratio": "9:16"}},
+    "publish": {"t": "انشر", "desc": "على حساباتك المربوطة في صفحة النشر، أو يستنى موافقتك", "accept": (), "opts": {"when": "draft", "platforms": [], "caption": ""}},
 }
+FIXED = ("export", "publish")   # آخر خطوتين دايمًا: صدّر وبعدها انشر (مابيتشالوش ومابيتحركوش)
+WHEN = {"draft": "يستنى موافقتي", "now": "ينزل على طول"}
 ORDERS = {"fresh": "اللي متستخدمش قبل كده", "random": "عشوائي", "newest": "الأحدث الأول", "oldest": "الأقدم الأول"}
 TRANS = {"": "من غير", "fade": "ذوبان", "whip": "سحبة"}
 RATIOS = ("9:16", "1:1", "4:5", "16:9")
@@ -35,8 +38,8 @@ def new_step(verb: str) -> dict:
 
 
 def starter() -> list[dict]:
-    """الموديل الجديد بيبدأ بمثال يتعدّل: اسحب ← تعليق ← موسيقى ← قطّع ← كابشن ← صدّر."""
-    return [new_step(v) for v in ("pull", "voice", "music", "cut", "caption", "export")]
+    """الموديل الجديد بيبدأ بمثال يتعدّل: اسحب ← تعليق ← موسيقى ← قطّع ← كابشن ← صدّر ← انشر."""
+    return [new_step(v) for v in ("pull", "voice", "music", "cut", "caption", "export", "publish")]
 
 
 def clean_src(raw) -> dict | None:
@@ -67,6 +70,12 @@ def clean_opts(verb: str, raw: dict) -> dict:
             base[k] = raw[k]
         elif k == "ratio" and raw[k] in RATIOS:
             base[k] = raw[k]
+        elif k == "when" and raw[k] in WHEN:
+            base[k] = raw[k]
+        elif k == "platforms" and isinstance(raw[k], list):
+            base[k] = [str(x)[:80] for x in raw[k] if str(x).strip()][:12]
+        elif k == "caption":
+            base[k] = str(raw[k] or "")[:2000]
         elif k in ("fit", "duck", "on"):
             base[k] = bool(raw[k])
         elif k == "count":
@@ -81,15 +90,19 @@ def clean_opts(verb: str, raw: dict) -> dict:
 
 
 def clean_steps(raw: list) -> list[dict]:
-    out = []
+    """الخطوات بالترتيب، و«صدّر» و«انشر» آخر حاجة دايمًا (لو مش موجودين بيتضافوا)."""
+    out, fixed = [], {}
     for s in raw or []:
         if not isinstance(s, dict) or s.get("verb") not in VERBS:
             continue
-        out.append({"id": str(s.get("id") or sid())[:12], "verb": s["verb"], "src": clean_src(s.get("src")) if VERBS[s["verb"]]["accept"] else None,
-                    "opts": clean_opts(s["verb"], s.get("opts") or {})})
-        if len(out) >= MAX_STEPS:
-            break
-    return out
+        st = {"id": str(s.get("id") or sid())[:12], "verb": s["verb"], "src": clean_src(s.get("src")) if VERBS[s["verb"]]["accept"] else None,
+              "opts": clean_opts(s["verb"], s.get("opts") or {})}
+        if st["verb"] in FIXED:
+            fixed.setdefault(st["verb"], st)
+            continue
+        if len(out) < MAX_STEPS:
+            out.append(st)
+    return out + [fixed.get(v) or new_step(v) for v in FIXED]
 
 
 def pick(files: list[dict], n: int, order: str, used: dict[str, int], rnd: random.Random) -> tuple[list[dict], bool]:
