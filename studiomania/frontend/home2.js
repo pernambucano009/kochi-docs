@@ -294,7 +294,8 @@ const NH = (() => {
   GL?.show(GLKEY[firstKey] || "app");
   // لحد ما المجسّم الـ 3D يجهز (أول تحميل أو ريفرش) نفس الأيقونة بتبان صورة في مكانه، فالنص عمره ما يبقى فاضي
   { const ph = document.querySelector(".nh-stage-ph");
-    if (ph && GL) { ph.innerHTML = glImg(GLKEY[firstKey] || "app"); GL.onReady(() => ph.classList.add("off")); } else ph?.remove(); }
+    // الصورة دي أول حاجة بتبان، فبتتحمّل على طول (مش lazy)، والمجسّم بيظهر كامل من غير ما يكبر من الصفر
+    if (ph && GL) { ph.innerHTML = glImg(GLKEY[firstKey] || "app").replace(/loading="lazy"/g, 'loading="eager" fetchpriority="high" decoding="sync"'); GL.onReady(() => ph.classList.add("off")); } else ph?.remove(); }
   // الماوس لما يعدّي على مربع في طريقه لمربع تاني مش بيغيّر المجسّم (عشان ميبقاش فيه تقطيع)
   let leaveT, hoverT;
   bento.addEventListener("pointerover", (e) => {

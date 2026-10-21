@@ -452,8 +452,10 @@ window.NHGL = (stage, getClient) => {
   let cur = null;
   const clock = new THREE.Clock();
   let order = 0;
+  let firstShow = true;
   function show(key) {   // مفيش قطع: كل مجسّم بيكمّل من مكانه (اللي داخل بيكبر واللي خارج بيختفي في نفس الوقت)
     const g = group(key);
+    if (firstShow) { firstShow = false; g.userData.a = 1; }   // أول مرة (فتح الصفحة / ريفرش): بيبان كامل على طول، من غير ما يبهت ويكبر
     cur = g;
     order += 2;   // اللي داخل بيترسم فوق اللي خارج على طول (من غير ما الترتيب يتقلب كل فريم)
     g.traverse((o) => { if (o.isMesh) o.renderOrder = order + (o.userData.mark ? 1 : 0); });
