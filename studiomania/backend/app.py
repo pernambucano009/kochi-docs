@@ -3803,7 +3803,7 @@ def set_post(post_id: str, **fields) -> None:
         plats = "، ".join(dict.fromkeys(publisher.PLATFORMS.get(publisher.split_target(k)[0], (None, k))[1] for k in json.loads(old["platforms"] or "[]")))
         if status == "published":
             notify("post", "ok", f"اتنشر: {name}", plats, "7", post_id)
-            if (json.loads(old["options"] or "{}") or {}).get("dm"):
+            if (json.loads(old["options"] or "{}") or {}).get("dm") or dm_detect(old["caption"] or ""):
                 threading.Thread(target=dm_start, args=(post_id,), daemon=True).start()
             try:
                 batch_auto()
@@ -4059,6 +4059,21 @@ def resend_without_tags(post_id: str, error: str) -> bool:
 DM_PLATFORMS = ("instagram", "facebook")   # تيك توك مش بيسمح برسايل أوتوماتيك على الكومنتات في منطقتنا
 
 
+DM_CTA = re.compile(r"(علّ?ق|علِّق|اكتب|كومنت|تعليق|comment)", re.I)
+
+
+def dm_detect(caption: str) -> str:
+    """الكابشن فيه دعوة «علّق بكلمة»؟ بيرجّع الكلمة. أي بوست فيه الدعوة دي الرد الأوتوماتيك بيشتغل لوحده من غير ما حد يفعّله."""
+    for line in (caption or "").splitlines():
+        if not DM_CTA.search(line):
+            continue
+        m = re.search(r"[«\"“'‘]\s*([^»\"”'’\n]{1,30}?)\s*[»\"”'’]", line) or re.search(r"كلمة\s+([\w\u0600-\u06FF]{2,30})", line) \
+            or re.search(r"\b(?:comment|type)\s+([A-Za-z0-9]{2,30})\b", line, re.I)
+        if m:
+            return m.group(1).strip()
+    return ""
+
+
 def dm_start(post_id: str) -> None:
     """أول ما البوست يتنشر: بيشغّل الرد الأوتوماتيك على كل منصة إنستجرام/فيسبوك اتنشر عليها.
     رقم البوست عند المنصة ممكن يتأخر شوية بعد النشر، فبنحاول كام مرة وبعدين نقف (مفيش ثريد شغال على طول)."""
@@ -4069,6 +4084,13 @@ def dm_start(post_id: str) -> None:
         return
     opts = json.loads(r["options"] or "{}")
     dm, done = opts.get("dm") or {}, dict(opts.get("dm_auto") or {})
+    if not dm:   # الدعوة مكتوبة في الكابشن ومحدش ظبط الرسالة: بتتعمل من خطة المحتوى ولينك الواتساب
+        word = dm_detect(r["caption"] or "")
+        if not word:
+            return
+        d = dm_defaults_for(r["client_id"] or active_client_id())
+        dm = {"words": [word], "message": d["message"], "reply": d["reply"], "auto": True}
+        opts["dm"] = dm
     for tgt in json.loads(r["platforms"] or "[]"):
         plat, acc = publisher.split_target(tgt)
         if plat not in DM_PLATFORMS or (done.get(plat) or {}).get("id"):
@@ -4096,9 +4118,12 @@ def dm_start(post_id: str) -> None:
 
 @app.get("/api/dm/defaults")
 def dm_defaults():
+    return dm_defaults_for(active_client_id())
+
+
+def dm_defaults_for(bid: str | None) -> dict:
     """الكلمة من «خطة المحتوى» (لو فيه)، والرسالة فيها لينك الواتساب لو مكتوب رقم."""
     import wacamp
-    bid = active_client_id()
     b = brain_row(bid) if bid else {}
     st = (b or {}).get("strategy") or {}
     w = (b or {}).get("wa") or {}

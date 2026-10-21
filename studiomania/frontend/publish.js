@@ -500,6 +500,23 @@ async function dmFill() {
   $("dmReply").value = dmDef.reply || "";
 }
 $("dmOn").addEventListener("change", dmFill);
+// الكابشن فيه «اكتب «كلمة» في كومنت»؟ الرد الأوتوماتيك بيتفعّل لوحده (زي السيرفر بالظبط)
+function dmDetect(c) {
+  for (const line of String(c || "").split("\n")) {
+    if (!/(علّ?ق|علِّق|اكتب|كومنت|تعليق|comment)/i.test(line)) continue;
+    const m = line.match(/[«"“'‘]\s*([^»"”'’\n]{1,30}?)\s*[»"”'’]/) || line.match(/كلمة\s+([\u0600-\u06FF\w]{2,30})/) || line.match(/\b(?:comment|type)\s+([A-Za-z0-9]{2,30})\b/i);
+    if (m) return m[1].trim();
+  }
+  return "";
+}
+$("postCaption").addEventListener("input", async () => {
+  const w = dmDetect($("postCaption").value);
+  $("dmAuto").hidden = !w;
+  if (!w || $("dmOn").checked) return;
+  $("dmOn").checked = true;
+  await dmFill();
+  $("dmWords").value = w;
+});
 $("dmCta").addEventListener("click", () => {
   const w = $("dmWords").value.split(/[,،]/)[0]?.trim();
   if (!w) return toast("اكتب الكلمة الأول", true);
@@ -556,7 +573,7 @@ function resetPostForm() {
   $("postCaption").value = "";
   pub.tagsTouched = false;
   $("igCollab").checked = false;
-  $("dmOn").checked = false; $("dmBox").hidden = true;
+  $("dmOn").checked = false; $("dmBox").hidden = true; $("dmAuto").hidden = true;
   ["dmWords", "dmMessage", "dmReply"].forEach((k) => ($(k).value = ""));
   setWhen(nextSlot());
   renderPostVideo();
