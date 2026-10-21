@@ -2378,3 +2378,21 @@ label.dim { opacity: .4; }
 .am-row input.am-sm { width: 64px !important; flex: 0 0 auto; }
 .am-row input[data-amq] { flex: 1 1 200px; width: auto !important; }
 .am-row input[type="number"] { width: 76px !important; flex: 0 0 auto; }
+/* 💬 حملات واتساب */
+.wa-link { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; margin-top: 10px; }
+.wa-link img { background: #fff; border-radius: 12px; padding: 6px; }
+.wa-link > div { flex: 1 1 240px; min-width: 0; }
+.wa-link code { display: block; overflow-wrap: anywhere; font-size: 12.5px; opacity: .8; }
+.wa-item { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 10px 0; border-top: 1px solid rgba(127, 127, 127, .15); }
+.wa-item:first-of-type { border-top: 0; }
+.wa-item p { flex: 1 1 100%; margin: 2px 0 0; font-size: 13.5px; line-height: 1.6; }
+.wa-item .nb-btn { margin-inline-start: auto; }
+.wa-item .nb-btn + .nb-btn { margin-inline-start: 0; }
+.wa-people { max-height: 60vh; overflow: auto; }
+.wa-full { display: flex; flex-direction: column; gap: 6px; margin: 10px 0; font-size: 13px; }
+.fs-card textarea, .wa-full textarea { width: 100%; box-sizing: border-box; padding: 9px 12px; border-radius: 12px; border: 1px solid rgba(127, 127, 127, .3); background: var(--nh-bg, #fff); color: inherit; font: inherit; }
+.wa-ok { font-size: 13px; }
+.wa-bubble { max-width: 420px; margin: 10px 0; padding: 10px 14px; border-radius: 4px 14px 14px 14px; background: #dcf8c6; color: #111; font-size: 14px; line-height: 1.6; white-space: pre-wrap; }
+.wa-bubble small { display: block; margin-top: 6px; opacity: .55; font-size: 12px; }
+.wa-bubble span { display: block; margin-top: 8px; padding-top: 6px; border-top: 1px solid rgba(0, 0, 0, .1); text-align: center; color: #0a7cff; }
+.wa-step b { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: rgba(229, 97, 62, .12); font-size: 12px; }

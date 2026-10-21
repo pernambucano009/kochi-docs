@@ -95,6 +95,7 @@ const BrandPage = (() => {
         { f: "pg", i: "rv:batch", page: "rivals", t: "📊 حلّل آخر ١٠ فيديوهات ليك", type: "page" },
         { f: "pg", i: "rv:audience", page: "rivals", t: "🎯 وصفة الاستهداف", type: "page" },
         { f: "pg", i: "adsmgr", page: "adsmgr", t: "📣 إعلاناتك", type: "page" },
+        { f: "pg", i: "wacamp", page: "wacamp", t: "💬 حملات واتساب", type: "page" },
       ] },
       // 📡 قواعد الخوارزميات: القواعد الأساسية اللي كل الأدوات بتمشي عليها (تتعدّل وتتقفل وترجع للأصل)
       { k: "algo", t: "قواعد الخوارزميات", en: "Algorithm Rules", leaves: Object.entries(ALGO_G).map(([g, t]) => ({ f: "ag", i: g, t, type: "algo" })) },

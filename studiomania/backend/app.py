@@ -5351,6 +5351,375 @@ def ads_audience_delete(audience_id: str, account_id: str = ""):
     return ads_audiences(account_id)
 
 
+# ---------------------------------------------------------------- 💬 حملات واتساب (wacamp.py): للناس اللي وافقوا بس
+import wacamp  # noqa: E402
+
+
+def wa_call(fn, *a, **kw):
+    try:
+        return fn(*a, **kw)
+    except (wacamp.WaError, publisher.PublishError, httpx.HTTPError) as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+def wa_fee(n: int) -> int:
+    """رسوم البرنامج على الحملة (لكل رسالة). رسايل واتساب نفسها Meta بتحاسب عليها حساب واتساب بيزنس بتاعك."""
+    try:
+        per = float(os.environ.get("WA_FEE_PER_MSG_USD", "0.002"))
+    except ValueError:
+        per = 0.002
+    return max(1, wallet.credits(per * n)) if n else 0
+
+
+def wa_state(bid: str) -> dict:
+    return (brain_row(bid) or {}).get("wa") or {}
+
+
+def wa_set(bid: str, **kw) -> None:
+    def fn(d):
+        d.setdefault("wa", {}).update(kw)
+    update_brain(bid, fn)
+
+
+def wa_push(bid: str, key: str, val: str) -> None:
+    def fn(d):
+        w = d.setdefault("wa", {})
+        w[key] = [*(w.get(key) or []), val][-200:]
+    update_brain(bid, fn)
+
+
+def wa_account() -> dict | None:
+    lst = MOCK_ACCOUNTS if publisher.service_name() == "mock" else ads_social()
+    return next((a for a in lst if a["platform"] == "whatsapp"), None)
+
+
+def wa_need() -> dict:
+    wa_call(wacamp.ready)
+    acc = wa_account()
+    if not acc:
+        raise HTTPException(400, "اربط واتساب بيزنس الأول من صفحة النشر")
+    return acc
+
+
+def wa_own(bid: str, key: str, val: str) -> None:
+    if val not in (wa_state(bid).get(key) or []):
+        raise HTTPException(404, "ده مش بتاع البراند ده")
+
+
+@app.get("/api/wa")
+def wa_get():
+    bid = rivals_client()
+    service = publisher.service_name()
+    w = wa_state(bid)
+    acc = wa_account() if service in ("zernio", "mock") else None
+    number = w.get("number") or (wacamp.phone(acc.get("username")) if acc else "")
+    kw = w.get("keyword") or "عايز العرض"
+    out = {"ready": service in ("zernio", "mock"), "mock": service == "mock", "account": acc, "number": number, "keyword": kw,
+           "link": wacamp.wa_link(number, kw) if number else "", "langs": wacamp.LANGS, "categories": wacamp.CATEGORIES, "stop": wacamp.STOP_FOOTER,
+           "fee_per_100": wa_fee(100), "templates": [], "broadcasts": [], "sequences": [], "automations": [], "contacts": {"total": 0, "subscribed": 0, "tags": []},
+           "error": None, "has_recipe": bool((rivals_state(bid).get("audience") or {}).get("sig"))}
+    if not acc:
+        return out
+    try:
+        if service == "mock":
+            wacamp.mock_review()
+        cs = wacamp.contacts(bid, limit=5000)
+        out["contacts"] = {"total": len(cs["contacts"]), "subscribed": sum(c["subscribed"] for c in cs["contacts"]), "tags": cs["tags"]}
+        out["templates"] = wacamp.templates(acc["id"])
+        out["broadcasts"] = list(reversed(wacamp.broadcasts(set(w.get("broadcasts") or [])))) if w.get("broadcasts") else []
+        out["sequences"] = wacamp.sequences(set(w.get("sequences") or [])) if w.get("sequences") else []
+        out["automations"] = wacamp.automations(set(w.get("automations") or [])) if w.get("automations") else []
+    except (wacamp.WaError, publisher.PublishError, httpx.HTTPError) as exc:
+        out["error"] = str(exc)[:300]
+    with closing(db()) as conn:
+        rows = conn.execute(POSTS_QUERY + " WHERE mine(p.client_id) AND p.status = 'published' AND p.remote_id IS NOT NULL ORDER BY p.published_at DESC LIMIT 30").fetchall()
+    out["posts"] = [{"id": r["id"], "caption": (r["caption"] or "")[:120], "platforms": [p for p in (publisher.split_target(t)[0] for t in json.loads(r["platforms"])) if p in ("instagram", "facebook")]}
+                    for r in rows]
+    out["posts"] = [p for p in out["posts"] if p["platforms"]]
+    return out
+
+
+@app.get("/api/wa/qr.svg")
+def wa_qr():
+    """QR بلينك الواتساب: تحطه على المنتج أو في المحل أو في الإعلان، واللي يصوّره بيكلّمك هو الأول."""
+    import segno
+    w = wa_get()
+    if not w["link"]:
+        raise HTTPException(400, "اكتب رقم الواتساب الأول")
+    buf = io.BytesIO()
+    segno.make(w["link"], error="m").save(buf, kind="svg", scale=8, border=2, dark="#181718")
+    return Response(buf.getvalue(), media_type="image/svg+xml", headers={"Content-Disposition": 'inline; filename="whatsapp-qr.svg"'})
+
+
+class WaNumberIn(BaseModel):
+    number: str = ""
+    keyword: str = ""
+
+
+@app.post("/api/wa/number")
+def wa_number(body: WaNumberIn):
+    """رقم الواتساب والكلمة اللي بتتكتب لوحدها في اللينك (علشان تعرف الناس جاية منين)."""
+    bid = rivals_client()
+    n = wacamp.phone(body.number) if body.number else ""
+    if body.number and not n:
+        raise HTTPException(400, "الرقم لازم يكون بكود الدولة، مثلًا +966501234567")
+    wa_set(bid, **({"number": n} if n else {}), **({"keyword": body.keyword.strip()[:60]} if body.keyword.strip() else {}))
+    return wa_get()
+
+
+@app.get("/api/wa/contacts")
+def wa_contacts(search: str = "", tag: str = ""):
+    bid = rivals_client()
+    wa_need()
+    return wa_call(wacamp.contacts, bid, search[:60], tag[:30], None, 500)
+
+
+class WaPeopleIn(BaseModel):
+    people: list[dict]
+    tags: list[str] = []
+    consent: bool = False
+
+
+@app.post("/api/wa/contacts")
+def wa_add(body: WaPeopleIn):
+    bid = rivals_client()
+    acc = wa_need()
+    if not body.consent:
+        raise HTTPException(400, "لازم تأكد إن الناس دول وافقوا يوصلهم منك رسايل على واتساب")
+    r = wa_call(wacamp.add_contacts, bid, acc["id"], body.people[:5000], body.tags, "manual")
+    return {**r, **wa_get()}
+
+
+@app.post("/api/wa/contacts/csv")
+async def wa_csv(file: UploadFile = File(...), tags: str = Form(""), consent: str = Form("")):
+    """ملف CSV: اسم ورقم (بكود الدولة) في كل سطر. للعملاء اللي وافقوا بس."""
+    bid = rivals_client()
+    acc = wa_need()
+    if consent != "yes":
+        raise HTTPException(400, "لازم تأكد إن الناس دول وافقوا يوصلهم منك رسايل على واتساب")
+    raw = (await file.read())[:5_000_000].decode("utf-8-sig", errors="ignore")
+    people = []
+    for row in csv.reader(io.StringIO(raw)):
+        ph = next((c for c in row if wacamp.phone(c)), "")
+        if ph:
+            name = next((c.strip() for c in row if c.strip() and c != ph and not re.search(r"\d{5,}|@", c)), "")
+            people.append({"name": name, "phone": ph})
+    r = wa_call(wacamp.add_contacts, bid, acc["id"], people[:20000], [t for t in tags.split(",") if t.strip()], "csv")
+    return {**r, **wa_get()}
+
+
+class WaSubIn(BaseModel):
+    subscribed: bool
+
+
+def wa_own_contact(bid: str, cid: str) -> None:
+    if not any(c["id"] == cid for c in wacamp.contacts(bid, limit=20000)["contacts"]):
+        raise HTTPException(404, "المشترك ده مش بتاع البراند ده")
+
+
+@app.patch("/api/wa/contacts/{cid}")
+def wa_sub(cid: str, body: WaSubIn):
+    bid = rivals_client()
+    wa_need()
+    wa_call(wa_own_contact, bid, cid)
+    wa_call(wacamp.set_subscribed, cid, body.subscribed)
+    return {"ok": True}
+
+
+@app.delete("/api/wa/contacts/{cid}")
+def wa_del_contact(cid: str):
+    bid = rivals_client()
+    wa_need()
+    wa_call(wa_own_contact, bid, cid)
+    wa_call(wacamp.delete_contact, cid)
+    return {"ok": True}
+
+
+class WaTplIn(BaseModel):
+    name: str
+    category: str = "MARKETING"
+    language: str = "ar"
+    body: str
+    button: str = ""
+
+
+@app.post("/api/wa/templates")
+def wa_tpl_new(body: WaTplIn):
+    """قالب جديد بيروح لواتساب يتراجع (من دقايق لـ ٢٤ ساعة). قوالب التسويق بيتحط فيها «للإلغاء ابعت إلغاء» لوحدها."""
+    rivals_client()
+    acc = wa_need()
+    wa_call(wacamp.create_template, acc["id"], body.name, body.category, body.language, body.body, "أحمد", body.button)
+    return wa_get()
+
+
+class WaDraftIn(BaseModel):
+    goal: str
+    category: str = "MARKETING"
+
+
+@app.post("/api/wa/templates/draft")
+def wa_tpl_draft(body: WaDraftIn):
+    """✍️ يكتب نص القالب من البراند والوصفة بطريقة واتساب بتقبلها."""
+    bid = rivals_client()
+    aud = rivals_state(bid).get("audience") or {}
+    if atlas.mock_mode():
+        return {"name": "new_offer", "body": "أهلًا {{1}} 👋 نزلت عندنا تشكيلة جديدة وعليها خصم لأول طلب. تحب أبعتلك الصور؟", "button": "ابعت الصور"}
+    cost = wallet.credits(wallet.est(chars=5000))
+    wallet.need(cost, "كتابة رسالة الواتساب")
+    raw = rivals_llm(wacamp.tpl_messages(growth_brand(), aud, body.goal, body.category), "رسالة الواتساب")
+    wallet.charge(cost, "حملات واتساب: كتابة رسالة", bid)
+    return {"name": wacamp.tpl_name(raw.get("name") or "offer"), "body": str(raw.get("body") or "")[:1000], "button": str(raw.get("button") or "")[:20]}
+
+
+@app.delete("/api/wa/templates/{name}")
+def wa_tpl_del(name: str):
+    rivals_client()
+    acc = wa_need()
+    wa_call(wacamp.delete_template, acc["id"], wacamp.tpl_name(name))
+    return wa_get()
+
+
+def wa_audience(bid: str, tag: str) -> list[str]:
+    """المشتركين بس (اللي ما لغوش) من البراند ده، ولو فيه تاج يبقى اللي عليهم التاج ده."""
+    return [c["id"] for c in wacamp.contacts(bid, only_tag=tag, subscribed=True, limit=20000)["contacts"] if c["subscribed"]]
+
+
+class WaBroadcastIn(BaseModel):
+    name: str
+    template: str
+    language: str = "ar"
+    vars: dict[str, str] = {}
+    tag: str = ""
+    when: datetime | None = None
+
+
+@app.post("/api/wa/broadcast")
+def wa_broadcast(body: WaBroadcastIn):
+    """📣 حملة بقالب متوافق عليه، للمشتركين بس."""
+    bid = rivals_client()
+    acc = wa_need()
+    tpl = next((t for t in wa_call(wacamp.templates, acc["id"]) if t["name"] == body.template), None)
+    if not tpl or tpl["status"] != "APPROVED":
+        raise HTTPException(400, "القالب ده لسه ما اتوافقش عليه من واتساب")
+    ids = wa_call(wa_audience, bid, body.tag)
+    if not ids:
+        raise HTTPException(400, "مفيش مشتركين في القايمة دي")
+    fee = wa_fee(len(ids))
+    wallet.need(fee, "حملة واتساب")
+    when = body.when.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ") if body.when else None
+    bc = wa_call(wacamp.broadcast, acc["id"], body.name.strip() or tpl["name"], tpl["name"], tpl["language"] or body.language, body.vars, ids, when)
+    wa_push(bid, "broadcasts", bc["id"])
+    wallet.charge(fee, f"حملات واتساب: «{body.name[:40]}» لـ {len(ids)} مشترك", bc["id"])
+    return wa_get()
+
+
+@app.post("/api/wa/broadcast/{bc_id}/cancel")
+def wa_bc_cancel(bc_id: str):
+    bid = rivals_client()
+    wa_need()
+    wa_own(bid, "broadcasts", bc_id)
+    wa_call(wacamp.cancel_broadcast, bc_id)
+    return wa_get()
+
+
+class WaStep(BaseModel):
+    template: str
+    delay_hours: int = 24
+    vars: dict[str, str] = {}
+
+
+class WaSeqIn(BaseModel):
+    name: str
+    language: str = "ar"
+    steps: list[WaStep]
+    tag: str = ""
+    enroll_now: bool = True
+
+
+@app.post("/api/wa/sequences")
+def wa_seq_new(body: WaSeqIn):
+    """🔁 سلسلة متابعة: رسالة ورا رسالة بمواعيد، واللي يرد أو يلغي بيخرج منها."""
+    bid = rivals_client()
+    acc = wa_need()
+    ok = {t["name"] for t in wa_call(wacamp.templates, acc["id"]) if t["status"] == "APPROVED"}
+    if any(s.template not in ok for s in body.steps):
+        raise HTTPException(400, "كل خطوة لازم يكون قالبها متوافق عليه من واتساب")
+    sq = wa_call(wacamp.sequence, acc["id"], body.name.strip() or "سلسلة متابعة", [s.model_dump() for s in body.steps], body.language)
+    wa_push(bid, "sequences", sq["id"])
+    n = 0
+    if body.enroll_now:
+        ids = wa_call(wa_audience, bid, body.tag)
+        if ids:
+            fee = wa_fee(len(ids) * len(body.steps))
+            wallet.need(fee, "سلسلة واتساب")
+            n = wa_call(wacamp.enroll, sq["id"], ids)
+            wallet.charge(fee, f"حملات واتساب: سلسلة «{body.name[:40]}» لـ {n} مشترك", sq["id"])
+    return {"enrolled": n, **wa_get()}
+
+
+class WaToggleIn(BaseModel):
+    on: bool
+
+
+@app.post("/api/wa/sequences/{sid}/toggle")
+def wa_seq_toggle(sid: str, body: WaToggleIn):
+    bid = rivals_client()
+    wa_need()
+    wa_own(bid, "sequences", sid)
+    wa_call(wacamp.toggle_sequence, sid, body.on)
+    return wa_get()
+
+
+class WaAutoIn(BaseModel):
+    post_id: str
+    platform: str
+    keywords: list[str]
+    dm: str = ""
+    reply: str = "بعتنالك رسالة 💬"
+
+
+@app.post("/api/wa/automations")
+def wa_auto_new(body: WaAutoIn):
+    """«علّق بكلمة»: اللي يكتب الكلمة في الكومنت بيوصله رسالة فيها لينك الواتساب، ولما يكلّمك بيبقى هو اللي بدأ."""
+    bid = rivals_client()
+    wa_call(wacamp.ready)
+    if body.platform not in ("instagram", "facebook"):
+        raise HTTPException(400, "الرد الأوتوماتيك على الكومنتات في إنستجرام وفيسبوك بس")
+    with closing(db()) as conn:
+        r = conn.execute("SELECT * FROM posts WHERE id = ? AND mine(client_id)", (body.post_id,)).fetchone()
+    if not r or not r["remote_id"] or r["status"] != "published":
+        raise HTTPException(400, "البوست ده لسه ما اتنشرش")
+    tgt = next((t for t in json.loads(r["platforms"]) if publisher.split_target(t)[0] == body.platform), None)
+    if not tgt:
+        raise HTTPException(400, "البوست ده ما اتنشرش على المنصة دي")
+    acc = publisher.split_target(tgt)[1] or ("m-acc" if publisher.service_name() == "mock" else wa_call(publisher.resolve_targets, [tgt])[0][1])
+    w = wa_get()
+    dm = body.dm.strip() or (f"أهلًا! كلّمنا على واتساب من هنا وهنبعتلك التفاصيل: {w['link']}" if w["link"] else "")
+    if not dm:
+        raise HTTPException(400, "اكتب رقم الواتساب الأول علشان اللينك يتعمل")
+    pid = wa_call(wacamp.platform_post_id, r["remote_id"], body.platform)
+    a = wa_call(wacamp.comment_automation, acc, pid, f"علّق بكلمة: {(r['caption'] or '')[:40]}", body.keywords, dm, body.reply.strip())
+    if a.get("id"):
+        wa_push(bid, "automations", a["id"])
+    return wa_get()
+
+
+@app.post("/api/wa/automations/{aid}/toggle")
+def wa_auto_toggle(aid: str, body: WaToggleIn):
+    bid = rivals_client()
+    wa_own(bid, "automations", aid)
+    wa_call(wacamp.toggle_automation, aid, body.on)
+    return wa_get()
+
+
+@app.delete("/api/wa/automations/{aid}")
+def wa_auto_del(aid: str):
+    bid = rivals_client()
+    wa_own(bid, "automations", aid)
+    wa_call(wacamp.delete_automation, aid)
+    return wa_get()
+
+
 class HumanizeIn(BaseModel):
     text: str
 
