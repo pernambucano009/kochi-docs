@@ -499,7 +499,7 @@ async function dmFill() {
   $("dmMessage").value = dmDef.message || "";
   $("dmReply").value = dmDef.reply || "";
 }
-$("dmOn").addEventListener("change", dmFill);
+$("dmOn").addEventListener("change", () => { dmFill(); renderPubCheck(); });
 // الكابشن فيه «اكتب «كلمة» في كومنت»؟ الرد الأوتوماتيك بيتفعّل لوحده (زي السيرفر بالظبط)
 function dmDetect(c) {
   for (const line of String(c || "").split("\n")) {
@@ -825,6 +825,22 @@ var PC_BAD_TAGS = /#(fyp|foryou|foryoupage|viral|explore|explorepage|trending|ا
 var PC_GREET = /^(\s*)(اهلا|أهلا|هلا|السلام|مرحبا|هاي|hi|hello|hey|صباح|مساء)/i;
 var PC_CTA = /(علّق|علق|اكتب|كومنت|تعليق|احفظ|شارك|ابعت|تابع|اللينك|الرابط|link|comment|save|follow|DM|رسالة|اطلب|حمّل|حمل|سجّل|سجل|احجز)/i;
 var PC_AI = /(ذكاء صناعي|ذكاء اصطناعي|#ai\b|AI generated|بالذكاء)/i;
+// 💬 الفيديو أو الكابشن بيقول «علّق بكلمة»؟ لازم الرد الأوتوماتيك يبقى شغال، وإلا اللي هيعلّق مش هيوصله حاجة
+function dmSpokenLoad() {
+  const id = pub.videoId;
+  if (!id || pub.spoken?.id === id || pub.spokenBusy === id) return;
+  pub.spokenBusy = id;
+  api(`/api/dm/spoken?export_id=${encodeURIComponent(id)}`).then((r) => { pub.spoken = { id, ...r }; })
+    .catch(() => { pub.spoken = { id, word: "" }; }).finally(() => { pub.spokenBusy = null; renderPubCheck(); });
+}
+function dmCheck(cap, pl) {
+  dmSpokenLoad();
+  const spoken = pub.spoken?.id === pub.videoId ? pub.spoken.word : "", inCap = dmDetect(cap), word = inCap || spoken;
+  if (!word) return [];
+  const where = inCap ? "في الكابشن" : "في آخر الفيديو";
+  if (!pl.some((v) => ["instagram", "facebook"].includes(platOf(v)))) return [{ ok: null, t: `قلت ${where} «علّق بكلمة ${word}»: الرد الأوتوماتيك بيشتغل على إنستجرام وفيسبوك بس، وفي تيك توك خلّي الدعوة «ابعت الكلمة على الواتساب»`, tip: "تيك توك مش بيسمح بالرد الأوتوماتيك على الكومنتات في منطقتنا" }];
+  return [{ ok: $("dmOn").checked, t: $("dmOn").checked ? `«علّق بكلمة ${word}» شغال: اللي هيعلّق هيوصله رسالة على الخاص` : `قلت ${where} «علّق بكلمة ${word}» والرد الأوتوماتيك مش متفعّل`, tip: "من غيره اللي هيعلّق مش هيوصله حاجة، وده بيضيّع العميل", act: "dm", word }];
+}
 function pubChecks() {
   const cap = $("postCaption").value.trim(), first = cap.split("\n").find((l) => l.trim()) || "";
   const tags = cap.match(/#[\p{L}\p{N}_]+/gu) || [];
@@ -836,6 +852,7 @@ function pubChecks() {
     { ok: tags.length >= 3 && tags.length <= 5, t: `٣–٥ هاشتاجات من المجال (دلوقتي ${tags.length})`, tip: "الهاشتاج تأثيره ضعيف؛ ٣–٥ محددين كفاية" },
     { ok: !tags.some((x) => PC_BAD_TAGS.test(x)), t: "من غير #fyp #viral #explore", tip: "بيودّوا الفيديو لناس مش مهتمة فوقت المشاهدة يقل" },
     ...(visual && pub.videoId ? [{ ok: $("coverOn").checked, t: "الغلاف متختار بنفسك (فريم مثير)", tip: "فرصة هوك زيادة في البروفايل", act: "cover" }] : []),
+    ...dmCheck(cap, pl),
     { ok: PC_AI.test(cap) || !!pub.notAi, t: "لو الفيديو معمول بالذكاء الصناعي معلّم عليه", tip: "مفيش عقاب، والمنصة ممكن تشيله لو ماعلّمتش", act: "ai" },
     { ok: null, t: "الترجمة في نص الشاشة ومش مستخبية تحت الكابشن والأزرار", tip: "اتأكد من الفيديو نفسه" },
     { ok: null, t: "بعد النشر: رد على أول ٣٠ كومنت", tip: "النقاش في الكومنتات بيطوّل وقت المشاهدة" },
@@ -849,6 +866,7 @@ function renderPubCheck() {
       <button type="button" class="btn sm" id="pcReview" title="الموديل بيقيّم الكابشن بقواعد الخوارزميات ويقترح واحد أحسن">📡 افحص الكابشن</button></div>
     <ul>${list.map((c) => `<li class="${c.ok === null ? "info" : c.ok ? "ok" : "no"}" title="${escapeHtml(c.tip)}"><i>${c.ok === null ? "•" : c.ok ? "✓" : "✕"}</i><span>${escapeHtml(c.t)}</span>
       ${c.act === "cover" && !c.ok ? `<button type="button" class="btn xs" data-pc="cover">اختار الغلاف</button>` : ""}
+      ${c.act === "dm" && !c.ok ? `<button type="button" class="btn xs" data-pc="dm" data-word="${escapeHtml(c.word)}">💬 فعّله</button>` : ""}
       ${c.act === "ai" && !c.ok ? `<button type="button" class="btn xs" data-pc="ai">🤖 علّم إنه AI</button><button type="button" class="btn xs" data-pc="notai">مش AI</button>` : ""}</li>`).join("")}</ul>
     <div id="pcOut"></div>`;
 }
@@ -873,6 +891,10 @@ $("pubCheck").addEventListener("click", async (e) => {
   if (b?.dataset.pc === "cover") { pub.showCover = true; $("coverOn").checked = true; $("coverOn").dispatchEvent(new Event("change")); return; }
   if (b?.dataset.pc === "ai") { const c = $("postCaption"); c.value = `${c.value.trimEnd()}${c.value.trim() ? "\n\n" : ""}🤖 الفيديو معمول بالذكاء الصناعي`; return renderPubCheck(); }
   if (b?.dataset.pc === "notai") { pub.notAi = true; return renderPubCheck(); }
+  if (b?.dataset.pc === "dm") {
+    $("dmOn").checked = true; await dmFill(); $("dmWords").value = b.dataset.word;
+    $("dmOpts").scrollIntoView({ behavior: "smooth", block: "center" }); return renderPubCheck();
+  }
   const use = e.target.closest("[data-pcuse]");
   if (use) { $("postCaption").value = use.dataset.pcuse; return renderPubCheck(); }
   if (!e.target.closest("#pcReview")) return;

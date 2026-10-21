@@ -4116,6 +4116,62 @@ def dm_start(post_id: str) -> None:
         conn.execute("UPDATE posts SET options = ? WHERE id = ?", (json.dumps({**opts, "dm_auto": done}), post_id))
 
 
+SPOKEN_CTA_FILE = DATA_DIR / "spoken_cta.json"   # الكلام اللي في آخر كل فيديو بيتسمع مرة واحدة بس
+
+
+@app.get("/api/dm/spoken")
+def dm_spoken(export_id: str):
+    """الفيديو بيقول «علّق بكلمة كذا»؟ بنسمع آخر ٢٠ ثانية (أو بناخد كلام التعليق الصوتي لو الفيديو معمول هنا)،
+    علشان فحص قبل النشر ينبّهك لو الرد الأوتوماتيك مش متفعّل."""
+    try:
+        cache = json.loads(SPOKEN_CTA_FILE.read_text("utf-8")) if SPOKEN_CTA_FILE.exists() else {}
+    except (OSError, ValueError):
+        cache = {}
+    if export_id in cache:
+        return cache[export_id]
+    with closing(db()) as conn:
+        ex = conn.execute("SELECT * FROM exports WHERE id = ? AND mine(client_id)", (export_id,)).fetchone()
+        if not ex:
+            raise HTTPException(404, "الفيديو مش موجود")
+        _, data = export_project(conn, export_id)
+        _, words = project_voice_words(conn, data)
+    text, paid = " ".join(str(w.get("w") or "") for w in words[-80:]), False
+    if not text:
+        path, dur = EXPORTS_DIR / ex["filename"], float(ex["duration"] or 0)
+        if not path.exists() or dur < 1:
+            return {"word": "", "text": ""}
+        cost = wallet.credits(wallet.est(stt_min=min(dur, 20) / 60))
+        if not atlas.mock_mode():
+            wallet.need(cost, "سماع آخر الفيديو")
+        wav = TMP_DIR / f"cta_{uuid.uuid4().hex[:8]}.wav"
+        try:
+            subprocess.run([ffmpeg_exe(), "-y", "-loglevel", "error", "-ss", f"{max(0.0, dur - 20):.2f}", "-i", str(path), "-vn", "-ac", "1", "-ar", "16000", str(wav)],
+                           check=True, timeout=120, capture_output=True)
+            text = " ".join(str(w.get("w") or "") for w in atlas.transcribe(wav, min(dur, 20)))
+            paid = True
+        except (subprocess.SubprocessError, OSError, atlas.AtlasError, httpx.HTTPError):
+            return {"word": "", "text": ""}
+        finally:
+            wav.unlink(missing_ok=True)
+        if not atlas.mock_mode():
+            wallet.charge(cost, "فحص قبل النشر: سماع الدعوة في آخر الفيديو", export_id)
+    out = {"word": dm_spoken_word(text), "text": text[-300:]}
+    cache[export_id] = out
+    try:
+        SPOKEN_CTA_FILE.write_text(json.dumps(dict(list(cache.items())[-2000:]), ensure_ascii=False), "utf-8")
+    except OSError:
+        pass
+    return out
+
+
+def dm_spoken_word(text: str) -> str:
+    """في الكلام المنطوق مفيش «» فبندوّر على الكلمة اللي بعد «علّق/اكتب … بكلمة/كلمة»."""
+    t = re.sub(r"[^\w\u0600-\u06FF\s]", " ", text or "")
+    m = re.search(r"(?:علّ?ق|علِّق|اكتب|اكتبوا|اكتبي|علقوا|كومنت|comment|type)\s+(?:لي\s+|لنا\s+|لينا\s+|في\s+الكومنت\s+|في\s+الكومنتات\s+|تحت\s+)?(?:بكلمة|كلمة|ب)\s*([\w\u0600-\u06FF]{2,20})", t, re.I) \
+        or re.search(r"(?:comment|type)\s+([A-Za-z0-9]{2,20})", t, re.I)
+    return m.group(1) if m else ""
+
+
 @app.get("/api/dm/defaults")
 def dm_defaults():
     return dm_defaults_for(active_client_id())
