@@ -2336,3 +2336,11 @@ label.dim { opacity: .4; }
 #nh .sc-grid button { border: 0; background: var(--nh-fill, #f0efec); border-radius: 12px; padding: 6px; display: grid; gap: 4px; cursor: pointer; color: inherit; font: inherit; }
 #nh .sc-grid img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px; } #nh .sc-grid small { font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @media (max-width: 980px) { #nh .sc-main { grid-template-columns: 1fr; } #nh .sc-side { overflow: visible; } #nh .sc-view { min-height: 420px; } }
+/* 🎯 وصفة الاستهداف */
+.tg-row { display: grid; grid-template-columns: minmax(110px, 160px) 1fr; gap: 10px; align-items: start; padding: 8px 0; border-top: 1px solid rgba(127, 127, 127, .15); }
+.tg-row:first-of-type { border-top: 0; }
+.tg-row > b { font-size: 13px; padding-top: 4px; }
+.tg-row p { margin: 0; }
+.tg-sum { font-size: 15px; line-height: 1.7; margin: 0; }
+.tg-per i { display: block; margin-top: 6px; }
+@media (max-width: 600px) { .tg-row { grid-template-columns: 1fr; gap: 4px; } }

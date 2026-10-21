@@ -4768,13 +4768,40 @@ def rivals_refresh(bid: str, only: str | None = None) -> None:
     rivals_set(bid, items=items, digest=rivals_digest(brain, [i for i in items if i.get("posts")]))
 
 
+def rivals_audience_urls(items: list[dict]) -> list[tuple[str, str]]:
+    return [(i["platform"], p["url"]) for i in items[:rivals.TOP] for p in (i.get("posts") or [])[:2] if p.get("url")]
+
+
+def rivals_audience_cost(items: list[dict]) -> int:
+    return wallet.credits(wallet.est(scrape=len(rivals_audience_urls(items)) * 3, chars=25000))
+
+
+def rivals_audience(bid: str) -> None:
+    """🎯 وصفة الاستهداف: كلام جمهور المنافسين (من غير أسامي) + هاشتاجاتهم ← شرايح واستهداف ميتا وجوجل وتيك توك."""
+    brain = brain_row(bid) or {}
+    items = [i for i in (brain.get("competitors") or {}).get("items") or [] if i.get("posts")]
+    if not rivals.live() or atlas.mock_mode():
+        aud, n = rivals.mock_audience(), 0
+    else:
+        said, urls = [], rivals_audience_urls(items)
+        for k, (plat, url) in enumerate(urls):
+            rivals_set(bid, step=f"بيقرا كلام الجمهور ({k + 1}/{len(urls)})…")
+            said += rivals.comments(plat, url, 40)
+        rivals_set(bid, step="بيكتب وصفة الاستهداف…")
+        tags = rivals.hashtags([p for i in items for p in i["posts"]])
+        aud = rivals.clean_audience(rivals_llm(rivals.audience_messages(brain, items, said, tags), "وصفة الاستهداف"))
+        wallet.charge(rivals_audience_cost(items), "المنافسين: وصفة الاستهداف", bid)
+        n = len(said)
+    rivals_set(bid, audience={**aud, "comments": n, "at": time.time()})
+
+
 def rivals_out(bid: str) -> dict:
     b = brain_row(bid) or {}
     c = b.get("competitors") or {}
     return {"client": bid, "name": b.get("name"), "live": rivals.live(), "platforms": rivals.PLATFORMS, "top": rivals.TOP, "algo_mode": algo.mode_on(b),
             "brain": {k: b.get(k) or "" for k in ("domain", "market", "audience", "language")},
             "items": c.get("items") or [], "digest": c.get("digest") or {}, "trending": c.get("trending") or [], "status": c.get("status") or "", "step": c.get("step"),
-            "error": c.get("error"), "updated_at": c.get("updated_at"), "excluded": len(c.get("excluded") or [])}
+            "error": c.get("error"), "updated_at": c.get("updated_at"), "excluded": len(c.get("excluded") or []), "audience": c.get("audience") or {}}
 
 
 def rivals_client() -> str:
@@ -4811,6 +4838,19 @@ def rivals_discover_ep():
 def rivals_refresh_ep(rid: str = ""):
     bid = rivals_client()
     rivals_job(bid, "بيحدّث بوستات المنافسين…", lambda: rivals_refresh(bid, rid or None))
+    return rivals_out(bid)
+
+
+@app.post("/api/rivals/audience")
+def rivals_audience_ep():
+    """يعمل وصفة الاستهداف من المنافسين اللي في الصفحة (لازم يكون فيه منافس واحد على الأقل)."""
+    bid = rivals_client()
+    items = [i for i in rivals_state(bid).get("items") or [] if i.get("posts")]
+    if not items:
+        raise HTTPException(400, "هات المنافسين الأول من تاب «المنافسين»")
+    if rivals.live() and not atlas.mock_mode():
+        wallet.need(rivals_audience_cost(items), "وصفة الاستهداف")
+    rivals_job(bid, "بيقرا كلام الجمهور…", lambda: rivals_audience(bid))
     return rivals_out(bid)
 
 

@@ -4,7 +4,7 @@
 const RivalsPage = (() => {
   const esc = (s) => escapeHtml(String(s ?? ""));
   const S = { el: null, d: null, timer: null, swap: null, focus: null, tab: "rivals", pl: { d: null, busy: false, notes: "" }, bt: { d: null, busy: "", handle: "", platform: "" } };
-  const TABS = [["rivals", "🏆 المنافسين"], ["works", "🧠 اللي بينجح عندهم"], ["batch", "📊 حلّل آخر ١٠ فيديوهات ليك"]];
+  const TABS = [["rivals", "🏆 المنافسين"], ["works", "🧠 اللي بينجح عندهم"], ["batch", "📊 حلّل آخر ١٠ فيديوهات ليك"], ["audience", "🎯 وصفة الاستهداف"]];
   const html = () => `<div class="nb-wrap fs-wrap rv-wrap" id="rvWrap"><div class="nh-empty">بيحمّل…</div></div>`;
   const fmt = (n) => { n = +n || 0; return n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${Math.round(n / 1e3)}K` : String(n); };
   const PL = { tiktok: "TikTok", instagram: "Instagram" };
@@ -129,11 +129,70 @@ const RivalsPage = (() => {
         <div class="bt-rows">${rows}</div>
         <div class="nb-bar"><button class="nb-btn fs-go" data-btgo ${B.busy ? "disabled" : ""}>${B.busy === "an" ? "⏳ بيحلّل…" : a ? "🔄 حلّل تاني" : "🧠 حلّل الدفعة"}</button></div></section>` + an + hist;
   }
+  // 🎯 وصفة الاستهداف: من كلام جمهور المنافسين (من غير أسامي) لاستهداف جاهز تحطه في ميتا وجوجل وتيك توك
+  const GEN = { all: "الكل", female: "ستات", male: "رجالة" };
+  const lines = (a) => (a || []).filter(Boolean).join("\n");
+  function audText(a) {
+    const m = a.meta, g = a.google, t = a.tiktok, sec = (h, b) => (b ? `${h}\n${b}\n` : "");
+    return [a.summary, ...a.personas.map((p) => sec(`👤 ${p.name} (${p.age.join("-")} · ${GEN[p.gender]})`, [p.who, p.hook && `الهوك: ${p.hook}`].filter(Boolean).join("\n"))),
+      sec("📘 ميتا", [`السن: ${m.age.join("-")} · ${GEN[m.gender]}`, m.locations.length && `الأماكن: ${m.locations.join("، ")}`, m.interests.length && `الاهتمامات: ${m.interests.join(", ")}`,
+        m.behaviors.length && `السلوك: ${m.behaviors.join(", ")}`, m.exclusions.length && `استبعد: ${m.exclusions.join("، ")}`, m.placements && `الأماكن: ${m.placements}`].filter(Boolean).join("\n")),
+      sec("🔎 جوجل: كلمات", lines(g.keywords)), sec("🚫 جوجل: كلمات سلبية", lines(g.negative)), sec("🎯 جوجل: سيجمنت المنافسين", lines(g.competitor_terms)), sec("▶️ يوتيوب", lines(g.youtube_topics)),
+      sec("🎵 تيك توك", [t.tt_interests.join(", "), t.tt_hashtags.map((h) => "#" + h).join(" ")].filter(Boolean).join("\n")),
+      sec("#️⃣ هاشتاجات", a.hashtags.map((h) => "#" + h).join(" ")), ...a.angles.map((x) => sec(`📣 ${x.angle} (${x.persona})`, `${x.text}\n${x.cta}`)),
+      sec("❓ أسئلة الجمهور", lines(a.questions)), sec("🧱 اعتراضات", lines(a.objections)), sec("💰 الميزانية", a.budget)].filter(Boolean).join("\n");
+  }
+  function audTab() {
+    const d = S.d, a = d.audience || {}, busy = d.status === "working", has = (a.personas || []).length || (a.meta?.interests || []).length;
+    const chips = (arr, k, pre = "") => (arr || []).length ? `<p>${arr.map((x) => `<span class="pl-chip">${pre}${esc(x)}</span>`).join("")}
+        <button class="nb-btn sm" data-aucp="${k}" title="انسخ">📋</button></p>` : "";
+    const row = (t, h) => (h ? `<div class="tg-row"><b>${t}</b>${h}</div>` : "");
+    const head = `<section class="fs-card"><h3>🎯 وصفة الاستهداف <small>مين الجمهور اللي هيشتري، وإزاي توصله في الإعلانات بالظبط</small></h3>
+        <p class="nb-hint">بنقرا كومنتات أحسن بوستات المنافسين وهاشتاجاتهم علشان نسمع الجمهور بيقول إيه، وبعدين المخ بيطلّعلك الشرايح والاستهداف الجاهز لميتا وجوجل وتيك توك، وزوايا إعلانات بلهجة السوق.</p>
+        <p class="nb-hint">🔒 بنقرا الكلام بس من غير أسامي، والاستهداف بالاهتمامات اللي المنصات نفسها بتديها، مش بقايمة ناس.</p>
+        ${d.items.length ? "" : `<p class="nb-hint">⚠️ هات المنافسين الأول من تاب «🏆 المنافسين».</p>`}
+        <div class="nb-bar"><button class="nb-btn fs-go" data-augo ${busy || !d.items.length ? "disabled" : ""}>${has ? "🔄 حدّث الوصفة" : "🎯 اعمل الوصفة"}</button>
+          ${has ? `<button class="nb-btn" data-aucp="all">📋 انسخ الكل</button><span class="nb-state">اتعملت ${ago(a.at)}${a.comments ? ` · من ${a.comments} كومنت` : ""}</span>` : ""}</div></section>`;
+    if (!has) return head;
+    const m = a.meta, g = a.google, t = a.tiktok;
+    return head + `${a.summary ? `<section class="fs-card"><p class="tg-sum">${esc(a.summary)}</p></section>` : ""}
+      ${a.personas.length ? `<section class="fs-card"><h3>👥 الشرايح</h3><div class="pl-grid">${a.personas.map((p) => `<div class="pl-card tg-per">
+          <b>${esc(p.name)}</b><small>${esc(p.who)}</small><small class="num">السن ${p.age.join("-")} · ${GEN[p.gender]}</small>
+          ${p.pains.length ? `<small>😣 ${esc(p.pains.join("، "))}</small>` : ""}${p.desires.length ? `<small>✨ ${esc(p.desires.join("، "))}</small>` : ""}
+          ${p.hook ? `<i>«${esc(p.hook)}»</i>` : ""}</div>`).join("")}</div></section>` : ""}
+      <section class="fs-card"><h3>📘 ميتا (فيسبوك وإنستجرام) <small>حطهم في Ads Manager ← الجمهور</small></h3>
+        ${row("السن والنوع", `<p class="num">${m.age.join("-")} · ${GEN[m.gender]}</p>`)}${row("الأماكن", chips(m.locations, "m.locations"))}
+        ${row("الاهتمامات", chips(m.interests, "m.interests"))}${row("السلوك", chips(m.behaviors, "m.behaviors"))}${row("استبعد", chips(m.exclusions, "m.exclusions"))}
+        ${row("أماكن الإعلان", m.placements ? `<p>${esc(m.placements)}</p>` : "")}</section>
+      <section class="fs-card"><h3>🔎 جوجل ويوتيوب</h3>${row("كلمات البحث", chips(g.keywords, "g.keywords"))}${row("كلمات سلبية (نستبعدها)", chips(g.negative, "g.negative"))}
+        ${row("سيجمنت مخصص: اللي بيدوروا على المنافسين", chips(g.competitor_terms, "g.competitor_terms"))}${row("مواضيع يوتيوب", chips(g.youtube_topics, "g.youtube_topics"))}</section>
+      <section class="fs-card"><h3>🎵 تيك توك والهاشتاجات</h3>${row("اهتمامات تيك توك", chips(t.tt_interests, "t.tt_interests"))}${row("هاشتاجات الإعلانات", chips(t.tt_hashtags, "t.tt_hashtags", "#"))}
+        ${row("هاشتاجات للمحتوى العادي", chips(a.hashtags, "hashtags", "#"))}</section>
+      ${a.angles.length ? `<section class="fs-card"><h3>📣 زوايا الإعلانات</h3><div class="pl-grid">${a.angles.map((x, i) => `<div class="pl-card"><b>${esc(x.angle)}</b>
+          <small>${esc(x.persona)}</small><p>${esc(x.text)}</p>${x.cta ? `<span class="pl-chip">${esc(x.cta)}</span>` : ""}<button class="nb-btn sm" data-aucp="angle.${i}">📋 انسخ</button></div>`).join("")}</div></section>` : ""}
+      ${a.questions.length || a.objections.length ? `<section class="fs-card"><div class="rv-dg">
+          ${a.questions.length ? `<div><h4>❓ أسئلة الجمهور <small>أفكار محتوى وإعلانات جاهزة</small></h4><ul>${a.questions.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div>` : ""}
+          ${a.objections.length ? `<div><h4>🧱 اللي بيمنعهم يشتروا <small>رد عليه في الإعلان</small></h4><ul>${a.objections.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div>` : ""}</div></section>` : ""}
+      ${a.budget ? `<section class="fs-card"><h3>💰 تبدأ بكام</h3><p>${esc(a.budget)}</p></section>` : ""}
+      <section class="fs-card"><h3>🔥 الجمهور الدافي <small>أقوى من أي اهتمامات، اعمله أول ما يبقى عندك تفاعل</small></h3><ul class="pl-list">
+        <li>اللي اتفرجوا على فيديوهاتك (٥٠٪ أو أكتر) في آخر ٣٠ يوم.</li><li>اللي اتفاعلوا مع صفحتك أو بعتولك رسالة.</li>
+        <li>اللي دخلوا موقعك (لو حاطط بيكسل ميتا أو تاج جوجل).</li><li>قايمة عملائك انت (اللي اشتروا منك ووافقوا) ← ومنها جمهور شبيه (Lookalike) ١-٣٪.</li></ul></section>`;
+  }
+  function audCopy(k) {
+    const a = S.d.audience || {}, src = { m: a.meta, g: a.google, t: a.tiktok };
+    let txt = "";
+    if (k === "all") txt = audText(a);
+    else if (k.startsWith("angle.")) { const x = a.angles[+k.slice(6)]; txt = x ? `${x.text}\n${x.cta}` : ""; }
+    else { const [o, f] = k.includes(".") ? k.split(".") : [null, k]; const arr = (o ? src[o] : a)?.[f] || []; txt = (/hashtags/.test(f) ? arr.map((h) => "#" + h) : arr).join(/hashtags/.test(f) ? " " : "\n"); }
+    if (!txt) return toast("مفيش حاجة تتنسخ", true);
+    navigator.clipboard.writeText(txt).then(() => toast("📋 اتنسخ")).catch(() => toast("المتصفح منع النسخ", true));
+  }
   function body() {
     const d = S.d, busy = d.status === "working";
     if (S.tab === "works") return digest(d.digest) || `<div class="nh-empty">لسه مفيش تحليل. هات المنافسين الأول.</div>`;
     if (S.tab === "plan") return planTab();
     if (S.tab === "batch") return batchTab();
+    if (S.tab === "audience") return audTab();
     return `<section class="fs-card"><h3>ضيف منافس بنفسك</h3>
         <div class="nb-row rv-add"><input type="text" data-rvnew placeholder="@اسم الحساب أو اللينك" dir="ltr">
           <select data-rvnewpl>${Object.entries(PL).map(([k, t]) => `<option value="${k}">${t}</option>`).join("")}</select>
@@ -214,6 +273,9 @@ const RivalsPage = (() => {
       if (tb) { S.tab = tb.dataset.rvtab; return render(); }
       if (e.target.closest(".vr-wrap")) return;
       const rid = e.target.closest("[data-rid]")?.dataset.rid;
+      if (e.target.closest("[data-augo]")) return act("/api/rivals/audience", { method: "POST" });
+      const cp = e.target.closest("[data-aucp]");
+      if (cp) return audCopy(cp.dataset.aucp);
       if (e.target.closest("[data-rvfind]")) return act("/api/rivals/discover", { method: "POST" });
       if (e.target.closest("[data-rvall]")) return act("/api/rivals/refresh", { method: "POST" });
       if (e.target.closest("[data-rvreset]")) return act("/api/rivals/reset-excluded", { method: "POST" });

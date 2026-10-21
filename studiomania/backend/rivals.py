@@ -311,6 +311,118 @@ def insight_text(brain: dict | None) -> str:
     return "\n".join(lines)[:2500]
 
 
+# ---------- 🎯 وصفة الاستهداف: مين الجمهور ده بالظبط وإزاي توصله في الإعلانات
+# بنقرا الكومنتات علشان نسمع صوت الجمهور (أسئلته ومشاكله وكلامه)، من غير ما نحفظ مين قال إيه:
+# مفيش أسامي ولا أرقام بتتخزن، والاستهداف بيتعمل بالاهتمامات والكلمات اللي المنصات نفسها بتديها (مش بقايمة ناس).
+def comments(platform: str, url: str, n: int = 40) -> list[str]:
+    try:
+        if platform == "tiktok":
+            d = _get("/v1/tiktok/video/comments", {"url": url, "trim": "true"}, 30)
+        else:
+            d = _get("/v1/instagram/post/comments", {"url": url, "amount": n}, 60)
+    except RivalsError:
+        return []
+    items = d.get("comments") or d.get("data") or d.get("items") or []
+    out = []
+    for c in items if isinstance(items, list) else []:
+        t = (c.get("text") or c.get("comment") or c.get("content") or "") if isinstance(c, dict) else ""
+        t = re.sub(r"@\w[\w.]*", "", str(t)).strip()   # المنشن بتاع الناس بيتشال
+        if len(t) >= 3:
+            out.append(t[:220])
+    return out[:n]
+
+
+def hashtags(posts: list[dict], n: int = 25) -> list[str]:
+    cnt: dict[str, int] = {}
+    for p in posts:
+        for h in re.findall(r"#([\w\u0600-\u06FF]+)", p.get("caption") or ""):
+            cnt[h.lower()] = cnt.get(h.lower(), 0) + 1
+    return [h for h, _ in sorted(cnt.items(), key=lambda x: -x[1])[:n]]
+
+
+AUD_LISTS = ("interests", "behaviors", "exclusions", "keywords", "negative", "competitor_terms", "youtube_topics", "tt_interests", "tt_hashtags", "hashtags", "questions", "objections")
+
+
+def audience_messages(brain: dict, items: list[dict], said: list[str], tags: list[str]) -> list[dict]:
+    posts = "\n".join(f"- @{i['handle']} ({i['platform']}): " + " | ".join((p.get("spoken") or p.get("caption") or "")[:140] for p in (i.get("posts") or [])[:3])
+                      for i in items[:TOP])
+    return [{"role": "system", "content": "You are a senior performance-marketing media buyer for Meta, Google and TikTok ads in the Arab world. Return JSON only."},
+            {"role": "user", "content": f"""{brand_info(brain)}
+
+The brand's closest competitors and their best posts:
+{posts or "(none)"}
+Hashtags they use most: {", ".join(tags[:25]) or "(none)"}
+What their audience writes in the comments (anonymous, the real voice of the buyers):
+{chr(10).join("- " + x for x in said[:160]) or "(none)"}
+
+Build a TARGETING RECIPE so the brand's ads reach people likely to buy or follow, using only targeting the ad platforms themselves offer
+(interests, behaviors, keywords, topics, lookalikes). Never suggest lists of specific people. Be concrete and specific to this market and dialect.
+Interest names must be real options that exist in Meta / TikTok ads (English names as they appear in Ads Manager). Google keywords in the language people actually search with.
+Write explanations in simple Egyptian Arabic. Return JSON:
+{{"summary": "جملتين: مين اللي هيشتري وإزاي نوصله",
+  "personas": [{{"name": "اسم قصير للشريحة", "who": "مين هم بالظبط", "age": [25, 40], "gender": "all|female|male", "pains": ["..."], "desires": ["..."], "hook": "هوك إعلان ليهم بلهجتهم"}}],
+  "meta": {{"age": [22, 45], "gender": "all|female|male", "locations": ["الدولة/المدن"], "interests": ["English interest names"], "behaviors": ["..."], "exclusions": ["..."], "placements": "اقتراح الأماكن (ريلز، ستوريز…) وليه"}},
+  "google": {{"keywords": ["كلمات بحث بنية شراء"], "negative": ["كلمات نستبعدها"], "competitor_terms": ["أسماء أو مواقع منافسين يستهدف اللي بيدوروا عليهم (Custom segment)"], "youtube_topics": ["..."]}},
+  "tiktok": {{"tt_interests": ["..."], "tt_hashtags": ["..."]}},
+  "hashtags": ["للمحتوى العادي"],
+  "angles": [{{"persona": "اسم الشريحة", "angle": "زاوية الإعلان", "text": "نص إعلان قصير بلهجة السوق", "cta": "زرار/دعوة"}}],
+  "questions": ["أكتر أسئلة الجمهور في الكومنتات (تنفع أفكار محتوى وإعلانات)"],
+  "objections": ["اعتراضات/مخاوف بتمنعهم يشتروا، ونرد عليها في الإعلان"],
+  "budget": "اقتراح بداية: ميزانية وتقسيم اختبار بسيط بالعربي المصري"}}
+2 to 4 personas, 8 to 15 interests, 10 to 20 keywords, 3 to 6 angles."""}]
+
+
+def _strs(v, n: int, m: int = 160) -> list[str]:
+    return [str(x).strip()[:m] for x in (v if isinstance(v, list) else []) if str(x).strip()][:n]
+
+
+def _age(v, d=(18, 45)) -> list[int]:
+    try:
+        a, b = int(v[0]), int(v[1])
+        return [max(13, min(a, b)), min(65, max(a, b))]
+    except (TypeError, ValueError, IndexError):
+        return list(d)
+
+
+def clean_audience(raw: dict) -> dict:
+    raw = raw if isinstance(raw, dict) else {}
+    g = lambda v: v if v in ("all", "female", "male") else "all"  # noqa: E731
+    me, go, tt = raw.get("meta") or {}, raw.get("google") or {}, raw.get("tiktok") or {}
+    return {"summary": str(raw.get("summary") or "")[:600],
+            "personas": [{"name": str(p.get("name") or "")[:60], "who": str(p.get("who") or "")[:300], "age": _age(p.get("age")), "gender": g(p.get("gender")),
+                          "pains": _strs(p.get("pains"), 5), "desires": _strs(p.get("desires"), 5), "hook": str(p.get("hook") or "")[:200]}
+                         for p in (raw.get("personas") or [])[:4] if isinstance(p, dict) and p.get("name")],
+            "meta": {"age": _age(me.get("age")), "gender": g(me.get("gender")), "locations": _strs(me.get("locations"), 10, 80),
+                     "interests": _strs(me.get("interests"), 20, 80), "behaviors": _strs(me.get("behaviors"), 10, 120),
+                     "exclusions": _strs(me.get("exclusions"), 10, 120), "placements": str(me.get("placements") or "")[:400]},
+            "google": {"keywords": _strs(go.get("keywords"), 25, 80), "negative": _strs(go.get("negative"), 20, 60),
+                       "competitor_terms": _strs(go.get("competitor_terms"), 15, 100), "youtube_topics": _strs(go.get("youtube_topics"), 10, 80)},
+            "tiktok": {"tt_interests": _strs(tt.get("tt_interests"), 15, 80), "tt_hashtags": [h.lstrip("#") for h in _strs(tt.get("tt_hashtags"), 20, 60)]},
+            "hashtags": [h.lstrip("#") for h in _strs(raw.get("hashtags"), 20, 60)],
+            "angles": [{"persona": str(a.get("persona") or "")[:60], "angle": str(a.get("angle") or "")[:200], "text": str(a.get("text") or "")[:500],
+                        "cta": str(a.get("cta") or "")[:60]} for a in (raw.get("angles") or [])[:6] if isinstance(a, dict) and a.get("text")],
+            "questions": _strs(raw.get("questions"), 10, 200), "objections": _strs(raw.get("objections"), 8, 200),
+            "budget": str(raw.get("budget") or "")[:500]}
+
+
+def mock_audience() -> dict:
+    return clean_audience({
+        "summary": "اللي هيشتري: ناس مهتمين بالموضة والرياضة في السعودية، بيقارنوا الأسعار وبيستنوا العروض. نوصلهم بإعلانات ريلز قصيرة فيها قبل وبعد وعرض واضح.",
+        "personas": [{"name": "الشاب الرياضي", "who": "شباب ٢٠-٣٢ بيروحوا الجيم ومهتمين بالشكل", "age": [20, 32], "gender": "male", "pains": ["المقاسات مش مضبوطة أونلاين"],
+                      "desires": ["لبس مريح وشكله حلو"], "hook": "لو بتتعب من المقاسات اللي مابتظبطش، شوف دي"},
+                     {"name": "الأم اللي بتشتري للبيت", "who": "ستات ٢٨-٤٥ بيشتروا لعيلتهم", "age": [28, 45], "gender": "female", "pains": ["الأسعار"], "desires": ["جودة بسعر معقول"],
+                      "hook": "جودة المحلات الكبيرة بنص السعر"}],
+        "meta": {"age": [20, 45], "gender": "all", "locations": ["السعودية: الرياض، جدة، الدمام"], "interests": ["Online shopping", "Fashion", "Sportswear", "Physical fitness", "Shoes"],
+                 "behaviors": ["Engaged Shoppers"], "exclusions": ["الموظفين في مجال الموضة"], "placements": "ريلز إنستجرام وستوريز: الجمهور بيتفرج فيديو قصير"},
+        "google": {"keywords": ["محل ملابس رياضية الرياض", "شراء ملابس أونلاين السعودية", "عروض ملابس"], "negative": ["مجاني", "وظائف"],
+                   "competitor_terms": ["متاجر ملابس رياضية مشهورة في السعودية"], "youtube_topics": ["Fitness", "Fashion"]},
+        "tiktok": {"tt_interests": ["Apparel & Accessories", "Sports & Outdoor"], "tt_hashtags": ["ملابس_رياضية", "الرياض"]},
+        "hashtags": ["موضة", "ملابس_رياضية", "الرياض"],
+        "angles": [{"persona": "الشاب الرياضي", "angle": "قبل وبعد في الجيم", "text": "نفس التمرين، بس بلبس مريح فرق معاك. اطلب النهارده والتوصيل لحد عندك.", "cta": "اطلب دلوقتي"}],
+        "questions": ["فيه مقاسات كبيرة؟", "التوصيل بياخد قد إيه؟"], "objections": ["خايفين المقاس مايظبطش"],
+        "budget": "ابدأ بـ ٥٠ ريال في اليوم لكل شريحة لمدة ٥ أيام، وشيل الأضعف وحط فلوسه على الأحسن."})
+
+
 # ---------- داتا تجريبية (من غير مفتاح)
 def _h(s: str) -> int:
     return int(hashlib.md5(s.encode()).hexdigest()[:8], 16)
