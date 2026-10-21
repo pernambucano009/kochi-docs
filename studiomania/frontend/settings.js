@@ -58,7 +58,45 @@ $("logout").onclick = async () => {
   location.href = "/login";
 };
 
-viewHooks["settings"] = () => { loadSettings(); markLook(); loadSetAccounts(); loadSetCredit(); loadKochiOld(); };
+viewHooks["settings"] = () => { loadSettings(); markLook(); loadSetAccounts(); loadSetCredit(); loadKochiOld(); loadProviders(); };
+
+// ---------- 💳 رصيد المنصات (للأدمن): الرصيد وحد التنبيه لكل منصة ----------
+const PROV_ST = { ok: ["✓ تمام", "ok"], low: ["🟠 قرّب يخلص", "low"], bad: ["🔴 خلص / فيه مشكلة", "bad"], unknown: ["—", ""] };
+function renderProviders(d) {
+  const box = $("provList");
+  if (!box) return;
+  box.innerHTML = d.items.map((p) => {
+    const st = PROV_ST[p.state] || PROV_ST.unknown;
+    const bal = p.balance == null ? (p.api ? (p.error ? `<small class="bad">${escapeHtml(p.error)}</small>` : "—") : "<small>مالهاش عداد، بنعرف من أول طلب يفشل</small>")
+      : `<b class="num">${p.unit === "$" ? "$" : ""}${Number(p.balance).toLocaleString("en-US", { maximumFractionDigits: 2 })}</b> ${p.unit !== "$" ? escapeHtml(p.unit) : ""}`;
+    return `<div class="prov ${st[1]}" data-prov="${p.key}"><div><b>${escapeHtml(p.name)}</b><small>${escapeHtml(p.what)}</small></div>
+      <div class="prov-bal">${bal}${p.fail ? `<small class="bad" title="${escapeHtml(p.fail.msg)}">آخر طلب فشل: ${escapeHtml(p.fail.msg.slice(0, 70))}</small>` : ""}</div>
+      <span class="prov-st">${st[0]}</span>
+      ${p.key === "zernio" || p.key === "fasih" ? "<span></span>" : `<label class="prov-min">نبّهني تحت <input type="number" min="0" step="any" value="${p.min}" data-provmin="${p.key}"></label>`}
+      ${!p.api || p.fail ? `<button type="button" class="btn xs" data-provclear="${p.key}">شحنت ✓</button>` : ""}</div>`;
+  }).join("");
+  $("provAt").textContent = d.checked ? `آخر تشييك ${new Date(d.checked * 1000).toLocaleTimeString(UI_LOCALE(), { hour: "numeric", minute: "2-digit" })}` : "";
+}
+async function loadProviders() {
+  if (!$("provList")) return;
+  try { renderProviders(await api("/api/admin/providers")); } catch { $("provList").innerHTML = ""; }
+}
+$("provRefresh")?.addEventListener("click", async () => {
+  $("provRefresh").disabled = true;
+  try { renderProviders(await api("/api/admin/providers/refresh", { method: "POST" })); toast("✅ اتشيّك"); } catch (err) { toast(err.message, true); }
+  $("provRefresh").disabled = false;
+});
+$("provList")?.addEventListener("change", async (e) => {
+  const k = e.target.dataset.provmin;
+  if (!k) return;
+  try { renderProviders(await api("/api/admin/providers/min", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: k, min: +e.target.value || 0 }) })); toast("✅ حد التنبيه اتحفظ"); }
+  catch (err) { toast(err.message, true); }
+});
+$("provList")?.addEventListener("click", async (e) => {
+  const k = e.target.closest("[data-provclear]")?.dataset.provclear;
+  if (!k) return;
+  try { renderProviders(await api(`/api/admin/providers/${k}/clear`, { method: "POST" })); toast("✅ اتسجّل إنه اتشحن"); } catch (err) { toast(err.message, true); }
+});
 
 // ---------- شغل كوتشي القديم: اتنقل لبرنامج كوتشي لوحده، فبيتمسح من هنا بدوسة (بعد ما تتأكد إنه وصل هناك) ----------
 async function loadKochiOld() {

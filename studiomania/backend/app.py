@@ -9392,6 +9392,59 @@ def spent_since(log: list[dict], since: datetime) -> float:
     return round(out, 4)
 
 
+# ---------------------------------------------------------------- 💳 رصيد المنصات (للأدمن بس، البوابة قافلة /api/admin على العملاء)
+import providers  # noqa: E402
+
+PROVIDERS_FILE = providers.state_file(DATA_DIR)
+
+
+def providers_out() -> dict:
+    d = providers.load(PROVIDERS_FILE)
+    return {"items": providers.summary(d), "checked": d.get("checked")}
+
+
+@app.get("/api/admin/providers")
+def admin_providers():
+    return providers_out()
+
+
+@app.post("/api/admin/providers/refresh")
+def admin_providers_refresh():
+    providers.refresh(PROVIDERS_FILE)
+    return providers_out()
+
+
+class ProviderMinIn(BaseModel):
+    key: str
+    min: float
+
+
+@app.put("/api/admin/providers/min")
+def admin_providers_min(body: ProviderMinIn):
+    """حد التنبيه: لو الرصيد قل عنه بيوصلك جرس وإيميل."""
+    if body.key not in providers.PROVIDERS:
+        raise HTTPException(404, "منصة مش معروفة")
+    d = providers.load(PROVIDERS_FILE)
+    d["min"][body.key] = max(0.0, float(body.min))
+    d["alerted"].pop(body.key, None)
+    providers.save(PROVIDERS_FILE, d)
+    return providers_out()
+
+
+@app.post("/api/admin/providers/{key}/clear")
+def admin_providers_clear(key: str):
+    """للمنصات اللي مالهاش API رصيد (AudioShake وفصيح): «شحنت» بتمسح آخر غلطة."""
+    d = providers.load(PROVIDERS_FILE)
+    cur = d["p"].get(key) or {}
+    cur.pop("fail", None)
+    cur.pop("balance", None) if not providers.PROVIDERS.get(key, {}).get("api") else None
+    cur["ok"] = True
+    d["p"][key] = cur
+    d["alerted"].pop(key, None)
+    providers.save(PROVIDERS_FILE, d)
+    return providers_out()
+
+
 @app.get("/api/atlas/money")
 def atlas_money():
     """الرصيد دلوقتي، واتصرف قد إيه النهارده والأسبوع ده، وعدد الطلبات لكل موديل في آخر يومين."""

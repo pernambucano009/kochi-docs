@@ -68,7 +68,9 @@ def _get(path: str, params: dict, timeout: float = 40) -> dict:
             if r.status_code in (401, 403):
                 raise RivalsError("مفتاح ScrapeCreators مش شغال، راجعه في Railway")
             if r.status_code == 402:
-                raise RivalsError("رصيد ScrapeCreators خلص")
+                import providers
+                providers.note_error("scrape", "402 payment required: credits")
+                raise RivalsError(providers.friendly("scrape") if os.environ.get("TENANT_ROLE") == "customer" else "رصيد ScrapeCreators خلص")
             if r.status_code >= 500:
                 last = f"{r.status_code}"
                 continue

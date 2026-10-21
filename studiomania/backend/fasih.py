@@ -43,6 +43,11 @@ def _err(resp: httpx.Response, what: str) -> FasihError:
              409: "نفس الطلب اتبعت ببيانات مختلفة", 410: "الصوت ده اتشال من فصيح، اختار صوت تاني", 429: "طلبات كتير ورا بعض"}
     if "quota" in code:
         hints[resp.status_code] = "رصيد فصيح خلص"
+    if resp.status_code == 403 or "quota" in code:
+        import providers
+        providers.note_error("fasih", f"quota/credit {resp.status_code} {code}")
+        if os.environ.get("TENANT_ROLE") == "customer":
+            return FasihError(providers.friendly("fasih"))
     return FasihError(f"{what}: {hints.get(resp.status_code, 'فصيح فيه مشكلة دلوقتي')} ({resp.status_code}) {code[:200]}".strip())
 
 

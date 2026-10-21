@@ -358,9 +358,44 @@ def _keep(wid: str) -> bool:
     return bool(w and (w["autopilot"] or (plan and plan.get("autopilot"))))   # الأوتوبايلوت لازم يفضل شغال
 
 
+def provider_watch() -> None:
+    """💳 رصيد المنصات: كل نص ساعة بنسأل، وكل دقيقة بنشوف لو حد سجّل طلب فشل بسبب الرصيد. التنبيه جرس عند الأدمن + إيميل."""
+    import providers
+    from datetime import datetime, timezone
+    f = PLATFORM / "providers.json"   # نفس الملف اللي النسخ بتكتب فيه (جنب PLATFORM_DB)
+    d = providers.load(f)
+    if time.time() - float(d.get("checked") or 0) > providers.CHECK_EVERY:
+        d = providers.refresh(f, owner_keys())
+    rows = providers.alerts(d)
+    providers.save(f, d)
+    if not rows:
+        return
+    with closing(db()) as c:
+        admins = [r["email"] for r in c.execute("SELECT email FROM users WHERE role='admin'")]
+    want = (os.environ.get("ADMIN_EMAIL") or "").strip().lower()
+    to = sorted({*admins, *([want] if want else [])})
+    for row in rows:
+        title, body = providers.alert_text(row)
+        try:
+            with closing(sqlite3.connect(DATA_DIR / "studiomania.db", timeout=10)) as c, c:
+                c.execute("INSERT INTO notifications (id, kind, level, title, body, link, ref, read, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)",
+                          (uuid.uuid4().hex[:12], "credit", "bad", title, body, "settings", f"credit:{row['key']}", datetime.now(timezone.utc).isoformat(timespec="seconds")))
+        except sqlite3.Error:
+            pass
+        for email in to:
+            try:
+                mailer.send(email, f"{title} · {mailer.BRAND}", f"{body}\n\nاشحن من لوحة المنصة، وبعدها البرنامج هيرجع يشتغل لوحده.")
+            except Exception:  # noqa: BLE001  (الإيميل مش أهم من الجرس)
+                pass
+
+
 def reaper() -> None:
     while True:
         time.sleep(60)
+        try:
+            provider_watch()
+        except Exception:  # noqa: BLE001  (المراقبة عمرها ماتوقف البوابة)
+            pass
         for wid, t in list(_tenants.items()):
             if t.proc.poll() is not None:
                 _tenants.pop(wid, None)

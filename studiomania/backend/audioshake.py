@@ -55,6 +55,10 @@ def _headers() -> dict:
 
 def _json(resp: httpx.Response, what: str) -> dict:
     if resp.status_code >= 400:
+        import providers
+        providers.note_error("audioshake", resp.text)
+        if os.environ.get("TENANT_ROLE") == "customer" and providers.LOW_WORDS.search(resp.text):
+            raise AudioShakeError(providers.friendly("audioshake"))
         raise AudioShakeError(f"AudioShake ({what}): {resp.status_code} {resp.text[:1500]}")
     try:
         return resp.json()

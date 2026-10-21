@@ -8,6 +8,7 @@
 
 import mimetypes
 import os
+import re
 import shutil
 import time
 from pathlib import Path
@@ -60,6 +61,11 @@ def _check(resp: httpx.Response, what: str):
     except ValueError:
         raise AtlasError(f"{what}: HTTP {resp.status_code}: {resp.text[:200]}")
     if resp.status_code >= 400:
+        if resp.status_code == 402 or (resp.status_code in (400, 403) and re.search(r"balance|credit|insufficient|quota", str(payload), re.I)):
+            import providers
+            providers.note_error("atlas", f"{resp.status_code} insufficient balance: {str(payload)[:200]}")
+            if os.environ.get("TENANT_ROLE") == "customer":
+                raise AtlasError(providers.friendly("atlas"))
         raise AtlasError(f"{what}: HTTP {resp.status_code}: {str(payload)[:300]}")
     return _unwrap(payload)
 
