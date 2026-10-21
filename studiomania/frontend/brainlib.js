@@ -4,7 +4,7 @@
 // التعليقات الصوتية والموسيقى هنا هي نفسها اللي المونتاج والقوالب بيختاروا منها.
 const BrainLibPage = (() => {
   const esc = (s) => escapeHtml(String(s ?? ""));
-  const S = { el: null, body: null, tab: "images", mod: null, lib: null, root: null, cur: null, q: "", hits: null, open: null, timer: null };
+  const S = { el: null, body: null, tab: "images", mod: null, lib: null, root: null, cur: null, q: "", hits: null, open: null, timer: null, share: null };
   const TABS = [["ideas", "💡 الأفكار"], ["images", "🖼️ الصور"], ["videos", "🎬 الفيديوهات"], ["voice", "🎙️ التعليقات الصوتية"], ["music", "🎵 الموسيقى"], ["comics", "🎭 الكوميكس"], ["chars", "🧑‍🎤 الشخصيات والأفاتار"], ["exports", "📤 الفيديوهات الجاهزة"]];
   const TAB = {
     images: { kind: "image", accept: "image/*", t: "الصور", en: "IMAGES", hint: "صور البراند في فولدرات جوه فولدرات زي ما تحب (مثلًا: صور ← أسنان ← قبل)." },
@@ -12,7 +12,7 @@ const BrainLibPage = (() => {
     voice: { kind: "audio", accept: "audio/*,video/*", t: "التعليقات الصوتية", en: "VOICE-OVERS", hint: "تسجيلات التعليق الصوتي. بتظهر برضو في المونتاج والقوالب." },
     music: { kind: "audio", accept: "audio/*,video/*", t: "الموسيقى", en: "MUSIC", hint: "الموسيقى اللي بتتحط تحت الفيديوهات. بتظهر برضو في المونتاج والقوالب." },
   };
-  const html = () => `<div class="nb-wrap fs-wrap bl-wrap" id="blWrap"><nav class="bl-tabs" role="tablist"></nav><div class="bl-tabbody" id="blBody"><div class="nh-empty">بيحمّل…</div></div></div>`;
+  const html = () => `<div class="nb-wrap fs-wrap bl-wrap" id="blWrap"><nav class="bl-tabs" role="tablist"></nav><div class="bl-share"></div><div class="bl-tabbody" id="blBody"><div class="nh-empty">بيحمّل…</div></div></div>`;
   const IC = { image: "🖼️", video: "🎬", audio: "🎙️" };
   const dur = (s) => (s ? `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, "0")}` : "");
   const folder = (id) => S.lib.folders.find((f) => f.id === id);
@@ -142,6 +142,7 @@ const BrainLibPage = (() => {
     });
     w.addEventListener("change", async (e) => {
       try {
+        if (e.target.matches("[data-blshare]")) return toggleShare(e.target);
         if (e.target.matches("[data-blup]")) { const fs = e.target.files; await upload(fs); e.target.value = ""; }
       } catch (err) { toast(err.message, true); }
     });
@@ -189,12 +190,39 @@ const BrainLibPage = (() => {
       <div class="bl-grid">${A.exports.map((e) => `<figure class="bl-item bl-acc"><video src="${esc(e.url)}#t=0.5" preload="metadata" muted playsinline controls></video>
         <figcaption><b>${esc(e.name)}</b><small class="muted num">${e.duration ? `${Math.round(e.duration)} ث · ` : ""}${esc(String(e.created_at || "").slice(0, 10))}</small></figcaption></figure>`).join("") || `<div class="nh-empty">لسه مفيش فيديوهات اتصدّرت.</div>`}</div>`;
   }
+  // 🔗 مشاركة الفولدر الأساسي ده مع باقي البراندات اللي في نفس الأكاونت
+  function shareBar() {
+    const el = S.el.querySelector(".bl-share");
+    if (!el) return;
+    if (S.tab === "comics") { el.innerHTML = `<span class="bl-sh muted">🔗 الكوميكس متشاركة بين كل البراندات دايمًا</span>`; return; }
+    const on = !!S.share?.keys.includes(S.tab), n = S.share?.brands || 1;
+    el.innerHTML = `<label class="bl-sh${on ? " on" : ""}"><input type="checkbox" data-blshare ${on ? "checked" : ""}>
+        <span>🔗 مشاركة محتويات الفولدر ده مع باقي البراندات في نفس الأكاونت</span></label>
+      <small class="muted">${on ? "متشارك: كل البراندات بتشوف نفس الحاجات هنا، واللي تضيفه في أي براند بيظهر في الباقي." : n < 2 ? "عندك براند واحد بس دلوقتي، المشاركة هتفرق لما تعمل براند تاني." : "مش متشارك: الحاجات دي للبراند ده بس."}</small>`;
+  }
+  async function toggleShare(box) {
+    const on = box.checked, name = TABS.find(([k]) => k === S.tab)?.[1] || "";
+    const move = ["ideas", "images", "videos", "voice", "music"].includes(S.tab);
+    const ok = await uiConfirm(on
+      ? `تشارك «${name}» مع كل البراندات اللي في الأكاونت؟ ${move ? "اللي في الفولدر ده في كل براند هيتجمع في مكان واحد، وكل البراندات هتشوفه." : "كل البراندات هتشوف اللي هنا."}`
+      : `تلغي مشاركة «${name}»؟ ${move ? "كل حاجة هترجع للبراند اللي اتضافت منه." : "كل براند هيشوف بتاعه بس تاني."}`);
+    if (!ok) { box.checked = !on; return; }
+    box.disabled = true;
+    try {
+      S.share = await api("/api/library/share", { method: "PUT", ...jsonBody({ key: S.tab, on }) });
+      toast(on ? "🔗 اتشارك مع كل البراندات" : "اتلغت المشاركة، وكل حاجة رجعت لبراندها");
+      S.cur = null; S.open = null; S.hits = null;
+      await showTab(S.tab);
+    } catch (err) { box.checked = !on; box.disabled = false; toast(err.message, true); }
+  }
   function closeSub() { try { S.mod?.close?.(); } catch { /* */ } S.mod = null; clearTimeout(S.timer); }
   async function showTab(tab) {
     closeSub();
     if (tab !== S.tab) { S.cur = null; S.open = null; S.hits = null; S.q = ""; }
     S.tab = TABS.some(([k]) => k === tab) ? tab : "images";
     S.el.querySelector(".bl-tabs").innerHTML = TABS.map(([k, t]) => `<button type="button" role="tab" class="bl-tab${k === S.tab ? " on" : ""}" data-bltab="${k}" aria-selected="${k === S.tab}">${t}</button>`).join("");
+    try { S.share = S.share || await api("/api/library/share"); } catch { /* الزرار مش هيظهر صح بس المكتبة تشتغل */ }
+    shareBar();
     try {
       if (S.tab === "comics") { S.mod = ComicsPage; S.body.innerHTML = ComicsPage.html(); return await ComicsPage.mount(S.body); }
       if (S.tab === "chars" || S.tab === "exports") return await renderAccount(S.tab);
@@ -206,7 +234,7 @@ const BrainLibPage = (() => {
   async function mount(root) {
     const w = root.querySelector("#blWrap");
     if (!w) return;
-    S.el = w; S.body = w.querySelector("#blBody");
+    S.el = w; S.body = w.querySelector("#blBody"); S.share = null;
     bind(w);
     const tab = window.BL_TAB || S.tab || "images";
     window.BL_TAB = null;

@@ -156,7 +156,7 @@ def probe_duration(path: Path) -> float:
 BRAND_TABLES = ("coaches", "audio", "exports", "projects", "generations", "posts", "videos", "folders")
 
 
-_BRAND = {"c": None, "f": None, "t": 0.0}
+_BRAND = {"c": None, "f": None, "s": (), "t": 0.0}
 _brand_tl = threading.local()
 
 
@@ -166,7 +166,7 @@ def brand_ids() -> tuple[str | None, str | None]:
         return _BRAND["c"], _BRAND["f"]
     _brand_tl.busy = True
     try:
-        _BRAND.update(c=active_client_id(), f=first_client_id(), t=time.time())
+        _BRAND.update(c=active_client_id(), f=first_client_id(), s=tuple(json.loads(auth.get_setting("lib_share") or "[]")), t=time.time())
     except Exception:  # noqa: BLE001 — قبل ما الجداول تتعمل
         pass
     finally:
@@ -182,12 +182,22 @@ def db() -> sqlite3.Connection:
         c, f = brand_ids()
         conn.create_function("cur_brand", 0, lambda: c, deterministic=True)
         conn.create_function("mine", 1, lambda cid: 1 if (cid == c if cid else (not c or c == f)) else 0, deterministic=True)
+        # 🔗 فولدر متشارك بين البراندات (من «مكتبة محتويات البراند»): vis(client_id, 'chars') بيعرض بتاع كل البراندات
+        sk = set(_BRAND["s"])
+        conn.create_function("vis", 2, lambda cid, k: 1 if k in sk or (cid == c if cid else (not c or c == f)) else 0, deterministic=True)
         for t in BRAND_TABLES:
             conn.execute(f"CREATE TEMP TRIGGER IF NOT EXISTS brand_{t} AFTER INSERT ON main.{t} WHEN NEW.client_id IS NULL AND cur_brand() IS NOT NULL "
                          f"BEGIN UPDATE {t} SET client_id = cur_brand() WHERE rowid = NEW.rowid; END")
     else:
         conn.create_function("mine", 1, lambda cid: 1)
+        conn.create_function("vis", 2, lambda cid, k: 1)
     return conn
+
+
+def share_keys() -> set[str]:
+    """الفولدرات الأساسية اللي صاحب الأكاونت مشاركها بين كل البراندات (ideas, images, videos, voice, music, chars, exports)."""
+    brand_ids()
+    return set(_BRAND.get("s") or ())
 
 
 BRAND_COLS_READY: dict = {}
@@ -1113,7 +1123,7 @@ def save_outro(outro: UploadFile, coach_id: str, kind: str = "outro") -> tuple[s
 @app.get("/api/coaches")
 def list_coaches():
     with closing(db()) as conn:
-        return [coach_to_dict(r) for r in conn.execute("SELECT * FROM coaches WHERE mine(client_id) ORDER BY name")]
+        return [coach_to_dict(r) for r in conn.execute("SELECT * FROM coaches WHERE vis(client_id, 'chars') ORDER BY name")]
 
 
 def coach_handles(instagram: str | None, tiktok: str | None) -> dict[str, str | None]:
@@ -1245,7 +1255,7 @@ async def preview_handles(file: UploadFile = File(...)):
     if name_col is None or (ig_col is None and tt_col is None):
         raise HTTPException(400, "لازم الملف يبقى فيه عمود للاسم وعمود لإنستجرام أو تيك توك")
     with closing(db()) as conn:
-        coaches = [dict(r) for r in conn.execute("SELECT id, name FROM coaches WHERE mine(client_id)")]
+        coaches = [dict(r) for r in conn.execute("SELECT id, name FROM coaches WHERE vis(client_id, 'chars')")]
     by_name = {sheets.norm_name(c["name"]): c for c in coaches}
     out = []
     for r in rows[1:]:
@@ -1932,7 +1942,7 @@ def check_kind(kind: str) -> str:
 def list_audio(kind: str):
     check_kind(kind)
     with closing(db()) as conn:
-        rows = conn.execute("SELECT * FROM audio WHERE kind = ? AND mine(client_id) ORDER BY created_at DESC", (kind,)).fetchall()
+        rows = conn.execute("SELECT * FROM audio WHERE kind = ? AND vis(client_id, kind) ORDER BY created_at DESC", (kind,)).fetchall()
     return [audio_to_dict(r) for r in rows]
 
 
@@ -2278,7 +2288,7 @@ def montage_sources():
         )
     # أوترو كل مدرب بيدخل المونتاج كقطعة عادية (تتقص وتتحرك وتتقسم)
     with closing(db()) as conn:
-        for c in conn.execute("SELECT id, name, outro_filename FROM coaches WHERE outro_filename IS NOT NULL AND mine(client_id) ORDER BY name"):
+        for c in conn.execute("SELECT id, name, outro_filename FROM coaches WHERE outro_filename IS NOT NULL AND vis(client_id, 'chars') ORDER BY name"):
             path = COACHES_DIR / c["outro_filename"]
             if not path.exists():
                 continue
@@ -2642,7 +2652,7 @@ def kochi_auto_montage(conn: sqlite3.Connection, data: dict, fps: int = 30) -> d
     mid = (data.get("music") or {}).get("id")
     mrow = conn.execute("SELECT id, filename, duration FROM audio WHERE id = ? AND kind = 'music'", (mid,)).fetchone() if mid else None
     if mrow is None:
-        mrow = next((r for r in conn.execute("SELECT id, filename, duration, name FROM audio WHERE kind = 'music' AND mine(client_id) ORDER BY created_at DESC")
+        mrow = next((r for r in conn.execute("SELECT id, filename, duration, name FROM audio WHERE kind = 'music' AND vis(client_id, kind) ORDER BY created_at DESC")
                      if DEFAULT_MUSIC_NAME in (r["name"] or "").lower()), None)
     if vrow is None or video_end <= 0:
         return report
@@ -3459,7 +3469,7 @@ def list_exports():
         coaches = {r["id"]: {"id": r["id"], "name": r["name"], "instagram": r["instagram"], "tiktok": r["tiktok"]}
                    for r in conn.execute("SELECT id, name, instagram, tiktok FROM coaches")}
         out = []
-        for r in conn.execute("SELECT * FROM exports WHERE mine(client_id) ORDER BY created_at DESC"):
+        for r in conn.execute("SELECT * FROM exports WHERE vis(client_id, 'exports') ORDER BY created_at DESC"):
             e = export_to_dict(r)
             e["coach"] = coaches.get(coach_of.get(r["project_id"]))
             out.append(e)
@@ -5050,7 +5060,7 @@ def autopilot_step(job: dict, settings: dict) -> None:
                     return autopilot_update(jid, tr_tries=tr_tries + 1, note="بيكتب كلام التعليق للكابشن")
                 return autopilot_update(jid, note="بيكتب كلام التعليق للكابشن")
             captions_on = tr.get("status") == "done" and bool(tr.get("words"))
-            music = next((r for r in conn.execute("SELECT id, name FROM audio WHERE kind = 'music' AND mine(client_id) ORDER BY created_at DESC")
+            music = next((r for r in conn.execute("SELECT id, name FROM audio WHERE kind = 'music' AND vis(client_id, kind) ORDER BY created_at DESC")
                           if DEFAULT_MUSIC_NAME in (r["name"] or "").lower()), None)
             body = ProjectIn(name=f["name"], video_id=vid, coach_id=f["coach_id"],
                              clips=[{"gen_id": g, "start": 0, "end": None, "zoom": 1, "x": 0, "y": 0, "volume": 1} for g in draft["gen_ids"]],
@@ -8077,7 +8087,7 @@ PRO_MIX = {"duck": 0.6, "whoosh": True, "punch": True}
 
 
 def default_music(conn: sqlite3.Connection) -> dict | None:
-    row = conn.execute("SELECT id FROM audio WHERE kind = 'music' AND mine(client_id) AND lower(name) LIKE ? ORDER BY lower(name) = ? DESC, created_at DESC",
+    row = conn.execute("SELECT id FROM audio WHERE kind = 'music' AND vis(client_id, kind) AND lower(name) LIKE ? ORDER BY lower(name) = ? DESC, created_at DESC",
                        (f"%{DEFAULT_MUSIC_NAME}%", DEFAULT_MUSIC_NAME)).fetchone()
     if not row:
         return None
@@ -9934,11 +9944,11 @@ def brain_tasks(bid: str):
         for k in tw:
             tw[k] = tw[k] or bool((t.get("ready") or {}).get(k))
     with closing(db()) as conn:
-        coaches = conn.execute("SELECT COUNT(*) FROM coaches WHERE mine(client_id)").fetchone()[0]
-        voices = conn.execute("SELECT COUNT(*) FROM audio WHERE kind = 'voice' AND mine(client_id)").fetchone()[0]
-        music = conn.execute("SELECT COUNT(*) FROM audio WHERE kind = 'music' AND mine(client_id)").fetchone()[0]
+        coaches = conn.execute("SELECT COUNT(*) FROM coaches WHERE vis(client_id, 'chars')").fetchone()[0]
+        voices = conn.execute("SELECT COUNT(*) FROM audio WHERE kind = 'voice' AND vis(client_id, kind)").fetchone()[0]
+        music = conn.execute("SELECT COUNT(*) FROM audio WHERE kind = 'music' AND vis(client_id, kind)").fetchone()[0]
     try:
-        lib_media = sum(1 for f in lib_load(active_client_id())["files"] if f.get("kind") in ("image", "video"))
+        lib_media = sum(1 for f in lib_merged(active_client_id(), ready=False)["files"] if f.get("kind") in ("image", "video"))
     except Exception:  # noqa: BLE001 — المكتبة لسه ماتعملتش
         lib_media = 0
     items = brainquiz.tasks(b, {"twin": tw, "coaches": coaches, "voices": voices, "music": music, "lib_media": lib_media})
@@ -21477,7 +21487,7 @@ def flow_pick_idea(fid: str, body: FlowPickIn):
         code = d["template"].get("kind") in ("motion", "typo", "phone")
         d.update(idea=it, stage="scenario" if code else "format", scenarios=[], scenario=None, **({"format": "reel"} if code else {}))
     d = flow_update(fid, fn)
-    mem_update(mem_cid(d), lambda m: ideamem.mark_used(m, "idea", d["idea"], fid, now()))
+    mark_idea_used(d, d["idea"], fid)
     if d["template"].get("kind") in ("motion", "typo", "phone"):
         flow_job(fid, "scenarios", lambda: flow_gen_scenarios(fid))
     return flow_to_dict(fid, flow_load(fid))
@@ -21606,15 +21616,27 @@ def flow_save_later(fid: str, body: FlowSaveIn):
 def flow_saved(fid: str):
     """مكتبة «لبعدين» بتاعة العميل: الأفكار تنفع في أي قالب، والسيناريو في نفس القالب بس."""
     d = flow_load(fid)
-    m = mem_load(mem_cid(d))
     return [{**saved_to_dict(s), "now": bool(s.get("now")), "here": s["kind"] in ("idea", "trend") or (s.get("template") or {}).get("id") == d["template"].get("id")}
-            for s in reversed(m.get("saved") or [])]
+            for s in reversed(saved_of(d))]
+
+
+def saved_of(d: dict) -> list[dict]:
+    """«لبعدين» بتاعة البراند، ومعاها أفكارك من فولدر الأفكار لو متشارك بين البراندات."""
+    own = mem_load(mem_cid(d)).get("saved") or []
+    return [*(mem_load(SHARED_LIB).get("saved") or []), *own] if "ideas" in share_keys() else own
+
+
+def mark_idea_used(d: dict, idea: dict, fid: str) -> None:
+    mem_update(mem_cid(d), lambda m: ideamem.mark_used(m, "idea", idea, fid, now()))
+    if "ideas" in share_keys():   # الفكرة ممكن تكون من فولدر الأفكار المشترك: عليها علامة إنها اتستخدمت
+        mem_update(SHARED_LIB, lambda m: ideamem.mark_used(m, "idea", idea, fid, now()))
 
 
 @app.delete("/api/flows/{fid}/saved/{sid}")
 def flow_saved_delete(fid: str, sid: str):
     d = flow_load(fid)
-    mem_update(mem_cid(d), lambda m: m.update(saved=[s for s in m.get("saved") or [] if s["id"] != sid]))
+    for c in {mem_cid(d), *([SHARED_LIB] if "ideas" in share_keys() else [])}:
+        mem_update(c, lambda m: m.update(saved=[s for s in m.get("saved") or [] if s["id"] != sid]))
     return flow_saved(fid)
 
 
@@ -21623,7 +21645,7 @@ def flow_use_saved(fid: str, sid: str):
     """استخدم حاجة من «لبعدين»: الفكرة بتتختار، والسيناريو بيتختار هو والفكرة بتاعته."""
     d = flow_load(fid)
     flow_idle(d)
-    s = next((x for x in mem_load(mem_cid(d)).get("saved") or [] if x["id"] == sid), None)
+    s = next((x for x in saved_of(d) if x["id"] == sid), None)
     if not s:
         raise HTTPException(404, "مش موجودة في المحفوظات")
     if s["kind"] == "trend":   # 📈 ترند محفوظ: الأفكار بتتبني عليه (والترند بيفضل محفوظ لحد ما تمسحه)
@@ -21639,7 +21661,7 @@ def flow_use_saved(fid: str, sid: str):
         raise HTTPException(400, f"السيناريو ده متعمل لقالب «{(s.get('template') or {}).get('name') or ''}»، استخدمه من هناك")
     sc, idea = {**s["item"], "id": uuid.uuid4().hex[:8]}, {**(s.get("idea") or {"title": s["item"].get("title", "")}), "id": uuid.uuid4().hex[:8]}
     flow_update(fid, lambda x: x.update(idea=idea, format=s.get("format") or x.get("format") or "reel", scenarios=[sc, *(x.get("scenarios") or [])]))
-    mem_update(mem_cid(d), lambda m: ideamem.mark_used(m, "idea", idea, fid, now()))
+    mark_idea_used(d, idea, fid)
     return flow_pick_scenario(fid, FlowPickIn(id=sc["id"]))
 
 
@@ -21662,7 +21684,7 @@ def my_idea_dict(s: dict) -> dict:
 
 
 def my_ideas_cid() -> str:
-    return mem_cid({})
+    return SHARED_LIB if "ideas" in share_keys() else mem_cid({})
 
 
 def my_idea_title(text: str, url: str) -> str:
@@ -21727,7 +21749,7 @@ def my_ideas_add(text: str = Form(""), url: str = Form(""), file: UploadFile | N
         raise HTTPException(400, "اكتب الفكرة، أو سجّلها صوت، أو حط لينك")
     iid = uuid.uuid4().hex[:10]
     audio = save_upload(file, IDEA_AUDIO_EXT, my_ideas_dir(cid), f"idea_{iid}") if file else ""
-    item = {"id": iid, "kind": "idea", "mine": True, "at": now(), "status": "transcribing" if audio else "ready",
+    item = {"id": iid, "kind": "idea", "mine": True, "at": now(), "status": "transcribing" if audio else "ready", "origin": mem_cid({}),
             "item": {"title": my_idea_title(text, url), "idea": text, "hook": "", "url": url, "audio": audio}}
     mem_update(cid, lambda m: m.update(saved=([*(m.get("saved") or []), item])[-ideamem.SAVED_MAX:]))
     if audio:
@@ -21818,7 +21840,7 @@ def flow_cast_options(fid: str):
            for a in brain.get("characters") or []]
     with closing(db()) as conn:
         out += [{"id": f"c:{r['id']}", "name": r["name"], "about": r["about"] or "", "image_url": f"/media/coaches/{r['image_filename']}"}
-                for r in conn.execute("SELECT * FROM coaches WHERE mine(client_id) ORDER BY name")]
+                for r in conn.execute("SELECT * FROM coaches WHERE vis(client_id, 'chars') ORDER BY name")]
     return out
 
 
@@ -24697,7 +24719,7 @@ def twins_list():
             d = json.loads(f.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             continue
-        if not owned(d.get("client_id")):   # 🔒 نسخة براند تاني
+        if not owned(d.get("client_id")) and "chars" not in share_keys():   # 🔒 نسخة براند تاني (إلا لو «الشخصيات» متشاركة)
             continue
         out.append(twin_to_dict(f.parent.name, d))
     return out
@@ -25627,8 +25649,8 @@ def content_backgrounds(bid: str | None = None) -> dict:
 def content_account():
     """📦 كل اللي في حساب البراند جوه «مكتبة محتويات البراند»: الشخصيات (صورها وصوتها)، نسختي (صورك وصوتك وأماكنك)، والفيديوهات الجاهزة."""
     with closing(db()) as conn:
-        chars = [coach_to_dict(r) for r in conn.execute("SELECT * FROM coaches WHERE mine(client_id) ORDER BY name")]
-        exports = [export_to_dict(r) for r in conn.execute("SELECT * FROM exports WHERE mine(client_id) ORDER BY created_at DESC LIMIT 120")]
+        chars = [coach_to_dict(r) for r in conn.execute("SELECT * FROM coaches WHERE vis(client_id, 'chars') ORDER BY name")]
+        exports = [export_to_dict(r) for r in conn.execute("SELECT * FROM exports WHERE vis(client_id, 'exports') ORDER BY created_at DESC LIMIT 120")]
     return {"characters": [{k: c.get(k) for k in ("id", "name", "image_url", "voice_url", "about", "sheet")} for c in chars],
             "twins": [{k: t.get(k) for k in ("id", "name", "photos", "voice_url", "backgrounds")} for t in twins_list()],
             "exports": exports}
@@ -25713,7 +25735,7 @@ def lib_root_of(d: dict, folder: str | None) -> str | None:
 
 def lib_audio_link(bid: str, f: dict, kind: str) -> None:
     """ملف صوت اتحط في «تعليقات صوتية» أو «موسيقى»: بيتسجّل في مكتبة الصوت كمان (المونتاج والقوالب بيختاروا منها)."""
-    src = lib_dir(bid) / f["file"]
+    src = lib_path(f, bid)
     aid = uuid.uuid4().hex[:12]
     name = f"{kind}_{aid}{src.suffix.lower()}"
     try:
@@ -25727,10 +25749,14 @@ def lib_audio_link(bid: str, f: dict, kind: str) -> None:
 
 
 def lib_ready(bid: str) -> dict:
-    """قبل ما المكتبة تتعرض: الفولدرات الأساسية، والتعليقات والموسيقى اللي اترفعت من مكان تاني بتتجاب هنا (مرة واحدة)."""
+    """قبل ما المكتبة تتعرض: الفولدرات الأساسية، والتعليقات والموسيقى اللي اترفعت من مكان تاني بتتجاب هنا (مرة واحدة).
+    المكتبة المشتركة (SHARED_LIB) بتاخد صوت كل البراندات للأنواع المتشاركة، ومكتبة البراند بتاخد بتاعه للأنواع اللي مش متشاركة."""
+    shared = bid == SHARED_LIB
+    kinds = sorted((share_keys() & {"voice", "music"}) if shared else ({"voice", "music"} - share_keys()))
     with closing(db()) as conn:
-        rows = [dict(r) for r in conn.execute("SELECT * FROM audio WHERE mine(client_id) AND kind IN ('voice', 'music') ORDER BY created_at")]
-        others = {r["id"] for r in conn.execute("SELECT id FROM audio WHERE NOT mine(client_id)")}
+        q = ",".join("?" * len(kinds))
+        rows = [dict(r) for r in conn.execute(f"SELECT * FROM audio WHERE {'1' if shared else 'mine(client_id)'} AND kind IN ({q}) ORDER BY created_at", kinds)] if kinds else []
+        others = set() if shared else {r["id"] for r in conn.execute("SELECT id FROM audio WHERE NOT mine(client_id)")}
     gone = []
     def fn(d):
         # 🔒 نسخ اتجابت قبل كده من براند تاني (لما المكتبة كانت مشتركة): بتتشال من هنا
@@ -25755,7 +25781,7 @@ def lib_ready(bid: str) -> dict:
                 continue
             d["files"].append({"id": lib_.fid(), "file": name, "name": lib_.clean_name(r["name"]), "kind": "audio", "folder": roots["music" if r["kind"] == "music" else "voice"],
                                "size": src.stat().st_size, "desc": "", "tags": [], "status": "ready", "at": r["created_at"], "dur": r["duration"], "audio_id": r["id"],
-                               "imported": True})
+                               "imported": True, **({"origin": r.get("client_id") or first_client_id()} if shared else {})})
         d["audio_seen"] = sorted(seen)
     lib = lib_update(fn, bid)
     for f in gone:
@@ -25764,7 +25790,7 @@ def lib_ready(bid: str) -> dict:
 
 
 def lib_file_dict(lib: dict, f: dict, bid: str) -> dict:
-    base = f"/media/ads/brains/{Path(bid).name}/library"
+    base = f"/media/ads/brains/{Path(f.get('_st') or bid).name}/library"
     return {**f, "url": f"{base}/{f['file']}", "thumb": f"{base}/{f['thumb']}" if f.get("thumb") else (f"{base}/{f['file']}" if f["kind"] == "image" else None),
             "path": lib_.path_text(lib, f.get("folder"))}
 
@@ -25780,10 +25806,164 @@ def lib_to_dict(lib: dict, bid: str) -> dict:
             "tagging": sum(1 for f in lib["files"] if f.get("status") == "tagging"), "kinds": lib_.KINDS}
 
 
+# 🔗 مشاركة فولدر أساسي مع باقي البراندات اللي في نفس الأكاونت: محتوياته بتتنقل لمكتبة مشتركة واحدة (SHARED_LIB)
+# وكل براند بيشوفها مكان الفولدر بتاعه، ولما المشاركة تتشال كل ملف بيرجع للبراند اللي جه منه (origin).
+SHARED_LIB = "_shared"
+SHARE_KEYS = ("ideas", "images", "videos", "voice", "music", "chars", "exports")
+SHARE_LOCK = threading.Lock()
+
+
+def lib_path(f: dict, bid: str | None = None) -> Path:
+    """مكان الملف على الديسك (ملف المكتبة المشتركة عليه _st)."""
+    return lib_dir(f.get("_st") or bid) / f["file"]
+
+
+def lib_subtree(d: dict, keys: set[str]) -> set[str]:
+    out = set()
+    for x in d["folders"]:
+        if x.get("sys") in keys:
+            out |= {x["id"]} | lib_.descendants(d, x["id"])
+    return out
+
+
+def lib_merged(bid: str, ready: bool = True) -> dict:
+    """المكتبة زي ما البراند شايفها: فولدراته، ومكان كل فولدر أساسي متشارك بييجي اللي في المكتبة المشتركة."""
+    sh = share_keys() & set(LIB_ROOTS)
+    own = lib_ready(bid) if ready else lib_load(bid)
+    if not sh:
+        return own
+    shl = lib_ready(SHARED_LIB) if ready else lib_load(SHARED_LIB)
+    if not ready:
+        shl = json.loads(json.dumps(shl)); lib_prepare(shl)
+    a, b = lib_subtree(own, sh), lib_subtree(shl, sh)
+    return {**own, "folders": [x for x in own["folders"] if x["id"] not in a] + [x for x in shl["folders"] if x["id"] in b],
+            "files": [x for x in own["files"] if x.get("folder") not in a] + [{**x, "_st": SHARED_LIB} for x in shl["files"] if x.get("folder") in b]}
+
+
+def lib_store_of(xid: str | None, bid: str) -> str:
+    """الفولدر أو الملف ده متخزن فين: مكتبة البراند ولا المشتركة."""
+    if xid and share_keys() & set(LIB_ROOTS):
+        sh = lib_load(SHARED_LIB)
+        if any(x["id"] == xid for x in sh["folders"]) or any(x["id"] == xid for x in sh["files"]):
+            return SHARED_LIB
+    return bid
+
+
+def lib_view(bid: str) -> dict:
+    return lib_to_dict(lib_merged(bid), bid)
+
+
+def lib_move_root(src: str, key: str, dest_of) -> None:
+    """ينقل كل اللي جوه الفولدر الأساسي key من مكتبة src للمكان اللي dest_of بيقوله (بنفس أسامي الفولدرات، والفولدرات اللي بنفس الاسم بتتدمج)."""
+    d = json.loads(json.dumps(lib_load(src)))
+    root = lib_prepare(d)[key]
+    sub = lib_.descendants(d, root)
+    rel = lambda fid: [x["name"] for x in lib_.path_of(d, fid)][1:]  # noqa: E731 — المسار من غير الفولدر الأساسي
+    groups: dict[str, dict] = {}
+    for x in d["folders"]:
+        if x["id"] in sub:
+            groups.setdefault(dest_of(x), {"folders": [], "files": []})["folders"].append(x)
+    for f in d["files"]:
+        if f.get("folder") in sub | {root}:
+            groups.setdefault(dest_of(f), {"folders": [], "files": []})["files"].append(f)
+    moved = set()
+    for dst, g in groups.items():
+        if dst == src:
+            continue
+        for f in g["files"]:
+            for k in ("file", "thumb"):
+                n = f.get(k)
+                if not n:
+                    continue
+                a, b = lib_dir(src) / Path(n).name, lib_dir(dst) / Path(n).name
+                if b.exists() and a.exists():
+                    f[k] = f"{uuid.uuid4().hex[:6]}_{Path(n).name}"; b = lib_dir(dst) / f[k]
+                if a.exists():
+                    shutil.move(str(a), str(b))
+        def fn(dd, g=g):
+            r = lib_prepare(dd)[key]
+            for x in g["folders"]:
+                fid_ = lib_.ensure_path(dd, r, rel(x["id"]))
+                hit = next((y for y in dd["folders"] if y["id"] == fid_), None)
+                if hit and dst == SHARED_LIB:
+                    hit.setdefault("origin", x.get("origin") or src)
+            for f in g["files"]:
+                nf = {k: v for k, v in f.items() if k != "_st"}
+                if dst == SHARED_LIB:
+                    nf.setdefault("origin", src)
+                nf["folder"] = lib_.ensure_path(dd, r, rel(f["folder"])) or r
+                dd["files"].append(nf)
+            dd["audio_seen"] = sorted(set(dd.get("audio_seen") or []) | {f["audio_id"] for f in g["files"] if f.get("audio_id")})
+        lib_update(fn, dst)
+        moved |= {x["id"] for x in g["folders"]} | {f["id"] for f in g["files"]}
+    if moved:
+        lib_update(lambda dd: dd.update(files=[f for f in dd["files"] if f["id"] not in moved], folders=[x for x in dd["folders"] if x["id"] not in moved]), src)
+
+
+def ideas_move(on: bool, brands: list[str], active: str | None) -> None:
+    """💡 أفكارك (فولدر الأفكار) بتتنقل للمشتركة وترجع بنفس الطريقة، ومعاها الفويس نوت بتاعها."""
+    cids = {mem_cid({"client_id": b}): b for b in brands}
+    srcs = list(cids) if on else [SHARED_LIB]
+    for src in srcs:
+        items = [x for x in mem_load(src).get("saved") or [] if x.get("kind") == "idea" and x.get("mine")]
+        if not items:
+            continue
+        for x in items:
+            dst = SHARED_LIB if on else (x.get("origin") if x.get("origin") in cids else mem_cid({"client_id": active}))
+            if on:
+                x.setdefault("origin", src)
+            a = (x.get("item") or {}).get("audio")
+            if a and (my_ideas_dir(src) / Path(a).name).exists():
+                shutil.move(str(my_ideas_dir(src) / Path(a).name), str(my_ideas_dir(dst) / Path(a).name))
+            mem_update(dst, lambda m, x=x: m.update(saved=([*(m.get("saved") or []), x])[-ideamem.SAVED_MAX:]))
+        ids = {x["id"] for x in items}
+        mem_update(src, lambda m: m.update(saved=[y for y in m.get("saved") or [] if y["id"] not in ids]))
+
+
+def share_state() -> dict:
+    with closing(db()) as conn:
+        n = conn.execute("SELECT COUNT(*) FROM ad_brains").fetchone()[0]
+    return {"keys": sorted(share_keys()), "brands": n}
+
+
+class ShareIn(BaseModel):
+    key: str
+    on: bool
+
+
+@app.get("/api/library/share")
+def library_share_get():
+    return share_state()
+
+
+@app.put("/api/library/share")
+def library_share_put(body: ShareIn):
+    if body.key not in SHARE_KEYS:
+        raise HTTPException(400, "الفولدر ده مينفعش يتشارك")
+    with SHARE_LOCK:
+        keys = set(json.loads(auth.get_setting("lib_share") or "[]"))
+        if body.on == (body.key in keys):
+            return share_state()
+        with closing(db()) as conn:
+            brands = [r["id"] for r in conn.execute("SELECT id FROM ad_brains ORDER BY created_at")]
+        active = active_client_id()
+        if body.key in LIB_ROOTS:
+            if body.on:
+                for b in brands:
+                    lib_move_root(b, body.key, lambda x: SHARED_LIB)
+            else:
+                lib_move_root(SHARED_LIB, body.key, lambda x: x.get("origin") if x.get("origin") in brands else active)
+        elif body.key == "ideas":
+            ideas_move(body.on, brands, active)
+        keys = (keys | {body.key}) if body.on else (keys - {body.key})
+        auth.set_setting("lib_share", json.dumps(sorted(keys)))
+        _BRAND["t"] = 0.0
+    return share_state()
+
+
 @app.get("/api/library")
 def library_get():
-    bid = active_client_id()
-    return lib_to_dict(lib_ready(bid), bid)
+    return lib_view(active_client_id())
 
 
 class LibFolderIn(BaseModel):
@@ -25793,7 +25973,8 @@ class LibFolderIn(BaseModel):
 
 @app.post("/api/library/folders")
 def library_folder_new(body: LibFolderIn):
-    bid = active_client_id()
+    me = active_client_id()
+    bid = lib_store_of(body.parent, me)
     def fn(d):
         if body.parent and not any(f["id"] == body.parent for f in d["folders"]):
             raise HTTPException(404, "الفولدر ده مش موجود")
@@ -25801,8 +25982,10 @@ def library_folder_new(body: LibFolderIn):
             raise HTTPException(400, "الفولدر الجديد بيتعمل جوه صور أو فيديوهات أو تعليقات صوتية أو موسيقى")
         if len(lib_.path_of(d, body.parent)) >= lib_.MAX_DEPTH:
             raise HTTPException(400, "كفاية فولدرات جوه بعض كده")
-        d["folders"].append({"id": lib_.fid(), "name": lib_.clean_name(body.name, "فولدر جديد"), "parent": body.parent or None})
-    return lib_to_dict(lib_update(fn, bid), bid)
+        d["folders"].append({"id": lib_.fid(), "name": lib_.clean_name(body.name, "فولدر جديد"), "parent": body.parent or None,
+                             **({"origin": me} if bid == SHARED_LIB else {})})
+    lib_update(fn, bid)
+    return lib_view(me)
 
 
 class LibFolderPatch(BaseModel):
@@ -25813,7 +25996,10 @@ class LibFolderPatch(BaseModel):
 
 @app.patch("/api/library/folders/{fid}")
 def library_folder_patch(fid: str, body: LibFolderPatch):
-    bid = active_client_id()
+    me = active_client_id()
+    bid = lib_store_of(fid, me)
+    if body.move and body.parent and lib_store_of(body.parent, me) != bid:
+        raise HTTPException(400, "الفولدر ده في مكتبة متشاركة والتاني لأ، مينفعش تنقل بينهم")
     def fn(d):
         f = next((x for x in d["folders"] if x["id"] == fid), None)
         if not f:
@@ -25828,13 +26014,15 @@ def library_folder_patch(fid: str, body: LibFolderPatch):
             if body.parent and (body.parent == fid or body.parent in lib_.descendants(d, fid)):
                 raise HTTPException(400, "مينفعش تحط الفولدر جوه نفسه")
             f["parent"] = body.parent or None
-    return lib_to_dict(lib_update(fn, bid), bid)
+    lib_update(fn, bid)
+    return lib_view(me)
 
 
 @app.delete("/api/library/folders/{fid}")
 def library_folder_delete(fid: str):
     """الفولدر بيتشال، واللي جواه (فولدرات وملفات) بيطلع للفولدر اللي فوقه، مفيش ملف بيتمسح."""
-    bid = active_client_id()
+    me = active_client_id()
+    bid = lib_store_of(fid, me)
     def fn(d):
         f = next((x for x in d["folders"] if x["id"] == fid), None)
         if not f:
@@ -25848,13 +26036,16 @@ def library_folder_delete(fid: str):
             if x.get("folder") == fid:
                 x["folder"] = f.get("parent")
         d["folders"] = [x for x in d["folders"] if x["id"] != fid]
-    return lib_to_dict(lib_update(fn, bid), bid)
+    lib_update(fn, bid)
+    return lib_view(me)
 
 
 @app.post("/api/library/files")
 def library_upload(folder: str = Form(""), paths: str = Form(""), files: list[UploadFile] = File(...)):
-    """⬆ ملفات أو فولدر كامل بفولدراته (paths = المسار جوه الفولدر لكل ملف، بنفس الترتيب)."""
-    bid = active_client_id()
+    """⬆ ملفات أو فولدر كامل بفولدراته (paths = المسار جوه الفولدر لكل ملف، بنفس الترتيب).
+    لو نوع الملف ليه فولدر أساسي في مكتبة تانية (متشاركة أو لأ) بيروح هناك."""
+    me = active_client_id()
+    bid = lib_store_of(folder or None, me)
     folder_dir = lib_dir(bid)
     rel = [x for x in paths.split("\n")] if paths else []
     added = []
@@ -25875,7 +26066,7 @@ def library_upload(folder: str = Form(""), paths: str = Form(""), files: list[Up
                 continue
         parts = [p for p in re.split(r"[/\\]+", rel[i])][:-1] if i < len(rel) and rel[i] else []
         added.append({"id": lib_.fid(), "file": name, "name": lib_.clean_name(Path(up.filename or name).stem), "kind": kind, "parts": parts,
-                      "size": (folder_dir / name).stat().st_size, "desc": "", "tags": [], "status": "tagging", "at": now(), **meta})
+                      "size": (folder_dir / name).stat().st_size, "desc": "", "tags": [], "status": "tagging", "at": now(), "origin": me, **meta})
     if not added:
         raise HTTPException(400, "مفيش صور أو فيديوهات أو أصوات في الملفات دي")
     def fn(d):
@@ -25886,6 +26077,9 @@ def library_upload(folder: str = Form(""), paths: str = Form(""), files: list[Up
         here = lib_root_of(d, base)
         for a in added:
             want = "voice" if a["kind"] == "audio" and here not in ("voice", "music") else lib_root_for(a) if a["kind"] != "audio" else here
+            if (SHARED_LIB if want in share_keys() else me) != bid:   # فولدره الأساسي في المكتبة التانية
+                a["_to"] = want
+                continue
             start = base if here == want or (a["kind"] == "audio" and here in ("voice", "music")) else roots[want]
             a["folder"] = lib_.ensure_path(d, start, a.pop("parts"))
             d["files"].append(a)
@@ -25893,9 +26087,25 @@ def library_upload(folder: str = Form(""), paths: str = Form(""), files: list[Up
             if r in ("voice", "music"):
                 lib_audio_link(bid, a, r)
         d["audio_seen"] = sorted(set(d.get("audio_seen") or []) | {a["audio_id"] for a in added if a.get("audio_id")})
-    lib = lib_update(fn, bid)
-    threading.Thread(target=run_library_tag, args=(bid, [a["id"] for a in added]), daemon=True).start()
-    return lib_to_dict(lib, bid)
+    lib_update(fn, bid)
+    threading.Thread(target=run_library_tag, args=(bid, [a["id"] for a in added if not a.get("_to")]), daemon=True).start()
+    away = [a for a in added if a.get("_to")]
+    if away:
+        dst = me if bid == SHARED_LIB else SHARED_LIB
+        for a in away:
+            shutil.move(str(folder_dir / a["file"]), str(lib_dir(dst) / a["file"]))
+        def fn2(d):
+            roots = lib_prepare(d)
+            for a in away:
+                want = a.pop("_to")
+                a["folder"] = lib_.ensure_path(d, roots[want], a.pop("parts")) or roots[want]
+                d["files"].append(a)
+                if want in ("voice", "music"):
+                    lib_audio_link(dst, a, want)
+            d["audio_seen"] = sorted(set(d.get("audio_seen") or []) | {a["audio_id"] for a in away if a.get("audio_id")})
+        lib_update(fn2, dst)
+        threading.Thread(target=run_library_tag, args=(dst, [a["id"] for a in away]), daemon=True).start()
+    return lib_view(me)
 
 
 def run_library_tag(bid: str, ids: list[str]) -> None:
@@ -25951,7 +26161,10 @@ class LibFilePatch(BaseModel):
 
 @app.patch("/api/library/files/{fid}")
 def library_file_patch(fid: str, body: LibFilePatch):
-    bid = active_client_id()
+    me = active_client_id()
+    bid = lib_store_of(fid, me)
+    if body.move and body.folder and lib_store_of(body.folder, me) != bid:
+        raise HTTPException(400, "الفولدر ده في مكتبة متشاركة والتاني لأ، مينفعش تنقل بينهم")
     def fn(d):
         f = next((x for x in d["files"] if x["id"] == fid), None)
         if not f:
@@ -25971,20 +26184,23 @@ def library_file_patch(fid: str, body: LibFilePatch):
             r = lib_root_of(d, f.get("folder"))
             with closing(db()) as conn, conn:
                 conn.execute("UPDATE audio SET name = ?, kind = COALESCE(?, kind) WHERE id = ?", (f["name"], r if r in ("voice", "music") else None, f["audio_id"]))
-    return lib_to_dict(lib_update(fn, bid), bid)
+    lib_update(fn, bid)
+    return lib_view(me)
 
 
 @app.post("/api/library/files/{fid}/retag")
 def library_file_retag(fid: str):
-    bid = active_client_id()
-    lib = lib_update(lambda d: next((x.update(status="tagging", error=None) for x in d["files"] if x["id"] == fid), None), bid)
+    me = active_client_id()
+    bid = lib_store_of(fid, me)
+    lib_update(lambda d: next((x.update(status="tagging", error=None) for x in d["files"] if x["id"] == fid), None), bid)
     threading.Thread(target=run_library_tag, args=(bid, [fid]), daemon=True).start()
-    return lib_to_dict(lib, bid)
+    return lib_view(me)
 
 
 @app.delete("/api/library/files/{fid}")
 def library_file_delete(fid: str):
-    bid = active_client_id()
+    me = active_client_id()
+    bid = lib_store_of(fid, me)
     gone = []
     def fn(d):
         gone.extend(x for x in d["files"] if x["id"] == fid)
@@ -25999,14 +26215,14 @@ def library_file_delete(fid: str):
                 delete_audio(f["audio_id"])
             except HTTPException:
                 pass
-    return lib_to_dict(lib, bid)
+    return lib_view(me)
 
 
 @app.get("/api/library/search")
 def library_search(q: str = "", kind: str = "", ref: str = ""):
     """🔎 بحث (بالاسم والوصف والتاجات)، أو منشن: ref = «صور/أسنان/قبل» (فولدر) أو مسار ملف بعينه."""
     bid = active_client_id()
-    lib = lib_load(bid)
+    lib = lib_merged(bid, ready=False)
     folder = None
     if ref:
         folder, f = lib_.resolve(lib, ref)
@@ -26090,12 +26306,12 @@ def auto_refs(q: str = "") -> list[dict]:
     """اللي ينفع يتمنشن (@) في «ولّد»: الشخصيات، نسختي، الخلفيات والأماكن، والفولدرات والصور والفيديوهات من مكتبة المحتويات."""
     out = []
     with closing(db()) as conn:
-        for r in conn.execute("SELECT * FROM coaches WHERE mine(client_id) ORDER BY name"):
+        for r in conn.execute("SELECT * FROM coaches WHERE vis(client_id, 'chars') ORDER BY name"):
             c = coach_to_dict(r)
             out.append({"kind": "char", "id": str(c["id"]), "label": c["name"], "thumb": c["image_url"], "sub": "شخصية"})
             if c.get("voice_url"):
                 out.append({"kind": "audio", "id": f"cv:{c['id']}", "label": f"صوت {c['name']}", "thumb": c["image_url"], "sub": "🎙️ صوت شخصية"})
-        exports = [export_to_dict(r) for r in conn.execute("SELECT * FROM exports WHERE mine(client_id) ORDER BY created_at DESC LIMIT 40")]
+        exports = [export_to_dict(r) for r in conn.execute("SELECT * FROM exports WHERE vis(client_id, 'exports') ORDER BY created_at DESC LIMIT 40")]
     for t in twins_list():
         ph = next((p for p in t.get("photos") or [] if p.get("angle") in ("front", "smile")), None) or next(iter(t.get("photos") or []), None)
         if ph:
@@ -26108,7 +26324,7 @@ def auto_refs(q: str = "") -> list[dict]:
     for x in bg["brand"] + bg["twin"]:
         out.append({"kind": "bg", "id": x["id"], "label": x["name"] or "خلفية", "thumb": x["url"], "sub": "خلفية"})
     bid = active_client_id()
-    lib = lib_load(bid)
+    lib = lib_merged(bid, ready=False)
     view = lib_to_dict(lib, bid)
     for f in view["folders"]:
         out.append({"kind": "folder", "id": f["id"], "label": f["path"] or f["name"], "thumb": "", "sub": f"📁 فولدر · {f['count']} ملف"})
@@ -26165,7 +26381,7 @@ def auto_ref_image(r: dict, src: Path | None, tmp: Path) -> Path | None:
                            check=True, capture_output=True, timeout=60)
             return out if out.exists() else None
         if k in ("file", "folder"):
-            lib = lib_load()
+            lib = lib_merged(active_client_id(), ready=False)
             if k == "file":
                 f = next((x for x in lib["files"] if x["id"] == rid), None)
             else:
@@ -26173,7 +26389,7 @@ def auto_ref_image(r: dict, src: Path | None, tmp: Path) -> Path | None:
                 f = random.choice(pool) if pool else None
             if not f:
                 return None
-            p = lib_dir() / f["file"]
+            p = lib_path(f, active_client_id())
             if f["kind"] == "video":
                 out = tmp / f"ref-{f['id']}.jpg"
                 subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", "0.5", "-i", str(p), "-frames:v", "1", "-q:v", "3", str(out)],
@@ -26197,7 +26413,7 @@ def auto_split_plan(lib: dict, s: dict) -> dict:
 
 def auto_to_dict(rid: str, d: dict, bid: str) -> dict:
     d = {**d, "steps": automate.clean_steps(d.get("steps") or [])}   # الموديلات القديمة: «صدّر» و«انشر» بيتضافوا في الآخر
-    lib = lib_load(bid)
+    lib = lib_merged(bid, ready=False)
     steps = []
     gen_sec = 0.0
     for s in d.get("steps") or []:
@@ -26363,7 +26579,7 @@ def automation_describe(rid: str, text: str = Form(""), audio: UploadFile | None
         said = f"{said} {heard}".strip()
     if not said:
         raise HTTPException(400, "اكتب أو سجّل اللي عايزه الأول")
-    lib = lib_load(bid)
+    lib = lib_merged(bid, ready=False)
     current = automate.clean_steps(d.get("steps") or [])
     if atlas.mock_mode() or not atlas.api_key():
         res = automate.mock_describe(said, current)
@@ -26433,7 +26649,7 @@ def auto_video_gen(bid: str, f: dict, cache: dict) -> str:
     k = f"vid:{f['id']}"
     if cache.get(k):
         return cache[k]
-    src = lib_dir(bid) / f["file"]
+    src = lib_path(f, bid)
     dest = GENERATED_DIR / f"auto_{f['id']}{src.suffix.lower()}"
     if not dest.exists():
         shutil.copy(src, dest)
@@ -26451,7 +26667,7 @@ def auto_image_gen(bid: str, f: dict, sec: float, ratio: str, cache: dict) -> st
     W, H = W * 2 // 3 // 2 * 2, H * 2 // 3 // 2 * 2   # 720 أسرع، والمونتاج بيكبّر
     n = int(sec * 30)
     dest = GENERATED_DIR / f"auto_{f['id']}_{int(sec * 10)}_{ratio.replace(':', 'x')}.mp4"
-    subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-loop", "1", "-i", str(lib_dir(bid) / f["file"]), "-t", f"{sec:.2f}",
+    subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-loop", "1", "-i", str(lib_path(f, bid)), "-t", f"{sec:.2f}",
                     "-vf", f"scale={W * 2}:{H * 2}:force_original_aspect_ratio=increase,crop={W * 2}:{H * 2},"
                            f"zoompan=z='1+0.06*on/{max(1, n)}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s={W}x{H}:fps=30,format=yuv420p",
                     "-r", "30", "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", str(dest)], check=True, capture_output=True, timeout=300)
@@ -26466,7 +26682,7 @@ def auto_audio_id(bid: str, f: dict, kind: str, cache: dict) -> tuple[str, float
             r = conn.execute("SELECT duration FROM audio WHERE id = ?", (cache[k],)).fetchone()
         if r:
             return cache[k], float(r["duration"])
-    src = lib_dir(bid) / f["file"]
+    src = lib_path(f, bid)
     aid = uuid.uuid4().hex[:12]
     name = f"{kind}_{aid}{src.suffix.lower()}"
     shutil.copy(src, AUDIO_DIR / name)
@@ -26528,8 +26744,8 @@ def auto_ref_audio(r: dict | None, src: Path | None, tmp: Path) -> Path | None:
             v = (twin_load(rid[3:]).get("voice") or {}).get("file")
             return twin_dir(rid[3:]) / v if v else None
         if rid.startswith("lib:"):
-            f = next((x for x in lib_load()["files"] if x["id"] == rid[4:]), None)
-            return lib_dir() / f["file"] if f else None
+            f = next((x for x in lib_merged(active_client_id(), ready=False)["files"] if x["id"] == rid[4:]), None)
+            return lib_path(f, active_client_id()) if f else None
     except (subprocess.SubprocessError, OSError, KeyError, ValueError, HTTPException):
         return None
     return None
@@ -26604,7 +26820,7 @@ def auto_gen_piece(src: Path, dur: float, g: dict, dest: Path, run_id: str, rati
 
 def auto_run_split(bid: str, s: dict, merge: dict | None, f: dict, ratio: str, run_id: str, setr, report: list[str]) -> list[dict]:
     """قطّع ← كل قطعة تمشي في مسارها (ولّد…) ← جمّع المخرجات المختارة بالترتيب. بيرجّع لقطات للمونتاج."""
-    src = lib_dir(bid) / f["file"]
+    src = lib_path(f, bid)
     dur = float(f.get("dur") or probe_duration(src))
     setr(step=f"✂️ بيقطّع «{f['name']}»")
     spans = auto_cut_spans(src, dur, s, run_id, report)
@@ -26688,7 +26904,7 @@ def run_automation(rid: str, run_id: str, bid: str, port: int = 8000) -> None:
     report: list[str] = []
     try:
         d = auto_load(rid, bid)
-        lib, (cache, cache_f) = lib_load(bid), auto_cache(bid)
+        lib, (cache, cache_f) = lib_merged(bid, ready=False), auto_cache(bid)
         rnd, used = random.Random(), dict(d.get("used") or {})
         steps = automate.clean_steps(d.get("steps") or [])
         opt = lambda verb: next((s["opts"] for s in steps if s["verb"] == verb), None)  # noqa: E731

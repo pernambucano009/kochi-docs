@@ -2190,6 +2190,11 @@ label.dim { opacity: .4; }
 #nh .nh-col-r .nh-tile:hover > .nh-tip, #nh .nh-col-l .nh-tile:hover > .nh-tip, #nh .nh-col-r .nh-tile:focus-visible > .nh-tip, #nh .nh-col-l .nh-tile:focus-visible > .nh-tip { translate: 0 0; }
 /* 📚 مكتبة محتويات البراند: تابات فوق */
 #nh .bl-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 14px; padding: 5px; border-radius: 999px; background: var(--nh-fill); width: fit-content; max-width: 100%; }
+#nh .bl-share { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin: -4px 0 14px; }
+#nh .bl-sh { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; background: var(--nh-fill); font-size: 13.5px; cursor: pointer; }
+#nh .bl-sh input { width: 17px; height: 17px; accent-color: var(--nh-accent, #E5613E); cursor: pointer; }
+#nh .bl-sh.on { background: rgba(229, 97, 62, .1); box-shadow: inset 0 0 0 1px rgba(229, 97, 62, .45); }
+#nh .bl-share small { font-size: 12px; }
 #nh .bl-tab { border: 0; padding: 8px 16px; border-radius: 999px; font-size: 13.5px; color: var(--nh-muted); white-space: nowrap; transition: background .2s, color .2s; }
 #nh .bl-tab:hover { color: inherit; }
 #nh .bl-tab.on { background: var(--nh-bg, #fff); color: inherit; box-shadow: 0 2px 8px rgba(0, 0, 0, .08); }
