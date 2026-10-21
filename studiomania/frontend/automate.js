@@ -54,8 +54,10 @@ const AutoPage = (() => {
   function genLeaves(o) {
     const m = genModel(o), mode = genMode(o), refs = o.refs || [];
     const L = [{ f: "model", t: "الموديل", val: m ? `${m.label} · ${S.meta.gen_modes?.[mode] || ""}` : "الافتراضي" },
-      { f: "prompt", t: "البرومبت", val: (o.prompt || "").slice(0, 40), miss: !(o.prompt || "").trim() }];
+      { f: "prompt", t: "البرومبت", val: (o.prompt || "").slice(0, 40), miss: mode !== "lipsync" && !(o.prompt || "").trim() }];
     if (mode === "image" || mode === "startend") L.push({ f: "start", t: "صورة البداية", val: o.start?.label || refs[0]?.label || "أول فريم من القطعة" });
+    if (mode === "avatar") L.push({ f: "start", t: "صورة اللي بيتكلم", val: o.start?.label || refs[0]?.label || "أول فريم من القطعة" });
+    if (mode === "avatar" || mode === "lipsync") L.push({ f: "audio", t: "الصوت", val: o.audio?.label || (mode === "avatar" ? "صوت القطعة نفسها" : ""), miss: mode === "lipsync" && !o.audio });
     if (mode === "startend") L.push({ f: "end", t: "صورة النهاية", val: o.end?.label || refs[1]?.label || "", miss: !o.end && refs.length < 2 });
     if (mode === "refs" || mode === "video") L.push({ f: "refs", t: mode === "refs" ? "المراجع (شخصيات وخلفيات وصور)" : "مراجع (اختياري)", val: refs.length ? refs.map((r) => r.label).join("، ").slice(0, 40) : "",
       miss: mode === "refs" && !refs.length && !(m?.video_in && o.use_piece) });
@@ -75,7 +77,8 @@ const AutoPage = (() => {
     if (!S.refs) { loadRefs(); return `<p class="bm-note">بيجيب الشخصيات والخلفيات والملفات…</p>`; }
     const nq = String(q || "").trim().toLowerCase(), on = new Set(chosen.map(refKey));
     const list = S.refs.filter((r) => !nq || `${r.label} ${r.sub}`.toLowerCase().includes(nq)).slice(0, 40);
-    const groups = [["char", "🧑‍🎤 الشخصيات"], ["twin", "🪞 نسختي"], ["bg", "🏞️ الخلفيات والأماكن"], ["folder", "📁 فولدرات"], ["file", "🖼️ صور وفيديوهات"]];
+    const groups = f === "audio" ? [["audio", "🎙️ الأصوات (الشخصيات، صوتك، التعليقات والموسيقى)"]]
+      : [["char", "🧑‍🎤 الشخصيات"], ["twin", "🪞 نسختي"], ["bg", "🏞️ الخلفيات والأماكن"], ["folder", "📁 فولدرات"], ["file", "🖼️ صور وفيديوهات"], ["export", "📤 فيديوهات جاهزة"]];
     return groups.map(([k, t]) => { const xs = list.filter((r) => r.kind === k); return xs.length ? `<p class="am-gh">${t}</p><div class="am-files">${xs.map((r) =>
       `<button class="am-file${on.has(refKey(r)) ? " on" : ""}" data-refpick="${esc(f)}" data-ref="${esc(refKey(r))}" title="${esc(r.sub)}">${refThumb(r)}<small>${esc(r.label)}</small></button>`).join("")}</div>` : ""; }).join("")
       || `<p class="bm-note">مفيش حاجة بالاسم ده. ضيف شخصيات من «الشخصيات والأفاتار» وخلفيات وملفات من «مكتبة محتويات البراند».</p>`;
@@ -83,10 +86,13 @@ const AutoPage = (() => {
   function refsCard(s, f) {
     const o = s.opts, mode = genMode(o), one = f !== "refs", chosen = one ? (o[f] ? [o[f]] : []) : (o.refs || []);
     const note = { refs: mode === "refs" ? `الموديل بيعمل الفيديو من المراجع دي (لحد ${AR_N(S.meta.max_refs || 6)}). اختار شخصية أو خلفية أو صورة، أو اكتب @ في البرومبت.` : "لو الموديل بيقبل صور مرجع، بتتبعت معاه القطعة (مثلًا الشخصية علشان شكلها يفضل ثابت).",
-      start: "الصورة اللي الفيديو هيبدأ منها. الافتراضي: أول فريم من القطعة.", end: "الصورة اللي الفيديو هيخلص عليها." }[f];
+      start: mode === "avatar" ? "صورة الشخص اللي هيتكلم (شخصية، نسختك، أو أي صورة). الافتراضي: أول فريم من القطعة." : "الصورة اللي الفيديو هيبدأ منها. الافتراضي: أول فريم من القطعة.",
+      end: "الصورة اللي الفيديو هيخلص عليها.",
+      audio: mode === "avatar" ? "الصوت اللي الشخص هيقوله (صوت شخصية، صوتك من «نسختي»، أو تعليق من المكتبة). الافتراضي: صوت القطعة نفسها. الفيديو بيطلع على قد الصوت." : "الصوت اللي الشفايف هتتظبط عليه." }[f];
     return `<p class="bm-note">${note}</p>
       ${chosen.length ? `<div class="am-chosen">${chosen.map((r) => `<span class="am-chip">${refThumb(r)}<b>${esc(r.label)}</b><button data-refrm="${esc(f)}|${esc(refKey(r))}" title="شيله">✕</button></span>`).join("")}</div>` : ""}
       ${f === "start" ? `<div class="bm-pills"><button class="bm-pill${o.start?.kind === "frame" || !o.start ? " on" : ""}" data-refset="start|frame|">🎞️ أول فريم من القطعة</button></div>` : ""}
+      ${f === "audio" && mode === "avatar" ? `<div class="bm-pills"><button class="bm-pill${o.audio?.kind === "piece_audio" || !o.audio ? " on" : ""}" data-refset="audio|piece_audio|">🎞️ صوت القطعة نفسها</button></div>` : ""}
       <div class="bm-write" contenteditable="plaintext-only" data-k="refq" data-ph="🔎 دوّر بالاسم">${esc(S.refQ || "")}</div>
       <div data-reflist>${refList(S.refQ, chosen, f)}</div>`;
   }
@@ -107,6 +113,10 @@ const AutoPage = (() => {
     const txt = el.innerText.replace(/(^|\s)@([^\s@]*)$/, (_, a) => `${a}@${r.label} `);
     el.innerText = txt;   // لو فيه حفظ للكتابة لسه مستني، بيحفظ نفس الكلام
     const it = { kind: r.kind, id: r.id, label: r.label, thumb: r.thumb };
+    if (r.kind === "audio") {
+      if (!["avatar", "lipsync"].includes(genMode(s.opts))) toast("الصوت بيتستخدم مع موديلات الأفاتار والليب سينك بس. غيّر الموديل علشان يتبعت");
+      return saveSteps(mapStep(s.id, (x) => ({ ...x, opts: { ...x.opts, prompt: txt, audio: it } })));
+    }
     return saveSteps(mapStep(s.id, (x) => {
       const cur = x.opts.refs || [];
       return { ...x, opts: { ...x.opts, prompt: txt, refs: cur.some((y) => refKey(y) === key) ? cur : [...cur, it].slice(0, S.meta.max_refs || 6) } };
@@ -426,14 +436,16 @@ const AutoPage = (() => {
     if (l.f === "caption") return head + editable("pubcap", o.caption || "", "الكابشن اللي هينزل مع الفيديو (لو فاضي: اسم الموديل)") + `<p class="bm-note">بيتحفظ لوحده لما تقف عن الكتابة.</p>`;
     if (l.f === "prompt" && s.verb === "gen") {
       const mode = genMode(o), PH = { video: "مثلًا: نفس المشهد بس بستايل أنمي، ألوان دافية", refs: "مثلًا: @سارة ماشية في @المكتب وبتشاور على الشاشة", image: "مثلًا: الكاميرا بتقرّب ببطء والناس بتتحرك",
-        startend: "مثلًا: الكاميرا بتلف من البداية للنهاية", text: "اكتب الفيديو كله: المكان، الناس، الحركة، الإضاءة" };
-      const NOTE = { video: "الموديل بياخد القطعة نفسها وبيعمل منها فيديو جديد بالبرومبت ده.", refs: "الموديل بيعمل فيديو جديد من المراجع اللي منشنتها.", image: "الموديل بيبدأ من صورة البداية ويحرّكها على حسب البرومبت.",
+        startend: "مثلًا: الكاميرا بتلف من البداية للنهاية", text: "اكتب الفيديو كله: المكان، الناس، الحركة، الإضاءة",
+        avatar: "مثلًا: @سارة بتتكلم بحماس وبتشاور بإيدها", lipsync: "اختياري" };
+      const NOTE = { avatar: "الموديل بيخلّي الشخص اللي في الصورة يتكلم بالصوت اللي تختاره.", lipsync: "الموديل بيظبط شفايف اللي في القطعة على الصوت اللي تختاره (البرومبت مش ضروري).",
+        video: "الموديل بياخد القطعة نفسها وبيعمل منها فيديو جديد بالبرومبت ده.", refs: "الموديل بيعمل فيديو جديد من المراجع اللي منشنتها.", image: "الموديل بيبدأ من صورة البداية ويحرّكها على حسب البرومبت.",
         startend: "الموديل بيعمل الحركة من صورة البداية لصورة النهاية.", text: "الموديل بيعمل الفيديو من الكلام بس، من غير القطعة." };
       if (!S.refs) loadRefs();
       return head + editable("opt:prompt", o.prompt || "", PH[mode]) + `<div class="am-ment" data-ment hidden></div>`
         + `<p class="bm-note">${NOTE[mode]} اكتب <b>@</b> علشان تمنشن شخصية أو خلفية أو صورة أو فولدر (بتتبعت للموديل كمرجع). بيتحفظ لوحده لما تقف عن الكتابة.${S.rec.est ? ` تكلفة التشغيل كله حوالي <b class="num">${AR_N(S.rec.est)}</b> نقطة.` : ""}</p>`;
     }
-    if (["refs", "start", "end"].includes(l.f)) return head + refsCard(s, l.f);
+    if (["refs", "start", "end", "audio"].includes(l.f)) return head + refsCard(s, l.f);
     if (l.f === "note") return head + editable("opt:note", o.note || "", "مثلًا: اقطع عند آخر كل جملة، وشيل أول ٣ ثواني، ومن غير السكوت الطويل") + `<p class="bm-note">لو سبته فاضي: قطع متساوية، والقطع بيتزق لأقرب سكوت علشان مايقطعش في نص كلمة. لو كتبت: المخ بيسمع الكلام ويقطّع على حسب طلبك (بيتخصم على قد طول الفيديو).</p>`;
     if (l.f === "model") {
       const cur = genModel(o)?.model;

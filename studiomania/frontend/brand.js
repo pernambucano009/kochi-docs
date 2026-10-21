@@ -81,6 +81,7 @@ const BrandPage = (() => {
         { f: "pg", i: "bl:voice", page: "brainlib", t: "🎙️ التعليقات الصوتية", type: "page" },
         { f: "pg", i: "bl:music", page: "brainlib", t: "🎵 الموسيقى", type: "page" },
         { f: "pg", i: "bl:comics", page: "brainlib", t: "🎭 الكوميكس", type: "page" },
+        { f: "pg", i: "bl:exports", page: "brainlib", t: "📤 الفيديوهات الجاهزة", type: "page" },
       ] },
       // 🤖 الموديل المخصص: مؤقتًا لوحده لحد ما نحدد مكانه
       { k: "tools", t: "الموديل المخصص", en: "Custom Model", leaves: [
@@ -562,7 +563,7 @@ const BrandPage = (() => {
       ${ar.changed ? `<div class="bm-acts"><button class="bm-pill" data-arreset="all">↺ رجّع كل القواعد للأصل</button></div>` : ""}`;
   }
   async function algoSave(fid, rows, reset) {
-    try { S.ar = await bAPI("/algo-rules", { method: "PUT", ...jsonBody(reset ? { reset: [fid] } : { parts: { [fid]: rows } }) }); S.arFor = cur()?.id; refreshCard(); }
+    try { S.ar = await bAPI("/algo-rules", { method: "PUT", ...jsonBody(reset ? { reset: [fid] } : { parts: { [fid]: rows } }) }); S.arFor = cur()?.id; refreshCard(); savedPill(reset ? "✅ القواعد رجعت للأصل" : "✅ قواعد الخوارزميات اتحدّثت"); }
     catch (err) { toast(err.message, true); }
   }
   const arRows = (fid) => (S.ar?.parts.find((p) => p.id === fid)?.rules || []).map((r) => ({ t: r.t, on: r.on }));
@@ -619,7 +620,7 @@ const BrandPage = (() => {
     if (step > 0 && pick == null && !ans && !(b.quiz_done || []).includes(q.id)) return toast("اكتب الإجابة، أو دوس «تخطّي»", true);
     if (ans && ans !== (S.qa?.[q.id] || "")) {
       S.qa = { ...S.qa, [q.id]: ans };
-      await save(() => bAPI("/quiz", { method: "POST", ...jsonBody({ qid: q.id, answer: ans, lang: QLANG() }) }), { card: false });
+      if (await save(() => bAPI("/quiz", { method: "POST", ...jsonBody({ qid: q.id, answer: ans, lang: QLANG() }) }), { card: false }) && ans) savedPill("✅ الإجابة اتحفظت في العقل");
     }
     move();
   }
@@ -813,7 +814,8 @@ const BrandPage = (() => {
       }
       if (busy(b)) watch();
       loadClients();
-    } catch (err) { toast(err.message, true); }
+      return true;
+    } catch (err) { toast(err.message, true); return false; }
   }
   // مصدر جديد (ملف / لينك / كلام): بيتقرا في الخلفية والاقتراحات بتظهر لوحدها
   function addSource(form) {
@@ -834,7 +836,45 @@ const BrandPage = (() => {
       } catch { clearInterval(S.poll); }
     }, 3000);
   }
-  const patch = (fields, name, opts) => save(() => bAPI("", { method: "PATCH", ...jsonBody(name != null ? { name, fields } : { fields }) }), opts);
+  // ✅ أي تعديل في العقل بيطلع فوقه رسالة صغيرة إنه اتحفظ (ومن إيه لإيه لو الكلام قصير)، وبتختفي لوحدها
+  function fieldLabel(k) {
+    if (k === "rules") return "القواعد";
+    if (k === "styles" || k === "style") return "الستايل";
+    for (const br of branches(cur())) for (const l of br.leaves) {
+      if (l.f === k) return l.t;
+      const m = (l.fields || []).find(([f]) => f === k);
+      if (m) return m[1].replace(/\s*\(.*\)$/, "");
+    }
+    return FIELD_T[k] || "المعلومة";
+  }
+  const shortV = (k, v, b) => { if (k === "styles") return styleIds({ ...b, styles: v }).map((id) => allStyles(b).find((c) => c.id === id)?.ar).filter(Boolean).join("، ");
+    const l = branches(b).flatMap((br) => br.leaves).find((x) => x.f === k && x.type === "pick"); return l ? l.opts.find(([o]) => o === String(v))?.[1] || "" : String(v ?? "").trim(); };
+  function savedMsg(fields, name, before) {
+    if (name != null) return `✅ اسم البراند اتحدّث لـ «${name}»`;
+    const ks = Object.keys(fields || {});
+    if (!ks.length) return "";
+    if (ks.length > 1) return `✅ اتحفظ: ${ks.map(fieldLabel).join("، ")}`;
+    const k = ks[0], t = fieldLabel(k);
+    if (k === "rules") return "✅ القواعد اتحدّثت";
+    const a = shortV(k, before?.[k], before), z = shortV(k, fields[k], before);
+    if (!z) return `✅ «${t}» اتمسح`;
+    if (a && a.length <= 40 && z.length <= 40) return `✅ «${t}» اتحدّث من «${a}» لـ «${z}»`;
+    return `✅ «${t}» اتحدّث`;
+  }
+  function savedPill(msg) {
+    if (!msg || !S.el) return;
+    let el = document.querySelector("body > .bm-saved");   // على الـ body علشان مايتغطاش تحت عنوان الصفحة
+    if (!el) { el = document.createElement("div"); el.className = "bm-saved"; el.setAttribute("role", "status"); document.body.appendChild(el); }
+    el.textContent = msg;
+    el.classList.remove("show"); void el.offsetWidth; el.classList.add("show");
+    clearTimeout(S.savedT); S.savedT = setTimeout(() => el.classList.remove("show"), 2600);
+  }
+  const patch = async (fields, name, opts) => {
+    const before = cur() ? { ...cur() } : null;
+    const ok = await save(() => bAPI("", { method: "PATCH", ...jsonBody(name != null ? { name, fields } : { fields }) }), opts);
+    if (ok) savedPill(savedMsg(fields, name, before));
+    return ok;
+  };
   // الكتابة بتتحفظ لوحدها بعد ما تقف شوية
   let typeT = null;
   function commit(el) {
@@ -852,7 +892,7 @@ const BrandPage = (() => {
       const [, part, id] = k.split(":"), n = (b.notes || []).find((x) => x.id === id);
       const key = { t: "title", s: "summary", b: "body" }[part];
       if (!n || (n[key] || "") === v || (part === "t" && !v)) return;
-      return save(() => bAPI(`/notes/${id}`, { method: "PATCH", ...jsonBody({ [key]: v }) }), { card: false });
+      return save(() => bAPI(`/notes/${id}`, { method: "PATCH", ...jsonBody({ [key]: v }) }), { card: false }).then((ok) => ok && savedPill(`✅ «${n.title || "المعلومة"}» اتحدّثت`));
     }
     if (k.startsWith("rule:")) {
       const rs = rulesOf(b), i = +k.slice(5);

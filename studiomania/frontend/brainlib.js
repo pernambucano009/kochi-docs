@@ -5,7 +5,7 @@
 const BrainLibPage = (() => {
   const esc = (s) => escapeHtml(String(s ?? ""));
   const S = { el: null, body: null, tab: "images", mod: null, lib: null, root: null, cur: null, q: "", hits: null, open: null, timer: null };
-  const TABS = [["ideas", "💡 الأفكار"], ["images", "🖼️ الصور"], ["videos", "🎬 الفيديوهات"], ["voice", "🎙️ التعليقات الصوتية"], ["music", "🎵 الموسيقى"], ["comics", "🎭 الكوميكس"]];
+  const TABS = [["ideas", "💡 الأفكار"], ["images", "🖼️ الصور"], ["videos", "🎬 الفيديوهات"], ["voice", "🎙️ التعليقات الصوتية"], ["music", "🎵 الموسيقى"], ["comics", "🎭 الكوميكس"], ["chars", "🧑‍🎤 الشخصيات والأفاتار"], ["exports", "📤 الفيديوهات الجاهزة"]];
   const TAB = {
     images: { kind: "image", accept: "image/*", t: "الصور", en: "IMAGES", hint: "صور البراند في فولدرات جوه فولدرات زي ما تحب (مثلًا: صور ← أسنان ← قبل)." },
     videos: { kind: "video", accept: "video/*", t: "الفيديوهات", en: "VIDEOS", hint: "فيديوهاتك الخام واللقطات في فولدرات جوه فولدرات." },
@@ -108,6 +108,7 @@ const BrainLibPage = (() => {
       try {
         let b;
         if ((b = q("[data-bltab]"))) return showTab(b.dataset.bltab);
+        if ((b = q("[data-blnav]"))) return b.dataset.blnav === "twin" ? showStep("16") : window.NHNav?.(b.dataset.blnav);
         if (!TAB[S.tab]) return;
         if ((b = q("[data-blgo]"))) { S.cur = b.dataset.blgo || S.root; S.open = null; S.hits = null; S.q = ""; return render(); }
         if (q("[data-blnew]")) {
@@ -164,6 +165,30 @@ const BrainLibPage = (() => {
       } catch (err) { toast(err.message, true); }
     });
   }
+  // 📦 اللي في حساب البراند: الشخصيات ونسختي والفيديوهات الجاهزة (بتظهر هنا لوحدها، وتقدر تمنشنها في الأوتوميشن)
+  async function renderAccount(tab) {
+    S.body.innerHTML = `<div class="nh-empty">بيحمّل…</div>`;
+    const A = await api("/api/content/account");
+    if (S.tab !== tab) return;
+    const au = (u) => (u ? `<audio src="${esc(u)}" controls preload="none"></audio>` : "");
+    if (tab === "chars") {
+      const ch = A.characters.map((c) => `<figure class="bl-item bl-acc"><img src="${esc(c.image_url)}" alt="" loading="lazy"><figcaption><b>${esc(c.name)}</b>
+          <small class="muted">🧑‍🎤 شخصية${(c.sheet || []).length ? ` · ${(c.sheet || []).length} صورة` : ""}</small>${au(c.voice_url)}</figcaption></figure>`).join("");
+      const tw = A.twins.map((t) => `${(t.photos || []).map((p) => `<figure class="bl-item bl-acc"><img src="${esc(p.url)}" alt="" loading="lazy"><figcaption><b>${esc(t.name)}</b><small class="muted">🪞 نسختي</small></figcaption></figure>`).join("")}
+          ${t.voice_url ? `<figure class="bl-item bl-acc"><span class="bl-ph">🎙️</span><figcaption><b>صوت ${esc(t.name)}</b>${au(t.voice_url)}</figcaption></figure>` : ""}
+          ${(t.backgrounds || []).map((b) => `<figure class="bl-item bl-acc"><img src="${esc(b.url)}" alt="" loading="lazy"><figcaption><b>${esc(b.name || "مكان تصوير")}</b><small class="muted">🏠 مكان من «نسختي»</small></figcaption></figure>`).join("")}`).join("");
+      S.body.innerHTML = `<section class="fs-hero"><div class="fs-hero-t"><b>الشخصيات والأفاتار</b><span class="latin">CHARACTERS</span></div>
+          <p>كل الشخصيات اللي عملتها، ونسختك (صورك وصوتك وأماكن التصوير). بيتضافوا هنا لوحدهم، وتقدر تمنشن أي واحد («@») في الأوتوميشن كصورة مرجع أو كصوت.</p>
+          <div class="nb-bar"><button type="button" class="nb-btn" data-blnav="coaches">🧑‍🎤 افتح الشخصيات</button><button type="button" class="nb-btn" data-blnav="twin">🪞 افتح نسختي</button></div></section>
+        <h4 class="bl-h">🧑‍🎤 الشخصيات</h4><div class="bl-grid">${ch || `<div class="nh-empty">لسه مفيش شخصيات.</div>`}</div>
+        <h4 class="bl-h">🪞 نسختي</h4><div class="bl-grid">${tw || `<div class="nh-empty">لسه ماعملتش نسختك.</div>`}</div>`;
+      return;
+    }
+    S.body.innerHTML = `<section class="fs-hero"><div class="fs-hero-t"><b>الفيديوهات الجاهزة</b><span class="latin">EXPORTS</span></div>
+        <p>كل فيديو اتصدّر من الحساب ده بيتحط هنا لوحده. تقدر تمنشنه («@») في الأوتوميشن كمرجع.</p><div class="cm-stats"><span><b class="num">${A.exports.length}</b> فيديو</span></div></section>
+      <div class="bl-grid">${A.exports.map((e) => `<figure class="bl-item bl-acc"><video src="${esc(e.url)}#t=0.5" preload="metadata" muted playsinline controls></video>
+        <figcaption><b>${esc(e.name)}</b><small class="muted num">${e.duration ? `${Math.round(e.duration)} ث · ` : ""}${esc(String(e.created_at || "").slice(0, 10))}</small></figcaption></figure>`).join("") || `<div class="nh-empty">لسه مفيش فيديوهات اتصدّرت.</div>`}</div>`;
+  }
   function closeSub() { try { S.mod?.close?.(); } catch { /* */ } S.mod = null; clearTimeout(S.timer); }
   async function showTab(tab) {
     closeSub();
@@ -172,6 +197,7 @@ const BrainLibPage = (() => {
     S.el.querySelector(".bl-tabs").innerHTML = TABS.map(([k, t]) => `<button type="button" role="tab" class="bl-tab${k === S.tab ? " on" : ""}" data-bltab="${k}" aria-selected="${k === S.tab}">${t}</button>`).join("");
     try {
       if (S.tab === "comics") { S.mod = ComicsPage; S.body.innerHTML = ComicsPage.html(); return await ComicsPage.mount(S.body); }
+      if (S.tab === "chars" || S.tab === "exports") return await renderAccount(S.tab);
       if (S.tab === "ideas") { S.mod = IdeasPage; S.body.innerHTML = IdeasPage.html(); return await IdeasPage.mount(S.body); }
       S.body.innerHTML = `<div class="nh-empty">بيحمّل…</div>`;
       await refresh(); render(); poll();

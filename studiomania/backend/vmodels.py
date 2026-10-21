@@ -311,7 +311,9 @@ def camera_body(c: dict, video_url: str, prompt: str, dur: float, ratio: str, im
 # ---------------------------------------------------------------- ✨ «ولّد» في الأوتوميشن: كل موديلات الفيديو، وكل موديل بنوع مدخلاته
 # النوع بيحدد شكل المربع في الواجهة: من الكلام بس / صورة بداية / بداية ونهاية / صور مرجع / فيديو (القطعة نفسها)
 GEN_MODES = {"text-to-video": "text", "image-to-video": "image", "start-end-to-video": "startend", "reference-to-video": "refs"}
-SKIP_HINTS = ("avatar", "lipsync", "lip-sync", "talking", "upscale", "extend", "audio")
+SKIP_HINTS = ("upscale", "extend", "audio-to", "text-to-audio", "music")
+AVATAR_HINTS = ("avatar", "infinitetalk", "omni-human", "talking")   # صورة + صوت ← حد بيتكلم
+LIPSYNC_HINTS = ("lipsync", "lip-sync")                             # فيديو + صوت ← الشفايف على الصوت
 
 
 def gen_catalog() -> list[dict]:
@@ -324,7 +326,11 @@ def gen_catalog() -> list[dict]:
         if mid in seen or any(h in low for h in SKIP_HINTS):
             continue
         seed25 = "seedance-2.5" in low or "seedance-2-5" in low
-        if last in GEN_MODES:
+        if any(h in low for h in LIPSYNC_HINTS):
+            mode = "lipsync"
+        elif any(h in low for h in AVATAR_HINTS):
+            mode = "avatar"
+        elif last in GEN_MODES:
             mode = GEN_MODES[last]
         elif last in CAM_KINDS or any(h in low for h in CAM_HINTS):
             mode = "video"
@@ -334,6 +340,6 @@ def gen_catalog() -> list[dict]:
         out.append({"model": mid, "label": _label(e) or mid, "per_sec": _price(e), "mode": mode, "org": e.get("organization") or mid.split("/")[0],
                     "video_in": mode == "video" or (mode == "refs" and seed25), "kind": "ref" if last == "reference-to-video" else "edit",
                     "schema": e.get("schema")})
-    order = {"video": 0, "refs": 1, "image": 2, "startend": 3, "text": 4}
+    order = {"video": 0, "refs": 1, "image": 2, "startend": 3, "text": 4, "avatar": 5, "lipsync": 6}
     out.sort(key=lambda x: (order[x["mode"]], x["per_sec"] or 9))
     return out

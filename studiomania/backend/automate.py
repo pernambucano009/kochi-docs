@@ -24,7 +24,7 @@ VERBS = {
     "split": {"t": "قطّع الفيديو", "desc": "يقسم فيديو طويل لقطع أقصر، وكل قطعة بتمشي في مسار لوحدها", "accept": ("video",),
               "opts": {"max": 15.0, "note": "", "order": "fresh"}},
     "gen": {"t": "ولّد", "desc": "فيديو جديد بالذكاء الصناعي: من القطعة، أو من صورة، أو من مراجع (شخصيات وخلفيات)، أو من الكلام بس، على حسب الموديل",
-            "accept": (), "opts": {"prompt": "", "model": "", "refs": [], "start": None, "end": None, "use_piece": True}},
+            "accept": (), "opts": {"prompt": "", "model": "", "refs": [], "start": None, "end": None, "audio": None, "use_piece": True}},
     "merge": {"t": "جمّع", "desc": "يجمع المخرجات اللي تختارها في فيديو واحد بالترتيب اللي تحدده", "accept": (), "opts": {"items": []}},
     "cut": {"t": "طول اللقطات", "desc": "أقصى طول لكل لقطة، وانتقال بين اللقطات", "accept": (), "opts": {"max": 3.0, "trans": "fade"}},
     "caption": {"t": "حط كابشن", "desc": "الكلام مكتوب على الشاشة من التعليق الصوتي", "accept": (), "opts": {"on": True}},
@@ -33,7 +33,8 @@ VERBS = {
 }
 FIXED = ("export", "publish")
 LANE_VERBS = ("gen",)
-REF_KINDS = {"char": "شخصية", "twin": "نسختي", "bg": "خلفية", "file": "ملف", "folder": "فولدر", "frame": "أول فريم من القطعة"}
+REF_KINDS = {"char": "شخصية", "twin": "نسختي", "bg": "خلفية", "file": "ملف", "folder": "فولدر", "export": "فيديو جاهز", "audio": "صوت",
+             "frame": "أول فريم من القطعة", "piece_audio": "صوت القطعة نفسها"}
 MAX_REFS = 6          # الخطوات اللي بتتحط جوه مسار قطعة
 MAX_LANES = 12   # آخر خطوتين دايمًا: صدّر وبعدها انشر (مابيتشالوش ومابيتحركوش)
 WHEN = {"draft": "يستنى موافقتي", "now": "ينزل على طول"}
@@ -77,8 +78,8 @@ def clean_ref(raw) -> dict | None:
     """منشن (@) لشخصية أو نسختي أو خلفية أو ملف أو فولدر من مكتبة المحتويات، أو «أول فريم من القطعة»."""
     if not isinstance(raw, dict) or raw.get("kind") not in REF_KINDS:
         return None
-    if raw["kind"] == "frame":
-        return {"kind": "frame", "id": "", "label": REF_KINDS["frame"]}
+    if raw["kind"] in ("frame", "piece_audio"):
+        return {"kind": raw["kind"], "id": "", "label": REF_KINDS[raw["kind"]]}
     if not str(raw.get("id") or "").strip():
         return None
     return {"kind": raw["kind"], "id": str(raw["id"])[:120], "label": str(raw.get("label") or "")[:80], "thumb": str(raw.get("thumb") or "")[:300]}
@@ -119,11 +120,11 @@ def clean_opts(verb: str, raw: dict) -> dict:
             seen, out = set(), []
             for r in raw[k]:
                 r = clean_ref(r)
-                if r and r["kind"] != "frame" and (r["kind"], r["id"]) not in seen:
+                if r and r["kind"] not in ("frame", "piece_audio", "audio") and (r["kind"], r["id"]) not in seen:
                     seen.add((r["kind"], r["id"]))
                     out.append(r)
             base[k] = out[:MAX_REFS]
-        elif k in ("start", "end"):
+        elif k in ("start", "end", "audio"):
             base[k] = clean_ref(raw[k])
         elif k in ("fit", "duck", "on", "use_piece"):
             base[k] = bool(raw[k])

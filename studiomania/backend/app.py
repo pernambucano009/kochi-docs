@@ -9332,6 +9332,11 @@ def create_brain(body: BrainIn):
     return brain_to_dict(brain_row(bid))
 
 
+def quiz_rule(line: str) -> str:
+    line = re.sub(r"^[\-•*\d.)\s]+", "", line.strip())
+    return line if re.match(r"^(ممنوع|لا |لازم|دايمًا|دايما|دائمًا|من غير|بدون|never|always|don'?t|no )", line, re.I) else f"ممنوع في المحتوى: {line}"
+
+
 @app.patch("/api/ad-brains/{bid}")
 def patch_brain(bid: str, body: BrainIn):
     def fn(d):
@@ -9822,7 +9827,9 @@ def brain_quiz_answer(bid: str, body: QuizIn):
                     d[to["pick"]] = ans
             elif "rules" in to:
                 have = [r for r in str(d.get("rules") or "").split("\n") if r.strip()]
-                d["rules"] = "\n".join([*have, *[x.strip() for x in ans.split("\n") if x.strip() and x.strip() not in have]])[:8000]
+                # سؤال «إيه الممنوع؟»: الإجابة بتتكتب قاعدة واضحة («ممنوع في المحتوى: …») مش كلمة لوحدها
+                new = [quiz_rule(x) for x in ans.split("\n") if x.strip()]
+                d["rules"] = "\n".join([*have, *[x for x in new if x not in have]])[:8000]
             elif "note" in to:
                 notes = d.setdefault("notes", [])
                 n = next((x for x in notes if x.get("quiz") == q["id"]), None)
@@ -25540,6 +25547,17 @@ def content_backgrounds(bid: str | None = None) -> dict:
     return {"bid": bid, "brand": brand, "twin": tw}
 
 
+@app.get("/api/content/account")
+def content_account():
+    """📦 كل اللي في حساب البراند جوه «مكتبة محتويات البراند»: الشخصيات (صورها وصوتها)، نسختي (صورك وصوتك وأماكنك)، والفيديوهات الجاهزة."""
+    with closing(db()) as conn:
+        chars = [coach_to_dict(r) for r in conn.execute("SELECT * FROM coaches ORDER BY name")]
+        exports = [export_to_dict(r) for r in conn.execute("SELECT * FROM exports ORDER BY created_at DESC LIMIT 120")]
+    return {"characters": [{k: c.get(k) for k in ("id", "name", "image_url", "voice_url", "about", "sheet")} for c in chars],
+            "twins": [{k: t.get(k) for k in ("id", "name", "photos", "voice_url", "backgrounds")} for t in twins_list()],
+            "exports": exports}
+
+
 @app.get("/api/content/backgrounds")
 def get_content_backgrounds():
     return content_backgrounds()
@@ -25962,9 +25980,12 @@ GEN_MOCK = [{"model": "mock/kling-o1/video-edit", "label": "Kling O1 Edit (تج�
             {"model": "mock/kling-o3/reference-to-video", "label": "Kling O3 مراجع (تجريبي)", "per_sec": 0.09, "mode": "refs", "kind": "ref", "video_in": False},
             {"model": "mock/kling-o3/image-to-video", "label": "Kling O3 من صورة (تجريبي)", "per_sec": 0.071, "mode": "image", "kind": "edit", "video_in": False},
             {"model": "mock/kling-o3/start-end-to-video", "label": "Kling O3 بداية ونهاية (تجريبي)", "per_sec": 0.071, "mode": "startend", "kind": "edit", "video_in": False},
-            {"model": "mock/veo-3/text-to-video", "label": "Veo 3 من الكلام (تجريبي)", "per_sec": 0.2, "mode": "text", "kind": "edit", "video_in": False}]
+            {"model": "mock/veo-3/text-to-video", "label": "Veo 3 من الكلام (تجريبي)", "per_sec": 0.2, "mode": "text", "kind": "edit", "video_in": False},
+            {"model": "mock/kling-v2.6-pro/avatar", "label": "Kling Avatar (تجريبي)", "per_sec": 0.095, "mode": "avatar", "kind": "edit", "video_in": False},
+            {"model": "mock/veed/lipsync", "label": "Veed Lipsync (تجريبي)", "per_sec": 0.05, "mode": "lipsync", "kind": "edit", "video_in": True}]
 GEN_MODE_T = {"video": "من القطعة نفسها (فيديو ← فيديو)", "refs": "من مراجع (شخصيات وخلفيات وصور)", "image": "من صورة بداية",
-              "startend": "من صورة بداية وصورة نهاية", "text": "من الكلام بس"}
+              "startend": "من صورة بداية وصورة نهاية", "text": "من الكلام بس", "avatar": "صورة + صوت ← حد بيتكلم (أفاتار)",
+              "lipsync": "القطعة + صوت ← الشفايف على الصوت (ليب سينك)"}
 
 
 def auto_gen_models() -> list[dict]:
@@ -25985,10 +26006,17 @@ def auto_refs(q: str = "") -> list[dict]:
         for r in conn.execute("SELECT * FROM coaches ORDER BY name"):
             c = coach_to_dict(r)
             out.append({"kind": "char", "id": str(c["id"]), "label": c["name"], "thumb": c["image_url"], "sub": "شخصية"})
+            if c.get("voice_url"):
+                out.append({"kind": "audio", "id": f"cv:{c['id']}", "label": f"صوت {c['name']}", "thumb": c["image_url"], "sub": "🎙️ صوت شخصية"})
+        exports = [export_to_dict(r) for r in conn.execute("SELECT * FROM exports ORDER BY created_at DESC LIMIT 40")]
     for t in twins_list():
         ph = next((p for p in t.get("photos") or [] if p.get("angle") in ("front", "smile")), None) or next(iter(t.get("photos") or []), None)
         if ph:
             out.append({"kind": "twin", "id": t["id"], "label": t.get("name") or "نسختي", "thumb": ph["url"], "sub": "🪞 نسختي"})
+        if t.get("voice_url"):
+            out.append({"kind": "audio", "id": f"tv:{t['id']}", "label": f"صوت {t.get('name') or 'نسختي'}", "thumb": ph["url"] if ph else "", "sub": "🎙️ صوتك (نسختي)"})
+    for e in exports:
+        out.append({"kind": "export", "id": e["id"], "label": e["name"], "thumb": "", "sub": "📤 فيديو جاهز"})
     bg = content_backgrounds()
     for x in bg["brand"] + bg["twin"]:
         out.append({"kind": "bg", "id": x["id"], "label": x["name"] or "خلفية", "thumb": x["url"], "sub": "خلفية"})
@@ -25999,12 +26027,16 @@ def auto_refs(q: str = "") -> list[dict]:
         out.append({"kind": "folder", "id": f["id"], "label": f["path"] or f["name"], "thumb": "", "sub": f"📁 فولدر · {f['count']} ملف"})
     hits = {f["id"] for f in lib_.search(lib, q, "")} if q.strip() else None
     for f in view["files"]:
-        if f.get("kind") in ("image", "video") and (hits is None or f["id"] in hits):
+        if hits is not None and f["id"] not in hits:
+            continue
+        if f.get("kind") in ("image", "video"):
             out.append({"kind": "file", "id": f["id"], "label": f["name"], "thumb": f.get("thumb") or "", "sub": "🖼️ صورة" if f["kind"] == "image" else "🎬 فيديو"})
+        elif f.get("kind") == "audio":
+            out.append({"kind": "audio", "id": f"lib:{f['id']}", "label": f["name"], "thumb": "", "sub": "🎵 موسيقى" if f.get("path", "").startswith("موسيقى") else "🎙️ تعليق صوتي"})
     if q.strip():
         n = lib_.norm(q)
         out = [x for x in out if x["kind"] == "file" or n in lib_.norm(x["label"])]
-    return out[:80]
+    return out[:160]
 
 
 @app.get("/api/automations-refs")
@@ -26036,6 +26068,15 @@ def auto_ref_image(r: dict, src: Path | None, tmp: Path) -> Path | None:
                 _, tid, xid = rid.split(":", 2)
                 x = next((b for b in twin_load(tid).get("backgrounds") or [] if b["id"] == xid), None)
                 return twin_dir(tid) / x["file"] if x else None
+        if k == "export":
+            with closing(db()) as conn:
+                row = conn.execute("SELECT filename FROM exports WHERE id = ?", (rid,)).fetchone()
+            if not row:
+                return None
+            out = tmp / f"exp-{rid}.jpg"
+            subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", "0.5", "-i", str(EXPORTS_DIR / row["filename"]), "-frames:v", "1", "-q:v", "3", str(out)],
+                           check=True, capture_output=True, timeout=60)
+            return out if out.exists() else None
         if k in ("file", "folder"):
             lib = lib_load()
             if k == "file":
@@ -26379,17 +26420,45 @@ def auto_cut_spans(src: Path, dur: float, s: dict, run_id: str, report: list[str
     return automate.snap_quiet(base, silences(src) if has_audio else [], mx)
 
 
+def auto_ref_audio(r: dict | None, src: Path | None, tmp: Path) -> Path | None:
+    """منشن صوت ← ملف: صوت شخصية، صوتك من «نسختي»، تعليق/موسيقى من المكتبة، أو صوت القطعة نفسها."""
+    if not r:
+        return None
+    k, rid = r.get("kind"), str(r.get("id") or "")
+    try:
+        if k == "piece_audio" and src:
+            out = tmp / "piece.m4a"
+            subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src), "-vn", "-c:a", "aac", "-b:a", "160k", str(out)],
+                           check=True, capture_output=True, timeout=120)
+            return out if out.exists() and out.stat().st_size > 1000 else None
+        if k != "audio":
+            return None
+        if rid.startswith("cv:"):
+            with closing(db()) as conn:
+                row = conn.execute("SELECT voice_filename FROM coaches WHERE id = ?", (rid[3:],)).fetchone()
+            return COACHES_DIR / row["voice_filename"] if row and row["voice_filename"] else None
+        if rid.startswith("tv:"):
+            v = (twin_load(rid[3:]).get("voice") or {}).get("file")
+            return twin_dir(rid[3:]) / v if v else None
+        if rid.startswith("lib:"):
+            f = next((x for x in lib_load()["files"] if x["id"] == rid[4:]), None)
+            return lib_dir() / f["file"] if f else None
+    except (subprocess.SubprocessError, OSError, KeyError, ValueError, HTTPException):
+        return None
+    return None
+
+
 def auto_gen_piece(src: Path, dur: float, g: dict, dest: Path, run_id: str, ratio: str) -> str:
     """«ولّد»: البرومبت + اللي الموديل بياخده (القطعة نفسها، أو صورة بداية/نهاية، أو مراجع من المنشن) ← فيديو جديد، والخصم على قد الثواني."""
     o = g["opts"]
     prompt = (o.get("prompt") or "").strip()
-    if not prompt:
-        raise RuntimeError("خطوة «ولّد» من غير برومبت")
     ms = auto_gen_models()
     cand = next((m for m in ms if m["model"] == o.get("model")), None) or (ms[0] if ms else None)
     if not cand:
         raise RuntimeError("مفيش موديل توليد فيديو متاح على Atlas دلوقتي")
     mode = cand.get("mode") or ("video" if cand.get("kind") == "edit" else "refs")
+    if not prompt and mode != "lipsync":
+        raise RuntimeError("خطوة «ولّد» من غير برومبت")
     tmp = GENERATED_DIR / f"autoref_{run_id}_{g['id']}"
     tmp.mkdir(parents=True, exist_ok=True)
     try:
@@ -26401,21 +26470,33 @@ def auto_gen_piece(src: Path, dur: float, g: dict, dest: Path, run_id: str, rati
                     prompt = prompt.replace(f"@{r['label']}", f"{r['label']} (reference image {i + 1})")
         prompt = re.sub(r"@(?=\S)", "", prompt)   # أي منشن تاني بيفضل اسم عادي
         pick = lambda key, fallback: (auto_ref_image(o[key], src, tmp) if o.get(key) else None) or fallback  # noqa: E731
-        start = pick("start", refs[0][1] if refs else auto_ref_image({"kind": "frame"}, src, tmp)) if mode in ("image", "startend") else None
+        start = pick("start", refs[0][1] if refs else auto_ref_image({"kind": "frame"}, src, tmp)) if mode in ("image", "startend", "avatar") else None
+        voice = auto_ref_audio(o.get("audio") or ({"kind": "piece_audio"} if mode == "avatar" else None), src, tmp) if mode in ("avatar", "lipsync") else None
+        if mode in ("avatar", "lipsync") and not voice:
+            raise RuntimeError("الموديل ده محتاج صوت: اختار صوت من «الصوت» (صوت شخصية، صوتك، أو تعليق من المكتبة)")
         end = pick("end", refs[1][1] if len(refs) > 1 else None) if mode == "startend" else None
         if mode == "refs" and not refs and not (cand.get("video_in") and o.get("use_piece", True)):
             raise RuntimeError("الموديل ده بيشتغل بمراجع: منشن شخصية أو خلفية أو صورة (@)")
         if mode == "startend" and not end:
             raise RuntimeError("الموديل ده محتاج صورة نهاية: اختارها من «صورة النهاية»")
+        if voice:   # الأفاتار والليب سينك: الفيديو على قد الصوت
+            dur = probe_duration(voice) or dur
         if atlas.mock_mode():
             subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src), "-vf", "hue=h=140:s=1.6,eq=contrast=1.15",
                             "-c:a", "copy", str(dest)], check=True, capture_output=True, timeout=300)
-            return f"{cand['label']} · {GEN_MODE_T.get(mode, mode)}" + (f" · {len(refs)} مرجع" if refs else "")
+            return f"{cand['label']} · {GEN_MODE_T.get(mode, mode)}" + (f" · {len(refs)} مرجع" if refs else "") + (" · بصوت" if voice else "")
         cost = wallet.credits((cand.get("per_sec") or 0.3) * dur * (2 if mode == "refs" and cand.get("video_in") else 1))
         wallet.need(cost, "توليد قطعة فيديو")
         imgs = [atlas.upload_media(seedance_ref(p)) for _, p in refs]
         secs = max(4, round(dur))
-        if mode == "video":
+        if mode == "avatar":
+            img = atlas.upload_media(seedance_ref(start))
+            body = {"model": cand["model"], "image": img, "image_url": img, "audio": atlas.upload_media(voice), "audio_url": atlas.upload_media(voice),
+                    "prompt": prompt + " Lips perfectly synced to the audio, natural blinking and subtle head movement. Keep the face, outfit and background as in the image."}
+        elif mode == "lipsync":
+            vurl, aurl = atlas.upload_media(src), atlas.upload_media(voice)
+            body = {"model": cand["model"], "video_url": vurl, "audio_url": aurl, "video": vurl, "audio": aurl}
+        elif mode == "video":
             body = vmodels.camera_body({**cand, "kind": cand.get("kind") or "edit"}, atlas.upload_media(src), prompt, dur, ratio, images=imgs or None)
         else:
             body = {"model": cand["model"], "prompt": prompt, "duration": secs, "ratio": ratio, "resolution": "720p"}
