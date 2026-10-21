@@ -26302,6 +26302,173 @@ def auto_gen_models() -> list[dict]:
     return ms
 
 
+# 🖼️ «ولّد صورة» و🎙️ «ولّد صوت»: كل موديل بخاناته (اللي بيقبل مرجع بيظهرله منشن مرجع)
+AUTO_IMG_KNOWN = {"google/nano-banana-2": "nano2", "google/nano-banana-pro": "nanopro", "openai/gpt-image-2.5-sunburst": "sunburst", "openai/gpt-image-2.5-flare": "flare"}
+AUTO_IMG_MOCK = [{"key": "google/nano-banana-2", "label": "Nano Banana 2 (تجريبي)", "t2i": "mock/nano2", "edit": "mock/nano2-edit", "refs": True, "max_refs": 8, "price": 0.045},
+                 {"key": "mock/flux", "label": "Flux Schnell من الكلام بس (تجريبي)", "t2i": "mock/flux", "edit": None, "refs": False, "max_refs": 0, "price": 0.01}]
+AUTO_VOICE_STD = {"model": "std", "label": "أصوات فصيح وElevenLabs (اللهجات العربية ولغات تانية)", "mode": "std", "ref": None, "voices": [], "price": None}
+AUTO_VOICE_MOCK = [{"model": "mock/clone-tts", "label": "كلام بصوت مرجع (تجريبي)", "mode": "tts", "ref": "reference_audio", "voice_field": None, "voices": [],
+                    "text_field": "text", "price": 0.05},
+                   {"model": "mock/music", "label": "موسيقى (تجريبي)", "mode": "music", "ref": None, "voice_field": None, "voices": [], "text_field": "prompt", "price": 0.15}]
+
+
+def auto_img_models() -> list[dict]:
+    try:
+        ms = vmodels.img_catalog()
+    except Exception:  # noqa: BLE001 — الكتالوج مش متاح دلوقتي
+        ms = []
+    if atlas.mock_mode() and not ms:
+        ms = AUTO_IMG_MOCK
+    for m in ms:   # الأسعار اللي البرنامج عارفها أدق من رقم الكتالوج
+        known = AUTO_IMG_KNOWN.get(m["key"])
+        if known in TV_IMAGE_MODELS:
+            m["price"] = TV_IMAGE_MODELS[known][0]
+        m["price"] = round(max(float(m.get("price") or 0), 0.02), 3)
+    return ms
+
+
+def auto_voice_models() -> list[dict]:
+    try:
+        ms = vmodels.voice_catalog()
+    except Exception:  # noqa: BLE001
+        ms = []
+    return [AUTO_VOICE_STD, *ms, *(AUTO_VOICE_MOCK if atlas.mock_mode() else [])]
+
+
+def auto_img_model(o: dict) -> dict | None:
+    ms = auto_img_models()
+    return next((m for m in ms if m["key"] == o.get("model")), None) or (ms[0] if ms else None)
+
+
+def auto_voice_model(o: dict) -> dict:
+    return next((m for m in auto_voice_models() if m["model"] == o.get("model")), None) or AUTO_VOICE_STD
+
+
+def auto_lib_add(bid: str, root: str, files: list[dict], src_dir: Path) -> list[dict]:
+    """الحاجات اللي اتولّدت بتدخل المكتبة في فولدر «✨ اتولّد بالموديل المخصص» (المشتركة لو الفولدر متشارك)."""
+    store = SHARED_LIB if root in share_keys() else bid
+    for f in files:
+        shutil.move(str(src_dir / f["file"]), str(lib_dir(store) / f["file"]))
+    def fn(d):
+        roots = lib_prepare(d)
+        folder = lib_.ensure_path(d, roots[root], ["✨ اتولّد بالموديل المخصص"]) or roots[root]
+        for f in files:
+            f["folder"] = folder
+            d["files"].append(f)
+            if root in ("voice", "music"):
+                lib_audio_link(store, f, root)
+        d["audio_seen"] = sorted(set(d.get("audio_seen") or []) | {f["audio_id"] for f in files if f.get("audio_id")})
+    lib_update(fn, store)
+    return [{**f, **({"_st": store} if store == SHARED_LIB else {})} for f in files]
+
+
+def auto_gen_images(bid: str, s: dict, ratio: str, run_id: str, report: list[str]) -> list[dict]:
+    """«ولّد صورة»: الوصف + صور المرجع (لو الموديل بيقبل) ← صورة أو أكتر، والخصم على قد اللي اترسم."""
+    o = s["opts"]
+    prompt = (o.get("prompt") or "").strip()
+    if not prompt:
+        report.append("⚠️ «ولّد صورة» من غير وصف، فاتخطّت")
+        return []
+    m = auto_img_model(o)
+    if not m:
+        raise RuntimeError("مفيش موديل صور متاح على Atlas دلوقتي")
+    tmp = GENERATED_DIR / f"autoimg_{run_id}_{s['id']}"
+    tmp.mkdir(parents=True, exist_ok=True)
+    try:
+        refs = [(r, p) for r in o.get("refs") or [] if (p := auto_ref_image(r, None, tmp)) and p.exists()]
+        if refs and not m["refs"]:
+            report.append(f"⚠️ «{m['label']}» مابيقبلش صور مرجع، فالصور اتعملت من الوصف بس")
+            refs = []
+        refs = refs[:m.get("max_refs") or 4]
+        for i, (r, _) in enumerate(refs):
+            if r.get("label"):
+                prompt = prompt.replace(f"@{r['label']}", f"{r['label']} (reference image {i + 1})")
+        prompt = re.sub(r"@(?=\S)", "", prompt)
+        n = max(1, min(8, int(o.get("count") or 1)))
+        each = wallet.credits(m["price"])
+        if not atlas.mock_mode():
+            wallet.need(each * n, "توليد صور")
+        urls = [atlas.reference_url(seedance_ref(p)) for _, p in refs] if refs and not atlas.mock_mode() else []
+        made = []
+        for i in range(n):
+            name = f"gen_{uuid.uuid4().hex[:10]}.png"
+            dest = tmp / name
+            if atlas.mock_mode():
+                subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i",
+                                f"color=c=0x{uuid.uuid4().hex[:6]}:s={GEN_RATIOS.get(ratio, '1024x1536')}", "-frames:v", "1", str(dest)], check=True, capture_output=True, timeout=60)
+            elif m["key"] in AUTO_IMG_KNOWN:
+                atlas.download(atlas.generate_image(AUTO_IMG_KNOWN[m["key"]], prompt, GEN_RATIOS.get(ratio, "1024x1536"), "high", urls or None), dest)
+            else:
+                atlas.download(atlas.run_model("Image", vmodels.img_body(m, prompt, ratio, urls or None), "صورة الموديل المخصص", max_seconds=900, interval=4), dest)
+            if not atlas.mock_mode():
+                wallet.charge(each, f"موديل مخصص: صورة ({m['label']})", run_id)
+            made.append({"id": lib_.fid(), "file": name, "name": lib_.clean_name(f"✨ {o.get('prompt', '')[:40]}"), "kind": "image", "size": dest.stat().st_size,
+                         "desc": o.get("prompt", "")[:300], "tags": ["اتولّدت"], "status": "ready", "at": now(), "origin": bid})
+        report.append(f"✓ اتولّد {len(made)} صورة ({m['label']}" + (f" · {len(refs)} مرجع" if refs else "") + ")")
+        return auto_lib_add(bid, "images", made, tmp)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def auto_gen_voice(bid: str, s: dict, run_id: str, report: list[str]) -> tuple[dict, str] | None:
+    """«ولّد صوت»: الكلام ← تعليق صوتي بصوت من فصيح/ElevenLabs أو موديل على Atlas (وبصوت مرجع لو الموديل بيقبل)، أو موسيقى."""
+    o = s["opts"]
+    m = auto_voice_model(o)
+    text = (o.get("text") or "").strip()
+    if not text:
+        report.append("⚠️ «ولّد صوت» من غير كلام، فاتخطّت")
+        return None
+    kind = "music" if m["mode"] == "music" else "voice"
+    tmp = GENERATED_DIR / f"autovo_{run_id}_{s['id']}"
+    tmp.mkdir(parents=True, exist_ok=True)
+    try:
+        name = f"{kind}_{uuid.uuid4().hex[:10]}.mp3"
+        mp3 = tmp / name
+        if m["mode"] == "std":
+            lang = o.get("lang") if o.get("lang") in dub.DIALECTS else "ar-eg-cairo"
+            voices = dub.DIALECTS[lang]["voices"]
+            voice = o.get("voice") if o.get("voice") in voices else voices[0]
+            cost = wallet.credits(dub.estimate([text], voice, len(text) / dub.CHARS_PER_SEC, None) or 0.01)
+            if not atlas.mock_mode():
+                wallet.need(cost, "توليد صوت")
+            wav = tmp / "say.wav"
+            vo_say(text, voice, lang, wav)
+            label = dub.VOICES[voice]["label"]
+        else:
+            ref = auto_ref_audio(o.get("ref"), None, tmp) if o.get("ref") else None
+            if o.get("ref") and not m.get("ref"):
+                report.append(f"⚠️ «{m['label']}» مابيقبلش صوت مرجع، فاتعمل بأصواته هو")
+            cost = wallet.credits(m.get("price") or 0.1)
+            wav = tmp / "say.src"
+            if atlas.mock_mode():
+                subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i",
+                                f"sine=frequency={220 if kind == 'music' else 330}:duration={max(2.0, len(text) / dub.CHARS_PER_SEC):.2f}", "-ar", "48000", str(wav.with_suffix('.wav'))],
+                               check=True, capture_output=True, timeout=60)
+                wav = wav.with_suffix(".wav")
+            else:
+                wallet.need(cost, "توليد صوت")
+                body = {"model": m["model"], m.get("text_field") or "text": text}
+                if kind == "music" and (o.get("lyrics") or "").strip():
+                    body["lyrics"] = o["lyrics"].strip()
+                if m.get("voice_field"):
+                    body[m["voice_field"]] = o.get("voice") if o.get("voice") in (m.get("voices") or []) else (m.get("voices") or [None])[0]
+                if ref and m.get("ref"):
+                    body[m["ref"]] = atlas.upload_media(ref)
+                atlas.download(atlas.run_model("Audio", body, "صوت الموديل المخصص", max_seconds=600, interval=3), wav)
+            label = m["label"] + (" · بصوت مرجع" if ref and m.get("ref") else "")
+        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(wav), "-c:a", "libmp3lame", "-b:a", "160k", str(mp3)],
+                       check=True, capture_output=True, timeout=180)
+        if not atlas.mock_mode():
+            wallet.charge(cost, f"موديل مخصص: {'موسيقى' if kind == 'music' else 'تعليق صوتي'} ({label})", run_id)
+        dur = round(probe_duration(mp3), 2)
+        f = {"id": lib_.fid(), "file": name, "name": lib_.clean_name(f"{'🎵' if kind == 'music' else '🎙️'} {text[:40]}"), "kind": "audio", "size": mp3.stat().st_size,
+             "desc": text[:300], "tags": ["اتولّد"], "status": "ready", "at": now(), "dur": dur, "origin": bid}
+        report.append(f"✓ اتولّد {'موسيقى' if kind == 'music' else 'تعليق صوتي'} {dur:.0f} ث ({label})")
+        return auto_lib_add(bid, kind, [f], tmp)[0], kind
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def auto_refs(q: str = "") -> list[dict]:
     """اللي ينفع يتمنشن (@) في «ولّد»: الشخصيات، نسختي، الخلفيات والأماكن، والفولدرات والصور والفيديوهات من مكتبة المحتويات."""
     out = []
@@ -26443,6 +26610,12 @@ def auto_to_dict(rid: str, d: dict, bid: str) -> dict:
     if gen_sec:   # «ولّد» أغلى حاجة: على قد ثواني القطع اللي هتتولّد
         per = next((m.get("per_sec") or 0.17 for m in auto_gen_models()), 0.17)
         est += wallet.credits(per * gen_sec)
+    for s in d.get("steps") or []:   # الصور والصوت اللي هيتولّدوا
+        if s["verb"] == "genimg" and (m := auto_img_model(s["opts"])):
+            est += wallet.credits(m["price"]) * max(1, int(s["opts"].get("count") or 1))
+        elif s["verb"] == "genvoice":
+            m = auto_voice_model(s["opts"])
+            est += wallet.credits(m.get("price") or max(0.01, len(s["opts"].get("text") or "") / 1000 * 0.1))
     return {**d, "id": rid, "steps": steps, "est": est, "gen_sec": round(gen_sec, 1), "busy": any(r.get("status") == "working" for r in d.get("runs") or [])}
 
 
@@ -26452,7 +26625,11 @@ def automations_meta():
             "orders": automate.ORDERS, "trans": automate.TRANS, "ratios": automate.RATIOS, "when": automate.WHEN, "fixed": automate.FIXED,
             "lane_verbs": automate.LANE_VERBS, "max_lanes": automate.MAX_LANES,
             "gen_models": [{k: m.get(k) for k in ("model", "label", "per_sec", "kind", "mode", "video_in")} for m in auto_gen_models()],
-            "gen_modes": GEN_MODE_T, "ref_kinds": automate.REF_KINDS, "max_refs": automate.MAX_REFS}
+            "gen_modes": GEN_MODE_T, "ref_kinds": automate.REF_KINDS, "max_refs": automate.MAX_REFS,
+            "img_models": [{k: m.get(k) for k in ("key", "label", "price", "refs", "max_refs")} for m in auto_img_models()],
+            "voice_models": [{k: m.get(k) for k in ("model", "label", "mode", "price", "voices")} | {"ref": bool(m.get("ref"))} for m in auto_voice_models()],
+            "dialects": {k: {"label": v["label"], "voices": v["voices"], "group": v["group"]} for k, v in dub.DIALECTS.items()},
+            "voices": {k: v["label"] for k, v in dub.VOICES.items() if not v.get("hidden")}}
 
 
 @app.get("/api/automations")
@@ -26627,8 +26804,8 @@ def automation_run(rid: str, request: Request):
     d = auto_load(rid, bid)
     if any(r.get("status") == "working" for r in d.get("runs") or []):
         raise HTTPException(400, "فيه تشغيل شغال، استنى يخلص")
-    if not any(s["verb"] in ("pull", "intro", "outro", "split") for s in d.get("steps") or []):
-        raise HTTPException(400, "الموديل محتاج خطوة «اسحب» صور أو فيديوهات، أو «قطّع الفيديو»، على الأقل")
+    if not any(s["verb"] in ("pull", "intro", "outro", "split", "genimg") for s in d.get("steps") or []):
+        raise HTTPException(400, "الموديل محتاج خطوة «اسحب» أو «ولّد صورة» أو «قطّع الفيديو»، على الأقل")
     run = {"id": uuid.uuid4().hex[:8], "at": now(), "status": "working", "step": "بيبدأ…", "project_id": None, "report": [], "error": None}
     auto_update(rid, lambda x: x.update(runs=[run, *(x.get("runs") or [])][:20]), bid)
     port = (request.scope.get("server") or ("127.0.0.1", 8000))[1]
@@ -26948,6 +27125,16 @@ def run_automation(rid: str, run_id: str, bid: str, port: int = 8000) -> None:
                     else:
                         outro = got[0]
                     report.append(f"✓ {'الإنترو' if v == 'intro' else 'الأوترو'}: {got[0]['name']}")
+            elif v == "genimg":
+                setr(step="🖼️ بيولّد الصور")
+                picked += [{"f": f, "sec": float(o.get("sec") or 2.5)} for f in auto_gen_images(bid, s, ratio, run_id, report)]
+            elif v == "genvoice":
+                setr(step="🎙️ بيولّد الصوت")
+                got = auto_gen_voice(bid, s, run_id, report)
+                if got and got[1] == "voice":
+                    voice = {"f": got[0], "fit": bool(o.get("fit", True))}
+                elif got:
+                    music = {"f": got[0], "volume": int(o.get("volume") or 35), "duck": bool(o.get("duck", True))}
             elif v in ("voice", "music"):
                 got, _ = automate.pick(auto_files(lib, s.get("src"), ("audio",)), 1, o.get("order") or "fresh", used, rnd)
                 if not got:
@@ -26959,7 +27146,7 @@ def run_automation(rid: str, run_id: str, bid: str, port: int = 8000) -> None:
                     music = {"f": got[0], "volume": int(o.get("volume") or 35), "duck": bool(o.get("duck"))}
                 report.append(f"✓ {'التعليق' if v == 'voice' else 'الموسيقى'}: {got[0]['name']}")
         if not picked and not intro and not outro:
-            raise RuntimeError("مفيش ولا صورة ولا فيديو اتسحب. راجع المنشن في خطوة «اسحب» أو «قطّع الفيديو»")
+            raise RuntimeError("مفيش ولا صورة ولا فيديو. راجع المنشن في «اسحب» أو «قطّع الفيديو»، أو وصف «ولّد صورة»")
         # التقطيع والتوليد الأول (أطول حاجة)، والقطع المتجمّعة بتاخد مكان «جمّع» في الترتيب
         for x in picked:
             if "split" in x:

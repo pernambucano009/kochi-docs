@@ -25,6 +25,10 @@ VERBS = {
               "opts": {"max": 15.0, "note": "", "order": "fresh"}},
     "gen": {"t": "ولّد", "desc": "فيديو جديد بالذكاء الصناعي: من القطعة، أو من صورة، أو من مراجع (شخصيات وخلفيات)، أو من الكلام بس، على حسب الموديل",
             "accept": (), "opts": {"prompt": "", "model": "", "refs": [], "start": None, "end": None, "audio": None, "use_piece": True}},
+    "genimg": {"t": "ولّد صورة", "desc": "صور جديدة بالذكاء الصناعي من الوصف، وبصور مرجع (شخصيات، خلفيات، صور من المكتبة) لو الموديل بيقبل. بتدخل الفيديو وبتتحفظ في المكتبة",
+               "accept": (), "opts": {"prompt": "", "model": "", "refs": [], "count": 1, "sec": 2.5}},
+    "genvoice": {"t": "ولّد صوت", "desc": "تعليق صوتي (أو موسيقى) جديد بالذكاء الصناعي من الكلام اللي تكتبه، وبصوت مرجع لو الموديل بيقبل. بيدخل الفيديو وبيتحفظ في المكتبة",
+                 "accept": (), "opts": {"text": "", "lyrics": "", "model": "", "lang": "", "voice": "", "ref": None, "fit": True, "volume": 35, "duck": True}},
     "merge": {"t": "جمّع", "desc": "يجمع المخرجات اللي تختارها في فيديو واحد بالترتيب اللي تحدده", "accept": (), "opts": {"items": []}},
     "cut": {"t": "طول اللقطات", "desc": "أقصى طول لكل لقطة، وانتقال بين اللقطات", "accept": (), "opts": {"max": 3.0, "trans": "fade"}},
     "caption": {"t": "حط كابشن", "desc": "الكلام مكتوب على الشاشة من التعليق الصوتي", "accept": (), "opts": {"on": True}},
@@ -106,6 +110,13 @@ def clean_opts(verb: str, raw: dict) -> dict:
             base[k] = [str(x)[:80] for x in raw[k] if str(x).strip()][:12]
         elif k in ("caption", "prompt"):
             base[k] = str(raw[k] or "")[:2000]
+        elif k in ("text", "lyrics"):
+            base[k] = str(raw[k] or "")[:4000]
+        elif k in ("lang", "voice"):
+            base[k] = str(raw[k] or "")[:120]
+        elif k == "ref":
+            r = clean_ref(raw[k])
+            base[k] = r if r and r["kind"] == "audio" else None
         elif k == "note":
             base[k] = str(raw[k] or "")[:600]
         elif k == "model":
@@ -298,7 +309,16 @@ def mock_describe(text: str, current: list[dict]) -> dict:
             sp["lanes"] = [[g]]
         steps.append(sp)
         steps.append(new_step("merge"))
-    if re.search(r"تعليق|فويس|voice", t):
+    if re.search(r"ول[دّ]\S*\s+صور", t):
+        g = new_step("genimg")
+        g["opts"]["prompt"] = t[:400]
+        steps.append(g)
+    if re.search(r"ول[دّ]\S*\s+(صوت|تعليق|فويس)", t):
+        g = new_step("genvoice")
+        m = re.search(r"(?:يقول|يقول:|بيقول|الكلام)[:\s]+(.+)", t)
+        g["opts"]["text"] = (m.group(1) if m else "")[:1000]
+        steps.append(g)
+    elif re.search(r"تعليق|فويس|voice", t):
         steps.append(new_step("voice"))
     if re.search(r"موسيق|music", t):
         steps.append(new_step("music"))

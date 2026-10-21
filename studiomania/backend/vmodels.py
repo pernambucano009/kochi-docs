@@ -343,3 +343,121 @@ def gen_catalog() -> list[dict]:
     order = {"video": 0, "refs": 1, "image": 2, "startend": 3, "text": 4, "avatar": 5, "lipsync": 6}
     out.sort(key=lambda x: (order[x["mode"]], x["per_sec"] or 9))
     return out
+
+
+# ---------------------------------------------------------------- 🖼️🎙️ «ولّد صورة» و«ولّد صوت» في الأوتوميشن
+# كل موديل بخاناته: الصور اللي ليها نسخة edit/reference بتقبل صور مرجع، والصوت اللي الـ schema بتاعه فيه خانة صوت مرجع بيقبل منشن صوت.
+IMG_T2I = ("text-to-image", "")
+IMG_EDIT = ("edit", "image-edit", "reference-to-image")
+IMG_SKIP = ("3d", "upscal", "remove-background", "layer-decomposition", "style-transfer", "blend", "sequential", "image-to-image", "-ultra", "-developer")
+IMG_FIRST = ("google/nano-banana-2", "google/nano-banana-pro", "openai/gpt-image-2.5-sunburst", "bytedance/seedream-v5.0-pro", "qwen-image-3.0-pro")
+REF_AUDIO = ("reference_audio", "ref_audio", "audio_reference", "voice_reference", "reference_voice", "prompt_audio", "speaker_audio",
+             "clone_audio", "voice_sample", "refer_audio", "refer_voice", "reference_audio_url", "voice_url", "audio_prompt")
+VOICE_FIELDS = ("voice", "voice_id", "voice_name", "speaker", "voice_type")
+TEXT_FIELDS = ("text", "input", "prompt")
+
+
+def schema_of(model_id: str) -> dict | None:
+    """الـ schema لأي موديل في الكتالوج (مش بس الفيديو)، ومتخزن على الجهاز."""
+    if model_id in _schemas and _schemas[model_id] is not None:
+        return _schemas[model_id]
+    sch = _schema_for(model_id)
+    if sch is None:
+        url = next((e.get("schema") for e in catalog() if e.get("model") == model_id and isinstance(e.get("schema"), str)), None)
+        if url:
+            try:
+                with httpx.Client(timeout=20) as c:
+                    r = c.get(url)
+                if r.status_code < 400:
+                    sch = r.json()
+                    (_cache_dir() / (model_id.replace("/", "__") + ".json")).write_text(json.dumps(sch), encoding="utf-8")
+            except (httpx.HTTPError, ValueError):
+                sch = None
+        _schemas[model_id] = sch
+    return sch
+
+
+def props_of(model_id: str) -> dict:
+    return _props(schema_of(model_id) or {})
+
+
+def img_catalog() -> list[dict]:
+    """موديلات الصور: لكل عيلة نسخة «من الكلام» ونسخة «بمراجع» لو موجودة (هي اللي بتقبل صور مرجع)."""
+    fams: dict[str, dict] = {}
+    for e in catalog():
+        if e.get("type") != "Image" or e.get("display_console") is False:
+            continue
+        mid = str(e.get("model") or "")
+        low = mid.lower()
+        if any(h in low for h in IMG_SKIP):
+            continue
+        fam, _, last = mid.rpartition("/")
+        if last in IMG_EDIT:
+            role = "edit"
+        elif last in IMG_T2I:
+            role = "t2i"
+        else:
+            fam, role = mid, "t2i"   # موديل من غير لاحقة (z-image/turbo، seedream-v4.5)
+        f = fams.setdefault(fam, {"key": fam, "label": "", "t2i": None, "edit": None, "price": None, "org": e.get("organization") or fam.split("/")[0]})
+        if role == "edit" and not f["edit"]:
+            f["edit"] = mid
+        elif role == "t2i" and not f["t2i"]:
+            f["t2i"] = mid
+            f["price"] = _price(e)
+            f["label"] = re.sub(r"\s*text[- ]to[- ]image\b", "", str(e.get("displayName") or mid), flags=re.I).strip()
+        if not f["label"]:
+            f["label"] = re.sub(r"\s*(edit|image[- ]edit|reference[- ]to[- ]image)\b", "", str(e.get("displayName") or mid), flags=re.I).strip()
+        if f["price"] is None:
+            f["price"] = _price(e)
+    out = [{**f, "refs": bool(f["edit"]), "max_refs": 8 if "nano-banana" in f["key"] else 4} for f in fams.values() if f["t2i"] or f["edit"]]
+    out.sort(key=lambda x: (IMG_FIRST.index(x["key"]) if x["key"] in IMG_FIRST else 99, x["price"] or 9))
+    return out
+
+
+def img_body(m: dict, prompt: str, ratio: str, images: list[str] | None) -> dict:
+    """طلب صورة بأسماء خانات الموديل ده (لو الـ schema متاح)، وإلا الأسامي المشهورة."""
+    model = m["edit"] if images and m.get("edit") else (m.get("t2i") or m["edit"])
+    props = props_of(model)
+    body = {"model": model, "prompt": prompt}
+    w, h = (int(x) for x in ratio.split(":"))
+    px = {"9:16": "1024x1536", "16:9": "1536x1024", "1:1": "1024x1024", "4:5": "1024x1280"}.get(ratio, "1024x1536")
+    if props:
+        name = next((a for a in ("aspect_ratio", "ratio", "size", "image_size") if a in props), None)
+        if name:
+            v = ratio if name != "size" and name != "image_size" else px
+            body[name] = _fit(v, props[name]) if (props[name] or {}).get("enum") else v
+    elif "openai/" in model:
+        body["size"] = px
+    else:
+        body["aspect_ratio"] = f"{w}:{h}"
+    if images:
+        name = next((a for a in ("images", "image_urls", "reference_images", "input_images", "image", "image_url") if a in props), None) if props else "images"
+        if name:
+            body[name] = images if (props.get(name) or {}).get("type", "array") == "array" else images[0]
+    return body
+
+
+def voice_catalog() -> list[dict]:
+    """موديلات الصوت على Atlas: كلام (بأصوات جاهزة من الـ schema) وموسيقى. اللي فيه خانة صوت مرجع بيقبل منشن صوت."""
+    out = []
+    for e in catalog():
+        if e.get("type") != "Audio" or e.get("display_console") is False:
+            continue
+        mid = str(e.get("model") or "")
+        low = mid.lower()
+        if any(h in low for h in ("stt", "asr", "lyrics")):
+            continue
+        mode = "music" if ("music" in low or "suno" in low) else "tts" if ("speech" in low or "tts" in low) else None
+        if not mode:
+            continue
+        props = props_of(mid)
+        ref = next((a for a in REF_AUDIO if a in props), None)
+        vf = next((a for a in VOICE_FIELDS if a in props), None)
+        voices = [str(v) for v in ((props.get(vf) or {}).get("enum") or [])][:80] if vf else []
+        if mode == "tts" and not voices and not ref:
+            continue   # مانعرفش أساميه أصواته ومفيش مرجع: مينفعش نشغّله
+        if mode == "music" and not props and not low.startswith("minimax/music"):
+            continue   # موسيقى من غير schema: بس MiniMax اللي طلبه مجرّب
+        out.append({"model": mid, "label": str(e.get("displayName") or mid), "mode": mode, "price": _price(e), "ref": ref, "voice_field": vf,
+                    "voices": voices, "text_field": next((a for a in TEXT_FIELDS if a in props), "text" if mode == "tts" else "prompt")})
+    return out

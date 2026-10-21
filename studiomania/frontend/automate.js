@@ -19,6 +19,8 @@ const AutoPage = (() => {
     split: "M3.5 12h5 M8.5 12 14 6.5h6 M8.5 12 14 17.5h6 M8.5 12H20",
     gen: "M12 3.5l1.9 5.4 5.6 1.9-5.6 1.9L12 18.1l-1.9-5.4-5.6-1.9 5.6-1.9z M18.5 16.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z",
     merge: "M3.5 6.5h5L14 12l-5.5 5.5h-5 M3.5 12H20 M16.5 9 20 12l-3.5 3",
+    genimg: "M4.5 5h15a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z M3.5 15.5l4.5-4.5 4 4 3-3 5 5 M16 7l.8 1.9 1.9.8-1.9.8L16 12.4l-.8-1.9-1.9-.8 1.9-.8z",
+    genvoice: "M10 3.5a3 3 0 0 1 3 3v5a3 3 0 0 1-6 0v-5a3 3 0 0 1 3-3z M4 11a6 6 0 0 0 12 0 M10 17v3.5 M18.5 4l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z",
     piece: "M5 4.5h14v15H5z M5 9h14 M5 15h14 M8 4.5v4.5 M16 15v4.5",
   };
   const svg = (d, s = 22) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}" aria-hidden="true"><path d="${d}" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
@@ -41,7 +43,7 @@ const AutoPage = (() => {
       split: [{ ...srcLeaf, t: "الفيديو", val: src ? `${src}${s.video ? ` · ${AR_N(Math.round(s.video.dur))} ث` : s.found != null ? ` · ${AR_N(s.found)} فيديو` : ""}` : "" },
         { f: "max", t: "أقصى طول للقطعة", val: `${AR_N(o.max)} ث${s.pieces ? ` · ${AR_N(s.pieces)} قطع` : ""}` },
         { f: "note", t: "محتاج إيه في التقطيع", val: (o.note || "").slice(0, 40) || "قطع متساوية عند السكوت" }, { f: "order", t: "أنهي فيديو", val: M.orders[o.order] }],
-      gen: genLeaves(o),
+      gen: genLeaves(o), genimg: imgLeaves(o), genvoice: voiceLeaves(o),
       merge: [{ f: "items", t: "إيه اللي يتجمع وبأي ترتيب", val: (o.items || []).length ? `${AR_N(o.items.length)} مخرج بالترتيب بتاعك` : "آخر حاجة في كل مسار" }],
       publish: [{ f: "when", t: "إمتى", val: M.when[o.when] }, { f: "platforms", t: "على فين", val: (o.platforms || []).length ? `${AR_N(o.platforms.length)} حساب` : "", miss: o.when === "now" && !(o.platforms || []).length },
         { f: "caption", t: "الكابشن", val: (o.caption || "").slice(0, 40) || "اسم الموديل" }],
@@ -64,6 +66,32 @@ const AutoPage = (() => {
     if (mode === "refs" && m?.video_in) L.push({ f: "use_piece", t: "القطعة كمرجع فيديو", val: o.use_piece ? "أيوه" : "لأ" });
     return L;
   }
+  // 🖼️ «ولّد صورة»: المراجع بتظهر بس لو الموديل بيقبل صور مرجع
+  const imgModel = (o) => (S.meta.img_models || []).find((m) => m.key === o.model) || (S.meta.img_models || [])[0] || null;
+  function imgLeaves(o) {
+    const m = imgModel(o), refs = o.refs || [];
+    const L = [{ f: "model", t: "الموديل", val: m ? `${m.label} · ${m.refs ? `بيقبل لحد ${AR_N(m.max_refs)} صور مرجع` : "من الوصف بس"}` : "الافتراضي" },
+      { f: "prompt", t: "الوصف", val: (o.prompt || "").slice(0, 40), miss: !(o.prompt || "").trim() }];
+    if (m?.refs) L.push({ f: "refs", t: "صور المرجع (اختياري)", val: refs.length ? refs.map((r) => r.label).join("، ").slice(0, 40) : "" });
+    L.push({ f: "count", t: "عدد الصور", val: AR_N(o.count) }, { f: "sec", t: "مدة الصورة في الفيديو", val: `${AR_N(o.sec)} ث` });
+    return L;
+  }
+  // 🎙️ «ولّد صوت»: الخانات على حسب الموديل (لهجة وصوت، أصوات الموديل، صوت مرجع، أو موسيقى)
+  const voModel = (o) => (S.meta.voice_models || []).find((m) => m.model === o.model) || (S.meta.voice_models || [])[0] || { mode: "std", label: "" };
+  function voiceLeaves(o) {
+    const m = voModel(o), M = S.meta, music = m.mode === "music";
+    const L = [{ f: "model", t: "الموديل", val: `${m.label}${m.ref ? " · بيقبل صوت مرجع" : ""}` },
+      { f: "text", t: music ? "وصف الموسيقى" : "الكلام", val: (o.text || "").slice(0, 40), miss: !(o.text || "").trim() }];
+    if (m.mode === "std") {
+      const lang = M.dialects?.[o.lang] ? o.lang : "ar-eg-cairo", vs = M.dialects?.[lang]?.voices || [];
+      L.push({ f: "lang", t: "اللهجة / اللغة", val: M.dialects?.[lang]?.label || "" }, { f: "voice", t: "الصوت", val: M.voices?.[vs.includes(o.voice) ? o.voice : vs[0]] || "" });
+    } else if ((m.voices || []).length) L.push({ f: "voice", t: "الصوت", val: (m.voices.includes(o.voice) ? o.voice : m.voices[0]) || "" });
+    if (m.ref) L.push({ f: "ref", t: "صوت مرجع (اختياري)", val: o.ref?.label || "" });
+    if (music) L.push({ f: "lyrics", t: "كلمات الأغنية (اختياري)", val: (o.lyrics || "").slice(0, 40) || "موسيقى من غير كلام" },
+      { f: "volume", t: "علو الموسيقى", val: `${AR_N(o.volume)}٪` }, { f: "duck", t: "توطى وقت الكلام", val: o.duck ? "أيوه" : "لأ" });
+    else L.push({ f: "fit", t: "الفيديو على قد الصوت", val: o.fit ? "أيوه" : "لأ" });
+    return L;
+  }
   // اللي ينفع يتمنشن: الشخصيات، نسختي، الخلفيات، والفولدرات والملفات من مكتبة المحتويات
   function loadRefs() {
     if (S.refsLoading) return;
@@ -77,7 +105,7 @@ const AutoPage = (() => {
     if (!S.refs) { loadRefs(); return `<p class="bm-note">بيجيب الشخصيات والخلفيات والملفات…</p>`; }
     const nq = String(q || "").trim().toLowerCase(), on = new Set(chosen.map(refKey));
     const list = S.refs.filter((r) => !nq || `${r.label} ${r.sub}`.toLowerCase().includes(nq)).slice(0, 40);
-    const groups = f === "audio" ? [["audio", "🎙️ الأصوات (الشخصيات، صوتك، التعليقات والموسيقى)"]]
+    const groups = f === "audio" || f === "ref" ? [["audio", "🎙️ الأصوات (الشخصيات، صوتك، التعليقات والموسيقى)"]]
       : [["char", "🧑‍🎤 الشخصيات"], ["twin", "🪞 نسختي"], ["bg", "🏞️ الخلفيات والأماكن"], ["folder", "📁 فولدرات"], ["file", "🖼️ صور وفيديوهات"], ["export", "📤 فيديوهات جاهزة"]];
     return groups.map(([k, t]) => { const xs = list.filter((r) => r.kind === k); return xs.length ? `<p class="am-gh">${t}</p><div class="am-files">${xs.map((r) =>
       `<button class="am-file${on.has(refKey(r)) ? " on" : ""}" data-refpick="${esc(f)}" data-ref="${esc(refKey(r))}" title="${esc(r.sub)}">${refThumb(r)}<small>${esc(r.label)}</small></button>`).join("")}</div>` : ""; }).join("")
@@ -85,10 +113,15 @@ const AutoPage = (() => {
   }
   function refsCard(s, f) {
     const o = s.opts, mode = genMode(o), one = f !== "refs", chosen = one ? (o[f] ? [o[f]] : []) : (o.refs || []);
-    const note = { refs: mode === "refs" ? `الموديل بيعمل الفيديو من المراجع دي (لحد ${AR_N(S.meta.max_refs || 6)}). اختار شخصية أو خلفية أو صورة، أو اكتب @ في البرومبت.` : "لو الموديل بيقبل صور مرجع، بتتبعت معاه القطعة (مثلًا الشخصية علشان شكلها يفضل ثابت).",
+    const note = s.verb === "genimg" ? { refs: `الصور دي بتتبعت للموديل كمرجع (لحد ${AR_N(imgModel(o)?.max_refs || 4)}): شخصية علشان شكلها يفضل ثابت، أو خلفية، أو أي صورة من المكتبة. أو اكتب @ في الوصف.` }[f]
+      : s.verb === "genvoice" ? { ref: "الموديل بيقلّد الصوت ده: صوت شخصية، صوتك من «نسختي»، أو تعليق من المكتبة." }[f] : { refs: mode === "refs" ? `الموديل بيعمل الفيديو من المراجع دي (لحد ${AR_N(S.meta.max_refs || 6)}). اختار شخصية أو خلفية أو صورة، أو اكتب @ في البرومبت.` : "لو الموديل بيقبل صور مرجع، بتتبعت معاه القطعة (مثلًا الشخصية علشان شكلها يفضل ثابت).",
       start: mode === "avatar" ? "صورة الشخص اللي هيتكلم (شخصية، نسختك، أو أي صورة). الافتراضي: أول فريم من القطعة." : "الصورة اللي الفيديو هيبدأ منها. الافتراضي: أول فريم من القطعة.",
       end: "الصورة اللي الفيديو هيخلص عليها.",
       audio: mode === "avatar" ? "الصوت اللي الشخص هيقوله (صوت شخصية، صوتك من «نسختي»، أو تعليق من المكتبة). الافتراضي: صوت القطعة نفسها. الفيديو بيطلع على قد الصوت." : "الصوت اللي الشفايف هتتظبط عليه." }[f];
+    if (s.verb !== "gen") return `<p class="bm-note">${note || ""}</p>
+      ${chosen.length ? `<div class="am-chosen">${chosen.map((r) => `<span class="am-chip">${refThumb(r)}<b>${esc(r.label)}</b><button data-refrm="${esc(f)}|${esc(refKey(r))}" title="شيله">✕</button></span>`).join("")}</div>` : ""}
+      <div class="bm-write" contenteditable="plaintext-only" data-k="refq" data-ph="🔎 دوّر بالاسم">${esc(S.refQ || "")}</div>
+      <div data-reflist>${refList(S.refQ, chosen, f)}</div>`;
     return `<p class="bm-note">${note}</p>
       ${chosen.length ? `<div class="am-chosen">${chosen.map((r) => `<span class="am-chip">${refThumb(r)}<b>${esc(r.label)}</b><button data-refrm="${esc(f)}|${esc(refKey(r))}" title="شيله">✕</button></span>`).join("")}</div>` : ""}
       ${f === "start" ? `<div class="bm-pills"><button class="bm-pill${o.start?.kind === "frame" || !o.start ? " on" : ""}" data-refset="start|frame|">🎞️ أول فريم من القطعة</button></div>` : ""}
@@ -113,6 +146,12 @@ const AutoPage = (() => {
     const txt = el.innerText.replace(/(^|\s)@([^\s@]*)$/, (_, a) => `${a}@${r.label} `);
     el.innerText = txt;   // لو فيه حفظ للكتابة لسه مستني، بيحفظ نفس الكلام
     const it = { kind: r.kind, id: r.id, label: r.label, thumb: r.thumb };
+    if (s.verb === "genimg") {
+      if (r.kind === "audio") return toast("«ولّد صورة» بياخد صور بس كمرجع", true);
+      if (!imgModel(s.opts)?.refs) toast("الموديل ده مابيقبلش صور مرجع، فالاسم هيتكتب بس. اختار موديل بيقبل مراجع لو عايزها تتبعت");
+      const max = imgModel(s.opts)?.max_refs || 4;
+      return saveSteps(mapStep(s.id, (x) => { const cur = x.opts.refs || []; return { ...x, opts: { ...x.opts, prompt: txt, refs: cur.some((y) => refKey(y) === key) ? cur : [...cur, it].slice(0, max) } }; }));
+    }
     if (r.kind === "audio") {
       if (!["avatar", "lipsync"].includes(genMode(s.opts))) toast("الصوت بيتستخدم مع موديلات الأفاتار والليب سينك بس. غيّر الموديل علشان يتبعت");
       return saveSteps(mapStep(s.id, (x) => ({ ...x, opts: { ...x.opts, prompt: txt, audio: it } })));
@@ -445,7 +484,38 @@ const AutoPage = (() => {
       return head + editable("opt:prompt", o.prompt || "", PH[mode]) + `<div class="am-ment" data-ment hidden></div>`
         + `<p class="bm-note">${NOTE[mode]} اكتب <b>@</b> علشان تمنشن شخصية أو خلفية أو صورة أو فولدر (بتتبعت للموديل كمرجع). بيتحفظ لوحده لما تقف عن الكتابة.${S.rec.est ? ` تكلفة التشغيل كله حوالي <b class="num">${AR_N(S.rec.est)}</b> نقطة.` : ""}</p>`;
     }
-    if (["refs", "start", "end", "audio"].includes(l.f)) return head + refsCard(s, l.f);
+    if (l.f === "prompt" && s.verb === "genimg") {
+      const m = imgModel(o);
+      if (!S.refs) loadRefs();
+      return head + editable("opt:prompt", o.prompt || "", m?.refs ? "مثلًا: @سارة ماسكة المنتج في @العيادة، إضاءة ناعمة، تصوير احترافي" : "مثلًا: كوباية قهوة على ترابيزة خشب جنب شباك، نور الصبح")
+        + `<div class="am-ment" data-ment hidden></div><p class="bm-note">${m?.refs ? "اكتب <b>@</b> علشان تمنشن شخصية أو خلفية أو صورة من المكتبة، وبتتبعت للموديل كصورة مرجع." : "الموديل ده بيرسم من الوصف بس (مابيقبلش صور مرجع)."} الصور بتدخل الفيديو بالترتيب، وبتتحفظ في «مكتبة محتويات البراند ← الصور ← ✨ اتولّد بالموديل المخصص». بيتحفظ لوحده لما تقف عن الكتابة.</p>`;
+    }
+    if ((l.f === "text" || l.f === "lyrics") && s.verb === "genvoice") {
+      const m = voModel(o), music = m.mode === "music";
+      return head + editable(`opt:${l.f}`, o[l.f] || "", l.f === "lyrics" ? "[Verse] ... [Chorus] ..." : music ? "مثلًا: موسيقى هادية بيانو ودرامز خفيفة، مود متفائل" : "اكتب الكلام اللي عايزه يتقال بالظبط")
+        + `<p class="bm-note">${l.f === "lyrics" ? "لو فاضية بتطلع موسيقى من غير كلام." : music ? "الموسيقى بتتحط تحت الفيديو، وبتتحفظ في «الموسيقى» في المكتبة." : "التعليق بيتحط على الفيديو، وبيتحفظ في «التعليقات الصوتية» في المكتبة."} بيتحفظ لوحده لما تقف عن الكتابة.</p>`;
+    }
+    if (l.f === "lang" && s.verb === "genvoice") {
+      const D = Object.entries(M.dialects || {}), cur = M.dialects?.[o.lang] ? o.lang : "ar-eg-cairo";
+      return head + `<p class="am-gh">عربي</p>` + pills("lang", D.filter(([, v]) => v.group === "ar").map(([k, v]) => [k, v.label]), cur) + `<p class="am-gh">لغات تانية</p>` + pills("lang", D.filter(([, v]) => v.group !== "ar").map(([k, v]) => [k, v.label]), cur);
+    }
+    if (l.f === "voice" && s.verb === "genvoice") {
+      const m = voModel(o);
+      if (m.mode === "std") { const lang = M.dialects?.[o.lang] ? o.lang : "ar-eg-cairo", vs = M.dialects?.[lang]?.voices || []; return head + pills("voice", vs.map((v) => [v, M.voices?.[v] || v]), vs.includes(o.voice) ? o.voice : vs[0]); }
+      return head + pills("voice", (m.voices || []).map((v) => [v, v]), (m.voices || []).includes(o.voice) ? o.voice : (m.voices || [])[0]);
+    }
+    if (l.f === "model" && s.verb === "genimg") {
+      const ms = M.img_models || [], cur = imgModel(o)?.key;
+      return head + `<p class="bm-note">الموديلات اللي بتقبل صور مرجع بيظهرلها «صور المرجع». السعر لكل صورة.</p>`
+        + `<p class="am-gh">بتقبل صور مرجع</p>` + pills("model", ms.filter((m) => m.refs).map((m) => [m.key, `${m.label} · $${m.price}`]), cur)
+        + (ms.some((m) => !m.refs) ? `<p class="am-gh">من الوصف بس</p>` + pills("model", ms.filter((m) => !m.refs).map((m) => [m.key, `${m.label} · $${m.price}`]), cur) : "");
+    }
+    if (l.f === "model" && s.verb === "genvoice") {
+      const ms = M.voice_models || [], cur = voModel(o).model, G = [["std", "🎙️ أصوات جاهزة بكل اللهجات"], ["tts", "🗣️ موديلات كلام على Atlas"], ["music", "🎵 موسيقى"]];
+      return head + `<p class="bm-note">الموديلات اللي بتقبل صوت مرجع بيظهرلها «صوت مرجع» تمنشن فيه صوت شخصية أو صوتك أو تعليق من المكتبة.</p>`
+        + G.map(([mode, t]) => { const xs = ms.filter((m) => m.mode === mode); return xs.length ? `<p class="am-gh">${t}</p>` + pills("model", xs.map((m) => [m.model, `${m.label}${m.ref ? " · بيقبل صوت مرجع" : ""}${m.price ? ` · $${m.price}` : ""}`]), cur) : ""; }).join("");
+    }
+    if (["refs", "start", "end", "audio", "ref"].includes(l.f)) return head + refsCard(s, l.f);
     if (l.f === "note") return head + editable("opt:note", o.note || "", "مثلًا: اقطع عند آخر كل جملة، وشيل أول ٣ ثواني، ومن غير السكوت الطويل") + `<p class="bm-note">لو سبته فاضي: قطع متساوية، والقطع بيتزق لأقرب سكوت علشان مايقطعش في نص كلمة. لو كتبت: المخ بيسمع الكلام ويقطّع على حسب طلبك (بيتخصم على قد طول الفيديو).</p>`;
     if (l.f === "model") {
       const cur = genModel(o)?.model;
@@ -708,7 +778,8 @@ const AutoPage = (() => {
           const it = { kind: r.kind, id: r.id, label: r.label, thumb: r.thumb };
           if (f !== "refs") return saveSteps(mapStep(s.id, (x) => ({ ...x, opts: { ...x.opts, [f]: it } })));
           const cur = s.opts.refs || [], has = cur.some((x) => refKey(x) === refKey(r));
-          if (!has && cur.length >= (S.meta.max_refs || 6)) return toast(`أقصى عدد ${S.meta.max_refs || 6} مراجع`, true);
+          const maxR = s.verb === "genimg" ? imgModel(s.opts)?.max_refs || 4 : S.meta.max_refs || 6;
+          if (!has && cur.length >= maxR) return toast(`أقصى عدد ${maxR} مراجع للموديل ده`, true);
           return saveSteps(mapStep(s.id, (x) => ({ ...x, opts: { ...x.opts, refs: has ? cur.filter((y) => refKey(y) !== refKey(r)) : [...cur, it] } })));
         }
         if ((b = t.closest("[data-refset]"))) { const [f, kind] = b.dataset.refset.split("|"); return saveSteps(mapStep(s.id, (x) => ({ ...x, opts: { ...x.opts, [f]: { kind, id: "", label: "" } } }))); }
