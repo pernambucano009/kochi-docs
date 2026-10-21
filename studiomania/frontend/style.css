@@ -2586,9 +2586,10 @@ dialog.cal-dlg { width: min(720px, 94vw); max-height: 90vh; border: 1px solid va
 :root:root .stage-title { margin-top: 6px; gap: 6px; }
 :root:root .stage-title h2 { font-size: 40px; font-weight: 500; letter-spacing: -.01em; }
 .stage-en { font-size: 12px; }
-:root:root :is(.stage-bell, .stage-money, .stage-cal) { width: 44px; height: 44px; border: 0; border-radius: 50%; padding: 0; display: grid; place-items: center; background: var(--card); box-shadow: 0 4px 18px rgba(24, 23, 24, .08); color: var(--text); cursor: pointer; }
+:root:root :is(.stage-bell, .stage-money, .stage-cal, .stage-plans) { width: 44px; height: 44px; border: 0; border-radius: 50%; padding: 0; display: grid; place-items: center; background: var(--card); box-shadow: 0 4px 18px rgba(24, 23, 24, .08); color: var(--text); cursor: pointer; }
 .stage-money { grid-area: money; } .stage-money[hidden] { display: none !important; }
 .stage-cal { grid-area: cal; }
+.stage-plans svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; }
 .stage-cal svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; }
 .stage-money svg { width: 40px; height: 40px; overflow: visible; }
 .stage-money circle { fill: none; stroke-width: 3; }

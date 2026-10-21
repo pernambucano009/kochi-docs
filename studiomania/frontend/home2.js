@@ -67,6 +67,7 @@ const NH = (() => {
     plan: { en: "Content Plan", ar: "خطة المحتوى", icon: "megaphone", page: "plan", desc: "استراتيجية حسابك، بتتبني لوحدها من كل اللي العقل عرفه عنك." },
     rivals: { en: "Your Competitors", ar: "منافسينك", icon: "megaphone", page: "rivals", desc: "البرنامج بيقترح منافسين وانت بتوافق، ومنهم اللي بينجح عندهم ووصفة الاستهداف." },
     wacamp: { en: "WhatsApp Campaigns", ar: "حملات واتساب", icon: "megaphone", page: "wacamp", desc: "اجمع موافقات الناس، واعمل رسايل متوافق عليها، وابعت حملات وسلاسل متابعة للمشتركين بس." },
+    plans: { en: "My Plan & Credits", ar: "باقتي ونقاطي", icon: "settings", page: "plans", desc: "باقتك ونقطك، والأبجريد، والنقط الزيادة." },
     adsmgr: { en: "Your Ads", ar: "إعلاناتك", icon: "megaphone", page: "adsmgr", desc: "روّج بوست أو اعمل إعلان جديد بالاستهداف من الوصفة، وتابع أرقامه، واعمل جماهير." },
     auto: { en: "Custom Model", ar: "الموديل المخصص", icon: "film", page: "auto", desc: "خطوات بترتّبها بنفسك (اسحب، حط، قطّع، صدّر) من مكتبة العقل، وكل تشغيل فيديو جديد." },
     brainlib: { en: "Content Library", ar: "مكتبة محتويات البراند", icon: "film", page: "brainlib", desc: "الخلفيات والأماكن، والتعليقات الصوتية، والموسيقى، والكوميكس، وفولدراتك. كل ملف تقدر تمنشنه في الأوتوميشن." },
@@ -177,7 +178,7 @@ const NH = (() => {
     </div>`;
   document.body.appendChild(bar);
   // الرصيد والردود والمواعيد (كانوا في راس الصفحات) بقوا في الشريط، وبيبانوا بره الرئيسية بس
-  ["stageMoney", "stageInbox", "stageCal"].forEach((id) => { const el = document.getElementById(id); if (el) { el.classList.add("nh-xtra"); document.getElementById("nhTools").prepend(el); } });
+  ["stageMoney", "stagePlans", "stageInbox", "stageCal"].forEach((id) => { const el = document.getElementById(id); if (el) { el.classList.add("nh-xtra"); document.getElementById("nhTools").prepend(el); } });
   // عنوان الصفحة المفتوحة: في نفس الركن اللي المربع كان فيه في الرئيسية (الإعدادات تحت شمال ← عنوانها تحت شمال)
   const corner = document.createElement("div");
   corner.id = "nhCorner";
@@ -502,7 +503,7 @@ const NH = (() => {
     pjFilter();
   });
   // صفحات كاملة بتنزل لتحت (عقل البراند، مكتبة الموشن): كل واحدة ليها موديول بيرسمها
-  const MODS = { brand: BrandPage, motion: MotionPage, coaches: CharactersPage, voice: VoicesPage, music: MusicPage, viral: ViralPage, ref2p: Ref2PromptPage, rivals: RivalsPage, plan: RivalsPage, adsmgr: AdsMgrPage, wacamp: WaCampPage, comics: ComicsPage, brainlib: BrainLibPage, auto: AutoPage };
+  const MODS = { brand: BrandPage, motion: MotionPage, coaches: CharactersPage, voice: VoicesPage, music: MusicPage, viral: ViralPage, ref2p: Ref2PromptPage, rivals: RivalsPage, plan: RivalsPage, adsmgr: AdsMgrPage, wacamp: WaCampPage, plans: PlansPage, comics: ComicsPage, brainlib: BrainLibPage, auto: AutoPage };
   const stopMedia = () => { MotionPage.close(); VoicesPage.close(); MusicPage.close(); CharactersPage.close?.(); Ref2PromptPage.close(); RivalsPage.close(); ComicsPage.close(); BrainLibPage.close(); AutoPage.close(); };
   let pageArg = null, pStack = [];
   // عنوان الصفحة (من البروتوتايب): الأيقونة الزجاج كبيرة، وفوق الاسم اسم القسم بالإنجليزي بالبرتقالي
@@ -790,6 +791,14 @@ const NH = (() => {
   return {
     refresh,
     // عقل البراند من أي مكان في البرنامج: لو فيه قسم مفتوح بيتقفل الأول، والصفحة بتفتح من مربع البراند
+    // 💳 باقتي ونقاطي من أيقونة الشريط: الصفحة بتطلع من الأيقونة نفسها (زي ما المربع بيكبر في الرئيسية)
+    openPlans(btn) {
+      const go = () => {
+        if (zoom?.page) return pGrid.dataset.key === "plans" ? null : swapPage("plans");
+        openPage(btn, "plans");
+      };
+      if (!$("stage").hidden) { closeStage(); setTimeout(go, 1100); } else go();
+    },
     openBrand(id) {
       const go = () => {
         if (zoom?.page) {
