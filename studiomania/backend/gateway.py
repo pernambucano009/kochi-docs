@@ -368,25 +368,91 @@ def provider_watch() -> None:
         d = providers.refresh(f, owner_keys())
     rows = providers.alerts(d)
     providers.save(f, d)
-    if not rows:
-        return
+    for row in rows:
+        title, body = providers.alert_text(row)
+        admin_alert(title, body, f"credit:{row['key']}", "اشحن من لوحة المنصة، وبعدها البرنامج هيرجع يشتغل لوحده.")
+
+
+def admin_alert(title: str, body: str, ref: str, tail: str = "") -> None:
+    """تنبيه للأدمن: جرس في البرنامج (قاعدة بيانات مساحة صاحب البرنامج) + إيميل."""
+    from datetime import datetime, timezone
+    try:
+        with closing(sqlite3.connect(DATA_DIR / "studiomania.db", timeout=10)) as c, c:
+            c.execute("INSERT INTO notifications (id, kind, level, title, body, link, ref, read, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)",
+                      (uuid.uuid4().hex[:12], "admin", "bad", title, body, "settings", ref, datetime.now(timezone.utc).isoformat(timespec="seconds")))
+    except sqlite3.Error:
+        pass
     with closing(db()) as c:
         admins = [r["email"] for r in c.execute("SELECT email FROM users WHERE role='admin'")]
     want = (os.environ.get("ADMIN_EMAIL") or "").strip().lower()
-    to = sorted({*admins, *([want] if want else [])})
-    for row in rows:
-        title, body = providers.alert_text(row)
+    for email in sorted({*admins, *([want] if want else [])}):
         try:
-            with closing(sqlite3.connect(DATA_DIR / "studiomania.db", timeout=10)) as c, c:
-                c.execute("INSERT INTO notifications (id, kind, level, title, body, link, ref, read, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)",
-                          (uuid.uuid4().hex[:12], "credit", "bad", title, body, "settings", f"credit:{row['key']}", datetime.now(timezone.utc).isoformat(timespec="seconds")))
-        except sqlite3.Error:
+            mailer.send(email, f"{title} · {mailer.BRAND}", f"{body}\n\n{tail}".strip())
+        except Exception:  # noqa: BLE001  (الإيميل مش أهم من الجرس)
             pass
-        for email in to:
-            try:
-                mailer.send(email, f"{title} · {mailer.BRAND}", f"{body}\n\nاشحن من لوحة المنصة، وبعدها البرنامج هيرجع يشتغل لوحده.")
-            except Exception:  # noqa: BLE001  (الإيميل مش أهم من الجرس)
-                pass
+
+
+# ---------------------------------------------------------------- 🗄️ النسخة الاحتياطية اليومية على جوجل درايف
+_backup_busy = threading.Lock()
+
+
+def backup_state() -> dict:
+    try:
+        last = json.loads(kv_get("backup_last") or "{}")
+    except ValueError:
+        last = {}
+    return {"connected": bool(kv_get("drive_refresh")), "email": kv_get("drive_email") or "", "last": last,
+            "error": kv_get("backup_error") or "", "google": bool(os.environ.get("GOOGLE_CLIENT_ID") and os.environ.get("GOOGLE_CLIENT_SECRET")),
+            "busy": _backup_busy.locked(), "keep": __import__("backup").KEEP}
+
+
+def backup_now() -> dict:
+    import backup
+    if not _backup_busy.acquire(blocking=False):
+        raise backup.BackupError("فيه نسخة بتتعمل دلوقتي")
+    try:
+        out = backup.run(DATA_DIR, kv_get("drive_refresh") or "", os.environ.get("GOOGLE_CLIENT_ID", ""), os.environ.get("GOOGLE_CLIENT_SECRET", ""),
+                         kv_get("drive_folder"))
+        kv_set("drive_folder", out["folder"])
+        kv_set("backup_last", json.dumps(out))
+        kv_set("backup_error", "")
+        return out
+    except (backup.BackupError, httpx.HTTPError, OSError) as exc:
+        kv_set("backup_error", str(exc)[:300])
+        kv_set("backup_tried", str(time.time()))
+        raise backup.BackupError(str(exc)) from exc
+    finally:
+        _backup_busy.release()
+
+
+def backup_first() -> None:
+    import backup
+    try:
+        backup_now()
+    except backup.BackupError:
+        pass   # الغلطة بتظهر في الإعدادات
+
+
+def backup_tick() -> None:
+    """مرة في اليوم (ولو فشلت بنجرّب تاني بعد ٣ ساعات، والتنبيه مرة واحدة لكل غلطة)."""
+    import backup
+    if not kv_get("drive_refresh") or not os.environ.get("GOOGLE_CLIENT_ID"):
+        return
+    try:
+        last = float(json.loads(kv_get("backup_last") or "{}").get("at") or 0)
+    except ValueError:
+        last = 0
+    tried = float(kv_get("backup_tried") or 0)
+    if time.time() - last < backup.EVERY or time.time() - tried < 3 * 3600:
+        return
+    kv_set("backup_tried", str(time.time()))
+    try:
+        backup_now()
+        kv_set("backup_alerted", "")
+    except backup.BackupError as exc:
+        if kv_get("backup_alerted") != str(exc)[:120]:
+            kv_set("backup_alerted", str(exc)[:120])
+            admin_alert("🔴 النسخة الاحتياطية مااتعملتش", str(exc)[:300], "backup", "افتح الإعدادات ← النسخة الاحتياطية، ودوس «اعمل نسخة دلوقتي» أو اربط جوجل درايف تاني.")
 
 
 def reaper() -> None:
@@ -395,6 +461,10 @@ def reaper() -> None:
         try:
             provider_watch()
         except Exception:  # noqa: BLE001  (المراقبة عمرها ماتوقف البوابة)
+            pass
+        try:
+            backup_tick()
+        except Exception:  # noqa: BLE001
             pass
         for wid, t in list(_tenants.items()):
             if t.proc.poll() is not None:
@@ -1077,6 +1147,69 @@ def admin(request: Request) -> sqlite3.Row:
     if not u or u["role"] != "admin":
         raise HTTPException(403, "للأدمن بس")
     return u
+
+
+@app.get("/auth/drive")
+def drive_start(request: Request):
+    """ربط جوجل درايف للنسخة الاحتياطية (الأدمن بس)."""
+    import backup
+    admin(request)
+    cid = os.environ.get("GOOGLE_CLIENT_ID")
+    if not cid or not os.environ.get("GOOGLE_CLIENT_SECRET"):
+        return RedirectResponse("/#settings")
+    state = secrets.token_urlsafe(16)
+    resp = RedirectResponse(backup.oauth_url(cid, f"{base_url(request)}/auth/drive/callback", state))
+    resp.set_cookie("d_state", state, max_age=600, httponly=True, samesite="lax")
+    return resp
+
+
+@app.get("/auth/drive/callback")
+def drive_back(request: Request, code: str = "", state: str = "", error: str = ""):
+    import backup
+    admin(request)
+    if error or not state or not hmac.compare_digest(state, request.cookies.get("d_state") or ""):
+        return RedirectResponse("/#settings")
+    try:
+        r = backup.exchange(code, os.environ["GOOGLE_CLIENT_ID"], os.environ.get("GOOGLE_CLIENT_SECRET", ""), f"{base_url(request)}/auth/drive/callback")
+    except (backup.BackupError, httpx.HTTPError, KeyError) as exc:
+        kv_set("backup_error", str(exc)[:300])
+        return RedirectResponse("/#settings")
+    kv_set("drive_refresh", r["refresh"])
+    kv_set("drive_email", r["email"])
+    kv_set("drive_folder", "")
+    kv_set("backup_error", "")
+    kv_set("backup_tried", "0")
+    threading.Thread(target=backup_first, daemon=True).start()   # أول نسخة على طول
+    resp = RedirectResponse("/#settings")
+    resp.delete_cookie("d_state")
+    return resp
+
+
+@app.get("/api/platform/backup")
+def backup_get(request: Request):
+    admin(request)
+    return backup_state()
+
+
+@app.post("/api/platform/backup")
+async def backup_run(request: Request):
+    import backup
+    admin(request)
+    if not kv_get("drive_refresh"):
+        raise HTTPException(400, "اربط جوجل درايف الأول")
+    try:
+        await asyncio.to_thread(backup_now)
+    except backup.BackupError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    return backup_state()
+
+
+@app.post("/api/platform/backup/disconnect")
+def backup_disconnect(request: Request):
+    admin(request)
+    kv_set("drive_refresh", "")
+    kv_set("drive_email", "")
+    return backup_state()
 
 
 @app.get("/api/platform/users")

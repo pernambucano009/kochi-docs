@@ -58,7 +58,36 @@ $("logout").onclick = async () => {
   location.href = "/login";
 };
 
-viewHooks["settings"] = () => { loadSettings(); markLook(); loadSetAccounts(); loadSetCredit(); loadKochiOld(); loadProviders(); };
+viewHooks["settings"] = () => { loadSettings(); markLook(); loadSetAccounts(); loadSetCredit(); loadKochiOld(); loadProviders(); loadBackup(); };
+
+// ---------- 🗄️ النسخة الاحتياطية على جوجل درايف (البوابة هي اللي بتعملها) ----------
+function renderBackup(b) {
+  const box = $("bkBox");
+  if (!box) return;
+  const last = b.last?.at ? `${new Date(b.last.at * 1000).toLocaleString(UI_LOCALE(), { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })} · ${(b.last.size / 1048576).toFixed(1)} ميجا · ${b.last.files} ملف` : "لسه مااتعملتش";
+  box.innerHTML = !b.google ? `<p class="hint">⚠️ محتاج GOOGLE_CLIENT_ID و GOOGLE_CLIENT_SECRET في Railway الأول (نفس بتوع الدخول بجوجل).</p>`
+    : !b.connected ? `<div class="row wrap"><a class="btn primary" href="/auth/drive">🔗 اربط جوجل درايف</a></div><p class="hint">هتسجّل دخول بإيميل الشركة. البرنامج بيشوف الملفات اللي هو عملها بس.</p>${b.error ? `<p class="hint bad">⚠️ ${escapeHtml(b.error)}</p>` : ""}`
+    : `<p>✅ مربوط بـ <b dir="ltr">${escapeHtml(b.email || "جوجل درايف")}</b></p>
+       <p class="hint">آخر نسخة: ${escapeHtml(last)}${b.busy ? " · ⏳ بتتعمل دلوقتي" : ""}</p>
+       ${b.error ? `<p class="hint bad">⚠️ آخر محاولة فشلت: ${escapeHtml(b.error)}</p>` : ""}
+       <div class="row wrap"><button type="button" class="btn sm primary" id="bkRun" ${b.busy ? "disabled" : ""}>اعمل نسخة دلوقتي</button>
+         <button type="button" class="btn sm" id="bkOff">افصل الدرايف</button></div>`;
+}
+async function loadBackup() {
+  const box = $("bkBox");
+  if (!box) return;
+  try { renderBackup(await api("/api/platform/backup")); }
+  catch { box.innerHTML = `<p class="hint">النسخة الاحتياطية بتشتغل على السيرفر بس (من خلال البوابة).</p>`; }
+}
+$("bkBox")?.addEventListener("click", async (e) => {
+  if (e.target.closest("#bkRun")) {
+    e.target.disabled = true; e.target.textContent = "⏳ بيعمل النسخة…";
+    try { renderBackup(await api("/api/platform/backup", { method: "POST" })); toast("✅ النسخة اترفعت على الدرايف"); } catch (err) { toast(err.message, true); loadBackup(); }
+  }
+  if (e.target.closest("#bkOff") && (await uiConfirm("تفصل جوجل درايف؟ النسخ اليومية هتقف."))) {
+    try { renderBackup(await api("/api/platform/backup/disconnect", { method: "POST" })); } catch (err) { toast(err.message, true); }
+  }
+});
 
 // ---------- 💳 رصيد المنصات (للأدمن): الرصيد وحد التنبيه لكل منصة ----------
 const PROV_ST = { ok: ["✓ تمام", "ok"], low: ["🟠 قرّب يخلص", "low"], bad: ["🔴 خلص / فيه مشكلة", "bad"], unknown: ["—", ""] };
