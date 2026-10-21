@@ -794,6 +794,14 @@
                     <label class="field">الكلمة (أو كذا كلمة بفاصلة) <input type="text" id="dmWords" placeholder="مثلًا: عايز"></label>
                     <label class="field">الرسالة اللي هتوصله على الخاص <textarea id="dmMessage" rows="3" placeholder="لينك، عرض، هدية، أو لينك الواتساب"></textarea></label>
                     <label class="field">الرد على الكومنت نفسه (اختياري) <input type="text" id="dmReply" placeholder="بعتنالك رسالة على الخاص 💬"></label>
+                    <label class="check"><input type="checkbox" id="dmGate" checked> 🔒 اسأله الأول «عامل فولو؟» واللينك يوصله لما يقول «أيوة»</label>
+                    <details class="dm-flow" id="dmFlow"><summary>⚙️ سيناريو الرد</summary>
+                      <ol class="dm-steps"><li>بيعلّق بالكلمة ← يوصله السؤال:<textarea id="dmAsk" rows="2"></textarea></li>
+                        <li>يرد بكلمة من دول ← يوصله اللي فوق (الرسالة):<input type="text" id="dmYes" placeholder="أيوة، تم، عملت…"></li>
+                        <li>يرد بأي حاجة تانية ← يوصله:<textarea id="dmNudge" rows="2"></textarea>ولما يبعت «تم» يوصله اللي طلبه.</li></ol>
+                      <div class="loc-row"><button type="button" class="btn sm" id="dmFlowSave">💾 احفظ السيناريو للبراند</button><span class="muted" id="dmFlowStat"></span></div>
+                      <p class="hint">مش بنتأكد من الفولو بجد، بنصدّق إجابته. السيناريو ده بيتحفظ للبراند وبيشتغل على كل البوستات.</p>
+                    </details>
                     <div class="loc-row"><button type="button" class="btn sm" id="dmCta"><span class="emo">✍️</span> ضيف الدعوة للكابشن</button></div>
                     <p class="hint" id="dmHint">بيشتغل على إنستجرام وفيسبوك أول ما البوست يتنشر. تيك توك مش بيسمح بالرد الأوتوماتيك في منطقتنا، فالدعوة في تيك توك بتبقى «ابعت الكلمة على الواتساب».</p>
                   </div>

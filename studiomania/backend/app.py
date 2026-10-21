@@ -3743,6 +3743,7 @@ class PostOptions(BaseModel):
     dm_words: list[str] = []
     dm_message: str = ""
     dm_reply: str = ""
+    dm_gate: bool = True         # 🔒 يسأله «عامل فولو؟» الأول، ولما يقول أيوة يوصله اللي طلبه
 
 
 class PostIn(BaseModel):
@@ -3775,7 +3776,7 @@ def clean_options(opts: PostOptions) -> str:
             raise HTTPException(400, "«علّق بكلمة»: اكتب الكلمة اللي الناس هتكتبها في الكومنت")
         if not opts.dm_message.strip():
             raise HTTPException(400, "«علّق بكلمة»: اكتب الرسالة اللي هتوصلهم على الخاص")
-        out["dm"] = {"words": words, "message": opts.dm_message.strip()[:900], "reply": opts.dm_reply.strip()[:200]}
+        out["dm"] = {"words": words, "message": opts.dm_message.strip()[:900], "reply": opts.dm_reply.strip()[:200], "gate": bool(opts.dm_gate)}
     return json.dumps(out)
 
 
@@ -4089,8 +4090,10 @@ def dm_start(post_id: str) -> None:
         if not word:
             return
         d = dm_defaults_for(r["client_id"] or active_client_id())
-        dm = {"words": [word], "message": d["message"], "reply": d["reply"], "auto": True}
+        dm = {"words": [word], "message": d["message"], "reply": d["reply"], "auto": True, "gate": dmflow.settings(brain_row(r["client_id"] or "") or {})["on"]}
         opts["dm"] = dm
+    flow = dmflow.settings(brain_row(r["client_id"] or active_client_id() or "") or {})
+    gate = bool(dm.get("gate", flow["on"]))
     for tgt in json.loads(r["platforms"] or "[]"):
         plat, acc = publisher.split_target(tgt)
         if plat not in DM_PLATFORMS or (done.get(plat) or {}).get("id"):
@@ -4101,8 +4104,12 @@ def dm_start(post_id: str) -> None:
                 if not acc:
                     acc = "m-acc" if publisher.service_name() == "mock" else publisher.resolve_targets([tgt])[0][1]
                 pid = wacamp.platform_post_id(r["remote_id"] or post_id, plat)
-                a = wacamp.comment_automation(acc, pid, f"علّق بكلمة: {(r['caption'] or '')[:40]}", dm["words"], dm["message"], dm.get("reply") or "")
-                done[plat] = {"id": a.get("id"), "error": None}
+                first = flow["ask"] if gate else dm["message"]   # 🔒 السؤال الأول، واللينك بيتبعت لما يرد «أيوة»
+                a = wacamp.comment_automation(acc, pid, f"علّق بكلمة: {(r['caption'] or '')[:40]}", dm["words"], first, dm.get("reply") or "")
+                done[plat] = {"id": a.get("id"), "error": None, "gate": gate}
+                if gate and a.get("id"):
+                    DM_STORE.add_gate(a["id"], acc, plat, dm["message"], dm["words"], post_id, r["client_id"] or "", flow)
+                    dm_hook_ready()
                 if a.get("id") and r["client_id"]:
                     wa_push(r["client_id"], "automations", a["id"])
                 break
@@ -4114,6 +4121,77 @@ def dm_start(post_id: str) -> None:
             notify("post", "bad", "«علّق بكلمة» مااشتغلش", f"{publisher.PLATFORMS[plat][1]}: {err}", "7", post_id)
     with closing(db()) as conn, conn:
         conn.execute("UPDATE posts SET options = ? WHERE id = ?", (json.dumps({**opts, "dm_auto": done}), post_id))
+
+
+import dmflow  # noqa: E402
+
+DM_STORE = dmflow.Store(DATA_DIR)
+_dm_hook = {"ok": False, "error": ""}
+DM_MOCK_SENT: list[dict] = []   # وضع التجربة: الرسايل اللي كانت هتتبعت
+
+
+def dm_hook_ready() -> None:
+    """مرة واحدة لكل تشغيل: الخدمة بتبعت الردود اللي على الخاص للبوابة (ومنها لنسخة العميل ده)."""
+    if _dm_hook["ok"]:
+        return
+    err = dmflow.ensure_webhook(os.environ.get("PUBLIC_URL") or "", dmflow.hook_secret())
+    _dm_hook.update(ok=not err, error=err)
+    if err:
+        notify("post", "bad", "الردود على الخاص مش هتوصل", err, "7", "dmhook")
+
+
+class DmFlowIn(BaseModel):
+    on: bool = True
+    ask: str = ""
+    nudge: str = ""
+    yes: list[str] = []
+
+
+@app.get("/api/dm/flow")
+def dm_flow_get():
+    """⚙️ سيناريو «علّق بكلمة»: السؤال، والرد لو لسه ماعملش فولو، والكلمات اللي بتعتبر «أيوة»."""
+    bid = rivals_client()
+    d = DM_STORE.load()
+    mine = {k for k, g in d["gates"].items() if g.get("brand") == bid}
+    return {**dmflow.settings(brain_row(bid)), "hook_error": _dm_hook["error"], "gates": len(mine), "mock_sent": DM_MOCK_SENT[-10:],
+            "sent": sum(1 for p in d["people"].values() if p.get("gate") in mine and p.get("state") == "sent"),
+            "nudged": sum(1 for p in d["people"].values() if p.get("gate") in mine and p.get("state") == "nudged")}
+
+
+@app.post("/api/dm/flow")
+def dm_flow_set(body: DmFlowIn):
+    bid = rivals_client()
+    clean = dmflow.clean_settings(body.model_dump())
+
+    def fn(d):
+        d["dmflow"] = clean
+    update_brain(bid, fn)
+    return dm_flow_get()
+
+
+@app.post("/api/_hooks/dm")
+async def dm_hook(request: Request):
+    """الرسايل اللي على الخاص (جاية من البوابة بعد ما اتأكدت من التوقيع): بنكمّل السيناريو."""
+    try:
+        payload = await request.json()
+    except ValueError:
+        raise HTTPException(400, "bad json")
+    msg = dmflow.parse(payload)
+    if not msg:
+        return {"ok": True, "did": "ignored"}
+
+    def send(conv: str, acc: str, text: str) -> None:
+        if publisher.service_name() == "mock":
+            DM_MOCK_SENT.append({"conv": conv, "text": text})
+            return
+        publisher.inbox_send(conv, acc, text)
+
+    try:
+        import asyncio
+        did = await asyncio.to_thread(dmflow.handle, DM_STORE, msg, send)
+    except (publisher.PublishError, httpx.HTTPError) as exc:
+        did = f"error: {exc}"[:200]
+    return {"ok": True, "did": did}
 
 
 SPOKEN_CTA_FILE = DATA_DIR / "spoken_cta.json"   # الكلام اللي في آخر كل فيديو بيتسمع مرة واحدة بس

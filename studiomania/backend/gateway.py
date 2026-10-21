@@ -256,6 +256,33 @@ def owner_keys() -> dict:
     return out
 
 
+def hook_secret() -> str:
+    v = kv_get("zernio_hook_secret")
+    if not v:
+        v = secrets.token_hex(24)
+        kv_set("zernio_hook_secret", v)
+    return v
+
+
+# 💬 مين صاحب حساب السوشيال ده؟ كل نسخة بتكتب حساباتها اللي عليها «علّق بكلمة» في dm_accounts.json
+_dm_routes: dict = {"t": 0.0, "map": {}}
+
+
+def dm_route(account: str) -> str | None:
+    if time.time() - _dm_routes["t"] > 30 or account not in _dm_routes["map"]:
+        m = {}
+        for d in [DATA_DIR, *(p for p in TENANTS.iterdir() if p.is_dir())]:
+            try:
+                accs = json.loads((d / "dm_accounts.json").read_text("utf-8"))
+            except (OSError, ValueError):
+                continue
+            wid = OWNER if d == DATA_DIR else d.name
+            for a in accs if isinstance(accs, list) else []:
+                m[str(a)] = wid
+        _dm_routes.update(t=time.time(), map=m)
+    return _dm_routes["map"].get(account)
+
+
 def tenant_env(wid: str) -> dict:
     env = dict(os.environ)
     for k, v in owner_keys().items():
@@ -270,6 +297,7 @@ def tenant_env(wid: str) -> dict:
     for k in list(env):
         if k.startswith(("STRIPE_", "PAYPAL_", "TAP_", "SMTP_", "RESEND_", "GOOGLE_CLIENT_")):
             env.pop(k)
+    env["ZERNIO_HOOK_SECRET"] = hook_secret()   # توقيع الرسايل اللي جاية من خدمة النشر (علّق بكلمة)
     if wid == OWNER:
         if kv_get("zernio_owner_profile"):
             env["ZERNIO_PROFILE_ID"] = kv_get("zernio_owner_profile")
@@ -1073,9 +1101,35 @@ async def capped(stream):
         yield chunk
 
 
+@app.post("/hooks/zernio")
+async def zernio_hook(request: Request):
+    """الرسايل اللي على الخاص من خدمة النشر: بنتأكد من التوقيع، ونوصّلها لنسخة العميل صاحب الحساب."""
+    import dmflow
+    raw = await request.body()
+    if not dmflow.verify(raw, request.headers.get("x-zernio-signature") or "", hook_secret()):
+        return JSONResponse({"detail": "bad signature"}, status_code=401)
+    try:
+        payload = json.loads(raw)
+    except ValueError:
+        return JSONResponse({"detail": "bad json"}, status_code=400)
+    msg = dmflow.parse(payload)
+    wid = dm_route(msg["account"]) if msg else None
+    if not wid:
+        return {"ok": True, "did": "no-route"}
+    t = await ensure(wid)
+    try:
+        r = await _http.post(f"http://127.0.0.1:{t.port}/api/_hooks/dm", content=raw,
+                             headers={"x-gateway-secret": GATEWAY_SECRET, "content-type": "application/json"}, timeout=60)
+        return JSONResponse(r.json(), status_code=r.status_code)
+    except (httpx.HTTPError, ValueError):
+        return JSONResponse({"detail": "tenant error"}, status_code=502)
+
+
 @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"])
 async def proxy(path: str, request: Request):
     url_path = "/" + path
+    if url_path.startswith(("/api/_hooks/", "/api/_tenant/")):   # داخلي بين البوابة والنسخ بس
+        return JSONResponse({"detail": "مش موجود"}, status_code=404)
     u = current_user(request)
     if not u or not u["verified"]:
         # ملفات الشكل (CSS / JS) لصفحات الدخول بتتقرا من الفولدر على طول

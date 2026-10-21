@@ -486,13 +486,28 @@ function postOptions() {
     dm_words: $("dmWords").value.split(/[,،]/).map((t) => t.trim()).filter(Boolean),
     dm_message: $("dmMessage").value,
     dm_reply: $("dmReply").value,
+    dm_gate: $("dmGate").checked,
   };
 }
 
 // 💬 «علّق بكلمة»: أول مرة بتتفتح بتتملى من خطة المحتوى ولينك الواتساب
-let dmDef = null;
+let dmDef = null, dmFlowD = null;
+async function dmFlowLoad() {
+  try { dmFlowD = await api("/api/dm/flow"); } catch { return; }
+  $("dmAsk").value = dmFlowD.ask; $("dmNudge").value = dmFlowD.nudge; $("dmYes").value = dmFlowD.yes.join("، ");
+  if (!pub.editing) $("dmGate").checked = dmFlowD.on;
+  $("dmFlowStat").textContent = dmFlowD.hook_error ? `⚠️ ${dmFlowD.hook_error}` : dmFlowD.gates ? `${dmFlowD.sent} وصلهم اللينك · ${dmFlowD.nudged} مستنيين يعملوا فولو` : "";
+}
+$("dmFlowSave").addEventListener("click", async () => {
+  try {
+    dmFlowD = await api("/api/dm/flow", { method: "POST", ...jsonBody({ on: $("dmGate").checked, ask: $("dmAsk").value, nudge: $("dmNudge").value,
+      yes: $("dmYes").value.split(/[,،]/).map((x) => x.trim()).filter(Boolean) }) });
+    toast("✅ السيناريو اتحفظ للبراند");
+  } catch (err) { toast(err.message, true); }
+});
 async function dmFill() {
   $("dmBox").hidden = !$("dmOn").checked;
+  if ($("dmOn").checked && !dmFlowD) dmFlowLoad();
   if (!$("dmOn").checked || $("dmWords").value || $("dmMessage").value) return;
   try { dmDef = dmDef || (await api("/api/dm/defaults")); } catch { dmDef = {}; }
   $("dmWords").value = dmDef.word || "";
@@ -710,6 +725,7 @@ function editPost(p) {
   $("dmWords").value = (o.dm?.words || []).join("، ");
   $("dmMessage").value = o.dm?.message || "";
   $("dmReply").value = o.dm?.reply || "";
+  $("dmGate").checked = o.dm ? o.dm.gate !== false : true;
   $("dmBox").hidden = !o.dm;
   renderReady();
   renderPostVideo();
