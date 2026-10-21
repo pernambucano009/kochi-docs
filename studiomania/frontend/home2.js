@@ -69,7 +69,8 @@ const NH = (() => {
     wacamp: { en: "WhatsApp Campaigns", ar: "حملات واتساب", icon: "megaphone", page: "wacamp", desc: "اجمع موافقات الناس، واعمل رسايل متوافق عليها، وابعت حملات وسلاسل متابعة للمشتركين بس." },
     plans: { en: "My Plan & Credits", ar: "باقتي ونقاطي", icon: "settings", page: "plans", desc: "باقتك ونقطك، والأبجريد، والنقط الزيادة." },
     adsmgr: { en: "Your Ads", ar: "إعلاناتك", icon: "megaphone", page: "adsmgr", desc: "روّج بوست أو اعمل إعلان جديد بالاستهداف من الوصفة، وتابع أرقامه، واعمل جماهير." },
-    auto: { en: "Custom Model", ar: "الموديل المخصص", icon: "film", page: "auto", desc: "خطوات بترتّبها بنفسك (اسحب، حط، قطّع، صدّر) من مكتبة العقل، وكل تشغيل فيديو جديد." },
+    pilot: { en: "Autopilot", ar: "الأوتوبايلوت", icon: "pulse", page: "pilot", desc: "كام بوست في اليوم، في أحسن أوقات، من القوالب اللي تختارها. يعمل لوحده أو يستنى موافقتك." },
+    auto: { en: "Custom Template", ar: "القالب المخصص", icon: "film", page: "auto", desc: "خطوات بترتّبها بنفسك (اسحب، حط، قطّع، صدّر) من مكتبة العقل، وكل تشغيل فيديو جديد." },
     brainlib: { en: "Content Library", ar: "مكتبة محتويات البراند", icon: "film", page: "brainlib", desc: "الخلفيات والأماكن، والتعليقات الصوتية، والموسيقى، والكوميكس، وفولدراتك. كل ملف تقدر تمنشنه في الأوتوميشن." },
     comics: { en: "Comics", ar: "مكتبة الكوميكس", icon: "megaphone", page: "comics", desc: "كوميكس حقيقية بسياق كل واحد، علشان تتحط في مكانها الصح." },
     ref2p: { en: "Reference → Prompt", ar: "من مرجع لبرومبت", icon: "clapper", page: "ref2p", desc: "فيديو مرجعي ← برومبت جاهز بـ 14 جزء ← توليد." },
@@ -86,7 +87,7 @@ const NH = (() => {
     return c?.logo ? `<img src="${esc(c.logo)}" alt="">` : esc((c?.name || "B").trim().slice(0, 1).toUpperCase());
   };
   const GLKEY = { create: "app", brand: "brand", assets: "assets", dubhub: "voices", settings: "settings", progress: "progress", publish: "publish", reel: "reel", raw: "film",
-    series: "series", carousel: "carousel", ad: "publish", typo: "create", dub: "voices", edit: "film", coaches: "characters", voice: "voices", music: "music" };
+    series: "series", carousel: "carousel", ad: "publish", typo: "create", dub: "voices", edit: "film", coaches: "characters", voice: "voices", music: "music", pilot: "pilot" };
   const iconOf = (k) => (k === "brand" ? `<div class="nh-plate">${brandMark()}</div>` : gi(k));
   const head = (id) => `<div class="nh-head"><div class="nh-name"><span class="latin">${T[id].en}</span><b>${T[id].ar}</b></div>${GLKEY[id] ? `<span class="gi nh-glt">${glImg(GLKEY[id])}</span>` : iconOf(T[id].icon)}</div>`;
   const dots = (n, at) => `<div class="nh-dots">${Array.from({ length: n }, (_, i) => `<i class="${i < at ? "done" : i === at ? "now" : ""}"></i>`).join("")}</div>`;
@@ -105,11 +106,12 @@ const NH = (() => {
   }
 
   // ---------- الرئيسية (نسخة أ): المجسّم في النص، والأقسام مكتوبة على الجنبين، و«ابدأ مشروع جديد» تحت المجسّم ----------
-  const SIDE_R = KOCHI ? ["brand", "assets"] : ["brand"], SIDE_L = KOCHI ? ["progress", "publish", "settings"] : ["publish", "settings"];   // RTL: أول عمود على اليمين
+  const SIDE_R = KOCHI ? ["brand", "assets"] : ["brand", "pilot"], SIDE_L = KOCHI ? ["progress", "publish", "settings"] : ["publish", "settings"];   // RTL: أول عمود على اليمين
   const META = {
     brand: () => { const pct = brainPct(D.brand); return `<span class="nh-mbar"><i style="width:${pct}%"></i></span><span>مكتمل <span class="num">${pct}%</span></span>`; },
     assets: () => `<span>${D.coaches.length} شخصية · ${D.voices} تعليق · ${D.music} موسيقى</span>`,
     dubhub: () => `<span>نفس الفيديو بلغة أو لهجة تانية</span>`,
+    pilot: () => `<span>${D.pilot?.settings?.on ? `شغّال · ${D.pilot.settings.times.length} بوست في اليوم${D.pilot.waiting ? ` · <em>${D.pilot.waiting} مستنيين منك</em>` : ""}` : "مقفول"}</span>`,
     progress: () => {
       const n = D.work.length, r = D.work.filter((p) => p.render_status === "rendering").length;
       return `<span>${n ? `${n} مشروع${r ? ` · ${r} بيتصدّر دلوقتي` : ""}` : "مفيش مشاريع لسه"}</span>`;
@@ -504,7 +506,7 @@ const NH = (() => {
     pjFilter();
   });
   // صفحات كاملة بتنزل لتحت (عقل البراند، مكتبة الموشن): كل واحدة ليها موديول بيرسمها
-  const MODS = { brand: BrandPage, motion: MotionPage, coaches: CharactersPage, voice: VoicesPage, music: MusicPage, viral: ViralPage, ref2p: Ref2PromptPage, rivals: RivalsPage, plan: RivalsPage, adsmgr: AdsMgrPage, wacamp: WaCampPage, plans: PlansPage, comics: ComicsPage, brainlib: BrainLibPage, auto: AutoPage };
+  const MODS = { brand: BrandPage, motion: MotionPage, coaches: CharactersPage, voice: VoicesPage, music: MusicPage, viral: ViralPage, ref2p: Ref2PromptPage, rivals: RivalsPage, plan: RivalsPage, adsmgr: AdsMgrPage, wacamp: WaCampPage, plans: PlansPage, comics: ComicsPage, brainlib: BrainLibPage, auto: AutoPage, pilot: PilotPage };
   const stopMedia = () => { MotionPage.close(); VoicesPage.close(); MusicPage.close(); CharactersPage.close?.(); Ref2PromptPage.close(); RivalsPage.close(); ComicsPage.close(); BrainLibPage.close(); AutoPage.close(); };
   let pageArg = null, pStack = [];
   // عنوان الصفحة (من البروتوتايب): الأيقونة الزجاج كبيرة، وفوق الاسم اسم القسم بالإنجليزي بالبرتقالي
@@ -764,6 +766,7 @@ const NH = (() => {
       KOCHI ? [] : api("/api/typo").catch(() => []), KOCHI ? { items: [] } : api("/api/dub").catch(() => ({ items: [] })),
       KOCHI ? [] : api("/api/scenes").catch(() => []),
     ]);
+    if (!KOCHI) D.pilot = await api("/api/pilot").catch(() => null);
     // 🧭 شغل لسه ما خلصش في القوالب (مسار القالب واقف عند الفكرة/السيناريو…، أو فيديو قالب لسه بيتعمل): بيظهر في «شغّال عليه»
     const FLOW_ST = { idea: "الفكرة", format: "نوع البوست", scenario: "السيناريو", cast: "الأبطال", assets: "الملفات", generate: "التوليد" };
     D.drafts = [

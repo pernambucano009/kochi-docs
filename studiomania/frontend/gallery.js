@@ -6,7 +6,12 @@ const Gallery = (() => {
   // التايبوجرافي قالب زي الباقي: فيديو العرض بتاعه مترسوم بمحرك الكلام المتحرك نفسه
   // 📱 الخط الأساسي: تصوير بالموبايل (أول قالب): الفكرة والسكريبت اختياريين ← الفيديو ← ملاحظات ← مونتاج أوتوماتيك
   const EXTRA = [{ id: "phone", name: "تصوير بالموبايل", icon: "📱", sample_url: "/gallery/phone.mp4", cover_url: "/gallery/phone.jpg", cat: "ugc",
-    desc: "صوّر نفسك بالموبايل وانت بتتكلم: البرنامج يديك ملاحظات للتحسين، ويعمل مونتاج أوتوماتيك بزوايا كاميرا وألوان وتايبوجرافي." },
+    desc: "صوّر نفسك بالموبايل وانت بتتكلم: البرنامج يديك ملاحظات للتحسين، ويعمل مونتاج أوتوماتيك بزوايا كاميرا وألوان وتايبوجرافي.", pin: 1 },
+    // 🪞 رقم ٢: نفس الكلام للكاميرا بس نسختك (من «نسختي») هي اللي بتقوله · 🧩 رقم ٣: القالب المخصص (خطواتك انت)
+    { id: "avatar", name: "تصوير الفيديو بالأفاتار", icon: "🪞", cat: "ugc", pin: 2,
+    desc: "نفس فكرة التصوير بالموبايل، بس من غير ما تصوّر: نسختك (من «نسختي») هي اللي بتقول السكريبت بوشّك وحركتك." },
+    { id: "custom", name: "قالب مخصص", icon: "🧩", cat: "other", pin: 3,
+    desc: "رتّب خطواتك بنفسك (اسحب من المكتبة، قطّع، ولّد، صدّر)، وكل تشغيل بيطلّع فيديو جديد. وبيظهر في الأوتوبايلوت كقالب تختاره." },
     // ✏️ Hairline: سجّل صوتك (أو ارفع فيديو، بناخد صوته بس) ← كلام بخط رفيع على أسود ورسومات أيزومتريك على قد الكلام
     { id: "hairline", name: "Hairline: خط رفيع على أسود", icon: "✏️", sample_url: "/gallery/hairline.mp4", cover_url: "/gallery/hairline.jpg", cat: "explain",
     desc: "سجّل صوتك، والبرنامج يكتب كلامك بخط رفيع على أسود، ويرسم جنبه رسومات أيزومتريك على قد الكلام (لابتوب، قفل، فلوس…)، ولو مفيش رسمة جاهزة يرسم واحدة." },
@@ -141,7 +146,8 @@ const Gallery = (() => {
   }
   function render() {
     const list = S.items.map((x, i) => [x, i]);
-    list.sort((a, b) => (!!b[0].sample_url - !!a[0].sample_url));   // اللي ليه فيديو الأول
+    // أول ٣ ثابتين (الموبايل ← الأفاتار ← القالب المخصص)، وبعدهم اللي ليه فيديو الأول
+    list.sort((a, b) => ((a[0].pin || 99) - (b[0].pin || 99)) || (!!b[0].sample_url - !!a[0].sample_url));
     W.list = list;
     const box = S.root.querySelector(".nh-gal-grid");
     if (!list.length) { box.innerHTML = `<div class="nh-empty">مفيش قوالب لسه.</div>`; return; }
@@ -451,6 +457,8 @@ const Gallery = (() => {
           const x = S.pvItem;
           closePv();
           if (x.id === "hairline") return startHairline();
+          if (x.id === "avatar") return showStep("16");
+          if (x.id === "custom") return window.NHNav?.("auto");
           return Flow.start({ id: x.id, name: x.name, cat: catName(x.cat), desc: x.desc || x.description || "" });
         }
         if (e.target.closest("[data-gedit]")) {   // ✏️ محرر القالب: كل خانة بنصيحتها، والخطوط والألوان والمشاهد
@@ -501,5 +509,5 @@ const Gallery = (() => {
     if (!root._gal) { root._gal = true; bind(root); }   // نفس العنصر بيتعاد استخدامه لكل الصفحات: الأحداث مرة واحدة بس
     try { await load(); render(); } catch (err) { root.querySelector(".nh-gal-grid").innerHTML = `<div class="nh-empty">${esc(err.message)}</div>`; }
   }
-  return { mount };
+  return { mount, list: () => EXTRA };
 })();

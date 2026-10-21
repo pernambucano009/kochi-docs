@@ -83,9 +83,9 @@ const BrandPage = (() => {
         { f: "pg", i: "bl:comics", page: "brainlib", t: "🎭 الكوميكس", type: "page" },
         { f: "pg", i: "bl:exports", page: "brainlib", t: "📤 الفيديوهات الجاهزة", type: "page" },
       ] },
-      // 🤖 الموديل المخصص: مؤقتًا لوحده لحد ما نحدد مكانه
-      { k: "tools", t: "الموديل المخصص", en: "Custom Model", leaves: [
-        { f: "pg", i: "auto", page: "auto", t: "🤖 الموديل المخصص (أوتوميشن)", type: "page" },
+      // 🤖 القالب المخصص: مؤقتًا لوحده لحد ما نحدد مكانه
+      { k: "tools", t: "القالب المخصص", en: "Custom Template", leaves: [
+        { f: "pg", i: "auto", page: "auto", t: "🤖 القالب المخصص (أوتوميشن)", type: "page" },
       ] },
       // 🏆 منافسينك: أعلى 5 في المجال والسوق، واللي بينجح عندهم، وتحليل آخر ١٠ فيديوهات ليك، وخطة المحتوى (كلهم صفحة واحدة بتابات)
       { k: "pulse", t: "منافسينك", en: "Competitors", leaves: [

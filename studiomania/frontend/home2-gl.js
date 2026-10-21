@@ -362,6 +362,18 @@ window.NHGL = (stage, getClient) => {
       return [cap, arc, stem, base];
     },
   };
+  // 🛫 الأوتوبايلوت: سهم بيلف حوالين نفسه (شغل بيتكرر لوحده) زي أنبوبة «شغّال عليه»
+  BUILD.pilot = (m) => {
+    const R = 1.15, a0 = Math.PI * .62, a1 = Math.PI * 2.32, pts = [];
+    for (let i = 0; i <= 48; i++) { const a = a0 + (a1 - a0) * i / 48; pts.push(new THREE.Vector3(Math.cos(a) * R, Math.sin(a) * R, 0)); }
+    const tube = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 160, .16, 32, false), m);
+    const end = pts[pts.length - 1], dir = end.clone().sub(pts[pts.length - 2]).normalize();
+    const head = new THREE.Mesh(new THREE.ConeGeometry(.36, .62, 40), m);
+    head.position.copy(end.clone().add(dir.clone().multiplyScalar(.22)));
+    head.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+    const cap = new THREE.Mesh(sph(.16, 32, 24), m); cap.position.copy(pts[0]);
+    return [tube, head, cap];
+  };
   BUILD.pulse = BUILD.progress;
 
   // طبقة لمعة فوق الزجاج (الماتكاب اللي فوق)، شغالة على أي شكل

@@ -1,6 +1,6 @@
-// 🤖 الموديل المخصص: بنفس شكل خريطة العقل (النقط والخطوط والزوم والكارت)، بس الخطوات خط واحد من الشمال لليمين:
+// 🤖 القالب المخصص: بنفس شكل خريطة العقل (النقط والخطوط والزوم والكارت)، بس الخطوات خط واحد من الشمال لليمين:
 // «▶ ابدأ» على الشمال، وبعدها الخطوات اللي العميل بيضيفها (فعل + منشن من «مكتبة العقل»)، و«＋» قبل «صدّر»، وآخر حاجة «انشر».
-// كل اختيار في الخطوة نقطة فوقها (النوع، منين، العدد…). «ابدأ» بيشغّل الموديل ويطلّع الفيديو ويصدّره وينشره.
+// كل اختيار في الخطوة نقطة فوقها (النوع، منين، العدد…). «ابدأ» بيشغّل القالب ويطلّع الفيديو ويصدّره وينشره.
 const AutoPage = (() => {
   const esc = (s) => escapeHtml(String(s ?? ""));
   const S = { el: null, list: [], id: null, rec: null, meta: null, lib: null, open: null, raf: 0, nodes: [], t0: performance.now(), timer: null };
@@ -46,7 +46,7 @@ const AutoPage = (() => {
       gen: genLeaves(o), genimg: imgLeaves(o), genvoice: voiceLeaves(o),
       merge: [{ f: "items", t: "إيه اللي يتجمع وبأي ترتيب", val: (o.items || []).length ? `${AR_N(o.items.length)} مخرج بالترتيب بتاعك` : "آخر حاجة في كل مسار" }],
       publish: [{ f: "when", t: "إمتى", val: M.when[o.when] }, { f: "platforms", t: "على فين", val: (o.platforms || []).length ? `${AR_N(o.platforms.length)} حساب` : "", miss: o.when === "now" && !(o.platforms || []).length },
-        { f: "caption", t: "الكابشن", val: (o.caption || "").slice(0, 40) || "اسم الموديل" }],
+        { f: "caption", t: "الكابشن", val: (o.caption || "").slice(0, 40) || "اسم القالب" }],
     }[s.verb] || [];
     return [...L.map((l) => ({ ...l, type: "opt" })), ...(M.fixed.includes(s.verb) || s.verb === "merge" ? [] : [{ f: "move", t: "رتّبها أو شيلها", type: "action" }])];
   }
@@ -259,19 +259,19 @@ const AutoPage = (() => {
       <div class="bm-world"><svg class="bm-lines" aria-hidden="true"></svg><div class="bm-nodes"></div></div>
       <div class="bm-zoom"><button data-zoom="1" aria-label="قرّب">+</button><button data-zoom="0" aria-label="الخريطة كلها">⤢</button><button data-zoom="-1" aria-label="بعّد">−</button></div>
       <div class="bm-card" hidden role="dialog"></div>
-      <div class="am-desc${S.descOpen ? " open" : ""}"><button class="am-desc-t" data-desc-open>✨ اوصف الموديل بكلامك (كتابة أو صوت)</button>
+      <div class="am-desc${S.descOpen ? " open" : ""}"><button class="am-desc-t" data-desc-open>✨ اوصف القالب بكلامك (كتابة أو صوت)</button>
         <div class="am-desc-b"><div class="bm-write" contenteditable="plaintext-only" data-k="desc" data-ph="مثلًا: قطّع الفيديو اللي في فولدر «لايفات» لقطع أقل من ١٥ ثانية، وولّد كل قطعة بستايل كرتون، وجمّعهم، وحط موسيقى وكابشن، واستنى موافقتي قبل النشر"></div>
           <div class="bm-acts"><button class="bm-pill" data-rec>🎙️ سجّل صوتك</button><span class="am-recst"></span>
             <button class="bm-go" data-desc-go>✨ اعمل الخطوات</button><button class="bm-pill" data-undo hidden>↩ رجّع زي ما كان</button></div>
           <p class="bm-note am-say"></p></div></div>
-      <p class="bm-hint">الخطوات من الشمال لليمين · دوس على أي نقطة تغيّرها · «قطّع الفيديو» بيفتح مسار لكل قطعة، و«جمّع» بيلمّهم · «+» خطوة جديدة · «▶» على الشمال يشغّل الموديل</p>`;
+      <p class="bm-hint">الخطوات من الشمال لليمين · دوس على أي نقطة تغيّرها · «قطّع الفيديو» بيفتح مسار لكل قطعة، و«جمّع» بيلمّهم · «+» خطوة جديدة · «▶» على الشمال يشغّل القالب</p>`;
   }
   function nodeHTML(n) {
     const r = S.rec;
     if (n.kind === "run") {
       const last = (r.runs || [])[0];
       const st = r.busy ? esc(last?.step || "شغال…") : last?.status === "failed" ? "آخر تشغيل فشل" : last?.status === "done" ? "آخر فيديو جاهز ✓" : "دوس تشغّل";
-      return `<button class="bm-n bm-quiz am-start${r.busy ? " busy" : ""}" data-n="run" title="شغّل الموديل، وغيّر اسمه أو بدّله"><i>▶</i><b>${r.active ? "⚡ " : ""}${esc(r.name)}</b><small>${r.saved ? "" : "مسودة · "}${st}</small></button>`;
+      return `<button class="bm-n bm-quiz am-start${r.busy ? " busy" : ""}" data-n="run" title="شغّل القالب، وغيّر اسمه أو بدّله"><i>▶</i><b>${esc(r.name)}</b><small>${r.saved ? "" : "مسودة · "}${st}</small></button>`;
     }
     if (n.kind === "add") return `<button class="bm-n bm-add" data-n="add" title="ضيف خطوة (فعل + منشن)"><i>+</i><b>خطوة جديدة</b></button>`;
     if (n.kind === "ladd") return `<button class="bm-n bm-add am-ladd" data-n="${n.id}" title="ضيف خطوة في مسار القطعة دي"><i>+</i><b>في المسار ده</b></button>`;
@@ -444,16 +444,15 @@ const AutoPage = (() => {
     if (n.kind === "run") {
       const runs = r.runs || [];
       return `<div class="bm-ch"><span class="latin">START</span><b>ابدأ</b></div>
-        ${editable("@name", r.name, "اسم الموديل")}
+        ${editable("@name", r.name, "اسم القالب")}
         <p class="bm-note">بيمشي على الخطوات من الشمال لليمين: بيعمل الفيديو، ويصدّره، وينشره (أو يستناك توافق).${r.est ? ` التكلفة حوالي <b class="num">${AR_N(r.est)}</b> نقطة (كتابة الكلام للكابشن).` : " من غير تكلفة نقط."}</p>
-        <div class="bm-acts"><button class="bm-go" data-run ${r.busy ? "disabled" : ""}>${r.busy ? "⏳ شغال…" : "▶ شغّل الموديل"}</button></div>
+        <div class="bm-acts"><button class="bm-go" data-run ${r.busy ? "disabled" : ""}>${r.busy ? "⏳ شغال…" : "▶ شغّل القالب"}</button></div>
         <div class="am-save">${r.saved
-          ? `<span class="am-tag ok">💾 محفوظ باسم «${esc(r.name)}»</span>
-             <button class="bm-pill${r.active ? " on" : ""}" data-active="${r.active ? 0 : 1}">${r.active ? "⚡ متفعّل للأوتوبايلوت (دوس تقفله)" : "⚡ فعّله للأوتوبايلوت"}</button>`
-          : `<span class="am-tag">مسودة (لسه مااتحفظش)</span><button class="bm-pill" data-saverec>💾 احفظ الموديل باسم</button>`}</div>
-        <p class="bm-note">${r.saved ? "الأوتوبايلوت هيشتغل بالموديل المتفعّل بس (واحد في المرة: لما تفعّل موديل، التاني بيتقفل)." : "احفظه باسم يميّزه، وبعدها تقدر تفعّله للأوتوبايلوت."}</p>
-        <div class="bm-pills">${S.list.map((x) => `<button class="bm-pill${x.id === S.id ? " on" : ""}" data-pick="${x.id}">${x.active ? "⚡ " : x.saved ? "" : "✎ "}${esc(x.name)}</button>`).join("")}
-          <button class="bm-pill" data-new>＋ موديل جديد</button><button class="bm-pill" data-delrec>🗑 امسح ده</button></div>
+          ? `<span class="am-tag ok">💾 محفوظ باسم «${esc(r.name)}»</span>`
+          : `<span class="am-tag">مسودة (لسه مااتحفظش)</span><button class="bm-pill" data-saverec>💾 احفظ القالب باسم</button>`}</div>
+        <p class="bm-note">${r.saved ? "بيظهر في الأوتوبايلوت كقالب تختاره مع باقي القوالب." : "احفظه باسم يميّزه، وبعدها يظهر في الأوتوبايلوت كقالب تختاره."}</p>
+        <div class="bm-pills">${S.list.map((x) => `<button class="bm-pill${x.id === S.id ? " on" : ""}" data-pick="${x.id}">${x.saved ? "" : "✎ "}${esc(x.name)}</button>`).join("")}
+          <button class="bm-pill" data-new>＋ قالب جديد</button><button class="bm-pill" data-delrec>🗑 امسح ده</button></div>
         ${runs.map((x) => `<div class="am-run ${x.status}"><b>${x.status === "done" ? "✓" : x.status === "failed" ? "⚠️" : "⏳"} ${esc(new Date(x.at).toLocaleString("ar-EG-u-nu-latn", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }))}</b>
           ${x.step ? `<small>${esc(x.step)}</small>` : ""}${(x.report || []).map((t) => `<small>${esc(t)}</small>`).join("")}${x.error ? `<small class="bad">${esc(x.error)}</small>` : ""}
           <span class="bm-acts">${x.export_url ? `<a class="bm-pill" href="${esc(x.export_url)}" target="_blank" rel="noopener">⬇ الفيديو</a>` : ""}${x.project_id ? `<button class="bm-pill" data-openpj="${x.project_id}">🎞️ افتح في المونتاج</button>` : ""}</span></div>`).join("")}`;
@@ -472,7 +471,7 @@ const AutoPage = (() => {
     if (l.f === "ratio") return head + pills("ratio", M.ratios.map((x) => [x, x]), o.ratio);
     if (l.f === "when") return head + pills("when", Object.entries(M.when), o.when) + `<p class="bm-note">«يستنى موافقتي»: الفيديو بيتصدّر ويستناك في صفحة النشر. «ينزل على طول»: بينزل على الحسابات اللي هتختارها.</p>`;
     if (l.f === "platforms") return head + platCard(o);
-    if (l.f === "caption") return head + editable("pubcap", o.caption || "", "الكابشن اللي هينزل مع الفيديو (لو فاضي: اسم الموديل)") + `<p class="bm-note">بيتحفظ لوحده لما تقف عن الكتابة.</p>`;
+    if (l.f === "caption") return head + editable("pubcap", o.caption || "", "الكابشن اللي هينزل مع الفيديو (لو فاضي: اسم القالب)") + `<p class="bm-note">بيتحفظ لوحده لما تقف عن الكتابة.</p>`;
     if (l.f === "prompt" && s.verb === "gen") {
       const mode = genMode(o), PH = { video: "مثلًا: نفس المشهد بس بستايل أنمي، ألوان دافية", refs: "مثلًا: @سارة ماشية في @المكتب وبتشاور على الشاشة", image: "مثلًا: الكاميرا بتقرّب ببطء والناس بتتحرك",
         startend: "مثلًا: الكاميرا بتلف من البداية للنهاية", text: "اكتب الفيديو كله: المكان، الناس، الحركة، الإضاءة",
@@ -606,7 +605,7 @@ const AutoPage = (() => {
     clearTimeout(S.timer);
     S.timer = setTimeout(async () => {
       if (!S.el?.isConnected) return;
-      try { const r = await aAPI(); await setRec(r, { card: S.open?.id === "run" }); if (!r.busy) toast("✓ الموديل خلّص. التفاصيل في «ابدأ»"); } catch { /* السيرفر بيعيد التشغيل */ }
+      try { const r = await aAPI(); await setRec(r, { card: S.open?.id === "run" }); if (!r.busy) toast("✓ القالب خلّص. التفاصيل في «ابدأ»"); } catch { /* السيرفر بيعيد التشغيل */ }
     }, 2500);
   }
   async function loadLib() { if (S.libLoading) return; S.libLoading = true; try { S.lib = await api("/api/library"); refreshCard(); } catch (err) { toast(err.message, true); } S.libLoading = false; }
@@ -686,12 +685,12 @@ const AutoPage = (() => {
         const cur = S.open?.n, s = cur?.s;
         if ((b = t.closest("[data-pick]"))) { S.id = b.dataset.pick; storageSet("studiomania.auto", S.id); S.view = null; return setRec(await aAPI()); }
         if (t.closest("[data-new]")) {
-          const name = (await uiPrompt("اسم الموديل الجديد (مثلًا: قبل وبعد التبييض):")); if (name == null) return;
+          const name = (await uiPrompt("اسم القالب الجديد (مثلًا: قبل وبعد التبييض):")); if (name == null) return;
           const r = await api("/api/automations", { method: "POST", ...jsonBody({ name }) });
           S.list = await api("/api/automations"); S.id = r.id; storageSet("studiomania.auto", S.id); S.view = null; return setRec(r);
         }
         if (t.closest("[data-delrec]")) {
-          if (!(await uiConfirm(`تمسح موديل «${S.rec.name}»؟`))) return;
+          if (!(await uiConfirm(`تمسح قالب «${S.rec.name}»؟`))) return;
           await aAPI("", { method: "DELETE" }); S.list = await api("/api/automations"); openCard(null); return start();
         }
         if ((b = t.closest("[data-addverb]"))) {
@@ -701,7 +700,7 @@ const AutoPage = (() => {
           openCard(null); await saveSteps(steps); const nn = S.byId[ns.id]; if (nn) openCard(nn); return;
         }
         if (t.closest("[data-saverec]")) {
-          const name = (await uiPrompt("اسم الموديل (علشان تختاره بعدين في الأوتوبايلوت):", S.rec.name || "")); if (name == null || !name.trim()) return;
+          const name = (await uiPrompt("اسم القالب (علشان تختاره بعدين في الأوتوبايلوت):", S.rec.name || "")); if (name == null || !name.trim()) return;
           const r = await aAPI("", { method: "PATCH", ...jsonBody({ name: name.trim(), saved: true }) });
           S.list = await api("/api/automations"); toast(`💾 اتحفظ «${r.name}»`); return setRec(r);
         }

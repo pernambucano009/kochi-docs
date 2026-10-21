@@ -6026,6 +6026,10 @@ def scheduler_loop() -> None:
             publish_due_posts()
         except Exception:  # المجدول لازم يفضل شغال مهما حصل
             pass
+        try:   # 🛫 الأوتوبايلوت: خطوة لكل مهمة (بيتعرّف تحت في الملف)
+            pilot_tick()
+        except Exception:  # noqa: BLE001
+            pass
         time.sleep(20)
 
 
@@ -22216,6 +22220,8 @@ def flow_template(tid: str, name: str, cat: str, desc: str) -> dict:
         return {"id": tid, "name": name or "تايبوجرافي", "cat": cat, "desc": desc, "kind": "typo"}
     if tid == "phone":
         return {"id": tid, "name": name or "تصوير بالموبايل", "cat": cat, "desc": desc, "kind": "phone"}
+    if tid == "avatar":   # 🪞 نفس سكريبت الكلام للكاميرا، بس اللي بيقوله نسختك (الأوتوبايلوت)
+        return {"id": tid, "name": name or "تصوير الفيديو بالأفاتار", "cat": cat, "desc": desc, "kind": "avatar"}
     try:
         t = tpl_load(tid)
     except HTTPException:
@@ -22248,7 +22254,7 @@ def flow_profile(tpl: dict) -> str:
             out.append("الخانات اللي بتتغير في القالب (والباقي شكل وحركة ثابتين مبيتغيروش):\n" + "\n".join(rows))
         out.append("يعني: الفكرة لازم تتحكي بالكامل جوه الخانات دي وبنفس تسلسل القالب. مفيش مشاهد أو شخصيات أو أماكن جديدة غير اللي القالب بيرسمها، "
                    "الكلام بس (والألوان) هو اللي بيتغير. خلي الكلام بنفس طول الأمثلة تقريبًا.")
-    elif kind == "phone":
+    elif kind in ("phone", "avatar"):
         out.append("القالب ده فيديو بيصوّره صاحب البراند بنفسه بالموبايل وهو بيتكلم للكاميرا (Talking head)، ومعاه لقطات قصيرة يصورها (B-roll). "
                    "السكريبت = الجمل اللي هيقولها بصوته بالترتيب، بلغة طبيعية سهلة تتقال، والهوك أول جملة، وكل beat فيه say (اللي هيتقال) "
                    "و visual (هيبان إيه: وشه، أو لقطة B-roll يصورها). مفيش شخصيات متولّدة ولا مشاهد خيالية.")
@@ -22521,7 +22527,7 @@ def flow_list():
             d = json.loads(f.read_text(encoding="utf-8"))
         except ValueError:
             continue
-        if owned(d.get("client_id")):
+        if owned(d.get("client_id")) and (d.get("template") or {}).get("kind") != "avatar":   # الأفاتار بيتعمل من الأوتوبايلوت بس
             out.append({"id": f.parent.name, "template": d.get("template"), "stage": d.get("stage"), "title": (d.get("idea") or {}).get("title") or "",
                         "format": d.get("format"), "updated_at": d.get("updated_at") or d.get("created_at")})
     return sorted(out, key=lambda x: x["updated_at"] or "", reverse=True)[:40]
@@ -22686,11 +22692,11 @@ def flow_pick_idea(fid: str, body: FlowPickIn):
             if not it:
                 raise HTTPException(404, "الفكرة دي مش موجودة")
         # قالب كود (موشن أو تايبوجرافي): مفيش نوع بوست، على السكريبت على طول
-        code = d["template"].get("kind") in ("motion", "typo", "phone")
+        code = d["template"].get("kind") in ("motion", "typo", "phone", "avatar")
         d.update(idea=it, stage="scenario" if code else "format", scenarios=[], scenario=None, **({"format": "reel"} if code else {}))
     d = flow_update(fid, fn)
     mark_idea_used(d, d["idea"], fid)
-    if d["template"].get("kind") in ("motion", "typo", "phone"):
+    if d["template"].get("kind") in ("motion", "typo", "phone", "avatar"):
         flow_job(fid, "scenarios", lambda: flow_gen_scenarios(fid))
     return flow_to_dict(fid, flow_load(fid))
 
@@ -22773,7 +22779,7 @@ def flow_pick_scenario(fid: str, body: FlowPickIn):
         code = d["template"].get("kind") == "motion"
         # التايبوجرافي كلام بس: مفيش أبطال ولا ملفات، من السكريبت للتوليد على طول
         kd = d["template"].get("kind")
-        d.update(scenario=it, stage="voice" if code else "generate" if kd == "typo" else "shoot" if kd == "phone" else "cast", **({"vo_track": None} if code else {}))
+        d.update(scenario=it, stage="voice" if code else "generate" if kd == "typo" else "shoot" if kd == "phone" else "say" if kd == "avatar" else "cast", **({"vo_track": None} if code else {}))
         if code:
             d["params"] = flow_motion_params(d)
     d = flow_update(fid, fn)
@@ -27436,7 +27442,7 @@ def library_search(q: str = "", kind: str = "", ref: str = ""):
     return {"ref": ref, "folder": folder, "files": [lib_file_dict(lib, f, bid) for f in hits[:200]]}
 
 
-# ---------------------------------------------------------------- 🤖 الموديل المخصص: خطوات بأفعال ومنشن من المكتبة ← مشروع مونتاج
+# ---------------------------------------------------------------- 🤖 القالب المخصص: خطوات بأفعال ومنشن من المكتبة ← مشروع مونتاج
 AUTO_LOCK = threading.Lock()
 AUTO_CANVAS = {"9:16": (1080, 1920), "1:1": (1080, 1080), "4:5": (1080, 1350), "16:9": (1920, 1080)}
 
@@ -27450,7 +27456,7 @@ def auto_dir(bid: str | None = None) -> Path:
 def auto_load(rid: str, bid: str | None = None) -> dict:
     f = auto_dir(bid) / f"{Path(rid).name}.json"
     if not f.exists():
-        raise HTTPException(404, "الموديل ده مش موجود")
+        raise HTTPException(404, "القالب ده مش موجود")
     return json.loads(f.read_text(encoding="utf-8"))
 
 
@@ -27601,9 +27607,9 @@ def auto_gen_images(bid: str, s: dict, ratio: str, run_id: str, report: list[str
             elif m["key"] in AUTO_IMG_KNOWN:
                 atlas.download(atlas.generate_image(AUTO_IMG_KNOWN[m["key"]], prompt, GEN_RATIOS.get(ratio, "1024x1536"), "high", urls or None), dest)
             else:
-                atlas.download(atlas.run_model("Image", vmodels.img_body(m, prompt, ratio, urls or None), "صورة الموديل المخصص", max_seconds=900, interval=4), dest)
+                atlas.download(atlas.run_model("Image", vmodels.img_body(m, prompt, ratio, urls or None), "صورة القالب المخصص", max_seconds=900, interval=4), dest)
             if not atlas.mock_mode():
-                wallet.charge(each, f"موديل مخصص: صورة ({m['label']})", run_id)
+                wallet.charge(each, f"قالب مخصص: صورة ({m['label']})", run_id)
             made.append({"id": lib_.fid(), "file": name, "name": lib_.clean_name(f"✨ {o.get('prompt', '')[:40]}"), "kind": "image", "size": dest.stat().st_size,
                          "desc": o.get("prompt", "")[:300], "tags": ["اتولّدت"], "status": "ready", "at": now(), "origin": bid})
         report.append(f"✓ اتولّد {len(made)} صورة ({m['label']}" + (f" · {len(refs)} مرجع" if refs else "") + ")")
@@ -27656,12 +27662,12 @@ def auto_gen_voice(bid: str, s: dict, run_id: str, report: list[str]) -> tuple[d
                     body[m["voice_field"]] = o.get("voice") if o.get("voice") in (m.get("voices") or []) else (m.get("voices") or [None])[0]
                 if ref and m.get("ref"):
                     body[m["ref"]] = atlas.upload_media(ref)
-                atlas.download(atlas.run_model("Audio", body, "صوت الموديل المخصص", max_seconds=600, interval=3), wav)
+                atlas.download(atlas.run_model("Audio", body, "صوت القالب المخصص", max_seconds=600, interval=3), wav)
             label = m["label"] + (" · بصوت مرجع" if ref and m.get("ref") else "")
         subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(wav), "-c:a", "libmp3lame", "-b:a", "160k", str(mp3)],
                        check=True, capture_output=True, timeout=180)
         if not atlas.mock_mode():
-            wallet.charge(cost, f"موديل مخصص: {'موسيقى' if kind == 'music' else 'تعليق صوتي'} ({label})", run_id)
+            wallet.charge(cost, f"قالب مخصص: {'موسيقى' if kind == 'music' else 'تعليق صوتي'} ({label})", run_id)
         dur = round(probe_duration(mp3), 2)
         f = {"id": lib_.fid(), "file": name, "name": lib_.clean_name(f"{'🎵' if kind == 'music' else '🎙️'} {text[:40]}"), "kind": "audio", "size": mp3.stat().st_size,
              "desc": text[:300], "tags": ["اتولّد"], "status": "ready", "at": now(), "dur": dur, "origin": bid}
@@ -27878,7 +27884,7 @@ class AutoNewIn(BaseModel):
 @app.post("/api/automations")
 def automation_new(body: AutoNewIn):
     bid, rid = active_client_id(), uuid.uuid4().hex[:10]
-    d = {"name": lib_.clean_name(body.name, "موديل جديد"), "steps": automate.starter(), "runs": [], "used": {}, "created_at": now()}
+    d = {"name": lib_.clean_name(body.name, "قالب جديد"), "steps": automate.starter(), "runs": [], "used": {}, "created_at": now()}
     auto_save(rid, d, bid)
     return auto_to_dict(rid, d, bid)
 
@@ -27984,7 +27990,7 @@ def automation_describe(rid: str, text: str = Form(""), audio: UploadFile | None
     prev = d.get("steps") or []
     d = auto_update(rid, lambda x: x.update(steps=steps, undo=prev), bid)
     if usd:
-        wallet.charge(wallet.credits(usd), "موديل مخصص: فهم الوصف وبناء الخطوات", rid)
+        wallet.charge(wallet.credits(usd), "قالب مخصص: فهم الوصف وبناء الخطوات", rid)
     return {**auto_to_dict(rid, d, bid), "say": res.get("say") or "", "heard": said}
 
 
@@ -28007,7 +28013,7 @@ def automation_run(rid: str, request: Request):
     if any(r.get("status") == "working" for r in d.get("runs") or []):
         raise HTTPException(400, "فيه تشغيل شغال، استنى يخلص")
     if not any(s["verb"] in ("pull", "intro", "outro", "split", "genimg") for s in d.get("steps") or []):
-        raise HTTPException(400, "الموديل محتاج خطوة «اسحب» أو «ولّد صورة» أو «قطّع الفيديو»، على الأقل")
+        raise HTTPException(400, "القالب محتاج خطوة «اسحب» أو «ولّد صورة» أو «قطّع الفيديو»، على الأقل")
     run = {"id": uuid.uuid4().hex[:8], "at": now(), "status": "working", "step": "بيبدأ…", "project_id": None, "report": [], "error": None}
     auto_update(rid, lambda x: x.update(runs=[run, *(x.get("runs") or [])][:20]), bid)
     port = (request.scope.get("server") or ("127.0.0.1", 8000))[1]
@@ -28091,7 +28097,7 @@ def auto_cut_spans(src: Path, dur: float, s: dict, run_id: str, report: list[str
                 finally:
                     audio.unlink(missing_ok=True)
             spans = automate.clean_spans(dict_chat(automate.split_messages(note, words, dur, mx)), dur, mx)
-            wallet.charge(wallet.credits(wallet.est(chars=6000, stt_min=dur / 60 if has_audio else 0)), "موديل مخصص: التقطيع على حسب طلبك", run_id)
+            wallet.charge(wallet.credits(wallet.est(chars=6000, stt_min=dur / 60 if has_audio else 0)), "قالب مخصص: التقطيع على حسب طلبك", run_id)
             if spans:
                 report.append(f"✂️ قطّع على حسب «{note[:60]}»")
                 return spans
@@ -28191,7 +28197,7 @@ def auto_gen_piece(src: Path, dur: float, g: dict, dest: Path, run_id: str, rati
                 if end:
                     body["last_image"] = atlas.upload_media(seedance_ref(end))
         atlas.download(atlas.run_model("Video", body, cand["label"], max_seconds=2400, interval=6), dest)
-        wallet.charge(cost, f"موديل مخصص: توليد قطعة ({cand['label']})", run_id)
+        wallet.charge(cost, f"قالب مخصص: توليد قطعة ({cand['label']})", run_id)
         return cand["label"]
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
@@ -28391,7 +28397,7 @@ def run_automation(rid: str, run_id: str, bid: str, port: int = 8000) -> None:
             clips.append({**vclip(outro, None), **({"trans": {"type": trans, "dur": 0.3}} if trans else {})})
         cache_f.write_text(json.dumps(cache, ensure_ascii=False), encoding="utf-8")
         caps = (opt("caption") or {}).get("on") and voice_id
-        data = {"name": f"🤖 {d.get('name') or 'موديل'}"[:100], "section": "free", "clips": clips, "outro": False, "brand_intro": False, "brand_outro": False,
+        data = {"name": f"🤖 {d.get('name') or 'قالب'}"[:100], "section": "free", "clips": clips, "outro": False, "brand_intro": False, "brand_outro": False,
                 "char_intro": False, "canvas": {"ratio": ratio, "bg": "#000000"}, "captions": {"enabled": True} if caps else {},
                 "voice": {"id": voice_id} if voice_id else None,
                 "music": {"id": music_id, "volume": round((music or {}).get("volume", 35) / 100, 2)} if music_id else None,
@@ -28407,7 +28413,7 @@ def run_automation(rid: str, run_id: str, bid: str, port: int = 8000) -> None:
                 if not atlas.mock_mode():
                     with closing(db()) as conn:
                         r = conn.execute("SELECT duration FROM audio WHERE id = ?", (voice_id,)).fetchone()
-                    wallet.charge(wallet.credits(wallet.est(stt_min=float(r["duration"]) / 60)), "موديل مخصص: كتابة الكلام للكابشن", run_id)
+                    wallet.charge(wallet.credits(wallet.est(stt_min=float(r["duration"]) / 60)), "قالب مخصص: كتابة الكلام للكابشن", run_id)
         for x in picked + ([voice] if voice else []) + ([music] if music else []):
             used[x["f"]["id"]] = used.get(x["f"]["id"], 0) + 1   # الفيديو اللي اتقطّع كمان (المرة الجاية ياخد غيره)
         auto_update(rid, lambda z: z.update(used=used), bid)
@@ -28835,6 +28841,506 @@ def scene_take_delete(sid: str, tid: str):
         if t.get("file"):
             (folder / t["file"]).unlink(missing_ok=True)
     return scene_dict(sid, d)
+
+
+# ---------------------------------------------------------------- 🛫 الأوتوبايلوت: كام بوست في اليوم، في أحسن أوقات، من القوالب اللي اخترتها
+# كل ميعاد بيبقى «مهمة»: فكرة ← سكريبت ← (تصوير / صوت / أفاتار / رسم) ← فيديو ← جدولة في ميعادها.
+# بيمشي على لفة المجدول الموجودة (كل ٢٠ ثانية) خطوة صغيرة لكل مهمة، والشغل التقيل بيتعمل بنفس دوال القوالب.
+# لو العميل اختار «أوافق على كل خطوة» المهمة بتقف عند الخطوة دي لحد ما يوافق. قالب الموبايل بيستنى العميل يصوّر.
+PILOT_FILE = DATA_DIR / "pilot.json"
+PILOT_LOCK, PILOT_TICK = threading.Lock(), threading.Lock()
+PILOT_STEPS = ("idea", "script", "montage", "video")
+PILOT_BEST = {1: ["19:00"], 2: ["13:00", "20:00"], 3: ["12:00", "17:00", "21:00"], 4: ["09:00", "13:00", "18:00", "21:30"],
+              5: ["09:00", "12:00", "15:00", "18:00", "21:30"], 6: ["08:00", "11:00", "13:30", "16:30", "19:00", "22:00"]}
+PILOT_DEFAULTS = {"on": False, "per_day": 2, "times": [{"t": t, "mine": False} for t in PILOT_BEST[2]], "tz": 180, "templates": [],
+                  "mode": "approve", "steps": list(PILOT_STEPS), "platforms": [], "twin": "", "names": {}}
+PILOT_ACTIVE = ("run", "wait", "cam")
+
+
+def pilot_load() -> dict:
+    try:
+        d = json.loads(PILOT_FILE.read_text(encoding="utf-8")) if PILOT_FILE.exists() else {}
+    except ValueError:
+        d = {}
+    return {"settings": {**PILOT_DEFAULTS, **(d.get("settings") or {})}, "jobs": d.get("jobs") or [], "rot": int(d.get("rot") or 0), "port": d.get("port") or 8000}
+
+
+def pilot_save(d: dict) -> None:
+    PILOT_FILE.with_suffix(".tmp").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+    PILOT_FILE.with_suffix(".tmp").replace(PILOT_FILE)
+
+
+def pilot_update(fn) -> dict:
+    with PILOT_LOCK:
+        d = pilot_load()
+        fn(d)
+        pilot_save(d)
+        return d
+
+
+def pilot_job_set(jid: str, **kw) -> None:
+    def fn(d):
+        for j in d["jobs"]:
+            if j["id"] == jid:
+                j.update(kw, updated_at=now())
+    pilot_update(fn)
+
+
+def pilot_kind(tpl: str) -> str:
+    return "custom" if tpl.startswith("auto:") else tpl if tpl in ("phone", "avatar") else "motion"
+
+
+def pilot_tpl_name(tpl: str, names: dict) -> str:
+    if tpl == "phone":
+        return "تصوير بالموبايل"
+    if tpl == "avatar":
+        return "تصوير الفيديو بالأفاتار"
+    if tpl.startswith("auto:"):
+        try:
+            return auto_load(tpl[5:], active_client_id()).get("name") or "قالب مخصص"
+        except HTTPException:
+            return "قالب مخصص (اتمسح)"
+    return names.get(tpl) or tpl   # أسماء قوالب الكود زي ما هي في معرض القوالب (الواجهة بتبعتها)
+
+
+def pilot_twin(s: dict) -> str | None:
+    """النسخة اللي هتتكلم: اللي اختارها، وإلا أول نسخة جاهزة."""
+    ts = twins_list()
+    for t in ts:
+        if t["id"] == s.get("twin") and (t["ready"]["video"] or t["ready"]["photo"]):
+            return t["id"]
+    return next((t["id"] for t in ts if t["ready"]["video"] or t["ready"]["photo"]), None)
+
+
+def pilot_slots(s: dict, start: datetime, hours: float = 24) -> list[datetime]:
+    """مواعيد النشر (بتوقيت العميل) اللي جاية في الـ ٢٤ ساعة الجاية، بتوقيت UTC."""
+    tz = timezone(timedelta(minutes=int(s.get("tz") or 0)))
+    local = start.astimezone(tz)
+    out = []
+    for day in (0, 1, 2):
+        base = (local + timedelta(days=day)).date()
+        for x in s.get("times") or []:
+            try:
+                hh, mm = (int(v) for v in str(x.get("t")).split(":"))
+            except ValueError:
+                continue
+            at = datetime(base.year, base.month, base.day, hh % 24, mm % 60, tzinfo=tz).astimezone(timezone.utc)
+            if start < at <= start + timedelta(hours=hours):
+                out.append(at)
+    return sorted(set(out))
+
+
+def pilot_plan() -> None:
+    """مهمة جديدة لكل ميعاد جاي في الـ ٢٤ ساعة مالوش مهمة، والقالب بيتلف على القوالب المختارة بالدور."""
+    def fn(d):
+        s = d["settings"]
+        pool = [t for t in s.get("templates") or [] if isinstance(t, str)]
+        if not s.get("on") or not pool:
+            return
+        have = {j["at"][:16] for j in d["jobs"] if j.get("at")}
+        for at in pilot_slots(s, datetime.now(timezone.utc)):
+            key = at.isoformat(timespec="minutes")
+            if key[:16] in have:
+                continue
+            tpl = pool[d["rot"] % len(pool)]
+            d["rot"] += 1
+            d["jobs"].insert(0, {"id": uuid.uuid4().hex[:8], "at": key, "tpl": tpl, "kind": pilot_kind(tpl), "name": pilot_tpl_name(tpl, s.get("names") or {}),
+                                 "status": "run", "phase": "start", "gate": None, "passed": [], "note": "في الطابور", "error": None,
+                                 "fid": None, "project_id": None, "export_id": None, "post_id": None, "tries": 0, "created_at": now()})
+            have.add(key[:16])
+        d["jobs"] = d["jobs"][:60]
+    pilot_update(fn)
+
+
+def pilot_gate(j: dict, s: dict, step: str) -> bool:
+    """الخطوة دي محتاجة موافقة العميل ولسه ماوافقش؟"""
+    return s.get("mode") == "approve" and step in (s.get("steps") or []) and step not in (j.get("passed") or [])
+
+
+def pilot_export_file(src: Path, name: str) -> str:
+    """فيديو جاهز ← «الفيديوهات الجاهزة» (اللي النشر بيقرا منها)."""
+    eid = uuid.uuid4().hex[:12]
+    filename = f"pilot_{eid}.mp4"
+    shutil.copy(src, EXPORTS_DIR / filename)
+    with closing(db()) as conn, conn:
+        conn.execute("INSERT INTO exports (id, name, filename, duration, source, project_id, created_at) VALUES (?, ?, ?, ?, 'pilot', NULL, ?)",
+                     (eid, name[:120], filename, probe_duration(EXPORTS_DIR / filename), now()))
+    return eid
+
+
+def pilot_render(pid: str, port: int) -> None:
+    with closing(db()) as conn, conn:
+        row = get_project(conn, pid)
+        if row["render_status"] == "rendering":
+            return
+        data = json.loads(row["data"])
+        cw, ch, fps, crf = export_settings(data)
+        with montage.canvas(cw, ch, fps, crf):
+            start_render(conn, row, pid, data, SimpleNamespace(scope={"server": ("127.0.0.1", port)}))
+
+
+def pilot_caption(d: dict) -> str:
+    sc, idea = d.get("scenario") or {}, d.get("idea") or {}
+    return (sc.get("caption") or "").strip() or "\n".join(x for x in (idea.get("title"), idea.get("hook")) if x)[:2000]
+
+
+def pilot_say(sc: dict) -> str:
+    return " ".join(str(b.get("say") or "").strip() for b in sc.get("beats") or [] if str(b.get("say") or "").strip())
+
+
+def pilot_step(j: dict, s: dict, port: int) -> None:
+    """خطوة واحدة للمهمة (من غير ما نستنى شغل تقيل: الشغل التقيل بيتعمل في الخلفية ونرجعله اللفة الجاية)."""
+    jid, kind, ph = j["id"], j["kind"], j["phase"]
+    put = lambda **kw: pilot_job_set(jid, **kw)  # noqa: E731
+    gate = lambda step, note: put(status="wait", gate=step, note=note) or True if pilot_gate(j, s, step) else False  # noqa: E731
+
+    if ph == "start":
+        wallet.need(wallet.credits(0.05), "الأوتوبايلوت")
+        if kind == "custom":
+            rid, bid = j["tpl"][5:], active_client_id()
+            auto_load(rid, bid)
+            run = {"id": uuid.uuid4().hex[:8], "at": now(), "status": "working", "step": "بيبدأ…", "project_id": None, "report": [], "error": None, "pilot": jid}
+            auto_update(rid, lambda x: x.update(runs=[run, *(x.get("runs") or [])][:20]), bid)
+            threading.Thread(target=run_automation, args=(rid, run["id"], bid, port), daemon=True).start()
+            return put(phase="custom", run_id=run["id"], note="القالب المخصص شغّال")
+        if kind == "avatar" and not pilot_twin(s):
+            raise HTTPException(400, "مفيش نسخة جاهزة في «نسختي». سجّل فيديو القراية أو صورة قدامية الأول")
+        f = flow_new(FlowNewIn(template=j["tpl"], name=j["name"] if j["name"] != j["tpl"] else ""))
+        flow_update(f["id"], lambda x: x.update(pilot=jid))
+        return put(phase="idea", fid=f["id"], note="بيفكّر في أفكار")
+
+    if kind == "custom" and ph == "custom":
+        rid = j["tpl"][5:]
+        run = next((r for r in auto_load(rid, active_client_id()).get("runs") or [] if r["id"] == j.get("run_id")), None)
+        if not run:
+            raise HTTPException(400, "التشغيل اتمسح")
+        if run["status"] == "working":
+            return put(note=run.get("step") or "شغّال")
+        if run["status"] == "failed":
+            raise HTTPException(400, run.get("error") or "القالب المخصص وقف")
+        ex = Path(str(run.get("export_url") or "")).stem
+        if not ex:
+            raise HTTPException(400, "القالب المخصص خلص من غير فيديو")
+        return put(phase="final", project_id=run.get("project_id"), export_id=ex, note="الفيديو جاهز")
+
+    if ph in ("final", "schedule"):
+        if gate("video", "الفيديو جاهز: شوفه ووافق عشان يتجدول"):
+            return
+        when = max(datetime.fromisoformat(j["at"]), datetime.now(timezone.utc) + timedelta(minutes=3))
+        plats = s.get("platforms") or [k for k in (publisher.accounts() if publisher.service_name() == "zernio" else {"instagram": 1})]
+        caption = j.get("caption") or (pilot_caption(flow_load(j["fid"])) if j.get("fid") else j["name"])
+        post = create_post(PostIn(export_id=j["export_id"], caption=caption, platforms=plats, scheduled_at=when))
+        notify("autopilot", "ok", f"🛫 اتجدول: {j['name']}", when.isoformat(timespec="minutes"), "7", post["id"])
+        return put(status="done", phase="done", gate=None, post_id=post["id"], note="اتجدول")
+
+    fid = j["fid"]
+    d = flow_load(fid)
+    if d.get("busy") and not flow_stale(d):
+        return
+    if d.get("error") or flow_stale(d):
+        if j.get("tries", 0) >= 2:
+            raise HTTPException(400, d.get("error") or "الخطوة وقفت")
+        put(tries=j.get("tries", 0) + 1, note="بيحاول تاني")
+        if ph == "idea":
+            return flow_job(fid, "ideas", lambda: flow_gen_ideas(fid))
+        if ph == "script":
+            return flow_job(fid, "scenarios", lambda: flow_gen_scenarios(fid))
+        flow_update(fid, lambda x: x.update(error=None, busy=None))
+        back = {"vo": "voice", "review": "shoot", "montage": "review"}.get(ph)   # نرجع للخطوة اللي بتبدأ الشغل ده ونعيده
+        return put(phase=back) if back else None
+
+    if ph == "idea":
+        if not d.get("ideas"):
+            return put(note="بيفكّر في أفكار")
+        if gate("idea", "اختار فكرة من التلاتة"):
+            return
+        pick = j.get("pick") if any(i["id"] == j.get("pick") for i in d["ideas"]) else d["ideas"][0]["id"]
+        flow_pick_idea(fid, FlowPickIn(id=pick))
+        return put(phase="script", pick=None, note="بيكتب السكريبت")
+
+    if ph == "script":
+        if not d.get("scenarios"):
+            return put(note="بيكتب السكريبت")
+        if gate("script", "اختار سكريبت"):
+            return
+        pick = j.get("pick") if any(x["id"] == j.get("pick") for x in d["scenarios"]) else d["scenarios"][0]["id"]
+        flow_pick_scenario(fid, FlowPickIn(id=pick))
+        nxt = {"motion": "voice", "phone": "shoot", "avatar": "say"}[kind]
+        return put(phase=nxt, pick=None, note="بيكمّل")
+
+    # 🎨 قالب كود: فويس أوفر ← رسم الفيديو
+    if ph == "voice":
+        lang = d.get("lang") if d.get("lang") in dub.DIALECTS else flow_lang_guess(d)
+        flow_voice(fid, FlowVoiceIn(speaker="narrator", lang=lang, voice=dub.DIALECTS[lang]["voices"][0]))
+        return put(phase="vo", note="بيسجّل الفويس أوفر")
+    if ph == "vo":
+        if not (d.get("vo_track") or {}).get("file"):
+            return
+        try:
+            flow_export(fid, FlowExportIn())
+        except HTTPException as exc:
+            return put(note=str(exc.detail)[:120])
+        return put(phase="draw", note="بيرسم الفيديو")
+    if ph == "draw":
+        o = flow_to_dict(fid, d).get("output") or {}
+        if o.get("status") == "failed":
+            raise HTTPException(400, o.get("error") or "الرسم وقف")
+        if o.get("status") != "done" or not o.get("asset"):
+            return put(note=f"بيرسم الفيديو {round((o.get('progress') or 0) * 100)}%")
+        ex = pilot_export_file(ASSETS_DIR / Path(o["asset"]).name / "clip.mp4", f"🛫 {(d.get('idea') or {}).get('title') or j['name']}")
+        return put(phase="final", export_id=ex, note="الفيديو جاهز")
+
+    # 📱 الموبايل: العميل بيصوّر ← ملاحظات ← مونتاج أوتوماتيك ← تصدير
+    if ph == "shoot":
+        if not ((d.get("footage") or {}).get("main") or {}).get("gen_id"):
+            if j.get("status") == "cam":
+                return
+            return put(status="cam", gate="shoot", note="📱 صوّر السكريبت وارفع الفيديو")
+        put(status="run", gate=None)
+        flow_phone_review(fid)
+        return put(phase="review", note="بيتفرج على الفيديو")
+    if ph == "review":
+        if not d.get("review"):
+            return
+        flow_phone_montage(fid, PhoneMontageIn())
+        return put(phase="montage", note="بيعمل المونتاج")
+    if ph == "montage":
+        pid = (d.get("montage") or {}).get("project_id")
+        if not pid:
+            return
+        put(project_id=pid)
+        if gate("montage", "المونتاج جاهز: افتحه وعدّل لو حابب، ووافق"):
+            return
+        pilot_render(pid, port)
+        return put(phase="export", note="بيصدّر الفيديو")
+    if ph == "export":
+        with closing(db()) as conn:
+            r = conn.execute("SELECT render_status, render_error, export_id FROM projects WHERE id = ?", (j["project_id"],)).fetchone()
+        if not r:
+            raise HTTPException(400, "مشروع المونتاج اتمسح")
+        if r["render_status"] == "rendering":
+            return put(note=f"بيصدّر: {RENDER_ACTIVE.get(j['project_id']) or ''}".strip(" :"))
+        if r["render_error"] or not r["export_id"]:
+            raise HTTPException(400, f"التصدير فشل: {r['render_error'] or ''}"[:300])
+        return put(phase="final", export_id=r["export_id"], note="الفيديو جاهز")
+
+    # 🪞 الأفاتار: السكريبت بصوت ← نسختك بتقوله
+    if ph == "say":
+        tid = pilot_twin(s)
+        if not tid:
+            raise HTTPException(400, "مفيش نسخة جاهزة في «نسختي»")
+        text = pilot_say(d.get("scenario") or {})
+        if not text:
+            raise HTTPException(400, "السكريبت مفيهوش كلام يتقال")
+        lang = d.get("lang") if d.get("lang") in dub.DIALECTS else flow_lang_guess(d)
+        voice = dub.DIALECTS[lang]["voices"][0]
+        cost = wallet.credits(dub.estimate([text], voice, len(text) / dub.CHARS_PER_SEC, None) or 0.01)
+        wallet.need(cost, "صوت الأفاتار")
+        cid = uuid.uuid4().hex[:8]
+        wav = vo_say(text, voice, lang, twin_dir(tid) / f"say_{cid}.wav")
+        if not atlas.mock_mode():
+            wallet.charge(cost, "الأوتوبايلوت: صوت الأفاتار", jid)
+        t = twin_load(tid)
+        method = "video" if twin.ready(t)["video"] else "photo"
+        item = {"id": cid, "method": method, "quality": "veed" if method == "video" else "pro", "text": text[:2000], "audio": wav.name,
+                "status": "queued", "step": "في الطابور", "file": None, "error": None, "created_at": now(), "pilot": jid}
+        twin_update(tid, lambda x: x.setdefault("clips", []).append(item))
+        threading.Thread(target=run_twin_clip, args=(tid, cid), daemon=True).start()
+        return put(phase="twin", twin=tid, clip=cid, note="نسختك بتتكلم (بياخد كام دقيقة)")
+    if ph == "twin":
+        c = next((x for x in twin_load(j["twin"]).get("clips") or [] if x["id"] == j.get("clip")), None)
+        if not c:
+            raise HTTPException(400, "فيديو النسخة اتمسح")
+        if c["status"] == "failed":
+            raise HTTPException(400, c.get("error") or "فيديو النسخة وقف")
+        if c["status"] != "done":
+            return put(note=c.get("step") or "شغّال")
+        ex = pilot_export_file(twin_dir(j["twin"]) / c["file"], f"🛫 {(d.get('idea') or {}).get('title') or j['name']}")
+        return put(phase="final", export_id=ex, note="الفيديو جاهز")
+
+
+def pilot_tick() -> None:
+    """بتتنادى من لفة المجدول: مهام جديدة للمواعيد الجاية، وخطوة لكل مهمة شغالة."""
+    if not PILOT_TICK.acquire(blocking=False):
+        return
+    try:
+        if not PILOT_FILE.exists():
+            return
+        pilot_plan()
+        d = pilot_load()
+        for j in d["jobs"]:
+            if j.get("status") not in ("run", "cam"):
+                continue
+            try:
+                pilot_step(j, d["settings"], d["port"])
+            except wallet.NoCredits as exc:
+                pilot_job_set(j["id"], status="failed", error=str(exc), note=None)
+            except HTTPException as exc:
+                pilot_job_set(j["id"], status="failed", error=str(exc.detail)[:300], note=None)
+            except Exception as exc:  # noqa: BLE001
+                pilot_job_set(j["id"], status="failed", error=str(exc)[:300], note=None)
+                log_render(f"pilot {j['id']}: {exc}")
+            if j.get("status") == "run":
+                after = next((x for x in pilot_load()["jobs"] if x["id"] == j["id"]), {})
+                if after.get("status") in ("failed", "wait", "cam") and after.get("status") != j.get("status"):
+                    level, title = ("bad", f"🛫 وقف: {j['name']}") if after["status"] == "failed" else ("info", f"🛫 مستنيك: {j['name']}")
+                    notify("autopilot", level, title, after.get("error") or after.get("note") or "", "pilot", j["id"])
+    finally:
+        PILOT_TICK.release()
+
+
+def pilot_job_dict(j: dict) -> dict:
+    out = {k: v for k, v in j.items() if k not in ("passed", "tries")}
+    d = None
+    if j.get("fid"):
+        try:
+            d = flow_load(j["fid"])
+        except HTTPException:
+            d = None
+    if d:
+        idea, sc = d.get("idea") or {}, d.get("scenario") or {}
+        out["title"] = sc.get("title") or idea.get("title") or ""
+        if j.get("gate") == "idea":
+            out["options"] = [{"id": i["id"], "title": i.get("title", ""), "text": i.get("hook") or i.get("idea", "")} for i in d.get("ideas") or []]
+        elif j.get("gate") == "script":
+            out["options"] = [{"id": x["id"], "title": x.get("title", ""), "text": pilot_say(x) or x.get("summary", "")} for x in d.get("scenarios") or []]
+        if j["kind"] == "phone" and sc:
+            out["script"] = [str(b.get("say") or "") for b in sc.get("beats") or [] if b.get("say")]
+    if j.get("export_id"):
+        with closing(db()) as conn:
+            r = conn.execute("SELECT filename FROM exports WHERE id = ?", (j["export_id"],)).fetchone()
+        out["video_url"] = f"/media/exports/{r['filename']}" if r else None
+    return out
+
+
+def pilot_state() -> dict:
+    d = pilot_load()
+    s = d["settings"]
+    jobs = [pilot_job_dict(j) for j in d["jobs"][:30]]
+    custom = [{"id": f"auto:{a['id']}", "name": a["name"], "kind": "custom"} for a in automations_list() if a.get("saved")]
+    twins = [{"id": t["id"], "name": t.get("name") or "", "ready": bool(t["ready"]["video"] or t["ready"]["photo"])} for t in twins_list()]
+    upcoming = [a.isoformat(timespec="minutes") for a in pilot_slots(s, datetime.now(timezone.utc), 48)][:12]
+    return {"settings": s, "jobs": jobs, "custom": custom, "twins": twins, "best": PILOT_BEST, "upcoming": upcoming,
+            "waiting": sum(1 for j in d["jobs"] if j.get("status") in ("wait", "cam"))}
+
+
+class PilotIn(BaseModel):
+    on: bool | None = None
+    per_day: int | None = None
+    times: list[dict] | None = None
+    tz: int | None = None
+    templates: list[str] | None = None
+    mode: str | None = None
+    steps: list[str] | None = None
+    platforms: list[str] | None = None
+    twin: str | None = None
+    names: dict | None = None   # أسماء قوالب الكود (للعرض)
+
+
+def pilot_port(request: Request) -> int:
+    return (request.scope.get("server") or ("127.0.0.1", 8000))[1]
+
+
+@app.get("/api/pilot")
+def pilot_get(request: Request):
+    port = pilot_port(request)
+    if pilot_load()["port"] != port:
+        pilot_update(lambda d: d.update(port=port))
+    return pilot_state()
+
+
+@app.put("/api/pilot")
+def pilot_put(body: PilotIn, request: Request):
+    def fn(d):
+        s = d["settings"]
+        if body.per_day is not None:
+            s["per_day"] = max(1, min(6, int(body.per_day)))
+        if body.times is not None:
+            seen, times = set(), []
+            for x in body.times[:6]:
+                t = str(x.get("t") or "")
+                if re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", t) and t not in seen:
+                    seen.add(t)
+                    times.append({"t": t, "mine": bool(x.get("mine"))})
+            s["times"] = sorted(times, key=lambda x: x["t"])
+            s["per_day"] = max(1, len(times))
+        if body.tz is not None:
+            s["tz"] = max(-720, min(840, int(body.tz)))
+        if body.templates is not None:
+            s["templates"] = [t for t in dict.fromkeys(body.templates) if t in ("phone", "avatar") or t.startswith("auto:") or re.fullmatch(r"t-[\w-]+", t)][:30]
+        if body.mode in ("auto", "approve"):
+            s["mode"] = body.mode
+        if body.steps is not None:
+            s["steps"] = [x for x in PILOT_STEPS if x in body.steps]
+        if body.platforms is not None:
+            s["platforms"] = [p for p in dict.fromkeys(body.platforms) if publisher.valid_target(p)][:20]
+        if body.twin is not None:
+            s["twin"] = body.twin[:40]
+        if body.on is not None:
+            s["on"] = bool(body.on)
+        if not s["on"]:   # الإيقاف بيوقف المهام اللي لسه مابدأتش بس
+            d["jobs"] = [j for j in d["jobs"] if not (j.get("status") == "run" and j.get("phase") == "start")]
+        d["port"] = pilot_port(request)
+        if body.names:
+            s["names"] = {**(s.get("names") or {}), **{k: str(v)[:80] for k, v in body.names.items() if str(k).startswith("t-")}}
+    pilot_update(fn)
+    return pilot_state()
+
+
+class PilotOkIn(BaseModel):
+    pick: str = ""
+
+
+@app.post("/api/pilot/jobs/{jid}/ok")
+def pilot_ok(jid: str, body: PilotOkIn):
+    """موافقة على الخطوة اللي المهمة واقفة عندها (ومعاها الاختيار: الفكرة أو السكريبت)."""
+    def fn(d):
+        j = next((x for x in d["jobs"] if x["id"] == jid), None)
+        if not j or j.get("status") != "wait":
+            raise HTTPException(400, "المهمة دي مش مستنية موافقة")
+        j.update(status="run", passed=[*(j.get("passed") or []), j["gate"]], gate=None, pick=body.pick or None, note="بيكمّل", updated_at=now())
+    pilot_update(fn)
+    return pilot_state()
+
+
+@app.post("/api/pilot/jobs/{jid}/footage")
+def pilot_footage(jid: str, file: UploadFile = File(...)):
+    """📱 الفيديو اللي العميل صوّره بالسكريبت."""
+    j = next((x for x in pilot_load()["jobs"] if x["id"] == jid), None)
+    if not j or not j.get("fid"):
+        raise HTTPException(404, "المهمة دي مش موجودة")
+    flow_footage_upload(j["fid"], "main", file)
+    if j.get("status") == "cam":
+        pilot_job_set(jid, status="run", gate=None, note="بيتفرج على الفيديو")
+    return pilot_state()
+
+
+@app.post("/api/pilot/jobs/{jid}/retry")
+def pilot_retry(jid: str):
+    def fn(d):
+        for j in d["jobs"]:
+            if j["id"] == jid and j.get("status") in ("failed", "stopped"):
+                j.update(status="run", error=None, tries=0, note="بيحاول تاني", updated_at=now())
+                if j["kind"] == "custom" and j["phase"] == "custom":
+                    j["phase"] = "start"
+    pilot_update(fn)
+    return pilot_state()
+
+
+@app.post("/api/pilot/jobs/{jid}/stop")
+def pilot_stop(jid: str):
+    def fn(d):
+        for j in d["jobs"]:
+            if j["id"] == jid and j.get("status") in PILOT_ACTIVE:
+                j.update(status="stopped", gate=None, note="اتوقفت", updated_at=now())
+    pilot_update(fn)
+    return pilot_state()
+
+
+@app.delete("/api/pilot/jobs/{jid}")
+def pilot_delete(jid: str):
+    pilot_update(lambda d: d.update(jobs=[j for j in d["jobs"] if not (j["id"] == jid and j.get("status") not in PILOT_ACTIVE)]))
+    return pilot_state()
 
 
 # الواجهة آخر حاجة: أي مسار مش API بيروح للملفات (لازم تفضل بعد كل الـ routes)
