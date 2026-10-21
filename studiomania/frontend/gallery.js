@@ -103,7 +103,6 @@ const Gallery = (() => {
   const CATS2 = [["projects", "المشاريع الأساسية", "القوالب"], ["dub", "الدبلجة والترجمة", "أي فيديو بلغة أو لهجة تانية"], ["video", "توليد فيديو", "بالذكاء الصناعي"],
     ["image", "توليد صور", "بالذكاء الصناعي"], ["voice", "توليد صوت", "بالذكاء الصناعي"]];
   const C = { pos: 0, vel: 0, target: 0, cur: 0, last: 0, setT: 0 };
-  const STEP2 = 25 * Math.PI / 180;
   const catsHTML = (cls) => `<div class="${cls}">${CATS2.map(([k, t, sub], i) => `<button type="button" class="nh-wh-cat${i === 0 ? " main" : ""}" data-cat2="${i}"><b>${t}</b><small>${sub}</small></button>`).join("")}</div>`;
   // صفحة الدبلجة نفسها (اللي كانت برّه في الرئيسية) بتتنقل جوه الصفحة دي، وبترجع مكانها لما تمشي
   const DUB = { home: null };
@@ -186,9 +185,10 @@ const Gallery = (() => {
     const h = wheel.clientHeight, w = wheel.clientWidth;
     // على الكمبيوتر الكورة باينة أكتر علشان الزراير تبقى جواها، وعلى الموبايل العجلة مستخبية أكتر ورا الحرف
     const R = mobile ? Math.min(h * .5, 300) : Math.min(h * .45, w * .7, 420), cx = mobile ? -R * .66 : -R * .1, cy = h * (mobile ? .36 : .5);
-    const rs = R * (mobile ? .6 : .56), rr = rs + R * .06;
-    const ring = (r, sw, op) => `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--nh-ink)" stroke-opacity="${op}" stroke-width="${sw}"/>`;
-    el.querySelector(".nh-wh-back").innerHTML = ring(R * 1.03, 1.2, .14) + ring(R * .985, 1, .07) + `<path class="arc" fill="none" stroke="var(--nh-ink)" stroke-width="3" stroke-linecap="round"/><g class="ticks"></g>`;
+    const rs = R * (mobile ? .6 : .63), rr = rs + R * .06;   // الكورة كبيرة كفاية إن أسماء الأقسام تبقى جواها
+    // الخطين اللي حوالين العجلة بيترسموا كل فريم وفيهم فراغ مكان كل اسم معدّي عليهم
+    const ring = (cls, sw, op) => `<path class="${cls}" fill="none" stroke="var(--nh-ink)" stroke-opacity="${op}" stroke-width="${sw}"/>`;
+    el.querySelector(".nh-wh-back").innerHTML = ring("rg1", 1.2, .14) + ring("rg2", 1, .07) + `<path class="arc" fill="none" stroke="var(--nh-ink)" stroke-width="3" stroke-linecap="round"/><g class="ticks"></g>`;
     // الطوق: حلقة تخينة بتدرّج نور ضلمة فوق الكورة
     el.querySelector(".nh-wh-ring").innerHTML = `<defs><linearGradient id="nhWhRg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" style="stop-color:var(--wh-ring-hi)"/><stop offset=".55" style="stop-color:var(--wh-ring)"/><stop offset="1" style="stop-color:var(--wh-ring-lo)"/></linearGradient></defs>
       <circle cx="${cx}" cy="${cy + 6}" r="${rr}" fill="none" stroke="#000" stroke-opacity=".12" stroke-width="${R * .05}" style="filter:blur(6px)"/>
@@ -210,7 +210,10 @@ const Gallery = (() => {
     W.G = { R, cx, cy, rs, cols, cellH, gh: cards.clientHeight, labs: [...el.querySelectorAll(".nh-wh-labs span")], cards: [...el.querySelectorAll(".nh-wc")],
       arc: el.querySelector(".arc"), ticks: el.querySelector(".ticks"), knurl: el.querySelector(".knurl"), sph: el.querySelector("#nhWhSph"),
       d3: el.querySelector(".nh-wh-3d"), track: el.querySelector(".nh-wh-track"), wheelW: w, wheelTop: wheel.offsetTop,
-      cats: [...el.querySelectorAll(".nh-wh-cats .nh-wh-cat")] };
+      cats: [...el.querySelectorAll(".nh-wh-cats .nh-wh-cat")], rg1: el.querySelector(".rg1"), rg2: el.querySelector(".rg2") };
+    // مقاسات الأسماء (من غير التحويلات) علشان نعرف كل اسم واخد قد إيه من الخطوط
+    W.G.labs.forEach((x) => { x._w = x.offsetWidth; x._h = x.offsetHeight; });
+    W.G.cats.forEach((x) => { x._w = x.offsetWidth; x._h = x.offsetHeight; });
     W.G.cards.forEach((c, i) => {
       const col = cols === 1 ? 0 : i % 2, row = cols === 1 ? i : Math.floor(i / 2);
       Object.assign(c.style, { top: (row * cellH + (col ? cellH / 2 : 0)) + "px", left: col || cols === 1 ? "0" : "50%", width: 100 / cols + "%", transform: "" });
@@ -334,42 +337,58 @@ const Gallery = (() => {
     G.d3.style.setProperty("--ry", (16 + T.x).toFixed(2) + "deg"); G.d3.style.setProperty("--rx", (T.y + spin * 3).toFixed(2) + "deg"); G.d3.style.setProperty("--lift", T.l.toFixed(3));
     const lx = G.cx + G.rs * (.35 + T.x * .02), ly = G.cy - G.rs * (.35 + T.y * .03);
     G.sph.setAttribute("cx", lx); G.sph.setAttribute("cy", ly); G.sph.setAttribute("fx", lx); G.sph.setAttribute("fy", ly);
-    const rl = G.R * .8;
+    const rl = G.R * .8, spans = [];   // كل اسم: زاويته وطوله لحد فين على نصف القطر
     G.labs.forEach((s, i) => {
       const a = (i - pos) * STEP;
       if (Math.abs(a) > 1.2) { s.style.opacity = 0; return; }
-      const d = Math.abs(i - pos);
-      s.style.opacity = Math.max(0, 1 - d * .12).toFixed(3);
-      s.style.transform = `translate(${G.cx + Math.cos(a) * rl}px,${G.cy + Math.sin(a) * rl - 8}px) rotate(${a}rad) scale(${d < .5 ? 1.12 : 1})`;
+      const d = Math.abs(i - pos), op = Math.max(0, 1 - d * .12), sc = d < .5 ? 1.12 : 1;
+      s.style.opacity = op.toFixed(3);
+      s.style.transform = `translate(${G.cx + Math.cos(a) * rl}px,${G.cy + Math.sin(a) * rl - (s._h || 14) / 2}px) rotate(${a}rad) scale(${sc})`;
       s.classList.toggle("on", i === idx);
+      if (op > .05) spans.push([a, rl + (s._w || 0) * sc, (s._h || 14) * sc / 2]);
     });
+    // الفراغات: أي خط دايري الاسم واصل له بيتقطع مكان الاسم بالظبط (بهامش صغير) علشان الكلام يبان معمول جوه العجلة
+    const gapsAt = (r) => spans.filter(([, end]) => end + 6 > r).map(([a, , hh]) => { const w = (hh + 6) / r; return [a - w, a + w]; }).sort((x, y) => x[0] - y[0]);
+    const arcD = (r, from, to, gaps) => {
+      const P = (a) => `${(G.cx + Math.cos(a) * r).toFixed(1)} ${(G.cy + Math.sin(a) * r).toFixed(1)}`;
+      const seg = (s0, e0) => e0 - s0 > .002 ? `M ${P(s0)} A ${r} ${r} 0 ${e0 - s0 > Math.PI ? 1 : 0} 1 ${P(e0)} ` : "";
+      let out = "", st = from;
+      for (const [gs, ge] of gaps) { if (ge <= st || gs >= to) continue; if (gs > st) out += seg(st, gs); st = Math.max(st, ge); }
+      return out + (st < to ? seg(st, to) : "");
+    };
+    const ringD = (r) => { const g = gapsAt(r); return arcD(r, -Math.PI, 0, g) + arcD(r, 0, Math.PI, g); };
+    G.rg1.setAttribute("d", ringD(G.R * 1.03)); G.rg2.setAttribute("d", ringD(G.R * .985));
     // القوس الغامق بيلف مع العجلة، والتكّات على الحلقة والحزوز على الكورة بتعدّي
-    const r = G.R * 1.03, a0 = -0.95 + (pos / Math.max(1, N - 1)) * 1.6, P = (a) => `${G.cx + Math.cos(a) * r} ${G.cy + Math.sin(a) * r}`;
-    G.arc.setAttribute("d", `M ${P(a0)} A ${r} ${r} 0 0 1 ${P(a0 + .3)}`);
-    const fr = ((pos % 1) + 1) % 1;
+    const a0 = -0.95 + (pos / Math.max(1, N - 1)) * 1.6;
+    G.arc.setAttribute("d", arcD(G.R * 1.03, a0, a0 + .3, gapsAt(G.R * 1.03)));
+    const fr = ((pos % 1) + 1) % 1, tg0 = gapsAt(G.R * .96);
     let html = "";
-    for (let j = -16; j <= 16; j++) { const a = (j - fr) * STEP, r1 = G.R * .96, r2 = G.R * .935; html += `<line x1="${G.cx + Math.cos(a) * r1}" y1="${G.cy + Math.sin(a) * r1}" x2="${G.cx + Math.cos(a) * r2}" y2="${G.cy + Math.sin(a) * r2}" stroke="var(--nh-ink)" stroke-opacity="${Math.max(0, .32 - Math.abs(j) * .018).toFixed(3)}" stroke-width="1.2"/>`; }
+    for (let j = -16; j <= 16; j++) { const a = (j - fr) * STEP, r1 = G.R * .96, r2 = G.R * .935; if (tg0.some(([gs, ge]) => a > gs && a < ge)) continue; html += `<line x1="${G.cx + Math.cos(a) * r1}" y1="${G.cy + Math.sin(a) * r1}" x2="${G.cx + Math.cos(a) * r2}" y2="${G.cy + Math.sin(a) * r2}" stroke="var(--nh-ink)" stroke-opacity="${Math.max(0, .32 - Math.abs(j) * .018).toFixed(3)}" stroke-width="1.2"/>`; }
     G.ticks.innerHTML = html;
+    // العجلة الصغيرة: سبرنج ناعم للقسم، وكل اسم آخره لازق في حزوز الكورة من جوه
+    C.vel += ((C.target - C.pos) * 120 - C.vel * 18) * dt; C.pos += C.vel * dt;
+    if (Math.abs(C.target - C.pos) < .001 && Math.abs(C.vel) < .01) { C.pos = C.target; C.vel = 0; }
+    const ci = Math.round(C.pos), rowH = Math.max(58, G.rs * .27), boxes = [];
+    G.cats.forEach((b, i) => {
+      const t = i - C.pos, d = Math.abs(t), dy = t * rowH, sc = 1 - Math.min(.22, d * .1), op = Math.max(0, 1 - d * .28);
+      const chord = Math.sqrt(Math.max(0, G.rs * G.rs - dy * dy)), w = (b._w || 0) * sc, h = (b._h || 0) * sc;
+      const x = Math.max(6, G.cx + chord * .975 - w);
+      b.style.opacity = op.toFixed(3);
+      b.style.pointerEvents = d > 2.6 ? "none" : "";
+      b.style.transform = `translate(${x.toFixed(1)}px,${(G.cy + dy).toFixed(1)}px) translateY(-50%) scale(${sc.toFixed(3)})`;
+      b.classList.toggle("near", i === ci);
+      if (op > .12) boxes.push([x - 5, G.cy + dy - h / 2 - 5, x + w + 5, G.cy + dy + h / 2 + 5]);
+    });
+    const under = (px, py) => boxes.some(([x1, y1, x2, y2]) => px > x1 && px < x2 && py > y1 && py < y2);
     html = "";
-    for (let j = 0; j < 48; j++) {   // الحزوز بتنوّر في الناحية اللي جاي منها النور (فوق يمين)
-      const a = (j - fr * 2) * Math.PI / 24, c = Math.cos(a), s = Math.sin(a);
+    for (let j = 0; j < 72; j++) {   // الحزوز بتنوّر في الناحية اللي جاي منها النور (فوق يمين)، وبتتمسح تحت أسماء الأقسام
+      const a = (j - fr * 3) * Math.PI / 36, c = Math.cos(a), s = Math.sin(a);
       if (c < -.2) continue;
       const lit = Math.max(0, c * .7 - s * .7), r1 = G.rs * .9, r2 = G.rs * .985;
+      if (under(G.cx + c * r1, G.cy + s * r1) || under(G.cx + c * r2, G.cy + s * r2) || under(G.cx + c * (r1 + r2) / 2, G.cy + s * (r1 + r2) / 2)) continue;
       html += `<line x1="${G.cx + c * r1}" y1="${G.cy + s * r1}" x2="${G.cx + c * r2}" y2="${G.cy + s * r2}" stroke="var(--wh-knurl)" stroke-opacity="${(.12 + lit * .45).toFixed(3)}" stroke-width="2" stroke-linecap="round"/>`;
     }
     G.knurl.innerHTML = html;
-    // العجلة الصغيرة: سبرنج ناعم للقسم، والأسماء على قوس جوه الكورة
-    C.vel += ((C.target - C.pos) * 120 - C.vel * 18) * dt; C.pos += C.vel * dt;
-    if (Math.abs(C.target - C.pos) < .001 && Math.abs(C.vel) < .01) { C.pos = C.target; C.vel = 0; }
-    // صف أسماء رأسي متقوّس على شكل الكورة: اللي في النص قدام وأكبر، واللي بعيد بيلف لورا ويبهت
-    const ci = Math.round(C.pos), rowH = Math.max(58, G.rs * .27), x0 = Math.max(18, G.cx + G.rs * .12);
-    G.cats.forEach((b, i) => {
-      const t = i - C.pos, d = Math.abs(t), a = t * STEP2;
-      b.style.opacity = Math.max(0, 1 - d * .28).toFixed(3);
-      b.style.pointerEvents = d > 2.6 ? "none" : "";
-      b.style.transform = `translate(${(x0 - (1 - Math.cos(a)) * G.rs * .55).toFixed(1)}px,${(G.cy + t * rowH).toFixed(1)}px) translateY(-50%) rotate(${(a * .35).toFixed(3)}rad) scale(${(1 - Math.min(.22, d * .1)).toFixed(3)})`;
-      b.classList.toggle("near", i === ci);
-    });
     const tg = Math.round(C.target);
     if (tg !== C.cur && C.pend !== tg && Math.abs(C.target - C.pos) < .25) { clearTimeout(C.setT); C.pend = tg; C.setT = setTimeout(() => { C.pend = null; setCat(Math.round(C.target)); }, 140); }
     W.raf = requestAnimationFrame(loop);
