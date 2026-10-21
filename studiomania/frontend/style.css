@@ -2994,3 +2994,73 @@ html[data-role="customer"] .admin-only { display: none !important; }
 .tw-cam-label { position: absolute; top: 14px; inset-inline: 0; text-align: center; color: #fff; font-size: 18px; text-shadow: 0 1px 6px #000; }
 .tw-cam-bar { display: flex; gap: 10px; align-items: center; justify-content: center; flex-wrap: wrap; padding: 12px; background: #111; color: #fff; }
 .tw-cam-bar label { display: flex; gap: 6px; align-items: center; font-size: 12px; }
+
+/* ============ 🎬 المونتاج الهادي (montage-ui.js) ============
+   الأدوات أيقونات بس (الاسم في الفقاعة)، كارت الأداة بيظهر وقت الحاجة والمعاينة بتاخد مكانه،
+   أدوات التايم لاين أيقونات، والتراكات المدموجة بتبان خطوط رفيعة لحد ما تفردها بدبل كليك. */
+.mtu-tip { position: fixed; z-index: 2147482000; max-width: 280px; padding: 6px 10px; border-radius: 10px; background: #181718; color: #fff; font: 12px/1.45 var(--font, "Readex Pro", sans-serif);
+  box-shadow: 0 10px 24px rgba(24, 23, 24, .2); opacity: 0; pointer-events: none; transition: opacity .15s; white-space: pre-line; }
+.mtu-tip.on { opacity: 1; }
+:root[data-nh-theme="dark"] .mtu-tip { background: #F1F1F3; color: #141416; }
+:root:root .stage .ed-top { grid-template-columns: auto minmax(0, 1fr); gap: 16px; align-items: start; }
+:root:root .stage .ed-inspector { grid-template-columns: 44px; gap: 0 14px; position: relative; }
+:root:root .stage .ed-inspector.mtu-open { grid-template-columns: 44px 300px; }
+:root:root .stage .ed-inspector > .pane, :root:root .stage .ed-inspector > .mtu-x { grid-row: 1; }
+:root:root .stage .ed-inspector > .tabs { gap: 6px; padding-top: 2px; grid-row: 1; grid-column: 1; }
+:root:root .stage #inspTabs button { flex: none; width: 42px; height: 42px; padding: 0; border-radius: 50%; font-size: 0; gap: 0; background: none; color: #6B6A66; justify-content: center; box-shadow: none; transition: background .2s, color .2s, box-shadow .2s; }
+:root:root .stage #inspTabs button[hidden] { display: none; }
+:root:root .stage #inspTabs button .emo { display: none; }
+:root:root .stage #inspTabs button::before { width: 19px; height: 19px; }
+:root:root .stage #inspTabs button:hover { background: var(--card); color: var(--text); box-shadow: 0 4px 18px rgba(24, 23, 24, .08); }
+:root:root .stage #inspTabs button.active { background: #181718; color: #fff; box-shadow: none; }
+:root[data-nh-theme="dark"] .stage #inspTabs button.active { background: #F2F1EE; color: #181718; }
+:root:root .stage .ed-inspector > .pane:not([hidden]) { min-height: 0; max-height: min(600px, calc(100vh - 450px)); padding: 20px; border-radius: 24px; font-size: 13px; }
+.stage .ed-inspector .mtu-x { justify-self: end; align-self: start; margin: 10px; z-index: 3; width: 28px; height: 28px; border-radius: 50%; border: 0; background: none; color: var(--muted); font-size: 17px; line-height: 1; cursor: pointer; }
+.stage .ed-inspector .mtu-x:hover { background: var(--field); color: var(--text); }
+.stage .ed-inspector:not(.mtu-open) .mtu-x { display: none; }
+.stage .ed-inspector > .pane .panel-head h2 { font-size: 14px; font-weight: 500; }
+/* المعاينة من غير المربع الرمادي */
+:root:root .stage .ed-player, :root[data-nh-theme="dark"] .stage .ed-player { background: none; padding-top: 0; }
+:root:root .stage .ed-player .frame { box-shadow: 0 18px 40px -18px rgba(24, 23, 24, .45); border-radius: 18px; }
+:root:root .stage .ed-player .transport .ic.play { width: 40px; height: 40px; }
+/* التايم لاين */
+:root:root .stage #montage .ed-timeline { background: var(--card); border: 0; border-radius: 24px; box-shadow: var(--card-shadow); padding: 6px 12px 10px; overflow: hidden; }
+:root:root .stage #montage .ed-timeline .tl-toolbar { border: 0; gap: 2px; padding: 4px 2px 6px; }
+:root:root .stage #montage .tl-toolbar .sep { height: 16px; background: var(--line); margin: 0 6px; }
+:root:root .stage #montage .tl-toolbar .mtu-ic { width: 30px; height: 30px; padding: 0; border: 0; border-radius: 50%; display: grid; place-items: center; background: none; color: #6B6A66; box-shadow: none; }
+:root:root .stage #montage .tl-toolbar .mtu-ic:hover { background: var(--field); color: var(--text); }
+:root:root .stage #montage .tl-toolbar .mtu-ic.active { background: rgba(229, 97, 62, .1); color: var(--accent); }
+:root:root .stage #montage .tl-toolbar .mtu-ic svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+:root:root .stage #montage .tl-toolbar input[type=range] { width: 120px; height: 2px; }
+:root:root .stage #montage .ed-timeline .tl-keys { display: none; }
+:root:root .stage #montage .tl-heads { width: 112px; }
+.stage #montage .tl-heads > div { gap: 4px; }
+.stage #montage .mtu-nm { font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+.stage #montage .tl-heads .trk-flags { opacity: 0; transition: opacity .15s; }
+.stage #montage .tl-heads > div:hover .trk-flags, .stage #montage .tl-heads .trk-flags:has(.on) { opacity: 1; }
+.stage #montage .mtu-gh { cursor: default; user-select: none; }
+.stage #montage .mtu-gh.mtu-closed::after { content: attr(data-more); font-size: 10px; padding: 1px 6px; border-radius: 99px; background: var(--field); color: var(--muted); margin-inline-start: 2px; }
+.stage #montage .mtu-mini { height: 8px !important; min-height: 0 !important; border-bottom: 0 !important; overflow: hidden; }
+.stage #montage .tl-heads > .mtu-mini > * { display: none !important; }
+.stage #montage .tl-track.mtu-mini > * { top: 1px !important; bottom: auto !important; height: 6px !important; min-height: 0 !important; border-radius: 3px !important; padding: 0 !important; font-size: 0 !important; pointer-events: none; }
+.stage #montage .tl-track.mtu-mini > * > * { display: none !important; }
+.stage #montage .mtu-gone { display: none !important; }
+.stage #montage :is(.tl-heads > div, .tl-track).mtu-empty:not(.mtu-mini) { height: 24px !important; min-height: 0 !important; }
+.stage #montage .tl-track.mtu-empty .tl-empty-track { font-size: 10.5px; line-height: 24px; padding-block: 0; opacity: .7; }
+.stage #montage .tl-heads > .mtu-empty .mtu-nm { opacity: .6; }
+:root:root .stage .ed-inspector > .pane { overflow-x: hidden; }
+.stage .ed-inspector > .pane * { max-width: 100%; }
+.stage .ed-inspector > .pane input[type=text], .stage .ed-inspector > .pane select, .stage .ed-inspector > .pane textarea { box-sizing: border-box; }
+/* الكابشن: عادي ولا تايبوجرافي 3D */
+.stage .mtu-seg { display: inline-flex; gap: 2px; padding: 2px; margin: 0 0 16px; border-radius: 999px; box-shadow: inset 0 0 0 1px var(--line); }
+.stage .mtu-seg button { height: 28px; padding: 0 14px; border: 0; border-radius: 999px; background: none; font: inherit; font-size: 12.5px; color: var(--muted); cursor: pointer; }
+.stage .mtu-seg button:hover { color: var(--text); }
+.stage .mtu-seg button.on { background: var(--field); color: var(--text); }
+.stage .mtu-typo[hidden] { display: none; }
+@media (max-width: 900px) {
+  :root:root .stage .ed-top { grid-template-columns: 1fr; }
+  :root:root .stage .ed-inspector, :root:root .stage .ed-inspector.mtu-open { grid-template-columns: 1fr; }
+  :root:root .stage .ed-inspector > .pane, :root:root .stage .ed-inspector > .mtu-x { grid-row: 2; grid-column: 1; }
+  :root:root .stage .ed-inspector > .tabs { flex-direction: row; overflow-x: auto; scrollbar-width: none; }
+  :root:root .stage #montage .tl-heads { width: 84px; }
+}

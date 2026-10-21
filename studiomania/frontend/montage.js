@@ -3,7 +3,7 @@
 const FPS = 30;
 let PV_W = 252, PV_H = 448; // حجم كادر المعاينة (بيتغير مع مقاس الكادر)
 const MIN_CLIP = 1 / 30; // أقل طول لقطعة: فريم واحد
-const PPS_MIN = 8, PPS_MAX = 600; // حدود زووم التايم لاين (بكسل لكل ثانية)
+const PPS_MIN = 0.5, PPS_MAX = 900; // حدود زووم التايم لاين (بكسل لكل ثانية): من ساعة كاملة على الشاشة لحد فريم فريم
 // كل قسم ليه مونتاج لوحده: مشاريعه ومشروعه المفتوح (فيديوهات الشخصيات / المسلسلات / الإعلانات)
 const SECTION_OF_STEP = { "6": "coach", "6s": "series", "6a": "ads", "6f": "free" };
 const SECTION_BACK = { series: ["9", "↩ رجوع للمسلسلات"], ads: ["10", "↩ رجوع للإعلانات"] };
@@ -604,8 +604,8 @@ function scheduleTimeline() {
 }
 
 function rulerStep() {
-  const steps = [1 / FPS, 2 / FPS, 5 / FPS, 10 / FPS, 0.5, 1, 2, 5, 10, 15, 30, 60, 120];
-  const major = steps.find((s) => s * mt.pps >= 70) || 120;
+  const steps = [1 / FPS, 2 / FPS, 5 / FPS, 10 / FPS, 0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600];
+  const major = steps.find((s) => s * mt.pps >= 70) || 600;
   const minor = major <= 1 / FPS ? major : major / (major < 1 ? (major * FPS) % 5 === 0 ? 5 : 2 : 5);
   return { major, minor: minor * mt.pps < 6 ? major : minor };
 }
@@ -2626,7 +2626,8 @@ const canvasRatio = () => (RATIOS[mt.project?.data.canvas?.ratio] ? mt.project.d
 function applyCanvas() {
   const [w, h] = RATIOS[canvasRatio()];
   OUT_W = w; OUT_H = h;
-  const s = Math.min(448 / h, 640 / w);
+  const H = Math.max(320, Math.min(448, (window.innerHeight || 900) - 520));   // الكادر على قد الشاشة عشان المونتاج كله يبان من غير سكرول
+  const s = Math.min(H / h, 640 / w);
   PV_W = Math.round(w * s); PV_H = Math.round(h * s);
   const fr = $("previewFrame");
   fr.style.width = `${PV_W}px`;
