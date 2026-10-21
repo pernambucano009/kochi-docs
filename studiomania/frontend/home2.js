@@ -127,11 +127,12 @@ const NH = (() => {
       <div class="nh-head"><div class="nh-name"><span class="latin">Create</span><b>ابدأ مشروع جديد</b></div>${gi("create")}</div>${tipOf("create")}</div>`;
   // «كمّل من مكان ما وقفت» (بقى مكان «شغّال عليه»): الزرار كله بيفتح كل المشاريع، والتشغيل اللي جنبه بيكمّل آخر مشروع على طول
   function contHTML() {
-    const p = [...D.work].sort((a, b) => String(b.updated_at || b.created_at || "").localeCompare(String(a.updated_at || a.created_at || "")))[0];
+    // آخر حاجة اتلمست: مشروع مونتاج، أو قالب/تايبوجرافي/دبلجة لسه ما خلصوش
+    const p = [...D.work, ...(D.drafts || [])].sort((a, b) => String(b.updated_at || b.created_at || "").localeCompare(String(a.updated_at || a.created_at || "")))[0];
     if (!p && KOCHI) return "";
-    const where = !p ? "" : p.section ? (p.render_status === "done" ? "اتصدّر" : "المونتاج") : STEPS5[folderStage(p).done] || "";
-    const attr = !p ? "" : p.section ? `data-proj="${esc(p.id)}"` : `data-folder="${esc(p.id)}"`;
-    const n = D.work.length, r = D.work.filter((x) => x.render_status === "rendering").length;
+    const where = !p ? "" : p.kind ? `${p.sec} · ${p.step}` : p.section ? (p.render_status === "done" ? "اتصدّر" : "المونتاج") : STEPS5[folderStage(p).done] || "";
+    const attr = !p ? "" : p.kind ? `data-draft="${p.kind}:${esc(p.id)}"` : p.section ? `data-proj="${esc(p.id)}"` : `data-folder="${esc(p.id)}"`;
+    const n = D.work.length + (D.drafts || []).length, r = D.work.filter((x) => x.render_status === "rendering").length;
     const count = n ? `${n} مشروع${r ? ` · ${r} بيتصدّر` : ""}` : "";
     // «شغّال عليه»: أيقونة واسم، وآخر مشروع وعدد المشاريع في الفقاعة. زرار التشغيل الصغير بيكمّل آخر مشروع على طول
     return `<div class="nh-tile nh-cont nh-cont-ic" data-id="progress" tabindex="0" role="button" aria-label="شغّال عليه">
@@ -709,6 +710,9 @@ const NH = (() => {
     if (line?.dataset.draft) {   // شغل قالب لسه ما خلصش: يكمّل من مكان ما وقف
       const [kind, id] = line.dataset.draft.split(":");
       if (kind === "flow") return Flow.open(id);
+      // التايبوجرافي والدبلجة بيفتحوا آخر مشروع متسجّل، فنسجّل ده ونفضّي المفتوح عشان يفتحه هو
+      if (kind === "typo") return openSection(line, () => { storageSet("studiomania.typo", id); tyx.cur = null; showStep("12"); });
+      if (kind === "dub") return openSection(line, () => { storageSet("studiomania.dub", id); dbx.cur = null; showStep("13"); });
       return openSection(line, async () => { try { tplx.cur = await api(`/api/tvideos/${id}`); } catch { tplx.cur = null; } showStep("14"); });
     }
     if (line?.dataset.proj) {   // مشروع مونتاج في ستوديومانيا: يفتح في المونتاج بتاع قسمه
@@ -741,12 +745,13 @@ const NH = (() => {
 
   // ---------- الداتا الحقيقية ----------
   async function refresh() {
-    const [folders, publisher, posts, coaches, voices, music, brains, cats, projects, flows, tvs] = await Promise.all([
+    const [folders, publisher, posts, coaches, voices, music, brains, cats, projects, flows, tvs, typos, dubs] = await Promise.all([
       KOCHI ? shellFolders(true) : [], api("/api/publisher").catch(() => null), api("/api/posts").catch(() => []), api("/api/coaches").catch(() => []),
       api("/api/audio?kind=voice").catch(() => []), api("/api/audio?kind=music").catch(() => []), api("/api/ad-brains").catch(() => []),
       D.cats.length ? D.cats : api("/api/style-cats").catch(() => []),
       KOCHI ? [] : api("/api/projects").catch(() => []),
       KOCHI ? [] : api("/api/flows").catch(() => []), KOCHI ? [] : api("/api/tvideos").catch(() => []),
+      KOCHI ? [] : api("/api/typo").catch(() => []), KOCHI ? { items: [] } : api("/api/dub").catch(() => ({ items: [] })),
     ]);
     // 🧭 شغل لسه ما خلصش في القوالب (مسار القالب واقف عند الفكرة/السيناريو…، أو فيديو قالب لسه بيتعمل): بيظهر في «شغّال عليه»
     const FLOW_ST = { idea: "الفكرة", format: "نوع البوست", scenario: "السيناريو", cast: "الأبطال", assets: "الملفات", generate: "التوليد" };
@@ -755,6 +760,11 @@ const NH = (() => {
         sec: `قالب «${f.template?.name || ""}»`, step: `واقف عند ${FLOW_ST[f.stage] || f.stage}`, updated_at: f.updated_at })),
       ...tvs.filter((v) => v.section === "templates" && v.status !== "done").map((v) => ({ kind: "tv", id: v.id, name: v.name || v.template_name || "فيديو قالب",
         sec: `قالب «${v.template_name || ""}»`, step: v.status === "failed" ? "وقف" : "لسه بيتعمل", updated_at: v.updated_at, thumb: v.thumb })),
+      // تايبوجرافي لسه ما اتصدّرش، ودبلجة لسه مفيهاش ولا لغة جاهزة
+      ...typos.filter((t) => !t.done).map((t) => ({ kind: "typo", id: t.id, name: t.name || "تايبوجرافي", sec: "تايبوجرافي",
+        step: t.busy ? "بيشتغل دلوقتي" : t.status === "failed" ? "وقف" : "لسه ما اتصدّرش", updated_at: t.updated_at })),
+      ...(dubs.items || []).filter((x) => !x.done).map((x) => ({ kind: "dub", id: x.id, name: x.name || "دبلجة", sec: "ترجمة ودبلجة",
+        step: x.busy ? "بيشتغل دلوقتي" : "لسه مفيش لغة جاهزة", updated_at: x.updated_at })),
     ].sort((a, b) => String(b.updated_at || "").localeCompare(String(a.updated_at || "")));
     D.work = KOCHI ? folders : projects.filter((p) => SEC[p.section]);
     Object.assign(D, { cats, folders, publisher, posts, coaches, voices: voices.length, music: music.length, money: window.money?.last || D.money,

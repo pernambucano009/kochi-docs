@@ -151,11 +151,46 @@ def probe_duration(path: Path) -> float:
     return int(h) * 3600 + int(m) * 60 + float(s)
 
 
+# 🔒 كل براند ملفاته لوحده: الجداول دي فيها client_id. أي حاجة جديدة بتتسجّل للبراند المفتوح (trigger على كل اتصال)،
+# والقوايم بتعرض بتاعة البراند ده بس: WHERE mine(client_id). القديم اللي من غير براند بيتحسب على أول براند.
+BRAND_TABLES = ("coaches", "audio", "exports", "projects", "generations", "posts", "videos", "folders")
+
+
+_BRAND = {"c": None, "f": None, "t": 0.0}
+_brand_tl = threading.local()
+
+
+def brand_ids() -> tuple[str | None, str | None]:
+    """(البراند المفتوح، أول براند) متخزنين ثانيتين، ومن غير ما يتحسبوا جوه اتصال تاني (علشان مفيش لف ولا قفل للداتابيز)."""
+    if time.time() - _BRAND["t"] < 2 or getattr(_brand_tl, "busy", False):
+        return _BRAND["c"], _BRAND["f"]
+    _brand_tl.busy = True
+    try:
+        _BRAND.update(c=active_client_id(), f=first_client_id(), t=time.time())
+    except Exception:  # noqa: BLE001 — قبل ما الجداول تتعمل
+        pass
+    finally:
+        _brand_tl.busy = False
+    return _BRAND["c"], _BRAND["f"]
+
+
 def db() -> sqlite3.Connection:
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
+    if BRAND_COLS_READY.get("ok"):
+        c, f = brand_ids()
+        conn.create_function("cur_brand", 0, lambda: c, deterministic=True)
+        conn.create_function("mine", 1, lambda cid: 1 if (cid == c if cid else (not c or c == f)) else 0, deterministic=True)
+        for t in BRAND_TABLES:
+            conn.execute(f"CREATE TEMP TRIGGER IF NOT EXISTS brand_{t} AFTER INSERT ON main.{t} WHEN NEW.client_id IS NULL AND cur_brand() IS NOT NULL "
+                         f"BEGIN UPDATE {t} SET client_id = cur_brand() WHERE rowid = NEW.rowid; END")
+    else:
+        conn.create_function("mine", 1, lambda cid: 1)
     return conn
+
+
+BRAND_COLS_READY: dict = {}
 
 
 def init_db() -> None:
@@ -352,6 +387,11 @@ with closing(db()) as _conn, _conn:
     # الأرشيف: NULL = لوحده (بعد التصدير)، 1 = اتأرشف بإيدك، 0 = رجّعته بإيدك
     if "archived" not in {c[1] for c in _conn.execute("PRAGMA table_info(videos)")}:
         _conn.execute("ALTER TABLE videos ADD COLUMN archived INTEGER")
+    # 🔒 البراند صاحب كل صف (الشخصيات، الصوت، الفيديوهات الجاهزة، المشاريع، التوليد، النشر…)
+    for _t in BRAND_TABLES:
+        if "client_id" not in {c[1] for c in _conn.execute(f"PRAGMA table_info({_t})")}:
+            _conn.execute(f"ALTER TABLE {_t} ADD COLUMN client_id TEXT")
+    BRAND_COLS_READY["ok"] = True
     # حسابات المدرب على السوشيال (للتاج في النشر)
     for _col in ("instagram", "tiktok"):
         if _col not in {c[1] for c in _conn.execute("PRAGMA table_info(coaches)")}:
@@ -718,7 +758,7 @@ def config():
 @app.get("/api/videos")
 def list_videos():
     with closing(db()) as conn:
-        rows = conn.execute("SELECT * FROM videos ORDER BY created_at DESC").fetchall()
+        rows = conn.execute("SELECT * FROM videos WHERE mine(client_id) ORDER BY created_at DESC").fetchall()
         return [video_row_to_dict(r, clips_count(conn, r["id"])) for r in rows]
 
 
@@ -1073,7 +1113,7 @@ def save_outro(outro: UploadFile, coach_id: str, kind: str = "outro") -> tuple[s
 @app.get("/api/coaches")
 def list_coaches():
     with closing(db()) as conn:
-        return [coach_to_dict(r) for r in conn.execute("SELECT * FROM coaches ORDER BY name")]
+        return [coach_to_dict(r) for r in conn.execute("SELECT * FROM coaches WHERE mine(client_id) ORDER BY name")]
 
 
 def coach_handles(instagram: str | None, tiktok: str | None) -> dict[str, str | None]:
@@ -1205,7 +1245,7 @@ async def preview_handles(file: UploadFile = File(...)):
     if name_col is None or (ig_col is None and tt_col is None):
         raise HTTPException(400, "لازم الملف يبقى فيه عمود للاسم وعمود لإنستجرام أو تيك توك")
     with closing(db()) as conn:
-        coaches = [dict(r) for r in conn.execute("SELECT id, name FROM coaches")]
+        coaches = [dict(r) for r in conn.execute("SELECT id, name FROM coaches WHERE mine(client_id)")]
     by_name = {sheets.norm_name(c["name"]): c for c in coaches}
     out = []
     for r in rows[1:]:
@@ -1268,7 +1308,7 @@ def list_handles():
     """كل الحسابات المعروفة (المدربين + اللي اتستوردت) عشان الاقتراحات في خانة التاج."""
     with closing(db()) as conn:
         out = [{"name": r["name"], "instagram": r["instagram"], "tiktok": r["tiktok"]}
-               for r in conn.execute("SELECT name, instagram, tiktok FROM coaches WHERE instagram IS NOT NULL OR tiktok IS NOT NULL")]
+               for r in conn.execute("SELECT name, instagram, tiktok FROM coaches WHERE mine(client_id) AND (instagram IS NOT NULL OR tiktok IS NOT NULL)")]
         seen = {h["instagram"] for h in out}
         out += [{"name": r["name"], "instagram": r["instagram"], "tiktok": r["tiktok"]}
                 for r in conn.execute("SELECT name, instagram, tiktok FROM social_handles ORDER BY name") if r["instagram"] not in seen]
@@ -1747,7 +1787,7 @@ def create_generations(body: GenerationIn):
 @app.get("/api/generations")
 def list_generations():
     with closing(db()) as conn:
-        rows = conn.execute("SELECT * FROM generations WHERE clip_id NOT LIKE 'series:%' AND clip_id NOT LIKE 'ad:%' AND clip_id != 'upload' ORDER BY created_at DESC, clip_label").fetchall()
+        rows = conn.execute("SELECT * FROM generations WHERE mine(client_id) AND clip_id NOT LIKE 'series:%' AND clip_id NOT LIKE 'ad:%' AND clip_id != 'upload' ORDER BY created_at DESC, clip_label").fetchall()
     return [generation_to_dict(r) for r in rows]
 
 
@@ -1771,7 +1811,7 @@ def archive_status():
     """حالة كل فيديو: شغال عليه ولا في الأرشيف. اللي اتصدّر بيتأرشف لوحده إلا لو رجّعته."""
     with closing(db()) as conn:
         exported = exported_videos(conn)
-        rows = conn.execute("SELECT id, name, archived, created_at FROM videos ORDER BY created_at DESC").fetchall()
+        rows = conn.execute("SELECT id, name, archived, created_at FROM videos WHERE mine(client_id) ORDER BY created_at DESC").fetchall()
     return [
         {
             "video_id": r["id"], "name": r["name"],
@@ -1892,7 +1932,7 @@ def check_kind(kind: str) -> str:
 def list_audio(kind: str):
     check_kind(kind)
     with closing(db()) as conn:
-        rows = conn.execute("SELECT * FROM audio WHERE kind = ? ORDER BY created_at DESC", (kind,)).fetchall()
+        rows = conn.execute("SELECT * FROM audio WHERE kind = ? AND mine(client_id) ORDER BY created_at DESC", (kind,)).fetchall()
     return [audio_to_dict(r) for r in rows]
 
 
@@ -2030,7 +2070,7 @@ def montage_sfx():
         path = sfxlib.ensure(SFXLIB_DIR, key)
         out.append({"id": f"lib:{key}", "name": label, "duration": round(sfxlib.duration(path), 2), "url": f"/api/montage/sfx/{key}.wav", "lib": True})
     with closing(db()) as conn:
-        out += [{**audio_to_dict(r), "lib": False} for r in conn.execute("SELECT * FROM audio WHERE kind = 'sfx' ORDER BY created_at DESC")]
+        out += [{**audio_to_dict(r), "lib": False} for r in conn.execute("SELECT * FROM audio WHERE kind = 'sfx' AND mine(client_id) ORDER BY created_at DESC")]
     return out
 
 
@@ -2218,7 +2258,7 @@ def montage_sources():
     """الفيديوهات المولَّدة الجاهزة اللي ينفع تدخل المونتاج."""
     with closing(db()) as conn:
         rows = conn.execute(
-            "SELECT * FROM generations WHERE status = 'completed' AND output_filename IS NOT NULL ORDER BY created_at DESC"
+            "SELECT * FROM generations WHERE status = 'completed' AND output_filename IS NOT NULL AND mine(client_id) ORDER BY created_at DESC"
         ).fetchall()
     out = []
     for r in rows:
@@ -2238,7 +2278,7 @@ def montage_sources():
         )
     # أوترو كل مدرب بيدخل المونتاج كقطعة عادية (تتقص وتتحرك وتتقسم)
     with closing(db()) as conn:
-        for c in conn.execute("SELECT id, name, outro_filename FROM coaches WHERE outro_filename IS NOT NULL ORDER BY name"):
+        for c in conn.execute("SELECT id, name, outro_filename FROM coaches WHERE outro_filename IS NOT NULL AND mine(client_id) ORDER BY name"):
             path = COACHES_DIR / c["outro_filename"]
             if not path.exists():
                 continue
@@ -2520,7 +2560,7 @@ def list_projects():
                     "UPDATE projects SET render_status = 'failed', render_error = ? WHERE id = ?",
                     (f"التصدير وقف في النص{memory_note()}. صدّر تاني.", r["id"]),
                 )
-        return [project_to_dict(r) for r in conn.execute("SELECT * FROM projects ORDER BY updated_at DESC")]
+        return [project_to_dict(r) for r in conn.execute("SELECT * FROM projects WHERE mine(client_id) ORDER BY updated_at DESC")]
 
 
 @app.post("/api/projects")
@@ -2602,7 +2642,7 @@ def kochi_auto_montage(conn: sqlite3.Connection, data: dict, fps: int = 30) -> d
     mid = (data.get("music") or {}).get("id")
     mrow = conn.execute("SELECT id, filename, duration FROM audio WHERE id = ? AND kind = 'music'", (mid,)).fetchone() if mid else None
     if mrow is None:
-        mrow = next((r for r in conn.execute("SELECT id, filename, duration, name FROM audio WHERE kind = 'music' ORDER BY created_at DESC")
+        mrow = next((r for r in conn.execute("SELECT id, filename, duration, name FROM audio WHERE kind = 'music' AND mine(client_id) ORDER BY created_at DESC")
                      if DEFAULT_MUSIC_NAME in (r["name"] or "").lower()), None)
     if vrow is None or video_end <= 0:
         return report
@@ -3419,7 +3459,7 @@ def list_exports():
         coaches = {r["id"]: {"id": r["id"], "name": r["name"], "instagram": r["instagram"], "tiktok": r["tiktok"]}
                    for r in conn.execute("SELECT id, name, instagram, tiktok FROM coaches")}
         out = []
-        for r in conn.execute("SELECT * FROM exports ORDER BY created_at DESC"):
+        for r in conn.execute("SELECT * FROM exports WHERE mine(client_id) ORDER BY created_at DESC"):
             e = export_to_dict(r)
             e["coach"] = coaches.get(coach_of.get(r["project_id"]))
             out.append(e)
@@ -3587,7 +3627,7 @@ def publisher_disconnect(account_id: str):
 @app.get("/api/posts")
 def list_posts():
     with closing(db()) as conn:
-        return [post_to_dict(r) for r in conn.execute(POSTS_QUERY + " ORDER BY p.scheduled_at")]
+        return [post_to_dict(r) for r in conn.execute(POSTS_QUERY + " WHERE mine(p.client_id) ORDER BY p.scheduled_at")]
 
 
 class PostOptions(BaseModel):
@@ -3780,7 +3820,7 @@ def _remote_orphans() -> list[dict]:
 def published_posts():
     """اللي اتنشر: من Zernio (بلينك البوست على كل منصة)، ولو مفيش Zernio من القايمة هنا."""
     with closing(db()) as conn:
-        local = [post_to_dict(r) for r in conn.execute(POSTS_QUERY + " WHERE p.status = 'published' ORDER BY p.published_at DESC")]
+        local = [post_to_dict(r) for r in conn.execute(POSTS_QUERY + " WHERE p.status = 'published' AND mine(p.client_id) ORDER BY p.published_at DESC")]
     if publisher.service_name() != "zernio":
         return [{"id": p["id"], "content": p["caption"], "published_at": p["published_at"] or p["scheduled_at"],
                  "media_url": p["export_url"], "name": p["export_name"],
@@ -5010,7 +5050,7 @@ def autopilot_step(job: dict, settings: dict) -> None:
                     return autopilot_update(jid, tr_tries=tr_tries + 1, note="بيكتب كلام التعليق للكابشن")
                 return autopilot_update(jid, note="بيكتب كلام التعليق للكابشن")
             captions_on = tr.get("status") == "done" and bool(tr.get("words"))
-            music = next((r for r in conn.execute("SELECT id, name FROM audio WHERE kind = 'music' ORDER BY created_at DESC")
+            music = next((r for r in conn.execute("SELECT id, name FROM audio WHERE kind = 'music' AND mine(client_id) ORDER BY created_at DESC")
                           if DEFAULT_MUSIC_NAME in (r["name"] or "").lower()), None)
             body = ProjectIn(name=f["name"], video_id=vid, coach_id=f["coach_id"],
                              clips=[{"gen_id": g, "start": 0, "end": None, "zoom": 1, "x": 0, "y": 0, "volume": 1} for g in draft["gen_ids"]],
@@ -5569,7 +5609,7 @@ def folder_to_dict(conn: sqlite3.Connection, f: sqlite3.Row) -> dict:
 @app.get("/api/folders")
 def list_folders():
     with closing(db()) as conn:
-        rows = conn.execute("SELECT * FROM folders ORDER BY created_at DESC").fetchall()
+        rows = conn.execute("SELECT * FROM folders WHERE mine(client_id) ORDER BY created_at DESC").fetchall()
         return [folder_to_dict(conn, r) for r in rows]
 
 
@@ -8037,7 +8077,7 @@ PRO_MIX = {"duck": 0.6, "whoosh": True, "punch": True}
 
 
 def default_music(conn: sqlite3.Connection) -> dict | None:
-    row = conn.execute("SELECT id FROM audio WHERE kind = 'music' AND lower(name) LIKE ? ORDER BY lower(name) = ? DESC, created_at DESC",
+    row = conn.execute("SELECT id FROM audio WHERE kind = 'music' AND mine(client_id) AND lower(name) LIKE ? ORDER BY lower(name) = ? DESC, created_at DESC",
                        (f"%{DEFAULT_MUSIC_NAME}%", DEFAULT_MUSIC_NAME)).fetchone()
     if not row:
         return None
@@ -9071,6 +9111,7 @@ def set_active_client(body: ActiveClientIn):
     if not brain_row(body.id):
         raise HTTPException(404, "العميل ده مش موجود")
     auth.set_setting("active_client", body.id)
+    _BRAND["t"] = 0.0   # 🔒 القوايم تتحسب للبراند الجديد على طول
     return list_clients()
 
 
@@ -9893,9 +9934,9 @@ def brain_tasks(bid: str):
         for k in tw:
             tw[k] = tw[k] or bool((t.get("ready") or {}).get(k))
     with closing(db()) as conn:
-        coaches = conn.execute("SELECT COUNT(*) FROM coaches").fetchone()[0]
-        voices = conn.execute("SELECT COUNT(*) FROM audio WHERE kind = 'voice'").fetchone()[0]
-        music = conn.execute("SELECT COUNT(*) FROM audio WHERE kind = 'music'").fetchone()[0]
+        coaches = conn.execute("SELECT COUNT(*) FROM coaches WHERE mine(client_id)").fetchone()[0]
+        voices = conn.execute("SELECT COUNT(*) FROM audio WHERE kind = 'voice' AND mine(client_id)").fetchone()[0]
+        music = conn.execute("SELECT COUNT(*) FROM audio WHERE kind = 'music' AND mine(client_id)").fetchone()[0]
     try:
         lib_media = sum(1 for f in lib_load(active_client_id())["files"] if f.get("kind") in ("image", "video"))
     except Exception:  # noqa: BLE001 — المكتبة لسه ماتعملتش
@@ -16827,7 +16868,7 @@ def typo_list():
             continue
         if owned(d.get("client_id")):
             out.append({"id": f.parent.name, "name": d.get("name"), "status": d.get("status"), "ratio": d.get("ratio"),
-                        "updated_at": d.get("updated_at"), "busy": d.get("status") in TYPO_BUSY})
+                        "updated_at": d.get("updated_at"), "busy": d.get("status") in TYPO_BUSY, "done": bool(d.get("final"))})
     return out
 
 
@@ -18721,9 +18762,10 @@ def dub_list():
             d = json.loads(f.read_text(encoding="utf-8"))
         except ValueError:
             continue
-        if d.get("client_id") and d["client_id"] != active_client_id():
+        if not owned(d.get("client_id")):
             continue
         out.append({"id": f.parent.name, "name": d.get("name"), "busy": dub_busy(d), "targets": list((d.get("targets") or {}).keys()),
+                    "done": any(t.get("video") for t in (d.get("targets") or {}).values()),
                     "duration": (d.get("source") or {}).get("duration"), "updated_at": d.get("updated_at")})
     return {"items": out, **dub_info()}
 
@@ -21261,14 +21303,13 @@ def flow_new(body: FlowNewIn):
 
 @app.get("/api/flows")
 def flow_list():
-    cid = active_client_id()
     out = []
     for f in FLOWS_DIR.glob("*/flow.json"):
         try:
             d = json.loads(f.read_text(encoding="utf-8"))
         except ValueError:
             continue
-        if d.get("client_id") in (cid, None):
+        if owned(d.get("client_id")):
             out.append({"id": f.parent.name, "template": d.get("template"), "stage": d.get("stage"), "title": (d.get("idea") or {}).get("title") or "",
                         "format": d.get("format"), "updated_at": d.get("updated_at") or d.get("created_at")})
     return sorted(out, key=lambda x: x["updated_at"] or "", reverse=True)[:40]
@@ -21777,7 +21818,7 @@ def flow_cast_options(fid: str):
            for a in brain.get("characters") or []]
     with closing(db()) as conn:
         out += [{"id": f"c:{r['id']}", "name": r["name"], "about": r["about"] or "", "image_url": f"/media/coaches/{r['image_filename']}"}
-                for r in conn.execute("SELECT * FROM coaches ORDER BY name")]
+                for r in conn.execute("SELECT * FROM coaches WHERE mine(client_id) ORDER BY name")]
     return out
 
 
@@ -24656,7 +24697,7 @@ def twins_list():
             d = json.loads(f.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             continue
-        if d.get("client_id") not in (None, active_client_id()) and active_client_id():
+        if not owned(d.get("client_id")):   # 🔒 نسخة براند تاني
             continue
         out.append(twin_to_dict(f.parent.name, d))
     return out
@@ -24959,7 +25000,7 @@ def flow_skip_shoot(fid: str):
 def footage_library():
     """☁️ الفيديوهات اللي اترفعت قبل كده (المكتبة السحابية للحساب): تتستخدم في أي مشروع."""
     with closing(db()) as conn:
-        rows = conn.execute("SELECT id, clip_label, output_filename, created_at FROM generations WHERE model = 'upload' AND status = 'completed' "
+        rows = conn.execute("SELECT id, clip_label, output_filename, created_at FROM generations WHERE model = 'upload' AND status = 'completed' AND mine(client_id) "
                             "ORDER BY created_at DESC LIMIT 120").fetchall()
     return [{"gen_id": r["id"], "name": r["clip_label"], "url": f"/media/generated/{r['output_filename']}", "at": r["created_at"]}
             for r in rows if (GENERATED_DIR / (r["output_filename"] or "_")).exists()]
@@ -25586,8 +25627,8 @@ def content_backgrounds(bid: str | None = None) -> dict:
 def content_account():
     """📦 كل اللي في حساب البراند جوه «مكتبة محتويات البراند»: الشخصيات (صورها وصوتها)، نسختي (صورك وصوتك وأماكنك)، والفيديوهات الجاهزة."""
     with closing(db()) as conn:
-        chars = [coach_to_dict(r) for r in conn.execute("SELECT * FROM coaches ORDER BY name")]
-        exports = [export_to_dict(r) for r in conn.execute("SELECT * FROM exports ORDER BY created_at DESC LIMIT 120")]
+        chars = [coach_to_dict(r) for r in conn.execute("SELECT * FROM coaches WHERE mine(client_id) ORDER BY name")]
+        exports = [export_to_dict(r) for r in conn.execute("SELECT * FROM exports WHERE mine(client_id) ORDER BY created_at DESC LIMIT 120")]
     return {"characters": [{k: c.get(k) for k in ("id", "name", "image_url", "voice_url", "about", "sheet")} for c in chars],
             "twins": [{k: t.get(k) for k in ("id", "name", "photos", "voice_url", "backgrounds")} for t in twins_list()],
             "exports": exports}
@@ -25688,8 +25729,15 @@ def lib_audio_link(bid: str, f: dict, kind: str) -> None:
 def lib_ready(bid: str) -> dict:
     """قبل ما المكتبة تتعرض: الفولدرات الأساسية، والتعليقات والموسيقى اللي اترفعت من مكان تاني بتتجاب هنا (مرة واحدة)."""
     with closing(db()) as conn:
-        rows = [dict(r) for r in conn.execute("SELECT * FROM audio ORDER BY created_at")]
+        rows = [dict(r) for r in conn.execute("SELECT * FROM audio WHERE mine(client_id) AND kind IN ('voice', 'music') ORDER BY created_at")]
+        others = {r["id"] for r in conn.execute("SELECT id FROM audio WHERE NOT mine(client_id)")}
+    gone = []
     def fn(d):
+        # 🔒 نسخ اتجابت قبل كده من براند تاني (لما المكتبة كانت مشتركة): بتتشال من هنا
+        keep = []
+        for f in d["files"]:
+            (gone if f.get("audio_id") in others else keep).append(f)
+        d["files"] = keep
         roots = lib_prepare(d)
         seen = set(d.get("audio_seen") or [])
         for r in rows:
@@ -25706,9 +25754,13 @@ def lib_ready(bid: str) -> dict:
             except OSError:
                 continue
             d["files"].append({"id": lib_.fid(), "file": name, "name": lib_.clean_name(r["name"]), "kind": "audio", "folder": roots["music" if r["kind"] == "music" else "voice"],
-                               "size": src.stat().st_size, "desc": "", "tags": [], "status": "ready", "at": r["created_at"], "dur": r["duration"], "audio_id": r["id"]})
+                               "size": src.stat().st_size, "desc": "", "tags": [], "status": "ready", "at": r["created_at"], "dur": r["duration"], "audio_id": r["id"],
+                               "imported": True})
         d["audio_seen"] = sorted(seen)
-    return lib_update(fn, bid)
+    lib = lib_update(fn, bid)
+    for f in gone:
+        (lib_dir(bid) / Path(f["file"]).name).unlink(missing_ok=True)
+    return lib
 
 
 def lib_file_dict(lib: dict, f: dict, bid: str) -> dict:
@@ -26038,12 +26090,12 @@ def auto_refs(q: str = "") -> list[dict]:
     """اللي ينفع يتمنشن (@) في «ولّد»: الشخصيات، نسختي، الخلفيات والأماكن، والفولدرات والصور والفيديوهات من مكتبة المحتويات."""
     out = []
     with closing(db()) as conn:
-        for r in conn.execute("SELECT * FROM coaches ORDER BY name"):
+        for r in conn.execute("SELECT * FROM coaches WHERE mine(client_id) ORDER BY name"):
             c = coach_to_dict(r)
             out.append({"kind": "char", "id": str(c["id"]), "label": c["name"], "thumb": c["image_url"], "sub": "شخصية"})
             if c.get("voice_url"):
                 out.append({"kind": "audio", "id": f"cv:{c['id']}", "label": f"صوت {c['name']}", "thumb": c["image_url"], "sub": "🎙️ صوت شخصية"})
-        exports = [export_to_dict(r) for r in conn.execute("SELECT * FROM exports ORDER BY created_at DESC LIMIT 40")]
+        exports = [export_to_dict(r) for r in conn.execute("SELECT * FROM exports WHERE mine(client_id) ORDER BY created_at DESC LIMIT 40")]
     for t in twins_list():
         ph = next((p for p in t.get("photos") or [] if p.get("angle") in ("front", "smile")), None) or next(iter(t.get("photos") or []), None)
         if ph:

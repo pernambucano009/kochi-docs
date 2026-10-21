@@ -2149,7 +2149,16 @@ label.dim { opacity: .4; }
 #nh .nh-tip .nh-mbar { display: none; }
 #nh .nh-tile:hover > .nh-tip, #nh .nh-tile:focus-visible > .nh-tip { opacity: 1; translate: -50% 0; }
 #nh .nh-cta > .nh-tip { top: calc(100% + 10px); }
-#nh .nh-cont-ic > .nh-tip { top: auto; bottom: calc(100% + 8px); }
+#nh .nh-cont-wrap, #nh .nh-cta-wrap { position: relative; z-index: 6; }
+/* فقاعة «شغّال عليه» بتطلع جنب الزرار، مش فوقه، عشان ماتستخباش ورا «ابدأ مشروع جديد» ولا تتقص من فوق */
+#nh .nh-cont-ic > .nh-tip { top: auto; bottom: 0; left: calc(100% + 14px); translate: 6px 0; z-index: 60; }
+#nh .nh-cont-ic:hover > .nh-tip, #nh .nh-cont-ic:focus-visible > .nh-tip { translate: 0 0; }
+[dir="rtl"] #nh .nh-cont-ic > .nh-tip { left: auto; right: calc(100% + 14px); translate: -6px 0; }
+[dir="rtl"] #nh .nh-cont-ic:hover > .nh-tip, [dir="rtl"] #nh .nh-cont-ic:focus-visible > .nh-tip { translate: 0 0; }
+@media (max-width: 820px) {
+  #nh .nh-cont-ic > .nh-tip, [dir="rtl"] #nh .nh-cont-ic > .nh-tip { top: calc(100% + 8px); bottom: auto; left: 50%; right: auto; translate: -50% 4px; }
+  #nh .nh-cont-ic:hover > .nh-tip, [dir="rtl"] #nh .nh-cont-ic:hover > .nh-tip, #nh .nh-cont-ic:focus-visible > .nh-tip, [dir="rtl"] #nh .nh-cont-ic:focus-visible > .nh-tip { translate: -50% 0; }
+}
 :root[data-nh-theme="dark"] #nh .nh-tip { background: #F1F1F3; color: #141416; }
 :root[data-nh-theme="dark"] #nh .nh-tip > span { color: rgba(20, 20, 22, .72); }
 :root[data-nh-theme="dark"] #nh .nh-tip .nh-tip-m { color: #C2482E; }
