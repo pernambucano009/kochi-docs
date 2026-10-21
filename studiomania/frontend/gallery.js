@@ -100,7 +100,7 @@ const Gallery = (() => {
   const gensHTML = (cls) => `<div class="${cls}">${GENS.map(([k, i, b, s]) => `<button type="button" class="nh-wh-gen" data-gen="${k}"><i>${i}</i><span><b>${b}</b><small>${s}</small></span></button>`).join("")}</div>`;
   // 🎡 العجلة الصغيرة جوه الكورة: الأقسام الكبيرة. «المشاريع الأساسية» (القوالب) هي الأساس وعليها دايرة برتقاني.
   // رول الماوس فوق الكورة بيلفّها، واللي تقف عليه بيظهر على اليمين: القوالب، أو صفحة الدبلجة، أو المولّدات.
-  const CATS2 = [["projects", "المشاريع الأساسية", "القوالب"], ["dub", "الدبلجة والترجمة", "أي فيديو بلغة أو لهجة تانية"], ["video", "توليد فيديو", "بالذكاء الصناعي"],
+  const CATS2 = [["projects", "المشاريع الأساسية", "القوالب"], ["dub", "الدبلجة والترجمة", "أي فيديو بلغة أو لهجة تانية"], ["video", "توليد فيديو", "بالذكاء الصناعي"], ["scene", "استوديو المشهد", "مسودة 3D ← فيديو حقيقي"],
     ["image", "توليد صور", "بالذكاء الصناعي"], ["voice", "توليد صوت", "بالذكاء الصناعي"]];
   const C = { pos: 0, vel: 0, target: 0, cur: 0, last: 0, setT: 0 };
   const catsHTML = (cls) => `<div class="${cls}">${CATS2.map(([k, t, sub], i) => `<button type="button" class="nh-wh-cat${i === 0 ? " main" : ""}" data-cat2="${i}"><b>${t}</b><small>${sub}</small></button>`).join("")}</div>`;
@@ -124,12 +124,13 @@ const Gallery = (() => {
     const panel = el.querySelector(".nh-wh-panel");
     el.classList.toggle("panel-on", k > 0);
     el.querySelectorAll("[data-cat2]").forEach((b) => b.classList.toggle("on", +b.dataset.cat2 === k));
-    dubOut(); Gen.close?.(); panel.innerHTML = "";
+    dubOut(); Gen.close?.(); SceneStudio.close?.(); panel.innerHTML = "";
     panel.hidden = k === 0;
     if (k === 0) return;
     const key = CATS2[k][0];
     panel.animate?.([{ opacity: 0, transform: "translateY(10px)" }, { opacity: 1, transform: "none" }], { duration: 280, easing: "cubic-bezier(.2,.8,.2,1)" });
     if (key === "dub") return dubIn(panel);
+    if (key === "scene") return SceneStudio.open(panel);
     Gen.open(key, panel);
   }
   function catGo(i) { C.target = Math.max(0, Math.min(CATS2.length - 1, i)); }
@@ -305,7 +306,7 @@ const Gallery = (() => {
   }
   function loop(now) {
     const el = W.el;
-    if (!el || !el.isConnected) { W.raf = 0; W.G.cards?.forEach((c) => play(c, false)); dubOut(); Gen.close?.(); return; }   // الصفحة اتقفلت
+    if (!el || !el.isConnected) { W.raf = 0; W.G.cards?.forEach((c) => play(c, false)); dubOut(); Gen.close?.(); SceneStudio.close?.(); return; }   // الصفحة اتقفلت
     const dt = Math.min(.05, (now - (W.last || now)) / 1000), N = W.list.length, G = W.G; W.last = now;
     if (W.mode === "coast") {   // بتجري بالدفعة وتهدى بالاحتكاك
       W.pos += W.vel * dt; W.vel *= Math.exp(-W.fric * dt);

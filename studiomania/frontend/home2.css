@@ -2288,3 +2288,51 @@ label.dim { opacity: .4; }
   #nh .nh-wh.panel-on .nh-wh-info { visibility: visible; }
   #nh .nh-wh.panel-on .nh-wh-info > :not(.nh-wh-mcats) { visibility: hidden; }
 }
+/* 🧊 استوديو المشهد (جوه عجلة «ابدأ مشروع جديد») */
+#nh .sc { height: 100%; }
+#nh .sc-wrap { display: grid; grid-template-rows: auto 1fr; gap: 14px; height: 100%; min-height: 0; }
+#nh .sc-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+#nh .sc-head > div { display: grid; } #nh .sc-head small { color: var(--nh-accent, #E5613E); font-size: 11px; letter-spacing: .2em; } #nh .sc-head b { font-size: 20px; font-weight: 600; }
+#nh .sc-main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 380px); gap: 16px; min-height: 0; }
+#nh .sc-stage { display: grid; grid-template-rows: auto minmax(0, 1fr) auto auto; gap: 10px; min-height: 0; }
+#nh .sc-tabs { display: flex; gap: 6px; } #nh .sc-tabs button { border: 0; padding: 7px 14px; border-radius: 99px; background: var(--nh-fill, #eee); color: inherit; font: inherit; font-size: 13px; cursor: pointer; }
+#nh .sc-tabs button.on { background: var(--nh-ink, #111); color: var(--nh-bg, #fff); }
+#nh .sc-view { position: relative; display: grid; place-items: center; min-height: 360px; border-radius: 22px; background: color-mix(in srgb, var(--nh-ink, #111) 6%, transparent); overflow: hidden; }
+#nh .sc-view canvas { display: block; border-radius: 14px; box-shadow: 0 16px 40px -18px rgba(0,0,0,.5); touch-action: none; cursor: grab; }
+#nh .sc-recov { position: absolute; top: 12px; inset-inline-start: 12px; padding: 6px 12px; border-radius: 99px; background: #D9443A; color: #fff; font-size: 13px; }
+#nh .sc-time { display: flex; align-items: center; gap: 10px; } #nh .sc-time input { flex: 1; accent-color: var(--nh-accent, #E5613E); } #nh .sc-time small { min-width: 90px; font-size: 12px; opacity: .7; }
+#nh .sc-row { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: end; }
+#nh .sc-f { display: grid; gap: 4px; font-size: 12.5px; } #nh .sc-f > span { opacity: .7; }
+#nh .sc-f input:not([type=checkbox]):not([type=color]), #nh .sc-f select, #nh .sc-f textarea, #nh .sc-box > textarea { width: 100%; box-sizing: border-box; padding: 7px 10px; border-radius: 10px; border: 1.5px solid color-mix(in srgb, var(--nh-ink, #111) 12%, transparent); background: var(--card, #fff); color: inherit; font: inherit; font-size: 13px; }
+#nh .sc-f input[type=number] { width: 74px; } #nh .sc-set .sc-f select { width: auto; }
+#nh .sc-c input[type=color] { width: 44px; height: 32px; border: 0; padding: 0; background: none; border-radius: 8px; }
+#nh .sc-chk { display: flex; align-items: center; gap: 6px; }
+#nh .sc-v3 { display: flex; gap: 6px; } #nh .sc-v3 label { display: flex; align-items: center; gap: 3px; } #nh .sc-v3 small { opacity: .5; font-size: 11px; } #nh .sc-v3 input { width: 64px !important; }
+#nh .sc-side { display: grid; align-content: start; gap: 10px; overflow: auto; min-height: 0; padding-inline-end: 4px; }
+#nh .sc-box { border-radius: 18px; background: var(--card, #fff); box-shadow: 0 6px 22px rgba(24,23,24,.06); padding: 12px 14px; display: grid; gap: 10px; }
+#nh .sc-box > summary { cursor: pointer; font-weight: 600; font-size: 14px; list-style: none; } #nh .sc-box > summary small { opacity: .5; font-weight: 400; }
+#nh .sc-box:not([open]) { gap: 0; }
+#nh .sc-note { margin: 0; font-size: 12.5px; line-height: 1.7; opacity: .7; }
+#nh .sc-pills { display: flex; flex-wrap: wrap; gap: 6px; }
+#nh .sc-pill { border: 0; padding: 6px 12px; border-radius: 99px; background: var(--nh-fill, #f0efec); color: inherit; font: inherit; font-size: 12.5px; cursor: pointer; }
+#nh .sc-pill.on { background: var(--nh-ink, #111); color: var(--nh-bg, #fff); }
+#nh .sc-btn { border: 0; padding: 8px 14px; border-radius: 99px; background: var(--nh-fill, #f0efec); color: inherit; font: inherit; font-size: 13px; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+#nh .sc-btn.sm { padding: 5px 10px; font-size: 12px; } #nh .sc-btn.pri { background: var(--nh-accent, #E5613E); color: #fff; } #nh .sc-btn.danger { color: #D9443A; }
+#nh .sc-btn:disabled { opacity: .45; cursor: default; } #nh .sc-btn small { opacity: .8; }
+#nh .sc-acts { display: flex; flex-wrap: wrap; gap: 6px; }
+#nh .sc-edit, #nh .sc-key { display: grid; gap: 10px; padding-top: 6px; border-top: 1px dashed color-mix(in srgb, var(--nh-ink, #111) 12%, transparent); }
+#nh .sc-key .sc-f { grid-auto-flow: column; justify-content: start; align-items: center; } #nh .sc-key .sc-f input { width: 60px !important; }
+#nh .sc-chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 4px 3px 10px; border-radius: 99px; background: var(--nh-fill, #f0efec); font-size: 12px; }
+#nh .sc-chip img { width: 22px; height: 22px; border-radius: 50%; object-fit: cover; } #nh .sc-chip button { border: 0; background: none; cursor: pointer; color: inherit; }
+#nh .sc-draft { width: 100%; max-height: 260px; border-radius: 12px; background: #000; }
+#nh .sc-takes { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+#nh .sc-take { margin: 0; display: grid; gap: 6px; } #nh .sc-take video, #nh .sc-take .sc-ph { width: 100%; aspect-ratio: 9 / 16; border-radius: 12px; background: #111; object-fit: cover; }
+#nh .sc-take .sc-ph { display: grid; place-items: center; align-content: center; gap: 8px; color: #fff; padding: 10px; box-sizing: border-box; text-align: center; font-size: 12px; }
+#nh .sc-take figcaption { display: grid; gap: 2px; font-size: 12px; } #nh .sc-take figcaption small { opacity: .6; }
+#nh .sc-pick { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; padding: 16px; background: rgba(15,15,20,.42); backdrop-filter: blur(6px); }
+#nh .sc-pick[hidden] { display: none; }
+#nh .sc-pick-in { width: min(640px, 100%); max-height: 80vh; overflow: auto; background: var(--card, #fff); border-radius: 22px; padding: 18px; display: grid; gap: 12px; }
+#nh .sc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+#nh .sc-grid button { border: 0; background: var(--nh-fill, #f0efec); border-radius: 12px; padding: 6px; display: grid; gap: 4px; cursor: pointer; color: inherit; font: inherit; }
+#nh .sc-grid img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px; } #nh .sc-grid small { font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 980px) { #nh .sc-main { grid-template-columns: 1fr; } #nh .sc-side { overflow: visible; } #nh .sc-view { min-height: 420px; } }

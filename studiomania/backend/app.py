@@ -27473,5 +27473,261 @@ def brain_trend_save(bid: str, tid: str, body: TrendUseIn):
     return {**trends_out(bid), "saved_id": item["id"]}
 
 
+# ---------------------------------------------------------------- 🧊 استوديو المشهد: مسودة 3D ← فيديو حقيقي
+# المتصفح بيرسم المشهد (أشكال بسيطة + حركة كاميرا) ويطلّع منه فيديو رمادي، والفيديو ده بيروح لموديل بياخد فيديو مرجع
+# مع صور العناصر والبرومبت، فالحركة والكادر ثابتين والموديل بيلوّن بس. كل توليدة «لقطة» محفوظة وتدخل الفيديوهات الجاهزة.
+import scene3d  # noqa: E402
+
+SCENE_DIR = DATA_DIR / "scenes"
+SCENE_DIR.mkdir(parents=True, exist_ok=True)
+app.mount("/media/scenes", StaticFiles(directory=SCENE_DIR), name="scenes")
+SCENE_LOCK = threading.Lock()
+
+
+def scene_load(sid: str) -> dict:
+    f = SCENE_DIR / Path(sid).name / "scene.json"
+    if not f.exists():
+        raise HTTPException(404, "المشهد ده مش موجود")
+    d = json.loads(f.read_text(encoding="utf-8"))
+    if not owned(d.get("client_id")):
+        raise HTTPException(404, "المشهد ده مش موجود")
+    return d
+
+
+def scene_save(sid: str, d: dict) -> None:
+    d["updated_at"] = now()
+    f = SCENE_DIR / Path(sid).name / "scene.json"
+    f.parent.mkdir(parents=True, exist_ok=True)
+    f.with_suffix(".tmp").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+    f.with_suffix(".tmp").replace(f)
+
+
+def scene_update(sid: str, fn) -> dict:
+    with SCENE_LOCK:
+        d = scene_load(sid)
+        fn(d)
+        scene_save(sid, d)
+        return d
+
+
+def scene_models() -> list[dict]:
+    """الموديلات اللي بتاخد فيديو مرجع: تعديل فيديو (فيديو ← فيديو) أو مراجع بفيديو (Seedance وWan وغيرهم)."""
+    ms = [m for m in auto_gen_models() if m.get("mode") == "video" or (m.get("mode") == "refs" and m.get("video_in"))]
+    # Seedance 2 بيمشي على المسودة بالحرف (ده اللي محتاجينه)، وبعده Wan 3 وKling O3
+    pref = ("seedance-2.0/", "seedance-2.5", "wan-3.0/", "kling-video-o3-pro", "kling-video-o3-std", "seedance-2.0-fast")
+    return sorted(ms, key=lambda m: next((i for i, p in enumerate(pref) if p in m["model"]), 99))
+
+
+def scene_dict(sid: str, d: dict) -> dict:
+    base = f"/media/scenes/{sid}"
+    return {**d, "id": sid, "draft_url": f"{base}/{d['draft']}?v={int(time.time())}" if d.get("draft") else None,
+            "takes": [{**t, "url": f"{base}/{t['file']}" if t.get("file") else None} for t in d.get("takes") or []]}
+
+
+@app.get("/api/scenes-meta")
+def scenes_meta():
+    return {"shapes": scene3d.SHAPES, "lights": scene3d.LIGHTS, "ratios": scene3d.RATIOS,
+            "models": [{k: m.get(k) for k in ("model", "label", "per_sec", "mode")} for m in scene_models()]}
+
+
+@app.get("/api/scenes")
+def scenes_list():
+    out = []
+    for f in sorted(SCENE_DIR.glob("*/scene.json"), key=lambda x: x.stat().st_mtime, reverse=True):
+        try:
+            d = json.loads(f.read_text(encoding="utf-8"))
+        except ValueError:
+            continue
+        if owned(d.get("client_id")):
+            out.append({"id": f.parent.name, "name": d.get("name"), "updated_at": d.get("updated_at"), "takes": len(d.get("takes") or []),
+                        "busy": any(t.get("status") == "working" for t in d.get("takes") or [])})
+    return out
+
+
+class SceneNewIn(BaseModel):
+    name: str = ""
+
+
+@app.post("/api/scenes")
+def scene_new(body: SceneNewIn):
+    sid = uuid.uuid4().hex[:10]
+    d = {"name": body.name.strip()[:80] or "مشهد جديد", "client_id": active_client_id(), "scene": scene3d.default(), "prompt": "", "refs": [],
+         "model": "", "draft": None, "takes": [], "say": "", "created_at": now()}
+    scene_save(sid, d)
+    return scene_dict(sid, d)
+
+
+@app.get("/api/scenes/{sid}")
+def scene_get(sid: str):
+    return scene_dict(sid, scene_load(sid))
+
+
+class ScenePatch(BaseModel):
+    name: str | None = None
+    scene: dict | None = None
+    prompt: str | None = None
+    refs: list | None = None
+    model: str | None = None
+
+
+@app.patch("/api/scenes/{sid}")
+def scene_patch(sid: str, body: ScenePatch):
+    def fn(d):
+        if body.name is not None:
+            d["name"] = body.name.strip()[:80] or d["name"]
+        if body.scene is not None:
+            new = scene3d.clean(body.scene)
+            if new != d.get("scene"):
+                d["draft"] = None   # المشهد اتغيّر: المسودة القديمة مابقتش شبهه
+            d["scene"] = new
+        if body.prompt is not None:
+            d["prompt"] = body.prompt.strip()[:3000]
+        if body.refs is not None:
+            d["refs"] = [r for r in (scene3d.clean_ref(x) for x in body.refs[:6]) if r]
+        if body.model is not None:
+            d["model"] = body.model[:120]
+    return scene_dict(sid, scene_update(sid, fn))
+
+
+@app.delete("/api/scenes/{sid}")
+def scene_delete(sid: str):
+    scene_load(sid)
+    shutil.rmtree(SCENE_DIR / Path(sid).name, ignore_errors=True)
+    return {"ok": True}
+
+
+class ScenePlanIn(BaseModel):
+    text: str
+
+
+@app.post("/api/scenes/{sid}/plan")
+def scene_plan(sid: str, body: ScenePlanIn):
+    """«اوصفه بكلامك»: المخ بيبني المسودة (الأشكال وحركتها والكاميرا) ويكتب برومبت الشكل الحقيقي (بيتخصم على قد الكلام)."""
+    text = body.text.strip()[:2000]
+    if not text:
+        raise HTTPException(400, "اوصف الفيديو الأول")
+    d = scene_load(sid)
+    if atlas.mock_mode() or not atlas.api_key():
+        res = scene3d.mock_plan(text)
+    else:
+        cost = wallet.credits(wallet.est(chars=9000 + len(text)))
+        wallet.need(cost, "بناء المشهد")
+        b = active_client() or {}
+        brand = " · ".join(str(b.get(k) or "") for k in ("name", "domain", "about") if b.get(k))
+        names = [f["name"] for f in lib_merged(active_client_id(), ready=False)["files"] if f.get("kind") == "image"][:40]
+        res = flow_llm(scene3d.plan_messages(text, brand, d.get("scene") or {}, names), "المشهد")
+        wallet.charge(cost, "استوديو المشهد: بناء المسودة", sid)
+    sc = scene3d.clean(res.get("scene") or {})
+    old = {o["name"]: o.get("img") for o in (d.get("scene") or {}).get("objects") or [] if o.get("img")}
+    for o in sc["objects"]:   # الصور اللي العميل كان حاططها على الأشكال بتفضل لو الاسم زي ما هو
+        o["img"] = o.get("img") or old.get(o["name"])
+    d = scene_update(sid, lambda x: x.update(scene=sc, draft=None, prompt=str(res.get("prompt") or x.get("prompt") or "")[:3000],
+                                             say=str(res.get("say") or "")[:400]))
+    return scene_dict(sid, d)
+
+
+@app.post("/api/scenes/{sid}/draft")
+def scene_draft(sid: str, frames: list[UploadFile] | None = File(None), video: UploadFile | None = File(None), fps: int = Form(24)):
+    """المسودة من المتصفح: فيديو VP8 (IVF) كل فريم بوقته، أو فريمات صور (المتصفحات القديمة) ← mp4 بنفس المدة بالظبط."""
+    d = scene_load(sid)
+    folder = SCENE_DIR / Path(sid).name
+    fps = max(12, min(30, int(fps or 24)))
+    if not video and (not frames or len(frames) > fps * 16):
+        raise HTTPException(400, "المسودة محتاجة فريمات (لحد ١٥ ثانية)")
+    tmp = TMP_DIR / f"scdraft_{uuid.uuid4().hex[:8]}"
+    tmp.mkdir(parents=True, exist_ok=True)
+    name = f"draft_{uuid.uuid4().hex[:6]}.mp4"
+    W, H = {"9:16": (720, 1280), "16:9": (1280, 720), "1:1": (960, 960), "4:5": (864, 1080)}[d["scene"]["ratio"]]
+    try:
+        if video:
+            (tmp / "in.ivf").write_bytes(video.file.read()[:200_000_000])
+            src = ["-r", str(fps), "-i", str(tmp / "in.ivf")]
+        else:
+            for i, up in enumerate(frames):
+                (tmp / f"f{i:04d}.jpg").write_bytes(up.file.read()[:8_000_000])
+            src = ["-framerate", str(fps), "-i", str(tmp / "f%04d.jpg")]
+        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", *src, "-t", f"{d['scene']['duration']:.2f}",
+                        "-vf", f"scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},format=yuv420p",
+                        "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-r", str(fps), "-movflags", "+faststart", str(folder / name)],
+                       check=True, capture_output=True, timeout=300)
+    except subprocess.SubprocessError as exc:
+        raise HTTPException(400, f"مقدرتش أجهّز المسودة: {exc}") from exc
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    old = d.get("draft")
+    d = scene_update(sid, lambda x: x.update(draft=name))
+    if old and old != name and not any(t.get("draft") == old for t in d.get("takes") or []):
+        (folder / old).unlink(missing_ok=True)
+    return scene_dict(sid, d)
+
+
+def run_scene_take(sid: str, tid: str) -> None:
+    folder = SCENE_DIR / Path(sid).name
+    def setp(**kw):
+        scene_update(sid, lambda x: next((t.update(**kw) for t in x["takes"] if t["id"] == tid), None))
+    try:
+        d = scene_load(sid)
+        t = next(t for t in d["takes"] if t["id"] == tid)
+        src = folder / t["draft"]
+        g = {"id": tid, "opts": {"prompt": t["prompt_full"], "model": t["model"], "refs": t.get("refs") or [], "use_piece": True}}
+        dest = folder / f"take_{tid}.mp4"
+        label = auto_gen_piece(src, float(d["scene"]["duration"]), g, dest, f"scene_{sid}", d["scene"]["ratio"])
+        dur = probe_duration(dest)
+        export_id = uuid.uuid4().hex[:12]
+        filename = f"scene_{export_id}.mp4"
+        shutil.copy(dest, EXPORTS_DIR / filename)
+        with closing(db()) as conn, conn:
+            conn.execute("INSERT INTO exports (id, name, filename, duration, source, project_id, created_at) VALUES (?, ?, ?, ?, 'scene', NULL, ?)",
+                         (export_id, f"🧊 {d.get('name') or 'مشهد'}"[:100], filename, dur, now()))
+        setp(status="done", step=None, file=dest.name, label=label, export_id=export_id, error=None)
+    except wallet.NoCredits as exc:
+        setp(status="failed", step=None, error=str(exc)[:300])
+    except Exception as exc:  # noqa: BLE001
+        setp(status="failed", step=None, error=str(getattr(exc, "detail", None) or exc)[:300])
+
+
+@app.post("/api/scenes/{sid}/generate")
+def scene_generate(sid: str):
+    """ولّد: المسودة + صور العناصر (المرجع) + البرومبت ← لقطة حقيقية بنفس الحركة. كل مرة لقطة جديدة (القديمة بتفضل)."""
+    d = scene_load(sid)
+    if not d.get("draft"):
+        raise HTTPException(400, "طلّع المسودة الأول")
+    if any(t.get("status") == "working" for t in d.get("takes") or []):
+        raise HTTPException(400, "فيه لقطة بتتولّد دلوقتي، استنى تخلص")
+    ms = scene_models()
+    m = next((x for x in ms if x["model"] == d.get("model")), None) or (ms[0] if ms else None)
+    if not m:
+        raise HTTPException(400, "مفيش موديل فيديو بياخد فيديو مرجع متاح دلوقتي")
+    # صور العناصر: اللي على الأشكال + اللي متضافة كمراجع، من غير تكرار
+    refs, seen = [], set()
+    for r in [o["img"] for o in d["scene"]["objects"] if o.get("img")] + (d.get("refs") or []):
+        k = (r["kind"], r["id"])
+        if k not in seen:
+            seen.add(k)
+            refs.append(r)
+    full = scene3d.gen_prompt(d["scene"], d.get("prompt") or "", refs)
+    per = m.get("per_sec") or 0.17
+    est = wallet.credits(per * d["scene"]["duration"] * (2 if m.get("mode") == "refs" else 1))
+    if not atlas.mock_mode():
+        wallet.need(est, "توليد لقطة المشهد")
+    tid = uuid.uuid4().hex[:8]
+    take = {"id": tid, "status": "working", "step": f"✨ بيولّد بـ {m['label']}", "model": m["model"], "model_label": m["label"], "draft": d["draft"],
+            "prompt": d.get("prompt") or "", "prompt_full": full, "refs": refs[:automate.MAX_REFS], "est": est, "at": now(), "error": None}
+    d = scene_update(sid, lambda x: x.update(takes=[*(x.get("takes") or []), take][-20:]))
+    threading.Thread(target=run_scene_take, args=(sid, tid), daemon=True).start()
+    return scene_dict(sid, d)
+
+
+@app.delete("/api/scenes/{sid}/takes/{tid}")
+def scene_take_delete(sid: str, tid: str):
+    folder = SCENE_DIR / Path(sid).name
+    gone = []
+    d = scene_update(sid, lambda x: (gone.extend(t for t in x["takes"] if t["id"] == tid), x.update(takes=[t for t in x["takes"] if t["id"] != tid])))
+    for t in gone:
+        if t.get("file"):
+            (folder / t["file"]).unlink(missing_ok=True)
+    return scene_dict(sid, d)
+
+
 # الواجهة آخر حاجة: أي مسار مش API بيروح للملفات (لازم تفضل بعد كل الـ routes)
 app.mount("/", StaticFiles(directory=FRONTEND_DIR), name="frontend")
