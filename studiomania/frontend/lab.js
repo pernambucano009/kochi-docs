@@ -651,7 +651,7 @@ document.querySelector('.view[data-view="11"]').addEventListener("click", async 
   const cutAt = e.target.closest("[data-splitat]");
   if (cutAt) {  // ✂️ على الفريم نفسه: دوسة واحدة
     const n = cutAt.dataset.splitn, t = Number(cutAt.dataset.splitat);
-    if (!confirm(`تقسم الحتة ${n} عند ${lt(t)}؟`)) return;
+    if (!(await uiConfirm(`تقسم الحتة ${n} عند ${lt(t)}؟`))) return;
     return busyButton(cutAt, "⏳", async () => {
       labx.cur = await api(`/api/lab/${labx.cur.id}/shots/${n}/split`, { method: "POST", ...jsonBody({ t }) });
       labx.pick = {};
@@ -665,7 +665,7 @@ document.querySelector('.view[data-view="11"]').addEventListener("click", async 
     const t = pick > s.start + 0.2 && pick < s.end - 0.2 ? pick
       : v && v.currentTime > s.start + 0.2 && v.currentTime < s.end - 0.2 ? v.currentTime : null;
     if (t == null) return toast("اختار الفريم اللي التغيير بيبدأ عنده من الشريط، أو وقّف الفيديو بتاع الحتة عنده", true);
-    if (!confirm(`تقسم الحتة عند ${lt(t)}؟ (العناصر بتتحلل للحتتين من جديد)`)) return;
+    if (!(await uiConfirm(`تقسم الحتة عند ${lt(t)}؟ (العناصر بتتحلل للحتتين من جديد)`))) return;
     return busyButton(split, "⏳", async () => {
       labx.cur = await api(`/api/lab/${labx.cur.id}/shots/${n}/split`, { method: "POST", ...jsonBody({ t }) });
       labx.pick = {};
@@ -683,7 +683,7 @@ document.querySelector('.view[data-view="11"]').addEventListener("click", async 
   }
   const hide = e.target.closest("[data-hide], [data-unhide]"), prune = e.target.closest("[data-prune]");
   if (hide || prune) {
-    if (prune && !confirm("يشيل كل اللقطات اللي ملهاش ولا كومبوننت؟ (تقدر ترجّع أي واحدة بعدين)")) return;
+    if (prune && !(await uiConfirm("يشيل كل اللقطات اللي ملهاش ولا كومبوننت؟ (تقدر ترجّع أي واحدة بعدين)"))) return;
     const url = prune ? `/api/lab/${labx.cur.id}/shots/prune` : `/api/lab/${labx.cur.id}/shots/${hide.dataset.hide || hide.dataset.unhide}`;
     return busyButton(hide || prune, "⏳", async () => {
       labx.cur = await api(url, prune ? { method: "POST" } : { method: "PATCH", ...jsonBody({ ignored: !!hide.dataset.hide }) });
@@ -703,7 +703,7 @@ document.querySelector('.view[data-view="11"]').addEventListener("click", async 
   }
   const cfresh = e.target.closest("[data-connfresh]");
   if (cfresh) {
-    if (!confirm("تمسح كل الكونيكتورز اللي اتلقطت في الفيديو ده (حتى اللي قبلتها أو رفضتها) ويدوّر من الأول؟ اللي في المكتبة بيفضل فيها.")) return;
+    if (!(await uiConfirm("تمسح كل الكونيكتورز اللي اتلقطت في الفيديو ده (حتى اللي قبلتها أو رفضتها) ويدوّر من الأول؟ اللي في المكتبة بيفضل فيها."))) return;
     return busyButton(cfresh, "⏳", async () => {
       labx.cur = await api(`/api/lab/${labx.cur.id}/run?step=connectors&fresh=true`, { method: "POST" });
       labx.xfilter = "";
@@ -712,7 +712,7 @@ document.querySelector('.view[data-view="11"]').addEventListener("click", async 
   }
   const fresh = e.target.closest("[data-compfresh]");
   if (fresh) {
-    if (!confirm("تمسح كل اقتراحات الكومبوننتس (حتى اللي قبلتها أو رفضتها) ويقترح من الصفر؟\nاللي اتحفظ في المكتبة بيفضل فيها، وأسباب الرفض بتفضل محفوظة عشان الموديل يتعلم منها.")) return;
+    if (!(await uiConfirm("تمسح كل اقتراحات الكومبوننتس (حتى اللي قبلتها أو رفضتها) ويقترح من الصفر؟\nاللي اتحفظ في المكتبة بيفضل فيها، وأسباب الرفض بتفضل محفوظة عشان الموديل يتعلم منها."))) return;
     return busyButton(fresh, "⏳", async () => {
       labx.cur = await api(`/api/lab/${labx.cur.id}/run?step=components&fresh=true`, { method: "POST" });
       labx.cfilter = "";
@@ -775,7 +775,7 @@ document.querySelector('.view[data-view="11"]').addEventListener("click", async 
     if (!pick.length) return toast("اختار حاجة واحدة على الأقل", true);
     storageSet(LAB_PICK_KEY, JSON.stringify(pick));
     const steps = pick.filter((k) => k !== "schema");
-    if (!confirm(`يطلّع من «${labx.cur.name}»: ${pick.map((k) => LAB_PICK[k]).join("، ")}؟`)) return;
+    if (!(await uiConfirm(`يطلّع من «${labx.cur.name}»: ${pick.map((k) => LAB_PICK[k]).join("، ")}؟`))) return;
     return busyButton(go, "⏳", async () => {
       if (steps.length) labx.cur = await api(`/api/lab/${labx.cur.id}/run?steps=${steps.join(",")}`, { method: "POST" });
       if (pick.includes("schema")) labx.cur = await api(`/api/lab/${labx.cur.id}/schema`, { method: "POST" });
@@ -789,7 +789,7 @@ document.querySelector('.view[data-view="11"]').addEventListener("click", async 
       components: "يقترح كومبوننتس جديدة؟ اللي قبلته أو رفضته بيفضل زي ما هو، ورفضك بيتبعت له عشان يتعلم منه.",
       connectors: "يدوّر على كونيكتورز؟ اللي قبلته أو رفضته بيفضل." }[run.dataset.labrun]
       || "تعيد الخطوة دي؟";
-    if (!confirm(ask)) return;
+    if (!(await uiConfirm(ask))) return;
     try { labx.cur = await api(`/api/lab/${labx.cur.id}/run?step=${run.dataset.labrun}`, { method: "POST" }); renderLab(); scheduleLabPoll(); }
     catch (err) { toast(err.message, true); }
     return;
@@ -882,7 +882,7 @@ $("labName").addEventListener("change", async () => {
   catch (err) { toast(err.message, true); }
 });
 $("labDelete").onclick = async () => {
-  if (!confirm("تمسح الفيديو ده من المعمل بكل أجزائه؟")) return;
+  if (!(await uiConfirm("تمسح الفيديو ده من المعمل بكل أجزائه؟"))) return;
   try {
     await api(`/api/lab/${labx.cur.id}`, { method: "DELETE" });
     labx.cur = null;
@@ -895,8 +895,8 @@ $("labSplit").addEventListener("change", async () => {
   const v = $("labSplit").value;
   try {
     labx.cur = await api(`/api/lab/${labx.cur.id}`, { method: "PATCH", ...jsonBody({ split: v }) });
-    if (confirm(v === "fine" ? "تقسّم الفيديو من جديد على كل تغيير جوه المشهد؟ (العناصر والكومبوننتس بيتعملوا من جديد بعدها)"
-      : "تقسّم الفيديو من جديد على القطعات بس؟ (العناصر والكومبوننتس بيتعملوا من جديد بعدها)")) {
+    if ((await uiConfirm(v === "fine" ? "تقسّم الفيديو من جديد على كل تغيير جوه المشهد؟ (العناصر والكومبوننتس بيتعملوا من جديد بعدها)"
+      : "تقسّم الفيديو من جديد على القطعات بس؟ (العناصر والكومبوننتس بيتعملوا من جديد بعدها)"))) {
       labx.cur = await api(`/api/lab/${labx.cur.id}/run?step=shots`, { method: "POST" });
       scheduleLabPoll();
     }

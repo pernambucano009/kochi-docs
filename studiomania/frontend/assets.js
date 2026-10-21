@@ -258,8 +258,8 @@ $("labLib").addEventListener("click", async (e) => {
   if (t.closest("[data-asback]")) { asx.cur = null; return openLib(); }
   const clear = t.closest("[data-asclear]");
   if (clear) {
-    if (!confirm(`تمسح كل الأصول اللي في المكتبة (${asx.list.length}) بكل نسخها؟ مفيش رجوع.`)) return;
-    if (!confirm("متأكد؟ المكتبة هتبقى فاضية. (الفيديوهات اللي في المعمل مش هتتمسح، والكومبوننتس اللي كنت قبلتها هترجع «لسه» وتقدر تقبلها تاني)")) return;
+    if (!(await uiConfirm(`تمسح كل الأصول اللي في المكتبة (${asx.list.length}) بكل نسخها؟ مفيش رجوع.`))) return;
+    if (!(await uiConfirm("متأكد؟ المكتبة هتبقى فاضية. (الفيديوهات اللي في المعمل مش هتتمسح، والكومبوننتس اللي كنت قبلتها هترجع «لسه» وتقدر تقبلها تاني)"))) return;
     return busyButton(clear, "⏳", async () => {
       const r = await api("/api/assets", { method: "DELETE" });
       toast(`🗑️ اتمسح ${r.deleted} أصل. المكتبة فاضية`);
@@ -276,7 +276,7 @@ $("labLib").addEventListener("click", async (e) => {
     return openLab(golab.dataset.asgolab);
   }
   if (t.closest("[data-asdel]")) {
-    if (!confirm("تمسح الأصل ده من المكتبة بكل نسخه؟")) return;
+    if (!(await uiConfirm("تمسح الأصل ده من المكتبة بكل نسخه؟"))) return;
     try { await api(`/api/assets/${asx.cur.id}`, { method: "DELETE" }); asx.cur = null; return openLib(); }
     catch (err) { return toast(err.message, true); }
   }
@@ -305,7 +305,7 @@ $("labLib").addEventListener("click", async (e) => {
       return busyButton(run, "⏳", async () => {
         asx.cur = await T(`/${tid}`, { method: "PATCH", ...jsonBody({ plan: trialPlanFrom(card) }) });
         const cost = asx.cur.trials.find((x) => x.id === tid).cost;
-        if (!confirm(`يولّد التجربة دي؟ هتتحسب على Atlas حوالي ${cost}$ (${tr.plan.keyframes.length} صورة و${tr.plan.segments.length} حركة)، وبتاخد كام دقيقة.`)) return renderLib();
+        if (!(await uiConfirm(`يولّد التجربة دي؟ هتتحسب على Atlas حوالي ${cost}$ (${tr.plan.keyframes.length} صورة و${tr.plan.segments.length} حركة)، وبتاخد كام دقيقة.`))) return renderLib();
         asx.cur = await T(`/${tid}/run`, { method: "POST" });
         renderLib(); scheduleAssetPoll();
       });
@@ -313,11 +313,11 @@ $("labLib").addEventListener("click", async (e) => {
     const redo = t.closest("[data-tredo]");
     if (redo) {
       const note = card.querySelector("[data-tredonote]").value.trim(), tr = asx.cur.trials.find((x) => x.id === tid);
-      if (!confirm(`${note ? `يعدّل الخطة على ملاحظتك («${note}») ويولّد تاني` : "يولّد تاني بنفس الخطة (محاولة جديدة)"}؟ حوالي ${tr.cost}$، والنتيجة القديمة بتتبدل.`)) return;
+      if (!(await uiConfirm(`${note ? `يعدّل الخطة على ملاحظتك («${note}») ويولّد تاني` : "يولّد تاني بنفس الخطة (محاولة جديدة)"}؟ حوالي ${tr.cost}$، والنتيجة القديمة بتتبدل.`))) return;
       return busyButton(redo, "⏳", async () => { asx.cur = await T(`/${tid}/redo`, { method: "POST", ...jsonBody({ note }) }); renderLib(); scheduleAssetPoll(); });
     }
     if (t.closest("[data-tdel]")) {
-      if (!confirm("تمسح التجربة دي؟")) return;
+      if (!(await uiConfirm("تمسح التجربة دي؟"))) return;
       try { asx.cur = await T(`/${tid}`, { method: "DELETE" }); renderLib(); } catch (err) { toast(err.message, true); }
       return;
     }
@@ -351,7 +351,7 @@ $("labLib").addEventListener("click", async (e) => {
     const text = [...changes, box.querySelector("[data-vtext]").value.trim()].filter(Boolean).join("\n");
     if (!text) return toast("غيّر مفتاح أو اكتب عايز تغيّر إيه", true);
     const sel = box.querySelector("[data-vmodel]");
-    if (!confirm(`يعدّل الأصل بـ ${sel.selectedOptions[0].textContent}؟`)) return;
+    if (!(await uiConfirm(`يعدّل الأصل بـ ${sel.selectedOptions[0].textContent}؟`))) return;
     return busyButton(go, "⏳", async () => {
       asx.cur = await api(`/api/assets/${asx.cur.id}/variants`, { method: "POST", ...jsonBody({ instruction: text, model: sel.value, base: base() }) });
       renderLib(); scheduleAssetPoll();
@@ -365,7 +365,7 @@ $("labLib").addEventListener("click", async (e) => {
     });
   }
   if (del) {
-    if (!confirm("تمسح النسخة دي؟")) return;
+    if (!(await uiConfirm("تمسح النسخة دي؟"))) return;
     asx.cur = await api(`/api/assets/${asx.cur.id}/variants/${del.dataset.asvdel}`, { method: "DELETE" });
     return renderLib();
   }

@@ -127,7 +127,7 @@ new MutationObserver(() => { if (document.getElementById("nhBell") && !document.
   .observe(document.body, { childList: true, subtree: true });
     }
     if (b?.dataset.n === "clear") {
-      if (!confirm("تمسح كل الإشعارات؟")) return;
+      if (!(await uiConfirm("تمسح كل الإشعارات؟"))) return;
       await api("/api/notifications", { method: "DELETE" });
       return ntfPoll();
 // الرئيسية بتتبني بعد الملف ده، فنحدّث العداد عليها لما تظهر

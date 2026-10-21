@@ -421,7 +421,7 @@ async function tyPatch(body) {
 // 🎙️ تسجيل الصوت من المتصفح: لما يوقف، التسجيل بيترفع كأنه ملف صوت (والكلام بيتكتب بتوقيته)
 async function tyRecord(v) {
   if (tyx.rec) { tyx.rec.mr.stop(); return; }
-  if (v.blocks?.length && !confirm("تسجّل من جديد؟ الكلام والحركات الحالية هيتبدلوا.")) return;
+  if (v.blocks?.length && !(await uiConfirm("تسجّل من جديد؟ الكلام والحركات الحالية هيتبدلوا."))) return;
   let stream;
   try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch { return toast("مقدرتش أفتح المايك. اسمح للمتصفح يستخدمه", true); }
   const type = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"].find((x) => window.MediaRecorder?.isTypeSupported?.(x)) || "";
@@ -462,7 +462,7 @@ function tyPoll() {
 }
 
 $("tyNew").onclick = async () => {
-  const name = prompt("اسم الفيديو:", "تايبوجرافي");
+  const name = (await uiPrompt("اسم الفيديو:", "تايبوجرافي"));
   if (name === null) return;
   try {
     const v = await api(TY(""), { method: "POST", ...jsonBody({ name, ratio: "9:16", style: tyx.styles[0]?.id || "mono-red" }) });
@@ -493,7 +493,7 @@ $("tySfx").addEventListener("click", async (e) => {
   const pl = e.target.closest("[data-sfxplay]");
   if (pl) { new Audio(pl.dataset.sfxplay).play().catch(() => {}); return; }
   const del = e.target.closest("[data-sfxdel]");
-  if (del && confirm(`تمسح ${del.dataset.sfxdel}؟`)) {
+  if (del && (await uiConfirm(`تمسح ${del.dataset.sfxdel}؟`))) {
     try { tyx.sfx = await api(TY(`/sfx/${encodeURIComponent(del.dataset.sfxdel)}`), { method: "DELETE" }); tyRender(); } catch (err) { toast(err.message, true); }
   }
 });
@@ -603,7 +603,7 @@ $("tyMain").addEventListener("click", async (e) => {
   if (stk) return tyStockOpen(v, stk.dataset.tystock);
   const bga = t.closest("[data-tybgauto]");
   if (bga) {
-    if ((v.bg?.file) && !confirm("الخلفية الحالية هتتبدل بخلفيات بيختارها البرنامج على حسب الكلام. تكمّل؟")) return;
+    if ((v.bg?.file) && !(await uiConfirm("الخلفية الحالية هتتبدل بخلفيات بيختارها البرنامج على حسب الكلام. تكمّل؟"))) return;
     return wrap(bga, async () => { tyx.cur = await api(TY(`/${v.id}/bg-auto`), { method: "POST", ...jsonBody({ kind: bga.dataset.tybgauto === "image" ? "photo" : "video" }) }); tyRender(); tyPoll(); });
   }
   const play = t.closest("[data-typlay]");
@@ -623,7 +623,7 @@ $("tyMain").addEventListener("click", async (e) => {
   if (st) return wrap(st, () => tyPatch({ text: document.querySelector("[data-tytext]").value }));
   const plan = t.closest("[data-typlan]");
   if (plan) {
-    if (v.blocks?.length && !confirm("توزّع الكلام من جديد؟ التعديلات اللي عملتها على اللقطات هتتبدل.")) return;
+    if (v.blocks?.length && !(await uiConfirm("توزّع الكلام من جديد؟ التعديلات اللي عملتها على اللقطات هتتبدل."))) return;
     return wrap(plan, async () => {
       tyx.cur = await api(TY(`/${v.id}/plan`), { method: "POST", ...jsonBody({ brief: document.querySelector("[data-tybrief]").value }) });
       tyRender(); tyPoll();
@@ -631,7 +631,7 @@ $("tyMain").addEventListener("click", async (e) => {
   }
   const ic = t.closest("[data-tyicons]");
   if (ic) {
-    if (!confirm(`يرسم ${v.missing_icons.length} أيقونة ناقصة بالستايل ده؟ حوالي ${v.draw_cost}$`)) return;
+    if (!(await uiConfirm(`يرسم ${v.missing_icons.length} أيقونة ناقصة بالستايل ده؟ حوالي ${v.draw_cost}$`))) return;
     return wrap(ic, async () => { tyx.cur = await api(TY(`/${v.id}/icons`), { method: "POST" }); tyRender(); tyPoll(); });
   }
   const ren = t.closest("[data-tyrender]");
@@ -655,7 +655,7 @@ $("tyMain").addEventListener("click", async (e) => {
   }
   const del = t.closest("[data-tydel]");
   if (del) {
-    if (!confirm(`تمسح «${v.name}»؟`)) return;
+    if (!(await uiConfirm(`تمسح «${v.name}»؟`))) return;
     return wrap(del, async () => {
       await api(TY(`/${v.id}`), { method: "DELETE" });
       tyx.cur = null; tyx.view = "home";
@@ -720,7 +720,7 @@ $("tyMain").addEventListener("change", async (e) => {
       return tyRender();
     }
     if (t.matches("[data-tysrc]") && t.files[0]) {
-      if (v.blocks?.length && !confirm("ترفع ملف جديد؟ الكلام والحركات الحالية هيتبدلوا.")) return;
+      if (v.blocks?.length && !(await uiConfirm("ترفع ملف جديد؟ الكلام والحركات الحالية هيتبدلوا."))) return;
       tyx.cur = await tyUpload(TY(`/${v.id}/source`), t.files[0]);
       tyx.force = true;
       tyRender();
@@ -785,7 +785,7 @@ $("tyStk").addEventListener("click", async (e) => {
   if (clean) return wrap(clean, async () => { await api(TY(`/stickers/${id}/clean`), { method: "POST" }); tyx.stk = await api(TY("/stickers")); tyRender(); toast("✨ اتضافت نسخة نضيفة"); });
   const del = t.closest("[data-stkdel]");
   if (del) {
-    if (!confirm("تمسح الستيكر ده؟")) return;
+    if (!(await uiConfirm("تمسح الستيكر ده؟"))) return;
     return wrap(del, async () => { await api(TY(`/stickers/${id}`), { method: "DELETE" }); tyx.stk = await api(TY("/stickers")); tyRender(); });
   }
 });
@@ -878,10 +878,10 @@ function renderLabTypo(d) {
   </details>`;
 }
 
-$("labTypoBtn").onclick = () => {
+$("labTypoBtn").onclick = async () => {
   const has = labx.cur?.typo?.data;
-  if (!confirm(has ? `تطلّع تايبوجرافي «${labx.cur.name}» من جديد؟ (الستايل والستيكرات القديمة بيفضلوا في المكتبة)`
-    : `يطلّع التايبوجرافي من «${labx.cur.name}»: الستايل، وكل لحظة الكلام اتحوّل فيها لشكل، والأيقونات كستيكرات شفافة؟`)) return;
+  if (!(await uiConfirm(has ? `تطلّع تايبوجرافي «${labx.cur.name}» من جديد؟ (الستايل والستيكرات القديمة بيفضلوا في المكتبة)`
+    : `يطلّع التايبوجرافي من «${labx.cur.name}»: الستايل، وكل لحظة الكلام اتحوّل فيها لشكل، والأيقونات كستيكرات شفافة؟`))) return;
   busyButton($("labTypoBtn"), "⏳", async () => {
     try {
       labx.cur = await api(`/api/lab/${labx.cur.id}/typo`, { method: "POST" });
@@ -899,13 +899,13 @@ $("labTypo").addEventListener("click", async (e) => {
   const del = t.closest("[data-ltdel]");
   if (del) {
     e.preventDefault();
-    if (!confirm("تمسح نتيجة التايبوجرافي؟ (الستايل والستيكرات بيفضلوا في المكتبة)")) return;
+    if (!(await uiConfirm("تمسح نتيجة التايبوجرافي؟ (الستايل والستيكرات بيفضلوا في المكتبة)"))) return;
     labx.cur = await api(`/api/lab/${labx.cur.id}/typo`, { method: "DELETE" });
     return renderLab();
   }
   const use = t.closest("[data-ltuse]");
   if (use) {
-    const name = prompt("اسم الفيديو:", "تايبوجرافي");
+    const name = (await uiPrompt("اسم الفيديو:", "تايبوجرافي"));
     if (name === null) return;
     try {
       const v = await api(TY(""), { method: "POST", ...jsonBody({ name, ratio: "9:16", style: labx.cur.typo.style_id }) });

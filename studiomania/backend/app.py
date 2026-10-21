@@ -21495,6 +21495,7 @@ class FlowSaveIn(BaseModel):
 def saved_to_dict(s: dict) -> dict:
     it = s["item"]
     return {"id": s["id"], "kind": s["kind"], "title": it.get("title") or "", "hook": it.get("hook") or "", "text": (it.get("idea") or it.get("summary") or "")[:400],
+            "mine": bool(s.get("mine")), "url": it.get("url") or "", "used_at": s.get("used_at"),
             "template": s.get("template") or {}, "format": s.get("format") or "", "idea_title": (s.get("idea") or {}).get("title") or "", "at": s.get("at")}
 
 
@@ -21557,6 +21558,172 @@ def flow_use_saved(fid: str, sid: str):
     flow_update(fid, lambda x: x.update(idea=idea, format=s.get("format") or x.get("format") or "reel", scenarios=[sc, *(x.get("scenarios") or [])]))
     mem_update(mem_cid(d), lambda m: ideamem.mark_used(m, "idea", idea, fid, now()))
     return flow_pick_scenario(fid, FlowPickIn(id=sc["id"]))
+
+
+# 💡 فولدر الأفكار (في «مكتبة محتويات البراند»): أفكارك انت، كتابة أو فويس نوت أو لينك فيديو/بوست. كل فكرة بتتحفظ في «لبعدين»
+# فبتظهرلك وانت بتختار الفكرة في أي مشروع جديد. «✨ نقّح» بيخلّي الذكاء الصناعي يرتّب الكلام (بيتخصم)، ولو مادستش بتفضل زي ما هي.
+IDEA_AUDIO_EXT = AUDIO_EXTENSIONS | {".webm", ".ogg", ".mp4", ".m4a"}
+
+
+def my_ideas_dir(cid: str) -> Path:
+    d = IDEA_MEM_DIR / cid
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def my_idea_dict(s: dict) -> dict:
+    it = s["item"]
+    return {"id": s["id"], "title": it.get("title") or "", "text": it.get("idea") or "", "hook": it.get("hook") or "", "url": it.get("url") or "",
+            "audio_url": f"/api/my-ideas/{s['id']}/audio" if it.get("audio") else None, "status": s.get("status") or "ready", "error": s.get("error"),
+            "polished": bool(it.get("raw")), "mine": bool(s.get("mine")), "at": s.get("at"), "used_at": s.get("used_at")}
+
+
+def my_ideas_cid() -> str:
+    return mem_cid({})
+
+
+def my_idea_title(text: str, url: str) -> str:
+    t = re.sub(r"\s+", " ", text or "").strip()
+    if t:
+        return (t[:60] + "…") if len(t) > 60 else t
+    if url:
+        host = re.sub(r"^https?://(www\.)?", "", url).split("/")[0]
+        return f"فكرة من لينك ({host})"
+    return "فكرة صوتية"
+
+
+@app.get("/api/my-ideas")
+def my_ideas_list():
+    m = mem_load(my_ideas_cid())
+    return [my_idea_dict(x) for x in reversed(m.get("saved") or []) if x.get("kind") == "idea"]
+
+
+def set_my_idea(cid: str, iid: str, **kw) -> None:
+    def fn(m):
+        for x in m.get("saved") or []:
+            if x["id"] == iid:
+                item = kw.pop("item", None)
+                if item:
+                    x["item"].update(item)
+                x.update(kw)
+    mem_update(cid, fn)
+
+
+def run_my_idea_voice(cid: str, iid: str, path: Path) -> None:
+    """الفويس نوت بيتكتب كلام (بيتخصم على قد الدقايق)، وبيبقى هو نص الفكرة."""
+    try:
+        dur = probe_duration(path)
+        if atlas.mock_mode():
+            text = "فكرة صوتية تجريبية: فيديو بيوري ٣ غلطات شائعة والحل في الآخر"
+        else:
+            wallet.need(wallet.credits(wallet.est(stt_min=dur / 60)), "كتابة الفويس نوت")
+            wav = path.with_suffix(".stt.wav")
+            subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(path), "-vn", "-ac", "1", "-ar", "16000", str(wav)],
+                           check=True, capture_output=True, timeout=300)
+            try:
+                text = " ".join(str(w.get("w") or "").strip() for w in atlas.transcribe(wav, dur)).strip()
+            finally:
+                wav.unlink(missing_ok=True)
+            wallet.charge(wallet.credits(wallet.est(stt_min=dur / 60)), "فولدر الأفكار: كتابة فويس نوت", iid)
+        m = mem_load(cid)
+        cur = next((x for x in m.get("saved") or [] if x["id"] == iid), None)
+        old = (cur or {}).get("item", {}).get("idea") or ""
+        full = f"{old}\n{text}".strip() if old else text
+        set_my_idea(cid, iid, status="ready", error=None, item={"idea": full, "title": (cur or {}).get("item", {}).get("title") if old else my_idea_title(text, "")})
+    except Exception as exc:  # noqa: BLE001
+        set_my_idea(cid, iid, status="ready", error=str(getattr(exc, "detail", None) or exc)[:200])
+
+
+@app.post("/api/my-ideas")
+def my_ideas_add(text: str = Form(""), url: str = Form(""), file: UploadFile | None = File(None)):
+    cid = my_ideas_cid()
+    text, url = text.strip()[:4000], url.strip()[:600]
+    if url and not re.match(r"^https?://", url, re.I):
+        url = "https://" + url
+    if not text and not url and not file:
+        raise HTTPException(400, "اكتب الفكرة، أو سجّلها صوت، أو حط لينك")
+    iid = uuid.uuid4().hex[:10]
+    audio = save_upload(file, IDEA_AUDIO_EXT, my_ideas_dir(cid), f"idea_{iid}") if file else ""
+    item = {"id": iid, "kind": "idea", "mine": True, "at": now(), "status": "transcribing" if audio else "ready",
+            "item": {"title": my_idea_title(text, url), "idea": text, "hook": "", "url": url, "audio": audio}}
+    mem_update(cid, lambda m: m.update(saved=([*(m.get("saved") or []), item])[-ideamem.SAVED_MAX:]))
+    if audio:
+        threading.Thread(target=run_my_idea_voice, args=(cid, iid, my_ideas_dir(cid) / audio), daemon=True).start()
+    return my_ideas_list()
+
+
+class MyIdeaPatch(BaseModel):
+    title: str | None = None
+    text: str | None = None
+    url: str | None = None
+
+
+@app.patch("/api/my-ideas/{iid}")
+def my_ideas_patch(iid: str, body: MyIdeaPatch):
+    upd = {k: v.strip()[:4000] for k, v in (("title", body.title), ("idea", body.text), ("url", body.url)) if v is not None}
+    set_my_idea(my_ideas_cid(), iid, item=upd)
+    return my_ideas_list()
+
+
+@app.get("/api/my-ideas/{iid}/audio")
+def my_ideas_audio(iid: str):
+    cid = my_ideas_cid()
+    s = next((x for x in mem_load(cid).get("saved") or [] if x["id"] == iid), None)
+    f = my_ideas_dir(cid) / Path((s or {}).get("item", {}).get("audio") or "_").name
+    if not s or not f.is_file():
+        raise HTTPException(404, "مفيش تسجيل")
+    return FileResponse(f)
+
+
+@app.post("/api/my-ideas/{iid}/polish")
+def my_ideas_polish(iid: str):
+    """✨ نقّح: الذكاء الصناعي بيرتّب الكلام في فكرة واضحة (عنوان + الفكرة + هوك)، والأصل بيتحفظ علشان «رجّع زي ما كتبتها»."""
+    cid = my_ideas_cid()
+    s = next((x for x in mem_load(cid).get("saved") or [] if x["id"] == iid), None)
+    if not s:
+        raise HTTPException(404, "الفكرة دي مش موجودة")
+    it = s["item"]
+    raw = it.get("raw") or {k: it.get(k) or "" for k in ("title", "idea", "hook")}
+    src = f"{raw.get('idea') or ''}\n{('لينك مرجعي: ' + it['url']) if it.get('url') else ''}".strip()
+    if not src:
+        raise HTTPException(400, "الفكرة فاضية لسه")
+    if atlas.mock_mode():
+        out = {"title": (raw.get("title") or "فكرة")[:50] + " (منقّحة)", "idea": "فكرة منظمة: " + raw.get("idea", ""), "hook": "إنت بتعمل الغلطة دي كل يوم؟"}
+    else:
+        wallet.need(1, "تنقيح الفكرة")
+        msgs = [{"role": "system", "content": "You are a short-form video content strategist. Rewrite the user's raw idea notes into one clear, "
+                                              "well-organized video idea, in the same language and dialect the user wrote in. Keep every point they made; "
+                                              "do not invent facts, products, prices or names. Return JSON only."},
+                {"role": "user", "content": f"Brand context:\n{growth_brand()[:3000]}\n\nRaw idea notes:\n{src[:4000]}\n\n"
+                                            'Return JSON: {"title": "short title (max 8 words)", "idea": "the idea organized in 2-5 short sentences '
+                                            '(what the video shows, the angle, and the ending/CTA if mentioned)", "hook": "one opening line for the first 2 seconds"}'}]
+        out = az.parse_json(series_chat(msgs), "تنقيح الفكرة")
+        wallet.charge(wallet.credits(wallet.est(chars=len(src) + 5000)), "فولدر الأفكار: تنقيح فكرة", iid)
+    clean = {k: str(out.get(k) or "").strip()[:1500] for k in ("title", "idea", "hook")}
+    if not clean["idea"]:
+        raise HTTPException(502, "التنقيح مارجعش حاجة، جرّب تاني")
+    set_my_idea(cid, iid, item={**clean, "raw": raw})
+    return my_ideas_list()
+
+
+@app.post("/api/my-ideas/{iid}/revert")
+def my_ideas_revert(iid: str):
+    cid = my_ideas_cid()
+    s = next((x for x in mem_load(cid).get("saved") or [] if x["id"] == iid), None)
+    if s and s["item"].get("raw"):
+        set_my_idea(cid, iid, item={**s["item"]["raw"], "raw": None})
+    return my_ideas_list()
+
+
+@app.delete("/api/my-ideas/{iid}")
+def my_ideas_delete(iid: str):
+    cid = my_ideas_cid()
+    gone = [x for x in mem_load(cid).get("saved") or [] if x["id"] == iid]
+    mem_update(cid, lambda m: m.update(saved=[x for x in m.get("saved") or [] if x["id"] != iid]))
+    for x in gone:
+        if x["item"].get("audio"):
+            (my_ideas_dir(cid) / Path(x["item"]["audio"]).name).unlink(missing_ok=True)
+    return my_ideas_list()
 
 
 @app.get("/api/flows/{fid}/cast-options")

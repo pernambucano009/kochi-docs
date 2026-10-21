@@ -288,7 +288,7 @@ function mtTypoPaneRender() {
 $("mtTypoPane").addEventListener("click", async (e) => {
   const t = e.target;
   if (t.id === "mtTypoPlan") {
-    if (mtx.cur?.blocks?.length && !confirm("توزّع التايبوجرافي من جديد؟ التعديلات اللي عملتها عليها هتتبدل.")) return;
+    if (mtx.cur?.blocks?.length && !(await uiConfirm("توزّع التايبوجرافي من جديد؟ التعديلات اللي عملتها عليها هتتبدل."))) return;
     await saveProject();
     try {
       const res = await api(`/api/projects/${mt.project.id}/typo`, { method: "POST", ...jsonBody({ brief: $("mtTypoBrief")?.value || "" }) });

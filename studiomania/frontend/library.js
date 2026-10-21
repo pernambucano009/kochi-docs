@@ -152,7 +152,7 @@ const CharactersPage = (() => {
       }
       if (t.closest("[data-talk]")) return talk();
       const tkd = t.closest("[data-tkdel]");
-      if (tkd) { if (confirm("تحذف الفيديو ده؟")) save(() => api(`/api/coaches/${S.open}/talks/${tkd.dataset.tkdel}`, { method: "DELETE" })); return; }
+      if (tkd) { if ((await uiConfirm("تحذف الفيديو ده؟"))) save(() => api(`/api/coaches/${S.open}/talks/${tkd.dataset.tkdel}`, { method: "DELETE" })); return; }
       if (t.closest("[data-cnewgo]")) {
         const name = w.querySelector("#chNewName").value.trim(), img = w.querySelector("#chNewImg").files[0];
         if (!name) return toast("اكتب اسم الشخصية", true);
@@ -166,13 +166,13 @@ const CharactersPage = (() => {
       if (t.closest("[data-cclose]")) { S.open = null; return render(); }
       if (t.closest("[data-cremove]")) {
         const c = cur();
-        if (!c || !confirm(`تحذف «${c.name}» بكل صورها وفيديوهاتها؟`)) return;
+        if (!c || !(await uiConfirm(`تحذف «${c.name}» بكل صورها وفيديوهاتها؟`))) return;
         try { await api(`/api/coaches/${c.id}`, { method: "DELETE" }); S.list = S.list.filter((x) => x.id !== c.id); S.open = null; render(); }
         catch (err) { toast(err.message, true); }
         return;
       }
       const del = t.closest("[data-cdel]");
-      if (del) { if (confirm("تشيله؟")) patch({ [`remove_${del.dataset.cdel}`]: "true" }); return; }
+      if (del) { if ((await uiConfirm("تشيله؟"))) patch({ [`remove_${del.dataset.cdel}`]: "true" }); return; }
       const sfig = t.closest("[data-sfile]");
       if (sfig && t.closest("[data-sdel]")) return save(() => api(`/api/coaches/${S.open}/sheet/${encodeURIComponent(sfig.dataset.sfile)}`, { method: "DELETE" }));
       const card = t.closest("[data-cid]");
@@ -312,7 +312,7 @@ function makeAudioPage(kind, noun, hint) {
         else { player.src = a.url; player.play().catch(() => {}); S.playing = a.id; }
         w.querySelector(".au-list").innerHTML = rows();
       }
-      if (e.target.closest("[data-adel]") && confirm(`تحذف «${a.name}»؟`)) {
+      if (e.target.closest("[data-adel]") && (await uiConfirm(`تحذف «${a.name}»؟`))) {
         try { await api(`/api/audio/${a.id}`, { method: "DELETE" }); S.list = S.list.filter((x) => x.id !== a.id); if (S.playing === a.id) player.pause(); render(); }
         catch (err) { toast(err.message, true); }
       }
@@ -491,7 +491,7 @@ const StyleClonePage = (() => {
           try { const p = await api("/api/stylecl", { method: "POST", body: form }); S.list.unshift(p); } finally { S.busy = false; render(); }
           return poll();
         }
-        if (e.target.closest("[data-sdel]") && confirm("تحذف الفيديو ده؟")) {
+        if (e.target.closest("[data-sdel]") && (await uiConfirm("تحذف الفيديو ده؟"))) {
           await api(`/api/stylecl/${sid}`, { method: "DELETE" }); S.list = S.list.filter((p) => p.id !== sid); return refreshList();
         }
         if (e.target.closest("[data-sretry]")) { const p = await api(`/api/stylecl/${sid}/retry`, { method: "POST" }); S.list = S.list.map((x) => x.id === sid ? p : x); refreshList(); return poll(); }

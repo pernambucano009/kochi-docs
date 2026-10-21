@@ -138,7 +138,7 @@ $("serRefs").addEventListener("change", async (e) => {
 });
 $("serRefs").addEventListener("click", async (e) => {
   const b = e.target.closest("[data-ref]");
-  if (!b || !confirm("مسح الصورة دي؟")) return;
+  if (!b || !(await uiConfirm("مسح الصورة دي؟"))) return;
   try { ser.list = (await api(`/api/series/${ser.sid}/refs?file=${encodeURIComponent(b.dataset.ref)}`, { method: "DELETE" })).series; renderSeries(); }
   catch (err) { toast(err.message, true); }
 });
@@ -168,8 +168,8 @@ function renderWriteTab() {
   $("serCopyNote").textContent = ep.copy_of ? `📑 دي نسخة${orig ? ` من «${orig.name}»` : ""}. أي تعديل هنا مش بيلمس الأصلية.` : "";
   $("serWriteState").textContent = ep.script_approved ? "✅ السكريبت معتمد: سجّل الفويس أوفر وارفعه في «3 الفويس أوفر»" : ep.lines.length ? `${ep.lines.length} جملة فويس أوفر` : "";
 }
-$("serEpDup").onclick = () => {
-  if (!confirm(`تعمل نسخة كاملة من «${ser.ep.name}»؟\nالنسخة فيها السكريبت والصوت والستوري بورد والفيديوهات، وأي تعديل فيها مش هيلمس الحلقة الأصلية.`)) return;
+$("serEpDup").onclick = async () => {
+  if (!(await uiConfirm(`تعمل نسخة كاملة من «${ser.ep.name}»؟\nالنسخة فيها السكريبت والصوت والستوري بورد والفيديوهات، وأي تعديل فيها مش هيلمس الحلقة الأصلية.`))) return;
   busyButton($("serEpDup"), "⏳ بينسخ...", async () => {
     const copy = await api(`/api/episodes/${ser.ep.id}/duplicate`, { method: "POST" });
     await loadSeries();
@@ -179,12 +179,12 @@ $("serEpDup").onclick = () => {
     toast(`📑 اتعملت «${copy.name}» وإنت دلوقتي جواها. الأصلية في القايمة زي ما هي`);
   });
 };
-$("serWriteForm").addEventListener("submit", (e) => {
+$("serWriteForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const message = $("serWriteMsg").value.trim();
   if (ser.ep.chat.length && !message) return $("serWriteMsg").focus();
   if (ser.ep.shots.some((s) => s.takes.length)
-    && !confirm("الحلقة دي ليها فيديوهات خلاص. الكاتب هنا بيكتب الحلقة من الأول، ولو غيّرت السكريبت اللقطات مش هتمشي معاه.\nلو عايز تغيّر الكلام بس وتسيب الفيديوهات، استخدم «🎭 كلام جديد على نفس الفيديوهات» فوق.\n\nتكمّل برضه؟")) return;
+    && !(await uiConfirm("الحلقة دي ليها فيديوهات خلاص. الكاتب هنا بيكتب الحلقة من الأول، ولو غيّرت السكريبت اللقطات مش هتمشي معاه.\nلو عايز تغيّر الكلام بس وتسيب الفيديوهات، استخدم «🎭 كلام جديد على نفس الفيديوهات» فوق.\n\nتكمّل برضه؟"))) return;
   busyButton($("serWriteGo"), "⏳ بيكتب...", async () => {
     ser.ep = await api(`/api/episodes/${ser.ep.id}/write`, { method: "POST", ...jsonBody({ message }) });
     $("serWriteMsg").value = "";
@@ -274,7 +274,7 @@ $("serRwLines").addEventListener("input", (e) => {
 $("serRwLines").addEventListener("change", (e) => {
   if (e.target.matches("textarea")) saveRw();
 });
-$("serRwLines").addEventListener("click", (e) => {
+$("serRwLines").addEventListener("click", async (e) => {
   const row = e.target.closest(".rw-line");
   if (!row) return;
   if (e.target.closest("[data-rw-add]")) {
@@ -283,7 +283,7 @@ $("serRwLines").addEventListener("click", (e) => {
     rwCount(fresh);
     fresh.querySelector("textarea").focus();
   } else if (e.target.closest("[data-rw-del]")) {
-    if (row.dataset.n && !confirm("تشيل الجملة دي؟ اللقطة بتاعتها بتفضل بفيديوها بس من غير كلام عليها (وتقدر تحذفها من تبويب اللقطات).")) return;
+    if (row.dataset.n && !(await uiConfirm("تشيل الجملة دي؟ اللقطة بتاعتها بتفضل بفيديوها بس من غير كلام عليها (وتقدر تحذفها من تبويب اللقطات)."))) return;
     row.remove();
     saveRw();
   }
@@ -316,9 +316,9 @@ $("serVoiceTxt").onclick = () => {
   a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 };
-$("serRwApply").onclick = () => {
+$("serRwApply").onclick = async () => {
   const added = ser.ep.rewrite.lines.filter((x) => x.n == null && x.text.trim()).length;
-  if (!confirm(`الكلام الجديد هيبقى سكريبت الحلقة. بعدها تسجّل الفويس أوفر بيه وترفعه، واللقطات تتظبط عليه.${added ? `\nالجمل الجديدة (${added}) هيتعمل لها لقطات جديدة بعد ما ترقّم الجمل على الصوت.` : ""}\n(المونتاج والفيديو اللي صدّرته قبل كده بيفضلوا زي ما هما.)`)) return;
+  if (!(await uiConfirm(`الكلام الجديد هيبقى سكريبت الحلقة. بعدها تسجّل الفويس أوفر بيه وترفعه، واللقطات تتظبط عليه.${added ? `\nالجمل الجديدة (${added}) هيتعمل لها لقطات جديدة بعد ما ترقّم الجمل على الصوت.` : ""}\n(المونتاج والفيديو اللي صدّرته قبل كده بيفضلوا زي ما هما.)`))) return;
   busyButton($("serRwApply"), "⏳", async () => {
     ser.ep = await api(`/api/episodes/${ser.ep.id}/rewrite/apply`, { method: "POST" });
     ser.tab = "script";
@@ -543,8 +543,8 @@ function renderShotsTab() {
   $("serRepromptAll").textContent = writing ? `✍️ بيكتب برومبتات (${writing} لقطة)...` : "✍️ برومبتات للكلام الحالي";
   if ($("serGalDialog").open) renderGallery();
 }
-$("serShotsGo").onclick = () => {
-  if (ser.ep.shots.length && !confirm("تقسيم جديد للحلقة؟ النسخ اللي اتولدت أو اترفعت هتفضل محفوظة تحت «نسخ محفوظة» وتقدر تحطها على أي لقطة.")) return;
+$("serShotsGo").onclick = async () => {
+  if (ser.ep.shots.length && !(await uiConfirm("تقسيم جديد للحلقة؟ النسخ اللي اتولدت أو اترفعت هتفضل محفوظة تحت «نسخ محفوظة» وتقدر تحطها على أي لقطة."))) return;
   busyButton($("serShotsGo"), "⏳ الموديل بيقسّم الحلقة...", async () => {
     ser.ep = await api(`/api/episodes/${ser.ep.id}/shots`, { method: "POST" });
     renderSeries();
@@ -623,7 +623,7 @@ $("serShots").addEventListener("click", async (e) => {
     }
     if (e.target.closest("[data-zoom]")) return openGallery(id, take.dataset.take);
     if (e.target.closest("[data-del-take]")) {
-      if (!confirm("مسح النسخة دي نهائي؟")) return;
+      if (!(await uiConfirm("مسح النسخة دي نهائي؟"))) return;
       ser.ep = await api(`/api/episodes/${ser.ep.id}/takes/${take.dataset.take}`, { method: "DELETE" });
     } else {
       ser.ep = await api(`/api/episodes/${ser.ep.id}/shots/${id}/pick`, { method: "POST", ...jsonBody({ take_id: take.dataset.take }) });
@@ -644,7 +644,7 @@ $("serPoolList").addEventListener("change", async (e) => {
 });
 $("serPoolList").addEventListener("click", async (e) => {
   const take = e.target.closest("[data-take]");
-  if (!take || !e.target.closest("[data-del-take]") || !confirm("مسح النسخة دي نهائي؟")) return;
+  if (!take || !e.target.closest("[data-del-take]") || !(await uiConfirm("مسح النسخة دي نهائي؟"))) return;
   try { ser.ep = await api(`/api/episodes/${ser.ep.id}/takes/${take.dataset.take}`, { method: "DELETE" }); renderSeries(); }
   catch (err) { toast(err.message, true); }
 });
@@ -789,8 +789,8 @@ $("serAddGo").onclick = () => busyButton($("serAddGo"), "⏳ بيكتب اللق
   if (card) { card.scrollIntoView({ behavior: "smooth", block: "center" }); card.classList.add("flash"); setTimeout(() => card.classList.remove("flash"), 2500); }
 });
 
-$("serRepromptAll").onclick = () => {
-  if (!confirm("الموديل يكتب وصف وبرومبت جديد لكل اللقطات على الكلام الحالي؟\nالستوري بورد والفيديوهات الموجودة بيفضلوا زي ما هما، والتوليد الجاي هيبقى على البرومبتات الجديدة.")) return;
+$("serRepromptAll").onclick = async () => {
+  if (!(await uiConfirm("الموديل يكتب وصف وبرومبت جديد لكل اللقطات على الكلام الحالي؟\nالستوري بورد والفيديوهات الموجودة بيفضلوا زي ما هما، والتوليد الجاي هيبقى على البرومبتات الجديدة."))) return;
   busyButton($("serRepromptAll"), "⏳", async () => {
     ser.ep = await api(`/api/episodes/${ser.ep.id}/reprompt`, { method: "POST" });
     renderSeries();
@@ -808,7 +808,7 @@ $("serApproveAll").onclick = () => busyButton($("serApproveAll"), "⏳", async (
 });
 $("serGenApproved").onclick = () => busyButton($("serGenApproved"), "⏳", async () => {
   const todo = ser.ep.shots.filter((s) => s.approved && !s.takes.some((t) => t.status !== "failed")).length;
-  if (!confirm(`هيتولد فيديو لـ ${todo} لقطة معتمدة بـ Seedance. نكمّل؟`)) return;
+  if (!(await uiConfirm(`هيتولد فيديو لـ ${todo} لقطة معتمدة بـ Seedance. نكمّل؟`))) return;
   ser.ep = await api(`/api/episodes/${ser.ep.id}/generate-approved`, { method: "POST" });
   renderSeries();
 });
@@ -1016,7 +1016,7 @@ $("serGalTakes").addEventListener("click", async (e) => {
   const take = e.target.closest("[data-take]");
   if (!take) return;
   if (e.target.closest("[data-del-take]")) {
-    if (!confirm("مسح النسخة دي نهائي؟")) return;
+    if (!(await uiConfirm("مسح النسخة دي نهائي؟"))) return;
     try { ser.ep = await api(`/api/episodes/${ser.ep.id}/takes/${take.dataset.take}`, { method: "DELETE" }); renderSeries(); }
     catch (err) { toast(err.message, true); }
     return;

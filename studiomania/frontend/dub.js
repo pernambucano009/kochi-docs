@@ -161,7 +161,7 @@ $("dbMain").addEventListener("click", async (e) => {
   const b = e.target.closest("button");
   if (!b) return;
   if (b.id === "dbDel") {
-    if (!confirm("تمسح مشروع الدبلجة ده؟ (النسخ اللي في الفيديوهات الجاهزة بتفضل)")) return;
+    if (!(await uiConfirm("تمسح مشروع الدبلجة ده؟ (النسخ اللي في الفيديوهات الجاهزة بتفضل)"))) return;
     try { await api(`/api/dub/${dbx.cur.id}`, { method: "DELETE" }); dbx.cur = null; storageSet("studiomania.dub", ""); await dbInit(); } catch (err) { toast(err.message, true); }
     return;
   }
@@ -172,13 +172,13 @@ $("dbMain").addEventListener("click", async (e) => {
   }
   if (b.dataset.dbadapt) {
     const k = b.dataset.dbadapt;
-    if (dbx.cur.targets[k]?.lines?.length && !confirm("الكلام هيتكتب من جديد وتعديلاتك هتتمسح. تكمّل؟")) return;
+    if (dbx.cur.targets[k]?.lines?.length && !(await uiConfirm("الكلام هيتكتب من جديد وتعديلاتك هتتمسح. تكمّل؟"))) return;
     return dbAct("/target", "POST", { dialect: k, voice: dbx.cur.targets[k]?.voice, brief: $("dbBrief")?.value || "" }, "✍️ بيكتب الكلام باللهجة…");
   }
   if (b.dataset.dbrender) {
     const k = b.dataset.dbrender, lip = document.querySelector(`[data-dblip="${k}"]`).value || null;
     const bg = document.querySelector(`[data-dbbg="${k}"]`).value;
-    if (lip && !confirm(`الليب سينك بيتكلف حوالي $${dbx.cur.targets[k].lip_cost[lip]} للفيديو ده. تكمّل؟`)) return;
+    if (lip && !(await uiConfirm(`الليب سينك بيتكلف حوالي $${dbx.cur.targets[k].lip_cost[lip]} للفيديو ده. تكمّل؟`))) return;
     const caps = document.querySelector(`[data-dbcap="${k}"]`)?.value || "";
     return dbAct(`/target/${k}/render`, "POST", { lipsync: lip, background: bg, captions: caps }, "🎙️ بيعمل الدبلجة…");
   }

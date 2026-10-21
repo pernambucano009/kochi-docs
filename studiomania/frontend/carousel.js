@@ -281,9 +281,9 @@ async function busyButton(btn, label, fn) {
   try { await fn(); } catch (err) { toast(err.message, true); } finally { btn.disabled = false; btn.textContent = old; }
 }
 
-$("carPlanBtn").onclick = () => {
+$("carPlanBtn").onclick = async () => {
   const c = car.cur;
-  if (c.plan && !confirm("فيه نص مكتوب قبل كده. تكتبه من الأول من النقاش؟")) return;
+  if (c.plan && !(await uiConfirm("فيه نص مكتوب قبل كده. تكتبه من الأول من النقاش؟"))) return;
   busyButton($("carPlanBtn"), "⏳ بيكتب...", async () => {
     await patchCarousel({ settings: { slides: $("carCount").value, ratio: $("carRatio").value, cta: ctaFromForm() } });
     car.cur = await api(`/api/carousels/${c.id}/plan`, { method: "POST" });
@@ -375,7 +375,7 @@ $("carPolish").onclick = () => busyButton($("carPolish"), "⏳ بينقّح...",
 $("carToOverview").onclick = () => busyButton($("carToOverview"), "⏳", async () => {
   await savePlan();
   const ov = car.cur.overview;
-  if (ov.status === "done" && !confirm("فيه شكل عام مرسوم. ترسمه تاني بالنص الجديد؟")) {
+  if (ov.status === "done" && !(await uiConfirm("فيه شكل عام مرسوم. ترسمه تاني بالنص الجديد؟"))) {
     car.sec = "overview";
     return renderCarousel();
   }
@@ -427,7 +427,7 @@ async function onVersionClick(e) {
   const file = ver.dataset.file;
   try {
     if (e.target.closest("[data-del-ver]")) {
-      if (!confirm("مسح النسخة دي نهائي؟")) return;
+      if (!(await uiConfirm("مسح النسخة دي نهائي؟"))) return;
       car.cur = await api(`/api/carousels/${car.cur.id}/versions?target=${encodeURIComponent(target)}&file=${encodeURIComponent(file)}`, { method: "DELETE" });
     } else {
       car.cur = await api(`/api/carousels/${car.cur.id}/pick`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ target, file }) });
@@ -475,7 +475,7 @@ function renderSlides() {
     .join("");
 }
 $("carSlidesAll").onclick = () => busyButton($("carSlidesAll"), "⏳", async () => {
-  if (!confirm("ترسم نسخة جديدة لكل السلايدات؟ النسخ القديمة هتفضل محفوظة وتقدر ترجعلها.")) return;
+  if (!(await uiConfirm("ترسم نسخة جديدة لكل السلايدات؟ النسخ القديمة هتفضل محفوظة وتقدر ترجعلها."))) return;
   car.cur = await api(`/api/carousels/${car.cur.id}/slides?redo_all=true`, { method: "POST" });
   renderCarousel();
 });
@@ -493,7 +493,7 @@ $("carGrid").addEventListener("click", (e) => {
 });
 
 $("carDelete").onclick = async () => {
-  if (!confirm(`حذف «${car.cur.name}» وكل صوره؟`)) return;
+  if (!(await uiConfirm(`حذف «${car.cur.name}» وكل صوره؟`))) return;
   try {
     await api(`/api/carousels/${car.cur.id}`, { method: "DELETE" });
     car.cur = null;
@@ -758,7 +758,7 @@ $("libItems").addEventListener("click", async (e) => {
     return patchAsset(item.dataset.id, form);
   }
   if (e.target.closest("[data-del-asset]")) {
-    if (!confirm("مسح ده من المكتبة؟")) return;
+    if (!(await uiConfirm("مسح ده من المكتبة؟"))) return;
     await api(`/api/carousel/library/${item.dataset.id}`, { method: "DELETE" });
     car.libEdit = null;
     await openLibrary();

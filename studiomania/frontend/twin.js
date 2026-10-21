@@ -192,7 +192,7 @@ $("twMain")?.addEventListener("click", async (e) => {
   if (mic) return twMic(mic.dataset.twmic);
   try {
     if (t.closest("[data-twdel]")) {
-      if (!confirm(`تمسح نسخة «${v.name}» بكل تسجيلاتها وفيديوهاتها؟`)) return;
+      if (!(await uiConfirm(`تمسح نسخة «${v.name}» بكل تسجيلاتها وفيديوهاتها؟`))) return;
       await api(TW(`/${v.id}`), { method: "DELETE" }); tw.cur = null; return twInit();
     }
     const dp = t.closest("[data-twdelph]");
@@ -200,7 +200,7 @@ $("twMain")?.addEventListener("click", async (e) => {
     const db = t.closest("[data-twdelbg]");
     if (db) { tw.cur = await api(TW(`/${v.id}/background/${db.dataset.twdelbg}`), { method: "DELETE" }); return twRender(); }
     const dc = t.closest("[data-twdelc]");
-    if (dc) { if (!confirm("تمسح الفيديو ده؟")) return; tw.cur = await api(TW(`/${v.id}/clips/${dc.dataset.twdelc}`), { method: "DELETE" }); return twRender(); }
+    if (dc) { if (!(await uiConfirm("تمسح الفيديو ده؟"))) return; tw.cur = await api(TW(`/${v.id}/clips/${dc.dataset.twdelc}`), { method: "DELETE" }); return twRender(); }
     const ty = t.closest("[data-twtypo]");
     if (ty) {
       const p = await api(TW(`/${v.id}/clips/${ty.dataset.twtypo}/typo`), { method: "POST" });

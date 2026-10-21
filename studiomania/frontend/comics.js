@@ -147,13 +147,13 @@ const ComicsPage = (() => {
           toast(value ? `✅ اتعتمد ${r.changed}` : `اتشال الاعتماد من ${r.changed}`); S.st = r; await load(); return render();
         }
         if (q("[data-cmseldel]")) {
-          if (!confirm(`تمسح ${S.sel.size} كوميك؟ المسح نهائي.`)) return;
+          if (!(await uiConfirm(`تمسح ${S.sel.size} كوميك؟ المسح نهائي.`))) return;
           const r = await api("/api/comics/delete", { method: "POST", ...jsonBody({ ids: [...S.sel] }) });
           toast(`🗑 اتمسح ${r.deleted}`); S.sel = null; S.st = r; await load(); return render();
         }
         if (q("[data-cmdelall]") || q("[data-cmdelevery]")) {
           const every = !!q("[data-cmdelevery]");
-          if (!confirm(every ? "تمسح كل المكتبة ما عدا المعتمد؟ المسح نهائي." : `تمسح الظاهر (${S.total}) ما عدا المعتمد؟ المسح نهائي.`)) return;
+          if (!(await uiConfirm(every ? "تمسح كل المكتبة ما عدا المعتمد؟ المسح نهائي." : `تمسح الظاهر (${S.total}) ما عدا المعتمد؟ المسح نهائي.`))) return;
           const r = await api("/api/comics/delete", { method: "POST", ...jsonBody(every ? { all: true } : { all: true, ...flt }) });
           toast(`🗑 اتمسح ${r.deleted}${r.kept_approved ? ` · فضل ${r.kept_approved} معتمد` : ""}`); S.st = r; await load(); return render();
         }
@@ -178,7 +178,7 @@ const ComicsPage = (() => {
           S.items = S.items.filter((c) => c.id !== r.id); S.open = null; await refresh(); return render();
         }
         if (q("[data-cmdel]")) {
-          if (!confirm("تمسح الكوميك ده؟")) return;
+          if (!(await uiConfirm("تمسح الكوميك ده؟"))) return;
           await api(`/api/comics/${cur.id}`, { method: "DELETE" }); S.items = S.items.filter((c) => c.id !== cur.id); S.open = null; await refresh(); return render();
         }
       } catch (err) { toast(err.message, true); }

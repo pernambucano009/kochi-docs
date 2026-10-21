@@ -100,14 +100,14 @@ $("readyGrid").addEventListener("click", async (e) => {
       pcAuto();   // الفحص قبل النشر بيشتغل لوحده
     }
     if (btn.dataset.act === "rename") {
-      const name = prompt("الاسم الجديد:", ex.name);
+      const name = (await uiPrompt("الاسم الجديد:", ex.name));
       if (!name || name === ex.name) return;
       await api(`/api/exports/${ex.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) });
       await pubLoadExports();
       await pubLoadPosts();
     }
     if (btn.dataset.act === "delete") {
-      if (!confirm(`حذف "${ex.name}" من الفولدر؟`)) return;
+      if (!(await uiConfirm(`حذف "${ex.name}" من الفولدر؟`))) return;
       await api(`/api/exports/${ex.id}`, { method: "DELETE" });
       await pubLoadExports();
     }
@@ -219,7 +219,7 @@ document.addEventListener("click", async (e) => {
       window.open(r.url, "_blank", "noopener");
       // لما العميل يرجع للصفحة بعد الربط، الحسابات بتتحدث لوحدها
       pub.waitLink = true;
-    } else if (confirm(`تفصل حساب «${del.dataset.paname}»؟ البوستات المتجدولة عليه مش هتنزل.`)) {
+    } else if ((await uiConfirm(`تفصل حساب «${del.dataset.paname}»؟ البوستات المتجدولة عليه مش هتنزل.`))) {
       const info = await api(`/api/publisher/accounts/${encodeURIComponent(del.dataset.padel)}`, { method: "DELETE" });
       pub.list = info.account_list || [];
       pub.accounts = info.accounts || {};
@@ -458,8 +458,8 @@ async function submitPost(now) {
   const when = now ? new Date() : new Date($("postWhen").value);
   if (isNaN(when)) return toast("اختار الميعاد", true);
   const names = platforms.map(tLabel).join("، ");
-  if (now && !confirm(`البوست هينزل دلوقتي على: ${names}. تكمّل؟`)) return;
-  if (!now && when < new Date() && !confirm("الميعاد ده عدّى، فالبوست هيتنشر على طول. تكمّل؟")) return;
+  if (now && !(await uiConfirm(`البوست هينزل دلوقتي على: ${names}. تكمّل؟`))) return;
+  if (!now && when < new Date() && !(await uiConfirm("الميعاد ده عدّى، فالبوست هيتنشر على طول. تكمّل؟"))) return;
   const body = JSON.stringify({
     export_id: pub.videoId,
     caption: $("postCaption").value,
@@ -581,7 +581,7 @@ async function postAction(act, p) {
       await pubLoadPosts();
     }
     if (act === "delete") {
-      if (!confirm(p.status === "scheduled" ? "إلغاء البوست ده؟" : "حذف البوست ده من القايمة؟")) return false;
+      if (!(await uiConfirm(p.status === "scheduled" ? "إلغاء البوست ده؟" : "حذف البوست ده من القايمة؟"))) return false;
       await api(`/api/posts/${p.id}`, { method: "DELETE" });
       if (pub.editing === p.id) resetPostForm();
       await pubLoadPosts();
@@ -627,7 +627,7 @@ $("remoteOrphans").addEventListener("click", async (e) => {
       await api("/api/posts/adopt", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ remote_id: rid }) });
       toast("✅ البوست اتضاف للقايمة");
     } else {
-      if (!confirm("تلغي البوست ده من Zernio؟ مش هيتنشر.")) return;
+      if (!(await uiConfirm("تلغي البوست ده من Zernio؟ مش هيتنشر."))) return;
       await api(`/api/posts/remote/${encodeURIComponent(rid)}/cancel`, { method: "POST" });
       toast("✅ اتلغى من Zernio");
     }

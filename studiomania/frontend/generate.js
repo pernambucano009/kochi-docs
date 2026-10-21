@@ -135,7 +135,7 @@ $("promptList").addEventListener("click", async (e) => {
   const act = e.target.closest("button[data-act]")?.dataset.act;
   if (act === "edit") return openPromptForm(p);
   if (act === "delete") {
-    if (!confirm(`حذف البرومبت "${p.name}"؟`)) return;
+    if (!(await uiConfirm(`حذف البرومبت "${p.name}"؟`))) return;
     try {
       await api(`/api/prompts/${p.id}`, { method: "DELETE" });
       if (gen.editing?.id === p.id) closePromptForm();
@@ -446,12 +446,12 @@ $("gensGroups").addEventListener("click", async (e) => {
   try {
     if (btn.dataset.act === "retry") await api(`/api/generations/${id}/retry`, { method: "POST" });
     if (btn.dataset.act === "again") {
-      if (!confirm("تولّد فيديو جديد للقطعة دي مكان القديم؟\nالفيديو القديم هيتمسح، والجديد هيتولد في نفس مكانه (ده توليد جديد بيتحسب عليك).")) return;
+      if (!(await uiConfirm("تولّد فيديو جديد للقطعة دي مكان القديم؟\nالفيديو القديم هيتمسح، والجديد هيتولد في نفس مكانه (ده توليد جديد بيتحسب عليك)."))) return;
       await api(`/api/generations/${id}/again`, { method: "POST" });
       toast("🔄 بيتولد فيديو جديد للقطعة دي");
     }
     if (btn.dataset.act === "delete") {
-      if (!confirm("حذف الفيديو ده؟")) return;
+      if (!(await uiConfirm("حذف الفيديو ده؟"))) return;
       await api(`/api/generations/${id}`, { method: "DELETE" });
     }
     await loadGenerations();

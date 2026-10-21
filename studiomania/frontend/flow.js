@@ -233,7 +233,7 @@ const Flow = (() => {
   function trendRow(d) {
     if (S.trendsFor !== d.id) {
       S.trendsFor = d.id; S.trends = null;
-      api(`/api/flows/${d.id}/saved`).then((x) => { S.trends = x.filter((i) => i.kind === "trend"); render(); }).catch(() => { S.trends = []; });
+      api(`/api/flows/${d.id}/saved`).then((x) => { S.trends = x.filter((i) => i.kind === "trend"); S.mine = x.filter((i) => i.kind === "idea" && i.mine); render(); }).catch(() => { S.trends = []; S.mine = []; });
       return "";
     }
     const list = S.trends || [], now = list.find((x) => x.now);
@@ -247,12 +247,19 @@ const Flow = (() => {
     return `<div class="flw-trend"><b>📈 عندك ${list.length === 1 ? "ترند محفوظ" : `${list.length} ترند محفوظين`} لبعدين. تبني الفكرة عليه؟</b>
       <div class="flw-acts">${list.slice(0, 3).map((x) => `<button type="button" class="flw-btn" data-usesaved="${esc(x.id)}" title="${esc(x.text || "")}" ${d.busy ? "disabled" : ""}>استخدم «${esc(x.title)}»</button>`).join("")}</div></div>`;
   }
+  // 💡 أفكارك من «فولدر الأفكار» (مكتبة محتويات البراند): بتظهر هنا لو حابب تستخدم واحدة
+  function mineRow(d) {
+    const list = S.trendsFor === d.id ? S.mine || [] : [];
+    if (!list.length) return "";
+    return `<div class="flw-trend flw-mine"><b>💡 أفكارك اللي في فولدر الأفكار (${list.length}). تستخدم واحدة منهم؟</b>
+      <div class="flw-acts">${list.slice(0, 6).map((x) => `<button type="button" class="flw-btn" data-usesaved="${esc(x.id)}" title="${esc([x.text, x.url].filter(Boolean).join("\n"))}" ${d.busy ? "disabled" : ""}>${x.used_at ? "✓ " : ""}«${esc(x.title)}»</button>`).join("")}</div></div>`;
+  }
   function stIdea(d) {
     const loading = d.busy === "ideas";
     return `<h2>اختار فكرة للبوست</h2><p class="flw-sub">المخ اقترح أفكار على قد البراند والقالب. اختار واحدة، أو عدّلها، أو اطلب غيرهم، أو اكتب فكرتك.</p>
       ${isPhone(d) ? `<div class="flw-skip"><button type="button" class="flw-btn" data-skipshoot>⏭ عندي الفيديو بتاعي، على الرفع على طول</button></div>` : ""}${tipBox(d.guide?.idea)}${seasonsRow()}
       ${d.algo_mode && (d.ideas_dropped || []).length ? `<p class="flw-algo-note" title="${esc(d.ideas_dropped.map((x) => `«${x.title}»: ${x.why_out}`).join("\n"))}">⚡ وضع الخوارزمية شال ${d.ideas_dropped.length} ${d.ideas_dropped.length === 1 ? "فكرة ضعيفة" : "أفكار ضعيفة"} وجاب غيرها (حط الماوس تشوف ليه)</p>` : ""}
-      ${trendRow(d)}${savedBox("idea", d)}<div class="flw-cards">${(d.ideas || []).map(ideaCard).join("")}${S.own ? ideaForm() : ""}</div>
+      ${trendRow(d)}${mineRow(d)}${savedBox("idea", d)}<div class="flw-cards">${(d.ideas || []).map(ideaCard).join("")}${S.own ? ideaForm() : ""}</div>
       ${loading ? working("المخ بيفكّر في أفكار على القالب…") : failed("idea")}
       <div class="flw-more">${S.hint ? `<div class="flw-chatrow"><input id="flwHint" placeholder="عايز أفكار عن إيه؟ (اختياري)"><button type="button" class="flw-btn" data-more="idea">اقترح</button></div>` : `
         <button type="button" class="flw-btn" data-more="idea" ${loading ? "disabled" : ""}>💡 اقترح أفكار تانية</button>
@@ -743,7 +750,7 @@ const Flow = (() => {
     if ((b = q("[data-castbg]"))) return call("/phone-cast", { twin: S.d.phone_cast?.twin || "", bg: b.dataset.castbg });
     if (q("[data-gotwin]")) { S.twins = undefined; close(); return showStep("16"); }
     if (q("[data-automont]")) { S.mstate = null; return call("/auto-montage", { plain: false, comics: S.comics || "auto" }).then(poll); }
-    if (q("[data-plain]")) { if (!confirm("تشيل المونتاج الأوتوماتيك وتطلّع الفيديو زي ما هو؟")) return; S.mstate = null; return call("/auto-montage", { plain: true }).then(poll); }
+    if (q("[data-plain]")) { if (!(await uiConfirm("تشيل المونتاج الأوتوماتيك وتطلّع الفيديو زي ما هو؟"))) return; S.mstate = null; return call("/auto-montage", { plain: true }).then(poll); }
     if ((b = q("[data-seek]"))) { const v = S.el.querySelector(".flw-rv"); if (v) { v.currentTime = +b.dataset.seek; v.play().catch(() => {}); } return; }
     if (q("[data-myedit]")) { const pid = S.d.montage?.project_id; if (!pid) return; close(); storageSet(projectKey("free"), pid); return showStep("6f"); }
     if (q("[data-render]")) {

@@ -49,7 +49,7 @@ $("newFolderForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const name = $("newFolderName").value.trim();
   if (!name) return;
-  if (fol.list.some((f) => f.name.trim() === name) && !confirm("فيه مشروع بنفس الاسم. تعمل واحد تاني؟")) return;
+  if (fol.list.some((f) => f.name.trim() === name) && !(await uiConfirm("فيه مشروع بنفس الاسم. تعمل واحد تاني؟"))) return;
   try {
     const f = await api("/api/folders", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) });
     $("newFolderName").value = "";
@@ -232,7 +232,7 @@ $("elScript").addEventListener("change", async (e) => {
   try {
     const text = await readTextFile(file);
     if (!text) return toast("الملف فاضي", true);
-    if (scriptState.saved && !confirm("ده هيبدّل السكريبت الحالي بالملف الجديد. تكمّل؟")) return;
+    if (scriptState.saved && !(await uiConfirm("ده هيبدّل السكريبت الحالي بالملف الجديد. تكمّل؟"))) return;
     $("scriptText").value = text;
     await saveScript();
   } catch (err) {
@@ -301,7 +301,7 @@ $("folderDetail").addEventListener("change", async (e) => {
     e.target.value = "";
     if (!file) return;
     if (up === "video" && fol.current.video?.clips &&
-        !confirm("تبديل الفيديو هيمسح الفيديو القديم والتقطيع بتاعه. الفيديوهات اللي اتولّدت قبل كده هتفضل موجودة. تكمّل؟")) return;
+        !(await uiConfirm("تبديل الفيديو هيمسح الفيديو القديم والتقطيع بتاعه. الفيديوهات اللي اتولّدت قبل كده هتفضل موجودة. تكمّل؟"))) return;
     const form = new FormData();
     form.append("file", file);
     try {
@@ -322,7 +322,7 @@ $("folderDetail").addEventListener("click", async (e) => {
   if (!del) return;
   const f = fol.current;
   if (del === "video") {
-    if (!confirm("حذف الفيديو الخام والتقطيع بتاعه؟")) return;
+    if (!(await uiConfirm("حذف الفيديو الخام والتقطيع بتاعه؟"))) return;
     try {
       fol.current = await api(`/api/folders/${f.id}/video`, { method: "DELETE" });
       await loadFolders();
@@ -334,7 +334,7 @@ $("folderDetail").addEventListener("click", async (e) => {
 
 $("folderDelete").onclick = async () => {
   const f = fol.current;
-  if (!confirm(`حذف المشروع "${f.name}" والفيديو الخام والقطع والفيديوهات المولّدة ومونتاجه؟\nالتعليق الصوتي والشخصية هيفضلوا في مكتباتهم، والفيديوهات اللي اتصدّرت هتفضل في فولدر الجاهز.`)) return;
+  if (!(await uiConfirm(`حذف المشروع "${f.name}" والفيديو الخام والقطع والفيديوهات المولّدة ومونتاجه؟\nالتعليق الصوتي والشخصية هيفضلوا في مكتباتهم، والفيديوهات اللي اتصدّرت هتفضل في فولدر الجاهز.`))) return;
   try {
     await api("/api/folders/delete", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: [f.id] }) });
   } catch (err) {
@@ -791,7 +791,7 @@ async function openAutopilot() {
         if (!st.settings.platforms?.length) return toast("اختار منصة واحدة على الأقل", true);
         const at = manual() ? Object.fromEntries(ids.map((id) => [id, dlg.querySelector(`[data-at="${id}"]`)?.value || ""])) : {};
         if (manual() && Object.values(at).some((v) => !v)) return toast("حدد يوم وساعة لكل مشروع مختار", true);
-        if (!confirm(`هيتولّد ويتنشر ${ids.length} مشروع لوحدهم، والتوليد بيصرف من رصيد Atlas. نكمّل؟`)) return;
+        if (!(await uiConfirm(`هيتولّد ويتنشر ${ids.length} مشروع لوحدهم، والتوليد بيصرف من رصيد Atlas. نكمّل؟`))) return;
         await saveSettings();
         st = await api("/api/autopilot", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ folder_ids: ids, at }) });
         dlg.querySelectorAll("[data-pick]").forEach((x) => (x.checked = false));
@@ -844,7 +844,7 @@ async function openFoldersPurge() {
       const ids = [...dlg.querySelectorAll("[data-pick]:checked")].map((x) => x.dataset.pick);
       if (!ids.length) return toast("اختار مشروع واحد على الأقل", true);
       const exports = dlg.querySelector("[data-exp]").checked;
-      if (!confirm(`هيتمسح ${ids.length} مشروع${exports ? " ومعاهم الفيديوهات النهائية" : ""} ومش هينفع ترجّعهم. متأكد؟`)) return;
+      if (!(await uiConfirm(`هيتمسح ${ids.length} مشروع${exports ? " ومعاهم الفيديوهات النهائية" : ""} ومش هينفع ترجّعهم. متأكد؟`))) return;
       try {
         const r = await api("/api/folders/delete", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids, exports }) });
         toast(`🗑️ اتمسح ${r.deleted} مشروع${r.kept_exports ? ` (${r.kept_exports} فيديو فضل عشان عليه بوست متجدول)` : ""}`);

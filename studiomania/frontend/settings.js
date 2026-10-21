@@ -68,7 +68,7 @@ async function loadKochiOld() {
   if (n) $("kochiOldInfo").textContent = `${k.folders} مشروع · ${k.videos} فيديو خام · ${k.projects} مونتاج`;
 }
 $("kochiOldWipe").onclick = async () => {
-  if (!confirm("اتأكدت إن كل شغل كوتشي وصل لبرنامج كوتشي الجديد؟\n\nهيتمسح من سمسم كيت: مشاريع كوتشي بفيديوهاتها الخام وقطعها والفيديوهات المولّدة والمونتاج والفيديوهات اللي اتصدّرت منها (إلا اللي عليها بوست لسه متجدول).\nالشخصيات والتعليق الصوتي والموسيقى بيفضلوا.\n\nالمسح ده مينفعش يترجع.")) return;
+  if (!(await uiConfirm("اتأكدت إن كل شغل كوتشي وصل لبرنامج كوتشي الجديد؟\n\nهيتمسح من سمسم كيت: مشاريع كوتشي بفيديوهاتها الخام وقطعها والفيديوهات المولّدة والمونتاج والفيديوهات اللي اتصدّرت منها (إلا اللي عليها بوست لسه متجدول).\nالشخصيات والتعليق الصوتي والموسيقى بيفضلوا.\n\nالمسح ده مينفعش يترجع."))) return;
   const btn = $("kochiOldWipe");
   btn.disabled = true;
   try {
@@ -169,7 +169,7 @@ $("storageInfo").addEventListener("click", async (e) => {
   const b = e.target.closest("[data-wipe]");
   if (!b) return;
   const [label, what] = WIPE_INFO[b.dataset.wipe];
-  if (!confirm(`${label} (${b.dataset.n})؟\n\n${what}\n\nالمسح ده مينفعش يترجع.`)) return;
+  if (!(await uiConfirm(`${label} (${b.dataset.n})؟\n\n${what}\n\nالمسح ده مينفعش يترجع.`))) return;
   b.disabled = true;
   try {
     const r = await api(`/api/storage/wipe/${b.dataset.wipe}`, { method: "POST" });

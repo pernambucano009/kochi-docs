@@ -129,8 +129,8 @@ const Ref2PromptPage = (() => {
         }
         if (q("[data-ropen]")) { S.d = await api(`/api/ref2p/${q("[data-ropen]").dataset.ropen}`); await refreshGens(); render(); return poll(); }
         if (q("[data-rback]")) { S.d = null; clearTimeout(S.timer); S.list = (await api("/api/ref2p")).items; return render(); }
-        if (q("[data-rdel]") && confirm("تحذف الفيديو ده والتحليل بتاعه؟")) { await api(`/api/ref2p/${S.d.id}`, { method: "DELETE" }); S.d = null; S.list = (await api("/api/ref2p")).items; return render(); }
-        if (q("[data-rredo]")) { if (!confirm("التحليل هيتعمل من الأول، والتعديلات اللي في البرومبت هتروح. تكمّل؟")) return; S.d = await api(`/api/ref2p/${S.d.id}/redo`, { method: "POST" }); render(); return poll(); }
+        if (q("[data-rdel]") && (await uiConfirm("تحذف الفيديو ده والتحليل بتاعه؟"))) { await api(`/api/ref2p/${S.d.id}`, { method: "DELETE" }); S.d = null; S.list = (await api("/api/ref2p")).items; return render(); }
+        if (q("[data-rredo]")) { if (!(await uiConfirm("التحليل هيتعمل من الأول، والتعديلات اللي في البرومبت هتروح. تكمّل؟"))) return; S.d = await api(`/api/ref2p/${S.d.id}/redo`, { method: "POST" }); render(); return poll(); }
         if (q("[data-rsave]")) { await savePrompt(); render(); return toast("✅ اتحفظ"); }
         if (q("[data-rcopy]")) { await navigator.clipboard.writeText(w.querySelector("[data-rprompt]").value); return toast("✅ اتنسخ"); }
         if (q("[data-rvar]") || q("[data-rvarown]")) {

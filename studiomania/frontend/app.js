@@ -746,7 +746,7 @@ document.addEventListener("keydown", (e) => {
 
 $("deleteVideo").onclick = async () => {
   const v = state.current;
-  if (!confirm(`حذف "${v.name}" وكل القطع اللي اتعملت منه؟`)) return;
+  if (!(await uiConfirm(`حذف "${v.name}" وكل القطع اللي اتعملت منه؟`))) return;
   await api(`/api/videos/${v.id}`, { method: "DELETE" });
   state.current = null;
   player.removeAttribute("src");
@@ -762,7 +762,7 @@ async function splitCurrent(thenSend) {
   const label = btn.textContent;
   clearTimeout(saveTimer);
   await save();
-  if (v.clips_count && !confirm("الفيديو ده اتقطّع قبل كده. التقطيع الجديد هيمسح القطع القديمة. تكمّل؟")) return;
+  if (v.clips_count && !(await uiConfirm("الفيديو ده اتقطّع قبل كده. التقطيع الجديد هيمسح القطع القديمة. تكمّل؟"))) return;
   $("splitBtn").disabled = $("splitSendBtn").disabled = true;
   btn.textContent = "⏳ بيقطّع...";
   try {
@@ -810,7 +810,7 @@ async function loadClips() {
 
 $("clipsGrid").addEventListener("click", async (e) => {
   const id = e.target.closest("[data-del]")?.dataset.del;
-  if (!id || !confirm("حذف القطعة دي؟")) return;
+  if (!id || !(await uiConfirm("حذف القطعة دي؟"))) return;
   await api(`/api/clips/${id}`, { method: "DELETE" });
   await loadVideos();
   await loadClips();

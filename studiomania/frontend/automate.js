@@ -604,12 +604,12 @@ const AutoPage = (() => {
         const cur = S.open?.n, s = cur?.s;
         if ((b = t.closest("[data-pick]"))) { S.id = b.dataset.pick; storageSet("studiomania.auto", S.id); S.view = null; return setRec(await aAPI()); }
         if (t.closest("[data-new]")) {
-          const name = prompt("اسم الموديل الجديد (مثلًا: قبل وبعد التبييض):"); if (name == null) return;
+          const name = (await uiPrompt("اسم الموديل الجديد (مثلًا: قبل وبعد التبييض):")); if (name == null) return;
           const r = await api("/api/automations", { method: "POST", ...jsonBody({ name }) });
           S.list = await api("/api/automations"); S.id = r.id; storageSet("studiomania.auto", S.id); S.view = null; return setRec(r);
         }
         if (t.closest("[data-delrec]")) {
-          if (!confirm(`تمسح موديل «${S.rec.name}»؟`)) return;
+          if (!(await uiConfirm(`تمسح موديل «${S.rec.name}»؟`))) return;
           await aAPI("", { method: "DELETE" }); S.list = await api("/api/automations"); openCard(null); return start();
         }
         if ((b = t.closest("[data-addverb]"))) {
@@ -619,7 +619,7 @@ const AutoPage = (() => {
           openCard(null); await saveSteps(steps); const nn = S.byId[ns.id]; if (nn) openCard(nn); return;
         }
         if (t.closest("[data-saverec]")) {
-          const name = prompt("اسم الموديل (علشان تختاره بعدين في الأوتوبايلوت):", S.rec.name || ""); if (name == null || !name.trim()) return;
+          const name = (await uiPrompt("اسم الموديل (علشان تختاره بعدين في الأوتوبايلوت):", S.rec.name || "")); if (name == null || !name.trim()) return;
           const r = await aAPI("", { method: "PATCH", ...jsonBody({ name: name.trim(), saved: true }) });
           S.list = await api("/api/automations"); toast(`💾 اتحفظ «${r.name}»`); return setRec(r);
         }
@@ -686,7 +686,7 @@ const AutoPage = (() => {
           return saveSteps([...units.flat(), ...tail]);
         }
         if (t.closest("[data-rmstep]")) {
-          if (!confirm(s.verb === "split" ? "تشيل التقطيع؟ المسارات و«جمّع» هيتشالوا معاه." : "تشيل الخطوة دي؟")) return;
+          if (!(await uiConfirm(s.verb === "split" ? "تشيل التقطيع؟ المسارات و«جمّع» هيتشالوا معاه." : "تشيل الخطوة دي؟"))) return;
           openCard(null);
           return saveSteps(mapStep(s.id, () => null).filter(Boolean).map((x) => (x.lanes ? { ...x, lanes: x.lanes.map((ln) => ln.filter(Boolean)) } : x)).filter((x) => !(s.verb === "split" && x.verb === "merge")));
         }

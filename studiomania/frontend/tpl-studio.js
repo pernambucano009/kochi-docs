@@ -123,7 +123,7 @@ $("tsGallery").addEventListener("click", async (e) => {
   if (!b) return;
   if (b.dataset.tssample) {
     const t = tsx.data.templates.find((x) => x.id === b.dataset.tssample);
-    if (!confirm(`تعمل عينة لـ «${t.name}»؟ حوالي $${t.sample_cost} (ستوري بورد GPT Image + لقطات Seedance Mini 480p من غير صوت)`)) return;
+    if (!(await uiConfirm(`تعمل عينة لـ «${t.name}»؟ حوالي $${t.sample_cost} (ستوري بورد GPT Image + لقطات Seedance Mini 480p من غير صوت)`))) return;
     try { await api(`/api/templates/${t.id}/sample`, { method: "POST" }); tsx.data = await api("/api/tpl-studio"); tsHome(); tsPoll(); toast("🎞️ بيعمل العينة… دقايق"); }
     catch (err) { toast(err.message, true); }
     return;

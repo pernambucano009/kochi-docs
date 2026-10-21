@@ -5,7 +5,7 @@
 const BrainLibPage = (() => {
   const esc = (s) => escapeHtml(String(s ?? ""));
   const S = { el: null, body: null, tab: "images", mod: null, lib: null, root: null, cur: null, q: "", hits: null, open: null, timer: null };
-  const TABS = [["images", "🖼️ الصور"], ["videos", "🎬 الفيديوهات"], ["voice", "🎙️ التعليقات الصوتية"], ["music", "🎵 الموسيقى"], ["comics", "🎭 الكوميكس"]];
+  const TABS = [["ideas", "💡 الأفكار"], ["images", "🖼️ الصور"], ["videos", "🎬 الفيديوهات"], ["voice", "🎙️ التعليقات الصوتية"], ["music", "🎵 الموسيقى"], ["comics", "🎭 الكوميكس"]];
   const TAB = {
     images: { kind: "image", accept: "image/*", t: "الصور", en: "IMAGES", hint: "صور البراند في فولدرات جوه فولدرات زي ما تحب (مثلًا: صور ← أسنان ← قبل)." },
     videos: { kind: "video", accept: "video/*", t: "الفيديوهات", en: "VIDEOS", hint: "فيديوهاتك الخام واللقطات في فولدرات جوه فولدرات." },
@@ -111,15 +111,15 @@ const BrainLibPage = (() => {
         if (!TAB[S.tab]) return;
         if ((b = q("[data-blgo]"))) { S.cur = b.dataset.blgo || S.root; S.open = null; S.hits = null; S.q = ""; return render(); }
         if (q("[data-blnew]")) {
-          const name = prompt("اسم الفولدر الجديد:"); if (!name?.trim()) return;
+          const name = (await uiPrompt("اسم الفولدر الجديد:")); if (!name?.trim()) return;
           S.lib = await api("/api/library/folders", { method: "POST", ...jsonBody({ name, parent: S.cur }) }); return render();
         }
         if (q("[data-blren]")) {
-          const name = prompt("الاسم الجديد:", folder(S.cur)?.name || ""); if (!name?.trim()) return;
+          const name = (await uiPrompt("الاسم الجديد:", folder(S.cur)?.name || "")); if (!name?.trim()) return;
           S.lib = await api(`/api/library/folders/${S.cur}`, { method: "PATCH", ...jsonBody({ name }) }); return render();
         }
         if (q("[data-blrm]")) {
-          if (!confirm("تشيل الفولدر ده؟ اللي جواه هيطلع للفولدر اللي فوقه، ومفيش ملف هيتمسح.")) return;
+          if (!(await uiConfirm("تشيل الفولدر ده؟ اللي جواه هيطلع للفولدر اللي فوقه، ومفيش ملف هيتمسح."))) return;
           const up = folder(S.cur)?.parent || S.root;
           S.lib = await api(`/api/library/folders/${S.cur}`, { method: "DELETE" }); S.cur = up; return render();
         }
@@ -134,7 +134,7 @@ const BrainLibPage = (() => {
         }
         if (q("[data-blretag]")) { S.lib = await api(`/api/library/files/${f.id}/retag`, { method: "POST" }); render(); return poll(); }
         if (q("[data-bldel]")) {
-          if (!confirm(`تمسح «${f.name}»؟ المسح نهائي.`)) return;
+          if (!(await uiConfirm(`تمسح «${f.name}»؟ المسح نهائي.`))) return;
           S.lib = await api(`/api/library/files/${f.id}`, { method: "DELETE" }); S.open = null; return render();
         }
       } catch (err) { toast(err.message, true); }
@@ -172,6 +172,7 @@ const BrainLibPage = (() => {
     S.el.querySelector(".bl-tabs").innerHTML = TABS.map(([k, t]) => `<button type="button" role="tab" class="bl-tab${k === S.tab ? " on" : ""}" data-bltab="${k}" aria-selected="${k === S.tab}">${t}</button>`).join("");
     try {
       if (S.tab === "comics") { S.mod = ComicsPage; S.body.innerHTML = ComicsPage.html(); return await ComicsPage.mount(S.body); }
+      if (S.tab === "ideas") { S.mod = IdeasPage; S.body.innerHTML = IdeasPage.html(); return await IdeasPage.mount(S.body); }
       S.body.innerHTML = `<div class="nh-empty">بيحمّل…</div>`;
       await refresh(); render(); poll();
     } catch (err) { S.body.innerHTML = `<div class="nh-empty">${esc(err.message)}</div>`; }

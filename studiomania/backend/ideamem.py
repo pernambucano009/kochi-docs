@@ -92,5 +92,12 @@ def mark_used(mem: dict, kind: str, it: dict, flow: str, at: str) -> None:
     used = [r for r in mem.get("used") or [] if not (r.get("flow") == flow and r.get("kind") == kind)]
     used.append({**entry(kind, it), "kind": kind, "flow": flow, "at": at})
     mem["used"] = used[-USED_MAX:]
-    # اتستخدمت ← مابقتش «لبعدين»
-    mem["saved"] = [s for s in mem.get("saved") or [] if not (s.get("kind") == kind and similar(entry(kind, s["item"]), entry(kind, it)))]
+    # اتستخدمت ← مابقتش «لبعدين» (إلا أفكارك اللي في فولدر الأفكار: بتفضل، وعليها علامة إنها اتستخدمت)
+    keep = []
+    for s in mem.get("saved") or []:
+        if s.get("kind") == kind and similar(entry(kind, s["item"]), entry(kind, it)):
+            if not s.get("mine"):
+                continue
+            s["used_at"] = at
+        keep.append(s)
+    mem["saved"] = keep

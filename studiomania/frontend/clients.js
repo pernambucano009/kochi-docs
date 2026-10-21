@@ -47,7 +47,7 @@ $("clientList").addEventListener("click", (e) => {
 });
 $("clientEdit").onclick = () => openClientProfile();
 $("clientNew").onclick = async () => {
-  const name = prompt("اسم العميل الجديد؟");
+  const name = (await uiPrompt("اسم العميل الجديد؟"));
   if (!name?.trim()) return;
   try {
     const b = await api("/api/ad-brains", { method: "POST", ...jsonBody({ name, fields: {} }) });

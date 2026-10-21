@@ -212,7 +212,7 @@ $("postsCal").addEventListener("drop", async (e) => {
   const when = new Date(y, m - 1, d, old.getHours(), old.getMinutes());
   if (calKey(when) === calKey(old)) return;
   if (when < new Date()) return toast("الميعاد ده عدّى. افتح البوست واختار ساعة جاية", true);
-  if (!confirm(`تنقل «${p.export_name || "البوست"}» لـ ${calFull(when)}؟`)) return;
+  if (!(await uiConfirm(`تنقل «${p.export_name || "البوست"}» لـ ${calFull(when)}؟`))) return;
   await calReschedule(p, when);
 });
 
@@ -272,7 +272,7 @@ function calOpenPost(p) {
     if (b.dataset.a === "move") {
       const d = new Date(dlg.querySelector("[data-when]").value);
       if (isNaN(d)) return toast("اختار الميعاد", true);
-      if (d < new Date() && !confirm("الميعاد ده عدّى، فالبوست هيتنشر على طول. تكمّل؟")) return;
+      if (d < new Date() && !(await uiConfirm("الميعاد ده عدّى، فالبوست هيتنشر على طول. تكمّل؟"))) return;
       b.disabled = true;
       if (await calReschedule(p, d)) dlg.close();
       b.disabled = false;

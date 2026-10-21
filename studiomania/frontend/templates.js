@@ -58,10 +58,10 @@ function schPlay(t0, t1) {
   v.scrollIntoView({ behavior: "smooth", block: "center" });
 }
 
-$("labSchemaBtn").onclick = () => {
+$("labSchemaBtn").onclick = async () => {
   const has = labx.cur?.schema?.data;
-  if (!confirm(has ? `تطلّع مخطط «${labx.cur.name}» من جديد؟ التعديلات اللي عملتها عليه هتتبدل (التيمبليتس اللي اتحفظت مش هتتأثر).`
-    : `يطلّع مخطط الفيديو المفتوح دلوقتي: «${labx.cur.name}»؟ (لو عايز فيديو تاني، اختاره من القايمة الأول)`)) return;
+  if (!(await uiConfirm(has ? `تطلّع مخطط «${labx.cur.name}» من جديد؟ التعديلات اللي عملتها عليه هتتبدل (التيمبليتس اللي اتحفظت مش هتتأثر).`
+    : `يطلّع مخطط الفيديو المفتوح دلوقتي: «${labx.cur.name}»؟ (لو عايز فيديو تاني، اختاره من القايمة الأول)`))) return;
   busyButton($("labSchemaBtn"), "⏳", async () => {
     labx.cur = await api(`/api/lab/${labx.cur.id}/schema`, { method: "POST" });
     renderLab(); scheduleLabPoll();
@@ -80,7 +80,7 @@ $("labSchema").addEventListener("click", async (e) => {
   const del = e.target.closest("[data-schdel]");
   if (del) {
     e.preventDefault();
-    if (!confirm(`تمسح مخطط «${labx.cur.name}»؟ (التيمبليتس اللي اتحفظت منه بتفضل)`)) return;
+    if (!(await uiConfirm(`تمسح مخطط «${labx.cur.name}»؟ (التيمبليتس اللي اتحفظت منه بتفضل)`))) return;
     return busyButton(del, "⏳", async () => {
       labx.cur = await api(`/api/lab/${labx.cur.id}/schema`, { method: "DELETE" });
       renderLab(); toast("🗑️ اتمسح");
@@ -340,7 +340,7 @@ $("labTpl").addEventListener("click", async (e) => {
   if (t.closest("[data-tvback]")) { tplx.cur = null; return tplBack(); }
   const del = t.closest("[data-tpdel]");
   if (del) {
-    if (!confirm("تمسح التيمبليت ده؟ (الفيديوهات اللي اتعملت منه بتفضل)")) return;
+    if (!(await uiConfirm("تمسح التيمبليت ده؟ (الفيديوهات اللي اتعملت منه بتفضل)"))) return;
     await api(`/api/templates/${del.dataset.tpdel}`, { method: "DELETE" });
     return openTpl();
   }
@@ -357,12 +357,12 @@ $("labTpl").addEventListener("click", async (e) => {
   }
   if (!tplx.cur) return;
   if (t.closest("[data-tvdel]")) {
-    if (!confirm("تمسح الفيديو ده بكل لوحاته؟")) return;
+    if (!(await uiConfirm("تمسح الفيديو ده بكل لوحاته؟"))) return;
     await V("", { method: "DELETE" }); tplx.cur = null; return tplBack();
   }
   const rf = t.closest("[data-tvrefill]");
   if (rf) {
-    if (!confirm("تملا الخانات من جديد؟ الشيتات واللوحات والفيديوهات اللي اتعملت هتتمسح.")) return;
+    if (!(await uiConfirm("تملا الخانات من جديد؟ الشيتات واللوحات والفيديوهات اللي اتعملت هتتمسح."))) return;
     return go(rf, () => V("/refill", { method: "POST" }));
   }
   const cp = t.closest("[data-tvcopy]");
@@ -380,7 +380,7 @@ $("labTpl").addEventListener("click", async (e) => {
   const dr = t.closest("[data-tvdraw]");
   if (dr) {
     const sh = tplx.cur.sheets[Number(dr.dataset.tvdraw)];
-    if (sh.url && !confirm("الشيت ده مرسوم. ترسمه تاني؟ اللوحات المقطوعة منه هتتبدل.")) return;
+    if (sh.url && !(await uiConfirm("الشيت ده مرسوم. ترسمه تاني؟ اللوحات المقطوعة منه هتتبدل."))) return;
     try { tplx.cur = await V("", { method: "PATCH", ...jsonBody({ fill: tvFillFromDom() }) }); } catch (err) { return toast(err.message, true); }
     return go(dr, () => V(`/sheets/${dr.dataset.tvdraw}/draw`, { method: "POST" }));
   }
@@ -388,7 +388,7 @@ $("labTpl").addEventListener("click", async (e) => {
   if (up) { const inp = tvSheetInput(); inp.dataset.k = up.dataset.tvup; return inp.click(); }
   const sh = t.closest("[data-tvsharp]");
   if (sh) {
-    if (!confirm(`يوضّح كل اللوحات اللي لسه ما اتوضّحتش؟ حوالي ${tplx.cur.costs.sharpen}$`)) return;
+    if (!(await uiConfirm(`يوضّح كل اللوحات اللي لسه ما اتوضّحتش؟ حوالي ${tplx.cur.costs.sharpen}$`))) return;
     return go(sh, () => V("/sharpen", { method: "POST", ...jsonBody({}) }));
   }
   const edb = t.closest("[data-tvedit]");
@@ -413,7 +413,7 @@ $("labTpl").addEventListener("click", async (e) => {
   }
   const rs = t.closest("[data-tvreslice]");
   if (rs) {
-    if (!confirm("يدوّر على اللوحات في الصورة من جديد ويقطّعها؟ اللوحات الحالية (والموضّحة منها) هتتبدل.")) return;
+    if (!(await uiConfirm("يدوّر على اللوحات في الصورة من جديد ويقطّعها؟ اللوحات الحالية (والموضّحة منها) هتتبدل."))) return;
     return busyButton(rs, "⏳", async () => {
       tplx.cur = await V(`/sheets/${rs.dataset.tvreslice}/slice`, { method: "POST", ...jsonBody({}) });
       renderTpl(); toast("✂️ اتقطّع تاني");
@@ -422,7 +422,7 @@ $("labTpl").addEventListener("click", async (e) => {
   const rd = t.closest("[data-tvredraw]");
   if (rd) {
     const j = Number(rd.dataset.tvredraw), note = rd.closest("[data-tp]").querySelector("[data-tpnote]").value.trim();
-    if (!confirm(`يرسم اللوحة ${j + 1} من الأول من وصفها (حوالي ${tplx.cur.costs.panel}$)؟ اللي في الشيت بتتبدل.`)) return;
+    if (!(await uiConfirm(`يرسم اللوحة ${j + 1} من الأول من وصفها (حوالي ${tplx.cur.costs.panel}$)؟ اللي في الشيت بتتبدل.`))) return;
     return go(rd, () => V(`/panels/${j}/redraw`, { method: "POST", ...jsonBody({ note }) }));
   }
   const sh1 = t.closest("[data-tvsharp1]");
@@ -432,7 +432,7 @@ $("labTpl").addEventListener("click", async (e) => {
   }
   const once = t.closest("[data-tvonce]");
   if (once) {
-    if (!confirm(`يولّد الفيديو كله في توليدة واحدة من الشيت؟ حوالي ${tplx.cur.costs.once}$`)) return;
+    if (!(await uiConfirm(`يولّد الفيديو كله في توليدة واحدة من الشيت؟ حوالي ${tplx.cur.costs.once}$`))) return;
     return go(once, () => V("/run", { method: "POST", ...jsonBody({ once: true }) }));
   }
   const run = t.closest("[data-tvrun]"), run1 = t.closest("[data-tvrun1]");
@@ -440,7 +440,7 @@ $("labTpl").addEventListener("click", async (e) => {
     const c = tplx.cur.costs;
     const msg = run1 ? `يولّد الجزء ${Number(run1.dataset.tvrun1) + 1} بس؟ حوالي ${c.seg[Number(run1.dataset.tvrun1)]}$`
       : c.video ? `يولّد الأجزاء اللي لسه متولدتش بس؟ حوالي ${c.video}$، واللي اتولد مش هيتلمس.` : "";
-    if (msg && !confirm(msg)) return;
+    if (msg && !(await uiConfirm(msg))) return;
     return go(run || run1, () => V("/run", { method: "POST", ...jsonBody(run1 ? { i: Number(run1.dataset.tvrun1) } : {}) }));
   }
   const ed = t.closest("[data-tveditor]");
@@ -480,7 +480,7 @@ $("labTpl").addEventListener("change", async (e) => {
       return toast("✅ اتحفظ. الفيديوهات الجديدة من التيمبليت ده هتبقى بالمقاس ده");
     }
     if (t.matches('[data-tvopt="ratio"]')) {
-      if ((tplx.cur.sheets || []).some((x) => x.url) && !confirm("تغيّر المقاس؟ الشيتات واللوحات والفيديوهات اللي اتعملت بالمقاس القديم هتتمسح، ولازم ترسم الشيت تاني.")) {
+      if ((tplx.cur.sheets || []).some((x) => x.url) && !(await uiConfirm("تغيّر المقاس؟ الشيتات واللوحات والفيديوهات اللي اتعملت بالمقاس القديم هتتمسح، ولازم ترسم الشيت تاني."))) {
         t.value = tplx.cur.ratio; return;
       }
     }

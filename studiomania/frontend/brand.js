@@ -75,6 +75,7 @@ const BrandPage = (() => {
       ] },
       // 📚 مكتبة محتويات البراند: صور، فيديوهات، تعليقات صوتية، موسيقى (كل واحد فولدرات جوه فولدرات)، والكوميكس. صفحة واحدة بتابات
       { k: "content", t: "مكتبة محتويات البراند", en: "Content Library", leaves: [
+        { f: "pg", i: "bl:ideas", page: "brainlib", t: "💡 الأفكار", type: "page" },
         { f: "pg", i: "bl:images", page: "brainlib", t: "🖼️ الصور", type: "page" },
         { f: "pg", i: "bl:videos", page: "brainlib", t: "🎬 الفيديوهات", type: "page" },
         { f: "pg", i: "bl:voice", page: "brainlib", t: "🎙️ التعليقات الصوتية", type: "page" },
@@ -995,16 +996,16 @@ const BrandPage = (() => {
         return window.NHNav?.("create");
       }
       const trd = t.closest("[data-trdel]");
-      if (trd) { if (!confirm("تمسح الترند ده من القايمة؟")) return; try { S.tr = await bAPI(`/trends/${trd.dataset.trdel}`, { method: "DELETE" }); redrawNode("trends"); refreshCard(); } catch (err) { toast(err.message, true); } return; }
+      if (trd) { if (!(await uiConfirm("تمسح الترند ده من القايمة؟"))) return; try { S.tr = await bAPI(`/trends/${trd.dataset.trdel}`, { method: "DELETE" }); redrawNode("trends"); refreshCard(); } catch (err) { toast(err.message, true); } return; }
       if (t.closest("[data-trref]")) { try { S.tr = await bAPI("/trends/refresh", { method: "POST" }); redrawNode("trends"); refreshCard(); S.trFor = null; loadTrends(cur()); } catch (err) { toast(err.message, true); } return; }
       const aro = t.closest("[data-aron]");
       if (aro) { const [fid, i] = aro.dataset.aron.split(":"), rows = arRows(fid); rows[+i].on = aro.checked; return algoSave(fid, rows); }
       const ard = t.closest("[data-ardel]");
-      if (ard) { if (!confirm("تمسح القاعدة دي؟ (تقدر ترجّعها بـ «رجّع الأصل»)")) return; const [fid, i] = ard.dataset.ardel.split(":"), rows = arRows(fid); rows.splice(+i, 1); return algoSave(fid, rows); }
+      if (ard) { if (!(await uiConfirm("تمسح القاعدة دي؟ (تقدر ترجّعها بـ «رجّع الأصل»)"))) return; const [fid, i] = ard.dataset.ardel.split(":"), rows = arRows(fid); rows.splice(+i, 1); return algoSave(fid, rows); }
       const ara = t.closest("[data-aradd]");
-      if (ara) { const v = prompt("القاعدة الجديدة:"); if (!v?.trim()) return; const rows = arRows(ara.dataset.aradd); rows.push({ t: v.trim(), on: true }); return algoSave(ara.dataset.aradd, rows); }
+      if (ara) { const v = (await uiPrompt("القاعدة الجديدة:")); if (!v?.trim()) return; const rows = arRows(ara.dataset.aradd); rows.push({ t: v.trim(), on: true }); return algoSave(ara.dataset.aradd, rows); }
       const arr = t.closest("[data-arreset]");
-      if (arr) { if (!confirm(arr.dataset.arreset === "all" ? "ترجّع كل قواعد الخوارزميات للأصل؟ أي تعديل عملته هيتمسح." : "ترجّع القواعد دي للأصل؟")) return; return algoSave(arr.dataset.arreset, null, true); }
+      if (arr) { if (!(await uiConfirm(arr.dataset.arreset === "all" ? "ترجّع كل قواعد الخوارزميات للأصل؟ أي تعديل عملته هيتمسح." : "ترجّع القواعد دي للأصل؟"))) return; return algoSave(arr.dataset.arreset, null, true); }
       const qt = t.closest("[data-qtab]");
       if (qt) { S.qtab = qt.dataset.qtab; if (S.qtab === "t") { const b = cur(); if (b) { S.tqFor = null; loadTasks(b); } } return refreshCard(); }
       const tg = t.closest("[data-tgo]");
@@ -1024,7 +1025,7 @@ const BrandPage = (() => {
       const td = t.closest("[data-tdone]");
       if (td) return save(() => bAPI(`/todos/${td.dataset.tdone}`, { method: "PATCH", ...jsonBody({ done: !!td.dataset.v }) }));
       const tdl = t.closest("[data-tdel]");
-      if (tdl) { if (confirm("تشيل النقطة دي؟")) { openCard(null); save(() => bAPI(`/todos/${tdl.dataset.tdel}`, { method: "DELETE" })); } return; }
+      if (tdl) { if ((await uiConfirm("تشيل النقطة دي؟"))) { openCard(null); save(() => bAPI(`/todos/${tdl.dataset.tdel}`, { method: "DELETE" })); } return; }
       if (t.closest("[data-socialgo]")) { S.addTab = "social"; const a = S.nodes.find((x) => x.id === "add"); if (a) { openCard(a); S.el.querySelector('.bm-card [data-k="@social"]')?.focus(); } return; }
       const itg = t.closest("[data-itgt]");
       if (itg) { if (S.imgTarget) S.imgTarget.t = itg.dataset.itgt; S.el.querySelectorAll(".bm-card [data-itgt]").forEach((x) => x.classList.toggle("on", x === itg)); return; }
@@ -1041,7 +1042,7 @@ const BrandPage = (() => {
       if (br) { S.id = br.dataset.brain; openCard(null); layout(); return; }
       if (t.closest("[data-del]")) {
         const b = cur();
-        if (!b || !confirm(`تحذف «${b.name}» بكل صوره؟`)) return;
+        if (!b || !(await uiConfirm(`تحذف «${b.name}» بكل صوره؟`))) return;
         try { await api(`/api/ad-brains/${b.id}`, { method: "DELETE" }); openCard(null); await load(); loadClients(); } catch (err) { toast(err.message, true); }
         return;
       }
@@ -1056,33 +1057,33 @@ const BrandPage = (() => {
       const no = t.closest("[data-no]");
       if (no) { openCard(null); return save(() => bAPI(`/pending/${no.dataset.no}`, { method: "DELETE" })); }
       const sdel = t.closest("[data-sdel]");
-      if (sdel) { if (confirm("تشيل المصدر ده واقتراحاته اللي لسه مستنية؟")) save(() => bAPI(`/sources/${sdel.dataset.sdel}`, { method: "DELETE" })); return; }
+      if (sdel) { if ((await uiConfirm("تشيل المصدر ده واقتراحاته اللي لسه مستنية؟"))) save(() => bAPI(`/sources/${sdel.dataset.sdel}`, { method: "DELETE" })); return; }
       if (t.closest("[data-seasons]")) {
         try { await bAPI("/seasons", { method: "POST" }); toast("🗓️ المخ بيجيب المواسم… هتتحدّث هنا بعد شوية"); } catch (err) { return toast(err.message, true); }
         const id = S.id; setTimeout(() => { if (S.id === id) save(() => bAPI("")); }, 15000);
         return;
       }
       const ndel = t.closest("[data-ndel]");
-      if (ndel) { if (confirm("تمسح المعلومة دي؟ المخ مش هيعرفها تاني ومش هيستخدمها في أي كتابة جديدة. (اللي اتعمل قبل كده مش هيتغير)")) { openCard(null); save(() => bAPI(`/notes/${ndel.dataset.ndel}`, { method: "DELETE" })); } return; }
+      if (ndel) { if ((await uiConfirm("تمسح المعلومة دي؟ المخ مش هيعرفها تاني ومش هيستخدمها في أي كتابة جديدة. (اللي اتعمل قبل كده مش هيتغير)"))) { openCard(null); save(() => bAPI(`/notes/${ndel.dataset.ndel}`, { method: "DELETE" })); } return; }
       const pick = t.closest("[data-pick]");
       if (pick) return patch({ [pick.dataset.pick]: pick.dataset.v });
       const von = t.closest("[data-von]");
       if (von) return patch({ [`${von.dataset.von}_on`]: von.dataset.v });
       const vdel = t.closest("[data-vdel]");
-      if (vdel) { if (confirm("تشيل الفيديو ده؟")) save(() => bAPI(`/brand-video/${vdel.dataset.vdel}`, { method: "DELETE" })); return; }
+      if (vdel) { if ((await uiConfirm("تشيل الفيديو ده؟"))) save(() => bAPI(`/brand-video/${vdel.dataset.vdel}`, { method: "DELETE" })); return; }
       const rdel = t.closest("[data-rdel]");
       if (rdel) { const rs = rulesOf(cur()); rs.splice(+rdel.dataset.rdel, 1); openCard(null); return patch({ rules: rs.join("\n") }); }
       const hdel = t.closest("[data-hdel]");
       if (hdel) return patch({ palette: String(cur()?.palette || "").replace(new RegExp(`${hdel.dataset.hdel}[^,\\n]*[,\\n]?\\s*`, "i"), "").trim() });
       if (t.closest("[data-analyze]")) return save(() => bAPI("/analyze", { method: "POST" }));
       const fig = t.closest("[data-file]");
-      if (fig && t.closest("[data-adel]")) { if (confirm("تحذف الصورة دي؟")) save(() => bAPI(`/assets/${encodeURIComponent(fig.dataset.file)}`, { method: "DELETE" })); return; }
+      if (fig && t.closest("[data-adel]")) { if ((await uiConfirm("تحذف الصورة دي؟"))) save(() => bAPI(`/assets/${encodeURIComponent(fig.dataset.file)}`, { method: "DELETE" })); return; }
       if (t.closest("[data-stnew]")) { S.stAdd = { cols: hexes(cur()?.palette).slice(0, 4), files: null }; return refreshCard(); }
       if (t.closest("[data-stcancel]")) { S.stAdd = null; return refreshCard(); }
       const stc = t.closest("[data-stcdel]");
       if (stc) { S.stAdd.cols = S.stAdd.cols.filter((h) => h !== stc.dataset.stcdel); return refreshCard(); }
       const stdel = t.closest("[data-stdel]");
-      if (stdel) { e.stopPropagation(); if (confirm("تحذف الستايل ده؟")) save(() => bAPI(`/styles/${stdel.dataset.stdel}`, { method: "DELETE" })); return; }
+      if (stdel) { e.stopPropagation(); if ((await uiConfirm("تحذف الستايل ده؟"))) save(() => bAPI(`/styles/${stdel.dataset.stdel}`, { method: "DELETE" })); return; }
       if (t.closest("[data-stgo]")) {
         const A = S.stAdd, form = new FormData();
         S.el.querySelectorAll("[data-st]").forEach((el) => { A[el.dataset.st] = el.value.trim(); });

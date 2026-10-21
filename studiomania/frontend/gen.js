@@ -158,7 +158,7 @@ const Gen = (() => {
     if ((b = q("[data-gtab]"))) { S.tab = b.dataset.gtab; S.files = {}; return render(); }
     if (q("[data-ggo]")) return go();
     if ((b = q("[data-gdel]"))) {
-      if (!confirm("تمسحه؟")) return;
+      if (!(await uiConfirm("تمسحه؟"))) return;
       try { await api(`/api/gens/${b.dataset.gdel}`, { method: "DELETE" }); S.list = S.list.filter((g) => g.id !== b.dataset.gdel); render(); } catch (err) { toast(err.message, true); }
     }
   }

@@ -277,18 +277,18 @@ $("labFilm").addEventListener("click", async (e) => {
   }
   if (!filmx.cur) return;
   if (t.closest("[data-fmdel]")) {
-    if (!confirm("تمسح الفيديو ده بكل فريماته؟")) return;
+    if (!(await uiConfirm("تمسح الفيديو ده بكل فريماته؟"))) return;
     try { await F("", { method: "DELETE" }); filmx.cur = null; return openFilm(); } catch (err) { return toast(err.message, true); }
   }
   const replan = t.closest("[data-fmreplan]");
   if (replan) {
-    if (!confirm("تكتب سيناريو جديد من الأول؟ الفريمات والفيديوهات اللي اتعملت هتتمسح.")) return;
+    if (!(await uiConfirm("تكتب سيناريو جديد من الأول؟ الفريمات والفيديوهات اللي اتعملت هتتمسح."))) return;
     return go(replan, () => F("/replan", { method: "POST" }));
   }
   const fr = t.closest("[data-fmframes]");
   if (fr) {
     await filmSave();
-    if (!confirm(`يرسم الفريمات؟ حوالي ${filmx.cur.costs.frames}$ على Atlas، وبعدها بيكتب خطة كل كونيكتور.`)) return renderFilm();
+    if (!(await uiConfirm(`يرسم الفريمات؟ حوالي ${filmx.cur.costs.frames}$ على Atlas، وبعدها بيكتب خطة كل كونيكتور.`))) return renderFilm();
     return go(fr, () => F("/frames", { method: "POST" }));
   }
   const redo = t.closest("[data-fmredo]");
@@ -299,7 +299,7 @@ $("labFilm").addEventListener("click", async (e) => {
     const client = keys.filter((k) => k.startsWith("c:")).map((k) => k.slice(2));
     try { await filmSave("scenes"); } catch (err) { return toast(err.message, true); }
     const what = note || keys.length ? "يعدّل" : "يرسم";
-    if (!confirm(`${what} ${w === "a" ? "أول المشهد (وآخره بيترسم من جديد معاه)" : "آخر المشهد"}${note ? ` بالملاحظة: «${note}»` : ""}${keys.length ? ` ومعاه ${keys.length} صورة مرجعية` : ""}؟ (حوالي ${w === "a" ? 0.12 : 0.06}$)`)) return renderFilm();
+    if (!(await uiConfirm(`${what} ${w === "a" ? "أول المشهد (وآخره بيترسم من جديد معاه)" : "آخر المشهد"}${note ? ` بالملاحظة: «${note}»` : ""}${keys.length ? ` ومعاه ${keys.length} صورة مرجعية` : ""}؟ (حوالي ${w === "a" ? 0.12 : 0.06}$)`))) return renderFilm();
     return go(redo, async () => {
       const r = await F(`/scenes/${i}/${w}`, { method: "POST", ...jsonBody({ note, refs, client }) });
       delete filmx.sel[i]; delete filmx.notes[i];
@@ -310,7 +310,7 @@ $("labFilm").addEventListener("click", async (e) => {
   const del = t.closest("[data-fmrefdel]");
   if (del) {
     e.preventDefault(); e.stopPropagation();
-    if (!confirm("تمسح الصورة دي؟")) return;
+    if (!(await uiConfirm("تمسح الصورة دي؟"))) return;
     Object.values(filmx.sel).forEach((s) => s.delete(`u:${del.dataset.fmrefdel}`));
     try { filmx.cur = await F(`/refs/${encodeURIComponent(del.dataset.fmrefdel)}`, { method: "DELETE" }); renderFilm(); } catch (err) { toast(err.message, true); }
     return;
@@ -342,7 +342,7 @@ $("labFilm").addEventListener("click", async (e) => {
   if (ed) {
     return busyButton(ed, "⏳", async () => {
       const miss = [...filmx.cur.scene_files.map((x, i) => (x.video ? null : `المشهد ${i + 1}`)), ...filmx.cur.link_files.map((x, i) => (x.video ? null : `الكونيكتور ${i + 1}`))].filter(Boolean);
-      if (miss.length && !confirm(`لسه متولدش: ${miss.join("، ")}. أنقل اللي جاهز؟ (المشهد اللي ملوش حركة بيدخل صورة ثابتة، والكونيكتور اللي ملوش فيديو بيتشال)`)) return;
+      if (miss.length && !(await uiConfirm(`لسه متولدش: ${miss.join("، ")}. أنقل اللي جاهز؟ (المشهد اللي ملوش حركة بيدخل صورة ثابتة، والكونيكتور اللي ملوش فيديو بيتشال)`))) return;
       const r = await F("/to-editor", { method: "POST" });
       storageSet("studiomania.projectId.ads", r.project_id);
       if (typeof mt !== "undefined") mt.project = null;
@@ -354,7 +354,7 @@ $("labFilm").addEventListener("click", async (e) => {
   if (apply) {
     try { await filmSave("scenes"); } catch (err) { return toast(err.message, true); }
     const n = (filmx.cur.stale || []).filter(Boolean).length;
-    if (!confirm(`يطبّق تعديلات السكريبت على ${n} مشهد؟ كل مشهد بيتعدّل بحوالي 0.12$ (ولو التعديل مش محتاج يتشاف في الصورة مش بيتحسب).`)) return;
+    if (!(await uiConfirm(`يطبّق تعديلات السكريبت على ${n} مشهد؟ كل مشهد بيتعدّل بحوالي 0.12$ (ولو التعديل مش محتاج يتشاف في الصورة مش بيتحسب).`))) return;
     return go(apply, () => F("/script/apply", { method: "POST" }));
   }
   const rw = t.closest("[data-fmrewrite]");
@@ -371,7 +371,7 @@ $("labFilm").addEventListener("click", async (e) => {
     try { await filmSave("scenes"); } catch (err) { return toast(err.message, true); }
     const voice = $("labFilm").querySelector("[data-fmvoice]").value;
     const force = filmx.cur.voice?.mode === "tts" && filmx.cur.voice.voice_id !== voice;
-    if (!confirm(`يولّد الفويس أوفر${force ? " كله بالصوت الجديد" : ""}؟ (رخيص، وبيتحسب على Atlas)`)) return;
+    if (!(await uiConfirm(`يولّد الفويس أوفر${force ? " كله بالصوت الجديد" : ""}؟ (رخيص، وبيتحسب على Atlas)`))) return;
     return go(tts, () => F("/voice/tts", { method: "POST", ...jsonBody({ voice_id: voice }) }));
   }
   const vup = t.closest("[data-fmvoup]");
@@ -386,7 +386,7 @@ $("labFilm").addEventListener("click", async (e) => {
   }
   const vdel = t.closest("[data-fmvodel]");
   if (vdel) {
-    if (!confirm("تشيل الفويس أوفر؟ (المشاهد بتفضل بطولها الحالي)")) return;
+    if (!(await uiConfirm("تشيل الفويس أوفر؟ (المشاهد بتفضل بطولها الحالي)"))) return;
     return go(vdel, () => F("/voice", { method: "DELETE" }));
   }
   const lp = t.closest("[data-fmlplan]");
@@ -395,7 +395,7 @@ $("labFilm").addEventListener("click", async (e) => {
   if (lr) {
     const i = Number(lr.dataset.fmlredo), note = lr.closest("[data-redo]").querySelector("[data-lnote]").value.trim();
     try { await filmSave("links"); } catch (err) { return toast(err.message, true); }
-    if (!confirm(`${note ? `يعدّل خطة الكونيكتور ${i + 1} على ملاحظتك («${note}») ويولّده تاني` : `يولّد الكونيكتور ${i + 1} تاني بنفس الخطة (محاولة جديدة)`}؟ حوالي ${filmx.cur.costs?.links?.[i]}$، والفيديو القديم بيتبدل.`)) return;
+    if (!(await uiConfirm(`${note ? `يعدّل خطة الكونيكتور ${i + 1} على ملاحظتك («${note}») ويولّده تاني` : `يولّد الكونيكتور ${i + 1} تاني بنفس الخطة (محاولة جديدة)`}؟ حوالي ${filmx.cur.costs?.links?.[i]}$، والفيديو القديم بيتبدل.`))) return;
     return go(lr, () => F(`/links/${i}/redo`, { method: "POST", ...jsonBody({ note }) }));
   }
   const run = t.closest("[data-fmrun]"), gen = t.closest("[data-fmgen]");
@@ -408,10 +408,10 @@ $("labFilm").addEventListener("click", async (e) => {
       : cc.todo_scenes || cc.todo_links ? `اللي لسه متولدش بس: ${[cc.todo_scenes ? `${cc.todo_scenes} مشهد` : "", cc.todo_links ? `${cc.todo_links} كونيكتور` : ""].filter(Boolean).join(" و")}. اللي اتولد قبل كده مش هيتلمس` : "";
     if (!gen && !what) return go(run, () => F("/run", { method: "POST", ...jsonBody({}) }));   // كله جاهز: تجميع بس، ببلاش
     const staleN = (filmx.cur.stale || []).filter(Boolean).length;
-    if (staleN && !confirm(`فيه ${staleN} مشهد السكريبت بتاعه اتغيّر والفريمات لسه على القديم. تكمّل من غير «✨ طبّق التعديلات على الفريمات»؟`)) return renderFilm();
+    if (staleN && !(await uiConfirm(`فيه ${staleN} مشهد السكريبت بتاعه اتغيّر والفريمات لسه على القديم. تكمّل من غير «✨ طبّق التعديلات على الفريمات»؟`))) return renderFilm();
     const voStale = (filmx.cur.voice?.lines || []).some((l) => l?.stale);
-    if (voStale && !confirm("فيه جمل في الفويس أوفر اتغيرت وصوتها لسه القديم. تكمّل؟")) return renderFilm();
-    if (!confirm(`يولّد ${what}؟ هيتحسب على Atlas${c && !gen ? ` حوالي ${c}$` : ""}، وبياخد كام دقيقة.${gen ? " (الفيديو الكامل بيتجمّع لوحده لما كل الحتت تبقى جاهزة)" : ""}`)) return renderFilm();
+    if (voStale && !(await uiConfirm("فيه جمل في الفويس أوفر اتغيرت وصوتها لسه القديم. تكمّل؟"))) return renderFilm();
+    if (!(await uiConfirm(`يولّد ${what}؟ هيتحسب على Atlas${c && !gen ? ` حوالي ${c}$` : ""}، وبياخد كام دقيقة.${gen ? " (الفيديو الكامل بيتجمّع لوحده لما كل الحتت تبقى جاهزة)" : ""}`))) return renderFilm();
     return go(run || gen, () => F("/run", { method: "POST", ...jsonBody(gen ? { kind: gen.dataset.fmgen, i: Number(gen.dataset.i) } : {}) }));
   }
 });

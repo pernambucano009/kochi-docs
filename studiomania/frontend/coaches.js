@@ -107,7 +107,7 @@ $("coachesGrid").addEventListener("click", async (e) => {
   if (!c) return;
   if (btn.dataset.act === "edit") editCoach(c);
   if (btn.dataset.act === "delete") {
-    if (!confirm(`حذف الشخصية "${c.name}"؟`)) return;
+    if (!(await uiConfirm(`حذف الشخصية "${c.name}"؟`))) return;
     await api(`/api/coaches/${c.id}`, { method: "DELETE" });
     if (coachState.editing?.id === c.id) resetCoachForm();
     await loadCoaches();
@@ -257,7 +257,7 @@ function renderUnmatched(unmatched) {
     .join("");
 }
 
-$("unmatchedList").addEventListener("click", (e) => {
+$("unmatchedList").addEventListener("click", async (e) => {
   const ign = e.target.closest("[data-ignore]");
   if (ign) {
     bulk.ignored.add(Number(ign.dataset.ignore));
@@ -275,7 +275,7 @@ $("unmatchedList").addEventListener("click", (e) => {
     row = { key: matchKey(c.name), image: null, name: c.name, existingId: c.id, outro: null, preview: c.image_url };
     bulk.rows.push(row);
   }
-  if (row.outro !== null && row.outro !== o && !confirm(`${row.name} عنده أوترو متربط بالفعل (${bulk.outros[row.outro].name}). تبدّله بالأوترو ده؟`)) return;
+  if (row.outro !== null && row.outro !== o && !(await uiConfirm(`${row.name} عنده أوترو متربط بالفعل (${bulk.outros[row.outro].name}). تبدّله بالأوترو ده؟`))) return;
   bulk.rows.forEach((r) => { if (r.outro === o) r.outro = null; });
   row.outro = o;
   toast(`✅ ${bulk.outros[o].name} اتربط بـ ${row.name}`);

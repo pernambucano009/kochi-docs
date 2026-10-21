@@ -151,7 +151,7 @@ $("logoUpload").addEventListener("change", async (e) => {
   }
 });
 $("logoRemove").onclick = async () => {
-  if (!confirm("حذف اللوجو من كل الفيديوهات الجاية؟")) return;
+  if (!(await uiConfirm("حذف اللوجو من كل الفيديوهات الجاية؟"))) return;
   await api("/api/logo", { method: "DELETE" });
   brand.logoUrl = null;
   renderBrandPanels();
@@ -273,7 +273,7 @@ function renderTranscriptStatus() {
 $("capTranscribe").onclick = async () => {
   const voice = mt.project.data.voice;
   const tr = brand.tr[voice.id];
-  if (tr?.edited && !confirm("إنت عدّلت الكلام قبل كده. الكتابة من الأول هتمسح تعديلاتك. تكمّل؟")) return;
+  if (tr?.edited && !(await uiConfirm("إنت عدّلت الكلام قبل كده. الكتابة من الأول هتمسح تعديلاتك. تكمّل؟"))) return;
   try {
     await api(`/api/audio/${voice.id}/transcribe`, { method: "POST" });
     brand.tr[voice.id] = { status: "working", words: [] };

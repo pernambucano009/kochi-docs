@@ -127,7 +127,7 @@ function mountAudioLibrary(root) {
       render();
     }
     if (btn.dataset.act === "rename") {
-      const name = prompt("الاسم الجديد:", a.name);
+      const name = (await uiPrompt("الاسم الجديد:", a.name));
       if (!name || name === a.name) return;
       try {
         await api(`/api/audio/${a.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) });
@@ -135,7 +135,7 @@ function mountAudioLibrary(root) {
       } catch (err) { toast(err.message, true); }
     }
     if (btn.dataset.act === "delete") {
-      if (!confirm(`حذف "${a.name}"؟`)) return;
+      if (!(await uiConfirm(`حذف "${a.name}"؟`))) return;
       if (lib.playing === a.id) { player.pause(); lib.playing = null; }
       await api(`/api/audio/${a.id}`, { method: "DELETE" });
       await load();

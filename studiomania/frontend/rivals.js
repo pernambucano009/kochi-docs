@@ -223,7 +223,7 @@ const RivalsPage = (() => {
         return act("/api/rivals/add", { method: "POST", ...jsonBody({ handle: h, platform: w.querySelector("[data-rvnewpl]").value }) });
       }
       if (!rid) return;
-      if (e.target.closest("[data-rvdel]")) { if (confirm("تشيل المنافس ده؟ مش هيرجع تاني في البحث.")) act(`/api/rivals/${rid}`, { method: "DELETE" }); return; }
+      if (e.target.closest("[data-rvdel]")) { if ((await uiConfirm("تشيل المنافس ده؟ مش هيرجع تاني في البحث."))) act(`/api/rivals/${rid}`, { method: "DELETE" }); return; }
       if (e.target.closest("[data-rvpin]")) { const r = S.d.items.find((x) => x.id === rid); return act(`/api/rivals/${rid}`, { method: "PATCH", ...jsonBody({ pinned: !r?.pinned }) }); }
       if (e.target.closest("[data-rvone]")) return act(`/api/rivals/refresh?rid=${encodeURIComponent(rid)}`, { method: "POST" });
       if (e.target.closest("[data-rvswap]")) { S.swap = rid; render(); w.querySelector("[data-rvswapin]")?.focus(); return; }

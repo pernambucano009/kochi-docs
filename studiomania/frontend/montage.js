@@ -422,7 +422,7 @@ $("binGrid").addEventListener("click", async (e) => {
   if (item && e.target.closest(".del")) {
     const src = mt.sources.find((s) => s.id === item.dataset.id);
     if (mt.project.data.clips.some((c) => c.gen_id === src.id)) return toast("الأوترو ده في التايم لاين. شيله منه الأول", true);
-    if (!confirm(`مسح «${src.label}»؟`)) return;
+    if (!(await uiConfirm(`مسح «${src.label}»؟`))) return;
     try {
       await api(`/api/outros/${encodeURIComponent(src.id)}`, { method: "DELETE" });
       mt.sources = mt.sources.filter((s) => s.id !== src.id);
@@ -462,7 +462,7 @@ $("clipUpload").addEventListener("change", async (e) => {
   if (!file || !mt.project) return;
   const d = mt.project.data;
   const c = selectedClip();
-  const replace = c && confirm("تبدّل فيديو القطعة المتحددة بالفيديو ده؟\n(لو لأ، هيتحط كقطعة جديدة عند المؤشر)");
+  const replace = c && (await uiConfirm("تبدّل فيديو القطعة المتحددة بالفيديو ده؟\n(لو لأ، هيتحط كقطعة جديدة عند المؤشر)"));
   const form = new FormData();
   form.append("file", file);
   if (d.coach_id) form.append("coach_id", d.coach_id);
@@ -1975,11 +1975,11 @@ $("tlMarkers").addEventListener("pointerdown", (e) => {
   e.stopPropagation();
   seek(markers()[Number(el.dataset.m)].t);
 });
-$("tlMarkers").addEventListener("dblclick", (e) => {
+$("tlMarkers").addEventListener("dblclick", async (e) => {
   const el = e.target.closest(".tl-mark");
   if (!el) return;
   const m = markers()[Number(el.dataset.m)];
-  const name = prompt("اسم العلامة", m.label || "");
+  const name = (await uiPrompt("اسم العلامة", m.label || ""));
   if (name == null) return;
   pushHistory();
   m.label = name.trim().slice(0, 40);
@@ -3008,7 +3008,7 @@ $("kochiLayoutBtn").onclick = async () => {
   }
 };
 $("deleteProject").onclick = async () => {
-  if (!confirm(`حذف المشروع "${mt.project.data.name}"؟ (الفيديوهات اللي اتصدّرت منه هتفضل موجودة)`)) return;
+  if (!(await uiConfirm(`حذف المشروع "${mt.project.data.name}"؟ (الفيديوهات اللي اتصدّرت منه هتفضل موجودة)`))) return;
   try {
     await api(`/api/projects/${mt.project.id}`, { method: "DELETE" });
     mt.projects = mt.projects.filter((p) => p.id !== mt.project.id);
@@ -3063,7 +3063,7 @@ function exportFileName(name) {
 $("renderBtn").onclick = async () => {
   pause();
   const pend = silPending().filter((m) => m.del).length;
-  if (pend && !confirm(`لسه فيه ${pend} جزء أحمر (سكتة/حشو) ماراجعتهوش. تصدّر من غير ما تشيلهم؟`)) return;
+  if (pend && !(await uiConfirm(`لسه فيه ${pend} جزء أحمر (سكتة/حشو) ماراجعتهوش. تصدّر من غير ما تشيلهم؟`))) return;
   await saveProject();
   try {
     await api(`/api/projects/${mt.project.id}/render`, { method: "POST" });
@@ -3079,7 +3079,7 @@ $("renderBtn").onclick = async () => {
 };
 
 $("renderCancel").onclick = async () => {
-  if (!confirm("توقّف التصدير؟")) return;
+  if (!(await uiConfirm("توقّف التصدير؟"))) return;
   try {
     await api(`/api/projects/${mt.project.id}/render/cancel`, { method: "POST" });
     toast("⏹ بيوقف التصدير…");

@@ -399,7 +399,7 @@ $("adEdGo").onclick = () => busyButton($("adEdGo"), "⏳ بيرفع ويقص..."
   };
   if (aed.file) await uploadAd(aed.file, edit);
   else {
-    if (!confirm("القص والكروب الجديد هيتطبق على الفيديو الأصلي، والتحليل والاقتراح هيتعملوا من الأول. تكمّل؟")) return;
+    if (!(await uiConfirm("القص والكروب الجديد هيتطبق على الفيديو الأصلي، والتحليل والاقتراح هيتعملوا من الأول. تكمّل؟"))) return;
     adx.cur = await api(`/api/ads/${aed.aid}/edit`, { method: "POST", ...jsonBody(edit) });
     adx.tab = "analysis";
     renderAds();
@@ -519,8 +519,8 @@ async function adaptWithControls() {
   adx.cur = await api(`/api/ads/${adx.cur.id}/adapt`, { method: "POST", ...jsonBody({ message: "" }) });
   renderAds(); scheduleAdPoll();
 }
-$("adCtlApply").onclick = () => {
-  if (adx.cur.adaptation && !confirm("يكتب الاقتراح من جديد بالاختيارات دي؟ الاقتراح الحالي هيتغير.")) return;
+$("adCtlApply").onclick = async () => {
+  if (adx.cur.adaptation && !(await uiConfirm("يكتب الاقتراح من جديد بالاختيارات دي؟ الاقتراح الحالي هيتغير."))) return;
   busyButton($("adCtlApply"), "⏳", adaptWithControls);
 };
 $("adBrandCtl").addEventListener("click", async (e) => {
@@ -528,7 +528,7 @@ $("adBrandCtl").addEventListener("click", async (e) => {
   const b = e.target.closest("[data-dir-pick]");
   if (!b) return;
   const d = adx.cur.directions[+b.dataset.dirPick];
-  if (adx.cur.adaptation && !confirm(`يكتب الاقتراح من جديد على اتجاه «${d.title}»؟ الاقتراح الحالي هيتغير.`)) return;
+  if (adx.cur.adaptation && !(await uiConfirm(`يكتب الاقتراح من جديد على اتجاه «${d.title}»؟ الاقتراح الحالي هيتغير.`))) return;
   await busyButton(b, "⏳", async () => {
     await patchAd({ settings: { direction: dirText(d) } });
     await adaptWithControls();
@@ -539,8 +539,8 @@ $("adReadapt").onclick = () => busyButton($("adReadapt"), "⏳", async () => {
   adx.tab = "adapt";
   renderAds();
 });
-function reanalyze() {
-  if (!confirm("تحلل الإعلان من الأول؟ التعديلات اللي عملتها على التحليل هتتمسح. الاقتراح الحالي هيفضل لحد ما تدوس «التالي» عشان يتكتب من التحليل الجديد.")) return;
+async function reanalyze() {
+  if (!(await uiConfirm("تحلل الإعلان من الأول؟ التعديلات اللي عملتها على التحليل هتتمسح. الاقتراح الحالي هيفضل لحد ما تدوس «التالي» عشان يتكتب من التحليل الجديد."))) return;
   busyButton($("adReanalyze"), "⏳", async () => {
     adx.cur = await api(`/api/ads/${adx.cur.id}/analyze`, { method: "POST" });
     adx.tab = "analysis";
@@ -550,7 +550,7 @@ function reanalyze() {
 $("adReanalyze").onclick = reanalyze;
 $("adReedit").onclick = () => openAdEditor({ ad: adx.cur });
 $("adDelete").onclick = async () => {
-  if (!confirm(`تحذف «${adx.cur.name}» وتحليله؟`)) return;
+  if (!(await uiConfirm(`تحذف «${adx.cur.name}» وتحليله؟`))) return;
   try {
     await api(`/api/ads/${adx.cur.id}`, { method: "DELETE" });
     adx.list = await api("/api/ads");
@@ -598,7 +598,7 @@ $("adStyleGrid").addEventListener("change", async (e) => {
 });
 $("adStyleGrid").addEventListener("click", async (e) => {
   const card = e.target.closest("[data-style]");
-  if (!card || !e.target.closest("[data-style-del]") || !confirm("تحذف الستايل ده؟")) return;
+  if (!card || !e.target.closest("[data-style-del]") || !(await uiConfirm("تحذف الستايل ده؟"))) return;
   try { await api(`/api/ad-styles/${card.dataset.style}`, { method: "DELETE" }); adx.styles = await api("/api/ad-styles"); renderAds(); }
   catch (err) { toast(err.message, true); }
 });
@@ -718,7 +718,7 @@ async function adFlow(btn, to) {
   const a = adx.cur;
   if (to === "adapt") {
     if (a.adaptation && !adaptStale(a)) { adx.tab = "adapt"; return renderAds(); }
-    if (a.adaptation && !confirm("هيكتب اقتراح جديد من آخر نسخة من التحليل والمكونات. التعديلات اللي عملتها بإيدك في الاقتراح الحالي هتتشال. تكمل؟")) return;
+    if (a.adaptation && !(await uiConfirm("هيكتب اقتراح جديد من آخر نسخة من التحليل والمكونات. التعديلات اللي عملتها بإيدك في الاقتراح الحالي هتتشال. تكمل؟"))) return;
     return busyButton(btn, "⏳", async () => {
       adx.cur = await api(`/api/ads/${a.id}/adapt`, { method: "POST", ...jsonBody({ message: "" }) });
       adx.tab = "adapt";
@@ -728,29 +728,29 @@ async function adFlow(btn, to) {
   if (a.prod && !prodStale(a)) { adx.tab = "prod"; return renderAds(); }
   if (adaptStale(a)) {
     // الموشن بيوصل للتنفيذ عن طريق الاقتراح: يتكتب من جديد من آخر تحليل، وبعدها التنفيذ بيبدأ منه لوحده
-    if (!confirm(a.prod ? "الاقتراح هيتكتب من جديد من آخر تحليل (بالموشن جرافيك اللي اتستخرج)، وبعدها التنفيذ هيبدأ منه لوحده. التنفيذ الحالي هيتحفظ وتقدر ترجعه. تكمل؟"
-      : "الاقتراح هيتكتب من جديد من آخر تحليل (بالموشن جرافيك اللي اتستخرج)، وبعدها التنفيذ هيبدأ منه لوحده. تكمل؟")) return;
+    if (!(await uiConfirm(a.prod ? "الاقتراح هيتكتب من جديد من آخر تحليل (بالموشن جرافيك اللي اتستخرج)، وبعدها التنفيذ هيبدأ منه لوحده. التنفيذ الحالي هيتحفظ وتقدر ترجعه. تكمل؟"
+      : "الاقتراح هيتكتب من جديد من آخر تحليل (بالموشن جرافيك اللي اتستخرج)، وبعدها التنفيذ هيبدأ منه لوحده. تكمل؟"))) return;
     return busyButton(btn, "⏳", async () => {
       adx.cur = await api(`/api/ads/${a.id}/adapt`, { method: "POST", ...jsonBody({ message: "", then_prod: true }) });
       adx.followProd = a.id;
       renderAds();
     });
   }
-  if (a.prod && !confirm("هيبدأ تنفيذ جديد من آخر نسخة من الاقتراح. التنفيذ الحالي (صوره وفيديوهاته) هيتحفظ وتقدر ترجعه بزرار «رجّع التنفيذ السابق». تكمل؟")) return;
+  if (a.prod && !(await uiConfirm("هيبدأ تنفيذ جديد من آخر نسخة من الاقتراح. التنفيذ الحالي (صوره وفيديوهاته) هيتحفظ وتقدر ترجعه بزرار «رجّع التنفيذ السابق». تكمل؟"))) return;
   return busyButton(btn, "⏳", async () => {
     adx.cur = await pAPI("/start", { method: "POST" });
     adx.tab = "prod";
     renderAds();
   });
 }
-document.querySelector('.view[data-view="10"]').addEventListener("click", (e) => {
+document.querySelector('.view[data-view="10"]').addEventListener("click", async (e) => {
   const f = e.target.closest("[data-flow]");
   if (f) return adFlow(f, f.dataset.flow);
   if (e.target.closest("[data-scomps]")) return $("adSceneCompsGo").click();
   const go = e.target.closest("[data-act-tab]");
   if (go) { adx.tab = go.dataset.actTab; return renderAds(); }
   const r = e.target.closest("[data-prod-restore]");
-  if (r && confirm("ترجّع التنفيذ السابق؟ التنفيذ الحالي هيتحفظ مكانه.")) pDo(r, "⏳", () => pAPI(`/restore?i=${r.dataset.prodRestore}`, { method: "POST" }));
+  if (r && (await uiConfirm("ترجّع التنفيذ السابق؟ التنفيذ الحالي هيتحفظ مكانه."))) pDo(r, "⏳", () => pAPI(`/restore?i=${r.dataset.prodRestore}`, { method: "POST" }));
 });
 
 // ---------- 4. التنفيذ: راس الإعلان ← ستوري بورد ← مكونات ← لقطات ← المونتاج ----------
@@ -1010,18 +1010,18 @@ $("adCast").addEventListener("click", async (e) => {
   try {
     if (b.dataset.castPick) adx.cur = await cAPI(`/${cid}/pick`, { method: "POST", ...jsonBody({ file: b.dataset.castPick }) });
     else if (act === "extract") {
-      if (adx.cur.prod.cast?.length && !confirm("يطلّع الأبطال والمكونات تاني من الاقتراح؟ اللي ليهم صور أو اتوافق عليهم بيفضلوا.")) return;
+      if (adx.cur.prod.cast?.length && !(await uiConfirm("يطلّع الأبطال والمكونات تاني من الاقتراح؟ اللي ليهم صور أو اتوافق عليهم بيفضلوا."))) return;
       adx.cur = await cAPI("/extract", { method: "POST" });
     } else if (act === "images") {
       const redo = adx.cur.prod.cast.filter((c) => !c.approved && c.image_url);
-      if (redo.length && !confirm(`في ${redo.length} (${redo.map((c) => c.name).join("، ")}) ليهم صور ومش معتمدين: هيترسموا من جديد والصورة القديمة بتاعتهم هتتمسح.\n\nلو في صورة عاجباك، اعتمدها الأول بـ «🧠 اعتمد وضيفه للعقل» عشان متتمسحش.\n\nتكمل؟`)) return;
+      if (redo.length && !(await uiConfirm(`في ${redo.length} (${redo.map((c) => c.name).join("، ")}) ليهم صور ومش معتمدين: هيترسموا من جديد والصورة القديمة بتاعتهم هتتمسح.\n\nلو في صورة عاجباك، اعتمدها الأول بـ «🧠 اعتمد وضيفه للعقل» عشان متتمسحش.\n\nتكمل؟`))) return;
       adx.cur = await cAPI(`/images?redo=true`, { method: "POST" });
     }
     else if (act === "approveall") adx.cur = await cAPI("/approve-all", { method: "POST" });
     else if (act === "img") adx.cur = await cAPI(`/images?cast_id=${cid}`, { method: "POST" });
     else if (act === "approve") { adx.cur = await cAPI(`/${cid}/approve`, { method: "POST" }); toast("✅ اتحفظ في ملف العميل واتربط باللقطات"); }
     else if (act === "unapprove") adx.cur = await cAPI(`/${cid}/approve?undo=true`, { method: "POST" });
-    else if (act === "del") { if (!confirm("تشيله من القايمة؟")) return; adx.cur = await cAPI(`/${cid}`, { method: "DELETE" }); }
+    else if (act === "del") { if (!(await uiConfirm("تشيله من القايمة؟"))) return; adx.cur = await cAPI(`/${cid}`, { method: "DELETE" }); }
     else if (act === "edit") {
       const c = adx.cur.prod.cast.find((x) => x.id === cid);
       return openFix({
@@ -1143,8 +1143,8 @@ function renderAdProd() {
 }
 
 $("adProdGo").onclick = () => pDo($("adProdGo"), "⏳", () => pAPI("/start", { method: "POST" }));
-$("adProdRestart").onclick = () => {
-  if (!confirm("تبدأ التنفيذ من جديد من الاقتراح الحالي؟ التنفيذ ده (صوره وفيديوهاته) هيتحفظ وتقدر ترجعه بزرار «رجّع التنفيذ السابق».")) return;
+$("adProdRestart").onclick = async () => {
+  if (!(await uiConfirm("تبدأ التنفيذ من جديد من الاقتراح الحالي؟ التنفيذ ده (صوره وفيديوهاته) هيتحفظ وتقدر ترجعه بزرار «رجّع التنفيذ السابق»."))) return;
   pDo($("adProdRestart"), "⏳", () => pAPI("/start", { method: "POST" }));
 };
 $("adHeader").addEventListener("change", (e) => {
@@ -1161,23 +1161,23 @@ $("adPBrain").onclick = () => busyButton($("adPBrain"), "⏳", async () => {
   renderAds();
   toast(r.applied ? `🧠 اتحط ${r.applied} مكون من ملف العميل (شاشات / لوجو / منتج)` : "مفيش مكونات شاشات أو لوجو محتاجة صور من ملف العميل");
 });
-$("adPDelFrames").onclick = () => {
+$("adPDelFrames").onclick = async () => {
   const n = adx.cur.prod.shots.filter((s) => s.frames.length).length;
   if (!n) return toast("مفيش ستوري بورد تتمسح");
-  if (!confirm(`تمسح الستوري بورد بتاعة كل اللقطات (${n} لقطة، بكل نسخها)؟ المكونات والفيديوهات مش هتتلمس.`)) return;
+  if (!(await uiConfirm(`تمسح الستوري بورد بتاعة كل اللقطات (${n} لقطة، بكل نسخها)؟ المكونات والفيديوهات مش هتتلمس.`))) return;
   pDo($("adPDelFrames"), "⏳", () => pAPI("/frames", { method: "DELETE" }));
 };
-const castWarn = () => {
+const castWarn = async () => {
   const n = (adx.cur.prod.cast || []).filter((c) => !c.approved).length;
-  return !n || confirm(`في ${n} من الأبطال والمكونات المتكررة لسه ما اتوافقش عليهم، فمش هيدخلوا في الرسم. ترسم برضه؟`);
+  return !n || (await uiConfirm(`في ${n} من الأبطال والمكونات المتكررة لسه ما اتوافقش عليهم، فمش هيدخلوا في الرسم. ترسم برضه؟`));
 };
-$("adPFrames").onclick = () => {
-  if (!castWarn()) return;
+$("adPFrames").onclick = async () => {
+  if (!(await castWarn())) return;
   // المعتمدة متتلمسش. اللي مش معتمدة: البرومبت بيتكتب من جديد بالمنشن وبتترسم، والجديد بيمسح القديم
   const shots = adx.cur.prod.shots, todo = shots.filter((s) => !s.approved);
   if (!todo.length) return toast("كل اللقطات معتمدة ✅. الغي اعتماد اللقطة اللي عايز ترسمها تاني");
   const old = todo.filter((s) => s.frame_url);
-  if (old.length && !confirm(`${old.length} لقطة (${old.map((s) => s.n).join("، ")}) ليها ستوري بورد ومش معتمدة: هتترسم من جديد والصورة القديمة بتاعتها هتتمسح.\n\nلو في ستوري بورد عاجبك، اعتمده الأول بـ «✅ اعتمد» تحت الصورة عشان ميتمسحش.\n\nالمعتمدة (${shots.length - todo.length}) مش هتتلمس. تكمل؟`)) return;
+  if (old.length && !(await uiConfirm(`${old.length} لقطة (${old.map((s) => s.n).join("، ")}) ليها ستوري بورد ومش معتمدة: هتترسم من جديد والصورة القديمة بتاعتها هتتمسح.\n\nلو في ستوري بورد عاجبك، اعتمده الأول بـ «✅ اعتمد» تحت الصورة عشان ميتمسحش.\n\nالمعتمدة (${shots.length - todo.length}) مش هتتلمس. تكمل؟`))) return;
   busyButton($("adPFrames"), "✍️ بيكتب البرومبتات...", async () => {
     adx.cur = await pAPI("/sb-prompts?skip_approved=true", { method: "POST" });
     renderAds();
@@ -1187,26 +1187,26 @@ $("adPFrames").onclick = () => {
   });
 };
 $("adPComps").onclick = () => pDo($("adPComps"), "⏳", () => pAPI("/components", { method: "POST" }));
-$("adPCompImgs").onclick = () => {
+$("adPCompImgs").onclick = async () => {
   const comps = adx.cur.prod.shots.flatMap((s) => s.components).filter((c) => c.use !== false);
   const todo = comps.filter((c) => !c.image_url && c.status !== "working").length, done = comps.length - todo;
   if (!todo) return toast("كل المكونات ليها صور ✅");
-  if (!confirm(`هيولّد صور لـ ${todo} مكون ملهمش صورة. المكونات اللي ليها صورة (${done})، ومنها اللي انت رافعها، مش هتتلمس. تكمل؟`)) return;
+  if (!(await uiConfirm(`هيولّد صور لـ ${todo} مكون ملهمش صورة. المكونات اللي ليها صورة (${done})، ومنها اللي انت رافعها، مش هتتلمس. تكمل؟`))) return;
   pDo($("adPCompImgs"), "⏳", () => pAPI("/comp-images", { method: "POST" }));
 };
-$("adPApproveAll").onclick = () => {
+$("adPApproveAll").onclick = async () => {
   const drawn = adx.cur.prod.shots.filter((s) => s.frame_url && !PBUSY.has(s.frame_status));
   const on = !(drawn.length && drawn.every((s) => s.approved));
   const missing = adx.cur.prod.shots.length - drawn.length;
-  if (on && missing && !confirm(`هيعتمد ${drawn.length} ستوري بورد. فيه ${missing} لقطة لسه ملهاش ستوري بورد (أو بترسم) ومش هتتعتمد. تكمل؟`)) return;
+  if (on && missing && !(await uiConfirm(`هيعتمد ${drawn.length} ستوري بورد. فيه ${missing} لقطة لسه ملهاش ستوري بورد (أو بترسم) ومش هتتعتمد. تكمل؟`))) return;
   busyButton($("adPApproveAll"), "⏳", async () => {
     adx.cur = await pAPI(`/approve-all?approved=${on}`, { method: "POST" });
     toast(on ? "✅ اتعتمد كل الستوري بورد" : "↩ اتلغى الاعتماد");
   }).then(renderAds);  // بعد ما الزرار يرجع: العدد الجديد يظهر عليه
 };
-$("adPGenerate").onclick = () => {
+$("adPGenerate").onclick = async () => {
   const n = adx.cur.prod.shots.filter((s) => s.approved && s.frame_url && !s.takes.some((t) => t.status !== "failed")).length;
-  if (n && !confirm(`تولّد فيديو لـ ${n} لقطة بـ Seedance؟ (التوليد بيتحسب عليك)`)) return;
+  if (n && !(await uiConfirm(`تولّد فيديو لـ ${n} لقطة بـ Seedance؟ (التوليد بيتحسب عليك)`))) return;
   pDo($("adPGenerate"), "⏳", () => pAPI("/generate-approved", { method: "POST" }));
 };
 $("adPEditor").onclick = () => busyButton($("adPEditor"), "⏳", async () => {
@@ -1261,11 +1261,11 @@ $("adPShots").addEventListener("click", async (e) => {
     if (b.dataset.pframe) adx.cur = await pAPI(`/shots/${sid}/frame`, { method: "POST", ...jsonBody({ file: b.dataset.pframe }) });
     else if (b.dataset.p === "frame") adx.cur = await pAPI(`/frames?shot_id=${sid}`, { method: "POST" });
     else if (b.dataset.p === "voice") adx.cur = await pAPI(`/voice?shot_id=${sid}`, { method: "POST" });
-    else if (b.dataset.p === "voicedel") { if (!confirm("تمسح صوت اللقطة دي؟")) return; adx.cur = await pAPI(`/shots/${sid}/voice`, { method: "DELETE" }); }
+    else if (b.dataset.p === "voicedel") { if (!(await uiConfirm("تمسح صوت اللقطة دي؟"))) return; adx.cur = await pAPI(`/shots/${sid}/voice`, { method: "DELETE" }); }
     else if (["lipvideo", "lipimage", "lipkavatar"].includes(b.dataset.p)) {
       const m = { lipvideo: "video", lipimage: "image", lipkavatar: "kavatar" }[b.dataset.p];
-      if (!confirm(m === "video" ? "يركّب الصوت على فيديو اللقطة ويحرّك البق مع الكلام (نسخة جديدة «👄»). تكمل؟"
-        : "يعمل فيديو جديد من صورة الستوري بورد والشخصية بتقول الكلام ده (بياخد حوالي ٣ دقايق). تكمل؟")) return;
+      if (!(await uiConfirm(m === "video" ? "يركّب الصوت على فيديو اللقطة ويحرّك البق مع الكلام (نسخة جديدة «👄»). تكمل؟"
+        : "يعمل فيديو جديد من صورة الستوري بورد والشخصية بتقول الكلام ده (بياخد حوالي ٣ دقايق). تكمل؟"))) return;
       adx.cur = await pAPI(`/shots/${sid}/lipsync?method=${m}`, { method: "POST" });
     }
     else if (b.dataset.p === "framecancel") adx.cur = await pAPI(`/shots/${sid}/frame-cancel`, { method: "POST" });
@@ -1278,29 +1278,29 @@ $("adPShots").addEventListener("click", async (e) => {
     else if (b.dataset.tedit) return editTake(s, b.dataset.tedit);
     else if (b.dataset.p === "delframe") {
       const more = s.frames.length > 1;
-      if (!confirm(more ? `تمسح الستوري بورد المعروضة للقطة ${s.n}؟ النسخة اللي قبلها هتظهر مكانها.` : `تمسح الستوري بورد بتاعة اللقطة ${s.n}؟`)) return;
+      if (!(await uiConfirm(more ? `تمسح الستوري بورد المعروضة للقطة ${s.n}؟ النسخة اللي قبلها هتظهر مكانها.` : `تمسح الستوري بورد بتاعة اللقطة ${s.n}؟`))) return;
       adx.cur = await pAPI(`/shots/${sid}/frame`, { method: "DELETE" });
     }
     else if (b.dataset.p === "approve") adx.cur = await pAPI(`/shots/${sid}`, { method: "PATCH", ...jsonBody({ fields: { approved: !s.approved } }) });
     else if (b.dataset.p === "comps") {
-      if (s.components.length && !confirm("تحدّث المكونات من الستوري بورد؟ المكونات اللي ليها صورة بنفس الاسم بتفضل بصورتها.")) return;
+      if (s.components.length && !(await uiConfirm("تحدّث المكونات من الستوري بورد؟ المكونات اللي ليها صورة بنفس الاسم بتفضل بصورتها."))) return;
       adx.cur = await pAPI(`/components?shot_id=${sid}`, { method: "POST" });
     } else if (b.dataset.p === "compimgs") adx.cur = await pAPI(`/comp-images?shot_id=${sid}`, { method: "POST" });
     else if (b.dataset.p === "addcomp") adx.cur = await pAPI(`/shots/${sid}/components`, { method: "POST", ...jsonBody({ fields: {} }) });
     else if (b.dataset.p === "gen") {
-      if (!confirm(`تولّد فيديو للقطة ${s.n} بـ Seedance؟ (التوليد بيتحسب عليك)`)) return;
+      if (!(await uiConfirm(`تولّد فيديو للقطة ${s.n} بـ Seedance؟ (التوليد بيتحسب عليك)`))) return;
       adx.cur = await pAPI(`/shots/${sid}/generate`, { method: "POST" });
     } else {
       const comp = b.closest("[data-pc]");
       if (comp && b.dataset.cimg) adx.cur = await pAPI(`/shots/${sid}/components/${comp.dataset.pc}`, { method: "PATCH", ...jsonBody({ fields: { image: b.dataset.cimg } }) });
       else if (comp && b.dataset.c === "img") adx.cur = await pAPI(`/comp-images?shot_id=${sid}&comp_id=${comp.dataset.pc}`, { method: "POST" });
       else if (comp && b.dataset.c === "del") {
-        if (!confirm("تشيل المكون ده؟")) return;
+        if (!(await uiConfirm("تشيل المكون ده؟"))) return;
         adx.cur = await pAPI(`/shots/${sid}/components/${comp.dataset.pc}`, { method: "DELETE" });
       } else {
         const take = b.closest("[data-pt]");
         if (!take || !b.dataset.t) return;
-        if (b.dataset.t === "delete" && !confirm("تمسح النسخة دي؟")) return;
+        if (b.dataset.t === "delete" && !(await uiConfirm("تمسح النسخة دي؟"))) return;
         adx.cur = await pAPI(`/shots/${sid}/take?action=${b.dataset.t}`, { method: "POST", ...jsonBody({ take_id: take.dataset.pt }) });
       }
     }
@@ -1396,7 +1396,7 @@ $("adBrainGo").onclick = $("adBrainGo2").onclick = async () => {
 $("adBrainBack").onclick = () => { adx.view = "ad"; renderAds(); };
 $("adBrainPick").onchange = () => { adx.brainId = $("adBrainPick").value; renderAds(); };
 $("adBrainNew").onclick = async () => {
-  const name = prompt("اسم العميل؟");
+  const name = (await uiPrompt("اسم العميل؟"));
   if (!name?.trim()) return;
   try {
     const b = await api("/api/ad-brains", { method: "POST", ...jsonBody({ name, fields: {} }) });
@@ -1407,7 +1407,7 @@ $("adBrainNew").onclick = async () => {
 };
 $("adBrainDel").onclick = async () => {
   const b = curBrain();
-  if (!b || !confirm(`تحذف العميل «${b.name}» بكل شاشاته ولوجوهاته؟ (إعلاناته وكاروسيلاته بتروح لأقدم عميل)`)) return;
+  if (!b || !(await uiConfirm(`تحذف العميل «${b.name}» بكل شاشاته ولوجوهاته؟ (إعلاناته وكاروسيلاته بتروح لأقدم عميل)`))) return;
   try { await api(`/api/ad-brains/${b.id}`, { method: "DELETE" }); adx.brains = await api("/api/ad-brains"); adx.brainId = null; renderAds(); loadClients(); }
   catch (err) { toast(err.message, true); }
 };
@@ -1440,10 +1440,10 @@ $("adBrainBody").addEventListener("change", async (e) => {
     toast("✅ اترفعت، والبرنامج بيوصفهم ويستنبط الهوية");
   }
 });
-$("adBrainBody").addEventListener("click", (e) => {
+$("adBrainBody").addEventListener("click", async (e) => {
   const vdel = e.target.closest("[data-bvdel]");
   if (vdel) {
-    if (confirm("تشيل الفيديو ده من البراند؟")) brainSave(() => bAPI(`/brand-video/${vdel.dataset.bvdel}`, { method: "DELETE" }));
+    if ((await uiConfirm("تشيل الفيديو ده من البراند؟"))) brainSave(() => bAPI(`/brand-video/${vdel.dataset.bvdel}`, { method: "DELETE" }));
     return;
   }
   const st = e.target.closest("[data-bstyle]");
@@ -1454,7 +1454,7 @@ $("adBrainBody").addEventListener("click", (e) => {
     return;
   }
   const item = e.target.closest("[data-bfile]");
-  if (!item || !e.target.closest("[data-bdel]") || !confirm("تحذف الصورة دي من ملف العميل؟")) return;
+  if (!item || !e.target.closest("[data-bdel]") || !(await uiConfirm("تحذف الصورة دي من ملف العميل؟"))) return;
   brainSave(() => bAPI(`/assets/${encodeURIComponent(item.dataset.bfile)}`, { method: "DELETE" }));
 });
 
@@ -1628,20 +1628,20 @@ $("adGalActs").addEventListener("click", async (e) => {
   const sid = agal.sid, a = b.dataset.ga;
   try {
     if (a === "gen") {
-      if (!confirm("تولّد نسخة تانية للقطة دي بـ Seedance؟ (التوليد بيتحسب عليك)")) return;
+      if (!(await uiConfirm("تولّد نسخة تانية للقطة دي بـ Seedance؟ (التوليد بيتحسب عليك)"))) return;
       adx.cur = await pAPI(`/shots/${sid}/generate`, { method: "POST" });
     } else if (a === "edit") {
       return editTake(adx.cur.prod.shots.find((x) => x.id === sid), agal.tid);
     } else if (a === "kavatar") {
-      if (!confirm("يعمل فيديو جديد من صورة الستوري بورد والشخصية بتقول كلام اللقطة بصوتنا (بياخد حوالي ٣ دقايق). تكمل؟")) return;
+      if (!(await uiConfirm("يعمل فيديو جديد من صورة الستوري بورد والشخصية بتقول كلام اللقطة بصوتنا (بياخد حوالي ٣ دقايق). تكمل؟"))) return;
       adx.cur = await pAPI(`/shots/${sid}/lipsync?method=kavatar`, { method: "POST" });
       toast("🎬👄 بيعمل الفيديو اللي بيتكلم... هيظهر هنا لما يخلص");
     } else if (a === "lip") {
-      if (!confirm("يحرّك البق في الفيديو ده على صوت اللقطة (نسخة جديدة «👄»، بتاخد أقل من دقيقة). تكمل؟")) return;
+      if (!(await uiConfirm("يحرّك البق في الفيديو ده على صوت اللقطة (نسخة جديدة «👄»، بتاخد أقل من دقيقة). تكمل؟"))) return;
       adx.cur = await pAPI(`/shots/${sid}/lipsync?method=video&take_id=${agal.tid}`, { method: "POST" });
       toast("👄 بيحرّك البق... النسخة الجديدة هتظهر جنب القديمة وفيها الصوت");
     } else {
-      if (a === "delete" && !confirm("تمسح النسخة دي؟")) return;
+      if (a === "delete" && !(await uiConfirm("تمسح النسخة دي؟"))) return;
       adx.cur = await pAPI(`/shots/${sid}/take?action=${a}`, { method: "POST", ...jsonBody({ take_id: agal.tid }) });
       if (a === "delete") agal.tid = null;
     }
