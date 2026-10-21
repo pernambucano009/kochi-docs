@@ -9332,6 +9332,41 @@ def create_brain(body: BrainIn):
     return brain_to_dict(brain_row(bid))
 
 
+# ✨ «اقترح» جوه كارت الخانة نفسها (زي «اقترح خطوط»): المخ بيقترح قيمة، والاقتراح بيظهر جوه الكارت تقبله أو تتجاهله
+SUGGEST_FIELDS = {"typography": ("fonts for this brand: one font for headlines and one for body text, both free Google Fonts that support Arabic "
+                                 "(and Latin if the brand writes English). Write it as one short Egyptian-Arabic line like «Cairo للعناوين و IBM Plex Sans Arabic للكلام» "
+                                 "and why in one sentence.", "Cairo للعناوين (عريض) و IBM Plex Sans Arabic للكلام")}
+
+
+@app.post("/api/ad-brains/{bid}/suggest/{field}")
+def brain_suggest_field(bid: str, field: str):
+    b = brain_row(bid)
+    if not b:
+        raise HTTPException(404, "البراند ده مش موجود")
+    if field not in SUGGEST_FIELDS:
+        raise HTTPException(400, "مفيش اقتراح للخانة دي")
+    ask, mock = SUGGEST_FIELDS[field]
+    if atlas.mock_mode():
+        out = {"value": mock, "why": "خطوط واضحة وبتدعم العربي، وشكلها مناسب للسوشيال"}
+    else:
+        wallet.need(1, "اقتراح")
+        msgs = [{"role": "system", "content": "You are a brand designer. Return JSON only."},
+                {"role": "user", "content": f"Brand:\n{az.brain_text(b)[:4000]}\n\nSuggest {ask}\n"
+                                            f"Current value (improve on it or keep its spirit): {b.get(field) or '-'}\n"
+                                            'Return JSON: {"value": "...", "why": "one short Egyptian-Arabic sentence"}'}]
+        out = az.parse_json(series_chat(msgs), "الاقتراح")
+        wallet.charge(wallet.credits(wallet.est(chars=6000)), f"عقل البراند: اقتراح {field}", bid)
+    val = str(out.get("value") or "").strip()[:600]
+    if not val:
+        raise HTTPException(502, "المخ مااقترحش حاجة، جرّب تاني")
+    item = {"id": uuid.uuid4().hex[:10], "kind": "field", "field": field, "value": val, "why": str(out.get("why") or "").strip()[:300], "source": "suggest"}
+
+    def fn(d):
+        d["pending"] = [p for p in d.get("pending") or [] if not (p.get("kind") == "field" and p.get("field") == field)] + [item]
+    update_brain(bid, fn)
+    return brain_to_dict(brain_row(bid))
+
+
 def quiz_rule(line: str) -> str:
     line = re.sub(r"^[\-•*\d.)\s]+", "", line.strip())
     return line if re.match(r"^(ممنوع|لا |لازم|دايمًا|دايما|دائمًا|من غير|بدون|never|always|don'?t|no )", line, re.I) else f"ممنوع في المحتوى: {line}"

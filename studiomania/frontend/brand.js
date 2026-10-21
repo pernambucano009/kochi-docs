@@ -106,7 +106,10 @@ const BrandPage = (() => {
       // الاقتراحات اللي مستنية موافقتك بتظهر نقط منوّرة على الفرع بتاعها
       // صور المنتج وشخصيات البراند اتشالوا: الاقتراحات القديمة بتاعتهم مابتظهرش
       const mine = (b?.pending || []).filter((p) => (p.kind !== "image" || p.target === "logos") && pendBranch(p) === br.k);
-      return { ...br, leaves: [...br.leaves, ...mine.map((p) => ({ f: "p", i: p.id, t: pendLabel(p), type: "pending", p }))] };
+      // اقتراح لخانة موجودة (زي «اقتراح: الخطوط») بيتحط جوه كارت الخانة نفسها، مش نقطة لوحده
+      const host = (p) => p.kind === "field" && br.leaves.find((l) => l.f === p.field || (l.fields || []).some(([f]) => f === p.field));
+      const leaves = br.leaves.map((l) => { const sg = mine.filter((p) => host(p) === l); return sg.length ? { ...l, sugg: sg } : l; });
+      return { ...br, leaves: [...leaves, ...mine.filter((p) => !host(p)).map((p) => ({ f: "p", i: p.id, t: pendLabel(p), type: "pending", p }))] };
     });
   }
   const FIELD_BR = { niche: "identity", about: "identity", audience: "identity", market: "identity", language: "identity", domain: "identity",
@@ -332,10 +335,10 @@ const BrandPage = (() => {
         <i>${p.kind === "question" ? "؟" : ""}</i><span class="bm-tip"><b>${esc(l.t)}</b><small>${esc(String(sub || "").slice(0, 60))}</small><small class="miss">مستني موافقتك</small></span></button>`;
     }
     // المعلومات الثابتة (قواعد الخوارزميات، القواعد، المعرفة) لونها لوحدها
-    const cls = l.type === "action" ? "act" : l.type === "rule-new" ? "add" : ["algo", "rule", "note"].includes(l.type) ? "full info" : n.on ? "full" : "empty";
+    const cls = (l.type === "action" ? "act" : l.type === "rule-new" ? "add" : ["algo", "rule", "note"].includes(l.type) ? "full info" : n.on ? "full" : "empty") + (l.sugg ? " sugg" : "");
     return `<button class="bm-n bm-leaf ${cls}${S.open?.id === n.id ? " on" : ""}" data-n="${esc(n.id)}" aria-label="${esc(l.t)}">
       <i>${l.type === "action" ? "✲" : l.type === "rule-new" ? "+" : ""}</i>
-      <span class="bm-tip"><b>${esc(l.type === "rule" ? "قاعدة" : l.t)}</b>${l.type === "rule" || l.type === "note" ? `<small>${esc(l.type === "note" ? l.note.summary || "" : l.t)}</small>` : val ? `<small>${esc(val.slice(0, 60))}</small>` : l.type === "action" || l.type === "rule-new" ? "" : `<small class="miss">لسه ناقصة</small>`}</span></button>`;
+      <span class="bm-tip"><b>${esc(l.type === "rule" ? "قاعدة" : l.t)}</b>${l.sugg ? `<small class="miss">💡 فيه اقتراح جوه</small>` : ""}${l.type === "rule" || l.type === "note" ? `<small>${esc(l.type === "note" ? l.note.summary || "" : l.t)}</small>` : val ? `<small>${esc(val.slice(0, 60))}</small>` : l.type === "action" || l.type === "rule-new" ? "" : `<small class="miss">لسه ناقصة</small>`}</span></button>`;
   }
   function draw() {
     const w = S.el, b = cur();
@@ -659,14 +662,14 @@ const BrandPage = (() => {
     }
     const l = n.l, head = `<div class="bm-ch"><span class="latin">${n.br.en}</span><b>${esc(l.type === "rule" ? "قاعدة" : l.t)}</b></div>`;
     switch (l.type) {
-      case "text": return head + editable(l.f, l.f === "@name" ? b?.name : b?.[l.f], l.ph, l.ltr) + (l.hint ? `<p class="bm-note">${esc(l.hint)}</p>` : "");
+      case "text": return head + editable(l.f, l.f === "@name" ? b?.name : b?.[l.f], l.ph, l.ltr) + (l.hint ? `<p class="bm-note">${esc(l.hint)}</p>` : "") + suggBox(b, l);
       case "rule": return head + editable(`rule:${l.i}`, l.t, "القاعدة") + `<button class="bm-link bad" data-rdel="${l.i}">شيل القاعدة دي</button>`;
       case "rule-new": return head + `<p class="bm-note">أي حاجة لازم تتراعى في كل شغل للبراند: السكريبت والصور والفيديو والصوت.</p>` + editable("rule:new", "", "مثلًا: من غير مزيكا · واضغط Enter");
       case "pick": return head + `<div class="bm-pills">${l.opts.map(([v, t]) => `<button class="bm-pill${String(b?.[l.f] || "") === v ? " on" : ""}" data-pick="${l.f}" data-v="${v}">${t}</button>`).join("")}</div>`;
       case "palette": {
         const hs = hexes(b?.palette);
         return head + `<div class="bm-sw">${hs.map((h) => `<button style="background:${h}" data-hdel="${h}" title="${h} · دوس تشيله"></button>`).join("")}
-          <label class="bm-swadd" title="ضيف لون">+<input type="color" data-hadd hidden></label></div>` + editable("palette", b?.palette, "#E5613E برتقالي، #111111 أسود", true);
+          <label class="bm-swadd" title="ضيف لون">+<input type="color" data-hadd hidden></label></div>` + editable("palette", b?.palette, "#E5613E برتقالي، #111111 أسود", true) + suggBox(b, l);
       }
       case "styles": {
         const ids = styleIds(b), mine = b?.custom_styles || [], A = S.stAdd;
@@ -702,7 +705,7 @@ const BrandPage = (() => {
           <div class="bm-pills"><button class="bm-pill${b[`${l.f}_on`] ? " on" : ""}" data-von="${l.f}" data-v="1">شغّال</button><button class="bm-pill${b[`${l.f}_on`] ? "" : " on"}" data-von="${l.f}" data-v="">مقفول</button></div>
           <button class="bm-link bad" data-vdel="${l.f}">شيل الفيديو</button>` : `<label class="bm-up wide">+<small>ارفع فيديو</small><input type="file" accept="video/*" data-vup="${l.f}" hidden></label>`);
       }
-      case "multi": return head + `<p class="bm-note">بيتكتب لوحده من اللوجو والصور، وتقدر تعدّله.</p>` + l.fields.map(([k, t]) => `<div class="bm-sub"><small>${t}</small>${editable(k, b?.[k], "…", /logo_description|ui_style|style/.test(k))}</div>`).join("");
+      case "multi": return head + `<p class="bm-note">بيتكتب لوحده من اللوجو والصور، وتقدر تعدّله.</p>` + l.fields.map(([k, t]) => `<div class="bm-sub"><small>${t}</small>${editable(k, b?.[k], "…", /logo_description|ui_style|style/.test(k))}</div>`).join("") + suggBox(b, l);
       case "todo": {
         const x = l.todo;
         return head + (x.why ? `<div class="bm-sub"><small>ليه</small><p class="bm-now">${esc(x.why)}</p></div>` : "") + (x.how ? `<div class="bm-sub"><small>تتصلّح إزاي</small><p class="bm-now">${esc(x.how)}</p></div>` : "")
@@ -748,6 +751,14 @@ const BrandPage = (() => {
         <button class="bm-go" data-analyze ${b?.status === "working" ? "disabled" : ""}>${b?.status === "working" ? "بيستنبط…" : "ابدأ الاستنباط"}</button>`;
     }
     return head;
+  }
+  // 💡 الاقتراح جوه كارت الخانة: «استخدم الاقتراح» أو «تجاهل»، و«✨ اقترح» للخانات اللي المخ يقدر يقترحها (الخطوط)
+  const SUGGEST = { typography: "✨ اقترح خطوط" };
+  function suggBox(b, l) {
+    const ps = l.sugg || [], from = (p) => (p.source === "suggest" ? "" : srcName(p.source));
+    return ps.map((p) => `<div class="bm-sugg"><small>💡 اقتراح البرنامج${from(p) ? ` (من «${esc(from(p))}»)` : ""}</small><p>${esc(p.value)}</p>${p.why ? `<p class="bm-note">${esc(p.why)}</p>` : ""}
+        <div class="bm-acts"><button class="bm-go" data-sugok="${esc(p.id)}">استخدم الاقتراح</button><button class="bm-pill" data-no="${esc(p.id)}">تجاهل</button></div></div>`).join("")
+      + (SUGGEST[l.f] && !ps.length ? `<div class="bm-acts"><button class="bm-pill" data-suggest="${esc(l.f)}" ${S.suggBusy ? "disabled" : ""}>${S.suggBusy ? "⏳ بيفكّر…" : SUGGEST[l.f]}</button></div>` : "");
   }
   function openCard(n) {
     if (n?.kind === "plan") { window.RV_FOCUS = "plan-only"; return window.NHNav?.("plan"); }
@@ -1094,8 +1105,17 @@ const BrandPage = (() => {
         openCard(null);
         return save(() => bAPI(`/pending/${ok.dataset.ok}/approve`, { method: "POST", ...jsonBody({ value: val ?? null, title: ttl ?? null, target: S.imgTarget?.id === ok.dataset.ok ? S.imgTarget.t : null }) }));
       }
+      const sok = t.closest("[data-sugok]");
+      if (sok) {
+        const p = (cur()?.pending || []).find((x) => x.id === sok.dataset.sugok), before = cur() ? { ...cur() } : null;
+        if (await save(() => bAPI(`/pending/${sok.dataset.sugok}/approve`, { method: "POST", ...jsonBody({ value: p?.value ?? null, title: null, target: null }) }), { card: true }) && p)
+          savedPill(savedMsg({ [p.field]: p.value }, null, before));
+        return;
+      }
+      const sgg = t.closest("[data-suggest]");
+      if (sgg) { S.suggBusy = true; refreshCard(); try { await save(() => bAPI(`/suggest/${sgg.dataset.suggest}`, { method: "POST" })); } finally { S.suggBusy = false; refreshCard(); } return; }
       const no = t.closest("[data-no]");
-      if (no) { openCard(null); return save(() => bAPI(`/pending/${no.dataset.no}`, { method: "DELETE" })); }
+      if (no) { if (!no.closest(".bm-sugg")) openCard(null); return save(() => bAPI(`/pending/${no.dataset.no}`, { method: "DELETE" })); }
       const sdel = t.closest("[data-sdel]");
       if (sdel) { if ((await uiConfirm("تشيل المصدر ده واقتراحاته اللي لسه مستنية؟"))) save(() => bAPI(`/sources/${sdel.dataset.sdel}`, { method: "DELETE" })); return; }
       if (t.closest("[data-seasons]")) {

@@ -98,6 +98,42 @@ const Gallery = (() => {
   // 🧪 مولّدات من غير قوالب (gen.js): زراير جوه الكورة الرمادي
   const GENS = [["video", "🎬", "مولد فيديو", "وصف ← فيديو"], ["image", "🖼️", "مولد صور", "وصف ومرجع ← صور"], ["voice", "🎙️", "مولد صوت", "كلام ← صوت"]];
   const gensHTML = (cls) => `<div class="${cls}">${GENS.map(([k, i, b, s]) => `<button type="button" class="nh-wh-gen" data-gen="${k}"><i>${i}</i><span><b>${b}</b><small>${s}</small></span></button>`).join("")}</div>`;
+  // 🎡 العجلة الصغيرة جوه الكورة: الأقسام الكبيرة. «المشاريع الأساسية» (القوالب) هي الأساس وعليها دايرة برتقاني.
+  // رول الماوس فوق الكورة بيلفّها، واللي تقف عليه بيظهر على اليمين: القوالب، أو صفحة الدبلجة، أو المولّدات.
+  const CATS2 = [["projects", "المشاريع الأساسية", "القوالب"], ["dub", "الدبلجة والترجمة", "أي فيديو بلغة أو لهجة تانية"], ["video", "توليد فيديو", "بالذكاء الصناعي"],
+    ["image", "توليد صور", "بالذكاء الصناعي"], ["voice", "توليد صوت", "بالذكاء الصناعي"]];
+  const C = { pos: 0, vel: 0, target: 0, cur: 0, last: 0, setT: 0 };
+  const STEP2 = 25 * Math.PI / 180;
+  const catsHTML = (cls) => `<div class="${cls}">${CATS2.map(([k, t, sub], i) => `<button type="button" class="nh-wh-cat${i === 0 ? " main" : ""}" data-cat2="${i}"><b>${t}</b><small>${sub}</small></button>`).join("")}</div>`;
+  // صفحة الدبلجة نفسها (اللي كانت برّه في الرئيسية) بتتنقل جوه الصفحة دي، وبترجع مكانها لما تمشي
+  const DUB = { home: null };
+  function dubIn(panel) {
+    const v = document.querySelector('.view[data-view="13"]');
+    if (!v) return;
+    if (!DUB.home) { DUB.home = document.createComment("dub-home"); v.parentNode.insertBefore(DUB.home, v); }
+    panel.appendChild(v); v.hidden = false;
+    viewHooks["13"]?.();
+  }
+  function dubOut() {
+    const v = document.querySelector('.view[data-view="13"]');
+    if (v && DUB.home && v.previousSibling !== DUB.home) { v.hidden = true; DUB.home.parentNode.insertBefore(v, DUB.home.nextSibling); }
+  }
+  function setCat(k) {
+    const el = W.el;
+    if (!el || k === C.cur) return;
+    C.cur = k;
+    const panel = el.querySelector(".nh-wh-panel");
+    el.classList.toggle("panel-on", k > 0);
+    el.querySelectorAll("[data-cat2]").forEach((b) => b.classList.toggle("on", +b.dataset.cat2 === k));
+    dubOut(); Gen.close?.(); panel.innerHTML = "";
+    panel.hidden = k === 0;
+    if (k === 0) return;
+    const key = CATS2[k][0];
+    panel.animate?.([{ opacity: 0, transform: "translateY(10px)" }, { opacity: 1, transform: "none" }], { duration: 280, easing: "cubic-bezier(.2,.8,.2,1)" });
+    if (key === "dub") return dubIn(panel);
+    Gen.open(key, panel);
+  }
+  function catGo(i) { C.target = Math.max(0, Math.min(CATS2.length - 1, i)); }
   function card(x, k) {
     const vid = x.sample_url ? `<video muted loop playsinline preload="none" ${x.cover_url ? `poster="${esc(x.cover_url)}"` : ""} data-src="${esc(x.sample_url)}"></video>` : `<span class="nh-gal-ph"><i>${x.icon || "✦"}</i><small>فيديو العرض جاي قريب</small></span>`;
     return `<article class="nh-wc${x.sample_url ? "" : " soon"}" tabindex="0" data-wi="${k}" aria-label="${esc(x.name)}">
@@ -116,20 +152,25 @@ const Gallery = (() => {
         <svg class="nh-wh-l nh-wh-ring" aria-hidden="true"></svg>
         <svg class="nh-wh-l nh-wh-ball" aria-hidden="true"></svg>
         <i class="nh-wh-l nh-wh-ptr" aria-hidden="true"></i>
-        ${gensHTML("nh-wh-l nh-wh-gens")}
+        ${catsHTML("nh-wh-l nh-wh-cats")}
       </div></div>
       <section class="nh-wh-info" dir="rtl" aria-live="polite">
-        ${gensHTML("nh-wh-mgens")}
+        ${catsHTML("nh-wh-mcats")}
         <div class="nh-wh-eye"><span class="num"></span><span>·</span><span class="cat"></span></div>
         <h2 class="nh-wh-title"><span></span></h2><p class="nh-wh-desc"></p>
         <button type="button" class="nh-wh-go">ابدأ بالقالب ده <span aria-hidden="true">←</span></button>
         <div class="nh-wh-foot"><span><kbd>رول الماوس</kbd> فوق العجلة بيجري أسرع</span><span><kbd>↑</kbd> <kbd>↓</kbd> قالب قالب</span></div>
       </section>
       <div class="nh-wh-cards"><div class="nh-wh-track">${list.map(([x], k) => card(x, k)).join("")}</div></div>
+      <section class="nh-wh-panel" dir="rtl" hidden></section>
       <aside class="nh-wh-side"><span class="nh-wh-dots" aria-hidden="true">${"<i></i>".repeat(12)}</span>
         <button type="button" class="nh-wh-snd" aria-pressed="${sndOn}" title="صوت العجلة"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 5 6 9H3v6h3l5 4V5z"/><path d="M16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12"/></svg><span>${sndOn ? "الصوت شغال" : "شغّل الصوت"}</span></button></aside>
     </div>`;
     Object.assign(W, { pos: 0, vel: 0, target: 0, mode: "snap", shown: -1, cell: 0, drag: null, el: box.querySelector(".nh-wh") });
+    const want = CATS2.findIndex(([k]) => k === window.GAL_CAT);   // لو الصفحة اتفتحت على قسم بعينه (مثلًا الدبلجة)
+    window.GAL_CAT = null;
+    Object.assign(C, { pos: Math.max(0, want), target: Math.max(0, want), vel: 0, cur: -1 });
+    setCat(Math.max(0, want));
     wheelBind(W.el);
     layout();
     show(0);
@@ -162,14 +203,14 @@ const Gallery = (() => {
     // الكلام في النص يبدأ بعد آخر أسماء العجلة علشان مايركبش عليها
     el.querySelector(".nh-wh-info").style.paddingLeft = mobile ? "" : Math.round(cx + R * .8 + 210) + "px";
     const ptr = el.querySelector(".nh-wh-ptr"); ptr.style.left = (cx + R * .74) + "px"; ptr.style.top = (cy - 7) + "px";
-    // الزراير في الجزء الباين من الكورة
-    const gw = Math.max(110, Math.min(170, cx + Math.sqrt(Math.max(0, rs * rs - 95 * 95)) - 70));
-    Object.assign(el.querySelector(".nh-wh-gens").style, { left: "34px", top: (cy - 92) + "px", width: gw + "px" });
+    // العجلة الصغيرة في الجزء الباين من الكورة، والصفحة اللي على اليمين بتبدأ بعد العجلة الكبيرة
+    el.querySelector(".nh-wh-panel").style.left = mobile ? "" : Math.round(cx + R * .8 + 150) + "px";
     // عمودين كروت كبيرة متزحزحين نص كارت (قالبين في الشاشة)، وكل كارت في مكانه على أسطوانة بتلف. الموبايل عمود واحد
     const cols = mobile ? 1 : 2, colW = cards.clientWidth / cols, cellH = (mobile ? 54 : 72) + colW * 5 / 4;
     W.G = { R, cx, cy, rs, cols, cellH, gh: cards.clientHeight, labs: [...el.querySelectorAll(".nh-wh-labs span")], cards: [...el.querySelectorAll(".nh-wc")],
       arc: el.querySelector(".arc"), ticks: el.querySelector(".ticks"), knurl: el.querySelector(".knurl"), sph: el.querySelector("#nhWhSph"),
-      d3: el.querySelector(".nh-wh-3d"), track: el.querySelector(".nh-wh-track"), wheelW: w };
+      d3: el.querySelector(".nh-wh-3d"), track: el.querySelector(".nh-wh-track"), wheelW: w, wheelTop: wheel.offsetTop,
+      cats: [...el.querySelectorAll(".nh-wh-cats .nh-wh-cat")] };
     W.G.cards.forEach((c, i) => {
       const col = cols === 1 ? 0 : i % 2, row = cols === 1 ? i : Math.floor(i / 2);
       Object.assign(c.style, { top: (row * cellH + (col ? cellH / 2 : 0)) + "px", left: col || cols === 1 ? "0" : "50%", width: 100 / cols + "%", transform: "" });
@@ -183,6 +224,15 @@ const Gallery = (() => {
   function wheelBind(el) {
     const cards = el.querySelector(".nh-wh-cards");
     el.addEventListener("wheel", (e) => {
+      // فوق الكورة: العجلة الصغيرة (الأقسام) بتلف قسم قسم
+      const r = el.getBoundingClientRect(), G = W.G, x = e.clientX - r.left, y = e.clientY - r.top - (G.wheelTop || 0);
+      if (innerWidth > 720 && Math.hypot(x - G.cx, y - G.cy) < G.rs) {
+        e.preventDefault();
+        const now = performance.now();
+        if (Math.abs(e.deltaY) > 2 && now - C.last > 170) { C.last = now; catGo(Math.round(C.target) + Math.sign(e.deltaY)); }
+        return;
+      }
+      if (C.cur > 0) return;   // صفحة الدبلجة أو المولّد مفتوحة: الرول بيسكرول فيها عادي
       e.preventDefault(); if (W.drag) return;
       const d = e.deltaMode === 1 ? e.deltaY * 33 : e.deltaMode === 2 ? e.deltaY * 400 : e.deltaY;
       if (W.mode === "snap" && Math.sign(d) !== Math.sign(W.vel)) W.vel *= .3;   // لو عكست الاتجاه العجلة تفرمل الأول
@@ -229,6 +279,7 @@ const Gallery = (() => {
     };
     cards.addEventListener("pointerup", end); cards.addEventListener("pointercancel", () => end(null));
     el.querySelector(".nh-wh-go").addEventListener("click", () => preview(S.items[W.list[W.shown][1]]));
+    el.addEventListener("click", (e) => { const b = e.target.closest("[data-cat2]"); if (b) catGo(+b.dataset.cat2); });
     el.querySelector(".nh-wh-snd").addEventListener("click", () => setSound(!sndOn));
   }
   // دوسة على القالب اللي في النص بتفتحه، وعلى أي قالب تاني بتلف العجلة عليه
@@ -251,7 +302,7 @@ const Gallery = (() => {
   }
   function loop(now) {
     const el = W.el;
-    if (!el || !el.isConnected) { W.raf = 0; W.G.cards?.forEach((c) => play(c, false)); return; }   // الصفحة اتقفلت
+    if (!el || !el.isConnected) { W.raf = 0; W.G.cards?.forEach((c) => play(c, false)); dubOut(); Gen.close?.(); return; }   // الصفحة اتقفلت
     const dt = Math.min(.05, (now - (W.last || now)) / 1000), N = W.list.length, G = W.G; W.last = now;
     if (W.mode === "coast") {   // بتجري بالدفعة وتهدى بالاحتكاك
       W.pos += W.vel * dt; W.vel *= Math.exp(-W.fric * dt);
@@ -307,6 +358,20 @@ const Gallery = (() => {
       html += `<line x1="${G.cx + c * r1}" y1="${G.cy + s * r1}" x2="${G.cx + c * r2}" y2="${G.cy + s * r2}" stroke="var(--wh-knurl)" stroke-opacity="${(.12 + lit * .45).toFixed(3)}" stroke-width="2" stroke-linecap="round"/>`;
     }
     G.knurl.innerHTML = html;
+    // العجلة الصغيرة: سبرنج ناعم للقسم، والأسماء على قوس جوه الكورة
+    C.vel += ((C.target - C.pos) * 120 - C.vel * 18) * dt; C.pos += C.vel * dt;
+    if (Math.abs(C.target - C.pos) < .001 && Math.abs(C.vel) < .01) { C.pos = C.target; C.vel = 0; }
+    // صف أسماء رأسي متقوّس على شكل الكورة: اللي في النص قدام وأكبر، واللي بعيد بيلف لورا ويبهت
+    const ci = Math.round(C.pos), rowH = Math.max(58, G.rs * .27), x0 = Math.max(18, G.cx + G.rs * .12);
+    G.cats.forEach((b, i) => {
+      const t = i - C.pos, d = Math.abs(t), a = t * STEP2;
+      b.style.opacity = Math.max(0, 1 - d * .28).toFixed(3);
+      b.style.pointerEvents = d > 2.6 ? "none" : "";
+      b.style.transform = `translate(${(x0 - (1 - Math.cos(a)) * G.rs * .55).toFixed(1)}px,${(G.cy + t * rowH).toFixed(1)}px) translateY(-50%) rotate(${(a * .35).toFixed(3)}rad) scale(${(1 - Math.min(.22, d * .1)).toFixed(3)})`;
+      b.classList.toggle("near", i === ci);
+    });
+    const tg = Math.round(C.target);
+    if (tg !== C.cur && C.pend !== tg && Math.abs(C.target - C.pos) < .25) { clearTimeout(C.setT); C.pend = tg; C.setT = setTimeout(() => { C.pend = null; setCat(Math.round(C.target)); }, 140); }
     W.raf = requestAnimationFrame(loop);
   }
   addEventListener("resize", () => layout());

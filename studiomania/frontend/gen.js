@@ -5,19 +5,26 @@ const Gen = (() => {
   const S = { el: null, tab: "video", info: null, list: [], timer: null, d: { lang: "", voice: "", imodel: "nano2", ratio: "9:16", count: 1, vmodel: "", secs: 5, res: "480p", audio: true } };
   const TABS = { voice: ["🎙️", "مولد صوت"], image: ["🖼️", "مولد صور"], video: ["🎬", "مولد فيديو"] };
 
-  function shell() {
-    if (S.el) return S.el;
-    S.el = Object.assign(document.createElement("div"), { className: "flw gen", hidden: true });
-    S.el.setAttribute("role", "dialog");
+  // host: لو اتبعت، المولّد بيترسم جوه العنصر ده (صفحة «ابدأ مشروع جديد») بدل ما يفتح فوق الشاشة
+  let escOn = false;
+  function shell(host) {
+    const want = host || document.body;
+    if (S.el && S.el.parentNode === want) return S.el;
+    if (S.el) { clearTimeout(S.timer); S.el.remove(); }
+    S.el = Object.assign(document.createElement("div"), { className: host ? "flw gen inline" : "flw gen", hidden: true });
+    if (!host) S.el.setAttribute("role", "dialog");
     S.el.addEventListener("click", onClick);
     S.el.addEventListener("change", onChange);
     S.el.addEventListener("input", (e) => { if (e.target.dataset.g) S.d[e.target.dataset.g] = e.target.value; if (e.target.dataset.g === "text") costLine(); });
-    document.body.appendChild(S.el);
-    document.addEventListener("keydown", (e) => { if (e.key === "Escape" && S.el && !S.el.hidden) { e.preventDefault(); e.stopImmediatePropagation(); close(); } }, true);
+    want.appendChild(S.el);
+    if (!escOn) {
+      escOn = true;
+      document.addEventListener("keydown", (e) => { if (e.key === "Escape" && S.el && !S.el.hidden && !S.el.classList.contains("inline")) { e.preventDefault(); e.stopImmediatePropagation(); close(); } }, true);
+    }
     return S.el;
   }
-  async function open(tab = "video") {
-    shell();
+  async function open(tab = "video", host = null) {
+    shell(host);
     S.tab = tab;
     S.el.hidden = false;
     S.el.innerHTML = `<div class="flw-box"><div class="flw-load"><span class="flw-spin"></span></div></div>`;
@@ -96,7 +103,7 @@ const Gen = (() => {
     const list = S.list.filter((g) => g.kind === S.tab);
     const scroll = S.el.querySelector(".flw-main")?.scrollTop || 0;
     S.el.innerHTML = `<div class="flw-box" data-built>
-      <header class="flw-head"><div class="flw-tpl"><small class="latin">Generate</small><b>مولّدات من غير قوالب</b></div>
+      <header class="flw-head"><div class="flw-tpl"><small class="latin">Generate</small><b>${S.el.classList.contains("inline") ? `${TABS[S.tab][0]} ${TABS[S.tab][1]} بالذكاء الصناعي` : "مولّدات من غير قوالب"}</b></div>
         <nav class="gen-tabs">${Object.entries(TABS).map(([k, [ic, t]]) => `<button type="button" class="${k === S.tab ? "on" : ""}" data-gtab="${k}">${ic} ${t}</button>`).join("")}</nav>
         <div class="flw-hr"><button type="button" class="flw-x big" data-gclose aria-label="اقفل">✕</button></div></header>
       <main class="flw-main"><div class="gen-form">${form}

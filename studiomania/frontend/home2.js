@@ -102,7 +102,7 @@ const NH = (() => {
   }
 
   // ---------- الرئيسية (نسخة أ): المجسّم في النص، والأقسام مكتوبة على الجنبين، و«ابدأ مشروع جديد» تحت المجسّم ----------
-  const SIDE_R = KOCHI ? ["brand", "assets"] : ["brand", "dubhub"], SIDE_L = KOCHI ? ["progress", "publish", "settings"] : ["publish", "settings"];   // RTL: أول عمود على اليمين
+  const SIDE_R = KOCHI ? ["brand", "assets"] : ["brand"], SIDE_L = KOCHI ? ["progress", "publish", "settings"] : ["publish", "settings"];   // RTL: أول عمود على اليمين
   const META = {
     brand: () => { const pct = brainPct(D.brand); return `<span class="nh-mbar"><i style="width:${pct}%"></i></span><span>مكتمل <span class="num">${pct}%</span></span>`; },
     assets: () => `<span>${D.coaches.length} شخصية · ${D.voices} تعليق · ${D.music} موسيقى</span>`,
