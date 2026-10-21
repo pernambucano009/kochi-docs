@@ -12,17 +12,18 @@ const RivalsPage = (() => {
   const profile = (r) => (r.platform === "tiktok" ? `https://www.tiktok.com/@${r.handle}` : `https://www.instagram.com/${r.handle}`);
 
   function card(r) {
-    const focus = S.focus === r.id;
-    return `<article class="fs-card rv-card${focus ? " on" : ""}" data-rid="${esc(r.id)}">
+    const focus = S.focus === r.id, ok = r.state === "approved";
+    return `<article class="fs-card rv-card${focus ? " on" : ""}${ok ? "" : " rv-pend"}" data-rid="${esc(r.id)}">
       <div class="rv-head">
         <span class="rv-pl rv-${esc(r.platform)}">${PL[r.platform] || esc(r.platform)}</span>
         <a href="${esc(profile(r))}" target="_blank" rel="noopener noreferrer" dir="ltr"><b>@${esc(r.handle)}</b></a>
-        ${r.pinned ? `<span class="rv-pin" title="ثابت: مش هيتبدّل لما تدوّر تاني">📌</span>` : ""}
-        <span class="rv-acts">
-          <button class="nb-btn sm" data-rvpin title="${r.pinned ? "فكّ التثبيت" : "ثبّته علشان مايتبدّلش"}">${r.pinned ? "فكّ التثبيت" : "📌 ثبّت"}</button>
+        ${ok ? `<span class="rv-ok">✓ معتمد</span>` : `<span class="rv-wait">مستني موافقتك</span>`}
+        <span class="rv-acts">${ok ? `
           <button class="nb-btn sm" data-rvswap>🔁 بدّل</button>
           <button class="nb-btn sm" data-rvone>↻ حدّث</button>
-          <button class="nb-btn sm danger" data-rvdel>✕ شيل</button></span></div>
+          <button class="nb-btn sm danger" data-rvdel>✕ شيل</button>` : `
+          <button class="nb-btn sm rv-yes" data-rvok>✅ منافس</button>
+          <button class="nb-btn sm danger" data-rvno>✕ مش منافس</button>`}</span></div>
       <div class="rv-stats"><span>متوسط المشاهدات <b class="num">${fmt(r.median_views)}</b></span><span>أعلى بوست <b class="num">${fmt(r.top_views)}</b></span>
         ${r.followers ? `<span>متابعين <b class="num">${fmt(r.followers)}</b></span>` : ""}<span>آخر ٣٠ يوم <b class="num">${r.recent_count || 0}</b> بوست</span></div>
       ${r.why ? `<p class="nb-hint">💡 ${esc(r.why)}</p>` : ""}${r.error ? `<div class="fs-err">⚠️ ${esc(r.error)}</div>` : ""}
@@ -46,12 +47,14 @@ const RivalsPage = (() => {
     const where = [b.domain && `المجال: ${b.domain}`, b.market && `السوق: ${b.market}`, b.audience && `الجمهور: ${b.audience}`].filter(Boolean);
     return `<section class="fs-hero">
         <div class="fs-hero-t"><b>منافسينك</b><span class="latin">YOUR COMPETITORS</span></div>
-        <p>أعلى ${d.top} منافسين مشاهدات في مجالك وسوقك، واللي بينجح عندهم، وتحليل آخر ١٠ فيديوهات ليك قصادهم. كل ده بيدخل لوحده في الأفكار والسكريبتات والهوكات بتاعتك، من غير ما ننسخ كلام حد.</p>
+        <p>البرنامج بيدوّر لوحده في مجالك وسوقك وبيقترحلك منافسين، وانت توافق على اللي عايز تبقى زيهم أو ترفض. من المعتمدين بس بنطلّع اللي بينجح عندهم ووصفة الاستهداف للإعلانات، وكل ما تعتمد منافسين أكتر كل ما الوصفة تبقى أدق.</p>
         <p class="nb-hint">بندوّر على حسب: ${where.length ? esc(where.join(" · ")) : "اكتب المجال والسوق والجمهور في فرع «الهوية» الأول"}</p>
         ${d.live ? "" : `<p class="nb-hint">⚠️ وضع تجربة: الحسابات والأرقام دي تجريبية لحد ما يتحط مفتاح مصدر الداتا.</p>`}
-        <div class="nb-bar"><button class="nb-btn fs-go" data-rvfind ${busy ? "disabled" : ""}>${d.items.length ? "🔍 دوّر تاني (المثبّتين بيفضلوا)" : `🔍 هات أعلى ${d.top} في مجالي`}</button>
-          ${d.items.length ? `<button class="nb-btn" data-rvall ${busy ? "disabled" : ""}>↻ حدّث</button>` : ""}
-          ${d.updated_at ? `<span class="nb-state">آخر تحديث ${ago(d.updated_at)} · بيتحدّث لوحده كل أسبوع</span>` : ""}</div>
+        <div class="rv-count"><span><b class="num">${d.approved}</b> منافس معتمد</span><span><b class="num">${d.pending}</b> مستني موافقتك</span></div>
+        <div class="nb-bar">${d.pending ? `<button class="nb-btn fs-go" data-rvokall>✅ وافق على الكل (${d.pending})</button><button class="nb-btn danger" data-rvnoall>✕ ارفض الكل</button>` : ""}
+          <button class="nb-btn" data-rvfind ${busy ? "disabled" : ""}>🔍 هات اقتراحات زيادة</button>
+          ${d.approved ? `<button class="nb-btn" data-rvall ${busy ? "disabled" : ""}>↻ حدّث</button>` : ""}
+          ${d.found_at || d.updated_at ? `<span class="nb-state">آخر تحديث ${ago(d.found_at || d.updated_at)} · اقتراحات جديدة بتيجي لوحدها كل أسبوع</span>` : ""}</div>
         <label class="rv-mode" title="القواعد بتبقى خطوات إجبارية: الأفكار الضعيفة أو برّه المجال بتتشال، السكريبت بيتفحص ويتصلّح قبل ما تشوفه، والمونتاج والكابشن بيتعملوا على القواعد">
           <input type="checkbox" data-rvmode ${d.algo_mode ? "checked" : ""}> <b>⚡ وضع الخوارزمية</b> <small>${d.algo_mode ? "شغال: القواعد خطوات إجبارية في صناعة كل فيديو" : "مقفول: القواعد نصايح بس"}</small></label>
       </section>
@@ -130,6 +133,7 @@ const RivalsPage = (() => {
         <div class="nb-bar"><button class="nb-btn fs-go" data-btgo ${B.busy ? "disabled" : ""}>${B.busy === "an" ? "⏳ بيحلّل…" : a ? "🔄 حلّل تاني" : "🧠 حلّل الدفعة"}</button></div></section>` + an + hist;
   }
   // 🎯 وصفة الاستهداف: من كلام جمهور المنافسين (من غير أسامي) لاستهداف جاهز تحطه في ميتا وجوجل وتيك توك
+  const NEED_OK = "يجب الموافقة على المنافسين الموجودين في صفحة المنافسين: لازم يبقى فيه منافس معتمد واحد على الأقل علشان الوصفة تتعمل.";
   const GEN = { all: "الكل", female: "ستات", male: "رجالة" };
   const lines = (a) => (a || []).filter(Boolean).join("\n");
   function audText(a) {
@@ -150,10 +154,11 @@ const RivalsPage = (() => {
     const head = `<section class="fs-card"><h3>🎯 وصفة الاستهداف <small>مين الجمهور اللي هيشتري، وإزاي توصله في الإعلانات بالظبط</small></h3>
         <p class="nb-hint">بنقرا كومنتات أحسن بوستات المنافسين وهاشتاجاتهم علشان نسمع الجمهور بيقول إيه، وبعدين المخ بيطلّعلك الشرايح والاستهداف الجاهز لميتا وجوجل وتيك توك، وزوايا إعلانات بلهجة السوق.</p>
         <p class="nb-hint">🔒 بنقرا الكلام بس من غير أسامي، والاستهداف بالاهتمامات اللي المنصات نفسها بتديها، مش بقايمة ناس.</p>
-        ${d.items.length ? "" : `<p class="nb-hint">⚠️ هات المنافسين الأول من تاب «🏆 المنافسين».</p>`}
-        <div class="nb-bar"><button class="nb-btn fs-go" data-augo ${busy || !d.items.length ? "disabled" : ""}>${has ? "🔄 حدّث الوصفة" : "🎯 اعمل الوصفة"}</button>
-          ${has ? `<button class="nb-btn" data-aucp="all">📋 انسخ الكل</button><span class="nb-state">اتعملت ${ago(a.at)}${a.comments ? ` · من ${a.comments} كومنت` : ""}</span>` : ""}</div></section>`;
-    if (!has) return head;
+        ${!d.approved ? `<div class="fs-err">⚠️ ${NEED_OK}${d.pending ? ` <button class="nb-btn sm" data-rvtab="rivals">راجع الاقتراحات (${d.pending})</button>` : ""}</div>`
+          : d.brief_due ? `<div class="fs-busy">⏳ ${busy ? esc(d.step || "…") : "الوصفة هتتعمل لوحدها من منافسينك المعتمدين…"}</div>` : ""}
+        ${d.approved && !busy && d.error && d.brief_due ? `<button class="nb-btn sm" data-augo>↻ جرّب تاني</button>` : ""}
+        ${has && d.approved ? `<div class="nb-bar"><button class="nb-btn" data-aucp="all">📋 انسخ الكل</button><span class="nb-state">اتعملت ${ago(a.at)} من ${a.rivals || d.approved} منافس${a.comments ? ` و${a.comments} كومنت` : ""} · بتتحدّث لوحدها لما تعتمد منافسين جداد</span></div>` : ""}</section>`;
+    if (!has || !d.approved) return head;
     const m = a.meta, g = a.google, t = a.tiktok;
     return head + `${a.summary ? `<section class="fs-card"><p class="tg-sum">${esc(a.summary)}</p></section>` : ""}
       ${a.personas.length ? `<section class="fs-card"><h3>👥 الشرايح</h3><div class="pl-grid">${a.personas.map((p) => `<div class="pl-card tg-per">
@@ -188,18 +193,20 @@ const RivalsPage = (() => {
     navigator.clipboard.writeText(txt).then(() => toast("📋 اتنسخ")).catch(() => toast("المتصفح منع النسخ", true));
   }
   function body() {
-    const d = S.d, busy = d.status === "working";
-    if (S.tab === "works") return digest(d.digest) || `<div class="nh-empty">لسه مفيش تحليل. هات المنافسين الأول.</div>`;
+    const d = S.d, busy = d.status === "working", pend = d.items.filter((r) => r.state !== "approved"), oks = d.items.filter((r) => r.state === "approved");
+    if (S.tab === "works") return d.approved ? digest(d.digest) || `<div class="nh-empty">⏳ التحليل بيتعمل لوحده…</div>` : `<div class="nh-empty">${NEED_OK}</div>`;
     if (S.tab === "plan") return planTab();
     if (S.tab === "batch") return batchTab();
     if (S.tab === "audience") return audTab();
-    return `<section class="fs-card"><h3>ضيف منافس بنفسك</h3>
+    return `${pend.length ? `<h3 class="rv-sec">🆕 مقترحين، مستنيين موافقتك <small>وافق على اللي عايز تبقى زيه</small></h3><div class="rv-list">${pend.map(card).join("")}</div>` : ""}
+      ${oks.length ? `<h3 class="rv-sec">✓ منافسينك المعتمدين</h3><div class="rv-list">${oks.map(card).join("")}</div>` : ""}
+      ${d.items.length ? "" : `<div class="nh-empty">${busy ? "⏳ بيدوّر على منافسين في مجالك…" : d.brain.domain ? "لسه مفيش اقتراحات. دوس «هات اقتراحات زيادة»." : "اكتب «المجال» في فرع الهوية، والبرنامج هيجيب المنافسين لوحده."}</div>`}
+      <section class="fs-card"><h3>ضيف منافس بنفسك</h3>
         <div class="nb-row rv-add"><input type="text" data-rvnew placeholder="@اسم الحساب أو اللينك" dir="ltr">
           <select data-rvnewpl>${Object.entries(PL).map(([k, t]) => `<option value="${k}">${t}</option>`).join("")}</select>
           <button class="nb-btn" data-rvadd ${busy ? "disabled" : ""}>＋ ضيف</button></div>
-        <p class="nb-hint">اللي بتضيفه بيتثبّت لوحده. واللي بتشيله مش بيرجع تاني لما تدوّر.
-          ${d.excluded ? `<button class="nb-btn sm" data-rvreset>رجّع اللي شيلتهم (${d.excluded})</button>` : ""}</p></section>
-      <div class="rv-list ${busy ? "fs-lock" : ""}">${d.items.map(card).join("") || `<div class="nh-empty">لسه مفيش منافسين. دوس «هات أعلى ${d.top} في مجالي».</div>`}</div>`;
+        <p class="nb-hint">اللي بتضيفه بيبقى معتمد على طول. واللي بترفضه أو تشيله مش بيتقترح تاني.
+          ${d.excluded ? `<button class="nb-btn sm" data-rvreset>رجّع اللي شيلتهم (${d.excluded})</button>` : ""}</p></section>`;
   }
   function render(onlyTop) {
     const w = S.el;
@@ -222,7 +229,7 @@ const RivalsPage = (() => {
   }
   function poll() {
     clearTimeout(S.timer);
-    if (S.d?.status !== "working") return;
+    if (S.d?.status !== "working" && !S.d?.brief_due && !(S.d && !S.d.items.length && S.d.brain?.domain && S.d.status !== "failed")) return;
     S.timer = setTimeout(async () => {
       try { S.d = await api("/api/rivals"); render(true); } catch {}
       poll();
@@ -276,6 +283,8 @@ const RivalsPage = (() => {
       if (e.target.closest("[data-augo]")) return act("/api/rivals/audience", { method: "POST" });
       const cp = e.target.closest("[data-aucp]");
       if (cp) return audCopy(cp.dataset.aucp);
+      if (e.target.closest("[data-rvokall]")) return act("/api/rivals/review", { method: "POST", ...jsonBody({ approve: true }) });
+      if (e.target.closest("[data-rvnoall]")) { if (await uiConfirm(`ترفض كل الاقتراحات (${S.d.pending})؟ مش هيتقترحوا تاني.`)) act("/api/rivals/review", { method: "POST", ...jsonBody({ approve: false }) }); return; }
       if (e.target.closest("[data-rvfind]")) return act("/api/rivals/discover", { method: "POST" });
       if (e.target.closest("[data-rvall]")) return act("/api/rivals/refresh", { method: "POST" });
       if (e.target.closest("[data-rvreset]")) return act("/api/rivals/reset-excluded", { method: "POST" });
@@ -286,7 +295,8 @@ const RivalsPage = (() => {
       }
       if (!rid) return;
       if (e.target.closest("[data-rvdel]")) { if ((await uiConfirm("تشيل المنافس ده؟ مش هيرجع تاني في البحث."))) act(`/api/rivals/${rid}`, { method: "DELETE" }); return; }
-      if (e.target.closest("[data-rvpin]")) { const r = S.d.items.find((x) => x.id === rid); return act(`/api/rivals/${rid}`, { method: "PATCH", ...jsonBody({ pinned: !r?.pinned }) }); }
+      if (e.target.closest("[data-rvok]")) return act("/api/rivals/review", { method: "POST", ...jsonBody({ approve: true, ids: [rid] }) });
+      if (e.target.closest("[data-rvno]")) return act("/api/rivals/review", { method: "POST", ...jsonBody({ approve: false, ids: [rid] }) });
       if (e.target.closest("[data-rvone]")) return act(`/api/rivals/refresh?rid=${encodeURIComponent(rid)}`, { method: "POST" });
       if (e.target.closest("[data-rvswap]")) { S.swap = rid; render(); w.querySelector("[data-rvswapin]")?.focus(); return; }
       if (e.target.closest("[data-rvswapx]")) { S.swap = null; return render(); }

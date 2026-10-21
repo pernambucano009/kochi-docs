@@ -6,6 +6,8 @@
 """
 from __future__ import annotations
 
+import rivals
+
 Q = [
     {"id": "domain", "to": {"field": "domain"},
      "ar": "ما مجال عملك؟", "en": "What field is your business in?",
@@ -101,7 +103,7 @@ def tasks(b: dict, ctx: dict) -> list[dict]:
         ("outro", "ارفع أوترو البراند", "فيديو قصير في آخر كل فيديو", bool(b.get("outro_file")), {"leaf": "delivery:outro:"}),
         ("caption", "اكتب الكابشن الافتراضي", "الشكل اللي الكابشن بينزل بيه مع كل بوست", bool(str(b.get("caption") or "").strip()), {"leaf": "delivery:caption:"}),
         ("social", "حلّل حساب السوشيال بتاعك", "المخ بيتعلم من بوستاتك ومشاهداتك", bool(b.get("todos") or b.get("niche")), {"leaf": "improve:social:"}),
-        ("rivals", "هات منافسينك", "أعلى ٥ في مجالك وسوقك", bool((b.get("competitors") or {}).get("items")), {"page": "rivals"}),
+        ("rivals", "وافق على منافسينك", "البرنامج بيقترح، وانت بتختار اللي عايز تبقى زيهم", bool(rivals.approved(b.get("competitors") or {})), {"page": "rivals"}),
         ("twin_photos", "ارفع صورك علشان الأفاتار", "صور وشّك من كذا زاوية في «نسختي»", bool(tw.get("photo")), {"page": "twin"}),
         ("twin_video", "ارفع فيديو ليك وانت بتتكلم", "علشان الأفاتار يتحرك ويتكلم زيك", bool(tw.get("video")), {"page": "twin"}),
         ("twin_voice", "سجّل صوتك", "علشان الأفاتار يتكلم بصوتك", bool(tw.get("voice")), {"page": "twin"}),

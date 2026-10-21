@@ -18,7 +18,9 @@ import algo
 
 API = "https://api.scrapecreators.com"
 PLATFORMS = {"tiktok": "تيك توك", "instagram": "إنستجرام"}
-TOP = 5            # كام منافس بيفضل في الفرع
+TOP = 5            # كام منافس بيدخل في برومبت الأفكار
+SUGGEST = 10       # كام اقتراح بيستنى موافقتك في المرة
+MAX_OK = 20        # أقصى عدد منافسين معتمدين
 STALE = 7 * 86400  # بعد أسبوع البوستات بتتحدّث لوحدها
 RECENT = 30 * 86400
 
@@ -170,6 +172,20 @@ def transcript(platform: str, url: str) -> str:
     return " ".join(t.split()[:120])
 
 
+# ---------- الموافقة: البرنامج بيقترح، وانت بتوافق أو ترفض. المعتمدين بس هم اللي بيدخلوا في التحليل والوصفة
+def is_ok(i: dict) -> bool:
+    st = i.get("state")
+    return st == "approved" if st else bool(i.get("pinned"))   # القديم: اللي كان مثبّت يعتبر معتمد
+
+
+def approved(c: dict) -> list[dict]:
+    return [i for i in c.get("items") or [] if is_ok(i) and i.get("posts")]
+
+
+def sig(items: list[dict]) -> str:
+    return hashlib.md5("|".join(sorted(f"{i['platform']}:{i['handle'].lower()}" for i in items)).encode()).hexdigest()[:12]
+
+
 # ---------- الحساب
 def candidates(posts: list[dict], exclude: set[str]) -> list[dict]:
     """الحسابات اللي طلعت في البحث، مترتبة بأعلى مشاهدات."""
@@ -291,7 +307,7 @@ def clean_digest(raw: dict) -> dict:
 def insight_text(brain: dict | None) -> str:
     """اللي بيدخل في برومبت الأفكار والسكريبتات."""
     c = (brain or {}).get("competitors") or {}
-    items = [i for i in c.get("items") or [] if i.get("posts")]
+    items = approved(c)
     if not items and not c.get("trending"):
         return ""
     lines = ["منافسين البراند في نفس المجال والسوق (أعلى مشاهدات). اتعلّم من الفكرة والهوك والهيكل اللي نجح عندهم، وماتنسخش كلامهم:"]

@@ -4710,18 +4710,36 @@ def rivals_search(bid: str, brain: dict, queries: list[str] | None = None) -> tu
     return posts, qs
 
 
+def rivals_merge(bid: str, fresh: dict[str, dict] | None = None, found: list[dict] | None = None) -> None:
+    """بيكتب نتيجة الشغل على الحالة الحالية: اللي وافقت عليه أو رفضته وانت مستني بيفضل زي ما هو."""
+    fresh, found = fresh or {}, found or []
+
+    def fn(d):
+        cc = d.setdefault("competitors", {})
+        ex = set(cc.get("excluded") or [])
+        out = []
+        for i in cc.get("items") or []:
+            f = fresh.get(rivals_key(i))
+            out.append({**f, **{k: i.get(k) for k in ("id", "why", "state", "pinned") if k in i}} if f else i)
+        have = {rivals_key(i) for i in out}
+        out += [f for f in found if rivals_key(f) not in have and rivals_key(f) not in ex]
+        cc["items"] = out
+    update_brain(bid, fn)
+
+
 def rivals_discover(bid: str) -> None:
+    """بيجيب اقتراحات منافسين لحد ما يبقى فيه ١٠ مستنيين موافقتك (المعتمدين واللي رفضتهم مابيتلمسوش)."""
     brain = brain_row(bid) or {}
     c = brain.get("competitors") or {}
-    keep = [i for i in c.get("items") or [] if i.get("pinned")][:rivals.TOP]
-    exclude = set(c.get("excluded") or []) | {rivals_key(i) for i in keep}
-    need = rivals.TOP - len(keep)
-    found = []
+    items = c.get("items") or []
+    exclude = set(c.get("excluded") or []) | {rivals_key(i) for i in items}
+    need = min(rivals.SUGGEST - sum(1 for i in items if not rivals.is_ok(i)), rivals.MAX_OK + rivals.SUGGEST - len(items))
     posts, qs = rivals_search(bid, brain)
-    rivals_set(bid, trending=rivals.trending(posts), queries=qs)
+    rivals_set(bid, trending=rivals.trending(posts), queries=qs, found_at=time.time())
+    calls, found = len(qs) * len(rivals.PLATFORMS), []
     if need > 0:
-        cands = rivals.candidates(posts, exclude)[:15]
-        if not cands:
+        cands = rivals.candidates(posts, exclude)[:25]
+        if not cands and not items:
             raise rivals.RivalsError("مالقيتش حسابات في المجال ده، جرّب تكتب «المجال» و«السوق» بشكل أوضح في الهوية")
         picks = []
         if atlas.mock_mode() or len(cands) <= need:
@@ -4738,48 +4756,61 @@ def rivals_discover(bid: str) -> None:
         for n, p in enumerate(picks):
             cd = cands[p["i"]]
             rivals_set(bid, step=f"بيجيب بوستات @{cd['handle']} ({n + 1}/{len(picks)})…")
+            calls += 3
             try:
                 it = rivals_fetch(cd["platform"], cd["handle"])
             except rivals.RivalsError:
                 continue
-            found.append({**it, "id": uuid.uuid4().hex[:8], "why": p["why"], "pinned": False, "updated": time.time()})
-    items = keep + found
-    rivals_set(bid, step="بيحلّل اللي بينجح عندهم…")
-    digest = rivals_digest(brain, items)
-    rivals_set(bid, items=items, digest=digest)
+            found.append({**it, "id": uuid.uuid4().hex[:8], "why": p["why"], "state": "pending", "updated": time.time()})
+    rivals_merge(bid, found=found)
+    if rivals.live() and not atlas.mock_mode():
+        wallet.charge(wallet.credits(wallet.est(scrape=calls, chars=12000)), "المنافسين: اقتراح منافسين", bid)
 
 
-def rivals_refresh(bid: str, only: str | None = None) -> None:
+def rivals_refresh(bid: str, only: str | None = None, search: bool = True) -> None:
+    """بيحدّث بوستات المنافسين المعتمدين (أو واحد بس)، والترند بنفس كلمات البحث."""
     brain = brain_row(bid) or {}
     c = brain.get("competitors") or {}
-    items = list(c.get("items") or [])
-    if not only:   # الترند بيتحدّث بنفس كلمات البحث (من غير ما المخ يكتبها تاني)
+    calls = 0
+    if search and not only:
         posts, qs = rivals_search(bid, brain, c.get("queries") or None)
         rivals_set(bid, trending=rivals.trending(posts), queries=qs)
-    for n, it in enumerate(items):
-        if only and it["id"] != only:
-            continue
-        rivals_set(bid, step=f"بيحدّث @{it['handle']} ({n + 1}/{len(items)})…")
+        calls += len(qs) * len(rivals.PLATFORMS)
+    todo = [i for i in c.get("items") or [] if (i["id"] == only if only else rivals.is_ok(i))]
+    fresh = {}
+    for n, it in enumerate(todo):
+        rivals_set(bid, step=f"بيحدّث @{it['handle']} ({n + 1}/{len(todo)})…")
+        calls += 3
         try:
-            items[n] = {**it, **rivals_fetch(it["platform"], it["handle"]), "updated": time.time(), "error": None}
+            fresh[rivals_key(it)] = {**it, **rivals_fetch(it["platform"], it["handle"]), "updated": time.time(), "error": None}
         except rivals.RivalsError as exc:
-            items[n] = {**it, "error": str(exc)[:200]}
-    rivals_set(bid, step="بيحلّل اللي بينجح عندهم…")
-    rivals_set(bid, items=items, digest=rivals_digest(brain, [i for i in items if i.get("posts")]))
+            fresh[rivals_key(it)] = {**it, "error": str(exc)[:200]}
+    rivals_merge(bid, fresh=fresh)
+    if calls and rivals.live() and not atlas.mock_mode():
+        wallet.charge(wallet.credits(wallet.est(scrape=calls)), "المنافسين: تحديث البوستات", bid)
+
+
+def rivals_cycle(bid: str) -> None:
+    """كل أسبوع: بوستات المعتمدين بتتحدّث، وبتيجي اقتراحات جديدة تستنى موافقتك."""
+    rivals_refresh(bid, search=False)
+    rivals_discover(bid)
 
 
 def rivals_audience_urls(items: list[dict]) -> list[tuple[str, str]]:
-    return [(i["platform"], p["url"]) for i in items[:rivals.TOP] for p in (i.get("posts") or [])[:2] if p.get("url")]
+    return [(i["platform"], p["url"]) for i in items[:10] for p in (i.get("posts") or [])[:2] if p.get("url")]
 
 
-def rivals_audience_cost(items: list[dict]) -> int:
-    return wallet.credits(wallet.est(scrape=len(rivals_audience_urls(items)) * 3, chars=25000))
+def rivals_brief_cost(items: list[dict]) -> int:
+    return wallet.credits(wallet.est(scrape=len(rivals_audience_urls(items)) * 3, chars=40000))
 
 
-def rivals_audience(bid: str) -> None:
-    """🎯 وصفة الاستهداف: كلام جمهور المنافسين (من غير أسامي) + هاشتاجاتهم ← شرايح واستهداف ميتا وجوجل وتيك توك."""
+def rivals_brief(bid: str) -> None:
+    """من المنافسين المعتمدين بس: «اللي بينجح عندهم» + 🎯 وصفة الاستهداف (كلام جمهورهم من غير أسامي + هاشتاجاتهم)."""
     brain = brain_row(bid) or {}
-    items = [i for i in (brain.get("competitors") or {}).get("items") or [] if i.get("posts")]
+    items = rivals.approved(brain.get("competitors") or {})
+    sg = rivals.sig(items)
+    rivals_set(bid, step="بيحلّل اللي بينجح عندهم…")
+    digest = rivals_digest(brain, items)
     if not rivals.live() or atlas.mock_mode():
         aud, n = rivals.mock_audience(), 0
     else:
@@ -4790,18 +4821,59 @@ def rivals_audience(bid: str) -> None:
         rivals_set(bid, step="بيكتب وصفة الاستهداف…")
         tags = rivals.hashtags([p for i in items for p in i["posts"]])
         aud = rivals.clean_audience(rivals_llm(rivals.audience_messages(brain, items, said, tags), "وصفة الاستهداف"))
-        wallet.charge(rivals_audience_cost(items), "المنافسين: وصفة الاستهداف", bid)
+        wallet.charge(rivals_brief_cost(items), "المنافسين: التحليل ووصفة الاستهداف", bid)
         n = len(said)
-    rivals_set(bid, audience={**aud, "comments": n, "at": time.time()})
+    rivals_set(bid, digest=digest, audience={**aud, "comments": n, "rivals": len(items), "sig": sg, "at": time.time()})
+
+
+RIVALS_SETTLE = 6   # ثواني بعد آخر موافقة/رفض قبل ما الوصفة تتعمل (علشان لو بتوافق على كذا واحد ورا بعض)
+
+
+def rivals_auto(bid: str) -> None:
+    """الشغل الأوتوماتيك (بيتشيّك لما الصفحة تتفتح أو تتحدّث، من غير ثريد شغال على طول):
+    مفيش منافسين ← بيجيب اقتراحات · عدّى أسبوع ← تحديث واقتراحات جديدة · المعتمدين اتغيروا ← التحليل والوصفة."""
+    if bid in RIVALS_BUSY:
+        return
+    b = brain_row(bid) or {}
+    c = b.get("competitors") or {}
+    now_ = time.time()
+    try:
+        if not c.get("items") and (b.get("domain") or b.get("about")):
+            if now_ - float(c.get("auto_at") or 0) > 6 * 3600:   # لو فشل مانعيدش كل شوية
+                rivals_set(bid, auto_at=now_)
+                rivals_job(bid, "بيدوّر على منافسين في مجالك…", lambda: rivals_discover(bid))
+            return
+        if c.get("items") and now_ - float(c.get("found_at") or c.get("updated_at") or 0) > rivals.STALE and now_ - float(c.get("auto_at") or 0) > 6 * 3600:
+            rivals_set(bid, auto_at=now_)
+            rivals_job(bid, "بيحدّث المنافسين ويجيب اقتراحات جديدة…", lambda: rivals_cycle(bid))
+            return
+        ok = rivals.approved(c)
+        sg = rivals.sig(ok)
+        tried = c.get("brief_try") or {}
+        if ok and sg != (c.get("audience") or {}).get("sig") and now_ - float(c.get("reviewed_at") or 0) > RIVALS_SETTLE \
+                and not (tried.get("sig") == sg and now_ - float(tried.get("at") or 0) < 3600):
+            rivals_set(bid, brief_try={"sig": sg, "at": now_})
+            if rivals.live() and not atlas.mock_mode():
+                wallet.need(rivals_brief_cost(ok), "وصفة الاستهداف")
+            rivals_job(bid, "بيعمل وصفة الاستهداف من منافسينك…", lambda: rivals_brief(bid))
+    except HTTPException as exc:   # الرصيد خلص أو شغل تاني شغال: نبيّنها ونكمّل
+        rivals_set(bid, status="failed", step=None, error=str(exc.detail)[:300])
+    except wallet.NoCredits as exc:
+        rivals_set(bid, status="failed", step=None, error=str(exc)[:300])
 
 
 def rivals_out(bid: str) -> dict:
     b = brain_row(bid) or {}
     c = b.get("competitors") or {}
-    return {"client": bid, "name": b.get("name"), "live": rivals.live(), "platforms": rivals.PLATFORMS, "top": rivals.TOP, "algo_mode": algo.mode_on(b),
-            "brain": {k: b.get(k) or "" for k in ("domain", "market", "audience", "language")},
-            "items": c.get("items") or [], "digest": c.get("digest") or {}, "trending": c.get("trending") or [], "status": c.get("status") or "", "step": c.get("step"),
-            "error": c.get("error"), "updated_at": c.get("updated_at"), "excluded": len(c.get("excluded") or []), "audience": c.get("audience") or {}}
+    items = [{**i, "state": "approved" if rivals.is_ok(i) else "pending"} for i in c.get("items") or []]
+    ok = rivals.approved(c)
+    aud = c.get("audience") or {}
+    return {"client": bid, "name": b.get("name"), "live": rivals.live(), "platforms": rivals.PLATFORMS, "top": rivals.SUGGEST, "max_ok": rivals.MAX_OK,
+            "algo_mode": algo.mode_on(b), "brain": {k: b.get(k) or "" for k in ("domain", "market", "audience", "language")},
+            "items": items, "approved": sum(1 for i in items if i["state"] == "approved"), "pending": sum(1 for i in items if i["state"] == "pending"),
+            "digest": c.get("digest") or {}, "trending": c.get("trending") or [], "status": c.get("status") or "", "step": c.get("step"),
+            "error": c.get("error"), "updated_at": c.get("updated_at"), "found_at": c.get("found_at"), "excluded": len(c.get("excluded") or []),
+            "audience": aud, "brief_due": bool(ok) and rivals.sig(ok) != aud.get("sig")}
 
 
 def rivals_client() -> str:
@@ -4813,24 +4885,26 @@ def rivals_client() -> str:
 
 @app.get("/api/rivals")
 def rivals_get():
-    """«منافسينك في المجال»: لو البوستات قدمت (أسبوع) بتتحدّث لوحدها."""
+    """«منافسينك»: الاقتراحات والتحديث والوصفة بيحصلوا لوحدهم، وانت بتوافق أو ترفض بس."""
     bid = rivals_client()
     c = rivals_state(bid)
     if c.get("status") == "working" and bid not in RIVALS_BUSY:   # السيرفر اتعمله ريستارت والشغل وقف
-        rivals_set(bid, status="failed", step=None, error="الشغل وقف، دوس تحديث تاني")
-    elif c.get("items") and c.get("status") != "working" and time.time() - float(c.get("updated_at") or 0) > rivals.STALE:
-        rivals_job(bid, "بيحدّث بوستات المنافسين…", lambda: rivals_refresh(bid))
+        rivals_set(bid, status="failed", step=None, error="الشغل وقف، هيكمّل لوحده المرة الجاية")
+    else:
+        rivals_auto(bid)
     return rivals_out(bid)
 
 
 @app.post("/api/rivals/discover")
 def rivals_discover_ep():
-    """يدوّر على أعلى 5 في المجال (اللي انت مثبّتهم بيفضلوا، والباقي بيتبدّل)."""
+    """هات اقتراحات زيادة دلوقتي (لحد ١٠ مستنيين موافقتك)."""
     bid = rivals_client()
     b = brain_row(bid) or {}
     if not (b.get("domain") or b.get("about")):
         raise HTTPException(400, "اكتب «المجال» في فرع الهوية الأول، علشان نعرف ندوّر فين")
-    rivals_job(bid, "بيدوّر في المجال…", lambda: rivals_discover(bid))
+    if rivals.live() and not atlas.mock_mode():
+        wallet.need(wallet.credits(wallet.est(scrape=40, chars=12000)), "اقتراح منافسين")
+    rivals_job(bid, "بيدوّر على منافسين في مجالك…", lambda: rivals_discover(bid))
     return rivals_out(bid)
 
 
@@ -4843,14 +4917,15 @@ def rivals_refresh_ep(rid: str = ""):
 
 @app.post("/api/rivals/audience")
 def rivals_audience_ep():
-    """يعمل وصفة الاستهداف من المنافسين اللي في الصفحة (لازم يكون فيه منافس واحد على الأقل)."""
+    """يعيد التحليل والوصفة دلوقتي (لو فشلت قبل كده). من غير منافسين معتمدين مفيش وصفة."""
     bid = rivals_client()
-    items = [i for i in rivals_state(bid).get("items") or [] if i.get("posts")]
-    if not items:
-        raise HTTPException(400, "هات المنافسين الأول من تاب «المنافسين»")
+    ok = rivals.approved(rivals_state(bid))
+    if not ok:
+        raise HTTPException(400, "يجب الموافقة على المنافسين الموجودين في صفحة المنافسين: لازم يبقى فيه منافس معتمد علشان الوصفة تتعمل")
     if rivals.live() and not atlas.mock_mode():
-        wallet.need(rivals_audience_cost(items), "وصفة الاستهداف")
-    rivals_job(bid, "بيقرا كلام الجمهور…", lambda: rivals_audience(bid))
+        wallet.need(rivals_brief_cost(ok), "وصفة الاستهداف")
+    rivals_set(bid, brief_try={"sig": rivals.sig(ok), "at": time.time()})
+    rivals_job(bid, "بيعمل وصفة الاستهداف من منافسينك…", lambda: rivals_brief(bid))
     return rivals_out(bid)
 
 
@@ -4862,22 +4937,21 @@ class RivalAddIn(BaseModel):
 
 @app.post("/api/rivals/add")
 def rivals_add(body: RivalAddIn):
-    """تضيف حساب بنفسك (أو تبدّل واحد بيه). اللي بتضيفه بيتثبّت ومايتبدّلش في البحث الجاي."""
+    """تضيف حساب بنفسك (أو تبدّل واحد بيه). اللي بتضيفه بيبقى معتمد على طول."""
     bid = rivals_client()
     handle = rivals.clean_handle(body.handle)
     plat = body.platform if body.platform in rivals.PLATFORMS else rivals.guess_platform(body.handle)
     if not handle:
         raise HTTPException(400, "اكتب اسم الحساب أو اللينك بتاعه")
-    c = rivals_state(bid)
-    items = c.get("items") or []
+    items = rivals_state(bid).get("items") or []
     if any(rivals_key(i) == f"{plat}:{handle.lower()}" for i in items):
         raise HTTPException(400, "الحساب ده موجود بالفعل")
-    if not body.replace and len(items) >= rivals.TOP * 2:
-        raise HTTPException(400, f"أقصى حاجة {rivals.TOP * 2} منافسين، شيل واحد الأول")
+    if not body.replace and sum(rivals.is_ok(i) for i in items) >= rivals.MAX_OK:
+        raise HTTPException(400, f"أقصى حاجة {rivals.MAX_OK} منافس معتمد، شيل واحد الأول")
 
     def work():
         it = rivals_fetch(plat, handle)
-        new = {**it, "id": uuid.uuid4().hex[:8], "why": "انت اللي ضفته", "pinned": True, "updated": time.time()}
+        new = {**it, "id": uuid.uuid4().hex[:8], "why": "انت اللي ضفته", "state": "approved", "updated": time.time()}
 
         def fn(d):
             cc = d.setdefault("competitors", {})
@@ -4889,44 +4963,50 @@ def rivals_add(body: RivalAddIn):
             else:
                 lst = lst + [new]
             cc["items"] = lst
+            cc["reviewed_at"] = time.time()
         update_brain(bid, fn)
-        b = brain_row(bid) or {}
-        rivals_set(bid, step="بيحلّل اللي بينجح عندهم…")
-        rivals_set(bid, digest=rivals_digest(b, [i for i in (b.get("competitors") or {}).get("items") or [] if i.get("posts")]))
     rivals_job(bid, f"بيجيب بوستات @{handle}…", work)
     return rivals_out(bid)
 
 
-class RivalPatchIn(BaseModel):
-    pinned: bool | None = None
+class RivalReviewIn(BaseModel):
+    approve: bool
+    ids: list[str] = []   # فاضي = كل اللي مستنيين موافقتك
 
 
-@app.patch("/api/rivals/{rid}")
-def rivals_patch(rid: str, body: RivalPatchIn):
-    bid = rivals_client()
-
+def rivals_review_apply(bid: str, ids: set[str] | None, approve: bool) -> None:
     def fn(d):
-        for i in (d.get("competitors") or {}).get("items") or []:
-            if i["id"] == rid and body.pinned is not None:
-                i["pinned"] = body.pinned
+        cc = d.setdefault("competitors", {})
+        lst = cc.get("items") or []
+        hit = [i for i in lst if (i["id"] in ids if ids else not rivals.is_ok(i))]
+        if approve:
+            room = rivals.MAX_OK - sum(rivals.is_ok(i) for i in lst)
+            for i in hit:
+                if not rivals.is_ok(i) and room > 0:
+                    i["state"], room = "approved", room - 1
+        else:   # اللي بترفضه بيتشال ومايتقترحش تاني
+            gone = {i["id"] for i in hit}
+            cc["excluded"] = list({*(cc.get("excluded") or []), *(rivals_key(i) for i in hit)})[-300:]
+            cc["items"] = [i for i in lst if i["id"] not in gone]
+        cc["reviewed_at"] = time.time()
     update_brain(bid, fn)
+
+
+@app.post("/api/rivals/review")
+def rivals_review(body: RivalReviewIn):
+    """✅ وافق / ✕ ارفض: على واحد أو أكتر، أو على كل الاقتراحات مرة واحدة."""
+    bid = rivals_client()
+    if body.approve and sum(rivals.is_ok(i) for i in rivals_state(bid).get("items") or []) >= rivals.MAX_OK:
+        raise HTTPException(400, f"أقصى حاجة {rivals.MAX_OK} منافس معتمد، شيل واحد الأول")
+    rivals_review_apply(bid, set(body.ids) or None, body.approve)
     return rivals_out(bid)
 
 
 @app.delete("/api/rivals/{rid}")
 def rivals_delete(rid: str):
-    """تشيله، ومايرجعش تاني في البحث."""
+    """تشيله (معتمد أو اقتراح)، ومايرجعش تاني في البحث."""
     bid = rivals_client()
-    if bid in RIVALS_BUSY:
-        raise HTTPException(409, "لسه شغال على المنافسين، استنى شوية")
-
-    def fn(d):
-        cc = d.setdefault("competitors", {})
-        gone = [i for i in cc.get("items") or [] if i["id"] == rid]
-        cc["items"] = [i for i in cc.get("items") or [] if i["id"] != rid]
-        if gone:
-            cc["excluded"] = list({*(cc.get("excluded") or []), rivals_key(gone[0])})[-200:]
-    update_brain(bid, fn)
+    rivals_review_apply(bid, {rid}, False)
     return rivals_out(bid)
 
 
