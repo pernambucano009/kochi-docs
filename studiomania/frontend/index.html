@@ -787,6 +787,17 @@
 
                 <p class="hint pub-algo" id="pubAlgo" hidden></p>
                 <div class="pub-check" id="pubCheck"></div>
+                <div class="post-extra dm-opts" id="dmOpts">
+                  <label class="check"><input type="checkbox" id="dmOn"> 💬 <b>علّق بكلمة</b>: اللي يكتب الكلمة في الكومنت بيوصله رسالة على الخاص لوحده</label>
+                  <div id="dmBox" hidden>
+                    <label class="field">الكلمة (أو كذا كلمة بفاصلة) <input type="text" id="dmWords" placeholder="مثلًا: عايز"></label>
+                    <label class="field">الرسالة اللي هتوصله على الخاص <textarea id="dmMessage" rows="3" placeholder="لينك، عرض، هدية، أو لينك الواتساب"></textarea></label>
+                    <label class="field">الرد على الكومنت نفسه (اختياري) <input type="text" id="dmReply" placeholder="بعتنالك رسالة على الخاص 💬"></label>
+                    <div class="loc-row"><button type="button" class="btn sm" id="dmCta"><span class="emo">✍️</span> ضيف الدعوة للكابشن</button></div>
+                    <p class="hint" id="dmHint">بيشتغل على إنستجرام وفيسبوك أول ما البوست يتنشر. تيك توك مش بيسمح بالرد الأوتوماتيك في منطقتنا، فالدعوة في تيك توك بتبقى «ابعت الكلمة على الواتساب».</p>
+                  </div>
+                </div>
+
                 <div class="post-extra" id="igOpts" hidden>
                   <div class="extra-title">📸 إنستجرام</div>
                   <label class="field"><span class="emo">🏷️</span> تاج لحسابات <input type="text" id="igTags" dir="ltr" list="handlesList" placeholder="@coach_name, @another" autocomplete="off"></label>

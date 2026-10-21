@@ -482,8 +482,35 @@ function postOptions() {
     ig_tags: tags,
     ig_collab: $("igCollab").checked,
     cover_ms: $("coverOn").checked ? Number($("coverRange").value) : null,
+    dm_on: $("dmOn").checked,
+    dm_words: $("dmWords").value.split(/[,،]/).map((t) => t.trim()).filter(Boolean),
+    dm_message: $("dmMessage").value,
+    dm_reply: $("dmReply").value,
   };
 }
+
+// 💬 «علّق بكلمة»: أول مرة بتتفتح بتتملى من خطة المحتوى ولينك الواتساب
+let dmDef = null;
+async function dmFill() {
+  $("dmBox").hidden = !$("dmOn").checked;
+  if (!$("dmOn").checked || $("dmWords").value || $("dmMessage").value) return;
+  try { dmDef = dmDef || (await api("/api/dm/defaults")); } catch { dmDef = {}; }
+  $("dmWords").value = dmDef.word || "";
+  $("dmMessage").value = dmDef.message || "";
+  $("dmReply").value = dmDef.reply || "";
+}
+$("dmOn").addEventListener("change", dmFill);
+$("dmCta").addEventListener("click", () => {
+  const w = $("dmWords").value.split(/[,،]/)[0]?.trim();
+  if (!w) return toast("اكتب الكلمة الأول", true);
+  const tt = [...$("postPlatforms").querySelectorAll("input:checked")].some((i) => platOf(i.value) === "tiktok");
+  const lines = [`💬 اكتب «${w}» في كومنت ويوصلك على الخاص`];
+  if (tt && dmDef?.number) lines.push(`📩 على تيك توك: ابعت «${w}» على الواتساب ${dmDef.number}`);
+  else if (tt) lines.push(`📩 على تيك توك: ابعتلنا «${w}» في رسالة`);
+  const c = $("postCaption");
+  c.value = `${c.value.trim()}\n\n${lines.join("\n")}`.trim();
+  c.dispatchEvent(new Event("input", { bubbles: true }));
+});
 
 // datetime-local بيشتغل بالتوقيت المحلي للجهاز
 function toLocalInput(d) {
@@ -529,6 +556,8 @@ function resetPostForm() {
   $("postCaption").value = "";
   pub.tagsTouched = false;
   $("igCollab").checked = false;
+  $("dmOn").checked = false; $("dmBox").hidden = true;
+  ["dmWords", "dmMessage", "dmReply"].forEach((k) => ($(k).value = ""));
   setWhen(nextSlot());
   renderPostVideo();
   const ex = pub.exports.find((x) => x.id === pub.videoId);
@@ -618,6 +647,7 @@ function renderPosts() {
           <span>${escapeHtml(p.export_name || (p.from_zernio ? "🔗 من حساباتك" : "⚠️ الفيديو اتمسح"))} · ${p.platforms.map(tLabel).join("، ")}</span>
           ${p.caption ? `<span class="cap" title="${escapeHtml(p.caption)}">${escapeHtml(p.caption)}</span>` : ""}
           ${p.options?.ig_tags?.length ? `<span class="tags" dir="ltr">🏷️ ${p.options.ig_tags.map((t) => `@${escapeHtml(t)}`).join(" ")}${p.options.ig_collab ? " · 🤝" : ""}</span>` : ""}
+          ${p.options?.dm ? `<span class="tags" title="${escapeHtml(Object.entries(p.options.dm_auto || {}).map(([k, v]) => `${k}: ${v.error || "شغال"}`).join(" · "))}">💬 «${escapeHtml(p.options.dm.words[0])}»${p.options.dm_auto ? (Object.values(p.options.dm_auto).some((v) => v.error) ? " ⚠️" : " ✓ شغال") : ""}</span>` : ""}
           ${p.error ? `<span class="err">${escapeHtml(p.error)}</span>` : ""}
         </div>
         <span class="pill ${cls}">${label}</span>
@@ -659,6 +689,11 @@ function editPost(p) {
   pub.tagsTouched = true;
   $("igCollab").checked = !!o.ig_collab;
   $("coverOn").checked = o.cover_ms != null;
+  $("dmOn").checked = !!o.dm;
+  $("dmWords").value = (o.dm?.words || []).join("، ");
+  $("dmMessage").value = o.dm?.message || "";
+  $("dmReply").value = o.dm?.reply || "";
+  $("dmBox").hidden = !o.dm;
   renderReady();
   renderPostVideo();
   if (o.cover_ms != null) setCover(o.cover_ms);

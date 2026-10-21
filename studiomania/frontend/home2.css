@@ -2396,3 +2396,5 @@ label.dim { opacity: .4; }
 .wa-bubble small { display: block; margin-top: 6px; opacity: .55; font-size: 12px; }
 .wa-bubble span { display: block; margin-top: 8px; padding-top: 6px; border-top: 1px solid rgba(0, 0, 0, .1); text-align: center; color: #0a7cff; }
 .wa-step b { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: rgba(229, 97, 62, .12); font-size: 12px; }
+/* 💬 علّق بكلمة (صفحة النشر) */
+.dm-opts textarea { width: 100%; box-sizing: border-box; }

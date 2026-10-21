@@ -3739,6 +3739,10 @@ class PostOptions(BaseModel):
     ig_tags: list[str] = []  # حسابات تتعمل تاج في إنستجرام
     ig_collab: bool = False  # البوست يظهر كمان في حساب المدرب (كولاب) لو وافق
     cover_ms: int | None = None  # الغلاف: فريم من الفيديو (بالملّي ثانية) لإنستجرام وتيك توك
+    dm_on: bool = False          # 💬 «علّق بكلمة»: اللي يكتب الكلمة في الكومنت بيوصله رسالة على الخاص (إنستجرام وفيسبوك)
+    dm_words: list[str] = []
+    dm_message: str = ""
+    dm_reply: str = ""
 
 
 class PostIn(BaseModel):
@@ -3764,7 +3768,15 @@ def clean_options(opts: PostOptions) -> str:
     if opts.ig_collab and len(tags) > 3:
         raise HTTPException(400, "الكولاب بيقبل 3 حسابات بالكتير")
     cover = max(0, int(opts.cover_ms)) if opts.cover_ms is not None else None
-    return json.dumps({"ig_tags": tags, "ig_collab": opts.ig_collab, "cover_ms": cover, "tag_slide": max(1, int(opts.tag_slide or 1))})
+    out = {"ig_tags": tags, "ig_collab": opts.ig_collab, "cover_ms": cover, "tag_slide": max(1, int(opts.tag_slide or 1))}
+    if opts.dm_on:
+        words = [w.strip()[:30] for w in opts.dm_words if w.strip()][:10]
+        if not words:
+            raise HTTPException(400, "«علّق بكلمة»: اكتب الكلمة اللي الناس هتكتبها في الكومنت")
+        if not opts.dm_message.strip():
+            raise HTTPException(400, "«علّق بكلمة»: اكتب الرسالة اللي هتوصلهم على الخاص")
+        out["dm"] = {"words": words, "message": opts.dm_message.strip()[:900], "reply": opts.dm_reply.strip()[:200]}
+    return json.dumps(out)
 
 
 def clean_post(conn: sqlite3.Connection, body: PostIn) -> tuple[str, str, str]:
@@ -3791,6 +3803,8 @@ def set_post(post_id: str, **fields) -> None:
         plats = "، ".join(dict.fromkeys(publisher.PLATFORMS.get(publisher.split_target(k)[0], (None, k))[1] for k in json.loads(old["platforms"] or "[]")))
         if status == "published":
             notify("post", "ok", f"اتنشر: {name}", plats, "7", post_id)
+            if (json.loads(old["options"] or "{}") or {}).get("dm"):
+                threading.Thread(target=dm_start, args=(post_id,), daemon=True).start()
             try:
                 batch_auto()
             except Exception:  # noqa: BLE001  (التحليل الأوتوماتيك عمره مايوقف النشر)
@@ -4039,6 +4053,60 @@ def resend_without_tags(post_id: str, error: str) -> bool:
     notify("post", "bad", f"شلت التاج من البوست ({who})",
            f"إنستجرام رفض التاج والكولاب لأن الحساب برايفت أو الاسم غلط، فالبوست اتبعت تاني من غيرهم. صحّح اسم الحساب في صفحة المدرب أو خليه عام.", "7", post_id)
     return True
+
+
+# ---------------------------------------------------------------- 💬 «علّق بكلمة» على البوستات اللي بتتنشر من البرنامج
+DM_PLATFORMS = ("instagram", "facebook")   # تيك توك مش بيسمح برسايل أوتوماتيك على الكومنتات في منطقتنا
+
+
+def dm_start(post_id: str) -> None:
+    """أول ما البوست يتنشر: بيشغّل الرد الأوتوماتيك على كل منصة إنستجرام/فيسبوك اتنشر عليها.
+    رقم البوست عند المنصة ممكن يتأخر شوية بعد النشر، فبنحاول كام مرة وبعدين نقف (مفيش ثريد شغال على طول)."""
+    import wacamp
+    with closing(db()) as conn:
+        r = conn.execute("SELECT * FROM posts WHERE id = ?", (post_id,)).fetchone()
+    if not r or not r["remote_id"] and publisher.service_name() != "mock":
+        return
+    opts = json.loads(r["options"] or "{}")
+    dm, done = opts.get("dm") or {}, dict(opts.get("dm_auto") or {})
+    for tgt in json.loads(r["platforms"] or "[]"):
+        plat, acc = publisher.split_target(tgt)
+        if plat not in DM_PLATFORMS or (done.get(plat) or {}).get("id"):
+            continue
+        err = ""
+        for attempt in range(4):
+            try:
+                if not acc:
+                    acc = "m-acc" if publisher.service_name() == "mock" else publisher.resolve_targets([tgt])[0][1]
+                pid = wacamp.platform_post_id(r["remote_id"] or post_id, plat)
+                a = wacamp.comment_automation(acc, pid, f"علّق بكلمة: {(r['caption'] or '')[:40]}", dm["words"], dm["message"], dm.get("reply") or "")
+                done[plat] = {"id": a.get("id"), "error": None}
+                if a.get("id") and r["client_id"]:
+                    wa_push(r["client_id"], "automations", a["id"])
+                break
+            except (wacamp.WaError, publisher.PublishError, httpx.HTTPError) as exc:
+                err = str(exc)[:200]
+                time.sleep(0 if publisher.service_name() == "mock" else 60 * (attempt + 1))
+        else:
+            done[plat] = {"id": None, "error": err}
+            notify("post", "bad", "«علّق بكلمة» مااشتغلش", f"{publisher.PLATFORMS[plat][1]}: {err}", "7", post_id)
+    with closing(db()) as conn, conn:
+        conn.execute("UPDATE posts SET options = ? WHERE id = ?", (json.dumps({**opts, "dm_auto": done}), post_id))
+
+
+@app.get("/api/dm/defaults")
+def dm_defaults():
+    """الكلمة من «خطة المحتوى» (لو فيه)، والرسالة فيها لينك الواتساب لو مكتوب رقم."""
+    import wacamp
+    bid = active_client_id()
+    b = brain_row(bid) if bid else {}
+    st = (b or {}).get("strategy") or {}
+    w = (b or {}).get("wa") or {}
+    word = ((st.get("funnel") or {}).get("keyword") or w.get("keyword") or "").strip()
+    link = wacamp.wa_link(w["number"], w.get("keyword") or word or "مرحبا") if w.get("number") else ""
+    magnet = ((st.get("funnel") or {}).get("magnet") or "").strip()
+    msg = (f"أهلًا! زي ما وعدناك 🎁 {magnet}" if magnet else "أهلًا! شكرًا على تعليقك 🙌") + (f"\nكلّمنا على واتساب من هنا: {link}" if link else "")
+    return {"word": word, "message": msg[:900], "reply": "بعتنالك رسالة على الخاص 💬", "wa_link": link, "number": w.get("number") or ""}
 
 
 _publish_lock = threading.Lock()
@@ -5418,6 +5486,11 @@ def wa_get():
            "link": wacamp.wa_link(number, kw) if number else "", "langs": wacamp.LANGS, "categories": wacamp.CATEGORIES, "stop": wacamp.STOP_FOOTER,
            "fee_per_100": wa_fee(100), "templates": [], "broadcasts": [], "sequences": [], "automations": [], "contacts": {"total": 0, "subscribed": 0, "tags": []},
            "error": None, "has_recipe": bool((rivals_state(bid).get("audience") or {}).get("sig"))}
+    if out["ready"] and w.get("automations"):   # «علّق بكلمة» مش محتاج واتساب مربوط
+        try:
+            out["automations"] = wacamp.automations(set(w["automations"]))
+        except (wacamp.WaError, publisher.PublishError, httpx.HTTPError):
+            pass
     if not acc:
         return out
     try:
@@ -5428,7 +5501,6 @@ def wa_get():
         out["templates"] = wacamp.templates(acc["id"])
         out["broadcasts"] = list(reversed(wacamp.broadcasts(set(w.get("broadcasts") or [])))) if w.get("broadcasts") else []
         out["sequences"] = wacamp.sequences(set(w.get("sequences") or [])) if w.get("sequences") else []
-        out["automations"] = wacamp.automations(set(w.get("automations") or [])) if w.get("automations") else []
     except (wacamp.WaError, publisher.PublishError, httpx.HTTPError) as exc:
         out["error"] = str(exc)[:300]
     with closing(db()) as conn:
