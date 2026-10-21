@@ -90,9 +90,11 @@ const BrandPage = (() => {
       // 🏆 منافسينك: أعلى 5 في المجال والسوق، واللي بينجح عندهم، وتحليل آخر ١٠ فيديوهات ليك، وخطة المحتوى (كلهم صفحة واحدة بتابات)
       { k: "pulse", t: "منافسينك", en: "Competitors", leaves: [
         ...(b?.rivals || []).map((r) => ({ f: "pg", i: `rv${r.id}`, page: "rivals", t: `@${r.handle}`, type: "page" })),
-        ...((b?.rivals || []).length ? [] : [{ f: "pg", i: "rv:rivals", page: "rivals", t: "🏆 هات منافسينك", type: "page" }]),
+        ...((b?.rivals || []).length && !b?.rivals_pending ? [] : [{ f: "pg", i: "rv:rivals", page: "rivals", t: b?.rivals_pending ? `🆕 ${b.rivals_pending} مستنيين موافقتك` : "🏆 منافسينك", type: "page" }]),
         { f: "pg", i: "rv:works", page: "rivals", t: "🧠 اللي بينجح عندهم", type: "page" },
         { f: "pg", i: "rv:batch", page: "rivals", t: "📊 حلّل آخر ١٠ فيديوهات ليك", type: "page" },
+        { f: "pg", i: "rv:audience", page: "rivals", t: "🎯 وصفة الاستهداف", type: "page" },
+        { f: "pg", i: "adsmgr", page: "adsmgr", t: "📣 إعلاناتك", type: "page" },
       ] },
       // 📡 قواعد الخوارزميات: القواعد الأساسية اللي كل الأدوات بتمشي عليها (تتعدّل وتتقفل وترجع للأصل)
       { k: "algo", t: "قواعد الخوارزميات", en: "Algorithm Rules", leaves: Object.entries(ALGO_G).map(([g, t]) => ({ f: "ag", i: g, t, type: "algo" })) },

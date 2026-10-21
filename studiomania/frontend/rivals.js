@@ -157,7 +157,7 @@ const RivalsPage = (() => {
         ${!d.approved ? `<div class="fs-err">⚠️ ${NEED_OK}${d.pending ? ` <button class="nb-btn sm" data-rvtab="rivals">راجع الاقتراحات (${d.pending})</button>` : ""}</div>`
           : d.brief_due ? `<div class="fs-busy">⏳ ${busy ? esc(d.step || "…") : "الوصفة هتتعمل لوحدها من منافسينك المعتمدين…"}</div>` : ""}
         ${d.approved && !busy && d.error && d.brief_due ? `<button class="nb-btn sm" data-augo>↻ جرّب تاني</button>` : ""}
-        ${has && d.approved ? `<div class="nb-bar"><button class="nb-btn" data-aucp="all">📋 انسخ الكل</button><span class="nb-state">اتعملت ${ago(a.at)} من ${a.rivals || d.approved} منافس${a.comments ? ` و${a.comments} كومنت` : ""} · بتتحدّث لوحدها لما تعتمد منافسين جداد</span></div>` : ""}</section>`;
+        ${has && d.approved ? `<div class="nb-bar"><button class="nb-btn fs-go" data-auads>📣 اعمل إعلان بالوصفة دي</button><button class="nb-btn" data-aucp="all">📋 انسخ الكل</button><span class="nb-state">اتعملت ${ago(a.at)} من ${a.rivals || d.approved} منافس${a.comments ? ` و${a.comments} كومنت` : ""} · بتتحدّث لوحدها لما تعتمد منافسين جداد</span></div>` : ""}</section>`;
     if (!has || !d.approved) return head;
     const m = a.meta, g = a.google, t = a.tiktok;
     return head + `${a.summary ? `<section class="fs-card"><p class="tg-sum">${esc(a.summary)}</p></section>` : ""}
@@ -280,6 +280,7 @@ const RivalsPage = (() => {
       if (tb) { S.tab = tb.dataset.rvtab; return render(); }
       if (e.target.closest(".vr-wrap")) return;
       const rid = e.target.closest("[data-rid]")?.dataset.rid;
+      if (e.target.closest("[data-auads]")) return window.NHNav?.("adsmgr");
       if (e.target.closest("[data-augo]")) return act("/api/rivals/audience", { method: "POST" });
       const cp = e.target.closest("[data-aucp]");
       if (cp) return audCopy(cp.dataset.aucp);

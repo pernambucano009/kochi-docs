@@ -5017,6 +5017,340 @@ def rivals_reset_excluded():
     return rivals_out(bid)
 
 
+# ---------------------------------------------------------------- 📣 إعلاناتك (ads.py): ترويج بوست، إعلان جديد، جماهير. الاستهداف من 🎯 الوصفة
+import ads  # noqa: E402
+import csv  # noqa: E402
+import io  # noqa: E402
+
+ADS_BOOSTABLE = ("facebook", "instagram", "tiktok", "linkedin", "pinterest", "x")
+
+
+def ads_fee() -> int:
+    """رسوم البرنامج على كل إعلان بيتعمل (فلوس الإعلان نفسها بتتدفع للمنصة من حساب إعلانات العميل)."""
+    try:
+        return wallet.credits(float(os.environ.get("ADS_FEE_USD", "0.5")))
+    except ValueError:
+        return wallet.credits(0.5)
+
+
+def ads_call(fn, *a, **kw):
+    try:
+        return fn(*a, **kw)
+    except (ads.AdsError, publisher.PublishError, httpx.HTTPError) as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+def ads_mine(bid: str) -> list[dict]:
+    return list((brain_row(bid) or {}).get("ads") or [])
+
+
+def ads_remember(bid: str, ad: dict) -> None:
+    def fn(d):
+        d["ads"] = [*(d.get("ads") or []), ad][-300:]
+    update_brain(bid, fn)
+
+
+def ads_own(bid: str, ad_id: str) -> dict:
+    hit = next((a for a in ads_mine(bid) if a["id"] == ad_id), None)
+    if not hit:
+        raise HTTPException(404, "الإعلان ده مش بتاع البراند ده")
+    return hit
+
+
+def ads_social() -> list[dict]:
+    if publisher.service_name() == "mock":
+        return MOCK_ACCOUNTS
+    try:
+        return publisher.account_list()
+    except (publisher.PublishError, httpx.HTTPError):
+        return []
+
+
+def ads_recipe(bid: str) -> dict:
+    """الاستهداف الجاهز من «🎯 وصفة الاستهداف» (لو اتعملت من منافسين معتمدين)."""
+    c = rivals_state(bid)
+    a = c.get("audience") or {}
+    if not a.get("sig") or not rivals.approved(c):
+        return {}
+    m = a.get("meta") or {}
+    return {"age": m.get("age") or [18, 45], "gender": m.get("gender") or "all", "countries": ads.countries(m.get("locations") or []),
+            "locations": m.get("locations") or [], "interests": m.get("interests") or [], "tt_interests": (a.get("tiktok") or {}).get("tt_interests") or [],
+            "keywords": (a.get("google") or {}).get("keywords") or [], "negative": (a.get("google") or {}).get("negative") or [],
+            "angles": a.get("angles") or [], "budget": a.get("budget") or "", "summary": a.get("summary") or ""}
+
+
+@app.get("/api/ads")
+def ads_get():
+    bid = rivals_client()
+    service = publisher.service_name()
+    out = {"ready": service in ("zernio", "mock"), "mock": service == "mock", "platforms": {k: v[1] for k, v in ads.PLATFORMS.items()},
+           "goals": {k: ads.goals_for(k) for k in ads.PLATFORMS}, "ctas": ads.CTAS, "min_budget": ads.MIN_BUDGET, "fee": ads_fee(),
+           "same_token": sorted(ads.SAME_TOKEN), "social": ads_social(), "ad_accounts": [], "ads": [], "error": None, "recipe": ads_recipe(bid)}
+    if not out["ready"]:
+        return out
+    try:
+        out["ad_accounts"] = ads.ad_accounts()
+        mine = {a["id"]: a for a in ads_mine(bid)}
+        live = {a["id"]: a for a in ads.list_ads(set(mine))} if mine else {}
+        out["ads"] = [{**m, **live.get(i, {"status": "unknown"})} for i, m in reversed(mine.items())]
+    except (ads.AdsError, publisher.PublishError, httpx.HTTPError) as exc:
+        out["error"] = str(exc)[:300]
+    with closing(db()) as conn:
+        rows = conn.execute(POSTS_QUERY + " WHERE mine(p.client_id) AND p.status = 'published' AND p.remote_id IS NOT NULL ORDER BY p.published_at DESC LIMIT 40").fetchall()
+        out["posts"] = [{"id": r["id"], "caption": (r["caption"] or "")[:160], "published_at": r["published_at"], "name": r["export_name"] or r["carousel_name"] or "",
+                         "platforms": [publisher.split_target(t)[0] for t in json.loads(r["platforms"]) if publisher.split_target(t)[0] in ADS_BOOSTABLE]}
+                        for r in rows]
+        out["posts"] = [p for p in out["posts"] if p["platforms"]]
+        out["exports"] = [{"id": r["id"], "name": r["name"], "url": f"/media/exports/{r['filename']}"}
+                          for r in conn.execute("SELECT id, name, filename FROM exports WHERE mine(client_id) ORDER BY created_at DESC LIMIT 40")]
+    return out
+
+
+class AdsConnectIn(BaseModel):
+    platform: str
+    account_id: str = ""
+
+
+@app.post("/api/ads/connect")
+def ads_connect(body: AdsConnectIn, request: Request):
+    """ربط حساب الإعلانات للمنصة. لو محتاج تسجيل دخول بيرجع لينك على المنصة نفسها، وبعدها بيرجع لصفحة إعلاناتك."""
+    rivals_client()
+    ads_call(ads.ready)
+    acc = body.account_id or next((a["id"] for a in ads_social() if a["platform"] == body.platform), "")
+    r = ads_call(ads.connect, body.platform, acc, str(request.base_url).rstrip("/") + "/#adsmgr")
+    return r if r.get("url") else ads_get()
+
+
+@app.get("/api/ads/interests")
+def ads_interests(q: str, account_id: str):
+    rivals_client()
+    return ads_call(ads.interests, q[:80], account_id)
+
+
+class AdsTargetIn(BaseModel):
+    account_id: str
+    platform: str
+
+
+@app.post("/api/ads/targeting")
+def ads_targeting(body: AdsTargetIn):
+    """🎯 بيحوّل الوصفة لاستهداف حقيقي على المنصة: كل اهتمام بيتدوّر عليه ويتاخد أقرب واحد موجود فعلًا."""
+    bid = rivals_client()
+    r = ads_recipe(bid)
+    if not r:
+        raise HTTPException(400, "يجب الموافقة على المنافسين الموجودين في صفحة المنافسين علشان وصفة الاستهداف تتعمل، وبعدها تقدر تستخدمها هنا")
+    names = r["tt_interests"] if body.platform == "tiktok" and r["tt_interests"] else r["interests"]
+    found = ads_call(ads.map_interests, names, body.account_id) if body.platform not in ("google",) else []
+    return {"age_min": r["age"][0], "age_max": r["age"][1], "gender": r["gender"], "countries": r["countries"] or [], "locations": r["locations"],
+            "interests": found, "asked": names[:12], "keywords": r["keywords"], "negative": r["negative"]}
+
+
+class AdsCopyIn(BaseModel):
+    platform: str
+    offer: str = ""
+
+
+@app.post("/api/ads/copy")
+def ads_copy(body: AdsCopyIn):
+    """✍️ يكتب نص الإعلان من الوصفة وزوايا المنافسين (عنوان ونص وبدائل)، بحدود المنصة."""
+    bid = rivals_client()
+    aud = rivals_state(bid).get("audience") or {}
+    if atlas.mock_mode():
+        ang = (aud.get("angles") or [{}])[0]
+        return ads.clean_copy({"headline": (ang.get("angle") or "عرض خاص")[:30], "body": ang.get("text") or "جرّب النهارده", "more_headlines": ["جودة بسعر معقول", "التوصيل لحد عندك"],
+                               "more_bodies": ["اطلب دلوقتي"], "cta": "SHOP_NOW"}, body.platform)
+    cost = wallet.credits(wallet.est(chars=6000))
+    wallet.need(cost, "كتابة الإعلان")
+    raw = rivals_llm(ads.copy_messages(growth_brand(), body.platform, aud, body.offer), "نص الإعلان")
+    wallet.charge(cost, "إعلاناتك: كتابة نص الإعلان", bid)
+    return ads.clean_copy(raw, body.platform)
+
+
+class AdsTarget(BaseModel):
+    age_min: int = 18
+    age_max: int = 45
+    countries: list[str] = []
+    interests: list[dict] = []
+
+
+class AdsBase(BaseModel):
+    platform: str
+    ad_account: str
+    account_id: str = ""
+    name: str = ""
+    goal: str = "engagement"
+    budget: float = 5
+    days: int = 7
+    currency: str = "USD"
+    targeting: AdsTarget = AdsTarget()
+
+
+class AdsBoostIn(AdsBase):
+    post_id: str
+
+
+class AdsCreateIn(AdsBase):
+    headline: str
+    body: str = ""
+    link: str = ""
+    export_id: str = ""
+    cta: str = "LEARN_MORE"
+    keywords: list[str] = []
+    more_headlines: list[str] = []
+    more_bodies: list[str] = []
+
+
+def ads_check(body: AdsBase) -> None:
+    if body.platform not in ads.PLATFORMS:
+        raise HTTPException(400, "منصة مش معروفة")
+    if body.goal not in ads.goals_for(body.platform):
+        raise HTTPException(400, "الهدف ده مش متاح على المنصة دي")
+    if not 1 <= body.days <= 90:
+        raise HTTPException(400, "مدة الإعلان من يوم لـ ٩٠ يوم")
+    if not body.targeting.countries and body.platform != "google":
+        raise HTTPException(400, "اختار بلد واحدة على الأقل")
+
+
+@app.post("/api/ads/boost")
+def ads_boost(body: AdsBoostIn):
+    """🚀 ترويج بوست اتنشر من البرنامج."""
+    bid = rivals_client()
+    ads_check(body)
+    if body.platform not in ADS_BOOSTABLE:
+        raise HTTPException(400, "المنصة دي مش بتدعم ترويج البوستات")
+    with closing(db()) as conn:
+        r = conn.execute("SELECT * FROM posts WHERE id = ? AND mine(client_id)", (body.post_id,)).fetchone()
+    if not r or not r["remote_id"] or r["status"] != "published":
+        raise HTTPException(400, "البوست ده لسه ما اتنشرش")
+    tgt = next((t for t in json.loads(r["platforms"]) if publisher.split_target(t)[0] == body.platform), None)
+    if not tgt:
+        raise HTTPException(400, "البوست ده ما اتنشرش على المنصة دي")
+    acc = body.account_id or (publisher.split_target(tgt)[1] or "")
+    if not acc and publisher.service_name() == "zernio":
+        acc = ads_call(publisher.resolve_targets, [tgt])[0][1]
+    fee = ads_fee()
+    wallet.need(fee, "ترويج البوست")
+    ad = ads_call(ads.boost, r["remote_id"], acc or "m-acc", body.ad_account, body.platform, body.name or f"ترويج: {(r['caption'] or '')[:40]}",
+                  body.goal, body.budget, body.days, body.currency, body.targeting.model_dump())
+    if not ad.get("id"):
+        raise HTTPException(400, "المنصة ما رجّعتش رقم الإعلان، شوف حساب الإعلانات")
+    ads_remember(bid, {"id": ad["id"], "name": ad["name"], "platform": body.platform, "kind": "boost", "goal": body.goal, "at": time.time(), "post": body.post_id})
+    wallet.charge(fee, f"إعلاناتك: ترويج بوست على {ads.PLATFORMS[body.platform][1]}", ad["id"])
+    return ads_get()
+
+
+@app.post("/api/ads/create")
+def ads_create(body: AdsCreateIn):
+    """✨ إعلان جديد من الصفر: عنوان ونص ولينك وصورة/فيديو من الفيديوهات الجاهزة."""
+    bid = rivals_client()
+    ads_check(body)
+    if not body.headline.strip():
+        raise HTTPException(400, "اكتب عنوان الإعلان")
+    if body.goal in ("traffic", "conversions", "lead_generation") and not body.link.startswith(("http://", "https://")):
+        raise HTTPException(400, "الهدف ده محتاج لينك يبدأ بـ https://")
+    if body.platform == "google" and not body.keywords:
+        raise HTTPException(400, "إعلان بحث جوجل محتاج كلمات بحث")
+    media = ""
+    if body.export_id:
+        with closing(db()) as conn:
+            e = conn.execute("SELECT filename FROM exports WHERE id = ? AND mine(client_id)", (body.export_id,)).fetchone()
+        if not e:
+            raise HTTPException(404, "الفيديو ده مش موجود")
+        media = "mock://" + e["filename"] if publisher.service_name() == "mock" else ads_call(publisher.upload_file, EXPORTS_DIR / e["filename"])
+    elif body.platform not in ("google",):
+        raise HTTPException(400, "اختار صورة أو فيديو للإعلان")
+    acc = body.account_id or next((a["id"] for a in ads_social() if a["platform"] == body.platform), "")
+    fee = ads_fee()
+    wallet.need(fee, "عمل الإعلان")
+    ad = ads_call(ads.create, acc, body.ad_account, body.platform, body.name or body.headline[:60], body.goal, body.budget, body.days, body.currency,
+                  body.targeting.model_dump(), body.headline.strip(), body.body.strip(), body.link.strip(), media, body.cta, body.keywords,
+                  body.more_headlines, body.more_bodies)
+    if not ad.get("id"):
+        raise HTTPException(400, "المنصة ما رجّعتش رقم الإعلان، شوف حساب الإعلانات")
+    ads_remember(bid, {"id": ad["id"], "name": ad["name"], "platform": body.platform, "kind": "create", "goal": body.goal, "at": time.time()})
+    wallet.charge(fee, f"إعلاناتك: إعلان جديد على {ads.PLATFORMS[body.platform][1]}", ad["id"])
+    return ads_get()
+
+
+class AdsPatchIn(BaseModel):
+    status: str | None = None
+    budget: float | None = None
+
+
+@app.patch("/api/ads/{ad_id}")
+def ads_patch(ad_id: str, body: AdsPatchIn):
+    bid = rivals_client()
+    mine = ads_own(bid, ad_id)
+    ads_call(ads.update, ad_id, body.status, body.budget, mine.get("platform") or "")
+    return ads_get()
+
+
+@app.delete("/api/ads/{ad_id}")
+def ads_delete(ad_id: str):
+    bid = rivals_client()
+    ads_own(bid, ad_id)
+    ads_call(ads.cancel, ad_id)
+    return ads_get()
+
+
+@app.get("/api/ads/{ad_id}/analytics")
+def ads_analytics(ad_id: str):
+    bid = rivals_client()
+    ads_own(bid, ad_id)
+    return ads_call(ads.analytics, ad_id)
+
+
+@app.get("/api/ads-audiences")
+def ads_audiences(account_id: str = ""):
+    rivals_client()
+    return {"audiences": ads_call(ads.audiences, account_id), "pixels": ads_call(ads.pixels, account_id) if account_id else []}
+
+
+class AudienceIn(BaseModel):
+    account_id: str
+    ad_account: str
+    name: str
+    kind: str              # customer_list / website / lookalike
+    source: str = ""
+    country: str = ""
+    ratio: float = 0.01
+    pixel: str = ""
+    days: int = 30
+
+
+@app.post("/api/ads-audiences")
+def ads_audience_new(body: AudienceIn):
+    rivals_client()
+    if not body.name.strip():
+        raise HTTPException(400, "اكتب اسم للجمهور")
+    a = ads_call(ads.create_audience, body.account_id, body.ad_account, body.name.strip(), body.kind, body.source, body.country, body.ratio, body.pixel, body.days)
+    return {"audience": a, **ads_audiences(body.account_id)}
+
+
+@app.post("/api/ads-audiences/{audience_id}/users")
+async def ads_audience_users(audience_id: str, file: UploadFile = File(...), consent: str = Form("")):
+    """رفع عملائك (إيميل أو رقم) لجمهور «قايمة عملاء». لازم يكونوا وافقوا إنك تتواصل معاهم، والبيانات بتتشفّر قبل ما توصل للمنصة."""
+    rivals_client()
+    if consent != "yes":
+        raise HTTPException(400, "لازم تأكد إن العملاء دول وافقوا إنك تتواصل معاهم")
+    raw = (await file.read())[:5_000_000].decode("utf-8-sig", errors="ignore")
+    users = []
+    for row in csv.reader(io.StringIO(raw)):
+        email = next((c.strip() for c in row if "@" in c and "." in c), "")
+        phone = next((re.sub(r"[^\d+]", "", c) for c in row if len(re.sub(r"\D", "", c)) >= 8 and "@" not in c), "")
+        if email or phone:
+            users.append({k: v for k, v in (("email", email.lower()), ("phone", phone)) if v})
+    n = ads_call(ads.upload_users, audience_id, users)
+    return {"uploaded": n}
+
+
+@app.delete("/api/ads-audiences/{audience_id}")
+def ads_audience_delete(audience_id: str, account_id: str = ""):
+    rivals_client()
+    ads_call(ads.delete_audience, audience_id)
+    return ads_audiences(account_id)
+
+
 class HumanizeIn(BaseModel):
     text: str
 
@@ -9139,7 +9473,8 @@ def brain_to_dict(b: dict) -> dict:
     out["pending"] = b.get("pending") or []
     out["notes"] = b.get("notes") or []
     out["knowledge"] = fz.knowledge(b, BRAIN_FIELDS, BRAIN_KINDS)
-    out["rivals"] = [{k: i.get(k) for k in ("id", "platform", "handle", "median_views")} for i in (b.get("competitors") or {}).get("items") or []]
+    out["rivals"] = [{k: i.get(k) for k in ("id", "platform", "handle", "median_views")} for i in rivals.approved(b.get("competitors") or {})]
+    out["rivals_pending"] = sum(1 for i in (b.get("competitors") or {}).get("items") or [] if not rivals.is_ok(i))
     out["custom_styles"] = [{**c, "cover_url": f"{base}/{c['cover']}" if c.get("cover") else None} for c in b.get("custom_styles") or []]
     return out
 

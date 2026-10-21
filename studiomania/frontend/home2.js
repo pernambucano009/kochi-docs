@@ -65,7 +65,8 @@ const NH = (() => {
     music: { en: "Music", ar: "الموسيقى", icon: "music", page: "music", desc: "مكتبة الموسيقى." },
     viral: { en: "Trends", ar: "اللي ماشي في مجالك", icon: "megaphone", page: "viral", desc: "بوستات المجال مرتّبة بقد إيه عدّت العادي، وأفكار بنفس الهيكل." },
     plan: { en: "Content Plan", ar: "خطة المحتوى", icon: "megaphone", page: "plan", desc: "استراتيجية حسابك، بتتبني لوحدها من كل اللي العقل عرفه عنك." },
-    rivals: { en: "Your Competitors", ar: "منافسينك", icon: "megaphone", page: "rivals", desc: "أعلى ٥ في مجالك واللي بينجح عندهم وتحليل فيديوهاتك، وبيدخلوا في أفكارك." },
+    rivals: { en: "Your Competitors", ar: "منافسينك", icon: "megaphone", page: "rivals", desc: "البرنامج بيقترح منافسين وانت بتوافق، ومنهم اللي بينجح عندهم ووصفة الاستهداف." },
+    adsmgr: { en: "Your Ads", ar: "إعلاناتك", icon: "megaphone", page: "adsmgr", desc: "روّج بوست أو اعمل إعلان جديد بالاستهداف من الوصفة، وتابع أرقامه، واعمل جماهير." },
     auto: { en: "Custom Model", ar: "الموديل المخصص", icon: "film", page: "auto", desc: "خطوات بترتّبها بنفسك (اسحب، حط، قطّع، صدّر) من مكتبة العقل، وكل تشغيل فيديو جديد." },
     brainlib: { en: "Content Library", ar: "مكتبة محتويات البراند", icon: "film", page: "brainlib", desc: "الخلفيات والأماكن، والتعليقات الصوتية، والموسيقى، والكوميكس، وفولدراتك. كل ملف تقدر تمنشنه في الأوتوميشن." },
     comics: { en: "Comics", ar: "مكتبة الكوميكس", icon: "megaphone", page: "comics", desc: "كوميكس حقيقية بسياق كل واحد، علشان تتحط في مكانها الصح." },
@@ -500,7 +501,7 @@ const NH = (() => {
     pjFilter();
   });
   // صفحات كاملة بتنزل لتحت (عقل البراند، مكتبة الموشن): كل واحدة ليها موديول بيرسمها
-  const MODS = { brand: BrandPage, motion: MotionPage, coaches: CharactersPage, voice: VoicesPage, music: MusicPage, viral: ViralPage, ref2p: Ref2PromptPage, rivals: RivalsPage, plan: RivalsPage, comics: ComicsPage, brainlib: BrainLibPage, auto: AutoPage };
+  const MODS = { brand: BrandPage, motion: MotionPage, coaches: CharactersPage, voice: VoicesPage, music: MusicPage, viral: ViralPage, ref2p: Ref2PromptPage, rivals: RivalsPage, plan: RivalsPage, adsmgr: AdsMgrPage, comics: ComicsPage, brainlib: BrainLibPage, auto: AutoPage };
   const stopMedia = () => { MotionPage.close(); VoicesPage.close(); MusicPage.close(); CharactersPage.close?.(); Ref2PromptPage.close(); RivalsPage.close(); ComicsPage.close(); BrainLibPage.close(); AutoPage.close(); };
   let pageArg = null, pStack = [];
   // عنوان الصفحة (من البروتوتايب): الأيقونة الزجاج كبيرة، وفوق الاسم اسم القسم بالإنجليزي بالبرتقالي
