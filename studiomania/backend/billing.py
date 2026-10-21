@@ -37,7 +37,8 @@ DEFAULTS = {
         {"key": "t35", "price": 35, "credits": 2500},
         {"key": "t75", "price": 75, "credits": 6000},
     ],
-    "rules": {"plan_credits_rollover": False, "topup_valid_months": 12, "refund_failed": True},
+    "rules": {"plan_credits_rollover": False, "topup_valid_months": 12, "refund_failed": True,
+              "yearly_months": 10},   # السنوي = ١٠ شهور (شهرين ببلاش)، والنقط بتتجدد كل شهر برضه
 }
 
 
@@ -83,6 +84,11 @@ def topup_margin(t: dict) -> dict:
     cost = t["credits"] * CREDIT_USD / MARKUP
     return {"cost": round(cost, 2), "fee": fee(t["price"]), "profit": round(t["price"] - cost - fee(t["price"]), 2),
             "per_credit_cents": round(t["price"] * 100 / t["credits"], 2)}
+
+
+def yearly(cfg: dict, monthly: float) -> float:
+    """سعر السنة لأي مبلغ شهري."""
+    return round(monthly * int(cfg["rules"].get("yearly_months", 10)), 2)
 
 
 def custom_total(cfg: dict, plan: str, extra_accounts: int = 0, autopilot: bool = False) -> dict:

@@ -70,7 +70,7 @@ def _flat(d, prefix: str = "") -> dict:
 
 
 def stripe_checkout(*, mode: str, lines: list[tuple[str, float, int]], meta: dict, email: str, customer: str | None,
-                    success: str, cancel: str) -> str:
+                    success: str, cancel: str, interval: str = "month") -> str:
     """lines = [(الاسم، السعر بالدولار، الكمية)]. بيرجّع لينك صفحة الدفع."""
     items = []
     for name, price, qty in lines:
@@ -78,7 +78,7 @@ def stripe_checkout(*, mode: str, lines: list[tuple[str, float, int]], meta: dic
             continue
         pd = {"currency": CUR.lower(), "unit_amount": int(round(price * 100)), "product_data": {"name": name}}
         if mode == "subscription":
-            pd["recurring"] = {"interval": "month"}
+            pd["recurring"] = {"interval": interval}
         items.append({"price_data": pd, "quantity": qty})
     body = {"mode": mode, "line_items": items, "success_url": success, "cancel_url": cancel,
             "client_reference_id": meta.get("wid"), "metadata": meta, "allow_promotion_codes": True}
@@ -195,8 +195,8 @@ def paypal_capture(order_id: str) -> dict:
             "amount": float((cap.get("amount") or {}).get("value") or 0)}
 
 
-def paypal_plan(plans_cache, key: str, name: str, price: float) -> str:
-    """خطة اشتراك شهري بالسعر ده (بتتعمل مرة واحدة وبتتحفظ). plans_cache = (get, set)."""
+def paypal_plan(plans_cache, key: str, name: str, price: float, interval: str = "MONTH") -> str:
+    """خطة اشتراك (شهري أو سنوي) بالسعر ده (بتتعمل مرة واحدة وبتتحفظ). plans_cache = (get, set)."""
     get, put = plans_cache
     _pp_token()   # يحدد sandbox ولا live قبل ما نقرا الكاش
     if (pid := get(f"paypal_plan:{_pp_base()}:{key}")):
@@ -207,7 +207,7 @@ def paypal_plan(plans_cache, key: str, name: str, price: float) -> str:
         put(f"paypal_product:{_pp_base()}", prod)
     pid = _pp("POST", "/v1/billing/plans", {
         "product_id": prod, "name": name[:120], "status": "ACTIVE",
-        "billing_cycles": [{"frequency": {"interval_unit": "MONTH", "interval_count": 1}, "tenure_type": "REGULAR", "sequence": 1,
+        "billing_cycles": [{"frequency": {"interval_unit": interval, "interval_count": 1}, "tenure_type": "REGULAR", "sequence": 1,
                             "total_cycles": 0, "pricing_scheme": {"fixed_price": {"value": f"{price:.2f}", "currency_code": CUR}}}],
         "payment_preferences": {"auto_bill_outstanding": True, "payment_failure_threshold": 1}})["id"]
     put(f"paypal_plan:{_pp_base()}:{key}", pid)

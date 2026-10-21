@@ -89,7 +89,8 @@ with closing(db()) as _c, _c:
     CREATE TABLE IF NOT EXISTS payments (ref TEXT PRIMARY KEY, workspace TEXT, provider TEXT, kind TEXT, amount REAL, note TEXT, at REAL);
     """)
     _cols = {r[1] for r in _c.execute("PRAGMA table_info(workspaces)")}
-    for _col, _typ in (("provider", "TEXT"), ("sub_id", "TEXT"), ("customer", "TEXT"), ("ends_at", "REAL"), ("sub_started", "REAL")):
+    for _col, _typ in (("provider", "TEXT"), ("sub_id", "TEXT"), ("customer", "TEXT"), ("ends_at", "REAL"), ("sub_started", "REAL"),
+                       ("cycle", "TEXT"), ("refill_at", "REAL")):
         if _col not in _cols:
             _c.execute(f"ALTER TABLE workspaces ADD COLUMN {_col} {_typ}")
 
@@ -464,6 +465,10 @@ def reaper() -> None:
             pass
         try:
             backup_tick()
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            yearly_refill()
         except Exception:  # noqa: BLE001
             pass
         for wid, t in list(_tenants.items()):
@@ -851,7 +856,7 @@ def paid_once(c: sqlite3.Connection, ref: str, wid: str, provider: str, kind: st
 
 
 def apply_subscription(wid: str, plan: str, extra: int, autopilot: bool, provider: str, sub_id: str, customer: str | None, ref: str,
-                       amount: float) -> None:
+                       amount: float, cycle: str = "month") -> None:
     p = plan_of(plan)
     w = workspace(wid)
     if not p or not w:
@@ -861,7 +866,8 @@ def apply_subscription(wid: str, plan: str, extra: int, autopilot: bool, provide
         if not paid_once(c, ref, wid, provider, "subscription", amount, f"{plan} +{extra} {'ap' if autopilot else ''}"):
             return
         c.execute("""UPDATE workspaces SET plan=?, extra_accounts=?, autopilot=?, provider=?, sub_id=?, customer=COALESCE(?, customer),
-                     ends_at=NULL, sub_started=? WHERE id=?""", (plan, extra, int(autopilot), provider, sub_id, customer, time.time(), wid))
+                     ends_at=NULL, sub_started=?, cycle=?, refill_at=? WHERE id=?""",
+                  (plan, extra, int(autopilot), provider, sub_id, customer, time.time(), "year" if cycle == "year" else "month", time.time(), wid))
         c.execute("INSERT OR IGNORE INTO wallet (workspace, plan_credits, topup_credits, updated_at) VALUES (?, 0, 0, ?)", (wid, time.time()))
         c.execute("UPDATE wallet SET plan_credits=?, updated_at=? WHERE workspace=?", (p["credits"], time.time(), wid))
         ledger_add(c, wid, p["credits"], "plan", f"باقة {p['name']}", ref)
@@ -885,7 +891,34 @@ def renew(wid: str, ref: str, amount: float) -> None:
         if not paid_once(c, ref, wid, w["provider"] or "", "renewal", amount, w["plan"]):
             return
         c.execute("UPDATE wallet SET plan_credits=?, updated_at=? WHERE workspace=?", (p["credits"], time.time(), wid))
+        c.execute("UPDATE workspaces SET refill_at=? WHERE id=?", (time.time(), wid))
         ledger_add(c, wid, p["credits"], "renewal", f"تجديد باقة {p['name']}", ref)
+
+
+MONTH = 30 * 86400
+
+
+def renews_at(w) -> float | None:
+    """إمتى نقط الباقة هترجع تاني (تقريبًا شهر من آخر مرة)."""
+    if not w or w["plan"] in ("none", "trial") or not w["refill_at"]:
+        return None
+    return w["refill_at"] + MONTH
+
+
+def yearly_refill() -> None:
+    """الاشتراك السنوي بيتدفع مرة في السنة، بس نقط الباقة بترجع لعددها كل شهر (من غير ترحيل)."""
+    now = time.time()
+    with closing(db()) as c:
+        rows = c.execute("""SELECT id, plan, refill_at FROM workspaces WHERE cycle='year' AND plan NOT IN ('none', 'trial')
+                            AND (ends_at IS NULL OR ends_at > ?) AND refill_at IS NOT NULL AND refill_at <= ?""", (now, now - MONTH)).fetchall()
+    for r in rows:
+        p = plan_of(r["plan"])
+        if not p:
+            continue
+        with closing(db()) as c, c:
+            c.execute("UPDATE workspaces SET refill_at=? WHERE id=?", (r["refill_at"] + MONTH, r["id"]))
+            c.execute("UPDATE wallet SET plan_credits=?, updated_at=? WHERE workspace=?", (p["credits"], now, r["id"]))
+            ledger_add(c, r["id"], p["credits"], "renewal", f"نقط الشهر · باقة {p['name']} السنوية")
 
 
 def end_subscription(wid: str, at: float | None = None) -> None:
@@ -934,10 +967,12 @@ def customer_user(request: Request) -> sqlite3.Row:
 
 
 @app.get("/billing")
-def billing_page(request: Request):
+def billing_page(request: Request, ok: str = "", err: str = ""):
+    """الصفحة القديمة اتشالت: «باقتي ونقاطي» بقت جوه البرنامج (أيقونة الكارت في الشريط اللي فوق)."""
     if not current_user(request):
         return RedirectResponse("/login?next=/billing")
-    return page("billing.html")
+    q = "&ok=" + ok if ok in ("plan", "topup") else "&err=paypal" if err == "paypal" else ""
+    return RedirectResponse("/?plans=1" + q)
 
 
 @app.get("/api/billing")
@@ -952,6 +987,7 @@ def billing_state(request: Request):
     cfg = billing.config(DATA_DIR)
     return {"me": me_dict(u), "owner": u["workspace"] == OWNER, "plan": w["plan"] if w else "owner",
             "extra_accounts": (w["extra_accounts"] if w else 0), "autopilot": bool(w and w["autopilot"]),
+            "cycle": (w["cycle"] if w and w["cycle"] else "month"), "renews_at": renews_at(w),
             "provider": w["provider"] if w else None, "ends_at": w["ends_at"] if w else None,
             "can_portal": bool(w and w["provider"] == "stripe" and w["customer"]),
             "stripe": payments.stripe_on(), "paypal": payments.paypal_on(),
@@ -965,6 +1001,7 @@ class CheckoutIn(BaseModel):
     accounts: int = 0         # حسابات زيادة
     autopilot: bool = False
     topup: str = ""
+    cycle: str = "month"      # month | year
 
 
 @app.post("/api/billing/checkout")
@@ -997,19 +1034,21 @@ def checkout(body: CheckoutIn, request: Request):
         p, add = plan_of(body.plan), {a["key"]: a for a in cfg["addons"]}
         extra = tot["accounts"] - p["accounts"]
         ap_paid = tot["autopilot"] and not p.get("autopilot")
-        meta = {"wid": wid, "kind": "plan", "plan": p["key"], "extra": str(extra), "ap": "1" if ap_paid else "0"}
+        yr = body.cycle == "year"
+        px = (lambda v: billing.yearly(cfg, v)) if yr else (lambda v: v)
+        meta = {"wid": wid, "kind": "plan", "plan": p["key"], "extra": str(extra), "ap": "1" if ap_paid else "0", "cycle": "year" if yr else "month"}
         if body.provider == "stripe":
-            lines = [(f"SimsimKit · باقة {p['name']}", p["price"], 1), (add["account"]["name"], add["account"]["price"], extra)]
+            lines = [(f"SimsimKit · باقة {p['name']}{' · سنوي' if yr else ''}", px(p["price"]), 1), (add["account"]["name"], px(add["account"]["price"]), extra)]
             if ap_paid:
-                lines.append((add["autopilot"]["name"], add["autopilot"]["price"], 1))
+                lines.append((add["autopilot"]["name"], px(add["autopilot"]["price"]), 1))
             url = payments.stripe_checkout(mode="subscription", lines=lines, meta=meta, email=u["email"],
                                            customer=w["customer"] if w and w["provider"] == "stripe" else None,
-                                           success=f"{back}/billing?ok=plan", cancel=f"{back}/billing")
+                                           success=f"{back}/billing?ok=plan", cancel=f"{back}/billing", interval="year" if yr else "month")
         elif body.provider == "paypal":
-            key = f"{p['key']}:{extra}:{int(ap_paid)}:{tot['total']}"
-            pid = payments.paypal_plan((kv_get, kv_set), key, f"SimsimKit {p['name_en']} +{extra} accounts{' +autopilot' if ap_paid else ''}",
-                                       tot["total"])
-            url = payments.paypal_subscribe(pid, f"{wid}|{p['key']}|{extra}|{int(ap_paid)}", u["email"],
+            key = f"{p['key']}:{extra}:{int(ap_paid)}:{tot['total']}{':y' if yr else ''}"
+            pid = payments.paypal_plan((kv_get, kv_set), key, f"SimsimKit {p['name_en']} +{extra} accounts{' +autopilot' if ap_paid else ''}{' yearly' if yr else ''}",
+                                       px(tot["total"]), "YEAR" if yr else "MONTH")
+            url = payments.paypal_subscribe(pid, f"{wid}|{p['key']}|{extra}|{int(ap_paid)}{'|y' if yr else ''}", u["email"],
                                             ret=f"{back}/api/billing/paypal/sub", cancel=f"{back}/billing")
         else:
             raise HTTPException(400, "طريقة دفع مش معروفة")
@@ -1074,7 +1113,7 @@ async def stripe_hook(request: Request):
                 add_topup(wid, m.get("topup", ""), "stripe", obj["id"], amount)
             elif m.get("kind") == "plan" and obj.get("subscription"):
                 apply_subscription(wid, m.get("plan", ""), int(m.get("extra") or 0), m.get("ap") == "1", "stripe",
-                                   obj["subscription"], obj.get("customer"), obj["id"], amount)
+                                   obj["subscription"], obj.get("customer"), obj["id"], amount, m.get("cycle") or "month")
     elif typ == "invoice.paid" and obj.get("billing_reason") == "subscription_cycle":
         with closing(db()) as c:
             r = c.execute("SELECT id FROM workspaces WHERE provider='stripe' AND sub_id=?", (obj.get("subscription"),)).fetchone()
@@ -1115,11 +1154,14 @@ def paypal_sub_back(request: Request, subscription_id: str = ""):
     except payments.PayError:
         return RedirectResponse("/billing?err=paypal")
     parts = (s.get("custom") or "").split("|")
-    if s["status"] not in ("ACTIVE", "APPROVED") or len(parts) != 4 or parts[0] != u["workspace"]:
+    if s["status"] not in ("ACTIVE", "APPROVED") or len(parts) not in (4, 5) or parts[0] != u["workspace"]:
         return RedirectResponse("/billing?err=paypal")
-    wid, plan, extra, ap = parts
-    tot = billing.custom_total(billing.config(DATA_DIR), plan, int(extra), ap == "1")
-    apply_subscription(wid, plan, int(extra), ap == "1", "paypal", subscription_id, None, f"pp-sub-{subscription_id}", tot["total"])
+    wid, plan, extra, ap = parts[:4]
+    yr = len(parts) == 5 and parts[4] == "y"
+    cfg = billing.config(DATA_DIR)
+    tot = billing.custom_total(cfg, plan, int(extra), ap == "1")
+    apply_subscription(wid, plan, int(extra), ap == "1", "paypal", subscription_id, None, f"pp-sub-{subscription_id}",
+                       billing.yearly(cfg, tot["total"]) if yr else tot["total"], "year" if yr else "month")
     return RedirectResponse("/billing?ok=plan")
 
 
@@ -1323,6 +1365,8 @@ async def proxy(path: str, request: Request):
             return JSONResponse({"detail": "أكّد إيميلك الأول"}, status_code=403)
         else:
             return RedirectResponse("/verify")
+    if u and u["verified"] and url_path in ("/pricing", "/pricing.html"):
+        return RedirectResponse("/?plans=1")   # المسجّل دخول بيشوف «باقتي ونقاطي» جوه البرنامج
     if u and u["role"] != "admin" and ADMIN_ONLY.match(url_path):
         if url_path == "/api/settings" and request.method == "GET":
             return JSONResponse({"keys": {}, "password_from_env": False, "customer": True})

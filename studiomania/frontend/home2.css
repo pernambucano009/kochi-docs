@@ -2415,50 +2415,12 @@ label.dim { opacity: .4; }
 .prov-st { font-size: 12px; white-space: nowrap; }
 .prov-min { font-size: 12px; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
 .prov-min input { width: 70px; }
-/* 💳 باقتي ونقاطي */
-.bp-hero { display: flex; flex-wrap: wrap; align-items: center; gap: 18px 28px; }
-.bp-hero-t { flex: 1 1 280px; min-width: 0; }
-.bp-ring { position: relative; width: 120px; height: 120px; flex: 0 0 auto; }
-.bp-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
-.bp-ring circle { fill: none; stroke-width: 6; }
-.bp-ring .trk { stroke: rgba(127, 127, 127, .15); }
-.bp-ring .val { stroke: var(--nh-accent, #E5613E); stroke-linecap: round; transition: stroke-dasharray .6s; }
-.bp-ring span { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; }
-.bp-ring b { font-size: 24px; line-height: 1.1; }
-.bp-ring small { font-size: 12px; opacity: .6; }
-.bp-split { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; opacity: .8; margin: 6px 0; }
-.bp-split b { margin-inline-start: 4px; }
-.bp-sec { margin: 6px 0 18px; }
-.bp-plans { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); gap: 14px; }
-.bp-plan { position: relative; display: flex; flex-direction: column; gap: 10px; margin: 0; border: 1.5px solid transparent; }
-.bp-plan h3 { margin: 0; font-size: 17px; }
-.bp-plan.pop { border-color: rgba(229, 97, 62, .45); }
-.bp-plan.on { border-color: #1f8a4c; box-shadow: 0 0 0 3px rgba(31, 138, 76, .12); }
-.bp-plan.low { opacity: .55; }
-.bp-tag { position: absolute; top: -10px; inset-inline-start: 16px; padding: 2px 10px; border-radius: 999px; background: var(--nh-accent, #E5613E); color: #fff; font-size: 11.5px; }
-.bp-price { display: flex; align-items: baseline; gap: 6px; }
-.bp-price b { font-size: 28px; line-height: 1; }
-.bp-price small { font-size: 12.5px; opacity: .6; }
-.bp-plan ul { margin: 0; padding-inline-start: 18px; display: grid; gap: 6px; font-size: 13.5px; line-height: 1.5; flex: 1; }
-.bp-act { margin-top: auto; }
-.bp-act .nb-btn { width: 100%; justify-content: center; text-align: center; text-decoration: none; box-sizing: border-box; }
-.bp-cur { display: block; text-align: center; padding: 9px; border-radius: 999px; background: rgba(31, 138, 76, .12); color: #1f8a4c; font-weight: 600; font-size: 13.5px; }
-.bp-low { display: block; text-align: center; font-size: 12.5px; opacity: .7; padding: 9px; }
-.bp-up { margin-top: 14px; }
-.bp-step { display: inline-flex; align-items: center; gap: 10px; }
-.bp-total { display: flex; align-items: baseline; gap: 8px; margin: 10px 0; }
-.bp-total b { font-size: 26px; }
-.bp-tops { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr)); gap: 14px; }
-.bp-top { margin: 0; display: flex; flex-direction: column; gap: 8px; }
-.bp-top p { margin: 0; font-size: 13px; opacity: .75; }
-.bp-top .bp-act { display: flex; gap: 8px; }
-.bp-top .bp-act .nb-btn { flex: 1; }
-.bp-hist { display: grid; }
-.bp-h { display: grid; grid-template-columns: 70px 1fr auto; gap: 10px; padding: 8px 0; border-top: 1px solid rgba(127, 127, 127, .14); font-size: 13.5px; }
-.bp-h:first-child { border-top: 0; }
-.bp-h span:first-child { opacity: .6; }
-.bp-h b.plus { color: #1f8a4c; }
-.bp-now { font-size: 16px; margin: 0 0 4px; }
+/* 💳 باقتي ونقاطي: الشكل في plans-view.js. الصفحة شاشة واحدة من غير عنوان كبير (الاسم في المسار اللي فوق) */
+#nh .nh-pgrid[data-key="plans"] { display: block; min-height: 0; height: 100%; overflow: auto; }
+#nh .nh-page:has(.nh-pgrid[data-key="plans"]) .nh-ptitle { visibility: hidden; }
+body:has(#nhPGrid[data-key="plans"]) #nhCorner { visibility: hidden; }
+#nh .bq-wrap { min-height: 100%; height: 100%; }
+#nh .bq-wrap > .pv { height: 100%; }
 @media (max-width: 820px) { #nhBar #stagePlans { display: grid !important; } }
 /* الرفعة في الهوفر بتزق الزرار من تحت الماوس لو واقف على طرفه، فبيرتعش (هوفر/مش هوفر). مساحة شفافة حواليه بتمسك الهوفر */
 .nh-tile:hover::after, .nh-cta:hover::after, #nh .nh-pj-card:hover::after { content: ""; position: absolute; inset: -8px; border-radius: inherit; }
