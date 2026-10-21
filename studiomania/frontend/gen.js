@@ -87,12 +87,13 @@ const Gen = (() => {
   }
 
   // ---------------------------------------------------------------- التاريخ
+  const sig = (g) => [g.status, g.url, g.step, g.error, g.cost].join("|");
   function card(g) {
     const media = g.status !== "done" ? `<div class="gen-ph">${g.status === "failed" ? "⚠️" : `<span class="flw-spin"></span>`}<small>${esc(g.step || (g.status === "failed" ? "وقف" : ""))}</small></div>`
       : g.kind === "image" ? `<a href="${esc(g.url)}" target="_blank" rel="noopener"><img src="${esc(g.url)}" alt="" loading="lazy"></a>`
       : g.kind === "video" ? `<video src="${esc(g.url)}" controls playsinline preload="metadata"></video>`
       : `<div class="gen-ph au"><audio src="${esc(g.url)}" controls preload="none"></audio></div>`;
-    return `<figure class="gen-card ${g.kind} ${g.status}">${media}
+    return `<figure class="gen-card ${g.kind} ${g.status}" data-gid="${esc(g.id)}" data-gsig="${esc(sig(g))}">${media}
       <figcaption><span dir="auto">${esc(g.prompt)}</span>${g.error ? `<small class="err">${esc(g.error)}</small>` : ""}
         <small class="muted">${g.kind === "video" ? `${esc((g.model_label || "").split(" · ")[0])} · ${g.duration || ""} ث` : g.kind === "voice" ? "اتحفظ في مكتبة التعليق" : esc(g.ratio || "")}${g.cost ? ` · $${g.cost}` : ""}</small>
         <span class="gen-acts">${g.url ? `<a class="flw-link" href="${esc(g.url)}" download>⬇️ نزّل</a>` : ""}<button type="button" class="flw-link" data-gdel="${esc(g.id)}">✕ امسح</button></span></figcaption></figure>`;
@@ -114,6 +115,26 @@ const Gen = (() => {
     if (S.files) Object.entries(S.files).forEach(([k, fs]) => { const n = S.el.querySelector(`[data-gnames="${k}"]`); if (n && fs.length) n.textContent = [...fs].map((f) => f.name).join("، "); });
     costLine();
   }
+  // وهو بيستنى التوليد: بنغيّر الكارت اللي اتغيّر بس، فالفيديوهات الجاهزة والخانات مابتترسمش تاني ولا بترمش
+  function patchGrid() {
+    const grid = S.el?.querySelector(".gen-grid");
+    if (!grid) return render();
+    const list = S.list.filter((g) => g.kind === S.tab), ids = new Set(list.map((g) => g.id));
+    grid.querySelectorAll("[data-gid]").forEach((el) => { if (!ids.has(el.dataset.gid)) el.remove(); });
+    let prev = null;
+    for (const g of list) {
+      let el = grid.querySelector(`[data-gid="${CSS.escape(g.id)}"]`);
+      if (!el || el.dataset.gsig !== sig(g)) {
+        const t = document.createElement("template"); t.innerHTML = card(g).trim();
+        const fresh = t.content.firstElementChild;
+        if (el) el.replaceWith(fresh); else grid.insertBefore(fresh, prev ? prev.nextSibling : grid.firstChild);
+        el = fresh;
+      }
+      prev = el;
+    }
+    grid.querySelector(".flw-empty")?.toggleAttribute("hidden", list.length > 0);
+    const n = S.el.querySelector(".gen-h small"); if (n) n.textContent = list.length;
+  }
   function poll() {
     clearTimeout(S.timer);
     if (!S.list.some((g) => g.status === "working")) return;
@@ -121,9 +142,7 @@ const Gen = (() => {
       if (!S.el || S.el.hidden) return;
       try {
         S.list = await api("/api/gens");
-        const busyUi = S.el.contains(document.activeElement) && document.activeElement.matches("input, textarea, select");
-        const playing = [...S.el.querySelectorAll("video, audio")].some((m) => !m.paused);
-        if (!busyUi && !playing) render();
+        patchGrid();
       } catch { /* بيعيد المحاولة */ }
       poll();
     }, 3000);
