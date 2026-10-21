@@ -87,8 +87,8 @@ async function loadSetAccounts() {
   try {
     const p = await api("/api/publisher");
     $("setAccHint").innerHTML = p.service === "zernio"
-      ? `عن طريق Zernio · <a href="#7" data-goto="7">اربط أو افصل حسابات من صفحة النشر ←</a>`
-      : "حط مفتاح Zernio عشان تربط الحسابات";
+      ? `<a href="#7" data-goto="7">اربط أو افصل حسابات من صفحة النشر ←</a>`
+      : "خدمة النشر لسه مش متوصّلة";
     // كل المنصات، وكل الحسابات المربوطة على كل منصة (الربط والفصل من صفحة النشر)
     list.innerHTML = Object.entries(p.platforms).map(([k, label]) => {
       const accs = (p.account_list || []).filter((a) => a.platform === k);

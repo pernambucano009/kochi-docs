@@ -3588,7 +3588,7 @@ def publisher_status():
         try:
             lst = publisher.account_list(refresh=True)
         except (publisher.PublishError, httpx.HTTPError) as exc:
-            error = f"مقدرتش أوصل لـ Zernio: {exc}"
+            error = f"مقدرتش أوصل لخدمة النشر: {exc}"
     elif service == "mock":
         lst = MOCK_ACCOUNTS
     linked: dict = {}
@@ -3599,9 +3599,10 @@ def publisher_status():
         "platforms": {k: v[1] for k, v in publisher.PLATFORMS.items()},
         "accounts": linked,            # أول حساب لكل منصة (القديم)
         "account_list": lst,           # كل الحسابات (أكتر من حساب على نفس المنصة)
-        "dashboard_only": sorted(publisher.DASHBOARD_ONLY),
+        "credentials": sorted(publisher.CREDENTIALS),   # بتتربط بفورم عندنا (من غير تسجيل دخول)
+        "soon": publisher.SOON,                          # لسه مش متاحة عند المنصة: «قريبًا»
+        "not_for_posts": sorted(publisher.NOT_FOR_POSTS),
         "accounts_error": error,
-        "dashboard_url": publisher.DASHBOARD_URL,
     }
 
 
@@ -3609,24 +3610,117 @@ class ConnectIn(BaseModel):
     platform: str
 
 
-@app.post("/api/publisher/connect")
-def publisher_connect(body: ConnectIn, request: Request):
-    """لينك ربط حساب جديد: العميل بيسجّل دخول على المنصة، وZernio بيرجّعه لصفحة النشر هنا."""
+def pub_back(request: Request) -> str:
+    return str(request.base_url).rstrip("/") + "/#7"
+
+
+def pub_ready() -> None:
     if publisher.service_name() != "zernio":
-        raise HTTPException(400, "حط مفتاح Zernio من الإعدادات الأول")
-    if body.platform in publisher.DASHBOARD_ONLY:
-        return {"url": publisher.DASHBOARD_URL, "dashboard": True}
-    back = str(request.base_url).rstrip("/") + "/#7"
+        raise HTTPException(400, "خدمة النشر مش متوصّلة لسه. كلّم الدعم")
+
+
+def pub_call(fn, *a):
     try:
-        return {"url": publisher.connect_url(body.platform, back)}
+        return fn(*a)
     except (publisher.PublishError, httpx.HTTPError) as exc:
         raise HTTPException(400, str(exc)) from exc
 
 
+@app.post("/api/publisher/connect")
+def publisher_connect(body: ConnectIn, request: Request):
+    """ربط حساب جديد: العميل بيسجّل دخول على المنصة نفسها وبيرجع لصفحة النشر هنا على طول،
+    والمنصات اللي من غير تسجيل دخول (بلوسكاي، تيليجرام، واتساب) بفورم جوه البرنامج."""
+    if body.platform in publisher.SOON:
+        raise HTTPException(400, publisher.SOON[body.platform])
+    if body.platform in publisher.CREDENTIALS:
+        return {"form": body.platform}
+    pub_ready()
+    return {"url": pub_call(publisher.connect_url, body.platform, pub_back(request))}
+
+
+class PendingIn(BaseModel):
+    params: dict
+
+
+@app.post("/api/publisher/connect/pending")
+def publisher_pending(body: PendingIn):
+    """رجع من تسجيل الدخول ومحتاج يختار صفحة/منظمة/مكان/بورد: القايمة بتظهر عندنا."""
+    pub_ready()
+    return pub_call(publisher.pending_options, {k: str(v) for k, v in body.params.items()})
+
+
+class PickIn(BaseModel):
+    sid: str
+    choice: str
+
+
+@app.post("/api/publisher/connect/select")
+def publisher_select(body: PickIn, request: Request):
+    pub_ready()
+    pub_call(publisher.pending_select, body.sid, body.choice, pub_back(request))
+    return publisher_status()
+
+
+class BlueskyIn(BaseModel):
+    identifier: str
+    password: str
+
+
+@app.post("/api/publisher/connect/bluesky")
+def publisher_bluesky(body: BlueskyIn):
+    if publisher.service_name() == "mock":
+        MOCK_ACCOUNTS.append({"id": f"m-bs{len(MOCK_ACCOUNTS)}", "platform": "bluesky", "name": body.identifier, "username": body.identifier, "avatar": None, "url": None, "needs_reconnect": False})
+        return publisher_status()
+    pub_ready()
+    pub_call(publisher.connect_bluesky, body.identifier, body.password)
+    return publisher_status()
+
+
+MOCK_TG: dict = {}
+
+
+@app.post("/api/publisher/connect/telegram")
+def publisher_telegram():
+    if publisher.service_name() == "mock":
+        MOCK_TG["n"] = 0
+        return {"code": "SIMSIM-4821", "bot": "SimsimKitBot", "expires_in": 900}
+    pub_ready()
+    return pub_call(publisher.telegram_code)
+
+
+@app.get("/api/publisher/connect/telegram/{code}")
+def publisher_telegram_status(code: str):
+    if publisher.service_name() == "mock":
+        MOCK_TG["n"] = MOCK_TG.get("n", 0) + 1
+        if MOCK_TG["n"] == 2:
+            MOCK_ACCOUNTS.append({"id": "m-tg1", "platform": "telegram", "name": "قناة تجريبية", "username": "demo_channel", "avatar": None, "url": None, "needs_reconnect": False})
+        return {"status": "connected" if MOCK_TG["n"] >= 2 else "pending"}
+    pub_ready()
+    return {"status": pub_call(publisher.telegram_status, code)}
+
+
+class WhatsAppIn(BaseModel):
+    token: str
+    waba: str
+    phone: str
+    pin: str = ""
+
+
+@app.post("/api/publisher/connect/whatsapp")
+def publisher_whatsapp(body: WhatsAppIn):
+    if not (body.token.strip() and body.waba.strip() and body.phone.strip()):
+        raise HTTPException(400, "كمّل الخانات التلاتة")
+    if publisher.service_name() == "mock":
+        MOCK_ACCOUNTS.append({"id": "m-wa1", "platform": "whatsapp", "name": "واتساب تجريبي", "username": "+966500000000", "avatar": None, "url": None, "needs_reconnect": False})
+        return publisher_status()
+    pub_ready()
+    pub_call(publisher.connect_whatsapp, body.token, body.waba, body.phone, body.pin)
+    return publisher_status()
+
+
 @app.delete("/api/publisher/accounts/{account_id}")
 def publisher_disconnect(account_id: str):
-    if publisher.service_name() != "zernio":
-        raise HTTPException(400, "حط مفتاح Zernio من الإعدادات الأول")
+    pub_ready()
     try:
         publisher.disconnect(account_id)
     except (publisher.PublishError, httpx.HTTPError) as exc:
@@ -3739,7 +3833,7 @@ def send_post(post_id: str, old_remote_id: str | None = None) -> None:
         set_post(post_id, status="scheduled", remote_id=remote_id, error=None)
     except (publisher.PublishError, httpx.HTTPError, HTTPException, subprocess.SubprocessError) as exc:
         detail = exc.detail if isinstance(exc, HTTPException) else exc
-        set_post(post_id, status="failed", remote_id=None, error=f"مقدرتش أسلّم البوست لـ Zernio: {detail}"[:500])
+        set_post(post_id, status="failed", remote_id=None, error=f"مقدرتش أسلّم البوست لخدمة النشر: {detail}"[:500])
 
 
 def after_save(post_id: str, when: str, old_remote_id: str | None) -> None:
@@ -3780,7 +3874,7 @@ def update_post(post_id: str, body: PostIn):
         if row["status"] in ("sending", "publishing", "published"):
             raise HTTPException(400, "البوست ده اتنشر أو بيتبعت دلوقتي")
         if row["status"] == "failed" and row["remote_id"]:
-            raise HTTPException(400, "البوست ده اتبعت لـ Zernio وفشل. استخدم إعادة المحاولة، أو احذفه واعمل واحد جديد")
+            raise HTTPException(400, "البوست ده اتبعت لخدمة النشر وفشل. استخدم إعادة المحاولة، أو احذفه واعمل واحد جديد")
         platforms, when, caption = clean_post(conn, body)
         options = clean_options(body.options)
         conn.execute(
@@ -3807,7 +3901,7 @@ def delete_post(post_id: str):
             publisher.cancel(row["remote_id"])
         except (publisher.PublishError, httpx.HTTPError) as exc:
             if row["status"] == "scheduled":
-                raise HTTPException(400, f"مقدرتش ألغيه عند Zernio: {exc}") from exc
+                raise HTTPException(400, f"مقدرتش ألغيه عند خدمة النشر: {exc}") from exc
     with closing(db()) as conn, conn:
         conn.execute("DELETE FROM posts WHERE id = ?", (post_id,))
     return {"ok": True}
@@ -3820,7 +3914,7 @@ def _remote_orphans() -> list[dict]:
     try:
         remote = publisher.list_scheduled()
     except (publisher.PublishError, httpx.HTTPError) as exc:
-        raise HTTPException(400, f"مقدرتش أوصل لـ Zernio: {exc}") from exc
+        raise HTTPException(400, f"مقدرتش أوصل لخدمة النشر: {exc}") from exc
     with closing(db()) as conn:
         known = {r["remote_id"] for r in conn.execute("SELECT remote_id FROM posts WHERE remote_id IS NOT NULL")}
     return [p for p in remote if p["id"] not in known]
@@ -3839,7 +3933,7 @@ def published_posts():
     try:
         remote = publisher.list_posts("published", 50)
     except (publisher.PublishError, httpx.HTTPError) as exc:
-        raise HTTPException(400, f"مقدرتش أوصل لـ Zernio: {exc}") from exc
+        raise HTTPException(400, f"مقدرتش أوصل لخدمة النشر: {exc}") from exc
     by_remote = {p.get("remote_id"): p for p in local}
     with closing(db()) as conn:
         names = {r["remote_id"]: r["export_name"] for r in conn.execute(POSTS_QUERY + " WHERE p.remote_id IS NOT NULL")}
@@ -3869,7 +3963,7 @@ def adopt_remote_post(body: AdoptIn):
     """بوست متجدول عند Zernio ومش هنا: نضيفه للقايمة عشان تتابعه وتلغيه من هنا."""
     post = next((p for p in _remote_orphans() if p["id"] == body.remote_id), None)
     if post is None:
-        raise HTTPException(404, "البوست ده مش لاقيه عند Zernio، أو موجود في القايمة بالفعل")
+        raise HTTPException(404, "البوست ده مش لاقيه عند خدمة النشر، أو موجود في القايمة بالفعل")
     try:
         when = datetime.fromisoformat(str(post["scheduled_for"]).replace("Z", "+00:00")).astimezone(timezone.utc)
     except ValueError:
@@ -3888,11 +3982,11 @@ def adopt_remote_post(body: AdoptIn):
 @app.post("/api/posts/remote/{remote_id}/cancel")
 def cancel_remote_post(remote_id: str):
     if not any(p["id"] == remote_id for p in _remote_orphans()):
-        raise HTTPException(404, "البوست ده مش لاقيه عند Zernio، أو موجود في القايمة بالفعل")
+        raise HTTPException(404, "البوست ده مش لاقيه عند خدمة النشر، أو موجود في القايمة بالفعل")
     try:
         publisher.cancel(remote_id)
     except (publisher.PublishError, httpx.HTTPError) as exc:
-        raise HTTPException(400, f"مقدرتش ألغيه عند Zernio: {exc}") from exc
+        raise HTTPException(400, f"مقدرتش ألغيه عند خدمة النشر: {exc}") from exc
     return {"ok": True}
 
 
@@ -3991,7 +4085,7 @@ def publish_due_posts() -> None:
             else:
                 set_post(
                     r["id"], status="failed",
-                    error="لسه مفيش خدمة نشر مربوطة، فالبوست متنشرش. حط مفتاح Zernio من ⚙️ الإعدادات ودوس إعادة المحاولة",
+                    error="لسه مفيش خدمة نشر مربوطة، فالبوست متنشرش. أول ما خدمة النشر تتوصّل دوس إعادة المحاولة",
                 )
     finally:
         _publish_lock.release()
@@ -4002,11 +4096,11 @@ def publish_due_posts() -> None:
 
 def _inbox_call(fn, *args):
     if publisher.service_name() != "zernio":
-        raise HTTPException(400, "صندوق الردود شغال مع Zernio بس. حط مفتاح Zernio من ⚙️ الإعدادات")
+        raise HTTPException(400, "صندوق الردود محتاج خدمة النشر، ولسه مش متوصّلة")
     try:
         return fn(*args)
     except (publisher.PublishError, httpx.HTTPError) as exc:
-        raise HTTPException(400, str(exc) if isinstance(exc, publisher.PublishError) else f"مقدرتش أوصل لـ Zernio: {exc}") from exc
+        raise HTTPException(400, str(exc) if isinstance(exc, publisher.PublishError) else f"مقدرتش أوصل لخدمة النشر: {exc}") from exc
 
 
 @app.get("/api/inbox/comments")
@@ -4899,7 +4993,7 @@ with closing(db()) as _conn, _conn:
         _conn.execute("ALTER TABLE posts ADD COLUMN options TEXT")
     # لو البرنامج اتقفل وهو بيسلّم بوست، مش عارفين وصل ولا لأ، فنعلّمه عشان تتأكد بنفسك
     _conn.execute(
-        "UPDATE posts SET status = 'failed', error = 'البرنامج اتقفل وهو بيبعت البوست. اتأكد من Zernio قبل ما تعيد المحاولة' "
+        "UPDATE posts SET status = 'failed', error = 'البرنامج اتقفل وهو بيبعت البوست. اتأكد من صفحة النشر قبل ما تعيد المحاولة' "
         "WHERE status IN ('sending', 'publishing')"
     )
 threading.Thread(target=scheduler_loop, daemon=True).start()

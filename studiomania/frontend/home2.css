@@ -1327,6 +1327,24 @@ html { overflow-x: clip; }
 .platforms label.plat.acc em { font-style: normal; font-size: 10px; opacity: .75; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pub-accounts .pa-more { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
 .pub-accounts .pa-chip { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 999px; border: 0; background: var(--page-bg, #F7F7F5); color: inherit; font: inherit; font-size: 12.5px; cursor: pointer; }
+.pub-accounts .pa-chip em { font-style: normal; font-size: 11px; padding: 1px 7px; border-radius: 99px; background: rgba(229, 97, 62, .12); color: var(--nh-accent, #E5613E); }
+.pub-accounts .pa-chip.soon { cursor: default; opacity: .6; }
+.pub-accounts .pa-chip.soon em { background: rgba(0, 0, 0, .07); color: inherit; }
+/* 🔗 مربعات الربط من جوه البرنامج (اختيار الصفحة، وفورم بلوسكاي/واتساب، وكود تيليجرام) */
+.pa-dlg .ui-dlg-box { width: min(520px, 100%); max-height: calc(100vh - 32px); overflow: auto; }
+.pa-dlg .pa-help { margin: 0 0 14px; font-size: 13px; line-height: 1.8; opacity: .85; }
+.pa-dlg .pa-help ol, .pa-dlg ol.pa-help { margin: 6px 0 0; padding-inline-start: 20px; }
+.pa-dlg .pa-f { display: grid; gap: 5px; font-size: 13px; }
+.pa-dlg .pa-f .ui-dlg-in { margin-bottom: 10px; }
+.pa-dlg .pa-code { display: inline-block; margin-top: 4px; padding: 6px 12px; border-radius: 10px; background: rgba(0, 0, 0, .06); font: 600 14px/1.4 ui-monospace, monospace; user-select: all; }
+.pa-dlg .pa-wait { font-size: 13px; margin: 0 0 14px; }
+.pa-dlg .pa-opts { display: grid; gap: 8px; margin: 0 0 16px; }
+.pa-dlg .pa-opt { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 14px; border: 1.5px solid rgba(0, 0, 0, .08); background: none; color: inherit; font: inherit; text-align: start; cursor: pointer; transition: border-color .15s, background .15s; }
+.pa-dlg .pa-opt:hover, .pa-dlg .pa-opt.on { border-color: #E5613E; background: rgba(229, 97, 62, .06); }
+.pa-dlg .pa-opt img, .pa-dlg .pa-opt i { width: 38px; height: 38px; border-radius: 50%; object-fit: cover; flex: none; display: grid; place-items: center; background: rgba(0, 0, 0, .06); font-style: normal; }
+.pa-dlg .pa-opt span { display: grid; gap: 2px; min-width: 0; }
+.pa-dlg .pa-opt small { opacity: .65; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:root[data-nh-theme="dark"] .pa-dlg .pa-opt { border-color: rgba(255, 255, 255, .12); }
 .pub-accounts .pa-chip svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .pub-accounts .pa-grid:empty { display: none; }
 .pub-accounts .pa-acc.bad { flex-wrap: wrap; } .pub-accounts .pa-acc.bad .pa-re { order: 5; flex-basis: 100%; text-align: start; }

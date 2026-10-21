@@ -4,7 +4,7 @@ const pub = { exports: [], posts: [], platforms: {}, accounts: {}, service: null
 const PLATFORMS_KEY = "studiomania.platforms";
 const POST_STATUS = {
   scheduled: ["متجدول", "scheduled"],
-  sending: ["بيتبعت لـ Zernio...", "active"],
+  sending: ["بيتبعت للنشر...", "active"],
   publishing: ["بيتنشر...", "active"],
   published: ["اتنشر", "published"],
   failed: ["فشل", "failed"],
@@ -16,19 +16,21 @@ async function initPublish() {
   pub.service = info.service;
   pub.accounts = info.accounts || {};
   pub.list = info.account_list || [];
-  pub.dashOnly = info.dashboard_only || [];
-  pub.dashUrl = info.dashboard_url;
+  pub.creds = info.credentials || [];
+  pub.soon = info.soon || {};
+  pub.noPost = info.not_for_posts || [];
   const alert = $("publisherAlert");
-  // الحسابات المربوطة بتبان في الإعدادات، فالشريط هنا بيظهر بس لو فيه مشكلة (مفيش Zernio أو مقدرش يوصل له)
+  // الحسابات المربوطة بتبان في الإعدادات، فالشريط هنا بيظهر بس لو فيه مشكلة (خدمة النشر مش متوصّلة أو مقدرش يوصل لها)
   alert.hidden = info.service === "mock" || (info.service === "zernio" && !info.accounts_error);
   alert.className = "alert " + (info.service === "zernio" && !info.accounts_error ? "info" : "warn");
   if (!info.service) {
-    alert.innerHTML = `⚠️ لسه مفيش ربط بـ Zernio. تقدر تجدول البوستات عادي، وأول ما تحط مفتاح Zernio من <a href="#" data-goto="settings">⚙️ الإعدادات</a> البرنامج هيبعتهم لوحده.`;
+    alert.innerHTML = `⚠️ خدمة النشر لسه مش متوصّلة. تقدر تجدول البوستات عادي، وأول ما تتوصّل البرنامج هيبعتهم لوحده.`;
   } else if (info.accounts_error) {
     alert.textContent = `⚠️ ${info.accounts_error}`;
   }
   renderAccounts();
   renderPlatformBoxes();
+  connectReturn();
   loadHandles();
   await Promise.all([pubLoadExports(), pubLoadPosts()]);
   if (pub.service === "zernio") loadRemoteOrphans();
@@ -152,6 +154,7 @@ const PLAT_SVG = {
   snapchat: "M12 4c2.8 0 4.5 2 4.5 4.6v2.2l1.8-.4c.5.5.3 1.1-.5 1.4l-1.4.5c.6 1.6 1.8 2.8 3.3 3.2-.4.8-1.6 1.1-2.8 1.2l-.4 1.1c-1.2-.2-2.3-.1-3.2.6-.8.6-1.6.6-2.4 0-.9-.7-2-.8-3.2-.6l-.4-1.1c-1.2-.1-2.4-.4-2.8-1.2 1.5-.4 2.7-1.6 3.3-3.2l-1.4-.5c-.8-.3-1-.9-.5-1.4l1.8.4V8.6C7.5 6 9.2 4 12 4z",
   googlebusiness: "M4 9.5 5.5 5h13L20 9.5 M4 9.5a2.7 2.7 0 0 0 5.3 0 2.7 2.7 0 0 0 5.4 0 2.7 2.7 0 0 0 5.3 0 M5.5 12v7h13v-7 M10 19v-4h4v4",
   telegram: "M4 11.5 19.5 5l-2.7 13.5-5-3.8-2.6 2.5.4-4 7.2-6.2-9 5.3z",
+  whatsapp: "M4.5 19.5l1.2-3.6A7.8 7.8 0 1 1 8.4 18.5z M9.2 8.8c.3 2.4 2 4.3 4.6 5l1.1-1.2 1.7.8c-.2 1.1-1 1.6-2 1.6-3 0-5.9-2.9-5.9-5.9 0-1 .5-1.8 1.6-2l.8 1.7z",
 };
 // اللوجوهات الحقيقية للمنصات (Simple Icons، CC0) جوه مربع بلون المنصة
 const PLAT_LOGO = {
@@ -205,20 +208,111 @@ function renderAccounts() {
       </div>`;
     }).join("")}</div>
     <div class="pa-more"><small class="muted">${pub.list.length ? "اربط منصة تانية:" : "اربط أول حساب:"}</small>
-      ${plats.filter(([k]) => !pub.list.some((a) => a.platform === k)).map(([k, label]) => `<button type="button" class="pa-chip" data-paadd="${k}">
-        ${pLogo(k, "sm")}＋ ${escapeHtml(label)}</button>`).join("")}</div>`;
+      ${plats.filter(([k]) => !pub.list.some((a) => a.platform === k)).map(([k, label]) => pub.soon[k]
+        ? `<span class="pa-chip soon" title="${escapeHtml(pub.soon[k])}">${pLogo(k, "sm")}${escapeHtml(label)} <em>قريبًا</em></span>`
+        : `<button type="button" class="pa-chip" data-paadd="${k}">${pLogo(k, "sm")}＋ ${escapeHtml(label)}${pub.noPost.includes(k) ? ` <em>للرسايل</em>` : ""}</button>`).join("")}</div>`;
+}
+
+// ---------- 🔗 الربط كله من جوه البرنامج ----------
+// مربع بسيط بنفس شكل مربعات البرنامج، بيرجّع العنصر وفانكشن تقفله
+function paModal(html) {
+  const back = document.createElement("div");
+  back.className = "ui-dlg pa-dlg";
+  back.innerHTML = `<div class="ui-dlg-box" dir="rtl">${html}</div>`;
+  const close = () => { back.remove(); document.removeEventListener("keydown", key, true); };
+  const key = (e) => { if (e.key === "Escape") close(); };
+  document.addEventListener("keydown", key, true);
+  back.addEventListener("mousedown", (e) => { if (e.target === back) close(); });
+  back.addEventListener("click", (e) => { if (e.target.closest("[data-pa-close]")) close(); });
+  document.body.appendChild(back);
+  return { el: back, close };
+}
+const paRefresh = (info) => { pub.list = info.account_list || []; pub.accounts = info.accounts || {}; renderAccounts(); renderPlatformBoxes(); };
+// المنصات اللي من غير تسجيل دخول: فورم عندنا
+const PA_FORMS = {
+  bluesky: { t: "اربط بلوسكاي", fields: [["identifier", "اسم الحساب أو الإيميل", "you.bsky.social", "ltr"], ["password", "باسورد التطبيق (App Password)", "xxxx-xxxx-xxxx-xxxx", "ltr"]],
+    help: "من بلوسكاي: Settings ← Privacy and security ← App passwords ← Add App Password. انسخ الباسورد اللي بيطلع وحطه هنا (مش باسورد حسابك العادي).", url: "/api/publisher/connect/bluesky" },
+  whatsapp: { t: "اربط واتساب بيزنس", fields: [["token", "Access Token (دايم، من System User)", "EAAG…", "ltr"], ["waba", "WhatsApp Business Account ID", "1234567890", "ltr"],
+      ["phone", "Phone Number ID", "1098765432", "ltr"], ["pin", "PIN التحقق بخطوتين (لو مفعّله)", "6 أرقام", "ltr"]],
+    help: `واتساب هنا للرسايل والرد على العملاء (الإنبوكس والرسايل الجماعية بقوالب متوافق عليها)، مش لنشر الفيديوهات.
+محتاج: <b>WhatsApp Business Platform (Cloud API)</b> من Meta، مش تطبيق واتساب بيزنس العادي على الموبايل.
+<ol><li>من business.facebook.com اعمل أو اختار WhatsApp Business Account، وضيف رقم مش متسجّل على واتساب عادي.</li>
+<li>من Business Settings ← System Users اعمل System User واديله صلاحيات whatsapp_business_management و whatsapp_business_messaging.</li>
+<li>اعمل له Access Token دايم.</li><li>من WhatsApp Manager ← Phone Numbers هتلاقي الـ WABA ID والـ Phone Number ID.</li></ol>`, url: "/api/publisher/connect/whatsapp" },
+};
+async function paForm(k) {
+  if (k === "telegram") return paTelegram();
+  const F = PA_FORMS[k];
+  const m = paModal(`<p class="ui-dlg-msg"><b>${F.t}</b></p><div class="pa-help">${F.help}</div>
+    ${F.fields.map(([n, l, ph, dir]) => `<label class="pa-f"><span>${l}</span><input class="ui-dlg-in" data-paf="${n}" dir="${dir}" placeholder="${escapeHtml(ph)}" ${n === "password" || n === "token" ? 'type="password"' : ""} autocomplete="off"></label>`).join("")}
+    <div class="ui-dlg-acts"><button type="button" class="ui-dlg-ok" data-pa-go>اربط</button><button type="button" class="ui-dlg-no" data-pa-close>إلغاء</button></div>`);
+  m.el.querySelector("input")?.focus();
+  m.el.querySelector("[data-pa-go]").onclick = async (e) => {
+    const body = {};
+    m.el.querySelectorAll("[data-paf]").forEach((i) => (body[i.dataset.paf] = i.value.trim()));
+    e.target.disabled = true; e.target.textContent = "⏳ بيربط…";
+    try { paRefresh(await api(F.url, { method: "POST", ...jsonBody(body) })); m.close(); toast("✅ اتربط"); }
+    catch (err) { toast(err.message, true); e.target.disabled = false; e.target.textContent = "اربط"; }
+  };
+}
+// تيليجرام: كود بنطلّعه، والعميل بيضيف البوت أدمن في القناة ويبعتله الكود، وإحنا بنستنى لحد ما يتربط
+async function paTelegram() {
+  let r;
+  try { r = await api("/api/publisher/connect/telegram", { method: "POST" }); } catch (err) { return toast(err.message, true); }
+  const m = paModal(`<p class="ui-dlg-msg"><b>اربط قناة أو جروب تيليجرام</b></p>
+    <ol class="pa-help"><li>ضيف <b dir="ltr">@${escapeHtml(r.bot || "")}</b> أدمن في القناة أو الجروب.</li>
+      <li>ابعت للبوت الرسالة دي (فيها الكود واسم القناة): <code dir="ltr" class="pa-code">${escapeHtml(r.code || "")} @قناتك</code></li>
+      <li>استنى هنا، أول ما يتربط هيظهر لوحده.</li></ol>
+    <p class="pa-wait">⏳ مستني الربط… <small>(الكود شغال ${Math.round((r.expires_in || 900) / 60)} دقيقة)</small></p>
+    <div class="ui-dlg-acts"><button type="button" class="ui-dlg-no" data-pa-close>اقفل</button></div>`);
+  const tick = async () => {
+    if (!m.el.isConnected) return;
+    try {
+      const st = await api(`/api/publisher/connect/telegram/${encodeURIComponent(r.code)}`);
+      if (st.status === "connected") { m.close(); toast("✅ تيليجرام اتربط"); return paRefresh(await api("/api/publisher")); }
+      if (st.status === "expired") { m.el.querySelector(".pa-wait").textContent = "⌛ الكود خلص. اقفل وابدأ تاني."; return; }
+    } catch { /* بيحاول تاني */ }
+    setTimeout(tick, 3000);
+  };
+  setTimeout(tick, 3000);
+}
+// رجع من تسجيل الدخول على المنصة: لو محتاج يختار صفحة/منظمة/مكان/بورد بنعرضله القايمة هنا
+async function connectReturn() {
+  const q = new URLSearchParams(location.search);
+  if (!q.has("step") && !q.has("connected") && !q.has("error")) return;
+  const params = Object.fromEntries(q.entries());
+  history.replaceState(null, "", location.pathname + location.hash);   // اللينك مايفضلش فيه بيانات الربط
+  if (params.error) return toast(`⚠️ الربط ماكملش: ${params.error_message || params.error}`, true);
+  if (params.connected) { toast("✅ الحساب اتربط"); return paRefresh(await api("/api/publisher")); }
+  let r;
+  try { r = await api("/api/publisher/connect/pending", { method: "POST", ...jsonBody({ params }) }); } catch (err) { return toast(err.message, true); }
+  const WHAT = { facebook: "الصفحة", instagram: "حساب إنستجرام", linkedin: "الحساب", googlebusiness: "المكان", pinterest: "البورد" };
+  const opts = [...(r.personal ? [{ id: "personal", name: "حسابي الشخصي", sub: "تنشر باسمك انت" }] : []), ...r.options];
+  const m = paModal(`<p class="ui-dlg-msg"><b>اختار ${WHAT[r.platform] || ""} اللي هتنشر عليه في ${escapeHtml(r.label)}</b></p>
+    <div class="pa-opts">${opts.map((o) => `<button type="button" class="pa-opt" data-paopt="${escapeHtml(o.id)}">${o.img ? `<img src="${escapeHtml(o.img)}" alt="" referrerpolicy="no-referrer">` : `<i>${escapeHtml((o.name || "?").slice(0, 1))}</i>`}
+      <span><b dir="auto">${escapeHtml(o.name)}</b>${o.sub ? `<small dir="auto">${escapeHtml(o.sub)}</small>` : ""}</span></button>`).join("") || `<p class="muted">مفيش حاجة تتختار. اتأكد إنك مدير على الصفحة أو المكان، وابدأ الربط تاني.</p>`}</div>
+    <div class="ui-dlg-acts"><button type="button" class="ui-dlg-no" data-pa-close>إلغاء</button></div>`);
+  m.el.addEventListener("click", async (e) => {
+    const b = e.target.closest("[data-paopt]");
+    if (!b) return;
+    m.el.querySelectorAll("[data-paopt]").forEach((x) => (x.disabled = true));
+    b.classList.add("on");
+    try { paRefresh(await api("/api/publisher/connect/select", { method: "POST", ...jsonBody({ sid: r.sid, choice: b.dataset.paopt }) })); m.close(); toast("✅ اتربط"); }
+    catch (err) { toast(err.message, true); m.close(); }
+  });
 }
 document.addEventListener("click", async (e) => {
   const add = e.target.closest("[data-paadd]"), del = e.target.closest("[data-padel]");
   if (!add && !del) return;
-  if (pub.service === "mock") return toast("ده وضع تجريبي: الربط الحقيقي بيشتغل لما تحط مفتاح Zernio", true);
+  if (pub.service === "mock" && !(add && ["bluesky", "telegram", "whatsapp"].includes(add.dataset.paadd))) return toast("ده وضع تجريبي: الربط الحقيقي بيشتغل لما خدمة النشر تتوصّل", true);
   try {
     if (add) {
-      const r = await api("/api/publisher/connect", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ platform: add.dataset.paadd }) });
-      if (r.dashboard) toast("المنصة دي بتتربط من لوحة Zernio (باسورد تطبيق أو بوت)، وبعدها ارجع هنا");
-      window.open(r.url, "_blank", "noopener");
-      // لما العميل يرجع للصفحة بعد الربط، الحسابات بتتحدث لوحدها
-      pub.waitLink = true;
+      const k = add.dataset.paadd;
+      if (pub.creds.includes(k)) return paForm(k);
+      const r = await api("/api/publisher/connect", { method: "POST", ...jsonBody({ platform: k }) });
+      if (r.form) return paForm(r.form);
+      // تسجيل الدخول على المنصة نفسها في نفس الصفحة، وبعدها بيرجع هنا على طول (ولو محتاج يختار صفحة بيختار عندنا)
+      location.assign(r.url);
     } else if ((await uiConfirm(`تفصل حساب «${del.dataset.paname}»؟ البوستات المتجدولة عليه مش هتنزل.`))) {
       const info = await api(`/api/publisher/accounts/${encodeURIComponent(del.dataset.padel)}`, { method: "DELETE" });
       pub.list = info.account_list || [];
@@ -244,7 +338,7 @@ function renderPlatformBoxes() {
   if (keep.length) saved = keep;
   // مع Zernio: مربع لكل حساب مربوط (ممكن أكتر من حساب على نفس المنصة) · من غير Zernio: مربع لكل منصة
   if (pub.list?.length) {
-    $("postPlatforms").innerHTML = pub.list.map((a) => {
+    $("postPlatforms").innerHTML = pub.list.filter((a) => !(pub.noPost || []).includes(a.platform)).map((a) => {
       const v = `${a.platform}@${a.id}`, on = saved.includes(v) || saved.includes(a.platform) && pub.accounts[a.platform]?.id === a.id;
       const many = pub.list.filter((x) => x.platform === a.platform).length > 1;
       return `<label title="${escapeHtml(pub.platforms[a.platform] || a.platform)} · ${escapeHtml(a.name || a.username)}" class="plat acc">
@@ -258,7 +352,7 @@ function renderPlatformBoxes() {
   $("postPlatforms").innerHTML = Object.entries(pub.platforms)
     .map(([k, label]) => {
       const off = needLink && !pub.accounts[k];
-      return `<label title="${off ? "الحساب ده مش مربوط في Zernio" : escapeHtml(label)}" class="plat ${off ? "off" : ""}">
+      return `<label title="${off ? "الحساب ده مش مربوط" : escapeHtml(label)}" class="plat ${off ? "off" : ""}">
         <input type="checkbox" value="${k}" ${saved.includes(k) && !off ? "checked" : ""} ${off ? "disabled" : ""}>
         ${pLogo(k)}<span>${label}</span></label>`;
     })
@@ -515,13 +609,13 @@ function renderPosts() {
   $("postsList").innerHTML = list
     .map((p) => {
       let [label, cls] = POST_STATUS[p.status] || [p.status, ""];
-      if (p.status === "scheduled" && p.sent) label = "متجدول في Zernio ✓";
+      if (p.status === "scheduled" && p.sent) label = "متجدول للنشر ✓";
       const when = new Date(p.scheduled_at).toLocaleString(UI_LOCALE(), { weekday: "long", day: "numeric", month: "long", hour: "numeric", minute: "2-digit" });
       return `<li data-id="${p.id}" class="${p.status === "failed" ? "failed" : ""}">
         ${p.image_url ? `<img class="post-thumb" src="${p.image_url}" alt="">` : p.export_url ? lightVideo(p.export_url, "muted") : ""}
         <div class="info">
           <span class="when">${when}</span>
-          <span>${escapeHtml(p.export_name || (p.from_zernio ? "🔗 من Zernio" : "⚠️ الفيديو اتمسح"))} · ${p.platforms.map(tLabel).join("، ")}</span>
+          <span>${escapeHtml(p.export_name || (p.from_zernio ? "🔗 من حساباتك" : "⚠️ الفيديو اتمسح"))} · ${p.platforms.map(tLabel).join("، ")}</span>
           ${p.caption ? `<span class="cap" title="${escapeHtml(p.caption)}">${escapeHtml(p.caption)}</span>` : ""}
           ${p.options?.ig_tags?.length ? `<span class="tags" dir="ltr">🏷️ ${p.options.ig_tags.map((t) => `@${escapeHtml(t)}`).join(" ")}${p.options.ig_collab ? " · 🤝" : ""}</span>` : ""}
           ${p.error ? `<span class="err">${escapeHtml(p.error)}</span>` : ""}
@@ -602,16 +696,16 @@ async function loadRemoteOrphans(verbose = false) {
   try {
     const list = await api("/api/posts/remote");
     box.hidden = !list.length;
-    if (verbose && !list.length) toast("✅ كل البوستات اللي على Zernio موجودة هنا");
+    if (verbose && !list.length) toast("✅ كل البوستات المتجدولة موجودة هنا");
     const when = (iso) => (iso ? new Date(iso).toLocaleString(UI_LOCALE(), { weekday: "long", day: "numeric", month: "long", hour: "numeric", minute: "2-digit" }) : "");
-    box.innerHTML = list.length ? `<p class="orphans-title">⚠️ فيه ${list.length} بوست متجدول على Zernio ومش في القايمة هنا</p>` + list.map((o) => `
+    box.innerHTML = list.length ? `<p class="orphans-title">⚠️ فيه ${list.length} بوست متجدول على حساباتك ومش في القايمة هنا</p>` + list.map((o) => `
       <div class="orphan" data-rid="${escapeHtml(o.id)}">
         ${o.media_url ? lightVideo(escapeHtml(o.media_url), "muted") : ""}
         <div class="info"><span class="when">${when(o.scheduled_for)}</span>
           <span>${o.platforms.map(tLabel).join("، ")}</span>
           ${o.content ? `<span class="cap">${escapeHtml(o.content)}</span>` : ""}</div>
         <span class="acts"><button class="btn sm" data-oact="adopt">＋ ضيفه للقايمة</button>
-          <button class="btn sm danger" data-oact="cancel">✕ الغيه من Zernio</button></span>
+          <button class="btn sm danger" data-oact="cancel">✕ الغيه</button></span>
       </div>`).join("") : "";
   } catch (err) {
     if (verbose) toast(err.message, true);
@@ -627,9 +721,9 @@ $("remoteOrphans").addEventListener("click", async (e) => {
       await api("/api/posts/adopt", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ remote_id: rid }) });
       toast("✅ البوست اتضاف للقايمة");
     } else {
-      if (!(await uiConfirm("تلغي البوست ده من Zernio؟ مش هيتنشر."))) return;
+      if (!(await uiConfirm("تلغي البوست ده؟ مش هيتنشر."))) return;
       await api(`/api/posts/remote/${encodeURIComponent(rid)}/cancel`, { method: "POST" });
-      toast("✅ اتلغى من Zernio");
+      toast("✅ اتلغى");
     }
     await pubLoadPosts();
     await loadRemoteOrphans();

@@ -10,6 +10,7 @@
 """
 
 import mimetypes
+import json
 import os
 import time
 import uuid
@@ -35,9 +36,21 @@ PLATFORMS = {
     "snapchat": ("snapchat", "سناب شات"),
     "googlebusiness": ("googlebusiness", "جوجل بيزنس"),
     "telegram": ("telegram", "تيليجرام"),
+    "whatsapp": ("whatsapp", "واتساب بيزنس"),
 }
-# دول بيتربطوا بطريقة غير تسجيل الدخول (باسورد تطبيق / بوت)، فبيتربطوا من لوحة Zernio نفسها
-DASHBOARD_ONLY = {"bluesky", "telegram"}
+# كل الربط بيحصل من جوه البرنامج: تسجيل الدخول على المنصة نفسها، وبعدها اختيار الصفحة/البورد/المكان عندنا (headless).
+# دول بيتربطوا من غير تسجيل دخول: بلوسكاي (باسورد تطبيق)، تيليجرام (كود للبوت)، واتساب بيزنس (بيانات Meta)
+CREDENTIALS = {"bluesky", "telegram", "whatsapp"}
+SOON = {"snapchat": "سناب شات لسه في تجربة مقفولة عند المنصة، هيتفتح قريب"}
+NOT_FOR_POSTS = {"whatsapp"}   # واتساب للرسايل والرد على العملاء (الإنبوكس والبرودكاست)، مش لنشر الفيديوهات
+# اختيار بعد تسجيل الدخول: الخطوة ← (المنصة، مسار القايمة، مسار الاختيار، اسم القايمة في الرد)
+SELECT_STEPS = {
+    "facebook": ("select-page", "select-page", "pages"),
+    "instagram": ("select-account", "select-account", "pages"),
+    "linkedin": ("organizations", "select-organization", "organizations"),
+    "googlebusiness": ("locations", "select-location", "locations"),
+    "pinterest": ("select-board", "select-board", "boards"),
+}
 
 
 def split_target(t: str) -> tuple[str, str | None]:
@@ -196,7 +209,7 @@ def resolve_targets(targets: list[str]) -> list[tuple[str, str]]:
             else:
                 missing.append(PLATFORMS.get(p, (p, p))[1])
     if missing:
-        raise PublishError(f"الحسابات دي مش مربوطة في Zernio: {'، '.join(missing)}. اربطها من صفحة النشر")
+        raise PublishError(f"الحسابات دي مش مربوطة: {'، '.join(missing)}. اربطها من صفحة النشر")
     return list(dict.fromkeys(out))
 
 
@@ -217,18 +230,174 @@ def default_profile() -> str:
 
 
 def connect_url(platform: str, redirect_url: str) -> str:
-    """لينك تسجيل الدخول على المنصة؛ بعد ما العميل يوافق Zernio بيرجّعه للبرنامج (ولو محتاج يختار صفحة/بورد بيختار عند Zernio)."""
-    if platform not in PLATFORMS:
+    """لينك تسجيل الدخول على المنصة نفسها. بعد الموافقة بيرجع للبرنامج على طول (headless)،
+    ولو المنصة محتاجة تختار صفحة أو بورد أو مكان، الاختيار بيحصل عندنا (pending_options / pending_select)."""
+    if platform not in PLATFORMS or platform in CREDENTIALS:
         raise PublishError("منصة مش معروفة")
+    if platform in SOON:
+        raise PublishError(SOON[platform])
     with _client(30) as c:
         data = _check(c.get(f"{BASE_URL}/connect/{PLATFORMS[platform][0]}",
-                            params={"profileId": default_profile(), "redirect_url": redirect_url}), "تجهيز الربط")
+                            params={"profileId": default_profile(), "redirect_url": redirect_url, "headless": "true", "welcome": "false"}), "تجهيز الربط")
     url = data.get("authUrl") or data.get("url") if isinstance(data, dict) else None
     if not url:
         raise PublishError(f"تجهيز الربط: رد غير متوقع: {str(data)[:200]}")
     global _accounts_cache
     _accounts_cache = None
     return url
+
+
+# ---------------------------------------------------------------- 🔗 الاختيار بعد تسجيل الدخول (من غير ما العميل يشوف صفحات Zernio)
+_PENDING: dict[str, dict] = {}
+
+
+def _drop_cache() -> None:
+    global _accounts_cache
+    _accounts_cache = None
+
+
+def _pick(data, key: str) -> list:
+    if isinstance(data, dict):
+        v = data.get(key)
+        if isinstance(v, list):
+            return v
+        for x in data.values():
+            if isinstance(x, list):
+                return x
+    return data if isinstance(data, list) else []
+
+
+def _profile_json(raw: str | None):
+    """userProfile بييجي متشفّر مرتين في اللينك: بنفكّه مرة كمان ونقراه JSON."""
+    from urllib.parse import unquote
+    if not raw:
+        return None
+    v = raw
+    for _ in range(4):   # ممكن ييجي متشفّر (%7B…) أو JSON جوه نص
+        if not isinstance(v, str):
+            return v
+        try:
+            v = json.loads(v)
+        except (TypeError, ValueError):
+            nxt = unquote(v)
+            if nxt == v:
+                return None
+            v = nxt
+    return v if not isinstance(v, str) else None
+
+
+def pending_options(params: dict) -> dict:
+    """رجع من تسجيل الدخول ومحتاج يختار: بنجيب الصفحات/المنظمات/الأماكن/البوردات ونحفظ بيانات الربط عندنا (مش في المتصفح)."""
+    plat = str(params.get("platform") or "")
+    mine_plat = next((k for k, v in PLATFORMS.items() if v[0] == plat), plat)
+    if plat not in SELECT_STEPS:
+        raise PublishError("مفيش اختيار مطلوب للمنصة دي")
+    list_path, _, key = SELECT_STEPS[plat]
+    profile = params.get("profileId") or default_profile()
+    temp, ctoken, pend = params.get("tempToken"), params.get("connect_token"), params.get("pendingDataToken")
+    headers = {"X-Connect-Token": ctoken} if ctoken else {}
+    q = {"profileId": profile}
+    if pend:
+        q["pendingDataToken"] = pend
+    if temp:
+        q["tempToken"] = temp
+    if plat == "linkedin":
+        ids = params.get("orgIds")
+        if not ids and params.get("organizations"):   # بعض الردود بتبعت المنظمات نفسها في اللينك
+            orgs = _profile_json(params["organizations"]) or []
+            ids = ",".join(str(o.get("id")) for o in orgs if isinstance(o, dict) and o.get("id")) if isinstance(orgs, list) else None
+        q = {"tempToken": temp, **({"orgIds": ids} if ids else {})}
+    with _client(30) as c:
+        data = _check(c.get(f"{BASE_URL}/connect/{plat}/{list_path}", params=q, headers=headers), "قايمة الاختيار")
+    items = _pick(data, key)
+    opts = []
+    for x in items:
+        if not isinstance(x, dict):
+            continue
+        if plat == "instagram":
+            ig = x.get("instagram_business_account") or {}
+            opts.append({"id": str(x.get("id")), "name": ig.get("username") and f"@{ig['username']}" or x.get("name"), "sub": x.get("name") or "", "img": ig.get("profile_picture_url")})
+        elif plat == "googlebusiness":
+            opts.append({"id": str(x.get("id")), "name": x.get("name") or "", "sub": x.get("address") or x.get("accountName") or "", "account": x.get("accountId")})
+        elif plat == "linkedin":
+            opts.append({"id": str(x.get("id")), "name": x.get("name") or x.get("vanityName") or str(x.get("id")), "sub": x.get("website") or x.get("industry") or "",
+                         "img": x.get("logoUrl"), "urn": x.get("urn") or f"urn:li:organization:{x.get('id')}", "vanity": x.get("vanityName")})
+        else:
+            opts.append({"id": str(x.get("id")), "name": x.get("name") or x.get("username") or str(x.get("id")), "sub": x.get("category") or x.get("description") or x.get("username") or ""})
+    sid = uuid.uuid4().hex
+    now = time.time()
+    for k in [k for k, v in _PENDING.items() if now - v["at"] > 900]:
+        _PENDING.pop(k, None)
+    _PENDING[sid] = {"at": now, "platform": plat, "profile": profile, "temp": temp, "ctoken": ctoken, "pend": pend,
+                     "user": _profile_json(params.get("userProfile")), "opts": {o["id"]: o for o in opts}}
+    return {"sid": sid, "platform": mine_plat, "label": PLATFORMS.get(mine_plat, (plat, plat))[1], "options": opts,
+            "personal": plat == "linkedin"}
+
+
+def pending_select(sid: str, choice: str, redirect_url: str) -> None:
+    """العميل اختار من القايمة اللي عندنا: بنكمّل الربط."""
+    p = _PENDING.pop(sid, None)
+    if not p or time.time() - p["at"] > 900:
+        raise PublishError("الربط خد وقت طويل وخلص. ابدأه تاني")
+    plat, o = p["platform"], p["opts"].get(choice)
+    if not o and not (plat == "linkedin" and choice == "personal"):
+        raise PublishError("الاختيار ده مش في القايمة")
+    base = {"profileId": p["profile"], "redirect_url": redirect_url}
+    if plat == "facebook":
+        body = {**base, "pageId": choice, "tempToken": p["temp"], "userProfile": p["user"]}
+    elif plat == "instagram":
+        body = {**base, "pageId": choice, "tempToken": p["temp"]}
+    elif plat == "linkedin":
+        body = {**base, "tempToken": p["temp"], "userProfile": p["user"] or {}, "accountType": "personal" if choice == "personal" else "organization"}
+        if choice != "personal":
+            body["selectedOrganization"] = {"id": o["id"], "urn": o["urn"], "name": o["name"], **({"logoUrl": o["img"]} if o.get("img") else {}),
+                                            **({"vanityName": o["vanity"]} if o.get("vanity") else {})}
+    elif plat == "googlebusiness":
+        body = {**base, "locationId": choice, **({"pendingDataToken": p["pend"]} if p["pend"] else {}), **({"accountId": o["account"]} if o.get("account") else {})}
+        if not p["pend"] and p["temp"]:
+            body["tempToken"] = p["temp"]
+    else:   # pinterest
+        body = {**base, "boardId": choice, "boardName": o["name"], "tempToken": p["temp"], **({"userProfile": p["user"]} if p["user"] else {})}
+    headers = {"X-Connect-Token": p["ctoken"]} if p["ctoken"] else {}
+    with _client(30) as c:
+        _check(c.post(f"{BASE_URL}/connect/{plat}/{SELECT_STEPS[plat][1]}", json={k: v for k, v in body.items() if v is not None}, headers=headers), "إكمال الربط")
+    _drop_cache()
+
+
+def connect_bluesky(identifier: str, app_password: str) -> None:
+    profile = default_profile()
+    with _client(30) as c:
+        users = _check(c.get(f"{BASE_URL}/users"), "قراءة الحساب")
+        uid = (users or {}).get("currentUserId") if isinstance(users, dict) else None
+        if not uid:
+            raise PublishError("مقدرتش أعرف رقم الحساب عند خدمة النشر")
+        _check(c.post(f"{BASE_URL}/connect/bluesky/credentials", json={"identifier": identifier.strip(), "appPassword": app_password.strip(),
+                                                                       "state": f"{uid}-{profile}"}), "ربط بلوسكاي")
+    _drop_cache()
+
+
+def telegram_code() -> dict:
+    with _client(30) as c:
+        data = _check(c.get(f"{BASE_URL}/connect/telegram", params={"profileId": default_profile()}), "كود تيليجرام")
+    return {"code": data.get("code"), "bot": data.get("botUsername"), "expires_in": data.get("expiresIn")}
+
+
+def telegram_status(code: str) -> str:
+    with _client(30) as c:
+        data = _check(c.patch(f"{BASE_URL}/connect/telegram", params={"code": code}), "حالة تيليجرام")
+    st = str((data or {}).get("status") or "pending")
+    if st == "connected":
+        _drop_cache()
+    return st
+
+
+def connect_whatsapp(access_token: str, waba_id: str, phone_id: str, pin: str = "") -> None:
+    body = {"profileId": default_profile(), "accessToken": access_token.strip(), "wabaId": waba_id.strip(), "phoneNumberId": phone_id.strip()}
+    if pin.strip():
+        body["pin"] = pin.strip()
+    with _client(60) as c:
+        _check(c.post(f"{BASE_URL}/connect/whatsapp/credentials", json=body), "ربط واتساب")
+    _drop_cache()
 
 
 def disconnect(account_id: str) -> None:
@@ -402,7 +571,7 @@ def list_posts(status: str, limit: int = 100) -> list[dict]:
     if (prof := tenant_profile()):
         params["profileId"] = prof
     with _client(30) as c:
-        data = _check(c.get(f"{BASE_URL}/posts", params=params), "قراءة البوستات من Zernio")
+        data = _check(c.get(f"{BASE_URL}/posts", params=params), "قراءة البوستات ")
     items = data.get("posts", data.get("data", [])) if isinstance(data, dict) else data
     if scoped():   # بس البوستات اللي على حسابات العميل ده
         ids = {a["id"] for a in account_list()}
@@ -477,7 +646,7 @@ def remote_status(remote_id: str) -> tuple[str, str | None]:
 # محتاج إضافة «Inbox» في اشتراك Zernio. الرسايل (DM): إنستجرام، فيسبوك، X وغيرهم، مش تيك توك.
 # قايمة البوستات اللي عليها كومنتات Zernio بيحدّثها كل 10 دقايق بالكتير.
 
-INBOX_ADDON_MSG = "صندوق الردود محتاج إضافة «Inbox» في اشتراك Zernio. فعّلها من لوحة Zernio وارجع هنا"
+INBOX_ADDON_MSG = "صندوق الردود لسه مش متفعّل في الاشتراك. كلّم الدعم يفعّله"
 
 
 def _inbox_check(resp: httpx.Response, what: str):

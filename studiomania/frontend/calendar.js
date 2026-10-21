@@ -69,7 +69,7 @@ function calCard(it, compact) {
   return `<div class="cal-card ${p.status}" data-pid="${p.id}"${drag}>
     ${thumb ? `<img src="${thumb}" alt="" loading="lazy">` : `<div class="cal-noimg">🎬</div>`}
     <div class="cal-meta"><b class="cal-dot ${CAL_DOT[p.status] || ""}"></b><span class="cal-t">${calTime(it.when)}</span>${p.status === "failed" ? `<span class="cal-bad">فشل</span>` : calPlatIcons(p.platforms)}</div>
-    <span class="cal-n">${escapeHtml(p.export_name || p.caption || (p.from_zernio ? "🔗 من Zernio" : ""))}</span>
+    <span class="cal-n">${escapeHtml(p.export_name || p.caption || (p.from_zernio ? "🔗 من حساباتك" : ""))}</span>
   </div>`;
 }
 
@@ -247,8 +247,8 @@ function calOpenPost(p) {
     <div class="cal-dlg-body">
       ${media ? `<div class="cal-media">${media}</div>` : ""}
       <div class="cal-info">
-        <h3>${escapeHtml(p.export_name || (p.from_zernio ? "🔗 من Zernio" : "⚠️ الفيديو اتمسح"))}</h3>
-        <span class="pill ${cls}">${p.status === "scheduled" && p.sent ? "متجدول في Zernio ✓" : label}</span>
+        <h3>${escapeHtml(p.export_name || (p.from_zernio ? "🔗 من حساباتك" : "⚠️ الفيديو اتمسح"))}</h3>
+        <span class="pill ${cls}">${p.status === "scheduled" && p.sent ? "متجدول للنشر ✓" : label}</span>
         <p class="when">📅 ${calFull(when)}</p>
         <p>${p.platforms.map((k) => `${PLATFORM_ICON[k] || ""} ${escapeHtml(pub.platforms[k] || k)}`).join(" · ")}</p>
         ${o.ig_tags?.length ? `<p dir="ltr" class="muted">🏷️ ${o.ig_tags.map((t) => `@${escapeHtml(t)}`).join(" ")}${o.ig_collab ? " · 🤝" : ""}</p>` : ""}
