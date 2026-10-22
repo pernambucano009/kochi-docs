@@ -111,7 +111,8 @@ const NH = (() => {
   }
 
   // ---------- الرئيسية (نسخة أ): المجسّم في النص، والأقسام مكتوبة على الجنبين، و«ابدأ مشروع جديد» تحت المجسّم ----------
-  const SIDE_R = KOCHI ? ["brand", "assets"] : ["brand", "pilot"], SIDE_L = KOCHI ? ["progress", "publish", "settings"] : ["publish", "settings"];   // RTL: أول عمود على اليمين
+  // RTL: أول عمود على اليمين · النشر تحت على اليمين، والأوتوبايلوت فوق على الشمال (نفس الأماكن بالعربي والإنجليزي)
+  const SIDE_R = KOCHI ? ["brand", "assets"] : ["brand", "publish"], SIDE_L = KOCHI ? ["progress", "publish", "settings"] : ["pilot", "settings"];
   const META = {
     // نفس رقم «العقل فاهمك قد إيه» اللي في العقل (مش رقم تاني)
     brand: () => { const pct = D.brand?.knowledge?.score ?? brainPct(D.brand); return `<span class="nh-mbar"><i style="width:${pct}%"></i></span><span>العقل فاهمك <span class="num">${pct}%</span></span>`; },

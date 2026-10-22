@@ -50,6 +50,10 @@ body.stage-settled #nh { visibility: hidden; }
 /* الرئيسية (نسخة أ): المجسّم في النص، الأقسام مكتوبة على الجنبين، و«ابدأ مشروع جديد» تحته (RTL: أول عمود على اليمين) */
 .nh-bento { display: grid; grid-template-columns: minmax(230px, 1fr) minmax(0, 2.3fr) minmax(230px, 1fr); grid-template-rows: minmax(0, 1fr) auto auto; gap: 6px var(--nh-gap); min-height: 0;
   grid-template-areas: "r s l" "r c l" "k k k"; }
+/* الأقسام في نفس أماكنها بالعربي والإنجليزي: العمود «r» على اليمين دايمًا (عقل البراند فوق، النشر تحت) */
+[dir="ltr"] .nh-bento { grid-template-areas: "l s r" "l c r" "k k k"; }
+[dir="ltr"] .nh-bento .nh-col-r { align-items: flex-end; }
+[dir="ltr"] .nh-bento .nh-col-l { align-items: flex-start; }
 .nh-col { display: flex; flex-direction: column; justify-content: space-evenly; gap: 6px; min-height: 0; padding-block: 10px; }
 .nh-col-r { grid-area: r; align-items: flex-start; }
 .nh-col-l { grid-area: l; align-items: flex-end; }
@@ -2475,3 +2479,34 @@ body:has(#nhPGrid[data-key="plans"]) #nhCorner { visibility: hidden; }
 #nh .bm-leaf.hot .bm-lab, #nh .bm-leaf.on .bm-lab { opacity: 0; }
 #nh .bm-leaf.go > i { background: var(--card, #fff); border: 1.5px solid #BDB5AC; }
 :root[data-nh-theme="dark"] #nh .bm-leaf.go > i { background: #121212; border-color: #5A5550; }
+
+/* ✨ كل زرار برتقاني بينوّر: لمعة من فوق، وهالة ناعمة حواليه بتتنفّس بهدوء، ولمعة بتعدّي عليه لما تقف عليه */
+:root { --glow-a: #F48A62; --glow-b: #E5613E; --glow-c: #D44E2C; }
+:root :is(.btn.primary, .nh-cta, .ml-add, .ui-dlg-ok:not(.danger), .cut-tl button.ic.cut, .sfx-item button.add),
+#nh :is(.nb-btn.fs-go, .nh-pj-new, .nh-cr-next, .bm-go, .sc-btn.pri, .ap .ap-acts .ok, .ml-sact .nb-btn.ml-add) {
+  position: relative; isolation: isolate;
+  background: linear-gradient(180deg, var(--glow-a) 0%, var(--glow-b) 55%, var(--glow-c) 100%) !important;
+  border-color: transparent !important; color: #fff !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .38), inset 0 -1px 0 rgba(0, 0, 0, .12),
+    0 0 0 1px rgba(229, 97, 62, .28), 0 8px 22px -6px rgba(229, 97, 62, .65), 0 0 24px rgba(240, 117, 79, .32);
+  animation: btnGlow 3.2s ease-in-out infinite;
+  transition: transform .2s ease, filter .2s ease;
+}
+:root :is(.btn.primary, .nh-cta, .ml-add, .ui-dlg-ok:not(.danger), .cut-tl button.ic.cut, .sfx-item button.add)::after,
+#nh :is(.nb-btn.fs-go, .nh-pj-new, .nh-cr-next, .bm-go, .sc-btn.pri, .ap .ap-acts .ok, .ml-sact .nb-btn.ml-add)::after {
+  content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; border-radius: inherit;
+  background: linear-gradient(105deg, transparent 30%, rgba(255, 255, 255, .45) 48%, transparent 66%) no-repeat;
+  background-size: 220% 100%; background-position: 130% 0; transition: background-position .75s ease;
+}
+:root :is(.btn.primary, .nh-cta, .ml-add, .ui-dlg-ok:not(.danger), .cut-tl button.ic.cut, .sfx-item button.add):hover:not(:disabled),
+#nh :is(.nb-btn.fs-go, .nh-pj-new, .nh-cr-next, .bm-go, .sc-btn.pri, .ap .ap-acts .ok, .ml-sact .nb-btn.ml-add):hover:not(:disabled) { filter: brightness(1.06) saturate(1.05); transform: translateY(-1px); }
+:root :is(.btn.primary, .nh-cta, .ml-add, .ui-dlg-ok:not(.danger), .cut-tl button.ic.cut, .sfx-item button.add):hover::after,
+#nh :is(.nb-btn.fs-go, .nh-pj-new, .nh-cr-next, .bm-go, .sc-btn.pri, .ap .ap-acts .ok, .ml-sact .nb-btn.ml-add):hover::after { background-position: -30% 0; }
+:root :is(.btn.primary, .nb-btn.fs-go, .ui-dlg-ok):disabled { animation: none; filter: saturate(.6) opacity(.7); }
+@keyframes btnGlow {
+  0%, 100% { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .38), inset 0 -1px 0 rgba(0, 0, 0, .12), 0 0 0 1px rgba(229, 97, 62, .28), 0 8px 22px -6px rgba(229, 97, 62, .65), 0 0 18px rgba(240, 117, 79, .26); }
+  50% { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .42), inset 0 -1px 0 rgba(0, 0, 0, .12), 0 0 0 1px rgba(229, 97, 62, .4), 0 10px 26px -6px rgba(229, 97, 62, .75), 0 0 32px rgba(240, 117, 79, .45); }
+}
+@media (prefers-reduced-motion: reduce) {
+  :root :is(.btn.primary, .nh-cta, .ml-add, .ui-dlg-ok), #nh :is(.nb-btn.fs-go, .nh-pj-new, .nh-cr-next, .bm-go, .sc-btn.pri, .ap .ap-acts .ok) { animation: none; }
+}
