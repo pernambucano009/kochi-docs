@@ -269,8 +269,9 @@ const RivalsPage = (() => {
     const w = S.el;
     if (!w || !S.d) return;
     if (!w.querySelector(".rv-top")) w.innerHTML = `<div class="rv-top"></div><div class="rv-body"></div>`;
-    w.querySelector(".rv-top").innerHTML = S.only ? `<section class="fs-hero"><div class="fs-hero-t"><b>خطة المحتوى</b><span class="latin">CONTENT PLAN</span></div>
-        <p>استراتيجية حسابك كله: بتتبني لوحدها وبتكبر مع كل معلومة العقل بيعرفها عنك، وكل الأفكار والسكريبتات والهوكات بتمشي عليها.</p></section>` : top();
+    w.querySelector(".rv-top").innerHTML = S.only === "plan" ? `<section class="fs-hero"><div class="fs-hero-t"><b>خطة المحتوى</b><span class="latin">CONTENT PLAN</span></div>
+        <p>استراتيجية حسابك كله: بتتبني لوحدها وبتكبر مع كل معلومة العقل بيعرفها عنك، وكل الأفكار والسكريبتات والهوكات بتمشي عليها.</p></section>`
+      : S.only === "audience" ? "" : top();
     if (onlyTop && (S.tab === "plan" || S.tab === "batch")) return;   // ماتمسحش اللي بتكتبه
     const bd = w.querySelector(".rv-body");
     bd.innerHTML = body();
@@ -403,8 +404,9 @@ const RivalsPage = (() => {
     w.innerHTML = "";
     const f = String(window.RV_FOCUS || "");
     window.RV_FOCUS = null;
-    S.only = f === "plan-only";   // 🧭 من نقطة «خطة المحتوى» في العقل: صفحة الخطة لوحدها
-    S.tab = S.only ? "plan" : TABS.some(([k]) => `rv:${k}` === f) ? f.slice(3) : "rivals";
+    // 🧭 من نقطة «خطة المحتوى» في العقل: صفحة الخطة لوحدها · 🎯 من «النشر»: وصفة الاستهداف لوحدها
+    S.only = f === "plan-only" || root.dataset.key === "plan" ? "plan" : root.dataset.key === "audience" ? "audience" : null;
+    S.tab = S.only || (TABS.some(([k]) => `rv:${k}` === f) ? f.slice(3) : "rivals");
     S.pl.d = null;   // عدّاد الخطة بيتجاب من جديد كل مرة
     S.mo = { d: null, busy: "", per: 0, edit: null };
     S.focus = /^rv[^:]/.test(f) ? f.slice(2) : null;

@@ -50,7 +50,12 @@ const NH = (() => {
     dubhub: { en: "Translate & Dub", ar: "الترجمة والدبلجة", icon: "globe", go: "13", desc: "أي فيديو بلغة أو لهجة تانية: ترجمة الكلام، صوت جديد، وتظبيط البُق." },
     settings: { en: "Settings", ar: "الإعدادات", icon: "gear", go: "settings", desc: "المفاتيح والرصيد والعملاء." },
     progress: { en: "In Progress", ar: "شغّال عليه", icon: "pulse", page: "progress", desc: "كل خط مشروع، وكل نقطة خطوة. دوس على أي خط يكمّل من مكان ما وقفت." },
-    publish: { en: "Publish", ar: "النشر", icon: "send", go: "7", desc: "الحسابات المربوطة والجدولة واللي اتنشر." },
+    publish: KOCHI ? { en: "Publish", ar: "النشر", icon: "send", go: "7", desc: "الحسابات المربوطة والجدولة واللي اتنشر." }
+      : { en: "Publish", ar: "النشر", icon: "send", page: "publish", desc: "انشر وجدول، والكومنتات والرسايل، وإعلاناتك ووصفة الاستهداف، وحملات واتساب." },
+    // 📤 جوه «النشر»: كل اللي بيوصّل المحتوى للناس (الإعلانات والاستهداف والواتساب اتنقلوا هنا من العقل)
+    pubpost: { en: "Post & Schedule", ar: "انشر وجدول", icon: "send", go: "7", desc: "الحسابات المربوطة، والفيديوهات الجاهزة، والجدولة واللي اتنشر." },
+    inbox: { en: "Comments & DMs", ar: "الكومنتات والرسايل", icon: "mic", go: "15", desc: "رد على الكومنتات والرسايل من مكان واحد." },
+    audience: { en: "Targeting Recipe", ar: "وصفة الاستهداف", icon: "users", page: "audience", desc: "مين الجمهور اللي هيشتري، والاستهداف الجاهز لميتا وجوجل وتيك توك." },
     // جوه «اعمل جديد»: كل نوع بيفتح القسم اللي بيعمله النهارده
     reel: { en: "Reel", ar: "شورت / ريل من قالب", icon: "phone", go: "14", desc: "اختار ستايل، اكتب فكرتك، والقالب بيكمّل: سكريبت ← صوت ← مشاهد." },
     raw: { en: "From Footage", ar: "فيديو من تصويرك", icon: "cut", go: "0", desc: "المشروع ← التقطيع ← التوليد ← المونتاج ← النشر." },
@@ -87,7 +92,7 @@ const NH = (() => {
     return c?.logo ? `<img src="${esc(c.logo)}" alt="">` : esc((c?.name || "B").trim().slice(0, 1).toUpperCase());
   };
   const GLKEY = { create: "app", brand: "brand", assets: "assets", dubhub: "voices", settings: "settings", progress: "progress", publish: "publish", reel: "reel", raw: "film",
-    series: "series", carousel: "carousel", ad: "publish", typo: "create", dub: "voices", edit: "film", coaches: "characters", voice: "voices", music: "music", pilot: "autopilot" };
+    series: "series", carousel: "carousel", ad: "publish", typo: "create", dub: "voices", edit: "film", coaches: "characters", voice: "voices", music: "music", pilot: "autopilot", pubpost: "publish" };
   const iconOf = (k) => (k === "brand" ? `<div class="nh-plate">${brandMark()}</div>` : gi(k));
   const head = (id) => `<div class="nh-head"><div class="nh-name"><span class="latin">${T[id].en}</span><b>${T[id].ar}</b></div>${GLKEY[id] ? `<span class="gi nh-glt">${glImg(GLKEY[id])}</span>` : iconOf(T[id].icon)}</div>`;
   const dots = (n, at) => `<div class="nh-dots">${Array.from({ length: n }, (_, i) => `<i class="${i < at ? "done" : i === at ? "now" : ""}"></i>`).join("")}</div>`;
@@ -455,6 +460,8 @@ const NH = (() => {
     assets: () => panel(4, 6, `${head("coaches")}<div class="nh-body">${D.coaches.length} شخصية</div><div class="nh-avs">${D.coaches.slice(0, 12).map((c) => `<img src="${esc(c.image_url)}" alt="">`).join("")}</div>`, `data-id="coaches" tabindex="0" role="button"`)
       + panel(4, 6, `${head("voice")}<div class="nh-body">${D.voices} تسجيل</div>`, `data-id="voice" tabindex="0" role="button"`)
       + panel(4, 6, `${head("music")}<div class="nh-body">${D.music} تراك</div>`, `data-id="music" tabindex="0" role="button"`),
+    publish: () => [["pubpost", 4, META.publish()], ["inbox", 4], ["adsmgr", 4], ["audience", 6], ["wacamp", 6]]
+      .map(([id, c, m]) => panel(c, 3, `${head(id)}<div class="nh-body">${m || esc(T[id].desc)}</div>`, `data-id="${id}" tabindex="0" role="button"`)).join(""),
     progress: () => KOCHI ? panel(12, 6, `${head("progress")}<div class="nh-lines" style="align-content:start">${D.work.map(lineHTML).join("") || `<div class="nh-empty">مفيش مشاريع لسه.</div>`}</div>`) : projectsBoard(),
   };
   // شغّال عليه (من البروتوتايب): دوّر، وفلتر بالحالة، وكل مشروع كارت بأيقونة قسمه وحالته
@@ -506,7 +513,7 @@ const NH = (() => {
     pjFilter();
   });
   // صفحات كاملة بتنزل لتحت (عقل البراند، مكتبة الموشن): كل واحدة ليها موديول بيرسمها
-  const MODS = { brand: BrandPage, motion: MotionPage, coaches: CharactersPage, voice: VoicesPage, music: MusicPage, viral: ViralPage, ref2p: Ref2PromptPage, rivals: RivalsPage, plan: RivalsPage, adsmgr: AdsMgrPage, wacamp: WaCampPage, plans: PlansPage, comics: ComicsPage, brainlib: BrainLibPage, auto: AutoPage, pilot: PilotPage };
+  const MODS = { brand: BrandPage, motion: MotionPage, coaches: CharactersPage, voice: VoicesPage, music: MusicPage, viral: ViralPage, ref2p: Ref2PromptPage, rivals: RivalsPage, plan: RivalsPage, audience: RivalsPage, adsmgr: AdsMgrPage, wacamp: WaCampPage, plans: PlansPage, comics: ComicsPage, brainlib: BrainLibPage, auto: AutoPage, pilot: PilotPage };
   const stopMedia = () => { MotionPage.close(); VoicesPage.close(); MusicPage.close(); CharactersPage.close?.(); Ref2PromptPage.close(); RivalsPage.close(); ComicsPage.close(); BrainLibPage.close(); AutoPage.close(); };
   let pageArg = null, pStack = [];
   // عنوان الصفحة (من البروتوتايب): الأيقونة الزجاج كبيرة، وفوق الاسم اسم القسم بالإنجليزي بالبرتقالي
@@ -800,6 +807,16 @@ const NH = (() => {
       const go = () => {
         if (zoom?.page) return pGrid.dataset.key === "plans" ? null : swapPage("plans");
         openPage(btn, "plans");
+      };
+      if (!$("stage").hidden) { closeStage(); setTimeout(go, 1100); } else go();
+    },
+    // 📤 صفحة «النشر» من أي مكان (ولو فيه صفحة جوّاها: إعلاناتك/الاستهداف/الواتساب بتتفتح بعدها)
+    openPublish(sub) {
+      const go = () => {
+        if (zoom?.page) { if (pGrid.dataset.key !== "publish") swapPage("publish"); if (sub) setTimeout(() => swapPage(sub), 500); return; }
+        const tile = bento.querySelector('.nh-tile[data-id="publish"]');
+        if (tile) openPage(tile, "publish");
+        if (sub) setTimeout(() => window.NHNav?.(sub), 1500);
       };
       if (!$("stage").hidden) { closeStage(); setTimeout(go, 1100); } else go();
     },

@@ -270,6 +270,6 @@ const AdsMgrPage = (() => {
     } catch (err) { w.innerHTML = `<div class="nh-empty">${esc(err.message)}</div>`; }
   }
   // راجع من تسجيل الدخول على منصة الإعلانات: افتح العقل وبعدين إعلاناتك
-  if (BACK) window.addEventListener("load", () => setTimeout(() => { if (typeof NH !== "undefined" && NH) { NH.openBrand(); setTimeout(() => window.NHNav?.("adsmgr"), 1500); } }, 1200));
+  if (BACK) window.addEventListener("load", () => setTimeout(() => { if (typeof NH !== "undefined" && NH) { NH.openPublish("adsmgr"); } }, 1200));
   return { html, mount, close: () => {} };
 })();
