@@ -8,12 +8,12 @@ const Gallery = (() => {
   const EXTRA = [{ id: "phone", name: "تصوير بالموبايل", icon: "📱", sample_url: "/gallery/phone.mp4", cover_url: "/gallery/phone.jpg", cat: "ugc",
     desc: "صوّر نفسك بالموبايل وانت بتتكلم: البرنامج يديك ملاحظات للتحسين، ويعمل مونتاج أوتوماتيك بزوايا كاميرا وألوان وتايبوجرافي.", pin: 1 },
     // 🪞 رقم ٢: نفس الكلام للكاميرا بس الأفاتار هو اللي بيقوله · 🧩 رقم ٣: القالب المخصص (خطواتك انت)
-    { id: "avatar", name: "تصوير الفيديو بالأفاتار", icon: "🪞", cat: "ugc", pin: 2,
+    { id: "avatar", name: "تصوير الفيديو بالأفاتار", icon: "🪞", cover_url: "/gallery/avatar.jpg", cat: "ugc", pin: 2,
     desc: "نفس فكرة التصوير بالموبايل، بس من غير ما تصوّر: الأفاتار (من «الأفاتار»: انت أو أي حد معاك إذنه) هو اللي بيقول السكريبت بوشّه وحركته." },
-    { id: "carousel", name: "كاروسيل", icon: "🖼️", cat: "social", pin: 4,
+    { id: "carousel", name: "كاروسيل", icon: "🖼️", cover_url: "/gallery/carousel.jpg", cat: "social", pin: 4,
     desc: "صور ورا بعض على إنستجرام: سلايد هوك يشد، وكل سلايد فكرة واحدة، وآخر سلايد دعوة. بستايل البراند وألوانه." },
     // 🎞️ فيديو إديتور: مونتاج حر فاضي، ترفع فيديوهاتك وتعمل مونتاج بنفسك من غير قالب
-    { id: "editor", name: "فيديو إديتور", icon: "🎞️", cat: "other", pin: 5,
+    { id: "editor", name: "فيديو إديتور", icon: "🎞️", cover_url: "/gallery/editor.jpg", cat: "other", pin: 5,
     desc: "محرر فيديو فاضي: ارفع فيديوهاتك من عندك، وقطّع ورتّب وحط كلام وموسيقى وانتقالات بنفسك، من غير قالب ولا توليد." },
     { id: "custom", name: "قالب مخصص", icon: "🧩", cat: "other", pin: 3,
     desc: "رتّب خطواتك بنفسك (اسحب من المكتبة، قطّع، ولّد، صدّر)، وكل تشغيل بيطلّع فيديو جديد. وبيظهر في الأوتوبايلوت كقالب تختاره." },
@@ -103,17 +103,19 @@ const Gallery = (() => {
   // رول الماوس بيدّي العجلة دفعة فتجري وتهدى بالاحتكاك وتقف على أقرب قالب (فوق العجلة بتجري أكتر من فوق الكروت)، ومعاها تكّة سقاطة.
   // العجلة طبقات على عمق مختلف (حلقات ← أسماء ← طوق ← كورة ← زراير) فلما الماوس يقف عليها بتميل ناحيته والطبقات بتبعد عن بعض.
   const W = { list: [], pos: 0, vel: 0, mode: "snap", target: 0, fric: 1.7, shown: -1, cell: 0, lastTick: 0, G: {}, raf: 0, drag: null, tilt: { x: 0, y: 0, l: 0, tx: 0, ty: 0, tl: 0 } };
-  const VMAX = 42, SNAPV = 1.6, STEP = 7.5 * Math.PI / 180;
+  const VMAX = 42, SNAPV = 1.6;
+  let STEP = 7.5 * Math.PI / 180;   // المسافة بين الأسماء: ثابتة، وعلى قد أطول اسم (سطر أو سطرين)
   const pad = (n) => String(n).padStart(2, "0");
   // 🧪 مولّدات من غير قوالب (gen.js): زراير جوه الكورة الرمادي
   const GENS = [["video", "🎬", "مولد فيديو", "وصف ← فيديو"], ["image", "🖼️", "مولد صور", "وصف ومرجع ← صور"], ["voice", "🎙️", "مولد صوت", "كلام ← صوت"]];
   const gensHTML = (cls) => `<div class="${cls}">${GENS.map(([k, i, b, s]) => `<button type="button" class="nh-wh-gen" data-gen="${k}"><i>${i}</i><span><b>${b}</b><small>${s}</small></span></button>`).join("")}</div>`;
   // 🎡 العجلة الصغيرة جوه الكورة: الأقسام الكبيرة. «المشاريع الأساسية» (القوالب) هي الأساس وعليها دايرة برتقاني.
   // رول الماوس فوق الكورة بيلفّها، واللي تقف عليه بيظهر على اليمين: القوالب، أو صفحة الدبلجة، أو المولّدات.
-  const CATS2 = [["projects", "القوالب", "جاهزة ومخصصة"], ["dub", "الدبلجة والترجمة", "أي فيديو بلغة أو لهجة تانية"], ["video", "توليد فيديو", "بالذكاء الصناعي"], ["scene", "استوديو المشهد", "مسودة 3D ← فيديو حقيقي"],
+  // 🧩 القوالب أول اختيارين في العجلة الداخلية: الجاهزة (العجلة الكبيرة) والمخصصة (قوالب العميل بخطواته)
+  const CATS2 = [["projects", "قوالب جاهزة", "القوالب"], ["custom", "قوالب مخصصة", "بخطواتك انت"], ["dub", "الدبلجة والترجمة", "أي فيديو بلغة أو لهجة تانية"], ["video", "توليد فيديو", "بالذكاء الصناعي"], ["scene", "استوديو المشهد", "مسودة 3D ← فيديو حقيقي"],
     ["image", "توليد صور", "بالذكاء الصناعي"], ["voice", "توليد صوت", "بالذكاء الصناعي"]];
   const C = { pos: 0, vel: 0, target: 0, cur: 0, last: 0, setT: 0 };
-  const catsHTML = (cls) => `<div class="${cls}">${CATS2.map(([k, t, sub], i) => `<button type="button" class="nh-wh-cat${i === 0 ? " main" : ""}" data-cat2="${i}"><b>${t}</b><small>${sub}</small></button>`).join("")}</div>`;
+  const catsHTML = (cls) => `<div class="${cls}">${CATS2.map(([k, t, sub], i) => `<button type="button" class="nh-wh-cat${i < 2 ? " main" : ""}" data-cat2="${i}"><b>${t}</b><small>${sub}</small></button>`).join("")}</div>`;
   // صفحة الدبلجة نفسها (اللي كانت برّه في الرئيسية) بتتنقل جوه الصفحة دي، وبترجع مكانها لما تمشي
   const DUB = { home: null };
   function dubIn(panel) {
@@ -133,8 +135,7 @@ const Gallery = (() => {
     C.cur = k;
     const panel = el.querySelector(".nh-wh-panel");
     el.classList.toggle("panel-on", k > 0);
-    el.classList.toggle("cat-other", k > 0);
-    K.kind = "ready"; el.querySelectorAll("[data-kind]").forEach((b) => b.classList.toggle("on", b.dataset.kind === "ready"));
+
     el.querySelectorAll("[data-cat2]").forEach((b) => b.classList.toggle("on", +b.dataset.cat2 === k));
     dubOut(); Gen.close?.(); SceneStudio.close?.(); panel.innerHTML = "";
     panel.hidden = k === 0;
@@ -142,34 +143,35 @@ const Gallery = (() => {
     const key = CATS2[k][0];
     panel.animate?.([{ opacity: 0, transform: "translateY(10px)" }, { opacity: 1, transform: "none" }], { duration: 280, easing: "cubic-bezier(.2,.8,.2,1)" });
     if (key === "dub") return dubIn(panel);
+    if (key === "custom") return customIn(panel);
     if (key === "scene") return SceneStudio.open(panel);
     Gen.open(key, panel);
   }
-  // 🧩 جوه «القوالب»: تابين، الجاهزة (العجلة) والمخصصة (القوالب اللي العميل عملها بخطواته، وزرار يعمل واحد جديد)
-  const K = { kind: "ready", list: null };
-  async function setKind(kind) {
-    const el = W.el;
-    if (!el || C.cur !== 0) return;
-    K.kind = kind;
-    el.querySelectorAll("[data-kind]").forEach((b) => b.classList.toggle("on", b.dataset.kind === kind));
-    const panel = el.querySelector(".nh-wh-panel");
-    el.classList.toggle("panel-on", kind === "custom");
-    panel.hidden = kind !== "custom";
-    if (kind !== "custom") { panel.innerHTML = ""; return; }
+  // 🧩 القوالب المخصصة: كروت بالقوالب اللي العميل عملها بخطواته، وكارت يعمل واحد جديد
+  async function customIn(panel) {
     panel.innerHTML = `<div class="nh-empty">بيحمّل…</div>`;
-    try { K.list = (await api("/api/automations")).filter((a) => a.saved); } catch (err) { K.list = []; toast(err.message, true); }
-    if (K.kind !== "custom") return;
-    panel.innerHTML = `<div class="nh-ct"><p class="nh-ct-hint">قوالب بخطواتك انت: تسحب من مكتبتك، تقطّع وتولّد وتصدّر، وكل تشغيل بيطلّع فيديو جديد. وبتظهر في الأوتوبايلوت كقالب تختاره.</p>
-      <div class="nh-ct-grid">${K.list.map((a) => `<button type="button" class="nh-ct-card" data-ctopen="${esc(a.id)}"><i>🧩</i><b>${esc(a.name || "قالب مخصص")}</b>
+    let list = [];
+    try { list = (await api("/api/automations")).filter((a) => a.saved); } catch (err) { toast(err.message, true); }
+    if (CATS2[C.cur]?.[0] !== "custom") return;
+    panel.innerHTML = `<div class="nh-ct"><h3 class="nh-ct-h">قوالب مخصصة</h3><p class="nh-ct-hint">قوالب بخطواتك انت: تسحب من مكتبتك، تقطّع وتولّد وتصدّر، وكل تشغيل بيطلّع فيديو جديد. وبتظهر في الأوتوبايلوت كقالب تختاره.</p>
+      <div class="nh-ct-grid">${list.map((a) => `<button type="button" class="nh-ct-card" data-ctopen="${esc(a.id)}"><i>🧩</i><b>${esc(a.name || "قالب مخصص")}</b>
           <small><span class="num">${a.steps}</span> خطوة · اتشغّل <span class="num">${a.runs}</span> مرة</small></button>`).join("")}
         <button type="button" class="nh-ct-card new" data-ctnew><i>＋</i><b>قالب مخصص جديد</b><small>رتّب خطواتك بنفسك</small></button></div></div>`;
-    panel.animate?.([{ opacity: 0, transform: "translateY(10px)" }, { opacity: 1, transform: "none" }], { duration: 280, easing: "cubic-bezier(.2,.8,.2,1)" });
   }
   function catGo(i) { C.target = Math.max(0, Math.min(CATS2.length - 1, i)); }
   function card(x, k) {
-    const vid = x.sample_url ? `<video muted loop playsinline preload="none" ${x.cover_url ? `poster="${esc(x.cover_url)}"` : ""} data-src="${esc(x.sample_url)}"></video>` : `<span class="nh-gal-ph"><i>${x.icon || "✦"}</i><small>فيديو العرض جاي قريب</small></span>`;
-    return `<article class="nh-wc${x.sample_url ? "" : " soon"}" tabindex="0" data-wi="${k}" aria-label="${esc(x.name)}">
+    const vid = x.sample_url ? `<video muted loop playsinline preload="none" ${x.cover_url ? `poster="${esc(x.cover_url)}"` : ""} data-src="${esc(x.sample_url)}"></video>`
+      : x.cover_url ? `<img src="${esc(x.cover_url)}" alt="" loading="lazy">` : `<span class="nh-gal-ph"><i>${x.icon || "✦"}</i><small>فيديو العرض جاي قريب</small></span>`;
+    return `<article class="nh-wc${x.sample_url || x.cover_url ? "" : " soon"}" tabindex="0" data-wi="${k}" aria-label="${esc(x.name)}">
       <div class="nh-wc-h"><b>${esc(x.name)}</b><i>${k + 1}</i></div><div class="nh-wc-art">${vid}</div></article>`;
+  }
+  // اسم أكتر من كلمة بيتكتب على سطرين (متقسّم بالنص على قد الكلمات)
+  function labLines(name) {
+    const w = String(name || "").split(/\s+/).filter(Boolean);
+    if (w.length < 2) return esc(name);
+    let best = 1, diff = 1e9;
+    for (let k = 1; k < w.length; k++) { const d = Math.abs(w.slice(0, k).join(" ").length - w.slice(k).join(" ").length); if (d < diff) { diff = d; best = k; } }
+    return `${esc(w.slice(0, best).join(" "))}<br>${esc(w.slice(best).join(" "))}`;
   }
   function render() {
     const list = S.items.map((x, i) => [x, i]);
@@ -181,7 +183,7 @@ const Gallery = (() => {
     box.innerHTML = `<div class="nh-wh" dir="ltr">
       <div class="nh-wh-wheel"><div class="nh-wh-3d">
         <svg class="nh-wh-l nh-wh-back" aria-hidden="true"></svg>
-        <div class="nh-wh-l nh-wh-labs" aria-hidden="true">${list.map(([x]) => `<span>${esc(x.name)}</span>`).join("")}</div>
+        <div class="nh-wh-l nh-wh-labs" aria-hidden="true">${list.map(([x]) => `<span>${labLines(x.name)}</span>`).join("")}</div>
         <svg class="nh-wh-l nh-wh-ring" aria-hidden="true"></svg>
         <svg class="nh-wh-l nh-wh-ball" aria-hidden="true"></svg>
         <i class="nh-wh-l nh-wh-ptr" aria-hidden="true"></i>
@@ -195,7 +197,6 @@ const Gallery = (() => {
         <div class="nh-wh-foot"><span><kbd>رول الماوس</kbd> فوق العجلة بيجري أسرع</span><span><kbd>↑</kbd> <kbd>↓</kbd> قالب قالب</span></div>
       </section>
       <div class="nh-wh-cards"><div class="nh-wh-track">${list.map(([x], k) => card(x, k)).join("")}</div></div>
-      <div class="nh-wh-kind" dir="rtl" role="tablist"><button type="button" data-kind="ready" class="on">قوالب جاهزة</button><button type="button" data-kind="custom">قوالب مخصصة</button></div>
       <section class="nh-wh-panel" dir="rtl" hidden></section>
       <aside class="nh-wh-side"><span class="nh-wh-dots" aria-hidden="true">${"<i></i>".repeat(12)}</span>
         <button type="button" class="nh-wh-snd" aria-pressed="${sndOn}" title="صوت العجلة"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 5 6 9H3v6h3l5 4V5z"/><path d="M16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12"/></svg><span>${sndOn ? "الصوت شغال" : "شغّل الصوت"}</span></button></aside>
@@ -248,6 +249,11 @@ const Gallery = (() => {
       cats: [...el.querySelectorAll(".nh-wh-cats .nh-wh-cat")], rg1: el.querySelector(".rg1"), rg2: el.querySelector(".rg2") };
     // مقاسات الأسماء (من غير التحويلات) علشان نعرف كل اسم واخد قد إيه من الخطوط
     W.G.labs.forEach((x) => { x._w = x.offsetWidth; x._h = x.offsetHeight; });
+    // المسافة الثابتة على قد أطول اسم، والطوق اللي برّه بيبعد لحد ما يبقى بعد آخر الكلام (مايقطعهوش)
+    const lw = Math.max(0, ...W.G.labs.map((x) => x._w)), lh = Math.max(14, ...W.G.labs.map((x) => x._h));
+    STEP = Math.max(7.5 * Math.PI / 180, (lh * 1.12 + 12) / (R * .8));
+    W.G.rOut = Math.max(R * .985, R * .8 + lw * 1.12 + 16);
+    if (!mobile) el.querySelector(".nh-wh-info").style.paddingLeft = Math.round(Math.max(cx + R * .8 + 210, cx + W.G.rOut + R * .06 + 40)) + "px";
     W.G.cats.forEach((x) => { x._w = x.offsetWidth; x._h = x.offsetHeight; });
     W.G.cards.forEach((c, i) => {
       const col = cols === 1 ? 0 : i % 2, row = cols === 1 ? i : Math.floor(i / 2);
@@ -262,8 +268,6 @@ const Gallery = (() => {
   function wheelBind(el) {
     const cards = el.querySelector(".nh-wh-cards");
     el.addEventListener("click", (e) => {
-      const kb = e.target.closest("[data-kind]");
-      if (kb) return setKind(kb.dataset.kind);
       const op = e.target.closest("[data-ctopen]");
       if (op) { storageSet("studiomania.auto", op.dataset.ctopen); return window.NHNav?.("auto"); }
       if (e.target.closest("[data-ctnew]")) {
@@ -280,7 +284,7 @@ const Gallery = (() => {
         if (Math.abs(e.deltaY) > 2 && now - C.last > 170) { C.last = now; catGo(Math.round(C.target) + Math.sign(e.deltaY)); }
         return;
       }
-      if (C.cur > 0 || K.kind === "custom") return;   // صفحة الدبلجة أو المولّد أو القوالب المخصصة مفتوحة: الرول بيسكرول فيها عادي
+      if (C.cur > 0) return;   // صفحة الدبلجة أو المولّد أو القوالب المخصصة مفتوحة: الرول بيسكرول فيها عادي
       e.preventDefault(); if (W.drag) return;
       const d = e.deltaMode === 1 ? e.deltaY * 33 : e.deltaMode === 2 ? e.deltaY * 400 : e.deltaY;
       if (W.mode === "snap" && Math.sign(d) !== Math.sign(W.vel)) W.vel *= .3;   // لو عكست الاتجاه العجلة تفرمل الأول
@@ -402,18 +406,19 @@ const Gallery = (() => {
       return out + (st < to ? seg(st, to) : "");
     };
     const ringD = (r) => { const g = gapsAt(r); return arcD(r, -Math.PI, 0, g) + arcD(r, 0, Math.PI, g); };
-    G.rg1.setAttribute("d", ringD(G.R * 1.03)); G.rg2.setAttribute("d", ringD(G.R * .985));
+    const rIn = G.rOut || G.R * .985, rOut2 = rIn + G.R * .045;
+    G.rg1.setAttribute("d", ringD(rOut2)); G.rg2.setAttribute("d", ringD(rIn));
     // القوس الغامق بيلف مع العجلة، والتكّات على الحلقة والحزوز على الكورة بتعدّي
     const a0 = -0.95 + (pos / Math.max(1, N - 1)) * 1.6;
-    G.arc.setAttribute("d", arcD(G.R * 1.03, a0, a0 + .3, gapsAt(G.R * 1.03)));
-    const fr = ((pos % 1) + 1) % 1, tg0 = gapsAt(G.R * .96);
+    G.arc.setAttribute("d", arcD(rOut2, a0, a0 + .3, gapsAt(rOut2)));
+    const fr = ((pos % 1) + 1) % 1, tg0 = gapsAt((G.rOut || G.R * .985) + G.R * .033);
     let html = "";
-    for (let j = -16; j <= 16; j++) { const a = (j - fr) * STEP, r1 = G.R * .96, r2 = G.R * .935; if (tg0.some(([gs, ge]) => a > gs && a < ge)) continue; html += `<line x1="${G.cx + Math.cos(a) * r1}" y1="${G.cy + Math.sin(a) * r1}" x2="${G.cx + Math.cos(a) * r2}" y2="${G.cy + Math.sin(a) * r2}" stroke="var(--nh-ink)" stroke-opacity="${Math.max(0, .32 - Math.abs(j) * .018).toFixed(3)}" stroke-width="1.2"/>`; }
+    for (let j = -16; j <= 16; j++) { const a = (j - fr) * STEP, r1 = (G.rOut || G.R * .985) + G.R * .033, r2 = (G.rOut || G.R * .985) + G.R * .01; if (tg0.some(([gs, ge]) => a > gs && a < ge)) continue; html += `<line x1="${G.cx + Math.cos(a) * r1}" y1="${G.cy + Math.sin(a) * r1}" x2="${G.cx + Math.cos(a) * r2}" y2="${G.cy + Math.sin(a) * r2}" stroke="var(--nh-ink)" stroke-opacity="${Math.max(0, .32 - Math.abs(j) * .018).toFixed(3)}" stroke-width="1.2"/>`; }
     G.ticks.innerHTML = html;
     // العجلة الصغيرة: سبرنج ناعم للقسم، وكل اسم آخره لازق في حزوز الكورة من جوه
     C.vel += ((C.target - C.pos) * 120 - C.vel * 18) * dt; C.pos += C.vel * dt;
     if (Math.abs(C.target - C.pos) < .001 && Math.abs(C.vel) < .01) { C.pos = C.target; C.vel = 0; }
-    const ci = Math.round(C.pos), rowH = Math.max(58, G.rs * .27), boxes = [];
+    const ci = Math.round(C.pos), rowH = Math.max(66, G.rs * .31), boxes = [];
     G.cats.forEach((b, i) => {
       const t = i - C.pos, d = Math.abs(t), dy = t * rowH, sc = 1 - Math.min(.22, d * .1), op = Math.max(0, 1 - d * .28);
       const chord = Math.sqrt(Math.max(0, G.rs * G.rs - dy * dy)), w = (b._w || 0) * sc, h = (b._h || 0) * sc;
@@ -525,7 +530,7 @@ const Gallery = (() => {
     const pv = pvEl();
     pv.innerHTML = `<div class="nh-gal-pvbox">
       <button type="button" class="nh-gal-x" data-gclose aria-label="اقفل">✕</button>
-      <div class="nh-gal-pvart">${x.sample_url ? `<video src="${esc(x.sample_url)}" ${x.cover_url ? `poster="${esc(x.cover_url)}"` : ""} autoplay loop playsinline controls></video>` : `<span class="nh-gal-ph big"><i>${x.icon || "✦"}</i><small>فيديو العرض جاي قريب</small></span>`}</div>
+      <div class="nh-gal-pvart">${x.sample_url ? `<video src="${esc(x.sample_url)}" ${x.cover_url ? `poster="${esc(x.cover_url)}"` : ""} autoplay loop playsinline controls></video>` : x.cover_url ? `<img src="${esc(x.cover_url)}" alt="">` : `<span class="nh-gal-ph big"><i>${x.icon || "✦"}</i><small>فيديو العرض جاي قريب</small></span>`}</div>
       <div class="nh-gal-pvt"><span class="latin">${esc(CAT_EN[x.cat] || x.cat)}</span><b>${esc(x.name)}</b>
         <p>${esc(x.desc || x.description || "")}</p><small class="muted">${esc(catName(x.cat))}</small>
         <button type="button" class="nh-gal-go" data-gstart>${x.id === "editor" ? "🎞️ افتح الإديتور" : "✨ ابدأ بالقالب ده"}</button>
