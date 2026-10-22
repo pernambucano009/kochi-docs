@@ -23,7 +23,11 @@ echo "== 2) الدخول: افتح اللينك اللي هيظهر، وادخل
 railway whoami >/dev/null 2>&1 || railway login --browserless
 
 echo "== 3) اختار المشروع والخدمة اللي فيها البرنامج (بالأسهم وEnter)"
-railway link
+railway status >/dev/null 2>&1 || railway link
+
+# الدخول على Railway بالـ ssh محتاج مفتاح على السيرفر ده (بيتعمل مرة واحدة، ولو Railway سأل يضيفه اختار Yes)
+[ -f "$HOME/.ssh/id_ed25519" ] || { mkdir -p "$HOME/.ssh"; ssh-keygen -q -t ed25519 -N "" -f "$HOME/.ssh/id_ed25519" -C "simsimkit-oracle"; }
+railway ssh keys add 2>/dev/null || true
 
 echo "== 4) بيسحب البيانات (ممكن ياخد وقت على حسب حجم الفيديوهات)"
 # سكريبت صغير بيشتغل جوه Railway: نسخة سليمة من كل قاعدة بيانات + كل الملفات ← tar.gz ← base64 بين علامتين
@@ -71,7 +75,7 @@ out.write("-----SIMSIM-END-----\n"); out.flush()
 EOF
 )
 B64=$(printf '%s' "$PY" | base64 -w0)
-railway ssh -- sh -c "echo $B64 | base64 -d | python3 -" > raw.txt
+railway ssh -- sh -c "echo $B64 | base64 -d | python3 -" > raw.txt || true
 sed -n '/-----SIMSIM-BEGIN-----/,/-----SIMSIM-END-----/p' raw.txt | sed '1d;$d' | tr -d '\r' | base64 -d > data.tgz
 grep -q -- "-----SIMSIM-END-----" raw.txt || { echo "⚠️ النقل ماكملش، شغّل الأمر تاني"; exit 1; }
 gzip -t data.tgz && tar tzf data.tgz >/dev/null
